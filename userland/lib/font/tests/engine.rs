@@ -600,59 +600,73 @@ fn real_fonts_ascent_and_slot_fit() {
     e.attach_arena(arena(ARENA_BYTES_SHELL), n_cell, n16, N32).unwrap();
     e.open(disk(root.join("Inconsolata-Regular.ttf")), disk(jf)).unwrap();
     assert!(e.begin());
+    // Ink is measured on the raster before the cell clip (F-15 (c)): an engine
+    // without an arena draws every glyph uncached from its scratch.
+    let mut plain: Box<Engine<Disk>> = Box::new(Engine::new());
+    plain.open(disk(root.join("Inconsolata-Regular.ttf")), disk(PathBuf::from(std::env::var("OS32_FONT_SHINONOME").unwrap()))).unwrap();
+    assert!(plain.begin());
     let below = CELL_H_PX as i16 - ASCENT_LATIN_PX;
     let ascii = measure(&mut e, 0x21..0x7f, Cell::Half, FaceId::Latin, 8);
+    let ascii_raw = measure(&mut plain, 0x21..0x7f, Cell::Half, FaceId::Latin, 8);
     println!("Inconsolata ASCII: {ascii:?}");
     assert_eq!(ascii.glyphs, 94);
-    assert!(ascii.top <= ASCENT_LATIN_PX, "ASCII top {} rows > ascent", ascii.top);
+    assert!(ascii_raw.top <= ASCENT_LATIN_PX, "ASCII top {} rows > ascent", ascii_raw.top);
     // 'j' etc. reach 3 rows below: ascent 13 is the only per-face baseline without a cut.
-    assert_eq!(ascii.below, below, "ASCII rows below the baseline");
+    assert_eq!(ascii_raw.below, below, "ASCII rows below the baseline");
     let latin1 = measure(&mut e, 0xa1..0x100, Cell::Half, FaceId::Latin, 8);
     let mut cut = Vec::new();
     for cp in 0xa1..0x100u32 {
         let mut g = Glyph::default();
-        if e.resolve(cp, Cell::Half, Px16, &mut g) == Resolved::Bitmap {
-            if let Some((top, under)) = ink(&g, e.bitmap(&g)) {
+        if plain.resolve(cp, Cell::Half, Px16, &mut g) == Resolved::Bitmap {
+            if let Some((top, under)) = ink(&g, plain.bitmap(&g)) {
                 if top > ASCENT_LATIN_PX || under > below {
                     cut.push(format!("U+{cp:04X}"));
                 }
             }
         }
-        e.release();
+        plain.release();
     }
     println!("Inconsolata Latin-1: {latin1:?}; outside the 8x16 cell vertically: {} {cut:?}", cut.len());
     // Measured 2026-10-20: the control box of c-cedilla (yMin -3.15) has a 4th row
     // below, but its coverage stays under the threshold, so no Latin-1 ink leaves
     // the 8x16 cell with ascent 13 (A-ring 12.72 / E-acute 12.66 included).
     assert!(cut.is_empty(), "Latin-1 ink outside the cell: {cut:?}");
-    assert_eq!(latin1.bbox_below, below + 1, "control box of the c-cedilla group");
+    // The c-cedilla group's control box has a 4th (inkless) row below: clipped
+    // into the cell (F-15 (c)), so the cached box ends at the cell bottom.
+    assert_eq!(latin1.bbox_below, below, "cell form after the clip");
     let jis = measure(&mut e, 0x20..0x10000, Cell::Full, FaceId::Ja, 16);
     println!("Shinonome (Full, ja face): {jis:?}");
     assert!(jis.glyphs > 6000, "corpus size");
     assert_eq!(jis.top, ASCENT_JA_PX, "Shinonome rows above the baseline");
     assert_eq!(jis.below, CELL_H_PX as i16 - ASCENT_JA_PX, "Shinonome rows below the baseline");
     assert_eq!((jis.over_left, jis.over_right), (0, 0), "Shinonome stays in its 16px cell");
-    // F-15: Inconsolata ASCII + Latin-1/Extended (the half range) bitmaps that
-    // leave the 8x16 cell take a Big16 slot (N16 of them) instead of a cell.
-    let mut over_cell = Vec::new();
+    // F-15 (c): every Inconsolata ASCII + Latin-1/Extended (the half range)
+    // bitmap goes to a cell, clipped to it, and draws the same pixels as the
+    // unclipped raster (an engine without an arena) drawn in the 8x16 cell.
+    e.invalidate_all().unwrap();
+    let (mut over_cell, mut clipped) = (Vec::new(), 0usize);
     for cp in (0x20..0x7f).chain(LATIN_HALF_FIRST..=LATIN_HALF_LAST) {
-        let mut g = Glyph::default();
-        if e.resolve(cp, Cell::Half, Px16, &mut g) == Resolved::Bitmap {
-            let x = g.entry;
-            if !(x.left == 0 && x.top == g.ascent && x.width == 8 && x.height == 16) {
-                over_cell.push(format!("U+{cp:04X}"));
-            }
-        }
+        let (mut g, mut u) = (Glyph::default(), Glyph::default());
+        let r = e.resolve(cp, Cell::Half, Px16, &mut g);
+        let cached_rows = cell_rows(&g, e.bitmap(&g), 8);
         e.release();
+        let ru = plain.resolve(cp, Cell::Half, Px16, &mut u);
+        let plain_rows = cell_rows(&u, plain.bitmap(&u), 8);
+        plain.release();
+        assert_eq!(r, ru, "U+{cp:04X}");
+        if r != Resolved::Bitmap {
+            continue;
+        }
+        let x = g.entry;
+        if !(g.cached && x.left == 0 && x.top == g.ascent && x.width == 8 && x.height == 16) {
+            over_cell.push(format!("U+{cp:04X}"));
+        }
+        let ux = u.entry;
+        clipped += usize::from(!(ux.left >= 0 && ux.left + ux.width as i16 <= 8 && u.ascent - ux.top >= 0 && u.ascent - ux.top + ux.height as i16 <= 16));
+        assert_eq!(cached_rows, plain_rows, "U+{cp:04X}: clipped cell == unclipped drawing");
     }
-    let latin1_over = over_cell.iter().filter(|u| u.as_str() < "U+0100").count();
-    println!("Inconsolata half range outside the cell: {} (Latin-1 {latin1_over}) {over_cell:?}", over_cell.len());
-    // Measured 2026-10-20 (F2): 44 of the half range leave the cell by their
-    // bitmap box (Latin-1: U+00B8, U+00C7, U+00E7; the rest Latin Extended-A/B
-    // with ogonek/cedilla/comma below or a tall accent), 17 of them with ink
-    // outside it. The design bound N16/2 (16) is not met: the PM decides (F2
-    // report). Pinned to the measurement so a regression shows.
-    assert!(latin1_over <= 3 && over_cell.len() <= 44, "{} glyphs leave the cell", over_cell.len());
+    println!("Inconsolata half range: {clipped} clipped into the cell, outside a cell: {} {over_cell:?}", over_cell.len());
+    assert!(over_cell.is_empty(), "{over_cell:?}");
     // Standard font set corpus (Shinonome, Inconsolata ASCII/Latin-1): no glyph
     // exceeds its slot. Inconsolata's own box drawing/blocks (reached only as the
     // fallback for codepoints Shinonome lacks) are 23 rows: uncached, counted.

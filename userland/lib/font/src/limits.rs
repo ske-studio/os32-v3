@@ -53,9 +53,11 @@ pub const QUAD_FLATNESS_SQ: f32 = 4.0;
 // TASK_FONTPERF F2 packed cell class (fontperf design §3). One owner arena of
 // fixed slots in three classes, in this order:
 //  - Cell: CELL_SLOT_BYTES = an 8 B header + the 16-row cell bitmap (Full 16x16
-//    pitch 2, Half 8x16 pitch 1 in the first 16 B). 16px keys whose bitmap fits
-//    the cell at the face's ascent, and 16px Space/Kcg/Missing (0 B).
-//  - Big16: SLOT16_BYTES = SLOT_HDR_BYTES + 20x21; 16px bitmaps that leave the cell.
+//    pitch 2, Half 8x16 pitch 1 in the first 16 B). 16px bitmaps of a face with
+//    an ascent, clipped to the cell (the drawing contract drops the rest; F-15
+//    (c)), and 16px Space/Kcg/Missing (0 B).
+//  - Big16: SLOT16_BYTES = SLOT_HDR_BYTES + 20x21; 16px bitmaps without a cell
+//    position (no face ascent), or every 16px key in a layout without cells.
 //  - Big32: SLOT32_BYTES = SLOT_HDR_BYTES + 36x37; every 32px key (N32 = 0: uncached).
 // The big slot rectangle is the standard face's measured maximum plus margin
 // (re-measure in a5 when the face changes). A glyph that does not fit is drawn uncached.

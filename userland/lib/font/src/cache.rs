@@ -1,9 +1,10 @@
 //! T7b-b3 glyph bitmap cache (glyph cache design §2-§4, b3/b4 design §2-1) with
 //! the TASK_FONTPERF F2 packed cells (fontperf design §3).
 //! One owner-private arena of fixed slots in three classes, slot numbers in this
-//! order: Cell (8 B header + 16-row cell bitmap; 16px keys that fit the cell at
-//! the face's ascent, and 16px Space/Kcg/Missing), Big16 (SLOT_HDR_BYTES header +
-//! 20x21; 16px bitmaps that leave the cell) and Big32 (every 32px key). Bitmaps
+//! order: Cell (8 B header + 16-row cell bitmap; 16px bitmaps of a face with an
+//! ascent, clipped to the cell, and 16px Space/Kcg/Missing), Big16
+//! (SLOT_HDR_BYTES header + 20x21; 16px bitmaps without a cell position, or
+//! every 16px key when the layout has no cells) and Big32 (every 32px key). Bitmaps
 //! are 1bpp, MSB left, byte-aligned rows, top to bottom; a Cell keeps the bitmap
 //! in cell coordinates (row 0 = baseline - ascent, column 0 = pen) and answers
 //! `{left 0, top ascent, width cell, height 16}`.
@@ -304,41 +305,53 @@ impl Default for GlyphCache {
     }
 }
 
-/// Bitmap fits the cell of width `cw` when placed at the face's ascent.
-fn fits_cell(e: &Entry, cw: usize) -> bool {
-    if e.kind != Kind::Bitmap {
-        return true;
-    }
-    let Some(asc) = ascent16(e.face) else {
-        return false;
-    };
-    let left = i32::from(e.left);
-    let y0 = i32::from(asc) - i32::from(e.top);
-    left >= 0
-        && left + i32::from(e.width) <= cw as i32
-        && y0 >= 0
-        && y0 + i32::from(e.height) <= CELL_H_PX as i32
+/// A 16px result goes to a cell when it has a cell position: every non-bitmap
+/// kind, and a bitmap of a face with an ascent whose rows fit the row window.
+/// The bitmap is clipped to the cell on commit: the drawing contract already
+/// drops what lies outside the cell (t7bb34 design §3, `cell_from_glyph`), so
+/// the clipped cell draws the same pixels (PM decision F-15 (c), 2026-10-20).
+fn fits_cell(e: &Entry) -> bool {
+    e.kind != Kind::Bitmap || (ascent16(e.face).is_some() && usize::from(e.pitch) <= CELL_ROW_WINDOW_BYTES)
 }
+/// Source row bytes read for the cell window (u64).
+const CELL_ROW_WINDOW_BYTES: usize = 8;
 
-/// Copy a fitting bitmap into cell coordinates (row y0 = ascent - top, shifted
-/// right by `left`; Half uses the first CELL_H_PX bytes).
+/// Copy a bitmap into cell coordinates, clipped to the cell: source pixel
+/// (x, r) lands on column left + x, row ascent - top + r; pixels outside the
+/// cell (and unused bits past the width) are dropped. Half uses the first
+/// CELL_H_PX bytes.
 fn to_cell(e: &Entry, bits: &[u8], cw: usize, out: &mut [u8; CELL_BITMAP_BYTES]) -> Option<()> {
     let asc = ascent16(e.face)?;
     let pitch = usize::from(e.pitch);
     let cell_pitch = cw / 8;
-    let y0 = usize::try_from(i32::from(asc) - i32::from(e.top)).ok()?;
-    let left = u32::try_from(e.left).ok()?;
-    let width = u32::from(e.width).min(16);
-    let mask: u16 = if width == 0 { 0 } else { u16::MAX << (16 - width) };
+    let y0 = i32::from(asc) - i32::from(e.top);
+    let left = i32::from(e.left);
+    let width = u32::from(e.width).min(64);
+    let mask: u64 = if width == 0 { 0 } else { u64::MAX << (64 - width) };
+    let cell_mask: u16 = if cw == CELL_HALF_W { 0xff00 } else { 0xffff };
     for r in 0..usize::from(e.height) {
+        let y = y0 + r as i32;
+        if !(0..CELL_H_PX as i32).contains(&y) {
+            continue;
+        }
         let row = bits.get(r * pitch..r * pitch + pitch)?;
-        let hi = u16::from(row.first().copied().unwrap_or(0));
-        let lo = u16::from(row.get(1).copied().unwrap_or(0));
-        let v = (((hi << 8) | lo) & mask) >> left;
-        let at = (y0 + r) * cell_pitch;
+        let mut v: u64 = 0;
+        for (k, b) in row.iter().enumerate() {
+            v |= u64::from(*b) << (56 - 8 * k as u32);
+        }
+        v &= mask;
+        let placed = if left >= 64 || left <= -64 {
+            0
+        } else if left >= 0 {
+            v >> left
+        } else {
+            v << -left
+        };
+        let cells = ((placed >> 48) as u16) & cell_mask;
+        let at = y as usize * cell_pitch;
         let dst = out.get_mut(at..at + cell_pitch)?;
         for (k, d) in dst.iter_mut().enumerate() {
-            *d = (v >> (8 - 8 * k as u32)) as u8;
+            *d = (cells >> (8 - 8 * k as u32)) as u8;
         }
     }
     Some(())
@@ -663,7 +676,7 @@ impl GlyphCache {
             return Err(Error::Limit);
         }
         let (class, width, height) = match key.px {
-            16 if self.n_cell > 0 && fits_cell(e, cell.width()) => return Ok(ClassId::Cell),
+            16 if self.n_cell > 0 && fits_cell(e) => return Ok(ClassId::Cell),
             16 => (ClassId::Big16, SLOT16_W, SLOT16_H),
             32 => (ClassId::Big32, SLOT32_W, SLOT32_H),
             _ => return Err(Error::Limit),

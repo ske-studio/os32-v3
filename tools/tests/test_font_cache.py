@@ -28,10 +28,13 @@ MUTATIONS = [
     ('slot-width-unchecked', 'src/cache.rs', '&& (usize::from(e.width) > width\n',
      '&& (false\n', 'fit_limits_per_glyph'),
     # F2 (fontperf design §7 ①): cells, clock, G-1.
-    ('fit-always-big', 'src/cache.rs', '16 if self.n_cell > 0 && fits_cell(e, cell.width()) =>',
-     '16 if false && fits_cell(e, cell.width()) =>', 'cell_fit_boundaries'),
-    ('cell-shift-dropped', 'src/cache.rs', 'let v = (((hi << 8) | lo) & mask) >> left;',
-     'let v = ((hi << 8) | lo) & mask;', 'cell_copy_matches_placement'),
+    ('fit-always-big', 'src/cache.rs', '16 if self.n_cell > 0 && fits_cell(e) =>',
+     '16 if false && fits_cell(e) =>', 'cell_fit_boundaries'),
+    # F-15 (c): rows outside the cell are clipped, not refused.
+    ('clip-missing', 'src/cache.rs', '        if !(0..CELL_H_PX as i32).contains(&y) {\n            continue;',
+     '        if !(0..CELL_H_PX as i32).contains(&y) {\n            return None;', 'cell_clip_matches_unclipped_drawing'),
+    ('cell-shift-dropped', 'src/cache.rs', '        } else if left >= 0 {\n            v >> left',
+     '        } else if left >= 0 {\n            v', 'cell_copy_matches_placement'),
     ('clock-ignores-ref', 'src/cache.rs', 'if !m.valid || !m.referenced {',
      'if !m.valid || !m.referenced || slot >= first {', 'clock_second_chance'),
     ('hand-kept-on-invalidate', 'src/cache.rs', '        self.hand = [0; CLASSES];\n        self.stats.invalidate',

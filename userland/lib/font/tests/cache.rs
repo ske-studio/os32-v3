@@ -41,9 +41,9 @@ fn bitmap(face: FaceId, left: i16, top: i16, w: u16, h: u16) -> Entry {
 fn small() -> Entry {
     bitmap(FaceId::Ja, 1, 13, 8, 10)
 }
-/// A 16px glyph that only fits the Big16 slot.
+/// A 16px bitmap without a cell position (no face ascent): the Big16 slot.
 fn wide() -> Entry {
-    bitmap(FaceId::Ja, 1, 13, 20, 21)
+    bitmap(FaceId::None, 1, 13, 20, 21)
 }
 fn pattern(e: &Entry, seed: u8) -> Vec<u8> {
     (0..e.bytes()).map(|i| (i as u8).wrapping_mul(37) ^ seed).collect()
@@ -56,8 +56,9 @@ fn put_big(c: &mut GlyphCache, k: GlyphKey) -> u16 {
     let e = wide();
     c.commit(k, &e, &pattern(&e, k.cp as u8), Cell::Full).unwrap()
 }
-/// Pixel-by-pixel placement of a bitmap in a cell (the drawing contract of
-/// gshell text.rs / libos32gui draw.rs: column `left`, row `ascent - top`).
+/// Pixel-by-pixel placement of an unclipped bitmap in a cell (the drawing
+/// contract of gshell text.rs / libos32gui draw.rs: column `left`, row
+/// `ascent - top`, pixels outside the cell are not drawn).
 fn placed(e: &Entry, bits: &[u8], cw: usize, ascent: i16) -> Vec<u8> {
     let cp = cw / 8;
     let mut out = vec![0u8; cp * CELL_H_PX];
@@ -65,8 +66,11 @@ fn placed(e: &Entry, bits: &[u8], cw: usize, ascent: i16) -> Vec<u8> {
     for r in 0..usize::from(e.height) {
         for x in 0..usize::from(e.width) {
             if bits[r * pitch + x / 8] & (0x80 >> (x % 8)) != 0 {
-                let (px, py) = (e.left as usize + x, (ascent - e.top) as usize + r);
-                out[py * cp + px / 8] |= 0x80 >> (px % 8);
+                let (px, py) = (e.left as i32 + x as i32, (ascent - e.top) as i32 + r as i32);
+                if (0..cw as i32).contains(&px) && (0..CELL_H_PX as i32).contains(&py) {
+                    let (px, py) = (px as usize, py as usize);
+                    out[py * cp + px / 8] |= 0x80 >> (px % 8);
+                }
             }
         }
     }
@@ -129,17 +133,17 @@ fn cell_fit_boundaries() {
     let asc_la = ASCENT_LATIN_PX;
     let cases: [(Entry, Cell, bool, &str); 13] = [
         (bitmap(FaceId::Ja, 0, asc_ja, 16, 16), Cell::Full, true, "full 16x16 at the ascent"),
-        (bitmap(FaceId::Ja, -1, asc_ja, 15, 16), Cell::Full, false, "left = -1"),
-        (bitmap(FaceId::Ja, 1, asc_ja, 16, 10), Cell::Full, false, "left + width = 17"),
+        (bitmap(FaceId::Ja, -1, asc_ja, 15, 16), Cell::Full, true, "left = -1"),
+        (bitmap(FaceId::Ja, 1, asc_ja, 16, 10), Cell::Full, true, "left + width = 17"),
         (bitmap(FaceId::Ja, 1, asc_ja, 15, 10), Cell::Full, true, "left + width = 16"),
-        (bitmap(FaceId::Ja, 0, asc_ja + 1, 8, 4), Cell::Full, false, "above row 0"),
+        (bitmap(FaceId::Ja, 0, asc_ja + 1, 8, 4), Cell::Full, true, "above row 0"),
         (bitmap(FaceId::Ja, 0, asc_ja - 2, 8, 14), Cell::Full, true, "last row is row 15"),
-        (bitmap(FaceId::Ja, 0, asc_ja - 2, 8, 15), Cell::Full, false, "16th row below the cell"),
+        (bitmap(FaceId::Ja, 0, asc_ja - 2, 8, 15), Cell::Full, true, "16th row below the cell"),
         (bitmap(FaceId::Latin, 0, asc_la, 8, 16), Cell::Half, true, "half 8x16"),
-        (bitmap(FaceId::Latin, 1, asc_la, 8, 16), Cell::Half, false, "half 9th column"),
-        (bitmap(FaceId::Latin, 0, asc_la, 9, 16), Cell::Half, false, "half width 9"),
+        (bitmap(FaceId::Latin, 1, asc_la, 8, 16), Cell::Half, true, "half 9th column"),
+        (bitmap(FaceId::Latin, 0, asc_la, 9, 16), Cell::Half, true, "half width 9"),
         (bitmap(FaceId::Latin, 0, asc_la, 8, 16), Cell::Full, true, "latin in a full cell"),
-        (bitmap(FaceId::Latin, 0, asc_la + 1, 8, 4), Cell::Half, false, "latin ascent 13"),
+        (bitmap(FaceId::Latin, 0, asc_la + 1, 8, 4), Cell::Half, true, "latin ascent 13"),
         (bitmap(FaceId::None, 0, asc_ja, 8, 8), Cell::Full, false, "no face, no ascent"),
     ];
     for (i, (e, cell, fits, what)) in cases.iter().enumerate() {
@@ -147,6 +151,7 @@ fn cell_fit_boundaries() {
         assert_eq!((slot as usize) < 32, *fits, "{what}");
         let got = c.lookup(key(i as u32)).unwrap().1;
         if *fits {
+            // Clipped into the cell (F-15 (c)): the cell form.
             let cw = cell.width() as u16;
             let asc = if e.face == FaceId::Latin { asc_la } else { asc_ja };
             assert_eq!(got, Entry { left: 0, top: asc, width: cw, height: 16, pitch: cw / 8, ..*e }, "{what}");
@@ -189,6 +194,33 @@ fn cell_copy_matches_placement() {
         let (hit, got) = c.lookup(key(i as u32)).unwrap();
         assert_eq!((hit, c.entry(slot)), (slot, Some(got)));
         assert_eq!(placed(&got, c.bits(slot).unwrap(), cell.width(), *asc), want, "drawn the same as uncached");
+    }
+}
+
+#[test]
+fn cell_clip_matches_unclipped_drawing() {
+    // F-15 (c): a bitmap that leaves the cell is clipped into it; the clipped
+    // cell draws exactly the pixels the unclipped bitmap draws in the cell.
+    let mut c = cache(16, 0, 0);
+    let cases = [
+        (bitmap(FaceId::Ja, -1, ASCENT_JA_PX, 17, 16), Cell::Full, ASCENT_JA_PX),
+        (bitmap(FaceId::Ja, -3, ASCENT_JA_PX + 2, 20, 21), Cell::Full, ASCENT_JA_PX),
+        (bitmap(FaceId::Ja, 2, 4, 16, 9), Cell::Full, ASCENT_JA_PX),
+        (bitmap(FaceId::Latin, 0, ASCENT_LATIN_PX, 8, 17), Cell::Half, ASCENT_LATIN_PX),
+        (bitmap(FaceId::Latin, 1, 11, 8, 15), Cell::Half, ASCENT_LATIN_PX),
+        (bitmap(FaceId::Latin, -1, ASCENT_LATIN_PX + 1, 10, 18), Cell::Half, ASCENT_LATIN_PX),
+        (bitmap(FaceId::Latin, 2, 0, 5, 4), Cell::Half, ASCENT_LATIN_PX),
+        (bitmap(FaceId::Ja, 0, ASCENT_JA_PX, 40, 40), Cell::Full, ASCENT_JA_PX),
+    ];
+    for (i, (e, cell, asc)) in cases.iter().enumerate() {
+        let bits: Vec<u8> = (0..e.bytes()).map(|b| 0xff ^ (b as u8).wrapping_mul(29)).collect();
+        let slot = c.commit(key(i as u32), e, &bits, *cell).unwrap();
+        assert!((slot as usize) < 16, "case {i}: a cell");
+        let want = placed(e, &bits, cell.width(), *asc);
+        assert!(want.iter().any(|&b| b != 0), "case {i}");
+        assert_eq!(c.bits(slot).unwrap(), &want[..], "case {i}: clipped == unclipped drawing");
+        let got = c.entry(slot).unwrap();
+        assert_eq!(placed(&got, c.bits(slot).unwrap(), cell.width(), *asc), want, "case {i}");
     }
 }
 
@@ -356,12 +388,17 @@ fn fit_limits_per_glyph() {
     use os32_font::reader::Error::Limit;
     let mut c = cache(2, 2, 1);
     for (w, h) in [(21, 10), (8, 22)] {
-        let e = bitmap(FaceId::Ja, 1, 13, w, h);
+        let e = bitmap(FaceId::None, 1, 13, w, h);
         assert_eq!(c.commit(key(1), &e, &pattern(&e, 0), Cell::Full), Err(Limit), "{w}x{h}");
     }
     let e = bitmap(FaceId::Ja, 1, 13, 37, 10);
     assert_eq!(c.commit(GlyphKey { px: 32, ..key(1) }, &e, &pattern(&e, 0), Cell::Full), Err(Limit));
     let bad_pitch = Entry { pitch: 1, ..bitmap(FaceId::Ja, 0, 14, 16, 16) };
+    // A cell-clipped glyph is not limited by the big slot (24 rows here).
+    let tall = bitmap(FaceId::Ja, 1, 18, 8, 24);
+    let s = c.commit(key(2), &tall, &pattern(&tall, 0), Cell::Full).unwrap();
+    assert!(s < 2, "cell");
+    c.invalidate_all();
     assert_eq!(c.commit(key(1), &bad_pitch, &[0; 16], Cell::Full), Err(Limit));
     assert_eq!(c.n_valid(), 0, "rejected glyphs leave no entry");
     // Classes without slots.
