@@ -127,12 +127,12 @@ stack_top-stack_size - stack_top   可変 stack 全量 RW
 
 実行中の libc EXACT 伸長・副 arena・大塊と exec_heap の追加領域は `mem_map` を使う。
 固定初期域と extent の回収を分け、終了後の leftover は0。
-resident shell/gshell は sbrk 上限0x4C5000、exec_heap 192KiB (小さい明示値のみ縮小) を維持する。
-像の上限は `MEM_SHELL_MAX_SIZE` (660KiB) で、像の末尾から sbrk 用に `MEM_SHELL_IMAGE_HEADROOM` (128KiB) を
-必ず残す (`sdk/link/app_sys.ld` の ASSERT と `exec_shell_layout`)。FONTPERF F3b (2026-10-20) で
-exec_heap を 256→192KiB に詰め、像の上限を 596→660KiB に広げた: 字形 cache の arena を gshell の .bss に
-移した後の gshell の exec_heap peak は 131,656 B (NP21/W、filer・edit_gui と FEP 変換・設定・trim の後)、
-gshell 自身の sbrk は 0 B (Rust の割り当ては mem_alloc)・CUI shell の sbrk peak は 1,032 B。
+resident shell/gshell は sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) を維持する。
+像の上限は `MEM_SHELL_MAX_SIZE` (660KiB) で、像の末尾から sbrk 用に `MEM_SHELL_IMAGE_HEADROOM` (64KiB) を
+必ず残す (`sdk/link/app_sys.ld` の ASSERT と `exec_shell_layout`)。FONTPERF F3b (2026-10-20) で余裕を
+128→64KiB に下げ、像の上限を 596→660KiB に広げた: sbrk の実測 peak は gshell 0 B (Rust の割り当ては
+mem_alloc)・CUI shell 1,032 B (NP21/W、filer・edit_gui と FEP 変換・設定・trim の後)。実行時の境界
+(sbrk 上限 = exec_heap の起点) は変えないので、配置の世代は上げない。gshell の exec_heap peak は 131,656 B。
 `mem` の `実測: Shell band sbrk上限` は CPL0 の常駐 shell だけに出る実際の上限値。
 `実測: ... resident heap total / used` は常駐 exec_heap の総量 / 使用量 (B) であり、
 定数の予約帯や USER の AS 側使用量とは別。表示の詳細は [mem.1](manpages/mem.1) を参照。

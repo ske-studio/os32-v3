@@ -122,7 +122,7 @@ def resident_link_contract():
             r = subprocess.run([str(cross / 'i386-elf-ld'), '-m', 'elf_i386', '-T', str(out / 'app_sys.ld'),
                                 str(tmp / 'image.o'), '-o', str(tmp / 'image.elf')], capture_output=True, text=True)
             assert (r.returncode == 0) == (extra == 0), r.stderr
-            if extra: assert '128KiB' in r.stderr, r.stderr
+            if extra: assert '64KiB sbrk' in r.stderr, r.stderr
     print('PASS resident ELF/header selection, mismatched load refusal, link headroom')
 
 

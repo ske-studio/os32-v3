@@ -234,8 +234,8 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_FIXED_PAGING_FRAME_END 0x3FB000UL
 #define MEM_FIXED_PAGING_FRAME_PAGES 26UL
 #define MEM_FIXED_PAGING_SPARE_PAGES 15UL
-#define MEM_SHELL_IMAGE_HEADROOM 0x020000UL
-#define MEM_SHELL_EXEC_HEAP_SIZE 0x030000UL
+#define MEM_SHELL_IMAGE_HEADROOM 0x010000UL
+#define MEM_SHELL_EXEC_HEAP_SIZE 0x040000UL
 #define MEM_SHELL_HEAP_ALIGN 4UL
 #define MEM_LAYOUT_LOAD_END MEM_FIXED_PAGING_GUARD_BASE
 #define MEM_FIXED_PAGING_USED_END MEM_FIXED_PAGING_END
@@ -269,11 +269,12 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 
 /* ====================================================================== */
 /*  シェル常駐帯域 (0x400000-0x4FFFFF, 1MiB)                                */
-/*  image + sbrk は 0x4C5000 まで。画像末尾から 128KiB 以上を確保する。     */
-/*  exec_heap: 0x4C5000-0x4F4FFF (192KiB)、guard: 0x4F5000、stack: 0x4F6000-。*/
-/*  FONTPERF F3b (2026-10-20): 字形 cache の arena を .bss に移した後の     */
-/*  gshell の exec_heap peak は 131,656 B (NP21/W、GUI の普通の操作) なので */
-/*  exec_heap を 256→192KiB に詰め、像の上限 MAX_SIZE を 596→660KiB に広げた。*/
+/*  image + sbrk は 0x4B5000 まで。画像末尾から 64KiB 以上を確保する。      */
+/*  exec_heap: 0x4B5000-0x4F4FFF、guard: 0x4F5000、stack: 0x4F6000-。       */
+/*  FONTPERF F3b (2026-10-20): sbrk の余裕 IMAGE_HEADROOM を 128→64KiB に   */
+/*  下げ、像の上限 MAX_SIZE を 596→660KiB に広げた。sbrk の実測 peak は      */
+/*  gshell 0 B (Rust は mem_alloc)・CUI shell 1,032 B。実行時の境界         */
+/*  (HEAP_BASE = sbrk 上限・exec_heap) は変えないので配置の世代は据え置き。 */
 /*                                                                          */
 /*  sbrk ヒープと exec_heap は **必ず別領域** にすること。かつて両方が BSS   */
 /*  終端から始まっていたため、newlib の stdio バッファと mem_alloc のブロック */
@@ -285,9 +286,9 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_SHELL_GUARD 0x4F5000UL
 #define MEM_SHELL_STACK_TOP 0x500000UL
 #define MEM_SHELL_STACK_SIZE  0x00A000UL  /* シェルスタックサイズ (40KB) */
-#define MEM_SHELL_HEAP_BASE 0x4C5000UL
+#define MEM_SHELL_HEAP_BASE 0x4B5000UL
 #define MEM_SHELL_HEAP_END MEM_SHELL_GUARD
-#define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 192KiB */
+#define MEM_SHELL_HEAP_SIZE   (MEM_SHELL_HEAP_END - MEM_SHELL_HEAP_BASE) /* 256KiB */
 /* T2a′: 画像外の固定 PD 1 + boot PT 8 + device PT 1 + 最上位 MMIO PT 1 (恒久予約)。 */
 #define MEM_FIXED_PAGING_BASE 0x3E1000UL
 #define MEM_FIXED_BOOT_PT_COUNT 8

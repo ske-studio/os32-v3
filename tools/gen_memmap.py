@@ -309,7 +309,7 @@ def bands(m, sym):
 
     shell_guard = v("MEM_SHELL_GUARD")
     add(SHELL, "シェル .text/.data/.bss + newlib sbrk", v("MEM_SHELL_LOAD_ADDR"),
-        v("MEM_SHELL_HEAP_BASE") - 1, "RW", "画像の後に sbrk 余裕128KiB以上")
+        v("MEM_SHELL_HEAP_BASE") - 1, "RW", "画像の後に sbrk 余裕64KiB以上")
     add(SHELL, "シェルスタックガード", shell_guard,
         (shell_guard + PAGE - 1) if shell_guard else None, "NP")
     stack_top = v("MEM_SHELL_STACK_TOP")
