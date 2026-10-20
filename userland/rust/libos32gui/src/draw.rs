@@ -6,7 +6,7 @@
 //!   (libos32gfx) を通す。8bpp (`GFX_FMT_PACKED8`) だけは契約どおり C1 の CPU 実装で
 //!   線形バッファへ直接書く分岐を用意する (v1.1 前半は PLANAR4 のみ動けばよい)。
 //! - **クリップは自分で守る**: サーフェス外へは 1 ピクセルも出さない。矩形は交差で、
-//!   線は 1 ピクセルごとにクリップ判定で、文字はグリフセル単位 (ANK は画素単位) で守る。
+//!   線は 1 ピクセルごとにクリップ判定で、文字は画素単位 (さらに cell の外は描かない) で守る。
 //! - ステートレス: 呼び出しごとに `Style` を受ける。DC 相当の選択状態は持たない。
 use crate::clip::{self, Target};
 use crate::ffi;
@@ -16,8 +16,11 @@ use os32api::gui::proto::{
     GUI_STYLE_DITHER50, GUI_STYLE_DOTTED, GUI_STYLE_TRANSPARENT_BG, GUI_STYLE_XOR,
 };
 use os32api::gui::types::{Rect, ScreenInfo, Stats, Style, SurfaceId, GFX_FMT_PACKED8};
+use crate::font::AppEngine;
+use os32_font::engine::{Cell as FontCell, Glyph, Resolved};
+use os32_font::raster::PixelSize;
 
-const CELL_H: i32 = 16; /* KCG セル高 (scale1) */
+const CELL_H: i32 = os32_font::limits::CELL_H_PX as i32; /* セル高 (scale1、font crate の正典) */
 const ANK_W: i32 = 8; /* 半角セル幅 */
 const KANJI_W: i32 = 16; /* 全角セル幅 */
 
@@ -509,8 +512,29 @@ pub fn blit(surface: SurfaceId, dx: i32, dy: i32, bitmap: SurfaceId, src_rect: R
 }
 
 /* ================================================================ */
-/*  文字 (UTF-8 → KCG)                                              */
+/*  文字 (UTF-8 → 字形 engine の 1bpp mask、欠字・失敗は KCG)       */
 /* ================================================================ */
+//
+// T7b-b4 S5 (設計 t7bb34 §2-2・§3-1): 全字を同じ mask 経路で描く。
+// - 幅は `decode_glyph` の規則のまま (ASCII = 8px、多バイト = 16px、不正バイトは 8px)。
+// - 経路: ASCII 0x20..=0x7E のうち **0x5C (¥) 以外**は TTF (`Cell::Half`)、多バイトは
+//   TTF (`Cell::Full`)。0x5C・制御字・不正バイトは ROM の ANK (従来どおり
+//   `kcg_read_ank(byte)`)。engine が使えない・欠字・raster 失敗は KCG
+//   (ASCII は `kcg_read_ank(byte)`、多バイトは `unicode_to_ank` → `kcg_read_ank`、
+//   0 なら `unicode_to_jis` (0 なら 0x2222) → `kcg_read_kanji`)。
+// - TTF の字は `cell.y + ascent - top` から (face ごとの baseline)、KCG は cell の
+//   先頭行から。**cell 矩形 (8|16 × 16) の外の画素は描かない**、その上で Painter の
+//   clip で画素単位に切る (全角もオフスクリーンも同じ)。
+// - engine は text() 1 回につき `begin` (face ごとの検証 1 回) 〜 `end`。cache に無い字
+//   だけ `fp_scope` の中で raster する。bitmap の借用は 1 字の間 (`release`)。
+
+/// ROM の ¥ (ANK 0x5C)。Inconsolata の `\` は描かない (設計 P3-4)。
+const ANK_YEN: u8 = 0x5C;
+/// JIS に無い字の代わり (□、gfx_kcg.c と同じ)。
+const JIS_FALLBACK: u16 = 0x2222;
+
+/// 1 cell の 1bpp (行ごと u16、MSB = cell の左端、半角は上位 8 bit だけ)。
+pub(crate) type CellRows = [u16; CELL_H as usize];
 
 /// 1 コードポイントを取り出す。戻り: (バイト長, ASCII か, セル幅px)。末尾で不完全なら len=0。
 fn decode_glyph(bytes: &[u8]) -> (usize, bool, i32) {
@@ -531,19 +555,168 @@ fn decode_glyph(bytes: &[u8]) -> (usize, bool, i32) {
     }
 }
 
-/// UTF-8 文字列を `(x,y)` から KCG で描く (契約 G2)。半角 8px / 全角 16px。
-/// クリップはグリフセル単位 (ANK かつ `TRANSPARENT_BG` は画素単位)。戻り値: 送り幅 px。
+/// 多バイト列 (`decode_glyph` が長さ 2..=4 と判定したもの) のコードポイント。
+fn decode_cp(seq: &[u8]) -> u32 {
+    let lead = match seq.len() {
+        2 => u32::from(seq[0] & 0x1F),
+        3 => u32::from(seq[0] & 0x0F),
+        _ => u32::from(seq[0] & 0x07),
+    };
+    seq[1..].iter().fold(lead, |cp, b| (cp << 6) | u32::from(b & 0x3F))
+}
+
+/// 1 字の行き先。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Route {
+    /// ROM の ANK (0x5C・制御字・不正バイト)。
+    Ank(u8),
+    /// 字形 engine。KCG に落ちたら `ank` (ASCII) か `cp` の KCG。
+    Ttf { cp: u32, cell: FontCell, ank: u8 },
+}
+
+fn route(seq: &[u8], is_ank: bool) -> Route {
+    let b = seq[0];
+    if is_ank {
+        if (0x20..=0x7E).contains(&b) && b != ANK_YEN {
+            return Route::Ttf { cp: u32::from(b), cell: FontCell::Half, ank: b };
+        }
+        return Route::Ank(b);
+    }
+    Route::Ttf { cp: decode_cp(seq), cell: FontCell::Full, ank: 0 }
+}
+
+/// ROM の ANK 8×16 (cell の先頭行から)。
+fn kcg_ank(ank: u8) -> CellRows {
+    let mut pat = [0u8; CELL_H as usize];
+    unsafe { (os32api::api().kcg_read_ank)(ank, pat.as_mut_ptr()) };
+    let mut rows: CellRows = [0; CELL_H as usize];
+    for (r, b) in pat.iter().enumerate() {
+        rows[r] = u16::from(*b) << 8;
+    }
+    rows
+}
+
+/// ROM の多バイト字: ANK に写る字 (半角カナ・全角英数・U+00A5) は ANK 8×16、
+/// それ以外は漢字 16×16 (JIS に無ければ □)。gfx_kcg.c の kcg_draw_utf8 と同じ。
+fn kcg_cp(cp: u32) -> CellRows {
+    let ank = unsafe { ffi::unicode_to_ank(cp) };
+    if ank != 0 {
+        return kcg_ank(ank);
+    }
+    let mut jis = unsafe { (os32api::api().unicode_to_jis)(cp) };
+    if jis == 0 {
+        jis = JIS_FALLBACK;
+    }
+    let mut pat = [0u8; CELL_H as usize * 2];
+    unsafe { (os32api::api().kcg_read_kanji)(jis, pat.as_mut_ptr()) };
+    let mut rows: CellRows = [0; CELL_H as usize];
+    for (r, row) in rows.iter_mut().enumerate() {
+        *row = (u16::from(pat[2 * r]) << 8) | u16::from(pat[2 * r + 1]);
+    }
+    rows
+}
+
+/// engine の bitmap を cell (幅 `w`、16 行) に置く: 左上は (`left`, `ascent - top`)、
+/// cell の外へ出る行・列は捨てる (G2 の cell 契約)。
+pub(crate) fn cell_from_glyph(g: &Glyph, bits: &[u8], w: i32) -> CellRows {
+    let mut rows: CellRows = [0; CELL_H as usize];
+    let e = &g.entry;
+    let pitch = usize::from(e.pitch);
+    if pitch == 0 || pitch > 4 {
+        return rows;
+    }
+    let oy = i32::from(g.ascent) - i32::from(e.top);
+    let ox = i32::from(e.left);
+    let wmask: u16 = if w >= KANJI_W { 0xFFFF } else { 0xFF00 };
+    let mut r = 0usize;
+    while r < usize::from(e.height) {
+        let dy = oy + r as i32;
+        if dy >= 0 && dy < CELL_H {
+            let mut v: u32 = 0;
+            let mut k = 0;
+            while k < pitch {
+                let b = bits.get(r * pitch + k).copied().unwrap_or(0);
+                v |= u32::from(b) << (24 - 8 * k as u32);
+                k += 1;
+            }
+            let shifted = if ox >= 32 || ox <= -32 {
+                0
+            } else if ox >= 0 {
+                v >> ox
+            } else {
+                v << (-ox)
+            };
+            rows[dy as usize] = ((shifted >> 16) as u16) & wmask;
+        }
+        r += 1;
+    }
+    rows
+}
+
+/// TTF の 1 字を cell の mask に。描けなければ None (呼び手が KCG)。
+/// cache に無い字だけ `fp_scope` の中で raster する。
+fn engine_cell(e: &mut AppEngine, cp: u32, cell: FontCell, w: i32) -> Option<CellRows> {
+    let mut g = Glyph::default();
+    let mut r = e.peek(cp, PixelSize::Px16, &mut g);
+    if r == Resolved::Miss {
+        r = crate::font::fp_scope(|| e.resolve(cp, cell, PixelSize::Px16, &mut g));
+    }
+    match r {
+        Resolved::Bitmap => {
+            let rows = cell_from_glyph(&g, e.bitmap(&g), w);
+            e.release();
+            Some(rows)
+        }
+        Resolved::Space => Some([0; CELL_H as usize]),
+        Resolved::Kcg | Resolved::Missing | Resolved::Miss => None,
+    }
+}
+
+/// 1 cell を置く: 不透過は cell∩clip を `bg` で塗り、`fg` の画素を Painter の clip で。
+fn put_cell(p: &Painter, penx: i32, ly: i32, w: i32, rows: &CellRows, fg: u8, bg: Option<u8>) {
+    if let Some(b) = bg {
+        p.fill_solid(Rect::new(penx as i16, ly as i16, w as i16, CELL_H as i16), b);
+    }
+    let mut row = 0i32;
+    while row < CELL_H {
+        let bits = rows[row as usize];
+        if bits != 0 {
+            let r = p.row(ly + row);
+            let mut col = 0i32;
+            while col < w {
+                if bits & (0x8000 >> col) != 0 {
+                    match &r {
+                        Some(r) => r.put(penx + col, fg),
+                        None => p.put(penx + col, ly + row, fg),
+                    }
+                }
+                col += 1;
+            }
+        }
+        row += 1;
+    }
+}
+
+/// UTF-8 文字列を `(x,y)` から描く (契約 G2)。半角 8px / 全角 16px の cell、字形は
+/// 字形 engine (欠字・失敗は KCG)。clip は画素単位、不透過は cell を塗ってから、
+/// `TRANSPARENT_BG` は fg の画素だけ。戻り値: 送り幅 px (`measure_text` と同じ)。
 pub fn text(surface: SurfaceId, x: i32, y: i32, utf8: &[u8], style: Style) -> i32 {
     let t = match clip::resolve_target(surface) {
         Some(t) => t,
         None => return 0,
     };
     let p = Painter::from_target(&t);
-    unsafe { ffi::kcg_set_scale(1) };
+    let bg = if style.has(GUI_STYLE_TRANSPARENT_BG) { None } else { Some(style.bg) };
 
-    let transparent = style.has(GUI_STYLE_TRANSPARENT_BG);
-    let ly = y as i32;
-    let mut penx = x as i32;
+    /* text() 1 回につき face ごとの検証 1 回 (§2-4)。使えなければ全字 KCG。 */
+    let mut eng = crate::font::ensure_open();
+    let usable = match eng.as_mut() {
+        Some(e) => e.begin(),
+        None => false,
+    };
+
+    let ly = y;
+    let mut penx = x;
     let mut i = 0usize;
     while i < utf8.len() {
         let (len, is_ank, cw) = decode_glyph(&utf8[i..]);
@@ -553,85 +726,31 @@ pub fn text(surface: SurfaceId, x: i32, y: i32, utf8: &[u8], style: Style) -> i3
         if utf8[i] == 0 {
             break; /* NUL 終端も尊重 */
         }
-        let cell = Rect::new(penx as i16, ly as i16, cw as i16, CELL_H as i16);
-
-        if is_ank && transparent {
-            /* ANK 透過: グリフビットマップを読み、fg 画素だけを画素単位クリップで置く */
-            draw_ank_bitmap(&p, penx, ly, utf8[i], style.fg, None);
-        } else if is_ank {
-            /* ANK 不透過: ビットマップで画素単位クリップ (端でも欠けない) */
-            draw_ank_bitmap(&p, penx, ly, utf8[i], style.fg, Some(style.bg));
-        } else {
-            /* 全角: セルがクリップ内に完全に収まるときだけ 1 グリフ描く
-             * (kcg_draw_utf8 が UTF-8→JIS 変換と描画を担う)。透過は v1 では不透過に退避。 */
-            if !p.offscreen.is_null() {
-                /* オフスクリーンへの全角は kcg 経路が無い (v1 制限) */
-            } else if t.clip.contains_rect(&cell) {
-                let mut buf = [0u8; 5];
-                let n = len.min(4);
-                buf[..n].copy_from_slice(&utf8[i..i + n]);
-                buf[n] = 0;
-                unsafe {
-                    ffi::kcg_draw_utf8(p.ox + penx, p.oy + ly, buf.as_ptr(), style.fg, style.bg);
+        /* cell が clip に掛からなければ字を引かない (raster もしない)。 */
+        if !p.cell_hidden(penx, ly, cw, CELL_H) {
+            let rows = match route(&utf8[i..i + len], is_ank) {
+                Route::Ank(b) => kcg_ank(b),
+                Route::Ttf { cp, cell, ank } => {
+                    let drawn = match eng.as_mut() {
+                        Some(e) if usable => engine_cell(e, cp, cell, cw),
+                        _ => None,
+                    };
+                    match drawn {
+                        Some(rows) => rows,
+                        None if ank != 0 => kcg_ank(ank),
+                        None => kcg_cp(cp),
+                    }
                 }
-            }
+            };
+            put_cell(&p, penx, ly, cw, &rows, style.fg, bg);
         }
-
         penx += cw;
         i += len;
     }
-    penx - x as i32
-}
-
-/// ANK (8x16) グリフをビットマップから画素単位で描く。`bg=None` は透過 (fg 画素だけ)。
-/// ビットは MSB が左端と仮定 (kcg_read_ank のパック規約)。
-fn draw_ank_bitmap(p: &Painter, penx: i32, ly: i32, ch: u8, fg: u8, bg: Option<u8>) {
-    if !p.offscreen.is_null() && bg.is_some() {
-        /* オフスクリーンの不透過 ANK は塗ってから... だが read_ank のビット順に依存するため
-         * v1 では画面サーフェスに限定。オフスクリーン文字は未対応 (票 C1 の割り切り)。 */
+    if let Some(e) = eng {
+        e.end();
     }
-    /* セルごとクリップの外なら何もしない (行 × 画素の判定を 1 回に畳む)。 */
-    if p.cell_hidden(penx, ly, ANK_W, CELL_H) {
-        return;
-    }
-    /* ANK は 8x16 = 16B。念のため広めに確保して先頭 16B だけ使う。 */
-    let mut pat = [0u8; 32];
-    unsafe {
-        let a = os32api::api();
-        (a.kcg_read_ank)(ch, pat.as_mut_ptr());
-    }
-    /* 不透過ならセルをまとめて塗ってから前景ビットだけ置く。結果は
-     * 「画素ごとに fg / bg を選ぶ」のと同じで、背景側が memset になる。 */
-    if let Some(b) = bg {
-        p.fill_solid(Rect::new(penx as i16, ly as i16, ANK_W as i16, CELL_H as i16), b);
-    }
-    let mut row = 0i32;
-    while row < CELL_H {
-        let bits = pat[row as usize];
-        if bits != 0 {
-            match p.row(ly + row) {
-                Some(r) => {
-                    let mut col = 0i32;
-                    while col < ANK_W {
-                        if (bits >> (7 - col)) & 1 != 0 {
-                            r.put(penx + col, fg);
-                        }
-                        col += 1;
-                    }
-                }
-                None => {
-                    let mut col = 0i32;
-                    while col < ANK_W {
-                        if (bits >> (7 - col)) & 1 != 0 {
-                            p.put(penx + col, ly + row, fg);
-                        }
-                        col += 1;
-                    }
-                }
-            }
-        }
-        row += 1;
-    }
+    penx - x
 }
 
 /// レイアウト用の寸法 (契約 G2)。半角 8px / 全角 16px、高さ 16px (scale1)。

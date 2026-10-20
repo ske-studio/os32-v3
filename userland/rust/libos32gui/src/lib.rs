@@ -55,7 +55,7 @@ pub use os32api::cfg as cfgabi;
 pub mod cfgro;
 
 /* ---- T7b-b3 字形 engine (設計 §2-1)。Engine 本体と arena は exec_heap、
- * static はポインタだけ。text() からの結線は S5。 */
+ * static はポインタだけ。text() (draw.rs) が mask 経路で使う (S5)。 */
 pub mod font;
 
 /* ---- UTF-8 境界計算 (票 N4 §5 で client.rs から切り出し) ----

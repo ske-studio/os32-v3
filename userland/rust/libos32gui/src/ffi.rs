@@ -59,11 +59,10 @@ extern "C" {
     pub fn gfx_line(x0: i32, y0: i32, x1: i32, y1: i32, color: u8);
     pub fn gfx_fill_rect(x: i32, y: i32, w: i32, h: i32, color: u8);
 
-    /* --- KCG 文字 (全画面バックバッファ、絶対座標) --- */
-    pub fn kcg_set_scale(scale: i32);
-    pub fn kcg_draw_ank(x: i32, y: i32, ch: u8, fg: u8, bg: u8);
-    pub fn kcg_draw_kanji(x: i32, y: i32, jis_code: u16, fg: u8, bg: u8);
-    pub fn kcg_draw_utf8(x: i32, y: i32, utf8_str: *const u8, fg: u8, bg: u8) -> i32;
+    /* --- 文字 (T7b-b4 S5): text() は字形 engine と KAPI kcg_read_* の 1bpp を
+     * Painter で置く。libos32gfx の kcg_draw_* / kcg_set_scale は呼ばない。 --- */
+    /// lib/utf8.c (libos32gfx.a の utf8_prog.o): ANK に写る字なら ANK byte、無ければ 0。
+    pub fn unicode_to_ank(cp: u32) -> u8;
 
     /* --- オフスクリーンサーフェス --- */
     pub fn gfx_create_surface(w: i32, h: i32) -> *mut GfxSurface;

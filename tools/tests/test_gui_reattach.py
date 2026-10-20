@@ -10,7 +10,9 @@ from mutpar import run_ordered
 ROOT=Path(__file__).resolve().parents[2]
 GUI='userland/rust/libos32gui/src/'
 GDI='userland/rust/gdi_test/src/lib.rs'
-TARGET_SRCS=[GUI+x+'.rs' for x in ('client','clip','draw','ffi','gstate','surface','utf8core')]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
+# T7b-b4 S5: draw.rs text() uses font.rs (and the os32-font crate), so both are compiled in.
+UNITS=('client','clip','draw','ffi','gstate','surface','utf8core','font')
+TARGET_SRCS=[GUI+x+'.rs' for x in UNITS]+[GDI,GUI+'shlib.rs','sdk/rust/os32api/src/lib.rs','sdk/rust/os32api/src/gui/stub.rs']
 MUTANTS=[
  ('shlib-no-detach-entry',GUI+'shlib.rs','    .long   os32gui_gfx_detach                  /* 119 */','', 'shlib detach entry missing'),
  ('shlib-no-detach-body',GUI+'shlib.rs','    unsafe { crate::ffi::libos32gfx_detach() };','', 'shlib detach body missing'),
@@ -31,7 +33,7 @@ def main():
     test_gui_trim.main()
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--mutate',action='store_true');a=p.parse_args()
     with tempfile.TemporaryDirectory(prefix='os32-e7-rust-') as d:
-        base=Path(d);rlib=os32api_host.build(base)
+        base=Path(d);rlib=os32api_host.build(base);font_rlib,deps=test_gui_trim.build_font_crate(base)
         def run(m=None):
             dest=base/(m[0] if m else 'normal');dest.mkdir()
             texts={p:(ROOT/p).read_text() for p in TARGET_SRCS}
@@ -39,7 +41,7 @@ def main():
                 assert texts[m[1]].count(m[2])==(2 if m[0]=='input-no-check' else 1),(m[0],texts[m[1]].count(m[2]))
                 texts[m[1]]=texts[m[1]].replace(m[2],m[3])
             root='#![allow(dead_code, unused_imports)]\n'
-            for path in TARGET_SRCS[:7]:
+            for path in TARGET_SRCS[:len(UNITS)]:
                 unit=Path(path).stem;(dest/(unit+'.rs')).write_text(texts[path]);root+=f'mod {unit};\n'
             root+=(ROOT/'tools/tests/gui_reattach_host.rs').read_text()
             input_helpers=texts['sdk/rust/os32api/src/lib.rs'].split('fn input_return() {',1)[1].split('/* ================================================================ */',1)[0]
@@ -49,7 +51,7 @@ def main():
 
             init=texts[GUI+'shlib.rs'].split('pub extern "C" fn os32gui_shlib_init(')[1].split('\n/* ===')[0]
             root+='\nuse os32api::KernelAPI;\nstatic mut SHLIB_INIT_OK: bool=false;\n'
-            root+='mod cfgro { pub fn set_kapi(_: *mut core::ffi::c_void) {} }\n'
+            root+='mod cfgro { pub fn set_kapi(_: *mut core::ffi::c_void) {} pub fn font_settings(_: i32, _: i32) -> Option<(i32, i32)> { None } }\n'
             root+='pub extern "C" fn os32gui_shlib_init('+init
             entries=re.findall(r'^\s*\.long\s+(os32gui_\w+)\s*/\*',texts[GUI+'shlib.rs'],re.M)
             root+='\nfn table_detach() { let entries = '+repr(entries).replace("'",'"')+'; assert_eq!(entries.get(119),Some(&"os32gui_gfx_detach"),"shlib detach entry missing"); os32gui_gfx_detach(); }\n'
@@ -60,7 +62,7 @@ def main():
             helper=texts[GDI].split('fn check_both_gfx() -> bool {')[1].split('\n#[no_mangle]')[0]
             root+='\nfn check_both_gfx() -> bool {'+helper.replace('os32api::','app_api::')
             (dest/'main.rs').write_text(root)
-            c=subprocess.run(['rustc','--edition=2021','--test',str(dest/'main.rs'),'--extern','os32api='+str(rlib),'-o',str(dest/'test')],capture_output=True,text=True)
+            c=subprocess.run(['rustc','--edition=2021','--test',str(dest/'main.rs'),'--extern','os32api='+str(rlib),'--extern','os32_font='+str(font_rlib),'-L','dependency='+str(deps),'-o',str(dest/'test')],capture_output=True,text=True)
             assert c.returncode==0,c.stderr
             return subprocess.run([str(dest/'test'),'--test-threads=1'],capture_output=True,text=True)
         r=run();print(r.stdout+r.stderr,end='');assert r.returncode==0
