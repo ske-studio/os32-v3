@@ -951,8 +951,8 @@ pub fn composite_rect(st: &GuiState, r: Rect) {
      *
      * `clip` との交差は取らない。装飾は clip より広く書くが、書く先は自分の
      * 外形の中だけなので他の窓・下地を壊さない。逆に clip で切ると、部分損傷の
-     * 周に**文字セルの一部だけ**が塗り直されて字が欠ける (`kcg_draw_utf8` に
-     * クリップが無く、セル単位でしか描けないため)。 */
+     * 周に**文字セルの一部だけ**が塗り直されて字が欠ける (`text::draw` は clip
+     * の外を描かないので、切った側のセルは塗り直されないまま残るため)。 */
     let mono = lease::mono(st);
     let mut z2 = 0;
     while z2 < st.z_count {

@@ -642,7 +642,7 @@ pub const MSG_MAX: usize = 128;
  *
  * 1 行に連結すると `settings.db: MISSING - run 'cfg init' in CUI close failed
  * (5)  load 0t save 0t` = 78 文字 = 624px になり、640px 画面のダイアログ
- * (上限 624px) の枠外へ描いてしまう (`kcg_draw_utf8` にクリップは無い)。
+ * (上限 624px) を越え、`text::draw` の clip で字が切れる。
  * **状態 / close 診断 / 計測を別の行に分け**、版面の幅と高さを実表示幅から
  * 出す。 */
 
