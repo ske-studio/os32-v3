@@ -99,11 +99,16 @@ static int failed;
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
 } } while (0)
 
+static void *h_mem_alloc(u32 n) { return malloc(n); }
+static void h_mem_free(void *p) { free(p); }
+
 static void reset(void)
 {
     memset(&g_fake, 0, sizeof(g_fake));
     g_fake.kprintf = (void (*)(u8, const char *, ...))h_kprintf;
     g_fake.kdebug_call = h_kdebug_call;
+    g_fake.mem_alloc = h_mem_alloc;
+    g_fake.mem_free = h_mem_free;
     g_fake.version = KAPI_VERSION;
     g_api = &g_fake;
     g_out[0] = '\0';

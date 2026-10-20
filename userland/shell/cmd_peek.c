@@ -162,7 +162,7 @@ int shell_cmd_peek(int argc, char **argv)
         kpeek_print_status(KDEBUG_PEEK_NOSYS, addr);
         return SH_STATUS_ERROR;
     }
-    buf = (u8 *)malloc(len);
+    buf = (u8 *)g_api->mem_alloc(len);   /* exec_heap (cmd_mnt と同じ)、常駐 shell の sbrk は使わない */
     if (!buf) {
         g_api->kprintf(ATTR_RED, "peek: err NOMEM len=%08X\n", len);
         return SH_STATUS_ERROR;
@@ -184,18 +184,18 @@ int shell_cmd_peek(int argc, char **argv)
         frames++;
         if (rc == OS32_ERR_NOSYS) {
             kpeek_print_status(KDEBUG_PEEK_NOSYS, addr + off);
-            free(buf);
+            g_api->mem_free(buf);
             return SH_STATUS_ERROR;
         }
         if (rc < 0) {
             g_api->kprintf(ATTR_RED, "peek: err KAPI rc=%d at %08X\n",
                            (int)rc, addr + off);
-            free(buf);
+            g_api->mem_free(buf);
             return SH_STATUS_ERROR;
         }
         if (kpeek_req.status != KDEBUG_PEEK_OK) {
             kpeek_print_status(kpeek_req.status, kpeek_req.fail_addr);
-            free(buf);
+            g_api->mem_free(buf);
             return SH_STATUS_ERROR;
         }
         memcpy(buf + off, kpeek_req.data, n);
@@ -212,6 +212,6 @@ int shell_cmd_peek(int argc, char **argv)
     }
     g_api->kprintf(ATTR_GREEN, "peek: ok len=%08X crc32=%08X frames=%u\n",
                    len, crc32_core_final(crc), frames);
-    free(buf);
+    g_api->mem_free(buf);
     return SH_STATUS_OK;
 }
