@@ -175,6 +175,10 @@
 //! 117 os32gui_w_textarea_take_input   溜まった確定文字列を引き取る
 //!  ---- 窓 (WindowId) でフォーカス中のウィジェット (穴 H13 の後始末) ----
 //! 118 os32gui_w_focused_in          77 はスロット添字でアプリから使えない
+//! 119 os32gui_gfx_detach
+//! 120 os32gui_trim_hook_set
+//!  ---- T7b-b3 字形 engine の観測 ----
+//! 121 os32gui_font_stats            `font::AppFontStats` を caller buffer へ
 //! ```
 #![allow(clippy::missing_safety_doc)]
 
@@ -210,7 +214,7 @@ core::arch::global_asm!(
 __os32_shlib_header:
     .long   0x42494C53                  /* 0x00 magic  'SLIB'            */
     .long   1                           /* 0x04 version = GUI_PROTO_VERSION */
-    .long   121                         /* 0x08 nfunc                    */
+    .long   122                         /* 0x08 nfunc                    */
     .long   __shlib_data_start          /* 0x0C data_vaddr               */
     .long   __shlib_data_pages          /* 0x10 data_pages               */
     .long   __shlib_text_pages          /* 0x14 text_pages               */
@@ -338,6 +342,7 @@ __os32_shlib_header:
     .long   os32gui_w_focused_in                /* 118 */
     .long   os32gui_gfx_detach                  /* 119 */
     .long   os32gui_trim_hook_set               /* 120 */
+    .long   os32gui_font_stats                  /* 121 */
     .text
 "#
 );
@@ -1439,4 +1444,19 @@ pub extern "C" fn os32gui_gfx_detach() {
 pub extern "C" fn os32gui_trim_hook_set(hook: Option<extern "C" fn() -> u32>) {
     gate!();
     crate::uistate::s().hook = hook;
+}
+
+/// Append-only entry 121 (T7b-b3): 字形 engine の数 (`font::AppFontStats`、repr(C)) を
+/// `out` へ最大 `len` バイト写す。戻り = 写したバイト数 / `OS32_ERR_INVAL`
+/// (`out` が NULL で `len != 0`)。
+#[no_mangle]
+pub extern "C" fn os32gui_font_stats(out: *mut u8, len: u32) -> i32 {
+    gate!(os32api::gui::proto::OS32_ERR_VERSION);
+    if out.is_null() && len != 0 {
+        return os32api::gui::proto::OS32_ERR_INVAL;
+    }
+    let snap = crate::font::stats();
+    let n = core::cmp::min(len as usize, core::mem::size_of::<crate::font::AppFontStats>());
+    unsafe { ptr::copy_nonoverlapping(&snap as *const _ as *const u8, out, n) };
+    n as i32
 }

@@ -169,6 +169,20 @@ pub fn is_focused_of(id: u32) -> bool {
     }
 }
 
+/// 登録している全窓のクライアント面を申告する (T7b-b3: font の失効後の描き直し)。
+pub fn invalidate_all_windows() {
+    let st = s();
+    let mut i = 0;
+    while i < st.windows.len() {
+        if st.windows[i].used {
+            let id = st.windows[i].id;
+            let c = st.windows[i].client;
+            st.damage.push(id, Rect::new(0, 0, c.w, c.h));
+        }
+        i += 1;
+    }
+}
+
 /// 所有型の `Drop` 相当: 登録表から落として WM へ `DESTROY` を送る。
 pub fn drop_window(id: u32) {
     unregister(id);

@@ -1,5 +1,5 @@
 use core::ffi::c_void;
-use os32api::gui::{GuiEvent, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY};
+use os32api::gui::{GuiEvent, GUI_EV_FONT, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY};
 type GuiResult<T> = Result<T,()>;
 struct AppVTable;
 struct Ui { timeout_ticks: u32 }
@@ -20,6 +20,8 @@ fn s()-> &'static mut State { unsafe { &mut STATE } }
 static mut LOG: Vec<&str> = Vec::new();
 static mut HANDLER: bool = false;
 static mut ROUND: usize = 0;
+// T7b-b3 S4: the font-event round (EV_FONT is taken before dispatch, no TRIM_DONE).
+static mut FONT_MODE: bool = false;
 mod client {
     use super::*;
     pub struct GuiErr;
@@ -31,6 +33,11 @@ mod client {
     pub fn poll(buf: &mut [GuiEvent])->GuiResult<Poll> {
         unsafe {
             ROUND+=1;
+            if FONT_MODE {
+                buf[0]=GuiEvent {kind:GUI_EV_FONT, sub:0, serial:0, window:0, payload:[0;8]};
+                buf[1]=GuiEvent {kind:1, sub:0, serial:0, window:0, payload:[0;8]};
+                return Ok(Poll {count:2,overflow:false,dropped:0});
+            }
             let epoch=if ROUND==1 { 51u32 } else { 77u32 };
             for i in 0..2 { buf[i]=GuiEvent {kind:GUI_EV_TRIM, sub:0, serial:0, window:0,payload:[0;8]};
                 buf[i].payload[..4].copy_from_slice(&(epoch+i as u32).to_le_bytes()); }
@@ -40,19 +47,28 @@ mod client {
     }
     pub fn commit(_:u32)->GuiResult<()> { unsafe { LOG.push("commit"); } Ok(()) }
     pub fn call(op:u32,epoch:u32)->GuiResult<i32> {
+        unsafe { runtime_check(!FONT_MODE,"font-ev-trim-done"); }
         assert_eq!(op,GUI_OP_TRIM_DONE);
         assert_eq!(epoch,if unsafe {ROUND}==1 {52} else {78});
         unsafe { LOG.push("done"); } Ok(0)
     }
     pub fn wait(_:u32)->GuiResult<()> { unsafe { LOG.push("wait"); } Ok(()) }
 }
-mod window { pub fn count()->usize {1} }
+mod window {
+    pub fn count()->usize {1}
+    pub fn invalidate_all_windows() { unsafe { crate::LOG.push("invalidate_all"); } }
+}
+mod font {
+    pub fn reload() { unsafe { crate::LOG.push("font_reload"); } }
+    pub fn trim()->bool { unsafe { crate::LOG.push("font_trim"); } true }
+}
 fn drain_pending_focus(_: &VApp,_:&mut Ui) {}
 fn flush_damage() {}
 fn paint_damaged(_: &VApp,_:&mut Ui) {}
 fn dispatch(_: &VApp,_:&mut Ui,ev:&GuiEvent) {
     assert_ne!(ev.kind,GUI_EV_TRIM,"forward-trim-to-app / on_raw");
-    unsafe { LOG.push("handler"); if ROUND==2 { s().quit=true; } }
+    runtime_check(ev.kind!=GUI_EV_FONT,"font-ev-dispatched");
+    unsafe { LOG.push("handler"); if ROUND==2 || FONT_MODE { s().quit=true; } }
 }
 fn runtime_check(condition:bool,label:&str) {
     if !condition { std::io::Write::write_all(&mut std::io::stdout(),label.as_bytes()).unwrap(); std::process::exit(101); }
@@ -75,15 +91,23 @@ fn trim_batch_contract() {
     s().hook=Some(trim_trampoline);
     let vt=AppVTable; let mut ui=Ui { timeout_ticks:0 };
     assert!(run_vt(&vt,core::ptr::null_mut(),&mut ui).is_ok());
-    unsafe { assert_eq!(LOG,vec!["handler","commit","after_commit","hook","done","wait",
-        "handler","commit","after_commit","hook","done"],"hook-twice-per-batch / done-before-hook / safe point"); }
+    unsafe { assert_eq!(LOG,vec!["handler","commit","after_commit","font_trim","hook","done","wait",
+        "handler","commit","after_commit","font_trim","hook","done"],"hook-twice-per-batch / done-before-hook / safe point / font-trim-skipped"); }
     assert_eq!((s().trim_events,s().trim_done_sent,s().hook_calls,s().hook_pages),(4,2,2,6));
     assert_eq!(retry_stats(),(0,0,6));
     // Optional app hook absent still sends exactly one DONE, including quit.
     TRIM_HOOK.0.set(None); s().quit=false;
     unsafe { ROUND=1; LOG.clear(); }
     assert!(run_vt(&vt,core::ptr::null_mut(),&mut ui).is_ok());
-    unsafe { assert_eq!(LOG,vec!["handler","commit","after_commit","done"]); }
+    unsafe { assert_eq!(LOG,vec!["handler","commit","after_commit","font_trim","done"],"font-trim-skipped"); }
+    // T7b-b3 S4: GUI_EV_FONT reloads the font and repaints every window before
+    // dispatch, and is not a trim: no hook, no TRIM_DONE.
+    let done=s().trim_done_sent;
+    s().quit=false;
+    unsafe { FONT_MODE=true; ROUND=0; LOG.clear(); }
+    assert!(run_vt(&vt,core::ptr::null_mut(),&mut ui).is_ok());
+    unsafe { FONT_MODE=false; assert_eq!(LOG,vec!["font_reload","invalidate_all","handler","commit","after_commit"],"font-ev-order"); }
+    assert_eq!(s().trim_done_sent,done,"font-ev-trim-done");
 }
 
 // The fixed-address jump-table binding is the host seam; init's ordering and

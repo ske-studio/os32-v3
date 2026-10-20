@@ -3,7 +3,7 @@
 #![allow(dead_code, static_mut_refs)]
 extern crate alloc;
 use core::ffi::c_void;
-use os32api::gui::{GuiEvent, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY};
+use os32api::gui::{GuiEvent, GUI_EV_FONT, GUI_EV_TRIM, GUI_OP_TRIM_DONE, GUI_RING_CAPACITY};
 use os32api::api;
 #[path = "CACHE_SOURCE"] mod cache;
 use cache::{Cache, Stat};
@@ -71,7 +71,9 @@ mod client {
     }
     pub fn wait(_: u32) -> GuiResult<()> { check(false, b"unexpected WAIT\0"); Ok(()) }
 }
-mod window { pub fn count() -> usize { 1 } }
+mod window { pub fn count() -> usize { 1 } pub fn invalidate_all_windows() {} }
+// T7b-b3 S4: run_vt reloads the font on GUI_EV_FONT and trims its arena; no font here.
+mod font { pub fn reload() {} pub fn trim() -> bool { false } }
 fn drain_pending_focus(_: &VApp, _: &mut Ui) {}
 fn flush_damage() {}
 fn paint_damaged(_: &VApp, _: &mut Ui) {}

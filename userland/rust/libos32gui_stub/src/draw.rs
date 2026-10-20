@@ -133,3 +133,10 @@ pub fn stats() -> Stats {
 pub fn base_violation_count() -> u32 {
     shcall!(sh::E_BASE_VIOLATION_COUNT, extern "C" fn() -> u32)
 }
+
+/// 字形 engine の数 (T7b-b3、ライブラリの `font::AppFontStats` の repr(C) の写し) を
+/// `out` へ写す。戻り = 写したバイト数 / 負のエラー。試験と観測用。
+pub fn font_stats(out: &mut [u8]) -> i32 {
+    shcall!(sh::E_FONT_STATS, extern "C" fn(*mut u8, u32) -> i32,
+            out.as_mut_ptr(), out.len() as u32)
+}

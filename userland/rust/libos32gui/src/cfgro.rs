@@ -517,3 +517,40 @@ pub extern "C" fn os32gui_cfg_set_text(
     let crc = unsafe { cfg_close(db) };
     fold_set(orc, work, crc)
 }
+
+/* ================================================================ */
+/*  T7b-b3 S4: font 設定 (設計 §2-3、crate::font だけが呼ぶ)          */
+/*                                                                  */
+/*  gshell が書く 2 キー (正典 assets/settings/defaults.tsv の        */
+/*  `gshell` scope): `font_set` (0 = 標準 / 1 = KCG のみ、            */
+/*  os32_font::limits::FONT_SET_*) と `font/gen` (gshell が font 設定を */
+/*  保存するたびに +1)。1 回の open → get → get → close で両方読む     */
+/*  (照合は EV_FOCUS と paint 1 周に 1 回なので、text() からは呼ばない)。 */
+/* ================================================================ */
+
+/// font 設定の scope (NUL 終端)。
+pub const FONT_CFG_SCOPE: &[u8] = b"gshell\0";
+/// 字体の組 (int、`os32_font::limits::FONT_SET_*`)。
+pub const FONT_CFG_KEY_SET: &[u8] = b"font_set\0";
+/// font 設定の世代 (int、gshell が保存ごとに +1)。
+pub const FONT_CFG_KEY_GEN: &[u8] = b"font/gen\0";
+
+/// `(font_set, font/gen)`。未設定のキーは `def_*`。open / close の失敗は `None`
+/// (読めなかったことを呼び手が区別する — 世代の照合を空振りで reload させない)。
+pub fn font_settings(def_set: i32, def_gen: i32) -> Option<(i32, i32)> {
+    if !kapi_ready() {
+        return None;
+    }
+    let mut db: *mut CfgDb = core::ptr::null_mut();
+    let orc = unsafe { open_checked(&mut db, 0) };
+    if orc < 0 {
+        return None;
+    }
+    let set = unsafe { cfg_get_int(db, FONT_CFG_SCOPE.as_ptr(), FONT_CFG_KEY_SET.as_ptr(), def_set) };
+    let gen = unsafe { cfg_get_int(db, FONT_CFG_SCOPE.as_ptr(), FONT_CFG_KEY_GEN.as_ptr(), def_gen) };
+    let crc = unsafe { cfg_close(db) };
+    if crc < 0 {
+        return None;
+    }
+    Some((set, gen))
+}
