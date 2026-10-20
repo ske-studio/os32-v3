@@ -17,7 +17,7 @@
 //!   再確保。取れなければ cache 無し (字は scratch から描く、`stats.uncached`)。
 //! - **face** は KAPI `font_source_*` の lease。FPU 無しは kernel が open を NOSYS で
 //!   断る → `KcgOnly(NoFpu)`。枠不足 (NOSPC) → `KcgOnly(Nospc)`。
-//! - **x87**: `Face::open` と miss の raster は [`fp_scope`] の中 (CW の保存/復元だけ。
+//! - **x87**: `Face::open` と miss の raster は [`fp_scope`] の中 (FNSTENV の環境の保存/復元。
 //!   ST は cdecl で呼び手が保存しない約束)。
 //! - **失効** (§2-3): `GUI_EV_FONT` → [`reload`]。取りこぼし対策に `font/gen` を
 //!   前景化 (EV_FOCUS) と paint 1 周に 1 回だけ照合 ([`check_gen`]、cfgro は毎回
@@ -103,21 +103,25 @@ impl Drop for AppSource {
 /*  x87 の範囲 (設計 §2-5 app 側)                                     */
 /* ================================================================ */
 
-/// `f` を既定の CW で走らせ、例外フラグを捨てて呼び手の CW に戻す。
-/// アプリは CPL3 の前景で自分の FPU 文脈を持つので、保存/復元するのは CW だけ。
+/// `f` を既定の CW で走らせ、呼び手の x87 環境 (CW・SW の例外フラグと条件・TAG) に戻す。
+/// アプリは CPL3 の前景で自分の FPU 文脈を持つ。ST の中身は cdecl で呼び手が保存しない
+/// 約束 (呼出し時は空) なので、保存/復元するのは FNSTENV の 28 B (T7b-b5⑤: 以前は CW
+/// だけを戻して fnclex で呼び手の例外フラグを消していた — C の慣例 (C11 7.6) に反する)。
 #[inline(never)]
 pub fn fp_scope<R>(f: impl FnOnce() -> R) -> R {
-    let mut saved: u16 = 0;
+    let mut saved = [0u32; 7];
     unsafe {
-        core::arch::asm!("fnstcw word ptr [{0}]", in(reg) &mut saved as *mut u16,
+        /* fnstenv は保存の後に全例外をマスクする。直後に既定の CW を入れる。 */
+        core::arch::asm!("fnstenv [{0}]", in(reg) saved.as_mut_ptr(),
                          options(nostack, preserves_flags));
         core::arch::asm!("fldcw word ptr [{0}]", in(reg) &X87_CW_STD as *const u16,
                          options(nostack, preserves_flags));
     }
     let r = f();
     unsafe {
+        /* f の例外フラグを捨て、呼び手の CW・SW・TAG に戻す。 */
         core::arch::asm!("fnclex", options(nomem, nostack, preserves_flags));
-        core::arch::asm!("fldcw word ptr [{0}]", in(reg) &saved as *const u16,
+        core::arch::asm!("fldenv [{0}]", in(reg) saved.as_ptr(),
                          options(nostack, preserves_flags));
     }
     r

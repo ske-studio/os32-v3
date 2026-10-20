@@ -16,6 +16,14 @@
 extern crate os32api;
 extern crate libos32gui;
 
+mod corpus;
+mod fontbench;
+
+/// trimreq の大きさ (app 帯 128MiB の内、64MB 機の空きより大きい)。
+const TRIMREQ_BYTES: u32 = 96 * 1024 * 1024;
+/// MemStat (os32_kapi_shared.h、KAPI v75) の u32 数。
+const MEMSTAT_WORDS: usize = 55;
+
 use libos32gui::gapi as g;
 use os32api::gui::proto::*;
 use os32api::gui::types::{Rect, Style, SurfaceId};
@@ -98,8 +106,31 @@ fn check_both_gfx() -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI) -> i32 {
+pub extern "C" fn main(argc: i32, argv: *const *const u8, api: *mut KernelAPI) -> i32 {
     os32api::os32_init(api);
+
+    /* `gdi_test memstat <id>`: その app の頁数と extent (b3④ の trim の頁戻りを見る)。 */
+    if argc >= 3 && unsafe { cstr(*argv.add(1)) } == b"memstat" {
+        let id = dec(unsafe { cstr(*argv.add(2)) });
+        let mut w = [0u32; MEMSTAT_WORDS];
+        let rc = unsafe { (os32api::api().mem_stat)(id, w.as_mut_ptr().cast(), (MEMSTAT_WORDS * 4) as u32) };
+        os32api::kprint!(b"gdi_test memstat id=%d rc=%d owner_pages=%d large=%d arena=%d exec_used=%d\r\n\0",
+            id, rc, w[49] as i32, w[16] as i32, w[15] as i32, w[19] as i32);
+        os32api::kprint!(b"gdi_test memstat id=%d flags=%x trim_epoch=%d pending=%x free=%d\r\n\0",
+            id, w[3] as i32, w[32] as i32, w[31] as i32, w[8] as i32);
+        return 0;
+    }
+
+    /* `gdi_test trimreq`: 物理の空きより大きい mem_map を 1 回だけ頼んで断られる
+     * (appmem_map の ENOSPC → park 中の GUI app へ trim 要求)。T7b-b5⑥ の trim の口。 */
+    if argc >= 2 && unsafe { cstr(*argv.add(1)) } == b"trimreq" {
+        let p = unsafe { (os32api::api().mem_map)(TRIMREQ_BYTES, core::ptr::null_mut(), 0) };
+        if !p.is_null() {
+            unsafe { (os32api::api().mem_unmap)(p, TRIMREQ_BYTES) };
+        }
+        os32api::kprint!(b"gdi_test trimreq mapped=%d\r\n\0", (!p.is_null()) as i32);
+        return 0;
+    }
 
     unsafe {
         let a = os32api::api();
@@ -129,6 +160,15 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     /* フルスクリーンサーフェス + 基底クリップ = 画面全体 (Paint 相当)。 */
     let screen: SurfaceId = g::screen_surface();
     g::set_base_clip(screen, r(0, 0, sw, sh));
+
+    /* `gdi_test font seq|scatter|x87` — T7b-b5 の字形計測 (fontbench.rs)。 */
+    if argc >= 3 {
+        let a1 = unsafe { cstr(*argv.add(1)) };
+        if a1 == b"font" {
+            let a2 = unsafe { cstr(*argv.add(2)) };
+            return fontbench::run(screen, sw, sh, a2);
+        }
+    }
 
     /* 背景 = DESKTOP。 */
     g::fill_rect(screen, r(0, 0, sw, sh), Style::new(0, GUI_COLOR_DESKTOP));
@@ -370,4 +410,26 @@ fn draw_edge_clip_checks(screen: SurfaceId, sw: i32, sh: i32) {
     g::text(screen, -12, 268, b"EDGE-LEFT-CLIP", Style::new(GUI_COLOR_WINDOW, GUI_COLOR_DESKTOP));
     /* 右端をまたぐ文字。 */
     g::text(screen, sw - 40, 286, b"EDGE-RIGHT-CLIP", Style::new(GUI_COLOR_WINDOW, GUI_COLOR_DESKTOP));
+}
+
+/// NUL 終端の argv 1 本 (64 byte まで)。
+unsafe fn cstr(p: *const u8) -> &'static [u8] {
+    if p.is_null() {
+        return b"";
+    }
+    let mut n = 0usize;
+    while n < 64 && *p.add(n) != 0 {
+        n += 1;
+    }
+    core::slice::from_raw_parts(p, n)
+}
+
+fn dec(s: &[u8]) -> i32 {
+    let mut v = 0i32;
+    for &c in s {
+        if c.is_ascii_digit() {
+            v = v * 10 + i32::from(c - b'0');
+        }
+    }
+    v
 }

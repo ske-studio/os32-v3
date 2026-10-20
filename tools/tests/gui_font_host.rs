@@ -154,6 +154,33 @@ fn fp_scope_restores_caller_cw() {
     check(after == other, "fp-scope-restore");
 }
 
+fn sw() -> u16 {
+    let mut v: u16 = 0;
+    unsafe { core::arch::asm!("fnstsw word ptr [{0}]", in(reg) &mut v as *mut u16) };
+    v
+}
+
+#[test]
+fn fp_scope_status_flags_kept() {
+    // T7b-b5⑤: the caller's sticky exception flags (here ZE from 1/0, masked) survive,
+    // and flags raised inside the scope do not leak out (C11 7.6 convention).
+    let std_cw: u16 = 0x037F;
+    unsafe {
+        core::arch::asm!("fninit", "fldcw word ptr [{0}]", "fld1", "fldz", "fdivp st(1), st", "fstp st(0)",
+                         in(reg) &std_cw as *const u16);
+    }
+    let before = sw();
+    font::fp_scope(|| unsafe {
+        // raise IE inside (0/0, masked)
+        core::arch::asm!("fldz", "fldz", "fdivp st(1), st", "fstp st(0)");
+    });
+    let after = sw();
+    unsafe { core::arch::asm!("fninit", "fldcw word ptr [{0}]", in(reg) &std_cw as *const u16) };
+    check(before & 0x3F == 0x04, "fp-scope-fixture-ze");
+    check(after & 0x3F == before & 0x3F, "fp-scope-status-flags");
+    check(after & 0x3800 == before & 0x3800, "fp-scope-top");
+}
+
 #[test]
 fn app_font_lifecycle() {
     install();
