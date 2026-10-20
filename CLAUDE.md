@@ -38,6 +38,7 @@ make deploy-kernel / deploy-boot          # NHD / boot area — stop NP21/W firs
 
 Which of the three deploy paths a change needs: [`docs/08_build.md`](docs/08_build.md#配備3経路) §8-4.
 
+Real hardware (Ra266) update while it stays HDD-booted: skill **`os32-realhw-update`**.
 Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; stop / start only with
 `tools/np21w_ctl.py` ([D1], [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §5).
 
