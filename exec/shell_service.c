@@ -2,8 +2,9 @@
  *  shell_service.c — 常駐 shell の内部入口 (T7b-b2、設計 §3)
  *
  *  表 g_shell_service の登録 (publish / retire) と、表に載せる入口 wrapper
- *  4 本の段 A (戻り番地) / 段 B (文脈)。段 C (shell lease の registry) と
- *  段 D (VFS) は kernel/font_source.c の shell 側実体が持つ。
+ *  5 本の段 A (戻り番地) / 段 B (文脈)。段 C (shell lease の registry) と
+ *  段 D (VFS) は kernel/font_source.c の shell 側実体が持つ。version 2 の
+ *  font_guard_run (T7b-b3 S2) は段 A/B の後に kernel/font_guard.c へ。
  *
  *  wrapper は noinline で、このファイルは -fno-optimize-sibling-calls で
  *  組む (build/kernel.mk)。戻り値は volatile に受けてから返し、尾呼出しに
@@ -19,6 +20,7 @@
 #include "gui.h"            /* GUI_SHELL_OWNER */
 #include "fd_redirect.h"    /* res_owner_get */
 #include "font_source.h"    /* font_lease_shell_* / font_lease_close_shell (段 C / D) */
+#include "font_guard.h"     /* font_guard_run / font_x87_present (version 2) */
 
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
@@ -87,6 +89,7 @@ shell_svc_font_source_open(const char *path, u32 *out_id, u32 *out_size)
     if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
         return shell_service_reject(reason);
     if (!shell_plain_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_OPEN);
+    if (!font_x87_present) return OS32_ERR_NOSYS;   /* x87 無しは raster できない → KCG */
     r = font_lease_shell_open(path, g_shell_service.generation, out_id, out_size);
     return r;
 }
@@ -127,6 +130,20 @@ shell_svc_font_source_close(u32 id)
     return r;
 }
 
+/* version 2: x87 guard の中で call(ctx)。段 B は read_at と同じ (callback の
+ * 中で read_at を呼ぶので、read_at が通る文脈でだけ通す)。 */
+static __attribute__((noinline)) i32 __cdecl
+shell_svc_font_guard_run(int (*call)(void *), void *ctx)
+{
+    volatile i32 r;
+    u32 reason = 0;
+    if (!shell_caller_ok((u32)(uptr)__builtin_return_address(0), &reason))
+        return shell_service_reject(reason);
+    if (!shell_read_context()) return shell_service_reject(SHELL_SVC_REJ_CTX_GUARD);
+    r = font_guard_run(call, ctx);
+    return r;
+}
+
 void shell_service_publish(u32 load_addr, u32 text_size)
 {
     u32 hi = load_addr + text_size;
@@ -143,6 +160,7 @@ void shell_service_publish(u32 load_addr, u32 text_size)
     g_shell_service.font_source_read_at = shell_svc_font_source_read_at;
     g_shell_service.font_source_validate = shell_svc_font_source_validate;
     g_shell_service.font_source_close = shell_svc_font_source_close;
+    g_shell_service.font_guard_run = shell_svc_font_guard_run;
     g_shell_text_lo = load_addr;
     g_shell_text_hi = hi;
     g_shell_active = 1;

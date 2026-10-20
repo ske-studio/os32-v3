@@ -113,6 +113,7 @@
 #define GUI_EV_QUIT       12  /* sub: 理由 */
 #define GUI_EV_PALETTE    13  /* sub: active 0/1。G8 */
 #define GUI_EV_TRIM       14  /* payload.raw[0..4]: pressure epoch (LE) */
+#define GUI_EV_FONT       15  /* payload なし。font 設定が変わった (T7b-b3): face を閉じ全窓を再描画、TRIM_DONE は送らない */
 
 /* ======================================================================== */
 /*  Style.flags (u8) — G6                                                    */
