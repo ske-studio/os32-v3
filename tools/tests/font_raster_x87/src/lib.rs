@@ -74,7 +74,7 @@ fn run(p: &mut Probe) -> Result<()> {
                 out.put(&q.advance.to_le_bytes())?;
                 out.put(bits.get(..q.bytes()).ok_or(Error::Bounds)?)?;
                 for &c in work.coverage() {
-                    out.put(&[(c * 255.0 + 0.5) as u8])?;
+                    out.put(&[c.min(255) as u8])?;
                 }
             }
             Err(e) => out.put(&(1 + e as i32).to_le_bytes())?,

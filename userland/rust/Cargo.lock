@@ -117,9 +117,6 @@ dependencies = [
 [[package]]
 name = "os32-font"
 version = "0.1.0"
-dependencies = [
- "ttf-parser",
-]
 
 [[package]]
 name = "os32_math"
@@ -146,10 +143,6 @@ dependencies = [
  "libos32gui_stub",
  "os32api",
 ]
-
-[[package]]
-name = "ttf-parser"
-version = "0.21.1"
 
 [[package]]
 name = "v12_api_test"

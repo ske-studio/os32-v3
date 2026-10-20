@@ -41,13 +41,31 @@ pub const MAX_PIXEL_FACTOR: usize = 2;
 // Largest committed bitmap (1bpp, byte-aligned rows) at MAX_PIXEL_FACTOR.
 pub const MAX_BITMAP_BYTES: usize =
     (MAX_BBOX_PX * MAX_PIXEL_FACTOR).div_ceil(8) * MAX_BBOX_PX * MAX_PIXEL_FACTOR;
-// Pixel is black when its 8-bit-equivalent coverage is >= 128.
-pub const COVERAGE_THRESHOLD: f32 = 128.0 / 255.0;
-// Outline coordinates (font units) beyond this (or NaN) are rejected before
-// integer casts; 26.6 products then fit i64/i32.
-pub const MAX_COORD_UNITS: f32 = 1_048_576.0;
-// a1 quadratic flattening: n segments with n^4 >= this * |a - 2c + b|^2 (error <= 1/8 px).
-pub const QUAD_FLATNESS_SQ: f32 = 4.0;
+// TASK_FONTPERF F5 integer raster (fontperf design §6): bitmap-relative points
+// in 1/RASTER_SUBPIXEL px (26.6 x 64); one pixel of area/cover accumulates to
+// RASTER_AREA_ONE = 2 * RASTER_SUBPIXEL^2 (ftgrays-style), reported as
+// coverage 0..=COVERAGE_ONE. A pixel is black when area / RASTER_AREA_ONE >=
+// COVERAGE_BLACK_NUM / COVERAGE_BLACK_DEN, tested exactly in integers. 128/255
+// is the a5 threshold (FONTCHK and the EBDT equality were accepted with it);
+// the design's 128/256 (FreeType's 8-bit >= 128) would turn every pixel at
+// exactly 0.5 black (F5 measured: IPAex Gothic 2,217 glyphs / 7,853 px,
+// Inconsolata 18 / 40 px of the corpora) and is left to the PM. 1/4096 px keeps
+// the integer coverage within the old float raster's threshold decisions
+// (1/256 px flipped 194 IPAex glyphs near 128/255, 1/4096 px 11); the products
+// stay in i32 (one pixel = 2^25) / i64.
+pub const RASTER_SUBPIXEL_BITS: u32 = 12;
+pub const RASTER_SUBPIXEL: i32 = 1 << RASTER_SUBPIXEL_BITS;
+pub const RASTER_AREA_ONE: u64 = 2 * (RASTER_SUBPIXEL as u64) * (RASTER_SUBPIXEL as u64);
+pub const COVERAGE_BITS: u32 = 8;
+pub const COVERAGE_ONE: i32 = 1 << COVERAGE_BITS;
+pub const COVERAGE_BLACK_NUM: u64 = 128;
+pub const COVERAGE_BLACK_DEN: u64 = 255;
+// Outline coordinates (font units) beyond this are rejected before the 26.6
+// products (which then fit i64/i32).
+pub const MAX_COORD_UNITS: i32 = 1_048_576;
+// a1 quadratic flattening: n segments with n^4 >= QUAD_FLATNESS_SQ * |a - 2c + b|^2
+// (in px^2; error <= 1/8 px). The subpixel form is n^4 * RASTER_SUBPIXEL^2 >= 4 d2.
+pub const QUAD_FLATNESS_SQ: u64 = 4;
 
 // T7b-b3 glyph cache (glyph cache design §3, b3/b4 design §2-1) with the
 // TASK_FONTPERF F2 packed cell class (fontperf design §3). One owner arena of

@@ -577,10 +577,14 @@ class FontVendorTest(unittest.TestCase):
                 self.assertEqual(hunk["upstream_sha256"], hunks[0]["upstream_sha256"])
             self.assertEqual(sha(text.encode()), hunks[0]["upstream_sha256"], rel)
         manifest_path = ROOT / "userland/lib/font/Cargo.toml"
-        dependency = tomllib.loads(manifest_path.read_text())["dependencies"]["ttf-parser"]
+        # TASK_FONTPERF F5 (F-10): ttf-parser is only the host tests' oracle
+        # (dev-dependency); no product dependency on it remains.
+        manifest = tomllib.loads(manifest_path.read_text())
+        self.assertNotIn("ttf-parser", manifest.get("dependencies", {}))
+        dependency = manifest["dev-dependencies"]["ttf-parser"]
         self.assertFalse(dependency["default-features"])
         self.assertEqual((manifest_path.parent / dependency["path"]).resolve(), vendor)
-        # font_test uses ttf-parser only through the product os32-font crate.
+        # font_test reaches the font code only through the product os32-font crate.
         font_test = tomllib.loads((ROOT / "userland/rust/font_test/Cargo.toml").read_text())["dependencies"]
         self.assertNotIn("ttf-parser", font_test)
         self.assertEqual((ROOT / "userland/rust/font_test" / font_test["os32-font"]["path"]).resolve(),

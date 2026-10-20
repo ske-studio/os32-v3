@@ -7,7 +7,7 @@
 //! per glyph -> `bitmap()` while drawing -> `release()` -> ... -> `end()`.
 //! A returned Bitmap is borrowed until `release`; meanwhile close/trim/
 //! invalidate_all/detach refuse with Busy and further resolves answer Kcg.
-//! `open` and a resolve that misses read and rasterise (f32): call them inside
+//! `open` and a resolve that misses read and rasterise: call them inside
 //! the x87 guard/fp scope on OS32. Hits and `peek` do not read or use x87.
 use crate::{
     cache::{Entry, FaceId, GlyphCache, GlyphKey, Kind, Stats},
