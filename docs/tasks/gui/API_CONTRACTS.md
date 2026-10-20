@@ -40,7 +40,7 @@
 | `draw_rect(rect, style)` | 1px 枠。`fg` |
 | `hline / vline / line(x0,y0,x1,y1, style)` | 線。`fg` |
 | `blit(dst_xy, bitmap, src_rect)` | ビットマップ転送 (カラーキー = 色 255) |
-| `text(x, y, utf8: &[u8], style)` | UTF-8 を KCG で描く。半角 8px / 全角 16px、ベースライン規約は既存 gen_font16 のもの |
+| `text(x, y, utf8: &[u8], style)` | UTF-8 を字形 engine (欧文 Inconsolata・和文 JF ドット東雲16、欠字と失敗は KCG) の 1bpp で描く (T7b-b4)。半角 8px / 全角 16px の cell、baseline は face ごと (欧文 13・和文 14、KCG は cell の先頭行から)、cell の外は描かない。clip は画素単位 (全角・オフスクリーンも)。0x5C は ROM の ¥ |
 | `push_clip(rect) / pop_clip()` | クリップは常に「現在のクリップ ∩ サーフェス」。深さ 8 |
 | `measure_text(utf8) -> (w, h)` | レイアウト用 |
 
