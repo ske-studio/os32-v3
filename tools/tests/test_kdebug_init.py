@@ -52,7 +52,7 @@ def boot_dispatch(kernel):
 def main():
     with tempfile.TemporaryDirectory(prefix='kdebug-init-') as td:
         folder = Path(td)
-        meta = gen.generate(gen.load_def(), folder, 'S4')
+        meta = gen.generate(gen.load_def(), folder, 'S5')
         for generated in (ROOT / 'kdebug/generated').iterdir():
             if generated.suffix in ('.c', '.h', '.S', '.json'):
                 assert generated.read_bytes() == (folder / generated.name).read_bytes(), generated
@@ -132,8 +132,8 @@ def main():
         (folder / 'loader_exports.c').write_text(exports)
         kernel_source = (ROOT / 'kernel/kernel.c').read_text()
         (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
-        def build_loader(module_source):
-            command([*host, ROOT / 'tools/tests/kdebug_loader_host.c',
+        def build_loader(module_source, call_source=ROOT / 'kernel/kdebug_call.c'):
+            command([*host, ROOT / 'tools/tests/kdebug_loader_host.c', call_source,
                      module_source, ROOT / 'kernel/module_image.c', ROOT / 'kernel/module_runtime.c',
                      ROOT / 'kernel/kselftest_report.c', folder / 'loader_exports.c', '-o', exe])
         build_loader(ROOT / 'kernel/module.c')
@@ -213,6 +213,18 @@ def main():
                     result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
                     assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
                 print('MUTATE', label, 'RED (runtime assertion)', flush=True)
+            (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
+            call_source = (ROOT / 'kernel/kdebug_call.c').read_text()
+            gate = 'return kdebug.ops.dbg_call ?'
+            assert call_source.count(gate) == 1
+            mutant = folder / 'kdebug-call-always-nosys.c'
+            mutant.write_text(call_source.replace(gate, 'return 0 ?'))
+            build_loader(ROOT / 'kernel/module.c', mutant)
+            payload = struct.pack('<5I', 0, 0, 0, len(image), pair) + image
+            for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+                result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
+                assert result.returncode == 1 and b'FAIL ' in result.stdout, ('kdebug-call', result)
+            print('MUTATE kdebug-call-always-nosys RED (runtime assertion)', flush=True)
         print('PASS init: candidate only, imports=0; loader cases=' + str(len(cases)))
     return 0
 

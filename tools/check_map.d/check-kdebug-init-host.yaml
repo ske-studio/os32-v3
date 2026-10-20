@@ -25,6 +25,7 @@ check-kdebug-init-host:
 - fs/vfs.h
 - tools/tests/nic_trace_host.c
 - kdebug/kdebug_main.c
+- kernel/kdebug_call.c
 - kdebug/kselftest.c
 - kernel/kselftest.h
 - kdebug/crt_diag.c

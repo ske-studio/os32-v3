@@ -27,7 +27,7 @@ KDEBUG_OPS_NAMES = (
     'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
     'gcap_active', 'gcap_keep_if', 'gcap_insn_abort', 'gcap_port_passed',
     'gcap_pass_in', 'gcap_pass_out', 'gcap_note_in', 'gcap_note_out',
-    'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace',
+    'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace', 'dbg_call',
 )
 # These fields also define struct module_component_policy's generated row order.
 POLICY_FIELDS = (
@@ -41,7 +41,7 @@ COMPONENTS = (
         dependencies=(), required=False,
         module_id=1, phase=CONSTANTS['PHASE_POST_ROOT'],
         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-        stop_allowed=0, ops_version=2, ops_slots=len(KDEBUG_OPS_NAMES),
+        stop_allowed=0, ops_version=3, ops_slots=len(KDEBUG_OPS_NAMES),
         image_max=262144, mem_max=262144,
         reloc_max=16384, import_max=1024, export_max=64, load_span_max=524288,
         init_symbol='kdebug_init', imports_symbol='kdebug_import_slots',

@@ -1912,6 +1912,54 @@
       "source": "kernel/paging.h",
       "context_safe": false,
       "index": 238
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_is_present",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 239
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_map_phys",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 240
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_pte_raw",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 241
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_pte_restore",
+      "source": "kernel/paging.h",
+      "context_safe": false,
+      "index": 242
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_find",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 243
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_get",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 244
     }
   ]
 }

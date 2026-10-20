@@ -43,11 +43,17 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 239)
-        self.assertEqual([e['name'] for e in self.entries[226:]], [
+        self.assertEqual(len(self.entries), 245)
+        self.assertEqual([e['name'] for e in self.entries[226:239]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
+        # S5 (TASK_KPEEK §2-6): peek's six imports, appended after S4.
+        self.assertEqual(gen.STAGES['S4'], 239)
+        self.assertEqual(gen.STAGES['S5'], 245)
+        self.assertEqual([(e['stage'], e['name']) for e in self.entries[239:]], [
+            ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
+            ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get')])
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {

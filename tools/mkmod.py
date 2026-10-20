@@ -3,7 +3,7 @@
 
 The product build packages kdebug separately from the resident kernel. Metadata
 comes from gen_kdebug_imports.py; exports come from the linked kdebug_ops
-initializer (version followed by the eighteen function pointers).
+initializer (version followed by the nineteen function pointers).
 """
 import argparse
 import json

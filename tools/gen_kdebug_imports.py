@@ -23,10 +23,12 @@ STAGE_KINDS = {
           ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
     'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
     'S4': ('FUNC',) * 25,
+    'S5': ('FUNC',) * 6,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
     STAGES[_stage] = (list(STAGES.values())[-1] if STAGES else 0) + len(_kinds)
+LAST_STAGE = list(STAGE_KINDS)[-1]
 GENERATIONS = json.loads((ROOT / 'sdk/kapi.json').read_text())['generations']
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
@@ -72,7 +74,7 @@ def declaration(row, root):
 def load_def(path=DEFAULT_DEF, root=ROOT):
     document = json.loads(Path(path).read_text())
     rows = document['imports']
-    if document['schema'] != 2 or len(rows) != STAGES['S4']:
+    if document['schema'] != 2 or len(rows) != STAGES[LAST_STAGE]:
         raise ValueError('expected schema 2 and complete stage table')
     contracts = [(stage, kind) for stage, kinds in STAGE_KINDS.items() for kind in kinds]
     entries = []
@@ -167,7 +169,7 @@ def check_nm(entries, nm=None, root=ROOT):
     return True
 
 
-def generate(entries, out_dir, stage='S4'):
+def generate(entries, out_dir, stage=LAST_STAGE):
     selected = entries[:STAGES[stage]]
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -203,7 +205,8 @@ def generate(entries, out_dir, stage='S4'):
     kernel += ['};', 'const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {']
     from mkmod import OPS_NAMES
     slots = {'S1': [5], 'S2': list(range(1, 6)),
-             'S3': list(range(1, 17)), 'S4': list(range(1, 17)) + [18]}[stage]
+             'S3': list(range(1, 17)), 'S4': list(range(1, 17)) + [18],
+             'S5': list(range(1, 17)) + [18, 19]}[stage]
     kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
     kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')
@@ -223,7 +226,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--def', dest='definition', type=Path, default=DEFAULT_DEF)
     parser.add_argument('--out-dir', type=Path)
-    parser.add_argument('--stage', choices=STAGES, default='S4')
+    parser.add_argument('--stage', choices=STAGES, default=LAST_STAGE)
     parser.add_argument('--check-nm', action='store_true')
     parser.add_argument('--nm')
     args = parser.parse_args()

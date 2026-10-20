@@ -298,6 +298,12 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kcg_cache_stats,
     (void (*)(void))v86_io_reset_policy,
     (void (*)(void))paging_pte_flags,
+    (void (*)(void))paging_is_present,
+    (void (*)(void))paging_map_phys,
+    (void (*)(void))paging_pte_raw,
+    (void (*)(void))paging_pte_restore,
+    (void (*)(void))pci_find,
+    (void (*)(void))pci_get,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -541,6 +547,12 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xa2bd76a9u, 1, 1},
     {0x80dedfebu, 1, 1},
     {0xb38c36d5u, 1, 1},
+    {0x57c7e202u, 1, 1},
+    {0x4aac19d1u, 1, 1},
+    {0x8df0b744u, 1, 1},
+    {0xad5cc9c0u, 1, 1},
+    {0x3f359573u, 1, 1},
+    {0xe2843d64u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},
@@ -560,4 +572,5 @@ const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = 
     [14] = {0x2492b85cu, 1, 0},
     [15] = {0x75aae460u, 1, 0},
     [17] = {0x51f56217u, 1, 0},
+    [18] = {0x2283f8adu, 1, 0},
 };

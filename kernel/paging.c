@@ -772,6 +772,28 @@ u32 paging_pte_flags(u32 virt_addr)
     return page_tables[pdi][pti] & 0xFFFu;
 }
 
+/* PTE の生値 (番地 + フラグ)。PT が無ければ 0。kdebug の peek が窓の PTE を
+ * 張り替える前に退避する (TASK_KPEEK §2-4 4)。読むだけ。 */
+u32 paging_pte_raw(u32 virt_addr)
+{
+    u32 pdi = virt_addr >> 22;
+    u32 pti = (virt_addr >> 12) & 0x3FF;
+    if (!page_tables[pdi]) return 0;
+    return page_tables[pdi][pti];
+}
+
+/* paging_pte_raw で退避した生値をそのまま書き戻す。PT が無ければ -1。
+ * PDE は触らない (窓の PDE は paging_init で present、live AS も同じ PT)。 */
+int paging_pte_restore(u32 virt_addr, u32 raw)
+{
+    u32 pdi = virt_addr >> 22;
+    u32 pti = (virt_addr >> 12) & 0x3FF;
+    if (!page_tables[pdi]) return -1;
+    page_tables[pdi][pti] = raw;
+    if (pg_enabled) arch_mmu_flush_tlb();
+    return 0;
+}
+
 /* ======================================================================== */
 /*  リング3 アドレス空間 (M1b: PD 複製)                                     */
 /*                                                                          */

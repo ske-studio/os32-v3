@@ -3,7 +3,7 @@ ifeq ($(origin KERNEL_CFLAGS),undefined)
 include build/config.mk
 endif
 KDEBUG_OUT ?= $(BUILD_OUT)/kdebug
-KDEBUG_STAGE := S4
+KDEBUG_STAGE := S5
 KDEBUG_GEN := kdebug/generated
 MODULE_SCHEMA := kernel/module_schema.h
 $(MODULE_SCHEMA): tools/module_schema.py tools/gen_module_schema.py

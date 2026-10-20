@@ -41,7 +41,7 @@ CASES += [('prefix-return-reclaimed', 10, 0), ('prefix-return-isolated', 10, 1)]
 CASES += [(f'registered-start-failure-{i}', 11, i) for i in range(6)]
 CASES += [('registry-full-unmount-reuse', 12, 0)]
 REJECTIONS = [(name, 9, rc) for _, name, _, rc, _ in image_cases()
-              if name in ('export-slot-19', 'export-duplicate', 'crc')]
+              if name in ('export-slot-20', 'export-duplicate', 'crc')]
 CASES += REJECTIONS
 
 
