@@ -26,3 +26,7 @@ check-gui-host:
 - userland/rust/libos32gui/src/utf8core.rs
 - tools/check_map.d/check-gui-host.yaml
 - build/checks.d/check-gui-host.mk
+- tools/tests/g16_fixture.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv

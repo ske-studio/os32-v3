@@ -98,4 +98,8 @@ check-trim-flow-host:
 - kernel/kaudit_boot.c
 - kernel/memory_boot.c
 - tools/fetch_fonts.py
+- tools/tests/g16_fixture.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv
 artifact_reader: true

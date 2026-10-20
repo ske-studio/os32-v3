@@ -180,6 +180,10 @@ fn ja_path() -> std::path::PathBuf {
 }
 unsafe extern "C" fn m_open(path: *const u8, id: *mut u32, size: *mut u32) -> i32 {
     let p = std::ffi::CStr::from_ptr(path as *const std::ffi::c_char).to_str().unwrap();
+    // TASK_FONTPERF F3: no .g16 bundle here (the TTF path; gui_font_host.rs tests the bundle).
+    if p == os32_font::paths::FONT_JA_G16 {
+        return os32api::gui::proto::OS32_ERR_NOTFOUND;
+    }
     let file = if p == os32_font::paths::FONT_LATIN {
         latin_path()
     } else {

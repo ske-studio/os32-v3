@@ -356,14 +356,14 @@ static void generic_regression(void)
     }
 }
 
-/* FD の予算 (T7b-a6 の値): 予約分の GENERIC を開いたまま shell と app の
+/* FD の予算 (T7b-a6 の値、F3 で束の +1・予約 9→7): 予約分の GENERIC を開いたまま shell と app の
  * 上限ぶんの font FD が全部開ける。値そのものも固定する */
 static void budget(void)
 {
     VfsFontLease l;
     int i;
-    CHECK(VFS_FONT_FD_RESERVED == 9 && VFS_FONT_FD_MAX_SHELL == 2);
-    CHECK(VFS_FONT_FD_MAX_APP == 2 && VFS_FONT_FD_MAX_APP_TOTAL == 2);
+    CHECK(VFS_FONT_FD_RESERVED == 7 && VFS_FONT_FD_MAX_SHELL == 3);
+    CHECK(VFS_FONT_FD_MAX_APP == 3 && VFS_FONT_FD_MAX_APP_TOTAL == 3);
     CHECK(VFS_FONT_FD_RESERVED + VFS_FONT_FD_MAX_SHELL +
           VFS_FONT_FD_MAX_APP_TOTAL <= VFS_MAX_OPEN_FILES - 3);
     for (i = 0; i < VFS_FONT_FD_RESERVED; i++) CHECK(vfs_open("/g", O_RDONLY) >= 3);

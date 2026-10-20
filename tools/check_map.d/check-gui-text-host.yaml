@@ -21,3 +21,7 @@ check-gui-text-host:
 - tools/tests/test_font_reader.py
 - userland/rust/libos32gui/src/app.rs
 - userland/rust/libos32gui_stub/src/lib.rs
+- tools/tests/g16_fixture.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv

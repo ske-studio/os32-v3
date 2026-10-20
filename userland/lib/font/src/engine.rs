@@ -9,7 +9,14 @@
 //! invalidate_all/detach refuse with Busy and further resolves answer Kcg.
 //! `open` and a resolve that misses read and rasterise (f32): call them inside
 //! the x87 guard/fp scope on OS32. Hits and `peek` do not read or use x87.
+//!
+//! TASK_FONTPERF F3: an optional .g16 bundle (`open_bundle`, after `open`) answers
+//! Full 16px misses with the pre-drawn cell (one read_at, no cmap/raster); it is
+//! never used at 32px (F-1). Every path that closes the faces (close,
+//! set_kcg_only, the Stale of `begin`, reopen) drops the bundle's source too
+//! (F-8). `preload_from_bundle` / `preload_ascii` fill the cache at open.
 use crate::{
+    bundle::{Bundle, BundleStats, Fetch, Reject},
     cache::{Entry, FaceId, GlyphCache, GlyphKey, Kind, Stats},
     limits::*,
     raster::{PixelSize, RasterScratch},
@@ -93,6 +100,7 @@ pub struct Engine<S> {
     ja: Face<S>,
     scratch: RasterScratch,
     cache: GlyphCache,
+    bundle: Bundle<S>,
     tmp: [u8; MAX_BITMAP_BYTES],
     set_slot: u16,
     state: State,
@@ -129,6 +137,7 @@ impl<S> Engine<S> {
             ja: Face::new(),
             scratch: RasterScratch::new(),
             cache: GlyphCache::new(),
+            bundle: Bundle::new(),
             tmp: [0; MAX_BITMAP_BYTES],
             set_slot: 0,
             state: State::Closed,
@@ -152,6 +161,22 @@ impl<S> Engine<S> {
     pub fn stats(&self) -> &Stats {
         self.cache.stats()
     }
+    /// Bundle counters (appended to the owners' stats, G-3).
+    pub fn bundle_stats(&self) -> BundleStats {
+        self.bundle.stats()
+    }
+    /// True while an accepted bundle is open.
+    pub fn bundle_ok(&self) -> bool {
+        self.bundle.is_ok()
+    }
+    /// True while the bundle holds a source (lease) — for the lease-count tests.
+    pub fn bundle_has_source(&self) -> bool {
+        self.bundle.has_source()
+    }
+    /// (n_all, n_pre) of the open bundle.
+    pub fn bundle_counts(&self) -> (u32, u32) {
+        self.bundle.counts()
+    }
     /// The shell's x87 guard answered BUSY for this text() (drawn KCG).
     pub fn note_guard_busy(&mut self) {
         let s = self.cache.stats_mut();
@@ -169,6 +194,7 @@ impl<S> Engine<S> {
     fn close_faces(&mut self) {
         self.latin.close();
         self.ja.close();
+        self.bundle.close();
         self.cache.invalidate_all();
         self.checked = false;
     }
@@ -338,6 +364,31 @@ impl<S> Engine<S> {
     }
 }
 
+/// A bundle record: the Full 16px cell of the ja face (fontperf design §2).
+const BUNDLE_ENTRY: Entry = Entry {
+    kind: Kind::Bitmap,
+    face: FaceId::Ja,
+    left: 0,
+    top: ASCENT_JA_PX,
+    width: G16_CELL_PX as u16,
+    height: G16_CELL_PX as u16,
+    pitch: (G16_CELL_PX / 8) as u16,
+};
+
+/// The entry of a bundle record: an inkless cell is a Space (as the raster
+/// answers a glyph without ink), any other the Full cell bitmap.
+fn bundle_entry(bits: &[u8; G16_ALL_REC]) -> Entry {
+    if bits.iter().all(|b| *b == 0) {
+        Entry {
+            kind: Kind::Space,
+            face: FaceId::Ja,
+            ..Entry::default()
+        }
+    } else {
+        BUNDLE_ENTRY
+    }
+}
+
 fn kind_result(kind: Kind) -> Resolved {
     match kind {
         Kind::Bitmap => Resolved::Bitmap,
@@ -370,6 +421,64 @@ impl<S: Source> Engine<S> {
                 Err(EngineError::Font(e))
             }
         }
+    }
+
+    /// F3: open the .g16 bundle of the open set (after `open`; its failure
+    /// leaves the faces Ready and the TTF path in use). The source is dropped
+    /// unless the bundle is accepted.
+    pub fn open_bundle(&mut self, src: S) -> Result<(), Reject> {
+        if self.busy || self.state != State::Ready {
+            drop(src);
+            self.bundle.reject(Reject::NotOpen);
+            return Err(Reject::NotOpen);
+        }
+        let identity = self.ja.head_identity();
+        self.bundle.open(src, identity)
+    }
+
+    /// F3 ⓑ: commit up to `max` records of the bundle's preload section (list
+    /// order) into the cache. Returns the number committed (0 without an
+    /// accepted bundle, an arena, or a Ready set).
+    pub fn preload_from_bundle(&mut self, max: usize) -> Result<u32, EngineError> {
+        self.not_busy()?;
+        if self.state != State::Ready || !self.cache.has_arena() {
+            return Ok(0);
+        }
+        let set = self.set_slot;
+        let cache = &mut self.cache;
+        Ok(self.bundle.preload(max, |cp, bits| {
+            let key = GlyphKey {
+                set,
+                cp,
+                px: px_code(PixelSize::Px16),
+            };
+            let entry = bundle_entry(bits);
+            let bits: &[u8] = if entry.kind == Kind::Bitmap { bits } else { &[] };
+            !cache.contains(key) && cache.commit(key, &entry, bits, Cell::Full).is_ok()
+        }))
+    }
+
+    /// F3 ⓑ: resolve the printable ASCII range (Half, 16px) once so the first
+    /// text() hits; call right after `open` inside the x87 scope (the leases
+    /// were checked by the open). Returns the number of cached results.
+    pub fn preload_ascii(&mut self) -> Result<u32, EngineError> {
+        self.not_busy()?;
+        if self.state != State::Ready || !self.cache.has_arena() {
+            return Ok(0);
+        }
+        let was = self.checked;
+        self.checked = true;
+        let mut n = 0;
+        for cp in PRELOAD_ASCII_FIRST..=PRELOAD_ASCII_LAST {
+            let mut g = Glyph::default();
+            let _ = self.resolve(cp, Cell::Half, PixelSize::Px16, &mut g);
+            self.release();
+            if g.cached {
+                n += 1;
+            }
+        }
+        self.checked = was;
+        Ok(n)
     }
 
     /// Entry of one text(): check each open face's lease once. A failure
@@ -412,6 +521,21 @@ impl<S: Source> Engine<S> {
         }
         let s = self.cache.stats_mut();
         s.miss = s.miss.wrapping_add(1);
+        // F3: a Full 16px miss is answered from the bundle when it holds the cp
+        // (F-1: never at 32px); a read failure falls through to the TTF path.
+        if px == PixelSize::Px16 && cell == Cell::Full && self.bundle.is_ok() {
+            let mut bits = [0u8; G16_ALL_REC];
+            if self.bundle.fetch(cp, &mut bits) == Fetch::Hit {
+                let entry = bundle_entry(&bits);
+                if entry.kind != Kind::Bitmap {
+                    return self.settle(key, entry, cell, px, out);
+                }
+                if let Some(dst) = self.tmp.get_mut(..G16_ALL_REC) {
+                    dst.copy_from_slice(&bits);
+                    return self.publish(key, entry, cell, px, out);
+                }
+            }
+        }
         // Full cells never fall back to the latin face (box/block glyphs overflow
         // the 16px slot); a miss there goes to KCG. Half cells above ASCII never
         // fall back to the ja face either (T7b-b5): its Latin-1 glyphs are
@@ -477,6 +601,12 @@ impl<S: Source> Engine<S> {
             entry.pitch = 0;
             return self.settle(key, entry, cell, px, out);
         }
+        self.publish(key, entry, cell, px, out)
+    }
+
+    /// Commit the complete bitmap in `tmp` and borrow it (from its slot, or
+    /// uncached from the scratch when no slot takes it).
+    fn publish(&mut self, key: GlyphKey, mut entry: Entry, cell: Cell, px: PixelSize, out: &mut Glyph) -> Resolved {
         let bits = self.tmp.get(..entry.bytes()).unwrap_or(&[]);
         let (cached, at) = match self.cache.commit(key, &entry, bits, cell) {
             Ok(slot) => {

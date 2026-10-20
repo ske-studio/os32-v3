@@ -24,6 +24,10 @@
 //!   SQLite を開閉するので text() からは読まない)。NOSPC / open 失敗は前景化の
 //!   たびに 1 回だけ再試行 ([`on_focus_in`])。
 //!
+//! - **束** (TASK_FONTPERF F3): face の open の直後に 3 本目の lease で `.g16` を開き
+//!   (NOTFOUND / NOSPC は束なし)、先読み節を `APP_PRELOAD_MAX` 字まで cache へ。
+//!   束の lease は face と同じ経路 (reload・再試行・Stale) で Engine が drop する。
+//!
 //! シングルタスク・協調切替。ここの関数はどれも 1 本のループからしか呼ばれない。
 #![allow(dead_code)]
 
@@ -31,10 +35,11 @@ use core::cell::UnsafeCell;
 use core::mem::{align_of, size_of};
 use core::ptr;
 
+use os32_font::bundle::BundleStats;
 use os32_font::cache::Stats;
 use os32_font::engine::{Engine, Reason, State};
-use os32_font::limits::{layout, ARENA_BYTES_APP, FONT_SET_KCG_ONLY, FONT_SET_STD, N32};
-use os32_font::paths::{FONT_JA_C, FONT_LATIN_C};
+use os32_font::limits::{layout, APP_PRELOAD_MAX, ARENA_BYTES_APP, FONT_SET_KCG_ONLY, FONT_SET_STD, N32};
+use os32_font::paths::{FONT_JA_C, FONT_JA_G16_C, FONT_LATIN_C};
 use os32_font::reader::{Error, Result as FontResult, Source};
 use os32api::gui::proto::{OS32_ERR_IO, OS32_ERR_NOSPC, OS32_ERR_NOSYS};
 
@@ -155,7 +160,11 @@ pub struct AppFontStats {
     pub arena_allocs: u32,
     pub arena_frees: u32,
     pub alloc_fails: u32,
+    /// TASK_FONTPERF F3 (G-3: 末尾にだけ足す、u32 は計 37): 束の ok / rejected / hit / miss / err。
+    pub bundle: BundleStats,
 }
+// fontbench (gdi_test) と libos32gui_stub は 37 語 (NSTAT) で読む。
+const _: () = assert!(size_of::<AppFontStats>() == 37 * 4);
 
 struct FontState {
     engine: *mut AppEngine,
@@ -285,10 +294,16 @@ fn open_faces(e: &mut AppEngine) -> i32 {
         }
     };
     /* 失敗は Engine が両 face を閉じ (Source の Drop で close) KcgOnly(OpenFailed)。 */
-    match fp_scope(|| e.open(latin, ja)) {
-        Ok(()) => 0,
-        Err(_) => OS32_ERR_IO,
+    if fp_scope(|| e.open(latin, ja)).is_err() {
+        return OS32_ERR_IO;
     }
+    /* F3: 束 (開けない・合わないときは TTF 経路のまま) と先読み (整数だけ、x87 不要)。 */
+    if let Ok(g16) = AppSource::open(FONT_JA_G16_C) {
+        if e.open_bundle(g16).is_ok() && APP_PRELOAD_MAX > 0 {
+            let _ = e.preload_from_bundle(APP_PRELOAD_MAX);
+        }
+    }
+    0
 }
 
 /// Closed の Engine を設定どおりに開く (font_set と font/gen を読み直す)。
@@ -445,6 +460,7 @@ pub fn stats() -> AppFontStats {
     };
     if let Some(e) = current() {
         out.engine = *e.stats();
+        out.bundle = e.bundle_stats();
         let (state, reason) = match e.state() {
             State::Closed => (0, 0),
             State::Ready => (1, 0),

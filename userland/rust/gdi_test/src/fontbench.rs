@@ -3,7 +3,7 @@
 //! `gdi_test font seq|scatter` : 1000 字 (a6 の `font_test -p/-s` と同じ字の並び、
 //!   corpus.rs) を 40 字 × 25 行で screen に描く。1 回目 = cold (この process で
 //!   Engine・arena・face を初めて開く)、2 回目 = warm (同じ画面の 2 回目)、
-//!   最後に先頭 600 字 (arena の 16px slot 682 に収まる) の 2 周目。各 pass の tick・
+//!   最後に先頭 600 字 (arena 128KiB の Cell 枠 3,200 に収まる) の 2 周目。各 pass の tick・
 //!   1 回の text() (40 字) の最大 tick・字形 engine の数の差 (`font_stats`)・
 //!   stack の high-water (入口から下 48KiB に印を塗って数える) を出す。
 //! `gdi_test font x87` : CW=0x0E7F・ZE を立てた状態で未 cache 字を描き、
@@ -21,8 +21,8 @@ const LINES: usize = 25;
 const SUBSET: usize = 600;
 const STACK_PAINT: usize = 48 * 1024;
 const STACK_MARK: u32 = 0x5A3C_96E1;
-/// `AppFontStats` の u32 数 (engine Stats 17 + 15)。
-const NSTAT: usize = 32;
+/// `AppFontStats` の u32 数 (engine Stats 17 + 15 + 束 5、TASK_FONTPERF F3 で末尾に足した)。
+const NSTAT: usize = 37;
 const I_STATE: usize = 17;
 const I_REASON: usize = 18;
 const I_ARENA: usize = 20;
@@ -30,6 +30,12 @@ const I_OPEN_RC: usize = 22;
 const I_OPENS: usize = 23;
 const I_ARENA_ALLOCS: usize = 29;
 const I_ALLOC_FAILS: usize = 31;
+/// 束の数 (`BundleStats`: ok / rejected / hit / miss / err)。
+const I_BUNDLE_OK: usize = 32;
+const I_BUNDLE_REJ: usize = 33;
+const I_BUNDLE_HIT: usize = 34;
+const I_BUNDLE_MISS: usize = 35;
+const I_BUNDLE_ERR: usize = 36;
 
 fn fstats() -> [u32; NSTAT] {
     let mut raw = [0u8; NSTAT * 4];
@@ -59,7 +65,7 @@ fn char_starts(s: &[u8], out: &mut [usize; 1001]) -> usize {
     n
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 struct PassResult {
     ticks: u32,
     max_call: u32,
@@ -129,6 +135,8 @@ fn report(label: &[u8], r: &PassResult) {
         label.as_ptr(), d[3] as i32, d[5] as i32, d[6] as i32, d[7] as i32, d[8] as i32);
     os32api::kprint!(b"FBENCH %s cmapmiss=%d validate=%d kcg=%d state=%d reason=%d\r\n\0",
         label.as_ptr(), d[9] as i32, d[10] as i32, d[12] as i32, d[I_STATE] as i32, d[I_REASON] as i32);
+    os32api::kprint!(b"FBENCH %s g16hit=%d g16miss=%d g16err=%d\r\n\0",
+        label.as_ptr(), d[I_BUNDLE_HIT] as i32, d[I_BUNDLE_MISS] as i32, d[I_BUNDLE_ERR] as i32);
 }
 
 pub fn run(screen: SurfaceId, sw: i32, sh: i32, mode: &[u8]) -> i32 {
@@ -165,6 +173,9 @@ pub fn run(screen: SurfaceId, sw: i32, sh: i32, mode: &[u8]) -> i32 {
     os32api::kprint!(b"FBENCH n=%d open_t=%d opens=%d open_rc=%d state=%d reason=%d arena=%d\r\n\0",
         n as i32, topen as i32, s1[I_OPENS].wrapping_sub(s0[I_OPENS]) as i32, s1[I_OPEN_RC] as i32,
         s1[I_STATE] as i32, s1[I_REASON] as i32, s1[I_ARENA] as i32);
+    os32api::kprint!(b"FBENCH g16 ok=%d rej=%d open_commit=%d open_hit=%d\r\n\0",
+        s1[I_BUNDLE_OK] as i32, s1[I_BUNDLE_REJ] as i32, s1[3].wrapping_sub(s0[3]) as i32,
+        s1[I_BUNDLE_HIT].wrapping_sub(s0[I_BUNDLE_HIT]) as i32);
     report(b"cold\0", &cold);
     report(b"warm\0", &warm);
     report(b"sub600_1\0", &sub1);

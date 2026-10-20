@@ -19,6 +19,12 @@
 //! 局所に受けて使ってから返す薄い `#[inline(never)]` 関数だけにする
 //! (尾呼出しにしない、b12 設計 §3-2 の注記)。
 //!
+//! TASK_FONTPERF F3: 3 本目の lease で描き済みの字形の束 (`.g16`) を開き
+//! (NOSPC / NOTFOUND は束なしで続ける)、[`open_cb`] の中で face の open の直後に
+//! `open_bundle` → 束の先読み節 (`SHELL_PRELOAD_MAX`) → ASCII 95 字の raster を
+//! cache に入れる。束の lease は face と同じ経路 (close・設定変更・Stale) で
+//! Engine が drop し、guard の中なら保留中の close へ回る ([`close_lease`])。
+//!
 //! 設定 (`gshell` scope の `font_set`) が変わったら [`reconfigure`]: close →
 //! open (Engine が invalidate_all → set_slot+1) → tracked app 全部に
 //! `GUI_EV_FONT` → 全クライアントと WM の chrome を描き直す。open の失敗は
@@ -27,10 +33,11 @@
 
 use core::cell::UnsafeCell;
 
+use os32_font::bundle::BundleStats;
 use os32_font::cache::Stats;
 use os32_font::engine::{Cell, Engine, EngineError, Glyph, Reason, Resolved, State};
-use os32_font::limits::{layout, ARENA_BYTES_SHELL, FONT_SET_KCG_ONLY, N32};
-use os32_font::paths::{FONT_JA_C, FONT_LATIN_C};
+use os32_font::limits::{layout, ARENA_BYTES_SHELL, FONT_SET_KCG_ONLY, N32, SHELL_PRELOAD_MAX};
+use os32_font::paths::{FONT_JA_C, FONT_JA_G16_C, FONT_LATIN_C};
 use os32_font::raster::PixelSize;
 use os32_font::reader::{Error as FontError, Result as FontResult, Source};
 use os32api::gui::proto::GUI_EV_FONT;
@@ -160,6 +167,10 @@ pub struct FontStats {
     pub n_valid: u32,
     pub retries: u32,
     pub cache: Stats,
+    /// TASK_FONTPERF F3 (G-3: 末尾にだけ足す): 束の数 (ok / rejected / hit / miss / err)。
+    pub bundle: BundleStats,
+    /// 直近の open の先読みで cache に入れた字 (束の先読み節 + ASCII)。
+    pub preloaded: u32,
 }
 
 impl FontStats {
@@ -212,6 +223,11 @@ struct Font {
     /// 次の `consume` で 1 回だけ開き直す。
     retry: bool,
     font_set: u8,
+    /// 直近の open の束の lease の rc (0 = 開けた、負 = 開けず束なし)。
+    g16_rc: i32,
+    /// 直近の open の先読みの字数 (束の先読み節、ASCII)。
+    pre_bundle: u32,
+    pre_ascii: u32,
 }
 
 impl Font {
@@ -223,6 +239,9 @@ impl Font {
         arena_tried: false,
         retry: false,
         font_set: 0,
+        g16_rc: 0,
+        pre_bundle: 0,
+        pre_ascii: 0,
     };
 }
 
@@ -359,16 +378,19 @@ fn sync_stats() {
     s.set_slot = u32::from(font.engine.set_slot());
     s.n_valid = font.engine.cache().n_valid() as u32;
     s.cache = *font.engine.stats();
+    s.bundle = font.engine.bundle_stats();
+    s.preloaded = font.pre_bundle.wrapping_add(font.pre_ascii);
 }
 
 /* ================================================================ */
 /*  open / close (top-level の安全点だけ)                            */
 /* ================================================================ */
 
-/// `open_cb` へ渡す lease 2 本 (callback が取る、取られなければ guard の外で drop)。
+/// `open_cb` へ渡す lease 2 本 + 束 (callback が取る、取られなければ guard の外で drop)。
 struct OpenJob {
     latin: Option<ShellSource>,
     ja: Option<ShellSource>,
+    g16: Option<ShellSource>,
 }
 
 /// 結果の語 (ログ用)。
@@ -392,12 +414,25 @@ unsafe extern "C" fn open_cb(ctx: *mut u8) -> i32 {
         (Some(l), Some(j)) => (l, j),
         _ => return -1,
     };
-    let eng = &mut f().engine;
+    let g16 = job.g16.take();
+    let font = f();
+    let eng = &mut font.engine;
     let rc = match eng.open(latin, ja) {
         Ok(()) => 0,
         Err(EngineError::Busy) => -2,
         Err(EngineError::Font(_)) => -1,
     };
+    if rc != 0 {
+        /* 束の lease は drop (guard の中なので close は保留へ)。 */
+        drop(g16);
+        return rc;
+    }
+    /* F3: 束 (失敗しても Ready のまま TTF 経路) → 先読み節 → ASCII の raster。 */
+    if let Some(src) = g16 {
+        let _ = eng.open_bundle(src);
+        font.pre_bundle = eng.preload_from_bundle(SHELL_PRELOAD_MAX).unwrap_or(0);
+    }
+    font.pre_ascii = font.engine.preload_ascii().unwrap_or(0);
     rc
 }
 
@@ -480,6 +515,8 @@ fn open_inner(font_set: u8, arm_retry: bool) -> i32 {
         ShellServiceState::Absent => return fail(Reason::OpenFailed, OS32_ERR_NOSYS, false),
     };
     arena_once();
+    f().pre_bundle = 0;
+    f().pre_ascii = 0;
     let mut sources = [None, None];
     for (k, path) in [FONT_LATIN_C, FONT_JA_C].iter().enumerate() {
         let (mut id, mut size) = (0u32, 0u32);
@@ -495,8 +532,13 @@ fn open_inner(font_set: u8, arm_retry: bool) -> i32 {
         }
         sources[k] = Some(ShellSource { id, size });
     }
+    /* F3: 束の lease (3 本目)。NOTFOUND / NOSPC は束なしで続ける。 */
+    let (mut id, mut size) = (0u32, 0u32);
+    let g16_rc = svc_open(t, FONT_JA_G16_C, &mut id, &mut size);
+    f().g16_rc = g16_rc;
+    let g16 = if g16_rc < 0 { None } else { Some(ShellSource { id, size }) };
     let [latin, ja] = sources;
-    let mut job = OpenJob { latin, ja };
+    let mut job = OpenJob { latin, ja, g16 };
     let rc = guard_run(t, open_cb, &mut job as *mut OpenJob as *mut u8);
     /* callback が取らなかった lease (NOSYS / BUSY) はここ (guard の外) で閉じる。 */
     drop(job);
@@ -531,6 +573,9 @@ fn open_set(st: &GuiState, font_set: u8, arm_retry: bool) -> i32 {
     }
     sync_stats();
     log_open(st, before, rc);
+    if f().engine.state() == State::Ready {
+        log_g16(st);
+    }
     rc
 }
 
@@ -701,6 +746,8 @@ struct Line {
     n: usize,
 }
 impl Line {
+    /* 呼出し点ごとに展開させない (像の余裕、TASK_FONTPERF F3)。 */
+    #[inline(never)]
     fn s(&mut self, s: &[u8]) {
         for &c in s {
             if self.n < self.b.len() - 2 {
@@ -709,6 +756,7 @@ impl Line {
             }
         }
     }
+    #[inline(never)]
     fn dec(&mut self, v: i32) {
         if v < 0 {
             self.s(b"-");
@@ -744,6 +792,39 @@ fn log_open(st: &GuiState, before: u16, rc: i32) {
     l.dec(i32::from(f().font_set));
     l.s(b" rc=");
     l.dec(rc);
+    let n = l.n;
+    if let Ok(msg) = core::str::from_utf8(&l.b[..n]) {
+        gserial::notify(st, msg);
+    }
+    l.b[n] = b'\n';
+    l.b[n + 1] = 0;
+    unsafe {
+        (os32api::api().kprintf)(os32api::ATTR_WHITE, b"%s\0".as_ptr(), l.b.as_ptr());
+    }
+}
+
+/// `font: g16 ok n_all=<n> n_pre=<n> pre=<束>+<ASCII>` /
+/// `font: g16 off rc=<lease rc> rej=<Reject> pre=0+<ASCII>` (F3、シリアル 1 行)。
+fn log_g16(st: &GuiState) {
+    let font = f();
+    let mut l = Line { b: [0; 96], n: 0 };
+    let b = font.engine.bundle_stats();
+    if font.engine.bundle_ok() {
+        let (n_all, n_pre) = font.engine.bundle_counts();
+        l.s(b"font: g16 ok n_all=");
+        l.dec(n_all as i32);
+        l.s(b" n_pre=");
+        l.dec(n_pre as i32);
+    } else {
+        l.s(b"font: g16 off rc=");
+        l.dec(font.g16_rc);
+        l.s(b" rej=");
+        l.dec(b.rejected as i32);
+    }
+    l.s(b" pre=");
+    l.dec(font.pre_bundle as i32);
+    l.s(b"+");
+    l.dec(font.pre_ascii as i32);
     let n = l.n;
     if let Ok(msg) = core::str::from_utf8(&l.b[..n]) {
         gserial::notify(st, msg);
