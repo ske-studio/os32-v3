@@ -1,5 +1,6 @@
 /* Real allocator and real caller frames; only Linux/MMU is simulated. */
 #include "mem_fixture.c"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm_source.c"
 #define kstack_high_water actual_kstack_high_water
 #include "kernel/kstack_hw.c"

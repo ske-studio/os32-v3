@@ -37,6 +37,7 @@ int ring3_user_ranges_writable(u32 a, u32 n, u32 b, u32 m)
   return writable(a, n) && writable(b, m); }
 #define KAPI_OUT_LEN(p,n) ((u32)(n))
 #define KAPI_HIT(slot) ((void)0)
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "public_wrap_host_source.c"
 #define REJECT(call) do { if (!__builtin_setjmp(jump)) { (void)(call); SAY("FAIL: guard " #call); die(1); } } while (0)
 static void caller_copy_tests(void)

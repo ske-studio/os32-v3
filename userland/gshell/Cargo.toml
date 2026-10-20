@@ -19,6 +19,11 @@ description = "OS32 GUI shell / window manager (resident shell band, CPL=0)"
 # staticlib: crt0 + libos32gfx.a と最終リンクして /bin/gshell.bin を作る。
 crate-type = ["staticlib"]
 
+[features]
+# T7b-b2 b2③ のゲスト fixture (src/fixture.rs)。製品 build には入れない —
+# `make gshell GSHELL_FEATURES=r1_fixture` のときだけ (build/programs.mk)。
+r1_fixture = []
+
 [dependencies]
 # in-repo クレートのみ。os32api が KernelAPI バインディング / GUI 共有定義
 # (os32api::gui::proto) / libos32gfx の extern "C" 宣言 / panic_handler /

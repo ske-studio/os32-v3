@@ -79,6 +79,10 @@ void v86_int80(u32 *frame) {
     assert(frame[V86I_EFLAGS] & EFLAGS_VM);
     guest_ints++;
 }
+/* T7b-b2: exec/shell_service.c の WM 区間の印 (ring3_wm_enter が深さ 1 で呼ぶ)。 */
+volatile u32 ring3_wm_shell_gen;
+static int wm_marks;
+void shell_service_wm_mark(void) { wm_marks++; ring3_wm_shell_gen = 9; }
 /* The runner inserts the unmodified ring3_syscall_dispatch definition here. */
 #include "dispatcher.inc"
 #include "wm.inc"
@@ -191,18 +195,24 @@ int main(void)
         assert(caller_access_enter(&previous, CALLER_TRUSTED));
         assert(caller_access_get(&a));
         frame[7] = 0;
+        ring3_wm_shell_gen = 5;   /* T7b-b2 b2⑤: 残った WM の印は dispatch 入口で 0 */
         ring3_syscall_dispatch(frame);
+        assert(ring3_wm_shell_gen == 0);
         assert(caller_access_get(&out) && !memcmp(&a, &out, sizeof(a)));
         caller_access_leave(&previous);
         /* Nested explicit WM scopes preserve the USER descriptor and IF/PD. */
         assert(caller_access_enter(&previous, CALLER_USER));
         assert(caller_access_get_user(&a));
+        wm_marks = 0;
         ring3_wm_enter(); ring3_wm_enter();
+        assert(wm_marks == 1 && ring3_wm_shell_gen == 9);   /* 一番外の enter だけ */
         assert(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
         assert(caller_access_get_user(&out) && !memcmp(&a, &out, sizeof(a)));
         ring3_wm_leave();
         assert(caller_access_get(&out) && out.origin == CALLER_TRUSTED);
+        assert(ring3_wm_shell_gen == 9);
         ring3_wm_leave();
+        assert(ring3_wm_shell_gen == 0);
         assert(caller_access_get(&out) && !memcmp(&a, &out, sizeof(a)));
         caller_access_invalidate();
         assert(!caller_access_get_user(&out) && !caller_access_get(&out));

@@ -1,6 +1,7 @@
 /* Complete product slots, caller/heap/paging transactions, gui and snapshot.
  * Linux MMU/IRQ and absent drivers/FDs are the fixture boundary. */
 #include "mem_fixture.c"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm_source.c"
 
 void *kmemcpy(void *dst, const void *src, u32 n)

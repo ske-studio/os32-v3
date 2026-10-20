@@ -100,13 +100,17 @@ static i32 font_lease_release(FontLease *s)
 
 /* ---- app (public KAPI) ----------------------------------------------- */
 
-/* 門 1・2。通れば *c に caller を入れて 0。 */
+/* 門 1・2。通れば *c に caller を入れて 0。
+ * 資源の owner は caller の app_id (= res_owner_get()、VFS FD の owner と
+ * exec_reclaim_resources(id) の id と同じ番号)。caller.owner は AS の所有者の
+ * 札 (paging の as->owner) で別の番号なので、照合にも lease の owner にも使わない
+ * (S3b のゲストで判明: AS の札 18 と app_id 2 が違い、門 2 で全部断っていた)。 */
 static i32 font_lease_app_gate(struct caller_access *c)
 {
     if (ring3_call_from_user() == 0)
         return font_lease_reject(FONT_LEASE_REJ_NOT_USER, OS32_ERR_INVAL);
     if (!caller_access_get(c) || c->origin != CALLER_USER ||
-        (int)c->owner != res_owner_get())
+        c->app_id != res_owner_get())
         return font_lease_reject(FONT_LEASE_REJ_CALLER, OS32_ERR_INVAL);
     return 0;
 }
@@ -125,7 +129,7 @@ static i32 font_lease_app_token(u32 id, const struct caller_access *c,
         return font_lease_reject(FONT_LEASE_REJ_ID_GEN, OS32_ERR_STALE);
     if (s->kind != FONT_LEASE_APP)
         return font_lease_reject(FONT_LEASE_REJ_KIND, OS32_ERR_INVAL);
-    if (s->vfs.owner != (int)c->owner)
+    if (s->vfs.owner != c->app_id)
         return font_lease_reject(FONT_LEASE_REJ_OWNER, OS32_ERR_INVAL);
     if (s->owner_gen != c->generation)
         return font_lease_reject(FONT_LEASE_REJ_OWNER_GEN, OS32_ERR_STALE);
@@ -145,10 +149,10 @@ i32 font_lease_app_open(const char *path, u32 *out_id, u32 *out_size)
         ring3_fault_kill();
         return font_lease_reject(FONT_LEASE_REJ_PATH, OS32_ERR_INVAL);
     }
-    if (font_lease_count(FONT_LEASE_APP, (int)c.owner, 0) >= VFS_FONT_FD_MAX_APP ||
+    if (font_lease_count(FONT_LEASE_APP, c.app_id, 0) >= VFS_FONT_FD_MAX_APP ||
         font_lease_count(FONT_LEASE_APP, 0, 1) >= VFS_FONT_FD_MAX_APP_TOTAL)
         return OS32_ERR_NOSPC;
-    return font_lease_install(FONT_LEASE_APP, kpath, (int)c.owner,
+    return font_lease_install(FONT_LEASE_APP, kpath, c.app_id,
                               VFS_FONT_OPEN_PIN, c.generation, out_id, out_size);
 }
 

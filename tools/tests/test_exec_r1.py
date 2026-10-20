@@ -40,6 +40,7 @@ def landing(s, start, buf, name):
 
 PRE = r'''
 #include "font_guard_inactive.h"
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "appslot.h"
 #include "exec.h"
 #include "exec_heap.h"
@@ -341,7 +342,7 @@ static int test(void) {
     CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
-    CHECK(sizeof(Ring3CallContext) == 44);
+    CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
     CHECK(irq_register(5, host_handler, 0, 0) == 0);
     kctx_irq_depth = 1; /* IRQ1/0 等固定スタブの上も同じ真実 */
     CHECK(irq_register(6, host_handler, 0, 0) == IRQ_ERR_CTX);

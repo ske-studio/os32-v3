@@ -20,6 +20,7 @@ static void *expected_ctx;
 static void *killed[5];
 volatile int ring3_wm_depth;
 volatile u32 ring3_wm_depth_underflow;
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm.inc"
 int ring3_call_from_user(void) { return user_call && !ring3_wm_depth; }
 void ring3_fault_kill(void) { assert(!fs_active); __builtin_longjmp(killed, 1); }

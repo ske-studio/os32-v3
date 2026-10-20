@@ -3,7 +3,9 @@
 設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §2・§5 (b1①〜⑦、b2②④ の lease 表側)。
 S1 = VFS の内部 API (vfs_open_font / validate / read_at / close_font、公開経路の
 締め出し、vfs_close_owned、FD 予算)。S2 = lease 表・app の門 (public KAPI
-font_source_* の実体)・shell 側の段 C/D (lease_* の case)。lease_limit は
+font_source_* の実体)・shell 側の段 C/D (lease_* の case)。S3b = exec/exec.c の
+回収 hook (exec_reclaim_resources を exec.c から切り出して tmp の exec_reclaim.inc
+に書き、lease_reclaim が実物として呼ぶ)。lease_limit は
 app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ごとの上限を見分ける。
 
   python3 -B tools/tests/test_font_source.py            # ホスト
@@ -22,7 +24,7 @@ CASES = ["open_fields", "open_reject", "read_at", "validate", "close_reuse",
          "stale_close", "public_reject", "close_owned", "pinned_busy",
          "generic_regression", "budget",
          "lease_open", "lease_gate", "lease_token", "lease_read", "lease_close",
-         "lease_limit", "lease_owned", "lease_shell"]
+         "lease_limit", "lease_owned", "lease_shell", "lease_reclaim"]
 # 変種: app の合計上限を owner ごとの上限より大きくして組む (a6 の値は両方 2 で、
 # そのままでは owner ごとの判定が合計の判定に隠れる)
 VARIANT_DEFS = ["-DFONT_SOURCE_HOST_APP_TOTAL=4"]
@@ -34,6 +36,7 @@ INC_DIRS = ("include", "fs", "drivers", "sdk/include/os32", "kernel", "exec", "l
 HOST = "tools/tests/font_source_host.c"
 SRC = "fs/vfs_fd.c"
 LEASE = "kernel/font_source.c"
+EXEC = "exec/exec.c"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
 TARGET_INC = ("include", "arch/x86", "platform/pc98", "sdk/include", "sdk/include/os32",
               "kernel", "drivers", "net", "fs", "exec", "gfx", "lib", "kapi")
@@ -79,18 +82,23 @@ MUTATIONS = [
      "    if (0)\n", "門 1 (CPL=3 の dispatch 中) を外す"),
     (LEASE, "    if (!caller_access_get(c) || c->origin != CALLER_USER ||\n",
      "    if (!caller_access_get(c) ||\n", "門 2 が origin を見ない"),
-    (LEASE, "        (int)c->owner != res_owner_get())\n",
-     "        0)\n", "b1① c.owner == res_owner_get() → 1"),
+    (LEASE, "        c->app_id != res_owner_get())\n",
+     "        0)\n", "b1① c.app_id == res_owner_get() → 1"),
+    (LEASE, "    if (s->vfs.owner != c->app_id)\n",
+     "    if (s->vfs.owner != (int)c->owner)\n", "3d を AS の札 (caller.owner) で照合する"),
+    (LEASE, "    return font_lease_install(FONT_LEASE_APP, kpath, c.app_id,",
+     "    return font_lease_install(FONT_LEASE_APP, kpath, (int)c.owner,",
+     "lease の owner を AS の札にする (回収 id と合わない)"),
     (LEASE, "    if (s->id_gen != id_gen)\n",
      "    if (s->id_gen != id_gen && 0)\n", "3b id_gen を見ない (再 close が STALE にならない)"),
     (LEASE, "    if (s->kind != FONT_LEASE_APP)\n",
      "    if (0)\n", "b2② 3c kind==APP の照合を外す"),
-    (LEASE, "    if (s->vfs.owner != (int)c->owner)\n",
+    (LEASE, "    if (s->vfs.owner != c->app_id)\n",
      "    if (0)\n", "3d 他 owner の id を通す"),
     (LEASE, "    if (s->owner_gen != c->generation)\n",
      "    if (0)\n", "b1① 3e owner_gen != c.generation → 0"),
-    (LEASE, "    if (font_lease_count(FONT_LEASE_APP, (int)c.owner, 0) >= VFS_FONT_FD_MAX_APP ||\n",
-     "    if (font_lease_count(FONT_LEASE_APP, (int)c.owner, 0) > VFS_FONT_FD_MAX_APP ||\n",
+    (LEASE, "    if (font_lease_count(FONT_LEASE_APP, c.app_id, 0) >= VFS_FONT_FD_MAX_APP ||\n",
+     "    if (font_lease_count(FONT_LEASE_APP, c.app_id, 0) > VFS_FONT_FD_MAX_APP ||\n",
      "b1③ >= VFS_FONT_FD_MAX_APP → >"),
     (LEASE, "        font_lease_count(FONT_LEASE_APP, 0, 1) >= VFS_FONT_FD_MAX_APP_TOTAL)\n",
      "        font_lease_count(FONT_LEASE_APP, 0, 1) > VFS_FONT_FD_MAX_APP_TOTAL)\n",
@@ -126,7 +134,24 @@ MUTATIONS = [
      "段 C 登録世代の照合を外す"),
     (LEASE, "        if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);\n",
      "        if (0) (void)font_lease_release(s);\n", "close_shell が閉じない"),
+    # ---- S3b: exec/exec.c の回収 hook ----
+    (EXEC, "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
+     "    vfs_close_owned(id);\n", "b1⑤ exec_reclaim_resources の font_lease_close_owned 呼出を外す"),
+    (EXEC, "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
+     "    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n    font_lease_close_owned(id);\n",
+     "font_lease_close_owned を回収の後ろへずらす"),
 ]
+
+
+def write_reclaim(root, out):
+    """exec.c の exec_reclaim_resources を切り出して out/exec_reclaim.inc に書く"""
+    text = (root / EXEC).read_text(encoding="utf-8")
+    head = "static void exec_reclaim_resources(int id)\n{"
+    if text.count(head) != 1:
+        raise RuntimeError("exec.c に exec_reclaim_resources が 1 つでない")
+    a = text.index(head)
+    b = text.index("\n}\n", a) + 3
+    (out / "exec_reclaim.inc").write_text(text[a:b], encoding="utf-8")
 
 
 def includes(root):
@@ -141,7 +166,9 @@ def gui_shell_owner(root):
 
 
 def build(root, exe, quiet=False, defs=()):
-    p = subprocess.run(["gcc", *FLAGS, *defs, gui_shell_owner(root), *includes(root),
+    write_reclaim(root, exe.parent)
+    p = subprocess.run(["gcc", *FLAGS, *defs, gui_shell_owner(root), "-I" + str(exe.parent),
+                        *includes(root),
                         str(root / HOST), "-o", str(exe)],
                        cwd=root, capture_output=True, text=True)
     if p.returncode != 0 and not quiet:

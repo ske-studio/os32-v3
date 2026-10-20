@@ -83,6 +83,7 @@ static int v86_call_dispatch(u32 slot, void *target, const void *args,
     (void)slot; (void)target; (void)args; (void)bytes; (void)result;
     return 0;
 }
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "dispatch_host_source.c"
 
 /* Exercise the real early gate and wrappers with a mapped USER argument window. */

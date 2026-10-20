@@ -7,6 +7,8 @@ check-font-source-host:
 - exec/exec.h
 - include/redir_access.h
 - fs/fd_redirect.h
+- exec/exec.c
+- exec/exec_kapi_init.inc
 - tools/tests/font_source_host.c
 - tools/tests/test_font_source.py
 - tools/check_map.d/check-font-source-host.yaml

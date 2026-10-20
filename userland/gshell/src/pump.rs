@@ -24,6 +24,9 @@ pub extern "C" fn gshell_gui_pump() {
         return;
     }
     st.in_pump = true;
+    /* b2③ fixture: WM 区間 (ポンプ) の中で shell lease を 1 回読む。 */
+    #[cfg(feature = "r1_fixture")]
+    crate::fixture::pump();
     input::capture(st, input::Ctx::Pump);
     st.in_pump = false;
 }

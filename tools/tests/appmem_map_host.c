@@ -694,6 +694,7 @@ void ring3_resume(const u32 *frame, u32 pd, void *tss) { (void)frame; (void)pd; 
 static void host_caller_access_leave(int *prev) { (void)prev; }
 static void exec_park_stop(u32 *frame) { (void)frame; entered_user++; }
 #define caller_access_leave host_caller_access_leave
+#include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "exec_source.c"
 #undef caller_access_leave
 #include "abort_clear_source.c"

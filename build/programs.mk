@@ -156,8 +156,17 @@ GSHELL_DIR = userland/gshell
 # 展開時に空にならないよう名前を直に書く。
 GSHELL_LIB = $(GSHELL_DIR)/target/i686-os32-none/release/libgshell.a
 
+# GSHELL_FEATURES: ゲスト fixture の cargo feature (例 r1_fixture、T7b-b2 b2③)。
+# 既定は空 = 製品 build。fixture 版の配備は `make gshell GSHELL_FEATURES=r1_fixture`
+# の後に deploy する (deploy の programs は gshell を組み直さない)。
+GSHELL_FEATURES ?=
+GSHELL_FEATURE_STAMP = $(GSHELL_DIR)/target/.os32-features
 $(GSHELL_LIB): FORCE $(RUST_KAPI_RS)
-	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release
+	cd $(GSHELL_DIR) && RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release $(if $(GSHELL_FEATURES),--features $(GSHELL_FEATURES))
+	@# cargo は feature を切り替えると前の build の成果物を古い mtime のまま戻す
+	@# (hard link) ので、feature が前回と違うときだけ時刻を進めて gshell.elf を組み直す。
+	@if [ "$$(cat $(GSHELL_FEATURE_STAMP) 2>/dev/null)" != "[$(GSHELL_FEATURES)]" ]; then \
+		echo "[$(GSHELL_FEATURES)]" > $(GSHELL_FEATURE_STAMP); touch $@; fi
 
 $(RESIDENT_OUT)/gshell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(GSHELL_LIB) $(GFX_OBJ) $(LIBCFG_OBJ)
 	@mkdir -p $(@D)

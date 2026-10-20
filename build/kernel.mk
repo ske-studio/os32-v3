@@ -44,7 +44,7 @@ C_KERNEL = \
     gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c gfx/backend_pc98.c gfx/backend_pegc.c \
     fs/fatfs/ff.c fs/fatfs/diskio.c fs/fatfs_vfs.c \
     fs/ext2_super.c fs/ext2_inode.c fs/ext2_dir.c fs/ext2_file.c fs/ext2_fmt.c fs/ext2_layout.c fs/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrvfs.c fs/sfs_proto.c fs/sfs_client.c fs/serialfs.c fs/serialfs_session.c \
-    exec/exec.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
+    exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
     $(KSTRING_C_SRC)
@@ -139,10 +139,8 @@ exec/%.o: exec/%.c kapi/kapi_generated.c
 # 尾呼出しを封じて組む (設計 §3-2)。
 SHELL_SERVICE_OBJ = $(KERNEL_OBJ_PREFIX)exec/shell_service.o
 $(SHELL_SERVICE_OBJ): private KERNEL_CFLAGS += -fno-optimize-sibling-calls
-# S3a: 呼ぶ先 (kernel/font_source.c の font_lease_shell_*) が S2、結線が S3b
-# なので、まだ C_KERNEL に入れずコンパイルだけする (-Werror 相当の確認は
-# tools/tests/test_shell_service.py --target)。S3b で C_KERNEL へ移し、
-# この順序だけの前提を消す。
+# S3b から C_KERNEL に入る (結線は exec/exec.c)。旗が付くことは
+# `make -n` で確かめる (tools/tests/test_shell_service.py の静的検査も見る)。
 
 # kapi/ モジュール
 KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
@@ -167,7 +165,7 @@ kapi/%.o: kapi/%.c kapi/kapi_generated.c
 lib/%.o: lib/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_LIB) -c $< -o $@
 
-$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) | $(SHELL_SERVICE_OBJ)
+$(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
 	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) -lgcc
 
 $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
@@ -264,6 +262,7 @@ check-net-l3:
 # T2h: entirely separate objects, dependencies, build ID, map and image.
 R1_OUT := $(BUILD_OUT)/r1
 R1_OBJ := $(R1_OUT)/obj
+$(R1_OBJ)/exec/shell_service.o: private KERNEL_CFLAGS += -fno-optimize-sibling-calls
 R1_C := $(C_KERNEL) kernel/r1_fixture.c kernel/font_guard_fixture.c
 R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o
 R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c kernel/paging_app.c
