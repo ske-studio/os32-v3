@@ -70,3 +70,4 @@ exec/exec_heap.c:user_view:所属 EXEC extent と PTE/owner を検証した USER
 exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 extent の仮想先頭
 exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化
 exec/exec_heap.c:exec_heap_user_trim:全 arena の PTE/owner とブロック鎖の検証後に USER 仮想末尾を走査
+kdebug/kpeek.c:kpeek_load:計算した番地 (恒等の RAM、張ったばかりのデバイス窓の VA) を幅どおりに読む (TASK_KPEEK §2-4)

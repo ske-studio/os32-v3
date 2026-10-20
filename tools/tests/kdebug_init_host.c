@@ -3,6 +3,7 @@
 #include "kernel/kselftest.h"
 #include "kprintf.h"
 #include "kernel/v86_gcap.h"
+#include "kdebug/kpeek.h"
 static unsigned calls;
 void kprintf(unsigned char color, const char *format, ...)
 {
@@ -26,6 +27,7 @@ void v86_gcap_note_emul_in(u16 p, int s, u32 v) { (void)p; (void)s; (void)v; cal
 void v86_gcap_note_emul_out(u16 p, int s, u32 v) { (void)p; (void)s; (void)v; calls++; }
 void v86_gcap_detach(void) { calls++; }
 void v86_gcap_release(void) { calls++; }
+i32 kpeek_call(u32 op, void *buf, u32 size) { (void)op; (void)buf; (void)size; calls++; return 0; }
 extern const struct kdebug_ops kdebug_ops;
 
 void _start(void)
@@ -44,7 +46,7 @@ void _start(void)
         !candidate.gcap_pass_in || !candidate.gcap_pass_out ||
         !candidate.gcap_note_in || !candidate.gcap_note_out ||
         !candidate.gcap_detach || !candidate.gcap_release || candidate.nic_selftest ||
-        candidate.nic_trace != nic_trace) rc = 1;
+        candidate.nic_trace != nic_trace || candidate.dbg_call != kpeek_call) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) { }
 }
