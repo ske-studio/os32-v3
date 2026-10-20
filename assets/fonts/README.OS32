@@ -72,3 +72,6 @@ UTF-8で保持し、JF-Dot-Shinonome16-LICENSE.txt としてTTFに添える。
 JF の説明 (http://jikasei.me/font/jf-dotfont/) は原版のライセンスを継承し、
 変換者独自の権利を行使しないとしている。同意の入力は不要。
 CI は IPA / Inconsolata と別のkeyで、このTTFとライセンスだけをキャッシュする。
+束 (TASK_FONTPERF ⓐ): ビルド時に tools/gen_g16.py がこの TTF の EBDT 16px strike
+から JF-Dot-Shinonome16.g16 (描き済みの 16x16 字形 6,955 字 + 先読み 1,600 字、約 290KB) を
+作り、TTF と同じ /usr/share/fonts/ に配る。派生物なので追跡しない (CI も毎回生成)。

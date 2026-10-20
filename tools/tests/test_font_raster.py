@@ -77,7 +77,17 @@ MUTATIONS = [
 ]
 
 
-def corpora(work):
+def bundle_cps(jf):
+    """Code points the .g16 bundle must hold (design §2), derived here independently:
+    the cmap's Full-path cps (>= 0x80, not U+00A0..U+024F), gid != 0."""
+    from fontTools.ttLib import TTFont
+    font = TTFont(str(jf))
+    order = font.getGlyphOrder()
+    return sorted(cp for cp, name in font.getBestCmap().items()
+                  if cp >= 0x80 and not 0xA0 <= cp <= 0x24F and order.index(name) != 0)
+
+
+def corpora(work, jf):
     jis = []
     for a in range(0x21, 0x7f):
         for b in range(0x21, 0x7f):
@@ -87,7 +97,9 @@ def corpora(work):
                 pass
     assert len(jis) == 6879
     latin = list(range(0x20, 0x7f)) + list(range(0xa0, 0x100))
-    ja = sorted(set(jis) | set(latin))
+    # TASK_FONTPERF F1: the Shinonome corpus also covers every .g16 record, so the
+    # Rust raster dump is the third reference of check_g16.
+    ja = sorted(set(jis) | set(latin) | set(bundle_cps(jf)))
     paths = {}
     for name, cps in (('JIS', jis), ('LATIN', latin), ('JA', ja)):
         paths[name] = work / (name.lower() + '.txt')
@@ -443,6 +455,155 @@ def isa386():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+# --- TASK_FONTPERF F1: the pre-drawn glyph bundle (.g16, tools/gen_g16.py) ---------
+G16_ASCENT = 14          # font crate limits.rs ASCENT_JA_PX: cell row 0 = baseline - 14
+G16_PRELOAD = 1600       # design §4
+G16_GLYPHS = {}          # the normal pass's dump, reused by the g16 mutations
+G16_MUTATIONS = [
+    # (label, file under tools/, old, new): each must make check_g16 fail.
+    ('g16-bearing-dropped', 'gen_g16.py', 'x = m.horiBearingX + c', 'x = c'),
+    ('g16-rank-crc', 'gen_g16.py', 'zlib.crc32(rank)', 'zlib.crc32(rank[:-1])'),
+    ('g16-unaligned', 'gen_g16.py', 'off_all = (pre_end + SECTOR - 1) // SECTOR * SECTOR', 'off_all = pre_end'),
+    ('g16-head-adjust', 'gen_g16.py', "adjust = struct.unpack_from('>I', data, off + 8)[0]",
+     "adjust = struct.unpack_from('>I', data, off + 12)[0]"),
+    ('g16-preload-order', 'g16/gen_preload16.py', "(('jis1-8', jis_rows_1_8()), ('ui', ui_chars(ui)),",
+     "(('ui', ui_chars(ui)), ('jis1-8', jis_rows_1_8()),"),
+]
+
+
+def g16_generate(tools, jf, work):
+    """Run the generators of `tools` (the product copy or a mutant) into `work`."""
+    work.mkdir(parents=True, exist_ok=True)
+    pre, g16 = work / 'preload16.txt', work / 'bundle.g16'
+    for cmd in (['g16/gen_preload16.py', '--ttf', str(jf), '-o', str(pre), '--ipadic', str(ROOT / 'assets/ipadic')],
+                ['gen_g16.py', '--ttf', str(jf), '--preload', str(pre), '-o', str(g16)]):
+        r = subprocess.run([sys.executable, '-B', str(tools / cmd[0]), *cmd[1:]], text=True, capture_output=True)
+        assert r.returncode == 0, (cmd[0], r.returncode, r.stdout + r.stderr)
+    return pre, g16
+
+
+def cell_of(dots):
+    """Absolute dots (x from pen, y up from baseline) -> 32-byte cell, None if outside."""
+    out = bytearray(32)
+    for x, y in dots:
+        row = G16_ASCENT - 1 - y
+        if not (0 <= x < 16 and 0 <= row < 16):
+            return None
+        out[row * 2 + x // 8] |= 0x80 >> (x % 8)
+    return bytes(out)
+
+
+def jis_rows_1_8():
+    """Design §4 part 1: JIS X 0208 rows 1-8 via the euc_jp codec, code order."""
+    out = []
+    for hi in range(0xA1, 0xA9):
+        for lo in range(0xA1, 0xFF):
+            try:
+                out.append(ord(bytes([hi, lo]).decode('euc_jp')))
+            except (UnicodeDecodeError, TypeError):
+                pass
+    return out
+
+
+def check_g16(jf, glyphs, g16, pre):
+    """Bundle == EBDT dots in the cell == Rust raster in the cell for every record;
+    preload records == the list and == the all-section record; rank index round trip
+    and CRC; head identity, size and sha256; 512-aligned all section. The file is
+    parsed here from the design §2 offsets, not with gen_g16's own structures."""
+    import hashlib
+    import zlib
+    from fontTools.ttLib import TTFont
+    data = g16.read_bytes()
+    raw = jf.read_bytes()
+    (magic, version, hdr_len, cell_w, cell_h, ascent, flags, n_all, n_pre, ttf_size, adjust, modified,
+     sha) = struct.unpack_from('<4sHHBBbBIIIIQ32s', data, 0)
+    off_rank, rank_len, rank_crc, off_pre = struct.unpack_from('<IIII', data, 68)
+    pre_rec, = struct.unpack_from('<H', data, 84)
+    off_all, = struct.unpack_from('<I', data, 86)
+    all_rec, = struct.unpack_from('<H', data, 90)
+    assert (magic, version, hdr_len, cell_w, cell_h, ascent, flags) == (b'OSG1', 1, 128, 16, 16, G16_ASCENT, 1), (
+        'g16 header', magic, version, hdr_len, cell_w, cell_h, ascent, flags)
+    assert data[92:128] == bytes(36), 'g16 header padding'
+    assert (pre_rec, all_rec, off_rank, rank_len, off_pre) == (36, 32, 128, 8704, 128 + 8704), 'g16 layout'
+    # The TTF identity the guest checks (size + head.checkSumAdjustment + head.modified)
+    # and the host-only sha256, read straight from the TTF bytes.
+    font = TTFont(str(jf))
+    head_off = next(struct.unpack_from('>I', raw, 12 + 16 * i + 8)[0]
+                    for i in range(struct.unpack_from('>H', raw, 4)[0]) if raw[12 + 16 * i:16 + 16 * i] == b'head')
+    assert ttf_size == len(raw), ('g16 ttf_size', ttf_size, len(raw))
+    assert adjust == font['head'].checkSumAdjustment == struct.unpack_from('>I', raw, head_off + 8)[0], (
+        'g16 head.checkSumAdjustment', adjust)
+    assert modified == struct.unpack_from('>Q', raw, head_off + 28)[0], ('g16 head.modified', modified)
+    assert sha == hashlib.sha256(raw).digest(), 'g16 ttf_sha256'
+    # 1 record = 1 sector (F-9).
+    pre_end = off_pre + n_pre * pre_rec
+    assert off_all % 512 == 0 and off_all >= pre_end, ('g16 off_all alignment', off_all)
+    assert data[pre_end:off_all] == bytes(off_all - pre_end), 'g16 gap is not zero'
+    assert len(data) == off_all + n_all * all_rec, ('g16 size', len(data))
+    # Rank index: CRC, then every BMP cp round trip.
+    rank = data[off_rank:off_rank + rank_len]
+    assert zlib.crc32(rank) == rank_crc, ('g16 rank_crc32', hex(zlib.crc32(rank)), hex(rank_crc))
+    bitmap, cum = rank[:8192], struct.unpack_from('<256H', rank, 8192)
+    cps = bundle_cps(jf)
+    assert n_all == len(cps), ('g16 n_all', n_all, len(cps))
+    present = set(cps)
+    rec_of = {cp: i for i, cp in enumerate(cps)}
+    for cp in range(0x10000):
+        bit = bitmap[cp >> 3] >> (cp & 7) & 1
+        assert bit == (cp in present), ('g16 rank bitmap', hex(cp))
+        if bit:
+            r = cum[cp >> 8] + sum(bitmap[c >> 3] >> (c & 7) & 1 for c in range(cp & ~0xFF, cp))
+            assert r == rec_of[cp], ('g16 rank', hex(cp), r, rec_of[cp])
+    # Every record == EBDT dots in the cell == Rust raster (dump) in the cell.
+    dots = ebdt_dots(jf)
+    records = {}
+    for i, cp in enumerate(cps):
+        rec = data[off_all + i * 32:off_all + i * 32 + 32]
+        g = glyphs[('shinonome', cp)]
+        want = cell_of(dots(g['gid']))
+        assert want is not None, f'U+{cp:04X}: EBDT glyph outside the 16x16 cell'
+        assert rec == want, f'g16 U+{cp:04X}: record != EBDT dots in the cell'
+        assert rec == cell_of(black(g)), f'g16 U+{cp:04X}: record != Rust raster in the cell'
+        records[cp] = rec
+    # Preload section: the list in its order, each record a copy of the all section.
+    listed = [int(f[0], 16) for f in (line.split() for line in pre.read_text(encoding='utf-8').splitlines())
+              if f and not f[0].startswith('#')]
+    got = []
+    for i in range(n_pre):
+        at = off_pre + i * pre_rec
+        cp, = struct.unpack_from('<I', data, at)
+        assert cp in records, ('g16 preload cp not in the bundle', hex(cp))
+        assert data[at + 4:at + 36] == records[cp], ('g16 preload record', hex(cp))
+        got.append(cp)
+    assert got == listed, 'g16 preload section != preload16.txt'
+    assert len(got) == len(set(got)) == G16_PRELOAD, ('g16 preload count', len(got), len(set(got)))
+    head = [cp for cp in jis_rows_1_8() if cp in present]
+    assert got[:len(head)] == head, 'g16 preload does not start with JIS rows 1-8 (code order)'
+    print(f'PASS g16 bundle {len(data)} B: {n_all} records == EBDT 16px dots == Rust raster in the 16x16 cell; '
+          f'preload {n_pre} (JIS rows 1-8 first, {len(head)}) == list, copies of the all section; rank index '
+          f'round trip over the BMP, CRC32 {rank_crc:08x}; off_all {off_all} % 512 == 0; head/size/sha256 == TTF',
+          flush=True)
+
+
+def g16_mutations(work, jf, glyphs):
+    """Each generator mutant must be caught by check_g16 (never touches tools/)."""
+    for label, name, old, new in G16_MUTATIONS:
+        tools = work / label / 'tools'
+        (tools / 'g16').mkdir(parents=True)
+        for rel in ('gen_g16.py', 'g16/gen_preload16.py', 'g16/ui_chars.txt'):
+            shutil.copyfile(ROOT / 'tools' / rel, tools / rel)
+        text = (tools / name).read_text()
+        assert text.count(old) == 1, label
+        (tools / name).write_text(text.replace(old, new))
+        pre, g16 = g16_generate(tools, jf, work / label / 'out')
+        try:
+            check_g16(jf, glyphs, g16, pre)
+        except AssertionError as error:
+            print(f'RED g16 {label} (generated): {error!s:.160}', flush=True)
+            continue
+        raise AssertionError(f'g16 mutation {label} survived')
+
+
 def verify(work, crate, env, jf, corpus, ja, jis, label, x87=True):
     """One full pass on `crate`: None on success, else (stage, detail)."""
     dump = work / (label + '-dump.txt')
@@ -454,6 +615,10 @@ def verify(work, crate, env, jf, corpus, ja, jis, label, x87=True):
     faces, glyphs = parse_dump(dump)
     try:
         check_dots(jf, glyphs, ja, jis)
+        if label == 'normal':
+            pre, g16 = g16_generate(ROOT / 'tools', jf, work / 'g16')
+            check_g16(jf, glyphs, g16, pre)
+            G16_GLYPHS.update(glyphs)
         check_metrics(faces, glyphs, corpus, jf)
         check_freetype(glyphs, corpus, jf)
         if x87:
@@ -477,7 +642,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='font-raster-') as directory:
         work = Path(directory)
         jf = shinonome(work)
-        jis, latin, ja, paths = corpora(work)
+        jis, latin, ja, paths = corpora(work, jf)
         corpus = dict(shinonome=ja, inconsolata=latin, ipaexg=jis, ipaexm=jis)
         env = {**os.environ, 'OS32_FONT_SHINONOME': str(jf),
                **{'OS32_FONT_' + k: str(v) for k, v in paths.items()}}
@@ -485,6 +650,7 @@ def main():
         assert normal is None, normal
         isa386()
         if args.mutate:
+            g16_mutations(work / 'g16-mut', jf, G16_GLYPHS)
             copy = work / 'mut/userland/lib/font'
             shutil.copytree(CRATE, copy, ignore=shutil.ignore_patterns('target'))
             (work / 'mut/assets').mkdir()
