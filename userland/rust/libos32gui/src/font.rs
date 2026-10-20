@@ -163,6 +163,8 @@ pub struct AppFontStats {
     /// TASK_FONTPERF F3 (G-3: 末尾にだけ足す、u32 は計 37): 束の ok / rejected / hit / miss / err。
     pub bundle: BundleStats,
 }
+// fontbench (gdi_test) と libos32gui_stub は 37 語 (NSTAT) で読む。
+const _: () = assert!(size_of::<AppFontStats>() == 37 * 4);
 
 struct FontState {
     engine: *mut AppEngine,
