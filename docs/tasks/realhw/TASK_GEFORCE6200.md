@@ -36,3 +36,13 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 | 4c | 承認地点 C: 画面モード (PCRTC/PRAMDAC、整数 PLL)、98 側との共存 (別コネクタ) | 書く | 承認・**モニタ接続はユーザー** |
 
 道具: [TASK_KPEEK](../v3/TASK_KPEEK.md) の peek (T7 の後の最初の実装) に MMIO の許可リストを足して使う。結果はシリアルで持ち帰る。PM 決定: Haiku のライセンスは調べて記録、envytools の nvbios はホストで自前の ROM に当てて使ってよい (MIT)、BAR の大きさは段 4a で測る、cfg 54h は段 4 で扱う、固まったときの電源断は 2026-10-12 の決定 (立会い無しの試験) の範囲。
+
+## 4. 観測の記録
+
+### 段 0〜2 (2026-10-21、実機 Ra266 1f1d115・KDEBUG=1、KPEEK、読み取りだけ、ノートの `~/os32-tmp/evidence/2026-10-21/gf6200_s012/`)
+
+- 段 0: Command 0x0106 (Mem+・I/O−・BusMaster+)、BAR0 0x24000000・BAR1 0x30000008 (pref)・BAR2 0x25000000、ROM BAR 0x26000000 (無効)、cfg 50h=0 (PROM の窓は開いている)・**54h=1**、IRQ 6。C バスブリッジ 0:6.0 の 50h〜5Fh は 00 01 02 0f 04 85 86 07 88 09 8a 0b 8c 0d 0e 8f。Trident・82557 と BAR は重ならない。
+- 段 1: **PMC_BOOT_0=0x04A100A1** (NV44A)、PMC_ENABLE=0x03010000、PMC 004/100/140=0、PSTRAPS 23409E8F 7FEF81C3 00001E0C 00000C90、**PFB 4KB は全部 0** (冷えている)、PCRTC h0/h1・PRAMDAC h0/h1 に 0 でない語 (7/7/41/30)、VGA 別名 3D5=0x10 ほか 0。固まらず DENY 0。1 回 約 3.3 秒 (LAN)。
+- 段 2: PROM の窓 128KB を 2 回読んで一致 (CRC F5ADEE03)、先頭 55 AA 7C (ROM 63,488 B、sum8=0)、後半 64KB は前半の写し。sha256 ec460969…dedd。「GeForce 6200 VGA BIOS IDG1」「Version 5.44.A2.10.00」「nv44 Board - p362h0」。
+- 段 2b (使用許諾の文字列): "Copyright (C) 1996-2004 NVIDIA Corp."・"NVIDIA"・"NVIDIA Corporation" だけ。license・reverse・disassembl を含む行は無い → 段 3 の可否はユーザー判断待ち。
+- 気づき: PMC_ENABLE と PCRTC/PRAMDAC が 0 でないのは、PC-98 の BIOS が POST しない前提に対して何かが一部を有効にしている可能性 (電源投入時の既定値か)。cfg 54h=1 なので段 4b の前に PBUS 0x1854←0 (計画 G1)。
