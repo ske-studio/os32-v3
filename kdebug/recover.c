@@ -1,6 +1,17 @@
 #include "recover.h"
 #include "../lib/crc32_core.inc"
 
+static int cleanup(struct recover *r);
+static bool bit_get(const u32 *bits, u32 n);
+static void bit_set(u32 *bits, u32 n);
+static void release_plan(struct recover *r);
+static int bus_read(struct recover *r, u32 key, u32 *value);
+static bool zero_guards(struct recover *r);
+static bool raw_matches(struct recover *r, bool memory);
+static void select_record(const struct recover_profile *p, const struct recover_plan *plan, u32 node, u32 *bits);
+static bool extent_ok(const struct recover_profile *p, const struct recover_target *t,
+                      const struct recover_bar_extent bars[3]);
+
 /* CRC words have canonical little-endian encoding, never C padding/pointers. */
 static u32 crc_word(u32 crc, u32 word)
 {
@@ -19,16 +30,83 @@ u32 recover_profile_crc(const struct recover_profile *p)
         c = crc_word(c, d->key); c = crc_word(c, d->width);
         c = crc_word(c, d->write_mask); c = crc_word(c, d->verify_mask);
         c = crc_word(c, d->kind); c = crc_word(c, d->read_safe);
+        c = crc_word(c, d->restore_rule_id);
     }
     c = crc_word(c, p->quiesce_count);
     for (u32 i = 0; i < p->quiesce_count; i++) {
         const struct recover_write *w = &p->quiesce[i];
         c = crc_word(c, w->key); c = crc_word(c, w->width);
         c = crc_word(c, w->value); c = crc_word(c, w->verify_mask);
+        c = crc_word(c, w->rule_id);
     }
     c = crc_word(c, p->trial_limit); c = crc_word(c, p->opcode_limit);
     c = crc_word(c, p->restore_limit); c = crc_word(c, p->max_steps);
     c = crc_word(c, p->max_polls); c = crc_word(c, p->cold_required);
+    c = crc_word(c, p->restore_max_polls);
+    c = crc_word(c, p->s0_reserve_ticks);
+    c = crc_word(c, p->s0_reserve_polls);
+    c = crc_word(c, p->vram_reserved.base);
+    c = crc_word(c, p->vram_reserved.len);
+    c = crc_word(c, p->target_count);
+    for (u32 i = 0; i < p->target_count; i++) {
+        const struct recover_target *d = &p->targets[i];
+        c = crc_word(c, d->space);
+        c = crc_word(c, d->bar);
+        c = crc_word(c, d->offset);
+        c = crc_word(c, d->head);
+        c = crc_word(c, d->port);
+        c = crc_word(c, d->index);
+        c = crc_word(c, d->width);
+        c = crc_word(c, d->access);
+        c = crc_word(c, d->read_safe);
+    }
+    c = crc_word(c, p->rule_count);
+    for (u32 i = 0; i < p->rule_count; i++) {
+        const struct recover_rule *d = &p->rules[i];
+        c = crc_word(c, d->id);
+        c = crc_word(c, d->key);
+        c = crc_word(c, d->phase);
+        c = crc_word(c, d->main_id);
+        c = crc_word(c, d->pc);
+        c = crc_word(c, d->substep);
+        c = crc_word(c, d->write_mask);
+        c = crc_word(c, d->verify_mask);
+        c = crc_word(c, d->flags);
+        c = crc_word(c, d->value.mode);
+        c = crc_word(c, d->value.mask);
+        c = crc_word(c, d->value.bits);
+        c = crc_word(c, d->value.min);
+        c = crc_word(c, d->value.max);
+        c = crc_word(c, d->value.expr_id);
+        c = crc_word(c, d->value.allowed_count);
+        c = crc_word(c, d->requires_count);
+        c = crc_word(c, d->guard_count);
+        for (u32 j = 0; j < d->value.allowed_count; j++) c = crc_word(c, d->value.allowed[j]);
+        for (u32 j = 0; j < d->requires_count; j++) c = crc_word(c, d->requires[j]);
+        for (u32 j = 0; j < d->guard_count; j++) {
+            const struct recover_guard *g = &d->guards[j];
+            c = crc_word(c, g->key);
+            c = crc_word(c, g->mask);
+            c = crc_word(c, g->expected);
+            c = crc_word(c, g->when);
+        }
+    }
+    c = crc_word(c, p->expr_count);
+    for (u32 i = 0; i < p->expr_count; i++) {
+        const struct recover_expr *d = &p->exprs[i];
+        c = crc_word(c, d->id);
+        c = crc_word(c, d->argc);
+        for (u32 j = 0; j < d->argc; j++) c = crc_word(c, d->kinds[j]);
+    }
+    c = crc_word(c, p->layout_count);
+    for (u32 i = 0; i < p->layout_count; i++) {
+        const struct recover_opcode_layout *d = &p->layouts[i];
+        c = crc_word(c, d->opcode);
+        c = crc_word(c, d->substep);
+        c = crc_word(c, d->argc);
+        c = crc_word(c, d->dir_substep);
+        for (u32 j = 0; j < d->argc; j++) c = crc_word(c, d->kinds[j]);
+    }
     return crc32_core_final(c);
 }
 
@@ -70,6 +148,8 @@ static bool token_matches(const struct recover *r, const struct recover_token *t
 static void fail(struct recover *r, enum recover_reason reason,
                  enum recover_phase phase, u32 key)
 {
+    if (reason == REC_NORMAL && (r->entered || r->expected_node != RECOVER_NONE))
+        fail(r, REC_CONTRACT, REC_PHASE_NONE, r->expected_node);
     if (!r->failed) {
         r->reason = reason; r->first_phase = phase; r->first_key = key;
     }
@@ -97,26 +177,243 @@ static bool finite(u32 n) { return n && n < RECOVER_HALF_TICKS; }
 static bool width_ok(u32 n) { return n == 1 || n == 2 || n == 4; }
 static u32 width_mask(u32 n) { return n == 4 ? ~0UL : (1UL << (n * 8)) - 1; }
 
-static bool profile_ok(const struct recover_profile *p, u32 budget)
+/* Shared descriptor validation. No hardware tables are supplied by T1b. */
+static const struct recover_rule *rule_by_id(const struct recover_profile *p, u32 id)
 {
-    if (!p || !p->version || !p->regs || !p->count ||
-        p->count > RECOVER_MAX_REGS || p->quiesce_count > RECOVER_MAX_REGS ||
-        (p->quiesce_count && !p->quiesce) || !finite(budget) ||
-        !finite(p->trial_limit) || budget > p->trial_limit ||
-        !finite(p->opcode_limit) || !finite(p->restore_limit) ||
-        !finite(p->max_steps) || !finite(p->max_polls)) return false;
+    for (u32 i = 0; i < p->rule_count; i++)
+        if (p->rules[i].id == id) return &p->rules[i];
+    return 0;
+}
+static const struct recover_expr *expr_by_id(const struct recover_profile *p, u32 id)
+{
+    for (u32 i = 0; i < p->expr_count; i++)
+        if (p->exprs[i].id == id) return &p->exprs[i];
+    return 0;
+}
+static const struct recover_opcode_layout *layout_for(const struct recover_profile *p,
+                                                      const struct recover_plan_node *n)
+{
+    for (u32 i = 0; i < p->layout_count; i++)
+        if (p->layouts[i].opcode == n->opcode && p->layouts[i].substep == n->substep)
+            return &p->layouts[i];
+    return 0;
+}
+static bool is_bar(const struct recover_target *t)
+{
+    return t->space == REC_BAR_MMIO || t->space == REC_BAR_VRAM ||
+        t->space == REC_VGA_DIRECT || t->space == REC_VGA_INDEXED;
+}
+int recover_target_address(const struct recover_target *t, u32 dir,
+                           struct recover_bus_access *a)
+{
+    if (!t || !a || !width_ok(t->width) || t->space > REC_VGA_INDEXED ||
+        t->access > REC_UNCLASSIFIED || t->read_safe > 1 || dir > REC_DATA)
+        return -1;
+    u32 off = t->offset;
+    if (t->space == REC_VGA_DIRECT || t->space == REC_VGA_INDEXED) {
+        if (t->bar || t->offset || t->head > 1 || t->width != 1) return -1;
+        if (t->space == REC_VGA_INDEXED) {
+            if (t->index > 255 || (t->port != RECOVER_SEQ && t->port != RECOVER_GFX &&
+                t->port != RECOVER_CRTC) || dir == REC_WRITE) return -1;
+        } else if (t->index != RECOVER_NONE ||
+                   (t->port != RECOVER_MISC_WRITE && t->port != RECOVER_MISC_READ &&
+                    t->port != RECOVER_VGA_ENABLE) ||
+                   dir == REC_SELECT || dir == REC_DATA) return -1;
+        off = (t->port == RECOVER_CRTC ? RECOVER_PRMCIO : RECOVER_PRMVIO) +
+            t->head * RECOVER_HEAD_STRIDE + t->port;
+        if (t->space == REC_VGA_INDEXED && dir != REC_SELECT) off++;
+    } else {
+        if (t->head || t->port || t->index != RECOVER_NONE ||
+            dir == REC_SELECT || dir == REC_DATA) return -1;
+        if (is_bar(t)) {
+            if (t->bar >= 3) return -1;
+            /* Reserve the entire VGA alias apertures, including head1. */
+            if (t->bar == 0 &&
+                ((off < RECOVER_PRMVIO + 2 * RECOVER_HEAD_STRIDE &&
+                  (unsigned long long)off + t->width > RECOVER_PRMVIO) ||
+                 (off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE &&
+                  (unsigned long long)off + t->width > RECOVER_PRMCIO))) return -1;
+        } else if (t->bar || (t->space == REC_PCI_CFG &&
+                   (off >= RECOVER_CFG_SIZE || t->width > RECOVER_CFG_SIZE - off)) ||
+                   (t->space == REC_PC98_IO &&
+                    (off > RECOVER_IO_LAST || off == RECOVER_ROUTE_PORT))) return -1;
+    }
+    /* These paired output/decode registers have only a 32-bit canonical form. */
+    if (t->space == REC_PCI_CFG || (t->space == REC_BAR_MMIO && !t->bar)) {
+        u32 first = t->space == REC_PCI_CFG ? RECOVER_CFG50 : RECOVER_PBUS1850;
+        if (off < first + 8 && (unsigned long long)off + t->width > first &&
+            (t->width != 4 || (off != first && off != first + 4))) return -1;
+    }
+    if (t->space == REC_PCI_CFG && off < RECOVER_COMMAND + 2 &&
+        off + t->width > RECOVER_COMMAND && (off != RECOVER_COMMAND || t->width != 2)) return -1;
+    if (off % t->width || (unsigned long long)off + t->width > RECOVER_ADDRESS_END) return -1;
+    *a = (struct recover_bus_access){0, dir, t->space, t->bar, off, t->width};
+    return 0;
+}
+static bool value_ok(const struct recover_value *v, u32 width, u32 value)
+{
+    if ((value & ~width_mask(width)) || (value & v->mask) != v->bits) return false;
+    if (v->mode == REC_LITERAL) return value == v->bits;
+    if (v->mode == REC_SET) {
+        for (u32 i = 0; i < v->allowed_count; i++) if (value == v->allowed[i]) return true;
+        return false;
+    }
+    if (v->mode == REC_RANGE || v->mode == REC_EXPR)
+        return value >= v->min && value <= v->max;
+    return v->mode == REC_SAVED;
+}
+static bool zero_target(const struct recover_target *t)
+{
+    return (t->space == REC_PCI_CFG && (t->offset == RECOVER_CFG50 || t->offset == RECOVER_CFG54)) ||
+        (t->space == REC_BAR_MMIO && !t->bar &&
+         (t->offset == RECOVER_PBUS1850 || t->offset == RECOVER_PBUS1854));
+}
+static bool n1_target(const struct recover_target *t)
+{
+    return t->space == REC_VGA_INDEXED && t->port == RECOVER_SEQ && t->index == RECOVER_SR01;
+}
+static bool saved_target(const struct recover_profile *p, u32 key)
+{
+    for (u32 i = 0; i < p->count; i++)
+        if (p->regs[i].key == key && p->regs[i].kind == REC_RW && p->regs[i].read_safe)
+            return true;
+    return false;
+}
+int recover_profile_ok(const struct recover_profile *p)
+{
+    if (!p || p->version != RECOVER_PROFILE_VERSION || p->count > RECOVER_MAX_REGS || (p->count && !p->regs) ||
+        p->quiesce_count > RECOVER_MAX_REGS || (p->quiesce_count && !p->quiesce) ||
+        !p->targets || !p->target_count || p->target_count > RECOVER_TARGET_MAX ||
+        p->rule_count > RECOVER_RULE_MAX || (p->rule_count && !p->rules) ||
+        p->expr_count > RECOVER_RULE_MAX || (p->expr_count && !p->exprs) ||
+        p->layout_count > RECOVER_RULE_MAX || (p->layout_count && !p->layouts)) return -1;
+    for (u32 i = 0; i < p->target_count; i++) {
+        struct recover_bus_access a;
+        const struct recover_target *t = &p->targets[i];
+        if (recover_target_address(t, REC_READ, &a)) return -1;
+        for (u32 j = 0; j < i; j++) {
+            const struct recover_target *q = &p->targets[j];
+            if (t->space == q->space && t->bar == q->bar && t->offset == q->offset &&
+                t->head == q->head && t->port == q->port && t->index == q->index) return -1;
+        }
+    }
+    for (u32 i = 0; i < p->expr_count; i++) {
+        const struct recover_expr *e = &p->exprs[i];
+        if (e->id == RECOVER_NONE || !e->eval || e->argc > RECOVER_EXPR_ARGS ||
+            (e->argc && !e->kinds)) return -1;
+        for (u32 j = 0; j < e->argc; j++) if (e->kinds[j] > REC_ARG_SAVED) return -1;
+        for (u32 j = 0; j < i; j++) if (p->exprs[j].id == e->id) return -1;
+    }
+    for (u32 i = 0; i < p->layout_count; i++) {
+        const struct recover_opcode_layout *l = &p->layouts[i];
+        if (l->argc > RECOVER_EXPR_ARGS + 1 || (l->argc && !l->kinds) ||
+            (l->dir_substep != RECOVER_NONE && l->dir_substep > REC_DATA)) return -1;
+        for (u32 j = 0; j < l->argc; j++) if (l->kinds[j] > REC_ARG_SAVED) return -1;
+        for (u32 j = 0; j < i; j++)
+            if (p->layouts[j].opcode == l->opcode && p->layouts[j].substep == l->substep) return -1;
+    }
+    for (u32 i = 0; i < p->rule_count; i++) {
+        const struct recover_rule *w = &p->rules[i];
+        if (w->id == RECOVER_NONE || w->key >= p->target_count || w->phase > REC_VERIFY_PHASE ||
+            (w->phase == REC_RUN ? (w->main_id > RECOVER_MAIN_MAX || w->pc == RECOVER_NONE) :
+             (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
+            w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
+            w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
+            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE))) return -1;
+        const struct recover_target *t = &p->targets[w->key];
+        const struct recover_value *v = &w->value;
+        u32 mask = width_mask(t->width);
+        if (t->access == REC_UNCLASSIFIED || ((w->write_mask | w->verify_mask | v->mask | v->bits) & ~mask) ||
+            (v->bits & ~v->mask) || v->mode > REC_SAVED ||
+            ((w->verify_mask || w->write_mask != mask) && !t->read_safe) ||
+            v->allowed_count > RECOVER_RULE_MAX || (v->allowed_count && !v->allowed) ||
+            (v->mode == REC_SET && !v->allowed_count) ||
+            ((v->mode == REC_RANGE || v->mode == REC_EXPR) && (v->min > v->max || v->max > mask)) ||
+            (v->mode == REC_EXPR && !expr_by_id(p, v->expr_id)) ||
+            (v->mode != REC_EXPR && v->expr_id != RECOVER_NONE)) return -1;
+        for (u32 j = 0; j < v->allowed_count; j++)
+            if (!value_ok(v, t->width, v->allowed[j])) return -1;
+        if (v->mode == REC_SAVED && (t->access != REC_RW || !t->read_safe ||
+            (!(w->flags & REC_LOCAL) && !saved_target(p, w->key)) ||
+            w->phase != REC_RESTORE)) return -1;
+        if (t->space == REC_PCI_CFG && t->offset == RECOVER_COMMAND &&
+            (t->width != 2 || v->mode == REC_SAVED)) return -1;
+        if ((w->flags & REC_N1) && (!n1_target(t) || w->phase != REC_RUN ||
+            w->main_id != RECOVER_N1_MAIN || w->pc != RECOVER_N1_PC)) return -1;
+        if (w->flags & REC_N1) {
+            u32 found = 0;
+            for (u32 j = 0; j < p->target_count; j++) {
+                const struct recover_target *g = &p->targets[j];
+                if (!zero_target(g)) continue;
+                if (!g->read_safe || g->width != 4) return -1;
+                if (g->space == REC_PCI_CFG) found |= g->offset == RECOVER_CFG50 ? RECOVER_N1_CFG50_BIT : RECOVER_N1_CFG54_BIT;
+                else found |= g->offset == RECOVER_PBUS1850 ? RECOVER_N1_PBUS1850_BIT : RECOVER_N1_PBUS1854_BIT;
+            }
+            if (found != RECOVER_N1_ALL_BITS) return -1;
+        }
+        for (u32 j = 0; j < i; j++) {
+            const struct recover_rule *q = &p->rules[j];
+            if (q->id == w->id || (q->key == w->key && q->phase == w->phase &&
+                q->main_id == w->main_id && q->pc == w->pc && q->substep == w->substep)) return -1;
+        }
+        for (u32 j = 0; j < w->requires_count; j++) {
+            if (w->requires[j] == w->id || !rule_by_id(p, w->requires[j])) return -1;
+            for (u32 k = 0; k < j; k++) if (w->requires[k] == w->requires[j]) return -1;
+        }
+        for (u32 j = 0; j < w->guard_count; j++) {
+            const struct recover_guard *g = &w->guards[j];
+            if (g->key >= p->target_count || !p->targets[g->key].read_safe ||
+                p->targets[g->key].space == REC_VGA_INDEXED ||
+                (g->when != REC_BEFORE && g->when != REC_AFTER && g->when != (REC_BEFORE | REC_AFTER)) ||
+                ((g->mask | g->expected) & ~width_mask(p->targets[g->key].width))) return -1;
+        }
+    }
+    /* Kahn-style elimination, bounded to the rule table, detects any cycle. */
+    u32 done[RECOVER_RULE_MAX / 32] = {0}, total = 0;
+    for (u32 pass = 0; pass < p->rule_count; pass++) {
+        u32 before = total;
+        for (u32 i = 0; i < p->rule_count; i++) {
+            if (done[i / 32] & (1U << (i % 32))) continue;
+            const struct recover_rule *w = &p->rules[i]; bool ready = true;
+            for (u32 j = 0; j < w->requires_count; j++) {
+                const struct recover_rule *q = rule_by_id(p, w->requires[j]);
+                u32 k = (u32)(q - p->rules);
+                if (!(done[k / 32] & (1U << (k % 32)))) ready = false;
+            }
+            if (ready) { done[i / 32] |= 1U << (i % 32); total++; }
+        }
+        if (total == before) break;
+    }
+    if (total != p->rule_count) return -1;
     for (u32 i = 0; i < p->count; i++) {
         const struct recover_reg *d = &p->regs[i];
-        if (!width_ok(d->width) || !d->read_safe ||
+        if (d->key >= p->target_count || p->targets[d->key].space == REC_VGA_INDEXED ||
+            d->width != p->targets[d->key].width ||
+            !d->read_safe || !p->targets[d->key].read_safe ||
             (d->kind != REC_RW && d->kind != REC_COLD) ||
-            ((d->write_mask | d->verify_mask) & ~width_mask(d->width))) return false;
+            d->kind != p->targets[d->key].access ||
+            ((d->write_mask | d->verify_mask) & ~width_mask(d->width))) return -1;
+        if (d->kind == REC_RW) {
+            const struct recover_rule *w = rule_by_id(p, d->restore_rule_id);
+            if (!w || w->key != d->key || w->phase != REC_RESTORE || w->value.mode != REC_SAVED ||
+                w->write_mask != d->write_mask || w->verify_mask != d->verify_mask) return -1;
+        }
     }
     for (u32 i = 0; i < p->quiesce_count; i++) {
-        const struct recover_write *w = &p->quiesce[i];
-        if (!width_ok(w->width) ||
-            ((w->value | w->verify_mask) & ~width_mask(w->width))) return false;
+        const struct recover_write *q = &p->quiesce[i];
+        const struct recover_rule *w = rule_by_id(p, q->rule_id);
+        if (!w || w->phase != REC_QUIESCE || w->key != q->key ||
+            q->width != p->targets[q->key].width || q->verify_mask != w->verify_mask ||
+            !value_ok(&w->value, q->width, q->value)) return -1;
     }
-    return p->crc == recover_profile_crc(p);
+    return 0;
+}
+
+static bool profile_ok(const struct recover_profile *p, u32 budget)
+{
+    return !recover_profile_ok(p) && finite(budget) && finite(p->trial_limit) &&
+        budget <= p->trial_limit && finite(p->opcode_limit) && finite(p->restore_limit) &&
+        finite(p->max_steps) && finite(p->max_polls) && p->crc == recover_profile_crc(p);
 }
 
 /* Called only while a kdebug_call is active; unsigned deltas survive wrap.
@@ -139,9 +436,7 @@ static bool restore_time(struct recover *r)
 
 static bool config_ok(struct recover *r)
 {
-    u32 command, bar;
-    if (r->ops->raw_config(r->opaque, &command, &bar) ||
-        !(command & RECOVER_COMMAND_MEM) || bar != r->token.identity.bar0) {
+    if (!raw_matches(r, true)) {
         fail(r, REC_CONFIG, REC_PHASE_QUIESCE, 0);
         return false;
     }
@@ -149,23 +444,30 @@ static bool config_ok(struct recover *r)
 }
 
 static bool write_verify(struct recover *r, const struct recover_write *w,
-                         enum recover_phase phase, bool restoring, u32 expected)
+                         enum recover_phase phase, bool restoring)
 {
-    u32 actual;
     if (restoring && !restore_time(r)) return false;
-    if (r->ops->write(r->opaque, w->key, w->width, w->value)) {
-        fail(r, REC_BUS, phase, w->key); return false;
-    }
-    if (restoring && !restore_time(r)) return false;
-    if (r->ops->read(r->opaque, w->key, w->width, &actual) ||
-        ((actual ^ expected) & w->verify_mask)) {
-        fail(r, REC_VERIFY, phase, w->key); return false;
-    }
-    return true;
+    u32 value = w->value;
+    r->auth_phase = phase == REC_PHASE_RESTORE ? REC_RESTORE : REC_QUIESCE;
+    if (recover_access(r, RECOVER_NONE, REC_WRITE, w->key, w->width, &value)) return false;
+    return !restoring || restore_time(r);
 }
 
 static bool quiesce(struct recover *r, bool restoring)
 {
+    if (r->measuring) {
+        bool measured = true;
+        u32 command = 0, bars[3] = {0};
+        if (r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE)
+            measured = false;
+        for (u32 i = 0; i < 3; i++)
+            if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) measured = false;
+        if (!measured) {
+            if (r->gpu_written) fail(r, REC_CONFIG, REC_PHASE_QUIESCE, 0);
+            return false;
+        }
+        for (u32 i = 0; i < 3; i++) r->bars[i] = r->measurement.bar[i];
+    }
     if (!config_ok(r)) return false;
     for (u32 i = 0; i < r->profile->quiesce_count; i++) {
         if (!restoring) {
@@ -174,8 +476,8 @@ static bool quiesce(struct recover *r, bool restoring)
                 fail(r, REC_TIMEOUT, REC_PHASE_QUIESCE, 0); return false;
             }
         }
-        if (!write_verify(r, &r->profile->quiesce[i], REC_PHASE_QUIESCE,
-                          restoring, r->profile->quiesce[i].value)) return false;
+        if (!write_verify(r, &r->profile->quiesce[i], REC_PHASE_QUIESCE, restoring))
+            return false;
     }
     return true;
 }
@@ -211,7 +513,13 @@ static void screen(struct recover *r)
 static int cleanup(struct recover *r)
 {
     r->in_call = false; r->in_opcode = false;
+    r->cursor = RECOVER_NONE; r->entered = false;
+    r->auth_phase = REC_RESTORE;
+    r->state = REC_RESTORING;
     r->restore_tick = r->ops->ticks(r->opaque);
+    if (r->ops->local_cleanup(r->opaque)) {
+        fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
+    }
     state(r, REC_RESTORING);
     bool safe = !r->access_blocked && quiesce(r, true);
     /* A partial snapshot is usable only for its completed safe entries. Never
@@ -222,20 +530,36 @@ static int cleanup(struct recover *r)
             if (d->kind == REC_COLD) continue;
             u32 actual;
             if (!restore_time(r)) break;
-            if (r->ops->read(r->opaque, d->key, d->width, &actual)) {
+            if (bus_read(r, d->key, &actual)) {
                 fail(r, REC_BUS, REC_PHASE_RESTORE, d->key); break;
             }
             struct recover_write w = { d->key, d->width,
                 (actual & ~d->write_mask) | (r->saved[i] & d->write_mask),
-                d->verify_mask };
-            if (!write_verify(r, &w, REC_PHASE_RESTORE, true, r->saved[i])) break;
+                d->verify_mask, d->restore_rule_id };
+            if (!write_verify(r, &w, REC_PHASE_RESTORE, true)) break;
         }
+    }
+    if (r->zero_hold && !zero_guards(r)) fail(r, REC_VERIFY, REC_PHASE_VERIFY, 0);
+    if (r->measuring) {
+        u32 command = 0, bars[3] = {0};
+        bool complete = !r->failed && !r->ops->raw_config(r->opaque, &command, bars) &&
+            command == RECOVER_COMMAND_OVERRIDE;
+        for (u32 i = 0; i < 3; i++)
+            if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
+        if (complete) r->cache = r->measurement;
+        else r->cache = (struct recover_bar_measurement){0};
     }
     screen(r);
     r->s1_verified = !r->failed && !r->cold_latched && r->valid;
     state(r, r->failed ? REC_FAILED : REC_VERIFIED);
     /* A final log failure cannot leave a successful state. */
     if (r->failed) r->state = REC_FAILED;
+    if (r->failed || r->reason != REC_NORMAL) {
+        if (r->measuring) r->cache = (struct recover_bar_measurement){0};
+    }
+    r->measurement = (struct recover_bar_measurement){0}; r->measuring = false;
+    r->local_saved_count = 0;
+    release_plan(r);
     return r->failed ? -1 : 0;
 }
 
@@ -271,17 +595,62 @@ static int pause_call(struct recover *r)
 int trial_begin(struct recover *r, const struct recover_profile *p,
                 u32 plan_hash, u32 budget)
 {
-    if (!r->enabled || (r->state != REC_IDLE && r->state != REC_VERIFIED) ||
-        r->cold_latched || !profile_ok(p, budget) ||
-        r->ops->start_ready(r->opaque)) return -1;
+    if (r->state != REC_IDLE && r->state != REC_VERIFIED) return -1;
+    if (!r->enabled || r->cold_latched || !profile_ok(p, budget) ||
+        !r->plan || r->bound_profile != p || plan_hash != r->bound_hash ||
+        !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) {
+        release_plan(r); return -1;
+    }
     struct recover_identity id;
-    if (r->ops->identity(r->opaque, &id) || r->next_session == ~0UL) return -1;
+    if (r->ops->identity(r->opaque, &id) || r->next_session == ~0UL) {
+        release_plan(r); return -1;
+    }
+    u32 raw_command, raw_bars[3] = {0};
+    bool raw_failed = r->ops->raw_config(r->opaque, &raw_command, raw_bars) != 0;
+    bool cache_ok = !raw_failed && same_identity(&id, &r->cache.identity);
+    for (u32 i = 0; i < 3; i++)
+        if (!r->cache.bar[i].valid || r->cache.bar[i].raw != raw_bars[i]) cache_ok = false;
+    if (!cache_ok) r->cache = (struct recover_bar_measurement){0};
+    r->measuring = r->plan->nodes[0].phase == REC_SIZE_BARS;
+    if (r->measuring) r->cache = (struct recover_bar_measurement){0};
+    for (u32 i = 0; i < 3; i++) {
+        r->bars[i] = r->cache.bar[i];
+        if (r->measuring) r->bars[i].raw = raw_bars[i];
+    }
+    /* All referenced targets, including snapshot/guards/cleanup, before arm.
+     * A1 may carry unused GF descriptors; only its cfg-only plan is required. */
+    u32 used[RECOVER_TARGET_MAX / 32] = {0};
+    for (u32 i = 0; i < p->count; i++) bit_set(used, p->regs[i].key);
+    for (u32 i = 0; i < r->plan->node_count; i++) {
+        const struct recover_plan_node *n = &r->plan->nodes[i];
+        const struct recover_opcode_layout *l = layout_for(p, n);
+        for (u32 j = 0; j < n->arg_count; j++) {
+            const struct recover_plan_arg *a = &r->plan->args[n->arg_first + j];
+            if ((j == 0 && l->dir_substep != RECOVER_NONE) || a->kind == REC_ARG_READ)
+                if (!r->measuring || !is_bar(&p->targets[a->value])) bit_set(used, a->value);
+        }
+    }
+    for (u32 i = 0; i < p->rule_count; i++) {
+        const struct recover_rule *w = &p->rules[i];
+        bool reached = !r->measuring && (w->phase == REC_RESTORE || w->phase == REC_QUIESCE);
+        for (u32 j = 0; j < r->plan->node_count; j++)
+            if (r->plan->nodes[j].rule_id == w->id) reached = true;
+        if (!reached) continue;
+        if (!r->measuring || !is_bar(&p->targets[w->key])) bit_set(used, w->key);
+        for (u32 j = 0; j < w->guard_count; j++)
+            if (!r->measuring || !is_bar(&p->targets[w->guards[j].key])) bit_set(used, w->guards[j].key);
+        if (w->flags & REC_N1) for (u32 j = 0; j < p->target_count; j++)
+            if (zero_target(&p->targets[j])) bit_set(used, j);
+    }
+    for (u32 i = 0; i < p->target_count; i++)
+        if (bit_get(used, i) && !extent_ok(p, &p->targets[i], r->bars)) { release_plan(r); return -1; }
     r->profile = p;
     r->token = (struct recover_token){ .session = ++r->next_session,
         .profile_crc = p->crc, .profile_version = p->version,
         .plan_hash = plan_hash, .identity = id };
-    r->saved_count = 0; r->valid = false; r->failed = false;
-    r->access_blocked = false;
+    r->saved_count = 0; r->local_saved_count = 0; r->valid = false; r->failed = false;
+    r->access_blocked = false; r->zero_hold = false; r->gpu_written = false;
+    r->measurement = (struct recover_bar_measurement){ .identity = id, .measurement_session = r->token.session };
     r->first_phase = REC_PHASE_NONE; r->first_key = 0; r->reason = REC_NORMAL;
     r->budget = budget; r->spent = 0; r->steps = 0; r->polls = 0;
     r->s0_verified = false; r->s1_verified = false;
@@ -290,7 +659,7 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     if (state(r, REC_SNAPSHOTTING)) return cleanup(r);
     for (u32 i = 0; i < p->count; i++) {
         const struct recover_reg *d = &p->regs[i];
-        if (r->ops->read(r->opaque, d->key, d->width, &r->saved[i])) {
+        if (bus_read(r, d->key, &r->saved[i])) {
             fail(r, REC_SNAPSHOT, REC_PHASE_SAVE, d->key); return cleanup(r);
         }
         r->saved_count++;
@@ -302,7 +671,7 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     }
     r->token.snapshot_crc = snapshot_crc(r);
     r->valid = true;
-    if (!quiesce(r, false)) { r->access_blocked = true; return cleanup(r); }
+    if (!r->measuring && !quiesce(r, false)) { r->access_blocked = true; return cleanup(r); }
     account(r);
     if (r->spent >= r->budget) {
         fail(r, REC_TIMEOUT, REC_PHASE_SAVE, 0); return cleanup(r);
@@ -363,6 +732,8 @@ int trial_end(struct recover *r, const struct recover_token *t,
         r->access_blocked = true;
         fail(r, REC_CONTRACT, REC_PHASE_NONE, 0);
     }
+    if (reason == REC_NORMAL && (r->entered || r->expected_node != RECOVER_NONE))
+        fail(r, REC_CONTRACT, REC_PHASE_NONE, r->expected_node);
     if (!r->failed) {
         r->reason = reason;
         if (reason != REC_NORMAL && reason != REC_ABORT)
@@ -379,4 +750,552 @@ int recover_request(struct recover *r, const struct recover_token *t,
     if (request != REC_REQUEST_STATUS || r->state == REC_PAUSED ||
         r->state == REC_RUNNING || r->state == REC_RESTORING) return -1;
     return 0;
+}
+
+static bool bit_get(const u32 *bits, u32 n) { return (bits[n / 32] & (1U << (n % 32))) != 0; }
+static void bit_set(u32 *bits, u32 n) { bits[n / 32] |= 1U << (n % 32); }
+static bool dependencies(const struct recover_profile *p, const struct recover_plan *plan,
+                         u32 node, const u32 *bits)
+{
+    const struct recover_plan_node *n = &plan->nodes[node];
+    const struct recover_rule *w = rule_by_id(p, n->rule_id);
+    const struct recover_opcode_layout *layout = layout_for(p, n);
+    if (layout && n->arg_count && (layout->dir_substep == REC_DATA || layout->dir_substep == REC_READ)) {
+        u32 key = plan->args[n->arg_first].value;
+        if (key >= p->target_count) return false;
+        if (p->targets[key].space == REC_VGA_INDEXED) {
+            bool selected = false;
+            for (u32 j = 0; j < node; j++) {
+                const struct recover_plan_node *q = &plan->nodes[j];
+                const struct recover_opcode_layout *l = layout_for(p, q);
+                const struct recover_rule *rw = rule_by_id(p, q->rule_id);
+                if (l && l->dir_substep == REC_SELECT && rw && rw->key == key &&
+                    q->ctx == n->ctx && q->phase == n->phase && q->main_id == n->main_id && bit_get(bits, j)) selected = true;
+            }
+            if (!selected) return false;
+        }
+    }
+    if (!w) return n->rule_id == RECOVER_NONE;
+    for (u32 i = 0; i < w->requires_count; i++) {
+        u32 id = w->requires[i], explicit_node = RECOVER_NONE;
+        for (u32 j = 0; j < plan->dep_count; j++)
+            if (plan->deps[j].consumer == node && plan->deps[j].required_rule == id)
+                explicit_node = plan->deps[j].producer;
+        bool found = false;
+        for (u32 j = 0; j < node; j++) {
+            const struct recover_plan_node *q = &plan->nodes[j];
+            if (q->rule_id == id && bit_get(bits, j) &&
+                (explicit_node != RECOVER_NONE ? j == explicit_node :
+                 (q->ctx == n->ctx && q->phase == n->phase && q->main_id == n->main_id)))
+                found = true;
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+/* A SELECT invalidates older selections of the same physical index port. */
+static void select_record(const struct recover_profile *p, const struct recover_plan *plan,
+                          u32 node, u32 *bits)
+{
+    const struct recover_plan_node *n = &plan->nodes[node];
+    const struct recover_opcode_layout *l = layout_for(p, n);
+    const struct recover_rule *w = rule_by_id(p, n->rule_id);
+    if (!l || l->dir_substep != REC_SELECT || !w) return;
+    const struct recover_target *t = &p->targets[w->key];
+    for (u32 i = 0; i < node; i++) {
+        const struct recover_rule *q = rule_by_id(p, plan->nodes[i].rule_id);
+        const struct recover_opcode_layout *ql = layout_for(p, &plan->nodes[i]);
+        if (q && ql && ql->dir_substep == REC_SELECT) {
+            const struct recover_target *qt = &p->targets[q->key];
+            if (t->space == qt->space && t->head == qt->head && t->port == qt->port)
+                bits[i / 32] &= ~(1U << (i % 32));
+        }
+    }
+}
+static bool node_rule(const struct recover_plan_node *n, const struct recover_rule *w)
+{
+    return n->phase == w->phase && n->main_id == w->main_id &&
+        n->pc == w->pc && n->substep == w->substep;
+}
+static bool arg_ok(const struct recover_profile *p, const struct recover_plan_arg *a)
+{
+    if (a->kind == REC_IMM) return true;
+    if (a->kind == REC_ARG_READ)
+        return a->value < p->target_count && p->targets[a->value].read_safe &&
+            p->targets[a->value].space != REC_VGA_INDEXED;
+    return a->kind == REC_ARG_SAVED && a->value < p->count &&
+        p->regs[a->value].kind == REC_RW && p->regs[a->value].read_safe;
+}
+static bool node_ok(const struct recover_profile *p, const struct recover_plan *plan, u32 id)
+{
+    const struct recover_plan_node *n = &plan->nodes[id];
+    const struct recover_opcode_layout *l = layout_for(p, n);
+    if (!l || n->phase > REC_VERIFY_PHASE || n->ctx >= plan->ctx_count ||
+        n->head > 1 || n->skip > 1 || n->arg_first > plan->arg_count ||
+        n->arg_count > plan->arg_count - n->arg_first || n->arg_count != l->argc ||
+        (n->phase == REC_RUN ? n->main_id > RECOVER_MAIN_MAX || n->pc == RECOVER_NONE :
+         n->main_id != RECOVER_NONE || n->pc != RECOVER_NONE)) return false;
+    const struct recover_plan_arg *args = n->arg_count ? &plan->args[n->arg_first] : 0;
+    for (u32 i = 0; i < n->arg_count; i++)
+        if (args[i].kind != l->kinds[i] || !arg_ok(p, &args[i])) return false;
+    if (l->dir_substep == RECOVER_NONE)
+        return n->rule_id == RECOVER_NONE && n->expr_id == RECOVER_NONE;
+    if (!n->arg_count || args[0].kind != REC_IMM || args[0].value >= p->target_count) return false;
+    const struct recover_target *t = &p->targets[args[0].value];
+    struct recover_bus_access bus;
+    if (recover_target_address(t, l->dir_substep, &bus) ||
+        ((t->space == REC_VGA_DIRECT || t->space == REC_VGA_INDEXED) && t->head != n->head)) return false;
+    if (l->dir_substep == REC_READ)
+        return !n->skip && t->read_safe && n->arg_count == 1 && n->rule_id == RECOVER_NONE && n->expr_id == RECOVER_NONE;
+    const struct recover_rule *w = rule_by_id(p, n->rule_id);
+    if (!w || !node_rule(n, w) || w->key != args[0].value || n->expr_id != w->value.expr_id ||
+        (n->skip && !(w->flags & REC_FORCE))) return false;
+    if (w->value.mode == REC_EXPR) {
+        const struct recover_expr *e = expr_by_id(p, n->expr_id);
+        if (!e || n->arg_count != e->argc + 1) return false;
+        if (zero_target(t) && (w->value.mask != width_mask(t->width) || w->value.bits)) return false;
+        if (n1_target(t) && n->phase == REC_RUN && !(w->flags & REC_N1) &&
+            (!(w->value.mask & RECOVER_SR_BLANK) || !(w->value.bits & RECOVER_SR_BLANK))) return false;
+        bool imm = true; u32 values[RECOVER_EXPR_ARGS], result;
+        for (u32 i = 0; i < e->argc; i++) {
+            if (args[i + 1].kind != e->kinds[i]) return false;
+            values[i] = args[i + 1].value;
+            if (args[i + 1].kind != REC_IMM) imm = false;
+        }
+        if (imm && (e->eval(values, e->argc, &result) || !value_ok(&w->value, t->width, result))) return false;
+    } else {
+        if (n->arg_count != 2) return false;
+        if (w->value.mode == REC_SAVED) {
+            if (args[1].kind != REC_ARG_SAVED || p->regs[args[1].value].key != w->key) return false;
+        } else if (args[1].kind != REC_IMM || !value_ok(&w->value, t->width, args[1].value)) return false;
+        if (l->dir_substep == REC_SELECT && args[1].value != t->index) return false;
+        if (zero_target(t) && args[1].value) return false;
+        if (l->dir_substep != REC_SELECT && n1_target(t) && !(args[1].value & RECOVER_SR_BLANK) &&
+            !(w->flags & REC_N1) && n->phase == REC_RUN) return false;
+    }
+    return true;
+}
+static u32 plan_crc(const struct recover_plan *p)
+{
+    u32 c = CRC32_INIT;
+    c = crc_word(c, p->version); c = crc_word(c, p->profile_crc);
+    c = crc_word(c, p->rom_crc); c = crc_word(c, p->rom_size);
+    c = crc_word(c, p->node_count); c = crc_word(c, p->arg_count);
+    c = crc_word(c, p->ctx_count); c = crc_word(c, p->dep_count); c = crc_word(c, p->entry_count);
+    for (u32 i = 0; i < p->node_count; i++) {
+        const struct recover_plan_node *n = &p->nodes[i];
+        c = crc_word(c, n->phase); c = crc_word(c, n->main_id); c = crc_word(c, n->pc);
+        c = crc_word(c, n->opcode); c = crc_word(c, n->substep); c = crc_word(c, n->ctx);
+        c = crc_word(c, n->head); c = crc_word(c, n->skip); c = crc_word(c, n->rule_id);
+        c = crc_word(c, n->expr_id); c = crc_word(c, n->arg_first); c = crc_word(c, n->arg_count);
+        c = crc_word(c, n->next[0]); c = crc_word(c, n->next[1]);
+    }
+    for (u32 i = 0; i < p->arg_count; i++) {
+        c = crc_word(c, p->args[i].kind); c = crc_word(c, p->args[i].value);
+    }
+    for (u32 i = 0; i < p->dep_count; i++) {
+        c = crc_word(c, p->deps[i].consumer); c = crc_word(c, p->deps[i].required_rule);
+        c = crc_word(c, p->deps[i].producer);
+    }
+    for (u32 i = 0; i < p->entry_count; i++) {
+        c = crc_word(c, p->entries[i].phase); c = crc_word(c, p->entries[i].main_id);
+        c = crc_word(c, p->entries[i].first);
+    }
+    return crc32_core_final(c);
+}
+int recover_bind_plan(struct recover *r, const struct recover_profile *p,
+    const struct recover_plan *plan, struct recover_plan_buffers *buf, u32 *hash)
+{
+    if (!r->enabled || r->plan || (r->state != REC_IDLE && r->state != REC_VERIFIED) ||
+        r->cold_latched || recover_profile_ok(p) || p->crc != recover_profile_crc(p) ||
+        !plan || !buf || !buf->flow_bits || !buf->valid_bits || !hash || !plan->version ||
+        plan->profile_crc != p->crc || !plan->node_count || plan->node_count > RECOVER_NODE_MAX ||
+        !plan->nodes || plan->arg_count > RECOVER_ARG_MAX || (plan->arg_count && !plan->args) ||
+        !plan->ctx_count || plan->ctx_count > RECOVER_CTX_MAX || plan->dep_count > RECOVER_DEP_MAX ||
+        (plan->dep_count && !plan->deps) || !plan->entry_count || plan->entry_count > RECOVER_ENTRY_MAX ||
+        !plan->entries) return -1;
+    for (u32 i = 0; i < RECOVER_BITS_WORDS; i++) buf->valid_bits[i] = 0;
+    for (u32 i = 0; i < plan->node_count * RECOVER_BITS_WORDS; i++) buf->flow_bits[i] = 0;
+    for (u32 i = 0; i < plan->entry_count; i++) {
+        const struct recover_plan_entry *e = &plan->entries[i];
+        if (e->first >= plan->node_count || (i == 0 && e->first != 0) ||
+            plan->nodes[e->first].phase != e->phase || plan->nodes[e->first].main_id != e->main_id) return -1;
+        if (i && (e->first <= plan->entries[i - 1].first ||
+            e->phase < plan->entries[i - 1].phase ||
+            (e->phase == plan->entries[i - 1].phase &&
+             (e->phase != REC_RUN || e->main_id != plan->entries[i - 1].main_id + 1)))) return -1;
+        if (e->phase == REC_RUN && (i == 0 || plan->entries[i - 1].phase != REC_RUN) && e->main_id) return -1;
+    }
+    for (u32 i = 0; i < plan->dep_count; i++) {
+        const struct recover_plan_dep *d = &plan->deps[i];
+        if (d->consumer >= plan->node_count || d->producer >= d->consumer ||
+            plan->nodes[d->producer].rule_id != d->required_rule) return -1;
+        const struct recover_rule *w = rule_by_id(p, plan->nodes[d->consumer].rule_id);
+        bool found = false;
+        if (w) for (u32 j = 0; j < w->requires_count; j++) if (w->requires[j] == d->required_rule) found = true;
+        if (!found) return -1;
+        for (u32 j = 0; j < i; j++) if (plan->deps[j].consumer == d->consumer &&
+            plan->deps[j].required_rule == d->required_rule) return -1;
+    }
+    bit_set(buf->valid_bits, 0); /* temporary reachability during forward scan */
+    u32 entry = 0;
+    for (u32 i = 0; i < plan->node_count; i++) {
+        const struct recover_plan_node *n = &plan->nodes[i];
+        if (entry + 1 < plan->entry_count && plan->entries[entry + 1].first == i) entry++;
+        if (!bit_get(buf->valid_bits, i) || !node_ok(p, plan, i) ||
+            n->phase != plan->entries[entry].phase || n->main_id != plan->entries[entry].main_id) return -1;
+        u32 *in = &buf->flow_bits[i * RECOVER_BITS_WORDS];
+        if (!dependencies(p, plan, i, in)) return -1;
+        if (n->rule_id != RECOVER_NONE) { select_record(p, plan, i, in); bit_set(in, i); }
+        for (u32 edge = 0; edge < 2; edge++) {
+            u32 next = n->next[edge];
+            if (next == RECOVER_NONE) {
+                if (entry + 1 != plan->entry_count) return -1;
+                continue;
+            }
+            if (next <= i || next >= plan->node_count) return -1;
+            if (entry + 1 < plan->entry_count && next >= plan->entries[entry + 1].first &&
+                next != plan->entries[entry + 1].first) return -1;
+            const struct recover_plan_node *q = &plan->nodes[next];
+            u32 head = n->head;
+            const struct recover_rule *w = rule_by_id(p, n->rule_id);
+            if (w) {
+                const struct recover_target *t = &p->targets[w->key];
+                const struct recover_opcode_layout *l = layout_for(p, n);
+                if (t->space == REC_VGA_INDEXED && t->port == RECOVER_CRTC &&
+                    t->index == RECOVER_CR44 && l->dir_substep == REC_DATA) {
+                    if (t->head || n->arg_count != 2 || plan->args[n->arg_first + 1].kind != REC_IMM) return -1;
+                    u32 value = plan->args[n->arg_first + 1].value;
+                    if (value != RECOVER_CR44_HEAD0 && value != RECOVER_CR44_HEAD1) return -1;
+                    head = value == RECOVER_CR44_HEAD1;
+                }
+            }
+            if (q->head != head) return -1;
+            u32 *out = &buf->flow_bits[next * RECOVER_BITS_WORDS];
+            bool seen = bit_get(buf->valid_bits, next);
+            for (u32 j = 0; j < RECOVER_BITS_WORDS; j++) out[j] = seen ? out[j] & in[j] : in[j];
+            bit_set(buf->valid_bits, next);
+        }
+    }
+    for (u32 i = 0; i < RECOVER_BITS_WORDS; i++) buf->valid_bits[i] = 0;
+    r->plan = plan; r->bound_profile = p; r->buffers = *buf;
+    r->bound_hash = plan_crc(plan); *hash = r->bound_hash;
+    r->cursor = RECOVER_NONE; r->expected_node = 0; r->head = plan->nodes[0].head;
+    r->entered = false; r->selected = RECOVER_NONE;
+    return 0;
+}
+static void release_plan(struct recover *r)
+{
+    if (r->plan) for (u32 i = 0; i < RECOVER_BITS_WORDS; i++) r->buffers.valid_bits[i] = 0;
+    r->plan = 0; r->bound_profile = 0; r->buffers = (struct recover_plan_buffers){0};
+    r->cursor = r->expected_node = RECOVER_NONE; r->entered = false;
+}
+
+static bool extent_ok(const struct recover_profile *p, const struct recover_target *t,
+                      const struct recover_bar_extent bars[3])
+{
+    if (!is_bar(t)) return true;
+    struct recover_bus_access a;
+    if (recover_target_address(t, REC_READ, &a)) return false;
+    const struct recover_bar_extent *b = &bars[a.bar];
+    if (!b->valid || a.width > b->length || a.offset > b->length - a.width ||
+        (unsigned long long)b->base + a.offset + a.width > RECOVER_ADDRESS_END) return false;
+    if (t->space == REC_BAR_VRAM) {
+        const struct recover_range *v = &p->vram_reserved;
+        if (!v->len || (unsigned long long)v->base + v->len > b->length || a.offset < v->base ||
+            (unsigned long long)a.offset + a.width > (unsigned long long)v->base + v->len) return false;
+    }
+    return true;
+}
+static bool raw_matches(struct recover *r, bool memory)
+{
+    u32 command, bars[3];
+    if (r->ops->raw_config(r->opaque, &command, bars) ||
+        (memory && !(command & RECOVER_COMMAND_MEM))) return false;
+    for (u32 i = 0; i < 3; i++) {
+        if ((r->bars[i].valid || r->measuring) && bars[i] != r->bars[i].raw) return false;
+    }
+    return bars[0] == r->token.identity.bar0;
+}
+static int bus_address(struct recover *r, u32 key, u32 dir, struct recover_bus_access *a)
+{
+    if (!r->profile || key >= r->profile->target_count) return -1;
+    const struct recover_target *t = &r->profile->targets[key];
+    if (r->measuring && is_bar(t) && r->measurement.bar[t->bar].valid) {
+        u32 command, bars[3];
+        if (r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE) return -1;
+        for (u32 i = 0; i < 3; i++)
+            if (bars[i] != r->bars[i].raw) return -1;
+        r->bars[t->bar] = r->measurement.bar[t->bar];
+    }
+    if (recover_target_address(t, dir, a) || !extent_ok(r->profile, t, r->bars)) return -1;
+    if (is_bar(t) && !raw_matches(r, true)) return -1;
+    a->key = key;
+    return 0;
+}
+static int bus_read(struct recover *r, u32 key, u32 *value)
+{
+    struct recover_bus_access a;
+    if (key >= r->profile->target_count || !r->profile->targets[key].read_safe ||
+        bus_address(r, key, REC_READ, &a)) return -1;
+    return r->ops->read(r->opaque, &a, value);
+}
+static bool zero_guards(struct recover *r)
+{
+    u32 found = 0;
+    if (!raw_matches(r, true)) return false;
+    for (u32 i = 0; i < r->profile->target_count; i++) {
+        const struct recover_target *t = &r->profile->targets[i];
+        if (!zero_target(t)) continue;
+        u32 value;
+        if (t->width != 4 || bus_read(r, i, &value) || value != 0) return false;
+        if (t->space == REC_PCI_CFG) found |= t->offset == RECOVER_CFG50 ? RECOVER_N1_CFG50_BIT : RECOVER_N1_CFG54_BIT;
+        else found |= t->offset == RECOVER_PBUS1850 ? RECOVER_N1_PBUS1850_BIT : RECOVER_N1_PBUS1854_BIT;
+    }
+    return found == RECOVER_N1_ALL_BITS;
+}
+static bool guards(struct recover *r, const struct recover_rule *w, u32 when)
+{
+    if ((w->flags & REC_N1) && !zero_guards(r)) return false;
+    for (u32 i = 0; i < w->guard_count; i++) {
+        const struct recover_guard *g = &w->guards[i]; u32 value;
+        if ((g->when & when) && (bus_read(r, g->key, &value) ||
+            (value & g->mask) != g->expected)) return false;
+    }
+    return true;
+}
+static bool evaluate(struct recover *r, const struct recover_plan_node *n,
+                     const struct recover_rule *w, u32 old, u32 *result)
+{
+    const struct recover_plan_arg *args = &r->plan->args[n->arg_first];
+    if (w->value.mode == REC_EXPR) {
+        const struct recover_expr *e = expr_by_id(r->profile, n->expr_id);
+        u32 values[RECOVER_EXPR_ARGS];
+        if (!e || n->arg_count != e->argc + 1) return false;
+        for (u32 i = 0; i < e->argc; i++) {
+            const struct recover_plan_arg *a = &args[i + 1];
+            if (a->kind == REC_IMM) values[i] = a->value;
+            else if (a->kind == REC_ARG_READ) {
+                if (bus_read(r, a->value, &values[i])) return false;
+            } else {
+                if (a->value >= r->saved_count || !r->valid) return false;
+                values[i] = r->saved[a->value];
+            }
+        }
+        return !e->eval(values, e->argc, result);
+    }
+    if (w->value.mode == REC_SAVED) {
+        if (!r->valid || args[1].value >= r->saved_count) return false;
+        *result = (old & ~w->write_mask) | (r->saved[args[1].value] & w->write_mask);
+    } else *result = args[1].value;
+    return true;
+}
+static int access_error(struct recover *r, u32 key)
+{
+    fail(r, REC_CONTRACT, REC_PHASE_NONE, key);
+    r->cursor = RECOVER_NONE; r->entered = false;
+    if (r->state == REC_RUNNING) cleanup(r);
+    return -1;
+}
+static enum recover_phase access_phase(const struct recover *r)
+{
+    switch (r->auth_phase) {
+    case REC_QUIESCE: return REC_PHASE_QUIESCE;
+    case REC_RESTORE: return REC_PHASE_RESTORE;
+    case REC_ROUTE: return REC_PHASE_ROUTE;
+    case REC_SCREEN: return REC_PHASE_SCREEN;
+    case REC_VERIFY_PHASE: return REC_PHASE_VERIFY;
+    default: return REC_PHASE_NONE;
+    }
+}
+int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, u32 *value)
+{
+    if (r->access_blocked) return -1;
+    if (r->enabled && value && node == RECOVER_NONE && dir == REC_READ &&
+        (r->state == REC_IDLE || r->state == REC_VERIFIED) && r->bound_profile) {
+        const struct recover_profile *p = r->bound_profile;
+        struct recover_bus_access a;
+        if (target >= p->target_count) return -1;
+        const struct recover_target *t = &p->targets[target];
+        if (!t->read_safe || t->space == REC_VGA_INDEXED || width != t->width ||
+            recover_target_address(t, REC_READ, &a) || !extent_ok(p, t, r->cache.bar)) return -1;
+        if (is_bar(t)) {
+            struct recover_identity id; u32 command, bars[3];
+            if (r->ops->identity(r->opaque, &id) || !same_identity(&id, &r->cache.identity) ||
+                r->ops->raw_config(r->opaque, &command, bars) || !(command & RECOVER_COMMAND_MEM)) return -1;
+            for (u32 i = 0; i < 3; i++) if (bars[i] != r->cache.bar[i].raw) return -1;
+        }
+        a.key = target;
+        return r->ops->read(r->opaque, &a, value);
+    }
+    if (!r->enabled || !r->profile || !value || target >= r->profile->target_count ||
+        (r->state != REC_RUNNING && r->state != REC_RESTORING && r->state != REC_SNAPSHOTTING)) return -1;
+    const struct recover_target *t = &r->profile->targets[target];
+    const struct recover_plan_node *n = 0;
+    const struct recover_rule *w = 0;
+    if (node != RECOVER_NONE) {
+        if (!r->plan || !r->entered || node != r->cursor || r->accessed ||
+            !r->valid || r->state != REC_RUNNING) return access_error(r, target);
+        n = &r->plan->nodes[node];
+        const struct recover_opcode_layout *l = layout_for(r->profile, n);
+        if (!l || l->dir_substep != dir || !node_ok(r->profile, r->plan, node) ||
+            !n->arg_count || r->plan->args[n->arg_first].value != target ||
+            n->head != r->head) return access_error(r, target);
+        w = rule_by_id(r->profile, n->rule_id);
+        if (!dependencies(r->profile, r->plan, node, r->buffers.valid_bits)) return access_error(r, target);
+    } else {
+        if (r->auth_phase != REC_RESTORE && r->auth_phase != REC_QUIESCE) return access_error(r, target);
+        for (u32 i = 0; i < r->profile->rule_count; i++) {
+            const struct recover_rule *q = &r->profile->rules[i];
+            if (q->key == target && q->phase == r->auth_phase && q->substep == dir &&
+                q->main_id == RECOVER_NONE && q->pc == RECOVER_NONE) {
+                if (w) return access_error(r, target);
+                w = q;
+            }
+        }
+        if (w && w->requires_count) return access_error(r, target);
+    }
+    struct recover_bus_access a;
+    if (width != t->width || bus_address(r, target, dir, &a)) return access_error(r, target);
+    if (dir == REC_READ) {
+        if (!t->read_safe || (t->space == REC_VGA_INDEXED && r->selected != target) ||
+            r->ops->read(r->opaque, &a, value)) return access_error(r, target);
+    } else {
+        if (r->state == REC_RESTORING && !restore_time(r)) return -1;
+        if (t->space == REC_PCI_CFG && t->offset == RECOVER_COMMAND) {
+            if (*value != RECOVER_COMMAND_OVERRIDE &&
+                (r->auth_phase != REC_SIZE_BARS || (*value & RECOVER_COMMAND_DMA_MEM))) return access_error(r, target);
+            if ((*value & RECOVER_COMMAND_MEM) && !raw_matches(r, false)) return access_error(r, target);
+        }
+        if (!w || t->access == REC_UNCLASSIFIED ||
+            (n && !node_rule(n, w)) || !value_ok(&w->value, width, *value)) return access_error(r, target);
+        if (dir == REC_SELECT && !(w->flags & REC_LOCAL) && *value != t->index) return access_error(r, target);
+        if (dir == REC_DATA && r->selected != target) return access_error(r, target);
+        if (zero_target(t) && *value != 0) return access_error(r, target);
+        if (n1_target(t) && dir == REC_DATA && !(*value & RECOVER_SR_BLANK) &&
+            r->auth_phase == REC_RUN && !(w->flags & REC_N1)) return access_error(r, target);
+        u32 old = 0, expected;
+        if (w->write_mask != width_mask(width) && (dir == REC_SELECT || bus_read(r, target, &old)))
+            return access_error(r, target);
+        if (((old ^ *value) & ~w->write_mask) != 0) return access_error(r, target);
+        if (n) {
+            if (!evaluate(r, n, w, old, &expected) || *value != expected) return access_error(r, target);
+        } else if (w->value.mode == REC_EXPR) return access_error(r, target);
+        else if (w->value.mode == REC_SAVED) {
+            bool found = false;
+            for (u32 i = 0; i < r->saved_count; i++) {
+                const struct recover_reg *d = &r->profile->regs[i];
+                if (d->key == target && d->kind == REC_RW && t->access == REC_RW &&
+                    d->restore_rule_id == w->id &&
+                    !((*value ^ r->saved[i]) & w->write_mask)) found = true;
+            }
+            if (w->flags & REC_LOCAL) for (u32 i = 0; i < r->local_saved_count; i++) {
+                const struct recover_local_saved *v = &r->local_saved[i];
+                if (v->key == target && v->dir_substep == dir &&
+                    !((*value ^ v->value) & w->write_mask)) found = true;
+            }
+            if (!found) return access_error(r, target);
+        }
+        if (t->space == REC_VGA_INDEXED && t->access == REC_RW && r->state == REC_RUNNING) {
+            bool saved = false;
+            for (u32 i = 0; i < r->local_saved_count; i++)
+                if (r->local_saved[i].key == target && r->local_saved[i].dir_substep == dir) saved = true;
+            if (!saved) {
+                u32 original;
+                if (!t->read_safe || r->local_saved_count == RECOVER_MAX_REGS ||
+                    r->ops->read(r->opaque, &a, &original)) return access_error(r, target);
+                r->local_saved[r->local_saved_count++] = (struct recover_local_saved){target, dir, original};
+            }
+        }
+        if (!guards(r, w, REC_BEFORE)) return access_error(r, target);
+        if (r->ops->write(r->opaque, &a, *value)) {
+            fail(r, REC_BUS, access_phase(r), target);
+            return access_error(r, target);
+        }
+        if (is_bar(t)) r->gpu_written = true;
+        if (dir == REC_SELECT) r->selected = *value == t->index ? target : RECOVER_NONE;
+        if (w->verify_mask) {
+            u32 actual;
+            /* SELECT readback reads the index port, not its data register. */
+            if (!t->read_safe) return access_error(r, target);
+            if (r->ops->read(r->opaque, &a, &actual)) {
+                fail(r, REC_BUS, access_phase(r), target);
+                return access_error(r, target);
+            }
+            if (((actual ^ *value) & w->verify_mask)) {
+                fail(r, REC_VERIFY, access_phase(r), target);
+                return access_error(r, target);
+            }
+        }
+        if (!guards(r, w, REC_AFTER)) return access_error(r, target);
+        if (t->space == REC_VGA_INDEXED && t->port == RECOVER_CRTC &&
+            t->index == RECOVER_CR44 && dir == REC_DATA) {
+            if (t->head || (*value != RECOVER_CR44_HEAD0 && *value != RECOVER_CR44_HEAD1)) return access_error(r, target);
+            r->head = *value == RECOVER_CR44_HEAD1;
+        }
+        if (node != RECOVER_NONE) {
+            select_record(r->profile, r->plan, node, r->buffers.valid_bits);
+            bit_set(r->buffers.valid_bits, node);
+        }
+    }
+    r->accessed = true;
+    return 0;
+}
+int recover_plan_enter(struct recover *r, u32 node)
+{
+    if (r->state != REC_RUNNING || !r->plan || !r->valid || r->entered ||
+        node >= r->plan->node_count || node != r->expected_node) return access_error(r, node);
+    const struct recover_plan_node *n = &r->plan->nodes[node];
+    if (n->head != r->head || !dependencies(r->profile, r->plan, node, r->buffers.valid_bits)) return access_error(r, node);
+    r->cursor = node; r->entered = true; r->accessed = false; r->auth_phase = n->phase;
+    if (n->phase == REC_RUN) {
+        for (u32 i = 0; i < r->profile->target_count; i++)
+            if (zero_target(&r->profile->targets[i])) r->zero_hold = true;
+        if (r->zero_hold && !zero_guards(r)) return access_error(r, node);
+    }
+    return 0;
+}
+int recover_plan_leave(struct recover *r, u32 edge)
+{
+    if (r->state != REC_RUNNING || !r->plan || !r->entered || edge > 1) return access_error(r, edge);
+    const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
+    const struct recover_opcode_layout *l = layout_for(r->profile, n);
+    if (!l || (l->dir_substep != RECOVER_NONE && !r->accessed)) return access_error(r, r->cursor);
+    if (n->phase == REC_RUN && r->zero_hold && !zero_guards(r)) return access_error(r, r->cursor);
+    u32 next = n->next[edge];
+    if (n->phase == REC_PREPARE && (next == RECOVER_NONE || r->plan->nodes[next].phase != REC_PREPARE)) {
+        bool gf = false;
+        for (u32 i = 0; i < r->profile->target_count; i++) if (zero_target(&r->profile->targets[i])) gf = true;
+        if (gf && !zero_guards(r)) return access_error(r, r->cursor);
+        r->zero_hold = gf;
+    }
+    r->expected_node = next; r->entered = false; r->cursor = RECOVER_NONE;
+    return 0;
+}
+static bool range_ok(const struct recover_range *r)
+{
+    return r->len && (unsigned long long)r->base + r->len <= RECOVER_ADDRESS_END;
+}
+int recover_bar_probe(struct recover *r, u32 bar, u32 raw, u32 mask,
+    const struct recover_range *exclude, u32 exclude_count,
+    const struct recover_range *upstream, u32 upstream_count)
+{
+    u32 base = raw & RECOVER_BAR_MASK, length = ~(mask & RECOVER_BAR_MASK) + 1U;
+    if (r->state != REC_RUNNING || r->auth_phase != REC_SIZE_BARS || !r->entered ||
+        !r->measuring || bar >= 3 || raw != r->bars[bar].raw || (raw & RECOVER_BAR_TYPE_MASK) || (mask & RECOVER_BAR_TYPE_MASK) || !base || !length ||
+        (length & (length - 1)) || base % length ||
+        (unsigned long long)base + length > RECOVER_ADDRESS_END || exclude_count > RECOVER_RANGE_MAX ||
+        upstream_count > RECOVER_RANGE_MAX || (exclude_count && !exclude) || (upstream_count && !upstream)) goto bad;
+    for (u32 i = 0; i < exclude_count; i++)
+        if (!range_ok(&exclude[i]) || ((unsigned long long)base < (unsigned long long)exclude[i].base + exclude[i].len &&
+            (unsigned long long)exclude[i].base < (unsigned long long)base + length)) goto bad;
+    for (u32 i = 0; i < upstream_count; i++)
+        if (!range_ok(&upstream[i]) || base < upstream[i].base ||
+            (unsigned long long)base + length > (unsigned long long)upstream[i].base + upstream[i].len) goto bad;
+    r->measurement.bar[bar] = (struct recover_bar_extent){raw, base, length, 1};
+    return 0;
+bad:
+    r->cache = (struct recover_bar_measurement){0};
+    r->measurement = (struct recover_bar_measurement){0};
+    return access_error(r, bar);
 }
