@@ -667,7 +667,7 @@ FD ルートの上に HDD の ext2 を載せても、残っている短い名前
 FD 上のパスはすべて 8.3 に収まること (mkfat12 は収まらない名前を黙って切り詰めるので、
 mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以外 FD にも入る** — 空きは 2026-09-25 に
 **2HD 359KB / 1221KB、1.44MB 568KB / 1424KB** (MINIMAL をレスキュー兼インストーラに絞った後。
-絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2HD が先に尽きるので、MINIMAL に
+絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-10-21 (kdebug.bin を `fd.exclude` で外した後、a82714b) は **2HD 134KB、1.44MB 346KB**。2HD が先に尽きるので、MINIMAL に
 足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB
 (`tools/tests/test_packages.py` の `FD_MIN_FREE_KB`、2HD と 1.44MB の両方) を切ると
 `make check-packages-host` が落ちる** — 溢れて `make all` が割れる前に、MINIMAL に足す物を
