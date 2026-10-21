@@ -2001,6 +2001,78 @@
       "source": "kernel/display_restore.h",
       "context_safe": false,
       "index": 249
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_get_setup",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 250
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_trygetchar",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 251
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_cmd_port",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 252
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_data_port",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 253
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_txrdy_mask",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 254
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_restore_98",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 255
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_ready",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 256
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_cell_read",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 257
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_cell_write",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 258
     }
   ]
 }

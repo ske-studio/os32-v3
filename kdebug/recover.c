@@ -161,10 +161,176 @@ static void fail(struct recover *r, enum recover_reason reason,
     r->failed = true;
 }
 
+/* One boot-lifetime owner; test sessions borrow it, never replace it. */
+static struct recover owner;
+struct recover *recover_owner(void) { return &owner; }
+int recover_owner_configure(const struct recover_ops *ops, void *opaque,
+    const struct recover_profile *s0_profile, bool route_write_approved)
+{
+    if ((owner.state != REC_IDLE && owner.state != REC_VERIFIED) ||
+        owner.failed || owner.cold_latched || !ops || !s0_profile) return -1;
+    owner.ops = ops; owner.opaque = opaque; owner.enabled = true;
+    owner.route_write_approved = route_write_approved;
+    owner.s0_profile = s0_profile;
+    return 0;
+}
+
+static void discard(struct recover *r, u32 n)
+{
+    if (n > ~0U - r->discarded_bytes) r->discarded_bytes = ~0U;
+    else r->discarded_bytes += n;
+}
+static u32 rx_word(const u8 *p)
+{
+    return (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24;
+}
+int recover_receive(struct recover *r)
+{
+    if (!r->transport || !r->transport->get) return 0;
+    bool abort = false;
+    for (u32 n = 0; n < RECOVER_RX_LIMIT; n++) {
+        int ch = r->transport->get(r->transport->opaque);
+        if (ch < 0) break;
+        r->rx[r->rx_used++] = (u8)ch;
+        while (r->rx_used && (r->rx[0] != RECOVER_ABORT_SYNC0 ||
+            (r->rx_used > 1 && r->rx[1] != RECOVER_ABORT_SYNC1) ||
+            r->rx_used == RECOVER_ABORT_SIZE)) {
+            if (r->rx_used == RECOVER_ABORT_SIZE &&
+                r->rx[0] == RECOVER_ABORT_SYNC0 && r->rx[1] == RECOVER_ABORT_SYNC1 &&
+                rx_word(r->rx + 2) == r->token.session && r->token.session &&
+                rx_word(r->rx + 6) == crc32_core_final(crc32_core_update(CRC32_INIT, r->rx, 6))) {
+                r->rx_used = 0; abort = true; break;
+            }
+            discard(r, 1);
+            --r->rx_used;
+            for (u32 i = 0; i < r->rx_used; i++) r->rx[i] = r->rx[i + 1];
+        }
+    }
+    return abort;
+}
+/* Command boundaries discard a partial frame and all already queued bytes.
+ * At 9600bps this is far more than can arrive during the bounded drain. The
+ * host must await EOT before sending the next command; it never retries abort. */
+static void receive_boundary(struct recover *r)
+{
+    discard(r, r->rx_used); r->rx_used = 0;
+    if (!r->transport || !r->transport->get) return;
+    for (u32 i = 0; i < RECOVER_RX_DRAIN; i++) {
+        if (r->transport->get(r->transport->opaque) < 0) return;
+        discard(r, 1);
+    }
+    fail(r, REC_CONTRACT, REC_PHASE_NONE, 0);
+}
+
+struct rec_row { char data[RECOVER_ROW_MAX]; u32 n; };
+static void row_text(struct rec_row *b, const char *s)
+{
+    while (*s && b->n < sizeof(b->data) - 1) b->data[b->n++] = *s++;
+}
+static void row_number(struct rec_row *b, const char *name, u32 v)
+{
+    char digits[10]; u32 n = 0;
+    row_text(b, name);
+    do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v);
+    while (n && b->n < sizeof(b->data) - 1) b->data[b->n++] = digits[--n];
+}
+static void row_start(struct recover *r, struct rec_row *b, const char *phase, const char *event)
+{
+    b->n = 0;
+    row_number(b, "REC sid=", r->token.session);
+    row_number(b, " seq=", ++r->seq);
+    row_text(b, " phase="); row_text(b, phase);
+    row_text(b, " event="); row_text(b, event);
+}
+static int row_send(struct recover *r, struct rec_row *b)
+{
+    const struct recover_transport *t = r->transport;
+    if (!t) return 0;
+    row_text(b, "\n");
+    r->emitting = true;
+    int rc = 0;
+    for (u32 i = 0; i < b->n; i++) {
+        if (recover_uart_byte(r, &t->uart, t->opaque, (u8)b->data[i], t->frame_us, t->max_polls)) {
+            rc = -1; break;
+        }
+    }
+    r->emitting = false;
+    if (rc) { r->lost_lines++; fail(r, REC_LOG, REC_PHASE_NONE, 0); }
+    return rc;
+}
+int recover_record(struct recover *r, const char *phase, const char *event,
+                   u32 step, u32 addr, int rc, u32 elapsed)
+{
+    if (!r->transport) return 0;
+    struct rec_row b;
+    row_start(r, &b, phase, event);
+    if (event[0] == 'B') {
+        row_number(&b, " step=", step); row_number(&b, " addr=", addr);
+    } else {
+        row_text(&b, " rc=");
+        if (rc < 0) row_text(&b, "-");
+        row_number(&b, "", rc < 0 ? 0U - (u32)rc : (u32)rc);
+        row_number(&b, " elapsed=", elapsed);
+    }
+    return row_send(r, &b);
+}
+static int transport_state(struct recover *r, enum recover_state s)
+{
+    if (!r->transport) return 0;
+    struct rec_row b;
+    if (s == REC_VERIFIED || s == REC_FAILED) {
+        if (r->discarded_bytes) {
+            row_start(r, &b, "receive", "DISCARD");
+            row_number(&b, " discarded_bytes=", r->discarded_bytes);
+            (void)row_send(r, &b);
+        }
+        row_start(r, &b, "final", "END");
+        row_text(&b, r->failed ? " result=FAIL" : r->s1_verified ? " result=OK" : " result=PARTIAL");
+        row_text(&b, " target=S0");
+        row_number(&b, " verified=", r->s0_verified);
+        row_number(&b, " unknown=", !r->s1_verified);
+        row_number(&b, " override=", r->command_override);
+        row_number(&b, " saved=", r->command_saved);
+        row_number(&b, " actual=", r->command_actual);
+        row_number(&b, " trial=", r->reason);
+        row_number(&b, " lost_lines=", r->lost_lines);
+        row_number(&b, " discarded_bytes=", r->discarded_bytes);
+    } else {
+        static const char *const names[] = {"IDLE", "SNAPSHOTTING", "ARMED", "RUNNING", "PAUSED", "RESTORING"};
+        row_start(r, &b, "state", names[s]);
+        row_number(&b, " version=", r->token.profile_version);
+        row_number(&b, " profile_crc=", r->token.profile_crc);
+        row_number(&b, " plan_hash=", r->token.plan_hash);
+        row_number(&b, " snapshot_crc=", r->token.snapshot_crc);
+    }
+    return row_send(r, &b);
+}
+
+int recover_now_session(struct recover *r, u32 session)
+{
+    if (!r->enabled || session != r->token.session) return -1;
+    if (r->state != REC_IDLE) return trial_end(r, &r->token, REC_ABORT);
+    if (session || !r->s0_profile || !r->ops->ticks || !r->ops->start_ready ||
+        !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) return -1;
+    const struct recover_profile *p = r->s0_profile;
+    if (p->version != RECOVER_PROFILE_VERSION || p->crc != recover_profile_crc(p) ||
+        p->count || p->quiesce_count || !p->restore_limit ||
+        p->restore_limit >= RECOVER_HALF_TICKS || !p->restore_max_polls ||
+        !p->restore_log_bytes || p->s0_reserve_ticks || p->s0_reserve_polls ||
+        p->s0_reserve_bytes) return -1;
+    r->profile = p;
+    r->token = (struct recover_token){ .session = ++r->next_session,
+        .profile_version = r->profile->version, .profile_crc = r->profile->crc };
+    r->s0_only = true; r->reason = REC_ABORT;
+    receive_boundary(r);
+    return cleanup(r);
+}
+
 static int state(struct recover *r, enum recover_state s)
 {
     bool restoring = r->state == REC_RESTORING;
     r->state = restoring ? REC_RESTORING : s;
+    if (transport_state(r, s)) return -1;
     if (r->ops->event) {
         if (restoring) {
             if (!restore_time(r)) return -1;
@@ -534,6 +700,69 @@ int recover_delay_ms(struct recover *r, u32 ms,
     return 0;
 }
 
+/* Records share the owner's sequence. Failed logging stops trial accesses;
+ * restoration still uses its bounded independent S0 allocation. */
+static const char *log_phase(const struct recover *r)
+{
+    if (r->state == REC_SNAPSHOTTING) return "snapshot";
+    if (r->state == REC_RESTORING) return "restore";
+    return "access";
+}
+static int logged_read(struct recover *r, const struct recover_bus_access *a, u32 *value)
+{
+    if (!r->transport || r->state == REC_IDLE || r->state == REC_VERIFIED)
+        return r->ops->read(r->opaque, a, value);
+    u32 tick = r->ops->ticks(r->opaque);
+    int log = recover_record(r, log_phase(r), "BEGIN", a->key, a->offset, 0, 0);
+    if (log && r->state != REC_RESTORING) return -1;
+    if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;
+    if (r->state != REC_RESTORING && call_point(r, false)) return -1;
+    int rc = r->ops->read(r->opaque, a, value);
+    log = recover_record(r, log_phase(r), "END", a->key, a->offset, rc,
+                         r->ops->ticks(r->opaque) - tick);
+    return rc ? rc : log;
+}
+static int logged_write(struct recover *r, const struct recover_bus_access *a, u32 value)
+{
+    if (!r->transport) return r->ops->write(r->opaque, a, value);
+    u32 tick = r->ops->ticks(r->opaque);
+    int log = recover_record(r, log_phase(r), "BEGIN", a->key, a->offset, 0, 0);
+    if (log && r->state != REC_RESTORING) return -1;
+    if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;
+    if (r->state != REC_RESTORING && call_point(r, false)) return -1;
+    int rc = r->ops->write(r->opaque, a, value);
+    log = recover_record(r, log_phase(r), "END", a->key, a->offset, rc,
+                         r->ops->ticks(r->opaque) - tick);
+    return rc ? rc : log;
+}
+static int logged_callback(struct recover *r, const char *phase, int (*fn)(void *))
+{
+    if (!r->transport) return fn(r->opaque);
+    u32 tick = r->ops->ticks(r->opaque);
+    (void)recover_record(r, phase, "BEGIN", 0, 0, 0, 0);
+    int rc = recover_restore_point(r) ? -1 : fn(r->opaque);
+    (void)recover_record(r, phase, "END", 0, 0, rc, r->ops->ticks(r->opaque) - tick);
+    return rc;
+}
+static int logged_route_read(struct recover *r, u32 *value)
+{
+    if (!r->transport) return r->ops->route_read(r->opaque, value);
+    u32 tick = r->ops->ticks(r->opaque);
+    (void)recover_record(r, "route", "BEGIN", 0, RECOVER_ROUTE_PORT, 0, 0);
+    int rc = recover_restore_point(r) ? -1 : r->ops->route_read(r->opaque, value);
+    (void)recover_record(r, "route", "END", 0, RECOVER_ROUTE_PORT, rc, r->ops->ticks(r->opaque) - tick);
+    return rc;
+}
+static int logged_route_write(struct recover *r)
+{
+    if (!r->transport) return r->ops->route_write(r->opaque, RECOVER_ROUTE_98);
+    u32 tick = r->ops->ticks(r->opaque);
+    (void)recover_record(r, "route", "BEGIN", 1, RECOVER_ROUTE_PORT, 0, 0);
+    int rc = recover_restore_point(r) ? -1 : r->ops->route_write(r->opaque, RECOVER_ROUTE_98);
+    (void)recover_record(r, "route", "END", 1, RECOVER_ROUTE_PORT, rc, r->ops->ticks(r->opaque) - tick);
+    return rc;
+}
+
 static bool config_ok(struct recover *r)
 {
     if (!raw_matches(r, true)) {
@@ -587,7 +816,7 @@ static void screen(struct recover *r)
 {
     u32 route;
     if (!restore_time(r)) return;
-    if (recover_restore_point(r) || r->ops->route_read(r->opaque, &route)) {
+    if (recover_restore_point(r) || logged_route_read(r, &route)) {
         fail(r, REC_BUS, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
     }
     if (route & RECOVER_ROUTE_MASK) {
@@ -595,17 +824,17 @@ static void screen(struct recover *r)
             fail(r, REC_CONTRACT, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
         if (!restore_time(r)) return;
-        if (recover_restore_point(r) || r->ops->route_write(r->opaque, RECOVER_ROUTE_98) ||
-            recover_restore_point(r) || r->ops->route_read(r->opaque, &route) || (route & RECOVER_ROUTE_MASK)) {
+        if (recover_restore_point(r) || logged_route_write(r) ||
+            recover_restore_point(r) || logged_route_read(r, &route) || (route & RECOVER_ROUTE_MASK)) {
             fail(r, REC_VERIFY, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
     }
     if (!restore_time(r)) return;
-    if (recover_restore_point(r) || r->ops->screen_safe(r->opaque)) {
+    if (recover_restore_point(r) || logged_callback(r, "decode", r->ops->screen_safe)) {
         fail(r, REC_VERIFY, REC_PHASE_SCREEN, 0); return;
     }
     if (!restore_time(r)) return;
-    if (recover_restore_point(r) || r->ops->screen_restore_verify(r->opaque)) {
+    if (recover_restore_point(r) || logged_callback(r, "screen", r->ops->screen_restore_verify)) {
         fail(r, REC_VERIFY, REC_PHASE_SCREEN, 0); return;
     }
     if (restore_time(r)) r->s0_verified = true;
@@ -628,7 +857,7 @@ static int cleanup(struct recover *r)
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
     state(r, REC_RESTORING);
-    bool safe = !r->access_blocked && quiesce(r, true);
+    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
     /* A partial snapshot is usable only for its completed safe entries. Never
      * execute trial writes unless valid; preparation failure still cleans up. */
     if (safe) {
@@ -671,7 +900,8 @@ static int cleanup(struct recover *r)
     restore_time(r);
     r->in_s0 = true;
     screen(r);
-    r->s1_verified = !r->failed && !r->cold_latched && r->valid && !r->command_override;
+    receive_boundary(r);
+    r->s1_verified = !r->s0_only && !r->failed && !r->cold_latched && r->valid && !r->command_override;
     state(r, r->failed ? REC_FAILED : REC_VERIFIED);
     /* A final log failure cannot leave a successful state. */
     if (r->failed) { r->state = REC_FAILED; r->s1_verified = false; }
@@ -700,13 +930,17 @@ static int check_deadline(struct recover *r)
     if (r->spent >= r->budget ||
         (r->in_opcode && (u32)(r->call_tick - r->opcode_tick) >=
          r->profile->opcode_limit)) {
-        fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
+        fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0);
+        if (!r->emitting) cleanup(r);
+        return -1;
     }
     return 0;
 }
 
 static int pause_call(struct recover *r)
 {
+    receive_boundary(r);
+    if (r->failed) return cleanup(r), -1;
     if (state(r, REC_PAUSED)) return cleanup(r), -1;
     if (check_deadline(r)) return -1;
     r->in_call = false; r->in_opcode = false;
@@ -767,6 +1001,8 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     }
     for (u32 i = 0; i < p->target_count; i++)
         if (bit_get(used, i) && !extent_ok(p, &p->targets[i], r->bars)) { release_plan(r); return -1; }
+    r->s0_only = false;
+    r->seq = 0; r->lost_lines = 0; r->discarded_bytes = 0;
     r->profile = p;
     r->token = (struct recover_token){ .session = ++r->next_session,
         .profile_crc = p->crc, .profile_version = p->version,
@@ -782,6 +1018,8 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     r->uart_polls = 0; r->uart_bytes = 0;
     r->in_call = true; r->call_tick = r->ops->ticks(r->opaque);
     r->cold_latched = p->cold_required;
+    receive_boundary(r);
+    if (r->failed) return cleanup(r), -1;
     if (state(r, REC_SNAPSHOTTING)) return cleanup(r);
     for (u32 i = 0; i < p->count; i++) {
         const struct recover_reg *d = &p->regs[i];
@@ -816,8 +1054,10 @@ static int call_point(struct recover *r, bool count_poll)
     if (count_poll && r->in_opcode && ++r->polls > r->profile->max_polls) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
     }
-    bool abort = r->ops->abort_requested &&
-        r->ops->abort_requested(r->opaque, r->token.session);
+    if (r->emitting) return 0;
+    bool wire_abort = recover_receive(r);
+    bool abort = wire_abort || (r->ops->abort_requested &&
+        r->ops->abort_requested(r->opaque, r->token.session));
     if (check_deadline(r)) return -1;
     if (abort) {
         r->reason = REC_ABORT; cleanup(r); return -1;
@@ -1179,7 +1419,7 @@ static int bus_read(struct recover *r, u32 key, u32 *value)
     if (key >= r->profile->target_count || !r->profile->targets[key].read_safe ||
         bus_address(r, key, REC_READ, &a)) return -1;
     if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;
-    return r->ops->read(r->opaque, &a, value);
+    return logged_read(r, &a, value);
 }
 static bool zero_guards(struct recover *r)
 {
@@ -1268,7 +1508,7 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             for (u32 i = 0; i < 3; i++) if (bars[i] != r->cache.bar[i].raw) return -1;
         }
         a.key = target;
-        return r->ops->read(r->opaque, &a, value);
+        return logged_read(r, &a, value);
     }
     if (!r->enabled || !r->profile || !value || target >= r->profile->target_count ||
         (r->state != REC_RUNNING && r->state != REC_RESTORING && r->state != REC_SNAPSHOTTING)) return -1;
@@ -1306,7 +1546,7 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
     if (dir == REC_READ) {
         if (!t->read_safe || (t->space == REC_VGA_INDEXED && r->selected != target) ||
             (r->state == REC_RESTORING && recover_restore_point(r)) ||
-            r->ops->read(r->opaque, &a, value)) return access_error(r, target);
+            logged_read(r, &a, value)) return access_error(r, target);
     } else {
         if (r->state == REC_RESTORING && !restore_time(r)) return -1;
         if (t->space == REC_PCI_CFG && t->offset == RECOVER_COMMAND) {
@@ -1350,13 +1590,13 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             if (!saved) {
                 u32 original;
                 if (!t->read_safe || r->local_saved_count == RECOVER_MAX_REGS ||
-                    r->ops->read(r->opaque, &a, &original)) return access_error(r, target);
+                    logged_read(r, &a, &original)) return access_error(r, target);
                 r->local_saved[r->local_saved_count++] = (struct recover_local_saved){target, dir, original};
             }
         }
         if (!guards(r, w, REC_BEFORE)) return access_error(r, target);
         if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
-            r->ops->write(r->opaque, &a, *value)) {
+            logged_write(r, &a, *value)) {
             fail(r, REC_BUS, access_phase(r), target);
             return access_error(r, target);
         }
@@ -1367,7 +1607,7 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             /* SELECT readback reads the index port, not its data register. */
             if (!t->read_safe) return access_error(r, target);
             if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
-                r->ops->read(r->opaque, &a, &actual)) {
+                logged_read(r, &a, &actual)) {
                 fail(r, REC_BUS, access_phase(r), target);
                 return access_error(r, target);
             }

@@ -5,6 +5,111 @@
 #include "kernel/v86_gcap.h"
 #include "kpeek.h"
 
+#include "recover.h"
+#include "recover_wire.h"
+#include "kernel/display_restore.h"
+#include "kernel/idt.h"
+#include "drivers/serial.h"
+#include "drivers/serial_plan.h"
+#include "lib/serial_diag.h"
+#include "console.h"
+#include "memmap.h"
+#include "io.h"
+#include "generated/kdebug_import_macros.h"
+
+static u32 recovery_ticks(void *opaque) { (void)opaque; return tick_count; }
+static int recovery_route(void *opaque, u32 *value)
+{ (void)opaque; *value = inp(RECOVER_ROUTE_PORT); return 0; }
+static int recovery_cui(void *opaque)
+{ (void)opaque; return display_recover_ready(); }
+static int recovery_ready(void *opaque)
+{
+    (void)opaque;
+    return display_recover_ready() || (inp(RECOVER_ROUTE_PORT) & RECOVER_ROUTE_MASK) ? -1 : 0;
+}
+static int recovery_restore(void *opaque)
+{ (void)opaque; display_restore_98(); return 0; }
+static int recovery_cell_read(void *opaque, u32 *value)
+{ (void)opaque; return display_recover_cell_read(value); }
+static int recovery_cell_write(void *opaque, u32 value)
+{ (void)opaque; return display_recover_cell_write(value); }
+/* The HAL preserves the CUI TVRAM contents. Re-enable/synchronize the cursor
+ * after restoring display START; no shadow console buffer needs repainting. */
+static int recovery_redraw(void *opaque)
+{ (void)opaque; console_hw_cursor_enable(); return 0; }
+static int recovery_local(void *opaque) { (void)opaque; return 0; }
+static const struct recover_screen_ops recovery_screen = {
+    recovery_ready, recovery_ready, recovery_restore,
+    recovery_cell_read, recovery_cell_write, recovery_redraw
+};
+static int recovery_screen_verify(void *opaque)
+{ (void)opaque; return recover_screen_98(recover_owner(), &recovery_screen, 0); }
+static const struct recover_ops recovery_ops = {
+    .ticks = recovery_ticks, .start_ready = recovery_cui,
+    .route_read = recovery_route, .screen_safe = recovery_ready,
+    .screen_restore_verify = recovery_screen_verify, .local_cleanup = recovery_local
+};
+static int recovery_rx(void *opaque)
+{ (void)opaque; return serial_gate_active() ? -1 : serial_trygetchar(); }
+static int recovery_tx_ready(void *opaque)
+{
+    (void)opaque;
+    const struct serial_setup *setup = serial_get_setup();
+    if (serial_gate_active() || !setup || !setup->actual) return -1;
+    return (inp(serial_cmd_port(setup->mode)) & serial_txrdy_mask(setup->mode)) != 0;
+}
+static int recovery_tx_put(void *opaque, u32 byte)
+{
+    (void)opaque;
+    const struct serial_setup *setup = serial_get_setup();
+    if (serial_gate_active() || !setup || !setup->actual) return -1;
+    outp(serial_data_port(setup->mode), byte);
+    return 0;
+}
+#define RECOVERY_UART_POLL_LIMIT 65536U
+static struct recover_transport recovery_transport = {
+    .get = recovery_rx,
+    .uart = {recovery_tx_ready, recovery_tx_put, recover_hal_wait_frame},
+    .max_polls = RECOVERY_UART_POLL_LIMIT
+};
+static struct recover_profile recovery_s0;
+static int recovery_attach(void)
+{
+    struct recover *r = recover_owner();
+    const struct serial_setup *setup = serial_get_setup();
+    if (serial_gate_active() || !setup || !setup->actual) return -1;
+    if (!r->ops) {
+        /* Includes REC state/terminal/RX rows plus the bounded HAL callbacks.
+         * The fixed S0 envelope remains 4096 bytes/10 s/16384 polls. */
+        const struct recover_static_work work = {4096, 2000, 256, 4096, 2000, 256};
+        recovery_s0.version = RECOVER_PROFILE_VERSION;
+        if (recover_budget_apply(&recovery_s0, REC_BUDGET_S0, PIT_HZ,
+                setup->actual, 10, &work) ||
+            recover_owner_configure(&recovery_ops, 0, &recovery_s0, false)) return -1;
+    }
+    if (!r->transport) {
+        recovery_transport.frame_us = 10000000U / setup->actual +
+                                      (10000000U % setup->actual != 0);
+        r->transport = &recovery_transport;
+    }
+    return 0;
+}
+static i32 recovery_call(u32 op, void *buf, u32 size)
+{
+    struct recover *r = recover_owner();
+    if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW) return -1;
+    if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
+        return kpeek_call(op, buf, size);
+    if (!buf || size != sizeof(KdebugRecover) || recovery_attach()) return -1;
+    KdebugRecover *out = buf;
+    if (op == KDEBUG_OP_RECOVER_NOW && recover_now_session(r, out->session)) return -1;
+    *out = (KdebugRecover){r->token.session, r->state, r->reason,
+        (r->s0_verified ? 1U : 0U) | (r->s1_verified ? 2U : 0U),
+        r->token.profile_crc, r->token.plan_hash, r->token.snapshot_crc,
+        r->seq, r->lost_lines, r->discarded_bytes};
+    return 0;
+}
+
 static void selftest_run(void) { (void)kselftest_run(); }
 static void selftest_post_exec(void) { (void)kselftest_run_post_exec(); }
 static void selftest_post_unicode(void) { (void)kselftest_run_post_unicode(); }
@@ -31,7 +136,7 @@ const struct kdebug_ops kdebug_ops = {
     .gcap_release = v86_gcap_release,
     .nic_selftest = 0,
     .nic_trace = nic_trace,
-    .dbg_call = kpeek_call
+    .dbg_call = recovery_call
 };
 
 /* No imports, allocation, device access or registration during init. */

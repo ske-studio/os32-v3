@@ -34,7 +34,7 @@ MUTATIONS = [
      "fail(r, REC_VERIFY, REC_PHASE_RESTORE, target);"),
     ("snapshot_valid_early", "r->valid = false; r->failed = false;",
      "r->valid = true; r->failed = false;"),
-    ("cleanup_removed", "bool safe = !r->access_blocked && quiesce(r, true);",
+    ("cleanup_removed", "bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);",
      "bool safe = false;"),
     ("w1c_allowed", """(d->kind != REC_RW && d->kind != REC_COLD) ||
             d->kind != p->targets[d->key].access""",
@@ -59,8 +59,8 @@ MUTATIONS = [
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
     state(r, REC_RESTORING);
-    bool safe = !r->access_blocked && quiesce(r, true);""", """    state(r, REC_RESTORING);
-    bool safe = !r->access_blocked && quiesce(r, true);
+    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);""", """    state(r, REC_RESTORING);
+    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
     if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }"""),

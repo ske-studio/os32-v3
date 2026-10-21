@@ -21,3 +21,4 @@ check-recover-host:
 - include/pc98.h
 - kernel/paging.h
 - include/io.h
+- tools/tests/recover_t3_host.inc

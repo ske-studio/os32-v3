@@ -1,0 +1,18 @@
+check-recover-t3:
+- kdebug/recover.c
+- kdebug/recover.h
+- kdebug/recover_wire.h
+- kdebug/recover_profile.c
+- tools/tests/recover_host.c
+- tools/tests/recover_t3_host.inc
+- tools/tests/test_recover.py
+- tools/tests/test_recover_t3.py
+- tools/rshell_recover.py
+- tools/tests/recover_descriptor_host.inc
+- tools/tests/recover_t2_host.inc
+- tools/tests/recover_hostshim/io.h
+- tools/check_map.d/check-recover-t3.yaml
+- build/checks.d/check-recover-t3.mk
+- lib/crc32_core.inc
+- tools/tests/host32.py
+- tools/tests/mutpar.py

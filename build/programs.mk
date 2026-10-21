@@ -76,7 +76,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
-SHELL_DEPS = sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
+SHELL_DEPS = kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
