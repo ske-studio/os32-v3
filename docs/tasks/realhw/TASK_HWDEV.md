@@ -79,9 +79,6 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - core の ABI と manifest を同じ生成契約で照合する。KMOD ABI 世代・RO 検査・slot 充填の詳細は CORE_API §8・§9 を正とする。
 - 指定された CORE_API の状態「確定」を使えるよう、状態語彙の正典 POLICY_DEV §8 に設計・契約用の語を追加した。
 
-## 送り項目 (取り込みのレビューの P3)
-- (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。
-
 ## M3a の実装で設計者が決めたこと (2026-10-22)
 
 - 自前 .def と確定 slot 表を相互照合し、共通生成器で両像を結ぶ。ABI・生成物・像の配置は CORE_API §3・§8・§9。
@@ -89,3 +86,6 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 送り R5 の DWARF 照合は維持する。テキスト CRC と違い inventory の列挙漏れを検出し、既存の host 生成処理だけで閉じるため過剰ではない。
 - 部品の初期化と公開だけを実 GF 像で検査し、試行の振分け・核からの除外・配備はそれぞれ M3b・M3c・M5 に残す。
 - 検証証拠は `~/os32-tmp/run/hwdev_m3a/`。実機・NP21/W は本段の対象外。
+
+## 送り項目 (取り込みのレビューの P3)
+- (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。

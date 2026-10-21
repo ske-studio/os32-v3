@@ -104,7 +104,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 - kdebug ではこれらを生成 stub (`kdebug_import_stubs.S`) が `jmp *kdebug_import_slots+N` で呼ぶので、HWDEV に同じ stub をリンクすると kdebug の slot を指して未解決になる。
 - HWDEV は自分の .def から `hwdev_import_stubs.S` と `hwdev_import_slots` を生成し、§2 の核の関数と kernel の関数を 1 つの表に並べる。`kdebug_import_stubs.o` は HWDEV にリンクしない。
 - gfinit.c・gfinit_resources.c は `generated/kdebug_import_macros.h` を取り込むが getter マクロは使っていない — 取り込みを HWDEV の生成物に差し替える。
-- `tools/gen_hwdev_contract.py` が共通契約と同時に stub・slot・metadata・取り込み用ヘッダを生成する。`HWDEV_MODULE` の GF ビルドだけ取り込み先を切替え、両像で配置 assert をコンパイルする。生成完了時に全出力を touch し、内容不変の入力更新も消化する。
+- `tools/gen_hwdev_contract.py` が共通契約と同時に stub・slot・metadata・取り込み用ヘッダを生成する。`HWDEV_MODULE` の GF ビルドだけ取り込み先を切替え、両像で配置 assert をコンパイルする。
 - `build/hwdev.mk` は同じ machine/ABI flags で GF 8 オブジェクトを別にコンパイルし、`hwdev_main.o` と専用 imports を `build/out/hwdev/hwdev.elf` (map 同居) へリンク、`build/out/hwdev.mod` へ pack する。`build/hwdev.ld` は HWDEV slot 配列を data 先頭に置く。
 - 表は facade が開始前に充填する (§1)。slot 25〜34 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
 
@@ -192,5 +192,4 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 - ROM/decode/plan/flow は専有 trial RAM。plan は decode の node/arg を借用し、profile は compiled の表を借用。PAUSED は bundle・lease・両 handle を保持。SIZE_BARS 成功から PREPARE までの保持も参照中として数える。同期 callback が帰る前に解放しない。
 - 終端順は局所 cleanup → 共通終端 → 核に結果保持 → plan/profile/expr/opaque の作業 RAM 参照解除 → release_work (I/Oなし・二重呼出し安全) → lease 解放。SIZE_BARS 成功の保持例外だけは解除/free を次の開始・中止まで送る。外部 recover、開始途中失敗、二重終端も同じ所有規則を使う。
 - FAILED/cold・PTE破損ラッチ・最後の結果・session 世代は核の boot 寿命で、部品の解放/再登録で初期化しない。核の S0 ops/profile に戻すまで部品作業 RAM を返さない。これらの実装は M4、M1 は契約の固定だけ。
-
 - M3a の body は `gfinit_call` と `gfinit_recover_end` を call/release_work に型照合して結ぶ。後者は既存の終端状態でだけ作業 RAM を返す実装を維持し、owner/lease の接続と全出口の整理は M4 の契約に従う。
