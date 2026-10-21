@@ -153,7 +153,10 @@ def one_mutation(item):
                 [host_cmd(exe)], capture_output=True)
         except subprocess.CalledProcessError as error:
             return f"MUTATE {name}: COMPILE FAIL {error.stderr!r}", 1
-        result = host32.run([str(exe)], cwd=str(tree), timeout=60, capture_output=True)
+        try:
+            result = host32.run([str(exe)], cwd=str(tree), timeout=60, capture_output=True)
+        except subprocess.TimeoutExpired:
+            return mutpar.timeout_red((f"MUTATE {name}: RED timeout", 0))
         if name == "cold_replayed":
             missing = [i for i in range(4)
                        if f"COLD replay exit {i}".encode() not in result.stdout]
