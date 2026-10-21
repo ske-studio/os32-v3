@@ -29,6 +29,21 @@ class ImportsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nm mismatch'):
             gen.check_nm(altered)
 
+    def test_retained_slot_requires_kernel_implementation(self):
+        original = gen.symbols
+        def without_legacy(nm, paths, undefined):
+            refs = original(nm, paths, undefined)
+            if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                refs.discard('v86_cui_display_restore')
+            return refs
+        with patch.object(gen, 'symbols', side_effect=without_legacy):
+            with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
+                gen.check_nm(self.entries)
+        altered = copy.deepcopy(self.entries)
+        altered[201].pop('retained')
+        with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
+            gen.check_nm(altered)
+
     def test_selftest_boot_references_are_not_excluded(self):
         original = gen.symbols
         for symbol in ('memory_boot_page_counts', 'kdebug'):
@@ -43,19 +58,23 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 249)
+        self.assertEqual(len(self.entries), 250)
         self.assertEqual([e['name'] for e in self.entries[226:239]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
         self.assertEqual(gen.STAGES['S4'], 239)
-        self.assertEqual(gen.STAGES['S5'], 249)
+        self.assertEqual(gen.STAGES['S5'], 250)
         self.assertEqual([(e['stage'], e['name']) for e in self.entries[239:]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
             ('S5', 'e82557_send'), ('S5', 'e82557_get_mac'), ('S5', 'e82557_state'),
-            ('S5', 'sfs_lan_peer_mac')])
+            ('S5', 'sfs_lan_peer_mac'), ('S5', 'display_text_start')])
+        self.assertEqual(self.entries[201]['name'], 'v86_cui_display_restore')
+        self.assertEqual(self.entries[201]['source'], 'kernel/v86_io.h')
+        self.assertTrue(self.entries[201]['retained'])
+        self.assertEqual(self.entries[249]['name'], 'display_text_start')
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {

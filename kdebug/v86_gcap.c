@@ -37,6 +37,7 @@
 #include "v86_gcap_math.h"
 #include "v86.h"
 #include "v86_io.h"
+#include "display_restore.h"
 #include "v86_mem.h"
 #include "pgalloc.h"
 #include "exec.h"       /* exec_ledger_owner: バッキングの台帳の owner */
@@ -595,7 +596,8 @@ static void tv_restore(const u16 *buf)
 
 static void gcap_cui_rebuild(const u16 *tv)
 {
-    v86_cui_display_restore();
+    /* ROM/fallback already restored PRAM and timing. Only restart CUI. */
+    display_text_start();
     tv_restore(tv);
     console_hw_cursor_enable();
 }

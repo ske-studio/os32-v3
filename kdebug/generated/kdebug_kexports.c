@@ -308,6 +308,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))e82557_get_mac,
     (void (*)(void))e82557_state,
     (void (*)(void))sfs_lan_peer_mac,
+    (void (*)(void))display_text_start,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -561,6 +562,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xef33472eu, 1, 1},
     {0x3e66697fu, 1, 1},
     {0x2a2e778au, 1, 1},
+    {0x18329f26u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

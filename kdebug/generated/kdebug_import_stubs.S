@@ -1246,4 +1246,9 @@ e82557_state:
 sfs_lan_peer_mac:
     jmp *kdebug_import_slots+992
 .size sfs_lan_peer_mac, .-sfs_lan_peer_mac
+.globl display_text_start
+.type display_text_start, @function
+display_text_start:
+    jmp *kdebug_import_slots+996
+.size display_text_start, .-display_text_start
 .section .note.GNU-stack,"",@progbits

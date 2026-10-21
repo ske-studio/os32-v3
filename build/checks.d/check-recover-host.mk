@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 193:check-recover-host
-# Pure T1 contracts; no kdebug/kernel build wiring or hardware imports.
+# T1/T1b/T2 contracts, injectable window/display/PIT bus; no command wiring.
 check-recover-host:
 	python3 -B tools/tests/test_recover.py $(MUT)
 

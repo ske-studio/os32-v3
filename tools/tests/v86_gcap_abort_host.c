@@ -99,7 +99,7 @@ int v86_gui_refuse(void) { return 0; }
 int v86_is_active(void) { return v86_session.active; }
 int gfx_get_height(void) { return GFX_HEIGHT; }
 void console_hw_cursor_enable(void) { cursor++; }
-void v86_cui_display_restore(void) { cui_restores++; }
+void display_text_start(void) { cui_restores++; }
 void __attribute__((weak)) pegc_restore_text_sync(int freq) { CHECK(freq == 1, "saved ROM sync frequency"); sync_restores++; }
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
