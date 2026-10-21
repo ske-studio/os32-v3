@@ -2,7 +2,11 @@
 #include "kprintf.h"
 #include "../drivers/pci.h"
 #ifndef GFINIT_RESOURCES_HOST
+#ifdef HWDEV_MODULE
+#include "hwdev/generated/hwdev_import_macros.h"
+#else
 #include "generated/kdebug_import_macros.h"
+#endif
 #endif
 /* PCI Type 1 memory windows: PCI Local Bus configuration header, matching
  * FreeBSD releng/14.3 sys/dev/pci/pcireg.h PCIR_MEMBASE_1/PCIR_MEMLIMIT_1 and

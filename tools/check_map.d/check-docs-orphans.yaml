@@ -1,4 +1,5 @@
 check-docs-orphans:
+- tools/gen_hwdev_pair.py
 - docs/**/*.md
 - tools/**/*.md
 - docs/.orphans-allow

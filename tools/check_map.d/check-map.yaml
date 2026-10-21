@@ -1,4 +1,5 @@
 check-map:
+- tools/gen_hwdev_pair.py
 - tools/check_map.yaml
 - tools/check_select.py
 - CLAUDE.md

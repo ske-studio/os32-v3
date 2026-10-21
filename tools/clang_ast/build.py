@@ -142,6 +142,14 @@ def dry_run(root):
             definition = pathlib.Path(root, "tools/prototypes/" + component + "_imports.def")
             if definition.is_file():
                 module.generate(pathlib.Path(out_dir, component), definition, module=component)
+    # Pair values do not affect C syntax/types. Generate a syntax-only header
+    # without requiring built images (also used by cross-free CI).
+    generator = pathlib.Path(root, "tools/gen_hwdev_pair.py")
+    if generator.is_file():
+        spec = importlib.util.spec_from_file_location("hwdev_pair_dry_run", generator)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.write_header(0, 0, pathlib.Path(out_dir, "hwdev/hwdev_pair.h"))
     for name in SAVED_SETTINGS:
         src = pathlib.Path(root, REAL_BUILD_OUT, name)
         if src.is_file():

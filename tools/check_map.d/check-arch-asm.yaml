@@ -5,6 +5,7 @@ check-arch-asm:
 - tools/check_p2v_allow.txt
 - tools/tests/mutpar.py
 - tools/clang_ast/**
+- tools/gen_hwdev_pair.py
 - tools/gen_sqlite_imports.py
 - tools/prototypes/cd_imports.def
 - tools/prototypes/pcm_imports.def

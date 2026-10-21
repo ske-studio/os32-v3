@@ -38,6 +38,11 @@ def slots():
         result.append(dict(e, index=int(index), group='kernel'))
     if [e['index'] for e in result] != list(range(35)):
         raise SystemExit('HWDEV slot order/count')
+    defined = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
+    keys = ('index', 'symbol', 'source', 'kind', 'group')
+    if defined != [{k: e[k] for k in keys} for e in result]:
+        raise SystemExit('HWDEV .def differs from core/kernel slot tables')
+    result = defined
     for e in result:
         e['declaration'] = declaration(e, ROOT)
     return result
@@ -149,10 +154,26 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     imports += [f'    slots[{e["index"]}] = (u32)(uptr)'+('core->' if e['group']=='core' else '')+e['symbol']+';' for e in entries]
     imports += ['}']
     files['hwdev_imports.h'] = '\n'.join(imports)+'\n'
+    files['hwdev_import_macros.h'] = '#include "hwdev_contract.h"\n'
+    files['hwdev_import_slots.c'] = ('#include "hwdev_contract.h"\n'
+        'u32 hwdev_import_slots[HWDEV_IMPORT_COUNT]\n'
+        '__attribute__((section(".data.hwdev_import_slots"), aligned(4))) = {0};\n')
+    asm = ['/* Generated i386 cdecl tail jumps; do not edit. */',
+           '.section .text.hwdev_imports,"ax",@progbits', '.code32']
+    for e in entries:
+        name = e['symbol']
+        asm += [f'.globl {name}', f'.type {name}, @function', f'{name}:',
+                f'    jmp *hwdev_import_slots+{4*e["index"]}', f'.size {name}, .-{name}']
+    asm += ['.section .note.GNU-stack,"",@progbits']
+    files['hwdev_import_stubs.S'] = '\n'.join(asm)+'\n'
+    files['hwdev_imports.json'] = json.dumps(dict(module_abi_gen=crc,
+        imports=[dict(name=e['symbol'], index=e['index'], kind=1, type_ver=1)
+                 for e in entries]), indent=2)+'\n'
     for name, text in files.items():
         p = out/name
         if not p.exists() or p.read_text() != text:
             p.write_text(text)
+        p.touch()  # Complete this generation even when content is unchanged.
 
 
 def main():

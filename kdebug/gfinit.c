@@ -13,8 +13,13 @@
 #include "drivers/pci.h"
 #include "drivers/serial.h"
 #include "include/bootinfo.h"
+#include "include/hwdev_private.h"
 #include "sys.h"
+#ifdef HWDEV_MODULE
+#include "hwdev/generated/hwdev_import_macros.h"
+#else
 #include "generated/kdebug_import_macros.h"
+#endif
 
 #define GF_BDF (GF_RES_GPU_DEV << 3)
 #define GF_DEVICE GF_RES_GPU_ID
@@ -25,7 +30,7 @@
 /* Each allocation is rounded independently; the old size-plan flow is freed
  * before the maximum flow allocation. Static control is not trial RAM. */
 #define GF_WORK_MAX_PAGES 267U
-STATIC_ASSERT(GF_WORK_MAX_PAGES == 267U, gf_work_page_contract);
+STATIC_ASSERT(GF_WORK_MAX_PAGES == HWDEV_WORK_MAX_PAGES, gf_work_page_contract);
 #define GF_FLOW_MAX_BYTES (RECOVER_NODE_MAX * RECOVER_BITS_WORDS * sizeof(u32))
 STATIC_ASSERT(RECOVER_NODE_MAX == 2048U, gf_work_node_contract);
 STATIC_ASSERT((PAGE_ALIGN_UP(GF_ROM_MAX) +

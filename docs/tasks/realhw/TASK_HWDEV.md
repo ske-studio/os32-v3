@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-22)** — M2 実装済み、独立レビュー待ち (M3 以降は未着手)
+> 状態: **実装中 (2026-10-22)** — M3a 実装済み、独立レビュー待ち (M3b 以降は未着手)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) と [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -35,7 +35,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 |---|---|---|---|
 | M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | 実装済み・レビュー待ち |
 | M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 実装済み・レビュー待ち |
-| M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 未 |
+| M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 実装済み・レビュー待ち |
 | M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 未 |
 | M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従、hwdev_audit の入力を HWDEV 側へ切替 | 未 |
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | 未 |
@@ -79,8 +79,13 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - core の ABI と manifest を同じ生成契約で照合する。KMOD ABI 世代・RO 検査・slot 充填の詳細は CORE_API §8・§9 を正とする。
 - 指定された CORE_API の状態「確定」を使えるよう、状態語彙の正典 POLICY_DEV §8 に設計・契約用の語を追加した。
 
+## M3a の実装で設計者が決めたこと (2026-10-22)
+
+- 自前 .def と確定 slot 表を相互照合し、共通生成器で両像を結ぶ。ABI・生成物・像の配置は CORE_API §3・§8・§9。
+- 送り M2 の生成反復は全出力の touch、頁上限の重複は GF/HWDEV 間の STATIC_ASSERT で解消。
+- 送り R5 の DWARF 照合は維持する。テキスト CRC と違い inventory の列挙漏れを検出し、既存の host 生成処理だけで閉じるため過剰ではない。
+- 部品の初期化と公開だけを実 GF 像で検査し、試行の振分け・核からの除外・配備はそれぞれ M3b・M3c・M5 に残す。
+- 検証証拠は `~/os32-tmp/run/hwdev_m3a/`。実機・NP21/W は本段の対象外。
+
 ## 送り項目 (取り込みのレビューの P3)
-- (M3a で) M2: build/kdebug.mk:80・tools/gen_hwdev_contract.py:150 — 生成器は内容が同じなら書き戻さないので、ヘッダを触ると以後の make のたびに生成が走り直す (遅くなるだけ) → 生成の最後に touch するか stamp ファイル。
-- (M3a で) M2: kdebug/gfinit.c:28 と include/hwdev_private.h:8 — 267 が GF_WORK_MAX_PAGES と HWDEV_WORK_MAX_PAGES の 2 か所、`STATIC_ASSERT(GF_WORK_MAX_PAGES == 267U)` は 2 つを結んでいない [C4] → `STATIC_ASSERT(GF_WORK_MAX_PAGES == HWDEV_WORK_MAX_PAGES)`。
-- (M3a で) M1: R5 — contract_crc に DWARF の突き合わせを重ねるのが過剰か決める (CORE_API §8 手順 3)。
 - (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。

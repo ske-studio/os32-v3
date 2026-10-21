@@ -1,9 +1,12 @@
-/* Actual facade + runtime + validator, synthetic executable KMOD body. */
+/* Actual facade + runtime + validator; synthetic M2 or built GF body. */
 #include "../../kernel/hwdev_module.c"
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"
-static u8 file[16384], pool[32768] __attribute__((aligned(4096)));
+#ifdef HWDEV_REAL_IMAGE
+#include "hwdev_pair.h"
+#endif
+static u8 file[MODULE_IMAGE_MAX], pool[MODULE_IMAGE_MAX] __attribute__((aligned(4096)));
 static u32 input[3], pos, opens, closes, live, logs;
 static struct hwdev_core_api fixture_core;
 static struct bootinfo bi;
@@ -104,7 +107,11 @@ void _start(void)
     c->state = MODULE_RUNNING;
     c->generation = 1;
     c->module_id = MODULE_ID_KDEBUG;
+#ifdef HWDEV_REAL_IMAGE
+    c->image_crc = HWDEV_CORE_IMAGE_CRC;
+#else
     c->image_crc = 0x11223344;
+#endif
     c->ro = (u32)(uptr)&fixture_core;
     c->ro_size = sizeof(fixture_core);
     c->text = (u32)(uptr)core_function;
@@ -131,8 +138,10 @@ void _start(void)
     } else {
         const struct hwdev_ops *ops = hwdev_module_ops();
         CHECK(ops && live);
+#ifndef HWDEV_REAL_IMAGE
         CHECK(ops->call(0, 0, 0, 0, 0, 0) == 42);
         ops->release_work();
+#endif
         struct module_record *r = module_record_get(hwdev_handle);
         CHECK(r && r->dependency_count == 1);
         /* Every core/kernel address was installed before initialize. */

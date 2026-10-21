@@ -1,0 +1,249 @@
+{
+  "imports": [
+    {
+      "index": 0,
+      "symbol": "trial_begin",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 1,
+      "symbol": "trial_step",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 2,
+      "symbol": "trial_end",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 3,
+      "symbol": "recover_owner",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 4,
+      "symbol": "recover_owner_configure",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 5,
+      "symbol": "recover_safe_point",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 6,
+      "symbol": "recover_plan_enter",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 7,
+      "symbol": "recover_plan_leave",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 8,
+      "symbol": "recover_plan_access",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 9,
+      "symbol": "recover_plan_check",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 10,
+      "symbol": "recover_bind_plan",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 11,
+      "symbol": "recover_budget_apply",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 12,
+      "symbol": "recover_bar_probe",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 13,
+      "symbol": "recover_profile_crc",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 14,
+      "symbol": "recover_access",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 15,
+      "symbol": "recover_restore_point",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 16,
+      "symbol": "recover_target_address",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 17,
+      "symbol": "recover_window_hal_init",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 18,
+      "symbol": "recover_window_access",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 19,
+      "symbol": "recover_window_cleanup",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 20,
+      "symbol": "recover_gf_pre",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 21,
+      "symbol": "recover_gf_result",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 22,
+      "symbol": "recover_gf_screen_safe",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 23,
+      "symbol": "recover_hal_wait_frame",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "index": 24,
+      "symbol": "kpeek_call",
+      "source": "kdebug/kpeek.h",
+      "kind": "FUNC",
+      "group": "core"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "index": 25,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "kmemset",
+      "source": "lib/kstring.h",
+      "index": 26,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pgalloc_alloc_phys",
+      "source": "kernel/pgalloc.h",
+      "index": 27,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "boot_image_info",
+      "source": "include/bootinfo.h",
+      "index": 28,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pgalloc_free_n_owner",
+      "source": "kernel/pgalloc.h",
+      "index": 29,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "serial_get_setup",
+      "source": "drivers/serial.h",
+      "index": 30,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read32",
+      "source": "drivers/pci.h",
+      "index": 31,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read16",
+      "source": "drivers/pci.h",
+      "index": 32,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write32",
+      "source": "drivers/pci.h",
+      "index": 33,
+      "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write16",
+      "source": "drivers/pci.h",
+      "index": 34,
+      "group": "kernel"
+    }
+  ]
+}

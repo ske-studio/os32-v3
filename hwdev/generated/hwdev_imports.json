@@ -1,0 +1,215 @@
+{
+  "module_abi_gen": 265564347,
+  "imports": [
+    {
+      "name": "trial_begin",
+      "index": 0,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "trial_step",
+      "index": 1,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "trial_end",
+      "index": 2,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_owner",
+      "index": 3,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_owner_configure",
+      "index": 4,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_safe_point",
+      "index": 5,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_plan_enter",
+      "index": 6,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_plan_leave",
+      "index": 7,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_plan_access",
+      "index": 8,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_plan_check",
+      "index": 9,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_bind_plan",
+      "index": 10,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_budget_apply",
+      "index": 11,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_bar_probe",
+      "index": 12,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_profile_crc",
+      "index": 13,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_access",
+      "index": 14,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_restore_point",
+      "index": 15,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_target_address",
+      "index": 16,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_window_hal_init",
+      "index": 17,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_window_access",
+      "index": 18,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_window_cleanup",
+      "index": 19,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_gf_pre",
+      "index": 20,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_gf_result",
+      "index": 21,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_gf_screen_safe",
+      "index": 22,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_hal_wait_frame",
+      "index": 23,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "kpeek_call",
+      "index": 24,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "kprintf",
+      "index": 25,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "kmemset",
+      "index": 26,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pgalloc_alloc_phys",
+      "index": 27,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "boot_image_info",
+      "index": 28,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pgalloc_free_n_owner",
+      "index": 29,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "serial_get_setup",
+      "index": 30,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pci_cfg_read32",
+      "index": 31,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pci_cfg_read16",
+      "index": 32,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pci_cfg_write32",
+      "index": 33,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "pci_cfg_write16",
+      "index": 34,
+      "kind": 1,
+      "type_ver": 1
+    }
+  ]
+}

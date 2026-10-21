@@ -31,4 +31,5 @@ check-hwdev-module-host:
 - sdk/kapi.json
 - lib/crc32_core.inc
 - build/module.ld
+- hwdev/hwdev_imports.def
 artifact_reader: true

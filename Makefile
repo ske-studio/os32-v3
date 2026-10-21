@@ -44,6 +44,7 @@ include build/config.mk
 include build/boot.mk
 include build/kernel.mk
 include build/kdebug.mk
+include build/hwdev.mk
 include build/sqlite-proto.mk
 include build/fep-module.mk
 include build/cd-module.mk

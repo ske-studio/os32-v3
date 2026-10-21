@@ -1,6 +1,7 @@
 check-c-dialect-host:
 - tools/prototypes/v86_imports.def
 - tools/clang_ast/**
+- tools/gen_hwdev_pair.py
 - tools/tests/test_clang_ast.py
 - '**/*.[ch]'
 - '**/*.inc'
