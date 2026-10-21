@@ -4,7 +4,7 @@
 #include "types.h"
 #include <stdbool.h>
 
-/* DESIGN.final §3–5, §7 T1. Host-only until T2 wires the imports.
+/* DESIGN.final §3–5, §7 T1/T2. Entrypoint wiring is deferred to T3.
  * All callbacks are synchronous, bounded, and return 0 on success. No callback
  * may dispatch shell commands. A step must call recover_safe_point at each
  * poll/delay/instruction boundary. The owner initializes once per boot; FAILED
@@ -150,6 +150,7 @@ struct recover_bar_measurement {
 };
 struct recover_profile {
     u32 version, crc;
+    u32 expected_bdf, expected_device; /* 0/0: synthetic generic fixture */
     const struct recover_reg *regs; /* restoration order, not reverse order */
     u32 count;
     const struct recover_write *quiesce;
@@ -161,6 +162,7 @@ struct recover_profile {
     const struct recover_expr *exprs; u32 expr_count;
     const struct recover_opcode_layout *layouts; u32 layout_count;
     u32 restore_max_polls, s0_reserve_ticks, s0_reserve_polls;
+    u32 restore_log_bytes, s0_reserve_bytes;
     /* VRAM reservation is a BAR-relative half-open interval, not capacity. */
     struct recover_range vram_reserved;
 };
@@ -200,6 +202,10 @@ struct recover {
     u32 local_saved_count;
     u32 next_session, budget, spent, call_tick, opcode_tick, restore_tick;
     u32 steps, polls, first_key;
+    u32 restore_polls, uart_polls, uart_bytes;
+    u32 restored_rules[RECOVER_RULE_MAX / 32U];
+    u32 command_saved, command_actual;
+    bool in_s0, command_override;
     enum recover_state state;
     enum recover_reason reason;
     enum recover_phase first_phase;
@@ -236,8 +242,74 @@ int trial_begin(struct recover *r, const struct recover_profile *profile,
 int trial_step(struct recover *r, const struct recover_token *token, bool approved,
                int (*operation)(struct recover *r, void *arg), void *arg);
 int recover_safe_point(struct recover *r);
+/* One bounded unit, including waits inside synchronous callbacks. In restore,
+ * the local/① segment cannot consume the independent ② reservation. */
+int recover_restore_point(struct recover *r);
+int recover_delay_ms(struct recover *r, u32 ms,
+                     int (*wait_us)(void *, u32), void *opaque);
+struct recover_uart_ops {
+    int (*ready)(void *opaque); /* negative error, 0 busy, 1 ready */
+    int (*put)(void *opaque, u32 byte);
+    int (*wait_frame)(void *opaque, u32 frame_us);
+};
+int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
+                      void *opaque, u32 byte, u32 frame_us, u32 max_polls);
+
 int trial_end(struct recover *r, const struct recover_token *token,
               enum recover_reason reason);
 int recover_request(struct recover *r, const struct recover_token *token,
                     enum recover_request request);
+/* T2 primitives: accessors are injectable; only local_cleanup owns release.
+ * One aligned datum per short window; IRQs never span a script or wait. */
+struct recover_window_ops {
+    u32 (*irq_save)(void *opaque);
+    void (*irq_restore)(void *opaque, u32 flags);
+    u32 (*pte_read)(void *opaque, u32 va);
+    int (*map)(void *opaque, u32 va, u32 pa);
+    int (*unmap)(void *opaque, u32 va, u32 raw);
+    int (*load)(void *opaque, u32 va, u32 width, u32 *value);
+    int (*store)(void *opaque, u32 va, u32 width, u32 value);
+};
+struct recover_window {
+    const struct recover_window_ops *ops;
+    void *opaque;
+    u32 va, raw, flags;
+    bool owned, failed;
+};
+void recover_window_hal_init(struct recover_window *w);
+int recover_window_cleanup(struct recover_window *w);
+int recover_window_access(struct recover_window *w, u32 pa, u32 width,
+                          bool write, u32 *value);
+
+/* Common 98 text proof, after screen_safe has independently verified decode.
+ * cell is one explicitly reserved unused TVRAM word, not a general write API.
+ * The caller supplies the reservation and confirms CUI before any write. */
+struct recover_screen_ops {
+    int (*cui)(void *opaque);
+    int (*safe)(void *opaque);
+    int (*restore)(void *opaque);
+    int (*read_cell)(void *opaque, u32 *value);
+    int (*write_cell)(void *opaque, u32 value);
+    int (*redraw)(void *opaque);
+};
+int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque);
+
+/* Provisional values from ADDENDUM.r2 §1. Hz is the real HAL frequency.
+ * Static work describes the actual bounded callback sequence, including all
+ * failure/BEGIN/END/final rows. Reject rather than grow any published limit. */
+enum recover_budget_class { REC_BUDGET_S0, REC_BUDGET_GF, REC_BUDGET_SIZE_BARS };
+struct recover_static_work { u32 bytes, wait_ms, points, s0_bytes, s0_wait_ms, s0_points; };
+int recover_gf_screen_safe(struct recover *r);
+int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz);
+int recover_budget_apply(struct recover_profile *p, u32 kind, u32 hz,
+                         u32 baud, u32 frame_bits, const struct recover_static_work *work);
+/* Finite raw PIT mode-2 latch sampling, <1us/count at both HAL clocks.
+ * No tick_count, calibration, or sys_time_now IRR/clamp dependency. */
+int recover_hal_wait_frame(void *opaque, u32 frame_us);
+/* Explicit local order, supplied by the same classified descriptor rules.
+ * UNLOCK → DATA → LOCK → original INDEX, then sole window release. */
+enum recover_local_role { REC_LOCAL_UNLOCK, REC_LOCAL_DATA, REC_LOCAL_LOCK, REC_LOCAL_INDEX };
+struct recover_local_step { u32 role, key, dir, width, value; };
+int recover_indexed_cleanup(struct recover *r, const struct recover_local_step *steps,
+                            u32 count, struct recover_window *window);
 #endif

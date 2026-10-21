@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 3534065117,
+  "module_abi_gen": 2933607942,
   "stage": "S5",
-  "count": 249,
+  "count": 250,
   "imports": [
     {
       "stage": "S1",
@@ -3025,6 +3025,7 @@
       "source": "kernel/v86_io.h",
       "context_safe": false,
       "index": 201,
+      "retained": true,
       "name": "v86_cui_display_restore",
       "kind_name": "FUNC",
       "type_ver": 1,
@@ -3735,6 +3736,21 @@
       "type_ver": 1,
       "signature": "int sfs_lan_peer_mac(u8 *out);",
       "source_declaration": "int sfs_lan_peer_mac(u8 *out);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "display_text_start",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 249,
+      "name": "display_text_start",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void display_text_start(void);",
+      "source_declaration": "void display_text_start(void);",
       "dtype": null,
       "array": false
     }

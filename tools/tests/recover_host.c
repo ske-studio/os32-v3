@@ -1,5 +1,6 @@
 /* Real T1 core, fake bus/clock/serial. ILP32, no libc, host32 qemu runner. */
 #include "../../kdebug/recover.c"
+#include "../../kdebug/recover_profile.c"
 
 #define NREG 16U
 #define TRACE_MAX 256U
@@ -14,13 +15,17 @@
 struct trace { char op; u32 key, value; };
 struct fake {
     u32 tick, tick_read, tick_write, values[NREG], route, command, bar;
+    u32 bus_calls, fail_at;
     u32 n, fail_read, fail_write, bad_verify, op_ticks, config_reads;
     u32 tick_abort, abort_calls, delay_abort_call, tick_pause;
     struct trace trace[TRACE_MAX];
     struct recover_identity id;
     bool ready, raw_fail, decode_fail, screen_fail, abort, route_fail;
     bool route_read_fail, route_stuck, log_fail, snapshot_early;
-    bool owned, screen_done, abort_selected, break_guard, restore_index;
+    bool owned, screen_done, abort_selected, break_guard, restore_index, command_bus;
+    bool uart_event, event_abort;
+    u32 event_fault, event_restore_tick, event_restore_polls, event_uart_polls;
+    u32 event_bytes[REC_FAILED + 1], config_ticks, config_polls, config_target, config_tail_calls;
     u32 releases, local_calls, selected_value, last_offset, last_dir, extra_bars[2];
     struct recover *core;
 };
@@ -43,6 +48,7 @@ static void note(struct fake *f, char op, u32 key, u32 value)
     CHECK(f->n < TRACE_MAX);
     if (f->n < TRACE_MAX) f->trace[f->n++] = (struct trace){op, key, value};
 }
+static int bus_fault(struct fake *f) { return ++f->bus_calls == f->fail_at; }
 static u32 ticks(void *v) { return ((struct fake *)v)->tick; }
 static int identity(void *v, struct recover_identity *out)
 { *out = ((struct fake *)v)->id; return 0; }
@@ -50,20 +56,25 @@ static int ready(void *v) { struct fake *f = v; f->screen_done = false; return !
 static int config(void *v, u32 *command, u32 bar[3])
 {
     struct fake *f = v; f->config_reads++; note(f, 'c', 0, 0);
-    *command = f->command; bar[0] = f->bar; bar[1] = f->extra_bars[0]; bar[2] = f->extra_bars[1]; return f->raw_fail;
+    if (f->core->state == REC_RESTORING && f->core->measuring && !f->core->in_s0) {
+        if (++f->config_tail_calls == f->config_target) f->tick += f->config_ticks;
+        f->config_polls = f->core->restore_polls;
+    }
+    *command = f->command; bar[0] = f->bar; bar[1] = f->extra_bars[0]; bar[2] = f->extra_bars[1]; return bus_fault(f) || f->raw_fail;
 }
 static int read_bus(void *v, const struct recover_bus_access *a, u32 *out)
 {
     u32 key = a->key, width = a->width;
     struct fake *f = v; (void)width;
     f->last_offset = a->offset; f->last_dir = a->dir_substep;
+    if (bus_fault(f)) return -1;
     if (a->dir_substep == REC_SELECT) { *out = f->selected_value; return 0; }
     note(f, 'r', key, 0); f->tick += f->tick_read;
     if (f->core->state == REC_SNAPSHOTTING && f->core->valid &&
         f->core->saved_count < f->core->profile->count)
         f->snapshot_early = true;
     if (key == f->fail_read) return -1;
-    CHECK(key < NREG); *out = f->values[key];
+    CHECK(key < NREG); *out = f->command_bus && key == GF_CMD ? f->command : f->values[key];
     if (key == f->bad_verify) *out ^= 1;
     return 0;
 }
@@ -72,7 +83,8 @@ static int write_bus(void *v, const struct recover_bus_access *a, u32 value)
     u32 key = a->key, width = a->width;
     struct fake *f = v; (void)width;
     CHECK(!f->screen_done);
-    if (key == OUTPUT) CHECK(!f->owned);
+    if (bus_fault(f)) return -1;
+    if (key == OUTPUT && !f->command_bus) CHECK(!f->owned);
     f->last_offset = a->offset; f->last_dir = a->dir_substep;
     if (a->dir_substep == REC_SELECT) {
         f->selected_value = value; f->owned = true;
@@ -82,34 +94,37 @@ static int write_bus(void *v, const struct recover_bus_access *a, u32 value)
     if (f->break_guard && a->dir_substep == REC_DATA) f->values[8] = 1;
     note(f, 'w', key, value); f->tick += f->tick_write;
     if (key == f->fail_write) return -1;
-    CHECK(key < NREG); f->values[key] = value; return 0;
+    CHECK(key < NREG); f->values[key] = value;
+    if (f->command_bus && key == GF_CMD) f->command = value;
+    return 0;
 }
 static int route_read(void *v, u32 *out)
 {
     struct fake *f = v; note(f, 'a', RECOVER_ROUTE_PORT, f->route);
-    *out = f->route; return f->route_read_fail;
+    *out = f->route; return bus_fault(f) || f->route_read_fail;
 }
 static int route_write(void *v, u32 value)
 {
     struct fake *f = v; note(f, 'A', RECOVER_ROUTE_PORT, value);
     if (!f->route_stuck) f->route = value | 0xFCU;
-    return f->route_fail;
+    return bus_fault(f) || f->route_fail;
 }
 static int screen_safe(void *v)
-{ struct fake *f = v; note(f, 'd', 0, 0); return f->decode_fail; }
+{ struct fake *f = v; note(f, 'd', 0, 0); return bus_fault(f) || f->decode_fail || (f->command_bus && recover_gf_screen_safe(f->core)); }
 static int screen_restore(void *v)
-{ struct fake *f = v; note(f, 'v', 0, 0); f->screen_done = true; return f->screen_fail; }
+{ struct fake *f = v; note(f, 'v', 0, 0); f->screen_done = true; return bus_fault(f) || f->screen_fail; }
 static int abort_requested(void *v, u32 session)
 {
     struct fake *f = v; CHECK(session == f->core->token.session);
     if (++f->abort_calls == f->delay_abort_call) f->tick += f->tick_abort;
     return f->abort;
 }
+static int event_uart(struct fake *f, enum recover_state state);
 static int event(void *v, enum recover_state state, u32 session)
 {
     struct fake *f = v; (void)session; note(f, 's', state, 0);
     if (state == REC_PAUSED) f->tick += f->tick_pause;
-    return f->log_fail;
+    return f->log_fail || (f->uart_event && event_uart(f, state));
 }
 static int local_cleanup(void *v)
 {
@@ -180,7 +195,7 @@ static void setup(bool cold)
     profile = (struct recover_profile){ .version = RECOVER_PROFILE_VERSION, .regs = regs, .count = 2,
         .quiesce = quiet, .quiesce_count = 3, .trial_limit = 100,
         .opcode_limit = 20, .restore_limit = 50, .max_steps = 4,
-        .max_polls = 8, .cold_required = cold, .targets = targets, .target_count = NREG,
+        .max_polls = 8, .restore_max_polls = 1024, .cold_required = cold, .targets = targets, .target_count = NREG,
         .rules = rules, .rule_count = 5, .layouts = layouts, .layout_count = 1 };
     profile.crc = recover_profile_crc(&profile);
     recover_init(&r, &ops, &f, true, false);
@@ -500,10 +515,12 @@ static void routes(void)
 }
 #include "recover_descriptor_host.inc"
 
+#include "recover_t2_host.inc"
+
 void _start(void)
 {
     preconditions(); normal(); mismatches(); timing(); callback_timing();
-    failures(); cold_and_config(); routes(); descriptor_tests();
+    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }

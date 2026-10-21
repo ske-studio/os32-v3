@@ -239,56 +239,7 @@ static void gfx_state_for_guest(void)
 /* OS32 の CUI に戻す。ゲストの VRAM 内容は保持するが表示は止める。 */
 static void gfx_state_for_os32(void)
 {
-    u32 i;
-    /* gfx_hardware_scroll(0) が 400 ライン・スクロール無しで出す値
-     * (SAD=0 / SL=400 の 1 分割)。実測した OS32 側の PRAM と一致する。 */
-    static const u8 pram_400[8] = { 0x00, 0x00, 0x00, 0x19,
-                                    0x00, 0x00, 0x00, 0x00 };
-
-    io_out(GDC_GFX_CMD, GDC_CMD_STOP);
-
-    /* Saved boot flags, never the guest's BDA. UNDOCUMENTED io_disp 006Ah:
-     * EGC→GRCG requires 04A0h=FFF0h; 20h/68h exist only on extended gfx.
-     * FreeBSD 10.4 sys/pc98/cbus/gdc.c:1095-1107 gates the latter too. */
-    const u8 *bios = v86_bios_real_lowmem();
-    if (bios[BIOS_GRAPH_FLAGS] & BIOS_GRAPH_EGC) {
-        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);
-        io_wait();
-        io_out(MODE_FF2_PORT, MFF2_UNLOCK);
-        io_out(MODE_FF2_PORT, MFF2_GRCG_MODE);
-        io_out(MODE_FF2_PORT, MFF2_LOCK);
-    }
-    if (bios[BIOS_CRT_FLAGS] & BIOS_CRT_GRCG)
-        io_out(GRCG_MODE_PORT, GRCG_MODE_OFF);
-    if (bios[PEGC_BIOS_ARCH_FLAG] & PEGC_BIOS_ARCH_EXTGFX) {
-        io_out(MODE_FF2_PORT, PEGC_FF2_UNLOCK);
-        io_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);
-        io_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);
-        io_out(MODE_FF2_PORT, PEGC_FF2_LOCK);
-    }
-    io_out(MODE_FF2_PORT, MFF2_16COLOR);
-    io_out(MODE_FF1_PORT, MFF1_HIRES);
-
-    io_out(GDC_GFX_CMD, GDC_GFX_400LINE);
-    io_out(GDC_GFX_PARAM, 0x00);
-    io_out(GDC_GFX_PARAM, 0x00);
-    io_out(GDC_GFX_PARAM, 0x00);
-
-    io_out(GDC_GFX_CMD, GDC_CMD_SCROLL);
-    for (i = 0; i < 8; i++) {
-        io_out(GDC_GFX_PARAM, pram_400[i]);
-    }
-
     v86_cui_display_restore();
-    io_out(GDC_DISP_PAGE, GDC_PAGE_0);
-    io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);
-
-    /* 16 色に戻した後でないとアナログパレットとして書き込まれない */
-    palette_init();
-
-    /* テキスト GDC のカーソル形状/位置もゲストが書き換えている
-     * (DOS は DC=1 のブロックカーソルを最後の位置に残す)。OS32 の形に戻す。 */
-    console_hw_cursor_enable();
 }
 
 /* ------------------------------------------------------------------------ */

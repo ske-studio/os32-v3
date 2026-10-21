@@ -23,7 +23,7 @@ STAGE_KINDS = {
           ('GETTER', 'SETTER') * 12 + ('PTR',) * 7 + ('OP',) * 6,
     'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
     'S4': ('FUNC',) * 25,
-    'S5': ('FUNC',) * 10,
+    'S5': ('FUNC',) * 11,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
@@ -164,8 +164,16 @@ def check_nm(entries, nm=None, root=ROOT):
         later = {e['symbol'] for e in entries[STAGES[stage]:]}
         cumulative |= refs - later
         expected = {e['symbol'] for e in entries[:STAGES[stage]] if e['kind_name'] != 'OP'}
-        if cumulative != expected:
-            raise ValueError(f'{stage} nm mismatch: missing={sorted(expected-cumulative)}, unexpected={sorted(cumulative-expected)}')
+        # Retained ABI slots need not have current module callers, but their
+        # implementation must still exist in the linked kernel export table.
+        retained = {e['symbol'] for e in entries[:STAGES[stage]] if e.get('retained')}
+        missing = expected - cumulative - retained
+        if missing or cumulative - expected:
+            raise ValueError(f'{stage} nm mismatch: missing={sorted(missing)}, unexpected={sorted(cumulative-expected)}')
+    retained = {e['symbol'] for e in entries if e.get('retained')}
+    absent = retained - symbols(nm, [root / 'build/out/kernel.elf'], False)
+    if absent:
+        raise ValueError('retained imports missing from kernel: ' + str(sorted(absent)))
     return True
 
 

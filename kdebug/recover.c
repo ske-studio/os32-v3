@@ -2,6 +2,9 @@
 #include "../lib/crc32_core.inc"
 
 static int cleanup(struct recover *r);
+static int check_deadline(struct recover *r);
+static bool restore_time(struct recover *r);
+static int call_point(struct recover *r, bool count_poll);
 static bool bit_get(const u32 *bits, u32 n);
 static void bit_set(u32 *bits, u32 n);
 static void release_plan(struct recover *r);
@@ -24,6 +27,7 @@ u32 recover_profile_crc(const struct recover_profile *p)
 {
     u32 c = CRC32_INIT;
     c = crc_word(c, p->version);
+    c = crc_word(c, p->expected_bdf); c = crc_word(c, p->expected_device);
     c = crc_word(c, p->count);
     for (u32 i = 0; i < p->count; i++) {
         const struct recover_reg *d = &p->regs[i];
@@ -45,6 +49,7 @@ u32 recover_profile_crc(const struct recover_profile *p)
     c = crc_word(c, p->restore_max_polls);
     c = crc_word(c, p->s0_reserve_ticks);
     c = crc_word(c, p->s0_reserve_polls);
+    c = crc_word(c, p->restore_log_bytes); c = crc_word(c, p->s0_reserve_bytes);
     c = crc_word(c, p->vram_reserved.base);
     c = crc_word(c, p->vram_reserved.len);
     c = crc_word(c, p->target_count);
@@ -158,11 +163,23 @@ static void fail(struct recover *r, enum recover_reason reason,
 
 static int state(struct recover *r, enum recover_state s)
 {
-    r->state = s;
-    if (r->ops->event && r->ops->event(r->opaque, s, r->token.session)) {
-        fail(r, REC_LOG, REC_PHASE_NONE, 0);
-        return -1;
+    bool restoring = r->state == REC_RESTORING;
+    r->state = restoring ? REC_RESTORING : s;
+    if (r->ops->event) {
+        if (restoring) {
+            if (!restore_time(r)) return -1;
+            r->restore_polls++;
+        }
+        int rc = r->ops->event(r->opaque, s, r->token.session);
+        /* A UART safe point may have completed cleanup inside the event. */
+        if (r->state != (restoring ? REC_RESTORING : s)) return -1;
+        if (rc) {
+            fail(r, REC_LOG, REC_PHASE_NONE, 0);
+            return -1;
+        }
+        if (restoring && !restore_time(r)) return -1;
     }
+    r->state = s;
     return 0;
 }
 
@@ -395,7 +412,10 @@ int recover_profile_ok(const struct recover_profile *p)
             ((d->write_mask | d->verify_mask) & ~width_mask(d->width))) return -1;
         if (d->kind == REC_RW) {
             const struct recover_rule *w = rule_by_id(p, d->restore_rule_id);
-            if (!w || w->key != d->key || w->phase != REC_RESTORE || w->value.mode != REC_SAVED ||
+            if (!w || w->key != d->key || w->phase != REC_RESTORE ||
+                (p->targets[d->key].space == REC_PCI_CFG && p->targets[d->key].offset == RECOVER_COMMAND ?
+                 (w->value.mode != REC_LITERAL || w->value.bits != RECOVER_COMMAND_OVERRIDE) :
+                 w->value.mode != REC_SAVED) ||
                 w->write_mask != d->write_mask || w->verify_mask != d->verify_mask) return -1;
         }
     }
@@ -413,7 +433,9 @@ static bool profile_ok(const struct recover_profile *p, u32 budget)
 {
     return !recover_profile_ok(p) && finite(budget) && finite(p->trial_limit) &&
         budget <= p->trial_limit && finite(p->opcode_limit) && finite(p->restore_limit) &&
-        finite(p->max_steps) && finite(p->max_polls) && p->crc == recover_profile_crc(p);
+        finite(p->max_steps) && finite(p->max_polls) && finite(p->restore_max_polls) &&
+        p->s0_reserve_ticks < p->restore_limit && p->s0_reserve_polls < p->restore_max_polls &&
+        p->s0_reserve_bytes <= p->restore_log_bytes && p->crc == recover_profile_crc(p);
 }
 
 /* Called only while a kdebug_call is active; unsigned deltas survive wrap.
@@ -428,10 +450,75 @@ static void account(struct recover *r)
 
 static bool restore_time(struct recover *r)
 {
-    if ((u32)(r->ops->ticks(r->opaque) - r->restore_tick) < r->profile->restore_limit)
-        return true;
+    u32 limit = r->profile->restore_limit;
+    u32 polls = r->profile->restore_max_polls;
+    if (!r->in_s0) {
+        limit -= r->profile->s0_reserve_ticks;
+        polls -= r->profile->s0_reserve_polls;
+    }
+    if ((u32)(r->ops->ticks(r->opaque) - r->restore_tick) < limit &&
+        r->restore_polls < polls) return true;
     fail(r, REC_TIMEOUT, REC_PHASE_RESTORE, 0);
     return false;
+}
+
+int recover_restore_point(struct recover *r)
+{
+    if (r->state != REC_RESTORING || !restore_time(r)) return -1;
+    r->restore_polls++;
+    return 0;
+}
+
+/* The initial TxRDY check is part of this character's poll, not an extra
+ * poll. Each unsuccessful frame consumes one more unit. No serial driver is
+ * called here; T3 supplies these bounded UART callbacks. */
+int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
+                      void *opaque, u32 byte, u32 frame_us, u32 max_polls)
+{
+    if (!ops || !ops->ready || !ops->put || !ops->wait_frame ||
+        !frame_us || !max_polls || byte > 255) return -1;
+    for (;;) {
+        if (r->uart_polls >= max_polls) break;
+        if (r->state == REC_RESTORING) {
+            u32 bytes = r->profile->restore_log_bytes;
+            if (!r->in_s0) bytes -= r->profile->s0_reserve_bytes;
+            if (r->uart_bytes >= bytes) break;
+        }
+        if (r->state == REC_RESTORING) {
+            if (recover_restore_point(r)) return -1;
+        } else {
+            if (call_point(r, false)) return -1;
+        }
+        r->uart_polls++;
+        int ready = ops->ready(opaque);
+        if (ready < 0) break;
+        if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
+        if (ready) {
+            r->uart_bytes++;
+            if (ops->put(opaque, byte)) break;
+            if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
+            if (ops->wait_frame(opaque, frame_us)) break;
+            if (r->state == REC_RESTORING) return restore_time(r) ? 0 : -1;
+            return check_deadline(r);
+        }
+        if (ops->wait_frame(opaque, frame_us)) break;
+    }
+    fail(r, REC_LOG, REC_PHASE_NONE, 0);
+    return -1;
+}
+
+int recover_delay_ms(struct recover *r, u32 ms,
+                     int (*wait_us)(void *, u32), void *opaque)
+{
+    if (!wait_us) return -1;
+    for (u32 i=0;i<ms;i++) {
+        if (r->state == REC_RESTORING ? recover_restore_point(r) : recover_safe_point(r)) return -1;
+        if (wait_us(opaque, 1000U)) {
+            fail(r, REC_BUS, REC_PHASE_NONE, 0); return -1;
+        }
+        if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
+    }
+    return 0;
 }
 
 static bool config_ok(struct recover *r)
@@ -458,7 +545,8 @@ static bool quiesce(struct recover *r, bool restoring)
     if (r->measuring) {
         bool measured = true;
         u32 command = 0, bars[3] = {0};
-        if (r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE)
+        if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
+        r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE)
             measured = false;
         for (u32 i = 0; i < 3; i++)
             if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) measured = false;
@@ -486,7 +574,7 @@ static void screen(struct recover *r)
 {
     u32 route;
     if (!restore_time(r)) return;
-    if (r->ops->route_read(r->opaque, &route)) {
+    if (recover_restore_point(r) || r->ops->route_read(r->opaque, &route)) {
         fail(r, REC_BUS, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
     }
     if (route & RECOVER_ROUTE_MASK) {
@@ -494,17 +582,17 @@ static void screen(struct recover *r)
             fail(r, REC_CONTRACT, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
         if (!restore_time(r)) return;
-        if (r->ops->route_write(r->opaque, RECOVER_ROUTE_98) ||
-            r->ops->route_read(r->opaque, &route) || (route & RECOVER_ROUTE_MASK)) {
+        if (recover_restore_point(r) || r->ops->route_write(r->opaque, RECOVER_ROUTE_98) ||
+            recover_restore_point(r) || r->ops->route_read(r->opaque, &route) || (route & RECOVER_ROUTE_MASK)) {
             fail(r, REC_VERIFY, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
     }
     if (!restore_time(r)) return;
-    if (r->ops->screen_safe(r->opaque)) {
+    if (recover_restore_point(r) || r->ops->screen_safe(r->opaque)) {
         fail(r, REC_VERIFY, REC_PHASE_SCREEN, 0); return;
     }
     if (!restore_time(r)) return;
-    if (r->ops->screen_restore_verify(r->opaque)) {
+    if (recover_restore_point(r) || r->ops->screen_restore_verify(r->opaque)) {
         fail(r, REC_VERIFY, REC_PHASE_SCREEN, 0); return;
     }
     if (restore_time(r)) r->s0_verified = true;
@@ -512,22 +600,30 @@ static void screen(struct recover *r)
 
 static int cleanup(struct recover *r)
 {
+    /* Events can unwind through several callers after a safe point cleans up.
+     * Only the first entry owns restoration and its deadline/poll budget. */
+    if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
+        r->state == REC_FAILED) return -1;
     r->in_call = false; r->in_opcode = false;
     r->cursor = RECOVER_NONE; r->entered = false;
     r->auth_phase = REC_RESTORE;
     r->state = REC_RESTORING;
     r->restore_tick = r->ops->ticks(r->opaque);
-    if (r->ops->local_cleanup(r->opaque)) {
+    for (u32 i = 0; i < RECOVER_RULE_MAX / 32U; i++) r->restored_rules[i] = 0;
+    r->restore_polls = 0; r->uart_polls = 0; r->uart_bytes = 0; r->in_s0 = false;
+    if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
     state(r, REC_RESTORING);
     bool safe = !r->access_blocked && quiesce(r, true);
     /* A partial snapshot is usable only for its completed safe entries. Never
      * execute trial writes unless valid; preparation failure still cleans up. */
-    if (safe && !r->profile->cold_required) {
+    if (safe) {
         for (u32 i = 0; i < r->saved_count; i++) {
             const struct recover_reg *d = &r->profile->regs[i];
-            if (d->kind == REC_COLD) continue;
+            bool command = r->profile->targets[d->key].space == REC_PCI_CFG &&
+                           r->profile->targets[d->key].offset == RECOVER_COMMAND;
+            if (d->kind == REC_COLD || (r->profile->cold_required && !command)) continue;
             u32 actual;
             if (!restore_time(r)) break;
             if (bus_read(r, d->key, &actual)) {
@@ -536,24 +632,36 @@ static int cleanup(struct recover *r)
             struct recover_write w = { d->key, d->width,
                 (actual & ~d->write_mask) | (r->saved[i] & d->write_mask),
                 d->verify_mask, d->restore_rule_id };
+            if (r->profile->targets[d->key].space == REC_PCI_CFG &&
+                r->profile->targets[d->key].offset == RECOVER_COMMAND) {
+                r->command_saved = r->saved[i]; r->command_override = true;
+                w.value = RECOVER_COMMAND_OVERRIDE;
+            }
             if (!write_verify(r, &w, REC_PHASE_RESTORE, true)) break;
+            if (r->command_override && r->profile->targets[d->key].space == REC_PCI_CFG &&
+                r->profile->targets[d->key].offset == RECOVER_COMMAND)
+                r->command_actual = RECOVER_COMMAND_OVERRIDE;
         }
     }
     if (r->zero_hold && !zero_guards(r)) fail(r, REC_VERIFY, REC_PHASE_VERIFY, 0);
     if (r->measuring) {
         u32 command = 0, bars[3] = {0};
-        bool complete = !r->failed && !r->ops->raw_config(r->opaque, &command, bars) &&
+        bool complete = !r->failed && !recover_restore_point(r) &&
+            !r->ops->raw_config(r->opaque, &command, bars) && restore_time(r) &&
             command == RECOVER_COMMAND_OVERRIDE;
         for (u32 i = 0; i < 3; i++)
             if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
         if (complete) r->cache = r->measurement;
         else r->cache = (struct recover_bar_measurement){0};
     }
+    /* Finish the first allocation before releasing the reserved S0 budget. */
+    restore_time(r);
+    r->in_s0 = true;
     screen(r);
-    r->s1_verified = !r->failed && !r->cold_latched && r->valid;
+    r->s1_verified = !r->failed && !r->cold_latched && r->valid && !r->command_override;
     state(r, r->failed ? REC_FAILED : REC_VERIFIED);
     /* A final log failure cannot leave a successful state. */
-    if (r->failed) r->state = REC_FAILED;
+    if (r->failed) { r->state = REC_FAILED; r->s1_verified = false; }
     if (r->failed || r->reason != REC_NORMAL) {
         if (r->measuring) r->cache = (struct recover_bar_measurement){0};
     }
@@ -602,7 +710,9 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
         release_plan(r); return -1;
     }
     struct recover_identity id;
-    if (r->ops->identity(r->opaque, &id) || r->next_session == ~0UL) {
+    if (r->ops->identity(r->opaque, &id) ||
+        (p->expected_device && (id.bdf != p->expected_bdf || id.device != p->expected_device)) ||
+        r->next_session == ~0UL) {
         release_plan(r); return -1;
     }
     u32 raw_command, raw_bars[3] = {0};
@@ -653,7 +763,10 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     r->measurement = (struct recover_bar_measurement){ .identity = id, .measurement_session = r->token.session };
     r->first_phase = REC_PHASE_NONE; r->first_key = 0; r->reason = REC_NORMAL;
     r->budget = budget; r->spent = 0; r->steps = 0; r->polls = 0;
+    for (u32 i = 0; i < RECOVER_RULE_MAX / 32U; i++) r->restored_rules[i] = 0;
     r->s0_verified = false; r->s1_verified = false;
+    r->command_override = false; r->command_saved = 0; r->command_actual = 0;
+    r->uart_polls = 0; r->uart_bytes = 0;
     r->in_call = true; r->call_tick = r->ops->ticks(r->opaque);
     r->cold_latched = p->cold_required;
     if (state(r, REC_SNAPSHOTTING)) return cleanup(r);
@@ -681,11 +794,13 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     return pause_call(r);
 }
 
-int recover_safe_point(struct recover *r)
+static int call_point(struct recover *r, bool count_poll)
 {
-    if (!r->in_call || r->state != REC_RUNNING) return -1;
+    /* Events run inside the call while snapshotting, arming and pausing too. */
+    if (!r->in_call || (r->state != REC_SNAPSHOTTING && r->state != REC_ARMED &&
+        r->state != REC_RUNNING && r->state != REC_PAUSED)) return -1;
     if (check_deadline(r)) return -1;
-    if (r->in_opcode && ++r->polls > r->profile->max_polls) {
+    if (count_poll && r->in_opcode && ++r->polls > r->profile->max_polls) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
     }
     bool abort = r->ops->abort_requested &&
@@ -695,6 +810,12 @@ int recover_safe_point(struct recover *r)
         r->reason = REC_ABORT; cleanup(r); return -1;
     }
     return 0;
+}
+
+int recover_safe_point(struct recover *r)
+{
+    if (r->state != REC_RUNNING) return -1;
+    return call_point(r, true);
 }
 
 int trial_step(struct recover *r, const struct recover_token *t, bool approved,
@@ -878,7 +999,8 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
 static u32 plan_crc(const struct recover_plan *p)
 {
     u32 c = CRC32_INIT;
-    c = crc_word(c, p->version); c = crc_word(c, p->profile_crc);
+    c = crc_word(c, p->version);
+    c = crc_word(c, p->profile_crc);
     c = crc_word(c, p->rom_crc); c = crc_word(c, p->rom_size);
     c = crc_word(c, p->node_count); c = crc_word(c, p->arg_count);
     c = crc_word(c, p->ctx_count); c = crc_word(c, p->dep_count); c = crc_word(c, p->entry_count);
@@ -1010,7 +1132,8 @@ static bool extent_ok(const struct recover_profile *p, const struct recover_targ
 static bool raw_matches(struct recover *r, bool memory)
 {
     u32 command, bars[3];
-    if (r->ops->raw_config(r->opaque, &command, bars) ||
+    if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
+        r->ops->raw_config(r->opaque, &command, bars) ||
         (memory && !(command & RECOVER_COMMAND_MEM))) return false;
     for (u32 i = 0; i < 3; i++) {
         if ((r->bars[i].valid || r->measuring) && bars[i] != r->bars[i].raw) return false;
@@ -1023,7 +1146,8 @@ static int bus_address(struct recover *r, u32 key, u32 dir, struct recover_bus_a
     const struct recover_target *t = &r->profile->targets[key];
     if (r->measuring && is_bar(t) && r->measurement.bar[t->bar].valid) {
         u32 command, bars[3];
-        if (r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE) return -1;
+        if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
+        r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE) return -1;
         for (u32 i = 0; i < 3; i++)
             if (bars[i] != r->bars[i].raw) return -1;
         r->bars[t->bar] = r->measurement.bar[t->bar];
@@ -1038,6 +1162,7 @@ static int bus_read(struct recover *r, u32 key, u32 *value)
     struct recover_bus_access a;
     if (key >= r->profile->target_count || !r->profile->targets[key].read_safe ||
         bus_address(r, key, REC_READ, &a)) return -1;
+    if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;
     return r->ops->read(r->opaque, &a, value);
 }
 static bool zero_guards(struct recover *r)
@@ -1153,12 +1278,17 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
                 w = q;
             }
         }
-        if (w && w->requires_count) return access_error(r, target);
+        if (w) for (u32 i = 0; i < w->requires_count; i++) {
+            const struct recover_rule *required = rule_by_id(r->profile, w->requires[i]);
+            if (!required || !bit_get(r->restored_rules, (u32)(required - r->profile->rules)))
+                return access_error(r, target);
+        }
     }
     struct recover_bus_access a;
     if (width != t->width || bus_address(r, target, dir, &a)) return access_error(r, target);
     if (dir == REC_READ) {
         if (!t->read_safe || (t->space == REC_VGA_INDEXED && r->selected != target) ||
+            (r->state == REC_RESTORING && recover_restore_point(r)) ||
             r->ops->read(r->opaque, &a, value)) return access_error(r, target);
     } else {
         if (r->state == REC_RESTORING && !restore_time(r)) return -1;
@@ -1208,7 +1338,8 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             }
         }
         if (!guards(r, w, REC_BEFORE)) return access_error(r, target);
-        if (r->ops->write(r->opaque, &a, *value)) {
+        if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
+            r->ops->write(r->opaque, &a, *value)) {
             fail(r, REC_BUS, access_phase(r), target);
             return access_error(r, target);
         }
@@ -1218,7 +1349,8 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             u32 actual;
             /* SELECT readback reads the index port, not its data register. */
             if (!t->read_safe) return access_error(r, target);
-            if (r->ops->read(r->opaque, &a, &actual)) {
+            if ((r->state == REC_RESTORING && recover_restore_point(r)) ||
+                r->ops->read(r->opaque, &a, &actual)) {
                 fail(r, REC_BUS, access_phase(r), target);
                 return access_error(r, target);
             }
@@ -1233,6 +1365,7 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             if (t->head || (*value != RECOVER_CR44_HEAD0 && *value != RECOVER_CR44_HEAD1)) return access_error(r, target);
             r->head = *value == RECOVER_CR44_HEAD1;
         }
+        if (node == RECOVER_NONE) bit_set(r->restored_rules, (u32)(w - r->profile->rules));
         if (node != RECOVER_NONE) {
             select_record(r->profile, r->plan, node, r->buffers.valid_bits);
             bit_set(r->buffers.valid_bits, node);
