@@ -58,6 +58,10 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_SEQ 0x3c4U
 #define RECOVER_GFX 0x3ceU
 #define RECOVER_CRTC 0x3d4U
+#define RECOVER_MISC_WRITE 0x3c2U
+#define RECOVER_MISC_READ 0x3ccU
+#define RECOVER_VGA_ENABLE 0x3c3U
+#define RECOVER_IO_LAST 0xffffU
 #define RECOVER_CR44 0x44U
 #define RECOVER_SR01 1U
 #define RECOVER_SR_BLANK 0x20U
@@ -147,7 +151,6 @@ struct recover_profile {
     u32 restore_max_polls, s0_reserve_ticks, s0_reserve_polls;
     /* VRAM reservation is a BAR-relative half-open interval, not capacity. */
     struct recover_range vram_reserved;
-
 };
 struct recover_token {
     u32 session, profile_crc, profile_version, snapshot_crc, plan_hash;

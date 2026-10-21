@@ -216,7 +216,8 @@ int recover_target_address(const struct recover_target *t, u32 dir,
             if (t->index > 255 || (t->port != RECOVER_SEQ && t->port != RECOVER_GFX &&
                 t->port != RECOVER_CRTC) || dir == REC_WRITE) return -1;
         } else if (t->index != RECOVER_NONE ||
-                   (t->port != 0x3c2U && t->port != 0x3ccU && t->port != 0x3c3U) ||
+                   (t->port != RECOVER_MISC_WRITE && t->port != RECOVER_MISC_READ &&
+                    t->port != RECOVER_VGA_ENABLE) ||
                    dir == REC_SELECT || dir == REC_DATA) return -1;
         off = (t->port == RECOVER_CRTC ? RECOVER_PRMCIO : RECOVER_PRMVIO) +
             t->head * RECOVER_HEAD_STRIDE + t->port;
@@ -235,7 +236,7 @@ int recover_target_address(const struct recover_target *t, u32 dir,
         } else if (t->bar || (t->space == REC_PCI_CFG &&
                    (off >= RECOVER_CFG_SIZE || t->width > RECOVER_CFG_SIZE - off)) ||
                    (t->space == REC_PC98_IO &&
-                    (off > 0xffffU || off == RECOVER_ROUTE_PORT))) return -1;
+                    (off > RECOVER_IO_LAST || off == RECOVER_ROUTE_PORT))) return -1;
     }
     /* These paired output/decode registers have only a 32-bit canonical form. */
     if (t->space == REC_PCI_CFG || (t->space == REC_BAR_MMIO && !t->bar)) {
@@ -368,7 +369,7 @@ int recover_profile_ok(const struct recover_profile *p)
         }
     }
     /* Kahn-style elimination, bounded to the rule table, detects any cycle. */
-    u32 done[RECOVER_BITS_WORDS] = {0}, total = 0;
+    u32 done[RECOVER_RULE_MAX / 32] = {0}, total = 0;
     for (u32 pass = 0; pass < p->rule_count; pass++) {
         u32 before = total;
         for (u32 i = 0; i < p->rule_count; i++) {
@@ -443,11 +444,10 @@ static bool config_ok(struct recover *r)
 }
 
 static bool write_verify(struct recover *r, const struct recover_write *w,
-                         enum recover_phase phase, bool restoring, u32 expected)
+                         enum recover_phase phase, bool restoring)
 {
     if (restoring && !restore_time(r)) return false;
     u32 value = w->value;
-    (void)expected;
     r->auth_phase = phase == REC_PHASE_RESTORE ? REC_RESTORE : REC_QUIESCE;
     if (recover_access(r, RECOVER_NONE, REC_WRITE, w->key, w->width, &value)) return false;
     return !restoring || restore_time(r);
@@ -476,8 +476,8 @@ static bool quiesce(struct recover *r, bool restoring)
                 fail(r, REC_TIMEOUT, REC_PHASE_QUIESCE, 0); return false;
             }
         }
-        if (!write_verify(r, &r->profile->quiesce[i], REC_PHASE_QUIESCE,
-                          restoring, r->profile->quiesce[i].value)) return false;
+        if (!write_verify(r, &r->profile->quiesce[i], REC_PHASE_QUIESCE, restoring))
+            return false;
     }
     return true;
 }
@@ -536,7 +536,7 @@ static int cleanup(struct recover *r)
             struct recover_write w = { d->key, d->width,
                 (actual & ~d->write_mask) | (r->saved[i] & d->write_mask),
                 d->verify_mask, d->restore_rule_id };
-            if (!write_verify(r, &w, REC_PHASE_RESTORE, true, r->saved[i])) break;
+            if (!write_verify(r, &w, REC_PHASE_RESTORE, true)) break;
         }
     }
     if (r->zero_hold && !zero_guards(r)) fail(r, REC_VERIFY, REC_PHASE_VERIFY, 0);

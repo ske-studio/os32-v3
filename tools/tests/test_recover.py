@@ -80,7 +80,6 @@ MUTATIONS = [
     ("nonzero_hold_allowed", "if (zero_target(t) && args[1].value) return false;", "if (false && zero_target(t) && args[1].value) return false;"),
     ("crc_tables_removed", "c = crc_word(c, d->value.bits);", "/* value bits omitted */"),
     ("cold_saved_allowed", "if (v->mode == REC_SAVED && (", "if (false && v->mode == REC_SAVED && ("),
-
 ]
 
 
