@@ -74,9 +74,9 @@ def audit(out, cross):
     elf = Elf((out/'kdebug/kdebug.elf').read_bytes())
     sections = {s['name']: s['size'] for s in elf.sections if s['flags'] & 2}
     content = sum(g[k] for g in groups.values() for k in ('text', 'rodata', 'data'))
-    require(header['IMAGE_SIZE'] == len(binary), "image/section accounting mismatch")
-    require(header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary), "image/section accounting mismatch")
-    require(all(sections['.'+k] >= sum(g[k] for g in groups.values()) for k in ('text','rodata','data','bss')), "image/section accounting mismatch")
+    require(header['IMAGE_SIZE'] == len(binary), 'image/section accounting mismatch')
+    require(header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary), 'image/section accounting mismatch')
+    require(all(sections['.'+k] >= sum(g[k] for g in groups.values()) for k in ('text','rodata','data','bss')), 'image/section accounting mismatch')
     return dict(header=header, elf_sections=sections, objects=details, groups=groups,
                 file_other=dict(prefix=header['PAYLOAD_OFF'], padding=header['PAYLOAD_SIZE']-content),
                 map=str(map_path), core_slots=slots, kernel_imports=kernel)

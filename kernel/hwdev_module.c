@@ -4,7 +4,6 @@
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"
-#include "kstring.h"
 #include "kprintf.h"
 
 static struct module_handle hwdev_handle;

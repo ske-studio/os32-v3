@@ -2,7 +2,6 @@
 """Generate the shared i386 HWDEV contract; inventory changes require review."""
 import argparse
 import json
-import os
 from pathlib import Path
 import re
 import shlex
@@ -158,13 +157,14 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--cc', default=os.environ.get('CROSS_DIR','/home/hight/opt/cross')+'/bin/i386-elf-gcc')
-    p.add_argument('--flags', default='-include sdk/include/os32/os32_unit_stamp.h -O2 -m32 -march=i386 -std=gnu11 -ffreestanding -fno-pie -fsigned-char -fno-short-enums -D__KERNEL_BUILD__')
-    p.add_argument('--includes', default='-I. -Iinclude -Ikernel -Idrivers -Ilib -Ifs -Iexec -Igfx -Iarch/x86 -Iplatform/pc98 -Isdk/include -Isdk/include/os32')
+    # Compiler, flags and includes come from build/kdebug.mk (KERNEL_CFLAGS, INC_KERNEL).
+    p.add_argument('--cc', required=True)
+    p.add_argument('--flags', required=True)
+    p.add_argument('--includes', required=True)
     p.add_argument('--out', type=Path, default=OUT)
     p.add_argument('--seed-inventory', action='store_true')
     p.add_argument('--check', action='store_true')
-    a=p.parse_args()
+    a = p.parse_args()
     if a.check:
         with tempfile.TemporaryDirectory(prefix='hwdev-reproduce-') as td:
             out = Path(td)
