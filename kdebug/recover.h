@@ -48,6 +48,7 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_PRMVIO 0x0c0000U
 #define RECOVER_PRMCIO 0x601000U
 #define RECOVER_HEAD_STRIDE 0x2000U
+#define RECOVER_WINDOW_PAGES 2U /* a peek chunk (< one page) spans at most two PTEs */
 #define RECOVER_CFG_SIZE 256U
 #define RECOVER_COMMAND 0x04U
 #define RECOVER_COMMAND_OVERRIDE 0x0102U
@@ -305,7 +306,8 @@ int trial_end(struct recover *r, const struct recover_token *token,
 int recover_request(struct recover *r, const struct recover_token *token,
                     enum recover_request request);
 /* T2 primitives: accessors are injectable; only local_cleanup owns release.
- * One aligned datum per short window; IRQs never span a script or wait. */
+ * T2 maps one aligned datum per short window, peek one chunk (kdebug_window);
+ * IRQs never span a script or wait. */
 struct recover_window_ops {
     u32 (*irq_save)(void *opaque);
     void (*irq_restore)(void *opaque, u32 flags);
@@ -318,7 +320,7 @@ struct recover_window_ops {
 struct recover_window {
     const struct recover_window_ops *ops;
     void *opaque;
-    u32 va, raw[2], flags, pages;
+    u32 va, raw[RECOVER_WINDOW_PAGES], flags, pages;
     bool owned, failed;
 };
 void recover_window_hal_init(struct recover_window *w);

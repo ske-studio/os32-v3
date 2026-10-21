@@ -119,5 +119,5 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - T2/peekの窓を共有し、READはRWなし・WRITEだけRW、PTE復元失敗はboot寿命で停止。peekの幅/許可表/2ページ跨ぎ/LAN契約を維持。
 - GF accessorは生PCI ID・Mem・BARを照合、Command16とBAR probe、PRMVIO/PRMCIOのhead別名をdescriptor経由で扱う。PCI imports・入口・shellはS6以降。
 - COPY2・一時再生3行を結線、局所CR11/CR1F/CR44→元index復元を追加。COLD DATAは終端再生しない。N1の4対象guardは維持。
-- S4送り3件を修正。設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS5節。
+- S4送り3件を修正。設計者判断は [REALHW_RECOVER_ADDENDUM.md](design/REALHW_RECOVER_ADDENDUM.md) の「4a S5 の実装で設計者が決めたこと」。
 - 証拠: `~/os32-tmp/run/gf4a_s5/` の最終build・候補・変異・錨・lint・docsログ。実機/NP21/W未実施、version.chip・T3送り・S6時計/結線は未確認のまま。

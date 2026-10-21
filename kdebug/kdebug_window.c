@@ -79,6 +79,7 @@ int kdebug_window_begin(struct recover_window *w, u32 pa, u32 len, bool write)
     w->owned = true;
     if (w->ops->map(w->opaque, w->va, pa & ~RECOVER_PAGE_MASK, w->pages,
                     PTE_PRESENT | PTE_PCD | (write ? PTE_RW : 0))) {
+        /* A failed map may already have changed the PTEs: always restore. */
         w->failed = true;
         recover_window_cleanup(w);
         return -1;

@@ -428,7 +428,6 @@ static void t_window(void)
     CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_WINDOW && irq_depth == 0);
     restore_fail = 0;
     CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_WINDOW && map_calls == 1);
-
 }
 
 /* ---- LAN の出口 (T5) ---------------------------------------------- */
