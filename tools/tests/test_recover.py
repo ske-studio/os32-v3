@@ -73,7 +73,7 @@ MUTATIONS = [
     ("value_mask_unchecked", "(value & v->mask) != v->bits", "((value & v->mask) != v->bits && false)"),
     ("value_set_unchecked", "if (v->mode == REC_SET) {", "if (v->mode == REC_SET) return true;\n    if (v->mode == REC_SET) {"),
     ("value_range_unchecked", "return value >= v->min && value <= v->max;", "return true;"),
-    ("expr_unchecked", "!evaluate(r, n, w, old, &expected) || *value != expected", "!evaluate(r, n, w, old, &expected)"),
+    ("expr_unchecked", "            if (*value != expected) return access_error(r, target);", "            (void)expected;"),
     ("dependency_order_reversed", "bool found = false;\n        for (u32 j = 0; j < node; j++) {", "bool found = false;\n        for (u32 j = node; j < plan->node_count; j++) {"),
     ("previous_iteration_reused", "q->ctx == n->ctx && q->phase == n->phase && q->main_id == n->main_id)))", "q->phase == n->phase && q->main_id == n->main_id)))"),
     ("n1_before_removed", "if (!guards(r, w, REC_BEFORE))", "if (false && !guards(r, w, REC_BEFORE))"),
