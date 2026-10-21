@@ -12,6 +12,16 @@
 
 - この票は、外部デバイスの実装方法のモデル (専用の文書群、[ROADMAP](../../ROADMAP.md) の長期テーマ) の材料にする (ユーザー決定 2026-10-20)。
 
+### ユーザー決定 (2026-10-21)
+
+- **N1・U1〜U3** (E81E の条件付き許可、固まったら当面は手で戻し書込みの段は立会い、段ごとの承認の順、4a はモニタ無し): 原文の意味は §5 と [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0。
+- **書込みは段ごとに結果を見て承認する** (U2。上の 2026-10-20 の「段ごとの承認」を 4a の A1 → A2 → main 0〜3 → A4 に具体化)。
+- **VBIOS の x86 コードは逆アセンブルしない — 最終手段で、要るときはユーザーが判断する**。データの表を公開実装と照らして読むのは可 (§4 段 2b)。
+- **nouveau はクリーンルーム開発を謳うので仕様として信じる**、**リバースエンジニアリングが明示的に禁じられたものはしない** — どちらも上の 2026-10-20 の決定を 2026-10-21 に改めて確認したもの。
+- **映像は抜いちゃダメボード経由で 98 の切替回路 (0FACh) に入る** (§4「映像の経路」)。戻す処理の「98 の画面に戻す」は 0FACh を 98 表示へ戻すことを含む。
+- **起動 FD に kdebug を載せない**。KPEEK・gfinit・recover は HDD 起動 (KDEBUG=1) の中だけで使う。 理由: 戻す処理が kdebug.bin に入って 64.6KB → 103KB になり、起動 FD (2HD) の空きが下限 64KB を割った (71KB → 33KB)。kdebug は開発用で FD (レスキュー兼インストーラ) に不要、FD からインストールした実機は hsync boot で入る。CD には残す。詳細は [08_build.md](../../08_build.md) の「起動 FD と MINIMAL」と [TASK_DBGREF](../v3/TASK_DBGREF.md) §3-9。
+- 戻す処理の起点の依頼 (「実機テストの時に特定の手順でリセットや画面復帰など特定のステータスに戻す処理の設計案を追加で作って…」) と、PG リセットの扱いの未決は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0。
+
 ## 1. 対象
 
 PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、subsys `10fc:1270`、irq 6、mem 0x24000000〜 (PLAN.md §1 の 2026-10-15 の基準構成)。OS32 は列挙だけで結線なし。
@@ -65,7 +75,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 
 ## 5. 詳細設計 (確定 2026-10-21、astra 起草・Opus 3 往復・PM が最終修正)
 
-全文: 段 4a `~/os32-tmp/run/gf6200_4a/DESIGN.final.md`、戻す処理 `~/os32-tmp/run/realhw_recover/DESIGN.final.md` (往復は同じ所の r1〜r3・REVIEW)。
+全文: 段 4a [GF6200_4A_DESIGN.md](design/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](design/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](design/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](design/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md)。
 
 - **ユーザー決定**: N1 main3 の E81E (SR01 bit5 の解除) だけを cfg 50h/54h=0 の保持を条件に許す。U1 固まったら当面ユーザーが手で戻し、書込みの段は立会い。U2 A1 (BAR の測定) → A2 (準備) → main 0〜3 の script ごと → A4 (VRAM の確認) を、結果を見て段ごとに承認。U3 4a はモニタ無し、モニタは 4b の前に決める。
 - **4a の実装段**: S1 fixture (27 種 193 命令) → S2 decode → S3 exec → S4 PLL → S5 bus・窓の共有 → S6 kdebug 統合 → S7 shell と KAPI 共有ヘッダ → S8 実機 A1/A2 → S9 以降 main ごと、最後に A4。各 0.5〜1 日。
@@ -81,26 +91,26 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - 持越し: S2の実opcode layout・COPY/一時再生式、S4 PLL、S5 accessor。全ROM RUNは未許可。共有検査は実VGA別名portの重なりだけを拒否し、indexed EXPR READには全経路/実行時の先行SELECTを要求。固定SIZE_BARSは測定/復元trace、PREPAREはCR11のbind/実行まで確認。ROM実バイト・実機は未検証。
 - ノートで `python3 tools/gfinit_rom_check.py --list` が各 script の開始・長さ・IEEE CRC32 を表示。同スクリプトに private ROM のパスを渡して照合（ROM を出力・保存しない）。期待値は txt からの復元値で、ROM 由来の検証済み値ではない。
 - 証拠: 入力 `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt`、[照合試験](../../../tools/tests/test_gfinit_fixture.py)。ログは `~/os32-tmp/run/gf4a_s1/` の `kernel.log`・`fixture.log`・`mutate.log`・`lint.log`・`docs.log`・`ci-stab.log`（終了 rc を末尾に記録）。
-- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1c/` の kernel/host/mutate-recover/mutate-gf/lint/docs ログ。設計決定は recover `ADDENDUM.final.md`「4a S1 追補で設計者が決めたこと」。
+- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1c/` の kernel/host/mutate-recover/mutate-gf/lint/docs ログ。設計決定は recover の [ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md)「4a S1 追補で設計者が決めたこと」。
 
 ### 4a S2 decode (2026-10-21)
 
 - [checked decode](../../../kdebug/gfinit_decode.c) と実27種のlayout、RMW/COPY式、命令内capture、ポート別SELECT記録を追加。e18の1850はliteral 0を維持。
 - S1の193命令を940 nodes・2418 args・19 ctx・5 entriesへ展開（main別220/459/122/138/1）。PLL内部101候補は含まず、2048上限内。
 - COPY 2行・一時再生3行とPLL入口3件は未結線inventoryとしてbind拒否。S3 executor、S4 PLL、S5 bus/cleanup、S6結線を本段で完了扱いしない。
-- 共有変更はprofile版3、capture/CRC、index保存分類と探索cache。設計決定はrecover `ADDENDUM.final.md`末尾、T3送り項目はS6前へ維持。
+- 共有変更はprofile版3、capture/CRC、index保存分類と探索cache。設計決定はrecoverの [ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md)「4a S2 の実装で設計者が決めたこと」、T3送り項目はS6前へ維持。
 - 証拠: [合成host試験](../../../tools/tests/test_gfinit.py)、`~/os32-tmp/run/gf4a_s2/` の `final-build.log`・`final-candidates.log`・`final-tests.log`・`final-mutate.log`・`final-lint.log`・`final-docs.log`・`final-size.log`。CIは外部ROM/一時資料を読まない。
 
 ### 4a S3 executor (2026-10-21)
 - `gfinit_exec` はS2のplanをrecover経由でmain単位に実行。条件・call/repeat・skip/force・待ち・動的予算を検査する。
 - S2送り項目はlayoutのheadフラグ、表位置定数、skip CR44拒否、重複処理等の整理と負の試験へ反映。固定結果CR44 RMWもbindで検査。
-- 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS3節。PLL/COPY/採取の本番未結線8行は引き続き拒否。
+- 設計者判断は [ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md) のS3節。PLL/COPY/採取の本番未結線8行は引き続き拒否。
 - 検証証拠: `~/os32-tmp/run/gf4a_s3/`。27種の独立期待trace・各予算境界は完全mockで検証。実機・NP21/Wは本段対象外。
 
 ### 4a S4 PLL (2026-10-21)
 - `gfinit_pll` は0x21表のchecked parser・27MHz/u32 solver・NV44A低位/高位列を実装。MIT表示を保持し、32bit部品リンクの未解決は0。
 - PLL101候補は76件を26書込みruleへ対応付け、25件はチップ分岐で不要。PLL未解決0、COPY2・一時再生3の拒否はS5へ残す。
 - 展開972 node（上限2048）。S3送りの読取り前検査・静的/実行時READ課金・4件の実行器変異と順序変異を試験へ反映。
-- 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS4節。同値時も有限列を実行し、PLL一時captureは中断後に再生しない。
+- 設計者判断は [ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md) のS4節。同値時も有限列を実行し、PLL一時captureは中断後に再生しない。
 - 部品増分はtext/rodata約7.33KiB（PLL単体3.37KiB）、recover BSS 116 byte、decoder所有領域580 byte。kdebug結線はS6。
 - 検証証拠: `~/os32-tmp/run/gf4a_s4/`。実accessor・実機・NP21/W・S6の時計/poll設定は対象外。
