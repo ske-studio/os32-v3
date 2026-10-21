@@ -55,21 +55,6 @@ struct gf_script {
 struct gf_effect {
     unsigned int pc, space, head, port, index, reg, width, keep, value, expression, flags;
 };
-/* Historical S1 gap inventory (before T1b). Current shared fields and rule
- * classification are in recover_gf.c and recover_gf_inventory.h.
- */
-struct gf_descriptor_mapping { const char *fixture, *recover, *gap; };
-static const struct gf_descriptor_mapping gf_descriptor_mapping[] = {
-    {"reg/space/head/port/index", "recover_reg.key", "opaque key; shared encoding/accessors absent"},
-    {"width", "recover_reg.width", "fits as 1 or 4"},
-    {"keep/value", "recover_reg.write_mask", "bit mask fits; value constraints/expressions absent"},
-    {"value", "recover_write.value", "literal fits; no per-op mask/phase/conditional value"},
-    {"readback mask", "recover_reg.verify_mask", "field fits; safe masks not classified by transcript"},
-    {"cold/read safety", "recover_reg.kind/read_safe", "PLL/PFB cold; indexed/trigger need specialized accessors"},
-    {"main/pc/order", "recover_profile.regs order", "restore order only; no execution dependency/phase fields"},
-    {"N1 cfg50/54 zero", "none", "no pre/post guards, main3/pc restriction or hold condition"},
-    {"all W rows", "recover_profile.count", "32 restored-register slots are not a GPU W allowlist"}
-};
 #define GF_SCRIPT(...) { __VA_ARGS__ }
 static const struct gf_script gf_scripts[] = {
     GF_SCRIPT(0, 0xdeb0, 741, 0xf8ece062, 0, 58, 1, 1),

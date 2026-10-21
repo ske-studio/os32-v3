@@ -87,6 +87,7 @@ MUTATIONS = [
 
 # Additional T2 mutations; every one must compile and fail at runtime.
 MUTATIONS += [
+    # gf4a S1 follow-up: raw VGA alias ports and indexed EXPR READ selection.
     ("indexed_expr_dependency_removed", "if (!target_read && arg->kind != REC_ARG_READ) continue;",
      "if (!target_read) continue;"),
     ("indexed_expr_selection_removed", "r->selected != a->value) || bus_read", "false) || bus_read"),
@@ -94,6 +95,7 @@ MUTATIONS += [
      "if (false) for (u32 head = 0; head < 2; head++)"),
     ("raw_alias_aperture", "/* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.",
      "if (off >= RECOVER_PRMCIO && off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE) return -1;\n            /* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs."),
+    # T2.
     ("t2_event_cleanup_reentered", """    if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
         r->state == REC_FAILED) return -1;""", "/* repeated cleanup */"),
     ("t2_event_cleanup_overwritten", "        if (r->state != (restoring ? REC_RESTORING : s)) return -1;", "/* completed cleanup ignored */"),

@@ -79,4 +79,4 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 - 持越し: S2の実opcode layout・COPY/一時再生式、S4 PLL、S5 accessor。全ROM RUNは未許可。共有検査は実VGA別名portの重なりだけを拒否し、indexed EXPR READには全経路/実行時の先行SELECTを要求。固定SIZE_BARSは測定/復元trace、PREPAREはCR11のbind/実行まで確認。ROM実バイト・実機は未検証。
 - ノートで `python3 tools/gfinit_rom_check.py --list` が各 script の開始・長さ・IEEE CRC32 を表示。同スクリプトに private ROM のパスを渡して照合（ROM を出力・保存しない）。期待値は txt からの復元値で、ROM 由来の検証済み値ではない。
 - 証拠: 入力 `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt`、[照合試験](../../../tools/tests/test_gfinit_fixture.py)。ログは `~/os32-tmp/run/gf4a_s1/` の `kernel.log`・`fixture.log`・`mutate.log`・`lint.log`・`docs.log`・`ci-stab.log`（終了 rc を末尾に記録）。
-- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1c/` の kernel/host/mutate-recover/mutate-gf/lint/docs ログ。設計決定は recover `ADDENDUM.final.md`「4a S1 追補で設計者が決めたこと」。T2との名前衝突は不変表を recover_gf_template に改名して解消。コミット・配備なし。
+- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1c/` の kernel/host/mutate-recover/mutate-gf/lint/docs ログ。設計決定は recover `ADDENDUM.final.md`「4a S1 追補で設計者が決めたこと」。

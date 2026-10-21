@@ -841,8 +841,8 @@ const struct recover_profile recover_gf_template = {
     .targets = targets, .target_count = sizeof(targets) / sizeof(targets[0]),
     .rules = rules, .rule_count = sizeof(rules) / sizeof(rules[0]),
     .regs = regs, .count = sizeof(regs) / sizeof(regs[0]),
-    .quiesce = gf_quiesce, .quiesce_count = 3,
-    .exprs = exprs, .expr_count = 4,
+    .quiesce = gf_quiesce, .quiesce_count = sizeof(gf_quiesce) / sizeof(gf_quiesce[0]),
+    .exprs = exprs, .expr_count = sizeof(exprs) / sizeof(exprs[0]),
     .layouts = fixed_layouts, .layout_count = sizeof(fixed_layouts) / sizeof(fixed_layouts[0]),
     .vram_reserved = {0, 1024},
 };
