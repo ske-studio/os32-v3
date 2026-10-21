@@ -1,0 +1,69 @@
+"""S3 complete mock traces, bounded execution and fail-stop; no external ROM."""
+import pathlib
+import subprocess
+import sys
+import tempfile
+import host32
+import mutpar
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
+         '-ffreestanding', '-fno-pie', '-fno-stack-protector']
+
+
+def command(exe):
+    return ['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
+            '-I'+str(ROOT/'include'), str(ROOT/'tools/tests/gfinit_exec_host.c'), '-o', str(exe)]
+
+
+MUTATIONS = [
+    ('steps', 'cost > GF_INIT_SCHEDULE - e->steps', 'false'),
+    ('wait_budget', 'us > GF_INIT_WAIT_MAX - e->wait_us', 'false'),
+    ('exec_deadline', 'e->elapsed_us >= GF_INIT_EXEC_US', 'false'),
+    ('call_depth', 'e->calls == GF_INIT_CALL_DEPTH', 'e->calls > GF_INIT_CALL_DEPTH'),
+    ('repeat_depth', 'e->repeats == GF_INIT_REPEAT_DEPTH', 'e->repeats > GF_INIT_REPEAT_DEPTH'),
+    ('condition_mask', '(e->read_value & a[1].value) == a[2].value', '(e->read_value & a[1].value) != a[2].value'),
+    ('selection', '>> a[1].value) == a[2].value;', '>> a[1].value) != a[2].value;'),
+    ('io_flag', '& a[4].value) == a[5].value', '& a[4].value) != a[5].value'),
+    ('skip_time', 'if (n->substep >= GF_INIT_K) return 0;', 'if (false && n->substep >= GF_INIT_K) return 0;'),
+    ('wait_failure', 'e->ops->wait_us(e->opaque, part) ||', '(e->ops->wait_us(e->opaque, part) && false) ||'),
+]
+SHARED_MUTATIONS = [
+    ('fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
+    ('planned_value', 'if (planned) *value = expected;', 'if (planned) *value = 0;'),
+]
+
+
+def mutation(item):
+    file, name, old, new = item
+    source = (ROOT/file).read_text()
+    if old and source.count(old) != 1:
+        return f'{name}: ambiguous anchor', 1
+    with tempfile.TemporaryDirectory(prefix='gfinit-mut-') as td:
+        exe = pathlib.Path(td)/'host'
+        try:
+            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1) if old else source},
+                                       [command(exe)], capture_output=True)
+        except subprocess.CalledProcessError as exc:
+            return f'{name}: compile failed {exc.stderr!r}', 1
+        result = host32.run([str(exe)], cwd=tree, timeout=60, capture_output=True)
+        return f'{name}: {"GREEN" if result.returncode == 0 else "RED"} rc={result.returncode}', int(result.returncode == 0)
+
+
+def main():
+    with tempfile.TemporaryDirectory(prefix='gfinit-') as td:
+        exe = pathlib.Path(td)/'host'
+        subprocess.run(command(exe), cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=120)
+        if result.returncode:
+            return result.returncode
+    if '--mutate' in sys.argv:
+        return int(bool(mutpar.run_with_control(mutation,
+            [('kdebug/gfinit_exec.c', *item) for item in MUTATIONS] +
+            [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS],
+            ('kdebug/gfinit_exec.c', 'control', '', ''))))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

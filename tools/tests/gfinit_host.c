@@ -120,7 +120,7 @@ static void decode_inventory(void)
     output(" repeat_depth=");number(decoded.max_repeat);output("\n");
     /* Complete reference/action inventory: node indices identify every edge;
      * args retain kind (IMM=0, READ=1, SAVED=2), no inferred read values. */
-    for(u32 i=0;i<decoded.plan.node_count;i++) {
+    for(u32 i=0;failures && i<decoded.plan.node_count;i++) {
         const struct recover_plan_node *n=&decoded.nodes[i];
         const struct recover_opcode_layout *l=layout_for(&recover_gf_template,n);
         output("node ");number(i);output(" pc ");number(n->pc);output(" op ");number(n->opcode);
@@ -159,7 +159,7 @@ static void contract_setup(u32 nodes_count)
         contract_rules[i]=(struct recover_rule){.id=200+i,.key=0,.phase=REC_RUN,.main_id=0,
             .pc=0x123,.substep=i,.write_mask=~0U,
             .value={.mode=REC_LITERAL,.mask=~0U,.bits=0,.max=~0U,.expr_id=RECOVER_NONE}};
-        contract_layouts[i]=(struct recover_opcode_layout){1,i,2,two,REC_WRITE};
+        contract_layouts[i]=(struct recover_opcode_layout){1,i,2,two,REC_WRITE,0};
         decoded.nodes[i]=(struct recover_plan_node){.phase=REC_RUN,.main_id=0,.pc=0x123,
             .opcode=1,.substep=i,.ctx=0,.rule_id=200+i,.expr_id=RECOVER_NONE,
             .arg_first=4*i,.arg_count=2,.next={i+1,i+1}};
@@ -194,14 +194,14 @@ static int contract_access(u32 i,u32 value)
 static void capture_fixture(u32 producer)
 {
     contract_setup(3);
-    contract_layouts[0]=(struct recover_opcode_layout){1,0,1,fixed_read,REC_READ};
+    contract_layouts[0]=(struct recover_opcode_layout){1,0,1,fixed_read,REC_READ,0};
     decoded.nodes[0].arg_count=1;decoded.nodes[0].rule_id=RECOVER_NONE;
-    contract_layouts[1]=(struct recover_opcode_layout){1,1,4,four,REC_WRITE};
+    contract_layouts[1]=(struct recover_opcode_layout){1,1,4,four,REC_WRITE,0};
     contract_rules[1].value=(struct recover_value){.mode=REC_EXPR,.mask=0xf00,.bits=0,.max=~0U,.expr_id=REC_GF_RMW};
     contract_rules[1].write_mask=0xf00;
     decoded.nodes[1].arg_count=4;decoded.nodes[1].expr_id=REC_GF_RMW;
     decoded.args[5]=READ(0);decoded.args[6]=IMM(0xfffff0ff);decoded.args[7]=IMM(0);
-    contract_layouts[2]=(struct recover_opcode_layout){1,2,2,captured_kind,REC_WRITE};
+    contract_layouts[2]=(struct recover_opcode_layout){1,2,2,captured_kind,REC_WRITE,0};
     contract_rules[2].value=(struct recover_value){.mode=REC_EXPR,.mask=0,.max=~0U,.expr_id=REC_GF_SAVED_BAR};
     decoded.nodes[2].expr_id=REC_GF_SAVED_BAR;decoded.args[9]=SAVED(0);
     decoded.captures[0]=(struct recover_capture){0,producer,2,0,0};
@@ -307,7 +307,7 @@ static void benchmark(u32 count)
         stress_rules[i].value=(struct recover_value){.mode=REC_LITERAL,.mask=255,
             .bits=i==nr-1?0x20:1,.max=255,.expr_id=RECOVER_NONE};
     }
-    for(u32 i=0;i<nl;i++)stress_layouts[i]=(struct recover_opcode_layout){1,i,2,two,i==nl-1?REC_DATA:REC_SELECT};
+    for(u32 i=0;i<nl;i++)stress_layouts[i]=(struct recover_opcode_layout){1,i,2,two,i==nl-1?REC_DATA:REC_SELECT,0};
     profile.rules=stress_rules;profile.rule_count=nr;profile.layouts=stress_layouts;profile.layout_count=nl;
     for(u32 i=0;i<count;i++) {
         decoded.nodes[i]=(struct recover_plan_node){.phase=REC_RUN,.main_id=0,.pc=0x123,
@@ -353,7 +353,7 @@ static void copy_order_tests(void)
         contract_rules[at].write_mask=nv?~0U:255;
         contract_rules[at].value=(struct recover_value){.mode=REC_EXPR,.max=nv?~0U:255,
             .expr_id=nv?REC_GF_EXPR_COPY_NV:REC_GF_EXPR_COPY};
-        contract_layouts[at]=(struct recover_opcode_layout){1,at,nv?7:6,nv?copy_nv_layout:copy_layout,nv?REC_WRITE:REC_DATA};
+        contract_layouts[at]=(struct recover_opcode_layout){1,at,nv?7:6,nv?copy_nv_layout:copy_layout,nv?REC_WRITE:REC_DATA,0};
         decoded.nodes[at].arg_count=nv?7:6;decoded.nodes[at].expr_id=contract_rules[at].value.expr_id;
         u32 base=4*at;
         decoded.args[base]=IMM(0);decoded.args[base+1]=READ(nv?1:0);decoded.args[base+2]=READ(nv?0:1);
@@ -368,19 +368,31 @@ static void copy_order_tests(void)
 }
 static void logical_head_tests(void)
 {
-    for(u32 group=0;group<2;group++) {
+    for(u32 group=0;group<4;group++) {
         contract_setup(2);profile.layout_count=2;
-        contract_layouts[0]=(struct recover_opcode_layout){group?0x54:0x53,0x20123,1,fixed_read,RECOVER_NONE};
-        contract_layouts[1]=(struct recover_opcode_layout){0x71,GF_INIT_C,0,0,RECOVER_NONE};
+        contract_layouts[0]=(struct recover_opcode_layout){group?0x54:0x53,0x20123,1,fixed_read,RECOVER_NONE,REC_LAYOUT_SKIP_HEAD};
+        contract_layouts[1]=(struct recover_opcode_layout){0x71,GF_INIT_C,0,0,RECOVER_NONE,0};
         decoded.nodes[0].opcode=group?0x54:0x53;decoded.nodes[0].substep=0x20123;
         decoded.nodes[0].skip=1;decoded.nodes[0].arg_count=1;decoded.nodes[0].rule_id=RECOVER_NONE;
         decoded.args[0]=IMM(group?4:3);
         decoded.nodes[1].opcode=0x71;decoded.nodes[1].substep=GF_INIT_C;
         decoded.nodes[1].head=1;decoded.nodes[1].skip=1;decoded.nodes[1].arg_count=0;decoded.nodes[1].rule_id=RECOVER_NONE;
+        if(group>=2) {
+            contract_layouts[0].flags=0;
+            if(group==2)contract_layouts[0].opcode=decoded.nodes[0].opcode=0x52;
+            CHECK(contract_bind()<0 && writes==0);continue;
+        }
         CHECK(contract_bind()==0);contract_arm();
         CHECK(recover_plan_enter(&core,0)==0 && recover_plan_leave(&core,0)==0);
         CHECK(core.head==1 && recover_plan_enter(&core,1)==0 && recover_plan_leave(&core,0)==0);
         CHECK(writes==0);
+    }
+    const u32 unsupported[]={0x52,0x62,0x78,0x37,0x51};
+    for(u32 i=0;i<GF_ARRAY(unsupported);i++) {
+        decoded.plan.node_count=decoded.plan.arg_count=decoded.error=0;
+        decoded.insns[0]=(struct gfinit_instruction){.opcode=unsupported[i],.port=RECOVER_CRTC,.index=RECOVER_CR44};
+        decoded.schedule[0]=(struct gfinit_scheduled){0};
+        CHECK(expand_step(&decoded,rom,&recover_gf_template,0,1)<0);
     }
     contract_setup(1);profile.rule_count=1;
     contract_targets[0]=(struct recover_target){.space=REC_VGA_INDEXED,.port=RECOVER_SEQ,
@@ -393,7 +405,10 @@ static void logical_head_tests(void)
     contract_rules[0].substep=REC_DATA;CHECK(recover_profile_ok(&profile)<0);
     contract_rules[0].substep=REC_SELECT;profile.index_save_count=0;CHECK(recover_profile_ok(&profile)<0);
 }
-void _start(void)
+#ifndef GF_S2_ENTRY
+#define GF_S2_ENTRY _start
+#endif
+void GF_S2_ENTRY(void)
 {
     parser_tests();decode_inventory();capture_tests();port_tests();copy_order_tests();logical_head_tests();rejection_tests();benchmark(940);benchmark(2048);
     output(failures?"GF S2 FAIL\n":"GF S2 PASS\n");

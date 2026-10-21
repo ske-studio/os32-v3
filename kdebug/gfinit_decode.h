@@ -12,6 +12,11 @@
 #define GF_INIT_C 0x11000U
 #define GF_INIT_PLL 0x11101U
 #define GF_INIT_K 0x20000U
+#define GF_INIT_SCRIPT_TABLE 0x5d4cU
+#define GF_INIT_MACRO_TABLE 0x5d66U
+#define GF_INIT_CONDITION_TABLE 0x5d86U
+#define GF_INIT_IO_FLAG_TABLE 0x5daaU
+#define GF_INIT_PLL_TABLE 0x5bc8U
 /* Owned by caller, no allocation or bus access. ROM remains borrowed only
  * during decode. A successful decode is an inventory, not permission to RUN:
  * S4 PLL entries deliberately have no executable layout. */

@@ -17,6 +17,7 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('skip_cr44_decode', 'if (op != 0x53 && op != 0x54 && v->port', 'if (false && op != 0x53 && op != 0x54 && v->port'),
     ('repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
     ('repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
     ('unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
@@ -30,6 +31,7 @@ MUTATIONS = [
 ]
 
 SHARED_MUTATIONS = [
+    ('skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
     ('capture_ordinal', 'c->read_ordinal)', '0)'),
     ('capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
     ('capture_consumed', 'r->capture_valid &= ~(1U << i);', 'r->capture_valid |= 1U << i;'),
