@@ -11,7 +11,7 @@
  * and cold-required cannot be cleared by starting a new session.
  */
 #define RECOVER_MAX_REGS 32U
-#define RECOVER_PROFILE_VERSION 2U
+#define RECOVER_PROFILE_VERSION 3U
 #define RECOVER_HALF_TICKS 0x80000000UL
 #define RECOVER_ROUTE_PORT 0x0FACU
 #define RECOVER_ROUTE_MASK 0x03U
@@ -124,6 +124,8 @@ struct recover_plan_node {
 };
 struct recover_plan_dep { u32 consumer, required_rule, producer; };
 struct recover_plan_entry { u32 phase, main_id, first; };
+#define RECOVER_CAPTURE_MAX 3U
+struct recover_capture { u32 slot, producer_node, consumer_node, target, read_ordinal; };
 struct recover_plan {
     u32 version, profile_crc, rom_crc, rom_size;
     const struct recover_plan_node *nodes; u32 node_count;
@@ -131,6 +133,8 @@ struct recover_plan {
     u32 ctx_count;
     const struct recover_plan_dep *deps; u32 dep_count;
     const struct recover_plan_entry *entries; u32 entry_count;
+    const struct recover_capture *captures; u32 capture_count;
+    u32 unresolved_count; /* decoder inventory is not executable permission */
 };
 struct recover_plan_buffers { u32 *flow_bits, *valid_bits; };
 struct recover_bar_extent { u32 raw, base, length, valid; };
@@ -170,6 +174,7 @@ struct recover_profile {
     u32 restore_log_bytes, s0_reserve_bytes;
     /* VRAM reservation is a BAR-relative half-open interval, not capacity. */
     struct recover_range vram_reserved;
+    const u32 *index_save_targets; u32 index_save_count;
 };
 struct recover_token {
     u32 session, profile_crc, profile_version, snapshot_crc, plan_hash;
@@ -229,8 +234,13 @@ struct recover {
     const struct recover_plan *plan;
     const struct recover_profile *bound_profile;
     struct recover_plan_buffers buffers;
-    u32 bound_hash, cursor, expected_node, head, auth_phase, selected;
+    u32 bound_hash, cursor, expected_node, head, auth_phase;
     bool entered, accessed, zero_hold, gpu_written, measuring;
+    const struct recover_opcode_layout *node_layout[RECOVER_NODE_MAX];
+    const struct recover_rule *node_write[RECOVER_NODE_MAX];
+    u32 index_port[RECOVER_TARGET_MAX], port_selected[RECOVER_TARGET_MAX];
+    u32 capture_values[RECOVER_CAPTURE_MAX], capture_valid;
+
     struct recover_bar_measurement cache, measurement;
     struct recover_bar_extent bars[3];
     bool enabled, route_write_approved, valid, in_call, in_opcode;

@@ -9,7 +9,8 @@ static unsigned failures;
 static void print(const char *s)
 {
     unsigned n = 0; while (s[n]) n++;
-    __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
+    u32 result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
 #define CHECK(x) do { if (!(x)) { print("FAIL " #x "\n"); failures++; } } while (0)
 static struct recover core;
@@ -64,6 +65,7 @@ static int event_fake(void *v,enum recover_state s,u32 session)
 { (void)v; (void)s; (void)session; return 0; }
 static const struct recover_ops ops = {tick,identity,ok,raw,read_fake,write_fake,
     route_read_fake,route_write_fake,ok,ok,abort_fake,cleanup_fake,event_fake};
+static const u32 four[] = {REC_IMM,REC_ARG_READ,REC_IMM,REC_IMM};
 static const u32 two[] = {REC_IMM,REC_IMM};
 static const struct recover_opcode_layout layouts[] = {
     {256,0,0,0,RECOVER_NONE},
@@ -143,7 +145,7 @@ static void inventory_test(void)
     CHECK(recover_gf_template.vram_reserved.base==0 && recover_gf_template.vram_reserved.len==1024);
     for(u32 i=0;i<recover_gf_template.target_count;i++) {
         const struct recover_target *t=&targets[i];
-        if(t->space==REC_BAR_MMIO) CHECK(t->access!=REC_RW);
+        if(t->space==REC_BAR_MMIO && t->offset!=0x1700) CHECK(t->access!=REC_RW);
     }
     for(u32 i=1;i<REC_GF_PREPARE_COUNT;i++) {
         const struct recover_rule *w=rule_by_id(&profile,recover_gf_prepare[i]);
@@ -182,6 +184,10 @@ static void trace_plan(void)
         entries[1+i]=(struct recover_plan_entry){REC_RUN,i,2+i};
     }
     node(5,sel,REC_SELECT,1); node(6,n1,REC_DATA,5);
+    nodes[6].expr_id=REC_GF_RMW; nodes[6].arg_count=4;
+    args[13]=(struct recover_plan_arg){REC_ARG_READ,n1key};
+    args[14]=(struct recover_plan_arg){REC_IMM,0xdf};
+    args[15]=(struct recover_plan_arg){REC_IMM,0};
     nodes[7]=(struct recover_plan_node){.phase=REC_RUN,.main_id=3,.pc=0xe824,
         .opcode=256,.rule_id=RECOVER_NONE,.expr_id=RECOVER_NONE,
         .next={RECOVER_NONE,RECOVER_NONE}};
@@ -190,7 +196,7 @@ static void trace_plan(void)
     links[1]=(struct recover_plan_dep){6,rules[1].id,1};
     trace_layouts[0]=layouts[0]; trace_layouts[1]=layouts[1];
     trace_layouts[2]=(struct recover_opcode_layout){257,sel->substep,2,two,REC_SELECT};
-    trace_layouts[3]=(struct recover_opcode_layout){257,n1->substep,2,two,REC_DATA};
+    trace_layouts[3]=(struct recover_opcode_layout){257,n1->substep,4,four,REC_DATA};
     profile.layouts=trace_layouts; profile.layout_count=4;
     profile.crc=recover_profile_crc(&profile);
     plan=(struct recover_plan){.version=1,.profile_crc=profile.crc,.nodes=nodes,
@@ -206,7 +212,7 @@ static int operation(struct recover *r,void *arg)
         if(i==6 && inject_when==REC_BEFORE) values[inject_key]=1;
         if(nodes[i].rule_id!=RECOVER_NONE) {
             const struct recover_opcode_layout *l=layout_for(&profile,&nodes[i]);
-            u32 key=args[2*i].value, value=args[2*i+1].value;
+            u32 key=args[2*i].value, value=i==6 ? 5 : args[2*i+1].value;
             if(recover_access(r,i,l->dir_substep,key,targets[key].width,&value)) return -1;
             if(i==6) n1_completed++;
         }

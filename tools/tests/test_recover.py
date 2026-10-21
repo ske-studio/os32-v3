@@ -26,8 +26,8 @@ def host_cmd(exe):
 
 MUTATIONS = [
     ("access_blocked_ignored", "    if (r->access_blocked) return -1;", ""),
-    ("local_selected_stale", "r->selected = *value == t->index ? target : RECOVER_NONE;",
-     "r->selected = target;"),
+    ("local_selected_stale", "r->port_selected[r->index_port[target]] =\n            *value == t->index ? target : RECOVER_NONE;",
+     "r->port_selected[r->index_port[target]] = target;"),
     ("write_bus_contract", "fail(r, REC_BUS, access_phase(r), target);\n            return access_error",
      "fail(r, REC_CONTRACT, REC_PHASE_NONE, target);\n            return access_error"),
     ("verify_phase_restore", "fail(r, REC_VERIFY, access_phase(r), target);",
@@ -90,7 +90,7 @@ MUTATIONS += [
     # gf4a S1 follow-up: raw VGA alias ports and indexed EXPR READ selection.
     ("indexed_expr_dependency_removed", "if (!target_read && arg->kind != REC_ARG_READ) continue;",
      "if (!target_read) continue;"),
-    ("indexed_expr_selection_removed", "r->selected != a->value) || bus_read", "false) || bus_read"),
+    ("indexed_expr_selection_removed", "r->port_selected[r->index_port[a->value]] != a->value) || bus_read", "false) || bus_read"),
     ("raw_alias_unchecked", "if (t->bar == 0) for (u32 head = 0; head < 2; head++)",
      "if (false) for (u32 head = 0; head < 2; head++)"),
     ("raw_alias_aperture", "/* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.",
