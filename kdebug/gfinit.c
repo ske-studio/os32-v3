@@ -15,8 +15,8 @@
 #include "sys.h"
 #include "generated/kdebug_import_macros.h"
 
-#define GF_BDF (13U << 3)
-#define GF_DEVICE 0x022110deU
+#define GF_BDF (GF_RES_GPU_DEV << 3)
+#define GF_DEVICE GF_RES_GPU_ID
 #define GF_US_PER_TICK (1000000U / PIT_HZ)
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN
 #define GF_ROM_UNIT 512U
@@ -88,8 +88,8 @@ static int gf_read_rom(struct gfinit_owner *g)
     if (g->rom_size > GF_ROM_MAX || g->rom_size < 0x18 || pcir > g->rom_size - 0x18 ||
         g->rom[pcir] != 'P' || g->rom[pcir+1] != 'C' ||
         g->rom[pcir+2] != 'I' || g->rom[pcir+3] != 'R' ||
-        ((u32)g->rom[pcir+4] | (u32)g->rom[pcir+5] << 8) != 0x10de ||
-        ((u32)g->rom[pcir+6] | (u32)g->rom[pcir+7] << 8) != 0x0221) return -1;
+        ((u32)g->rom[pcir+4] | (u32)g->rom[pcir+5] << 8) != (GF_DEVICE & 0xffffU) ||
+        ((u32)g->rom[pcir+6] | (u32)g->rom[pcir+7] << 8) != GF_DEVICE >> 16) return -1;
     u8 sum = 0;
     for (u32 i = 0; i < g->rom_size; i++) sum += g->rom[i];
     return sum ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, &g->decoded);
@@ -177,8 +177,8 @@ static int gf_fixed(struct recover *r, void *arg)
         if (n->phase == REC_SIZE_BARS && r->node_layout[id]->dir_substep == REC_READ) {
             u32 key = r->plan->args[n->arg_first].value;
             const struct recover_target *t = &r->profile->targets[key];
-            if (t->space != REC_PCI_CFG || t->offset < 0x10 || t->offset > 0x18) return -1;
-            u32 bar = (t->offset - 0x10) / 4;
+            if (t->space != REC_PCI_CFG || t->offset < PCI_CFG_BAR0 || t->offset > PCI_CFG_BAR0 + 4 * 2) return -1;
+            u32 bar = (t->offset - PCI_CFG_BAR0) / 4;
             if (recover_bar_probe(r, bar, g->bus.bars[bar], value,
                     g->exclude, g->exclude_count, 0, 0)) return -1;
         }

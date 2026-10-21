@@ -11,8 +11,6 @@
  * Unknown endpoint apertures deliberately fail ADDENDUM's length contract. */
 #define GF_RES_DEVICES 32U
 #define GF_RES_FUNCTIONS 8U
-#define GF_RES_GPU_DEV 13U
-#define GF_RES_GPU_ID 0x022110deU
 #define GF_RES_HEADER 0x0cU
 #define GF_RES_MEM_WINDOW 0x20U
 #define GF_RES_PREF_WINDOW 0x24U
