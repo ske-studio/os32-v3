@@ -1,0 +1,16 @@
+check-hwdev-audit-host:
+- tools/hwdev_audit.py
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/module_schema.py
+- kernel/kdebug_imports.def
+- docs/tasks/realhw/design/HWDEV_CORE_API.md
+- build/module.ld
+- build/checks.d/check-hwdev-audit-host.mk
+- tools/check_map.d/check-hwdev-audit-host.yaml
+- kdebug/gfinit*.c
+- kdebug/gfinit*.h
+- kdebug/recover*.h
+- kdebug/recover_gf.c
+- sdk/kapi.json
+artifact_reader: true

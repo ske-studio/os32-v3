@@ -85,10 +85,10 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 | GF hwdev.mod | 105〜155 / image 192 | 移動約 4 千行、許可表・reloc・import prefix を含む。実測が 192 を超えたら移動境界を再検討、上限を黙って拡大しない |
 | 常駐 body | 核 145〜185 + GF 105〜160 / 各 mem 256・192 | BSS 込み、file 上限と別検査。拒否判定/facade 追加は概算 1〜4KiB (kernel 分) |
 | ロード時 | HWDEV load_span ≤256 | in-place 読込み、全像二重 staging なし。prefix 解放後も必要な契約は部品登録情報に保持 |
-| 試行 RAM | 最大 1,028,096B = 1004KiB | S6 送りの 251 頁。ROM/decode/plan/flow を含む、flow 最大 512KiB。二重コピーしない |
+| 試行 RAM | 上限は [CORE_API §9](HWDEV_CORE_API.md#9-部品の寿命-manifest-v1-m2m3a-の入力契約) | M1 で最悪 node 数の実測に訂正。ROM/decode/plan/flow を含む。二重コピーしない |
 | 将来 DMA RAM | 装置別の明示上限、v1 は 0 | 要件は [DEVICE_STATES.md](DEVICE_STATES.md) §2 |
 
-- 合計の目安は常駐 250〜345KiB + 試行 1004KiB、OS 既存使用量は別。32MB だから確保成功とはせず、必要な連続 block が取れなければ開始を拒否。
+- 合計の目安は常駐 250〜345KiB + 上表の試行 RAM、OS 既存使用量は別。32MB だから確保成功とはせず、必要な連続 block が取れなければ開始を拒否。
 - 現行 S6 像 234.3KiB から、核だけで概算 84〜119KiB 削減。全部品合計の file 量は増え得る。分離の目的は核上限と装置追加時の増加を切り離すこと。
 - 2048 node 最悪・first-fit 断片化・各確保失敗点を検査。P100 の全経路検査時間も測り、node→rule cache と整数 bitset を維持、無制限探索・圧縮展開を追加しない。
 
@@ -111,7 +111,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 - N1・CR1F・0FACh・CUI/31kHz・S0 と S1 の区別などの安全条件は [GF6200_4A_DESIGN.md](GF6200_4A_DESIGN.md) と [REALHW_RECOVER_DESIGN.md](REALHW_RECOVER_DESIGN.md) のまま維持する (この分離で変えない)。GF 部品には 0FACh 操作を渡さない。
 - 既存 fixture・host 期待 trace・変異 ID は保持、リンク/import だけ追随 (ソースパスは維持)。核単体 mock に加え、実 KMOD の型と ABI を通る結合試験で境界欠落を検出する。
 - 順序: M1〜M5 → 旧 S7 → T4b → T5 → S8 (A1 承認 → 結果 → A2 承認) → main 0/1/2/3 を各承認 → A4 承認 → T6/T7 の残件 (段の表は [TASK_HWDEV.md](../TASK_HWDEV.md) §3)。
-- S6 送りの 251 頁 assert・最悪 node 試験は M1、Ra266 0:8.0/0:7.0 の BAR 長根拠は T5 前、version.chip の実 ROM 確認も実機開始前。T4a 合格は再利用し、部品境界の回帰だけ追加。
+- S6 送りの上限 assert・最悪 node 試験 (M1 の上限訂正は CORE_API §9)は M1、Ra266 0:8.0/0:7.0 の BAR 長根拠は T5 前、version.chip の実 ROM 確認も実機開始前。T4a 合格は再利用し、部品境界の回帰だけ追加。
 - 60 秒実行枠と実 UART 送信時間の除外、wire 上界 2 倍 + 3 秒、復帰 18/33 秒、PAUSED 時間除外をそのまま継承 ([REALHW_RECOVER_ADDENDUM.md](REALHW_RECOVER_ADDENDUM.md) の 246 行)。
 
 ## 7. ファイルごとの変更一覧

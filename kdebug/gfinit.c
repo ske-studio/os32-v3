@@ -22,6 +22,16 @@
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN
 #define GF_ROM_UNIT 512U
 #define GF_LOG_MARGIN_SECONDS 3U
+/* Each allocation is rounded independently; the old size-plan flow is freed
+ * before the maximum flow allocation. Static control is not trial RAM. */
+#define GF_WORK_MAX_PAGES 267U
+#define GF_FLOW_MAX_BYTES (RECOVER_NODE_MAX * RECOVER_BITS_WORDS * sizeof(u32))
+STATIC_ASSERT(RECOVER_NODE_MAX == 2048U, gf_work_node_contract);
+STATIC_ASSERT((PAGE_ALIGN_UP(GF_ROM_MAX) +
+               PAGE_ALIGN_UP(sizeof(struct gfinit_decode)) +
+               PAGE_ALIGN_UP(sizeof(struct gfinit_plan)) +
+               PAGE_ALIGN_UP(GF_FLOW_MAX_BYTES)) / PAGE_SIZE <= GF_WORK_MAX_PAGES,
+              gf_work_page_contract);
 struct gfinit_owner {
     struct gfinit_bus bus;
     struct recover_ops ops;
@@ -230,6 +240,7 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
             gfinit_plan_build(g->compiled, g->decoded, &g->profile, r->cache.bar[1].length)) return -1;
         plan = &g->compiled->plan;
     }
+    if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;
     if (gf_budget(g, r, transport, size ? REC_BUDGET_SIZE_BARS : REC_BUDGET_GF, plan)) return -1;
     if (size) g->size_plan.profile_crc = g->profile.crc;
     else g->compiled->plan.profile_crc = g->profile.crc;
