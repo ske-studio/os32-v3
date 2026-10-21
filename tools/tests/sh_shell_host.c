@@ -501,6 +501,7 @@ static void show_prompt(void) { out_str("sh> "); }
 /* `peek` (cmd_sys.c の表の 1 行) の本体 cmd_peek.c は heap と CRC32 を使うので
  * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
 int shell_cmd_peek(int argc, char **argv) { (void)argc; (void)argv; return 0; }
+int shell_cmd_recover(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 
 /* ---- シェルの他モジュールの代わり -------------------------------------- */
 
