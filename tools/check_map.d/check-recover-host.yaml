@@ -1,0 +1,11 @@
+check-recover-host:
+- kdebug/recover.c
+- kdebug/recover.h
+- include/types.h
+- lib/crc32_core.inc
+- tools/tests/recover_host.c
+- tools/tests/test_recover.py
+- tools/tests/host32.py
+- tools/tests/mutpar.py
+- tools/check_map.d/check-recover-host.yaml
+- build/checks.d/check-recover-host.mk
