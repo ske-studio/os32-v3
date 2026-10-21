@@ -14,6 +14,7 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('max_nodes', 'if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;', ''),
     ('size_failure_retained', 'op != GF_OP_SIZE_BARS || r->state == REC_FAILED', 'op != GF_OP_SIZE_BARS'),
     ('inspect_replaces_s0_ops', 'g->s0 = s0;', 'g->s0 = s0; (void)recover_owner_configure(&g->ops, &g->bus, s0, false);'),
     ('begin_leaves_s0_ops', 'recover_owner_configure(&g->ops, &g->bus, g->s0, false) ||', ''),

@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **設計中 (2026-10-22)** — 設計を確定、実装はユーザーの合図待ち
+> 状態: **実装中 (2026-10-22)** — M1 実装済み、独立レビュー待ち (M2 以降は未着手)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) と [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -32,7 +32,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 | 段 | 重さ / 実装 | 合格条件 (要約) | 状態 |
 |---|---|---|---|
-| M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、251 頁の最悪条件と部品の寿命の契約を固定 | 未 |
+| M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | 実装済み・レビュー待ち |
 | M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 未 |
 | M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 未 |
 | M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 未 |
@@ -51,8 +51,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 ## 4. 未決
 
-- この設計の新しい未決は 0 件。
-- 残っていたユーザー判断 (PG リセット) は 2026-10-22 に「付けない」で決着 ([TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0)。この設計の未決は無い。
+- 残っていたユーザー判断 (PG リセット) は 2026-10-22 に「付けない」で決着 ([TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0)。PG リセットの未決は無い。
 
 ## 5. 設計の所在
 
@@ -63,3 +62,10 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - [DEVICE_STATES.md](design/DEVICE_STATES.md) — 共通の要件: 想定する装置ごとに要る状態と、今の recover の前提で足りない所
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
+
+## M1 の実装で設計者が決めたこと (2026-10-22)
+- 同じS6像のmap/size/headerで核・GF・prefix/整列を分け、参照照合の生成器はCORE_APIのslot表を入力にする (詳細・実測はCORE_API §2・§7)。
+- kernel importsは既存kdebug番号順で核のslotの後へ置き、既存kdebug importは変更しない (CORE_API §3)。
+- G4の配置CRCを独立欄に具体化し、配置inventoryと前処理テキストの生成・正規化・照合を固定する (CORE_API §8)。
+- boot寿命・同期callback・DMAなしのmanifest形式と初期化時の参照検査を固定し、callのtransportは既存宣言と同型にする (CORE_API §9)。
+- PM 決定に従い owner 上限を2048 node時の267頁へ訂正する。251頁へ収める領域削減は行わず、個別の頁丸上げをSTATIC_ASSERTとfirst-fit/全確保失敗試験で固定する (CORE_API §9)。

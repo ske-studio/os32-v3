@@ -257,6 +257,7 @@ struct recover_opcode_layout {
 - S6修正: A1の長さ不明memory BAR/ROM・header・bridge窓・GPU不一致/不在は拒否理由とbus0 BDF・reg・rawを開始前にログへ出す；Ra266のTrident 0:8.0/NEC 0:7.0による拒否の実機確認はPMがT5前に行う。
 
 ## 4a S6 の取り込みで送る項目 (2026-10-22、Opus の S6 レビュー 2 回目、P3)
+- 訂正 (PM 決定 2026-10-22): 以下の251頁は1790 node時の値。2048 nodeの上限は267頁 = 1,093,632Bへ訂正し、M1で固定する ([HWDEV_CORE_API §9](HWDEV_CORE_API.md#9-部品の寿命-manifest-v1-m2m3a-の入力契約))。
 - owner の作業領域の上限 (最大 251 ページ = 1,028,096B) を STATIC_ASSERT で固定する。host の fake は生きている頁の合計を 1MiB で打ち切るが node_count=1790 で回していて 2048 の最悪の場合は通していない、実際の確保口の連続性 (first-fit) も模していない — 最悪の node 数で 1 件足す。
 - (PM、T5 の前に) 実機 Ra266 の bus0 の Trident 0:8.0 と NEC 0:7.0 の Command とメモリ BAR を読み、A1 の他装置の窓の照合で拒否されないか確かめる (拒否されれば A1 のログに理由・BDF・reg・raw が出る)。
 - kdebug.bin は 239,908B で KDEBUG の上限 262,144 (tools/module_schema.py) の 92%。S7 以降で足す前に、上限の引き上げ・装置ごとの部分を別の部品へ・許可表を小さい型に詰める (約 30KB)・kselftest を別の部品へ (54KB) のどれにするかをユーザーに諮る。
