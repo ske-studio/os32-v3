@@ -31,7 +31,7 @@ int v86g_result(const V86Gcap *g) { return (int)g->status; }
 void v86g_reset(V86Gcap *g) { u8 *p=(void *)g; for(u32 i=0;i<sizeof(*g);i++)p[i]=0; }
 static void tv_save(u16 *p) { for(u32 i=0;i<GCAP_TV_CELLS*2;i++)p[i]=(u16)i; }
 static void tv_restore(const u16 *p) { for(u32 i=0;i<GCAP_TV_CELLS*2;i++)CHECK(p[i]==(u16)i); restored++; }
-static void v86_cui_display_restore(void) {}
+static void display_text_start(void) {}
 static void v86_io_reset_policy(void) {}
 static void console_hw_cursor_enable(void) { cursor++; }
 int v86g_mode_is_31k(int l,unsigned int a) { (void)l;(void)a;return 0; }
