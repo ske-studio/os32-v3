@@ -15,6 +15,7 @@
 #define GF_PLL_VIDEO_STAGE 0x680580U
 #define GF_PLL_WRITES_MAX 15U
 #define GF_PLL_SUBSTEP 0x12000U
+#define GF_PLL_SUBSTEP_STRIDE 32U /* core, memory, video */
 struct gfinit_pll_vco { u32 min_freq, max_freq, min_input, max_input, min_n, max_n, min_m, max_m; };
 struct gfinit_pll_limits { struct gfinit_pll_vco vco1, vco2; u32 max_p, bias_p, ref; };
 struct gfinit_pll_solution { u32 n1, m1, n2, m2, p, actual, error; };

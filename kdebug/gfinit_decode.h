@@ -16,6 +16,7 @@
 #define GF_INIT_CONDITION_TABLE 0x5d86U
 #define GF_INIT_IO_FLAG_TABLE 0x5daaU
 #define GF_INIT_PLL_TABLE 0x5bc8U
+#define GF_INIT_FIXED_CAPTURES 3U /* 0x65 saved slot + one 0x51 slot per head */
 /* Owned by caller, no allocation or bus access. ROM remains borrowed only
  * during decode. A successful decode is an inventory, not permission to RUN:
  * COPY and non-PLL temporary restore entries remain unresolved until S5. */

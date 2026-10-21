@@ -839,7 +839,6 @@ static const struct recover_rule rules[] = {
     {567, 153, REC_RUN, 2, 0xe623, 0x12042, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_567, 1, 0, 0, 0},
     {568, 152, REC_RUN, 2, 0xe623, 0x12043, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_568, 1, 0, 0, 0},
     {569, 25, REC_RUN, 2, 0xe623, 0x12044, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_569, 1, 0, 0, 0},
-
 };
 static const struct recover_reg regs[] = {
     {7, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, 7},

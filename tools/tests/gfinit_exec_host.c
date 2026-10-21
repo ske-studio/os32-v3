@@ -45,8 +45,9 @@ static int exec_delay(void *v,u32 us)
 static const struct gfinit_exec_ops executor_ops={exec_clock,exec_delay};
 static struct recover_ops executor_bus;
 /* Deliberately synthetic permissions: exact decoded operand expressions, no
- * hardware permission claim. Missing COPY/capture rows exist only in this test. PLL rows use their
- * expanded expressions; production PLL authorization is tested separately. */
+ * hardware permission claim. Missing COPY/capture rows exist only in this
+ * test. PLL rows use their expanded expressions; production PLL
+ * authorization is tested separately. */
 static void synthetic_profile(void)
 {
     profile=recover_gf_template;profile.regs=0;profile.count=0;
@@ -71,7 +72,7 @@ static void synthetic_profile(void)
         if(l->dir_substep==RECOVER_NONE || l->dir_substep==REC_READ)continue;
         u32 expr=RECOVER_NONE;
         if(l->argc==4)expr=REC_GF_RMW;
-        if(n->substep>=GF_PLL_SUBSTEP && n->substep<GF_PLL_SUBSTEP+96 && l->argc==4)expr=REC_GF_PLL_SAVED;
+        if(n->substep>=GF_PLL_SUBSTEP && n->substep<GF_PLL_SUBSTEP+3*GF_PLL_SUBSTEP_STRIDE && l->argc==4)expr=REC_GF_PLL_SAVED;
         if(n->opcode==0x37 && l->argc==6)expr=REC_GF_EXPR_COPY;
         if(n->opcode==0x5f)expr=REC_GF_EXPR_COPY_NV;
         if(l->argc==2 && decoded.args[n->arg_first+1].kind==REC_ARG_SAVED)expr=REC_GF_SAVED_BAR;

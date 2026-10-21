@@ -17,25 +17,27 @@ def command(exe):
 
 
 MUTATIONS = [
-    ('pll_version', 'r[table]!=0x21', 'false'),
+    ('pll_version', 'r[table] != 0x21', 'false'),
     ('pll_ref', 'l->ref == GF_PLL_REF', 'true'),
-    ('pll_round', '(cp*m+GF_PLL_REF/2)/GF_PLL_REF', '(cp*m)/GF_PLL_REF'),
-    ('pll_output_round', '((n*GF_PLL_REF+div/2)/div+m/2)/m', '(n*GF_PLL_REF/div)/m'),
-    ('pll_gain', 'n2/m2<4 || n2/m2>10', 'false'),
-    ('pll_mirror', 'GF_PLL_MEMORY_MIRROR,preg,keep,bits', 'GF_PLL_MEMORY_MIRROR,preg,keep,bits^1U'),
-    ('pll_gate_restore', 'GF_PLL_GATE,GF_PLL_GATE,~0U,0', 'GF_PLL_GATE,GF_PLL_GATE,~0U,1U'),
+    ('pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),
+    ('pll_output_round', '((n * GF_PLL_REF + div / 2) / div + m / 2) / m', '(n * GF_PLL_REF / div) / m'),
+    ('pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
+    ('pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
+    ('pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
+    ('pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
 ]
 SHARED_MUTATIONS = []
+
 
 def mutation(item):
     file, name, old, new = item
     source = (ROOT/file).read_text()
-    if old and not source.count(old):
+    if old and source.count(old) != 1:
         return f'{name}: ambiguous anchor', 1
     with tempfile.TemporaryDirectory(prefix='gfinit-mut-') as td:
         exe = pathlib.Path(td)/'host'
         try:
-            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new) if old else source},
+            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1) if old else source},
                                        [command(exe)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1

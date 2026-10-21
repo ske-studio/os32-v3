@@ -6,6 +6,7 @@
 #include "../lib/crc32_core.inc"
 #define GF_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
 STATIC_ASSERT(GF_INIT_SCHEDULE >= RECOVER_NODE_MAX, gf_schedule_scratch);
+STATIC_ASSERT(GF_INIT_FIXED_CAPTURES <= RECOVER_CAPTURE_MAX, gf_fixed_captures);
 struct gf_script_span { u32 id, pc, length, crc; };
 static const struct gf_script_span scripts[] = {
     {0x0U, 0xdeb0U, 0x2e5U, 0xf8ece062U},
@@ -329,7 +330,7 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     if (o->port && o->port != RECOVER_CRTC && o->port != RECOVER_SEQ && o->port != RECOVER_GFX) return -1;
     if (o->opcode == 0x4a || o->opcode == 0x4b) {
         struct gfinit_pll_limits limits;
-        if (gfinit_pll_parse(r,size,GF_INIT_PLL_TABLE,o->target,&limits)) return -1;
+        if (gfinit_pll_parse(r, size, GF_INIT_PLL_TABLE, o->target, &limits)) return -1;
     }
     return 0;
 }
@@ -453,38 +454,41 @@ static u32 read_node(struct gfinit_decode *d, const struct recover_profile *p,
 }
 /* Solver runs before any bus access. All runtime values come from checked
  * captures and every write uses the recover-owned rule for this pc/substep. */
-static int expand_pll(struct gfinit_decode *d,const u8 *r,const struct recover_profile *p,
-                      const struct gfinit_scheduled *s,u32 state,u32 khz)
+static int expand_pll(struct gfinit_decode *d, const u8 *r, const struct recover_profile *p,
+                      const struct gfinit_scheduled *s, u32 state, u32 khz)
 {
-    const struct gfinit_instruction *v=&d->insns[s->instruction];
+    const struct gfinit_instruction *v = &d->insns[s->instruction];
     struct gfinit_pll_limits limits;
     struct gfinit_pll_solution solution;
     struct gfinit_pll_sequence q;
-    if (gfinit_pll_parse(r,d->plan.rom_size,GF_INIT_PLL_TABLE,v->target,&limits) ||
-        gfinit_pll_solve(&limits,khz,&solution) || gfinit_pll_sequence(v->target,&limits,&solution,&q)) return -1;
-    u32 sources[GF_PLL_WRITES_MAX], producers[GF_PLL_WRITES_MAX], count=0;
-    for (u32 i=0;i<q.count;i++) if (q.writes[i].source) {
-        u32 source=q.writes[i].source,j=0;
-        for (;j<count;j++) if (sources[j]==source) break;
-        if (j==count) {
-            sources[count]=source;
-            producers[count++]=read_node(d,p,s,state,key_for(p,source,0,0,0));
+    if (gfinit_pll_parse(r, d->plan.rom_size, GF_INIT_PLL_TABLE, v->target, &limits) ||
+        gfinit_pll_solve(&limits, khz, &solution) ||
+        gfinit_pll_sequence(v->target, &limits, &solution, &q)) return -1;
+    u32 sources[GF_PLL_WRITES_MAX], producers[GF_PLL_WRITES_MAX], count = 0;
+    for (u32 i = 0; i < q.count; i++) if (q.writes[i].source) {
+        u32 source = q.writes[i].source, j = 0;
+        for (; j < count; j++) if (sources[j] == source) break;
+        if (j == count) {
+            sources[count] = source;
+            producers[count++] = read_node(d, p, s, state, key_for(p, source, 0, 0, 0));
         }
     }
-    u32 base=GF_PLL_SUBSTEP+(v->target==GF_PLL_CORE?0:v->target==GF_PLL_MEMORY?32:64);
-    for (u32 i=0;i<q.count;i++) {
-        const struct gfinit_pll_write *w=&q.writes[i];
-        u32 key=key_for(p,w->reg,0,0,0);
-        if (key==RECOVER_NONE) return -1;
-        if (!w->source) write_node(d,p,s,state,base+i,REC_WRITE,key,0,w->value,false);
+    u32 base = GF_PLL_SUBSTEP + GF_PLL_SUBSTEP_STRIDE *
+        (v->target == GF_PLL_CORE ? 0 : v->target == GF_PLL_MEMORY ? 1 : 2);
+    for (u32 i = 0; i < q.count; i++) {
+        const struct gfinit_pll_write *w = &q.writes[i];
+        u32 key = key_for(p, w->reg, 0, 0, 0);
+        if (key == RECOVER_NONE) return -1;
+        if (!w->source) write_node(d, p, s, state, base + i, REC_WRITE, key, 0, w->value, false);
         else {
-            u32 c=d->plan.capture_count,j=0;
-            if (c==RECOVER_CAPTURE_MAX) return -1;
-            for (;j<count;j++) if (sources[j]==w->source) break;
-            if (j==count) return -1;
-            struct recover_plan_arg a[]={IMM(key),SAVED(p->count+c),IMM(w->keep),IMM(w->value)};
-            u32 consumer=emit(d,p,s,state,base+i,REC_WRITE,a,4);
-            d->captures[c]=(struct recover_capture){p->count+c,producers[j],consumer,key_for(p,w->source,0,0,0),0};
+            u32 c = d->plan.capture_count, j = 0;
+            if (c == RECOVER_CAPTURE_MAX) return -1;
+            for (; j < count; j++) if (sources[j] == w->source) break;
+            if (j == count) return -1;
+            struct recover_plan_arg a[] = {IMM(key), SAVED(p->count + c), IMM(w->keep), IMM(w->value)};
+            u32 consumer = emit(d, p, s, state, base + i, REC_WRITE, a, 4);
+            d->captures[c] = (struct recover_capture){p->count + c, producers[j], consumer,
+                key_for(p, w->source, 0, 0, 0), 0};
             d->plan.capture_count++;
         }
     }
@@ -554,14 +558,14 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
             ends[k] = d->plan.node_count;
             d->nodes[branches[k]].next[1] = ends[k];
             if (op == 0x32) write_node(d, p, s, state, e+k, REC_WRITE, key_for(p, v->target, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
-            else if (expand_pll(d,r,p,s,state,le(r,v->ref+4*k,4))) return -1;
+            else if (expand_pll(d, r, p, s, state, le(r, v->ref+4*k, 4))) return -1;
             if (d->error) return -1;
             d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, state);
         }
         d->reachable[next_step] |= 1U << state;
         return d->error ? -1 : 0;
     }
-    case 0x4b: if (expand_pll(d,r,p,s,state,v->value)) return -1; break;
+    case 0x4b: if (expand_pll(d, r, p, s, state, v->value)) return -1; break;
     case 0x6e: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
     case 0x7a: case 0x6f: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
     case 0x52: case 0x53: case 0x62: case 0x78:
@@ -630,7 +634,7 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
     if (!r || !p || !d) return -1;
     d->plan = (struct recover_plan){.version = 1, .profile_crc = p->crc, .rom_size = size,
         .nodes = d->nodes, .args = d->args, .entries = d->entries, .entry_count = GF_INIT_MAINS,
-        .captures = d->captures, .capture_count = 3};
+        .captures = d->captures, .capture_count = GF_INIT_FIXED_CAPTURES};
     d->instruction_count = d->schedule_count = d->error = d->max_call = d->max_repeat = 0;
     u32 active[GF_INIT_INSNS] = {0}, main_start[GF_INIT_MAINS];
     for (u32 i = 0; i < GF_ARRAY(scripts); i++) {
@@ -717,7 +721,7 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
         u32 delay = (n->opcode == 0x74 || n->opcode == 0x65) && n->substep == GF_INIT_C ?
             d->args[n->arg_first].value : 0;
         u32 cost = 1;
-        for (u32 j=0;j<n->arg_count;j++)
+        for (u32 j = 0; j < n->arg_count; j++)
             if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;
         if (cost > GF_INIT_SCHEDULE - max_steps || delay > GF_INIT_WAIT_MAX - max_wait) return -1;
         d->schedule[i].k = max_steps + cost; d->schedule[i].count = max_wait + delay;

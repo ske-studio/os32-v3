@@ -32,6 +32,7 @@ MUTATIONS = [
     ('skip_time', 'if (n->substep >= GF_INIT_K) return 0;', 'if (false && n->substep >= GF_INIT_K) return 0;'),
     ('wait_failure', 'e->ops->wait_us(e->opaque, part) ||', '(e->ops->wait_us(e->opaque, part) && false) ||'),
 ]
+PLANNED = '        if (planned) *value = expected;\n'
 PRECHECK = """        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rule(n, w)) ||
             (dir == REC_DATA && r->port_selected[r->index_port[target]] != target))
             return access_error(r, target);
@@ -51,7 +52,10 @@ def mutation(item):
     with tempfile.TemporaryDirectory(prefix='gfinit-mut-') as td:
         exe = pathlib.Path(td)/'host'
         try:
-            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1).replace('        if (planned) *value = expected;', '        if (planned) *value = expected;\n' + PRECHECK) if name == 'pre_read_order' else source.replace(old, new, 1) if old else source},
+            mutated = source.replace(old, new, 1) if old else source
+            if name == 'pre_read_order':
+                mutated = mutated.replace(PLANNED, PLANNED + PRECHECK, 1)
+            tree = mutpar.build_in_tree(ROOT, td, {file: mutated},
                                        [command(exe)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1
