@@ -74,7 +74,7 @@ loader_hdd.asm + boot_main.c + ext2_mini.c + lz4_mini.c
                 →  nasm + gcc + ld (-T loader.ld) → loader_hdd.bin (LBA 2-17、最大 8KB)
 build/out/vmkernel.lz4 → ext2 FS 内 /boot/vmkernel.lz4 に配置 (nhd_deploy.py)
 build/out/kdebug.bin   → ext2 FS 内 /boot/kdebug.bin (デバッグ部品、vmkernel.lz4 の Image CRC と対。
-                         対で配る — nhd_deploy の copy --dest /boot、hsync boot、FD インストール。票 TASK_DBGREF §3-9)
+                         対で配る — nhd_deploy の copy --dest /boot、hsync boot。2026-10-21 決定: 開発用で FD の空きを圧迫するため FD には載せず、インストール後に hsync boot で入れる。票 TASK_DBGREF §3-9)
 
 === FDD デプロイ (FAT12) ===
 boot_fat.asm    →  nasm (-f bin)             →  boot_fat.bin (1024B FAT12 IPL)
@@ -639,13 +639,14 @@ diff / du / cal / man / sndctl。残すコマンド・FD の profile・インス
 ##### 起動 FD と MINIMAL
 
 **起動 FD (2HD `images/os32_boot.d88` / 1.44MB `images/os32_boot144.img`) の中身は
-CD の BOOT + MINIMAL と同じ集合。** `build/image.mk` は一覧を持たず、
+CD の BOOT + MINIMAL から `fd.exclude` を除いた集合。** `build/image.mk` は一覧を持たず、
 `python3 tools/mkpkg.py --plan build/packages.yaml --fd-args --fd-loader <LOADER.BIN のもと>`
 が `mkfat12.py --tree` の引数を出す (2026-09-24 まで `FDD_MIN_CMDS` を手で持っていて
 CD の MINIMAL とずれていた)。違いは `build/packages.yaml` の `fd:` に理由つきで書いた物だけ:
 
 | FD | HDD / CD の同等物 | 理由 |
 |---|---|---|
+| 無し (`exclude`) | `/boot/kdebug.bin` | 2026-10-21 ユーザー決定: 開発用でレスキュー兼インストーラには不要。T3 の増分で 2HD の空きが下限 64KB を割ったため除外し、実機はインストール後に `hsync boot` で入れる |
 | `/LOADER.BIN` (only) | BOOT の `loader_hdd.bin` (ブート領域) | FAT の IPL が読む 2 段目。2HD は `loader_fat_new.bin`、1.44MB は `loader_fat144.bin` |
 | `/etc/profile` (only、`assets/profile_fdd`) | 無し (`assets/profile` は配備マニフェストに載っていない) | FD 用の PATH (`/bin:/sbin`) |
 | `/VMKRNL.LZ4` | `/boot/vmkernel.lz4` | FAT ローダはルートから読む。install.bin が `/hd0/boot/` へ写す |
@@ -661,10 +662,10 @@ FD ルートの上に HDD の ext2 を載せても、残っている短い名前
 載っていない** (FD に手で置けば読む)。**install.bin (FD → HDD) は
 この表を逆に当てて正規名で写し**、ブート領域へ書く物と FD だけの物は写さない
 (`userland/system/install.c` の `fd_renames` / `fd_only`。case 9 が packages.yaml と
-突き合わせ、実物の install.c を回して HDD の集合 = MINIMAL を見る)。
+突き合わせ、実物の install.c を回して HDD の集合 = MINIMAL − `fd.exclude` を見る)。
 
 FD 上のパスはすべて 8.3 に収まること (mkfat12 は収まらない名前を黙って切り詰めるので、
-mkpkg が先に断る)。**`core` / `base` に足した物は FD にも入る** — 空きは 2026-09-25 に
+mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以外 FD にも入る** — 空きは 2026-09-25 に
 **2HD 359KB / 1221KB、1.44MB 568KB / 1424KB** (MINIMAL をレスキュー兼インストーラに絞った後。
 絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2HD が先に尽きるので、MINIMAL に
 足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB

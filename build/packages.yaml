@@ -17,7 +17,7 @@
 #                         直す)
 #
 #  **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
-#  レスキュー兼インストーラ** (2026-09-25、ユーザー決定)。起動 FD と同じ集合なので
+#  レスキュー兼インストーラ** (2026-09-25、ユーザー決定)。起動 FD は fd.exclude を除いた集合なので
 #  2HD (1232KB) に収まる大きさに保つ。それ以外は NORMAL:
 
 #    - more / find / sort / head / tail / wc / tee / touch / sleep / diff / du / cal /
@@ -33,13 +33,13 @@
 #
 #  cdinst の選択肢との対応 (userland/system/cdinst.c)。展開は依存の順
 #  BOOT → MINIMAL → GUI → NORMAL → DEBUG:
-#    1. Minimal = BOOT + MINIMAL                (CUI のレスキュー兼インストーラ。起動 FD と同じ集合)
+#    1. Minimal = BOOT + MINIMAL                (CUI のレスキュー兼インストーラ。起動 FD は fd.exclude を除いた集合)
 #    2. Normal  = 1 + GUI + NORMAL
 #    3. Full    = 2 + DEBUG
 #
-#  **起動 FD (build/image.mk) の中身は BOOT + MINIMAL そのもの** (下の fd:)。
-#  FD だけに要る物と FAT の 8.3 に合わせた置き場所の違いだけを fd: に書く。
-#  core / base に足した物は FD にも入るので、FD の空き (docs/08_build.md) を見ること。
+#  **起動 FD (build/image.mk) の中身は BOOT + MINIMAL から fd.exclude を除いた集合** (下の fd:)。
+#  FD の除外・FD だけに要る物・FAT の 8.3 に合わせた置き場所の違いを fd: に書く。
+#  core / base に足した物は fd.exclude 以外 FD にも入るので、FD の空き (docs/08_build.md) を見ること。
 #  **2HD の空きが FD_MIN_FREE_KB (tools/tests/test_packages.py) を切ると
 #  make check-packages-host が落ちる** — 2026-09-25 にカーネルの 4KB 増で 2HD が
 #  前触れなく作れなくなった (既定フォント 184KB と一般コマンドを NORMAL へ移して空けた)。
@@ -98,8 +98,9 @@ exclude: []
 
 # ---------------------------------------------------------------------------
 # 起動 FD (build/image.mk の images/os32_boot.d88 と images/os32_boot144.img)。
-# 中身は from のパッケージと同じ集合で、足しも引きもしない (make
+# 中身は from のパッケージから exclude を除いた集合 (make
 # check-packages-host が実物のイメージで等しいことを見る)。違うのは:
+#   exclude FD には不要な物。guest と reason を書く (CD の集合には残す)
 #   rename  FAT (FatFs は LFN なし) の 8.3 に収まらない名前と、FD 上の置き場所が
 #           HDD と違う物。guest は配備マニフェストのゲストパス、fd は FD 上のパス
 #   only    FD だけが要る起動用の物。host の {loader} は make が渡す
@@ -107,10 +108,13 @@ exclude: []
 # どれも reason: を必ず書く。install.bin (FD → HDD) はこの表を逆に当てて正規名で
 # 写す (userland/system/install.c の fd_renames / fd_only。足したら両方直す —
 # make check-packages-host の case 9 が突き合わせ、FD → install → HDD の集合が
-# MINIMAL と等しいことも見る)。
+# MINIMAL から fd.exclude を除いた集合と等しいことも見る)。
 # ---------------------------------------------------------------------------
 fd:
   from: [boot, minimal]
+  exclude:
+    - guest: /boot/kdebug.bin
+      reason: 2026-10-21 ユーザー決定。開発用 kdebug はレスキュー兼インストーラの FD には不要。T3 の増分で 2HD の空きが 64KB を割り、今後も増えるため除外。FD インストール後は実機の更新 (hsync boot) で入れる
   rename:
     - guest: /boot/vmkernel.lz4
       fd: /VMKRNL.LZ4

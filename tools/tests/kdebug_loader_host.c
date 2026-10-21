@@ -234,6 +234,10 @@ void _start(void)
         for (u32 i = 0; i < sizeof(kdebug.ops); i++) CHECK(!((u8 *)&kdebug.ops)[i]);
         if (!input[0]) CHECK(!owners && !kdebug.owner);
     }
+    if (input[2] == KDEBUG_NOT_FOUND) {
+        CHECK(logs == 1 && !owners && !reads);
+        CHECK(kdebug_call(KDEBUG_OP_PEEK, 0, 0) == OS32_ERR_NOSYS);
+    }
     check_boot_dispatch();
     check_kdebug_call();
     finish(0);
