@@ -256,7 +256,7 @@ LB-1 の生成段は S4、export は既存 1〜5 と 18。gcap の移動はこ�
 2. `reboot` (シリアルから、起動待ちは 1 回の待ち受け)。
 3. `ver` で `Image CRC` と `kdebug: on (pair <同じ CRC>, body N pages, owner M pages)` を確かめる。
 4. 受入・配備確認・CRTFREQ の採取・`v86 -g` はこの状態で。終わったら `kdebug off` → `reboot`。
-5. 配備は対で: NHD は **停止 → `deploy-kernel` (vmkernel.lz4 + kdebug.bin) → 起動** ([D1]、`np21w_ctl.py` だけで)。不一致の注入試験: 停止 → 1 つ前の `kdebug.bin` を `nhd_deploy.py` で置く → 起動 → `ver` が `rejected (4 PAIR_MISMATCH)` → 停止 → 対を戻す → 起動。FD は boot の集合、HostDrv の `hsync` は `/boot` も入れ替える。
+5. 配備は対で: NHD は **停止 → `deploy-kernel` (vmkernel.lz4 + kdebug.bin) → 起動** ([D1]、`np21w_ctl.py` だけで)。不一致の注入試験: 停止 → 1 つ前の `kdebug.bin` を `nhd_deploy.py` で置く → 起動 → `ver` が `rejected (4 PAIR_MISMATCH)` → 停止 → 対を戻す → 起動。2026-10-21 ユーザー決定: 開発用 kdebug はレスキュー兼インストーラの FD には不要で、T3 の増分で空きが下限 64KB を割ったため載せない。FD インストール後の実機には `hsync boot` で入れる。
 6. NP21/W の受入: `run-os32` の配備で `system.cfg` に `KDEBUG=1`。受入の prereq は「`kdebug_state == 1` かつ `kdebug_pair_crc == Image CRC`」。
 
 ---

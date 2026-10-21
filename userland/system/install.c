@@ -19,10 +19,10 @@
 /*    /sys/boot_hdd.bin, /sys/loader_h.bin → HDDブートセクタ                */
 /*    /VMKRNL.LZ4 → /hd0/boot/vmkernel.lz4                                  */
 /*    /sys/, /bin/, /sbin/, /etc/ → /hd0/ 配下にディレクトリごとコピー       */
-/*  2026-09-24: FD の中身は CD の BOOT + MINIMAL と同じ集合。FAT の 8.3 に    */
+/*  2026-09-24: FD は BOOT + MINIMAL から fd.exclude を除いた集合。FAT の 8.3 に    */
 /*    合わせて名前を変えた物 (build/packages.yaml の fd.rename) は正規名へ    */
 /*    戻して写し、ブート領域へ書く物と FD だけの物 (fd.only) は写さない      */
-/*    (fd_renames / fd_only。FD → install → HDD の集合 = MINIMAL)            */
+/*    (fd_renames / fd_only。FD → install → HDD の集合 = MINIMAL - fd.exclude)            */
 /*  v5.0 (票 TASK_HDD_INSTALL 段 2): hd0 の扱いを CD の cdinst と共通の      */
 /*    inst_hdd.c / inst_disk.c に移した — 区画表は PC-98 標準配置、IPL の     */
 /*    [8]/[9] と区画の CHS は BIOS 幾何、区画は LBA 1632 以上の最初の BIOS    */
@@ -262,7 +262,7 @@ static int confirm_install(void) {
 /* ======== ディレクトリ再帰コピー ======== */
 
 /* ======== FD の名前 → HDD の正規名 (build/packages.yaml の fd: の逆) ========
- * FD の中身は CD の BOOT + MINIMAL と同じ集合で、FAT (LFN なし) に置けない名前と
+ * FD は BOOT + MINIMAL から fd.exclude を除いた集合で、FAT (LFN なし) に置けない名前と
  * 置き場所の違うものだけ fd.rename で名前を変えてある。install はそれを**逆に**
  * 当てて正規名で写す — そのまま写すと HDD に /etc/filetype が残り、HDD
  * 起動では filetypes が失われる (実装レビュー往復 2。既定フォントも同じ扱い

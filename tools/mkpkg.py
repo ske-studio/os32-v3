@@ -10,7 +10,7 @@
 #        振り分けの検査だけ (ファイルは読まない)
 #    python3 tools/mkpkg.py --plan build/packages.yaml --fd-args \
 #        --fd-loader boot/loader_fat_new.bin
-#        起動 FD の中身 (= BOOT + MINIMAL、packages.yaml の fd:) を
+#        起動 FD の中身 (= BOOT + MINIMAL - fd.exclude、packages.yaml の fd:) を
 #        mkfat12 --tree の引数で出す (build/image.mk)
 #    python3 tools/mkpkg.py --list packages/NORMAL.PKG
 #        PKG の中身の一覧
@@ -539,12 +539,12 @@ def expand_plan(plan, base_dir, manifest=None):
 
 
 # ======================================================================== #
-#  起動 FD (build/image.mk) — 中身は CD の BOOT + MINIMAL と同じ集合
+#  起動 FD (build/image.mk) — 中身は CD の BOOT + MINIMAL から fd.exclude を除いた集合
 # ======================================================================== #
 # FD の中身を手で並べると CD の MINIMAL とずれる (2026-09-24 まで image.mk の
 # FDD_MIN_CMDS が別の一覧だった)。packages.yaml の fd: が「どのパッケージを
 # 載せるか (from)」「FAT に置けないので名前を変える物 (rename)」「FD だけの
-# 起動用の物 (only)」を決め、それ以外は足しも引きもしない。
+# 起動用の物 (only)」「FD から除く物 (exclude)」を決め、それ以外は足しも引きもしない。
 
 FD_LOADER_TOKEN = '{loader}'
 # FatFs (FF_USE_LFN 0、CP437) の短い名前に使える文字 (英小文字は大文字に畳む)
@@ -578,6 +578,16 @@ def fd_plan(plan, base_dir, loader=None, manifest=None):
     problems += probs
     by_name = {n: f for n, _, f in pkgs}
 
+    exclude = set()
+    for e in fd.get('exclude') or []:
+        g = e['guest']
+        if not (e.get('reason') or '').strip():
+            problems.append(f"fd.exclude {g!r} に理由 (reason:) が無い")
+        if g in exclude:
+            problems.append(f"fd.exclude {g!r} が 2 回")
+        exclude.add(g)
+    excluded = set()
+
     rename = {}
     for r in fd.get('rename') or []:
         if not (r.get('reason') or '').strip():
@@ -603,10 +613,15 @@ def fd_plan(plan, base_dir, loader=None, manifest=None):
             problems.append(f"fd.from {name!r} が packages: に無い")
             continue
         for g, h in by_name[name]:
+            if g in exclude:
+                excluded.add(g)
+                continue
             if g in rename:
                 used.add(g)
                 g = rename[g]
             out.append((g, h))
+    for g in exclude - excluded:
+        problems.append(f"fd.exclude {g!r} が fd.from のどれにも無い (古い exclude)")
     for g in rename:
         if g not in used:
             problems.append(f"fd.rename {g!r} が fd.from のどれにも無い (古い rename)")

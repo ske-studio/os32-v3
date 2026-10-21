@@ -20,7 +20,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
   6. cdinst.c のベース名が構成の名前と一致し、展開の順が MINIMAL → GUI →
      NORMAL → DEBUG で、pkg.h の上限が mkpkg と一致するか
   7. 起動 FD: build/image.mk が一覧を手で持たず、FD の中身が BOOT + MINIMAL
-     (+ fd.only) と**等しい**か。構成 (fd_plan) と、実物のイメージ
+     (- fd.exclude + fd.only) と**等しい**か。構成 (fd_plan) と、実物のイメージ
      (images/os32_boot.img = 2HD の D88 のもと、images/os32_boot144.img) を
      FAT12 として読み戻してバイト列で見る。否定側 (8.3 違反・理由なし・古い
      rename) も。空きを表示し、**FD_2HD_MIN_FREE_KB を切ったら落ちる** (否定側:
@@ -30,7 +30,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
   9. FD → install → HDD: install.c の逆変換表 (fd_renames / fd_only) が
      packages.yaml の fd.rename / fd.only と一致し、実物の install.c を
      ホストで回すと (tools/tests/install_fresh_host.c の段 fdset) HDD に
-     出来るファイルの集合と大きさが MINIMAL と等しい。否定側: 逆変換を
+     出来るファイルの集合と大きさが MINIMAL - fd.exclude と等しい。否定側: 逆変換を
      当てない変異で不一致になる
 
 先に make all を通してから実行すること (4 と 5 は成果物を読む)。
@@ -485,7 +485,7 @@ def fat12_files(path):
 
 
 def case_fd(plan, resolved):
-    print("case 7: 起動 FD = BOOT + MINIMAL (+ fd.only)")
+    print("case 7: 起動 FD = BOOT + MINIMAL (- fd.exclude + fd.only)")
     mk = open(IMAGE_MK, encoding='utf-8').read()
     check(not re.search(r'^FDD_MIN_CMDS\s*[:?]?=', mk, re.M) and '--fd-args' in mk
           and '/bin/$$cmd.bin' not in mk,
@@ -493,11 +493,12 @@ def case_fd(plan, resolved):
     fd = plan.get('fd') or {}
     rename = {r['guest']: r['fd'] for r in fd.get('rename') or []}
     only = {o['fd'] for o in fd.get('only') or []}
+    exclude = {e['guest'] for e in fd.get('exclude') or []}
     check(fd.get('from') == ['boot', 'minimal'], f"FD の元は BOOT + MINIMAL ({fd.get('from')})")
 
-    # 構成: FD の中身 (rename を戻し、only を除いた集合) = BOOT + MINIMAL
+    # 構成: FD の中身 (rename を戻し、only を除いた集合) = BOOT + MINIMAL - fd.exclude
     src = {g: os.path.join(ROOT, h) for n, _, _, fs in resolved
-           if n == 'boot' or n.startswith('minimal') for g, h in fs}
+           if n == 'boot' or n.startswith('minimal') for g, h in fs if g not in exclude}
     plans = {}
     for label, _, loader in FD_IMAGES:
         files, probs = mkpkg.fd_plan(plan, ROOT, loader)
@@ -507,7 +508,7 @@ def case_fd(plan, resolved):
         back = {v: k for k, v in rename.items()}
         core = {back.get(g, g) for g, _ in files if g not in only}
         check(core == set(src),
-              f"FD {label}: 中身 = BOOT + MINIMAL (FD にだけ {sorted(core - set(src))}、"
+              f"FD {label}: 中身 = BOOT + MINIMAL - fd.exclude (FD にだけ {sorted(core - set(src))}、"
               f"MINIMAL にだけ {sorted(set(src) - core)})")
         check(sorted(g for g, _ in files if g in only) == sorted(only),
               f"FD {label}: FD だけの物は fd.only の {sorted(only)} だけ")
@@ -546,6 +547,19 @@ def case_fd(plan, resolved):
         {'fd': '/SYS/SHELL.BIN', 'host': 'x', 'reason': 'x'}]}
     _, p = mkpkg.fd_plan(fp, ROOT, None, fake_manifest(base))
     check(any('2 回' in x for x in p), "否定: FD のパスの重複 (大文字小文字を畳む) を報告する")
+
+    for entries, diagnostic in (
+        ([{'guest': '/sys/shell.bin'}], '理由'),
+        ([{'guest': '/nope', 'reason': 'x'}], '古い exclude'),
+        ([{'guest': '/sys/shell.bin', 'reason': 'x'}] * 2, '2 回'),
+    ):
+        fp['fd'] = {'from': ['boot', 'minimal'], 'exclude': entries}
+        _, p = mkpkg.fd_plan(fp, ROOT, None, fake_manifest(base))
+        check(any(diagnostic in x for x in p), f"否定: fd.exclude の {diagnostic} を報告する")
+    fp['fd'] = {'from': ['minimal'], 'exclude': [
+        {'guest': '/sys/shell.bin', 'reason': 'FD には不要'}]}
+    files, p = mkpkg.fd_plan(fp, ROOT, None, fake_manifest(base))
+    check(not p and not files, "fd.exclude は指定したファイルを FD から除く")
 
     # 実物のイメージ
     for label, img, _ in FD_IMAGES:
@@ -762,7 +776,7 @@ def run_install_fdset(install_src, fd_files):
 
 
 def case_install(plan, resolved):
-    print("case 9: FD → install → HDD = MINIMAL")
+    print("case 9: FD → install → HDD = MINIMAL - fd.exclude")
     fd = plan.get('fd') or {}
     src = open(INSTALL_C, encoding='utf-8').read()
     ren, only = install_table(src)
@@ -778,8 +792,10 @@ def case_install(plan, resolved):
         check(False, "FD の構成と成果物が揃っている (先に make all)")
         return
     fd_files = [(g, os.path.getsize(os.path.join(ROOT, h))) for g, h in files]
+    exclude = {e['guest'] for e in fd.get('exclude') or []}
+    check(exclude == {'/boot/kdebug.bin'}, f"fd.exclude は kdebug.bin だけ (ユーザー決定 2026-10-21) {sorted(exclude)}")
     minimal = {g: os.path.getsize(h) for n, _, _, fs in resolved
-               if n.startswith('minimal') for g, h in fs}
+               if n.startswith('minimal') for g, h in fs if g not in exclude}
     got = run_install_fdset(src, fd_files)
     check(got is not None, "実物の install.c が段 fdset で通る")
     if got is None:
@@ -792,14 +808,14 @@ def case_install(plan, resolved):
     for g in extra[:10]:
         print(f"       extra   {g}")
     check(not miss and not extra and not size,
-          f"HDD の集合 = MINIMAL ({len(got)} 件、欠け {len(miss)}、余分 {len(extra)}、"
+          f"HDD の集合 = MINIMAL - fd.exclude ({len(got)} 件、欠け {len(miss)}、余分 {len(extra)}、"
           f"大きさ違い {len(size)})")
     # 否定側: 逆変換を当てない (8.3 名のまま写す) と不一致
     mark = '        if (!str_eq_lower(src_path, fd_renames[i].fd)) continue;'
     check(src.count(mark) == 1, "変異の目印がちょうど 1 か所")
     bad = run_install_fdset(src.replace(mark, '        continue;'), fd_files)
     check(bad is not None and set(bad) != set(minimal),
-          "否定: fd.rename を逆に当てない install は MINIMAL と違う集合になる")
+          "否定: fd.rename を逆に当てない install は MINIMAL - fd.exclude と違う集合になる")
 
 
 def main():
