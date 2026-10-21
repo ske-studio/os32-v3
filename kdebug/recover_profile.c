@@ -13,7 +13,6 @@
 #include "generated/kdebug_import_macros.h"
 #endif
 
-#define RECOVER_PAGE_MASK (MEM_PAGE_SIZE - 1U)
 #define RECOVER_UART_US 1000000U
 #define RECOVER_WAIT_SAMPLES 1048576U
 #define RECOVER_BUDGET_LOG_S0 4096U
@@ -22,74 +21,6 @@
 #define RECOVER_BUDGET_STEPS 4096U
 #define RECOVER_BUDGET_POLLS 65536U
 #define RECOVER_BUDGET_S0_POLLS 16384U
-
-static u32 window_hal_irq_save(void *opaque) { (void)opaque; return irq_save(); }
-static void window_hal_irq_restore(void *opaque,u32 flags) { (void)opaque; irq_restore(flags); }
-static u32 window_hal_pte(void *opaque,u32 va) { (void)opaque; return paging_pte_raw(va); }
-static int window_hal_map(void *opaque,u32 va,u32 pa)
-{
-    (void)opaque;
-    return paging_map_phys(va,pa,1,PTE_PRESENT|PTE_RW|PTE_PCD);
-}
-static int window_hal_unmap(void *opaque,u32 va,u32 raw)
-{ (void)opaque; return paging_pte_restore(va,raw); }
-static int window_hal_load(void *opaque,u32 va,u32 width,u32 *value)
-{
-    (void)opaque;
-    if (width==1) *value=*(volatile u8 *)(uptr)va;
-    else if (width==2) *value=*(volatile u16 *)(uptr)va;
-    else *value=*(volatile u32 *)(uptr)va;
-    return 0;
-}
-static int window_hal_store(void *opaque,u32 va,u32 width,u32 value)
-{
-    (void)opaque;
-    if (width==1) *(volatile u8 *)(uptr)va=(u8)value;
-    else if (width==2) *(volatile u16 *)(uptr)va=(u16)value;
-    else *(volatile u32 *)(uptr)va=value;
-    return 0;
-}
-static const struct recover_window_ops window_hal_ops={
-    window_hal_irq_save,window_hal_irq_restore,window_hal_pte,window_hal_map,
-    window_hal_unmap,window_hal_load,window_hal_store
-};
-void recover_window_hal_init(struct recover_window *w)
-{
-    *w=(struct recover_window){.ops=&window_hal_ops,.va=MEM_DEVICE_APERTURE_BASE};
-}
-
-int recover_window_cleanup(struct recover_window *w)
-{
-    if (!w || !w->ops) return -1;
-    if (!w->owned) return w->failed ? -1 : 0;
-    /* A failed map may already have changed the PTE: always restore it. */
-    int rc = w->ops->unmap(w->opaque, w->va, w->raw);
-    w->ops->irq_restore(w->opaque, w->flags);
-    w->owned = false;
-    if (rc) w->failed = true;
-    return w->failed ? -1 : 0;
-}
-
-int recover_window_access(struct recover_window *w, u32 pa, u32 width,
-                          bool write, u32 *value)
-{
-    if (!w || !value || !w->ops || w->owned || w->failed ||
-        !w->ops->irq_save || !w->ops->irq_restore || !w->ops->pte_read ||
-        !w->ops->map || !w->ops->unmap || !w->ops->load || !w->ops->store ||
-        (w->va & RECOVER_PAGE_MASK) ||
-        (width != 1 && width != 2 && width != 4) || pa % width) return -1;
-    w->flags = w->ops->irq_save(w->opaque);
-    w->raw = w->ops->pte_read(w->opaque, w->va);
-    w->owned = true;
-    int rc = w->ops->map(w->opaque, w->va, pa & ~RECOVER_PAGE_MASK);
-    if (!rc) {
-        u32 addr = w->va + (pa & RECOVER_PAGE_MASK);
-        rc = write ? w->ops->store(w->opaque, addr, width, *value) :
-                     w->ops->load(w->opaque, addr, width, value);
-    }
-    if (rc) w->failed = true;
-    return recover_window_cleanup(w);
-}
 
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {

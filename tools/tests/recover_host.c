@@ -1,5 +1,7 @@
 /* Real T1 core, fake bus/clock/serial. ILP32, no libc, host32 qemu runner. */
 #include "../../kdebug/recover.c"
+#define KDEBUG_WINDOW_HOST 1
+#include "../../kdebug/kdebug_window.c"
 #include "../../kdebug/recover_profile.c"
 
 #define NREG 16U

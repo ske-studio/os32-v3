@@ -104,7 +104,7 @@ def main():
         objects = []
         for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c',
                     ROOT / 'kdebug/nic_trace.c', ROOT / 'kdebug/v86_gcap.c',
-                    ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c',
+                    ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c', ROOT / 'kdebug/kdebug_window.c', ROOT / 'kdebug/gfinit_bus.c',
                     ROOT / 'kdebug/kpeek_allow.c', ROOT / 'kdebug/recover.c',
                     ROOT / 'kdebug/recover_profile.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):

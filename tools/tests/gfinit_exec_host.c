@@ -45,9 +45,8 @@ static int exec_delay(void *v,u32 us)
 static const struct gfinit_exec_ops executor_ops={exec_clock,exec_delay};
 static struct recover_ops executor_bus;
 /* Deliberately synthetic permissions: exact decoded operand expressions, no
- * hardware permission claim. Missing COPY/capture rows exist only in this
- * test. PLL rows use their expanded expressions; production PLL
- * authorization is tested separately. */
+ * hardware permission claim. The separate S5 bus test executes the production
+ * COPY/capture/PLL permissions as well as this synthetic control coverage. */
 static void synthetic_profile(void)
 {
     profile=recover_gf_template;profile.regs=0;profile.count=0;

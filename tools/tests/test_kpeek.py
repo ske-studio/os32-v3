@@ -58,10 +58,8 @@ MUTATIONS = [
     # (名前, 対象, 元, 変異後)
     ("chunk_ge", KPEEK,
      "req->len > KDEBUG_PEEK_CHUNK", "req->len >= KDEBUG_PEEK_CHUNK"),
-    ("no_restore", KPEEK,
-     "        if (paging_pte_restore(va0 + i * PAGE_SIZE, raw[i]) != 0)\n"
-     "            st = KDEBUG_PEEK_WINDOW;\n",
-     "        (void)raw[i];\n"),
+    ("no_restore", "kdebug/kdebug_window.c",
+     "w->ops->unmap(w->opaque, w->va + i * MEM_PAGE_SIZE, w->raw[i])", "0"),
     ("width_mask_flip", ALLOW,
      "if (!(r->width_mask & width)) continue;",
      "if (r->width_mask & width) continue;"),
@@ -78,9 +76,8 @@ MUTATIONS = [
     ("no_legacy_deny", KPEEK,
      "        else if (page >= KPEEK_RAM_DENY_LO && page < KPEEK_RAM_DENY_HI)\n"
      "            st = KDEBUG_PEEK_DENY;\n", ""),
-    ("win_rw", KPEEK,
-     "#define KPEEK_WIN_FLAGS   (PTE_PRESENT | PTE_PCD)",
-     "#define KPEEK_WIN_FLAGS   (PTE_PRESENT | PTE_RW | PTE_PCD)"),
+    ("win_rw", "kdebug/kdebug_window.c",
+     "(write ? PTE_RW : 0)", "(write ? PTE_RW : PTE_RW)"),
     ("no_io_bar", ALLOW,
      "    if (bar & KPEEK_BAR_IO_BIT) return 0;\n", ""),
     # T5 (LAN の出口)
@@ -140,7 +137,7 @@ def main():
             print("TARGET i386-elf-gcc が無い = FAIL (CROSS_DIR を渡す)")
             failed += 1
         else:
-            for src in (KPEEK, ALLOW):
+            for src in (KPEEK, ALLOW, "kdebug/kdebug_window.c"):
                 subprocess.run([gcc, *FLAGS, "-m32", "-march=i386",
                                 "-ffreestanding", "-fno-pie",
                                 "-fno-stack-protector", "-O2",

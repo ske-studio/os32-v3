@@ -115,12 +115,11 @@ static void inventory_test(void)
             continue;
         }
         if(c->kind!=REC_GF_RULE) {
-            CHECK(c->rule==RECOVER_NONE);
-            for(u32 j=0;j<recover_gf_template.rule_count;j++)
-                CHECK(rules[j].phase!=REC_RUN || rules[j].substep!=i);
-            CHECK((c->kind==REC_GF_PLL && e->expression==GF_PLL) ||
-                (c->kind==REC_GF_COPY && e->expression==GF_COPY) ||
-                (c->kind==REC_GF_TEMP_SAVED && e->expression==GF_RESTORE));
+            const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
+            CHECK(w && w->phase==REC_RUN && w->pc==e->pc && w->substep==i);
+            CHECK(w && w->value.mode==REC_EXPR &&
+                (c->kind==REC_GF_COPY ? (w->value.expr_id==REC_GF_EXPR_COPY || w->value.expr_id==REC_GF_EXPR_COPY_NV) :
+                 w->value.expr_id==REC_GF_SAVED_BAR));
             continue;
         }
         const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);

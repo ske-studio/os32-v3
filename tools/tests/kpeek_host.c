@@ -86,7 +86,7 @@ int paging_is_present(u32 va) { return pg_on ? (pt_get(va) & PTE_PRESENT) != 0 :
 u32 paging_pte_flags(u32 va) { return pg_on ? (pt_get(va) & 0xFFFU) : 0; }
 u32 paging_pte_raw(u32 va) { note('r'); return pt_get(va); }
 
-static int map_fail;
+static int map_fail, restore_fail;
 static u32 map_flags, map_calls, restore_calls;
 int paging_map_phys(u32 va, u32 pa, u32 n, u32 flags)
 {
@@ -98,7 +98,7 @@ int paging_map_phys(u32 va, u32 pa, u32 n, u32 flags)
     for (i = 0; i < n; i++) pt_set(va + i * PAGE_SIZE, (pa + i * PAGE_SIZE) | flags);
     return 0;
 }
-int paging_pte_restore(u32 va, u32 raw) { note('R'); restore_calls++; pt_set(va, raw); return 0; }
+int paging_pte_restore(u32 va, u32 raw) { note('R'); restore_calls++; pt_set(va, raw); return restore_fail ? -1 : 0; }
 
 static int irq_depth;
 static unsigned int irq_save(void) { note('S'); irq_depth++; return 0x5A5AU; }
@@ -181,6 +181,8 @@ int sfs_lan_peer_mac(u8 *out)
 }
 
 #include "../../kdebug/kpeek_allow.c"
+#define KDEBUG_WINDOW_HOST 1
+#include "../../kdebug/kdebug_window.c"
 #include "../../kdebug/kpeek.c"
 
 /* ---- 道具 ---------------------------------------------------------- */
@@ -189,9 +191,10 @@ static KdebugPeek rq;
 
 static void reset(void)
 {
+    window_busy = window_failed = false;
     memset(pt, 0, sizeof(pt)); npt = 0; pg_on = 1;
     nev = 0; ev[0] = 0;
-    map_fail = 0; map_flags = 0; map_calls = 0; restore_calls = 0;
+    map_fail = restore_fail = 0; map_flags = 0; map_calls = 0; restore_calls = 0;
     irq_depth = 0; load_calls = 0; load_phys = 0; load_pte = 0;
     nsent = 0; send_calls = 0; tick_step = 0; send_rc = 0; send_rc_times = 0;
     lan_state = E82557_RUNNING; peer_ok = 0; peer_calls = 0;
@@ -414,6 +417,17 @@ static void t_window(void)
     CHECK(streq(ev, "SrMRU") && irq_depth == 0 && load_calls == 0);
     CHECK(rq.fail_addr == NV_BAR0 && data_untouched());
     CHECK(pt_get(win) == (0xFE000000U | PTE_PRESENT | PTE_RW | PTE_PCD));
+    /* GF/T2 holds the same aperture; peek cannot alter its PTEs. */
+    reset();
+    struct recover_window held;
+    recover_window_hal_init(&held);
+    CHECK(kdebug_window_begin(&held, NV_BAR0, 4, true) == 0);
+    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_WINDOW && map_calls == 1);
+    CHECK(recover_window_cleanup(&held) == 0 && irq_depth == 0);
+    reset(); restore_fail = 1;
+    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_WINDOW && irq_depth == 0);
+    restore_fail = 0;
+    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_WINDOW && map_calls == 1);
 }
 
 /* ---- LAN の出口 (T5) ---------------------------------------------- */

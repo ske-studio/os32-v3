@@ -17,6 +17,9 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('pll_write_limit', 'if (q->count < GF_PLL_WRITES_MAX)', 'if (q->count <= GF_PLL_WRITES_MAX)'),
+    ('pll_low_clock', 'min = clk * GF_PLL_P_MAX', 'min = clk << GF_PLL_P_MAX'),
+    ('pll_input_exit', 'if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;', 'if (GF_PLL_REF / m < a->min_input) break;'),
     ('pll_version', 'r[table] != 0x21', 'false'),
     ('pll_ref', 'l->ref == GF_PLL_REF', 'true'),
     ('pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),

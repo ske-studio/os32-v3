@@ -100,7 +100,7 @@ static void decode_inventory(void)
 {
     fixture(); CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)==0);
     CHECK(decoded.instruction_count==193 && decoded.plan.node_count==972);
-    CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==5);
+    CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==0);
     CHECK(recover_profile_ok(&recover_gf_template)==0);
     for(u32 i=0;i<decoded.plan.node_count;i++) {
         const struct recover_plan_node *n=&decoded.nodes[i];

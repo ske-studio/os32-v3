@@ -3,8 +3,8 @@ struct window_fake { u32 pte, irq, maps, unmaps, loads, stores, fail, addr; };
 static u32 win_irq_save(void *v) { struct window_fake *w=v; u32 old=w->irq; w->irq=0; return old; }
 static void win_irq_restore(void *v,u32 flags) { ((struct window_fake *)v)->irq=flags; }
 static u32 win_pte(void *v,u32 va) { (void)va; return ((struct window_fake *)v)->pte; }
-static int win_map(void *v,u32 va,u32 pa)
-{ struct window_fake *w=v; (void)va; w->maps++; w->pte=pa|3; return w->fail==1; }
+static int win_map(void *v,u32 va,u32 pa,u32 pages,u32 flags)
+{ struct window_fake *w=v; (void)va; (void)pages; (void)flags; w->maps++; w->pte=pa|3; return w->fail==1; }
 static int win_unmap(void *v,u32 va,u32 raw)
 { struct window_fake *w=v; (void)va; w->unmaps++; w->pte=raw; return w->fail==2; }
 static int win_load(void *v,u32 va,u32 width,u32 *value)
@@ -32,11 +32,12 @@ static void windows(void)
     u32 datum=4;
     CHECK(!recover_window_access(&hw,0x10000ffc,4,false,&datum));
     CHECK(hal_va==MEM_DEVICE_APERTURE_BASE && hal_pa==0x10000000 && hal_pages==1);
-    CHECK(hal_flags==(PTE_PRESENT|PTE_RW|PTE_PCD) && !(hal_flags&PTE_USER));
+    CHECK(hal_flags==(PTE_PRESENT|PTE_PCD) && !(hal_flags&PTE_USER));
     CHECK(hal_pte==0x765430a5 && hal_restores==1 && recover_test_irq_save()==1);
     recover_test_irq_restore(1);
     for (u32 irq=0;irq<2;irq++) for (u32 fault=0;fault<5;fault++)
     for (u32 write=0;write<2;write++) for (u32 width=1;width<=4;width*=2) {
+        window_failed=false;
         struct window_fake wf={.irq=irq,.pte=0x123456a5,.fail=fault};
         struct recover_window w={.ops=&win_ops,.opaque=&wf,.va=MEM_DEVICE_APERTURE_BASE};
         u32 value=width;
@@ -49,6 +50,7 @@ static void windows(void)
         CHECK(recover_window_cleanup(&w)==rc && wf.unmaps==1);
         if (!bad) CHECK(wf.addr==MEM_DEVICE_APERTURE_BASE+0xffc);
     }
+    window_failed=false;
 }
 struct text_fake { u32 cell, saved, calls, fail_at, corrupt_at, writes, redraws; bool gui; };
 static int text_hit(struct text_fake *t) { return ++t->calls==t->fail_at; }
