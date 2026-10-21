@@ -1006,11 +1006,11 @@ kzalloc:
 pegc_restore_text_sync:
     jmp *kdebug_import_slots+800
 .size pegc_restore_text_sync, .-pegc_restore_text_sync
-.globl v86_cui_display_restore
-.type v86_cui_display_restore, @function
-v86_cui_display_restore:
+.globl display_text_start
+.type display_text_start, @function
+display_text_start:
     jmp *kdebug_import_slots+804
-.size v86_cui_display_restore, .-v86_cui_display_restore
+.size display_text_start, .-display_text_start
 .globl v86_gui_refuse
 .type v86_gui_refuse, @function
 v86_gui_refuse:

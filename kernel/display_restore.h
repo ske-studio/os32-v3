@@ -7,6 +7,8 @@
 /* Last character word, outside both the 25- and 30-row console grids.
  * The console never uses it; recover alone leases it for the round trip. */
 #define DISPLAY_RECOVER_CELL (TVRAM_ATTR_BASE - sizeof(u16))
+/* Display start only: preserves ROM/fallback PRAM and mode settings. */
+void display_text_start(void);
 void display_restore_98(void);
 int display_recover_ready(void);
 int display_recover_cell_read(u32 *value);

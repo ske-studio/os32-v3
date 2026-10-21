@@ -23,6 +23,8 @@ struct fake {
     bool ready, raw_fail, decode_fail, screen_fail, abort, route_fail;
     bool route_read_fail, route_stuck, log_fail, snapshot_early;
     bool owned, screen_done, abort_selected, break_guard, restore_index, command_bus;
+    bool uart_event;
+    u32 event_bytes[REC_FAILED + 1], config_ticks, config_polls, config_target, config_tail_calls;
     u32 releases, local_calls, selected_value, last_offset, last_dir, extra_bars[2];
     struct recover *core;
 };
@@ -53,6 +55,10 @@ static int ready(void *v) { struct fake *f = v; f->screen_done = false; return !
 static int config(void *v, u32 *command, u32 bar[3])
 {
     struct fake *f = v; f->config_reads++; note(f, 'c', 0, 0);
+    if (f->core->state == REC_RESTORING && f->core->measuring && !f->core->in_s0) {
+        if (++f->config_tail_calls == f->config_target) f->tick += f->config_ticks;
+        f->config_polls = f->core->restore_polls;
+    }
     *command = f->command; bar[0] = f->bar; bar[1] = f->extra_bars[0]; bar[2] = f->extra_bars[1]; return bus_fault(f) || f->raw_fail;
 }
 static int read_bus(void *v, const struct recover_bus_access *a, u32 *out)
@@ -112,11 +118,12 @@ static int abort_requested(void *v, u32 session)
     if (++f->abort_calls == f->delay_abort_call) f->tick += f->tick_abort;
     return f->abort;
 }
+static int event_uart(struct fake *f, enum recover_state state);
 static int event(void *v, enum recover_state state, u32 session)
 {
     struct fake *f = v; (void)session; note(f, 's', state, 0);
     if (state == REC_PAUSED) f->tick += f->tick_pause;
-    return f->log_fail;
+    return f->log_fail || (f->uart_event && event_uart(f, state));
 }
 static int local_cleanup(void *v)
 {

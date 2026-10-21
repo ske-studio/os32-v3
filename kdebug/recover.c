@@ -4,7 +4,7 @@
 static int cleanup(struct recover *r);
 static int check_deadline(struct recover *r);
 static bool restore_time(struct recover *r);
-static int safe_point(struct recover *r, bool count_poll);
+static int call_point(struct recover *r, bool count_poll);
 static bool bit_get(const u32 *bits, u32 n);
 static void bit_set(u32 *bits, u32 n);
 static void release_plan(struct recover *r);
@@ -484,7 +484,7 @@ int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
         if (r->state == REC_RESTORING) {
             if (recover_restore_point(r)) return -1;
         } else {
-            if (safe_point(r, false)) return -1;
+            if (call_point(r, false)) return -1;
         }
         r->uart_polls++;
         int ready = ops->ready(opaque);
@@ -639,13 +639,16 @@ static int cleanup(struct recover *r)
     if (r->zero_hold && !zero_guards(r)) fail(r, REC_VERIFY, REC_PHASE_VERIFY, 0);
     if (r->measuring) {
         u32 command = 0, bars[3] = {0};
-        bool complete = !r->failed && !r->ops->raw_config(r->opaque, &command, bars) &&
+        bool complete = !r->failed && !recover_restore_point(r) &&
+            !r->ops->raw_config(r->opaque, &command, bars) && restore_time(r) &&
             command == RECOVER_COMMAND_OVERRIDE;
         for (u32 i = 0; i < 3; i++)
             if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
         if (complete) r->cache = r->measurement;
         else r->cache = (struct recover_bar_measurement){0};
     }
+    /* Finish the first allocation before releasing the reserved S0 budget. */
+    restore_time(r);
     r->in_s0 = true;
     screen(r);
     r->s1_verified = !r->failed && !r->cold_latched && r->valid && !r->command_override;
@@ -784,9 +787,11 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     return pause_call(r);
 }
 
-static int safe_point(struct recover *r, bool count_poll)
+static int call_point(struct recover *r, bool count_poll)
 {
-    if (!r->in_call || r->state != REC_RUNNING) return -1;
+    /* Events run inside the call while snapshotting, arming and pausing too. */
+    if (!r->in_call || (r->state != REC_SNAPSHOTTING && r->state != REC_ARMED &&
+        r->state != REC_RUNNING && r->state != REC_PAUSED)) return -1;
     if (check_deadline(r)) return -1;
     if (count_poll && r->in_opcode && ++r->polls > r->profile->max_polls) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
@@ -802,7 +807,8 @@ static int safe_point(struct recover *r, bool count_poll)
 
 int recover_safe_point(struct recover *r)
 {
-    return safe_point(r, true);
+    if (r->state != REC_RUNNING) return -1;
+    return call_point(r, true);
 }
 
 int trial_step(struct recover *r, const struct recover_token *t, bool approved,

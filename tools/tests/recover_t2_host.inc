@@ -130,6 +130,31 @@ static int uart_ready(void *v) { struct uart_fake *u=v; u->calls++; return u->er
 static int uart_put(void *v,u32 byte) { struct uart_fake *u=v; CHECK(byte==65); u->puts++; return 0; }
 static int uart_wait(void *v,u32 us) { struct uart_fake *u=v; u->waits++; u->frame=us; f.tick+=us; return 0; }
 static const struct recover_uart_ops uart_ops={uart_ready,uart_put,uart_wait};
+static int event_uart(struct fake *f, enum recover_state state)
+{
+    struct uart_fake u={0};
+    int rc=recover_uart_byte(f->core,&uart_ops,&u,65,1,1024);
+    f->event_bytes[state]+=u.puts;
+    return rc;
+}
+static void uart_events(void)
+{
+    setup(false); profile.restore_log_bytes=16; profile.crc=recover_profile_crc(&profile);
+    f.uart_event=true; begin();
+    CHECK(r.state==REC_PAUSED && !r.failed);
+    CHECK(f.event_bytes[REC_SNAPSHOTTING]==1 && f.event_bytes[REC_ARMED]==1 &&
+          f.event_bytes[REC_RUNNING]==1 && f.event_bytes[REC_PAUSED]==1);
+    CHECK(r.spent==4 && r.uart_polls==4 && !r.in_call);
+    CHECK(recover_safe_point(&r)<0);
+    CHECK(!trial_end(&r,&r.token,REC_NORMAL));
+    CHECK(f.event_bytes[REC_RESTORING]==1 && f.event_bytes[REC_VERIFIED]==1);
+    /* Each call-state event must also charge its transmission time. */
+    for(u32 s=REC_SNAPSHOTTING;s<=REC_PAUSED;s++) {
+        setup(false); begin(); r.state=s; r.in_call=true; r.in_opcode=false;
+        r.spent=r.budget-1; r.call_tick=f.tick;
+        CHECK(event_uart(&f,s)<0 && r.failed && r.reason==REC_TIMEOUT);
+    }
+}
 static void budgets(void)
 {
     static const u32 bytes[]={4096,8192,16384}, sec[]={10,18,33}, polls[]={16384,32768,65536};
@@ -243,6 +268,38 @@ static void a1_failed_config(void)
         CHECK(!count('w',GF_OUT) && !count('w',GF_LEGACY) && !count('w',GF_IRQ));
     }
 }
+static void size_tail_setup(u32 max_polls)
+{
+    setup(false); CHECK(!recover_gf_profile(&profile,false,REC_BUDGET_SIZE_BARS,100));
+    profile.restore_limit=33; profile.s0_reserve_ticks=10;
+    profile.s0_reserve_polls=0; profile.restore_max_polls=max_polls;
+    profile.layouts=layouts; profile.layout_count=1; profile.crc=recover_profile_crc(&profile);
+    f.command_bus=true; f.command=0x0106; f.id.bdf=RECOVER_GF_BDF; f.id.device=RECOVER_GF_DEVICE;
+    nodes[0].phase=REC_SIZE_BARS; entries[0].phase=REC_SIZE_BARS;
+    CHECK(!bound_begin(&r,&profile,0,100));
+    for(u32 i=0;i<3;i++) r.measurement.bar[i]=(struct recover_bar_extent){
+        .raw=i ? 0:f.bar,.base=i ? 0:f.bar,.length=0x1000000U,.valid=1};
+    f.command=RECOVER_COMMAND_OVERRIDE;
+}
+static void size_tail_deadline(void)
+{
+    size_tail_setup(65536);
+    CHECK(!trial_end(&r,&r.token,REC_NORMAL));
+    u32 calls=f.config_tail_calls, polls=f.config_polls;
+    /* This fixed GF fixture uses 29 polls before the final raw callback. */
+    CHECK(polls==30);
+    for(u32 delta=0;delta<3;delta++) {
+        size_tail_setup(65536);
+        f.config_target=calls; f.config_ticks=22+delta;
+        int rc=trial_end(&r,&r.token,REC_NORMAL);
+        CHECK(f.config_tail_calls==calls && f.config_polls==polls && r.s0_verified);
+        if(!delta) CHECK(!rc && r.state==REC_VERIFIED && r.cache.bar[0].valid);
+        else CHECK(rc<0 && r.state==REC_FAILED && r.reason==REC_TIMEOUT && !r.cache.bar[0].valid);
+    }
+    /* The tail raw callback consumes exactly one restoration poll. */
+    size_tail_setup(polls);
+    CHECK(trial_end(&r,&r.token,REC_NORMAL)<0 && r.reason==REC_TIMEOUT);
+}
 static void indexed_order(void)
 {
     for(u32 bad=0;bad<2;bad++) {
@@ -286,4 +343,4 @@ static void every_restore_callback(void)
         CHECK(trial_end(&r,&r.token,REC_NORMAL)<0 && f.bus_calls==calls);
     }
 }
-static void t2_tests(void) { windows(); texts(); frame_clock(); budgets(); delays(); gf_profiles(); indexed_order(); every_restore_callback(); a1_failed_config(); }
+static void t2_tests(void) { uart_events(); size_tail_deadline(); windows(); texts(); frame_clock(); budgets(); delays(); gf_profiles(); indexed_order(); every_restore_callback(); a1_failed_config(); }

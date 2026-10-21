@@ -87,6 +87,24 @@ MUTATIONS = [
 
 # Additional T2 mutations; every one must compile and fail at runtime.
 MUTATIONS += [
+    ("t2_uart_running_only", "if (!r->in_call || (r->state != REC_SNAPSHOTTING && r->state != REC_ARMED &&\n        r->state != REC_RUNNING && r->state != REC_PAUSED)) return -1;",
+     "if (!r->in_call || r->state != REC_RUNNING) return -1;"),
+    ("t2_size_tail_no_poll", "!r->failed && !recover_restore_point(r) &&", "!r->failed &&"),
+    ("t2_size_tail_no_deadline", """bars) && restore_time(r) &&
+            command == RECOVER_COMMAND_OVERRIDE;
+        for (u32 i = 0; i < 3; i++)
+            if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
+        if (complete) r->cache = r->measurement;
+        else r->cache = (struct recover_bar_measurement){0};
+    }
+    /* Finish the first allocation before releasing the reserved S0 budget. */
+    restore_time(r);""", """bars) &&
+            command == RECOVER_COMMAND_OVERRIDE;
+        for (u32 i = 0; i < 3; i++)
+            if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
+        if (complete) r->cache = r->measurement;
+        else r->cache = (struct recover_bar_measurement){0};
+    }"""),
     ("t2_s0_reserve_removed", "limit -= r->profile->s0_reserve_ticks;", "/* no reservation */"),
     ("t2_poll_removed", "r->restore_polls++;\n    return 0;", "return 0;"),
     ("t2_delay_truncated", "wait_us(opaque, 1000U)", "wait_us(opaque, 999U)"),

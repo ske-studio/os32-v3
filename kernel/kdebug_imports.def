@@ -1612,8 +1612,8 @@
     {
       "stage": "S3",
       "kind": "FUNC",
-      "symbol": "v86_cui_display_restore",
-      "source": "kernel/v86_io.h",
+      "symbol": "display_text_start",
+      "source": "kernel/display_restore.h",
       "context_safe": false,
       "index": 201
     },

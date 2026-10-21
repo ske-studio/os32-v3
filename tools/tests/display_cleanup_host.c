@@ -111,9 +111,9 @@ int main(int argc, char **argv)
         CHECK(!n && !palette && !cursor && !sound && deny == 1, "capture bypass retained");
     } else {
         gcap_cui_rebuild(&tv);
-        CHECK(n == 21 && restored == 1 && cursor >= 1, "capture rebuild");
+        CHECK(n == 3 && restored == 1 && cursor == 1 && !palette, "capture rebuild");
         for (unsigned int i = 0; i < n; i++)
-            CHECK(ports[i] == want_ports[i] && values[i] == want_values[i], "shared CUI order");
+            CHECK(ports[i] == want_ports[i + 16] && values[i] == want_values[i + 16], "shared CUI order");
     }
     if (mode != 1) CHECK(gfx_current_height == GFX_HEIGHT && !gfx_flip_enabled, "CUI height flip");
     CHECK(waits == n, "I/O wait for every OUT");
