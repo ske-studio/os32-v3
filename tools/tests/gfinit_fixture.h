@@ -12,7 +12,8 @@
  * coefficients and chip branches are S4 work; inventory is a conservative set.
  * Effects enumerate potential operations per static instruction, including
  * index writes; REPEAT is NOT dynamically expanded (MACRO2 runs ten times).
- * This is evidence, NOT a write allowlist. ALL effects have DENY_W.
+ * This is evidence, NOT a write allowlist. ALL effects retain DENY_W.
+ * S1 follow-up rules live in kdebug/recover_gf.c; host inventory maps ordinals.
  * Read safety and verify masks are unclassified; no REC_RW entry is created.
  */
 #ifndef TOOLS_TESTS_GFINIT_FIXTURE_H
@@ -54,8 +55,8 @@ struct gf_script {
 struct gf_effect {
     unsigned int pc, space, head, port, index, reg, width, keep, value, expression, flags;
 };
-/* Candidate mapping only: key needs a shared bus-key encoding first.
- * recover_reg fields cannot encode the right column. Do not change recover.h.
+/* Historical S1 gap inventory (before T1b). Current shared fields and rule
+ * classification are in recover_gf.c and recover_gf_inventory.h.
  */
 struct gf_descriptor_mapping { const char *fixture, *recover, *gap; };
 static const struct gf_descriptor_mapping gf_descriptor_mapping[] = {
