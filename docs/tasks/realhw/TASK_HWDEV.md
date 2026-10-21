@@ -78,3 +78,9 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - M2 の台帳受入は合成像で閉じ、配布リストへの実 HWDEV の追加は M3a/M5 で行う。
 - core の ABI と manifest を同じ生成契約で照合する。KMOD ABI 世代・RO 検査・slot 充填の詳細は CORE_API §8・§9 を正とする。
 - 指定された CORE_API の状態「確定」を使えるよう、状態語彙の正典 POLICY_DEV §8 に設計・契約用の語を追加した。
+
+## 送り項目 (取り込みのレビューの P3)
+- (M3a で) M2: build/kdebug.mk:80・tools/gen_hwdev_contract.py:150 — 生成器は内容が同じなら書き戻さないので、ヘッダを触ると以後の make のたびに生成が走り直す (遅くなるだけ) → 生成の最後に touch するか stamp ファイル。
+- (M3a で) M2: kdebug/gfinit.c:28 と include/hwdev_private.h:8 — 267 が GF_WORK_MAX_PAGES と HWDEV_WORK_MAX_PAGES の 2 か所、`STATIC_ASSERT(GF_WORK_MAX_PAGES == 267U)` は 2 つを結んでいない [C4] → `STATIC_ASSERT(GF_WORK_MAX_PAGES == HWDEV_WORK_MAX_PAGES)`。
+- (M3a で) M1: R5 — contract_crc に DWARF の突き合わせを重ねるのが過剰か決める (CORE_API §8 手順 3)。
+- (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。
