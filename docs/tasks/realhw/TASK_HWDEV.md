@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-22)** — M1 実装済み、独立レビュー待ち (M2 以降は未着手)
+> 状態: **実装中 (2026-10-22)** — M2 実装済み、独立レビュー待ち (M3 以降は未着手)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) と [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -34,10 +34,10 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | 段 | 重さ / 実装 | 合格条件 (要約) | 状態 |
 |---|---|---|---|
 | M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | 実装済み・レビュー待ち |
-| M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 未 |
+| M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 実装済み・レビュー待ち |
 | M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 未 |
 | M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 未 |
-| M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従 | 未 |
+| M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従、hwdev_audit の入力を HWDEV 側へ切替 | 未 |
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | 未 |
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | 未 |
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | 未 |
@@ -70,4 +70,11 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - kernel imports は既存 kdebug の番号順で核の slot の後へ置き、既存 kdebug の import は変えない (CORE_API §3)。
 - G4 の配置 CRC を独立の欄にし、配置 inventory と前処理テキストの生成・正規化・照合を固定する (CORE_API §8)。
 - boot 寿命・同期 callback・DMA なしの manifest の形と初期化時の参照検査を固定し、call の transport は既存宣言と同じ型にする (CORE_API §9)。
-- 上限は §1 の 267 頁とし、旧 251 頁へ収めるための領域削減はせず、頁ごとの丸め上げを STATIC_ASSERT と first-fit・全確保失敗点の試験で固定する (CORE_API §9)。
+- 上限は §1 を参照し、旧 251 頁へ収めるための領域削減はせず、頁ごとの丸め上げを STATIC_ASSERT と first-fit・全確保失敗点の試験で固定する (CORE_API §9)。
+
+## M2 の実装で設計者が決めたこと (2026-10-22)
+
+- HWDEV の facade は KDEBUG の公開後に起動し、既存 module runtime の依存 handle と rollback を使う。GeForce の振分け・owner 接続はこの段では変えない。
+- M2 の台帳受入は合成像で閉じ、配布リストへの実 HWDEV の追加は M3a/M5 で行う。
+- core の ABI と manifest を同じ生成契約で照合する。KMOD ABI 世代・RO 検査・slot 充填の詳細は CORE_API §8・§9 を正とする。
+- 指定された CORE_API の状態「確定」を使えるよう、状態語彙の正典 POLICY_DEV §8 に設計・契約用の語を追加した。

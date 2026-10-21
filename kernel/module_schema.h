@@ -20,8 +20,9 @@
 #define MODULE_ID_V86 8U
 #define MODULE_ID_LAN 9U
 #define MODULE_ID_CIRRUS 10U
-#define MODULE_RUNTIME_SLOTS 19U
-#define MODULE_RECORD_CAP 10U
+#define MODULE_ID_HWDEV 11U
+#define MODULE_RUNTIME_SLOTS 20U
+#define MODULE_RECORD_CAP 11U
 #define MODULE_REQUIRED_PATHS { "/boot/sqlite.mod", "/boot/fep.mod" }
 
 /* Compatibility names for the existing KDEBUG contracts. */
@@ -29,7 +30,7 @@
 #define MODULE_RELOC_MAX 16384U
 #define MODULE_IMPORT_MAX 1024U
 #define MODULE_EXPORT_MAX 64U
-#define MODULE_OPS_SLOTS 19U
+#define MODULE_OPS_SLOTS 20U
 
 /* Wire word numbers; decode little-endian bytes explicitly. */
 enum module_field {
@@ -79,8 +80,8 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 3U, \
-        .ops_slots = 19U, \
+        .ops_version = 4U, \
+        .ops_slots = 20U, \
         .image_max = 262144U, \
         .mem_max = 262144U, \
         .reloc_max = 16384U, \
@@ -222,6 +223,21 @@ enum module_field {
         .import_max = 16U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+    }, \
+    { \
+        .module_id = 11U, \
+        .phase = 2U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
+        .stop_allowed = 0U, \
+        .ops_version = 1U, \
+        .ops_slots = 1U, \
+        .image_max = 196608U, \
+        .mem_max = 196608U, \
+        .reloc_max = 16384U, \
+        .import_max = 128U, \
+        .export_max = 1U, \
+        .load_span_max = 262144U, \
     }, \
 }
 

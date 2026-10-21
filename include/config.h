@@ -31,6 +31,7 @@
 #define SYS_KCG_MOD           "/boot/kcg.mod"
 #define SYS_FEP_MOD           "/boot/fep.mod"
 #define SYS_SETTINGS_DB "/etc/settings.db"
+#define SYS_HWDEV_MOD         "/boot/hwdev.mod"
 #define SYS_KDEBUG_BIN        "/boot/kdebug.bin"
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */

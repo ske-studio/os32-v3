@@ -71,11 +71,11 @@ helper:
 .globl kdebug_ops
 .type kdebug_ops,@object
 kdebug_ops:
-    .long 3
+    .long 4
     .long helper
     .zero 12
     .long kdebug_init
-    .zero 56
+    .zero 60
 .size kdebug_ops, .-kdebug_ops
 .section .bss
 .balign 4
@@ -103,7 +103,7 @@ def verify(module, elf, metadata, kernel, pair, validator):
     words = struct.unpack_from('<36I', image)
     assert words[:3] == (int.from_bytes(b'KMOD', 'little'), 1, 144)
     assert words[4:6] == (KAPI, LAYOUT) and words[7:10] == (1, 2, 1)
-    assert words[33] == 3 and len(module.OPS_NAMES) == 19
+    assert words[33] == 4 and len(module.OPS_NAMES) == 20
     assert words[31] == pair
     checked = bytearray(image)
     struct.pack_into('<I', checked, 128, 0)

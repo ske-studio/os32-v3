@@ -20,27 +20,35 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = 'docs/tasks/realhw/design/HWDEV_CORE_API.md'
 
 
+def require(ok, message):
+    if not ok:
+        raise SystemExit(message)
+
+
 def audit(out, cross):
     map_path = out / 'kdebug/kdebug.map'
     map_text = map_path.read_text()
     objects = [Path(p) for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
-    assert objects and len(objects) == len(set(objects)), 'missing/duplicate map inputs'
+    require(objects and len(objects) == len(set(objects)), 'missing/duplicate map inputs')
     gf = [p for p in objects if p.stem.startswith('gfinit') or p.stem == 'recover_gf']
-    assert len(gf) == 8, 'expected eight GF objects'
+    require(len(gf) == 8, 'expected eight GF objects')
     nm = str(cross / 'bin/i386-elf-nm')
     refs = symbols(nm, gf, True) - symbols(nm, gf, False) - {ABI_SYMBOL}
+    doc = (ROOT / DOC).read_text()
+    core_table = doc.split('## 2.', 1)[1].split('## 3.', 1)[0]
+    kernel_table = doc.split('## 3.', 1)[1].split('## 4.', 1)[0]
     rows = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
-                      (ROOT / DOC).read_text(), re.M)
-    assert [int(r[0]) for r in rows] == list(range(25)), 'core slot order/count'
+                      core_table, re.M)
+    require([int(r[0]) for r in rows] == list(range(25)), 'core slot order/count')
     imports = {r['symbol']: r for r in json.loads((ROOT/'kernel/kdebug_imports.def').read_text())['imports']}
     core_names = {r[1] for r in rows}
     kernel_names = refs & imports.keys()
-    assert refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}'
+    require(refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}')
     kernel_rows = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
-                             (ROOT / DOC).read_text(), re.M)
+                             kernel_table, re.M)
     expected_kernel = [(str(25+i), n, str(imports[n]['index'])) for i, n in
                        enumerate(sorted(kernel_names, key=lambda n: imports[n]['index']))]
-    assert kernel_rows == expected_kernel, 'kernel import table order/symbol/index'
+    require(kernel_rows == expected_kernel, 'kernel import table order/symbol/index')
     slots = []
     for index, name, source in rows:
         slots.append(dict(index=int(index), symbol=name, declaration=declaration(
@@ -66,9 +74,9 @@ def audit(out, cross):
     elf = Elf((out/'kdebug/kdebug.elf').read_bytes())
     sections = {s['name']: s['size'] for s in elf.sections if s['flags'] & 2}
     content = sum(g[k] for g in groups.values() for k in ('text', 'rodata', 'data'))
-    assert header['IMAGE_SIZE'] == len(binary)
-    assert header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary)
-    assert all(sections['.'+k] >= sum(g[k] for g in groups.values()) for k in ('text','rodata','data','bss'))
+    require(header['IMAGE_SIZE'] == len(binary), 'image/section accounting mismatch')
+    require(header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary), 'image/section accounting mismatch')
+    require(all(sections['.'+k] >= sum(g[k] for g in groups.values()) for k in ('text','rodata','data','bss')), 'image/section accounting mismatch')
     return dict(header=header, elf_sections=sections, objects=details, groups=groups,
                 file_other=dict(prefix=header['PAYLOAD_OFF'], padding=header['PAYLOAD_SIZE']-content),
                 map=str(map_path), core_slots=slots, kernel_imports=kernel)

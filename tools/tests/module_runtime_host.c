@@ -217,7 +217,7 @@ static int start(struct module_record *r, u32 entry, u32 *ops)
     starts++;
     current.slot = (u32)(r - module_records); current.generation = r->generation;
     CHECK(r->state == MODULE_STARTING && !module_exports(current));
-    CHECK(entry == r->init && ops[0] == 3 && ops[5] == r->base + 10);
+    CHECK(entry == r->init && ops[0] == 4 && ops[5] == r->base + 10);
     CHECK(!fd_live);
     /* Real BSS zeroing/import resolution, and actual body code execution. */
     CHECK(*(u32 *)(uptr)(r->base + 32) == 0x12345678U);
@@ -260,7 +260,7 @@ static struct module_request request(void)
     /* Hashes are supplied from the independent Python fixture's contracts. */
     struct module_request q = {
         .path = "/boot/test.mod", .name = "fixture",
-        .policy = {75, 3, 0x12345678, 0xabcdef01, 3, 1, 1,
+        .policy = {75, 3, 0x12345678, 0xabcdef01, 4, 1, 1,
                    imports, exports, MODULE_ID_KDEBUG},
         .imports = addresses,
         .lifecycle = {start, quiesce, detach, stop_dma}
@@ -316,7 +316,7 @@ static void registry_limits(void)
 }
 void _start(void)
 {
-    CHECK(MODULE_RECORD_CAP == 10);
+    CHECK(MODULE_RECORD_CAP == 11);
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     if (input[0] == 12) { registry_limits(); finish(0); }
     /* Decode contract hashes independently from the file's known records. */

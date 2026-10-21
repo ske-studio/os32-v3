@@ -13,4 +13,5 @@ check-hwdev-audit-host:
 - kdebug/recover*.h
 - kdebug/recover_gf.c
 - sdk/kapi.json
+- tools/tests/test_hwdev_audit.py
 artifact_reader: true
