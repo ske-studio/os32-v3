@@ -17,6 +17,12 @@ def command(exe):
             '-o', str(exe)]
 
 MUTATIONS = [
+    ('indexed_read_rejected', 'kdebug/recover.c',
+     'return a->value < p->target_count && p->targets[a->value].read_safe;',
+     'return a->value < p->target_count && p->targets[a->value].read_safe && p->targets[a->value].space != REC_VGA_INDEXED;'),
+    ('raw_alias_aperture', 'kdebug/recover.c',
+     '/* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.',
+     'if (off >= RECOVER_PRMCIO && off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE) return -1;\n            /* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.'),
     ('n1_before', 'kdebug/recover.c', 'if (!guards(r, w, REC_BEFORE))',
      'if (false && !guards(r, w, REC_BEFORE))'),
     ('n1_after', 'kdebug/recover.c', 'if (!guards(r, w, REC_AFTER))',

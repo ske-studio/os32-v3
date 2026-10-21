@@ -75,8 +75,8 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 
 - 決定: [fixture](../../../tools/tests/gfinit_fixture.h) に 9 本・193 命令・27 種、main 順、表長、副作用候補 619 行を収録。NV_REG 圧縮 3 行は各 4 命令、COPY_NV_REG は E7FB。
 - N1: main3/E81E だけ cfg50/54・PBUS1850/1854=0 の前後確認・保持を条件とする旗。他の表示有効化・W 行不足は静的拒否。
-- S1追補: [recover GF profile](../../../kdebug/recover_gf.c) に target 144・rule 543（script 512＋固定/復元31）。619候補は rule 512／PLL 101／COPY 2／一時再生3／602858h別名検査の欠け1に分類。後4分類は拒否。
-- 持越し: S2の実opcode layout・COPY/一時再生式、S4 PLL、S5 accessor。共有検査がCR11 indexed READと602858hを拒否するため全ROM RUN不可。固定SIZE_BARSは測定/復元trace、PREPAREは最終nodeのbind拒否まで確認。ROM実バイト・実機は未検証。
+- S1追補: [recover GF profile](../../../kdebug/recover_gf.c) に target 145・rule 544（script 513＋固定/復元31）。619候補は rule 513／PLL 101／COPY 2／一時再生3／別名検査の欠け0に分類。残る106候補は拒否。
+- 持越し: S2の実opcode layout・COPY/一時再生式、S4 PLL、S5 accessor。全ROM RUNは未許可。共有検査は実VGA別名portの重なりだけを拒否し、indexed EXPR READには全経路/実行時の先行SELECTを要求。固定SIZE_BARSは測定/復元trace、PREPAREはCR11のbind/実行まで確認。ROM実バイト・実機は未検証。
 - ノートで `python3 tools/gfinit_rom_check.py --list` が各 script の開始・長さ・IEEE CRC32 を表示。同スクリプトに private ROM のパスを渡して照合（ROM を出力・保存しない）。期待値は txt からの復元値で、ROM 由来の検証済み値ではない。
 - 証拠: 入力 `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt`、[照合試験](../../../tools/tests/test_gfinit_fixture.py)。ログは `~/os32-tmp/run/gf4a_s1/` の `kernel.log`・`fixture.log`・`mutate.log`・`lint.log`・`docs.log`・`ci-stab.log`（終了 rc を末尾に記録）。
-- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1b/` の kernel/host/mutate/lint/docs ログ。設計決定・共有検査の最小修正要求は recover `ADDENDUM.final.md` 末尾。追補は未完（共有検査の欠けを残す）、コミット・配備なし。
+- 追補の証拠: [host試験](../../../tools/tests/test_recover_gf.py)、`~/os32-tmp/run/gf4a_s1c/` の kernel/host/mutate-recover/mutate-gf/lint/docs ログ。設計決定は recover `ADDENDUM.final.md`「4a S1 追補で設計者が決めたこと」。T2との名前衝突は不変表を recover_gf_template に改名して解消。コミット・配備なし。

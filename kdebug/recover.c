@@ -244,12 +244,25 @@ int recover_target_address(const struct recover_target *t, u32 dir,
             dir == REC_SELECT || dir == REC_DATA) return -1;
         if (is_bar(t)) {
             if (t->bar >= 3) return -1;
-            /* Reserve the entire VGA alias apertures, including head1. */
-            if (t->bar == 0 &&
-                ((off < RECOVER_PRMVIO + 2 * RECOVER_HEAD_STRIDE &&
-                  (unsigned long long)off + t->width > RECOVER_PRMVIO) ||
-                 (off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE &&
-                  (unsigned long long)off + t->width > RECOVER_PRMCIO))) return -1;
+            /* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.
+             * envytools f102b82 nv_vga.xml nv_vga_vio/nv_vga_cio. */
+            static const u32 vio[] = {RECOVER_MISC_WRITE, RECOVER_VGA_ENABLE,
+                RECOVER_SEQ, RECOVER_SEQ + 1, RECOVER_MISC_READ,
+                RECOVER_GFX, RECOVER_GFX + 1};
+            static const u32 cio[] = {RECOVER_CRTC_MONO, RECOVER_CRTC_MONO + 1,
+                RECOVER_STATUS_MONO, RECOVER_ATTR, RECOVER_ATTR + 1,
+                RECOVER_MISC_WRITE, RECOVER_FEATURE_READ,
+                RECOVER_CRTC, RECOVER_CRTC + 1, RECOVER_STATUS};
+            if (t->bar == 0) for (u32 head = 0; head < 2; head++) {
+                for (u32 i = 0; i < sizeof(vio) / sizeof(vio[0]); i++) {
+                    u32 port = RECOVER_PRMVIO + head * RECOVER_HEAD_STRIDE + vio[i];
+                    if (off <= port && (unsigned long long)off + t->width > port) return -1;
+                }
+                for (u32 i = 0; i < sizeof(cio) / sizeof(cio[0]); i++) {
+                    u32 port = RECOVER_PRMCIO + head * RECOVER_HEAD_STRIDE + cio[i];
+                    if (off <= port && (unsigned long long)off + t->width > port) return -1;
+                }
+            }
         } else if (t->bar || (t->space == REC_PCI_CFG &&
                    (off >= RECOVER_CFG_SIZE || t->width > RECOVER_CFG_SIZE - off)) ||
                    (t->space == REC_PC98_IO &&
@@ -881,8 +894,12 @@ static bool dependencies(const struct recover_profile *p, const struct recover_p
     const struct recover_plan_node *n = &plan->nodes[node];
     const struct recover_rule *w = rule_by_id(p, n->rule_id);
     const struct recover_opcode_layout *layout = layout_for(p, n);
-    if (layout && n->arg_count && (layout->dir_substep == REC_DATA || layout->dir_substep == REC_READ)) {
-        u32 key = plan->args[n->arg_first].value;
+    for (u32 i = 0; i < n->arg_count; i++) {
+        const struct recover_plan_arg *arg = &plan->args[n->arg_first + i];
+        bool target_read = i == 0 && layout &&
+            (layout->dir_substep == REC_DATA || layout->dir_substep == REC_READ);
+        if (!target_read && arg->kind != REC_ARG_READ) continue;
+        u32 key = arg->value;
         if (key >= p->target_count) return false;
         if (p->targets[key].space == REC_VGA_INDEXED) {
             bool selected = false;
@@ -942,8 +959,7 @@ static bool arg_ok(const struct recover_profile *p, const struct recover_plan_ar
 {
     if (a->kind == REC_IMM) return true;
     if (a->kind == REC_ARG_READ)
-        return a->value < p->target_count && p->targets[a->value].read_safe &&
-            p->targets[a->value].space != REC_VGA_INDEXED;
+        return a->value < p->target_count && p->targets[a->value].read_safe;
     return a->kind == REC_ARG_SAVED && a->value < p->count &&
         p->regs[a->value].kind == REC_RW && p->regs[a->value].read_safe;
 }
@@ -1201,7 +1217,8 @@ static bool evaluate(struct recover *r, const struct recover_plan_node *n,
             const struct recover_plan_arg *a = &args[i + 1];
             if (a->kind == REC_IMM) values[i] = a->value;
             else if (a->kind == REC_ARG_READ) {
-                if (bus_read(r, a->value, &values[i])) return false;
+                if ((r->profile->targets[a->value].space == REC_VGA_INDEXED &&
+                     r->selected != a->value) || bus_read(r, a->value, &values[i])) return false;
             } else {
                 if (a->value >= r->saved_count || !r->valid) return false;
                 values[i] = r->saved[a->value];

@@ -152,6 +152,7 @@ static const struct recover_target targets[] = {
     {REC_BAR_MMIO, 0x0U, 0x140cU, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 141 */
     {REC_BAR_MMIO, 0x0U, 0x1098U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 142 */
     {REC_BAR_MMIO, 0x0U, 0x1310U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 143 */
+    {REC_BAR_MMIO, 0, 0x602858U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 144 */
 };
 static const struct recover_guard n1_guards[] = {
     {0, 0xffffffffU, 0, REC_BEFORE | REC_AFTER},
@@ -778,6 +779,7 @@ static const struct recover_rule rules[] = {
     {0x21cU, 0x84U, REC_RUN, 0x3U, 0x5e7bU, 0x268U, 0x100U, 0x0U, {REC_RANGE, 0x100U, 0x100U, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, 0, 0x0U, 0, 0x0U, 0}, /* gf_effects[616] */
     {0x21dU, 0x85U, REC_RUN, 0x3U, 0x5e88U, 0x269U, 0x100U, 0x0U, {REC_RANGE, 0x100U, 0x0U, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, 0, 0x0U, 0, 0x0U, 0}, /* gf_effects[617] */
     {0x21eU, 0x84U, REC_RUN, 0x3U, 0x5e95U, 0x26aU, 0x100U, 0x0U, {REC_RANGE, 0x100U, 0x0U, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, 0, 0x0U, 0, 0x0U, 0}, /* gf_effects[618] */
+    {0x21fU, 0x90U, REC_RUN, 0, 0xded7U, 3, 0x1fffU, 0, {REC_RANGE, 0x1fffU, 0x1fffU, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, 0, 0, 0, 0, 0}, /* gf_effects[3] */
 };
 static const struct recover_reg regs[] = {
     {7, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, 7},
@@ -834,7 +836,7 @@ static const struct recover_opcode_layout fixed_layouts[] = {
     {0x108, REC_DATA, 2, fixed_literal, REC_DATA},
     {0x109, REC_DATA, 2, fixed_rmw, REC_DATA},
 };
-const struct recover_profile recover_gf_profile = {
+const struct recover_profile recover_gf_template = {
     .version = RECOVER_PROFILE_VERSION, .cold_required = true,
     .targets = targets, .target_count = sizeof(targets) / sizeof(targets[0]),
     .rules = rules, .rule_count = sizeof(rules) / sizeof(rules[0]),

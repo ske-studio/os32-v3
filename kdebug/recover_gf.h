@@ -13,12 +13,11 @@
 #define REC_GF_CR11_UNLOCK 4U
 #define REC_GF_PREPARE_COUNT 10U
 #define REC_GF_SIZE_BARS_COUNT 8U
-extern const struct recover_profile recover_gf_profile;
+extern const struct recover_profile recover_gf_template;
 extern const u32 recover_gf_prepare[REC_GF_PREPARE_COUNT];
 extern const u32 recover_gf_size_bars[REC_GF_SIZE_BARS_COUNT];
 /* Copy plan and set profile_crc after supplying checked budgets. PREPARE's
- * indexed READ operand is intentionally rejected by current T1b arg_ok;
- * see ADDENDUM.final S1 follow-up. Do not replace it with a guessed literal. */
+ * CR11 expression reads the target selected by its preceding SELECT node. */
 extern const struct recover_plan recover_gf_size_bars_plan;
 extern const struct recover_plan recover_gf_prepare_plan;
 #endif

@@ -80,9 +80,9 @@ static u32 hash;
 static void setup(void)
 {
     rawcommand=0x102; rawbars[0]=0x24000000; rawbars[1]=0x30000008; rawbars[2]=0x25000000;
-    profile=recover_gf_profile;
+    profile=recover_gf_template;
     profile.trial_limit=1000; profile.opcode_limit=1000; profile.restore_limit=1000;
-    profile.max_steps=4096; profile.max_polls=65536;
+    profile.max_steps=4096; profile.max_polls=65536; profile.restore_max_polls=65536;
     profile.layouts=layouts; profile.layout_count=ARRAY_SIZE(layouts);
     profile.crc=recover_profile_crc(&profile);
     recover_init(&core,&ops,0,true,false);
@@ -95,22 +95,23 @@ static void setup(void)
 }
 static void inventory_test(void)
 {
-    CHECK(recover_profile_ok(&recover_gf_profile)==0);
+    CHECK(recover_profile_ok(&recover_gf_template)==0);
     CHECK(ARRAY_SIZE(inventory)==619 && ARRAY_SIZE(gf_effects)==619);
-    u32 counts[5]={0};
+    u32 counts[4]={0};
     for(u32 i=0;i<ARRAY_SIZE(inventory);i++) {
         const struct gf_classification *c=&inventory[i];
         const struct gf_effect *e=&gf_effects[i];
-        CHECK(c->effect==i && c->kind<5); counts[c->kind]++;
+        CHECK(c->effect==i && c->kind<4); counts[c->kind]++;
         if(c->kind!=REC_GF_RULE) {
             CHECK(c->rule==RECOVER_NONE);
+            for(u32 j=0;j<recover_gf_template.rule_count;j++)
+                CHECK(rules[j].phase!=REC_RUN || rules[j].substep!=i);
             CHECK((c->kind==REC_GF_PLL && e->expression==GF_PLL) ||
                 (c->kind==REC_GF_COPY && e->expression==GF_COPY) ||
-                (c->kind==REC_GF_TEMP_SAVED && e->expression==GF_RESTORE) ||
-                (c->kind==REC_GF_ALIAS_GAP && e->reg==0x602858));
+                (c->kind==REC_GF_TEMP_SAVED && e->expression==GF_RESTORE));
             continue;
         }
-        const struct recover_rule *w=rule_by_id(&recover_gf_profile,c->rule);
+        const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
         CHECK(w!=0); if(!w) continue;
         const struct recover_target *t=&targets[w->key];
         struct recover_bus_access bus;
@@ -138,9 +139,9 @@ static void inventory_test(void)
                 w->guards[j].when==(REC_BEFORE|REC_AFTER));
         }
     }
-    CHECK(counts[0]==512 && counts[1]==101 && counts[2]==2 && counts[3]==3 && counts[4]==1);
-    CHECK(recover_gf_profile.vram_reserved.base==0 && recover_gf_profile.vram_reserved.len==1024);
-    for(u32 i=0;i<recover_gf_profile.target_count;i++) {
+    CHECK(counts[0]==513 && counts[1]==101 && counts[2]==2 && counts[3]==3);
+    CHECK(recover_gf_template.vram_reserved.base==0 && recover_gf_template.vram_reserved.len==1024);
+    for(u32 i=0;i<recover_gf_template.target_count;i++) {
         const struct recover_target *t=&targets[i];
         if(t->space==REC_BAR_MMIO) CHECK(t->access!=REC_RW);
     }
@@ -152,7 +153,7 @@ static void inventory_test(void)
         const struct recover_rule *w=rule_by_id(&profile,recover_gf_size_bars[i]);
         CHECK(w && w->requires_count==1 && w->requires[0]==recover_gf_size_bars[i-1]);
     }
-    print("inventory: 512 rules, 101 PLL, 2 COPY, 3 temporary saved, 1 alias gap; 619 accounted\n");
+    print("inventory: 513 rules, 101 PLL, 2 COPY, 3 temporary saved, 0 alias gap; 619 accounted\n");
 }
 static void node(u32 at,const struct recover_rule *w,u32 dir,u32 value)
 {
@@ -241,11 +242,27 @@ static int size_operation(struct recover *r,void *arg)
     }
     return 0;
 }
+static int prepare_operation(struct recover *r,void *arg)
+{
+    (void)arg;
+    for(u32 i=0;i<plan.node_count;i++) {
+        const struct recover_plan_node *n=&plan.nodes[i];
+        const struct recover_opcode_layout *l=layout_for(&profile,n);
+        u32 key=plan.args[n->arg_first].value;
+        u32 value=plan.args[n->arg_first+1].value;
+        if(n->expr_id==REC_GF_PMC_ENABLE) value=values[key]|1U;
+        if(n->expr_id==REC_GF_CR11_UNLOCK) value=values[key]&0x7fU;
+        if(recover_plan_enter(r,i) ||
+            recover_access(r,i,l->dir_substep,key,targets[key].width,&value) ||
+            recover_plan_leave(r,0)) return -1;
+    }
+    return 0;
+}
 static void fixed_test(void)
 {
     setup();
-    profile.layouts=recover_gf_profile.layouts;
-    profile.layout_count=recover_gf_profile.layout_count;
+    profile.layouts=recover_gf_template.layouts;
+    profile.layout_count=recover_gf_template.layout_count;
     profile.crc=recover_profile_crc(&profile);
     plan=recover_gf_size_bars_plan; plan.profile_crc=profile.crc;
     CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)==0);
@@ -257,15 +274,18 @@ static void fixed_test(void)
     CHECK(trial_end(&core,&core.token,REC_NORMAL)==0);
     CHECK(core.cache.bar[0].valid && core.cache.bar[1].valid && core.cache.bar[2].valid);
     setup();
-    profile.layouts=recover_gf_profile.layouts;
-    profile.layout_count=recover_gf_profile.layout_count;
+    profile.layouts=recover_gf_template.layouts;
+    profile.layout_count=recover_gf_template.layout_count;
     profile.crc=recover_profile_crc(&profile);
     plan=recover_gf_prepare_plan; plan.profile_crc=profile.crc;
-    CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)<0 && writes==0);
-    /* Isolate the missing indexed READ contract, not an unrelated failure. */
-    for(u32 i=0;i<plan.node_count-1;i++) CHECK(node_ok(&profile,&plan,i));
-    CHECK(!node_ok(&profile,&plan,plan.node_count-1));
-    print("fixed: SIZE_BARS bind/probe/restore PASS; PREPARE indexed READ blocked by T1b\n");
+    CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)==0 && writes==0);
+    for(u32 i=0;i<plan.node_count;i++) CHECK(node_ok(&profile,&plan,i));
+    values[12]=0xa5;
+    CHECK(trial_begin(&core,&profile,hash,1000)==0);
+    CHECK(trial_step(&core,&core.token,true,prepare_operation,0)==0);
+    CHECK(values[12]==0x25 && indices[12]==0x11);
+    CHECK(trial_end(&core,&core.token,REC_NORMAL)==0);
+    print("fixed: SIZE_BARS bind/probe/restore PASS; PREPARE indexed READ bind/execute PASS\n");
 }
 static void trace_test(void)
 {

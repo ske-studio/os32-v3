@@ -3,13 +3,13 @@
  * PLL -> S4 integer coefficients/internal branch order.
  * COPY -> S2 registered expression; TEMP_SAVED -> S2/S5 per-op saved value.
  */
-enum gf_class { REC_GF_RULE, REC_GF_PLL, REC_GF_COPY, REC_GF_TEMP_SAVED, REC_GF_ALIAS_GAP };
+enum gf_class { REC_GF_RULE, REC_GF_PLL, REC_GF_COPY, REC_GF_TEMP_SAVED };
 struct gf_classification { unsigned int effect, rule, kind; };
 static const struct gf_classification inventory[] = {
     {0, 31, REC_GF_RULE},
     {1, 32, REC_GF_RULE},
     {2, 33, REC_GF_RULE},
-    {3, RECOVER_NONE, REC_GF_ALIAS_GAP},
+    {3, 543, REC_GF_RULE},
     {4, 34, REC_GF_RULE},
     {5, 35, REC_GF_RULE},
     {6, 36, REC_GF_RULE},
