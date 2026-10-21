@@ -17,12 +17,15 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('gf_pre_begin_ignored', 'if (recover_gf_pre(r, n, "BEGIN", n->substep < GF_INIT_K, 0)) return -1;', '(void)recover_gf_pre(r, n, "BEGIN", n->substep < GF_INIT_K, 0);'),
+    ('gf_pre_end_omitted', 'int log = recover_gf_pre(r, n, "END", n->substep < GF_INIT_K, rc);', 'int log = 0;'),
     ('call_return', 'e->call[e->calls-1].pc != n->pc || e->call[e->calls-1].ctx != n->ctx', 'false'),
     ('repeat_return', 'n->ctx != f->ctx || a[0].value != f->count', 'false'),
     ('main_frames', 'return e->calls || e->repeats ? -1 : 0;', 'return 0;'),
     ('unresolved_exec', '!r->plan || r->plan->unresolved_count ||', '!r->plan ||'),
     ('steps', 'cost > GF_INIT_SCHEDULE - e->steps', 'false'),
     ('wait_budget', 'us > GF_INIT_WAIT_MAX - e->wait_us', 'false'),
+    ('exec_timeout_reason', 'r->reason = REC_TIMEOUT;', 'r->reason = REC_OPERATION;'),
     ('exec_deadline', 'e->elapsed_us >= GF_INIT_EXEC_US', 'false'),
     ('call_depth', 'e->calls == GF_INIT_CALL_DEPTH', 'e->calls > GF_INIT_CALL_DEPTH'),
     ('repeat_depth', 'e->repeats == GF_INIT_REPEAT_DEPTH', 'e->repeats > GF_INIT_REPEAT_DEPTH'),
@@ -38,6 +41,7 @@ PRECHECK = """        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rul
             return access_error(r, target);
 """
 SHARED_MUTATIONS = [
+    ('timeout_reason', 'r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION', 'REC_OPERATION'),
     ('pre_read_order', PRECHECK + "        if (w->write_mask", "        if (!w) return access_error(r, target);\n        if (w->write_mask"),
     ('fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
     ('planned_value', 'if (planned) *value = expected;', 'if (planned) *value = 0;'),

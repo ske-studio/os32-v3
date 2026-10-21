@@ -1,6 +1,9 @@
 #ifndef KDEBUG_RECOVER_GF_H
 #define KDEBUG_RECOVER_GF_H
 #include "recover.h"
+#include "../include/memmap.h"
+#define REC_GF_OPCODE_TICKS (60U * PIT_HZ)
+#define REC_GF_MAX_POLLS 65536U
 /* Recover owns the rules; S2 supplies real opcode layouts and expanded plan.
  * A caller copies this immutable template, supplies checked tick budgets and
  * layouts, then calculates recover_profile_crc before bind. No default arm.

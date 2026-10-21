@@ -80,3 +80,15 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) { }
 }
+
+int serial_checked_begin(void) { calls++; return -1; }
+int serial_checked_ready(void) { calls++; return -1; }
+int serial_checked_put(u32 byte) { (void)byte; calls++; return -1; }
+int serial_checked_empty(void) { calls++; return -1; }
+void serial_checked_end(void) { calls++; }
+int recover_uart_flush(struct recover *r, int (*empty)(void *), void *opaque, u32 frame, u32 polls)
+{ (void)r; (void)empty; (void)opaque; (void)frame; (void)polls; calls++; return -1; }
+void gfinit_recover_end(void) { calls++; }
+int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
+                struct recover_transport *transport, const struct recover_profile *s0)
+{ (void)op; (void)buf; (void)size; (void)base; (void)transport; (void)s0; calls++; return -1; }

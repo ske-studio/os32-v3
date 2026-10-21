@@ -47,7 +47,7 @@ int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, v
         if (recover_restore_point(r) || SCREEN_CALL(4, ops->read_cell(opaque, &actual)) || actual != test) rc = -1;
     }
     if (recover_restore_point(r) || SCREEN_CALL(5, ops->write_cell(opaque, saved))) return -1;
-    if (recover_restore_point(r) || SCREEN_CALL(4, ops->read_cell(opaque, &actual)) || actual != saved) return -1;
+    if (recover_restore_point(r) || SCREEN_CALL(7, ops->read_cell(opaque, &actual)) || actual != saved) return -1;
     if (rc || recover_restore_point(r) || SCREEN_CALL(6, ops->redraw(opaque))) return -1;
     return 0;
 #undef SCREEN_CALL
@@ -239,12 +239,13 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
         "REC sid=4294967295 seq=4294967295 phase=receive event=DISCARD discarded_bytes=4294967295\n";
     static const char state_row[] =
         "REC sid=4294967295 seq=4294967295 phase=state event=RESTORING version=4294967295 profile_crc=4294967295 plan_hash=4294967295 snapshot_crc=4294967295\n";
-    u32 pair_bytes=sizeof(begin_row)+sizeof(end_row)-2;
-    u32 s0_bytes=14*pair_bytes+sizeof(final_row)+sizeof(discard_row)-2;
+    /* Include a resynchronizing newline before each row after a lost row. */
+    u32 pair_bytes=sizeof(begin_row)+sizeof(end_row);
+    u32 s0_bytes=14*pair_bytes+sizeof(final_row)+sizeof(discard_row);
     u32 main_pairs=1+1+p->quiesce_count+1+1+1+6;
     if (kind==REC_BUDGET_SIZE_BARS) main_pairs+=7;
     struct recover_static_work work={
-        main_pairs*pair_bytes+s0_bytes+sizeof(state_row)-1, kind==REC_BUDGET_SIZE_BARS ? 6000:4000,
+        main_pairs*pair_bytes+s0_bytes+sizeof(state_row), kind==REC_BUDGET_SIZE_BARS ? 6000:4000,
         main_pairs*8+256, s0_bytes,2000,256};
 
     return recover_budget_apply(p,kind,hz,9600,10,&work);
@@ -255,17 +256,24 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
  * permits independent ②; it never clears a failure of ① or declares S1. */
 int recover_gf_screen_safe(struct recover *r)
 {
-    const u32 keys[]={GF_CMD,GF_CFG50,GF_CFG54};
-    for(u32 i=0;i<sizeof(keys)/sizeof(*keys);i++) {
+    const u32 offsets[]={RECOVER_COMMAND,RECOVER_CFG50,RECOVER_CFG54};
+    for(u32 i=0;i<sizeof(offsets)/sizeof(*offsets);i++) {
         u32 value;
         struct recover_bus_access access;
-        if (!r->profile || keys[i]>=r->profile->target_count) return -1;
-        const struct recover_target *target=&r->profile->targets[keys[i]];
+        if (!r->profile) return -1;
+        u32 key=RECOVER_NONE;
+        for(u32 j=0;j<r->profile->target_count;j++) {
+            const struct recover_target *t=&r->profile->targets[j];
+            if(t->space==REC_PCI_CFG && t->offset==offsets[i] &&
+                t->width==(i ? 4U:2U)) { key=j; break; }
+        }
+        if(key==RECOVER_NONE) return -1;
+        const struct recover_target *target=&r->profile->targets[key];
         /* access_blocked forbids suspect GPU access. These three safe PCI
          * reads are the independent ② proof, not a reopening of that gate. */
         if (target->space!=REC_PCI_CFG || !target->read_safe ||
             recover_target_address(target,REC_READ,&access) || recover_restore_point(r)) return -1;
-        access.key=keys[i];
+        access.key=key;
         if (r->ops->read(r->opaque,&access,&value)) return -1;
         if (i ? value!=0 : (value & (RECOVER_COMMAND_DMA_MEM & ~RECOVER_COMMAND_MEM))!=0) return -1;
     }

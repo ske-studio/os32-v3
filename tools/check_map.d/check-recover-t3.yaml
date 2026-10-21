@@ -18,3 +18,8 @@ check-recover-t3:
 - tools/tests/mutpar.py
 - kdebug/kdebug_window.c
 - kdebug/kdebug_window.h
+- tools/lan_bridge.py
+- tools/lanfs_host.py
+- tools/rshell_peek.py
+- tools/rshell_serial.py
+- tools/serialfs_host.py

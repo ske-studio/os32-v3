@@ -5,7 +5,7 @@
 #include "gfinit_pll.h"
 #include "../lib/crc32_core.inc"
 #define GF_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
-STATIC_ASSERT(GF_INIT_SCHEDULE >= RECOVER_NODE_MAX, gf_schedule_scratch);
+STATIC_ASSERT(GF_INIT_WORK_STEPS >= RECOVER_NODE_MAX, gf_schedule_scratch);
 STATIC_ASSERT(GF_INIT_FIXED_CAPTURES <= RECOVER_CAPTURE_MAX, gf_fixed_captures);
 struct gf_script_span { u32 id, pc, length, crc; };
 static const struct gf_script_span scripts[] = {
@@ -342,7 +342,7 @@ static u32 instruction_at(const struct gfinit_decode *d, u32 pc)
 static int schedule_add(struct gfinit_decode *d, u32 ins, u32 ctx, u32 main,
                         u32 kind, u32 k, u32 count)
 {
-    if (d->schedule_count == GF_INIT_SCHEDULE) return -1;
+    if (d->schedule_count == GF_INIT_WORK_STEPS) return -1;
     d->schedule[d->schedule_count++] = (struct gfinit_scheduled){ins, ctx, main, kind, k, count, 0};
     return 0;
 }
@@ -402,7 +402,7 @@ static u32 emit(struct gfinit_decode *d, const struct recover_profile *p,
                 const struct gfinit_scheduled *s, u32 state, u32 sub, u32 dir,
                 const struct recover_plan_arg *a, u32 argc)
 {
-    if (d->plan.node_count >= RECOVER_NODE_MAX || argc > RECOVER_ARG_MAX - d->plan.arg_count) {
+    if (d->plan.node_count >= RECOVER_NODE_MAX || argc > GF_INIT_ARGS - d->plan.arg_count) {
         d->error = 1; return RECOVER_NONE;
     }
     const struct gfinit_instruction *v = &d->insns[s->instruction];

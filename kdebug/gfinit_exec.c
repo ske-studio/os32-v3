@@ -7,7 +7,11 @@ static int exec_point(struct recover *r, struct gfinit_exec *e)
     u32 now;
     if (recover_safe_point(r) || e->ops->clock_us(e->opaque, &now)) return -1;
     e->elapsed_us = now - e->started;
-    return e->elapsed_us >= GF_INIT_EXEC_US ? -1 : 0;
+    if (e->elapsed_us >= GF_INIT_EXEC_US) {
+        r->reason = REC_TIMEOUT;
+        return -1;
+    }
+    return 0;
 }
 static int exec_wait(struct recover *r, struct gfinit_exec *e, u32 us)
 {
@@ -103,13 +107,19 @@ int gfinit_exec_run(struct recover *r, void *arg)
         if (cost > GF_INIT_SCHEDULE - e->steps) return -1;
         e->steps += cost;
         if (exec_point(r, e) || recover_plan_enter(r, id)) return -1;
+        if (recover_gf_pre(r, n, "BEGIN", n->substep < GF_INIT_K, 0)) return -1;
         u32 edge = 0, value = 0;
+        int rc = 0;
         if (l->dir_substep != RECOVER_NONE) {
-            if (recover_plan_access(r, &value)) return -1;
+            rc = recover_plan_access(r, &value);
             if (l->dir_substep == REC_READ) {
                 e->read_value = value; e->read_pc = n->pc; e->read_ctx = n->ctx;
             }
-        } else if (exec_control(r, e, n, &edge)) return -1;
+        } else rc = exec_control(r, e, n, &edge);
+        /* An access safe point may already have emitted the final cleanup. */
+        if (r->state != REC_RUNNING) return -1;
+        int log = recover_gf_pre(r, n, "END", n->substep < GF_INIT_K, rc);
+        if (rc || log) return -1;
         if (exec_point(r, e) || recover_plan_leave(r, edge)) return -1;
     }
 }

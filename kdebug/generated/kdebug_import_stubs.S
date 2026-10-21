@@ -1296,4 +1296,49 @@ display_recover_cell_read:
 display_recover_cell_write:
     jmp *kdebug_import_slots+1032
 .size display_recover_cell_write, .-display_recover_cell_write
+.globl serial_checked_begin
+.type serial_checked_begin, @function
+serial_checked_begin:
+    jmp *kdebug_import_slots+1036
+.size serial_checked_begin, .-serial_checked_begin
+.globl serial_checked_ready
+.type serial_checked_ready, @function
+serial_checked_ready:
+    jmp *kdebug_import_slots+1040
+.size serial_checked_ready, .-serial_checked_ready
+.globl serial_checked_put
+.type serial_checked_put, @function
+serial_checked_put:
+    jmp *kdebug_import_slots+1044
+.size serial_checked_put, .-serial_checked_put
+.globl serial_checked_empty
+.type serial_checked_empty, @function
+serial_checked_empty:
+    jmp *kdebug_import_slots+1048
+.size serial_checked_empty, .-serial_checked_empty
+.globl serial_checked_end
+.type serial_checked_end, @function
+serial_checked_end:
+    jmp *kdebug_import_slots+1052
+.size serial_checked_end, .-serial_checked_end
+.globl pci_cfg_read32
+.type pci_cfg_read32, @function
+pci_cfg_read32:
+    jmp *kdebug_import_slots+1056
+.size pci_cfg_read32, .-pci_cfg_read32
+.globl pci_cfg_read16
+.type pci_cfg_read16, @function
+pci_cfg_read16:
+    jmp *kdebug_import_slots+1060
+.size pci_cfg_read16, .-pci_cfg_read16
+.globl pci_cfg_write32
+.type pci_cfg_write32, @function
+pci_cfg_write32:
+    jmp *kdebug_import_slots+1064
+.size pci_cfg_write32, .-pci_cfg_write32
+.globl pci_cfg_write16
+.type pci_cfg_write16, @function
+pci_cfg_write16:
+    jmp *kdebug_import_slots+1068
+.size pci_cfg_write16, .-pci_cfg_write16
 .section .note.GNU-stack,"",@progbits

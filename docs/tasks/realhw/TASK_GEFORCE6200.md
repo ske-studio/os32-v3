@@ -121,3 +121,10 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - COPY2・一時再生3行を結線、局所CR11/CR1F/CR44→元index復元を追加。COLD DATAは終端再生しない。N1の4対象guardは維持。
 - S4送り3件を修正。設計者判断は [REALHW_RECOVER_ADDENDUM.md](design/REALHW_RECOVER_ADDENDUM.md) の「4a S5 の実装で設計者が決めたこと」。
 - 証拠: `~/os32-tmp/run/gf4a_s5/` の最終build・候補・変異・錨・lint・docsログ。実機/NP21/W未実施、version.chip・T3送り・S6時計/結線は未確認のまま。
+
+### 4a S6 (2026-10-21)
+- 実装: checked REC・試行op・session/phase・cleanup・RUN_ONE・A4、private imports末尾追加。決定は[追記](design/REALHW_RECOVER_ADDENDUM.md#4a-s6-の実装で設計者が決めたこと-2026-10-21)。
+- S5のCR1F読書値・cleanup順・負のbus試験、S3の60秒/poll境界を反映。
+- 検証証拠: `/home/hight/os32-tmp/run/gf4a_s6/`（最終結果は実装報告）。
+- 未確認: NP21/W・実機は未実施、S7の公開入口とS8以降の承認・立会いを維持。
+- A1前提: 他装置の有効memory BAR/ROM長が不明なら書込み前に拒否、実機の長さ根拠をPMが揃える。

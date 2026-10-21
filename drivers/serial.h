@@ -316,4 +316,14 @@ int serial_getchar_kapi(void);
 int serial_putchar_kapi(char c);
 void serial_puts_kapi(const char *str);
 
+/* Private module TX ownership. Nonblocking: begin/put 0 or -1;
+ * ready/empty 1, 0, or -1 (no ownership). Caller budgets all polling,
+ * waits the final frame and checks empty, and always releases with end.
+ * Ordinary output is retained by serial_hold_take; RX is unchanged. */
+int serial_checked_begin(void);
+int serial_checked_ready(void);
+int serial_checked_put(u32 byte);
+int serial_checked_empty(void);
+void serial_checked_end(void);
+
 #endif /* __SERIAL_H */

@@ -2073,6 +2073,78 @@
       "source": "kernel/display_restore.h",
       "context_safe": false,
       "index": 258
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_begin",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 259
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_ready",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 260
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_put",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 261
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_empty",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 262
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_end",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 263
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read32",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 264
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read16",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 265
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write32",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 266
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write16",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 267
     }
   ]
 }

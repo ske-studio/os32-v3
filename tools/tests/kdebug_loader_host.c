@@ -15,8 +15,10 @@
 #include "kernel_selftest_dispatch.h"
 
 #define CAP (MODULE_IMAGE_MAX + MODULE_PAGE_SIZE)
+/* File limit excludes the separately zeroed resident BSS. */
+#define POOL_CAP (4U * MODULE_IMAGE_MAX)
 static u8 file[CAP];
-static u8 pool[CAP] __attribute__((aligned(MODULE_PAGE_SIZE)));
+static u8 pool[POOL_CAP] __attribute__((aligned(MODULE_PAGE_SIZE)));
 static u32 input[5]; /* config, failure injection, expected state, image size, pair */
 static unsigned pos, opens, closes, owners, retires, pages, reads, logs, imports;
 static struct bootinfo bi;
@@ -99,7 +101,7 @@ int ledger_owner_retire(u32 owner)
 }
 u32 pgalloc_alloc_phys(u32 owner, int n)
 {
-    CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1) && !pages && (u32)n * PAGE_SIZE <= CAP);
+    CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1) && !pages && (u32)n * PAGE_SIZE <= POOL_CAP);
     if (input[1] == 5) return 0;
     pages = n;
     return (u32)pool;
@@ -118,7 +120,7 @@ int ledger_reclaim_owner(u32 owner, u32 *reclaimed)
     CHECK(owner == (LEDGER_OWNER_FIXED_LAST + 1));
     *reclaimed = pages;
     pages = 0;
-    kmemset(pool, 0xdd, CAP);
+    kmemset(pool, 0xdd, POOL_CAP);
     return 1;
 }
 void kprintf(unsigned char color, const char *format, ...)
@@ -205,7 +207,7 @@ void _start(void)
     read_input(file, input[3]);
     bi.img_valid = input[1] != 7; bi.img_crc = input[4];
     int rc;
-    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(CAP), "d"(7) : "memory");
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(POOL_CAP), "d"(7) : "memory");
     CHECK(!rc);
     kdebug_load();
     CHECK(kdebug.state == input[2] && imports == 0);

@@ -49,7 +49,17 @@ static void physical(u32 va,u32 width,bool write)
 static int memory_read(void *v,u32 va,u32 width,u32 *out)
 {(void)v;physical(va,width,false);return fault==3?-1:exec_bus_read(0,active,out);}
 static int memory_write(void *v,u32 va,u32 width,u32 value)
-{(void)v;physical(va,width,true);return fault==3?-1:exec_bus_write(0,active,value);}
+{
+    (void)v;physical(va,width,true);
+    if(fault==3)return -1;
+    int rc=exec_bus_write(0,active,value);
+    const struct recover_target *t=&profile.targets[active->key];
+    if(active->dir_substep==REC_DATA && t->port==RECOVER_CRTC && t->index==RECOVER_CR1F) {
+        CHECK(value==RECOVER_CR1F_UNLOCK || value==RECOVER_CR1F_LOCK);
+        values[active->key]=value==RECOVER_CR1F_UNLOCK?RECOVER_CR1F_UNLOCKED:0;
+    }
+    return rc;
+}
 static struct recover_window_ops memory_ops;
 static int bus_read_test(void *v,const struct recover_bus_access *a,u32 *out)
 {(void)v;active=a;return gfinit_bus_read(&device,a,out);}
@@ -82,7 +92,7 @@ static void accessor_tests(void)
         if(t->space==REC_VGA_INDEXED) {
             CHECK(a.offset==(t->port==0x3d4?0x601000U:0xc0000U)+t->head*0x2000+t->port);
             CHECK(bus_write_test(0,&a,t->index)==0);
-            a=address(key,REC_DATA);CHECK(bus_write_test(0,&a,0x5a)==0);
+            a=address(key,REC_DATA);CHECK(bus_write_test(0,&a,t->index==RECOVER_CR1F?RECOVER_CR1F_UNLOCK:0x5a)==0);
         }
         a.offset++;u32 before=maps;CHECK(bus_read_test(0,&a,&value)<0 && maps==before);
     }
@@ -103,6 +113,21 @@ static void accessor_tests(void)
         if(bad==4)a.space=REC_PC98_IO;
         CHECK(bus_read_test(0,&a,&value)<0 && !maps);
     }
+    bus_setup();pci_id=~0U;
+    struct recover_bus_access cfg=address(6,REC_READ);u32 absent=0;
+    CHECK(bus_read_test(0,&cfg,&absent)<0 && !pci_writes);
+    cfg.dir_substep=REC_WRITE;CHECK(bus_write_test(0,&cfg,0x102)<0 && !pci_writes);
+    for(u32 type=1;type<=4;type+=3) {
+        bus_setup();device.ready=false;rawbars[0]|=type;
+        CHECK(gfinit_bus_probe(&device)<0 && !device.ready);
+    }
+    bus_setup();
+    struct recover_target legacy_targets[RECOVER_TARGET_MAX];
+    for(u32 i=0;i<profile.target_count;i++)legacy_targets[i]=profile.targets[i];
+    profile.targets=legacy_targets;legacy_targets[4].offset=0;
+    rawbars[0]=device.bars[0]=0xa0000;
+    struct recover_bus_access legacy=address(4,REC_READ);u32 legacy_value=0;
+    CHECK(bus_read_test(0,&legacy,&legacy_value)<0 && !maps);
     for(u32 bad=1;bad<=3;bad++) {
         bus_setup();fault=bad;struct recover_bus_access a=address(4,REC_READ);u32 value=0;
         CHECK(bus_read_test(0,&a,&value)<0 && restores==1 && irq_state==1 && !window_busy);
@@ -120,7 +145,7 @@ static void accessor_tests(void)
 }
 static struct recover_plan_entry combined_entries[6];
 static struct recover_plan_dep combined_deps[2];
-static void production_plan(void)
+static void production_plan(u32 initial_lock)
 {
     bus_setup();fixture();
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0 && decoded.plan.unresolved_count==0);
@@ -158,6 +183,7 @@ static void production_plan(void)
     /* Guard values and retained locks are readable; reference interpreter
      * receives the same deterministic initial register contents. */
     for(u32 i=0;i<profile.target_count;i++)reference_values[i]=values[i]=0;
+    values[11]=initial_lock;
     ref_head=ref_skip=0;
     for(u32 i=0;i<nn;i++) {
         u32 value;
@@ -182,15 +208,89 @@ static void production_plan(void)
     u32 saved_count=core.local_saved_count;
     struct recover_local_saved saved[RECOVER_MAX_REGS];
     for(u32 i=0;i<saved_count;i++)saved[i]=core.local_saved[i];
+    u32 cleanup_first=actual_count;
     CHECK(gfinit_bus_local_cleanup(&device,&core)==0 && !core.local_saved_count);
+    const u32 cleanup_keys[]={11,12,10,11};
+    const u32 cleanup_values[]={RECOVER_CR1F_UNLOCK,0,0,
+        initial_lock==RECOVER_CR1F_UNLOCKED?RECOVER_CR1F_UNLOCK:RECOVER_CR1F_LOCK};
+    CHECK(actual_count>=cleanup_first+9);
+    for(u32 i=0;i<4;i++) {
+        CHECK(actual[cleanup_first+2*i].dir==REC_SELECT && actual[cleanup_first+2*i].key==cleanup_keys[i]);
+        CHECK(actual[cleanup_first+2*i+1].dir==REC_DATA && actual[cleanup_first+2*i+1].key==cleanup_keys[i]);
+        CHECK(actual[cleanup_first+2*i+1].value==cleanup_values[i]);
+    }
+    CHECK(actual[cleanup_first+8].dir==REC_SELECT);
     for(u32 i=0;i<saved_count;i++)if(saved[i].dir_substep==REC_DATA)CHECK(values[saved[i].key]==saved[i].value);
     u32 count=actual_count;CHECK(gfinit_bus_local_cleanup(&device,&core)==0 && actual_count==count);
     output("bus: local CR11/lock/owner and original indices restored once, COLD data not replayed\n");
     output("bus: full production plan through S3, COPY/capture permissions, no unresolved rows\n");
 }
-void _start(void)
+/* Independently fake the live PCI configuration used for exclusions. */
+#define GFINIT_RESOURCES_HOST 1
+#include "../../kdebug/gfinit_resources.c"
+static u32 resource_cfg[32][8][16];
+static const char *resource_reason;
+static u32 resource_dev, resource_fn, resource_reg, resource_raw;
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
-    accessor_tests();production_plan();
+    __builtin_va_list ap;
+    (void)attr; (void)fmt;
+    __builtin_va_start(ap, fmt);
+    resource_reason=__builtin_va_arg(ap,const char *);
+    resource_dev=__builtin_va_arg(ap,u32);resource_fn=__builtin_va_arg(ap,u32);
+    resource_reg=__builtin_va_arg(ap,u32);resource_raw=__builtin_va_arg(ap,u32);
+    __builtin_va_end(ap);
+}
+u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
+{CHECK(bus==0 && dev<32 && fn<8 && reg<64);return resource_cfg[dev][fn][reg/4];}
+u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
+{return (u16)(pci_cfg_read32(bus,dev,fn,reg&~3U)>>((reg&2)*8));}
+static void resource_setup(void)
+{
+    for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)for(u32 r=0;r<16;r++)resource_cfg[d][f][r]=r?0:~0U;
+}
+static void resource_tests(void)
+{
+    struct recover_range ranges[RECOVER_RANGE_MAX];u32 n=123;
+    resource_setup();CHECK(gfinit_resources(ranges,&n)<0 && n==0);
+    resource_cfg[13][0][0]=GF_RES_GPU_ID;
+    CHECK(gfinit_resources(ranges,&n)==0 && n==0);
+    resource_cfg[2][7][0]=0x12298086;resource_cfg[2][7][1]=2;
+    resource_cfg[2][7][4]=0x20410000;
+    CHECK(gfinit_resources(ranges,&n)<0 && n==0); /* No guessed aperture. */
+    CHECK(resource_reason && resource_reason[0]=='m' && resource_dev==2 && resource_fn==7 &&
+          resource_reg==PCI_CFG_BAR0 && resource_raw==0x20410000);
+    resource_cfg[2][7][1]=0;CHECK(gfinit_resources(ranges,&n)==0);
+    resource_cfg[2][7][1]=2;resource_cfg[2][7][4]=0x6001;
+    CHECK(gfinit_resources(ranges,&n)==0);
+    resource_cfg[2][7][12]=1;CHECK(gfinit_resources(ranges,&n)<0);
+    resource_cfg[2][7][12]=0;
+    resource_cfg[2][7][3]=1U<<16;
+    resource_cfg[2][7][8]=0x21f02000; /* [20000000,22000000) */
+    resource_cfg[2][7][9]=0x31f13001; /* 64-bit prefetch, zero upper halves */
+    CHECK(gfinit_resources(ranges,&n)==0 && n==2);
+    CHECK(ranges[0].base==0x20000000 && ranges[0].len==0x2000000);
+    CHECK(ranges[1].base==0x30000000 && ranges[1].len==0x2000000);
+    resource_cfg[2][7][10]=1;
+    CHECK(gfinit_resources(ranges,&n)<0 && n==0);
+    resource_cfg[2][7][10]=0;resource_cfg[2][7][9]=0x31f03001;
+    CHECK(gfinit_resources(ranges,&n)<0 && n==0);
+    resource_cfg[2][7][9]=0x0000fff0; /* disabled */
+    CHECK(gfinit_resources(ranges,&n)==0 && n==1);
+    resource_cfg[2][7][8]=0xfff00000; /* 4 GiB length cannot fit u32 */
+    CHECK(gfinit_resources(ranges,&n)<0 && n==0);
+    resource_cfg[2][7][8]=0x21f02000;
+    n=RECOVER_RANGE_MAX;
+    CHECK(resource_window(ranges,&n,2,7,GF_RES_MEM_WINDOW)<0);
+    output("resources: live scan, unknown BAR reject, disabled/IO skip, bridge windows and bounds PASS\n");
+}
+
+#ifndef GF_S5_ENTRY
+#define GF_S5_ENTRY _start
+#endif
+void GF_S5_ENTRY(void)
+{
+    resource_tests();accessor_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
     output(failures?"GF S5 FAIL\n":"GF S5 PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

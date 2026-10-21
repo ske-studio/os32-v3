@@ -5,6 +5,8 @@
 #define GF_INIT_INSNS 193U
 #define GF_INIT_MAINS 5U
 #define GF_INIT_SCHEDULE 4096U
+#define GF_INIT_WORK_STEPS 2048U /* bounded expansion scratch, not execution budget */
+#define GF_INIT_ARGS 6144U /* includes S6 PREPARE and maximum BAR1 verification */
 #define GF_INIT_CALL_DEPTH 16U
 #define GF_INIT_REPEAT_DEPTH 8U
 #define GF_INIT_WAIT_MAX 5000000U
@@ -30,12 +32,12 @@ struct gfinit_scheduled {
 struct gfinit_decode {
     struct recover_plan plan;
     struct recover_plan_node nodes[RECOVER_NODE_MAX];
-    struct recover_plan_arg args[RECOVER_ARG_MAX];
+    struct recover_plan_arg args[GF_INIT_ARGS];
     struct recover_plan_entry entries[GF_INIT_MAINS];
     struct recover_capture captures[RECOVER_CAPTURE_MAX];
     struct gfinit_instruction insns[GF_INIT_INSNS];
-    struct gfinit_scheduled schedule[GF_INIT_SCHEDULE];
-    u32 heads[GF_INIT_SCHEDULE][4], reachable[GF_INIT_SCHEDULE];
+    struct gfinit_scheduled schedule[GF_INIT_WORK_STEPS];
+    u32 heads[GF_INIT_WORK_STEPS][4], reachable[GF_INIT_WORK_STEPS];
     u32 instruction_count, schedule_count, error_pc, error;
     u32 main_nodes[GF_INIT_MAINS], main_steps[GF_INIT_MAINS], main_wait[GF_INIT_MAINS], max_call, max_repeat;
 };

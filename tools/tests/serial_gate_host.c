@@ -29,6 +29,7 @@ static int g_tx_n;
 static unsigned char g_rxq[4096];
 static int g_rxq_head, g_rxq_n;
 static unsigned g_sts_err;          /* 次の 0032h 読みに乗せる誤りビット */
+static int g_checked_status = -1;
 static int g_cmd_writes;            /* 0032h への書き込み (モード設定の検出) */
 
 void fake_outp(unsigned port, unsigned val)
@@ -44,6 +45,7 @@ void fake_outp(unsigned port, unsigned val)
 unsigned fake_inp(unsigned port)
 {
     unsigned r = 0xFF;
+    if (g_checked_status >= 0 && (port == 0x32 || port == 0x132)) return (unsigned)g_checked_status;
     if (port == 0x32) {
         /* TxRDY 常に 1、RxRDY = 待ち行列にある */
         r = 0x01 | (g_rxq_n ? 0x02 : 0) | g_sts_err;
@@ -249,10 +251,45 @@ static void isr_counts(void)
     CHECK(serial_fe_mask(SER_MODE_COMPAT) == STS_FE);
 }
 
+static void checked_tx(void)
+{
+    reset();
+    ser_initialized=0;
+    CHECK(serial_checked_begin()<0);
+    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')<0);
+    ser_initialized=1;
+    serial_gate_set(1);CHECK(serial_checked_begin()<0);serial_gate_set(0);
+    CHECK(serial_checked_begin()==0 && serial_checked_begin()<0);
+    serial_putchar('h');CHECK(g_tx_n==0);
+    u8 held[4];CHECK(serial_hold_take(held,4)==1 && held[0]=='h');
+    CHECK(serial_gate_put((const u8 *)"x",1)==SER_TX_DROPPED && g_tx_n==0);
+    serial_gate_set(1);CHECK(!serial_gate_active());
+    serial_init(19200);CHECK(g_cmd_writes==0);
+    CHECK(serial_init_vfast(115200)==SER_INIT_REFUSED && g_cmd_writes==0);
+    CHECK(serial_set_div4(1)<0);
+    for(u32 mode=SER_MODE_COMPAT;mode<=SER_MODE_VFAST;mode++) {
+        s_setup.mode=mode;s_port_cmd=serial_cmd_port(mode);
+        s_port_data=serial_data_port(mode);s_mask_txrdy=serial_txrdy_mask(mode);
+        g_checked_status=0;
+        CHECK(serial_checked_ready()==0 && serial_checked_put('x')<0 && !serial_checked_empty());
+        int before=g_tx_n;
+        g_checked_status=s_mask_txrdy;
+        CHECK(serial_checked_ready()==1 && serial_checked_empty()==0);
+        CHECK(serial_checked_put('R')==0 && g_tx_n==before+1 && g_tx[before]=='R');
+        g_checked_status=mode==SER_MODE_VFAST?SER_FSTS_TXEMP:STS_TXE;
+        CHECK(serial_checked_empty()==1 && serial_checked_ready()==0);
+    }
+    serial_checked_end();
+    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')<0);
+    g_checked_status=-1;
+    serial_init(9600);g_tx_n=0;serial_putchar('z');CHECK(g_tx_n==1 && g_tx[0]=='z');
+}
+
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
-    if (!strcmp(c, "gate_tx")) gate_tx();
+    if (!strcmp(c, "checked_tx")) checked_tx();
+    else if (!strcmp(c, "gate_tx")) gate_tx();
     else if (!strcmp(c, "hold_overflow")) hold_overflow();
     else if (!strcmp(c, "gate_rx")) gate_rx();
     else if (!strcmp(c, "gate_init_refused")) gate_init_refused();
