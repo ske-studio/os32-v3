@@ -1,9 +1,15 @@
 /* Actual S6 owner/request/ROM lifetime code. Platform and trial engine are
  * injected contracts; bus/decoder/plan internals have separate real tests. */
 #include "../../kdebug/gfinit.c"
-static struct gfinit_owner storage;
+#define TEST_PAGE_BUDGET (1024U * 1024U / PAGE_SIZE)
+static u8 decode_storage[PAGE_ALIGN_UP(sizeof(struct gfinit_decode))] __attribute__((aligned(PAGE_SIZE)));
+static u8 plan_storage[PAGE_ALIGN_UP(sizeof(struct gfinit_plan))] __attribute__((aligned(PAGE_SIZE)));
+static u8 flow_storage[RECOVER_NODE_MAX * RECOVER_BITS_WORDS * 4] __attribute__((aligned(PAGE_SIZE)));
+static u32 live_pages, peak_pages, alloc_calls, fail_alloc;
+static u32 block_pages[4];
 static struct recover core;
-static u8 rom_storage[GF_ROM_MAX], image[GF_ROM_MAX];
+static u8 rom_storage[GF_ROM_MAX] __attribute__((aligned(PAGE_SIZE)));
+static u8 image[GF_ROM_MAX];
 static u32 failures, allocations, frees, reads, writes, begins, steps, ends, cleans;
 static u32 run_mask, run_fail, step_fail, decode_fail, probe_fail, peek_fail, verify_calls;
 static char events[64]; static u32 event_count;
@@ -12,9 +18,33 @@ static void output(const char *s)
 #define CHECK(x) do { if (!(x)) { output("FAIL " #x "\n"); failures++; } } while(0)
 static void zero(void *p,u32 n) { u8 *b=p;while(n--)*b++=0; }
 static void event(char c) { CHECK(event_count<sizeof(events));if(event_count<sizeof(events))events[event_count++]=c; }
-void *kmalloc(u32 size) { CHECK(size==GF_ROM_MAX);allocations++;return rom_storage; }
-void *kzalloc(u32 size) { CHECK(size==sizeof(storage));zero(&storage,sizeof(storage));return &storage; }
-void kfree(void *p) { CHECK(p==rom_storage);frees++; }
+void *kmemset(void *p,int value,u32 n) { u8 *b=p;while(n--)*b++=value;return p; }
+u32 pgalloc_alloc_phys(u32 who,int n)
+{
+    CHECK(who==LEDGER_OWNER_KERNEL && n>0);
+    alloc_calls++;
+    if(alloc_calls==fail_alloc || n<=0 || live_pages+(u32)n>TEST_PAGE_BUDGET)return 0;
+    u32 slot;
+    void *p;
+    if((u32)n==sizeof(decode_storage)/PAGE_SIZE){slot=0;p=decode_storage;}
+    else if((u32)n==sizeof(plan_storage)/PAGE_SIZE){slot=1;p=plan_storage;}
+    else if((u32)n==sizeof(rom_storage)/PAGE_SIZE){slot=2;p=rom_storage;allocations++;}
+    else {slot=3;p=flow_storage;CHECK((u32)n<=sizeof(flow_storage)/PAGE_SIZE);}
+    CHECK(!block_pages[slot]);if(block_pages[slot])return 0;
+    block_pages[slot]=n;live_pages+=n;if(live_pages>peak_pages)peak_pages=live_pages;
+    return V2P(p);
+}
+int pgalloc_free_n_owner(u32 who,u32 pfn,int n)
+{
+    void *blocks[]={decode_storage,plan_storage,rom_storage,flow_storage};
+    CHECK(who==LEDGER_OWNER_KERNEL);
+    for(u32 i=0;i<4;i++)if(V2P(blocks[i])/PAGE_SIZE==pfn) {
+        CHECK(block_pages[i]==(u32)n && n>0);
+        if(block_pages[i]!=(u32)n || n<=0)return 0;
+        live_pages-=n;block_pages[i]=0;if(i==2)frees++;return 1;
+    }
+    CHECK(false);return 0;
+}
 u32 pci_cfg_read32(u32 b,u32 d,u32 f,u32 o) { (void)b;(void)d;(void)f;(void)o;reads++;return 0; }
 u16 pci_cfg_read16(u32 b,u32 d,u32 f,u32 o) { return pci_cfg_read32(b,d,f,o); }
 void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v) { (void)b;(void)d;(void)f;(void)o;(void)v;writes++; }
@@ -46,12 +76,12 @@ int gfinit_decode_rom(const u8 *rom,u32 size,const struct recover_profile *p,str
 { CHECK(rom==rom_storage && size==512 && p);zero(d,sizeof(*d));return decode_fail?-1:0; }
 int gfinit_resources(struct recover_range *ranges,u32 *n) { ranges[0]=(struct recover_range){0};*n=1;return 0; }
 const struct recover_profile recover_gf_template={.trial_limit=6000,.opcode_limit=6000,.max_polls=65536};
-const struct recover_plan recover_gf_size_bars_plan={.version=1};
+const struct recover_plan recover_gf_size_bars_plan={.version=1,.node_count=32};
 int gfinit_plan_build(struct gfinit_plan *p,struct gfinit_decode *d,struct recover_profile *profile,u32 length)
-{ (void)d;(void)profile;CHECK(length==0x100000);zero(p,sizeof(*p));p->plan.version=1;return 0; }
+{ (void)d;(void)profile;CHECK(length==0x100000);zero(p,sizeof(*p));p->plan.version=1;p->plan.node_count=1790;return 0; }
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
-{ CHECK(p==&owner->compiled && r==&core && a);(void)value; }
-int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==&owner->compiled);verify_calls++;return 0; }
+{ CHECK(p==owner->compiled && r==&core && a);(void)value; }
+int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==owner->compiled);verify_calls++;return 0; }
 int recover_budget_apply(struct recover_profile *p,u32 kind,u32 hz,u32 baud,u32 bits,const struct recover_static_work *w)
 { CHECK(kind==REC_BUDGET_SIZE_BARS || kind==REC_BUDGET_GF);CHECK(hz==PIT_HZ && baud==9600 && bits==10 && w->bytes);p->crc=1;return 0; }
 u32 recover_profile_crc(const struct recover_profile *p) { (void)p;return 1; }
@@ -59,7 +89,8 @@ struct recover *recover_owner(void) { return &core; }
 int recover_owner_configure(const struct recover_ops *ops,void *opaque,const struct recover_profile *s0,bool approved)
 { CHECK(!approved);core.ops=ops;core.opaque=opaque;core.s0_profile=s0;return 0; }
 int recover_bind_plan(struct recover *r,const struct recover_profile *p,const struct recover_plan *plan,struct recover_plan_buffers *b,u32 *hash)
-{ CHECK(r==&core && b->valid_bits);r->profile=p;r->plan=plan;*hash=123;return 0; }
+{ CHECK(r==&core && b->valid_bits && b->flow_bits);
+  CHECK(block_pages[3]==PAGE_ALIGN_UP(plan->node_count*RECOVER_BITS_WORDS*4)/PAGE_SIZE);r->profile=p;r->plan=plan;*hash=123;return 0; }
 int trial_begin(struct recover *r,const struct recover_profile *p,u32 hash,u32 budget)
 { CHECK((r->state==REC_IDLE || r->state==REC_VERIFIED) && p==r->profile && hash==123 && budget==p->trial_limit);begins++;event('B');r->token.session++;r->state=REC_PAUSED;r->expected_node=RECOVER_NONE;return 0; }
 int trial_step(struct recover *r,const struct recover_token *token,bool approved,int (*operation)(struct recover *,void *),void *arg)
@@ -90,7 +121,9 @@ static int call(u32 op,u32 flags,u32 main)
 { struct gfinit_request q=request(flags,main);return gfinit_call(op,&q,sizeof(q),&base,&transport,&s0); }
 static void setup(void)
 {
-    owner=0;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
+    if(owner)gf_release_rom(owner);
+    CHECK(live_pages==0);zero(block_pages,sizeof(block_pages));alloc_calls=fail_alloc=peak_pages=0;
+    zero(&control,sizeof(control));owner=0;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
@@ -125,6 +158,7 @@ static void failures_test(void)
     setup();prepared();gfinit_recover_end();CHECK(frees==0 && owner->rom);
     core.state=REC_VERIFIED;gfinit_recover_end();CHECK(frees==1 && !owner->rom);
     gfinit_recover_end();CHECK(frees==1);
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)<0 && begins==2 && live_pages==0);
     setup();prepared();core.state=REC_FAILED;gfinit_recover_end();CHECK(frees==1 && !owner->rom);
     setup();CHECK(call(GF_OP_INSPECT,0,0)==0);step_fail=1;
     CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)<0 && core.state==REC_FAILED && frees==1 && cleans==1);
@@ -137,5 +171,24 @@ static void failures_test(void)
     setup();CHECK(call(GF_OP_INSPECT,0,0)==0);CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);
     CHECK(call(GF_OP_INSPECT,0,0)==0 && owner->inspected && owner->rom && frees==1 && allocations==2);
 }
+static void number(u32 n)
+{ char buf[16];u32 i=0;do{buf[i++]='0'+n%10;n/=10;}while(n);while(i){char c[2]={buf[--i],0};output(c);} }
+static void allocation_test(void)
+{
+    for(u32 fail=1;fail<=5;fail++) {
+        setup();fail_alloc=fail;
+        int rc=call(GF_OP_INSPECT,0,0);
+        if(!rc)rc=call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0);
+        if(!rc)rc=call(GF_OP_PREPARE,GF_ALLOW_WRITE,0);
+        CHECK(rc<0 && live_pages==0 && !owner->inspected);
+    }
+    setup();prepared();CHECK(peak_pages<=TEST_PAGE_BUDGET);
+    output("bytes control/decode/plan/ROM/flow pages_peak: ");
+    number(sizeof(control));output("/");number(sizeof(struct gfinit_decode));output("/");
+    number(sizeof(struct gfinit_plan));output("/");number(GF_ROM_MAX);output("/");
+    number(owner->flow_bytes);output(" pages=");number(peak_pages);output("\n");
+    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && live_pages==0);
+    setup();probe_fail=1;CHECK(call(GF_OP_INSPECT,0,0)<0 && live_pages==0);
+}
 void _start(void)
-{ lifecycle();failures_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ lifecycle();failures_test();allocation_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

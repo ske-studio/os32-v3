@@ -229,6 +229,18 @@ static void production_plan(u32 initial_lock)
 #define GFINIT_RESOURCES_HOST 1
 #include "../../kdebug/gfinit_resources.c"
 static u32 resource_cfg[32][8][16];
+static const char *resource_reason;
+static u32 resource_dev, resource_fn, resource_reg, resource_raw;
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    __builtin_va_list ap;
+    (void)attr; (void)fmt;
+    __builtin_va_start(ap, fmt);
+    resource_reason=__builtin_va_arg(ap,const char *);
+    resource_dev=__builtin_va_arg(ap,u32);resource_fn=__builtin_va_arg(ap,u32);
+    resource_reg=__builtin_va_arg(ap,u32);resource_raw=__builtin_va_arg(ap,u32);
+    __builtin_va_end(ap);
+}
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
 {CHECK(bus==0 && dev<32 && fn<8 && reg<64);return resource_cfg[dev][fn][reg/4];}
 u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
@@ -246,6 +258,8 @@ static void resource_tests(void)
     resource_cfg[2][7][0]=0x12298086;resource_cfg[2][7][1]=2;
     resource_cfg[2][7][4]=0x20410000;
     CHECK(gfinit_resources(ranges,&n)<0 && n==0); /* No guessed aperture. */
+    CHECK(resource_reason && resource_reason[0]=='m' && resource_dev==2 && resource_fn==7 &&
+          resource_reg==PCI_CFG_BAR0 && resource_raw==0x20410000);
     resource_cfg[2][7][1]=0;CHECK(gfinit_resources(ranges,&n)==0);
     resource_cfg[2][7][1]=2;resource_cfg[2][7][4]=0x6001;
     CHECK(gfinit_resources(ranges,&n)==0);

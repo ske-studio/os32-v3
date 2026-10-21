@@ -32,7 +32,7 @@ struct recover_plan {
     const struct recover_plan_dep *deps; u32 dep_count;
     const struct recover_plan_entry *entries; u32 entry_count;
 };
-struct recover_plan_buffers { u32 *flow_bits, *valid_bits; }; /* 下記上限分を4aが静的確保 */
+struct recover_plan_buffers { u32 *flow_bits, *valid_bits; }; /* 4aが実node数×64 u32とvalid 64 u32を確保 */
 int recover_bind_plan(struct recover *r, const struct recover_profile *p,
                       const struct recover_plan *plan, struct recover_plan_buffers *buf, u32 *plan_hash);
 int recover_plan_enter(struct recover *r, u32 node);
@@ -251,3 +251,7 @@ struct recover_opcode_layout {
 - A1の資源採取はGPU直結bus0の全functionを生configで読み、off-path bridgeは正確な転送窓全体で子装置を包含して排他する（TI PCI2050B SCPS076G §§4.20–4.25、FreeBSD releng/14.3 `sys/dev/pci/pcireg.h`）；有効なendpoint memory BAR/ROMの長さ不明は既定どおり書込み前に拒否し、隣接割当・baseの整列から実長を推測しない。
 - private opは5=INSPECT・6=SIZE_BARS・7=PREPARE・8=RUN_ONE・9=VERIFY・10=ABORT、版1の40byte要求とし既存kdebug_callを使う；公開SDK・shellのgfinit表示はS7、importは既存258番の後ろに追加して生成し既存slotを保つ。
 - hostの--statusはsession/state/image-crc不要の状態表示専用とし、echo・本文・EOTを照合する；復旧成功とは扱わずver・abort・session更新を行わない。aidebug:は既存AidebugPortを使い、serialはexclusive=Trueだけで所有する。
+- S6修正: ownerのcallback・状態だけを小さい静的controlへ残し、ROM・decode・plan・flowは既存`pgalloc_alloc_phys(LEDGER_OWNER_KERNEL)`と対のfreeで試行中だけ所有する；flowはbind対象の実node数×64 u32、decodeは作業2048step/引数6144、planはtarget768/rule1280/layout1056/expr16のGF固有上限（超過は開始拒否）とし、32MB機の一時領域を1MiB以内でhost検査する。
+- S6修正: SIZE_BARS成功だけは次のPREPARE用にROM/decodeを保持し、終端・中止・開始失敗では全ページを返しlast_opを無効化する；外部recover後の同session再送も成功キャッシュを返さない。
+- S6修正: checked TX中の通常kprintfは既存holdに入るがchecked_endでは排出せず、次のSerialFS gateで消える仕様と明記する；RECの有限送信予算と既存rshell/SerialFSの動作を変更しない。
+- S6修正: A1の長さ不明memory BAR/ROM・header・bridge窓・GPU不一致/不在は拒否理由とbus0 BDF・reg・rawを開始前にログへ出す；Ra266のTrident 0:8.0/NEC 0:7.0による拒否の実機確認はPMがT5前に行う。

@@ -19,12 +19,16 @@ MUTATIONS = [
     ('begin_leaves_s0_ops', 'recover_owner_configure(&g->ops, &g->bus, g->s0, false) ||', ''),
     ('idle_abort', 'owner && owner->inspected && r->state == REC_IDLE', 'false'),
     ('external_recover_release', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED) && false)'),
-    ('duplicate_error', 'return owner->last.status ? -1 : 0;', 'return 0;'),
+    ('cache_invalidate', 'g->last_op = RECOVER_NONE;', ''),
+    ('flow_size', 'plan->node_count * RECOVER_BITS_WORDS * sizeof(u32)', 'RECOVER_NODE_MAX * RECOVER_BITS_WORDS * sizeof(u32)'),
+    ('decode_release', 'gf_free(g->decoded, sizeof(*g->decoded));', ''),
+    ('plan_release', 'gf_free(g->compiled, sizeof(*g->compiled));', ''),
+    ('page_round', 'pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, PAGE_ALIGN_UP(bytes) / PAGE_SIZE)', 'pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, bytes / PAGE_SIZE)'),
     ('inspect_release', 'op != GF_OP_INSPECT && (op != GF_OP_SIZE_BARS || r->state == REC_FAILED)', '(op != GF_OP_SIZE_BARS || r->state == REC_FAILED)'),
     ('write_flag', '(op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))', 'false'),
     ('session', 'if (q.session != r->token.session) return -1;', ''),
     ('main_order', 'q.script_id == owner->next_main &&', ''),
-    ('rom_release', 'if (g->rom) kfree(g->rom);', ''),
+    ('rom_release', 'gf_free(g->rom, GF_ROM_MAX);', ''),
     ('size_end', 'if (size) return trial_end(r, &r->token, REC_NORMAL);', 'if (size) return 0;'),
 ]
 

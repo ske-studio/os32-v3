@@ -86,11 +86,11 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
     if (!out || !d || !p || (bar1_length & (bar1_length-1)) || bar1_length < GF_PLAN_VRAM_WORDS * 4 ||
         d->plan.unresolved_count || !d->plan.node_count ||
         d->plan.node_count + prep->node_count + extra_nodes > RECOVER_NODE_MAX ||
-        d->plan.arg_count + prep->arg_count + 9 * GF_PLAN_VRAM_WORDS + 10*points > RECOVER_ARG_MAX ||
+        d->plan.arg_count + prep->arg_count + 9 * GF_PLAN_VRAM_WORDS + 10*points > GF_INIT_ARGS ||
         d->plan.entry_count + 2 > RECOVER_ENTRY_MAX ||
-        p->target_count + GF_PLAN_VRAM_WORDS + points > RECOVER_TARGET_MAX ||
-        p->rule_count + 2 * GF_PLAN_VRAM_WORDS + points > RECOVER_RULE_MAX ||
-        p->layout_count + 6 > RECOVER_RULE_MAX || p->expr_count + 4 > RECOVER_RULE_MAX) return -1;
+        p->target_count + GF_PLAN_VRAM_WORDS + points > GF_PLAN_TARGETS ||
+        p->rule_count + 2 * GF_PLAN_VRAM_WORDS + points > GF_PLAN_RULES ||
+        p->layout_count + 6 > GF_PLAN_LAYOUTS || p->expr_count + 4 > GF_PLAN_EXPRS) return -1;
     out->pfb_key=RECOVER_NONE;
     for(u32 i=0;i<p->target_count;i++)if(p->targets[i].space==REC_BAR_MMIO &&
         p->targets[i].bar==0 && p->targets[i].offset==GF_PLAN_PFB_AMOUNT && p->targets[i].width==4)

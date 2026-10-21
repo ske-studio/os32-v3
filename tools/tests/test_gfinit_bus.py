@@ -34,7 +34,8 @@ SHARED_MUTATIONS = [
      'v->key == target && *value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
-    ('resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO)) return -1;', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false) return -1;'),
+    ('resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
+    ('resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
     ('resource_function', 'fn < GF_RES_FUNCTIONS', 'fn < 1U'),
     ('resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
     ('resource_window_len', 'last + GF_RES_WINDOW_GRANULE - base', 'last - base'),

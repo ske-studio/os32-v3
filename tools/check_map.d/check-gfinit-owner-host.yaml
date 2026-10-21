@@ -9,7 +9,11 @@ check-gfinit-owner-host:
 - kdebug/recover.h
 - kdebug/kpeek.h
 - kdebug/kpeek_allow.h
-- kernel/kmalloc.h
+- kernel/pgalloc.h
+- kernel/paging.h
+- kernel/physmem.h
+- include/memmap.h
+- lib/kstring.h
 - kernel/idt.h
 - kernel/module.h
 - drivers/pci.h

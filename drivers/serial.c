@@ -680,6 +680,9 @@ static void ser_hold_push(u8 c)
 
 int serial_putchar(char c)
 {
+    /* Checked REC rows suppress ordinary output: this hold is not drained
+     * by checked_end. Only SerialFS drains it, and its next gate resets it.
+     * Thus kprintf during checked TX is intentionally lost, not deferred TX. */
     if (s_checked) {
         ser_hold_push((u8)c);
         return SER_TX_OK;
