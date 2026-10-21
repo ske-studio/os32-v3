@@ -9,6 +9,9 @@
 #include "../kernel/paging.h"
 #include "pc98.h"
 #include "io.h"
+#ifdef RECOVER_MODULE
+#include "generated/kdebug_import_macros.h"
+#endif
 
 #define RECOVER_PAGE_MASK (MEM_PAGE_SIZE - 1U)
 #define RECOVER_UART_US 1000000U
@@ -91,23 +94,32 @@ int recover_window_access(struct recover_window *w, u32 pa, u32 width,
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {
     u32 saved, actual;
+    int screen_rc;
+    /* Each synchronous screen action has a bounded BEGIN/END pair. Logging
+     * cannot authorize an access after its allocation has expired. */
+#define SCREEN_CALL(step, expression) \
+    ((void)recover_record(r, "screen", "BEGIN", step, 0, 0, 0), \
+     screen_rc = (r->transport && recover_restore_point(r)) ? -1 : (expression), \
+     (void)recover_record(r, "screen", "END", step, 0, screen_rc, \
+                         r->ops->ticks(r->opaque) - r->restore_tick), screen_rc)
     if (!ops || !ops->cui || !ops->safe || !ops->restore || !ops->read_cell ||
         !ops->write_cell || !ops->redraw || ops->cui(opaque)) return -1;
-    if (recover_restore_point(r) || ops->safe(opaque) ||
-        recover_restore_point(r) || ops->restore(opaque) ||
-        recover_restore_point(r) || ops->read_cell(opaque, &saved)) return -1;
+    if (recover_restore_point(r) || SCREEN_CALL(0, ops->safe(opaque)) ||
+        recover_restore_point(r) || SCREEN_CALL(1, ops->restore(opaque)) ||
+        recover_restore_point(r) || SCREEN_CALL(2, ops->read_cell(opaque, &saved))) return -1;
     u32 test = (saved ^ 0xffffU) & 0xffffU;
     if (recover_restore_point(r)) return -1;
-    int rc = ops->write_cell(opaque, test);
+    int rc = SCREEN_CALL(3, ops->write_cell(opaque, test));
     /* Even a write reporting failure may have changed VRAM. Restore once,
      * preserving the first error. No retry of the failed access. */
     if (!rc) {
-        if (recover_restore_point(r) || ops->read_cell(opaque, &actual) || actual != test) rc = -1;
+        if (recover_restore_point(r) || SCREEN_CALL(4, ops->read_cell(opaque, &actual)) || actual != test) rc = -1;
     }
-    if (recover_restore_point(r) || ops->write_cell(opaque, saved)) return -1;
-    if (recover_restore_point(r) || ops->read_cell(opaque, &actual) || actual != saved) return -1;
-    if (rc || recover_restore_point(r) || ops->redraw(opaque)) return -1;
+    if (recover_restore_point(r) || SCREEN_CALL(5, ops->write_cell(opaque, saved))) return -1;
+    if (recover_restore_point(r) || SCREEN_CALL(4, ops->read_cell(opaque, &actual)) || actual != saved) return -1;
+    if (rc || recover_restore_point(r) || SCREEN_CALL(6, ops->redraw(opaque))) return -1;
     return 0;
+#undef SCREEN_CALL
 }
 
 static int seconds_ticks(u32 sec, u32 hz, u32 *out)
@@ -287,17 +299,21 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
      * ②: route R/W/R, safe, display, cell R/W/R/W/R, redraw, final verify.
      * E is conservatively entirely counted as 1ms waits, per the addendum. */
     static const char begin_row[] =
-        "REC sid=4294967295 seq=4294967295 phase=restore event=BEGIN step=4294967295 addr=FFFFFFFF\n";
+        "REC sid=4294967295 seq=4294967295 phase=restore event=BEGIN step=4294967295 addr=4294967295\n";
     static const char end_row[] =
         "REC sid=4294967295 seq=4294967295 phase=restore event=END rc=-2147483648 elapsed=4294967295\n";
     static const char final_row[] =
-        "REC sid=4294967295 seq=4294967295 result=PARTIAL target=S0 verified=4294967295 unknown=4294967295 override=4294967295 saved=FFFFFFFF actual=FFFFFFFF\n";
+        "REC sid=4294967295 seq=4294967295 phase=final event=END result=PARTIAL target=S0 verified=4294967295 unknown=4294967295 override=4294967295 saved=4294967295 actual=4294967295 trial=4294967295 lost_lines=4294967295 discarded_bytes=4294967295\n";
+    static const char discard_row[] =
+        "REC sid=4294967295 seq=4294967295 phase=receive event=DISCARD discarded_bytes=4294967295\n";
+    static const char state_row[] =
+        "REC sid=4294967295 seq=4294967295 phase=state event=RESTORING version=4294967295 profile_crc=4294967295 plan_hash=4294967295 snapshot_crc=4294967295\n";
     u32 pair_bytes=sizeof(begin_row)+sizeof(end_row)-2;
-    u32 s0_bytes=12*pair_bytes+sizeof(final_row)-1;
+    u32 s0_bytes=14*pair_bytes+sizeof(final_row)+sizeof(discard_row)-2;
     u32 main_pairs=1+1+p->quiesce_count+1+1+1+6;
     if (kind==REC_BUDGET_SIZE_BARS) main_pairs+=7;
     struct recover_static_work work={
-        main_pairs*pair_bytes+s0_bytes, kind==REC_BUDGET_SIZE_BARS ? 6000:4000,
+        main_pairs*pair_bytes+s0_bytes+sizeof(state_row)-1, kind==REC_BUDGET_SIZE_BARS ? 6000:4000,
         main_pairs*8+256, s0_bytes,2000,256};
 
     return recover_budget_apply(p,kind,hz,9600,10,&work);

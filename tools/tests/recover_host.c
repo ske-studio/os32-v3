@@ -516,11 +516,12 @@ static void routes(void)
 #include "recover_descriptor_host.inc"
 
 #include "recover_t2_host.inc"
+#include "recover_t3_host.inc"
 
 void _start(void)
 {
     preconditions(); normal(); mismatches(); timing(); callback_timing();
-    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests();
+    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }

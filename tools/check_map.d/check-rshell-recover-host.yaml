@@ -1,0 +1,5 @@
+check-rshell-recover-host:
+- tools/rshell_recover.py
+- tools/tests/test_rshell_recover.py
+- tools/check_map.d/check-rshell-recover-host.yaml
+- build/checks.d/check-rshell-recover-host.mk

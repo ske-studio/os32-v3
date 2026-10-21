@@ -1251,4 +1251,49 @@ sfs_lan_peer_mac:
 display_text_start:
     jmp *kdebug_import_slots+996
 .size display_text_start, .-display_text_start
+.globl serial_get_setup
+.type serial_get_setup, @function
+serial_get_setup:
+    jmp *kdebug_import_slots+1000
+.size serial_get_setup, .-serial_get_setup
+.globl serial_trygetchar
+.type serial_trygetchar, @function
+serial_trygetchar:
+    jmp *kdebug_import_slots+1004
+.size serial_trygetchar, .-serial_trygetchar
+.globl serial_cmd_port
+.type serial_cmd_port, @function
+serial_cmd_port:
+    jmp *kdebug_import_slots+1008
+.size serial_cmd_port, .-serial_cmd_port
+.globl serial_data_port
+.type serial_data_port, @function
+serial_data_port:
+    jmp *kdebug_import_slots+1012
+.size serial_data_port, .-serial_data_port
+.globl serial_txrdy_mask
+.type serial_txrdy_mask, @function
+serial_txrdy_mask:
+    jmp *kdebug_import_slots+1016
+.size serial_txrdy_mask, .-serial_txrdy_mask
+.globl display_restore_98
+.type display_restore_98, @function
+display_restore_98:
+    jmp *kdebug_import_slots+1020
+.size display_restore_98, .-display_restore_98
+.globl display_recover_ready
+.type display_recover_ready, @function
+display_recover_ready:
+    jmp *kdebug_import_slots+1024
+.size display_recover_ready, .-display_recover_ready
+.globl display_recover_cell_read
+.type display_recover_cell_read, @function
+display_recover_cell_read:
+    jmp *kdebug_import_slots+1028
+.size display_recover_cell_read, .-display_recover_cell_read
+.globl display_recover_cell_write
+.type display_recover_cell_write, @function
+display_recover_cell_write:
+    jmp *kdebug_import_slots+1032
+.size display_recover_cell_write, .-display_recover_cell_write
 .section .note.GNU-stack,"",@progbits

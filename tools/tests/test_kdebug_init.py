@@ -105,10 +105,11 @@ def main():
         for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c',
                     ROOT / 'kdebug/nic_trace.c', ROOT / 'kdebug/v86_gcap.c',
                     ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c',
-                    ROOT / 'kdebug/kpeek_allow.c', source,
+                    ROOT / 'kdebug/kpeek_allow.c', ROOT / 'kdebug/recover.c',
+                    ROOT / 'kdebug/recover_profile.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
-            command([cross / 'i386-elf-gcc', *FLAGS, *inc, '-c', src, '-o', obj])
+            command([cross / 'i386-elf-gcc', '-DRECOVER_MODULE', *FLAGS, *inc, '-c', src, '-o', obj])
             objects.append(obj)
         elf = folder / 'module.elf'
         command([cross / 'i386-elf-ld', '-m', 'elf_i386', '--emit-relocs',

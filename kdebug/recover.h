@@ -4,7 +4,7 @@
 #include "types.h"
 #include <stdbool.h>
 
-/* DESIGN.final §3–5, §7 T1/T2. Entrypoint wiring is deferred to T3.
+/* DESIGN.final §3–5, §7 T1/T2/T3.
  * All callbacks are synchronous, bounded, and return 0 on success. No callback
  * may dispatch shell commands. A step must call recover_safe_point at each
  * poll/delay/instruction boundary. The owner initializes once per boot; FAILED
@@ -176,6 +176,13 @@ struct recover_token {
     struct recover_identity identity;
 };
 struct recover_local_saved { u32 key, dir_substep, value; };
+#define RECOVER_ABORT_SIZE 10U
+#define RECOVER_ABORT_SYNC0 0xa5U
+#define RECOVER_ABORT_SYNC1 0x5aU
+#define RECOVER_RX_LIMIT 64U
+#define RECOVER_RX_DRAIN 4096U
+#define RECOVER_ROW_MAX 384U
+struct recover_transport;
 struct recover;
 struct recover_ops {
     u32 (*ticks)(void *opaque);
@@ -199,6 +206,11 @@ struct recover_ops {
 };
 struct recover {
     const struct recover_ops *ops;
+    const struct recover_transport *transport;
+    const struct recover_profile *s0_profile;
+    u8 rx[RECOVER_ABORT_SIZE];
+    u32 rx_used, discarded_bytes, seq, lost_lines;
+    bool emitting, s0_only;
     void *opaque;
     const struct recover_profile *profile;
     struct recover_token token;
@@ -257,6 +269,20 @@ struct recover_uart_ops {
     int (*put)(void *opaque, u32 byte);
     int (*wait_frame)(void *opaque, u32 frame_us);
 };
+struct recover_transport {
+    int (*get)(void *opaque); /* nonblocking, -1 means empty */
+    struct recover_uart_ops uart;
+    void *opaque;
+    u32 frame_us, max_polls;
+};
+struct recover *recover_owner(void);
+int recover_owner_configure(const struct recover_ops *ops, void *opaque,
+    const struct recover_profile *s0_profile, bool route_write_approved);
+int recover_now_session(struct recover *r, u32 session);
+int recover_receive(struct recover *r);
+/* Shared REC sequence for future trial opcode/window records too. */
+int recover_record(struct recover *r, const char *phase, const char *event,
+                   u32 step, u32 addr, int rc, u32 elapsed);
 int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
                       void *opaque, u32 byte, u32 frame_us, u32 max_polls);
 

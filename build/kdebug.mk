@@ -10,7 +10,7 @@ $(MODULE_SCHEMA): tools/module_schema.py tools/gen_module_schema.py
 	python3 tools/gen_module_schema.py
 
 KDEBUG_OBJS := $(KDEBUG_OUT)/v86_gcap.o $(KDEBUG_OUT)/v86_gcap_math.o $(KDEBUG_OUT)/nic_trace.o $(KDEBUG_OUT)/kselftest.o $(KDEBUG_OUT)/crt_diag.o $(KDEBUG_OUT)/kdebug_main.o \
-               $(KDEBUG_OUT)/kpeek.o $(KDEBUG_OUT)/kpeek_allow.o \
+               $(KDEBUG_OUT)/kpeek.o $(KDEBUG_OUT)/kpeek_allow.o $(KDEBUG_OUT)/recover.o $(KDEBUG_OUT)/recover_profile.o \
                $(KDEBUG_OUT)/kdebug_import_slots.o $(KDEBUG_OUT)/kdebug_import_stubs.o
 KDEBUG_KEXPORT_OBJ := $(KDEBUG_OUT)/kdebug_kexports.o
 C_KERNEL_OBJ += $(KDEBUG_KEXPORT_OBJ)
@@ -28,6 +28,8 @@ $(KDEBUG_GENERATED) &: kernel/kdebug_imports.def tools/gen_kdebug_imports.py too
 
 kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h $(MODULE_SCHEMA)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module.c -o $@
+
+$(KDEBUG_OUT)/recover_profile.o: KERNEL_CFLAGS += -DRECOVER_MODULE
 
 $(KDEBUG_OUT)/%.o: kdebug/%.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_import_macros.h
 	mkdir -p $(@D)

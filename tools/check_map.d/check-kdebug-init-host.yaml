@@ -25,6 +25,13 @@ check-kdebug-init-host:
 - fs/vfs.h
 - tools/tests/nic_trace_host.c
 - kdebug/kdebug_main.c
+- kdebug/recover.c
+- kdebug/recover.h
+- kdebug/recover_profile.c
+- kdebug/recover_wire.h
+- drivers/serial.h
+- drivers/serial_plan.h
+- kernel/display_restore.h
 - kernel/kdebug_call.c
 - kdebug/kselftest.c
 - kernel/kselftest.h

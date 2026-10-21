@@ -7,6 +7,8 @@
 #include "drivers/kbd.h"
 #include "drivers/pci.h"
 #include "drivers/pcm_cs4231.h"
+#include "drivers/serial.h"
+#include "drivers/serial_plan.h"
 #include "exec/appmem.h"
 #include "exec/appslot.h"
 #include "exec/exec.h"
@@ -121,8 +123,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 250
-#define KDEBUG_ABI_GEN 0xaedb4e06u
+#define KDEBUG_IMPORT_COUNT 259
+#define KDEBUG_ABI_GEN 0xeda9258eu
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];
