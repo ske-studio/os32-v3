@@ -68,10 +68,10 @@ static const struct recover_ops ops = {tick,identity,ok,raw,read_fake,write_fake
 static const u32 four[] = {REC_IMM,REC_ARG_READ,REC_IMM,REC_IMM};
 static const u32 two[] = {REC_IMM,REC_IMM};
 static const struct recover_opcode_layout layouts[] = {
-    {256,0,0,0,RECOVER_NONE},
-    {256,REC_WRITE,2,two,REC_WRITE},
-    {257,REC_SELECT,2,two,REC_SELECT},
-    {257,REC_DATA,2,two,REC_DATA},
+    {256,0,0,0,RECOVER_NONE,0},
+    {256,REC_WRITE,2,two,REC_WRITE,0},
+    {257,REC_SELECT,2,two,REC_SELECT,0},
+    {257,REC_DATA,2,two,REC_DATA,0},
 };
 static struct recover_plan_node nodes[8];
 static struct recover_plan_arg args[16];
@@ -195,8 +195,8 @@ static void trace_plan(void)
     links[0]=(struct recover_plan_dep){6,rules[0].id,0};
     links[1]=(struct recover_plan_dep){6,rules[1].id,1};
     trace_layouts[0]=layouts[0]; trace_layouts[1]=layouts[1];
-    trace_layouts[2]=(struct recover_opcode_layout){257,sel->substep,2,two,REC_SELECT};
-    trace_layouts[3]=(struct recover_opcode_layout){257,n1->substep,4,four,REC_DATA};
+    trace_layouts[2]=(struct recover_opcode_layout){257,sel->substep,2,two,REC_SELECT,0};
+    trace_layouts[3]=(struct recover_opcode_layout){257,n1->substep,4,four,REC_DATA,0};
     profile.layouts=trace_layouts; profile.layout_count=4;
     profile.crc=recover_profile_crc(&profile);
     plan=(struct recover_plan){.version=1,.profile_crc=profile.crc,.nodes=nodes,

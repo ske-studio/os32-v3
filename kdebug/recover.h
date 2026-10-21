@@ -11,7 +11,7 @@
  * and cold-required cannot be cleared by starting a new session.
  */
 #define RECOVER_MAX_REGS 32U
-#define RECOVER_PROFILE_VERSION 3U
+#define RECOVER_PROFILE_VERSION 4U
 #define RECOVER_HALF_TICKS 0x80000000UL
 #define RECOVER_ROUTE_PORT 0x0FACU
 #define RECOVER_ROUTE_MASK 0x03U
@@ -114,8 +114,9 @@ struct recover_expr {
     u32 id, argc; const u32 *kinds;
     int (*eval)(const u32 *args, u32 argc, u32 *value);
 };
+#define REC_LAYOUT_SKIP_HEAD 1U
 struct recover_opcode_layout {
-    u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep;
+    u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
 struct recover_plan_arg { u32 kind, value; };
 struct recover_plan_node {
@@ -255,6 +256,8 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
     const struct recover_plan *plan, struct recover_plan_buffers *buf, u32 *hash);
 int recover_plan_enter(struct recover *r, u32 node);
 int recover_plan_leave(struct recover *r, u32 edge);
+/* Evaluate checked operands once and perform the current node access. */
+int recover_plan_access(struct recover *r, u32 *value);
 int recover_access(struct recover *r, u32 node, u32 dir_substep,
                    u32 target, u32 width, u32 *value);
 int recover_bar_probe(struct recover *r, u32 bar, u32 raw, u32 mask,

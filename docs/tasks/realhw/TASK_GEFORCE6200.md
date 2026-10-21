@@ -90,3 +90,9 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - COPY 2行・一時再生3行とPLL入口3件は未結線inventoryとしてbind拒否。S3 executor、S4 PLL、S5 bus/cleanup、S6結線を本段で完了扱いしない。
 - 共有変更はprofile版3、capture/CRC、index保存分類と探索cache。設計決定はrecover `ADDENDUM.final.md`末尾、T3送り項目はS6前へ維持。
 - 証拠: [合成host試験](../../../tools/tests/test_gfinit.py)、`~/os32-tmp/run/gf4a_s2/` の `final-build.log`・`final-candidates.log`・`final-tests.log`・`final-mutate.log`・`final-lint.log`・`final-docs.log`・`final-size.log`。CIは外部ROM/一時資料を読まない。
+
+### 4a S3 executor (2026-10-21)
+- `gfinit_exec` はS2のplanをrecover経由でmain単位に実行。条件・call/repeat・skip/force・待ち・動的予算を検査する。
+- S2送り項目はlayoutのheadフラグ、表位置定数、skip CR44拒否、重複処理等の整理と負の試験へ反映。固定結果CR44 RMWもbindで検査。
+- 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS3節。PLL/COPY/採取の本番未結線8行は引き続き拒否。
+- 検証証拠: `~/os32-tmp/run/gf4a_s3/`。27種の独立期待trace・各予算境界は完全mockで検証。実機・NP21/Wは本段対象外。

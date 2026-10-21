@@ -155,7 +155,7 @@ static struct recover_target targets[NREG];
 static struct recover_rule rules[16];
 static struct recover_plan_node nodes[1];
 static struct recover_plan_entry entries[1];
-static const struct recover_opcode_layout layouts[] = {{0, 0, 0, 0, RECOVER_NONE}};
+static const struct recover_opcode_layout layouts[] = {{0, 0, 0, 0, RECOVER_NONE,0}};
 static struct recover_plan plan;
 static u32 flow[RECOVER_NODE_MAX * RECOVER_BITS_WORDS], valid_bits[RECOVER_BITS_WORDS];
 static struct recover_plan_buffers buffers = { flow, valid_bits };

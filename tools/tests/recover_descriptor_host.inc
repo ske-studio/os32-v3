@@ -10,10 +10,10 @@ static const u32 one_kind[] = {REC_IMM};
 static const u32 two_kinds[] = {REC_IMM, REC_IMM};
 static const u32 expr_kinds[] = {REC_IMM, REC_IMM, REC_IMM};
 static const struct recover_opcode_layout sl[] = {
-    {0, 0, 0, 0, RECOVER_NONE}, {0, 1, 1, one_kind, REC_READ},
-    {1, REC_WRITE, 2, two_kinds, REC_WRITE},
-    {1, REC_SELECT, 2, two_kinds, REC_SELECT}, {1, REC_DATA, 2, two_kinds, REC_DATA},
-    {2, 0, 3, expr_kinds, REC_WRITE}
+    {0, 0, 0, 0, RECOVER_NONE,0}, {0, 1, 1, one_kind, REC_READ,0},
+    {1, REC_WRITE, 2, two_kinds, REC_WRITE,0},
+    {1, REC_SELECT, 2, two_kinds, REC_SELECT,0}, {1, REC_DATA, 2, two_kinds, REC_DATA,0},
+    {2, 0, 3, expr_kinds, REC_WRITE,0}
 };
 static int add_expr(const u32 *a, u32 argc, u32 *out)
 {
@@ -250,7 +250,7 @@ static void indexed_expr_setup(void)
     static struct recover_opcode_layout layouts[7];
     synthetic(4);
     for (u32 i=0;i<sizeof(sl)/sizeof(sl[0]);i++) layouts[i]=sl[i];
-    layouts[6]=(struct recover_opcode_layout){3, REC_WRITE, 2, indexed_expr_kinds, REC_WRITE};
+    layouts[6]=(struct recover_opcode_layout){3, REC_WRITE, 2, indexed_expr_kinds, REC_WRITE,0};
     profile.layouts=layouts; profile.layout_count=7;
     profile.exprs=&expr; profile.expr_count=1;
     targets[TK]=(struct recover_target){.space=REC_VGA_INDEXED,

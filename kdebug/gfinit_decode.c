@@ -4,6 +4,7 @@
 #include "gfinit_decode.h"
 #include "../lib/crc32_core.inc"
 #define GF_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
+STATIC_ASSERT(GF_INIT_SCHEDULE >= RECOVER_NODE_MAX, gf_schedule_scratch);
 struct gf_script_span { u32 id, pc, length, crc; };
 static const struct gf_script_span scripts[] = {
     {0x0U, 0xdeb0U, 0x2e5U, 0xf8ece062U},
@@ -272,7 +273,7 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
         break;
     case 0x39: case 0x75: case 0x6f: {
         u32 entry = r[pc + 1];
-        u32 base = o->opcode == 0x39 ? 0x5daaU : o->opcode == 0x75 ? 0x5d86U : 0x5d66U;
+        u32 base = o->opcode == 0x39 ? GF_INIT_IO_FLAG_TABLE : o->opcode == 0x75 ? GF_INIT_CONDITION_TABLE : GF_INIT_MACRO_TABLE;
         u32 width = o->opcode == 0x39 ? 9 : o->opcode == 0x75 ? 12 : 8;
         u32 count = o->opcode == 0x39 ? 8 : o->opcode == 0x75 ? 3 : 4;
         if (entry >= count) return -1;
@@ -307,8 +308,8 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     case 0x6b:
         o->index = r[pc + 1];
         if (o->index != 6 && o->index != 7 && o->index != 8) return -1;
-        if (span(size, 0x5d4cU + o->index * 2, 2)) return -1;
-        o->ref = le(r, 0x5d4cU + o->index * 2, 2); break;
+        if (span(size, GF_INIT_SCRIPT_TABLE + o->index * 2, 2)) return -1;
+        o->ref = le(r, GF_INIT_SCRIPT_TABLE + o->index * 2, 2); break;
     case 0x62: case 0x78:
         o->port = le(r, pc + 1, 2); o->index = r[pc + 3];
         o->mask = o->opcode == 0x78 ? r[pc + 4] : 0;
@@ -328,9 +329,9 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     if (o->opcode == 0x4a || o->opcode == 0x4b) {
         /* S4 parses the full limits entries; S2 validates the version/header
          * and bounded data span, never authorizes coefficients. */
-        if (span(size, 0x5bc8U, 4) || r[0x5bc8] != 0x21 ||
-            r[0x5bc9] < 4 || !r[0x5bca] || r[0x5bcb] != 4 ||
-            span(size, 0x5bc8U, r[0x5bc9] + r[0x5bca] * r[0x5bcb])) return -1;
+        if (span(size, GF_INIT_PLL_TABLE, 4) || r[GF_INIT_PLL_TABLE] != 0x21 ||
+            r[GF_INIT_PLL_TABLE+1] < 4 || !r[GF_INIT_PLL_TABLE+2] || r[GF_INIT_PLL_TABLE+3] != 4 ||
+            span(size, GF_INIT_PLL_TABLE, r[GF_INIT_PLL_TABLE+1] + r[GF_INIT_PLL_TABLE+2] * r[GF_INIT_PLL_TABLE+3])) return -1;
     }
     return 0;
 }
@@ -466,6 +467,8 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
         if (s->kind == 3) control(d, p, s, state, GF_INIT_C+1+s->count, s->count, 0, 0, 1);
     } else if ((state & 1) && op != 0x33 && op != 0x36 && op != 0x38 &&
                op != 0x71 && op != 0x72 && op != 0x65 && op != 0x63) {
+        if (op != 0x53 && op != 0x54 && v->port == RECOVER_CRTC &&
+            (v->index == RECOVER_CR44 || (op == 0x51 && v->value == RECOVER_CR44))) return -1;
         control(d, p, s, state, GF_INIT_K+pc, v->length, 0, 0, 1);
         if (op == 0x5b || op == 0x6b) next_step = s->jump;
         if (op == 0x53 && v->index == RECOVER_CR44) next_state = (v->value == 3 ? 2 : 0) | 1;
@@ -514,14 +517,14 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
             ends[k] = d->plan.node_count;
             d->nodes[branches[k]].next[1] = ends[k];
             if (op == 0x32) write_node(d, p, s, state, e+k, REC_WRITE, key_for(p, v->target, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
-            else control(d, p, s, state, GF_INIT_PLL, v->target, le(r, v->ref+4*k, 4), 0x5bc8, 3);
+            else control(d, p, s, state, GF_INIT_PLL, v->target, le(r, v->ref+4*k, 4), GF_INIT_PLL_TABLE, 3);
             if (d->error) return -1;
             d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, state);
         }
         d->reachable[next_step] |= 1U << state;
         return d->error ? -1 : 0;
     }
-    case 0x4b: control(d, p, s, state, GF_INIT_PLL, v->target, v->value, 0x5bc8, 3); break;
+    case 0x4b: control(d, p, s, state, GF_INIT_PLL, v->target, v->value, GF_INIT_PLL_TABLE, 3); break;
     case 0x6e: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
     case 0x7a: case 0x6f: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
     case 0x52: case 0x53: case 0x62: case 0x78:
