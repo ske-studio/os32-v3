@@ -70,3 +70,13 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 - **戻す処理の段**: T1 状態機械 → T2 窓・profile・98 復帰 → T3 shell/host/deadman → T4 NP21/W → T5 実機の無書込み (+ 0FACh の初めての書込みを明示承認の 1 回) → T6 承認済み書込み → T7 復旧演習。4a の S5〜S6 は recover の descriptor とログの契約を使うので、**T1〜T3 を先に着地させる**。
 - **98 の画面に戻す** (② の先頭): 0FACh を読み、bit1..0 が 00b なら書かず、違えば 00h を書いて読み戻す。経路の最終判定はユーザーの目視。4a は 0FACh を読み書きしない。
 - **最後の手段**: CPU リセット (F0h / `sys_reboot`) は PCI RST# を保証しない。PG (電源コネクタの POWER GOOD を GND に落とす) は Ra266 で未確認で、付けるかはユーザー判断。PG 後は warm-residue として扱い、cold-required の解除に数えるかはユーザー決定。
+
+### 4a S1 fixture (2026-10-21)
+
+- 決定: [fixture](../../../tools/tests/gfinit_fixture.h) に 9 本・193 命令・27 種、main 順、表長、副作用候補 619 行を収録。NV_REG 圧縮 3 行は各 4 命令、COPY_NV_REG は E7FB。
+- N1: main3/E81E だけ cfg50/54・PBUS1850/1854=0 の前後確認・保持を条件とする旗。他の表示有効化・W 行不足は静的拒否。
+- 設計の欠け: T1 descriptor に phase・head/port/index の共有符号化・値制約・依存順序・N1 guard が無い。対応表を fixture に記録し、全 W 候補を拒否のまま保持。recover.h は変更せず、許可拡張は実装しない。
+- 未確認・持越し: PLL 内部値・安全な読戻し mask は記号値。ROM 実バイト、PLL 表 entry 長、実機は未検証。共有 descriptor の解決・レビューまで実機 RUN 許可無し。
+- ノートで `python3 tools/gfinit_rom_check.py --list` が各 script の開始・長さ・IEEE CRC32 を表示。同スクリプトに private ROM のパスを渡して照合（ROM を出力・保存しない）。期待値は txt からの復元値で、ROM 由来の検証済み値ではない。
+- 証拠: 入力 `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt`、[照合試験](../../../tools/tests/test_gfinit_fixture.py)。ログは `~/os32-tmp/run/gf4a_s1/` の `kernel.log`・`fixture.log`・`mutate.log`・`lint.log`・`docs.log`・`ci-stab.log`（終了 rc を末尾に記録）。
+- 未決: 外部 txt の置き場は `GFINIT_SOURCE` / `--source` で指定可。無い場合は検査失敗とし、ROM 照合はノートへ持越す。S2 以降の実装、コミット、配備は行わない。

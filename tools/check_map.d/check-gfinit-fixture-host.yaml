@@ -1,0 +1,9 @@
+check-gfinit-fixture-host:
+- tools/tests/gfinit_fixture.h
+- tools/tests/gfinit_fixture_host.c
+- tools/tests/test_gfinit_fixture.py
+- tools/tests/host32.py
+- tools/gfinit_source.py
+- tools/gfinit_rom_check.py
+- tools/check_map.d/check-gfinit-fixture-host.yaml
+- build/checks.d/check-gfinit-fixture-host.mk
