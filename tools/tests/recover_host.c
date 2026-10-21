@@ -23,7 +23,8 @@ struct fake {
     bool ready, raw_fail, decode_fail, screen_fail, abort, route_fail;
     bool route_read_fail, route_stuck, log_fail, snapshot_early;
     bool owned, screen_done, abort_selected, break_guard, restore_index, command_bus;
-    bool uart_event;
+    bool uart_event, event_abort;
+    u32 event_fault, event_restore_tick, event_restore_polls, event_uart_polls;
     u32 event_bytes[REC_FAILED + 1], config_ticks, config_polls, config_target, config_tail_calls;
     u32 releases, local_calls, selected_value, last_offset, last_dir, extra_bars[2];
     struct recover *core;

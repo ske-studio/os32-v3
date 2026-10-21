@@ -121,8 +121,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 249
-#define KDEBUG_ABI_GEN 0x3fa53c41u
+#define KDEBUG_IMPORT_COUNT 250
+#define KDEBUG_ABI_GEN 0xaedb4e06u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

@@ -1006,11 +1006,11 @@ kzalloc:
 pegc_restore_text_sync:
     jmp *kdebug_import_slots+800
 .size pegc_restore_text_sync, .-pegc_restore_text_sync
-.globl display_text_start
-.type display_text_start, @function
-display_text_start:
+.globl v86_cui_display_restore
+.type v86_cui_display_restore, @function
+v86_cui_display_restore:
     jmp *kdebug_import_slots+804
-.size display_text_start, .-display_text_start
+.size v86_cui_display_restore, .-v86_cui_display_restore
 .globl v86_gui_refuse
 .type v86_gui_refuse, @function
 v86_gui_refuse:
@@ -1246,4 +1246,9 @@ e82557_state:
 sfs_lan_peer_mac:
     jmp *kdebug_import_slots+992
 .size sfs_lan_peer_mac, .-sfs_lan_peer_mac
+.globl display_text_start
+.type display_text_start, @function
+display_text_start:
+    jmp *kdebug_import_slots+996
+.size display_text_start, .-display_text_start
 .section .note.GNU-stack,"",@progbits

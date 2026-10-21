@@ -1612,10 +1612,11 @@
     {
       "stage": "S3",
       "kind": "FUNC",
-      "symbol": "display_text_start",
-      "source": "kernel/display_restore.h",
+      "symbol": "v86_cui_display_restore",
+      "source": "kernel/v86_io.h",
       "context_safe": false,
-      "index": 201
+      "index": 201,
+      "retained": true
     },
     {
       "stage": "S3",
@@ -1992,6 +1993,14 @@
       "source": "fs/serialfs.h",
       "context_safe": false,
       "index": 248
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_text_start",
+      "source": "kernel/display_restore.h",
+      "context_safe": false,
+      "index": 249
     }
   ]
 }

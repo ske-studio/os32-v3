@@ -260,7 +260,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kmalloc,
     (void (*)(void))kzalloc,
     (void (*)(void))pegc_restore_text_sync,
-    (void (*)(void))display_text_start,
+    (void (*)(void))v86_cui_display_restore,
     (void (*)(void))v86_gui_refuse,
     (void (*)(void))v86_is_active,
     (void (*)(void))v86_mem_setup,
@@ -308,6 +308,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))e82557_get_mac,
     (void (*)(void))e82557_state,
     (void (*)(void))sfs_lan_peer_mac,
+    (void (*)(void))display_text_start,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -513,7 +514,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xd7fb90d6u, 1, 1},
     {0xae8ba225u, 1, 1},
     {0xbc6d4c41u, 1, 1},
-    {0x18329f26u, 1, 1},
+    {0x2e253adbu, 1, 1},
     {0x2938dd48u, 1, 1},
     {0x600a118fu, 1, 1},
     {0x1f695827u, 1, 1},
@@ -561,6 +562,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xef33472eu, 1, 1},
     {0x3e66697fu, 1, 1},
     {0x2a2e778au, 1, 1},
+    {0x18329f26u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

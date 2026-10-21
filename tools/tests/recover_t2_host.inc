@@ -133,7 +133,20 @@ static const struct recover_uart_ops uart_ops={uart_ready,uart_put,uart_wait};
 static int event_uart(struct fake *f, enum recover_state state)
 {
     struct uart_fake u={0};
+    bool inject=f->event_fault==(u32)state;
+    if (inject) {
+        f->event_fault=0; /* Restoration events use the same real callback. */
+        if (f->event_abort) f->abort=true;
+        else f->core->spent=f->core->budget-1;
+    }
     int rc=recover_uart_byte(f->core,&uart_ops,&u,65,1,1024);
+    if (inject) {
+        CHECK(rc<0);
+        f->event_restore_tick=f->core->restore_tick;
+        f->event_restore_polls=f->core->restore_polls;
+        f->event_uart_polls=f->core->uart_polls;
+        f->tick++; /* A second cleanup would extend the original deadline. */
+    }
     f->event_bytes[state]+=u.puts;
     return rc;
 }
@@ -148,6 +161,24 @@ static void uart_events(void)
     CHECK(recover_safe_point(&r)<0);
     CHECK(!trial_end(&r,&r.token,REC_NORMAL));
     CHECK(f.event_bytes[REC_RESTORING]==1 && f.event_bytes[REC_VERIFIED]==1);
+    /* Enter through trial_begin/trial_step, including pause_call, so the
+     * event failure unwinds through its actual outer cleanup caller. */
+    for (u32 step=0;step<2;step++)
+    for (u32 abort=0;abort<2;abort++)
+    for (u32 s=step ? REC_RUNNING : REC_SNAPSHOTTING;s<=REC_PAUSED;s++) {
+        setup(false);
+        profile.restore_log_bytes=16; profile.crc=recover_profile_crc(&profile);
+        if (step) begin();
+        f.uart_event=true; f.event_fault=s; f.event_abort=abort;
+        int rc=step ? trial_step(&r,&r.token,true,change,0) :
+            bound_begin(&r,&profile,123,100);
+        CHECK(rc<0 && !f.event_fault && f.local_calls==1);
+        CHECK(r.reason==(abort ? REC_ABORT : REC_TIMEOUT));
+        CHECK(r.state==(abort ? REC_VERIFIED : REC_FAILED));
+        CHECK(r.restore_tick==f.event_restore_tick);
+        CHECK(r.restore_polls==f.event_restore_polls && r.restore_polls>0);
+        CHECK(r.uart_polls==f.event_uart_polls);
+    }
     /* Each call-state event must also charge its transmission time. */
     for(u32 s=REC_SNAPSHOTTING;s<=REC_PAUSED;s++) {
         setup(false); begin(); r.state=s; r.in_call=true; r.in_opcode=false;

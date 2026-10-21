@@ -87,6 +87,9 @@ MUTATIONS = [
 
 # Additional T2 mutations; every one must compile and fail at runtime.
 MUTATIONS += [
+    ("t2_event_cleanup_reentered", """    if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
+        r->state == REC_FAILED) return -1;""", "/* repeated cleanup */"),
+    ("t2_event_cleanup_overwritten", "        if (r->state != (restoring ? REC_RESTORING : s)) return -1;", "/* completed cleanup ignored */"),
     ("t2_uart_running_only", "if (!r->in_call || (r->state != REC_SNAPSHOTTING && r->state != REC_ARMED &&\n        r->state != REC_RUNNING && r->state != REC_PAUSED)) return -1;",
      "if (!r->in_call || r->state != REC_RUNNING) return -1;"),
     ("t2_size_tail_no_poll", "!r->failed && !recover_restore_point(r) &&", "!r->failed &&"),

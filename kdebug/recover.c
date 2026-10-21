@@ -170,7 +170,10 @@ static int state(struct recover *r, enum recover_state s)
             if (!restore_time(r)) return -1;
             r->restore_polls++;
         }
-        if (r->ops->event(r->opaque, s, r->token.session)) {
+        int rc = r->ops->event(r->opaque, s, r->token.session);
+        /* A UART safe point may have completed cleanup inside the event. */
+        if (r->state != (restoring ? REC_RESTORING : s)) return -1;
+        if (rc) {
             fail(r, REC_LOG, REC_PHASE_NONE, 0);
             return -1;
         }
@@ -597,6 +600,10 @@ static void screen(struct recover *r)
 
 static int cleanup(struct recover *r)
 {
+    /* Events can unwind through several callers after a safe point cleans up.
+     * Only the first entry owns restoration and its deadline/poll budget. */
+    if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
+        r->state == REC_FAILED) return -1;
     r->in_call = false; r->in_opcode = false;
     r->cursor = RECOVER_NONE; r->entered = false;
     r->auth_phase = REC_RESTORE;
