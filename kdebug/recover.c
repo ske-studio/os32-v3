@@ -11,7 +11,7 @@ static void release_plan(struct recover *r);
 static int bus_read(struct recover *r, u32 key, u32 *value);
 static bool zero_guards(struct recover *r);
 static bool raw_matches(struct recover *r, bool memory);
-static void select_record(const struct recover *r, const struct recover_profile *p, const struct recover_plan *plan, u32 node, u32 *bits);
+static void select_record(const struct recover *r, u32 node, u32 *bits);
 static bool extent_ok(const struct recover_profile *p, const struct recover_target *t,
                       const struct recover_bar_extent bars[3]);
 
@@ -1194,10 +1194,8 @@ static bool dependencies(const struct recover *r, const struct recover_profile *
     return true;
 }
 /* A SELECT invalidates older selections of the same physical index port. */
-static void select_record(const struct recover *r, const struct recover_profile *p, const struct recover_plan *plan,
-                          u32 node, u32 *bits)
+static void select_record(const struct recover *r, u32 node, u32 *bits)
 {
-    (void)p; (void)plan;
     const struct recover_opcode_layout *l = r->node_layout[node];
     const struct recover_rule *w = r->node_write[node];
     if (!l || l->dir_substep != REC_SELECT || !w) return;
@@ -1417,7 +1415,7 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
         for (u32 j = 0; j < plan->capture_count; j++)
             if (plan->captures[j].consumer_node == i &&
                 !bit_get(in, plan->captures[j].producer_node)) return -1;
-        select_record(r, p, plan, i, in); bit_set(in, i);
+        select_record(r, i, in); bit_set(in, i);
         for (u32 edge = 0; edge < 2; edge++) {
             u32 next = n->next[edge];
             if (next == RECOVER_NONE) {
@@ -1745,7 +1743,7 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
         }
         if (node == RECOVER_NONE) bit_set(r->restored_rules, (u32)(w - r->profile->rules));
         if (node != RECOVER_NONE) {
-            select_record(r, r->profile, r->plan, node, r->buffers.valid_bits);
+            select_record(r, node, r->buffers.valid_bits);
             bit_set(r->buffers.valid_bits, node);
         }
     }

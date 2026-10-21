@@ -20,7 +20,7 @@ MUTATIONS = [
     ('repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
     ('repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
     ('unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
-    ('rom_crc', 'if(crc32_core_final(crc)!=s->crc)', 'if(false && crc32_core_final(crc)!=s->crc)'),
+    ('rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
     ('copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
     ('table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
     ('call_depth', 'calls > GF_INIT_CALL_DEPTH', 'false'),

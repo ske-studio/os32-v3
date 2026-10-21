@@ -461,126 +461,126 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
     u32 next_state = state, next_step = step + 1, first = d->plan.node_count;
     u32 t = key_for(p, v->target, v->port, v->index, head);
     if (s->kind) {
-        if (s->kind == 1) control(d,p,s,state,GF_INIT_C+1,pc+v->length,0,0,1);
-        if (s->kind == 2) control(d,p,s,state,GF_INIT_C+1+s->k,s->k,0,0,1);
-        if (s->kind == 3) control(d,p,s,state,GF_INIT_C+1+s->count,s->count,0,0,1);
+        if (s->kind == 1) control(d, p, s, state, GF_INIT_C+1, pc+v->length, 0, 0, 1);
+        if (s->kind == 2) control(d, p, s, state, GF_INIT_C+1+s->k, s->k, 0, 0, 1);
+        if (s->kind == 3) control(d, p, s, state, GF_INIT_C+1+s->count, s->count, 0, 0, 1);
     } else if ((state & 1) && op != 0x33 && op != 0x36 && op != 0x38 &&
                op != 0x71 && op != 0x72 && op != 0x65 && op != 0x63) {
-        control(d,p,s,state,GF_INIT_K+pc,v->length,0,0,1);
+        control(d, p, s, state, GF_INIT_K+pc, v->length, 0, 0, 1);
         if (op == 0x5b || op == 0x6b) next_step = s->jump;
         if (op == 0x53 && v->index == RECOVER_CR44) next_state = (v->value == 3 ? 2 : 0) | 1;
-        if (op == 0x54) for (u32 j=0;j<v->count;j++)
+        if (op == 0x54) for (u32 j = 0; j < v->count; j++)
             if (r[pc+2+2*j] == RECOVER_CR44) next_state = (r[pc+3+2*j] == 3 ? 2 : 0) | 1;
     } else switch (op) {
-    case 0x33: control(d,p,s,state,GF_INIT_C,v->count,v->end_repeat,0,2); break;
-    case 0x36: control(d,p,s,state,GF_INIT_C,s->jump,s->k,s->count,3); break;
-    case 0x38: control(d,p,s,state,GF_INIT_C,0,0,0,0); next_state ^= 1; break;
-    case 0x72: control(d,p,s,state,GF_INIT_C,0,0,0,0); next_state &= ~1U; break;
-    case 0x63: case 0x71: control(d,p,s,state,GF_INIT_C,0,0,0,0); break;
-    case 0x74: control(d,p,s,state,GF_INIT_C,v->value,0,0,1); break;
-    case 0x5b: control(d,p,s,state,GF_INIT_C,v->ref,pc+v->length,0,2); break;
-    case 0x6b: control(d,p,s,state,GF_INIT_C,v->index,v->ref,pc+v->length,3); break;
+    case 0x33: control(d, p, s, state, GF_INIT_C, v->count, v->end_repeat, 0, 2); break;
+    case 0x36: control(d, p, s, state, GF_INIT_C, s->jump, s->k, s->count, 3); break;
+    case 0x38: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state ^= 1; break;
+    case 0x72: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state &= ~1U; break;
+    case 0x63: case 0x71: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); break;
+    case 0x74: control(d, p, s, state, GF_INIT_C, v->value, 0, 0, 1); break;
+    case 0x5b: control(d, p, s, state, GF_INIT_C, v->ref, pc+v->length, 0, 2); break;
+    case 0x6b: control(d, p, s, state, GF_INIT_C, v->index, v->ref, pc+v->length, 3); break;
     case 0x75: case 0x39: {
-        if (op == 0x39) write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-        read_node(d,p,s,state,t);
+        if (op == 0x39) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+        read_node(d, p, s, state, t);
         u32 branch;
-        if (op == 0x75) branch = control(d,p,s,state,GF_INIT_C,r[pc+1],v->mask,v->value,3);
+        if (op == 0x75) branch = control(d, p, s, state, GF_INIT_C, r[pc+1], v->mask, v->value, 3);
         else {
-            struct recover_plan_arg a[] = {IMM(r[pc+1]),IMM(v->mask),IMM(v->shift),
-                IMM(le(r,v->ref+5,2)),IMM(r[v->ref+7]),IMM(r[v->ref+8])};
-            branch = emit(d,p,s,state,GF_INIT_C,RECOVER_NONE,a,6);
+            struct recover_plan_arg a[] = {IMM(r[pc+1]), IMM(v->mask), IMM(v->shift),
+                IMM(le(r, v->ref+5, 2)), IMM(r[v->ref+7]), IMM(r[v->ref+8])};
+            branch = emit(d, p, s, state, GF_INIT_C, RECOVER_NONE, a, 6);
         }
         if (branch == RECOVER_NONE) return -1;
-        d->nodes[branch].next[0] = destination(next_step,state|1);
-        d->nodes[branch].next[1] = destination(next_step,state);
+        d->nodes[branch].next[0] = destination(next_step, state|1);
+        d->nodes[branch].next[1] = destination(next_step, state);
         d->reachable[next_step] |= (1U << (state|1)) | (1U << state);
         return d->error ? -1 : 0;
     }
     case 0x32: case 0x4a: {
-        u32 src = key_for(p,0,v->port,v->index,head);
-        write_node(d,p,s,state,e++,REC_SELECT,src,0,v->index,false);
-        read_node(d,p,s,state,src);
+        u32 src = key_for(p, 0, v->port, v->index, head);
+        write_node(d, p, s, state, e++, REC_SELECT, src, 0, v->index, false);
+        read_node(d, p, s, state, src);
         u32 branches[256], ends[256];
-        for (u32 k=0;k<v->count;k++) {
-            struct recover_plan_arg a[] = {IMM(v->mask),IMM(v->shift),IMM(k),IMM(v->count)};
-            branches[k] = emit(d,p,s,state,GF_INIT_C+k,RECOVER_NONE,a,4);
+        for (u32 k = 0; k < v->count; k++) {
+            struct recover_plan_arg a[] = {IMM(v->mask), IMM(v->shift), IMM(k), IMM(v->count)};
+            branches[k] = emit(d, p, s, state, GF_INIT_C+k, RECOVER_NONE, a, 4);
             if (branches[k] == RECOVER_NONE) return -1;
         }
-        for (u32 k=0;k<v->count;k++) {
-            d->nodes[branches[k]].next[0] = k+1<v->count ? branches[k+1] : destination(next_step,state);
-            if (op == 0x4a && k && le(r,v->ref+4*k,4) == le(r,v->ref,4)) {
+        for (u32 k = 0; k < v->count; k++) {
+            d->nodes[branches[k]].next[0] = k+1 < v->count ? branches[k+1] : destination(next_step, state);
+            if (op == 0x4a && k && le(r, v->ref+4*k, 4) == le(r, v->ref, 4)) {
                 d->nodes[branches[k]].next[1] = ends[0]; continue;
             }
             ends[k] = d->plan.node_count;
             d->nodes[branches[k]].next[1] = ends[k];
-            if (op == 0x32) write_node(d,p,s,state,e+k,REC_WRITE,key_for(p,v->target,0,0,head),0,le(r,v->ref+4*k,4),false);
-            else control(d,p,s,state,GF_INIT_PLL,v->target,le(r,v->ref+4*k,4),0x5bc8,3);
+            if (op == 0x32) write_node(d, p, s, state, e+k, REC_WRITE, key_for(p, v->target, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
+            else control(d, p, s, state, GF_INIT_PLL, v->target, le(r, v->ref+4*k, 4), 0x5bc8, 3);
             if (d->error) return -1;
-            d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step,state);
+            d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, state);
         }
         d->reachable[next_step] |= 1U << state;
         return d->error ? -1 : 0;
     }
-    case 0x4b: control(d,p,s,state,GF_INIT_PLL,v->target,v->value,0x5bc8,3); break;
-    case 0x6e: write_node(d,p,s,state,e,REC_WRITE,t,v->mask,v->value,true); break;
-    case 0x7a: case 0x6f: write_node(d,p,s,state,e,REC_WRITE,t,0,v->value,false); break;
+    case 0x4b: control(d, p, s, state, GF_INIT_PLL, v->target, v->value, 0x5bc8, 3); break;
+    case 0x6e: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
+    case 0x7a: case 0x6f: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
     case 0x52: case 0x53: case 0x62: case 0x78:
-        write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-        write_node(d,p,s,state,e,REC_DATA,t,v->mask,v->value,op==0x52 || op==0x78);
-        if (v->port == RECOVER_CRTC && v->index == RECOVER_CR44) next_state = (v->value==3 ? 2 : 0) | (state&1);
+        write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+        write_node(d, p, s, state, e, REC_DATA, t, v->mask, v->value, op == 0x52 || op == 0x78);
+        if (v->port == RECOVER_CRTC && v->index == RECOVER_CR44) next_state = (v->value == 3 ? 2 : 0) | (state&1);
         break;
     case 0x54:
-        for (u32 k=0;k<v->count;k++) {
-            u32 index=r[pc+2+2*k], value=r[pc+3+2*k];
-            t=key_for(p,0,RECOVER_CRTC,index,next_state/2);
-            write_node(d,p,s,next_state,e++,REC_SELECT,t,0,index,false);
-            write_node(d,p,s,next_state,e++,REC_DATA,t,0,value,false);
-            if(index==RECOVER_CR44) next_state=(value==3 ? 2 : 0)|(state&1);
+        for (u32 k = 0; k < v->count; k++) {
+            u32 index = r[pc+2+2*k], value = r[pc+3+2*k];
+            t = key_for(p, 0, RECOVER_CRTC, index, next_state/2);
+            write_node(d, p, s, next_state, e++, REC_SELECT, t, 0, index, false);
+            write_node(d, p, s, next_state, e++, REC_DATA, t, 0, value, false);
+            if (index == RECOVER_CR44) next_state = (value == 3 ? 2 : 0)|(state&1);
         }
         break;
     case 0x58:
-        for (u32 k=0;k<v->count;k++) write_node(d,p,s,state,e++,REC_WRITE,
-            key_for(p,v->target+4*k,0,0,head),0,le(r,v->ref+4*k,4),false);
+        for (u32 k = 0; k < v->count; k++) write_node(d, p, s, state, e++, REC_WRITE,
+            key_for(p, v->target+4*k, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
         break;
     case 0x37: case 0x5f: {
-        if(op==0x37) write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-        u32 src=key_for(p,v->ref,0,0,head);
-        struct recover_plan_arg a[] = {IMM(t),READ(op==0x37?t:src),READ(op==0x37?src:t),
-            IMM(v->shift),IMM(op==0x37?v->value:le(r,pc+6,4)),
-            IMM(op==0x37?v->mask:le(r,pc+10,4)),IMM(v->mask)};
-        if(src==RECOVER_NONE) return -1;
-        emit(d,p,s,state,e,op==0x37?REC_DATA:REC_WRITE,a,op==0x37?6:7); break;
+        if (op == 0x37) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+        u32 src = key_for(p, v->ref, 0, 0, head);
+        struct recover_plan_arg a[] = {IMM(t), READ(op == 0x37 ? t : src), READ(op == 0x37 ? src : t),
+            IMM(v->shift), IMM(op == 0x37 ? v->value : le(r, pc+6, 4)),
+            IMM(op == 0x37 ? v->mask : le(r, pc+10, 4)), IMM(v->mask)};
+        if (src == RECOVER_NONE) return -1;
+        emit(d, p, s, state, e, op == 0x37 ? REC_DATA : REC_WRITE, a, op == 0x37 ? 6 : 7); break;
     }
     case 0x65: {
-        u32 saved=key_for(p,0x184c,0,0,head), producer=d->plan.node_count;
-        write_node(d,p,s,state,e++,REC_WRITE,saved,0xfffff0ffU,0,true);
-        write_node(d,p,s,state,e++,REC_WRITE,t,0,v->mask,false);
-        control(d,p,s,state,GF_INIT_C,10,0,0,1);
-        write_node(d,p,s,state,e++,REC_WRITE,t,0,v->value,false);
-        struct recover_plan_arg a[]={IMM(saved),SAVED(p->count)};
-        u32 consumer=emit(d,p,s,state,e++,REC_WRITE,a,2);
-        d->captures[0]=(struct recover_capture){p->count,producer,consumer,saved,0};
-        write_node(d,p,s,state,e,REC_WRITE,key_for(p,0x1850,0,0,head),0,0,false); break;
+        u32 saved = key_for(p, 0x184c, 0, 0, head), producer = d->plan.node_count;
+        write_node(d, p, s, state, e++, REC_WRITE, saved, 0xfffff0ffU, 0, true);
+        write_node(d, p, s, state, e++, REC_WRITE, t, 0, v->mask, false);
+        control(d, p, s, state, GF_INIT_C, 10, 0, 0, 1);
+        write_node(d, p, s, state, e++, REC_WRITE, t, 0, v->value, false);
+        struct recover_plan_arg a[] = {IMM(saved), SAVED(p->count)};
+        u32 consumer = emit(d, p, s, state, e++, REC_WRITE, a, 2);
+        d->captures[0] = (struct recover_capture){p->count, producer, consumer, saved, 0};
+        write_node(d, p, s, state, e, REC_WRITE, key_for(p, 0x1850, 0, 0, head), 0, 0, false); break;
     }
     case 0x51: {
-        write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-        u32 producer=read_node(d,p,s,state,t);
-        u32 other=key_for(p,0,RECOVER_CRTC,v->value,head);
-        for(u32 k=0;k<v->count;k++) {
-            if(k) write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-            write_node(d,p,s,state,e++,REC_DATA,t,0,v->mask+k,false);
-            write_node(d,p,s,state,e++,REC_SELECT,other,0,v->value,false);
-            write_node(d,p,s,state,e++,REC_DATA,other,0,r[v->ref+k],false);
+        write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+        u32 producer = read_node(d, p, s, state, t);
+        u32 other = key_for(p, 0, RECOVER_CRTC, v->value, head);
+        for (u32 k = 0; k < v->count; k++) {
+            if (k) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+            write_node(d, p, s, state, e++, REC_DATA, t, 0, v->mask+k, false);
+            write_node(d, p, s, state, e++, REC_SELECT, other, 0, v->value, false);
+            write_node(d, p, s, state, e++, REC_DATA, other, 0, r[v->ref+k], false);
         }
-        write_node(d,p,s,state,e++,REC_SELECT,t,0,v->index,false);
-        struct recover_plan_arg a[]={IMM(t),SAVED(p->count+1+head)};
-        u32 consumer=emit(d,p,s,state,e,REC_DATA,a,2);
-        d->captures[1+head]=(struct recover_capture){p->count+1+head,producer,consumer,t,0}; break;
+        write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+        struct recover_plan_arg a[] = {IMM(t), SAVED(p->count+1+head)};
+        u32 consumer = emit(d, p, s, state, e, REC_DATA, a, 2);
+        d->captures[1+head] = (struct recover_capture){p->count+1+head, producer, consumer, t, 0}; break;
     }
     default: return -1;
     }
     if (d->error || first == d->plan.node_count || next_step > d->schedule_count) return -1;
-    d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step,next_state);
+    d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, next_state);
     if (next_step < d->schedule_count) d->reachable[next_step] |= 1U << next_state;
     return 0;
 }
@@ -588,80 +588,80 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
                       struct gfinit_decode *d)
 {
     if (!r || !p || !d) return -1;
-    d->plan=(struct recover_plan){.version=1,.profile_crc=p->crc,.rom_size=size,
-        .nodes=d->nodes,.args=d->args,.entries=d->entries,.entry_count=5,
-        .captures=d->captures,.capture_count=3};
-    d->instruction_count=d->schedule_count=d->error=d->max_call=d->max_repeat=0;
-    u32 active[GF_INIT_INSNS]={0}, main_start[5];
-    for(u32 i=0;i<GF_ARRAY(scripts);i++) {
-        const struct gf_script_span *s=&scripts[i];
-        if(span(size,s->pc,s->length)) return -1;
-        u32 crc=CRC32_INIT;
-        crc=crc32_core_update(crc,r+s->pc,s->length);
-        if(crc32_core_final(crc)!=s->crc) return -1;
-        u32 pc=s->pc, stack[GF_INIT_REPEAT_DEPTH], depth=0;
-        while(pc<s->pc+s->length) {
-            d->error_pc=pc;
-            if(d->instruction_count==GF_INIT_INSNS) return -1;
-            u32 id=d->instruction_count++;
-            struct gfinit_instruction *v=&d->insns[id];
-            if(gfinit_decode_instruction(r,size,pc,v) || v->length>s->pc+s->length-pc) return -1;
-            for(u32 j=0;j<GF_ARRAY(effect_spans);j++) if(effect_spans[j].pc==pc) {
-                v->effect_first=effect_spans[j].first; v->effect_count=effect_spans[j].count;
+    d->plan = (struct recover_plan){.version = 1, .profile_crc = p->crc, .rom_size = size,
+        .nodes = d->nodes, .args = d->args, .entries = d->entries, .entry_count = GF_INIT_MAINS,
+        .captures = d->captures, .capture_count = RECOVER_CAPTURE_MAX};
+    d->instruction_count = d->schedule_count = d->error = d->max_call = d->max_repeat = 0;
+    u32 active[GF_INIT_INSNS] = {0}, main_start[GF_INIT_MAINS];
+    for (u32 i = 0; i < GF_ARRAY(scripts); i++) {
+        const struct gf_script_span *s = &scripts[i];
+        if (span(size, s->pc, s->length)) return -1;
+        u32 crc = CRC32_INIT;
+        crc = crc32_core_update(crc, r + s->pc, s->length);
+        if (crc32_core_final(crc) != s->crc) return -1;
+        u32 pc = s->pc, stack[GF_INIT_REPEAT_DEPTH], depth = 0;
+        while (pc < s->pc + s->length) {
+            d->error_pc = pc;
+            if (d->instruction_count == GF_INIT_INSNS) return -1;
+            u32 id = d->instruction_count++;
+            struct gfinit_instruction *v = &d->insns[id];
+            if (gfinit_decode_instruction(r, size, pc, v) || v->length > s->pc + s->length - pc) return -1;
+            for (u32 j = 0; j < GF_ARRAY(effect_spans); j++) if (effect_spans[j].pc == pc) {
+                v->effect_first = effect_spans[j].first; v->effect_count = effect_spans[j].count;
             }
-            if(v->opcode==0x33) {
-                if(depth==GF_INIT_REPEAT_DEPTH) return -1;
-                stack[depth++]=id;
+            if (v->opcode == 0x33) {
+                if (depth == GF_INIT_REPEAT_DEPTH) return -1;
+                stack[depth++] = id;
             }
-            if(v->opcode==0x36) {
-                if(!depth) return -1;
-                d->insns[stack[--depth]].end_repeat=pc;
+            if (v->opcode == 0x36) {
+                if (!depth) return -1;
+                d->insns[stack[--depth]].end_repeat = pc;
             }
-            if(v->opcode==0x71 && pc+1!=s->pc+s->length) return -1;
-            pc+=v->length;
+            if (v->opcode == 0x71 && pc + 1 != s->pc + s->length) return -1;
+            pc += v->length;
         }
-        if(depth || r[pc-1]!=0x71) return -1;
+        if (depth || r[pc - 1] != 0x71) return -1;
     }
-    if(d->instruction_count!=GF_INIT_INSNS) return -1;
-    u32 crc=CRC32_INIT;
-    crc=crc32_core_update(crc,r,size);
-    d->plan.rom_crc=crc32_core_final(crc);
-    for(u32 main=0;main<5;main++) {
-        main_start[main]=d->schedule_count;
-        for(u32 i=0;i<GF_ARRAY(scripts);i++) if(scripts[i].id==main)
-            if(schedule_block(d,scripts[i].pc,scripts[i].pc+scripts[i].length-1,
-                              d->plan.ctx_count++,main,0,0,active)) return -1;
+    if (d->instruction_count != GF_INIT_INSNS) return -1;
+    u32 crc = CRC32_INIT;
+    crc = crc32_core_update(crc, r, size);
+    d->plan.rom_crc = crc32_core_final(crc);
+    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
+        main_start[main] = d->schedule_count;
+        for (u32 i = 0; i < GF_ARRAY(scripts); i++) if (scripts[i].id == main)
+            if (schedule_block(d, scripts[i].pc, scripts[i].pc + scripts[i].length - 1,
+                               d->plan.ctx_count++, main, 0, 0, active)) return -1;
     }
-    for(u32 i=0;i<d->schedule_count;i++) {
-        d->reachable[i]=0;
-        for(u32 j=0;j<4;j++) d->heads[i][j]=RECOVER_NONE;
+    for (u32 i = 0; i < d->schedule_count; i++) {
+        d->reachable[i] = 0;
+        for (u32 j = 0; j < 4; j++) d->heads[i][j] = RECOVER_NONE;
     }
-    for(u32 main=0;main<5;main++) {
-        u32 end=main==4?d->schedule_count:main_start[main+1];
-        d->reachable[main_start[main]]=1;
-        d->entries[main]=(struct recover_plan_entry){REC_RUN,main,d->plan.node_count};
-        for(u32 step=main_start[main];step<end;step++) {
-            for(u32 state=0;state<4;state++) if(d->reachable[step]&(1U<<state)) {
-                d->heads[step][state]=d->plan.node_count;
-                d->error_pc=d->insns[d->schedule[step].instruction].pc;
-                if(expand_step(d,r,p,step,state)) return -1;
+    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
+        u32 end = main == GF_INIT_MAINS - 1 ? d->schedule_count : main_start[main + 1];
+        d->reachable[main_start[main]] = 1;
+        d->entries[main] = (struct recover_plan_entry){REC_RUN, main, d->plan.node_count};
+        for (u32 step = main_start[main]; step < end; step++) {
+            for (u32 state = 0; state < 4; state++) if (d->reachable[step] & (1U << state)) {
+                d->heads[step][state] = d->plan.node_count;
+                d->error_pc = d->insns[d->schedule[step].instruction].pc;
+                if (expand_step(d, r, p, step, state)) return -1;
             }
         }
-        d->main_nodes[main]=d->plan.node_count-d->entries[main].first;
+        d->main_nodes[main] = d->plan.node_count - d->entries[main].first;
     }
-    for(u32 i=0;i<d->plan.node_count;i++) for(u32 edge=0;edge<2;edge++) {
-        u32 dest=d->nodes[i].next[edge];
-        if(dest&GF_PENDING) {
-            u32 step=(dest&~GF_PENDING)/4,state=dest&3;
-            if(step==d->schedule_count) dest=RECOVER_NONE;
-            else if(step>d->schedule_count) return -1;
+    for (u32 i = 0; i < d->plan.node_count; i++) for (u32 edge = 0; edge < 2; edge++) {
+        u32 dest = d->nodes[i].next[edge];
+        if (dest & GF_PENDING) {
+            u32 step = (dest & ~GF_PENDING) / 4, state = dest & 3;
+            if (step == d->schedule_count) dest = RECOVER_NONE;
+            else if (step > d->schedule_count) return -1;
             else {
-                if(d->schedule[step].main_id!=d->nodes[i].main_id) state=0;
-                dest=d->heads[step][state];
+                if (d->schedule[step].main_id != d->nodes[i].main_id) state = 0;
+                dest = d->heads[step][state];
             }
-            d->nodes[i].next[edge]=dest;
+            d->nodes[i].next[edge] = dest;
         }
-        if(dest!=RECOVER_NONE && (dest<=i || dest>=d->plan.node_count)) return -1;
+        if (dest != RECOVER_NONE && (dest <= i || dest >= d->plan.node_count)) return -1;
     }
     /* Longest path, not sum of mutually exclusive branches. Schedule scratch
      * is no longer live; reuse it for step/wait costs to avoid another arena. */
@@ -679,7 +679,7 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
         if (max_steps >= GF_INIT_SCHEDULE || delay > GF_INIT_WAIT_MAX - max_wait) return -1;
         d->schedule[i].k = max_steps + 1; d->schedule[i].count = max_wait + delay;
     }
-    for (u32 main = 0; main < 5; main++) {
+    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
         d->main_steps[main] = d->schedule[d->entries[main].first].k;
         d->main_wait[main] = d->schedule[d->entries[main].first].count;
     }
