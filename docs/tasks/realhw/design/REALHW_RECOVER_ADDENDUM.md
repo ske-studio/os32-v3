@@ -255,3 +255,8 @@ struct recover_opcode_layout {
 - S6修正: SIZE_BARS成功だけは次のPREPARE用にROM/decodeを保持し、終端・中止・開始失敗では全ページを返しlast_opを無効化する；外部recover後の同session再送も成功キャッシュを返さない。
 - S6修正: checked TX中の通常kprintfは既存holdに入るがchecked_endでは排出せず、次のSerialFS gateで消える仕様と明記する；RECの有限送信予算と既存rshell/SerialFSの動作を変更しない。
 - S6修正: A1の長さ不明memory BAR/ROM・header・bridge窓・GPU不一致/不在は拒否理由とbus0 BDF・reg・rawを開始前にログへ出す；Ra266のTrident 0:8.0/NEC 0:7.0による拒否の実機確認はPMがT5前に行う。
+
+## 4a S6 の取り込みで送る項目 (2026-10-22、Opus の S6 レビュー 2 回目、P3)
+- owner の作業領域の上限 (最大 251 ページ = 1,028,096B) を STATIC_ASSERT で固定する。host の fake は生きている頁の合計を 1MiB で打ち切るが node_count=1790 で回していて 2048 の最悪の場合は通していない、実際の確保口の連続性 (first-fit) も模していない — 最悪の node 数で 1 件足す。
+- (PM、T5 の前に) 実機 Ra266 の bus0 の Trident 0:8.0 と NEC 0:7.0 の Command とメモリ BAR を読み、A1 の他装置の窓の照合で拒否されないか確かめる (拒否されれば A1 のログに理由・BDF・reg・raw が出る)。
+- kdebug.bin は 239,908B で KDEBUG の上限 262,144 (tools/module_schema.py) の 92%。S7 以降で足す前に、上限の引き上げ・装置ごとの部分を別の部品へ・許可表を小さい型に詰める (約 30KB)・kselftest を別の部品へ (54KB) のどれにするかをユーザーに諮る。
