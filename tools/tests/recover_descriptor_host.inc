@@ -107,6 +107,21 @@ static void address_tests(void)
     t = (struct recover_target){.space=REC_BAR_MMIO, .offset=0xc03c4, .index=RECOVER_NONE,
         .width=1, .read_safe=1};
     CHECK(recover_target_address(&t, REC_WRITE, &a) < 0);
+    /* Both heads, every documented alias byte and every supported raw width. */
+    static const u32 aliases[]={0xc03c2,0xc03c3,0xc03c4,0xc03c5,0xc03cc,0xc03ce,0xc03cf,
+        0x6013b4,0x6013b5,0x6013ba,0x6013c0,0x6013c1,0x6013c2,0x6013ca,
+        0x6013d4,0x6013d5,0x6013da};
+    for (u32 head=0;head<2;head++) for(u32 i=0;i<sizeof(aliases)/sizeof(aliases[0]);i++)
+        for(u32 width=1;width<=4;width*=2) {
+            t.width=width; t.offset=(aliases[i]+head*0x2000)&~(width-1);
+            CHECK(recover_target_address(&t,REC_READ,&a)<0);
+            CHECK(recover_target_address(&t,REC_WRITE,&a)<0);
+        }
+    t.width=4; t.offset=0x602858;
+    CHECK(recover_target_address(&t,REC_READ,&a)==0 && a.offset==0x602858);
+    CHECK(recover_target_address(&t,REC_WRITE,&a)==0);
+    t.width=1; t.offset=0xc03c6;
+    CHECK(recover_target_address(&t,REC_WRITE,&a)==0);
     t.space=REC_VGA_DIRECT; t.offset=0; t.port=RECOVER_DAC_DATA;
     CHECK(recover_target_address(&t, REC_READ, &a) < 0);
 }
@@ -220,6 +235,59 @@ static void indexed_tests(void)
         CHECK(f.releases==(mode<2 ? 1U : 0U));
         CHECK(count('w',TK)==(mode==0 ? 1U : 0U));
         u32 n=f.n; trial_end(&r,&r.token,REC_ABORT); CHECK(n==f.n);
+    }
+}
+static const u32 indexed_read_kind[] = {REC_ARG_READ};
+static const u32 indexed_expr_kinds[] = {REC_IMM, REC_ARG_READ};
+static int read_identity(const u32 *a, u32 argc, u32 *out)
+{
+    if (argc != 1) return -1;
+    *out = a[0]; return 0;
+}
+static void indexed_expr_setup(void)
+{
+    static const struct recover_expr expr = {2, 1, indexed_read_kind, read_identity};
+    static struct recover_opcode_layout layouts[7];
+    synthetic(4);
+    for (u32 i=0;i<sizeof(sl)/sizeof(sl[0]);i++) layouts[i]=sl[i];
+    layouts[6]=(struct recover_opcode_layout){3, REC_WRITE, 2, indexed_expr_kinds, REC_WRITE};
+    profile.layouts=layouts; profile.layout_count=7;
+    profile.exprs=&expr; profile.expr_count=1;
+    targets[TK]=(struct recover_target){.space=REC_VGA_INDEXED,
+        .port=RECOVER_SEQ,.index=1,.width=1,.access=REC_RW,.read_safe=1};
+    targets[TK+1]=targets[TK]; targets[TK+1].index=2;
+    writer(1,5,TK,REC_SELECT,1);
+    writer(3,6,TK+2,REC_WRITE,0x24);
+    rules[6].value=(struct recover_value){.mode=REC_EXPR,.max=~0U,.expr_id=2};
+    sn[3].opcode=3; sn[3].expr_id=2;
+    sa[sn[3].arg_first+1]=(struct recover_plan_arg){REC_ARG_READ,TK};
+    bar_cache(); f.values[TK]=0x24;
+}
+static void indexed_expr_tests(void)
+{
+    for (u32 bad=0;bad<6;bad++) {
+        indexed_expr_setup();
+        if (bad==1) sn[0].next[1]=2; /* one branch misses SELECT */
+        if (bad==2) sn[1].ctx=1;
+        if (bad==3) writer(2,7,TK+1,REC_SELECT,2); /* same port invalidates */
+        if (bad==4) { sn[1].opcode=0; sn[1].substep=0;
+            sn[1].arg_count=0; sn[1].rule_id=RECOVER_NONE; }
+        if (bad==5) targets[TK].read_safe=0;
+        CHECK((bind_synthetic()==0)==(bad==0));
+    }
+    for (u32 bad=0;bad<4;bad++) {
+        indexed_expr_setup(); synthetic_begin();
+        CHECK(step_node(0)==0); CHECK(step_node(1)==0); CHECK(step_node(2)==0);
+        if (bad==1) r.selected=RECOVER_NONE;
+        if (bad==2) r.selected=TK+1;
+        if (bad==3) r.buffers.valid_bits[0]=0;
+        u32 reads=count('r',TK);
+        override_request=true; requested=0x24;
+        CHECK((step_node(3)==0)==(bad==0));
+        CHECK(count('r',TK)==reads+(bad==0));
+        CHECK(count('w',TK+2)==(bad==0));
+        if (!bad) CHECK(trial_end(&r,&r.token,REC_NORMAL)==0);
+        CHECK(f.local_calls==1);
     }
 }
 static void local_saved_tests(void)
@@ -354,6 +422,6 @@ static void bar_tests(void)
 }
 static void descriptor_tests(void)
 {
-    address_tests(); bind_tests(); values_tests(); value_static_tests(); dependency_tests(); indexed_tests(); local_saved_tests();
+    address_tests(); bind_tests(); values_tests(); value_static_tests(); dependency_tests(); indexed_tests(); indexed_expr_tests(); local_saved_tests();
     guards_tests(); crc_tests(); bar_tests(); cache_tests();
 }
