@@ -28,6 +28,14 @@ static int v86_gcap_active(void) { return active; }
 struct kdebug kdebug = { .ops = { .gcap_active = v86_gcap_active } };
 static void snd_state_for_os32(void) { sound++; }
 static void tv_restore(const u16 *tv) { CHECK(*tv == 123, "saved TVRAM"); restored++; }
+#include "display_restore.h"
+static u16 reserved_cell;
+static int gui;
+static u32 sync_read=0x81;
+static unsigned int inp(unsigned int port) { CHECK(port==PEGC_HSYNC_PORT,"frequency read only"); return sync_read; }
+static int con_sink_is_enabled(void) { return gui; }
+#undef P2V_IO
+#define P2V_IO(addr) ((void *)((addr) == DISPLAY_RECOVER_CELL ? &reserved_cell : (u16 *)0))
 #include "display_cleanup_slice.inc"
 int main(int argc, char **argv)
 {
@@ -40,6 +48,25 @@ int main(int argc, char **argv)
         0x0C, 0x01, 0x08, 0x4B, 0, 0, 0, 0x70,
         0, 0, 0, 0x19, 0, 0, 0, 0, 0x0C, 0x0F, 0x0D, 0, 0
     };
+    u32 cell;
+    CHECK(DISPLAY_RECOVER_CELL >= TVRAM_CHAR_BASE + TVRAM_ROWS_30 * TVRAM_BPR,
+          "probe cell outside console grids");
+    reserved_cell = 0x1234;
+    gfx_current_height=GFX_HEIGHT; gfx_flip_enabled=0;
+    CHECK(!display_recover_ready() && !display_recover_cell_read(&cell) && cell == 0x1234,
+          "reserved cell read");
+    CHECK(!display_recover_cell_write(cell ^ 0xffff) && reserved_cell == 0xedcb,
+          "reserved cell test write");
+    CHECK(!display_recover_cell_write(cell) && reserved_cell == 0x1234,
+          "reserved cell restore");
+    gui = 1;
+    CHECK(display_recover_ready() && display_recover_cell_read(&cell) &&
+          display_recover_cell_write(1) && reserved_cell == 0x1234, "GUI refuses before write");
+    gui = 0; sync_read=0xff;
+    CHECK(display_recover_ready() && display_recover_cell_write(1) && reserved_cell==0x1234,
+          "unknown frequency refuses before write");
+    sync_read=0x81; gfx_current_height=200; gfx_flip_enabled=1;
+    CHECK(display_recover_ready(),"unknown CUI refuses before write");
     u16 tv = 123;
     CHECK(argc == 2, "case argument");
     int mode = atoi(argv[1]);
@@ -84,9 +111,9 @@ int main(int argc, char **argv)
         CHECK(!n && !palette && !cursor && !sound && deny == 1, "capture bypass retained");
     } else {
         gcap_cui_rebuild(&tv);
-        CHECK(n == 3 && restored == 1 && cursor == 1, "capture rebuild");
+        CHECK(n == 21 && restored == 1 && cursor >= 1, "capture rebuild");
         for (unsigned int i = 0; i < n; i++)
-            CHECK(ports[i] == want_ports[16+i] && values[i] == want_values[16+i], "shared CUI order");
+            CHECK(ports[i] == want_ports[i] && values[i] == want_values[i], "shared CUI order");
     }
     if (mode != 1) CHECK(gfx_current_height == GFX_HEIGHT && !gfx_flip_enabled, "CUI height flip");
     CHECK(waits == n, "I/O wait for every OUT");

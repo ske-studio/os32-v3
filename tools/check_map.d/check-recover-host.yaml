@@ -10,3 +10,14 @@ check-recover-host:
 - tools/check_map.d/check-recover-host.yaml
 - build/checks.d/check-recover-host.mk
 - tools/tests/recover_descriptor_host.inc
+- kdebug/recover_profile.c
+- tools/tests/recover_t2_host.inc
+- include/memmap.h
+- tools/tests/recover_hostshim/io.h
+- kernel/idt.h
+- kernel/pit_math.h
+- platform/pc98/platform_io.h
+- arch/x86/arch_io.h
+- include/pc98.h
+- kernel/paging.h
+- include/io.h

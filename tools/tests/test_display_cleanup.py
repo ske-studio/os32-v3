@@ -15,7 +15,7 @@ TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', '
 
 
 def function(text, name):
-    match = re.search(r'^(?:static )?void ' + name + r'\([^\n]*\)\n\{', text, re.M)
+    match = re.search(r'^(?:static )?(?:void|int) ' + name + r'\([^\n]*\)\n\{', text, re.M)
     if not match:
         raise AssertionError('missing function: ' + name)
     start = match.start()
@@ -35,7 +35,7 @@ def build_run(tree, kind, cases):
             gcap = (tree / TARGET_SRCS[1]).read_text()
             names = ['io_out']
             core = (tree / TARGET_SRCS[4]).read_text()
-            body = function(core, 'v86_cui_display_restore') + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
+            body = ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'v86_cui_display_restore', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
             if 'static void gcap_out(' in gcap:
                 body += function(gcap, 'gcap_out')
             body += function(gcap, 'gcap_cui_rebuild')
@@ -57,23 +57,23 @@ def build_run(tree, kind, cases):
 
 # Each anchor's exact hit count is fixed; compile failures never count as RED.
 MUTATIONS = [
-    ('standard-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);',
+    ('standard-mode-omitted', TARGET_SRCS[4], '        display_out(MODE_FF2_PORT, PEGC_FF2_STD_GFX);',
      '', 1, 'v86', 'FAIL: standard/extended restore'),
-    ('400-line-mode-omitted', TARGET_SRCS[0], '        io_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);',
+    ('400-line-mode-omitted', TARGET_SRCS[4], '        display_out(MODE_FF2_PORT, PEGC_FF2_VRAM_400L);',
      '', 1, 'v86', 'FAIL: standard/extended restore'),
-    ('egc-reset-omitted', TARGET_SRCS[0], '        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);',
+    ('egc-reset-omitted', TARGET_SRCS[4], '        outpw(EGC_ACCESS_PORT, EGC_ACCESS_RESET);',
      '', 1, 'v86', 'FAIL: standard/extended restore'),
-    ('grcg-off-omitted', TARGET_SRCS[0], '        io_out(GRCG_MODE_PORT, GRCG_MODE_OFF);',
+    ('grcg-off-omitted', TARGET_SRCS[4], '        display_out(GRCG_MODE_PORT, GRCG_MODE_OFF);',
      '        (void)bios;', 1, 'v86', 'FAIL: standard/extended restore'),
 
     ('v86-height', TARGET_SRCS[4], '    gfx_current_height = GFX_HEIGHT;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-flip', TARGET_SRCS[4], '    gfx_flip_enabled = 0;', '', 1, 'v86', 'FAIL: CUI height flip'),
     ('v86-start', TARGET_SRCS[0], '    v86_cui_display_restore();',
      '    io_out(GDC_GFX_CMD, GDC_CMD_START);', 1, 'v86', 'FAIL: graphics must stay stopped'),
-    ('v86-access-one', TARGET_SRCS[0], 'io_out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n\n    /* 16 色',
-     'io_out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n\n    /* 16 色', 1, 'v86', 'FAIL: access page must be zero'),
-    ('v86-display-one', TARGET_SRCS[0], 'v86_cui_display_restore();\n    io_out(GDC_DISP_PAGE, GDC_PAGE_0);',
-     'v86_cui_display_restore();\n    io_out(GDC_DISP_PAGE, GDC_PAGE_1);', 1, 'v86', 'FAIL: display page must be zero'),
+    ('v86-access-one', TARGET_SRCS[4], 'display_out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n\n    /* 16 色',
+     'display_out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n\n    /* 16 色', 1, 'v86', 'FAIL: access page must be zero'),
+    ('v86-display-one', TARGET_SRCS[4], 'display_text_start();\n    display_out(GDC_DISP_PAGE, GDC_PAGE_0);',
+     'display_text_start();\n    display_out(GDC_DISP_PAGE, GDC_PAGE_1);', 1, 'v86', 'FAIL: display page must be zero'),
     ('no-display-enable', TARGET_SRCS[4], '    outp(MODE_FF1_PORT, MFF1_DISP_ON);', '', 1, 'v86', 'FAIL: display output must be enabled'),
     ('no-text-start', TARGET_SRCS[4], '    outp(GDC_TEXT_CMD, GDC_CMD_START);', '', 1, 'v86', 'FAIL: text must be started'),
     ('gcap-no-restore', TARGET_SRCS[1], '    v86_cui_display_restore();', '', 1, 'v86', 'FAIL: capture rebuild'),
