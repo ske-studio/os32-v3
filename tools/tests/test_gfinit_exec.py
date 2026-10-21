@@ -17,6 +17,10 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('call_return', 'e->call[e->calls-1].pc != n->pc || e->call[e->calls-1].ctx != n->ctx', 'false'),
+    ('repeat_return', 'n->ctx != f->ctx || a[0].value != f->count', 'false'),
+    ('main_frames', 'return e->calls || e->repeats ? -1 : 0;', 'return 0;'),
+    ('unresolved_exec', '!r->plan || r->plan->unresolved_count ||', '!r->plan ||'),
     ('steps', 'cost > GF_INIT_SCHEDULE - e->steps', 'false'),
     ('wait_budget', 'us > GF_INIT_WAIT_MAX - e->wait_us', 'false'),
     ('exec_deadline', 'e->elapsed_us >= GF_INIT_EXEC_US', 'false'),
@@ -28,7 +32,13 @@ MUTATIONS = [
     ('skip_time', 'if (n->substep >= GF_INIT_K) return 0;', 'if (false && n->substep >= GF_INIT_K) return 0;'),
     ('wait_failure', 'e->ops->wait_us(e->opaque, part) ||', '(e->ops->wait_us(e->opaque, part) && false) ||'),
 ]
+PLANNED = '        if (planned) *value = expected;\n'
+PRECHECK = """        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rule(n, w)) ||
+            (dir == REC_DATA && r->port_selected[r->index_port[target]] != target))
+            return access_error(r, target);
+"""
 SHARED_MUTATIONS = [
+    ('pre_read_order', PRECHECK + "        if (w->write_mask", "        if (!w) return access_error(r, target);\n        if (w->write_mask"),
     ('fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
     ('planned_value', 'if (planned) *value = expected;', 'if (planned) *value = 0;'),
 ]
@@ -42,7 +52,10 @@ def mutation(item):
     with tempfile.TemporaryDirectory(prefix='gfinit-mut-') as td:
         exe = pathlib.Path(td)/'host'
         try:
-            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1) if old else source},
+            mutated = source.replace(old, new, 1) if old else source
+            if name == 'pre_read_order':
+                mutated = mutated.replace(PLANNED, PLANNED + PRECHECK, 1)
+            tree = mutpar.build_in_tree(ROOT, td, {file: mutated},
                                        [command(exe)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1

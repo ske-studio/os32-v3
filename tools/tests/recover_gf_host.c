@@ -99,11 +99,21 @@ static void inventory_test(void)
 {
     CHECK(recover_profile_ok(&recover_gf_template)==0);
     CHECK(ARRAY_SIZE(inventory)==619 && ARRAY_SIZE(gf_effects)==619);
-    u32 counts[4]={0};
+    u32 counts[5]={0};
     for(u32 i=0;i<ARRAY_SIZE(inventory);i++) {
         const struct gf_classification *c=&inventory[i];
         const struct gf_effect *e=&gf_effects[i];
-        CHECK(c->effect==i && c->kind<4); counts[c->kind]++;
+        CHECK(c->effect==i && c->kind<5); counts[c->kind]++;
+        if(c->kind==REC_GF_PLL || c->kind==REC_GF_PLL_UNUSED) {
+            CHECK(e->expression==GF_PLL);
+            if(c->kind==REC_GF_PLL) {
+                const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
+                CHECK(w && w->phase==REC_RUN && w->pc==e->pc && targets[w->key].offset==e->reg);
+            } else CHECK(c->rule==RECOVER_NONE &&
+                ((e->pc==0xe728 && (e->reg==0x4038 || e->reg==0x403c || e->reg==0x4600)) ||
+                 (e->pc==0xe623 && e->reg==0x1584)));
+            continue;
+        }
         if(c->kind!=REC_GF_RULE) {
             CHECK(c->rule==RECOVER_NONE);
             for(u32 j=0;j<recover_gf_template.rule_count;j++)
@@ -141,7 +151,7 @@ static void inventory_test(void)
                 w->guards[j].when==(REC_BEFORE|REC_AFTER));
         }
     }
-    CHECK(counts[0]==513 && counts[1]==101 && counts[2]==2 && counts[3]==3);
+    CHECK(counts[0]==513 && counts[1]==76 && counts[4]==25 && counts[2]==2 && counts[3]==3);
     CHECK(recover_gf_template.vram_reserved.base==0 && recover_gf_template.vram_reserved.len==1024);
     for(u32 i=0;i<recover_gf_template.target_count;i++) {
         const struct recover_target *t=&targets[i];
@@ -155,7 +165,7 @@ static void inventory_test(void)
         const struct recover_rule *w=rule_by_id(&profile,recover_gf_size_bars[i]);
         CHECK(w && w->requires_count==1 && w->requires[0]==recover_gf_size_bars[i-1]);
     }
-    print("inventory: 513 rules, 101 PLL, 2 COPY, 3 temporary saved, 0 alias gap; 619 accounted\n");
+    print("inventory: 513 rules, 76 PLL covered / 25 chip-excluded / 0 pending, 2 COPY, 3 temporary saved, 0 alias gap; 619 accounted\n");
 }
 static void node(u32 at,const struct recover_rule *w,u32 dir,u32 value)
 {

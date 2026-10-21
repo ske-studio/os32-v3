@@ -1376,6 +1376,9 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
         for (u32 j = 0; j < i; j++) if (plan->deps[j].consumer == d->consumer &&
             plan->deps[j].required_rule == d->required_rule) return -1;
     }
+    /* A capture names a read source and one explicit expression consumer;
+     * the consumer may write a different target (e.g. a PLL mirror). The
+     * same instruction/context, dominance and single-use checks still apply. */
     for (u32 i = 0; i < plan->capture_count; i++) {
         const struct recover_capture *c = &plan->captures[i];
         if (c->slot != p->count + i || c->producer_node >= c->consumer_node ||
@@ -1385,7 +1388,7 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
         if (!node_ok(p, plan, c->producer_node) || !node_ok(p, plan, c->consumer_node) ||
             a->phase != REC_RUN || b->phase != REC_RUN || a->main_id != b->main_id ||
             a->pc != b->pc || a->ctx != b->ctx || a->head != b->head ||
-            b->arg_count < 2 || plan->args[b->arg_first].value != c->target) return -1;
+            b->arg_count < 2) return -1;
         bool uses_slot = false;
         for (u32 j = 1; j < b->arg_count; j++)
             if (plan->args[b->arg_first + j].kind == REC_ARG_SAVED &&
@@ -1678,15 +1681,15 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             if ((*value & RECOVER_COMMAND_MEM) && !raw_matches(r, false)) return access_error(r, target);
         }
         u32 old = 0, expected = 0;
-        if (!w) return access_error(r, target);
+        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rule(n, w)) ||
+            (dir == REC_DATA && r->port_selected[r->index_port[target]] != target))
+            return access_error(r, target);
         if (w->write_mask != width_mask(width) && (dir == REC_SELECT || bus_read(r, target, &old)))
             return access_error(r, target);
         if (n && !evaluate(r, n, w, old, &expected)) return access_error(r, target);
         if (planned) *value = expected;
-        if (t->access == REC_UNCLASSIFIED ||
-            (n && !node_rule(n, w)) || !value_ok(&w->value, width, *value)) return access_error(r, target);
+        if (!value_ok(&w->value, width, *value)) return access_error(r, target);
         if (dir == REC_SELECT && !(w->flags & REC_LOCAL) && *value != t->index) return access_error(r, target);
-        if (dir == REC_DATA && r->port_selected[r->index_port[target]] != target) return access_error(r, target);
         if (zero_target(t) && *value != 0) return access_error(r, target);
         if (n1_target(t) && dir == REC_DATA && !(*value & RECOVER_SR_BLANK) &&
             r->auth_phase == REC_RUN && !(w->flags & REC_N1)) return access_error(r, target);

@@ -4,6 +4,7 @@ static unsigned lookup_steps;
 #define _start gf_profile_entry
 #include "recover_gf_host.c"
 #undef _start
+#include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_decode.c"
 static struct gfinit_decode decoded;
 static u8 rom[65536];
@@ -25,7 +26,17 @@ static void fixture(void)
     }
     for(u32 i=0;i<GF_ARRAY(gf_scripts);i++)
         if(gf_scripts[i].script<9)put(0x5d4c+2*gf_scripts[i].script,gf_scripts[i].start,2);
-    put(0x5bc8,0x21,1);put(0x5bc9,4,1);put(0x5bca,1,1);put(0x5bcb,4,1);
+    /* Synthetic 0x21 limits; no real VBIOS table bytes. */
+    put(GF_INIT_PLL_TABLE,0x21,1);put(GF_INIT_PLL_TABLE+1,4,1);
+    put(GF_INIT_PLL_TABLE+2,35,1);put(GF_INIT_PLL_TABLE+3,4,1);
+    const u32 pll_regs[]={GF_PLL_CORE-4,GF_PLL_MEMORY-4,GF_PLL_VIDEO,0x680520};
+    for(u32 i=0;i<4;i++) {
+        u32 at=GF_INIT_PLL_TABLE+4+35*i;
+        put(at,pll_regs[i],4);put(at+4,100,2);put(at+6,500,2);
+        put(at+12,1,2);put(at+16,27,2);
+        put(at+20,1,1);put(at+21,255,1);put(at+22,1,1);put(at+23,27,1);
+        put(at+29,7,1);put(at+30,1,1);
+    }
     for(u32 i=0;i<8;i++) {
         put(0x5daa+9*i,0x3d4,2);put(0x5dac+9*i,0x3c,1);
         put(0x5daf+9*i,0x5c59,2);
@@ -88,8 +99,8 @@ static void parser_tests(void)
 static void decode_inventory(void)
 {
     fixture(); CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)==0);
-    CHECK(decoded.instruction_count==193 && decoded.plan.node_count==940);
-    CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==8);
+    CHECK(decoded.instruction_count==193 && decoded.plan.node_count==972);
+    CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==5);
     CHECK(recover_profile_ok(&recover_gf_template)==0);
     for(u32 i=0;i<decoded.plan.node_count;i++) {
         const struct recover_plan_node *n=&decoded.nodes[i];
@@ -109,7 +120,9 @@ static void decode_inventory(void)
         CHECK(c->slot==recover_gf_template.count+i && c->producer_node<c->consumer_node);
         CHECK(decoded.nodes[c->producer_node].pc==decoded.nodes[c->consumer_node].pc);
     }
+    const u32 step_bounds[]={208,281,143,127,1};
     for(u32 m=0;m<5;m++) {
+        CHECK(decoded.main_steps[m]==step_bounds[m]);
         output("main=");number(m);output(" nodes=");number(decoded.main_nodes[m]);
         output(" steps=");number(decoded.main_steps[m]);output(" wait_us=");number(decoded.main_wait[m]);output("\n");
     }
@@ -410,7 +423,7 @@ static void logical_head_tests(void)
 #endif
 void GF_S2_ENTRY(void)
 {
-    parser_tests();decode_inventory();capture_tests();port_tests();copy_order_tests();logical_head_tests();rejection_tests();benchmark(940);benchmark(2048);
+    parser_tests();decode_inventory();capture_tests();port_tests();copy_order_tests();logical_head_tests();rejection_tests();benchmark(972);benchmark(2048);
     output(failures?"GF S2 FAIL\n":"GF S2 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));
     __builtin_unreachable();

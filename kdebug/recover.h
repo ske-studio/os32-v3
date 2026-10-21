@@ -125,7 +125,8 @@ struct recover_plan_node {
 };
 struct recover_plan_dep { u32 consumer, required_rule, producer; };
 struct recover_plan_entry { u32 phase, main_id, first; };
-#define RECOVER_CAPTURE_MAX 3U
+#define RECOVER_CAPTURE_MAX 32U
+STATIC_ASSERT(RECOVER_CAPTURE_MAX <= 32U, recover_capture_bits);
 struct recover_capture { u32 slot, producer_node, consumer_node, target, read_ordinal; };
 struct recover_plan {
     u32 version, profile_crc, rom_crc, rom_size;
