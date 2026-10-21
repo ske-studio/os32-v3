@@ -15,6 +15,7 @@ struct trace { char op; u32 key, value; };
 struct fake {
     u32 tick, tick_read, tick_write, values[NREG], route, command, bar;
     u32 n, fail_read, fail_write, bad_verify, op_ticks, config_reads;
+    u32 tick_abort, abort_calls, delay_abort_call, tick_pause;
     struct trace trace[TRACE_MAX];
     struct recover_identity id;
     bool ready, raw_fail, decode_fail, screen_fail, abort, route_fail;
@@ -84,10 +85,15 @@ static int screen_safe(void *v)
 static int screen_restore(void *v)
 { struct fake *f = v; note(f, 'v', 0, 0); return f->screen_fail; }
 static int abort_requested(void *v, u32 session)
-{ struct fake *f = v; CHECK(session == f->core->token.session); return f->abort; }
+{
+    struct fake *f = v; CHECK(session == f->core->token.session);
+    if (++f->abort_calls == f->delay_abort_call) f->tick += f->tick_abort;
+    return f->abort;
+}
 static int event(void *v, enum recover_state state, u32 session)
 {
     struct fake *f = v; (void)session; note(f, 's', state, 0);
+    if (state == REC_PAUSED) f->tick += f->tick_pause;
     return f->log_fail;
 }
 static const struct recover_ops ops = {
@@ -281,6 +287,43 @@ static void timing(void)
     CHECK(trial_end(&r, &r.token, REC_NORMAL) < 0);
     CHECK(r.state == REC_FAILED && writes() == 4); /* 3 prepare + 1 restore */
 }
+static void callback_timing(void)
+{
+    /* A receive that exhausts the budget must stop before the operation. */
+    setup(false); begin(); f.tick_abort = r.budget;
+    f.delay_abort_call = f.abort_calls + 1;
+    CHECK(trial_step(&r, &r.token, true, change, 0) < 0);
+    CHECK(r.reason == REC_TIMEOUT && f.values[DATA0] == INITIAL);
+    /* Final receive and PAUSED notification belong to the active call. */
+    for (u32 step = 0; step < 2; step++) {
+        for (u32 receive = 0; receive < 2; receive++) {
+            for (u32 opcode = 0; opcode <= step; opcode++) {
+                setup(false);
+                if (step) begin();
+                u32 delay = opcode ? profile.opcode_limit : r.budget;
+                if (!step) delay = profile.trial_limit;
+                if (receive) {
+                    f.tick_abort = delay;
+                    f.delay_abort_call = f.abort_calls + (step ? 2 : 1);
+                } else f.tick_pause = delay;
+                int rc = step ? trial_step(&r, &r.token, true, change, 0) :
+                    trial_begin(&r, &profile, 123, 100);
+                CHECK(rc < 0 && r.state == REC_FAILED && r.reason == REC_TIMEOUT);
+                CHECK(r.s0_verified && !r.in_call && !r.in_opcode);
+                CHECK(count('s', REC_RESTORING) == 1);
+                CHECK(r.spent == delay);
+            }
+        }
+    }
+    setup(false); f.tick_abort = 3; f.delay_abort_call = 1; f.tick_pause = 4;
+    begin(); CHECK(r.spent == 7);
+    f.tick += 100000;
+    f.delay_abort_call = f.abort_calls + 2;
+    CHECK(trial_step(&r, &r.token, true, change, 0) == 0 && r.spent == 14);
+    f.tick += 100000;
+    CHECK(trial_step(&r, &r.token, true, change, 0) == 0 && r.spent == 18);
+    CHECK(trial_end(&r, &r.token, REC_NORMAL) == 0);
+}
 static void failures(void)
 {
     setup(false); f.fail_read = DATA1;
@@ -318,7 +361,11 @@ static void cold_and_config(void)
                 f.op_ticks = 100;
                 rc = trial_step(&r, &r.token, true, change, 0);
             } else rc = trial_step(&r, &r.token, true, error_op, 0);
-            CHECK(count('w', DATA0) == 0 && count('w', DATA1) == 0);
+            if (count('w', DATA0)) {
+                output("COLD replay exit "); decimal(reason); output("\n");
+            }
+            CHECK(count('w', DATA0) == 0);
+            CHECK(count('w', DATA1) == 0);
             CHECK(!r.s1_verified && r.cold_latched && r.s0_verified);
             CHECK(count('w', OUTPUT) == (cfg == 0 ? 1U : 0U));
             CHECK(writes() == (cfg == 0 ? 3U : 0U));
@@ -369,7 +416,8 @@ static void routes(void)
 }
 void _start(void)
 {
-    preconditions(); normal(); mismatches(); timing(); failures(); cold_and_config(); routes();
+    preconditions(); normal(); mismatches(); timing(); callback_timing();
+    failures(); cold_and_config(); routes();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }

@@ -249,6 +249,25 @@ static bool live_matches(struct recover *r)
         !r->ops->identity(r->opaque, &id) && same_identity(&id, &r->token.identity);
 }
 
+static int check_deadline(struct recover *r)
+{
+    account(r);
+    if (r->spent >= r->budget ||
+        (r->in_opcode && (u32)(r->call_tick - r->opcode_tick) >=
+         r->profile->opcode_limit)) {
+        fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
+    }
+    return 0;
+}
+
+static int pause_call(struct recover *r)
+{
+    if (state(r, REC_PAUSED)) return cleanup(r), -1;
+    if (check_deadline(r)) return -1;
+    r->in_call = false; r->in_opcode = false;
+    return 0;
+}
+
 int trial_begin(struct recover *r, const struct recover_profile *p,
                 u32 plan_hash, u32 budget)
 {
@@ -290,22 +309,20 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     }
     if (state(r, REC_ARMED) || state(r, REC_RUNNING)) return cleanup(r);
     if (recover_safe_point(r)) return -1;
-    r->in_call = false;
-    if (state(r, REC_PAUSED)) return cleanup(r);
-    return 0;
+    return pause_call(r);
 }
 
 int recover_safe_point(struct recover *r)
 {
     if (!r->in_call || r->state != REC_RUNNING) return -1;
-    account(r);
-    if (r->spent >= r->budget ||
-        (r->in_opcode && ((u32)(r->call_tick - r->opcode_tick) >=
-          r->profile->opcode_limit || ++r->polls > r->profile->max_polls))) {
+    if (check_deadline(r)) return -1;
+    if (r->in_opcode && ++r->polls > r->profile->max_polls) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
     }
-    if (r->ops->abort_requested &&
-        r->ops->abort_requested(r->opaque, r->token.session)) {
+    bool abort = r->ops->abort_requested &&
+        r->ops->abort_requested(r->opaque, r->token.session);
+    if (check_deadline(r)) return -1;
+    if (abort) {
         r->reason = REC_ABORT; cleanup(r); return -1;
     }
     return 0;
@@ -332,9 +349,7 @@ int trial_step(struct recover *r, const struct recover_token *t, bool approved,
     if (r->state != REC_RUNNING) return -1; /* safe point already cleaned up */
     if (rc) { fail(r, REC_OPERATION, REC_PHASE_NONE, 0); return cleanup(r); }
     if (recover_safe_point(r)) return -1;
-    r->in_call = false; r->in_opcode = false;
-    if (state(r, REC_PAUSED)) return cleanup(r);
-    return 0;
+    return pause_call(r);
 }
 
 int trial_end(struct recover *r, const struct recover_token *t,

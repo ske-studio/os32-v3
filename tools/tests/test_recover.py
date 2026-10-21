@@ -39,7 +39,17 @@ MUTATIONS = [
     ("stale_session", "t && t->session == r->token.session &&", "t &&"),
     ("verify_ok", "fail(r, REC_VERIFY, phase, w->key); return false;",
      "return true;"),
-    ("cold_replayed", "if (safe && !r->profile->cold_required)", "if (safe)"),
+    ("cold_replayed", """if (safe && !r->profile->cold_required) {
+        for (u32 i = 0; i < r->saved_count; i++) {
+            const struct recover_reg *d = &r->profile->regs[i];
+            if (d->kind == REC_COLD) continue;""", """if (safe) {
+        for (u32 i = 0; i < r->saved_count; i++) {
+            const struct recover_reg *d = &r->profile->regs[i];
+            if (d->kind != REC_COLD) continue;"""),
+    ("receive_time_lost", "    if (check_deadline(r)) return -1;\n    if (abort)",
+     "    if (abort)"),
+    ("pause_time_lost", "    if (check_deadline(r)) return -1;\n    r->in_call = false;",
+     "    r->in_call = false;"),
 ]
 
 
@@ -59,6 +69,11 @@ def one_mutation(item):
         result = host32.run([str(exe)], cwd=str(tree), timeout=60, capture_output=True)
         if result.returncode == 0:
             return f"MUTATE {name}: GREEN", 1
+        if name == "cold_replayed":
+            for reason in range(4):
+                if f"COLD replay exit {reason}\n".encode() not in result.stdout:
+                    return f"MUTATE {name}: exit {reason} not detected", 1
+            return f"MUTATE {name}: RED normal/abort/timeout/failure rc={result.returncode}", 0
         return f"MUTATE {name}: RED rc={result.returncode}", 0
 
 
