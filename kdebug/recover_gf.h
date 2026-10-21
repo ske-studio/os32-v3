@@ -7,6 +7,7 @@
  * Fixed columns are ordered rule IDs; SIZE_BARS reads each mask between the
  * probe and saved-value write, feeding recover_bar_probe before continuing.
  */
+#define REC_GF_PLL_SAVED 8U
 #define REC_GF_RMW 5U
 #define REC_GF_EXPR_COPY 6U
 #define REC_GF_EXPR_COPY_NV 7U

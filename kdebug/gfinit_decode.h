@@ -10,7 +10,6 @@
 #define GF_INIT_WAIT_MAX 5000000U
 #define GF_INIT_Q 0x10000U
 #define GF_INIT_C 0x11000U
-#define GF_INIT_PLL 0x11101U
 #define GF_INIT_K 0x20000U
 #define GF_INIT_SCRIPT_TABLE 0x5d4cU
 #define GF_INIT_MACRO_TABLE 0x5d66U
@@ -19,7 +18,7 @@
 #define GF_INIT_PLL_TABLE 0x5bc8U
 /* Owned by caller, no allocation or bus access. ROM remains borrowed only
  * during decode. A successful decode is an inventory, not permission to RUN:
- * S4 PLL entries deliberately have no executable layout. */
+ * COPY and non-PLL temporary restore entries remain unresolved until S5. */
 struct gfinit_instruction {
     u32 pc, opcode, length, end_repeat, effect_first, effect_count;
     u32 ref, count, port, index, mask, shift, target, value;

@@ -25,7 +25,6 @@ static int exec_control(struct recover *r, struct gfinit_exec *e,
 {
     const struct recover_plan_arg *a = &r->plan->args[n->arg_first];
     if (n->substep >= GF_INIT_K) return 0; /* checked K: no access or wait */
-    if (n->substep == GF_INIT_PLL) return -1; /* S4 must expand this first */
     switch (n->opcode) {
     case 0x32: case 0x4a:
         if (n->arg_count != 4 || a[1].value >= 32 || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;

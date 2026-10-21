@@ -45,8 +45,8 @@ static int exec_delay(void *v,u32 us)
 static const struct gfinit_exec_ops executor_ops={exec_clock,exec_delay};
 static struct recover_ops executor_bus;
 /* Deliberately synthetic permissions: exact decoded operand expressions, no
- * hardware permission claim. Missing COPY/capture rows and PLL writes exist
- * only in this test. Production template remains unresolved and unbindable. */
+ * hardware permission claim. Missing COPY/capture rows exist only in this test. PLL rows use their
+ * expanded expressions; production PLL authorization is tested separately. */
 static void synthetic_profile(void)
 {
     profile=recover_gf_template;profile.regs=0;profile.count=0;
@@ -68,19 +68,13 @@ static void synthetic_profile(void)
         struct recover_opcode_layout *l=0;
         for(u32 j=0;j<profile.layout_count;j++)if(exec_layouts[j].opcode==n->opcode && exec_layouts[j].substep==n->substep)l=&exec_layouts[j];
         CHECK(l!=0);if(!l)return;
-        if(n->substep==GF_INIT_PLL) {
-            /* Synthetic PLL: one literal write of requested kHz to the
-             * existing PLL target. It tests selection, never coefficients. */
-            u32 reg=decoded.args[n->arg_first].value;
-            decoded.args[n->arg_first]=IMM(key_for(&profile,reg,0,0,0));
-            n->arg_count=2;l->argc=2;l->kinds=two;l->dir_substep=REC_WRITE;
-        }
         if(l->dir_substep==RECOVER_NONE || l->dir_substep==REC_READ)continue;
         u32 expr=RECOVER_NONE;
         if(l->argc==4)expr=REC_GF_RMW;
+        if(n->substep>=GF_PLL_SUBSTEP && n->substep<GF_PLL_SUBSTEP+96 && l->argc==4)expr=REC_GF_PLL_SAVED;
         if(n->opcode==0x37 && l->argc==6)expr=REC_GF_EXPR_COPY;
         if(n->opcode==0x5f)expr=REC_GF_EXPR_COPY_NV;
-        if(decoded.args[n->arg_first+1].kind==REC_ARG_SAVED)expr=REC_GF_SAVED_BAR;
+        if(l->argc==2 && decoded.args[n->arg_first+1].kind==REC_ARG_SAVED)expr=REC_GF_SAVED_BAR;
         u32 key=decoded.args[n->arg_first].value;
         u32 id=0;
         for(;id<profile.rule_count;id++)if(exec_rules[id].key==key && exec_rules[id].main_id==n->main_id && exec_rules[id].pc==n->pc && exec_rules[id].substep==n->substep)break;
@@ -143,6 +137,41 @@ static void ref_delay(u32 us)
     while(us){u32 n=us>1000?1000:us;trace_add(expected,&expected_count,RECOVER_NONE,0,n);us-=n;}
 }
 static u32 ref_shift(u32 v,u32 s){return s<128?v>>s:v<<(256-s);}
+static void reference_pll(u32 reg,u32 khz)
+{
+    if(ref_skip)return;
+    struct gfinit_pll_limits l;struct gfinit_pll_solution s;
+    CHECK(gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,reg,&l)==0);
+    CHECK(gfinit_pll_solve(&l,khz,&s)==0);
+    u32 gate=ref_read(ref_key(GF_PLL_GATE,0,0));
+    u32 old=ref_read(ref_key(reg==GF_PLL_VIDEO?reg:reg-4,0,0));
+    u32 nm1=s.n1*256+s.m1,nm2=s.n2*256+s.m2;
+#define PW(r,v) ref_write(ref_key((r),0,0),(v),REC_WRITE)
+    if(reg==GF_PLL_VIDEO) {
+        u32 stage=ref_read(ref_key(GF_PLL_VIDEO_STAGE,0,0));
+        u32 coeff=ref_read(ref_key(GF_PLL_VIDEO_COEFF,0,0));
+        PW(GF_PLL_GATE,gate&0xfffcffffU);
+        PW(GF_PLL_VIDEO_STAGE,(stage&0xfffffeffU)|(s.n2==s.m2?0x100:0));
+        PW(GF_PLL_VIDEO_COEFF,(coeff&0x7fff0000U)|0x80000000U|nm2|(s.n2==s.m2?0x11f:0));
+        PW(reg,(old&0xfff80000U)|(s.p<<16)|nm1);PW(GF_PLL_GATE,gate);
+    } else {
+        bool mem=reg==GF_PLL_MEMORY;
+        u32 power=mem?ref_read(ref_key(GF_PLL_MEMORY_POWER,0,0)):0;
+        u32 p=(old&(mem?0xff88ffffU:0xfff8ffffU))|0xc0000000U|(s.p<<16);
+        if(mem){u32 bias=s.p+l.bias_p;if(bias>l.max_p)bias=l.max_p;p|=0x10000000U|(bias<<20);}
+        if(s.n2==s.m2)p|=mem?0x1000:0x100;
+        if(mem)PW(GF_PLL_MEMORY_POWER,power|0x80000000U);
+        PW(reg-4,old|0x10000000U);PW(reg-4,p&0xbfffffffU);
+        if(mem){p|=0x800000;PW(reg-4,p&0x3fffffffU);PW(GF_PLL_MEMORY_MIRROR,p&0x3fffffffU);}
+        PW(GF_PLL_GATE,gate&(mem?0xffff3fffU:0xfffffcccU));PW(reg,(nm2<<16)|nm1);
+        if(mem)PW(GF_PLL_MEMORY_COEFF,(nm2<<16)|nm1);
+        PW(reg-4,p);
+        if(mem){p&=0xff7fffffU;PW(reg-4,p);PW(GF_PLL_MEMORY_MIRROR,p);PW(GF_PLL_MEMORY_POWER,power);}
+        PW(GF_PLL_GATE,gate);
+        if(mem){PW(reg-4,p&0xefffffffU);PW(GF_PLL_MEMORY_MIRROR,p&0xefffffffU);}
+    }
+#undef PW
+}
 static u32 reference(u32 pc,u32 depth)
 {
     CHECK(depth<24);
@@ -154,7 +183,10 @@ static u32 reference(u32 pc,u32 depth)
             port=le(rom,pc+1,2);index=rom[pc+3];mask=rom[pc+4];shift=rom[pc+5];count=rom[pc+6];
             t=ref_key(0,port,index);ref_write(t,index,REC_SELECT);
             v=(ref_read(t)&mask)>>shift;
-            if(!ref_skip && v<count)ref_write(ref_key(le(rom,pc+7,4),0,0),le(rom,pc+11+4*v,4),REC_WRITE);
+            if(!ref_skip && v<count) {
+                if(op==0x4a)reference_pll(le(rom,pc+7,4),le(rom,pc+11+4*v,4));
+                else ref_write(ref_key(le(rom,pc+7,4),0,0),le(rom,pc+11+4*v,4),REC_WRITE);
+            }
             len=11+4*count;break;
         case 0x33:
             count=rom[pc+1];v=0;for(u32 k=0;k<count;k++)v=reference(pc+2,depth+1);
@@ -170,7 +202,7 @@ static u32 reference(u32 pc,u32 depth)
             ref_write(t,rom[base+2],REC_SELECT);v=(ref_read(t)&rom[base+3])>>rom[base+4];
             if((rom[le(rom,base+5,2)+v]&rom[base+7])!=rom[base+8])ref_skip=1;
             len=2;break;
-        case 0x4b:ref_write(ref_key(le(rom,pc+1,4),0,0),le(rom,pc+5,4),REC_WRITE);len=9;break;
+        case 0x4b:reference_pll(le(rom,pc+1,4),le(rom,pc+5,4));len=9;break;
         case 0x51:
             t=ref_key(0,RECOVER_CRTC,rom[pc+1]);dst=ref_key(0,RECOVER_CRTC,rom[pc+2]);
             ref_write(t,rom[pc+1],REC_SELECT);v=ref_read(t);count=rom[pc+4];
@@ -345,6 +377,41 @@ static void condition_tests(void)
     finish_controls();bus_fail=1;CHECK(gfinit_exec_run(&core,&execution)==0 && actual_count==0 && wait_total==0);
     output("conditions true/false, IO flag lookup, skipped read/write/TIME/CALL and forced COMPUTE_MEM\n");
 }
+static void frame_mismatch_tests(void)
+{
+    for(u32 kind=0;kind<7;kind++) {
+        bool repeat=kind>=2 && kind<=3;
+        control_begin();append_control(repeat?0x33:0x5b,GF_INIT_C,0x100,0,2,1,0,0);
+        if(kind<4)append_control(repeat?0x33:0x5b,GF_INIT_C+(repeat?2:1),
+            kind==0?0x101:0x100,kind==1 || kind==2?1:0,1,kind==3?2:1,0,0);
+        if(kind==6) { /* missing repeat exit independently */
+            decoded.nodes[0].opcode=0x33;exec_layouts[0].opcode=0x33;
+        }
+        append_control(0x71,GF_INIT_C,0x200,0,0,0,0,0);finish_controls();
+        CHECK(gfinit_exec_run(&core,&execution)<0 && actual_count==0);
+    }
+}
+static u32 unsafe_reads;
+static int count_unsafe_read(void *v,const struct recover_bus_access *a,u32 *out)
+{unsafe_reads++;return exec_bus_read(v,a,out);}
+static void pre_read_tests(void)
+{
+    for(u32 unclassified=0;unclassified<2;unclassified++) {
+        contract_setup(1);profile.rule_count=1;profile.layout_count=1;
+        contract_targets[0]=(struct recover_target){.space=REC_VGA_INDEXED,.port=RECOVER_CRTC,
+            .index=0x57,.width=1,.access=REC_RW,.read_safe=1};
+        contract_rules[0]=(struct recover_rule){.id=200,.key=0,.phase=REC_RESTORE,.main_id=RECOVER_NONE,
+            .pc=RECOVER_NONE,.substep=REC_DATA,.write_mask=0x7f,
+            .value={.mode=REC_LITERAL,.mask=0x7f,.bits=1,.max=255,.expr_id=RECOVER_NONE}};
+        contract_arm();core.profile=&profile;core.state=REC_RESTORING;core.auth_phase=REC_RESTORE;
+        core.restore_tick=0;core.restore_polls=0;
+        executor_bus=ops;executor_bus.read=count_unsafe_read;core.ops=&executor_bus;
+        core.index_port[0]=0;core.port_selected[0]=unclassified?0:RECOVER_NONE;
+        if(unclassified)contract_targets[0].access=REC_UNCLASSIFIED;
+        unsafe_reads=0;u32 value=1;
+        CHECK(recover_access(&core,RECOVER_NONE,REC_DATA,0,1,&value)<0 && unsafe_reads==0);
+    }
+}
 static void failure_tests(void)
 {
     for(u32 fail_kind=0;fail_kind<7;fail_kind++) {
@@ -409,9 +476,12 @@ static void force_reset_test(void)
     output("RESET forced during skip: clear/write/wait/write/restore/zero, capture preserved\n");
 }
 
-void _start(void)
+#ifndef GF_S3_ENTRY
+#define GF_S3_ENTRY _start
+#endif
+void GF_S3_ENTRY(void)
 {
-    all_trace();depth_tests();budget_tests();condition_tests();selection_tests();force_reset_test();failure_tests();
+    all_trace();depth_tests();budget_tests();condition_tests();selection_tests();force_reset_test();failure_tests();frame_mismatch_tests();pre_read_tests();
     output(failures?"GF S3 FAIL\n":"GF S3 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));__builtin_unreachable();
 }

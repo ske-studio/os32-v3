@@ -96,3 +96,11 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - S2送り項目はlayoutのheadフラグ、表位置定数、skip CR44拒否、重複処理等の整理と負の試験へ反映。固定結果CR44 RMWもbindで検査。
 - 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS3節。PLL/COPY/採取の本番未結線8行は引き続き拒否。
 - 検証証拠: `~/os32-tmp/run/gf4a_s3/`。27種の独立期待trace・各予算境界は完全mockで検証。実機・NP21/Wは本段対象外。
+
+### 4a S4 PLL (2026-10-21)
+- `gfinit_pll` は0x21表のchecked parser・27MHz/u32 solver・NV44A低位/高位列を実装。MIT表示を保持し、32bit部品リンクの未解決は0。
+- PLL101候補は76件を26書込みruleへ対応付け、25件はチップ分岐で不要。PLL未解決0、COPY2・一時再生3の拒否はS5へ残す。
+- 展開972 node（上限2048）。S3送りの読取り前検査・静的/実行時READ課金・4件の実行器変異と順序変異を試験へ反映。
+- 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS4節。同値時も有限列を実行し、PLL一時captureは中断後に再生しない。
+- 部品増分はtext/rodata約7.33KiB（PLL単体3.37KiB）、recover BSS 116 byte、decoder所有領域580 byte。kdebug結線はS6。
+- 検証証拠: `~/os32-tmp/run/gf4a_s4/`。実accessor・実機・NP21/W・S6の時計/poll設定は対象外。

@@ -24,6 +24,6 @@ struct gfinit_exec {
 /* A trial_step operation: execute exactly the expected main entry of a bound,
  * immutable decoded plan. The owner retains ROM/plan and handles cleanup via
  * trial_step; no direct bus or PLL callback bypasses recover authorization.
- * S4 replaces unresolved PLL entries with authorized internal plan nodes. */
+ * PLL operations are ordinary authorized internal plan nodes. */
 int gfinit_exec_run(struct recover *r, void *arg);
 #endif

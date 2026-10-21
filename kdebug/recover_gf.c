@@ -33,11 +33,11 @@ static const struct recover_target targets[] = {
     {REC_BAR_MMIO, 0x0U, 0xc020U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 22 */
     {REC_BAR_MMIO, 0x0U, 0x100210U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 23 */
     {REC_BAR_MMIO, 0x0U, 0x402cU, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 24 */
-    {REC_BAR_MMIO, 0x0U, 0xc040U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 25 */
-    {REC_BAR_MMIO, 0x0U, 0x4000U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 26 */
+    {REC_BAR_MMIO, 0x0U, 0xc040U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 25 */
+    {REC_BAR_MMIO, 0x0U, 0x4000U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 26 */
     {REC_BAR_MMIO, 0x0U, 0x4008U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 27 */
-    {REC_BAR_MMIO, 0x0U, 0x680580U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 28 */
-    {REC_BAR_MMIO, 0x0U, 0x4020U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 29 */
+    {REC_BAR_MMIO, 0x0U, 0x680580U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 28 */
+    {REC_BAR_MMIO, 0x0U, 0x4020U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 29 */
     {REC_BAR_MMIO, 0x0U, 0x680510U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 30 */
     {REC_VGA_INDEXED, 0x0U, 0x0U, 0x0U, 0x3d4U, 0x3cU, 0x1U, REC_COLD, 0x1U}, /* 31 */
     {REC_BAR_MMIO, 0x0U, 0x1508U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x0U}, /* 32 */
@@ -155,6 +155,13 @@ static const struct recover_target targets[] = {
     {REC_BAR_MMIO, 0, 0x602858U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 144 */
     {REC_BAR_MMIO, 0, 0x1700U, 0, 0, RECOVER_NONE, 4, REC_RW, 1}, /* 145: COPY destination */
     {REC_BAR_MMIO, 0, 0x10020cU, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 146: COPY source only */
+    {REC_BAR_MMIO, 0, 0x4004U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 147 */
+    {REC_BAR_MMIO, 0, 0x4024U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 148 */
+    {REC_BAR_MMIO, 0, 0x4038U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 149 */
+    {REC_BAR_MMIO, 0, 0x403cU, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 150 */
+    {REC_BAR_MMIO, 0, 0x4600U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 151 */
+    {REC_BAR_MMIO, 0, 0x680508U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 152 */
+    {REC_BAR_MMIO, 0, 0x680578U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 153 */
 };
 static const struct recover_guard n1_guards[] = {
     {0, 0xffffffffU, 0, REC_BEFORE | REC_AFTER},
@@ -237,6 +244,29 @@ static const u32 dep_481[] = {480};
 static const u32 dep_483[] = {482};
 static const u32 dep_515[] = {514, 0, 1};
 static const u32 dep_527[] = {526};
+static const u32 pll_dep_545[] = {544};
+static const u32 pll_dep_546[] = {545};
+static const u32 pll_dep_547[] = {546};
+static const u32 pll_dep_548[] = {547};
+static const u32 pll_dep_549[] = {548};
+static const u32 pll_dep_551[] = {550};
+static const u32 pll_dep_552[] = {551};
+static const u32 pll_dep_553[] = {552};
+static const u32 pll_dep_554[] = {553};
+static const u32 pll_dep_555[] = {554};
+static const u32 pll_dep_556[] = {555};
+static const u32 pll_dep_557[] = {556};
+static const u32 pll_dep_558[] = {557};
+static const u32 pll_dep_559[] = {558};
+static const u32 pll_dep_560[] = {559};
+static const u32 pll_dep_561[] = {560};
+static const u32 pll_dep_562[] = {561};
+static const u32 pll_dep_563[] = {562};
+static const u32 pll_dep_564[] = {563};
+static const u32 pll_dep_566[] = {565};
+static const u32 pll_dep_567[] = {566};
+static const u32 pll_dep_568[] = {567};
+static const u32 pll_dep_569[] = {568};
 static const struct recover_rule rules[] = {
     {0x0U, 0x3U, REC_PREPARE, RECOVER_NONE, RECOVER_NONE, REC_WRITE, 0xffffffffU, 0xffffffffU, {REC_LITERAL, 0xffffffffU, 0x0U, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, 0, 0x0U, 0, 0x0U, 0},
     {0x1U, 0x2U, REC_PREPARE, RECOVER_NONE, RECOVER_NONE, REC_WRITE, 0xffffffffU, 0xffffffffU, {REC_LITERAL, 0xffffffffU, 0x0U, 0, 0xffffffffU, RECOVER_NONE, 0, 0}, dep_1, 0x1U, 0, 0x0U, 0},
@@ -782,6 +812,34 @@ static const struct recover_rule rules[] = {
     {0x21dU, 0x85U, REC_RUN, 0x3U, 0x5e88U, 0x269U, 0x100U, 0x0U, {REC_EXPR, 0x100U, 0x0U, 0, 0xffffffffU, REC_GF_RMW, 0, 0}, 0, 0x0U, 0, 0x0U, 0}, /* gf_effects[617] */
     {0x21eU, 0x84U, REC_RUN, 0x3U, 0x5e95U, 0x26aU, 0x100U, 0x0U, {REC_EXPR, 0x100U, 0x0U, 0, 0xffffffffU, REC_GF_RMW, 0, 0}, 0, 0x0U, 0, 0x0U, 0}, /* gf_effects[618] */
     {0x21fU, 0x90U, REC_RUN, 0, 0xded7U, 3, 0x1fffU, 0, {REC_EXPR, 0x1fffU, 0x1fffU, 0, 0xffffffffU, REC_GF_RMW, 0, 0}, 0, 0, 0, 0, 0}, /* gf_effects[3] */
+    /* NV44A PLL programming, MIT provenance and license in gfinit_pll.c. */
+    {544, 26, REC_RUN, 0, 0xe728, 0x12000, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, 0, 0, 0, 0, 0},
+    {545, 26, REC_RUN, 0, 0xe728, 0x12001, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_545, 1, 0, 0, 0},
+    {546, 25, REC_RUN, 0, 0xe728, 0x12002, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_546, 1, 0, 0, 0},
+    {547, 147, REC_RUN, 0, 0xe728, 0x12003, ~0U, ~0U, {REC_RANGE, 0, 0, 0, ~0U, RECOVER_NONE, 0, 0}, pll_dep_547, 1, 0, 0, 0},
+    {548, 26, REC_RUN, 0, 0xe728, 0x12004, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_548, 1, 0, 0, 0},
+    {549, 25, REC_RUN, 0, 0xe728, 0x12005, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_549, 1, 0, 0, 0},
+    {550, 151, REC_RUN, 0, 0xe754, 0x12020, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, 0, 0, 0, 0, 0},
+    {551, 29, REC_RUN, 0, 0xe754, 0x12021, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_551, 1, 0, 0, 0},
+    {552, 29, REC_RUN, 0, 0xe754, 0x12022, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_552, 1, 0, 0, 0},
+    {553, 29, REC_RUN, 0, 0xe754, 0x12023, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_553, 1, 0, 0, 0},
+    {554, 149, REC_RUN, 0, 0xe754, 0x12024, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_554, 1, 0, 0, 0},
+    {555, 25, REC_RUN, 0, 0xe754, 0x12025, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_555, 1, 0, 0, 0},
+    {556, 148, REC_RUN, 0, 0xe754, 0x12026, ~0U, ~0U, {REC_RANGE, 0, 0, 0, ~0U, RECOVER_NONE, 0, 0}, pll_dep_556, 1, 0, 0, 0},
+    {557, 150, REC_RUN, 0, 0xe754, 0x12027, ~0U, ~0U, {REC_RANGE, 0, 0, 0, ~0U, RECOVER_NONE, 0, 0}, pll_dep_557, 1, 0, 0, 0},
+    {558, 29, REC_RUN, 0, 0xe754, 0x12028, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_558, 1, 0, 0, 0},
+    {559, 29, REC_RUN, 0, 0xe754, 0x12029, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_559, 1, 0, 0, 0},
+    {560, 149, REC_RUN, 0, 0xe754, 0x1202a, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_560, 1, 0, 0, 0},
+    {561, 151, REC_RUN, 0, 0xe754, 0x1202b, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_561, 1, 0, 0, 0},
+    {562, 25, REC_RUN, 0, 0xe754, 0x1202c, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_562, 1, 0, 0, 0},
+    {563, 29, REC_RUN, 0, 0xe754, 0x1202d, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_563, 1, 0, 0, 0},
+    {564, 149, REC_RUN, 0, 0xe754, 0x1202e, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_564, 1, 0, 0, 0},
+    {565, 25, REC_RUN, 2, 0xe623, 0x12040, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, 0, 0, 0, 0, 0},
+    {566, 28, REC_RUN, 2, 0xe623, 0x12041, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_566, 1, 0, 0, 0},
+    {567, 153, REC_RUN, 2, 0xe623, 0x12042, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_567, 1, 0, 0, 0},
+    {568, 152, REC_RUN, 2, 0xe623, 0x12043, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_568, 1, 0, 0, 0},
+    {569, 25, REC_RUN, 2, 0xe623, 0x12044, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_569, 1, 0, 0, 0},
+
 };
 static const struct recover_reg regs[] = {
     {7, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, 7},
@@ -841,7 +899,9 @@ static int gf_copy_nv(const u32 *a, u32 n, u32 *v)
     if (n != 6 || gf_shift(a[0], a[2], &shifted)) return -1;
     *v = (a[1] & a[5]) | ((shifted & a[3]) ^ a[4]); return 0;
 }
+static const u32 pll_saved_kinds[] = {REC_ARG_SAVED, REC_IMM, REC_IMM};
 static const struct recover_expr exprs[] = {
+    {REC_GF_PLL_SAVED, 3, pll_saved_kinds, gf_rmw},
     {REC_GF_EXPR_COPY, 5, copy_kinds, gf_copy},
     {REC_GF_EXPR_COPY_NV, 6, copy_nv_kinds, gf_copy_nv},
     {REC_GF_RMW, 3, rmw_kinds, gf_rmw},
@@ -859,7 +919,36 @@ static const u32 rmw_layout[] = {REC_IMM, REC_ARG_READ, REC_IMM, REC_IMM};
 static const u32 copy_layout[] = {REC_IMM, REC_ARG_READ, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM};
 static const u32 copy_nv_layout[] = {REC_IMM, REC_ARG_READ, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 control_kinds[] = {REC_IMM, REC_IMM, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
+static const u32 pll_saved_layout[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM};
 static const struct recover_opcode_layout fixed_layouts[] = {
+    {0x4b, 0x10000, 1, fixed_read, REC_READ, 0},
+    {0x4a, 0x12000, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12001, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12002, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12003, 2, fixed_literal, REC_WRITE, 0},
+    {0x4a, 0x12004, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12005, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12020, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12021, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12022, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12023, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12024, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12025, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12026, 2, fixed_literal, REC_WRITE, 0},
+    {0x4a, 0x12027, 2, fixed_literal, REC_WRITE, 0},
+    {0x4a, 0x12028, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x12029, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x1202a, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x1202b, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x1202c, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x1202d, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4a, 0x1202e, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4b, 0x12040, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4b, 0x12041, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4b, 0x12042, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4b, 0x12043, 4, pll_saved_layout, REC_WRITE, 0},
+    {0x4b, 0x12044, 4, pll_saved_layout, REC_WRITE, 0},
+
     {0x6eU, 0x0U, 4, rmw_layout, REC_WRITE, 0},
     {0x6eU, 0x1U, 4, rmw_layout, REC_WRITE, 0},
     {0x6eU, 0x2U, 4, rmw_layout, REC_WRITE, 0},
@@ -1862,8 +1951,6 @@ static const struct recover_opcode_layout fixed_layouts[] = {
     {0x33U, 0x110fdU, 1, control_kinds, RECOVER_NONE, 0},
     {0x33U, 0x110feU, 1, control_kinds, RECOVER_NONE, 0},
     {0x33U, 0x110ffU, 1, control_kinds, RECOVER_NONE, 0},
-    {0x4aU, 0x11101U, 3, control_kinds, RECOVER_NONE, 0},
-    {0x4bU, 0x11101U, 3, control_kinds, RECOVER_NONE, 0},
 
     {0x100, 0, 2, fixed_rmw, REC_WRITE, 0},
     {0x101, 0, 2, fixed_literal, REC_WRITE, 0},
