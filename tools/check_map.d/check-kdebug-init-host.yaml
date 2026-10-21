@@ -78,4 +78,6 @@ check-kdebug-init-host:
 - kdebug/gfinit_resources.h
 - kdebug/recover_gf.c
 - kdebug/recover_gf.h
+- hwdev/generated/hwdev_core.c
+- hwdev/generated/hwdev_contract.h
 artifact_reader: true

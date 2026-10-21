@@ -244,3 +244,7 @@ void _start(void)
     check_kdebug_call();
     finish(0);
 }
+
+/* HWDEV facade is separately exercised with real synthetic images. */
+int hwdev_module_load(struct module_handle core)
+{ CHECK(module_exports(core) != 0); return MODULE_NOT_FOUND; }

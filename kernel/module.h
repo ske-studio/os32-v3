@@ -4,9 +4,11 @@
 #include "types.h"
 #include "os32_kapi_shared.h"
 
-#define KDEBUG_OPS_VERSION 3U
+#define KDEBUG_OPS_VERSION 4U
 
-/* Wire slots 1..19 follow version; 17 is reserved until LB-4. */
+struct hwdev_core_api;
+
+/* Wire slots 1..20 follow version; 17 is reserved until LB-4. */
 struct kdebug_ops {
     u32 version;
     void (*selftest_run)(void);
@@ -28,6 +30,7 @@ struct kdebug_ops {
     void (*nic_selftest)(void);
     void (*nic_trace)(u32 stage); /* Normal context only: uses VFS. */
     i32 (*dbg_call)(u32 op, void *buf, u32 size); /* KAPI kdebug_call (S5). */
+    const struct hwdev_core_api *(*hwdev_core_get)(void);
 };
 
 struct kdebug {

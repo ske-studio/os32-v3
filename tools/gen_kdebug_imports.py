@@ -214,7 +214,7 @@ def generate(entries, out_dir, stage=LAST_STAGE):
     from mkmod import OPS_NAMES
     slots = {'S1': [5], 'S2': list(range(1, 6)),
              'S3': list(range(1, 17)), 'S4': list(range(1, 17)) + [18],
-             'S5': list(range(1, 17)) + [18, 19]}[stage]
+             'S5': list(range(1, 17)) + [18, 19, 20]}[stage]
     kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
     kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')

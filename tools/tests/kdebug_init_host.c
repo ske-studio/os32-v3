@@ -58,6 +58,7 @@ int display_recover_ready(void) { calls++; return -1; }
 int display_recover_cell_read(u32 *value) { (void)value; calls++; return -1; }
 int display_recover_cell_write(u32 value) { (void)value; calls++; return -1; }
 u32 kdi_get_tick_count(void) { calls++; return 0; }
+const struct hwdev_core_api *hwdev_core_get(void) { calls++; return 0; }
 extern const struct kdebug_ops kdebug_ops;
 
 void _start(void)
@@ -76,7 +77,7 @@ void _start(void)
         !candidate.gcap_pass_in || !candidate.gcap_pass_out ||
         !candidate.gcap_note_in || !candidate.gcap_note_out ||
         !candidate.gcap_detach || !candidate.gcap_release || candidate.nic_selftest ||
-        candidate.nic_trace != nic_trace || !candidate.dbg_call) rc = 1;
+        candidate.nic_trace != nic_trace || !candidate.dbg_call || candidate.hwdev_core_get != hwdev_core_get) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) { }
 }

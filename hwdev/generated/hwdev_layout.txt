@@ -1,0 +1,2647 @@
+size	BootImageInfo	40
+align	BootImageInfo	4
+offset	BootImageInfo.commit	12
+member_size	BootImageInfo.commit	24
+offset	BootImageInfo.crc_valid	8
+member_size	BootImageInfo.crc_valid	1
+offset	BootImageInfo.image_crc	0
+member_size	BootImageInfo.image_crc	4
+offset	BootImageInfo.image_size	4
+member_size	BootImageInfo.image_size	4
+offset	BootImageInfo.reserved	10
+member_size	BootImageInfo.reserved	2
+offset	BootImageInfo.reserved2	36
+member_size	BootImageInfo.reserved2	4
+offset	BootImageInfo.source	9
+member_size	BootImageInfo.source	1
+size	DB_ColumnInfo	12
+align	DB_ColumnInfo	4
+offset	DB_ColumnInfo.data_offset	8
+member_size	DB_ColumnInfo.data_offset	4
+offset	DB_ColumnInfo.length	4
+member_size	DB_ColumnInfo.length	4
+offset	DB_ColumnInfo.type	0
+member_size	DB_ColumnInfo.type	4
+size	DB_ResultHeader	12
+align	DB_ResultHeader	4
+offset	DB_ResultHeader.column_count	4
+member_size	DB_ResultHeader.column_count	4
+offset	DB_ResultHeader.error_offset	8
+member_size	DB_ResultHeader.error_offset	4
+offset	DB_ResultHeader.status	0
+member_size	DB_ResultHeader.status	4
+size	DirEntry_Ext	264
+align	DirEntry_Ext	4
+offset	DirEntry_Ext.name	0
+member_size	DirEntry_Ext.name	256
+offset	DirEntry_Ext.size	256
+member_size	DirEntry_Ext.size	4
+offset	DirEntry_Ext.type	260
+member_size	DirEntry_Ext.type	1
+size	GFX_Color	3
+align	GFX_Color	1
+offset	GFX_Color.b	2
+member_size	GFX_Color.b	1
+offset	GFX_Color.g	1
+member_size	GFX_Color.g	1
+offset	GFX_Color.r	0
+member_size	GFX_Color.r	1
+size	GFX_Framebuffer	28
+align	GFX_Framebuffer	4
+offset	GFX_Framebuffer.height	4
+member_size	GFX_Framebuffer.height	4
+offset	GFX_Framebuffer.pitch	8
+member_size	GFX_Framebuffer.pitch	4
+offset	GFX_Framebuffer.planes	12
+member_size	GFX_Framebuffer.planes	16
+offset	GFX_Framebuffer.width	0
+member_size	GFX_Framebuffer.width	4
+size	GFX_RasterPalEntry	8
+align	GFX_RasterPalEntry	2
+offset	GFX_RasterPalEntry._pad	6
+member_size	GFX_RasterPalEntry._pad	2
+offset	GFX_RasterPalEntry.b	5
+member_size	GFX_RasterPalEntry.b	1
+offset	GFX_RasterPalEntry.g	4
+member_size	GFX_RasterPalEntry.g	1
+offset	GFX_RasterPalEntry.line	0
+member_size	GFX_RasterPalEntry.line	2
+offset	GFX_RasterPalEntry.pal_idx	2
+member_size	GFX_RasterPalEntry.pal_idx	1
+offset	GFX_RasterPalEntry.r	3
+member_size	GFX_RasterPalEntry.r	1
+size	GFX_RasterPalTable	1604
+align	GFX_RasterPalTable	4
+offset	GFX_RasterPalTable.count	0
+member_size	GFX_RasterPalTable.count	4
+offset	GFX_RasterPalTable.entries	4
+member_size	GFX_RasterPalTable.entries	1600
+size	GFX_Rect	16
+align	GFX_Rect	4
+offset	GFX_Rect.h	12
+member_size	GFX_Rect.h	4
+offset	GFX_Rect.w	8
+member_size	GFX_Rect.w	4
+offset	GFX_Rect.x	0
+member_size	GFX_Rect.x	4
+offset	GFX_Rect.y	4
+member_size	GFX_Rect.y	4
+size	GFX_ScreenInfo	28
+align	GFX_ScreenInfo	4
+offset	GFX_ScreenInfo.bpp	4
+member_size	GFX_ScreenInfo.bpp	1
+offset	GFX_ScreenInfo.flags	8
+member_size	GFX_ScreenInfo.flags	4
+offset	GFX_ScreenInfo.format	5
+member_size	GFX_ScreenInfo.format	1
+offset	GFX_ScreenInfo.height	2
+member_size	GFX_ScreenInfo.height	2
+offset	GFX_ScreenInfo.lease_count	16
+member_size	GFX_ScreenInfo.lease_count	2
+offset	GFX_ScreenInfo.lease_first	14
+member_size	GFX_ScreenInfo.lease_first	2
+offset	GFX_ScreenInfo.lease_mask	12
+member_size	GFX_ScreenInfo.lease_mask	2
+offset	GFX_ScreenInfo.reserved	18
+member_size	GFX_ScreenInfo.reserved	10
+offset	GFX_ScreenInfo.width	0
+member_size	GFX_ScreenInfo.width	2
+size	GFX_Sprite	40
+align	GFX_Sprite	4
+offset	GFX_Sprite._pool_idx	36
+member_size	GFX_Sprite._pool_idx	4
+offset	GFX_Sprite.bg_buf	32
+member_size	GFX_Sprite.bg_buf	4
+offset	GFX_Sprite.h	4
+member_size	GFX_Sprite.h	4
+offset	GFX_Sprite.mask	28
+member_size	GFX_Sprite.mask	4
+offset	GFX_Sprite.pitch	8
+member_size	GFX_Sprite.pitch	4
+offset	GFX_Sprite.planes	12
+member_size	GFX_Sprite.planes	16
+offset	GFX_Sprite.w	0
+member_size	GFX_Sprite.w	4
+size	GFX_Stats	16
+align	GFX_Stats	4
+offset	GFX_Stats.commits	12
+member_size	GFX_Stats.commits	4
+offset	GFX_Stats.hw_ops	4
+member_size	GFX_Stats.hw_ops	4
+offset	GFX_Stats.io_accesses	8
+member_size	GFX_Stats.io_accesses	4
+offset	GFX_Stats.present_bytes	0
+member_size	GFX_Stats.present_bytes	4
+size	GFX_Surface	32
+align	GFX_Surface	4
+offset	GFX_Surface._pool_idx	28
+member_size	GFX_Surface._pool_idx	4
+offset	GFX_Surface.h	4
+member_size	GFX_Surface.h	4
+offset	GFX_Surface.pitch	8
+member_size	GFX_Surface.pitch	4
+offset	GFX_Surface.planes	12
+member_size	GFX_Surface.planes	16
+offset	GFX_Surface.w	0
+member_size	GFX_Surface.w	4
+size	HddGeom	32
+align	HddGeom	4
+offset	HddGeom.addr_mode	29
+member_size	HddGeom.addr_mode	1
+offset	HddGeom.ata_cur_cyl	14
+member_size	HddGeom.ata_cur_cyl	2
+offset	HddGeom.ata_cur_heads	16
+member_size	HddGeom.ata_cur_heads	2
+offset	HddGeom.ata_cur_spt	18
+member_size	HddGeom.ata_cur_spt	2
+offset	HddGeom.ata_def_cyl	8
+member_size	HddGeom.ata_def_cyl	2
+offset	HddGeom.ata_def_heads	10
+member_size	HddGeom.ata_def_heads	2
+offset	HddGeom.ata_def_spt	12
+member_size	HddGeom.ata_def_spt	2
+offset	HddGeom.ata_present	28
+member_size	HddGeom.ata_present	1
+offset	HddGeom.ata_total	24
+member_size	HddGeom.ata_total	4
+offset	HddGeom.ata_w49	20
+member_size	HddGeom.ata_w49	2
+offset	HddGeom.ata_w53	22
+member_size	HddGeom.ata_w53	2
+offset	HddGeom.bios_cyl	4
+member_size	HddGeom.bios_cyl	2
+offset	HddGeom.bios_da	30
+member_size	HddGeom.bios_da	1
+offset	HddGeom.bios_heads	2
+member_size	HddGeom.bios_heads	1
+offset	HddGeom.bios_queried	0
+member_size	HddGeom.bios_queried	1
+offset	HddGeom.bios_seclen	6
+member_size	HddGeom.bios_seclen	2
+offset	HddGeom.bios_spt	3
+member_size	HddGeom.bios_spt	1
+offset	HddGeom.bios_valid	1
+member_size	HddGeom.bios_valid	1
+offset	HddGeom.reserved	31
+member_size	HddGeom.reserved	1
+size	IME_UserEntry	68
+align	IME_UserEntry	4
+offset	IME_UserEntry.freq	64
+member_size	IME_UserEntry.freq	4
+offset	IME_UserEntry.kanji	32
+member_size	IME_UserEntry.kanji	32
+offset	IME_UserEntry.yomi	0
+member_size	IME_UserEntry.yomi	32
+size	KbdDiag	24
+align	KbdDiag	4
+offset	KbdDiag.cmd	20
+member_size	KbdDiag.cmd	1
+offset	KbdDiag.empty_count	4
+member_size	KbdDiag.empty_count	4
+offset	KbdDiag.err_count	8
+member_size	KbdDiag.err_count	4
+offset	KbdDiag.flushed	12
+member_size	KbdDiag.flushed	4
+offset	KbdDiag.init_st_after	17
+member_size	KbdDiag.init_st_after	1
+offset	KbdDiag.init_st_before	16
+member_size	KbdDiag.init_st_before	1
+offset	KbdDiag.irq_count	0
+member_size	KbdDiag.irq_count	4
+offset	KbdDiag.last_code	19
+member_size	KbdDiag.last_code	1
+offset	KbdDiag.last_st	18
+member_size	KbdDiag.last_st	1
+offset	KbdDiag.now_st	21
+member_size	KbdDiag.now_st	1
+offset	KbdDiag.overrun_count	22
+member_size	KbdDiag.overrun_count	2
+size	KbdDiagLogEnt	8
+align	KbdDiagLogEnt	4
+offset	KbdDiagLogEnt.code	4
+member_size	KbdDiagLogEnt.code	1
+offset	KbdDiagLogEnt.flags	6
+member_size	KbdDiagLogEnt.flags	1
+offset	KbdDiagLogEnt.mods	5
+member_size	KbdDiagLogEnt.mods	1
+offset	KbdDiagLogEnt.reserved	7
+member_size	KbdDiagLogEnt.reserved	1
+offset	KbdDiagLogEnt.seq	0
+member_size	KbdDiagLogEnt.seq	4
+size	KdebugPeek	1064
+align	KdebugPeek	4
+offset	KdebugPeek.addr	4
+member_size	KdebugPeek.addr	4
+offset	KdebugPeek.data	40
+member_size	KdebugPeek.data	1024
+offset	KdebugPeek.dst	32
+member_size	KdebugPeek.dst	6
+offset	KdebugPeek.fail_addr	20
+member_size	KdebugPeek.fail_addr	4
+offset	KdebugPeek.flags	24
+member_size	KdebugPeek.flags	4
+offset	KdebugPeek.len	12
+member_size	KdebugPeek.len	4
+offset	KdebugPeek.reserved	38
+member_size	KdebugPeek.reserved	2
+offset	KdebugPeek.space	0
+member_size	KdebugPeek.space	4
+offset	KdebugPeek.status	16
+member_size	KdebugPeek.status	4
+offset	KdebugPeek.tag	28
+member_size	KdebugPeek.tag	4
+offset	KdebugPeek.width	8
+member_size	KdebugPeek.width	4
+size	KernelAPI	1216
+align	KernelAPI	4
+offset	KernelAPI.boot_image_info	944
+member_size	KernelAPI.boot_image_info	4
+offset	KernelAPI.buz_off	256
+member_size	KernelAPI.buz_off	4
+offset	KernelAPI.buz_on	252
+member_size	KernelAPI.buz_on	4
+offset	KernelAPI.caller_identity	988
+member_size	KernelAPI.caller_identity	4
+offset	KernelAPI.con_sink_read	756
+member_size	KernelAPI.con_sink_read	4
+offset	KernelAPI.con_sink_stat	760
+member_size	KernelAPI.con_sink_stat	4
+offset	KernelAPI.console_get_cursor_x	288
+member_size	KernelAPI.console_get_cursor_x	4
+offset	KernelAPI.console_get_cursor_y	292
+member_size	KernelAPI.console_get_cursor_y	4
+offset	KernelAPI.console_get_size	320
+member_size	KernelAPI.console_get_size	4
+offset	KernelAPI.console_set_cursor	296
+member_size	KernelAPI.console_set_cursor	4
+offset	KernelAPI.db_bind_blob	828
+member_size	KernelAPI.db_bind_blob	4
+offset	KernelAPI.db_bind_int	820
+member_size	KernelAPI.db_bind_int	4
+offset	KernelAPI.db_bind_null	832
+member_size	KernelAPI.db_bind_null	4
+offset	KernelAPI.db_bind_text	824
+member_size	KernelAPI.db_bind_text	4
+offset	KernelAPI.db_close	572
+member_size	KernelAPI.db_close	4
+offset	KernelAPI.db_column_int	588
+member_size	KernelAPI.db_column_int	4
+offset	KernelAPI.db_column_text	592
+member_size	KernelAPI.db_column_text	4
+offset	KernelAPI.db_error_code	836
+member_size	KernelAPI.db_error_code	4
+offset	KernelAPI.db_exec	576
+member_size	KernelAPI.db_exec	4
+offset	KernelAPI.db_finalize	596
+member_size	KernelAPI.db_finalize	4
+offset	KernelAPI.db_last_error	600
+member_size	KernelAPI.db_last_error	4
+offset	KernelAPI.db_mem_used	604
+member_size	KernelAPI.db_mem_used	4
+offset	KernelAPI.db_open	568
+member_size	KernelAPI.db_open	4
+offset	KernelAPI.db_open_existing	812
+member_size	KernelAPI.db_open_existing	4
+offset	KernelAPI.db_prepare	580
+member_size	KernelAPI.db_prepare	4
+offset	KernelAPI.db_prepare_only	816
+member_size	KernelAPI.db_prepare_only	4
+offset	KernelAPI.db_step	584
+member_size	KernelAPI.db_step	4
+offset	KernelAPI.dev_blk_read	632
+member_size	KernelAPI.dev_blk_read	4
+offset	KernelAPI.dev_blk_write	636
+member_size	KernelAPI.dev_blk_write	4
+offset	KernelAPI.dev_count	168
+member_size	KernelAPI.dev_count	4
+offset	KernelAPI.dev_get_info	172
+member_size	KernelAPI.dev_get_info	4
+offset	KernelAPI.dev_mount_count	932
+member_size	KernelAPI.dev_mount_count	4
+offset	KernelAPI.exec_abort_clear	752
+member_size	KernelAPI.exec_abort_clear	4
+offset	KernelAPI.exec_app_state	744
+member_size	KernelAPI.exec_app_state	4
+offset	KernelAPI.exec_kill	740
+member_size	KernelAPI.exec_kill	4
+offset	KernelAPI.exec_last_result	868
+member_size	KernelAPI.exec_last_result	4
+offset	KernelAPI.exec_park	736
+member_size	KernelAPI.exec_park	4
+offset	KernelAPI.exec_resume	732
+member_size	KernelAPI.exec_resume	4
+offset	KernelAPI.exec_run	164
+member_size	KernelAPI.exec_run	4
+offset	KernelAPI.exec_start	728
+member_size	KernelAPI.exec_start	4
+offset	KernelAPI.ext2_format	240
+member_size	KernelAPI.ext2_format	4
+offset	KernelAPI.ext2_format_at	928
+member_size	KernelAPI.ext2_format_at	4
+offset	KernelAPI.fm_note_off	516
+member_size	KernelAPI.fm_note_off	4
+offset	KernelAPI.fm_note_on	512
+member_size	KernelAPI.fm_note_on	4
+offset	KernelAPI.fm_play_mml	180
+member_size	KernelAPI.fm_play_mml	4
+offset	KernelAPI.fm_set_tone_num	520
+member_size	KernelAPI.fm_set_tone_num	4
+offset	KernelAPI.fm_startup_sound	176
+member_size	KernelAPI.fm_startup_sound	4
+offset	KernelAPI.font_source_close	1016
+member_size	KernelAPI.font_source_close	4
+offset	KernelAPI.font_source_open	1008
+member_size	KernelAPI.font_source_open	4
+offset	KernelAPI.font_source_read_at	1012
+member_size	KernelAPI.font_source_read_at	4
+offset	KernelAPI.get_tick	36
+member_size	KernelAPI.get_tick	4
+offset	KernelAPI.gfx_add_dirty_rect	372
+member_size	KernelAPI.gfx_add_dirty_rect	4
+offset	KernelAPI.gfx_get_framebuffer	368
+member_size	KernelAPI.gfx_get_framebuffer	4
+offset	KernelAPI.gfx_get_palette	364
+member_size	KernelAPI.gfx_get_palette	4
+offset	KernelAPI.gfx_hardware_scroll	336
+member_size	KernelAPI.gfx_hardware_scroll	4
+offset	KernelAPI.gfx_hw_blit	688
+member_size	KernelAPI.gfx_hw_blit	4
+offset	KernelAPI.gfx_hw_fill_rect	684
+member_size	KernelAPI.gfx_hw_fill_rect	4
+offset	KernelAPI.gfx_init	8
+member_size	KernelAPI.gfx_init	4
+offset	KernelAPI.gfx_init_200	12
+member_size	KernelAPI.gfx_init_200	4
+offset	KernelAPI.gfx_lease_palette	704
+member_size	KernelAPI.gfx_lease_palette	4
+offset	KernelAPI.gfx_present	20
+member_size	KernelAPI.gfx_present	4
+offset	KernelAPI.gfx_present_dirty	376
+member_size	KernelAPI.gfx_present_dirty	4
+offset	KernelAPI.gfx_present_nosync	380
+member_size	KernelAPI.gfx_present_nosync	4
+offset	KernelAPI.gfx_present_raster	384
+member_size	KernelAPI.gfx_present_raster	4
+offset	KernelAPI.gfx_present_rect	340
+member_size	KernelAPI.gfx_present_rect	4
+offset	KernelAPI.gfx_screen_info	680
+member_size	KernelAPI.gfx_screen_info	4
+offset	KernelAPI.gfx_screen_owner	776
+member_size	KernelAPI.gfx_screen_owner	4
+offset	KernelAPI.gfx_set_palette	360
+member_size	KernelAPI.gfx_set_palette	4
+offset	KernelAPI.gfx_shutdown	16
+member_size	KernelAPI.gfx_shutdown	4
+offset	KernelAPI.gfx_stats	700
+member_size	KernelAPI.gfx_stats	4
+offset	KernelAPI.gfx_surface_lease	976
+member_size	KernelAPI.gfx_surface_lease	4
+offset	KernelAPI.gui_call	692
+member_size	KernelAPI.gui_call	4
+offset	KernelAPI.gui_register	696
+member_size	KernelAPI.gui_register	4
+offset	KernelAPI.hdd_geom_info	940
+member_size	KernelAPI.hdd_geom_info	4
+offset	KernelAPI.host_close	856
+member_size	KernelAPI.host_close	4
+offset	KernelAPI.host_open	840
+member_size	KernelAPI.host_open	4
+offset	KernelAPI.host_read	848
+member_size	KernelAPI.host_read	4
+offset	KernelAPI.host_status	844
+member_size	KernelAPI.host_status	4
+offset	KernelAPI.host_write	852
+member_size	KernelAPI.host_write	4
+offset	KernelAPI.ide_drive_present	208
+member_size	KernelAPI.ide_drive_present	4
+offset	KernelAPI.ide_get_info	612
+member_size	KernelAPI.ide_get_info	4
+offset	KernelAPI.ide_identify	212
+member_size	KernelAPI.ide_identify	4
+offset	KernelAPI.ide_init	204
+member_size	KernelAPI.ide_init	4
+offset	KernelAPI.ide_read_sector	216
+member_size	KernelAPI.ide_read_sector	4
+offset	KernelAPI.ide_write_sector	264
+member_size	KernelAPI.ide_write_sector	4
+offset	KernelAPI.ide_write_sectors	268
+member_size	KernelAPI.ide_write_sectors	4
+offset	KernelAPI.ime_feed_key	720
+member_size	KernelAPI.ime_feed_key	4
+offset	KernelAPI.ime_get_mode	428
+member_size	KernelAPI.ime_get_mode	4
+offset	KernelAPI.ime_getchar	408
+member_size	KernelAPI.ime_getchar	4
+offset	KernelAPI.ime_getkey	432
+member_size	KernelAPI.ime_getkey	4
+offset	KernelAPI.ime_is_active	420
+member_size	KernelAPI.ime_is_active	4
+offset	KernelAPI.ime_set_mode	424
+member_size	KernelAPI.ime_set_mode	4
+offset	KernelAPI.ime_set_render	724
+member_size	KernelAPI.ime_set_render	4
+offset	KernelAPI.ime_switch_dict	640
+member_size	KernelAPI.ime_switch_dict	4
+offset	KernelAPI.ime_toggle	416
+member_size	KernelAPI.ime_toggle	4
+offset	KernelAPI.ime_trygetchar	412
+member_size	KernelAPI.ime_trygetchar	4
+offset	KernelAPI.ime_trygetkey	660
+member_size	KernelAPI.ime_trygetkey	4
+offset	KernelAPI.ime_user_clear	656
+member_size	KernelAPI.ime_user_clear	4
+offset	KernelAPI.ime_user_delete	648
+member_size	KernelAPI.ime_user_delete	4
+offset	KernelAPI.ime_user_export	652
+member_size	KernelAPI.ime_user_export	4
+offset	KernelAPI.ime_user_list	644
+member_size	KernelAPI.ime_user_list	4
+offset	KernelAPI.kapi_reserved	1024
+member_size	KernelAPI.kapi_reserved	184
+offset	KernelAPI.kbd_diag	924
+member_size	KernelAPI.kbd_diag	4
+offset	KernelAPI.kbd_diag_log	960
+member_size	KernelAPI.kbd_diag_log	4
+offset	KernelAPI.kbd_dropped_count	712
+member_size	KernelAPI.kbd_dropped_count	4
+offset	KernelAPI.kbd_get_modifiers	324
+member_size	KernelAPI.kbd_get_modifiers	4
+offset	KernelAPI.kbd_getchar	96
+member_size	KernelAPI.kbd_getchar	4
+offset	KernelAPI.kbd_getkey	100
+member_size	KernelAPI.kbd_getkey	4
+offset	KernelAPI.kbd_inject	768
+member_size	KernelAPI.kbd_inject	4
+offset	KernelAPI.kbd_inject_pending	772
+member_size	KernelAPI.kbd_inject_pending	4
+offset	KernelAPI.kbd_is_pressed	508
+member_size	KernelAPI.kbd_is_pressed	4
+offset	KernelAPI.kbd_peekkey	864
+member_size	KernelAPI.kbd_peekkey	4
+offset	KernelAPI.kbd_trygetchar	24
+member_size	KernelAPI.kbd_trygetchar	4
+offset	KernelAPI.kbd_trygetchar_local	880
+member_size	KernelAPI.kbd_trygetchar_local	4
+offset	KernelAPI.kbd_trygetkey	104
+member_size	KernelAPI.kbd_trygetkey	4
+offset	KernelAPI.kbd_trygetrawkey	716
+member_size	KernelAPI.kbd_trygetrawkey	4
+offset	KernelAPI.kcg_init	244
+member_size	KernelAPI.kcg_init	4
+offset	KernelAPI.kcg_load_font	608
+member_size	KernelAPI.kcg_load_font	4
+offset	KernelAPI.kcg_read_ank	388
+member_size	KernelAPI.kcg_read_ank	4
+offset	KernelAPI.kcg_read_kanji	392
+member_size	KernelAPI.kcg_read_kanji	4
+offset	KernelAPI.kcg_set_scale	248
+member_size	KernelAPI.kcg_set_scale	4
+offset	KernelAPI.kdebug_call	1020
+member_size	KernelAPI.kdebug_call	4
+offset	KernelAPI.kmalloc_free	68
+member_size	KernelAPI.kmalloc_free	4
+offset	KernelAPI.kmalloc_total	60
+member_size	KernelAPI.kmalloc_total	4
+offset	KernelAPI.kmalloc_used	64
+member_size	KernelAPI.kmalloc_used	4
+offset	KernelAPI.kprintf	40
+member_size	KernelAPI.kprintf	4
+offset	KernelAPI.launch_cancel	800
+member_size	KernelAPI.launch_cancel	4
+offset	KernelAPI.launch_child	804
+member_size	KernelAPI.launch_child	4
+offset	KernelAPI.launch_pending	784
+member_size	KernelAPI.launch_pending	4
+offset	KernelAPI.launch_poll	796
+member_size	KernelAPI.launch_poll	4
+offset	KernelAPI.launch_report	792
+member_size	KernelAPI.launch_report	4
+offset	KernelAPI.launch_req	780
+member_size	KernelAPI.launch_req	4
+offset	KernelAPI.launch_take	788
+member_size	KernelAPI.launch_take	4
+offset	KernelAPI.loop_attach	620
+member_size	KernelAPI.loop_attach	4
+offset	KernelAPI.loop_detach	624
+member_size	KernelAPI.loop_detach	4
+offset	KernelAPI.loop_status	628
+member_size	KernelAPI.loop_status	4
+offset	KernelAPI.magic	0
+member_size	KernelAPI.magic	4
+offset	KernelAPI.mem_alloc	28
+member_size	KernelAPI.mem_alloc	4
+offset	KernelAPI.mem_free	32
+member_size	KernelAPI.mem_free	4
+offset	KernelAPI.mem_map	992
+member_size	KernelAPI.mem_map	4
+offset	KernelAPI.mem_stat	1000
+member_size	KernelAPI.mem_stat	4
+offset	KernelAPI.mem_unmap	996
+member_size	KernelAPI.mem_unmap	4
+offset	KernelAPI.mouse_available	540
+member_size	KernelAPI.mouse_available	4
+offset	KernelAPI.mouse_cursor_hide	564
+member_size	KernelAPI.mouse_cursor_hide	4
+offset	KernelAPI.mouse_cursor_set_mode	556
+member_size	KernelAPI.mouse_cursor_set_mode	4
+offset	KernelAPI.mouse_cursor_show	560
+member_size	KernelAPI.mouse_cursor_show	4
+offset	KernelAPI.mouse_poll	536
+member_size	KernelAPI.mouse_poll	4
+offset	KernelAPI.mouse_set_bounds	544
+member_size	KernelAPI.mouse_set_bounds	4
+offset	KernelAPI.np2_check_hostdrv	200
+member_size	KernelAPI.np2_check_hostdrv	4
+offset	KernelAPI.np2_detect	184
+member_size	KernelAPI.np2_detect	4
+offset	KernelAPI.np2_get_clock	196
+member_size	KernelAPI.np2_get_clock	4
+offset	KernelAPI.np2_get_cpu	192
+member_size	KernelAPI.np2_get_cpu	4
+offset	KernelAPI.np2_get_version	188
+member_size	KernelAPI.np2_get_version	4
+offset	KernelAPI.paging_enabled	72
+member_size	KernelAPI.paging_enabled	4
+offset	KernelAPI.paging_is_present	476
+member_size	KernelAPI.paging_is_present	4
+offset	KernelAPI.path_get_cwd	224
+member_size	KernelAPI.path_get_cwd	4
+offset	KernelAPI.path_get_drive	220
+member_size	KernelAPI.path_get_drive	4
+offset	KernelAPI.path_parse	236
+member_size	KernelAPI.path_parse	4
+offset	KernelAPI.path_set_cwd	232
+member_size	KernelAPI.path_set_cwd	4
+offset	KernelAPI.path_set_drive	228
+member_size	KernelAPI.path_set_drive	4
+offset	KernelAPI.pci_bind_info	900
+member_size	KernelAPI.pci_bind_info	4
+offset	KernelAPI.pci_cfg_read32	892
+member_size	KernelAPI.pci_cfg_read32	4
+offset	KernelAPI.pci_count	884
+member_size	KernelAPI.pci_count	4
+offset	KernelAPI.pci_get	888
+member_size	KernelAPI.pci_get	4
+offset	KernelAPI.pcm_close	916
+member_size	KernelAPI.pcm_close	4
+offset	KernelAPI.pcm_open	904
+member_size	KernelAPI.pcm_open	4
+offset	KernelAPI.pcm_set_volume	920
+member_size	KernelAPI.pcm_set_volume	4
+offset	KernelAPI.pcm_status	912
+member_size	KernelAPI.pcm_status	4
+offset	KernelAPI.pcm_write	908
+member_size	KernelAPI.pcm_write	4
+offset	KernelAPI.rshell_set_active	260
+member_size	KernelAPI.rshell_set_active	4
+offset	KernelAPI.rtc_read	76
+member_size	KernelAPI.rtc_read	4
+offset	KernelAPI.sbrk_heap_limit	1208
+member_size	KernelAPI.sbrk_heap_limit	4
+offset	KernelAPI.serial_diag	956
+member_size	KernelAPI.serial_diag	4
+offset	KernelAPI.serial_get_status	876
+member_size	KernelAPI.serial_get_status	4
+offset	KernelAPI.serial_getchar	148
+member_size	KernelAPI.serial_getchar	4
+offset	KernelAPI.serial_init	140
+member_size	KernelAPI.serial_init	4
+offset	KernelAPI.serial_init_vfast	872
+member_size	KernelAPI.serial_init_vfast	4
+offset	KernelAPI.serial_is_initialized	160
+member_size	KernelAPI.serial_is_initialized	4
+offset	KernelAPI.serial_putchar	152
+member_size	KernelAPI.serial_putchar	4
+offset	KernelAPI.serial_puts	144
+member_size	KernelAPI.serial_puts	4
+offset	KernelAPI.serial_trygetchar	156
+member_size	KernelAPI.serial_trygetchar	4
+offset	KernelAPI.sfs_begin	948
+member_size	KernelAPI.sfs_begin	4
+offset	KernelAPI.sfs_end	952
+member_size	KernelAPI.sfs_end	4
+offset	KernelAPI.shell_print_utf8	284
+member_size	KernelAPI.shell_print_utf8	4
+offset	KernelAPI.shell_putchar	280
+member_size	KernelAPI.shell_putchar	4
+offset	KernelAPI.shm_base	1212
+member_size	KernelAPI.shm_base	4
+offset	KernelAPI.snd_bgm_is_playing	488
+member_size	KernelAPI.snd_bgm_is_playing	4
+offset	KernelAPI.snd_bgm_play	480
+member_size	KernelAPI.snd_bgm_play	4
+offset	KernelAPI.snd_bgm_set_persist	504
+member_size	KernelAPI.snd_bgm_set_persist	4
+offset	KernelAPI.snd_bgm_stop	484
+member_size	KernelAPI.snd_bgm_stop	4
+offset	KernelAPI.snd_focus	748
+member_size	KernelAPI.snd_focus	4
+offset	KernelAPI.snd_se_play	492
+member_size	KernelAPI.snd_se_play	4
+offset	KernelAPI.snd_se_play_raw	496
+member_size	KernelAPI.snd_se_play_raw	4
+offset	KernelAPI.snd_set_master	500
+member_size	KernelAPI.snd_set_master	4
+offset	KernelAPI.ssg_all_off	532
+member_size	KernelAPI.ssg_all_off	4
+offset	KernelAPI.ssg_tone	524
+member_size	KernelAPI.ssg_tone	4
+offset	KernelAPI.ssg_volume	528
+member_size	KernelAPI.ssg_volume	4
+offset	KernelAPI.surface_lease	972
+member_size	KernelAPI.surface_lease	4
+offset	KernelAPI.surface_query	968
+member_size	KernelAPI.surface_query	4
+offset	KernelAPI.surface_unlease	980
+member_size	KernelAPI.surface_unlease	4
+offset	KernelAPI.sys_chdir	120
+member_size	KernelAPI.sys_chdir	4
+offset	KernelAPI.sys_close	304
+member_size	KernelAPI.sys_close	4
+offset	KernelAPI.sys_exit	344
+member_size	KernelAPI.sys_exit	4
+offset	KernelAPI.sys_fstat	356
+member_size	KernelAPI.sys_fstat	4
+offset	KernelAPI.sys_get_build_info	616
+member_size	KernelAPI.sys_get_build_info	4
+offset	KernelAPI.sys_get_mem_kb	328
+member_size	KernelAPI.sys_get_mem_kb	4
+offset	KernelAPI.sys_getcwd	124
+member_size	KernelAPI.sys_getcwd	4
+offset	KernelAPI.sys_halt	276
+member_size	KernelAPI.sys_halt	4
+offset	KernelAPI.sys_is_mounted	116
+member_size	KernelAPI.sys_is_mounted	4
+offset	KernelAPI.sys_is_redirected	444
+member_size	KernelAPI.sys_is_redirected	4
+offset	KernelAPI.sys_isatty	348
+member_size	KernelAPI.sys_isatty	4
+offset	KernelAPI.sys_ls	56
+member_size	KernelAPI.sys_ls	4
+offset	KernelAPI.sys_ls_window	984
+member_size	KernelAPI.sys_ls_window	4
+offset	KernelAPI.sys_lseek	316
+member_size	KernelAPI.sys_lseek	4
+offset	KernelAPI.sys_mkdir	52
+member_size	KernelAPI.sys_mkdir	4
+offset	KernelAPI.sys_mount	108
+member_size	KernelAPI.sys_mount	4
+offset	KernelAPI.sys_open	300
+member_size	KernelAPI.sys_open	4
+offset	KernelAPI.sys_pipe_alloc	448
+member_size	KernelAPI.sys_pipe_alloc	4
+offset	KernelAPI.sys_pipe_clear	464
+member_size	KernelAPI.sys_pipe_clear	4
+offset	KernelAPI.sys_pipe_free	452
+member_size	KernelAPI.sys_pipe_free	4
+offset	KernelAPI.sys_pipe_get_buf	456
+member_size	KernelAPI.sys_pipe_get_buf	4
+offset	KernelAPI.sys_pipe_get_len	460
+member_size	KernelAPI.sys_pipe_get_len	4
+offset	KernelAPI.sys_ram_kb	764
+member_size	KernelAPI.sys_ram_kb	4
+offset	KernelAPI.sys_read	308
+member_size	KernelAPI.sys_read	4
+offset	KernelAPI.sys_reboot	272
+member_size	KernelAPI.sys_reboot	4
+offset	KernelAPI.sys_redirect_fd	436
+member_size	KernelAPI.sys_redirect_fd	4
+offset	KernelAPI.sys_redirect_fd_buf	468
+member_size	KernelAPI.sys_redirect_fd_buf	4
+offset	KernelAPI.sys_redirect_get_buf_len	472
+member_size	KernelAPI.sys_redirect_get_buf_len	4
+offset	KernelAPI.sys_rename	48
+member_size	KernelAPI.sys_rename	4
+offset	KernelAPI.sys_reset_redirect	440
+member_size	KernelAPI.sys_reset_redirect	4
+offset	KernelAPI.sys_rmdir	136
+member_size	KernelAPI.sys_rmdir	4
+offset	KernelAPI.sys_set_mtime	860
+member_size	KernelAPI.sys_set_mtime	4
+offset	KernelAPI.sys_shm_alloc	396
+member_size	KernelAPI.sys_shm_alloc	4
+offset	KernelAPI.sys_shm_free	404
+member_size	KernelAPI.sys_shm_free	4
+offset	KernelAPI.sys_shm_lock	400
+member_size	KernelAPI.sys_shm_lock	4
+offset	KernelAPI.sys_stat	352
+member_size	KernelAPI.sys_stat	4
+offset	KernelAPI.sys_switch_shell	708
+member_size	KernelAPI.sys_switch_shell	4
+offset	KernelAPI.sys_time	332
+member_size	KernelAPI.sys_time	4
+offset	KernelAPI.sys_time_now	896
+member_size	KernelAPI.sys_time_now	4
+offset	KernelAPI.sys_umount	112
+member_size	KernelAPI.sys_umount	4
+offset	KernelAPI.sys_umount_checked	936
+member_size	KernelAPI.sys_umount_checked	4
+offset	KernelAPI.sys_unlink	44
+member_size	KernelAPI.sys_unlink	4
+offset	KernelAPI.sys_write	312
+member_size	KernelAPI.sys_write	4
+offset	KernelAPI.sys_yield	808
+member_size	KernelAPI.sys_yield	4
+offset	KernelAPI.tvram_clear	80
+member_size	KernelAPI.tvram_clear	4
+offset	KernelAPI.tvram_putchar_at	84
+member_size	KernelAPI.tvram_putchar_at	4
+offset	KernelAPI.tvram_putkanji_at	88
+member_size	KernelAPI.tvram_putkanji_at	4
+offset	KernelAPI.tvram_readchar_at	548
+member_size	KernelAPI.tvram_readchar_at	4
+offset	KernelAPI.tvram_reverse_cell	552
+member_size	KernelAPI.tvram_reverse_cell	4
+offset	KernelAPI.tvram_scroll	92
+member_size	KernelAPI.tvram_scroll	4
+offset	KernelAPI.unicode_to_jis	1004
+member_size	KernelAPI.unicode_to_jis	4
+offset	KernelAPI.v86_boot	672
+member_size	KernelAPI.v86_boot	4
+offset	KernelAPI.v86_boot2	676
+member_size	KernelAPI.v86_boot2	4
+offset	KernelAPI.v86_disktest	668
+member_size	KernelAPI.v86_disktest	4
+offset	KernelAPI.v86_gdc_capture	964
+member_size	KernelAPI.v86_gdc_capture	4
+offset	KernelAPI.v86_selftest	664
+member_size	KernelAPI.v86_selftest	4
+offset	KernelAPI.version	4
+member_size	KernelAPI.version	4
+offset	KernelAPI.vfs_devname	128
+member_size	KernelAPI.vfs_devname	4
+offset	KernelAPI.vfs_sync	132
+member_size	KernelAPI.vfs_sync	4
+size	MemStat	220
+align	MemStat	4
+offset	MemStat.app_id	4
+member_size	MemStat.app_id	4
+offset	MemStat.arenas	72
+member_size	MemStat.arenas	4
+offset	MemStat.audit_fail	184
+member_size	MemStat.audit_fail	4
+offset	MemStat.audit_runs	180
+member_size	MemStat.audit_runs	4
+offset	MemStat.exec_heap_base	104
+member_size	MemStat.exec_heap_base	4
+offset	MemStat.exec_heap_cur_end	88
+member_size	MemStat.exec_heap_cur_end	4
+offset	MemStat.exec_heap_size	108
+member_size	MemStat.exec_heap_size	4
+offset	MemStat.exec_heap_used	76
+member_size	MemStat.exec_heap_used	4
+offset	MemStat.extents	48
+member_size	MemStat.extents	20
+offset	MemStat.extents_free	68
+member_size	MemStat.extents_free	4
+offset	MemStat.extents_total	44
+member_size	MemStat.extents_total	4
+offset	MemStat.fault_kill_count	164
+member_size	MemStat.fault_kill_count	4
+offset	MemStat.flags	12
+member_size	MemStat.flags	4
+offset	MemStat.guard_b	92
+member_size	MemStat.guard_b	4
+offset	MemStat.img_end	80
+member_size	MemStat.img_end	4
+offset	MemStat.kdebug_open_count	216
+member_size	MemStat.kdebug_open_count	4
+offset	MemStat.kdebug_owner_pages	212
+member_size	MemStat.kdebug_owner_pages	4
+offset	MemStat.kdebug_pages	208
+member_size	MemStat.kdebug_pages	4
+offset	MemStat.kdebug_pair_crc	204
+member_size	MemStat.kdebug_pair_crc	4
+offset	MemStat.kdebug_state	200
+member_size	MemStat.kdebug_state	4
+offset	MemStat.kheap_free	24
+member_size	MemStat.kheap_free	4
+offset	MemStat.kheap_peak	136
+member_size	MemStat.kheap_peak	4
+offset	MemStat.kheap_total	16
+member_size	MemStat.kheap_total	4
+offset	MemStat.kheap_used	20
+member_size	MemStat.kheap_used	4
+offset	MemStat.kselftest_fail	192
+member_size	MemStat.kselftest_fail	4
+offset	MemStat.kselftest_pass	188
+member_size	MemStat.kselftest_pass	4
+offset	MemStat.kstack_high_water	132
+member_size	MemStat.kstack_high_water	4
+offset	MemStat.lease_active	176
+member_size	MemStat.lease_active	4
+offset	MemStat.ledger_bad_free	160
+member_size	MemStat.ledger_bad_free	4
+offset	MemStat.ledger_exc_ops	156
+member_size	MemStat.ledger_exc_ops	4
+offset	MemStat.ledger_irq_ops	152
+member_size	MemStat.ledger_irq_ops	4
+offset	MemStat.leftover_pages	148
+member_size	MemStat.leftover_pages	4
+offset	MemStat.load_addr	96
+member_size	MemStat.load_addr	4
+offset	MemStat.owner_pages	196
+member_size	MemStat.owner_pages	4
+offset	MemStat.phys_free_pages	32
+member_size	MemStat.phys_free_pages	4
+offset	MemStat.phys_total_pages	28
+member_size	MemStat.phys_total_pages	4
+offset	MemStat.pressure_epoch	120
+member_size	MemStat.pressure_epoch	4
+offset	MemStat.primary_mapped_end	84
+member_size	MemStat.primary_mapped_end	4
+offset	MemStat.reclaim_count	168
+member_size	MemStat.reclaim_count	4
+offset	MemStat.resident_heap_fail	144
+member_size	MemStat.resident_heap_fail	4
+offset	MemStat.resident_heap_peak	140
+member_size	MemStat.resident_heap_peak	4
+offset	MemStat.resident_heap_total	36
+member_size	MemStat.resident_heap_total	4
+offset	MemStat.resident_heap_used	40
+member_size	MemStat.resident_heap_used	4
+offset	MemStat.sbrk_heap_limit	100
+member_size	MemStat.sbrk_heap_limit	4
+offset	MemStat.size	0
+member_size	MemStat.size	4
+offset	MemStat.stack_size	116
+member_size	MemStat.stack_size	4
+offset	MemStat.stack_top	112
+member_size	MemStat.stack_top	4
+offset	MemStat.state	8
+member_size	MemStat.state	4
+offset	MemStat.stop_park_count	172
+member_size	MemStat.stop_park_count	4
+offset	MemStat.trim_epoch	128
+member_size	MemStat.trim_epoch	4
+offset	MemStat.trim_pending_mask	124
+member_size	MemStat.trim_pending_mask	4
+size	MouseInfo	10
+align	MouseInfo	2
+offset	MouseInfo.buttons	8
+member_size	MouseInfo.buttons	1
+offset	MouseInfo.dx	4
+member_size	MouseInfo.dx	2
+offset	MouseInfo.dy	6
+member_size	MouseInfo.dy	2
+offset	MouseInfo.mode	9
+member_size	MouseInfo.mode	1
+offset	MouseInfo.x	0
+member_size	MouseInfo.x	2
+offset	MouseInfo.y	2
+member_size	MouseInfo.y	2
+size	OS32Header	60
+align	OS32Header	4
+offset	OS32Header.bss_size	24
+member_size	OS32Header.bss_size	4
+offset	OS32Header.entry_offset	16
+member_size	OS32Header.entry_offset	4
+offset	OS32Header.flags	12
+member_size	OS32Header.flags	4
+offset	OS32Header.header_size	4
+member_size	OS32Header.header_size	4
+offset	OS32Header.heap_size	28
+member_size	OS32Header.heap_size	4
+offset	OS32Header.kapi_abi_generation	48
+member_size	OS32Header.kapi_abi_generation	4
+offset	OS32Header.kapi_data_off	44
+member_size	OS32Header.kapi_data_off	4
+offset	OS32Header.load_addr	40
+member_size	OS32Header.load_addr	4
+offset	OS32Header.magic	0
+member_size	OS32Header.magic	4
+offset	OS32Header.memory_layout_generation	52
+member_size	OS32Header.memory_layout_generation	4
+offset	OS32Header.min_api_ver	36
+member_size	OS32Header.min_api_ver	4
+offset	OS32Header.shlib_protocol	56
+member_size	OS32Header.shlib_protocol	4
+offset	OS32Header.stack_size	32
+member_size	OS32Header.stack_size	4
+offset	OS32Header.text_size	20
+member_size	OS32Header.text_size	4
+offset	OS32Header.version	8
+member_size	OS32Header.version	4
+size	OS32ShlibHeader	32
+align	OS32ShlibHeader	4
+offset	OS32ShlibHeader._rsvd	24
+member_size	OS32ShlibHeader._rsvd	8
+offset	OS32ShlibHeader.data_pages	16
+member_size	OS32ShlibHeader.data_pages	4
+offset	OS32ShlibHeader.data_vaddr	12
+member_size	OS32ShlibHeader.data_vaddr	4
+offset	OS32ShlibHeader.magic	0
+member_size	OS32ShlibHeader.magic	4
+offset	OS32ShlibHeader.nfunc	8
+member_size	OS32ShlibHeader.nfunc	4
+offset	OS32ShlibHeader.text_pages	20
+member_size	OS32ShlibHeader.text_pages	4
+offset	OS32ShlibHeader.version	4
+member_size	OS32ShlibHeader.version	4
+size	OS32_LeaseResult	116
+align	OS32_LeaseResult	4
+offset	OS32_LeaseResult.count	0
+member_size	OS32_LeaseResult.count	4
+offset	OS32_LeaseResult.views	4
+member_size	OS32_LeaseResult.views	112
+size	OS32_LeaseView	28
+align	OS32_LeaseView	4
+offset	OS32_LeaseView.base	4
+member_size	OS32_LeaseView.base	4
+offset	OS32_LeaseView.bytes	8
+member_size	OS32_LeaseView.bytes	4
+offset	OS32_LeaseView.planes	12
+member_size	OS32_LeaseView.planes	16
+offset	OS32_LeaseView.token	0
+member_size	OS32_LeaseView.token	4
+size	OS32_LsEntry	264
+align	OS32_LsEntry	4
+offset	OS32_LsEntry.name	0
+member_size	OS32_LsEntry.name	256
+offset	OS32_LsEntry.reserved	261
+member_size	OS32_LsEntry.reserved	3
+offset	OS32_LsEntry.size	256
+member_size	OS32_LsEntry.size	4
+offset	OS32_LsEntry.type	260
+member_size	OS32_LsEntry.type	1
+size	OS32_LsPacket	3708
+align	OS32_LsPacket	4
+offset	OS32_LsPacket.count	0
+member_size	OS32_LsPacket.count	4
+offset	OS32_LsPacket.done	8
+member_size	OS32_LsPacket.done	4
+offset	OS32_LsPacket.entries	12
+member_size	OS32_LsPacket.entries	3696
+offset	OS32_LsPacket.result	4
+member_size	OS32_LsPacket.result	4
+size	OS32_Stat	32
+align	OS32_Stat	4
+offset	OS32_Stat.st_atime	20
+member_size	OS32_Stat.st_atime	4
+offset	OS32_Stat.st_ctime	28
+member_size	OS32_Stat.st_ctime	4
+offset	OS32_Stat.st_dev	0
+member_size	OS32_Stat.st_dev	4
+offset	OS32_Stat.st_gid	14
+member_size	OS32_Stat.st_gid	2
+offset	OS32_Stat.st_ino	4
+member_size	OS32_Stat.st_ino	4
+offset	OS32_Stat.st_mode	8
+member_size	OS32_Stat.st_mode	2
+offset	OS32_Stat.st_mtime	24
+member_size	OS32_Stat.st_mtime	4
+offset	OS32_Stat.st_nlink	10
+member_size	OS32_Stat.st_nlink	2
+offset	OS32_Stat.st_size	16
+member_size	OS32_Stat.st_size	4
+offset	OS32_Stat.st_uid	12
+member_size	OS32_Stat.st_uid	2
+size	OS32_SurfaceDesc	60
+align	OS32_SurfaceDesc	4
+offset	OS32_SurfaceDesc.access_max	56
+member_size	OS32_SurfaceDesc.access_max	4
+offset	OS32_SurfaceDesc.backend	12
+member_size	OS32_SurfaceDesc.backend	4
+offset	OS32_SurfaceDesc.bytes	52
+member_size	OS32_SurfaceDesc.bytes	4
+offset	OS32_SurfaceDesc.format	16
+member_size	OS32_SurfaceDesc.format	4
+offset	OS32_SurfaceDesc.height	24
+member_size	OS32_SurfaceDesc.height	4
+offset	OS32_SurfaceDesc.pitch	28
+member_size	OS32_SurfaceDesc.pitch	4
+offset	OS32_SurfaceDesc.plane_offset	36
+member_size	OS32_SurfaceDesc.plane_offset	16
+offset	OS32_SurfaceDesc.planes	32
+member_size	OS32_SurfaceDesc.planes	4
+offset	OS32_SurfaceDesc.ref	0
+member_size	OS32_SurfaceDesc.ref	8
+offset	OS32_SurfaceDesc.role	8
+member_size	OS32_SurfaceDesc.role	4
+offset	OS32_SurfaceDesc.width	20
+member_size	OS32_SurfaceDesc.width	4
+size	OS32_SurfaceQueryResult	244
+align	OS32_SurfaceQueryResult	4
+offset	OS32_SurfaceQueryResult.count	0
+member_size	OS32_SurfaceQueryResult.count	4
+offset	OS32_SurfaceQueryResult.desc	4
+member_size	OS32_SurfaceQueryResult.desc	240
+size	OS32_SurfaceRef	8
+align	OS32_SurfaceRef	4
+offset	OS32_SurfaceRef.generation	4
+member_size	OS32_SurfaceRef.generation	4
+offset	OS32_SurfaceRef.sid	0
+member_size	OS32_SurfaceRef.sid	4
+size	RTC_Time_Ext	7
+align	RTC_Time_Ext	1
+offset	RTC_Time_Ext.day	2
+member_size	RTC_Time_Ext.day	1
+offset	RTC_Time_Ext.hour	4
+member_size	RTC_Time_Ext.hour	1
+offset	RTC_Time_Ext.min	5
+member_size	RTC_Time_Ext.min	1
+offset	RTC_Time_Ext.month	1
+member_size	RTC_Time_Ext.month	1
+offset	RTC_Time_Ext.sec	6
+member_size	RTC_Time_Ext.sec	1
+offset	RTC_Time_Ext.wday	3
+member_size	RTC_Time_Ext.wday	1
+offset	RTC_Time_Ext.year	0
+member_size	RTC_Time_Ext.year	1
+size	SerialDiag	16
+align	SerialDiag	4
+offset	SerialDiag.fe	4
+member_size	SerialDiag.fe	4
+offset	SerialDiag.oe	0
+member_size	SerialDiag.oe	4
+offset	SerialDiag.overflow	12
+member_size	SerialDiag.overflow	4
+offset	SerialDiag.pe	8
+member_size	SerialDiag.pe	4
+size	V86Gcap	8460
+align	V86Gcap	4
+offset	V86Gcap.abort_cs	24
+member_size	V86Gcap.abort_cs	2
+offset	V86Gcap.abort_ip	26
+member_size	V86Gcap.abort_ip	2
+offset	V86Gcap.abort_kind	20
+member_size	V86Gcap.abort_kind	4
+offset	V86Gcap.exit_reason	16
+member_size	V86Gcap.exit_reason	4
+offset	V86Gcap.in	76
+member_size	V86Gcap.in	192
+offset	V86Gcap.in_other	60
+member_size	V86Gcap.in_other	4
+offset	V86Gcap.in_total	56
+member_size	V86Gcap.in_total	4
+offset	V86Gcap.layout	8
+member_size	V86Gcap.layout	4
+offset	V86Gcap.mode	4
+member_size	V86Gcap.mode	4
+offset	V86Gcap.n_in	64
+member_size	V86Gcap.n_in	4
+offset	V86Gcap.n_out	48
+member_size	V86Gcap.n_out	4
+offset	V86Gcap.out	268
+member_size	V86Gcap.out	8192
+offset	V86Gcap.overflow	52
+member_size	V86Gcap.overflow	4
+offset	V86Gcap.r31_ax	28
+member_size	V86Gcap.r31_ax	2
+offset	V86Gcap.r31_bx	30
+member_size	V86Gcap.r31_bx	2
+offset	V86Gcap.restore	12
+member_size	V86Gcap.restore	4
+offset	V86Gcap.rst_ax	40
+member_size	V86Gcap.rst_ax	2
+offset	V86Gcap.rst_bx	42
+member_size	V86Gcap.rst_bx	2
+offset	V86Gcap.rst_ret_ax	44
+member_size	V86Gcap.rst_ret_ax	2
+offset	V86Gcap.rst_ret_bx	46
+member_size	V86Gcap.rst_ret_bx	2
+offset	V86Gcap.selftest_fail	68
+member_size	V86Gcap.selftest_fail	4
+offset	V86Gcap.seq_next	72
+member_size	V86Gcap.seq_next	4
+offset	V86Gcap.set_ax	32
+member_size	V86Gcap.set_ax	2
+offset	V86Gcap.set_bx	34
+member_size	V86Gcap.set_bx	2
+offset	V86Gcap.set_ret_ax	36
+member_size	V86Gcap.set_ret_ax	2
+offset	V86Gcap.set_ret_bx	38
+member_size	V86Gcap.set_ret_bx	2
+offset	V86Gcap.status	0
+member_size	V86Gcap.status	4
+size	V86GcapIn	12
+align	V86GcapIn	4
+offset	V86GcapIn.count	4
+member_size	V86GcapIn.count	4
+offset	V86GcapIn.first	8
+member_size	V86GcapIn.first	2
+offset	V86GcapIn.flags	3
+member_size	V86GcapIn.flags	1
+offset	V86GcapIn.last	10
+member_size	V86GcapIn.last	2
+offset	V86GcapIn.port	0
+member_size	V86GcapIn.port	2
+offset	V86GcapIn.widths	2
+member_size	V86GcapIn.widths	1
+size	V86GcapOut	16
+align	V86GcapOut	4
+offset	V86GcapOut.cs	8
+member_size	V86GcapOut.cs	2
+offset	V86GcapOut.flags	13
+member_size	V86GcapOut.flags	1
+offset	V86GcapOut.ip	10
+member_size	V86GcapOut.ip	2
+offset	V86GcapOut.port	4
+member_size	V86GcapOut.port	2
+offset	V86GcapOut.reserved	14
+member_size	V86GcapOut.reserved	2
+offset	V86GcapOut.seq	0
+member_size	V86GcapOut.seq	4
+offset	V86GcapOut.value	6
+member_size	V86GcapOut.value	2
+offset	V86GcapOut.width	12
+member_size	V86GcapOut.width	1
+size	struct addrspace	1228
+align	struct addrspace	4
+offset	struct addrspace.app_pde	8
+member_size	struct addrspace.app_pde	4
+offset	struct addrspace.app_pde_count	12
+member_size	struct addrspace.app_pde_count	4
+offset	struct addrspace.app_pt_phys	16
+member_size	struct addrspace.app_pt_phys	256
+offset	struct addrspace.appmem	692
+member_size	struct addrspace.appmem	512
+offset	struct addrspace.appmem_layout	1204
+member_size	struct addrspace.appmem_layout	16
+offset	struct addrspace.appmem_poisoned	1220
+member_size	struct addrspace.appmem_poisoned	4
+offset	struct addrspace.exec_heap_used	1224
+member_size	struct addrspace.exec_heap_used	4
+offset	struct addrspace.generation	0
+member_size	struct addrspace.generation	4
+offset	struct addrspace.lease_pt_phys	276
+member_size	struct addrspace.lease_pt_phys	224
+offset	struct addrspace.leases	500
+member_size	struct addrspace.leases	192
+offset	struct addrspace.owner	272
+member_size	struct addrspace.owner	4
+offset	struct addrspace.pd_phys	4
+member_size	struct addrspace.pd_phys	4
+size	struct appmem_extent	16
+align	struct appmem_extent	4
+offset	struct appmem_extent.base	0
+member_size	struct appmem_extent.base	4
+offset	struct appmem_extent.end	4
+member_size	struct appmem_extent.end	4
+offset	struct appmem_extent.flags	12
+member_size	struct appmem_extent.flags	4
+offset	struct appmem_extent.kind	8
+member_size	struct appmem_extent.kind	4
+size	struct appmem_layout	16
+align	struct appmem_layout	4
+offset	struct appmem_layout.exec_heap_cur_end	8
+member_size	struct appmem_layout.exec_heap_cur_end	4
+offset	struct appmem_layout.guard_b	12
+member_size	struct appmem_layout.guard_b	4
+offset	struct appmem_layout.img_end	0
+member_size	struct appmem_layout.img_end	4
+offset	struct appmem_layout.primary_mapped_end	4
+member_size	struct appmem_layout.primary_mapped_end	4
+size	struct appmem_table	512
+align	struct appmem_table	4
+offset	struct appmem_table.e	0
+member_size	struct appmem_table.e	512
+size	struct as_lease	24
+align	struct as_lease	4
+offset	struct as_lease.base	12
+member_size	struct as_lease.base	4
+offset	struct as_lease.flags	20
+member_size	struct as_lease.flags	4
+offset	struct as_lease.generation	8
+member_size	struct as_lease.generation	4
+offset	struct as_lease.npages	16
+member_size	struct as_lease.npages	4
+offset	struct as_lease.sid	4
+member_size	struct as_lease.sid	4
+offset	struct as_lease.token	0
+member_size	struct as_lease.token	4
+size	struct bootinfo	48
+align	struct bootinfo	4
+offset	struct bootinfo.drive	12
+member_size	struct bootinfo.drive	24
+offset	struct bootinfo.img_crc	40
+member_size	struct bootinfo.img_crc	4
+offset	struct bootinfo.img_size	44
+member_size	struct bootinfo.img_size	4
+offset	struct bootinfo.img_valid	36
+member_size	struct bootinfo.img_valid	1
+offset	struct bootinfo.magic	4
+member_size	struct bootinfo.magic	4
+offset	struct bootinfo.ndrives	11
+member_size	struct bootinfo.ndrives	1
+offset	struct bootinfo.source	10
+member_size	struct bootinfo.source	1
+offset	struct bootinfo.status	0
+member_size	struct bootinfo.status	4
+offset	struct bootinfo.version	8
+member_size	struct bootinfo.version	2
+size	struct bootinfo_ata	20
+align	struct bootinfo_ata	4
+offset	struct bootinfo_ata.cur_cyl	6
+member_size	struct bootinfo_ata.cur_cyl	2
+offset	struct bootinfo_ata.cur_heads	8
+member_size	struct bootinfo_ata.cur_heads	2
+offset	struct bootinfo_ata.cur_spt	10
+member_size	struct bootinfo_ata.cur_spt	2
+offset	struct bootinfo_ata.cur_valid	12
+member_size	struct bootinfo_ata.cur_valid	1
+offset	struct bootinfo_ata.def_cyl	0
+member_size	struct bootinfo_ata.def_cyl	2
+offset	struct bootinfo_ata.def_heads	2
+member_size	struct bootinfo_ata.def_heads	2
+offset	struct bootinfo_ata.def_spt	4
+member_size	struct bootinfo_ata.def_spt	2
+offset	struct bootinfo_ata.lba	13
+member_size	struct bootinfo_ata.lba	1
+offset	struct bootinfo_ata.total	16
+member_size	struct bootinfo_ata.total	4
+size	struct bootinfo_drive	12
+align	struct bootinfo_drive	2
+offset	struct bootinfo_drive.ah	5
+member_size	struct bootinfo_drive.ah	1
+offset	struct bootinfo_drive.cf	4
+member_size	struct bootinfo_drive.cf	1
+offset	struct bootinfo_drive.cyl	8
+member_size	struct bootinfo_drive.cyl	2
+offset	struct bootinfo_drive.da	0
+member_size	struct bootinfo_drive.da	1
+offset	struct bootinfo_drive.heads	10
+member_size	struct bootinfo_drive.heads	1
+offset	struct bootinfo_drive.loader_valid	2
+member_size	struct bootinfo_drive.loader_valid	1
+offset	struct bootinfo_drive.queried	1
+member_size	struct bootinfo_drive.queried	1
+offset	struct bootinfo_drive.seclen	6
+member_size	struct bootinfo_drive.seclen	2
+offset	struct bootinfo_drive.spt	11
+member_size	struct bootinfo_drive.spt	1
+offset	struct bootinfo_drive.valid	3
+member_size	struct bootinfo_drive.valid	1
+size	struct bootinfo_wire	64
+align	struct bootinfo_wire	4
+offset	struct bootinfo_wire.check	44
+member_size	struct bootinfo_wire.check	4
+offset	struct bootinfo_wire.drive	8
+member_size	struct bootinfo_wire.drive	32
+offset	struct bootinfo_wire.img_check	56
+member_size	struct bootinfo_wire.img_check	4
+offset	struct bootinfo_wire.img_crc	48
+member_size	struct bootinfo_wire.img_crc	4
+offset	struct bootinfo_wire.img_rsvd	60
+member_size	struct bootinfo_wire.img_rsvd	4
+offset	struct bootinfo_wire.img_size	52
+member_size	struct bootinfo_wire.img_size	4
+offset	struct bootinfo_wire.magic	0
+member_size	struct bootinfo_wire.magic	4
+offset	struct bootinfo_wire.ndrives	7
+member_size	struct bootinfo_wire.ndrives	1
+offset	struct bootinfo_wire.rsvd	42
+member_size	struct bootinfo_wire.rsvd	2
+offset	struct bootinfo_wire.source	6
+member_size	struct bootinfo_wire.source	1
+offset	struct bootinfo_wire.sum	40
+member_size	struct bootinfo_wire.sum	2
+offset	struct bootinfo_wire.version	4
+member_size	struct bootinfo_wire.version	2
+size	struct bootinfo_wire_drive	16
+align	struct bootinfo_wire_drive	2
+offset	struct bootinfo_wire_drive.ah	3
+member_size	struct bootinfo_wire_drive.ah	1
+offset	struct bootinfo_wire_drive.bx	4
+member_size	struct bootinfo_wire_drive.bx	2
+offset	struct bootinfo_wire_drive.cf	2
+member_size	struct bootinfo_wire_drive.cf	1
+offset	struct bootinfo_wire_drive.cx	6
+member_size	struct bootinfo_wire_drive.cx	2
+offset	struct bootinfo_wire_drive.da	0
+member_size	struct bootinfo_wire_drive.da	1
+offset	struct bootinfo_wire_drive.dh	8
+member_size	struct bootinfo_wire_drive.dh	1
+offset	struct bootinfo_wire_drive.dl	9
+member_size	struct bootinfo_wire_drive.dl	1
+offset	struct bootinfo_wire_drive.queried	10
+member_size	struct bootinfo_wire_drive.queried	1
+offset	struct bootinfo_wire_drive.rsvd	11
+member_size	struct bootinfo_wire_drive.rsvd	5
+offset	struct bootinfo_wire_drive.valid	1
+member_size	struct bootinfo_wire_drive.valid	1
+size	struct gfinit_bus	88
+align	struct gfinit_bus	4
+offset	struct gfinit_bus.bars	72
+member_size	struct gfinit_bus.bars	12
+offset	struct gfinit_bus.identity	40
+member_size	struct gfinit_bus.identity	32
+offset	struct gfinit_bus.pci	0
+member_size	struct gfinit_bus.pci	4
+offset	struct gfinit_bus.profile	4
+member_size	struct gfinit_bus.profile	4
+offset	struct gfinit_bus.ready	84
+member_size	struct gfinit_bus.ready	1
+offset	struct gfinit_bus.window	8
+member_size	struct gfinit_bus.window	32
+size	struct gfinit_decode	273800
+align	struct gfinit_decode	4
+offset	struct gfinit_decode.args	114752
+member_size	struct gfinit_decode.args	49152
+offset	struct gfinit_decode.captures	163964
+member_size	struct gfinit_decode.captures	640
+offset	struct gfinit_decode.entries	163904
+member_size	struct gfinit_decode.entries	60
+offset	struct gfinit_decode.error	273728
+member_size	struct gfinit_decode.error	4
+offset	struct gfinit_decode.error_pc	273724
+member_size	struct gfinit_decode.error_pc	4
+offset	struct gfinit_decode.heads	232756
+member_size	struct gfinit_decode.heads	32768
+offset	struct gfinit_decode.insns	164604
+member_size	struct gfinit_decode.insns	10808
+offset	struct gfinit_decode.instruction_count	273716
+member_size	struct gfinit_decode.instruction_count	4
+offset	struct gfinit_decode.main_nodes	273732
+member_size	struct gfinit_decode.main_nodes	20
+offset	struct gfinit_decode.main_steps	273752
+member_size	struct gfinit_decode.main_steps	20
+offset	struct gfinit_decode.main_wait	273772
+member_size	struct gfinit_decode.main_wait	20
+offset	struct gfinit_decode.max_call	273792
+member_size	struct gfinit_decode.max_call	4
+offset	struct gfinit_decode.max_repeat	273796
+member_size	struct gfinit_decode.max_repeat	4
+offset	struct gfinit_decode.nodes	64
+member_size	struct gfinit_decode.nodes	114688
+offset	struct gfinit_decode.plan	0
+member_size	struct gfinit_decode.plan	64
+offset	struct gfinit_decode.reachable	265524
+member_size	struct gfinit_decode.reachable	8192
+offset	struct gfinit_decode.schedule	175412
+member_size	struct gfinit_decode.schedule	57344
+offset	struct gfinit_decode.schedule_count	273720
+member_size	struct gfinit_decode.schedule_count	4
+size	struct gfinit_exec	348
+align	struct gfinit_exec	4
+offset	struct gfinit_exec.call	60
+member_size	struct gfinit_exec.call	192
+offset	struct gfinit_exec.calls	52
+member_size	struct gfinit_exec.calls	4
+offset	struct gfinit_exec.elapsed_us	28
+member_size	struct gfinit_exec.elapsed_us	4
+offset	struct gfinit_exec.fail_pc	32
+member_size	struct gfinit_exec.fail_pc	4
+offset	struct gfinit_exec.main_id	8
+member_size	struct gfinit_exec.main_id	4
+offset	struct gfinit_exec.opaque	16
+member_size	struct gfinit_exec.opaque	4
+offset	struct gfinit_exec.ops	12
+member_size	struct gfinit_exec.ops	4
+offset	struct gfinit_exec.read_ctx	48
+member_size	struct gfinit_exec.read_ctx	4
+offset	struct gfinit_exec.read_pc	44
+member_size	struct gfinit_exec.read_pc	4
+offset	struct gfinit_exec.read_value	40
+member_size	struct gfinit_exec.read_value	4
+offset	struct gfinit_exec.repeat	252
+member_size	struct gfinit_exec.repeat	96
+offset	struct gfinit_exec.repeats	56
+member_size	struct gfinit_exec.repeats	4
+offset	struct gfinit_exec.rom	0
+member_size	struct gfinit_exec.rom	4
+offset	struct gfinit_exec.rom_size	4
+member_size	struct gfinit_exec.rom_size	4
+offset	struct gfinit_exec.started	36
+member_size	struct gfinit_exec.started	4
+offset	struct gfinit_exec.steps	20
+member_size	struct gfinit_exec.steps	4
+offset	struct gfinit_exec.wait_us	24
+member_size	struct gfinit_exec.wait_us	4
+size	struct gfinit_exec_frame	12
+align	struct gfinit_exec_frame	4
+offset	struct gfinit_exec_frame.count	8
+member_size	struct gfinit_exec_frame.count	4
+offset	struct gfinit_exec_frame.ctx	4
+member_size	struct gfinit_exec_frame.ctx	4
+offset	struct gfinit_exec_frame.pc	0
+member_size	struct gfinit_exec_frame.pc	4
+size	struct gfinit_exec_ops	8
+align	struct gfinit_exec_ops	4
+offset	struct gfinit_exec_ops.clock_us	0
+member_size	struct gfinit_exec_ops.clock_us	4
+offset	struct gfinit_exec_ops.wait_us	4
+member_size	struct gfinit_exec_ops.wait_us	4
+size	struct gfinit_instruction	56
+align	struct gfinit_instruction	4
+offset	struct gfinit_instruction.count	28
+member_size	struct gfinit_instruction.count	4
+offset	struct gfinit_instruction.effect_count	20
+member_size	struct gfinit_instruction.effect_count	4
+offset	struct gfinit_instruction.effect_first	16
+member_size	struct gfinit_instruction.effect_first	4
+offset	struct gfinit_instruction.end_repeat	12
+member_size	struct gfinit_instruction.end_repeat	4
+offset	struct gfinit_instruction.index	36
+member_size	struct gfinit_instruction.index	4
+offset	struct gfinit_instruction.length	8
+member_size	struct gfinit_instruction.length	4
+offset	struct gfinit_instruction.mask	40
+member_size	struct gfinit_instruction.mask	4
+offset	struct gfinit_instruction.opcode	4
+member_size	struct gfinit_instruction.opcode	4
+offset	struct gfinit_instruction.pc	0
+member_size	struct gfinit_instruction.pc	4
+offset	struct gfinit_instruction.port	32
+member_size	struct gfinit_instruction.port	4
+offset	struct gfinit_instruction.ref	24
+member_size	struct gfinit_instruction.ref	4
+offset	struct gfinit_instruction.shift	44
+member_size	struct gfinit_instruction.shift	4
+offset	struct gfinit_instruction.target	48
+member_size	struct gfinit_instruction.target	4
+offset	struct gfinit_instruction.value	52
+member_size	struct gfinit_instruction.value	4
+size	struct gfinit_pci_ops	16
+align	struct gfinit_pci_ops	4
+offset	struct gfinit_pci_ops.read16	4
+member_size	struct gfinit_pci_ops.read16	4
+offset	struct gfinit_pci_ops.read32	0
+member_size	struct gfinit_pci_ops.read32	4
+offset	struct gfinit_pci_ops.write16	12
+member_size	struct gfinit_pci_ops.write16	4
+offset	struct gfinit_pci_ops.write32	8
+member_size	struct gfinit_pci_ops.write32	4
+size	struct gfinit_plan	163044
+align	struct gfinit_plan	4
+offset	struct gfinit_plan.bar1_length	163024
+member_size	struct gfinit_plan.bar1_length	4
+offset	struct gfinit_plan.capacity_bytes	163028
+member_size	struct gfinit_plan.capacity_bytes	4
+offset	struct gfinit_plan.capacity_known	163036
+member_size	struct gfinit_plan.capacity_known	4
+offset	struct gfinit_plan.deps	448
+member_size	struct gfinit_plan.deps	768
+offset	struct gfinit_plan.entries	64
+member_size	struct gfinit_plan.entries	384
+offset	struct gfinit_plan.exprs	161728
+member_size	struct gfinit_plan.exprs	256
+offset	struct gfinit_plan.full_capacity	163040
+member_size	struct gfinit_plan.full_capacity	4
+offset	struct gfinit_plan.layouts	136384
+member_size	struct gfinit_plan.layouts	25344
+offset	struct gfinit_plan.pfb_key	163020
+member_size	struct gfinit_plan.pfb_key	4
+offset	struct gfinit_plan.plan	0
+member_size	struct gfinit_plan.plan	64
+offset	struct gfinit_plan.rules	28864
+member_size	struct gfinit_plan.rules	107520
+offset	struct gfinit_plan.saved_count	163016
+member_size	struct gfinit_plan.saved_count	4
+offset	struct gfinit_plan.saved_vram	161984
+member_size	struct gfinit_plan.saved_vram	1024
+offset	struct gfinit_plan.targets	1216
+member_size	struct gfinit_plan.targets	27648
+offset	struct gfinit_plan.tested_bytes	163032
+member_size	struct gfinit_plan.tested_bytes	4
+offset	struct gfinit_plan.vram_first	163008
+member_size	struct gfinit_plan.vram_first	4
+offset	struct gfinit_plan.vram_node	163012
+member_size	struct gfinit_plan.vram_node	4
+size	struct gfinit_pll_limits	76
+align	struct gfinit_pll_limits	4
+offset	struct gfinit_pll_limits.bias_p	68
+member_size	struct gfinit_pll_limits.bias_p	4
+offset	struct gfinit_pll_limits.max_p	64
+member_size	struct gfinit_pll_limits.max_p	4
+offset	struct gfinit_pll_limits.ref	72
+member_size	struct gfinit_pll_limits.ref	4
+offset	struct gfinit_pll_limits.vco1	0
+member_size	struct gfinit_pll_limits.vco1	32
+offset	struct gfinit_pll_limits.vco2	32
+member_size	struct gfinit_pll_limits.vco2	32
+size	struct gfinit_pll_sequence	244
+align	struct gfinit_pll_sequence	4
+offset	struct gfinit_pll_sequence.count	0
+member_size	struct gfinit_pll_sequence.count	4
+offset	struct gfinit_pll_sequence.writes	4
+member_size	struct gfinit_pll_sequence.writes	240
+size	struct gfinit_pll_solution	28
+align	struct gfinit_pll_solution	4
+offset	struct gfinit_pll_solution.actual	20
+member_size	struct gfinit_pll_solution.actual	4
+offset	struct gfinit_pll_solution.error	24
+member_size	struct gfinit_pll_solution.error	4
+offset	struct gfinit_pll_solution.m1	4
+member_size	struct gfinit_pll_solution.m1	4
+offset	struct gfinit_pll_solution.m2	12
+member_size	struct gfinit_pll_solution.m2	4
+offset	struct gfinit_pll_solution.n1	0
+member_size	struct gfinit_pll_solution.n1	4
+offset	struct gfinit_pll_solution.n2	8
+member_size	struct gfinit_pll_solution.n2	4
+offset	struct gfinit_pll_solution.p	16
+member_size	struct gfinit_pll_solution.p	4
+size	struct gfinit_pll_vco	32
+align	struct gfinit_pll_vco	4
+offset	struct gfinit_pll_vco.max_freq	4
+member_size	struct gfinit_pll_vco.max_freq	4
+offset	struct gfinit_pll_vco.max_input	12
+member_size	struct gfinit_pll_vco.max_input	4
+offset	struct gfinit_pll_vco.max_m	28
+member_size	struct gfinit_pll_vco.max_m	4
+offset	struct gfinit_pll_vco.max_n	20
+member_size	struct gfinit_pll_vco.max_n	4
+offset	struct gfinit_pll_vco.min_freq	0
+member_size	struct gfinit_pll_vco.min_freq	4
+offset	struct gfinit_pll_vco.min_input	8
+member_size	struct gfinit_pll_vco.min_input	4
+offset	struct gfinit_pll_vco.min_m	24
+member_size	struct gfinit_pll_vco.min_m	4
+offset	struct gfinit_pll_vco.min_n	16
+member_size	struct gfinit_pll_vco.min_n	4
+size	struct gfinit_pll_write	16
+align	struct gfinit_pll_write	4
+offset	struct gfinit_pll_write.keep	8
+member_size	struct gfinit_pll_write.keep	4
+offset	struct gfinit_pll_write.reg	0
+member_size	struct gfinit_pll_write.reg	4
+offset	struct gfinit_pll_write.source	4
+member_size	struct gfinit_pll_write.source	4
+offset	struct gfinit_pll_write.value	12
+member_size	struct gfinit_pll_write.value	4
+size	struct gfinit_request	40
+align	struct gfinit_request	4
+offset	struct gfinit_request.fail_pc	28
+member_size	struct gfinit_request.fail_pc	4
+offset	struct gfinit_request.fail_reg	32
+member_size	struct gfinit_request.fail_reg	4
+offset	struct gfinit_request.flags	8
+member_size	struct gfinit_request.flags	4
+offset	struct gfinit_request.max_steps	20
+member_size	struct gfinit_request.max_steps	4
+offset	struct gfinit_request.script_id	16
+member_size	struct gfinit_request.script_id	4
+offset	struct gfinit_request.session	12
+member_size	struct gfinit_request.session	4
+offset	struct gfinit_request.size	4
+member_size	struct gfinit_request.size	4
+offset	struct gfinit_request.status	24
+member_size	struct gfinit_request.status	4
+offset	struct gfinit_request.steps	36
+member_size	struct gfinit_request.steps	4
+offset	struct gfinit_request.version	0
+member_size	struct gfinit_request.version	4
+size	struct gfinit_scheduled	28
+align	struct gfinit_scheduled	4
+offset	struct gfinit_scheduled.count	20
+member_size	struct gfinit_scheduled.count	4
+offset	struct gfinit_scheduled.ctx	4
+member_size	struct gfinit_scheduled.ctx	4
+offset	struct gfinit_scheduled.instruction	0
+member_size	struct gfinit_scheduled.instruction	4
+offset	struct gfinit_scheduled.jump	24
+member_size	struct gfinit_scheduled.jump	4
+offset	struct gfinit_scheduled.k	16
+member_size	struct gfinit_scheduled.k	4
+offset	struct gfinit_scheduled.kind	12
+member_size	struct gfinit_scheduled.kind	4
+offset	struct gfinit_scheduled.main_id	8
+member_size	struct gfinit_scheduled.main_id	4
+size	struct hwdev_core_api	116
+align	struct hwdev_core_api	4
+offset	struct hwdev_core_api.abi	0
+member_size	struct hwdev_core_api.abi	4
+offset	struct hwdev_core_api.contract_crc	8
+member_size	struct hwdev_core_api.contract_crc	4
+offset	struct hwdev_core_api.kpeek_call	112
+member_size	struct hwdev_core_api.kpeek_call	4
+offset	struct hwdev_core_api.layout_crc	12
+member_size	struct hwdev_core_api.layout_crc	4
+offset	struct hwdev_core_api.recover_access	72
+member_size	struct hwdev_core_api.recover_access	4
+offset	struct hwdev_core_api.recover_bar_probe	64
+member_size	struct hwdev_core_api.recover_bar_probe	4
+offset	struct hwdev_core_api.recover_bind_plan	56
+member_size	struct hwdev_core_api.recover_bind_plan	4
+offset	struct hwdev_core_api.recover_budget_apply	60
+member_size	struct hwdev_core_api.recover_budget_apply	4
+offset	struct hwdev_core_api.recover_gf_pre	96
+member_size	struct hwdev_core_api.recover_gf_pre	4
+offset	struct hwdev_core_api.recover_gf_result	100
+member_size	struct hwdev_core_api.recover_gf_result	4
+offset	struct hwdev_core_api.recover_gf_screen_safe	104
+member_size	struct hwdev_core_api.recover_gf_screen_safe	4
+offset	struct hwdev_core_api.recover_hal_wait_frame	108
+member_size	struct hwdev_core_api.recover_hal_wait_frame	4
+offset	struct hwdev_core_api.recover_owner	28
+member_size	struct hwdev_core_api.recover_owner	4
+offset	struct hwdev_core_api.recover_owner_configure	32
+member_size	struct hwdev_core_api.recover_owner_configure	4
+offset	struct hwdev_core_api.recover_plan_access	48
+member_size	struct hwdev_core_api.recover_plan_access	4
+offset	struct hwdev_core_api.recover_plan_check	52
+member_size	struct hwdev_core_api.recover_plan_check	4
+offset	struct hwdev_core_api.recover_plan_enter	40
+member_size	struct hwdev_core_api.recover_plan_enter	4
+offset	struct hwdev_core_api.recover_plan_leave	44
+member_size	struct hwdev_core_api.recover_plan_leave	4
+offset	struct hwdev_core_api.recover_profile_crc	68
+member_size	struct hwdev_core_api.recover_profile_crc	4
+offset	struct hwdev_core_api.recover_restore_point	76
+member_size	struct hwdev_core_api.recover_restore_point	4
+offset	struct hwdev_core_api.recover_safe_point	36
+member_size	struct hwdev_core_api.recover_safe_point	4
+offset	struct hwdev_core_api.recover_target_address	80
+member_size	struct hwdev_core_api.recover_target_address	4
+offset	struct hwdev_core_api.recover_window_access	88
+member_size	struct hwdev_core_api.recover_window_access	4
+offset	struct hwdev_core_api.recover_window_cleanup	92
+member_size	struct hwdev_core_api.recover_window_cleanup	4
+offset	struct hwdev_core_api.recover_window_hal_init	84
+member_size	struct hwdev_core_api.recover_window_hal_init	4
+offset	struct hwdev_core_api.size	4
+member_size	struct hwdev_core_api.size	4
+offset	struct hwdev_core_api.trial_begin	16
+member_size	struct hwdev_core_api.trial_begin	4
+offset	struct hwdev_core_api.trial_end	24
+member_size	struct hwdev_core_api.trial_end	4
+offset	struct hwdev_core_api.trial_step	20
+member_size	struct hwdev_core_api.trial_step	4
+size	struct hwdev_identity	32
+align	struct hwdev_identity	4
+offset	struct hwdev_identity.abi	0
+member_size	struct hwdev_identity.abi	4
+offset	struct hwdev_identity.build_id	12
+member_size	struct hwdev_identity.build_id	4
+offset	struct hwdev_identity.contract_crc	28
+member_size	struct hwdev_identity.contract_crc	4
+offset	struct hwdev_identity.core_image_crc	24
+member_size	struct hwdev_identity.core_image_crc	4
+offset	struct hwdev_identity.kernel_pair_crc	20
+member_size	struct hwdev_identity.kernel_pair_crc	4
+offset	struct hwdev_identity.kind	8
+member_size	struct hwdev_identity.kind	4
+offset	struct hwdev_identity.profile_version	16
+member_size	struct hwdev_identity.profile_version	4
+offset	struct hwdev_identity.size	4
+member_size	struct hwdev_identity.size	4
+size	struct hwdev_manifest	68
+align	struct hwdev_manifest	4
+offset	struct hwdev_manifest.dma_max_pages	52
+member_size	struct hwdev_manifest.dma_max_pages	4
+offset	struct hwdev_manifest.identity	0
+member_size	struct hwdev_manifest.identity	32
+offset	struct hwdev_manifest.layout_crc	40
+member_size	struct hwdev_manifest.layout_crc	4
+offset	struct hwdev_manifest.lifetime_flags	44
+member_size	struct hwdev_manifest.lifetime_flags	4
+offset	struct hwdev_manifest.ops_abi	56
+member_size	struct hwdev_manifest.ops_abi	4
+offset	struct hwdev_manifest.ops_size	60
+member_size	struct hwdev_manifest.ops_size	4
+offset	struct hwdev_manifest.reserved	64
+member_size	struct hwdev_manifest.reserved	4
+offset	struct hwdev_manifest.size	36
+member_size	struct hwdev_manifest.size	4
+offset	struct hwdev_manifest.version	32
+member_size	struct hwdev_manifest.version	4
+offset	struct hwdev_manifest.work_max_pages	48
+member_size	struct hwdev_manifest.work_max_pages	4
+size	struct hwdev_ops	16
+align	struct hwdev_ops	4
+offset	struct hwdev_ops.abi	0
+member_size	struct hwdev_ops.abi	4
+offset	struct hwdev_ops.call	8
+member_size	struct hwdev_ops.call	4
+offset	struct hwdev_ops.release_work	12
+member_size	struct hwdev_ops.release_work	4
+offset	struct hwdev_ops.size	4
+member_size	struct hwdev_ops.size	4
+size	struct lease_mapping	32
+align	struct lease_mapping	4
+offset	struct lease_mapping.base	0
+member_size	struct lease_mapping.base	4
+offset	struct lease_mapping.flags	12
+member_size	struct lease_mapping.flags	4
+offset	struct lease_mapping.generation	28
+member_size	struct lease_mapping.generation	4
+offset	struct lease_mapping.npages	8
+member_size	struct lease_mapping.npages	4
+offset	struct lease_mapping.phys	4
+member_size	struct lease_mapping.phys	4
+offset	struct lease_mapping.sid	24
+member_size	struct lease_mapping.sid	4
+offset	struct lease_mapping.slot	16
+member_size	struct lease_mapping.slot	4
+offset	struct lease_mapping.token	20
+member_size	struct lease_mapping.token	4
+size	struct ledger_owner	24
+align	struct ledger_owner	4
+offset	struct ledger_owner.alloc_irq	16
+member_size	struct ledger_owner.alloc_irq	4
+offset	struct ledger_owner.free_irq	20
+member_size	struct ledger_owner.free_irq	4
+offset	struct ledger_owner.id	1
+member_size	struct ledger_owner.id	1
+offset	struct ledger_owner.kind	0
+member_size	struct ledger_owner.kind	1
+offset	struct ledger_owner.name	2
+member_size	struct ledger_owner.name	8
+offset	struct ledger_owner.pad	10
+member_size	struct ledger_owner.pad	2
+offset	struct ledger_owner.pages	12
+member_size	struct ledger_owner.pages	4
+size	struct ledger_region	16
+align	struct ledger_region	4
+offset	struct ledger_region.cache	10
+member_size	struct ledger_region.cache	1
+offset	struct ledger_region.end	4
+member_size	struct ledger_region.end	4
+offset	struct ledger_region.first	0
+member_size	struct ledger_region.first	4
+offset	struct ledger_region.flags	11
+member_size	struct ledger_region.flags	1
+offset	struct ledger_region.owner	9
+member_size	struct ledger_region.owner	1
+offset	struct ledger_region.pad	15
+member_size	struct ledger_region.pad	1
+offset	struct ledger_region.res_mask	12
+member_size	struct ledger_region.res_mask	2
+offset	struct ledger_region.span_set	14
+member_size	struct ledger_region.span_set	1
+offset	struct ledger_region.type	8
+member_size	struct ledger_region.type	1
+size	struct ledger_resource	32
+align	struct ledger_resource	4
+offset	struct ledger_resource.bar	28
+member_size	struct ledger_resource.bar	1
+offset	struct ledger_resource.bdf	20
+member_size	struct ledger_resource.bdf	2
+offset	struct ledger_resource.boot_gen	30
+member_size	struct ledger_resource.boot_gen	1
+offset	struct ledger_resource.bus	26
+member_size	struct ledger_resource.bus	1
+offset	struct ledger_resource.decode_end	8
+member_size	struct ledger_resource.decode_end	4
+offset	struct ledger_resource.decode_first	4
+member_size	struct ledger_resource.decode_first	4
+offset	struct ledger_resource.device	24
+member_size	struct ledger_resource.device	2
+offset	struct ledger_resource.map_end	16
+member_size	struct ledger_resource.map_end	4
+offset	struct ledger_resource.map_first	12
+member_size	struct ledger_resource.map_first	4
+offset	struct ledger_resource.pad	31
+member_size	struct ledger_resource.pad	1
+offset	struct ledger_resource.raw_bar	0
+member_size	struct ledger_resource.raw_bar	4
+offset	struct ledger_resource.revision	27
+member_size	struct ledger_resource.revision	1
+offset	struct ledger_resource.vendor	22
+member_size	struct ledger_resource.vendor	2
+offset	struct ledger_resource.width_basis	29
+member_size	struct ledger_resource.width_basis	1
+size	struct ledger_span	16
+align	struct ledger_span	4
+offset	struct ledger_span.end	4
+member_size	struct ledger_span.end	4
+offset	struct ledger_span.first	0
+member_size	struct ledger_span.first	4
+offset	struct ledger_span.kind	8
+member_size	struct ledger_span.kind	4
+offset	struct ledger_span.res	12
+member_size	struct ledger_span.res	4
+size	struct ledger_surface	48
+align	struct ledger_surface	4
+offset	struct ledger_surface.backend	38
+member_size	struct ledger_surface.backend	1
+offset	struct ledger_surface.backing	37
+member_size	struct ledger_surface.backing	1
+offset	struct ledger_surface.cache	42
+member_size	struct ledger_surface.cache	1
+offset	struct ledger_surface.closing	44
+member_size	struct ledger_surface.closing	1
+offset	struct ledger_surface.first	0
+member_size	struct ledger_surface.first	4
+offset	struct ledger_surface.format	40
+member_size	struct ledger_surface.format	1
+offset	struct ledger_surface.gen	8
+member_size	struct ledger_surface.gen	4
+offset	struct ledger_surface.height	32
+member_size	struct ledger_surface.height	2
+offset	struct ledger_surface.lease_count	28
+member_size	struct ledger_surface.lease_count	2
+offset	struct ledger_surface.npages	4
+member_size	struct ledger_surface.npages	4
+offset	struct ledger_surface.owner	36
+member_size	struct ledger_surface.owner	1
+offset	struct ledger_surface.perm_max	43
+member_size	struct ledger_surface.perm_max	1
+offset	struct ledger_surface.pitch	34
+member_size	struct ledger_surface.pitch	2
+offset	struct ledger_surface.plane_offset	12
+member_size	struct ledger_surface.plane_offset	16
+offset	struct ledger_surface.planes	41
+member_size	struct ledger_surface.planes	1
+offset	struct ledger_surface.role	39
+member_size	struct ledger_surface.role	1
+offset	struct ledger_surface.width	30
+member_size	struct ledger_surface.width	2
+size	struct pci_dev	40
+align	struct pci_dev	4
+offset	struct pci_dev.bar	12
+member_size	struct pci_dev.bar	24
+offset	struct pci_dev.bus	0
+member_size	struct pci_dev.bus	1
+offset	struct pci_dev.class	8
+member_size	struct pci_dev.class	1
+offset	struct pci_dev.command	38
+member_size	struct pci_dev.command	2
+offset	struct pci_dev.dev	1
+member_size	struct pci_dev.dev	1
+offset	struct pci_dev.device	6
+member_size	struct pci_dev.device	2
+offset	struct pci_dev.fn	2
+member_size	struct pci_dev.fn	1
+offset	struct pci_dev.header	11
+member_size	struct pci_dev.header	1
+offset	struct pci_dev.irq_line	36
+member_size	struct pci_dev.irq_line	1
+offset	struct pci_dev.irq_pin	37
+member_size	struct pci_dev.irq_pin	1
+offset	struct pci_dev.progif	10
+member_size	struct pci_dev.progif	1
+offset	struct pci_dev.subclass	9
+member_size	struct pci_dev.subclass	1
+offset	struct pci_dev.vendor	4
+member_size	struct pci_dev.vendor	2
+size	struct pgalloc_layout	24
+align	struct pgalloc_layout	4
+offset	struct pgalloc_layout.capacity	4
+member_size	struct pgalloc_layout.capacity	4
+offset	struct pgalloc_layout.kind	20
+member_size	struct pgalloc_layout.kind	4
+offset	struct pgalloc_layout.metadata	0
+member_size	struct pgalloc_layout.metadata	4
+offset	struct pgalloc_layout.metadata_first	8
+member_size	struct pgalloc_layout.metadata_first	4
+offset	struct pgalloc_layout.workspace_end	16
+member_size	struct pgalloc_layout.workspace_end	4
+offset	struct pgalloc_layout.workspace_first	12
+member_size	struct pgalloc_layout.workspace_first	4
+size	struct physmem	1032
+align	struct physmem	4
+offset	struct physmem.count	0
+member_size	struct physmem.count	4
+offset	struct physmem.legacy_ceiling	4
+member_size	struct physmem.legacy_ceiling	4
+offset	struct physmem.ranges	8
+member_size	struct physmem.ranges	1024
+size	struct physmem_range	16
+align	struct physmem_range	4
+offset	struct physmem_range.end	4
+member_size	struct physmem_range.end	4
+offset	struct physmem_range.first	0
+member_size	struct physmem_range.first	4
+offset	struct physmem_range.kind	8
+member_size	struct physmem_range.kind	4
+offset	struct physmem_range.sources	12
+member_size	struct physmem_range.sources	4
+size	struct recover	25944
+align	struct recover	4
+offset	struct recover.access_blocked	25938
+member_size	struct recover.access_blocked	1
+offset	struct recover.accessed	1001
+member_size	struct recover.accessed	1
+offset	struct recover.auth_phase	996
+member_size	struct recover.auth_phase	4
+offset	struct recover.bars	25884
+member_size	struct recover.bars	48
+offset	struct recover.bound_hash	980
+member_size	struct recover.bound_hash	4
+offset	struct recover.bound_profile	968
+member_size	struct recover.bound_profile	4
+offset	struct recover.budget	628
+member_size	struct recover.budget	4
+offset	struct recover.buffers	972
+member_size	struct recover.buffers	8
+offset	struct recover.cache	25716
+member_size	struct recover.cache	84
+offset	struct recover.call_tick	636
+member_size	struct recover.call_tick	4
+offset	struct recover.capture_valid	25712
+member_size	struct recover.capture_valid	4
+offset	struct recover.capture_values	25584
+member_size	struct recover.capture_values	128
+offset	struct recover.cold_latched	25939
+member_size	struct recover.cold_latched	1
+offset	struct recover.command_actual	944
+member_size	struct recover.command_actual	4
+offset	struct recover.command_override	949
+member_size	struct recover.command_override	1
+offset	struct recover.command_saved	940
+member_size	struct recover.command_saved	4
+offset	struct recover.cursor	984
+member_size	struct recover.cursor	4
+offset	struct recover.discarded_bytes	28
+member_size	struct recover.discarded_bytes	4
+offset	struct recover.emitting	40
+member_size	struct recover.emitting	1
+offset	struct recover.enabled	25932
+member_size	struct recover.enabled	1
+offset	struct recover.entered	1000
+member_size	struct recover.entered	1
+offset	struct recover.expected_node	988
+member_size	struct recover.expected_node	4
+offset	struct recover.failed	25937
+member_size	struct recover.failed	1
+offset	struct recover.first_key	656
+member_size	struct recover.first_key	4
+offset	struct recover.first_phase	960
+member_size	struct recover.first_phase	4
+offset	struct recover.gpu_written	1003
+member_size	struct recover.gpu_written	1
+offset	struct recover.head	992
+member_size	struct recover.head	4
+offset	struct recover.in_call	25935
+member_size	struct recover.in_call	1
+offset	struct recover.in_opcode	25936
+member_size	struct recover.in_opcode	1
+offset	struct recover.in_s0	948
+member_size	struct recover.in_s0	1
+offset	struct recover.index_port	17392
+member_size	struct recover.index_port	4096
+offset	struct recover.local_saved	236
+member_size	struct recover.local_saved	384
+offset	struct recover.local_saved_count	620
+member_size	struct recover.local_saved_count	4
+offset	struct recover.log_limit	660
+member_size	struct recover.log_limit	4
+offset	struct recover.log_partial	41
+member_size	struct recover.log_partial	1
+offset	struct recover.lost_lines	36
+member_size	struct recover.lost_lines	4
+offset	struct recover.measurement	25800
+member_size	struct recover.measurement	84
+offset	struct recover.measuring	1004
+member_size	struct recover.measuring	1
+offset	struct recover.next_session	624
+member_size	struct recover.next_session	4
+offset	struct recover.node_layout	1008
+member_size	struct recover.node_layout	8192
+offset	struct recover.node_write	9200
+member_size	struct recover.node_write	8192
+offset	struct recover.opaque	44
+member_size	struct recover.opaque	4
+offset	struct recover.opcode_spent	668
+member_size	struct recover.opcode_spent	4
+offset	struct recover.opcode_tick	640
+member_size	struct recover.opcode_tick	4
+offset	struct recover.ops	0
+member_size	struct recover.ops	4
+offset	struct recover.plan	964
+member_size	struct recover.plan	4
+offset	struct recover.polls	652
+member_size	struct recover.polls	4
+offset	struct recover.port_selected	21488
+member_size	struct recover.port_selected	4096
+offset	struct recover.profile	48
+member_size	struct recover.profile	4
+offset	struct recover.reason	956
+member_size	struct recover.reason	4
+offset	struct recover.restore_polls	672
+member_size	struct recover.restore_polls	4
+offset	struct recover.restore_tick	644
+member_size	struct recover.restore_tick	4
+offset	struct recover.restored_rules	684
+member_size	struct recover.restored_rules	256
+offset	struct recover.route_write_approved	25933
+member_size	struct recover.route_write_approved	1
+offset	struct recover.rx	12
+member_size	struct recover.rx	10
+offset	struct recover.rx_used	24
+member_size	struct recover.rx_used	4
+offset	struct recover.s0_only	42
+member_size	struct recover.s0_only	1
+offset	struct recover.s0_profile	8
+member_size	struct recover.s0_profile	4
+offset	struct recover.s0_verified	25940
+member_size	struct recover.s0_verified	1
+offset	struct recover.s1_verified	25941
+member_size	struct recover.s1_verified	1
+offset	struct recover.saved	104
+member_size	struct recover.saved	128
+offset	struct recover.saved_count	232
+member_size	struct recover.saved_count	4
+offset	struct recover.seq	32
+member_size	struct recover.seq	4
+offset	struct recover.spent	632
+member_size	struct recover.spent	4
+offset	struct recover.state	952
+member_size	struct recover.state	4
+offset	struct recover.steps	648
+member_size	struct recover.steps	4
+offset	struct recover.token	52
+member_size	struct recover.token	52
+offset	struct recover.transport	4
+member_size	struct recover.transport	4
+offset	struct recover.tx_ticks	664
+member_size	struct recover.tx_ticks	4
+offset	struct recover.uart_bytes	680
+member_size	struct recover.uart_bytes	4
+offset	struct recover.uart_polls	676
+member_size	struct recover.uart_polls	4
+offset	struct recover.valid	25934
+member_size	struct recover.valid	1
+offset	struct recover.zero_hold	1002
+member_size	struct recover.zero_hold	1
+size	struct recover_bar_extent	16
+align	struct recover_bar_extent	4
+offset	struct recover_bar_extent.base	4
+member_size	struct recover_bar_extent.base	4
+offset	struct recover_bar_extent.length	8
+member_size	struct recover_bar_extent.length	4
+offset	struct recover_bar_extent.raw	0
+member_size	struct recover_bar_extent.raw	4
+offset	struct recover_bar_extent.valid	12
+member_size	struct recover_bar_extent.valid	4
+size	struct recover_bar_measurement	84
+align	struct recover_bar_measurement	4
+offset	struct recover_bar_measurement.bar	36
+member_size	struct recover_bar_measurement.bar	48
+offset	struct recover_bar_measurement.identity	0
+member_size	struct recover_bar_measurement.identity	32
+offset	struct recover_bar_measurement.measurement_session	32
+member_size	struct recover_bar_measurement.measurement_session	4
+size	struct recover_bus_access	24
+align	struct recover_bus_access	4
+offset	struct recover_bus_access.bar	12
+member_size	struct recover_bus_access.bar	4
+offset	struct recover_bus_access.dir_substep	4
+member_size	struct recover_bus_access.dir_substep	4
+offset	struct recover_bus_access.key	0
+member_size	struct recover_bus_access.key	4
+offset	struct recover_bus_access.offset	16
+member_size	struct recover_bus_access.offset	4
+offset	struct recover_bus_access.space	8
+member_size	struct recover_bus_access.space	4
+offset	struct recover_bus_access.width	20
+member_size	struct recover_bus_access.width	4
+size	struct recover_capture	20
+align	struct recover_capture	4
+offset	struct recover_capture.consumer_node	8
+member_size	struct recover_capture.consumer_node	4
+offset	struct recover_capture.producer_node	4
+member_size	struct recover_capture.producer_node	4
+offset	struct recover_capture.read_ordinal	16
+member_size	struct recover_capture.read_ordinal	4
+offset	struct recover_capture.slot	0
+member_size	struct recover_capture.slot	4
+offset	struct recover_capture.target	12
+member_size	struct recover_capture.target	4
+size	struct recover_expr	16
+align	struct recover_expr	4
+offset	struct recover_expr.argc	4
+member_size	struct recover_expr.argc	4
+offset	struct recover_expr.eval	12
+member_size	struct recover_expr.eval	4
+offset	struct recover_expr.id	0
+member_size	struct recover_expr.id	4
+offset	struct recover_expr.kinds	8
+member_size	struct recover_expr.kinds	4
+size	struct recover_guard	16
+align	struct recover_guard	4
+offset	struct recover_guard.expected	8
+member_size	struct recover_guard.expected	4
+offset	struct recover_guard.key	0
+member_size	struct recover_guard.key	4
+offset	struct recover_guard.mask	4
+member_size	struct recover_guard.mask	4
+offset	struct recover_guard.when	12
+member_size	struct recover_guard.when	4
+size	struct recover_identity	32
+align	struct recover_identity	4
+offset	struct recover_identity.bar0	28
+member_size	struct recover_identity.bar0	4
+offset	struct recover_identity.bdf	12
+member_size	struct recover_identity.bdf	4
+offset	struct recover_identity.boot	0
+member_size	struct recover_identity.boot	4
+offset	struct recover_identity.device	16
+member_size	struct recover_identity.device	4
+offset	struct recover_identity.image_version	4
+member_size	struct recover_identity.image_version	4
+offset	struct recover_identity.kdebug_version	8
+member_size	struct recover_identity.kdebug_version	4
+offset	struct recover_identity.revision	24
+member_size	struct recover_identity.revision	4
+offset	struct recover_identity.subsys	20
+member_size	struct recover_identity.subsys	4
+size	struct recover_local_saved	12
+align	struct recover_local_saved	4
+offset	struct recover_local_saved.dir_substep	4
+member_size	struct recover_local_saved.dir_substep	4
+offset	struct recover_local_saved.key	0
+member_size	struct recover_local_saved.key	4
+offset	struct recover_local_saved.value	8
+member_size	struct recover_local_saved.value	4
+size	struct recover_local_step	20
+align	struct recover_local_step	4
+offset	struct recover_local_step.dir	8
+member_size	struct recover_local_step.dir	4
+offset	struct recover_local_step.key	4
+member_size	struct recover_local_step.key	4
+offset	struct recover_local_step.role	0
+member_size	struct recover_local_step.role	4
+offset	struct recover_local_step.value	16
+member_size	struct recover_local_step.value	4
+offset	struct recover_local_step.width	12
+member_size	struct recover_local_step.width	4
+size	struct recover_opcode_layout	24
+align	struct recover_opcode_layout	4
+offset	struct recover_opcode_layout.argc	8
+member_size	struct recover_opcode_layout.argc	4
+offset	struct recover_opcode_layout.dir_substep	16
+member_size	struct recover_opcode_layout.dir_substep	4
+offset	struct recover_opcode_layout.flags	20
+member_size	struct recover_opcode_layout.flags	4
+offset	struct recover_opcode_layout.kinds	12
+member_size	struct recover_opcode_layout.kinds	4
+offset	struct recover_opcode_layout.opcode	0
+member_size	struct recover_opcode_layout.opcode	4
+offset	struct recover_opcode_layout.substep	4
+member_size	struct recover_opcode_layout.substep	4
+size	struct recover_ops	52
+align	struct recover_ops	4
+offset	struct recover_ops.abort_requested	40
+member_size	struct recover_ops.abort_requested	4
+offset	struct recover_ops.event	48
+member_size	struct recover_ops.event	4
+offset	struct recover_ops.identity	4
+member_size	struct recover_ops.identity	4
+offset	struct recover_ops.local_cleanup	44
+member_size	struct recover_ops.local_cleanup	4
+offset	struct recover_ops.raw_config	12
+member_size	struct recover_ops.raw_config	4
+offset	struct recover_ops.read	16
+member_size	struct recover_ops.read	4
+offset	struct recover_ops.route_read	24
+member_size	struct recover_ops.route_read	4
+offset	struct recover_ops.route_write	28
+member_size	struct recover_ops.route_write	4
+offset	struct recover_ops.screen_restore_verify	36
+member_size	struct recover_ops.screen_restore_verify	4
+offset	struct recover_ops.screen_safe	32
+member_size	struct recover_ops.screen_safe	4
+offset	struct recover_ops.start_ready	8
+member_size	struct recover_ops.start_ready	4
+offset	struct recover_ops.ticks	0
+member_size	struct recover_ops.ticks	4
+offset	struct recover_ops.write	20
+member_size	struct recover_ops.write	4
+size	struct recover_plan	64
+align	struct recover_plan	4
+offset	struct recover_plan.arg_count	28
+member_size	struct recover_plan.arg_count	4
+offset	struct recover_plan.args	24
+member_size	struct recover_plan.args	4
+offset	struct recover_plan.capture_count	56
+member_size	struct recover_plan.capture_count	4
+offset	struct recover_plan.captures	52
+member_size	struct recover_plan.captures	4
+offset	struct recover_plan.ctx_count	32
+member_size	struct recover_plan.ctx_count	4
+offset	struct recover_plan.dep_count	40
+member_size	struct recover_plan.dep_count	4
+offset	struct recover_plan.deps	36
+member_size	struct recover_plan.deps	4
+offset	struct recover_plan.entries	44
+member_size	struct recover_plan.entries	4
+offset	struct recover_plan.entry_count	48
+member_size	struct recover_plan.entry_count	4
+offset	struct recover_plan.node_count	20
+member_size	struct recover_plan.node_count	4
+offset	struct recover_plan.nodes	16
+member_size	struct recover_plan.nodes	4
+offset	struct recover_plan.profile_crc	4
+member_size	struct recover_plan.profile_crc	4
+offset	struct recover_plan.rom_crc	8
+member_size	struct recover_plan.rom_crc	4
+offset	struct recover_plan.rom_size	12
+member_size	struct recover_plan.rom_size	4
+offset	struct recover_plan.unresolved_count	60
+member_size	struct recover_plan.unresolved_count	4
+offset	struct recover_plan.version	0
+member_size	struct recover_plan.version	4
+size	struct recover_plan_arg	8
+align	struct recover_plan_arg	4
+offset	struct recover_plan_arg.kind	0
+member_size	struct recover_plan_arg.kind	4
+offset	struct recover_plan_arg.value	4
+member_size	struct recover_plan_arg.value	4
+size	struct recover_plan_buffers	8
+align	struct recover_plan_buffers	4
+offset	struct recover_plan_buffers.flow_bits	0
+member_size	struct recover_plan_buffers.flow_bits	4
+offset	struct recover_plan_buffers.valid_bits	4
+member_size	struct recover_plan_buffers.valid_bits	4
+size	struct recover_plan_dep	12
+align	struct recover_plan_dep	4
+offset	struct recover_plan_dep.consumer	0
+member_size	struct recover_plan_dep.consumer	4
+offset	struct recover_plan_dep.producer	8
+member_size	struct recover_plan_dep.producer	4
+offset	struct recover_plan_dep.required_rule	4
+member_size	struct recover_plan_dep.required_rule	4
+size	struct recover_plan_entry	12
+align	struct recover_plan_entry	4
+offset	struct recover_plan_entry.first	8
+member_size	struct recover_plan_entry.first	4
+offset	struct recover_plan_entry.main_id	4
+member_size	struct recover_plan_entry.main_id	4
+offset	struct recover_plan_entry.phase	0
+member_size	struct recover_plan_entry.phase	4
+size	struct recover_plan_node	56
+align	struct recover_plan_node	4
+offset	struct recover_plan_node.arg_count	44
+member_size	struct recover_plan_node.arg_count	4
+offset	struct recover_plan_node.arg_first	40
+member_size	struct recover_plan_node.arg_first	4
+offset	struct recover_plan_node.ctx	20
+member_size	struct recover_plan_node.ctx	4
+offset	struct recover_plan_node.expr_id	36
+member_size	struct recover_plan_node.expr_id	4
+offset	struct recover_plan_node.head	24
+member_size	struct recover_plan_node.head	4
+offset	struct recover_plan_node.main_id	4
+member_size	struct recover_plan_node.main_id	4
+offset	struct recover_plan_node.next	48
+member_size	struct recover_plan_node.next	8
+offset	struct recover_plan_node.opcode	12
+member_size	struct recover_plan_node.opcode	4
+offset	struct recover_plan_node.pc	8
+member_size	struct recover_plan_node.pc	4
+offset	struct recover_plan_node.phase	0
+member_size	struct recover_plan_node.phase	4
+offset	struct recover_plan_node.rule_id	32
+member_size	struct recover_plan_node.rule_id	4
+offset	struct recover_plan_node.skip	28
+member_size	struct recover_plan_node.skip	4
+offset	struct recover_plan_node.substep	16
+member_size	struct recover_plan_node.substep	4
+size	struct recover_profile	124
+align	struct recover_profile	4
+offset	struct recover_profile.cold_required	52
+member_size	struct recover_profile.cold_required	1
+offset	struct recover_profile.count	20
+member_size	struct recover_profile.count	4
+offset	struct recover_profile.crc	4
+member_size	struct recover_profile.crc	4
+offset	struct recover_profile.expected_bdf	8
+member_size	struct recover_profile.expected_bdf	4
+offset	struct recover_profile.expected_device	12
+member_size	struct recover_profile.expected_device	4
+offset	struct recover_profile.expr_count	76
+member_size	struct recover_profile.expr_count	4
+offset	struct recover_profile.exprs	72
+member_size	struct recover_profile.exprs	4
+offset	struct recover_profile.index_save_count	120
+member_size	struct recover_profile.index_save_count	4
+offset	struct recover_profile.index_save_targets	116
+member_size	struct recover_profile.index_save_targets	4
+offset	struct recover_profile.layout_count	84
+member_size	struct recover_profile.layout_count	4
+offset	struct recover_profile.layouts	80
+member_size	struct recover_profile.layouts	4
+offset	struct recover_profile.max_polls	48
+member_size	struct recover_profile.max_polls	4
+offset	struct recover_profile.max_steps	44
+member_size	struct recover_profile.max_steps	4
+offset	struct recover_profile.opcode_limit	36
+member_size	struct recover_profile.opcode_limit	4
+offset	struct recover_profile.quiesce	24
+member_size	struct recover_profile.quiesce	4
+offset	struct recover_profile.quiesce_count	28
+member_size	struct recover_profile.quiesce_count	4
+offset	struct recover_profile.regs	16
+member_size	struct recover_profile.regs	4
+offset	struct recover_profile.restore_limit	40
+member_size	struct recover_profile.restore_limit	4
+offset	struct recover_profile.restore_log_bytes	100
+member_size	struct recover_profile.restore_log_bytes	4
+offset	struct recover_profile.restore_max_polls	88
+member_size	struct recover_profile.restore_max_polls	4
+offset	struct recover_profile.rule_count	68
+member_size	struct recover_profile.rule_count	4
+offset	struct recover_profile.rules	64
+member_size	struct recover_profile.rules	4
+offset	struct recover_profile.s0_reserve_bytes	104
+member_size	struct recover_profile.s0_reserve_bytes	4
+offset	struct recover_profile.s0_reserve_polls	96
+member_size	struct recover_profile.s0_reserve_polls	4
+offset	struct recover_profile.s0_reserve_ticks	92
+member_size	struct recover_profile.s0_reserve_ticks	4
+offset	struct recover_profile.target_count	60
+member_size	struct recover_profile.target_count	4
+offset	struct recover_profile.targets	56
+member_size	struct recover_profile.targets	4
+offset	struct recover_profile.trial_limit	32
+member_size	struct recover_profile.trial_limit	4
+offset	struct recover_profile.version	0
+member_size	struct recover_profile.version	4
+offset	struct recover_profile.vram_reserved	108
+member_size	struct recover_profile.vram_reserved	8
+size	struct recover_range	8
+align	struct recover_range	4
+offset	struct recover_range.base	0
+member_size	struct recover_range.base	4
+offset	struct recover_range.len	4
+member_size	struct recover_range.len	4
+size	struct recover_reg	28
+align	struct recover_reg	4
+offset	struct recover_reg.key	0
+member_size	struct recover_reg.key	4
+offset	struct recover_reg.kind	16
+member_size	struct recover_reg.kind	4
+offset	struct recover_reg.read_safe	20
+member_size	struct recover_reg.read_safe	1
+offset	struct recover_reg.restore_rule_id	24
+member_size	struct recover_reg.restore_rule_id	4
+offset	struct recover_reg.verify_mask	12
+member_size	struct recover_reg.verify_mask	4
+offset	struct recover_reg.width	4
+member_size	struct recover_reg.width	4
+offset	struct recover_reg.write_mask	8
+member_size	struct recover_reg.write_mask	4
+size	struct recover_rule	84
+align	struct recover_rule	4
+offset	struct recover_rule.flags	80
+member_size	struct recover_rule.flags	4
+offset	struct recover_rule.guard_count	76
+member_size	struct recover_rule.guard_count	4
+offset	struct recover_rule.guards	72
+member_size	struct recover_rule.guards	4
+offset	struct recover_rule.id	0
+member_size	struct recover_rule.id	4
+offset	struct recover_rule.key	4
+member_size	struct recover_rule.key	4
+offset	struct recover_rule.main_id	12
+member_size	struct recover_rule.main_id	4
+offset	struct recover_rule.pc	16
+member_size	struct recover_rule.pc	4
+offset	struct recover_rule.phase	8
+member_size	struct recover_rule.phase	4
+offset	struct recover_rule.requires	64
+member_size	struct recover_rule.requires	4
+offset	struct recover_rule.requires_count	68
+member_size	struct recover_rule.requires_count	4
+offset	struct recover_rule.substep	20
+member_size	struct recover_rule.substep	4
+offset	struct recover_rule.value	32
+member_size	struct recover_rule.value	32
+offset	struct recover_rule.verify_mask	28
+member_size	struct recover_rule.verify_mask	4
+offset	struct recover_rule.write_mask	24
+member_size	struct recover_rule.write_mask	4
+size	struct recover_screen_ops	24
+align	struct recover_screen_ops	4
+offset	struct recover_screen_ops.cui	0
+member_size	struct recover_screen_ops.cui	4
+offset	struct recover_screen_ops.read_cell	12
+member_size	struct recover_screen_ops.read_cell	4
+offset	struct recover_screen_ops.redraw	20
+member_size	struct recover_screen_ops.redraw	4
+offset	struct recover_screen_ops.restore	8
+member_size	struct recover_screen_ops.restore	4
+offset	struct recover_screen_ops.safe	4
+member_size	struct recover_screen_ops.safe	4
+offset	struct recover_screen_ops.write_cell	16
+member_size	struct recover_screen_ops.write_cell	4
+size	struct recover_static_work	24
+align	struct recover_static_work	4
+offset	struct recover_static_work.bytes	0
+member_size	struct recover_static_work.bytes	4
+offset	struct recover_static_work.points	8
+member_size	struct recover_static_work.points	4
+offset	struct recover_static_work.s0_bytes	12
+member_size	struct recover_static_work.s0_bytes	4
+offset	struct recover_static_work.s0_points	20
+member_size	struct recover_static_work.s0_points	4
+offset	struct recover_static_work.s0_wait_ms	16
+member_size	struct recover_static_work.s0_wait_ms	4
+offset	struct recover_static_work.wait_ms	4
+member_size	struct recover_static_work.wait_ms	4
+size	struct recover_target	36
+align	struct recover_target	4
+offset	struct recover_target.access	28
+member_size	struct recover_target.access	4
+offset	struct recover_target.bar	4
+member_size	struct recover_target.bar	4
+offset	struct recover_target.head	12
+member_size	struct recover_target.head	4
+offset	struct recover_target.index	20
+member_size	struct recover_target.index	4
+offset	struct recover_target.offset	8
+member_size	struct recover_target.offset	4
+offset	struct recover_target.port	16
+member_size	struct recover_target.port	4
+offset	struct recover_target.read_safe	32
+member_size	struct recover_target.read_safe	4
+offset	struct recover_target.space	0
+member_size	struct recover_target.space	4
+offset	struct recover_target.width	24
+member_size	struct recover_target.width	4
+size	struct recover_token	52
+align	struct recover_token	4
+offset	struct recover_token.identity	20
+member_size	struct recover_token.identity	32
+offset	struct recover_token.plan_hash	16
+member_size	struct recover_token.plan_hash	4
+offset	struct recover_token.profile_crc	4
+member_size	struct recover_token.profile_crc	4
+offset	struct recover_token.profile_version	8
+member_size	struct recover_token.profile_version	4
+offset	struct recover_token.session	0
+member_size	struct recover_token.session	4
+offset	struct recover_token.snapshot_crc	12
+member_size	struct recover_token.snapshot_crc	4
+size	struct recover_transport	36
+align	struct recover_transport	4
+offset	struct recover_transport.begin	28
+member_size	struct recover_transport.begin	4
+offset	struct recover_transport.end	32
+member_size	struct recover_transport.end	4
+offset	struct recover_transport.frame_us	20
+member_size	struct recover_transport.frame_us	4
+offset	struct recover_transport.get	0
+member_size	struct recover_transport.get	4
+offset	struct recover_transport.max_polls	24
+member_size	struct recover_transport.max_polls	4
+offset	struct recover_transport.opaque	16
+member_size	struct recover_transport.opaque	4
+offset	struct recover_transport.uart	4
+member_size	struct recover_transport.uart	12
+size	struct recover_uart_ops	12
+align	struct recover_uart_ops	4
+offset	struct recover_uart_ops.put	4
+member_size	struct recover_uart_ops.put	4
+offset	struct recover_uart_ops.ready	0
+member_size	struct recover_uart_ops.ready	4
+offset	struct recover_uart_ops.wait_frame	8
+member_size	struct recover_uart_ops.wait_frame	4
+size	struct recover_value	32
+align	struct recover_value	4
+offset	struct recover_value.allowed	24
+member_size	struct recover_value.allowed	4
+offset	struct recover_value.allowed_count	28
+member_size	struct recover_value.allowed_count	4
+offset	struct recover_value.bits	8
+member_size	struct recover_value.bits	4
+offset	struct recover_value.expr_id	20
+member_size	struct recover_value.expr_id	4
+offset	struct recover_value.mask	4
+member_size	struct recover_value.mask	4
+offset	struct recover_value.max	16
+member_size	struct recover_value.max	4
+offset	struct recover_value.min	12
+member_size	struct recover_value.min	4
+offset	struct recover_value.mode	0
+member_size	struct recover_value.mode	4
+size	struct recover_window	32
+align	struct recover_window	4
+offset	struct recover_window.failed	29
+member_size	struct recover_window.failed	1
+offset	struct recover_window.flags	20
+member_size	struct recover_window.flags	4
+offset	struct recover_window.opaque	4
+member_size	struct recover_window.opaque	4
+offset	struct recover_window.ops	0
+member_size	struct recover_window.ops	4
+offset	struct recover_window.owned	28
+member_size	struct recover_window.owned	1
+offset	struct recover_window.pages	24
+member_size	struct recover_window.pages	4
+offset	struct recover_window.raw	12
+member_size	struct recover_window.raw	8
+offset	struct recover_window.va	8
+member_size	struct recover_window.va	4
+size	struct recover_window_ops	28
+align	struct recover_window_ops	4
+offset	struct recover_window_ops.irq_restore	4
+member_size	struct recover_window_ops.irq_restore	4
+offset	struct recover_window_ops.irq_save	0
+member_size	struct recover_window_ops.irq_save	4
+offset	struct recover_window_ops.load	20
+member_size	struct recover_window_ops.load	4
+offset	struct recover_window_ops.map	12
+member_size	struct recover_window_ops.map	4
+offset	struct recover_window_ops.pte_read	8
+member_size	struct recover_window_ops.pte_read	4
+offset	struct recover_window_ops.store	24
+member_size	struct recover_window_ops.store	4
+offset	struct recover_window_ops.unmap	16
+member_size	struct recover_window_ops.unmap	4
+size	struct recover_write	20
+align	struct recover_write	4
+offset	struct recover_write.key	0
+member_size	struct recover_write.key	4
+offset	struct recover_write.rule_id	16
+member_size	struct recover_write.rule_id	4
+offset	struct recover_write.value	8
+member_size	struct recover_write.value	4
+offset	struct recover_write.verify_mask	12
+member_size	struct recover_write.verify_mask	4
+offset	struct recover_write.width	4
+member_size	struct recover_write.width	4
+size	struct serial_setup	20
+align	struct serial_setup	4
+offset	struct serial_setup.actual	4
+member_size	struct serial_setup.actual	4
+offset	struct serial_setup.clk	8
+member_size	struct serial_setup.clk	4
+offset	struct serial_setup.count	12
+member_size	struct serial_setup.count	2
+offset	struct serial_setup.exact	15
+member_size	struct serial_setup.exact	1
+offset	struct serial_setup.has_fifo	16
+member_size	struct serial_setup.has_fifo	1
+offset	struct serial_setup.mode	17
+member_size	struct serial_setup.mode	1
+offset	struct serial_setup.sysclk_8mhz	14
+member_size	struct serial_setup.sysclk_8mhz	1
+offset	struct serial_setup.vfast_div	18
+member_size	struct serial_setup.vfast_div	1
+offset	struct serial_setup.want	0
+member_size	struct serial_setup.want	4
+enum	APPMEM_ANON	3
+enum	APPMEM_EXEC_ARENA	4
+enum	APPMEM_EXEC_INITIAL	2
+enum	APPMEM_EXEC_LARGE	5
+enum	APPMEM_LIBC_INITIAL	1
+enum	EXEC_ERR_FAULT	4294967294
+enum	EXEC_ERR_GENERAL	4294967295
+enum	EXEC_ERR_INVALID	4294967291
+enum	EXEC_ERR_NOMEM	4294967292
+enum	EXEC_ERR_NOT_FOUND	4294967293
+enum	EXEC_SUCCESS	0
+enum	REC_ABORT	1
+enum	REC_AFTER	2
+enum	REC_ARG_READ	1
+enum	REC_ARG_SAVED	2
+enum	REC_ARMED	2
+enum	REC_BAR_MMIO	1
+enum	REC_BAR_VRAM	2
+enum	REC_BEFORE	1
+enum	REC_BUDGET_GF	1
+enum	REC_BUDGET_S0	0
+enum	REC_BUDGET_SIZE_BARS	2
+enum	REC_BUS	7
+enum	REC_COLD	1
+enum	REC_CONFIG	6
+enum	REC_CONTRACT	4
+enum	REC_DATA	3
+enum	REC_EXPR	3
+enum	REC_FAILED	7
+enum	REC_FORCE	4
+enum	REC_IDLE	0
+enum	REC_IMM	0
+enum	REC_LITERAL	0
+enum	REC_LOCAL	2
+enum	REC_LOCAL_DATA	1
+enum	REC_LOCAL_INDEX	3
+enum	REC_LOCAL_LOCK	2
+enum	REC_LOCAL_UNLOCK	0
+enum	REC_LOG	9
+enum	REC_N1	1
+enum	REC_NORMAL	0
+enum	REC_OPERATION	3
+enum	REC_PAUSED	4
+enum	REC_PC98_IO	3
+enum	REC_PCI_CFG	0
+enum	REC_PHASE_NONE	0
+enum	REC_PHASE_QUIESCE	2
+enum	REC_PHASE_RESTORE	3
+enum	REC_PHASE_ROUTE	4
+enum	REC_PHASE_SAVE	1
+enum	REC_PHASE_SCREEN	5
+enum	REC_PHASE_VERIFY	6
+enum	REC_PREPARE	1
+enum	REC_QUIESCE	4
+enum	REC_RANGE	2
+enum	REC_READ	0
+enum	REC_REQUEST_NOW	0
+enum	REC_REQUEST_STATUS	1
+enum	REC_RESTORE	5
+enum	REC_RESTORING	5
+enum	REC_ROUTE	6
+enum	REC_RUN	2
+enum	REC_RUNNING	3
+enum	REC_RW	0
+enum	REC_SAVED	4
+enum	REC_SCREEN	7
+enum	REC_SELECT	2
+enum	REC_SET	1
+enum	REC_SIZE_BARS	0
+enum	REC_SNAPSHOT	5
+enum	REC_SNAPSHOTTING	1
+enum	REC_TIMEOUT	2
+enum	REC_UNCLASSIFIED	3
+enum	REC_VERIFIED	6
+enum	REC_VERIFY	8
+enum	REC_VERIFY_PHASE	8
+enum	REC_VGA_DIRECT	4
+enum	REC_VGA_INDEXED	5
+enum	REC_VRAM_TEST	3
+enum	REC_W1C	2
+enum	REC_WRITE	1

@@ -20,14 +20,14 @@ CONSTANTS = dict(
     MAGIC=0x444f4d4b, FORMAT_VERSION=1,
     PHASE_POST_ROOT=2, FLAG_PAIR=1,
 )
-# Fixed resident record budget; adding an eleventh component needs a new decision.
-MODULE_RECORD_CAP = 10
+# PM HWDEV decision: preserve the first ten policies, append HWDEV.
+MODULE_RECORD_CAP = 11
 KDEBUG_OPS_NAMES = (
     'selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
     'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
     'gcap_active', 'gcap_keep_if', 'gcap_insn_abort', 'gcap_port_passed',
     'gcap_pass_in', 'gcap_pass_out', 'gcap_note_in', 'gcap_note_out',
-    'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace', 'dbg_call',
+    'gcap_detach', 'gcap_release', 'nic_selftest', 'nic_trace', 'dbg_call', 'hwdev_core_get',
 )
 # These fields also define struct module_component_policy's generated row order.
 POLICY_FIELDS = (
@@ -41,7 +41,7 @@ COMPONENTS = (
         dependencies=(), required=False,
         module_id=1, phase=CONSTANTS['PHASE_POST_ROOT'],
         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-        stop_allowed=0, ops_version=3, ops_slots=len(KDEBUG_OPS_NAMES),
+        stop_allowed=0, ops_version=4, ops_slots=len(KDEBUG_OPS_NAMES),
         image_max=262144, mem_max=262144,
         reloc_max=16384, import_max=1024, export_max=64, load_span_max=524288,
         init_symbol='kdebug_init', imports_symbol='kdebug_import_slots',
@@ -163,6 +163,14 @@ COMPONENTS = (
         init_symbol='cirrus_module_init', imports_symbol='cirrus_import_slots',
         ops_symbol='cirrus_module_ops', ops_names=('initialize',),
     ),
+    dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
+         module_id=11, phase=CONSTANTS['PHASE_POST_ROOT'],
+         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+         stop_allowed=0, ops_version=1, ops_slots=1,
+         image_max=196608, mem_max=196608, load_span_max=262144,
+         reloc_max=16384, import_max=128, export_max=1,
+         init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
+         ops_symbol='hwdev_ops', ops_names=('initialize',)),
 )
 
 

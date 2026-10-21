@@ -44,7 +44,7 @@ $(KDEBUG_OUT)/kdebug_import_stubs.o: $(KDEBUG_GEN)/kdebug_import_stubs.S build/c
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 
 $(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OBJS) build/module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -Map=$(KDEBUG_OUT)/kdebug.map -T build/module.ld $(KDEBUG_OBJS) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -Map=$(KDEBUG_OUT)/kdebug.map -T build/module.ld $(KDEBUG_OBJS) $(KDEBUG_OUT)/hwdev_core.o -o $@
 
 # Values come from their authoritative definitions, including before S1b's bump.
 KDEBUG_KAPI_GEN = $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])')
@@ -72,3 +72,17 @@ kernel/module_image.o kernel/module_runtime.o $(R1_OBJ)/kernel/module.o \
     $(KERNEL_OBJ_PREFIX)kernel/module.o $(KERNEL_OBJ_PREFIX)kernel/module_image.o \
     $(KERNEL_OBJ_PREFIX)kernel/module_runtime.o: $(MODULE_SCHEMA)
 -include $(KDEBUG_OBJS:.o=.d) $(KDEBUG_KEXPORT_OBJ:.o=.d)
+
+# One shared contract, compiled with the kernel machine/ABI flags.
+HWDEV_GEN := hwdev/generated
+HWDEV_HEADERS := $(wildcard include/*.h kernel/*.h drivers/*.h lib/*.h fs/*.h exec/*.h gfx/*.h arch/x86/*.h platform/pc98/*.h sdk/include/os32/*.h kdebug/*.h)
+HWDEV_GENERATED := $(addprefix $(HWDEV_GEN)/,hwdev_contract.h hwdev_core.c hwdev_imports.h hwdev_layout.txt)
+$(HWDEV_GENERATED) &: tools/gen_hwdev_contract.py tools/hwdev_layout.json docs/tasks/realhw/design/HWDEV_CORE_API.md $(HWDEV_HEADERS)
+	python3 tools/gen_hwdev_contract.py --cc $(CROSS_DIR)/bin/i386-elf-gcc --flags '$(filter-out -MMD -MP,$(KERNEL_CFLAGS))' --includes '$(INC_KERNEL)'
+$(KDEBUG_OUT)/hwdev_core.o: $(HWDEV_GEN)/hwdev_core.c $(HWDEV_GEN)/hwdev_contract.h
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(HWDEV_GEN) -c $< -o $@
+$(KDEBUG_OUT)/kdebug_main.o kernel/hwdev_module.o $(KERNEL_OBJ_PREFIX)kernel/hwdev_module.o $(R1_OBJ)/kernel/hwdev_module.o: $(HWDEV_GENERATED)
+$(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OUT)/hwdev_core.o
+
+-include $(KDEBUG_OUT)/hwdev_core.d

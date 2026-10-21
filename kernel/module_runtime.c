@@ -104,6 +104,9 @@ int module_load(const struct module_request *q, struct module_handle *out)
     r->prefix_pages = h[MI_PAYLOAD_OFF] / PAGE_SIZE;
     r->text = r->base + h[MI_TEXT_OFF];
     r->text_size = h[MI_TEXT_SIZE];
+    r->ro = r->base + h[MI_RO_OFF];
+    r->ro_size = h[MI_RO_SIZE];
+    r->image_crc = h[MI_IMAGE_CRC];
     r->init = r->base + h[MI_INIT];
     r->state = MODULE_RELOCATED;
     return 0;

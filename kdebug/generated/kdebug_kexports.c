@@ -619,4 +619,5 @@ const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = 
     [15] = {0x75aae460u, 1, 0},
     [17] = {0x51f56217u, 1, 0},
     [18] = {0x2283f8adu, 1, 0},
+    [19] = {0x0d773974u, 1, 0},
 };

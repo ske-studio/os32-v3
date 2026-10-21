@@ -22,6 +22,7 @@ def rejected(rows, validator=schema.validate_components):
 
 def fixtures(validator=schema.validate_components):
     rows = copy.deepcopy(schema.COMPONENTS)
+    assert rows[10]["name"] == "HWDEV" and rows[10]["module_id"] == 11
     validator(rows)
     assert rejected(rows[:-1], validator), 'missing component accepted'
     for change in ('duplicate', 'unknown', 'cycle', 'missing-dependency', 'duplicate-dependency'):
@@ -38,22 +39,24 @@ def fixtures(validator=schema.validate_components):
             bad[2]['dependencies'] = (2, 2)
         assert rejected(bad, validator), change
     extra = copy.deepcopy(rows[0])
-    extra.update(module_id=11, name='EXTRA', path='/boot/extra.mod', dependencies=())
-    assert rejected((*rows, extra), validator), 'eleventh ID accepted'
+    extra.update(module_id=12, name='EXTRA', path='/boot/extra.mod', dependencies=())
+    assert rejected((*rows, extra), validator), 'twelfth ID accepted'
 
 
 def conformance():
     assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale schema'
     config = (ROOT / 'include/config.h').read_text()
     deployed = yaml.safe_load((ROOT / 'build/core.yaml').read_text())['filesystem']['files']
-    expected = [row['path'].split('/')[-1] for row in schema.COMPONENTS]
+    # M2 admits synthetic HWDEV; production image/deployment belongs to M3a/M5.
+    distributed = schema.COMPONENTS[:10]
+    expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()
     paired = re.search(r'^KERNEL_PAIRED_MODULES := (.*)$', build, re.M)[1]
     assert paired.split() == ['$(BUILD_OUT)/' + name for name in expected], 'paired build list'
     actual = [row for row in deployed if row['guest'].endswith(('.mod', '/kdebug.bin'))]
     assert [(row['host'], row['guest'], row['tags']) for row in actual] == [
         ('build/out/' + name, row['path'], ['core'])
-        for name, row in zip(expected, schema.COMPONENTS)], 'core distribution list'
+        for name, row in zip(expected, distributed)], 'core distribution list'
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
         adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
@@ -61,7 +64,11 @@ def conformance():
         path_macro = re.search(r'\.path = (SYS_\w+)', source)[1]
         assert re.search(r'^#define ' + path_macro + r'\s+"' + re.escape(row['path']) + '"', config, re.M), row
         assert 'MODULE_ID_' + row['name'] in source, row
-        if row['dependencies']:
+        if row['name'] == 'HWDEV':
+            assert row['dependencies'] == (schema.CONSTANTS['ID_KDEBUG'],)
+            assert '.dependencies = &core_handle, .dependency_count = 1' in source
+            assert '(void)hwdev_module_load(handle);' in (ROOT/'kernel/module.c').read_text()
+        elif row['dependencies']:
             assert row['dependencies'] == (schema.CONSTANTS['ID_SQLITE'],)
             assert '.dependencies = &sqlite, .dependency_count = 1' in source
             engine = (ROOT / 'kernel/sqlite_engine.c').read_text()
@@ -95,8 +102,8 @@ def main():
         try:
             fixtures(namespace['validate_components'])
         except AssertionError as exc:
-            assert str(exc) == 'eleventh ID accepted', exc
-            print('MUTATE capacity-check-removed RED (compiled Python, runtime eleventh ID)')
+            assert str(exc) == 'twelfth ID accepted', exc
+            print('MUTATE capacity-check-removed RED (compiled Python, runtime twelfth ID)')
         else:
             raise AssertionError('capacity mutant survived')
 

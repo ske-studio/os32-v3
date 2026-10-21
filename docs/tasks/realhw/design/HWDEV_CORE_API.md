@@ -1,6 +1,6 @@
 # HWDEV の核の API・private ABI・台帳 — 参照の表
 
-> 状態: **設計中 (2026-10-22)** — 確定 (G1〜G5 を反映)、M1 で計測・ABI 契約を具体化、後続実装は未着手 ([TASK_HWDEV.md](../TASK_HWDEV.md))。
+> 状態: **確定 (M1 で §7〜§9 を追記)** ([TASK_HWDEV.md](../TASK_HWDEV.md))。
 > 出所: ~/os32-tmp/run/devmod/DESIGN.final.md を 2026-10-22 に粒度別に分けて写した。
 
 核 (kdebug) と装置部品 (`/boot/hwdev.mod`) の境界の番号・型・定義だけを置く。分け方と理由は [HWDEV_DESIGN.md](HWDEV_DESIGN.md) §4。i386 cdecl、u32 固定、size/version は完全一致で照合する。
@@ -104,13 +104,11 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 - kdebug ではこれらを生成 stub (`kdebug_import_stubs.S`) が `jmp *kdebug_import_slots+N` で呼ぶので、HWDEV に同じ stub をリンクすると kdebug の slot を指して未解決になる。
 - HWDEV は自分の .def から `hwdev_import_stubs.S` と `hwdev_import_slots` を生成し、§2 の核の関数と kernel の関数を 1 つの表に並べる。`kdebug_import_stubs.o` は HWDEV にリンクしない。
 - gfinit.c・gfinit_resources.c は `generated/kdebug_import_macros.h` を取り込むが getter マクロは使っていない — 取り込みを HWDEV の生成物に差し替える。
-- 表は facade が開始前に充填する (§1)。依存 handle だけで symbol を解決したとは扱わない。
+- 表は facade が開始前に充填する (§1)。slot 25〜34 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
 
 ## 4. contract_crc (G4)
 
-- 含めるもの: slot 順・全関数型と、recover.h の共有構造体 (struct recover と推移的に参照する型、recover_ops 等) のメンバ順・型・sizeof/alignof/offsetof・enum 値を i386 ABI で正規化したもの。GF が transport/log_limit/expected_node/cache.bar 等を直接扱うため、配置差は開始前に拒否する。
-- **計算の方式 (確定)**: 両方の像に、(1) 生成した `STATIC_ASSERT(sizeof/offsetof/alignof)` の表 (共有構造体の全メンバ) と、(2) 前処理後の recover.h・gfinit*.h を空白とコメントを除いて正規化したテキストの CRC を埋め込み、読み込み時にその 2 つを照合する。型を自前で解析する生成器は作らない。
-- CRC は破損・取り違えの検出で、権限の根拠ではない。profile CRC・plan hash・部品 CRC・核 CRC の役割分担は [HWDEV_DESIGN.md](HWDEV_DESIGN.md) §4。
+生成入力・正規化・照合の方式は §8 を正とする。
 
 ## 5. 部品の台帳の 11 枠目 (PM 決定 2026-10-22)
 
@@ -167,7 +165,8 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 5. 配置の正規形は UTF-8/LF、各行 `kind\tname\tdecimal-u32\n` (kind は size/align/offset/member_size/enum)。`layout_crc` はその全 byte の CRC-32/ISO-HDLC (`zlib.crc32(data) & 0xffffffff`)。これは配置表の指紋であり、テキスト CRC と別に保持する。
 6. umbrella を同じクロスコンパイラで `-E -P`。行番号とコメントは含めず、文字列/文字リテラル内部を維持して外側の空白を除く。リテラルの escape は展開・変更しない。日時・絶対パス等のビルド依存マクロを共有ヘッダで使わない。正規化 slot 宣言は `core:<index>:<symbol>:<declaration>\n` と `kernel:<index>:<symbol>:<declaration>\n` の順 (declaration は同じ空白正規化)。最後に正規化ヘッダテキストを連結した UTF-8 byte 列の同じ CRC-32 を `contract_crc` とする。署名の const・引数順・callback 型、enum・配列長の変更も対象となる。
 7. `hwdev_identity` は §1 の32Bを維持。`hwdev_core_api` の固定 prefix は `u32 abi, size, contract_crc, layout_crc` (16B) に確定し、その後に §2 の25ポインタ (計116B、abi=1)。manifest にも `layout_crc` を持たせ、M2 は version/size、両 CRC、PAIR と core image CRC の完全一致を登録前に検査する。CRC 値 0 を未指定/wildcard にしない。
-8. M3a の受入は生成の再実行で差分0、両像の assert 通過、関数順・署名・enum 値・同サイズのメンバ交換・callback の const を片側で変更した負例が照合失敗。生成器はどちらかの像だけを正として自動的に追認せず、一組の契約を生成する。
+8. M2 の生成器は `tools/gen_hwdev_contract.py`、配置 inventory は `tools/hwdev_layout.json`、共通生成物は `hwdev/generated/`。KMOD の `module_abi_gen` は `contract_crc` と同値。kernel の facade も同じ CRC・配置 assert を使い、core 表全体の RO span と25関数の text 範囲を照合してから slot を充填する。module runtime は検証済みの RO 範囲と IMAGE_CRC を record に保持する。
+9. M3a の受入は生成の再実行で差分0、両像の assert 通過、関数順・署名・enum 値・同サイズのメンバ交換・callback の const を片側で変更した負例が照合失敗。生成器はどちらかの像だけを正として自動的に追認せず、一組の契約を生成する。
 
 ## 9. 部品の寿命 manifest v1 (M2/M3a の入力契約)
 

@@ -57,7 +57,7 @@ def main():
             if generated.suffix in ('.c', '.h', '.S', '.json'):
                 assert generated.read_bytes() == (folder / generated.name).read_bytes(), generated
         cross = Path(os.environ['CROSS_DIR']) / 'bin'
-        inc = [*INCLUDES, '-I' + td]
+        inc = [*INCLUDES, '-I' + td, '-I' + str(ROOT/'hwdev/generated')]
         host = ['gcc', *FLAGS, *inc, '-nostdlib', '-static', '-no-pie']
         exe = folder / 'init'
         harness = ROOT / 'tools/tests/kdebug_init_host.c'
@@ -107,7 +107,7 @@ def main():
                     ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c', ROOT / 'kdebug/kdebug_window.c', ROOT / 'kdebug/gfinit_bus.c',
                     ROOT / 'kdebug/gfinit.c', ROOT / 'kdebug/gfinit_plan.c', ROOT / 'kdebug/gfinit_resources.c', ROOT / 'kdebug/gfinit_decode.c', ROOT / 'kdebug/gfinit_exec.c', ROOT / 'kdebug/gfinit_pll.c', ROOT / 'kdebug/recover_gf.c',
                     ROOT / 'kdebug/kpeek_allow.c', ROOT / 'kdebug/recover.c',
-                    ROOT / 'kdebug/recover_profile.c', source,
+                    ROOT / 'kdebug/recover_profile.c', ROOT / 'hwdev/generated/hwdev_core.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
             command([cross / 'i386-elf-gcc', '-DRECOVER_MODULE', *FLAGS, *inc, '-c', src, '-o', obj])

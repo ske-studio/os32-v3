@@ -1,5 +1,6 @@
 /* POST_ROOT debug module: validate privately, publish once, retain body only. */
 #include "module.h"
+#include "hwdev_module.h"
 #include "module_runtime.h"
 #include "kdebug_imports.h"
 #include "bootinfo.h"
@@ -73,5 +74,6 @@ void kdebug_load(void)
     kdebug.base_pa = record->backing;
     kdebug.pages = record->pages;
     kdebug.state = KDEBUG_RUNNING;
+    (void)hwdev_module_load(handle);
     kprintf(0x07, "[kdebug] running pair %08x\n", kdebug.pair_crc);
 }

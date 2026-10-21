@@ -1,7 +1,7 @@
 /* Actual S6 owner/request/ROM lifetime code. Platform and trial engine are
  * injected contracts; bus/decoder/plan internals have separate real tests. */
 #include "../../kdebug/gfinit.c"
-#define TEST_PAGE_BUDGET 267U
+#define TEST_PAGE_BUDGET GF_WORK_MAX_PAGES
 #define TEST_ARENA_PAGES 512U
 /* Contiguous physical pages, ascending first-fit as in pgalloc. Foreign pages
  * split the arena; they are never owned or returned by the GF owner. */

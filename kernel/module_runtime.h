@@ -43,6 +43,7 @@ struct module_request {
 struct module_record {
     u32 owner, generation, state, module_id, pair_crc;
     u32 backing, pages, prefix_pages, base, text, text_size, init;
+    u32 ro, ro_size, image_crc;
     u32 exports[MODULE_RUNTIME_SLOTS + 1];
     struct module_handle dependencies[MODULE_DEPENDENCY_CAP];
     u32 dependency_count;

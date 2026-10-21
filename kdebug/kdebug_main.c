@@ -1,4 +1,5 @@
 #include "kernel/module.h"
+#include "hwdev/generated/hwdev_contract.h"
 #include "crt_diag.h"
 #include "nic_trace.h"
 #include "kernel/kselftest.h"
@@ -148,7 +149,8 @@ const struct kdebug_ops kdebug_ops = {
     .gcap_release = v86_gcap_release,
     .nic_selftest = 0,
     .nic_trace = nic_trace,
-    .dbg_call = recovery_call
+    .dbg_call = recovery_call,
+    .hwdev_core_get = hwdev_core_get
 };
 
 /* No imports, allocation, device access or registration during init. */
