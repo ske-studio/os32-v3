@@ -1,7 +1,7 @@
 /* Real T1 core, fake bus/clock/serial. ILP32, no libc, host32 qemu runner. */
 #include "../../kdebug/recover.c"
 
-#define NREG 8U
+#define NREG 16U
 #define TRACE_MAX 256U
 #define DATA0 1U
 #define DATA1 2U
@@ -20,6 +20,8 @@ struct fake {
     struct recover_identity id;
     bool ready, raw_fail, decode_fail, screen_fail, abort, route_fail;
     bool route_read_fail, route_stuck, log_fail, snapshot_early;
+    bool owned, screen_done, abort_selected, break_guard, restore_index;
+    u32 releases, local_calls, selected_value, last_offset, last_dir, extra_bars[2];
     struct recover *core;
 };
 static int fails;
@@ -44,15 +46,18 @@ static void note(struct fake *f, char op, u32 key, u32 value)
 static u32 ticks(void *v) { return ((struct fake *)v)->tick; }
 static int identity(void *v, struct recover_identity *out)
 { *out = ((struct fake *)v)->id; return 0; }
-static int ready(void *v) { return !((struct fake *)v)->ready; }
-static int config(void *v, u32 *command, u32 *bar)
+static int ready(void *v) { struct fake *f = v; f->screen_done = false; return !f->ready; }
+static int config(void *v, u32 *command, u32 bar[3])
 {
     struct fake *f = v; f->config_reads++; note(f, 'c', 0, 0);
-    *command = f->command; *bar = f->bar; return f->raw_fail;
+    *command = f->command; bar[0] = f->bar; bar[1] = f->extra_bars[0]; bar[2] = f->extra_bars[1]; return f->raw_fail;
 }
-static int read_bus(void *v, u32 key, u32 width, u32 *out)
+static int read_bus(void *v, const struct recover_bus_access *a, u32 *out)
 {
+    u32 key = a->key, width = a->width;
     struct fake *f = v; (void)width;
+    f->last_offset = a->offset; f->last_dir = a->dir_substep;
+    if (a->dir_substep == REC_SELECT) { *out = f->selected_value; return 0; }
     note(f, 'r', key, 0); f->tick += f->tick_read;
     if (f->core->state == REC_SNAPSHOTTING && f->core->valid &&
         f->core->saved_count < f->core->profile->count)
@@ -62,9 +67,19 @@ static int read_bus(void *v, u32 key, u32 width, u32 *out)
     if (key == f->bad_verify) *out ^= 1;
     return 0;
 }
-static int write_bus(void *v, u32 key, u32 width, u32 value)
+static int write_bus(void *v, const struct recover_bus_access *a, u32 value)
 {
+    u32 key = a->key, width = a->width;
     struct fake *f = v; (void)width;
+    CHECK(!f->screen_done);
+    if (key == OUTPUT) CHECK(!f->owned);
+    f->last_offset = a->offset; f->last_dir = a->dir_substep;
+    if (a->dir_substep == REC_SELECT) {
+        f->selected_value = value; f->owned = true;
+        if (f->abort_selected) f->abort = true;
+        note(f, 'i', key, value); return 0;
+    }
+    if (f->break_guard && a->dir_substep == REC_DATA) f->values[8] = 1;
     note(f, 'w', key, value); f->tick += f->tick_write;
     if (key == f->fail_write) return -1;
     CHECK(key < NREG); f->values[key] = value; return 0;
@@ -83,7 +98,7 @@ static int route_write(void *v, u32 value)
 static int screen_safe(void *v)
 { struct fake *f = v; note(f, 'd', 0, 0); return f->decode_fail; }
 static int screen_restore(void *v)
-{ struct fake *f = v; note(f, 'v', 0, 0); return f->screen_fail; }
+{ struct fake *f = v; note(f, 'v', 0, 0); f->screen_done = true; return f->screen_fail; }
 static int abort_requested(void *v, u32 session)
 {
     struct fake *f = v; CHECK(session == f->core->token.session);
@@ -96,13 +111,39 @@ static int event(void *v, enum recover_state state, u32 session)
     if (state == REC_PAUSED) f->tick += f->tick_pause;
     return f->log_fail;
 }
+static int local_cleanup(void *v)
+{
+    struct fake *f = v; f->local_calls++;
+    int rc = 0;
+    CHECK(f->core->restore_tick == f->tick);
+    if (f->owned) {
+        CHECK(!f->screen_done);
+        if (f->restore_index) {
+            for (u32 i = f->core->local_saved_count; i > 0; i--) {
+                struct recover_local_saved *s = &f->core->local_saved[i - 1];
+                u32 value = s->value;
+                if (recover_access(f->core, RECOVER_NONE, s->dir_substep, s->key, 1, &value)) { rc = -1; break; }
+            }
+        }
+        f->owned = false; f->releases++;
+    }
+    note(f, 'l', 0, 0); return rc;
+}
 static const struct recover_ops ops = {
     ticks, identity, ready, config, read_bus, write_bus, route_read, route_write,
-    screen_safe, screen_restore, abort_requested, event
+    screen_safe, screen_restore, abort_requested, local_cleanup, event
 };
 static struct recover_reg regs[2];
 static struct recover_write quiet[3];
 static struct recover_profile profile;
+static struct recover_target targets[NREG];
+static struct recover_rule rules[16];
+static struct recover_plan_node nodes[1];
+static struct recover_plan_entry entries[1];
+static const struct recover_opcode_layout layouts[] = {{0, 0, 0, 0, RECOVER_NONE}};
+static struct recover_plan plan;
+static u32 flow[RECOVER_NODE_MAX * RECOVER_BITS_WORDS], valid_bits[RECOVER_BITS_WORDS];
+static struct recover_plan_buffers buffers = { flow, valid_bits };
 static struct recover r;
 static struct fake f;
 static void setup(bool cold)
@@ -112,15 +153,35 @@ static void setup(bool cold)
         .bad_verify = BAD_KEY, .route = 0xFC, .core = &r,
         .id = {1, 2, 3, 4, 5, 6, 7, 0x10000000UL} };
     for (u32 i = 0; i < NREG; i++) f.values[i] = INITIAL;
-    regs[0] = (struct recover_reg){DATA0, 1, MASK, MASK, cold ? REC_COLD : REC_RW, true};
-    regs[1] = (struct recover_reg){DATA1, 1, MASK, MASK, REC_RW, true};
-    quiet[0] = (struct recover_write){OUTPUT, 4, 0, ~0UL};
-    quiet[1] = (struct recover_write){LEGACY, 4, 0, ~0UL};
-    quiet[2] = (struct recover_write){IRQ, 4, 0, ~0UL};
-    profile = (struct recover_profile){ .version = 1, .regs = regs, .count = 2,
+    regs[0] = (struct recover_reg){DATA0, 1, MASK, MASK, cold ? REC_COLD : REC_RW, true, 0};
+    regs[1] = (struct recover_reg){DATA1, 1, MASK, MASK, REC_RW, true, 1};
+    quiet[0] = (struct recover_write){OUTPUT, 4, 0, ~0UL, 2};
+    quiet[1] = (struct recover_write){LEGACY, 4, 0, ~0UL, 3};
+    quiet[2] = (struct recover_write){IRQ, 4, 0, ~0UL, 4};
+    for (u32 i = 0; i < NREG; i++) targets[i] = (struct recover_target){
+        .space = REC_PC98_IO, .offset = i * 4, .index = RECOVER_NONE,
+        .width = i == DATA0 || i == DATA1 ? 1 : 4, .access = REC_RW, .read_safe = 1 };
+    if (cold) targets[DATA0].access = REC_COLD;
+    for (u32 i = 0; i < 5; i++) rules[i] = (struct recover_rule){
+        .id = i, .key = i + 1, .phase = i < 2 ? REC_RESTORE : REC_QUIESCE,
+        .main_id = RECOVER_NONE, .pc = RECOVER_NONE, .substep = REC_WRITE,
+        .write_mask = i < 2 ? MASK : ~0U, .verify_mask = i < 2 ? MASK : ~0U,
+        .value = { .mode = i < 2 ? REC_SAVED : REC_LITERAL, .expr_id = RECOVER_NONE } };
+    if (cold) {
+        rules[0].value.mode = REC_RANGE; rules[0].value.max = MASK;
+        f.values[DATA0] &= MASK;
+    }
+    nodes[0] = (struct recover_plan_node){ .phase = REC_PREPARE, .main_id = RECOVER_NONE,
+        .pc = RECOVER_NONE, .rule_id = RECOVER_NONE, .expr_id = RECOVER_NONE,
+        .next = {RECOVER_NONE, RECOVER_NONE} };
+    entries[0] = (struct recover_plan_entry){REC_PREPARE, RECOVER_NONE, 0};
+    plan = (struct recover_plan){ .version = 1, .nodes = nodes, .node_count = 1,
+        .ctx_count = 1, .entries = entries, .entry_count = 1 };
+    profile = (struct recover_profile){ .version = RECOVER_PROFILE_VERSION, .regs = regs, .count = 2,
         .quiesce = quiet, .quiesce_count = 3, .trial_limit = 100,
         .opcode_limit = 20, .restore_limit = 50, .max_steps = 4,
-        .max_polls = 8, .cold_required = cold };
+        .max_polls = 8, .cold_required = cold, .targets = targets, .target_count = NREG,
+        .rules = rules, .rule_count = 5, .layouts = layouts, .layout_count = 1 };
     profile.crc = recover_profile_crc(&profile);
     recover_init(&r, &ops, &f, true, false);
 }
@@ -141,7 +202,7 @@ static int change(struct recover *core, void *arg)
 {
     (void)arg;
     CHECK(core->valid && core->state == REC_RUNNING);
-    f.values[DATA0] = 0xB9; f.values[DATA1] = 0xC9;
+    f.values[DATA0] = profile.cold_required ? (0xB9 & MASK) : 0xB9; f.values[DATA1] = 0xC9;
     f.tick += f.op_ticks;
     return 0;
 }
@@ -154,20 +215,36 @@ static int polling(struct recover *core, void *arg)
         if (recover_safe_point(core)) return -1;
     return 0;
 }
+static int bound_begin(struct recover *core, const struct recover_profile *p, u32 seed, u32 budget)
+{
+    (void)seed;
+    u32 hash;
+    if (!core->plan) {
+        plan.profile_crc = p->crc;
+        if (recover_bind_plan(core, p, &plan, &buffers, &hash)) return -1;
+    }
+    int rc = trial_begin(core, p, core->bound_hash, budget);
+    if (!rc) {
+        core->state = REC_RUNNING;
+        CHECK(recover_plan_enter(core, 0) == 0 && recover_plan_leave(core, 0) == 0);
+        core->state = REC_PAUSED;
+    }
+    return rc;
+}
 static void begin(void)
 {
-    CHECK(trial_begin(&r, &profile, 123, 100) == 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) == 0);
     CHECK(r.state == REC_PAUSED && r.valid && !r.in_call);
     CHECK(!f.snapshot_early);
 }
 static void preconditions(void)
 {
     setup(false); r.enabled = false;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0);
     CHECK(trial_step(&r, &r.token, true, change, 0) < 0);
     CHECK(trial_end(&r, &r.token, REC_NORMAL) < 0 && writes() == 0);
     setup(false); f.ready = false;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
     for (u32 i = 0; i < 8; i++) {
         setup(false);
         switch (i) {
@@ -181,13 +258,13 @@ static void preconditions(void)
         case 7: regs[0].verify_mask = 0x100; break;
         }
         profile.crc = recover_profile_crc(&profile);
-        CHECK(trial_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
+        CHECK(bound_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
     }
     setup(false); profile.crc ^= 1;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
     setup(false);
-    CHECK(trial_begin(&r, &profile, 123, 0) < 0);
-    CHECK(trial_begin(&r, &profile, 123, RECOVER_HALF_TICKS) < 0);
+    CHECK(bound_begin(&r, &profile, 123, 0) < 0);
+    CHECK(bound_begin(&r, &profile, 123, RECOVER_HALF_TICKS) < 0);
     CHECK(writes() == 0);
 }
 static void normal(void)
@@ -202,7 +279,7 @@ static void normal(void)
     }
     CHECK(j == 4);
     u32 n = f.n;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0 && f.n == n);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0 && f.n == n);
     CHECK(recover_request(&r, &r.token, REC_REQUEST_STATUS) < 0);
     CHECK(trial_step(&r, &r.token, false, change, 0) < 0 && f.n == n);
     CHECK(trial_step(&r, &r.token, true, change, 0) == 0);
@@ -220,7 +297,7 @@ static void normal(void)
     n = f.n;
     CHECK(trial_end(&r, &r.token, REC_ABORT) == 0 && f.n == n);
     CHECK(recover_request(&r, &r.token, REC_REQUEST_NOW) == 0 && f.n == n);
-    CHECK(trial_begin(&r, &profile, 123, 100) == 0 && r.token.session == 2);
+    CHECK(bound_begin(&r, &profile, 123, 100) == 0 && r.token.session == 2);
 }
 static void mismatches(void)
 {
@@ -307,7 +384,7 @@ static void callback_timing(void)
                     f.delay_abort_call = f.abort_calls + (step ? 2 : 1);
                 } else f.tick_pause = delay;
                 int rc = step ? trial_step(&r, &r.token, true, change, 0) :
-                    trial_begin(&r, &profile, 123, 100);
+                    bound_begin(&r, &profile, 123, 100);
                 CHECK(rc < 0 && r.state == REC_FAILED && r.reason == REC_TIMEOUT);
                 CHECK(r.s0_verified && !r.in_call && !r.in_opcode);
                 CHECK(count('s', REC_RESTORING) == 1);
@@ -327,13 +404,20 @@ static void callback_timing(void)
 static void failures(void)
 {
     setup(false); f.fail_read = DATA1;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0);
     CHECK(r.state == REC_FAILED && !r.valid && r.saved_count == 1);
     CHECK(r.reason == REC_SNAPSHOT && count('w', DATA0) == 1 && count('w', DATA1) == 0);
     CHECK(r.s0_verified && !f.snapshot_early);
     setup(false); f.fail_write = OUTPUT;
-    CHECK(trial_begin(&r, &profile, 123, 100) < 0);
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0);
     CHECK(count('w', OUTPUT) == 1 && r.state == REC_FAILED && r.s0_verified);
+    CHECK(r.reason == REC_BUS && r.first_phase == REC_PHASE_QUIESCE && r.first_key == OUTPUT);
+    setup(false); f.bad_verify = OUTPUT;
+    CHECK(bound_begin(&r, &profile, 123, 100) < 0);
+    CHECK(r.reason == REC_VERIFY && r.first_phase == REC_PHASE_QUIESCE && r.first_key == OUTPUT);
+    setup(false); begin(); f.fail_write = DATA0;
+    CHECK(trial_end(&r, &r.token, REC_NORMAL) < 0);
+    CHECK(r.reason == REC_BUS && r.first_phase == REC_PHASE_RESTORE && r.first_key == DATA0);
     setup(false); begin(); CHECK(trial_step(&r, &r.token, true, error_op, 0) < 0);
     CHECK(r.state == REC_FAILED && r.reason == REC_OPERATION && r.s0_verified);
     setup(false); begin(); f.abort = true;
@@ -341,7 +425,7 @@ static void failures(void)
     CHECK(r.state == REC_VERIFIED && r.reason == REC_ABORT);
     setup(false); begin(); f.bad_verify = DATA0; f.n = 0;
     CHECK(trial_end(&r, &r.token, REC_NORMAL) < 0);
-    CHECK(r.state == REC_FAILED && r.reason == REC_VERIFY && r.first_key == DATA0);
+    CHECK(r.state == REC_FAILED && r.reason == REC_VERIFY && r.first_phase == REC_PHASE_RESTORE && r.first_key == DATA0);
     CHECK(count('w', DATA1) == 0 && r.s0_verified);
     setup(false); begin(); f.log_fail = true;
     CHECK(trial_step(&r, &r.token, true, change, 0) < 0 && r.state == REC_FAILED);
@@ -372,7 +456,7 @@ static void cold_and_config(void)
             CHECK(r.state == ((cfg || reason >= 2) ? REC_FAILED : REC_VERIFIED));
             CHECK((rc < 0) == (cfg || reason >= 2));
             u32 n = f.n;
-            CHECK(trial_begin(&r, &profile, 123, 100) < 0 && f.n == n);
+            CHECK(bound_begin(&r, &profile, 123, 100) < 0 && f.n == n);
             trial_end(&r, &r.token, REC_ABORT); CHECK(f.n == n);
         }
     }
@@ -381,7 +465,7 @@ static void cold_and_config(void)
         if (cfg == 0) f.command = 0;
         if (cfg == 1) f.bar++;
         if (cfg == 2) f.raw_fail = true;
-        CHECK(trial_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
+        CHECK(bound_begin(&r, &profile, 123, 100) < 0 && writes() == 0);
         CHECK(r.state == REC_FAILED && r.s0_verified);
     }
 }
@@ -414,10 +498,12 @@ static void routes(void)
     CHECK(trial_end(&r, &r.token, REC_NORMAL) < 0);
     CHECK(writes() == 1 && count('A', RECOVER_ROUTE_PORT) == 1 && r.s0_verified);
 }
+#include "recover_descriptor_host.inc"
+
 void _start(void)
 {
     preconditions(); normal(); mismatches(); timing(); callback_timing();
-    failures(); cold_and_config(); routes();
+    failures(); cold_and_config(); routes(); descriptor_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }
