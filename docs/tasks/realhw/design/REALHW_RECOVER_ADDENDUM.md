@@ -231,3 +231,9 @@ struct recover_opcode_layout {
 - COPY2行と非PLL一時再生3行は既存EXPR/capture契約により本番ruleへ追加する；1700hのCOPY宛先はCOLDとし、実行中の一回消費と終端再生禁止を維持する。
 - 局所cleanupは保存済みCR11→CR1F→CR44 DATA→元indexの順とする；RUN許可列はCR1Fの解錠を保持する。LOCAL/SAVED SELECTには保存DATAの対象index選択だけを追加許可し、COLD DATAは再生しない。成功後は局所保存件数を0にして二重再生を防ぐ。
 - S4送りの単段PLL低入力境界は探索全体のreturnに揃え、clk<min/64の分岐と書込み列上限を合成入力/変異で検査する；version.chipの実ROM確認は未実施のまま残す。
+
+## 4a S5 の取り込みで送る項目 (2026-10-21、Opus の S5 レビュー)
+- **P2 (S6 で、実機の S8 = A2 より前に必ず)** kdebug/gfinit_bus.c:111-121・kdebug/recover_gf.c:295,297: CR1F は読みと書きで値の意味が違う — 読むと 0=LOCKED / 3=UNLOCKED、書くと 0x57=UNLOCK / 0x99=LOCK (envytools nv_vga.xml:253-259、nouveau hw.h:315)。今は局所 cleanup が保存した読み値 (0 か 3) をそのまま書き戻す。PREPARE の rule 0x1a は 0x57 を書いて verify_mask 0xff で比べるので、実機では 3 が読めて REC_VERIFY で止まる見込み (安全側だが A2 が進まない。host の fake は書いた値を返すので試験では見えない)。CR44 は拡張 CR なので CR1F を施錠した後に書くと効かないかもしれない (推測、xf86-video-nv nv_driver.c:2301-2315 は解錠したまま書く)。既存の recover_indexed_cleanup (recover_profile.c:145) は UNLOCK→DATA→LOCK→INDEX で、今回の CR11→CR1F→CR44 と食い違う → CR1F の復元は読み値から書き値へ写す (3→0x57、0→0x99)、PREPARE の verify は 3 と比べる、CR44 は施錠の前に戻す。fake も読みと書きで値が違う形にして試験する。
+- P3 tools/tests/gfinit_bus_host.c:185: 局所 cleanup の順序を確かめる試験がなく、入れ替えの変異も生き残る → trace の順の確認 1 件と変異 1 件。
+- P3 gfinit_bus.c:80 (PCI cfg の present())、:96 (legacy [A0000h,C0000h) の拒否)、:47-49 (probe の I/O・64bit BAR の拒否) に負の試験と変異が無い → それぞれ合成入力 1 件と変異 1 件。
+- P3 kdebug_window.c:89-101: SELECT と DATA が別々の窓 (別々の割込み禁止区間) で、設計 §2「index/data は一組の間だけ割込み禁止」と違う。今の OS32 には GPU に触る割込み処理が無いので実害なし → 設計の文言を今の形に合わせて書く。
