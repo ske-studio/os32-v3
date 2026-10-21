@@ -299,12 +299,10 @@ static void budget_tests(void)
         contract_targets[0].offset=0x1700;contract_targets[1].offset=0x1800;
         contract_rules[0].value=(struct recover_value){.mode=REC_EXPR,.max=~0U,.expr_id=REC_GF_EXPR_COPY_NV};
         contract_layouts[0]=(struct recover_opcode_layout){0x5f,0,7,copy_nv_layout,REC_WRITE,0};
-        for(u32 i=0;i<1365;i++) {
+        /* Every COPY shares one immutable operand tuple to stay below ARG_MAX. */
+        for(u32 i=0;i<1365;i++)
             decoded.nodes[i]=(struct recover_plan_node){.phase=REC_RUN,.main_id=0,.pc=0x123,.opcode=0x5f,
-                .rule_id=200,.expr_id=REC_GF_EXPR_COPY_NV,.arg_first=7*i,.arg_count=7,.next={i+1,i+1}};
-            /* Reuse the same immutable operand tuple to stay below ARG_MAX. */
-            decoded.nodes[i].arg_first=0;
-        }
+                .rule_id=200,.expr_id=REC_GF_EXPR_COPY_NV,.arg_first=0,.arg_count=7,.next={i+1,i+1}};
         decoded.args[0]=IMM(0);decoded.args[1]=READ(0);decoded.args[2]=READ(0);decoded.args[3]=IMM(0);
         decoded.args[4]=IMM(~0U);decoded.args[5]=IMM(0);decoded.args[6]=IMM(0);
         decoded.plan.arg_count=7;decoded.plan.node_count=1365;decoded.plan.rom_size=sizeof(rom);
@@ -372,7 +370,6 @@ static void failure_tests(void)
         else CHECK(cleanup_calls==1 && actual_count==0 && !core.plan);
     }
 }
-
 static void selection_tests(void)
 {
     for(u32 pll=0;pll<2;pll++)for(u32 selected=0;selected<8;selected++) {

@@ -12,8 +12,6 @@ check-gfinit-exec-host:
 - tools/tests/mutpar.py
 - include/types.h
 - lib/crc32_core.inc
-- build/checks.d/check-gfinit-host.mk
-- tools/check_map.d/check-gfinit-host.yaml
 - tools/tests/recover_gf_host.c
 - tools/tests/recover_gf_inventory.h
 - kdebug/gfinit_exec.c

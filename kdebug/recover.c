@@ -1683,7 +1683,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             return access_error(r, target);
         if (n && !evaluate(r, n, w, old, &expected)) return access_error(r, target);
         if (planned) *value = expected;
-        if (!w || t->access == REC_UNCLASSIFIED ||
+        if (t->access == REC_UNCLASSIFIED ||
             (n && !node_rule(n, w)) || !value_ok(&w->value, width, *value)) return access_error(r, target);
         if (dir == REC_SELECT && !(w->flags & REC_LOCAL) && *value != t->index) return access_error(r, target);
         if (dir == REC_DATA && r->port_selected[r->index_port[target]] != target) return access_error(r, target);
@@ -1755,9 +1755,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             r->head = *value == RECOVER_CR44_HEAD1;
         }
         if (node == RECOVER_NONE) bit_set(r->restored_rules, (u32)(w - r->profile->rules));
-        if (node != RECOVER_NONE) {
-            select_record(r, node, r->buffers.valid_bits);
-        }
+        if (node != RECOVER_NONE) select_record(r, node, r->buffers.valid_bits);
     }
     if (node != RECOVER_NONE) {
         for (u32 i = 0; i < r->plan->capture_count; i++)
