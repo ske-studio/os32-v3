@@ -298,6 +298,46 @@ static void finish_controls(void)
     decoded.nodes[last].next[0]=decoded.nodes[last].next[1]=RECOVER_NONE;
     CHECK(contract_bind()==0);exec_arm();
 }
+static char exec_log[4096];
+static u32 exec_log_n;
+static bool exec_log_busy;
+static int exec_log_get(void *opaque) { (void)opaque; return -1; }
+static int exec_log_ready(void *opaque) { (void)opaque; return !exec_log_busy; }
+static int exec_log_put(void *opaque, u32 byte)
+{
+    (void)opaque;
+    if (exec_log_n + 1 >= sizeof(exec_log)) return -1;
+    exec_log[exec_log_n++] = byte; exec_log[exec_log_n] = 0; return 0;
+}
+static int exec_log_wait(void *opaque, u32 us) { (void)opaque; (void)us; return 0; }
+static bool exec_log_has(const char *text)
+{
+    for (u32 i = 0; i < exec_log_n; i++) {
+        u32 n = 0;
+        while (text[n] && exec_log[i + n] && text[n] == exec_log[i + n]) n++;
+        if (!text[n]) return true;
+    }
+    return false;
+}
+static const struct recover_transport exec_transport = {
+    .get=exec_log_get, .uart={exec_log_ready,exec_log_put,exec_log_wait}, .frame_us=1042, .max_polls=4096
+};
+static void log_tests(void)
+{
+    for (u32 busy = 0; busy < 2; busy++) {
+        control_begin(); append_control(0x74, GF_INIT_C, 0x123, 0, 1, 17, 0, 0); finish_controls();
+        exec_log_n=0;exec_log[0]=0;exec_log_busy=busy;core.transport=&exec_transport;
+        CHECK((gfinit_exec_run(&core,&execution)==0)==!busy);
+        if (busy) CHECK(wait_total==0 && actual_count==0);
+        else {
+            CHECK(wait_total==17);
+            CHECK(exec_log_has("phase=gf_pre event=BEGIN main=0 pc=291 opcode=116 exec=1"));
+            CHECK(exec_log_has("phase=gf_pre event=END main=0 pc=291 opcode=116 exec=1"));
+            CHECK(exec_log_has("rc=0"));
+        }
+        core.transport=0;
+    }
+}
 static void depth_tests(void)
 {
     for(u32 repeat=0;repeat<2;repeat++)for(u32 extra=0;extra<2;extra++) {
@@ -314,6 +354,20 @@ static void depth_tests(void)
 }
 static void budget_tests(void)
 {
+    CHECK(recover_gf_template.opcode_limit == 60U * PIT_HZ);
+    CHECK(recover_gf_template.max_polls == 65536U);
+    /* Production poll budget covers both sides of 4096 nodes and 5000 waits. */
+    CHECK(recover_gf_template.max_polls >= 2U * 4096U + 2U * 5000U);
+    for(u32 extra=0;extra<2;extra++) {
+        control_begin();append_control(0x71,GF_INIT_C,0x100,0,0,0,0,0);finish_controls();
+        core.token.profile_crc=profile.crc;core.token.profile_version=profile.version;
+        core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
+        core.state=REC_PAUSED;core.in_call=false;clock_jump=GF_INIT_EXEC_US-1+extra;
+        int rc=trial_step(&core,&core.token,true,gfinit_exec_run,&execution);
+        CHECK(extra ? rc<0 : rc==0);
+        CHECK(extra ? core.reason==REC_TIMEOUT && cleanup_calls==1 : core.state==REC_PAUSED);
+    }
+
     for(u32 extra=0;extra<2;extra++) {
         control_begin();append_control(0x74,GF_INIT_C,0x100,0,1,GF_INIT_WAIT_MAX+extra,0,0);finish_controls();
         int rc=gfinit_exec_run(&core,&execution);CHECK(extra?rc<0:rc==0);
@@ -481,7 +535,7 @@ static void force_reset_test(void)
 #endif
 void GF_S3_ENTRY(void)
 {
-    all_trace();depth_tests();budget_tests();condition_tests();selection_tests();force_reset_test();failure_tests();frame_mismatch_tests();pre_read_tests();
+    all_trace();log_tests();depth_tests();budget_tests();condition_tests();selection_tests();force_reset_test();failure_tests();frame_mismatch_tests();pre_read_tests();
     output(failures?"GF S3 FAIL\n":"GF S3 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));__builtin_unreachable();
 }

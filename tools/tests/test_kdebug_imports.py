@@ -58,14 +58,14 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 259)
+        self.assertEqual(len(self.entries), 268)
         self.assertEqual([e['name'] for e in self.entries[226:239]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
         self.assertEqual(gen.STAGES['S4'], 239)
-        self.assertEqual(gen.STAGES['S5'], 259)
+        self.assertEqual(gen.STAGES['S5'], 268)
         self.assertEqual([(e['stage'], e['name']) for e in self.entries[239:]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
@@ -75,7 +75,17 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'serial_cmd_port'), ('S5', 'serial_data_port'),
             ('S5', 'serial_txrdy_mask'), ('S5', 'display_restore_98'),
             ('S5', 'display_recover_ready'), ('S5', 'display_recover_cell_read'),
-            ('S5', 'display_recover_cell_write')])
+            ('S5', 'display_recover_cell_write'),
+            ('S5', 'serial_checked_begin'),
+            ('S5', 'serial_checked_ready'),
+            ('S5', 'serial_checked_put'),
+            ('S5', 'serial_checked_empty'),
+            ('S5', 'serial_checked_end'),
+            ('S5', 'pci_cfg_read32'),
+            ('S5', 'pci_cfg_read16'),
+            ('S5', 'pci_cfg_write32'),
+            ('S5', 'pci_cfg_write16'),
+        ])
         self.assertEqual(self.entries[201]['name'], 'v86_cui_display_restore')
         self.assertEqual(self.entries[201]['source'], 'kernel/v86_io.h')
         self.assertTrue(self.entries[201]['retained'])

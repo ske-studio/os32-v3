@@ -318,6 +318,15 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))display_recover_ready,
     (void (*)(void))display_recover_cell_read,
     (void (*)(void))display_recover_cell_write,
+    (void (*)(void))serial_checked_begin,
+    (void (*)(void))serial_checked_ready,
+    (void (*)(void))serial_checked_put,
+    (void (*)(void))serial_checked_empty,
+    (void (*)(void))serial_checked_end,
+    (void (*)(void))pci_cfg_read32,
+    (void (*)(void))pci_cfg_read16,
+    (void (*)(void))pci_cfg_write32,
+    (void (*)(void))pci_cfg_write16,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -581,6 +590,15 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xaa3874aeu, 1, 1},
     {0x8f6bb7c8u, 1, 1},
     {0xd08f2623u, 1, 1},
+    {0x6a310b89u, 1, 1},
+    {0x07d1c743u, 1, 1},
+    {0xc3128cbdu, 1, 1},
+    {0x55fe3495u, 1, 1},
+    {0x4ac1e029u, 1, 1},
+    {0x2ea1abb2u, 1, 1},
+    {0xbaa70544u, 1, 1},
+    {0xbba6498fu, 1, 1},
+    {0x47aba321u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

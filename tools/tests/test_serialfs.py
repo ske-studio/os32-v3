@@ -72,7 +72,7 @@ C_CASES = ["crc_and_frames", "timing_and_seq", "vfs_contract", "mount_permit",
            "cannot_wait",
            "seq_exhausted", "hello_cases", "bad_host_replies", "rshell_rules", "rshell_watchdog_junk",
            "bootold_rules"]
-GATE_CASES = ["gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
+GATE_CASES = ["checked_tx", "gate_tx", "hold_overflow", "gate_rx", "gate_init_refused",
               "isr_counts"]
 SESSION_CASES = ["flow", "hello_fail_quiet", "hello_fail_flood", "end_late_hold",
                  "end_not_quiet", "lan_session", "lan_start", "lan_lifetime"]
@@ -1509,7 +1509,16 @@ C_MUTATIONS = [
      "            if (k > len - i) k = len - i;\n            state = crc32_core_update(state, chunk + i, k);",
      "image_crc 欄を 0 にせずに CRC を取る"),
 ]
-GATE_MUTATIONS = [
+CHECKED_MUTATIONS = [
+    ("drivers/serial.c", r"!ser_initialized \|\| s_gate \|\| s_checked", "0", "checked ownership excluded"),
+    ("drivers/serial.c", r"if \(serial_checked_ready\(\) != 1\)", "if (0)", "checked put ignores TxRDY"),
+    ("drivers/serial.c", r"SER_FSTS_TXEMP : STS_TXE", "SER_FSTS_TXRDY : STS_TXRDY", "checked wire completion uses TxRDY"),
+    ("drivers/serial.c", r"if \(s_checked\) \{\n        ser_hold_push", "if (0) {\n        ser_hold_push", "checked ordinary output interleaves"),
+    ("drivers/serial.c", r"if \(s_checked\) return SER_TX_DROPPED;", "if (0) return SER_TX_DROPPED;", "checked gate output interleaves"),
+    ("drivers/serial.c", r"if \(s_checked\) \{ irq_restore\(f\); return; \}", "if (0) { irq_restore(f); return; }", "checked gate switch allowed"),
+    ("drivers/serial.c", r"if \(s_checked\) return;", "if (0) return;", "checked baud change allowed"),
+]
+GATE_MUTATIONS = CHECKED_MUTATIONS + [
     ("drivers/serial.c", r"    if \(s_gate\) \{\n        ser_hold_push\(\(u8\)c\);",
      "    if (0) {\n        ser_hold_push((u8)c);",
      "ゲート中の serial_putchar が線へ出る (console の複写がフレームに混ざる)"),
@@ -1523,8 +1532,8 @@ GATE_MUTATIONS = [
      "保留リングが溢れたら新しい方を捨てる (結果行と exit が消える)"),
     ("drivers/serial.c", r"    if \(s_gate\) \{\n        kprintf\(0x0E, \"\[ser\] refuse serial_init during SerialFS session\\n\"\);\n        return;\n    \}",
      "", "セッション中に速度を変えられる"),
-    ("drivers/serial.c", r"            if \(sts & serial_oe_mask\(s_setup.mode\)\) ser_err_oe\+\+;\n            if \(sts & serial_fe_mask",
-     "            if (sts & serial_fe_mask", "ISR が OE を数えない"),
+    ("drivers/serial.c", r"(void serial_irq_handler\(void\)[\s\S]*?)            if \(sts & serial_oe_mask\(s_setup.mode\)\) ser_err_oe\+\+;\n            if \(sts & serial_fe_mask",
+     r"\1            if (sts & serial_fe_mask", "ISR が OE を数えない"),
     ("drivers/serial.c", r"            if \(!\(sts & s_mask_rxrdy\)\) break;\n            \(void\)inp\(s_port_data\);",
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]

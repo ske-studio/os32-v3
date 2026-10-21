@@ -1,0 +1,262 @@
+/* GF4a owner. All trial writes go through recover's immutable plan. */
+#include "gfinit.h"
+#include "gfinit_bus.h"
+#include "gfinit_exec.h"
+#include "gfinit_plan.h"
+#include "gfinit_resources.h"
+#include "kpeek.h"
+#include "kpeek_allow.h"
+#include "kernel/kmalloc.h"
+#include "kernel/idt.h"
+#include "kernel/module.h"
+#include "drivers/pci.h"
+#include "drivers/serial.h"
+#include "include/bootinfo.h"
+#include "sys.h"
+#include "generated/kdebug_import_macros.h"
+
+#define GF_BDF (13U << 3)
+#define GF_DEVICE 0x022110deU
+#define GF_US_PER_TICK (1000000U / PIT_HZ)
+#define GF_ROM_MAX KPEEK_NV_PROM_LEN
+#define GF_ROM_UNIT 512U
+#define GF_LOG_MARGIN_SECONDS 3U
+struct gfinit_owner {
+    struct gfinit_bus bus;
+    struct recover_ops ops;
+    struct recover_profile profile;
+    const struct recover_profile *s0;
+    struct gfinit_decode decoded;
+    struct gfinit_plan compiled;
+    struct recover_plan size_plan;
+    struct recover_plan_buffers buffers;
+    u32 flow[RECOVER_NODE_MAX * RECOVER_BITS_WORDS];
+    u32 valid[RECOVER_BITS_WORDS];
+    struct recover_range exclude[RECOVER_RANGE_MAX];
+    u32 exclude_count, rom_size, next_main, last_op, last_main;
+    struct gfinit_request last;
+    u8 *rom;
+    bool inspected;
+};
+static struct gfinit_owner *owner;
+static const struct gfinit_pci_ops gf_pci = {
+    pci_cfg_read32, pci_cfg_read16, pci_cfg_write32, pci_cfg_write16
+};
+
+static int gf_read(void *opaque, const struct recover_bus_access *a, u32 *value)
+{
+    int rc = gfinit_bus_read(opaque, a, value);
+    if (!rc && owner) gfinit_plan_read(&owner->compiled, recover_owner(), a, *value);
+    return rc;
+}
+static int gf_local(void *opaque)
+{ return gfinit_bus_local_cleanup(opaque, recover_owner()); }
+static int gf_screen_safe(void *opaque)
+{ (void)opaque; return recover_gf_screen_safe(recover_owner()); }
+static int gf_clock(void *opaque, u32 *value)
+{
+    struct recover *r = opaque;
+    if (r->spent > ~0U / GF_US_PER_TICK) return -1;
+    *value = r->spent * GF_US_PER_TICK;
+    return 0;
+}
+static const struct gfinit_exec_ops gf_clock_ops = {gf_clock, recover_hal_wait_frame};
+static int gf_read_rom(struct gfinit_owner *g)
+{
+    KdebugPeek req;
+    u32 raw, bars[3];
+    if (gfinit_bus_raw_config(&g->bus, &raw, bars) || !(raw & RECOVER_COMMAND_MEM) ||
+        bars[0] > ~0U - KPEEK_NV_PROM_OFF - GF_ROM_MAX) return -1;
+    g->rom = kmalloc(GF_ROM_MAX);
+    if (!g->rom) return -1;
+    /* Read both copies through the existing read-only PROM descriptor/window. */
+    for (u32 pass = 0; pass < 2; pass++) {
+        for (u32 off = 0; off < GF_ROM_MAX; off += KDEBUG_PEEK_CHUNK) {
+            req = (KdebugPeek){0};
+            req.addr = bars[0] + KPEEK_NV_PROM_OFF + off;
+            req.len = KDEBUG_PEEK_CHUNK; req.width = 1; req.space = KDEBUG_PEEK_SPACE_MMIO;
+            if (kpeek_call(KDEBUG_OP_PEEK, &req, sizeof(req)) || req.status) return -1;
+            for (u32 j = 0; j < req.len; j++) {
+                if (pass && g->rom[off+j] != req.data[j]) return -1;
+                g->rom[off+j] = req.data[j];
+            }
+        }
+    }
+    if (g->rom[0] != 0x55 || g->rom[1] != 0xaa || !g->rom[2]) return -1;
+    g->rom_size = (u32)g->rom[2] * GF_ROM_UNIT;
+    u32 pcir = (u32)g->rom[0x18] | (u32)g->rom[0x19] << 8;
+    if (g->rom_size > GF_ROM_MAX || g->rom_size < 0x18 || pcir > g->rom_size - 0x18 ||
+        g->rom[pcir] != 'P' || g->rom[pcir+1] != 'C' ||
+        g->rom[pcir+2] != 'I' || g->rom[pcir+3] != 'R' ||
+        ((u32)g->rom[pcir+4] | (u32)g->rom[pcir+5] << 8) != 0x10de ||
+        ((u32)g->rom[pcir+6] | (u32)g->rom[pcir+7] << 8) != 0x0221) return -1;
+    u8 sum = 0;
+    for (u32 i = 0; i < g->rom_size; i++) sum += g->rom[i];
+    return sum ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, &g->decoded);
+}
+static void gf_release_rom(struct gfinit_owner *g)
+{
+    if (g->rom) kfree(g->rom);
+    g->rom = 0; g->inspected = false;
+}
+void gfinit_recover_end(void)
+{
+    struct recover *r = recover_owner();
+    if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))
+        gf_release_rom(owner);
+}
+static int gf_inspect(struct recover *r, const struct recover_ops *base,
+                       struct recover_transport *transport, const struct recover_profile *s0)
+{
+    if (r->state != REC_IDLE && r->state != REC_VERIFIED) return -1;
+    if (r->cold_latched) return -1;
+    if (!owner) owner = kzalloc(sizeof(*owner));
+    if (!owner) return -1;
+    struct gfinit_owner *g = owner;
+    gf_release_rom(g);
+    g->profile = recover_gf_template;
+    g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
+    gfinit_bus_init(&g->bus, &g->profile, &gf_pci);
+    BootImageInfo boot;
+    if (boot_image_info(&boot) || !boot.crc_valid || gfinit_bus_probe(&g->bus)) return -1;
+    g->bus.identity.boot = 1; /* singleton lifetime is this boot, never persisted */
+    g->bus.identity.image_version = boot.image_crc;
+    g->bus.identity.kdebug_version = KDEBUG_OPS_VERSION;
+    g->ops = *base;
+    g->ops.identity = gfinit_bus_identity; g->ops.raw_config = gfinit_bus_raw_config;
+    g->ops.read = gf_read; g->ops.write = gfinit_bus_write;
+    g->ops.local_cleanup = gf_local; g->ops.screen_safe = gf_screen_safe;
+    g->s0 = s0;
+    r->transport = transport;
+    g->buffers = (struct recover_plan_buffers){g->flow, g->valid};
+    if (gf_read_rom(g)) { gf_release_rom(g); return -1; }
+    g->inspected = true; g->next_main = 0;
+    return 0;
+}
+/* Static upper bound from every expanded node/READ, including both branch
+ * arms. Each access can emit old/BEGIN/verify/END and each node PRE/END. */
+static int gf_budget(struct gfinit_owner *g, struct recover *r,
+                     struct recover_transport *transport, u32 kind,
+                     const struct recover_plan *plan)
+{
+    const struct serial_setup *serial = serial_get_setup();
+    const struct recover_static_work work = {
+        kind == REC_BUDGET_SIZE_BARS ? 16384U : 8192U,
+        kind == REC_BUDGET_SIZE_BARS ? 6000U : 4000U, 1024U,
+        4096U, 2000U, 1024U
+    };
+    if (!serial || !serial->actual || recover_budget_apply(&g->profile, kind,
+            PIT_HZ, serial->actual, 10, &work)) return -1;
+    u32 rows = 128;
+    if (plan->node_count > (~0U - rows) / 12U) return -1;
+    rows += plan->node_count * 12U;
+    if (plan->arg_count > (~0U - rows) / 4U) return -1;
+    rows += plan->arg_count * 4U;
+    if (rows > ~0U / (RECOVER_ROW_MAX + 1U)) return -1;
+    u32 bytes = rows * (RECOVER_ROW_MAX + 1U);
+    u32 seconds = bytes / serial->actual;
+    if (seconds > (~0U - 10U) / 10U) return -1;
+    seconds = seconds * 10U + (bytes % serial->actual * 10U + serial->actual - 1U) / serial->actual;
+    if (seconds > (RECOVER_HALF_TICKS / PIT_HZ - GF_LOG_MARGIN_SECONDS) / 2U ||
+        bytes > (~0U - 1024U) / 2U) return -1;
+    r->log_limit = (seconds * 2U + GF_LOG_MARGIN_SECONDS) * PIT_HZ;
+    transport->max_polls = bytes * 2U + 1024U;
+    g->profile.crc = recover_profile_crc(&g->profile);
+    return 0;
+}
+static int gf_fixed(struct recover *r, void *arg)
+{
+    struct gfinit_owner *g = arg;
+    while (r->expected_node != RECOVER_NONE) {
+        u32 id = r->expected_node;
+        const struct recover_plan_node *n = &r->plan->nodes[id];
+        if (n->phase == REC_RUN || n->phase == REC_VRAM_TEST) break;
+        u32 value = 0;
+        if (recover_safe_point(r) || recover_plan_enter(r, id) ||
+            recover_plan_access(r, &value)) return -1;
+        if (n->phase == REC_SIZE_BARS && r->node_layout[id]->dir_substep == REC_READ) {
+            u32 key = r->plan->args[n->arg_first].value;
+            const struct recover_target *t = &r->profile->targets[key];
+            if (t->space != REC_PCI_CFG || t->offset < 0x10 || t->offset > 0x18) return -1;
+            u32 bar = (t->offset - 0x10) / 4;
+            if (recover_bar_probe(r, bar, g->bus.bars[bar], value,
+                    g->exclude, g->exclude_count, 0, 0)) return -1;
+        }
+        if (recover_plan_leave(r, 0)) return -1;
+    }
+    return 0;
+}
+static int gf_begin(struct recover *r, struct gfinit_owner *g,
+                    struct recover_transport *transport, bool size)
+{
+    if (!g || !g->inspected || r->cold_latched ||
+        (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
+    g->profile = recover_gf_template;
+    g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
+    const struct recover_plan *plan;
+    if (size) {
+        if (gfinit_resources(g->exclude, &g->exclude_count)) return -1;
+        g->profile.cold_required = false;
+        g->size_plan = recover_gf_size_bars_plan;
+        plan = &g->size_plan;
+    } else {
+        if (!r->cache.bar[1].valid || gfinit_decode_rom(g->rom, g->rom_size,
+                &g->profile, &g->decoded) ||
+            gfinit_plan_build(&g->compiled, &g->decoded, &g->profile, r->cache.bar[1].length)) return -1;
+        plan = &g->compiled.plan;
+    }
+    if (gf_budget(g, r, transport, size ? REC_BUDGET_SIZE_BARS : REC_BUDGET_GF, plan)) return -1;
+    if (size) g->size_plan.profile_crc = g->profile.crc;
+    else g->compiled.plan.profile_crc = g->profile.crc;
+    u32 hash;
+    if (recover_owner_configure(&g->ops, &g->bus, g->s0, false) ||
+        recover_bind_plan(r, &g->profile, plan, &g->buffers, &hash) ||
+        trial_begin(r, &g->profile, hash, g->profile.trial_limit)) return -1;
+    if (trial_step(r, &r->token, true, gf_fixed, g)) return -1;
+    if (size) return trial_end(r, &r->token, REC_NORMAL);
+    return 0;
+}
+int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
+                struct recover_transport *transport, const struct recover_profile *s0)
+{
+    if (!buf || size != sizeof(struct gfinit_request)) return -1;
+    struct gfinit_request q = *(const struct gfinit_request *)buf;
+    struct recover *r = recover_owner();
+    if (q.version != GF_INIT_VERSION || q.size != sizeof(q) ||
+        (q.flags & ~GF_ALLOW_WRITE) || q.max_steps != GF_INIT_SCHEDULE ||
+        q.status || q.fail_pc || q.fail_reg || q.steps ||
+        (op != GF_OP_RUN_ONE && q.script_id) ||
+        (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
+    if (owner && q.session && q.session == r->token.session && owner->last_op == op &&
+        owner->last_main == q.script_id) { *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0; }
+    if (q.session != r->token.session) return -1;
+    int rc = -1;
+    if (op == GF_OP_INSPECT) rc = gf_inspect(r, base, transport, s0);
+    else if (op == GF_OP_SIZE_BARS || op == GF_OP_PREPARE)
+        rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS);
+    else if (owner && owner->inspected && op == GF_OP_RUN_ONE &&
+             q.script_id == owner->next_main && q.script_id < GF_INIT_MAINS) {
+        struct gfinit_exec e = {.rom = owner->rom, .rom_size = owner->rom_size,
+            .main_id = q.script_id, .ops = &gf_clock_ops, .opaque = r};
+        rc = trial_step(r, &r->token, true, gfinit_exec_run, &e);
+        q.steps = e.steps; q.fail_pc = e.fail_pc;
+        if (!rc) owner->next_main++;
+    } else if (owner && op == GF_OP_VERIFY && owner->next_main == GF_INIT_MAINS) {
+        rc = trial_step(r, &r->token, true, gfinit_plan_verify, &owner->compiled);
+        if (!rc) rc = trial_end(r, &r->token, REC_NORMAL);
+    } else if (op == GF_OP_ABORT) {
+        if (owner && owner->inspected && r->state == REC_IDLE) {
+            gf_release_rom(owner); rc = 0;
+        } else rc = trial_end(r, &r->token, REC_ABORT);
+    }
+    q.session = r->token.session; q.status = rc ? r->reason + 1U : 0;
+    q.fail_reg = r->first_key;
+    if (owner) {
+        owner->last_op = op; owner->last_main = q.script_id; owner->last = q;
+        if ((r->state == REC_VERIFIED || r->state == REC_FAILED) &&
+            op != GF_OP_INSPECT && (op != GF_OP_SIZE_BARS || r->state == REC_FAILED))
+            gf_release_rom(owner);
+    }
+    *(struct gfinit_request *)buf = q;
+    return rc;
+}

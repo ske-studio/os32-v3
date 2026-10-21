@@ -3,6 +3,7 @@ struct t3_wire {
     u8 input[512]; u32 size, pos, available, gets, waits, puts;
     char output[16384]; u32 out;
     bool busy;
+    u32 trigger, begins, row_at, mode, tick_per_wait;
 };
 static struct t3_wire wire;
 static int t3_get(void *v)
@@ -15,12 +16,26 @@ static int t3_put(void *v, u32 ch)
 {
     struct t3_wire *w = v; w->puts++;
     if (w->out + 1 >= sizeof(w->output)) return -1;
-    w->output[w->out++] = ch; w->output[w->out] = 0; return 0;
+    w->output[w->out++] = ch; w->output[w->out] = 0;
+    if (w->mode == 3 && w->out == w->trigger) f.tick += profile.opcode_limit;
+    if (ch == '\n') {
+        bool begin_row = false;
+        for (u32 i = w->row_at; i + 11 < w->out; i++)
+            if (w->output[i] == 'e' && w->output[i + 6] == 'B' && w->output[i + 10] == 'N') begin_row = true;
+        w->row_at = w->out;
+        if (begin_row && ++w->begins == w->trigger) {
+            if (w->mode == 1) w->busy = true;
+            if (w->mode == 2) f.abort = true;
+        }
+    }
+    return 0;
 }
 static int t3_wait(void *v, u32 us)
-{ CHECK(us == 1042); ((struct t3_wire *)v)->waits++; return 0; }
+{ CHECK(us == 1042); struct t3_wire *w = v; w->waits++;
+  if (r.state != REC_RESTORING) f.tick += w->tick_per_wait;
+  return 0; }
 static struct recover_transport t3_transport = {
-    t3_get, {t3_ready, t3_put, t3_wait}, &wire, 1042, 16384
+    t3_get, {t3_ready, t3_put, t3_wait}, &wire, 1042, 16384, 0, 0
 };
 static void t3_setup(bool start)
 {
@@ -85,6 +100,129 @@ static void t3_receive_tests(void)
     t3_frame(r.token.session); wire.available = wire.size;
     r.token.session++;
     CHECK(recover_receive(&r) == 0 && r.discarded_bytes == 20);
+}
+/* Exercise the actual logged access path, after RUNNING has been sent. */
+static int t3_access(struct recover *core, void *arg)
+{
+    (void)arg;
+    core->auth_phase = REC_RESTORE;
+    u32 value = INITIAL;
+    int rc = recover_access(core, RECOVER_NONE, REC_WRITE, DATA0, 1, &value);
+    if (wire.mode == 1) CHECK(count('w', DATA0) == 0);
+    return rc;
+}
+static int t3_begin_failure(struct recover *core, void *arg)
+{
+    (void)arg;
+    /* The state line succeeded. Fail only the first BEGIN transmission. */
+    wire.busy = true;
+    struct recover_bus_access a = {.key = DATA0, .width = 1};
+    u32 value = 0;
+    CHECK(logged_read(core, &a, &value) < 0 && count('r', DATA0) == 0);
+    CHECK(logged_write(core, &a, INITIAL, INITIAL) < 0 && count('w', DATA0) == 0);
+    return -1;
+}
+static void t3_access_tests(void)
+{
+    t3_setup(true);
+    CHECK(trial_step(&r, &r.token, true, t3_begin_failure, 0) < 0);
+    CHECK(t3_contains("event=RUNNING") && r.lost_lines && f.local_calls == 1);
+    /* Abort after the old-value read BEGIN, write BEGIN and verify BEGIN. */
+    for (u32 at = 1; at <= 3; at++) {
+        t3_setup(true); wire.mode = 2; wire.trigger = at;
+        CHECK(trial_step(&r, &r.token, true, t3_access, 0) < 0);
+        CHECK(r.state == REC_VERIFIED && r.reason == REC_ABORT && !r.failed);
+        CHECK(f.local_calls == 1 && t3_contains("result=OK"));
+    }
+    /* Expiry mid-state-row must defer cleanup until the emitter unwinds. */
+    t3_setup(true); wire.mode = 3; wire.trigger = 17;
+    CHECK(trial_step(&r, &r.token, true, change, 0) < 0);
+    CHECK(r.state == REC_FAILED && r.reason == REC_TIMEOUT && f.local_calls == 1);
+    CHECK(r.lost_lines == 1);
+    CHECK(wire.output[17] == '\n' && wire.output[18] == 'R');
+    CHECK(t3_contains("phase=final event=END result=FAIL"));
+}
+static u32 t3_acquires, t3_releases, t3_release_ticks;
+static bool t3_owned, t3_acquire_fail, t3_flush_fail;
+static int t3_acquire(void *opaque)
+{
+    (void)opaque; CHECK(!t3_owned); t3_acquires++;
+    if (t3_acquire_fail) return -1;
+    t3_owned = true; return 0;
+}
+static int t3_release(struct recover *core, void *opaque, int rc)
+{
+    (void)opaque; CHECK(core == &r && t3_owned); t3_releases++;
+    t3_owned = false; f.tick += t3_release_ticks; return t3_flush_fail ? -1 : rc;
+}
+static u32 t3_empty_calls, t3_empty_mode;
+static int t3_empty(void *opaque)
+{
+    (void)opaque; t3_empty_calls++;
+    if (t3_empty_mode == 2) f.tick += profile.opcode_limit;
+    return t3_empty_mode ? 0 : t3_empty_calls == 3;
+}
+static void t3_flush_tests(void)
+{
+    for (u32 mode = 0; mode < 3; mode++) {
+        t3_setup(true); r.state = REC_RUNNING; r.in_call = true; r.in_opcode = true; r.emitting = true;
+        t3_empty_calls = 0; t3_empty_mode = mode;
+        CHECK((recover_uart_flush(&r, t3_empty, &wire, 1042, 4) == 0) == (mode == 0));
+        CHECK(wire.puts == 0 && r.uart_bytes == 0 && t3_empty_calls <= 4);
+        if (mode == 0) CHECK(t3_empty_calls == 3 && wire.waits == 2);
+        if (mode == 1) CHECK(r.reason == REC_LOG && t3_empty_calls == 4);
+        if (mode == 2) CHECK(r.reason == REC_TIMEOUT && !wire.waits);
+        r.emitting = false;
+    }
+    t3_setup(false); r.profile = &profile; r.state = REC_RESTORING; r.in_s0 = true;
+    t3_empty_calls = t3_empty_mode = 0;
+    CHECK(recover_uart_flush(&r, t3_empty, &wire, 1042, 4) == 0);
+    CHECK(r.uart_bytes == 0 && r.uart_polls == 3);
+}
+static void t3_log_budget_tests(void)
+{
+    for (u32 extra = 0; extra < 2; extra++) {
+        t3_setup(true); r.log_limit = 10000; wire.tick_per_wait = 1;
+        f.op_ticks = profile.opcode_limit - 1 + extra;
+        CHECK((trial_step(&r, &r.token, true, change, 0) == 0) == !extra);
+        CHECK(r.spent == f.op_ticks && r.tx_ticks > profile.opcode_limit);
+        if (!extra) CHECK(r.state == REC_PAUSED && r.reason == REC_NORMAL);
+        else CHECK(r.state == REC_FAILED && r.reason == REC_TIMEOUT);
+    }
+    /* A real bus interval preceding END belongs to execution, never TX. */
+    t3_setup(true); r.log_limit = 10000; wire.tick_per_wait = 1;
+    f.tick_read = profile.opcode_limit;
+    CHECK(trial_step(&r, &r.token, true, t3_access, 0) < 0);
+    CHECK(r.reason == REC_TIMEOUT && r.spent == profile.opcode_limit);
+    /* Flush/release tail belongs to TX even after its last safe point. */
+    t3_setup(true); r.log_limit = 10000; r.state = REC_RUNNING; r.in_call = true;
+    t3_release_ticks = 3; t3_acquire_fail = t3_flush_fail = false;
+    t3_transport.begin = t3_acquire; t3_transport.end = t3_release;
+    CHECK(recover_record(&r, "test", "BEGIN", 0, 0, 0, 0) == 0);
+    CHECK(r.tx_ticks == 3 && r.spent == 0);
+    CHECK(recover_safe_point(&r) == 0 && r.spent == 0);
+    t3_release_ticks = 0; t3_transport.begin = 0; t3_transport.end = 0;
+    t3_setup(true); r.log_limit = 17; wire.tick_per_wait = 1;
+    CHECK(trial_step(&r, &r.token, true, change, 0) < 0);
+    CHECK(r.reason == REC_LOG && r.tx_ticks == 17 && r.spent == 0);
+    CHECK(f.values[DATA0] == INITIAL && f.local_calls == 1);
+}
+static void t3_owner_tests(void)
+{
+    for (u32 mode = 0; mode < 4; mode++) {
+        t3_setup(true); r.state = REC_RUNNING; r.in_call = true;
+        t3_acquires = t3_releases = 0; t3_owned = false;
+        t3_acquire_fail = mode == 1; t3_flush_fail = mode == 2; wire.busy = mode == 3;
+        t3_transport.begin = t3_acquire; t3_transport.end = t3_release;
+        CHECK((recover_record(&r, "test", "BEGIN", 0, 0, 0, 0) == 0) == (mode == 0));
+        CHECK(t3_acquires == 1 && t3_releases == (mode == 1 ? 0U : 1U) && !t3_owned);
+        if (mode == 1) CHECK(wire.puts == 0);
+        t3_transport.begin = 0; t3_transport.end = 0;
+    }
+    t3_setup(true); r.state = REC_RUNNING; r.in_call = true;
+    CHECK(t3_access(&r, 0) == 0);
+    CHECK(t3_contains("phase=gf_bus event=BEGIN pc=4294967295 bar=0 off=4 width=1 old=165 new=165"));
+    CHECK(t3_contains("phase=gf_bus event=END") && t3_contains("readback=165 rc=0"));
 }
 static void t3_safe_tests(void)
 {
@@ -155,6 +293,11 @@ static void t3_log_tests(void)
 }
 static void t3_s0_tests(void)
 {
+    t3_setup(false); r.profile = &profile; r.state = REC_RESTORING; r.in_s0 = true;
+    struct text_fake text = {.cell = 0x1234};
+    CHECK(recover_screen_98(&r, &text_ops, &text) == 0);
+    CHECK(t3_contains("phase=screen event=BEGIN step=4") &&
+          t3_contains("phase=screen event=BEGIN step=7"));
     for (u32 mode = 0; mode < 3; mode++) {
         t3_setup(false);
         struct recover_profile s0 = profile;
@@ -174,4 +317,4 @@ static void t3_s0_tests(void)
     }
 }
 static void t3_tests(void)
-{ t3_receive_tests(); t3_safe_tests(); t3_log_tests(); t3_s0_tests(); }
+{ t3_receive_tests(); t3_access_tests(); t3_owner_tests(); t3_flush_tests(); t3_log_budget_tests(); t3_safe_tests(); t3_log_tests(); t3_s0_tests(); }

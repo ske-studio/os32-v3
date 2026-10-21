@@ -74,6 +74,7 @@ static volatile int ser_count = 0;
 /*  触らない)。                                                             */
 /* ======================================================================== */
 static volatile int s_gate = 0;
+static volatile int s_checked = 0;
 static u8  s_hold[SER_HOLD_SIZE];
 static u32 s_hold_head = 0;       /* いちばん古いバイト */
 static u32 s_hold_count = 0;
@@ -170,6 +171,7 @@ int serial_get_ext_ctrl(void)
 int serial_set_div4(int bit_value)
 {
     u8 v;
+    if (s_checked) return -1;
 
     /* **bit0 (ポート切り離し) を保つ。** 読んでから bit6 だけ差し替える。 */
     v = (u8)inp(SER_EXT_CTRL);
@@ -424,6 +426,7 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
 
 void serial_init(unsigned long baud)
 {
+    if (s_checked) return;
     /* **セッション中は速度を変えない** (§1-v3)。ホストは今の速度で
      * フレームを待っている。報告の kprintf は保留リングへ入る。 */
     if (s_gate) {
@@ -437,6 +440,7 @@ void serial_init(unsigned long baud)
 
 int serial_init_vfast(unsigned long baud)
 {
+    if (s_checked) return SER_INIT_REFUSED;
     if (s_gate) {
         kprintf(0x0E, "[ser] refuse serial_init during SerialFS session\n");
         return SER_INIT_REFUSED;
@@ -676,6 +680,10 @@ static void ser_hold_push(u8 c)
 
 int serial_putchar(char c)
 {
+    if (s_checked) {
+        ser_hold_push((u8)c);
+        return SER_TX_OK;
+    }
     /* セッション中は線へ出さずに溜める (後で長さ付きのフレームで運ぶ) */
     if (s_gate) {
         ser_hold_push((u8)c);
@@ -684,12 +692,51 @@ int serial_putchar(char c)
     return ser_tx_byte(c);
 }
 
+/* Recovery log rows own TX only. The caller bounds every ready/empty poll
+ * and waits a frame before empty: TxRDY alone is not wire completion.
+ * Port and bit semantics: PC9800Bible 2-10, FreeBSD pc98/cbus/sio.c;
+ * FIFO TxEMP is the existing io_rs.md 0132h definition in serial.h. */
+int serial_checked_begin(void)
+{
+    unsigned int f = irq_save();
+    if (!ser_initialized || s_gate || s_checked) { irq_restore(f); return -1; }
+    s_checked = 1;
+    irq_restore(f);
+    return 0;
+}
+int serial_checked_ready(void)
+{
+    if (!s_checked) return -1;
+    return ((u8)inp(s_port_cmd) & s_mask_txrdy) != 0;
+}
+int serial_checked_put(u32 byte)
+{
+    unsigned int f = irq_save();
+    if (serial_checked_ready() != 1) { irq_restore(f); return -1; }
+    outp(s_port_data, (u8)byte);
+    irq_restore(f);
+    return 0;
+}
+int serial_checked_empty(void)
+{
+    if (!s_checked) return -1;
+    u8 mask = s_setup.mode == SER_MODE_VFAST ? SER_FSTS_TXEMP : STS_TXE;
+    return ((u8)inp(s_port_cmd) & mask) != 0;
+}
+void serial_checked_end(void)
+{
+    unsigned int f = irq_save();
+    s_checked = 0;
+    irq_restore(f);
+}
+
 /* ======================================================================== */
 /*  ゲートの口 (fs/serialfs_session.c だけが使う)                          */
 /* ======================================================================== */
 void serial_gate_set(int on)
 {
     unsigned int f = irq_save();
+    if (s_checked) { irq_restore(f); return; }
     if (on) {
         s_hold_head = 0;
         s_hold_count = 0;
@@ -726,6 +773,7 @@ int serial_gate_active(void)
 int serial_gate_put(const u8 *buf, u32 n)
 {
     u32 i;
+    if (s_checked) return SER_TX_DROPPED;
     for (i = 0; i < n; i++) {
         if (ser_tx_byte((char)buf[i]) != SER_TX_OK) return SER_TX_DROPPED;
     }

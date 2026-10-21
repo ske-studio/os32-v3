@@ -47,7 +47,12 @@ static int write_fake(void *v, const struct recover_bus_access *a, u32 value)
         }
     }
     if (a->dir_substep==REC_SELECT) indices[a->key]=value;
-    else values[a->key]=value;
+    else {
+        const struct recover_target *t=&profile.targets[a->key];
+        values[a->key]=a->dir_substep==REC_DATA && t->space==REC_VGA_INDEXED &&
+            t->port==RECOVER_CRTC && t->index==RECOVER_CR1F ?
+            (value==RECOVER_CR1F_UNLOCK?RECOVER_CR1F_UNLOCKED:0):value;
+    }
     if (a->key==n1key && a->dir_substep==REC_DATA) {
         data_writes++;
         if (inject_when==REC_AFTER) values[inject_key]=1;

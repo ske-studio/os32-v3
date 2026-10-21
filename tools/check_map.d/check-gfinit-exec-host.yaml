@@ -11,6 +11,7 @@ check-gfinit-exec-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - include/types.h
+- include/memmap.h
 - lib/crc32_core.inc
 - tools/tests/recover_gf_host.c
 - tools/tests/recover_gf_inventory.h

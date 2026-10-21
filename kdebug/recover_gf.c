@@ -1975,6 +1975,7 @@ static const struct recover_opcode_layout fixed_layouts[] = {
 static const u32 index_saves[] = {10, 16, 17, 111};
 const struct recover_profile recover_gf_template = {
     .version = RECOVER_PROFILE_VERSION, .cold_required = true,
+    .opcode_limit = REC_GF_OPCODE_TICKS, .max_polls = REC_GF_MAX_POLLS,
     .targets = targets, .target_count = sizeof(targets) / sizeof(targets[0]),
     .rules = rules, .rule_count = sizeof(rules) / sizeof(rules[0]),
     .regs = regs, .count = sizeof(regs) / sizeof(regs[0]),

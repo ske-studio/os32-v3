@@ -237,3 +237,17 @@ struct recover_opcode_layout {
 - P3 tools/tests/gfinit_bus_host.c:185: 局所 cleanup の順序を確かめる試験がなく、入れ替えの変異も生き残る → trace の順の確認 1 件と変異 1 件。
 - P3 gfinit_bus.c:80 (PCI cfg の present())、:96 (legacy [A0000h,C0000h) の拒否)、:47-49 (probe の I/O・64bit BAR の拒否) に負の試験と変異が無い → それぞれ合成入力 1 件と変異 1 件。
 - P3 kdebug_window.c:89-101: SELECT と DATA が別々の窓 (別々の割込み禁止区間) で、設計 §2「index/data は一組の間だけ割込み禁止」と違う。今の OS32 には GPU に触る割込み処理が無いので実害なし → 設計の文言を今の形に合わせて書く。
+
+## 4a S6 の実装で設計者が決めたこと (2026-10-21)
+- CR1Fの局所SAVEDは保存読値0/3を命令値99h/57hへ写して承認し、同じLOCAL ruleでcleanup冒頭の解錠57hを許す；全CR1F DATAのverifyは命令値を読値0/3へ写し、順序をUNLOCK→CR11→CR44→LOCK→INDEXとする。
+- GFのSELECTとDATAはそれぞれ短い独立したIRQ禁止・窓区間とする；単一タスクでGPUを扱う割込みが無い前提に合わせ、4a本文§2の「一組の間」をこの形で具体化し、ログ・待ちはIRQ禁止区間に入れない。
+- checked UARTの所有はRECの1行単位のTXだけとしRXは維持する；通常出力は既存holdへ保留、SerialFS送信・gate変更・速度変更を拒否し、最後のframe待ち後に既存UARTのTxEMPを有限予算で確認、全帰還で所有を解放する。
+- RECの途中送信失敗後は次行前にchecked改行1byteで境界を復帰し、その送信も当該予算へ課金、静的Bには各行1byteを追加算入する；gf_preは展開node/substepごと、gf_busは必要readback後にENDを出し、verify無しのreadbackはNONE（未確認）とする。
+- GFの送信枠は不変planの全node・READ引数と最大REC行長から両辺を含む上界をchecked算出し、実UARTの8N1速度でwire時間の2倍＋3秒を有限上限にする；送信中の実tickだけを60秒の実行枠から除外し、PAUSEDを双方から除外、復帰は既定の独立18/33秒枠を維持する。
+- A4の読戻しは専用layout flagの読取専用CHECK_EXPR nodeへ8語ずつまとめる；recoverに登録した純整数式とread_safeな非indexed targetだけを許し、Wの1node/1rule・既存件数上限・全経路照合を変えず、式未実行のleaveを拒否する。
+- A4先頭1KiBの元値は最初のpattern書込み式の許可済READで部品所有RAMへ一度だけ退避する；破棄予約なので終端で再生せず、2パターンとも全書込み後に全読戻しを行う。
+- PFB10020Chの容量はMIT nouveau `subdev/fb/ramnv44.c:30` とenvytools `memory/nv10_pfb.xml:213` のMEM_AMOUNTにより上位8bitをbyte量として読む；16MiB以上の2冪だけをこの段の合理的形式とし、0・他形式は容量未検証と記録して最小試験だけを行い、実容量無しとは主張しない。
+- 容量照合は実測BAR1長までの2冪境界・終端DWORD・先頭の固定候補をplanへ収め、PFBとの小さい方に入る点だけを前向き分岐で選ぶ；GPU専有の破棄予約をその候補範囲へ広げるが、W許可は固定候補だけとし、最小試験・容量確認・窓による部分確認とS0復帰の結果を分けてRECへ残す。
+- A1の資源採取はGPU直結bus0の全functionを生configで読み、off-path bridgeは正確な転送窓全体で子装置を包含して排他する（TI PCI2050B SCPS076G §§4.20–4.25、FreeBSD releng/14.3 `sys/dev/pci/pcireg.h`）；有効なendpoint memory BAR/ROMの長さ不明は既定どおり書込み前に拒否し、隣接割当・baseの整列から実長を推測しない。
+- private opは5=INSPECT・6=SIZE_BARS・7=PREPARE・8=RUN_ONE・9=VERIFY・10=ABORT、版1の40byte要求とし既存kdebug_callを使う；公開SDK・shellのgfinit表示はS7、importは既存258番の後ろに追加して生成し既存slotを保つ。
+- hostの--statusはsession/state/image-crc不要の状態表示専用とし、echo・本文・EOTを照合する；復旧成功とは扱わずver・abort・session更新を行わない。aidebug:は既存AidebugPortを使い、serialはexclusive=Trueだけで所有する。

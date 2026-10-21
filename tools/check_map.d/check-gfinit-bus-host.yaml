@@ -35,3 +35,8 @@ check-gfinit-bus-host:
 - tools/tests/recover_hostshim/io.h
 - build/checks.d/check-gfinit-bus-host.mk
 - tools/check_map.d/check-gfinit-bus-host.yaml
+- kdebug/gfinit_resources.c
+- kdebug/gfinit_resources.h
+- drivers/pci.h
+- drivers/pci_decode.h
+- sdk/include/os32/os32_kapi_shared.h

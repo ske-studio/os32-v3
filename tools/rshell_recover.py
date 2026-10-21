@@ -3,12 +3,15 @@
 
 Use an already-running rshell. --command starts an explicitly approved trial;
 without it, send recover now SESSION. Keep --state and --log across PAUSED calls.
+--status sends only recover status (no trial, abort, boot probe or state update).
+--port aidebug:http://127.0.0.1:8025 uses NP21/W COM1; do not use /api/cmd
+or another serial reader concurrently. NP21/W does not emulate serial baud timing.
 --image-crc is the expected deployed vmkernel image CRC, checked with ver first.
 A saved session skips ver (PAUSED forbids ordinary commands); reset detection then
 relies on session/sequence/metadata. --session 0 requests untested S0 recovery.
 """
 import argparse
-import fcntl
+from contextlib import closing
 import io
 import json
 from pathlib import Path
@@ -156,34 +159,67 @@ def verify_boot(port, expected_crc, timeout, raw, clock=time.monotonic):
         raise RecoverError('boot image CRC/build verification failed')
 
 
-def main():
+def status(port, timeout, raw, clock=time.monotonic):
+    capture = io.BytesIO()
+    try:
+        exchange(port, 'recover status', None, timeout, timeout, capture,
+                 lambda _: None, clock)
+    finally:
+        raw.write(capture.getvalue())
+        raw.flush()
+    lines = capture.getvalue().decode('ascii', errors='replace').replace('\x04', '\n').splitlines()
+    echo = lines.index('> recover status')
+    pattern = (r'recover sid=\d+ state=\d+ reason=\d+ verified=\d+ '
+               r'profile=[0-9A-Fa-f]{8} plan=[0-9A-Fa-f]{8} '
+               r'snapshot=[0-9A-Fa-f]{8} seq=\d+ lost=\d+ discarded=\d+')
+    replies = [line for line in lines[echo + 1:] if re.fullmatch(pattern, line)]
+    if len(replies) != 1:
+        raise RecoverError('missing/malformed status reply')
+    return replies[0]
+
+
+def open_port(name, baud):
+    if name.startswith('aidebug:'):
+        from rshell_serial import AidebugPort
+        return AidebugPort(name[len('aidebug:'):], timeout=.1)
     import serial
+    return serial.Serial(name, baud, timeout=.1, write_timeout=.2, exclusive=True)
+
+
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', default='/dev/ttyUSB0')
     parser.add_argument('--baud', type=int, default=9600)
-    parser.add_argument('--session', type=int, required=True)
-    parser.add_argument('--image-crc', required=True)
-    parser.add_argument('--state', type=Path, required=True)
+    parser.add_argument('--session', type=int)
+    parser.add_argument('--image-crc')
+    parser.add_argument('--state', type=Path)
     parser.add_argument('--log', type=Path, required=True)
     parser.add_argument('--timeout', type=float, default=60)
     parser.add_argument('--cleanup-timeout', type=float, default=40)
-    parser.add_argument('--command')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--command')
+    mode.add_argument('--status', action='store_true')
     args = parser.parse_args()
-    if not 0 <= args.session <= 0xffffffff or min(args.timeout, args.cleanup_timeout) <= 0:
+    if min(args.timeout, args.cleanup_timeout) <= 0 or (
+            args.session is not None and not 0 <= args.session <= 0xffffffff):
         parser.error('session must fit in u32 and deadlines must be positive')
-    if not re.fullmatch('[0-9a-fA-F]{8}', args.image_crc):
+    if not args.status and (args.session is None or args.state is None or args.image_crc is None):
+        parser.error('trial/recovery needs --session, --state and --image-crc')
+    if args.image_crc is not None and not re.fullmatch('[0-9a-fA-F]{8}', args.image_crc):
         parser.error('--image-crc must have 8 hexadecimal digits')
-    command = args.command or 'recover now %d' % args.session
+    command = 'recover status' if args.status else (args.command or 'recover now %d' % args.session)
     if any(c in command for c in '\r\n\x04'):
         parser.error('one command only')
-    previous = json.loads(args.state.read_text()) if args.state.exists() else None
-    records = Records(args.session, previous)
+    previous = (json.loads(args.state.read_text())
+                if not args.status and args.state.exists() else None)
+    records = None if args.status else Records(args.session, previous)
     def save(data):
         args.state.write_text(json.dumps(data, sort_keys=True) + '\n')
     try:
-        with serial.Serial(args.port, args.baud, timeout=.1, write_timeout=.2,
-                           exclusive=True) as port, args.log.open('ab') as raw:
-            fcntl.flock(port.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with closing(open_port(args.port, args.baud)) as port, args.log.open('ab') as raw:
+            if args.status:
+                print(status(port, args.timeout, raw))
+                return 0
             if previous is None:
                 verify_boot(port, args.image_crc, args.timeout, raw)
                 records.data['image_crc'] = args.image_crc.lower()
@@ -194,7 +230,7 @@ def main():
                               args.cleanup_timeout, raw, save)
             print(result)
             return 0
-    except (RecoverError, OSError, serial.SerialException) as exc:
+    except (RecoverError, OSError) as exc:
         print('recover: ' + str(exc))
         return 1
 

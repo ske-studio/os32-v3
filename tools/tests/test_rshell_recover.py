@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Fake serial/time tests of the actual recover host; --mutate kills guards."""
 import argparse
+from contextlib import redirect_stdout
 import importlib.util
 import io
 from pathlib import Path
 import struct
+import sys
+from types import SimpleNamespace
+from unittest.mock import patch
 import tempfile
 import zlib
 
@@ -97,11 +101,62 @@ def cases(m):
             raise AssertionError('unverified boot accepted')
 
 
+def status_cases(m):
+    reply = ('recover sid=0 state=0 reason=0 verified=0 profile=00000000 '
+             'plan=00000000 snapshot=00000000 seq=0 lost=0 discarded=0')
+    data = ('\x04> recover status\n' + reply + '\n\x04').encode()
+    for split in (1, 7, 256):
+        port = Port(data, split=split)
+        raw = io.BytesIO()
+        assert m.status(port, 10, raw, port.clock) == reply
+        assert raw.getvalue() == data
+        assert port.writes == [b'recover status\n']
+    for data in (b'> recover status\n\x04', b'> recover status\nrecover: rejected rc=-1\n\x04',
+                 b'> recover status\nrecover: kdebug unavailable\n\x04',
+                 ('> recover status\n' + reply + '\n').encode(),
+                 (reply + '\n\x04').encode()):
+        port = Port(data)
+        try:
+            m.status(port, .2, io.BytesIO(), port.clock)
+        except m.RecoverError:
+            pass
+        else:
+            raise AssertionError('invalid status accepted')
+        assert port.writes == [b'recover status\n']  # Never abort an observational call.
+
+    calls = []
+    fake = SimpleNamespace(
+        AidebugPort=lambda *a, **kw: calls.append(('aidebug', a, kw)),
+        Serial=lambda *a, **kw: calls.append(('serial', a, kw)))
+    with patch.dict(sys.modules, {'rshell_serial': fake, 'serial': fake}):
+        m.open_port('aidebug:http://localhost:8025', 9600)
+        m.open_port('/dev/fake', 19200)
+    assert calls == [('aidebug', ('http://localhost:8025',), {'timeout': .1}),
+                     ('serial', ('/dev/fake', 19200),
+                      {'timeout': .1, 'write_timeout': .2, 'exclusive': True})]
+    # CLI status needs no boot/session files and sends no ver or recovery command.
+    with tempfile.TemporaryDirectory(prefix='recover_status_') as tmp:
+        port = Port(('> recover status\n' + reply + '\n\x04').encode())
+        closed = []
+        port.close = lambda: closed.append(True)
+        log = Path(tmp) / 'raw.log'
+        state = Path(tmp) / 'state.json'
+        state.write_text('preserve even non-JSON data')
+        argv = ['rshell_recover', '--status', '--log', str(log), '--state', str(state)]
+        with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), redirect_stdout(io.StringIO()) as out:
+            assert m.main() == 0
+        assert out.getvalue().strip() == reply
+        assert state.read_text() == 'preserve even non-JSON data'
+        assert port.writes == [b'recover status\n'] and closed == [True]
+        assert log.read_bytes().endswith(b'\x04')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     cases(load(SRC))
+    status_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         mutations = [
@@ -110,6 +165,8 @@ def main():
             ('loss', "f.get('lost_lines') == '0'", 'True'),
             ('verify', "f.get('verified') == '1'", 'True'),
             ('echo', 'if not echo:', 'if False:'),
+            ('status-body', "raise RecoverError('missing/malformed status reply')", "return 'accepted'"),
+            ('serial-owner', 'exclusive=True', 'exclusive=False'),
             ('timeout', "failure = failure or 'host timeout'", 'failure = failure'),
         ]
         with tempfile.TemporaryDirectory(prefix='recover_host_') as tmp:
@@ -121,6 +178,7 @@ def main():
                 mutant = load(path)
                 try:
                     cases(mutant)
+                    status_cases(mutant)
                 except (AssertionError, mutant.RecoverError):
                     print('killed:', name)
                 else:

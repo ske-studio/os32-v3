@@ -17,7 +17,7 @@
 #define GF_BAR_TYPE 7U
 #define GF_LEGACY_LO 0xa0000U
 #define GF_LEGACY_HI 0xc0000U
-#define GF_CR_LOCK 0x1fU
+#define GF_CR_LOCK RECOVER_CR1F
 #define GF_CR_PROTECT 0x11U
 
 void gfinit_bus_init(struct gfinit_bus *b, const struct recover_profile *p,
@@ -102,19 +102,22 @@ int gfinit_bus_read(void *opaque, const struct recover_bus_access *a, u32 *value
 int gfinit_bus_write(void *opaque, const struct recover_bus_access *a, u32 value)
 { return bus_access(opaque, a, true, &value); }
 
-/* Restore CR11 before CR1F locks it, then owner CR44, then original indices.
- * CR1F remains unlocked throughout the classified RUN write-set. No COLD
- * DATA or capture/PLL temporary value is replayed here. */
+/* UNLOCK -> DATA (CR11, CR44) -> LOCK -> original INDEX.
+ * CR1F saved reads (0/3) are translated into write commands (99/57).
+ * No COLD DATA or capture/PLL temporary value is replayed here. */
 int gfinit_bus_local_cleanup(struct gfinit_bus *b, struct recover *r)
 {
     int rc = recover_window_cleanup(&b->window);
-    const u32 order[] = {GF_CR_PROTECT, GF_CR_LOCK, RECOVER_CR44};
+    const u32 order[] = {GF_CR_LOCK, GF_CR_PROTECT, RECOVER_CR44, GF_CR_LOCK};
     for (u32 k = 0; !rc && k < sizeof(order) / sizeof(order[0]); k++) {
         for (u32 i = 0; !rc && i < r->local_saved_count; i++) {
             const struct recover_local_saved *v = &r->local_saved[i];
             const struct recover_target *t = &r->profile->targets[v->key];
             if (v->dir_substep != REC_DATA || t->index != order[k]) continue;
             u32 index = t->index, value = v->value;
+            if (t->index == GF_CR_LOCK)
+                value = !k || v->value == RECOVER_CR1F_UNLOCKED ?
+                    RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK;
             if (recover_restore_point(r) ||
                 recover_access(r, RECOVER_NONE, REC_SELECT, v->key, 1, &index) ||
                 recover_access(r, RECOVER_NONE, REC_DATA, v->key, 1, &value)) rc = -1;

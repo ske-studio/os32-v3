@@ -98,3 +98,9 @@ NP21/W には PCI バスが無く通信速度も模擬しないので、NV44A �
 - [GF6200_4A_S2_LAYOUT.md](design/GF6200_4A_S2_LAYOUT.md) — 段 4a S2 の引数配置
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
+
+### 4a S6 接続 (2026-10-21)
+- 実装: trial_begin/step/endへのGF接続、T3のBEGIN不達・終端理由・送信中期限・SCREEN_CALL7・host所有重複を修正。
+- T4b道具: `rshell_recover.py --status` と `--port aidebug:...` を追加。
+- 決定は[追記](design/REALHW_RECOVER_ADDENDUM.md#4a-s6-の実装で設計者が決めたこと-2026-10-21)、検証証拠は `/home/hight/os32-tmp/run/gf4a_s6/`（最終結果は実装報告）。
+- 未確認: PAUSEDの門・peek経路はT4bのNP21/Wで確認、31kHzのini鍵はT4b前にPMが扱う。

@@ -7,6 +7,7 @@
 
 #include "recover.h"
 #include "recover_wire.h"
+#include "gfinit.h"
 #include "kernel/display_restore.h"
 #include "kernel/idt.h"
 #include "drivers/serial.h"
@@ -52,26 +53,27 @@ static const struct recover_ops recovery_ops = {
 static int recovery_rx(void *opaque)
 { (void)opaque; return serial_gate_active() ? -1 : serial_trygetchar(); }
 static int recovery_tx_ready(void *opaque)
-{
-    (void)opaque;
-    const struct serial_setup *setup = serial_get_setup();
-    if (serial_gate_active() || !setup || !setup->actual) return -1;
-    return (inp(serial_cmd_port(setup->mode)) & serial_txrdy_mask(setup->mode)) != 0;
-}
+{ (void)opaque; return serial_checked_ready(); }
 static int recovery_tx_put(void *opaque, u32 byte)
+{ (void)opaque; return serial_checked_put(byte); }
+static int recovery_tx_begin(void *opaque)
+{ (void)opaque; return serial_checked_begin(); }
+static int recovery_tx_empty(void *opaque)
+{ (void)opaque; return serial_checked_empty(); }
+static int recovery_tx_end(struct recover *r, void *opaque, int rc)
 {
-    (void)opaque;
-    const struct serial_setup *setup = serial_get_setup();
-    if (serial_gate_active() || !setup || !setup->actual) return -1;
-    outp(serial_data_port(setup->mode), byte);
-    return 0;
+    if (!rc) rc = recover_uart_flush(r, recovery_tx_empty, opaque,
+                                    r->transport->frame_us, r->transport->max_polls);
+    serial_checked_end();
+    return rc;
 }
 #define RECOVERY_UART_POLL_LIMIT 65536U
 #define RECOVERY_FRAME_BIT_US 10000000U /* 10 bits/frame x 1 s in us */
 static struct recover_transport recovery_transport = {
     .get = recovery_rx,
     .uart = {recovery_tx_ready, recovery_tx_put, recover_hal_wait_frame},
-    .max_polls = RECOVERY_UART_POLL_LIMIT
+    .max_polls = RECOVERY_UART_POLL_LIMIT,
+    .begin = recovery_tx_begin, .end = recovery_tx_end
 };
 static struct recover_profile recovery_s0;
 static int recovery_attach(void)
@@ -98,12 +100,21 @@ static int recovery_attach(void)
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
     struct recover *r = recover_owner();
+    if (op >= GF_OP_INSPECT && op <= GF_OP_ABORT) {
+        if (recovery_attach()) return -1;
+        return gfinit_call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
+    }
     if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW) return -1;
     if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
         return kpeek_call(op, buf, size);
     if (!buf || size != sizeof(KdebugRecover) || recovery_attach()) return -1;
     KdebugRecover *out = buf;
-    if (op == KDEBUG_OP_RECOVER_NOW && recover_now_session(r, out->session)) return -1;
+    if (op == KDEBUG_OP_RECOVER_NOW) {
+        enum recover_state before = r->state;
+        int rc = recover_now_session(r, out->session);
+        if (!rc || r->state != before) gfinit_recover_end();
+        if (rc) return -1;
+    }
     *out = (KdebugRecover){r->token.session, r->state, r->reason,
         (r->s0_verified ? 1U : 0U) | (r->s1_verified ? 2U : 0U),
         r->token.profile_crc, r->token.plan_hash, r->token.snapshot_crc,

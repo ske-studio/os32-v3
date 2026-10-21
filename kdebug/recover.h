@@ -69,6 +69,10 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_VGA_ENABLE 0x3c3U
 #define RECOVER_DAC_DATA 0x3c9U
 #define RECOVER_IO_LAST 0xffffU
+#define RECOVER_CR1F 0x1fU
+#define RECOVER_CR1F_UNLOCKED 3U
+#define RECOVER_CR1F_UNLOCK 0x57U
+#define RECOVER_CR1F_LOCK 0x99U
 #define RECOVER_CR44 0x44U
 #define RECOVER_SR01 1U
 #define RECOVER_SR_BLANK 0x20U
@@ -116,6 +120,7 @@ struct recover_expr {
     int (*eval)(const u32 *args, u32 argc, u32 *value);
 };
 #define REC_LAYOUT_SKIP_HEAD 1U
+#define REC_LAYOUT_CHECK_EXPR 2U
 struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
@@ -218,7 +223,7 @@ struct recover {
     const struct recover_profile *s0_profile;
     u8 rx[RECOVER_ABORT_SIZE];
     u32 rx_used, discarded_bytes, seq, lost_lines;
-    bool emitting, s0_only;
+    bool emitting, log_partial, s0_only;
     void *opaque;
     const struct recover_profile *profile;
     struct recover_token token;
@@ -227,6 +232,8 @@ struct recover {
     u32 local_saved_count;
     u32 next_session, budget, spent, call_tick, opcode_tick, restore_tick;
     u32 steps, polls, first_key;
+    /* GF manifest-derived UART budget; zero preserves the generic budget. */
+    u32 log_limit, tx_ticks, opcode_spent;
     u32 restore_polls, uart_polls, uart_bytes;
     u32 restored_rules[RECOVER_RULE_MAX / 32U];
     u32 command_saved, command_actual;
@@ -260,6 +267,7 @@ int recover_plan_enter(struct recover *r, u32 node);
 int recover_plan_leave(struct recover *r, u32 edge);
 /* Evaluate checked operands once and perform the current node access. */
 int recover_plan_access(struct recover *r, u32 *value);
+int recover_plan_check(struct recover *r, u32 *value);
 int recover_access(struct recover *r, u32 node, u32 dir_substep,
                    u32 target, u32 width, u32 *value);
 int recover_bar_probe(struct recover *r, u32 bar, u32 raw, u32 mask,
@@ -289,6 +297,9 @@ struct recover_transport {
     struct recover_uart_ops uart;
     void *opaque;
     u32 frame_us, max_polls;
+    int (*begin)(void *opaque);
+    /* Always release ownership; on success first flush under r's budget. */
+    int (*end)(struct recover *r, void *opaque, int row_rc);
 };
 struct recover *recover_owner(void);
 int recover_owner_configure(const struct recover_ops *ops, void *opaque,
@@ -298,6 +309,13 @@ int recover_receive(struct recover *r);
 /* Shared REC sequence for future trial opcode/window records too. */
 int recover_record(struct recover *r, const char *phase, const char *event,
                    u32 step, u32 addr, int rc, u32 elapsed);
+int recover_gf_pre(struct recover *r, const struct recover_plan_node *node,
+                   const char *event, bool executing, int rc);
+int recover_gf_result(struct recover *r, u32 saved_words, bool minimal,
+                      bool capacity_known, bool full_capacity, u32 capacity_bytes,
+                      u32 tested_bytes);
+int recover_uart_flush(struct recover *r, int (*empty)(void *), void *opaque,
+                       u32 frame_us, u32 max_polls);
 int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
                       void *opaque, u32 byte, u32 frame_us, u32 max_polls);
 
