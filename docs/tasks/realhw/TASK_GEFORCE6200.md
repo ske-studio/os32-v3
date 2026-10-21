@@ -55,3 +55,8 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 - **基準水晶は 27MHz** (PSTRAPS bit22=1・bit6=0、nouveau の判定 strap&0x00400040 == 0x00400000)。
 - **メモリ**: RAM の組 3 (CR3C の strap bits 2-5 から)、組 3 の PFB 値 (100220=03080e0b・100224=05010405・100228=20220303・10022c=41088102・100234=00266622 ほか)。DDR 系・200MHz までの推定、量は init 3 の COMPUTE_MEM が実行時に測る (段 4a で BAR1 の大きさと合わせて確かめる)。
 - 次: 段 4a (初期化 script の試行、書き込み) は 27 種類の命令の解釈器が要る → astra の設計 (nouveau の devinit/bios の MIT 部と Haiku の coldstart を根拠) と Opus のレビューを先に。書き込みの実施は段ごとにユーザーの承認。
+
+### 映像の経路 (ユーザー 2026-10-21)
+
+- **GeForce 6200 の映像は「抜いちゃダメボード」経由で 98 の切替回路につながっている** (1 本のモニタ)。切替回路は 98 表示・内蔵 (Trident)・PCI ボードの RGB-IN の 3 つから 1 つを選び、選ぶのは UNDOCUMENTED の 0FACh の bit0 (RGB IN のスルー / 内蔵) と bit1 (内蔵 / 98) [推] — [TASK_TRIDENT_DRIVER §3-7](TASK_TRIDENT_DRIVER.md)。Ra266 も 0FACh と同じ仕組みとして扱う (2026-10-17 のユーザー決定)。
+- 帰結: 4b・4c で GeForce の映像を見るには 0FACh で RGB-IN を選ぶ。**戻す処理 (realhw_recover) の「98 の画面に戻す」は 0FACh で 98 表示を選び直すことを含む** — recover r2 の「0FACh を GeForce に使わない」は改める (r3 の後に PM が直す)。入力の選び違いは黒画面として現れる (§3-7)。モニタの決定 (U3) はこの経路で決まり、4b の前に 0FACh の値と画面の切り替えを確かめる。
