@@ -104,3 +104,10 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - 設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS4節。同値時も有限列を実行し、PLL一時captureは中断後に再生しない。
 - 部品増分はtext/rodata約7.33KiB（PLL単体3.37KiB）、recover BSS 116 byte、decoder所有領域580 byte。kdebug結線はS6。
 - 検証証拠: `~/os32-tmp/run/gf4a_s4/`。実accessor・実機・NP21/W・S6の時計/poll設定は対象外。
+
+### 4a S5 bus・共有窓 (2026-10-21)
+- T2/peekの窓を共有し、READはRWなし・WRITEだけRW、PTE復元失敗はboot寿命で停止。peekの幅/許可表/2ページ跨ぎ/LAN契約を維持。
+- GF accessorは生PCI ID・Mem・BARを照合、Command16とBAR probe、PRMVIO/PRMCIOのhead別名をdescriptor経由で扱う。PCI imports・入口・shellはS6以降。
+- COPY2・一時再生3行を結線、局所CR11/CR1F/CR44→元index復元を追加。COLD DATAは終端再生しない。N1の4対象guardは維持。
+- S4送り3件を修正。設計者判断は `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` のS5節。
+- 証拠: `~/os32-tmp/run/gf4a_s5/` の最終build・候補・変異・錨・lint・docsログ。実機/NP21/W未実施、version.chip・T3送り・S6時計/結線は未確認のまま。

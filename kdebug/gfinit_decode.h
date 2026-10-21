@@ -19,7 +19,7 @@
 #define GF_INIT_FIXED_CAPTURES 3U /* 0x65 saved slot + one 0x51 slot per head */
 /* Owned by caller, no allocation or bus access. ROM remains borrowed only
  * during decode. A successful decode is an inventory, not permission to RUN:
- * COPY and non-PLL temporary restore entries remain unresolved until S5. */
+ * S5 supplies COPY/capture rules; S6 composes PREPARE dependencies and arm. */
 struct gfinit_instruction {
     u32 pc, opcode, length, end_repeat, effect_first, effect_count;
     u32 ref, count, port, index, mask, shift, target, value;

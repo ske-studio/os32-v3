@@ -32,6 +32,7 @@
 #include "paging.h"
 #include "kpeek_allow.h"
 #include "kpeek.h"
+#include "kdebug_window.h"
 #include "drivers/e82557.h"
 #include "fs/sfs_proto.h"
 #include "fs/sfs_lan.h"
@@ -45,11 +46,6 @@
 /* 窓の PT 1 枚 (デバイス窓の先頭 4MB) の中のオフセット */
 #define KPEEK_WIN_MASK    (MEM_DEVICE_APERTURE_PDE_SIZE - 1U)
 #define KPEEK_PAGE_MASK   ((u32)PAGE_SIZE - 1U)
-/* 窓の張り方: 読み専用・キャッシュ無効・supervisor (K7) */
-#define KPEEK_WIN_FLAGS   (PTE_PRESENT | PTE_PCD)
-/* 1 回で触る PTE の上限 (len <= CHUNK < PAGE_SIZE なので 2) */
-#define KPEEK_WIN_PAGES   2U
-
 /* LAN の出口 (§2-8): フレーム = Ethernet 14 + SFS ヘッダ 12 + [addr u32][data]
  * + CRC32 4 (最大 1058 B、bss)。ペイロードは SFS_LAN_MAX_PAYLOAD に収まる。 */
 #define KPEEK_LAN_ADDR_LEN   4U
@@ -111,10 +107,6 @@ static u32 kpeek_ram(KdebugPeek *req)
 
 static u32 kpeek_mmio(KdebugPeek *req)
 {
-    u32 raw[KPEEK_WIN_PAGES];
-    u32 pa0, va0, n, i, st;
-    unsigned int fl;
-
     if ((req->addr & KPEEK_WIN_MASK) + req->len > MEM_DEVICE_APERTURE_PDE_SIZE) {
         req->fail_addr = req->addr;
         return KDEBUG_PEEK_ARG;
@@ -123,27 +115,14 @@ static u32 kpeek_mmio(KdebugPeek *req)
         req->fail_addr = req->addr;
         return KDEBUG_PEEK_DENY;
     }
-    pa0 = req->addr & ~KPEEK_PAGE_MASK;
-    n = ((req->addr + req->len - 1U) >> PAGE_SHIFT) - (req->addr >> PAGE_SHIFT) + 1U;
-    if (n > KPEEK_WIN_PAGES) {           /* len <= CHUNK では起きない */
-        req->fail_addr = req->addr;
-        return KDEBUG_PEEK_ARG;
+    struct recover_window window;
+    recover_window_hal_init(&window);
+    window.va += (req->addr & ~KPEEK_PAGE_MASK) & KPEEK_WIN_MASK;
+    u32 st = KDEBUG_PEEK_WINDOW;
+    if (!kdebug_window_begin(&window, req->addr, req->len, false)) {
+        kpeek_load(window.va + (req->addr & KPEEK_PAGE_MASK), req->width, req->len, req->data);
+        if (!recover_window_cleanup(&window)) st = KDEBUG_PEEK_OK;
     }
-    va0 = (u32)MEM_DEVICE_APERTURE_BASE + (pa0 & KPEEK_WIN_MASK);
-
-    fl = irq_save();
-    for (i = 0; i < n; i++) raw[i] = paging_pte_raw(va0 + i * PAGE_SIZE);
-    if (paging_map_phys(va0, pa0, n, KPEEK_WIN_FLAGS) == 0) {
-        kpeek_load(va0 + (req->addr - pa0), req->width, req->len, req->data);
-        st = KDEBUG_PEEK_OK;
-    } else {
-        st = KDEBUG_PEEK_WINDOW;
-    }
-    for (i = 0; i < n; i++) {
-        if (paging_pte_restore(va0 + i * PAGE_SIZE, raw[i]) != 0)
-            st = KDEBUG_PEEK_WINDOW;
-    }
-    irq_restore(fl);
     if (st != KDEBUG_PEEK_OK) req->fail_addr = req->addr;
     return st;
 }

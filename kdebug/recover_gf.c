@@ -153,7 +153,7 @@ static const struct recover_target targets[] = {
     {REC_BAR_MMIO, 0x0U, 0x1098U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 142 */
     {REC_BAR_MMIO, 0x0U, 0x1310U, 0x0U, 0x0U, RECOVER_NONE, 0x4U, REC_COLD, 0x1U}, /* 143 */
     {REC_BAR_MMIO, 0, 0x602858U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 144 */
-    {REC_BAR_MMIO, 0, 0x1700U, 0, 0, RECOVER_NONE, 4, REC_RW, 1}, /* 145: COPY destination */
+    {REC_BAR_MMIO, 0, 0x1700U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 145: COPY destination */
     {REC_BAR_MMIO, 0, 0x10020cU, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 146: COPY source only */
     {REC_BAR_MMIO, 0, 0x4004U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 147 */
     {REC_BAR_MMIO, 0, 0x4024U, 0, 0, RECOVER_NONE, 4, REC_COLD, 1}, /* 148 */
@@ -839,6 +839,14 @@ static const struct recover_rule rules[] = {
     {567, 153, REC_RUN, 2, 0xe623, 0x12042, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_567, 1, 0, 0, 0},
     {568, 152, REC_RUN, 2, 0xe623, 0x12043, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_568, 1, 0, 0, 0},
     {569, 25, REC_RUN, 2, 0xe623, 0x12044, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_PLL_SAVED, 0, 0}, pll_dep_569, 1, 0, 0, 0},
+    {570, 16, REC_RESTORE, RECOVER_NONE, RECOVER_NONE, REC_SELECT, 255, 255, {REC_SAVED, 0, 0, 0, 255, RECOVER_NONE, 0, 0}, 0, 0, 0, 0, REC_LOCAL},
+    {571, 17, REC_RESTORE, RECOVER_NONE, RECOVER_NONE, REC_SELECT, 255, 255, {REC_SAVED, 0, 0, 0, 255, RECOVER_NONE, 0, 0}, 0, 0, 0, 0, REC_LOCAL},
+    {572, 111, REC_RESTORE, RECOVER_NONE, RECOVER_NONE, REC_SELECT, 255, 255, {REC_SAVED, 0, 0, 0, 255, RECOVER_NONE, 0, 0}, 0, 0, 0, 0, REC_LOCAL},
+    {573, 18, REC_RUN, 0, 0xdf10, 17, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_SAVED_BAR, 0, 0}, 0, 0, 0, 0, REC_FORCE},
+    {574, 31, REC_RUN, 0, 0xdfaf, 37, 255, 255, {REC_EXPR, 0, 0, 0, 255, REC_GF_EXPR_COPY, 0, 0}, 0, 0, 0, 0, 0},
+    {575, 106, REC_RUN, 2, 0xe67f, 410, 255, 255, {REC_EXPR, 0, 0, 0, 255, REC_GF_SAVED_BAR, 0, 0}, 0, 0, 0, 0, 0},
+    {576, 122, REC_RUN, 2, 0xe6c0, 454, 255, 255, {REC_EXPR, 0, 0, 0, 255, REC_GF_SAVED_BAR, 0, 0}, 0, 0, 0, 0, 0},
+    {577, 145, REC_RUN, 3, 0xe7fb, 492, ~0U, ~0U, {REC_EXPR, 0, 0, 0, ~0U, REC_GF_EXPR_COPY_NV, 0, 0}, 0, 0, 0, 0, 0},
 };
 static const struct recover_reg regs[] = {
     {7, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, 7},
@@ -1962,8 +1970,8 @@ static const struct recover_opcode_layout fixed_layouts[] = {
     {0x108, REC_DATA, 2, fixed_literal, REC_DATA, 0},
     {0x109, REC_DATA, 2, fixed_rmw, REC_DATA, 0},
 };
-/* Classified index ports only; this grants no COLD data restore. S5 owns
- * their actual cleanup connection. */
+/* Classified index ports only; gfinit_bus restores these after local locks.
+ * This grants no COLD data restore. */
 static const u32 index_saves[] = {10, 16, 17, 111};
 const struct recover_profile recover_gf_template = {
     .version = RECOVER_PROFILE_VERSION, .cold_required = true,

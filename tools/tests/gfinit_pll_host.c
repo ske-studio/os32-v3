@@ -47,6 +47,10 @@ static void pll_solver_tests(void)
     }
     CHECK(gfinit_pll_solve(&l,400000,&s)==0 && s.n1==237 && s.m1==16 && s.actual==399938 && s.error==62);
     CHECK(gfinit_pll_solve(&l,36000,&s)==0 && s.n1==16 && s.m1==3 && s.p==2 && s.actual==36000);
+    l.vco1=(struct gfinit_pll_vco){1000000,2000000,1000,27000,1,255,1,27};
+    CHECK(gfinit_pll_solve(&l,1000,&s)==0 && s.p==3 && s.actual==1000);
+    l.vco1=(struct gfinit_pll_vco){1,1000000,14000,27000,1,255,1,27};
+    CHECK(gfinit_pll_solve(&l,148500,&s)==0 && s.p==0 && s.n1==6 && s.m1==1 && s.actual==162000);
     /* Isolate each of the two single-stage rounding additions. */
     l.vco1=(struct gfinit_pll_vco){1,1000000,1000,27000,1,255,7,7};
     CHECK(gfinit_pll_solve(&l,10000,&s)==0 && s.n1==83 && s.p==5 && s.actual==10004 && s.error==4);
@@ -72,6 +76,8 @@ static void pll_solver_tests(void)
     l.vco2.max_freq=400000;l.vco2.max_input=400000;
     CHECK(gfinit_pll_solve(&l,108000,&s)==0 && s.n2==1 && s.m2==1);
     l.vco2.max_freq=0;l.vco1.max_input=0;CHECK(gfinit_pll_solve(&l,200000,&s)<0);
+    struct gfinit_pll_sequence full={.count=GF_PLL_WRITES_MAX};
+    pll_write(&full,0,0,0,0);CHECK(full.count==GF_PLL_WRITES_MAX);
     output("PLL solver: single/double, staged rounding, fixed gain, no solution, zero/overflow/input bounds\n");
 }
 static u32 pll_double;

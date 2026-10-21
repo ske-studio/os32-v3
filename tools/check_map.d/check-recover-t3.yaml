@@ -16,3 +16,5 @@ check-recover-t3:
 - lib/crc32_core.inc
 - tools/tests/host32.py
 - tools/tests/mutpar.py
+- kdebug/kdebug_window.c
+- kdebug/kdebug_window.h

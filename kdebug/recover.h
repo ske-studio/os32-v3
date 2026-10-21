@@ -310,7 +310,7 @@ struct recover_window_ops {
     u32 (*irq_save)(void *opaque);
     void (*irq_restore)(void *opaque, u32 flags);
     u32 (*pte_read)(void *opaque, u32 va);
-    int (*map)(void *opaque, u32 va, u32 pa);
+    int (*map)(void *opaque, u32 va, u32 pa, u32 pages, u32 flags);
     int (*unmap)(void *opaque, u32 va, u32 raw);
     int (*load)(void *opaque, u32 va, u32 width, u32 *value);
     int (*store)(void *opaque, u32 va, u32 width, u32 value);
@@ -318,7 +318,7 @@ struct recover_window_ops {
 struct recover_window {
     const struct recover_window_ops *ops;
     void *opaque;
-    u32 va, raw, flags;
+    u32 va, raw[2], flags, pages;
     bool owned, failed;
 };
 void recover_window_hal_init(struct recover_window *w);

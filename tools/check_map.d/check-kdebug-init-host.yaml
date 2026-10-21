@@ -60,4 +60,8 @@ check-kdebug-init-host:
 - kernel/kernel.c
 - kernel/kselftest_report.c
 - kernel/memory_boot.h
+- kdebug/kdebug_window.c
+- kdebug/kdebug_window.h
+- kdebug/gfinit_bus.c
+- kdebug/gfinit_bus.h
 artifact_reader: true

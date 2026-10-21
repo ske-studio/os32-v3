@@ -122,7 +122,7 @@ int gfinit_pll_solve(const struct gfinit_pll_limits *l, u32 clk, struct gfinit_p
             if (cp < min) continue;
             if (cp > max) break;
             for (u32 m = a->min_m; m <= a->max_m; m++) {
-                if (GF_PLL_REF / m < a->min_input) break;
+                if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;
                 if (GF_PLL_REF / m > a->max_input) continue;
                 if (cp > (0xffffffffU - GF_PLL_REF / 2) / m) return -1;
                 u32 n = (cp * m + GF_PLL_REF / 2) / GF_PLL_REF;
@@ -170,7 +170,7 @@ int gfinit_pll_solve(const struct gfinit_pll_limits *l, u32 clk, struct gfinit_p
 }
 static void pll_write(struct gfinit_pll_sequence *q, u32 reg, u32 source, u32 keep, u32 value)
 {
-    q->writes[q->count++] = (struct gfinit_pll_write){reg, source, keep, value};
+    if (q->count < GF_PLL_WRITES_MAX) q->writes[q->count++] = (struct gfinit_pll_write){reg, source, keep, value};
 }
 int gfinit_pll_sequence(u32 reg, const struct gfinit_pll_limits *l,
                         const struct gfinit_pll_solution *s, struct gfinit_pll_sequence *q)

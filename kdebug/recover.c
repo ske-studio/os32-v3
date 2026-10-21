@@ -1707,6 +1707,10 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             }
             if (w->flags & REC_LOCAL) for (u32 i = 0; i < r->local_saved_count; i++) {
                 const struct recover_local_saved *v = &r->local_saved[i];
+                /* A classified saved DATA needs its own SELECT before replay;
+                 * the original port index is still restored last. */
+                if (dir == REC_SELECT && v->dir_substep == REC_DATA &&
+                    v->key == target && *value == t->index && t->access == REC_RW) found = true;
                 if (v->dir_substep == dir && (v->key == target ||
                     (dir == REC_SELECT && index_save_safe(r->profile, target) &&
                      r->index_port[v->key] == r->index_port[target])) &&
