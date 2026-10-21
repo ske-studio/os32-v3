@@ -53,6 +53,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | T3abの段別実装順序 | [T3ab A〜G](tasks/v3/t3ab/README.md) (設計中) | T3配置の決定を継承 |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (計画中、着手はドライバの見直しの後) | [tasks/realhw/GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) (VBIOS について分かっていることのまとめ) |
+| 実機試験を決まった状態 (安全な 98 の CUI) へ戻す処理 (realhw_recover: 状態機械・期限・98 画面復帰・`recover now`) | [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) (実装中 — T1〜T3 着地、T4a 合格) | 確定設計は [tasks/realhw/design/](tasks/realhw/design/REALHW_RECOVER_DESIGN.md) (段 4a の設計も同じ所)、[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) §5 |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
@@ -204,6 +205,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [tasks/realhw/TASK_FDRECOV.md](tasks/realhw/TASK_FDRECOV.md) | FD で起動して LAN で HDD 一式を復旧する経路と、hsync の配置の世代の門 **受入完了** (2026-10-17、NP21/W の受入 7 項に合格) |
 | [tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) | 内蔵 LAN (Intel 82557) で Host Services — **実装中**。LAN 経由の hsync は達成。現在地・残件は同票の冒頭と [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) / [GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) | 増設の GeForce 6200 (NV44A、PCI 0:13.0) の観測と初期化 **設計中** — 段 0〜3 は観測済み (読み取りだけ)、段 4a を実装中 / VBIOS について分かっていること (表・init script・命令・メモリと PLL・出力) **現行** |
+| [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) **実装中** — T1・T1b・T2・T3 は main、T4a は NP21/W で合格、T4b は 4a の S6 の後、T5〜T7 (実機) は未。確定設計の写しは `tasks/realhw/design/` (戻す処理 3 本・段 4a 2 本、票の §6 から辿る) |
 | [tasks/realhw/TASK_FD144.md](tasks/realhw/TASK_FD144.md) | 1.44MB FD からの起動 — **受入完了・実機確認待ち** (エミュレータで F1〜F13 合格) |
 | [archive/realhw_v21/TASK_FDC_REALHW.md](archive/realhw_v21/TASK_FDC_REALHW.md) / [TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) | 実機の FD 起動 (2026-09-22) / シリアル 115200 (2026-09-22〜23) — 受入完了 |
 | [archive/realhw_v21/TASK_HDD_INSTALL.md](archive/realhw_v21/TASK_HDD_INSTALL.md) / [TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) / [TASK_ATAPI_TIMEOUT.md](archive/realhw_v21/TASK_ATAPI_TIMEOUT.md) | CD から HDD へのインストールと HDD 起動 (2026-09-25) / SerialFS と `hsync --root` による実機の更新 (2026-09-29) / ATAPI の待ち上限を秒単位に (2026-09-26) — 受入完了 |
