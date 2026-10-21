@@ -278,8 +278,8 @@ static void indexed_expr_tests(void)
     for (u32 bad=0;bad<4;bad++) {
         indexed_expr_setup(); synthetic_begin();
         CHECK(step_node(0)==0); CHECK(step_node(1)==0); CHECK(step_node(2)==0);
-        if (bad==1) r.selected=RECOVER_NONE;
-        if (bad==2) r.selected=TK+1;
+        if (bad==1) r.port_selected[r.index_port[TK]]=RECOVER_NONE;
+        if (bad==2) r.port_selected[r.index_port[TK]]=TK+1;
         if (bad==3) r.buffers.valid_bits[0]=0;
         u32 reads=count('r',TK);
         override_request=true; requested=0x24;
@@ -314,7 +314,7 @@ static void local_saved_tests(void)
         }
         CHECK(step_node(2)==0);
         CHECK(trial_end(&r,&r.token,REC_NORMAL)==0);
-        CHECK(r.selected==RECOVER_NONE);
+        CHECK(r.port_selected[r.index_port[TK]]==RECOVER_NONE);
         CHECK(f.values[TK]==INITIAL && f.selected_value==0 && f.releases==1);
         u32 writes_before=writes(); CHECK(local_cleanup(&f)==0);
         CHECK(writes()==writes_before && f.releases==1);

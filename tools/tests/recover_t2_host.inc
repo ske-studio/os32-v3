@@ -342,7 +342,7 @@ static void indexed_order(void)
             .write_mask=0xff,.verify_mask=0xff,.value={.mode=REC_RANGE,.max=255,.expr_id=RECOVER_NONE},
             .flags=REC_LOCAL};
         profile.rule_count=7; bar_cache(); synthetic_begin();
-        r.state=REC_RESTORING; r.auth_phase=REC_RESTORE; r.selected=TK; f.selected_value=1;
+        r.state=REC_RESTORING; r.auth_phase=REC_RESTORE; r.port_selected[r.index_port[TK]]=TK; f.selected_value=1;
         r.restore_tick=f.tick; f.n=0;
         struct recover_local_step steps[]={
             {REC_LOCAL_DATA,TK,REC_DATA,1,0xa5},
@@ -356,7 +356,7 @@ static void indexed_order(void)
             for(u32 j=0;j<f.n;j++) if(f.trace[j].op=='w' || f.trace[j].op=='i') {
                 CHECK(f.trace[j].value==steps[n].value); n++;
             }
-            CHECK(n==3 && r.selected==RECOVER_NONE);
+            CHECK(n==3 && r.port_selected[r.index_port[TK]]==RECOVER_NONE);
         }
     }
 }
