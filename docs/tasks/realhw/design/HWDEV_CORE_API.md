@@ -83,7 +83,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 
 ## 3. HWDEV の import の生成 (G3)
 
-- 核は **25** 関数で上表に不足・余剰なし。「24」は数え違いで、除外する関数は無い。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
+- 核は **25** 関数で上表に不足・余剰なし。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
 - kernel imports は実測 **10**。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
 
 | HWDEV index | 関数 | 既存 kdebug index |
@@ -99,7 +99,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 33 | pci_cfg_write32 | 266 |
 | 34 | pci_cfg_write16 | 267 |
 
-旧 §3 の概略列挙に無かった `boot_image_info`・`pci_cfg_write32/16` が必要で、`kmemcpy` は現行GFの未解決参照に無く不要。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
+`boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 
 - kdebug ではこれらを生成 stub (`kdebug_import_stubs.S`) が `jmp *kdebug_import_slots+N` で呼ぶので、HWDEV に同じ stub をリンクすると kdebug の slot を指して未解決になる。
 - HWDEV は自分の .def から `hwdev_import_stubs.S` と `hwdev_import_slots` を生成し、§2 の核の関数と kernel の関数を 1 つの表に並べる。`kdebug_import_stubs.o` は HWDEV にリンクしない。

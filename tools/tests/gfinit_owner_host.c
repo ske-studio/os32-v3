@@ -227,7 +227,6 @@ static void allocation_test(void)
         CHECK(rc<0 && alloc_calls==fail && writes==0 && live_pages==0);
         for(u32 i=0;i<TEST_ARENA_PAGES;i++)CHECK(page_owner[i]!=1);
     }
-
 }
 void _start(void)
 { lifecycle();failures_test();allocation_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

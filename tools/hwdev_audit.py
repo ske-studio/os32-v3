@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M1: measure one linked S6 image and reconcile GF references with CORE_API.
+"""Measure the linked kdebug image and reconcile GF references with CORE_API.
 
 No runtime ABI is emitted. The JSON report carries declarations, slot order,
 object users, ELF/header sizes and map provenance for the later generators.

@@ -17,6 +17,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 - **部品の台帳 (tools/module_schema.py) の 11 枠目を HWDEV に使う** (台帳は 10 枠で 10 種類が使用済み)。定義は [HWDEV_CORE_API.md](design/HWDEV_CORE_API.md) §4。
 - 設計の A 案と、初版は boot 中に入れ替えない部品の寿命は、設計の提案としてレビューで承認された (Opus 2 往復、確定 G1〜G5)。
+- **owner の作業領域の上限は 267 頁** (2048 node の最悪の場合の実測、S6 送りの 251 頁を訂正)。内訳は [HWDEV_CORE_API.md](design/HWDEV_CORE_API.md) §9。
 
 ## 2. 方式の結論 — A (今の C と表をそのまま部品へ移す)
 
@@ -63,9 +64,10 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
 
-## M1 の実装で設計者が決めたこと (2026-10-22)
-- 同じS6像のmap/size/headerで核・GF・prefix/整列を分け、参照照合の生成器はCORE_APIのslot表を入力にする (詳細・実測はCORE_API §2・§7)。
-- kernel importsは既存kdebug番号順で核のslotの後へ置き、既存kdebug importは変更しない (CORE_API §3)。
-- G4の配置CRCを独立欄に具体化し、配置inventoryと前処理テキストの生成・正規化・照合を固定する (CORE_API §8)。
-- boot寿命・同期callback・DMAなしのmanifest形式と初期化時の参照検査を固定し、callのtransportは既存宣言と同型にする (CORE_API §9)。
-- PM 決定に従い owner 上限を2048 node時の267頁へ訂正する。251頁へ収める領域削減は行わず、個別の頁丸上げをSTATIC_ASSERTとfirst-fit/全確保失敗試験で固定する (CORE_API §9)。
+## 6. M1 の実装で設計者が決めたこと (2026-10-22)
+
+- 同じ S6 像の map・size・header で核・GF・prefix/整列を分け、参照照合の生成器は CORE_API の slot 表を入力にする (実測は [CORE_API](design/HWDEV_CORE_API.md) §2・§7)。
+- kernel imports は既存 kdebug の番号順で核の slot の後へ置き、既存 kdebug の import は変えない (CORE_API §3)。
+- G4 の配置 CRC を独立の欄にし、配置 inventory と前処理テキストの生成・正規化・照合を固定する (CORE_API §8)。
+- boot 寿命・同期 callback・DMA なしの manifest の形と初期化時の参照検査を固定し、call の transport は既存宣言と同じ型にする (CORE_API §9)。
+- 上限は §1 の 267 頁とし、旧 251 頁へ収めるための領域削減はせず、頁ごとの丸め上げを STATIC_ASSERT と first-fit・全確保失敗点の試験で固定する (CORE_API §9)。
