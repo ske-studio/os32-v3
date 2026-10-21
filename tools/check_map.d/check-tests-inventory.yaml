@@ -1,4 +1,5 @@
 check-tests-inventory:
+- tools/gen_hwdev_pair.py
 - tools/tests/**
 - .github/workflows/*.yml
 - docs/TESTS.md

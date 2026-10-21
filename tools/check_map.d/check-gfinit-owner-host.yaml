@@ -29,3 +29,4 @@ check-gfinit-owner-host:
 - tools/tests/mutpar.py
 - build/checks.d/check-gfinit-owner-host.mk
 - tools/check_map.d/check-gfinit-owner-host.yaml
+- include/hwdev_private.h

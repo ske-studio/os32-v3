@@ -1,4 +1,5 @@
 check-check-select-host:
+- tools/gen_hwdev_pair.py
 - CLAUDE.md
 - README.md
 - docs/08_build.md

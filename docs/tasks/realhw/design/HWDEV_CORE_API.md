@@ -104,6 +104,8 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 - kdebug ではこれらを生成 stub (`kdebug_import_stubs.S`) が `jmp *kdebug_import_slots+N` で呼ぶので、HWDEV に同じ stub をリンクすると kdebug の slot を指して未解決になる。
 - HWDEV は自分の .def から `hwdev_import_stubs.S` と `hwdev_import_slots` を生成し、§2 の核の関数と kernel の関数を 1 つの表に並べる。`kdebug_import_stubs.o` は HWDEV にリンクしない。
 - gfinit.c・gfinit_resources.c は `generated/kdebug_import_macros.h` を取り込むが getter マクロは使っていない — 取り込みを HWDEV の生成物に差し替える。
+- `tools/gen_hwdev_contract.py` が共通契約と同時に stub・slot・metadata・取り込み用ヘッダを生成する。`HWDEV_MODULE` の GF ビルドだけ取り込み先を切替え、両像で配置 assert をコンパイルする。生成完了時に全出力を touch し、内容不変の入力更新も消化する。
+- `build/hwdev.mk` は同じ machine/ABI flags で GF 8 オブジェクトを別にコンパイルし、`hwdev_main.o` と専用 imports を `build/out/hwdev/hwdev.elf` (map 同居) へリンク、`build/out/hwdev.mod` へ pack する。`build/hwdev.ld` は HWDEV slot 配列を data 先頭に置く。
 - 表は facade が開始前に充填する (§1)。slot 25〜34 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
 
 ## 4. contract_crc (G4)
@@ -158,7 +160,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 
 ## 8. M1 固定の G4 生成・照合手順 (M2/M3a の入力契約)
 
-1. 生成入力は §2 の順序、§3 の kernel import 順、共有ヘッダの umbrella、配置 inventory。既存宣言を取得する方式は `gen_kdebug_imports.py` を再利用し、型の独自 parser は追加しない。
+1. 生成入力は `hwdev/hwdev_imports.def` (§2 の順序・§3 の kernel import 順と完全一致を検査)、共有ヘッダの umbrella、配置 inventory。既存宣言を取得する方式は `gen_kdebug_imports.py` を再利用し、型の独自 parser は追加しない。
 2. umbrella は `recover.h`, `recover_gf.h`, 辞書順の `gfinit*.h`, `kpeek.h`, 新設する `hwdev_private.h` と kernel import の宣言元を各一度 include。両像とも同じ生成物と i386 の machine/ABI flags、`__KERNEL_BUILD__` でコンパイルする。`RECOVER_MODULE` 等の像固有定義は契約生成に渡さない。
 3. 配置 inventory は umbrella が宣言する共有の全 struct/union と全メンバ (配列自体、関数ポインタも含む)、全 enum の列挙子。`recover` から到達する型だけを推測で間引かない。新 private 型も対象。名前の inventory をヘッダ変更と同時に更新し、コンパイラの DWARF (`-g -fno-eliminate-unused-debug-types`) と突き合わせて欠落・余剰を失敗にする。DWARF は列挙の照合用で、型の再実装には使わない。
 4. inventory から `sizeof(T)`, `__alignof__(T)`, `offsetof(T, member)`, `sizeof(((T *)0)->member)`、enum 値の定数表を C で生成し、対象クロスコンパイラが出す ELF32 の専用 section から little-endian u32 を読む (ゲスト実行不要)。名前は型名/メンバ名の ASCII 辞書順、enum は列挙子名順。負の enum は u32 の2の補数。値から `STATIC_ASSERT` 全行を生成し、両像の実ビルドで include する。値の変化を片側だけ再生成して通してはいけない。
@@ -182,7 +184,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 | 56 | `u32 ops_abi, ops_size` | 1、16 (`hwdev_ops`: prefix 8B + call/release_work 各4B) |
 | 64 | `u32 reserved` | 0 |
 
-- `build_id` は部品生成時の u32 世代。manifest の自己申告で loader の handle/generation/base/size/CRC を置き換えない。kernel_pair_crc は KMOD PAIR_CRC、core_image_crc は依存先 KDEBUG の KMOD IMAGE_CRC と一致。部品自体の CRC は loader が検証する (manifest へ自己 CRC を循環埋込みしない)。
+- `build_id` は部品生成時の u32 世代 (v1 は `contract_crc`)。`tools/gen_hwdev_pair.py` はビルド済み kernel/KDEBUG の対と IMAGE_CRC を検証し、manifest 用の `build/out/hwdev/hwdev_pair.h` を生成する。manifest の自己申告で loader の handle/generation/base/size/CRC を置き換えない。kernel_pair_crc は KMOD PAIR_CRC、core_image_crc は依存先 KDEBUG の KMOD IMAGE_CRC と一致。部品自体の CRC は loader が検証する (manifest へ自己 CRC を循環埋込みしない)。
 - KMOD export の `initialize` は `int (__cdecl *)(const struct hwdev_manifest **manifest, const struct hwdev_ops **ops)`。slot 充填後に一度呼び、静的な RO の2ポインタを返すだけ。登録・確保・I/O・core 呼出しをしない。失敗時は公開しない。manifest/ops の全 span が当該 body の RO 内、call/release_work が text 内であることを facade が checked 範囲検査する。
 - `hwdev_ops.call` の第5引数は実宣言どおり **`struct recover_transport *`** (const なし)。GF が max_polls を更新する。第4・6引数の const は維持。M3a は既存 `gfinit_call` への型照合を生成する。
 - 登録した body・ops・expr callback・静的許可表は boot 寿命、依存 KDEBUG handle を保持、stop=0、再初期化/差替え/hot unload なし。登録失敗は module rollback/隔離へ返し、公開前の参照だけを取り消す。
@@ -190,3 +192,5 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 - ROM/decode/plan/flow は専有 trial RAM。plan は decode の node/arg を借用し、profile は compiled の表を借用。PAUSED は bundle・lease・両 handle を保持。SIZE_BARS 成功から PREPARE までの保持も参照中として数える。同期 callback が帰る前に解放しない。
 - 終端順は局所 cleanup → 共通終端 → 核に結果保持 → plan/profile/expr/opaque の作業 RAM 参照解除 → release_work (I/Oなし・二重呼出し安全) → lease 解放。SIZE_BARS 成功の保持例外だけは解除/free を次の開始・中止まで送る。外部 recover、開始途中失敗、二重終端も同じ所有規則を使う。
 - FAILED/cold・PTE破損ラッチ・最後の結果・session 世代は核の boot 寿命で、部品の解放/再登録で初期化しない。核の S0 ops/profile に戻すまで部品作業 RAM を返さない。これらの実装は M4、M1 は契約の固定だけ。
+
+- M3a の body は `gfinit_call` と `gfinit_recover_end` を call/release_work に型照合して結ぶ。後者は既存の終端状態でだけ作業 RAM を返す実装を維持し、owner/lease の接続と全出口の整理は M4 の契約に従う。
