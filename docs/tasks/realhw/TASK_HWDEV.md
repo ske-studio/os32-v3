@@ -88,4 +88,6 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 検証証拠は `~/os32-tmp/run/hwdev_m3a/`。実機・NP21/W は本段の対象外。
 
 ## 送り項目 (取り込みのレビューの P3)
+- (M3b で) M3a: tools/tests/test_hwdev_image.py:31・hwdev_module_host.c:141 — 実 GF 像では stub を一度も呼んでいない (stub のバイト列と飛び先の番地までしか見ていない)。M3b の部品越しに呼ぶ試験がこれを覆うこと、その試験で読み込み後に再配置された stub から核へ飛べることを確かめる。
+- (M5 で) M3a: build/kernel.mk:357・build/hwdev.mk:23 — generations-manifest.json の前提は KERNEL_PAIRED_MODULES だけで hwdev.mod が入っていない。gen_generation_manifest.py:14 が build/out/*.mod を拾うので `make -j all` の順番しだいで hwdev.mod が載らないか古いハッシュが載る (配備の照合には効かず害なし)。M5 で hwdev.mod を KERNEL_PAIRED_MODULES に入れて解消。
 - (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。
