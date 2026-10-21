@@ -107,7 +107,7 @@ static void address_tests(void)
     t = (struct recover_target){.space=REC_BAR_MMIO, .offset=0xc03c4, .index=RECOVER_NONE,
         .width=1, .read_safe=1};
     CHECK(recover_target_address(&t, REC_WRITE, &a) < 0);
-    t.space=REC_VGA_DIRECT; t.offset=0; t.port=0x3c9;
+    t.space=REC_VGA_DIRECT; t.offset=0; t.port=RECOVER_DAC_DATA;
     CHECK(recover_target_address(&t, REC_READ, &a) < 0);
 }
 static void bind_tests(void)
@@ -224,19 +224,33 @@ static void indexed_tests(void)
 }
 static void local_saved_tests(void)
 {
-    synthetic(2); targets[TK]=(struct recover_target){.space=REC_VGA_INDEXED,
-        .port=RECOVER_SEQ,.index=1,.width=1,.access=REC_RW,.read_safe=1};
-    writer(0,5,TK,REC_SELECT,1); writer(1,6,TK,REC_DATA,0x20);
-    for (u32 i=7;i<9;i++) rules[i]=(struct recover_rule){.id=i,.key=TK,
-        .phase=REC_RESTORE,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
-        .substep=i==7 ? REC_SELECT : REC_DATA,.write_mask=0xff,.verify_mask=0xff,
-        .value={.mode=REC_SAVED,.expr_id=RECOVER_NONE},.flags=REC_LOCAL};
-    profile.rule_count=9; bar_cache(); synthetic_begin(); f.restore_index=true;
-    CHECK(step_node(0)==0); CHECK(step_node(1)==0);
-    CHECK(trial_end(&r,&r.token,REC_NORMAL)==0);
-    CHECK(f.values[TK]==INITIAL && f.selected_value==0 && f.releases==1);
-    u32 writes_before=writes(); CHECK(local_cleanup(&f)==0);
-    CHECK(writes()==writes_before && f.releases==1);
+    for (u32 blocked=0; blocked<2; blocked++) {
+        synthetic(3); targets[TK]=(struct recover_target){.space=REC_VGA_INDEXED,
+            .port=RECOVER_SEQ,.index=1,.width=1,.access=REC_RW,.read_safe=1};
+        writer(0,5,TK,REC_SELECT,1); writer(1,6,TK,REC_DATA,0x20);
+        for (u32 i=7;i<9;i++) rules[i]=(struct recover_rule){.id=i,.key=TK,
+            .phase=REC_RESTORE,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
+            .substep=i==7 ? REC_SELECT : REC_DATA,.write_mask=0xff,.verify_mask=0xff,
+            .value={.mode=REC_SAVED,.expr_id=RECOVER_NONE},.flags=REC_LOCAL};
+        profile.rule_count=9; bar_cache(); synthetic_begin(); f.restore_index=true;
+        CHECK(step_node(0)==0); CHECK(step_node(1)==0);
+        CHECK(r.local_saved_count==2);
+        if (blocked) {
+            u32 selects=count('i',TK), data=count('w',TK), reads=count('r',TK);
+            f.id.device++;
+            CHECK(step_node(2)<0 && r.access_blocked);
+            CHECK(count('i',TK)==selects && count('w',TK)==data && count('r',TK)==reads);
+            CHECK(!f.owned && f.releases==1 && f.local_calls==1);
+            CHECK(r.reason==REC_CONTRACT && r.first_phase==REC_PHASE_NONE);
+            continue;
+        }
+        CHECK(step_node(2)==0);
+        CHECK(trial_end(&r,&r.token,REC_NORMAL)==0);
+        CHECK(r.selected==RECOVER_NONE);
+        CHECK(f.values[TK]==INITIAL && f.selected_value==0 && f.releases==1);
+        u32 writes_before=writes(); CHECK(local_cleanup(&f)==0);
+        CHECK(writes()==writes_before && f.releases==1);
+    }
 }
 static void n1_setup(void)
 {

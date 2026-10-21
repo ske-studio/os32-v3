@@ -315,7 +315,7 @@ int recover_profile_ok(const struct recover_profile *p)
     for (u32 i = 0; i < p->rule_count; i++) {
         const struct recover_rule *w = &p->rules[i];
         if (w->id == RECOVER_NONE || w->key >= p->target_count || w->phase > REC_VERIFY_PHASE ||
-            (w->phase == REC_RUN ? (w->main_id > 4 || w->pc == RECOVER_NONE) :
+            (w->phase == REC_RUN ? (w->main_id > RECOVER_MAIN_MAX || w->pc == RECOVER_NONE) :
              (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
             w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
             w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
@@ -339,17 +339,17 @@ int recover_profile_ok(const struct recover_profile *p)
         if (t->space == REC_PCI_CFG && t->offset == RECOVER_COMMAND &&
             (t->width != 2 || v->mode == REC_SAVED)) return -1;
         if ((w->flags & REC_N1) && (!n1_target(t) || w->phase != REC_RUN ||
-            w->main_id != 3 || w->pc != RECOVER_N1_PC)) return -1;
+            w->main_id != RECOVER_N1_MAIN || w->pc != RECOVER_N1_PC)) return -1;
         if (w->flags & REC_N1) {
             u32 found = 0;
             for (u32 j = 0; j < p->target_count; j++) {
                 const struct recover_target *g = &p->targets[j];
                 if (!zero_target(g)) continue;
                 if (!g->read_safe || g->width != 4) return -1;
-                if (g->space == REC_PCI_CFG) found |= g->offset == RECOVER_CFG50 ? 1U : 2U;
-                else found |= g->offset == RECOVER_PBUS1850 ? 4U : 8U;
+                if (g->space == REC_PCI_CFG) found |= g->offset == RECOVER_CFG50 ? RECOVER_N1_CFG50_BIT : RECOVER_N1_CFG54_BIT;
+                else found |= g->offset == RECOVER_PBUS1850 ? RECOVER_N1_PBUS1850_BIT : RECOVER_N1_PBUS1854_BIT;
             }
-            if (found != 15U) return -1;
+            if (found != RECOVER_N1_ALL_BITS) return -1;
         }
         for (u32 j = 0; j < i; j++) {
             const struct recover_rule *q = &p->rules[j];
@@ -833,7 +833,7 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
     if (!l || n->phase > REC_VERIFY_PHASE || n->ctx >= plan->ctx_count ||
         n->head > 1 || n->skip > 1 || n->arg_first > plan->arg_count ||
         n->arg_count > plan->arg_count - n->arg_first || n->arg_count != l->argc ||
-        (n->phase == REC_RUN ? n->main_id > 4 || n->pc == RECOVER_NONE :
+        (n->phase == REC_RUN ? n->main_id > RECOVER_MAIN_MAX || n->pc == RECOVER_NONE :
          n->main_id != RECOVER_NONE || n->pc != RECOVER_NONE)) return false;
     const struct recover_plan_arg *args = n->arg_count ? &plan->args[n->arg_first] : 0;
     for (u32 i = 0; i < n->arg_count; i++)
@@ -966,8 +966,8 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
                     t->index == RECOVER_CR44 && l->dir_substep == REC_DATA) {
                     if (t->head || n->arg_count != 2 || plan->args[n->arg_first + 1].kind != REC_IMM) return -1;
                     u32 value = plan->args[n->arg_first + 1].value;
-                    if (value != 0 && value != 3) return -1;
-                    head = value == 3;
+                    if (value != RECOVER_CR44_HEAD0 && value != RECOVER_CR44_HEAD1) return -1;
+                    head = value == RECOVER_CR44_HEAD1;
                 }
             }
             if (q->head != head) return -1;
@@ -1049,10 +1049,10 @@ static bool zero_guards(struct recover *r)
         if (!zero_target(t)) continue;
         u32 value;
         if (t->width != 4 || bus_read(r, i, &value) || value != 0) return false;
-        if (t->space == REC_PCI_CFG) found |= t->offset == RECOVER_CFG50 ? 1U : 2U;
-        else found |= t->offset == RECOVER_PBUS1850 ? 4U : 8U;
+        if (t->space == REC_PCI_CFG) found |= t->offset == RECOVER_CFG50 ? RECOVER_N1_CFG50_BIT : RECOVER_N1_CFG54_BIT;
+        else found |= t->offset == RECOVER_PBUS1850 ? RECOVER_N1_PBUS1850_BIT : RECOVER_N1_PBUS1854_BIT;
     }
-    return found == 15U;
+    return found == RECOVER_N1_ALL_BITS;
 }
 static bool guards(struct recover *r, const struct recover_rule *w, u32 when)
 {
@@ -1097,8 +1097,20 @@ static int access_error(struct recover *r, u32 key)
     if (r->state == REC_RUNNING) cleanup(r);
     return -1;
 }
+static enum recover_phase access_phase(const struct recover *r)
+{
+    switch (r->auth_phase) {
+    case REC_QUIESCE: return REC_PHASE_QUIESCE;
+    case REC_RESTORE: return REC_PHASE_RESTORE;
+    case REC_ROUTE: return REC_PHASE_ROUTE;
+    case REC_SCREEN: return REC_PHASE_SCREEN;
+    case REC_VERIFY_PHASE: return REC_PHASE_VERIFY;
+    default: return REC_PHASE_NONE;
+    }
+}
 int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, u32 *value)
 {
+    if (r->access_blocked) return -1;
     if (r->enabled && value && node == RECOVER_NONE && dir == REC_READ &&
         (r->state == REC_IDLE || r->state == REC_VERIFIED) && r->bound_profile) {
         const struct recover_profile *p = r->bound_profile;
@@ -1196,23 +1208,30 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
             }
         }
         if (!guards(r, w, REC_BEFORE)) return access_error(r, target);
-        if (r->ops->write(r->opaque, &a, *value)) return access_error(r, target);
+        if (r->ops->write(r->opaque, &a, *value)) {
+            fail(r, REC_BUS, access_phase(r), target);
+            return access_error(r, target);
+        }
         if (is_bar(t)) r->gpu_written = true;
-        if (dir == REC_SELECT) r->selected = target;
+        if (dir == REC_SELECT) r->selected = *value == t->index ? target : RECOVER_NONE;
         if (w->verify_mask) {
             u32 actual;
             /* SELECT readback reads the index port, not its data register. */
-            if (!t->read_safe || r->ops->read(r->opaque, &a, &actual) ||
-                ((actual ^ *value) & w->verify_mask)) {
-                fail(r, REC_VERIFY, REC_PHASE_RESTORE, target);
+            if (!t->read_safe) return access_error(r, target);
+            if (r->ops->read(r->opaque, &a, &actual)) {
+                fail(r, REC_BUS, access_phase(r), target);
+                return access_error(r, target);
+            }
+            if (((actual ^ *value) & w->verify_mask)) {
+                fail(r, REC_VERIFY, access_phase(r), target);
                 return access_error(r, target);
             }
         }
         if (!guards(r, w, REC_AFTER)) return access_error(r, target);
         if (t->space == REC_VGA_INDEXED && t->port == RECOVER_CRTC &&
             t->index == RECOVER_CR44 && dir == REC_DATA) {
-            if (t->head || (*value != 0 && *value != 3)) return access_error(r, target);
-            r->head = *value == 3;
+            if (t->head || (*value != RECOVER_CR44_HEAD0 && *value != RECOVER_CR44_HEAD1)) return access_error(r, target);
+            r->head = *value == RECOVER_CR44_HEAD1;
         }
         if (node != RECOVER_NONE) {
             select_record(r->profile, r->plan, node, r->buffers.valid_bits);
@@ -1263,7 +1282,7 @@ int recover_bar_probe(struct recover *r, u32 bar, u32 raw, u32 mask,
 {
     u32 base = raw & RECOVER_BAR_MASK, length = ~(mask & RECOVER_BAR_MASK) + 1U;
     if (r->state != REC_RUNNING || r->auth_phase != REC_SIZE_BARS || !r->entered ||
-        !r->measuring || bar >= 3 || raw != r->bars[bar].raw || (raw & 7U) || (mask & 7U) || !base || !length ||
+        !r->measuring || bar >= 3 || raw != r->bars[bar].raw || (raw & RECOVER_BAR_TYPE_MASK) || (mask & RECOVER_BAR_TYPE_MASK) || !base || !length ||
         (length & (length - 1)) || base % length ||
         (unsigned long long)base + length > RECOVER_ADDRESS_END || exclude_count > RECOVER_RANGE_MAX ||
         upstream_count > RECOVER_RANGE_MAX || (exclude_count && !exclude) || (upstream_count && !upstream)) goto bad;

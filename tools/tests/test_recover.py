@@ -24,6 +24,13 @@ def host_cmd(exe):
 
 
 MUTATIONS = [
+    ("access_blocked_ignored", "    if (r->access_blocked) return -1;", ""),
+    ("local_selected_stale", "r->selected = *value == t->index ? target : RECOVER_NONE;",
+     "r->selected = target;"),
+    ("write_bus_contract", "fail(r, REC_BUS, access_phase(r), target);\n            return access_error",
+     "fail(r, REC_CONTRACT, REC_PHASE_NONE, target);\n            return access_error"),
+    ("verify_phase_restore", "fail(r, REC_VERIFY, access_phase(r), target);",
+     "fail(r, REC_VERIFY, REC_PHASE_RESTORE, target);"),
     ("snapshot_valid_early", "r->valid = false; r->failed = false;",
      "r->valid = true; r->failed = false;"),
     ("cleanup_removed", "bool safe = !r->access_blocked && quiesce(r, true);",
@@ -97,6 +104,12 @@ def one_mutation(item):
         except subprocess.CalledProcessError as error:
             return f"MUTATE {name}: COMPILE FAIL {error.stderr!r}", 1
         result = host32.run([str(exe)], cwd=str(tree), timeout=60, capture_output=True)
+        if name == "cold_replayed":
+            missing = [i for i in range(4)
+                       if f"COLD replay exit {i}".encode() not in result.stdout]
+            if missing:
+                return f"MUTATE {name}: missing exit paths {missing}", 1
+            return f"MUTATE {name}: RED all 4 exit paths rc={result.returncode}", 0
         if result.returncode == 0:
             return f"MUTATE {name}: GREEN", 1
         return f"MUTATE {name}: RED rc={result.returncode}", 0
