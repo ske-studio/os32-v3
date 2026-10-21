@@ -20,6 +20,8 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 
 `~/os32-tmp/refs/geforce6200/INDEX.md` (envytools f102b82・xf86-video-nv 8234bce・Haiku af754c7c の nvidia ドライバ・nouveau c03c1a1 の devinit/bios/fb/clk/dispnv04、版とライセンス、見る所)。リポジトリには入れない。
 
+VBIOS について分かっていること (表の地図・init script 9 本・27 種の命令・書込みの分類・メモリと PLL・出力) のまとめ: [GEFORCE6200_VBIOS.md](GEFORCE6200_VBIOS.md)。
+
 ## 3. 手順の計画 (確定 2026-10-20、Fable 起草・Opus 2 往復・PM が最終修正)
 
 全文 (根拠の資料と行番号、合否、危険と戻し方): `~/os32-tmp/run/gf6200/PLAN.final.md`。
@@ -53,7 +55,7 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 - 表: init script 表 0x5d4c (main 5 本)・condition 0x5d86 (3)・IO flag condition 0x5daa (8)・macro 0x5d66 (4)・PLL limits 0x5bc8 (版 21、4 件、ref_clk 0 = strap から)・DCB 0x96ac (版 3.0: ANALOG OR0・ANALOG OR1・TMDS OR0 (DVI-I)・TV)・I2C 0x9715・GPIO 0x974e・CONN 0x97da (VGA・DVI_I・COMPOSITE・S_VIDEO・RGB)・TMDS 0x95ea・perf 0xdcef (Core 300MHz・Memory 200MHz の 1 段)・memory timings 0xddd1 (全部 0)。strap の上書き select ffef81c3 / value 00001e0c は PSTRAPS の実値と一致。
 - init script: main 0〜4 と SUB/CALL 先を合わせて 9 本、命令 193 個・27 種類 (多い順 ZM_REG 42・NV_REG 36・IO_RESTRICT_PROG 32・TIME 13・ZM_CR 9・DONE 9・INDEX_IO 8・RESUME 6・MACRO 5・…・COMPUTE_MEM 1)。PLL は R[4004]=200MHz・R[4024]=400MHz・R[680508]=36MHz・R[402c]=c1c11002。
 - **基準水晶は 27MHz** (PSTRAPS bit22=1・bit6=0、nouveau の判定 strap&0x00400040 == 0x00400000)。
-- **メモリ**: RAM の組 3 (CR3C の strap bits 2-5 から)、組 3 の PFB 値 (100220=03080e0b・100224=05010405・100228=20220303・10022c=41088102・100234=00266622 ほか)。DDR 系・200MHz までの推定、量は init 3 の COMPUTE_MEM が実行時に測る (段 4a で BAR1 の大きさと合わせて確かめる)。
+- **メモリ**: RAM の組 3 (CR3C の strap bits 2-5 から)、組 3 の PFB 値 (100220=03080e0b・100224=05010405・100228=20220303・10022c=41088102・100234=00266622 ほか)。DDR 系・200MHz までの推定、量は init 3 の COMPUTE_MEM が測ると読んだが、NV44A では COMPUTE_MEM は何もしない (4a 確定設計 D2 で訂正) — 量は段 4a で BAR1 の大きさと VRAM の試験で確かめる。
 - 次: 段 4a (初期化 script の試行、書き込み) は 27 種類の命令の解釈器が要る → astra の設計 (nouveau の devinit/bios の MIT 部と Haiku の coldstart を根拠) と Opus のレビューを先に。書き込みの実施は段ごとにユーザーの承認。
 
 ### 映像の経路 (ユーザー 2026-10-21)
