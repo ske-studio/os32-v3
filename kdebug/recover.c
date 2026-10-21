@@ -744,22 +744,19 @@ static int logged_callback(struct recover *r, const char *phase, int (*fn)(void 
     (void)recover_record(r, phase, "END", 0, 0, rc, r->ops->ticks(r->opaque) - tick);
     return rc;
 }
-static int logged_route_read(struct recover *r, u32 *value)
+/* value NULL writes RECOVER_ROUTE_98 (step 1); otherwise reads (step 0). */
+static int route_call(struct recover *r, u32 *value)
 {
-    if (!r->transport) return r->ops->route_read(r->opaque, value);
-    u32 tick = r->ops->ticks(r->opaque);
-    (void)recover_record(r, "route", "BEGIN", 0, RECOVER_ROUTE_PORT, 0, 0);
-    int rc = recover_restore_point(r) ? -1 : r->ops->route_read(r->opaque, value);
-    (void)recover_record(r, "route", "END", 0, RECOVER_ROUTE_PORT, rc, r->ops->ticks(r->opaque) - tick);
-    return rc;
+    return value ? r->ops->route_read(r->opaque, value)
+                 : r->ops->route_write(r->opaque, RECOVER_ROUTE_98);
 }
-static int logged_route_write(struct recover *r)
+static int logged_route(struct recover *r, u32 *value)
 {
-    if (!r->transport) return r->ops->route_write(r->opaque, RECOVER_ROUTE_98);
-    u32 tick = r->ops->ticks(r->opaque);
-    (void)recover_record(r, "route", "BEGIN", 1, RECOVER_ROUTE_PORT, 0, 0);
-    int rc = recover_restore_point(r) ? -1 : r->ops->route_write(r->opaque, RECOVER_ROUTE_98);
-    (void)recover_record(r, "route", "END", 1, RECOVER_ROUTE_PORT, rc, r->ops->ticks(r->opaque) - tick);
+    if (!r->transport) return route_call(r, value);
+    u32 tick = r->ops->ticks(r->opaque), step = value ? 0 : 1;
+    (void)recover_record(r, "route", "BEGIN", step, RECOVER_ROUTE_PORT, 0, 0);
+    int rc = recover_restore_point(r) ? -1 : route_call(r, value);
+    (void)recover_record(r, "route", "END", step, RECOVER_ROUTE_PORT, rc, r->ops->ticks(r->opaque) - tick);
     return rc;
 }
 
@@ -816,7 +813,7 @@ static void screen(struct recover *r)
 {
     u32 route;
     if (!restore_time(r)) return;
-    if (recover_restore_point(r) || logged_route_read(r, &route)) {
+    if (recover_restore_point(r) || logged_route(r, &route)) {
         fail(r, REC_BUS, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
     }
     if (route & RECOVER_ROUTE_MASK) {
@@ -824,8 +821,8 @@ static void screen(struct recover *r)
             fail(r, REC_CONTRACT, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
         if (!restore_time(r)) return;
-        if (recover_restore_point(r) || logged_route_write(r) ||
-            recover_restore_point(r) || logged_route_read(r, &route) || (route & RECOVER_ROUTE_MASK)) {
+        if (recover_restore_point(r) || logged_route(r, 0) ||
+            recover_restore_point(r) || logged_route(r, &route) || (route & RECOVER_ROUTE_MASK)) {
             fail(r, REC_VERIFY, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
     }

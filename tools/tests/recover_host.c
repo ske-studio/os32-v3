@@ -516,8 +516,6 @@ static void routes(void)
 #include "recover_descriptor_host.inc"
 
 #include "recover_t2_host.inc"
-
-
 #include "recover_t3_host.inc"
 
 void _start(void)

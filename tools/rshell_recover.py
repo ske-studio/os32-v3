@@ -9,6 +9,7 @@ relies on session/sequence/metadata. --session 0 requests untested S0 recovery.
 """
 import argparse
 import fcntl
+import io
 import json
 from pathlib import Path
 import re
@@ -143,7 +144,6 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
 
 
 def verify_boot(port, expected_crc, timeout, raw, clock=time.monotonic):
-    import io
     capture = io.BytesIO()
     try:
         exchange(port, 'ver', None, timeout, timeout, capture, lambda _: None, clock)
@@ -170,7 +170,7 @@ def main():
     parser.add_argument('--command')
     args = parser.parse_args()
     if not 0 <= args.session <= 0xffffffff or min(args.timeout, args.cleanup_timeout) <= 0:
-        parser.error('session and deadlines must be positive')
+        parser.error('session must fit in u32 and deadlines must be positive')
     if not re.fullmatch('[0-9a-fA-F]{8}', args.image_crc):
         parser.error('--image-crc must have 8 hexadecimal digits')
     command = args.command or 'recover now %d' % args.session

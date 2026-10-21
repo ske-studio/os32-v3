@@ -1,5 +1,10 @@
+/* cmd_recover.c — `recover status` / `recover now <session>` (realhw_recover T3)
+ * kdebug_call の私有 op (kdebug/recover_wire.h) で状態を読み、now は指定 session
+ * の復旧を頼む。ホスト側: tools/rshell_recover.py。試験: tools/tests/recover_cli_host.c */
 #include "shell.h"
 #include "../../kdebug/recover_wire.h"
+
+#define RECOVER_KAPI_MIN 78U /* kdebug_call (slot 253) の版 */
 
 int shell_cmd_recover(int argc, char **argv)
 {
@@ -15,7 +20,7 @@ int shell_cmd_recover(int argc, char **argv)
         }
         op = KDEBUG_OP_RECOVER_NOW;
     } else if (argc != 2 || !str_eq(argv[1], "status")) goto usage;
-    if (g_api->version < 78 || !g_api->kdebug_call) {
+    if (g_api->version < RECOVER_KAPI_MIN || !g_api->kdebug_call) {
         g_api->kprintf(ATTR_RED, "recover: kdebug unavailable\n");
         return 1;
     }

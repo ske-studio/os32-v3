@@ -67,6 +67,7 @@ static int recovery_tx_put(void *opaque, u32 byte)
     return 0;
 }
 #define RECOVERY_UART_POLL_LIMIT 65536U
+#define RECOVERY_FRAME_BIT_US 10000000U /* 10 bits/frame x 1 s in us */
 static struct recover_transport recovery_transport = {
     .get = recovery_rx,
     .uart = {recovery_tx_ready, recovery_tx_put, recover_hal_wait_frame},
@@ -88,8 +89,8 @@ static int recovery_attach(void)
             recover_owner_configure(&recovery_ops, 0, &recovery_s0, false)) return -1;
     }
     if (!r->transport) {
-        recovery_transport.frame_us = 10000000U / setup->actual +
-                                      (10000000U % setup->actual != 0);
+        recovery_transport.frame_us = RECOVERY_FRAME_BIT_US / setup->actual +
+                                      (RECOVERY_FRAME_BIT_US % setup->actual != 0);
         r->transport = &recovery_transport;
     }
     return 0;
