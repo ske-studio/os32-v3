@@ -2,8 +2,8 @@
 """Notebook: python3 tools/gfinit_rom_check.py /path/to/private.rom
 
 Prints expected start/length/IEEE CRC32 with --list (no ROM needed).
-Reads ONLY the nine init-data ranges. Does not disassemble, write, copy or
-store ROM bytes. All expectations come from the S1 transcript reconstruction,
+Reads the whole ROM into memory but compares ONLY the nine init-data ranges.
+Does not disassemble, write, copy or store ROM bytes. All expectations come from the S1 transcript reconstruction,
 not a prior ROM validation. Mismatch is failure: do not update expectations
 from ROM automatically; compare notebook nvbios output and review the cause.
 The script/fixture pair can be copied to a notebook without the source txt.

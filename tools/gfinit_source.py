@@ -105,8 +105,8 @@ DENY_W, N1, DENY_DISPLAY = 1, 2, 4
 def effects(rows):
     out, head = [], 0
     for sid, pc, raw in rows:
-        if sid in (0, 1, 2, 3, 4, 6, 7, 8, 255) and (
-                not out or sid != previous_sid):
+        # Every main ends on head0 and SUB 6/7/8 are called on head0, so a new script starts on head0.
+        if not out or sid != previous_sid:
             head = 0
         previous_sid = sid
         op = raw[0]
