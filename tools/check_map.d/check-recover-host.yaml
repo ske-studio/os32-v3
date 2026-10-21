@@ -9,3 +9,4 @@ check-recover-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-recover-host.yaml
 - build/checks.d/check-recover-host.mk
+- tools/tests/recover_descriptor_host.inc

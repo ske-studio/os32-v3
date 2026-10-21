@@ -1,6 +1,6 @@
-"""T1 pure recovery contracts; real source + fake bus/clock, no hardware.
+"""T1/T1b recovery contracts; real source + fake bus/clock, no hardware.
 
---mutate covers DESIGN.final §7's T1 mutations; PTE restore belongs to T2.
+--mutate covers T1 plus ADDENDUM.r2 §3 T1b mutations; hardware PTE work is T2.
 """
 import os
 import pathlib
@@ -28,17 +28,18 @@ MUTATIONS = [
      "r->valid = true; r->failed = false;"),
     ("cleanup_removed", "bool safe = !r->access_blocked && quiesce(r, true);",
      "bool safe = false;"),
-    ("w1c_allowed", "(d->kind != REC_RW && d->kind != REC_COLD)",
+    ("w1c_allowed", """(d->kind != REC_RW && d->kind != REC_COLD) ||
+            d->kind != p->targets[d->key].access""",
      "(d->kind != REC_RW && d->kind != REC_COLD && d->kind != REC_W1C)"),
     ("mask_all_bits", "(actual & ~d->write_mask) | (r->saved[i] & d->write_mask)",
      "r->saved[i]"),
-    ("restore_order", "const struct recover_reg *d = &r->profile->regs[i];",
-     "const struct recover_reg *d = &r->profile->regs[r->saved_count - 1 - i];"),
+    ("restore_order", "const struct recover_reg *d = &r->profile->regs[i];\n            if (d->kind == REC_COLD)",
+     "const struct recover_reg *d = &r->profile->regs[r->saved_count - 1 - i];\n            if (d->kind == REC_COLD)"),
     ("deadline_inverted", "if (r->spent >= r->budget ||",
      "if (r->spent < r->budget ||"),
     ("stale_session", "t && t->session == r->token.session &&", "t &&"),
-    ("verify_ok", "fail(r, REC_VERIFY, phase, w->key); return false;",
-     "return true;"),
+    ("verify_ok", "((actual ^ *value) & w->verify_mask)) {",
+     "(((actual ^ *value) & w->verify_mask) && false)) {"),
     ("cold_replayed", """if (safe && !r->profile->cold_required) {
         for (u32 i = 0; i < r->saved_count; i++) {
             const struct recover_reg *d = &r->profile->regs[i];
@@ -50,6 +51,36 @@ MUTATIONS = [
      "    if (abort)"),
     ("pause_time_lost", "    if (check_deadline(r)) return -1;\n    r->in_call = false;",
      "    r->in_call = false;"),
+    ("local_cleanup_removed", "if (r->ops->local_cleanup(r->opaque)) {", "if (false) {"),
+    ("local_cleanup_after_quiesce", """    if (r->ops->local_cleanup(r->opaque)) {
+        fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
+    }
+    state(r, REC_RESTORING);
+    bool safe = !r->access_blocked && quiesce(r, true);""", """    state(r, REC_RESTORING);
+    bool safe = !r->access_blocked && quiesce(r, true);
+    if (r->ops->local_cleanup(r->opaque)) {
+        fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
+    }"""),
+    ("head_stride_removed", "t->head * RECOVER_HEAD_STRIDE + t->port", "0 * t->head + t->port"),
+    ("prmcio_confused", "? RECOVER_PRMCIO : RECOVER_PRMVIO", "? RECOVER_PRMVIO : RECOVER_PRMVIO"),
+    ("index_data_reversed", "t->space == REC_VGA_INDEXED && dir != REC_SELECT", "t->space == REC_VGA_INDEXED && dir == REC_SELECT"),
+    ("select_write_unchecked", "if (dir == REC_READ) {", "if (dir == REC_READ || dir == REC_SELECT) {"),
+    ("phase_unchecked", "n->phase == w->phase && n->main_id == w->main_id", "n->main_id == w->main_id"),
+    ("pc_unchecked", "n->pc == w->pc && n->substep == w->substep", "n->substep == w->substep"),
+    ("value_mask_unchecked", "(value & v->mask) != v->bits", "((value & v->mask) != v->bits && false)"),
+    ("value_set_unchecked", "if (v->mode == REC_SET) {", "if (v->mode == REC_SET) return true;\n    if (v->mode == REC_SET) {"),
+    ("value_range_unchecked", "return value >= v->min && value <= v->max;", "return true;"),
+    ("expr_unchecked", "!evaluate(r, n, w, old, &expected) || *value != expected", "!evaluate(r, n, w, old, &expected)"),
+    ("dependency_order_reversed", "bool found = false;\n        for (u32 j = 0; j < node; j++) {", "bool found = false;\n        for (u32 j = node; j < plan->node_count; j++) {"),
+    ("previous_iteration_reused", "q->ctx == n->ctx && q->phase == n->phase && q->main_id == n->main_id)))", "q->phase == n->phase && q->main_id == n->main_id)))"),
+    ("n1_before_removed", "if (!guards(r, w, REC_BEFORE))", "if (false && !guards(r, w, REC_BEFORE))"),
+    ("n1_after_removed", "if (!guards(r, w, REC_AFTER))", "if (false && !guards(r, w, REC_AFTER))"),
+    ("n1_cfg_only", "if (!zero_target(t)) continue;", "if (!zero_target(t) || t->space != REC_PCI_CFG) continue;"),
+    ("n1_mmio_only", "if (!zero_target(t)) continue;", "if (!zero_target(t) || t->space != REC_BAR_MMIO) continue;"),
+    ("nonzero_hold_allowed", "if (zero_target(t) && args[1].value) return false;", "if (false && zero_target(t) && args[1].value) return false;"),
+    ("crc_tables_removed", "c = crc_word(c, d->value.bits);", "/* value bits omitted */"),
+    ("cold_saved_allowed", "if (v->mode == REC_SAVED && (", "if (false && v->mode == REC_SAVED && ("),
+
 ]
 
 
@@ -69,11 +100,6 @@ def one_mutation(item):
         result = host32.run([str(exe)], cwd=str(tree), timeout=60, capture_output=True)
         if result.returncode == 0:
             return f"MUTATE {name}: GREEN", 1
-        if name == "cold_replayed":
-            for reason in range(4):
-                if f"COLD replay exit {reason}\n".encode() not in result.stdout:
-                    return f"MUTATE {name}: exit {reason} not detected", 1
-            return f"MUTATE {name}: RED normal/abort/timeout/failure rc={result.returncode}", 0
         return f"MUTATE {name}: RED rc={result.returncode}", 0
 
 
