@@ -78,6 +78,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 全文: 段 4a [GF6200_4A_DESIGN.md](design/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](design/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](design/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](design/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](design/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md)。
 
 - **ユーザー決定**: N1 main3 の E81E (SR01 bit5 の解除) だけを cfg 50h/54h=0 の保持を条件に許す。U1 固まったら当面ユーザーが手で戻し、書込みの段は立会い。U2 A1 (BAR の測定) → A2 (準備) → main 0〜3 の script ごと → A4 (VRAM の確認) を、結果を見て段ごとに承認。U3 4a はモニタ無し、モニタは 4b の前に決める。
+- **S7 以降の段の並べ替え (2026-10-22)**: 装置ごとの部分を別の部品に分ける段 (M1〜M5) を先に入れた。順序は [TASK_HWDEV.md](TASK_HWDEV.md) §3 が正。
 - **4a の実装段**: S1 fixture (27 種 193 命令) → S2 decode → S3 exec → S4 PLL → S5 bus・窓の共有 → S6 kdebug 統合 → S7 shell と KAPI 共有ヘッダ → S8 実機 A1/A2 → S9 以降 main ごと、最後に A4。各 0.5〜1 日。
 - **戻す処理の段**: T1 状態機械 → T2 窓・profile・98 復帰 → T3 shell/host/deadman → T4 NP21/W → T5 実機の無書込み (+ 0FACh の初めての書込みを明示承認の 1 回) → T6 承認済み書込み → T7 復旧演習。4a の S5〜S6 は recover の descriptor とログの契約を使うので、**T1〜T3 を先に着地させる**。
 - **98 の画面に戻す** (② の先頭): 0FACh を読み、bit1..0 が 00b なら書かず、違えば 00h を書いて読み戻す。経路の最終判定はユーザーの目視。4a は 0FACh を読み書きしない。

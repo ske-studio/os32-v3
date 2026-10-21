@@ -12,7 +12,7 @@
 - **U3 (2026-10-21)**: 4a は GeForce 用のモニタ無しで行い、映像出力のモニタは 4b の前に決める (映像の経路は [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) §4「映像の経路」)。
 - **N1 (2026-10-21)**: main3 の E81E (SR01 bit5 の解除) だけを、cfg 50h・54h と PBUS 1850h・1854h が 0 のまま保たれる (実行の前後に読み戻す) ことを条件に許す。
 - **起動 FD に kdebug を載せない (2026-10-21)**。recover は kdebug の部品 (KDEBUG=1) の中にあるので、FD で起動した状態では使えない前提で手順を組む。 理由: 戻す処理が kdebug.bin に入って 64.6KB → 103KB になり、起動 FD (2HD) の空きが下限 64KB を割った (71KB → 33KB)。kdebug は開発用で FD (レスキュー兼インストーラ) に不要、FD からインストールした実機は hsync boot で入る。CD には残す。詳細は [08_build.md](../../08_build.md) の「起動 FD と MINIMAL」と [TASK_DBGREF](../v3/TASK_DBGREF.md) §3-9。
-- **未決 (ユーザー判断)**: PG リセット (§5) を付けるか、PG の後の起動を cold-required の解除 (電源の入れ直しの記録 + COLD の取り直し) に数えるか。それまで cold-required の解除は「ユーザーの電源の入れ直し」だけ。
+- **PG リセット (§5) は付けない (ユーザー決定 2026-10-22「つけない」)**。固まったときは立会いのときに手で電源を入れ直し、その後に COLD を取り直す。cold-required の解除は「ユーザーの電源の入れ直し」だけ (PG の後をどう数えるかは付けないので決めない)。
 
 ## 1. PM 決定
 
@@ -39,6 +39,8 @@
 | T5 | 実機・書込みなし: status と安全な snapshot → 同値 restore → S0、続けて明示承認の 1 回で 0FACh←00h と目視、各 profile の実測 (A3 の置き換え) | 未 | — |
 | T6 | 実機・承認済みの書込み: 最小変更 → 手動 abort → 短い期限切れ → 意図的なソフト失敗 → ①② | 未 (4a と並行か後) | — |
 | T7 | 復旧演習: シリアル reboot、旧版一式の復旧、立会いの物理復帰を各 1 回、外部デバイス実装モデルの材料に | 未 | — |
+
+T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部品に分ける M1〜M5 を先に): 順序は [TASK_HWDEV.md](TASK_HWDEV.md) §3 が正。
 
 合格条件の全文は [DESIGN](design/REALHW_RECOVER_DESIGN.md) §7 の表と [ADDENDUM_R2](design/REALHW_RECOVER_ADDENDUM_R2.md) §3。変異の実行は PM のレビューの後 (ROLES §0)。
 
