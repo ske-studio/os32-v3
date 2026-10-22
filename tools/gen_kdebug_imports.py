@@ -30,6 +30,8 @@ for _stage, _kinds in STAGE_KINDS.items():
     STAGES[_stage] = (list(STAGES.values())[-1] if STAGES else 0) + len(_kinds)
 LAST_STAGE = list(STAGE_KINDS)[-1]
 GENERATIONS = json.loads((ROOT / 'sdk/kapi.json').read_text())['generations']
+# Slots 264..267 were called only by the GF body, which M3c moved to HWDEV.
+GF_ONLY_SLOTS = range(264, 268)
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
 
@@ -182,7 +184,7 @@ def check_nm(entries, nm=None, root=ROOT):
     if refs - expected:
         raise ValueError('unexpected core references: ' + str(sorted(refs - expected)))
     for e in entries:
-        if e['index'] in range(264, 268):
+        if e['index'] in GF_ONLY_SLOTS:
             if not e.get('retained') or e['name'] in refs:
                 raise ValueError('GF-only slot must be retained without core callers: ' + e['name'])
     retained = {e['symbol'] for e in entries if e.get('retained')}

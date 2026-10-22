@@ -45,7 +45,7 @@ class ImportsTests(unittest.TestCase):
             gen.check_nm(altered)
 
     def test_gf_slots_retained_without_core_callers(self):
-        for index in range(264, 268):
+        for index in gen.GF_ONLY_SLOTS:
             altered = copy.deepcopy(self.entries)
             altered[index].pop('retained')
             with self.assertRaisesRegex(ValueError, 'GF-only slot must be retained'):
