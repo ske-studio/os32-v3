@@ -84,7 +84,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - **4a の実装段**: S1 fixture (27 種 193 命令) → S2 decode → S3 exec → S4 PLL → S5 bus・窓の共有 → S6 kdebug 統合 → S7 shell と KAPI 共有ヘッダ → S8 実機 A1/A2 → S9 以降 main ごと、最後に A4。各 0.5〜1 日。
 - **戻す処理の段**: T1 状態機械 → T2 窓・profile・98 復帰 → T3 shell/host/deadman → T4 NP21/W → T5 実機の無書込み (+ 0FACh の初めての書込みを明示承認の 1 回) → T6 承認済み書込み → T7 復旧演習。4a の S5〜S6 は recover の descriptor とログの契約を使うので、**T1〜T3 を先に着地させる**。
 - **98 の画面に戻す** (② の先頭): 0FACh を読み、bit1..0 が 00b なら書かず、違えば 00h を書いて読み戻す。経路の最終判定はユーザーの目視。4a は 0FACh を読み書きしない。
-- **最後の手段**: CPU リセット (F0h / `sys_reboot`) は PCI RST# を保証しない。PG (電源コネクタの POWER GOOD を GND に落とす) は Ra266 で未確認で、付けるかはユーザー判断。PG 後は warm-residue として扱い、cold-required の解除に数えるかはユーザー決定。
+- **最後の手段**: CPU リセット (F0h / `sys_reboot`) は PCI RST# を保証しない。PG (電源コネクタの POWER GOOD を GND に落とす) は付けない (ユーザー決定 2026-10-22、`TASK_REALHW_RECOVER` §0)。PG 後は warm-residue として扱い、cold-required の解除に数えるかはユーザー決定。
 
 ### 4a S1 fixture (2026-10-21)
 

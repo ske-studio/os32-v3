@@ -54,7 +54,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。
 3. **M4a と M4b**: 対象は誰も持っていない 0:13.0 だけなので、まとめて 1 段にできるかを依頼の前に PM が決める。送り項目の「S0 の最小 GF 復帰」の扱いはここで決める。
 4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す ([GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) §8 の S7 行と [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) §6 の書換えが要る)。M5 と同じ段にできるかは設計の後に決める。
-5. **T4b**: NP21/W では GPU を確かめられないので、PAUSED の門と `recover now 0` の経路に絞る。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
+5. **T4b**: NP21/W に GeForce は無いので、GPU への試行が通ることは T4b では確かめない (実機の S8 以降)。戻す処理そのものの項目 (`recover now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障、送信詰まり・poll 上限・終端不着、旧版一式への巻戻し) は DEFERRED_TESTS の RECOVER-T4B の行のまま残す。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
 6. **T5 と S8**: T5 は A1・A2 の測定と併合してよい ([ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md))。書込みなしの部分 (status・snapshot・version.chip の実 ROM 確認) は立会いなしでシリアルで先に回し、0FACh の初めての書込みと目視は S8 と同じ立会いの回にまとめる。
 
 並びの要約: M5 (+旧 S7 の可否) ∥ BARLEN 設計 → M4 → T4b → T5 の無書込み → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7。
