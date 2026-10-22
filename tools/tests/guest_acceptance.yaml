@@ -1,4 +1,7 @@
 # Acceptance index; batch entry names resolve through guest_tests.txt.
+# contract は項目が確かめる性質の正典 (仕様・決定の文書、試験・道具のコード、延期は DEFERRED_TESTS) を 1 つか並びで指す。
+# docs/archive/ は指さない ([D4]、gen_guest_acceptance.py が落とす)。合否の閾値 (±10% など)・観測の段取り・fixture 固有の値は
+# この索引の項目自身が正典で、仕様の文書へ写さない (PM 決定 2026-10-22、4 段目のレビュー往復 2)。
 - id: e9-nop
   gate: e9
   contract: userland/tests/ring3_marker.h
@@ -1824,6 +1827,7 @@
   - tools/tests/guest_tests.txt
   - userland/tests/db_test.c
   - userland/tests/db_v50_test.c
+  - docs/KAPI_SPEC.md#4-10-mem_map-v71
   mode: manual
   prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: guest_tests.txt; db_test; db_v50_test; g-L-2 / g-G-9
@@ -1960,6 +1964,7 @@
   contract:
   - userland/tests/bench_scale2x/main.c
   - docs/BENCHMARK.md
+  - docs/tasks/DEFERRED_TESTS.md#E10-4
   mode: manual
   prereq: "R1b: R1a と同じ L-h / 本 NHD / 17MB。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致後に GUI。切替は協調型で同時実行は 1 本。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'E11-PERF: present/query; bench_scale2x Test 1; E10-4 v86 -g 中の kill'
@@ -2527,6 +2532,7 @@
   contract:
   - userland/tests/pcm_test.c
   - docs/09_exec.md#gui-の-kapi-loop-の-stop
+  - docs/tasks/v3/TASK_PCM_CS4231.md
   mode: manual
   prereq: "R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start し保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '[pcm] 起動行; pcm_test E5 (CPL3 CUI); GUI再生 park/resume'
