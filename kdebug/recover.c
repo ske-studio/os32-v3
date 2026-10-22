@@ -167,12 +167,27 @@ static void fail(struct recover *r, enum recover_reason reason,
 
 /* One boot-lifetime owner; test sessions borrow it, never replace it. */
 static struct recover owner;
+static const struct recover_ops *owner_s0_ops;
+static void *owner_s0_opaque;
+static const struct recover_profile *owner_s0_profile;
 struct recover *recover_owner(void) { return &owner; }
 int recover_owner_configure(const struct recover_ops *ops, void *opaque,
     const struct recover_profile *s0_profile, bool route_write_approved)
 {
+    if (!ops) {
+        if (!owner_s0_ops || (owner.state != REC_IDLE &&
+            owner.state != REC_VERIFIED && owner.state != REC_FAILED)) return -1;
+        release_plan(&owner);
+        owner.profile = owner_s0_profile;
+        owner.ops = owner_s0_ops; owner.opaque = owner_s0_opaque;
+        owner.s0_profile = owner_s0_profile;
+        return 0;
+    }
     if ((owner.state != REC_IDLE && owner.state != REC_VERIFIED) ||
         owner.failed || owner.cold_latched || !ops || !s0_profile) return -1;
+    if (!owner.ops) {
+        owner_s0_ops = ops; owner_s0_opaque = opaque; owner_s0_profile = s0_profile;
+    }
     owner.ops = ops; owner.opaque = opaque; owner.enabled = true;
     owner.route_write_approved = route_write_approved;
     owner.s0_profile = s0_profile;
@@ -1073,7 +1088,7 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
                 u32 plan_hash, u32 budget)
 {
     if (r->state != REC_IDLE && r->state != REC_VERIFIED) return -1;
-    if (!r->enabled || r->cold_latched || !profile_ok(p, budget) ||
+    if (!r->enabled || r->failed || r->cold_latched || !profile_ok(p, budget) ||
         !r->plan || r->bound_profile != p || plan_hash != r->bound_hash ||
         !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) {
         release_plan(r); return -1;
@@ -1438,7 +1453,7 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
     const struct recover_plan *plan, struct recover_plan_buffers *buf, u32 *hash)
 {
     if (!r->enabled || r->plan || (r->state != REC_IDLE && r->state != REC_VERIFIED) ||
-        r->cold_latched || recover_profile_ok(p) || p->crc != recover_profile_crc(p) ||
+        r->failed || r->cold_latched || recover_profile_ok(p) || p->crc != recover_profile_crc(p) ||
         !plan || !buf || !buf->flow_bits || !buf->valid_bits || !hash || !plan->version ||
         plan->profile_crc != p->crc || !plan->node_count || plan->node_count > RECOVER_NODE_MAX ||
         !plan->nodes || plan->arg_count > RECOVER_ARG_MAX || (plan->arg_count && !plan->args) ||
@@ -1580,6 +1595,9 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
 static void release_plan(struct recover *r)
 {
     if (r->plan) for (u32 i = 0; i < RECOVER_BITS_WORDS; i++) r->buffers.valid_bits[i] = 0;
+    for (u32 i = 0; i < RECOVER_NODE_MAX; i++) {
+        r->node_layout[i] = 0; r->node_write[i] = 0;
+    }
     r->capture_valid = 0;
     r->plan = 0; r->bound_profile = 0; r->buffers = (struct recover_plan_buffers){0};
     r->cursor = r->expected_node = RECOVER_NONE; r->entered = false;

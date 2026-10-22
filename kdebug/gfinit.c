@@ -1,5 +1,6 @@
 /* GF4a owner. All trial writes go through recover's immutable plan. */
 #include "gfinit.h"
+#include "hwdev/owner.h"
 #include "gfinit_bus.h"
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
@@ -55,9 +56,21 @@ struct gfinit_owner {
     struct gfinit_request last;
     u8 *rom;
     bool inspected;
+    u32 generation;
 };
 static struct gfinit_owner control; /* small, stable callbacks survive terminal status */
 static struct gfinit_owner *owner;
+/* There is no production GF driver in v1. Only this fixed, stopped device is
+ * classified; IDE, LAN/SerialFS, display and unknown inputs never claim. */
+static struct hwdev_device_owner gf_device = {
+    .bdf = GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
+};
+static struct hwdev_lease gf_lease;
+static bool gf_owned(struct recover *r)
+{
+    return owner && hwdev_lease_matches(&gf_lease, &gf_device,
+                                        owner->generation, r->token.session);
+}
 
 static void *gf_alloc(u32 bytes)
 {
@@ -78,9 +91,15 @@ static const struct gfinit_pci_ops gf_pci = {
 
 static int gf_read(void *opaque, const struct recover_bus_access *a, u32 *value)
 {
+    if (!gf_owned(recover_owner())) return -1;
     int rc = gfinit_bus_read(opaque, a, value);
     if (!rc && owner && owner->compiled) gfinit_plan_read(owner->compiled, recover_owner(), a, *value);
     return rc;
+}
+static int gf_write(void *opaque, const struct recover_bus_access *a, u32 value)
+{
+    if (!gf_owned(recover_owner())) return -1;
+    return gfinit_bus_write(opaque, a, value);
 }
 static int gf_local(void *opaque)
 { return gfinit_bus_local_cleanup(opaque, recover_owner()); }
@@ -129,6 +148,12 @@ static int gf_read_rom(struct gfinit_owner *g)
 }
 static void gf_release_rom(struct gfinit_owner *g)
 {
+    struct recover *r = recover_owner();
+    /* Detach even a partially bound plan before returning its backing pages.
+     * INSPECT has not installed callbacks and therefore needs no detachment. */
+    if ((r->ops == &g->ops || r->profile == &g->profile ||
+         r->bound_profile == &g->profile) &&
+        recover_owner_configure(0, 0, 0, false)) return;
     gf_free(g->rom, GF_ROM_MAX);
     gf_free(g->decoded, sizeof(*g->decoded));
     gf_free(g->compiled, sizeof(*g->compiled));
@@ -138,6 +163,7 @@ static void gf_release_rom(struct gfinit_owner *g)
     g->profile = recover_gf_template;
     g->last_op = RECOVER_NONE;
     g->rom = 0; g->inspected = false;
+    gf_lease.active = false;
 }
 void gfinit_recover_end(void)
 {
@@ -149,11 +175,13 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
                        struct recover_transport *transport, const struct recover_profile *s0)
 {
     if (r->state != REC_IDLE && r->state != REC_VERIFIED) return -1;
-    if (r->cold_latched) return -1;
+    if (r->failed || r->cold_latched) return -1;
     if (!owner) owner = &control;
     if (!owner) return -1;
     struct gfinit_owner *g = owner;
     gf_release_rom(g);
+    if (hwdev_claim(&gf_lease, &gf_device, r->token.session)) return -1;
+    g->generation = gf_lease.generation;
     g->profile = recover_gf_template;
     g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
     gfinit_bus_init(&g->bus, &g->profile, &gf_pci);
@@ -164,7 +192,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     g->bus.identity.kdebug_version = KDEBUG_OPS_VERSION;
     g->ops = *base;
     g->ops.identity = gfinit_bus_identity; g->ops.raw_config = gfinit_bus_raw_config;
-    g->ops.read = gf_read; g->ops.write = gfinit_bus_write;
+    g->ops.read = gf_read; g->ops.write = gf_write;
     g->ops.local_cleanup = gf_local; g->ops.screen_safe = gf_screen_safe;
     g->s0 = s0;
     r->transport = transport;
@@ -229,7 +257,7 @@ static int gf_fixed(struct recover *r, void *arg)
 static int gf_begin(struct recover *r, struct gfinit_owner *g,
                     struct recover_transport *transport, bool size)
 {
-    if (!g || !g->inspected || r->cold_latched ||
+    if (!g || !g->inspected || !gf_owned(r) || r->cold_latched ||
         (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
     g->profile = recover_gf_template;
     g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
@@ -257,8 +285,11 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     g->buffers = (struct recover_plan_buffers){g->flow, g->valid};
     u32 hash;
     if (recover_owner_configure(&g->ops, &g->bus, g->s0, false) ||
-        recover_bind_plan(r, &g->profile, plan, &g->buffers, &hash) ||
-        trial_begin(r, &g->profile, hash, g->profile.trial_limit)) return -1;
+        recover_bind_plan(r, &g->profile, plan, &g->buffers, &hash)) return -1;
+    /* Snapshot callbacks run after trial_begin advances the core session. */
+    gf_lease.session = r->next_session + 1U;
+    if (trial_begin(r, &g->profile, hash, g->profile.trial_limit)) return -1;
+    gf_lease.session = r->token.session;
     if (trial_step(r, &r->token, true, gf_fixed, g)) return -1;
     if (size) return trial_end(r, &r->token, REC_NORMAL);
     return 0;
@@ -274,6 +305,7 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         q.status || q.fail_pc || q.fail_reg || q.steps ||
         (op != GF_OP_RUN_ONE && q.script_id) ||
         (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
+    if (owner && owner->inspected && !gf_owned(r)) return -1;
     if (owner && q.session && q.session == r->token.session && owner->last_op == op &&
         owner->last_main == q.script_id) { *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0; }
     if (q.session != r->token.session) return -1;

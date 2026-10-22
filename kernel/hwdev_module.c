@@ -15,12 +15,33 @@ static int contains(u32 base, u32 size, u32 address, u32 bytes)
     return address >= base && address - base <= size && bytes <= size - (address - base);
 }
 
-const struct hwdev_ops *hwdev_module_ops(void)
+static const struct hwdev_ops *current_ops(void)
 {
     struct module_record *r = module_record_get(hwdev_handle);
     if (!r || !module_exports(hwdev_handle) || r->dependency_count != 1 ||
         !module_exports(r->dependencies[0])) return 0;
     return published;
+}
+
+/* Cached facade pointers still check both loader generations at every entry.
+ * The successfully published body is pinned for this boot, including PAUSED. */
+static int hwdev_call(u32 op, void *req, u32 size, const struct recover_ops *base,
+                      struct recover_transport *transport, const struct recover_profile *s0)
+{
+    const struct hwdev_ops *ops = current_ops();
+    return ops ? ops->call(op, req, size, base, transport, s0) : -1;
+}
+static void hwdev_release(void)
+{
+    const struct hwdev_ops *ops = current_ops();
+    if (ops) ops->release_work();
+}
+static const struct hwdev_ops facade = {
+    HWDEV_ABI, sizeof(struct hwdev_ops), hwdev_call, hwdev_release
+};
+const struct hwdev_ops *hwdev_module_ops(void)
+{
+    return current_ops() ? &facade : 0;
 }
 
 static int hwdev_detach(struct module_record *r)
@@ -97,6 +118,12 @@ int hwdev_module_load(struct module_handle core_handle)
     };
     int rc = module_load(&request, &hwdev_handle);
     if (!rc) rc = module_start(hwdev_handle);
+    if (!rc) {
+        struct module_record *r = module_record_get(hwdev_handle);
+        /* BOOT_BODY: no hot unload; rollback before publication remains free. */
+        if (!module_ref_acquire(hwdev_handle, r->owner, MODULE_REF_REGISTRATION, 0))
+            rc = MODULE_INIT_FAILED;
+    }
     if (rc) kprintf(0x07, "[hwdev] rejected: %s\n", kdebug_state_name(rc));
     return rc;
 }

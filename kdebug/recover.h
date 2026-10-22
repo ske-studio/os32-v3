@@ -302,6 +302,8 @@ struct recover_transport {
     int (*end)(struct recover *r, void *opaque, int row_rc);
 };
 struct recover *recover_owner(void);
+/* NULL ops detaches trial references to the original S0 callbacks at IDLE or
+ * terminal state; preserves result, session, FAILED and cold latches. */
 int recover_owner_configure(const struct recover_ops *ops, void *opaque,
     const struct recover_profile *s0_profile, bool route_write_approved);
 int recover_now_session(struct recover *r, u32 session);
