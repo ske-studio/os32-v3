@@ -20,7 +20,7 @@
 static u8 file[CAP];
 static u8 pool[POOL_CAP] __attribute__((aligned(MODULE_PAGE_SIZE)));
 static u32 input[5]; /* config, failure injection, expected state, image size, pair */
-static unsigned pos, opens, closes, owners, retires, pages, reads, logs, imports;
+static unsigned pos, opens, closes, owners, retires, pages, reads, logs, imports, hwdev_loads;
 static struct bootinfo bi;
 static u32 running_logs, skipped_logs, not_run_logs, dispatch;
 static void finish(int code) __attribute__((noreturn));
@@ -212,6 +212,7 @@ void _start(void)
     kdebug_load();
     CHECK(kdebug.state == input[2] && imports == 0);
     CHECK(running_logs == (input[2] == KDEBUG_RUNNING));
+    CHECK(hwdev_loads == (input[2] == KDEBUG_RUNNING));
     CHECK(opens == (input[0] == 1) && kdebug.open_count == opens);
     CHECK(closes == (opens && input[1] != 1));
     if (input[2] == KDEBUG_RUNNING) {
@@ -247,4 +248,5 @@ void _start(void)
 
 /* HWDEV facade is separately exercised with real synthetic images. */
 int hwdev_module_load(struct module_handle core)
-{ CHECK(module_exports(core) != 0); return MODULE_NOT_FOUND; }
+{ CHECK(kdebug.state == KDEBUG_RUNNING && module_exports(core) != 0);
+  hwdev_loads++; return MODULE_NOT_FOUND; }

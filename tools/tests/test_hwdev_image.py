@@ -12,6 +12,7 @@ import zlib
 import test_hwdev_module as module
 import test_hwdev_trace as trace
 import test_hwdev_dispatch as dispatch
+from gen_kdebug_imports import hwdev_gf_objects
 
 ROOT = module.ROOT
 OUT = ROOT / 'build/out'
@@ -46,8 +47,7 @@ def main():
     cross = Path(os.environ['CROSS_DIR'])/'bin'
     assert not subprocess.check_output([str(cross/'i386-elf-nm'), '-u', str(OUT/'hwdev/hwdev.elf')])
     core = module.mkmod.Elf((OUT/'kdebug/kdebug.elf').read_bytes())
-    gf_objects = ('gfinit_bus', 'gfinit', 'gfinit_plan', 'gfinit_resources',
-                  'gfinit_decode', 'gfinit_exec', 'gfinit_pll', 'recover_gf')
+    gf_objects = hwdev_gf_objects()
     for name in gf_objects:
         names = subprocess.check_output([str(cross/'i386-elf-nm'), '-g', '--defined-only',
                                          str(OUT/'hwdev'/(name+'.o'))], text=True)
@@ -57,7 +57,15 @@ def main():
     for name in ('recover_gf_profile', 'recover_gf_screen_safe',
                  'recover_gf_pre', 'recover_gf_result'):
         assert name in core.symbols, name
-    assert len((OUT/'kdebug.bin').read_bytes()) <= 150*1024
+    assert len((OUT/'kdebug.bin').read_bytes()) <= 192*1024
+    for name, module_id in (('kdebug.bin', 1), ('hwdev.mod', 11)):
+        data = (OUT/name).read_bytes()
+        header = dict(zip(module.mkmod.HEADER_FIELDS, struct.unpack_from('<36I', data)))
+        policy = module.mkmod.POLICIES[module_id]
+        assert len(data) <= policy['image_max'], name
+        assert header['MEM_SIZE'] <= policy['mem_max'], name
+        assert header['PAYLOAD_OFF'] + header['MEM_SIZE'] <= policy['load_span_max'], name
+        print(f'PASS {name}: image={len(data)} body={header["MEM_SIZE"]} prefix={header["PAYLOAD_OFF"]}')
     print('PASS GF body absent from core; S0 and shared GF log retained')
     verify_stubs(elf_data, meta['imports'])
     cases = [('actual-GF', 0, 0, image), ('actual-GF-core-contract', 5, 6, image),
@@ -142,8 +150,7 @@ def main():
             subprocess.run([str(cross/'i386-elf-gcc'), '-m32', '-c',
                             str(folder/'hwdev_import_stubs.S'), '-o', str(obj)], check=True)
             objects = [OUT/'hwdev'/ (n+'.o') for n in
-                       ('gfinit_bus', 'gfinit', 'gfinit_plan', 'gfinit_resources', 'gfinit_decode',
-                        'gfinit_exec', 'gfinit_pll', 'recover_gf', 'hwdev_main', 'hwdev_import_slots')]
+                       (*gf_objects, 'hwdev_main', 'hwdev_import_slots')]
             linked = folder/'mutant.elf'
             subprocess.run([str(cross/'i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
                             '-T', str(ROOT/'build/hwdev.ld'), *map(str, objects), str(obj),

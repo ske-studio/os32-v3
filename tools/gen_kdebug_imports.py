@@ -35,6 +35,18 @@ GF_ONLY_SLOTS = range(264, 268)
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
 
+def hwdev_gf_objects(root=ROOT):
+    """Read the GF object inventory from its authoritative make definition."""
+    text = (Path(root) / 'build/hwdev.mk').read_text()
+    match = re.search(r'^HWDEV_GF := ([\w ]+)$', text, re.M)
+    if not match:
+        raise ValueError('missing HWDEV_GF literal inventory')
+    names = tuple(match[1].split())
+    if not names or len(names) != len(set(names)):
+        raise ValueError('empty/duplicate HWDEV_GF inventory')
+    return names
+
+
 def fnv1a(data):
     value = 2166136261
     for byte in data:
@@ -176,7 +188,7 @@ def check_nm(entries, nm=None, root=ROOT):
     # output directory. Their old kernel slots remain callable ABI entries.
     map_text = (root / 'build/out/kdebug/kdebug.map').read_text()
     paths = [root / p for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
-    if any(p.stem.startswith('gfinit') or p.stem == 'recover_gf' for p in paths):
+    if any(p.stem in hwdev_gf_objects(root) for p in paths):
         raise ValueError('GF object still linked into kdebug')
     callers = [p for p in paths if p.stem not in ('kdebug_import_slots', 'kdebug_import_stubs')]
     refs = symbols(nm, callers, True) - symbols(nm, callers, False) - {ABI_SYMBOL}

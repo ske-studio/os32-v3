@@ -21,6 +21,7 @@ check-hwdev-image-host:
 - build/kdebug.mk
 - build/out/kdebug/*
 - build/out/kdebug.bin
+- build/out/*
 - sdk/link/generations.ld
 - sdk/kapi.json
 - tools/tests/test_hwdev_image.py

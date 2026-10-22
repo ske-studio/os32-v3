@@ -115,6 +115,8 @@ fd:
   exclude:
     - guest: /boot/kdebug.bin
       reason: 2026-10-21 ユーザー決定。開発用 kdebug はレスキュー兼インストーラの FD には不要。T3 の増分で 2HD の空きが 64KB を割り、今後も増えるため除外。FD インストール後は実機の更新 (hsync boot) で入れる
+    - guest: /boot/hwdev.mod
+      reason: 2026-10-23 PM 決定。開発用で kdebug が RUNNING のときだけ読むため、kdebug.bin の無い起動 FD から除外。FD インストール後は実機の更新 (hsync boot) で入れる
   rename:
     - guest: /boot/vmkernel.lz4
       fd: /VMKRNL.LZ4

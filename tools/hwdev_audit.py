@@ -12,7 +12,7 @@ import re
 import struct
 import subprocess
 
-from gen_kdebug_imports import ABI_SYMBOL, declaration, symbols
+from gen_kdebug_imports import ABI_SYMBOL, declaration, symbols, hwdev_gf_objects
 from mkmod import Elf
 from module_schema import HEADER_FIELDS
 
@@ -30,8 +30,9 @@ def audit(out, cross):
     map_text = map_path.read_text()
     objects = [Path(p) for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
     require(objects and len(objects) == len(set(objects)), 'missing/duplicate map inputs')
-    gf = [p for p in objects if p.stem.startswith('gfinit') or p.stem == 'recover_gf']
-    require(len(gf) == 8, 'expected eight GF objects')
+    gf_names = hwdev_gf_objects()
+    gf = [p for p in objects if p.stem in gf_names]
+    require({p.stem for p in gf} == set(gf_names), 'GF object inventory mismatch')
     nm = str(cross / 'bin/i386-elf-nm')
     refs = symbols(nm, gf, True) - symbols(nm, gf, False) - {ABI_SYMBOL}
     doc = (ROOT / DOC).read_text()

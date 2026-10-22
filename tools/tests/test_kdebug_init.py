@@ -154,6 +154,9 @@ def main():
             if word != 32:
                 seal(bad)
             cases.append((label, 1, 0, state, bad))
+        bad = bytearray(image)
+        struct.pack_into('<I', bad, 10 * 4, mkmod.POLICIES[1]['mem_max'] + 4096)
+        cases.append(('core-body-over-limit', 1, 0, 3, seal(bad)))
         words = struct.unpack_from('<36I', image)
         for label, off, value, state in (
             ('reloc-range', words[21], words[12], 11),

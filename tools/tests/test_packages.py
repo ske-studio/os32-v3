@@ -793,7 +793,8 @@ def case_install(plan, resolved):
         return
     fd_files = [(g, os.path.getsize(os.path.join(ROOT, h))) for g, h in files]
     exclude = {e['guest'] for e in fd.get('exclude') or []}
-    check(exclude == {'/boot/kdebug.bin'}, f"fd.exclude は kdebug.bin だけ (ユーザー決定 2026-10-21) {sorted(exclude)}")
+    check(exclude == {'/boot/kdebug.bin', '/boot/hwdev.mod'},
+          f"fd.exclude は kdebug.bin と hwdev.mod (PM 決定 2026-10-23) {sorted(exclude)}")
     minimal = {g: os.path.getsize(h) for n, _, _, fs in resolved
                if n.startswith('minimal') for g, h in fs if g not in exclude}
     got = run_install_fdset(src, fd_files)
