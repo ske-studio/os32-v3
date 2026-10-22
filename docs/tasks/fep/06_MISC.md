@@ -1,23 +1,23 @@
 # [P6] その他
 
-> 索引: [`00_INDEX.md`](00_INDEX.md)
+> 上位: [`00_INDEX.md`](00_INDEX.md)
 > 優先度: **低**
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「その他」のうち、変換キー対応と kprintf va_args 調査。
+`FEP_FUTURE.md`「その他」のうち、変換キー対応と kprintf va_args 調査。
 
 ---
 
 ## 1. 変換キー (XFER) 対応
 
 XFER の候補操作は実装済み。インライン候補中はリスト展開、リスト中は次候補となる
-(`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER 対応は残件。操作の表は [P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照。
+(`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER 対応は残件。操作の表は P1 §3 (`01_UI_CANDIDATE.md`) を参照。
 `KEY_NFER` のかな直接確定への割当は将来の検討事項として残す。
 
 ---
 
 ## 2. kprintf va_args 問題の調査
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「`.sqlite_text` セクションからの `kprintf` 呼び出しで Page Fault」。
+`FEP_FUTURE.md`「`.sqlite_text` セクションからの `kprintf` 呼び出しで Page Fault」。
 
 調査タスク (設計というより原因究明):
 1. `ime_dict.c` の `kprintf(ATTR_RED, "... %s ...", path, rc)` 等が
@@ -27,7 +27,7 @@ XFER の候補操作は実装済み。インライン候補中はリスト展開
    Page Fault が消えるか切り分け。
 4. 根本原因が va_args ABI なら、該当呼び出しを `kputs` + 数値専用 `kput_hex` に分解。
 
-→ [`03_DICT_COMMAND.md`](03_DICT_COMMAND.md) (辞書管理) でエラー表示を増やす前に切り分けておくこと。
+→ `03_DICT_COMMAND.md` (辞書管理) でエラー表示を増やす前に切り分けておくこと。
 詳細は `docs/archive/v21/sqlite/07_OBSTACLES.md` と突き合わせる。
 
 ---
@@ -45,7 +45,7 @@ Page Fault が発生しないこと。
 
 ---
 
-*前: [`05_GFX_MODE.md`](05_GFX_MODE.md) ／ 次: [`07_BUNSETSU.md`](07_BUNSETSU.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: `05_GFX_MODE.md` ／ 次: `07_BUNSETSU.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
 
 ## 4. 候補ゼロ障害の記録 (2026-08-07)
 
