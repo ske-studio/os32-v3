@@ -10,7 +10,7 @@
 > **ゴールの改定 (ユーザー決定 2026-10-15)**: ゴールは **`hsync` が LAN 経由で動くこと** — 実機の `/host` (今はシリアル越しの SerialFS、ノートの `tools/serialfs_host.py`) を LAN 越しにも出せるようにし、`hsync` 自体は変えずに LAN の速度で配備できるようにする。**印刷 (`lpr`) とダウンロード (`wget`) は後回し** (L-D2・L-E のうちその部分)。新しい段 **L-F (LAN 版の `/host`)** を本命に置き、L-C は L-F に要る分に絞る。L-F の設計は L-B の後に起こす (astra が書き Opus がレビュー、規則 [HW3])。
 > **通信の安全の方針 (ユーザー決定 2026-10-15)**: PC-9821 とホスト (ノート) のあいだの LAN は**平文でよい** — 家庭内のローカルで、狙う者はいない。OS32 の側に暗号・認証は入れない。**ホストから外へ出ていく通信の暗号化はホストの側が担う** (ダウンロード等を再開するとき)。相手の MAC の固定 (`SFS_LAN_PEER` / `lanfs_host.py --peer`) は取り違えを防ぐための設定で、防御ではない。キーによるペアリング (ホストがキーを出す → OS32 で入力 → 0x88B5 で MAC を交換して保存) は使い勝手の改善として後の段に残す。
 
-正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、`docs/archive/v3/PLAN.md` §1 (順序) ・§3 (ドライバの動的読み込み)、
+正典: [`RA266.md`](../../decisions/realhw/RA266.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、`docs/archive/v3/PLAN.md` §1 (順序) ・§3 (ドライバの動的読み込み)、
 リンク層と Host Services は `LINK_PLAN` / `HOST_SERVICES_PLAN`。
 資料: `docs/hw/undocumented/io_pci.md` (PC-98 の PCI)、**`docs/hw/intel/8255x_open_source_sdm.pdf`** (Intel 8255x Open Source Software Developer Manual、
 341 ページ、2026-09-22 に Intel の公開 URL から取得。`docs/hw/` は著作権物のミラーで gitignore)。テキスト版 `8255x_open_source_sdm.txt` (9,133 行、`pdftotext -layout`) も同じ場所 — grep で引く。要点の所在: SCB = §6.3.2 (34 ページ)、EEPROM = §5/§6.3.4、Configure = 62 ページ、RFD = 100 ページ、PCI Interrupt Line = §4.1.15。
@@ -25,7 +25,7 @@
 
 | 事実 | 出典 |
 |---|---|
-| NP21/W は PCI を再現しない (`0CF8h` の実装が無い)。**PCI も 82557 も実機でしか動かせない** | PLAN §5/§6 |
+| NP21/W は PCI を再現しない (`0CF8h` の実装が無い)。**PCI も 82557 も実機でしか動かせない** | RA266 §5/§6 |
 | 実機との会話はシリアル 115200 で 3.2 KB/s、`tools/rshell_serial.py` (2026-09-22) | TASK_SERIAL_VFAST |
 | PC-98 の PCI: コンフィギュレーションメカニズム #1 (`0CF8h` DWORD でアドレス、`0CFCh` でデータ)。マーキュリー (82434LX) だけ #2 が要る。PCMC = デバイス 0、PCI-C バスブリッヂ = デバイス 1 (資料の例。Ra266 の実測は 0:6.0)、スロット #0〜2 = デバイス 8〜10 | `io_pci.md` 40〜75 行 |
 | PIRQ0〜3 → 8259 の割り当ては C バスブリッヂの PCI コンフィギュレーションレジスタで、通常 PnP BIOS が起動時に設定 → **デバイスの Interrupt Line レジスタを読めば IRQ が分かる** | 同 315〜320 行 |
@@ -104,7 +104,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
    `CAP_NET_RAW`)。`host_agent.py` (Python 標準ライブラリ) も同じ Ubuntu 機で動かす。`rshell_serial.py` は pyserial なので
    Ubuntu でも `--port /dev/ttyUSB0` でそのまま。Windows/Npcap 版は作らない。
 3. **配線** — **決まった**: Ubuntu 機と実機はローカルのスイッチで直結 (同じ L2)。
-4. **82557 で確かめてから** コンボカード (1394US2G-PCI) を判断する (PLAN §6 のまま)。
+4. **82557 で確かめてから** コンボカード (1394US2G-PCI) を判断する (RA266 §6 のまま)。
 
 ## 4. 実機でしか分からないこと (最初に測る)
 

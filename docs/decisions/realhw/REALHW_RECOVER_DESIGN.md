@@ -46,11 +46,11 @@
 | `R/kernel/sys.c:16`、`R/userland/shell/cmd_sys.c:144` | reboot は SHUT0/1→CPU_RESET_PORT。PCI 装置が冷間値になる保証はコードにない |
 | `R/userland/system/hsync.c:1745`、`:1770`、`:1801` | 起動 CRC と一致するカーネルを .old に複製・検証・rename。起動不能時の自動選択機能ではない |
 | `R/docs/manpages/hsync.1:494`、[docs/08_build.md:137](../../08_build.md) | FD 起動後の .old 巻戻し手順と制約。対の kdebug.bin/sqlite.mod、必要な /sys も同じ版へ戻す |
-| `docs/tasks/realhw/PLAN.md:18`、`:51` | ノート→SerialFS/hsync→reboot→ver の運用と現在の PCI 実測。LAN 82557 自体の試験では制御経路をシリアルに固定 |
+| `docs/tasks/realhw/PLAN.md:18`、`:51` (2026-10-22 に [RA266.md](RA266.md) §0・§1-1 へ移った) | ノート→SerialFS/hsync→reboot→ver の運用と現在の PCI 実測。LAN 82557 自体の試験では制御経路をシリアルに固定 |
 | `M/os32-realhw-31k-default.md:11`、`:14`、`M/os32-realhw-headless-tests-ok.md:15` | 31kHz 既定、立会いの最後はユーザーが GRPH+2+RESET。無応答時は記録して止め、物理操作はユーザー |
 | `docs/ROADMAP.md:380` | 外部デバイス実装モデルの文書群に、復帰契約・試験表・実例を組み込む位置づけ |
 
-- 食い違い F1 (1 件): `docs/tasks/realhw/PLAN.md:29` は 0:12.0 を Creative とする旧記録。`:51` の新しい実測は HighPoint と GeForce 0:13.0。後者を基準とし、毎回 ID/BAR を再照合する。
+- 食い違い F1 (1 件): `docs/tasks/realhw/PLAN.md:29` (今は RA266 §1) は 0:12.0 を Creative とする旧記録。`:51` の新しい実測は HighPoint と GeForce 0:13.0。後者を基準とし、毎回 ID/BAR を再照合する。
 - 4a は `T/run/gf6200_4a/DESIGN.r1.md` の op・DIRTY・W 行・GF ログを確認済み。§5 の recover 側への一本化案を接続条件とし、4a 側は r2 でこれに合わせる。
 
 ## 2. 復帰先と証明

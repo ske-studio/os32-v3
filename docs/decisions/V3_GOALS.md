@@ -10,7 +10,7 @@
 OS32 側の契約は小さく保つ。*
 
 この一文の出どころは 4 つの動機 — 入れ物を作り直す (PLAN §0)、アプリを優先する ([DESIGN_APP_FIRST.md](../DESIGN_APP_FIRST.md))、
-実機で動かす (realhw/PLAN.md)、レガシーを生きたまま保存する ([LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md)) — で、並べ方は草案 §2。
+実機で動かす ([realhw/RA266.md](realhw/RA266.md))、レガシーを生きたまま保存する ([LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md)) — で、並べ方は草案 §2。
 
 **変更の受け入れ基準**: DESIGN_APP_FIRST §12 の判断基準 (7 項目) を、票の「しないこと」の判定に使う。迷ったら
 「この変更で 1 本のアプリが PC-98 をより有効に使えるか」。
@@ -20,7 +20,7 @@ OS32 側の契約は小さく保つ。*
 | | 内容 |
 |---|---|
 | **v3 に入れる** | 柱 P0〜P7 (計画の票 V3_PLAN §3)。v3 後半に P8〜P10 と後半の票 (同 §5) — **GUI アプリ群は範囲外から外して v3 後半に入れる** (U4 の修正、U7 の決定。コントロールパネル・多言語対応・移植アプリはここ) |
-| **v3 に入れない** | 多機種・多アーキテクチャ (`docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`)、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (realhw/PLAN §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
+| **v3 に入れない** | 多機種・多アーキテクチャ (`docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`)、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (realhw/RA266 §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
 | **v3 / v4 の外** | **OS64** — OS32 とは別の 64 ビット OS の構想 (U3、2026-09-30)。語の定義は [LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md) の冒頭。移植は 32 ビット限定 (ARM_GAUGE §10) と「別物」として両立する |
 | **v3 で守る v4 の原則** | V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示)。ACS は HAL のバックエンド表に「補助コア / ホスト / 主コア」の差し込み口を**塞がない**ことだけ |
 

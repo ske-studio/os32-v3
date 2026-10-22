@@ -54,6 +54,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | T2h の外部再開ゲート・配備期待集合の扱い | [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) (H-7 の追随 8 項目、KAPI 74 / MemStat 200B 再構築、deploy-set と配備元照合) | 持越しは DEFERRED_TESTS H-7、契約は T2d〜h詳細 §5 |
 | NHD ext2のerrors印の原因調査 | ext2調査票 (アーカイブ: `docs/archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md`) (受入完了 2026-10-01、再インストールで印を解消・原因の発生時点は未確定。T2h受入前ゲートの照合先) | T2d〜h詳細 §0・§5・§8は順序とリンク |
 | v3 T3以降の実装契約・分割・受入と後半接続 | [T3配置](tasks/v3/TASK_T3_LAYOUT.md) (補遺 [T3d1 Unicode の組表ファイル](tasks/v3/T3D1_UNICODE_FILE.md))、[T4〜T6bモジュール/起動](tasks/v3/TASK_T4_T6_MODULES.md)、[T7/後半接続](tasks/v3/TASK_T7_AND_FOLLOWUPS.md) (T3 は受入完了、T4〜T6b・T7 は受入完了・実機確認待ち。D決定の本文はMEMMAP_V3) | V3_PLAN / MEMMAP_V3 はリンクのみ |
+| 実機 Ra266 の機体構成・基準構成 (2026-10-15 のスナップショット) と実機の方針 (82557・PCI・Trident・1.44MB・しないこと) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) (2026-10-22 に realhw/PLAN の本文を節の番号のまま移した) | 実機の票の一覧は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (索引) |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (計画中、着手はドライバの見直しの後) | [tasks/realhw/GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) (VBIOS について分かっていることのまとめ) |
 | 実機試験を決まった状態 (安全な 98 の CUI) へ戻す処理 (realhw_recover: 状態機械・期限・98 画面復帰・`recover now`) | [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) (実装中 — T1〜T3 着地、T4a 合格) | 確定設計は [decisions/realhw/](decisions/realhw/REALHW_RECOVER_DESIGN.md) (段 4a の設計も同じ所)、[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) §5 |
@@ -183,6 +184,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 |---|---|
 | [decisions/V3_GOALS.md](decisions/V3_GOALS.md) | v3 の目的の一文・範囲・目標の 2 段 (ユーザー決定)。計画の票は V3_PLAN |
 | [decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) | v3 のメモリマップ (D1〜D36、帯の表、§12 T4〜T6b の争点)。票は T2・T3・T4〜T6b・T7 |
+| [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | 実機 Ra266 の機体構成・基準構成と実機の方針 (旧 realhw/PLAN の本文、節の番号は同じ) |
 | [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md) / [HWDEV_CORE_API.md](decisions/realhw/HWDEV_CORE_API.md) / [DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) | 実機の装置の部品 (HWDEV) の構造・核の API・装置ごとに要る状態。票は TASK_HWDEV |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) / [ADDENDUM](decisions/realhw/REALHW_RECOVER_ADDENDUM.md) / [ADDENDUM_R2](decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) | 実機試験を決まった状態へ戻す処理の確定設計と追記。票は TASK_REALHW_RECOVER |
 | [decisions/realhw/GF6200_4A_DESIGN.md](decisions/realhw/GF6200_4A_DESIGN.md) / [GF6200_4A_S2_LAYOUT.md](decisions/realhw/GF6200_4A_S2_LAYOUT.md) | GeForce 6200 の段 4a (初期化 script の試行) と S2 の引数配置。票は TASK_GEFORCE6200 |
@@ -215,7 +217,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機で動かす計画 **実装中** — v2.1 の到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。現在地・残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
+| [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) | 実機の票の索引 (機体構成と方針は [decisions/realhw/RA266.md](decisions/realhw/RA266.md))。v2.1 の到達点は [RELEASE_v2.1.md](RELEASE_v2.1.md) §1。現在地・残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md) |
 | [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md) | **Ra266 の PEGC 640x480 の正典** — **受入完了 (2026-09-30、実機目視合格)**。実機 ROM (INT 18h AH=30h) の OUT 列 (`v86 -g`) に値と順序を合わせた。状態・残件は同票の状態行を参照 |
 | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) | 内蔵 Trident (1023:9660) ドライバ **設計中** — 設計票 v5 が Codex 5 回目で Approve (2026-09-29)、実装は未着手。ユーザー決定「Cirrus はエミュレータ用、実機は Trident」 |
 | [tasks/realhw/TASK_FDRECOV.md](tasks/realhw/TASK_FDRECOV.md) | FD で起動して LAN で HDD 一式を復旧する経路と、hsync の配置の世代の門 **受入完了** (2026-10-17、NP21/W の受入 7 項に合格) |

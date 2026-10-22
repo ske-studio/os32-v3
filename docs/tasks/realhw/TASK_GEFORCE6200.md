@@ -26,7 +26,7 @@
 
 ## 1. 対象
 
-PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、subsys `10fc:1270`、irq 6、mem 0x24000000〜 (PLAN.md §1 の 2026-10-15 の基準構成)。OS32 は列挙だけで結線なし。
+PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、subsys `10fc:1270`、irq 6、mem 0x24000000〜 ([RA266.md](../../decisions/realhw/RA266.md) §1-1 の 2026-10-15 の基準構成)。OS32 は列挙だけで結線なし。
 
 ## 2. 参照資料
 

@@ -49,7 +49,7 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 - LAN 版 SerialFS の使い方 (`sfs lan peer`・`sfs lan on`、ノートの `lanfs_host.py --iface … --root … --peer …`、
   `rshell_serial.py --sfs-lan … cmd "sfs run hsync boot"`) は
   [TASK_LAN_82557](../../../docs/tasks/realhw/TASK_LAN_82557.md) の状態行。LAN が使えないときは
-  シリアル版 (`--serve-host <hostdrv>`) で同じ順 ([realhw PLAN](../../../docs/tasks/realhw/PLAN.md) の冒頭)。
+  シリアル版 (`--serve-host <hostdrv>`) で同じ順 ([RA266](../../../docs/decisions/realhw/RA266.md) §0 の引用)。
 - `hsync boot` は `/boot/vmkernel.old` を残す。戻すときは旧カーネルで起動できる (hsync の bootold)。
 
 ## 2. 結果の受け取り (PM)
@@ -58,7 +58,7 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 - 起動ログの部品の PAIR と rc。`mem` の leftover・audit_fail が 0 か。
 - 画面確認の要る項目は実施しないで、台帳 ([DEFERRED_TESTS](../../../docs/tasks/DEFERRED_TESTS.md)) の該当行に
   「画面確認待ち」として残す。
-- 票の状態行と証拠の所在を記録する。実機の基準構成が変わっていたら [realhw PLAN](../../../docs/tasks/realhw/PLAN.md) §1 を先に照合。
+- 票の状態行と証拠の所在を記録する。実機の基準構成が変わっていたら [RA266](../../../docs/decisions/realhw/RA266.md) §1-1 を先に照合。
 
 ## 罠
 

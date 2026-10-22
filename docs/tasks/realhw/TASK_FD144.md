@@ -6,7 +6,7 @@
 >
 > 発行: PM (Claude Code `claude-opus-5`、2026-09-18) / それまでの状態: **エミュレータで受入完了 (F1〜F13 合格)**。実機は未検証 (§6)
 
-基点: `feat/gui`。正典の関係は [`PLAN.md`](PLAN.md) (実機計画)、
+基点: `feat/gui`。正典の関係は [`RA266.md`](../../decisions/realhw/RA266.md) (実機の構成と方針)、
 FDD の仕様表は [`../../03_disk.md`](../../03_disk.md) §3-1。
 
 ## 0. なぜやるか
