@@ -290,9 +290,9 @@ helper 対向で連続送受信を行う順にする。エミュレータで確�
 
 | 項目 | 内容 | この計画への影響 |
 |---|---|---|
-| オンボード LAN | **Intel 82557**、PCI、100BASE-TX / 10BASE-T | **v3 の実機 LAN はこれを狙う** (ユーザー決裁 2026-09-17)。PCI の列挙から作る。LGY-98 が高価・品薄なのに対し**機体に載っていてゼロ円**、そして **Intel の公開開発者マニュアルと Linux `e100` / FreeBSD `fxp` という参照実装がある** (LGY-98 は一次資料が無い)。詳細は `realhw/PLAN` §5 |
+| オンボード LAN | **Intel 82557**、PCI、100BASE-TX / 10BASE-T | **v3 の実機 LAN はこれを狙う** (ユーザー決裁 2026-09-17)。PCI の列挙から作る。LGY-98 が高価・品薄なのに対し**機体に載っていてゼロ円**、そして **Intel の公開開発者マニュアルと Linux `e100` / FreeBSD `fxp` という参照実装がある** (LGY-98 は一次資料が無い)。詳細は `decisions/realhw/RA266` §5 |
 | 拡張スロット | **C バス 3 本** / PCI 2 本 | **C バスに LGY-98 を挿せば既存のドライバがそのまま使える。** M4 の残り (受信バッファ溢れからの復帰) を確かめるならこれが最短 |
-| 内蔵グラフィックス | Trident TGUI9682XGi (VRAM 2MB) | GUI の HAL に無いが **PEGC は使えるとユーザーが確認済み**。NP21/W の Trident は結線されていないので**書いても検証できない** → 保留 (`realhw/PLAN` §7) |
+| 内蔵グラフィックス | Trident TGUI9682XGi (VRAM 2MB) | GUI の HAL に無いが **PEGC は使えるとユーザーが確認済み**。NP21/W の Trident は結線されていないので**書いても検証できない** → 保留 (`decisions/realhw/RA266` §7) |
 
 出典: [PC-9821Ra266 データベース](https://www.pc-9800.net/db_98/data/pc-9821ra266.htm)、
 [PC-9821Ra ページ](https://takerun.my.coocan.jp/mypc/9821ra.htm)。
