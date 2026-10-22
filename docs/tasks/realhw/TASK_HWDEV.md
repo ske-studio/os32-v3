@@ -100,6 +100,10 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 証拠は `~/os32-tmp/run/hwdev_m3c/`。M4 の所有照合・終端と M5 の配備は本段に含めない。
 
 ## 送り項目 (取り込みのレビューの P3)
+- (M4 で、PM の判断を要す) M3c: 設計の「S0 の最小 GF 復帰」は、コード (recover_gf_profile・recover_indexed_cleanup) は核に残っているが呼出し元が無く実行の経路につながっていない (M3c より前から) → 経路につなぐか、HWDEV_DESIGN §6 の表の言い方を実態に直すかを決める。
+- (M4 で) M3c: tools/check_map.d/check-mkmod-host.yaml に kdebug/*.c と hwdev/generated/hwdev_core.c を足す (check_nm は kdebug の LOAD 入力の全部を読むのに、回す test_kdebug_imports が check-mkmod-host にしか無く、核に GF だけの slot の呼出しを足しても check-changed で選ばれない)。
+- (M4 で) M3c: test_kdebug_imports.py:47-61 — 「核が GF だけの slot を呼ぶ」の拒否を RED にする試験が無い → kdebug.map の LOAD に gfinit.o を足した写しと、callers の refs に pci_cfg_read32 を足す patch の 2 例。
+- (M4 か M5 で) M3c: GF の 8 オブジェクトの名前が build/hwdev.mk:3・test_hwdev_image.py:49,115・gen_kdebug_imports.py:179・hwdev_audit.py:33 の 4 か所以上に別々 → hwdev.mk から 1 か所で読む。
 - (M4 で) M3b: tools/tests/hwdev_module_host.c:154-164 — 実像の ops->call で通すのは PAUSED で断る出口だけ。ABORT の解放・FAILED の固定・二重 cleanup は host でコンパイルした同じソース (gfinit_owner_host) でしか見ていない (§3 の M3b 行「全出口が部品越しに一致」より証拠が狭い) → M4 で owner の照合と一緒に実像で通す。
 - (M5 で) M3a: build/kernel.mk:357・build/hwdev.mk:23 — generations-manifest.json の前提は KERNEL_PAIRED_MODULES だけで hwdev.mod が入っていない。gen_generation_manifest.py:14 が build/out/*.mod を拾うので `make -j all` の順番しだいで hwdev.mod が載らないか古いハッシュが載る (配備の照合には効かず害なし)。M5 で hwdev.mod を KERNEL_PAIRED_MODULES に入れて解消。
 - (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。
