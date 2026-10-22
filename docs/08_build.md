@@ -360,6 +360,8 @@ python3 tools/gen_memmap.py --manifest --check
 どれも `make all` の後に回す (成果物を読む検査がある)。規則と登録は
 `build/checks.d/<検査名>.mk` に置き、`build/sdk.mk` が include する。
 `CHECK_PAR_ORDER` の番号で従来の順序を保ち、`CHECK_PAR_TARGETS` を集める。
+`check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
+保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
 
 | ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|

@@ -966,6 +966,8 @@ def effective_checks(m, rules):
 # A static audit, not Python execution: unknown path components become globs.
 # Keep exceptions source-specific and explain why they cannot read real artifacts.
 PATH_AUDIT_ALLOW = {
+    "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",
+    "tools/tests/" + "test_preflight.py": "preflight fixtures create private build artifacts and tool stubs",
     "tools/tests/" + "test_check_select.py": "selector fixtures describe synthetic inputs",
     "tools/tests/" + "test_checkinfra.py": "selector fixtures use private repository roots",
     "tools/tests/" + "host32.py": "cache contains only freshly compiled host fixtures",

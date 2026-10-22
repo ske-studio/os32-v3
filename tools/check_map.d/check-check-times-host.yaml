@@ -1,0 +1,7 @@
+check-check-times-host:
+- tools/check_time.py
+- tools/tests/test_check_times.py
+- build/sdk.mk
+- sdk/kapi.json
+- build/checks.d/check-check-times-host.mk
+- tools/check_map.d/check-check-times-host.yaml
