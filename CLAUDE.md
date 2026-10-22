@@ -19,7 +19,7 @@ AI コーディングアシスタント共通の入口。**置くのは指示と
 あるあいだは、新機能より先に直す** — 理由と適用の仕方は
 [`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §1。
 **カーネルレベルの機能は整数演算が第一選択、浮動小数点演算が要るときは実装前にユーザーに確認する** ([`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §2)。
-承認済みスコープの中では止まらずに進め、止まるのは [D1]〜[D3] の承認・仕様の分岐・スコープ拡大・
+承認済みスコープの中では止まらずに進め、止まるのは [D1]〜[D4] の承認・仕様の分岐・スコープ拡大・
 **独立レビューが要る地点** の 4 つだけ。レビューは PM が代行せず、ROLES §5 の書式で依頼する。
 
 ## Build Commands
@@ -47,7 +47,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 
 規則の正典は [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) — 理由と詳細はそこにある。ここは規則行だけで、
 ずれは `make check` (`tools/check_constraints.py`) が ID で検出する。
-[D1]〜[D3] の一部の操作には `.claude/settings.json` の `ask` / `deny` も設定している。
+[D1]〜[D4] の一部の操作には `.claude/settings.json` の `ask` / `deny` も設定している。
 これは包括的な保護ではない。NP21/W の停止確認や別コマンド経由の操作にも正典の規則を適用する。
 
 - **[C1]** C11 (GNU11) for internal code — kernel, boot, userland and SDK implementation build with `-std=gnu11`; public SDK headers stay C89/GNU89-compatible and SQLite keeps GNU89. No implicit declarations / implicit int / VLA; no new anonymous structs/unions, `restrict`, atomics, TLS or thread APIs.
@@ -69,6 +69,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 - **[D2]** Get approval before irreversible operations (overwriting the NHD or image masters,
   `rm -rf`, `git reset --hard`, editing `*.ini`).
 - **[D3]** Never put the contents of `.env`, API keys or passwords in output.
+- **[D4]** Read or cite `docs/archive/` only when the user tells you to. Never use it as the basis for work, never link to it from current documents, and never point tests or acceptance lists at it.
 
 ## 触る前に読む 1 か所
 
@@ -93,7 +94,7 @@ In-tree programs live under `userland/`. The `apps/` and `game/` submodules are 
 | Document | Content |
 |---|---|
 | [`docs/INDEX.md`](docs/INDEX.md) | 索引。冒頭の「情報単位ごとの正典」表が**更新先を 1 か所に決める**。§1〜§10 の技術仕様と `docs/tasks/` の領域別設計もここから辿る |
-| [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) | 制約規則の正典 ([C1]〜[D3] の理由と詳細) |
+| [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) | 制約規則の正典 ([C1]〜[D4] の理由と詳細) |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 作業別の参照先 (§1) とファイル地図 (§2) — 未知のサブシステムはここから |
 | [`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) | KernelAPI 仕様と追加手順 (§3-1) |
 | [`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) / [`POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) | 開発規約 / デバッグ (反映確認 §2、教訓集 §4、道具箱 §5) |
