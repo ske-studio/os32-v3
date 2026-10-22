@@ -93,7 +93,7 @@ kdebug 固有の現行契約は [TASK_DBGREF §3-2](TASK_DBGREF.md#3-2-部品の
 little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module_image.h:7,23`、`docs/tasks/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
 
 ヘッダword 0〜35は `magic,format,header_size,image_size,kapi,layout,module_abi,id,phase,flags,mem_size,payload_off,payload_size,text_off/size,ro_off/size,data_off/size,bss_off/size,reloc_off/count,import_off/count,export_off/count,names_off/size,init,stop,pair_crc,image_crc,ops_version,reserved0,reserved1`。表offsetはcontainer基点、節・入口・reloc書込先・slotはbody基点。relocは4B、importは `{u32 hash; u16 type_ver,kind; u32 slot_off}`、exportは `{u32 hash; u16 slot,ver; u32 entry_off}` の12B。名前は順序付きNUL列、63B上限、hashと実名を照合し衝突は生成失敗。CRCはimage_crc欄 (byte128〜131) を0にした容器全体 (`docs/tasks/v3/TASK_DBGREF.md:132,158,164`)。
-現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops=2・18口/画像とbody各256KiB/reloc≤16,384/import≤1,024/export≤64 (`kernel/module_image.c:49,103`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移行済みで、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。SQLITEの画像/body上限は各512KiB、load_span≤544,768B、reloc≤4,096/import≤32/export≤1とする (T4a-2試作測定、下記)。超過を握り潰さない。旧連結SQLite 374,968Bは当時のKDEBUG用256KiB上限に入らなかった。T4でSQLITE用policyを分離済み。
+現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops の版 4・20 口 (T4 のときは 2・18、HWDEV M2 で 3・19 → 4・20、`tools/module_schema.py:44`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移行済みで、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。**部品ごとの大きさ・表の件数の上限 (値・由来・今の余裕) は [§2-1a](#2-1a-部品ごとの大きさの上限と由来) の表が 1 か所** (値の正は `tools/module_schema.py`)。超過を握り潰さない。旧連結SQLite 374,968BはKDEBUG用の上限に入らず、T4でSQLITE用policyを分離した。
 wire名 `kapi_abi_gen` は現KMODではKAPI機能版76を入れる欄であり、D35のKAPI ABI世代1とは別 (`docs/tasks/v3/TASK_DBGREF.md:141`、`sdk/kapi.json:2`)。意味を黙って入れ替えず、4世代は生成物の印と配備一式で照合する。`module_abi_gen` はmodule別import定義のFNV-1a、`ops_version` はexport契約。KDEBUGのpair CRCは維持。T5の追加部品もPOST_ROOT・PAIR必須とする。EARLY用のPAIR例外は作らない。
 
 | 項目 | 意味と検査 |
@@ -123,6 +123,30 @@ S4の型・slot・生成ABI・pair CRC・ops2/18口を正常対照として維�
 `make kernel` は「カーネルの像と、それと対になって起動時に読む部品の一式」を組む (部品は像の CRC を埋めるので像と一緒に組み直す。Tx の段ごとの `make kernel` で部品の誤りを拾うため、ユーザー決定 2026-10-18)。起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
 
 T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収にも必要な同じ入口を使い、自己試験の移設と別の接続を省く方が小さい)。S4は235本・生成ABI印 `0xf8381b03` を維持し、PCMの私有ABIは型付き表とimport定義から生成する。T5c-3の依頼前にV86 importのcore facade維持か自己試験移設を決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
+
+### 2-1a. 部品ごとの大きさの上限と由来
+
+値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
+欄: image = ファイル (容器) の長さ、mem = body (BSS 込み)、load_span = `payload_offset + mem_size` (§2-1)、表 = reloc / import / export の件数。
+由来の区分: **実測** (日付・値)、**導出** (式)、**決定** (誰が・いつ・票)、**由来不明** (値だけ — 当時の推測を添える)。「式に一致」は今回 (2026-10-22) 数字を照合しただけで、当時の記載は無い。
+今の大きさは main 79ba4b0 (HWDEV M3b) と同じ木の成果物 (`~/wt/os32-v3/hwdev_m3b/build/out/`、2026-10-22 09:23) のヘッダ word 3・10・11・22・24・26 を読んだ値。余裕の % は 今 ÷ 上限。
+
+| 部品 (ID) | image / mem / load_span の上限 | reloc / import / export の上限 | 由来 | 今の大きさ (% = 今 ÷ 上限) |
+|---|---|---|---|---|
+| KDEBUG (1) | 262,144 / 262,144 / 524,288 | 16,384 / 1,024 / 64 | **由来不明** (値だけ — DBGREF 設計 r4 2026-10-14 で理由なしに入り、S0 9c905de で実装。当時の見積りは移す 3 対象 38,067 B・import 211 本 ([DBGREF](TASK_DBGREF.md) §1-2 の表) で、その 7 倍・5 倍弱の 2 の冪の丸めと推測)。load_span は T4a-2 a53c242 で欄を足したときの値で、image_max + mem_max に一致 (旧検査を狭めない値と読める、記載なし)。2026-10-22 の [HWDEV 設計 §5](../realhw/design/HWDEV_DESIGN.md#5-大きさメモリの見積もり) が上限 256 KiB の維持と核 ≤192 KiB を M5 の合格条件にすると**決定** | **M3c 取り込み後 (5d597d6、GF を部品へ出した後) 109,060 (42%) / 126,976 (48%) / 143,360 (27%)** (表の件数は M3c 後は未測定)。M3c の前 (2531f49) は 240,036 (92%) / 249,856 (95%) / 274,432 (52%)、表 2,972 (18%) / 269 (26%) / 19 (30%) |
+| SQLITE (2) | 524,288 / 524,288 / 544,768 | 4,096 / 32 / 1 | **実測** (T4a-2 2026-10-18、試作の容器 394,104 B・reloc 3,040・import 23、§7-1 の表の後の「T4a-2 試作測定」) と **導出** (load_span = body 512 KiB + 表最大 `144 + reloc×4 + import×12 + export×12 + 名前 (import+export)×64` = 19,036 B の頁切上げ 20,480 B)。512 KiB・4,096・32 への丸め方は書かれていない | 398,456 (76%) / 385,024 (73%) / 401,408 (74%)、表 3,129 (76%) / 29 (91%) / 1 |
+| FEP (3) | 65,536 / 65,536 / 81,920 | 2,048 / 96 / 1 | **由来不明** (値だけ — T5a-2 8532808 2026-10-18 で実装者が入れ、票・報告に理由なし。当時の fep.mod 24,392 B・import 65 本に対する 2 の冪と 1.5 倍の丸めと推測)。load_span は mem_max + SQLITE と同じ式の表最大 15,708 B の頁切上げ 16,384 B に**式に一致** | 24,392 (37%) / 24,576 (38%) / 32,768 (40%)、表 704 (34%) / 65 (68%) / 1 |
+| ATAPI_ISO (4) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5b-5 94d67d5 で FEP の値を写したと推測。表の式なら prefix は 12,288 B で足りる) | 11,616 (18%) / 8,192 (12%) / 12,288 (15%)、表 141 (7%) / 12 (38%) / 1 |
+| KCG (5) | 16,384 / 81,920 / 86,016 | 256 / 2 / 1 | image と表は **由来不明** (T5c-1 ddce74f、当時 kcg.mod 4,644 B・import 2 本。MEMMAP_V3 D14 の見積り「モジュール 4KB」の 4 倍と推測)。mem は image_max + cache 64 KiB (`KCG_ROM_CACHE_BYTES`、BSS、[MEMMAP_V3](TASK_MEMMAP_V3.md) §5-4 の計上値 = **決定** D14) に**式に一致**、load_span は mem_max + 1 頁に一致 | 4,672 (29%) / 69,632 (85%) / 73,728 (86%)、表 23 (9%) / 2 (**100%**) / 1 |
+| FM (6) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-2a 78f648a、FEP の値の写しと推測。当時 import 4 本) | 9,776 (15%) / 20,480 (31%) / 24,576 (30%)、表 260 (13%) / 4 (25%) / 1 |
+| PCM (7) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5c-2b 0ae7c69、同上) | 9,868 (15%) / 8,192 (12%) / 12,288 (15%)、表 213 (10%) / 18 (56%) / 1 |
+| V86 (8) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-3 884e20e、同上。当時 import 28 本) | 11,606 (18%) / 16,384 (25%) / 20,480 (25%)、表 337 (16%) / 28 (58%) / 1 |
+| LAN (9) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-4 8d9c5db、同上。当時 import 28 本) | 16,640 (25%) / 16,384 (25%) / 20,480 (25%)、表 343 (17%) / 28 (58%) / 1 |
+| CIRRUS (10) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-5b a77b893、同上) | 9,624 (15%) / 8,192 (12%) / 12,288 (15%)、表 106 (5%) / 9 (56%) / 1 |
+| HWDEV (11) | 196,608 / 196,608 / 262,144 | 16,384 / 128 / 1 | image・mem・load_span は **決定** (2026-10-22 の [HWDEV 設計 §5](../realhw/design/HWDEV_DESIGN.md#5-大きさメモリの見積もり): 見積り 105〜155 KiB に対し上限 192 KiB、超えたら移動の境界を見直し上限を黙って広げない。load_span ≤256 KiB も同表)。reloc・import は **由来不明** (値だけ — reloc は KDEBUG の値の写しと推測) | 131,488 (67%) / 126,976 (65%) / 135,168 (52%)、表 1,683 (10%) / 35 (27%) / 1 |
+
+- export_max = 1 は全部品で **導出** (ops 1 口 `initialize` だけを export する、`ops_slots=1`)。KDEBUG の 64 は上の由来不明に含む。
+- load_span の上限が mem_max + 表最大の頁切上げより小さい部品がある (HWDEV: reloc・import を上限まで使うと prefix 77,824 B > 65,536 B)。load_span は別に検査するので読み込みは安全側に断る。
 
 ### 2-2. 状態と公開
 

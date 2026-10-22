@@ -159,6 +159,8 @@ LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒
 | 33 `ops_version` | export 表の契約版 (= `KDEBUG_OPS_VERSION` 2)。record の `ops.version` に写す。**関数の入口とは別の欄** | 一致 |
 | 34〜35 予約 | 0 | 0 でなければ拒否 |
 
+上の 262,144・16,384・1,024・64 は S0 当時の KDEBUG の値。今の値・由来・余裕は [T4_T6 §2-1a](TASK_T4_T6_MODULES.md#2-1a-部品ごとの大きさの上限と由来) (KDEBUG の行)。
+
 4 つの表は互いに非重複 (`[off, off+len)` を昇順に並べて隣接比較)。
 **表のレコード**:
 - reloc: `u32 off` (body 基点、`R_386_32` の書込位置)。**非整列を許す** (i386 の絶対即値は非整列の位置にある)。検査: `payload_size ≥ 4 && off ≤ payload_size − 4` (T4:44 の減算前提の形 `off ≤ limit && 4 ≤ limit − off`)、**4 バイト全体の区間 `[off, off+4)` が互いに重ならず** (昇順に並べて `off[i+1] ≥ off[i] + 4`)、import slot の区間とも重ならない、bss・prefix への書込みは範囲の検査で自動的に拒否。元の値 (リンク時の VA 0 基点) が `≤ mem_size` (one-past を許す)。実行時にも同じ範囲検査をしてから `+= body_base`。
