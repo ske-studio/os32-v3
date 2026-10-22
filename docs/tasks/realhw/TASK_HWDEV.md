@@ -75,6 +75,8 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) — 参照の表: 核の関数の slot、private ABI の構造体、import の生成、contract_crc、台帳の 11 枠目、KDEBUG の ops 版 4
 - [DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md) — 共通の要件: 想定する装置ごとに要る状態と、今の recover の前提で足りない所
 
+- [BARLEN_DESIGN.md](../../decisions/realhw/BARLEN_DESIGN.md) — BARLEN (2026-10-23 確定): 他の装置のメモリ BAR は正確な長さではなく**上限** (番地の整列と、Mem が有効な装置の隣の BAR までの距離の小さい方) と、根拠のある既知の長さの表 (82557) で GeForce の窓との重なりを判定する。BAR への書込み・Trident の資料は採らない (ユーザー承認)。実装は M4 の後 (host の試験のファイルが重なる)
+
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
 
 ## 6. M1 の実装で設計者が決めたこと (2026-10-22)
