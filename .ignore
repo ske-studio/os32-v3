@@ -1,0 +1,2 @@
+# [D4]: ripgrep (Claude Code の Grep・rg) の既定の検索から外す。読むのはユーザーの指示があるときだけ (docs/CONSTRAINTS.md [D4])。
+docs/archive/

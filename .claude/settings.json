@@ -8,7 +8,11 @@
       "Bash(git reset --hard:*)",
       "Bash(rm -rf:*)",
       "Edit(**/*.ini)",
-      "Write(**/*.ini)"
+      "Write(**/*.ini)",
+      "Read(docs/archive/**)",
+      "Bash(cat docs/archive/:*)",
+      "Bash(head docs/archive/:*)",
+      "Bash(sed -n * docs/archive/:*)"
     ]
   },
   "hooks": {
