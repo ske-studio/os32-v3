@@ -94,5 +94,8 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 送り M3a の stub 実呼出しは本段で回収。証拠は `~/os32-tmp/run/hwdev_m3b/`。
 
 ## 送り項目 (取り込みのレビューの P3)
+- (M3c で) M3b: tools/tests/test_hwdev_trace.py:40-44 — `#define` で像の関数へ差し替える仕組みが壊れても trace は host のコードで緑のまま通り、検出する変異が無い → 像の中の 1 関数の本体を壊す変異を 1 件足して RED を確かめる。
+- (M3c で) M3b: tools/tests/kdebug_init_host.c:144-146 — 部品が無いときの「要求を変えない」を確かめていない (buf を書き換える変異が生き残る) → 呼出しの後に buf[0]==0 を確かめる。
+- (M4 で) M3b: tools/tests/hwdev_module_host.c:154-164 — 実像の ops->call で通すのは PAUSED で断る出口だけ。ABORT の解放・FAILED の固定・二重 cleanup は host でコンパイルした同じソース (gfinit_owner_host) でしか見ていない (§3 の M3b 行「全出口が部品越しに一致」より証拠が狭い) → M4 で owner の照合と一緒に実像で通す。
 - (M5 で) M3a: build/kernel.mk:357・build/hwdev.mk:23 — generations-manifest.json の前提は KERNEL_PAIRED_MODULES だけで hwdev.mod が入っていない。gen_generation_manifest.py:14 が build/out/*.mod を拾うので `make -j all` の順番しだいで hwdev.mod が載らないか古いハッシュが載る (配備の照合には効かず害なし)。M5 で hwdev.mod を KERNEL_PAIRED_MODULES に入れて解消。
 - (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。
