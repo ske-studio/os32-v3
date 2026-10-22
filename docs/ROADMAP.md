@@ -63,7 +63,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 | CUI/GUI | `/etc/system.cfg` の GUI=0/1 は**次回 boot の既定値**。実行中 shell の切替は `sys_switch_shell` |
 | FEP | gshell が GFX renderer を保持。CUI へ戻る前に renderer callback を解除 |
 | 性能目標 | Pentium 100MHz / 32MB で「超快適」を目標とするが、32MB をメモリの設計上限にしない |
-| メモリ方針 | v3 の最低条件は 8MB 機で GUI + 私有 2MB のアプリ (目標、V3_PLAN §2-2)。構成別の判定は v3 最終段、それまでのゲスト受入は 64MB の 1 構成。設計対象と現行実装は [02_memory.md](02_memory.md) を参照 |
+| メモリ方針 | v3 の最低条件は 8MB 機で GUI + 私有 2MB のアプリ (目標、V3_GOALS §3)。構成別の判定は v3 最終段、それまでのゲスト受入は 64MB の 1 構成。設計対象と現行実装は [02_memory.md](02_memory.md) を参照 |
 
 ### 技術基盤
 
@@ -361,7 +361,7 @@ image viewer (MGX は `mgxview` が既にある。VBZ / VDP / BMP を足す)、m
 
 ### 16bit DOSプログラム移植スキーム
 
-→ **v3 の範囲に入れない** (ユーザー決定 2026-09-30、[tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) §2-1)。
+→ **v3 の範囲に入れない** (ユーザー決定 2026-09-30、[decisions/V3_GOALS.md](decisions/V3_GOALS.md) §2)。
 
 ```text
 [DOS 16bit .COM/.EXE]

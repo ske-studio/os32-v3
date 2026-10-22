@@ -47,7 +47,8 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | `build/out/TESTS.md` / `build/out/HOST32.md` (生成表、`make docs-gen`)、[TESTS.md](TESTS.md) (手書きの読み方・判断) | [08_build.md](08_build.md) は手順と参照のみ |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | `docs/archive/portability/SURVEY_N1.md` (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、`docs/archive/portability/TASK_KSTRING_BENCH.md` (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
-| v3 の目的・範囲・目標の 2 段・柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | ROADMAP.md の v3 の行、README.md (目的の一文)。メモリマップの決定の本文は MEMMAP_V3 (D 番号) |
+| v3 の目的・範囲・目標の 2 段 | [decisions/V3_GOALS.md](decisions/V3_GOALS.md) (ユーザー決定、2026-10-22 に V3_PLAN §1・§2 から移した) | ROADMAP.md の v3 の行、README.md (目的の一文) |
+| v3 の柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | メモリマップの決定の本文は MEMMAP_V3 (D 番号) |
 | v3 T2d〜T2h の詳細な実装契約・分割・受入 | T2d〜T2h詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) (契約・分割・受入条件・未実施の手順だけ。実行記録は `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`、変異対応・分類別集計は T2E_MUTANTS (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はMEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
 | T2g の変異対応・分類別集計 | T2G_MUTANTS (アーカイブ: `docs/archive/v3/T2G_MUTANTS.md`) | T2d〜h詳細 §4-3、実行証拠は g5 の報告 |
 | T2h の外部再開ゲート・配備期待集合の扱い | [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) (H-7 の追随 8 項目、KAPI 74 / MemStat 200B 再構築、deploy-set と配備元照合) | 持越しは DEFERRED_TESTS H-7、契約は T2d〜h詳細 §5 |
@@ -180,6 +181,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | 文書 | 内容 |
 |---|---|
+| [decisions/V3_GOALS.md](decisions/V3_GOALS.md) | v3 の目的の一文・範囲・目標の 2 段 (ユーザー決定)。計画の票は V3_PLAN |
 | [decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) | v3 のメモリマップ (D1〜D36、帯の表、§12 T4〜T6b の争点)。票は T2・T3・T4〜T6b・T7 |
 | [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md) / [HWDEV_CORE_API.md](decisions/realhw/HWDEV_CORE_API.md) / [DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) | 実機の装置の部品 (HWDEV) の構造・核の API・装置ごとに要る状態。票は TASK_HWDEV |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) / [ADDENDUM](decisions/realhw/REALHW_RECOVER_ADDENDUM.md) / [ADDENDUM_R2](decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) | 実機試験を決まった状態へ戻す処理の確定設計と追記。票は TASK_REALHW_RECOVER |
@@ -264,7 +266,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
-| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的の一文 (§1)、範囲と v3 / v4 の外 (§2-1)、**目標の 2 段の正典** (§2-2)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。進捗は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照 |
+| [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) | **v3 本案 — 実装中 (2026-09-30)** — 目的・範囲・目標の 2 段は [V3_GOALS](decisions/V3_GOALS.md) へ移した (§1・§2 は案内だけ)、柱 P0〜P10 と正典 (§3)、順序 (§4)、v3 後半の票 (§5)、持ち越した宿題 (§6)、決定と経緯の在りか (§7)。進捗は同票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照 |
 
 ### シェル・配備 (hsync)
 

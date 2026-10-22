@@ -7,7 +7,7 @@
 このリポジトリ **os32-v3** が現行の開発 (v3) です。v3 の目的は
 *「PC-9821 の実機で、1 本のアプリケーションに機械の資源を渡し切れる入れ物を作り直す。入れ物とは、カーネル帯の切り方 (再配置)、
 ドライバの置き場 (動的読み込み)、装置窓の資源割当、実機の装置ドライバ、そしてその上の HAL の口である。時代依存の仕事は Host Service に任せ、
-OS32 側の契約は小さく保つ」* ([docs/tasks/v3/V3_PLAN.md §1](docs/tasks/v3/V3_PLAN.md)、本案)。機能を足す前に入れ物を作り直す版で、
+OS32 側の契約は小さく保つ」* ([docs/decisions/V3_GOALS.md §1](docs/decisions/V3_GOALS.md))。機能を足す前に入れ物を作り直す版で、
 最初の票は C89 → C11 の移行 (`docs/archive/v3/TASK_C11_MIGRATION.md`)、
 設計の決定は [docs/decisions/MEMMAP_V3.md](docs/decisions/MEMMAP_V3.md) にあります。
 
@@ -23,7 +23,7 @@ fork の段取りは `docs/archive/v3/FORK_PLAN.md`。os32 (v2.x、`main`) は�
 NP21/W エミュレータと実機で動作します (実機は PC-9821Ra266 で FD 起動・CD からの HDD インストール・HDD 起動を確認 —
 [v2.1 のリリースノート](docs/RELEASE_v2.1.md))。以下の機能一覧と数字は fork 時点 (v2.1) のもので、v3 の作業で順に更新します。
 
-v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3_PLAN §2-2](docs/tasks/v3/V3_PLAN.md))。判定は v3 の最終段に構成別で行い、それまでのゲスト受入は 64MB の 1 構成です。番地・設計対象・現行実装は [メモリ方針](docs/02_memory.md) を参照してください。
+v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3_GOALS §3](docs/decisions/V3_GOALS.md))。判定は v3 の最終段に構成別で行い、それまでのゲスト受入は 64MB の 1 構成です。番地・設計対象・現行実装は [メモリ方針](docs/02_memory.md) を参照してください。
 
 ## 制作経緯
 昨今AIでのバイブコーディングの波にRide On!しており、昔高校生の頃に遊んでいた「PC98のプログラムとかバリバリかけるんじゃね？」という思いつきで開発を始めました。

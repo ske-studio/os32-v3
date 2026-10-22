@@ -165,7 +165,7 @@ gshell 起動
 | 同期 | `os32_sqlite_vfs.c` の xSync が ext2 の書き戻しを待つか。待たないなら `cfg_commit` の後に `sys_sync` 相当を呼ぶ | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
 | 速度 | NP21/W の実測構成で `cfg_open` + 20 件 get + close の時間 (tick)。gshell 起動が体感で遅れないこと | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
 | 大きさ | ページサイズ 1KB / 数百件で DB が 64KB 以内に収まること (FDD の媒体にも載る) | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
-| メモリ | 固定 SQLite プールでも FEP・設定 DB の共存時のピークと OOM・回収を実測する。v3 の最低条件は 8MB GUI + 私有 2MB のアプリ (V3_PLAN §2-2、目標)、構成別の判定は v3 最終段。必要 RAM と開発方針は [02_memory.md](../../02_memory.md) に従う | 合格 (記録はアーカイブ `docs/archive/settings/TASK_S5.md` §6) |
+| メモリ | 固定 SQLite プールでも FEP・設定 DB の共存時のピークと OOM・回収を実測する。v3 の最低条件は 8MB GUI + 私有 2MB のアプリ (V3_GOALS §3、目標)、構成別の判定は v3 最終段。必要 RAM と開発方針は [02_memory.md](../../02_memory.md) に従う | 合格 (記録はアーカイブ `docs/archive/settings/TASK_S5.md` §6) |
 
 表の「合格」は NP21/W (15MB) での実測で、tick は相対値 (386 実機の計測ではない)。数値の記録はアーカイブ `docs/archive/settings/TASK_S5.md` §6。
 守る決まり:
