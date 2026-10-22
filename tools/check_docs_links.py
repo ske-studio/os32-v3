@@ -14,7 +14,7 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
 
 ## 何を見るか
 
-  * **相対パスの実在** — `[foo](tasks/gui/DESIGN.md)` の指す先があること。
+  * **相対パスの実在** — `[foo](decisions/gui/DESIGN.md)` の指す先があること。
   * **見出しアンカーの実在** (`--include-fragments`) —
     `[foo](08_build.md#配備3経路)` の `#配備3経路` が実際にその文書の
     見出しから生成されること。日本語の見出しも GitHub と同じ規則で
