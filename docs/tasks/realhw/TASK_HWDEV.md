@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-22)** — M3a 実装済み、独立レビュー待ち (M3b 以降は未着手)
+> 状態: **実装中 (2026-10-22)** — M3b 実装済み、独立レビュー待ち (M3c 以降は未着手)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) と [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -36,7 +36,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | 実装済み・レビュー待ち |
 | M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 実装済み・レビュー待ち |
 | M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 実装済み・レビュー待ち |
-| M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 未 |
+| M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 実装済み・レビュー待ち |
 | M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従、hwdev_audit の入力を HWDEV 側へ切替 | 未 |
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | 未 |
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | 未 |
@@ -87,7 +87,12 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 部品の初期化と公開だけを実 GF 像で検査し、試行の振分け・核からの除外・配備はそれぞれ M3b・M3c・M5 に残す。
 - 検証証拠は `~/os32-tmp/run/hwdev_m3a/`。実機・NP21/W は本段の対象外。
 
+## M3b の実装で設計者が決めたこと (2026-10-22)
+
+- 試行の入口と外部 recover 後の解放先を公開済み部品へ切替え、S0 は部品なしで維持する。取得口と拒否・解放の契約は CORE_API §10。
+- host 受入は実像の ops 呼出し (再配置 stub から核へ届く) と、同じ実像を `module_image_relocate` で読んで公開 GF 関数を差し替えた既存 S3〜S6 の trace oracle (装置・PCI/PTE・時間は既存 mock、期待 trace は不変、白箱用の static helper は host のまま) で閉じる。配備・実機の検証の代わりではない。M4 の所有照合・終端整理と M5 の配備は進めない。
+- 送り M3a の stub 実呼出しは本段で回収。証拠は `~/os32-tmp/run/hwdev_m3b/`。
+
 ## 送り項目 (取り込みのレビューの P3)
-- (M3b で) M3a: tools/tests/test_hwdev_image.py:31・hwdev_module_host.c:141 — 実 GF 像では stub を一度も呼んでいない (stub のバイト列と飛び先の番地までしか見ていない)。M3b の部品越しに呼ぶ試験がこれを覆うこと、その試験で読み込み後に再配置された stub から核へ飛べることを確かめる。
 - (M5 で) M3a: build/kernel.mk:357・build/hwdev.mk:23 — generations-manifest.json の前提は KERNEL_PAIRED_MODULES だけで hwdev.mod が入っていない。gen_generation_manifest.py:14 が build/out/*.mod を拾うので `make -j all` の順番しだいで hwdev.mod が載らないか古いハッシュが載る (配備の照合には効かず害なし)。M5 で hwdev.mod を KERNEL_PAIRED_MODULES に入れて解消。
 - (M5 まで許容、PM 決定 2026-10-22) M2: KDEBUG=1 で起動するたびに「[hwdev] rejected: NOT_FOUND」が出る (hwdev.mod を M5 で配備するまで、害なし)。

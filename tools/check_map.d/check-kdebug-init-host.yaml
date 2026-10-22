@@ -81,4 +81,5 @@ check-kdebug-init-host:
 - hwdev/generated/hwdev_core.c
 - hwdev/generated/hwdev_contract.h
 - include/hwdev_private.h
+- kernel/hwdev_module.h
 artifact_reader: true

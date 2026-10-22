@@ -1,4 +1,4 @@
-"""M3a: the built GF KMOD crosses the real M2 loader/facade boundary."""
+"""Built GF KMOD: loader/facade, relocated calls and existing trace oracles."""
 import json
 import os
 import re
@@ -10,6 +10,8 @@ import tempfile
 import zlib
 
 import test_hwdev_module as module
+import test_hwdev_trace as trace
+import test_hwdev_dispatch as dispatch
 
 ROOT = module.ROOT
 OUT = ROOT / 'build/out'
@@ -71,7 +73,23 @@ def main():
         command[1:1] = ['-DHWDEV_REAL_IMAGE', '-I'+str(OUT/'hwdev')]
         subprocess.run(command, check=True)
         module.run(exe, cases)
+        print("PASS actual ops->call op5-10 and release_work -> relocated core stubs")
+        trace.run(folder)
+        dispatch.main()
         if '--mutate' in sys.argv:
+            # Keep the KMOD valid but redirect the executed recover_owner stub
+            # to trial_end. A byte-only oracle is deliberately not used here.
+            b = bytearray(image)
+            pos = h[11] + symbols['recover_owner'] + 2
+            old_slot = struct.unpack_from('<I', b, pos)[0]
+            assert old_slot == symbols['hwdev_import_slots'] + 4*3
+            struct.pack_into('<I', b, pos, old_slot - 4)
+            try:
+                module.run(exe, [('executed-stub-wrong-slot', 0, 0, seal(b))])
+            except AssertionError:
+                print('MUTATE executed-stub-wrong-slot RED')
+            else:
+                raise AssertionError('survived executed stub wrong slot')
             # Real image table corruption must turn the positive acceptance RED.
             for label, changed in [('order', swapped), ('count', shortened)]:
                 try:

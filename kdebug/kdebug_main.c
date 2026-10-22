@@ -9,6 +9,7 @@
 #include "recover.h"
 #include "recover_wire.h"
 #include "gfinit.h"
+#include "kernel/hwdev_module.h"
 #include "kernel/display_restore.h"
 #include "kernel/idt.h"
 #include "drivers/serial.h"
@@ -102,8 +103,9 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
 {
     struct recover *r = recover_owner();
     if (op >= GF_OP_INSPECT && op <= GF_OP_ABORT) {
-        if (recovery_attach()) return -1;
-        return gfinit_call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
+        const struct hwdev_ops *ops = hwdev_module_ops();
+        if (!ops || recovery_attach()) return -1;
+        return ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
     }
     if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW) return -1;
     if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
@@ -113,7 +115,10 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
     if (op == KDEBUG_OP_RECOVER_NOW) {
         enum recover_state before = r->state;
         int rc = recover_now_session(r, out->session);
-        if (!rc || r->state != before) gfinit_recover_end();
+        if (!rc || r->state != before) {
+            const struct hwdev_ops *ops = hwdev_module_ops();
+            if (ops) ops->release_work();
+        }
         if (rc) return -1;
     }
     *out = (KdebugRecover){r->token.session, r->state, r->reason,

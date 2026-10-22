@@ -193,3 +193,13 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 - 終端順は局所 cleanup → 共通終端 → 核に結果保持 → plan/profile/expr/opaque の作業 RAM 参照解除 → release_work (I/Oなし・二重呼出し安全) → lease 解放。SIZE_BARS 成功の保持例外だけは解除/free を次の開始・中止まで送る。外部 recover、開始途中失敗、二重終端も同じ所有規則を使う。
 - FAILED/cold・PTE破損ラッチ・最後の結果・session 世代は核の boot 寿命で、部品の解放/再登録で初期化しない。核の S0 ops/profile に戻すまで部品作業 RAM を返さない。これらの実装は M4、M1 は契約の固定だけ。
 - M3a の body は `gfinit_call` と `gfinit_recover_end` を call/release_work に型照合して結ぶ。後者は既存の終端状態でだけ作業 RAM を返す実装を維持し、owner/lease の接続と全出口の整理は M4 の契約に従う。
+
+## 10. M3b の試行入口と外部 recover
+
+| 境界 | 契約 |
+|---|---|
+| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`kernel/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
+| op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
+| op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
+
+KDEBUG の ops 版 4・20 口と HWDEV ABI は変更しない。GF 本体の同梱は M3c まで継続。

@@ -327,6 +327,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))pci_cfg_read16,
     (void (*)(void))pci_cfg_write32,
     (void (*)(void))pci_cfg_write16,
+    (void (*)(void))hwdev_module_ops,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -599,6 +600,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xbaa70544u, 1, 1},
     {0xbba6498fu, 1, 1},
     {0x47aba321u, 1, 1},
+    {0x7c742f03u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

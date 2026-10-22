@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1154468181,
+  "module_abi_gen": 2085416685,
   "stage": "S5",
-  "count": 268,
+  "count": 269,
   "imports": [
     {
       "stage": "S1",
@@ -4021,6 +4021,21 @@
       "type_ver": 1,
       "signature": "int pci_cfg_write16(u32 bus, u32 dev, u32 fn, u32 reg, u16 value);",
       "source_declaration": "int pci_cfg_write16(u32 bus, u32 dev, u32 fn, u32 reg, u16 value);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S5",
+      "kind": 1,
+      "symbol": "hwdev_module_ops",
+      "source": "kernel/hwdev_module.h",
+      "context_safe": false,
+      "index": 268,
+      "name": "hwdev_module_ops",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "const struct hwdev_ops *hwdev_module_ops(void);",
+      "source_declaration": "const struct hwdev_ops *hwdev_module_ops(void);",
       "dtype": null,
       "array": false
     }

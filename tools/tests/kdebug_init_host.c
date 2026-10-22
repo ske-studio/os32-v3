@@ -6,7 +6,15 @@
 #include "kdebug/kpeek.h"
 #include "kdebug/recover.h"
 #include "drivers/serial.h"
+#include "hwdev_private.h"
+#include "kdebug/gfinit.h"
+#include "kdebug/recover_wire.h"
 static unsigned calls;
+#ifdef HWDEV_DISPATCH
+static int dispatch_tests(const struct kdebug_ops *);
+static unsigned loaded, recover_done, release_calls, module_calls, attach_calls;
+static int recover_rc;
+#endif
 void kprintf(unsigned char color, const char *format, ...)
 {
     (void)color; (void)format;
@@ -35,7 +43,14 @@ i32 kpeek_call(u32 op, void *buf, u32 size) { (void)op; (void)buf; (void)size; c
 static struct recover owner;
 struct recover *recover_owner(void) { calls++; return &owner; }
 int recover_now_session(struct recover *r, u32 session)
-{ (void)r; (void)session; calls++; return -1; }
+{ (void)session; calls++;
+#ifdef HWDEV_DISPATCH
+    recover_done++; if (recover_rc != -2) r->state = REC_VERIFIED;
+    return recover_rc ? -1 : 0;
+#else
+    (void)r; return -1;
+#endif
+}
 int recover_owner_configure(const struct recover_ops *ops, void *opaque,
     const struct recover_profile *profile, bool approved)
 { (void)ops; (void)opaque; (void)profile; (void)approved; calls++; return -1; }
@@ -46,7 +61,14 @@ int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, v
 { (void)r; (void)ops; (void)opaque; calls++; return -1; }
 int recover_hal_wait_frame(void *opaque, u32 us)
 { (void)opaque; (void)us; calls++; return -1; }
-const struct serial_setup *serial_get_setup(void) { calls++; return 0; }
+const struct serial_setup *serial_get_setup(void) { calls++;
+#ifdef HWDEV_DISPATCH
+    static const struct serial_setup serial = {.actual=9600};
+    attach_calls++; return &serial;
+#else
+    return 0;
+#endif
+}
 int serial_gate_active(void) { calls++; return 0; }
 int serial_trygetchar(void) { calls++; return -1; }
 unsigned int serial_cmd_port(int mode) { (void)mode; calls++; return 0; }
@@ -78,6 +100,9 @@ void _start(void)
         !candidate.gcap_note_in || !candidate.gcap_note_out ||
         !candidate.gcap_detach || !candidate.gcap_release || candidate.nic_selftest ||
         candidate.nic_trace != nic_trace || !candidate.dbg_call || candidate.hwdev_core_get != hwdev_core_get) rc = 1;
+#ifdef HWDEV_DISPATCH
+    if (dispatch_tests(&candidate)) rc = 1;
+#endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) { }
 }
@@ -93,3 +118,49 @@ void gfinit_recover_end(void) { calls++; }
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 { (void)op; (void)buf; (void)size; (void)base; (void)transport; (void)s0; calls++; return -1; }
+
+#ifdef HWDEV_DISPATCH
+static int device_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
+                       struct recover_transport *transport, const struct recover_profile *s0)
+{
+    module_calls++;
+    if (!base || !transport || !s0 || !buf || size != 40 ||
+        !base->screen_restore_verify || !transport->uart.wait_frame) return -99;
+    *(u32 *)buf = op;
+    return (int)op;
+}
+static void device_release(void)
+{
+    if (!recover_done || owner.state != REC_VERIFIED) release_calls += 100;
+    release_calls++;
+}
+static const struct hwdev_ops device = {HWDEV_ABI, sizeof(device), device_call, device_release};
+const struct hwdev_ops *hwdev_module_ops(void) { calls++; return loaded ? &device : 0; }
+static int dispatch_tests(const struct kdebug_ops *ops)
+{
+    u32 buf[10] = {0};
+    static const struct recover_ops base = {0};
+    owner.ops = &base;
+    for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {
+        if (ops->dbg_call(op, buf, sizeof(buf)) != -1 || module_calls || attach_calls) return 1;
+    }
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf))) return 1;
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) || release_calls) return 1;
+    loaded = 1;
+    for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {
+        if (ops->dbg_call(op, buf, sizeof(buf)) != (int)op || buf[0] != op) return 1;
+    }
+    if (module_calls != 6) return 1;
+    owner.state = REC_PAUSED;
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf)) != -1) return 1;
+    recover_done = 0;
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) || release_calls != 1) return 1;
+    owner.state = REC_PAUSED; recover_rc = -2;
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) != -1 || release_calls != 1) return 1;
+    recover_rc = -1;
+    if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) != -1 || release_calls != 2) return 1;
+    return 0;
+}
+#else
+const struct hwdev_ops *hwdev_module_ops(void) { calls++; return 0; }
+#endif

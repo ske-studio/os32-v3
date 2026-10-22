@@ -5,6 +5,12 @@
 #include "vfs.h"
 #ifdef HWDEV_REAL_IMAGE
 #include "hwdev_pair.h"
+#include "kdebug/gfinit.h"
+static struct recover image_owner;
+static u32 image_owner_calls, image_end_calls;
+static struct recover *image_recover_owner(void) { image_owner_calls++; return &image_owner; }
+static int image_trial_end(struct recover *r, const struct recover_token *t, enum recover_reason why)
+{ (void)r; (void)t; (void)why; image_end_calls++; return -1; }
 #endif
 static u8 file[MODULE_IMAGE_MAX], pool[MODULE_IMAGE_MAX] __attribute__((aligned(4096)));
 static u32 input[3], pos, opens, closes, live, logs;
@@ -103,6 +109,10 @@ void _start(void)
     fixture_core.contract_crc = HWDEV_CONTRACT_CRC;
     fixture_core.layout_crc = HWDEV_LAYOUT_CRC;
     for (u32 i = 0; i < HWDEV_CORE_SLOTS; i++) ((u32 *)&fixture_core)[4 + i] = (u32)(uptr)core_function;
+#ifdef HWDEV_REAL_IMAGE
+    fixture_core.recover_owner = image_recover_owner;
+    fixture_core.trial_end = image_trial_end;
+#endif
     struct module_record *c = &module_records[0];
     c->state = MODULE_RUNNING;
     c->generation = 1;
@@ -116,6 +126,9 @@ void _start(void)
     c->ro_size = sizeof(fixture_core);
     c->text = (u32)(uptr)core_function;
     c->text_size = 1;
+#ifdef HWDEV_REAL_IMAGE
+    c->text = 0x08048000; c->text_size = 0x100000;   /* -no-pie host text holds the image_* core callbacks */
+#endif
     kdebug.state = KDEBUG_RUNNING;
     kdebug.ops.hwdev_core_get = get_core;
     struct module_handle dep = {0, 1};
@@ -138,7 +151,18 @@ void _start(void)
     } else {
         const struct hwdev_ops *ops = hwdev_module_ops();
         CHECK(ops && live);
-#ifndef HWDEV_REAL_IMAGE
+#ifdef HWDEV_REAL_IMAGE
+        image_owner.state = REC_PAUSED;
+        for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {
+            struct gfinit_request q = {.version=GF_INIT_VERSION, .size=sizeof(q),
+                .flags=GF_ALLOW_WRITE, .max_steps=GF_INIT_SCHEDULE};
+            CHECK(ops->call(op, &q, sizeof(q), 0, 0, 0) == -1);
+            CHECK(image_owner_calls == op - GF_OP_INSPECT + 1 && q.status);
+        }
+        CHECK(image_end_calls == 1);
+        ops->release_work();
+        CHECK(image_owner_calls == 7);
+#else
         CHECK(ops->call(0, 0, 0, 0, 0, 0) == 42);
         ops->release_work();
 #endif
