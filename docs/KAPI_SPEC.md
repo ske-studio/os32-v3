@@ -1580,7 +1580,7 @@ CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 - `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
 
 query/lease は保存 USER の AS/owner/generation と現在実行中の slot の一致を要求する。
-CUI では CLIENT は GFX flag 不要、DISPLAY は GFX flag が必要、TVRAM は前景 USER、Unicode は ready な表の RO のみ。
+CUI では CLIENT は GFX flag 不要、DISPLAY は GFX flag が必要、TVRAM は前景 USER。Unicode 表は貸さない (role 4 の query は `OS32_ERR_INVAL`、変換は §4-13 の `unicode_to_jis`)。
 GUI では通常 CLIENT は GFX flag 不要、全画面 CLIENT と DISPLAY は GFX flag と gfx owner 一致が必要。TVRAM は拒否。
 TRUSTED/WM/IRQ/例外からの surface 貸与は不可。授権の詳細は票 TASK_T2D_T2H §2-2 が持つ。
 戻り値は 0 / `OS32_ERR_INVAL` (-9) / `OS32_ERR_STALE` (-11) / `OS32_ERR_FULL` (-13、lease slot 不足) /
@@ -1620,8 +1620,8 @@ C の `libos32gfx_getchar` / `libos32gfx_trygetchar` / `libos32gfx_yield` / `lib
 (空 poll は除く)。**生 KAPI で待った場合は描画前に `libos32gfx_check()` を呼ぶ**。Rust の入力帰路も同契約。
 全画面所有中の CLIENT regen は自分の init/shutdown の中だけであり、V86 帰路の regen は DISPLAY だけ。
 明示 mode 変更後も再 attach し、失敗時は描画しない。static/shlib 混用時は両実体を check し、片方の失敗で両方 detach。
-shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は不変)。Unicode は checked attach の1か所で取得し、
-ユーザー版 utf8 は NULL から開始して port が渡す RO 表を検証する。残る consumer は c3、旧 USER 撤去は b2。
+shlib の末尾119番 `os32gui_gfx_detach` を追加 (120本、protocol世代は不変)。Unicode 表は取得しない
+(変換は §4-13 の `unicode_to_jis` を KAPI 経由で呼ぶ)。残る consumer は c3、旧 USER 撤去は b2。
 
 ### T2g g2: shlib TRIM と allocator の再試行
 
