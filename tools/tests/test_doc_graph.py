@@ -40,6 +40,24 @@ def suite(mod):
         def only(self, kind, count):
             self.assertEqual(self.counts(), {k: count if k == kind else 0 for k in mod.KINDS})
 
+        def test_git_tree_counts_tracked_only(self):
+            import subprocess
+            git = lambda *a: subprocess.run(['git', '-C', str(self.root), *a], check=True, capture_output=True)
+            git('init', '-q')
+            self.put('docs/02_x.md', '[t](tasks/TASK_A.md)\n')
+            self.put('docs/tasks/TASK_A.md', '# A\n')
+            self.put('docs/sub/B.md', '[t](../tasks/TASK_A.md)\n')
+            git('add', '-A')
+            git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'x')
+            self.put('docs/03_untracked.md', '[t](tasks/TASK_A.md)\n')
+            outside = tempfile.TemporaryDirectory(prefix='doc-graph-out-')
+            self.addCleanup(outside.cleanup)
+            Path(outside.name, 'B.md').write_text('[t](../tasks/TASK_A.md)\n[u](../tasks/TASK_A.md)\n', encoding='utf-8')
+            import shutil
+            shutil.rmtree(self.root / 'docs/sub')
+            (self.root / 'docs/sub').symlink_to(outside.name, target_is_directory=True)
+            self.only('spec_to_ticket', 1)
+
         def cli(self, *args):
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
@@ -240,6 +258,8 @@ MUTATIONS = [
     ('counts[k] > baseline[k]', 'False', '増加しても通す'),
     ("if path.startswith('docs/decisions/') or re.match", 'if False and re.match', '決定層を無視'),
     ('if dest in paths and dest != source:', 'if dest in paths:', '自己参照も数える'),
+    ('    tracked = git_tracked_md(root)\n', '    tracked = None\n', 'git の管理外も数える'),
+    (' and not parents_link and path.is_file()', ' and path.is_file()', '親の symlink を辿る'),
 ]
 
 

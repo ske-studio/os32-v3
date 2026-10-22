@@ -97,7 +97,8 @@ def documents(root):
         # git の作業木では管理しているファイルだけを数える (管理外の写し .agents/ などを拾わない)。
         for rel in tracked:
             path = root / rel
-            if (path.suffix == '.md' and not path.is_symlink() and path.is_file()
+            parents_link = any((root / q).is_symlink() for q in Path(rel).parents if str(q) != '.')
+            if (path.suffix == '.md' and not path.is_symlink() and not parents_link and path.is_file()
                     and not any(rel == e or rel.startswith(e + '/') for e in EXCLUDED)):
                 result[rel] = path.read_text(encoding='utf-8').splitlines()
         return result
