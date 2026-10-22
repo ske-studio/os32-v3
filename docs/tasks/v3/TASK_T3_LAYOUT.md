@@ -29,7 +29,7 @@
 | KHEAP 192KiB・SHM224KiB・508KiB圧縮上限 | 維持 | 192KiB は上位票:82 の設計値。現行176KiBは暫定 (`memmap.h:42-44`) なので T3 で戻す。SHM は削らない、圧縮上限は `boot/boot_defs.h:93` |
 | 文書計画提示・台帳引渡し | 維持 | `DOCS_REORG_T3.md:3,23,89` の承認済み計画と F-9/H-4(a) を §1 で受ける。設計を現状へ弱めない |
 | SLACK、2heap peak、kstack、Unicode 時間 | 未測定 (T3配置) | 現配置の基準値 (H-5、実機 Ra266): 10/14 d14b は kstack=4,348 B・shell_stack=20,840 B・kheap_peak=111,960 B・resident_peak=131,656 B、**10/16 (86ba40c、LAN の hsync と GUI 往復の後) は kstack=3,544 B・shell_stack=20,440 B・kheap_peak=45,176 B・resident_peak=131,656 B** (`~/os32-tmp/evidence/2026-10-16/h5_mem/`)。kstack 16KiB に対し最大 4,348 B。resident_peakを2heap各々のpeakと同一視せず、T3c2で同じ指標と新しい個別peakを採る。SLACK算術は下記、T7将来分は未測定 |
-| 構成別のゲスト受入 | 要改訂 | `V3_PLAN.md:41-46`、`DEFERRED_TESTS.md:19` の10/14決定に従い当面64MB一構成。8/17MB等の最低条件は最終段に残す |
+| 構成別のゲスト受入 | 要改訂 | V3_GOALS §3 (確かめる時期)、`DEFERRED_TESTS.md:19` の10/14決定に従い当面64MB一構成。8/17MB等の最低条件は最終段に残す |
 
 **現行予算 [既存成果物の実測]**: `build/out/kernel.map:4452` の `__bss_end=0x1940C0` → 本体606,400 B。`memmap.h:259-261` の上限は `0x99000=626,688 B` (`build/os32.ld:23` と一致)、残り **20,288 B**。DBGREF 後30,176 B (`TASK_T2D_T2H.md:547`) から差引9,888 B増であり「LAN約+6.5KB」だけでは説明しない。KHEAPを今の帯のまま192KiBへ戻すと残り3,904 Bに減るため、Unicode表の先行投入は不可。
 `build/out/vmkernel.lz4` は **500,430 / 520,192 B、残り19,762 B** (ファイル長、`generations-manifest.json:62-64`)、manifest:3-9 は基点/KAPI75/形式4・ABI1・配置3・shlib2を示す。kernel.bin と圧縮像の SHA256 は manifest と一致。これは T3 の圧縮後サイズではない。後続 LAN 統合で基点が動けば実装パックで再計算する。

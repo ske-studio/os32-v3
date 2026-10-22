@@ -1,7 +1,7 @@
 # V3_GOALS — v3 の目的・範囲・目標の 2 段 (ユーザー決定)
 
 > 状態: **現行 (2026-10-22)** — v3 の目的の一文・範囲・目標の 2 段の正典。2026-10-22 に計画の票 V3_PLAN の §1・§2 からそのまま移した (計画の票は柱と順序と後半の票を並べる索引になる)。
-> 決定の記録は [MEMMAP_V3.md](MEMMAP_V3.md) D22 (目標の 2 段)・D20 (高位カーネルは v4 以降)。版と fork は [ROADMAP.md](../ROADMAP.md) §0。本文の「草案」「策定時の計画」は記録で、所在は V3_PLAN の冒頭。
+> 決定の記録は [MEMMAP_V3.md](MEMMAP_V3.md) D22 (目標の 2 段)・D20 (高位カーネルは v4 以降)。版と fork は [ROADMAP.md](../ROADMAP.md) §0。本文の「草案」と「PLAN」(策定時の計画) は記録で、所在は V3_PLAN の冒頭。
 
 ## 1. 目的 (ユーザー承認 2026-09-30、U4)
 
@@ -9,8 +9,8 @@
 ドライバの置き場 (動的読み込み)、装置窓の資源割当、実機の装置ドライバ、そしてその上の HAL の口である。時代依存の仕事は Host Service に任せ、
 OS32 側の契約は小さく保つ。*
 
-この一文の出どころは 4 つの動機 — 入れ物を作り直す (策定時の計画 §0)、アプリを優先する ([DESIGN_APP_FIRST.md](../DESIGN_APP_FIRST.md))、
-実機で動かす (実機の計画 `docs/tasks/realhw/PLAN.md`)、レガシーを生きたまま保存する ([LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md)) — で、並べ方は草案 §2。
+この一文の出どころは 4 つの動機 — 入れ物を作り直す (PLAN §0)、アプリを優先する ([DESIGN_APP_FIRST.md](../DESIGN_APP_FIRST.md))、
+実機で動かす (realhw/PLAN.md)、レガシーを生きたまま保存する ([LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md)) — で、並べ方は草案 §2。
 
 **変更の受け入れ基準**: DESIGN_APP_FIRST §12 の判断基準 (7 項目) を、票の「しないこと」の判定に使う。迷ったら
 「この変更で 1 本のアプリが PC-98 をより有効に使えるか」。
@@ -20,7 +20,7 @@ OS32 側の契約は小さく保つ。*
 | | 内容 |
 |---|---|
 | **v3 に入れる** | 柱 P0〜P7 (計画の票 V3_PLAN §3)。v3 後半に P8〜P10 と後半の票 (同 §5) — **GUI アプリ群は範囲外から外して v3 後半に入れる** (U4 の修正、U7 の決定。コントロールパネル・多言語対応・移植アプリはここ) |
-| **v3 に入れない** | 多機種・多アーキテクチャ (`docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`)、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (実機の計画 §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
+| **v3 に入れない** | 多機種・多アーキテクチャ (`docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`)、OS32 Fabric / Link (V4)、補助コア ACS ([AUXILIARY_CORE_SERVICE.md](../AUXILIARY_CORE_SERVICE.md))、SMP、16bit DOS 移植スキーム (ROADMAP §2)、USB / IEEE 1394 (realhw/PLAN §9)、スワップ、**カーネルの仮想アドレス化 (高位カーネル) — v4 以降の候補** (MEMMAP_V3 D20。v3 は恒等写像のまま P2V/V2P の集約だけ) |
 | **v3 / v4 の外** | **OS64** — OS32 とは別の 64 ビット OS の構想 (U3、2026-09-30)。語の定義は [LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md) の冒頭。移植は 32 ビット限定 (ARM_GAUGE §10) と「別物」として両立する |
 | **v3 で守る v4 の原則** | V4 §11 の 8 原則のうち 1・2・4・6 (PC-98 固有を portable 層へ流さない、HAL 境界、固定番地を契約にしない、platform-only は明示)。ACS は HAL のバックエンド表に「補助コア / ホスト / 主コア」の差し込み口を**塞がない**ことだけ |
 
