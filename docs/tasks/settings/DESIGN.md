@@ -196,7 +196,7 @@ tar c /hd0/backup/etc.tar /etc/settings.json /etc/system.cfg /etc/profile   # �
   汎用 JSON ライブラリは持ち込まない — 依存を増やさない方針)。
 - `import` は `schema_version` を見て、新しいファイルは拒否、古いファイルは読める範囲で取り込む。
 - **tar**: `userland/cmds/tar.c` の `tar c ARCHIVE PATH...` / `tar x ARCHIVE [-C DIR]` (既定は `.`) / `tar t ARCHIVE` は実装済み。圧縮は持たず、外側で `lz4` を掛ける (`etc.tar.lz4`)。
-  扱うのは通常ファイルとディレクトリ (再帰) だけ。所有者・時刻はヘッダに書くが展開では使わない。ustar の読み書きは `lib/microtar/` (MIT、改変点は `lib/microtar/README.OS32`)。
+  扱うのは通常ファイルとディレクトリ (再帰) だけ。所有者・時刻は保存しない (書庫では 0)。ustar の読み書きは `lib/microtar/` (MIT、改変点は `lib/microtar/README.OS32`)。
   名前は先頭の `/` を落として格納し、99B を超える名前は拒否して非ゼロ終了する。展開では `..` を含む名前と絶対パスを断る。
   試験は `tools/tests/test_tar_cmd.py`。経緯と受入の記録: `docs/archive/settings/TASK_S6.md`。
 - リカバリモードとの関係: `install --recover-settings` はマスタ DB を戻す。バックアップからの
@@ -226,7 +226,7 @@ tar c /hd0/backup/etc.tar /etc/settings.json /etc/system.cfg /etc/profile   # �
 ライブラリとコマンドは S2 (アーカイブ: `docs/archive/settings/TASK_S2.md`)、
 リカバリは S3 (アーカイブ: `docs/archive/settings/TASK_S3.md`)、GUI 統合は S4 (アーカイブ: `docs/archive/settings/TASK_S4.md`)、
 共存・受入は S5 (記録はアーカイブ `docs/archive/settings/TASK_S5.md`)、tar は S6 (記録はアーカイブ `docs/archive/settings/TASK_S6.md`)。
-通常配備で既存の設定を上書きしない契約: ゲストの `/etc` の `settings.db`・`-journal`・`-wal`・`-shm`・`.bak` (大文字小文字を区別しない) は、
+通常配備で既存の設定を上書きしない契約: ゲストの `/etc` の `settings.db` とその付属 (`-journal`・`-wal`・`-shm`・`.bak`・`.bak-journal`・`.failed`・`.failed-journal`・`.new`・`.new-journal`・`.recover-state`、一覧の正典は `tools/deploy_protect.py` の `PROTECTED_BASENAMES`、大文字小文字を区別しない) は、
 通常配備 (`nhd_deploy.py` の sync・copy・rm、`hostdrv_deploy.py` の sync・clean、`prune_stale.py`、ゲストの `hsync`) が作成・上書き・削除・rename しない
-(判定は `tools/deploy_protect.py`、名前と実体 (symlink・hardlink の別名) の 2 段、除外は `protected:` のログ)。NHD 全体の deploy は pull の stamp と remote の hash が一致するときだけ書く。
+(判定は `tools/deploy_protect.py`、名前と実体 (symlink・hardlink の別名) の 2 段、除外は `protected:` のログ)。NHD 全体の deploy は pull の stamp と remote の hash が一致するときだけ書く (不一致を越えるのはプロファイル未指定の `deploy --force` だけ、プロファイル指定時は `--force` でも書かない)。
 明示 install と `cfg init` は対象外。経緯: `docs/archive/settings/TASK_S0.md` の S0-D。
