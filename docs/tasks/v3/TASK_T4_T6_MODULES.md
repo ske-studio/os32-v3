@@ -72,7 +72,7 @@ X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,4
 
 ### 2-1. バイト形式案
 
-kdebug 固有の現行契約は [TASK_DBGREF §3-2](TASK_DBGREF.md#3-2-部品の形式--t4-と同じ形式として-1-つのスキーマに確定-q3)。LB-1 で ops は**版 2、18 口**となり、旧版は ABI_MISMATCH で拒否する。
+部品の形式 (kdebug を含む) の現行契約は [08_build §8-2「起動時に読む部品の形式」](../../08_build.md#起動時に読む部品の形式-kmod-v1)。ops の版が合わない部品は init 前に ABI_MISMATCH で拒否する。
 
 little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module_image.h:7,23`、`docs/tasks/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
 
@@ -152,7 +152,7 @@ EXECNESTのcaller/frameとTSS.ESP0の保存・IRQ保護下復元 (`exec/exec.c:3
 
 ### 3-2. F2/F3 と重複接続の移行規則
 
-[F2_OWNERSHIP](../settings/F2_OWNERSHIP.md) のgroup/leaseを唯一のFD所有モデルにする。`os32_sqlite_group_open` を全openへ適用し、default VFSの所属無しopenはfail-closed。RESIDENT groupは **2slot、1group=1接続=1回open**。bootではsettings/selftestが1slotを順次acquire→open→close→finishして返し、両slotがFREEになってからFEPを開始する。DICT_META前はFEPが1slot、後は辞書RO+学習RWの2slotを同時に使う。settingsはFEPのslotを借りたまま保持しない。settings close失敗ならそのslotをQUARANTINEDにし、残slotで標準起動を強行せずboot transactionを失敗させる。後発journalも同group。close/finalize失敗はquarantineへ残し、同じownerを正常retireしない。`exec_cleanup_owned_resources` はアプリgroupだけを処理しFEP/親groupに触れない。
+[KAPI_SPEC の DB API「接続と FD の所有」](../../KAPI_SPEC.md#db-api-v29-v31) のgroup/leaseを唯一のFD所有モデルにする。`os32_sqlite_group_open` を全openへ適用し、default VFSの所属無しopenはfail-closed。RESIDENT groupは **2slot、1group=1接続=1回open**。bootではsettings/selftestが1slotを順次acquire→open→close→finishして返し、両slotがFREEになってからFEPを開始する。DICT_META前はFEPが1slot、後は辞書RO+学習RWの2slotを同時に使う。settingsはFEPのslotを借りたまま保持しない。settings close失敗ならそのslotをQUARANTINEDにし、残slotで標準起動を強行せずboot transactionを失敗させる。後発journalも同group。close/finalize失敗はquarantineへ残し、同じownerを正常retireしない。`exec_cleanup_owned_resources` はアプリgroupだけを処理しFEP/親groupに触れない。
 
 F3a/c: xTruncate/xSyncのI/O rcを `SQLITE_IOERR_TRUNCATE` / `SQLITE_IOERR_FSYNC` へ翻訳、xDeleteは未存在と実I/O失敗を区別し失敗を成功にしない。xAccessは有無/読取/書込可否とI/O失敗を分ける。xOpenのpOutFlagsを実open結果から返し、RO接続のwriteはVFS側でも拒否する。SQLite lock表は作らない (D29、`docs/decisions/MEMMAP_V3.md:45`)。
 

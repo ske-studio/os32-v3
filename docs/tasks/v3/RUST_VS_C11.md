@@ -47,7 +47,7 @@ Rust が**確実に効く**のは「外部入力を解釈する純粋計算で�
 | 制約 | 出典 | Rust 側の約束 |
 |---|---|---|
 | ISR は池を確保・解放しない (R1) | MEMMAP_V3 §3-5-1 | `alloc` を使わない (`#![no_std]` + `extern crate alloc` 無し)。状態は呼び手 (C のドライバ) が渡す固定長の構造体 |
-| `irq_dispatch` は IF=0・ネスト無し | [TASK_HAL_WIRING](TASK_HAL_WIRING.md) §1-1 (`:102`) | 1 回の呼び出しの上限時間を決める (PLAN §5-5: 描画の粒度 256 frame)。IF=0 区間の契約 (< 10ms、TASK_PCM §2-1) の内側 |
+| `irq_dispatch` は IF=0・ネスト無し | [04_interrupts §4-4](../../04_interrupts.md#4-4-割り込みの動的登録と-irq_dispatch-の約束) | 1 回の呼び出しの上限時間を決める (PLAN §5-5: 描画の粒度 256 frame)。IF=0 区間の上限 (< 10ms、同じ節) の内側 |
 | スタックはカーネルスタック 16KB (0x3FC000〜) を ISR も使う | MEMMAP_V3 §2-1 | 大きな配列をスタックに置かない。作業域は状態構造体の中 |
 | x87 は退避されない | §1-2 | `f32` / `f64` 禁止 (整数演算から、MEMMAP_V3 §3-5-3 の 3)。表の事前計算は `const` (コンパイル時) か init (通常文脈、整数演算) で。検査は **IRQ から実行されるコードに絞る** (§7-2 の 4。`.a` 全体に 0 件を求めると `compiler_builtins` のメンバーの x87 1,765 件で不合格になる — リンクで捨てられるコードと IRQ から実行されるコードを区別する) |
 | panic は許されない | `os32_lz4` の `loop {}` が前例 | 添字はマスク (`& (N-1)`) と `wrapping_*` で境界検査を消す設計にし、それでも残る panic は「合成器を止めて無音 + カウンタ」にする専用ハンドラ (§3-3) |
@@ -216,7 +216,7 @@ Rust が**確実に効く**のは「外部入力を解釈する純粋計算で�
 |---|---|---|---|
 | 1 | **CPU 設定の明示** | `i686-os32-none.json` (とモジュール用 JSON) に `cpu = "i386"` と必要な feature の無効化を書き、`core` / `compiler_builtins` / 依存クレートも同じ設定で再構築する (build-std なので自動) | **前提。合格条件にしない** (7-1) |
 | 2 | **byte swap は 386 命令だけで書く** | 純 Rust のシフト・マスクへの書き換えは最適化で再び `bswap` に認識され得る (#58470 の再現例)。確実なのは **386 命令だけの inline asm / 外部 asm**、または **GCC `-march=i386` で作る外部 C 関数** (LLVM の再最適化を避ける境界を保ち、生成物を検査する)。`u32::from_be_bytes` / `swap_bytes` / `to_be` の使用は OpenType の読み出し (big-endian) と `compiler_builtins` に集中する (推測 — `font_test` の 45 件の由来は T7b で特定する) | 回避実装 |
-| 3 | **atomic は OS32 の同期契約で実装する** | `fetch_add` / `compare_exchange` (CAS) を**使わない**。通常の読み書きや `volatile` への置き換えで済ませることもしない。OS32 は**単一 CPU**で、カーネル側の排他は **IF の保存・復元 (割り込み禁止区間)** (MEMMAP_V3 §3-5 R1、[TASK_HAL_WIRING](TASK_HAL_WIRING.md) §1-1 の `irq_dispatch` = IF=0・ネスト無し) — 合成器は IF=0 の中で呼ばれるので atomic 自体が要らない。CPL=3 からは KAPI を使う。target JSON の `max-atomic-width` / `atomic-cas` は API の利用を絞る候補だが **LLVM の命令禁止スイッチではない** | 回避実装 |
+| 3 | **atomic は OS32 の同期契約で実装する** | `fetch_add` / `compare_exchange` (CAS) を**使わない**。通常の読み書きや `volatile` への置き換えで済ませることもしない。OS32 は**単一 CPU**で、カーネル側の排他は **IF の保存・復元 (割り込み禁止区間)** (MEMMAP_V3 §3-5 R1、[04_interrupts §4-4](../../04_interrupts.md#4-4-割り込みの動的登録と-irq_dispatch-の約束) の `irq_dispatch` = IF=0・ネスト無し) — 合成器は IF=0 の中で呼ばれるので atomic 自体が要らない。CPL=3 からは KAPI を使う。target JSON の `max-atomic-width` / `atomic-cas` は API の利用を絞る候補だが **LLVM の命令禁止スイッチではない** | 回避実装 |
 | 4 | **最終成果物の検査を `make check` に** | 検査対象は**最終リンク後の実行コード** (`build/out/kernel.elf`、`gshell.elf`、`libos32gui.shlib` の ELF、各 `.bin` / `.mod` の元 ELF、合成器を含むモジュール) — `.a` / `.rlib` / `.o` ではない (捨てられるコードを数えない、取り込まれた `compiler_builtins`・依存・asm を漏らさない)。方法は `objdump -d --no-show-raw-insn` の**命令欄**の集計 (`lock` / `rep` 等の接頭辞を剥がして次の語を見る。全セクションを強制逆アセンブルする `-D` は使わない)。**禁止**: `cmov*`、`bswap*`、`cmpxchg*` (`cmpxchg8b` を含む)、`xadd*`、`cpuid`、`rdtsc`、XMM / MM レジスタ参照、`fxsave` / `fxrstor` / `ldmxcsr` / `*fence` / `emms`。**x87 (`f*` + `wait`) は IRQ から到達するコードに限って 0 件** (§3-2)。三命令の検査は最低限で、386 対応の判定は命令・エンコーディング全体で行う。**toolchain 更新時 (§5 の 6) も必須**。検査器は `tools/check_constraints.py` と同じ作法 (ID で報告) で 1 本 (名前は仮に `tools/check_isa386.py`、推測) | **必須の工程** |
 | 5 | **落ちたときの扱い** | その部品は **Rust で作らない (C11 へ) か、2・3 で避ける**。検査を緩めない (「NP21/W で動く」「Ra266 で動く」は理由にならない) | ユーザー決定 (a) |
 

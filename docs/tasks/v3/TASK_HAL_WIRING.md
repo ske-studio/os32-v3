@@ -62,6 +62,8 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 
 ### 1-1. 割り込みの動的登録 — `kernel/irq.c` / `kernel/irq.h`
 
+今の約束 (登録・共有・`irq_dispatch`・ハンドラ・ストーム・IF=0 区間・寿命) は [04_interrupts §4-4](../../04_interrupts.md#4-4-割り込みの動的登録と-irq_dispatch-の約束)。以下は設計の往復の記録。
+
 ```c
 #define IRQ_NONE      0   /* 自分の要因ではない */
 #define IRQ_HANDLED   1   /* 自分の要因を見つけて落とし、残件は無い */

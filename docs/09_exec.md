@@ -85,6 +85,13 @@ V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラ
   ポンプ (X4) を回し、計算ループ中でもカーソルとクリックを取りこぼさない (契約 T6)。WM 自身 (owner 1) は除外。
 - CPL=3 の KAPI 呼び出しは **IF=1** で走る (`int80_stub` の `sti` / 出口 `cli`。[POLICY_DEBUG §4-19](POLICY_DEBUG.md))。
 
+### GUI アプリのスロットと譲り合い
+
+- **割当**: GUI アプリは起動直後に `gui_call(OP_INIT)` を呼び、戻り値でスロット番号 (0〜3、`GUI_SLOT_MAX` = 4) を受け取る。スロットの先頭は `shm_base + GUI_SHM_OFFSET + 番号 × GUI_SLOT_SIZE` (16KB)。WM はスロットを窓の所有者 (owner) に結び、同じ owner がもう一度 `OP_INIT` を呼べば同じ番号を返す。アプリの終了・kill で回収する。空きが無ければ `OS32_ERR_FULL` (5 本目は起動しない)。実体は `userland/gshell/src/handler.rs` の `op_init` と `wm.rs` の `alloc_slot`。
+- **配送**: イベントは窓の所有者のスロットのリングへ書く。`OP_POLL` は呼んだアプリのスロットだけを読む。フォーカスの切替で特別な処理は無い (リングはアプリごとに独立)。
+- **譲り合い** (協調切替、スレッドは無い): アプリが WM へ制御を返す (park する) のは `OP_WAIT`・kbd 待ち・polling・`sys_yield`・GUI STOP の WM 返却要求の 5 種だけ (`exec/appslot.c` の `parked_from_*`)。5 番目は次節の形で正常 syscall の完了後に退避する。起こす順は WM の `pick` / `should_park` (`userland/gshell/src/multiapp.rs`)。
+- **見え方**: SHM は全 PD 共有 + USER なので、アプリは他のアプリのスロットを読める。GUI の要求・イベントに秘密は無いので、今はこれを許す。
+
 ### GUI の KAPI-loop の STOP
 
 GUI アプリが KAPI を呼び続けるループ (get_tick loop など) に入ると、IRQ 側の受付は暴走判定に掛からず、

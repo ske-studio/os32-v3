@@ -579,6 +579,15 @@ FEP の SQLite 予約は既定 192 KiB、settings の system scope の `fep_mem_
 SQLite 部品が無いとき、`db_*` は `OS32_ERR_NOSYS` を返し、`db_last_error` は診断文字列を返す。
 FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `db_*` は公開、IME は stub、FEP 予約は 0 とする (ユーザー決定 2026-10-19)。
 
+**接続と FD の所有 (group / lease)**: SQLite がファイルを開く FD の所有は、接続ごとの group と FD の lease だけで決める (実体は `lib/sqlite3/os32_sqlite_vfs.c/.h`、FD 側は `fs/vfs_fd.c` の `vfs_open_sqlite` / `vfs_close_sqlite` / `vfs_count_sqlite` / `vfs_quarantine_sqlite`)。
+
+- group は固定の表で、EXEC が `DB_MAX_CONNECTIONS` (8)、RESIDENT が 2。状態は FREE → OPENING → LIVE → CLOSING → FREE、失敗は QUARANTINED。各 group は専用の非 default VFS (`os32-g0`〜`g7`、`os32-resident`・`os32-resident1`) を起動中ずっと持ち、cookie `{group_index, generation}` を値で渡す (generation は acquire ごとに進み、上限に達した group は使わない)。
+- **1 group = 1 接続 = 1 回の open**。開くのは `os32_sqlite_group_open` だけで、URI (`SQLITE_OPEN_URI`・`file:`) による VFS の差し替えは SQLite に渡す前に断る。default VFS からの所属無しの file open は fail-closed (`SQLITE_CANTOPEN`)。main / journal / 一時ファイルなど、実際に開いた FD は全部その group に属し、open の途中 (OPENING) から所属する。
+- SQLITE の FD は通常の `vfs_close`・`vfs_close_owned`・`vfs_fd_set_protect` では閉じない・外さない。閉じるのは xClose の lease 経由だけ。
+- `db_*` (KAPI) は EXEC group を呼び手の owner で取り、`exec_cleanup_owned_resources` (`db_cleanup_owned`) はその owner の EXEC group だけを閉じる。FEP・settings など常駐側は RESIDENT group を使い、アプリの終了で触られない。
+- close の成功は「close OK・残る FD 0・sticky な失敗無し」のときだけ。close / finalize に失敗した group は QUARANTINED にして再起動まで残し、同じ owner を正常に retire しない。RESIDENT のどちらかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
+- 起動時は settings が RESIDENT 1 本を acquire → open (RO) → close → finish で返してから FEP を始める。FEP は今は辞書 1 本を RW で開き、RESIDENT 1 本を使う (`kernel/ime_dict.c`)。2 本目は辞書 RO と学習 RW を分けるときの分 (未実装)。
+
 | Offset | フィールド | プロトタイプ |
 |--------|-----------|------|
 | 0x238 | db_open | `int(const char *path)` |

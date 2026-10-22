@@ -52,6 +52,8 @@ temp pager は `:63227–63240`、sorter は `:107820–107831` で接続由来�
 
 ## 3. 凍結する最小方式: 接続専用 VFS instance＋FD lease
 
+今の契約 (group の数と状態、1 group = 1 接続、fail-closed、lease、隔離、exec 終了との境界) は [KAPI_SPEC の DB API「接続と FD の所有」](../../KAPI_SPEC.md#db-api-v29-v31)。以下は設計時の記録 (§3.1a の RESIDENT=1 は今は 2)。
+
 ### 3.1 接続 group と専用 VFS
 
 `lib/sqlite3/os32_sqlite_vfs.c/.h` に kernel 内部の `Os32SqliteGroup` を導入する。

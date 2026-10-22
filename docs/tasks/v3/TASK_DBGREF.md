@@ -126,7 +126,7 @@ r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出�
 
 ### 3-2. 部品の形式 — T4 と同じ形式として 1 つのスキーマに確定 (Q3)
 
-LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒否する。
+今の形式の契約は [08_build §8-2「起動時に読む部品の形式」](../../08_build.md#起動時に読む部品の形式-kmod-v1)。以下は S0 設計時の記録 (KAPI 75、LB-1 で ops 版 2・18 口。今は版 4・20 口)。
 
 **容器 (container、ファイル = 読み込んだ像)**: `header (144 B) → reloc 表 → import 表 → export 表 → 名前表 → (ページ整列) → payload (text / rodata / data) → bss (ファイルには無い)`。
 **基点**: `reloc_offset` / `import_offset` / `export_offset` / `names_offset` / `payload_offset` は **container の先頭 (バイト 0) 基点**。節 (`text/ro/data/bss` の offset)、reloc の書込位置、import slot、`init_offset`、export の `entry_off` は **body 基点** (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。
