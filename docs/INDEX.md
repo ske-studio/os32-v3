@@ -12,7 +12,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 同じ事実を 2 か所で独立に更新する構造は必ず食い違う (2026-09-05 の診断で 6 件)。
 **変わりやすい数値・手順・進捗は下表の正典だけを更新し、他の文書は要約と参照に留める。**
 
-> **文書の正典はここ (このリポジトリ os32-v3、現行の開発 = v3)。** [os32](https://github.com/ske-studio/os32) (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録・戻り先で、更新しない** — 新機能は入れず、手を入れるのは戻る必要が生じたときと致命的な不具合のときだけ (ユーザー決定 2026-09-29、正典は [ROADMAP.md §0-1](ROADMAP.md))。
+> **文書の正典はここ (このリポジトリ os32-v3、現行の開発 = v3)。** [os32](https://github.com/ske-studio/os32) (v2.x、タグ `v2.1`、`main`) は **v2.1 時点の記録・戻り先で、更新しない** — 新機能は入れず、手を入れるのは戻る必要が生じたときと致命的な不具合のときだけ (ユーザー決定 2026-09-29、正典は [decisions/VERSIONS.md §2](decisions/VERSIONS.md))。
 > fork は 2026-09-30 (os32 v2.1 `6ccc4049` + feat/gui `dfa97f57` から、新しい履歴で。段取りと持ってこなかったものは `docs/archive/v3/FORK_PLAN.md` §1・§3)。経緯の要約は [HISTORY.md](HISTORY.md)、普遍的な教訓は [CASE_STUDIES.md](CASE_STUDIES.md)。
 
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
@@ -46,7 +46,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | アプリ帯の広さ・私有量 (v3) | [MEMMAP_V3](decisions/MEMMAP_V3.md) D9・D11・§3-5 (決定)、[TASK_T2_APPBAND](tasks/v3/TASK_T2_APPBAND.md) と T2d〜h (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) (実装・受入) | 02_memory.md は地図の説明。旧 v2.1 の帯と未記録ゲスト受入は [APP_BAND_PDE](tasks/memory/APP_BAND_PDE.md) の履歴として区別 |
 | 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | `build/out/TESTS.md` / `build/out/HOST32.md` (生成表、`make docs-gen`)、[TESTS.md](TESTS.md) (手書きの読み方・判断) | [08_build.md](08_build.md) は手順と参照のみ |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | `docs/archive/portability/SURVEY_N1.md` (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、`docs/archive/portability/TASK_KSTRING_BENCH.md` (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
-| 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [ROADMAP.md §0](ROADMAP.md) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
+| 版数 (カーネル 2.1 / GUI 1.4 で閉じた / 現行の開発 v3 / v4 草案) と v3 の fork の段取り | [decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2 (2026-10-22 に ROADMAP §0 から移した) | 各版の要約は [CHANGELOG.md](../CHANGELOG.md) (3〜5 行 + リリースノートへのリンク)、詳細は `RELEASE_vX.md` ([RELEASE_v2.1.md](RELEASE_v2.1.md))。`ver` の文字列、タグ |
 | v3 の目的・範囲・目標の 2 段 | [decisions/V3_GOALS.md](decisions/V3_GOALS.md) (ユーザー決定、2026-10-22 に V3_PLAN §1・§2 から移した) | ROADMAP.md の v3 の行、README.md (目的の一文) |
 | v3 の柱 (P0〜P10) と順序・v3 後半の票 | [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30 昇格) | メモリマップの決定の本文は MEMMAP_V3 (D 番号) |
 | v3 T2d〜T2h の詳細な実装契約・分割・受入 | T2d〜T2h詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) (契約・分割・受入条件・未実施の手順だけ。実行記録は `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`、変異対応・分類別集計は T2E_MUTANTS (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)、延期は [DEFERRED_TESTS](tasks/DEFERRED_TESTS.md)。決定はMEMMAP_V3とTASK_T2_APPBAND、a〜cの実績は後者§5-1) | TASK_T2_APPBAND §5-1は段の要約とリンク |
@@ -114,7 +114,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v78 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 254) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — 作業別の参照先 (読む / 触る / 検証) と、ファイル → 役割 → 仕様のファイル地図。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — **§0 版数の対応表と v3 への fork の段取り** (正典)、v1.x GUI の記録、v3 以降の長期項目 |
-| [RELEASE_v2.1.md](RELEASE_v2.1.md) | **v2.1 のリリースノート** (2026-09-29、タグ `v2.1`、KAPI v68) — 実機 Ra266 で動くようになったもの、PEGC 640x480 の受け入れ条件、分かっている制限。版の対応は [ROADMAP.md §0](ROADMAP.md)、各版の要約は [CHANGELOG.md](../CHANGELOG.md) |
+| [RELEASE_v2.1.md](RELEASE_v2.1.md) | **v2.1 のリリースノート** (2026-09-29、タグ `v2.1`、KAPI v68) — 実機 Ra266 で動くようになったもの、PEGC 640x480 の受け入れ条件、分かっている制限。版の対応は [decisions/VERSIONS.md §1](decisions/VERSIONS.md)、各版の要約は [CHANGELOG.md](../CHANGELOG.md) |
 | [HISTORY.md](HISTORY.md) | **開発の経緯と推移 (完了記録、2026-09-30)** — 初期コミット (2026-04-07) から v1.0 / v1.1 / v2.0 / GUI 1.1〜1.4 / v2.1 / v3 の fork までの年表、版ごとの要約、体制の推移、主要なユーザー決定の年表、数字。os32-v3 へ持っていく写しの原本 |
 | [CASE_STUDIES.md](CASE_STUDIES.md) | **ケーススタディ (現行、2026-09-30 の快照)** — 普遍的な教訓 10 件 (資料の食い違い、エミュレータと実機の差、PEGC 480、3 者討論、設計レビューの型、文書運用、変異試験、所有者タグ、配備の反映確認、ドラッグ枠の残像)。os32-v3 側で足していく |
 | `docs/archive/README.md` | **アーカイブの運用** — 受入完了した票をどこへどう移すか (`tools/move_docs.py`)、移したあとも守ること。籠の一覧は「ログ」節 |
@@ -182,6 +182,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 | 文書 | 内容 |
 |---|---|
+| [decisions/VERSIONS.md](decisions/VERSIONS.md) | 版数の対応表 (カーネル 2.1・GUI 1.4 で閉じた・v3・v4 草案) と、現行の開発 v3・os32 v2.x の扱い・fork の決定・KAPI の関数表の容量の規則 (2026-10-22 に ROADMAP §0 から移した) |
 | [decisions/V3_GOALS.md](decisions/V3_GOALS.md) | v3 の目的の一文・範囲・目標の 2 段 (ユーザー決定)。計画の票は V3_PLAN |
 | [decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) | v3 のメモリマップ (D1〜D36、帯の表、§12 T4〜T6b の争点)。票は T2・T3・T4〜T6b・T7 |
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | 実機 Ra266 の機体構成・基準構成と実機の方針 (旧 realhw/PLAN の本文、節の番号は同じ) |
@@ -245,7 +246,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 
 ### v3 (現行の開発 — 本案は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md))
 
-版の線と fork の段取りは [ROADMAP.md §0](ROADMAP.md)。下の票のうち HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯は v2.1 に先行して着地した (残件があるので v3/ に残す)。
+版の線と fork の段取りは [decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2。下の票のうち HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯は v2.1 に先行して着地した (残件があるので v3/ に残す)。
 
 | ドキュメント | 内容 |
 |-------------|------|

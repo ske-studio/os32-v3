@@ -1,6 +1,6 @@
 # Changelog
 
-OS32 **v3** (このリポジトリ os32-v3) の変更履歴。版数の対応表は [docs/ROADMAP.md §0](docs/ROADMAP.md)。
+OS32 **v3** (このリポジトリ os32-v3) の変更履歴。版数の対応表は [docs/decisions/VERSIONS.md §1](docs/decisions/VERSIONS.md)。
 
 **v2.x 以前の履歴はここに無い** — 版ごとの要約と経緯は [docs/HISTORY.md](docs/HISTORY.md)、
 各版の変更点の本文は os32 リポジトリ (v2.1 時点の記録、タグ `v2.1`) の `CHANGELOG.md` と `docs/RELEASE_v2.1.md`

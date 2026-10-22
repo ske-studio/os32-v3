@@ -320,7 +320,7 @@ VFSの仕様に基づき、固定のバッファサイズ(0x4000など)を利用
 
 ### リリースの手順 (v2.1 で行った形)
 
-1. 版の区切りの条件をユーザーが決め、[ROADMAP.md §0](ROADMAP.md) に書く (版の対応の正典)。
+1. 版の区切りの条件をユーザーが決め、[decisions/VERSIONS.md §1](decisions/VERSIONS.md) に書く (版の対応の正典)。
 2. `make clean` → `make all` → `make external` → `make check` (全部) が通ることを確かめ、rc を読む。
 3. エミュレータと (実機が対象なら) 実機で条件を確かめ、判定を記録する (v2.1 は実機の回の CHECKLIST の末尾)。
 4. **リリースノート `docs/RELEASE_vX.md`** (到達点・受け入れの条件・分かっている制限) を書き、

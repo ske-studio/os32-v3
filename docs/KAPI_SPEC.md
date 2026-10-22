@@ -296,7 +296,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
 超えたら `gen_kapi.py` が生成を拒否する** — そのときは次の R を決める票を起こす (目安は
-計画 ROADMAP §0)。
+VERSIONS §2)。
 
 **OS32X ヘッダ v3** (48 バイト、`OS32Header`): v2 の末尾に `kapi_data_off` (0x2C) を足した。
 値は包装時ではなく**コードが実際に使った配置**から取る — crt0 (`sdk/crt/crt0_c.c`) と

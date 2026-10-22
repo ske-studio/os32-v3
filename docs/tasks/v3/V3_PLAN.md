@@ -7,7 +7,7 @@
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。
 
 置くのは**柱と順序・v3 後半の票**だけ。決定の本文は各正典 (目的・範囲・目標の 2 段は [V3_GOALS.md](../../decisions/V3_GOALS.md)、メモリマップは [MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) の D 番号、
-版と fork は [ROADMAP.md §0](../../ROADMAP.md)) にあり、ここには写さない。論点の経緯 (草案の一覧と振り分け、食い違い、v2.x 互換の論点、fork の段取り、
+版と fork は [VERSIONS.md](../../decisions/VERSIONS.md) §1・§2) にあり、ここには写さない。論点の経緯 (草案の一覧と振り分け、食い違い、v2.x 互換の論点、fork の段取り、
 判断の往復) は草案に残した — §7 の表から辿る。数字 (カーネル予算など) の正典は [02_memory.md §2-1](../../02_memory.md) から案内する `build/out/MEMMAP.md` と [KAPI_SPEC.md](../../KAPI_SPEC.md)。
 
 策定時 (2026-09-17) の計画 `docs/archive/v3/PLAN.md` は記録として残す (ドライバの動的読み込みの動機 §3、HAL の棚卸し §3-1、温めているアイデア §5 は各票の出典)。
@@ -89,7 +89,7 @@ PLAN §5 の残り (5-1 ホストを仮想メモリに、5-2 V86 の装置要求
 | メモリマップ・モジュール・ABI・実行モデルの要件の決定 (D1〜D36) | [MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) §0 (経緯 §11、Codex X1〜X8 の補足 §8-4) |
 | ユーザー判断 U1〜U11 と Codex の論点 X1〜X8 の往復 | `docs/archive/v3/V3_PLAN_DRAFT.md` §7 |
 | 草案の一覧と振り分け、食い違い D1〜D21、v2.x 互換の論点 C1〜C8 | 同 §1、§4、§5 (C1 は D35 で決着、C7 は二段移行) |
-| 版数と fork の決定、os32 v2.x の扱い | [ROADMAP.md §0](../../ROADMAP.md)、`docs/archive/v3/FORK_PLAN.md` |
+| 版数と fork の決定、os32 v2.x の扱い | [VERSIONS.md](../../decisions/VERSIONS.md) §1・§2、`docs/archive/v3/FORK_PLAN.md` |
 | 保留 5 件の拾い方 | `docs/archive/v3/U6_PENDING_REVIEW.md`、MEMMAP_V3 D29〜D34 |
 | Rust と C11 の分担、386 下限 | [RUST_VS_C11.md](RUST_VS_C11.md)、MEMMAP_V3 D36 |
 | 現在地と残件 (日々の進捗) | 最新の引き継ぎ ([INDEX.md](../../INDEX.md) 冒頭の正典表の「引き継ぎ」の行) と各票の状態行 |

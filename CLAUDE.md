@@ -14,7 +14,7 @@ AI コーディングアシスタント共通の入口。**置くのは指示と
 **PM の推奨は基本的に承認、[D2] と実機の物理操作は個別承認**。
 **3 ラリーで決着しない争点はユーザーへ**。
 **このリポジトリ os32-v3 が現行 (v3)** (2026-09-30 に os32 から fork)。os32 の v2.x (タグ `v2.1`、`main`) は戻り先 —
-新機能は入れず、文書の正典もここ ([`docs/ROADMAP.md`](docs/ROADMAP.md) §0-1)。
+新機能は入れず、文書の正典もここ ([`docs/decisions/VERSIONS.md`](docs/decisions/VERSIONS.md) §2)。
 **カーネル層 (カーネル本体・VFS/FS・exec/ページング・KAPI・shlib 読み込み) に分かっている不具合が
 あるあいだは、新機能より先に直す** — 理由と適用の仕方は
 [`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §1。

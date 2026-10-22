@@ -102,7 +102,7 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 - WM 側 FEP (SHIFT+SPACE)、14 色リース、モーダル、CTRL+STOP でアプリを畳む
 - マウスなしの操作 (Win98 準拠: CTRL+ESC、GRPH+TAB、GRPH+SPACE の窓メニュー、カナでマウスキー)。一覧は `man os32gui`
 - 9821 対応: **PEGC 640×480×256 色**、**Cirrus GD5430 (Xe10)** の HW 塗り / BLT (バックエンド表で切替)
-- v3 では GUI に版を付けず、入れ物 (メモリマップ・ドライバの置き場) の作り直しの上で続ける ([docs/ROADMAP.md §0](docs/ROADMAP.md))
+- v3 では GUI に版を付けず、入れ物 (メモリマップ・ドライバの置き場) の作り直しの上で続ける ([docs/decisions/VERSIONS.md §1](docs/decisions/VERSIONS.md))
 
 ### グラフィックス
 
