@@ -90,7 +90,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 ## M3b の実装で設計者が決めたこと (2026-10-22)
 
 - 試行の入口と外部 recover 後の解放先を公開済み部品へ切替え、S0 は部品なしで維持する。取得口と拒否・解放の契約は CORE_API §10。
-- host 受入は実像の ops 呼出しと再配置済み GF コードへの既存 trace oracle で閉じる。M4 の所有照合・終端整理と M5 の配備は進めない。
+- host 受入は実像の ops 呼出し (再配置 stub から核へ届く) と、同じ実像を `module_image_relocate` で読んで公開 GF 関数を差し替えた既存 S3〜S6 の trace oracle (装置・PCI/PTE・時間は既存 mock、期待 trace は不変、白箱用の static helper は host のまま) で閉じる。配備・実機の検証の代わりではない。M4 の所有照合・終端整理と M5 の配備は進めない。
 - 送り M3a の stub 実呼出しは本段で回収。証拠は `~/os32-tmp/run/hwdev_m3b/`。
 
 ## 送り項目 (取り込みのレビューの P3)

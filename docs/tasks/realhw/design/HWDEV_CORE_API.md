@@ -199,11 +199,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 | 境界 | 契約 |
 |---|---|
 | kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`kernel/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
-| op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と6引数を維持して `ops->call` |
+| op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
 | op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
 
-KDEBUG の ops 版4・20口と HWDEV ABI は変更しない。GF 本体の同梱は M3c まで継続。
-実像試験は loader/facade 経由の ops 5〜10・release_work が再配置 stub から核へ届くことを観測する。
-trace 試験は同じ実像を `module_image_relocate` で読み、ELF の symbol offset から既存 S3〜S6
-試験の公開 GF 呼出し先を差し替える (装置・PCI/PTE・時間は既存 mock、期待 trace は不変)。
-白箱試験用の static helper は host に残す。これは配備・実機の検証を代替するものではない。
+KDEBUG の ops 版 4・20 口と HWDEV ABI は変更しない。GF 本体の同梱は M3c まで継続。

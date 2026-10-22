@@ -127,7 +127,7 @@ void _start(void)
     c->text = (u32)(uptr)core_function;
     c->text_size = 1;
 #ifdef HWDEV_REAL_IMAGE
-    c->text = 0x08048000; c->text_size = 0x100000;
+    c->text = 0x08048000; c->text_size = 0x100000;   /* -no-pie host text holds the image_* core callbacks */
 #endif
     kdebug.state = KDEBUG_RUNNING;
     kdebug.ops.hwdev_core_get = get_core;
