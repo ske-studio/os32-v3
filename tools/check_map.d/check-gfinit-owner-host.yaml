@@ -1,4 +1,5 @@
 check-gfinit-owner-host:
+- hwdev/owner.h
 - kdebug/gfinit.c
 - kdebug/gfinit.h
 - kdebug/gfinit_bus.h

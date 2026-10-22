@@ -60,6 +60,28 @@ class ImportsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                     gen.check_nm(self.entries)
 
+    def test_reject_gf_object_in_core_map(self):
+        original = Path.read_text
+        def contaminated(path, *args, **kwargs):
+            text = original(path, *args, **kwargs)
+            if path == ROOT / 'build/out/kdebug/kdebug.map':
+                text += '\nLOAD build/out/hwdev/gfinit.o\n'
+            return text
+        with patch.object(Path, 'read_text', contaminated):
+            with self.assertRaisesRegex(ValueError, 'GF object still linked'):
+                gen.check_nm(self.entries)
+
+    def test_reject_gf_slot_from_core_caller(self):
+        original = gen.symbols
+        def contaminated(nm, paths, undefined):
+            refs = original(nm, paths, undefined)
+            if undefined and ROOT / 'build/out/kdebug/kdebug_main.o' in paths:
+                refs.add('pci_cfg_read32')
+            return refs
+        with patch.object(gen, 'symbols', side_effect=contaminated):
+            with self.assertRaisesRegex(ValueError, 'GF-only slot must be retained'):
+                gen.check_nm(self.entries)
+
     def test_selftest_boot_references_are_not_excluded(self):
         original = gen.symbols
         for symbol in ('memory_boot_page_counts', 'kdebug'):

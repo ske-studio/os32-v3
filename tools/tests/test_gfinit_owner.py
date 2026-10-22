@@ -14,6 +14,10 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('lease_generation', 'owner->generation, r->token.session', 'gf_lease.generation, r->token.session'),
+    ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) return -1;', ''),
+    ('detach_before_free', 'recover_owner_configure(0, 0, 0, false)', '0'),
+    ('paused_work_retained', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))', 'if (owner)'),
     ('max_nodes', 'if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;', ''),
     ('size_failure_retained', 'op != GF_OP_SIZE_BARS || r->state == REC_FAILED', 'op != GF_OP_SIZE_BARS'),
     ('inspect_replaces_s0_ops', 'g->s0 = s0;', 'g->s0 = s0; (void)recover_owner_configure(&g->ops, &g->bus, s0, false);'),

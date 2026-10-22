@@ -6,11 +6,31 @@
 #ifdef HWDEV_REAL_IMAGE
 #include "hwdev_pair.h"
 #include "kdebug/gfinit.h"
+#include "hwdev_owner_fixture.h"
 static struct recover image_owner;
-static u32 image_owner_calls, image_end_calls;
+static u32 image_owner_calls, image_end_calls, image_free_calls, image_terminal;
+static u8 work[32 * PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+static const struct recover_ops image_base;
+static const struct recover_profile image_s0;
+static int image_configure(const struct recover_ops *ops, void *opaque,
+                            const struct recover_profile *s0, bool approved)
+{
+    (void)opaque; (void)s0; (void)approved;
+    if (ops) return -1;
+    image_owner.ops = &image_base; image_owner.opaque = 0;
+    image_owner.profile = &image_s0; image_owner.plan = 0;
+    image_owner.bound_profile = 0;
+    return 0;
+}
 static struct recover *image_recover_owner(void) { image_owner_calls++; return &image_owner; }
 static int image_trial_end(struct recover *r, const struct recover_token *t, enum recover_reason why)
-{ (void)r; (void)t; (void)why; image_end_calls++; return -1; }
+{
+    (void)t; (void)why; image_end_calls++;
+    if (!image_terminal || r->state != REC_PAUSED) return -1;
+    r->state = image_terminal == 1 ? REC_VERIFIED : REC_FAILED;
+    r->failed = image_terminal != 1; r->cold_latched = r->failed;
+    return r->failed ? -1 : 0;
+}
 #endif
 static u8 file[MODULE_IMAGE_MAX], pool[MODULE_IMAGE_MAX] __attribute__((aligned(4096)));
 static u32 input[3], pos, opens, closes, live, logs;
@@ -73,6 +93,14 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
 }
 int pgalloc_free_n_owner(u32 owner, u32 page, int n)
 {
+#ifdef HWDEV_REAL_IMAGE
+    if (owner == LEDGER_OWNER_KERNEL) {
+        CHECK(page == (u32)(uptr)work / PAGE_SIZE && n == 32);
+        CHECK(image_owner.ops == &image_base && !image_owner.opaque && !image_owner.plan);
+        image_free_calls++;
+        return 1;
+    }
+#endif
     (void)page;
     CHECK(owner == 100 && n > 0);
     return 1;
@@ -112,6 +140,7 @@ void _start(void)
 #ifdef HWDEV_REAL_IMAGE
     fixture_core.recover_owner = image_recover_owner;
     fixture_core.trial_end = image_trial_end;
+    fixture_core.recover_owner_configure = image_configure;
 #endif
     struct module_record *c = &module_records[0];
     c->state = MODULE_RUNNING;
@@ -162,6 +191,38 @@ void _start(void)
         CHECK(image_end_calls == 1);
         ops->release_work();
         CHECK(image_owner_calls == 7);
+        struct module_record *body = module_record_get(hwdev_handle);
+        struct gfinit_owner *g = (void *)(uptr)(body->base + IMAGE_CONTROL);
+        struct hwdev_lease *lease = (void *)(uptr)(body->base + IMAGE_GF_LEASE);
+        *(struct gfinit_owner **)(uptr)(body->base + IMAGE_OWNER) = g;
+        for (u32 terminal = 1; terminal <= 2; terminal++) {
+            kmemset(g, 0, sizeof(*g));
+            g->rom = work; g->inspected = true; g->generation = terminal;
+            *lease = (struct hwdev_lease){terminal, 1, terminal, true};
+            image_owner.state = REC_PAUSED; image_owner.token.session = terminal;
+            image_owner.ops = &g->ops; image_owner.opaque = &g->bus;
+            image_owner.profile = &g->profile;
+            image_owner.plan = &g->size_plan;
+            image_terminal = terminal;
+            u32 freed = image_free_calls;
+            ops->release_work();
+            CHECK(image_free_calls == freed && lease->active && g->rom);
+            struct gfinit_request q = {.version=GF_INIT_VERSION, .size=sizeof(q),
+                .flags=GF_ALLOW_WRITE, .max_steps=GF_INIT_SCHEDULE, .session=terminal};
+            CHECK((ops->call(GF_OP_ABORT, &q, sizeof(q), 0, 0, 0) == 0) == (terminal == 1));
+            CHECK(image_free_calls == freed + 1 && !lease->active && !g->rom);
+            CHECK(image_owner.state == (terminal == 1 ? REC_VERIFIED : REC_FAILED));
+            CHECK(image_owner.failed == (terminal == 2) && image_owner.cold_latched == (terminal == 2));
+            ops->release_work(); ops->release_work();
+            q.status = 0;
+            CHECK(ops->call(GF_OP_ABORT, &q, sizeof(q), 0, 0, 0) == -1);
+            CHECK(image_free_calls == freed + 1 && image_owner.token.session == terminal);
+        }
+        CHECK(image_owner.failed && image_owner.cold_latched);
+        struct gfinit_request cold = {.version=GF_INIT_VERSION, .size=sizeof(cold),
+            .max_steps=GF_INIT_SCHEDULE, .session=image_owner.token.session};
+        CHECK(ops->call(GF_OP_INSPECT, &cold, sizeof(cold), 0, 0, 0) == -1);
+        CHECK(hwdev_module_load(dep) == MODULE_BUSY && image_owner.failed && image_owner.cold_latched);
 #else
         CHECK(ops->call(0, 0, 0, 0, 0, 0) == 42);
         ops->release_work();
@@ -175,8 +236,14 @@ void _start(void)
         CHECK(!memcmp(slots, expected, sizeof(expected)));
         c->generation++;
         CHECK(!hwdev_module_ops());
+        CHECK(ops->call(0, 0, 0, 0, 0, 0) == -1);
+        ops->release_work();
         c->generation--;
-        CHECK(module_abort(hwdev_handle) == 0 && !hwdev_module_ops() && !live);
+        r->generation++;
+        CHECK(!hwdev_module_ops() && ops->call(0, 0, 0, 0, 0, 0) == -1);
+        r->generation--;
+        CHECK(r->registration_refs == 1);
+        CHECK(module_abort(hwdev_handle) == MODULE_ISOLATED && !hwdev_module_ops() && live);
     }
     CHECK(c->state == MODULE_RUNNING); /* HWDEV failure never rolls back S0's body. */
     if (input[0] == 2) CHECK(!opens && !logs);

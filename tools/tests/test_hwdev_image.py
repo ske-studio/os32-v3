@@ -90,9 +90,17 @@ def main():
     cases.append(('actual-GF-import-count', 0, 6, shortened))
     with tempfile.TemporaryDirectory(prefix='hwdev-image-') as td:
         folder = Path(td)
+        # Seed a PAUSED bundle at the real private owner's layout. Only the
+        # platform/trial callbacks are doubles; call/release execute KMOD code.
+        owner_source = (ROOT/'kdebug/gfinit.c').read_text()
+        owner_type = re.search(r'struct gfinit_owner \{.*?\n\};', owner_source, re.S)[0]
+        header = '#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n' + owner_type + '\n'
+        for name in ('control', 'owner', 'gf_lease'):
+            header += '#define IMAGE_' + name.upper() + ' ' + str(symbols[name]) + 'U\n'
+        (folder/'hwdev_owner_fixture.h').write_text(header)
         exe = folder/'host'
         command = module.build(exe)
-        command[1:1] = ['-DHWDEV_REAL_IMAGE', '-I'+str(OUT/'hwdev')]
+        command[1:1] = ['-DHWDEV_REAL_IMAGE', '-I'+str(OUT/'hwdev'), '-I'+str(folder)]
         subprocess.run(command, check=True)
         module.run(exe, cases)
         print("PASS actual ops->call op5-10 and release_work -> relocated core stubs")

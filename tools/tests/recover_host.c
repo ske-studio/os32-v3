@@ -520,10 +520,38 @@ static void routes(void)
 #include "recover_t2_host.inc"
 #include "recover_t3_host.inc"
 
+static void owner_detach_tests(void)
+{
+    /* t3 registered the original core S0 ops and left the owner PAUSED. */
+    struct recover *o = recover_owner();
+    CHECK(recover_owner_configure(0, 0, 0, false) < 0);
+    const struct recover_ops *base = owner_s0_ops;
+    const struct recover_profile *s0 = owner_s0_profile;
+    struct recover_ops borrowed = *base;
+    for (u32 mode = 0; mode < 3; mode++) {
+        o->state = mode == 0 ? REC_IDLE : mode == 1 ? REC_VERIFIED : REC_FAILED;
+        o->ops = &borrowed; o->opaque = &borrowed; o->profile = &profile;
+        o->plan = &plan; o->bound_profile = &profile;
+        o->buffers = (struct recover_plan_buffers){flow, valid_bits};
+        o->node_layout[RECOVER_NODE_MAX-1] = layouts;
+        o->node_write[RECOVER_NODE_MAX-1] = rules;
+        o->failed = mode == 2; o->cold_latched = mode != 0;
+        o->token.session = 9; o->next_session = 9; o->reason = REC_OPERATION;
+        CHECK(recover_owner_configure(0, 0, 0, false) == 0);
+        CHECK(o->ops == base && o->opaque == owner_s0_opaque && o->profile == s0);
+        CHECK(!o->plan && !o->bound_profile && !o->buffers.flow_bits && !o->buffers.valid_bits);
+        CHECK(!o->node_layout[RECOVER_NODE_MAX-1] && !o->node_write[RECOVER_NODE_MAX-1]);
+        CHECK(o->failed == (mode == 2) && o->cold_latched == (mode != 0));
+        CHECK(o->token.session == 9 && o->next_session == 9 && o->reason == REC_OPERATION);
+        CHECK(recover_owner_configure(0, 0, 0, false) == 0);
+        if (mode) CHECK(recover_owner_configure(&borrowed, 0, s0, false) < 0);
+    }
+}
+
 void _start(void)
 {
     preconditions(); normal(); mismatches(); timing(); callback_timing();
-    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests();
+    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests(); owner_detach_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }

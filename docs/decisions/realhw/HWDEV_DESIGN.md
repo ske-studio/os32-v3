@@ -105,7 +105,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 |---|---|
 | recover.c:294–340 recover_gf_pre / recover_gf_result / gf_bus_record | 核に残す。REC 送信・課金・失敗伝播を共有し、前 2 関数を slot 公開 |
 | recover.c:472–490 の GFX port 検査、zero_target (:534) と検証/復帰側の全呼出し | 核に残す。GF の zero 保持と共通 accessor/復帰の安全条件 |
-| recover_profile.c:165–281 の gf_targets / gf_rules / gf_regs / gf_quiet、recover_gf_profile / recover_gf_screen_safe | 核に残す。S0 用の最小 GF 復帰モデルと停止確認、予算。HWDEV 不在でも使用可能 |
+| recover_profile.c:165–281 の gf_targets / gf_rules / gf_regs / gf_quiet、recover_gf_profile / recover_gf_screen_safe | 核に残す。最小 GF モデルと停止確認・予算の部品。独立した GF 復帰の起動経路はない。HWDEV 不在で使えるのは共通 98 の S0 経路 (M4 決定参照) |
 | gfinit*.c/.h の全関数・データ、recover_gf.c の template/許可表/式/固定 plan | ソース位置を維持して HWDEV 像へリンク。核からの直接 symbol 参照は call/release_work へ置換 |
 
 - N1・CR1F・0FACh・CUI/31kHz・S0 と S1 の区別などの安全条件は [GF6200_4A_DESIGN.md](GF6200_4A_DESIGN.md) と [REALHW_RECOVER_DESIGN.md](REALHW_RECOVER_DESIGN.md) のまま維持する (この分離で変えない)。GF 部品には 0FACh 操作を渡さない。
@@ -161,3 +161,10 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 - **S0 の最小 GF 復帰** (§6 の表の「HWDEV 不在でも使用可能」): `recover_gf_profile`・`recover_gf_screen_safe` は核に残ったが、核の経路から呼ばれていない (M3c より前から)。扱いは M4 で PM が決める (票 TASK_HWDEV の送り項目)。
 - **順序** (§8 の「M1〜M5 → 旧 S7 → T4b → T5 → S8」と「BAR 長根拠は T5 前」): 2026-10-23 に見直した (票 TASK_HWDEV §3-1)。BAR 長の根拠は新しい設計の段 BARLEN に置き換え、Trident 0:8.0 に加えて 82557 0:11.0 も対象 (NEC 0:7.0 は BAR が 0 で対象外)。
 - **状態行** (冒頭の「実装はユーザーの合図待ち」): 実装は 2026-10-22 に始まり、M1〜M3c が main。段の状態は票 TASK_HWDEV。
+
+## M4 の実装で設計者が決めたこと (2026-10-23)
+
+- v1 の所有入力は `hwdev/owner.h` の BDF/platform ID・I/O/MMIO/IRQ/DMA 範囲・所有世代と分類。実装済み本番 GF driver がない固定 0:13.0 だけを停止・非所有と分類し、IDE・LAN/SerialFS・表示所有中・未分類は試験で注入して拒否する。registry や driver 中断は作らない。
+- lease は常駐 GF control と同じ boot body に置き、単調増加する claim 世代・所有世代・session を作業領域の世代と照合する。部品入口は kernel facade で依存/自分の loader 世代を毎回照合し、公開成功後の registration ref は boot 中保持する (開始失敗の rollback は保持しない)。
+- `recover_owner_configure(NULL, ...)` は IDLE/終端でのみ、最初に登録した核 S0 ops/profile/opaque に戻し plan と派生参照を解除する。結果・session・FAILED/cold は初期化せず、解放順は共通終端 → 核の参照解除 → work free → lease 解除、A1 成功だけは保持する。
+- S0 の決着: `recover_gf_profile` の quiesce を HWDEV 不在時に自動実行する経路は作らない。モデルだけでは対象の所有・identity・BAR の照合と bus がなく、開始途中の拒否後に書込みを始めるのは試行の開始条件を迂回するため。§6 の「不在でも使用可能」を共通 98 S0 経路に訂正し、GF 停止を伴う独立経路と混同しない。FAILED/cold の終端は再実行せず結果を保持する。
