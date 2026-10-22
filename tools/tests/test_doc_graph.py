@@ -6,11 +6,13 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import types
 import unittest
+from unittest.mock import patch
 
 SRC = Path(__file__).resolve().parents[1] / 'doc_graph.py'
 
@@ -28,6 +30,10 @@ def suite(mod):
             self.tmp = tempfile.TemporaryDirectory(prefix='doc-graph-')
             self.addCleanup(self.tmp.cleanup)
             self.root = Path(self.tmp.name)
+            # 作業木内の TMPDIR でも、偽の .git から親のリポジトリを拾わない。
+            isolation = patch.dict(os.environ, {'GIT_CEILING_DIRECTORIES': str(self.root.parent)})
+            isolation.start()
+            self.addCleanup(isolation.stop)
 
         def put(self, path, text=''):
             dest = self.root / path
@@ -203,6 +209,28 @@ def suite(mod):
 ''')
             self.only('spec_to_ticket', 6)
 
+        def test_review_reference_normalization_duplicates_and_escapes(self):
+            paths = {'docs/archive/A.md', 'docs/Current.md'}
+            cases = [
+                ('[a b] [a  b]\n[a b]: archive/A.md', [(1, 'docs/archive/A.md')] * 2),
+                ('[r]\n[r]: Current.md\n[r]: archive/A.md', [(1, 'docs/Current.md')]),
+                ('[r]\n[r]: archive/A.md\n[r]: Current.md', [(1, 'docs/archive/A.md')]),
+                ('[Straße\t A][STRASSE A]\n[straße a]: archive/A.md', [(1, 'docs/archive/A.md')]),
+                ('\\[r]\n[r]: archive/A.md', []),
+                ('\\[r](archive/A.md)', []),
+                ('[0,1) [a](archive/A.md) [literal', [(1, 'docs/archive/A.md')]),
+                ('[a\n b][r]\n[r]: archive/A.md', []),
+                ('\\\\[r](archive/A.md)', [(1, 'docs/archive/A.md')]),
+                ('[a `]` b](archive/A.md)', [(1, 'docs/archive/A.md')]),
+                ('[a \\] b][r]\n[r]: archive/A.md', [(1, 'docs/archive/A.md')]),
+                ('[![img](archive/A.png)](archive/A.md)', [(1, 'docs/archive/A.md')]),
+                ('[![img](archive/A.md)](Current.md)',
+                 [(1, 'docs/Current.md'), (1, 'docs/archive/A.md')]),
+            ]
+            for body, expected in cases:
+                with self.subTest(body=body):
+                    self.assertEqual(list(mod.links('docs/S.md', body.splitlines(), paths)), expected)
+
         def test_exclusions_and_symlinks(self):
             self.put('docs/S.md', '[excluded](hw/T.md) [built](../build/T.md)')
             for name in ('docs/hw', 'build/', 'apps', 'game', '.git'):
@@ -240,6 +268,10 @@ def suite(mod):
 
 
 MUTATIONS = [
+    ("return ' '.join(label.split()).casefold()", 'return label.casefold()', '参照名の空白正規化を外す'),
+    ("return ' '.join(label.split()).casefold()", "return ' '.join(label.split())", '参照名の大小文字折畳みを外す'),
+    ('definitions.setdefault(key, target)', 'definitions[key] = target', '最後の定義を有効にする'),
+    ('return (pos - start) % 2 == 1', 'return False', 'エスケープ判定を外す'),
     ('if a == 2 and b == 4:', 'if False:', '仕様→票を数えない'),
     ('if a == 3 and b == 4:', 'if False:', '決定→票を数えない'),
     ('if a == 4 and b == 4 and dest not in parents[source] | successors[source]:', 'if False:', '横の票を数えない'),

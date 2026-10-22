@@ -4,6 +4,7 @@
 """
 import contextlib
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -18,10 +19,11 @@ import doc_graph
 SRC = Path(__file__).resolve().parents[1] / 'doc_delink_archive.py'
 
 
-def load(source):
+def load(source, graph=None):
     module = types.ModuleType('doc_delink_under_test')
     module.__file__ = str(SRC)
-    exec(compile(source, str(SRC), 'exec'), module.__dict__)
+    with patch.dict(sys.modules, {'doc_graph': graph or doc_graph}):
+        exec(compile(source, str(SRC), 'exec'), module.__dict__)
     return module
 
 
@@ -31,6 +33,10 @@ def suite(mod):
             self.tmp = tempfile.TemporaryDirectory(prefix='doc-delink-')
             self.addCleanup(self.tmp.cleanup)
             self.root = Path(self.tmp.name)
+            # 作業木内の TMPDIR でも、偽の .git から親のリポジトリを拾わない。
+            isolation = patch.dict(os.environ, {'GIT_CEILING_DIRECTORIES': str(self.root.parent)})
+            isolation.start()
+            self.addCleanup(isolation.stop)
 
         def put(self, rel, text=''):
             path = self.root / rel
@@ -96,12 +102,109 @@ def suite(mod):
 ''')
             self.assertIn('リンク 5 件、定義削除 1 件', output)
 
-        def test_keep_definitions_for_remaining_non_archive_uses(self):
-            # doc_graph と同じく、同名の最後の定義を解決先に使う。
-            body = '[shared] [x][shared]\n[shared]: archive/A.md\n[shared]: Current.md\n'
+        def test_review_reference_normalization(self):
+            # レビュー反例をそのまま保持する。
+            body = '[a b] [a  b]\n[a b]: archive/A.md'
+            expected = 'a b (アーカイブ: `docs/archive/A.md`) a  b (アーカイブ: `docs/archive/A.md`)\n'
+            self.assertEqual(mod.delink('docs/S.md', body)[0], expected)
+            body = '[Straße\t A][STRASSE A] [strasse  a][]\n[straße a]: archive/A.md\n'
+            self.assertEqual(len(mod.delink('docs/S.md', body)[1]), 3)
+
+        def test_review_first_definition_wins(self):
+            body = '[r]\n[r]: Current.md\n[r]: archive/A.md'
+            self.assertEqual(mod.delink('docs/S.md', body), (body, []))
+            body = '[r]\n[r]: archive/A.md\n[r]: Current.md'
+            self.assertEqual(mod.delink('docs/S.md', body)[0],
+                             'r (アーカイブ: `docs/archive/A.md`)\n[r]: Current.md')
+            # 正規化後に重複する定義も先勝ち。
+            body = '[A B]\n[a  b]: Current.md\n[A B]: archive/A.md'
+            self.assertEqual(mod.delink('docs/S.md', body), (body, []))
+
+        def test_review_label_boundaries(self):
+            cases = {
+                '[a `]` b](archive/A.md)': 'a `]` b (アーカイブ: `docs/archive/A.md`)',
+                '[a \\] b][r]\n[r]: archive/A.md': 'a \\] b (アーカイブ: `docs/archive/A.md`)\n',
+                '[a ``x`]`x`` b](archive/A.md)': 'a ``x`]`x`` b (アーカイブ: `docs/archive/A.md`)',
+                '[a \\] b](archive/A.md)': 'a \\] b (アーカイブ: `docs/archive/A.md`)',
+            }
+            for body, expected in cases.items():
+                with self.subTest(body=body):
+                    skips = []
+                    result, edits = mod.delink('docs/S.md', body, skips)
+                    self.assertEqual(result, expected)
+                    self.assertTrue(edits)
+                    self.assertEqual(skips, [])
+                    self.assertEqual(mod.delink('docs/S.md', result), (result, []))
+
+        def test_review_escaped_opening_bracket(self):
+            for body in ('\\[r]\n[r]: archive/A.md', '\\[r](archive/A.md)',
+                         '\\![r](archive/A.md)'):
+                with self.subTest(body=body):
+                    # \! は ! だけをエスケープし、後続の [r] は通常リンク。
+                    if body.startswith('\\!'):
+                        expected = '\\!r (アーカイブ: `docs/archive/A.md`)'
+                        self.assertEqual(mod.delink('docs/S.md', body)[0], expected)
+                    else:
+                        self.assertEqual(mod.delink('docs/S.md', body), (body, []))
+            body = '\\\\[r](archive/A.md)'
+            self.assertEqual(mod.delink('docs/S.md', body)[0],
+                             '\\\\r (アーカイブ: `docs/archive/A.md`)')
+
+        def test_review_link_containing_image_is_one_edit(self):
+            for inner, outer in (('archive/A.png', 'archive/B.md'),
+                                 ('current.png', 'archive/B.md'),
+                                 ('archive/A.png', 'Current.md')):
+                body = f'[![img]({inner})]({outer})'
+                self.put('docs/S.md', body)
+                rc, output = self.cli('--dry-run')
+                self.assertEqual(rc, 0, output)
+                self.assertIn('リンク 1 件', output)
+                self.assertEqual(self.read('docs/S.md'), body)
+                self.assertEqual(self.cli()[0], 0)
+                result = self.read('docs/S.md')
+                label = ('img (アーカイブ: `docs/archive/A.png`)' if inner.startswith('archive/')
+                         else '![img](current.png)')
+                expected = (label + ' (アーカイブ: `docs/archive/B.md`)' if outer.startswith('archive/')
+                            else '[' + label + '](Current.md)')
+                self.assertEqual(result, expected)
+                self.assertEqual(mod.delink('docs/S.md', result), (result, []))
+
+        def test_unsupported_is_reported_in_both_modes_and_keeps_definitions(self):
+            body = '[outer [inner](Current.md)][r] [r]\n[r]: archive/A.md\n'
             self.put('docs/S.md', body)
-            self.assertEqual(self.cli()[0], 0)
-            self.assertEqual(self.read('docs/S.md'), body)
+            for args in (('--dry-run',), ()):
+                rc, output = self.cli(*args)
+                self.assertEqual(rc, 0, output)
+                self.assertIn('skip docs/S.md:1 画像以外のリンクを内包するラベルは未対応', output)
+                self.assertIn('skip 1 件', output)
+                self.assertIn('[outer [inner](Current.md)][r]', self.read('docs/S.md'))
+                self.assertIn('[r]: archive/A.md', self.read('docs/S.md'))
+            result = self.read('docs/S.md')
+            self.assertEqual(mod.delink('docs/S.md', result)[0], result)
+
+        def test_unsupported_destination_is_kept_with_diagnostics(self):
+            body = "[a](archive/A.md 'title')\n"
+            self.put('docs/S.md', body)
+            for args in (('--dry-run',), ()):
+                rc, output = self.cli(*args)
+                self.assertEqual(rc, 0, output)
+                self.assertIn('skip docs/S.md:1 複数行または未対応の宛先', output)
+                self.assertEqual(self.read('docs/S.md'), body)
+
+        def test_multiline_candidates_are_kept_with_diagnostics(self):
+            for body in ('[a\n b][r]\n[r]: archive/A.md\n',
+                         '[a](\narchive/A.md)\n', '[a](archive/A.md\n "title")\n'):
+                self.put('docs/S.md', body)
+                for args in (('--dry-run',), ()):
+                    rc, output = self.cli(*args)
+                    self.assertEqual(rc, 0, output)
+                    self.assertIn('skip docs/S.md:1 複数行のリンクは未対応', output)
+                    self.assertEqual(self.read('docs/S.md'), body)
+
+        def test_literal_brackets_do_not_hide_links(self):
+            body = '[0,1) [a](archive/A.md) [literal\n'
+            self.assertEqual(mod.delink('docs/S.md', body)[0],
+                             '[0,1) a (アーカイブ: `docs/archive/A.md`) [literal\n')
 
         def test_tables_offsets_crlf_and_eof(self):
             body = '| 前 `code` | [旧](archive/A.md#f) | [A.md](archive/A.md) | 後 |\r\n末尾'
@@ -246,15 +349,34 @@ MUTATIONS = [
 ]
 
 
+# 実装が共有するパーサーへの変異も解除器の反例で検出する。
+GRAPH_MUTATIONS = [
+    ("return ' '.join(label.split()).casefold()", 'return label.casefold()', '参照名の空白正規化を外す'),
+    ("return ' '.join(label.split()).casefold()", "return ' '.join(label.split())", '参照名の大小文字折畳みを外す'),
+    ('definitions.setdefault(key, target)', 'definitions[key] = target', '最後の定義を有効にする'),
+    ('return (pos - start) % 2 == 1', 'return False', 'エスケープ判定を外す'),
+]
+
+
 def main():
     source = SRC.read_text(encoding='utf-8')
     result = unittest.TextTestRunner(verbosity=2).run(suite(load(source)))
     bad = not result.wasSuccessful()
     if '--mutate' in sys.argv:
-        for old, new, name in MUTATIONS:
-            if source.count(old) != 1:
+        graph_source = Path(doc_graph.__file__).read_text(encoding='utf-8')
+        cases = [(source, item, False) for item in MUTATIONS]
+        cases += [(graph_source, item, True) for item in GRAPH_MUTATIONS]
+        for original, (old, new, name), shared in cases:
+            if original.count(old) != 1:
                 raise AssertionError('変異箇所が一意でない: ' + name)
-            changed = load(source.replace(old, new, 1))
+            mutated = original.replace(old, new, 1)
+            if shared:
+                graph = types.ModuleType('doc_graph_mutant')
+                graph.__file__ = doc_graph.__file__
+                exec(compile(mutated, graph.__file__, 'exec'), graph.__dict__)
+                changed = load(source, graph)
+            else:
+                changed = load(mutated)
             output = io.StringIO()
             result = unittest.TextTestRunner(stream=output).run(suite(changed))
             # 例外だけでなく、期待した挙動との不一致で RED になったことを確認する。

@@ -9,6 +9,7 @@ L1〜L4 → L5 はリンクを正典への参照として検査する (意味の
 --update-baseline だけが基準値を書き換える。通常実行は一覧と比較を出す。
 """
 import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -29,11 +30,154 @@ KINDS = {
 }
 # 除外パスはディレクトリ表記の末尾 / を正規化する。
 EXCLUDED = {name.rstrip('/') for name in ('.git', 'build/', 'apps', 'game', 'docs/hw')}
-INLINE = re.compile(r'!?\[[^\]\n]*\]\(\s*(<[^>\n]+>|(?:[^\s()]|\([^()]*\))+)(?:\s+"[^"\n]*")?\s*\)')
-REFDEF = re.compile(r'^ {0,3}\[([^]\n]+)\]:\s*(<[^>\n]+>|\S+)')
-REFUSE = re.compile(r'(?<!!)\[([^]\n]+)\](?:\[([^]\n]*)\])?(?!\()')
+DESTINATION = re.compile(r'\(\s*(<[^>\n]+>|(?:[^\s()]|\([^()]*\))+)(?:\s+"[^"\n]*")?\s*\)')
+REFDEF = re.compile(r'^ {0,3}\[((?:\\.|[^]\\\n])+)\]:\s*(<[^>\n]+>|\S+)')
 STATUS = re.compile(r'(?:^|> |/ )状態:\s*(.*)$')
 DECL = re.compile(r'^> (索引|上位|後続):\s*(.*)$')
+
+
+def normalize_reference(label):
+    """CommonMark の参照名: Unicode case folding と空白の畳み込み。"""
+    return ' '.join(label.split()).casefold()
+
+
+def escaped(text, pos):
+    start = pos
+    while start and text[start - 1] == '\\':
+        start -= 1
+    return (pos - start) % 2 == 1
+
+
+def code_end(text, start):
+    """同じ長さのバッククォート列で閉じるコードスパン (無ければ None)。"""
+    run = re.match(r'`+', text[start:])[0]
+    for match in re.finditer(r'`+', text[start + len(run):]):
+        if len(match[0]) == len(run):
+            return start + len(run) + match.end()
+    return None
+
+
+def reference_definitions(lines, visible):
+    definitions, locations = {}, {}
+    for index, line in enumerate(visible):
+        match = REFDEF.match(line)
+        if match:
+            # ラベル中のコードも、定義では参照名そのもの。
+            raw = lines[index]
+            key = normalize_reference(raw[match.start(1):match.end(1)])
+            target = raw[match.start(2):match.end(2)]
+            definitions.setdefault(key, target)  # CommonMark: 最初の定義が有効
+            locations[index] = (key, target)
+    return definitions, locations
+
+
+@dataclass
+class Link:
+    start: int
+    end: int
+    label_start: int
+    label_end: int
+    target: str
+    key: str
+    image: bool
+    children: list
+    reason: str = ''
+
+
+def scan_links(line, visible, definitions, start=0, end=None):
+    """位置つきのリンク木。未対応の候補は範囲全体を reason 付きで残す。
+
+    1 行内のラベル・宛先に対応。コードスパン、エスケープ、入れ子の画像を
+    ラベル境界で考慮し、部分一致で参照の末尾だけを拾わない。
+    """
+    end = len(line) if end is None else end
+    found, pos = [], start
+    while pos < end:
+        image = line.startswith('![', pos) and not escaped(line, pos)
+        opening = pos + int(image)
+        if (opening >= end or visible[opening:opening + 1] != '['
+                or escaped(line, opening)):
+            pos += 1
+            continue
+        cursor, depth = opening + 1, 1
+        while cursor < end:
+            char = line[cursor]
+            if escaped(line, cursor):
+                cursor += 1
+                continue
+            if char == '`':
+                cursor = (code_end(line[:end], cursor)
+                          or cursor + len(re.match(r'`+', line[cursor:])[0]))
+                continue
+            if char == '[':
+                depth += 1
+            elif char == ']':
+                depth -= 1
+                if not depth:
+                    break
+            cursor += 1
+        if depth:
+            # 閉じない [ は文字 (半開区間の表記など)。後続のリンクは走査する。
+            pos += 1
+            continue
+        label = line[opening + 1:cursor]
+        stop, target, key, reason = cursor + 1, '', '', ''
+        if line[stop:stop + 1] == '(':
+            match = DESTINATION.match(line, stop, end)
+            if match:
+                stop, target = match.end(), match[1]
+            else:
+                stop, reason = end, '複数行または未対応の宛先'
+        elif line[stop:stop + 1] == '[':
+            ref_end = stop + 1
+            while ref_end < end and (line[ref_end] != ']' or escaped(line, ref_end)):
+                ref_end += 1
+            if ref_end == end:
+                stop, reason = end, '複数行または閉じていない参照名は未対応'
+            else:
+                key = normalize_reference(line[stop + 1:ref_end] or label)
+                stop, target = ref_end + 1, definitions.get(key, '')
+        else:
+            key = normalize_reference(label)
+            target = definitions.get(key, '')
+        children = scan_links(line, visible, definitions, opening + 1, cursor)
+        if target and not image and any(child.target and not child.image for child in children):
+            reason = '画像以外のリンクを内包するラベルは未対応'
+        found.append(Link(pos, stop, opening + 1, cursor, target, key, image, children, reason))
+        pos = stop
+    return found
+
+
+def link_rows(lines, visible, definitions, locations):
+    """未対応候補がある段落は全体を保持し、次行の参照だけを変換しない。"""
+    def reason(node):
+        return node.reason or next((value for child in node.children
+                                    if (value := reason(child))), '')
+
+    def flush(rows):
+        issues = [(index, nodes, next((value for node in nodes
+                                      if (value := reason(node))), ''))
+                  for index, nodes in rows]
+        # 複数行リンクの末尾だけを単独の参照として扱わない。
+        raw = '\n'.join(lines[index].rstrip('\r\n') for index, _ in rows)
+        mask = '\n'.join(visible[index] for index, _ in rows)
+        for node in scan_links(raw, mask, definitions):
+            if (node.target or node.reason) and '\n' in raw[node.start:node.end]:
+                row = raw[:node.start].count('\n')
+                index, nodes, _ = issues[row]
+                issues[row] = (index, nodes, '複数行のリンクは未対応')
+        unsupported = any(issue for _, _, issue in issues)
+        for index, nodes, issue in issues:
+            yield index, [] if unsupported else nodes, issue
+
+    rows = []
+    for index, line in enumerate(visible):
+        if index in locations or not line.strip():
+            yield from flush(rows)
+            rows = []
+        if index not in locations and line.strip():
+            rows.append((index, scan_links(lines[index], line, definitions)))
+    yield from flush(rows)
 
 
 def prose(text, preserve_columns=False):
@@ -57,7 +201,17 @@ def prose(text, preserve_columns=False):
         elif fence:
             out.append(hide(line))
         else:
-            out.append(re.sub(r'(`+).*?\1', lambda m: hide(m[0]), line))
+            parts, pos = [], 0
+            while pos < len(line):
+                if (line[pos] == '`' and not escaped(line, pos)
+                        and (end := code_end(line, pos)) is not None):
+                    parts.append(hide(line[pos:end]))
+                    pos = end
+                else:
+                    width = len(re.match(r'`+', line[pos:])[0]) if line[pos] == '`' else 1
+                    parts.append(line[pos:pos + width])
+                    pos += width
+            out.append(''.join(parts))
     return out
 
 
@@ -126,16 +280,20 @@ def documents(root):
 
 def links(source, lines, paths):
     """(行番号, 宛先)。参照形式も使用箇所で数え、定義そのものは数えない。"""
-    definitions = {m[1].casefold(): m[2] for line in lines if (m := REFDEF.match(line))}
-    for no, line in enumerate(lines, 1):
-        if REFDEF.match(line):
-            continue
-        targets = [m[1] for m in INLINE.finditer(line)]
-        remainder = INLINE.sub('', line)
-        for m in REFUSE.finditer(remainder):
-            key = (m[2] or m[1]).casefold()
-            if key in definitions:
-                targets.append(definitions[key])
+    visible = prose('\n'.join(lines), preserve_columns=True)
+    definitions, locations = reference_definitions(lines, visible)
+
+    def targets_in(nodes):
+        for node in nodes:
+            if node.reason:
+                continue
+            if node.target:
+                yield node.target
+            yield from targets_in(node.children)
+
+    for index, nodes, _ in link_rows(lines, visible, definitions, locations):
+        no = index + 1
+        targets = targets_in(nodes)
         for target in targets:
             url = urlsplit(target.strip('<>'))
             if url.scheme or url.netloc or url.path.startswith('/'):
@@ -152,7 +310,7 @@ def analyze(root):
     raw_docs = documents(Path(root).resolve())
     docs = {p: prose('\n'.join(lines)) for p, lines in raw_docs.items()}
     layers = {p: classify(p, lines) for p, lines in docs.items()}
-    edges = {p: list(links(p, lines, docs)) for p, lines in docs.items()}
+    edges = {p: list(links(p, lines, docs)) for p, lines in raw_docs.items()}
     indexes, parents, successors = set(), {}, {}
     for source, lines in docs.items():
         parents[source], successors[source] = set(), set()
