@@ -1,7 +1,7 @@
 状態: **受入完了** (2026-10-17) — 6b4e37e で main へ。NP21/W 64MB の受入 (2026-10-16) と実機 Ra266 の回帰 T3bR (2026-10-17、全項目 PASS) が済んだ。
 
 ## 目的
-[T3票](../TASK_T3_LAYOUT.md) §2-1・§2-2・§4 T3ab の入口・ゼロ化・stack参照を揃える。
+[T3票](../../../tasks/v3/TASK_T3_LAYOUT.md) §2-1・§2-2・§4 T3ab の入口・ゼロ化・stack参照を揃える。
 Aの記号を使い、現在の起動順と復帰経路を保ったままCへ渡す。
 
 ## 触るファイルと関数
@@ -41,4 +41,4 @@ DMA可否の起動結線はE（[索引](README.md)のPMの判断1〜4）。TSS�
 ## 実装記録 (2026-10-16)
 - 入口ESPは生成ヘッダの `LAYOUT_MEM_KSTACK_TOP`、fault表示境界は `__sqlite_start`。TSS/SQLite引数/高水位は既存の共通マクロを維持。
 - 製品入口ASM・TSS/高水位C・SQLite trampoline・setjmp/longjmpを0/1で直接実行。core/SQLite全byteゼロ、guard不変、引数/ESP/TSS、正常復帰とfault復帰分岐を観測。CR0/LTRとexec teardownはホスト代替。
-- 検査と固定部/浮動端の比較は `~/os32-tmp/run/t3ab/REPORT_B.md` と `b-*.log`。持越しは [台帳](../../DEFERRED_TESTS.md) T3AB-B。
+- 検査と固定部/浮動端の比較は `~/os32-tmp/run/t3ab/REPORT_B.md` と `b-*.log`。持越しは [台帳](../../../tasks/DEFERRED_TESTS.md) T3AB-B。

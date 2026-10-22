@@ -1,7 +1,7 @@
 状態: **受入完了** (2026-10-17) — 6b4e37e で main へ。NP21/W 64MB の受入 (2026-10-16) と実機 Ra266 の回帰 T3bR (2026-10-17、全項目 PASS) が済んだ。
 
 ## 目的
-[T3票](../TASK_T3_LAYOUT.md) §2-1〜§2-3・§4 T3ab の配置定義を準備する。
+[T3票](../../../tasks/v3/TASK_T3_LAYOUT.md) §2-1〜§2-3・§4 T3ab の配置定義を準備する。
 上位票 §2-1 の案5は確定。B〜Fが参照する記号を揃え、実配置の切替はGに残す。
 
 ## 触るファイルと関数
@@ -49,4 +49,4 @@ Bへ旧値に解決する記号一覧と通常/R1の比較根拠を渡す。
 - 既定0の固定シンボル・manifest固定区間・既存ASSERT 7本は一致。`__bss_end`/KHEAP/SQLite両端は移動0、`__bss_start`だけ−4B (直前paddingをゼロ化範囲へ包含)。
 - 票と違う判断: `paging.c`/`memory_boot.c` は旧配置専用ASSERTのみ分岐 (実行時処理は未変更)。`boot.mk`・`mkvmkernel.py`・関連試験/検査登録も生成入力と切替依存へ追随。
 - 証拠: `~/os32-tmp/run/t3ab/` の `final-*.log`、`a-build1.log`、`baseline-compare.log`、`layout-comparison.json`。初期のASSERT/fixture不整合は修正後に再検査。
-- 統合時の未確認・未結線は [持越し台帳 T3AB-A](../../DEFERRED_TESTS.md) に集約。段AのV5像はリンク検査用で、起動可能という判定はしない。
+- 統合時の未確認・未結線は [持越し台帳 T3AB-A](../../../tasks/DEFERRED_TESTS.md) に集約。段AのV5像はリンク検査用で、起動可能という判定はしない。

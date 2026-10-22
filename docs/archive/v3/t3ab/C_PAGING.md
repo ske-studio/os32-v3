@@ -1,7 +1,7 @@
 状態: **受入完了** (2026-10-17) — 6b4e37e で main へ。NP21/W 64MB の受入 (2026-10-16) と実機 Ra266 の回帰 T3bR (2026-10-17、全項目 PASS) が済んだ。
 
 ## 目的
-[T3票](../TASK_T3_LAYOUT.md) §2-2・§4 T3ab の恒等写像とguardを担当する。
+[T3票](../../../tasks/v3/TASK_T3_LAYOUT.md) §2-2・§4 T3ab の恒等写像とguardを担当する。
 A/Bの区間を使う形に直し、新配置fixtureと現在のPG開始時の意味を分けて確認する。
 
 ## 触るファイルと関数
@@ -46,4 +46,4 @@ Dへ区間ごとのPTE期待とbacking入口の契約を渡す。
 - `make kernel MUTATE=0` は0/1ともrc=0。0のBSS終端−32B、1は0B、KHEAPは両方0B。固定シンボル/旧manifest固定区間/展開先/SQLite宛先/ASSERTは一致。
 - 圧縮像0/1は500053/500039B。証拠は `~/os32-tmp/run/t3ab/c-final-*.log`・`c-comparison.json`・`REPORT_C.md`。
 - 票外: boundsハーネスと本持越し記録へ追随。新DMAはRAM検出どおりの初期PTEを維持し、旧穴の強制再写像を適用しない (装置判断はE)。
-- 未確認・未実施の正典: [持越し台帳 T3AB-C](../../DEFERRED_TESTS.md)。検査登録は既存のmemmap/memory入力集合を使用。
+- 未確認・未実施の正典: [持越し台帳 T3AB-C](../../../tasks/DEFERRED_TESTS.md)。検査登録は既存のmemmap/memory入力集合を使用。
