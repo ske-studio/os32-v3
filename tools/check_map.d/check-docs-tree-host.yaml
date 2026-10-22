@@ -1,0 +1,8 @@
+check-docs-tree-host:
+- tools/doc_graph.py
+- tools/tests/test_doc_graph.py
+- tools/check_map.d/check-docs-tree-host.yaml
+- build/checks.d/check-docs-tree-host.mk
+# 分類用の名前と合成 fixture も依存検査が保守的に拾う。
+- '**/*.md'
+- tools/doc_tree_baseline.json

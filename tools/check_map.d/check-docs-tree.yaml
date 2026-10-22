@@ -1,0 +1,6 @@
+check-docs-tree:
+- '**/*.md'
+- tools/doc_graph.py
+- tools/doc_tree_baseline.json
+- tools/check_map.d/check-docs-tree.yaml
+- build/checks.d/check-docs-tree.mk

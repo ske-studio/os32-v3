@@ -307,6 +307,7 @@ python3 tools/gen_memmap.py --manifest --check
 
 依頼パックの事実は `python3 tools/check_select.py --pack --files <触るファイル…>` の出力を貼る。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。
 票の段の記録は `check-docs-status` が 10 行超・台帳 ID のない未実施/延期/未確認を警告する (`--strict` で失敗)。
+`make check-docs-tree` は文書の層・宣言によるリンク違反を種類ごとの基準値 (`tools/doc_tree_baseline.json`) と比べ、増加で失敗、減少で更新可能と表示する (`python3 tools/doc_graph.py --update-baseline` で明示更新)。
 
 `HOST32_RUNNERS` は既定 `native qemu`。対象試験の一覧は `make tests-inventory` で
 `build/out/HOST32.md` に生成する ([生成文書の見方](INDEX.md#生成文書の見方))。
