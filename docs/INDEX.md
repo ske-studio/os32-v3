@@ -34,7 +34,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | CI の本体ビルド (GitHub Actions の成果物・キャッシュ・取り方) | [08_build.md §8-6](08_build.md) (`.github/workflows/build.yml`、`tools/ci/build_cross.sh`、`tools/ci_fetch.sh`) | `check.yml` の冒頭コメント |
 | ファイル → 役割 → 仕様の対応 | [DEVELOPMENT.md §2](DEVELOPMENT.md) | — |
 | 第三者の部品とライセンス (版・改変の有無・原文の所在) | [../THIRD_PARTY.md](../THIRD_PARTY.md) (原文は各 vendor ディレクトリと `assets/*/README.OS32`) | README.md「ライセンス」(リンクのみ)、[../requirements.txt](../requirements.txt) (ホストの Python 依存) |
-| 作業別の参照先 | [DEVELOPMENT.md §1](DEVELOPMENT.md) | — |
+| 作業別の参照先 | [WORK_GUIDE.md](WORK_GUIDE.md) (2026-10-23 に DEVELOPMENT §1 から切り出した) | — |
 | 実行モデル (ローダ、ネスト、リング3、資源回収、exec_run の分割壁) | [09_exec.md](09_exec.md) | [10 §10-9](10_notes.md)、`archive/kernel_v2/` (設計経緯) |
 | 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md は参照のみ |
 | 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | 1 行の注意は同じ §4 の冒頭「領域別の早見」(2026-10-06 に CLAUDE.md から移した)。CLAUDE.md は入口の 1 行だけ |
@@ -112,7 +112,8 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — 仮説駆動デバッグ、バイナリ反映確認、教訓集、AI協調ルール |
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v78 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 254) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — 作業別の参照先 (読む / 触る / 検証) と、ファイル → 役割 → 仕様のファイル地図。仕様本文は持たない |
+| [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |
 | [ROADMAP.md](ROADMAP.md) | リリースロードマップ — §0 は版数の対応表と fork の決定 ([decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2) への案内、v1.x GUI の記録、v3 以降の長期項目 |
 | [RELEASE_v2.1.md](RELEASE_v2.1.md) | **v2.1 のリリースノート** (2026-09-29、タグ `v2.1`、KAPI v68) — 実機 Ra266 で動くようになったもの、PEGC 640x480 の受け入れ条件、分かっている制限。版の対応は [decisions/VERSIONS.md §1](decisions/VERSIONS.md)、各版の要約は [CHANGELOG.md](../CHANGELOG.md) |
 | [HISTORY.md](HISTORY.md) | **開発の経緯と推移 (完了記録、2026-09-30)** — 初期コミット (2026-04-07) から v1.0 / v1.1 / v2.0 / GUI 1.1〜1.4 / v2.1 / v3 の fork までの年表、版ごとの要約、体制の推移、主要なユーザー決定の年表、数字。os32-v3 へ持っていく写しの原本 |

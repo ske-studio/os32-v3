@@ -75,7 +75,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 
 | 何をするか | 読む場所 |
 |---|---|
-| 知らないサブシステムに触る | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) §1 (作業別の入口)・§2 (ファイル地図) |
+| 知らないサブシステムに触る | [`docs/WORK_GUIDE.md`](docs/WORK_GUIDE.md) (作業別の入口)・[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) §2 (ファイル地図) |
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`) |
 | ビルド・配備・検証を選ぶ | スキル **`os32-build-verify`**、[`docs/08_build.md`](docs/08_build.md) §8-4 |
@@ -95,7 +95,7 @@ In-tree programs live under `userland/`. The `apps/` and `game/` submodules are 
 |---|---|
 | [`docs/INDEX.md`](docs/INDEX.md) | 索引。冒頭の「情報単位ごとの正典」表が**更新先を 1 か所に決める**。§1〜§10 の技術仕様と `docs/tasks/` の領域別設計もここから辿る |
 | [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) | 制約規則の正典 ([C1]〜[D4] の理由と詳細) |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 作業別の参照先 (§1) とファイル地図 (§2) — 未知のサブシステムはここから |
+| [`docs/WORK_GUIDE.md`](docs/WORK_GUIDE.md) / [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 作業別の入口 (索引) / ファイル地図 (§2) — 未知のサブシステムはここから |
 | [`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) | KernelAPI 仕様と追加手順 (§3-1) |
 | [`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) / [`POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) | 開発規約 / デバッグ (反映確認 §2、教訓集 §4、道具箱 §5) |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | リリース計画 (v1.x GUI シェル〜) |
