@@ -1,6 +1,6 @@
 # T2e e10a SHM/boot USER 試験記録
 
-正典: [TASK_T2D_T2H.md e10a](../../docs/tasks/v3/TASK_T2D_T2H.md)。
+正典: TASK_T2D_T2H.md e10a (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
 
 ## 対象と境界
 

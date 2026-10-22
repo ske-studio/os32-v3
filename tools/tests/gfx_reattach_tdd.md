@@ -1,7 +1,7 @@
 # T2e e7 帰路と描画の門
 
 状態: **実装済み** (2026-10-03、ホスト検査。ゲスト未実施)。
-正典: [TASK_T2D_T2H §2](../../docs/tasks/v3/TASK_T2D_T2H.md)、e7 実装結果。
+正典: TASK_T2D_T2H §2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)、e7 実装結果。
 PM の ref_e7 §8・§9 に従う。本番の port は NULL、protocol は変更しない。
 
 ## C の2実体

@@ -1,6 +1,6 @@
 # Display cleanup: V86 CUI exits and planar pages
 
-票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) の表示不具合の修正。
+票: `docs/archive/v3/TASK_T2D_T2H.md` の表示不具合の修正。
 
 ## Scope
 

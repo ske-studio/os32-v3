@@ -1,11 +1,11 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **受入完了 (2026-10-16)** — T2d〜T2h は受入済み。次のゲスト受入の関門 (8 行) は 2026-10-16 に閉じた (5 行 PASS、E9-1・E11-9 は H-7 へ、H-2 は (3) だけ後続へ — 台帳と閉鎖台帳)。§5-4 (STOP のユーザー決定)・§11・§12 は契約・方針として残す。それまでの状態: **実装中 (2026-10-13)** — T2d〜T2g は受入済み、T2h は L-h 着地・受入 R0〜R7 一巡 (§5-1)。残りは h9 の締め (台帳の閉/渡/持)。現在地は [HANDOVER](../agents/HANDOVER_2026-10-09.md)
+> 状態: **受入完了 (2026-10-16)** — T2d〜T2h は受入済み。次のゲスト受入の関門 (8 行) は 2026-10-16 に閉じた (5 行 PASS、E9-1・E11-9 は H-7 へ、H-2 は (3) だけ後続へ — 台帳と閉鎖台帳)。§5-4 (STOP のユーザー決定)・§11・§12 は契約・方針として残す。それまでの状態: **実装中 (2026-10-13)** — T2d〜T2g は受入済み、T2h は L-h 着地・受入 R0〜R7 一巡 (§5-1)。残りは h9 の締め (台帳の閉/渡/持)。現在地は [HANDOVER](../../tasks/agents/HANDOVER_2026-10-09.md)
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
-> **実行記録は 2026-10-06 に `docs/archive/v3/TASK_T2D_T2H_RECORDS.md` へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
+> **実行記録は 2026-10-06 に `docs/archive/v3/TASK_T2D_T2H_RECORDS.md` へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../../tasks/agents/ROLES.md))。
 > 計画文書。下記のAPI名・内部構造・分割は実装契約案であり、未実装のものを現行仕様とはしない。
-> 決定の正典は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
+> 決定の正典は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](../../tasks/v3/TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
 
 ## 0. 入口と作業の単位
 
@@ -13,7 +13,7 @@ T2a / T2a′ / T2b / T2c の実装結果・レビュー・PM受入は TASK_T2ABC
 
 本票の承認後に d0 (既存不具合候補の再現確認→修正) → d → e → f → g → h の順で進む。ext2調査をdと並行に先行着手し、hの受入前に調査ゲートを閉じる。既知のカーネル層不具合と確定した場合は [POLICY_DEV §1](../../POLICY_DEV.md) に従い新機能より修正を優先する。各小段は**実装・対象ホスト試験・報告を含め45〜75分を目安、最大120分**。75分で残作業を見積もり、90分で実装を止め、差分・失敗ログ・次の1ケースを記録する。120分に検査を押し込まない。表の小段でも超えるなら「失敗注入の半分」等へ分ける。着地単位と一回のコーダー依頼は別で、未使用helperの準備は個別レビュー可能、公開切替は依存小段を揃えて一組で受け入れる。
 
-各段のチェック結線・全再ビルド・独立レビュー・PMゲスト受入は別の依頼単位にする。検査の役割分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) を参照。実装者は `make all`・直接の追加/変更試験を `MUTATE=0`・`check_select.py --lint`、取り込みの検査はレビュー後に PM が行う。一時物と TMPDIR は `/home/hight/os32-tmp/` 以下。
+各段のチェック結線・全再ビルド・独立レビュー・PMゲスト受入は別の依頼単位にする。検査の役割分担は [ROLES §0](../../tasks/agents/ROLES.md#0-現行の体制) を参照。実装者は `make all`・直接の追加/変更試験を `MUTATE=0`・`check_select.py --lint`、取り込みの検査はレビュー後に PM が行う。一時物と TMPDIR は `/home/hight/os32-tmp/` 以下。
 
 | 作業 | 依存 / 並行できる準備 |
 |---|---|
@@ -145,7 +145,7 @@ SDK gfxのC静的側とshlib側の両方で、待ち/yield/resumeから戻るた
 
 Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでlease pointerを受け、CRTとshlib初期化の双方が取得/終了解除する。kernel版は恒等のまま。既知JIS対照は維持、取得失敗時はpointerをNULL、`jis_table_ready=0`にしてCRT/shlib初期化を続け、未ready時の既存代替表示を使う。未初期化/古い表は読まず、低位直読へ戻さない。T3のKAPI化でこの橋を撤去する (§7)。フォントはkcg_read系を使いfont帯全USERを消す。
 
-`kcg_load_font`のLZ4 scratch (`drivers/kcg.c:215`、Unicode起点から最大344KiB)はUnicode表とplanar BBを重ねる。公開口を残したままeを受け入れると正規KAPIからSURFACEを破壊できるため、[T3 §3](TASK_T3_LAYOUT.md)の**boot後NOSYS化をe8bへ前倒し**する。D7は変更しない。boot内部読込だけを許し、scratch失効→Unicode表構築/検証→BB・mailbox初期化→SURFACE公開→通常ASの順を固定する。bootフェーズ終了後はTRUSTEDを含む全経路でNOSYS・VFS進入/書込みなし。公開KAPI slotは残し説明と版をeの一式で更新する。`font_load_test`はNOSYS期待の成功試験へ変更し、
+`kcg_load_font`のLZ4 scratch (`drivers/kcg.c:215`、Unicode起点から最大344KiB)はUnicode表とplanar BBを重ねる。公開口を残したままeを受け入れると正規KAPIからSURFACEを破壊できるため、[T3 §3](../../tasks/v3/TASK_T3_LAYOUT.md)の**boot後NOSYS化をe8bへ前倒し**する。D7は変更しない。boot内部読込だけを許し、scratch失効→Unicode表構築/検証→BB・mailbox初期化→SURFACE公開→通常ASの順を固定する。bootフェーズ終了後はTRUSTEDを含む全経路でNOSYS・VFS進入/書込みなし。公開KAPI slotは残し説明と版をeの一式で更新する。`font_load_test`はNOSYS期待の成功試験へ変更し、
 guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkselftest/host観測で確認し、受入から除外しない。scratch定数の整理とUnicode KAPI化はT3に残す。
 
 ### 2-4. USER切替の一括境界
@@ -180,7 +180,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 | 補4 | 4 | a/b | V86全出口と通常地図の結線 | session end → CR3 reload → 3段検査 | 旧出口の復元漏れ | V86正常/失敗/STOP/kill/K1・VM INT80h | 内容/属性・PCD・PDE USER復元、通常AS禁止、DISPLAY/TVRAM再lease |
 
 **e11 統合受入 (2026-10-07)**: 合格。証拠: `~/os32-tmp/evidence/2026-10-07/accept_e11/RESULT.md`。
-未完了項目は [持越し台帳](../DEFERRED_TESTS.md)、閉じた項目と予算の証拠は 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) を参照。
+未完了項目は [持越し台帳](../../tasks/DEFERRED_TESTS.md)、閉じた項目と予算の証拠は 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) を参照。
 > 記録は archive へ移した (2026-10-07): 優先段・KAPI-AUDIT-FIX・e11c1/c3 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)、e11b1/c2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ### e11 の分担と切替順
@@ -188,7 +188,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
 > 記録は archive へ移した (2026-10-07): e11b2・e11a2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
-- **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門の表)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
+- **KAPI-CALLBACK**: 未完了は[台帳の優先段](../../tasks/DEFERRED_TESTS.md#関門の表)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
 - **KAPI-DISK-AUTH**: 台帳の優先段でkernelが知るexec経路・`/sys`由来・CUI前景の識別を授権に使い、拒否＋許可リストを先行配備。無授権I/Oゼロと隔離媒体での正規caller `inst_hdd` (CPL3)・常駐シェル`cmd_hdprep`を受入。OS32Xヘッダへflagを足す方式はE11-4のe11c。
 - **KAPI-AUDIT-FIX**: 台帳の優先段で`console_set_cursor`の後の`cursor_x++`の符号付きあふれをclampで防ぎ、FM/SSGのch無検査、`fm_play_mml`/`serial_getchar`のCTRL+STOP不能DoS、`wrap_rshell_set_active`の無授権を先行修正・配備・受入。残りの未監査区分 (pipe/redirect/host_*、exec_*/launch_*/appslot、ime_*、gui_call/register、con_sink) はe11a着手前に分類し、到達可能な穴は新機能より先に修正。公開意味変更・範囲検査P3変異はE11-8へ。
@@ -272,7 +272,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 
 ### 3-5. 分割・試験・受入
 
-段別の実装契約・制限は以下に残す。実行結果は各行の証拠パス、f1a〜f4 の詳細は 実行記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。台帳 ID は段の実施当時の対応であり、現在の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
+段別の実装契約・制限は以下に残す。実行結果は各行の証拠パス、f1a〜f4 の詳細は 実行記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。台帳 ID は段の実施当時の対応であり、現在の未完了は [持越し台帳](../../tasks/DEFERRED_TESTS.md) を参照する。
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
@@ -306,7 +306,7 @@ fのmap失敗理由・allocator busy/trim・STOP全返却がGREEN。appslot/appm
 
 ### 4-3. 分割・試験・受入
 
-受入済みの段を以下に要約する。配送・未読入力による先行起床・再試行の制限は §4-2、後続の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
+受入済みの段を以下に要約する。配送・未読入力による先行起床・再試行の制限は §4-2、後続の未完了は [持越し台帳](../../tasks/DEFERRED_TESTS.md) を参照する。
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
@@ -543,9 +543,9 @@ T2e 変異対応表 (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)。既存
 
 | 次の票 | T2から渡すもの / T2でしないこと |
 |---|---|
-| [T3配置](TASK_T3_LAYOUT.md) | 高位AS、画像外固定10枚、private map/owner診断、resident CRT分離。shell再配置/SLACK/metadata移動はT3。固定PTを再移設しない。Unicode RO leaseはT3の全caller KAPI化と同時に廃止。kcg boot後NOSYS/試験変更はe8bへ前倒し、T3は継承検証とscratch定数整理 |
-| [T4〜T6](TASK_T4_T6_MODULES.md) | B1 caller/copyと失敗試験。旧db_exec/db_prepareの全結線/stmt finalize前copy、B4 engine異常、F2/F3、512KiB MEMSYS5/FEP優先予約、必須module/MINIMALはT4/T5a。T2のSQLite entry0はB1接続済み3入口だけ |
-| [T7/後半](TASK_T7_AND_FOLLOWUPS.md) | lease経由のplanarポインタ、再init/再attach、V86通常復元検査。低位640KiB専有化、BB pool移動、.kcgfont廃止/OpenTypeはT7。page0 NPのためのboot snapshot移行も後続 |
+| [T3配置](../../tasks/v3/TASK_T3_LAYOUT.md) | 高位AS、画像外固定10枚、private map/owner診断、resident CRT分離。shell再配置/SLACK/metadata移動はT3。固定PTを再移設しない。Unicode RO leaseはT3の全caller KAPI化と同時に廃止。kcg boot後NOSYS/試験変更はe8bへ前倒し、T3は継承検証とscratch定数整理 |
+| [T4〜T6](../../tasks/v3/TASK_T4_T6_MODULES.md) | B1 caller/copyと失敗試験。旧db_exec/db_prepareの全結線/stmt finalize前copy、B4 engine異常、F2/F3、512KiB MEMSYS5/FEP優先予約、必須module/MINIMALはT4/T5a。T2のSQLite entry0はB1接続済み3入口だけ |
+| [T7/後半](../../tasks/v3/TASK_T7_AND_FOLLOWUPS.md) | lease経由のplanarポインタ、再init/再attach、V86通常復元検査。低位640KiB専有化、BB pool移動、.kcgfont廃止/OpenTypeはT7。page0 NPのためのboot snapshot移行も後続 |
 | P4/P6/P7/P8/P9 | 検証済みDEVICE resourceの利用、停止/trim安全点、4世代manifestを渡す。BAR汎用配置、x87切替/長いKAPI期限、fork slot整理、音/Video HAL刷新、私有surface合成は本票外 |
 
 T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュール、最終shell/font予算が揃った後の再測定が要る。T2で未確認の実機/外部成果物は、将来票の存在だけで閉じない。

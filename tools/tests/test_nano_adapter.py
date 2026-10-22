@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """T2f f1b real nano connection. Log: tools/tests/nano_adapter_tdd.md
-票: docs/tasks/v3/TASK_T2D_T2H.md §3-5 f1b
+段: T2f f1b
 """
 import argparse
 import importlib.util

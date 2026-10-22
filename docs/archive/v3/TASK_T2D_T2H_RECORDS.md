@@ -1,6 +1,6 @@
 # TASK_T2D_T2H の実行記録 (2026-10-02〜10-06)
 
-状態: **完了記録 (2026-10-06 に [TASK_T2D_T2H.md](../../tasks/v3/TASK_T2D_T2H.md) から切り離した実行記録)**。
+状態: **完了記録 (2026-10-06 に [TASK_T2D_T2H.md](TASK_T2D_T2H.md) から切り離した実行記録)**。
 契約・分割・受入条件・未実施の手順は元の票に残してある。ここは各段の実装結果・レビュー対応・検査とゲスト受入の記録を、元の並びのまま移したもの。
 **「記録の所在」であって「全部の受入が済んだ」の意味ではない** — 延ばした試験と未実施は [DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) が正。
 見出しの「元の行」は切り離す前 (`b486494`) の TASK_T2D_T2H.md の行番号。
@@ -3632,7 +3632,7 @@ tvdump: `/api/cmd` で取った生バイトが TVDM 80×25・4,000 B、内容は
 
 ## T2h 受入 (2026-10-10〜13)
 
-> 票 [TASK_T2D_T2H §5-1](../../tasks/v3/TASK_T2D_T2H.md) から 2026-10-14 に移した (反省会の決定、DOCS_REORG_T3 §5)。票には回ごとに合否 1 語と証拠だけを残した。
+> 票 [TASK_T2D_T2H §5-1](TASK_T2D_T2H.md) から 2026-10-14 に移した (反省会の決定、DOCS_REORG_T3 §5)。票には回ごとに合否 1 語と証拠だけを残した。
 
 **L-h 着地 (2026-10-10、f1bd680)**: h0t・h1・h1b・h2・h3b・h4a〜c (各段 Fable レビュー Approve、h4b は P1 1 件を直して再確認) と P3 の小直しを統合、`make clean → all` / `make check` rc=0。KAPI 74・MemStat 200B・製品 kernel +888B (h 枠の上限 900B)。H-10 は h0t で閉じた。受入の回で PM が守ること: 「記録」型の expect は PASS に数えない、R4 で h2 (i) が add<16 page に当たったら仕様の分岐として扱う (fixture で直さない)、R4 の記録に free0 と need pages、5b は wait 起きに限る、R1c の初回 derive は DrvFs で rc と生成物を照合。証拠 `~/os32-tmp/run/h/`
 

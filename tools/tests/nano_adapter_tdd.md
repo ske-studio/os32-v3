@@ -1,6 +1,6 @@
 # T2f f1b 実 nano の単体接続記録
 
-票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §3-5 f1b。
+票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f1b。
 
 2026-10-03、Codex gpt-6-astra、wt/t2f1b、基点 d4d5a2b。
 `test_nano_adapter.py --runner qemu --mutate` は rc=0。

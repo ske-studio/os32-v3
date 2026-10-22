@@ -7,7 +7,7 @@ apps / game はユーザー決定 (2026-09-30) により v3 のビルド対象�
 T2h で確かめる。外部集合の移行・動作を PASS とした記録ではない。
 担当は再開を決めるユーザーと、再構築・監査・guest 受入を行う PM。
 持越しの正典は [DEFERRED_TESTS](../DEFERRED_TESTS.md) H-7、契約は
-[TASK_T2D_T2H](TASK_T2D_T2H.md) §5-1 / §5-2。
+TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) §5-1 / §5-2。
 
 ## 再開前に揃える 8 項目
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """f6 real USER/resident CRT; only named runtime assertions count as RED.
-票: docs/tasks/v3/TASK_T2D_T2H.md §3-5 f6
+段: T2f f6
 """
 import argparse
 import os

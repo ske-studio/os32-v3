@@ -1,6 +1,6 @@
 # T2e e5 — gfx 再 init / revoke
 
-正典: [TASK_T2D_T2H.md §2](../../docs/tasks/v3/TASK_T2D_T2H.md)。
+正典: TASK_T2D_T2H.md §2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
 `test_gfx_reinit.py` / `gfx_reinit_host.c` は実 gfx_core・3 backend・
 lease・surface_query・paging・pgalloc を ILP32 で連結する。
 appslot の列挙/現在 caller は3 ASの足場、I/O・機種検出・MMU はホスト足場。

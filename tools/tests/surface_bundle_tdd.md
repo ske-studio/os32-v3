@@ -1,6 +1,6 @@
 # T2e e3 — DISPLAY 4面束と native alias
 
-票: [TASK_T2D_T2H](../../docs/tasks/v3/TASK_T2D_T2H.md) §2-5 e3。
+票: TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) §2-5 e3。
 
 `test_surface_bundle.py` は `test_surface_lease.py` の ILP32 ビルド足場を共有し、
 実 lease/query/B1/access_walk/paging/pgalloc を走らせる。`host32.py` 経由で

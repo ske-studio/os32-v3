@@ -1,6 +1,6 @@
 # KAPI の範囲検査 — 実ターゲットのホスト試験
 
-対象票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) T2e
+対象票: `docs/archive/v3/TASK_T2D_T2H.md` T2e
 「KAPI の範囲検査の欠落の修正」。2026-10-03、GPT-6。
 
 ## RED → GREEN

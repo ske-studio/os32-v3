@@ -1,6 +1,6 @@
 # T2e e6 — C SDK checked attach と互換 void 橋
 
-票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §2 e6。
+票: `docs/archive/v3/TASK_T2D_T2H.md` §2 e6。
 
 対象: `test_gfx_attach.py` / `gfx_attach_host.c`。正常対照は指定された全
 HOST32_RUNNERS、変異は先頭 runner。kernel/query/lease/ledger/paging/3 backend と

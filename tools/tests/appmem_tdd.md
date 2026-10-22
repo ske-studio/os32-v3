@@ -1,9 +1,9 @@
 # T2f f2 extent / 穴探索のホスト試験記録
 
-票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §3-5 f2。
+票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f2。
 
 対象は [appmem.c](../../exec/appmem.c) と [appmem.h](../../exec/appmem.h)。
-正典 [TASK_T2D_T2H §3-5](../../docs/tasks/v3/TASK_T2D_T2H.md)、
+正典 TASK_T2D_T2H §3-5 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)、
 PM 判断 `/home/hight/os32-tmp/ref_f2_pm.md` Q1〜Q8/Q10 に従う未結線の先行準備。
 kernel の判定を fixture に複製せず、実 appmem.c を ILP32 でリンクする。
 MMU/物理確保/呼出元の検査は f3/f5、unmap は f4。ゲスト試験は範囲外。
@@ -79,7 +79,7 @@ hint下限をshlibへ緩和 (`outside`) の3変異を追加。合計16/16 runtim
 
 ## f4 の純粋な表操作 (2026-10-03)
 
-票 [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §3-5 f4。
+票 `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f4。
 全体/先頭/末尾/中抜き/隣接異kind、32本FULL/31本成功、残片kind/flagsと
 EXEC_LARGE識別、古いunmap proposal (属性/端) と同数古いmap proposal (挿入/左右併合) を検査。
 LIBC_INITIALの返却後はimageのpage境界をlayoutに渡し、flags0で穴を再利用する。

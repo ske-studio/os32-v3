@@ -1,5 +1,5 @@
 """f8: execute the real Os32Alloc against mem_alloc/free mocks, without newlib.
-票: docs/tasks/v3/TASK_T2D_T2H.md §3-4 / §3-5 f8
+段: T2f f8
 """
 import argparse
 from pathlib import Path

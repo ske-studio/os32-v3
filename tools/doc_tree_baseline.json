@@ -1,8 +1,8 @@
 {
   "spec_to_ticket": 6,
   "decision_to_ticket": 2,
-  "ticket_crosslink": 269,
-  "mutual_non_parent": 96,
+  "ticket_crosslink": 251,
+  "mutual_non_parent": 94,
   "current_to_archive": 0,
-  "canonical_to_record": 33
+  "canonical_to_record": 32
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """f1a toolchain ledger regression. Log: tools/tests/nano_inputs_tdd.md
-票: docs/tasks/v3/TASK_T2D_T2H.md §3-5 f1a
+段: T2f f1a
 Relocatable i386 probes are inspected, never executed (no ILP32 runner needed).
 """
 import copy

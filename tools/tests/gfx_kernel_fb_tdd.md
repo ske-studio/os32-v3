@@ -1,6 +1,6 @@
 # T2e e4: kernel framebuffer / backend geometry
 
-設計票: [TASK_T2D_T2H §2](../../docs/tasks/v3/TASK_T2D_T2H.md)。
+設計票: TASK_T2D_T2H §2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
 PM 判断: 作業依頼の `ref_e4.md` §8 Q1〜Q10。独立レビューP2-1を受け、PMがQ3を訂正 (公開query/互換fbは選択backend)。
 
 `test_gfx_kernel_fb.py --runner qemu --mutate` は **正常496チェック、10/10 runtime RED**。

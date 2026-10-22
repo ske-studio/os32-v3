@@ -1094,7 +1094,7 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 同じ取得先の `os32_boot.img` (2HD 生) の FD への書込みは**ユーザー自身**が行う (ノートの USB FDD、2026-10-11 決定) →
 `tools/rshell_serial.py` の `--serve-host <取得先>/hostdrv` で SerialFS に渡す。配備元は取得先に展開した `hostdrv/`
 をそのまま使い、作業場の `C:\os32` は使わない (名札外のファイルが常にある)。実機のそのほかの物理操作は個別承認。
-新 FD からの 2 段同期 (U3 の修正版 B — 新 FD 起動 + 全体同期と `/sys` 同期を別々に): 新 FD で起動 (HDD の hsync は使わない) → `hsync --root /hd0 --no-backup` (全体、`/sys` は除外される) → `hsync --root /hd0 sys` → 両方を `--verify` で変更 0 件・errors 0。同期の前に配備元の名札照合 (`deploy_source_check.py`)、同期の後に HDD 側の余剰照合 (シリアルの `ls -R`) を行い、1 件でも欠け・不一致・余剰があれば HDD 起動しない。準備・復旧・予行を含む 0〜7 の全手順は詳細設計 `~/os32-tmp/run/h/T2H_DESIGN.md` §3-4 (リポジトリ外、所在は票 TASK_T2D_T2H §5-1)。
+新 FD からの 2 段同期 (U3 の修正版 B — 新 FD 起動 + 全体同期と `/sys` 同期を別々に): 新 FD で起動 (HDD の hsync は使わない) → `hsync --root /hd0 --no-backup` (全体、`/sys` は除外される) → `hsync --root /hd0 sys` → 両方を `--verify` で変更 0 件・errors 0。同期の前に配備元の名札照合 (`deploy_source_check.py`)、同期の後に HDD 側の余剰照合 (シリアルの `ls -R`) を行い、1 件でも欠け・不一致・余剰があれば HDD 起動しない。準備・復旧・予行を含む 0〜7 の全手順は詳細設計 `~/os32-tmp/run/h/T2H_DESIGN.md` §3-4 (リポジトリ外)。
 **再起動と再同期** (R7 の教訓、2026-10-14 反省会): 実機の再起動は rshell の `reboot` (シリアル) で行う — 本体のリセットボタンが効かないことがあった。起動待ちは出力の待ち受け (`wait_text` の類) で 1 回だけ待ち、`ver` を連打しない (連打がリセット直後の起動を邪魔した)。
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない

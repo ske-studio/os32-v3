@@ -362,7 +362,7 @@ OWNER_EXIT の内部 arg は EXEC_KIND_*。ABORTED (3) は窓の除去前に WM 
 abort_seen と退避 raw の CTRL+STOP make を捨てる。カーネルも未読 raw の同 make を
 除去する。1 個の STOP が前景変更後の相手を二度目に畳まないための内部契約で、
 公開 KAPI の変更はない。詳細と既知の限界は
-[TASK_T2D_T2H §5-4](../v3/TASK_T2D_T2H.md)。
+TASK_T2D_T2H §5-4 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
 
 ### T9. CUI シェル ⇄ gshell の切替 — 2026-09-05 追加
 

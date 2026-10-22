@@ -16,12 +16,12 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 
 | 元票の前提・着手条件 | 判定 | 今の根拠と本票での扱い |
 |---|---|---|
-| T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/tasks/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-09.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
+| T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/archive/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-09.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
 | T2 → T3 → T4 → T5-0 → T5a/b/c → T7 (FD容量不足時だけT6b-M) | r5で更新 | 上位§6と本票§7-1。T3配置は受入済み。本票各段で差分を再計測する。既存S4とLAN受入範囲を後続の正常対照にする (§2・§6) |
 | e11 公開版・4世代を後で照合 | 吸収済み (T2/DBGREF) | `sdk/kapi.json:2`、`:3`: format=4、KAPI ABI=1、memory=4、shlib=2、機能版76。更新時は生成値で照合する |
 | 専用module核・生成器・リンカ | T4で実装済み | `kernel/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
 | SQLite分離とroot順 | T4実績へ更新 | SQLiteはowner割当の部品へ移行済み。root → PG/台帳の順は維持、U19の前倒しは作らない (§5) |
-| B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/tasks/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c:610`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
+| B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/archive/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c:610`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
 | 512KiB単一MEMSYS5・FEP優先取り分 | T4実績・予約方針更新 | FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大。APP+SYSTEM上限319,488Bは既定時の値。全outerの代替stackとRESIDENT groupを維持 |
 | FEP予約量・S/M/L最大負荷 | T4実績を継承 | §7-2のhost値と受入一式を区別。T5-0aでゲストstackを測定し、未測定経路を記録 |
 | LAN/82557の移設範囲 | 更新 | TX/RX/IRQ・BOUNDとLB-3・LAN版/host実機受入済み (`drivers/e82557.c:377,700,729,793`、`docs/tasks/realhw/TASK_LAN_82557.md:3`)。T5c-4で移設回帰。LB-4まで完了とはしない |

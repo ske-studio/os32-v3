@@ -9,7 +9,7 @@ import time
 from mutpar import run_ordered
 from test_gfx_kernel_fb import run_case, TARGET_SRCS as KERNEL_SRCS, ROOT
 
-# docs/tasks/v3/TASK_T2D_T2H.md §2 e6; literal closure for the inventory.
+# T2e e6 (contract: docs/KAPI_SPEC.md §4-10 v70); literal closure for the inventory.
 TARGET_SRCS = [
     'gfx/gfx_core.c',
     'gfx/backend_pc98.c',

@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)、d〜h の状態は [子票](TASK_T2D_T2H.md)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
+> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)、d〜h の状態は 子票 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -131,7 +131,7 @@ int surface_unlease(u32 token);
 - query は **選択中 backend の、呼出元に許可した role だけ** (Unicode表はbackend非依存のシステムRO roleとして別判定)。単なる sid の知識は権限にならず、lease 時も caller / role / generation を照合する。`access` は RO / RW だけ、PWT/PCD や任意の物理は渡させない。ユーザー指定 AS は受け取らず、保存済み caller AS に貸す。
 - token は boot 内の単調 u32 (0無効)、AS に紐付く。周回時は新規貸与を拒否し、再 boot まで再利用しない。別 AS の token、二重解除、revoke 済み token は負の誤りで無変更。
 - **lease 結果の VA は記述子とは別**の `OS32_LeaseView` に返す。同じ参照でも AS ごとに異なる VA になり得る。同じ AS の明示 lease 呼出しは別 token。SDK の attach は保持中 token を再利用し、繰返し query だけで参照数を増やさない。
-- out / ref は B1 の checked copy で kernel 内に確定し、出力範囲を事前検査する。失敗時は out・PTE・refcount・owner 会計がすべて元のまま。誤りは INVAL (参照/権限/範囲)、NOMEM (物理/PT)、FULL (固定表)、旧世代は INVAL と診断理由で区別する。 (実装は e11 で旧世代を STALE (-11) に確定 — [T2d〜h §8](TASK_T2D_T2H.md)。新しいエラー番号は予約しない)実際の `OS32_ERR_*` への対応を生成時に固定する。
+- out / ref は B1 の checked copy で kernel 内に確定し、出力範囲を事前検査する。失敗時は out・PTE・refcount・owner 会計がすべて元のまま。誤りは INVAL (参照/権限/範囲)、NOMEM (物理/PT)、FULL (固定表)、旧世代は INVAL と診断理由で区別する。 (実装は e11 で旧世代を STALE (-11) に確定 — T2d〜h §8 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。新しいエラー番号は予約しない)実際の `OS32_ERR_*` への対応を生成時に固定する。
 - `gfx_get_framebuffer` のソース互換は SDK の薄い橋で保つ。CPL=3 には lease view の plane VA を返す。新しい失敗可能な attach を SDK 内で使い、失敗を無視して NULL 面へ描かない。古い void API のカーネル入口を残す場合は失敗を明示的なアプリ終了に変換する。trusted kernel / WM には内部 `gfx_kernel_framebuffer` で恒等のポインタを返す。公開 query の出力と内部 framebuffer の型を流用しない。
 - API は `sdk/kapi.json` から C/Rust とラッパを生成 ([C3][ABI1])、既存 slot は通常追記 ([ABI2])。P7 が D35 の1回の整理を実施するときだけ、世代を切る同じ成果物集合で統合する。T2 が独自にスロットを並べ替えない。各追加で version と KAPI_VERSION を揃え全再ビルド ([ABI3])。
 
@@ -162,7 +162,7 @@ owner が返却を要求した面は新規貸与を拒否する状態にし、�
 - 再 init は **新規貸与停止 → 全関連 lease revoke → TLB → refcount0 → backend 初期化/geometry更新 → generation更新 → 面公開**。失敗時は失効した旧 token を復活させず、予約済み fallback の面を新世代として公開する。GUI → CUI → GUI でも RAM backing の確保し直しは不要。SDK は保存済み framebuffer を捨て、resume / attach 時に再取得してから描く。生ポインタの失効を魔法で検出できるとはしない: 旧 mapping は NP、旧 token での操作は拒否、後の VA 再利用は通常の解放後ポインタと同じ禁止契約。
 - **libos32gfx の2実体**: アプリ静的リンク側と libos32gui.shlib 内側は保存状態が別 (`userland/lib/gfx/libos32gfx_core.c:25`、`userland/rust/libos32gui/src/client.rs:185` (attach_gfx、shlib側からの呼出しは `shlib.rs:437`))。両方を使う GUI アプリは同一 AS の CLIENT lease を **2本**消費し、8本/AS の内数。token の再利用は各実体内で行う。Unicode の各実体分も含め容量を検査し、満杯時は一括巻戻し。再 init / resume 後は両方の保存 pointer/token を捨て、双方を再 attach してから各描画経路を再開する。受入は両方で描画し、片方だけ再取得する変異を検出する。
 - **U20 の確定対象**: tvdump は TVRAM の文字/属性を値で返す checked-copy KAPI に置換し、`tools/tvdump_recv.py` の TVDM 形式を保つ。通常 GUI の権限を広げず、CUI 全画面所有者だけへ提供 (非所有者は明示拒否)。nop / ring3_hello / ring3_fault / ring3_guard の判定用マーカーは、テストに割り当てた SHM 枠へ移す。SHM の番地取得・初期化を CRT 非依存試験にも用意し、観測側も同時に更新。保護違反を試す VRAM アクセス自体は残し、直前マーカーと目的の fault を区別する。
-- **Unicode の移行穴を閉じる**: `lib/utf8.c` のユーザー用ビルドは、低位固定表でなく起動時取得した **RO lease** のポインタを使う (CRT と shlib 初期化の両方)。kernel 版は恒等のまま。表128KBは kernel 所有の固定 RAM SURFACE とし、T7 の新表 / 廃止までの橋とする。 (撤去は T3 で KAPI 化と同時 — [T2d〜h §7](TASK_T2D_T2H.md) で引き渡し済み)これは共有グリフキャッシュ U21 の採用ではない。字形は既存 `kcg_read_*` を用い、フォント低位全域の USER を消す。apps/game を含め直読が残るなら同じ移行段で直す。
+- **Unicode の移行穴を閉じる**: `lib/utf8.c` のユーザー用ビルドは、低位固定表でなく起動時取得した **RO lease** のポインタを使う (CRT と shlib 初期化の両方)。kernel 版は恒等のまま。表128KBは kernel 所有の固定 RAM SURFACE とし、T7 の新表 / 廃止までの橋とする。 (撤去は T3 で KAPI 化と同時 — T2d〜h §7 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) で引き渡し済み)これは共有グリフキャッシュ U21 の採用ではない。字形は既存 `kcg_read_*` を用い、フォント低位全域の USER を消す。apps/game を含め直読が残るなら同じ移行段で直す。
 
 ## 4. exec / 仮想メモリの設計
 
@@ -217,7 +217,7 @@ int mem_unmap(void *base, u32 bytes);
 - 物理は1ページずつ。VA探索・extent slot・必要PT・全物理を用意し、公開直前まで未完 map を呼出元に見せない。既存 PTE を上書きする MAP_FIXED は持たない。準備途中のページは未公開 PT の PTE 等で追跡し、失敗時に全件返す (巨大なスタック上 PFN 配列は作らない)。
 - unmap は **呼出元の mem_map extent と allocator用初期heap extent** だけ。image / stack / shlib / lease を混ぜた範囲は全拒否。部分解除を許可し、分割で記録が足りなければ無変更で FULL。NP→TLB→owner free。隣接した同種 extent は併合し、伸長ごとに32本を消費しない。ポインタ再利用後の二重freeは allocator の責任で、カーネルは記録と owner を照合する。
 - `_sbrk` は signed incr / pointer overflow を検査し、現 break より先が必要ならページ末尾を hint に EXACT map。**_sbrk は非連続の結果を連続と偽って返さない**。続きが取れない場合、上の malloc が flags=0 の別 extent を新しい arena として扱う。newlib の MORECORE と map arena の接続を SDK 内で実装し、_sbrk 単体は −1 / ENOMEM。負の incr は break を下げるだけで、ページ返却は allocator が末尾の生存参照なしを確認した trim の時に行う。
-- `malloc` / `calloc` / `realloc` / `free` と Rust allocator の対応を揃える。**C は要求サイズ、Rust は prefix・整列余白込みで mem_alloc に渡す実 byte 数**で64KiB閾値を分類する。大塊の TOPDOWN と fallback の条件は [子票 §3-4](TASK_T2D_T2H.md#3-4-allocatorの選択と安全な返却) を参照。overflow の calloc、realloc失敗で旧内容保持、大小を跨ぐreallocを試験する。64KB未満は heap、完全に空いた末尾ページを trim 可能にする。
+- `malloc` / `calloc` / `realloc` / `free` と Rust allocator の対応を揃える。**C は要求サイズ、Rust は prefix・整列余白込みで mem_alloc に渡す実 byte 数**で64KiB閾値を分類する。大塊の TOPDOWN と fallback の条件は 子票 §3-4 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) を参照。overflow の calloc、realloc失敗で旧内容保持、大小を跨ぐreallocを試験する。64KB未満は heap、完全に空いた末尾ページを trim 可能にする。
 - 既存 `exec_heap_alloc` / mem_alloc も共通の map 実体で伸長し、大塊は同閾値。shell の固定heapは従来のままで、poolを使い切っても閉じる操作が動く。user heap のメタ情報を kernel が無検証で辿って他 owner を返さない。KHeap の部分trim/複数arenaが必要なら明示的な検証・境界を足す (汎用 KHEAP を池へ伸長しない)。allocator の具体的な実装選択 (TLSFを含む) は T2f の実装設計で実サイズと試験から決める。
 - R5: extent の回収後 owner 0。`ledger_reclaim_owner` の最後の掃除だけで漏れを隠さず、`exec_as_leftover_pages==0` を要求する。起動失敗でも PD/PT・lease・shlib data を含め全返却する。
 
@@ -225,7 +225,7 @@ int mem_unmap(void *base, u32 bytes);
 
 **mem_map の失敗時には要求 bit / epoch を記録して NULL を返し、KAPI の内部で WM を回さない**。通知は「物理池不足」のときだけ (VA断片化・固定表満杯・引数不正では出さない)。back GUI の AppSlot に1 bitを合成して保持し、追加メモリを使わない。CUIと終了中のASは対象外。
 
-SDK の GUI イベントループが、安全な既存 park / resume の配送で trim event を受け、malloc の末尾空きページと未使用map arenaを返す。任意キャッシュ解放 hook は allocator が操作中でないときだけ1回呼び、再入bitで二重配送を防ぐ。応答しないアプリを待たない。front の SDK は map失敗後、allocatorの操作を終えて安全に yield できる GUI 文脈なら **yield → 1回再試行 (厳密な一巡は保証しない)**し、できない文脈ならそのまま ENOMEM。retry のための新しいメモリ KAPI は作らない。配送・再試行の条件は [子票 §4-2](TASK_T2D_T2H.md#4-2-状態と配送契約) を参照。
+SDK の GUI イベントループが、安全な既存 park / resume の配送で trim event を受け、malloc の末尾空きページと未使用map arenaを返す。任意キャッシュ解放 hook は allocator が操作中でないときだけ1回呼び、再入bitで二重配送を防ぐ。応答しないアプリを待たない。front の SDK は map失敗後、allocatorの操作を終えて安全に yield できる GUI 文脈なら **yield → 1回再試行 (厳密な一巡は保証しない)**し、できない文脈ならそのまま ENOMEM。retry のための新しいメモリ KAPI は作らない。配送・再試行の条件は 子票 §4-2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) を参照。
 
 **端末配下の CUI 前景**では D24 の帰結として、裏 GUI が park したままなら通知を記録してもその場で返却させられず、前景に ENOMEM を返す。CUI の失敗を隠す同期 WM pump は追加しない。CUI が戻って次の安全点で裏 GUI が配送を受けること、応答後の別要求は成功し得ることを T2g で受け入れる。
 
@@ -266,7 +266,7 @@ v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を�
 
 ### 5-1. 単独着地の単位
 
-**T2d〜T2h は受入完了**。詳細契約・受入・残件への入口は [TASK_T2D_T2H](TASK_T2D_T2H.md)。以下の段表は受入条件の要約、T2a〜T2c の実績は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) を参照。
+**T2d〜T2h は受入完了**。詳細契約・受入・残件への入口は TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。以下の段表は受入条件の要約、T2a〜T2c の実績は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) を参照。
 
 以下は**策定時の実装分割・受入条件**であり、実施結果は上記の参照先を読む。各段は前段までの正常起動を保ち、実ソースILP32ホスト試験でRED→GREENを記録する。追加試験は tests inventory / check_map / build に登録し、起動用guestは自層deploy.yamlへ [V2]。変異は写しの木で行い、コンパイル失敗を実行時REDに数えない (意図したASSERT拒否は別集計)。検査の役割分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) に従う。
 

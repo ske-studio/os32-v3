@@ -1,6 +1,6 @@
 # T2f f3 map transaction のホスト試験記録
 
-票: [TASK_T2D_T2H.md](../../docs/tasks/v3/TASK_T2D_T2H.md) §3-5 f3。
+票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f3。
 PM 判断 `/home/hight/os32-tmp/ref_f3.md` §8 Q1〜Q10 を適用する未結線の先行準備。
 実 [appmem.c](../../exec/appmem.c)、[appmem_map.c](../../exec/appmem_map.c)、
 [paging_app.c](../../kernel/paging_app.c)、paging/pgalloc/physmem を ILP32 で連結する。

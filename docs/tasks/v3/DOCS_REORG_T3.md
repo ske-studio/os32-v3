@@ -1,7 +1,7 @@
 # DOCS_REORG_T3 — T3 前の反省会と文書整理の計画
 
 > 状態: **実装中 (2026-10-14、ユーザーが「推奨どおり」で承認)** — r2 (2026-10-13、基点 c3262ee) をそのまま採った。決定と実施の状況は [REVIEW_2026-10-14](../agents/REVIEW_2026-10-14.md)。以下の本文は r2 のまま (提示時点の事実)。
-> 関門の正典: [T2d〜h §6-1](TASK_T2D_T2H.md) 末尾「T3 前の文書の再整備計画」。D1〜D36・契約・順序は変更しない。新しい D 決定は提案しない。
+> 関門の正典: T2d〜h §6-1 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) 末尾「T3 前の文書の再整備計画」。D1〜D36・契約・順序は変更しない。新しい D 決定は提案しない。
 > リンクは `docs/tasks/v3/` に置いたときの相対パス (この草案の置き場からは解決しない)。書き手: Fable 5.1 (`claude-fable-5-1`、リポジトリは読むだけ)。レビューは astra、提示は PM ([ROLES §0](../agents/ROLES.md) のカウンターの原則)。前版は `docs/tasks/v3/DOCS_REORG_T3.md` (3c4171a 基点、この版で置き換える案)。
 
 ## 1. 範囲と読み方
@@ -17,7 +17,7 @@
 | [V3_PLAN](V3_PLAN.md) | 116 | 実装中 (10-03) | 目的・範囲・柱・順序の正典。状態行と P1 行の「3c4171a 時点 / e1〜e4 と h の準備」が古い → 「T2d〜g 受入済み、T2h は R0〜R7 一巡、残は台帳」の 1 行に。§4 末尾の T3 前関門の文は保つ |
 | [MEMMAP_V3](../../decisions/MEMMAP_V3.md) | 630 | 設計中・方針確定 (09-30) | D1〜D36 の正典。保持。状態行の「実装は未着手」を「T0〜T2 の状態は各票」に直すだけ (D の承認と進捗を分ける) |
 | [TASK_T2_APPBAND](TASK_T2_APPBAND.md) | 460 | 実装中 (10-01) | T2 親契約の正典。a〜c の実績は既に T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)。状態行の「ここで一旦止め…」を「d〜h は子票」に。§3-1 旧世代 INVAL / §3-4 Unicode 撤去担当の 2 点は §4 |
-| [TASK_T2D_T2H](TASK_T2D_T2H.md) | 631 | 実装中 (10-13) | d〜h 契約の正典。10-06 に実行記録 (3,631 行) を RECORDS (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) へ分けた後、§5-1 に R0〜R7・h9 の段落 (約 12 段落、1 段落 300〜700 字) が再び溜まった → §5 の案で分ける |
+| TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) | 631 | 実装中 (10-13) | d〜h 契約の正典。10-06 に実行記録 (3,631 行) を RECORDS (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) へ分けた後、§5-1 に R0〜R7・h9 の段落 (約 12 段落、1 段落 300〜700 字) が再び溜まった → §5 の案で分ける |
 | T2E_MUTANTS (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`) / T2G_MUTANTS (アーカイブ: `docs/archive/v3/T2G_MUTANTS.md`) | 77 / 111 | 状態行なし (基点 83f2db7 / b43e814) | 変異対応表。受入が済んだ段の記録 → `docs/archive/v3/` へ (INDEX の正典表の行も archive を指す) |
 | [T2H_EXTERNAL_GATE](T2H_EXTERNAL_GATE.md) | 80 | 状態行なし | H-7 再開時ゲートの正典。CLAUDE.md が参照。保持、状態行「現行 (決定による持越し)」を足す |
 | [TASK_T3_LAYOUT](TASK_T3_LAYOUT.md) | 124 | 設計中 (10-03、基点 3c4171a) | T3 契約の正典。§1 の着手条件「e5 は別 worktree…」と「T2 完了後に確定」の項が T2 完了で確定できる → §6 の再照合 (Fable 起草・astra レビュー) で 1 回更新。§1 の「T2h 受入後の一式で再計算」は予算の関門 (§4-1) |

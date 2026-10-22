@@ -14,7 +14,7 @@ arm/loop-watch/stop no longer read --trace or need an external foreground writer
 The landing/pending capture and physical foreground snapshot share the serialized
 capture pump. Vector remains REQUIRED external evidence:
 current kernel has no counters for both setjmp landings or pending consumption.
-See TASK_T2D_T2H §5-2. Missing evidence is an error, never a synthetic PASS.
+Contract: docs/decisions/MEMMAP_V3.md §7-1 and userland/tests/h3/protocol.h. Missing evidence is an error, never a synthetic PASS.
 """
 import argparse
 import fcntl
