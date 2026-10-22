@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 from urllib.parse import unquote, urlsplit
 
@@ -75,10 +76,31 @@ def classify(path, lines):
     return 2
 
 
+def git_tracked_md(root):
+    """root が git の作業木の頂点なら管理している .md の相対パス、そうでなければ None (合成の試験の木)。"""
+    if not (root / '.git').exists():
+        return None
+    try:
+        out = subprocess.run(['git', '-C', str(root), 'ls-files', '-z', '--', '*.md'],
+                             capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return sorted(p for p in out.decode('utf-8').split('\0') if p)
+
+
 def documents(root):
     if not root.is_dir():
         raise ValueError('対象のルートがありません: ' + str(root))
     result = {}
+    tracked = git_tracked_md(root)
+    if tracked is not None:
+        # git の作業木では管理しているファイルだけを数える (管理外の写し .agents/ などを拾わない)。
+        for rel in tracked:
+            path = root / rel
+            if (path.suffix == '.md' and not path.is_symlink() and path.is_file()
+                    and not any(rel == e or rel.startswith(e + '/') for e in EXCLUDED)):
+                result[rel] = path.read_text(encoding='utf-8').splitlines()
+        return result
     for directory, dirs, files in os.walk(root):
         base = Path(directory)
         dirs[:] = sorted(d for d in dirs if not (base / d).is_symlink()
