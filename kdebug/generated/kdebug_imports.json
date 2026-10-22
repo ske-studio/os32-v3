@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 2085416685,
+  "module_abi_gen": 2337385065,
   "stage": "S5",
   "count": 269,
   "imports": [
@@ -3971,6 +3971,7 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 264,
+      "retained": true,
       "name": "pci_cfg_read32",
       "kind_name": "FUNC",
       "type_ver": 1,
@@ -3986,6 +3987,7 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 265,
+      "retained": true,
       "name": "pci_cfg_read16",
       "kind_name": "FUNC",
       "type_ver": 1,
@@ -4001,6 +4003,7 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 266,
+      "retained": true,
       "name": "pci_cfg_write32",
       "kind_name": "FUNC",
       "type_ver": 1,
@@ -4016,6 +4019,7 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 267,
+      "retained": true,
       "name": "pci_cfg_write16",
       "kind_name": "FUNC",
       "type_ver": 1,

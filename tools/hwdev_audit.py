@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure the linked kdebug image and reconcile GF references with CORE_API.
+"""Measure the linked HWDEV image and reconcile GF references with CORE_API.
 
 No runtime ABI is emitted. The JSON report carries declarations, slot order,
 object users, ELF/header sizes and map provenance for the later generators.
@@ -26,7 +26,7 @@ def require(ok, message):
 
 
 def audit(out, cross):
-    map_path = out / 'kdebug/kdebug.map'
+    map_path = out / 'hwdev/hwdev.map'
     map_text = map_path.read_text()
     objects = [Path(p) for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
     require(objects and len(objects) == len(set(objects)), 'missing/duplicate map inputs')
@@ -56,7 +56,7 @@ def audit(out, cross):
             users=[p.name for p in gf if name in symbols(nm, [p], True)]))
     kernel = [dict(symbol=n, kdebug_index=imports[n]['index'], declaration=declaration(imports[n], ROOT))
               for n in sorted(kernel_names, key=lambda n: imports[n]['index'])]
-    groups = {g: dict(text=0, rodata=0, data=0, bss=0) for g in ('core', 'gf')}
+    groups = {g: dict(text=0, rodata=0, data=0, bss=0) for g in ('module', 'gf')}
     details = {}
     for p in objects:
         sizes = dict(text=0, rodata=0, data=0, bss=0)
@@ -66,12 +66,12 @@ def audit(out, cross):
             if key in sizes:
                 sizes[key] += int(size)
         details[p.name] = sizes
-        group = groups['gf' if p in gf else 'core']
+        group = groups['gf' if p in gf else 'module']
         for key, value in sizes.items():
             group[key] += value
-    binary = (out/'kdebug.bin').read_bytes()
+    binary = (out/'hwdev.mod').read_bytes()
     header = dict(zip(HEADER_FIELDS, struct.unpack_from('<36I', binary)))
-    elf = Elf((out/'kdebug/kdebug.elf').read_bytes())
+    elf = Elf((out/'hwdev/hwdev.elf').read_bytes())
     sections = {s['name']: s['size'] for s in elf.sections if s['flags'] & 2}
     content = sum(g[k] for g in groups.values() for k in ('text', 'rodata', 'data'))
     require(header['IMAGE_SIZE'] == len(binary), 'image/section accounting mismatch')

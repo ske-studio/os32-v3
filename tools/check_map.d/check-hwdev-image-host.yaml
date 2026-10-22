@@ -17,6 +17,10 @@ check-hwdev-image-host:
 - kdebug/recover_gf.c
 - kdebug/kpeek.h
 - build/hwdev.ld
+- build/hwdev.mk
+- build/kdebug.mk
+- build/out/kdebug/*
+- build/out/kdebug.bin
 - sdk/link/generations.ld
 - sdk/kapi.json
 - tools/tests/test_hwdev_image.py

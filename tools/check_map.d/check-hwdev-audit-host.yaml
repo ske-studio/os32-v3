@@ -5,7 +5,10 @@ check-hwdev-audit-host:
 - tools/module_schema.py
 - kernel/kdebug_imports.def
 - docs/tasks/realhw/design/HWDEV_CORE_API.md
-- build/module.ld
+- build/hwdev.ld
+- build/hwdev.mk
+- build/kdebug.mk
+- hwdev/**
 - build/checks.d/check-hwdev-audit-host.mk
 - tools/check_map.d/check-hwdev-audit-host.yaml
 - kdebug/gfinit*.c

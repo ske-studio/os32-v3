@@ -22,7 +22,7 @@ FUNCTIONS = {
 }
 
 
-def run(folder):
+def run(folder, image=None):
     elf = module.mkmod.Elf((ROOT/'build/out/hwdev/hwdev.elf').read_bytes())
     header = '#define TRACE_IMPORT_SLOTS %dU\n' % elf.symbol('hwdev_import_slots')['value']
     (folder/'hwdev_trace_symbols.h').write_text(header)
@@ -70,11 +70,12 @@ def run(folder):
     command[-2:-2] = [str(ROOT/'tools/tests/hwdev_trace_image.c'), str(ROOT/'kernel/module_image.c'),
                       *module.INCLUDES, '-I'+str(folder), '-I'+str(ROOT/'build/out/hwdev')]
     subprocess.run(command, check=True)
-    image = (ROOT/'build/out/hwdev.mod').read_bytes()
+    if image is None:
+        image = (ROOT/'build/out/hwdev.mod').read_bytes()
     result = host32.run([str(exe)], input=struct.pack('<I', len(image))+image,
                         capture_output=True, timeout=120)
     print(result.stdout.decode(), end='')
-    assert result.returncode == 0, (result.returncode, result.stderr)
+    assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
     print('PASS relocated GF image: S3/S4/S5/S6 existing trace oracles')
 
 
