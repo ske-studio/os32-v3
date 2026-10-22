@@ -145,10 +145,19 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 `/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `kernel/module_schema.h`)、検査の実体は `kernel/module_image.c`、生成は `tools/mkmod.py`。
 
 - **並び**: `header (144 B、u32 LE × 36 語) → reloc 表 → import 表 → export 表 → 名前表 → (4096 B 整列) → payload (text / rodata / data) → bss (ファイルには無い)`。C の構造体を cast して読まず、語ごとに little-endian で decode する。
-- **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり、必須)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜28 reloc/import/export/名前表の offset・件数、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約 (0)。
-- **基点**: 表の offset (21〜28) は容器の先頭基点。節・init・reloc の書込位置・import slot・export の入口は body 基点 (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。`load_span = payload_offset + mem_size` を 1 回で確保する。
-- **表の 1 件**: reloc は `u32 off` (`R_386_32` の書込位置、非整列可、4 B 区間が互いにも import slot とも重ならない)。import は `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B (slot は `.data` 内の 4 B 整列)。export は `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B (slot は 1〜ops の口数、入口は text 内)。名前は NUL 区切りで各 63 B 以内、hash と突き合わせる。
-- **検査**: 本体は最初の 144 B だけを読んで全欄を検査してから `load_span` を確保する。image_size はファイルの実長と一致し部品ごとの上限以下、magic・format・header_size・KAPI 版・layout・module_abi_gen・ops_version・pair_image_crc (対の `vmkernel.lz4` の Image CRC) は一致、module_id は呼び手が期待する ID、未知の flags・予約欄の非 0・stop を許さない部品の stop ≠ 0 は拒否。payload_offset と mem_size は 4096 の倍数、各範囲は `off ≤ limit && len ≤ limit − off` の形で overflow させない。image_crc は欄 (バイト 128〜131) を 0 にした容器全体の CRC32。どれかが外れたら init を一度も呼ばずに断る。
+- **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜26 reloc/import/export 表の offset・**件数**、27〜28 名前表の offset・**バイト長** (NUL を含む、`tools/mkmod.py:299`)、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約。
+- **基点**: 表の offset (21・23・25・27) は容器の先頭基点。節・init・stop・reloc の書込位置・import slot・export の入口は body 基点 (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。`load_span = payload_offset + mem_size` を 1 回で確保する。
+- **表の 1 件**: reloc は `u32 off` (`R_386_32` の書込位置)。import は `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B、export は `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。名前表は import の順、続いて export の順に NUL 区切りの名前を並べたもの。
+- **ローダーが拒否する条件** (`kernel/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
+  - header (`:60`): magic・format・header_size が違う / image_size がファイルの実長と違うか部品の image 上限を超える / module_id が呼び手の期待と違う / phase が違う / 必須の flags が無いか未知の flags がある / stop を許さない部品で stop ≠ 0 / 予約欄が 0 でない。
+  - 大きさ (`:69`): payload_offset が 4096 未満・4096 の倍数でない・ファイル長を超える / payload_size ≠ image_size − payload_offset / mem_size が 4096 の倍数でない・mem 上限を超える・payload_size 未満 / load_span が overflow するか上限を超える。
+  - 節 (`:79`): text/ro/data/bss が mem_size からはみ出す、text/ro/data が payload_size からはみ出す、bss が payload の中に始まる、節どうしが重なる / init が text の外 / stop ≠ 0 で text の外。
+  - 表 (`:91`): 各表が `[144, payload_offset)` からはみ出す、件数が部品の上限を超える、4 つの表どうしが重なる。
+  - 世代 (`:119`): KAPI 版・layout・module_abi_gen・ops_version・import の件数が本体と違う → `ABI_MISMATCH`。対の CRC が必須なのに本体の Image CRC が無い、または pair_image_crc が違う。
+  - CRC (`:154`): image_crc 欄 (バイト 128〜131) を 0 にした容器全体の CRC32 が違う。
+  - import (`:162`): kind が 1〜5 でないか本体の契約と違う、type_ver・name_hash が契約と違う、名前が空・63 B 超・hash と合わない、slot が 4 B 整列でないか `.data` の外、slot または name_hash の重複。
+  - export (`:178`): slot が 1〜ops の口数の外か重複、入口が text の外、ver・name_hash が契約と違う、名前が hash と合わない、name_hash の重複。名前表を import→export の順に読み切って長さがちょうど合わない (`:193`)。
+  - reloc (`:197`): 書込位置の 4 B が payload の外、元の値 (VA 0 基点) が mem_size を超える (one-past は可)、reloc どうしの 4 B が重なる、import slot と重なる。再配置のときも base + mem_size の overflow を断る (`:228`)。
 - **KDEBUG (ID 1)**: POST_ROOT・対の CRC 必須・stop 無し・ops は版 4・20 口 (`KDEBUG_OPS_VERSION`、`tools/module_schema.py` の `KDEBUG_OPS_NAMES`)。他の部品は ops 1 口 (`initialize`)。大きさと表の件数の上限は次の表。
 
 #### 起動時に読む部品の大きさの上限と由来
