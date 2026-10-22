@@ -150,6 +150,32 @@ def suite(mod):
             self.assertEqual(mod.delink('docs/S.md', body)[0],
                              '\\\\r (アーカイブ: `docs/archive/A.md`)')
 
+        def test_review_comments_in_label_boundaries(self):
+            for comment in (']', '[', '`', '[fake](archive/A.md)'):
+                label = f'a <!-- {comment} --> b'
+                for suffix in ('(archive/A.md)', '[r]\n[r]: archive/A.md'):
+                    body = f'[{label}]{suffix}'
+                    with self.subTest(body=body):
+                        skips = []
+                        result, edits = mod.delink('docs/S.md', body, skips)
+                        expected = label + ' (アーカイブ: `docs/archive/A.md`)'
+                        if suffix.startswith('[r]'):
+                            expected += '\n'
+                        self.assertEqual(result, expected)
+                        self.assertTrue(edits)
+                        self.assertEqual(skips, [])
+                        self.assertEqual(mod.delink('docs/S.md', result), (result, []))
+
+        def test_review_unsupported_paragraph_is_still_not_edited(self):
+            for body in ("[a](archive/A.md)\n[x](Current.md 'title')",
+                         "[x](Current.md 'title') [a](archive/A.md)",
+                         '[x][unclosed [a](archive/A.md)',
+                         '[a](archive/A.md)\n[b\n c][r]\n[r]: archive/A.md'):
+                with self.subTest(body=body):
+                    skips = []
+                    self.assertEqual(mod.delink('docs/S.md', body, skips), (body, []))
+                    self.assertTrue(skips)
+
         def test_review_link_containing_image_is_one_edit(self):
             for inner, outer in (('archive/A.png', 'archive/B.md'),
                                  ('current.png', 'archive/B.md'),
@@ -340,6 +366,8 @@ prefix <!-- hidden --> [x](archive/A.md) suffix
 
 
 MUTATIONS = [
+    ('            skipped.append((index + 1, reason))\n            continue',
+     '            skipped.append((index + 1, reason))', '保留中の段落も編集する'),
     ('return dest if in_archive(dest) else None', 'return None', '解決先の判定を壊す'),
     ('visible = prose(text, preserve_columns=True)', 'visible = text.splitlines()', 'フェンス除外を壊す'),
     ("            result[index] = ''", '            pass', '定義行を削除しない'),
@@ -351,6 +379,8 @@ MUTATIONS = [
 
 # 実装が共有するパーサーへの変異も解除器の反例で検出する。
 GRAPH_MUTATIONS = [
+    ('            char = visible[cursor]', '            char = line[cursor]',
+     'ラベル境界走査のコメントマスクを外す'),
     ("return ' '.join(label.split()).casefold()", 'return label.casefold()', '参照名の空白正規化を外す'),
     ("return ' '.join(label.split()).casefold()", "return ' '.join(label.split())", '参照名の大小文字折畳みを外す'),
     ('definitions.setdefault(key, target)', 'definitions[key] = target', '最後の定義を有効にする'),

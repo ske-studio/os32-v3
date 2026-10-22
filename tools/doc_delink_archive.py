@@ -76,6 +76,7 @@ def delink(source, text, skips=None):
     for index, nodes, reason in link_rows(lines, visible, definitions, definition_lines):
         if reason:
             skipped.append((index + 1, reason))
+            continue
         raw = lines[index]
         for node in reversed(nodes):
             new = render(node, raw)

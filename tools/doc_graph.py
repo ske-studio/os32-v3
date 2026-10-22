@@ -31,6 +31,8 @@ KINDS = {
 # 除外パスはディレクトリ表記の末尾 / を正規化する。
 EXCLUDED = {name.rstrip('/') for name in ('.git', 'build/', 'apps', 'game', 'docs/hw')}
 DESTINATION = re.compile(r'\(\s*(<[^>\n]+>|(?:[^\s()]|\([^()]*\))+)(?:\s+"[^"\n]*")?\s*\)')
+# 編集できないタイトル等でも、読める宛先は計数する。
+DESTINATION_PREFIX = re.compile(r'\(\s*(<[^>\n]+>|(?:[^\s()]|\([^()]*\))+)')
 REFDEF = re.compile(r'^ {0,3}\[((?:\\.|[^]\\\n])+)\]:\s*(<[^>\n]+>|\S+)')
 STATUS = re.compile(r'(?:^|> |/ )状態:\s*(.*)$')
 DECL = re.compile(r'^> (索引|上位|後続):\s*(.*)$')
@@ -85,7 +87,7 @@ class Link:
 
 
 def scan_links(line, visible, definitions, start=0, end=None):
-    """位置つきのリンク木。未対応の候補は範囲全体を reason 付きで残す。
+    """位置つきのリンク木。未対応候補も読める宛先と reason を残す。
 
     1 行内のラベル・宛先に対応。コードスパン、エスケープ、入れ子の画像を
     ラベル境界で考慮し、部分一致で参照の末尾だけを拾わない。
@@ -101,13 +103,9 @@ def scan_links(line, visible, definitions, start=0, end=None):
             continue
         cursor, depth = opening + 1, 1
         while cursor < end:
-            char = line[cursor]
+            char = visible[cursor]
             if escaped(line, cursor):
                 cursor += 1
-                continue
-            if char == '`':
-                cursor = (code_end(line[:end], cursor)
-                          or cursor + len(re.match(r'`+', line[cursor:])[0]))
                 continue
             if char == '[':
                 depth += 1
@@ -127,13 +125,17 @@ def scan_links(line, visible, definitions, start=0, end=None):
             if match:
                 stop, target = match.end(), match[1]
             else:
-                stop, reason = end, '複数行または未対応の宛先'
+                prefix = DESTINATION_PREFIX.match(line, stop, end)
+                if prefix:
+                    stop, target = prefix.end(), prefix[1]
+                reason = '複数行または未対応の宛先'
         elif line[stop:stop + 1] == '[':
             ref_end = stop + 1
-            while ref_end < end and (line[ref_end] != ']' or escaped(line, ref_end)):
+            while ref_end < end and (visible[ref_end] not in '[]' or escaped(line, ref_end)):
                 ref_end += 1
-            if ref_end == end:
-                stop, reason = end, '複数行または閉じていない参照名は未対応'
+            if ref_end == end or visible[ref_end] != ']':
+                # 後続に読めるリンクがあれば計数できるよう、残りも走査する。
+                reason = '複数行または閉じていない参照名は未対応'
             else:
                 key = normalize_reference(line[stop + 1:ref_end] or label)
                 stop, target = ref_end + 1, definitions.get(key, '')
@@ -148,36 +150,43 @@ def scan_links(line, visible, definitions, start=0, end=None):
     return found
 
 
+def link_paragraphs(lines, visible, locations):
+    """定義行・空行を除いた段落を、元の行番号とマスク付きで返す。"""
+    rows = []
+    for index, line in enumerate(visible):
+        if index in locations or not line.strip():
+            if rows:
+                yield rows
+                rows = []
+        if index not in locations and line.strip():
+            rows.append((index, lines[index].rstrip('\r\n'), line))
+    if rows:
+        yield rows
+
+
 def link_rows(lines, visible, definitions, locations):
-    """未対応候補がある段落は全体を保持し、次行の参照だけを変換しない。"""
+    """編集用の行。未対応候補がある段落は全行に保留理由を付ける。"""
     def reason(node):
         return node.reason or next((value for child in node.children
                                     if (value := reason(child))), '')
 
-    def flush(rows):
+    for paragraph in link_paragraphs(lines, visible, locations):
+        rows = [(index, scan_links(raw, mask, definitions))
+                for index, raw, mask in paragraph]
         issues = [(index, nodes, next((value for node in nodes
                                       if (value := reason(node))), ''))
                   for index, nodes in rows]
         # 複数行リンクの末尾だけを単独の参照として扱わない。
-        raw = '\n'.join(lines[index].rstrip('\r\n') for index, _ in rows)
-        mask = '\n'.join(visible[index] for index, _ in rows)
+        raw = '\n'.join(raw for _, raw, _ in paragraph)
+        mask = '\n'.join(mask for _, _, mask in paragraph)
         for node in scan_links(raw, mask, definitions):
             if (node.target or node.reason) and '\n' in raw[node.start:node.end]:
                 row = raw[:node.start].count('\n')
                 index, nodes, _ = issues[row]
                 issues[row] = (index, nodes, '複数行のリンクは未対応')
-        unsupported = any(issue for _, _, issue in issues)
+        unsupported = next((issue for _, _, issue in issues if issue), '')
         for index, nodes, issue in issues:
-            yield index, [] if unsupported else nodes, issue
-
-    rows = []
-    for index, line in enumerate(visible):
-        if index in locations or not line.strip():
-            yield from flush(rows)
-            rows = []
-        if index not in locations and line.strip():
-            rows.append((index, scan_links(lines[index], line, definitions)))
-    yield from flush(rows)
+            yield index, nodes, issue or unsupported
 
 
 def prose(text, preserve_columns=False):
@@ -285,16 +294,17 @@ def links(source, lines, paths):
 
     def targets_in(nodes):
         for node in nodes:
-            if node.reason:
-                continue
             if node.target:
-                yield node.target
+                yield node.start, node.target
             yield from targets_in(node.children)
 
-    for index, nodes, _ in link_rows(lines, visible, definitions, locations):
-        no = index + 1
-        targets = targets_in(nodes)
-        for target in targets:
+    # 編集の保留とは独立。複数行・未対応の候補も、読める宛先は数える。
+    for paragraph in link_paragraphs(lines, visible, locations):
+        raw = '\n'.join(raw for _, raw, _ in paragraph)
+        mask = '\n'.join(mask for _, _, mask in paragraph)
+        nodes = scan_links(raw, mask, definitions)
+        for start, target in targets_in(nodes):
+            no = paragraph[0][0] + 1 + raw[:start].count('\n')
             url = urlsplit(target.strip('<>'))
             if url.scheme or url.netloc or url.path.startswith('/'):
                 continue

@@ -219,7 +219,7 @@ def suite(mod):
                 ('\\[r]\n[r]: archive/A.md', []),
                 ('\\[r](archive/A.md)', []),
                 ('[0,1) [a](archive/A.md) [literal', [(1, 'docs/archive/A.md')]),
-                ('[a\n b][r]\n[r]: archive/A.md', []),
+                ('[a\n b][r]\n[r]: archive/A.md', [(1, 'docs/archive/A.md')]),
                 ('\\\\[r](archive/A.md)', [(1, 'docs/archive/A.md')]),
                 ('[a `]` b](archive/A.md)', [(1, 'docs/archive/A.md')]),
                 ('[a \\] b][r]\n[r]: archive/A.md', [(1, 'docs/archive/A.md')]),
@@ -230,6 +230,37 @@ def suite(mod):
             for body, expected in cases:
                 with self.subTest(body=body):
                     self.assertEqual(list(mod.links('docs/S.md', body.splitlines(), paths)), expected)
+
+        def test_unsupported_edit_does_not_hide_readable_targets(self):
+            paths = {'docs/archive/A.md', 'docs/Current.md'}
+            cases = [
+                ("[a](archive/A.md)\n[x](Current.md 'title')",
+                 [(1, 'docs/archive/A.md'), (2, 'docs/Current.md')]),
+                ("[x](Current.md 'title') [a](archive/A.md)",
+                 [(1, 'docs/Current.md'), (1, 'docs/archive/A.md')]),
+                ("[x](<archive/A.md> 'title') [a](archive/A.md)",
+                 [(1, 'docs/archive/A.md')] * 2),
+                ('[x](??? [a](archive/A.md)', [(1, 'docs/archive/A.md')]),
+                ('[x][unclosed [a](archive/A.md)', [(1, 'docs/archive/A.md')]),
+                ('[outer [inner](archive/A.md)](Current.md)',
+                 [(1, 'docs/Current.md'), (1, 'docs/archive/A.md')]),
+                ('[a](\narchive/A.md)\n[b](archive/A.md)',
+                 [(1, 'docs/archive/A.md'), (3, 'docs/archive/A.md')]),
+                ('[a\n b][r]\n[c](archive/A.md)\n[r]: archive/A.md',
+                 [(1, 'docs/archive/A.md'), (3, 'docs/archive/A.md')]),
+            ]
+            for body, expected in cases:
+                with self.subTest(body=body):
+                    self.assertEqual(list(mod.links('docs/S.md', body.splitlines(), paths)), expected)
+
+        def test_comments_do_not_change_label_boundaries(self):
+            paths = {'docs/archive/A.md'}
+            for comment in (']', '[', '`', '[fake](archive/A.md)'):
+                for suffix in ('(archive/A.md)', '[r]\n[r]: archive/A.md'):
+                    body = f'[a <!-- {comment} --> b]{suffix}'
+                    with self.subTest(body=body):
+                        self.assertEqual(list(mod.links('docs/S.md', body.splitlines(), paths)),
+                                         [(1, 'docs/archive/A.md')])
 
         def test_exclusions_and_symlinks(self):
             self.put('docs/S.md', '[excluded](hw/T.md) [built](../build/T.md)')
@@ -268,6 +299,14 @@ def suite(mod):
 
 
 MUTATIONS = [
+    ('        nodes = scan_links(raw, mask, definitions)\n',
+     '        nodes = scan_links(raw, mask, definitions)\n'
+     '        if any(node.reason for node in nodes):\n            continue\n',
+     '編集保留と段落の計数除外を再結合する'),
+    ('            char = visible[cursor]', '            char = line[cursor]',
+     'ラベル境界走査のコメントマスクを外す'),
+    ('                    stop, target = prefix.end(), prefix[1]', '                    stop = prefix.end()',
+     '未対応構文の読める宛先を捨てる'),
     ("return ' '.join(label.split()).casefold()", 'return label.casefold()', '参照名の空白正規化を外す'),
     ("return ' '.join(label.split()).casefold()", "return ' '.join(label.split())", '参照名の大小文字折畳みを外す'),
     ('definitions.setdefault(key, target)', 'definitions[key] = target', '最後の定義を有効にする'),
