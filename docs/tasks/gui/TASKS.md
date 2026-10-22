@@ -1,6 +1,6 @@
 # GUI シェル v1.1 — 作業分担票 (全体)
 
-> 索引: GUI シェル v1.1 の作業票を並べる
+> 上位: [GUI の設計](DESIGN.md)・[GUI の契約](API_CONTRACTS.md)
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > 親: [DESIGN.md](DESIGN.md) / 契約: [API_CONTRACTS.md](API_CONTRACTS.md) (2026-09-04 凍結)
@@ -29,7 +29,7 @@
 | **C** クライアント | Rust, `userland/rust/libos32gui/` | `docs/archive/gui_v11/TASK_C1_drawing.md` | G 描画 (Rect / Style / Surface / クリップ / 文字) を libos32gfx の上に |
 | | | `docs/archive/gui_v11/TASK_C2_client_loop_widgets.md` | `gui_call` スタブ、U3 ループ、ウィジェット木、箱レイアウト、gui_demo 書き換え |
 | | | `docs/archive/gui_v11/TASK_C3_shared_lib.md` | 固定アドレス・ジャンプ表・バージョン照合の共有ライブラリ化 (K3 と同時) |
-| **W** (追加) | Rust, `userland/gshell/` | [TASK_KBD_NAV.md](TASK_KBD_NAV.md) | キーボードだけの GUI 操作 (WM ショートカット + KANA ラッチのマウスキー)。設計票、実機でバスマウスが無いため (2026-09-25) |
+| **W** (追加) | Rust, `userland/gshell/` | TASK_KBD_NAV.md | キーボードだけの GUI 操作 (WM ショートカット + KANA ラッチのマウスキー)。設計票、実機でバスマウスが無いため (2026-09-25) |
 | **PM** | Python, `tools/` | (票なし、本書 §5) | 共有定数の照合スクリプト、ゲート検証、`os32-cycle` の GUI 用サブコマンド |
 
 ## 2. 依存と順序
@@ -89,7 +89,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 | 上限 | ウィンドウ 16、サーフェス 16、ウィジェット 64、リスト項目 128、タイマ 8/アプリ、クリップ深さ 8、損傷 8/ウィンドウ、文字列 256B |
 | 追加 KAPI (v41) | `gui_call(u32 op, u32 arg) -> i32`、`gui_register(handler, pump) -> i32` (shell 帯からのみ)、`gfx_stats(void *out)`、`gfx_lease_palette(first, count, const u8 *rgb)`、`sys_switch_shell(const char *path) -> i32` (shell 帯からのみ、K4)、`kbd_dropped_count(void) -> u32` (カーネルのキー待ち行列が捨てた打鍵の累計。`drivers/kbd.c` の満杯分岐で加算) |
 
-> **版番号確定 (2026-09-06、同日改訂)**: GUI は **v42** (ime_feed_key / ime_set_render を含む 180 関数。開発中は v41 と呼んでいた)、ネットワークの Host Services ([../network/LINK_PLAN.md](../network/LINK_PLAN.md)) は **v43**。ユーザー承諾済み。版番号割り当ての正典は [KAPI_SPEC §3-2 の予約表](../../KAPI_SPEC.md)。
+> **版番号確定 (2026-09-06、同日改訂)**: GUI は **v42** (ime_feed_key / ime_set_render を含む 180 関数。開発中は v41 と呼んでいた)、ネットワークの Host Services (`../network/LINK_PLAN.md`) は **v43**。ユーザー承諾済み。版番号割り当ての正典は [KAPI_SPEC §3-2 の予約表](../../KAPI_SPEC.md)。
 
 ## 5. ゲート (検証層が `os32-cycle` で回す。各票の完了条件はゲートに対応させる)
 
