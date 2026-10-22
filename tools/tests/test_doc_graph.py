@@ -73,6 +73,21 @@ def suite(mod):
             self.only('spec_to_ticket', 2)
             self.assertIn('docs/S.md:1 → docs/tasks/T.md', mod.analyze(self.root)['spec_to_ticket'])
 
+        def test_decision_to_ticket(self):
+            self.put('docs/tasks/realhw/TASK_HWDEV.md')
+            cases = {
+                'docs/decisions/D.md': '',
+                'docs/tasks/realhw/design/HWDEV_CORE_API.md': '> 状態: **確定**\n',
+            }
+            for path, header in cases.items():
+                with self.subTest(path=path):
+                    target = '../tasks/realhw/TASK_HWDEV.md' if path.startswith('docs/decisions/') else '../TASK_HWDEV.md'
+                    self.put(path, header + '[ticket](' + target + ')\n')
+                    self.only('decision_to_ticket', 1)
+                    self.put(path, header + '> 索引: 子の一覧\n[ticket](' + target + ')\n')
+                    self.only('decision_to_ticket', 0)
+                    self.put(path, '')
+
         def test_ticket_parent_and_successor(self):
             self.put('docs/tasks/A.md', '[p](P.md) [n](N.md) [x](X.md)')
             for name in ('P', 'N', 'X'):
@@ -109,19 +124,35 @@ def suite(mod):
                 self.put('docs/DEVELOPMENT.md', '# 題\n\n' + declaration + '\n[x](tasks/T.md)')
                 self.only('spec_to_ticket', 0)
 
-        def test_archive_history_is_same_line(self):
+        def test_archive_history_is_forbidden(self):
             self.put('docs/S.md', '[x](archive/A.md)\n経緯\n[x](archive/A.md)\n経緯: [x](archive/A.md)\n`経緯`: [x](archive/A.md)')
             self.put('docs/archive/A.md', '[back](../S.md) [t](../tasks/T.md)')
             self.put('docs/tasks/T.md')
-            self.only('current_to_archive', 2)
-            self.put('docs/S.md', '> 索引: 過去の一覧\n[x](archive/A.md)')
-            self.only('current_to_archive', 0)
+            self.only('current_to_archive', 4)
+
+        def test_archive_forbidden_from_every_current_layer_and_index(self):
+            self.put('docs/archive/A.md', '[other](README.md) [current](../S.md)')
+            self.put('docs/archive/README.md', '[old](A.md) [current](../S.md)')
+            cases = {
+                'docs/INDEX.md': 'archive/A.md',
+                'docs/POLICY_DEV.md': 'archive/A.md',
+                'docs/S.md': 'archive/A.md',
+                'docs/decisions/D.md': '../archive/A.md',
+                'docs/tasks/T.md': '../archive/A.md',
+                'docs/tasks/agents/HANDOVER.md': '../../archive/A.md',
+                'docs/tasks/DEFERRED_TESTS.md': '../archive/A.md',
+            }
+            for path, target in cases.items():
+                for header in ('', '> 索引: 一覧\n'):
+                    with self.subTest(path=path, header=header):
+                        self.put(path, header + '経緯: [old](' + target + ')')
+                        self.only('current_to_archive', 1)
+                        self.put(path, '')
 
         def test_record_and_deferred_exception(self):
-            self.put('docs/tasks/DEFERRED_TESTS.md', '[all](../archive/A.md) [t](Other.md)')
-            self.put('docs/archive/A.md')
+            self.put('docs/tasks/DEFERRED_TESTS.md', '[t](Other.md)')
             self.put('docs/tasks/Other.md')
-            self.put('docs/tasks/agents/HANDOVER.md', '[all](../../archive/A.md)')
+            self.put('docs/tasks/agents/HANDOVER.md')
             self.put('docs/tasks/T.md', '[ok](DEFERRED_TESTS.md) [bad](agents/HANDOVER.md)')
             self.put('docs/S.md', '[bad](tasks/DEFERRED_TESTS.md)')
             self.put('docs/POLICY_DEV.md', '[bad](tasks/agents/HANDOVER.md)')
@@ -192,13 +223,17 @@ def suite(mod):
 
 MUTATIONS = [
     ('if a == 2 and b == 4:', 'if False:', '仕様→票を数えない'),
+    ('if a == 3 and b == 4:', 'if False:', '決定→票を数えない'),
     ('if a == 4 and b == 4 and dest not in parents[source] | successors[source]:', 'if False:', '横の票を数えない'),
     ('if not parent_child and pair not in violations', 'if False and pair not in violations', '相互リンクを数えない'),
-    ("if b == 9 and a != 5 and '経緯' not in raw_docs[source][no - 1]:", 'if False:', 'アーカイブを数えない'),
+    ('if b == 9:', 'if False:', 'アーカイブを数えない'),
+    ('if b == 9:', "if b == 9 and '経緯' not in raw_docs[source][no - 1]:", '経緯の免除を復活'),
+    ('if b == 9:', 'if b == 9 and source not in indexes:', '索引の免除を復活'),
+    ('if b == 9:', "if b == 9 and source != 'docs/INDEX.md':", 'INDEX の免除を復活'),
+    ('if b == 9:', 'if b == 9 and a != 5:', 'L5 の免除を復活'),
     ('if a in (1, 2, 3, 4) and b == 5 and not (', 'if False and not (', '記録参照を数えない'),
     ('if source not in indexes:', 'if True:', '索引を無視'),
     ('dest not in parents[source] | successors[source]', 'True', '上位・後続を無視'),
-    ("'経緯' not in raw_docs[source][no - 1]", 'True', '経緯を無視'),
     ("a == 4 and dest == 'docs/tasks/DEFERRED_TESTS.md'", 'False', '延期の例外を無視'),
     ('if not parent_child and pair', 'if pair', '親子の例外を無視'),
     ('if args.update_baseline:', 'if True:', '基準値を無断で更新'),

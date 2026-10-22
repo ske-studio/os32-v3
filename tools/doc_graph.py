@@ -20,9 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 HEAD_LINES = 12
 KINDS = {
     'spec_to_ticket': '仕様→票',
+    'decision_to_ticket': '決定→票',
     'ticket_crosslink': '票→票の上位・後続以外',
     'mutual_non_parent': '親子以外の相互リンク',
-    'current_to_archive': '現行→アーカイブの経緯以外',
+    'current_to_archive': '現行→アーカイブ',
     'canonical_to_record': 'L1〜L4→L5 の正典参照',
 }
 # 除外パスはディレクトリ表記の末尾 / を正規化する。
@@ -140,13 +141,16 @@ def analyze(root):
         for no, dest in outgoing:
             b = layers[dest]
             detail = f'{source}:{no} → {dest}'
+            # [D4]: 索引・記録・経緯も含め、全現行層から禁止する。
+            if b == 9:
+                violations['current_to_archive'].append(detail)
             if source not in indexes:
                 if a == 2 and b == 4:
                     violations['spec_to_ticket'].append(detail)
+                if a == 3 and b == 4:
+                    violations['decision_to_ticket'].append(detail)
                 if a == 4 and b == 4 and dest not in parents[source] | successors[source]:
                     violations['ticket_crosslink'].append(detail)
-                if b == 9 and a != 5 and '経緯' not in raw_docs[source][no - 1]:
-                    violations['current_to_archive'].append(detail)
                 if a in (1, 2, 3, 4) and b == 5 and not (
                         a == 4 and dest == 'docs/tasks/DEFERRED_TESTS.md'):
                     violations['canonical_to_record'].append(detail)
