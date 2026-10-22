@@ -118,6 +118,11 @@ class AcceptanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ga.validate(self.cases)
 
+    def test_archive_contract(self):
+        self.cases[0]['contract'] = 'docs/./archive/absent.md'
+        with self.assertRaisesRegex(ValueError, 'archive'):
+            ga.validate(self.cases)
+
     def test_mode(self):
         self.cases[0]['mode'] = 'unknown'
         with self.assertRaises(ValueError):
@@ -424,6 +429,7 @@ MUTATIONS = [
     ('tools/tests/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
 
     ('tools/gen_guest_acceptance.py', 'or case["id"] in ids', 'or False'),
+    ('tools/gen_guest_acceptance.py', '.startswith("docs/archive/")', '.startswith("docs/archive/") and False'),
     ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
     ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
      "as_ptr = word(slot, o['slot_as'] + WORD_BYTES)"),

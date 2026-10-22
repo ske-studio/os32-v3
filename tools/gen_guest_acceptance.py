@@ -2,6 +2,7 @@
 """Validate a guest acceptance index and render an uncommitted Markdown table."""
 import argparse
 from pathlib import Path
+import posixpath
 import sys
 import yaml
 
@@ -27,6 +28,8 @@ def validate(data, root=ROOT):
         if case["mode"] not in {"batch", "tool", "manual"}:
             raise ValueError("invalid mode")
         contract = case["contract"]
+        if isinstance(contract, str) and posixpath.normpath(contract.split("#", 1)[0]).startswith("docs/archive/"):
+            raise ValueError("contract must not point to docs/archive/ ([D4])")
         if not isinstance(contract, str) or not (root / contract.split("#", 1)[0]).is_file():
             raise ValueError("contract file missing")
         if not deferred and any(case[key] is None or case[key] == "" for key in REQUIRED):

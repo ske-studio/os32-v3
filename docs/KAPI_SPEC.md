@@ -1579,10 +1579,22 @@ CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 - `gfx_surface_lease`: PC98 DISPLAY の 4 ref を query と同順で渡す。4 面すべて成功か巻戻し。count/欠落/重複/別束は INVAL、古い世代は STALE。
 - `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
 
-query/lease は保存 USER の AS/owner/generation と現在実行中の slot の一致を要求する。
-CUI では CLIENT は GFX flag 不要、DISPLAY は GFX flag が必要、TVRAM は前景 USER。Unicode 表は貸さない (role 4 の query は `OS32_ERR_INVAL`、変換は §4-13 の `unicode_to_jis`)。
-GUI では通常 CLIENT は GFX flag 不要、全画面 CLIENT と DISPLAY は GFX flag と gfx owner 一致が必要。TVRAM は拒否。
-TRUSTED/WM/IRQ/例外からの surface 貸与は不可。授権の詳細は票 TASK_T2D_T2H §2-2 が持つ。
+query/lease はどちらも次の授権表で判定する。U は保存した USER caller と**現在実行中**の slot/AS/owner/generation の一致、
+G は kernel が読んだ `hdr_flags & OS32X_FLAG_GFX`、F は GUI の `appslot_gfx_owner()==caller.app_id`。
+親や park 中の AS に代理で貸さない。user 引数の owner や sid を権限にしない。どの role も desc の最大 access 以内。
+
+| モード | CLIENT | DISPLAY | TVRAM |
+|---|---|---|---|
+| GUI (`gui_mode=1`) | U、選択 backend。通常 GUI は G 不要、全画面 GFX なら G かつ F | U かつ G かつ F | 拒否 |
+| CUI (GUI→CUI を含む、`gui_mode=0`) | U、選択 backend の初期化済み面。G 不要 (`libos32gfx_init`→BB→`gfx_present` を許す) | U かつ G、CUI 前景の実行者だけ | U、CUI 前景の実行者だけ。G 不要 |
+| gshell 不在の boot (`gui_mode=0`) | 通常 AS の開始前の USER 要求は不可。開始後は U かつ boot 所有の初期化済み面 (CUI と同条件) | 通常 AS の開始後 U かつ G | 通常 AS の開始後 U、G 不要 |
+
+Unicode 表 (role 4) はどのモードでも貸さない (query は `OS32_ERR_INVAL`、変換は §4-13 の `unicode_to_jis`)。
+TRUSTED (boot/kernel/WM) は lease の授権を迂回して USER へ貸さず、内部の backing 口を使う。IRQ/例外からの貸与は不可。
+caller の由来は CPL や現在の CR3 から推測しない。CUI で `g_gfx_owner` が WM のままでも U を直接照合する。
+GUI→CUI では旧 lease を revoke・TLB 同期してモード世代を更新してから前景 CUI へ貸す。CUI→GUI でも貸与を切り替え、
+park 中の GUI の古い view は再 attach まで使えない。CLIENT の backing の台帳 owner が gshell (や gshell 不在の boot owner) のままでも、
+物理の所有と利用の授権を分けてこの表で貸す。
 戻り値は 0 / `OS32_ERR_INVAL` (-9) / `OS32_ERR_STALE` (-11) / `OS32_ERR_FULL` (-13、lease slot 不足) /
 `OS32_ERR_NOSPC` (-4、ページ不足)。失敗時の out は不変。
 

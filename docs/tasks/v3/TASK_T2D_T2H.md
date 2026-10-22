@@ -123,15 +123,7 @@ dのcopy契約とlease基盤がGREEN。変更は `gfx/gfx_core.c` / `gfx/backend
 
 親票§3のquery/lease/unleaseを追記する。公開descはu32のref、role/backend、format、width/height/pitch、planes数、plane offset[4]、bytes、最大access。phys/kernel pointer/cache指定欄は無い。kernel内の48B ledger_surfaceと公開descを同型にしない。queryは値の写しだけ、lease数を増やさない。
 
-query/leaseの両方で次の授権表を適用する。Uは保存したUSER callerと**現在実行中**のslot/AS/owner/generationの一致、Gはkernelが読んだ `hdr_flags & OS32X_FLAG_GFX`、FはGUIの `appslot_gfx_owner()==caller.app_id`。親/park中ASに代理貸与しない。UnicodeはROだけ、他roleもdescの最大access以内。user引数のownerや単なるsidを権限にしない。
-
-| モード | CLIENT | DISPLAY | TVRAM | Unicode |
-|---|---|---|---|---|
-| GUI (`gui_mode=1`) | U、選択backend。通常GUIにはG不要、全画面GFXならGかつF | UかつGかつF | 拒否 | U、backend非依存RO |
-| CUI (GUI→CUIを含む、`gui_mode=0`) | U、選択backendの初期化済み面。G不要 (`libos32gfx_init→BB→gfx_present`を許可) | UかつG、CUI前景実行者のみ | U、CUI前景実行者のみ。G不要 | U、表ready時RO |
-| gshell不在のboot (`gui_mode=0`) | 通常AS開始前のUSER要求は不可。開始後はUかつboot所有の初期化済み面、CUIと同条件 | 通常AS開始後UかつG | 通常AS開始後U、G不要 | 通常AS開始後Uかつ表ready、RO |
-
-TRUSTEDのboot/kernel/WMはlease授権を迂回してUSERへ貸すのではなく、内部backing口を使う。caller由来は§1-2で固定し、CPL/現在CR3で推測しない。CUIで `g_gfx_owner` がWMのままでもUを直接照合する。GUI→CUIは旧leaseをrevoke/TLB同期してモード世代を更新してから前景CUIへ貸す。CLIENT backingの台帳ownerがgshellのままでも、物理所有と利用授権を分け、この表で貸与を許可する。gshell不在のboot ownerも同様。CUI→GUIでも貸与を切り替え、park中GUIの古いviewは再attachまで使用不可。
+授権表とモード切替の扱いは [KAPI_SPEC §4-10 v70](../../KAPI_SPEC.md#4-10-v70-surface-値-abi列挙-window本人識別-e11c1) へ移した (2026-10-22)。
 
 不連続planar DISPLAYは4 SURFACEをまとめて取得する内部lease_acquire(count=4)を使用する。公開側にはroleを指定する束取得口 `gfx_surface_lease(role, refs, count, access, out)` (queryが返す最大4本のref配列を入力、outは4 viewとcount)を追記し、任意物理やASを受け取らない。単一surface_leaseはCLIENT/Unicode/TVRAM等の単面用とし、planar DISPLAYの単面要求は拒否する。queryは束の全desc/refを一つのsnapshotで返す。leaseでcount・sid順・role/backendと**各generation**が現在の束に一致することを照合し、旧世代はSTALE、
 面欠落/重複/別束はINVALでout不変。4 slot/全PT/全出力を事前検査し全成功か全巻戻し。releaseは各tokenでよく、再init/終了revokeは全関連tokenを処理する。
@@ -163,7 +155,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 1. `shm_init`がSHM状態/guardを初期化した**後**、最初のAS生成前に専用master初期化口でSHMをUSER|RW/WB、trampolineをUSER|RO/WBにする。boot専用初期化完了時のSHM契約はUSER|RWで、後続boot処理にsupervisorへ戻させない。既存の起動ごとの共有mapを撤去。
 2. execのVRAM/font/Unicode/BB直接USER化とring3_ptr_okの旧VRAM例外を撤去。addrspace通常map/unmapは私有PTだけ許可、共有PTへの操作は無変更拒否。
 3. masterの汎用map/set_page/map_physはlive AS後のUSER昇格を禁止。V86専用session口に加え、SHM専用権限口を**既存USERページのRW切替**として例外にする。`kernel/shm.c`のlockはUSER|RO、free/free_owned/cleanup_allはUSER|RW、初期化は1の順でUSER|RW、全てPCDなし。SHM範囲/PFN/共有PTを固定検査し、USER欠落は一般昇格で救済せず不変条件違反として検出する。PDE USERを維持、変更後active TLBを同期し、他ASは次回CR3 loadで同期。exec_exitのfree_owned後にも次アプリのSHM書込みが通ること。通常のDEVICE aliasはsupervisorのまま。
-4. V86全出口で旧低位内容/属性を復元し、VRAM/Eのsetup/teardown両行のPCDを台帳と一致させる。SHM/trampoline用のPDE USERも復元→CR3 reload→通常地図検査。V86中の通常AS実行/生成/検査は禁止。T7の低位専有化やpage0 NPは前倒ししない。
+4. V86 全出口の復元は [09_exec](../../09_exec.md#ring3-の-user-写像-exec_run-が-as-を作るときに立てるもの) へ移した (2026-10-22)。
 5. tvdumpはCUI授権済みchecked copy KAPIへ移しTVDM wire形式を維持。nop/ring3_hello/fault/guardの観測マーカーは割当済みSHMへ (CRT非依存入口も同じ取得/初期化)。保護違反そのもののVRAM書込みは残す。db_v50_testのVRAM許可期待をRAM境界成功と未貸与VRAM拒否へ変更。
 6. memory世代更新と現行ビルド対象の全再ビルド。apps/gameはユーザー決定により対象外。caller追随要件と再開時ゲートをhへ渡し、決定による持越しと記録する (§5/§8)。
 
@@ -310,19 +302,7 @@ fのmap失敗理由・allocator busy/trim・STOP全返却がGREEN。appslot/appm
 
 ### 4-2. 状態と配送契約
 
-> 2026-10-09 改訂 (U14、ユーザー承認): シングルタスク・協調切替 (走るのは 1 本、切替はアプリ自身の park / yield / 終了のときだけ) の前提で、厳密な一巡保証と kernel 側の前景判定を外し、状態を実設計に合わせた。詳細設計は `~/os32-tmp/run/g/T2G_DESIGN.md` (r4)。
-
-各AppSlotに固定の `trim_pending` (bit) と `trim_epoch` (bitを立てたときの値) を置き、カーネルにu32 `appslot_trim_epoch` (0=無し、巻戻しのたび+1、32bit満了はsaturate) を置く。保留の識別はbitで行い、epochはTRIM_DONEの値照合と観測にだけ使う (飽和しても配送は止まらない)。**bitが立っている slot への再要求は何もしない** — 走るアプリは1本なので、配送中の保留が別の要求者から書き換わることは無く、アプリはtrimする時点のheapを返すので後続の要求も同じtrimで満たされる。WMは slot ごとに `sent` (いまの保留にイベントを積んだ) の bit だけを持ち、SDKは `gui_retry` と `in_trim` を持つ。動的queueは作らない。slot回収/再利用で `trim_pending / trim_epoch` をゼロにし、古いイベントを次のownerへ渡さない。
-
-appmemは**data/PTの物理池不足**で準備を全巻戻しした後だけ、要求者以外の生きたGUI slot (PARKED / WAIT_KEY / WAIT_POLL) にbitを立ててNULLを返す。VAの穴不足・extent満杯・KHEAP制御不足・引数不正は要求しない。割当ての動作 (EXACT→TOPDOWNの fallback、allocatorのarena巡回) は変えず、1回の割当てでENOSPCが複数回出ても slot のbitは最初の1回で立つ。front/backの区別はカーネルではしない — **WM (CPL=0) が自分の `front_owner` で配送時に判定**し、前景の slot へは積まない (bitは残り、裏に戻った周に積む)。USER申告は使わない。kernelのepochは通知の合成であり再試行保証ではない。
-
-WMは既存のX3周期 (`wm_cycle`、アプリのOP_WAIT内と単独ループ) で `mem_stat(0)` のpending maskを1回読み、bitの立つ slot が **PARKED で、前景でなく、未配送** (`sent` が偽) なら、その slot のリングに固定形の trim イベント (`GUI_EV_TRIM`、window 0、payloadにepoch) を1件積んで `sent` を立てる。通常queue満杯なら積まず次周に後送し、既存イベントを捨てない。`sent` は mask のbitが0になったとき (完了・回収) と owner の終了で下ろす。積まれた slot は既存の規則で**入力ready**になるので、**起こす順は既存の `pick` / `should_park` / ラウンド規則のまま**: 走っているアプリは「他にreadyが居る」で譲り、backは入力群としてID昇順・turnつきで1回ずつ起き、`sys_yield` した要求者 (WAIT_POLL = 最下位) はreadyが尽きてから戻り、OP_WAITのtimeoutで待つ要求者 (導出群) も入力群の後になる。**厳密な一巡保証はしない** — 前景のアプリに入力が来ていれば既存の応答性優先で先に起きる。専用の集合・要求者の追跡・`should_park` の項は置かない。1 slotの試行は既存の安全なresume→park/終了までで、応答待ちを追加しない。満杯なら次周、未応答 (TRIMを消費したがTRIM_DONEを送らない) ならbitと `sent` を残して再配送も再resumeもしない (1巡で打切り。そのアプリは終了まで再通知されない)。USER loopから戻らないslotの停止は既存STOP/P6境界で、今回新たな強制preempt保証は作らない。更新途中のwrapperやallocatorから起こさない。CUI/終了ASへは配送しない。SDK受信時はhandlerの外・allocatorの外の安全点でtrim→任意cache hookを1回→TRIM_DONE (受信バッチごとに1回)。GUI protoに内部のTRIM_DONE op (epochを値で渡す) を設け、**カーネルが `gui_call` で横取り**して、saved callerの slot に保留があり epoch が一致する場合だけ受理してbitを下ろし、この帰路でkernel側exec_heapの安全な末尾trimを同じcaller ASのまま実行し、他ASへ切り替えない。保留が無い/不一致はSTALEで状態不変 (重複DONEは無害)。新しいメモリKAPIは増やさない (`mem_stat` の末尾追記だけ)。hook中はin_trim、hookのmalloc失敗で再帰trim・再試行をしない。hookの戻り値はSDK内の観測用hintで、pool freeは台帳から測る。
-
-front SDKのmalloc/map失敗時はallocator lock/busyを解き、GUIクライアントの初期化で立つ `gui_retry` があり `in_trim` でない文脈だけ `sys_yield` 1回→**公開入口の操作全体**を1回再実行する (reallocは新確保→copy→旧解放まで含めて再実行し、1回目の失敗は旧内容を保つ)。allocatorへの再入による入口拒否は確保失敗ではなく再試行しない。raw mem_mapとsize 0は自動retryしない。再試行も失敗ならENOMEM、未応答backを待たない。要求/提示/配送/完了/retryは別カウンタで、成功の判定は実freeと再試行rc。pool0でも固定slot/eventで通知・閉じる・STOPが動く。
-
-`ring3_wm_depth`を更新排他とみなさない。appmem/leaseのtransaction busyとSDK allocator busyは別に持つ。syscall入口の既存 `ring3_gui_pump` は入力処理の役割を維持するが、ここからtrim hookや別AS実行を追加しない。park可能な操作をSDKが明示した帰路に限定する。
-
-端末配下CUI前景では失敗時にback GUIへbit記録→CUI自身はENOMEM。CUIが親へ戻り、親端末のOP_WAIT (X3) でbackへ配送され、backがreadyになって端末が譲り、その後の**別要求**が成功し得る。CUIの失敗を同期pumpで成功へ偽装しない。
+本文は [09_exec の trim の配送](../../09_exec.md#gui-slot-への-trim-要求と配送-池不足時) へ移した (2026-10-22)。
 
 ### 4-3. 分割・試験・受入
 
@@ -419,13 +399,7 @@ mode=1 pf (#PF14)、2 gp (HLT/#GP13)、3 de (DIV0/#DE0)、4 ud (UD2/#UD6)、
 
 ### 5-3. 統合matrixと観測
 
-親票§5-2の(a)master/(b)各AS/(c)post-exec毎boot/(d)leaseを適用する。低位present USERはSHM/trampolineだけ、APP/LEASEのmaster PDEは空、AS私有PFNはowner一致、共有shlib textはRO、lease全page/cache/refcount一致。PDE USER単独を漏れと数えない。guardと15〜16MB未登録部NP、DEVICE永久予約を確認する。
-
-8MB planar/PEGC、17MB planar/PEGC/Cirrus、Ra26664MB PEGCの行ごとに、boot fail0→通常CUI/GUI/FEP→高位HostDrv read/write→親子→lease切替→map枯渇→trim→fault/STOP→次起動→V86往復を記録。8MBの私有総量2048KiBは親票§5-3の3配分で、shlib dataは実測分を内数、PD/PT/共有text/BBは別勘定。起動/描画/終了を20回。T2時点の固定帯で不足するなら必要/不足ページを記録してT3へ渡すことは既決だが、「2MB達成」とは記さない。
-
-診断の番地は**受入対象の新kernel.elf / kernel.map / nmから毎回引き直す**。static symbolがmapに無ければnm/専用診断、`used_pages`は関数なので値の番地として読まない。NP21/Wは物理読取と画面、Ra266はmem/bootlog/シリアル診断を使う。読み口不足はh4で固定量の診断へ追加し、公開の任意物理read APIを作らない。
-
-記録欄: SHA/build ID/hash/画像size/機種RAM/backend、実コマンド/rc、kselftest/地図、owner別used/free、lease数、leftover、bad_free、IRQ/例外深さ、ledger_irq_ops/exc_ops、fault終了種別、KHEAP/stack high-water、画面結果。brokerのboot自己診断+1は基準値、操作差分は0。失敗後の次起動と親データの一致までが1ケース。失敗/skipには担当と次の試験を記す。
+本文は [MEMMAP_V3 §7-1](../../decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録) へ、旧形式の fixture (§5-2 の行) は [§7-2](../../decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture) へ移した (2026-10-22)。
 
 ### 5-4. GUI KAPI-loop の STOP (ユーザー決定: A + 二重 kill の修正、2026-10-02、GPT-6)
 
@@ -434,28 +408,7 @@ Opus の第三案 C ではなく **A** を選択し、OWNER_EXIT の内部引数
 渡す変更も承認した。設計 A = h3 の **KAPI-loop A / wm-kill**。
 公開 KAPI・sdk/kapi.json・KAPI 版・h3 台本は変更しない。
 
-**確定設計**: IRQ の GUI 受付拒否時、RUNNING/gui/CPL3 の current に
-`stop_wm_req` だけを立てる。WM の入力読取り直後〜resume/start の隙間に
-IRQ が来たときは shell slot に未配送要求を保持する。次の正常 syscall、既存park、
-WMのabort_clear、回収で消費し、currentへ誤killせず同じAへ渡す。正常 syscall 完了後 (戻り値書込・callback 復帰後)、
-第5の由来 `parked_from_stop` で WAIT_POLL に退避する。状態の公開値は増やさず、
-WM の既存 pick/should_park で起こせる。resume は EAX を保存し注入リングを読まない。
-既存 park・abort_clear・reclaim で要求を消す。WM は既存宛先解決で exec_kill。
-`resume_one` の前段でも keyboard capture (Standalone) → top_level_abort を行う。
-exec_start が同じ周の X3 より後に戻った場合も、未読 raw / deferred / abort_seen を
-処理してから再開する。マウス・時計はそこで取り込まず、既存の起床順位/tick制御を保つ。
-ABORTED の OWNER_EXIT は raw の未読 CTRL+STOP make、WM の abort_seen と
-pending_raw 内の CTRL+STOP make を消費し、次の前景への二重 kill を防ぐ。
-STOP 以外の打鍵・break は保つ。複数の未処理 STOP は既存 bool と同じく合流する。
-H-2 (2): ABORTED 後に遅着する CTRL+STOP make も、STOP・修飾キー以外の
-次の make、新しいマウスボタンの押下、ABORTED から 500 ms (PIT 50 tick) 経過の
-いずれかまで合流して捨てる。終了に伴う自動の前景切替では解除しない。
-修飾キー・break・ボタン解放・押しっぱなしでは解除しない。解除後の STOP は新しい前景へ効く。
-カーネルは raw への追加と abort 要求の両方より前で除外し、WM も pending_raw を
-含めて同じ条件を適用する。CUI と GUI セッションの切替時にはこの抑止を持ち越さない。
-STOP と無関係な ABORTED (request_kill_all、resume 失敗の exec_kill_one) でも、
-その時点の実打鍵 STOP はこの合流に含めて消費する。
-IRQ/例外では ledger を触らず、通常回収の深さ0、owner別回収、R1 pending一回消費を維持。
+**確定設計**: [09_exec の KAPI-loop の STOP](../../09_exec.md#gui-の-kapi-loop-の-stop) へ移した (2026-10-22)。
 
 **レビューの扱い**: P1-1 は既知の制約として受け入れる。張本人=current と
 前景連鎖末尾の宛先が違う場合、宛先を畳んだ後に張本人は保存 EAX で再開し、
@@ -632,10 +585,5 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 
 ## 12. 受入の構成の方針 (ユーザー指示 2026-10-02)
 
-「ハードウェア構成の変更でのテストは行わない。切りの良いところで一括」「(RAM 量・音源の) 二点は最後に確認すれば良い」。
-
-- **d〜g の各段の NP21/W 受入は、現行構成 (64MB、`np21x64w.ini`、2026-10-14) だけで行う。** ini を切り替えない。
-- 本票の各段にある **8MB、planar / PEGC / Cirrus の切替、音源 (PC-9801-118 の PCM) など構成を変える確認は、受入記録に「構成依存は一括確認へ持越し」と書いて溜め、v3 の最終段でまとめて行う** (DEFERRED_TESTS の同名関門)。Ra266 64MB の構成別確認も最終段。それまでのゲスト受入は 64MB の 1 構成。
-- ゲスト側の設定 (`gfxmode` など) で済む確認は、構成の変更に当たらない — 段の受入で行ってよい。
-  - V86 の出口は 6Ah の標準/拡張 (20h/21h) も戻さない — 9821 でゲストが拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま ([U] 00A6h)。未対処・未観測。
+方針は [MEMMAP_V3 §7-1](../../decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録) へ、V86 の 6Ah の未対処は [09_exec](../../09_exec.md#ring3-の-user-写像-exec_run-が-as-を作るときに立てるもの) へ移した (2026-10-22)。
 > **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — [TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3504)。

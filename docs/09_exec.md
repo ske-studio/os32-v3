@@ -65,6 +65,11 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
+V86 session の全出口 (正常・失敗・STOP・kill) で、旧低位の内容と属性を復元し、VRAM/E の setup と teardown の両方で PCD を台帳と一致させる。
+SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し、通常の地図を検査する。V86 中は通常 AS の実行・生成・検査をしない。
+V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。
+未対処・未観測: V86 の出口は 6Ah の標準/拡張 (20h/21h) を戻さない。9821 でゲストが拡張モードのまま戻ると A6h が効かず、E0000h が MMIO のまま残る ([U] 00A6h)。
+
 ### 起動失敗の巻き戻しと強制脱出
 
 - `exec_nest_level++` の後で起動に失敗した場合 (`paging_addrspace_create` / `shlib_addrspace_attach`)
@@ -78,6 +83,45 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
 - **syscall 境界ポンプ** (`ring3_gui_pump`): アプリが KAPI を呼ぶたび (1 tick に 1 回まで) に WM の
   ポンプ (X4) を回し、計算ループ中でもカーソルとクリックを取りこぼさない (契約 T6)。WM 自身 (owner 1) は除外。
 - CPL=3 の KAPI 呼び出しは **IF=1** で走る (`int80_stub` の `sti` / 出口 `cli`。[POLICY_DEBUG §4-19](POLICY_DEBUG.md))。
+
+### GUI の KAPI-loop の STOP
+
+GUI アプリが KAPI を呼び続けるループ (get_tick loop など) に入ると、IRQ 側の受付は暴走判定に掛からず、
+WM 側も STOP を消費する OP_WAIT / top-level に届かない。この場合の STOP は次の形で WM が畳む (ユーザー決定 A、2026-10-02)。
+
+- IRQ の GUI 受付拒否時、RUNNING・gui・CPL3 の current に `stop_wm_req` だけを立てる。WM の入力読取り直後〜resume/start の隙間に
+  IRQ が来たときは shell slot に未配送の要求として保持し、次の正常 syscall・既存 park・WM の abort_clear・回収で消費する (current を誤って kill しない)。
+- 正常 syscall の完了後 (戻り値の書込み・callback 復帰の後)、第 5 の由来 `parked_from_stop` で WAIT_POLL に退避する。状態の公開値は増やさず、
+  WM の既存 pick/should_park で起こす。resume は EAX を保存し、注入リングを読まない。WM は既存の宛先解決で `exec_kill` する。
+- `resume_one` の前段でも keyboard capture (Standalone) → top_level_abort を行う。exec_start が同じ周の X3 より後に戻った場合も、
+  未読 raw / deferred / abort_seen を処理してから再開する。マウス・時計はそこで取り込まず、既存の起床順位と tick 制御を保つ。
+- ABORTED の OWNER_EXIT は raw の未読 CTRL+STOP make、WM の abort_seen、pending_raw 内の CTRL+STOP make を消費し、次の前景への二重 kill を防ぐ。
+  ABORTED の後に遅れて届く CTRL+STOP make も、STOP・修飾キー以外の次の make、新しいマウスボタンの押下、ABORTED から 500 ms (PIT 50 tick) の
+  いずれかまで合流して捨てる。修飾キー・break・ボタン解放・押しっぱなし・終了に伴う自動の前景切替では解除しない。CUI と GUI の切替で抑止を持ち越さない。
+- 既知の制約: STOP の張本人 (current) と前景連鎖の末尾が違うとき、宛先を畳んだ後に張本人は保存 EAX で再開し、再び WM を塞ぎ得る。
+  窓なし・連鎖外の張本人と、GUI アプリの `exec_run` の子 (gui=0) の KAPI-loop は畳めない。協調切替なので KAPI-loop 中は時計も止まる。
+
+### GUI slot への trim 要求と配送 (池不足時)
+
+シングルタスク・協調切替の前提 (2026-10-09 改訂、ユーザー承認) で、厳密な一巡保証と kernel 側の前景判定は持たない。
+
+- **状態**: 各 AppSlot に `trim_pending` (bit) と `trim_epoch`、kernel に u32 `appslot_trim_epoch` (0=無し、巻戻しごとに +1、満了で飽和)。
+  保留の識別は bit で、epoch は TRIM_DONE の照合と観測にだけ使う。bit が立っている slot への再要求は何もしない。
+  slot の回収・再利用で両方をゼロにし、古いイベントを次の owner へ渡さない。動的な queue は作らない。
+- **要求**: appmem は data/PT の物理池の不足で準備を全巻戻しした後だけ、要求者以外の生きた GUI slot (PARKED / WAIT_KEY / WAIT_POLL) に bit を立てて NULL を返す。
+  VA の穴不足・extent 満杯・KHEAP 制御の不足・引数不正では要求しない。割当ての動作 (EXACT→TOPDOWN、arena の巡回) は変えない。
+- **配送**: WM は既存の X3 周期 (`wm_cycle`) で `mem_stat(0)` の pending mask を 1 回読み、bit の立つ slot が PARKED・前景でない・未配送 (`sent` が偽) なら、
+  そのリングに `GUI_EV_TRIM` (window 0、payload に epoch) を 1 件積んで `sent` を立てる。前景の判定は WM が自分の `front_owner` で行い、USER の申告は使わない。
+  queue が満杯なら次周へ送り、既存イベントを捨てない。起こす順は既存の pick / should_park / ラウンド規則のまま。未応答の slot には再配送も再 resume もしない。
+  CUI と終了中の AS へは配送しない。
+- **完了**: SDK は handler と allocator の外の安全点で trim → 任意の cache hook を 1 回 → TRIM_DONE (受信バッチごとに 1 回)。kernel は `gui_call` で TRIM_DONE を横取りし、
+  saved caller の slot に保留があり epoch が一致するときだけ bit を下ろし、同じ caller AS のまま kernel 側 exec_heap の末尾を trim する。保留なし・不一致は STALE で状態不変。
+  `sent` は mask の bit が 0 になったときと owner の終了で下ろす。新しいメモリ KAPI は無い (`mem_stat` の末尾追記だけ)。
+- **再試行**: 前景の SDK の malloc/map 失敗時は allocator の lock を解き、`gui_retry` があり `in_trim` でない文脈だけ `sys_yield` 1 回 → 公開入口の操作全体を 1 回再実行する
+  (realloc は新確保→copy→旧解放まで含め、1 回目の失敗は旧内容を保つ)。raw mem_map と size 0 は自動で再試行しない。再試行も失敗なら ENOMEM。SDK 側の契約は
+  [KAPI_SPEC の T2g g2](KAPI_SPEC.md#t2g-g2-shlib-trim-と-allocator-の再試行)。
+- **端末配下の CUI**: 前景 CUI の失敗では裏の GUI に bit を記録して CUI 自身は ENOMEM。親端末の OP_WAIT (X3) で配送され、その後の別の要求が成功し得る。CUI の失敗を同期の pump で成功に見せない。
+- `ring3_wm_depth` を更新の排他とみなさない。syscall 入口の `ring3_gui_pump` から trim hook や別 AS の実行を起こさない。pool 0 でも固定 slot/event で通知・閉じる・STOP が動く。
 
 ### `sys_ls` の CPL3 callback
 

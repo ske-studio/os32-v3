@@ -508,6 +508,31 @@ T3以降の実装分割・失敗処理・測定ゲートは T3詳細 (票 TASK_T
 | 全構成 | 旧形式 (load_addr 0x500000 / `--cpl0` / 旧 shell.bin / 旧 shlib / 旧 `.kcgfont`) の拒否、**旧新混在 (D35 / Codex X6、P7 と共有): 旧アプリ・旧常駐シェル・旧 shlib・新 SDK + 旧 `.o`・v2 SDK でビルドした apps/game・HostDrv と NHD の食い違い、のそれぞれが入口へ飛ぶ前に拒否される (形式版・KAPI ABI 世代・メモリ配置世代・shlib プロトコルの不一致。未知の形式版も拒否)**、DMA 64KB 境界、圧縮画像の上限508KiB (集積拡張は凍結) と非重複検査、変異 (境界を 1 ページずらす) をリンク ASSERT と地図検査が止める |
 | 保護 | ring3_guard: アプリから (a) シェル帯、(b) 池の他 owner、(c) 自分の PT、(d) 固定 PT、(e) **VRAM (テキスト・プレーン・バンク窓・リニア窓)**、(f) 他 AS に貸したサーフェス (自分には未貸与の面) を触ると kill されて OS が生きる。(g) SHM・トランポリン・自分の lease は読めて生き残る。**通常 GUI アプリは VRAM に触れない** |
 
+### 7-1. 構成ごとの観測と記録
+
+構成を変える確認 (8MB、planar / PEGC / Cirrus の切替、PC-9801-118 の PCM、Ra266 64MB) は段ごとには行わず、v3 の最終段でまとめて行う
+(ユーザー指示 2026-10-02「ハードウェア構成の変更でのテストは行わない。切りの良いところで一括」)。それまでのゲスト受入は現行の 1 構成 (64MB、`np21x64w.ini`) で、
+受入記録に「構成依存は一括確認へ持越し」と書く。ゲスト側の設定 (`gfxmode` など) で済む確認は構成の変更に当たらない。
+
+地図の検査は (a) master、(b) 各 AS、(c) exec の後の毎 boot、(d) lease の 4 段。低位の present USER は SHM/トランポリンだけ、APP/LEASE の master PDE は空、
+AS 私有の PFN は owner 一致、共有 shlib text は RO、lease の全ページ・cache・refcount が一致すること。PDE USER 単独は漏れと数えない。
+guard と 15〜16MB の未登録部が NP、DEVICE の永久予約があることも確かめる。
+
+表の構成ごとに、boot の fail 0 → 通常の CUI/GUI/FEP → 高位 HostDrv の read/write → 親子 → lease の切替 → map の枯渇 → trim → fault/STOP → 次の起動 → V86 往復を記録し、
+起動・描画・終了を 20 回回す。8MB の私有総量 2048KiB は上の 3 配分で、shlib data は実測分を内数、PD/PT・共有 text・BB は別勘定。
+診断の番地は受入対象の kernel.elf / kernel.map / nm から毎回引き直す (`used_pages` は関数なので値の番地として読まない)。
+NP21/W は物理読取りと画面、Ra266 は mem / bootlog / シリアル診断を使い、公開の任意物理 read API は作らない。
+
+記録欄: SHA・build ID・hash・画像 size・機種 RAM・backend、実コマンドと rc、kselftest・地図、owner 別の used/free、lease 数、leftover、bad_free、IRQ/例外の深さ、
+ledger_irq_ops / exc_ops、fault の終了種別、KHEAP・stack の high-water、画面の結果。broker の boot 自己診断 +1 は基準値で、操作の差分は 0。
+失敗の後の次の起動と親データの一致までを 1 ケースとし、失敗・skip には担当と次の試験を書く。
+
+### 7-2. 旧形式の拒否の fixture
+
+旧 app・旧 shell・旧 shlib・未知の形式・世代違い・旧 CPL0 flag の専用の破損 fixture を隔離媒体に置く。正常 control の entry 差分 +1 に対して拒否の差分 0。
+shell は初回 0 と停止理由、shlib は未公開で依存 app の entry 0。新 SDK + 旧 `.o` はリンク・包装で拒否して guest binary を作らないこと自体が合格で、
+強制した不正世代 fixture の guest 拒否とは別に記録する。古い有効印で包装を偽造する試験を通常ビルドの証拠にしない。
+
 ---
 
 ## 8. Codex 指摘の解消 (往復 3・4)

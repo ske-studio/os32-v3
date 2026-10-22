@@ -20,7 +20,10 @@ check-guest-acceptance-host:
 - tools/np21w_mcp/symbols.py
 - include/memmap.h
 - userland/tests/ring3_marker.h
-- docs/tasks/v3/TASK_T2D_T2H.md
+- docs/09_exec.md
+- docs/KAPI_SPEC.md
+- docs/decisions/MEMMAP_V3.md
+- docs/08_build.md
 - docs/tasks/DEFERRED_TESTS.md
 - build/checks.d/check-guest-acceptance-host.mk
 - tools/check_map.d/check-guest-acceptance-host.yaml
