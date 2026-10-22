@@ -1,8 +1,8 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 発行: PM (Claude Code `claude-fable-5-1`、2026-09-30) / 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30、[`../v3/TASK_MEMMAP_V3.md`](../v3/TASK_MEMMAP_V3.md) D27・D28) を記録した段。**着手は v3 の後の方** ([`../../archive/v3/V3_PLAN_DRAFT.md`](../../archive/v3/V3_PLAN_DRAFT.md) §3 P10「v3 後半」)。設計票の往復・実装は未着手。
-> 出所: ユーザー「辞書のメタ情報と学習データを辞書と別ファイルに分ける — 採用。ただしすぐ取り掛からず v3 の後の方でよい」(2026-09-30、TASK_MEMMAP_V3 §11-3 の「ユーザー決定 (池の運用規則まわり)」7)。
-> 正典の関係: SQLite の予算と FEP の取り分 (`mem_reserve_kb` の使い道) は TASK_MEMMAP_V3 §4-6 (D27)。FEP のアーキテクチャの快照は [`FEP_STATUS.md`](FEP_STATUS.md)、フェーズ別の設計は [`00_INDEX.md`](00_INDEX.md)。辞書の品質 (コスト式・頻度) は [`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) の領分で、この票は**入れ物 (メタ情報と学習の置き場)** だけを扱う。
+> 発行: PM (Claude Code `claude-fable-5-1`、2026-09-30) / 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30、[`../../decisions/MEMMAP_V3.md`](../../decisions/MEMMAP_V3.md) D27・D28) を記録した段。**着手は v3 の後の方** ([`../../archive/v3/V3_PLAN_DRAFT.md`](../../archive/v3/V3_PLAN_DRAFT.md) §3 P10「v3 後半」)。設計票の往復・実装は未着手。
+> 出所: ユーザー「辞書のメタ情報と学習データを辞書と別ファイルに分ける — 採用。ただしすぐ取り掛からず v3 の後の方でよい」(2026-09-30、MEMMAP_V3 §11-3 の「ユーザー決定 (池の運用規則まわり)」7)。
+> 正典の関係: SQLite の予算と FEP の取り分 (`mem_reserve_kb` の使い道) は MEMMAP_V3 §4-6 (D27)。FEP のアーキテクチャの快照は [`FEP_STATUS.md`](FEP_STATUS.md)、フェーズ別の設計は [`00_INDEX.md`](00_INDEX.md)。辞書の品質 (コスト式・頻度) は [`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) の領分で、この票は**入れ物 (メタ情報と学習の置き場)** だけを扱う。
 > 本文の `file:line` は `feat/gui` 5d79e5dd の行。**数字は 2026-09-30 に手元の `assets/fep.db` を Python の `sqlite3` で照合した実測**。
 
 ---
@@ -11,12 +11,12 @@
 
 | # | 決定 | 出所 |
 |---|---|---|
-| M1 | 辞書 (SQLite DB) に**メタ情報**を持たせる。項目は §2 の表 | TASK_MEMMAP_V3 D28 |
+| M1 | 辞書 (SQLite DB) に**メタ情報**を持たせる。項目は §2 の表 | MEMMAP_V3 D28 |
 | M2 | **学習データを辞書と別ファイルに分ける** (例 `/etc/fep_user.db`)。理由は §3 | 同 D28 |
 | M3 | 辞書のメタ情報 `mem_reserve_kb` が **FEP の SQLite 取り分** (起動時に優先確保) の出典。settings で上書き可。事前確保量を超える辞書への入れ替えは**再起動で再確保** | 同 D27、§4-6 |
-| M4 | **着手は v3 の後の方** — TASK_MEMMAP_V3 の T4 (SQLite モジュール化) と T5a (FEP モジュール化) の後。それまで FEP は今の `fep.db` (メタ無し、学習表同居) のまま動き、`mem_reserve_kb` は既定値 + settings だけ | ユーザー (同日)、V3_PLAN_DRAFT §3 P10 |
+| M4 | **着手は v3 の後の方** — MEMMAP_V3 の T4 (SQLite モジュール化) と T5a (FEP モジュール化) の後。それまで FEP は今の `fep.db` (メタ無し、学習表同居) のまま動き、`mem_reserve_kb` は既定値 + settings だけ | ユーザー (同日)、V3_PLAN_DRAFT §3 P10 |
 | M5 | `license` / `attribution` は**必須項目** — 辞書はパブリックの `os32-v3` で配るので、元データ (IPADIC) の配布条件をファイル自身が運ぶ | PM (M1 の項目の中で必須に格上げ。理由は §2) |
-| M6 | **学習データの移行は二段** — fork 直後は既存データを保持した媒体で v3 のシステム一式だけ更新し (`fep.db` の `dict_user` を配備で消さない)、この票で旧 `dict_user` を `fep_user.db` へ移す (件数・内容の照合、再実行の二重加算防止、途中失敗の復旧、S/M/L の `dict_id` 対応)。`fep_user.db` は `hsync` の保護名に。v2.x の戻り先は旧データの写しも保持 (§3 末尾) | ユーザー (2026-09-30、Codex X8 の推奨を承認。TASK_MEMMAP_V3 §8-4) |
+| M6 | **学習データの移行は二段** — fork 直後は既存データを保持した媒体で v3 のシステム一式だけ更新し (`fep.db` の `dict_user` を配備で消さない)、この票で旧 `dict_user` を `fep_user.db` へ移す (件数・内容の照合、再実行の二重加算防止、途中失敗の復旧、S/M/L の `dict_id` 対応)。`fep_user.db` は `hsync` の保護名に。v2.x の戻り先は旧データの写しも保持 (§3 末尾) | ユーザー (2026-09-30、Codex X8 の推奨を承認。MEMMAP_V3 §8-4) |
 
 ---
 
@@ -32,7 +32,7 @@
 | S / M / L | `tools/fep_to_sqlite.py` の `SIZE_DEFS` (`:33-38`): S = cost ≤ 800 (`fep_s.db`)、M = cost ≤ 1500 (`fep.db`、既定)、L = 無制限 (`fep_l.db`)。`--all` で 3 つ、`--size` で 1 つ。dict_raw → yomi+kanji で重複排除 (同点は pos_id 最小、再現性のため) → `dict` → `VACUUM` | `tools/fep_to_sqlite.py:33-38,192-236,244-270` |
 | 切り替え | `ime_switch_dict(variant)` が `/db/fep_s.db` / `/db/fep.db` / `/db/fep_l.db` を開き直す (`ime_dict_reopen`)。**開いている辞書の置き換えは VFS が BUSY で断る**ので、`hsync` は差し替えられない | `kernel/ime.c:882-895`、`kernel/ime_dict.c:150-157` |
 | 配備 | `assets/fep.db` → ゲスト `/db/fep.db` | `userland/deploy.yaml:311-312` |
-| SQLite の取り分 (今) | FEP 辞書が常駐した状態で 38,784B (`cfg_bench` の実測)。MEMSYS5 は全接続共有の 1 ヒープ (今 384KB → v3 で 512KB) | [`../settings/DESIGN.md`](../settings/DESIGN.md) §6、`lib/sqlite3/os32_sqlite_vfs.c:34-39`、TASK_MEMMAP_V3 §4-6 |
+| SQLite の取り分 (今) | FEP 辞書が常駐した状態で 38,784B (`cfg_bench` の実測)。MEMSYS5 は全接続共有の 1 ヒープ (今 384KB → v3 で 512KB) | [`../settings/DESIGN.md`](../settings/DESIGN.md) §6、`lib/sqlite3/os32_sqlite_vfs.c:34-39`、MEMMAP_V3 §4-6 |
 | `PRAGMA user_version` はカーネルの SQLite で**省かれている** | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` (`lib/sqlite3/os32_sqlite_config.h:56`) は `schema_version` だけでなく **`user_version` の PRAGMA も落とす** (`lib/sqlite3/sqlite3.c:144652-144658` の `#if !defined(SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS)` の内側) | `sqlite3.c` の PRAGMA 表 |
 | ライセンス文 | `assets/ipadic/` は CSV 13 本だけで、**IPADIC の配布条件の原文は本リポジトリに無い** | `ls assets/ipadic` (2026-09-30) |
 
@@ -57,11 +57,11 @@
 | `entry_count` | 整数 | `SELECT count(*)` を起動時に流さずに語数を表示・検査する (97,514 のような数を `ime` コマンドで出す) | `meta` |
 | `pos_table_version` | 整数 | `pos_id` の意味 (品詞表) の版。**学習データ側にも記録して不整合を検出** (§3)。品詞表を変えた辞書に古い学習を混ぜない | `meta` |
 | `cost_scale` | 整数または文字列 | `cost` の尺度 (IPADIC の生コストか正規化後か、上限値)。候補の並べ替えで辞書と学習の `freq` を合成するときの基準 | `meta` |
-| **`mem_reserve_kb`** | 整数 (KB) | **FEP の SQLite 取り分** (TASK_MEMMAP_V3 D27・§4-6)。起動時にこの量を MEMSYS5 から優先確保し、アプリの `db_open` は「プール − この分」で上限。settings (`fep.mem_reserve_kb`) で上書き。切り替え先の値が起動時の確保量を超えるときは再起動で再確保 | `meta` |
+| **`mem_reserve_kb`** | 整数 (KB) | **FEP の SQLite 取り分** (MEMMAP_V3 D27・§4-6)。起動時にこの量を MEMSYS5 から優先確保し、アプリの `db_open` は「プール − この分」で上限。settings (`fep.mem_reserve_kb`) で上書き。切り替え先の値が起動時の確保量を超えるときは再起動で再確保 | `meta` |
 | `cache_pages` | 整数 (ページ) | 辞書の接続に設定する `PRAGMA cache_size` の推奨値 (`mem_reserve_kb` の内訳。page_size × cache_pages ≤ mem_reserve_kb × 1024 をビルド時に検査) | `meta` |
 | `checksum` | 文字列 (`dict` 表の内容のハッシュ、または全ファイル) | 配備の照合 (`hsync --verify` の代わりに辞書だけ検査)、破損の検出。全ファイルのハッシュはファイル自身に書けないので**表の内容のハッシュ**にする | `meta` |
 
-未指定の項目の既定値 (メタ情報の無い今の `fep.db` を v3 の途中で読むための救済) は**実装の段で決める**: `format_version` 0 = 「メタ無しの旧形式」として `dict` 表だけ読み、`mem_reserve_kb` は既定値 (TASK_MEMMAP_V3 §4-6)。
+未指定の項目の既定値 (メタ情報の無い今の `fep.db` を v3 の途中で読むための救済) は**実装の段で決める**: `format_version` 0 = 「メタ無しの旧形式」として `dict` 表だけ読み、`mem_reserve_kb` は既定値 (MEMMAP_V3 §4-6)。
 
 ---
 
@@ -79,7 +79,7 @@
 
 **学習 DB のスキーマ (案)**: `dict_user` は今の列のまま (`yomi, kanji, freq, last_ts`、PRIMARY KEY `(yomi, kanji)`) + `meta` 表 (`kind = user`、`dict_id`、`pos_table_version`、`format_version`、`created`)。無ければ FEP が作る (今の `CREATE TABLE IF NOT EXISTS` の経路を学習 DB 側へ移す)。
 
-**接続の数**: 辞書 1 本 (RO) + 学習 1 本 (RW) の **2 本**になる。SQLite の取り分 (`mem_reserve_kb`) は 2 本分で見積もる (TASK_MEMMAP_V3 §4-6 の既定値も、この票の着手時に 2 本分へ更新する)。
+**接続の数**: 辞書 1 本 (RO) + 学習 1 本 (RW) の **2 本**になる。SQLite の取り分 (`mem_reserve_kb`) は 2 本分で見積もる (MEMMAP_V3 §4-6 の既定値も、この票の着手時に 2 本分へ更新する)。
 
 **移行 (M6 — Codex X8、2026-09-30、ユーザー承認)**: v3 への移行でメモリの再配置がディスク上のデータ形式を変えることは無いが、**配備の上書きと、この票の辞書変更には明示の保存・移行が要る**。二段に分ける:
 
@@ -115,18 +115,18 @@
 - `dict_id` の違う学習 DB を置いたとき、学習の使用が止まり警告が出て、辞書の変換は動くこと。
 - システム辞書を RO で開いた状態で ROFS (書き込み全拒否) を起こしても 1 語変換が通ること。
 - `ime` コマンドが `license` / `attribution` と `entry_count` を表示すること。
-- `mem_reserve_kb` を settings で上書きしたとき、起動時の確保量がその値になること。切り替え先の値が確保量を超えるとき、その場で確保せず再起動を促すこと (TASK_MEMMAP_V3 §4-6)。
+- `mem_reserve_kb` を settings で上書きしたとき、起動時の確保量がその値になること。切り替え先の値が確保量を超えるとき、その場で確保せず再起動を促すこと (MEMMAP_V3 §4-6)。
 - **移行 (M6)**: 旧 `fep.db` / `fep_s.db` / `fep_l.db` の `dict_user` から移した学習の件数と内容 (`yomi / kanji / freq / last_ts`、重複規則どおりの合成) が一致すること。移行を 2 回実行しても `freq` が二重加算されないこと。途中で失敗させても旧表が残り、再実行で完了すること。S/M/L のどれで学習した語も `dict_id` の対応規則どおりに使えること。`hsync` が `fep_user.db` を上書きしないこと。
 
 ---
 
 ## 6. 時期と依存
 
-- **v3 の後の方** (ユーザー 2026-09-30)。前提: TASK_MEMMAP_V3 の **T4** (SQLite のモジュール化 — `mem_reserve_kb` の既定値と `db_open` の上限はそこで入る) と **T5a** (FEP のモジュール化)。この票はその上に「辞書からの読み取り」と「学習の別ファイル化」を載せる。
+- **v3 の後の方** (ユーザー 2026-09-30)。前提: MEMMAP_V3 の **T4** (SQLite のモジュール化 — `mem_reserve_kb` の既定値と `db_open` の上限はそこで入る) と **T5a** (FEP のモジュール化)。この票はその上に「辞書からの読み取り」と「学習の別ファイル化」を載せる。
 - 並べる先: [`../../archive/v3/V3_PLAN_DRAFT.md`](../../archive/v3/V3_PLAN_DRAFT.md) §3 **P10 データ・設定層** (v3 後半)。
 - 関係する票: [`../settings/FEP_BOUNDARY.md`](../settings/FEP_BOUNDARY.md) (FEP の KAPI 境界)、[`../settings/F2_OWNERSHIP.md`](../settings/F2_OWNERSHIP.md) (接続単位の FD 所有 — 学習 DB の接続も同じ規則)、[`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) (コスト式。`cost_scale` / `pos_table_version` の値を決めるのはそちら)。
-- **移行の前段 (Codex X8、2026-09-30)**: fork 直後の v3 一式への更新は**既存データを保持した媒体**で行い、`fep.db` の `dict_user` を配備で消さない (§3 の 1)。v2.x の戻り先は旧データの写しも保持。**排他 open (D29) の導入まで**の同一 DB の重複接続 (parked アプリ同士を含む) の扱いは TASK_MEMMAP_V3 §4-6 (T4 で明記)。
-- **後続 (U6 決定、ユーザー 2026-09-30、TASK_MEMMAP_V3 D29)**: F3b「同一 DB の排他 open」(S0_FOUNDATION の lock 表は作らず、親子 (exec の入れ子) が同じ DB を同時に開く経路を open で塞ぐ最小代案) は**この票の後**に P10 で行う — 辞書 RO 1 本 + 学習 RW 1 本になれば「辞書は RO 共有、学習は RW 単独」で排他 open と相性がよい。出典 [`../../archive/v3/U6_PENDING_REVIEW.md`](../../archive/v3/U6_PENDING_REVIEW.md) §1-1。
+- **移行の前段 (Codex X8、2026-09-30)**: fork 直後の v3 一式への更新は**既存データを保持した媒体**で行い、`fep.db` の `dict_user` を配備で消さない (§3 の 1)。v2.x の戻り先は旧データの写しも保持。**排他 open (D29) の導入まで**の同一 DB の重複接続 (parked アプリ同士を含む) の扱いは MEMMAP_V3 §4-6 (T4 で明記)。
+- **後続 (U6 決定、ユーザー 2026-09-30、MEMMAP_V3 D29)**: F3b「同一 DB の排他 open」(S0_FOUNDATION の lock 表は作らず、親子 (exec の入れ子) が同じ DB を同時に開く経路を open で塞ぐ最小代案) は**この票の後**に P10 で行う — 辞書 RO 1 本 + 学習 RW 1 本になれば「辞書は RO 共有、学習は RW 単独」で排他 open と相性がよい。出典 [`../../archive/v3/U6_PENDING_REVIEW.md`](../../archive/v3/U6_PENDING_REVIEW.md) §1-1。
 
 ---
 
@@ -134,5 +134,5 @@
 
 | 日付 | 出来事 |
 |---|---|
-| 2026-09-30 | v3 のメモリマップの討論 (TASK_MEMMAP_V3 §11-3) の中で、FEP の SQLite 取り分の出典として「辞書のメタ情報 `mem_reserve_kb`」が出た → ユーザーが**メタ情報の項目と学習データの別ファイル化を採用、着手は v3 の後の方**と決定 (D27・D28)。この票を起こした (計画) |
+| 2026-09-30 | v3 のメモリマップの討論 (MEMMAP_V3 §11-3) の中で、FEP の SQLite 取り分の出典として「辞書のメタ情報 `mem_reserve_kb`」が出た → ユーザーが**メタ情報の項目と学習データの別ファイル化を採用、着手は v3 の後の方**と決定 (D27・D28)。この票を起こした (計画) |
 | 2026-09-30 | V3_PLAN_DRAFT §7-2 **X8** (データの互換) への Codex の回答をユーザーが承認 → **M6** (二段移行、`fep_user.db` の保護名、v2.x の戻り先は旧データの写しも) を §0・§3・§4・§5・§6 に追記。決定 M1〜M5 は変えない |

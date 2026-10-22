@@ -200,7 +200,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### v1.3 — 「ターミナル統合とCUI抽象化」 ✅ 完了 (2026-09-14)
 
-全項目受入済み・main にマージ済み (`fac0d89`)。残件の小物 4 件 (タスクバー経路の試験、`stat`、S6 `tar`、試験の棚卸し文書) も 2026-09-14 に feat/gui へ着地。持ち越し: S6-P (ext2 の小書き込み性能、[archive/settings/TASK_S6.md](archive/settings/TASK_S6.md))、F3a〜c 等の保留 5 件 ([archive/agents/HANDOVER_v14.md](archive/agents/HANDOVER_v14.md) §3) は **2026-09-30 に v3 の U6 で決裁「一部」** ([archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md)、[tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) D29〜D34): F3a / F3c・F2・FEP_BOUNDARY は v3 P1 の T2 / T4 / T5a の要件、DEVICE_RESERVATION は改訂して P4、F3b は TASK_DICT_META の後、MEMORY_RAM_INTEGRATION は撤回 ([archive/settings/](archive/settings/MEMORY_RAM_INTEGRATION.md))。
+全項目受入済み・main にマージ済み (`fac0d89`)。残件の小物 4 件 (タスクバー経路の試験、`stat`、S6 `tar`、試験の棚卸し文書) も 2026-09-14 に feat/gui へ着地。持ち越し: S6-P (ext2 の小書き込み性能、[archive/settings/TASK_S6.md](archive/settings/TASK_S6.md))、F3a〜c 等の保留 5 件 ([archive/agents/HANDOVER_v14.md](archive/agents/HANDOVER_v14.md) §3) は **2026-09-30 に v3 の U6 で決裁「一部」** ([archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md)、[decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) D29〜D34): F3a / F3c・F2・FEP_BOUNDARY は v3 P1 の T2 / T4 / T5a の要件、DEVICE_RESERVATION は改訂して P4、F3b は TASK_DICT_META の後、MEMORY_RAM_INTEGRATION は撤回 ([archive/settings/](archive/settings/MEMORY_RAM_INTEGRATION.md))。
 
 着手計画: [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md)、監査と決裁: [AUDIT_2026-09-10](archive/gui_v13/AUDIT_2026-09-10.md)。
 2026-09-10 決裁: **GUI アプリ 4 本の同時実行 (契約 T2a) を v1.3 の最初に置く** ([K5](archive/gui_v13/TASK_K5_multiapp.md))。
@@ -324,7 +324,7 @@ v2.1 に入った — 本案 §4 で順序を引き直した)。カーネル本�
 ### メモリマップの全体再配置と C11 への移行 (ユーザー決裁 2026-09-17)
 
 **再配置の中身は 2026-09-30 の 3 者討論 (ユーザー・Fable・Codex) で決定した** — 正典は
-[tasks/v3/TASK_MEMMAP_V3.md](tasks/v3/TASK_MEMMAP_V3.md) (決定 D1〜D36、帯の表、票 T0〜T7)。要点: カーネル・シェル・通常 RAM は
+[decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) (決定 D1〜D36、帯の表、票 T0〜T7)。要点: カーネル・シェル・通常 RAM は
 恒等写像のまま、アプリだけ 0x80000000〜 の私有写像。物理地図と所有権台帳を先に作り、固定帯はカーネル 3MB + シェル 1MB だけ。
 SQLite は同一リンクをやめてモジュール、低位 640KB は V86 へ。策定時に未決だった**本体の上限**はその討論で決まった
 (鎖の終端 ≤ 0x3E0000 をリンカ ASSERT で、本体の予算 2,516KB、余りは KERNEL_SLACK として池へ)。ARM との順序と `u32` / `<stdint.h>` は

@@ -31,7 +31,7 @@ Windows 98 のコントロールパネルに当たる **GUI の設定アプリ�
 | マウス | **マウスキーの速さ** (加速の段と移動量) | `userland/gshell/src/kbdnav.rs` の定数 `MK_ACCEL` | KBD_NAV で「設定画面で決める」を先送り。2026-09-30 に実機で遅いとの指摘で定数を 3 倍にした — 設定値にする最初の候補 |
 | マウス | ダブルクリックの間隔 | gshell `modal.rs` の `DBLCLICK_TICKS`、filer の 30 tick | アプリごとに別の定数になっている — 1 か所にまとめるか |
 | キーボード | リピートの開始・間隔、カナ / CAPS の扱い | ドライバの定数 | 実機 (KBD_NAV K3) の結果しだい |
-| 日本語入力 | FEP の取り分 `fep.mem_reserve_kb`、辞書 S/M/L の選択 | settings (TASK_MEMMAP_V3 D27)、[TASK_DICT_META](../fep/TASK_DICT_META.md) | 変えたら再起動 (D27: 辞書の入れ替えは再起動で再確保) |
+| 日本語入力 | FEP の取り分 `fep.mem_reserve_kb`、辞書 S/M/L の選択 | settings (MEMMAP_V3 D27)、[TASK_DICT_META](../fep/TASK_DICT_META.md) | 変えたら再起動 (D27: 辞書の入れ替えは再起動で再確保) |
 | 言語 | UI の表示言語 (`en` / `ja`) | 未整備 | [TASK_I18N](TASK_I18N.md) (ユーザー発案 2026-09-30) |
 | 日付と時刻 | 時計の設定 | CUI の `date` 系 | RTC への書き込み |
 | 音 | 音量・出力先 (FM / PCM) | 未整備 | P3 / P5 (PCM の合成器) の後 |

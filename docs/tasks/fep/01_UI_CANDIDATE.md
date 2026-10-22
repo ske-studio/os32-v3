@@ -13,7 +13,7 @@
 | 前提 | 内容 |
 |------|------|
 | シングルタスク | FEP ON 時はアプリのメインループが `ime_getkey()` 内でブロックする。割り込み駆動の非同期描画は不要 |
-| メモリ制約 | カーネルヒープ + MEMSYS5。現行の MEMSYS5 容量は `lib/sqlite3/os32_sqlite_vfs.c:34`、v3 の計画予算は [TASK_MEMMAP_V3 §4-6](../v3/TASK_MEMMAP_V3.md#4-6-sqlite-の予算と-fep-の取り分-d27ユーザー決定-2026-09-30) を参照。`IME_State` は `static` グローバル 1 個 (BSS) |
+| メモリ制約 | カーネルヒープ + MEMSYS5。現行の MEMSYS5 容量は `lib/sqlite3/os32_sqlite_vfs.c:34`、v3 の計画予算は [MEMMAP_V3 §4-6](../../decisions/MEMMAP_V3.md#4-6-sqlite-の予算と-fep-の取り分-d27ユーザー決定-2026-09-30) を参照。`IME_State` は `static` グローバル 1 個 (BSS) |
 | 描画経路 | [CONSTRAINTS.md HW1](../../CONSTRAINTS.md#hw1-egc--grcg--gdc-描画コマンドを使わない) に従う。GFX 計画の実装時も HAL の描画経路に合わせる |
 | 既存 API 互換維持 | `ime_getchar()` / `ime_getkey()` のシグネチャと戻り値仕様は変更しない。KAPI バイナリ互換を壊さない |
 | UTF-8 内部表現 | かなバッファ・確定バッファは全て UTF-8。文字境界処理は `utf8_*` を使用 |

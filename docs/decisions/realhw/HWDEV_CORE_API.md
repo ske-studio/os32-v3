@@ -1,6 +1,6 @@
 # HWDEV の核の API・private ABI・台帳 — 参照の表
 
-> 状態: **確定 (M1 で §7〜§9 を追記)** ([TASK_HWDEV.md](../TASK_HWDEV.md))。
+> 状態: **確定 (M1 で §7〜§9 を追記)** (段の状態は票 TASK_HWDEV が持つ)。
 > 出所: ~/os32-tmp/run/devmod/DESIGN.final.md を 2026-10-22 に粒度別に分けて写した。
 
 核 (kdebug) と装置部品 (`/boot/hwdev.mod`) の境界の番号・型・定義だけを置く。分け方と理由は [HWDEV_DESIGN.md](HWDEV_DESIGN.md) §4。i386 cdecl、u32 固定、size/version は完全一致で照合する。
@@ -128,7 +128,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
      ops_symbol='hwdev_ops', ops_names=('initialize',))
 ```
 
-- 大きさの上限の由来は [HWDEV_DESIGN §5](HWDEV_DESIGN.md#5-大きさメモリの見積もり)、全部品の上限・由来・今の余裕の表は [T4_T6 §2-1a](../../v3/TASK_T4_T6_MODULES.md#2-1a-部品ごとの大きさの上限と由来)。
+- 大きさの上限の由来は [HWDEV_DESIGN §5](HWDEV_DESIGN.md#5-大きさメモリの見積もり)、全部品の上限・由来・今の余裕の表は票 TASK_T4_T6_MODULES §2-1a。
 - schema:23–24 の注記と、台帳試験 T5c-6 の「11 番目を拒否」を HWDEV の受入へ変える (未定義の 12 番目・容量超過の拒否は維持)。
 
 ## 6. KDEBUG の ops の版 3→4・slot 19→20 と波及 (G5)
@@ -137,7 +137,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
 - 揃えるもの: kernel/module.h の構造体、KDEBUG ops の初期化子、生成の MODULE_OPS_SLOTS / KDEBUG_OPS_VERSION。module.c:16 の STATIC_ASSERT を版 4 の 20 口 + version で成立させる。
 - **G5 (M2 の依頼文に書く)**: KDEBUG_OPS_VERSION は kernel/module.h:7 の手書きの定義で、GF の identity (gfinit.c:148 → recover.c:130 の CRC) にも入る。新しい口には `kdebug_export_contracts[MODULE_OPS_SLOTS]` (gen_kdebug_imports.py:213) の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
 - kdebug の既存 import は未使用になっても削除・並替え禁止、必要分だけ末尾追加。内部 ops 版 / 契約 CRC も更新。
-- 公開の入口 (旧 S7) は既存の kdebug_call のまま。KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新・clean → all を守る ([KAPI_SPEC.md](../../../KAPI_SPEC.md) §3-1)。
+- 公開の入口 (旧 S7) は既存の kdebug_call のまま。KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新・clean → all を守る ([KAPI_SPEC.md](../../KAPI_SPEC.md) §3-1)。
 
 ## 7. M1 の同一像計測 (2026-10-22)
 

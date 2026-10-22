@@ -2460,7 +2460,7 @@ A は対象ID一致の wm_kill 1 / syscall-abort 0、B は wm_kill 0 / syscall-a
 
 **e/g への申し送り (未観測、コード読み)**:
 [TASK_T2_APPBAND §4-3 R1 / §4-4 R2](../../tasks/v3/TASK_T2_APPBAND.md) は KAPI 連打の強制停止受入と
-通常文脈回収を要求し、[TASK_MEMMAP_V3 §3-5-1](../../tasks/v3/TASK_MEMMAP_V3.md) は KAPI 内の更新を
+通常文脈回収を要求し、[TASK_MEMMAP_V3 §3-5-1](../../decisions/MEMMAP_V3.md) は KAPI 内の更新を
 途中で破棄せず安全点へ渡す。PM決定により、通常文脈での WM kill と syscall 境界 abort の
 両方を認める。穴の直し方は e/g が決める。現実装の `appslot_abort_admit` は RUNNING /
 in_op_wait=0 かつ int80 ごとに last_kernel_tick が更新される get_tick loop を拒否する。

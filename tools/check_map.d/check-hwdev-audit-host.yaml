@@ -4,7 +4,7 @@ check-hwdev-audit-host:
 - tools/mkmod.py
 - tools/module_schema.py
 - kernel/kdebug_imports.def
-- docs/tasks/realhw/design/HWDEV_CORE_API.md
+- docs/decisions/realhw/HWDEV_CORE_API.md
 - build/hwdev.ld
 - build/hwdev.mk
 - build/kdebug.mk

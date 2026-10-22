@@ -354,7 +354,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_DEVICE_APERTURE_BASE 0xFE000000UL           /* 4GB - 32MB */
 #define MEM_DEVICE_APERTURE_END  MEM_PHYS_MMIO_TOP      /* exclusive */
 #define MEM_DEVICE_APERTURE_PDE_SIZE 0x00400000UL       /* PT 1 枚 = 4MB */
-/* RAM として登録してよい上端 (D11、TASK_MEMMAP_V3)。0594h の申告はここで
+/* RAM として登録してよい上端 (D11、MEMMAP_V3)。0594h の申告はここで
  * 頭打ちにし、[MEM_PHYS_RAM_CEILING, 4GB) は RAM にしない (PCI の BAR や
  * デバイス窓の帯が載る。v3 のアプリ帯 0x80000000〜 は仮想なので物理とは
  * 別物)。 */
@@ -368,7 +368,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_POOL_BASE 0x500000UL
 
 /* ====================================================================== */
-/*  ブート時の集積域・同梱域 (TASK_MEMMAP_V3 §4-5)                          */
+/*  ブート時の集積域・同梱域 (MEMMAP_V3 §4-5)                               */
 /*                                                                          */
 /*  集積域 = ローダが圧縮画像を読む場所 (展開が終われば池へ)。同梱域 =      */
 /*  ブート必須モジュールの展開先 (台帳が owner=bundle で予約)。T1 の時点    */

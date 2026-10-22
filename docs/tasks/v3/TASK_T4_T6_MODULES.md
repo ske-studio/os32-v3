@@ -8,7 +8,7 @@
 > それまでの状態: **設計中 (2026-10-18、再照合 r4)** — main `952f16b`、T3受入完了 (2026-10-18)、KAPI v76・memory_layout 4。圧縮余裕18,165 B。本票の実装・受入は未実施。
 > **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T5c-4 の 82557 の回帰 — NP21/W は 82557 を再現しないのでホスト試験と LGY-98 の経路で代える) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
 > 改訂: **r4 (2026-10-18)** — RECHECK_r4とOpusレビュー・PM判断F1〜F6を反映。T4a-1着手可、T4全体の受入を意味しない。r3までのレビュー経過は§8。
-> 上位契約: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §3-5・§4・§6・§7。前提: [T2](TASK_T2_APPBAND.md)・[T3](TASK_T3_LAYOUT.md) 受入完了。この票は形式、状態、移行と失敗処理の実装契約を補う。D番号の決定を変更しない。
+> 上位契約: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §3-5・§4・§6・§7。前提: [T2](TASK_T2_APPBAND.md)・[T3](TASK_T3_LAYOUT.md) 受入完了。この票は形式、状態、移行と失敗処理の実装契約を補う。D番号の決定を変更しない。
 
 ## 0. 再照合
 
@@ -135,17 +135,17 @@ T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収に�
 
 | 部品 (ID) | image / mem / load_span の上限 | reloc / import / export の上限 | 由来 | 今の大きさ (% = 今 ÷ 上限) |
 |---|---|---|---|---|
-| KDEBUG (1) | 262,144 / 262,144 / 524,288 | 16,384 / 1,024 / 64 | **由来不明** (値だけ — DBGREF 設計 r4 2026-10-14 で理由なしに入り、S0 9c905de で実装。当時の見積りは移す 3 対象 38,067 B・import 211 本 ([DBGREF](TASK_DBGREF.md) §1-2 の表) で、その 7 倍・5 倍弱の 2 の冪の丸めと推測)。load_span は T4a-2 a53c242 で欄を足したときの値で、image_max + mem_max に一致 (旧検査を狭めない値と読める、記載なし)。2026-10-22 の [HWDEV 設計 §5](../realhw/design/HWDEV_DESIGN.md#5-大きさメモリの見積もり) が上限 256 KiB の維持と核 ≤192 KiB を M5 の合格条件にすると**決定** | **M3c 取り込み後 (5d597d6、GF を部品へ出した後) 109,060 (42%) / 126,976 (48%) / 143,360 (27%)** (表の件数は M3c 後は未測定)。M3c の前 (2531f49) は 240,036 (92%) / 249,856 (95%) / 274,432 (52%)、表 2,972 (18%) / 269 (26%) / 19 (30%) |
+| KDEBUG (1) | 262,144 / 262,144 / 524,288 | 16,384 / 1,024 / 64 | **由来不明** (値だけ — DBGREF 設計 r4 2026-10-14 で理由なしに入り、S0 9c905de で実装。当時の見積りは移す 3 対象 38,067 B・import 211 本 ([DBGREF](TASK_DBGREF.md) §1-2 の表) で、その 7 倍・5 倍弱の 2 の冪の丸めと推測)。load_span は T4a-2 a53c242 で欄を足したときの値で、image_max + mem_max に一致 (旧検査を狭めない値と読める、記載なし)。2026-10-22 の [HWDEV 設計 §5](../../decisions/realhw/HWDEV_DESIGN.md#5-大きさメモリの見積もり) が上限 256 KiB の維持と核 ≤192 KiB を M5 の合格条件にすると**決定** | **M3c 取り込み後 (5d597d6、GF を部品へ出した後) 109,060 (42%) / 126,976 (48%) / 143,360 (27%)** (表の件数は M3c 後は未測定)。M3c の前 (2531f49) は 240,036 (92%) / 249,856 (95%) / 274,432 (52%)、表 2,972 (18%) / 269 (26%) / 19 (30%) |
 | SQLITE (2) | 524,288 / 524,288 / 544,768 | 4,096 / 32 / 1 | **実測** (T4a-2 2026-10-18、試作の容器 394,104 B・reloc 3,040・import 23、§7-1 の表の後の「T4a-2 試作測定」) と **導出** (load_span = body 512 KiB + 表最大 `144 + reloc×4 + import×12 + export×12 + 名前 (import+export)×64` = 19,036 B の頁切上げ 20,480 B)。512 KiB・4,096・32 への丸め方は書かれていない | 398,456 (76%) / 385,024 (73%) / 401,408 (74%)、表 3,129 (76%) / 29 (91%) / 1 |
 | FEP (3) | 65,536 / 65,536 / 81,920 | 2,048 / 96 / 1 | **由来不明** (値だけ — T5a-2 8532808 2026-10-18 で実装者が入れ、票・報告に理由なし。当時の fep.mod 24,392 B・import 65 本に対する 2 の冪と 1.5 倍の丸めと推測)。load_span は mem_max + SQLITE と同じ式の表最大 15,708 B の頁切上げ 16,384 B に**式に一致** | 24,392 (37%) / 24,576 (38%) / 32,768 (40%)、表 704 (34%) / 65 (68%) / 1 |
 | ATAPI_ISO (4) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5b-5 94d67d5 で FEP の値を写したと推測。表の式なら prefix は 12,288 B で足りる) | 11,616 (18%) / 8,192 (12%) / 12,288 (15%)、表 141 (7%) / 12 (38%) / 1 |
-| KCG (5) | 16,384 / 81,920 / 86,016 | 256 / 2 / 1 | image と表は **由来不明** (T5c-1 ddce74f、当時 kcg.mod 4,644 B・import 2 本。MEMMAP_V3 D14 の見積り「モジュール 4KB」の 4 倍と推測)。mem は image_max + cache 64 KiB (`KCG_ROM_CACHE_BYTES`、BSS、[MEMMAP_V3](TASK_MEMMAP_V3.md) §5-4 の計上値 = **決定** D14) に**式に一致**、load_span は mem_max + 1 頁に一致 | 4,672 (29%) / 69,632 (85%) / 73,728 (86%)、表 23 (9%) / 2 (**100%**) / 1 |
+| KCG (5) | 16,384 / 81,920 / 86,016 | 256 / 2 / 1 | image と表は **由来不明** (T5c-1 ddce74f、当時 kcg.mod 4,644 B・import 2 本。MEMMAP_V3 D14 の見積り「モジュール 4KB」の 4 倍と推測)。mem は image_max + cache 64 KiB (`KCG_ROM_CACHE_BYTES`、BSS、[MEMMAP_V3](../../decisions/MEMMAP_V3.md) §5-4 の計上値 = **決定** D14) に**式に一致**、load_span は mem_max + 1 頁に一致 | 4,672 (29%) / 69,632 (85%) / 73,728 (86%)、表 23 (9%) / 2 (**100%**) / 1 |
 | FM (6) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-2a 78f648a、FEP の値の写しと推測。当時 import 4 本) | 9,776 (15%) / 20,480 (31%) / 24,576 (30%)、表 260 (13%) / 4 (25%) / 1 |
 | PCM (7) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5c-2b 0ae7c69、同上) | 9,868 (15%) / 8,192 (12%) / 12,288 (15%)、表 213 (10%) / 18 (56%) / 1 |
 | V86 (8) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-3 884e20e、同上。当時 import 28 本) | 11,606 (18%) / 16,384 (25%) / 20,480 (25%)、表 337 (16%) / 28 (58%) / 1 |
 | LAN (9) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-4 8d9c5db、同上。当時 import 28 本) | 16,640 (25%) / 16,384 (25%) / 20,480 (25%)、表 343 (17%) / 28 (58%) / 1 |
 | CIRRUS (10) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-5b a77b893、同上) | 9,624 (15%) / 8,192 (12%) / 12,288 (15%)、表 106 (5%) / 9 (56%) / 1 |
-| HWDEV (11) | 196,608 / 196,608 / 262,144 | 16,384 / 128 / 1 | image・mem・load_span は **決定** (2026-10-22 の [HWDEV 設計 §5](../realhw/design/HWDEV_DESIGN.md#5-大きさメモリの見積もり): 見積り 105〜155 KiB に対し上限 192 KiB、超えたら移動の境界を見直し上限を黙って広げない。load_span ≤256 KiB も同表)。reloc・import は **由来不明** (値だけ — reloc は KDEBUG の値の写しと推測) | 131,488 (67%) / 126,976 (65%) / 135,168 (52%)、表 1,683 (10%) / 35 (27%) / 1 |
+| HWDEV (11) | 196,608 / 196,608 / 262,144 | 16,384 / 128 / 1 | image・mem・load_span は **決定** (2026-10-22 の [HWDEV 設計 §5](../../decisions/realhw/HWDEV_DESIGN.md#5-大きさメモリの見積もり): 見積り 105〜155 KiB に対し上限 192 KiB、超えたら移動の境界を見直し上限を黙って広げない。load_span ≤256 KiB も同表)。reloc・import は **由来不明** (値だけ — reloc は KDEBUG の値の写しと推測) | 131,488 (67%) / 126,976 (65%) / 135,168 (52%)、表 1,683 (10%) / 35 (27%) / 1 |
 
 - export_max = 1 は全部品で **導出** (ops 1 口 `initialize` だけを export する、`ops_slots=1`)。KDEBUG の 64 は上の由来不明に含む。
 - load_span の上限が mem_max + 表最大の頁切上げより小さい部品がある (HWDEV: reloc・import を上限まで使うと prefix 77,824 B > 65,536 B)。load_span は別に検査するので読み込みは安全側に断る。
@@ -153,7 +153,7 @@ T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収に�
 ### 2-2. 状態と公開
 
 `ABSENT → HEADER_CHECKED → OWNED_IMAGE → VALIDATED → RELOCATED → STARTING → RUNNING`。
-エラーは公開前なら `ROLLING_BACK → ABSENT`、参照を断てなければ `QUARANTINED` または起動停止。SERVICES_READY後の unload/reload は v3 のこの票に入れない。DBGREF票:28の「実行時に取り外し」はこの票へ機能を追加する根拠にせず、上位R7 (`docs/tasks/v3/TASK_MEMMAP_V3.md:252`) を優先する。boot transaction内のRUNNING依存先は、利用者未公開である限り後述の逆順rollback対象に含む。
+エラーは公開前なら `ROLLING_BACK → ABSENT`、参照を断てなければ `QUARANTINED` または起動停止。SERVICES_READY後の unload/reload は v3 のこの票に入れない。DBGREF票:28の「実行時に取り外し」はこの票へ機能を追加する根拠にせず、上位R7 (`docs/decisions/MEMMAP_V3.md:252`) を優先する。boot transaction内のRUNNING依存先は、利用者未公開である限り後述の逆順rollback対象に含む。
 
 内部APIの責務 (T4で共通化済み、以下は設計上の責務名。実装名と状態は後段のruntime記述):
 
@@ -192,7 +192,7 @@ EXECNESTのcaller/frameとTSS.ESP0の保存・IRQ保護下復元 (`exec/exec.c:3
 
 [F2_OWNERSHIP](../settings/F2_OWNERSHIP.md) のgroup/leaseを唯一のFD所有モデルにする。`os32_sqlite_group_open` を全openへ適用し、default VFSの所属無しopenはfail-closed。RESIDENT groupは **2slot、1group=1接続=1回open**。bootではsettings/selftestが1slotを順次acquire→open→close→finishして返し、両slotがFREEになってからFEPを開始する。DICT_META前はFEPが1slot、後は辞書RO+学習RWの2slotを同時に使う。settingsはFEPのslotを借りたまま保持しない。settings close失敗ならそのslotをQUARANTINEDにし、残slotで標準起動を強行せずboot transactionを失敗させる。後発journalも同group。close/finalize失敗はquarantineへ残し、同じownerを正常retireしない。`exec_cleanup_owned_resources` はアプリgroupだけを処理しFEP/親groupに触れない。
 
-F3a/c: xTruncate/xSyncのI/O rcを `SQLITE_IOERR_TRUNCATE` / `SQLITE_IOERR_FSYNC` へ翻訳、xDeleteは未存在と実I/O失敗を区別し失敗を成功にしない。xAccessは有無/読取/書込可否とI/O失敗を分ける。xOpenのpOutFlagsを実open結果から返し、RO接続のwriteはVFS側でも拒否する。SQLite lock表は作らない (D29、`docs/tasks/v3/TASK_MEMMAP_V3.md:45`)。
+F3a/c: xTruncate/xSyncのI/O rcを `SQLITE_IOERR_TRUNCATE` / `SQLITE_IOERR_FSYNC` へ翻訳、xDeleteは未存在と実I/O失敗を区別し失敗を成功にしない。xAccessは有無/読取/書込可否とI/O失敗を分ける。xOpenのpOutFlagsを実open結果から返し、RO接続のwriteはVFS側でも拒否する。SQLite lock表は作らない (D29、`docs/decisions/MEMMAP_V3.md:45`)。
 
 **F3b前の暫定重複禁止案:** 新しいlock表は持たず、既存live DB/groupレコードを走査して同じファイルの2本目の接続をmode/ownerによらず拒否する。parked・親子・RESIDENT・close失敗quarantineを含む。更新可能なFEP DBへのアプリ直openも拒否し、学習はFEP facadeからだけ行う。不変CDのREADONLY例外はhost実装を凍結保持するだけで、製品からは許可しない。`:memory:` は別接続ごとの実体なので対象外。判定は文字列pathでなく **MAIN_DBのxOpenで取得したFD** のidentity `(mount_generation, fs_file_id)`。CREATEで初めて作るファイルも、破壊的truncateを伴わないopen後にinodeを取得→既存group走査→groupへ登録、の順にする。重複なら新FDだけcloseしてSQLiteへopen失敗を返し、既存接続とファイル内容を変えない。相対/絶対/別名も同一とみなす。identity取得→走査→group登録は通常文脈の非再入区間、失敗/close完了でのみ解除する。
 
@@ -226,7 +226,7 @@ SQLITE_ONLY の FEP 予約は 0。settings の接続を閉じ、RESIDENT group �
 
 FD 復旧は T4b-4 の ext2 限定を維持する (PM 決定 2026-10-19)。install は FAT の `/etc/settings.db` を `/hd0/etc/settings.db.master.new` にコピーし、長さ・バイト一致を確認してから写しを SQLite で照合する。以後はその写しから既存の `.new` を作り、退避・最終切替の手順を保つ。既存の写しとその journal は消さず停止し、今回の写しだけを成功・取消し・失敗の出口で回収する。close 失敗時は既存の `.new` と同様に隔離 inode を保持し、再起動後の削除を案内する。RAM 試験は FD 側を SQLite 非対応、対象を ext2 対応として正常系と途中失敗を確認する。FDC と実 FD 起動の受入は NP21/W で別途確認する。
 
-`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。辞書なしは `SETTINGS_CLOSED → SQLITE_ONLY` へ分岐する。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/tasks/v3/TASK_MEMMAP_V3.md:442`)。
+`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。辞書なしは `SETTINGS_CLOSED → SQLITE_ONLY` へ分岐する。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/decisions/MEMMAP_V3.md:442`)。
 
 SQLite失敗・fep.mod欠落・FEP画像CRC不一致・辞書ありでの辞書open/init失敗・予約不足等は利用者へ未公開の失敗として、FEPの部分stmt/groupをclose/finalize → settingsを含むRESIDENT groupゼロを確認 → sqlite3_shutdown → 内部exportをstubへ → RUNNING/STARTINGからROLLING_BACK → FEP/SQLite ownerの回収、の順。init自身で失敗した場合も同じ段階印で一度だけ処理する。正常rollback後はSQLite/FEPの占有ゼロ、全dbはNOSYSのMINIMALへ入る。close/shutdown/装置停止の証明が失敗したらcode/heap/stack/groupを依存閉包ごとQUARANTINEDに残す。一般KAPIはstubだが **MINIMAL_QUARANTINED** と別状態で診断し、隔離byte数を空きから差し引く。これを標準MINIMALや8MB標準合格に数えない。安全な入力/回復継続を証明できなければ起動停止する。
 
@@ -241,7 +241,7 @@ ATAPI/iso9660はT5b-5でFD/HDD rootの `/boot` からPOST_ROOTとして読み、
 
 ## 4. T5a FEP 案 B
 
-T4でfacade化したFEPを `/boot/fep.mod` へ移す。SQLite RUNNINGの依存を必須とし、未公開init中に辞書group/stmt/入力状態を全て準備してからexportを一括公開する。core側stubの意味は上位票 §5-6 (`docs/tasks/v3/TASK_MEMMAP_V3.md:444`) のAPI別表をそのままテストoracleとする。is_active/get_modeは0、set_mode/toggle/set_renderは無操作、switch_dictはNOSYS、feed_key(k)は無入力の負値も含めkをそのまま返す (T4c-2の実装とWMの消費判定を保持)、getkey/getcharは生のblocking入力、trygetkeyはkbd_trygetkeyの生キー (無入力だけ−1)、trygetcharはその文字、ime_user_*はNOSYS。MINIMALの英数編集を非ブロッキング/ブロッキング両経路で確認する。
+T4でfacade化したFEPを `/boot/fep.mod` へ移す。SQLite RUNNINGの依存を必須とし、未公開init中に辞書group/stmt/入力状態を全て準備してからexportを一括公開する。core側stubの意味は上位票 §5-6 (`docs/decisions/MEMMAP_V3.md:444`) のAPI別表をそのままテストoracleとする。is_active/get_modeは0、set_mode/toggle/set_renderは無操作、switch_dictはNOSYS、feed_key(k)は無入力の負値も含めkをそのまま返す (T4c-2の実装とWMの消費判定を保持)、getkey/getcharは生のblocking入力、trygetkeyはkbd_trygetkeyの生キー (無入力だけ−1)、trygetcharはその文字、ime_user_*はNOSYS。MINIMALの英数編集を非ブロッキング/ブロッキング両経路で確認する。
 
 B2 facadeは `ime_user_list/delete/export` の全入力を先にbounded copy → kernel staging → bind/step → stmt finalize/resetとbinding寿命終了 → engine_leave → copyout、の順。listは上限件数/文字列長で打ち切り状態を返す。deleteの不正kanjiをNULL条件に変換しない。exportはpath検証完了前にcreate/truncateしない。上限は [FEP_BOUNDARY §3](../settings/FEP_BOUNDARY.md) を引継ぎ、失敗時に返却バッファを部分公開しない。具体値はprefix/yomi/kanji/path各256B (NUL込み)、list max=1〜64、staging=64×68=4,352Bを専用領域に置く。NULL prefixは全件、NULL/正常な空kanjiは同一yomi全候補削除、不正kanjiは失敗。上限±1とページ末尾NUL、失敗後busy解除を試す (`docs/tasks/settings/FEP_BOUNDARY.md:45`)。
 
@@ -367,7 +367,7 @@ T4でSQLiteはFIXED鎖からowner割当へ移行済み。T5入口で実mapを基
 | T4a-4 再測定 (当時のhost ILP32実績、製品はT4で結線済み) | core増分0 | 512KiB内に固定管理状態80B、HEAP 524,208B、実容量516,096B。予約196,608B、APP+SYSTEM上限319,488B。現在の settings による上書きと下限は [KAPI_SPEC](../../KAPI_SPEC.md#db-api-v29-v31) を参照。合成S/M/L最大FEP 99,328B、実IPADIC 101,376B、各27切替成功 (ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) |
 | T4b facade/F2/F3/X群 | +4〜10KiB | group/identity/出力stagingを含むmap差分。X-1の棚卸しで上限が変わるなら着手前に再見積もり |
 | T4c SQLite分離 | core接続増分+4,072B、T4c-2で+1,174B [実績]。受入像約252KB・常駐終端0x19c000 | 別観測のbuild ID 562ff32 (受入一式の再ビルド値ではない) は常駐終端0x19d000・sqlite.mod=398,424B、body385,024B、prefix16,384B。heap512KiB+stack128KiB+guard4KiB込み定常1,044,480B、prefix込み1,060,864B (record等別)。T5-0aで受入一式を再測定 |
-| T5a FEP分離 | FEP撤去とB2 staging等のcore増減を記録 | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/tasks/v3/TASK_MEMMAP_V3.md:322`、現実測の節約量ではない |
+| T5a FEP分離 | FEP撤去とB2 staging等のcore増減を記録 | module本体/状態・ページ丸めを新mapで計上。旧群値は `docs/decisions/MEMMAP_V3.md:322`、現実測の節約量ではない |
 | T5b CD POST_ROOT | ATAPI/iso9660のcore減分とfacade/登録核の増分を実測 | FAT/HostDrvはcore。同梱域/212B wireの増分なし。FD上部品とprefix/常駐量を別に計上 |
 | T5c 各driver/manifest | broker/一覧追加と各群撤去のcore増減を記録 | NIC・PCMのDMAは固定DMA pool、module RAMと二重計上しない。群別の新mapとprefix/常駐/隔離を各段で採る |
 | T6b-M | 圧縮対応によるcore/loaderの増減を記録 | FD純節減・読込/展開時間・peakを実測 |
@@ -389,17 +389,6 @@ r4材料は `RECHECK_r4.md` と `opus_r1.md` (Approve、PMはF1〜F6採用)。�
 
 ## 9. 決定済みの争点
 
-| 論点 | 決定・根拠 | 反映・確認する段 |
-|---|---|---|
-| **ユーザー決定 2026-10-19: Cirrus/Trident はソフトウェアの確認で足りる** | Cirrus は NP21/W の構成、Trident は実機の構成というだけ。描画の HAL の確認が NP21/W で取れれば、構成の組合せ (64MB+Cirrus など) や実機での WAB の追加確認は求めない | T5c-5b、台帳 H-4 の Cirrus 構成別・T4T7-RH の WAB 候補 |
-| **PM 決定 2026-10-19: splash は core のまま (アプリにしない)** | T5c-6 の容量プローブで、アプリ化は配布 +9,448 B (FD 空き 2HD -9,216 B)・常駐の空き差 0。得るものが無いので core の `kernel/boot_splash.c` を維持し、T5c-6 は policy の一覧の統合だけ | T5c-6 (`~/os32-tmp/run/t5c6/report.md`)。起動順 splash→rshell/SerialFS→shell と表示失敗でも shell は既存の試験で維持 |
-| **ユーザー決定 2026-10-19: FD 起動は FEP なし (SQLite だけ)、recover-settings のため** | D21 を改訂。辞書 NOTFOUND は SQLite → settings close → SQLITE_ONLY (`db_*` 公開・IME stub・FEP予約0)。SQLite/FEP の実失敗は従来どおり MINIMAL。recover-settings の NOSYS 案内はインストール用 FD と `/boot/sqlite.mod` を確認する手順 | §3-4・MEMMAP_V3 D21/§3-5 (必須/省略)。host は実部品起動と install の RAM backend、FD 実起動は PM が NP21/W で確認 |
-| **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | FINDINGS.mdの推奨を採用。stack固定、集積拡張凍結、増減記録、policyのID数でrecord容量を決定、KCG hit率記録、FEP予約の下方上書き | §0・§3-1・§5-2/5-4・§6・§7。#7のコード変更は別依頼 |
-| **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 本票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |
-| **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5の契約を維持し、GUIRUNKEY-1・IMECAND/IMEIND・終了中STOPをT5a-3で回帰。IMEDUP-1の最初のゲスト確認はT5-0a |
-| **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | §3-5・§5。HostDrvはcoreの現行挙動を維持 |
-| **ユーザー決定 2026-10-18: CD はインストールの元だけで起動の媒体ではない。CD の RO FEP は作らない** | インストールは FD/HDD から起動して cdinst で CD を読む。CD root の起動・CD 上の FEP・CD の settings の経路は作らない | §3-5・T4c-3・T5b-5・MEMMAP_V3 §4-5へ反映 |
-| **ユーザー決定2026-10-18: EARLYを作らない** | FAT/HostDrvはcore。VK32複数entry製品利用・bootinfo新形式・U19前倒し・同梱1MiB/所有移譲・対応ASM/hsync_bootoldは作らない。全媒体同一像、形式上限4は不変。ATAPI/iso9660はPOST_ROOTでMINIMALでもcdinst前に読む | §5、T5b-1〜3/6・T5c-5a削除、T5b-4縮小、T5c-0前倒し、T5b-5置換。上位§3-5/4-5/6を同期 |
-| **ユーザー決定2026-10-18: 不変CDのRO SQLiteを凍結** | コードとhost試験を残しT4c/T5bの製品接続予定は取消。次にVFS/ISO境界を触るときに削除費用と像の差で判断 | §3-2・T4b-4cの履歴、台帳T4B-CD。通常CD読取はT5b-5 |
+決定の表は [MEMMAP_V3 §12](../../decisions/MEMMAP_V3.md#12-t4t6b-で決めた争点-2026-10-1619) へ移した (2026-10-22)。この票は反映と受入を持つ。
 
 残る技術ゲートはFD容量とT6b-Mの挿入時期・ATAPI/ISOの部品境界と登録rollback・PCM/V86のkdebug接続。stackは§3-1の32KiB + NP 1頁で決定済み。FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大 (コードの直しは別依頼)。8MB/17MBは最終段、実機はT4T7-RHへ。D番号とP100/32MBの目標は変えず、未測定の数字を承認済みにしない。

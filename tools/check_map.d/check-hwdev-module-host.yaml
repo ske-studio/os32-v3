@@ -23,7 +23,7 @@ check-hwdev-module-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - tools/mkmod.py
-- docs/tasks/realhw/design/HWDEV_CORE_API.md
+- docs/decisions/realhw/HWDEV_CORE_API.md
 - build/checks.d/check-hwdev-module-host.mk
 - tools/check_map.d/check-hwdev-module-host.yaml
 - tools/gen_kdebug_imports.py

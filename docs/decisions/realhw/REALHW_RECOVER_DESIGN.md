@@ -1,6 +1,6 @@
 # 実機試験を決まった状態へ戻す設計 r3
 
-> 状態: **現行 (2026-10-21)** — 実機試験を決まった状態へ戻す処理の確定設計。r3 + PM の修正 + Opus 第 3 回。追記は [ADDENDUM_R2](REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](REALHW_RECOVER_ADDENDUM.md)、段の現在地は [TASK_REALHW_RECOVER.md](../TASK_REALHW_RECOVER.md)。
+> 状態: **現行 (2026-10-21)** — 実機試験を決まった状態へ戻す処理の確定設計。r3 + PM の修正 + Opus 第 3 回。追記は [ADDENDUM_R2](REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](REALHW_RECOVER_ADDENDUM.md)、段の現在地は票 TASK_REALHW_RECOVER が持つ。
 > 出所: `~/os32-tmp/run/realhw_recover/DESIGN.final.md` の確定版を 2026-10-21 に写した。往復の版 r1〜rN は ~/os32-tmp に残る。中身は変えず、リポジトリ内の文書への参照だけリンクに直した。
 
 
@@ -39,18 +39,18 @@
 |---|---|
 | `R/tools/rshell_serial.py:236`、`:253`、`R/userland/shell/rshell.c:491` | シリアルでコマンドと EOT を受け渡す。ホスト timeout は待つのをやめるだけで、ゲストの命令を止めない |
 | `R/userland/shell/rshell.c:95`、`:113`、`:402` | 既存 watchdog は速度変更後の ack 不着でシリアル設定を戻すもの。装置試験の deadman ではない |
-| [docs/tasks/v3/TASK_KPEEK.md:9](../../v3/TASK_KPEEK.md)、`:21`、`:22`、`:25` | KDEBUG=1 の部品、kdebug_call・ops の入口、許可リスト、LAN ダンプがある。peek 自体は読み専用のまま |
+| `docs/tasks/v3/TASK_KPEEK.md:9`、`:21`、`:22`、`:25` | KDEBUG=1 の部品、kdebug_call・ops の入口、許可リスト、LAN ダンプがある。peek 自体は読み専用のまま |
 | `R/kdebug/kpeek.c:134` | PTE を退避→短い irq_save 内で写像→読出し→PTE 復元→irq_restore。復元失敗は WINDOW。CPU/バス停止から戻す仕組みではない |
 | `R/kernel/v86.c:957` | コア側の `v86_cui_display_restore` は kdebug から利用可能で、 graphics STOP・表示許可・text START 等。6Ah/EGC/GRCG 全体の復帰ではない |
 | `R/kernel/v86_io.c:240`、`:254`、`:282` | static の `gfx_state_for_os32` が起動時 BIOS flags を用いて EGC/GRCG/6Ah、ページ、パレット、カーソルを復元。`R/build/v86-module.mk:8` の v86_io.o として v86.mod 側にあり、共通部品へ切り出す必要がある。`v86_bios_real_lowmem` はコア側 (`R/kernel/v86_snapshot.c:24`) |
 | `R/kernel/sys.c:16`、`R/userland/shell/cmd_sys.c:144` | reboot は SHUT0/1→CPU_RESET_PORT。PCI 装置が冷間値になる保証はコードにない |
 | `R/userland/system/hsync.c:1745`、`:1770`、`:1801` | 起動 CRC と一致するカーネルを .old に複製・検証・rename。起動不能時の自動選択機能ではない |
-| `R/docs/manpages/hsync.1:494`、[docs/08_build.md:137](../../../08_build.md) | FD 起動後の .old 巻戻し手順と制約。対の kdebug.bin/sqlite.mod、必要な /sys も同じ版へ戻す |
-| [docs/tasks/realhw/PLAN.md:18](../PLAN.md)、`:51` | ノート→SerialFS/hsync→reboot→ver の運用と現在の PCI 実測。LAN 82557 自体の試験では制御経路をシリアルに固定 |
+| `R/docs/manpages/hsync.1:494`、[docs/08_build.md:137](../../08_build.md) | FD 起動後の .old 巻戻し手順と制約。対の kdebug.bin/sqlite.mod、必要な /sys も同じ版へ戻す |
+| `docs/tasks/realhw/PLAN.md:18`、`:51` | ノート→SerialFS/hsync→reboot→ver の運用と現在の PCI 実測。LAN 82557 自体の試験では制御経路をシリアルに固定 |
 | `M/os32-realhw-31k-default.md:11`、`:14`、`M/os32-realhw-headless-tests-ok.md:15` | 31kHz 既定、立会いの最後はユーザーが GRPH+2+RESET。無応答時は記録して止め、物理操作はユーザー |
-| [docs/ROADMAP.md:380](../../../ROADMAP.md) | 外部デバイス実装モデルの文書群に、復帰契約・試験表・実例を組み込む位置づけ |
+| `docs/ROADMAP.md:380` | 外部デバイス実装モデルの文書群に、復帰契約・試験表・実例を組み込む位置づけ |
 
-- 食い違い F1 (1 件): [docs/tasks/realhw/PLAN.md:29](../PLAN.md) は 0:12.0 を Creative とする旧記録。`:51` の新しい実測は HighPoint と GeForce 0:13.0。後者を基準とし、毎回 ID/BAR を再照合する。
+- 食い違い F1 (1 件): `docs/tasks/realhw/PLAN.md:29` は 0:12.0 を Creative とする旧記録。`:51` の新しい実測は HighPoint と GeForce 0:13.0。後者を基準とし、毎回 ID/BAR を再照合する。
 - 4a は `T/run/gf6200_4a/DESIGN.r1.md` の op・DIRTY・W 行・GF ログを確認済み。§5 の recover 側への一本化案を接続条件とし、4a 側は r2 でこれに合わせる。
 
 ## 2. 復帰先と証明
@@ -64,7 +64,7 @@
 
 - S0 と S1 は別の保証。既定の復帰は S1 のうち安全な項目を戻した後 S0 に収束する。S1 が VGA 窓を再び開く値なら S0 を優先し、その項目を `override` と記録、S1 完全一致を宣言しない。
 - write-only の設定記録は読戻しの代用ではない。`verified / shadow / unknown / override` を分け、必須項目が unknown なら成功にしない。
-- GeForce 冷間観測の PMC_ENABLE=03010000 は記録値であり初期化解除用の命令ではない ([docs/tasks/v3/TASK_KPEEK.md:33](../../v3/TASK_KPEEK.md))。
+- GeForce 冷間観測の PMC_ENABLE=03010000 は記録値であり初期化解除用の命令ではない (`docs/tasks/v3/TASK_KPEEK.md:33`)。
 
 ## 3. 軽い順の復帰階梯
 
@@ -81,8 +81,8 @@
 - quiesce 前に生の PCI config で Command.Mem=1 と BAR0 が snapshot と一致することを確認する。不一致・確認不能なら MMIO quiesce を省き FAILED に固定し、独立に安全を確認できる②（98画面）だけを行う。decode 解放を確認できなければ②でも VRAM に触れず停止する。
 - GeForce は PBUS 1850h を 0 にして出力を停止し読戻し、1854h を 0 にして legacy を解放し読戻す。BAR0 の decode を先に閉じて自分の復帰口を失わない。
 - 4b の開始条件は **1854h←0 の確認を先に、1850h←1 は後** (`T/run/gf6200/PLAN.final.md:88`)。保存値 1854h=1 を機械的に戻さない。
-- **(PM 修正 2026-10-21、ユーザー情報) GeForce の映像は「抜いちゃダメボード」経由で 98 の切替回路の RGB-IN につながる** (1 本のモニタ、[docs/tasks/realhw/TASK_GEFORCE6200.md:61](../TASK_GEFORCE6200.md))。切替は 0FACh (bit1 = 内蔵/RGB 側 か 98 か、bit0 = RGB-IN スルー か 内蔵 [推]、[docs/tasks/realhw/TASK_TRIDENT_DRIVER.md](../TASK_TRIDENT_DRIVER.md) §3-7)。r2/r3 の「別コネクタ・0FACh は GeForce に使わない」は取り消す。
-- **②の 98 画面復帰は全装置共通で、最初に 0FACh を 98 表示へ戻す**。0FACh は [READ/WRITE] (`R/docs/hw/undocumented/io_wab.md:345-366`、bit7〜2 は常に 1)。手順: 読む → bit1..0 (mask 03h) が 00b なら書かない → 違えば 00h を書いて読み戻し、mask 03h で 00b なら verified、違えば S0=FAIL。Trident の Disable が 0FACh←00h を最初に書く順と同じ ([docs/tasks/realhw/TASK_TRIDENT_DRIVER.md:356](../TASK_TRIDENT_DRIVER.md))。I/O ポートで VGA 範囲外なので、MMIO quiesce を省く失敗経路でも書ける。
+- **(PM 修正 2026-10-21、ユーザー情報) GeForce の映像は「抜いちゃダメボード」経由で 98 の切替回路の RGB-IN につながる** (1 本のモニタ、`docs/tasks/realhw/TASK_GEFORCE6200.md:61`)。切替は 0FACh (bit1 = 内蔵/RGB 側 か 98 か、bit0 = RGB-IN スルー か 内蔵 [推]、`docs/tasks/realhw/TASK_TRIDENT_DRIVER.md` §3-7)。r2/r3 の「別コネクタ・0FACh は GeForce に使わない」は取り消す。
+- **②の 98 画面復帰は全装置共通で、最初に 0FACh を 98 表示へ戻す**。0FACh は [READ/WRITE] (`R/docs/hw/undocumented/io_wab.md:345-366`、bit7〜2 は常に 1)。手順: 読む → bit1..0 (mask 03h) が 00b なら書かない → 違えば 00h を書いて読み戻し、mask 03h で 00b なら verified、違えば S0=FAIL。Trident の Disable が 0FACh←00h を最初に書く順と同じ (`docs/tasks/realhw/TASK_TRIDENT_DRIVER.md:356`)。I/O ポートで VGA 範囲外なので、MMIO quiesce を省く失敗経路でも書ける。
 - **読み戻しはモニタに何が映るかを証明しない** (Ra266 の割当ては [推]、LSI 統合)。経路の最終判定は**ユーザーの目視**。A0000h の往復が確かめるのは CPU→98 テキスト VRAM の到達だけ。
 - **Ra266 で 0FACh を初めて書くのは T5 の中の明示承認の 1 回** (Trident T9 の関門と同じ扱い、戻らなければリセット)。それまでは読みだけで、bit1..0≠00b なら書かずに FAILED として止める。GeForce を映す値 (RGB-IN 選択) は 4b の前に確かめる項目で、recover は書かない。
 - 共通画面処理は `gfx_state_for_os32` の 6Ah/EGC/GRCG 等と text START を統合して共有。V86 を起動せず、v86.mod 不在でも使える最小の HAL/kernel 入口にする。`PEGC_FF2_STD_GFX` を書くため PEGC GUI の既定構成へは戻せない。CUI での開始を必須とし、GUI 中（CUI を確認できない場合を含む）の開始は書込み前に拒否する。PEGC GUI 復帰は別試験。
@@ -186,7 +186,7 @@
 
 - 必須変異: snapshot valid を早める、cleanup を除去、W1C を許可、mask を全 bit にする、restore 順序を交換、PTE 戻しを省く、deadline 比較を反転、stale session を許可、verify 失敗を OK にする、cold-required 項目を保存値で書き戻す。各変異を対応ケースが検出すること。
 - sol は関連 host 試験を MUTATE=0 で実行し、変異実行は repo 運用どおり PM のレビュー後にまとめる。今回の設計作業ではコード試験は未実行。
-- NP21/W には PCI バスがなく ([docs/tasks/v3/TASK_KPEEK.md:32](../../v3/TASK_KPEEK.md))、NV44A/82557/内蔵 Trident の電気的な復帰、実バス停止、モニタ入力切替は証明できない。host 模型で証明した順序と実機結果を混同しない。
+- NP21/W には PCI バスがなく (`docs/tasks/v3/TASK_KPEEK.md:32`)、NV44A/82557/内蔵 Trident の電気的な復帰、実バス停止、モニタ入力切替は証明できない。host 模型で証明した順序と実機結果を混同しない。
 - 実機の画面受入: decode 解放の読戻し後に A0000h の予約した空きテキストセル 1 つで保存→異なる試験値の書込み→読戻し→元値復元→再照合を行い、98 側への不達・復元不一致・検査不能は S0=FAIL。98 の A0000h テキスト継続、page 0、31kHz、PEGC の既定構成を確認。0FACh の読み戻し (mask 03h=00b) とユーザーの目視で 98 表示を確かめる。ケーブルの抜き差しはユーザー。終了時は **GRPH+2+RESET**、再起動後の ver と 09A8h を記録する。
 
 ## 8. 未決 — ユーザー判断 0 件

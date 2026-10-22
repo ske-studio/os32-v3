@@ -5,7 +5,7 @@
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
 > 計画文書。下記のAPI名・内部構造・分割は実装契約案であり、未実装のものを現行仕様とはしない。
-> 決定の正典は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
+> 決定の正典は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
 
 ## 0. 入口と作業の単位
 
@@ -496,7 +496,7 @@ KAPI-loop に入る場合も救えない (修正前からの制約)。
 完了済み syscall を第5由来として区別する (API_CONTRACTS T8 を更新)。
 前回の B (X4 で宛先を決め、syscall境界へ私有要求を渡す) は採用しない。
 第三案 C (WMへ2秒戻らないことを暴走へ追加) も採用しない。
-R1/R2 と [TASK_MEMMAP_V3 §3-5-1/§3-5-3](TASK_MEMMAP_V3.md) の
+R1/R2 と [MEMMAP_V3 §3-5-1/§3-5-3](../../decisions/MEMMAP_V3.md) の
 安全点と通常文脈回収の範囲内で接続する。
 
 **A の不変条件・実装の境界**:

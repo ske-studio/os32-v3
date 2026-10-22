@@ -99,7 +99,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 
 「機能を足す前に入れ物を作り直す」版。2026-09-17 にカーネル帯 1MB の帯域超過 (必要量 1041KB) が判明し、再配置で凌いだ (修正後の余裕は 34KB、`docs/archive/kernel_v21/TASK_KSTACK_USER.md` §7) が、v2.1 の時点では本体の予算の残りが約 13KB — 穴の根は帯の切り方で、帯の中で削るのは延命、というのが出発点。
 目的の一文と目標の 2 段 (8MB 機で GUI + 私有 2MB のアプリ / 前景 1 本で P100/32MB の Win95 より快適、32〜64MB 機で Win2000 当時の使用感) は `docs/archive/v3/V3_PLAN_DRAFT.md` §2。
-メモリマップ (システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType) は 3 者討論で決めた (`docs/tasks/v3/TASK_MEMMAP_V3.md`、D1〜D36)。
+メモリマップ (システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType) は 3 者討論で決めた (`docs/decisions/MEMMAP_V3.md`、D1〜D36)。
 最初の票は T0 (C89 → C11、`docs/archive/v3/TASK_C11_MIGRATION.md`)。os32-v3 は新しい履歴 (初期コミット) で始め、経緯はこの文書で持つ (FORK_PLAN)。
 
 ---
@@ -122,7 +122,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 2026-09-25 | **レビュアーは Codex だけ**。コーダーは Codex の重大 (P1) 指摘を含む修正なら Fable 5.1、他は Opus 5.5 | ROLES §0 |
 | 2026-09-26 | Codex にモデル名を名乗らせ、astra でなければ休ませて Fable が代行。検査の 3 段とレビューの重さ (P3 だけの直しは PM が読んで着地) | ROLES §0 |
 | 2026-09-29 | PM = Sonnet 5.5 (取り次ぎのみ) → 同日夕に Opus 5.5 へ戻す。ドライバ設計のレビューは必ず Codex と突き合わせる。推奨は基本的に承認、[D2] と実機の物理操作は個別承認 | ROLES §0 |
-| 2026-09-29〜30 | **3 者討論** (ユーザー = 決定者、Fable 5.1、Codex gpt-6-astra、PM は進行) — 意見書 → 反論と合成 → 最終案 → Codex 往復 → ユーザー決裁の形式で v3 のメモリマップを決めた | `docs/tasks/v3/TASK_MEMMAP_V3.md` §11 |
+| 2026-09-29〜30 | **3 者討論** (ユーザー = 決定者、Fable 5.1、Codex gpt-6-astra、PM は進行) — 意見書 → 反論と合成 → 最終案 → Codex 往復 → ユーザー決裁の形式で v3 のメモリマップを決めた | `docs/decisions/MEMMAP_V3.md` §11 |
 
 現行の体制 (fork 時点) は ROLES §0 の 1 表。os32-v3 でも同じ体制で始める (FORK_PLAN §3 g)。
 
@@ -150,7 +150,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 2026-09-25 | MINIMAL を「起動・HDD への導入・回復」に絞る (フォントと一般コマンドは NORMAL へ)。インストール後の実機 HDD の e2fsck は行わない。レビュアーは Codex だけ | RELEASE_v2.1 §4、ROLES §0 |
 | 2026-09-26 | 検査の 3 段 (コーダーの完了条件は `check-changed` rc=0、PM は着地で `check` を 1 回)。P3 だけの直しにレビューを回さない | ROLES §0 |
 | 2026-09-29 | **v2.1 確定** — Ra266 の PEGC は画面を見ない条件で受け入れ (v3 を遅らせない)。**GUI の版は 1.4 で閉じる**。OS64 は版数表に載せない。資料不足は FreeBSD を参照。**fork の決定群**: 現行の開発は v3 / 別リポジトリ **os32-v3** (ブランチではない) / **パブリック** / os32 の v2.x は戻り先 (新機能は入れない) / submodule は引き継ぐが当面の保守は os32 側 / CI は作り直す / 文書の正典は os32-v3 / `tools/` と NP21/W フォークは共有だが動作保証は v3 だけ | ROADMAP §0-1、`docs/archive/agents/HANDOVER_2026-09-29.md` §2 |
-| 2026-09-30 | **メモリマップの方針** (3 者討論): 8MB 機は GUI + 私有 2MB のアプリ、バイナリ互換は捨てる (ソース互換は極力)、アプリ帯 0x80000000、`--cpl0` 廃止、SQLite はカーネルの機能だが同一リンクにしない、低位 640KB は V86 へ、OpenType / KCG 廃止の検討、同時使用はしない (快適の判定は前景 1 本)、池の運用規則 (口は `mem_map` / `mem_unmap` の 2 つ、閾値 64KB)、MEMSYS5 512KB、SQLite と FEP は常に読み込む (例外は MINIMAL)。D35: fork 時の KAPI 整理でスロット順を変えてよい。D36: Rust で作る部品も 386 下限を守る (最終成果物の検査を必須の工程に)。保留 5 件 (U6) の仕分け、Rust vs C11 (U5、IRQ 文脈の合成器は Rust 可)、T0 = C11 化。**fork の準備を承認** (J1〜J8 は推奨どおり: LICENSE は MIT のまま、THIRD_PARTY.md はルート、TDD 記録と設計記録は持つ、CI は静的ゲート + 本体ビルドから) | `docs/tasks/v3/TASK_MEMMAP_V3.md` §0・§11、`RUST_VS_C11.md`、`U6_PENDING_REVIEW.md`、`FORK_PLAN.md` |
+| 2026-09-30 | **メモリマップの方針** (3 者討論): 8MB 機は GUI + 私有 2MB のアプリ、バイナリ互換は捨てる (ソース互換は極力)、アプリ帯 0x80000000、`--cpl0` 廃止、SQLite はカーネルの機能だが同一リンクにしない、低位 640KB は V86 へ、OpenType / KCG 廃止の検討、同時使用はしない (快適の判定は前景 1 本)、池の運用規則 (口は `mem_map` / `mem_unmap` の 2 つ、閾値 64KB)、MEMSYS5 512KB、SQLite と FEP は常に読み込む (例外は MINIMAL)。D35: fork 時の KAPI 整理でスロット順を変えてよい。D36: Rust で作る部品も 386 下限を守る (最終成果物の検査を必須の工程に)。保留 5 件 (U6) の仕分け、Rust vs C11 (U5、IRQ 文脈の合成器は Rust 可)、T0 = C11 化。**fork の準備を承認** (J1〜J8 は推奨どおり: LICENSE は MIT のまま、THIRD_PARTY.md はルート、TDD 記録と設計記録は持つ、CI は静的ゲート + 本体ビルドから) | `docs/decisions/MEMMAP_V3.md` §0・§11、`RUST_VS_C11.md`、`U6_PENDING_REVIEW.md`、`FORK_PLAN.md` |
 
 ---
 

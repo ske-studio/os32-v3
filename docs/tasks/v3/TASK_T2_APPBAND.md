@@ -3,12 +3,12 @@
 > 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md)、d〜h の状態は [子票](TASK_T2D_T2H.md)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
-> 決定の正典: [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
+> 決定の正典: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
 > 番地の正典は `include/memmap.h`、実装後の地図は [02_memory](../../02_memory.md) §2-1 (説明と生成手順への入口)。本票は T2 の実装契約・段・受入を持ち、上位の決定本文を置き換えない。[C1]〜[C5]・[ABI1]〜[ABI3] は [CONSTRAINTS](../../CONSTRAINTS.md)、状態行は [POLICY_DEV](../../POLICY_DEV.md) §8。
 
 ## 1. 範囲と引継ぎ
 
-### 1-1. TASK_MEMMAP_V3 §6 T2 の対応表
+### 1-1. MEMMAP_V3 §6 T2 の対応表
 
 | # | T2 の項目 | 担当段 | 契約 / 受入 |
 |---|---|---|---|
@@ -56,11 +56,11 @@ T1 の残件は消さない: PCM STOP → 再 open は実機で未確認、`cirr
 | P7 | T2c の4世代検査、コンパイル単位の識別、混在試験 | 全 KAPI の整理を独自に広げない。fork 時の並替えは P7 と一組でのみ行う |
 | サーフェス層 / P8 / P9 | (b) gshell の CLIENT と全画面 lease | (c) 私有面 + WM 合成、Video HAL、SDL、音・入力の層 |
 
-T3 票へ渡す物理境界 (半開区間。固定 PD/PT 以外の最終配置は [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) §2-1):
+T3 票へ渡す物理境界 (半開区間。固定 PD/PT 以外の最終配置は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §2-1):
 
 | 範囲 | T2a′ の占有・属性 | T3 の引継ぎ |
 |---|---|---|
-| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 (**2026-10-16 注**: 最終地図は案 5 で改めた — DMA は 0x7F0000、0x3E0000〜0x3FFFFF は見張り・PT の枠・見張り・スタック。正は [TASK_MEMMAP_V3 §2-1](TASK_MEMMAP_V3.md) と [T3 §2-2](TASK_T3_LAYOUT.md)) |
+| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 (**2026-10-16 注**: 最終地図は案 5 で改めた — DMA は 0x7F0000、0x3E0000〜0x3FFFFF は見張り・PT の枠・見張り・スタック。正は [MEMMAP_V3 §2-1](../../decisions/MEMMAP_V3.md) と [T3 §2-2](TASK_T3_LAYOUT.md)) |
 | [0x3F1000,0x3FB000) | 固定PD/PT 10枚、sup/RW/WB、恒久FIXED | 案5では 0x3E1000 起点・26枚枠・使用11枚へ変更。現行定義は `include/memmap.h:305`、配置・属性は [T3 §2-2](TASK_T3_LAYOUT.md#2-2-固定領域とページング) |
 | [0x3FB000,0x400000) | 未使用20KiB、恒久FIXED・NP | guard [0x3FB000,0x3FC000) と kstack [0x3FC000,0x400000)へ。T2ではstackを動かさない |
 | [0x400000,0x500000) | T2c以後は物理池の一部 | 常駐shellの新しい1箱。MEM_POOL_BASEを0x500000へ変更 |
@@ -343,7 +343,7 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 
 **T2b の静的保持と T2c への移行 (レビュー1回目対応)**: 現時点は既存exec/park/resume/自己診断が `AppSlot.as` を値で扱うため、T2bでポインタ化して全生命周期を変更せず、**T2cのAS生成/破棄・公開caller切替と同時に固定KHEAP確保へ移す**。それまでの予算差分は `addrspace` 24→440B (+416B) ×全6slot = **BSS +2,496B** (未使用ID0とshell枠も含む)、`AppSlot` 204→620B、表全体1,224→3,720B。これはKHEAPを使わない暫定の常時占有で、将来のPT控え/extentを同じ埋込みへ増設しない。`exec/appslot.c` のtarget `STATIC_ASSERT` は埋込みASを二重計上せず全6 AppSlot + owner/region/resource + SURFACEを合計し、現在 **3,720 + 2,816 + 768 = 7,304B ≤ 16,384B**を検査する。T2cはAppSlot本体 + 全AS制御ブロックの固定容量 + 台帳の合計へ検査式を更新し、KHEAPピークと確保失敗/終了時返却も検証する。PFNメタデータとPD/PT実ページは従来どおり別の物理予算。
 
-**X15 の前倒し (ユーザー決定 2026-10-01)**: T3 の「固定 PT をカーネルイメージの外へ」を **T2a → T2a′ → T2b** の必須ゲートへ移す。TASK_MEMMAP_V3 §6 の T3 行および D 番号の本文は変更しない。前倒しで完了する範囲と T3 の残りは §1-3。T2a + T2b の見込みだけで現 text/data 余白 2,524B を超えるため、容量不足後の相談にはしない。T2a 自体が予算を超えたら同段を未受入とし、診断削除・ASSERT緩和・帯拡張で通さない。
+**X15 の前倒し (ユーザー決定 2026-10-01)**: T3 の「固定 PT をカーネルイメージの外へ」を **T2a → T2a′ → T2b** の必須ゲートへ移す。MEMMAP_V3 §6 の T3 行および D 番号の本文は変更しない。前倒しで完了する範囲と T3 の残りは §1-3。T2a + T2b の見込みだけで現 text/data 余白 2,524B を超えるため、容量不足後の相談にはしない。T2a 自体が予算を超えたら同段を未受入とし、診断削除・ASSERT緩和・帯拡張で通さない。
 
 #### T2a′ の配置 (半開区間、実装時に memmap.h を正典にする)
 

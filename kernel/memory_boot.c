@@ -241,7 +241,7 @@ int memory_boot_dma_available(void)
 }
 
 /* ======================================================================== */
-/*  集積域・同梱域の規則 (TASK_T1_LEDGER §3-3 ③、TASK_MEMMAP_V3 §4-5)        */
+/*  集積域・同梱域の規則 (TASK_T1_LEDGER §3-3 ③、MEMMAP_V3 §4-5)             */
 /*                                                                          */
 /*  [first, end) (PFN) はローダが bootinfo で申告した同梱エントリの範囲。     */
 /*  0, 0 = 申告なし。申告があれば同梱域 MEM_BOOT_BUNDLE_* を丸ごと owner =    */

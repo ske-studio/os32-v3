@@ -30,7 +30,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 | P5 | [`05_GFX_MODE.md`](05_GFX_MODE.md) | GFX モード対応 | 未着手 | 高(大規模) | §1 描画抽象化 |
 | P6 | [`06_MISC.md`](06_MISC.md) | その他 (XFER / kprintf va_args) | 一部 (XFER の候補操作。入力中の変換開始は未対応) | 低 | なし |
 | P7 | [`07_BUNSETSU.md`](07_BUNSETSU.md) | 連文節変換 (将来構想・保留) | 未着手 | 低 | 全て |
-| — | [`TASK_DICT_META.md`](TASK_DICT_META.md) | 辞書のメタ情報 (形式の版・dict_id・license・`mem_reserve_kb` 等) と学習データの別ファイル化 (`/etc/fep_user.db`)。ユーザー決定 2026-09-30 (TASK_MEMMAP_V3 D27・D28) | **計画** (着手は **v3 の後の方**) | 中 | v3 T4 (SQLite モジュール化)・T5a (FEP モジュール化) |
+| — | [`TASK_DICT_META.md`](TASK_DICT_META.md) | 辞書のメタ情報 (形式の版・dict_id・license・`mem_reserve_kb` 等) と学習データの別ファイル化 (`/etc/fep_user.db`)。ユーザー決定 2026-09-30 (MEMMAP_V3 D27・D28) | **計画** (着手は **v3 の後の方**) | 中 | v3 T4 (SQLite モジュール化)・T5a (FEP モジュール化) |
 
 P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象化を伴う最大の変更で、
 他フェーズと切り離して最後に実施する。

@@ -1,6 +1,6 @@
 # GeForce 6200 段 4a 詳細設計 r3 — init script の試行
 
-> 状態: **現行 (2026-10-21)** — 段 4a (初期化 script の試行) の確定設計。r3 + Opus 第 3 回の PM 反映。実装の段は S1〜 ([TASK_GEFORCE6200.md](../TASK_GEFORCE6200.md) §5)。
+> 状態: **現行 (2026-10-21)** — 段 4a (初期化 script の試行) の確定設計。r3 + Opus 第 3 回の PM 反映。実装の段は S1〜 (段の状態は票 TASK_GEFORCE6200 §5 が持つ)。
 > 出所: `~/os32-tmp/run/gf6200_4a/DESIGN.final.md` の確定版を 2026-10-21 に写した。往復の版 r1〜rN は ~/os32-tmp に残る。中身は変えず、リポジトリ内の文書への参照だけリンクに直した。
 
 

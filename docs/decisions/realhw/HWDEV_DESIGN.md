@@ -1,9 +1,9 @@
 # 実機の調査・試行・復帰の核と装置部品 — 設計 r2 (構造)
 
-> 状態: **設計中 (2026-10-22)** — 確定 (G1〜G5 を反映)、実装はユーザーの合図待ち ([TASK_HWDEV.md](../TASK_HWDEV.md))。
+> 状態: **確定 (2026-10-22)** — G1〜G5 を反映、実装はユーザーの合図待ち (段の状態は票 TASK_HWDEV が持つ)。
 > 出所: ~/os32-tmp/run/devmod/DESIGN.final.md を 2026-10-22 に粒度別に分けて写した。
 
-この文書は構造だけを持つ。決定・段の状態は [TASK_HWDEV.md](../TASK_HWDEV.md)、関数の slot・構造体・台帳の定義は [HWDEV_CORE_API.md](HWDEV_CORE_API.md)、装置ごとに要る状態は [DEVICE_STATES.md](DEVICE_STATES.md) (元の §2)。r1→r2 の変更記録は ~/os32-tmp に残る。
+この文書は構造だけを持つ。決定・段の状態は票 TASK_HWDEV、関数の slot・構造体・台帳の定義は [HWDEV_CORE_API.md](HWDEV_CORE_API.md)、装置ごとに要る状態は [DEVICE_STATES.md](DEVICE_STATES.md) (元の §2)。r1→r2 の変更記録は ~/os32-tmp に残る。
 
 - **推奨: A (C と表の装置部品化) を先行。HW-BASIC は GeForce 実機合格後に同じ核へ接続する。**
 - 対象は置き場・境界・寿命。確定済みの戻す処理と段 4a の文書 ([REALHW_RECOVER_DESIGN.md](REALHW_RECOVER_DESIGN.md)・追記 2 本・[GF6200_4A_DESIGN.md](GF6200_4A_DESIGN.md)・[GF6200_4A_S2_LAYOUT.md](GF6200_4A_S2_LAYOUT.md)) の許可・保存・復帰・N1・承認を変更しない。
@@ -39,7 +39,7 @@
 
 - 旧像のヘッダ実測: file=104,860B、payload=88,476B、mem=118,784B、prefix=16,384B。整列・表を含み、BSS は file に含まない。
 - 現行 S6 の 239,908B は [REALHW_RECOVER_ADDENDUM.md](REALHW_RECOVER_ADDENDUM.md) の末尾とユーザー提供値。残り 22,236B、91.52%。現行 .o の実測値と偽って内訳を作らない。
-- **実物との食い違い 2 件**: ① 手元像は 104,860B で GF/window の .o も欠け、S6 の 239,908B と世代が違う。② [TASK_T4_T6_MODULES.md](../../v3/TASK_T4_T6_MODULES.md) の 96 行は ops 2/18 口、schema は ops 3/19 口。
+- **実物との食い違い 2 件**: ① 手元像は 104,860B で GF/window の .o も欠け、S6 の 239,908B と世代が違う。② `docs/tasks/v3/TASK_T4_T6_MODULES.md` の 96 行は ops 2/18 口、schema は ops 3/19 口。
 - 分割実装の最初 (M1) に同一ソース・同一設定の map/size/header を採り直す。旧像と S6 像の差 135,048B をそのまま GF の大きさとはしない。
 
 ## 3. 2 つの方式と組み合わせ
@@ -55,7 +55,7 @@
 - **今回の選択は A のみ。** 既存 GF の検証済み decode/exec/PLL を移す方が軽い。B は 125 行の exec を移すだけでは成立せず、容量節約のために安全契約を作り直す費用が大きい。
 - 増えた約 135KB の多くは recover_gf.c の表データ (2071 行の大半、関数は 862 行以降) で、インタプリタ化しても縮まない。ただし増分全体を GF 量とはせず M1 で再計測する。
 - A でも核へ渡すものは既存の profile/plan/expr/layout に統一。GeForce 完了後、Trident で必要な共通命令だけ抽出するため、外部 ABI に GF opcode を固定しない。
-- HW-BASIC 初版は読取り、続いて「短い plan をコピー → 全経路検査 → 承認 → 実行 → 終端」の対話単位を候補とする。実行中に任意番地を追加しない。現在の 4a 要求にユーザーポインタや任意 opcode を追加しない ([TASK_TRIDENT_DRIVER.md](../TASK_TRIDENT_DRIVER.md) の 41 行)。
+- HW-BASIC 初版は読取り、続いて「短い plan をコピー → 全経路検査 → 承認 → 実行 → 終端」の対話単位を候補とする。実行中に任意番地を追加しない。現在の 4a 要求にユーザーポインタや任意 opcode を追加しない (`docs/tasks/realhw/TASK_TRIDENT_DRIVER.md` の 41 行)。
 
 ## 4. 推奨の構造
 
@@ -110,7 +110,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 
 - N1・CR1F・0FACh・CUI/31kHz・S0 と S1 の区別などの安全条件は [GF6200_4A_DESIGN.md](GF6200_4A_DESIGN.md) と [REALHW_RECOVER_DESIGN.md](REALHW_RECOVER_DESIGN.md) のまま維持する (この分離で変えない)。GF 部品には 0FACh 操作を渡さない。
 - 既存 fixture・host 期待 trace・変異 ID は保持、リンク/import だけ追随 (ソースパスは維持)。核単体 mock に加え、実 KMOD の型と ABI を通る結合試験で境界欠落を検出する。
-- 順序: M1〜M5 → 旧 S7 → T4b → T5 → S8 (A1 承認 → 結果 → A2 承認) → main 0/1/2/3 を各承認 → A4 承認 → T6/T7 の残件 (段の表は [TASK_HWDEV.md](../TASK_HWDEV.md) §3)。
+- 順序: M1〜M5 → 旧 S7 → T4b → T5 → S8 (A1 承認 → 結果 → A2 承認) → main 0/1/2/3 を各承認 → A4 承認 → T6/T7 の残件 (段の表は票 TASK_HWDEV §3)。
 - S6 送りの上限 assert・最悪 node 試験 (M1 の上限訂正は CORE_API §9)は M1、Ra266 0:8.0/0:7.0 の BAR 長根拠は T5 前、version.chip の実 ROM 確認も実機開始前。T4a 合格は再利用し、部品境界の回帰だけ追加。
 - 60 秒実行枠と実 UART 送信時間の除外、wire 上界 2 倍 + 3 秒、復帰 18/33 秒、PAUSED 時間除外をそのまま継承 ([REALHW_RECOVER_ADDENDUM.md](REALHW_RECOVER_ADDENDUM.md) の 246 行)。
 
@@ -129,7 +129,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 
 ## 8. 試験と変異
 
-段・重さ・実装モデル・合格条件の要約は [TASK_HWDEV.md](../TASK_HWDEV.md) §3。並列: M1 は後続の前提なので直列。M2 は M1 の後、M3 の移動準備と並列可。M3 は M2 と別ファイルの作業だけ並列、結合は M2 の後。M4 は M3 の後に直列。M5 は M4 の後に結合。
+段・重さ・実装モデル・合格条件の要約は票 TASK_HWDEV §3。並列: M1 は後続の前提なので直列。M2 は M1 の後、M3 の移動準備と並列可。M3 は M2 と別ファイルの作業だけ並列、結合は M2 の後。M4 は M3 の後に直列。M5 は M4 の後に結合。
 
 - M1 試験: 2048 node・断片化・全確保失敗点で書込み 0 / 全頁返却、現行 size/map を保存。
 - M1 変異: 頁丸上げ又は最大 node 検査を落とすと上限試験が失敗。

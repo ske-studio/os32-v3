@@ -1464,7 +1464,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   持たないので、判定は SQLite と 1 対 1 になる)。**step しない**ので、SELECT の先頭行も
   DML も進まない。同じ handle の旧 stmt は **入力を受け付けたときだけ** finalize して
   置換し、入力拒否時は stmt・slot・transaction・SHM 結果を変えない
-  ([T4〜T6 票 §9 の決定](tasks/v3/TASK_T4_T6_MODULES.md#9-決定済みの争点))。
+  ([MEMMAP_V3 §12 の決定](decisions/MEMMAP_V3.md#12-t4t6b-で決めた争点-2026-10-1619))。
   拒否の戻り値を見ずに step すると前の文の続きが返る。
   `db_exec` / `db_prepare` も同じコピー拒否時不変契約を持つ。
   コピー拒否では診断欄も変更せず、戻り値 -1 で拒否を通知する。

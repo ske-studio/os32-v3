@@ -15,7 +15,7 @@
 | 文書 | 行 | 状態行 | 役割 / 処置案 |
 |---|---:|---|---|
 | [V3_PLAN](V3_PLAN.md) | 116 | 実装中 (10-03) | 目的・範囲・柱・順序の正典。状態行と P1 行の「3c4171a 時点 / e1〜e4 と h の準備」が古い → 「T2d〜g 受入済み、T2h は R0〜R7 一巡、残は台帳」の 1 行に。§4 末尾の T3 前関門の文は保つ |
-| [TASK_MEMMAP_V3](TASK_MEMMAP_V3.md) | 630 | 設計中・方針確定 (09-30) | D1〜D36 の正典。保持。状態行の「実装は未着手」を「T0〜T2 の状態は各票」に直すだけ (D の承認と進捗を分ける) |
+| [MEMMAP_V3](../../decisions/MEMMAP_V3.md) | 630 | 設計中・方針確定 (09-30) | D1〜D36 の正典。保持。状態行の「実装は未着手」を「T0〜T2 の状態は各票」に直すだけ (D の承認と進捗を分ける) |
 | [TASK_T2_APPBAND](TASK_T2_APPBAND.md) | 460 | 実装中 (10-01) | T2 親契約の正典。a〜c の実績は既に [T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md)。状態行の「ここで一旦止め…」を「d〜h は子票」に。§3-1 旧世代 INVAL / §3-4 Unicode 撤去担当の 2 点は §4 |
 | [TASK_T2D_T2H](TASK_T2D_T2H.md) | 631 | 実装中 (10-13) | d〜h 契約の正典。10-06 に実行記録 (3,631 行) を [RECORDS](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ分けた後、§5-1 に R0〜R7・h9 の段落 (約 12 段落、1 段落 300〜700 字) が再び溜まった → §5 の案で分ける |
 | [T2E_MUTANTS](../../archive/v3/T2E_MUTANTS.md) / [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md) | 77 / 111 | 状態行なし (基点 83f2db7 / b43e814) | 変異対応表。受入が済んだ段の記録 → `docs/archive/v3/` へ (INDEX の正典表の行も archive を指す) |

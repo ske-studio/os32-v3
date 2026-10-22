@@ -1,6 +1,6 @@
 # recover 確定設計への追記 r4（r2への差し込み、2026-10-21）
 
-> 状態: **現行 (2026-10-21)** — 戻す処理の確定設計への追記 (plan の契約 r4 と、T1b・T3・4a S1〜S5 で設計者が決めたこと・送り項目)。本文の一部。段の現在地は [TASK_REALHW_RECOVER.md](../TASK_REALHW_RECOVER.md)。
+> 状態: **現行 (2026-10-21)** — 戻す処理の確定設計への追記 (plan の契約 r4 と、T1b・T3・4a S1〜S5 で設計者が決めたこと・送り項目)。本文の一部。段の現在地は票 TASK_REALHW_RECOVER が持つ。
 > 出所: `~/os32-tmp/run/realhw_recover/ADDENDUM.final.md` の確定版を 2026-10-21 に写した。往復の版 r1〜rN は ~/os32-tmp に残る。中身は変えず、リポジトリ内の文書への参照だけリンクに直した。
 
 r3→r4 の変更 A：leaveはnext[0]/next[1]の辺だけを確認し、opcode条件の再評価を削除。

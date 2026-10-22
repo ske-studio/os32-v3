@@ -12,7 +12,7 @@ import zlib
 from gen_kdebug_imports import declaration, fnv1a
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC = ROOT / 'docs/tasks/realhw/design/HWDEV_CORE_API.md'
+DOC = ROOT / 'docs/decisions/realhw/HWDEV_CORE_API.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
 OUT = ROOT / 'hwdev/generated'
 

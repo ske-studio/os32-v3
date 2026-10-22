@@ -389,7 +389,7 @@ void _start(void)
         CHECK(MEM_PHYS_RAM_CEILING == 0x80000000UL);
         CHECK((MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB == 2032UL);
         CHECK(MEM_PHYS_RAM_CEILING <= MEM_DEVICE_APERTURE_BASE);
-        /* 集積域・同梱域 (TASK_MEMMAP_V3 §4-5 の区間表、定数だけ — 規則は T1b)。
+        /* 集積域・同梱域 (MEMMAP_V3 §4-5 の区間表、定数だけ — 規則は T1b)。
          * 1MB ずつ、ページ整列、隣接して重ならず、8MB 機で成立 (0x700000 まで)、
          * 池の中で共有ライブラリ帯より上。 */
         CHECK(MEM_BOOT_STAGING_SIZE == MEM_1MB && MEM_BOOT_BUNDLE_SIZE == MEM_1MB);

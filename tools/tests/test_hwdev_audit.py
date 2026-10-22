@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
-DOC = ROOT/'docs/tasks/realhw/design/HWDEV_CORE_API.md'
+DOC = ROOT/'docs/decisions/realhw/HWDEV_CORE_API.md'
 
 
 def main():
