@@ -2,7 +2,6 @@
 """Validate a guest acceptance index and render an uncommitted Markdown table."""
 import argparse
 from pathlib import Path
-import posixpath
 import sys
 import yaml
 
@@ -27,11 +26,18 @@ def validate(data, root=ROOT):
         ids.add(case["id"])
         if case["mode"] not in {"batch", "tool", "manual"}:
             raise ValueError("invalid mode")
+        # contract is one canonical reference or a non-empty list of them; never docs/archive/ ([D4]).
         contract = case["contract"]
-        if isinstance(contract, str) and posixpath.normpath(contract.split("#", 1)[0]).startswith("docs/archive/"):
-            raise ValueError("contract must not point to docs/archive/ ([D4])")
-        if not isinstance(contract, str) or not (root / contract.split("#", 1)[0]).is_file():
-            raise ValueError("contract file missing")
+        refs = contract if isinstance(contract, list) and contract else [contract]
+        archive = (root / "docs/archive").resolve()
+        for ref in refs:
+            if not isinstance(ref, str) or not ref:
+                raise ValueError("contract file missing")
+            target = (root / ref.split("#", 1)[0]).resolve()
+            if target == archive or archive in target.parents:
+                raise ValueError("contract must not point to docs/archive/ ([D4])")
+            if not target.is_file():
+                raise ValueError("contract file missing")
         if not deferred and any(case[key] is None or case[key] == "" for key in REQUIRED):
             raise ValueError("empty required field")
         if case["mode"] == "batch":
@@ -46,6 +52,8 @@ def validate(data, root=ROOT):
 def render(cases):
     fields = ["id", "gate", "contract", "mode", "prereq", "entry", "observe", "expect", "evidence", "status"]
     def cell(value):
+        if isinstance(value, list) and all(isinstance(v, str) for v in value):
+            value = ", ".join(value)
         return str(value).replace("|", "\\|").replace("\n", " ")
     return "\n".join(["| " + " | ".join(fields) + " |", "| " + " | ".join(["---"] * len(fields)) + " |"] +
                      ["| " + " | ".join(cell(case.get(f, "")) for f in fields) + " |" for case in cases]) + "\n"

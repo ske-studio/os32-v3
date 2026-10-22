@@ -585,5 +585,5 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 
 ## 12. 受入の構成の方針 (ユーザー指示 2026-10-02)
 
-方針は [MEMMAP_V3 §7-1](../../decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録) へ、V86 の 6Ah の未対処は [09_exec](../../09_exec.md#ring3-の-user-写像-exec_run-が-as-を作るときに立てるもの) へ移した (2026-10-22)。
+方針は [MEMMAP_V3 §7-1](../../decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録) へ、V86 の 6Ah の扱いは [09_exec](../../09_exec.md#ring3-の-user-写像-exec_run-が-as-を作るときに立てるもの) へ移した (2026-10-22)。
 > **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — [TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3504)。

@@ -65,10 +65,11 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
-V86 session の全出口 (正常・失敗・STOP・kill) で、旧低位の内容と属性を復元し、VRAM/E の setup と teardown の両方で PCD を台帳と一致させる。
+V86 session の全出口 (正常・失敗・STOP・kill) で、低位の PTE の属性を戻し (VRAM/E の setup と teardown の両方で PCD を台帳と一致させる)、
+boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`kernel/v86_mem.c`)。
 SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し、通常の地図を検査する。V86 中は通常 AS の実行・生成・検査をしない。
-V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。
-未対処・未観測: V86 の出口は 6Ah の標準/拡張 (20h/21h) を戻さない。9821 でゲストが拡張モードのまま戻ると A6h が効かず、E0000h が MMIO のまま残る ([U] 00A6h)。
+V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラフィック対応機では出口で 6Ah に標準グラフィック (20h) を書いて戻す
+(`kernel/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
 
 ### 起動失敗の巻き戻しと強制脱出
 
@@ -112,7 +113,7 @@ WM 側も STOP を消費する OP_WAIT / top-level に届かない。この場�
   VA の穴不足・extent 満杯・KHEAP 制御の不足・引数不正では要求しない。割当ての動作 (EXACT→TOPDOWN、arena の巡回) は変えない。
 - **配送**: WM は既存の X3 周期 (`wm_cycle`) で `mem_stat(0)` の pending mask を 1 回読み、bit の立つ slot が PARKED・前景でない・未配送 (`sent` が偽) なら、
   そのリングに `GUI_EV_TRIM` (window 0、payload に epoch) を 1 件積んで `sent` を立てる。前景の判定は WM が自分の `front_owner` で行い、USER の申告は使わない。
-  queue が満杯なら次周へ送り、既存イベントを捨てない。起こす順は既存の pick / should_park / ラウンド規則のまま。未応答の slot には再配送も再 resume もしない。
+  queue が満杯なら次周へ送り、既存イベントを捨てない。起こす順は既存の pick / should_park / ラウンド規則のまま。TRIM の未応答を理由とする再配送・追加の resume はしない (通常のイベントによる resume は既存の規則どおり)。
   CUI と終了中の AS へは配送しない。
 - **完了**: SDK は handler と allocator の外の安全点で trim → 任意の cache hook を 1 回 → TRIM_DONE (受信バッチごとに 1 回)。kernel は `gui_call` で TRIM_DONE を横取りし、
   saved caller の slot に保留があり epoch が一致するときだけ bit を下ろし、同じ caller AS のまま kernel 側 exec_heap の末尾を trim する。保留なし・不一致は STALE で状態不変。

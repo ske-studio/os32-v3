@@ -119,9 +119,19 @@ class AcceptanceTests(unittest.TestCase):
             ga.validate(self.cases)
 
     def test_archive_contract(self):
-        self.cases[0]['contract'] = 'docs/./archive/absent.md'
-        with self.assertRaisesRegex(ValueError, 'archive'):
-            ga.validate(self.cases)
+        for ref in ('docs/./archive/absent.md', str(ROOT / 'docs/archive/absent.md'),
+                    'tools/../docs/archive/absent.md', ['docs/09_exec.md', 'docs/archive/absent.md']):
+            self.cases[0]['contract'] = ref
+            with self.assertRaisesRegex(ValueError, 'archive'):
+                ga.validate(self.cases)
+
+    def test_contract_list(self):
+        self.cases[0]['contract'] = ['docs/09_exec.md', 'docs/KAPI_SPEC.md#x']
+        ga.validate(self.cases)
+        for bad in ([], ['docs/09_exec.md', 'absent-contract.md'], ['docs/09_exec.md', 3]):
+            self.cases[0]['contract'] = bad
+            with self.assertRaises(ValueError):
+                ga.validate(self.cases)
 
     def test_mode(self):
         self.cases[0]['mode'] = 'unknown'
@@ -429,7 +439,7 @@ MUTATIONS = [
     ('tools/tests/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
 
     ('tools/gen_guest_acceptance.py', 'or case["id"] in ids', 'or False'),
-    ('tools/gen_guest_acceptance.py', '.startswith("docs/archive/")', '.startswith("docs/archive/") and False'),
+    ('tools/gen_guest_acceptance.py', 'if target == archive or archive in target.parents:', 'if target == archive:'),
     ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
     ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
      "as_ptr = word(slot, o['slot_as'] + WORD_BYTES)"),
