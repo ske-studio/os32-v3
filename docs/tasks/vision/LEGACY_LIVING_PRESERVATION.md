@@ -6,7 +6,7 @@
 > OS32 の版ではなく、**v3 / v4 の範囲に入れない** (版数表にも載せない — VERSIONS §1)。Host Service の実装の名前でもない
 > (Host Service は現代ホストで動くサービスで、そのホストの OS は問わない。OS64 はその候補の 1 つ)。
 > OS32 の移植を 32 ビットに限る決定 (票 ARM_GAUGE §10「64 ビットは範囲外」) とは**別物として両立する** —
-> OS32 を 64 ビットへ移すのではなく、64 ビット機には別の OS を考える。本文と [AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) の「OS64」はこの意味で読む。
+> OS32 を 64 ビットへ移すのではなく、64 ビット機には別の OS を考える。本文と `docs/tasks/vision/AUXILIARY_CORE_SERVICE.md` の「OS64」はこの意味で読む。
 
 ## 目的
 
@@ -104,7 +104,7 @@ OS32 / OS64による保存は「電源が入る」「当時のソフトが起動
 
 ## Auxiliary Core Serviceとの関係
 
-[AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) の補助コア利用も、この原則に従う。
+`docs/tasks/vision/AUXILIARY_CORE_SERVICE.md` の補助コア利用も、この原則に従う。
 
 余剰コアが存在するからといってOS32を一般的なSMP OSへ変えるのではない。補助コアは、その実機内部で完結させることに意味があり、かつ固定機能として単純化できる仕事へ利用する。
 

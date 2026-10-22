@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: C / 前提: C1 完了 + K1 完了 (共有ヘッダ確定)。動作確認は W1 と結合後
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: T1〜T5, T7, U1〜U3, U5〜U7, U9 / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §9.4
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: T1〜T5, T7, U1〜U3, U5〜U7, U9 / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §9.4
 > 排他: `userland/rust/libos32gui/**`、`userland/rust/gui_demo/**`
 
 ## ゴール

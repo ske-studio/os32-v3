@@ -5,7 +5,7 @@
 > 発行: 2026-09-28 / それまでの状態: **完了 (画面を見ない条件で受け入れ、2026-09-29)** — 実機の目視確認だけ残る。記録と受け入れは [TASK_PEGC480_REALHW](../../tasks/realhw/TASK_PEGC480_REALHW.md) §3-3・§5、[RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1
 > 対象リリース: **kernel v2.1**
 > 対象: PC-9821Ra266 実機 / PEGC 640x480x256
-> 関連: [GUI設計](../../tasks/gui/DESIGN.md) / [PEGC完了記録](../gui_v11/TASK_H2_pegc.md) / [ドライバ仕様](../../05_drivers.md#5-5-グラフィック-gfx-hal--libos32gfx)
+> 関連: [GUI設計](../../decisions/gui/DESIGN.md) / [PEGC完了記録](../gui_v11/TASK_H2_pegc.md) / [ドライバ仕様](../../05_drivers.md#5-5-グラフィック-gfx-hal--libos32gfx)
 
 ## 0. 位置づけ
 

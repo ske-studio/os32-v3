@@ -1,8 +1,8 @@
 # GUI シェル v1.2 — 作業分担票
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-07)**  
-> 親: [../DESIGN.md](../../tasks/gui/DESIGN.md)  
-> 基底契約: [../API_CONTRACTS.md](../../tasks/gui/API_CONTRACTS.md)  
+> 親: [../DESIGN.md](../../decisions/gui/DESIGN.md)  
+> 基底契約: [../API_CONTRACTS.md](../../decisions/gui/API_CONTRACTS.md)  
 > v1.2 追加契約: [CONTRACTS.md](../../tasks/gui/v12/CONTRACTS.md)  
 > 前提: GUI v1.1 G1〜G5 完了
 

@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: C / 前提: C2 完了。K3 と同時 (一斉再ビルドを 1 回で)
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §9.3 (案 A)
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §9.3 (案 A)
 > 排他: `userland/rust/libos32gui/**`、`sdk/rust/os32api/src/gui/**`
 
 ## ゴール

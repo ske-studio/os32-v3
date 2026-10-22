@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: W / 前提: W1 完了 + C2 完了 (ウィジェット側の `Text` / `Palette` 受け)
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: U2a, G8, U4 / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §9.4
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: U2a, G8, U4 / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §9.4
 > 排他: `userland/gshell/**`
 
 ## ゴール

@@ -4,7 +4,7 @@
 
 基点: `feat/gui` = `c342c36`。
 正典: [`../../ROADMAP.md`](../../ROADMAP.md) §1 の v1.4 表、
-[`DESIGN.md`](../../tasks/gui/DESIGN.md)、[`API_CONTRACTS.md`](../../tasks/gui/API_CONTRACTS.md)。
+[`DESIGN.md`](../../decisions/gui/DESIGN.md)、[`API_CONTRACTS.md`](../../decisions/gui/API_CONTRACTS.md)。
 
 ## 0. これは何のための票か
 
@@ -37,7 +37,7 @@ API の穴が出る場所**なので、正面から扱う。
 
 ### 決裁 A1 — **新しい種類を末尾に追記する** (ユーザー、2026-09-17)
 
-[API_CONTRACTS.md](../../tasks/gui/API_CONTRACTS.md) は **「op 番号・イベント種別・構造体は末尾追記のみ。
+[API_CONTRACTS.md](../../decisions/gui/API_CONTRACTS.md) は **「op 番号・イベント種別・構造体は末尾追記のみ。
 以後の変更にはユーザ承認を要する」**と凍結している。
 
 - **既存の `WK_TEXTBOX` は 1 行のまま。触らない。** 既存の利用者 (filer ほか) に影響が出ない。

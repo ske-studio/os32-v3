@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: C (Rust, `userland/rust/libos32gui/`) / 前提: なし (今すぐ着手可)
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: G1〜G7 / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §2, §8, §9.4
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: G1〜G7 / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §2, §8, §9.4
 > 排他: `userland/rust/libos32gui/**`、`userland/rust/gui_demo/**`、`sdk/rust/os32api/src/gui/**` (新規)
 
 ## ゴール

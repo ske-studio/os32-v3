@@ -168,7 +168,7 @@ CTRL_SET = DATA_SELECT | RUN
 - CPU は転送に関与しない。**OS32 の `gfx_present()` はむしろ安く実装できる**。
 - ただし Linux 実装は `drm_atomic_helper_damage_merged()` で damage 矩形を求めておきながら、
   **その矩形を使わず毎回全画面を転送している** (`brain_fb_dirty_full`)。
-  OS32 の InvalidateRect 方式 (`docs/tasks/gui/DESIGN.md`) を活かすなら、
+  OS32 の InvalidateRect 方式 (`docs/decisions/gui/DESIGN.md`) を活かすなら、
   ILI9805 の Column/Page Address Set で転送範囲を絞る余地がここにある。
 - 代償として **キャッシュ管理が必須**。ARM926 は D キャッシュが VIVT でハードウェアコヒーレンシが無いため、
   描画後・DMA 前に clean が要る。OS32 の GFX は x86 のコヒーレントキャッシュを暗黙に前提にしている。

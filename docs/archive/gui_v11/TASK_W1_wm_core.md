@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > (同日改訂: 契約 T8 / G4 / T3 / T9 を反映) / レーン: W (Rust, `userland/gshell/` 新規) / 前提: K1 完了 (共有ヘッダ、`gui_register`) + H1 完了 (`gfx_stats`) + K4-0 完了 (`sys_switch_shell`)
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: T2, T2a, T3, T4, U1, U2, U5, U8, G4, G6 / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §1 R1〜R4, §9.2
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 契約: T2, T2a, T3, T4, U1, U2, U5, U8, G4, G6 / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §1 R1〜R4, §9.2
 > 排他: `userland/gshell/**`。`build/programs.mk` / `userland/deploy.yaml` への追加は PM 経由
 
 ## ゴール

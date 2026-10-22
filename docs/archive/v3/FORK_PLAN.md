@@ -46,7 +46,7 @@
 |---|---|---|---|
 | `docs/INDEX.md` (正典表)、`01`〜`10_*.md`、`CONSTRAINTS.md`、`POLICY_DEV.md`、`POLICY_DEBUG.md`、`ROADMAP.md`、`DEVELOPMENT.md`、`KAPI_SPEC.md`、`TESTS.md` (生成)、`MGX_FORMAT.md`、`NHD_FORMAT.md`、`BENCHMARK.md`、`DESIGN_APP_FIRST.md`、`.orphans-allow` | 25 | **持つ** | INDEX 冒頭の注記を「正典はここ (os32-v3)。os32 は v2.1 時点の記録」に書き換える (§3 e)。ROADMAP §0 の版数表は v3 の行を「現行」に。POLICY_DEBUG §4 は全部持つ (v3 でも踏む罠。普遍的なものは CASE_STUDIES に要約) |
 | `docs/RELEASE_v2.1.md` | 1 | **持つ** (経緯の要約として) | fork の起点の記録。HISTORY.md から指す |
-| `docs/AUXILIARY_CORE_SERVICE.md` `LEGACY_LIVING_PRESERVATION.md` `V4_GAME_PLATFORM_DRAFT.md` | 3 | **持つ** (草案) | ROADMAP §0 の版数表に載せない扱いは変えない |
+| `docs/tasks/vision/AUXILIARY_CORE_SERVICE.md` `LEGACY_LIVING_PRESERVATION.md` `V4_GAME_PLATFORM_DRAFT.md` | 3 | **持つ** (草案) | ROADMAP §0 の版数表に載せない扱いは変えない |
 | `docs/manpages/` | 67 | **持つ** | コマンドの正典。`sfs.1` の `/dev/ttyUSB0` は一般名で問題なし |
 | `docs/images/` (2 png) | 2 | **持つ** | README が使う |
 | `docs/tasks/v3/` (8 本 + 本票) | 9 | **持つ** | 正典の移転先。V3_PLAN_DRAFT は本案に昇格するまで草案のまま |

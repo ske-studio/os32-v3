@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-10) / 状態: **受入完了 (2026-09-12)**
 > レーン: K (C、カーネル背骨) / 前提: ユーザー決裁 B ([AUDIT §6](AUDIT_2026-09-10.md))
-> 親: [PLAN.md](../../tasks/gui/v13/PLAN.md) / 契約: T2, T2a, T3, T4, U8 ([API_CONTRACTS](../../tasks/gui/API_CONTRACTS.md))、
+> 親: [PLAN.md](../../tasks/gui/v13/PLAN.md) / 契約: T2, T2a, T3, T4, U8 ([API_CONTRACTS](../../decisions/gui/API_CONTRACTS.md))、
 > v1.2 S1 (暫定「1 本」を撤廃)、S2〜S8 ([v12 CONTRACTS](../../tasks/gui/v12/CONTRACTS.md))
 > 排他: `kernel/**` `exec/**` `kapi/**` `include/memmap.h` `sdk/kapi.json` + 生成物。
 > gshell 側 (`userland/gshell/**`) は K5b で W レーンと調停する。

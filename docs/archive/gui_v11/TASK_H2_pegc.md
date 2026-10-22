@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: H / 前提: H1 完了
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §3.1, §8 (PEGC), §10-2 / 契約: G5, G8
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §3.1, §8 (PEGC), §10-2 / 契約: G5, G8
 > 排他: `gfx/backend_pegc.c` (新規)、`include/pegc.h` (新規、ポート定数)
 > 位置づけ: v1.1 後半。ゲート G5 の前半
 

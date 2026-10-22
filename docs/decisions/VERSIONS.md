@@ -11,7 +11,7 @@
 | **v3** | **現行** (2026-09-30〜、このリポジトリ os32-v3。**本案は 2026-09-30 に確定。段の進捗は各票の状態行、現在地は HANDOVER**) | 機能を足す前に入れ物を作り直す版。本案のうち目的・範囲・目標は [V3_GOALS.md](V3_GOALS.md)、柱と順序は tasks/v3/V3_PLAN.md、票は INDEX の「v3」節。一部の票 (HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯) は v2.1 に先行して着地した。**2026-09-15 のユーザー決裁で「v2」ではなく v3 と呼ぶ** (出荷済み 2.0 と衝突するため) | ROADMAP §2 |
 | ゲーム基盤 | v4 (草案) | `docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`。v3 の後 | — |
 
-**OS64** (草案 [LEGACY_LIVING_PRESERVATION.md](../LEGACY_LIVING_PRESERVATION.md)・[AUXILIARY_CORE_SERVICE.md](../AUXILIARY_CORE_SERVICE.md) に出る語) は**版数表に載せない** (ユーザー決定 2026-09-29) — OS32 とは別の 64 ビット OS の構想で、v3 / v4 の範囲に入れない (ユーザー決定 2026-09-30)。語の定義は LEGACY_LIVING_PRESERVATION.md の冒頭。
+**OS64** (草案 `docs/tasks/vision/LEGACY_LIVING_PRESERVATION.md`・`docs/tasks/vision/AUXILIARY_CORE_SERVICE.md` に出る語) は**版数表に載せない** (ユーザー決定 2026-09-29) — OS32 とは別の 64 ビット OS の構想で、v3 / v4 の範囲に入れない (ユーザー決定 2026-09-30)。語の定義は LEGACY_LIVING_PRESERVATION.md の冒頭。
 
 ## 2. 現行の開発 (v3 = このリポジトリ os32-v3) と、os32 v2.x の扱い (ユーザー決定 2026-09-29)
 

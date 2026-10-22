@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > レーン: H (C, カーネル `gfx/`) / 前提: なし (今すぐ着手可)
-> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../tasks/gui/DESIGN.md) §2 B1〜B3, §6, §7, §8 / 契約: G5, G7, G8
+> 親: [TASKS.md](../../tasks/gui/TASKS.md) / 設計: [DESIGN.md](../../decisions/gui/DESIGN.md) §2 B1〜B3, §6, §7, §8 / 契約: G5, G7, G8
 > 排他: `gfx/**`、`include/gfx_hal.h` (新規)
 
 ## ゴール
