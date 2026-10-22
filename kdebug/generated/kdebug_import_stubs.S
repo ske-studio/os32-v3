@@ -1341,4 +1341,9 @@ pci_cfg_write32:
 pci_cfg_write16:
     jmp *kdebug_import_slots+1068
 .size pci_cfg_write16, .-pci_cfg_write16
+.globl hwdev_module_ops
+.type hwdev_module_ops, @function
+hwdev_module_ops:
+    jmp *kdebug_import_slots+1072
+.size hwdev_module_ops, .-hwdev_module_ops
 .section .note.GNU-stack,"",@progbits

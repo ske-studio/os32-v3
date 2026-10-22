@@ -2145,6 +2145,14 @@
       "source": "drivers/pci.h",
       "context_safe": false,
       "index": 267
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "hwdev_module_ops",
+      "source": "kernel/hwdev_module.h",
+      "context_safe": false,
+      "index": 268
     }
   ]
 }

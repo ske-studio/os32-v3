@@ -34,6 +34,7 @@
 #include "kernel/display_restore.h"
 #include "kernel/dma_pool.h"
 #include "kernel/gui.h"
+#include "kernel/hwdev_module.h"
 #include "kernel/idt.h"
 #include "kernel/irq.h"
 #include "kernel/irq_math.h"
@@ -123,8 +124,8 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
-#define KDEBUG_IMPORT_COUNT 268
-#define KDEBUG_ABI_GEN 0x44cfc955u
+#define KDEBUG_IMPORT_COUNT 269
+#define KDEBUG_ABI_GEN 0x7c4ceeedu
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];
