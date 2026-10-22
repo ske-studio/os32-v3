@@ -1,6 +1,6 @@
 # gui_gate.py の「GUI に入れたか」— ホスト試験の記録 (RED→GREEN)
 
-- 経緯: [`docs/archive/settings/TASK_S5.md`](../../docs/archive/settings/TASK_S5.md) §6 の
+- 経緯: `docs/archive/settings/TASK_S5.md` §6 の
   R2 の予備調査 (2026-09-29)、[`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-31。
   台本が rshell を閉じずに `os32gui` を打つと、4 文字ずつの text が `os32` / `gui` の
   2 コマンドになって GUI に入らず、`leave_gshell` の `ver` は CUI でも通るので

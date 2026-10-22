@@ -8,7 +8,7 @@
 > **ゴールの改定 (ユーザー決定 2026-10-15)**: ゴールは **`hsync` が LAN 経由で動くこと** — 実機の `/host` (今はシリアル越しの SerialFS、ノートの `tools/serialfs_host.py`) を LAN 越しにも出せるようにし、`hsync` 自体は変えずに LAN の速度で配備できるようにする。**印刷 (`lpr`) とダウンロード (`wget`) は後回し** (L-D2・L-E のうちその部分)。新しい段 **L-F (LAN 版の `/host`)** を本命に置き、L-C は L-F に要る分に絞る。L-F の設計は L-B の後に起こす (astra が書き Opus がレビュー、規則 [HW3])。
 > **通信の安全の方針 (ユーザー決定 2026-10-15)**: PC-9821 とホスト (ノート) のあいだの LAN は**平文でよい** — 家庭内のローカルで、狙う者はいない。OS32 の側に暗号・認証は入れない。**ホストから外へ出ていく通信の暗号化はホストの側が担う** (ダウンロード等を再開するとき)。相手の MAC の固定 (`SFS_LAN_PEER` / `lanfs_host.py --peer`) は取り違えを防ぐための設定で、防御ではない。キーによるペアリング (ホストがキーを出す → OS32 で入力 → 0x88B5 で MAC を交換して保存) は使い勝手の改善として後の段に残す。
 
-正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、[`../../archive/v3/PLAN.md`](../../archive/v3/PLAN.md) §1 (順序) ・§3 (ドライバの動的読み込み)、
+正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、`docs/archive/v3/PLAN.md` §1 (順序) ・§3 (ドライバの動的読み込み)、
 リンク層と Host Services は [`../network/LINK_PLAN.md`](../network/LINK_PLAN.md) / [`../network/HOST_SERVICES_PLAN.md`](../network/HOST_SERVICES_PLAN.md)。
 資料: `docs/hw/undocumented/io_pci.md` (PC-98 の PCI)、**`docs/hw/intel/8255x_open_source_sdm.pdf`** (Intel 8255x Open Source Software Developer Manual、
 341 ページ、2026-09-22 に Intel の公開 URL から取得。`docs/hw/` は著作権物のミラーで gitignore)。テキスト版 `8255x_open_source_sdm.txt` (9,133 行、`pdftotext -layout`) も同じ場所 — grep で引く。要点の所在: SCB = §6.3.2 (34 ページ)、EEPROM = §5/§6.3.4、Configure = 62 ページ、RFD = 100 ページ、PCI Interrupt Line = §4.1.15。
@@ -153,6 +153,6 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 | 2026-09-22 | L-A | `drivers/pci.c` / `pci_decode.c` (メカニズム #1、bus 0 + ブリッジ配下、32 件の静的表)、`lspci` / `pcidump` (KAPI **v58**: `pci_count` / `pci_get` / `pci_cfg_read32`)、`inpd/outpd` は `platform/pc98/platform_io.h`。判定は 2 値 (`0x80000000` と `0x80FFFFFC` の読み戻し) — 実機で `absent` なら 1 値に緩める。ホスト試験 `check-pci-decode-host` (9 ケース、変異 7 本)。**カーネル 446.9KB / 468KB (残り 21.1KB)**。NP21/W: `[pci] 0 devices`、`lspci: no PCI (mechanism #1 not present)`、kselftest 104/104 |
 | 2026-09-22 | L-D | `tools/lan_bridge.py` (AF_PACKET ↔ FrameStream、標準ライブラリのみ、MAC は透過、`--agent-mac` 照合)。ホスト試験 `check-lan-bridge-host` (9 ケース、変異 5 本、実物の host_agent と L0 往復)。実 NIC は未確認 |
 | 2026-09-22 | 検証 | `make clean` → `make all` → `make external` → `make check` exit 0 (98a0785) |
-| 2026-09-23 | **R1〜R4 (実機)** | **取得済み**。Ra266 の C バスブリッジは 0:6.0、82557 は 0:11.0 (8086:1229)、BAR1 I/O 0x6000、IRQ 3 / pin A。BIOS による窓割当済み、PCI メカニズム #1 が動作。[生ダンプ・判定の証拠](../../archive/realhw/LAN_PCI_EVIDENCE_2026-09-23.md)。PIRQ 対応の解読と R5〜R7 は別途確認 |
+| 2026-09-23 | **R1〜R4 (実機)** | **取得済み**。Ra266 の C バスブリッジは 0:6.0、82557 は 0:11.0 (8086:1229)、BAR1 I/O 0x6000、IRQ 3 / pin A。BIOS による窓割当済み、PCI メカニズム #1 が動作。生ダンプ・判定の証拠 (アーカイブ: `docs/archive/realhw/LAN_PCI_EVIDENCE_2026-09-23.md`)。PIRQ 対応の解読と R5〜R7 は別途確認 |
 
 **R1〜R4 は 2026-09-23 に取得済み (上の表)**。2 値判定はそのまま通った (6 装置)。次の実機の回は **R5 (EEPROM から MAC)** — L-B の最小片が要る。

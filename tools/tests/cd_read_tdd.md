@@ -224,7 +224,7 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   UA を 1 回しか出し直さない) は全部 RED。全 61 本 RED / 0 SURVIVED (対照は SURVIVED)
 - ATAPI の待ち上限 (ループ回数) を tick の秒単位にする件は別票
 
-## 3-6. 待ちの上限を秒で (2026-09-26、[TASK_ATAPI_TIMEOUT](../../docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md))
+## 3-6. 待ちの上限を秒で (2026-09-26、TASK_ATAPI_TIMEOUT (アーカイブ: `docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md`))
 
 - BSY / DRQ の待ちを `IDE_TIMEOUT_LOOP` (100 万回の inp) から**時間**へ: `atapi_wait_clear` が読み 1 回ごとに
   `cpu_delay_us(ATAPI_POLL_US = 100µs)` を挟んで合計を数える。上限は `ATAPI_CMD_TIMEOUT_US` 10 秒 (init の間は

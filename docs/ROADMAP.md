@@ -6,10 +6,10 @@
 
 | 線 | 現在 | 意味 | 記録 |
 |---|---|---|---|
-| **カーネル** | **2.1 — 完了 (os32、戻り先)** (タグ `v2.1`、2026-09-29、KernelAPI v68。os32-v3 の初期コミットはこの時点の写し) | 2.0 (2026-09-03) はリング 3 (CPL=3) ネイティブ。2.1 は **v3 へ進む前の区切り** — 実機 PC-9821Ra266 で FD 起動・CD からの HDD インストール・HDD 起動まで通し、Ra266 の PEGC 640x480 を画面を見ない条件で受け入れた (ユーザー決定 2026-09-29) | [RELEASE_v2.1.md](RELEASE_v2.1.md)、[CHANGELOG.md](../CHANGELOG.md)、[archive/kernel_v2/PLAN.md](archive/kernel_v2/PLAN.md) |
+| **カーネル** | **2.1 — 完了 (os32、戻り先)** (タグ `v2.1`、2026-09-29、KernelAPI v68。os32-v3 の初期コミットはこの時点の写し) | 2.0 (2026-09-03) はリング 3 (CPL=3) ネイティブ。2.1 は **v3 へ進む前の区切り** — 実機 PC-9821Ra266 で FD 起動・CD からの HDD インストール・HDD 起動まで通し、Ra266 の PEGC 640x480 を画面を見ない条件で受け入れた (ユーザー決定 2026-09-29) | [RELEASE_v2.1.md](RELEASE_v2.1.md)、[CHANGELOG.md](../CHANGELOG.md)、`docs/archive/kernel_v2/PLAN.md` |
 | **GUI シェル** | **1.4 で閉じた** (2026-09-29) | 1.1〜1.4 は本書 §1。1.4 の範囲 (Host Services N1〜N4、エディタ GUI 版、About、R2 計測) はすべて v2.1 に入った。N5 (実機 LAN) は実機の内蔵 82557 の票 (L-B) に吸収。**GUI の版はここで閉じ、以後の GUI の作業は v3 の線で扱う** (ユーザー決定 2026-09-29) | §1 |
 | **v3** | **現行** (2026-09-30〜、このリポジトリ os32-v3。**本案は 2026-09-30 に確定。段の進捗は各票の状態行、現在地は [HANDOVER](tasks/agents/HANDOVER_2026-10-09.md)**) | 機能を足す前に入れ物を作り直す版。本案 (目的・範囲・目標・柱と順序) は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md)、票は INDEX の「v3」節。一部の票 (HAL_WIRING・PCM・KHEAP の切り直し・デバイス窓の帯) は v2.1 に先行して着地した。**2026-09-15 のユーザー決裁で「v2」ではなく v3 と呼ぶ** (出荷済み 2.0 と衝突するため) | §2 |
-| ゲーム基盤 | v4 (草案) | [V4_GAME_PLATFORM_DRAFT.md](archive/v4/V4_GAME_PLATFORM_DRAFT.md)。v3 の後 | — |
+| ゲーム基盤 | v4 (草案) | `docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`。v3 の後 | — |
 
 **OS64** (草案 [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md)・[AUXILIARY_CORE_SERVICE.md](AUXILIARY_CORE_SERVICE.md) に出る語) は**版数表に載せない** (ユーザー決定 2026-09-29) — OS32 とは別の 64 ビット OS の構想で、v3 / v4 の範囲に入れない (ユーザー決定 2026-09-30)。語の定義は LEGACY_LIVING_PRESERVATION.md の冒頭。
 
@@ -19,7 +19,7 @@
   新しい履歴で始め、v2.x までの履歴は os32 に)。本案は [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (2026-09-30 確定)、草案と票は `docs/tasks/v3/` ほか (INDEX の「v3」節)。
 - **[os32](https://github.com/ske-studio/os32) の v2.x — タグ `v2.1`、`main` — は「戻り先」として保つ**。新機能は入れない。
   手を入れるのは、**戻る必要が生じたとき**と**致命的な不具合のとき**だけ。os32 側の docs は v2.1 時点の記録で、更新しない。
-- fork の段取りで**決まっていること** (未決は無い。**2026-09-30 に実施、os32-v3** — 段取りと結果は [tasks/v3/FORK_PLAN.md §3](archive/v3/FORK_PLAN.md)):
+- fork の段取りで**決まっていること** (未決は無い。**2026-09-30 に実施、os32-v3** — 段取りと結果は tasks/v3/FORK_PLAN.md §3 (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)):
 
 | 項目 | 決定 |
 |---|---|
@@ -31,12 +31,12 @@
 | 共有の道具 (`tools/`、NP21/W のフォーク `~/np21w-src`) | 共有するが、**動作保証は v3 側だけ** — v2.x 側で動かなくなっても直す義務は無い |
 
 **KernelAPI の版と関数表の容量**: 本数・残り・オフセットの正典は [KAPI_SPEC.md](KAPI_SPEC.md) (v63 からデータ欄は 0x4B8 に固定、
-関数表の容量 R = 300、票 [TASK_KAPI_DATA_FIELDS](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md))。ここに置く規則は 1 つ:
+関数表の容量 R = 300、票 TASK_KAPI_DATA_FIELDS (アーカイブ: `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`))。ここに置く規則は 1 つ:
 **残りが 16 本を切ったら次の R を決める票を起こす** — R を変えるとデータ欄が動き、全バイナリの作り直し (v63 と同じ移行) になる。
 トランポリン 1 ページの上限は R ≤ 318。配備順は
 [08_build.md §8-4](08_build.md#kapi-v63-移行) を参照する。
 
-*v1.0 到達までの開発履歴は [archive/ROADMAP_v1.0.md](archive/ROADMAP_v1.0.md) を参照*
+*v1.0 到達までの開発履歴は `docs/archive/ROADMAP_v1.0.md` を参照*
 
 ---
 
@@ -150,14 +150,14 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### v1.2 — 「デスクトップ環境」
 
-> **状況 (2026-09-07)**: main へマージ済み (`d739494`)。G0〜G5 の検証記録と既知の検証上の制約は [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md) §10 を参照。ESC 即時切替と上部バーは撤去済み (`DEBUG_SHORTCUTS`)。
+> **状況 (2026-09-07)**: main へマージ済み (`d739494`)。G0〜G5 の検証記録と既知の検証上の制約は `docs/archive/gui_v12/TASKS.md` §10 を参照。ESC 即時切替と上部バーは撤去済み (`DEBUG_SHORTCUTS`)。
 
 **ゴール**: taskbar・Start・File Manager・launcher が揃い、GUIだけで基本操作が完結する。app 置換、CUI 切替、system halt を現在の single-foreground-app model を壊さず実現する。
 
 正式設計:
 
 - [tasks/gui/v12/CONTRACTS.md](tasks/gui/v12/CONTRACTS.md)
-- [archive/gui_v12/TASKS.md](archive/gui_v12/TASKS.md)
+- `docs/archive/gui_v12/TASKS.md`
 
 **KAPI v42 は維持。v43 は network / Host Services 用予約。** GUI wire protocol と shlib jump table の末尾追記で進める。
 
@@ -200,10 +200,10 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### v1.3 — 「ターミナル統合とCUI抽象化」 ✅ 完了 (2026-09-14)
 
-全項目受入済み・main にマージ済み (`fac0d89`)。残件の小物 4 件 (タスクバー経路の試験、`stat`、S6 `tar`、試験の棚卸し文書) も 2026-09-14 に feat/gui へ着地。持ち越し: S6-P (ext2 の小書き込み性能、[archive/settings/TASK_S6.md](archive/settings/TASK_S6.md))、F3a〜c 等の保留 5 件 ([archive/agents/HANDOVER_v14.md](archive/agents/HANDOVER_v14.md) §3) は **2026-09-30 に v3 の U6 で決裁「一部」** ([archive/v3/U6_PENDING_REVIEW.md](archive/v3/U6_PENDING_REVIEW.md)、[decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) D29〜D34): F3a / F3c・F2・FEP_BOUNDARY は v3 P1 の T2 / T4 / T5a の要件、DEVICE_RESERVATION は改訂して P4、F3b は TASK_DICT_META の後、MEMORY_RAM_INTEGRATION は撤回 ([archive/settings/](archive/settings/MEMORY_RAM_INTEGRATION.md))。
+全項目受入済み・main にマージ済み (`fac0d89`)。残件の小物 4 件 (タスクバー経路の試験、`stat`、S6 `tar`、試験の棚卸し文書) も 2026-09-14 に feat/gui へ着地。持ち越し: S6-P (ext2 の小書き込み性能、`docs/archive/settings/TASK_S6.md`)、F3a〜c 等の保留 5 件 (`docs/archive/agents/HANDOVER_v14.md` §3) は **2026-09-30 に v3 の U6 で決裁「一部」** (`docs/archive/v3/U6_PENDING_REVIEW.md`、[decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) D29〜D34): F3a / F3c・F2・FEP_BOUNDARY は v3 P1 の T2 / T4 / T5a の要件、DEVICE_RESERVATION は改訂して P4、F3b は TASK_DICT_META の後、MEMORY_RAM_INTEGRATION は撤回 (archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`))。
 
-着手計画: [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md)、監査と決裁: [AUDIT_2026-09-10](archive/gui_v13/AUDIT_2026-09-10.md)。
-2026-09-10 決裁: **GUI アプリ 4 本の同時実行 (契約 T2a) を v1.3 の最初に置く** ([K5](archive/gui_v13/TASK_K5_multiapp.md))。
+着手計画: [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md)、監査と決裁: AUDIT_2026-09-10 (アーカイブ: `docs/archive/gui_v13/AUDIT_2026-09-10.md`)。
+2026-09-10 決裁: **GUI アプリ 4 本の同時実行 (契約 T2a) を v1.3 の最初に置く** (K5 (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`))。
 端末は外部アプリ。hermes 期の T5b (常駐パネル) は撤去、T6a (有限実行) は破棄。
 
 **ゴール**: GUI desktop 上で CUI command が実行でき、既存 CUI program との互換性を確保する。
@@ -212,7 +212,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 | 作業 | カテゴリ | 備考 |
 |------|---------|------|
-| **GUI アプリ 4 本の同時実行** | kernel / GUI | 契約 T2/T2a。PD 切替は `OP_WAIT` の中だけ、5 本目は `ERR_FULL`、資源回収はアプリ単位。[K5](archive/gui_v13/TASK_K5_multiapp.md)。端末と CUI 子の同居の土台 |
+| **GUI アプリ 4 本の同時実行** | kernel / GUI | 契約 T2/T2a。PD 切替は `OP_WAIT` の中だけ、5 本目は `ERR_FULL`、資源回収はアプリ単位。K5 (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`)。端末と CUI 子の同居の土台 |
 | ターミナルウィンドウ | app | **外部アプリ**。libos32term (セルモデル) + libos32term_render (厳密 clip) を Paint に接続 |
 | CUI program output redirect | kernel | console_write -> terminal window virtual console |
 | full-screen GFX program | GUI | exec_run後にGUI全体再描画 |
@@ -252,10 +252,10 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 | PEGC / Cirrus の 8bpp バックエンド (R2) (**受入完了 2026-09-29**) | GUI | 基盤 | S5 から先送り。PEGC 640x480・NP21/W の Cirrus 640x480 で gui_gate v11/v12g1/v12g4 が通る ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2) |
 | N4 のアプリ側 (ファイラの印刷、端末のコピー / 貼り付け) (**受入完了 2026-09-15**) | app | Claude Code PM + Opus 5 コーダー (別エージェント案は 2026-09-14 に撤回) | libos32gui の `host_*` ラッパー経由 |
 | About dialog (**受入完了 2026-09-29**) | app | アプリ層 | OS32 About (`about.bin`、`ver` と同じ内容) |
-| text editor GUI (**受入完了 2026-09-18**) | app | Claude Code PM + Opus 5 コーダー | edit.bin GUI版。**API の退行検出を兼ねる** ([archive/gui_v14/TASK_EDIT_GUI.md](archive/gui_v14/TASK_EDIT_GUI.md)) |
+| text editor GUI (**受入完了 2026-09-18**) | app | Claude Code PM + Opus 5 コーダー | edit.bin GUI版。**API の退行検出を兼ねる** (`docs/archive/gui_v14/TASK_EDIT_GUI.md`) |
 | Host Services N5 (実機 LAN、Npcap + scapy) | host / driver | — | **実機の内蔵 82557 の票に吸収** ([tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md) の L-B、v3 の線) |
-| hsync H1 / H3 (同サイズ差し替えの検出、日時前置判定、KAPI v52) | system / fs | Claude Code PM + Opus 5 コーダー | **受入完了 2026-09-15**。H2 (置換の安全化) / H4 (配備マニフェスト) も **受入完了 2026-09-16** ([archive/shell/](archive/shell/TASK_H2.md)) |
-| ext2 の B8 (読み取り失敗の読み替えを塞ぐ、remount-ro 相当) | fs / vfs | 同上 | **受入完了 2026-09-15** ([archive/shell/TASK_FS_TYPE.md](archive/shell/TASK_FS_TYPE.md)) |
+| hsync H1 / H3 (同サイズ差し替えの検出、日時前置判定、KAPI v52) | system / fs | Claude Code PM + Opus 5 コーダー | **受入完了 2026-09-15**。H2 (置換の安全化) / H4 (配備マニフェスト) も **受入完了 2026-09-16** (archive/shell/ (アーカイブ: `docs/archive/shell/TASK_H2.md`)) |
+| ext2 の B8 (読み取り失敗の読み替えを塞ぐ、remount-ro 相当) | fs / vfs | 同上 | **受入完了 2026-09-15** (`docs/archive/shell/TASK_FS_TYPE.md`) |
 
 先送り (v3 以降、[§2](#2-長期ロードマップ-次期カーネル-v3-以降) の「GUI アプリケーション群」): 設定アプリの拡張項目、
 image viewer (VBZ / VDP / BMP)、music player、`sed` / `awk`。
@@ -270,7 +270,7 @@ v3 の新しい設計へ進む前に、現行系で判明した実機依存の�
 - **実機 Ra266 の PEGC 640x480**: 実機の ROM (INT 18h AH=30h) が 480 ラインへ入る・戻るときの OUT 列を `v86 -g` で記録し、
   `pegc_apply_timing` をその順序と値に合わせた。画面を見ない条件 (ROM の OUT 列との一致・NP21/W 回帰・実機 `pegcchk`) で受け入れ
   ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、正典の票は [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md)、起票は
-  [archive/realhw_v21/TASK_PEGC_RA266_TIMING.md](archive/realhw_v21/TASK_PEGC_RA266_TIMING.md))。
+  `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md`)。
 - **v2.1 の後に残った確認** (新機能ではない。v3 と並行、実機の前に居るときなど): ~~PEGC の GUI の目視~~ (2026-09-30 合格)、KBD_NAV の K3、FD144 の実機、
   HAL_WIRING の W7、PCM の E4〜E6、APP_BAND_PDE の §5 のゲスト受入。一覧は最新の引き継ぎ (INDEX 正典表の「引き継ぎ」) の残件表。
 
@@ -312,7 +312,7 @@ Trident のバックエンドは**保留** — NP21/W の `tgui9680.c` が結線
 書いても検証できない。**LAN と違って「無くても困らない」** (PEGC が使える) ので結論が変わる。
 → **2026-09-29 のユーザー決定で着手** (「Cirrus はエミュレータ用、実機は Trident」)。調査・設計は [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md)。
 
-### v3 の全体計画 → [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30。策定時の計画は [archive/v3/PLAN.md](archive/v3/PLAN.md))
+### v3 の全体計画 → [tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) (本案、2026-09-30。策定時の計画は `docs/archive/v3/PLAN.md`)
 
 **機能を足す前に入れ物を作り直す。** 策定時 (2026-09-17) の順序は
 **C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → Intel 82557** (PCI と 82557 は 2026-09-22 の決裁で静的に先行し、
@@ -328,12 +328,12 @@ v2.1 に入った — 本案 §4 で順序を引き直した)。カーネル本�
 恒等写像のまま、アプリだけ 0x80000000〜 の私有写像。物理地図と所有権台帳を先に作り、固定帯はカーネル 3MB + シェル 1MB だけ。
 SQLite は同一リンクをやめてモジュール、低位 640KB は V86 へ。策定時に未決だった**本体の上限**はその討論で決まった
 (鎖の終端 ≤ 0x3E0000 をリンカ ASSERT で、本体の予算 2,516KB、余りは KERNEL_SLACK として池へ)。ARM との順序と `u32` / `<stdint.h>` は
-[archive/v3/V3_PLAN_DRAFT.md](archive/v3/V3_PLAN_DRAFT.md) §3 P0 / §1-5 (ARM は v3 の後、固定長は維持) のまま。
+`docs/archive/v3/V3_PLAN_DRAFT.md` §3 P0 / §1-5 (ARM は v3 の後、固定長は維持) のまま。
 
 策定時 (2026-09-17) は、配置超過と表明の検査不足を背景に、原因を切り分けられるよう C11 化を先に、再配置を後にする順序を選んだ。
 T0 の C11 移行は受入完了。現在の順序・決定は [V3_PLAN.md](tasks/v3/V3_PLAN.md)、
 型と C11 機能の採用範囲は [POLICY_DEV.md §2](POLICY_DEV.md) を参照。
-策定時の懸念は [TASK_KSTACK_USER.md §7-5](archive/kernel_v21/TASK_KSTACK_USER.md) に残す。
+策定時の懸念は TASK_KSTACK_USER.md §7-5 (アーカイブ: `docs/archive/kernel_v21/TASK_KSTACK_USER.md`) に残す。
 
 ### 他アーキテクチャへの移植に備えた調査 (継続)
 

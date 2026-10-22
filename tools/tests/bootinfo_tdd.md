@@ -1,6 +1,6 @@
 # bootinfo — RED → GREEN の記録
 
-票: [`docs/archive/realhw_v21/TASK_HDD_INSTALL.md`](../../docs/archive/realhw_v21/TASK_HDD_INSTALL.md) 段 0 (§1-v3 N1 / N2)
+票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 0 (§1-v3 N1 / N2)
 対象: `kernel/bootinfo_check.c` (検証と表示行) / `boot/bootinfo.inc` (NASM 側の写し) / `kernel/bootinfo.c` (写す側)
 試験: `tools/tests/test_bootinfo.py` + `tools/tests/bootinfo_host.c`
 実行: `make check-bootinfo-host` (`check-par` の列)

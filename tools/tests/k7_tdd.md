@@ -1,6 +1,6 @@
 # K7-K (入力統合、カーネル + KAPI v47) — ホスト TDD の記録
 
-票: [docs/archive/gui_v13/TASK_K7_input.md](../../docs/archive/gui_v13/TASK_K7_input.md) §1 D1〜D7 / §5 (R1 / R2 / B / C / D)
+票: `docs/archive/gui_v13/TASK_K7_input.md` §1 D1〜D7 / §5 (R1 / R2 / B / C / D)
 実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
 `exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐) / `kernel/kselftest.c` / `sdk/kapi.json` (v47)
 試験: `tools/tests/kbd_inject_host.c` + `test_kbd_inject.py` (`make check-kbd-inject-host`) と

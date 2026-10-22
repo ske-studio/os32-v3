@@ -16,23 +16,23 @@
 |---|---:|---|---|
 | [V3_PLAN](V3_PLAN.md) | 116 | 実装中 (10-03) | 目的・範囲・柱・順序の正典。状態行と P1 行の「3c4171a 時点 / e1〜e4 と h の準備」が古い → 「T2d〜g 受入済み、T2h は R0〜R7 一巡、残は台帳」の 1 行に。§4 末尾の T3 前関門の文は保つ |
 | [MEMMAP_V3](../../decisions/MEMMAP_V3.md) | 630 | 設計中・方針確定 (09-30) | D1〜D36 の正典。保持。状態行の「実装は未着手」を「T0〜T2 の状態は各票」に直すだけ (D の承認と進捗を分ける) |
-| [TASK_T2_APPBAND](TASK_T2_APPBAND.md) | 460 | 実装中 (10-01) | T2 親契約の正典。a〜c の実績は既に [T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md)。状態行の「ここで一旦止め…」を「d〜h は子票」に。§3-1 旧世代 INVAL / §3-4 Unicode 撤去担当の 2 点は §4 |
-| [TASK_T2D_T2H](TASK_T2D_T2H.md) | 631 | 実装中 (10-13) | d〜h 契約の正典。10-06 に実行記録 (3,631 行) を [RECORDS](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ分けた後、§5-1 に R0〜R7・h9 の段落 (約 12 段落、1 段落 300〜700 字) が再び溜まった → §5 の案で分ける |
-| [T2E_MUTANTS](../../archive/v3/T2E_MUTANTS.md) / [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md) | 77 / 111 | 状態行なし (基点 83f2db7 / b43e814) | 変異対応表。受入が済んだ段の記録 → `docs/archive/v3/` へ (INDEX の正典表の行も archive を指す) |
+| [TASK_T2_APPBAND](TASK_T2_APPBAND.md) | 460 | 実装中 (10-01) | T2 親契約の正典。a〜c の実績は既に T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)。状態行の「ここで一旦止め…」を「d〜h は子票」に。§3-1 旧世代 INVAL / §3-4 Unicode 撤去担当の 2 点は §4 |
+| [TASK_T2D_T2H](TASK_T2D_T2H.md) | 631 | 実装中 (10-13) | d〜h 契約の正典。10-06 に実行記録 (3,631 行) を RECORDS (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) へ分けた後、§5-1 に R0〜R7・h9 の段落 (約 12 段落、1 段落 300〜700 字) が再び溜まった → §5 の案で分ける |
+| T2E_MUTANTS (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`) / T2G_MUTANTS (アーカイブ: `docs/archive/v3/T2G_MUTANTS.md`) | 77 / 111 | 状態行なし (基点 83f2db7 / b43e814) | 変異対応表。受入が済んだ段の記録 → `docs/archive/v3/` へ (INDEX の正典表の行も archive を指す) |
 | [T2H_EXTERNAL_GATE](T2H_EXTERNAL_GATE.md) | 80 | 状態行なし | H-7 再開時ゲートの正典。CLAUDE.md が参照。保持、状態行「現行 (決定による持越し)」を足す |
 | [TASK_T3_LAYOUT](TASK_T3_LAYOUT.md) | 124 | 設計中 (10-03、基点 3c4171a) | T3 契約の正典。§1 の着手条件「e5 は別 worktree…」と「T2 完了後に確定」の項が T2 完了で確定できる → §6 の再照合 (Fable 起草・astra レビュー) で 1 回更新。§1 の「T2h 受入後の一式で再計算」は予算の関門 (§4-1) |
 | [TASK_T4_T6_MODULES](TASK_T4_T6_MODULES.md) | 223 | 設計中 (10-03、同) | 同上。台帳から渡る X-11・E11-A2b・X-1 の一部を §1 に ID で受ける |
 | [TASK_T7_AND_FOLLOWUPS](TASK_T7_AND_FOLLOWUPS.md) | 189 | 設計中 (10-03、同) | 同上。台帳から渡る E10-4・H-6b・H-5 (CG 窓 WB・68h)・X-1 の一部を §1 に ID で受ける |
 | [TASK_HAL_WIRING](TASK_HAL_WIRING.md) | 646 | 受入完了・実機確認待ち (09-23) | HAL 契約。保持。残 W7 は LAN L-B の実機の回に載せる候補 |
 | [TASK_PCM_CS4231](TASK_PCM_CS4231.md) | 271 | 受入待ち (09-29) | PCM 契約。保持。台帳から R7-2・H-4 (b)(c) が渡る → 状態行に ID を足す |
-| [FORK_PLAN](../../archive/v3/FORK_PLAN.md) | 202 | 実装中 (09-30、残 f・g) | g (T0) は済。f (U9 古い数字の修正) の閉鎖根拠を PM が確かめてから「完了記録」→ `docs/archive/v3/`。INDEX の説明「計画」も古い |
+| FORK_PLAN (アーカイブ: `docs/archive/v3/FORK_PLAN.md`) | 202 | 実装中 (09-30、残 f・g) | g (T0) は済。f (U9 古い数字の修正) の閉鎖根拠を PM が確かめてから「完了記録」→ `docs/archive/v3/`。INDEX の説明「計画」も古い |
 | [PORT_CANDIDATES](PORT_CANDIDATES.md) / [RUST_VS_C11](RUST_VS_C11.md) | 191 / 283 | 計画 / 設計中・方針確定 | v3 後半の正典。保持、触らない |
 | [DOCS_REORG_T3](DOCS_REORG_T3.md) | 120 | 草案 (10-03) | 本草案で置き換える。承認後に `docs/tasks/v3/` へ写し、旧版は git 履歴に任せる (archive に写しを作らない) |
 | [ROLES](../agents/ROLES.md) | 115 | 現行 (10-06) | 体制の正典。§0 の「記録」「設計票」行に §4-2 の承認済み 2 件を 1 文ずつ足すだけ。§0 末尾の「見直し」(次の REVIEW で §4-1 を機械化 / 人 / 出ていないに分ける) は反省会の成果物 |
 | [HANDOVER_2026-10-09](../agents/HANDOVER_2026-10-09.md) | 43 | 実装中 (10-13 更新) | 入口の 1 枚 (50 行以内・上書き) — 前版の「リンク表に」案は実現済み。§2 の 1 が 8 行の長文に戻っている → 反省会の後に §2 を順序 (§8-1) の 3 行で上書き |
 | [REVIEW_2026-10-06](../agents/REVIEW_2026-10-06.md) | 58 | 完了記録 | 前回の見直し。反省会の結果は **REVIEW_2026-10-1x** として同じ形で書く (ROLES §0 の「見直し」の指示どおり) |
 | [DEFERRED_TESTS](../DEFERRED_TESTS.md) | 80 | 現行 (10-13、h9 照合済み) | 渡す 21・持越し 3・実機の所見 4。関門の表が出来た。行き先の票は §4-2 の 4 件目。関門の行を変えるのは PM (X-4 は §7) |
-| [DEFERRED_CLOSED](../../archive/v3/DEFERRED_CLOSED.md) | 489 | 完了記録 (10-13) | 閉じた行の証拠。保持。INDEX 末尾の説明「e11 統合受入で閉じた」が古い (T2h まで) |
+| DEFERRED_CLOSED (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) | 489 | 完了記録 (10-13) | 閉じた行の証拠。保持。INDEX 末尾の説明「e11 統合受入で閉じた」が古い (T2h まで) |
 | [INDEX](../../INDEX.md) | 378 | — | 正典表は現行。v3 節の票の説明文が古い (FORK_PLAN「計画」、TASK_T2_APPBAND「設計中」、MEMMAP「D1〜D35」、V3_PLAN「09-30」) → 説明文は状態行の写しにせず **票名 + 1 句**に縛る |
 | [ROADMAP](../../ROADMAP.md) | 395 | 09-30 更新 | §0 の v3 行「T0 受入完了、次は T1」が進捗を持っている → §4-2 の 1 件目 |
 | [CLAUDE.md](../../../CLAUDE.md) | 99 | — | 入口。10-13 (fc2c59c) に `make external` の H-7 の行を直した。reviewer の用途の明記は `.claude/agents/reviewer.md` 側。残る直しなし |

@@ -1,6 +1,6 @@
 # T8-K (full-screen GFX の画面所有者、カーネル + KAPI v48) — ホスト TDD の記録
 
-票: [docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md](../../docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md) §2 の D1 / D1a / D3
+票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §2 の D1 / D1a / D3
 実装: `exec/appslot.c` + `exec/appslot.h` (所有者の表と判定) / `exec/exec.c` (`hdr_flags` の控え・
 `--cpl0` の GUI 拒否・回収の並び) / `gfx/gfx_core.c` + `gfx/gfx.h` (KAPI の門) /
 `kernel/kselftest.c` / `sdk/kapi.json` (v48)
@@ -126,7 +126,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # T8-2 (CUI 専用の宣言 + 「拒否は畳む」、カーネル + ビルド系) — 追記 2026-09-12
 
-票: [TASK_T8_fullscreen_gfx.md](../../docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md) §6 の F5 / F1 後半
+票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §6 の F5 / F1 後半
 実装: `sdk/include/os32/os32_kapi_shared.h` (`OS32X_FLAG_CUI_ONLY` = 0x0010) / `sdk/mkos32x.py`
 (`--cui-only`) / `build/programs.mk` + `build/app.conf` (4 列目 `gfx`|`cui`) /
 `tools/check_manifests.py` §2b / `exec/appslot.c` + `exec/appslot.h` (`appslot_cui_only_admit`、
@@ -214,7 +214,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # T8-3 K (ポーリング型の協調 yield、カーネル) — 追記 2026-09-12
 
-票: [TASK_T8_fullscreen_gfx.md](../../docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md) §7 D8 (受入 F8)
+票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §7 D8 (受入 F8)
 実装: `exec/appslot.c` + `exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
 `appslot_park_poll_check/commit`、`appslot_poll_yield_reset`、カウンタ `ring3_poll_yield_count`) /
 `exec/exec.c` + `exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /

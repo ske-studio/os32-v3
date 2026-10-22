@@ -1,6 +1,6 @@
 # 試験の合否を機械が読める形にする約束事 (ホスト試験の RED→GREEN の記録)
 
-- 票: [`docs/archive/test/TASK_TEST_RESULT.md`](../../docs/archive/test/TASK_TEST_RESULT.md)
+- 票: `docs/archive/test/TASK_TEST_RESULT.md`
   §2 (約束事の制定) / §4 (第 1 陣) / §5 (欠陥 2 件) / §6 の段取り 1〜4 /
   **§11 (追補 — 集計行は fd 1 へ。下の §7)**
 - 実行: `python3 -B tools/tests/test_result_conv.py [--target] [--mutate]`

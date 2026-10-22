@@ -89,31 +89,31 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | 版 | 状態 | 追加内容 | 出典 |
 |---|---|---|---|
 | v40 | **実装済み** | GUI HAL 枠 `gfx_screen_info` / `gfx_hw_fill_rect` / `gfx_hw_blit` ほか | 本書 §4 |
-| v42 | **実装済み (2026-09-06)** | GUI v1.1: `gui_call` / `gui_register` / `gfx_stats` / `gfx_lease_palette` / `sys_switch_shell` / `kbd_dropped_count` / `kbd_trygetrawkey` (レビュー ⑥) / `ime_feed_key` / `ime_set_render` (W2)。開発中は v41 と呼んでいたが、ime_* の追記を機に main マージ前に **v42 として確定** (2026-09-06 ユーザー承諾)。v41 の成果物は存在しない (main 未リリース) | [archive/gui_v11/TASK_K1](archive/gui_v11/TASK_K1_gui_call.md) |
-| v43 | **欠番** (Host Services に予約していたが v44〜v50 が先に実装された。使わない) | — | [archive/network/TASK_N0.md](archive/network/TASK_N0.md) §1 |
-| v44 | **実装済み (2026-09-11、K5b-K)** | GUI v1.3 K5: アプリ 4 本の同時実行 (契約 T2a、GetMessage 方式) `exec_start` / `exec_resume` / `exec_park` / `exec_kill` / `exec_app_state` と、フォーカス追従の音の排他 `snd_focus`。owner 1 (シェル帯) 専用。カウンタはカーネルシンボル (KAPI にしない)。v43 はネットワークに予約済みなので**飛ばした** | [archive/gui_v13/TASK_K5_multiapp.md §D8](archive/gui_v13/TASK_K5_multiapp.md)、[TASK_K5B_kernel](archive/gui_v13/TASK_K5B_kernel.md) |
-| v45 | **実装済み (2026-09-11、K5c)** | GUI v1.3 K5: `exec_abort_clear` — CTRL+STOP の宛先を**フォーカス窓のアプリ**にする (契約 T6、決裁 A1)。IRQ1 は走っているアプリにしか要求を立てられないので、WM が本人の要求を降ろしてからフォーカス窓の ID を `exec_kill` する。owner 1 (シェル帯) 専用 | [archive/gui_v13/TASK_K5B_gshell.md §決裁](archive/gui_v13/TASK_K5B_gshell.md) |
-| v46 | **実装済み (2026-09-12、K6C)** | GUI v1.3 K6C: console シンク `con_sink_read` / `con_sink_stat` — GUI モード中のカーネル出力をリングに溜め、端末アプリ (外部) が吸う。読み手は 1 本 (owner 回収)。同じ追記で `sys_ram_kb` (K6-RAM 決裁 (2): 起動時に登録した実 RAM の合計 KB) も足した | [archive/gui_v13/TASK_K6C_console.md](archive/gui_v13/TASK_K6C_console.md)、[TASK_K6_ram_ceiling.md](archive/gui_v13/TASK_K6_ram_ceiling.md) |
-| v47 | **実装済み (2026-09-12、K7-K)** | GUI v1.3 K7 入力統合: `kbd_inject` (con_sink の読み手専用、UTF-8 を 256B の注入リングへ) / `kbd_inject_pending` (未読バイト数、誰でも可)。GUI 中の `kbd_getchar` / `kbd_getkey` は第 2 の park 点 (`APP_STATE_WAIT_KEY`) になり、`exec_resume` が注入リングから 1 バイトを EAX に入れる。同じ追記でエラー番号 -14 `OS32_ERR_AGAIN` を取った | [archive/gui_v13/TASK_K7_input.md](archive/gui_v13/TASK_K7_input.md) |
-| v48 | **実装済み (2026-09-12、T8-K)** | GUI v1.3 T8 full-screen GFX 復帰: `gfx_screen_owner` (画面の所有者 = `gfx_init` / `gfx_init_200` を呼んだ CPL=3 アプリ、回収で WM へ戻る)。同じ追記で「GUI 中に `OS32X_FLAG_GFX` の無い CPL=3 の `gfx_init` を断る」(D1a) と「`--cpl0` は GUI から起動させない」(D1) を入れた。WM の present を捨てる D2 は**落とした** (2026-09-12 ユーザー決裁) | [archive/gui_v13/TASK_T8_fullscreen_gfx.md](archive/gui_v13/TASK_T8_fullscreen_gfx.md) |
-| v49 | **実装済み (2026-09-12、T9-K)** | GUI v1.3 T9 shell script: 起動要求表 8 本 — `launch_req` / `launch_pending` / `launch_take` / `launch_report` / `launch_poll` / `launch_cancel` / `launch_child` と `sys_yield`。GUI 中の CPL=3 は入れ子 `exec_run` を使えないので、外部プログラムの起動と kill をカーネルの表に載せ owner 1 (WM) が仲介する。同じ追記で `exec_kill` を「id と子孫を末尾から回収」に固定した (D8) | [archive/gui_v13/TASK_T9_sh.md](archive/gui_v13/TASK_T9_sh.md) |
-| v50 | **実装済み (2026-09-13、S0-K)** | 設定レジストリ: `db_open_existing` (RO / RW、CREATE 無し) / `db_prepare_only` / `db_bind_int` / `db_bind_text` / `db_bind_blob` / `db_bind_null` / `db_error_code` の 7 本 (slot 201〜207、data_fields は 0x348 / 0x34C へ)。既存 `db_*` 10 本は不変 | [archive/settings/TASK_S0.md §1a](archive/settings/TASK_S0.md) |
-| v51 | **実装済み (2026-09-14、N1)** | ネットワーク Host Services `host_open` / `host_status` / `host_read` / `host_write` / `host_close` の 5 本 (slot 208〜212 = 0x348〜0x358、data_fields は 0x35C / 0x360 へ)。非ブロッキング (プロトコルを進めるのは 100Hz の `link_tick` だけ)、同時 2 ハンドル、ストリーム 1 本。実体は `kapi/kapi_host.c` + `net/link.c` | [archive/network/TASK_N0.md](archive/network/TASK_N0.md) §1a |
-| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2_vfs.c` | [archive/shell/TASK_H3.md](archive/shell/TASK_H3.md) |
-| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI3])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | [archive/shell/TASK_H2.md](archive/shell/TASK_H2.md) |
+| v42 | **実装済み (2026-09-06)** | GUI v1.1: `gui_call` / `gui_register` / `gfx_stats` / `gfx_lease_palette` / `sys_switch_shell` / `kbd_dropped_count` / `kbd_trygetrawkey` (レビュー ⑥) / `ime_feed_key` / `ime_set_render` (W2)。開発中は v41 と呼んでいたが、ime_* の追記を機に main マージ前に **v42 として確定** (2026-09-06 ユーザー承諾)。v41 の成果物は存在しない (main 未リリース) | archive/gui_v11/TASK_K1 (アーカイブ: `docs/archive/gui_v11/TASK_K1_gui_call.md`) |
+| v43 | **欠番** (Host Services に予約していたが v44〜v50 が先に実装された。使わない) | — | `docs/archive/network/TASK_N0.md` §1 |
+| v44 | **実装済み (2026-09-11、K5b-K)** | GUI v1.3 K5: アプリ 4 本の同時実行 (契約 T2a、GetMessage 方式) `exec_start` / `exec_resume` / `exec_park` / `exec_kill` / `exec_app_state` と、フォーカス追従の音の排他 `snd_focus`。owner 1 (シェル帯) 専用。カウンタはカーネルシンボル (KAPI にしない)。v43 はネットワークに予約済みなので**飛ばした** | archive/gui_v13/TASK_K5_multiapp.md §D8 (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`)、TASK_K5B_kernel (アーカイブ: `docs/archive/gui_v13/TASK_K5B_kernel.md`) |
+| v45 | **実装済み (2026-09-11、K5c)** | GUI v1.3 K5: `exec_abort_clear` — CTRL+STOP の宛先を**フォーカス窓のアプリ**にする (契約 T6、決裁 A1)。IRQ1 は走っているアプリにしか要求を立てられないので、WM が本人の要求を降ろしてからフォーカス窓の ID を `exec_kill` する。owner 1 (シェル帯) 専用 | archive/gui_v13/TASK_K5B_gshell.md §決裁 (アーカイブ: `docs/archive/gui_v13/TASK_K5B_gshell.md`) |
+| v46 | **実装済み (2026-09-12、K6C)** | GUI v1.3 K6C: console シンク `con_sink_read` / `con_sink_stat` — GUI モード中のカーネル出力をリングに溜め、端末アプリ (外部) が吸う。読み手は 1 本 (owner 回収)。同じ追記で `sys_ram_kb` (K6-RAM 決裁 (2): 起動時に登録した実 RAM の合計 KB) も足した | `docs/archive/gui_v13/TASK_K6C_console.md`、`docs/archive/gui_v13/TASK_K6_ram_ceiling.md` |
+| v47 | **実装済み (2026-09-12、K7-K)** | GUI v1.3 K7 入力統合: `kbd_inject` (con_sink の読み手専用、UTF-8 を 256B の注入リングへ) / `kbd_inject_pending` (未読バイト数、誰でも可)。GUI 中の `kbd_getchar` / `kbd_getkey` は第 2 の park 点 (`APP_STATE_WAIT_KEY`) になり、`exec_resume` が注入リングから 1 バイトを EAX に入れる。同じ追記でエラー番号 -14 `OS32_ERR_AGAIN` を取った | `docs/archive/gui_v13/TASK_K7_input.md` |
+| v48 | **実装済み (2026-09-12、T8-K)** | GUI v1.3 T8 full-screen GFX 復帰: `gfx_screen_owner` (画面の所有者 = `gfx_init` / `gfx_init_200` を呼んだ CPL=3 アプリ、回収で WM へ戻る)。同じ追記で「GUI 中に `OS32X_FLAG_GFX` の無い CPL=3 の `gfx_init` を断る」(D1a) と「`--cpl0` は GUI から起動させない」(D1) を入れた。WM の present を捨てる D2 は**落とした** (2026-09-12 ユーザー決裁) | `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` |
+| v49 | **実装済み (2026-09-12、T9-K)** | GUI v1.3 T9 shell script: 起動要求表 8 本 — `launch_req` / `launch_pending` / `launch_take` / `launch_report` / `launch_poll` / `launch_cancel` / `launch_child` と `sys_yield`。GUI 中の CPL=3 は入れ子 `exec_run` を使えないので、外部プログラムの起動と kill をカーネルの表に載せ owner 1 (WM) が仲介する。同じ追記で `exec_kill` を「id と子孫を末尾から回収」に固定した (D8) | `docs/archive/gui_v13/TASK_T9_sh.md` |
+| v50 | **実装済み (2026-09-13、S0-K)** | 設定レジストリ: `db_open_existing` (RO / RW、CREATE 無し) / `db_prepare_only` / `db_bind_int` / `db_bind_text` / `db_bind_blob` / `db_bind_null` / `db_error_code` の 7 本 (slot 201〜207、data_fields は 0x348 / 0x34C へ)。既存 `db_*` 10 本は不変 | archive/settings/TASK_S0.md §1a (アーカイブ: `docs/archive/settings/TASK_S0.md`) |
+| v51 | **実装済み (2026-09-14、N1)** | ネットワーク Host Services `host_open` / `host_status` / `host_read` / `host_write` / `host_close` の 5 本 (slot 208〜212 = 0x348〜0x358、data_fields は 0x35C / 0x360 へ)。非ブロッキング (プロトコルを進めるのは 100Hz の `link_tick` だけ)、同時 2 ハンドル、ストリーム 1 本。実体は `kapi/kapi_host.c` + `net/link.c` | `docs/archive/network/TASK_N0.md` §1a |
+| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
+| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI3])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
 | v54 | **実装済み (2026-09-16、継承バグ)** | 覗くだけのキー取得 `kbd_peekkey` 1 本 (slot 214 = 0x360、data_fields は 0x364 / 0x368 へ)。キューを**1 バイトも動かさず**に 次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。`script_exec` の毎行の ESC 監視が `kbd_trygetkey` で打鍵を**取り出して捨てて**いたのを直す。実体は `drivers/kbd.c` (+ `drivers/serial.c` の `serial_peekchar` と `kernel/kbd_inject.c` の `kbd_inject_peek`) | 票 INHERITED_BUGS |
-| v55 | **実装済み (2026-09-16、$?)** | 終了コードの配線 `exec_last_result` 1 本 (slot 215 = 0x364、data_fields は 0x368 / 0x36C へ)。直前の `exec_run` の結果を**種別 + 値**で返す。種別 (`EXEC_KIND_*`) は畳んだ側が渡すので `exit(-2)` / fault / CTRL+STOP を値ではなく種別で見分けられる。`exec_run` は**すべての return 点で**記録を書くので、起動しなかった場合に前回の記録が残らない。GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない。実体は `exec/exec.c` | [archive/shell/TASK_EXIT_STATUS.md](archive/shell/TASK_EXIT_STATUS.md) |
-| v56 | **実装済み (2026-09-22、実機シリアル)** | V･FAST モード `serial_init_vfast` / `serial_get_status` の 2 本 (slot 216 = 0x368、217 = 0x36C、data_fields は 0x370 / 0x374 へ)。FIFO 搭載機 (`0136h` bit6 の反転で判定) で `013Ah` bit7 を立てて **8253 と無関係に** 115200bps まで出す。**起動時の既定 9600 は互換モードのまま** — V･FAST は `serial N` で明示的に入る。併せて `serial_putchar` の TxRDY 待ちを「10ms tick まで寝る」から「1 文字時間 × 2 の予算で `cpu_delay_us` を挟んで見る」へ。実体は `drivers/serial.c` / `drivers/serial_plan.c` | [archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) |
-| v57 | **実装済み (2026-09-22、実機シリアル往復 4)** | ローカル打鍵だけの読み口 `kbd_trygetchar_local` 1 本 (slot 218 = 0x370、data_fields は 0x374 / 0x378 へ)。cooked リングだけを見て**シリアルも注入リングも見ない**。rshell の速度切替の番犬が「この 1 バイトはシリアル由来か」を**1 回の読みで**確定できるようにする (2 度読みの窓を消す)。⚠ 番号は PM が着地時に振り直す (同日に L-A も v57 を取得) | [archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) |
+| v55 | **実装済み (2026-09-16、$?)** | 終了コードの配線 `exec_last_result` 1 本 (slot 215 = 0x364、data_fields は 0x368 / 0x36C へ)。直前の `exec_run` の結果を**種別 + 値**で返す。種別 (`EXEC_KIND_*`) は畳んだ側が渡すので `exit(-2)` / fault / CTRL+STOP を値ではなく種別で見分けられる。`exec_run` は**すべての return 点で**記録を書くので、起動しなかった場合に前回の記録が残らない。GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない。実体は `exec/exec.c` | `docs/archive/shell/TASK_EXIT_STATUS.md` |
+| v56 | **実装済み (2026-09-22、実機シリアル)** | V･FAST モード `serial_init_vfast` / `serial_get_status` の 2 本 (slot 216 = 0x368、217 = 0x36C、data_fields は 0x370 / 0x374 へ)。FIFO 搭載機 (`0136h` bit6 の反転で判定) で `013Ah` bit7 を立てて **8253 と無関係に** 115200bps まで出す。**起動時の既定 9600 は互換モードのまま** — V･FAST は `serial N` で明示的に入る。併せて `serial_putchar` の TxRDY 待ちを「10ms tick まで寝る」から「1 文字時間 × 2 の予算で `cpu_delay_us` を挟んで見る」へ。実体は `drivers/serial.c` / `drivers/serial_plan.c` | `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` |
+| v57 | **実装済み (2026-09-22、実機シリアル往復 4)** | ローカル打鍵だけの読み口 `kbd_trygetchar_local` 1 本 (slot 218 = 0x370、data_fields は 0x374 / 0x378 へ)。cooked リングだけを見て**シリアルも注入リングも見ない**。rshell の速度切替の番犬が「この 1 バイトはシリアル由来か」を**1 回の読みで**確定できるようにする (2 度読みの窓を消す)。⚠ 番号は PM が着地時に振り直す (同日に L-A も v57 を取得) | `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` |
 | v58 | **実装済み (2026-09-22、手元ビルドのみ)** | 実機の PCI 列挙 `pci_count` / `pci_get` / `pci_cfg_read32` の 3 本 (slot 219 = 0x374、220 = 0x378、221 = 0x37C、data_fields は 0x380 / 0x384 へ)。起動時に `pci_init()` が コンフィギュレーションメカニズム #1 (`0CF8h` DWORD / `0CFCh`) で bus 0 を走査し、vendor/device/class/BAR/Interrupt Line を静的表 (上限 32) に記録する。**読むだけ** — BAR のサイズ判定 (全 1 を書いて読み戻す) はしないので BIOS の割り当てを壊さない。シェルの `lspci` / `pcidump` がこの 3 本を使う。**NP21/W は PCI を実装していない**ので、エミュレータでは `[pci] mech#1 absent` と `lspci: no PCI` が正しい姿。実体は `drivers/pci.c` / `drivers/pci_decode.c` | 票 TASK_LAN_82557 |
 | v59 | **実装済み (2026-09-23、手元ビルドのみ)** | µs 時計 `sys_time_now` 1 本 (slot 222 = 0x380、data_fields は 0x384 / 0x388 へ)。起動からの経過を µs で返す。**64 ビットは KAPI で返せない** (往復 1 の B14) ので、出力引数 2 本に**同じスナップショットの上下**を書く。時間源は `tick_count` (§1-0 の後はどちらのシステムクロックでもちょうど 10ms) と PIT ch0 のラッチ読みで、周期の境界はPIC1 の IRR bit0 をラッチの前後で挟んで判定する (最大 3 回やり直す)。戻り 0 = 成功 / `OS32_ERR_AGAIN` = 3 回とも判定できなかった / `OS32_ERR_NOSYS` = PIT 未初期化か mode 2 でない / `OS32_ERR_INVAL` = `lo` か `hi` が NULL・4 バイトが帯境界を跨ぐ・**2 本の範囲が交差する (差 0〜3)**。**負のときは 2 本とも書かない**。出力が読み取り専用の USER ページ (共有ライブラリの `.text`) なら `ring3_fault_kill` — OS32 は CR0.WP = 0 なのでハードウェアは止めない。実体は `kernel/ktime.c` / `kernel/time_math.c`、検証は `kapi/kapi_sys.c` の `kapi_sys_time_now` | 票 TASK_HAL_WIRING §1-5 |
 | v60 | **実装済み (2026-09-23、手元ビルドのみ)** | PCI 結線の診断の取得口 `pci_bind_info` 1 本 (slot 223 = 0x384、data_fields は 0x388 / 0x38C へ)。`idx` 番目 (**`pci_get` と同じ列挙順**) の結線結果を呼び手のバッファへ**8 バイトちょうど**写す。並びは `drivers/pci_bind.h` の `struct pci_bind_info`。`result` = NONE / BOUND / DECLINED / QUARANTINED、`reason` は上書き規則 1 つだけが正、`line_state` は**読む時点で合成**する (結線のときは正常だった線が後から隔離されても `result` は BOUND のまま `line_state` だけが QUARANTINED になる)。**既存 `pci_get` の 40 バイトは広げない** — 旧呼び手のバッファを踏むので別の口にした。戻り 0 = 成功 / `OS32_ERR_INVAL` = CPL=0 / WM で `out` が NULL (CPL=3 は wrap で kill)・8 バイトが帯境界を跨ぐ・`idx` が範囲外 (**負のときは 1 バイトも書かない**)。出力が読み取り専用の USER ページなら `ring3_fault_kill` (v59 と同じ規則)。シェルの `lspci` が注記を出す。実体は `drivers/pci_bind.c`、検証は `kapi/kapi_sys.c` の `kapi_pci_bind_info` | 票 TASK_HAL_WIRING §1-4 |
 | v61 | **実装済み (2026-09-23、手元ビルドのみ)** | CS4231 (MATE-X PCM) の再生 `pcm_open` / `pcm_write` / `pcm_status` / `pcm_close` / `pcm_set_volume` の 5 本 (slot 224〜228 = 0x388〜0x398、data_fields は 0x39C / 0x3A0 へ)。16 ビット・ステレオ・44.1k / 22.05kHz の**再生だけ**で、単位は frame (左右 1 組 = 4 バイト)。カーネルが DMA リング 16KB (`dma_pool`) とステージング 16KB (`kmalloc`) を持ち、**アプリのバッファを IRQ から読むことはしない** — `pcm_write` はステージングへ写すだけで、リングを書くのは `pcm_advance` (IRQ / tick、IF=0) と停止中の `pcm_start` / RS_RESTART に限る。所有者は既存の資源 owner と同じアプリ ID で、異常終了は `exec_reclaim_owned` の `pcm_reclaim` が**待たずに**止めて返す。実体は `drivers/pcm_cs4231.c` / `drivers/pcm_cs4231_math.c` | 票 TASK_PCM_CS4231 |
-| v63 | **実装済み (2026-09-24、手元ビルドのみ)** | **データ欄の固定配置** (票 TASK_KAPI_DATA_FIELDS)。関数は増えていない。関数表の容量を **R = 300** 予約し (予約スロット 230〜299)、`sbrk_heap_limit` / `shm_base` を **0x4B8 / 0x4BC に固定** — 以後の関数追加でデータ欄は動かない。OS32X ヘッダを **v3** (末尾に `kapi_data_off`) にし、exec / shlib ローダ / 常駐シェルの起動は値がカーネルと違えば断る。crt の `kapi` の実名を `os32_kapi_v63` に変えた。**旧バイナリは一度だけ全部断られる** — 移行は [08_build.md](08_build.md) §8-4 | [archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md) |
-| v64 | **実装済み (2026-09-24、手元ビルドのみ)** | HDD の一時置き場 (票 TASK_HDD_INSTALL 段 1): `ext2_format_at` / `dev_mount_count` / `sys_umount_checked` / `hdd_geom_info` の 4 本 (slot 230〜233 = 0x3A0〜0x3AC。データ欄は v63 で固定済みなので動かない、crt の `kapi` の実名も `os32_kapi_v63` のまま)。`ext2_format_at` は区画表を読まずに範囲だけに作る (ディスク総数超過・LBA 0〜17・桁あふれは 1 バイトも書かずに断る)、`sys_umount_checked` は sync を先に呼んで失敗なら外さない、`hdd_geom_info` は BIOS 幾何 (INT 1Bh AH=84h) と IDENTIFY と I/O の方式を `HddGeom` (32 バイト) に写す。同じ版で ATA I/O を LBA28 (word 49 bit9) に、区画表を PC-98 標準配置に、ext2 の区画探索を「見つからなければ失敗」に変えた — **旧配置の NHD は `make nhd-migrate-pt` で移す** ([08_build.md](08_build.md) §8-4)。配備は**カーネルを先** | [archive/realhw_v21/TASK_HDD_INSTALL.md](archive/realhw_v21/TASK_HDD_INSTALL.md) 段 1 |
+| v63 | **実装済み (2026-09-24、手元ビルドのみ)** | **データ欄の固定配置** (票 TASK_KAPI_DATA_FIELDS)。関数は増えていない。関数表の容量を **R = 300** 予約し (予約スロット 230〜299)、`sbrk_heap_limit` / `shm_base` を **0x4B8 / 0x4BC に固定** — 以後の関数追加でデータ欄は動かない。OS32X ヘッダを **v3** (末尾に `kapi_data_off`) にし、exec / shlib ローダ / 常駐シェルの起動は値がカーネルと違えば断る。crt の `kapi` の実名を `os32_kapi_v63` に変えた。**旧バイナリは一度だけ全部断られる** — 移行は [08_build.md](08_build.md) §8-4 | `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md` |
+| v64 | **実装済み (2026-09-24、手元ビルドのみ)** | HDD の一時置き場 (票 TASK_HDD_INSTALL 段 1): `ext2_format_at` / `dev_mount_count` / `sys_umount_checked` / `hdd_geom_info` の 4 本 (slot 230〜233 = 0x3A0〜0x3AC。データ欄は v63 で固定済みなので動かない、crt の `kapi` の実名も `os32_kapi_v63` のまま)。`ext2_format_at` は区画表を読まずに範囲だけに作る (ディスク総数超過・LBA 0〜17・桁あふれは 1 バイトも書かずに断る)、`sys_umount_checked` は sync を先に呼んで失敗なら外さない、`hdd_geom_info` は BIOS 幾何 (INT 1Bh AH=84h) と IDENTIFY と I/O の方式を `HddGeom` (32 バイト) に写す。同じ版で ATA I/O を LBA28 (word 49 bit9) に、区画表を PC-98 標準配置に、ext2 の区画探索を「見つからなければ失敗」に変えた — **旧配置の NHD は `make nhd-migrate-pt` で移す** ([08_build.md](08_build.md) §8-4)。配備は**カーネルを先** | `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 1 |
 | v62 | **実装済み (2026-09-23、手元ビルドのみ)** | キーボード 8251 の診断 `kbd_diag` 1 本 (slot 229 = 0x39C、data_fields は 0x3A0 / 0x3A4 へ)。`KbdDiag` (24 バイト、`os32_kapi_shared.h`) を呼び手のバッファへ写す — IRQ1 回数・空 IRQ (RxRDY = 0)・エラー (PE/FE)・オーバーラン (OE だけ、バイトは使う)・起動時に読み捨てたバイト数・`kbd_init` の前後の 0043h・直近の 0043h とスキャンコード・書いたコマンド語・呼んだ時点の 0043h。戻り 0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。出力は生成ラッパの `out` 検査 (読み取り専用の USER ページなら `ring3_fault_kill`)。シェルの `kbdstat` が 1 行で出す。同じ変更でカーネルが 0043h に書くコマンド語を **0x14 → 0x16** (DTR = 1 = RTY# HIGH、BIOS の定常値) に直した — 実機 PC-9821Ra266 で打鍵が一切届かなかった件。実体は `drivers/kbd.c` / `drivers/kbd_status.c` | [POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57 |
-| v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-4 |
-| v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | [archive/realhw_v21/TASK_SERIAL_HOSTFS.md](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 B |
+| v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 A-4 |
+| v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 B |
 | v67 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | キーボードの受信記録 `kbd_diag_log` 1 本 (slot 238 = 0x3C0)。IRQ1 が 0041h から**使うバイトを読むたびに** `KbdDiagLogEnt` (8 バイト: seq / 生の code / 処理後の修飾 / 印) を 32 件の循環リングへ積み、`after_seq` より新しい分を古い順に写す。EMPTY / ERROR で捨てたバイトは積まない。上書きで失われた分は写した先頭の seq の飛びで分かる。シェルの `kbdstat -w` が使う — 実機のカナ / CAPS が「ロックで make、解除で break」か「押すたびに make だけ」かを見る準備。実体は `drivers/kbd_dlog.c` / `drivers/kbd.c` | 票 TASK_KBD_NAV §3 |
 | v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `kernel/v86_gcap.c` / `kernel/v86_gcap_math.c` | 票 TASK_PEGC480_REALHW §3 段 1 |
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | 票 TASK_T2_APPBAND §4-6・T2c-R |
@@ -663,7 +663,7 @@ V86 ゲストを起動する。MS-DOS 5.00A の起動確認に使う。
 
 いずれも **owner 1 (シェル帯 = gshell / CUI シェル) からのみ**。判定は `gui_register` と同じ形で、
 それ以外からは `OS32_ERR_INVAL`。設計の正典は
-[archive/gui_v13/TASK_K5_multiapp.md](archive/gui_v13/TASK_K5_multiapp.md) の D0〜D11。
+`docs/archive/gui_v13/TASK_K5_multiapp.md` の D0〜D11。
 
 - `exec_start(cmdline)`: **塞がない起動**。>0 = app_id (2〜5) で OP_WAIT / キー待ち / poll・yield / STOP 完了安全点の
   いずれかで park した / 0 = park より前に終了した (回収済み・`gui_owner_exit` 配送済み) /
@@ -741,7 +741,7 @@ FEP 対応版にあたる (エディタ等のメインループから使う)。
 GUI モード中 (gshell が全画面 GFX を握っている間) は IRQ1 が cooked リングに積まないので、
 CUI プログラムが `kbd_getchar()` を呼ぶとカーネルの `hlt` ループに入って**戻らない** —
 syscall の中なので `exec_park` も起きず、協調型の全体が止まる。v47 はこれを 2 つで解く。
-票 [archive/gui_v13/TASK_K7_input.md](archive/gui_v13/TASK_K7_input.md) §1 / §5。
+票 `docs/archive/gui_v13/TASK_K7_input.md` §1 / §5。
 
 - `kbd_inject(utf8, len)`: UTF-8 のバイト列をカーネルの**注入リング (256B、静的)** へ積み、
   積んだバイト数を返す。通常は **con_sink の読み手** (= 端末アプリ) だけが呼べる。
@@ -784,7 +784,7 @@ GUI モード中 (gshell が全画面 GFX を握っている間) は、カーネ
 v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、端末アプリ (外部、K6C-A) が
 吸って描けるようにする。有効化の API は無い — `console_text_gdc_stop()` (GUI 入場) で
 空から溜め始め、`console_text_gdc_start()` (CUI 復帰) で捨てる。票
-[archive/gui_v13/TASK_K6C_console.md](archive/gui_v13/TASK_K6C_console.md) §2。
+`docs/archive/gui_v13/TASK_K6C_console.md` §2。
 
 - **レコード形式** (`os32_kapi_shared.h` の `CON_SINK_*` が正典)。先頭 1 バイトが型で、
   残りは型ごと。詰め物も整列も無い:
@@ -822,7 +822,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | 0x308 | gfx_screen_owner | `i32(void)` |
 
 全画面 GFX は「1 枚の画面を丸ごと持っていく」操作なので、**持ち主をカーネルが 1 つだけ覚える**。
-票 [archive/gui_v13/TASK_T8_fullscreen_gfx.md](archive/gui_v13/TASK_T8_fullscreen_gfx.md) §2 の D1 / D1a / D3。
+票 `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §2 の D1 / D1a / D3。
 
 - `gfx_screen_owner()`: いま画面を握っている ID。**1 = シェル帯 (WM)** / 2〜5 = アプリ。
   誰でも呼べる (所有権は要らない)。WM (gshell) は `exec_start` / `exec_resume` から戻った
@@ -864,7 +864,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 既存 `db_*` 10 本 (0x238〜0x25C) は 1 つも動かない ([ABI2])。追加は末尾だけで、
 新しい handle にも既存の `db_step` / `db_finalize` / `db_close` をそのまま使う
 (反復は再 prepare。reset API は足さない)。票
-[archive/settings/TASK_S0.md](archive/settings/TASK_S0.md) §1a、実体は `kapi/kapi_db.c`。
+`docs/archive/settings/TASK_S0.md` §1a、実体は `kapi/kapi_db.c`。
 
 | Offset | フィールド | プロトタイプ |
 |--------|-----------|------|
@@ -881,7 +881,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 要求 1 本 = ハンドル 1 本。**どれも待たない** (呼び手は `OS32_ERR_AGAIN` を見て
 `sys_yield` / `sys_halt` で再試行する)。プロトコルを進めるのは 100Hz の
 `link_tick()` だけで、KAPI は状態を読み書きするだけ。契約の正典は票
-[archive/network/TASK_N0.md](archive/network/TASK_N0.md) §1a、実体は
+`docs/archive/network/TASK_N0.md` §1a、実体は
 `kapi/kapi_host.c` (検証と写し) + `net/link.c` (状態機械)。
 
 | Offset | フィールド | プロトタイプ |
@@ -994,7 +994,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   (POLICY_DEBUG §4-13 の `db_last_error` と同じ事故を繰り返さないため)。
 - 資料は `docs/hw/undocumented/io_rs.md` (`0130h`〜`013Ah`)。**NP21/W は通信速度を
   模擬しない**ので、分周が合っているかはエミュレータでは確かめられない
-  ([archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md))。
+  (`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`)。
 
 ### ローカル打鍵だけの読み口 (v57)
 
@@ -1012,7 +1012,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   番犬は**シリアル由来の行だけ**を往復の証拠に数えるので、
   「シリアルを 1 回読む → 空ならローカルを 1 回読む」と書ける口が要る。
   2 度読みのあいだに届いたバイトが由来の印を落とす窓が消える
-  ([archive/realhw_v21/TASK_SERIAL_VFAST.md](archive/realhw_v21/TASK_SERIAL_VFAST.md) 往復 3 ④)。
+  (`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` 往復 3 ④)。
 - 同じ日に L-A (PCI 列挙) も版を取ったので、**着地時にそちらを v58 へ送った**。この節のスロット 0x370 はそのまま。
 
 **併せて `serial_putchar` (slot 36 = 0x98) の戻り値を `void` → `int` に広げた。**
@@ -1227,7 +1227,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | 0x3A8 | sys_umount_checked | `int(const char *prefix)` |
 | 0x3AC | hdd_geom_info | `int(int drv, HddGeom *out)` |
 
-票 [TASK_HDD_INSTALL](archive/realhw_v21/TASK_HDD_INSTALL.md) 段 1。シェルの `hdprep`
+票 TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 1。シェルの `hdprep`
 (空の hd0 に OS32 の一時置き場を作る) が使う。インストーラは段 2 でこれに乗る。
 
 - **`ext2_format_at`** — 区画表を**読まずに** `[start_lba, start_lba + length)` だけに
@@ -1281,7 +1281,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 |--------|-----------|------|
 | 0x3B0 | boot_image_info | `int(BootImageInfo *out)` |
 
-票 [TASK_SERIAL_HOSTFS](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-4 (§1-v3「`.old` の識別は
+票 TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 A-4 (§1-v3「`.old` の識別は
 カーネルイメージの CRC」)。シェルの `ver` と、部品 B の `hsync` (`/boot/vmkernel.lz4` を
 置き換える前に「今動いている版か」を比べる) が使う。
 
@@ -1315,7 +1315,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 | 0x3B8 | sfs_end | `int(int exit_code)` |
 | 0x3BC | serial_diag | `int(SerialDiag *out)` |
 
-票 [TASK_SERIAL_HOSTFS](archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 B (§1-v3)。呼ぶのは
+票 TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 B (§1-v3)。呼ぶのは
 常駐シェルの `sfs run <コマンド行>` だけ (owner 1 以外は `OS32_ERR_INVAL`)。
 ホストは `tools/rshell_serial.py --serve-host <dir> cmd "sfs run ..."`、形式の正典は
 `fs/sfs_proto.h` (ホスト側の写しは `tools/serialfs_host.py`)。
@@ -1523,7 +1523,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 GUI 中の CPL=3 アプリは入れ子 `exec_run` を使えない (子が park できず、協調型の全体が止まる)。
 そこで「外部プログラムを起動したい」と「この子を畳みたい」を**カーネルの表**に載せ、
 owner 1 (WM) が top-level で取りに来て `exec_start` / `exec_kill` を実行し、結果を表へ返す。
-票 [archive/gui_v13/TASK_T9_sh.md](archive/gui_v13/TASK_T9_sh.md) §1 D3 / §1a。実体は `exec/launch.c`。
+票 `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3 / §1a。実体は `exec/launch.c`。
 
 表は **要求者 ID ごとに 1 本** (ID 2〜5 の 4 本)。欄は「配送状態」(`phase` / `kind`) と
 「子の所有」(`child`) を分けてあり、取消や要求者の退場の途中でも `child` は消えない。

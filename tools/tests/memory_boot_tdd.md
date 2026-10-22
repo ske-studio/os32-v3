@@ -4,7 +4,7 @@
 
 **RED → GREEN の実施ログではない。** 他の 13 組 (`*_host.c` + `test_*.py` + `*_tdd.md`) と違い、
 `memory_boot` は TDD 記録だけが残されないまま作業が中断していた
-([RETROSPECTIVE_2026-09-09](../../docs/archive/agents/RETROSPECTIVE_2026-09-09.md) §6)。
+(RETROSPECTIVE_2026-09-09 (アーカイブ: `docs/archive/agents/RETROSPECTIVE_2026-09-09.md`) §6)。
 後から RED→GREEN の経過を書き起こすと偽の履歴になるので、ここには
 **2026-09-09 に実際に走らせて確認した内容だけ**を書く ([V4])。
 

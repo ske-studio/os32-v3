@@ -121,19 +121,19 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 
 | ID | 条件 | 判定・証拠 |
 |---|---|---|
-| F1 | IPL が 512B セクタ・18 セクタ/トラックで読める | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F2 | `boot_fat144.bin` が 512 バイトに収まる | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F3 | LOADER.BIN の探索とロード | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F4 | カーネル起動 | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F5 | `boot_drive` が 0x30 として渡る | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F6 | ルートマウント | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F7 | kselftest | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F8 | シェル起動 | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F9 | 読み出しがバイト単位で正しい | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F10 | `04BEh` が効く | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F11 | **ホスト機能が無くても起動する** | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| F12 | `make check` | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
-| **F13** | **2HD (1232KB) の回帰** | **合格** ([証拠](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md)) |
+| F1 | IPL が 512B セクタ・18 セクタ/トラックで読める | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F2 | `boot_fat144.bin` が 512 バイトに収まる | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F3 | LOADER.BIN の探索とロード | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F4 | カーネル起動 | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F5 | `boot_drive` が 0x30 として渡る | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F6 | ルートマウント | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F7 | kselftest | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F8 | シェル起動 | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F9 | 読み出しがバイト単位で正しい | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F10 | `04BEh` が効く | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F11 | **ホスト機能が無くても起動する** | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| F12 | `make check` | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
+| **F13** | **2HD (1232KB) の回帰** | **合格** (証拠 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`)) |
 
 ### 5-1. ホスト機能への依存 (F11 の内訳)
 
@@ -152,7 +152,7 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 ### 5-2. FD のフォント構成
 
 現在の FD / MINIMAL の構成は [08_build.md「起動 FD と MINIMAL」](../../08_build.md#起動-fd-と-minimal) を参照。
-フォントの追加・除外と `FONT..NG` の記録は [受入記録](../../archive/realhw/FD144_ACCEPTANCE_2026-09.md) に保存した。
+フォントの追加・除外と `FONT..NG` の記録は 受入記録 (アーカイブ: `docs/archive/realhw/FD144_ACCEPTANCE_2026-09.md`) に保存した。
 
 ## 6. 残件
 

@@ -22,7 +22,7 @@
 
 **理由**: コードベース全体が `-std=gnu11` でビルドされ、SQLite 系だけ gnu89。混在の切り分けは `check-c-dialect` が実際の旗で検査する。
 
-**詳細**: `docs/POLICY_DEV.md` §2 (C11 の採用範囲の表 = [TASK_C11_MIGRATION](archive/v3/TASK_C11_MIGRATION.md) §4)
+**詳細**: `docs/POLICY_DEV.md` §2 (C11 の採用範囲の表 = TASK_C11_MIGRATION (アーカイブ: `docs/archive/v3/TASK_C11_MIGRATION.md`) §4)
 
 ### [C2] カーネル内の文字列操作は `lib/kstring.h`
 

@@ -2,15 +2,15 @@
 
 > 発行: PM (2026-09-09) / 状態: **受入完了 (2026-09-14)**
 
-2026-09-10 に監査 ([AUDIT_2026-09-10.md](../../../archive/gui_v13/AUDIT_2026-09-10.md)) を経て再編。
+2026-09-10 に監査 (`docs/archive/gui_v13/AUDIT_2026-09-10.md`) を経て再編。
 ユーザー決裁: T5b (常駐表示パネル) は撤去、T6a (監査済み有限実行) は破棄、設定 F1/F2 は保持、
 **端末の形は B = 契約 T2a (GUI アプリ 4 本) を v1.3 の最初に実装し、端末は外部アプリ**。
-最初の票は [K5 (4 アプリ同時実行)](../../../archive/gui_v13/TASK_K5_multiapp.md)。段ごとの最終判定は §6 を参照する。
+最初の票は K5 (4 アプリ同時実行) (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`)。段ごとの最終判定は §6 を参照する。
 **2026-09-11**: K5a の設計を決裁 (D9 の 8 分岐 + D11、票末尾の「決裁」)。KAPI **v44** を予約。
-[K5b-K (カーネル)](../../../archive/gui_v13/TASK_K5B_kernel.md) と [K5b-W (gshell)](../../../archive/gui_v13/TASK_K5B_gshell.md) は実装済み・**実機受入は G9 以外すべて合格**
+K5b-K (カーネル) (アーカイブ: `docs/archive/gui_v13/TASK_K5B_kernel.md`) と K5b-W (gshell) (アーカイブ: `docs/archive/gui_v13/TASK_K5B_gshell.md`) は実装済み・**実機受入は G9 以外すべて合格**
 (2026-09-12、G1〜G8 / G10。G9 は 2 本以上を同時 ready にする観測手段が無く未実施)。受入中に見つけた
 K7 (8MB で shlib .data 4 ページの勘定漏れ、`8cc13d8`) と W-3 (背面窓の枠線が前面のクライアント面に落ちる、`36ccf15`) は修正・実機確認済み。
-**[K6-RAM (物理 RAM 上限の撤廃)](../../../archive/gui_v13/TASK_K6_ram_ceiling.md)** は `f6ec520` で着地、M1〜M5 合格 (32MB / 128MB / 15MB / 8MB)。
+**K6-RAM (物理 RAM 上限の撤廃) (アーカイブ: `docs/archive/gui_v13/TASK_K6_ram_ceiling.md`)** は `f6ec520` で着地、M1〜M5 合格 (32MB / 128MB / 15MB / 8MB)。
 K6 の決裁事項 4 件は 2026-09-12 にユーザー決裁 (2.8GB 見送り / `mem` に実 RAM 合計を並記 / 0594h 無しは何もしない / Cirrus 窓の移動は Cirrus レーン再開時)。G9 はホスト模型を受入とし K5b は**完了**。feat/gui → main のマージも同日承認。**K6C console の差し込み口は完了** (K 側 `d381000` KAPI v46、端末アプリ `abef34f`、受入 C1〜C4 / A1〜A5、2026-09-12)。**K7 入力統合も完了** (設計は独立レビュー通過、K `c6a775d` KAPI v47 / A / W / W2、受入 I1〜I5、2026-09-12。GUI 中の CUI プログラムは `kbd_getchar` で park され、端末アプリの打鍵で起きる)。**T7「CUI コマンドを端末で流す」も完了** (K `7a6b124` EXIT レコード、A `ce0406b` プロンプト / 起動 / 接続モード、受入 T1〜T5、2026-09-12)。**T8 full-screen GFX 復帰は完了** (画面の所有者 + 宣言ビット `gfx` / `cui`、gshell の全画面モード、ポーリング型の協調 yield (tick に 1 回)、受入 F1〜F8 合格、2026-09-12)。PEGC 構成も確認済み (K6-3 `1a559a0` で K6 の probe 回帰を修正)。8MB は端末 + 子が NOMEM で仕様どおり。後続の **T9 shell script** (常駐シェルのソースを CPL=3 の `sh.bin` としてもビルドし端末から起動、外部プログラムは端末経由で起動して `sys_yield` で待つ) は設計 `TASK_T9_sh.md` 第 6 版が Codex の独立レビュー (3 往復) を通過 (2026-09-12)、K / ビルド系 → S / W / A を発注。その後の T9・設定も受入済み (§6)。
 レビュアー (ChatGPT) は枯渇し、以後の合否はユーザーが PM の材料で判断する。
 
@@ -93,8 +93,8 @@ ROADMAPの「terminal app」との差異は未決であり、外部terminalか�
 
 T0 (claude-opus-5) とT1 (Codex) の読み取り専用設計を受領済み。
 PMレビューのR1〜R5をT0修正版が反映。統合の安全条件が未解決のため契約凍結は保留。S0は未発注。
-判定と次のゲートは [REVIEW_T0_T1.md](../../../archive/gui_v13_reviews/REVIEW_T0_T1.md) を参照。
-メモリのホスト測定は [MEMORY_BUDGET.md](../../../archive/gui_v13/MEMORY_BUDGET.md)。ゲスト実行時の空きは未測定。
+判定と次のゲートは `docs/archive/gui_v13_reviews/REVIEW_T0_T1.md` を参照。
+メモリのホスト測定は `docs/archive/gui_v13/MEMORY_BUDGET.md`。ゲスト実行時の空きは未測定。
 T0とS0を同一エージェントへ同時発注しない。共有ファイルの編集はPMが直列化する。
 
 ## 4. S0で凍結する事項
@@ -137,13 +137,13 @@ v1.3 は 2026-09-14 受入完了。最終状態と後続段は [ROADMAP の v1.3
 
 | 段 | 判定・証拠 |
 |---|---|
-| T4 / T5R | 受入済み: [T4 レビュー](../../../archive/gui_v13_reviews/REVIEW_T4.md)、[T5R レビュー](../../../archive/gui_v13_reviews/REVIEW_T5_RENDER.md) |
-| T5a | 受入済み (2026-09-12): [票](../../../archive/gui_v13/TASK_T5A_APP.md) |
-| T5b / T6a | 決裁 B で撤去 / 破棄 ([T5b の記録](../../../archive/gui_v13/TASK_T5B_FINITE.md))。未完了の実装待ちとして扱わない |
+| T4 / T5R | 受入済み: T4 レビュー (アーカイブ: `docs/archive/gui_v13_reviews/REVIEW_T4.md`)、T5R レビュー (アーカイブ: `docs/archive/gui_v13_reviews/REVIEW_T5_RENDER.md`) |
+| T5a | 受入済み (2026-09-12): 票 (アーカイブ: `docs/archive/gui_v13/TASK_T5A_APP.md`) |
+| T5b / T6a | 決裁 B で撤去 / 破棄 (T5b の記録 (アーカイブ: `docs/archive/gui_v13/TASK_T5B_FINITE.md`))。未完了の実装待ちとして扱わない |
 | K5 / K6-RAM / K6C / K7 / T7 / T8 | 受入済み。K5 の G9 はホスト模型で受入 (冒頭の証拠リンク) |
-| T9 | 受入済み (2026-09-13): [票](../../../archive/gui_v13/TASK_T9_sh.md) |
+| T9 | 受入済み (2026-09-13): 票 (アーカイブ: `docs/archive/gui_v13/TASK_T9_sh.md`) |
 
-旧設計からの調査・作業経緯は [完了記録](../../../archive/gui/GUI_V13_PROGRESS_LOG.md)。
+旧設計からの調査・作業経緯は 完了記録 (アーカイブ: `docs/archive/gui/GUI_V13_PROGRESS_LOG.md`)。
 試験棚卸し・stat 等の小物は ROADMAP の 2026-09-14 着地記録で閉鎖済み。
 後続の保留事項は同節の S6-P と U6 決裁先へ引き継ぐ。v3 の外部端末に依る未実施は
 [DEFERRED_TESTS の H-7](../../DEFERRED_TESTS.md) に残る。

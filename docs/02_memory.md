@@ -37,7 +37,7 @@
 > 「浮いた番地と固定番地を同じ帯で隣り合わせにしない」ため —
 > カーネル帯域は `KHEAP_BASE` 以降が `__bss_end` 由来で浮くので、カーネルが
 > 育つと共有メモリが固定番地のスタックへ食い込む
-> (票 [`archive/kernel_v21/TASK_KSTACK_USER.md`](archive/kernel_v21/TASK_KSTACK_USER.md))。
+> (票 `docs/archive/kernel_v21/TASK_KSTACK_USER.md`)。
 > 0x9FFFC は今もローダー段の ESP として使われるが、カーネルは `kentry.asm` で
 > `MEM_KSTACK_TOP` に張り替える。
 >
@@ -192,7 +192,7 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 > 出力引数に共有ライブラリの `.text`/`.rodata` を渡しても #PF は起きない。出力ポインタは
 > 書く前に `exec/exec.c` の `ring3_user_ranges_writable()` で present + RW + USER を
 > 確かめる (生成される wrapper の先頭。票
-> [archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md](archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md))。
+> `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`)。
 
 > **0x90000 の自動プレイ観測メールボックス**: ゲーム側が毎フレーム状態ブロックを書き、
 > ホストが `GET /api/mem?addr=0x90000&space=phys` で読む。**レイアウトを変えたら

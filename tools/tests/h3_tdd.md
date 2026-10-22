@@ -1,6 +1,6 @@
 # 票 H3 — mtime の取得と保存、日時の前置判定 (ホスト TDD の記録)
 
-- 票: [`docs/archive/shell/TASK_H3.md`](../../docs/archive/shell/TASK_H3.md) (とくに §8 = ユーザー決裁 2026-09-15)
+- 票: `docs/archive/shell/TASK_H3.md` (とくに §8 = ユーザー決裁 2026-09-15)
 - 設計: [`HSYNC_IMPROVEMENT_PLAN.md`](../../docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) §5 / §7.2 / §9
 - 基点: `feat/gui` の `d734f54`
 - 実行: `python3 -B tools/tests/test_hsync_h3.py --target --mutate`

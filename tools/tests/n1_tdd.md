@@ -1,7 +1,7 @@
 # N1 — Host Services 基盤 (ワイヤ v2 / `net/link.c` 非ブロッキング / KAPI v51 / Agent v2) の TDD 記録
 
-票: [`docs/archive/network/TASK_N1.md`](../../docs/archive/network/TASK_N1.md)、
-契約の正典は [`docs/archive/network/TASK_N0.md`](../../docs/archive/network/TASK_N0.md) 第 5 版
+票: `docs/archive/network/TASK_N1.md`、
+契約の正典は `docs/archive/network/TASK_N0.md` 第 5 版
 (§1a ABI / §1b ワイヤ v2 / §2 駆動・排他・状態機械 / §3 TDD の全ケース)。
 
 試験は 2 本。**どちらも実物のソースを動かす**:

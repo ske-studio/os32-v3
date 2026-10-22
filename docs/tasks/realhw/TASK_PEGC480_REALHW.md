@@ -2,11 +2,11 @@
 
 > 状態: **受入完了 (2026-09-30)** — 実機 Ra266 で `gfxmode pegc` の GUI が正しい位置に出て、GUI から CUI へも正しく戻ることをユーザーが目視で確認した (§5 P1、末尾の記録)。480 ライン時の液晶 OSD (周波数) は未採取 — [TASK_TRIDENT_DRIVER](TASK_TRIDENT_DRIVER.md) 段 0 の残件へ。
 >
-> それまでの状態: **受入完了・実機確認待ち (2026-09-29)** — 段 2 (値と順序を実機の ROM に合わせる) を実装し、画面を見ない条件 ((A) ホスト試験・(B) NP21/W 回帰・(C) 実機 `pegcchk`) で受け入れて v2.1 に入った ([RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1)。残るのは**実機で GUI を目で見ること**だけ。**Ra266 の PEGC 640x480 の正典はこの票** ([TASK_PEGC_RA266_TIMING](../../archive/realhw_v21/TASK_PEGC_RA266_TIMING.md) は完了記録)。(2026-09-29 の棚卸しで更新)
+> それまでの状態: **受入完了・実機確認待ち (2026-09-29)** — 段 2 (値と順序を実機の ROM に合わせる) を実装し、画面を見ない条件 ((A) ホスト試験・(B) NP21/W 回帰・(C) 実機 `pegcchk`) で受け入れて v2.1 に入った ([RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1)。残るのは**実機で GUI を目で見ること**だけ。**Ra266 の PEGC 640x480 の正典はこの票** (TASK_PEGC_RA266_TIMING (アーカイブ: `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md`) は完了記録)。(2026-09-29 の棚卸しで更新)
 >
 > それまでの状態: **§3 段 1 実機 2 回目 (2026-09-29 20:51) で ROM の OUT 列が全部取れた → §3-3 の比較で原因を特定、段 2 (値と順序を実機の ROM に合わせる) を実装 — ホスト試験 (受け入れ A) と NP21/W の回帰まで。実機の GUI 表示は未確認 (§5 の (C) `pegcchk` を実機で走らせる段)** (wt/pegc480-real)。段 0 は未着手。設計は Codex 設計レビュー 2 回で P1 なし、2 回目の P2×1・P3×1 は文面で反映 (2026-09-25)。発行: PM (Claude Code `claude-opus-5-5`)、2026-09-25。
 > 対象: 実機 PC-9821Ra266 + 液晶モニター。当初は「v2.1 には入れない (ユーザー決定: v3 で良い)」→ **2026-09-29 のユーザー決定で v2.1 に入れた** (画面を見ない条件)。
-> 関係: [PLAN.md](PLAN.md) §7、[TASK_FDC_REALHW.md](../../archive/realhw_v21/TASK_FDC_REALHW.md) §9-1 (CUI のずれ、prepare で直した件)、
+> 関係: [PLAN.md](PLAN.md) §7、`docs/archive/realhw_v21/TASK_FDC_REALHW.md` §9-1 (CUI のずれ、prepare で直した件)、
 > `gfx/backend_pegc.c` / `include/pegc.h`。
 
 ## 0. 症状 (2026-09-25、ユーザー報告)
@@ -390,7 +390,7 @@ FIFO 待ち単独の寄与は未確定。待ち条件と上限は `gfx/backend_p
 
 ## 実機での受け入れ (C) の記録 (2026-09-29 22:21、実機エージェント、672f849)
 
-**合格**。`pegcchk 5` の実行・CUI 復帰と続く `v86 -g` を確認。GUI の目視は次節。[実行出力・証拠](../../archive/realhw/PEGC480_REALHW_EVIDENCE_2026-10-01.md)。
+**合格**。`pegcchk 5` の実行・CUI 復帰と続く `v86 -g` を確認。GUI の目視は次節。実行出力・証拠 (アーカイブ: `docs/archive/realhw/PEGC480_REALHW_EVIDENCE_2026-10-01.md`)。
 
 ## 実機での目視 (P1) の記録 (2026-09-30、ユーザー、672f849)
 
@@ -402,4 +402,4 @@ HDD に入っている 672f849 (9/29 に (C) を通したビルド、配備な�
 
 ## v3 のカーネルでの実機ログ (2026-10-01、実機エージェント、`737f6e4`、画面は見ていない)
 
-**24kHz 起動からの 480 ライン移行・起動時同期への復帰を確認** (`737f6e4`)。画面は未確認。[起動ログ・コマンド出力](../../archive/realhw/PEGC480_REALHW_EVIDENCE_2026-10-01.md)。
+**24kHz 起動からの 480 ライン移行・起動時同期への復帰を確認** (`737f6e4`)。画面は未確認。起動ログ・コマンド出力 (アーカイブ: `docs/archive/realhw/PEGC480_REALHW_EVIDENCE_2026-10-01.md`)。

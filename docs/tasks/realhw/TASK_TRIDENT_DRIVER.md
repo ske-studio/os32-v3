@@ -2,7 +2,7 @@
 
 > 状態: **設計中** — 設計票 v5 は **Codex 5 回目で Approve** (2026-09-29、§段 2-X の注記「Codex 5 回目の Approve に付いた注記」)。実装は未着手。(2026-09-29 の棚卸しで更新)
 >
-> それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 ([第 4 回レビュー](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md#review-4))。5 回目 (差分の確認) 待ち。
+> それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
 > 対象: 実機 PC-9821Ra266 の内蔵アクセラレータ (PCI 0:8.0 `1023:9660`)。**NP21/W では動かせない** (§3-3)。
 > 関係: [PLAN.md](PLAN.md) §1・§7、[TASK_PEGC480_REALHW.md](TASK_PEGC480_REALHW.md)、[TASK_LAN_82557.md](TASK_LAN_82557.md) §6 (PCI 列挙の実測)、
@@ -21,17 +21,17 @@
 - **この票は調査と設計まで**。コードは書かない。実装に入るのは §7 の決裁と Codex 設計レビューの後。
 - 書き方の約束: `docs/hw/` (Bible / UNDOCUMENTED) と実測に**あること**と**無いこと**を分ける。無いことは「資料に記述なし」と書き、
   記憶や一般論で断定しない。一般論で補った所は「(一般値、docs/hw に記述なし)」と明記する。
-- **v2 の要点** (Codex 1 回目、[レビュー記録](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md#review-1) に所見ごとの対応表): 段 1 は「出典付き許可リストの読み取りだけ」(全ダンプ・試し書きを外す)、
+- **v2 の要点** (Codex 1 回目、レビュー記録 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に所見ごとの対応表): 段 1 は「出典付き許可リストの読み取りだけ」(全ダンプ・試し書きを外す)、
   段 2 は**映像を 98 側へ戻す経路 (§3-5) と窓の予約・写像の順序 (§4-2) が揃うまで禁止**、高位仮想窓の公開は
   v3 の資源台帳と私有 lease に統合した (§4-2)。
   9682 の device ID・VRAM 容量・bar0 の用途は「資料に記述なし」に戻した。
-- **v3 の要点** (Codex 2 回目、[第 2 回レビュー](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md#review-2)): 復帰操作の根拠は資料か**実際の往復成功の記録**だけ (「復帰値を先に書いて表示が変わらない」は根拠から外す)。
+- **v3 の要点** (Codex 2 回目、第 2 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`)): 復帰操作の根拠は資料か**実際の往復成功の記録**だけ (「復帰値を先に書いて表示が変わらない」は根拠から外す)。
   **ユーザー決裁 (2026-09-29)**: 「復帰未確認・リセット前提の探索試験」を通常の段 2 と**別の段 (段 2-X)** として置くことを**承認**、T8 は **(i)**。
   復帰の接続点は**両方の例外ハンドラ**でアプリ fault の分岐の**後**・TVRAM 出力の前 (子アプリの fault では戻さない)。復帰フックは**対象識別と
   復帰資源の準備が済んでから最初の装置変更より前に有効化**し、有効化後の写像は失敗・shutdown 後も保持、有効化前の失敗では装置に触らない。
   0FACh も許可リストの採用条件に従い、満たさなければ段 1 は**読み取り 0 件で停止**。帯は feat/gui `44bd0fe1` で**実装済み**の
   `MEM_DEVICE_APERTURE_*` を使い、Trident の枠 [0xFE400000, 0xFE800000) と追加 PT はこの票の追加作業。
-- **v4 の要点** (Codex 3 回目、[第 3 回レビュー](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md#review-3)): 段 2-X は「R1 以外を免除」ではなく、**試す 1 組の切替・復帰操作を開始前に固定** (アドレス・幅・値/マスク・順序・根拠・未確認点)、
+- **v4 の要点** (Codex 3 回目、第 3 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`)): 段 2-X は「R1 以外を免除」ではなく、**試す 1 組の切替・復帰操作を開始前に固定** (アドレス・幅・値/マスク・順序・根拠・未確認点)、
   アクセス先・配送・他装置への影響の確認は免除しない (3Cxh の衝突禁止は段 2-X の開始条件でもある)、観測に基づく中止条件、記録の中身 (§3-5)。段 0 の結論は
   「A と PCI の I/O 応答に依存する B は現在無効、外部論理による B は不明、C は Memory Enable が立っているが窓の有効性・レジスタ対応・安全性は未確認、
   許可リストが空なので段 1 は読み取り 0 件」に限定 (§2-1)。**新しい資料**: X.Org `xf86-video-trident` (MIT/X11、FreeBSD ports の旧 `x11-drivers/xf86-video-trident`)
@@ -453,7 +453,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 
 資源・面・lease の正典は [MEMMAP_V3 §0 D33](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) と
 [§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `kernel/paging.c` の私有 lease 窓、`exec/lease.c` と `kernel/ledger_pci.c`。
-旧共有 PT 昇格案と変更経緯は [設計履歴](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md) に保存した。
+旧共有 PT 昇格案と変更経緯は 設計履歴 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に保存した。
 
 **予約と準備 (Trident 固有部分は未実装)**
 
@@ -539,7 +539,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 
 ## 8. 設計レビューの結論
 
-2026-09-29 の第 5 回で Approve。第 1〜4 回の所見・採否と第 5 回に渡した論点は [レビュー記録](../../archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md)。
+2026-09-29 の第 5 回で Approve。第 1〜4 回の所見・採否と第 5 回に渡した論点は レビュー記録 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`)。
 採用した設計は §3-4 (許可リスト)、§3-5 (復帰と探索試験の開始条件)、§4-1 (所有と表示状態)、§4-2 (v3 の資源台帳・lease)、§9 (受入) に統合した。
 未解決は Ra266 のレジスタ配送・副作用、BAR の用途と decode 幅、復帰操作の十分性、段 3 でのカーネル例外誘発手段、モニタと容量の確認。各節・§7 の条件を満たすまで該当段へ進まない。
 

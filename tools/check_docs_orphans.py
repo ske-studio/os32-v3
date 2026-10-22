@@ -35,7 +35,8 @@ check_docs_orphans.py — どこからも辿れない文書 (孤児) の検出
 生成器がメモリ上で作る表を使うので、生成物の有無・鮮度で結果は変わらない。
 
 `docs/hw/` は対象外。gitignore された著作権物のミラーで、環境によって
-有ったり無かったりする。
+有ったり無かったりする。`docs/archive/` も (1) の対象外 — 規則 [D4] (2026-10-22) で現行の文書から
+アーカイブへはリンクしないので、索引から辿れないのが正しい形 (一覧は `docs/archive/README.md`)。
 
 ## 意図した例外
 
@@ -64,7 +65,7 @@ ROOT_DOC = "docs/INDEX.md"
 ALLOW_FILE = "docs/.orphans-allow"
 
 # 走査から外すディレクトリ (docs 直下からの相対)
-SKIP_DIRS = {"hw"}
+SKIP_DIRS = {"hw", "archive"}
 
 # Markdown のインライン リンク `[text](target)` / `[text](<target> "title")`。
 # 参照定義 `[id]: target` の形は OS32 の文書では使っていないので見ない。

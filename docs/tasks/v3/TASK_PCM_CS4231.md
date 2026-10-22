@@ -3,8 +3,8 @@
 > 状態: **受入待ち** — 着地済み・v2.1 に同梱。NP21/W で E0〜E3 合格、実装レビュー往復 2 で Approve。残: E4・E5 (NP21/W) と E6 (実機)。(2026-09-29 の棚卸しで更新) 台帳から: R7-2、H-4 (b)(c) (2026-10-14)。
 >
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-23) / それまでの状態: **実装済み・NP21/W で E0〜E3 合格 (2026-09-23、§3-1)。実装レビュー (Codex) 往復 1 = Request changes 5 件 (reclaim と restart の競合、close 入口の非原子性、close 期限の公開順、時計の巻き戻り判定、FAULTED 後の音量書き) → 修正済み (e301a61: 交互試験 7 ケース RED→GREEN、変異 30 本)。合流後に NP21/W で E3 を再確認 (5 秒 × 2 + 短いストリーム、close 0、fault site 0、kselftest 197/197)。**実装レビュー往復 2 = Approve** (P1〜P5 閉、新規 blocker 無し。非 blocker: claim のコメント、wrapper 経由の write 契約試験、交互試験の補強 3 件 — §3-1 の残件に)。E4/E5 は残件、E6 は実機**。
-> 正典の関係: [`PLAN.md`](../../archive/v3/PLAN.md) §5-5、土台は [`TASK_HAL_WIRING.md`](TASK_HAL_WIRING.md) (1-1 割り込み、1-2 8237、1-3 プール、1-5 時計)、
-> 出力保護は [`../../archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](../../archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md)。
+> 正典の関係: `docs/archive/v3/PLAN.md` §5-5、土台は [`TASK_HAL_WIRING.md`](TASK_HAL_WIRING.md) (1-1 割り込み、1-2 8237、1-3 プール、1-5 時計)、
+> 出力保護は `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`。
 > 典拠: Crystal **CS4231A データシート DS139PP2** (`docs/hw/crystal/cs4231a.pdf`、gitignore のミラー、`pdftotext` 済み)、
 > `docs/hw/undocumented/io_sound.md`「PC-9821X･N内蔵型」、NP21/W `src/sound/cs4231c.c` / `src/cbus/cs4231io.c`。
 > **NP21/W 上の実装と一次受入 (E0〜E5) は実機不要**。実機でしか検証できない項目は E6 に残る。
@@ -175,7 +175,7 @@ CLOSED → 何もしない。正常終了・fault・CTRL+STOP・park 中の kill
 
 #### 進捗 (2026-09-23、worktree `wt/pcm`、基点 17e3f46)
 
-記録は [TASK_PCM_CS4231_RESULTS](../../archive/v3/TASK_PCM_CS4231_RESULTS.md) へ移した。
+記録は TASK_PCM_CS4231_RESULTS (アーカイブ: `docs/archive/v3/TASK_PCM_CS4231_RESULTS.md`) へ移した。
 
 **票からの逸脱 (PM の判断が要る)**:
 
@@ -250,7 +250,7 @@ close / reclaim が各状態から 1 度だけ解放すること)。
 | ID | 結果 |
 |---|---|
 | E0 | 合格: NP21/W フォーク `wt/pcm-api`、main `2dca70f` (`/api/sound` の採取口)。PUR/PU は未模擬のため計数なし |
-| E1 | 合格: [実装・ホスト記録](../../archive/v3/TASK_PCM_CS4231_RESULTS.md) |
+| E1 | 合格: 実装・ホスト記録 (アーカイブ: `docs/archive/v3/TASK_PCM_CS4231_RESULTS.md`) |
 | E2 | 合格: `np21w-trial-pcm-sndboard64.ini`、`pcm_test nodev` の対照 (§3 の受入条件) |
 | E3 | 合格 (採取できた範囲): `pcm_test` / `pcm_test short`、当時の観測は下記。**未実施**: 200ms 書込み停止、開始直後/close直前の採取、ミュートの別確認、8KBコピー時間 |
 | E4 | 未: 共有 IRQ の偽装置 hook は未実装 |

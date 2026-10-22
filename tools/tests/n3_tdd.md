@@ -1,6 +1,6 @@
 # N3 ホスト TDD の記録 (libos32host + wget / lpr / hclip / hdate)
 
-票 [docs/archive/network/TASK_N3.md](../../docs/archive/network/TASK_N3.md) §4。C 側だけ
+票 `docs/archive/network/TASK_N3.md` §4。C 側だけ
 (Agent = `host_agent.py` は別コーダー・別票)。実行:
 
 ```

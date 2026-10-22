@@ -1,6 +1,6 @@
 # HDD の一時置き場 (段 1) — RED→GREEN の記録
 
-- 票: [docs/archive/realhw_v21/TASK_HDD_INSTALL.md](../../docs/archive/realhw_v21/TASK_HDD_INSTALL.md) 段 1 / §1-v3 (N3〜N7、R3-1)
+- 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 1 / §1-v3 (N3〜N7、R3-1)
 - 実行: `python3 -B tools/tests/test_hdd_stage1.py --target --mutate` (`make check-hdd-stage1-host`)
 - ハーネス: `tools/tests/hdd_stage1_host.c` (純粋関数、ホスト 64 ビット + libc)、
   `tools/tests/ext2_part_host.c` (ext2 の区画探索と format_at、ILP32 -nostdlib)

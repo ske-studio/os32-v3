@@ -1,6 +1,6 @@
 # serialfs 検証記録 (シリアル越しの /host、`sfs run`)
 
-票: [TASK_SERIAL_HOSTFS](../../docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 B
+票: TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 B
 (§1-v2 / §1-v3 / ユーザー決裁 2026-09-24)。受入 T1 と T5 のホスト部分。
 
 ## この文書の性格

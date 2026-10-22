@@ -12,7 +12,7 @@
 
 H1〜H4 は実装・受入済み。本文はその初期設計と受入条件の記録で、後続案 (§8「後続」) は未着手。
 利用時の現行仕様は [hsync(1)](../../manpages/hsync.1#description)、H4 の完了証拠は
-[TASK_H4 §8](../../archive/shell/TASK_H4.md#8-ゲスト受入-pm2026-09-16c9bec9c) を参照する。
+TASK_H4 §8 (アーカイブ: `docs/archive/shell/TASK_H4.md`) を参照する。
 初期案の常時内容比較から現行の同サイズ・同mtime時の省略への変更は [同一判定](../../manpages/hsync.1#同一判定) を参照。
 
 ## 1. 推奨方針
@@ -206,7 +206,7 @@ build IDはGit SHAだけでなく、未コミット差分・ビルド設定・�
 | H1 | 同サイズ内容比較、ストリームCRC＋読戻し、dry-run、理由表示、stat失敗の是正 | hsync.c、CRC共通コア、HostDrvのエラー処理、hsync.1、ホスト試験 | 同サイズ・同時刻更新を検出し、I/O失敗を成功にしない。直接上書きの制限は明記 | **受入完了 (2026-09-15)** |
 | H2 | 一時ファイル、排他的作成、置換の失敗処理、必要な復旧契約 | VFS/FD、ext2、KAPI（必要分のみ）、hsync | 書込み・検証・置換失敗を注入し、定めた範囲で旧宛先を維持。電源断保証は別に判定 | **受入完了 (2026-09-16)** |
 | H3 | HostDrv時刻変換、mtime設定API、時刻のみの同期 | hostdrvfs.c、VfsOps、ext2、sdk/kapi.json、hsync | 時刻保存と未知／範囲外時刻を処理。CPL=3経路と各FSの非対応動作を検証 | **受入完了 (2026-09-15)** |
-| H4 | 配備世代・manifest・期待ID・不変なコピー元・適用記録 | hostdrv_deploy.py、deploy経路、hsync、検証ツール | 古い／不完全／混在した配備を検出。途中失敗で世代完了にしない | **受入完了 (2026-09-16)** ([H4 完了記録](../../archive/shell/TASK_H4.md#8-ゲスト受入-pm2026-09-16c9bec9c)) |
+| H4 | 配備世代・manifest・期待ID・不変なコピー元・適用記録 | hostdrv_deploy.py、deploy経路、hsync、検証ツール | 古い／不完全／混在した配備を検出。途中失敗で世代完了にしない | **受入完了 (2026-09-16)** (H4 完了記録 (アーカイブ: `docs/archive/shell/TASK_H4.md`)) |
 | 後続 | 列挙の分割、管理対象削除、条件付き高速化 | 別票 | 実測と用途に基づき追加 | 未着手 |
 
 H1をH3/H4待ちにしない。H2のFS保証は既存SQLite等のrename利用者にも影響するため、別にレビューする。
@@ -215,8 +215,8 @@ CRCだけの追加とmtime API追加で、必要なビルド・ABI確認を分�
 ## 9. 受入項目
 
 以下は初期設計時の受入条件。H1〜H4 の判定・実施範囲は各完了票
-([H1](../../archive/shell/TASK_H1.md)、[H2](../../archive/shell/TASK_H2.md)、
-[H3](../../archive/shell/TASK_H3.md)、[H4](../../archive/shell/TASK_H4.md)) に従う。
+(H1 (アーカイブ: `docs/archive/shell/TASK_H1.md`)、H2 (アーカイブ: `docs/archive/shell/TASK_H2.md`)、
+H3 (アーカイブ: `docs/archive/shell/TASK_H3.md`)、H4 (アーカイブ: `docs/archive/shell/TASK_H4.md`)) に従う。
 電源断保証や後続案まで一括して合格とする表ではない。
 
 | ID | 反例・操作 | 期待結果 |
@@ -249,4 +249,4 @@ CRCだけの追加とmtime API追加で、必要なビルド・ABI確認を分�
 残る設計判断は、(1) H2の電源断復旧をどこまで保証するか、(2) 時刻有効性を将来のstat拡張へいつ載せるか、(3) manifestと世代ディレクトリの形式・保存先、(4) CRCコアの共通ビルド配置と測定後の表サイズ。
 これらが未確定でもH1の同サイズ比較の実装範囲は切り出せる。
 
-関連: [ファイルシステム仕様](../../06_filesystem.md)、[配備経路](../../08_build.md#配備3経路)、[デバッグ教訓](../../POLICY_DEBUG.md)、[設定保護](../../archive/settings/S0_FOUNDATION.md)、[hsync保護試験](../../../tools/tests/test_hsync_protect.py)。
+関連: [ファイルシステム仕様](../../06_filesystem.md)、[配備経路](../../08_build.md#配備3経路)、[デバッグ教訓](../../POLICY_DEBUG.md)、設定保護 (アーカイブ: `docs/archive/settings/S0_FOUNDATION.md`)、[hsync保護試験](../../../tools/tests/test_hsync_protect.py)。

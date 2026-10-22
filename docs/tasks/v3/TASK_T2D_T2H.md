@@ -3,13 +3,13 @@
 > 状態: **受入完了 (2026-10-16)** — T2d〜T2h は受入済み。次のゲスト受入の関門 (8 行) は 2026-10-16 に閉じた (5 行 PASS、E9-1・E11-9 は H-7 へ、H-2 は (3) だけ後続へ — 台帳と閉鎖台帳)。§5-4 (STOP のユーザー決定)・§11・§12 は契約・方針として残す。それまでの状態: **実装中 (2026-10-13)** — T2d〜T2g は受入済み、T2h は L-h 着地・受入 R0〜R7 一巡 (§5-1)。残りは h9 の締め (台帳の閉/渡/持)。現在地は [HANDOVER](../agents/HANDOVER_2026-10-09.md)
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
-> **実行記録は 2026-10-06 に [archive/v3/TASK_T2D_T2H_RECORDS.md](../../archive/v3/TASK_T2D_T2H_RECORDS.md) へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
+> **実行記録は 2026-10-06 に `docs/archive/v3/TASK_T2D_T2H_RECORDS.md` へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../agents/ROLES.md))。
 > 計画文書。下記のAPI名・内部構造・分割は実装契約案であり、未実装のものを現行仕様とはしない。
 > 決定の正典は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) D1〜D36 と [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §1〜§4・§6。本票は決定を変更しない詳細化。食い違いは§8へ。番地の定義は `include/memmap.h`、地図は [02_memory](../../02_memory.md) §2-1、ABIは `sdk/kapi.json`、規則は [CONSTRAINTS](../../CONSTRAINTS.md)。
 
 ## 0. 入口と作業の単位
 
-T2a / T2a′ / T2b / T2c の実装結果・レビュー・PM受入は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md) を参照。NP21/W 8/17MB の合格を Ra266 や未実施ケースの合格に読み替えない。
+T2a / T2a′ / T2b / T2c の実装結果・レビュー・PM受入は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) を参照。NP21/W 8/17MB の合格を Ra266 や未実施ケースの合格に読み替えない。
 
 本票の承認後に d0 (既存不具合候補の再現確認→修正) → d → e → f → g → h の順で進む。ext2調査をdと並行に先行着手し、hの受入前に調査ゲートを閉じる。既知のカーネル層不具合と確定した場合は [POLICY_DEV §1](../../POLICY_DEV.md) に従い新機能より修正を優先する。各小段は**実装・対象ホスト試験・報告を含め45〜75分を目安、最大120分**。75分で残作業を見積もり、90分で実装を止め、差分・失敗ログ・次の1ケースを記録する。120分に検査を押し込まない。表の小段でも超えるなら「失敗注入の半分」等へ分ける。着地単位と一回のコーダー依頼は別で、未使用helperの準備は個別レビュー可能、公開切替は依存小段を揃えて一組で受け入れる。
 
@@ -18,7 +18,7 @@ T2a / T2a′ / T2b / T2c の実装結果・レビュー・PM受入は [TASK_T2AB
 | 作業 | 依存 / 並行できる準備 |
 |---|---|
 | d0a→d0b→d1〜d6 | fd_redirectのゲスト再現確認を先頭に置く。修正に必要な最小caller/walkはd0bへ前倒しし、dの新機能より先に閉じる |
-| ext2調査 | [調査票](../../archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md)をdと並行。原因判定・必要な修正/再検証はh受入の前提。既知不具合化したら上記の優先順へ |
+| ext2調査 | 調査票 (アーカイブ: `docs/archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md`)をdと並行。原因判定・必要な修正/再検証はh受入の前提。既知不具合化したら上記の優先順へ |
 | e1〜e12 | d完了後。e10a (boot/SHM/閉鎖)、e10b (V86)、e10c (3段検査)を分離、全切替はe11 |
 | f1a / f1b、h2 / h3準備 | eと並行可。toolchain台帳・adapter単体接続・fixture準備だけ。fの公開切替はe受入後、hの証拠は最終一式で再実行 |
 | f2〜f13→g→h | f1bの成立とe受入がf公開切替の前提。h受入はd〜g・ext2ゲート・実機ゲートを照合 |
@@ -93,7 +93,7 @@ walkはT2cの低位恒等backingをP2Vで参照し、**dではmaster往復を除
 
 DB接続は `kapi_db.c:512` / `:974` / `:1116` の3呼出箇所 (db_open / db_open_existing / db_prepare_only)とその補助だけ。copy失敗では既存rcを返し、SQLite入口カウンタ差分0、旧stmt/FDに副作用なし。B3/B4やFEP全体を安全化したとは報告しない。 **例外: `db_prepare_only` の旧 stmt はコピー拒否でも入口で finalize する** (公開仕様 KAPI_SPEC.md:1304-1306 を優先、§10-13)。
 
-> 記録は archive へ移した (2026-10-07): [d0a の試験と判定](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r94)。
+> 記録は archive へ移した (2026-10-07): d0a の試験と判定 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ### 1-3. 分割・試験・受入
 
@@ -159,7 +159,7 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 5. tvdumpはCUI授権済みchecked copy KAPIへ移しTVDM wire形式を維持。nop/ring3_hello/fault/guardの観測マーカーは割当済みSHMへ (CRT非依存入口も同じ取得/初期化)。保護違反そのもののVRAM書込みは残す。db_v50_testのVRAM許可期待をRAM境界成功と未貸与VRAM拒否へ変更。
 6. memory世代更新と現行ビルド対象の全再ビルド。apps/gameはユーザー決定により対象外。caller追随要件と再開時ゲートをhへ渡し、決定による持越しと記録する (§5/§8)。
 
-**e11 結線表** ([閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md) の ID。§2-4 項の「—」は内部準備・契約補足)
+**e11 結線表** (閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) の ID。§2-4 項の「—」は内部準備・契約補足)
 
 | ID | §2-4 項 | 担当パック (a/b/c、複数可) | 何を | 接続先 (port・KAPI) | 撤去する旧経路 | 期待が変わる試験 | 受入 |
 |---|---|---|---|---|---|---|---|
@@ -180,13 +180,13 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 | 補4 | 4 | a/b | V86全出口と通常地図の結線 | session end → CR3 reload → 3段検査 | 旧出口の復元漏れ | V86正常/失敗/STOP/kill/K1・VM INT80h | 内容/属性・PCD・PDE USER復元、通常AS禁止、DISPLAY/TVRAM再lease |
 
 **e11 統合受入 (2026-10-07)**: 合格。証拠: `~/os32-tmp/evidence/2026-10-07/accept_e11/RESULT.md`。
-未完了項目は [持越し台帳](../DEFERRED_TESTS.md)、閉じた項目と予算の証拠は [閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md) を参照。
-> 記録は archive へ移した (2026-10-07): [優先段・KAPI-AUDIT-FIX・e11c1/c3](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r217)、[e11b1/c2](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r678)。
+未完了項目は [持越し台帳](../DEFERRED_TESTS.md)、閉じた項目と予算の証拠は 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) を参照。
+> 記録は archive へ移した (2026-10-07): 優先段・KAPI-AUDIT-FIX・e11c1/c3 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)、e11b1/c2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ### e11 の分担と切替順
 
 - a=内部結線 (旧USER下は準備確認)、b=低位USER/旧例外撤去・SHM/V86契約・拒否、c=正規lease対照・公開KAPI/caller/SDK/生成/版/manifest。**順序は b1 → c → b2** (aの後。b1は直接consumerの無いTVRAM/font/VRAM例外、b2はUnicode/BB/共有PT)。a/b/cは独立公開・配備せず、**版の更新は統合でだけ行う** (b1のTVRAM wrap本体は宣言・slot・版不変で再生成可)。統合で§2-4全6項を同時成立、現行対象再ビルド・配備を一括。受入は§2-5末尾のNP21/W一式とe12の変異一覧による。apps/gameは§5/§8へ。E11-5は2026-10-03決定の「全画面中のowner 1または専用のKAPI」、追加ならcで版一括へ含める。
-> 記録は archive へ移した (2026-10-07): [e11b2・e11a2](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r231)。
+> 記録は archive へ移した (2026-10-07): e11b2・e11a2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 - **KAPI-CALLBACK**: 未完了は[台帳の優先段](../DEFERRED_TESTS.md#関門の表)。公開KAPIの形と版を変えずCPL0実行を塞ぎ、**e11より先に配備・受入する**。hsync・install・filerを壊す単純拒否は不可。候補はkernel生成trampolineのslot 12 stubをCPL3 shimへ替え、kernel内部の列挙口で項目を写しcallbackをCPL3で呼ぶ。CPL0不実行・既存callerの列挙正常・`man -l` crash解消を受入。値返し列挙KAPI追加とcaller移行はe11c。
 - **KAPI-OWNER**: 台帳の優先段でSHM lock/free・pipe free/clear/get_buf・DB slotをwrapで所有者照合し、既存の-1で他owner操作を無変更拒否。本人成功・trusted回収も先行受入。`pipe_get_buf`がkernel番地を返す件の意味変更はE11-8のe11c。
@@ -211,16 +211,16 @@ guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkself
 | e10b | V86 sessionと全出口復元。VRAM/Eのsetup/teardown PCDはe3へ前倒し済み (PM判断、初回起動/V86でUCを失わないため)。PDE USER、失敗/STOP出口を確認 |
 | e10c | master/AS/post-exec毎bootの3段検査。kselftest (c)とV86帰路でalias_cache一致、DISPLAY/TVRAM再取得 |
 | e11 | 全切替・世代/生成/manifest確認 (前小段を統合、単独で部分配備しない)<br>申し送り (2026-10-02): `test_app_bb_overlap.py` は旧直接BB公開の撤去時に退役するか lease CLIENT 試験へ作り直す。e10a の map_user_keep 試験更新も統合する。 |
-| e12 | 変異対応表 [T2E_MUTANTS](../../archive/v3/T2E_MUTANTS.md)・§6-1 実測・構成別 guest_acceptance を確定。X-12/X-13/X-10 と X-2 前半を閉鎖、ピークを kernel 専用化。検査証拠は `~/os32-tmp/run/e12/report.md`、構成 / PF 詳細 / ピーク再測定は H-4/H-8/H-9/E11-BUD 等で PM 受入 |
+| e12 | 変異対応表 T2E_MUTANTS (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)・§6-1 実測・構成別 guest_acceptance を確定。X-12/X-13/X-10 と X-2 前半を閉鎖、ピークを kernel 専用化。検査証拠は `~/os32-tmp/run/e12/report.md`、構成 / PF 詳細 / ピーク再測定は H-4/H-8/H-9/E11-BUD 等で PM 受入 |
 
 実ソース `test_lease.py` / `test_gfx_boot.py` とSDK呼出しを連結し、backendを選ぶだけの模型で終えない。変異は旧bb pointer、plane stride丸め、片実体だけ再attach、GUI DISPLAY許可、UC落ち、共有PT書込み許可、revoke前free、V86後PDE USER復元欠落、teardownのPCD欠落、SHM lock/free/回収後USER欠落、束generation照合削除、fontのboot終了ガード除去。既存10 lease変異の意図も保持。
 
 NP21/Wは8MB planar/PEGC、17MB planar/PEGC/Cirrus。日本語/描画/present、GUI→CUI→GUI、全画面DISPLAY、通常GUIの低位VRAMとdevice直書きkill、S/T/Uと片側revoke、cirrus-off強制指定fallback、V86復元後のalias_cache一致とDISPLAY/TVRAM再lease、SHMの2本目書込み、boot後font_load_testのNOSYS/表・BB不変を確認。ring3_guard旧Eの「低位BB生存」はここから**拒否へ更新**し、正規CLIENT leaseで生存する対照を追加。Bはshlib実ロード後にPTE P/U/ROかつPF error=7、Aは実stack直下NPかつerror=6を確認する。Ra266のPEGC/日本語/全画面とUCはhへ。予算は§6のe枠。
 
-> 記録は archive へ移した (2026-10-07): [e11a1・e10c・e10b・e9](../../archive/v3/TASK_T2D_T2H_RECORDS.md#land-r274)。
+> 記録は archive へ移した (2026-10-07): e11a1・e10c・e10b・e9 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 未確認: B は shlib を読み込まずに走らせた (RO の error 7 は未証明、台帳 H-9)、sh.bin 経由の tvdump (台帳 E9-1)。証拠は `~/os32-tmp/evidence/2026-10-06/accept_e9/`。
 
-> **記録は archive へ移した (2026-10-06)**: T2e — e1〜e10a、KAPI の範囲検査・NULL 検査 (kapinull) の実装結果と受入 — [TASK_T2D_T2H_RECORDS.md の「元の行 219–1889」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r219)。
+> **記録は archive へ移した (2026-10-06)**: T2e — e1〜e10a、KAPI の範囲検査・NULL 検査 (kapinull) の実装結果と受入 — TASK_T2D_T2H_RECORDS.md の「元の行 219–1889」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ## 3. T2f — map/unmapとallocator、暫定heap終了
 
@@ -272,7 +272,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 
 ### 3-5. 分割・試験・受入
 
-段別の実装契約・制限は以下に残す。実行結果は各行の証拠パス、f1a〜f4 の詳細は [実行記録](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。台帳 ID は段の実施当時の対応であり、現在の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
+段別の実装契約・制限は以下に残す。実行結果は各行の証拠パス、f1a〜f4 の詳細は 実行記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。台帳 ID は段の実施当時の対応であり、現在の未完了は [持越し台帳](../DEFERRED_TESTS.md) を参照する。
 
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
@@ -292,7 +292,7 @@ nanoのtail trimは実free list上で末尾のfree chunkを確認し、header/�
 | f12 | f12a: USER 起動を exec_heap 最低64KiB・libc BSS端のpage_up+1pageへ切替、可変stack全map。旧折半/tier/物理0xC00000天井を撤去。memory 3・KAPI 71据置、resident/親子回収は維持。PDE集合の実消費・不足/overflow/KHEAP失敗とresident 3条件をhostで検査。boot最小域は共通 `MEM_EXEC_BOOT_MIN`: 0x590000→0x551000 (bootstrap/init/selftest/host境界、8MB不変)。証拠 `/home/hight/os32-tmp/run/f12/f12a_report.md`・`f12_sizes.json`。台本/文書固定値・F-5/F-9・性能・8MB延期登録はf12b、ゲスト受入はPM。 |
 | f13 | f13a: `mem_stat(app_id,out,size)` slot 248・**KAPI 72** (WM/CPL0 常駐は任意 ID、USER は自己と ID 0、MemStat 120B・MIN 44B、USER 使用量は AS 側)、`mem` を作り直し (CPL0 は 2..5 を 3 行ずつ、NOTFOUND 非表示、CPL3 は自己だけ・resident sbrk 実測は CPL0 だけ)。kselftest +1 (289)。kernel `__bss_end` +1,184B (上限は PM が +800→+1,400B に改訂)。f13b: 変異の対応表の洗い、台本の版 72 追従と f13/F-14 項目、teardown の extent 採取ツール `tools/accept/as_extents_at_teardown.py` (入口 EAX=AppSlot*、offset 生成)。ゲスト受入 2026-10-09 で CPL3 sh の mem が kprintf の引数の窓 (14 個) を超えて壊れる不具合 → 1 行 1 回に分割 (6a393ac)。証拠 `/home/hight/os32-tmp/run/f13/`・`~/os32-tmp/evidence/2026-10-09/f13_acc/RESULT.md`。f13c (2026-10-09): mem.1・07_shell・02_memory・KAPI_SPEC の文言を実物に揃え、§3-2 を昇順・v71/v72 を受入済みに。F-14 の generation-shlib と installer-cancel もゲストで合格。F-14 の残り (filer の数百件) は台帳。 |
 
-> **記録は archive へ移した (2026-10-06)**: T2f — f1a〜f4 の実装記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 1951–2370」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r1951)。
+> **記録は archive へ移した (2026-10-06)**: T2f — f1a〜f4 の実装記録 — TASK_T2D_T2H_RECORDS.md の「元の行 1951–2370」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ## 4. T2g — 池不足時の非同期trim
 
@@ -311,10 +311,10 @@ fのmap失敗理由・allocator busy/trim・STOP全返却がGREEN。appslot/appm
 | 小段 (各45〜75分) | 成果 / 閉じる試験 |
 |---|---|
 | g1 (取り込み単位 L1) | カーネル: 固定bit/epoch/理由分類、`mem_stat` 末尾追記 (KAPI 73)、TRIM_DONEの横取りと `exec_heap_user_trim` の結線 (F-12)。slot再利用、保留中の再要求で不変、飽和、pool0無確保。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g1_gk1/RESULT.md` |
-| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成。GK-2 実施済み、証拠: `~/os32-tmp/evidence/2026-10-09/g23_gk/RESULT.md`。そこで未合格だった G-3/G-7 は後続 GK-3/GK-4 で閉鎖 ([閉鎖台帳 X-21](../../archive/v3/DEFERRED_CLOSED.md#x-21-部分閉)) |
+| g2 (取り込み単位 L2、WM側とSDK側の2パックでも取り込みは1回) | WMのX3配送 (PARKED・非前景・未配送に1件、満杯は後送、完了で `sent` 解除)、shlibのTRIM消費/hook/TRIM_DONE、C/Rust allocatorの1回再試行 (入口拒否・in_trim・size0・raw mapは除外)、`shlib_protocol` +1 と全consumer再生成。GK-2 実施済み、証拠: `~/os32-tmp/evidence/2026-10-09/g23_gk/RESULT.md`。そこで未合格だった G-3/G-7 は後続 GK-3/GK-4 で閉鎖 (閉鎖台帳 X-21 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`)) |
 | g3 | C fixture (back×2・front、CUI子) とhost trace: A map開始→巻戻し→KAPI復帰→解錠→yield→X3配送→B resume→B trim→TRIM_DONE→B park→A resume→A再試行1回。未応答・raw map・CUI・旧内容保持。受入済み、証拠: `~/os32-tmp/evidence/2026-10-09/g_x21/` |
 | g4 | Rust fixture (shlib経由)、STOPとの統合trace、受入台本の確定。受入済み、証拠: `~/os32-tmp/evidence/2026-10-10/gk4/` |
-| g5 | 変異対応表/小さなkselftest/予算とPM台帳。受入済み、証拠: [T2G_MUTANTS](../../archive/v3/T2G_MUTANTS.md)・`~/os32-tmp/run/g/g_sizes.json` |
+| g5 | 変異対応表/小さなkselftest/予算とPM台帳。受入済み、証拠: T2G_MUTANTS (アーカイブ: `docs/archive/v3/T2G_MUTANTS.md`)・`~/os32-tmp/run/g/g_sizes.json` |
 
 受入の限界: g3 の host trace は syscall 入口のポンプを観測せず、DONE 後の枯渇注入解除も返却ページの再利用そのものの証拠ではない (実返却は GK-3)。未読入力で A が先に起き ENOMEM になるのは §4-2 の仕様。Rust の無応答は SDK が必ず DONE を返すため C fixture で確認し、raw map の再試行なしは構造でも固定する。Rust の LARGE は準備前から存在する GUI surface pool 分を基準に不変と判定する。STOP は対象の前景を確定させ、hook 中と DONE 直後の park の差を区別する。
 
@@ -327,7 +327,7 @@ NP21/W 17MB (§12、当時の ini) でback末尾返却と空ARENA返却による
 ### 5-1. 条件・成果物
 
 **詳細設計票 (確定 2026-10-10)**: `~/os32-tmp/run/h/T2H_DESIGN.md` r5 (Fable 5.1 が設計、astra のレビュー 5 往復、U1〜U9 はユーザー決定 — U3 Ra266 は修正版 B (新 FD 起動 + 全体同期と `/sys` 同期を別々に)、U9 MemStat 200B・KAPI 74 + 固定シリアル診断)。実装の段 h0t・h1・h1b・h2・h3b・h4a→h4b→h4c (+h3fix 条件付き)、受入の回 R0・R1a〜d・R3〜R7 (7 回 12 セッション)。往復の記録は同じ dir の `astra_r*_final.md` / `fable_r*_response.md`。
-**T2h の受入の実績** (2026-10-10〜13、本文は [RECORDS の「T2h 受入」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#t2h-受入-2026-10-1013) へ移した、2026-10-14 反省会):
+**T2h の受入の実績** (2026-10-10〜13、本文は RECORDS の「T2h 受入」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) へ移した、2026-10-14 反省会):
 
 | 回 | 合否 | 証拠 |
 |---|---|---|
@@ -345,10 +345,10 @@ d〜gの対象host/変異・独立レビューとNP21/W受入が揃って統合�
 
 **h1** manifest/世代/全consumer台帳、**h2** stack/旧形式fixture、**h3** resume/fault/STOP fixture、**h4** panic専用fixture/診断読み口、**h5** 8MB planar、**h6** 8MB PEGC、**h7** 17MB各backend、**h8** Ra266、**h9** 結果/残件の照合に分ける。準備は各45〜75分、PM実行は各構成/試験群を120分以内に切る。h2/h3準備はf以前へ前倒ししてよく、受入の証拠は最終一式でも取り直す。
 
-manifestはkernel/loader/SDK/CRT/libs/shell/gshell/shlib/sh.bin/testsのhash/4世代/ビルドIDを固定。**apps/gameはv3でビルド対象外** ([ユーザー決定2026-09-30](../../archive/agents/HANDOVER_2026-09-30.md) §1/§3)。hの成果は外部callerの追随一覧 (lease/query/世代、低位直読撤去、heap/整列、再attach/trim、manifest)と、再開時の再構築・監査・guest受入ゲート。状態はPASSやh未完ではなく**決定による持越し**。外部集合の完全移行を実証したとは記さない。旧shellを起動して更新する手順にはしない [D1][D2][V1][V2]。
+manifestはkernel/loader/SDK/CRT/libs/shell/gshell/shlib/sh.bin/testsのhash/4世代/ビルドIDを固定。**apps/gameはv3でビルド対象外** (ユーザー決定2026-09-30 (アーカイブ: `docs/archive/agents/HANDOVER_2026-09-30.md`) §1/§3)。hの成果は外部callerの追随一覧 (lease/query/世代、低位直読撤去、heap/整列、再attach/trim、manifest)と、再開時の再構築・監査・guest受入ゲート。状態はPASSやh未完ではなく**決定による持越し**。外部集合の完全移行を実証したとは記さない。旧shellを起動して更新する手順にはしない [D1][D2][V1][V2]。
 媒体異常のあるNHDを無断修復せず、PMが健全な試験媒体を用意する (別件は§8)。
 
-> **記録は archive へ移した (2026-10-06)**: T2h — h2 の準備記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 2416–2584」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r2416)。
+> **記録は archive へ移した (2026-10-06)**: T2h — h2 の準備記録 — TASK_T2D_T2H_RECORDS.md の「元の行 2416–2584」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ### 5-2. 未実施項目の担当と合格証拠
 
@@ -372,7 +372,7 @@ PM決定(A)を採用。初期化時だけ、ホストが SHM 所有アプリ ID 
 台帳 AS owner / AS generation を照合して owner、generation の順に書く。
 GUI slot を owner、tick を generation とする代用はない。以後は mode / arm のみ。
 e9 で本人識別を渡す正式な経路ができたら、h3 の初期化もそちらへ切り替える。
-> **記録は archive へ移した (2026-10-06)**: T2h — h3 の実装記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 2606–2622」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r2606)。
+> **記録は archive へ移した (2026-10-06)**: T2h — h3 の実装記録 — TASK_T2D_T2H_RECORDS.md の「元の行 2606–2622」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 #### e9 と共有する観測形式
 
@@ -395,7 +395,7 @@ mode=1 pf (#PF14)、2 gp (HLT/#GP13)、3 de (DIV0/#DE0)、4 ud (UD2/#UD6)、
 5 USER-loop、6 KAPI-loop。arm は RESUMED 後に0へ戻し consumed を1へ。
 不正 mode / 二度目の arm は発火させない。任意アドレス書込み口を製品に追加していない。
 
-> **記録は archive へ移した (2026-10-06)**: T2h — h3 台本の修正 (h3fix〜h3fix4) と確認の記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 2642–3122」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r2642)。
+> **記録は archive へ移した (2026-10-06)**: T2h — h3 台本の修正 (h3fix〜h3fix4) と確認の記録 — TASK_T2D_T2H_RECORDS.md の「元の行 2642–3122」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ### 5-3. 統合matrixと観測
 
@@ -469,7 +469,7 @@ R1/R2 と [MEMMAP_V3 §3-5-1/§3-5-3](../../decisions/MEMMAP_V3.md) の
   syscall の戻り値を改変せず、再開時に副作用のある KAPI を二回呼ばない。
   通常の OP_WAIT park と STOP 由来退避を識別し、h3 の park 証拠を偽装しない。
 
-> **記録は archive へ移した (2026-10-06)**: §5-4 GUI KAPI-loop の STOP — 実装・ホスト検証の記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 3216–3346」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3216)。
+> **記録は archive へ移した (2026-10-06)**: §5-4 GUI KAPI-loop の STOP — 実装・ホスト検証の記録 — TASK_T2D_T2H_RECORDS.md の「元の行 3216–3346」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 **PM へのゲスト手順 (A 採用・実装・ホスト検査完了後、未実施)**:
 
@@ -485,7 +485,7 @@ R1/R2 と [MEMMAP_V3 §3-5-1/§3-5-3](../../decisions/MEMMAP_V3.md) の
    時計の再進行と相手窓への操作で WM 再開も観測する。次起動の新世代まで確認する。
 4. 両fixtureで対象を交換して再実行し、USER-loop・4 fault・park中WM kill の対照を行う。
    e〜g を含む最終一式で全証拠を取り直す。native のホスト検査は PM が行う。
-> **記録は archive へ移した (2026-10-06)**: §5-4 GUI KAPI-loop の STOP — 着地とゲスト受入の記録 — [TASK_T2D_T2H_RECORDS.md の「元の行 3361–3369」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3361)。
+> **記録は archive へ移した (2026-10-06)**: §5-4 GUI KAPI-loop の STOP — 着地とゲスト受入の記録 — TASK_T2D_T2H_RECORDS.md の「元の行 3361–3369」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ## 6. 予算・ホスト試験の重さ
 
@@ -537,7 +537,7 @@ d6 は正味 4,260B、未消費 1,628B。旧「全枠消費後の余白 5,520B�
 1変異の目安はcompile+runで30秒以内、timeoutは誤り検出用でGREEN/REDに数えない。初回に最重と中央値を計測し、60秒を越す変異は対象fixture/依存を絞ってから全本数へ展開する (実機待ちを縮める指示ではない)。生き残り、compile/link error、timeout、意図したruntime REDを別集計し、理由assertを必須にする。リンクASSERT/生成拒否は別分類の正当な拒否で、runtime RED本数へ混ぜない。
 
 e12 の変異名・検出条件・分類別集計の正典は
-[T2e 変異対応表](../../archive/v3/T2E_MUTANTS.md)。既存 12 種類と lease 10 種類を保持する。
+T2e 変異対応表 (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)。既存 12 種類と lease 10 種類を保持する。
 
 ## 7. T3以降へ渡す境界
 
@@ -561,17 +561,17 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 | 受入条件と実績 | 親票§6-1は64MB実機未確認ならT2a′受入完了にしない。main着地/NP21/W受入は済みだがRa266は未実施 | hへ未閉鎖ゲートとして継承。PMが実機日程/試験手段を決める。延期なら部分受入の明示だけ、免除はユーザー判断 |
 | ユーザー決定の適用 | D35の外部caller追随要件に対し、2026-09-30にapps/gameをv3で組まないと決定済み | §5の一覧と再開時ゲートへ引渡す。決定による持越し、追加の対象外承認は不要。再開はユーザー判断 |
 | 既存の不具合候補 | Rust allocatorがLayout.alignを満たす処理を持たない | fで実要求を試験し整列adapterへ接続。現時点の全Rustアプリが誤動作したと断定しない |
-| 原因未確定の観測 | PM記録にT2b起動からext2のerrors印。原因未確定のため現時点では既知の不具合と断定しない | [調査票](../../archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md)をdと並行、h受入前ゲート。FSはカーネル層で、既知不具合化したらPOLICY_DEV §1により修正優先。修復は[D2]承認対象 |
+| 原因未確定の観測 | PM記録にT2b起動からext2のerrors印。原因未確定のため現時点では既知の不具合と断定しない | 調査票 (アーカイブ: `docs/archive/v3/TASK_EXT2_ERRORS_INVESTIGATION.md`)をdと並行、h受入前ゲート。FSはカーネル層で、既知不具合化したらPOLICY_DEV §1により修正優先。修復は[D2]承認対象 |
 | 既存の不具合候補 | fd_redirectが登録者ASを保存せず別CR3でVAを解決、ゲスト未再現 | d0aで再現確認→d0bで修正/回帰を新機能より先に実施。§1-2の登録済みpointer契約 |
 | 公開エラー対応の具体化 | 親票§3-1は旧世代INVALとするが、実際のOS32_ERR対応を生成時に固定する契約。既存STALE=-11が利用可能 | §0-2は旧世代をSTALEへ対応する案。親票本文/Dは変えず、PM/独立レビューで対応を確認 |
 
 新しいD決裁を必要とする仕様変更は本票から提案していない。allocator接続の成立、公開束API/エラー対応、世代更新は実装前レビューの対象。成立しない場合は到達可能な反例と差分案をPMへ返し、争点3ラリーならユーザーへ。ゲートを外す判断をコーダーへ委ねない。
 
-> **記録は archive へ移した (2026-10-06)**: §9 文書検査・§10 独立レビュー所見の対応 — [TASK_T2D_T2H_RECORDS.md の「元の行 3437–3481」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3437)。
+> **記録は archive へ移した (2026-10-06)**: §9 文書検査・§10 独立レビュー所見の対応 — TASK_T2D_T2H_RECORDS.md の「元の行 3437–3481」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。
 
 ## 10-2〜10-16. T2d (d0a〜d6) の実装結果と受入 — アーカイブへ移した
 
-2026-10-02 に T2d の完了記録 (d0a〜d6 の実装結果・レビュー対応・ゲスト受入、§10-2〜§10-16) を [archive/v3/TASK_T2D_RESULTS.md](../../archive/v3/TASK_T2D_RESULTS.md) へそのまま移した。この票の中の「§10-2」〜「§10-16」はそのファイルの同じ節番号を指す。
+2026-10-02 に T2d の完了記録 (d0a〜d6 の実装結果・レビュー対応・ゲスト受入、§10-2〜§10-16) を `docs/archive/v3/TASK_T2D_RESULTS.md` へそのまま移した。この票の中の「§10-2」〜「§10-16」はそのファイルの同じ節番号を指す。
 
 ## 11. 独立レビュー 2 回目 (Opus 5.5、Approve) の P3 — 実装時の注記
 
@@ -586,4 +586,4 @@ T2で2MBが成立しても最終P1/P6合格ではない。SQLite/FEP/モジュ�
 ## 12. 受入の構成の方針 (ユーザー指示 2026-10-02)
 
 方針は [MEMMAP_V3 §7-1](../../decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録) へ、V86 の 6Ah の扱いは [09_exec](../../09_exec.md#ring3-の-user-写像-exec_run-が-as-を作るときに立てるもの) へ移した (2026-10-22)。
-> **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — [TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」](../../archive/v3/TASK_T2D_T2H_RECORDS.md#r3504)。
+> **記録は archive へ移した (2026-10-06)**: §12 の P3 対応の記録、§13 検査の仕組みの整理 (ci-stab / ci-select / ci-stab2) — TASK_T2D_T2H_RECORDS.md の「元の行 3504–4013」 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)。

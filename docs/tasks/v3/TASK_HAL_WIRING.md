@@ -6,7 +6,7 @@
 > ユーザー指示 2026-09-23: 「結線の土台の票の設計を先に起こす」。
 > 往復記録: v1 → Codex 往復 1 (B1〜B14、Request changes) → v2 → Codex 往復 2 (R1〜R9、Request changes) → v3 → Codex 往復 3 (B1〜B7、Request changes。R2/R3/R4/R6 は閉、R1/R5/R7/R8/R9 は部分) → v4 → Codex 往復 4 (R1〜R6、Request changes。B3/B6/B7 は閉、B1/B4/B5 は部分、B2 は未閉) → v5 → Codex 往復 5 (B1〜B4、Request changes。R1〜R6 は閉、R4 は残件移管) → v6 → Codex 往復 6 (R1〜R3、Request changes。B1/B3 は閉、B2/B4 は部分) → v7 → Codex 往復 7 (B1〜B3。R2 は閉、R1/R3 は部分。B1/B2 = 実装前に決める設計判断、B3 = 実装レビューで可) → v8 (PM の決定を固定) → Codex 往復 8 (R8-1〜R8-3、Request changes。B1〜B3 は閉、1-2/1-3 に新規 blocker 無し) → v9 → Codex 往復 9 (R9-1〜R9-3、Request changes。R8-1 は閉、R8-2/R8-3 は部分。1-1 の dispatch/EOI/storm と 1-2/1-3 に新規 blocker 無し) → v10 → Codex 往復 10 (R10-1 の 1 件のみ、Request changes。R9-1/R9-3 は閉。L-B 持ち越し無し) → v11 (PM の決定で固定) → Codex 往復 11 (R11-1 の 1 件。競合・shlib 属性・COW は新規無し) → v12 → **Codex 往復 12: Approve** (新規 blocker 無し、注意 7 点) → v13。
 
-正典の関係: [`PLAN.md`](../../archive/v3/PLAN.md) §3-1 (HAL の棚卸し)、§3 (ドライバの動的読み込み — この票の「取り決め」を後で外部モジュールに開く)、
+正典の関係: `docs/archive/v3/PLAN.md` §3-1 (HAL の棚卸し)、§3 (ドライバの動的読み込み — この票の「取り決め」を後で外部モジュールに開く)、
 [`../realhw/TASK_LAN_82557.md`](../realhw/TASK_LAN_82557.md) (L-B 82557 が最初の顧客)、§5-5 (PCM リングとタイマが 2 番目の顧客)。
 
 ## 0. なぜ要るか
@@ -178,7 +178,7 @@ ISR の中からの登録・解除・自己解除は禁止 (契約、debug ビ�
 この層は遅延処理を持たない (driver 側の tick フックはこの層の外で、解除の前に driver が自分で止める)。
 
 - **実装・受入**: ホスト合格。証拠は `tools/tests/irq_math_tdd.md`、ゲストの合否と観測範囲は
-  [受入記録 W1/W3](../../archive/v3/TASK_HAL_WIRING_RESULTS.md#3-1-受入の記録-pm2026-09-23np21w--実機-ra266-の-w0)。
+  受入記録 W1/W3 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   実 IRQ の共有・slave 側・V86 中、NE2000 enter/leave・再初期化窓・tick 回収、CPL=3 中の片方解除・noisy隔離・IRQ0所要時間・rshell/LAN通信の観測を、人工 `int 0x23` の合格で代用しない。
   LGY-98 の登録拒否時は既存 tick 回収によるポーリング稼働を維持する (PCI probe の利用不可とは区別)。
   **未実装**: debug のハンドラ1ms超診断と `irq_off_max_us` (§1-6)。
@@ -243,7 +243,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   `DMA_MASK_CH2` 直書きも `dma_chan_mask(2)` に。
 
 - **実装・受入**: ホスト合格 (`tools/tests/dma8237_tdd.md`)。FDC の受入は
-  [受入記録 W2](../../archive/v3/TASK_HAL_WIRING_RESULTS.md#3-1-受入の記録-pm2026-09-23np21w--実機-ra266-の-w0)。
+  受入記録 W2 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   timeout→abort→再試行、実機 FD と 0439h の確認は未観測分を残す。
   エラーは `OS32_ERR_INVAL` / `OS32_ERR_AGAIN` / `OS32_ERR_NOSYS` の内部別名を使う。
   `dma_chan_remaining` / `dma_chan_ack_tc` は現在 PCM が使う。装置の遷移確認は PCM E6・LAN の各票で受ける。
@@ -294,7 +294,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
 - 純粋関数: 最初適合 + 整列 + 64KB 跨ぎの判定、span の登録 / 解放 / 不正解放をホスト試験に。
 
 - **実装・受入**: ホスト合格 (`tools/tests/dma_pool_tdd.md`)。地図・サイズの受入は
-  [受入記録 W5](../../archive/v3/TASK_HAL_WIRING_RESULTS.md#3-1-受入の記録-pm2026-09-23np21w--実機-ra266-の-w0)。
+  受入記録 W5 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   現行配置は `include/memmap.h`、生成地図は `build/out/MEMMAP.md` を参照。
 
 ### 1-4. PCI デバイスの結線表 — `drivers/pci_bind.c`
@@ -359,7 +359,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 - **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。
   `pci_bind_info` はローカルの8Bスナップショットを書き、NULL・帯境界跨ぎ・idx範囲外は INVAL、
   writable 検査の拒否は kill。線の状態は取得時に合成する。NP21/W/実機の結線・隔離の観測範囲は
-  [受入記録 W3/W6](../../archive/v3/TASK_HAL_WIRING_RESULTS.md#3-1-受入の記録-pm2026-09-23np21w--実機-ra266-の-w0) と LAN 票を参照。
+  受入記録 W3/W6 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`) と LAN 票を参照。
 
 ### 1-5. µs 時計 — `sys_time_now(u32 *lo, u32 *hi)`
 
@@ -421,7 +421,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 
 - **実装・受入**: ホスト合格 (`tools/tests/time_math_tdd.md`、`tools/tests/test_ring3_str.py`)。
   NP21/W と実機の W4 は合格。証拠と未観測の PIT 位相は
-  [受入記録 W4](../../archive/v3/TASK_HAL_WIRING_RESULTS.md#3-1-受入の記録-pm2026-09-23np21w--実機-ra266-の-w0)。
+  受入記録 W4 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   RO 出力・非恒等写像・CR3 復帰・IF=0 10.2ms の観測は受入条件として残し、
   記録のない項目まで W4 合格から推定しない。単調性の補正は上記クランプ契約を参照。
 
@@ -488,7 +488,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 
 ### 3-1. 受入の記録 (PM、2026-09-23、NP21/W + 実機 Ra266 の W0)
 
-記録は [TASK_HAL_WIRING_RESULTS](../../archive/v3/TASK_HAL_WIRING_RESULTS.md) へ移した。
+記録は TASK_HAL_WIRING_RESULTS (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`) へ移した。
 
 未確認・残件 (記述時点は元の記録のまま):
 

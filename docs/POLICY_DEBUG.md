@@ -256,7 +256,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 
 - **現象** (2026-08-18): game で econ 常時接続 + battle/items/rpg/events の順次ロードの最後の `db_query` が `out of memory`
 - **原因**: MEMSYS5 は固定プール (`lib/sqlite3/os32_sqlite_vfs.c`) で、カーネル側 FEP 辞書を含む全接続が共有する。当時 200KB
-- **対策**: 384KB に拡大 (SQLite 拡張域 0x200000〜0x2FFFFF 内、残り約 280KB)。エンジンライブラリは `*_init()` の末尾で接続を閉じる。**枯渇の診断は `db_last_error()` を必ず出す** — 戻り値だけでは「テーブルがない」と区別できない。実機で任意 DB を調べるには `dbq` (`userland/tests/dbq.c`)。**2026-09-17 まで `db_last_error()` はカーネル番地を返しており、CPL=3 のアプリが読むと #PF で死んだ** (票 [`archive/kernel_v21/TASK_DB_ERRSTR.md`](archive/kernel_v21/TASK_DB_ERRSTR.md) で修正)。いまは共有メモリを指すので安全。直前の `db_exec` のエラーだけでよければ `db_errmsg()` (KAPI 呼び出し無しで共有メモリを直接読む) のほうが速い
+- **対策**: 384KB に拡大 (SQLite 拡張域 0x200000〜0x2FFFFF 内、残り約 280KB)。エンジンライブラリは `*_init()` の末尾で接続を閉じる。**枯渇の診断は `db_last_error()` を必ず出す** — 戻り値だけでは「テーブルがない」と区別できない。実機で任意 DB を調べるには `dbq` (`userland/tests/dbq.c`)。**2026-09-17 まで `db_last_error()` はカーネル番地を返しており、CPL=3 のアプリが読むと #PF で死んだ** (票 `docs/archive/kernel_v21/TASK_DB_ERRSTR.md` で修正)。いまは共有メモリを指すので安全。直前の `db_exec` のエラーだけでよければ `db_errmsg()` (KAPI 呼び出し無しで共有メモリを直接読む) のほうが速い
 
 ### 4-14. `mui_pump_input()` がキー待ち行列を食う
 
@@ -610,7 +610,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - **原因**: 読み取り失敗を、`ext2_lookup` は `NOTFOUND` に、`ext2_bmap` は `0` (= 未割当) に、`fs_is_dir` /
   `vfs_open_internal` は「ディレクトリではない」に、それぞれ**読み替えていた**。1 段直すと次の受け手で同じ形が出る
   (`fs_is_dir` → `vfs_path_kind` → `vfs_open_internal` → `mkdir` / `create` / `rename` → `ext2_free_block` → `alloc_block`)。
-- **修正**: 票 [`archive/shell/TASK_FS_TYPE.md`](archive/shell/TASK_FS_TYPE.md) §2。解放は「媒体上の参照を先に消し、解放は後」
+- **修正**: 票 `docs/archive/shell/TASK_FS_TYPE.md` §2。解放は「媒体上の参照を先に消し、解放は後」
   (ジャーナル無し、漏れは許容し交差リンクは原理的に起きない)。ディレクトリ rename は旧名を先に消す。メタデータの
   I/O エラーで以後の書き込みを断る (`OS32_ERR_ROFS` = -15、Linux の `errors=remount-ro` 相当。再起動で警告付き rw)。
   空なのに `links_count > 2` の `rmdir` を断る。
@@ -633,7 +633,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   (両側を全部読むため)。票 H3 で HostDrv の `stat` に `mtime` を載せ、`sys_set_mtime` (KAPI v52) で宛先へ保存し、
   **サイズか日時が違うものだけ内容比較、両方同じならスキップ、日時が不明なら内容比較** (証拠が無いことを同一の根拠にしない)
   に。2 回目以降 `hsync sys` 0.26 秒 / 全体 2.9 秒。見逃すのは「サイズも日時も同じで中身が違う」ものだけ (`--verify` で全件比較)。
-  [`archive/shell/TASK_H1.md`](archive/shell/TASK_H1.md) / [`TASK_H3.md`](archive/shell/TASK_H3.md)。
+  `docs/archive/shell/TASK_H1.md` / `docs/archive/shell/TASK_H3.md`。
 - **教訓**: 「読まずに同一を証明する」には前回一致・コピー元不変・宛先未変更の 3 条件が要る (Codex 相談)。
   MD5 に変えても I/O は減らない。日時は省略の根拠ではなく絞り込みに使う。
 - **続き (票 H2、2026-09-16)**: H1 / H3 の時点では宛先を `O_CREAT|O_TRUNC` で**直接上書き**していたので、
@@ -656,7 +656,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
     `--unsafe-overwrite` を明示したときだけ旧来の直接上書きで進み、そのときは旧内容が残らない。
     `build/app.conf` の hsync の要求版は **52 のまま** — 53 にすると exec が
     `min_api_ver > KAPI_VERSION` で弾き、この警告自体が届かない。
-  [`archive/shell/TASK_H2.md`](archive/shell/TASK_H2.md)、記録は `tools/tests/hsync_h2_tdd.md` /
+  `docs/archive/shell/TASK_H2.md`、記録は `tools/tests/hsync_h2_tdd.md` /
   `vfs_excl_tdd.md` / `b8_tdd.md` §13。
 
 ### 4-37. Agent の worktree は古い基点 (`main` 側のマージ) から始まることがある — コーダーは最初に基点を報告する (2026-09-15)
@@ -679,7 +679,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - **なぜ気づきにくいか**: どれも**成功したように見える**。赤字も終了コードも出ないまま、
   意図と違うものが走る。`glob` の `mem_alloc` 失敗 (T6) は一致の**一部だけ**を渡すので
   `rm /tmp/item*` が 1 件だけ消えて成功に見えた。
-- **修正**: 票 [`archive/shell/TASK_SH_TRUNCATION.md`](archive/shell/TASK_SH_TRUNCATION.md) §2 の規則
+- **修正**: 票 `docs/archive/shell/TASK_SH_TRUNCATION.md` §2 の規則
   **「切り詰めたら実行せずに断る」**を経路ごとに入れた。赤字 1 行 (`sh_refuse(何が, 上限)`) +
   印 (`sh_refused_flag`)、スクリプト中なら `script_exec` が打ち切る。
 - **数え方の落とし穴**: `try_exec` は `parse_args_and_glob` が剥がしたクォートを**付け直す**ので、
@@ -763,7 +763,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   NULLで非零長を0に消さず、入力・出力とも長さの全域をB1で検査する (NULL・長さ0だけはアクセス不要)。
 - **試験**: 実ソースをホストで組み、正常な末端セルと領域外の番兵を確認する。
   u32 の乗算が周回して有効番地に戻る値も拒否を確認し、各入口の検査を個別に外す。
-  詳細と残課題は [T2e の修正記録](archive/v3/TASK_T2D_T2H_RECORDS.md#kapi-の範囲検査の欠落の修正-2026-10-03)、
+  詳細と残課題は T2e の修正記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`)、
   [ホスト試験記録](../tools/tests/kapi_bounds_tdd.md) を参照。
 
 ## §5. デバッグ道具箱
@@ -980,7 +980,7 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
   待ち時間を短く切らない ([V3] と同じ考え方をホスト側の試験にも当てる)。
 - **解消 (2026-09-26)**: 実物を書き換える変異試験 14 本を全部「一時ディレクトリの写しの木に変異を当てる」
   作り (`tools/tests/mutpar.py`) へ移した。打ち切っても実物に変異は残らない。番人は残してある
-  (票 [TASK_CHECK_MUT_PARALLEL](archive/tools/TASK_CHECK_MUT_PARALLEL.md) §5-1)。
+  (票 TASK_CHECK_MUT_PARALLEL (アーカイブ: `docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`) §5-1)。
 
 ### 4-41. ビルドと検査が遅い — 並列を一度も指定していなかった (2026-09-17、解消)
 
@@ -1214,7 +1214,7 @@ read-modify-write で保つ。
 - **連鎖**: タイムアウトの後に SENSE INTERRUPT で回収しないまま次の SEEK を出すと、µPD765 の INT 線が
   上がりっぱなしになり PIC (エッジ) に次のエッジが来ない → 以後の待ちが全部落ちる → 3 回リトライしても
   読めず `root panic`。媒体に依らないので 1.2MB / 1.44MB の両方で同じになる。
-- **対策**: 票 [`archive/realhw_v21/TASK_FDC_REALHW.md`](archive/realhw_v21/TASK_FDC_REALHW.md)。時間定数を機構から導き
+- **対策**: 票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md`。時間定数を機構から導き
   (シーク 1.5s / R/W 1s)、SEEK の前に SIS で排水、タイムアウト後は SIS で「取りこぼし」を判定、
   リトライの間に FDC リセット + recalibrate、最終失敗だけ `[fdc]` の 1 行を画面に出す。
 - **第 2 の原因 (レビューで発見)**: `I/O 0439h bit2` は「1MB 以上のアドレスへの DMA アクセス禁止」で、
@@ -1228,7 +1228,7 @@ read-modify-write で保つ。
 - **続き (2026-09-24、速度)**: 通るようになった後、1 セクタごとに SEEK + 20ms + READ DATA で**ほぼ 1 回転ずつ**待ち、
   フォント (188KB) で 1 分以上止まった (これも回転待ちを模擬しない NP21/W では出ない)。同じシリンダのシークを省き、
   要求セクタから EOT までを 1 回で読んで持つ形にした (`drivers/fdc_track.c`、FatFs の窓は count=1 で来るので束ねるだけでは効かない)。
-  まとめ読みの時間上限も同じく最悪値 `2 × (2 回転 + ceil(count/spt) 回転 + HLT)` から導く。票 [`TASK_FDC_REALHW.md`](archive/realhw_v21/TASK_FDC_REALHW.md) の v3 の節。
+  まとめ読みの時間上限も同じく最悪値 `2 × (2 回転 + ceil(count/spt) 回転 + HLT)` から導く。票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md` の v3 の節。
   **ただし 1 本の先読みは効かなかった** — FatFs (`FF_FS_TINY=1`) は FAT とデータで窓を取り合い、クラスタを越えるたびに
   シリンダ 0 の FAT を読み直すので、FAT とデータのトラックが追い出し合う (1KB ごとにシーク 2 回)。2 本にした。
   「読みを速くしたのに速くならない」ときは、**上の層の読み方 (どのセクタがどの順で来るか) を先に数える**。
@@ -1325,7 +1325,7 @@ read-modify-write で保つ。
 
 ### 4-57. NP21/W はキーボード 8251 の DTR (RTY#)・RTS (RDY#)・RxE を見ない — 実機の定常値は BIOS と同じ 0x16 (2026-09-23)
 
-> **実装レビュー (2026-09-23)**: bda95fa + f924275 は Codex / Opus のラリー 2 で両者 Approve。レビューで出た KAPI データ欄のずれ (旧バイナリの malloc が ENOMEM) は既存の構造問題として別票 [`archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md)。実機での打鍵は未確認。
+> **実装レビュー (2026-09-23)**: bda95fa + f924275 は Codex / Opus のラリー 2 で両者 Approve。レビューで出た KAPI データ欄のずれ (旧バイナリの malloc が ENOMEM) は既存の構造問題として別票 `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`。実機での打鍵は未確認。
 
 - **症状**: 実機 PC-9821Ra266 で本体キーボードの打鍵が**一切**効かない。シリアル (rshell) は動く。NP21/W では効く。
 - **原因 (本命)**: `kbd_init()` が 0043h にコマンド語 **0x14** (ER + RxE) を書いていた。bit1 (DTR) = 0 は

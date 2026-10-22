@@ -1,7 +1,7 @@
 # OS32 v2.1 リリースノート
 
 > 状態: **確定** (2026-09-29、タグ `v2.1`)。実機 PC-9821Ra266 で CHECKLIST_2026-09-26 の手順 1〜7 (判定の記録は os32 リポジトリの `docs/archive/realhw_v21/CHECKLIST_2026-09-26.md`) を満たし、
-> Ra266 の PEGC 640x480 の修正 ([TASK_PEGC_RA266_TIMING](archive/realhw_v21/TASK_PEGC_RA266_TIMING.md)、[ROADMAP](ROADMAP.md) §1.5) を**実機の画面を見ずに確かめられる条件**で受け入れた (ユーザー決定 2026-09-29、v3 を遅らせないため)。
+> Ra266 の PEGC 640x480 の修正 (TASK_PEGC_RA266_TIMING (アーカイブ: `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md`)、[ROADMAP](ROADMAP.md) §1.5) を**実機の画面を見ずに確かめられる条件**で受け入れた (ユーザー決定 2026-09-29、v3 を遅らせないため)。
 > 前の版: `v2.0` (2026-09-03、KernelAPI v39)。この版: KernelAPI **v68**。
 
 v2.1 は **v3 へ分岐する前の区切り**。v2.0 (リング 3 ネイティブ) の上に GUI シェルを載せ、**実機 PC-9821Ra266 で FD 起動・CD からの

@@ -1,6 +1,6 @@
 # sh_truncation TDD — シェルが入力を黙って切り詰める経路
 
-票: [`docs/archive/shell/TASK_SH_TRUNCATION.md`](../../docs/archive/shell/TASK_SH_TRUNCATION.md)
+票: `docs/archive/shell/TASK_SH_TRUNCATION.md`
 基点: `feat/gui` = `a4f5429` (段 1) / 段 4 は `3fd4da5`
 試験: `make check-sh-truncation-host` (= `python3 -B tools/tests/test_sh_truncation.py`)
     否定側もまとめて: `python3 -B tools/tests/test_sh_truncation.py --mutate`
@@ -125,7 +125,7 @@ pre-fix の再現になっている。全ソースを段 1 の状態へ戻すと
 
 段 2 では「パイプの段で断っても**段の途中では止めない**」(bash の `false | cat` に寄せる)
 という判断をして PM の裁定を仰いだ。**独立レビューが同じ箇所を指摘した**ので、
-票 [`TASK_SH_TRUNCATION.md`](../../docs/archive/shell/TASK_SH_TRUNCATION.md) §2 の
+票 `docs/archive/shell/TASK_SH_TRUNCATION.md` §2 の
 **「その場で赤字のエラーを 1 行出して、行全体を実行しない」**に合わせる。
 
 反例:

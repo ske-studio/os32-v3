@@ -1,6 +1,6 @@
 # HDD インストーラ (段 2) — RED→GREEN の記録
 
-- 票: [docs/archive/realhw_v21/TASK_HDD_INSTALL.md](../../docs/archive/realhw_v21/TASK_HDD_INSTALL.md) 段 2 (9〜11) / §1-v3 (N4・N6・N8・R3-1)
+- 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 2 (9〜11) / §1-v3 (N4・N6・N8・R3-1)
 - 実行: `python3 -B tools/tests/test_hdd_stage2.py --target --mutate` (`make check-hdd-stage2-host`)
 - ハーネス: `tools/tests/hdd_stage2_host.c` (純粋関数、ホスト 64 ビット + libc)、
   `tools/tests/cdinst_host.c` (実物の cdinst.c を main から、ILP32 -nostdlib)、

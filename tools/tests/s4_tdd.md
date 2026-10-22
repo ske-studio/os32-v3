@@ -1,9 +1,9 @@
 # S4-W — gshell の設定レジストリ消費と設定ダイアログのホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S4.md`](../../docs/archive/settings/TASK_S4.md) 第 4 版 §0 の **S4-W**。
-契約の正典は [`S0_FOUNDATION.md`](../../docs/archive/settings/S0_FOUNDATION.md) §2、
+票: `docs/archive/settings/TASK_S4.md` 第 4 版 §0 の **S4-W**。
+契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §2、
 [`DESIGN.md`](../../docs/tasks/settings/DESIGN.md) §3〜§5、
-API は [`TASK_S2.md`](../../docs/archive/settings/TASK_S2.md) §1 と `userland/lib/cfg/libos32cfg.h`。
+API は `docs/archive/settings/TASK_S2.md` §1 と `userland/lib/cfg/libos32cfg.h`。
 
 走らせ方:
 
@@ -277,7 +277,7 @@ G2 / G4 / G5 のスクリーンショット確認は PM / テスターの再実�
 
 ---
 
-## S5 で反映した残件 (票 [`TASK_S5.md`](../../docs/archive/settings/TASK_S5.md) §0 の S5-W)
+## S5 で反映した残件 (票 `docs/archive/settings/TASK_S5.md` §0 の S5-W)
 
 S4 の実装レビュー往復 2 で non-blocker として残した 4 件を、票 S5 のレーン W で入れた。
 触ったのは `userland/gshell/src/modal.rs` と `host/{settings_tests.rs, mocks.rs}` だけ。

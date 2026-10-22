@@ -1,6 +1,6 @@
 # 票 H4 — 配備マニフェストと世代の確認 (ホスト TDD の記録)
 
-- 票: [`docs/archive/shell/TASK_H4.md`](../../docs/archive/shell/TASK_H4.md)
+- 票: `docs/archive/shell/TASK_H4.md`
   (§2-1 形式 / §2-2 書く側 / §2-3 読む側 / §2-3-1 保証しないこと / §4 受入)
 - 決裁: **D1 = 行指向の平文 (`.deploy/manifest.txt`)**、ユーザー決裁 2026-09-16
 - 設計: レビュー 3 往復で Approve、`10a498a` で設計凍結

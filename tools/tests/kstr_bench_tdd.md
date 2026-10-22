@@ -1,6 +1,6 @@
 # kstr_bench — 計測の枠組みの RED→GREEN の記録
 
-票: [`docs/archive/portability/TASK_KSTRING_BENCH.md`](../../docs/archive/portability/TASK_KSTRING_BENCH.md)
+票: `docs/archive/portability/TASK_KSTRING_BENCH.md`
 対象: `userland/tests/kstr_bench.c` / ハーネス `tools/tests/kstr_bench_host.c` /
 実行 `tools/tests/test_kstr_bench.py` (`make check-kstr-bench-host`)
 

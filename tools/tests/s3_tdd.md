@@ -1,8 +1,8 @@
 # S3 — リカバリ (`install --recover-settings`) と `cfg import` のホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S3.md`](../../docs/archive/settings/TASK_S3.md)、
-契約の正典は [`docs/archive/settings/S0_FOUNDATION.md`](../../docs/archive/settings/S0_FOUNDATION.md) §6
-(明示リカバリ契約) と [`docs/archive/settings/TASK_S0.md`](../../docs/archive/settings/TASK_S0.md) §D (配備保護)。
+票: `docs/archive/settings/TASK_S3.md`、
+契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
+(明示リカバリ契約) と `docs/archive/settings/TASK_S0.md` §D (配備保護)。
 
 3 票 (S3-I / S3-C / S3-D) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。
@@ -157,10 +157,10 @@ symlink / hardlink の別名は `S3RecoveryJudgement` の 3 件が判定その�
 
 # S3 — リカバリのホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S3.md`](../../docs/archive/settings/TASK_S3.md) 第 5 版。
-契約の正典は [`S0_FOUNDATION.md`](../../docs/archive/settings/S0_FOUNDATION.md) §6
-(明示リカバリ契約)、[`TASK_S2.md`](../../docs/archive/settings/TASK_S2.md) §1-1 (b) の meta 検査 SQL と
-§1-7 (f) の rename 両名検査、[`TASK_S0.md`](../../docs/archive/settings/TASK_S0.md) (配備保護)。
+票: `docs/archive/settings/TASK_S3.md` 第 5 版。
+契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
+(明示リカバリ契約)、`docs/archive/settings/TASK_S2.md` §1-1 (b) の meta 検査 SQL と
+§1-7 (f) の rename 両名検査、`docs/archive/settings/TASK_S0.md` (配備保護)。
 
 ---
 

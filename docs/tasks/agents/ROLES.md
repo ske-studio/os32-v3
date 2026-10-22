@@ -1,7 +1,7 @@
 # エージェント運用体制 — 役割と起動
 
 状態: **現行 (2026-10-06 に 3 役へ畳み直した)**。現行の規則はこの文書だけ。日付つきの過去の指示と畳む前の本文は
-[archive/agents/ROLES_HISTORY_2026-10-06.md](../../archive/agents/ROLES_HISTORY_2026-10-06.md) (判断には使わない)。
+`docs/archive/agents/ROLES_HISTORY_2026-10-06.md` (判断には使わない)。
 見直しの根拠は [REVIEW_2026-10-06](REVIEW_2026-10-06.md) と [REVIEW_2026-10-14](REVIEW_2026-10-14.md#5-役の見直し-同日ユーザー決定)。
 
 ## 0. 現行の体制

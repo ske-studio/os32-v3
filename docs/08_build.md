@@ -347,7 +347,7 @@ python3 tools/gen_memmap.py --manifest --check
 | `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
 | `make check` | 全検査を変異込み | 取り込み前に1回 (PM は `make -k check` で最後まで回す、ROLES §0) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
-今回の条件・実測・RED/GREEN は [検査整理の記録](archive/v3/TASK_T2D_T2H_RECORDS.md#検査の仕組みの整理-ci-select) を参照。
+今回の条件・実測・RED/GREEN は 検査整理の記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) を参照。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
 recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,test_x.py)` の1行。
 `check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
@@ -406,10 +406,10 @@ lint は「手書きの一覧 + 自動ヘッダ依存」とrecipeからの入力
   `mutant_tree` / `build_in_tree` / `run_script_in_tree` で一時ディレクトリの写しの木 (変異を当てるファイルと
   gcc -MM の依存は実体、残りは symlink) に当て、変異なしの写しが GREEN であること (`CONTROL`) を
   先に確かめる。新しい変異試験もこの作りにする — 実物を書き換える試験は列に足さない
-  (票 [TASK_CHECK_MUT_PARALLEL](archive/tools/TASK_CHECK_MUT_PARALLEL.md) §5)。
+  (票 TASK_CHECK_MUT_PARALLEL (アーカイブ: `docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`) §5)。
 
 <a id="kapi-v63-移行"></a>
-#### KAPI v63 への移行 (データ欄の固定配置、票 [TASK_KAPI_DATA_FIELDS](archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md))
+#### KAPI v63 への移行 (データ欄の固定配置、票 TASK_KAPI_DATA_FIELDS (アーカイブ: `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`))
 
 v63 で KernelAPI のデータ欄を 0x4B8 に固定し、OS32X ヘッダを v3 にした
 ([KAPI_SPEC.md §4-0](KAPI_SPEC.md#4-0-データ欄の固定配置とヘッダ-v3-v63票-task_kapi_data_fields))。**v62 以前のバイナリ (アプリ・常駐シェル・
@@ -433,7 +433,7 @@ shlib ローダが要求版で断ったときは、GUI を選んでいても CUI
 配置違いの `rebuild required (KAPI data layout)` とは直し方が逆なので案内を分けてある。
 
 <a id="区画表の移行-v64"></a>
-**v64 の区画表の移行 (NHD、票 [TASK_HDD_INSTALL](archive/realhw_v21/TASK_HDD_INSTALL.md) N3)**:
+**v64 の区画表の移行 (NHD、票 TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) N3)**:
 v64 のカーネルとローダは区画表 (LBA 1) を **PC-98 標準配置**でしか読まない
 (開始 = +8/+9/+10-11。2026-09-23 までの OS32 は +6/+7/+8-9 の独自配置で書いていた)。
 旧配置の NHD を新しいカーネルで起動すると `/` (hd0) がマウントできず、新しいローダは
@@ -454,7 +454,7 @@ make nhd-migrate-pt           # = python3 tools/nhd_deploy.py migrate-pt (push �
 CD / FD のインストーラ (`cdinst` / `install`) は段 2 から標準配置・BIOS 幾何で書く。
 空の hd0 か OS32 の区画 1 つ (旧配置の 8/17 の NHD を含む) を**作り直す**ので、旧配置の NHD は
 `migrate-pt` の代わりに入れ直してもよい (中のファイルは消える)。規則は
-[TASK_HDD_INSTALL](archive/realhw_v21/TASK_HDD_INSTALL.md) の「段 2 の実装メモ」。
+TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) の「段 2 の実装メモ」。
 
 - **旧配置の NHD には下の HostDrv の手順 (`make deploy` → ゲストで `hsync boot`) を使わない。**
   カーネルだけが v64 になり、次の起動で `/` がマウントできない (ローダは旧いままなので起動は
@@ -767,7 +767,7 @@ GCC が PATH に無い場合の libgcc パス問い合わせ専用 shim を一�
 clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。
 実ビルドで選ばれたソースとそこから取り込むヘッダが対象で、未使用ヘッダ・
 非選択の `#if` 分岐は対象外。旗の読み替え・判定・比較の詳細は
-[TASK_CLANG_CHECKS](archive/v3/TASK_CLANG_CHECKS.md) §4・§6。
+TASK_CLANG_CHECKS (アーカイブ: `docs/archive/v3/TASK_CLANG_CHECKS.md`) §4・§6。
 
 - `make check-p2v`: canonical type とマクロ展開で物理キャスト・物理引数、
   user/lease の V2P、関数内 CONST を検査。[C5] の file:function:reason は
@@ -793,7 +793,7 @@ tools/audit_cast_align.sh all
 ```
 
 候補が出ても実際に壊れるとは限らない。仕分けの記録は
-[archive/arch_port/M0_PORTABILITY_AUDIT.md](archive/arch_port/M0_PORTABILITY_AUDIT.md)。
+`docs/archive/arch_port/M0_PORTABILITY_AUDIT.md`。
 旧5本 (正規表現版) は比較のあと撤去した (ユーザー決定 2026-10-01、git の履歴 `8612b06` 以前とリポジトリ外のバックアップに残る)。
 重複していた `create_fat12_d88.py` は撤去。FD生成は `tools/mkfat12.py` を使う。
 
@@ -841,7 +841,7 @@ python3 tools/move_docs.py SRC DST [SRC DST ...]
 `tools/tests/*_tdd.md` が互いを指す慣例の書き方)、(3) 表示文字がパスそのもののリンクのラベル。
 動いた文書自身の中のリンクは深さが変わるので全部引き直す。`--dry-run` で一覧だけ出せる。
 運用 (何を落として何を残すか、落としたあとに守ること) は
-[archive/README.md](archive/README.md)。実行後は `check-docs-links` / `check-docs-orphans` /
+`docs/archive/README.md`。実行後は `check-docs-links` / `check-docs-orphans` /
 `make check-tests-inventory` (登録の照合) の 3 つを回す。
 
 **`--ext` / `--rewrite-only`** — 追従させるのは `.md` だけではない。票の番号や設計の正典は
@@ -1040,7 +1040,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 ### §8-6 GitHub Actions での本体ビルド
 
 `.github/workflows/build.yml` (workflow 名 `build`、os32-v3 で 2026-09-30 に最小から作り直し —
-[FORK_PLAN §3 d](archive/v3/FORK_PLAN.md)) が、素の clone から core を完全ビルドし、`make check-fast`
+FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の clone から core を完全ビルドし、`make check-fast`
 を回して、成果物を artifact に置く。静的ゲートの `check.yml` とは別 (変異込みの `make check` は回さない)。
 
 **狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
@@ -1051,7 +1051,7 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
 | ビルド | `make -j$(nproc) all` → `make check-fast` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`)。最後の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する |
-| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す ([FORK_PLAN §3 d ③](archive/v3/FORK_PLAN.md)) |
+| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |

@@ -1,6 +1,6 @@
 # cpu_calibrate — RED → GREEN の記録
 
-票: [`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`](../../docs/archive/realhw_v21/TASK_SERIAL_VFAST.md) (往復 3)
+票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` (往復 3)
 対象: `kernel/cpu_calibrate_math.c` (止め方と計算) / `kernel/cpu_calibrate.c` (計測)
 試験: `tools/tests/test_cpu_calibrate.py` + `tools/tests/cpu_calibrate_host.c`
 実行: `make check-cpu-calibrate-host` (`check-par` の列)

@@ -1,7 +1,7 @@
 # cirrus_win — Cirrus の窓の可否を物理地図で決める (ホスト TDD の記録)
 
 教訓: [docs/POLICY_DEBUG.md](../../docs/POLICY_DEBUG.md) §4-34 (デバイス窓は物理地図で判定、RAM の上端で判定しない)
-観測: [docs/archive/settings/TASK_S5.md](../../docs/archive/settings/TASK_S5.md) §6 R2 (Cirrus)
+観測: `docs/archive/settings/TASK_S5.md` §6 R2 (Cirrus)
 実装: `gfx/backend_cirrus.c` の `cirrus_win_usable()`
 試験: `tools/tests/cirrus_win_host.c` + `tools/tests/test_cirrus_win.py` (`make check-cirrus-win-host`)
 

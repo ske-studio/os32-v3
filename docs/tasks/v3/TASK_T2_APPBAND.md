@@ -1,9 +1,9 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md)、d〜h の状態は [子票](TASK_T2D_T2H.md)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
+> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)、d〜h の状態は [子票](TASK_T2D_T2H.md)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
-> 決定の正典: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: [TASK_T1_LEDGER](../../archive/v3/TASK_T1_LEDGER.md) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
+> 決定の正典: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
 > 番地の正典は `include/memmap.h`、実装後の地図は [02_memory](../../02_memory.md) §2-1 (説明と生成手順への入口)。本票は T2 の実装契約・段・受入を持ち、上位の決定本文を置き換えない。[C1]〜[C5]・[ABI1]〜[ABI3] は [CONSTRAINTS](../../CONSTRAINTS.md)、状態行は [POLICY_DEV](../../POLICY_DEV.md) §8。
 
 ## 1. 範囲と引継ぎ
@@ -266,7 +266,7 @@ v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を�
 
 ### 5-1. 単独着地の単位
 
-**T2d〜T2h は受入完了**。詳細契約・受入・残件への入口は [TASK_T2D_T2H](TASK_T2D_T2H.md)。以下の段表は受入条件の要約、T2a〜T2c の実績は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md) を参照。
+**T2d〜T2h は受入完了**。詳細契約・受入・残件への入口は [TASK_T2D_T2H](TASK_T2D_T2H.md)。以下の段表は受入条件の要約、T2a〜T2c の実績は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) を参照。
 
 以下は**策定時の実装分割・受入条件**であり、実施結果は上記の参照先を読む。各段は前段までの正常起動を保ち、実ソースILP32ホスト試験でRED→GREENを記録する。追加試験は tests inventory / check_map / build に登録し、起動用guestは自層deploy.yamlへ [V2]。変異は写しの木で行い、コンパイル失敗を実行時REDに数えない (意図したASSERT拒否は別集計)。検査の役割分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) に従う。
 
@@ -286,7 +286,7 @@ T2b の新APIは内部のみ、T2c の旧共有USERは既存機能を保つ過�
 
 **heapの切替はT2fで一括**: T2c〜T2eでは実行中の伸長がまだ無いので、初期量を64KB/1ページへ縮めない。T1の起動時予算計算を物理専用の暫定helperとして残し、旧配置のcode/stack/guardを引いた容量から得たsbrk/exec_heapの「byte数」だけを新しい仮想予約へ写す (256MBの仮想余白を半分にして物理を先取りしてはいけない)。高位VAをこの予算helperへ入力しない。T2fでmap・allocatorと最小初期量を同時に有効化し、この暫定helperと旧二段先取りを撤去する。これは旧バイナリ互換層ではなく、各段の起動を維持する実装順序である。
 
-T2a〜T2c の実装・受入記録 (未実施・残件を含む) は [TASK_T2ABC_RESULTS](../../archive/v3/TASK_T2ABC_RESULTS.md) へ移した。
+T2a〜T2c の実装・受入記録 (未実施・残件を含む) は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) へ移した。
 
 ### 5-2. 検査3段と lease 回帰 (d)
 

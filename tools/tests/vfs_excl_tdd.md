@@ -1,6 +1,6 @@
 # vfs_excl TDD 記録 — 排他的作成 `O_EXCL` (票 H2 §2-1、KAPI v53)
 
-対象票: [`docs/archive/shell/TASK_H2.md`](../../docs/archive/shell/TASK_H2.md) §2-1 / §4-1 の **X1 / X2**
+対象票: `docs/archive/shell/TASK_H2.md` §2-1 / §4-1 の **X1 / X2**
 試験: `tools/tests/vfs_excl_host.c` (実物の `fs/vfs.c` + `fs/vfs_fd.c` を `#include`)
 実行: `python3 -B tools/tests/test_vfs_excl.py [--target] [--mutate]` / `make check-vfs-excl-host`
 

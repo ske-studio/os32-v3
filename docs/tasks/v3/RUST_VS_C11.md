@@ -1,9 +1,9 @@
 # RUST_VS_C11 — v3 で Rust にする部品と C11 に揃える部品 (U5 の再確認)
 
-> 状態: **設計中 (2026-09-30)** — **方針確定**。[V3_PLAN_DRAFT.md](../../archive/v3/V3_PLAN_DRAFT.md) §7-1 **U5** に付いたユーザー指示 (2026-09-30)「**Rust 化するほうが有利なものを再度確認する。C11 化するのでそれとの実装コスト比較で**」への答え (調査票)。U5 自体は同日に決定済み: **IRQ 文脈で Rust を呼ぶ合成器 (音源) は認める**。**§5 の判断 7 点は同日ユーザーが決定** (1〜5 は推奨どおり、6 nightly は固定済み、7 TCP/IP は足さない) し、Codex の事実確認 (§8: 命令制限の記述の訂正、バージョンアップでは直らない) を受けて **ユーザー決定 (a): Rust で作る部品も 386 下限を守る — 最終成果物の検査を必須の工程に** (§7)。実装 (§3-3 の 3 点・§7-2 の検査器) は未着手で、T5c / T7b の前段。それまでの状態: 草案 (2026-09-30、初版)。決定の一覧は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) **D36**。
+> 状態: **設計中 (2026-09-30)** — **方針確定**。`docs/archive/v3/V3_PLAN_DRAFT.md` §7-1 **U5** に付いたユーザー指示 (2026-09-30)「**Rust 化するほうが有利なものを再度確認する。C11 化するのでそれとの実装コスト比較で**」への答え (調査票)。U5 自体は同日に決定済み: **IRQ 文脈で Rust を呼ぶ合成器 (音源) は認める**。**§5 の判断 7 点は同日ユーザーが決定** (1〜5 は推奨どおり、6 nightly は固定済み、7 TCP/IP は足さない) し、Codex の事実確認 (§8: 命令制限の記述の訂正、バージョンアップでは直らない) を受けて **ユーザー決定 (a): Rust で作る部品も 386 下限を守る — 最終成果物の検査を必須の工程に** (§7)。実装 (§3-3 の 3 点・§7-2 の検査器) は未着手で、T5c / T7b の前段。それまでの状態: 草案 (2026-09-30、初版)。決定の一覧は [MEMMAP_V3](../../decisions/MEMMAP_V3.md) **D36**。
 >
 > 発行: コーダー `claude-fable-5-1` (feat/gui `d0284b81`、KernelAPI v68)、PM の指示による。改訂: 同日 (基点 `37190d76`) — Codex (gpt-6-astra、読み取りのみ) の事実確認 2 件 (`x18/rustisa.md` 命令制限の記述の正誤、`x18/rustver.md` バージョンアップで直るか) とユーザー決定 (`memdebate/user_2.md` 末尾) を反映。
-> 読んだもの: [V3_PLAN_DRAFT](../../archive/v3/V3_PLAN_DRAFT.md) (P0 の C11 化・P2〜P10・§4 D8・§5 C3)、[MEMMAP_V3](../../decisions/MEMMAP_V3.md) (D1〜D34、§3-5 池の運用規則、§4-2 モジュール形式、§4-4 コアとモジュールの大きさ、§5-4 OpenType、§6 T0〜T7)、[PLAN.md](../../archive/v3/PLAN.md) §5-5 (合成器)、[TASK_PCM_CS4231](TASK_PCM_CS4231.md)、[PORT_CANDIDATES](PORT_CANDIDATES.md)、[DESIGN_APP_FIRST](../../DESIGN_APP_FIRST.md) §12、[CONSTRAINTS](../../CONSTRAINTS.md) [C1]、[V4_GAME_PLATFORM_DRAFT](../../archive/v4/V4_GAME_PLATFORM_DRAFT.md) §7、[ARM_GAUGE](../portability/ARM_GAUGE.md) §10、[M0_PORTABILITY_AUDIT](../../archive/arch_port/M0_PORTABILITY_AUDIT.md)、そしてソース (`userland/rust/`、`userland/gshell/`、`lib/os32_lz4/`、`sdk/rust/`、`sdk/kapi_rust_gen.py`、`build/*.mk`、`build/out/kernel.map`)。改訂で足したもの: Codex の実測 (`rustc --print target-cpus / cfg`、`objdump -d` の命令欄の集計、同梱 LLVM 22.1.4 の C API による生成実験)、[LLVM #58470](https://github.com/llvm/llvm-project/issues/58470)。
+> 読んだもの: V3_PLAN_DRAFT (アーカイブ: `docs/archive/v3/V3_PLAN_DRAFT.md`) (P0 の C11 化・P2〜P10・§4 D8・§5 C3)、[MEMMAP_V3](../../decisions/MEMMAP_V3.md) (D1〜D34、§3-5 池の運用規則、§4-2 モジュール形式、§4-4 コアとモジュールの大きさ、§5-4 OpenType、§6 T0〜T7)、`docs/archive/v3/PLAN.md` §5-5 (合成器)、[TASK_PCM_CS4231](TASK_PCM_CS4231.md)、[PORT_CANDIDATES](PORT_CANDIDATES.md)、[DESIGN_APP_FIRST](../../DESIGN_APP_FIRST.md) §12、[CONSTRAINTS](../../CONSTRAINTS.md) [C1]、V4_GAME_PLATFORM_DRAFT (アーカイブ: `docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md`) §7、[ARM_GAUGE](../portability/ARM_GAUGE.md) §10、M0_PORTABILITY_AUDIT (アーカイブ: `docs/archive/arch_port/M0_PORTABILITY_AUDIT.md`)、そしてソース (`userland/rust/`、`userland/gshell/`、`lib/os32_lz4/`、`sdk/rust/`、`sdk/kapi_rust_gen.py`、`build/*.mk`、`build/out/kernel.map`)。改訂で足したもの: Codex の実測 (`rustc --print target-cpus / cfg`、`objdump -d` の命令欄の集計、同梱 LLVM 22.1.4 の C API による生成実験)、[LLVM #58470](https://github.com/llvm/llvm-project/issues/58470)。
 > **事実は `file:line` で示す。「推測」と書いたものは未確認。** 行数は `wc -l` (2026-09-30)、大きさは `ls -l` / `size` / `nm` の実測 (`build/out/` は手元ビルド)。
 
 ---
@@ -18,7 +18,7 @@ Rust が**確実に効く**のは「外部入力を解釈する純粋計算で�
 
 ### 1-1. C11 化 (P0 / T0) の範囲とコスト
 
-2026-09-30 の移行前調査では、C11 化は旗・マクロ・規約の変更が中心で、既存部品を Rust へ書き直す比較より小さいと判断した。調査の訂正と移行結果は [T0 の記録](../../archive/v3/TASK_C11_MIGRATION.md) を参照。T0 は受入完了。
+2026-09-30 の移行前調査では、C11 化は旗・マクロ・規約の変更が中心で、既存部品を Rust へ書き直す比較より小さいと判断した。調査の訂正と移行結果は T0 の記録 (アーカイブ: `docs/archive/v3/TASK_C11_MIGRATION.md`) を参照。T0 は受入完了。
 現在の言語規約は [CONSTRAINTS [C1]](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする) が正典。公開 SDK ヘッダは C89/GNU89 互換、内部実装は GNU11、SQLite 系は GNU89 を維持する (§5 の決定4)。
 比較すべきは「新規部品をどちらで書くか」と「既存部品を書き直す価値があるか」であり、C11 化だけを理由に Rust へ書き直さない。
 
@@ -144,7 +144,7 @@ Rust が**確実に効く**のは「外部入力を解釈する純粋計算で�
 
 | 部品 | Rust | C11 | 差の中身 |
 |---|---|---|---|
-| T0 C11 化そのもの | — | **S** | 旗 5 行 + マクロ 1 行 + `shm.c` の 2 本 + 規則 3 文書 + 検査器 + C3 の決裁 (**訂正 2026-09-30**: 実際の作業は [TASK_C11_MIGRATION](../../archive/v3/TASK_C11_MIGRATION.md) §3 — SQLite 旗の分離、既存欠陥 5 + 1 件、ホスト試験 89 ファイルの旗、`check-c-dialect`、変異試験の更新。`shm.c` は修正済みで対象外。相対コストは依然 S) |
+| T0 C11 化そのもの | — | **S** | 旗 5 行 + マクロ 1 行 + `shm.c` の 2 本 + 規則 3 文書 + 検査器 + C3 の決裁 (**訂正 2026-09-30**: 実際の作業は TASK_C11_MIGRATION (アーカイブ: `docs/archive/v3/TASK_C11_MIGRATION.md`) §3 — SQLite 旗の分離、既存欠陥 5 + 1 件、ホスト試験 89 ファイルの旗、`check-c-dialect`、変異試験の更新。`shm.c` は修正済みで対象外。相対コストは依然 S) |
 | N1 合成器 | **M〜L** (移植 2,464〜4,762 行 + 表の `const` 化 + ホスト md5 試験 + IRQ 制約の検査 + target JSON) | **M** (C 版をほぼそのまま + `_math.c` 分離 + ホスト試験) | Rust は +S〜M (表の整数化・target JSON・panic 方針・`unsafe` 境界の設計)。見返りは回り込み・添字の誤りをコンパイル時に出せること |
 | N2 + N3 OpenType | **M** (読み出し層 数百行 + ラスタライザの取り込み + キャッシュ + T7b の受入) | **M + S** (stb_truetype 移植 + Rust からの FFI + C8 の話は消えるが二重構造) | C11 のほうが**高い** (置き場が Rust) |
 | N4 デコーダ | (Rust クレート + C ABI 包み: M) | **S〜M / 本** (移植元そのまま) | C11 のほうが安い |

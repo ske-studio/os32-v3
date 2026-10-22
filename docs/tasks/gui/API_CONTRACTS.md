@@ -1,6 +1,6 @@
 # libos32gui — 凍結インターフェース契約
 
-> 策定: 2026-09-04 / 親: [DESIGN.md](DESIGN.md) / 書式は [v2 CONTRACTS](../../archive/kernel_v2/CONTRACTS.md) に倣う
+> 策定: 2026-09-04 / 親: [DESIGN.md](DESIGN.md) / 書式は v2 CONTRACTS (アーカイブ: `docs/archive/kernel_v2/CONTRACTS.md`) に倣う
 > 位置づけ: **凍結 (2026-09-04)**。未決 4 点 (G6/G8 色、T2/T2a SHM、U2a キー) をユーザ
 > レビューで確定し、凍結した。以後の変更にはユーザ承認を要する (op 番号・イベント種別・
 > 構造体は末尾追記のみ)。方針は DESIGN.md §9.4 (Wayland 型の協定 + 保持型ウィジェット木 + モーダルの
@@ -632,4 +632,4 @@ UTF-8 入力、KCG の 8x16 / 16x16 セル、幅は半角セル数 × 8。プロ
 `os32gui_w_focused` (entry 77) は窓スロット添字を取る既存 ABI を維持する。
 アプリは WindowId を取る `os32gui_w_focused_in` を使う。定義は
 [`shlib.rs:1171・1183–1187`](../../../userland/rust/libos32gui/src/shlib.rs)。
-凍結・改訂の経緯は [完了記録](../../archive/gui/GUI_API_HISTORY.md)。
+凍結・改訂の経緯は 完了記録 (アーカイブ: `docs/archive/gui/GUI_API_HISTORY.md`)。

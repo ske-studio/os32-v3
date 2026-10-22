@@ -1,6 +1,6 @@
 # メモリ地図の生成と照合 — TDD 記録 (2026-09-17)
 
-票: [`docs/archive/kernel_v21/TASK_KSTACK_USER.md`](../../docs/archive/kernel_v21/TASK_KSTACK_USER.md) §4 の 1・2・3 と §4-bis
+票: `docs/archive/kernel_v21/TASK_KSTACK_USER.md` §4 の 1・2・3 と §4-bis
 
 対象: `tools/gen_memmap.py` / `kernel/paging.c` / `kernel/kselftest.c` / `include/memmap.h`
 試験: `tools/tests/test_memmap_gen.py` / `tools/tests/test_memmap_boot.py` + `memmap_boot_host.c`

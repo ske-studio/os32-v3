@@ -1,7 +1,7 @@
 # pegc_mode — PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO 待ち (ホスト TDD の記録)
 
 票: [docs/tasks/realhw/TASK_PEGC480_REALHW.md](../../docs/tasks/realhw/TASK_PEGC480_REALHW.md) §2 (H2・H3・H5)、§4 /
-[docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md](../../docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md) §4
+`docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` §4
 実装: `gfx/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
 値は `include/pegc.h` §10 (実機の記録で差し替える 1 か所)・§11・§12
 試験: `tools/tests/pegc_mode_host.c` + `tools/tests/test_pegc_mode.py` + `tools/tests/pegc_hostshim/io.h`

@@ -1,6 +1,6 @@
 # TASK_EDIT_GUI — 本文と桁・折り返し (ホスト試験の記録)
 
-- 票: [`docs/archive/gui_v14/TASK_EDIT_GUI.md`](../../docs/archive/gui_v14/TASK_EDIT_GUI.md)
+- 票: `docs/archive/gui_v14/TASK_EDIT_GUI.md`
   — 受入 **E8** (本文の操作をゲスト抜きで確かめる) と **E10**
   (既存の `WK_TEXTBOX` の見え方と振る舞いが変わっていない)
 - 実行: `python3 -B tools/tests/test_edit_doc.py [--mutate]`

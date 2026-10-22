@@ -1,6 +1,6 @@
 # sh_status TDD — 終了コードの配線と `$?`
 
-票: [`docs/archive/shell/TASK_EXIT_STATUS.md`](../../docs/archive/shell/TASK_EXIT_STATUS.md)
+票: `docs/archive/shell/TASK_EXIT_STATUS.md`
 基点: `feat/gui` = `a11ee98` (設計レビュー 5 往復で Approve、設計凍結)
 試験: `make check-sh-status-host` (= `python3 -B tools/tests/test_sh_status.py --mutate`)
     肯定側だけ: `python3 -B tools/tests/test_sh_status.py`

@@ -1,7 +1,7 @@
 # K5b-W — gshell 側 (アプリ 4 本の同時実行) の RED → GREEN 記録
 
-> 票: [`docs/archive/gui_v13/TASK_K5B_gshell.md`](../../docs/archive/gui_v13/TASK_K5B_gshell.md) /
-> 規則の正典: [K5a 設計 D11-3 / D11-3a](../../docs/archive/gui_v13/TASK_K5_multiapp.md) /
+> 票: `docs/archive/gui_v13/TASK_K5B_gshell.md` /
+> 規則の正典: K5a 設計 D11-3 / D11-3a (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`) /
 > 模型: [`multiapp_model_host.c`](multiapp_model_host.c) (ケース 12〜16、84 検査) と
 > [`multiapp_model_tdd.md`](multiapp_model_tdd.md)
 >
@@ -213,7 +213,7 @@ make check-kapi-version  → KAPI バージョン一致: v44 (4 箇所)
 # 追補 — 不具合 W-1 (park 中のアプリの露出領域が再描画されない)
 
 > 発見: 2026-09-11 の実機受入 (`f164805`、15MB 構成、証跡 `build/out/gui_gate/k5b_g1/*.png`)。
-> 票の記載は [`TASK_K5B_gshell.md` の「不具合 W-1」](../../docs/archive/gui_v13/TASK_K5B_gshell.md)。
+> 票の記載は `TASK_K5B_gshell.md` の「不具合 W-1」 (アーカイブ: `docs/archive/gui_v13/TASK_K5B_gshell.md`)。
 > 基点: `d56fda2` (feat/gui の先端)。
 
 ## 観測 (PM)
@@ -307,7 +307,7 @@ make check-gshell-host   → 29 passed / 0 failed
 
 # 追補 W-2 — K5c への追随 (ユーザー決裁 2026-09-11 A1 / A3)
 
-> 票の末尾「決裁」: [`docs/archive/gui_v13/TASK_K5B_gshell.md`](../../docs/archive/gui_v13/TASK_K5B_gshell.md)
+> 票の末尾「決裁」: `docs/archive/gui_v13/TASK_K5B_gshell.md`
 > 前提: K5c (`exec_abort_clear` = KAPI v45、Rust 生成器の `i32`) を取り込んだ上で作業。
 
 ## 直したこと 3 つ

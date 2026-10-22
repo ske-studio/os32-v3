@@ -1,6 +1,6 @@
 # kapi_out — RED → GREEN の記録
 
-票: [`docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](../../docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) 受入 G1
+票: `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md` 受入 G1
 対象: `sdk/gen_kapi.py` (`out` の解釈・検査・生成) / `sdk/kapi.json` (申告)
 試験: `tools/tests/test_kapi_out.py`
 実行: `make check-kapi-out` (`check-par` の列)。否定側は `--mutate` (手で回す)

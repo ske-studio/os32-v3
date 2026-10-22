@@ -1,6 +1,6 @@
 # ring3_guard — WM の文脈では KAPI の出力検査を効かせない (RED → GREEN の記録)
 
-票: [`docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`](../../docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md) §6 (追補 2026-09-26)
+票: `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md` §6 (追補 2026-09-26)
 対象: `exec/ring3_str.c` (`ring3_guard_active`) / `kernel/gui.c` (`gui_call` / `gui_owner_exit` の印) /
 `exec/exec.c` (`ring3_wm_depth`、3 つの門、ポンプ、longjmp 地点の立ち直し)
 試験: `tools/tests/test_ring3_guard.py` (ホスト、実物を `#include`) + `kernel/kselftest.c` の `test_ring3_wm_guard` (ゲスト、実物の門)

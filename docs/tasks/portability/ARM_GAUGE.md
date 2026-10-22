@@ -477,7 +477,7 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 ### kstring の asm 版 / C 版の速度 (2026-09-17、基点 `63754b4`)
 
 順序 4-b で新設した `lib/kstring_c.c` を **x86 でも使うか**を実測した
-(票 [`TASK_KSTRING_BENCH.md`](../../archive/portability/TASK_KSTRING_BENCH.md)、計測プログラム
+(票 `docs/archive/portability/TASK_KSTRING_BENCH.md`、計測プログラム
 `userland/tests/kstr_bench.c`、集計 `tools/kstr_bench_report.py`)。
 NP21/W の既定設定 (約 16MHz) で 3 回、13 本 × 7 長 × 2 ずれ × 2 版 = 364 升。
 

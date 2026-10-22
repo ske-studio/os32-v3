@@ -19,7 +19,7 @@ KernelAPIポインタを引数として実行する。
 | ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) |
 | ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
 | 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`exec/appslot.c:261`)。保護されたカーネル常駐 FD は回収しない |
-| 不正ポインタ | ディスパッチャがアプリ帯 / SHM / VRAM の範囲で早期検証。検証しきれないものは「ring3 syscall 実行中フォールトガード」が捕捉し、**アプリだけ kill** (`fault_kill_count`)。設計: [archive/kernel_v2/](archive/kernel_v2/PLAN.md) |
+| 不正ポインタ | ディスパッチャがアプリ帯 / SHM / VRAM の範囲で早期検証。検証しきれないものは「ring3 syscall 実行中フォールトガード」が捕捉し、**アプリだけ kill** (`fault_kill_count`)。設計: archive/kernel_v2/ (アーカイブ: `docs/archive/kernel_v2/PLAN.md`) |
 | プログラム専用スタック | CPL=3: `MEM_APP_STACK_TOP` (0x90000000) から可変量 (既定256KiB) を全 map、その直下に guard_b 1 page。常駐 shell/gshell は固定配置 |
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
 

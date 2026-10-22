@@ -1,6 +1,6 @@
 # vk32_crc 検証記録 (VK32 v2 の CRC32 表とローダの検査、コミット ID)
 
-票: [TASK_SERIAL_HOSTFS](../../docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-4、
+票: TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 A-4、
 §1-v3「`.old` の識別はカーネルイメージの CRC」「FD ローダ」、ユーザー決裁 (2026-09-24) の 4
 (旧ローダとの互換は取らない)。
 

@@ -354,7 +354,7 @@ NP21/WエミュレータのHostDrv機能を利用し、ホストPC (Windows) の
 - **fatfs/ + fatfs_vfs.c** — ELM FatFs (elm-chan.org) の移植 + VfsOps 統合ラッパー。ext2_vfs.c と同じマルチインスタンスパターン (FatFsCtx を kmalloc/kfree)。FDD ブート時のルートFSでもある (`root_fs = "fat"`)
 - FatFs のボリュームは pdrv 0/1 (fd0/fd1) の2つ。`fatfs_vfs_mount` は pdrv 単位の busy フラグで二重マウントを弾く (fd1 の自動マウント試行が fd0 のマウントを壊す経路があったため)
 - **FD の媒体を差し替えたら umount / mount する (契約)**。FD の読みはトラックの先読みとセクタキャッシュを
-  持ち (`drivers/fdc_track.c`、票 [`archive/realhw_v21/TASK_FDC_REALHW.md`](archive/realhw_v21/TASK_FDC_REALHW.md))、FatFs も
+  持ち (`drivers/fdc_track.c`、票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、FatFs も
   マウント中は FAT とディレクトリを覚えている。捨てる合図は (1) `disk_initialize` (= マウント)、(2) 書き込みと
   SIS で見た Ready 変化による世代、(3) **最後の読みから 2 秒 (200 tick) 空いたとき** (MS-DOS と同じ考え方の
   「2 秒規則」)。FRY=1 では同じ形式の媒体の差し替えが Ready 変化にならず (io_fdd.md の 0094h)、NP21/W も

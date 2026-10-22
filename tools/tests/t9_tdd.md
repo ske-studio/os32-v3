@@ -1,6 +1,6 @@
 # T9 ホスト TDD の記録 (K = 起動要求表 / W = WM 側の仲介)
 
-票: [docs/archive/gui_v13/TASK_T9_sh.md](../../docs/archive/gui_v13/TASK_T9_sh.md) §1 D3 / D5 / D8、
+票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3 / D5 / D8、
 §1a の ABI 表、§10 の non-blocker 1 / 2。
 実行: `make check-launch-host` (= `python3 -B tools/tests/test_launch.py`) と
 `make check-multiapp-model-host` (その中の `test_multiapp_impl.py`)。
@@ -283,7 +283,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # A. 端末 (t5a_display) の要求表切り替え — ホスト TDD の記録
 
-票: [TASK_T9_sh.md](../../docs/archive/gui_v13/TASK_T9_sh.md) §1 D4 / D9、§1a の ABI 表。
+票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D4 / D9、§1a の ABI 表。
 実行: `make check-t5a-host` (= `cargo test --manifest-path
 userland/rust/t5a_display/host_tests/Cargo.toml --target x86_64-unknown-linux-gnu --offline`)。
 実機・エミュレータ・`make` は**未実施** ([V4])。
@@ -527,7 +527,7 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 (sh.bin の起動待ち)
 
-票: [TASK_T9_sh.md](../../docs/archive/gui_v13/TASK_T9_sh.md) §1 D3a。
+票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3a。
 実行: `make check-sh-launch-host` (= `python3 -B tools/tests/test_sh_launch.py`)。
 
 `tools/tests/sh_launch_host.c` が `userland/shell/sh_launch.inc` を**そのまま**
@@ -567,7 +567,7 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 2 (行再描画と source 中の exit)
 
-票: [TASK_T9_sh.md](../../docs/archive/gui_v13/TASK_T9_sh.md) §1 D2(d) と
+票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D2(d) と
 実装レビュー (往復 1/3) の blocker 1 / 2。
 実行: `make check-sh-shell-host` (= `python3 -B tools/tests/test_sh_shell.py`)。
 

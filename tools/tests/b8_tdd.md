@@ -1,6 +1,6 @@
 # 票 B8 — 読み取り失敗を「不存在」として扱う処理の是正 (ホスト TDD の記録)
 
-- 票: [`docs/archive/shell/TASK_FS_TYPE.md`](../../docs/archive/shell/TASK_FS_TYPE.md) §2
+- 票: `docs/archive/shell/TASK_FS_TYPE.md` §2
 - 基点: `feat/gui` の `3316fdb`
 - 実行: `python3 -B tools/tests/test_b8_open.py --target`
   (`make check-b8-open-host` が同じものを回す)
@@ -1349,7 +1349,7 @@ rename_dir 段 6 とそのコメント、不変条件のコメントの訂正、
 
 ## 12. 段 H — 独立した 2 か所の失敗 (二重故障、2026-09-16)
 
-[`docs/archive/shell/TASK_FS_TYPE.md`](../../docs/archive/shell/TASK_FS_TYPE.md) §2-6 が
+`docs/archive/shell/TASK_FS_TYPE.md` §2-6 が
 「範囲外の未解消」として残していた 3 つのうちの最後の 1 つ。失敗注入の網羅は
 「N 番目を 1 回だけ (once)」「N 番目以降を全部 (sticky)」の 2 形式で、独立した
 2 か所の失敗の組み合わせは専用試験 1 件 (`[P1-C'']` `case_create_inode_write_ambiguous`) だけだった。
@@ -1433,7 +1433,7 @@ inode) と孤児・末尾の穴だけで、これは `e2fsck` 側でも「Block 
 
 ## 13. 段 X3 — 通常ファイル同士の置き換え rename (票 H2 §2-2)
 
-対象票: [`../../docs/archive/shell/TASK_H2.md`](../../docs/archive/shell/TASK_H2.md) §2-2 / §2-2-1 /
+対象票: `docs/archive/shell/TASK_H2.md` §2-2 / §2-2-1 /
 §2-2-2 / §2-2-3 と §4-1 の **X3 / X3b / X3c / X3d**。基点 `feat/gui` = `15c5edf`。
 
 ### 13-1. 何を足したか

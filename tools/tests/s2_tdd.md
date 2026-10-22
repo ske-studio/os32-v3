@@ -1,7 +1,7 @@
 # S2-C — `libos32cfg` / `cfg` コマンドのホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S2.md`](../../docs/archive/settings/TASK_S2.md) 第 5 版 §0 の **S2-C**。
-契約の正典は [`S0_FOUNDATION.md`](../../docs/archive/settings/S0_FOUNDATION.md) §2 と
+票: `docs/archive/settings/TASK_S2.md` 第 5 版 §0 の **S2-C**。
+契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §2 と
 [`DESIGN.md`](../../docs/tasks/settings/DESIGN.md) §3〜§5。
 走らせ方:
 

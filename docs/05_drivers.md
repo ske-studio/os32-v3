@@ -263,7 +263,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   UNIT ATTENTION を立てるので、次のコマンドの出し直しは呼び手が行う。
   2026-09-26 まではマスターしか見ず、NP21/W で ide2 が空の CD のまま ide3 (セカンダリのスレーブ) に ISO を付けると
   `cd0: block 1 sects` (NP21/W は空のドライブの容量を 0 と答える) になり、1 セクタも読めなかった
-- **待ちの上限 (秒、2026-09-26 [TASK_ATAPI_TIMEOUT](archive/realhw_v21/TASK_ATAPI_TIMEOUT.md))**: BSY / DRQ の待ちは ALT_STATUS を
+- **待ちの上限 (秒、2026-09-26 TASK_ATAPI_TIMEOUT (アーカイブ: `docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md`))**: BSY / DRQ の待ちは ALT_STATUS を
   1 回読むごとに `cpu_delay_us(ATAPI_POLL_US = 100µs)` を挟み、挟んだ時間の合計で上限を数える (`atapi_wait_clear`)。
   それまでは `IDE_TIMEOUT_LOOP` (100 万回の inp、Ra266 で 0.5〜1 秒) で、実機のスピンアップ (READ(10) で 2〜4 秒 BSY) に足りず
   健全な装置を DEVICE RESET で捨てていた。`tick_count` で数えないのは、呼ばれる文脈 (起動時の `atapi_init`、KAPI 経由の読み) で
@@ -407,6 +407,6 @@ libos32math  (依存なし — 最も基底のライブラリ)
 
 **リソース使用量**: 合計約4KB (コード~1.6KB + LUTデータ~2.3KB)。
 
-詳細は [LIBMATH_DESIGN.md](archive/v21/libmath/LIBMATH_DESIGN.md) を参照。
+詳細は `docs/archive/v21/libmath/LIBMATH_DESIGN.md` を参照。
 
 ---

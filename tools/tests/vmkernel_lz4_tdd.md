@@ -1,7 +1,7 @@
 # vmkernel_lz4 検証記録 (LZ4 高圧縮と展開側 3 実装)
 
-票: [TASK_SERIAL_HOSTFS](../../docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md) 部品 A-1
-(先行して着地)。生成側の上限検査は [TASK_HDD_INSTALL](../../docs/archive/realhw_v21/TASK_HDD_INSTALL.md) N8。
+票: TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 A-1
+(先行して着地)。生成側の上限検査は TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) N8。
 
 ## この文書の性格
 

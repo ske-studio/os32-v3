@@ -1,9 +1,9 @@
 # ゲスト一括実行ランナー — ホスト試験の記録 (RED→GREEN)
 
-- 票: [`docs/archive/test/TASK_TEST_RUNNER.md`](../../docs/archive/test/TASK_TEST_RUNNER.md)
+- 票: `docs/archive/test/TASK_TEST_RUNNER.md`
   — 受入 **R7** (「生成と集計はホストだけで試験でき、そこが壊れていたらゲストで
   回しても意味がない」)。R1〜R6 / R8 の**ホストで見える側**もここで踏む。
-- 前段: [`docs/archive/test/TASK_TEST_RESULT.md`](../../docs/archive/test/TASK_TEST_RESULT.md)
+- 前段: `docs/archive/test/TASK_TEST_RESULT.md`
   §2 の約束事 (終了コード 0/1/2 と集計行 `<名前>: PASS n/m`)。
   その記録は [`result_conv_tdd.md`](result_conv_tdd.md)。
 - 実行: `python3 -B tools/tests/test_guest_tests.py [--mutate]`

@@ -1,6 +1,6 @@
 # `db_last_error()` / `db_column_text()` の返り先 (ホスト試験の記録)
 
-- 票: [`docs/archive/kernel_v21/TASK_DB_ERRSTR.md`](../../docs/archive/kernel_v21/TASK_DB_ERRSTR.md) §4 / §5
+- 票: `docs/archive/kernel_v21/TASK_DB_ERRSTR.md` §4 / §5
 - 対象: [`kapi/kapi_db.c`](../../kapi/kapi_db.c) の `kapi_db_last_error` /
   `kapi_db_column_text` と、結果データの上限を見ている 5 か所
 - 領域の管理元: [`sdk/include/os32/os32_kapi_shared.h`](../../sdk/include/os32/os32_kapi_shared.h)

@@ -1,6 +1,6 @@
 # con_sink (K6C) — ホスト TDD の記録
 
-票: [docs/archive/gui_v13/TASK_K6C_console.md](../../docs/archive/gui_v13/TASK_K6C_console.md) §2
+票: `docs/archive/gui_v13/TASK_K6C_console.md` §2
 実装: `kernel/con_sink.c` / `include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
 試験: `tools/tests/con_sink_host.c` + `tools/tests/test_con_sink.py` (`make check-con-sink-host`)
 

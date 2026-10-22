@@ -1,6 +1,6 @@
 # TASK_FS_TYPE §3 — 種別が「分からない」とき cp / mv / rm が断る (ホスト試験の記録)
 
-- 票: [`docs/archive/shell/TASK_FS_TYPE.md`](../../docs/archive/shell/TASK_FS_TYPE.md) §3
+- 票: `docs/archive/shell/TASK_FS_TYPE.md` §3
   (`fs_is_dir` は「不明」を運べない)
 - 原則: [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-35 —
   「読めなかった」を「無い / その型ではない」と読み替えない。判定関数ではなく**受け手**を試す

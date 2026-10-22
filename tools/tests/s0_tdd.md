@@ -1,7 +1,7 @@
 # S0 — 設定レジストリ基盤のホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S0.md`](../../docs/archive/settings/TASK_S0.md)、
-契約の正典は [`docs/archive/settings/S0_FOUNDATION.md`](../../docs/archive/settings/S0_FOUNDATION.md)。
+票: `docs/archive/settings/TASK_S0.md`、
+契約の正典は `docs/archive/settings/S0_FOUNDATION.md`。
 
 3 票 (S0-K / S0-D / S0-T) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。
@@ -348,7 +348,7 @@ type / int の字句 / text 255B / blob の hex) と境界値の受理、`RealDe
 - 新規インストールでの seed (FDD の `install.bin` が `/kernel.bin` を要求する既存不整合、B10) は
   S3 の受入。本票では「媒体に入っている」までしか言えない。
 
-票 [docs/archive/settings/TASK_S0.md](../../docs/archive/settings/TASK_S0.md)。
+票 `docs/archive/settings/TASK_S0.md`。
 本書は **S0-K (KAPI v50 / `shm_write_row` の境界 / exec 回収順序)** 分。
 S0-D (配備保護) と S0-T (初期値 tsv) は別票が同じファイルに節を足す。
 

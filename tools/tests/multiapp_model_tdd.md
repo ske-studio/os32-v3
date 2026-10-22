@@ -1,6 +1,6 @@
 # multiapp_model — GUI アプリ 4 本同時実行 (K5a) のホスト TDD
 
-対象票: [`docs/archive/gui_v13/TASK_K5_multiapp.md`](../../docs/archive/gui_v13/TASK_K5_multiapp.md) §K5a-8
+対象票: `docs/archive/gui_v13/TASK_K5_multiapp.md` §K5a-8
 実行: `python3 -B tools/tests/test_multiapp_model.py` (`make check` への登録は PM)
 三点セット: `multiapp_model_host.c` (模型 + 検査本体) / `test_multiapp_model.py` (ビルドと実行) /
 このファイル (何を見ているか + RED→GREEN の記録)。

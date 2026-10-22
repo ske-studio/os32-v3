@@ -5,7 +5,7 @@
   「順序 4-a でも数字は動かない — この計測器が測っていないものだから」
 - 実行: `python3 tools/check_le_access.py` (`make check-le-access`)
 - 対象: `tools/check_le_access.py` の `GUARDED` に並ぶ 9 ファイル
-- 関連: [`SURVEY_N1.md`](../../docs/archive/portability/SURVEY_N1.md) の 2026-09-15 追記 (順序 4-a で解消)
+- 関連: `docs/archive/portability/SURVEY_N1.md` の 2026-09-15 追記 (順序 4-a で解消)
 
 ## 0. 正直に書く ([V4])
 
@@ -111,4 +111,4 @@ pointer cast の canonical pointee alignment が増えるかを見る。
 解析失敗の SKIP は撤去。`test_clang_ast.py` は typedef・複数修飾子・
 文字列連結 asm・マクロ asm と対照を有効な C で確認し、検査規則を壊す変異を
 Python の構文確認後に実行して runtime RED を要求する。
-比較の実数は [TASK_CLANG_CHECKS](../../docs/archive/v3/TASK_CLANG_CHECKS.md) §6。
+比較の実数は TASK_CLANG_CHECKS (アーカイブ: `docs/archive/v3/TASK_CLANG_CHECKS.md`) §6。

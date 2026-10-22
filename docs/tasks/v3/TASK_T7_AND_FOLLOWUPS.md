@@ -13,8 +13,8 @@
 
 | 元票の前提・着手条件 | 分類 | 今の根拠 / r6 での扱い |
 |---|---|---|
-| T2 の e5〜e12 の再init/revoke/再attach・200行・Unicode橋は引渡し待ち | 吸収済み | T2e 受入済み (`TASK_T2D_T2H.md:190-227`、[閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md))。公開leaseを基盤として引継ぐ |
-| f2〜f13/g の map・allocator・trim は引渡し待ち | 吸収済み | [閉鎖台帳](../../archive/v3/DEFERRED_CLOSED.md) の F/G 各行。通常文脈の安全点を再利用し、font独自の借用guardは追加する |
+| T2 の e5〜e12 の再init/revoke/再attach・200行・Unicode橋は引渡し待ち | 吸収済み | T2e 受入済み (`TASK_T2D_T2H.md:190-227`、閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`))。公開leaseを基盤として引継ぐ |
+| f2〜f13/g の map・allocator・trim は引渡し待ち | 吸収済み | 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) の F/G 各行。通常文脈の安全点を再利用し、font独自の借用guardは追加する |
 | h の V86/STOP 復元が未確定 | 要改訂 | 既存session/正確なPTE復元・通常文脈回収は `kernel/v86_mem.c:50-214`、`kernel/paging.c:656-687`。未観測は台帳に残し §1 で受ける |
 | T3→T4→T5-0→T5a→T5b→T5c→T7a→T7b | r6で更新 | T5-0はstack計測・KSTK-DF。engine stack 32KiB + NP 1頁で決定済み (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。T5bはcore FAT回帰とPOST_ROOT CD、登録核T5c-0をCDより前へ。FD容量不足時だけT6b-Mを先行。EARLY/HostDrv分離段は削除。集積拡張T6b-1/2は凍結し、圧縮像が508KiBの8割 (406.4KiB≈416kB) に近づいたら起票。T7はT5c-1のKCG facade/cache・T5c-3の原本/V86復帰口とT5最終一式を受ける (T6b-Mは不要) |
 | planar BB の旧低位 backing をpoolへ移す | 維持 | `include/memmap.h:122-123`、`kernel/memory_boot.c:208-220`。CLIENT/SURFACE契約は維持してbackingを替える |

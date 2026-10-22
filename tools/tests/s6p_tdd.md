@@ -1,7 +1,7 @@
 # S6-P (ext2 の小さな書き込みが極端に遅い) — ホスト TDD の記録
 
-票: S6-P / 観測は [`docs/archive/settings/TASK_S6.md`](../../docs/archive/settings/TASK_S6.md) 「PM 受入記録」
-診断: [`docs/archive/settings/TASK_S6P.md`](../../docs/archive/settings/TASK_S6P.md)
+票: S6-P / 観測は `docs/archive/settings/TASK_S6.md` 「PM 受入記録」
+診断: `docs/archive/settings/TASK_S6P.md`
 実装 (段 B, ext2): `fs/ext2_ctx.h` / `fs/ext2_super.c` / `fs/ext2_inode.c` / `fs/ext2_dir.c` /
       `fs/ext2_vfs.c` / `fs/ext2_priv.h` / `fs/ext2_fmt.c`
 実装 (段 A, 呼び出し側): `lib/microtar/microtar.c` の `write_null_bytes()`

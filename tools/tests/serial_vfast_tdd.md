@@ -1,6 +1,6 @@
 # serial_vfast — RED → GREEN の記録
 
-票: [`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`](../../docs/archive/realhw_v21/TASK_SERIAL_VFAST.md)
+票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`
 対象: `drivers/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
       (切替後の番犬) / `drivers/serial.c` `userland/shell/rshell.c` (I/O と配線)
 試験: `tools/tests/test_serial_vfast.py` + `tools/tests/serial_vfast_host.c`

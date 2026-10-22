@@ -1,6 +1,6 @@
 # S3I2 — FDD からの新規インストール (lz4 + `/boot`) と使い捨て NHD の道具のホスト TDD 記録
 
-票: [`docs/archive/settings/TASK_S3I2.md`](../../docs/archive/settings/TASK_S3I2.md)。
+票: `docs/archive/settings/TASK_S3I2.md`。
 
 3 票 (S3I2-I / S3I2-T / S3I2-K) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。

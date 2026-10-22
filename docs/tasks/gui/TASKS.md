@@ -2,7 +2,7 @@
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
 > 親: [DESIGN.md](DESIGN.md) / 契約: [API_CONTRACTS.md](API_CONTRACTS.md) (2026-09-04 凍結)
-> 書式は v2 の [PLAN.md](../../archive/kernel_v2/PLAN.md) / [CONTRACTS.md](../../archive/kernel_v2/CONTRACTS.md) に倣う。
+> 書式は v2 の `docs/archive/kernel_v2/PLAN.md` / `docs/archive/kernel_v2/CONTRACTS.md` に倣う。
 > ロードマップ: `docs/ROADMAP.md` v1.1
 
 体制は v2 と同じ 3 層 (設計 = PM、コーディング = コーダー、ビルド検証 = `os32-cycle` を回す
@@ -15,18 +15,18 @@
 
 | レーン | 言語 / 場所 | 票 | 内容 |
 |---|---|---|---|
-| **H** HAL | C, `gfx/` `drivers/` | [TASK_H1_hal_backend.md](../../archive/gui_v11/TASK_H1_hal_backend.md) | バックエンド表 + 9801 プレーン実装 + カウンタ |
-| | | [TASK_H2_pegc.md](../../archive/gui_v11/TASK_H2_pegc.md) | PEGC 256 色バックエンド (v1.1 後半) |
-| | | [TASK_H3_cirrus.md](../../archive/gui_v11/TASK_H3_cirrus.md) | Cirrus GD54xx チップドライバ + Xe10 グルー + ai-debug screenshot 拡張 (v1.2) |
-| **K** カーネル背骨 | C, `kernel/` `exec/` `sdk/kapi.json` | [TASK_K1_gui_call.md](../../archive/gui_v11/TASK_K1_gui_call.md) | `gui_call` / `gui_register` KAPI、SHM 末尾の GUI 領域予約 (契約 T2)、共有ヘッダ、エラー番号 |
-| | | [TASK_K2_pump_hook.md](../../archive/gui_v11/TASK_K2_pump_hook.md) | syscall 境界の入力ポンプ (T6) |
-| | | [TASK_K3_shared_lib_band.md](../../archive/gui_v11/TASK_K3_shared_lib_band.md) | 共有ライブラリ帯域 0x400000〜0x4FFFFF とロードアドレス移動 (最後) |
-| | | [TASK_K4_gui_boot.md](../../archive/gui_v11/TASK_K4_gui_boot.md) | `/etc/system.cfg`、テキスト GDC 制御、`os32gui` コマンド |
-| **W** WM (gshell) | Rust, `userland/gshell/` (新規) | [TASK_W1_wm_core.md](../../archive/gui_v11/TASK_W1_wm_core.md) | gshell 本体: ウィンドウ管理、スロット、イベントリング、損傷/commit、クローム、カーソル、タイマ |
-| | | [TASK_W2_fep_lease_modal.md](../../archive/gui_v11/TASK_W2_fep_lease_modal.md) | FEP を WM で持つ、14 色リースと 2 色クローム、モーダル、標準ダイアログ |
-| **C** クライアント | Rust, `userland/rust/libos32gui/` | [TASK_C1_drawing.md](../../archive/gui_v11/TASK_C1_drawing.md) | G 描画 (Rect / Style / Surface / クリップ / 文字) を libos32gfx の上に |
-| | | [TASK_C2_client_loop_widgets.md](../../archive/gui_v11/TASK_C2_client_loop_widgets.md) | `gui_call` スタブ、U3 ループ、ウィジェット木、箱レイアウト、gui_demo 書き換え |
-| | | [TASK_C3_shared_lib.md](../../archive/gui_v11/TASK_C3_shared_lib.md) | 固定アドレス・ジャンプ表・バージョン照合の共有ライブラリ化 (K3 と同時) |
+| **H** HAL | C, `gfx/` `drivers/` | `docs/archive/gui_v11/TASK_H1_hal_backend.md` | バックエンド表 + 9801 プレーン実装 + カウンタ |
+| | | `docs/archive/gui_v11/TASK_H2_pegc.md` | PEGC 256 色バックエンド (v1.1 後半) |
+| | | `docs/archive/gui_v11/TASK_H3_cirrus.md` | Cirrus GD54xx チップドライバ + Xe10 グルー + ai-debug screenshot 拡張 (v1.2) |
+| **K** カーネル背骨 | C, `kernel/` `exec/` `sdk/kapi.json` | `docs/archive/gui_v11/TASK_K1_gui_call.md` | `gui_call` / `gui_register` KAPI、SHM 末尾の GUI 領域予約 (契約 T2)、共有ヘッダ、エラー番号 |
+| | | `docs/archive/gui_v11/TASK_K2_pump_hook.md` | syscall 境界の入力ポンプ (T6) |
+| | | `docs/archive/gui_v11/TASK_K3_shared_lib_band.md` | 共有ライブラリ帯域 0x400000〜0x4FFFFF とロードアドレス移動 (最後) |
+| | | `docs/archive/gui_v11/TASK_K4_gui_boot.md` | `/etc/system.cfg`、テキスト GDC 制御、`os32gui` コマンド |
+| **W** WM (gshell) | Rust, `userland/gshell/` (新規) | `docs/archive/gui_v11/TASK_W1_wm_core.md` | gshell 本体: ウィンドウ管理、スロット、イベントリング、損傷/commit、クローム、カーソル、タイマ |
+| | | `docs/archive/gui_v11/TASK_W2_fep_lease_modal.md` | FEP を WM で持つ、14 色リースと 2 色クローム、モーダル、標準ダイアログ |
+| **C** クライアント | Rust, `userland/rust/libos32gui/` | `docs/archive/gui_v11/TASK_C1_drawing.md` | G 描画 (Rect / Style / Surface / クリップ / 文字) を libos32gfx の上に |
+| | | `docs/archive/gui_v11/TASK_C2_client_loop_widgets.md` | `gui_call` スタブ、U3 ループ、ウィジェット木、箱レイアウト、gui_demo 書き換え |
+| | | `docs/archive/gui_v11/TASK_C3_shared_lib.md` | 固定アドレス・ジャンプ表・バージョン照合の共有ライブラリ化 (K3 と同時) |
 | **W** (追加) | Rust, `userland/gshell/` | [TASK_KBD_NAV.md](TASK_KBD_NAV.md) | キーボードだけの GUI 操作 (WM ショートカット + KANA ラッチのマウスキー)。設計票、実機でバスマウスが無いため (2026-09-25) |
 | **PM** | Python, `tools/` | (票なし、本書 §5) | 共有定数の照合スクリプト、ゲート検証、`os32-cycle` の GUI 用サブコマンド |
 
@@ -118,12 +118,12 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 
 ## 7. 進捗 (v1.1 の関門記録)
 
-条件は §5、操作・出力・調査経緯は [受入記録](../../archive/gui/GUI_V11_ACCEPTANCE_LOG.md)。
+条件は §5、操作・出力・調査経緯は 受入記録 (アーカイブ: `docs/archive/gui/GUI_V11_ACCEPTANCE_LOG.md`)。
 以下は NP21/W の NHD 配備での判定であり、物理実機の性能判定ではない。
 
 | 関門 | 判定 | 証拠・持越し |
 |---|---|---|
-| G0 | 凍結済み | [契約の凍結記録](../../archive/gui/GUI_API_HISTORY.md#凍結の記録) |
+| G0 | 凍結済み | 契約の凍結記録 (アーカイブ: `docs/archive/gui/GUI_API_HISTORY.md`) |
 | G1 | 通過 (2026-09-05) | 受入記録の K1/H1/C1/K4 結合行 |
 | G2 | 通過 (2026-09-06) | 受入記録の C2 結合と main マージ行。ドラッグ・重なりは mouse API 追加後に確認 |
 | G3 | 通過 (2026-09-06) | 受入記録の G3 行。FEP キャレット位置は同日の 9801 回帰行で確認 |
@@ -136,7 +136,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 
 PEGC の 480 ライン・TVRAM 合成・CUI 復帰と、Cirrus Xe10 の HW 塗り/BLT・FEP・CUI 復帰を確認。
 WAB screenshot は np21w-src `337e7ff` で対応し、出力元 `X-Screen-Source: wab` とリレー状態を確認した。
-WAB OFF 後の PEGC/9801 回帰も通過。詳しい条件と出力は [受入記録](../../archive/gui/GUI_V11_ACCEPTANCE_LOG.md)。
+WAB OFF 後の PEGC/9801 回帰も通過。詳しい条件と出力は 受入記録 (アーカイブ: `docs/archive/gui/GUI_V11_ACCEPTANCE_LOG.md`)。
 
 ### 未確認事項の扱い
 
