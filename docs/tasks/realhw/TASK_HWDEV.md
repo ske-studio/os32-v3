@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-22)** — M3c 実装済み、独立レビュー待ち (M4 以降は未着手)
+> 状態: **実装中 (2026-10-23)** — M1〜M3c は main (M3c 92153ea、kdebug.bin 240,036 → 109,060B)。M4・M5 と後続は未着手。2026-10-23 に順序を見直した (§3-1、ユーザー承認)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -33,19 +33,32 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 | 段 | 重さ / 実装 | 合格条件 (要約) | 状態 |
 |---|---|---|---|
-| M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | 実装済み・レビュー待ち |
-| M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | 実装済み・レビュー待ち |
-| M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | 実装済み・レビュー待ち |
-| M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | 実装済み・レビュー待ち |
-| M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従、hwdev_audit の入力を HWDEV 側へ切替 | 実装済み・レビュー待ち |
+| M1 計測・ABI 固定 | 中 / astra | 同じ S6 像の内訳を採り直し、267 頁の最悪条件と部品の寿命の契約を固定 | main (c9a4817) |
+| M2 台帳・loader・対照合 | 中 / astra | 11 枠目を足し既存 10 種を維持、壊れた部品を公開せず S0 は生きる | main (0387ab1) |
+| M3a 部品の像の組み立て | 中 / astra | HWDEV の import の stub と slot の生成 (CORE_API の G3)、GeForce の部品の像が組めて未解決シンボル 0・contract_crc が一致。kdebug の中身と動作は変えない | main (911464c) |
+| M3b 試行の入口の切替 | 中 / astra | op 5〜10 の振り分けを kdebug の中から部品へ。27 種・PLL・COPY・A4・CR1F・N1・全出口の既存の期待 trace が部品越しに一致 (kdebug の中の GF はまだ残る — 大きさは一時的に変わらない) | main (c1986c3) |
+| M3c GeForce の部分を kdebug から外す | 中 / astra | 核に gfinit*/recover_gf.c への直接参照が無い (S0 の最小 GF 復帰は残す)、kdebug.bin が見積もり (115〜150KiB) まで縮む、試験と対応表の追従、hwdev_audit の入力を HWDEV 側へ切替 | main (92153ea) |
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | 未 |
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | 未 |
-| M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | 未 |
-| 旧 S7 (shell と KAPI 共有ヘッダ) | 中 / sol | 固定 40B の wire と shell、KAPI の手順 ([ABI1]〜[ABI3]) | 未 |
-| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 未 |
+| M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | 未 (大きさの条件は M3c で満たした — kdebug.bin 109,060B・hwdev.mod 131,488B。残りは配備・KERNEL_PAIRED_MODULES・generations-manifest。§3-1 で M4 より先へ) |
+| 旧 S7 (shell と KAPI 共有ヘッダ) | 中 / sol | 固定 40B の wire と shell、KAPI の手順 ([ABI1]〜[ABI3]) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
+| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 未 (前提の `np21w_ini_live.py` の 31kHz の鍵が無い、hwdev.mod の配備 = M5 も前提) |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
 
 - 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は `TASK_GEFORCE6200` §5・`TASK_REALHW_RECOVER` §2 のまま。
+### 3-1. 順序の見直し (2026-10-23、PM 提案・ユーザー承認)
+
+実装の状態を確かめ直して、上の表の後半の順序を次に替える (表の各段の合格条件は変えない)。
+
+1. **M5 を M4 より先に**: 大きさの条件はもう満たした。配備定義・`KERNEL_PAIRED_MODULES`・generations-manifest・KDEBUG=0 の門の試験だけの軽い段。起動のたびの `[hwdev] rejected: NOT_FOUND` もここで消える。
+2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。
+3. **M4a と M4b**: 対象は誰も持っていない 0:13.0 だけなので、まとめて 1 段にできるかを依頼の前に PM が決める。送り項目の「S0 の最小 GF 復帰」の扱いはここで決める。
+4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す ([GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) §8 の S7 行と [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) §6 の書換えが要る)。M5 と同じ段にできるかは設計の後に決める。
+5. **T4b**: NP21/W では GPU を確かめられないので、PAUSED の門と `recover now 0` の経路に絞る。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
+6. **T5 と S8**: T5 は A1・A2 の測定と併合してよい ([ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md))。書込みなしの部分 (status・snapshot・version.chip の実 ROM 確認) は立会いなしでシリアルで先に回し、0FACh の初めての書込みと目視は S8 と同じ立会いの回にまとめる。
+
+並びの要約: M5 (+旧 S7 の可否) ∥ BARLEN 設計 → M4 → T4b → T5 の無書込み → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7。
+
 - HW-BASIC と DMA 対応はこの段に混ぜない。DMA は装置ごとに [HW3] の根拠・停止の証明・IRQ と RAM の寿命を別に設計してこの核へ足す ([DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md))。
 
 - 段の分け方 (PM 決定 2026-10-22、ユーザーの問い「M3・M4 が重いならより粒度を細かくする必要はあるか」に答えて): 設計の M3 を 3 段、M4 を 2 段に分けた (1 段 = 単独で受け入れられる契約・半日〜1 日、ROLES §0)。M3a を先に置き、動作を変えずに境目 (関数表・照合) の誤りを切替の前に見つける。設計 ([HWDEV_DESIGN](../../decisions/realhw/HWDEV_DESIGN.md) §8) の試験と変異の行は M3 → M3a〜c、M4 → M4a〜b に振り分けて依頼に書く。核の関数の slot は final の表で数えると 25 (依頼文の 24 ではない) — M1 の照合で確かめる。
