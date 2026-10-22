@@ -2,7 +2,7 @@
 
 > 状態: **実装中 (2026-10-22)** — M3c 実装済み、独立レビュー待ち (M4 以降は未着手)
 
-kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) と [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) のまま変えず、変えるのは置き場・境界・寿命だけ。
+kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
 ## 0. ユーザー決定 (2026-10-22)
 
@@ -45,14 +45,14 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 未 |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
 
-- 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) §5・[TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §2 のまま。
+- 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は `TASK_GEFORCE6200` §5・`TASK_REALHW_RECOVER` §2 のまま。
 - HW-BASIC と DMA 対応はこの段に混ぜない。DMA は装置ごとに [HW3] の根拠・停止の証明・IRQ と RAM の寿命を別に設計してこの核へ足す ([DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md))。
 
 - 段の分け方 (PM 決定 2026-10-22、ユーザーの問い「M3・M4 が重いならより粒度を細かくする必要はあるか」に答えて): 設計の M3 を 3 段、M4 を 2 段に分けた (1 段 = 単独で受け入れられる契約・半日〜1 日、ROLES §0)。M3a を先に置き、動作を変えずに境目 (関数表・照合) の誤りを切替の前に見つける。設計 ([HWDEV_DESIGN](../../decisions/realhw/HWDEV_DESIGN.md) §8) の試験と変異の行は M3 → M3a〜c、M4 → M4a〜b に振り分けて依頼に書く。核の関数の slot は final の表で数えると 25 (依頼文の 24 ではない) — M1 の照合で確かめる。
 
 ## 4. 未決
 
-- 残っていたユーザー判断 (PG リセット) は 2026-10-22 に「付けない」で決着 ([TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0)。PG リセットの未決は無い。
+- 残っていたユーザー判断 (PG リセット) は 2026-10-22 に「付けない」で決着 (`TASK_REALHW_RECOVER` §0)。PG リセットの未決は無い。
 
 ## 5. 設計の所在
 

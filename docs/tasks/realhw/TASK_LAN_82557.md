@@ -11,7 +11,7 @@
 > **通信の安全の方針 (ユーザー決定 2026-10-15)**: PC-9821 とホスト (ノート) のあいだの LAN は**平文でよい** — 家庭内のローカルで、狙う者はいない。OS32 の側に暗号・認証は入れない。**ホストから外へ出ていく通信の暗号化はホストの側が担う** (ダウンロード等を再開するとき)。相手の MAC の固定 (`SFS_LAN_PEER` / `lanfs_host.py --peer`) は取り違えを防ぐための設定で、防御ではない。キーによるペアリング (ホストがキーを出す → OS32 で入力 → 0x88B5 で MAC を交換して保存) は使い勝手の改善として後の段に残す。
 
 正典: [`PLAN.md`](PLAN.md) §5 (82557 を狙う理由)・§6 (PCI の土台)、`docs/archive/v3/PLAN.md` §1 (順序) ・§3 (ドライバの動的読み込み)、
-リンク層と Host Services は [`../network/LINK_PLAN.md`](../network/LINK_PLAN.md) / [`../network/HOST_SERVICES_PLAN.md`](../network/HOST_SERVICES_PLAN.md)。
+リンク層と Host Services は `LINK_PLAN` / `HOST_SERVICES_PLAN`。
 資料: `docs/hw/undocumented/io_pci.md` (PC-98 の PCI)、**`docs/hw/intel/8255x_open_source_sdm.pdf`** (Intel 8255x Open Source Software Developer Manual、
 341 ページ、2026-09-22 に Intel の公開 URL から取得。`docs/hw/` は著作権物のミラーで gitignore)。テキスト版 `8255x_open_source_sdm.txt` (9,133 行、`pdftotext -layout`) も同じ場所 — grep で引く。要点の所在: SCB = §6.3.2 (34 ページ)、EEPROM = §5/§6.3.4、Configure = 62 ページ、RFD = 100 ページ、PCI Interrupt Line = §4.1.15。
 
@@ -47,7 +47,7 @@
 | **L-D2** | **Ubuntu 向けのホスト側バックエンド**: `host_agent.py` のクリップボード (`clip.exe`/PowerShell) と印刷 (win32print) は Windows 前提。Linux では `xclip`/`wl-copy` と `lp` (CUPS) に差し替える (無ければ 503、既存の方針どおり) | ホストのみ | Ubuntu 機で `hclip` / `lpr` |
 | **L-E** | **Host Services の疎通**: 実機で `link_selftest` (L0〜L3 相当) → クリップボード / 印刷 / `wget` / TIME | — | 実機 |
 
-L-A と L-D は独立 (並行できる)。**L-B の前に結線の土台** ([`../v3/TASK_HAL_WIRING.md`](../v3/TASK_HAL_WIRING.md): 共有 IRQ の動的登録、`dma_alloc`、PCI の結線表) を入れる。L-B は L-A の上、L-C は L-B と同時、L-E は全部の上。
+L-A と L-D は独立 (並行できる)。**L-B の前に結線の土台** (`TASK_HAL_WIRING`: 共有 IRQ の動的登録、`dma_alloc`、PCI の結線表) を入れる。L-B は L-A の上、L-C は L-B と同時、L-E は全部の上。
 
 ### LB-2c: DP83840A PCR 初期化 (2026-10-15)
 

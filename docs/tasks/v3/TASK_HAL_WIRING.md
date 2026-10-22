@@ -1,5 +1,7 @@
 # TASK_HAL_WIRING — 結線の土台 (割り込みの動的登録 / 8237 DMA の共通部 / DMA プール / PCI の結線表 / µs 時計)
 
+> 後続: [TASK_LAN_82557](../realhw/TASK_LAN_82557.md)・[TASK_PCM_CS4231](TASK_PCM_CS4231.md)
+
 > 状態: **受入完了・実機確認待ち (2026-09-23)** — NP21/W 受入、Codex 実装レビュー Approve、v2.1 に同梱。実機は W0 と W4 が合格 (W4: `timetest` TIME PASS・`clamped 0 of 10000`、archive の HANDOVER_2026-09-22 §次の実機の回)。残: W7 (キャッシュ整合、実機)。(2026-09-29 の棚卸しで更新)
 >
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-23) / それまでの状態: **実装済み・NP21/W 受入済み (2026-09-23、§3-1)。Codex の実装レビュー往復 1 = Approve (非 blocker 5 件、うち 2 件はコード修正、3 件は本文に反映)。**実機 (Ra266、2026-09-23): W0 合格 (120 秒で uptime +120 秒、修正前は +148 秒相当)、82557 は Interrupt Line 3 / PIN A**。W4 (2.4576MHz の `ktime_clamp_count`、`time_test`) と W7 は次の実機回 — FD に `time_test` を **`/bin/timetest.bin`** として足した (`build/image.mk`。FAT12 は 8.3 のみ = `time_test` は NOTFOUND になる)、kselftest の行は画面で読む**。

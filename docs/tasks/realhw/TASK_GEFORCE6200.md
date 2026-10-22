@@ -16,13 +16,13 @@
 
 ### ユーザー決定 (2026-10-21)
 
-- **N1・U1〜U3** (E81E の条件付き許可、固まったら当面は手で戻し書込みの段は立会い、段ごとの承認の順、4a はモニタ無し): 原文の意味は §5 と [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0。
+- **N1・U1〜U3** (E81E の条件付き許可、固まったら当面は手で戻し書込みの段は立会い、段ごとの承認の順、4a はモニタ無し): 原文の意味は §5 と `TASK_REALHW_RECOVER` §0。
 - **書込みは段ごとに結果を見て承認する** (U2。上の 2026-10-20 の「段ごとの承認」を 4a の A1 → A2 → main 0〜3 → A4 に具体化)。
 - **VBIOS の x86 コードは逆アセンブルしない — 最終手段で、要るときはユーザーが判断する**。データの表を公開実装と照らして読むのは可 (§4 段 2b)。
 - **nouveau はクリーンルーム開発を謳うので仕様として信じる**、**リバースエンジニアリングが明示的に禁じられたものはしない** — どちらも上の 2026-10-20 の決定を 2026-10-21 に改めて確認したもの。
 - **映像は抜いちゃダメボード経由で 98 の切替回路 (0FACh) に入る** (§4「映像の経路」)。戻す処理の「98 の画面に戻す」は 0FACh を 98 表示へ戻すことを含む。
-- **起動 FD に kdebug を載せない**。KPEEK・gfinit・recover は HDD 起動 (KDEBUG=1) の中だけで使う。 理由: 戻す処理が kdebug.bin に入って 64.6KB → 103KB になり、起動 FD (2HD) の空きが下限 64KB を割った (71KB → 33KB)。kdebug は開発用で FD (レスキュー兼インストーラ) に不要、FD からインストールした実機は hsync boot で入る。CD には残す。詳細は [08_build.md](../../08_build.md) の「起動 FD と MINIMAL」と [TASK_DBGREF](../v3/TASK_DBGREF.md) §3-9。
-- 戻す処理の起点の依頼 (「実機テストの時に特定の手順でリセットや画面復帰など特定のステータスに戻す処理の設計案を追加で作って…」) と、PG リセットの扱いの未決は [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) §0。
+- **起動 FD に kdebug を載せない**。KPEEK・gfinit・recover は HDD 起動 (KDEBUG=1) の中だけで使う。 理由: 戻す処理が kdebug.bin に入って 64.6KB → 103KB になり、起動 FD (2HD) の空きが下限 64KB を割った (71KB → 33KB)。kdebug は開発用で FD (レスキュー兼インストーラ) に不要、FD からインストールした実機は hsync boot で入る。CD には残す。詳細は [08_build.md](../../08_build.md) の「起動 FD と MINIMAL」と `TASK_DBGREF` §3-9。
+- 戻す処理の起点の依頼 (「実機テストの時に特定の手順でリセットや画面復帰など特定のステータスに戻す処理の設計案を追加で作って…」) と、PG リセットの扱いの未決は `TASK_REALHW_RECOVER` §0。
 
 ## 1. 対象
 
@@ -32,7 +32,7 @@ PCI 0:13.0 `10de:0221` (NVIDIA NV44A、GeForce 6200)、class 03.00、rev a1、su
 
 `~/os32-tmp/refs/geforce6200/INDEX.md` (envytools f102b82・xf86-video-nv 8234bce・Haiku af754c7c の nvidia ドライバ・nouveau c03c1a1 の devinit/bios/fb/clk/dispnv04、版とライセンス、見る所)。リポジトリには入れない。
 
-VBIOS について分かっていること (表の地図・init script 9 本・27 種の命令・書込みの分類・メモリと PLL・出力) のまとめ: [GEFORCE6200_VBIOS.md](GEFORCE6200_VBIOS.md)。
+VBIOS について分かっていること (表の地図・init script 9 本・27 種の命令・書込みの分類・メモリと PLL・出力) のまとめ: `GEFORCE6200_VBIOS`。
 
 ## 3. 手順の計画 (確定 2026-10-20、Fable 起草・Opus 2 往復・PM が最終修正)
 
@@ -49,7 +49,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 | 4b | 承認地点 B: **PBUS 0x1854←0 を先に**、映像出力の有効化 (PBUS 0x1850←1)、合否に「A0000h のテキストが表示されたまま」 | 書く | 承認 |
 | 4c | 承認地点 C: 画面モード (PCRTC/PRAMDAC、整数 PLL)、98 側との共存 (別コネクタ) | 書く | 承認・**モニタ接続はユーザー** |
 
-道具: [TASK_KPEEK](../v3/TASK_KPEEK.md) の peek (T7 の後の最初の実装) に MMIO の許可リストを足して使う。結果はシリアルで持ち帰る。PM 決定: Haiku のライセンスは調べて記録、envytools の nvbios はホストで自前の ROM に当てて使ってよい (MIT)、BAR の大きさは段 4a で測る、cfg 54h は段 4 で扱う、固まったときの電源断は 2026-10-12 の決定 (立会い無しの試験) の範囲。
+道具: `TASK_KPEEK` の peek (T7 の後の最初の実装) に MMIO の許可リストを足して使う。結果はシリアルで持ち帰る。PM 決定: Haiku のライセンスは調べて記録、envytools の nvbios はホストで自前の ROM に当てて使ってよい (MIT)、BAR の大きさは段 4a で測る、cfg 54h は段 4 で扱う、固まったときの電源断は 2026-10-12 の決定 (立会い無しの試験) の範囲。
 
 ## 4. 観測の記録
 
@@ -72,15 +72,15 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 
 ### 映像の経路 (ユーザー 2026-10-21)
 
-- **GeForce 6200 の映像は「抜いちゃダメボード」経由で 98 の切替回路につながっている** (1 本のモニタ)。切替回路は 98 表示・内蔵 (Trident)・PCI ボードの RGB-IN の 3 つから 1 つを選び、選ぶのは UNDOCUMENTED の 0FACh の bit0 (RGB IN のスルー / 内蔵) と bit1 (内蔵 / 98) [推] — [TASK_TRIDENT_DRIVER §3-7](TASK_TRIDENT_DRIVER.md)。Ra266 も 0FACh と同じ仕組みとして扱う (2026-10-17 のユーザー決定)。
+- **GeForce 6200 の映像は「抜いちゃダメボード」経由で 98 の切替回路につながっている** (1 本のモニタ)。切替回路は 98 表示・内蔵 (Trident)・PCI ボードの RGB-IN の 3 つから 1 つを選び、選ぶのは UNDOCUMENTED の 0FACh の bit0 (RGB IN のスルー / 内蔵) と bit1 (内蔵 / 98) [推] — `TASK_TRIDENT_DRIVER` §3-7。Ra266 も 0FACh と同じ仕組みとして扱う (2026-10-17 のユーザー決定)。
 - 帰結: 4b・4c で GeForce の映像を見るには 0FACh で RGB-IN を選ぶ。**戻す処理 (realhw_recover) の「98 の画面に戻す」は 0FACh で 98 表示を選び直すことを含む** — recover r2 の「0FACh を GeForce に使わない」は取り消した (§5 の確定設計)。入力の選び違いは黒画面として現れる (§3-7)。モニタの決定 (U3) はこの経路で決まり、4b の前に 0FACh の値と画面の切り替えを確かめる。
 
 ## 5. 詳細設計 (確定 2026-10-21、astra 起草・Opus 3 往復・PM が最終修正)
 
-全文: 段 4a [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md)。
+全文: 段 4a [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: `TASK_REALHW_RECOVER`。
 
 - **ユーザー決定**: N1 main3 の E81E (SR01 bit5 の解除) だけを cfg 50h/54h=0 の保持を条件に許す。U1 固まったら当面ユーザーが手で戻し、書込みの段は立会い。U2 A1 (BAR の測定) → A2 (準備) → main 0〜3 の script ごと → A4 (VRAM の確認) を、結果を見て段ごとに承認。U3 4a はモニタ無し、モニタは 4b の前に決める。
-- **S7 以降の段の並べ替え (2026-10-22)**: 装置ごとの部分を別の部品に分ける段 (M1〜M5) を先に入れた。順序は [TASK_HWDEV.md](TASK_HWDEV.md) §3 が正。
+- **S7 以降の段の並べ替え (2026-10-22)**: 装置ごとの部分を別の部品に分ける段 (M1〜M5) を先に入れた。順序は `TASK_HWDEV` §3 が正。
 - **4a の実装段**: S1 fixture (27 種 193 命令) → S2 decode → S3 exec → S4 PLL → S5 bus・窓の共有 → S6 kdebug 統合 → S7 shell と KAPI 共有ヘッダ → S8 実機 A1/A2 → S9 以降 main ごと、最後に A4。各 0.5〜1 日。
 - **戻す処理の段**: T1 状態機械 → T2 窓・profile・98 復帰 → T3 shell/host/deadman → T4 NP21/W → T5 実機の無書込み (+ 0FACh の初めての書込みを明示承認の 1 回) → T6 承認済み書込み → T7 復旧演習。4a の S5〜S6 は recover の descriptor とログの契約を使うので、**T1〜T3 を先に着地させる**。
 - **98 の画面に戻す** (② の先頭): 0FACh を読み、bit1..0 が 00b なら書かず、違えば 00h を書いて読み戻す。経路の最終判定はユーザーの目視。4a は 0FACh を読み書きしない。

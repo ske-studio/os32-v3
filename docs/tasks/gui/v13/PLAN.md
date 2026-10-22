@@ -39,8 +39,8 @@ GUI 側の回帰は手元の `make check` (rustc あり) と実機が正。CI �
 旧 T5a 未受入・T5b/T6a の次ゲートという記述は、決裁 B と受入完了により失効。
 現在の段ごとの判定は §6 を参照する。
 
-親計画: [ROADMAP](../../../ROADMAP.md)。現行契約: [v1.2 CONTRACTS](../v12/CONTRACTS.md)。
-設定レジストリの仕様案は [settings DESIGN](../../settings/DESIGN.md) を正典とし、ここには進行条件だけを置く。
+親計画: [ROADMAP](../../../ROADMAP.md)。現行契約: v1.2 の `v12/CONTRACTS`。
+設定レジストリの仕様案は `settings/DESIGN` を正典とし、ここには進行条件だけを置く。
 
 ## 1. 範囲と進め方
 

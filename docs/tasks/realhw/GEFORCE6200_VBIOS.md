@@ -1,5 +1,7 @@
 # GeForce 6200 (NV44A) の VBIOS — 分かっていること
 
+> 上位: [TASK_GEFORCE6200](TASK_GEFORCE6200.md)
+
 > 状態: **現行 (2026-10-21)** — 実機 Ra266 の GeForce 6200 の VBIOS について、段 0〜3 の観測と 4a S1 (fixture・ROM 照合) までで分かったことのまとめ。段 4a 以降で分かったら書き足す。
 
 この文書は「VBIOS に何が書いてあり、それが何を意味するか」の 1 枚のまとめです。段の計画・承認・実装の進み具合は
@@ -301,7 +303,7 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 | 項目 | 内容 | 確度 |
 |---|---|---|
 | 選ぶ物 | 98 表示・内蔵 (Trident)・PCI ボードの RGB-IN の 3 つから 1 つ | 確 (ユーザーの説明) |
-| 選び方 | 0FACh の bit0 (RGB-IN のスルー / 内蔵) と bit1 (内蔵 / 98) | 推 (UNDOCUMENTED の記述、[TASK_TRIDENT_DRIVER §3-7](TASK_TRIDENT_DRIVER.md)) |
+| 選び方 | 0FACh の bit0 (RGB-IN のスルー / 内蔵) と bit1 (内蔵 / 98) | 推 (UNDOCUMENTED の記述、`TASK_TRIDENT_DRIVER` §3-7) |
 | 98 の画面に戻す | 0FACh を読み、bit1..0 が 00b なら書かない、違えば 00h を書いて読み戻す。最終判定はユーザーの目視 | 設計 (recover の確定設計) |
 | 4a での扱い | 0FACh を読みも書きもしない | 設計 |
 | 選び違い | 黒画面として見える | 資 (Trident 票 §3-7) |

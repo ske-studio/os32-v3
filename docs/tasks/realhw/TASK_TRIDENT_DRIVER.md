@@ -7,15 +7,15 @@
 > それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
 > 対象: 実機 PC-9821Ra266 の内蔵アクセラレータ (PCI 0:8.0 `1023:9660`)。**NP21/W では動かせない** (§3-3)。
-> 関係: [PLAN.md](PLAN.md) §1・§7、[TASK_PEGC480_REALHW.md](TASK_PEGC480_REALHW.md)、[TASK_LAN_82557.md](TASK_LAN_82557.md) §6 (PCI 列挙の実測)、
-> [../settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md)、[../../decisions/MEMMAP_V3.md](../../decisions/MEMMAP_V3.md)、
-> [../v3/TASK_HAL_WIRING.md](../v3/TASK_HAL_WIRING.md) §1-4 (PCI の結線表)、[../gui/DESIGN.md](../gui/DESIGN.md) §2・§3・§6、[05_drivers.md §5-5](../../05_drivers.md)。
+> 関係: [PLAN.md](PLAN.md) §1・§7、`TASK_PEGC480_REALHW`、`TASK_LAN_82557` §6 (PCI 列挙の実測)、
+> `DEVICE_RESERVATION`、[../../decisions/MEMMAP_V3.md](../../decisions/MEMMAP_V3.md)、
+> `TASK_HAL_WIRING` §1-4 (PCI の結線表)、`gui/DESIGN` §2・§3・§6、[05_drivers.md §5-5](../../05_drivers.md)。
 
 ## 0. ユーザー決定 (2026-09-29) とこの票の範囲
 
 > 「Cirrus はエミュレータ互換のためだけ。実機 (Ra266) は Trident。Trident のドライバが必要なら Trident のドライバを作成する」
 
-- これで [PLAN.md](PLAN.md) §7 の「Trident は保留」と [TASK_PEGC480_REALHW.md](TASK_PEGC480_REALHW.md) §6 の「Trident のドライバは作らない」は
+- これで [PLAN.md](PLAN.md) §7 の「Trident は保留」と `TASK_PEGC480_REALHW` §6 の「Trident のドライバは作らない」は
   **上書きされる** (両票には本票への参照を足した)。
 - **ユーザー決定 (2026-10-17)**: 「X-MATE (Cirrus) 以降、映像の切替の仕様変更は無いので同じ仕組みのはず」— **Ra266 の映像の切替は UNDOCUMENTED の 0FACh (§2-2) と同じ**として扱う。
   これで 0FACh は段 1 の許可リストの「Ra266 で届く根拠」を満たし (読み取り: bit7〜2 は常に 111111b)、段 2-X で固定する切替・復帰の操作の候補になる (内蔵アクセラレータ = bit1=1・bit0=0、98 へ戻す = bit1=0・bit0=0)。
@@ -44,7 +44,7 @@
 
 - **ユーザー決定**: 「Geforce が終わった後の Trident で実験しましょう」。GeForce 6200 の 4a が実機で通った後、この Trident の調査を、実機の上で PCI config・I/O・MMIO を読み書きしながら次の操作を決める小型スクリプトの試金石にする。
 - 狙い: 「仮説 → C で実装 → 配備 → 実機で確かめる」を「仮説 → スクリプトで操作 → 実機で観測 → 手順を確定 → C のドライバへ移す」に変え、観測の手順を試験の資産として残す (ROADMAP の「PCI・外部デバイスを実装する型」の材料)。
-- PM の見立て (2026-10-21): インタプリタはユーザーランドに置き、特権の操作は kdebug の検証経路だけを通す。**書き込みは戻す処理 ([TASK_REALHW_RECOVER](TASK_REALHW_RECOVER.md)) の許可表・保存・復帰・時間の上限・中止を必ず通す** — ただし戻す処理は静的な実行計画の全経路検査を前提にしているので、実行中に行き先が決まる書き込みには「1 回ごとに許可表で照合する対話の形」の設計が要る。4a の検査付き実行器 (kdebug/gfinit_decode・gfinit_exec) を汎用の調査用命令列に再利用できるかを先に決める。PC-98 の I/O ポートは部分デコードの衝突 (FDD・GP-IB) を許可リストで縛る。
+- PM の見立て (2026-10-21): インタプリタはユーザーランドに置き、特権の操作は kdebug の検証経路だけを通す。**書き込みは戻す処理 (`TASK_REALHW_RECOVER`) の許可表・保存・復帰・時間の上限・中止を必ず通す** — ただし戻す処理は静的な実行計画の全経路検査を前提にしているので、実行中に行き先が決まる書き込みには「1 回ごとに許可表で照合する対話の形」の設計が要る。4a の検査付き実行器 (kdebug/gfinit_decode・gfinit_exec) を汎用の調査用命令列に再利用できるかを先に決める。PC-98 の I/O ポートは部分デコードの衝突 (FDD・GP-IB) を許可リストで縛る。
 - **題材 (ユーザー案 2026-10-21)**: XFree86 と StratoHAL の Trident の実装例の手順 (初期化・映像の切替・戻し — XFree86 の分は §3 に行番号つき) をインタプリタの命令列に写し、実機で 1 手順ずつ流してレジスタの変化を観測して確かめる。PC-98 の VGA I/O ポートの部分デコードの衝突と、0FACh の初回の書込みは許可リストで縛ってから流す。StratoHAL の Trident は [src/98disp_trident.c](https://github.com/awemorris/StratoHAL/blob/main/src/98disp_trident.c) で、**ライセンスは zlib** (`SPDX-License-Identifier: Zlib`、Copyright 2025-2026 Awe Morris・1996-2024 Keiichi Tabata — 2026-10-21 に冒頭を確認) — [HW3] の参照してよい実装に当たる (出典を偽らない・改変は明記)。冒頭の要旨 (読んだのは要約だけ、行番号は着手のときに取る): PCI で 1023h を探してチップを識別、640x480・800x600、**レジスタはまず 3C0h 番台の PIO を試し、応答が無ければ BAR1 の MMIO — コメントに「Ra 系の機種では PIO が機能しない」** (§3 の「I/O か MMIO か決まらない」への Ra 系での答えの候補)、0FACh で GDC と Trident の映像を切り替え終了時に戻す、レジスタを保存して戻す、GE の経路は実装済みで既定は無効。
 - 段: (1) 読み取りの命令 (pciread・ioread・mmioread、時間を区切った待ちと記録) — KPEEK の延長、(2) 書き込みとスクリプト — 上の対話の形の設計の後。着手は GeForce の 4a の実機の段 (S8) が通った後で、設計の往復 (スキル os32-design-rally) から。
 
@@ -62,8 +62,8 @@
 
 PEGC は実機 ROM の採取・比較と修正を終え、2026-09-30 に表示・CUI 復帰を目視確認済み。
 SYNC 値の不一致は否定され、順序と不足操作のどれが効いたかは未確定。
-根拠は [TASK_PEGC480 の結論](TASK_PEGC480_REALHW.md#原因の結論-事実として言えること) と
-[実機目視](TASK_PEGC480_REALHW.md#実機での目視-p1-の記録-2026-09-30ユーザー672f849)。
+根拠は `TASK_PEGC480_REALHW` の「原因の結論」 と
+同票の「実機での目視」。
 
 ### 1-2. Trident で解決するもの・しないもの
 

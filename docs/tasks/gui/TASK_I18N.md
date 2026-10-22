@@ -1,8 +1,8 @@
 # TASK_I18N — UI メッセージの多言語対応 (SQLite のメッセージ表)
 
-> 状態: **計画 (2026-09-30)** — ユーザー発案 (2026-09-30「v4 か v3 の後半に多言語対応。テキスト表示の UI メッセージを SQLite で管理し、メッセージ ID ごとに翻訳を持つ」)。§2 の 5 点はユーザーと決めた。**設計票の作成は v3 後半** (P1 の T4 = SQLite のモジュール化と、[TASK_CONTROL_PANEL](TASK_CONTROL_PANEL.md) の後)。日本語・英語以外の文字体系の表示は OpenType 層 (MEMMAP_V3 の T7b) の後 = v3 の終わりか v4。
+> 状態: **計画 (2026-09-30)** — ユーザー発案 (2026-09-30「v4 か v3 の後半に多言語対応。テキスト表示の UI メッセージを SQLite で管理し、メッセージ ID ごとに翻訳を持つ」)。§2 の 5 点はユーザーと決めた。**設計票の作成は v3 後半** (P1 の T4 = SQLite のモジュール化と、`TASK_CONTROL_PANEL` の後)。日本語・英語以外の文字体系の表示は OpenType 層 (MEMMAP_V3 の T7b) の後 = v3 の終わりか v4。
 >
-> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: `docs/archive/v3/V3_PLAN_DRAFT.md` §3 P8、[settings/DESIGN.md](../settings/DESIGN.md) (TSV → SQLite の生成と「開いて読んで閉じる」作法の手本)、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) D21・D27 (SQLite の常時読み込みと MEMSYS5 の予算)。
+> 発行: PM (Claude Code `claude-opus-5-5`、2026-09-30)。関係: `docs/archive/v3/V3_PLAN_DRAFT.md` §3 P8、`settings/DESIGN` (TSV → SQLite の生成と「開いて読んで閉じる」作法の手本)、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) D21・D27 (SQLite の常時読み込みと MEMSYS5 の予算)。
 
 ## 1. 目的と範囲
 
@@ -30,7 +30,7 @@
 | ホストの生成器 | Python の PO 読み取り (`polib`、または GNU gettext の `msgfmt` で `.mo` → Python 標準の `gettext` モジュールで読む) → SQLite (`mk_settings_db.py` と同じ流儀で `messages.db` を作る) | 今は `polib` も `msgfmt` も入っていない — 依存の追加は設計票で決める (CI の `build.yml` にも) |
 | 番号付き引数の書式 | **POSIX の `%n$` 書式** (`"%2$s を %1$s にコピー"`) | gettext の `c-format` 検査が引数の数・型の食い違いを見つける。**注意: 今の newlib は nano 構成 (`--enable-newlib-nano-formatted-io`、[08_build.md](../../08_build.md)) で、nano の printf は `%n$` を扱わない** — 選択肢は (a) 番号付きを扱う小さな前処理 (引数を並べ替えて通常の printf へ渡す)、(b) newlib の位置引数の構成 (`--enable-newlib-io-pos-args`、nano と両立しない — 容量の実測が要る)。どちらにしても書式そのものは POSIX のまま。Rust 側は `format!` の番号付き引数 (`{0}`) に写すか、同じ前処理を使う |
 | 複数形・数の書き方 | gettext の `Plural-Forms` (英語・日本語では要るのは英語だけ) | 最初は英語の 2 形だけ。言語を増やすときに CLDR の規則へ |
-| 言語の指定 | `settings.db` の `system` 区分に 1 キー (`locale/lang` など、値は BCP 47 の言語タグ `en` / `ja`) | [TASK_CONTROL_PANEL](TASK_CONTROL_PANEL.md) の項目に入れる |
+| 言語の指定 | `settings.db` の `system` 区分に 1 キー (`locale/lang` など、値は BCP 47 の言語タグ `en` / `ja`) | `TASK_CONTROL_PANEL` の項目に入れる |
 
 ## 4. 設計で決めること (設計票で答える)
 
@@ -41,12 +41,12 @@
 | Q3 | 起動時の読み込みの API (`libos32cfg` に足すか、新しい小さなライブラリか) と、読み込み失敗時の扱い (英語のまま続ける、1 回だけ警告) |
 | Q4 | `%n$` の実行時の扱い (§3 の (a) / (b)) と、訳文の引数が原文と合わないときの扱い (生成時に拒否) |
 | Q5 | 表示幅: 訳文が長くなってボタン・窓に収まらないとき (ウィジェット側の切り詰めは UTF-8 境界、日本語は 2 桁) |
-| Q6 | 言語の切り替えの反映: 再起動か、アプリの読み直しか ([TASK_CONTROL_PANEL](TASK_CONTROL_PANEL.md) Q2 の変更通知と同じ口) |
+| Q6 | 言語の切り替えの反映: 再起動か、アプリの読み直しか (`TASK_CONTROL_PANEL` Q2 の変更通知と同じ口) |
 | Q7 | 検査 (`make check`): 名前の文字種・長さ、区分ごとの重複、未使用の名前、未訳 (言語ごとの件数を出すだけか失敗にするか)、引数の食い違い |
 
 ## 5. 依存と順序
 
-- **前**: P1 の T4 (SQLite のモジュール化、`db_*` の経路が変わる)、[TASK_CONTROL_PANEL](TASK_CONTROL_PANEL.md) (言語を選ぶ画面)。
+- **前**: P1 の T4 (SQLite のモジュール化、`db_*` の経路が変わる)、`TASK_CONTROL_PANEL` (言語を選ぶ画面)。
 - **最初の版**: 英語 + 日本語、gshell と libos32gui の共通語 (`common`) から。コマンドは後から少しずつ。
 - **後**: 他の文字体系は OpenType 層 (T7b) の後。
 

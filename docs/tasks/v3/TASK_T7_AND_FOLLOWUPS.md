@@ -7,7 +7,7 @@
 > **ユーザー決定 (2026-10-17)**: 「T4 から T7 までは実機でテストを行わず、エミュレーター上だけで確認を取れれば大丈夫」。真意は「ソフトウェアのコード変更はエミュレータでの確認で十分。ハードウェアに触るカーネルの変更は実機のテストをまとめて行う」— 各段の合否は NP21/W (64MB) で決める。本文で実機の観測を求めている項目 (T7a-2c の 9821 実機の再描画と H-5 の CG 窓、T7a-2e の Ra266 `-g`/boot2/DOS、T7 §3-2 の Ra266 の計測) は、ハードウェアに触る変更がある程度たまった所でまとめて行う実機の回 (台帳 T4T7-RH) へ送り、段の受入を止めない。本文の「実機未確認を NP21/W だけで閉じない」系の記述は、この行が上書きする。
 > **レビューの経過 (PM、2026-10-16)**: astra が起草 (r2・r3) → Opus 5.5 が独立レビュー 2 往復 (r1「直してから」、r2「確定してよい (未決の争点はユーザーへ)」)。往復の記録は `~/os32-tmp/run/t3design/T7_AND_FOLLOWUPS/` (`opus_r1.md`・`astra_r2_response.md`・`opus_r2.md`)。F5 は return PC 検査を維持、F7 は CPU 命令だけならメーカー資料必須・既存実装任意に決定済み (§7)。本文へ反映済み、実装と未測定ゲートは残る。
 > 設計: Codex。再照合基点 `846dbeb` (2026-10-19、main、作業木差分なし)。旧調査基点 `3c4171a`、元の設計レビュー基点 `59c4285`。D1〜D36・契約・順序は変更しない。file:line はこの再照合基点、相対リンクは正典の `docs/tasks/v3/` 配置を基準とする。
-> 決定本文は [MEMMAP_V3](../../decisions/MEMMAP_V3.md)、柱/範囲/順序は [V3_PLAN](V3_PLAN.md)。前提は [T3](TASK_T3_LAYOUT.md) と [T4〜T6b](TASK_T4_T6_MODULES.md)。後半の既存票を置換せず、接続契約と未起票項目の着手ゲートを定める。
+> 決定本文は [MEMMAP_V3](../../decisions/MEMMAP_V3.md)、柱/範囲/順序は [V3_PLAN](V3_PLAN.md)。前提は `TASK_T3_LAYOUT` と `TASK_T4_T6_MODULES`。後半の既存票を置換せず、接続契約と未起票項目の着手ゲートを定める。
 
 ## 0. 再照合
 
@@ -221,17 +221,17 @@ FD正常起動 (SQLITE_ONLY、FEP stub・予約0) と部品等の実失敗によ
 
 | 柱/項目 | 渡す契約 | 着手時に閉じる設計・受入 |
 |---|---|---|
-| P3 HAL W7/NIC L-C/音 | T5cのowner/IRQ/DMA/import境界。portable側へPC-98 portを漏らさない | [HAL_WIRING](TASK_HAL_WIRING.md) の残と各driver票を突合。1kHz tickは専用票を新設しclock別divisor、wrap、期限換算、ISR負荷、既存PCM/FM/V86/keyboardの影響を測る。測定前に周波数だけ変更しない |
-| P4 resource broker | T1のverified resource、T2 lease、T5cの永久予約とmodule owner分離 | [DEVICE_RESERVATION](../settings/DEVICE_RESERVATION.md) の旧GUI初回予約条件をD33へ改訂。GUI入口でBDF/ID/revision/BAR decode/boot世代を再照合、不一致はenable拒否・予約差替えなし。第二span衝突、GUI=0、probe失敗、再enterを試験 |
+| P3 HAL W7/NIC L-C/音 | T5cのowner/IRQ/DMA/import境界。portable側へPC-98 portを漏らさない | `TASK_HAL_WIRING` の残と各driver票を突合。1kHz tickは専用票を新設しclock別divisor、wrap、期限換算、ISR負荷、既存PCM/FM/V86/keyboardの影響を測る。測定前に周波数だけ変更しない |
+| P4 resource broker | T1のverified resource、T2 lease、T5cの永久予約とmodule owner分離 | `DEVICE_RESERVATION` の旧GUI初回予約条件をD33へ改訂。GUI入口でBDF/ID/revision/BAR decode/boot世代を再照合、不一致はenable拒否・予約差替えなし。第二span衝突、GUI=0、probe失敗、再enterを試験 |
 | P5 82557/PCM/Trident/FD/KBD | DMA物理記述子、module lifetime、gfxのsurface/lease | 各既存票の実機段。Cirrus/Tridentはソフトウェアの確認で足り、追加の実機WAB・64MB組合せ確認は求めない (ユーザー決定2026-10-19、`TASK_T4_T6_MODULES.md:367`)。ドライバ設計はOpus/Codex突合。PCM合成器はまずIRQ整数演算 (D36) |
 | P5 IDE DMA/cache/先読み | 永久device資源、DMA停止証明、VFS I/Oエラーとowner | 新票でPIO実測baseline、DMA mask/境界/descriptor所有、timeout→停止→fallback、dirty/writeback/flush順序を設計。cache所有はkernel、アプリ終了でdirtyを消さない。使い捨てext2で失敗/再起動後e2fsckと内容比較 |
 | P6 実行モデル | T2のSTOP要求/通常回収、trim安全点、T4のengine active | 新票で自動番犬と明示STOPの条件を分離。KAPI中はAS切替なし、長いKAPIの期限/取消点、VFS/SQLite副作用の中断規則、x87をAS毎に保存復元。純loop/長いKAPI/WM再入/SQLite active/PCM/park-resumeを列挙して停止応答を測る。IRQからfreeしない |
 | P7 ABI整理 | T2の形式/KAPI/layout/shlibの4識別とcompile-unit stamp (T2cで基盤吸収済み、現行値は `sdk/kapi.json` の `version` / `generations` を参照) | 未実施の一度限りのスロット整理について、世代正典と整理一覧を1回の変更セットに固定する。未知型のRust生成失敗、旧shell含む混在拒否、旧.oのlink拒否、NHD/HostDrv一組を検査。[ABI1]〜[ABI3] の通常append-onlyとD35の一度限り整理を混同しない |
 | P8 GUI音・入力 | DMA ring/lease、T2通常文脈、gshell owner | 新票でproducer/consumer cursor、underrun/overrun、close/fault時停止、event所有/容量/drop、入力focusとWM再入を定める。microUIマウスキーも対象に含め、既存WMマウスキーと二重配送せずfocus/移動/クリック/リピートを試験。8bppを維持 |
-| P9 Video HAL/SDL/移植 | SURFACE記述子とlease VA分離、能力bit、全画面専有 | 新票でformat/pitch/plane/clip/present/flip/mode-change revoke、SW fallback、私有面(c)の費用を定義。(b)を勝手に(c)へ変えない。PEGC直描きは全画面だけ。SDL shimはcapabilityで断り、固定VRAM番地を公開しない。[PORT_CANDIDATES](PORT_CANDIDATES.md) の低難度移植から着手しZSNESもv3候補として依存API/CPU/メモリ/音性能を個別票で測る。移植完了をこのHAL票だけで認定しない |
+| P9 Video HAL/SDL/移植 | SURFACE記述子とlease VA分離、能力bit、全画面専有 | 新票でformat/pitch/plane/clip/present/flip/mode-change revoke、SW fallback、私有面(c)の費用を定義。(b)を勝手に(c)へ変えない。PEGC直描きは全画面だけ。SDL shimはcapabilityで断り、固定VRAM番地を公開しない。`PORT_CANDIDATES` の低難度移植から着手しZSNESもv3候補として依存API/CPU/メモリ/音性能を個別票で測る。移植完了をこのHAL票だけで認定しない |
 | U21 共有グリフ最適化 | T7b私有版のcold/warm/実peak、gshell所有・RO leaseのT2契約 | 私有80KiB×owner数との実節減を測ってから別票。補充GUI opの再入、cache evictionと借用寿命、世代/revoke、gshell終了・app faultを設計。測定で価値が出る前に共有化しない |
-| P10 辞書meta/F3b | T4の単一heap予約と暫定重複禁止、T5a RESIDENT group | [TASK_DICT_META](../fep/TASK_DICT_META.md)でdict_id、S/M/L、学習別file、再実行冪等、途中失敗復旧。F3b導入後に暫定禁止を置換し、parked/親子/別名の競合試験を再利用 |
-| control panel/i18n/GUI apps | 設定保存と実行中state適用を分離、FEP再起動要求、font API | [CONTROL_PANEL](../gui/TASK_CONTROL_PANEL.md)→[I18N](../gui/TASK_I18N.md)。設定保存失敗で表示を成功にしない。画像/音楽アプリ等は個別票と終了owner試験を起こす |
+| P10 辞書meta/F3b | T4の単一heap予約と暫定重複禁止、T5a RESIDENT group | `TASK_DICT_META`でdict_id、S/M/L、学習別file、再実行冪等、途中失敗復旧。F3b導入後に暫定禁止を置換し、parked/親子/別名の競合試験を再利用 |
+| control panel/i18n/GUI apps | 設定保存と実行中state適用を分離、FEP再起動要求、font API | `TASK_CONTROL_PANEL`→`TASK_I18N`。設定保存失敗で表示を成功にしない。画像/音楽アプリ等は個別票と終了owner試験を起こす |
 | network CD/HostDrv | 82557 L-B〜Eに加えL-F、既存Host Service、通常I/O期限 | LANFS/L-FのNIC/session結線・実機hsyncは受入済み (`docs/tasks/realhw/TASK_LAN_82557.md:3`)。`TASK_LAN_82557.md:8` の決定どおりL-CはL-Fに必要な分、lpr/wgetは後回し。実機で済んだのはL-Fのhsyncだけで、残りの段 (L-C/L-E・cdinstのLAN経由) では接続断・短読・再試行冪等・cdinst契約・実機/NP21分離を測る。LAN /hostも製品font sourceにはしない。host virtual memory/EMSは混入しない |
 
 **T7 の後のリファクタリング (ユーザー決定 2026-10-20: T7 を予定どおり実装した後に切り出す)**: 字形ラスタの整数化。輪郭の受取りを ttf-parser の f32 から自前の i16 点集め (outline.rs) へ、合成字の拡大は F2Dot14 の固定小数点、曲線の分割数は整数平方根、面積・被覆は 26.6 の整数累積 (FreeType ftgrays 型)、`userland/rust/os32_math` (fix16・sqrt・recip) を使う (font crate はユーザーランドの部品なので同じ層の依存。カーネル層からは使わない — POLICY_DEV §2)。終われば x87 guard (a2 の FNSAVE/FRSTOR、service 表 v2 の `font_guard_run`、FPU 無しの NOSYS・`KcgOnly(NoFpu)`) を撤去し、FPU 無しでも新フォントで描ける (台帳 NOFPU-1 の font 部分)。受入は a5 のやり直し (FONTCHK、東雲の EBDT 全字一致、変異)。T7 の実装中は x87 guard のまま進める。

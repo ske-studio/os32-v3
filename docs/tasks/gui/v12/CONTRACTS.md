@@ -1,5 +1,7 @@
 # GUI シェル v1.2 — 追加契約
 
+> 上位: [GUI の API 契約](../API_CONTRACTS.md)・[GUI の設計](../DESIGN.md)
+
 > 発行: PM (2026-09-06)  
 > 親契約: [../API_CONTRACTS.md](../API_CONTRACTS.md)  
 > 親設計: [../DESIGN.md](../DESIGN.md)  

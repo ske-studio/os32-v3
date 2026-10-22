@@ -1,6 +1,6 @@
 # GUI プロトコル レイアウト参考 (PROTO_LAYOUT)
 
-> 上位: [GUI v1.1 の作業票](TASKS.md)
+> 上位: [GUI v1.1 の作業票](TASKS.md)・[GUI の API 契約](API_CONTRACTS.md)
 
 > 発行: K1 (2026-09-06) / 親: [TASKS.md](TASKS.md) §4 / 契約: [API_CONTRACTS.md](API_CONTRACTS.md) T2 / U2
 > C 側正典: `sdk/include/os32/os32_gui_shared.h` (STATIC_ASSERT で固定)

@@ -199,7 +199,7 @@ LB-1: ops は版 2、18 口。版 1 の部品は init 前に ABI_MISMATCH で拒
 | 16 | `gcap_release()` — `kfree` を含む回収 | 通常文脈 (`kctx_*depth` 0) | nop |
 | 17 | `nic_selftest(void)` — LB-1 は NULL、LB-4 で結線 | 通常文脈のみ | nop |
 | 18 | `nic_trace(u32 stage)` — lan.log の段の印 | probe の通常文脈のみ (IRQ/tick/irq_save 内は禁止) | nop |
-| 19 | `dbg_call(op, buf, size)` — KAPI `kdebug_call` (slot 253) の本体、ops 版 3・段 S5 (peek は `kdebug/kpeek.c`、[TASK_KPEEK](TASK_KPEEK.md)) | KAPI (アプリ PD、CPL0) の通常文脈 | `OS32_ERR_NOSYS` |
+| 19 | `dbg_call(op, buf, size)` — KAPI `kdebug_call` (slot 253) の本体、ops 版 3・段 S5 (peek は `kdebug/kpeek.c`、`TASK_KPEEK`) | KAPI (アプリ PD、CPL0) の通常文脈 | `OS32_ERR_NOSYS` |
 
 LB-1 の trace は 256 B に seq/crc と段を積み、毎段の全文書き直しと sync を行う。
 `void` ABI のため保存失敗は部品から本体の `kprintf` で `[e82557] trace=off` を一度出し、以後書かない (probe の最終行より前)。

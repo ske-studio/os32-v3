@@ -106,7 +106,7 @@ CREATE INDEX idx_user_yomi ON dict_user(yomi);
 
 - 前方一致時、完全一致には **-500 コストボーナス** を付与
 - ユーザー辞書 (`dict_user`) はコスト `(-10000 - freq)` で最優先。SQL が返す最大32行を C 側で収集するときに、31 B に切る前の同じ表記を除いて学習語を1回だけ出し、減った分は取り直さないため候補が32件未満になることを許す。
-- 品詞違いを別候補にはしない。辞書生成も `(yomi, kanji)` で集約する (`tools/fep_to_sqlite.py`)。学習表の主キーも同じで品詞列はなく、[FEP_BOUNDARY §3](../settings/FEP_BOUNDARY.md) と [KAPI の IME 契約](../../KAPI_SPEC.md) の削除も `yomi, kanji` 単位。学習候補の `pos_id=0` を保持する。
+- 品詞違いを別候補にはしない。辞書生成も `(yomi, kanji)` で集約する (`tools/fep_to_sqlite.py`)。学習表の主キーも同じで品詞列はなく、`FEP_BOUNDARY` §3 と [KAPI の IME 契約](../../KAPI_SPEC.md) の削除も `yomi, kanji` 単位。学習候補の `pos_id=0` を保持する。
 
 ### コスト計算 (fep_to_sqlite.py)
 

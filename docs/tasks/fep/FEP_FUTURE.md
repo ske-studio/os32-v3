@@ -22,7 +22,7 @@ FEP の残存タスクと将来拡張の計画。
   - 対応する数字キーで即座に確定
 - [x] **候補ページング**
   - 最大 `IME_MAX_RESULTS` (32、`kernel/ime.h:28`) 件の候補をページ分割
-  - RollDown/Right・RollUp/Left でページ切替 (`kernel/ime.c:407`)。操作は [P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照
+  - RollDown/Right・RollUp/Left でページ切替 (`kernel/ime.c:407`)。操作は `01_UI_CANDIDATE` §3 を参照
 
 ### GFX モード対応
 
@@ -43,7 +43,7 @@ FEP の残存タスクと将来拡張の計画。
 ### TVRAM スクロール保護 — 実装済 (P2、`tvram_set_scroll_reserve`)
 
 - [x] **`tvram_scroll` を 24 行制限に変更**
-  - FEP ON 時は最下行を保護し、候補リスト中は予約を拡大する ([P2 §4](02_SCROLL_GUARD.md#4-fep-からの制御))
+  - FEP ON 時は最下行を保護し、候補リスト中は予約を拡大する (`02_SCROLL_GUARD` §4)
 
 ---
 
@@ -99,7 +99,7 @@ FEP の残存タスクと将来拡張の計画。
   - `ime user export` — CSV エクスポート
 - [ ] **変換キー (XFER) 対応** (P6、候補操作のみ実装済み)
   - PC-98 専用キー `KEY_XFER` (0x35) への機能割り当て
-  - 候補リスト展開・候補送りは実装済み (`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER は残件。[P1 §3](01_UI_CANDIDATE.md#3-キーバインド設計) を参照
+  - 候補リスト展開・候補送りは実装済み (`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER は残件。`01_UI_CANDIDATE` §3 を参照
 - [ ] **kprintf va_args 問題の調査**
   - `.sqlite_text` セクションからの `kprintf` 呼び出しで Page Fault
   - FEP 辞書のエラー出力に影響する可能性

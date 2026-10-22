@@ -143,7 +143,7 @@ GUI の設計判断はすべてこの上限の内側で行い、下限は 386 �
 
 - PEGC の TVRAM 合成は NP21/W で確認済み (2026-09-06)。
   `pegc_query` は `GFX_CAP_TEXT_OVERLAY` を返す ([`backend_pegc.c:973–979`](../../../gfx/backend_pegc.c))。
-- 480 ライン表示と 24kHz 復帰は [実機票の受入](../realhw/TASK_PEGC480_REALHW.md#5-受け入れ)
+- 480 ライン表示と 24kHz 復帰は 実機票 `TASK_PEGC480_REALHW` §5 の受入
   と同票末尾の実機記録を参照する。エミュレータ待ちという旧状態は解消済み。
 - 実機のアクセラレータでの表示リレー: 資料上は 0FA3h/0FABh レジスタ 03h bit1 または
   0FACh bit1 (§3.2)。NP21/W は内蔵 (0FABh 03h) と C バスボード (40E1h bit0) のリレー状態を
@@ -339,7 +339,7 @@ DC の状態機械 / 型なしメッセージとポインタ越境 / SendMessage
 捨てるもの: 宣言的差分再構築 (React/SwiftUI 系) と即時モード (ImGui/microUI) の全面採用、
 入れ子メッセージループ、同期の越境メッセージ。
 
-凍結インターフェース: [API_CONTRACTS.md](API_CONTRACTS.md) (G 描画 → T 経路 → U 窓)。2026-09-04 凍結。
+凍結インターフェース: `API_CONTRACTS` (G 描画 → T 経路 → U 窓)。2026-09-04 凍結。
 
 ## 10. 進め方 (承認済み 2026-09-04)
 
