@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightweight preflight fixtures; no network, OS build, or check registration."""
+"""Lightweight preflight fixtures; no network or OS build."""
 import hashlib
 import os
 from pathlib import Path

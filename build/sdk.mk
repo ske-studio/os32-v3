@@ -124,20 +124,20 @@ check:
 
 check-fast:
 	@python3 tools/check_tree_unchanged.py --save fast
-	@$(MAKE) $(CHECK_PAR_TARGETS) MUTATE=0
+	@$(MAKE) check-par MUTATE=0
 	@python3 tools/check_tree_unchanged.py --verify fast
 
 # 並列 1 段 (選ばれた検査だけ変異込み、残りは変異なし)。
 # FILES="<パス>..." を渡すと git を見ずにその一覧を変更とみなす (選び方の試し。
 # `FILES=` と空で渡せば「変更なし」)。
 BASE ?=
-check-changed:
+check-changed: check-times-init
 	@mkdir -p $(BUILD_OUT)
 	@python3 tools/check_select.py --select --base "$(BASE)" \
 	  $(if $(filter command line,$(origin FILES)),--files $(FILES)) > $(BUILD_OUT)/check_changed.sh
 	@. $(BUILD_OUT)/check_changed.sh; \
 	  python3 tools/check_tree_unchanged.py --save chg1 && \
-	  { [ -z "$$CC_STAGE1" ] || $(MAKE) $$CC_STAGE1 MUTATE=sel MUTATE_TARGETS="$$CC_MUT1"; } && \
+	  $(MAKE) check-par CHECK_PAR_TARGETS="$$CC_STAGE1" MUTATE=sel MUTATE_TARGETS="$$CC_MUT1" && \
 	  python3 tools/check_tree_unchanged.py --verify chg1 && \
 	  echo "*** $$CC_SUMMARY ***"
 
@@ -160,4 +160,15 @@ CHECK_PAR_ORDER :=
 include $(sort $(wildcard build/checks.d/*.mk))
 CHECK_PAR_TARGETS = $(foreach entry,$(sort $(CHECK_PAR_ORDER)),$(word 2,$(subst :, ,$(entry))))
 
-check-par: $(CHECK_PAR_TARGETS)
+CHECK_TIMES ?= build/out/check_times.tsv
+
+.PHONY: check-times-init $(addprefix check-time-,$(CHECK_PAR_TARGETS))
+check-times-init:
+	@python3 tools/check_time.py --reset "$(CHECK_TIMES)"
+
+check-par: check-times-init $(addprefix check-time-,$(CHECK_PAR_TARGETS))
+$(addprefix check-time-,$(CHECK_PAR_TARGETS)): check-time-%: | check-times-init
+	+@python3 tools/check_time.py "$(CHECK_TIMES)" "$*" $(MAKE) --no-print-directory CHECK_TIME_CHILD=1 $*
+# 検査どうしで共有する前提は親の make で 1 回だけ作り、入れ子の make (CHECK_TIME_CHILD=1) では作らない
+# (sqlite.bin は .FORCE なので、子が並列に作り直すと他方の読み取り中に書き換わる)。
+check-time-check-sqlite-module-proto-host check-time-check-sqlite-stack-host: sqlite-module-proto
