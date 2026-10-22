@@ -38,7 +38,8 @@ class CheckTimesTest(unittest.TestCase):
         for name, source in stubs.items():
             self.write(f'tools/{name}.py', source)
         self.env = dict(os.environ)
-        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES'):
+        # 呼び手の CHECK_TIMES・CHECK_TIME_CHILD を引き継ぐと、偽の木の表の置き場や前提が変わる。
+        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD'):
             self.env.pop(key, None)
 
     def write(self, path, text):
