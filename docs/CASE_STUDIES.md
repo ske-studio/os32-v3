@@ -136,4 +136,4 @@ GUI の受入台本が CUI のまま `RESULT: OK` を出していた。
 状態の変化 (前面の交代) は**旧と新の両方**を損傷にする。受け入れは目視ではなく、画素の見張り色で「Paint 無しに変わっていないか」を機械で見る。最初はリリースノートの「既知の制限」に書いて締めるつもりだったが、
 同じ日に直せたのは損傷モデルが票 (契約) に書いてあり、どこに責任があるかを議論せずに済んだから。
 
-出典: os32 の `git log` `b87e4a03` (2026-09-29、fix(gshell))、`docs/RELEASE_v2.1.md` §2、`docs/tasks/gui/API_CONTRACTS.md` G4 (無効化と commit)、`docs/tasks/gui/DESIGN.md`。
+出典: os32 の `git log` `b87e4a03` (2026-09-29、fix(gshell))、`docs/RELEASE_v2.1.md` §2、`docs/decisions/gui/API_CONTRACTS.md` G4 (無効化と commit)、`docs/decisions/gui/DESIGN.md`。

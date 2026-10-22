@@ -27,7 +27,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | KAPI 追加手順 | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) | スキル `.claude/skills/os32-kapi-add` と CLAUDE.md (どちらもポインタのみ) |
 | KAPI 版番号・エラー番号の予約 (未実装の先取り調停) | [KAPI_SPEC.md §3-2](KAPI_SPEC.md) | 各計画 (GUI TASK_K1、network LINK_PLAN) は参照 |
 | エラーコード | `os32_kapi_shared.h` の `OS32_ERR_*` | 各 FS は境界で翻訳 |
-| GUI 共有プロトコル (op / イベント / 構造体 / SHM 配置) | `sdk/include/os32/os32_gui_shared.h` (C が正典) → [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) (契約) | `sdk/rust/os32api/src/gui/proto.rs` は写し (`tools/check_gui_proto.py` = `make check-gui-proto` が照合)、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
+| GUI 共有プロトコル (op / イベント / 構造体 / SHM 配置) | `sdk/include/os32/os32_gui_shared.h` (C が正典) → [decisions/gui/API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md) (契約) | `sdk/rust/os32api/src/gui/proto.rs` は写し (`tools/check_gui_proto.py` = `make check-gui-proto` が照合)、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
 | ビルドターゲット・ツール・コンパイラフラグ | [08_build.md](08_build.md) (フラグの実体は `build/config.mk`) | CLAUDE.md「Build Commands」(日常分のみ) |
 | 配備 3 経路の使い分け | [08_build.md §8-4](08_build.md#配備3経路) | [POLICY_DEV.md §4](POLICY_DEV.md) (表のみ)、CLAUDE.md (1 行)、スキル `os32-build-verify` |
 | ディレクトリ木 | [08_build.md §8-3](08_build.md) | CLAUDE.md / INDEX は参照のみ |
@@ -184,6 +184,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | 文書 | 内容 |
 |---|---|
 | [decisions/VERSIONS.md](decisions/VERSIONS.md) | 版数の対応表 (カーネル 2.1・GUI 1.4 で閉じた・v3・v4 草案) と、現行の開発 v3・os32 v2.x の扱い・fork の決定・KAPI の関数表の容量の規則 (2026-10-22 に ROADMAP §0 から移した) |
+| [decisions/gui/DESIGN.md](decisions/gui/DESIGN.md) / [API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md) | GUI シェル (libos32gui) の設計決定記録と凍結インターフェース契約 (T1〜T9)。2026-10-23 に docs/tasks/gui/ から移した。作業分担は票 TASKS |
 | [decisions/V3_GOALS.md](decisions/V3_GOALS.md) | v3 の目的の一文・範囲・目標の 2 段 (ユーザー決定)。計画の票は V3_PLAN |
 | [decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) | v3 のメモリマップ (D1〜D36、帯の表、§12 T4〜T6b の争点)。票は T2・T3・T4〜T6b・T7 |
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | 実機 Ra266 の機体構成・基準構成と実機の方針 (旧 realhw/PLAN の本文、節の番号は同じ) |
@@ -341,8 +342,8 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) | **GUI シェル v1.x 設計記録** (2026-09-04) — 再描画モデル、HAL/バックエンド表 |
-| [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md) | libos32gui 凍結インターフェース契約 (2026-09-04 凍結) |
+| [decisions/gui/DESIGN.md](decisions/gui/DESIGN.md) | **GUI シェル v1.x 設計記録** (2026-09-04) — 再描画モデル、HAL/バックエンド表 |
+| [decisions/gui/API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md) | libos32gui 凍結インターフェース契約 (2026-09-04 凍結) |
 | [tasks/gui/TASKS.md](tasks/gui/TASKS.md) | v1.1 作業分担票とゲート表 — v1.1 の票 (`archive/gui_v11/TASK_*.md` 12 本) の索引 |
 | `archive/gui_v12/` | v1.2 の票 5 本 (受入完了 2026-09-07 `d739494`)。索引は `docs/archive/gui_v12/TASKS.md` |
 | [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md) | **v1.3 計画と票の索引** (受入完了 2026-09-14) — K5b / K6 / K7 / T7〜T9、監査 (`AUDIT_2026-09-10.md`)、レビュー記録 (`archive/gui_v13_reviews/REVIEW_*.md`、完了記録) |

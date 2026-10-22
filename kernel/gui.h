@@ -5,7 +5,7 @@
 /*  自分を登録する gui_register を提供する。カーネルは op の意味を解釈せず、  */
 /*  登録ハンドラへ転送 + owner 付与だけを行う (契約 T1)。                     */
 /*                                                                          */
-/*  設計: docs/tasks/gui/API_CONTRACTS.md (T1 / T4 / T9)、TASK_K1_gui_call.md */
+/*  設計: docs/decisions/gui/API_CONTRACTS.md (T1 / T4 / T9)、TASK_K1_gui_call.md */
 /* ======================================================================== */
 
 #ifndef __GUI_H

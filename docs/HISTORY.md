@@ -84,7 +84,7 @@ Win3.1 / 早期 Win95 の見た目、協調型シングルタスク、WM = gshel
 | 1.3 端末と CUI 抽象化 | 09-09〜14 | libos32term、GUI アプリ 4 本の協調 (K5)、RAM 上限 16MB 撤廃 (K6)、入力統合 (K7)、全画面 GFX 復帰 (T8)、CPL=3 のシェル `sh` (T9)、settings.db (S0〜S5)。hermes が独断で着手した T5b/T6a を監査して撤去 |
 | 1.4 ホストサービスと最小のアプリ | 09-14〜29 | Host Services N1〜N4、hsync H1〜H4、エディタ GUI 版、About、R2 計測、キーボードだけの GUI 操作 (KBD_NAV)。**GUI の版はここで閉じ、以後は v3 の線** (ユーザー決定 09-29) |
 
-設計記録は `docs/tasks/gui/DESIGN.md`、契約は `docs/tasks/gui/API_CONTRACTS.md`、票は `docs/archive/gui_v1{1,2,3,4}/`。
+設計記録は `docs/decisions/gui/DESIGN.md`、契約は `docs/decisions/gui/API_CONTRACTS.md`、票は `docs/archive/gui_v1{1,2,3,4}/`。
 
 ### v2.1 (2026-09-29) — 実機 PC-9821Ra266 で動く区切りの版
 
@@ -110,7 +110,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 |---|---|---|
 | 2026-04〜08 | ユーザー + AI コーディングアシスタント 1 セッション。設計・実装・検証を同じセッションで。`CLAUDE.md` は 558 行 (`21cd48e9`、09-05) まで膨らんだ | README「制作経緯」、`docs/POLICY_DEV.md` §1 |
 | 2026-09-01 | 3 層 (設計 = Fable 5 / コーディング = 自宅サーバーのローカル LLM / ビルド検証 = NPU のローカル LLM) を組む | `docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |
-| 2026-09-04〜06 | GUI 1.1 で**レーン別の並列コーダー** (worktree 隔離のサブエージェント 12 票) と、外部の設計レビュー (契約の改訂 3 回) を初めて使う | `docs/tasks/gui/API_CONTRACTS.md`「改訂の記録」 |
+| 2026-09-04〜06 | GUI 1.1 で**レーン別の並列コーダー** (worktree 隔離のサブエージェント 12 票) と、外部の設計レビュー (契約の改訂 3 回) を初めて使う | `docs/decisions/gui/API_CONTRACTS.md`「改訂の記録」 |
 | 2026-09-05 | 文書運用の決定: 情報単位ごとに正典 1 か所、CLAUDE.md は入口だけ、手順はスキルへ | `docs/INDEX.md` 冒頭の正典表 |
 | 2026-09-07〜09 | hermes (Agent CLI) を PM に据え Claude / Codex / ローカル LLM をワーカーに。過剰なバグ懸念と 1 ステップごとの中断、設定の消失、Codex のクォータ枯渇で**撤収** | RETROSPECTIVE_2026-09-09 |
 | 2026-09-09 | **4 役**に固定: PM = Claude Code (Fable 5.1) / コーダー = Opus サブエージェント (worktree) / レビュアー / テスター = ローカル AI (`tools/emu_agent/`)。規約は 3 行に固定 (インシデントごとに 1 行足さない) | `docs/tasks/agents/ROLES.md` 旧 §1 |
@@ -135,7 +135,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 日付 | 決定 | 出典 (os32) |
 |---|---|---|
 | 2026-09-01 | v2 は保護機構の導入 (リング 3)。Rust は新規ユーザーランド層だけ | `docs/archive/kernel_v2/PLAN.md` §1 |
-| 2026-09-04 | GUI の設計前提: **486 機能ティアは見送り** (可否は CPU 世代ではなくダーティ面積で決まる)、InvalidateRect / XOR 枠 / 単一バックバッファ、9821 は PEGC → Cirrus の順、共有ライブラリ帯は案 A (0x400000〜)、API 契約の凍結 (以後の変更はユーザー承認) | `docs/tasks/gui/DESIGN.md`、`API_CONTRACTS.md` |
+| 2026-09-04 | GUI の設計前提: **486 機能ティアは見送り** (可否は CPU 世代ではなくダーティ面積で決まる)、InvalidateRect / XOR 枠 / 単一バックバッファ、9821 は PEGC → Cirrus の順、共有ライブラリ帯は案 A (0x400000〜)、API 契約の凍結 (以後の変更はユーザー承認) | `docs/decisions/gui/DESIGN.md`、`API_CONTRACTS.md` |
 | 2026-09-05 | 文書運用: 情報単位ごとの正典 1 か所 (外部の冗長性診断 6 件を受けて) | `docs/INDEX.md` 冒頭 |
 | 2026-09-09 | hermes の撤収、4 役の体制 | RETROSPECTIVE_2026-09-09 |
 | 2026-09-11 | 物理 RAM 上限 16MB → 32MB 以上 (目標 128MB、K6-RAM)。CPL=3 アプリ生存中は `--cpl0` の子を拒否 (A1)。8MB は 1 本立てば要件 | `docs/archive/gui_v13/` |
@@ -194,7 +194,7 @@ FatFs (`fs/fatfs/`)、`assets/` (IPADIC・IPAex・常用漢字表) と、gitigno
 | 各版の要約 / v2.1 のリリースノート | `CHANGELOG.md`、`docs/RELEASE_v2.1.md` |
 | v1.0 到達までの経緯 | `docs/archive/ROADMAP_v1.0.md`、`docs/archive/REFACTORING_PLAN.md` |
 | v2.0 (リング 3) の判断と完了記録 | `docs/archive/kernel_v2/PLAN.md` |
-| GUI 1.1〜1.4 の設計・契約・票 | `docs/tasks/gui/DESIGN.md`、`API_CONTRACTS.md`、`docs/archive/gui_v11/`〜`gui_v14/` |
+| GUI 1.1〜1.4 の設計・契約・票 | `docs/decisions/gui/DESIGN.md`、`API_CONTRACTS.md`、`docs/archive/gui_v11/`〜`gui_v14/` |
 | 実機 Ra266 の票と判定 | `docs/archive/realhw_v21/` (CHECKLIST_2026-09-24/25/26、TASK_FDC_REALHW、TASK_SERIAL_VFAST、TASK_SERIAL_HOSTFS、TASK_HDD_INSTALL ほか)、`docs/tasks/realhw/` |
 | 引き継ぎ (日ごとの記録) | `docs/archive/agents/HANDOVER_2026-09-29.md`、`docs/archive/agents/HANDOVER_2026-09-{16,18,22}.md` |
 | 体制の推移 | `docs/tasks/agents/ROLES.md` (§0 現行、末尾に経緯)、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |

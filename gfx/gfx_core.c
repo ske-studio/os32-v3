@@ -691,7 +691,7 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
 }
 
 /* ======================================================================== */
-/*  KAPI: 画面能力の問い合わせ (GUI HAL, docs/tasks/gui/API_CONTRACTS.md G5)  */
+/*  KAPI: 画面能力の問い合わせ (GUI HAL, docs/decisions/gui/API_CONTRACTS.md G5)  */
 /*  現在の唯一のバックエンドは 9801 プレーン: CPU 直書き、HW 塗り/転送なし。   */
 /* ======================================================================== */
 void __cdecl gfx_screen_info(void *out)

@@ -1,6 +1,6 @@
 //! libos32gui — GUI シェル v1.1 のクライアントライブラリ (Rust, no_std)
 //!
-//! 契約 [`docs/tasks/gui/API_CONTRACTS.md`] の G / T / U をアプリ側から見た形で
+//! 契約 [`docs/decisions/gui/API_CONTRACTS.md`] の G / T / U をアプリ側から見た形で
 //! 実装する。**WM (ウィンドウ管理・Z 順・フォーカス・入力取り込み) は gshell 側**
 //! (`userland/gshell`) にあり、ここには無い。旧版にあった「アプリ 1 本の中で WM を
 //! 動かす」API (`gui_pump` / `gui_draw` / `Window` 配列) は票 C2 で削除した。

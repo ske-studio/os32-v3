@@ -13,7 +13,7 @@
 /*      固定する。同じ数表を docs/tasks/gui/PROTO_LAYOUT.md に書き出し、      */
 /*      PM の tools/check_gui_proto.py が C 側の正典として読む。             */
 /*                                                                          */
-/*  親: docs/tasks/gui/API_CONTRACTS.md (G6 / T2 / T4 / U2)、TASKS.md §4     */
+/*  親: docs/decisions/gui/API_CONTRACTS.md (G6 / T2 / T4 / U2)、TASKS.md §4     */
 /* ======================================================================== */
 
 #ifndef OS32_GUI_SHARED_H

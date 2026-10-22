@@ -17,7 +17,7 @@
 **コンセプト**: Windows 3.1 / 早期 Windows 95 の**見た目**をモデルにしたグラフィカルデスクトップ環境。OS32のCLI・グラフィックス・ファイルシステム全技術の集大成。
 
 API は Win16 の再現ではなく、その欠点を 386 で払える範囲の現代の様式で解消する。
-設計記録: [tasks/gui/DESIGN.md](tasks/gui/DESIGN.md) / v1.1 凍結契約: [tasks/gui/API_CONTRACTS.md](tasks/gui/API_CONTRACTS.md)。
+設計記録: [decisions/gui/DESIGN.md](decisions/gui/DESIGN.md) / v1.1 凍結契約: [decisions/gui/API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md)。
 
 ### 設計方針
 

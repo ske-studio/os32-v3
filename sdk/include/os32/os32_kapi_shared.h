@@ -309,7 +309,7 @@ typedef struct {
     u8 *planes[4];  /* 0:B, 1:R, 2:G, 3:I */
 } GFX_Framebuffer;
 
-/* 画面能力 (GUI HAL 用、docs/tasks/gui/API_CONTRACTS.md G5)。gfx_screen_info() が埋める。
+/* 画面能力 (GUI HAL 用、docs/decisions/gui/API_CONTRACTS.md G5)。gfx_screen_info() が埋める。
  * バックエンド (9801 プレーン / PEGC 8bpp / アクセラレータ) の違いはここで問い合わせ、
  * GUI とアプリは 400 ライン・16 色を決め打ちしない。末尾追記のみ。 */
 #define GFX_FMT_PLANAR4   0   /* 4 プレーン 16 色 (PC-9801 標準) */
@@ -329,7 +329,7 @@ typedef struct {
     u16 reserved[5];
 } GFX_ScreenInfo;
 
-/* GUI カウンタ (gfx_stats() が埋める、docs/tasks/gui/API_CONTRACTS.md G7)。
+/* GUI カウンタ (gfx_stats() が埋める、docs/decisions/gui/API_CONTRACTS.md G7)。
  * 累積値。NP21/W ではウェイトを再現しないので、性能はこの回数・転送量で
  * 見積もる (契約 P2)。末尾追記のみ。 */
 typedef struct {

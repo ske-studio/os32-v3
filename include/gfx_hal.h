@@ -6,8 +6,8 @@
 /*  各バックエンドは probe / init / present などを 1 枚の GfxBackend として   */
 /*  実装し、GUI からはポート番号・VRAM アドレス・機種名を隠す。               */
 /*                                                                          */
-/*  設計: docs/tasks/gui/DESIGN.md §2 (B1〜B3), §6, §7 /                     */
-/*        契約 docs/tasks/gui/API_CONTRACTS.md G5, G7, G8                    */
+/*  設計: docs/decisions/gui/DESIGN.md §2 (B1〜B3), §6, §7 /                     */
+/*        契約 docs/decisions/gui/API_CONTRACTS.md G5, G7, G8                    */
 /* ======================================================================== */
 
 #ifndef __GFX_HAL_H

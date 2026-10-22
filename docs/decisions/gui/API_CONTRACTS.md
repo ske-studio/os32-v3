@@ -1,6 +1,6 @@
 # libos32gui — 凍結インターフェース契約
 
-> 上位: [GUI の設計](DESIGN.md)
+> 親: [GUI の設計](DESIGN.md) (2026-10-23 に docs/tasks/gui/ から決定の層へ移した)
 
 > 策定: 2026-09-04 / 親: [DESIGN.md](DESIGN.md) / 書式は v2 CONTRACTS (アーカイブ: `docs/archive/kernel_v2/CONTRACTS.md`) に倣う
 > 位置づけ: **凍結 (2026-09-04)**。未決 4 点 (G6/G8 色、T2/T2a SHM、U2a キー) をユーザ

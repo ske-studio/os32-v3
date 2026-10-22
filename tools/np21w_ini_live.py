@@ -30,7 +30,7 @@ OPERATIONS = {'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
               # 台帳の置き場を FIXED 型 (0x2F9000、低位 RAM の末尾に置けない構成)
               # にする経路を通すための構成 (T1a で legacy の pgalloc_init は撤去)。
               # GUI の最低要件ではない (INSTALL.md / docs/02_memory.md /
-              # tasks/gui/DESIGN.md)。16 はゲスト 15360KB = 15MB (実測)。
+              # decisions/gui/DESIGN.md)。16 はゲスト 15360KB = 15MB (実測)。
               # NP21/W は 0xF00000〜0xFFFFFF (16MB システム空間) を RAM にしない
               # ので、ExMemory >= 16 では使える拡張メモリ = ExMemory - 1 MB
               # (np21w-src mem/memory.c、bios.c:241 の 0x401/0x594)。

@@ -1,9 +1,9 @@
 # GUI シェル v1.1 — 作業分担票 (全体)
 
-> 上位: [GUI の設計](DESIGN.md)・[GUI の契約](API_CONTRACTS.md)
+> 上位: [GUI の設計](../../decisions/gui/DESIGN.md)・[GUI の契約](../../decisions/gui/API_CONTRACTS.md)
 
 > 発行: PM (2026-09-05) / 状態: **受入完了 (2026-09-06)**
-> 親: [DESIGN.md](DESIGN.md) / 契約: [API_CONTRACTS.md](API_CONTRACTS.md) (2026-09-04 凍結)
+> 親: [DESIGN.md](../../decisions/gui/DESIGN.md) / 契約: [API_CONTRACTS.md](../../decisions/gui/API_CONTRACTS.md) (2026-09-04 凍結)
 > 書式は v2 の `docs/archive/kernel_v2/PLAN.md` / `docs/archive/kernel_v2/CONTRACTS.md` に倣う。
 > ロードマップ: `docs/ROADMAP.md` v1.1
 
@@ -79,7 +79,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 | 項目 | 提案値 (K1 が確定させる) |
 |---|---|
 | `GUI_PROTO_VERSION` | 1 |
-| SHM | [契約 T2](API_CONTRACTS.md#t2-shm-レイアウト--確定-2026-09-04) と `include/memmap.h` / `os32_gui_shared.h` の定義を参照 |
+| SHM | [契約 T2](../../decisions/gui/API_CONTRACTS.md#t2-shm-レイアウト--確定-2026-09-04) と `include/memmap.h` / `os32_gui_shared.h` の定義を参照 |
 | op | 0 予約、1 `INIT`、2 `POLL`、3 `WAIT`、4 `COMMIT`、5 `INVALIDATE`、6 `STATS`、7 `LEASE_PALETTE`、16〜 ウィンドウ (`CREATE` `DESTROY` `MOVE` `RESIZE` `SHOW` `SET_TITLE` `CLIENT_RECT` `RAISE` `SET_FOCUS` `SET_TEXT_CURSOR`)、32〜 サーフェス (`CREATE` `DESTROY`)、48〜 タイマ (`SET` `KILL`)、64〜 モーダル (`OPEN`)、80〜 予備 |
 | イベント種別 | 契約 U2 の並び順どおり 1 から: `PAINT` `CONFIGURE` `CLOSE` `FOCUS` `KEY` `TEXT` `POINTER` `BUTTON` `TIMER` `WIDGET` `MODAL` `QUIT` `PALETTE` |
 | イベント配置 | **16B = 共通ヘッダ 8B (`kind` u8 @0, `sub` u8 @1, `serial` u16 @2, `window` u32 @4 = index:16 \| generation:16) + ペイロード 8B** (契約 U2 の表)。C / Rust とも大きさとオフセットを static assert |
@@ -116,7 +116,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 5. **内部 C は GNU11、公開 SDK ヘッダは C89/GNU89 互換、SQLite は GNU89。`kstr*`、三層定数** ([C1] [C2] [C4])。ポート・ID は資料の出典をコメントに
    (`docs/hw/undocumented/io_*.md`。ミラーは git 管理外)。
 6. **検証は [V1]〜[V4]**: deploy.yaml に載せる、NHD 配備で確かめる、失敗はそのまま書く。
-7. **`get_tick` スピン禁止** (v2 M0)。GUI イベント待ちは `OP_WAIT`。park の条件は [契約 T8](API_CONTRACTS.md#park-origins)。
+7. **`get_tick` スピン禁止** (v2 M0)。GUI イベント待ちは `OP_WAIT`。park の条件は [契約 T8](../../decisions/gui/API_CONTRACTS.md#park-origins)。
 
 ## 7. 進捗 (v1.1 の関門記録)
 

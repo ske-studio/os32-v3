@@ -1,10 +1,10 @@
 # GUI シェル v1.2 — 追加契約
 
-> 上位: [GUI の API 契約](../API_CONTRACTS.md)・[GUI の設計](../DESIGN.md)
+> 上位: [GUI の API 契約](../../../decisions/gui/API_CONTRACTS.md)・[GUI の設計](../../../decisions/gui/DESIGN.md)
 
 > 発行: PM (2026-09-06)  
-> 親契約: [../API_CONTRACTS.md](../API_CONTRACTS.md)  
-> 親設計: [../DESIGN.md](../DESIGN.md)  
+> 親契約: [../../../decisions/gui/API_CONTRACTS.md](../../../decisions/gui/API_CONTRACTS.md)  
+> 親設計: [../../../decisions/gui/DESIGN.md](../../../decisions/gui/DESIGN.md)  
 > 作業分担: `docs/archive/gui_v12/TASKS.md`
 >
 > v1.1 の G / T / U 契約は変更しない。本書は v1.2 で必要な事項だけを追加する。  
@@ -13,7 +13,7 @@
 ---
 
 本書は **v1.2 当時の追加契約**。単一アプリ方式や版・関数数は当時の記録である。
-現在の利用には [GUI 契約](../API_CONTRACTS.md#park-origins) と
+現在の利用には [GUI 契約](../../../decisions/gui/API_CONTRACTS.md#park-origins) と
 [shlib ABI 世代](../../../KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69) を参照する。
 
 ## 0. v1.2 の範囲

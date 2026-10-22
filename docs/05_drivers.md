@@ -136,7 +136,7 @@ GUI もアプリも 400 ライン / 16 色 / プレーンを決め打ちしな�
 (表示面へ直接描かせない = 契約 G4。写像の規則は [02 §2-1](02_memory.md))。counters
 (`gfx_stats`: present_bytes / hw_ops / io_accesses / commits) で「CPU が運んだ量」と
 「エンジンに任せた回数」を測る (NP21/W では時間が測れないため)。設計と経緯は
-票 `tasks/gui/DESIGN.md` §5〜§8、Cirrus の資料は `include/wab_xe10.h` と
+決定 `decisions/gui/DESIGN.md` §5〜§8、Cirrus の資料は `include/wab_xe10.h` と
 `drivers/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
