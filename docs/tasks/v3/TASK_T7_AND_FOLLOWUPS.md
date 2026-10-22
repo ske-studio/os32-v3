@@ -65,6 +65,8 @@ T7aの到達点は「低位を一般poolへ追加」ではなく、bootinfoの�
 
 ### 1-1. V86 状態遷移
 
+> 契約の正典は [09_exec.md](../../09_exec.md) の「V86 セッションの入場と呼出元」と低位の復元の段落 (2026-10-23 に移した)。下は設計時の記録。
+
 `CUI_IDLE → PREPARING → V86_ACTIVE → RESTORING → CUI_IDLE`。呼出元はCPL=3の `userland/cmds/v86.c` (`v86 -t/-b/-g` のKAPI呼出し) であり、**そのASの存在自体は拒否理由にしない**。入場はCUI・非再入・呼出元以外の通常ASなし (parked/親ASも含む) に限定する。resident shellは通常ASとは別。T2の「CUI呼出元ASは停止中」の例外をここで具体化する。親ASを伴うCUI入れ子はBUSYで副作用なく拒否し、単独起動へ案内する。親を含む集合のpin/復帰は本案に含めない。GUIと他ASありの拒否は低位PTEを触る前に行う。
 
 PREPARINGではT2のuaccessでpath/secondをkernelの上限付きstagingへコピーし、`V86Gcap`等の出力範囲をcaller PDで検証する。NULL可否は既存API契約どおり。未終端/範囲外は副作用前に失敗。callerのslot/generation・PD・KAPI復帰状態を固定して、slotにV86呼出し中の印を付ける。caller所有のPD/backingをpinし、park/resume、trim配送、別アプリ起動とcaller teardownを禁止する。この停止は他アプリへのスケジューリングではない。

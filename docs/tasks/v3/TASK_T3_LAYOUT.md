@@ -79,6 +79,8 @@ SLACK は `[align_up(chain_end, PAGE_SIZE), MEM_FIXED_PAGING_GUARD_BASE)`、新�
 
 ### 2-2. 固定領域とページング
 
+> 契約の正典は [02_memory.md](../../02_memory.md) §2-1 の「ページング」(固定 PD/PT 枠の並び・DMA の池・FIXED 型の台帳の置き場、2026-10-23 に移した)。下は設計時の記録。
+
 最終番地の表は上位票 §2-1 を参照し、値の正典は `memmap.h` とし、linker/boot ASMの必要な写しも同じ差分で更新して生成検査で一致させる。`MEM_POOL_BASE` は shell 新帯の直後へ移り、台帳の L0/固定用途、メタデータ置場、workspace、DMA、BB 探索下限、起動最小 RAM 判定も同じ差分で追随させる。旧 SQLite 予約と旧 shell heap 予約の削除漏れ・二重供給を検査する。
 
 **案5のページ配置 (半開区間)**: guard `[0x3E0000,0x3E1000)`、固定PD/PT枠 `[0x3E1000,0x3FB000)` (26枚)、guard `[0x3FB000,0x3FC000)`、kstack `[0x3FC000,0x400000)` (4枚)。PD は `0x3E1000`、boot PT 8枚は `0x3E2000 + i×0x1000` (i=0〜7)、device PT は `0x3EA000`、最上位MMIO PT は `0x3EB000`。予備15枚 `[0x3EC000,0x3FB000)` も固定kernel ownerで保持し、枠全体を恒等sup/RW/WB、両guardだけNPとする。使用終端と枠終端を別定義にし、余りをSLACKへ返さない (`include/memmap.h:345-352`、`kernel/paging.c:226-229,320-323` の11枚を維持)。
