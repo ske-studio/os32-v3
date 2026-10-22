@@ -69,6 +69,6 @@ gh run list -L 2                          # build と check
 ## 6. 記録
 
 - 票の状態行に段の着地と受入の証拠の所在。延ばした試験は [DEFERRED_TESTS](../../../docs/tasks/DEFERRED_TESTS.md) に 1 行。
-- 台帳の行を閉じるとき: 証拠 (RESULT.md) を確かめ、[閉鎖台帳](../../../docs/archive/v3/DEFERRED_CLOSED.md) の末尾へ
+- 台帳の行を閉じるとき: 証拠 (RESULT.md) を確かめ、閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) の末尾へ
   `| ID | 中身 | 日付 | 証拠の所在 — 何で閉じたか |` を足し、現行の台帳から行を消して状態行を更新。
 - 節目では HANDOVER の §1 (最後の全体検査・KAPI の版) と §2 (次の一手) を書き換える。

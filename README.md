@@ -8,13 +8,13 @@
 *「PC-9821 の実機で、1 本のアプリケーションに機械の資源を渡し切れる入れ物を作り直す。入れ物とは、カーネル帯の切り方 (再配置)、
 ドライバの置き場 (動的読み込み)、装置窓の資源割当、実機の装置ドライバ、そしてその上の HAL の口である。時代依存の仕事は Host Service に任せ、
 OS32 側の契約は小さく保つ」* ([docs/tasks/v3/V3_PLAN.md §1](docs/tasks/v3/V3_PLAN.md)、本案)。機能を足す前に入れ物を作り直す版で、
-最初の票は C89 → C11 の移行 ([docs/archive/v3/TASK_C11_MIGRATION.md](docs/archive/v3/TASK_C11_MIGRATION.md))、
+最初の票は C89 → C11 の移行 (`docs/archive/v3/TASK_C11_MIGRATION.md`)、
 設計の決定は [docs/decisions/MEMMAP_V3.md](docs/decisions/MEMMAP_V3.md) にあります。
 
 **fork 元**: os32 v2.1 (リポジトリ [os32](https://github.com/ske-studio/os32)、タグ `v2.1` = コミット `6ccc4049`) と、fork 時点の `feat/gui` (`dfa97f57`、2026-09-30) の作業ツリーです。
 os32-v3 は新しい履歴 (初期コミット 1 つ) で始めていて、**v2.x までのコミット履歴・日次の記録は os32 にあります**。
 開発の経緯と版の推移は [docs/HISTORY.md](docs/HISTORY.md)、得た教訓は [docs/CASE_STUDIES.md](docs/CASE_STUDIES.md)、
-fork の段取りは [docs/archive/v3/FORK_PLAN.md](docs/archive/v3/FORK_PLAN.md)。os32 (v2.x、`main`) は戻り先で、新機能は入れず、文書の正典もこのリポジトリに移しました (os32 側の docs は更新しません)。
+fork の段取りは `docs/archive/v3/FORK_PLAN.md`。os32 (v2.x、`main`) は戻り先で、新機能は入れず、文書の正典もこのリポジトリに移しました (os32 側の docs は更新しません)。
 
 **submodule `apps/` `game/` は private です**。標準アプリと盤上ゲーム RPG は別リポジトリ (`ske-studio/os32-apps`、`ske-studio/os32-game`) で、
 公開していません。clone は `--recurse-submodules` を**付けずに**行ってください — apps / game が無くてもカーネル・シェル・コマンド・SDK・ディスクイメージ
@@ -167,7 +167,7 @@ make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)
 (構築手順は [docs/08_build.md](docs/08_build.md) §8-5、CI 用のスクリプトは `tools/ci/build_cross.sh`)。
 日本語フォント (IPAex) はリポジトリに無く、初回の `make all` (または `make fonts`) が IPA の公式配布から取得します —
 IPA Font License v1.0 への同意を聞きます (非対話は `OS32_ACCEPT_IPA_LICENSE=1`、[docs/08_build.md](docs/08_build.md) §8-1)。
-CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。fork 当時の計画は [FORK_PLAN §3](docs/archive/v3/FORK_PLAN.md#3-手順-順に) に残しています。
+CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。fork 当時の計画は FORK_PLAN §3 (アーカイブ: `docs/archive/v3/FORK_PLAN.md`) に残しています。
 
 ## ライセンス
 

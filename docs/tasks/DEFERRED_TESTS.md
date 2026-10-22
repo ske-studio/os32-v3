@@ -4,7 +4,7 @@
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移す (**元の票がアーカイブ済みなら、証拠の所在は閉鎖台帳の行と、その作業をした今の票に書く** — アーカイブは書き換えない、ユーザー決定 2026-10-22)。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
-「元の行」は切り離す前 (`b486494`) の TASK_T2D_T2H.md の行番号 — `git show b486494:docs/archive/v3/TASK_T2D_T2H.md | sed -n 'N,Mp'` か、
+「元の行」は切り離す前 (`b486494`) の TASK_T2D_T2H.md の行番号 — `git show b486494:docs/tasks/v3/TASK_T2D_T2H.md | sed -n 'N,Mp'` か、
 `docs/archive/v3/TASK_T2D_T2H_RECORDS.md` の同じ範囲の見出しから読む。
 拾い出しの作業表 (全件、約 290 行) は `~/os32-tmp/evidence/2026-10-06/t2dh_open_items/`。T2h の受入の結果は TASK_T2D_T2H §5-1 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
 

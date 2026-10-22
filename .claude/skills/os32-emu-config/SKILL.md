@@ -180,7 +180,7 @@ cleanup timeout は成功として扱わない。起動済みプロセス・stag
 
 ## 範囲と根拠
 
-[TASK_H3_cirrus.md §0](../../../docs/archive/gui_v11/TASK_H3_cirrus.md) と
+TASK_H3_cirrus.md §0 (アーカイブ: `docs/archive/gui_v11/TASK_H3_cirrus.md`) と
 [GUI TASKS.md の 2026-09-06 WAB OFF 記録](../../../docs/tasks/gui/TASKS.md) に従い、
 Cirrus 操作は `[NekoProject21]` の `USEGD5430=true/false`、`GD5430TYPE=91` のみ扱う。
 91 は十進 Xe10 固定。欠落・重複・未知の既存値は追記や推測をせず拒否する。
