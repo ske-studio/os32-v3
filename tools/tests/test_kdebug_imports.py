@@ -44,6 +44,22 @@ class ImportsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
 
+    def test_gf_slots_retained_without_core_callers(self):
+        for index in range(264, 268):
+            altered = copy.deepcopy(self.entries)
+            altered[index].pop('retained')
+            with self.assertRaisesRegex(ValueError, 'GF-only slot must be retained'):
+                gen.check_nm(altered)
+            original = gen.symbols
+            def without_slot(nm, paths, undefined):
+                refs = original(nm, paths, undefined)
+                if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                    refs.discard(self.entries[index]['symbol'])
+                return refs
+            with patch.object(gen, 'symbols', side_effect=without_slot):
+                with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
+                    gen.check_nm(self.entries)
+
     def test_selftest_boot_references_are_not_excluded(self):
         original = gen.symbols
         for symbol in ('memory_boot_page_counts', 'kdebug'):

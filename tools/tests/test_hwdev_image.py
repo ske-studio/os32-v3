@@ -45,6 +45,20 @@ def main():
     assert meta['module_abi_gen'] == struct.unpack_from('<I', image, 24)[0] == contract
     cross = Path(os.environ['CROSS_DIR'])/'bin'
     assert not subprocess.check_output([str(cross/'i386-elf-nm'), '-u', str(OUT/'hwdev/hwdev.elf')])
+    core = module.mkmod.Elf((OUT/'kdebug/kdebug.elf').read_bytes())
+    gf_objects = ('gfinit_bus', 'gfinit', 'gfinit_plan', 'gfinit_resources',
+                  'gfinit_decode', 'gfinit_exec', 'gfinit_pll', 'recover_gf')
+    for name in gf_objects:
+        names = subprocess.check_output([str(cross/'i386-elf-nm'), '-g', '--defined-only',
+                                         str(OUT/'hwdev'/(name+'.o'))], text=True)
+        for line in names.splitlines():
+            symbol = line.split()[-1]
+            assert symbol not in core.symbols, symbol
+    for name in ('recover_gf_profile', 'recover_gf_screen_safe',
+                 'recover_gf_pre', 'recover_gf_result'):
+        assert name in core.symbols, name
+    assert len((OUT/'kdebug.bin').read_bytes()) <= 150*1024
+    print('PASS GF body absent from core; S0 and shared GF log retained')
     verify_stubs(elf_data, meta['imports'])
     cases = [('actual-GF', 0, 0, image), ('actual-GF-core-contract', 5, 6, image),
              ('actual-GF-core-layout', 6, 6, image), ('actual-GF-kernel-pair', 9, 4, image)]
@@ -77,6 +91,22 @@ def main():
         trace.run(folder)
         dispatch.main()
         if '--mutate' in sys.argv:
+            # Break only the loaded body. Host white-box copies remain intact:
+            # losing the trace macro substitution would let this mutant survive.
+            b = bytearray(image)
+            entry = symbols['gfinit_exec_run']
+            pos = h[11] + entry
+            trap = b'\xb8\xff\xff\xff\xff\xc3'  # return -1
+            relocs = struct.unpack_from('<' + 'I'*h[22], image, h[21])
+            assert all(r + 4 <= entry or r >= entry + len(trap) for r in relocs)
+            b[pos:pos+len(trap)] = trap
+            try:
+                trace.run(folder, seal(b))
+            except AssertionError as exc:
+                assert exc.args[0][0] == 1 and b'FAIL ' in exc.args[0][1], exc
+                print('MUTATE trace-image-exec-body RED')
+            else:
+                raise AssertionError('survived trace image body; substitution broken')
             # Keep the KMOD valid but redirect the executed recover_owner stub
             # to trial_end. A byte-only oracle is deliberately not used here.
             b = bytearray(image)

@@ -1,4 +1,4 @@
-# M3a: a separate GF body; kdebug retains its existing GF objects until M3c.
+# GF body lives only in HWDEV; S0 recovery stays in kdebug.
 HWDEV_OUT := $(BUILD_OUT)/hwdev
 HWDEV_GF := gfinit_bus gfinit gfinit_plan gfinit_resources gfinit_decode gfinit_exec gfinit_pll recover_gf
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \

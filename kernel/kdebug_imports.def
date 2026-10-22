@@ -2120,7 +2120,8 @@
       "symbol": "pci_cfg_read32",
       "source": "drivers/pci.h",
       "context_safe": false,
-      "index": 264
+      "index": 264,
+      "retained": true
     },
     {
       "stage": "S5",
@@ -2128,7 +2129,8 @@
       "symbol": "pci_cfg_read16",
       "source": "drivers/pci.h",
       "context_safe": false,
-      "index": 265
+      "index": 265,
+      "retained": true
     },
     {
       "stage": "S5",
@@ -2136,7 +2138,8 @@
       "symbol": "pci_cfg_write32",
       "source": "drivers/pci.h",
       "context_safe": false,
-      "index": 266
+      "index": 266,
+      "retained": true
     },
     {
       "stage": "S5",
@@ -2144,7 +2147,8 @@
       "symbol": "pci_cfg_write16",
       "source": "drivers/pci.h",
       "context_safe": false,
-      "index": 267
+      "index": 267,
+      "retained": true
     },
     {
       "stage": "S5",

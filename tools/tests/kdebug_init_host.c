@@ -114,7 +114,7 @@ int serial_checked_empty(void) { calls++; return -1; }
 void serial_checked_end(void) { calls++; }
 int recover_uart_flush(struct recover *r, int (*empty)(void *), void *opaque, u32 frame, u32 polls)
 { (void)r; (void)empty; (void)opaque; (void)frame; (void)polls; calls++; return -1; }
-void gfinit_recover_end(void) { calls++; }
+/* Mutation-only trap: a direct GF call must fail dispatch expectations. */
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 { (void)op; (void)buf; (void)size; (void)base; (void)transport; (void)s0; calls++; return -1; }
@@ -142,7 +142,7 @@ static int dispatch_tests(const struct kdebug_ops *ops)
     static const struct recover_ops base = {0};
     owner.ops = &base;
     for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {
-        if (ops->dbg_call(op, buf, sizeof(buf)) != -1 || module_calls || attach_calls) return 1;
+        if (ops->dbg_call(op, buf, sizeof(buf)) != -1 || module_calls || attach_calls || buf[0] != 0) return 1;
     }
     if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf))) return 1;
     if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) || release_calls) return 1;

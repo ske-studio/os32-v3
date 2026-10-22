@@ -170,6 +170,21 @@ def check_nm(entries, nm=None, root=ROOT):
         missing = expected - cumulative - retained
         if missing or cumulative - expected:
             raise ValueError(f'{stage} nm mismatch: missing={sorted(missing)}, unexpected={sorted(cumulative-expected)}')
+    # M3c: read actual linked inputs, never stale GF .o files left in the
+    # output directory. Their old kernel slots remain callable ABI entries.
+    map_text = (root / 'build/out/kdebug/kdebug.map').read_text()
+    paths = [root / p for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
+    if any(p.stem.startswith('gfinit') or p.stem == 'recover_gf' for p in paths):
+        raise ValueError('GF object still linked into kdebug')
+    callers = [p for p in paths if p.stem not in ('kdebug_import_slots', 'kdebug_import_stubs')]
+    refs = symbols(nm, callers, True) - symbols(nm, callers, False) - {ABI_SYMBOL}
+    expected = {e['name'] for e in entries}
+    if refs - expected:
+        raise ValueError('unexpected core references: ' + str(sorted(refs - expected)))
+    for e in entries:
+        if e['index'] in range(264, 268):
+            if not e.get('retained') or e['name'] in refs:
+                raise ValueError('GF-only slot must be retained without core callers: ' + e['name'])
     retained = {e['symbol'] for e in entries if e.get('retained')}
     absent = retained - symbols(nm, [root / 'build/out/kernel.elf'], False)
     if absent:

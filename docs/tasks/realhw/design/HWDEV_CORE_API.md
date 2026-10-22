@@ -202,4 +202,21 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 | op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
 | op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
 
-KDEBUG の ops 版 4・20 口と HWDEV ABI は変更しない。GF 本体の同梱は M3c まで継続。
+KDEBUG の ops 版 4・20 口と HWDEV ABI は変更しない。GF 本体は M3c で核から除外した。
+
+## 11. M3c の旧 import 保持と像の境界
+
+| kdebug slot | symbol | 扱い |
+|---:|---|---|
+| 264 | pci_cfg_read32 | retained |
+| 265 | pci_cfg_read16 | retained |
+| 266 | pci_cfg_write32 | retained |
+| 267 | pci_cfg_write16 | retained |
+
+GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retained` で保持する。
+269 slot の順序・型・実装を維持し、private 生成契約のみ再生成する (KAPI と ops の版は不変)。
+生成器の nm 検査は実際の kdebug map の LOAD 入力を読み、GF オブジェクトの混入・
+核の未知参照・上の口への核の参照・retained の欠落・kernel 側の旧実装欠落を拒否する。
+出力ディレクトリに残る古い GF オブジェクトはリンク入力として数えない。
+`hwdev_audit.py` の計測対象は HWDEV の map/ELF/header とし、GF 8 オブジェクトと
+部品接続部分を分ける。§7 の M1 単一像実測は過去の基準値として維持する。
