@@ -128,7 +128,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
      ops_symbol='hwdev_ops', ops_names=('initialize',))
 ```
 
-- 大きさの上限の由来は [HWDEV_DESIGN §5](HWDEV_DESIGN.md#5-大きさメモリの見積もり)、全部品の上限・由来・今の余裕の表は票 TASK_T4_T6_MODULES §2-1a。
+- 大きさの上限の由来は [HWDEV_DESIGN §5](HWDEV_DESIGN.md#5-大きさメモリの見積もり)、全部品の上限・由来・今の余裕の表は [08_build §8-2](../../08_build.md#起動時に読む部品の大きさの上限と由来)。
 - schema:23–24 の注記と、台帳試験 T5c-6 の「11 番目を拒否」を HWDEV の受入へ変える (未定義の 12 番目・容量超過の拒否は維持)。
 
 ## 6. KDEBUG の ops の版 3→4・slot 19→20 と波及 (G5)

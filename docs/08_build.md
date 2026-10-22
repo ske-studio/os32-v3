@@ -107,7 +107,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 日常のターゲット (`make all` に含まれる): `kernel` `programs` `libs` `gshell` `shlib`。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
 ([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
-`make all` の最後、および各配備 (`deploy` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の書込み前に、使う成果物から `build/out/deploy-set.json` を生成する。生成に失敗した場合は配備先へ書き込まない。配備時の期待表は最後に HostDrv/NHD へ配ったものの表で、FD の中身は含まない。`deploy-fd` と部分同期 `sync --tag` は期待表を再生成しない。期待集合・allow-list・名札照合と外部対象外の扱いは [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md)。
+`make all` の最後、および各配備 (`deploy` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の書込み前に、使う成果物から `build/out/deploy-set.json` を生成する。生成に失敗した場合は配備先へ書き込まない。配備時の期待表は最後に HostDrv/NHD へ配ったものの表で、FD の中身は含まない。`deploy-fd` と部分同期 `sync --tag` は期待表を再生成しない。期待集合・allow-list・名札照合と外部対象外の扱いは 票 T2H_EXTERNAL_GATE。
 
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
@@ -139,6 +139,30 @@ ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの
 SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed facade を
 初期化 export から受け取る。`/boot` の部品・Unicode 表を含む一式を `hsync boot`
 で更新する。`vmkernel.old` への巻戻しでは、同じ像と対の部品も一緒に復元する。
+
+#### 起動時に読む部品の大きさの上限と由来
+
+値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
+欄: image = ファイル (容器) の長さ、mem = body (BSS 込み)、load_span = `payload_offset + mem_size` (票 TASK_T4_T6_MODULES §2-1 の形式)、表 = reloc / import / export の件数。
+由来の区分: **実測** (日付・値)、**導出** (式)、**決定** (誰が・いつ・票)、**由来不明** (値だけ — 当時の推測を添える)。「式に一致」は今回 (2026-10-22) 数字を照合しただけで、当時の記載は無い。
+今の大きさは main 79ba4b0 (HWDEV M3b) と同じ木の成果物 (`~/wt/os32-v3/hwdev_m3b/build/out/`、2026-10-22 09:23) のヘッダ word 3・10・11・22・24・26 を読んだ値。余裕の % は 今 ÷ 上限。
+
+| 部品 (ID) | image / mem / load_span の上限 | reloc / import / export の上限 | 由来 | 今の大きさ (% = 今 ÷ 上限) |
+|---|---|---|---|---|
+| KDEBUG (1) | 262,144 / 262,144 / 524,288 | 16,384 / 1,024 / 64 | **由来不明** (値だけ — DBGREF 設計 r4 2026-10-14 で理由なしに入り、S0 9c905de で実装。当時の見積りは移す 3 対象 38,067 B・import 211 本 (票 TASK_DBGREF §1-2 の表) で、その 7 倍・5 倍弱の 2 の冪の丸めと推測)。load_span は T4a-2 a53c242 で欄を足したときの値で、image_max + mem_max に一致 (旧検査を狭めない値と読める、記載なし)。2026-10-22 の [HWDEV 設計 §5](decisions/realhw/HWDEV_DESIGN.md#5-大きさメモリの見積もり) が上限 256 KiB の維持と核 ≤192 KiB を M5 の合格条件にすると**決定** | **M3c 取り込み後 (5d597d6、GF を部品へ出した後) 109,060 (42%) / 126,976 (48%) / 143,360 (27%)** (表の件数は M3c 後は未測定)。M3c の前 (2531f49) は 240,036 (92%) / 249,856 (95%) / 274,432 (52%)、表 2,972 (18%) / 269 (26%) / 19 (30%) |
+| SQLITE (2) | 524,288 / 524,288 / 544,768 | 4,096 / 32 / 1 | **実測** (T4a-2 2026-10-18、試作の容器 394,104 B・reloc 3,040・import 23、票 TASK_T4_T6_MODULES §7-1 の表の後の「T4a-2 試作測定」) と **導出** (load_span = body 512 KiB + 表最大 `144 + reloc×4 + import×12 + export×12 + 名前 (import+export)×64` = 19,036 B の頁切上げ 20,480 B)。512 KiB・4,096・32 への丸め方は書かれていない | 398,456 (76%) / 385,024 (73%) / 401,408 (74%)、表 3,129 (76%) / 29 (91%) / 1 |
+| FEP (3) | 65,536 / 65,536 / 81,920 | 2,048 / 96 / 1 | **由来不明** (値だけ — T5a-2 8532808 2026-10-18 で実装者が入れ、票・報告に理由なし。当時の fep.mod 24,392 B・import 65 本に対する 2 の冪と 1.5 倍の丸めと推測)。load_span は mem_max + SQLITE と同じ式の表最大 15,708 B の頁切上げ 16,384 B に**式に一致** | 24,392 (37%) / 24,576 (38%) / 32,768 (40%)、表 704 (34%) / 65 (68%) / 1 |
+| ATAPI_ISO (4) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5b-5 94d67d5 で FEP の値を写したと推測。表の式なら prefix は 12,288 B で足りる) | 11,616 (18%) / 8,192 (12%) / 12,288 (15%)、表 141 (7%) / 12 (38%) / 1 |
+| KCG (5) | 16,384 / 81,920 / 86,016 | 256 / 2 / 1 | image と表は **由来不明** (T5c-1 ddce74f、当時 kcg.mod 4,644 B・import 2 本。MEMMAP_V3 D14 の見積り「モジュール 4KB」の 4 倍と推測)。mem は image_max + cache 64 KiB (`KCG_ROM_CACHE_BYTES`、BSS、[MEMMAP_V3](decisions/MEMMAP_V3.md) §5-4 の計上値 = **決定** D14) に**式に一致**、load_span は mem_max + 1 頁に一致 | 4,672 (29%) / 69,632 (85%) / 73,728 (86%)、表 23 (9%) / 2 (**100%**) / 1 |
+| FM (6) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-2a 78f648a、FEP の値の写しと推測。当時 import 4 本) | 9,776 (15%) / 20,480 (31%) / 24,576 (30%)、表 260 (13%) / 4 (25%) / 1 |
+| PCM (7) | 65,536 / 65,536 / 81,920 | 2,048 / 32 / 1 | **由来不明** (値だけ — T5c-2b 0ae7c69、同上) | 9,868 (15%) / 8,192 (12%) / 12,288 (15%)、表 213 (10%) / 18 (56%) / 1 |
+| V86 (8) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-3 884e20e、同上。当時 import 28 本) | 11,606 (18%) / 16,384 (25%) / 20,480 (25%)、表 337 (16%) / 28 (58%) / 1 |
+| LAN (9) | 65,536 / 65,536 / 81,920 | 2,048 / 48 / 1 | **由来不明** (値だけ — T5c-4 8d9c5db、同上。当時 import 28 本) | 16,640 (25%) / 16,384 (25%) / 20,480 (25%)、表 343 (17%) / 28 (58%) / 1 |
+| CIRRUS (10) | 65,536 / 65,536 / 81,920 | 2,048 / 16 / 1 | **由来不明** (値だけ — T5c-5b a77b893、同上) | 9,624 (15%) / 8,192 (12%) / 12,288 (15%)、表 106 (5%) / 9 (56%) / 1 |
+| HWDEV (11) | 196,608 / 196,608 / 262,144 | 16,384 / 128 / 1 | image・mem・load_span は **決定** (2026-10-22 の [HWDEV 設計 §5](decisions/realhw/HWDEV_DESIGN.md#5-大きさメモリの見積もり): 見積り 105〜155 KiB に対し上限 192 KiB、超えたら移動の境界を見直し上限を黙って広げない。load_span ≤256 KiB も同表)。reloc・import は **由来不明** (値だけ — reloc は KDEBUG の値の写しと推測) | 131,488 (67%) / 126,976 (65%) / 135,168 (52%)、表 1,683 (10%) / 35 (27%) / 1 |
+
+- export_max = 1 は全部品で **導出** (ops 1 口 `initialize` だけを export する、`ops_slots=1`)。KDEBUG の 64 は上の由来不明に含む。
+- load_span の上限が mem_max + 表最大の頁切上げより小さい部品がある (HWDEV: reloc・import を上限まで使うと prefix 77,824 B > 65,536 B)。load_span は別に検査するので読み込みは安全側に断る。
 
 ### §8-3 ディレクトリ構造
 
@@ -206,16 +230,16 @@ Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジト�
 
 | ターゲット | 動作 |
 |-----------|------|
-| `make fd144` | **1.44MB フロッピーイメージ** `images/os32_boot144.img` (生イメージ、1,474,560 バイト)。2HD の `images/os32_boot.d88` とは別物で、既定は 2HD のまま。2026-09-24 から `make all` も作る (中身が CD の MINIMAL と同じなので容量の検査を毎回通す)。票 [`tasks/realhw/TASK_FD144.md`](tasks/realhw/TASK_FD144.md) |
+| `make fd144` | **1.44MB フロッピーイメージ** `images/os32_boot144.img` (生イメージ、1,474,560 バイト)。2HD の `images/os32_boot.d88` とは別物で、既定は 2HD のまま。2026-09-24 から `make all` も作る (中身が CD の MINIMAL と同じなので容量の検査を毎回通す)。票 TASK_FD144 |
 | `make deploy` | HostDrv (`C:\os32`) への同期 — 再起動不要 |
 | `make deploy-kernel` | HostDrv同期 + HostDrv→ext2同期 + NHDコピー — **要NP21/W再起動**。名前に反して**カーネル単独ではなく一式** (ユーザーランド・`/sys` も NHD へ書く) |
 | `make nhd-migrate-pt` | 旧配置の区画表を PC-98 標準配置へ + ローダ + カーネルを同時に (KAPI v64 への初回だけ、[下の節](#区画表の移行-v64))。NP21/W 停止中 ([D1]) |
 | `make deploy-boot` | ブートローダー (loader_hdd.bin) をNHDブート領域へ書き込み |
 | `make deploy-nhd` | deploy.yaml フルデプロイ + NHDコピー — **要NP21/W再起動** |
-| `make prune-source-extra` / `make prune-source-extra-delete` | HostDrv 配備元の名札外ファイルを一覧 (dry-run) / 削除。拡張子を限定せず、設定保護・allow-list は除外。正典は [T2H_EXTERNAL_GATE](tasks/v3/T2H_EXTERNAL_GATE.md) |
+| `make prune-source-extra` / `make prune-source-extra-delete` | HostDrv 配備元の名札外ファイルを一覧 (dry-run) / 削除。拡張子を限定せず、設定保護・allow-list は除外。正典は 票 T2H_EXTERNAL_GATE |
 | `make prune-stale` / `make prune-stale-delete` | 配備先 (HostDrv + NHD) に残ったマニフェストに無い *.bin を一覧 / 削除。deploy 系は既定で削除まで行う (`NO_PRUNE=1` で一覧のみ) |
 | `make apps` / `make game` | 外部リポジトリ (git submodule `apps/` = os32-apps、`game/` = os32-game) を SDK 経由でビルド。空なら `git submodule update --init` を促す |
-| `make external` | [H-7 の再開条件](tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし承認後に、上記 2 つをまとめてビルド。再開後は KAPI / SDK ライブラリ変更時にも再ビルドする。ポインタ更新条件は下記参照 |
+| `make external` | H-7 の再開条件 (票 T2H_EXTERNAL_GATE) を満たし承認後に、上記 2 つをまとめてビルド。再開後は KAPI / SDK ライブラリ変更時にも再ビルドする。ポインタ更新条件は下記参照 |
 | `make clean-external` | 外部リポジトリの生成物を削除 |
 | `make deploy` → ゲストで `hsync` | HostDrv 経由の配送 — 再起動不要。`hsync` は既定で `/sys` を外す (稼働中のシェル・共有ライブラリ)。入れ替えるときは `hsync sys` |
 | `make nhd-pull` | Windows 側 NHD を作業イメージ `build/nhd/os32.nhd` に取り込む (フォーマットしない)。deploy 系は無ければ自動で pull する |
@@ -533,7 +557,7 @@ U3 の予行・実機更新の準備は `make deploy-u3 HOSTDRV_DIR=<配備元�
 標準アプリとゲームは別リポジトリ (`ske-studio/os32-apps` / `ske-studio/os32-game`) で、
 `apps/` `game/` に git submodule として置き、`make sdk` が作る `build/sdk/` を指してビルドする。
 
-**現在は v3 のビルド対象外 (H-7)**。再開の条件・監査・受入は正典 [T2H_EXTERNAL_GATE.md](tasks/v3/T2H_EXTERNAL_GATE.md) に従う。
+**現在は v3 のビルド対象外 (H-7)**。再開の条件・監査・受入は正典 票 T2H_EXTERNAL_GATE に従う。
 
 再開が決まった後の初期化・ビルド:
 
@@ -542,7 +566,7 @@ git submodule update --init     # 初回 / clone 直後
 make external                  # apps + game (make apps / make game で個別)
 ```
 
-[H-7 の条件を満たして再開が承認された後](tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) は KAPI または SDK のライブラリ (libos32gfx 等) を変えたときも両方を再ビルドする。
+H-7 の条件を満たして再開が承認された後 (票 T2H_EXTERNAL_GATE) は KAPI または SDK のライブラリ (libos32gfx 等) を変えたときも両方を再ビルドする。
 アプリは静的リンクなので、旧 `.bin` に新ライブラリの変更は反映されない。
 再ビルドだけでは submodule のコミットもポインタも変わらない。submodule 側のソース変更で
 参照先が変わった場合にだけ、検証した組み合わせのポインタを親リポジトリで更新する。
@@ -1070,7 +1094,7 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 同じ取得先の `os32_boot.img` (2HD 生) の FD への書込みは**ユーザー自身**が行う (ノートの USB FDD、2026-10-11 決定) →
 `tools/rshell_serial.py` の `--serve-host <取得先>/hostdrv` で SerialFS に渡す。配備元は取得先に展開した `hostdrv/`
 をそのまま使い、作業場の `C:\os32` は使わない (名札外のファイルが常にある)。実機のそのほかの物理操作は個別承認。
-新 FD からの 2 段同期は [T2d〜h詳細 §5-1](tasks/v3/TASK_T2D_T2H.md) が指す設計票 §3-4 (修正版 B) の 0〜7 に従う。
+新 FD からの 2 段同期 (U3 の修正版 B — 新 FD 起動 + 全体同期と `/sys` 同期を別々に): 新 FD で起動 (HDD の hsync は使わない) → `hsync --root /hd0 --no-backup` (全体、`/sys` は除外される) → `hsync --root /hd0 sys` → 両方を `--verify` で変更 0 件・errors 0。同期の前に配備元の名札照合 (`deploy_source_check.py`)、同期の後に HDD 側の余剰照合 (シリアルの `ls -R`) を行い、1 件でも欠け・不一致・余剰があれば HDD 起動しない。準備・復旧・予行を含む 0〜7 の全手順は詳細設計 `~/os32-tmp/run/h/T2H_DESIGN.md` §3-4 (リポジトリ外、所在は票 TASK_T2D_T2H §5-1)。
 **再起動と再同期** (R7 の教訓、2026-10-14 反省会): 実機の再起動は rshell の `reboot` (シリアル) で行う — 本体のリセットボタンが効かないことがあった。起動待ちは出力の待ち受け (`wait_text` の類) で 1 回だけ待ち、`ver` を連打しない (連打がリセット直後の起動を邪魔した)。
 
 > ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない

@@ -7,32 +7,9 @@
 2026-10-17。設計案。OS32 は単一利用者・単一タスク・協調切替、攻撃者を想定しない。装置の誤動作・実装の誤りから戻れる範囲を扱う。以下の file:line は `/home/hight/os32-v3` の参照時点。実装・ビルド・ゲスト試験は未実施。
 `docs/tasks/v3/TASK_T3_LAYOUT.md:182` の決定を継承し、表は像に含めない。通常 +10,158 B、R1 +11,527 B の上限超過という T3d0 の結論を変更しない。
 
-## 1. ファイル形式・配置・会計
+## 1〜3. ファイル形式・配置・会計 / 読込順序と失敗 / 媒体
 
-- `/sys/unicode.bin` は **7,063 組 × 4 B = 28,252 B**、各組は `u16 Unicode, u16 JIS` の順の LE、Unicode の厳密な昇順、ヘッダなしとする。読み取りは `le16_rd`。現行ファイルは 65,536 語・131,072 B の直引き形式 (`tools/gen_unicode.c:11-17`) なので、同じ名前でも形式を切り替える必要がある。
-- `tools/gen_unicode.c` を組表の明示的 LE 出力へ変更する。`build/programs.mk:578-580` の「既存ファイルなら生成しない」を依存関係による再生成へ直し、生成器・原表の更新が必ず届くようにする。`build/deploy.mk:16` の `deploy-kernel` にも `unicode_bin` 依存を追加する。原表ヘッダは生成器・対照試験だけに使い、製品の kernel/SDK/shlib にはリンクしない。旧128KiB形式の互換読込は設けず、一式の再生成・配備で更新する。
-- KHEAP ではなく `pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, 7)` で連続 **7頁 = 28,672 B** を確保し `P2V` で読む。実装は SLACK を含む一般割当域から探す (`kernel/pgalloc.c:512-526`。ヘッダの「MEM_POOL_BASE以上」というコメントも追随)。低位 scratch は使わず、専用 owner・SURFACE・恒久予約は増やさない。成功時は起動中保持し、失敗時は `pgalloc_free_n_owner` で7頁を返す。
-- `kernel/kaudit_boot.c:14-28` の分類は空き頁数ではなく領域の総数。新7頁は PFN に応じ **slack または pool の内数**のまま、kernel owner の使用頁が7増え、空きが7減る。`other` へ重複加算しない (`kernel/memory_boot.c:390-455`)。表の有無・PFN・7頁は自己試験で確認する。
-- 旧低位128KiB (`kernel/memory_boot.c:210-214`) は SURFACE_BACKING から kernel FIXED に変更し、旧 Unicode 分の **other −32頁、fixed +32頁**、総数不変。T7a まで一般池に返さず scratch 用途を維持する。表用の KHEAP 常駐消費は0、頁末の余り420 Bは探索しない。
-
-## 2. 読込順序と失敗
-
-- 新しい kernel 専用の読込・探索部を設ける。呼出しは `kernel/kernel.c:596` の初期自己試験終了直後。root mount (:453)、paging (:524)、memory_boot_init (:575)、初期試験による再初期化が済み、`kaudit_boot_pages` (:659)、KAPI構築 `exec_init` (:663)、IME (:695) より前となる。既存 :670-689 の低位読込・公開を置き換える。ここまでの起動表示は ASCII とし、日本語の最初の描画・外部KAPI呼出し前に成否を確定する。
-- `vfs_stat` で長さ28,252 Bを確認し、確保した頁へ `vfs_read`、返却長も一致することを確認する (`fs/vfs.c:515,752`)。全組を一巡して厳密昇順（従って重複なし）を検証し、成功時だけ内部ポインタを設定する。これが検証の唯一の時点。旧 ready 三状態・4点照合・公開setter・初回呼出し時の検証は不要。
-- 無い、stat/read失敗、長さ不一致、逆順、重複、確保失敗はすべて起動継続。部分表を公開せず内部ポインタNULL、確保済み頁は返す。診断は起動時 **1行** `[unicode] unavailable reason=<missing|io|size|order|nomem>; kana-only`（逆順・重複は order）。正常時は `[unicode] loaded pairs=7063 pages=7 pfn=<先頭PFN>`。呼出しごとのログ・再読込・HostDrvへの自動退避はしない。
-- 変換は最初に従来のかな算術 (`lib/utf8.c:288-308`) を行い、ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は表がなくても維持する。他は有効表の二分探索、未収録・BMP外・無効表なら0。NULLは内部の有無だけを表し、新しい公開 ready API は作らない。
-- `kernel/kernel.c:773` の close は「scratch失効 → planar BB全域/mailbox初期化 → 通常AS・USER lease公開」の順を保持。`drivers/kcg.c:251` の Unicode 再検証だけ削除する。表は低位から独立し、close後も同じ頁を引く。`kcg_load_font` の boot後 NOSYS は維持する。
-
-## 3. 媒体
-
-| 媒体 | 起動時の扱いと配備 |
-|---|---|
-| HDD/ext2 | 現行 root hd0 の `/sys/unicode.bin` を上記 VFS 経路で読む (`kernel/kernel.c:444-453`)。 |
-| FD/FAT | root fd0、同じパス・同じ処理。unicode は core tag (`build/core.yaml:48-50`)、MINIMALかつ起動FDに含まれる (`build/packages.yaml:12-20,38-40`)。名前は8.3に収まる。 |
-| CD/iso9660 | 現行は `/cdN` サブマウント (:489-490)、ISO はインストール用PKG (`build/image.mk:50-57`)。直接CD root起動ではない。MINIMALをインストール後、HDD/FD rootの同じ経路になる。 |
-| HostDrv | 現行は `/host` (:503-505)。配備・hsyncの供給元であり、`/host/sys/unicode.bin` があるだけでは root の欠損を救わない。rootへコピー後、次回起動で読む。 |
-
-FSに依存しない stat/read・検証・探索を共通化する。CD/HostDrvを新しいroot候補にする変更は含めない。配備の長さ・CRC照合は既存の deploy-set (`tools/tests/test_deploy_set.py:419-472`) を使う。新しい検出器・世代管理・混在拒否は加えず、混在時もかなだけで起動を続ける。
+受入後 (2026-10-22) に現行の契約として [KAPI_SPEC §4-13](../../KAPI_SPEC.md#4-13-unicode_to_jis-v76) へ移した (RAM の勘定は [02_memory §2-1](../../02_memory.md))。設計時の file:line と旧低位 128KiB の扱い (T7a-2e で V86_LOW に統合) は移していない。
 
 ## 4. 撤去・置換と caller
 

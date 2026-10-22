@@ -54,7 +54,7 @@ WAIT_KEY との共有承認は v3 で改めた (GUIRUNKEY-1、ユーザー決定
 | 0xA0000〜0xBFFFF | supervisor (e11b1〜) | テキスト / グラフィック VRAM。CPL=3 は KAPI (`tvram_*`) か lease 経由だけ |
 | 低位 V86_LOW | supervisor | V86 session 中だけゲストの RAM として使用 |
 | SHM | RW+USER (共有 PT、lock 中は RO) | boot 専用口で初期化し、SHM 専用口で RW だけ切替 |
-| Unicode の組表 (kernel 所有の 7 頁、T3d1〜) | supervisor | CPL=3 は KAPI `unicode_to_jis` だけ (表は公開しない、[T3D1_UNICODE_FILE](tasks/v3/T3D1_UNICODE_FILE.md)) |
+| Unicode の組表 (kernel 所有の 7 頁、T3d1〜) | supervisor | CPL=3 は KAPI `unicode_to_jis` だけ (表は公開しない、[KAPI_SPEC §4-13](KAPI_SPEC.md#4-13-unicode_to_jis-v76)) |
 | pool から確保した 32 頁 (SURFACE、9801 BB)、バックエンド固有 BB | supervisor (e11b2〜) | CLIENT lease の私有 VA で描画。Cirrus DISPLAY は授権された lease だけ RW |
 | KAPI トランポリン 1 ページ | RO+USER | `int 0x80` スタブ列 |
 | 0x80000000〜 shlib .text | RO+USER (共有) / .data は per-app | 共有ライブラリ |

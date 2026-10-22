@@ -24,7 +24,7 @@ PC-98キーボードコントローラ制御。IRQ1割り込みハンドラで�
 **修飾キー**: SHIFT・CTRL・GRPH は make で ON、break で OFF。**カナ・CAPS は機械式ロック**で、ロックすると make、
 外すと break が来るので同じく make で ON、break で OFF (方式 B。2026-09-26 までは make で反転して break を捨てていた
 ため、外しても ON のままだった)。根拠は BIOS ワークエリア 0000:053Ah (INT 09h が make でセット・break でリセット) と
-NP21/W の観測 — 経緯と未確認点 (実機) は [TASK_KBD_NAV](tasks/gui/TASK_KBD_NAV.md) §2。修飾キーはすべて V86 セッション中も
+NP21/W の観測 — 経緯と未確認点 (実機) は 票 TASK_KBD_NAV §2。修飾キーはすべて V86 セッション中も
 追う (打鍵データはゲストだけへ渡す)。起動時は `kbd_init` が 053Ah のカナ・CAPS ビットを引き継ぐ (起動行 `[kbd] ... lock=XX`)。
 
 **特殊キー (kbd_getkey()のスキャンコード)**:
@@ -136,11 +136,11 @@ GUI もアプリも 400 ライン / 16 色 / プレーンを決め打ちしな�
 (表示面へ直接描かせない = 契約 G4。写像の規則は [02 §2-1](02_memory.md))。counters
 (`gfx_stats`: present_bytes / hw_ops / io_accesses / commits) で「CPU が運んだ量」と
 「エンジンに任せた回数」を測る (NP21/W では時間が測れないため)。設計と経緯は
-[tasks/gui/DESIGN.md §5〜§8](tasks/gui/DESIGN.md)、Cirrus の資料は `include/wab_xe10.h` と
+票 `tasks/gui/DESIGN.md` §5〜§8、Cirrus の資料は `include/wab_xe10.h` と
 `drivers/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
-`kernel/v86_gcap.c`、票 [TASK_PEGC480_REALHW](tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1):
+`kernel/v86_gcap.c`、票 TASK_PEGC480_REALHW §3 段 1):
 `include/pegc.h` の 480 ラインの SYNC は実機 Ra266 の ROM から採った値を使う。uPD7220 の SYNC は読み戻せないため、
 採取には V86 の監視部で**実機の ROM の INT 18h** を呼ぶ — AH=31h で今のモードを読み、その値の bit の並び
 (NP21/W の bit2 / Bible 3-2 の bit3。その並びとして正しい値になるのがちょうど 1 つのときだけ決め、決まらなければ 30h を呼ばない。
@@ -159,11 +159,11 @@ NP21/W の ROM は SYNC を内部状態へ直接書くので、エミュレー�
 純粋部 (記録・判定) のホスト試験は `make check-v86-gcap-host`。
 
 **PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らない** (2026-09-29〜、票
-[TASK_PEGC480_REALHW](tasks/realhw/TASK_PEGC480_REALHW.md) §2 H2・H3・H5):
+票 TASK_PEGC480_REALHW §2 H2・H3・H5):
 `pegc_apply_timing` が 1 か所で 09A8h → 6Ah GDC クロック (83h・85h = 5MHz) → 両 GDC の SYNC → グラフィック GDC の
 PITCH (80) → SCROLL → 表示開始の順に書く (クロックは SYNC の前 — Bible 3-2 表3-2)。戻りは起動時に 09A0h
 (sel 09h の bit0 = CLOCK-1、読み値 bit1 = CLOCK-2) で読んだクロックへ戻し、PITCH (書き込み専用)・グラフィック GDC の SYNC・
-SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [include/pegc.h](../include/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う (採取記録は [TASK_PEGC480_REALHW §3](tasks/realhw/TASK_PEGC480_REALHW.md))。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
+SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [include/pegc.h](../include/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う (採取記録は 票 TASK_PEGC480_REALHW §3)。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
 上限 2µs × 5000 回で打ち切って数える — `pegc_gdc_fifo_timeouts`、kernel.map から読める)。09A8h へは bit1,0 だけを書く
 (実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。ホスト試験は `make check-pegc-mode-host`。
 
@@ -355,7 +355,7 @@ TEXTモードではTVRAM属性反転 (ビット2 XOR) によるカーソル表�
 ### §5-9 漢字キャラクタジェネレータ (kcg.c / kcg.h)
 
 PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`kernel/kcg_body.c:15,42-65`、facade は `kernel/kcg_module.c`)。
-V86 の復帰口は部品の有無によらず core で 68h を CODE に戻し、搭載中の KCG facade の `invalidate` で ROM/CG RAM キャッシュを全失効する。失効では統計を消さず、次の読出しを miss として観測する。通常の CUI 復帰は保存済み BIOS の機能ビットで EGC/GRCG を停止し、9821 のみ 6Ah の標準・400ライン構成へ戻す。CG 窓 WB・VRAM UC は既存のページ属性を維持する。固定診断と根拠は [T7a 設計票 §1](tasks/v3/TASK_T7_AND_FOLLOWUPS.md#1-t7a-低位の所有権切替)。
+V86 の復帰口は部品の有無によらず core で 68h を CODE に戻し、搭載中の KCG facade の `invalidate` で ROM/CG RAM キャッシュを全失効する。失効では統計を消さず、次の読出しを miss として観測する。通常の CUI 復帰は保存済み BIOS の機能ビットで EGC/GRCG を停止し、9821 のみ 6Ah の標準・400ライン構成へ戻す。CG 窓 WB・VRAM UC は既存のページ属性を維持する。固定診断と根拠は票 TASK_T7_AND_FOLLOWUPS §1 が持つ。
 旧 `.kcgfont` の起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
 
 | 項目 | 仕様 |

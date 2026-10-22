@@ -41,7 +41,7 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 **PCI コマンド** (cmd_pci.c):
 
 実機 PC-9821Ra266 の内蔵 LAN (Intel 82557 = `8086:1229`) を見つけるための口
-(票 [`tasks/realhw/TASK_LAN_82557.md`](tasks/realhw/TASK_LAN_82557.md) L-A)。
+(票 TASK_LAN_82557 L-A)。
 **NP21/W は PCI を実装していない**ので、エミュレータでは
 `lspci: no PCI (mechanism #1 not present)` が正しい応答。
 

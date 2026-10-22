@@ -1,6 +1,6 @@
 # Auxiliary Core Service 設計草案
 
-> 状態: **草案 (2026-09-28)** — 設計思想の草案で、ロードマップ・実装契約ではない。位置は v3 本案 ([tasks/v3/V3_PLAN.md](tasks/v3/V3_PLAN.md) §2-1、2026-09-30) で決めた: **ACS は v3 の範囲に入れない** (v3 では HAL のバックエンド表に差し込み口を塞がないことだけ守る)。本文の「OS64」の定義は [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) の冒頭。
+> 状態: **草案 (2026-09-28)** — 設計思想の草案で、ロードマップ・実装契約ではない。位置は v3 本案 (計画 V3_PLAN §2-1、2026-09-30) で決めた: **ACS は v3 の範囲に入れない** (v3 では HAL のバックエンド表に差し込み口を塞がないことだけ守る)。本文の「OS64」の定義は [LEGACY_LIVING_PRESERVATION.md](LEGACY_LIVING_PRESERVATION.md) の冒頭。
 
 ## 目的
 

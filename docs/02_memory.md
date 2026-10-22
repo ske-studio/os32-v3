@@ -3,7 +3,7 @@
 ### 開発方針と現在の実装上限
 
 - **最低動作環境の数値は未確定**。旧物理固定配置での9.6MB下限説明
-  ([tasks/gui/DESIGN.md §9.3](tasks/gui/DESIGN.md)、2026-09-04) は当時の設計記録。
+  (票 `tasks/gui/DESIGN.md` §9.3、2026-09-04) は当時の設計記録。
   現行は高位 VA と物理 pool を分離し、旧ホットデプロイ窓も撤去済み。
   f12 の8MBホスト証拠をゲストや全バックエンドの最低動作環境へ一般化しない。
 - **CPL=3 は高位 VA の私有 AS**。image/libc は `MEM_EXEC_LOAD_ADDR` (0x80100000)、
@@ -98,7 +98,7 @@ VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供�
 不一致は `ng diff=総和−物理頁数` と表示し、起動は続ける。
 KDEBUG=1 の自己試験は部品が RUNNING の場合だけ呼び、post_exec の `slack_cycle` は
 空き頁を1頁ずつ確保して再割当拒否・使用中 owner の保持・返却後の空き頁数を確かめる。
-ゲストでの T3b1 受入は [T3配置票](tasks/v3/TASK_T3_LAYOUT.md) §4 に従う。
+ゲストでの T3b1 受入の手順と結果は票 TASK_T3_LAYOUT §4 が持つ。
 
 
 Unicode-JIS は `/sys/unicode.bin` の昇順 7,063 組 (28,252 B) を起動時に一度読み、

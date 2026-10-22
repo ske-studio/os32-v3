@@ -3,7 +3,7 @@
 ### §3-1 フロッピーディスク仕様
 
 フォーマットは 2 つある。**既定は 2HD 1232KB。** 1.44MB は `make fd144` で作る
-(票 [`tasks/realhw/TASK_FD144.md`](tasks/realhw/TASK_FD144.md))。
+(票 TASK_FD144)。
 **値の正典は `tools/mkfat12.py` の `GEOMETRIES`** — ここは写し。
 
 | パラメータ | 2HD (既定) | 1.44MB |

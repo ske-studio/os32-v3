@@ -22,7 +22,7 @@ check-kapi-print-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - sdk/kapi.json
-- docs/tasks/v3/TASK_T4_T6_MODULES.md
+- docs/KAPI_SPEC.md
 - userland/tests/kprint_boundary.c
 - build/checks.d/check-kapi-print-host.mk
 - tools/check_map.d/check-kapi-print-host.yaml

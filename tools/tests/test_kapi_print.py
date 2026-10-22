@@ -64,8 +64,8 @@ def inventory():
     apis = json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
     inputs = {a['name'] for a in apis
               if any('const char *' in p for p in a['args'])}
-    document = (ROOT / 'docs/tasks/v3/TASK_T4_T6_MODULES.md').read_text()
-    section = document.split('### 1-3. X-1 公開 NUL 入力・可変引数の担当表\n')[1].split('\n## 2.')[0]
+    document = (ROOT / 'docs/KAPI_SPEC.md').read_text()
+    section = document.split('### 公開 NUL 入力・可変引数の担当表 (X-1)\n')[1].split('\n### ')[0]
     listed = set(re.findall(r'`(\w+)`', section))
     assert not inputs - listed, sorted(inputs - listed)
     assert {a['name'] for a in apis if '...' in a['args']} == {'kprintf'}
