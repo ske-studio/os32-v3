@@ -87,9 +87,8 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 | c3 / d1 | `tools/tests/test_hsync_protect.py:10` のとおり、`hsync` の inode 比較はコンパイル確認だけで、動作を検査しない。 |
 | R1 | `tools/tests/multiapp_model_host.c:6` の純粋な模型が残り、実物ソースの状態遷移を試験していない。 |
 
-2026-09-14 の分類・改善案 R1〜R12・未読記録は
-調査の快照 §2〜§4 (アーカイブ: `docs/archive/TEST_INVENTORY_2026-09-14.md`) を参照する。
-快照の本文が正で、快照冒頭の「移した」は当時の注記。今も残る項目は上の表。たとえば R8 の再構築試験は
+2026-09-14 の分類・改善案 R1〜R12・未読記録の経緯: `docs/archive/TEST_INVENTORY_2026-09-14.md` §2〜§4。
+今も残る項目は上の表だけ。たとえば R8 の再構築試験は
 現在の 2 モードが自動実行される (§0)。現行の CI 被覆は §4 と生成表で確認する。
 改善案の採否を再検討するときは、現在の recipe・試験本体と照合する。
 延ばした試験の現行の判断は [DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) に集約する。

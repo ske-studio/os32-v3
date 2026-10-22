@@ -1,8 +1,8 @@
 # 設定レジストリ (settings.db) — 設計書 初版
 
 > 発行: PM (2026-09-06) / 状態: **受入完了 (2026-09-14)**
-> v1.3 で受け入れた設定レジストリの現行設計。旧ゲートの解消と実装経緯は
-> S0 (アーカイブ: `docs/archive/settings/TASK_S0.md`)・S2 (アーカイブ: `docs/archive/settings/TASK_S2.md`) を参照。
+> v1.3 で受け入れた設定レジストリの現行設計。旧ゲートの解消と実装の経緯:
+> `docs/archive/settings/TASK_S0.md`・`docs/archive/settings/TASK_S2.md`。
 > SQLite の基盤 API は [KAPI_SPEC.md v50](../../KAPI_SPEC.md#設定レジストリの基盤-v50) が正典。
 
 Windows のレジストリに相当する「設定の置き場」を 1 つに決める。
@@ -165,9 +165,16 @@ gshell 起動
 | 同期 | `os32_sqlite_vfs.c` の xSync が ext2 の書き戻しを待つか。待たないなら `cfg_commit` の後に `sys_sync` 相当を呼ぶ | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
 | 速度 | NP21/W の実測構成で `cfg_open` + 20 件 get + close の時間 (tick)。gshell 起動が体感で遅れないこと | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
 | 大きさ | ページサイズ 1KB / 数百件で DB が 64KB 以内に収まること (FDD の媒体にも載る) | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
-| メモリ | 固定 SQLite プールでも FEP・設定 DB の共存時のピークと OOM・回収を実測する。v3 の最低条件は 8MB GUI + 私有 2MB のアプリ (V3_PLAN §2-2、目標)、構成別の判定は v3 最終段。必要 RAM と開発方針は [02_memory.md](../../02_memory.md) に従う | 合格 (S5 §6 (アーカイブ: `docs/archive/settings/TASK_S5.md`)) |
+| メモリ | 固定 SQLite プールでも FEP・設定 DB の共存時のピークと OOM・回収を実測する。v3 の最低条件は 8MB GUI + 私有 2MB のアプリ (V3_PLAN §2-2、目標)、構成別の判定は v3 最終段。必要 RAM と開発方針は [02_memory.md](../../02_memory.md) に従う | 合格 (記録はアーカイブ `docs/archive/settings/TASK_S5.md` §6) |
 
-数値と条件は S5 §6 の証拠を参照 (386 実機の計測ではない)。hot journal は自動回復せず CORRUPT とする S2 の契約 (アーカイブ: `docs/archive/settings/TASK_S2.md`) を維持する。強制終了試験の範囲は S3 (アーカイブ: `docs/archive/settings/TASK_S3.md`) に従う。
+表の「合格」は NP21/W (15MB) での実測で、tick は相対値 (386 実機の計測ではない)。数値の記録はアーカイブ `docs/archive/settings/TASK_S5.md` §6。
+守る決まり:
+- **hot journal は自動回復しない**。`cfg_open` は BUSY_RECOVERY を CORRUPT として扱い、get は既定値、set / begin は拒否する (`userland/lib/cfg/libos32cfg.c`)。
+- 回復は `install --recover-settings` だけが行う。残った journal は `.bak-journal` に写してから消し、切り替える。
+- **強制終了・電源断の耐性 (DELETE journal の回復) は保証しない (未検証)**。ゲストで確かめたのは「`cfg set` → ハードリセット → 値が残る」までで、強制終了の試験は別途承認した使い捨てイメージでだけ行う。
+- リカバリの失敗点の網羅はホスト試験 (`tools/tests/install_recover_host.c`) の範囲。
+
+経緯: S2 `docs/archive/settings/TASK_S2.md`、S3 `docs/archive/settings/TASK_S3.md`。
 
 ---
 
@@ -188,7 +195,10 @@ tar c /hd0/backup/etc.tar /etc/settings.json /etc/system.cfg /etc/profile   # �
 - 読み書きは `libos32cfg` に**最小の JSON writer / reader** を持たせる (この形しか読まない。
   汎用 JSON ライブラリは持ち込まない — 依存を増やさない方針)。
 - `import` は `schema_version` を見て、新しいファイルは拒否、古いファイルは読める範囲で取り込む。
-- **tar**: `userland/cmds/tar.c` の `tar c|x|t` は実装済み。仕様と受入は S6 (アーカイブ: `docs/archive/settings/TASK_S6.md`) を参照。圧縮は外側で `lz4` を掛ける (`etc.tar.lz4`)。
+- **tar**: `userland/cmds/tar.c` の `tar c ARCHIVE PATH...` / `tar x ARCHIVE [-C DIR]` (既定は `.`) / `tar t ARCHIVE` は実装済み。圧縮は持たず、外側で `lz4` を掛ける (`etc.tar.lz4`)。
+  扱うのは通常ファイルとディレクトリ (再帰) だけ。所有者・時刻はヘッダに書くが展開では使わない。ustar の読み書きは `lib/microtar/` (MIT、改変点は `lib/microtar/README.OS32`)。
+  名前は先頭の `/` を落として格納し、99B を超える名前は拒否して非ゼロ終了する。展開では `..` を含む名前と絶対パスを断る。
+  試験は `tools/tests/test_tar_cmd.py`。経緯と受入の記録: `docs/archive/settings/TASK_S6.md`。
 - リカバリモードとの関係: `install --recover-settings` はマスタ DB を戻す。バックアップからの
   復元は `cfg import` (通常運用) で、リカバリモードにも `--from <json|tar.lz4>` を足せる (S3 に含める)。
 - 自動バックアップ: 設定を書き戻すたびに JSON を出すのは重いので、**`install` / 大きな変更の
@@ -215,5 +225,8 @@ tar c /hd0/backup/etc.tar /etc/settings.json /etc/system.cfg /etc/profile   # �
 旧ゲートと実装順序の記録は S0 (アーカイブ: `docs/archive/settings/TASK_S0.md`)、
 ライブラリとコマンドは S2 (アーカイブ: `docs/archive/settings/TASK_S2.md`)、
 リカバリは S3 (アーカイブ: `docs/archive/settings/TASK_S3.md`)、GUI 統合は S4 (アーカイブ: `docs/archive/settings/TASK_S4.md`)、
-共存・受入は S5 (アーカイブ: `docs/archive/settings/TASK_S5.md`)、tar は S6 (アーカイブ: `docs/archive/settings/TASK_S6.md`) を参照。
-通常配備で既存の設定を上書きしない契約は S0-D (アーカイブ: `docs/archive/settings/TASK_S0.md`) に記録されている。
+共存・受入は S5 (記録はアーカイブ `docs/archive/settings/TASK_S5.md`)、tar は S6 (記録はアーカイブ `docs/archive/settings/TASK_S6.md`)。
+通常配備で既存の設定を上書きしない契約: ゲストの `/etc` の `settings.db`・`-journal`・`-wal`・`-shm`・`.bak` (大文字小文字を区別しない) は、
+通常配備 (`nhd_deploy.py` の sync・copy・rm、`hostdrv_deploy.py` の sync・clean、`prune_stale.py`、ゲストの `hsync`) が作成・上書き・削除・rename しない
+(判定は `tools/deploy_protect.py`、名前と実体 (symlink・hardlink の別名) の 2 段、除外は `protected:` のログ)。NHD 全体の deploy は pull の stamp と remote の hash が一致するときだけ書く。
+明示 install と `cfg init` は対象外。経緯: `docs/archive/settings/TASK_S0.md` の S0-D。

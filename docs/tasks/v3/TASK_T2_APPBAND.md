@@ -1,6 +1,6 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
-> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。a〜c の証拠は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`)、d〜h の状態は 子票 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)、残件は [持越し台帳](../DEFERRED_TESTS.md) を参照。構成別の未実施分まで合格とはしない。
+> 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。残件は [持越し台帳](../DEFERRED_TESTS.md)。a〜c の証拠と d〜h の経緯の記録はアーカイブ (`docs/archive/v3/TASK_T2ABC_RESULTS.md`、`docs/archive/v3/TASK_T2D_T2H.md`)。構成別の未実施分まで合格とはしない。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。
 > 決定の正典: [MEMMAP_V3](../../decisions/MEMMAP_V3.md) §0・§2-2・§2-3 ⑥・§3-5・§6 T2・§7・§8-4。位置づけ: [V3_PLAN](V3_PLAN.md) P1 / P7。引継ぎ: TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`) §1-2・§4-1-R〜§4-6-N。B1: [FEP_BOUNDARY](../settings/FEP_BOUNDARY.md) §4 (D31 で T2 に移管)。
@@ -217,7 +217,7 @@ int mem_unmap(void *base, u32 bytes);
 - 物理は1ページずつ。VA探索・extent slot・必要PT・全物理を用意し、公開直前まで未完 map を呼出元に見せない。既存 PTE を上書きする MAP_FIXED は持たない。準備途中のページは未公開 PT の PTE 等で追跡し、失敗時に全件返す (巨大なスタック上 PFN 配列は作らない)。
 - unmap は **呼出元の mem_map extent と allocator用初期heap extent** だけ。image / stack / shlib / lease を混ぜた範囲は全拒否。部分解除を許可し、分割で記録が足りなければ無変更で FULL。NP→TLB→owner free。隣接した同種 extent は併合し、伸長ごとに32本を消費しない。ポインタ再利用後の二重freeは allocator の責任で、カーネルは記録と owner を照合する。
 - `_sbrk` は signed incr / pointer overflow を検査し、現 break より先が必要ならページ末尾を hint に EXACT map。**_sbrk は非連続の結果を連続と偽って返さない**。続きが取れない場合、上の malloc が flags=0 の別 extent を新しい arena として扱う。newlib の MORECORE と map arena の接続を SDK 内で実装し、_sbrk 単体は −1 / ENOMEM。負の incr は break を下げるだけで、ページ返却は allocator が末尾の生存参照なしを確認した trim の時に行う。
-- `malloc` / `calloc` / `realloc` / `free` と Rust allocator の対応を揃える。**C は要求サイズ、Rust は prefix・整列余白込みで mem_alloc に渡す実 byte 数**で64KiB閾値を分類する。大塊の TOPDOWN と fallback の条件は 子票 §3-4 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) を参照。overflow の calloc、realloc失敗で旧内容保持、大小を跨ぐreallocを試験する。64KB未満は heap、完全に空いた末尾ページを trim 可能にする。
+- `malloc` / `calloc` / `realloc` / `free` と Rust allocator の対応を揃える。**C は要求サイズ、Rust は prefix・整列余白込みで mem_alloc に渡す実 byte 数**で64KiB閾値を分類する。大塊の TOPDOWN と fallback の条件は [09_exec の「ヒープの大塊と副 arena」](../../09_exec.md#ヒープの大塊と副-arena) (経緯: `docs/archive/v3/TASK_T2D_T2H.md` §3-4)。overflow の calloc、realloc失敗で旧内容保持、大小を跨ぐreallocを試験する。64KB未満は heap、完全に空いた末尾ページを trim 可能にする。
 - 既存 `exec_heap_alloc` / mem_alloc も共通の map 実体で伸長し、大塊は同閾値。shell の固定heapは従来のままで、poolを使い切っても閉じる操作が動く。user heap のメタ情報を kernel が無検証で辿って他 owner を返さない。KHeap の部分trim/複数arenaが必要なら明示的な検証・境界を足す (汎用 KHEAP を池へ伸長しない)。allocator の具体的な実装選択 (TLSFを含む) は T2f の実装設計で実サイズと試験から決める。
 - R5: extent の回収後 owner 0。`ledger_reclaim_owner` の最後の掃除だけで漏れを隠さず、`exec_as_leftover_pages==0` を要求する。起動失敗でも PD/PT・lease・shlib data を含め全返却する。
 
@@ -225,7 +225,7 @@ int mem_unmap(void *base, u32 bytes);
 
 **mem_map の失敗時には要求 bit / epoch を記録して NULL を返し、KAPI の内部で WM を回さない**。通知は「物理池不足」のときだけ (VA断片化・固定表満杯・引数不正では出さない)。back GUI の AppSlot に1 bitを合成して保持し、追加メモリを使わない。CUIと終了中のASは対象外。
 
-SDK の GUI イベントループが、安全な既存 park / resume の配送で trim event を受け、malloc の末尾空きページと未使用map arenaを返す。任意キャッシュ解放 hook は allocator が操作中でないときだけ1回呼び、再入bitで二重配送を防ぐ。応答しないアプリを待たない。front の SDK は map失敗後、allocatorの操作を終えて安全に yield できる GUI 文脈なら **yield → 1回再試行 (厳密な一巡は保証しない)**し、できない文脈ならそのまま ENOMEM。retry のための新しいメモリ KAPI は作らない。配送・再試行の条件は 子票 §4-2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) を参照。
+SDK の GUI イベントループが、安全な既存 park / resume の配送で trim event を受け、malloc の末尾空きページと未使用map arenaを返す。任意キャッシュ解放 hook は allocator が操作中でないときだけ1回呼び、再入bitで二重配送を防ぐ。応答しないアプリを待たない。front の SDK は map失敗後、allocatorの操作を終えて安全に yield できる GUI 文脈なら **yield → 1回再試行 (厳密な一巡は保証しない)**し、できない文脈ならそのまま ENOMEM。retry のための新しいメモリ KAPI は作らない。配送・再試行の条件は [09_exec の trim の配送](../../09_exec.md#gui-slot-への-trim-要求と配送-池不足時) が正典。
 
 **端末配下の CUI 前景**では D24 の帰結として、裏 GUI が park したままなら通知を記録してもその場で返却させられず、前景に ENOMEM を返す。CUI の失敗を隠す同期 WM pump は追加しない。CUI が戻って次の安全点で裏 GUI が配送を受けること、応答後の別要求は成功し得ることを T2g で受け入れる。
 
@@ -266,7 +266,7 @@ v2戻り先とv3の成果物/配備先を分離し、PMが停止中に一組を�
 
 ### 5-1. 単独着地の単位
 
-**T2d〜T2h は受入完了**。詳細契約・受入・残件への入口は TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。以下の段表は受入条件の要約、T2a〜T2c の実績は TASK_T2ABC_RESULTS (アーカイブ: `docs/archive/v3/TASK_T2ABC_RESULTS.md`) を参照。
+**T2d〜T2h は受入完了**。詳細設計と受入の経緯: `docs/archive/v3/TASK_T2D_T2H.md` (契約は 09_exec・KAPI_SPEC へ移し済み、残件は [持越し台帳](../DEFERRED_TESTS.md))。以下の段表は受入条件の要約。T2a〜T2c の実績の記録: `docs/archive/v3/TASK_T2ABC_RESULTS.md`。
 
 以下は**策定時の実装分割・受入条件**であり、実施結果は上記の参照先を読む。各段は前段までの正常起動を保ち、実ソースILP32ホスト試験でRED→GREENを記録する。追加試験は tests inventory / check_map / build に登録し、起動用guestは自層deploy.yamlへ [V2]。変異は写しの木で行い、コンパイル失敗を実行時REDに数えない (意図したASSERT拒否は別集計)。検査の役割分担は [ROLES §0](../agents/ROLES.md#0-現行の体制) に従う。
 

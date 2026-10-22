@@ -359,7 +359,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 - **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。
   `pci_bind_info` はローカルの8Bスナップショットを書き、NULL・帯境界跨ぎ・idx範囲外は INVAL、
   writable 検査の拒否は kill。線の状態は取得時に合成する。NP21/W/実機の結線・隔離の観測範囲は
-  受入記録 W3/W6 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`) と LAN 票を参照。
+  LAN 票と、受入 W3/W6 の記録 (アーカイブ `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`) にある。
 
 ### 1-5. µs 時計 — `sys_time_now(u32 *lo, u32 *hi)`
 

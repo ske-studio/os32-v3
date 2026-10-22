@@ -11,8 +11,8 @@
 ユーザー要望: 同サイズのファイルが同期されない問題を解消し、CRCとタイムスタンプの導入、および追加の改善点を検討する。
 
 H1〜H4 は実装・受入済み。本文はその初期設計と受入条件の記録で、後続案 (§8「後続」) は未着手。
-利用時の現行仕様は [hsync(1)](../../manpages/hsync.1#description)、H4 の完了証拠は
-TASK_H4 §8 (アーカイブ: `docs/archive/shell/TASK_H4.md`) を参照する。
+利用時の現行仕様は [hsync(1)](../../manpages/hsync.1#description)、H4 の完了証拠の記録は
+アーカイブ `docs/archive/shell/TASK_H4.md` §8。
 初期案の常時内容比較から現行の同サイズ・同mtime時の省略への変更は [同一判定](../../manpages/hsync.1#同一判定) を参照。
 
 ## 1. 推奨方針
@@ -214,9 +214,10 @@ CRCだけの追加とmtime API追加で、必要なビルド・ABI確認を分�
 
 ## 9. 受入項目
 
-以下は初期設計時の受入条件。H1〜H4 の判定・実施範囲は各完了票
-(H1 (アーカイブ: `docs/archive/shell/TASK_H1.md`)、H2 (アーカイブ: `docs/archive/shell/TASK_H2.md`)、
-H3 (アーカイブ: `docs/archive/shell/TASK_H3.md`)、H4 (アーカイブ: `docs/archive/shell/TASK_H4.md`)) に従う。
+以下は初期設計時の受入条件。今の hsync が保証する範囲としない範囲は
+[hsync(1)](../../manpages/hsync.1) の「保証する範囲としない範囲」が正典。H1〜H4 の判定・実施範囲の記録はアーカイブ
+(`docs/archive/shell/TASK_H1.md`、`docs/archive/shell/TASK_H2.md`、
+`docs/archive/shell/TASK_H3.md`、`docs/archive/shell/TASK_H4.md`)。
 電源断保証や後続案まで一括して合格とする表ではない。
 
 | ID | 反例・操作 | 期待結果 |

@@ -167,7 +167,7 @@ make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)
 (構築手順は [docs/08_build.md](docs/08_build.md) §8-5、CI 用のスクリプトは `tools/ci/build_cross.sh`)。
 日本語フォント (IPAex) はリポジトリに無く、初回の `make all` (または `make fonts`) が IPA の公式配布から取得します —
 IPA Font License v1.0 への同意を聞きます (非対話は `OS32_ACCEPT_IPA_LICENSE=1`、[docs/08_build.md](docs/08_build.md) §8-1)。
-CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。fork 当時の計画は FORK_PLAN §3 (アーカイブ: `docs/archive/v3/FORK_PLAN.md`) に残しています。
+CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。fork 当時の計画の経緯: `docs/archive/v3/FORK_PLAN.md` §3。
 
 ## ライセンス
 

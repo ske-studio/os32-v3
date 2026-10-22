@@ -36,8 +36,9 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 - 外部プログラム向け KAPI (`db_open` 等) とは独立した辞書アクセスパス
 - シングルタスク前提: FEP ON 時はアプリのメインループが停止
 
-SQLite カーネル統合の詳細は
-docs/tasks/sqlite/ (アーカイブ: `docs/archive/v21/sqlite/00_INDEX.md`) を参照。
+現行の SQLite 部品 (`/boot/sqlite.mod`) の配置と予約は [02_memory.md](../../02_memory.md) §2-1、
+DB の KAPI と FEP 予約は [KAPI_SPEC の DB API](../../KAPI_SPEC.md#db-api-v29-v31)。
+v2.1 のカーネル統合の経緯: `docs/archive/v21/sqlite/00_INDEX.md`。
 
 ---
 

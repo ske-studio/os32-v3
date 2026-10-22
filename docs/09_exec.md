@@ -102,6 +102,17 @@ WM 側も STOP を消費する OP_WAIT / top-level に届かない。この場�
 - 既知の制約: STOP の張本人 (current) と前景連鎖の末尾が違うとき、宛先を畳んだ後に張本人は保存 EAX で再開し、再び WM を塞ぎ得る。
   窓なし・連鎖外の張本人と、GUI アプリの `exec_run` の子 (gui=0) の KAPI-loop は畳めない。協調切替なので KAPI-loop 中は時計も止まる。
 
+### ヒープの大塊と副 arena
+
+USER の AS の割当て。閾値は 64KiB (`OS32_NANO_LARGE` / `MEM_EXEC_HEAP_MIN`) で、C (`sdk/allocator/nano_adapter.c`、newlib nano + SDK の adapter) は要求サイズ (calloc は積)、
+Rust は prefix・整列余白込みで `mem_alloc` に渡る実 byte 数で分ける。
+
+- **大塊 (64KiB 以上)**: C は prefix 付きで `mem_map(TOPDOWN)` に直接写し、失敗はそのまま ENOMEM (arena へ落とさない)。free は即 unmap。
+  kernel 側の `mem_alloc` (`exec/exec_heap.c`) は TOPDOWN の LARGE extent を取り、取れなければ既存 arena の空きだけを使う (新しい arena は作らない)。
+- **小塊**: C は主 arena を `_sbrk` の EXACT で伸ばし、続きが取れなければ flags=0 の副 arena (最小 64KiB、取れなければ必要量で 1 回) を作る。arena ごとに nano の状態を持ち、free list を跨いで繋がない。
+  kernel 側は exec_heap の現在端へ EXACT、取れなければ TOPDOWN で arena (最小 64KiB) を足す。
+- 大小を跨ぐ realloc は新確保→copy→旧解放で、失敗は旧内容を保つ。完全に空いた副 arena と末尾の空きページは下の trim で返す。
+
 ### GUI slot への trim 要求と配送 (池不足時)
 
 シングルタスク・協調切替の前提 (2026-10-09 改訂、ユーザー承認) で、厳密な一巡保証と kernel 側の前景判定は持たない。

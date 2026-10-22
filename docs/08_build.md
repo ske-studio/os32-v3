@@ -347,7 +347,7 @@ python3 tools/gen_memmap.py --manifest --check
 | `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
 | `make check` | 全検査を変異込み | 取り込み前に1回 (PM は `make -k check` で最後まで回す、ROLES §0) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
-今回の条件・実測・RED/GREEN は 検査整理の記録 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`) を参照。
+上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
 recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,test_x.py)` の1行。
 `check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・

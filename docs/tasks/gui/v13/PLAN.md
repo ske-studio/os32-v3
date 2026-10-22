@@ -5,7 +5,7 @@
 2026-09-10 に監査 (`docs/archive/gui_v13/AUDIT_2026-09-10.md`) を経て再編。
 ユーザー決裁: T5b (常駐表示パネル) は撤去、T6a (監査済み有限実行) は破棄、設定 F1/F2 は保持、
 **端末の形は B = 契約 T2a (GUI アプリ 4 本) を v1.3 の最初に実装し、端末は外部アプリ**。
-最初の票は K5 (4 アプリ同時実行) (アーカイブ: `docs/archive/gui_v13/TASK_K5_multiapp.md`)。段ごとの最終判定は §6 を参照する。
+最初の票は K5 (4 アプリ同時実行、記録はアーカイブ `docs/archive/gui_v13/TASK_K5_multiapp.md`)。段ごとの最終判定は §6 を参照する。
 **2026-09-11**: K5a の設計を決裁 (D9 の 8 分岐 + D11、票末尾の「決裁」)。KAPI **v44** を予約。
 K5b-K (カーネル) (アーカイブ: `docs/archive/gui_v13/TASK_K5B_kernel.md`) と K5b-W (gshell) (アーカイブ: `docs/archive/gui_v13/TASK_K5B_gshell.md`) は実装済み・**実機受入は G9 以外すべて合格**
 (2026-09-12、G1〜G8 / G10。G9 は 2 本以上を同時 ready にする観測手段が無く未実施)。受入中に見つけた

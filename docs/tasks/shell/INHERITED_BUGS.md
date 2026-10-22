@@ -4,7 +4,7 @@ T9 (sh.bin = 常駐シェルの CPL=3 ビルド) の実装レビュー (Codex、
 まとめて挙がった。T9 の判定は「T9 由来 + T9 の修正が持ち込んだ回帰」で行い、ここに載るものは別作業で扱う。
 到達可能な反例つきのものは T9 の往復の中で直した (S7 の例外として常駐 .o が変わる)。残りは未修正。
 
-修正済み項目とゲスト受入の証拠は 閉鎖記録 (アーカイブ: `docs/archive/shell/INHERITED_BUGS_CLOSED.md`) を参照。
+修正済み項目とゲスト受入の証拠の記録はアーカイブ `docs/archive/shell/INHERITED_BUGS_CLOSED.md`。
 
 ## 未修正 (non-blocker、別作業)
 
