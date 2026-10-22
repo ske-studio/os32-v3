@@ -75,6 +75,7 @@ def fixtures(folder):
             struct.pack_into('<I', b, 128, 0)
             struct.pack_into('<I', b, 128, zlib.crc32(b))
         cases.append((label, 0, rc, b))
+    change('body-over-limit', 10 * 4, mkmod.POLICIES[11]['mem_max'] + 4096, 3)
     change('image-crc', manifest + 12, 2, 9, False)
     change('ops-version', 33 * 4, 2, 6)
     change('format-version', 4, 2, 3)

@@ -47,8 +47,7 @@ def conformance():
     assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale schema'
     config = (ROOT / 'include/config.h').read_text()
     deployed = yaml.safe_load((ROOT / 'build/core.yaml').read_text())['filesystem']['files']
-    # M2 admits synthetic HWDEV; production image/deployment belongs to M3a/M5.
-    distributed = schema.COMPONENTS[:10]
+    distributed = schema.COMPONENTS
     expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()
     paired = re.search(r'^KERNEL_PAIRED_MODULES := (.*)$', build, re.M)[1]
