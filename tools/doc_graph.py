@@ -36,22 +36,28 @@ STATUS = re.compile(r'(?:^|> |/ )状態:\s*(.*)$')
 DECL = re.compile(r'^> (索引|上位|後続):\s*(.*)$')
 
 
-def prose(text):
-    """コード例・HTML コメントをリンクや宣言として読まない。行番号は保つ。"""
-    text = re.sub(r'<!--[\s\S]*?-->', lambda m: '\n' * m[0].count('\n'), text)
+def prose(text, preserve_columns=False):
+    """コード例・HTML コメントを読まない。preserve_columns は編集用に桁も保つ。"""
+    def hide(value):
+        return re.sub(r'[^\r\n]', ' ', value) if preserve_columns else '\n' * value.count('\n')
+
+    comments = r'<!--[\s\S]*?-->'
+    fence_lines = re.sub(comments, lambda m: '\n' * m[0].count('\n'), text).splitlines()
+    text = re.sub(comments, lambda m: hide(m[0]), text)
     out, fence = [], None
-    for line in text.splitlines():
-        mark = re.match(r'^ {0,3}(`{3,}|~{3,})', line)
+    for index, line in enumerate(text.splitlines()):
+        fence_line = fence_lines[index] if index < len(fence_lines) else ''
+        mark = re.match(r'^ {0,3}(`{3,}|~{3,})', fence_line)
         if mark:
             if fence is None:
                 fence = mark[1]
             elif mark[1][0] == fence[0] and len(mark[1]) >= len(fence):
                 fence = None
-            out.append('')
+            out.append(hide(line))
         elif fence:
-            out.append('')
+            out.append(hide(line))
         else:
-            out.append(re.sub(r'(`+).*?\1', '', line))
+            out.append(re.sub(r'(`+).*?\1', lambda m: hide(m[0]), line))
     return out
 
 
@@ -88,10 +94,10 @@ def git_tracked_md(root):
     return sorted(p for p in out.decode('utf-8').split('\0') if p)
 
 
-def documents(root):
+def document_paths(root):
+    """本文を読まずに対象を列挙する。D4 の道具は archive を読取前に除外できる。"""
     if not root.is_dir():
         raise ValueError('対象のルートがありません: ' + str(root))
-    result = {}
     tracked = git_tracked_md(root)
     if tracked is not None:
         # git の作業木では管理しているファイルだけを数える (管理外の写し .agents/ などを拾わない)。
@@ -100,8 +106,8 @@ def documents(root):
             parents_link = any((root / q).is_symlink() for q in Path(rel).parents if str(q) != '.')
             if (path.suffix == '.md' and not path.is_symlink() and not parents_link and path.is_file()
                     and not any(rel == e or rel.startswith(e + '/') for e in EXCLUDED)):
-                result[rel] = path.read_text(encoding='utf-8').splitlines()
-        return result
+                yield rel
+        return
     for directory, dirs, files in os.walk(root):
         base = Path(directory)
         dirs[:] = sorted(d for d in dirs if not (base / d).is_symlink()
@@ -110,8 +116,12 @@ def documents(root):
             path = base / name
             if path.suffix == '.md' and not path.is_symlink():
                 rel = path.relative_to(root).as_posix()
-                result[rel] = path.read_text(encoding='utf-8').splitlines()
-    return result
+                yield rel
+
+
+def documents(root):
+    return {rel: (root / rel).read_text(encoding='utf-8').splitlines()
+            for rel in document_paths(root)}
 
 
 def links(source, lines, paths):
