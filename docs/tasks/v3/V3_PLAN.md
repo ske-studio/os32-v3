@@ -1,5 +1,7 @@
 # V3_PLAN — v3 本案 (目的・範囲・目標・柱と順序)
 
+> 索引: v3 の段の票を並べる親 (子の票は `> 上位:` でここを指す)
+
 > 状態: **実装中 (2026-10-19)** — v3 の本案。草案 `docs/archive/v3/V3_PLAN_DRAFT.md` を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2・T3・T4・T5 は受入完了、T7 は受入完了・実機確認待ち (台帳 T7B-REALHW、2026-10-20)。詳細は T2 (`TASK_T2_APPBAND.md`)・[T3](TASK_T3_LAYOUT.md)・[T4〜T6b](TASK_T4_T6_MODULES.md)・[T7](TASK_T7_AND_FOLLOWUPS.md) の状態行を参照** (T2d〜h の経緯: `docs/archive/v3/TASK_T2D_T2H.md`)。
 >
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。

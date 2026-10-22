@@ -1,5 +1,7 @@
 # TASK_PEGC480_REALHW — 実機の PEGC 640x480 で桁がずれる (v2.1 で受け入れ)
 
+> 上位: [実機の計画](PLAN.md)
+
 > 状態: **受入完了 (2026-09-30)** — 実機 Ra266 で `gfxmode pegc` の GUI が正しい位置に出て、GUI から CUI へも正しく戻ることをユーザーが目視で確認した (§5 P1、末尾の記録)。480 ライン時の液晶 OSD (周波数) は未採取 — [TASK_TRIDENT_DRIVER](TASK_TRIDENT_DRIVER.md) 段 0 の残件へ。
 >
 > それまでの状態: **受入完了・実機確認待ち (2026-09-29)** — 段 2 (値と順序を実機の ROM に合わせる) を実装し、画面を見ない条件 ((A) ホスト試験・(B) NP21/W 回帰・(C) 実機 `pegcchk`) で受け入れて v2.1 に入った ([RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1)。残るのは**実機で GUI を目で見ること**だけ。**Ra266 の PEGC 640x480 の正典はこの票** (TASK_PEGC_RA266_TIMING (アーカイブ: `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md`) は完了記録)。(2026-09-29 の棚卸しで更新)

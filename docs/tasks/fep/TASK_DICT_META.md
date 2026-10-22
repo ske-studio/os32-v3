@@ -1,5 +1,7 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
+> 上位: [FEP の索引](00_INDEX.md)
+
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-30) / 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30、[`../../decisions/MEMMAP_V3.md`](../../decisions/MEMMAP_V3.md) D27・D28) を記録した段。**着手は v3 の後の方** (`docs/archive/v3/V3_PLAN_DRAFT.md` §3 P10「v3 後半」)。設計票の往復・実装は未着手。
 > 出所: ユーザー「辞書のメタ情報と学習データを辞書と別ファイルに分ける — 採用。ただしすぐ取り掛からず v3 の後の方でよい」(2026-09-30、MEMMAP_V3 §11-3 の「ユーザー決定 (池の運用規則まわり)」7)。
 > 正典の関係: SQLite の予算と FEP の取り分 (`mem_reserve_kb` の使い道) は MEMMAP_V3 §4-6 (D27)。FEP のアーキテクチャの快照は [`FEP_STATUS.md`](FEP_STATUS.md)、フェーズ別の設計は [`00_INDEX.md`](00_INDEX.md)。辞書の品質 (コスト式・頻度) は [`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) の領分で、この票は**入れ物 (メタ情報と学習の置き場)** だけを扱う。

@@ -1,5 +1,7 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
+> 上位: [V3_PLAN](V3_PLAN.md)
+
 > 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。残件は [持越し台帳](../DEFERRED_TESTS.md)。a〜c の証拠と d〜h の経緯の記録はアーカイブ (`docs/archive/v3/TASK_T2ABC_RESULTS.md`、`docs/archive/v3/TASK_T2D_T2H.md`)。構成別の未実施分まで合格とはしない。
 >
 > 発行・改訂: GPT-6-astra / Codex (設計者)。初稿調査基点 `b5cd920`、1 回目の確認基点 `705a227`、2 回目の改訂 GPT-6 / Codex、確認基点 `8a7bf4c` (`wt/t2-design`)。以下の `file:line` は初回の実コード調査を引き継ぎ、2 回目の対象箇所は `8a7bf4c` で再確認した。今回の作業はこの worktree の文書だけ、commit / push・配備・NP21/W・NHD・ini・Windows 側の操作なし。

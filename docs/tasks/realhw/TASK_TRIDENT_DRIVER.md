@@ -1,5 +1,7 @@
 # TASK_TRIDENT_DRIVER — 実機 Ra266 の内蔵 Trident (1023:9660) を GUI の画面にする (v3)
 
+> 上位: [実機の計画](PLAN.md)
+
 > 状態: **設計中** — 設計票 v5 は **Codex 5 回目で Approve** (2026-09-29、§段 2-X の注記「Codex 5 回目の Approve に付いた注記」)。実装は未着手。(2026-09-29 の棚卸しで更新)
 >
 > それまでの状態: **調査・設計票 v5 (2026-09-29)** — 実装なし。Codex 設計レビュー 4 回目 (Request Changes、P2 × 5。3 回目の P1 と D6 は解消) と PM による docs/hw/undocumented の横断結果を反映 (第 4 回レビュー (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`))。5 回目 (差分の確認) 待ち。

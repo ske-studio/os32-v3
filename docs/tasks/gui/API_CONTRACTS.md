@@ -1,5 +1,7 @@
 # libos32gui — 凍結インターフェース契約
 
+> 上位: [GUI v1.1 の作業票](TASKS.md)
+
 > 策定: 2026-09-04 / 親: [DESIGN.md](DESIGN.md) / 書式は v2 CONTRACTS (アーカイブ: `docs/archive/kernel_v2/CONTRACTS.md`) に倣う
 > 位置づけ: **凍結 (2026-09-04)**。未決 4 点 (G6/G8 色、T2/T2a SHM、U2a キー) をユーザ
 > レビューで確定し、凍結した。以後の変更にはユーザ承認を要する (op 番号・イベント種別・
