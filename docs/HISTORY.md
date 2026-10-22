@@ -190,7 +190,7 @@ FatFs (`fs/fatfs/`)、`assets/` (IPADIC・IPAex・常用漢字表) と、gitigno
 
 | 情報 | os32 の場所 |
 |---|---|
-| 版数の対応と fork の段取り | `docs/decisions/VERSIONS.md` §1・§2 (2026-10-22 まで `docs/ROADMAP.md` §0) |
+| 版数の対応と fork の段取り | `docs/ROADMAP.md` §0 |
 | 各版の要約 / v2.1 のリリースノート | `CHANGELOG.md`、`docs/RELEASE_v2.1.md` |
 | v1.0 到達までの経緯 | `docs/archive/ROADMAP_v1.0.md`、`docs/archive/REFACTORING_PLAN.md` |
 | v2.0 (リング 3) の判断と完了記録 | `docs/archive/kernel_v2/PLAN.md` |

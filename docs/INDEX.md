@@ -113,7 +113,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — 仮説駆動デバッグ、バイナリ反映確認、教訓集、AI協調ルール |
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v78 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 254) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — 作業別の参照先 (読む / 触る / 検証) と、ファイル → 役割 → 仕様のファイル地図。仕様本文は持たない |
-| [ROADMAP.md](ROADMAP.md) | リリースロードマップ — **§0 版数の対応表と v3 への fork の段取り** (正典)、v1.x GUI の記録、v3 以降の長期項目 |
+| [ROADMAP.md](ROADMAP.md) | リリースロードマップ — §0 は版数の対応表と fork の決定 ([decisions/VERSIONS.md](decisions/VERSIONS.md) §1・§2) への案内、v1.x GUI の記録、v3 以降の長期項目 |
 | [RELEASE_v2.1.md](RELEASE_v2.1.md) | **v2.1 のリリースノート** (2026-09-29、タグ `v2.1`、KAPI v68) — 実機 Ra266 で動くようになったもの、PEGC 640x480 の受け入れ条件、分かっている制限。版の対応は [decisions/VERSIONS.md §1](decisions/VERSIONS.md)、各版の要約は [CHANGELOG.md](../CHANGELOG.md) |
 | [HISTORY.md](HISTORY.md) | **開発の経緯と推移 (完了記録、2026-09-30)** — 初期コミット (2026-04-07) から v1.0 / v1.1 / v2.0 / GUI 1.1〜1.4 / v2.1 / v3 の fork までの年表、版ごとの要約、体制の推移、主要なユーザー決定の年表、数字。os32-v3 へ持っていく写しの原本 |
 | [CASE_STUDIES.md](CASE_STUDIES.md) | **ケーススタディ (現行、2026-09-30 の快照)** — 普遍的な教訓 10 件 (資料の食い違い、エミュレータと実機の差、PEGC 480、3 者討論、設計レビューの型、文書運用、変異試験、所有者タグ、配備の反映確認、ドラッグ枠の残像)。os32-v3 側で足していく |
@@ -251,7 +251,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 | ドキュメント | 内容 |
 |-------------|------|
 | `docs/archive/v3/V3_PLAN_DRAFT.md` | **v3 本案の草案 — 草案群のまとめ (2026-09-30、完了記録: 本案 V3_PLAN.md に昇格)** — 草案の一覧と振り分け (§1)、目的と範囲・**目標の 2 段** (§2、§2-1)、柱と順序の案 (§3)、**メモリマップの柱は決定済み** (§3-1 は要点と決着先、正典は MEMMAP_V3)、食い違いの一覧 (§4)、v2.x との互換 (§5)、fork の段取り (§6)、ユーザー判断と Codex の論点 (§7)。**§7-2 X1〜X8 は 2026-09-30 に Codex が回答しユーザーが承認 (結論と反映先は表)**。本案への昇格はユーザー判断と Codex の突き合わせの後 |
-| `docs/archive/v3/FORK_PLAN.md` | **os32-v3 への fork の段取り — 完了記録 (2026-10-16、票の状態行)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。版と fork の扱いは [ROADMAP.md §0-1](ROADMAP.md) |
+| `docs/archive/v3/FORK_PLAN.md` | **os32-v3 への fork の段取り — 完了記録 (2026-10-16、票の状態行)** — 持っていくものの一覧 (`git ls-files` 1,551 ファイルをディレクトリ単位で 持つ / 持たない / 要判断、§1)、経緯の要約とケーススタディの候補 (HISTORY / CASE_STUDIES / THIRD_PARTY、§1-4)、**公開前の監査 (秘密・著作権物・第三者ライセンス・実パス・ホスト名、コマンドと合格条件、2026-09-30 の結果、§2)**、手順 a〜g と [D2] の地点 (§3)、判断が要る点 J1〜J8 (§4)。版と fork の扱いは [decisions/VERSIONS.md §2](decisions/VERSIONS.md) |
 | `docs/archive/v3/PLAN.md` | **v3 の計画 (2026-09-17)** — 機能を足す前に入れ物を作り直す (C11 → メモリマップ再配置 → ドライバの動的読み込み → PCI → 82557)。カーネル本体の大きさと残りは `build/out/MEMMAP.md` ([生成手順](#生成文書の見方))。アプリへの払い出し §4、アイデア §5。**完了記録 (2026-09-30): 策定時の計画。本案は V3_PLAN.md** |
 | [decisions/MEMMAP_V3.md](decisions/MEMMAP_V3.md) | **v3 のメモリマップ** (方針確定 2026-09-30、3 者討論で決定、Codex Approve)。決定 D1〜D36 (D29〜D34 = 保留 5 件 U6 の拾い方、**D35 = D7 の改訂: fork 時の KAPI 整理でスロット順を変えてよい、世代の識別と旧新混在試験が条件**、2026-09-30; システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType)、帯の表、票 T0〜T7、受入条件、**Codex X1〜X8 の補足の対応表 (§8-4)**、経緯、§12 T4〜T6b で決めた争点 (票 TASK_T4_T6_MODULES §9 から 2026-10-22 に移した)。実装の状態は各段の票の状態行と [現行引き継ぎ](tasks/agents/HANDOVER_2026-10-09.md) を参照 |
 | `docs/archive/v3/U6_PENDING_REVIEW.md` | **U6 の仕分け表 — 決裁済み (2026-09-30、ユーザーが 6 点すべて推奨どおりに決定 → MEMMAP_V3 D29〜D34)**: 保留 5 件 (F3a〜c / F2c / FEP_BOUNDARY / MEMORY_RAM_INTEGRATION / DEVICE_RESERVATION) の現状 (コードで確認)、MEMMAP_V3 の決定で置き換わった部分と残る部分、拾う先 (T2 / T4 / T5a の要件、P4、撤回)、判断点 6 つとその決定 |
@@ -358,7 +358,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 
 | ドキュメント | 内容 |
 |-------------|------|
-| `docs/archive/kernel_v2/PLAN.md` | **カーネル 2.0 の計画 (完了記録)** — リング 3 / Rust の適用範囲 / KAPI 呼び出し実測。M1〜M3 は 2026-09-03 完了、タグ `v2.0`。版数の対応は [ROADMAP.md §0](ROADMAP.md) |
+| `docs/archive/kernel_v2/PLAN.md` | **カーネル 2.0 の計画 (完了記録)** — リング 3 / Rust の適用範囲 / KAPI 呼び出し実測。M1〜M3 は 2026-09-03 完了、タグ `v2.0`。版数の対応は [decisions/VERSIONS.md §1](decisions/VERSIONS.md) |
 | `docs/archive/kernel_v2/M1_RING3.md` / `docs/archive/kernel_v2/M2_KAPI_TRAMPOLINE.md` / `docs/archive/kernel_v2/M3_VERIFY.md` / `docs/archive/kernel_v2/CONTRACTS.md` | 2.0 の設計 (リング 3 土台、KAPI トランポリン、検証、凍結契約)。完了記録 |
 | `docs/archive/kernel_v2/TASK_coder1_M0b_privileged.md` / `docs/archive/kernel_v2/TASK_coder1_M1_ring3.md` / `docs/archive/kernel_v2/TASK_coder2_libos32gui.md` | 2.0 のコーダー票。完了記録 |
 | `docs/archive/v4/V4_GAME_PLATFORM_DRAFT.md` / [tasks/v4/README.md](tasks/v4/README.md) | ゲーム基盤 v4 の草案 (2026-09-07)。v3 の後 |
