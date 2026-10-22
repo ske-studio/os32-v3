@@ -1,9 +1,9 @@
 # [P3] 辞書管理シェルコマンド `ime`
 
-> 索引: [`00_INDEX.md`](00_INDEX.md)
+> 上位: [`00_INDEX.md`](00_INDEX.md)
 > 優先度: **中** ／ 依存: KAPI 公開済 (`ime_*`)
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「ユーザー辞書管理コマンド」「辞書バリアント動的切り替え」をまとめた
+`FEP_FUTURE.md`「ユーザー辞書管理コマンド」「辞書バリアント動的切り替え」をまとめた
 外部プログラム `userland/cmds/ime.c` (シェルコマンド) の実装済み設計記録。
 
 ---
@@ -59,7 +59,7 @@ int  ime_switch_dict(int variant);   /* 0=S,1=M,2=L → reopen */
 
 > 現状 `assets/fep_s.db` / `fep_l.db` は存在するが `deploy.yaml` で配備されているのは
 > `fep.db` のみ。動的切替を使うには `deploy.yaml` に S/L も追加 (`tags:[data]`) する。
-> 詳細は [`04_DICT_QUALITY.md` §3](04_DICT_QUALITY.md)。
+> 詳細は `04_DICT_QUALITY.md` §3。
 
 ---
 
@@ -99,4 +99,4 @@ int  ime_switch_dict(int variant);   /* 0=S,1=M,2=L → reopen */
 
 ---
 
-*前: [`02_SCROLL_GUARD.md`](02_SCROLL_GUARD.md) ／ 次: [`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: `02_SCROLL_GUARD.md` ／ 次: `04_DICT_QUALITY.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*

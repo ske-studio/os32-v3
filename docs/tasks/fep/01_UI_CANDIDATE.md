@@ -1,9 +1,9 @@
 # [P1] 候補操作の拡充
 
-> 索引: [`00_INDEX.md`](00_INDEX.md) ／ 前提: [`00_INDEX.md` §1 描画抽象化](00_INDEX.md#1-全体アーキテクチャ方針-共通設計基盤)
+> 上位: [`00_INDEX.md`](00_INDEX.md) ／ 前提: [`00_INDEX.md` §1 描画抽象化](00_INDEX.md#1-全体アーキテクチャ方針-共通設計基盤)
 > 優先度: **高**
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「候補操作の拡充」3 項目 (↑↓リスト送り / 数字ダイレクト選択 / ページング) の実装済み設計。
+`FEP_FUTURE.md`「候補操作の拡充」3 項目 (↑↓リスト送り / 数字ダイレクト選択 / ページング) の実装済み設計。
 共通の描画抽象と状態機械も本書にまとめる。コードスケッチは設計の説明であり、現行実装は参照先のソースを読む。
 
 ---
@@ -49,7 +49,7 @@ typedef struct {
 ```
 
 - テキストモード実装 (`ime_render_tvram.c`): 既存の `tvram_putchar_at` / `tvram_putkanji_at` / `unicode_to_jis` をラップ。
-- 将来のグラフィックモード実装 (`ime_render_gfx.c`): GVRAM プレーンへの直接ビットマップ転送 ([`05_GFX_MODE.md`](05_GFX_MODE.md))。
+- 将来のグラフィックモード実装 (`ime_render_gfx.c`): GVRAM プレーンへの直接ビットマップ転送 (`05_GFX_MODE.md`)。
 
 `kernel/ime.c:592` で TVRAM 実装を選択する。描画表の定義は `kernel/ime_render.h:10`。
 
@@ -64,7 +64,7 @@ typedef struct {
 ```
 
 `converting` は `state != IME_ST_INPUT` と等価。現行実装は `g_ime.converting` と `g_ime.state` を併用し、変換開始・終了時に同期する。
-将来の連文節変換 ([`07_BUNSETSU.md`](07_BUNSETSU.md)) では `IME_ST_BUNSETSU` を追加できる構造にしておく。
+将来の連文節変換 (`07_BUNSETSU.md`) では `IME_ST_BUNSETSU` を追加できる構造にしておく。
 
 ---
 
@@ -120,7 +120,7 @@ typedef struct {
 > 候補リスト展開中 (`IME_ST_CANDLIST`) のみ数字を選択キーとして奪う。
 > これにより「ばん1」のような数字混じり入力を壊さない。
 
-`KEY_XFER` (変換) / `KEY_NFER` (無変換) の割り当ては [`06_MISC.md` §1](06_MISC.md) と整合させる。
+`KEY_XFER` (変換) / `KEY_NFER` (無変換) の割り当ては `06_MISC.md` §1 と整合させる。
 
 ---
 
@@ -207,7 +207,7 @@ static void candlist_draw(void)
 
 `draw_utf8(x, y, str, col)` は既存 `preedit_draw` 内のデコードループ
 (`utf8_decode` → `unicode_to_ank` / `unicode_to_jis`) を関数化して共用する。
-この `draw_utf8` は GFX モード ([`05_GFX_MODE.md`](05_GFX_MODE.md)) でもそのまま再利用される。
+この `draw_utf8` は GFX モード (`05_GFX_MODE.md`) でもそのまま再利用される。
 
 ---
 
@@ -217,8 +217,8 @@ TVRAM ではリスト展開前に `candlist_save()` が候補領域の文字と�
 畳む / 確定する際に `candlist_clear()` → `candlist_restore()` で復元する
 (`kernel/ime.c:76`、`kernel/ime.c:98`、`kernel/ime.c:120`)。退避済みフラグで二重退避を防ぐ。
 退避バッファが無い場合は保存しないため、その場合の復元は保証されない。
-スクロールの予約行制御は [P2 §4](02_SCROLL_GUARD.md#4-fep-からの制御)、
-未実装の GVRAM 退避・復元案は [P5 §3](05_GFX_MODE.md#3-gfx-vram-退避復元) を参照。
+スクロールの予約行制御は P2 §4 (`02_SCROLL_GUARD.md`)、
+未実装の GVRAM 退避・復元案は P5 §3 (`05_GFX_MODE.md`) を参照。
 
 ---
 
@@ -242,4 +242,4 @@ TVRAM ではリスト展開前に `candlist_save()` が候補領域の文字と�
 
 ---
 
-*前: (なし) ／ 次: [`02_SCROLL_GUARD.md`](02_SCROLL_GUARD.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: (なし) ／ 次: `02_SCROLL_GUARD.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*

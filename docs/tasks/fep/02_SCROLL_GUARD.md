@@ -1,9 +1,9 @@
 # [P2] TVRAM スクロール保護
 
-> 索引: [`00_INDEX.md`](00_INDEX.md)
+> 上位: [`00_INDEX.md`](00_INDEX.md)
 > 優先度: **高**
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「TVRAM スクロール保護」。FEP 表示行 (25 行目 = 行 24) を
+`FEP_FUTURE.md`「TVRAM スクロール保護」。FEP 表示行 (25 行目 = 行 24) を
 アプリ出力のスクロールが巻き込む問題を解消する。本フェーズは他フェーズに依存しない。
 
 ---
@@ -109,7 +109,7 @@ void ime_toggle(void) {
 }
 ```
 
-> 候補リストウィンドウ ([`01_UI_CANDIDATE.md` §5](01_UI_CANDIDATE.md)) を TVRAM で多行表示する間は `reserve = rows+1` に
+> 候補リストウィンドウ (`01_UI_CANDIDATE.md` §5) を TVRAM で多行表示する間は `reserve = rows+1` に
 > 一時拡張し、畳んだら 1 に戻す処理も実装済み。現行は候補 3 行 + インライン 1 行を保護する
 > (`kernel/ime.c:374`、`kernel/ime.c:453`)。
 
@@ -129,4 +129,4 @@ void ime_toggle(void) {
 
 ---
 
-*前: [`01_UI_CANDIDATE.md`](01_UI_CANDIDATE.md) ／ 次: [`03_DICT_COMMAND.md`](03_DICT_COMMAND.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: `01_UI_CANDIDATE.md` ／ 次: `03_DICT_COMMAND.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*

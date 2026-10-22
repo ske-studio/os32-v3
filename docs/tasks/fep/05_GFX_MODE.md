@@ -1,9 +1,9 @@
 # [P5] GFX モード対応
 
-> 索引: [`00_INDEX.md`](00_INDEX.md) ／ 前提: [`00_INDEX.md` §1 描画抽象化](00_INDEX.md#11-描画バックエンドの抽象化-p1--p5-の土台)
+> 上位: [`00_INDEX.md`](00_INDEX.md) ／ 前提: [`00_INDEX.md` §1 描画抽象化](00_INDEX.md#11-描画バックエンドの抽象化-p1--p5-の土台)
 > 優先度: **高(大規模)** ／ 他フェーズと切り離して最後に実施
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「GFX モード対応」。最大規模の変更。グラフィックモードアプリ
+`FEP_FUTURE.md`「GFX モード対応」。最大規模の変更。グラフィックモードアプリ
 (`gfx_demo` 等) で FEP プリエディットを表示する。
 
 ---
@@ -133,14 +133,14 @@ static void ovl_draw_glyph(int px, int py, const u8 *pat, int wb, int h, u8 colo
 > 背景 (黒) は `begin()` の黒塗りで処理。前景色のビットだけ OR するため
 > アンチエイリアスなしの単色描画。座標は 8px 境界 (byte 境界) に揃え、
 > シフト描画は不要 (セルグリッドが 8px 単位のため)。
-> UTF-8 デコードループ自体は [`01_UI_CANDIDATE.md` §5](01_UI_CANDIDATE.md) の `draw_utf8` を共用し、
+> UTF-8 デコードループ自体は `01_UI_CANDIDATE.md` §5 の `draw_utf8` を共用し、
 > 末端の `putc`/`putw` だけが本実装に差し替わる。
 
 ---
 
 ## 5. テキスト/グラフィック混在制御 (任意・将来)
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md) はテキスト VRAM とグラフィック VRAM の同時表示
+`FEP_FUTURE.md` はテキスト VRAM とグラフィック VRAM の同時表示
 (GDC 画面モード `0x68` 系) も挙げている。これにより GFX 画面の上に
 **テキスト VRAM のプリエディット行をそのまま重ねる**選択肢がある。
 
@@ -190,4 +190,4 @@ void ime_select_render(void)
 
 ---
 
-*前: [`04_DICT_QUALITY.md`](04_DICT_QUALITY.md) ／ 次: [`06_MISC.md`](06_MISC.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: `04_DICT_QUALITY.md` ／ 次: `06_MISC.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*

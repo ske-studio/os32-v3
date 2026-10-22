@@ -1,9 +1,9 @@
 # [P4] 辞書品質向上
 
-> 索引: [`00_INDEX.md`](00_INDEX.md)
+> 上位: [`00_INDEX.md`](00_INDEX.md)
 > 優先度: **中** ／ 依存: P3 (切替 UI)。§1・§2 は計画。実装状況は [索引の P4 行](00_INDEX.md#フェーズ別ドキュメント) を参照。
 
-[`FEP_FUTURE.md`](FEP_FUTURE.md)「辞書品質向上」。ランタイム (SQLite) とビルド時 (Python) の両面。
+`FEP_FUTURE.md`「辞書品質向上」。ランタイム (SQLite) とビルド時 (Python) の両面。
 
 ---
 
@@ -62,7 +62,7 @@ cost = apply_compression_heuristic(cost, yomi, surface)
 
 ## 3. 辞書バリアント動的切替
 
-[`03_DICT_COMMAND.md` §3](03_DICT_COMMAND.md) の `ime_switch_dict()` で実装済み。`ime dict s|m|l` から呼ぶ。
+`03_DICT_COMMAND.md` §3 の `ime_switch_dict()` で実装済み。`ime dict s|m|l` から呼ぶ。
 
 動的切替を実運用するには `deploy.yaml` に S/L 辞書を配備する:
 
@@ -107,4 +107,4 @@ DB 再生成後は `analyze_dict.py` / `check_candidates.py` で候補順を確�
 
 ---
 
-*前: [`03_DICT_COMMAND.md`](03_DICT_COMMAND.md) ／ 次: [`05_GFX_MODE.md`](05_GFX_MODE.md) ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
+*前: `03_DICT_COMMAND.md` ／ 次: `05_GFX_MODE.md` ／ 索引: [`00_INDEX.md`](00_INDEX.md)*
