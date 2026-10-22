@@ -1,6 +1,6 @@
 # TASK_REALHW_RECOVER — 実機試験を決まった状態へ戻す処理 (realhw_recover)
 
-> 状態: **実装中 (2026-10-21)** — T1・T1b・T2・T3 は main に着地、T4a は NP21/W で合格。T4b は段 4a の S6 の後、T5〜T7 (実機) は未着手。確定設計は §6 の 4 本。
+> 状態: **実装中 (2026-10-23)** — T1・T1b・T2・T3 は main に着地、T4a は NP21/W で合格。段 4a の S6 (59ba733) で試行の op を結線済み。T4b 以降は未着手で、順序は `TASK_HWDEV` §3-1 (M5 の配備と 31kHz の鍵が T4b の前提)。確定設計は §6 の 4 本。
 
 実機 (Ra266) で装置に書き込む試験 (まず GeForce 6200 の段 4a、`TASK_GEFORCE6200`) の途中で、失敗・中止・期限切れが起きても、決まった手順で「安全な 98 の CUI」(S0) に戻すための仕組み。装置ごとの「何を保存して何を戻してよいか」の表 (profile)、試験の状態機械、期限 (deadman)、98 の画面に戻す共通処理、シリアル 1 命令の復帰 (`recover now`) からなる。
 
@@ -35,7 +35,7 @@
 | T2 | 窓の PTE/IRQ 復元、GF descriptor と Command=0102h の override、98 画面の共通復帰 (0FACh・A0000h のセル検査・GUI 拒否)、暫定予算と ② の予約・poll 計数・UART 1 フレーム待ち | main | 4f8685b、f339944 (astra レビュー)、7e28d26、c76226e |
 | T3 | shell `recover status / now <session>`、ホストの [tools/rshell_recover.py](../../../tools/rshell_recover.py)、固定長 abort (10 B)、REC の連番・欠落・破棄量 | main | b14a905、34f7503 (後片付け)、07a9d83。取り込みの検査での試験の直し 02e08d3・a604c91 |
 | T4a | NP21/W: KDEBUG=1 の status、KDEBUG=0 の NOSYS、peek の回帰、シリアル 1 命令、reboot→ver | **合格** (2026-10-21、像 53bbee8) | `~/os32-tmp/evidence/2026-10-21/recover_t4a/RESULT.md`。`now 0` は NP21/W が 24kHz 起動のため設計どおり拒否 |
-| T4b | NP21/W: `now 0` の PARTIAL と 98 復帰の経路、試行・PAUSED・期限・故障、送信詰まり、旧版一式への巻戻し | 未 (4a の S6 の後) | [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) RECOVER-T4B (前提: np21w_ini_live.py の 31kHz の鍵、rshell_recover.py の status だけの形と aidebug の口) |
+| T4b | NP21/W: `now 0` の PARTIAL と 98 復帰の経路、試行・PAUSED・期限・故障、送信詰まり、旧版一式への巻戻し | 未 (S6 は済。前提: np21w_ini_live.py の 31kHz の鍵 (未)、hwdev.mod の配備 = HWDEV M5 (未)。rshell_recover.py の `--status` と aidebug の口は S6 9108549 で済) | [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) RECOVER-T4B |
 | T5 | 実機・書込みなし: status と安全な snapshot → 同値 restore → S0、続けて明示承認の 1 回で 0FACh←00h と目視、各 profile の実測 (A3 の置き換え) | 未 | — |
 | T6 | 実機・承認済みの書込み: 最小変更 → 手動 abort → 短い期限切れ → 意図的なソフト失敗 → ①② | 未 (4a と並行か後) | — |
 | T7 | 復旧演習: シリアル reboot、旧版一式の復旧、立会いの物理復帰を各 1 回、外部デバイス実装モデルの材料に | 未 | — |
@@ -71,7 +71,7 @@ T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部�
 | 手段 | 届く範囲 | 扱い |
 |---|---|---|
 | ユーザーの手の電源・リセット操作 | 現行の運用 (U1)。電源を入れ直したら COLD/S2 を取り直す。リセットだけで GPU の内部状態が消えるとはしない | 初版の標準。立会い無しで固まったら記録してユーザーを待つ |
-| PG リセット (電源コネクタの POWER GOOD を GND に落とす) | 電源投入と同じなので PCI RST# まで届く見込み [推]。**資料は他機種 (V200/Xv13/Ra43 など)、Ra266 では未確認** | 付けるかはユーザー判断 (§0 未決)。手押しボタン (立会い) を先に、遠隔はその後。導通確認と取り付けはユーザー。PG の後の起動は S2 + warm-residue として扱う |
+| PG リセット (電源コネクタの POWER GOOD を GND に落とす) | 電源投入と同じなので PCI RST# まで届く見込み [推]。**資料は他機種 (V200/Xv13/Ra43 など)、Ra266 では未確認** | **付けない (ユーザー決定 2026-10-22、§0)**。固まったら立会いで手で電源を入れ直す。(付けると決めていたときの案: 手押しボタンを先に遠隔は後、PG の後の起動は S2 + warm-residue) |
 | CPU リセット (F0h、`sys_reboot`) | **PCI RST# が出る保証は無い** — GPU の状態が残りうる | ⑤ の reboot。S2 で COLD と比べて差を warm-residue として記録する |
 | 0FACh で 98 表示に戻す | 切替回路を 98 表示へ (GeForce の映像は抜いちゃダメボード経由で同じ切替回路に入る)。読み戻しはモニタに何が映るかを証明しない | ② の先頭、全装置共通。読んで bit1..0≠00b のときだけ 00h を書いて読み戻す。最終判定はユーザーの目視。Ra266 での初めての書込みは T5 の承認の 1 回 |
 | USB リレー (RESET 接点・電源ボタン)・スマートプラグ・NMI | Ra266 の端子・仕様は未確認、NMI はバスリセットではない | 後で検討。初版は採らない |

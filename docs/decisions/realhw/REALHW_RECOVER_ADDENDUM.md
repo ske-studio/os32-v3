@@ -261,3 +261,10 @@ struct recover_opcode_layout {
 - owner の作業領域の上限 (最大 251 ページ = 1,028,096B) を STATIC_ASSERT で固定する。host の fake は生きている頁の合計を 1MiB で打ち切るが node_count=1790 で回していて 2048 の最悪の場合は通していない、実際の確保口の連続性 (first-fit) も模していない — 最悪の node 数で 1 件足す。
 - (PM、T5 の前に) 実機 Ra266 の bus0 の Trident 0:8.0 と NEC 0:7.0 の Command とメモリ BAR を読み、A1 の他装置の窓の照合で拒否されないか確かめる (拒否されれば A1 のログに理由・BDF・reg・raw が出る)。
 - kdebug.bin は 239,908B で KDEBUG の上限 262,144 (tools/module_schema.py) の 92%。S7 以降で足す前に、上限の引き上げ・装置ごとの部分を別の部品へ・許可表を小さい型に詰める (約 30KB)・kselftest を別の部品へ (54KB) のどれにするかをユーザーに諮る。
+
+## 送り項目の行き先 (2026-10-23、PM が実装と照合)
+
+- S6 送りの上限の STATIC_ASSERT と最悪 node の試験: HWDEV M1 (c9a4817) で 267 頁として固定済み。
+- kdebug.bin の 92%: HWDEV の分離で解消 (M3c 92153ea、109,060B = 42%)。
+- Trident 0:8.0・NEC 0:7.0 の BAR の確認: 実機を待たず 2026-10-15 の基準構成の生データで照合した ([RA266.md](RA266.md) §1-1)。NEC は BAR が 0 で通るが、Trident 0:8.0 と **82557 0:11.0** が長さ不明のメモリ BAR で拒否に当たる。根拠の設計は票 TASK_HWDEV §3-1 の BARLEN。
+- S4 送りの pll_write の上限は `kdebug/gfinit_pll.c` に入っている。S3 送りは S6 で回収 (票 TASK_REALHW_RECOVER)。S5 送りの割込み禁止の文言は [GF6200_4A_DESIGN.md](GF6200_4A_DESIGN.md) 末尾の注記で閉じた。

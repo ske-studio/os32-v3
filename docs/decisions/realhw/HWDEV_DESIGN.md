@@ -153,3 +153,11 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 - G3 (P2): HWDEV は自前の .def から import の stub と slot を生成し、核と kernel の関数を 1 つの表に。kdebug_import_stubs.o はリンクしない。
 - G4 (P2): contract_crc は生成 STATIC_ASSERT の表と前処理後のヘッダの正規化テキストの CRC の 2 つを照合する方式に決めた。
 - G5 (P3、M2 の依頼文に書く): KDEBUG_OPS_VERSION は kernel/module.h:7 の手書きの定義で、GF の identity にも入る。新しい口には kdebug_export_contracts の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
+
+## 実装の後の変化 (2026-10-23、PM 注記 — 上の確定本文は書き換えない)
+
+- **大きさ**: M3c (92153ea) で kdebug.bin は 240,036 → 109,060B (KDEBUG の上限の 42%)、hwdev.mod は 131,488B (上限 196,608B)。§5 の合格条件の大きさは満たした。
+- **ops の版** (§1 の「食い違い ②」): いまは版 4・20 口 (`tools/module_schema.py`、08_build §8-2)。
+- **S0 の最小 GF 復帰** (§6 の表の「HWDEV 不在でも使用可能」): `recover_gf_profile`・`recover_gf_screen_safe` は核に残ったが、核の経路から呼ばれていない (M3c より前から)。扱いは M4 で PM が決める (票 TASK_HWDEV の送り項目)。
+- **順序** (§8 の「M1〜M5 → 旧 S7 → T4b → T5 → S8」と「BAR 長根拠は T5 前」): 2026-10-23 に見直した (票 TASK_HWDEV §3-1)。BAR 長の根拠は新しい設計の段 BARLEN に置き換え、Trident 0:8.0 に加えて 82557 0:11.0 も対象 (NEC 0:7.0 は BAR が 0 で対象外)。
+- **状態行** (冒頭の「実装はユーザーの合図待ち」): 実装は 2026-10-22 に始まり、M1〜M3c が main。段の状態は票 TASK_HWDEV。

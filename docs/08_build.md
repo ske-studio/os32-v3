@@ -165,7 +165,7 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
 欄: image = ファイル (容器) の長さ、mem = body (BSS 込み)、load_span = `payload_offset + mem_size` (上の「起動時に読む部品の形式」)、表 = reloc / import / export の件数。
 由来の区分: **実測** (日付・値)、**導出** (式)、**決定** (誰が・いつ・票)、**由来不明** (値だけ — 当時の推測を添える)。「式に一致」は今回 (2026-10-22) 数字を照合しただけで、当時の記載は無い。
-今の大きさは main 79ba4b0 (HWDEV M3b) と同じ木の成果物 (`~/wt/os32-v3/hwdev_m3b/build/out/`、2026-10-22 09:23) のヘッダ word 3・10・11・22・24・26 を読んだ値。余裕の % は 今 ÷ 上限。
+今の大きさは main 79ba4b0 (HWDEV M3b) と同じ木の成果物 (`~/wt/os32-v3/hwdev_m3b/build/out/`、2026-10-22 09:23) のヘッダ word 3・10・11・22・24・26 を読んだ値 (KDEBUG と HWDEV の行だけは M3c 取り込み後の値を併記)。余裕の % は 今 ÷ 上限。
 
 | 部品 (ID) | image / mem / load_span の上限 | reloc / import / export の上限 | 由来 | 今の大きさ (% = 今 ÷ 上限) |
 |---|---|---|---|---|
