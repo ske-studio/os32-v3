@@ -238,7 +238,15 @@ def main():
     gfinit_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
-        return int(bool(mutpar.run_with_control(mutation, MUTATIONS, ('control', '', ''))))
+        # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.
+        missed = 0
+        for item in [('control', '', '')] + MUTATIONS:
+            text, survived = mutation(item)
+            if item[0] == 'control':
+                survived = not survived
+            print(('CONTROL ' if item[0] == 'control' else '') + text)
+            missed += survived
+        return int(bool(missed))
     return 0
 
 
