@@ -37,7 +37,7 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 1. ノートで git pull、`tools/ci_fetch.sh --sha <SHA>` (build がまだなら `gh run watch`)。lanfs_host を止め、
    新しい成果物の hostdrv を root にして起動し直す (peer は今の値)。
 2. `sfs run hsync -n boot` (計画だけ確認) → `sfs run hsync boot` → reboot → ver で Commit <SHA>。
-3. `sfs run hsync` (全体) → reboot → ver (Commit・Image CRC・services の行が SERVICES_READY)、
+3. `sfs run hsync` (全体、/sys は既定で外れる) → `sfs run hsync sys` (常駐 shell・共有ライブラリ・フォント) → reboot → ver (Commit・Image CRC・services の行が SERVICES_READY)、
    起動ログの部品の PAIR と rc、`mem` の leftover/audit_fail、`db_test`。
 4. <画面不要の試験があれば、各コマンドと期待値>
 5. 最後に CUI のまま `ver`。
@@ -64,5 +64,6 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 
 - 文書だけのコミットの SHA を頼むと CI の成果物が無い (`ci_fetch.sh` が見つけられない)。
 - 全体同期を先にすると旧 hsync が 1 件も書かずに断る (KAPI が上がった版)。必ず boot が先。
+- 全体の `hsync` は `/sys` を既定で外す (`userland/system/hsync.c:45-48`)。shell のコマンドや共有ライブラリを変えた版で `hsync sys` を抜かすと、新しいカーネルに古い shell のまま動く (2026-10-24、route-test の Usage が出ないことで気づいた)。
 - `--fast` での sync は運用しない (取りこぼしの調査を増やさない)。読み出しだけ速くしてよい。
 - ノートの os32-v3 が古いと `tools/` の約束が合わない。最初に git pull。
