@@ -1,4 +1,5 @@
-/* cmd_gfinit.c — GF6200_S7_SHELL S7a/S7c の明示的な単一 op。
+/* cmd_gfinit.c — `gfinit inspect <sid>` / `gfinit size-bars|prepare|verify|abort <sid> --allow-write` /
+ * `gfinit run-one <sid> <main> --allow-write` (GF6200_S7_SHELL S7a/S7c)。
  * kdebug_call の私有 op (kdebug/gfinit_wire.h) を呼ぶ。試験: tools/tests/gfinit_owner_host.c */
 #include "shell.h"
 #include "../../kdebug/gfinit_wire.h"
@@ -52,6 +53,7 @@ int shell_cmd_gfinit(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "gfinit: rejected rc=%d\n", rc);
     return rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gfinit inspect <sid> | gfinit {size-bars|prepare|verify|abort} <sid> --allow-write | gfinit run-one <sid> <main:0-4> --allow-write\n");
+    g_api->kprintf(ATTR_WHITE, "Usage: gfinit inspect <sid> | gfinit {size-bars|prepare|verify|abort} <sid> --allow-write | gfinit run-one <sid> <main:0-%u> --allow-write\n",
+                   GF_INIT_MAINS - 1U);
     return 2;
 }
