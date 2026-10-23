@@ -27,6 +27,8 @@ MUTATIONS = [
     ('pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
     ('pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
     ('pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
+    ('pll_fallback_not_first', 'u32 at = table + header, found = 0;', 'u32 at = table + header + len, found = 0;'),
+    ('pll_match_ignored', '        at = table + header + i * len;\n', '        (void)i;\n'),
     ('pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
 ]
 SHARED_MUTATIONS = []

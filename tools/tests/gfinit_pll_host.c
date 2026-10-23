@@ -31,7 +31,12 @@ static void pll_parser_tests(void)
     }
     fixture();put(GF_INIT_PLL_TABLE+4+31,27000,4);
     CHECK(gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,GF_PLL_CORE,&l)==0);
-    output("PLL parser: truncation at every byte, 4 entries, reg-4, duplicate/missing/version/ranges/ref\n");
+    /* No matching key uses the first entry (nouveau pll.c:162-175, the Ra266 ROM shape);
+     * a matching key still selects its own entry. */
+    fixture();put(GF_INIT_PLL_TABLE+4,0,4);put(GF_INIT_PLL_TABLE+4+29,5,1);put(GF_INIT_PLL_TABLE+4+2*35+29,6,1);
+    CHECK(gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,GF_PLL_CORE,&l)==0 && l.max_p==5);
+    CHECK(gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&l)==0 && l.max_p==6);
+    output("PLL parser: truncation at every byte, 4 entries, reg-4, duplicate/missing/version/ranges/ref, first entry when no key\n");
 }
 static void pll_solver_tests(void)
 {

@@ -149,7 +149,7 @@
 | 除外ポート | 3C9・3DA/3BA等の副作用読取、未知port・indexは拒否。IO命令でread側が未定義のportは勝手に0を返さず、資料に基づく別名/意味が確定するまで止める |
 | TIME | GPU PTIMERは初期化中なので時計にしない。OSのsys_time_now＋cpu_delay_usで少なくとも指定µsを待つ。校正済みを確認、分割待ちで予算を検査。長い待ちは切上げ可、切下げ不可 |
 
-- PLL limits: 表0x5BC8、版0x21、4件。`N/subdev/bios/pll.c:301–333` のVCO1/2上下限・入力周波数・N/M範囲・max_p/bias_pをchecked読取。ref_clk=0は27,000kHz（同:386–398）。
+- PLL limits: 表0x5BC8、版0x21、4件。**エントリの選び方 (2026-10-23、S7b の実 ROM で PM 決定)**: 対象レジスタのキー (NV40 の対応 CORE 0x004000・MEMORY 0x004020・VPLL0 0x680508) が一致するエントリ、無ければ表の最初のエントリ (`N/subdev/bios/pll.c:162–175`)。キーの重複は断る。Ra266 の ROM はヘッダ 5・エントリ 35 バイト、キーは 0・0x4020・0x4008・0x402C で、CORE と VIDEO は最初のエントリを使う。`N/subdev/bios/pll.c:301–333` のVCO1/2上下限・入力周波数・N/M範囲・max_p/bias_pをchecked読取。ref_clk=0は27,000kHz（同:386–398）。
 - 周波数はkHz整数、`f≈27000×N1×N2/(M1×M2×2^P)`。単段はN2=M2=1。中間積はu32、nouveauの段別演算順を維持し、一括積の式へ置換しない。N/M<=255、ref=27000を検査し、`_Static_assert(27000U <= UINT32_MAX / 255U / 255U, "PLL product")`で二段積上限1,755,675,000を確認する。clkP×M+丸め項も乗算前に `(UINT32_MAX-add)/M` と比較し、shift・加算・分母を検査して超過は拒否。pllnv04.c:99/107/171/184/195の演算をhostで比較し、32bitリンクで__udivdi3等の64bit除算支援が不要なことを確認する。
 - solverは `N/subdev/clk/pllnv04.c:28–120,127–247` の探索順・丸め・単段/二段選択・NV4xの段間倍率制約を再現。解無しなら書かない。返した係数・実周波数・誤差をログ化する。
 - 4004h/4024hは低位PLLのNMNM。limits検索はreg−4（`N/subdev/devinit/nv04.c:366`）、4000h/4020hの制御と対で扱う。680508hは高位PLL。

@@ -84,22 +84,24 @@ int gfinit_pll_parse(const u8 *r, u32 size, u32 table, u32 reg, struct gfinit_pl
     u32 key = reg;
     if (reg == GF_PLL_CORE || reg == GF_PLL_MEMORY) key -= 4;
     else if (reg != GF_PLL_VIDEO) return -1;
-    u32 found = 0;
+    /* No matching key: use the first entry, as nouveau nvkm/subdev/bios/pll.c:162-175
+     * (MIT) does for version 0x2x tables (Ra266's ROM keys only the memory PLL). */
+    u32 at = table + header, found = 0;
     for (u32 i = 0; i < count; i++) {
-        u32 at = table + header + i * len;
-        if (pll_le(r, at, 4) != key) continue;
+        if (pll_le(r, table + header + i * len, 4) != key) continue;
         if (found++) return -1;
-        *o = (struct gfinit_pll_limits){0};
-        o->vco1 = (struct gfinit_pll_vco){pll_le(r, at + 4, 2) * 1000, pll_le(r, at + 6, 2) * 1000,
-            pll_le(r, at + 12, 2) * 1000, pll_le(r, at + 16, 2) * 1000, r[at + 20], r[at + 21], r[at + 22], r[at + 23]};
-        o->vco2 = (struct gfinit_pll_vco){pll_le(r, at + 8, 2) * 1000, pll_le(r, at + 10, 2) * 1000,
-            pll_le(r, at + 14, 2) * 1000, pll_le(r, at + 18, 2) * 1000, r[at + 24], r[at + 25], r[at + 26], r[at + 27]};
-        o->max_p = r[at + 29]; o->bias_p = r[at + 30];
-        o->ref = len > 34 ? pll_le(r, at + 31, 4) : 0;
-        if (!o->ref) o->ref = GF_PLL_REF;
-        if (!limits_ok(o)) return -1;
+        at = table + header + i * len;
     }
-    return found == 1 ? 0 : -1;
+    *o = (struct gfinit_pll_limits){0};
+    o->vco1 = (struct gfinit_pll_vco){pll_le(r, at + 4, 2) * 1000, pll_le(r, at + 6, 2) * 1000,
+        pll_le(r, at + 12, 2) * 1000, pll_le(r, at + 16, 2) * 1000, r[at + 20], r[at + 21], r[at + 22], r[at + 23]};
+    o->vco2 = (struct gfinit_pll_vco){pll_le(r, at + 8, 2) * 1000, pll_le(r, at + 10, 2) * 1000,
+        pll_le(r, at + 14, 2) * 1000, pll_le(r, at + 18, 2) * 1000, r[at + 24], r[at + 25], r[at + 26], r[at + 27]};
+    o->max_p = r[at + 29]; o->bias_p = r[at + 30];
+    o->ref = len > 34 ? pll_le(r, at + 31, 4) : 0;
+    if (!o->ref) o->ref = GF_PLL_REF;
+    if (!limits_ok(o)) return -1;
+    return 0;
 }
 static void pll_best(struct gfinit_pll_solution *s, u32 clk, u32 actual,
                      u32 n1, u32 m1, u32 n2, u32 m2, u32 p)
