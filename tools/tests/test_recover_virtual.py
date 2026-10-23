@@ -1,4 +1,4 @@
-"""T4b-5: real dispatcher and virtual normal/fault trials, fake HAL, ILP32."""
+"""T4b-6: real dispatcher and virtual normal/fault/trial-expire trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +9,10 @@ import mutpar
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
+    ('trial_deadline_removed', 'if (r->spent >= r->budget ||',
+     'if ((r->spent >= r->budget && 0) ||'),
+    ('short_trial_omitted', 'profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;',
+     'profile.trial_limit = profile.opcode_limit;'),
     ('step_failure_ignored',
      'if (rc) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,',
      'if (rc && 0) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,'),
@@ -29,22 +33,23 @@ MUTATIONS = [
 ]
 
 
-def build_cmd(temp, dispatch=None):
+def build_cmd(temp, dispatch=None, expire=0):
     source = (dispatch if dispatch is not None else (ROOT / 'kdebug/kdebug_main.c').read_text()).split('static void selftest_run')[0]
     source = '\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
     (temp / 'virtual_dispatch.inc').write_text(source)
     return ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
+            '-DTEST_EXPIRE='+str(expire), '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
             '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
             '-I'+str(temp), '-I'+str(ROOT / 'tools/tests/recover_hostshim'),
             '-I'+str(ROOT / 'include'),
-            str(ROOT / 'tools/tests/recover_virtual_host.c'), '-o', str(temp / 'virtual')]
+            str(ROOT / 'tools/tests/recover_virtual_host.c'), '-o', str(temp / ('virtual'+str(expire)))]
 
 
 def one(item):
     name, before, after = item
     path = {'paused_gate_removed': 'kdebug/kdebug_main.c',
-            'step_failure_ignored': 'kdebug/recover.c'}.get(name, SOURCE)
+            'step_failure_ignored': 'kdebug/recover.c',
+            'trial_deadline_removed': 'kdebug/recover.c'}.get(name, SOURCE)
     source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:
@@ -55,24 +60,30 @@ def one(item):
         try:
             tree = mutpar.build_in_tree(ROOT, directory,
                 {path: changed},
-                [build_cmd(temp, changed if path == 'kdebug/kdebug_main.c' else None)], capture_output=True)
+                [build_cmd(temp, changed if path == 'kdebug/kdebug_main.c' else None, expire)
+                 for expire in (0, 1)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': COMPILE FAIL ' + str(exc.stderr), 1
         try:
-            result = host32.run([str(temp / 'virtual')], cwd=str(tree),
-                                timeout=30, capture_output=True)
+            for expire in (0, 1):
+                result = host32.run([str(temp / ('virtual'+str(expire)))], cwd=str(tree),
+                                    timeout=30, capture_output=True)
+                if result.returncode:
+                    return name + ': RED', 0
         except subprocess.TimeoutExpired:
-            return mutpar.timeout_red((name + ': runtime boundedness failure', 0))
-        return name + (': GREEN' if not result.returncode else ': RED'), int(result.returncode == 0)
+            # Retried once by mutpar; a second timeout still counts as survived.
+            return mutpar.timeout_red((name + ': TIMEOUT (watchdog failed)', 1))
+        return name + ': GREEN', 1
 
 
 def main():
     with tempfile.TemporaryDirectory(prefix='recover-virtual-') as directory:
         temp = Path(directory)
-        subprocess.run(build_cmd(temp), check=True)
-        rc = host32.run([str(temp / 'virtual')], timeout=30).returncode
-        if rc:
-            return rc
+        for expire in (0, 1):
+            subprocess.run(build_cmd(temp, expire=expire), check=True)
+            rc = host32.run([str(temp / ('virtual'+str(expire)))], timeout=30).returncode
+            if rc:
+                return rc
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(one, MUTATIONS, ('control', '', ''))))
     return 0

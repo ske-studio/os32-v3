@@ -2,6 +2,7 @@
  * recovery_call has already validated the wire form and the case. */
 #include "recover_virtual.h"
 
+#define VIRTUAL_TRIAL_SECONDS 8U
 #define VIRTUAL_UART_POLLS 4096U
 #define VIRTUAL_FRAME_BIT_US 10000000U
 #define VIRTUAL_FRAME_BITS 10U
@@ -89,12 +90,21 @@ void recover_virtual_detach(void)
     }
 }
 
+static int virtual_wait_tick(struct recover *r)
+{
+    u32 before = r->ops->ticks(r->opaque);
+    while (r->ops->ticks(r->opaque) == before) {}
+    return recover_safe_point(r);
+}
+
 static int virtual_operation(struct recover *r, void *arg)
 {
     (void)arg;
     if (recover_plan_enter(r, 0)) return -1;
-    if (active_case == RECOVER_VIRTUAL_FAULT) {
+    if (active_case == RECOVER_VIRTUAL_FAULT || active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE) {
         (void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);
+        if (active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE)
+            while (!virtual_wait_tick(r)) {}
         return -1; /* trial_step owns the failure and cleanup. */
     }
     return recover_plan_leave(r, 0);
@@ -112,6 +122,11 @@ static int virtual_begin(struct recover *r, u32 hz, u32 case_id)
     if (!r->transport || !r->transport->frame_us ||
         recover_budget_apply(&profile, REC_BUDGET_S0, hz,
             VIRTUAL_FRAME_BIT_US / r->transport->frame_us, VIRTUAL_FRAME_BITS, &work)) return -1;
+    if (case_id == RECOVER_VIRTUAL_TRIAL_EXPIRE) {
+        /* Below the 60 s opcode_limit that recover_budget_apply just checked. */
+        profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;
+        profile.crc = recover_profile_crc(&profile);
+    }
     saved_ops = r->ops;
     ops = *saved_ops;
     ops.start_ready = start_ready;
