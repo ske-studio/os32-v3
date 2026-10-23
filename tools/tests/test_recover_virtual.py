@@ -1,4 +1,4 @@
-"""T4b-3: real dispatcher and virtual normal trial, fake HAL, ILP32."""
+"""T4b-5: real dispatcher and virtual normal/fault trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +9,12 @@ import mutpar
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
+    ('step_failure_ignored',
+     'if (rc) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,',
+     'if (rc && 0) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,'),
+    ('inject_begin_omitted',
+     '(void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);',
+     '(void)active_case;'),
     ('paused_gate_removed',
      'if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&',
      'if (0 && r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&'),
@@ -37,7 +43,8 @@ def build_cmd(temp, dispatch=None):
 
 def one(item):
     name, before, after = item
-    path = 'kdebug/kdebug_main.c' if name == 'paused_gate_removed' else SOURCE
+    path = {'paused_gate_removed': 'kdebug/kdebug_main.c',
+            'step_failure_ignored': 'kdebug/recover.c'}.get(name, SOURCE)
     source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:
@@ -48,7 +55,7 @@ def one(item):
         try:
             tree = mutpar.build_in_tree(ROOT, directory,
                 {path: changed},
-                [build_cmd(temp, changed if path != SOURCE else None)], capture_output=True)
+                [build_cmd(temp, changed if path == 'kdebug/kdebug_main.c' else None)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': COMPILE FAIL ' + str(exc.stderr), 1
         try:

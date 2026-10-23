@@ -11,18 +11,19 @@ static int wire_tests(void)
         req.action = action;
         for (u32 id = RECOVER_VIRTUAL_NORMAL; id <= RECOVER_VIRTUAL_TXBUSY_STOP; id++) {
             req.case_id = id;
-            /* -1 for begin normal / step / end comes from recovery_attach failing
+            /* -1 for begin normal or fault / step / end comes from recovery_attach failing
              * in this inert fixture, not from the wire check. */
-            int expected = action == RECOVER_VIRTUAL_BEGIN && id != RECOVER_VIRTUAL_NORMAL ?
+            int expected = action == RECOVER_VIRTUAL_BEGIN &&
+                id != RECOVER_VIRTUAL_NORMAL && id != RECOVER_VIRTUAL_FAULT ?
                 KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED : -1;
             if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) !=
                 expected) return 1;
         }
     }
-    /* A well-formed begin fault returns UNSUPPORTED, so each malformed variant
+    /* A well-formed begin trial-expire returns UNSUPPORTED, so each malformed variant
      * below must be rejected by the wire check itself. */
     req.action = RECOVER_VIRTUAL_BEGIN;
-    req.case_id = RECOVER_VIRTUAL_FAULT;
+    req.case_id = RECOVER_VIRTUAL_TRIAL_EXPIRE;
     if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED) return 1;
     if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, 0, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_INVALID) return 1;
     const u32 sizes[] = {0, 39, 41};
