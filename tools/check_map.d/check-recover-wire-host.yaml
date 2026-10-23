@@ -5,5 +5,6 @@ check-recover-wire-host:
 - tools/tests/kdebug_init_host.c
 - tools/tests/test_recover_wire.py
 - tools/tests/host32.py
+- tools/tests/mutpar.py
 - build/checks.d/check-recover-wire-host.mk
 - tools/check_map.d/check-recover-wire-host.yaml
