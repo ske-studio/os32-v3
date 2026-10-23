@@ -238,5 +238,5 @@
 
 - **置き場** (§2・§8 の「kdebug の部品」「kdebug ビルド定義」): S1〜S6 は kdebug に入ったが、kdebug.bin が上限の 92% になったため、GeForce の部分は HWDEV の分離 (M3c 92153ea) で `/boot/hwdev.mod` へ移った。入口 (kdebug_call の op 5〜10) は核から部品へ振り分ける (M3b c1986c3)。構造は HWDEV_DESIGN.md。
 - **割込み禁止の区間** (§2 の「index/data と RMW は一組の間だけ割込み禁止」): 実装は REALHW_RECOVER_ADDENDUM.md の S5 の決定 (区間を分ける) に従う。S5 のレビューの P3 で送った文言の直しをこの注記で閉じる。
-- **S7** (§8 の行の「KAPI 共有ヘッダと版更新」): 先にできた `recover` は部品の private な wire ヘッダを shell が直接読み KAPI を変えていない。S7 もそれに揃える方向で見直す (票 TASK_HWDEV §3-1、設計の書換えはその段で)。
+- **S7** (§8 の行の「KAPI 共有ヘッダと版更新」): 先にできた `recover` は部品の private な wire ヘッダを shell が直接読み KAPI を変えていない。S7 もそれに揃える — **2026-10-23 確定**: private な `kdebug/gfinit_wire.h` を shell (`cmd_gfinit.c`) が直接読み、既存の kdebug_call の op 5〜10 を使う。KAPI の版・slot・生成元は変えない。§8 の S7 行より [GF6200_S7_SHELL.md](GF6200_S7_SHELL.md) (段 S7a・S7b・S7c) を正とする。trial の外の INSPECT は例外として通常の 1 行と終わりの行を出す (同 §3)。
 - **A1 の他装置の BAR**: Ra266 の基準構成 ([RA266.md](RA266.md) §1-1) では Trident 0:8.0 と 82557 0:11.0 が「長さ不明のメモリ BAR」で拒否に当たる。根拠の設計は票 TASK_HWDEV §3-1 の BARLEN。

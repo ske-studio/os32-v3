@@ -224,4 +224,4 @@ GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retai
 
 ## 実装の後の変化 (2026-10-23、PM 注記)
 
-- §6 の「公開の入口 (旧 S7) は … KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新」は、`recover` の先例 (`userland/shell/cmd_recover.c` が `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃える方向で見直す (票 TASK_HWDEV §3-1)。決まるまではこの節の本文を正とする。
+- §6 の「公開の入口 (旧 S7) は … KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新」は、`recover` の先例 (`userland/shell/cmd_recover.c` が `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃える — **2026-10-23 確定** ([GF6200_S7_SHELL.md](GF6200_S7_SHELL.md)): 公開の入口は既存の kdebug_call のまま、shell は private な `kdebug/gfinit_wire.h` を直接読む。sdk/kapi.json・KAPI の版・slot・SDK の生成物は変えない。§6 の KDEBUG の内部 ops の版 4・20 口の説明はそのまま。

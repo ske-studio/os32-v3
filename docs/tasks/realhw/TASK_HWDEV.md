@@ -41,7 +41,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | main (067da15、2026-10-23) — hwdev.mod を KERNEL_PAIRED_MODULES・core・R1 版・世代表の依存へ、起動 FD からは kdebug.bin と同じく除外 (PM 決定)、GF 8 オブジェクト名は hwdev.mk の HWDEV_GF だけ。NP21/W で NOT_FOUND が消え hwdev の handle を得た (`~/os32-tmp/evidence/2026-10-23/m5_np21w/RESULT.md`) |
-| 旧 S7 (shell と KAPI 共有ヘッダ) | 中 / sol | 固定 40B の wire と shell、KAPI の手順 ([ABI1]〜[ABI3]) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
+| 旧 S7 (shell、private wire) | 中 / sol | 固定 40B の wire と shell (KAPI は変えない、GF6200_S7_SHELL) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
 | T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | **合格** (2026-10-23、TASK_REALHW_RECOVER の T4b-1〜11 — 31kHz は CRT31K、`now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障・送信詰まり・終端不着、隔離像の巻戻し) — `~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md` |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
 
@@ -53,9 +53,9 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 1. **M5 を M4 より先に**: 大きさの条件はもう満たした。配備定義・`KERNEL_PAIRED_MODULES`・generations-manifest・KDEBUG=0 の門の試験だけの軽い段。起動のたびの `[hwdev] rejected: NOT_FOUND` もここで消える。
 2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。 **main (1fd0a49、2026-10-23、sol 実装・astra 取り込み可)** — NP21/W で起動・hwdev の handle は変わらず (`~/os32-tmp/evidence/2026-10-23/m5_np21w/BARLEN.md`)、実機の照合は S8。
 3. **M4a と M4b**: 対象は誰も持っていない 0:13.0 だけなので、まとめて 1 段にできるかを依頼の前に PM が決める。送り項目の「S0 の最小 GF 復帰」の扱いはここで決める。
-4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す ([GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) §8 の S7 行と [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) §6 の書換えが要る)。M5 と同じ段にできるかは設計の後に決める。
+4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す ([GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) §8 の S7 行と [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) §6 の書換えが要る)。M5 と同じ段にできるかは設計の後に決める。 **2026-10-23 確定**: [GF6200_S7_SHELL.md](../../decisions/realhw/GF6200_S7_SHELL.md) — private wire、KAPI 不変、段 S7a (wire と `gfinit inspect`) → S7b (実機の回、ROM と version.chip) → S7c (op 6〜10、`--allow-write` 必須)。
 5. **T4b**: NP21/W に GeForce は無いので、GPU への試行が通ることは T4b では確かめない (実機の S8 以降)。戻す処理そのものの項目 (`recover now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障、送信詰まり・poll 上限・終端不着、旧版一式への巻戻し) は DEFERRED_TESTS の RECOVER-T4B の行のまま残す。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
-6. **T5 と S8**: T5 は A1・A2 の測定と併合してよい ([ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md))。書込みなしの部分 (status・snapshot・version.chip の実 ROM 確認) は立会いなしでシリアルで先に回し、0FACh の初めての書込みと目視は S8 と同じ立会いの回にまとめる。
+6. **T5 と S8**: T5 は A1・A2 の測定と併合してよい ([ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md))。書込みなしの部分 (status・version.chip の実 ROM 確認 — snapshot は S8 の A1 の REC で取る、2026-10-23 PM 決定) は立会いなしでシリアルで先に回し、0FACh の初めての書込みと目視は S8 と同じ立会いの回にまとめる。
 
 並びの要約: M5 (+旧 S7 の可否) ∥ BARLEN 設計 → M4 → T4b → T5 の無書込み → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7。
 
@@ -75,6 +75,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) — 参照の表: 核の関数の slot、private ABI の構造体、import の生成、contract_crc、台帳の 11 枠目、KDEBUG の ops 版 4
 - [DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md) — 共通の要件: 想定する装置ごとに要る状態と、今の recover の前提で足りない所
 
+- [GF6200_S7_SHELL.md](../../decisions/realhw/GF6200_S7_SHELL.md) — 旧 S7 (2026-10-23 確定): シェルの `gfinit` コマンドで GF の op 5〜10 を呼ぶ。private な kdebug/gfinit_wire.h、KAPI 不変。INSPECT は ROM・version.chip の 1 行、書込みを伴う op は `--allow-write` 必須
 - [CRT31K_DESIGN.md](../../decisions/realhw/CRT31K_DESIGN.md) — CRT31K (2026-10-23 確定): NP21/W フォークに 31kHz で起動する ini 鍵 `CRT31K` (既定 false) を足し、T4b の S0 を NP21/W で回せるようにする。INT18h の修正は範囲外 (bios18.c:567 の AH=31h の rate は別票)。ctl の停止では ini が保存されないので、鍵は原本の写しに足してから `np21w_ini.py derive … crt31k-on`
 - [BARLEN_DESIGN.md](../../decisions/realhw/BARLEN_DESIGN.md) — BARLEN (2026-10-23 確定): 他の装置のメモリ BAR は正確な長さではなく**上限** (番地の整列と、Mem が有効な装置の隣の BAR までの距離の小さい方) と、根拠のある既知の長さの表 (82557) で GeForce の窓との重なりを判定する。BAR への書込み・Trident の資料は採らない (ユーザー承認)。実装は M4 の後 (host の試験のファイルが重なる)
 
