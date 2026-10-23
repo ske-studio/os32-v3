@@ -1,6 +1,11 @@
 /* Real dispatcher; the existing inert fixture counts every HAL dependency. */
 #define _start kdebug_fixture_start
+#define serial_get_setup fixture_serial_get_setup
 #include "kdebug_init_host.c"
+#undef serial_get_setup
+static unsigned wire_attach_calls;
+const struct serial_setup *serial_get_setup(void)
+{ wire_attach_calls++; return fixture_serial_get_setup(); }
 #undef _start
 
 STATIC_ASSERT(sizeof(KdebugRecoverVirtual) == 40, recover_virtual_wire_size);
@@ -11,21 +16,15 @@ static int wire_tests(void)
         req.action = action;
         for (u32 id = RECOVER_VIRTUAL_NORMAL; id <= RECOVER_VIRTUAL_TXBUSY_STOP; id++) {
             req.case_id = id;
-            /* -1 for begin normal, fault, trial-expire or poll-stop / step / end comes from recovery_attach failing
-             * in this inert fixture, not from the wire check. */
-            int expected = action == RECOVER_VIRTUAL_BEGIN &&
-                id != RECOVER_VIRTUAL_NORMAL && id != RECOVER_VIRTUAL_FAULT &&
-                id != RECOVER_VIRTUAL_TRIAL_EXPIRE && id != RECOVER_VIRTUAL_POLL_STOP ?
-                KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED : -1;
-            if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) !=
-                expected) return 1;
+            unsigned before=wire_attach_calls;
+            if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) != -1 ||
+                wire_attach_calls != before+1) return 1;
         }
     }
-    /* A well-formed begin txbusy-stop returns UNSUPPORTED, so each malformed variant
-     * below must be rejected by the wire check itself. */
+    /* Invalid requests must never reach attach, regardless of the shared -1. */
     req.action = RECOVER_VIRTUAL_BEGIN;
     req.case_id = RECOVER_VIRTUAL_TXBUSY_STOP;
-    if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED) return 1;
+    unsigned before=wire_attach_calls;
     if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, 0, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_INVALID) return 1;
     const u32 sizes[] = {0, 39, 41};
     for (u32 i = 0; i < sizeof(sizes)/sizeof(*sizes); i++)
@@ -42,6 +41,7 @@ static int wire_tests(void)
     }
     owner.state = REC_PAUSED;
     if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) != -1) return 1;
+    if (wire_attach_calls != before) return 1;
     return 0;
 }
 void _start(void)

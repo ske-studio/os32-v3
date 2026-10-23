@@ -139,3 +139,8 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - poll-stop は bind 前に max_polls=64 を設定して CRC を確定し、inject BEGIN の直後に virtual_freeze で recover の時計だけを凍結する。operation は safe_point を反復し、既存の poll 上限で cleanup へ進む。
 - virtual_local_cleanup の冒頭で offset += real_now−freeze_real として解除し、借用元の local_cleanup へ委譲する。凍結中に採った restore_tick と解除直後の virt は一致し、以後は real−offset で復帰の実経過を数える。
 - host は独立プロセスで凍結中にも real tick を進め、65 polls・仮想 tick 差0・解除直後の restore_tick 一致・復帰中の7 tick加算を確認する。poll比較除去時は128回の受信pollで非0終了する watchdog を使う。
+
+## T4b-8 の実装で設計者が決めたこと
+- txbusy-stop は inject BEGIN の成功後に時計を凍結し、専用の phase=txbusy event=BEGIN step=4 addr=0 の1行だけ ready=0 にする。put・実UART設定は借用元のままとする。
+- virtual_tx_end は失敗時も借用元 end を呼んで所有を解放した後、virtual_tx_clear で注入を解除する。local_cleanup の冒頭でも解除し、既存のUART累積値リセットで復帰ログを送る。
+- wire fixture は serial_get_setup の呼出し数で attach 到達を判定する。正しい全caseは到達し、不正wireは到達しないため、INVALIDと同値の-1だけでは合格にしない。

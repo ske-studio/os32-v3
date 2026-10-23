@@ -55,7 +55,7 @@ def main():
         result = host32.run([str(exe)], timeout=30)
         if result.returncode:
             return result.returncode
-        print('recover wire: 40B/version/reserved/size/UNSUPPORTED/PAUSED PASS')
+        print('recover wire: 40B/version/reserved/size/attach-effects/PAUSED PASS')
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(one, MUTATIONS, ('control', '', ''))))
     return 0

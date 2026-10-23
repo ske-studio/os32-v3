@@ -123,7 +123,8 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
     if (op == KDEBUG_OP_RECOVER_VIRTUAL) {
         if (req->action == RECOVER_VIRTUAL_BEGIN &&
             req->case_id != RECOVER_VIRTUAL_NORMAL && req->case_id != RECOVER_VIRTUAL_FAULT &&
-            req->case_id != RECOVER_VIRTUAL_TRIAL_EXPIRE && req->case_id != RECOVER_VIRTUAL_POLL_STOP)
+            req->case_id != RECOVER_VIRTUAL_TRIAL_EXPIRE && req->case_id != RECOVER_VIRTUAL_POLL_STOP &&
+            req->case_id != RECOVER_VIRTUAL_TXBUSY_STOP)
             return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
         if (recovery_attach()) return -1;
         return recover_virtual_call(req, PIT_HZ);
