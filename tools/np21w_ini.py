@@ -51,13 +51,14 @@ ALLOWED = {'USEGD5430': ('true', 'false'), 'GD5430TYPE': ('91',),
 
 # Additional fields are required only when selected, keeping old receipts and
 # the original four-field backend contract valid. SNDboard is saved as hex.
-EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME'}
+EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}
 DERIVE_OPERATIONS = {
     'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
     'cirrus-off': {'USEGD5430': 'false', 'GD5430TYPE': '91'},
     'pegc-on': {'USEPEGCP': 'true'}, 'pegc-off': {'USEPEGCP': 'false'},
     'ram-8mb': {'EXMEMORY': '7'}, 'ram-64mb': {'EXMEMORY': '65'},
     'snd118-on': {'SNDBOARD': '64'}, 'e_resume=false': {'E_RESUME': 'false'},
+    'crt31k-on': {'CRT31K': 'true'}, 'crt31k-off': {'CRT31K': 'false'},
 }
 
 # パス値を持つキーは固定値の白リストでは表せないので別表にする (票 S3I2-T)。
@@ -196,7 +197,7 @@ def _extra_value(key, value):
         raise IniError('unsupported additional field value')
     if key == 'SNDBOARD':
         valid = re.fullmatch(r'[0-9A-Fa-f]{1,2}', value)
-    elif key == 'E_RESUME':
+    elif key in ('E_RESUME', 'CRT31K'):
         valid = value in ('true', 'false')
     else:
         # A socket spec is an opaque literal. Do not interpret addresses or
@@ -273,6 +274,8 @@ def transform(raw, changes):
                 (set(ALLOWED_PATHS) if want_path else set()) | (set(changes) & EXTRA))
     if sections == 1 and 'NP2NETSOCK' in changes and 'NP2NETSOCK' not in found:
         raise IniError('鍵欠落: NP2NETSOCK (missing key); refusing derivation')
+    if sections == 1 and 'CRT31K' in changes and 'CRT31K' not in found:
+        raise IniError('鍵欠落: CRT31K (missing key); 新フォークで通常の ini 保存を行ってから再試行してください')
     if sections != 1 or set(found) != required:
         raise IniError('missing or duplicate target section/backend fields')
     diff = []
@@ -284,7 +287,7 @@ def transform(raw, changes):
         if old == new:
             continue
         parts[i] = parts[i][:start] + new + parts[i][end:]
-        if key in ALLOWED or key in ('SNDBOARD', 'E_RESUME'):
+        if key in ALLOWED or key in ('SNDBOARD', 'E_RESUME', 'CRT31K'):
             diff.append(f"{key}: {old.decode('ascii')} -> {resolved[key]}")
         else:
             # Never print the previous opaque path/spec; new is operator-chosen.
