@@ -42,7 +42,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | main (067da15、2026-10-23) — hwdev.mod を KERNEL_PAIRED_MODULES・core・R1 版・世代表の依存へ、起動 FD からは kdebug.bin と同じく除外 (PM 決定)、GF 8 オブジェクト名は hwdev.mk の HWDEV_GF だけ。NP21/W で NOT_FOUND が消え hwdev の handle を得た (`~/os32-tmp/evidence/2026-10-23/m5_np21w/RESULT.md`) |
 | 旧 S7 (shell と KAPI 共有ヘッダ) | 中 / sol | 固定 40B の wire と shell、KAPI の手順 ([ABI1]〜[ABI3]) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
-| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 実装中 (2026-10-23) — 前提の 31kHz は CRT31K (NP21/W の鍵、np21w-src 964b73f + os32-v3 49b1ddb、`crt31k.ini`) で済。`recover now 0` の PARTIAL と 98 復帰は NP21/W で合格 (`~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md`)。仮想の試行・期限・故障・送信詰まりの口は設計の欠けで追記を往復中、隔離像の巻戻しは未 |
+| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | **合格** (2026-10-23、TASK_REALHW_RECOVER の T4b-1〜11 — 31kHz は CRT31K、`now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障・送信詰まり・終端不着、隔離像の巻戻し) — `~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md` |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
 
 - 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は `TASK_GEFORCE6200` §5・`TASK_REALHW_RECOVER` §2 のまま。
