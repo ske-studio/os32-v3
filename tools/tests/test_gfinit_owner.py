@@ -1,4 +1,4 @@
-"""S6 real owner lifecycle with explicit platform/trial contract doubles."""
+"""S6 owner lifecycle and S7a shell/ROM output through the real console."""
 import pathlib
 import subprocess
 import sys
@@ -9,11 +9,14 @@ import mutpar
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/gfinit.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
+         '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('cli_op_swap', 'op = GF_OP_ABORT;', 'op = GF_OP_INSPECT;', 'userland/shell/cmd_gfinit.c'),
+    ('cli_nosys_success', 'return rc ? 1 : 0;', 'return rc && rc != -10 ? 1 : 0;', 'userland/shell/cmd_gfinit.c'),
+    ('chip_fixed', 'return rom[data + GF_BIT_CHIP_OFFSET];', 'return GF_VERSION_CHIP;'),
     ('lease_generation', 'owner->generation, r->token.session', 'gf_lease.generation, r->token.session'),
     ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) {', 'if (false) {'),
     ('idle_unowned_release', 'if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);', ''),
@@ -39,18 +42,19 @@ MUTATIONS = [
 ]
 
 def command(exe):
-    return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',
-            str(ROOT/'tools/tests/gfinit_owner_host.c'), '-o', str(exe)]
+    return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+            str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'lib/kprintf.c'), '-o', str(exe)]
 
 def mutation(item):
-    name, old, new = item
-    source = (ROOT/SOURCE).read_text()
+    name, old, new = item[:3]
+    path = item[3] if len(item) == 4 else SOURCE
+    source = (ROOT/path).read_text()
     if old and source.count(old) != 1:
         return f'{name}: ambiguous anchor', 1
     with tempfile.TemporaryDirectory(prefix='gf-owner-mut-') as td:
         exe = pathlib.Path(td)/'host'
         try:
-            tree = mutpar.build_in_tree(ROOT, td, {SOURCE: source.replace(old, new, 1) if old else source},
+            tree = mutpar.build_in_tree(ROOT, td, {path: source.replace(old, new, 1) if old else source},
                                        [command(exe)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1
@@ -64,6 +68,13 @@ def mutation(item):
 def main():
     with tempfile.TemporaryDirectory(prefix='gf-owner-') as td:
         exe = pathlib.Path(td)/'host'
+        subprocess.run(['gcc', '-std=gnu89', '-pedantic-errors', '-I'+str(ROOT),
+                        '-x', 'c', '-c', '-o', str(pathlib.Path(td)/'wire.o'), '-'],
+                       input='typedef unsigned int u32;\n#include "kdebug/gfinit_wire.h"\n'
+                             'typedef char wire_size[sizeof(struct gfinit_request)==40 ? 1 : -1];\n',
+                       text=True, check=True)
+        assert '"gfinit", shell_cmd_gfinit,' in (ROOT/'userland/shell/cmd_sys.c').read_text()
+        assert 'kdebug/gfinit_wire.h' in (ROOT/'build/programs.mk').read_text()
         subprocess.run(command(exe), check=True, cwd=ROOT)
         result = host32.run([str(exe)], cwd=ROOT, timeout=30)
         if result.returncode:
