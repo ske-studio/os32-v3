@@ -94,8 +94,8 @@ static int virtual_operation(struct recover *r, void *arg)
     (void)arg;
     if (recover_plan_enter(r, 0)) return -1;
     if (active_case == RECOVER_VIRTUAL_FAULT) {
-        if (recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0)) return -1;
-        return -1; /* Fault callback; trial_step owns failure and cleanup. */
+        (void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);
+        return -1; /* trial_step owns the failure and cleanup. */
     }
     return recover_plan_leave(r, 0);
 }

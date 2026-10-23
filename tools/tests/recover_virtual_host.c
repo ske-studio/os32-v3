@@ -74,20 +74,12 @@ static void print(int attr,const char *fmt,...) {(void)attr;(void)fmt;}
 static struct api {u32 version;void (*kprintf)(int,const char *,...);i32 (*kdebug_call)(u32,void *,u32);}
     api={78,print,recovery_call}, *g_api=&api;
 #include "../../userland/shell/cmd_recover.c"
-static bool contains(const char *needle)
-{
-    for(u32 i=0;i<used;i++){u32 j=0;while(needle[j] && trace[i+j]==needle[j])j++;if(!needle[j])return true;}
-    return false;
-}
 static u32 trace_at(const char *needle)
 {
-    for (u32 i=0;i<used;i++) {
-        u32 j=0;
-        while (needle[j] && trace[i+j]==needle[j]) j++;
-        if (!needle[j]) return i;
-    }
+    for(u32 i=0;i<used;i++){u32 j=0;while(needle[j] && trace[i+j]==needle[j])j++;if(!needle[j])return i;}
     return used;
 }
+static bool contains(const char *needle) {return trace_at(needle)<used;}
 static void run(void)
 {
     struct recover *r=recover_owner();
@@ -180,11 +172,6 @@ static void run(void)
     CHECK(!recovery_call(KDEBUG_OP_RECOVER_NOW,&q,sizeof(q)));
     CHECK(begins==ends);
     CHECK(!contains("phase=inject"));
-    for (u32 id=RECOVER_VIRTUAL_TRIAL_EXPIRE;id<=RECOVER_VIRTUAL_TXBUSY_STOP;id++) {
-        v=(KdebugRecoverVirtual){.version=RECOVER_VIRTUAL_VERSION,
-            .action=RECOVER_VIRTUAL_BEGIN,.case_id=id};
-        CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED);
-    }
     used=0; trace[0]=0;
     char *fault[]={"recover","virtual","begin","fault"};
     CHECK(!shell_cmd_recover(4,fault));

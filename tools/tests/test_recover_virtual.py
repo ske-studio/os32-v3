@@ -1,4 +1,4 @@
-"""T4b-5: real dispatcher and virtual normal trial, fake HAL, ILP32."""
+"""T4b-5: real dispatcher and virtual normal/fault trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -13,9 +13,8 @@ MUTATIONS = [
      'if (rc) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,',
      'if (rc && 0) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,'),
     ('inject_begin_omitted',
-     'if (recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0)) return -1;',
-     'if (0) return -1;'),
-
+     '(void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);',
+     '(void)active_case;'),
     ('paused_gate_removed',
      'if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&',
      'if (0 && r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&'),
