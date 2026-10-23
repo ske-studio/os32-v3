@@ -141,6 +141,6 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - host は独立プロセスで凍結中にも real tick を進め、65 polls・仮想 tick 差0・解除直後の restore_tick 一致・復帰中の7 tick加算を確認する。poll比較除去時は128回の受信pollで非0終了する watchdog を使う。
 
 ## T4b-8 の実装で設計者が決めたこと
-- txbusy-stop は inject BEGIN の成功後に時計を凍結し、専用の phase=txbusy event=BEGIN step=4 addr=0 の1行だけ ready=0 にする。put・実UART設定は借用元のままとする。
+- txbusy-stop は inject BEGIN の成功後に時計を凍結して plan を正常に leave し、続く既存の state PAUSED 行1行だけ ready=0 にする。新しい REC 行は足さず、put・実UART設定は借用元のままとする。
 - virtual_tx_end は失敗時も借用元 end を呼んで所有を解放した後、virtual_tx_clear で注入を解除する。local_cleanup の冒頭でも解除し、既存のUART累積値リセットで復帰ログを送る。
 - wire fixture は serial_get_setup の呼出し数で attach 到達を判定する。正しい全caseは到達し、不正wireは到達しないため、INVALIDと同値の-1だけでは合格にしない。

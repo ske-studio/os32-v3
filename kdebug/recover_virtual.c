@@ -20,9 +20,9 @@
 #define VIRTUAL_FINAL_BYTES sizeof(VIRTUAL_ROW "final event=END result=PARTIAL target=S0 verified=1 unknown=1 override=4294967295 saved=4294967295 actual=4294967295 trial=4294967295 lost_lines=4294967295 discarded_bytes=4294967295\n")
 #define VIRTUAL_DISCARD_BYTES sizeof(VIRTUAL_ROW "receive event=DISCARD discarded_bytes=4294967295\n")
 #define VIRTUAL_RESTORE_BYTES (11U * (VIRTUAL_BEGIN_BYTES + VIRTUAL_END_BYTES) + VIRTUAL_STATE_BYTES + VIRTUAL_FINAL_BYTES + VIRTUAL_DISCARD_BYTES)
-#define VIRTUAL_TRIAL_BYTES (6U * VIRTUAL_STATE_BYTES + VIRTUAL_DISCARD_BYTES + 2U * VIRTUAL_BEGIN_BYTES)
+#define VIRTUAL_TRIAL_BYTES (6U * VIRTUAL_STATE_BYTES + VIRTUAL_DISCARD_BYTES + VIRTUAL_BEGIN_BYTES)
 /* One ready poll per byte and one empty poll per row at minimum. */
-STATIC_ASSERT(VIRTUAL_TRIAL_BYTES + 9U < VIRTUAL_UART_POLLS, virtual_trial_polls);
+STATIC_ASSERT(VIRTUAL_TRIAL_BYTES + 8U < VIRTUAL_UART_POLLS, virtual_trial_polls);
 STATIC_ASSERT(VIRTUAL_RESTORE_BYTES <= VIRTUAL_LOG_BYTES, virtual_restore_log);
 STATIC_ASSERT(VIRTUAL_RESTORE_BYTES + 25U < VIRTUAL_UART_POLLS, virtual_restore_polls);
 
@@ -144,9 +144,10 @@ static int virtual_operation(struct recover *r, void *arg)
         active_case == RECOVER_VIRTUAL_POLL_STOP || active_case == RECOVER_VIRTUAL_TXBUSY_STOP) {
         if (recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0)) return -1;
         if (active_case == RECOVER_VIRTUAL_TXBUSY_STOP) {
+            /* The next existing row (state PAUSED) stalls; virtual_tx_end clears it. */
             virtual_freeze(r->opaque);
             tx_busy = true;
-            return recover_record(r, "txbusy", "BEGIN", active_case, 0, 0, 0);
+            return recover_plan_leave(r, 0);
         }
         if (active_case == RECOVER_VIRTUAL_POLL_STOP) {
             virtual_freeze(r->opaque);

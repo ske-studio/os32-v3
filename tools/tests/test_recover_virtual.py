@@ -1,4 +1,4 @@
-"""T4b-8: real dispatcher and virtual normal/fault/trial-expire/poll-stop trials, fake HAL, ILP32."""
+"""T4b-8: real dispatcher and virtual normal/fault/trial-expire/poll-stop/txbusy-stop trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -12,7 +12,6 @@ MUTATIONS = [
     ('uart_poll_limit_removed', 'if (r->uart_polls >= max_polls) break;',
      'if (r->uart_polls >= max_polls && 0) break;'),
     ('tx_injection_not_cleared', 'tx_busy = false;', '(void)tx_busy;'),
-
     ('step_poll_limit_removed',
      '++r->polls > r->profile->max_polls)',
      '(++r->polls > r->profile->max_polls && 0))'),

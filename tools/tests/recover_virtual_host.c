@@ -352,11 +352,10 @@ static void run_txbusy(void)
     CHECK(r->state==REC_FAILED && r->reason==REC_LOG && r->lost_lines==1);
     CHECK(r->s0_verified && !r->s1_verified && writes==2 && cell==0x1234);
     CHECK(contains("phase=inject event=BEGIN step=4 addr=0\n"));
-    CHECK(!contains("phase=txbusy"));
     CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
     CHECK(contains(" trial=9 lost_lines=1"));
     /* All received REC sequence numbers are consecutive except the one row
-     * immediately after inject (seq 6): missing seq 7, restoration starts at 8. */
+     * immediately after inject (seq 6): state PAUSED is seq 7, restoration starts at 8. */
     u32 last=0, gaps=0;
     for (u32 i=0;i+5<used;i++) {
         if (trace[i]!=' ' || trace[i+1]!='s' || trace[i+2]!='e' ||
