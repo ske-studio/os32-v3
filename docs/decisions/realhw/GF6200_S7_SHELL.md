@@ -96,3 +96,7 @@ rc = g_api->kdebug_call(op, &q, sizeof(q));
 - inspectの呼出し失敗はinspect-endのrcだけで示し、abort失敗は既存recover先例の `gfinit: rejected rc=`、abort成功は追加行なしとする；API不足/NULLは呼ばずunavailableとする。
 - KDEBUGはビルド時の分岐ではなく起動設定なので同じ成果物を使い、hostは実物kernel/kdebug_call.cの未公開opsによるNOSYSと公開opsの両経路を試験する。
 - gfinit_wire.hはgfinit.h経由でDWARF収集に含まれるため、generatorのglobから直接includeだけを除き、冗長な1行追加を防いで生成物・inventoryの差0を維持する。
+
+## S7c の実装で設計者が決めたこと
+- main 範囲は既存 GF_INIT_MAINS=5 を gfinit_decode.h から private gfinit_wire.h に移し、shell と部品で共用する（wire 配置・op・KAPI は不変）。
+- size-bars/prepare/run-one/verify は abort と同じく非ゼロ rc を `gfinit: rejected rc=`、ゼロ rc は追加行なしとし、REC の結果判定は既存 monitor に任せる。

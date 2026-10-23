@@ -397,5 +397,58 @@ static void cli_test(void)
     CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));api.kdebug_call=kdebug_call;
     output("S7a CLI / KDEBUG=0 NOSYS / inspect two lines via console serial PASS checks complete\n");
 }
+static void cli_write_test(void)
+{
+    const char *names[]={"size-bars","prepare","run-one","verify","abort"};
+    const u32 ops[]={6,7,8,9,10};
+    const char *bad[]={"", "-1", "+1", "4294967296", "1x", " 1"};
+    cli_live=0;api.version=78;api.kdebug_call=kdebug_call;
+    for(u32 i=0;i<sizeof(ops)/sizeof(*ops);i++) {
+        int argc=i==2 ? 5 : 4;
+        char *args[]={"gfinit",(char *)names[i],"4294967295","--allow-write","--allow-write","extra"};
+        if(i==2)args[3]="0";
+        kdebug.ops.dbg_call=cli_dispatch;cli_result=0;
+        u32 before=cli_calls;
+        clear_output();
+        CHECK(shell_cmd_gfinit(argc,args)==0 && cli_calls==before+1 && cli_op==ops[i]);
+        CHECK(!serial_length); /* No automatic next stage or added success line. */
+        CHECK(cli_request.version==1 && cli_request.size==40 && cli_request.flags==1);
+        CHECK(cli_request.session==~0U && cli_request.script_id==0 && cli_request.max_steps==4096);
+        CHECK(!cli_request.status && !cli_request.fail_pc && !cli_request.fail_reg && !cli_request.steps);
+        before=cli_calls;
+        for(int n=1;n<=6;n++)if(n!=argc)CHECK(shell_cmd_gfinit(n,args)==2);
+        args[argc-1]="--unknown";CHECK(shell_cmd_gfinit(argc,args)==2);
+        args[argc-1]="--allow-write";
+        for(u32 j=0;j<sizeof(bad)/sizeof(*bad);j++) {
+            args[2]=(char *)bad[j];CHECK(shell_cmd_gfinit(argc,args)==2);
+        }
+        args[2]="5";
+        if(i==2) {
+            const char *bad_main[]={"5","4294967295","", "-1", "+1", "4294967296", "1x", " 1"};
+            for(u32 j=0;j<sizeof(bad_main)/sizeof(*bad_main);j++) {
+                args[3]=(char *)bad_main[j];CHECK(shell_cmd_gfinit(argc,args)==2);
+            }
+            CHECK(cli_calls==before);
+            for(u32 main=0;main<5;main++) {
+                char number[]={(char)('0'+main),0};args[3]=number;
+                CHECK(shell_cmd_gfinit(argc,args)==0 && cli_request.script_id==main);
+                CHECK(cli_calls==++before && cli_op==8);
+            }
+            args[3]="0";
+        }
+        CHECK(cli_calls==before);
+        cli_result=-1;clear_output();
+        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before+1);
+        CHECK(equal(serial_output,"gfinit: rejected rc=-1\n"));
+        kdebug.ops.dbg_call=0;before=cli_calls;clear_output();
+        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
+        CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
+        api.version=77;clear_output();CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
+        CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
+        api.version=78;api.kdebug_call=0;
+        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);api.kdebug_call=kdebug_call;
+    }
+    output("S7c single-op CLI / main range / write gate / NOSYS PASS checks complete\n");
+}
 void _start(void)
-{ cli_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import tempfile
 import zlib
+import mutpar
 
 SRC = Path(__file__).resolve().parents[1] / 'rshell_recover.py'
 
@@ -151,39 +152,103 @@ def status_cases(m):
         assert log.read_bytes().endswith(b'\x04')
 
 
+def gfinit_cases(m):
+    meta = META.replace('sid=7', 'sid=6')
+    final = FINAL.replace('sid=7', 'sid=6')
+    command = 'gfinit prepare 5 --allow-write'
+    for split in (1, 7, 256):
+        for ending, good in [
+                (meta, True), (meta+final, True), ('', False),
+                ('gfinit: rejected rc=-1\n', False),
+                (meta+'gfinit: rejected rc=-1\n', False),
+                (meta+final+'gfinit: rejected rc=-1\n', False),
+                (meta+final.replace('result=OK', 'result=PARTIAL'), False),
+                (meta+final.replace('override=0', 'override=1'), False)]:
+            data = ('> '+command+'\n'+ending+'\x04').encode()
+            port = Port(data, split=split)
+            raw = io.BytesIO(); saves = []; records = m.Records(0)
+            try:
+                m.exchange(port, command, records, 10, 1, raw,
+                           lambda d: saves.append(dict(d)), port.clock)
+            except m.RecoverError:
+                assert not good
+            else:
+                assert good
+            assert raw.getvalue() == data
+            assert port.writes == [(command+'\n').encode()]
+            if ending.startswith(meta):
+                assert saves[-1]['sid'] == 6 and saves[-1]['crc']['snapshot_crc'] == 13
+    # A2 PAUSED saves the newly assigned sid; continuation never probes ver.
+    records = m.Records(0);records.line(meta)
+    resumed = m.Records(6, records.data)
+    command = 'gfinit run-one 6 0 --allow-write'
+    port = Port(('> '+command+'\n').encode())
+    try:
+        m.exchange(port, command, resumed, 1, 1, io.BytesIO(), lambda _: None, port.clock)
+    except m.RecoverError:
+        pass
+    else:
+        raise AssertionError('timeout accepted')
+    assert port.writes == [(command+'\n').encode(), m.abort_frame(6)]
+    try:
+        m.Records(5, records.data)
+    except m.RecoverError:
+        pass
+    else:
+        raise AssertionError('stale session accepted')
+
+
+MUTATIONS = [
+    ('session', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
+    ('sequence', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "sid != self.data['sid']"),
+    ('loss', "f.get('lost_lines') == '0'", 'True'),
+    ('verify', "f.get('verified') == '1'", 'True'),
+    ('echo', 'if not echo:', 'if False:'),
+    ('status-body', "raise RecoverError('missing/malformed status reply')", "return 'accepted'"),
+    ('serial-owner', 'exclusive=True', 'exclusive=False'),
+    ('timeout', "failure = failure or 'host timeout'", 'failure = failure'),
+    ('gfinit-rejected', "'gfinit: rejected rc='", "'gfinit: ignored rc='"),
+]
+
+
+def mutation(item):
+    name, before, after = item
+    source = SRC.read_text()
+    if before and source.count(before) != 1:
+        return name + ': ambiguous anchor', 1
+    with tempfile.TemporaryDirectory(prefix='recover_host_') as tmp:
+        path = Path(tmp) / (name + '.py')
+        path.write_text(source.replace(before, after, 1) if before else source)
+        mutant = load(path)
+        try:
+            cases(mutant)
+            status_cases(mutant)
+            gfinit_cases(mutant)
+        except (AssertionError, mutant.RecoverError):
+            return name + ': RED', 0
+        return name + ': GREEN', 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     cases(load(SRC))
     status_cases(load(SRC))
+    gfinit_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
-        mutations = [
-            ('session', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
-            ('sequence', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "sid != self.data['sid']"),
-            ('loss', "f.get('lost_lines') == '0'", 'True'),
-            ('verify', "f.get('verified') == '1'", 'True'),
-            ('echo', 'if not echo:', 'if False:'),
-            ('status-body', "raise RecoverError('missing/malformed status reply')", "return 'accepted'"),
-            ('serial-owner', 'exclusive=True', 'exclusive=False'),
-            ('timeout', "failure = failure or 'host timeout'", 'failure = failure'),
-        ]
-        with tempfile.TemporaryDirectory(prefix='recover_host_') as tmp:
-            for name, before, after in mutations:
-                source = SRC.read_text()
-                assert source.count(before) == 1
-                path = Path(tmp) / (name + '.py')
-                path.write_text(source.replace(before, after))
-                mutant = load(path)
-                try:
-                    cases(mutant)
-                    status_cases(mutant)
-                except (AssertionError, mutant.RecoverError):
-                    print('killed:', name)
-                else:
-                    raise AssertionError('survived: ' + name)
+        # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.
+        missed = 0
+        for item in [('control', '', '')] + MUTATIONS:
+            text, survived = mutation(item)
+            if item[0] == 'control':
+                survived = not survived
+            print(('CONTROL ' if item[0] == 'control' else '') + text)
+            missed += survived
+        return int(bool(missed))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

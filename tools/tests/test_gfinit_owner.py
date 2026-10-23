@@ -1,4 +1,4 @@
-"""S6 owner lifecycle and S7a shell/ROM output through the real console."""
+"""S6 owner lifecycle and S7a/S7c shell/ROM output through the real console."""
 import pathlib
 import subprocess
 import sys
@@ -14,6 +14,9 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('cli_write_gate', 'argc != expected || !str_eq(argv[argc - 1], "--allow-write")',
+     'argc != expected && !str_eq(argv[argc - 1], "--allow-write")', 'userland/shell/cmd_gfinit.c'),
+    ('cli_main_range', 'q.script_id >= GF_INIT_MAINS', '0', 'userland/shell/cmd_gfinit.c'),
     ('cli_op_swap', 'op = GF_OP_ABORT;', 'op = GF_OP_INSPECT;', 'userland/shell/cmd_gfinit.c'),
     ('cli_nosys_success', 'return rc ? 1 : 0;', 'return rc && rc != -10 ? 1 : 0;', 'userland/shell/cmd_gfinit.c'),
     ('chip_fixed', 'return rom[data + GF_BIT_CHIP_OFFSET];', 'return GF_VERSION_CHIP;'),
