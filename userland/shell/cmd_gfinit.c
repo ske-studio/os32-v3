@@ -1,8 +1,9 @@
-/* S7a: private GF wire through the existing kdebug_call slot. */
+/* cmd_gfinit.c — `gfinit inspect <sid>` / `gfinit abort <sid> --allow-write` (GF6200_S7_SHELL S7a)。
+ * kdebug_call の私有 op (kdebug/gfinit_wire.h) を呼ぶ。試験: tools/tests/gfinit_owner_host.c */
 #include "shell.h"
 #include "../../kdebug/gfinit_wire.h"
 
-#define GFINIT_KAPI_MIN 78U
+#define GFINIT_KAPI_MIN 78U /* kdebug_call (slot 253) の版 */
 
 static int gfinit_session(const char *s, u32 *out)
 {

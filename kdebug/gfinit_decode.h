@@ -1,10 +1,10 @@
 #ifndef KDEBUG_GFINIT_DECODE_H
 #define KDEBUG_GFINIT_DECODE_H
 #include "recover_gf.h"
+#include "gfinit_wire.h" /* GF_INIT_SCHEDULE */
 #define GF_INIT_SCRIPTS 9U
 #define GF_INIT_INSNS 193U
 #define GF_INIT_MAINS 5U
-#include "gfinit_wire.h"
 #define GF_INIT_WORK_STEPS 2048U /* bounded expansion scratch, not execution budget */
 #define GF_INIT_ARGS 6144U /* includes S6 PREPARE and maximum BAR1 verification */
 #define GF_INIT_CALL_DEPTH 16U
