@@ -106,3 +106,9 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 ## T4b-1 の実装で設計者が決めたこと
 - 私有 wire の不正は `KDEBUG_RECOVER_VIRTUAL_INVALID=-1`、形式が正しい未実装要求は `KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED=-2` とし、KDEBUG=0 の既存 NOSYS=-10 は変えない。
 - op 11 の受け口は既存 PAUSED 門の後・kpeek 分岐の前とし、この段では PAUSED の例外を設けない。
+
+## T4b-2 の実装で設計者が決めたこと
+- PAUSED 門の例外は T4b-3 に残し、host は実 recovery_call で begin→PAUSED を確認した後、内側の recover_virtual_call を直接呼んで step/end を確認する（外側の op 11 は -1 のまま）。
+- 仮想 identity の boot/image/kdebug は保存しない RAM 試行の固定値1とし、装置欄は0、開始条件は借用元の start_ready と route_read の両方へ委譲する。
+- normal だけを実装し、他 case の begin は UNSUPPORTED のままとする。終端の借用解除は既存 now 経路にも接続するが、now の受入と PAUSED 門の変更は次段に残す。
+- recover_budget_apply の wait_ms は呼出側が渡す復帰の静的作業量で、trial 待機を加算しない。normal は既存 S0 の予算を使い、最大幅 REC 行（復帰11対＋state/final/discard、begin〜stepはstate6行＋discard）を開始前に4096B・UART4096 pollsと照合する。

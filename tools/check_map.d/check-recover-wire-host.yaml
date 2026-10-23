@@ -8,3 +8,4 @@ check-recover-wire-host:
 - tools/tests/mutpar.py
 - build/checks.d/check-recover-wire-host.mk
 - tools/check_map.d/check-recover-wire-host.yaml
+- kdebug/recover_virtual.h

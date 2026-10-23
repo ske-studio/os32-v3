@@ -11,9 +11,10 @@ static int wire_tests(void)
         req.action = action;
         for (u32 id = RECOVER_VIRTUAL_NORMAL; id <= RECOVER_VIRTUAL_TXBUSY_STOP; id++) {
             req.case_id = id;
-            unsigned before = calls;
+            int expected = action == RECOVER_VIRTUAL_BEGIN && id != RECOVER_VIRTUAL_NORMAL ?
+                KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED : KDEBUG_RECOVER_VIRTUAL_INVALID;
             if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) !=
-                KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED || calls != before + 1) return 1;
+                expected) return 1;
         }
     }
     if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, 0, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_INVALID) return 1;

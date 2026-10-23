@@ -70,4 +70,5 @@ check-hwdev-image-host:
 - sdk/include/os32/os32_kapi_shared.h
 - tools/tests/gfinit_plan_host.c
 - tools/tests/test_gfinit_plan.py
+- kdebug/recover_virtual.h
 artifact_reader: true
