@@ -71,7 +71,8 @@ def one(item):
                 if result.returncode:
                     return name + ': RED', 0
         except subprocess.TimeoutExpired:
-            return name + ': TIMEOUT (watchdog failed)', 1
+            # Retried once by mutpar; a second timeout still counts as survived.
+            return mutpar.timeout_red((name + ': TIMEOUT (watchdog failed)', 1))
         return name + ': GREEN', 1
 
 
