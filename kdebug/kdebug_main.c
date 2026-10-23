@@ -8,6 +8,7 @@
 
 #include "recover.h"
 #include "recover_wire.h"
+#include "recover_virtual.h"
 #include "gfinit.h"
 #include "kernel/hwdev_module.h"
 #include "kernel/display_restore.h"
@@ -114,7 +115,10 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
             return KDEBUG_RECOVER_VIRTUAL_INVALID;
         for (u32 i = 0; i < sizeof(req->reserved) / sizeof(req->reserved[0]); i++)
             if (req->reserved[i]) return KDEBUG_RECOVER_VIRTUAL_INVALID;
-        return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
+        if (req->action == RECOVER_VIRTUAL_BEGIN && req->case_id != RECOVER_VIRTUAL_NORMAL)
+            return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
+        if (recovery_attach()) return -1;
+        return recover_virtual_call(req, PIT_HZ);
     }
     if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
         return kpeek_call(op, buf, size);
@@ -123,6 +127,7 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
     if (op == KDEBUG_OP_RECOVER_NOW) {
         enum recover_state before = r->state;
         int rc = recover_now_session(r, out->session);
+        recover_virtual_detach();
         if (!rc || r->state != before) {
             const struct hwdev_ops *ops = hwdev_module_ops();
             if (ops) ops->release_work();

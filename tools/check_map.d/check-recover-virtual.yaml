@@ -1,0 +1,18 @@
+check-recover-virtual:
+- kdebug/recover.c
+- kdebug/recover.h
+- kdebug/recover_profile.c
+- kdebug/recover_virtual.c
+- kdebug/recover_virtual.h
+- kdebug/recover_wire.h
+- kdebug/kdebug_main.c
+- userland/shell/cmd_recover.c
+- tools/tests/recover_virtual_host.c
+- tools/tests/test_recover_virtual.py
+- tools/tests/host32.py
+- tools/tests/recover_hostshim/io.h
+- lib/crc32_core.inc
+- build/checks.d/check-recover-virtual.mk
+- tools/check_map.d/check-recover-virtual.yaml
+- tools/tests/mutpar.py
+- build/kdebug.mk

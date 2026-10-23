@@ -164,3 +164,8 @@ static int dispatch_tests(const struct kdebug_ops *ops)
 #else
 const struct hwdev_ops *hwdev_module_ops(void) { calls++; return 0; }
 #endif
+
+/* Virtual execution is covered by recover_virtual_host.c. */
+int recover_virtual_call(const KdebugRecoverVirtual *q, u32 hz)
+{ (void)q; (void)hz; return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED; }
+void recover_virtual_detach(void) {}

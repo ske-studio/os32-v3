@@ -106,7 +106,8 @@ def main():
                     ROOT / 'kdebug/nic_trace.c', ROOT / 'kdebug/v86_gcap.c',
                     ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c', ROOT / 'kdebug/kdebug_window.c',
                     ROOT / 'kdebug/kpeek_allow.c', ROOT / 'kdebug/recover.c',
-                    ROOT / 'kdebug/recover_profile.c', ROOT / 'hwdev/generated/hwdev_core.c', source,
+                    ROOT / 'kdebug/recover_profile.c', ROOT / 'kdebug/recover_virtual.c',
+                    ROOT / 'hwdev/generated/hwdev_core.c', source,
                     folder / 'kdebug_import_slots.c', folder / 'kdebug_import_stubs.S'):
             obj = folder / (src.stem + '.o')
             command([cross / 'i386-elf-gcc', '-DRECOVER_MODULE', *FLAGS, *inc, '-c', src, '-o', obj])
