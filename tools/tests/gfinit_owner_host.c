@@ -199,6 +199,14 @@ static void failures_test(void)
 }
 static void ownership_test(void)
 {
+    const enum recover_state inactive[]={REC_IDLE,REC_VERIFIED};
+    for(u32 i=0;i<sizeof(inactive)/sizeof(*inactive);i++){
+        setup();CHECK(call(GF_OP_INSPECT,0,0)==0 && owner->rom);
+        core.state=inactive[i];gf_device.generation++;
+        CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)<0);
+        CHECK(!live_pages && !owner->inspected && !owner->rom && !gf_lease.active);
+        CHECK(!writes && !begins && !steps && !ends && frees==1);
+    }
     const enum hwdev_owner_state busy[] = {
         HWDEV_UNCLASSIFIED, HWDEV_ROOT_IDE, HWDEV_LAN_SERIALFS, HWDEV_DISPLAY
     };
