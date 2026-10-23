@@ -38,5 +38,7 @@
 
 - `recover status` (IDLE または VERIFIED)、`ver`、`mem` (leftover・audit_fail が 0)。
 - CUI のまま、最後に **GRPH+2+RESET** (31kHz)、再起動後の `ver` と 09A8h。
-- 0FACh の初めての書込みは別の承認 (口は [RECOVER_ROUTE_TEST](../../docs/decisions/realhw/RECOVER_ROUTE_TEST.md)、実装の後に `recover route-test 0 --approve` を 1 回、目視)。
+- 0FACh の初めての書込み — 承認 3 (A2 を止めた後、IDLE・session 0 の新しい起動で。route-test は session 0 だけ受ける):
+  `rshell_serial.py … cmd 'recover route-test 0 --approve'` → route の step 0→1→0 が 1 組ずつ、終端 `PARTIAL target=S0 verified=1`。
+  直後にユーザーが 98 画面を目視。戻らなければユーザーがリセット。口は [RECOVER_ROUTE_TEST](../../docs/decisions/realhw/RECOVER_ROUTE_TEST.md)。
 - 結果は `RESULT.md` に項目ごとの 合格/不合格/未確認。票には合否 1 語と証拠の所在だけ。
