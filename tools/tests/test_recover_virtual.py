@@ -37,7 +37,7 @@ MUTATIONS = [
     ('synthetic_access_allowed',
      '(void)opaque; (void)a; (void)value;\n    return -1;',
      '(void)opaque; (void)a; (void)value;\n    return 0;'),
-    ('plan_leave_skipped', 'return recover_plan_leave(r, 0);', 'return 0;'),
+    ('plan_leave_skipped', '    }\n    return recover_plan_leave(r, 0);\n}', '    }\n    return 0;\n}'),
     ('transport_not_restored', 'r->transport = saved_transport;',
      '(void)saved_transport;'),
 ]
