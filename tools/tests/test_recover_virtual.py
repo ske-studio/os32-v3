@@ -12,7 +12,7 @@ MUTATIONS = [
     ('paused_gate_removed',
      'if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&',
      'if (0 && r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&'),
-    ('foreign_owner_allowed', 'r->ops == &ops &&', ''),
+    ('foreign_owner_allowed', 'r->ops == &ops &&', '((void)r, 1) &&'),
 
     ('synthetic_access_allowed',
      '(void)opaque; (void)a; (void)value;\n    return -1;',
