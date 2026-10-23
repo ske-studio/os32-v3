@@ -1,4 +1,4 @@
-"""T4b-6: real dispatcher and virtual normal/fault trials, fake HAL, ILP32."""
+"""T4b-6: real dispatcher and virtual normal/fault/trial-expire trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -11,9 +11,8 @@ SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
     ('trial_deadline_removed', 'if (r->spent >= r->budget ||',
      'if ((r->spent >= r->budget && 0) ||'),
-    ('short_trial_omitted', 'profile.trial_limit = (u32)ticks;',
-     'profile.trial_limit = profile.opcode_limit + (u32)ticks * 0U;'),
-
+    ('short_trial_omitted', 'profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;',
+     'profile.trial_limit = profile.opcode_limit;'),
     ('step_failure_ignored',
      'if (rc) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,',
      'if (rc && 0) {\n        fail(r, r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION,'),
@@ -74,7 +73,6 @@ def one(item):
         except subprocess.TimeoutExpired:
             return name + ': TIMEOUT (watchdog failed)', 1
         return name + ': GREEN', 1
-
 
 
 def main():

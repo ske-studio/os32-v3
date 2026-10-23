@@ -123,9 +123,8 @@ static int virtual_begin(struct recover *r, u32 hz, u32 case_id)
         recover_budget_apply(&profile, REC_BUDGET_S0, hz,
             VIRTUAL_FRAME_BIT_US / r->transport->frame_us, VIRTUAL_FRAME_BITS, &work)) return -1;
     if (case_id == RECOVER_VIRTUAL_TRIAL_EXPIRE) {
-        unsigned long long ticks = (unsigned long long)VIRTUAL_TRIAL_SECONDS * hz;
-        if (!ticks || ticks >= RECOVER_HALF_TICKS) return -1;
-        profile.trial_limit = (u32)ticks;
+        /* Below the 60 s opcode_limit that recover_budget_apply just checked. */
+        profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;
         profile.crc = recover_profile_crc(&profile);
     }
     saved_ops = r->ops;
