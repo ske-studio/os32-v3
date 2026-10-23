@@ -13,7 +13,7 @@ MUTATIONS = [
 ]
 
 def command(binary):
-    return [os.environ.get("HOST_CC", "cc"), "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+    return [os.environ.get("HOST_CC", "gcc"), "-std=gnu11", "-Wall", "-Wextra", "-Werror",
             str(ROOT / "tools/tests/recover_cli_host.c"), "-o", str(binary)]
 
 def one(item):

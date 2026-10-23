@@ -12,8 +12,8 @@ MUTATIONS = [
      'int rc = gfinit_call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);'),
     ('absent-fallback', 'if (!ops || recovery_attach()) return -1;',
      'if (!ops) return 0;\n        if (recovery_attach()) return -1;'),
-    ('cleanup-before-recover', 'int rc = recover_now_session(r, out->session);',
-     'const struct hwdev_ops *early = hwdev_module_ops();\n        if (early) early->release_work();\n        int rc = recover_now_session(r, out->session);'),
+    ('cleanup-before-recover', 'enum recover_state before = r->state;',
+     'enum recover_state before = r->state;\n        const struct hwdev_ops *early = hwdev_module_ops();\n        if (early) early->release_work();'),
 ]
 
 
