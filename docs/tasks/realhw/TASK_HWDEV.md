@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-23)** — M1〜M5 と BARLEN は main (BARLEN 1fd0a49)。次は T4b。2026-10-23 に順序を見直した (§3-1、ユーザー承認)
+> 状態: **実装中 (2026-10-24)** — M1〜M5・BARLEN・T4b・T5 の無書込みは済み、0FACh の書込みの口 route-test も main (7e9be2b、実機も更新済み)。次は S8 (立会い、`tools/accept/gf_s8.md`)。2026-10-23 に順序を見直した (§3-1、ユーザー承認)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -43,7 +43,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | main (067da15、2026-10-23) — hwdev.mod を KERNEL_PAIRED_MODULES・core・R1 版・世代表の依存へ、起動 FD からは kdebug.bin と同じく除外 (PM 決定)、GF 8 オブジェクト名は hwdev.mk の HWDEV_GF だけ。NP21/W で NOT_FOUND が消え hwdev の handle を得た (`~/os32-tmp/evidence/2026-10-23/m5_np21w/RESULT.md`) |
 | 旧 S7 (shell、private wire) | 中 / sol | 固定 40B の wire と shell (KAPI は変えない、GF6200_S7_SHELL) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
 | T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | **合格** (2026-10-23、TASK_REALHW_RECOVER の T4b-1〜11 — 31kHz は CRT31K、`now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障・送信詰まり・終端不着、隔離像の巻戻し) — `~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md` |
-| T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
+| T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | T5 の無書込みは合格 (TASK_REALHW_RECOVER の T5 行)。S8 はユーザーの立会いの日時待ち (台本 `tools/accept/gf_s8.md`、承認 3 つ: A1・A2・route-test)。main 0〜3 以降は未 |
 
 - 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は `TASK_GEFORCE6200` §5・`TASK_REALHW_RECOVER` §2 のまま。
 ### 3-1. 順序の見直し (2026-10-23、PM 提案・ユーザー承認)
@@ -117,4 +117,4 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 証拠は `~/os32-tmp/run/hwdev_m3c/`。M4 の所有照合・終端と M5 の配備は本段に含めない。
 
 ## 送り項目 (取り込みのレビューの P3)
-- (BARLEN か T4b で) M4: kernel/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。
+- (BARLEN か T4b で) M4: kernel/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。 **済** (0a2bf5b、失敗時に published=0)

@@ -85,3 +85,7 @@ recover route-test 0 --approve
 - op 12 の session・IDLE・接続済み ops の検査は attach より前に行い、未接続時だけ既存 attach で実機 S0 ops を接続する。拒否時は detach/release_work も行わない。
 - shell の専用形の session は文字列 `0` のみを受け付ける。入口関数の宣言は private wire ヘッダに置く (recover.h は宣言の追加だけでも hwdev 契約 CRC が変わるため不変とする)。
 - route_write callback が無い場合は REC_CONTRACT として終了し、一回用承認は消費・解除する。
+
+## 送り項目 (取り込みのレビューの P3、2026-10-24)
+- `tools/tests/kdebug_loader_host.c` の op 12 の NOSYS の確かめが弱い (KDEBUG=0 で op 12 が NOSYS を返すことを直接照合していない)。次に触るときに足す。
+- `recover_route_test_session` (kdebug/recover.c) の IDLE・session の検査は kdebug_main.c の op 12 の門と重なる。害は無いので残す。
