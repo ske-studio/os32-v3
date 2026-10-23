@@ -46,6 +46,19 @@ static const struct recover_plan_node node = {
 static const struct recover_plan_entry entry = {REC_PREPARE, RECOVER_NONE, 0};
 static struct recover_plan plan;
 
+static bool tx_busy;
+static void virtual_tx_clear(void) { tx_busy = false; }
+static int virtual_tx_ready(void *opaque)
+{
+    return tx_busy ? 0 : saved_transport->uart.ready(opaque);
+}
+static int virtual_tx_end(struct recover *r, void *opaque, int rc)
+{
+    int result = saved_transport->end(r, opaque, rc);
+    virtual_tx_clear();
+    return result;
+}
+
 static bool clock_frozen;
 static u32 clock_offset, freeze_real, freeze_tick;
 
@@ -63,6 +76,7 @@ static void virtual_freeze(void *opaque)
 
 static int virtual_local_cleanup(void *opaque)
 {
+    virtual_tx_clear();
     if (clock_frozen) {
         clock_offset += saved_ops->ticks(opaque) - freeze_real;
         clock_frozen = false;
@@ -127,8 +141,14 @@ static int virtual_operation(struct recover *r, void *arg)
     (void)arg;
     if (recover_plan_enter(r, 0)) return -1;
     if (active_case == RECOVER_VIRTUAL_FAULT || active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE ||
-        active_case == RECOVER_VIRTUAL_POLL_STOP) {
-        (void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);
+        active_case == RECOVER_VIRTUAL_POLL_STOP || active_case == RECOVER_VIRTUAL_TXBUSY_STOP) {
+        if (recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0)) return -1;
+        if (active_case == RECOVER_VIRTUAL_TXBUSY_STOP) {
+            /* The next existing row (state PAUSED) stalls; virtual_tx_end clears it. */
+            virtual_freeze(r->opaque);
+            tx_busy = true;
+            return recover_plan_leave(r, 0);
+        }
         if (active_case == RECOVER_VIRTUAL_POLL_STOP) {
             virtual_freeze(r->opaque);
             while (!recover_safe_point(r)) {}
@@ -176,6 +196,8 @@ static int virtual_begin(struct recover *r, u32 hz, u32 case_id)
     saved_transport = r->transport;
     transport = *saved_transport;
     transport.max_polls = VIRTUAL_UART_POLLS;
+    transport.uart.ready = virtual_tx_ready;
+    transport.end = virtual_tx_end;
     if (recover_owner_configure(&ops, r->opaque, r->s0_profile, false)) return -1;
     active_case = case_id;
     borrowed = true;

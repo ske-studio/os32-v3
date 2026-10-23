@@ -19,6 +19,8 @@ static void die(u32 line)
 volatile u32 tick_count;
 static bool advance_ticks, poll_test, restore_clock_checked;
 static u32 frozen_samples;
+static bool tx_test, uart_owned;
+static u32 busy_ready, busy_waits, polls_before_busy, busy_bytes, bytes_after_busy;
 static u32 tick_reads;
 static u32 fake_ticks(void)
 {
@@ -61,8 +63,13 @@ static int serial_trygetchar(void)
     }
     return -1;
 }
+static int counted_virtual_ready(void *opaque)
+{
+    if (tx_busy) CHECK(++busy_ready<=4096U);
+    return virtual_tx_ready(opaque);
+}
 static int serial_checked_ready(void) {return 1;}
-static int serial_checked_put(u32 b) {CHECK(used+1<sizeof(trace));trace[used++]=b;trace[used]=0;return 0;}
+static int serial_checked_put(u32 b) {CHECK(!tx_test || !tx_busy);CHECK(used+1<sizeof(trace));trace[used++]=b;trace[used]=0;return 0;}
 static int serial_checked_begin(void)
 {
     if (poll_test && recover_owner()->state==REC_RESTORING && !restore_clock_checked) {
@@ -71,13 +78,44 @@ static int serial_checked_begin(void)
         CHECK(r->restore_tick==freeze_tick);
         restore_clock_checked=true;
     }
+    if (tx_test) {
+        CHECK(!uart_owned);
+        uart_owned=true;
+        if (tx_busy && !busy_waits) {
+            polls_before_busy=recover_owner()->uart_polls;
+            busy_bytes=used;
+            CHECK(clock_frozen);
+        } else if (recover_owner()->state==REC_RESTORING) {
+            CHECK(!tx_busy && !clock_frozen);
+        }
+    }
     begins++;return 0;
 }
 static int serial_checked_empty(void) {return 1;}
-static void serial_checked_end(void) {ends++;}
+static void serial_checked_end(void)
+{
+    if (tx_test) {
+        CHECK(uart_owned);
+        uart_owned=false;
+        if (tx_busy) {
+            CHECK(recover_owner()->uart_polls==4096);
+            bytes_after_busy=used;
+        }
+    }
+    ends++;
+}
 struct serial_setup {u32 actual;};
 static const struct serial_setup *serial_get_setup(void) {setup_reads++;static const struct serial_setup s={9600};return &s;}
-static int fake_wait(void *p,u32 us) {(void)p;(void)us;return 0;}
+static int fake_wait(void *p,u32 us)
+{
+    (void)p;(void)us;
+    if (tx_test && tx_busy) {
+        CHECK(++busy_waits<=4096U); /* finite watchdog when UART limit is removed */
+        tick_count++;
+        CHECK(clock_frozen && virtual_ticks(0)==freeze_tick);
+    }
+    return 0;
+}
 struct hwdev_ops {
     int (*call)(u32,void *,u32,const struct recover_ops *,const struct recover_transport *,const struct recover_profile *);
     void (*release_work)(void);
@@ -295,9 +333,46 @@ static void run_poll_stop(void)
     CHECK(writes==2 && cell==0x1234 && begins==ends);
     output("virtual poll-stop/65-polls/frozen-delta-0/restore-clock PASS\n");
 }
+static void run_txbusy(void)
+{
+    struct recover *r=recover_owner();
+    char *begin[]={"recover","virtual","begin","txbusy-stop"};
+    CHECK(!shell_cmd_recover(4,begin));
+    CHECK(r->state==REC_PAUSED && !contains("phase=inject"));
+    CHECK(transport.uart.put==recovery_transport.uart.put);
+    transport.uart.ready=counted_virtual_ready;
+    tx_test=true;
+    KdebugRecoverVirtual v={.version=RECOVER_VIRTUAL_VERSION,
+        .action=RECOVER_VIRTUAL_STEP,.session=r->token.session};
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    tx_test=false;
+    CHECK(busy_ready==4096U-polls_before_busy && busy_waits==busy_ready && polls_before_busy>0);
+    CHECK(busy_bytes==bytes_after_busy && busy_waits==clock_offset);
+    CHECK(!clock_frozen && !tx_busy && !uart_owned && begins==ends);
+    CHECK(r->state==REC_FAILED && r->reason==REC_LOG && r->lost_lines==1);
+    CHECK(r->s0_verified && !r->s1_verified && writes==2 && cell==0x1234);
+    CHECK(contains("phase=inject event=BEGIN step=4 addr=0\n"));
+    CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
+    CHECK(contains(" trial=9 lost_lines=1"));
+    /* All received REC sequence numbers are consecutive except the one row
+     * immediately after inject (seq 6): state PAUSED is seq 7, restoration starts at 8. */
+    u32 last=0, gaps=0;
+    for (u32 i=0;i+5<used;i++) {
+        if (trace[i]!=' ' || trace[i+1]!='s' || trace[i+2]!='e' ||
+            trace[i+3]!='q' || trace[i+4]!='=') continue;
+        u32 n=0,j=i+5;
+        while (trace[j]>='0' && trace[j]<='9') n=n*10+trace[j++]-'0';
+        if (n!=last+1) {CHECK(last==6 && n==8);gaps++;}
+        last=n;
+    }
+    CHECK(gaps==1 && last==r->seq);
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    output("virtual txbusy/ready-count/seq-gap/release/S0 PASS\n");
+}
 void _start(void)
 {
-    if (TEST_EXPIRE==2) run_poll_stop();
+    if (TEST_EXPIRE==3) run_txbusy();
+    else if (TEST_EXPIRE==2) run_poll_stop();
     else if (TEST_EXPIRE==1) run_expire(); else run();
     __asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();
 }
