@@ -182,6 +182,7 @@ static void check_boot_dispatch(void)
         CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
     }
 }
+#include "kdebug/recover_wire.h"
 /* KAPI kdebug_call (kernel/kdebug_call.c): NOSYS without slot 19, else pass-through. */
 static u32 call_op, call_size;
 static void *call_buf;
@@ -196,6 +197,8 @@ static void check_kdebug_call(void)
     i32 (*saved)(u32, void *, u32) = kdebug.ops.dbg_call;
     kdebug.ops.dbg_call = 0;
     CHECK(kdebug_call(KDEBUG_OP_PEEK, req, sizeof(req)) == OS32_ERR_NOSYS);
+    /* Private route-test also stays dormant with KDEBUG disabled. */
+    CHECK(kdebug_call(KDEBUG_OP_RECOVER_ROUTE_TEST, req, sizeof(req)) == OS32_ERR_NOSYS);
     kdebug.ops.dbg_call = fake_dbg_call;
     CHECK(kdebug_call(KDEBUG_OP_PEEK_LAN_PROBE, req, sizeof(req)) == 0x5a);
     CHECK(call_op == KDEBUG_OP_PEEK_LAN_PROBE && call_buf == req && call_size == sizeof(req));

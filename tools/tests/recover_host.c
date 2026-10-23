@@ -16,6 +16,7 @@
 #define BAD_KEY (~0UL)
 struct trace { char op; u32 key, value; };
 struct fake {
+    u32 route_readback, route_ticks;
     u32 tick, tick_read, tick_write, values[NREG], route, command, bar;
     u32 bus_calls, fail_at;
     u32 n, fail_read, fail_write, bad_verify, op_ticks, config_reads;
@@ -103,12 +104,13 @@ static int write_bus(void *v, const struct recover_bus_access *a, u32 value)
 static int route_read(void *v, u32 *out)
 {
     struct fake *f = v; note(f, 'a', RECOVER_ROUTE_PORT, f->route);
-    *out = f->route; return bus_fault(f) || f->route_read_fail;
+    *out = f->route; f->tick += f->route_ticks; return bus_fault(f) || f->route_read_fail;
 }
 static int route_write(void *v, u32 value)
 {
     struct fake *f = v; note(f, 'A', RECOVER_ROUTE_PORT, value);
-    if (!f->route_stuck) f->route = value | 0xFCU;
+    CHECK(!route_test_once && !route_test_approved);
+    if (!f->route_stuck) f->route = f->route_readback ? f->route_readback : value | 0xFCU;
     return bus_fault(f) || f->route_fail;
 }
 static int screen_safe(void *v)

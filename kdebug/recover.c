@@ -1,4 +1,5 @@
 #include "recover.h"
+#include "recover_wire.h"
 #include "../lib/crc32_core.inc"
 
 static int cleanup(struct recover *r);
@@ -384,6 +385,18 @@ static int transport_state(struct recover *r, enum recover_state s)
         row_number(&b, " snapshot_crc=", r->token.snapshot_crc);
     }
     return row_send(r, &b);
+}
+
+static bool route_test_once, route_test_approved;
+
+int recover_route_test_session(struct recover *r, u32 session)
+{
+    int rc = -1;
+    route_test_once = route_test_approved = true;
+    if (r->state == REC_IDLE && !session && !r->token.session)
+        rc = recover_now_session(r, session);
+    route_test_once = route_test_approved = false;
+    return rc;
 }
 
 int recover_now_session(struct recover *r, u32 session)
@@ -950,8 +963,13 @@ static void screen(struct recover *r)
     if (recover_restore_point(r) || logged_route(r, &route)) {
         fail(r, REC_BUS, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
     }
-    if (route & RECOVER_ROUTE_MASK) {
-        if (!r->route_write_approved) {
+    bool once = route_test_once && route_test_approved;
+    if (once) route_test_once = route_test_approved = false;
+    if (once || (route & RECOVER_ROUTE_MASK)) {
+        if (!once && !r->route_write_approved) {
+            fail(r, REC_CONTRACT, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
+        }
+        if (!r->ops->route_write) {
             fail(r, REC_CONTRACT, REC_PHASE_ROUTE, RECOVER_ROUTE_PORT); return;
         }
         if (!restore_time(r)) return;

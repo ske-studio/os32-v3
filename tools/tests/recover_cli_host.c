@@ -90,6 +90,20 @@ int main(void)
     assert(shell_cmd_recover(4,v)==2 && called==before);
     v[2]="step"; result=-10; /* existing KDEBUG=0 NOSYS */
     assert(shell_cmd_recover(4,v)==1 && strstr(output,"rejected rc=-10"));
+    char *route[]={"recover","route-test","0","--approve","extra"};
+    before=called; result=0;
+    assert(shell_cmd_recover(3,route)==2 && called==before);
+    assert(shell_cmd_recover(5,route)==2 && called==before);
+    route[3]="approve";
+    assert(shell_cmd_recover(4,route)==2 && called==before);
+    route[3]="--approve"; route[2]="1";
+    assert(shell_cmd_recover(4,route)==2 && called==before);
+    route[2]="0";
+    assert(shell_cmd_recover(4,route)==0 && called==before+1);
+    assert(observed_op==KDEBUG_OP_RECOVER_ROUTE_TEST && observed_session==0);
+    assert(strstr(output,"verified=1"));
+    result=-10;
+    assert(shell_cmd_recover(4,route)==1 && strstr(output,"rejected rc=-10"));
     puts("recover virtual CLI: cases/actions/session/arity/rejection PASS");
     puts("recover CLI: status/now/session bounds/rejection PASS");
     return 0;

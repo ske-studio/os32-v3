@@ -80,3 +80,8 @@ recover route-test 0 --approve
 - C2 (P3): 48B の KdebugRecoverRouteTest と version/flags は採らない。新しい private op `KDEBUG_OP_RECOVER_ROUTE_TEST` (12U、3/4/5〜10/11 と衝突しない) に既存の 40B KdebugRecover を使う。サブコマンド `recover route-test 0 --approve` が承認そのもの (`--approve` 無しは usage)。§4 の「旧40/新48 byte」の行は「op 12 の 40B の要求の検査と旧 op 4 の不変」に読み替える。
 - C3 (P3): 試験に 1 行足す — gfinit の ops が接続中 (r->ops≠&recovery_ops、gfinit.c:337 の configure の後) なら route-test を拒否し I/O は 0 件。
 - 未決 1 件 (実機の実施時点) は運用のゲート。推奨どおり host・変異・ビルドの確認の後、立会いの回 (S8 と同じ回) に 1 回だけ承認を取る。
+
+## route-test の実装で設計者が決めたこと
+- op 12 の session・IDLE・接続済み ops の検査は attach より前に行い、未接続時だけ既存 attach で実機 S0 ops を接続する。拒否時は detach/release_work も行わない。
+- shell の専用形の session は文字列 `0` のみを受け付ける。入口関数の宣言は private wire ヘッダに置く (recover.h は宣言の追加だけでも hwdev 契約 CRC が変わるため不変とする)。
+- route_write callback が無い場合は REC_CONTRACT として終了し、一回用承認は消費・解除する。

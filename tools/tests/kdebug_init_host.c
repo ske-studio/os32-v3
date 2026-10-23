@@ -51,20 +51,50 @@ int recover_now_session(struct recover *r, u32 session)
     (void)r; return -1;
 #endif
 }
+#ifdef RECOVER_ROUTE_WIRE
+static u32 route_wire_calls;
+#endif
+int recover_route_test_session(struct recover *r, u32 session)
+{
+#ifdef RECOVER_ROUTE_WIRE
+    route_wire_calls++;
+    if (session) return -1;
+    r->state = REC_VERIFIED; r->s0_verified = true; r->token.session = 1;
+    return 0;
+#else
+    return recover_now_session(r, session);
+#endif
+}
 int recover_owner_configure(const struct recover_ops *ops, void *opaque,
     const struct recover_profile *profile, bool approved)
-{ (void)ops; (void)opaque; (void)profile; (void)approved; calls++; return -1; }
+{
+    (void)ops; (void)opaque; (void)profile; (void)approved; calls++;
+#ifdef RECOVER_ROUTE_WIRE
+    owner.ops = ops; return 0;
+#else
+    return -1;
+#endif
+}
 int recover_budget_apply(struct recover_profile *p, u32 k, u32 hz, u32 baud,
     u32 bits, const struct recover_static_work *work)
-{ (void)p; (void)k; (void)hz; (void)baud; (void)bits; (void)work; calls++; return -1; }
+{ (void)p; (void)k; (void)hz; (void)baud; (void)bits; (void)work; calls++;
+#ifdef RECOVER_ROUTE_WIRE
+    return 0;
+#else
+    return -1;
+#endif
+}
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 { (void)r; (void)ops; (void)opaque; calls++; return -1; }
 int recover_hal_wait_frame(void *opaque, u32 us)
 { (void)opaque; (void)us; calls++; return -1; }
 const struct serial_setup *serial_get_setup(void) { calls++;
-#ifdef HWDEV_DISPATCH
+#if defined(HWDEV_DISPATCH) || defined(RECOVER_ROUTE_WIRE)
     static const struct serial_setup serial = {.actual=9600};
-    attach_calls++; return &serial;
+#ifdef HWDEV_DISPATCH
+    attach_calls++;
+#endif
+    return &serial;
 #else
     return 0;
 #endif

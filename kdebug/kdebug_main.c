@@ -24,6 +24,13 @@
 static u32 recovery_ticks(void *opaque) { (void)opaque; return tick_count; }
 static int recovery_route(void *opaque, u32 *value)
 { (void)opaque; *value = inp(RECOVER_ROUTE_PORT); return 0; }
+static int recovery_route_write(void *opaque, u32 value)
+{
+    (void)opaque;
+    if (value != RECOVER_ROUTE_98) return -1;
+    outp(RECOVER_ROUTE_PORT, RECOVER_ROUTE_98);
+    return 0;
+}
 static int recovery_cui(void *opaque)
 { (void)opaque; return display_recover_ready(); }
 static int recovery_ready(void *opaque)
@@ -50,7 +57,7 @@ static int recovery_screen_verify(void *opaque)
 { (void)opaque; return recover_screen_98(recover_owner(), &recovery_screen, 0); }
 static const struct recover_ops recovery_ops = {
     .ticks = recovery_ticks, .start_ready = recovery_cui,
-    .route_read = recovery_route, .screen_safe = recovery_ready,
+    .route_read = recovery_route, .route_write = recovery_route_write, .screen_safe = recovery_ready,
     .screen_restore_verify = recovery_screen_verify, .local_cleanup = recovery_local
 };
 static int recovery_rx(void *opaque)
@@ -129,13 +136,19 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
         if (recovery_attach()) return -1;
         return recover_virtual_call(req, PIT_HZ);
     }
-    if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
+    if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW &&
+        op != KDEBUG_OP_RECOVER_ROUTE_TEST)
         return kpeek_call(op, buf, size);
-    if (!buf || size != sizeof(KdebugRecover) || recovery_attach()) return -1;
+    if (!buf || size != sizeof(KdebugRecover)) return -1;
+    if (op == KDEBUG_OP_RECOVER_ROUTE_TEST &&
+        (r->state != REC_IDLE || r->token.session || ((KdebugRecover *)buf)->session ||
+         (r->ops && r->ops != &recovery_ops))) return -1;
+    if (recovery_attach()) return -1;
     KdebugRecover *out = buf;
-    if (op == KDEBUG_OP_RECOVER_NOW) {
+    if (op == KDEBUG_OP_RECOVER_NOW || op == KDEBUG_OP_RECOVER_ROUTE_TEST) {
         enum recover_state before = r->state;
-        int rc = recover_now_session(r, out->session);
+        int rc = op == KDEBUG_OP_RECOVER_ROUTE_TEST ?
+            recover_route_test_session(r, out->session) : recover_now_session(r, out->session);
         recover_virtual_detach();
         if (!rc || r->state != before) {
             const struct hwdev_ops *ops = hwdev_module_ops();

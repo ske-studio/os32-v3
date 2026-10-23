@@ -316,5 +316,50 @@ static void t3_s0_tests(void)
         }
     }
 }
+/* Route-test uses the real core and bounded wire, with the same S0 profile as now. */
+static void route_test_tests(void)
+{
+    for (u32 mode = 0; mode < 10; mode++) {
+        t3_setup(false);
+        struct recover_profile s0 = profile;
+        s0.count = s0.quiesce_count = 0;
+        s0.crc = recover_profile_crc(&s0); r.s0_profile = &s0;
+        if (mode == 1) f.route = 0xfd;
+        if (mode == 2) f.route_readback = 0xfd;
+        if (mode == 3) f.ready = false;
+        if (mode == 4) f.route_read_fail = true;
+        if (mode == 5) f.route_fail = true;
+        if (mode == 6) f.route_ticks = s0.restore_limit;
+        if (mode == 7) r.state = REC_PAUSED;
+        if (mode == 8) r.token.session = 1;
+        int rc = recover_route_test_session(&r, mode == 9 ? 1 : 0);
+        CHECK(!route_test_once && !route_test_approved && !r.route_write_approved);
+        CHECK(count('A', RECOVER_ROUTE_PORT) == (mode <= 2 || mode == 5 ? 1U : 0U));
+        if (mode < 2) {
+            CHECK(rc == 0 && r.s0_verified && !r.s1_verified && !r.lost_lines);
+            u32 at = 0;
+            for (u32 i = 0; i < f.n; i++) if (f.trace[i].key == RECOVER_ROUTE_PORT) {
+                CHECK(at < 3 && f.trace[i].op == (at == 1 ? 'A' : 'a'));
+                if (at == 1) CHECK(f.trace[i].value == 0);
+                at++;
+            }
+            CHECK(at == 3);
+        } else {
+            CHECK(rc < 0 && !r.s0_verified && !count('v', 0));
+            if (mode == 2) CHECK(r.reason == REC_VERIFY && r.state == REC_FAILED);
+            if (mode == 3 || mode >= 7) CHECK(f.n == 0);
+        }
+        /* Re-enter cleanup after completion: the write must never be repeated. */
+        u32 n = count('A', RECOVER_ROUTE_PORT);
+        if (mode < 3 || mode == 5) (void)cleanup(&r);
+        CHECK(count('A', RECOVER_ROUTE_PORT) == n);
+        for (u32 non98 = 0; non98 < 2; non98++) {
+            t3_setup(false); r.s0_profile = &s0; f.route = non98 ? 0xfd : 0xfc;
+            rc = recover_now_session(&r, 0);
+            CHECK(!count('A', RECOVER_ROUTE_PORT));
+            CHECK(non98 ? rc < 0 && r.reason == REC_CONTRACT : rc == 0 && r.s0_verified);
+        }
+    }
+}
 static void t3_tests(void)
-{ t3_receive_tests(); t3_access_tests(); t3_owner_tests(); t3_flush_tests(); t3_log_budget_tests(); t3_safe_tests(); t3_log_tests(); t3_s0_tests(); }
+{ route_test_tests(); t3_receive_tests(); t3_access_tests(); t3_owner_tests(); t3_flush_tests(); t3_log_budget_tests(); t3_safe_tests(); t3_log_tests(); t3_s0_tests(); }

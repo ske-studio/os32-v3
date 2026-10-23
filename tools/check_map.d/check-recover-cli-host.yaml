@@ -6,3 +6,4 @@ check-recover-cli-host:
 - tools/tests/test_recover_cli.py
 - build/checks.d/check-recover-cli-host.mk
 - tools/check_map.d/check-recover-cli-host.yaml
+- tools/tests/mutpar.py

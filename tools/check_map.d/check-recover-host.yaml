@@ -24,3 +24,4 @@ check-recover-host:
 - tools/tests/recover_t3_host.inc
 - kdebug/kdebug_window.c
 - kdebug/kdebug_window.h
+- kdebug/recover_wire.h

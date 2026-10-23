@@ -12,6 +12,8 @@ INCLUDES = ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')
 
 MUTATIONS = [
+    ('route_dispatch_now', 'recover_route_test_session(r, out->session) :', 'recover_now_session(r, out->session) :'),
+    ('route_gf_ops_accepted', '(r->ops && r->ops != &recovery_ops)', 'false'),
     ('reserved_unchecked', 'if (req->reserved[i]) return KDEBUG_RECOVER_VIRTUAL_INVALID;',
      'if (req->reserved[i] && 0) return KDEBUG_RECOVER_VIRTUAL_INVALID;'),
     ('unknown_case_accepted', 'req->case_id != RECOVER_VIRTUAL_TXBUSY_STOP)\n            return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;',
@@ -25,7 +27,8 @@ def build_cmd(exe):
     return ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall',
             '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
             '-fno-stack-protector', '-D__KERNEL_BUILD__', '-nostdlib',
-            '-static', '-no-pie', *['-I'+str(ROOT / x) for x in INCLUDES],
+            '-static', '-no-pie', '-DRECOVER_ROUTE_WIRE',
+            '-I'+str(ROOT / 'tools/tests/recover_hostshim'), *['-I'+str(ROOT / x) for x in INCLUDES],
             str(ROOT / 'tools/tests/recover_wire_host.c'),
             str(ROOT / SOURCE), '-o', str(exe)]
 

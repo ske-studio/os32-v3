@@ -25,6 +25,11 @@ def host_cmd(exe):
 
 
 MUTATIONS = [
+    ("route_unapproved_write", "if (!once && !r->route_write_approved)", "if (false)"),
+    ("route_zero_skipped", "if (once || (route & RECOVER_ROUTE_MASK))", "if (route & RECOVER_ROUTE_MASK)"),
+    ("route_readback_ignored", "logged_route(r, &route) || (route & RECOVER_ROUTE_MASK)", "logged_route(r, &route)"),
+    ("route_exit_approval_leaked", "    route_test_once = route_test_approved = false;\n    return rc;", "    return rc;"),
+    ("route_consumption_removed", "if (once) route_test_once = route_test_approved = false;", "/* not consumed */"),
     ("access_blocked_ignored", "    if (r->access_blocked) return -1;", ""),
     ("local_selected_stale", "r->port_selected[r->index_port[target]] =\n            *value == t->index ? target : RECOVER_NONE;",
      "r->port_selected[r->index_port[target]] = target;"),
