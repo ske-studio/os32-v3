@@ -53,7 +53,12 @@
 | T4b-7 | 停止時の poll 上限: case poll-stop (`virt = real − offset` の凍結、max_polls 64) → `trial=2`、入口 1 + 64 = 65 | recover_virtual.c | host で tick 差 0 と 65 / 変異: step の poll 比較を外す |
 | T4b-8 | 送信詰まり: case txbusy-stop (専用 1 行の ready=0 と凍結) → `trial=9 lost_lines=1`、seq の欠番 1 | recover_virtual.c | host で UART 上限 / 変異: UART の poll 比較を外す |
 | T4b-9 | ホストの終端不着: tools/accept/recover_t4b_host.py (final 行だけ・EOT だけを監視器に渡さない、raw は保存) | tools/accept/ (tools だけ) | フィルタ無し rc=0・有り rc=1 / 変異: host の終端必須を外す |
-| T4b-10 | **ゲスト受入 (PM)**: T4b-5〜9 の 5 case と台本 tools/accept/recover_t4b.md の仕上げ。隔離像の巻戻しは別の段 (T4b-11、PM の配備) | 証拠 | 合否は RESULT.md |
+| T4b-10 | **ゲスト受入 (PM)**: T4b-5〜9 の 5 case と台本 tools/accept/recover_t4b.md の仕上げ。隔離像の巻戻しは T4b-11a〜e (PM の配備、1 段ずつ) | 証拠 | 合否は RESULT.md |
+| T4b-11a | **隔離像の起動の準備 (PM)**: `np21w_ini.py derive crt31k.ini t4b11_isolated.ini hdd=os32_t2h_install.nhd e_resume=false` (原本と crt31k.ini は書かない)、その ini で起動して今の隔離像の `ver` と 31kHz を記録、本像 crt31k.ini に戻す | 派生 ini | 隔離像で起動・`[pegc] hsync=31k` |
+| T4b-11b | **旧版一式の採取 (host)**: 旧版 53bbee8 を別の作業木で `make all`、配る一式 (カーネル・paired modules・`/sys`・userland) の一覧とハッシュを保存。新版 (main) も同じ形で。配置の世代・KAPI の差を一覧に | ~/os32-tmp/evidence/ | 一覧とハッシュ (配備はしない) |
+| T4b-11c | **旧版を隔離像へ (PM)**: stop → `nhd_deploy.py umount/pull --profile t2h` → 旧版一式を `copy --profile t2h` → `deploy --profile t2h` → 隔離 ini で起動、`ver` の Commit・Image CRC・部品の PAIR を記録 (これが戻り先) | 隔離 NHD | 旧版で起動 |
+| T4b-11d | **新版へ更新 (PM)**: 隔離像で `hsync boot` (または同じ copy 手順) で新版へ、`/boot/vmkernel.old` の CRC が旧版の起動 CRC と一致することを記録、新版で起動 | 隔離 NHD | 新版で起動・.old 一致 |
+| T4b-11e | **旧版一式へ巻戻し (PM)**: stop → pull → T4b-11b の旧版一式 (カーネルは .old と同じ世代、paired modules・`/sys`・userland を揃える) を戻す → deploy → 起動、`ver`・PAIR・ハッシュ・シェルの応答を照合。最後に本像 crt31k.ini で起動して残す | 隔離 NHD | 旧版で起動・混在なし |
 
 - 依頼は 1 段ずつ、完了条件は `make kernel` (T4b-9 は不要) + その段の直接の試験 `MUTATE=0` + `--lint`。変異は PM がレビューの後に 1 回。T4b-1〜3 は同じ作業木で順に積むが、依頼・レビュー・取り込みは段ごと。
 - 2026-10-23 に B1+B2 を 1 回で出して止めた途中の変更 (作業木 wt/t4b、約 240 行) は T4b-1〜3 の材料として残す。
