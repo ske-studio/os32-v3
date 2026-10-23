@@ -677,7 +677,7 @@ static const ShellCmd sys_cmds[] = {
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
-    { "recover", shell_cmd_recover, "status | now <session>", "Show recovery state or recover the current session" },
+    { "recover", shell_cmd_recover, "status | now <session> | virtual begin <case> | virtual step|end <session>", "Show recovery state or recover the current session" },
     { "peek",   shell_cmd_peek, "[-k|-p|-m] [-w1|-w2|-w4] addr [len]", "Read memory via kdebug (hex, KDEBUG=1)" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },
     { (const char *)0, 0, 0, 0 }

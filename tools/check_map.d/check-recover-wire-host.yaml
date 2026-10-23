@@ -1,0 +1,9 @@
+check-recover-wire-host:
+- kdebug/kdebug_main.c
+- kdebug/recover_wire.h
+- tools/tests/recover_wire_host.c
+- tools/tests/kdebug_init_host.c
+- tools/tests/test_recover_wire.py
+- tools/tests/host32.py
+- build/checks.d/check-recover-wire-host.mk
+- tools/check_map.d/check-recover-wire-host.yaml

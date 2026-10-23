@@ -108,6 +108,14 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
         return ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
     }
     if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW) return -1;
+    if (op == KDEBUG_OP_RECOVER_VIRTUAL) {
+        const KdebugRecoverVirtual *req = buf;
+        if (!req || size != sizeof(*req) || req->version != RECOVER_VIRTUAL_VERSION)
+            return KDEBUG_RECOVER_VIRTUAL_INVALID;
+        for (u32 i = 0; i < sizeof(req->reserved) / sizeof(req->reserved[0]); i++)
+            if (req->reserved[i]) return KDEBUG_RECOVER_VIRTUAL_INVALID;
+        return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
+    }
     if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
         return kpeek_call(op, buf, size);
     if (!buf || size != sizeof(KdebugRecover) || recovery_attach()) return -1;
