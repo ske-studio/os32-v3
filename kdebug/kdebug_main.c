@@ -106,15 +106,21 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
     if (op >= GF_OP_INSPECT && op <= GF_OP_ABORT) {
         const struct hwdev_ops *ops = hwdev_module_ops();
         if (!ops || recovery_attach()) return -1;
-        return ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
+        int rc = ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
+        recover_virtual_detach();
+        return rc;
     }
-    if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW) return -1;
+    const KdebugRecoverVirtual *req = 0;
     if (op == KDEBUG_OP_RECOVER_VIRTUAL) {
-        const KdebugRecoverVirtual *req = buf;
+        req = buf;
         if (!req || size != sizeof(*req) || req->version != RECOVER_VIRTUAL_VERSION)
             return KDEBUG_RECOVER_VIRTUAL_INVALID;
         for (u32 i = 0; i < sizeof(req->reserved) / sizeof(req->reserved[0]); i++)
             if (req->reserved[i]) return KDEBUG_RECOVER_VIRTUAL_INVALID;
+    }
+    if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&
+        !(op == KDEBUG_OP_RECOVER_VIRTUAL && recover_virtual_allowed(req))) return -1;
+    if (op == KDEBUG_OP_RECOVER_VIRTUAL) {
         if (req->action == RECOVER_VIRTUAL_BEGIN && req->case_id != RECOVER_VIRTUAL_NORMAL)
             return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
         if (recovery_attach()) return -1;

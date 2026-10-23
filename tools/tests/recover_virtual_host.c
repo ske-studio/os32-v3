@@ -17,7 +17,7 @@ static void die(u32 line)
 }
 #define CHECK(x) do {if(!(x)) die(__LINE__);}while(0)
 volatile u32 tick_count;
-static u32 cell=0x1234, writes, peek_calls, begins, ends, route;
+static u32 cell=0x1234, writes, peek_calls, begins, ends, route, setup_reads, gf_calls;
 static int cui;
 static char trace[32768]; static u32 used;
 u32 recover_test_irq_save(void) {return 0;}
@@ -38,13 +38,28 @@ static int serial_checked_begin(void) {begins++;return 0;}
 static int serial_checked_empty(void) {return 1;}
 static void serial_checked_end(void) {ends++;}
 struct serial_setup {u32 actual;};
-static const struct serial_setup *serial_get_setup(void) {static const struct serial_setup s={9600};return &s;}
+static const struct serial_setup *serial_get_setup(void) {setup_reads++;static const struct serial_setup s={9600};return &s;}
 static int fake_wait(void *p,u32 us) {(void)p;(void)us;return 0;}
 struct hwdev_ops {
     int (*call)(u32,void *,u32,const struct recover_ops *,const struct recover_transport *,const struct recover_profile *);
     void (*release_work)(void);
 };
-static const struct hwdev_ops *hwdev_module_ops(void) {return 0;}
+static int gf_abort(u32 op, void *buf, u32 size, const struct recover_ops *base,
+                    const struct recover_transport *transport, const struct recover_profile *s0)
+{
+    (void)base; (void)transport; (void)s0;
+    CHECK(op==10 && size==sizeof(u32));
+    struct recover *r=recover_owner();
+    if (*(u32 *)buf!=r->token.session) return -1;
+    gf_calls++;
+    return trial_end(r,&r->token,REC_ABORT);
+}
+static void release_work(void) {}
+static const struct hwdev_ops *hwdev_module_ops(void)
+{
+    static const struct hwdev_ops hw={gf_abort,release_work};
+    return &hw;
+}
 static int kpeek_call(u32 op,void *p,u32 sz) {(void)op;(void)p;(void)sz;peek_calls++;return 0;}
 #define GF_OP_INSPECT 5U
 #define GF_OP_ABORT 10U
@@ -88,23 +103,38 @@ static void run(void)
     CHECK(contains("phase=state event=PAUSED") && !contains("phase=screen"));
     CHECK(r->seq==4);
     CHECK(!ops.route_write && profile.target_count==1);
-    u32 seq=r->seq, crc=r->token.snapshot_crc, spent=r->spent;
+    u32 seq=r->seq, crc=r->token.snapshot_crc, spent=r->spent, log_bytes=used;
     KdebugRecover q={0};
     CHECK(recovery_call(KDEBUG_OP_RECOVER_STATUS,&q,sizeof(q))==-1);
     CHECK(recovery_call(0,0,0)==-1 && !peek_calls);
     CHECK(shell_cmd_recover(4,begin)==1);
     KdebugRecoverVirtual v={.version=RECOVER_VIRTUAL_VERSION,.action=RECOVER_VIRTUAL_STEP,.session=2};
     CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
-    CHECK(r->seq==seq && r->token.snapshot_crc==crc);
+    CHECK(r->seq==seq && r->token.snapshot_crc==crc && used==log_bytes);
     tick_count+=10000;
-    CHECK(recover_virtual_call(&v,PIT_HZ)==-1);
     v.session=1;
+    /* Same session, foreign ops: rejection must occur before attach, even
+     * when a later dispatch would independently reject with the same -1. */
+    u32 reads=setup_reads;
+    r->ops=&recovery_ops;
     CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
-    CHECK(!recover_virtual_call(&v,PIT_HZ));
+    CHECK(setup_reads==reads && r->seq==seq);
+    r->ops=&ops;
+    v.version=0;
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    v.version=RECOVER_VIRTUAL_VERSION;
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v)-1)==-1);
+    v.reserved[0]=1;
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    v.reserved[0]=0;
+    CHECK(r->seq==seq && r->token.snapshot_crc==crc && used==log_bytes);
+    char *step[]={"recover","virtual","step","1"};
+    CHECK(!shell_cmd_recover(4,step));
     CHECK(r->state==REC_PAUSED && r->spent==spent && r->expected_node==RECOVER_NONE);
     CHECK(!r->entered && r->expected_node==RECOVER_NONE && r->seq==6 && !writes);
     v.action=RECOVER_VIRTUAL_END;
-    CHECK(!recover_virtual_call(&v,PIT_HZ));
+    char *end[]={"recover","virtual","end","1"};
+    CHECK(!shell_cmd_recover(4,end));
     CHECK(!borrowed && r->transport==&recovery_transport && r->ops==&recovery_ops);
     CHECK(r->state==REC_VERIFIED && r->s0_verified && r->s1_verified && writes==2 && cell==0x1234);
     CHECK(contains("result=OK target=S0 verified=1 unknown=0"));
@@ -120,6 +150,28 @@ static void run(void)
     CHECK(shell_cmd_recover(4,begin)==1);
     CHECK(!borrowed && r->token.session==session && r->state==REC_VERIFIED);
     CHECK(r->ops==&recovery_ops && r->transport==&recovery_transport);
-    output("virtual normal/profile/plan/S0/detach PASS\n");
+    route=0; used=0; trace[0]=0;
+    CHECK(!shell_cmd_recover(4,begin));
+    q.session=r->token.session;
+    CHECK(!recovery_call(KDEBUG_OP_RECOVER_NOW,&q,sizeof(q)));
+    CHECK(r->state==REC_VERIFIED && r->reason==REC_ABORT);
+    CHECK(contains("result=OK target=S0 verified=1 unknown=0"));
+    CHECK(contains(" trial=1 lost_lines=0"));
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    /* Exercise the real dispatch's post-GF cleanup with an endpoint that
+     * uses the same trial_end(ABORT) primitive as gfinit_call. */
+    CHECK(!shell_cmd_recover(4,begin));
+    u32 sid=r->token.session+1, abort_seq=r->seq;
+    CHECK(recovery_call(GF_OP_ABORT,&sid,sizeof(sid))==-1);
+    CHECK(borrowed && r->state==REC_PAUSED && r->seq==abort_seq);
+    sid=r->token.session;
+    CHECK(!recovery_call(GF_OP_ABORT,&sid,sizeof(sid)));
+    CHECK(gf_calls==1 && r->state==REC_VERIFIED && r->reason==REC_ABORT);
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    CHECK(!shell_cmd_recover(4,begin));
+    q.session=r->token.session;
+    CHECK(!recovery_call(KDEBUG_OP_RECOVER_NOW,&q,sizeof(q)));
+    CHECK(begins==ends);
+    output("virtual normal/PAUSED/now/GF-abort/detach PASS\n");
 }
 void _start(void) {run();__asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();}

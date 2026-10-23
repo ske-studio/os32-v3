@@ -1,4 +1,4 @@
-"""T4b-2: real dispatcher and virtual normal trial, fake HAL, ILP32."""
+"""T4b-3: real dispatcher and virtual normal trial, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +9,11 @@ import mutpar
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
+    ('paused_gate_removed',
+     'if (r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&',
+     'if (0 && r->state == REC_PAUSED && op != KDEBUG_OP_RECOVER_NOW &&'),
+    ('foreign_owner_allowed', 'r->ops == &ops &&', ''),
+
     ('synthetic_access_allowed',
      '(void)opaque; (void)a; (void)value;\n    return -1;',
      '(void)opaque; (void)a; (void)value;\n    return 0;'),
@@ -18,8 +23,8 @@ MUTATIONS = [
 ]
 
 
-def build_cmd(temp):
-    source = (ROOT / 'kdebug/kdebug_main.c').read_text().split('static void selftest_run')[0]
+def build_cmd(temp, dispatch=None):
+    source = (dispatch if dispatch is not None else (ROOT / 'kdebug/kdebug_main.c').read_text()).split('static void selftest_run')[0]
     source = '\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
     (temp / 'virtual_dispatch.inc').write_text(source)
     return ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
@@ -32,16 +37,18 @@ def build_cmd(temp):
 
 def one(item):
     name, before, after = item
-    source = (ROOT / SOURCE).read_text()
+    path = 'kdebug/kdebug_main.c' if name == 'paused_gate_removed' else SOURCE
+    source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:
         return name + ': missing/ambiguous anchor', 1
     with tempfile.TemporaryDirectory(prefix='recover-virtual-mut-') as directory:
         temp = Path(directory)
+        changed = source.replace(before, after) if before else source
         try:
             tree = mutpar.build_in_tree(ROOT, directory,
-                {SOURCE: source.replace(before, after) if before else source},
-                [build_cmd(temp)], capture_output=True)
+                {path: changed},
+                [build_cmd(temp, changed if path != SOURCE else None)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': COMPILE FAIL ' + str(exc.stderr), 1
         try:

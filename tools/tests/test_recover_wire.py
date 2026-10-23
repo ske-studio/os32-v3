@@ -14,7 +14,8 @@ INCLUDES = ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
 MUTATIONS = [
     ('reserved_unchecked', 'if (req->reserved[i]) return KDEBUG_RECOVER_VIRTUAL_INVALID;',
      'if (req->reserved[i] && 0) return KDEBUG_RECOVER_VIRTUAL_INVALID;'),
-    ('virtual_falls_to_kpeek', 'if (op == KDEBUG_OP_RECOVER_VIRTUAL) {', 'if (0) {'),
+    ('virtual_falls_to_kpeek', 'if (op == KDEBUG_OP_RECOVER_VIRTUAL) {\n        if (req->action',
+     'if (0) {\n        if (req->action'),
 ]
 
 
