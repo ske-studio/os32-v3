@@ -79,6 +79,15 @@ static bool contains(const char *needle)
     for(u32 i=0;i<used;i++){u32 j=0;while(needle[j] && trace[i+j]==needle[j])j++;if(!needle[j])return true;}
     return false;
 }
+static u32 trace_at(const char *needle)
+{
+    for (u32 i=0;i<used;i++) {
+        u32 j=0;
+        while (needle[j] && trace[i+j]==needle[j]) j++;
+        if (!needle[j]) return i;
+    }
+    return used;
+}
 static void run(void)
 {
     struct recover *r=recover_owner();
@@ -170,6 +179,34 @@ static void run(void)
     q.session=r->token.session;
     CHECK(!recovery_call(KDEBUG_OP_RECOVER_NOW,&q,sizeof(q)));
     CHECK(begins==ends);
-    output("virtual normal/PAUSED/now/GF-abort/detach PASS\n");
+    CHECK(!contains("phase=inject"));
+    for (u32 id=RECOVER_VIRTUAL_TRIAL_EXPIRE;id<=RECOVER_VIRTUAL_TXBUSY_STOP;id++) {
+        v=(KdebugRecoverVirtual){.version=RECOVER_VIRTUAL_VERSION,
+            .action=RECOVER_VIRTUAL_BEGIN,.case_id=id};
+        CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED);
+    }
+    used=0; trace[0]=0;
+    char *fault[]={"recover","virtual","begin","fault"};
+    CHECK(!shell_cmd_recover(4,fault));
+    CHECK(r->state==REC_PAUSED && !contains("phase=inject"));
+    u32 before_writes=writes;
+    v=(KdebugRecoverVirtual){.version=RECOVER_VIRTUAL_VERSION,
+        .action=RECOVER_VIRTUAL_STEP,.session=r->token.session};
+    /* STEP's zero case_id must not replace the case saved by BEGIN. */
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    CHECK(r->state==REC_FAILED && r->failed && r->reason==REC_OPERATION);
+    CHECK(r->s0_verified && !r->s1_verified && r->lost_lines==0);
+    CHECK(contains("phase=inject event=BEGIN step=1 addr=0\n"));
+    CHECK(trace_at("phase=inject")<trace_at("phase=state event=RESTORING"));
+    CHECK(trace_at("phase=state event=RESTORING")<trace_at("phase=final event=END"));
+    CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
+    CHECK(contains(" trial=3 lost_lines=0"));
+    CHECK(writes==before_writes+2 && cell==0x1234 && begins==ends);
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    u32 failed_seq=r->seq, failed_used=used;
+    CHECK(shell_cmd_recover(4,begin)==1 && shell_cmd_recover(4,fault)==1);
+    CHECK(r->state==REC_FAILED && r->reason==REC_OPERATION);
+    CHECK(r->seq==failed_seq && used==failed_used);
+    output("virtual normal/PAUSED/now/GF-abort/fault/latch PASS\n");
 }
 void _start(void) {run();__asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();}
