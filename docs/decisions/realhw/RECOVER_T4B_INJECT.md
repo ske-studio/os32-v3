@@ -148,3 +148,7 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 ## T4b-9 の実装で設計者が決めたこと
 - helper は既存 state の session/Image CRC を照合して virtual end だけを送る。begin/step の state/log を継続し、ver を再送しない。drop=none/final/eot を各別sessionで実行する。
 - 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort フレーム数は標準出力に出し、成功は既存exchangeのOKだけとする。
+
+## T4b-9 の取り込みで残す項目 (2026-10-23、Opus レビュー P3)
+- tools/accept/recover_t4b_host.py の `result != 'OK'` の枝 (exchange が PAUSED を返す場合) を殺す変異が無い。PAUSED を返す fake 列を足すときに変異も足す。
+- abort_frames は `data == abort` の write で数えるので、write_bounded が部分書込みで送り直すと少なく出る。数え方を exchange の abort の回数に替えるのは、この helper を実機で使うときに。

@@ -85,3 +85,4 @@ python3 tools/accept/recover_t4b_host.py --port "$P" --session "$N" --image-crc 
 none は rc=0、final/eot は rc=1 が期待値。下位 raw は end の全受信、上位 log は抑止後の受信を追記し、
 標準出力 (.out) の abort_frames は期限後に送った abort フレームの数。正常な列なら final 抑止は
 EOT で拒否して 0、eot 抑止は期限後に 1。既定は応答60秒・cleanup40秒。raw の final/EOT と上位の欠落を照合してから合否を書く。
+eot 抑止の後は abort フレーム (10 B) がシェルの行入力に残りうるので、次の session の前に `recover status` か空行で入力を空にする。

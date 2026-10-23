@@ -65,13 +65,12 @@ def main(argv=None, clock=time.monotonic):
     parser.add_argument('--timeout', type=float, default=60)
     parser.add_argument('--cleanup-timeout', type=float, default=40)
     args = parser.parse_args(argv)
-    previous = json.loads(args.state.read_text())
-    records = recover.Records(args.session, previous)
-
     def save(data):
         args.state.write_text(json.dumps(data, sort_keys=True) + '\n')
 
     try:
+        previous = json.loads(args.state.read_text())
+        records = recover.Records(args.session, previous)
         if previous.get('image_crc') != args.image_crc.lower():
             raise recover.RecoverError('saved boot CRC differs')
         with closing(recover.open_port(args.port, args.baud)) as port, \
@@ -87,7 +86,7 @@ def main(argv=None, clock=time.monotonic):
             raise recover.RecoverError('end did not reach verified terminal')
         print(result)
         return 0
-    except (recover.RecoverError, OSError) as exc:
+    except (recover.RecoverError, OSError, ValueError) as exc:
         print('recover: ' + str(exc))
         return 1
 
