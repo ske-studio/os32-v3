@@ -40,6 +40,24 @@
 | T6 | 実機・承認済みの書込み: 最小変更 → 手動 abort → 短い期限切れ → 意図的なソフト失敗 → ①② | 未 (4a と並行か後) | — |
 | T7 | 復旧演習: シリアル reboot、旧版一式の復旧、立会いの物理復帰を各 1 回、外部デバイス実装モデルの材料に | 未 | — |
 
+### T4b の段の細分 (2026-10-23、PM — 設計は [RECOVER_T4B_INJECT](../../decisions/realhw/RECOVER_T4B_INJECT.md)、1 段 = 1 回の依頼で 1〜2 時間、段ごとにレビューと取り込み)
+
+| 段 | 中身 (この段だけ) | 主なファイル | 受入 (host) と変異 (PM が 1 回) |
+|---|---|---|---|
+| T4b-1 | wire と shell: 私有 op 11・40B の `KdebugRecoverVirtual`、`recover virtual begin <case>\|step <sid>\|end <sid>` の厳密な引数解析と help、kdebug 側は op 11 を UNSUPPORTED で返す (中身は空)。KDEBUG=0 は既存の NOSYS | recover_wire.h、cmd_recover.c・cmd_sys.c、kdebug_main.c (op 11 の受け口だけ) | 構造体 40B・版・reserved≠0 の拒否、未知 case・引数過多の拒否 / 変異: reserved の照合を外す |
+| T4b-2 | 仮想 profile と最小 plan と合成 ops (装置に触れない ①、② は既存 S0 へ委譲)、begin → PAUSED・step・end → `result=OK target=S0 verified=1 unknown=0 trial=0` | recover_virtual.c/.h (新規)、kdebug.mk、kdebug_main.c の dispatch | host harness で normal の REC 列、無装置アクセス (合成 target の read/write は常に拒否)、kdebug.bin の増分 / 変異: 合成 target の拒否を外す |
+| T4b-3 | PAUSED の門: kdebug_main.c:110 に `op==11 && action∈{step,end} && 仮想 owner` の例外 (C2: :111 より前)、PAUSED 中の status/peek/別 begin の拒否、PAUSED からの `now N` → `result=OK trial=1` | kdebug_main.c | 拒否で REC が増えない・次の step の seq が連続、now N の終端 / 変異: :110 の門を外す (HWDEV_DESIGN:144) |
+| T4b-4 | **ゲスト受入 (PM)**: NP21/W 31kHz で T4b-1〜3 — normal・PAUSED 中の拒否 (host rc≠0 が期待)・now N、画面と `echo alive` | 証拠 `~/os32-tmp/evidence/<日付>/recover_t4b/` | 合否は RESULT.md |
+| T4b-5 | 故障の注入: case fault (step の callback が -1)、`phase=inject event=BEGIN step=<case>` の行 → `result=FAIL verified=1 unknown=1 trial=3` | recover_virtual.c | host の REC 列 / 変異: step の失敗を無視 |
+| T4b-6 | 期限: case trial-expire (8 秒の短い profile 行、C1: 1 tick 進むまで待って safe_point、C3: recover_profile.c:83 の検算の範囲を先に確かめる) → `trial=2`、poll 数 < max_polls | recover_virtual.c (C3 によっては recover_profile.c) | host で期限側の TIMEOUT / 変異: trial の期限比較を外す |
+| T4b-7 | 停止時の poll 上限: case poll-stop (`virt = real − offset` の凍結、max_polls 64) → `trial=2`、入口 1 + 64 = 65 | recover_virtual.c | host で tick 差 0 と 65 / 変異: step の poll 比較を外す |
+| T4b-8 | 送信詰まり: case txbusy-stop (専用 1 行の ready=0 と凍結) → `trial=9 lost_lines=1`、seq の欠番 1 | recover_virtual.c | host で UART 上限 / 変異: UART の poll 比較を外す |
+| T4b-9 | ホストの終端不着: tools/accept/recover_t4b_host.py (final 行だけ・EOT だけを監視器に渡さない、raw は保存) | tools/accept/ (tools だけ) | フィルタ無し rc=0・有り rc=1 / 変異: host の終端必須を外す |
+| T4b-10 | **ゲスト受入 (PM)**: T4b-5〜9 の 5 case と台本 tools/accept/recover_t4b.md の仕上げ。隔離像の巻戻しは別の段 (T4b-11、PM の配備) | 証拠 | 合否は RESULT.md |
+
+- 依頼は 1 段ずつ、完了条件は `make kernel` (T4b-9 は不要) + その段の直接の試験 `MUTATE=0` + `--lint`。変異は PM がレビューの後に 1 回。T4b-1〜3 は同じ作業木で順に積むが、依頼・レビュー・取り込みは段ごと。
+- 2026-10-23 に B1+B2 を 1 回で出して止めた途中の変更 (作業木 wt/t4b、約 240 行) は T4b-1〜3 の材料として残す。
+
 T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部品に分ける M1〜M5 を先に): 順序は `TASK_HWDEV` §3 が正。
 
 合格条件の全文は [DESIGN](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) §7 の表と [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) §3。変異の実行は PM のレビューの後 (ROLES §0)。
