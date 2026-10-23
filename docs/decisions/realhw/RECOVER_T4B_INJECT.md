@@ -102,3 +102,7 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - C1 (§3 trial-expire の待ち): 「既存の有限1ms待ち」は recover*.c・kdebug_main.c に無い。実装者は operation の中で owner の ticks (仮想 transport の時計、凍結しない) を見て 1 tick 進むまで待ってから safe_point を呼ぶ形にし、その関数名を本書の末尾の「設計者が決めたこと」に 1 行。safe_point の空回しで max_polls が先に尽きる形にしない (host 試験で reason=TIMEOUT が期限側で出たことを poll 数 < max_polls で確かめる)。
 - C2 (§2 :110 の例外): op 11 の分岐は kdebug_main.c:111 の `op != STATUS && op != NOW → kpeek_call` より**前**に置く (PAUSED でないときの op 11 が kpeek へ流れない)。
 - C3 (§3 予算の静的検算): recover_profile.c:83 の検算 (wait_ms ≤ E=2000ms) が試行中の待ちまで数えるかを実装の最初に確かめる。数えるなら trial-expire の profile だけ数え方を変えずに済む形 (試行の待ちは trial_limit が上限) を設計者として決めて末尾に 1 行、確定本文を覆すなら止めて報告。
+
+## T4b-1 の実装で設計者が決めたこと
+- 私有 wire の不正は `KDEBUG_RECOVER_VIRTUAL_INVALID=-1`、形式が正しい未実装要求は `KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED=-2` とし、KDEBUG=0 の既存 NOSYS=-10 は変えない。
+- op 11 の受け口は既存 PAUSED 門の後・kpeek 分岐の前とし、この段では PAUSED の例外を設けない。
