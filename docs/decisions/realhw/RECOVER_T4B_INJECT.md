@@ -119,4 +119,5 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 
 ## T4b-3 の実装で設計者が決めたこと
 - GF_OP_ABORT は既存 GF 分岐・許可判定を維持し、ops->call の戻り直後に recover_virtual_detach を呼ぶ。仮想 trial が終端なら即座に借用を解除し、拒否・非終端なら借用を維持する。
-- PAUSED の例外は40B・版・reservedの検証後、仮想借用中の ops・session と step/end の一致で許可する。host は内側の直接呼出しをやめ、実 recovery_call と shell 経由で normal・拒否・now を確認し、GF出口は trial_end(ABORT) を呼ぶ fixture で借用解除を確認する。
+- PAUSED の例外は 40B・版・reserved の検証後、仮想借用中の ops・session と step/end の一致で許可する。
+- host は内側の直接呼出しをやめ、実 recovery_call と shell 経由で normal・拒否・now を、GF 出口は trial_end(ABORT) を呼ぶ fixture で借用解除を確かめる。

@@ -131,7 +131,6 @@ static int virtual_begin(struct recover *r, u32 hz)
     return rc;
 }
 
-/* The dispatcher validates the wire before consulting this owner predicate. */
 bool recover_virtual_allowed(const KdebugRecoverVirtual *q)
 {
     struct recover *r = recover_owner();

@@ -113,8 +113,7 @@ static void run(void)
     CHECK(r->seq==seq && r->token.snapshot_crc==crc && used==log_bytes);
     tick_count+=10000;
     v.session=1;
-    /* Same session, foreign ops: rejection must occur before attach, even
-     * when a later dispatch would independently reject with the same -1. */
+    /* Same session, foreign ops: rejected at the gate, before attach. */
     u32 reads=setup_reads;
     r->ops=&recovery_ops;
     CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
@@ -158,8 +157,7 @@ static void run(void)
     CHECK(contains("result=OK target=S0 verified=1 unknown=0"));
     CHECK(contains(" trial=1 lost_lines=0"));
     CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
-    /* Exercise the real dispatch's post-GF cleanup with an endpoint that
-     * uses the same trial_end(ABORT) primitive as gfinit_call. */
+    /* Post-GF detach; the fake ends the trial with trial_end(ABORT) like gfinit_call. */
     CHECK(!shell_cmd_recover(4,begin));
     u32 sid=r->token.session+1, abort_seq=r->seq;
     CHECK(recovery_call(GF_OP_ABORT,&sid,sizeof(sid))==-1);
