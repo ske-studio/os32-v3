@@ -1,4 +1,4 @@
-"""T4b-6: real dispatcher and virtual normal/fault/trial-expire trials, fake HAL, ILP32."""
+"""T4b-7: real dispatcher and virtual normal/fault/trial-expire/poll-stop trials, fake HAL, ILP32."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +9,13 @@ import mutpar
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
+    ('step_poll_limit_removed',
+     '++r->polls > r->profile->max_polls)',
+     '(++r->polls > r->profile->max_polls && 0))'),
+    ('freeze_offset_omitted',
+     'clock_offset += saved_ops->ticks(opaque) - freeze_real;',
+     'clock_offset += (saved_ops->ticks(opaque) - freeze_real) * 0U;'),
+
     ('trial_deadline_removed', 'if (r->spent >= r->budget ||',
      'if ((r->spent >= r->budget && 0) ||'),
     ('short_trial_omitted', 'profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;',
@@ -49,7 +56,8 @@ def one(item):
     name, before, after = item
     path = {'paused_gate_removed': 'kdebug/kdebug_main.c',
             'step_failure_ignored': 'kdebug/recover.c',
-            'trial_deadline_removed': 'kdebug/recover.c'}.get(name, SOURCE)
+            'trial_deadline_removed': 'kdebug/recover.c',
+            'step_poll_limit_removed': 'kdebug/recover.c'}.get(name, SOURCE)
     source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:
@@ -61,11 +69,11 @@ def one(item):
             tree = mutpar.build_in_tree(ROOT, directory,
                 {path: changed},
                 [build_cmd(temp, changed if path == 'kdebug/kdebug_main.c' else None, expire)
-                 for expire in (0, 1)], capture_output=True)
+                 for expire in (0, 1, 2)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': COMPILE FAIL ' + str(exc.stderr), 1
         try:
-            for expire in (0, 1):
+            for expire in (0, 1, 2):
                 result = host32.run([str(temp / ('virtual'+str(expire)))], cwd=str(tree),
                                     timeout=30, capture_output=True)
                 if result.returncode:
@@ -79,7 +87,7 @@ def one(item):
 def main():
     with tempfile.TemporaryDirectory(prefix='recover-virtual-') as directory:
         temp = Path(directory)
-        for expire in (0, 1):
+        for expire in (0, 1, 2):
             subprocess.run(build_cmd(temp, expire=expire), check=True)
             rc = host32.run([str(temp / ('virtual'+str(expire)))], timeout=30).returncode
             if rc:
