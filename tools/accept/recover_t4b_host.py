@@ -24,7 +24,7 @@ class FilterPort:
         self.abort_frames = 0
 
     def write(self, data):
-        self.abort_frames += data == self.abort
+        self.abort_frames += data.startswith(self.abort)
         return self.port.write(data)
 
     def read(self, count):

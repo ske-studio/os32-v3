@@ -121,8 +121,10 @@ int hwdev_module_load(struct module_handle core_handle)
     if (!rc) {
         struct module_record *r = module_record_get(hwdev_handle);
         /* BOOT_BODY: no hot unload; rollback before publication remains free. */
-        if (!module_ref_acquire(hwdev_handle, r->owner, MODULE_REF_REGISTRATION, 0))
+        if (!module_ref_acquire(hwdev_handle, r->owner, MODULE_REF_REGISTRATION, 0)) {
+            published = 0;
             rc = MODULE_INIT_FAILED;
+        }
     }
     if (rc) kprintf(0x07, "[hwdev] rejected: %s\n", kdebug_state_name(rc));
     return rc;
