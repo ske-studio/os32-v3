@@ -1,6 +1,7 @@
 #ifndef KDEBUG_GFINIT_WIRE_H
 #define KDEBUG_GFINIT_WIRE_H
 /* Private kdebug_call wire; include after u32 is defined (GNU89 compatible). */
+#define GF_INIT_MAINS 5U
 #define GF_INIT_SCHEDULE 4096U
 #define GF_INIT_VERSION 1U
 #define GF_ALLOW_WRITE 1U

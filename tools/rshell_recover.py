@@ -132,7 +132,7 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                 if text == '> ' + command:
                     echo = True
                 if echo:
-                    if text.startswith('recover: rejected'):
+                    if text.startswith(('recover: rejected', 'gfinit: rejected rc=')):
                         failure = 'guest rejected recovery'
                     try:
                         if records is not None:

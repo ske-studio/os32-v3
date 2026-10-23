@@ -96,3 +96,18 @@ rc = g_api->kdebug_call(op, &q, sizeof(q));
 - inspectの呼出し失敗はinspect-endのrcだけで示し、abort失敗は既存recover先例の `gfinit: rejected rc=`、abort成功は追加行なしとする；API不足/NULLは呼ばずunavailableとする。
 - KDEBUGはビルド時の分岐ではなく起動設定なので同じ成果物を使い、hostは実物kernel/kdebug_call.cの未公開opsによるNOSYSと公開opsの両経路を試験する。
 - gfinit_wire.hはgfinit.h経由でDWARF収集に含まれるため、generatorのglobから直接includeだけを除き、冗長な1行追加を防いで生成物・inventoryの差0を維持する。
+
+## S8 用の受け方（S7c では実行しない）
+ユーザー承認・立会いの下で、PM が各結果を確認してから次のコマンドを選ぶ。
+`<現在sid>` は status または直前の応答で得た値、`<取得sid>` は A2 の最初の REC で採用された値。
+受信者は常に1個とし、PARTIAL・override は失敗終了のままログ・state を保存する。
+以下は別々に実行する形であり、一括実行する台本ではない。
+
+- A1: `python3 tools/rshell_recover.py --port <port> --session 0 --state <新規A1.json> --image-crc <CRC> --log <A1.log> --command 'gfinit size-bars <現在sid> --allow-write'`
+- A1 の証拠を保存して確認後、A2: `python3 tools/rshell_recover.py --port <port> --session 0 --state <別の新規A2.json> --image-crc <CRC> --log <A2.log> --command 'gfinit prepare <現在sid> --allow-write'`
+- A2 の PAUSED 継続: `python3 tools/rshell_recover.py --port <port> --session <取得sid> --state <A2.json> --image-crc <CRC> --log <A2.log> --command 'gfinit run-one <取得sid> <main> --allow-write'`（main は0〜4、1本ずつ承認・結果確認）。
+- 全 main 後は同じ session/state/log で command を `gfinit verify <取得sid> --allow-write` にする。PAUSED の中止は同じ受け方で `gfinit abort <取得sid> --allow-write`。補助命令や ver を挟まない。
+
+## S7c の実装で設計者が決めたこと
+- main 範囲は既存 GF_INIT_MAINS=5 を gfinit_decode.h から private gfinit_wire.h に移し、shell と部品で共用する（wire 配置・op・KAPI は不変）。
+- size-bars/prepare/run-one/verify は abort と同じく非ゼロ rc を `gfinit: rejected rc=`、ゼロ rc は追加行なしとし、REC の結果判定は既存 monitor に任せる。
