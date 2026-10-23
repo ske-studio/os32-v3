@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-23)** — M1〜M3c は main (M3c 92153ea、kdebug.bin 240,036 → 109,060B)。M4・M5 と後続は未着手。2026-10-23 に順序を見直した (§3-1、ユーザー承認)
+> 状態: **実装中 (2026-10-23)** — M1〜M5 と BARLEN は main (BARLEN 1fd0a49)。次は T4b。2026-10-23 に順序を見直した (§3-1、ユーザー承認)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -51,7 +51,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 実装の状態を確かめ直して、上の表の後半の順序を次に替える (表の各段の合格条件は変えない)。
 
 1. **M5 を M4 より先に**: 大きさの条件はもう満たした。配備定義・`KERNEL_PAIRED_MODULES`・generations-manifest・KDEBUG=0 の門の試験だけの軽い段。起動のたびの `[hwdev] rejected: NOT_FOUND` もここで消える。
-2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。
+2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。 **main (1fd0a49、2026-10-23、sol 実装・astra 取り込み可)** — NP21/W で起動・hwdev の handle は変わらず (`~/os32-tmp/evidence/2026-10-23/m5_np21w/BARLEN.md`)、実機の照合は S8。
 3. **M4a と M4b**: 対象は誰も持っていない 0:13.0 だけなので、まとめて 1 段にできるかを依頼の前に PM が決める。送り項目の「S0 の最小 GF 復帰」の扱いはここで決める。
 4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す ([GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) §8 の S7 行と [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) §6 の書換えが要る)。M5 と同じ段にできるかは設計の後に決める。
 5. **T4b**: NP21/W に GeForce は無いので、GPU への試行が通ることは T4b では確かめない (実機の S8 以降)。戻す処理そのものの項目 (`recover now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障、送信詰まり・poll 上限・終端不着、旧版一式への巻戻し) は DEFERRED_TESTS の RECOVER-T4B の行のまま残す。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
@@ -115,5 +115,4 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 証拠は `~/os32-tmp/run/hwdev_m3c/`。M4 の所有照合・終端と M5 の配備は本段に含めない。
 
 ## 送り項目 (取り込みのレビューの P3)
-- (BARLEN か T4b で) M4: kdebug/gfinit.c:308 — 「inspected だが gf_owned でない」で断る出口は gf_release_rom を通らない。今は到達しない (session を進める経路は trial_begin と recover_now_session だけで、どちらも解放する) が、経路が増えると ROM 作業領域と lease が次の release_work まで残る → 断る前に IDLE/VERIFIED なら gf_release_rom(owner)。
 - (BARLEN か T4b で) M4: kernel/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。
