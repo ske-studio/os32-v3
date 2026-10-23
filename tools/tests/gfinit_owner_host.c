@@ -1,6 +1,11 @@
 /* Actual S6 owner/request/ROM lifetime code. Platform and trial engine are
  * injected contracts; bus/decoder/plan internals have separate real tests. */
 #include "../../kdebug/gfinit.c"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include "gfinit_output_host.h"
+#pragma GCC diagnostic pop
 #define TEST_PAGE_BUDGET GF_WORK_MAX_PAGES
 #define TEST_ARENA_PAGES 512U
 /* Contiguous physical pages, ascending first-fit as in pgalloc. Foreign pages
@@ -146,6 +151,11 @@ static void setup(void)
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
+    image[0x40]=0xff;image[0x41]=0xb8;image[0x42]='B';image[0x43]='I';image[0x44]='T';
+    image[0x47]=1;image[0x48]=12;image[0x49]=6;image[0x4a]=1;
+    image[0x4c]='i';image[0x4d]=1;image[0x4e]=5;image[0x50]=0x60;
+    image[0x62]=0x44;
+    clear_output();
     u8 sum=0;for(u32 i=0;i<511;i++)sum+=image[i];image[511]=0-sum;
 }
 static void prepared(void)
@@ -281,5 +291,111 @@ static void allocation_test(void)
         for(u32 i=0;i<TEST_ARENA_PAGES;i++)CHECK(page_owner[i]!=1);
     }
 }
+static void inspection_test(void)
+{
+    setup();core.token.session=5;
+    CHECK(call(GF_OP_INSPECT,0,0)==0);
+    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output," chip=44 expect=44 match=1\n"));
+    CHECK(!writes && !begins && core.token.session==5 && core.seq==0);
+    clear_output();CHECK(call(GF_OP_INSPECT,0,0)==0 && !serial_length);
+    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && !writes && !gf_lease.active && !live_pages);
+    setup();image[0x62]=0x43;image[511]++;
+    CHECK(call(GF_OP_INSPECT,0,0)<0 && !writes && !live_pages);
+    CHECK(contains(serial_output," chip=43 expect=44 match=0\n"));
+    setup();image[0x4c]='x';
+    CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(contains(serial_output," chip=unknown expect=44 match=unknown\n"));
+    setup();peek_fail=1;
+    CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(equal(serial_output,"GF inspect sid=0 rc=-1 rom_len=unknown crc=unknown chip=unknown expect=44 match=unknown\n"));
+    setup();decode_fail=1;
+    CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(contains(serial_output,"GF inspect sid=0 rc=-1 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output," chip=44 expect=44 match=1\n"));
+    setup();image[0x50]=0xff;image[0x51]=0xff;
+    CHECK(call(GF_OP_INSPECT,0,0)<0 && contains(serial_output,"chip=unknown"));
+    setup();image[0x4e]=2;
+    CHECK(call(GF_OP_INSPECT,0,0)<0 && contains(serial_output,"chip=unknown"));
+    setup();image[0x49]=5;
+    CHECK(call(GF_OP_INSPECT,0,0)<0 && contains(serial_output,"chip=unknown"));
+    setup();image[511]++;
+    CHECK(call(GF_OP_INSPECT,0,0)<0 && contains(serial_output,"match=1"));
+    setup();rshell_active=0;CHECK(call(GF_OP_INSPECT,0,0)==0 && !serial_length);
+}
+/* Real shell and KDEBUG=0 gateway; only the loaded GF dispatch is injected. */
+#define SHELL_H
+#define str_eq(a,b) equal(a,b)
+#include "../../kernel/kdebug_call.c"
+struct kdebug kdebug;
+static u32 cli_calls, cli_op;
+static struct gfinit_request cli_request;
+static int cli_result, cli_live;
+static i32 cli_dispatch(u32 op, void *buf, u32 size)
+{
+    CHECK(size==40);
+    cli_calls++;cli_op=op;cli_request=*(struct gfinit_request *)buf;
+    if (cli_live) return gfinit_call(op,buf,size,&base,&transport,&s0);
+    ((struct gfinit_request *)buf)->status=99; /* rc, never status, is authoritative */
+    return cli_result;
+}
+static struct {
+    u32 version;
+    void (*kprintf)(u8,const char *,...);
+    i32 (*kdebug_call)(u32,void *,u32);
+} api={78,kprintf,kdebug_call}, *g_api=&api;
+#include "../../userland/shell/cmd_gfinit.c"
+static void cli_test(void)
+{
+    char *inspect[]={"gfinit","inspect","5","--allow-write","extra"};
+    char *abort[]={"gfinit","abort","5","--allow-write","extra"};
+    setup();kdebug.ops.dbg_call=cli_dispatch;cli_live=1;core.token.session=5;
+    CHECK(shell_cmd_gfinit(3,inspect)==0);
+    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output,"match=1\nGF inspect-end sid=5 rc=0\n"));
+    clear_output();CHECK(shell_cmd_gfinit(3,inspect)==0);
+    CHECK(equal(serial_output,"GF inspect-end sid=5 rc=0\n"));
+    CHECK(shell_cmd_gfinit(4,abort)==0 && !writes && !gf_lease.active && !live_pages);
+    cli_live=0;cli_result=0;
+    inspect[2]="4294967295";
+    CHECK(shell_cmd_gfinit(3,inspect)==0 && cli_op==5);
+    CHECK(cli_request.version==1 && cli_request.size==40 && cli_request.session==~0U);
+    CHECK(cli_request.flags==0 && cli_request.script_id==0 && cli_request.max_steps==4096);
+    CHECK(!cli_request.status && !cli_request.fail_pc && !cli_request.fail_reg && !cli_request.steps);
+    CHECK(shell_cmd_gfinit(4,abort)==0 && cli_op==10 && cli_request.flags==1);
+    CHECK(cli_request.session==5 && cli_request.script_id==0 && cli_request.max_steps==4096);
+    CHECK(!cli_request.status && !cli_request.fail_pc && !cli_request.fail_reg && !cli_request.steps);
+    u32 before=cli_calls;
+    CHECK(shell_cmd_gfinit(4,inspect)==2 && shell_cmd_gfinit(3,abort)==2);
+    for (int n=1;n<=5;n++) {
+        if(n!=3)CHECK(shell_cmd_gfinit(n,inspect)==2);
+        if(n!=4)CHECK(shell_cmd_gfinit(n,abort)==2);
+    }
+    const char *bad[]={"", "-1", "+1", "4294967296", "1x", " 1"};
+    for(u32 i=0;i<sizeof(bad)/sizeof(*bad);i++) {
+        inspect[2]=(char *)bad[i];abort[2]=(char *)bad[i];
+        CHECK(shell_cmd_gfinit(3,inspect)==2 && shell_cmd_gfinit(4,abort)==2);
+    }
+    inspect[2]=abort[2]="0";abort[3]="--unknown";
+    CHECK(shell_cmd_gfinit(4,abort)==2);
+    const char *commands[]={"size-bars","prepare","run-one","verify","unknown"};
+    for(u32 i=0;i<sizeof(commands)/sizeof(*commands);i++) {
+        inspect[1]=(char *)commands[i];CHECK(shell_cmd_gfinit(3,inspect)==2);
+    }
+    CHECK(cli_calls==before);inspect[1]="inspect";abort[3]="--allow-write";
+    cli_result=-1;clear_output();CHECK(shell_cmd_gfinit(3,inspect)==1);
+    CHECK(equal(serial_output,"GF inspect-end sid=0 rc=-1\n"));
+    kdebug.ops.dbg_call=0;before=cli_calls;clear_output();
+    CHECK(shell_cmd_gfinit(3,inspect)==1 && cli_calls==before);
+    CHECK(equal(serial_output,"GF inspect-end sid=0 rc=-10\n"));
+    clear_output();CHECK(shell_cmd_gfinit(4,abort)==1 && cli_calls==before);
+    CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
+    api.version=77;clear_output();CHECK(shell_cmd_gfinit(3,inspect)==1);
+    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
+    api.version=78;api.kdebug_call=0;clear_output();
+    CHECK(shell_cmd_gfinit(3,inspect)==1 && cli_calls==before);
+    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));api.kdebug_call=kdebug_call;
+    output("S7a CLI / KDEBUG=0 NOSYS / inspect two lines via console serial PASS checks complete\n");
+}
 void _start(void)
-{ lifecycle();failures_test();allocation_test();ownership_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ cli_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

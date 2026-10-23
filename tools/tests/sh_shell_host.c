@@ -502,6 +502,7 @@ static void show_prompt(void) { out_str("sh> "); }
  * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
 int shell_cmd_peek(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 int shell_cmd_recover(int argc, char **argv) { (void)argc; (void)argv; return 0; }
+int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 
 /* ---- シェルの他モジュールの代わり -------------------------------------- */
 

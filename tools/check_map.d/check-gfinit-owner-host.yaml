@@ -31,3 +31,15 @@ check-gfinit-owner-host:
 - build/checks.d/check-gfinit-owner-host.mk
 - tools/check_map.d/check-gfinit-owner-host.yaml
 - include/hwdev_private.h
+- kdebug/gfinit_wire.h
+- userland/shell/cmd_gfinit.c
+- userland/shell/shell.h
+- userland/shell/cmd_sys.c
+- build/programs.mk
+- tools/tests/gfinit_output_host.h
+- lib/crc32_core.inc
+- lib/kprintf.c
+- lib/kprintf_attr.c
+- kernel/console.c
+- kernel/kdebug_call.c
+- hwdev/hwdev_imports.def

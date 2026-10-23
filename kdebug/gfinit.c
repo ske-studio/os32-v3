@@ -16,6 +16,8 @@
 #include "include/bootinfo.h"
 #include "include/hwdev_private.h"
 #include "sys.h"
+#include "kprintf.h"
+#include "../lib/crc32_core.inc"
 #ifdef HWDEV_MODULE
 #include "hwdev/generated/hwdev_import_macros.h"
 #else
@@ -113,7 +115,47 @@ static int gf_clock(void *opaque, u32 *value)
     return 0;
 }
 static const struct gfinit_exec_ops gf_clock_ops = {gf_clock, recover_hal_wait_frame};
-static int gf_read_rom(struct gfinit_owner *g)
+/* BIT i version byte order: envytools nvbios/info.c (MIT), +2 is chip.
+ * Expected NV44/NV44A version.chip: REALHW_RECOVER_ADDENDUM, S4. */
+#define GF_VERSION_CHIP 0x44U
+#define GF_CHIP_UNKNOWN 0x100U
+#define GF_BIT_HEADER 12U
+#define GF_BIT_ENTRY 6U
+#define GF_BIT_CHIP_OFFSET 2U
+static u32 gf_rom_chip(const u8 *rom, u32 size)
+{
+    static const u8 signature[] = {0xff, 0xb8, 'B', 'I', 'T', 0, 0};
+    for (u32 off = 0; off + GF_BIT_HEADER <= size; off++) {
+        u32 i = 0;
+        while (i < sizeof(signature) && rom[off+i] == signature[i]) i++;
+        if (i != sizeof(signature)) continue;
+        u32 head = rom[off+8], stride = rom[off+9], count = rom[off+10];
+        if (head < GF_BIT_HEADER || stride < GF_BIT_ENTRY ||
+            head + count * stride > size - off) return GF_CHIP_UNKNOWN;
+        for (u32 n = 0; n < count; n++) {
+            const u8 *entry = rom + off + head + n * stride;
+            if (entry[0] != 'i' || entry[1] != 1) continue;
+            u32 len = (u32)entry[2] | (u32)entry[3] << 8;
+            u32 data = (u32)entry[4] | (u32)entry[5] << 8;
+            if (len <= GF_BIT_CHIP_OFFSET || data > size || len > size - data)
+                return GF_CHIP_UNKNOWN;
+            return rom[data + GF_BIT_CHIP_OFFSET];
+        }
+        return GF_CHIP_UNKNOWN;
+    }
+    return GF_CHIP_UNKNOWN;
+}
+static void gf_inspect_line(u32 sid, int rc, u32 len, u32 crc, u32 chip)
+{
+    kprintf(ATTR_WHITE, "GF inspect sid=%u rc=%d rom_len=", sid, rc);
+    if (len) kprintf(ATTR_WHITE, "%u crc=%08X", len, crc);
+    else kprintf(ATTR_WHITE, "unknown crc=unknown");
+    if (chip == GF_CHIP_UNKNOWN)
+        kprintf(ATTR_WHITE, " chip=unknown expect=%02X match=unknown\n", GF_VERSION_CHIP);
+    else kprintf(ATTR_WHITE, " chip=%02X expect=%02X match=%u\n",
+                 chip, GF_VERSION_CHIP, chip == GF_VERSION_CHIP);
+}
+static int gf_read_rom(struct gfinit_owner *g, u32 *len, u32 *crc, u32 *chip)
 {
     KdebugPeek req;
     u32 raw, bars[3];
@@ -136,15 +178,19 @@ static int gf_read_rom(struct gfinit_owner *g)
     }
     if (g->rom[0] != 0x55 || g->rom[1] != 0xaa || !g->rom[2]) return -1;
     g->rom_size = (u32)g->rom[2] * GF_ROM_UNIT;
+    if (g->rom_size > GF_ROM_MAX) return -1;
+    *len = g->rom_size;
+    *crc = crc32_core_final(crc32_core_update(CRC32_INIT, g->rom, *len));
+    *chip = gf_rom_chip(g->rom, *len);
     u32 pcir = (u32)g->rom[0x18] | (u32)g->rom[0x19] << 8;
-    if (g->rom_size > GF_ROM_MAX || g->rom_size < 0x18 || pcir > g->rom_size - 0x18 ||
+    if (g->rom_size < 0x18 || pcir > g->rom_size - 0x18 ||
         g->rom[pcir] != 'P' || g->rom[pcir+1] != 'C' ||
         g->rom[pcir+2] != 'I' || g->rom[pcir+3] != 'R' ||
         ((u32)g->rom[pcir+4] | (u32)g->rom[pcir+5] << 8) != (GF_DEVICE & 0xffffU) ||
         ((u32)g->rom[pcir+6] | (u32)g->rom[pcir+7] << 8) != GF_DEVICE >> 16) return -1;
     u8 sum = 0;
     for (u32 i = 0; i < g->rom_size; i++) sum += g->rom[i];
-    return sum ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, g->decoded);
+    return sum || *chip != GF_VERSION_CHIP ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, g->decoded);
 }
 static void gf_release_rom(struct gfinit_owner *g)
 {
@@ -197,7 +243,10 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     g->s0 = s0;
     r->transport = transport;
     g->decoded = gf_alloc(sizeof(*g->decoded));
-    if (!g->decoded || gf_read_rom(g)) { gf_release_rom(g); return -1; }
+    u32 len = 0, crc = 0, chip = GF_CHIP_UNKNOWN;
+    int rc = g->decoded ? gf_read_rom(g, &len, &crc, &chip) : -1;
+    gf_inspect_line(r->token.session, rc, len, crc, chip);
+    if (rc) { gf_release_rom(g); return -1; }
     g->inspected = true; g->next_main = 0;
     return 0;
 }
