@@ -112,3 +112,7 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - 仮想 identity の boot/image/kdebug は保存しない RAM 試行の固定値1とし、装置欄は0、開始条件は借用元の start_ready と route_read の両方へ委譲する。
 - normal だけを実装し、他 case の begin は UNSUPPORTED のままとする。終端の借用解除は既存 now 経路にも接続するが、now の受入と PAUSED 門の変更は次段に残す。
 - recover_budget_apply の wait_ms は呼出側が渡す復帰の静的作業量で、trial 待機を加算しない。normal は既存 S0 の予算を使い、最大幅 REC 行（復帰11対＋state/final/discard、begin〜stepはstate6行＋discard）を開始前に4096B・UART4096 pollsと照合する。
+
+## T4b-2 の取り込みで T4b-3 へ送る項目 (2026-10-23、Opus レビュー P3)
+- kdebug/recover_virtual.c:84-89 と kdebug/gfinit.c:330-332: virtual begin で PAUSED の後に同じ session へ op 10 の GF_OP_ABORT を送ると、PAUSED の門を通らずに trial_end(ABORT) で VERIFIED になり、borrowed=1 で ops が仮想のまま残る (次の op 11 か NOW の detach で戻る、実害は見当たらない)。T4b-3 で門の例外を作るときに、recovery_call の GF 分岐の後にも recover_virtual_detach() を置くか、仮想 owner の PAUSED 中は GF 5〜10 を断るかを決める。
+- kdebug/recover.c:1103-1105: 仮想の identity は実装置と違うので、virtual begin のたびに GF の SIZE_BARS の BAR cache が 0 に戻る (後の GF PREPARE は再測定 — 安全側)。仕様として受け入れる。
