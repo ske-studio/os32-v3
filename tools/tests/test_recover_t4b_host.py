@@ -1,6 +1,4 @@
 """T4b-9: one fake reader, split terminal/EOT suppression, real monitor."""
-from contextlib import redirect_stdout
-import io
 import json
 from pathlib import Path
 import sys
@@ -12,7 +10,7 @@ from test_rshell_recover import Port, load
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'tools/accept/recover_t4b_host.py'
 MUTATIONS = [
-    ('terminal_not_required', '            rc = 1', '            rc = 0'),
+    ('terminal_not_required', '        return 1', '        return 0'),
     ('raw_not_recorded', 'self.raw.write(chunk)', "self.raw.write(b'')"),
 ]
 ECHO = b'> recover virtual end 7\n'
@@ -28,7 +26,7 @@ def cases(module):
         for drop in ('none', 'final', 'eot'):
             with tempfile.TemporaryDirectory(prefix='t4b-host-case-') as directory:
                 path = Path(directory)
-                state, log, raw, stats = [path / x for x in ('state', 'log', 'raw', 'stats')]
+                state, log, raw = [path / x for x in ('state', 'log', 'raw')]
                 state.write_text(json.dumps(dict(sid=7, seq=2, image_crc='1234abcd',
                     crc=dict(version=1, profile_crc=11, plan_hash=12, snapshot_crc=13),
                     metadata_frozen=True, last_begin=None)))
@@ -37,10 +35,11 @@ def cases(module):
                 port.close = lambda: closed.append(True)
                 args = ['--port', 'fake', '--session', '7', '--image-crc', '1234abcd',
                         '--state', str(state), '--log', str(log), '--raw', str(raw),
-                        '--stats', str(stats), '--drop', drop,
+                        '--drop', drop,
                         '--timeout', '10', '--cleanup-timeout', '1']
-                with patch.object(module.recover, 'open_port', return_value=port) as opened, \
-                        redirect_stdout(io.StringIO()):
+                printed = []
+                module.print = printed.append  # per module: mutations run in threads
+                with patch.object(module.recover, 'open_port', return_value=port) as opened:
                     rc = module.main(args, clock=port.clock)
                 assert rc == (0 if drop == 'none' else 1), (split, drop, rc)
                 assert raw.read_bytes() == DATA
@@ -49,7 +48,7 @@ def cases(module):
                 assert log.read_bytes() == expected
                 aborts = int(drop == 'eot')
                 assert port.writes == [b'recover virtual end 7\n'] + [module.recover.abort_frame(7)] * aborts
-                assert json.loads(stats.read_text()) == dict(abort_frames=aborts, abort_writes=aborts)
+                assert 'abort_frames=%d' % aborts in printed
                 assert port.t < 12 and closed == [True]
                 opened.assert_called_once_with('fake', 9600)
 

@@ -147,4 +147,4 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 
 ## T4b-9 の実装で設計者が決めたこと
 - helper は既存 state の session/Image CRC を照合して virtual end だけを送る。begin/step の state/log を継続し、ver を再送しない。drop=none/final/eot を各別sessionで実行する。
-- 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort_framesとabort_writesを別JSONに記録し、成功は既存exchangeのOKだけとする。
+- 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort フレーム数は標準出力に出し、成功は既存exchangeのOKだけとする。
