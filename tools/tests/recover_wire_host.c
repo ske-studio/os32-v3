@@ -21,6 +21,12 @@ static int wire_tests(void)
                 wire_attach_calls != before+1) return 1;
         }
     }
+    /* An unknown begin case is UNSUPPORTED and does not reach attach. */
+    req.action = RECOVER_VIRTUAL_BEGIN;
+    req.case_id = RECOVER_VIRTUAL_TXBUSY_STOP + 1;
+    unsigned unknown_before = wire_attach_calls;
+    if (kdebug_ops.dbg_call(KDEBUG_OP_RECOVER_VIRTUAL, &req, sizeof(req)) != KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED ||
+        wire_attach_calls != unknown_before) return 1;
     /* Invalid requests must never reach attach, regardless of the shared -1. */
     req.action = RECOVER_VIRTUAL_BEGIN;
     req.case_id = RECOVER_VIRTUAL_TXBUSY_STOP;
