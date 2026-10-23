@@ -131,6 +131,13 @@ static int virtual_begin(struct recover *r, u32 hz)
     return rc;
 }
 
+bool recover_virtual_allowed(const KdebugRecoverVirtual *q)
+{
+    struct recover *r = recover_owner();
+    return borrowed && r->ops == &ops && q->session == token.session &&
+        (q->action == RECOVER_VIRTUAL_STEP || q->action == RECOVER_VIRTUAL_END);
+}
+
 int recover_virtual_call(const KdebugRecoverVirtual *q, u32 hz)
 {
     struct recover *r = recover_owner();
@@ -139,8 +146,7 @@ int recover_virtual_call(const KdebugRecoverVirtual *q, u32 hz)
         if (q->session) return -1;
         rc = virtual_begin(r, hz);
     } else {
-        if (!borrowed || r->ops != &ops || q->session != token.session ||
-            (q->action != RECOVER_VIRTUAL_STEP && q->action != RECOVER_VIRTUAL_END)) return -1;
+        if (!recover_virtual_allowed(q)) return -1;
         rc = q->action == RECOVER_VIRTUAL_STEP ? trial_step(r, &token, true, virtual_operation, 0) :
                                                  trial_end(r, &token, REC_NORMAL);
     }
