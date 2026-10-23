@@ -8,8 +8,8 @@ import test_hwdev_module as init
 
 ROOT = init.ROOT
 MUTATIONS = [
-    ('bypass-module', 'return ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);',
-     'return gfinit_call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);'),
+    ('bypass-module', 'int rc = ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);',
+     'int rc = gfinit_call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);'),
     ('absent-fallback', 'if (!ops || recovery_attach()) return -1;',
      'if (!ops) return 0;\n        if (recovery_attach()) return -1;'),
     ('cleanup-before-recover', 'int rc = recover_now_session(r, out->session);',
