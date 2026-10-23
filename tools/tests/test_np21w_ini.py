@@ -130,6 +130,53 @@ class Derivation(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), self.RAW)
 
 
+class Crt31k(unittest.TestCase):
+    RAW = (b'; CP932 \x82\xa0\r\n[nEkOpRoJeCt21]\r\n'
+           b' CrT31k \t= false \t; keep \x82\xa2\r\nopaque=\xff\r\n'
+           b'[other]\r\nCRT31K=untouched\r\n')
+
+    def test_on_off_round_trip_preserves_every_other_byte(self):
+        on, diff = ini.transform(self.RAW, ini.DERIVE_OPERATIONS['crt31k-on'])
+        self.assertEqual(on, self.RAW.replace(b'= false', b'= true'))
+        self.assertEqual(diff, ['CRT31K: false -> true'])
+        off, diff = ini.transform(on, ini.DERIVE_OPERATIONS['crt31k-off'])
+        self.assertEqual(off, self.RAW)
+        self.assertEqual(diff, ['CRT31K: true -> false'])
+        self.assertEqual(ini.transform(off, {'CRT31K': 'false'}), (off, []))
+
+    def test_missing_duplicate_and_invalid_bool_are_rejected(self):
+        for raw in (self.RAW.replace(b' CrT31k \t= false \t; keep \x82\xa2\r\n', b''),
+                    self.RAW.replace(b'opaque=', b'crt31k=false\r\nopaque=')):
+            with self.subTest(raw=raw), self.assertRaises(ini.IniError):
+                ini.transform(raw, {'CRT31K': 'true'})
+        for value in ('TRUE', 'False', '1', '0', '', 'yes', 'falsex', 'true false', '\u3042'):
+            with self.subTest(value=value):
+                with self.assertRaises(ini.IniError):
+                    ini.transform(self.RAW, {'CRT31K': value})
+                with self.assertRaises(ini.IniError):
+                    ini.transform(self.RAW.replace(b'= false', b'= ' + value.encode('cp932')),
+                                  {'CRT31K': 'true'})
+
+    def test_derive_and_missing_key_do_not_modify_source(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+                ini, 'np21w_directory', return_value=(tmp, r'C:\NP21')):
+            source = Path(tmp) / 'original.ini'
+            source.write_bytes(self.RAW)
+            output, _ = ini.derive(source, 'on.ini', ['crt31k-on'])
+            self.assertEqual(output.read_bytes(), self.RAW.replace(b'= false', b'= true'))
+            output, _ = ini.derive(source, 'off.ini', ['crt31k-on', 'crt31k-off'])
+            self.assertEqual(output.read_bytes(), self.RAW)
+            self.assertEqual(source.read_bytes(), self.RAW)
+            source.write_bytes(RAW)  # old fixture without CRT31K
+            before = set(Path(tmp).iterdir())
+            with self.assertRaisesRegex(ini.IniError, 'CRT31K.*通常.*保存'):
+                ini.derive(source, 'missing.ini', ['crt31k-on'])
+            self.assertEqual(set(Path(tmp).iterdir()), before)
+            self.assertEqual(source.read_bytes(), RAW)
+            output, _ = ini.derive(source, 'old.ini', ['cirrus-on'])
+            self.assertEqual(output.read_bytes(), EXPECTED)
+
+
 class ExMemory(unittest.TestCase):
     """ExMemory は MB 単位の拡張メモリ (win9x/ini.cpp:477, PFTYPE_UINT16、
     SUPPORT_LARGE_MEMORY 有効時)。ブートローダが 1MB から 512KB 刻みで実測するので

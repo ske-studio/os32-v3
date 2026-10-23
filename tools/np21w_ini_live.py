@@ -25,6 +25,8 @@ OPERATIONS = {'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
               'cirrus-off': {'USEGD5430': 'false', 'GD5430TYPE': '91'},
               'pegc-on': {'USEPEGCP': 'true'},
               'pegc-off': {'USEPEGCP': 'false'},
+              'crt31k-on': {'CRT31K': 'true'},
+              'crt31k-off': {'CRT31K': 'false'},
               # ExMemory (ini の綴りは ExMemory、照合は大文字) は MB 単位の
               # 拡張メモリ。8MB は **CUI の**最低動作環境で、memory_boot が
               # 台帳の置き場を FIXED 型 (0x2F9000、低位 RAM の末尾に置けない構成)

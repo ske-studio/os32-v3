@@ -131,6 +131,65 @@ class SoundAnd64MB(unittest.TestCase):
         self.assertNotIn('stop', fake.calls)
 
 
+class Crt31k(unittest.TestCase):
+    def test_preview_apply_receipt_and_restore(self):
+        for operation, old, new in (('crt31k-on', b'false', b'true'),
+                                    ('crt31k-off', b'true', b'false')):
+            with self.subTest(operation=operation):
+                fake = Fake()
+                original = RAW + b'\r\n CrT31k = ' + old + b' \t; CP932 \x82\xa0\r\n'
+                expected = original.replace(b'= ' + old, b'= ' + new)
+                fake.snapshot['data'] = original
+                service = live.Live(fake, TARGET)
+                preview = service.run(operation)
+                self.assertFalse(preview['applied'])
+                self.assertEqual(preview['diff'], ['CRT31K: %s -> %s' %
+                                                 (old.decode(), new.decode())])
+                self.assertEqual(fake.snapshot['data'], original)
+                self.assertEqual(fake.calls, ['query', 'snapshot', 'close'])
+                result = service.run(operation, live_apply=True, exclusive=True)
+                self.assertTrue(result['applied'])
+                self.assertEqual(fake.snapshot['data'], expected)
+                self.assertEqual(fake.saved['data'], original)
+                self.assertEqual(fake.record['original']['data'], original)
+                self.assertEqual(fake.record['applied'], fake.snapshot)
+                self.assertEqual(fake.record['operation'], operation)
+                self.assertEqual(fake.record['diff'], preview['diff'])
+                self.assertEqual(result['receipt'], fake.receipt_id)
+                before = copy.deepcopy(fake.snapshot)
+                self.assertFalse(service.run('restore', receipt=result['receipt'])['applied'])
+                self.assertEqual(fake.snapshot, before)
+                self.assertTrue(service.run('restore', receipt=result['receipt'],
+                                            live_apply=True, exclusive=True)['applied'])
+                self.assertEqual(fake.snapshot['data'], original)
+
+    def test_off_is_false_and_restore_can_return_true(self):
+        fake = Fake()
+        original = RAW + b'\nCRT31K=true\n'
+        fake.snapshot['data'] = original
+        service = live.Live(fake, TARGET)
+        result = service.run('crt31k-off', live_apply=True, exclusive=True)
+        self.assertEqual(fake.snapshot['data'], original.replace(b'CRT31K=true', b'CRT31K=false'))
+        service.run('restore', receipt=result['receipt'], live_apply=True, exclusive=True)
+        self.assertEqual(fake.snapshot['data'], original)
+
+    def test_missing_and_invalid_keys_fail_before_stop_or_write(self):
+        for field in (b'', b'CRT31K=1\n', b'CRT31K=TRUE\n', b'CRT31K=\n',
+                      b'CRT31K=true\ncrt31k=false\n'):
+            for operation in ('crt31k-on', 'crt31k-off'):
+                with self.subTest(field=field, operation=operation):
+                    fake = Fake()
+                    original = RAW + b'\n' + field
+                    fake.snapshot['data'] = original
+                    with self.assertRaises(live.IniError) as caught:
+                        live.Live(fake, TARGET).run(operation, live_apply=True, exclusive=True)
+                    if not field:
+                        self.assertRegex(str(caught.exception), 'CRT31K.*通常.*保存')
+                    self.assertEqual(fake.snapshot['data'], original)
+                    for op in ('stop', 'backup', 'replace', 'start'):
+                        self.assertNotIn(op, fake.calls)
+
+
 class Identity(unittest.TestCase):
     def test_exact_identity(self):
         self.assertEqual(live.identify([ROW], TARGET, 42), ROW)
@@ -641,6 +700,8 @@ class ReceiptAndPathBoundaries(unittest.TestCase):
         import json
         starts = {'cirrus-on': RAW, 'cirrus-off': NEW,
                   'pegc-on': RAW, 'pegc-off': PEGC_ON,
+                  'crt31k-on': RAW + b'\nCRT31K=false\n',
+                  'crt31k-off': RAW + b'\nCRT31K=true\n',
                   'ram-8mb': RAW, 'ram-9mb': RAW, 'ram-15mb': RAM_8MB,
                   'ram-32mb': RAW, 'ram-64mb': RAW, 'ram-128mb': RAW,
                   'snd118-on': RAW + b'\nSNDboard=26\n'}
@@ -1431,6 +1492,9 @@ IDENTITY = ("INI_SWITCH = '/i'  # exactly what np21w_ctl.py emits",
             "INI_SWITCH = '/i'  # exactly what np21w_ctl.py emits (identity)",
             'identity control (comment only; must stay GREEN)')
 MUTATIONS = [
+    ("                candidate = record['original']['data']",
+     "                candidate, _ = transform(record['original']['data'], {'CRT31K': 'false'})",
+     "CRT31K restore is replaced with off instead of original bytes"),
     ("    if token.startswith(INI_SWITCH):",
      "    if token[:2].lower() in ('/i', '-i'):",
      "accept '-i' / '/I' as the ctl switch"),
@@ -1638,23 +1702,43 @@ def _suite_failures(mod):
 
 def mutate():
     original = SRC.read_text(encoding='utf-8')
+    common_src = SRC.with_name('np21w_ini.py')
+    common = common_src.read_text(encoding='utf-8')
+    common_mutations = [
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
+         "EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
+         "shared transform identity control (must stay GREEN)"),
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
+         "ALLOWED['CRT31K'] = ('true', 'false')\nEXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME'}",
+         "CRT31K moved to ALLOWED breaks old fixtures and receipts"),
+        ("elif key in ('E_RESUME', 'CRT31K'):",
+         "elif key == 'E_RESUME':",
+         "CRT31K BOOL validation removed"),
+    ]
     bad = red = green = uncounted = 0
     with tempfile.TemporaryDirectory(prefix='np21w-ini-live-mut-') as tmp:
-        for i, (old, new, why) in enumerate([IDENTITY] + MUTATIONS):
-            if original.count(old) != 1:
-                print('MUTATION %d NOT APPLICABLE (%d matches): %s' % (i, original.count(old), why))
+        cases = [(original, item, False) for item in [IDENTITY] + MUTATIONS]
+        cases += [(common, item, True) for item in common_mutations]
+        for i, (source, (old, new, why), is_common) in enumerate(cases):
+            if source.count(old) != 1:
+                print('MUTATION %d NOT APPLICABLE (%d matches): %s' % (i, source.count(old), why))
                 bad += 1
                 continue
             path = Path(tmp) / ('mut%d.py' % i)
-            path.write_text(original.replace(old, new), encoding='utf-8')
+            path.write_text(source.replace(old, new), encoding='utf-8')
             try:
                 mod = _load(path)
+                if is_common:
+                    common_mod = mod
+                    mod = _load(SRC)
+                    common_mod.IniError = mod.IniError
+                    mod.transform = common_mod.transform
             except Exception as exc:
                 print('MUTATION %d NOT COUNTED (import: %s): %s' % (i, type(exc).__name__, why))
                 uncounted += 1
                 continue
             fails = _suite_failures(mod)
-            if i == 0:
+            if i == 0 or (is_common and old == new):
                 ok = fails == 0
                 print('IDENTITY %s (%d failed): %s' % ('GREEN' if ok else '**RED (harness broken)**', fails, why))
                 bad += not ok
@@ -1666,7 +1750,7 @@ def mutate():
                 green += 1
                 bad += 1
                 print('MUTATION %d **GREEN (missed)**: %s' % (i, why))
-    print('MUTATION SUMMARY red=%d green=%d not_counted=%d identity=1' % (red, green, uncounted))
+    print('MUTATION SUMMARY red=%d green=%d not_counted=%d identity=2' % (red, green, uncounted))
     return bad
 
 
