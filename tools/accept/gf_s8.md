@@ -38,5 +38,5 @@
 
 - `recover status` (IDLE または VERIFIED)、`ver`、`mem` (leftover・audit_fail が 0)。
 - CUI のまま、最後に **GRPH+2+RESET** (31kHz)、再起動後の `ver` と 09A8h。
-- 0FACh の初めての書込みはこの台本に入れない (口の設計は別、`~/os32-tmp/run/route/`)。
+- 0FACh の初めての書込みは別の承認 (口は [RECOVER_ROUTE_TEST](../../docs/decisions/realhw/RECOVER_ROUTE_TEST.md)、実装の後に `recover route-test 0 --approve` を 1 回、目視)。
 - 結果は `RESULT.md` に項目ごとの 合格/不合格/未確認。票には合否 1 語と証拠の所在だけ。
