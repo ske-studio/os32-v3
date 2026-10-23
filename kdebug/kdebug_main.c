@@ -118,7 +118,7 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
         if (req->action == RECOVER_VIRTUAL_BEGIN && req->case_id != RECOVER_VIRTUAL_NORMAL)
             return KDEBUG_RECOVER_VIRTUAL_UNSUPPORTED;
         if (recovery_attach()) return -1;
-        return recover_virtual_call(buf, size, PIT_HZ);
+        return recover_virtual_call(req, PIT_HZ);
     }
     if (op != KDEBUG_OP_RECOVER_STATUS && op != KDEBUG_OP_RECOVER_NOW)
         return kpeek_call(op, buf, size);

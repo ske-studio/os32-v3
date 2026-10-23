@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
     ('synthetic_access_allowed',
-     '{ (void)opaque; (void)a; (void)value; return -1; }',
-     '{ (void)opaque; (void)a; (void)value; return 0; }'),
-    ('plan_leave_skipped', 'return recover_plan_leave(r,0);', 'return 0;'),
-    ('transport_not_restored', 'r->transport=saved_transport;',
+     '(void)opaque; (void)a; (void)value;\n    return -1;',
+     '(void)opaque; (void)a; (void)value;\n    return 0;'),
+    ('plan_leave_skipped', 'return recover_plan_leave(r, 0);', 'return 0;'),
+    ('transport_not_restored', 'r->transport = saved_transport;',
      '(void)saved_transport;'),
 ]
 

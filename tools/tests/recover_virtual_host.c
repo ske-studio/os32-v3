@@ -97,14 +97,14 @@ static void run(void)
     CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
     CHECK(r->seq==seq && r->token.snapshot_crc==crc);
     tick_count+=10000;
-    CHECK(recover_virtual_call(&v,sizeof(v),PIT_HZ)==-1);
+    CHECK(recover_virtual_call(&v,PIT_HZ)==-1);
     v.session=1;
     CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
-    CHECK(!recover_virtual_call(&v,sizeof(v),PIT_HZ));
+    CHECK(!recover_virtual_call(&v,PIT_HZ));
     CHECK(r->state==REC_PAUSED && r->spent==spent && r->expected_node==RECOVER_NONE);
     CHECK(!r->entered && r->expected_node==RECOVER_NONE && r->seq==6 && !writes);
     v.action=RECOVER_VIRTUAL_END;
-    CHECK(!recover_virtual_call(&v,sizeof(v),PIT_HZ));
+    CHECK(!recover_virtual_call(&v,PIT_HZ));
     CHECK(!borrowed && r->transport==&recovery_transport && r->ops==&recovery_ops);
     CHECK(r->state==REC_VERIFIED && r->s0_verified && r->s1_verified && writes==2 && cell==0x1234);
     CHECK(contains("result=OK target=S0 verified=1 unknown=0"));
