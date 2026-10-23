@@ -15,7 +15,8 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
     ('lease_generation', 'owner->generation, r->token.session', 'gf_lease.generation, r->token.session'),
-    ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) return -1;', ''),
+    ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) {', 'if (false) {'),
+    ('idle_unowned_release', 'if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);', ''),
     ('detach_before_free', 'recover_owner_configure(0, 0, 0, false)', '0'),
     ('paused_work_retained', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))', 'if (owner && ((void)r, 1))'),
     ('max_nodes', 'if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;', ''),

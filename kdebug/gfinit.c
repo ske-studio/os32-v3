@@ -305,7 +305,10 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         q.status || q.fail_pc || q.fail_reg || q.steps ||
         (op != GF_OP_RUN_ONE && q.script_id) ||
         (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
-    if (owner && owner->inspected && !gf_owned(r)) return -1;
+    if (owner && owner->inspected && !gf_owned(r)) {
+        if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);
+        return -1;
+    }
     if (owner && q.session && q.session == r->token.session && owner->last_op == op &&
         owner->last_main == q.script_id) { *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0; }
     if (q.session != r->token.session) return -1;
