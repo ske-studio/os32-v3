@@ -153,7 +153,7 @@ static void setup(void)
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
     image[0x40]=0xff;image[0x41]=0xb8;image[0x42]='B';image[0x43]='I';image[0x44]='T';
     image[0x47]=1;image[0x48]=12;image[0x49]=6;image[0x4a]=1;
-    image[0x4c]='i';image[0x4d]=1;image[0x4e]=5;image[0x50]=0x60;
+    image[0x4c]='i';image[0x4d]=2;image[0x4e]=5;image[0x50]=0x60;
     image[0x62]=0x44;
     clear_output();
     u8 sum=0;for(u32 i=0;i<511;i++)sum+=image[i];image[511]=0-sum;
@@ -295,7 +295,7 @@ static void inspection_test(void)
 {
     setup();core.token.session=5;
     CHECK(call(GF_OP_INSPECT,0,0)==0);
-    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=E0A29354"));
     CHECK(contains(serial_output," chip=44 expect=44 match=1\n"));
     CHECK(!writes && !begins && core.token.session==5 && core.seq==0);
     clear_output();CHECK(call(GF_OP_INSPECT,0,0)==0 && !serial_length);
@@ -311,7 +311,7 @@ static void inspection_test(void)
     CHECK(equal(serial_output,"GF inspect sid=0 rc=-1 rom_len=unknown crc=unknown chip=unknown expect=44 match=unknown\n"));
     setup();decode_fail=1;
     CHECK(call(GF_OP_INSPECT,0,0)<0);
-    CHECK(contains(serial_output,"GF inspect sid=0 rc=-1 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output,"GF inspect sid=0 rc=-1 rom_len=512 crc=E0A29354"));
     CHECK(contains(serial_output," chip=44 expect=44 match=1\n"));
     setup();image[0x50]=0xff;image[0x51]=0xff;
     CHECK(call(GF_OP_INSPECT,0,0)<0 && contains(serial_output,"chip=unknown"));
@@ -351,7 +351,7 @@ static void cli_test(void)
     char *abort[]={"gfinit","abort","5","--allow-write","extra"};
     setup();kdebug.ops.dbg_call=cli_dispatch;cli_live=1;core.token.session=5;
     CHECK(shell_cmd_gfinit(3,inspect)==0);
-    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=7D57AF38"));
+    CHECK(contains(serial_output,"GF inspect sid=5 rc=0 rom_len=512 crc=E0A29354"));
     CHECK(contains(serial_output,"match=1\nGF inspect-end sid=5 rc=0\n"));
     clear_output();CHECK(shell_cmd_gfinit(3,inspect)==0);
     CHECK(equal(serial_output,"GF inspect-end sid=5 rc=0\n"));

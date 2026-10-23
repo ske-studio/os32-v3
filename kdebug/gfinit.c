@@ -122,6 +122,7 @@ static const struct gfinit_exec_ops gf_clock_ops = {gf_clock, recover_hal_wait_f
 #define GF_BIT_HEADER 12U
 #define GF_BIT_ENTRY 6U
 #define GF_BIT_CHIP_OFFSET 2U
+#define GF_BIT_I_VERSION 2U /* envytools nvbios/bit.c:50 ({ 'i', 2, ... }) */
 static u32 gf_rom_chip(const u8 *rom, u32 size)
 {
     static const u8 signature[] = {0xff, 0xb8, 'B', 'I', 'T', 0, 0};
@@ -134,7 +135,7 @@ static u32 gf_rom_chip(const u8 *rom, u32 size)
             head + count * stride > size - off) return GF_CHIP_UNKNOWN;
         for (u32 n = 0; n < count; n++) {
             const u8 *entry = rom + off + head + n * stride;
-            if (entry[0] != 'i' || entry[1] != 1) continue;
+            if (entry[0] != 'i' || entry[1] != GF_BIT_I_VERSION) continue;
             u32 len = (u32)entry[2] | (u32)entry[3] << 8;
             u32 data = (u32)entry[4] | (u32)entry[5] << 8;
             if (len <= GF_BIT_CHIP_OFFSET || data > size || len > size - data)
