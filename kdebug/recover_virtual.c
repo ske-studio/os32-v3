@@ -2,6 +2,7 @@
  * recovery_call has already validated the wire form and the case. */
 #include "recover_virtual.h"
 
+#define VIRTUAL_STEP_POLLS 64U
 #define VIRTUAL_TRIAL_SECONDS 8U
 #define VIRTUAL_UART_POLLS 4096U
 #define VIRTUAL_FRAME_BIT_US 10000000U
@@ -44,6 +45,30 @@ static const struct recover_plan_node node = {
 };
 static const struct recover_plan_entry entry = {REC_PREPARE, RECOVER_NONE, 0};
 static struct recover_plan plan;
+
+static bool clock_frozen;
+static u32 clock_offset, freeze_real, freeze_tick;
+
+static u32 virtual_ticks(void *opaque)
+{
+    return clock_frozen ? freeze_tick : saved_ops->ticks(opaque) - clock_offset;
+}
+
+static void virtual_freeze(void *opaque)
+{
+    freeze_real = saved_ops->ticks(opaque);
+    freeze_tick = freeze_real - clock_offset;
+    clock_frozen = true;
+}
+
+static int virtual_local_cleanup(void *opaque)
+{
+    if (clock_frozen) {
+        clock_offset += saved_ops->ticks(opaque) - freeze_real;
+        clock_frozen = false;
+    }
+    return saved_ops->local_cleanup(opaque);
+}
 
 static int start_ready(void *opaque)
 {
@@ -101,8 +126,13 @@ static int virtual_operation(struct recover *r, void *arg)
 {
     (void)arg;
     if (recover_plan_enter(r, 0)) return -1;
-    if (active_case == RECOVER_VIRTUAL_FAULT || active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE) {
+    if (active_case == RECOVER_VIRTUAL_FAULT || active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE ||
+        active_case == RECOVER_VIRTUAL_POLL_STOP) {
         (void)recover_record(r, "inject", "BEGIN", active_case, 0, 0, 0);
+        if (active_case == RECOVER_VIRTUAL_POLL_STOP) {
+            virtual_freeze(r->opaque);
+            while (!recover_safe_point(r)) {}
+        }
         if (active_case == RECOVER_VIRTUAL_TRIAL_EXPIRE)
             while (!virtual_wait_tick(r)) {}
         return -1; /* trial_step owns the failure and cleanup. */
@@ -127,8 +157,16 @@ static int virtual_begin(struct recover *r, u32 hz, u32 case_id)
         profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;
         profile.crc = recover_profile_crc(&profile);
     }
+    if (case_id == RECOVER_VIRTUAL_POLL_STOP) {
+        profile.max_polls = VIRTUAL_STEP_POLLS;
+        profile.crc = recover_profile_crc(&profile);
+    }
     saved_ops = r->ops;
     ops = *saved_ops;
+    clock_offset = 0;
+    clock_frozen = false;
+    ops.ticks = virtual_ticks;
+    ops.local_cleanup = virtual_local_cleanup;
     ops.start_ready = start_ready;
     ops.identity = identity;
     ops.raw_config = raw_config;

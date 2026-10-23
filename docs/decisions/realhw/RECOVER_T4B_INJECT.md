@@ -134,3 +134,8 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - C1の待ち関数は virtual_wait_tick：owner の ticks が1 tick進むまで待ち、その後に recover_safe_point を呼ぶ。時計・spent・reason は変更しない。
 - host は trial-expire を別プロセスで実行し、fake tick を進める。10秒相当または100000回のtick読取りで非0終了する watchdog を設け、期限比較除去を TimeoutExpired で合格扱いしない。
 - (T4b-6 の取り込み、Opus レビュー P3) virtual_wait_tick (recover_virtual.c) は tick が進まないと抜けない。今の呼出し元 (KAPI・シェル) は IF=1 なので到達しない。IF=0 の文脈から呼ぶようになったら tick を読む回数に上限を足す。
+
+## T4b-7 の実装で設計者が決めたこと
+- poll-stop は bind 前に max_polls=64 を設定して CRC を確定し、inject BEGIN の直後に virtual_freeze で recover の時計だけを凍結する。operation は safe_point を反復し、既存の poll 上限で cleanup へ進む。
+- virtual_local_cleanup の冒頭で offset += real_now−freeze_real として解除し、借用元の local_cleanup へ委譲する。凍結中に採った restore_tick と解除直後の virt は一致し、以後は real−offset で復帰の実経過を数える。
+- host は独立プロセスで凍結中にも real tick を進め、65 polls・仮想 tick 差0・解除直後の restore_tick 一致・復帰中の7 tick加算を確認する。poll比較除去時は128回の受信pollで非0終了する watchdog を使う。

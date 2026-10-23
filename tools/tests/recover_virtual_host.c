@@ -17,7 +17,8 @@ static void die(u32 line)
 }
 #define CHECK(x) do {if(!(x)) die(__LINE__);}while(0)
 volatile u32 tick_count;
-static bool advance_ticks;
+static bool advance_ticks, poll_test, restore_clock_checked;
+static u32 frozen_samples;
 static u32 tick_reads;
 static u32 fake_ticks(void)
 {
@@ -38,15 +39,40 @@ void recover_test_outp(u32 p,u32 v) {(void)p;(void)v;die(__LINE__);}
 u32 recover_test_inp(u32 p) {CHECK(p==RECOVER_ROUTE_PORT);return route;}
 const struct pit_setup *pit_get_setup(void) {return 0;}
 static int display_recover_ready(void) {return cui;}
-static void display_restore_98(void) {}
+static void display_restore_98(void)
+{
+    if (poll_test) {
+        struct recover *r=recover_owner();
+        tick_count+=7;
+        CHECK(r->ops->ticks(r->opaque)-r->restore_tick==7);
+    }
+}
 static int display_recover_cell_read(u32 *v) {*v=cell;return 0;}
 static int display_recover_cell_write(u32 v) {cell=v;writes++;return 0;}
 static void console_hw_cursor_enable(void) {}
 static int serial_gate_active(void) {return 0;}
-static int serial_trygetchar(void) {return -1;}
+static int serial_trygetchar(void)
+{
+    if (poll_test && clock_frozen) {
+        struct recover *r=recover_owner();
+        CHECK(++frozen_samples<=128U); /* bounded even with the poll comparison removed */
+        tick_count++;
+        CHECK(r->ops->ticks(r->opaque)==freeze_tick);
+    }
+    return -1;
+}
 static int serial_checked_ready(void) {return 1;}
 static int serial_checked_put(u32 b) {CHECK(used+1<sizeof(trace));trace[used++]=b;trace[used]=0;return 0;}
-static int serial_checked_begin(void) {begins++;return 0;}
+static int serial_checked_begin(void)
+{
+    if (poll_test && recover_owner()->state==REC_RESTORING && !restore_clock_checked) {
+        struct recover *r=recover_owner();
+        CHECK(!clock_frozen && r->ops->ticks(r->opaque)==r->restore_tick);
+        CHECK(r->restore_tick==freeze_tick);
+        restore_clock_checked=true;
+    }
+    begins++;return 0;
+}
 static int serial_checked_empty(void) {return 1;}
 static void serial_checked_end(void) {ends++;}
 struct serial_setup {u32 actual;};
@@ -241,8 +267,37 @@ static void run_expire(void)
     CHECK(shell_cmd_recover(4,begin)==1 && r->state==REC_FAILED);
     output("virtual trial-expire/8s/CRC/polls/watchdog PASS\n");
 }
+static void run_poll_stop(void)
+{
+    struct recover *r=recover_owner();
+    char *begin[]={"recover","virtual","begin","poll-stop"};
+    CHECK(!shell_cmd_recover(4,begin));
+    CHECK(profile.max_polls==64 && profile.trial_limit==60U*PIT_HZ);
+    CHECK(profile.opcode_limit==60U*PIT_HZ && !clock_frozen);
+    CHECK(profile.crc==recover_profile_crc(&profile));
+    u32 crc=profile.crc;
+    poll_test=true;
+    KdebugRecoverVirtual v={.version=RECOVER_VIRTUAL_VERSION,
+        .action=RECOVER_VIRTUAL_STEP,.session=r->token.session};
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    poll_test=false;
+    CHECK(r->state==REC_FAILED && r->reason==REC_TIMEOUT && r->polls==65);
+    CHECK(frozen_samples>0 && clock_offset==frozen_samples);
+    CHECK(!clock_frozen && restore_clock_checked && tick_count==frozen_samples+7);
+    CHECK(r->spent==0 && virtual_ticks(r->opaque)-r->restore_tick==7);
+    CHECK(profile.crc==crc && profile.crc==recover_profile_crc(&profile));
+    CHECK(contains("phase=inject event=BEGIN step=3 addr=0\n"));
+    CHECK(trace_at("phase=inject")<trace_at("phase=state event=RESTORING"));
+    CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
+    CHECK(contains(" trial=2 lost_lines=0"));
+    CHECK(r->s0_verified && !r->s1_verified && !r->lost_lines);
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    CHECK(writes==2 && cell==0x1234 && begins==ends);
+    output("virtual poll-stop/65-polls/frozen-delta-0/restore-clock PASS\n");
+}
 void _start(void)
 {
-    if (TEST_EXPIRE) run_expire(); else run();
+    if (TEST_EXPIRE==2) run_poll_stop();
+    else if (TEST_EXPIRE==1) run_expire(); else run();
     __asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();
 }
