@@ -18,7 +18,7 @@ MUTATIONS = [
     ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) {', 'if (false) {'),
     ('idle_unowned_release', 'if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);', ''),
     ('detach_before_free', 'recover_owner_configure(0, 0, 0, false)', '0'),
-    ('paused_work_retained', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))', 'if (owner)'),
+    ('paused_work_retained', 'if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))', 'if (owner && ((void)r, 1))'),
     ('max_nodes', 'if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;', ''),
     ('size_failure_retained', 'op != GF_OP_SIZE_BARS || r->state == REC_FAILED', 'op != GF_OP_SIZE_BARS'),
     ('inspect_replaces_s0_ops', 'g->s0 = s0;', 'g->s0 = s0; (void)recover_owner_configure(&g->ops, &g->bus, s0, false);'),
