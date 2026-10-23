@@ -144,3 +144,11 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - txbusy-stop は inject BEGIN の成功後に時計を凍結して plan を正常に leave し、続く既存の state PAUSED 行1行だけ ready=0 にする。新しい REC 行は足さず、put・実UART設定は借用元のままとする。
 - virtual_tx_end は失敗時も借用元 end を呼んで所有を解放した後、virtual_tx_clear で注入を解除する。local_cleanup の冒頭でも解除し、既存のUART累積値リセットで復帰ログを送る。
 - wire fixture は serial_get_setup の呼出し数で attach 到達を判定する。正しい全caseは到達し、不正wireは到達しないため、INVALIDと同値の-1だけでは合格にしない。
+
+## T4b-9 の実装で設計者が決めたこと
+- helper は既存 state の session/Image CRC を照合して virtual end だけを送る。begin/step の state/log を継続し、ver を再送しない。drop=none/final/eot を各別sessionで実行する。
+- 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort フレーム数は標準出力に出し、成功は既存exchangeのOKだけとする。
+
+## T4b-9 の取り込みで残す項目 (2026-10-23、Opus レビュー P3)
+- tools/accept/recover_t4b_host.py の `result != 'OK'` の枝 (exchange が PAUSED を返す場合) を殺す変異が無い。PAUSED を返す fake 列を足すときに変異も足す。
+- abort_frames は `data == abort` の write で数えるので、write_bounded が部分書込みで送り直すと少なく出る。数え方を exchange の abort の回数に替えるのは、この helper を実機で使うときに。

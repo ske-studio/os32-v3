@@ -69,3 +69,20 @@ ini は PM が選ぶ隔離像専用のもの (以下 `<隔離ini>`)、31kHz と�
    本像の `ver` と 31kHz の画面を保存し、起動状態で残す。
 
 この手順は未実行であり、隔離像の配備や巻戻しの合格を主張しない。
+
+## T4b-9: host 終端不着 helper
+
+各モードを別の normal session で実施する。既存の rshell_recover.py で
+begin→step を終えた PAUSED の sid を N とし、同じ state/log を引き継ぐ。
+P はポート、C は実 Image CRC、D は証拠ディレクトリ、CASE は当該 session のファイル名。
+helper は end だけを送る。ver は再送せず、COM1 reader や /api/cmd を並行させない。
+
+```sh
+python3 tools/accept/recover_t4b_host.py --port "$P" --session "$N" --image-crc "$C" --state "$D/$CASE.json" --log "$D/$CASE.log" --raw "$D/$CASE.bottom.raw" --drop none > "$D/$CASE.out"
+# 別の normal session の end で --drop final、その次の別 session で --drop eot
+```
+
+none は rc=0、final/eot は rc=1 が期待値。下位 raw は end の全受信、上位 log は抑止後の受信を追記し、
+標準出力 (.out) の abort_frames は期限後に送った abort フレームの数。正常な列なら final 抑止は
+EOT で拒否して 0、eot 抑止は期限後に 1。既定は応答60秒・cleanup40秒。raw の final/EOT と上位の欠落を照合してから合否を書く。
+eot 抑止の後は abort フレーム (10 B) がシェルの行入力に残りうるので、次の session の前に `recover status` か空行で入力を空にする。
