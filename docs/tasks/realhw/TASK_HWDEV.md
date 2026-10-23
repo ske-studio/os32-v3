@@ -42,7 +42,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | main (067da15、2026-10-23) — hwdev.mod を KERNEL_PAIRED_MODULES・core・R1 版・世代表の依存へ、起動 FD からは kdebug.bin と同じく除外 (PM 決定)、GF 8 オブジェクト名は hwdev.mk の HWDEV_GF だけ。NP21/W で NOT_FOUND が消え hwdev の handle を得た (`~/os32-tmp/evidence/2026-10-23/m5_np21w/RESULT.md`) |
 | 旧 S7 (shell と KAPI 共有ヘッダ) | 中 / sol | 固定 40B の wire と shell、KAPI の手順 ([ABI1]〜[ABI3]) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
-| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 未 (前提の `np21w_ini_live.py` の 31kHz の鍵が無い、hwdev.mod の配備 = M5 も前提) |
+| T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | 実装中 (2026-10-23) — 前提の 31kHz は CRT31K (NP21/W の鍵、np21w-src 964b73f + os32-v3 49b1ddb、`crt31k.ini`) で済。`recover now 0` の PARTIAL と 98 復帰は NP21/W で合格 (`~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md`)。仮想の試行・期限・故障・送信詰まりの口は設計の欠けで追記を往復中、隔離像の巻戻しは未 |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | 未 |
 
 - 並べ替え (2026-10-22): GeForce 4a の S7 以降と戻す処理の T4b 以降は、この票の M1〜M5 の後に回す。順序の正はこの表。各段の中身は `TASK_GEFORCE6200` §5・`TASK_REALHW_RECOVER` §2 のまま。
@@ -75,6 +75,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - [HWDEV_CORE_API.md](../../decisions/realhw/HWDEV_CORE_API.md) — 参照の表: 核の関数の slot、private ABI の構造体、import の生成、contract_crc、台帳の 11 枠目、KDEBUG の ops 版 4
 - [DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md) — 共通の要件: 想定する装置ごとに要る状態と、今の recover の前提で足りない所
 
+- [CRT31K_DESIGN.md](../../decisions/realhw/CRT31K_DESIGN.md) — CRT31K (2026-10-23 確定): NP21/W フォークに 31kHz で起動する ini 鍵 `CRT31K` (既定 false) を足し、T4b の S0 を NP21/W で回せるようにする。INT18h の修正は範囲外 (bios18.c:567 の AH=31h の rate は別票)。ctl の停止では ini が保存されないので、鍵は原本の写しに足してから `np21w_ini.py derive … crt31k-on`
 - [BARLEN_DESIGN.md](../../decisions/realhw/BARLEN_DESIGN.md) — BARLEN (2026-10-23 確定): 他の装置のメモリ BAR は正確な長さではなく**上限** (番地の整列と、Mem が有効な装置の隣の BAR までの距離の小さい方) と、根拠のある既知の長さの表 (82557) で GeForce の窓との重なりを判定する。BAR への書込み・Trident の資料は採らない (ユーザー承認)。実装は M4 の後 (host の試験のファイルが重なる)
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。

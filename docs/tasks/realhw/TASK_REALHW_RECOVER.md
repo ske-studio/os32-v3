@@ -96,6 +96,7 @@ NP21/W には PCI バスが無く通信速度も模擬しないので、NV44A �
 - [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) — 戻す処理の本文 (復帰先 S0/S1/S2/COLD、軽い順の段、deadman、書込み試験との契約、ハードの候補、受入と段分け)
 - [REALHW_RECOVER_ADDENDUM_R2.md](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) — 追記 r2 (暫定予算・A3・段の割り当てと変異)。本文の一部
 - [REALHW_RECOVER_ADDENDUM.md](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) — 追記 r4 (plan の契約) と、各段で設計者が決めたこと・送り項目。本文の一部
+- [RECOVER_T4B_INJECT.md](../../decisions/realhw/RECOVER_T4B_INJECT.md) — T4b の追記 (2026-10-23 確定): NP21/W で仮想 profile の試行 (`recover virtual begin|step|end`、私有 op 11) と故障・期限・停止時の poll・送信詰まりの 5 case を起こす口、ホストの終端不着の helper。段は B1・B2
 - [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) — 段 4a の設計 (recover の契約を使う側)
 - [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md) — 段 4a S2 の引数配置
 
