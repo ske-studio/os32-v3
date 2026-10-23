@@ -17,6 +17,18 @@ static void die(u32 line)
 }
 #define CHECK(x) do {if(!(x)) die(__LINE__);}while(0)
 volatile u32 tick_count;
+static bool advance_ticks;
+static u32 tick_reads;
+static u32 fake_ticks(void)
+{
+    if (advance_ticks) {
+        CHECK(++tick_reads < 100000U);
+        CHECK(tick_count < 10U * PIT_HZ); /* finite watchdog, before 60s opcode limit */
+        if (recover_owner()->state==REC_RUNNING && !recover_owner()->emitting &&
+            tick_reads % 4U == 0) tick_count++;
+    }
+    return tick_count;
+}
 static u32 cell=0x1234, writes, peek_calls, begins, ends, route, setup_reads, gf_calls;
 static int cui;
 static char trace[32768]; static u32 used;
@@ -64,7 +76,9 @@ static int kpeek_call(u32 op,void *p,u32 sz) {(void)op;(void)p;(void)sz;peek_cal
 #define GF_OP_INSPECT 5U
 #define GF_OP_ABORT 10U
 #define recover_hal_wait_frame fake_wait
+#define tick_count fake_ticks()
 #include "virtual_dispatch.inc"
+#undef tick_count
 #undef recover_hal_wait_frame
 #define SHELL_H
 #define ATTR_RED 1
@@ -196,4 +210,39 @@ static void run(void)
     CHECK(r->seq==failed_seq && used==failed_used);
     output("virtual normal/PAUSED/now/GF-abort/fault/latch PASS\n");
 }
-void _start(void) {run();__asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();}
+static void run_expire(void)
+{
+    struct recover *r=recover_owner();
+    char *begin[]={"recover","virtual","begin","trial-expire"};
+    CHECK(!shell_cmd_recover(4,begin));
+    CHECK(r->state==REC_PAUSED && !contains("phase=inject"));
+    CHECK(profile.trial_limit==8U*PIT_HZ && profile.opcode_limit==60U*PIT_HZ);
+    CHECK(profile.restore_limit==10U*PIT_HZ && profile.max_polls==65536U);
+    CHECK(profile.max_steps==4096U && profile.restore_log_bytes==4096U);
+    CHECK(profile.crc==recover_profile_crc(&profile) && r->token.profile_crc==profile.crc);
+    u32 crc=profile.crc;
+    KdebugRecoverVirtual v={.version=RECOVER_VIRTUAL_VERSION,
+        .action=RECOVER_VIRTUAL_STEP,.session=r->token.session};
+    advance_ticks=true;
+    CHECK(recovery_call(KDEBUG_OP_RECOVER_VIRTUAL,&v,sizeof(v))==-1);
+    advance_ticks=false;
+    CHECK(r->state==REC_FAILED && r->reason==REC_TIMEOUT);
+    CHECK(r->spent>=8U*PIT_HZ && r->spent<10U*PIT_HZ);
+    CHECK(r->polls>1 && r->polls<profile.max_polls);
+    CHECK(r->spent-r->opcode_spent<profile.opcode_limit);
+    CHECK(profile.crc==crc && profile.crc==recover_profile_crc(&profile));
+    CHECK(contains("phase=inject event=BEGIN step=2 addr=0\n"));
+    CHECK(trace_at("phase=inject")<trace_at("phase=state event=RESTORING"));
+    CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
+    CHECK(contains(" trial=2 lost_lines=0"));
+    CHECK(r->s0_verified && !r->s1_verified && !r->lost_lines);
+    CHECK(!borrowed && r->ops==&recovery_ops && r->transport==&recovery_transport);
+    CHECK(writes==2 && cell==0x1234 && begins==ends);
+    CHECK(shell_cmd_recover(4,begin)==1 && r->state==REC_FAILED);
+    output("virtual trial-expire/8s/CRC/polls/watchdog PASS\n");
+}
+void _start(void)
+{
+    if (TEST_EXPIRE) run_expire(); else run();
+    __asm__ volatile("int $0x80"::"a"(1),"b"(0));__builtin_unreachable();
+}

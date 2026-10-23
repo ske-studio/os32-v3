@@ -128,3 +128,8 @@ python3 tools/rshell_recover.py --port "$P" --session "$N" --image-crc "$C" --st
 - reason・FAILED・S0 復帰は既存 trial_step/cleanup に任せる。
 - 試行ログの静的上限に inject BEGIN 1 行と flush 1 回を加算する。
 - 他の注入 case は UNSUPPORTED のままとする (wire 試験が case ごとに確かめる)。
+
+## T4b-6 の実装で設計者が決めたこと
+- C3再確認：recover_budget_apply の wait_ms/needed は呼出側の復帰作業量だけを検算し、試行待ちは数えない。trial-expire は bind 前に trial_limit=8秒×実HAL Hz を checked 整数換算して CRC を再確定し、opcode60秒・復帰10秒等は既存 S0 予算を保つ。
+- C1の待ち関数は virtual_wait_tick：owner の ticks が1 tick進むまで待ち、その後に recover_safe_point を呼ぶ。時計・spent・reason は変更しない。
+- host は trial-expire を別プロセスで実行し、fake tick を進める。10秒相当または100000回のtick読取りで非0終了する watchdog を設け、期限比較除去を TimeoutExpired で合格扱いしない。
