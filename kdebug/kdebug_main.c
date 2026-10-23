@@ -57,8 +57,9 @@ static int recovery_screen_verify(void *opaque)
 { (void)opaque; return recover_screen_98(recover_owner(), &recovery_screen, 0); }
 static const struct recover_ops recovery_ops = {
     .ticks = recovery_ticks, .start_ready = recovery_cui,
-    .route_read = recovery_route, .route_write = recovery_route_write, .screen_safe = recovery_ready,
-    .screen_restore_verify = recovery_screen_verify, .local_cleanup = recovery_local
+    .route_read = recovery_route, .route_write = recovery_route_write,
+    .screen_safe = recovery_ready, .screen_restore_verify = recovery_screen_verify,
+    .local_cleanup = recovery_local
 };
 static int recovery_rx(void *opaque)
 { (void)opaque; return serial_gate_active() ? -1 : serial_trygetchar(); }
@@ -140,11 +141,11 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
         op != KDEBUG_OP_RECOVER_ROUTE_TEST)
         return kpeek_call(op, buf, size);
     if (!buf || size != sizeof(KdebugRecover)) return -1;
+    KdebugRecover *out = buf;
     if (op == KDEBUG_OP_RECOVER_ROUTE_TEST &&
-        (r->state != REC_IDLE || r->token.session || ((KdebugRecover *)buf)->session ||
+        (r->state != REC_IDLE || r->token.session || out->session ||
          (r->ops && r->ops != &recovery_ops))) return -1;
     if (recovery_attach()) return -1;
-    KdebugRecover *out = buf;
     if (op == KDEBUG_OP_RECOVER_NOW || op == KDEBUG_OP_RECOVER_ROUTE_TEST) {
         enum recover_state before = r->state;
         int rc = op == KDEBUG_OP_RECOVER_ROUTE_TEST ?

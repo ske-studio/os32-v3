@@ -13,6 +13,7 @@
 #include "kdebug_imports.h"
 #include <stdarg.h>
 #include "kernel_selftest_dispatch.h"
+#include "kdebug/recover_wire.h"
 
 #define CAP (MODULE_IMAGE_MAX + MODULE_PAGE_SIZE)
 /* File limit excludes the separately zeroed resident BSS. */
@@ -182,7 +183,6 @@ static void check_boot_dispatch(void)
         CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
     }
 }
-#include "kdebug/recover_wire.h"
 /* KAPI kdebug_call (kernel/kdebug_call.c): NOSYS without slot 19, else pass-through. */
 static u32 call_op, call_size;
 static void *call_buf;
