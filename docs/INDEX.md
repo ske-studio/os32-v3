@@ -67,6 +67,7 @@ T3 前の反省会と文書整理の計画は [DOCS_REORG_T3](tasks/v3/DOCS_REOR
 T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/boot/kdebug.bin`、対象を絞った 1 段目) は [TASK_DBGREF](tasks/v3/TASK_DBGREF.md)。
 標準フォントの描画を D15 に届かせる改善 (描き済みの字形の束・枠の詰め直し・先読み・領域の拡大・ラスタの整数化、KPEEK より先) は [TASK_FONTPERF](tasks/v3/TASK_FONTPERF.md)。
 実機でシリアル経由にメモリを読む道具 (kdebug の peek、T7 の後の最初の実装) は [TASK_KPEEK](tasks/v3/TASK_KPEEK.md)。
+検査の整理 (重い検査を軽く・重複を束ねる・古い試験を削る、2026-10-24 ユーザー決定) は [TASK_TEST_TIDY](tasks/v3/TASK_TEST_TIDY.md)。
 
 ## 生成文書の見方
 
