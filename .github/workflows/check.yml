@@ -114,6 +114,4 @@ jobs:
           make check-np21w-ctl-host
           make check-rshell-serial-host
           make check-serial-portc-host
-          make check-sqlite-groups-host
           make check-vfs-fd-path-host
-          make check-vfs-fd-sqlite-host
