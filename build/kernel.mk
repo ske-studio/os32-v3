@@ -24,7 +24,7 @@ endif
 
 ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o)
 
-exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
+exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
 exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
@@ -271,12 +271,12 @@ $(R1_OBJ)/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
-$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc
+$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc
 	@mkdir -p $(@D)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $@.asm
 	$(AS) -p sdk/crt/generations.inc -f elf32 $@.asm -o $@
 
-$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
+$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
 	@mkdir -p $(@D)
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
@@ -332,7 +332,7 @@ $(KERNEL_OBJ_PREFIX)%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(if $(filter kernel/module.c,$<),-Ikdebug/generated) $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
-$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h
+$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
 	@mkdir -p $(@D)
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
@@ -343,7 +343,7 @@ $(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
 -include $(C_KERNEL_OBJ:.o=.d)
 endif
 
-$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc
+$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc
 	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $(BUILD_OUT)/asm/$<
 	$(AS) -p sdk/crt/generations.inc -f elf32 $(BUILD_OUT)/asm/$< -o $@
