@@ -22,6 +22,26 @@ from tools.np21w_mcp import gui
 
 
 class McpTests(unittest.TestCase):
+    def test_retired_delivery_tools_return_expected_errors_without_io(self):
+        # File placement was retired: neither tool has a successful transfer path.
+        with patch.object(server.emu, 'get', side_effect=AssertionError('LIVE GET')), \
+             patch.object(server.emu, 'post', side_effect=AssertionError('LIVE POST')):
+            for name in ('emu_put_file', 'emu_deploy_status'):
+                with self.subTest(name=name):
+                    result = self.request('tools/call', {'name': name, 'arguments': {}})
+                    self.assertTrue(result['isError'])
+                    message = result['content'][0]['text']
+                    self.assertTrue(message.startswith('error: retired 2026-09-09:'))
+                    self.assertNotIn('internal error', message)
+                    self.assertIn('hsync', message)
+
+    def test_status_success_with_mock_client(self):
+        with patch.object(server.emu, 'get', return_value=b'{"ok":true}') as get:
+            result = self.request('tools/call', {'name': 'emu_status'})
+        self.assertNotIn('isError', result)
+        self.assertEqual(json.loads(result['content'][0]['text']), {'ok': True})
+        get.assert_called_once_with('/api/status')
+
     def test_key_form_encoding_preserves_chords_and_text(self):
         for args in ({'seq': 'CTRL+STOP'},
                      {'text': 'a+b &c=1% 日本語'},

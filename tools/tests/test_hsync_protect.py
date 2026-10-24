@@ -7,11 +7,12 @@ hsync は HostDrv (C:\\os32) の中身を NHD の / へ O_CREAT|O_TRUNC で写�
 古い etc/settings.db が 1 つ残っているだけで、ゲストが書いた設定 DB が切り詰められる。
 userland/system/hsync_protect.inc の純関数 (字句正規化 + 名前規則) をホストで走らせ、
 同じソースが外部プログラムと同じ i386-elf-gcc / PROGRAM_FLAGS でも通ることを別に見る
-([C1] GNU11)。実体規則 (sys_stat の inode 比較) は hsync.c 側にあり、ここでは
-コンパイルが通ることだけを見る。エミュレータ・実配備・make には一切触れない。
+([C1] GNU11)。実体規則は hsync.c の sys_stat と dev/inode の比較を字句判定で確認する。
+比較を除いた固定入力が拒否されることも確認する。エミュレータ・実配備・make には一切触れない。
 """
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -35,7 +36,37 @@ TARGET_INCLUDES = ["-I" + str(ROOT), "-I" + str(ROOT / "include"),
 HOST_SRC = ROOT / "tools/tests/hsync_protect_host.c"
 GUEST_SRC = ROOT / "userland/system/hsync.c"
 
+def check_inode_guard(source):
+    # コメントに残った比較を誤って合格にしない。
+    source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
+    match = re.search(r"static int is_same_as_protected\([^)]*\)\s*\{(.*?)^\}",
+                      source, flags=re.S | re.M)
+    assert match, "is_same_as_protected is missing"
+    body = match.group(1)
+    assert re.search(r"rc\s*=\s*api->sys_stat\(dst_path,\s*&here\)", body), \
+        "destination sys_stat is missing"
+    assert re.search(
+        r"if\s*\(\s*here\.st_dev\s*==\s*g_prot_dev\[i\]\s*&&\s*"
+        r"here\.st_ino\s*==\s*g_prot_ino\[i\]\s*\)\s*return\s+1\s*;", body), \
+        "device/inode equality must protect the destination"
+
+
+def test_inode_guard():
+    source = GUEST_SRC.read_text()
+    check_inode_guard(source)
+    for comparison in ("here.st_ino == g_prot_ino[i]", "here.st_dev == g_prot_dev[i]"):
+        assert comparison in source
+        try:
+            check_inode_guard(source.replace(comparison, "1"))
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("missing comparison was accepted: " + comparison)
+    print("INODE guard + missing-comparison rejection PASS", flush=True)
+
+
 if __name__ == "__main__":
+    test_inode_guard()
     with tempfile.TemporaryDirectory(prefix="os32-hsync-protect-") as tmp:
         tmp = pathlib.Path(tmp)
         exe = tmp / "hsync-protect"

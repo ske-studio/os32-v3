@@ -232,7 +232,7 @@ def tool_put_file(args):
     kernel agent writes the file when the shell is next responsive.
     """
     del args
-    return tool_error(
+    raise emu.EmuError(
         "retired 2026-09-09: the hotdeploy staging window was removed. "
         "Use `make deploy` (host -> C:\\os32) then `hsync` in the guest "
         "(/host -> /, sys excluded unless named). "
@@ -242,7 +242,7 @@ def tool_put_file(args):
 def tool_deploy_status(args):
     """Retired with the hotdeploy window (2026-09-09)."""
     del args
-    return tool_error(
+    raise emu.EmuError(
         "retired 2026-09-09: no guest-side file-placement agent any more. "
         "Delivery is `make deploy` + guest `hsync`.")
 

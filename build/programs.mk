@@ -69,10 +69,8 @@ endif
 SHELL_SRC = $(wildcard userland/shell/*.c)
 SHELL_OBJ = $(SHELL_SRC:.c=.o)
 
-# ヘッダと .inc の明示依存 (B7)。Makefile の DEPFILES は boot/kernel/... しか
-# 走査しないので userland の .d は読まれない。sh_launch.inc / sh_pipe.inc /
-# sh_redraw.inc を直しても .o が作り直されないと、直したつもりの sh.bin が
-# 出来上がる。常駐側にも同じ依存を足す (レシピは変えないので .o は不変)。
+# ヘッダと .inc の明示依存 (B7)。生成済み .d は Makefile の DEPFILES でも読む。
+# 初回ビルドでも常駐側・外部プログラム側に同じ依存を与える。
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
