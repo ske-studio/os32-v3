@@ -359,12 +359,17 @@ def case_suite_cache_owner(cd):
         with tempfile.TemporaryDirectory(prefix='c_dialect_owner_') as d:
             os.environ['OS32_C_DIALECT_TEST_CACHE'] = d
             check(cd._suite_cache() is None, "所有者の印の無いキャッシュは使わない")
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(os.getpid()))
+            me = os.getpid()
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d %s' % (me, cd.process_start(me)))
             check(cd._suite_cache() == d, "生きている suite のキャッシュは使う")
             dead = subprocess.Popen([sys.executable, "-c", "pass"])
             dead.wait()
-            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(dead.pid))
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d 1' % dead.pid)
             check(cd._suite_cache() is None, "終わった suite のキャッシュ (残骸・手で指定) は使わない")
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text('%d %d' % (me, int(cd.process_start(me)) + 1))
+            check(cd._suite_cache() is None, "使い回された pid (開始時刻が違う) のキャッシュは使わない")
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(me))
+            check(cd._suite_cache() is None, "開始時刻の無い印は使わない")
     finally:
         if old is None:
             os.environ.pop('OS32_C_DIALECT_TEST_CACHE', None)
@@ -723,6 +728,9 @@ if __name__ == "__main__":
     # Cache only successful internal TU checks, for this one suite invocation.
     # Every checker still reads its real make graph, flags, probes and SDK inputs.
     with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
-        pathlib.Path(cache, '.suite_owner_pid').write_text(str(os.getpid()))
+        sys.path.insert(0, str(ROOT / "tools"))
+        import check_c_dialect as owner  # noqa: E402
+        pathlib.Path(cache, owner.SUITE_CACHE_OWNER).write_text(
+            '%d %s' % (os.getpid(), owner.process_start(os.getpid())))
         os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
         sys.exit(main(sys.argv[1:]))

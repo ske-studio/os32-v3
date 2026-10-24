@@ -404,17 +404,25 @@ def _suite_cache():
 
     Honoured only while the suite that created the directory (its pid in
     SUITE_CACHE_OWNER) is alive, so a leftover or hand-set directory cannot make
-    the product check skip translation units.
+    the product check skip translation units. The owner is the pid and its start
+    time, so a recycled pid does not revive a leftover directory.
     """
     cache = os.environ.get('OS32_C_DIALECT_TEST_CACHE')
     if not cache:
         return None
     try:
-        pid = int(pathlib.Path(cache, SUITE_CACHE_OWNER).read_text())
-        os.kill(pid, 0)
+        pid, start = pathlib.Path(cache, SUITE_CACHE_OWNER).read_text().split()
+        if process_start(int(pid)) != start:
+            return None  # Gone, or the pid now belongs to another process.
     except (OSError, ValueError):
         return None
     return cache
+
+
+def process_start(pid):
+    """Start time of pid in clock ticks since boot (/proc/<pid>/stat field 22)."""
+    stat = pathlib.Path('/proc', str(pid), 'stat').read_text()
+    return stat.rpartition(')')[2].split()[19]
 
 
 _SOURCE_DIGEST = []
@@ -426,7 +434,8 @@ def _checker_source_digest():
         return _SOURCE_DIGEST[0]
     here = pathlib.Path(__file__).resolve()
     digest = hashlib.sha256(here.read_bytes())
-    for p in sorted(pathlib.Path(ast.__file__).resolve().parent.glob('*.py')):
+    package = pathlib.Path(ast.__file__).resolve().parent
+    for p in sorted(q for q in package.rglob('*') if q.is_file() and '__pycache__' not in q.parts):
         digest.update(p.name.encode() + b'\0' + p.read_bytes())
     _SOURCE_DIGEST.append(digest.hexdigest())
     return _SOURCE_DIGEST[0]
