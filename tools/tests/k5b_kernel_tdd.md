@@ -167,7 +167,7 @@ python3 -B tools/tests/test_multiapp_impl.py    # 回 3 (新規)
 ```
 
 `build/sdk.mk` の `check:` へは PM が足す (票の指示どおりこちらでは触っていない)。
-足すときの並びの例:
+足すときの並びの例 (記録当時の例。この 2 つの名前の検査は今の build/checks.d には無い):
 
 ```make
 check-owner-reclaim-host:

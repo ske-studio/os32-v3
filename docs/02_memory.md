@@ -98,7 +98,7 @@ VRAM/MMIO の表示面は BB に加えない。領域台帳と allocator の供�
 不一致は `ng diff=総和−物理頁数` と表示し、起動は続ける。
 KDEBUG=1 の自己試験は部品が RUNNING の場合だけ呼び、post_exec の `slack_cycle` は
 空き頁を1頁ずつ確保して再割当拒否・使用中 owner の保持・返却後の空き頁数を確かめる。
-ゲストでの T3b1 受入の手順と結果は票 TASK_T3_LAYOUT §4 が持つ。
+T3b1 のゲスト受入は 2026-10-18 に完了した (経緯: `docs/archive/v3/TASK_T3_LAYOUT.md` §4)。
 
 
 Unicode-JIS は `/sys/unicode.bin` の昇順 7,063 組 (28,252 B) を起動時に一度読み、

@@ -72,7 +72,7 @@ PM / ユーザーが削除・統合を決める前の材料であり、この文
 | 20 | `tools/tests/test_physmem.py` | 実物ソースを #include (`kernel/physmem.c`) | 物理レンジ模型。合成入力だけで、実機 RAM の証拠にはしない (docstring) | 9 | 未計測 | ○ `check-memory-host` | × |
 | 21 | `tools/tests/paging_bounds_host.c` | 実物ソースを #include (`kernel/paging.c` + `pgalloc.c`、特権 asm だけ置換) | ページング境界 (Phase 1)。シェルの 2 ヒープ (0x380000–0x3FFFFF) を present に保つ類の不変条件 | 95 `CHECK()` | 未計測 | ○ 同上 | × |
 | 22 | `tools/tests/paging_rebuild_host.c` | 実物ソースを #include (同上) | PD 再構築の 5 モード (nonmaster / rollback / sparse / attrs / final) | 39 `CHECK()` | 未計測 | **×** — `test_paging_bounds.py` は `--rebuild` を付けたときだけこのハーネスを選ぶ (同 26 行目)。`check-memory-host` は引数なしで呼ぶ | × |
-| 23 | `tools/tests/app_band_pde_host.c` | 実物ソースを #include (同上) | `docs/tasks/memory/APP_BAND_PDE.md` — アプリ帯が 4MB (PDE) 単位で伸びる | 107 `CHECK()` | 未計測 | ○ 同上 | × |
+| 23 | `tools/tests/app_band_pde_host.c` | 実物ソースを #include (同上) | `docs/archive/v3/APP_BAND_PDE.md` — アプリ帯が 4MB (PDE) 単位で伸びる | 107 `CHECK()` | 未計測 | ○ 同上 | × |
 | 24 | `tools/tests/test_pgalloc_model.py` | 実物ソースを #include (`kernel/pgalloc.c` + `sys.c` + `exec/exec.c` の配置ヘルパ) | 物理アロケータと物理レンジ模型の結合。`exec_child_claim` は並行に書いた別式ではなく出荷コードを切り出す (docstring) | 12 | 未計測 | ○ 同上 | × |
 | 25 | `tools/tests/pgalloc_range_host.c` | 実物ソースを #include (`kernel/pgalloc.c`) | A0 — 範囲付き pgalloc。`pgalloc_range_has_ram` 系 (POLICY_DEBUG §4-34 のデバイス窓の判断) | 48 `CHECK()` | 未計測 | ○ 同上 | × |
 | 26 | `tools/tests/highram_stage_host.c` | 実物ソースを #include (`paging.c` `pgalloc.c` `sys.c`) | 高位 RAM の段階公開 (K6-RAM)。32/64 は模型上の MiB で、実行は実ターゲット ILP32 型 | 59 `CHECK()` | 未計測 | ○ 同上 | × |

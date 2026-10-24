@@ -2,7 +2,7 @@
  *  FS_KIND_HOST.C — 種別判定を「列挙の成否」で代用していた退行 (B5) を
  *  **実物のソースで** 確かめる
  *
- *  票: H1 (docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) / Codex 実装レビュー
+ *  票: H1 (docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md) / Codex 実装レビュー
  *      往復 3 の B5。`d574704` で入った退行。
  *  実行: python3 -B tools/tests/test_fs_kind.py [--target]
  *  記録: tools/tests/h1_tdd.md

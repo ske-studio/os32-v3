@@ -1,7 +1,7 @@
 /* ========================================================================
  *  crc32_core.inc — CRC-32 のストリーム核 (カーネル / ユーザーランド共用)
  *
- *  票: H1 (docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §4.1)
+ *  票: H1 (docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §4.1)
  *
  *  既存 lib/crc32.c の crc32_calc() と**同じ CRC-32**:
  *    反転多項式 0xEDB88320 / 内部初期値 0xFFFFFFFF / 最後に 0xFFFFFFFF を XOR。

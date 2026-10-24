@@ -1,6 +1,6 @@
 """H1: hdrv_list_dir() の列挙ループが「途中で切れた一覧」を成功で返さない。
 
-票:   docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §8 の H1 行
+票:   docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §8 の H1 行
       (完了条件「I/O 失敗を成功にしない」/ 対象「HostDrv のエラー処理」)
 記録: tools/tests/h1_tdd.md
 

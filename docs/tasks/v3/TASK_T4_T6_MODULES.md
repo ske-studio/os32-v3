@@ -18,7 +18,7 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 
 | 元票の前提・着手条件 | 判定 | 今の根拠と本票での扱い |
 |---|---|---|
-| T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/archive/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-09.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
+| T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/archive/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-25.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
 | T2 → T3 → T4 → T5-0 → T5a/b/c → T7 (FD容量不足時だけT6b-M) | r5で更新 | 上位§6と本票§7-1。T3配置は受入済み。本票各段で差分を再計測する。既存S4とLAN受入範囲を後続の正常対照にする (§2・§6) |
 | e11 公開版・4世代を後で照合 | 吸収済み (T2/DBGREF) | `sdk/kapi.json:2`、`:3`: format=4、KAPI ABI=1、memory=4、shlib=2、機能版76。更新時は生成値で照合する |
 | 専用module核・生成器・リンカ | T4で実装済み | `kernel/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
@@ -32,7 +32,7 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 | 8MB/17MB/実機の構成別受入 | 要改訂 (実施時期のみ) | `docs/tasks/DEFERRED_TESTS.md:19` の10-14決定で最終段へ。途中は64MB、D9/D21の最低条件・必須サービスは維持 |
 | 像・RAMの基準 | T4受入後に再採取 | T3値は履歴。T5-0aで同一SHA・設定のcore/module/guard/FD残量を基準化 (§7-2) |
 
-**T3引渡し値 (履歴、T5の予算には使わない)** (`docs/tasks/v3/TASK_T3_LAYOUT.md:192`)：既存成果物のbuild IDは `ab020da` (`build/out/kernel.map:3833`)。main `952f16b` との差は文書3本と `tools/tests/test_nano_adapter.py` のみ。再ビルド値ではない。
+**T3引渡し値 (履歴、T5の予算には使わない)** (`docs/archive/v3/TASK_T3_LAYOUT.md:192`)：既存成果物のbuild IDは `ab020da` (`build/out/kernel.map:3833`)。main `952f16b` との差は文書3本と `tools/tests/test_nano_adapter.py` のみ。再ビルド値ではない。
 `__bss_end=__sqlite_start=0x198000`、`__sqlite_end=0x254200`、`__kernel_resident_end=0x276000` (`build/out/kernel.map:4473,4477,8033,8038`)。core BSS→SQLite→guard→128KiB stackのリンク時連結配置で、KHEAP192KiBはresident終端から算出する (`build/os32.ld:60`、`include/memmap.h:42,228`)。常駐像上限0x275000 B、resident占有0x176000 B。鎖末尾0x2E1000からSLACK終端0x3E0000まで0xFF000=1,044,480 B (255頁) だが、連続空きの保証ではない。
 案5の配置はDMA=0x7F0000/64KiB、PT26頁 (使用11)、guard=0x3FB000、kstack=0x3FC000から16KiB、shell=0x400000 (`include/memmap.h:64,247,271,297,307`)。後続の配置期待はこの基準から導出する。
 `kernel.bin`=390,340 B、`sqlite.bin`=374,968 B、`vmkernel.lz4`=502,027 B、508KiB上限まで **520,192−502,027=18,165 B**。T3受入時のSLACK free=236/busy=19、KHEAP peak=3,784 B、kstack peak=4,348 Bは観測範囲の値。各段で同構成のmap・圧縮長・最大連続空きを測り直す (§7-2)。
@@ -54,7 +54,7 @@ T2dのB1とT4のB3/B4を維持し、FEP追加は既存module/import生成入力�
 
 ### 1-2. 台帳から受けるIDと関門
 
-`docs/tasks/v3/DOCS_REORG_T3.md:24,51,74,89` から **X-11・E11-A2b・X-1の一部**を受ける。未実施/閉鎖の正典は `docs/tasks/DEFERRED_TESTS.md:61,62,64`。ここでは担当と判定先だけを固定し、証拠なしに閉じない。
+**X-11・E11-A2b・X-1の一部**を受ける (経緯: `docs/archive/v3/DOCS_REORG_T3.md:24,51,74,89`)。未実施/閉鎖の正典は `docs/tasks/DEFERRED_TESTS.md:61,62,64`。ここでは担当と判定先だけを固定し、証拠なしに閉じない。
 
 | ID | 本票の受け口・完了を判定する段 | 境界 |
 |---|---|---|

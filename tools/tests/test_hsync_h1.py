@@ -1,6 +1,6 @@
 """H1: hsync の「同サイズ更新の検出」を実物のソースで確かめる。
 
-票:   docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §8 の H1 行 / §9 の A01〜A13
+票:   docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §8 の H1 行 / §9 の A01〜A13
 記録: tools/tests/h1_tdd.md
 
 tools/tests/hsync_h1_host.c が userland/system/hsync.c を 1 行も写さず

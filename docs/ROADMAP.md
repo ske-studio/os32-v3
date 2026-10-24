@@ -266,7 +266,7 @@ v3 では timer interrupt を利用したプリエンプティブ寄りの multi
 計画は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (実装中)。策定時 (2026-09-17) は「v1.x のあいだは着手しない」としたが、
 **v2.1 で FD 起動・CD からの HDD インストール・HDD 起動・シリアル 115200・SerialFS (シリアル越しの `/host`)・PCI 列挙まで到達した**
 ([RELEASE_v2.1.md](RELEASE_v2.1.md) §1)。実機は**エミュレータが嘘をついている箇所を暴くため**に使う (役割が違うので両方を取る)。
-現在地と残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-09.md)、LAN の詳細は [82557 票](tasks/realhw/TASK_LAN_82557.md) を参照。当時の鍵だった「ホスト側のシリアル実装」は
+現在地と残件は [現行引き継ぎ §1](tasks/agents/HANDOVER_2026-10-25.md)、LAN の詳細は [82557 票](tasks/realhw/TASK_LAN_82557.md) を参照。当時の鍵だった「ホスト側のシリアル実装」は
 `tools/rshell_serial.py` と SerialFS で埋まった。
 
 **実機 LAN はオンボードの Intel 82557 を狙う** (ユーザー決裁 2026-09-17)。

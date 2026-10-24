@@ -1,6 +1,6 @@
 # app_band_pde — アプリ帯の可変 PDE 化 のホスト TDD
 
-対象票: [`docs/tasks/memory/APP_BAND_PDE.md`](../../docs/tasks/memory/APP_BAND_PDE.md)
+対象票: `docs/archive/v3/APP_BAND_PDE.md`
 実行: `make check-memory-host` / `python3 -B tools/tests/test_app_band_pde.py`
 三点セット: `app_band_pde_host.c` (検査本体) / `test_app_band_pde.py` (ビルドと実行) /
 このファイル (何を見ているか)。

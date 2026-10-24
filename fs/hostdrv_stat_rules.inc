@@ -1,7 +1,7 @@
 /* ========================================================================
  *  hostdrv_stat_rules.inc — hdrv_stat() の「成功と言ってよいか」の純規則
  *
- *  票: H1 (docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §2 / §4.3)
+ *  票: H1 (docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §2 / §4.3)
  *  ホスト試験: tools/tests/hsync_h1_host.c (A11)
  *
  *  直した点:

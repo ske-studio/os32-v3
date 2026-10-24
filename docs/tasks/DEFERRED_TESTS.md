@@ -1,6 +1,6 @@
 # 持越し台帳 — 延ばした試験・SKIP・ホストだけの合格・未結線
 
-> 状態: **現行 (2026-10-20)** — T7BB1-GUEST は閉鎖台帳へ (S3b の受入)。 — T5完了後の証拠照合。T4C1-CORE・T4C1-FD・T4B7-GUI・IMEDUP-1・E11-A2bは 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移した。未証拠の項目と実機の残件は下表に残す。
+> 状態: **現行 (2026-10-25)** — 2026-10-24 に BUILDDEP-1・MCPPUT-1・CI-FLAKY-1・T4B-CD を閉鎖台帳へ、LGY98-L12 は保守外 (TASK_TEST_TIDY)。T7BB1-GUEST は閉鎖台帳へ (S3b の受入)。 — T5完了後の証拠照合。T4C1-CORE・T4C1-FD・T4B7-GUI・IMEDUP-1・E11-A2bは 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移した。未証拠の項目と実機の残件は下表に残す。
 > 規則: **未完了だけを持つ**。終わった行は、証拠の所在を票に書いてから 閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) へ移す (**元の票がアーカイブ済みなら、証拠の所在は閉鎖台帳の行と、その作業をした今の票に書く** — アーカイブは書き換えない、ユーザー決定 2026-10-22)。実行ログを貼らない。同じ延期を票・引き継ぎ・memory に写さない。
 > ここに行が無い SKIP・未実行は合格に数えない ([ROLES §4](agents/ROLES.md))。FAIL・crash・timeout を延期に書き換えない。関門に着いたら、その関門の行を全部消すまで次へ進まない。
 
@@ -89,5 +89,5 @@
 
 `tools/tests/guest_tests.txt` (一括) と `tools/emu_agent/tasks/regress.txt` (6 項目) には `d0a_test`・`kout_test`・fault 系・STOP / park-resume・GUI 受入が無い。
 一覧を回しただけでは受入一式の代わりにならない — これらは段の受入で個別に回し、結果を票に 1 行書く。
-一覧への追加と「台帳に無い SKIP・未起動の必須試験を失敗にする」照合は [REVIEW_2026-10-06 §5 の b](agents/REVIEW_2026-10-06.md)。
+一覧への追加と「台帳に無い SKIP・未起動の必須試験を失敗にする」照合はまだ無い (経緯: 2026-10-06 の体制の見直しの残り b、`docs/archive/agents/REVIEW_2026-10-06.md`)。
 SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の S-1・S-4 だけ — ここに無い SKIP は延期ではない。

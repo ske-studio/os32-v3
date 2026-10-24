@@ -5,7 +5,7 @@ description: 段の実装 (または後片付け・ゲスト受入) を実装者
 
 # os32-delegate — 実装の依頼とレビューの依頼
 
-役の割り当ての正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) と [HANDOVER](../../../docs/tasks/agents/HANDOVER_2026-10-09.md) §2
+役の割り当ての正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) と [HANDOVER](../../../docs/tasks/agents/HANDOVER_2026-10-25.md) §2
 (2026-10-21 に通常の体制へ戻した: 実装 = Codex (既定 sol、難所は astra)、sol の差分 → astra、astra の実装・設計票 → Opus reviewer。一時体制 (Fable/Opus) は終了)。
 Codex は ROLES §2 の `codex exec` の形で起動する。**書き手とレビュアーは別のモデル。**
 

@@ -1,6 +1,6 @@
 # H1 ホスト TDD の記録 (hsync の同サイズ更新の検出)
 
-票 [docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md](../../docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md)
+票 `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md`
 §8 の H1 行 / §9 の A01〜A13。実行:
 
 ```

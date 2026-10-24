@@ -3,7 +3,7 @@
 > 発行: PM (Claude Code / Fable 5.1) (2026-09-15) / 状態: **受入完了 (2026-09-15)**
 > 実装済み・実機受入済み (`faa14df`、KAPI v52)。
 
-- 正典: [`HSYNC_IMPROVEMENT_PLAN.md`](../../tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) §5 (取得・保存)、§8 の **H3** 行
+- 正典: [`HSYNC_IMPROVEMENT_PLAN.md`](HSYNC_IMPROVEMENT_PLAN.md) §5 (取得・保存)、§8 の **H3** 行
 - 前提: [`TASK_H1.md`](TASK_H1.md) の着地 (内容比較と CRC 検証)。H2 とは独立
 
 ## 1. なぜ H1 と分けて、しかし先送りにしないか

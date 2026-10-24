@@ -111,7 +111,7 @@ STATIC_ASSERT((MEM_EXEC_LOAD_ADDR >> 22) == APP_BAND_PDE, exec_load_in_app_band)
 STATIC_ASSERT(((MEM_APP_BAND_TOP - 1) >> 22) == APP_BAND_PDE, app_band_top_in_pde);
 STATIC_ASSERT(MEM_SHLIB_END <= MEM_EXEC_LOAD_ADDR, shlib_band_below_exec);
 
-/* 可変 PDE 化 (票 docs/tasks/memory/APP_BAND_PDE.md)。帯は先頭 PDE から
+/* 可変 PDE 化 (票 docs/archive/v3/APP_BAND_PDE.md)。帯は先頭 PDE から
  * 連続 MEM_APP_BAND_MAX_PDES 枚まで伸びうる。次の 5 つが崩れると、
  * アプリ PD がカーネル帯やデバイス窓を差し替えて黙って壊れる。 */
 STATIC_ASSERT(MEM_APP_BAND_MAX_PDES >= 1, app_band_at_least_one_pde);

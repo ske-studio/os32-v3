@@ -20,7 +20,7 @@
 
 - **件数** (表明の数)。数え方が種類ごとに違う — C は `check()` / `CHECK()` の呼び出し数、
   Rust は `#[test]` の数、Python は `def test*` または `CASES` の長さ。合算に意味が無い。
-- **実行時間**。**1 本も計測していない**。ソースから読める重さの根拠だけは分かっていて、
+- **実行時間**。検査ごとの壁時計は `make check` が `build/out/check_times.tsv` に残す (2026-10-23 の全体検査で全本を計測、重い 4 本は 2026-10-24 の票 TASK_TEST_TIDY で 3,032→982 秒)。ソースから読める重さの根拠は、
   `check-cfg-host` / `check-db-errstr-host` / `check-install-recover-host` などは SQLite の amalgamation
   (`lib/sqlite3/sqlite3.c`、**267,757 行**) を**それぞれ独立に**毎回コンパイルする。
   `check-sqlite-groups-host` / `check-vfs-fd-sqlite-host` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。

@@ -1,6 +1,6 @@
 """B6: vfs_path_kind() が「読めなかったディレクトリ」をファイルと判定しない。
 
-票:   docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md (H1) / Codex 実装レビュー 往復 3 の B6
+票:   docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md (H1) / Codex 実装レビュー 往復 3 の B6
 記録: tools/tests/h1_tdd.md
 
 tools/tests/vfs_kind_host.c が実物の fs/vfs.c をそのまま #include し、

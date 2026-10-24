@@ -2,7 +2,7 @@
 
 > 発行: PM (Claude Code / Fable 5.1) (2026-09-15) / 状態: **受入完了 (2026-09-15)**
 
-- 正典: [`HSYNC_IMPROVEMENT_PLAN.md`](../../tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) — ユーザー起草。**設計判断はこの文書に従う**
+- 正典: [`HSYNC_IMPROVEMENT_PLAN.md`](HSYNC_IMPROVEMENT_PLAN.md) — ユーザー起草。**設計判断はこの文書に従う**
 - 段階: 計画 §8 の **H1**。H2 (一時ファイル・置換の安全化) / H3 (mtime) / H4 (manifest・世代) は別票
 
 ## 1. 背景

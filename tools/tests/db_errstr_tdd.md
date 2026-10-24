@@ -145,4 +145,4 @@ SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所
 | owned → errstr 障害注入 fixture | 8→8 | 6→6 | `test_public_owner`: 2 ガードそれぞれの削除・反転・TRUSTED 拒否。ほか寿命、回収順、prepare 置換 finalize 失敗、finalize 失敗、rollback 失敗、BUSY 隔離、open 失敗を保持 |
 
 v50 の残りは `API_CASES` に全登録し、回収順の本文検査も移管した。
-`check-db-caller-host` / `check-kapi-ranges` の内容・ケース・変異は変更しない。
+db-caller (2026-10-24 から群 `check-access-host` の中の test_db_caller.py) と `check-kapi-ranges-host` の内容・ケース・変異は変更しない。

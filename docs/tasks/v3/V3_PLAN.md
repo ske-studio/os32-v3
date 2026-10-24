@@ -2,7 +2,7 @@
 
 > 索引: v3 の段の票を並べる親 (子の票は `> 上位:` でここを指す)
 
-> 状態: **実装中 (2026-10-19)** — v3 の本案。草案 `docs/archive/v3/V3_PLAN_DRAFT.md` を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2・T3・T4・T5 は受入完了、T7 は受入完了・実機確認待ち (台帳 T7B-REALHW、2026-10-20)。詳細は T2 (`TASK_T2_APPBAND.md`)・[T3](TASK_T3_LAYOUT.md)・[T4〜T6b](TASK_T4_T6_MODULES.md)・[T7](TASK_T7_AND_FOLLOWUPS.md) の状態行を参照** (T2d〜h の経緯: `docs/archive/v3/TASK_T2D_T2H.md`)。
+> 状態: **実装中 (2026-10-19)** — v3 の本案。草案 `docs/archive/v3/V3_PLAN_DRAFT.md` を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2・T3・T4・T5 は受入完了、T7 は受入完了・実機確認待ち (台帳 T7B-REALHW、2026-10-20)。詳細は T2 (`TASK_T2_APPBAND.md`)・T3 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`)・[T4〜T6b](TASK_T4_T6_MODULES.md)・[T7](TASK_T7_AND_FOLLOWUPS.md) の状態行を参照** (T2d〜h の経緯: `docs/archive/v3/TASK_T2D_T2H.md`)。
 >
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。
 
@@ -52,9 +52,9 @@
 | 4 | **P3 → P5 の残り** (PCM の合成器、Trident 段 3〜5)、**P6** の実装 | — |
 | 5 | **v3 後半** (§5): P8 → P9、P10 の残り、GUI アプリ群 | — |
 
-T3以降の実装用詳細設計: [T3 配置](TASK_T3_LAYOUT.md)、[T4〜T6b モジュール・起動](TASK_T4_T6_MODULES.md)、[T7 低位・OpenType / P3〜P10 接続ゲート](TASK_T7_AND_FOLLOWUPS.md)。T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19)、T7 は設計中。各票の状態行を参照し、方針決定と実装・受入を区別する。
+T3以降の実装用詳細設計: T3 配置 (受入完了 2026-10-18、契約は 02_memory §2-1、経緯: `docs/archive/v3/TASK_T3_LAYOUT.md`)、[T4〜T6b モジュール・起動](TASK_T4_T6_MODULES.md)、[T7 低位・OpenType / P3〜P10 接続ゲート](TASK_T7_AND_FOLLOWUPS.md)。T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19)、T7 は設計中。各票の状態行を参照し、方針決定と実装・受入を区別する。
 
-T3 着手前の文書再整備の経過・残件は [DOCS_REORG_T3](DOCS_REORG_T3.md) の状態行を参照する。予算再計算の経緯: `docs/archive/v3/TASK_T2D_T2H.md` §6-1。
+T3 着手前の文書再整備は済み (経緯: `docs/archive/v3/DOCS_REORG_T3.md`)。予算再計算の経緯: `docs/archive/v3/TASK_T2D_T2H.md` §6-1。
 
 票の中の順序と受入は MEMMAP_V3 §6・§7 が正典。策定時の「1 と 2 を同時に動かさない」「アイデアを順序に割り込ませない」(PLAN §1・§6) は維持する。
 

@@ -20,7 +20,7 @@
 | h の V86/STOP 復元が未確定 | 要改訂 | 既存session/正確なPTE復元・通常文脈回収は `kernel/v86_mem.c:50-214`、`kernel/paging.c:656-687`。未観測は台帳に残し §1 で受ける |
 | T3→T4→T5-0→T5a→T5b→T5c→T7a→T7b | r6で更新 | T5-0はstack計測・KSTK-DF。engine stack 32KiB + NP 1頁で決定済み (深さ100のhost実測24,388Bが収まる、SQLITE_MAX_EXPR_DEPTH=100のまま、ユーザー決定2026-10-18)。T5bはcore FAT回帰とPOST_ROOT CD、登録核T5c-0をCDより前へ。FD容量不足時だけT6b-Mを先行。EARLY/HostDrv分離段は削除。集積拡張T6b-1/2は凍結し、圧縮像が508KiBの8割 (406.4KiB≈416kB) に近づいたら起票。T7はT5c-1のKCG facade/cache・T5c-3の原本/V86復帰口とT5最終一式を受ける (T6b-Mは不要) |
 | planar BB の旧低位 backing をpoolへ移す | 維持 | `include/memmap.h:122-123`、`kernel/memory_boot.c:208-220`。CLIENT/SURFACE契約は維持してbackingを替える |
-| Unicode の暫定RO leaseをT7まで残す可能性 | 要改訂 | 撤去はT3の組表/KAPI化と同時 (`DOCS_REORG_T3.md:60`)。T7aは撤去済みを照合する |
+| Unicode の暫定RO leaseをT7まで残す可能性 | 要改訂 | 撤去はT3の組表/KAPI化と同時 (経緯: `docs/archive/v3/DOCS_REORG_T3.md:60`)。T7aは撤去済みを照合する |
 | `.kcgfont` 廃止とKCGのpool cache (64KiBは計上値) | 維持 | 旧低位cache/boot読込は `drivers/kcg.c:41-44,196-203` に存続。T5c module化とT7a caller撤去の境界を照合 |
 | 旧font KAPIをNOSYSにする | 吸収済み | boot終了後のNOSYSは `drivers/kcg.c:188-203`。T7aはboot読込も撤去し旧slotのNOSYSを保つ |
 | CUI表示復帰と両ページ消去 | 吸収済み | `kernel/v86_io.c:238-271`、`gfx/gfx_core.c:899-912` とT2受入。KCG CODE/cache、6Ah標準/拡張、CG窓WBの残件とは別 |
@@ -42,7 +42,7 @@ T7への引渡しはT5c-1のKCG facade (`kernel/kcg_module.c`)・ROM/cache (`ker
 
 ## 1. T7a 低位の所有権切替
 
-**台帳から受けるID** (`DOCS_REORG_T3.md:25,51,74`、正典 `docs/tasks/DEFERRED_TESTS.md:25,68,71,73,92`)。台帳の本文・進捗は複製せず、閉鎖証拠の受け口だけを定める。
+**台帳から受けるID** (正典 `docs/tasks/DEFERRED_TESTS.md:25,68,71,73,92`、経緯: `docs/archive/v3/DOCS_REORG_T3.md:25,51,74`)。台帳の本文・進捗は複製せず、閉鎖証拠の受け口だけを定める。
 
 | ID | 本票の関門 |
 |---|---|

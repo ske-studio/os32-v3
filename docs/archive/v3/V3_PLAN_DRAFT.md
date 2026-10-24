@@ -53,7 +53,7 @@
 | [TASK_LAN_82557.md](../../tasks/realhw/TASK_LAN_82557.md) | 実装中 (L-A・L-D 着地、次は L-B) | 内蔵 82557 で Host Services。L-A PCI 列挙 (KAPI v58) 済み、R1〜R4 実機で取得 (irq 3、io 0x6000)。L-B (10〜15KB) は静的で入れる決裁 (b)。L-C NIC 境界、L-E 疎通 | **v3** (§3 P5 の最初)。§1 の予算行 (442.6KB/468KB) は古い (§4 D2) |
 | [TASK_PEGC480_REALHW.md](../../tasks/realhw/TASK_PEGC480_REALHW.md) | 受入完了・実機確認待ち (GUI の目視) | Ra266 の PEGC 640x480。実機 ROM の OUT 列に合わせた。v2.1 に同梱 | **並行** (目視だけ) |
 | [TASK_FD144.md](../../tasks/realhw/TASK_FD144.md) | 受入完了・実機確認待ち | 1.44MB FD 起動 (エミュレータ合格)。D88 の 1.44MB は未対応 | **並行** |
-| [memory/APP_BAND_PDE.md](../../tasks/memory/APP_BAND_PDE.md) | 受入待ち (§5 のゲスト受入が未記録) | アプリ帯の可変 PDE 化 (1〜2 枚、0x400000〜0xBFFFFF、天井は PEGC 窓 0xF00000)。実装 `b8dab24` は v2.1 に同梱。4-B: 8MB 構成の EXEC_DYN_RESERVE の重なりは既存のまま | **並行** (§5 受入を先に閉じる — PLAN §4「受入していない土台の上に見直しを積まない」) + **討論の論点** (§3-1 M4) |
+| [memory/APP_BAND_PDE.md](APP_BAND_PDE.md) | 受入待ち (§5 のゲスト受入が未記録) | アプリ帯の可変 PDE 化 (1〜2 枚、0x400000〜0xBFFFFF、天井は PEGC 窓 0xF00000)。実装 `b8dab24` は v2.1 に同梱。4-B: 8MB 構成の EXEC_DYN_RESERVE の重なりは既存のまま | **並行** (§5 受入を先に閉じる — PLAN §4「受入していない土台の上に見直しを積まない」) + **討論の論点** (§3-1 M4) |
 | [gui/TASK_KBD_NAV.md](../../tasks/gui/TASK_KBD_NAV.md) | 受入完了・実機確認待ち (K3、カナ) | キーボードだけで GUI を操作 (Win98 の割り当て)。`libos32ui` (microUI) にはマウスキーが届かない (RELEASE §6) | **並行** (K3) + **v3 後半** (microUI の扱い、§3 P8) |
 
 ### 1-5. 移植性・アーキテクチャ (v3 の前提を縛るもの)

@@ -1,7 +1,7 @@
 /* =========================================================================
  *  HSYNC_H1_HOST.C — 票 H1 (同サイズ更新の検出) を **実物のソースで** 確かめる
  *
- *  対象票: docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §9 の A01〜A13
+ *  対象票: docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §9 の A01〜A13
  *  実行:   python3 -B tools/tests/test_hsync_h1.py [--target]
  *  記録:   tools/tests/h1_tdd.md
  *

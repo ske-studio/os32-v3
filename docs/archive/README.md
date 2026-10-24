@@ -20,7 +20,7 @@
 | `settings/` | 設定レジストリの受入完了票 (S2 / S3 / S3I2 / S4 / S5、2026-09-29 に S0 / S6 / S6P と S0 の計画・基盤設計を追加) |
 | `network/` | Host Services の票 (N0〜N4) |
 | `kernel_v2/` | カーネル 2.0 の完了記録 8 本 |
-| `shell/` | hsync H1〜H4・B8 (FS_TYPE)・シェルの切り詰め・終了コードの票 7 本 (2026-09-29 に移動) |
+| `shell/` | hsync H1〜H4・B8 (FS_TYPE)・シェルの切り詰め・終了コードの票 7 本 (2026-09-29 に移動)、親の計画 HSYNC_IMPROVEMENT_PLAN (2026-10-25) |
 | `test/` | ゲスト試験ランナー 3 段 (FSTAT_REDIR / TEST_RESULT / TEST_RUNNER) |
 | `tools/` | キー注入 (KEY_INJECT)・変異試験の並列化 (CHECK_MUT_PARALLEL) |
 | `kernel_v21/` | v2.1 までに直したカーネル層の不具合の票 6 本 (KSTACK_USER / EXT2_EMPTY_NAME / KAPI_DATA_FIELDS / VFS_FD_PATH / KAPI_OUTPUT_GUARD / DB_ERRSTR) |
@@ -31,8 +31,9 @@
 | `portability/` | kstring の速度実測 (TASK_KSTRING_BENCH)、N1 の移植性調査 (SURVEY_N1)。32 ビット限定方針の正典 ARM_GAUGE は `tasks/portability/` に残る |
 | `arch_port/` | 別リポジトリ `pw-sh4-research` の調査の快照 (索引・Brain i.MX28・M0 監査)。未対処所見も原文のまま保持 |
 | `v4/` | V4_GAME_PLATFORM_DRAFT (v3 対象外の草案)。ROADMAP・V3_PLAN からの参照を維持 |
-| `v3/` | v3 で受入完了・完了記録になった票 (2026-10-02): T0 の TASK_C11_MIGRATION、TASK_CLANG_CHECKS、TASK_EXT2_ERRORS_INVESTIGATION、T1 の TASK_T1_LEDGER、策定時の PLAN・U6_PENDING_REVIEW・V3_PLAN_DRAFT、TASK_T2D_T2H から切り出した T2d の結果 (TASK_T2D_RESULTS)、TASK_T2_APPBAND §5-1 から切り出した T2a〜T2c の結果 (TASK_T2ABC_RESULTS)。MEMMAP の §11 の経緯 (TASK_MEMMAP_V3_RESULTS)、HAL の §3-1 の受入記録 (TASK_HAL_WIRING_RESULTS)、PCM の実装記録 (TASK_PCM_CS4231_RESULTS)。2026-10-22 に T3ab の段の票 8 本 (`t3ab/`、A〜G と索引の README、受入完了 2026-10-17、残件は台帳 T3AB-R1)。2026-10-22 に TASK_T2D_T2H (T2d〜T2h の詳細設計、受入完了 2026-10-16。約束の節は 09_exec・KAPI_SPEC §4-10・decisions/MEMMAP_V3 §7 へ移し、ゲストの受入の contract は現行の正典を指す)。進行中・受入待ちの v3 票 (V3_PLAN・T2_APPBAND・T3 以降・HAL_WIRING・PCM_CS4231 など) は `tasks/v3/` に残る |
-| `agents/` | 引き継ぎ (HANDOVER_v14 / 2026-09-16 / 09-18 / 09-22 / 09-29)・体制の快照 (RETROSPECTIVE_2026-09-09)・Hermes の最上位プロンプト (SOUL.md、撤収済み・効力なし) |
+| `v3/` | v3 で受入完了・完了記録になった票 (2026-10-02): T0 の TASK_C11_MIGRATION、TASK_CLANG_CHECKS、TASK_EXT2_ERRORS_INVESTIGATION、T1 の TASK_T1_LEDGER、策定時の PLAN・U6_PENDING_REVIEW・V3_PLAN_DRAFT、TASK_T2D_T2H から切り出した T2d の結果 (TASK_T2D_RESULTS)、TASK_T2_APPBAND §5-1 から切り出した T2a〜T2c の結果 (TASK_T2ABC_RESULTS)。MEMMAP の §11 の経緯 (TASK_MEMMAP_V3_RESULTS)、HAL の §3-1 の受入記録 (TASK_HAL_WIRING_RESULTS)、PCM の実装記録 (TASK_PCM_CS4231_RESULTS)。2026-10-22 に T3ab の段の票 8 本 (`t3ab/`、A〜G と索引の README、受入完了 2026-10-17、残件は台帳 T3AB-R1)。2026-10-22 に TASK_T2D_T2H (T2d〜T2h の詳細設計、受入完了 2026-10-16。約束の節は 09_exec・KAPI_SPEC §4-10・decisions/MEMMAP_V3 §7 へ移し、ゲストの受入の contract は現行の正典を指す)。2026-10-25 に T3 の票 TASK_T3_LAYOUT (受入完了 2026-10-18、契約は 02_memory §2-1) と補遺 T3D1_UNICODE_FILE (契約は KAPI_SPEC §4-13)、T3 前の文書整理の計画 DOCS_REORG_T3、完了記録 APP_BAND_PDE (元 `tasks/memory/`)。進行中・受入待ちの v3 票 (V3_PLAN・T2_APPBAND・T3 以降・HAL_WIRING・PCM_CS4231 など) は `tasks/v3/` に残る |
+| `realhw_v3/` | v3 で受入完了した実機の票 (2026-10-25: TASK_FDRECOV — FD 起動から LAN で HDD 一式を復旧、受入完了 2026-10-17) |
+| `agents/` | 引き継ぎ (HANDOVER_v14 / 2026-09-16 / 09-18 / 09-22 / 09-29 / 10-06 / 10-08 / 10-09)・反省会の記録 (REVIEW_2026-10-06 / 10-14、2026-10-25 に移動)・体制の快照 (RETROSPECTIVE_2026-09-09)・Hermes の最上位プロンプト (SOUL.md、撤収済み・効力なし) |
 | 直下 | 領域に属さない単発の記録 (`REFACTORING_PLAN.md` `ROADMAP_v1.0.md` `TEST_INVENTORY_2026-09-14.md` `debug_kcg_load_font.md`) |
 
 **現行の計画・設計・契約・仕様と、その入口になる索引は残す。**

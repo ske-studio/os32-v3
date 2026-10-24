@@ -41,7 +41,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 | M4a 持ち主と世代の照合 | 中 / astra | v1 の拒否判定 (起動ディスクの IDE・LAN が使用中なら断る、未分類も断る)、古い世代の部品を使い回さない | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M4b 解放と失敗の経路・回帰 | 中 / astra | PAUSED の保持と中止・外からの recover now・二重の終端・開始途中の失敗・cold の後の再登録で宙に浮く参照なし、FAILED/cold 不変 | main (3bd99c9、2026-10-23、M4a と M4b を同じ作業木で順に実装) — S0 の最小 GF 復帰は独立経路を作らず HWDEV_DESIGN §6 を訂正 (設計者が決めたこと 4 件は HWDEV_DESIGN 末尾) |
 | M5 配備定義・計測・既存試験の追随 | 軽〜中 / sol | 核の像 ≤192KiB、両方の mem 上限、KDEBUG=0/1、既存 trace 一致 | main (067da15、2026-10-23) — hwdev.mod を KERNEL_PAIRED_MODULES・core・R1 版・世代表の依存へ、起動 FD からは kdebug.bin と同じく除外 (PM 決定)、GF 8 オブジェクト名は hwdev.mk の HWDEV_GF だけ。NP21/W で NOT_FOUND が消え hwdev の handle を得た (`~/os32-tmp/evidence/2026-10-23/m5_np21w/RESULT.md`) |
-| 旧 S7 (shell、private wire) | 中 / sol | 固定 40B の wire と shell (KAPI は変えない、GF6200_S7_SHELL) | 未 (`userland/shell/cmd_gfinit.c` は無い。§3-1 で wire の置き場を見直す) |
+| 旧 S7 (shell、private wire) | 中 / sol | 固定 40B の wire と shell (KAPI は変えない、GF6200_S7_SHELL) | main (S7a・S7c 9d9a8ad、2026-10-23、private な `kdebug/gfinit_wire.h`)。実機の S7b は合格 |
 | T4b (NP21/W) | 中 / astra | PAUSED と復帰の結合、拒否・復帰の trace | **合格** (2026-10-23、TASK_REALHW_RECOVER の T4b-1〜11 — 31kHz は CRT31K、`now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障・送信詰まり・終端不着、隔離像の巻戻し) — `~/os32-tmp/evidence/2026-10-23/recover_t4b/RESULT.md` |
 | T5 → S8 (A1 → A2) → main 0〜3 → A4 → T6・T7 | 重 / astra | 各段の既定の受入、物理操作と各書込みの承認はユーザー | T5 の無書込みは合格 (TASK_REALHW_RECOVER の T5 行)。S8 はユーザーの立会いの日時待ち (台本 `tools/accept/gf_s8.md`、承認 3 つ: A1・A2・route-test)。main 0〜3 以降は未 |
 

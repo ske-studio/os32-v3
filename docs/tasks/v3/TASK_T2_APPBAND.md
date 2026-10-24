@@ -1,7 +1,7 @@
 # TASK_T2_APPBAND — T2: アプリ帯 + lease 窓 (設計票)
 
 > 上位: [V3_PLAN](V3_PLAN.md)
-> 後続: [TASK_T3_LAYOUT](TASK_T3_LAYOUT.md)
+> 後続: TASK_T3_LAYOUT (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`)
 
 > 状態: **受入完了 (2026-10-16)** — T2a〜T2h は受入済み。残件は [持越し台帳](../DEFERRED_TESTS.md)。a〜c の証拠と d〜h の経緯の記録はアーカイブ (`docs/archive/v3/TASK_T2ABC_RESULTS.md`、`docs/archive/v3/TASK_T2D_T2H.md`)。構成別の未実施分まで合格とはしない。
 >
@@ -63,8 +63,8 @@ T3 票へ渡す物理境界 (半開区間。固定 PD/PT 以外の最終配置�
 
 | 範囲 | T2a′ の占有・属性 | T3 の引継ぎ |
 |---|---|---|
-| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 (**2026-10-16 注**: 最終地図は案 5 で改めた — DMA は 0x7F0000、0x3E0000〜0x3FFFFF は見張り・PT の枠・見張り・スタック。正は [MEMMAP_V3 §2-1](../../decisions/MEMMAP_V3.md) と [T3 §2-2](TASK_T3_LAYOUT.md)) |
-| [0x3F1000,0x3FB000) | 固定PD/PT 10枚、sup/RW/WB、恒久FIXED | 案5では 0x3E1000 起点・26枚枠・使用11枚へ変更。現行定義は `include/memmap.h:305`、配置・属性は [T3 §2-2](TASK_T3_LAYOUT.md#2-2-固定領域とページング) |
+| [0x380000,0x3F1000) | 常駐shell exec_heap、452KiB、sup/RW/WB | shellを0x400000へ移して解放し、最終地図の鎖/SLACK・DMA [0x3E0000,0x3F0000)・NP guard [0x3F0000,0x3F1000)へ分割 (**2026-10-16 注**: 最終地図は案 5 で改めた — DMA は 0x7F0000、0x3E0000〜0x3FFFFF は見張り・PT の枠・見張り・スタック。正は [MEMMAP_V3 §2-1](../../decisions/MEMMAP_V3.md) と T3 §2-2 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`)) |
+| [0x3F1000,0x3FB000) | 固定PD/PT 10枚、sup/RW/WB、恒久FIXED | 案5では 0x3E1000 起点・26枚枠・使用11枚へ変更。現行定義は `include/memmap.h:305`、配置・属性は T3 §2-2 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`) |
 | [0x3FB000,0x400000) | 未使用20KiB、恒久FIXED・NP | guard [0x3FB000,0x3FC000) と kstack [0x3FC000,0x400000)へ。T2ではstackを動かさない |
 | [0x400000,0x500000) | T2c以後は物理池の一部 | 常駐shellの新しい1箱。MEM_POOL_BASEを0x500000へ変更 |
 
@@ -374,7 +374,7 @@ T1 §4-0 と同じ道具を使う。実施は後日PM/テスター、今回の�
 1. L0は4MB未満RESERVEDを維持。`memory_boot_fixed` の現shell全域 `[0x300000,0x400000)` のFIXED行を **[0x300000,0x3F1000) / [0x3F1000,0x3FB000) / [0x3FB000,0x400000)** の3行に分割する。全てowner=kernel、WB、PERMANENT (既存の登録処理で付与)、中央をPD/PT専用として識別。SQLiteからDMA直前のFIXED行は変えない。重複登録・pool確保・workspace流用をせず、L1/L2配布対象外を検査する。2行増える台帳容量も8MB FIXED型/ARENA_TOP型で確認。
 2. `kentry` は画像とSQLiteのBSSだけをclearし、従来のkstackへ切替えて `kernel_main` へ進む。固定PD/PTはBSS外なのでこのclearに頼らない。`kernel.c:262`・`:292` は既に `_enable()` を行い、`:506` の `paging_init` **入口IF=0は前提にできない**。`paging_init` 内で `irq_save()` → 一度だけ初期化するガードの確認 → PG=0で固定10枚を明示ゼロ化/構築 → 下記写像検証 → CR3/PG有効化 → `pg_enabled=1` → `irq_restore(saved)` とする。再呼出しの早期return・PG有効化前の失敗出口でも入口IFを復元し、live AS/動的PTを再初期化しない。構築中は割込み依存のI/Oやcallbackを呼ばない。PG前の物理アクセスは `P2V_BOOT`、PG後の恒等pointerは `P2V`、PDE/CR3へは `V2P` [C5]。固定領域は絶対定数/リンカシンボルとし、大きなBSS/NOLOADを作らない。
 3. 現 `paging.c:309` は `[0x380000,0x400000)` 全域をshell exec_heapとしてpresentに保つ。これを縮小heap・固定PD/PT・残余NPへ分割する。既存カーネル予約域NP化 (`:291`) に加え、切り離した末尾 `[MEM_SHELL_HEAP_END,MEM_SHELL_BAND_END+1)` を一旦NP化し、**全NP化の後に固定10枚を恒等sup/RW/WBで明示再写像**する。残余20KiBはNPのまま。範囲APIの終端規約 (NP化はinclusive、mapはexclusive) に合わせる。DMA/kstack/SQLite/縮小shell heapとguardの属性を確認してから CR3=V2P(master PD) → CR0.PG、固定10枚のaliasがpresentになった後で入口IFを復元。写像失敗はPGを立てずboot失敗。T1 FIXED metadataは別途後段の `paging_map_ledger_backing` で有効化する。
-4. 32MB超のmaster動的PTはT1 workspaceから供給し、固定10枚と会計を分離。ASは低位backingをsupervisorで共有し、private PD/PTの解放で固定領域を返さない。T2当時は10枚。T3の配置・初期化は [T3 §2-2](TASK_T3_LAYOUT.md#2-2-固定領域とページング) に従う (案5へ移行済み)。
+4. 32MB超のmaster動的PTはT1 workspaceから供給し、固定10枚と会計を分離。ASは低位backingをsupervisorで共有し、private PD/PTの解放で固定領域を返さない。T2当時は10枚。T3の配置・初期化は T3 §2-2 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`) に従う (案5へ移行済み)。
 
 **リンカ・地図・実動作を一組にする**:
 

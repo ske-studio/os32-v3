@@ -178,7 +178,7 @@ int paging_pte_restore(u32 virt_addr, u32 raw);
  * 共有ライブラリ帯域 (0x80000000-0x800FFFFF)・プログラム本体
  * (MEM_EXEC_LOAD_ADDR 0x80100000-)・ヒープ・ユーザスタックがここから載る。
  *
- * 2026-09-10 (票 docs/tasks/memory/APP_BAND_PDE.md): アプリ固有 PDE は
+ * 2026-09-10 (票 docs/archive/v3/APP_BAND_PDE.md): アプリ固有 PDE は
  * 1 枚固定ではなく [APP_BAND_PDE, APP_BAND_PDE + count) の連続 count 枚。
  * count は 1〜MEM_APP_BAND_MAX_PDES で、要求量に応じて exec が決める。
  * 整合は kernel/paging.c の STATIC_ASSERT が検査する。 */

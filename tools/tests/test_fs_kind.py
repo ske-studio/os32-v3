@@ -1,6 +1,6 @@
 """B5: シェルの種別判定が「列挙の成否」を使わないこと / cp -r の宛先階層。
 
-票:   docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md (H1) / Codex 実装レビュー 往復 3 の B5
+票:   docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md (H1) / Codex 実装レビュー 往復 3 の B5
 記録: tools/tests/h1_tdd.md
 
 tools/tests/fs_kind_host.c が実物の userland/shell/cmd_fs_shared.c と

@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)
 
-> 状態: **実装中 (2026-10-23)** — 段 0〜3 は観測済み。段 4a は S1〜S6 が main (S6 は 59ba733)、GeForce の部分は HWDEV の分離 (M3c 92153ea) で `/boot/hwdev.mod` へ移った。S7 以降は未着手で、順序は `TASK_HWDEV` §3-1 (2026-10-23 の見直し)。**A1 は今のコードのままでは Ra266 で必ず断られる** (他装置の BAR の長さ、同 §3-1 の BARLEN)。実機の書込みは段ごとにユーザー承認・立会い。
+> 状態: **実装中 (2026-10-25)** — 段 0〜3 は観測済み。段 4a は S1〜S6 が main (S6 は 59ba733)、GeForce の部分は HWDEV の分離 (M3c 92153ea) で `/boot/hwdev.mod` へ移った。S7 (shell の `gfinit`、S7a・S7c、実機の S7b は合格) と BARLEN (他装置の BAR の長さ) も main。次は S8 (実機の立会い、台本 `tools/accept/gf_s8.md`)、順序は `TASK_HWDEV` §3-1。実機の書込みは段ごとにユーザー承認・立会い。
 
 ## 0. ユーザー決定 (2026-10-20)
 
@@ -129,5 +129,5 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - 実装: checked REC・試行op・session/phase・cleanup・RUN_ONE・A4、private imports末尾追加。決定は[追記](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md#4a-s6-の実装で設計者が決めたこと-2026-10-21)。
 - S5のCR1F読書値・cleanup順・負のbus試験、S3の60秒/poll境界を反映。
 - 検証証拠: `/home/hight/os32-tmp/run/gf4a_s6/`（最終結果は実装報告）。
-- 未確認: NP21/W・実機は未実施、S7の公開入口とS8以降の承認・立会いを維持。
+- 未確認 (S6 の時点): NP21/W・実機は未実施、S7の公開入口とS8以降の承認・立会いを維持。→ S7 は 2026-10-23 に main (9d9a8ad)、実機の S7b も合格。
 - A1前提: 他装置の有効memory BAR/ROM長が不明なら書込み前に拒否、実機の長さ根拠をPMが揃える。→ 2026-10-23 に基準構成の生データで照合: Trident 0:8.0 と 82557 0:11.0 が拒否に当たる。根拠の設計は `TASK_HWDEV` §3-1 の BARLEN。

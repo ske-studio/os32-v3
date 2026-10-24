@@ -1,6 +1,6 @@
 # H1 — `hdrv_list_dir()` の列挙ループ (ホスト試験の記録)
 
-- 票: [`docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md`](../../docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md)
+- 票: `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md`
   §8 の H1 行 — 完了条件「I/O 失敗を成功にしない」/ 対象「HostDrv のエラー処理」
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_hostdrv_list.py [--target]`

@@ -1,7 +1,7 @@
 """H3: mtime の取得・保存と、日時を前置フィルタにした同一判定。
 
 票:   docs/archive/shell/TASK_H3.md §6 / §8
-      docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §5 / §7.2 / §9 の A03 A04 A16
+      docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §5 / §7.2 / §9 の A03 A04 A16
 記録: tools/tests/h3_tdd.md
 
 tools/tests/hsync_h3_host.c が userland/system/hsync.c を 1 行も写さず

@@ -3,7 +3,7 @@
 > 発行: PM (Claude Code `claude-opus-5`、2026-09-16) / 状態: **受入完了 (2026-09-16、設計 3 往復 + 実装レビュー Approve、実機受入済み)**
 
 基点: `feat/gui` = `d191fd5`。
-計画の正典: [`HSYNC_IMPROVEMENT_PLAN.md`](../../tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) §6 (手順と保証の限界)、§8 (H2 の行)、§9 (A14 / A15 / A17)。
+計画の正典: [`HSYNC_IMPROVEMENT_PLAN.md`](HSYNC_IMPROVEMENT_PLAN.md) §6 (手順と保証の限界)、§8 (H2 の行)、§9 (A14 / A15 / A17)。
 引き継ぎ: [`../agents/HANDOVER_2026-09-16.md`](../agents/HANDOVER_2026-09-16.md) §3。
 前提の票: [`TASK_H1.md`](TASK_H1.md) (内容比較・CRC 読戻し)、[`TASK_H3.md`](TASK_H3.md) (mtime)、
 [`TASK_FS_TYPE.md`](TASK_FS_TYPE.md) (B8: 読めなかったを無いと読まない、ext2 の書き込み順序)。

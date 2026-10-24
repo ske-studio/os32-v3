@@ -3,7 +3,7 @@
  *                    **実物のソースで** 確かめる
  *
  *  対象票: docs/archive/shell/TASK_H3.md §6 / §8
- *          docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §5 / §7.2 / §9 の A03 A04 A16
+ *          docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §5 / §7.2 / §9 の A03 A04 A16
  *  実行:   python3 -B tools/tests/test_hsync_h3.py [--target]
  *  記録:   tools/tests/h3_tdd.md
  *

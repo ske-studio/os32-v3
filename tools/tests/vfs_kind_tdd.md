@@ -1,6 +1,6 @@
 # B6 / B7 — `vfs_path_kind()` と、それを消費する `vfs_open()` (ホスト試験の記録)
 
-- 票: [`docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md`](../../docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md)
+- 票: `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md`
   (票 H1) / Codex 実装レビュー 往復 3 の **B6**、往復 4 の **B7**。退行が入ったのは `d574704`
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_vfs_kind.py [--target]`

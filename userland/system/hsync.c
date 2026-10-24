@@ -19,7 +19,7 @@
 /*    hsync --root /hd0 boot — /host/boot/ → /hd0/boot/ (同期先の根を替える) */
 /*                                                                          */
 /*  **同一判定は「サイズ + 内容のバイト比較」** (票 H1、設計書              */
-/*  docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md §1 / §3.1)。                 */
+/*  docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §1 / §3.1)。                 */
 /*  以前はサイズが同じなら中身を見ずにスキップしていたので、長さを変えずに   */
 /*  ヘッダだけ変わった shlib (2026-09-14 の libos32gui.shlib) が更新されず、 */
 /*  「配備したのに古いまま」が起きた。                                      */

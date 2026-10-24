@@ -566,7 +566,7 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 
 | ID | 何を残したか | 理由 | 次の関門 |
 |---|---|---|---|
-| FDRECOV-1 | FD 起動から LAN で HDD を直す経路 ([TASK_FDRECOV](../../tasks/realhw/TASK_FDRECOV.md)) の**実機の部分**: 82557 の初期化 → シリアル操作 → auto peer の LAN 転送 → 最小インストールなしで HDD 再起動、必要時の明示 peer、wrong peer / ケーブル抜けからの再試行 | 実装 1611c76・39ee7dd (main 3dd05eb) は NP21/W で受入済み (2026-10-17、7 項合格: 新旧 FD の復旧・世代の門・FD 無書込み・書込み禁止の文言、`~/os32-tmp/evidence/2026-10-17/fdrecov_np21w/RESULT.md`)。NP21/W は 82557 を再現しない | 次にノートで実機を回すとき (立会い不要) |
+| FDRECOV-1 | FD 起動から LAN で HDD を直す経路 ([TASK_FDRECOV](../realhw_v3/TASK_FDRECOV.md)) の**実機の部分**: 82557 の初期化 → シリアル操作 → auto peer の LAN 転送 → 最小インストールなしで HDD 再起動、必要時の明示 peer、wrong peer / ケーブル抜けからの再試行 | 実装 1611c76・39ee7dd (main 3dd05eb) は NP21/W で受入済み (2026-10-17、7 項合格: 新旧 FD の復旧・世代の門・FD 無書込み・書込み禁止の文言、`~/os32-tmp/evidence/2026-10-17/fdrecov_np21w/RESULT.md`)。NP21/W は 82557 を再現しない | 次にノートで実機を回すとき (立会い不要) |
 
 閉鎖 (2026-10-17、FDWP-1 を main 7c54bd9 で直した: FDC の NW を STA_PROTECT として FatFs に伝え、書込み系の失敗でボリュームをマウントし直して汚れた窓を捨てる。NP21/W の受入 4 項に合格、証拠 `~/os32-tmp/evidence/2026-10-17/fdwp_np21w/RESULT.md`)
 

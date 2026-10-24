@@ -1,6 +1,6 @@
 # TASK_T2D_T2H — T2d〜T2h 詳細設計
 
-> 状態: **受入完了 (2026-10-16)** — T2d〜T2h は受入済み。次のゲスト受入の関門 (8 行) は 2026-10-16 に閉じた (5 行 PASS、E9-1・E11-9 は H-7 へ、H-2 は (3) だけ後続へ — 台帳と閉鎖台帳)。§5-4 (STOP のユーザー決定)・§11・§12 は契約・方針として残す。それまでの状態: **実装中 (2026-10-13)** — T2d〜T2g は受入済み、T2h は L-h 着地・受入 R0〜R7 一巡 (§5-1)。残りは h9 の締め (台帳の閉/渡/持)。現在地は [HANDOVER](../../tasks/agents/HANDOVER_2026-10-09.md)
+> 状態: **受入完了 (2026-10-16)** — T2d〜T2h は受入済み。次のゲスト受入の関門 (8 行) は 2026-10-16 に閉じた (5 行 PASS、E9-1・E11-9 は H-7 へ、H-2 は (3) だけ後続へ — 台帳と閉鎖台帳)。§5-4 (STOP のユーザー決定)・§11・§12 は契約・方針として残す。それまでの状態: **実装中 (2026-10-13)** — T2d〜T2g は受入済み、T2h は L-h 着地・受入 R0〜R7 一巡 (§5-1)。残りは h9 の締め (台帳の閉/渡/持)。現在地は [HANDOVER](../agents/HANDOVER_2026-10-09.md)
 > それまでの状態: 設計中 (2026-10-01) — 独立レビュー Opus 5.5 は 1 回目 Request changes (P1 2件 / P2 11件 / P3 8件) → 反映 → 2 回目 Approve (P3 5件は §11 の実装時の注記)。
 > 作成: GPT-6 / Codex。調査基点: main / docs/t2d-h-design 共通 **9ae6073406c2027fd50938e3870a3fb3888cd7f6**。
 > **実行記録は 2026-10-06 に `docs/archive/v3/TASK_T2D_T2H_RECORDS.md` へ移した** (この票は契約・分割・受入条件・未実施の手順だけ)。延ばした試験と未実施は [DEFERRED_TESTS.md](../../tasks/DEFERRED_TESTS.md) が正。段の記録は 1 段 10 行以内で書く ([ROLES §0](../../tasks/agents/ROLES.md))。
@@ -145,7 +145,7 @@ SDK gfxのC静的側とshlib側の両方で、待ち/yield/resumeから戻るた
 
 Unicodeはkernel所有FIXED_RAM/RO SURFACE。ユーザー版utf8だけsetterでlease pointerを受け、CRTとshlib初期化の双方が取得/終了解除する。kernel版は恒等のまま。既知JIS対照は維持、取得失敗時はpointerをNULL、`jis_table_ready=0`にしてCRT/shlib初期化を続け、未ready時の既存代替表示を使う。未初期化/古い表は読まず、低位直読へ戻さない。T3のKAPI化でこの橋を撤去する (§7)。フォントはkcg_read系を使いfont帯全USERを消す。
 
-`kcg_load_font`のLZ4 scratch (`drivers/kcg.c:215`、Unicode起点から最大344KiB)はUnicode表とplanar BBを重ねる。公開口を残したままeを受け入れると正規KAPIからSURFACEを破壊できるため、[T3 §3](../../tasks/v3/TASK_T3_LAYOUT.md)の**boot後NOSYS化をe8bへ前倒し**する。D7は変更しない。boot内部読込だけを許し、scratch失効→Unicode表構築/検証→BB・mailbox初期化→SURFACE公開→通常ASの順を固定する。bootフェーズ終了後はTRUSTEDを含む全経路でNOSYS・VFS進入/書込みなし。公開KAPI slotは残し説明と版をeの一式で更新する。`font_load_test`はNOSYS期待の成功試験へ変更し、
+`kcg_load_font`のLZ4 scratch (`drivers/kcg.c:215`、Unicode起点から最大344KiB)はUnicode表とplanar BBを重ねる。公開口を残したままeを受け入れると正規KAPIからSURFACEを破壊できるため、[T3 §3](TASK_T3_LAYOUT.md)の**boot後NOSYS化をe8bへ前倒し**する。D7は変更しない。boot内部読込だけを許し、scratch失効→Unicode表構築/検証→BB・mailbox初期化→SURFACE公開→通常ASの順を固定する。bootフェーズ終了後はTRUSTEDを含む全経路でNOSYS・VFS進入/書込みなし。公開KAPI slotは残し説明と版をeの一式で更新する。`font_load_test`はNOSYS期待の成功試験へ変更し、
 guest台本/host成功経路期待も同時更新。表/BB/mailbox不変はkselftest/host観測で確認し、受入から除外しない。scratch定数の整理とUnicode KAPI化はT3に残す。
 
 ### 2-4. USER切替の一括境界
@@ -543,7 +543,7 @@ T2e 変異対応表 (アーカイブ: `docs/archive/v3/T2E_MUTANTS.md`)。既存
 
 | 次の票 | T2から渡すもの / T2でしないこと |
 |---|---|
-| [T3配置](../../tasks/v3/TASK_T3_LAYOUT.md) | 高位AS、画像外固定10枚、private map/owner診断、resident CRT分離。shell再配置/SLACK/metadata移動はT3。固定PTを再移設しない。Unicode RO leaseはT3の全caller KAPI化と同時に廃止。kcg boot後NOSYS/試験変更はe8bへ前倒し、T3は継承検証とscratch定数整理 |
+| [T3配置](TASK_T3_LAYOUT.md) | 高位AS、画像外固定10枚、private map/owner診断、resident CRT分離。shell再配置/SLACK/metadata移動はT3。固定PTを再移設しない。Unicode RO leaseはT3の全caller KAPI化と同時に廃止。kcg boot後NOSYS/試験変更はe8bへ前倒し、T3は継承検証とscratch定数整理 |
 | [T4〜T6](../../tasks/v3/TASK_T4_T6_MODULES.md) | B1 caller/copyと失敗試験。旧db_exec/db_prepareの全結線/stmt finalize前copy、B4 engine異常、F2/F3、512KiB MEMSYS5/FEP優先予約、必須module/MINIMALはT4/T5a。T2のSQLite entry0はB1接続済み3入口だけ |
 | [T7/後半](../../tasks/v3/TASK_T7_AND_FOLLOWUPS.md) | lease経由のplanarポインタ、再init/再attach、V86通常復元検査。低位640KiB専有化、BB pool移動、.kcgfont廃止/OpenTypeはT7。page0 NPのためのboot snapshot移行も後続 |
 | P4/P6/P7/P8/P9 | 検証済みDEVICE resourceの利用、停止/trim安全点、4世代manifestを渡す。BAR汎用配置、x87切替/長いKAPI期限、fork slot整理、音/Video HAL刷新、私有surface合成は本票外 |

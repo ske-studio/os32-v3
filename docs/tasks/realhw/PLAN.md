@@ -15,6 +15,6 @@
 | [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
 | [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) |
 | [TASK_HWDEV.md](TASK_HWDEV.md) | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) |
-| [TASK_FDRECOV.md](TASK_FDRECOV.md) | FD 起動から LAN で HDD 一式を復旧する (FDRECOV-1) |
+| `docs/archive/realhw_v3/TASK_FDRECOV.md` | FD 起動から LAN で HDD 一式を復旧する (FDRECOV-1) |
 
 残件 (票の無いもの): ディスクの健全性と 8GB 全域の読み書きの検証 (RA266 §2)。

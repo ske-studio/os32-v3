@@ -62,7 +62,7 @@ multi-task」(v2.0 で検討) は**本票の範囲外**で、その足場も作�
    アプリの `exit` / fault / CTRL+STOP / 起動失敗のそれぞれで、その ID だけを畳んで WM へ戻る経路。
    フォーカスの無いアプリへの CTRL+STOP は届かない (T6 はフォーカス窓のアプリ宛)。
 5. **メモリの勘定**: 4 本が要求どおりに入らないときは**拒否** (`ERR_NOMEM` / `ERR_FULL`)。スワップは
-   しない (ユーザー方針 2026-09-10、[memory `APP_BAND_PDE`](../../tasks/memory/APP_BAND_PDE.md))。
+   しない (ユーザー方針 2026-09-10、[memory `APP_BAND_PDE`](../v3/APP_BAND_PDE.md))。
    8MB (CUI) / 9MB / 15MB (PEGC) の各構成で、gshell + アプリ n 本の見積表を出す。
 6. **SHM スロット** (F7): `OP_INIT` で 0〜3 を配り、5 本目は `ERR_FULL`。所有者 ID との対応。
 7. **変えないもの**: `shell.bin` の入れ子 `exec_run`、v86、`sys_switch_shell` (T9)、

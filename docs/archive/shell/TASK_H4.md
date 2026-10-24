@@ -3,7 +3,7 @@
 > 発行: PM (Claude Code `claude-opus-5`、2026-09-16) / 状態: **受入完了 (2026-09-16、設計レビュー 3 往復で Approve、ホスト試験 RED→GREEN、ゲスト受入 4 項目は §8)**
 
 基点: `feat/gui` = `9742a6b`。
-計画の正典: [`HSYNC_IMPROVEMENT_PLAN.md`](../../tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) §7-1 (本文)、§8 (H4 の行)、§9 の A18。
+計画の正典: [`HSYNC_IMPROVEMENT_PLAN.md`](HSYNC_IMPROVEMENT_PLAN.md) §7-1 (本文)、§8 (H4 の行)、§9 の A18。
 前提の票: [`TASK_H1.md`](TASK_H1.md)、[`TASK_H2.md`](TASK_H2.md) (置換の安全化)、[`TASK_H3.md`](TASK_H3.md) (mtime)。
 引き継ぎ: [`../agents/HANDOVER_2026-09-16.md`](../agents/HANDOVER_2026-09-16.md) §4。
 RED→GREEN の記録: [`../../../tools/tests/h4_manifest_tdd.md`](../../../tools/tests/h4_manifest_tdd.md)。
