@@ -459,6 +459,9 @@ def mutation_result(item):
         mutated.write_text(source.replace(old, new, 1), encoding="utf-8")
         try:
             cases(mutated)
+        except subprocess.TimeoutExpired as e:
+            # 並列の負荷による時間切れは run_ordered に逐次で再試行させる
+            return mutpar.timeout_red((name, "RED (timeout: %s)" % e, True))
         except (AssertionError, subprocess.SubprocessError) as e:
             return name, "RED (%s)" % e, True
     return name, "**GREEN — 試験が穴を見逃した**", False
