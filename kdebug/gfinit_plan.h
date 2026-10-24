@@ -1,6 +1,19 @@
 #ifndef KDEBUG_GFINIT_PLAN_H
 #define KDEBUG_GFINIT_PLAN_H
 #include "gfinit_decode.h"
+/* Synthetic opcodes, separate from ROM instruction bytes. */
+#define REC_GF_OP_SIZE_COMMAND_OFF 0x100U
+#define REC_GF_OP_SIZE_PROBE 0x101U
+#define REC_GF_OP_SIZE_READ 0x102U
+#define REC_GF_OP_SIZE_RESTORE_BAR 0x103U
+#define REC_GF_OP_SIZE_RESTORE_COMMAND 0x104U
+#define REC_GF_OP_PREPARE_LITERAL 0x105U
+#define REC_GF_OP_PREPARE_RMW 0x106U
+#define REC_GF_OP_SELECT 0x107U
+#define REC_GF_OP_DATA_LITERAL 0x108U
+#define REC_GF_OP_DATA_RMW 0x109U
+#define GF_PLAN_OPCODE 0x200U
+#define GF_PLAN_PFB_AMOUNT 0x10020cU
 #define GF_PLAN_SUB_SAVE 0
 #define GF_PLAN_SUB_LITERAL 1
 #define GF_PLAN_SUB_CHECK 2

@@ -2,13 +2,11 @@
  * before arm; READ groups use only profile-registered pure expressions. */
 #include "gfinit_plan.h"
 #define GF_PLAN_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
-#define GF_PLAN_OPCODE 0x200U
 #define GF_PLAN_EXPR_SAVE 0x200U
 #define GF_PLAN_EXPR_CHECK 0x201U
 #define GF_PLAN_EXPR_BRANCH 0x202U
 #define GF_PLAN_EXPR_EQUAL 0x203U
 #define GF_PLAN_ALIAS_MAX 61U
-#define GF_PLAN_PFB_AMOUNT 0x10020cU
 #define GF_PLAN_PFB_MASK 0xff000000U
 #define GF_PLAN_PFB_MIN 0x01000000U
 static const u32 branch_kinds[] = {REC_ARG_READ, REC_IMM, REC_IMM};
