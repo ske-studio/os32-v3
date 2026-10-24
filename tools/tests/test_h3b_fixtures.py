@@ -176,12 +176,12 @@ def main():
             assert result.returncode == 1 and label in result.stdout, (name, result)
             print('RED ' + name + ': ' + label)
         for name, old, new in [
-            ('read-sentinel', 'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    if (code)',
-             'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) { if (code) *code = 0; return; }\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    if (code)'),
+            ('read-sentinel', 'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;\n    if (code)',
+             'if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) { if (code) *code = 0; return; }\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;\n    if (code)'),
             ('reverse-result', 'y >= TVRAM_ROWS) return 0;', 'y >= TVRAM_ROWS) return 1;'),
             ('write-next', '= (u16)(u8)ch;', '= (u16)(u8)(ch + 1);'),
-            ('out-of-range-write', 'TVRAM_ROWS) return;\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    *(volatile u16 *)',
-             'TVRAM_ROWS) { x = y = 0; }\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * 2;\n    *(volatile u16 *)'),
+            ('out-of-range-write', 'TVRAM_ROWS) return;\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;\n    *(volatile u16 *)',
+             'TVRAM_ROWS) { x = y = 0; }\n    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;\n    *(volatile u16 *)'),
         ]:
             result = run_harness((old, new))
             assert result.returncode == 1 and 'FAIL audit TVRAM' in result.stdout, (name, result)

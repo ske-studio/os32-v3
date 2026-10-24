@@ -469,7 +469,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
              function(source, 'services_settings').replace('OS32_SQLITE_FEP_RESERVE_MIN',
                                                           'OS32_SQLITE_FEP_RESERVE'), 20),
             ('reserve-no-minimum', path, source,
-             'if (kb < OS32_SQLITE_FEP_RESERVE_MIN / 1024)', 'if (0)', 34),
+             'if (kb < OS32_SQLITE_FEP_RESERVE_MIN / (int)KIB)', 'if (0)', 34),
             ('early-public', path, source,
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY;',
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY; services_public = 1;', 10),
