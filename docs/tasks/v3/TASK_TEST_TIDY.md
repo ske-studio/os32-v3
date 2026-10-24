@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)
 
-> 状態: **受入完了 (2026-10-24)** — TT1〜TT5 が main。検査は 225 → 197 本 + ローカルだけ 4 本、ケースと変異は減らしていない。残りの候補: c-dialect-host (TT1 で速くならなかった、1,037 秒)。調査は `~/os32-tmp/run/test_survey/REPORT.md`。
+> 状態: **実装中 (2026-10-24)** — TT1〜TT5 が main、TT6 (c-dialect-host) を実装中。検査は 225 → 197 本 + ローカルだけ 4 本、ケースと変異は減らしていない。調査は `~/os32-tmp/run/test_survey/REPORT.md`。
 
 ## 0. ユーザー決定 (2026-10-24)
 
@@ -23,3 +23,4 @@
 | TT3 | b1〜b4 の束ね (gfx 4 本・font 5 本・access/caller 5 本・gfinit は現行 PAR の 6 本) | sol | **main** (a42bcf4、astra 取り込み可) — 20 検査を 4 登録へ (gfx・font・access・gfinit、tools/run_host_group.py が親の jobserver を共用)。ケース・変異・RED/GREEN の数は同じ。検査は 220→204 本 |
 | TT5 | T4B-CD の凍結コードと試験・a6 の削除 (カーネル層の fs/vfs に触るので候補の検査を全部 MUTATE=0) | sol | **main** (fb1c7f3、astra 取り込み可、台帳 T4B-CD は閉鎖台帳へ) |
 | TT4 | b5〜b7 の束ね (hsync・fs-kind・sh-input・sh-exec・sqlite-module-proto の 5 群) | sol | **main** (e4681ff、astra 取り込み可) — 12 検査を 5 登録へ (hsync・fs-kind・sh-input・sh-exec・sqlite-module-proto、sqlite は同じ主試験の 2 回を 1 回に)。ケース・変異・RED/GREEN の数は同じ。b7 の +0.84 秒は 1 回ずつの計測の幅として束ねたまま (PM 判断) |
+| TT6 | c-dialect-host を軽くする (TT1 で速くならなかった。内訳: 変異 32 本でそれぞれ実物の木に検査器を丸ごと回す ≈718 秒、make の変種 ≈232 秒)。ケース・変異の検出力は減らさない | sol | 未 |
