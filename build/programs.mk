@@ -428,8 +428,9 @@ $(SQLITE_SA_DIR)/sqlite_standalone.elf: sdk/link/app.ld $(SQLITE_SA_OBJ)
 sqlite_standalone: $(CRT0_OBJ) $(SQLITE_SA_DIR)/sqlite_standalone.bin
 
 # === ベースプログラム パターンルール ===
+# .o を経ずに .elf を作るので、-MT $@ で .d の依存先を .elf にする (ヘッダ・.inc の変更で .elf を作り直す)。
 userland/cmds/%.elf: userland/cmds/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/cmds/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/cmds/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/$*.o -lc -lgcc
 
 # cfg — 設定レジストリの CUI (libos32cfg を静的リンク、票 S2-C)。既定の
@@ -528,15 +529,15 @@ userland/cmds/hdate.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/hdate.o $(LIB
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
 userland/tests/%.elf: userland/tests/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/tests/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/$*.o -lc -lgcc
 
 userland/tests/bench/%.elf: userland/tests/bench/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/tests/bench/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/bench/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/bench/$*.o -lc -lgcc
 
 userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/system/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/$*.o -lc -lgcc
 
 # .inc を #include する system プログラムの明示依存 (レシピ無し = 上のパターン規則に前提だけ足す)。
