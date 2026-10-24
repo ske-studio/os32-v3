@@ -355,9 +355,9 @@ S0-D (配備保護) と S0-T (初期値 tsv) は別票が同じファイルに�
 走らせ方 (ホストのみ。`make`・配備・エミュレータ・ローカル AI は使っていない):
 
 ```
-python3 -B tools/tests/test_kapi_db_v50.py            # 9 件 + 回収順の本文検査
-python3 -B tools/tests/test_kapi_db_v50.py --target   # 上に i386-elf 単体コンパイル
-python3 -B -m unittest discover -s tools/tests -p 'test_kapi_db_owned.py'
+python3 -B tools/tests/test_db_errstr.py            # 9 件 + 回収順の本文検査
+python3 -B tools/tests/test_db_errstr.py --target   # 上に i386-elf 単体コンパイル
+python3 -B tools/tests/test_db_errstr.py
 # tools/tests/test_vfs_fd_sqlite.py: 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)
 # tools/tests/test_sqlite_groups.py: 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)
 ```
@@ -401,7 +401,7 @@ python3 -B -m unittest discover -s tools/tests -p 'test_kapi_db_owned.py'
 
 ### 2b. 実装レビュー 往復 1 (Codex、`08b4879`) の blocker 6 件 — RED → GREEN
 
-反例はすべて `test_kapi_db_v50.py` に常設した。RED は **実装を 1 件ずつ元へ戻して**
+反例はすべて `test_db_errstr.py` に常設した。RED は **実装を 1 件ずつ元へ戻して**
 採ったもの (実行した `FAIL` 行をそのまま写す)。
 
 | # | blocker | ケース | RED |
@@ -630,7 +630,7 @@ AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理*
 警告として書いた。計器 (`ring3_range_reject_*`) はそのまま残す
 (方針 B が効いていれば `count` は 0 のままになる)。
 
-### 3. ケース一覧 (`test_kapi_db_v50.py`)
+### 3. ケース一覧 (`test_db_errstr.py`)
 
 | ケース | 見るもの |
 |---|---|

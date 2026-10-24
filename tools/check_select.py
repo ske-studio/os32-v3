@@ -93,11 +93,13 @@ def load_map():
         with open(path, encoding="utf-8") as f:
             shard = yaml.safe_load(f)
         name = os.path.basename(path)[:-5]
-        if not isinstance(shard, dict) or not {name} <= set(shard) <= {name, "artifact_reader"}:
+        if not isinstance(shard, dict) or not {name} <= set(shard) <= {name, "artifact_reader", "local_only"}:
             raise SystemExit("check-map: shard name mismatch: " + path)
         if name in m.get("checks", {}):
             raise SystemExit("check-map: duplicate: " + name)
         m.setdefault("checks", {})[name] = shard[name]
+        if shard.get("local_only"):
+            m.setdefault("local_checks", []).append(name)
         if shard.get("artifact_reader"):
             m.setdefault("artifact_readers", []).append(name)
     m.setdefault("ignore", [])
@@ -1193,9 +1195,15 @@ def lint():
     m = load_map()
     rules, vars_ = read_makefiles()
     par = check_lists(vars_)
-    listed = set(par)
+    local = set(m.get("local_checks", []))
+    listed = set(par) | local
     mapped = set(m["checks"])
     errs = []
+    for t in sorted(local & set(par)):
+        errs.append("ローカル専用の検査が列にある: %s" % t)
+    for t in sorted(local):
+        if not rules.get(t):
+            errs.append("ローカル専用の検査に recipe が無い: %s" % t)
     for t in sorted(listed - mapped):
         errs.append("対応表に無い検査: %s (tools/check_map.d/ に足す)" % t)
     for t in sorted(mapped - listed):
@@ -1242,7 +1250,7 @@ def lint():
         for e in errs:
             sys.stderr.write("  " + e + "\n")
         return 1
-    print("check-map: 検査 %d 本、対応表の漏れ 0 件" % len(listed))
+    print("check-map: 検査 %d 本 + ローカル専用 %d 本、対応表の漏れ 0 件" % (len(par), len(local)))
     return 0
 
 
@@ -1299,7 +1307,7 @@ def plan(files, base=None):
     # Source/script changes use the explicit map; lint always checks both.
     inputs = effective_checks(m, rules) if any(
         f.endswith(".h") or f == "sdk/kapi.json" for f in files) else m["checks"]
-    checks = {t: compile_globs(g) for t, g in inputs.items()}
+    checks = {t: compile_globs(g) for t, g in inputs.items() if t not in m.get("local_checks", [])}
     # 走査型の検査 (broad:) の `**` を含む glob は「表に載っている」の判定に数えない
     # — ツリーを丸ごと舐める検査に当たっただけで安全側が発火しなくなるのを防ぐ
     # (代行レビュー P2-1 の保険)。変異込みで回す検査を選ぶ方には数える。

@@ -9,3 +9,4 @@ check-host-lib-host:
 - userland/lib/host/libos32host.c
 - tools/check_map.d/check-host-lib-host.yaml
 - build/checks.d/check-host-lib-host.mk
+local_only: true

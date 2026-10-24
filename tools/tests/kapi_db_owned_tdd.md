@@ -4,7 +4,10 @@
 実DB slot実装の複製はない。SQLite境界のfault injection、owner取得、SHMアドレス、
 kstring/kprintfのhost shimのみ。SQLiteの実VFS/実ファイル/exec終了は試験しない。
 
-実行: `ulimit -c 0; python3 tools/tests/test_kapi_db_owned.py`
+TT2 (2026-10-24): Python runner は後続の `check-db-errstr-host` へ移管。
+現在は C シナリオ 8 件・ガード変異 6 本を保持する。下記は元の TDD 記録。
+
+実行: `ulimit -c 0; python3 tools/tests/test_db_errstr.py`
 全サイクルでcompileは成功し、REDはCのassertion/SIGABRTによりrunnerがexit 1。
 各最小変更後に同じコマンドを再実行し、それ以前の全ケースを含めexit 0を確認した。
 
