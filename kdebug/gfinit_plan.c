@@ -1,13 +1,12 @@
 /* S6 PREPARE/RUN/VRAM composition. Addresses, values and comparisons are fixed
  * before arm; READ groups use only profile-registered pure expressions. */
 #include "gfinit_plan.h"
-#define GF_PLAN_OPCODE 0x200U
+#define GF_PLAN_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
 #define GF_PLAN_EXPR_SAVE 0x200U
 #define GF_PLAN_EXPR_CHECK 0x201U
 #define GF_PLAN_EXPR_BRANCH 0x202U
 #define GF_PLAN_EXPR_EQUAL 0x203U
 #define GF_PLAN_ALIAS_MAX 61U
-#define GF_PLAN_PFB_AMOUNT 0x10020cU
 #define GF_PLAN_PFB_MASK 0xff000000U
 #define GF_PLAN_PFB_MIN 0x01000000U
 static const u32 branch_kinds[] = {REC_ARG_READ, REC_IMM, REC_IMM};
@@ -54,6 +53,14 @@ static const u32 check_kinds[] = {
     REC_ARG_READ, REC_IMM, REC_ARG_READ, REC_IMM,
     REC_ARG_READ, REC_IMM, REC_ARG_READ, REC_IMM
 };
+/* Both pattern passes write and check every word. Alias points each add
+ * two branches, one signature write and one equality comparison. */
+#define GF_PLAN_ARGS_PER_WORD (GF_PLAN_ARRAY(save_layout) + GF_PLAN_ARRAY(literal_layout) + \
+    2U * GF_PLAN_ARRAY(check_kinds) / GF_PLAN_CHECK_WORDS)
+#define GF_PLAN_ARGS_PER_ALIAS (2U * GF_PLAN_ARRAY(branch_kinds) + \
+    GF_PLAN_ARRAY(literal_layout) + GF_PLAN_ARRAY(equal_kinds))
+#define GF_PLAN_RULES_PER_WORD 2U
+#define GF_PLAN_ADDED_EXPRS (GF_PLAN_EXPR_EQUAL - GF_PLAN_EXPR_SAVE + 1U)
 static int save_pattern(const u32 *args, u32 argc, u32 *value)
 {
     if (argc != 2) return -1;
@@ -86,11 +93,11 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
     if (!out || !d || !p || (bar1_length & (bar1_length-1)) || bar1_length < GF_PLAN_VRAM_WORDS * 4 ||
         d->plan.unresolved_count || !d->plan.node_count ||
         d->plan.node_count + prep->node_count + extra_nodes > RECOVER_NODE_MAX ||
-        d->plan.arg_count + prep->arg_count + 9 * GF_PLAN_VRAM_WORDS + 10*points > GF_INIT_ARGS ||
+        d->plan.arg_count + prep->arg_count + GF_PLAN_ARGS_PER_WORD * GF_PLAN_VRAM_WORDS + GF_PLAN_ARGS_PER_ALIAS*points > GF_INIT_ARGS ||
         d->plan.entry_count + 2 > RECOVER_ENTRY_MAX ||
         p->target_count + GF_PLAN_VRAM_WORDS + points > GF_PLAN_TARGETS ||
-        p->rule_count + 2 * GF_PLAN_VRAM_WORDS + points > GF_PLAN_RULES ||
-        p->layout_count + 6 > GF_PLAN_LAYOUTS || p->expr_count + 4 > GF_PLAN_EXPRS) return -1;
+        p->rule_count + GF_PLAN_RULES_PER_WORD * GF_PLAN_VRAM_WORDS + points > GF_PLAN_RULES ||
+        p->layout_count + GF_PLAN_SUB_COUNT > GF_PLAN_LAYOUTS || p->expr_count + GF_PLAN_ADDED_EXPRS > GF_PLAN_EXPRS) return -1;
     out->pfb_key=RECOVER_NONE;
     for(u32 i=0;i<p->target_count;i++)if(p->targets[i].space==REC_BAR_MMIO &&
         p->targets[i].bar==0 && p->targets[i].offset==GF_PLAN_PFB_AMOUNT && p->targets[i].width==4)
@@ -109,14 +116,14 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
             .bar=1,.offset=i*4,.width=4,.index=RECOVER_NONE,.access=REC_COLD,.read_safe=1};
     out->exprs[p->expr_count++] = (struct recover_expr){GF_PLAN_EXPR_SAVE,2,save_kinds,save_pattern};
     out->exprs[p->expr_count++] = (struct recover_expr){GF_PLAN_EXPR_CHECK,2*GF_PLAN_CHECK_WORDS,check_kinds,check_words};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,0,3,save_layout,REC_WRITE,0};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,1,2,literal_layout,REC_WRITE,0};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,2,2*GF_PLAN_CHECK_WORDS,check_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_SAVE,3,save_layout,REC_WRITE,0};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_LITERAL,2,literal_layout,REC_WRITE,0};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_CHECK,2*GF_PLAN_CHECK_WORDS,check_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
     out->exprs[p->expr_count++] = (struct recover_expr){GF_PLAN_EXPR_BRANCH,3,branch_kinds,alias_branch};
     out->exprs[p->expr_count++] = (struct recover_expr){GF_PLAN_EXPR_EQUAL,2,equal_kinds,alias_equal};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,3,2,literal_layout,REC_WRITE,0};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,4,3,branch_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
-    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,5,2,equal_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_ALIAS_WRITE,2,literal_layout,REC_WRITE,0};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_BRANCH,3,branch_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
+    out->layouts[p->layout_count++] = (struct recover_opcode_layout){GF_PLAN_OPCODE,GF_PLAN_SUB_EQUAL,2,equal_kinds,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR};
     for(u32 i=0;i<points;i++) {
         if(offsets[i]<GF_PLAN_VRAM_WORDS*4)keys[i]=out->vram_first+offsets[i]/4;
         else {
@@ -163,10 +170,10 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
             u32 key=out->vram_first+i, id=out->plan.node_count++, a=out->plan.arg_count;
             u32 expr=pass?RECOVER_NONE:GF_PLAN_EXPR_SAVE;
             out->rules[p->rule_count++]=(struct recover_rule){.id=rule_id,.key=key,.phase=REC_VRAM_TEST,
-                .main_id=RECOVER_NONE,.pc=RECOVER_NONE,.substep=pass,.write_mask=~0U,
+                .main_id=RECOVER_NONE,.pc=RECOVER_NONE,.substep=GF_PLAN_SUB_SAVE+pass,.write_mask=~0U,
                 .value={.mode=pass?REC_LITERAL:REC_EXPR,.mask=~0U,.bits=pattern(pass,i),.max=~0U,.expr_id=expr}};
             d->nodes[id]=(struct recover_plan_node){.phase=REC_VRAM_TEST,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
-                .opcode=GF_PLAN_OPCODE,.substep=pass,.rule_id=rule_id++,.expr_id=expr,.arg_first=a,
+                .opcode=GF_PLAN_OPCODE,.substep=GF_PLAN_SUB_SAVE+pass,.rule_id=rule_id++,.expr_id=expr,.arg_first=a,
                 .arg_count=pass?2:3,.next={id+1,id+1}};
             d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_IMM,key};
             if(!pass)d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_ARG_READ,key};
@@ -175,7 +182,7 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
         for(u32 i=0;i<GF_PLAN_VRAM_WORDS;i+=GF_PLAN_CHECK_WORDS) {
             u32 id=out->plan.node_count++, a=out->plan.arg_count;
             d->nodes[id]=(struct recover_plan_node){.phase=REC_VRAM_TEST,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
-                .opcode=GF_PLAN_OPCODE,.substep=2,.rule_id=RECOVER_NONE,.expr_id=GF_PLAN_EXPR_CHECK,
+                .opcode=GF_PLAN_OPCODE,.substep=GF_PLAN_SUB_CHECK,.rule_id=RECOVER_NONE,.expr_id=GF_PLAN_EXPR_CHECK,
                 .arg_first=a,.arg_count=2*GF_PLAN_CHECK_WORDS,.next={id+1,id+1}};
             for(u32 j=0;j<GF_PLAN_CHECK_WORDS;j++) {
                 d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_ARG_READ,out->vram_first+i+j};
@@ -187,17 +194,17 @@ int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *d,
     for(u32 pass=0;pass<2;pass++)for(u32 i=0;i<points;i++) {
         u32 id=out->plan.node_count++, a=out->plan.arg_count;
         d->nodes[id]=(struct recover_plan_node){.phase=REC_VRAM_TEST,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
-            .opcode=GF_PLAN_OPCODE,.substep=4,.rule_id=RECOVER_NONE,.expr_id=GF_PLAN_EXPR_BRANCH,
+            .opcode=GF_PLAN_OPCODE,.substep=GF_PLAN_SUB_BRANCH,.rule_id=RECOVER_NONE,.expr_id=GF_PLAN_EXPR_BRANCH,
             .arg_first=a,.arg_count=3,.next={id+2,id+1}};
         d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_ARG_READ,out->pfb_key};
         d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_IMM,bar1_length};
         d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_IMM,offsets[i]};
         id=out->plan.node_count++;a=out->plan.arg_count;
         if(!pass)out->rules[p->rule_count++]=(struct recover_rule){.id=rule_id,.key=keys[i],.phase=REC_VRAM_TEST,
-            .main_id=RECOVER_NONE,.pc=RECOVER_NONE,.substep=3,.write_mask=~0U,
+            .main_id=RECOVER_NONE,.pc=RECOVER_NONE,.substep=GF_PLAN_SUB_ALIAS_WRITE,.write_mask=~0U,
             .value={.mode=REC_LITERAL,.mask=~0U,.bits=alias_signature(offsets[i]),.max=~0U,.expr_id=RECOVER_NONE}};
         d->nodes[id]=(struct recover_plan_node){.phase=REC_VRAM_TEST,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
-            .opcode=GF_PLAN_OPCODE,.substep=pass?5:3,.rule_id=pass?RECOVER_NONE:rule_id++,
+            .opcode=GF_PLAN_OPCODE,.substep=pass?GF_PLAN_SUB_EQUAL:GF_PLAN_SUB_ALIAS_WRITE,.rule_id=pass?RECOVER_NONE:rule_id++,
             .expr_id=pass?GF_PLAN_EXPR_EQUAL:RECOVER_NONE,.arg_first=a,.arg_count=2,.next={id+1,id+1}};
         d->args[out->plan.arg_count++]=(struct recover_plan_arg){pass?REC_ARG_READ:REC_IMM,keys[i]};
         d->args[out->plan.arg_count++]=(struct recover_plan_arg){REC_IMM,alias_signature(offsets[i])};
@@ -231,9 +238,9 @@ int gfinit_plan_verify(struct recover *r, void *arg)
         u32 id=r->expected_node, value=0, edge=0;
         if(recover_safe_point(r) || recover_plan_enter(r,id))return -1;
         const struct recover_plan_node *n=&out->plan.nodes[id];
-        if(n->substep==2 || n->substep==4 || n->substep==5) {
+        if(n->substep==GF_PLAN_SUB_CHECK || n->substep==GF_PLAN_SUB_BRANCH || n->substep==GF_PLAN_SUB_EQUAL) {
             if(recover_plan_check(r,&value))return -1;
-            if(n->substep==4)edge=value;
+            if(n->substep==GF_PLAN_SUB_BRANCH)edge=value;
             else if(!value) { (void)trial_end(r,&r->token,REC_VERIFY); return -1; }
         } else if(recover_plan_access(r,&value))return -1;
         if(recover_plan_leave(r,edge))return -1;

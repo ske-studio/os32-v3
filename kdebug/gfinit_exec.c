@@ -30,22 +30,22 @@ static int exec_control(struct recover *r, struct gfinit_exec *e,
     const struct recover_plan_arg *a = &r->plan->args[n->arg_first];
     if (n->substep >= GF_INIT_K) return 0; /* checked K: no access or wait */
     switch (n->opcode) {
-    case 0x32: case 0x4a:
-        if (n->arg_count != 4 || a[1].value >= 32 || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;
+    case GF_INIT_IO_RESTRICT_PROG: case GF_INIT_IO_RESTRICT_PLL2:
+        if (n->arg_count != 4 || a[1].value >= GF_SHIFT_BITS || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;
         *edge = ((e->read_value & a[0].value) >> a[1].value) == a[2].value;
         return 0;
-    case 0x75:
+    case GF_INIT_CONDITION:
         if (n->arg_count != 3 || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;
         *edge = (e->read_value & a[1].value) == a[2].value;
         return 0;
-    case 0x39: {
-        if (n->arg_count != 6 || a[2].value >= 32 || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;
+    case GF_INIT_IO_FLAG_CONDITION: {
+        if (n->arg_count != 6 || a[2].value >= GF_SHIFT_BITS || e->read_pc != n->pc || e->read_ctx != n->ctx) return -1;
         u32 index = (e->read_value & a[1].value) >> a[2].value;
         if (a[3].value >= e->rom_size || index >= e->rom_size - a[3].value) return -1;
         *edge = (e->rom[a[3].value + index] & a[4].value) == a[5].value;
         return 0;
     }
-    case 0x5b: case 0x6b:
+    case GF_INIT_SUB_DIRECT: case GF_INIT_SUB:
         if (n->substep == GF_INIT_C) {
             if (e->calls == GF_INIT_CALL_DEPTH) return -1;
             e->call[e->calls++] = (struct gfinit_exec_frame){n->pc, n->ctx, 0};
@@ -54,7 +54,7 @@ static int exec_control(struct recover *r, struct gfinit_exec *e,
             e->calls--;
         }
         return 0;
-    case 0x33:
+    case GF_INIT_REPEAT:
         if (n->substep == GF_INIT_C) {
             if (n->arg_count != 2 || !a[0].value || e->repeats == GF_INIT_REPEAT_DEPTH) return -1;
             e->repeat[e->repeats++] = (struct gfinit_exec_frame){n->pc, n->ctx, a[0].value};
@@ -68,11 +68,11 @@ static int exec_control(struct recover *r, struct gfinit_exec *e,
             } else if (a[0].value >= f->count) return -1;
         }
         return 0;
-    case 0x36:
+    case GF_INIT_END_REPEAT:
         return e->repeats ? 0 : -1;
-    case 0x74: case 0x65:
+    case GF_INIT_TIME: case GF_INIT_RESET:
         return n->arg_count == 1 ? exec_wait(r, e, a[0].value) : -1;
-    case 0x38: case 0x72: case 0x63: case 0x71:
+    case GF_INIT_NOT: case GF_INIT_RESUME: case GF_INIT_COMPUTE_MEM: case GF_INIT_DONE:
         return n->arg_count ? -1 : 0; /* head/skip live in checked successors */
     default: return -1;
     }

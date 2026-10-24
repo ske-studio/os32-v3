@@ -18,7 +18,7 @@ def command(exe):
 
 MUTATIONS = [
     ('static_read_cost', 'if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;', 'if (false && d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;'),
-    ('skip_cr44_decode', 'if (op != 0x53 && op != 0x54 && v->port', 'if (false && op != 0x53 && op != 0x54 && v->port'),
+    ('skip_cr44_decode', 'if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port', 'if (false && op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port'),
     ('repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
     ('repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
     ('unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
