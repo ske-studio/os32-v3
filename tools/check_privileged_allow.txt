@@ -1,0 +1,4 @@
+# object:mnemonic:max_count:reason
+userland/tests/faulttest.o:hlt:1:CPL=3 の hlt による #GP 回収を確かめる意図した fault 試験
+userland/tests/h3a.o:hlt:1:CPL=3 の hlt による #GP と他タスクの継続を確かめる試験
+userland/tests/h3b.o:hlt:1:CPL=3 の hlt による #GP と他タスクの継続を確かめる試験

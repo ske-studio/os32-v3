@@ -3,16 +3,10 @@
 """
 check_privileged.py — ユーザランドの特権命令検査 (リング3 準備)
 
-v2 でユーザプログラムは CPL=3 で走る (docs/archive/kernel_v2/M1_RING3.md)。CPL=3 では
-特権命令・IOPL 依存命令は #GP になる。ビルド済みの userland/*.o を逆アセンブル
-(既存の i386-elf-objdump) して、そういう命令が残っていないか検査する。
-
-2 モード:
-  (既定)     警告のみ。offender を [--] で列挙し exit 0。
-             現在 userland は CPL=0 で動くので、これらは今は正常。
-             make check はこのモードで呼ぶ (green ビルドを壊さない)。
-  --strict   1 つでもあれば exit 1。リング3 が入ったあとのゲート用。
-             os32-cycle / M1e 検証がこちらを使う。
+ユーザプログラムは CPL=3 で走る。ビルド済みの userland/*.o を逆アセンブル
+(既存の i386-elf-objdump) して特権命令・IOPL 依存命令を検査する。
+意図した #GP 試験だけ tools/check_privileged_allow.txt に名前・命令・個数・理由で許可する。
+既定は警告のみ、make check は --strict で未許可の命令を exit 1 にする。
 
 「車輪の再発明」ではない: 逆アセンブラは objdump をそのまま使い、本スクリプトは
 ニーモニック列の抽出とフィルタだけを行う (docs/tasks/v2 の方針)。
@@ -110,6 +104,23 @@ def find_objects():
     return sorted(objs)
 
 
+def load_allow():
+    """既存の allow ファイル同様、理由を持つコロン区切り。個数の超過は許可しない。"""
+    allowed = {}
+    path = os.path.join(PROJ_DIR, "tools", "check_privileged_allow.txt")
+    with open(path, encoding="utf-8") as stream:
+        for line in stream:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            obj, mnemonic, count, reason = line.split(":", 3)
+            key = (obj, mnemonic)
+            if key in allowed or int(count) < 1 or not reason.strip():
+                raise ValueError("invalid privileged allow entry: " + line)
+            allowed[key] = int(count)
+    return allowed
+
+
 def main():
     strict = "--strict" in sys.argv
     objdump = objdump_bin()
@@ -124,11 +135,21 @@ def main():
               file=sys.stderr)
         return 2
 
+    allowed = load_allow()
     findings = []
     for obj in objs:
         hits = scan_object(objdump, obj)
-        if hits:
-            findings.append((os.path.relpath(obj, PROJ_DIR), hits))
+        rel = os.path.relpath(obj, PROJ_DIR)
+        unexpected = []
+        for mnemonic, count in hits:
+            limit = allowed.get((rel, mnemonic), 0)
+            if count > limit:
+                unexpected.append((mnemonic, count))
+            else:
+                print("  [OK] %s %s x%d (intentional #GP test)"
+                      % (rel, mnemonic, count))
+        if unexpected:
+            findings.append((rel, unexpected))
 
     print("== ユーザランドの特権命令 (CPL=3 で #GP) ==")
     if not findings:
@@ -146,8 +167,7 @@ def main():
         return 1
 
     print("")
-    print("  (警告のみ。現在 userland は CPL=0 で動作。リング3 導入時に")
-    print("   --strict でゲートする。sys_halt KAPI 等への置換が必要)")
+    print("  (警告のみ。--strict では未許可の命令をエラーにする)")
     return 0
 
 

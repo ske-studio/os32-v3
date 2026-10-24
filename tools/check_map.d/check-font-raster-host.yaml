@@ -5,6 +5,7 @@ check-font-raster-host:
 - sdk/rust/i686-os32-none.json
 - tools/check_isa386.py
 - tools/check_privileged.py
+- tools/check_privileged_allow.txt
 - tools/tests/test_font_raster.py
 - tools/tests/test_font_outline.py
 - tools/tests/test_font_reader.py

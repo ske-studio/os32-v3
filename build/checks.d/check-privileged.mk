@@ -1,7 +1,7 @@
 CHECK_PAR_ORDER += 028:check-privileged
-# ユーザランドの特権命令検査 (リング3 準備)。既定は警告のみ (exit 0) で
-# green ビルドを壊さない。リング3 導入後に --strict でゲートする。
+# 意図した #GP 試験だけ理由・個数つきで許可し、残りは strict で拒否する。
 check-privileged:
-	@python3 tools/check_privileged.py
+	@python3 -B tools/tests/test_check_privileged.py
+	@python3 tools/check_privileged.py --strict
 
 .PHONY: check-privileged

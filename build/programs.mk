@@ -69,10 +69,8 @@ endif
 SHELL_SRC = $(wildcard userland/shell/*.c)
 SHELL_OBJ = $(SHELL_SRC:.c=.o)
 
-# ヘッダと .inc の明示依存 (B7)。Makefile の DEPFILES は boot/kernel/... しか
-# 走査しないので userland の .d は読まれない。sh_launch.inc / sh_pipe.inc /
-# sh_redraw.inc を直しても .o が作り直されないと、直したつもりの sh.bin が
-# 出来上がる。常駐側にも同じ依存を足す (レシピは変えないので .o は不変)。
+# ヘッダと .inc の明示依存 (B7)。生成済み .d は Makefile の DEPFILES でも読む。
+# 初回ビルドでも常駐側・外部プログラム側に同じ依存を与える。
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
@@ -430,8 +428,9 @@ $(SQLITE_SA_DIR)/sqlite_standalone.elf: sdk/link/app.ld $(SQLITE_SA_OBJ)
 sqlite_standalone: $(CRT0_OBJ) $(SQLITE_SA_DIR)/sqlite_standalone.bin
 
 # === ベースプログラム パターンルール ===
+# .o を経ずに .elf を作るので、-MT $@ で .d の依存先を .elf にする (ヘッダ・.inc の変更で .elf を作り直す)。
 userland/cmds/%.elf: userland/cmds/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/cmds/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/cmds/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/$*.o -lc -lgcc
 
 # cfg — 設定レジストリの CUI (libos32cfg を静的リンク、票 S2-C)。既定の
@@ -530,15 +529,15 @@ userland/cmds/hdate.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/hdate.o $(LIB
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
 userland/tests/%.elf: userland/tests/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/tests/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/$*.o -lc -lgcc
 
 userland/tests/bench/%.elf: userland/tests/bench/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/tests/bench/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/bench/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/bench/$*.o -lc -lgcc
 
 userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ)
-	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/$*.o
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/system/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/$*.o -lc -lgcc
 
 # .inc を #include する system プログラムの明示依存 (レシピ無し = 上のパターン規則に前提だけ足す)。
