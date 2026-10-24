@@ -21,8 +21,8 @@
 /*      82557 の実装として載っている — こちらが手元で引ける正典             */
 /* ======================================================================== */
 
-#ifndef PCI_DECODE_H
-#define PCI_DECODE_H
+#ifndef PCI_DECODE_CONSTANTS_H
+#define PCI_DECODE_CONSTANTS_H
 
 #include "types.h"
 
@@ -63,11 +63,6 @@
 #define PCI_MECH1_PROBE_A       0x80000000UL
 #define PCI_MECH1_PROBE_B       0x80FFFFFCUL  /* bus 0xFF / dev 31 / fn 7 / reg 0xFC */
 
-/* 組み立て: bit31 | bus<<16 | dev<<11 | fn<<8 | (reg & 0xFC)。
- * bus / dev / fn / reg は呼び手が範囲外を渡しても**隣の欄を侵さない**よう
- * マスクしてから詰める (侵すと別のデバイスの config を読む)。 */
-u32 pci_cfg_addr(u32 bus, u32 dev, u32 fn, u32 reg);
-
 /* ======================================================================== */
 /*  2. Type 0 コンフィギュレーションヘッダのオフセット                      */
 /*                                                                          */
@@ -87,9 +82,22 @@ u32 pci_cfg_addr(u32 bus, u32 dev, u32 fn, u32 reg);
 #define PCI_CFG_BIST            0x0F  /* u8  */
 #define PCI_CFG_BAR0            0x10  /* u32 × 6 (0x10〜0x24) */
 #define PCI_CFG_BAR_COUNT       6
+#define PCI_CFG_BAR_STRIDE      4U
+#define PCI_BRIDGE_BAR_COUNT    2
+#define PCI_REVISION_MASK       0xffU
 #define PCI_CFG_PRIMARY_BUS     0x18  /* u8 (Type 1 のみ) */
 #define PCI_CFG_SECONDARY_BUS   0x19  /* u8 (Type 1 のみ) */
 #define PCI_CFG_SUBORDINATE_BUS 0x1A  /* u8 (Type 1 のみ) */
+#define PCI_CFG_MEM_WINDOW      0x20U /* Type 1 memory base/limit */
+#define PCI_CFG_PREF_WINDOW     0x24U /* Type 1 prefetch base/limit */
+#define PCI_CFG_PREF_BASE_HIGH  0x28U
+#define PCI_CFG_PREF_LIMIT_HIGH 0x2cU
+#define PCI_CFG_ROM_ENDPOINT    0x30U
+#define PCI_CFG_ROM_BRIDGE      0x38U
+#define PCI_BRIDGE_WINDOW_MASK   0xfff0U
+#define PCI_BRIDGE_WINDOW_SHIFT  16U
+#define PCI_BRIDGE_WINDOW_GRANULE 0x100000U
+
 #define PCI_CFG_SUBSYS_VENDOR   0x2C  /* u16 */
 #define PCI_CFG_SUBSYS_ID       0x2E  /* u16 */
 #define PCI_CFG_CAP_PTR         0x34  /* u8 (SDM 4.1.14) */
@@ -122,6 +130,8 @@ u32 pci_cfg_addr(u32 bus, u32 dev, u32 fn, u32 reg);
 #define PCI_SUB_BRIDGE_PCI      0x04
 
 /* 狙いのデバイス (票 §2 L-A)。8255x SDM 4.1.1 / 4.1.2 (727〜736 行)。 */
+#define PCI_VENDOR_NVIDIA       0x10deU
+#define PCI_DEVICE_NV44A        0x0221U
 #define PCI_VENDOR_INTEL        0x8086
 #define PCI_DEVICE_82557        0x1229
 
@@ -150,6 +160,32 @@ u32 pci_cfg_addr(u32 bus, u32 dev, u32 fn, u32 reg);
 #define PCI_BAR_MEM_PREFETCH 0x00000008UL /* bit3 */
 #define PCI_BAR_IO_ADDR_MASK  0xFFFFFFFCUL /* ~3 */
 #define PCI_BAR_MEM_ADDR_MASK 0xFFFFFFF0UL /* ~0xF */
+#define PCI_BAR_MEM_ATTR_MASK 0xfU
+#define PCI_BAR_MEM_TYPE32 0U
+#define PCI_BAR_MEM_TYPE64 4U
+#define PCI_BAR_TYPE_MASK (PCI_BAR_SPACE_IO | PCI_BAR_MEM_TYPE)
+
+/* PCI expansion ROM header and PCIR data structure offsets. */
+#define PCI_ROM_SIG0       0x55U
+#define PCI_ROM_SIG1       0xaaU
+#define PCI_ROM_SIZE_OFF   2U
+#define PCI_ROM_SIZE_UNIT  512U
+#define PCI_ROM_PCIR_PTR   0x18U
+#define PCIR_HEADER_SIZE   0x18U
+#define PCIR_VENDOR        4U
+#define PCIR_DEVICE        6U
+
+#endif /* PCI_DECODE_CONSTANTS_H */
+
+/* recover.h needs the numeric PCI vocabulary without adding declarations to
+ * HWDEV's preprocessed ABI contract. A later normal include still declares
+ * the decoder API, even after a constants-only include. */
+#if !defined(PCI_DECODE_CONSTANTS_ONLY) && !defined(PCI_DECODE_H)
+#define PCI_DECODE_H
+/* 組み立て: bit31 | bus<<16 | dev<<11 | fn<<8 | (reg & 0xFC)。
+ * bus / dev / fn / reg は呼び手が範囲外を渡しても**隣の欄を侵さない**よう
+ * マスクしてから詰める (侵すと別のデバイスの config を読む)。 */
+u32 pci_cfg_addr(u32 bus, u32 dev, u32 fn, u32 reg);
 
 /* 生値から種別 (PCI_BAR_*) を返す。
  * **生値 0 だけ**を PCI_BAR_NONE にする。0x00000001 (= 番地未割り当ての

@@ -42,30 +42,30 @@ CASES = ["phase_diag", "port_list", "insn", "record_order", "overflow", "in_tabl
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib", "kdebug")]
+INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib", "kdebug", "include")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
     (r"after.in - before.in", "after.in", "phase delta forgets baseline"),
-    (r"    if \(!set_ran\) return 1;\n    return \(\(set_ah & 0xFFU\) == 0x05U\) \? 1 : 0;",
+    (r"    if \(!set_ran\) return 1;\n    return \(\(set_ah & 0xFFU\) == V86G_INT18_AH_DONE\) \? 1 : 0;",
      "    (void)set_ran; (void)set_ah;\n    return 1;",
      "③ が断られても (無変化) ④ を呼ぶ — ④ も断られると OS32 の表で同期を書き換え、"
      "並びの誤判定と重なると 24kHz 機に 31kHz を入れる (代行レビュー P2-2)"),
     (r"    if \(!set_ran\) return 1;\n",
      "    (void)set_ran;\n",
      "③ が途中で終わったとき ④ を呼ばない (何を変えたか分からないまま放置)"),
-    (r"    if \(rst_ran && \(rst_ah & 0xFFU\) == 0x05U\) return V86G_RST_ROM;",
-     "    if (rst_ran || (rst_ah & 0xFFU) == 0x05U) return V86G_RST_ROM;",
+    (r"    if \(rst_ran && \(rst_ah & 0xFFU\) == V86G_INT18_AH_DONE\) return V86G_RST_ROM;",
+     "    if (rst_ran || (rst_ah & 0xFFU) == V86G_INT18_AH_DONE) return V86G_RST_ROM;",
      "④ が途中で終わっても ROM で戻ったとみなす (FALLBACK を落とす)"),
-    (r"    return \(\(set_ah & 0xFFU\) == 0x05U\) \? 1 : 0;",
-     "    return (set_ah == 0x05U) ? 1 : 0;",
+    (r"    return \(\(set_ah & 0xFFU\) == V86G_INT18_AH_DONE\) \? 1 : 0;",
+     "    return (set_ah == V86G_INT18_AH_DONE) ? 1 : 0;",
      "③ の戻り AH の上位を見てしまう (AX を渡す呼び手で 05h を取りこぼす)"),
-    (r"if \(port == 0x09A8U \|\| port == 0x09A0U\)",
-     "if (port == 0x09A0U)",
+    (r"if \(port == PEGC_HSYNC_PORT \|\| port == PEGC_STAT_PORT\)",
+     "if (port == PEGC_STAT_PORT)",
      "09A8h (水平周波数) を通さない — 票の表の筆頭。捕まえて捨てると ROM の "
      "31kHz への切り替えが記録にも実機にも残らない"),
-    (r"port <= 0x007AU && \(port & 1U\) == 0\)",
-     "port <= 0x007AU)",
+    (r"port <= CRTC_SCROLL_LINES && \(port & 1U\) == 0\)",
+     "port <= CRTC_SCROLL_LINES)",
      "偶数だけに絞らない (奇数の 71h〜77h は PIT — OS32 の 100Hz タイマを "
      "ROM に触らせる)"),
     (r"if \(!opsize16 && \(opcode == 0xE5U",
@@ -94,25 +94,25 @@ MUTATIONS = [
      "    if (v86g_note_out(g, port, size, value, cs, ip, 1, phase) != 0) return;\n",
      "溢れたら実機へ通すのをやめる (ROM のモード切り替えが途中で崩れ、戻しの "
      "AH=30h の前提が壊れる)"),
-    (r"\*al480 = 0x08U \| 0x04U \| \(al & V86G_AL_RASTER\);",
-     "*al480 = 0x08U | (al & V86G_AL_RASTER);",
+    (r"\*al480 = V86G_AL_BIT3 \| V86G_AL_BIT2 \| \(al & V86G_AL_RASTER\);",
+     "*al480 = V86G_AL_BIT3 | (al & V86G_AL_RASTER);",
      "bit2 並びの 480 で 31kHz の bit を立てない (NP21/W は 640x480 を断る)"),
-    (r"    if \(\(al & ~\(0x04U \| V86G_AL_RASTER\) & 0xFFU\) != 0x08U\) return 0;",
-     "    if ((al & 0xFBU) != 0x08U) return 0;",
+    (r"    if \(\(al & ~\(V86G_AL_BIT2 \| V86G_AL_RASTER\) & 0xFFU\) != V86G_AL_BIT3\) return 0;",
+     "    if ((al & 0xFBU) != V86G_AL_BIT3) return 0;",
      "bit2 並びで AL bit0 (ラスタスキャン) を弾く — 実機 Ra266 の AX=310Dh が "
      "V86G_ST_UNDECIDED になり 30h へ進まない (2026-09-29 の実機の v86 -g)"),
-    (r"    if \(\(al & ~\(0x08U \| V86G_AL_RASTER\) & 0xFFU\) != 0\) return 0;",
+    (r"    if \(\(al & ~\(V86G_AL_BIT3 \| V86G_AL_RASTER\) & 0xFFU\) != 0\) return 0;",
      "    if ((al & 0xF7U) != 0) return 0;",
      "bit3 並びで AL bit0 を弾く (資料の bit0 は並びを区別しない)"),
-    (r"    if \(\(al & ~\(0x04U \| V86G_AL_RASTER\) & 0xFFU\) != 0x08U\) return 0;",
-     "    if ((al & 0xF9U) != 0x08U) return 0;",
+    (r"    if \(\(al & ~\(V86G_AL_BIT2 \| V86G_AL_RASTER\) & 0xFFU\) != V86G_AL_BIT3\) return 0;",
+     "    if ((al & 0xF9U) != V86G_AL_BIT3) return 0;",
      "bit2 並びで bit0 の代わりに予約の bit1 を許す"),
-    (r"        \*al480 = 0x08U \| 0x04U \| \(al & V86G_AL_RASTER\);",
-     "        *al480 = 0x08U | 0x04U;",
+    (r"        \*al480 = V86G_AL_BIT3 \| V86G_AL_BIT2 \| \(al & V86G_AL_RASTER\);",
+     "        *al480 = V86G_AL_BIT3 | V86G_AL_BIT2;",
      "30h へ渡す AL で ROM の bit0 を落とす (ROM の設定したラスタスキャンを "
      "480 へ入るときに勝手に変える)"),
-    (r"        \*al480 = 0x08U \| \(al & V86G_AL_RASTER\);",
-     "        *al480 = 0x08U;",
+    (r"        \*al480 = V86G_AL_BIT3 \| \(al & V86G_AL_RASTER\);",
+     "        *al480 = V86G_AL_BIT3;",
      "bit3 並びで 30h へ渡す AL の bit0 を落とす"),
     (r"\*bh480 = \(3U << 4\) \| 2U;",
      "*bh480 = (3U << 4) | 1U;",
@@ -130,8 +130,8 @@ MUTATIONS = [
     (r"    if \(rows == 3U\) return 0;\n",
      "",
      "行数 3 (未定義) を受け入れる"),
-    (r"    return valid_mode\(\(bh >> 1\) & 3U, \(bh >> 3\) & 3U, \(al & 0x08U\) != 0\);",
-     "    return valid_mode((bh >> 3) & 3U, (bh >> 1) & 3U, (al & 0x08U) != 0);",
+    (r"    return valid_mode\(\(bh >> 1\) & 3U, \(bh >> 3\) & 3U, \(al & V86G_AL_BIT3\) != 0\);",
+     "    return valid_mode((bh >> 3) & 3U, (bh >> 1) & 3U, (al & V86G_AL_BIT3) != 0);",
      "bit3 並びの行数と解像度を取り違える (Bible の D4-D3 / D2-D1)"),
     (r"    if \(b2 && !b3\) \{",
      "    if (b2) {",
@@ -140,8 +140,8 @@ MUTATIONS = [
      r"        return V86G_DEC_NO31;\n    \}\n",
      "",
      "印のままを「答えが無い」と言わない (未対応の ROM を「並び不明」に混ぜる)"),
-    (r"    if \(layout == V86G_LAYOUT_BIT3\) return \(al & 0x08U\) \? 1 : 0;",
-     "    if (layout == V86G_LAYOUT_BIT3) return (al & 0x04U) ? 1 : 0;",
+    (r"    if \(layout == V86G_LAYOUT_BIT3\) return \(al & V86G_AL_BIT3\) \? 1 : 0;",
+     "    if (layout == V86G_LAYOUT_BIT3) return (al & V86G_AL_BIT2) ? 1 : 0;",
      "bit3 並びの 31kHz を bit2 で読む (ROM で戻れないときに 24kHz へ落とし、"
      "CUI の桁ずれを再発させる)"),
     (r" &&\n            \(\(e->flags & V86G_F_PASSED\) != 0\) == \(passed != 0\)\) \{",
@@ -162,6 +162,7 @@ def host_build(tmp, source_text=None):
         mut = src_dir / "kdebug"
         mut.mkdir(exist_ok=True)
         (mut / "v86_gcap_math.c").write_text(source_text, encoding="utf-8")
+        (mut / "v86_gcap_defs.h").write_text((ROOT / "kdebug/v86_gcap_defs.h").read_text())
         (mut / "v86_gcap_diag.h").write_text((ROOT / "kdebug/v86_gcap_diag.h").read_text())
         (src_dir / "serial_diag_host.h").write_text((ROOT / "tools/tests/serial_diag_host.h").read_text())
         (mut / "v86_gcap_math.h").write_text(
@@ -173,7 +174,7 @@ def host_build(tmp, source_text=None):
                 '"../../kdebug/v86_gcap_math.c"', '"kdebug/v86_gcap_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "sdk/include/os32"),
-               "-I" + str(ROOT / "lib"), "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
+               "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "include"), "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -218,9 +219,16 @@ def check_guest_bytes(tmp):
             print(f"FAIL entry {name} @{o:#x} is not the routine head", flush=True)
             bad += 1
     # 期待する OUT 列の IP は OUT 命令を指す (imm8 形ならポートも一致)
-    for port, _w, _p, _v, ip in re.findall(
-            r"\{ 0x([0-9A-F]{4}), (\d), (\d), 0x([0-9A-F]{4}), 0x([0-9A-F]{4}) \}",
-            text):
+    # Expand the canonical port names before checking all five expected OUTs.
+    table = text[text.index('} gcap_expect[] = {'):text.index('#define GCAP_EXPECT_N')]
+    expanded = subprocess.check_output(
+        ['gcc', '-E', '-P', '-I' + str(ROOT / 'include'), '-x', 'c', '-'],
+        input='#include "pegc.h"\n' + table, text=True)
+    expected = re.findall(
+        r"\{ 0x([0-9A-Fa-f]+)[Uu]?, (\d), (\d), 0x([0-9A-F]{4}), 0x([0-9A-F]{4}) \}",
+        expanded)
+    assert len(expected) == 5, 'all expected OUT rows must be checked'
+    for port, _w, _p, _v, ip in expected:
         p, i = int(port, 16), int(ip, 16)
         op = have[i]
         if op not in (0xE6, 0xE7, 0xEE, 0xEF) or \

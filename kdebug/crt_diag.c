@@ -84,5 +84,5 @@ void crt_diag_bootlog(void)
     char buf[CRT_DIAG_BUFSZ];
     crt_diag_read(&raw);
     if (crt_diag_format(&raw, buf, sizeof(buf)) >= 0)
-        kprintf(0x07, "%s\n", buf);
+        kprintf(KLOG_ATTR, "%s\n", buf);
 }

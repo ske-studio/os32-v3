@@ -96,8 +96,8 @@ MUTATIONS += [
     ("indexed_expr_dependency_removed", "if (!target_read && arg->kind != REC_ARG_READ) continue;",
      "if (!target_read) continue;"),
     ("indexed_expr_selection_removed", "r->port_selected[r->index_port[a->value]] != a->value) || bus_read", "false) || bus_read"),
-    ("raw_alias_unchecked", "if (t->bar == 0) for (u32 head = 0; head < 2; head++)",
-     "if (false) for (u32 head = 0; head < 2; head++)"),
+    ("raw_alias_unchecked", "if (t->bar == 0) for (u32 head = 0; head < RECOVER_HEAD_COUNT; head++)",
+     "if (false) for (u32 head = 0; head < RECOVER_HEAD_COUNT; head++)"),
     ("raw_alias_aperture", "/* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.",
      "if (off >= RECOVER_PRMCIO && off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE) return -1;\n            /* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs."),
     # T2.
@@ -109,7 +109,7 @@ MUTATIONS += [
     ("t2_size_tail_no_poll", "!r->failed && !recover_restore_point(r) &&", "!r->failed &&"),
     ("t2_size_tail_no_deadline", """bars) && restore_time(r) &&
             command == RECOVER_COMMAND_OVERRIDE;
-        for (u32 i = 0; i < 3; i++)
+        for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
             if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
         if (complete) r->cache = r->measurement;
         else r->cache = (struct recover_bar_measurement){0};
@@ -117,14 +117,14 @@ MUTATIONS += [
     /* Finish the first allocation before releasing the reserved S0 budget. */
     restore_time(r);""", """bars) &&
             command == RECOVER_COMMAND_OVERRIDE;
-        for (u32 i = 0; i < 3; i++)
+        for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
             if (!r->measurement.bar[i].valid || bars[i] != r->measurement.bar[i].raw) complete = false;
         if (complete) r->cache = r->measurement;
         else r->cache = (struct recover_bar_measurement){0};
     }"""),
     ("t2_s0_reserve_removed", "limit -= r->profile->s0_reserve_ticks;", "/* no reservation */"),
     ("t2_poll_removed", "r->restore_polls++;\n    return 0;", "return 0;"),
-    ("t2_delay_truncated", "wait_us(opaque, 1000U)", "wait_us(opaque, 999U)"),
+    ("t2_delay_truncated", "wait_us(opaque, RECOVER_US_PER_MS)", "wait_us(opaque, 999U)"),
     ("t2_uart_1ms", "    for (;;) {", "    frame_us = 1000;\n    for (;;) {"),
     ("t2_uart_double_poll", "        r->uart_polls++;\n        int ready = ops->ready(opaque);", "        r->uart_polls += 2;\n        int ready = ops->ready(opaque);"),
     ("t2_trial_budget_reused", "u32 limit = r->profile->restore_limit;", "u32 limit = r->budget - r->spent;"),

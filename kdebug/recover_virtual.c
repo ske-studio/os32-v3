@@ -5,11 +5,6 @@
 #define VIRTUAL_STEP_POLLS 64U
 #define VIRTUAL_TRIAL_SECONDS 8U
 #define VIRTUAL_UART_POLLS 4096U
-#define VIRTUAL_FRAME_BIT_US 10000000U
-#define VIRTUAL_FRAME_BITS 10U
-#define VIRTUAL_WAIT_MS 2000U
-#define VIRTUAL_POINTS 256U
-#define VIRTUAL_LOG_BYTES 4096U
 #define VIRTUAL_ID 1U /* fixed within this image/boot; never persisted */
 /* Decimal u32 maxima; sizeof includes one spare byte per row. S0 has
  * route/decode/screen plus eight nested screen BEGIN/END pairs. */
@@ -23,7 +18,7 @@
 #define VIRTUAL_TRIAL_BYTES (6U * VIRTUAL_STATE_BYTES + VIRTUAL_DISCARD_BYTES + VIRTUAL_BEGIN_BYTES)
 /* One ready poll per byte and one empty poll per row at minimum. */
 STATIC_ASSERT(VIRTUAL_TRIAL_BYTES + 8U < VIRTUAL_UART_POLLS, virtual_trial_polls);
-STATIC_ASSERT(VIRTUAL_RESTORE_BYTES <= VIRTUAL_LOG_BYTES, virtual_restore_log);
+STATIC_ASSERT(VIRTUAL_RESTORE_BYTES <= RECOVER_BUDGET_BYTES_S0, virtual_restore_log);
 STATIC_ASSERT(VIRTUAL_RESTORE_BYTES + 25U < VIRTUAL_UART_POLLS, virtual_restore_polls);
 
 static bool borrowed;
@@ -99,11 +94,11 @@ static int identity(void *opaque, struct recover_identity *out)
     return 0;
 }
 
-static int raw_config(void *opaque, u32 *command, u32 bars[3])
+static int raw_config(void *opaque, u32 *command, u32 bars[RECOVER_BAR_COUNT])
 {
     (void)opaque;
     *command = RECOVER_COMMAND_MEM;
-    for (u32 i = 0; i < 3; i++) bars[i] = 0;
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) bars[i] = 0;
     return 0;
 }
 
@@ -167,11 +162,11 @@ static int virtual_begin(struct recover *r, u32 hz, u32 case_id)
     profile = (struct recover_profile){.version = RECOVER_PROFILE_VERSION,
         .targets = &target, .target_count = 1, .layouts = &layout, .layout_count = 1};
     /* S0 restoration only; trial work is bounded by trial_limit. */
-    const struct recover_static_work work = {VIRTUAL_LOG_BYTES, VIRTUAL_WAIT_MS, VIRTUAL_POINTS,
-                                             VIRTUAL_LOG_BYTES, VIRTUAL_WAIT_MS, VIRTUAL_POINTS};
+    const struct recover_static_work work = {RECOVER_BUDGET_BYTES_S0, RECOVER_BUDGET_S0_WAIT_MS, RECOVER_BUDGET_S0_POINTS,
+                                             RECOVER_BUDGET_BYTES_S0, RECOVER_BUDGET_S0_WAIT_MS, RECOVER_BUDGET_S0_POINTS};
     if (!r->transport || !r->transport->frame_us ||
         recover_budget_apply(&profile, REC_BUDGET_S0, hz,
-            VIRTUAL_FRAME_BIT_US / r->transport->frame_us, VIRTUAL_FRAME_BITS, &work)) return -1;
+            RECOVER_UART_FRAME_US / r->transport->frame_us, RECOVER_UART_FRAME_BITS, &work)) return -1;
     if (case_id == RECOVER_VIRTUAL_TRIAL_EXPIRE) {
         /* Below the 60 s opcode_limit that recover_budget_apply just checked. */
         profile.trial_limit = VIRTUAL_TRIAL_SECONDS * hz;

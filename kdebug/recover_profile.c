@@ -4,6 +4,7 @@
  * only one latch/read. Never use tick/PIC-derived time for UART frame waits.
  */
 #include "recover.h"
+#include "config.h"
 #include "memmap.h"
 #include "../kernel/idt.h"
 #include "../kernel/paging.h"
@@ -13,14 +14,7 @@
 #include "generated/kdebug_import_macros.h"
 #endif
 
-#define RECOVER_UART_US 1000000U
 #define RECOVER_WAIT_SAMPLES 1048576U
-#define RECOVER_BUDGET_LOG_S0 4096U
-#define RECOVER_BUDGET_POINTS 1024U
-#define RECOVER_BUDGET_TRIAL_SECONDS 60U
-#define RECOVER_BUDGET_STEPS 4096U
-#define RECOVER_BUDGET_POLLS 65536U
-#define RECOVER_BUDGET_S0_POLLS 16384U
 
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {
@@ -64,10 +58,10 @@ static int seconds_ticks(u32 sec, u32 hz, u32 *out)
 int recover_budget_apply(struct recover_profile *p, u32 kind, u32 hz,
                          u32 baud, u32 frame_bits, const struct recover_static_work *w)
 {
-    static const u32 seconds[] = {10, 18, 33};
-    static const u32 bytes[] = {4096, 8192, 16384};
-    static const u32 execution_ms[] = {2000, 4000, 6000};
-    static const u32 polls[] = {16384, 32768, 65536};
+    static const u32 seconds[] = {RECOVER_BUDGET_SECONDS_S0, RECOVER_BUDGET_SECONDS_RUN, RECOVER_BUDGET_SECONDS_SIZE_BARS};
+    static const u32 bytes[] = {RECOVER_BUDGET_BYTES_S0, RECOVER_BUDGET_BYTES_RUN, RECOVER_BUDGET_BYTES_SIZE_BARS};
+    static const u32 execution_ms[] = {RECOVER_BUDGET_EXEC_MS_S0, RECOVER_BUDGET_EXEC_MS_RUN, RECOVER_BUDGET_EXEC_MS_SIZE_BARS};
+    static const u32 polls[] = {RECOVER_BUDGET_POLLS_S0, RECOVER_BUDGET_POLLS_RUN, RECOVER_BUDGET_POLLS_SIZE_BARS};
     if (!p || !w || kind > REC_BUDGET_SIZE_BARS || !baud || !frame_bits) return -1;
     if (frame_bits > (~0U / RECOVER_UART_US)) return -1;
     u32 bit_us = frame_bits * RECOVER_UART_US;
@@ -76,27 +70,27 @@ int recover_budget_apply(struct recover_profile *p, u32 kind, u32 hz,
     u32 tx_us = bytes[kind] * frame;
     u32 tx_seconds = tx_us / RECOVER_UART_US + (tx_us % RECOVER_UART_US != 0);
     u32 margin = (tx_seconds + 1) / 2;
-    if (margin < 3) margin = 3;
-    if (!frame || frame > RECOVER_UART_US || tx_seconds + execution_ms[kind] / 1000 + margin > seconds[kind]) return -1;
+    if (margin < RECOVER_BUDGET_MARGIN_S) margin = RECOVER_BUDGET_MARGIN_S;
+    if (!frame || frame > RECOVER_UART_US || tx_seconds + execution_ms[kind] / RECOVER_US_PER_MS + margin > seconds[kind]) return -1;
     unsigned long long needed = (unsigned long long)w->bytes + w->wait_ms + w->points;
     unsigned long long s0_needed = (unsigned long long)w->s0_bytes + w->s0_wait_ms + w->s0_points;
     if (w->bytes > bytes[kind] || w->wait_ms > execution_ms[kind] || w->points > RECOVER_BUDGET_POINTS ||
-        w->s0_bytes > RECOVER_BUDGET_LOG_S0 || w->s0_wait_ms > 2000 ||
+        w->s0_bytes > RECOVER_BUDGET_BYTES_S0 || w->s0_wait_ms > RECOVER_BUDGET_S0_WAIT_MS ||
         w->s0_points > RECOVER_BUDGET_POINTS || w->s0_bytes > w->bytes ||
         w->s0_wait_ms > w->wait_ms || w->s0_points > w->points ||
-        needed > polls[kind] || s0_needed > RECOVER_BUDGET_S0_POLLS ||
-        (kind && (needed - s0_needed > polls[kind] - RECOVER_BUDGET_S0_POLLS ||
-                  w->bytes - w->s0_bytes > bytes[kind] - RECOVER_BUDGET_LOG_S0))) return -1;
+        needed > polls[kind] || s0_needed > RECOVER_BUDGET_POLLS_S0 ||
+        (kind && (needed - s0_needed > polls[kind] - RECOVER_BUDGET_POLLS_S0 ||
+                  w->bytes - w->s0_bytes > bytes[kind] - RECOVER_BUDGET_BYTES_S0))) return -1;
     struct recover_profile next = *p;
     if (seconds_ticks(seconds[kind], hz, &next.restore_limit) ||
         seconds_ticks(RECOVER_BUDGET_TRIAL_SECONDS, hz, &next.trial_limit)) return -1;
     next.opcode_limit = next.trial_limit;
     next.max_steps = RECOVER_BUDGET_STEPS; next.max_polls = RECOVER_BUDGET_POLLS;
-    next.restore_log_bytes = bytes[kind]; next.s0_reserve_bytes = kind ? RECOVER_BUDGET_LOG_S0:0;
+    next.restore_log_bytes = bytes[kind]; next.s0_reserve_bytes = kind ? RECOVER_BUDGET_BYTES_S0:0;
     next.restore_max_polls = polls[kind]; next.s0_reserve_ticks = 0; next.s0_reserve_polls = 0;
     if (kind) {
         if (seconds_ticks(seconds[REC_BUDGET_S0], hz, &next.s0_reserve_ticks)) return -1;
-        next.s0_reserve_polls = RECOVER_BUDGET_S0_POLLS;
+        next.s0_reserve_polls = RECOVER_BUDGET_POLLS_S0;
     }
     next.crc = recover_profile_crc(&next);
     *p = next;
@@ -167,9 +161,6 @@ int recover_indexed_cleanup(struct recover *r, const struct recover_local_step *
  * References: DESIGN.final §3/§5; gf6200/PLAN.final §1 PMC INTR_ENABLE 0140h;
  * envytools docs/hw/bus/{pci,pmc}.rst, MIT; xf86-video-nv nv_driver.c:2290.
  * This is not the 619-candidate classification or a real ROM implementation. */
-#define RECOVER_GF_BDF (13U << 3)
-#define RECOVER_GF_DEVICE 0x022110deU
-#define RECOVER_GF_PMC_IRQ 0x0140U
 #define RECOVER_GF_COMMAND_MASK 0x0107U
 #define GF_CMD 0U
 #define GF_OUT 1U
@@ -245,10 +236,10 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
     u32 main_pairs=1+1+p->quiesce_count+1+1+1+6;
     if (kind==REC_BUDGET_SIZE_BARS) main_pairs+=7;
     struct recover_static_work work={
-        main_pairs*pair_bytes+s0_bytes+sizeof(state_row), kind==REC_BUDGET_SIZE_BARS ? 6000:4000,
-        main_pairs*8+256, s0_bytes,2000,256};
+        main_pairs*pair_bytes+s0_bytes+sizeof(state_row), kind==REC_BUDGET_SIZE_BARS ? RECOVER_BUDGET_EXEC_MS_SIZE_BARS:RECOVER_BUDGET_EXEC_MS_RUN,
+        main_pairs*8+RECOVER_BUDGET_S0_POINTS, s0_bytes,RECOVER_BUDGET_S0_WAIT_MS,RECOVER_BUDGET_S0_POINTS};
 
-    return recover_budget_apply(p,kind,hz,9600,10,&work);
+    return recover_budget_apply(p,kind,hz,SYS_SERIAL_BAUD,RECOVER_UART_FRAME_BITS,&work);
 }
 
 /* Independent proof via PCI config mirrors; never MMIO when BAR/Mem failed.

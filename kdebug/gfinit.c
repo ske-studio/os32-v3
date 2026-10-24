@@ -24,15 +24,11 @@
 #include "generated/kdebug_import_macros.h"
 #endif
 
-#define GF_BDF (GF_RES_GPU_DEV << 3)
-#define GF_DEVICE GF_RES_GPU_ID
-#define GF_US_PER_TICK (1000000U / PIT_HZ)
+#define GF_US_PER_TICK (RECOVER_UART_US / PIT_HZ)
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN
-#define GF_ROM_UNIT 512U
-#define GF_LOG_MARGIN_SECONDS 3U
 /* Each allocation is rounded independently; the old size-plan flow is freed
  * before the maximum flow allocation. Static control is not trial RAM. */
-#define GF_WORK_MAX_PAGES 267U
+#define GF_WORK_MAX_PAGES HWDEV_WORK_MAX_PAGES
 STATIC_ASSERT(GF_WORK_MAX_PAGES == HWDEV_WORK_MAX_PAGES, gf_work_page_contract);
 #define GF_FLOW_MAX_BYTES (RECOVER_NODE_MAX * RECOVER_BITS_WORDS * sizeof(u32))
 STATIC_ASSERT(RECOVER_NODE_MAX == 2048U, gf_work_node_contract);
@@ -65,7 +61,7 @@ static struct gfinit_owner *owner;
 /* There is no production GF driver in v1. Only this fixed, stopped device is
  * classified; IDE, LAN/SerialFS, display and unknown inputs never claim. */
 static struct hwdev_device_owner gf_device = {
-    .bdf = GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
+    .bdf = RECOVER_GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
 };
 static struct hwdev_lease gf_lease;
 static bool gf_owned(struct recover *r)
@@ -159,7 +155,7 @@ static void gf_inspect_line(u32 sid, int rc, u32 len, u32 crc, u32 chip)
 static int gf_read_rom(struct gfinit_owner *g, u32 *len, u32 *crc, u32 *chip)
 {
     KdebugPeek req;
-    u32 raw, bars[3];
+    u32 raw, bars[RECOVER_BAR_COUNT];
     if (gfinit_bus_raw_config(&g->bus, &raw, bars) || !(raw & RECOVER_COMMAND_MEM) ||
         bars[0] > ~0U - KPEEK_NV_PROM_OFF - GF_ROM_MAX) return -1;
     g->rom = gf_alloc(GF_ROM_MAX);
@@ -177,18 +173,18 @@ static int gf_read_rom(struct gfinit_owner *g, u32 *len, u32 *crc, u32 *chip)
             }
         }
     }
-    if (g->rom[0] != 0x55 || g->rom[1] != 0xaa || !g->rom[2]) return -1;
-    g->rom_size = (u32)g->rom[2] * GF_ROM_UNIT;
+    if (g->rom[0] != PCI_ROM_SIG0 || g->rom[1] != PCI_ROM_SIG1 || !g->rom[PCI_ROM_SIZE_OFF]) return -1;
+    g->rom_size = (u32)g->rom[PCI_ROM_SIZE_OFF] * PCI_ROM_SIZE_UNIT;
     if (g->rom_size > GF_ROM_MAX) return -1;
     *len = g->rom_size;
     *crc = crc32_core_final(crc32_core_update(CRC32_INIT, g->rom, *len));
     *chip = gf_rom_chip(g->rom, *len);
-    u32 pcir = (u32)g->rom[0x18] | (u32)g->rom[0x19] << 8;
-    if (g->rom_size < 0x18 || pcir > g->rom_size - 0x18 ||
+    u32 pcir = (u32)g->rom[PCI_ROM_PCIR_PTR] | (u32)g->rom[PCI_ROM_PCIR_PTR + 1] << 8;
+    if (g->rom_size < PCIR_HEADER_SIZE || pcir > g->rom_size - PCIR_HEADER_SIZE ||
         g->rom[pcir] != 'P' || g->rom[pcir+1] != 'C' ||
         g->rom[pcir+2] != 'I' || g->rom[pcir+3] != 'R' ||
-        ((u32)g->rom[pcir+4] | (u32)g->rom[pcir+5] << 8) != (GF_DEVICE & 0xffffU) ||
-        ((u32)g->rom[pcir+6] | (u32)g->rom[pcir+7] << 8) != GF_DEVICE >> 16) return -1;
+        ((u32)g->rom[pcir+PCIR_VENDOR] | (u32)g->rom[pcir+PCIR_VENDOR+1] << 8) != PCI_VENDOR_NVIDIA ||
+        ((u32)g->rom[pcir+PCIR_DEVICE] | (u32)g->rom[pcir+PCIR_DEVICE+1] << 8) != PCI_DEVICE_NV44A) return -1;
     u8 sum = 0;
     for (u32 i = 0; i < g->rom_size; i++) sum += g->rom[i];
     return sum || *chip != GF_VERSION_CHIP ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, g->decoded);
@@ -230,7 +226,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     if (hwdev_claim(&gf_lease, &gf_device, r->token.session)) return -1;
     g->generation = gf_lease.generation;
     g->profile = recover_gf_template;
-    g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
+    g->profile.expected_bdf = RECOVER_GF_BDF; g->profile.expected_device = RECOVER_GF_DEVICE;
     gfinit_bus_init(&g->bus, &g->profile, &gf_pci);
     BootImageInfo boot;
     if (boot_image_info(&boot) || !boot.crc_valid || gfinit_bus_probe(&g->bus)) return -1;
@@ -259,12 +255,12 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
 {
     const struct serial_setup *serial = serial_get_setup();
     const struct recover_static_work work = {
-        kind == REC_BUDGET_SIZE_BARS ? 16384U : 8192U,
-        kind == REC_BUDGET_SIZE_BARS ? 6000U : 4000U, 1024U,
-        4096U, 2000U, 1024U
+        kind == REC_BUDGET_SIZE_BARS ? RECOVER_BUDGET_BYTES_SIZE_BARS : RECOVER_BUDGET_BYTES_RUN,
+        kind == REC_BUDGET_SIZE_BARS ? RECOVER_BUDGET_EXEC_MS_SIZE_BARS : RECOVER_BUDGET_EXEC_MS_RUN, RECOVER_BUDGET_POINTS,
+        RECOVER_BUDGET_BYTES_S0, RECOVER_BUDGET_S0_WAIT_MS, RECOVER_BUDGET_POINTS
     };
     if (!serial || !serial->actual || recover_budget_apply(&g->profile, kind,
-            PIT_HZ, serial->actual, 10, &work)) return -1;
+            PIT_HZ, serial->actual, RECOVER_UART_FRAME_BITS, &work)) return -1;
     u32 rows = 128;
     if (plan->node_count > (~0U - rows) / 12U) return -1;
     rows += plan->node_count * 12U;
@@ -273,11 +269,11 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
     if (rows > ~0U / (RECOVER_ROW_MAX + 1U)) return -1;
     u32 bytes = rows * (RECOVER_ROW_MAX + 1U);
     u32 seconds = bytes / serial->actual;
-    if (seconds > (~0U - 10U) / 10U) return -1;
-    seconds = seconds * 10U + (bytes % serial->actual * 10U + serial->actual - 1U) / serial->actual;
-    if (seconds > (RECOVER_HALF_TICKS / PIT_HZ - GF_LOG_MARGIN_SECONDS) / 2U ||
+    if (seconds > (~0U - RECOVER_UART_FRAME_BITS) / RECOVER_UART_FRAME_BITS) return -1;
+    seconds = seconds * RECOVER_UART_FRAME_BITS + (bytes % serial->actual * RECOVER_UART_FRAME_BITS + serial->actual - 1U) / serial->actual;
+    if (seconds > (RECOVER_HALF_TICKS / PIT_HZ - RECOVER_BUDGET_MARGIN_S) / 2U ||
         bytes > (~0U - 1024U) / 2U) return -1;
-    r->log_limit = (seconds * 2U + GF_LOG_MARGIN_SECONDS) * PIT_HZ;
+    r->log_limit = (seconds * 2U + RECOVER_BUDGET_MARGIN_S) * PIT_HZ;
     transport->max_polls = bytes * 2U + 1024U;
     g->profile.crc = recover_profile_crc(&g->profile);
     return 0;
@@ -295,8 +291,8 @@ static int gf_fixed(struct recover *r, void *arg)
         if (n->phase == REC_SIZE_BARS && r->node_layout[id]->dir_substep == REC_READ) {
             u32 key = r->plan->args[n->arg_first].value;
             const struct recover_target *t = &r->profile->targets[key];
-            if (t->space != REC_PCI_CFG || t->offset < PCI_CFG_BAR0 || t->offset > PCI_CFG_BAR0 + 4 * 2) return -1;
-            u32 bar = (t->offset - PCI_CFG_BAR0) / 4;
+            if (t->space != REC_PCI_CFG || t->offset < PCI_CFG_BAR0 || t->offset > PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * (RECOVER_BAR_COUNT - 1)) return -1;
+            u32 bar = (t->offset - PCI_CFG_BAR0) / PCI_CFG_BAR_STRIDE;
             if (recover_bar_probe(r, bar, g->bus.bars[bar], value,
                     g->exclude, g->exclude_count, 0, 0)) return -1;
         }
@@ -310,7 +306,7 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     if (!g || !g->inspected || !gf_owned(r) || r->cold_latched ||
         (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
     g->profile = recover_gf_template;
-    g->profile.expected_bdf = GF_BDF; g->profile.expected_device = GF_DEVICE;
+    g->profile.expected_bdf = RECOVER_GF_BDF; g->profile.expected_device = RECOVER_GF_DEVICE;
     const struct recover_plan *plan;
     if (size) {
         if (gfinit_resources(g->exclude, &g->exclude_count)) return -1;

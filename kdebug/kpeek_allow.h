@@ -17,7 +17,7 @@
 #ifndef KDEBUG_KPEEK_ALLOW_H
 #define KDEBUG_KPEEK_ALLOW_H
 
-#include "types.h"
+#include "recover.h"
 
 /* width_mask の bit は幅の値そのもの (1 / 2 / 4)。 */
 #define KPEEK_W1   1U
@@ -25,47 +25,13 @@
 #define KPEEK_W4   4U
 
 /* PCI BAR の下位 4 bit (メモリ BAR の種別・prefetch)。メモリ BAR だけ扱う。 */
-#define KPEEK_BAR_IO_BIT     0x1U
-#define KPEEK_BAR_ADDR_MASK  (~0xFU)
+#define KPEEK_BAR_IO_BIT     PCI_BAR_SPACE_IO
+#define KPEEK_BAR_ADDR_MASK  PCI_BAR_MEM_ADDR_MASK
 
 /* -k (RAM) で写像や PCD に関わらず断る帯: TVRAM・VRAM・C バス窓・
  * 拡張 ROM (R2)。E8000h 以上の BIOS ROM は PCD でなく読める。 */
 #define KPEEK_RAM_DENY_LO    TVRAM_CHAR_BASE   /* 0A0000h */
 #define KPEEK_RAM_DENY_HI    BIOS_ROM_BASE     /* 0E8000h (exclusive) */
-
-/* GeForce 6200 (NV44A) */
-#define KPEEK_NV_VENDOR      0x10DEU
-#define KPEEK_NV44A_DEVICE   0x0221U
-#define KPEEK_NV_BAR_MMIO    0U       /* BAR0 = レジスタ空間 16MB */
-
-/* BAR0 内のオフセット (nouveau / envytools の名前) と長さ */
-#define KPEEK_NV_PMC_OFF        0x000000U   /* PMC: ID・有効化 */
-#define KPEEK_NV_PMC_LEN        0x000400U
-#define KPEEK_NV_PBUS_OFF       0x001800U   /* PBUS: PCI 設定の写し */
-#define KPEEK_NV_PBUS_LEN       0x000100U
-#define KPEEK_NV_PFB_OFF        0x100000U   /* PFB: メモリ制御 */
-#define KPEEK_NV_PFB_LEN        0x001000U
-#define KPEEK_NV_PSTRAPS_OFF    0x101000U   /* PEXTDEV の strap */
-#define KPEEK_NV_PSTRAPS_LEN    0x000010U
-#define KPEEK_NV_PCRTC0_OFF     0x600000U   /* PCRTC head 0 */
-#define KPEEK_NV_PCRTC1_OFF     0x602000U   /* PCRTC head 1 */
-#define KPEEK_NV_PCRTC_LEN      0x001000U
-#define KPEEK_NV_PRAMDAC0_OFF   0x680000U   /* PRAMDAC head 0 */
-#define KPEEK_NV_PRAMDAC1_OFF   0x682000U   /* PRAMDAC head 1 */
-#define KPEEK_NV_PRAMDAC_LEN    0x001000U
-#define KPEEK_NV_PROM_OFF       0x300000U   /* PROM: VBIOS の窓 */
-#define KPEEK_NV_PROM_LEN       0x020000U
-#define KPEEK_NV_PRMVIO0_OFF    0x0C0000U   /* NV_PRMVIO0_OFFSET */
-#define KPEEK_NV_PRMCIO0_OFF    0x601000U   /* NV_PRMCIO0_OFFSET */
-#define KPEEK_VGA_MISC_W        0x3C2U      /* NV_PRMVIO_MISC__WRITE */
-#define KPEEK_VGA_SRX           0x3C4U      /* NV_PRMVIO_SRX */
-#define KPEEK_VGA_SR            0x3C5U      /* NV_PRMVIO_SR */
-#define KPEEK_VGA_MISC_R        0x3CCU      /* NV_PRMVIO_MISC__READ */
-#define KPEEK_VGA_GRX           0x3CEU      /* NV_PRMVIO_GRX */
-#define KPEEK_VGA_GX            0x3CFU      /* NV_PRMVIO_GX */
-#define KPEEK_VGA_CRX           0x3D4U      /* NV_PRMCIO_CRX__COLOR */
-#define KPEEK_VGA_CR            0x3D5U      /* NV_PRMCIO_CR__COLOR */
-#define KPEEK_VGA_BYTE_LEN      1U
 
 typedef struct {
     u16 vendor;

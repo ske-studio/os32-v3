@@ -6,6 +6,8 @@
 /* ======================================================================== */
 
 #include "v86_gcap_math.h"
+#include "v86_gcap_defs.h"
+#include "pegc.h"
 
 void v86g_reset(V86Gcap *g)
 {
@@ -32,14 +34,14 @@ void v86g_reset(V86Gcap *g)
 /* ------------------------------------------------------------------------ */
 int v86g_port_passed(unsigned int port)
 {
-    if (port == 0x09A8U || port == 0x09A0U) {
+    if (port == PEGC_HSYNC_PORT || port == PEGC_STAT_PORT) {
         return 1;
     }
-    if (port >= 0x0060U && port <= 0x007AU && (port & 1U) == 0) {
+    if (port >= GDC_TEXT_PARAM && port <= CRTC_SCROLL_LINES && (port & 1U) == 0) {
         return 1;               /* テキスト GDC / モード F/F / CRTC */
     }
-    if (port == 0x00A0U || port == 0x00A2U ||
-        port == 0x00A4U || port == 0x00A6U) {
+    if (port == GDC_GFX_PARAM || port == GDC_GFX_CMD ||
+        port == GDC_DISP_PAGE || port == GDC_ACCESS_PAGE) {
         return 1;               /* グラフィック GDC / 表示・描画ページ */
     }
     return 0;
@@ -199,16 +201,16 @@ static int valid_mode(unsigned int res, unsigned int rows, int is31k)
 
 static int is_bit2(unsigned int al, unsigned int bh)
 {
-    if ((al & ~(0x04U | V86G_AL_RASTER) & 0xFFU) != 0x08U) return 0;
+    if ((al & ~(V86G_AL_BIT2 | V86G_AL_RASTER) & 0xFFU) != V86G_AL_BIT3) return 0;
     if ((bh & 0xCCU) != 0) return 0;
-    return valid_mode((bh >> 4) & 3U, bh & 3U, (al & 0x04U) != 0);
+    return valid_mode((bh >> 4) & 3U, bh & 3U, (al & V86G_AL_BIT2) != 0);
 }
 
 static int is_bit3(unsigned int al, unsigned int bh)
 {
-    if ((al & ~(0x08U | V86G_AL_RASTER) & 0xFFU) != 0) return 0;
+    if ((al & ~(V86G_AL_BIT3 | V86G_AL_RASTER) & 0xFFU) != 0) return 0;
     if ((bh & 0xE1U) != 0) return 0;
-    return valid_mode((bh >> 1) & 3U, (bh >> 3) & 3U, (al & 0x08U) != 0);
+    return valid_mode((bh >> 1) & 3U, (bh >> 3) & 3U, (al & V86G_AL_BIT3) != 0);
 }
 
 int v86g_decide(unsigned int al, unsigned int bh,
@@ -227,12 +229,12 @@ int v86g_decide(unsigned int al, unsigned int bh,
     b3 = is_bit3(al, bh);
     if (b2 && !b3) {
         /* 31kHz / 640x480 / 30 行 (OS32 の PEGC と同じ 30 行) */
-        *al480 = 0x08U | 0x04U | (al & V86G_AL_RASTER);
+        *al480 = V86G_AL_BIT3 | V86G_AL_BIT2 | (al & V86G_AL_RASTER);
         *bh480 = (3U << 4) | 2U;
         return V86G_LAYOUT_BIT2;
     }
     if (b3 && !b2) {
-        *al480 = 0x08U | (al & V86G_AL_RASTER);
+        *al480 = V86G_AL_BIT3 | (al & V86G_AL_RASTER);
         *bh480 = (2U << 3) | (3U << 1);
         return V86G_LAYOUT_BIT3;
     }
@@ -242,19 +244,19 @@ int v86g_decide(unsigned int al, unsigned int bh,
 int v86g_need_restore(int set_ran, unsigned int set_ah)
 {
     if (!set_ran) return 1;
-    return ((set_ah & 0xFFU) == 0x05U) ? 1 : 0;
+    return ((set_ah & 0xFFU) == V86G_INT18_AH_DONE) ? 1 : 0;
 }
 
 unsigned int v86g_restore_kind(int rst_ran, unsigned int rst_ah)
 {
-    if (rst_ran && (rst_ah & 0xFFU) == 0x05U) return V86G_RST_ROM;
+    if (rst_ran && (rst_ah & 0xFFU) == V86G_INT18_AH_DONE) return V86G_RST_ROM;
     return V86G_RST_FALLBACK;
 }
 
 int v86g_mode_is_31k(int layout, unsigned int al)
 {
-    if (layout == V86G_LAYOUT_BIT2) return (al & 0x04U) ? 1 : 0;
-    if (layout == V86G_LAYOUT_BIT3) return (al & 0x08U) ? 1 : 0;
+    if (layout == V86G_LAYOUT_BIT2) return (al & V86G_AL_BIT2) ? 1 : 0;
+    if (layout == V86G_LAYOUT_BIT3) return (al & V86G_AL_BIT3) ? 1 : 0;
     return 0;
 }
 
