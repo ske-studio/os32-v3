@@ -146,10 +146,10 @@ def real_suite(exe, directory, vmkernel, runner, packer=mkmod):
 
 
 MUTATIONS = (
-    ('payload-boundary', '!within(off, 4, h[MI_PAYLOAD_SIZE])', '!within(off, 2, h[MI_PAYLOAD_SIZE])'),
-    ('base-overflow', 'if (base > 0xffffffffUL - h[MI_MEM_SIZE])', 'if (0)'),
-    ('import-crossing', 'if (overlap(off, 4, slot, 4))', 'if (0 && overlap(off, 4, slot, 4))'),
-    ('duplicate-write', 'if (overlap(off, 4, prev, 4))', 'if (0 && overlap(off, 4, prev, 4))'),
+    ('payload-boundary', '!within(off, MODULE_WORD_BYTES, h[MI_PAYLOAD_SIZE])', '!within(off, 2, h[MI_PAYLOAD_SIZE])'),
+    ('base-overflow', 'if (base > U32_MAX - h[MI_MEM_SIZE])', 'if (0)'),
+    ('import-crossing', 'if (overlap(off, MODULE_WORD_BYTES, slot, MODULE_WORD_BYTES))', 'if (0 && overlap(off, MODULE_WORD_BYTES, slot, MODULE_WORD_BYTES))'),
+    ('duplicate-write', 'if (overlap(off, MODULE_WORD_BYTES, prev, MODULE_WORD_BYTES))', 'if (0 && overlap(off, MODULE_WORD_BYTES, prev, MODULE_WORD_BYTES))'),
 )
 
 

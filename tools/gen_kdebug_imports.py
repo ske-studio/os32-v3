@@ -14,9 +14,11 @@ import re
 import subprocess
 import sys
 
+from module_schema import CONSTANTS, SYMBOL_KINDS
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DEF = ROOT / 'kernel/kdebug_imports.def'
-KINDS = {'FUNC': 1, 'GETTER': 2, 'SETTER': 3, 'PTR': 4, 'OP': 5}
+KINDS = SYMBOL_KINDS
 STAGE_KINDS = {
     'S1': ('FUNC',),
     'S2': ('FUNC',) * 134 + ('GETTER',) * 22 +
@@ -48,9 +50,9 @@ def hwdev_gf_objects(root=ROOT):
 
 
 def fnv1a(data):
-    value = 2166136261
+    value = CONSTANTS['NAME_HASH_BASIS']
     for byte in data:
-        value = ((value ^ byte) * 16777619) & 0xffffffff
+        value = ((value ^ byte) * CONSTANTS['NAME_HASH_PRIME']) & 0xffffffff
     return value
 
 

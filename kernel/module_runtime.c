@@ -66,7 +66,7 @@ int module_load(const struct module_request *q, struct module_handle *out)
     rc = MODULE_SHORT_READ;
     if (vfs_fstat(fd, &st) < 0 ||
         vfs_read_fd(fd, header, sizeof(header)) != (int)sizeof(header)) goto rejected;
-    r->pair_crc = read_word(header + MI_PAIR_CRC * 4);
+    r->pair_crc = read_word(header + MI_PAIR_CRC * MODULE_WORD_BYTES);
     rc = module_image_header(header, sizeof(header), st.st_size, &q->policy, &plan);
     if (rc) goto rejected;
     r->state = MODULE_HEADER_CHECKED;
@@ -92,14 +92,14 @@ int module_load(const struct module_request *q, struct module_handle *out)
     r->state = MODULE_VALIDATED;
     /* relocate validates export count/unique slots against generated policy. */
     for (u32 i = 0; i < h[MI_IMPORT_COUNT]; i++) {
-        u32 off = read_word(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + 8);
+        u32 off = read_word(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
         kmemcpy(body + off, &q->imports[i], sizeof(u32));
     }
     r->exports[0] = h[MI_OPS_VERSION];
     for (u32 i = 0; i < h[MI_EXPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_EXPORT_OFF] + i * MODULE_RECORD_SIZE;
-        u32 slot = (u32)rec[4] | ((u32)rec[5] << 8);
-        r->exports[slot] = r->base + read_word(rec + 8);
+        u32 slot = (u32)rec[MODULE_EXPORT_SLOT_OFF] | ((u32)rec[MODULE_EXPORT_SLOT_OFF + 1] << 8);
+        r->exports[slot] = r->base + read_word(rec + MODULE_EXPORT_ADDR_OFF);
     }
     r->prefix_pages = h[MI_PAYLOAD_OFF] / PAGE_SIZE;
     r->text = r->base + h[MI_TEXT_OFF];
