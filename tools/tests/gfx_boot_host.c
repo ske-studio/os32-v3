@@ -79,6 +79,7 @@ static void report(const char *s, u32 n)
 
 #include "gfx_hal.h"
 #include "gfx.h"
+#include "kprintf.h"
 #include "pegc.h"
 #include "wab_xe10.h"
 

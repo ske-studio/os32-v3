@@ -291,17 +291,17 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
     /* 0 バイトの write_stream は何もしない (作りもしない)。write_file の
      * 0 バイトは TRUNC の要求を 1 回出して空のファイルを作る。 */
     if (size == 0 && !first_trunc) return 0;
-    n = sfs_put_path(pl + 5, (u16)(sizeof(pl) - 5), path);
+    n = sfs_put_path(pl + SFS_WRITE_HDR_LEN, (u16)(sizeof(pl) - SFS_WRITE_HDR_LEN), path);
     if (n < 0) return OS32_ERR_NAMETOOLONG;
-    room = (u16)(c->max_payload - 5 - n);
+    room = (u16)(c->max_payload - SFS_WRITE_HDR_LEN - n);
     if (room == 0) return OS32_ERR_NAMETOOLONG;
 
     while (first || done < size) {
         chunk = (u16)((size - done > room) ? room : (size - done));
         sfs_put32(pl, offset + done);
         pl[4] = (u8)((first && first_trunc) ? SFS_WF_TRUNC : 0);
-        for (k = 0; k < chunk; k++) pl[5 + n + k] = src[done + k];
-        rc = sfs_rpc(c, SFS_T_WRITE, pl, (u16)(5 + n + chunk), &body, &blen);
+        for (k = 0; k < chunk; k++) pl[SFS_WRITE_HDR_LEN + n + k] = src[done + k];
+        rc = sfs_rpc(c, SFS_T_WRITE, pl, (u16)(SFS_WRITE_HDR_LEN + n + chunk), &body, &blen);
         if (rc < 0) return rc;
         if ((u32)rc != chunk) return OS32_ERR_IO;   /* 書き切れない = 失敗 */
         done += chunk;

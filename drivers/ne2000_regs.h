@@ -133,10 +133,11 @@
 #define NE2K_PROM_SIG       0x57    /* PROM byte 14/15 = 'W' (NE2000 署名) */
 
 /* ---- Ethernet フレーム ---- */
-#define NE2K_ETH_HDR_LEN    14
-#define NE2K_ETH_MIN_LEN    60      /* FCS を除く最小長 (padding 後) */
-#define NE2K_ETH_MAX_LEN    1514    /* FCS を除く最大長 (非 VLAN) */
+#include "net_eth.h"
+#define NE2K_ETH_HDR_LEN    ETH_HLEN
+#define NE2K_ETH_MIN_LEN    ETH_ZLEN      /* FCS を除く最小長 (padding 後) */
+#define NE2K_ETH_MAX_LEN    (ETH_FRAME_MAX - NE2K_ETH_FCS_LEN)    /* FCS を除く最大長 (非 VLAN) */
 #define NE2K_ETH_FCS_LEN    4
-#define NE2K_ETH_ADDR_LEN   6
+#define NE2K_ETH_ADDR_LEN   ETH_ALEN
 
 #endif /* NE2000_REGS_H */

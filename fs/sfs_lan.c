@@ -36,17 +36,17 @@ static int lan_receive(SfsLan *lan)
     if (lan->rx_pos < lan->rx_end) return 1;
     lan->rx_pos = lan->rx_end = 0;
     if (lan->nic->recv(lan->rx, sizeof(lan->rx), &n) != 0) return 0;
-    if (n > sizeof(lan->rx) || n < SFS_LAN_HDR_LEN + 3) return 0;
-    if (lan->rx[12] != (SFS_LAN_ETHERTYPE >> 8) ||
-        lan->rx[13] != (SFS_LAN_ETHERTYPE & 0xff) ||
+    if (n > sizeof(lan->rx) || n < SFS_LAN_HDR_LEN + SFS_PREAMBLE_LEN) return 0;
+    if (lan->rx[ETH_TYPE_OFF] != (SFS_LAN_ETHERTYPE >> 8) ||
+        lan->rx[ETH_TYPE_OFF + 1] != (SFS_LAN_ETHERTYPE & 0xff) ||
         !mac_equal(lan->rx, lan->mac) ||
         mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->mac)) return 0;
     if ((lan->linked || lan->peer_fixed) &&
         !mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->peer))
         return 0;
     if (lan->rx[SFS_LAN_HDR_LEN] != SFS_ENQ ||
-        lan->rx[SFS_LAN_HDR_LEN + 1] != SFS_MAGIC1 ||
-        lan->rx[SFS_LAN_HDR_LEN + 2] != SFS_MAGIC2) return 0;
+        lan->rx[SFS_LAN_HDR_LEN + SFS_OFF_MAGIC1] != SFS_MAGIC1 ||
+        lan->rx[SFS_LAN_HDR_LEN + SFS_OFF_MAGIC2] != SFS_MAGIC2) return 0;
     lan->rx_pos = SFS_LAN_HDR_LEN;
     lan->rx_end = n;
     lan->prepared = 0;
@@ -71,9 +71,9 @@ static int lan_prepare(SfsLan *lan)
         if (r != 1) continue;
         if (!lan->linked) {
             if (!lan->hello || frame.type != (SFS_T_HELLO | SFS_T_RESP) ||
-                frame.sid == 0 || frame.seq != 0 || frame.len < 12 ||
+                frame.sid == 0 || frame.seq != 0 || frame.len < SFS_HELLO_RSP_LEN ||
                 sfs_get32(frame.payload) != 0 ||
-                sfs_get32(frame.payload + 8) != lan->nonce) break;
+                sfs_get32(frame.payload + SFS_HELLO_RSP_NONCE) != lan->nonce) break;
             for (n = 0; n < SFS_LAN_MAC_LEN; n++)
                 lan->peer[n] = lan->rx[SFS_LAN_MAC_LEN + n];
             lan->linked = 1;
@@ -107,8 +107,8 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
 
     if (!lan_can_wait(ctx)) return -1;
     if (n < SFS_HDR_LEN + SFS_CRC_LEN || n > SFS_BUFFER_FRAME) return -1;
-    if (buf[3] == SFS_T_HELLO && n >= SFS_HDR_LEN + 8 + SFS_CRC_LEN) {
-        lan->nonce = sfs_get32(buf + SFS_HDR_LEN + 4);
+    if (buf[SFS_OFF_TYPE] == SFS_T_HELLO && n >= SFS_HDR_LEN + SFS_HELLO_REQ_LEN + SFS_CRC_LEN) {
+        lan->nonce = sfs_get32(buf + SFS_HDR_LEN + SFS_HELLO_REQ_NONCE);
         lan->hello = 1;
         lan->linked = 0;
     } else if (!lan->linked) {
@@ -118,8 +118,8 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
         lan->tx[i] = lan->linked ? lan->peer[i] : 0xff;
         lan->tx[SFS_LAN_MAC_LEN + i] = lan->mac[i];
     }
-    lan->tx[12] = SFS_LAN_ETHERTYPE >> 8;
-    lan->tx[13] = SFS_LAN_ETHERTYPE & 0xff;
+    lan->tx[ETH_TYPE_OFF] = SFS_LAN_ETHERTYPE >> 8;
+    lan->tx[ETH_TYPE_OFF + 1] = SFS_LAN_ETHERTYPE & 0xff;
     for (i = 0; i < n; i++) lan->tx[SFS_LAN_HDR_LEN + i] = buf[i];
     size = SFS_LAN_HDR_LEN + n;
     while (size < SFS_LAN_MIN_FRAME) lan->tx[size++] = 0;

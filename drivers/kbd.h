@@ -132,6 +132,11 @@ void kbd_set_gui_mode(int on);/* GUI (WM 常駐) 中は cooked リングに積�
 
 /* シフトキー状態 */
 extern volatile u8 kbd_shift_state;
+#define KBD_RAW_MAKE          0x100
+#define KBD_RAW_MOD_SHIFT     9
+#define KBD_RAW_MOD_MASK      0x7F
+#define KBD_RAW_KEY_MAKE_MASK 0x1FF
+
 #define SHIFT_SHIFT  0x01
 #define SHIFT_CAPS   0x02
 #define SHIFT_KANA   0x04

@@ -67,7 +67,7 @@ MUTATIONS = [
      "pgalloc_range_has_ram(base / PAGE_SIZE - 1, last"),
     # 5 = 32bit 空間の末尾越えを見ない (末尾番地が桁あふれして小さく見える)。
     ("no_wrap_check", IDENTIFY,
-     "    if (size - 1 > 0xFFFFFFFFUL - base) return 0;\n", ""),
+     "    if (size - 1 > U32_MAX - base) return 0;\n", ""),
     # 6 = auto でも NP21/W 判定をせずに ID を読む (実機でポートを叩く)。
     ("no_np2_gate", MUT_TARGET,
      "    if (gfx_get_backend_pref() != GFX_PREF_CIRRUS && !np2_detect()) return 0;\n",

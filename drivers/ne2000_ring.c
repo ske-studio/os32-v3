@@ -6,12 +6,13 @@
 /* ======================================================================== */
 
 #include "ne2000_ring.h"
+#include "../include/net_eth.h"
 
 #define RING_PAGE_SIZE   256
 #define RING_HDR_LEN     4
 #define RING_FCS_LEN     4
-#define RING_ETH_MIN     60
-#define RING_ETH_MAX     1514
+#define RING_ETH_MIN     ETH_ZLEN
+#define RING_ETH_MAX     (ETH_FRAME_MAX - RING_FCS_LEN)
 #define RING_STATUS_PRX  0x01
 
 void ne2k_ring_decode_hdr(const u8 raw[4], struct ne2k_rx_hdr *h)

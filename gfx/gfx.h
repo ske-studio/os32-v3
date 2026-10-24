@@ -9,6 +9,7 @@
 #define __GFX_H
 
 #include "pc98.h"
+#include "../exec/surface_limits.h"
 #include "types.h"  /* u8, u16, u32 */
 
 /* ======== 画面定数 ======== */
@@ -45,7 +46,7 @@
 u32 gfx_sf_backend(void);
 struct gfx_kernel_fb {
     u32 width, height, pitch, format;
-    u8 *planes[4];
+    u8 *planes[SURFACE_QUERY_MAX];
 };
 int gfx_kernel_framebuffer(struct gfx_kernel_fb *out);
 struct surface_query_source;

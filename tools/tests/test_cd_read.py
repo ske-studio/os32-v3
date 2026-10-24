@@ -242,7 +242,7 @@ MUTATIONS = [
      "    devname[0] = type == VFS_DEV_CD ? 'c' : 'h';\n"
      "    devname[1] = 'd';", "T5b5: HD 上の ISO を受付"),
     ("fs/iso9660.c",
-     r"pvd\[6\] != 1", "0", "T5b5: 壊れた PVD を公開"),
+     r"pvd\[6\] != ISO_PVD_VERSION", "0", "T5b5: 壊れた PVD を公開"),
     # --- fs/iso9660.c: 覚えたパス
     ("fs/iso9660.c",
      r"if \(ctx->pc_valid && kstrcmp\(ctx->pc_path, path\) == 0\) \{",

@@ -54,9 +54,9 @@ static int sfs_match(const SfsClient *c, const SfsFrame *f, u8 type,
     if (hello) {
         if (f->type != (u8)(SFS_T_HELLO | SFS_T_RESP)) return 0;
         if (f->seq != 0 || f->sid == 0) return 0;
-        if (f->len < 12) return 0;
+        if (f->len < SFS_HELLO_RSP_LEN) return 0;
         if (sfs_get32(f->payload) != 0) return 0;
-        if (sfs_get32(f->payload + 8) != nonce) return 0;
+        if (sfs_get32(f->payload + SFS_HELLO_RSP_NONCE) != nonce) return 0;
         return 1;
     }
     if (f->sid != c->sid || f->seq != seq) return 0;
@@ -125,20 +125,20 @@ static void sfs_note_fail(SfsClient *c)
 
 int sfs_client_hello(SfsClient *c, u32 nonce)
 {
-    u8 pl[8];
+    u8 pl[SFS_HELLO_REQ_LEN];
     u16 flen;
     SfsFrame f;
 
     if (!c->io->can_wait(c->ctx)) return OS32_ERR_IO;
     sfs_put16(pl, (u16)SFS_VERSION);
-    sfs_put16(pl + 2, c->max_payload);
-    sfs_put32(pl + 4, nonce);
-    flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, 8);
+    sfs_put16(pl + SFS_HELLO_REQ_MAX, c->max_payload);
+    sfs_put32(pl + SFS_HELLO_REQ_NONCE, nonce);
+    flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, SFS_HELLO_REQ_LEN);
     if (sfs_exchange(c, flen, SFS_T_HELLO, 0, 1, nonce, &f) != 0)
         return OS32_ERR_IO;
-    if (sfs_get16(f.payload + 4) != SFS_VERSION ||
-        sfs_get16(f.payload + 6) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
-    if (sfs_get16(f.payload + 6) < c->max_payload)
+    if (sfs_get16(f.payload + SFS_HELLO_RSP_VER) != SFS_VERSION ||
+        sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
+    if (sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < c->max_payload)
         /* A smaller peer falls back to the serial wire limit. */
         c->max_payload = SFS_MAX_PAYLOAD;
     c->dec.max_payload = c->max_payload;
@@ -157,7 +157,7 @@ static void sfs_note_rtt(SfsClient *c, u32 lo, u32 hi, int valid)
     elapsed = (((unsigned long long)end_hi << 32) | end_lo) -
               (((unsigned long long)hi << 32) | lo);
     /* Saturate a single sample rather than wrap after 71 minutes. */
-    if (elapsed > 0xffffffffULL) elapsed = 0xffffffffULL;
+    if (elapsed > U32_MAX) elapsed = U32_MAX;
     c->rtt_total_us += elapsed;
     c->rtt_samples++;
     if ((u32)elapsed > c->rtt_max_us) c->rtt_max_us = (u32)elapsed;

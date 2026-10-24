@@ -32,7 +32,7 @@ u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
 int gfx_current_height = GFX_HEIGHT;  /* 200 or 400 */
 
-u8 *bb[4];
+u8 *bb[SURFACE_QUERY_MAX];
 
 DirtyRectQueue dirty_queue = {0};
 DirtyRectQueue prev_dirty = {0};   /* 前フレームdirty (ステイルページ対策) */
@@ -223,7 +223,7 @@ void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
     fb->width = kernel.width;
     fb->height = kernel.height;
     fb->pitch = kernel.pitch;
-    for (i = 0; i < 4; i++) fb->planes[i] = kernel.planes[i];
+    for (i = 0; i < SURFACE_QUERY_MAX; i++) fb->planes[i] = kernel.planes[i];
 }
 
 /* All legacy planar pointers and the selected backend descriptor share one
@@ -238,7 +238,7 @@ static void gfx_bind_client(void)
     if (sf && !sf->closing)
         base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
              ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
-    for (i = 0; i < 4; i++) bb[i] = base && i < sf->planes ? base + sf->plane_offset[i] : 0;
+    for (i = 0; i < SURFACE_QUERY_MAX; i++) bb[i] = base && i < sf->planes ? base + sf->plane_offset[i] : 0;
     bb_b = bb[0]; bb_r = bb[1]; bb_g = bb[2]; bb_i = bb[3];
     backend->bb_base = bb[0];
     backend->bb_size = base ? sf->npages * PAGE_SIZE : 0;
@@ -272,6 +272,10 @@ static void gfx_bind_client(void)
 /*       ledger_selfcheck("gfx")。                                          */
 /*  **予約は装置の存在の証明ではない** (DEVICE_RESERVATION §6)。             */
 /* ======================================================================== */
+enum { GFX_RES_PEGC, GFX_RES_XE10_BANK, GFX_RES_XE10_LINEAR,
+       GFX_RES_PEGC_ALT, GFX_RES_COUNT };
+enum { GFX_SF_PC98, GFX_SF_PEGC, GFX_SF_CIRRUS_CLIENT,
+       GFX_SF_CIRRUS_DISPLAY, GFX_SF_COUNT };
 #define GFX_CAND_PEGC   1u
 #define GFX_CAND_CIRRUS 2u
 #define GFX_PFN(a)      ((u32)(a) / PAGE_SIZE)
@@ -280,22 +284,22 @@ static void gfx_bind_client(void)
  * raw_bar, decode_first/end, map_first/end, bdf, vendor, device, bus,
  * revision, bar, width_basis, boot_gen。Xe10 の 2 本は glue の定数 =
  * **NP21/W の窓の値で、実機 Xe10 の実測ではない** (GLUE_CONST)。 */
-static const struct ledger_resource gfx_res[4] = {
+static const struct ledger_resource gfx_res[GFX_RES_COUNT] = {
     /* PEGC: 拡張グラフィックスのリニア窓 512KB (資料の値) */
-    { 0, GFX_PFN(PEGC_LINEAR_BASE), GFX_PFN(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE),
+    [GFX_RES_PEGC] = { 0, GFX_PFN(PEGC_LINEAR_BASE), GFX_PFN(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE),
       GFX_PFN(PEGC_LINEAR_BASE), GFX_PFN(PEGC_LINEAR_BASE + PEGC_LINEAR_SIZE),
       0, 0, 0, LEDGER_BUS_FIXED, 0, 0, LEDGER_WB_DATASHEET, 0, 0 },
     /* Xe10-bank: 銀行窓 32KB (写像しない) */
-    { 0, GFX_PFN(WAB_XE10_WIN_BASE), GFX_PFN(WAB_XE10_WIN_BASE + WAB_XE10_WIN_SIZE),
+    [GFX_RES_XE10_BANK] = { 0, GFX_PFN(WAB_XE10_WIN_BASE), GFX_PFN(WAB_XE10_WIN_BASE + WAB_XE10_WIN_SIZE),
       0, 0, 0, 0, 0, LEDGER_BUS_CBUS, 0, 0, LEDGER_WB_GLUE_CONST, 0, 0 },
     /* Xe10-linear: decode 4MB、写像は描画に使う先頭 2MB */
-    { 0, GFX_PFN(WAB_XE10_LINEARWIN_BASE),
+    [GFX_RES_XE10_LINEAR] = { 0, GFX_PFN(WAB_XE10_LINEARWIN_BASE),
       GFX_PFN(WAB_XE10_LINEARWIN_BASE + WAB_XE10_LINEARWIN_DECODE),
       GFX_PFN(WAB_XE10_LINEARWIN_BASE),
       GFX_PFN(WAB_XE10_LINEARWIN_BASE + WAB_XE10_LINEARWIN_SIZE),
       0, 0, 0, LEDGER_BUS_CBUS, 0, 0, LEDGER_WB_GLUE_CONST, 0, 0 },
     /* PEGC-alt: 16MB システム空間を RAM にした機械の別名 (512KB)。 */
-    { 0, GFX_PFN(PEGC_LINEAR_ALT_BASE), GFX_PFN(PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE),
+    [GFX_RES_PEGC_ALT] = { 0, GFX_PFN(PEGC_LINEAR_ALT_BASE), GFX_PFN(PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE),
       GFX_PFN(PEGC_LINEAR_ALT_BASE), GFX_PFN(PEGC_LINEAR_ALT_BASE + PEGC_LINEAR_SIZE),
       0, 0, 0, LEDGER_BUS_FIXED, 0, 0, LEDGER_WB_DATASHEET, 0, 0 }
 };
@@ -304,29 +308,29 @@ static const struct ledger_resource gfx_res[4] = {
  * RAM の first は確保した PFN で埋める。Cirrus の面の割り付け (表示面 = 窓の
  * 先頭、クライアント面 = その直後、同じ 300KB) は backend_cirrus.c の
  * STATIC_ASSERT が突き合わせる。 */
-static const struct ledger_surface gfx_sf[4] = {
-    { .npages = GFX_PFN(MEM_GFX_BB_SIZE),
+static const struct ledger_surface gfx_sf[GFX_SF_COUNT] = {
+    [GFX_SF_PC98] = { .npages = GFX_PFN(MEM_GFX_BB_SIZE),
       .width = GFX_WIDTH, .height = GFX_HEIGHT, .pitch = GFX_BPL,
       .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
       .backend = LEDGER_SF_PC98, .role = LEDGER_ROLE_CLIENT,
-      .format = GFX_BB_PLANAR4, .planes = 4, .cache = LEDGER_CACHE_WB,
+      .format = GFX_BB_PLANAR4, .planes = GVRAM_PLANES, .cache = LEDGER_CACHE_WB,
       .perm_max = LEDGER_PERM_RW,
       .plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,
                        3 * GFX_BPL * GFX_HEIGHT} },
-    { .npages = GFX_PFN(MEM_GFX_BB8_SIZE), .width = MEM_GFX_BB8_WIDTH,
+    [GFX_SF_PEGC] = { .npages = GFX_PFN(MEM_GFX_BB8_SIZE), .width = MEM_GFX_BB8_WIDTH,
       .height = MEM_GFX_BB8_HEIGHT, .pitch = MEM_GFX_BB8_PITCH,
       .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_RAM,
       .backend = LEDGER_SF_PEGC, .role = LEDGER_ROLE_CLIENT,
       .format = GFX_BB_PACKED8, .planes = 1, .cache = LEDGER_CACHE_WB,
       .perm_max = LEDGER_PERM_RW },
-    { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE + MEM_GFX_BB8_SIZE),
+    [GFX_SF_CIRRUS_CLIENT] = { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE + MEM_GFX_BB8_SIZE),
       .npages = GFX_PFN(MEM_GFX_BB8_SIZE), .width = MEM_GFX_BB8_WIDTH,
       .height = MEM_GFX_BB8_HEIGHT, .pitch = MEM_GFX_BB8_PITCH,
       .owner = LEDGER_OWNER_BOOT, .backing = LEDGER_SB_MMIO,
       .backend = LEDGER_SF_CIRRUS, .role = LEDGER_ROLE_CLIENT,
       .format = GFX_BB_PACKED8, .planes = 1, .cache = LEDGER_CACHE_UC,
       .perm_max = LEDGER_PERM_RW },
-    { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE), .npages = GFX_PFN(MEM_GFX_BB8_SIZE),
+    [GFX_SF_CIRRUS_DISPLAY] = { .first = GFX_PFN(WAB_XE10_LINEARWIN_BASE), .npages = GFX_PFN(MEM_GFX_BB8_SIZE),
       .width = MEM_GFX_BB8_WIDTH, .height = MEM_GFX_BB8_HEIGHT,
       .pitch = MEM_GFX_BB8_PITCH, .owner = LEDGER_OWNER_KERNEL,
       .backing = LEDGER_SB_MMIO, .backend = LEDGER_SF_CIRRUS,
@@ -338,7 +342,7 @@ static const struct ledger_surface gfx_sf[4] = {
  * One record per discontiguous plane. PLANAR4 describes the pixel layout;
  * planes=1 describes this record. Do not clear device padding (32000..32767).
  * DISPLAY permissions are granted only by the authorized lease entry. */
-static const u32 gfx_display_planes[4] = {
+static const u32 gfx_display_planes[GVRAM_PLANES] = {
     VRAM_PLANE_B, VRAM_PLANE_R, VRAM_PLANE_G, VRAM_PLANE_I
 };
 static const struct ledger_surface gfx_planar_display = {
@@ -373,7 +377,7 @@ static const struct ledger_surface system_tvram = {
 /* 資源レコード i がどの候補のものか。先頭3本は SURFACE 型板 i + 1 に対応。 */
 static u32 gfx_cand_of(u32 i)
 {
-    return i == 1 || i == 2 ? GFX_CAND_CIRRUS : GFX_CAND_PEGC;
+    return i == GFX_RES_XE10_BANK || i == GFX_RES_XE10_LINEAR ? GFX_CAND_CIRRUS : GFX_CAND_PEGC;
 }
 
 /* 副作用のない識別。GFX= と機種 (9821 系) と各 backend の identify だけ。 */
@@ -393,11 +397,11 @@ static u32 gfx_identify_candidates(void)
  * TASK_T1_LEDGER §4-5-R)。判定は変わらない。 */
 void __attribute__((cold)) gfx_boot_reserve(void)
 {
-    struct ledger_span sp[4];
+    struct ledger_span sp[GFX_RES_COUNT];
     struct ledger_surface sf;
     const struct ledger_resource *r;
     u32 i, n, m, rid, pfn, cand, display_fail = 0;
-    u32 resource_ids[4] = {LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES,
+    u32 resource_ids[GFX_RES_COUNT] = {LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES,
                            LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
     rid = 0;
 
@@ -405,7 +409,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     pfn = 0;
     /* 2. 登録できた窓をまとめて予約。登録に失敗した候補から先は登録しない
      *    (先に登録した窓は保持する。PEGC は F00 だけ登録済みでも alt が無ければ落ちる)。 */
-    for (i = n = 0; m && i < 4; i++) {
+    for (i = n = 0; m && i < GFX_RES_COUNT; i++) {
         if (!(m & gfx_cand_of(i))) continue;
         if (!ledger_resource_add(&gfx_res[i], &rid)) break;
         resource_ids[i] = rid;
@@ -417,7 +421,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     }
     if (m && !ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)) m = 0;
     /* 3. 写像範囲だけを supervisor + PCD。落ちた候補は外す (予約は残る)。 */
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < GFX_RES_COUNT; i++) {
         r = &gfx_res[i];
         if (resource_ids[i] == LEDGER_MAX_RESOURCES)
             m &= ~gfx_cand_of(i);
@@ -442,7 +446,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     else
         m &= ~GFX_CAND_PEGC;
     /* 5. planar は fallback 用にも連続 pool を保持する。登録失敗は返却。 */
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < GFX_SF_COUNT; i++) {
         if (i && !(m & gfx_cand_of(i - 1))) continue;
         sf = gfx_sf[i];
         if (!i) {
@@ -451,7 +455,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
                     LEDGER_TOP_DOWN, &sf.first)) continue;
             kmemset(P2V(sf.first * PAGE_SIZE), 0, MEM_GFX_BB_SIZE);
         }
-        if (i == 1) sf.first = pfn;
+        if (i == GFX_SF_PEGC) sf.first = pfn;
         if (!ledger_surface_create(&sf, 0)) {
             if (sf.backing == LEDGER_SB_RAM)
                 (void)pgalloc_free_n_owner(sf.owner, sf.first, (int)sf.npages);
@@ -459,7 +463,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         }
     }
     gfx_bind_client();
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < GVRAM_PLANES; i++) {
         sf = gfx_planar_display;
         sf.first = GFX_PFN(gfx_display_planes[i]);
         if (!ledger_surface_create(&sf, 0)) display_fail++;
@@ -467,7 +471,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
     (void)ledger_surface_create(&system_tvram, 0);
     /* 6. */
     ledger_arena_freeze();
-    kprintf(0x07, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,
+    kprintf(KLOG_ATTR, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,
             pfn * PAGE_SIZE, ledger_arena_top() * PAGE_SIZE);
     (void)ledger_selfcheck("gfx");
 }
@@ -494,14 +498,14 @@ static int gfx_selected_source(u32 role, struct surface_query_source *out)
     *out = source;
     if (role != LEDGER_ROLE_CLIENT && role != LEDGER_ROLE_DISPLAY)
         return OS32_ERR_INVAL;
-    count = role == LEDGER_ROLE_DISPLAY && source.backend == LEDGER_SF_PC98 ? 4 : 1;
+    count = role == LEDGER_ROLE_DISPLAY && source.backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1;
     for (plane = 0; plane < count; plane++) {
         for (i = 0; i < LEDGER_MAX_SURFACES; i++) {
             const struct ledger_surface *sf = &ledger_surfaces[i];
             if ((gfx_surface_unready & (1U << i)) || !sf->npages || sf->closing ||
                 sf->backend != source.backend ||
                 sf->role != role) continue;
-            if (count == 4 && sf->first != GFX_PFN(gfx_display_planes[plane])) continue;
+            if (count == GVRAM_PLANES && sf->first != GFX_PFN(gfx_display_planes[plane])) continue;
             source.refs[plane] = (struct surface_ref){i, sf->gen};
             break;
         }
@@ -544,7 +548,7 @@ int gfx_selected_selfcheck(void)
         g_backend->bb_pitch != sf->pitch || g_backend->bb_format != sf->format) return 0;
     u8 *base = sf->backing >= LEDGER_SB_VRAM ?
                (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
-    for (u32 i = 0; i < 4; i++)
+    for (u32 i = 0; i < SURFACE_QUERY_MAX; i++)
         if (bb[i] != (i < sf->planes ? base + sf->plane_offset[i] : 0)) return 0;
     return bb_b == bb[0] && bb_r == bb[1] && bb_g == bb[2] && bb_i == bb[3];
 }
@@ -1109,7 +1113,7 @@ void gfx_framebuffer_bridge(void *out)
     if (bad_output) goto fail;
     if (caller.origin == CALLER_TRUSTED) {
         if (gfx_kernel_framebuffer(&kernel)) goto fail;
-        for (i = 0; i < 4; i++) fb.planes[i] = kernel.planes[i];
+        for (i = 0; i < SURFACE_QUERY_MAX; i++) fb.planes[i] = kernel.planes[i];
         fb.width = kernel.width; fb.height = kernel.height; fb.pitch = kernel.pitch;
         if (copy_to_caller(&caller, out, &fb, sizeof(fb))) return;
         bad_output = 1;

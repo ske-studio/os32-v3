@@ -19,12 +19,13 @@
 /*    12   len   ペイロード                                                 */
 /*    12+len 4   CRC32 (zlib.crc32 と同じ) — 種別からペイロードの末尾まで    */
 /*                                                                          */
-/*  [C1] C89 / GNU89。依存は types.h と os32_kapi_shared.h (エラー番号) だけ。*/
+/*  [C1] 内部 GNU11。types.h と memmap.h (共通 tick 周期) を参照する。      */
 /* ======================================================================== */
 #ifndef FS_SFS_PROTO_H
 #define FS_SFS_PROTO_H
 
 #include "types.h"
+#include "memmap.h"
 
 #define SFS_ENQ            0x05
 #define SFS_MAGIC1         0x53    /* 'S' */
@@ -41,6 +42,19 @@
 #define SFS_LAN_MAX_PAYLOAD (SFS_READ_ALIGN * 2 + SFS_STATUS_LEN)
 #define SFS_BUFFER_FRAME   (SFS_HDR_LEN + SFS_LAN_MAX_PAYLOAD + SFS_CRC_LEN)
 #define SFS_READ_ALIGN     512
+
+#define SFS_PREAMBLE_LEN    3
+#define SFS_OFF_TYPE        SFS_PREAMBLE_LEN
+#define SFS_OFF_MAGIC1      1
+#define SFS_OFF_MAGIC2      2
+#define SFS_HELLO_REQ_MAX   2
+#define SFS_HELLO_REQ_NONCE 4
+#define SFS_HELLO_REQ_LEN   8
+#define SFS_HELLO_RSP_VER   4
+#define SFS_HELLO_RSP_MAX   6
+#define SFS_HELLO_RSP_NONCE 8
+#define SFS_HELLO_RSP_LEN   12
+#define SFS_WRITE_HDR_LEN   5
 
 /* ---- 種別 ---- */
 #define SFS_T_HELLO        0x01    /* ver u16, max u16, nonce u32 → 応答で ID */
@@ -91,7 +105,7 @@
 #define SFS_RESYNC_MAX_MS  1000    /* その待ちの上限 (相手が送り続けるとき) */
 #define SFS_QUIET_MS       500     /* セッションの終わりの隔離: 静かな時間 */
 #define SFS_QUIET_MAX_MS   5000    /* 隔離の上限 (決裁 1B) */
-#define SFS_TICK_MS        10      /* tick_count の周期 */
+#define SFS_TICK_MS        TICK_MS      /* tick_count の周期 */
 /* 番号は 1〜SFS_SEQ_LAST を使う。次が SFS_SEQ_LAST を越える要求は IO で
  * 失敗させ、セッションを閉じる (u16 を周回させない、§1-v3 Codex N4)。 */
 #define SFS_SEQ_LAST       0xFFFEu

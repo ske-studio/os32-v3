@@ -400,7 +400,7 @@ static void kbd_deliver(u8 scancode)
     }
 
     /* 生イベントを raw リングへ (make も break も、全キー。IRQ 内なので保護不要)。
-     * エントリ = keycode | (down << 8) | (修飾状態 (SHIFT_*, 7bit) << 9)。
+     * エントリ = keycode | (down << 8) | (修飾状態 (SHIFT_*, 7bit) << KBD_RAW_MOD_SHIFT)。
      * raw は WM (gshell) しか読まないので GUI モード中だけ積む — CUI 中に
      * 溜めると次の gshell に古い打鍵が届き、kbd_raw_dropped も水増しになる
      * (レビュー #3 ③)。 */
@@ -415,8 +415,8 @@ static void kbd_deliver(u8 scancode)
             (kbd_shift_state & SHIFT_CTRL)) return;
         if (kbd_raw_count < KBD_BUF_SIZE) {
             kbd_raw_buf[kbd_raw_tail] = (u16)keycode
-                                      | (is_break ? 0 : 0x100)
-                                      | (u16)((kbd_shift_state & 0x7F) << 9);
+                                      | (is_break ? 0 : KBD_RAW_MAKE)
+                                      | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
             kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
             kbd_raw_count++;
         } else {
@@ -424,7 +424,7 @@ static void kbd_deliver(u8 scancode)
              * Replace the newest entry: earlier input order and head stay intact. */
             if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {
                 int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
-                kbd_raw_buf[last] = KEY_STOP | 0x100 | (u16)((kbd_shift_state & 0x7F) << 9);
+                kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((kbd_shift_state & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
             }
             kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
         }
@@ -901,8 +901,8 @@ void kbd_discard_stop(void)
     while (n-- > 0) {
         u16 raw = kbd_raw_buf[read];
         read = (read + 1) % KBD_BUF_SIZE;
-        if ((raw & 0x1ff) == (KEY_STOP | 0x100) &&
-            (raw & (SHIFT_CTRL << 9))) continue;
+        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
+            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;
         kbd_raw_buf[write] = raw;
         write = (write + 1) % KBD_BUF_SIZE;
         kept++;
@@ -913,7 +913,7 @@ void kbd_discard_stop(void)
 }
 
 /* 生 make/break イベントを 1 件取り出す (レビュー ⑥)。無ければ -1。
- * 戻り値 = keycode | (down << 8) | (mods << 9)。down=1 が押下 (make)、0 が離し
+ * 戻り値 = keycode | (down << 8) | (mods << KBD_RAW_MOD_SHIFT)。down=1 が押下 (make)、0 が離し
  * (break)。mods はそのイベント時点の修飾状態 (SHIFT_* の 7bit、レビュー #3 ②)。
  * GUI モード中 (kbd_set_gui_mode(1)) にしか積まれない。
  * WM (gshell) が Key down/up イベントを作るのに使う。 */

@@ -218,7 +218,7 @@ int vfs_sync(void)
 { CHECK(!irq_depth); fs_calls++; if(sync_fail) return VFS_ERR_IO; files[0].synced=files[1].synced=1; return 0; }
 int vfs_rm(const char *path)
 { CHECK(!irq_depth); fs_calls++; rm_calls++; CHECK(!strcmp(path,"/var/log/lan.try")); if(remove_fail) return VFS_ERR_IO; files[0].present=0; return 0; }
-static void kprintf(int attr, const char *fmt, ...)
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { va_list ap; size_t n=strlen(output); (void)attr; va_start(ap,fmt); vsnprintf(output+n,sizeof(output)-n,fmt,ap); va_end(ap); }
 #include "../../drivers/pci_bind_match.c"
 static u32 irq_save(void) { u32 f=irq_depth?0:0x200; irq_depth++; return f; }
@@ -402,7 +402,7 @@ int irq_register(unsigned int irq,irq_handler_fn fn,void *arg,unsigned int flags
 { CHECK(!irq_depth && allocated && !bm_writes && irq==3 && !arg && flags==IRQ_F_SHARED); if(irq_fail) return -1; handler=fn; registered=1; return 0; }
 int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
 { CHECK(!irq_depth && irq==3 && fn==handler && !arg && registered && !freed && resets>last_start_reset && mask==1); registered=0; unregistered++; return 0; }
-static int kutoa_dec(u32 value,char *buf,u32 cap) { return snprintf(buf,cap,"%u",value); }
+int kutoa_dec(u32 value,char *buf,int cap) { return snprintf(buf,cap,"%u",value); }
 #define tick_count fake_ticks()
 #define E82557_HOST_TEST
 #include "../../drivers/e82557.c"

@@ -415,7 +415,7 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
 
     /* dev_type を dev_id の上位バイトにエンコードして渡す。FS ドライバは
      * VFS_MOUNT_DEV_TYPE() で自分が扱える種別かを必ず確かめること。 */
-    if (mount_generation == 0xffffffffUL) return VFS_ERR_FULL;
+    if (mount_generation == U32_MAX) return VFS_ERR_FULL;
     fs_ctx = ops->mount(VFS_MOUNT_DEV_ENCODE(dev_type, dev_id));
     if (!fs_ctx) return VFS_ERR_IO;
 

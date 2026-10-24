@@ -38,12 +38,14 @@ enum tx_state { TX_IDLE, TX_RESERVED, TX_ISSUED };
 #ifndef E82557_HOST_YIELD
 #define E82557_HOST_YIELD() ((void)0)
 #endif
+enum { E82557_RS_STOP = 1, E82557_RS_REOWN, E82557_RS_RESTART };
+
 static struct {
     struct dma_buf dma;
     struct e82557_stop stop;
     struct e82557_rx rx;
     struct pci_dev dev;
-    u32 stats[12], gen, tx_issued, reset_begin, stop_tries;
+    u32 stats[E82557_ST_COUNT], gen, tx_issued, reset_begin, stop_tries;
     u16 base;
     u8 mac[E82557_MAC_LEN];
     int state, tx, recover_step, recover_pending, rnr_pending;
@@ -170,12 +172,12 @@ static int scb_wait(u16 base)
 static int scb_issue(u16 base, u8 cuc, u8 ruc, u32 ptr, int need_ptr, int *after)
 {
     *after = 0;
-    if (!scb_wait(base)) { nic.stats[11]++; return ISSUE_TIMEOUT; }
+    if (!scb_wait(base)) { nic.stats[E82557_ST_SCB_STUCK]++; return ISSUE_TIMEOUT; }
     if (need_ptr) outpd(base + E82557_SCB_POINTER, ptr);
     outp(base + E82557_SCB_COMMAND, e82557_scb_cmd(cuc, ruc));
     *after = 1;
     if (scb_wait(base)) return ISSUE_OK;
-    nic.stats[11]++;
+    nic.stats[E82557_ST_SCB_STUCK]++;
     return ISSUE_TIMEOUT;
 }
 
@@ -196,17 +198,17 @@ static void ee_delay(void *ctx, u32 us)
 static int ee_mac_read(u16 base, u8 *mac, int *selected_width)
 {
     struct e82557_ee_pins pins = { &base, ee_write, ee_read, ee_delay, E82557_EE_STEP_US };
-    u16 words[3], ignored;
+    u16 words[E82557_MAC_WORDS], ignored;
     int attempt, addr, dummy, width = E82557_EE_WIDTH6;
     for (attempt = 0; attempt < 2; attempt++) {
         if (attempt && e82557_ee_read_word(&pins, E82557_EE_AUTO,
                     &width, 0, &ignored, &dummy) != E82557_OK) return 0;
-        for (addr = 0; addr < 3; addr++) {
+        for (addr = 0; addr < E82557_MAC_WORDS; addr++) {
             if (e82557_ee_read_word(&pins, E82557_EE_FIXED, &width,
                     (u16)addr, &words[addr], &dummy) != E82557_OK || dummy != 0)
                 break;
         }
-        if (addr != 3) continue;
+        if (addr != E82557_MAC_WORDS) continue;
         e82557_ee_mac(words, mac);
         if (e82557_mac_form(mac) == E82557_OK) { *selected_width = width; return 1; }
     }
@@ -268,12 +270,12 @@ static void hello_build(u8 *frame, const u8 *mac)
     for (u32 i = 0; i < E82557_MAC_LEN; i++) {
         frame[i] = 0xff;
         frame[E82557_MAC_LEN + i] = mac[i];
-        frame[E82557_FRAME_MIN + E82557_HELLO_MARK_LEN + i] = mac[i];
+        frame[ETH_HLEN + E82557_HELLO_MARK_LEN + i] = mac[i];
     }
-    frame[E82557_FRAME_MIN - 2] = E82557_HELLO_TYPE >> 8;
-    frame[E82557_FRAME_MIN - 1] = E82557_HELLO_TYPE & 0xff;
+    frame[ETH_TYPE_OFF] = E82557_HELLO_TYPE >> 8;
+    frame[ETH_TYPE_OFF + 1] = E82557_HELLO_TYPE & 0xff;
     for (u32 i = 0; i < E82557_HELLO_MARK_LEN; i++)
-        frame[E82557_FRAME_MIN + i] = (u8)mark[i];
+        frame[ETH_HLEN + i] = (u8)mark[i];
 }
 
 struct phy_observation {
@@ -403,7 +405,7 @@ static void tx_complete(void)
             nic.tx = TX_IDLE;
             /* SDM :4648-4663: C implies OK, and means DMA done.
              * !OK is defensive handling of an anomalous value. */
-            nic.stats[(st & E82557_CB_OK) ? 5 : 6]++;
+            nic.stats[(st & E82557_CB_OK) ? E82557_ST_TX_DMA_DONE : E82557_ST_TX_FAIL]++;
         }
     }
 }
@@ -418,16 +420,16 @@ static int e82557_irq(unsigned int irq, void *arg)
         nic.state == E82557_STOPPING) return IRQ_NONE;
     for (u32 pass = 0; pass < 2; pass++) {
         u16 st = inpw(nic.base + E82557_SCB_STATUS);
-        u8 ack = (u8)(st >> 8);
-        if (ack == 0xff) { nic.stats[4]++; return IRQ_NONE; }
+        u8 ack = (u8)(st >> E82557_STAT_SHIFT);
+        if (ack == 0xff) { nic.stats[E82557_ST_OTHER]++; return IRQ_NONE; }
         if (!ack) break;
         outp(nic.base + E82557_SCB_ACK, ack);
         handled = IRQ_HANDLED;
-        if (st & (E82557_STAT_CX | E82557_STAT_CNA)) nic.stats[0]++;
-        if (st & E82557_STAT_FR) nic.stats[1]++;
-        if (st & E82557_STAT_RNR) nic.stats[2]++;
-        if (st & E82557_STAT_SWI) nic.stats[3]++;
-        if (st & E82557_STAT_MDI) nic.stats[4]++;
+        if (st & (E82557_STAT_CX | E82557_STAT_CNA)) nic.stats[E82557_ST_CX]++;
+        if (st & E82557_STAT_FR) nic.stats[E82557_ST_FR]++;
+        if (st & E82557_STAT_RNR) nic.stats[E82557_ST_RNR]++;
+        if (st & E82557_STAT_SWI) nic.stats[E82557_ST_SWI]++;
+        if (st & E82557_STAT_MDI) nic.stats[E82557_ST_OTHER]++;
         if (nic.state == E82557_RUNNING) {
             if (st & (E82557_STAT_CX | E82557_STAT_CNA)) tx_complete();
             if (st & E82557_STAT_RNR) nic.rnr_pending = 1;
@@ -448,12 +450,12 @@ static void recover_begin(void)
     if (nic.tx == TX_RESERVED) { nic.recover_pending = 1; return; }
     nic.recover_pending = 0;
     nic.gen++;
-    nic.stats[9]++;
-    if (nic.stats[9] > E82557_RECOVER_MAX) { failed_dma(); return; }
+    nic.stats[E82557_ST_RECOVER_TOTAL]++;
+    if (nic.stats[E82557_ST_RECOVER_TOTAL] > E82557_RECOVER_MAX) { failed_dma(); return; }
     nic.state = E82557_RECOVER;
     scb_mask(nic.base, 1);
     nic.stop_tries = 0;
-    nic.recover_step = 1;
+    nic.recover_step = E82557_RS_STOP;
     nic.reset_begin = nic.stop.reset_seq;
 }
 /* IF=0. Unlike fxp's continuous consume/restart (if_fxp.c:1994-1998),
@@ -462,10 +464,10 @@ static void recover_begin(void)
 static int ru_restart(void)
 {
     u16 st = inpw(nic.base + E82557_SCB_STATUS);
-    u32 rus = (st & E82557_RUS_MASK) >> 2;
+    u32 rus = (st & E82557_RUS_MASK) >> E82557_RUS_SHIFT;
     int after;
     if (rus == E82557_RUS_READY) { nic.rnr_pending = 0; return ISSUE_OK; }
-    if ((st >> 8) == 0xff || rus > 2) return ISSUE_TIMEOUT;
+    if ((st >> E82557_STAT_SHIFT) == 0xff || rus > E82557_RUS_NORES) return ISSUE_TIMEOUT;
     rx_scan(); /* stopped RU: settle DMA completions since the earlier scan */
     if (nic.rx.ready == E82557_RFD_COUNT) return ISSUE_OK;
     E82557_BARRIER(); /* publish recycled descriptors before RU Start */
@@ -494,11 +496,11 @@ void e82557_tick(void)
     if (nic.state == E82557_RX_WAIT) {
         if (nic.rx.ready == E82557_RFD_COUNT) return;
         nic.state = E82557_RECOVER;
-        nic.recover_step = 3;
+        nic.recover_step = E82557_RS_RESTART;
     }
     if (nic.state != E82557_RECOVER) return;
     switch (nic.recover_step) {
-    case 1:
+    case E82557_RS_STOP:
         if (nic.stop.reset_seq - nic.reset_begin >= E82557_RECOVER_RESETS) {
             failed_dma(); return;
         }
@@ -508,25 +510,25 @@ void e82557_tick(void)
         }
         nic.stop_tries = 0;
         rx_scan(); /* R1 final scan: reset has now stopped all DMA writes */
-        nic.recover_step = 2;
+        nic.recover_step = E82557_RS_REOWN;
         break;
-    case 2:
-        if (nic.tx == TX_ISSUED) { nic.tx = TX_IDLE; nic.stats[6]++; }
+    case E82557_RS_REOWN:
+        if (nic.tx == TX_ISSUED) { nic.tx = TX_IDLE; nic.stats[E82557_ST_TX_FAIL]++; }
         e82557_rx_reown(rx_ring(), &nic.rx); /* only rx_free, preserve C=1 */
-        nic.recover_step = 3;
+        nic.recover_step = E82557_RS_RESTART;
         break;
-    case 3:
+    case E82557_RS_RESTART:
         if (nic.rx.ready == E82557_RFD_COUNT) { nic.state = E82557_RX_WAIT; break; }
         if (ru_restart() == ISSUE_OK) {
             /* Drain while still RECOVER and masked, before exposing INTA. */
             if (!nic.swi_wait) (void)e82557_irq(0, NULL);
             nic.state = E82557_RUNNING;
             scb_mask(nic.base, 0);
-            nic.stats[10]++;
+            nic.stats[E82557_ST_RECOVER_OK]++;
             return;
         } else if (nic.stop.reset_seq - nic.reset_begin >= E82557_RECOVER_RESETS) {
             failed_dma();
-        } else nic.recover_step = 1;
+        } else nic.recover_step = E82557_RS_STOP;
         break;
     }
     /* Reset has M=1; also drain events that arrived before R1. */
@@ -543,7 +545,7 @@ int e82557_send(const void *buf, u32 len)
     int after, rc;
     unsigned int flags = irq_save();
     if (nic.state != E82557_RUNNING) { rc = packet_unavailable(); goto out; }
-    if (!buf || len < E82557_FRAME_MIN || len > E82557_FRAME_MAX) {
+    if (!buf || len < ETH_HLEN || len > E82557_FRAME_MAX) {
         rc = OS32_ERR_INVAL; goto out;
     }
     if (nic.tx == TX_ISSUED) tx_complete();
@@ -592,8 +594,8 @@ int e82557_recv(void *buf, u32 cap, u32 *len)
     irq_restore(flags);
     u16 st = e82557_rd16(rfd);
     E82557_BARRIER(); /* recv completion acquisition */
-    u32 count = e82557_rd16(rfd + 12) & E82557_RFD_COUNT_MASK;
-    int drop = !(st & E82557_RFD_OK) || count < E82557_FRAME_MIN || count > E82557_FRAME_MAX;
+    u32 count = e82557_rd16(rfd + E82557_DESC_COUNT) & E82557_RFD_COUNT_MASK;
+    int drop = !(st & E82557_RFD_OK) || count < ETH_HLEN || count > E82557_FRAME_MAX;
     if (!drop && count > cap) return OS32_ERR_NOSPC;
     if (!drop) {
         E82557_DESC_ACCESS(rfd + E82557_RFD_HEADER, count, 0);
@@ -605,7 +607,7 @@ int e82557_recv(void *buf, u32 cap, u32 *len)
     /* FAILED DMA is deliberately retained. Do not publish more buffers to it. */
     if (nic.state != E82557_FAILED)
         e82557_rfd_recycle(rx_ring(), &nic.rx);
-    nic.stats[drop ? 8 : 7]++;
+    nic.stats[drop ? E82557_ST_RX_DROP : E82557_ST_RX_OK]++;
     rc = drop ? OS32_ERR_AGAIN : 0;
  out:
     irq_restore(flags);
@@ -620,7 +622,7 @@ int e82557_rx_ready(void)
 {
     unsigned int flags = irq_save();
     int ready = nic.state == E82557_RUNNING &&
-        ((inpw(nic.base + E82557_SCB_STATUS) & E82557_RUS_MASK) >> 2) ==
+        ((inpw(nic.base + E82557_SCB_STATUS) & E82557_RUS_MASK) >> E82557_RUS_SHIFT) ==
         E82557_RUS_READY;
     irq_restore(flags);
     return ready;
@@ -636,7 +638,7 @@ u32 e82557_rx_free(void)
     return free;
 }
 int e82557_loopback(int on) { (void)on; return OS32_ERR_NOSYS; }
-u32 e82557_stat(u32 idx) { return idx < 12 ? nic.stats[idx] : 0; }
+u32 e82557_stat(u32 idx) { return idx < E82557_ST_COUNT ? nic.stats[idx] : 0; }
 
 static int probe_ru(void)
 {
@@ -677,7 +679,7 @@ static int e82557_probe(const struct pci_dev *dev)
     cpu_delay_us(E82557_RESET_US);
     scb_mask(base, 1);
     status = inpw(base + E82557_SCB_STATUS);
-    outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> 8));
+    outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> E82557_STAT_SHIFT));
     status = inpw(base + E82557_SCB_STATUS);
     if (status & (E82557_CUS_MASK | E82557_RUS_MASK)) {
         pci_bind_set_reason(PCI_BIND_RESET_FAILED);
@@ -759,7 +761,7 @@ static int e82557_probe(const struct pci_dev *dev)
     E82557_BARRIER(); /* loopback completion acquisition */
     stage = "cmp";
     nic_trace(E82557_TRACE_CMP);
-    lb_len = e82557_rd16(rx_ring() + 12) & E82557_RFD_COUNT_MASK;
+    lb_len = e82557_rd16(rx_ring() + E82557_DESC_COUNT) & E82557_RFD_COUNT_MASK;
     if (!(e82557_rd16(rx_ring()) & E82557_RFD_OK) || lb_len != E82557_HELLO_LEN) {
         why = "ng"; goto done;
     }
@@ -798,12 +800,12 @@ static int e82557_probe(const struct pci_dev *dev)
     stage = "swi";
     nic_trace(E82557_TRACE_SWI);
     outp(base + E82557_SCB_INTCTL, E82557_SCB_SI);
-    for (u32 us = 0; !nic.stats[3] && us < E82557_SWI_WAIT_MS * 1000; us += E82557_SWI_POLL_US)
+    for (u32 us = 0; !nic.stats[E82557_ST_SWI] && us < E82557_SWI_WAIT_MS * 1000; us += E82557_SWI_POLL_US)
         cpu_delay_us(E82557_SWI_POLL_US);
     flags = irq_save();
     nic.swi_wait = 0;
     irq_restore(flags);
-    if (!nic.stats[3]) why = "irq";
+    if (!nic.stats[E82557_ST_SWI]) why = "irq";
     nic_trace(E82557_TRACE_BOUND);
     kprintf(E82557_LOG_ATTR, "[e82557] lb=ok len=%u cmp=ok rst2=ok cfg2=ok ia2=ok ru=ok irq=%s bound irq=%u\n",
             lb_len, why ? "ng" : "ok(swi)", dev->irq_line);
@@ -816,7 +818,7 @@ static int e82557_probe(const struct pci_dev *dev)
             flags = irq_save();
             int stopped = stop_dma(base, &nic.stop, E82557_STOP_ATTEMPTS);
             status = inpw(base + E82557_SCB_STATUS);
-            outp(base + E82557_SCB_ACK, (u8)(status >> 8));
+            outp(base + E82557_SCB_ACK, (u8)(status >> E82557_STAT_SHIFT));
             irq_restore(flags);
             if (stopped) {
                 if (registered) (void)irq_unregister(dev->irq_line, e82557_irq, NULL);
@@ -855,7 +857,7 @@ int lan_module_quiet(void)
     int stopped = stop_dma(nic.base, &nic.stop, E82557_STOP_ATTEMPTS);
     if (stopped) {
         u16 status = inpw(nic.base + E82557_SCB_STATUS);
-        outp(nic.base + E82557_SCB_ACK, (u8)(status >> 8));
+        outp(nic.base + E82557_SCB_ACK, (u8)(status >> E82557_STAT_SHIFT));
     }
     irq_restore(flags);
     if (!stopped) {

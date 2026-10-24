@@ -12,7 +12,7 @@ static int cirrus_win_usable(u32 base, u32 size)
     if (size == 0) return 0;
     /* 32bit の物理空間の末尾を越えないこと (4GB ちょうどで終わるのは可)。
      * 末尾番地 (inclusive) で持つので base + size の桁あふれを作らない。 */
-    if (size - 1 > 0xFFFFFFFFUL - base) return 0;
+    if (size - 1 > U32_MAX - base) return 0;
     last = base + (size - 1);
     /* 窓に RAM が登録されていれば張ってはいけない (自分の RAM を隠す)。
      * **RAM の上端 (sys_get_mem_kb) では決めない** — K6-RAM 以後、15MB 機
