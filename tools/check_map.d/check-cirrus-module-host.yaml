@@ -78,8 +78,8 @@ check-cirrus-module-host:
 - tools/tests/mutpar.py
 - tools/tests/test_gfx_kernel_fb.py
 - tools/tests/kernel_layout.py
-- tools/check_map.d/check-gfx-kernel-fb-host.yaml
-- build/checks.d/check-gfx-kernel-fb-host.mk
+- tools/check_map.d/check-gfx-host.yaml
+- build/checks.d/check-gfx-host.mk
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
 - tools/tests/cirrus_win_host.c

@@ -2,6 +2,7 @@ check-ci-stab-host:
 - tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
+- tools/run_host_group.py
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - tools/check_map.d/check-ci-stab-host.yaml

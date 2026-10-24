@@ -1,4 +1,5 @@
 check-tests-inventory:
+- tools/run_host_group.py
 - tools/gen_hwdev_pair.py
 - tools/tests/**
 - .github/workflows/*.yml

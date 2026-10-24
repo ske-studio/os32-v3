@@ -1,8 +1,0 @@
-check-font-cache-host:
-- userland/lib/font/**
-- tools/tests/test_font_cache.py
-- tools/tests/test_font_reader.py
-- build/checks.d/check-font-cache-host.mk
-- tools/check_map.d/check-font-cache-host.yaml
-- tools/tests/test_font_outline.py
-- tools/fetch_fonts.py

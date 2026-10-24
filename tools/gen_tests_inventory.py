@@ -551,6 +551,9 @@ def render_host32():
         for cmd in info["recipe"]:
             if "HOST32_RUNNERS ごと:" in cmd:
                 names += [os.path.basename(p)[5:-3] for p in PY_IN_CMD.findall(cmd)]
+            elif "tools/run_host_group.py" in cmd:
+                names += [os.path.basename(p)[5:-3] for p in
+                          re.findall(r"--host32\s+(tools/tests/[a-z0-9_]+\.py)", cmd)]
     return ("# HOST32 試験一覧 (生成物)\n\n"
             "`make tests-inventory` で生成する。コミットしない。\n\n"
             "`HOST32_RUNNERS` は既定 `native qemu`。%d 試験 (%s) の正常対照を指定した全 runner、"

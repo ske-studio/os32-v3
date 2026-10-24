@@ -132,6 +132,61 @@ CONTROL_SKIP_ALLOW = {
 
 
 class InfrastructureTests(unittest.TestCase):
+    def run_host_group_fixture(self, body, arguments, jobs=2):
+        import json
+        import shlex
+        import sys
+        root = pathlib.Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as directory:
+            work = pathlib.Path(directory)
+            script = work / 'fixture.py'
+            script.write_text(body)
+            trace = work / 'trace.jsonl'
+            command = [sys.executable, '-B', str(root / 'tools/run_host_group.py'),
+                       '--mutate']
+            for argument in arguments:
+                command += [argument, str(script)]
+            makefile = work / 'Makefile'
+            makefile.write_text('all:\n\t+' + shlex.join(command) + '\n')
+            env = {**os.environ, 'HOST32_RUNNERS': 'native qemu', 'GROUP_TRACE': str(trace)}
+            # This is an isolated parent make, not another user of the live jobserver.
+            for name in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
+                env.pop(name, None)
+            result = subprocess.run(['make', '--no-print-directory', f'-j{jobs}',
+                                     '-f', str(makefile)], env=env,
+                                    capture_output=True, text=True, timeout=30)
+            records = [json.loads(line) for line in trace.read_text().splitlines()] if trace.exists() else []
+            return result, records
+
+    def test_host_group_keeps_runner_controls_and_mutation_arguments(self):
+        result, records = self.run_host_group_fixture(
+            'import json, os, sys\n'
+            'with open(os.environ["GROUP_TRACE"], "a") as out:\n'
+            '    out.write(json.dumps(sys.argv[1:]) + "\\n")\n',
+            ['--host32', '--plain', '--control'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertCountEqual(records, [['--runner', 'native', '--mutate'],
+                                       ['--runner', 'qemu'], ['--mutate'], []])
+
+    def test_host_group_propagates_child_failure(self):
+        result, _ = self.run_host_group_fixture('raise SystemExit(7)\n', ['--plain'])
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_host_group_shares_parent_parallel_budget(self):
+        result, records = self.run_host_group_fixture(
+            'import json, os, time\n'
+            'def record(delta):\n'
+            '    with open(os.environ["GROUP_TRACE"], "a") as out:\n'
+            '        out.write(json.dumps([time.monotonic(), delta]) + "\\n")\n'
+            'record(1)\ntime.sleep(0.1)\nrecord(-1)\n', ['--plain'] * 4)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('jobserver unavailable', result.stderr)
+        live = peak = 0
+        for _, delta in sorted(records):
+            live += delta
+            peak = max(peak, live)
+        self.assertEqual((live, peak), (0, 2))
+
     def test_make_clean_removes_control_receipts(self):
         import re
         root = pathlib.Path(__file__).resolve().parents[2]

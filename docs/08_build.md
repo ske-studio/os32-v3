@@ -363,6 +363,12 @@ python3 tools/gen_memmap.py --manifest --check
 `check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
 保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
 
+同じ対象の host 試験は `check-gfx-host`、`check-font-host`、`check-access-host`、
+`check-gfinit-host` にまとめている。`tools/run_host_group.py` が元の試験を別々の make job
+として実行し、親の jobserver と正常対照・変異の runner 規則を共用する。
+入力対応表は各群の和集合で、群の一部に当たればその群を選ぶ。
+`check-gfinit-fixture-host` は引き続きローカル専用で、この群には含まない。
+
 | ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|
 | `make check-fast` | 全検査を変異なし | 作業中 | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |

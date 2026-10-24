@@ -158,7 +158,7 @@ helper の処理順:
 | 変更 | `tools/tests/gfinit_bus_host.c` 基準写し・境界・trace・連結試験 | +140〜190 |
 | 変更 | `tools/tests/test_gfinit_bus.py` RESOURCE_MUTATIONS 更新 | 12〜20 |
 | 新規 | `tools/tests/gfinit_resources_ra266.h` 生dumpの00〜3fh、7台分、出典行付き | 45〜65 |
-| 変更 | `tools/check_map.d/check-gfinit-bus-host.yaml` fixture追加 | +1 |
+| 変更 | `tools/check_map.d/check-gfinit-host.yaml` fixture追加 | +1 |
 | 変更 | `docs/decisions/realhw/GF6200_4A_DESIGN.md` BARLEN契約への参照 | 3〜5 |
 
 
@@ -190,7 +190,7 @@ helper の処理順:
 - 上限の5区間を期待値とし、正確なTrident長と表示しない。6aの基準構成試験は資料取得を待たず常時実行する。 6a (半日〜1日): 表＋上限helper、基準fixture・B2変種・write stub・拒否/境界/trace、既存mutation追随。
 - 6b (半日〜1日): probe連結試験・変異・実像回帰・サイズ計測。M4と共有するhost/owner回帰は直列に統合する。
 - M4の持ち主/終端コードと resources 本体は別。gfinit_bus_host.c・test_gfinit_bus.py・check-map は競合し得るため先に差分を取り込む。
-- 実装時の検査: `make check-gfinit-bus-host`、GF owner/plan の既存host検査、hwdev実像検査、`make check-changed` と `make check-c-dialect`。
+- 実装時の検査: `make check-gfinit-host`、GF owner/plan の既存host検査、hwdev実像検査、`make check-changed` と `make check-c-dialect`。
 - 実像検査は既存 `tools/tests/test_hwdev_image.py` を使い、核にGFが戻らないこと・import不変・hwdevのサイズを確認する。
 - ゲストは T4b のNP21/WでGPU成功を要求しない。実機A1はS8の段別承認後、hsyncと復元値を併記して受け入れる。
 - 本票作成時はビルド・host試験・実機測定を実行していない。上記は実装後の受入仕様である。

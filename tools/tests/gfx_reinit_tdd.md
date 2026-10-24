@@ -7,7 +7,7 @@ appslot の列挙/現在 caller は3 ASの足場、I/O・機種検出・MMU は�
 実機/ゲストの TLB と表示の合格は PM の受入へ。
 
 正常対照は指定した全 HOST32_RUNNERS、変異は先頭 runner。
-`make check-gfx-reinit-host` (`HOST32_RUNNERS=qemu`、`MUT=--mutate`)。
+`make check-gfx-host` (`HOST32_RUNNERS=qemu`、`MUT=--mutate`)。
 試験のソースは一度読み、変異 TU だけをコンパイル、正常 object を再利用する。
 一組の開始/終了で入力 hash を照合し、変異は `mutpar.run_ordered` で回す。
 

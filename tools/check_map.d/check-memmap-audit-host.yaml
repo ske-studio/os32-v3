@@ -2,7 +2,7 @@ check-memmap-audit-host:
 - tools/tests/font_guard_inactive.h
 - kernel/v86_snapshot.c
 - arch/x86/**
-- build/checks.d/check-gfx-reinit-host.mk
+- build/checks.d/check-gfx-host.mk
 - build/checks.d/check-memmap-audit-host.mk
 - exec/access_walk.c
 - exec/exec.c
@@ -39,7 +39,7 @@ check-memmap-audit-host:
 - kernel/v86_mem.*
 - platform/pc98/**
 - sdk/include/**
-- tools/check_map.d/check-gfx-reinit-host.yaml
+- tools/check_map.d/check-gfx-host.yaml
 - tools/check_map.d/check-memmap-audit-host.yaml
 - tools/tests/e10c_gcap_host.c
 - tools/tests/gfx_kernel_fb_host.c

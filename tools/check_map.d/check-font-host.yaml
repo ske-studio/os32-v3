@@ -1,0 +1,24 @@
+check-font-host:
+- userland/lib/font/**
+- tools/fetch_fonts.py
+- assets/fonts/IPA_Font_License_Agreement_v1.0.txt
+- tools/tests/test_font_reader.py
+- tools/tests/test_font_outline.py
+- build/checks.d/check-font-host.mk
+- tools/check_map.d/check-font-host.yaml
+- userland/rust/font_test/**
+- userland/rust/Cargo.lock
+- sdk/rust/i686-os32-none.json
+- tools/check_isa386.py
+- tools/check_privileged.py
+- tools/check_privileged_allow.txt
+- tools/tests/test_font_raster.py
+- tools/tests/host32.py
+- tools/gen_g16.py
+- tools/g16/**
+- assets/ipadic/*.csv
+- tools/tests/test_font_cache.py
+- tools/tests/test_font_engine.py
+- tools/tests/g16_fixture.py
+- tools/run_host_group.py
+artifact_reader: true

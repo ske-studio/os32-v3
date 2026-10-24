@@ -993,7 +993,7 @@ PATH_AUDIT_ALLOW = {
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
     ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
-    ("check-caller-access-host", "tools/" + "h3_park_resume" + ".py"):
+    ("check-access-host", "tools/" + "h3_park_resume" + ".py"):
         "identity observer uses synthetic memory; main's ELF/map defaults are unused",
     "tools/" + "check_select.py": "selector audits path names without reading build payloads",
 }

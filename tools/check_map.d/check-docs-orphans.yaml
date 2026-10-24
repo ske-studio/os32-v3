@@ -1,4 +1,5 @@
 check-docs-orphans:
+- tools/run_host_group.py
 - tools/gen_hwdev_pair.py
 - docs/**/*.md
 - tools/**/*.md
