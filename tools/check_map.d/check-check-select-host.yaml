@@ -1,4 +1,14 @@
 check-check-select-host:
+- userland/system/hsync_bootold.inc
+- userland/system/hsync.c
+- userland/shell/sh_ls.inc
+- userland/shell/sh_launch.inc
+- userland/shell/sh_exec.inc
+- userland/shell/sh_args.inc
+- userland/shell/main.c
+- userland/shell/cmd_file.c
+- lib/crc32_core.inc
+- fs/vfs.c
 - tools/run_host_group.py
 - tools/gen_hwdev_pair.py
 - CLAUDE.md

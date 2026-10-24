@@ -959,7 +959,7 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
 ### 4-40. `make check` を途中で止めると**変異が当たったまま**ソースに残る (2026-09-17)
 
 - **現象**: `make check` を時間切れとメモリ不足で 2 度打ち切った後、次の実行が
-  `check-sh-status-host` で `MUTATE exit_arg_unchecked SKIP (目印が 0 か所)` を出して
+  `check-sh-input-host` で `MUTATE exit_arg_unchecked SKIP (目印が 0 か所)` を出して
   非ゼロ終了した。他の変異はすべて RED、本体は `ALL PASS` なのにターゲットだけ落ちる。
 - **原因**: 変異試験は**実物のソースを書き換えて戻す**作りなので、書き換えと復元の
   あいだで殺されると**変異が当たったまま残る**。`git status` に
@@ -969,7 +969,7 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
   緑にすると変異が試験されていないことに気づけない)。
 - **本当に危ないのはここ**: 打ち切った直後に `git add -A` すると
   **壊したコードがそのままコミットに入る**。今回は commit した回の `make check` が
-  別の地点 (`check-host-lib-host`) で死んでおり、`check-sh-status-host` は
+  別の地点 (`check-host-lib-host`) で死んでおり、`check-sh-input-host` は
   完走して復元していたので無事だった (`git show <sha>:userland/shell/main.c` で確認)。
   **運が良かっただけ。**
 - **対策**: `make check` を打ち切ったら、コミットの前に必ず `git status` と

@@ -171,4 +171,4 @@ $(addprefix check-time-,$(CHECK_PAR_TARGETS)): check-time-%: | check-times-init
 	+@python3 tools/check_time.py "$(CHECK_TIMES)" "$*" $(MAKE) --no-print-directory CHECK_TIME_CHILD=1 $*
 # 検査どうしで共有する前提は親の make で 1 回だけ作り、入れ子の make (CHECK_TIME_CHILD=1) では作らない
 # (sqlite.bin は .FORCE なので、子が並列に作り直すと他方の読み取り中に書き換わる)。
-check-time-check-sqlite-module-proto-host check-time-check-sqlite-stack-host: sqlite-module-proto
+check-time-check-sqlite-module-proto-host: sqlite-module-proto

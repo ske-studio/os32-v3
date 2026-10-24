@@ -116,15 +116,25 @@ def case_recipe_semicolon(cs):
 
 def case_inc_extract(cs):
     rules, _ = cs.read_makefiles()
-    for t in ("check-hsync-h2-host", "check-settings-protect-host"):
+    for t in ("check-hsync-host", "check-settings-protect-host"):
         assert "userland/system/hsync_protect.inc" in cs.extract(rules, t), t
-    assert "userland/shell/sh_pipe.inc" in cs.extract(rules, "check-sh-status-host")
+    assert "userland/shell/sh_pipe.inc" in cs.extract(rules, "check-sh-input-host")
+    for target, script, source in (
+            ('check-hsync-host', 'test_hsync_h1.py', 'userland/system/hsync.c'),
+            ('check-hsync-host', 'test_hsync_h2.py', 'userland/system/hsync_protect.inc'),
+            ('check-hsync-host', 'test_hsync_h3.py', 'fs/vfs.c'),
+            ('check-fs-kind-host', 'test_fs_kind_callers.py', 'userland/shell/cmd_file.c'),
+            ('check-fs-kind-host', 'test_vfs_kind.py', 'fs/vfs.c'),
+            ('check-sh-input-host', 'test_sh_truncation.py', 'userland/shell/main.c')):
+        inputs = cs.extract(rules, target)
+        assert 'tools/tests/' + script in inputs, (target, script)
+        assert source in inputs, (target, source)
 
 
 def case_hsync_protect(cs):
     mode, st, mu = run_plan(cs, ["userland/system/hsync_protect.inc"])
     assert mode == "sel", mode
-    for t in ("check-hsync-h2-host", "check-hsync-h3-host", "check-h4-manifest-host",
+    for t in ("check-hsync-host", "check-h4-manifest-host",
               "check-settings-protect-host"):
         assert t in mu, (t, mu)
     assert mu <= st, "変異込みの検査が回す列に無い"
@@ -133,7 +143,7 @@ def case_hsync_protect(cs):
 def case_sh_pipe(cs):
     mode, st, mu = run_plan(cs, ["userland/shell/sh_pipe.inc"])
     assert mode == "sel", mode
-    assert {"check-sh-status-host", "check-sh-truncation-host"} <= mu, mu
+    assert {"check-sh-input-host"} <= mu, mu
     assert "check-serialfs-host" in st and "check-serialfs-host" not in mu, \
         "当たらない検査は変異なしで回す"
 
@@ -191,7 +201,7 @@ def case_single_stage(cs):
     # Makefile は make の比較ができないので全部。
     _, vars_ = cs.read_makefiles()
     par = cs.check_lists(vars_)
-    assert "check-sh-status-host" in par and "check-kapi-layout-host" in par
+    assert "check-sh-input-host" in par and "check-kapi-layout-host" in par
     for f in ("Makefile", "build/sdk.mk"):
         mode, st, mu = run_plan(cs, [f])
         assert mode == "full" and st == set(par) and mu == set(par), (f, mode)

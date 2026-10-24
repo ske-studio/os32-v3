@@ -647,7 +647,7 @@ def main():
             print(f'PASS {runner}: unaligned/last-word reloc; tail-2/BSS/duplicate/import/overflow write=0')
         pair_runtime_suite(folder, mutate=args.mutate)
         real_runtime_suite(folder, args.directory, args.vmkernel, mutate=args.mutate,
-                           stack_mutate=args.stack_mutate, fep_mutate=args.fep_mutate, policy_mutate=args.policy_mutate or args.mutate)
+                           stack_mutate=args.stack_mutate or args.mutate, fep_mutate=args.fep_mutate, policy_mutate=args.policy_mutate or args.mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
             source = (ROOT / 'kernel/module_image.c').read_text()

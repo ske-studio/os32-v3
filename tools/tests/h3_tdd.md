@@ -4,7 +4,7 @@
 - 設計: [`HSYNC_IMPROVEMENT_PLAN.md`](../../docs/tasks/shell/HSYNC_IMPROVEMENT_PLAN.md) §5 / §7.2 / §9
 - 基点: `feat/gui` の `d734f54`
 - 実行: `python3 -B tools/tests/test_hsync_h3.py --target --mutate`
-  (`make check-hsync-h3-host` が同じものを回す)
+  (`make check-hsync-host` が同じものを回す)
 - 日付: 2026-09-15
 
 ## 0. 正直に書く ([V4])
@@ -250,7 +250,7 @@ H1 側からも押さえる形になった。時刻を使う試験は H3 側が�
 - `tools/tests/vfs_set_mtime_host.c` (新規)
 - `tools/tests/test_hsync_h3.py` (新規)
 - `tools/tests/hsync_h1_host.c` (贋 stat の mtime を 0 = 不明に)
-- `build/sdk.mk` — `check-hsync-h3-host`
+- `build/sdk.mk` — `check-hsync-host`
 - `tools/tests/h3_tdd.md` (これ)
 
 ---
@@ -373,7 +373,7 @@ FAIL slot_layout_append:448: db_slot_layout_ok(KAPI_SLOT_COUNT + 1)
 上の全探索は `KAPI_SLOT_COUNT` / `KAPI_FUNC_COUNT` の**等号**だけを見ており、
 **「特定の関数が `api[-1]` であること」** という同じ意味の決め打ちを拾えていなかった。
 `kbd_peekkey` (v54、継承バグ「`source` が ESC 以外も食う」) を末尾に追記したときに
-`check-hsync-h3-host` が落ちて見つかった。該当は 2 か所で、どちらも直した:
+`check-hsync-host` が落ちて見つかった。該当は 2 か所で、どちらも直した:
 
 | 箇所 | 元の主張 | 直した後 |
 |---|---|---|

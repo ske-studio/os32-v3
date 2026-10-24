@@ -21,7 +21,7 @@ broad:
 - check-kcg-module-host
 - check-cd-module-host
 - check-double-fault-host
-- check-sqlite-stack-host
+- check-sqlite-module-proto-host
 - check-sqlite-engine-host
 - check-memmap-host
 - check-deploy-set-host

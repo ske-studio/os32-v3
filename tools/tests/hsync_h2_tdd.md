@@ -2,7 +2,7 @@
 
 対象票: `docs/archive/shell/TASK_H2.md` §2-3 / §2-4 / §4-1
 試験: `tools/tests/hsync_h2_host.c` (実物の `userland/system/hsync.c` を `#include`)
-実行: `python3 -B tools/tests/test_hsync_h2.py [--target] [--mutate]` / `make check-hsync-h2-host`
+実行: `python3 -B tools/tests/test_hsync_h2.py [--target] [--mutate]` / `make check-hsync-host`
 
 基点: `feat/gui` = `15c5edf`。
 

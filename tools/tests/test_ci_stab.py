@@ -145,9 +145,13 @@ class InfrastructureTests(unittest.TestCase):
             command = [sys.executable, '-B', str(root / 'tools/run_host_group.py'),
                        '--mutate']
             for argument in arguments:
-                command += [argument, str(script)]
+                if isinstance(argument, tuple):
+                    option, extra = argument
+                    command += [option, shlex.join([str(script), *extra])]
+                else:
+                    command += [argument, str(script)]
             makefile = work / 'Makefile'
-            makefile.write_text('all:\n\t+' + shlex.join(command) + '\n')
+            makefile.write_text('all:\n\t+' + shlex.join(command).replace('$', '$$') + '\n')
             env = {**os.environ, 'HOST32_RUNNERS': 'native qemu', 'GROUP_TRACE': str(trace)}
             # This is an isolated parent make, not another user of the live jobserver.
             for name in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
@@ -170,6 +174,20 @@ class InfrastructureTests(unittest.TestCase):
 
     def test_host_group_propagates_child_failure(self):
         result, _ = self.run_host_group_fixture('raise SystemExit(7)\n', ['--plain'])
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_host_group_explicit_arguments_are_literal(self):
+        result, records = self.run_host_group_fixture(
+            'import json, os, sys\n'
+            'with open(os.environ["GROUP_TRACE"], "a") as out:\n'
+            '    out.write(json.dumps(sys.argv[1:]) + "\\n")\n',
+            [('--command', ['--target', '--mutate-rshell', 'two words', '$HOME']),
+             ('--command', [])])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertCountEqual(records,
+                              [['--target', '--mutate-rshell', 'two words', '$HOME'], []])
+        result, _ = self.run_host_group_fixture('raise SystemExit(7)\n',
+                                                [('--command', ['--target'])])
         self.assertNotEqual(result.returncode, 0)
 
     def test_host_group_shares_parent_parallel_budget(self):

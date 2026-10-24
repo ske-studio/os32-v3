@@ -528,7 +528,7 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 # T9-S ホスト TDD の記録 (sh.bin の起動待ち)
 
 票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3a。
-実行: `make check-sh-launch-host` (= `python3 -B tools/tests/test_sh_launch.py`)。
+実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_launch.py`)。
 
 `tools/tests/sh_launch_host.c` が `userland/shell/sh_launch.inc` を**そのまま**
 `#include` し、KernelAPI の `launch_req` / `launch_poll` / `sys_yield` / `kprintf`
@@ -569,7 +569,7 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D2(d) と
 実装レビュー (往復 1/3) の blocker 1 / 2。
-実行: `make check-sh-shell-host` (= `python3 -B tools/tests/test_sh_shell.py`)。
+実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_shell.py`)。
 
 `tools/tests/sh_shell_host.c` が `userland/shell/sh_redraw.inc` と
 `userland/shell/cmd_script.c` を**そのまま** `#include` する。差し替えるのは

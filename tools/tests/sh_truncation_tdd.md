@@ -2,7 +2,7 @@
 
 票: `docs/archive/shell/TASK_SH_TRUNCATION.md`
 基点: `feat/gui` = `a4f5429` (段 1) / 段 4 は `3fd4da5`
-試験: `make check-sh-truncation-host` (= `python3 -B tools/tests/test_sh_truncation.py`)
+試験: `make check-sh-input-host` (うち `python3 -B tools/tests/test_sh_truncation.py`)
     否定側もまとめて: `python3 -B tools/tests/test_sh_truncation.py --mutate`
 
 ## 0. この段 (§5 の段 1「足場」) で何をしたか

@@ -5,7 +5,7 @@
 
 ```
 python3 -B tools/tests/test_hsync_h1.py [--target]
-make check-hsync-h1-host        # 同じもの (--target 付き)
+make check-hsync-host        # 同じもの (--target 付き)
 ```
 
 - `tools/tests/hsync_h1_host.c` … 実物の `userland/system/hsync.c` を 1 行も写さず
@@ -426,7 +426,7 @@ B4a と B4b が互いの検査を落とさないことも、この 2 つが独�
   `cp -r /src /big` が `/big/src/a.txt` へ入り `/big/a.txt` (内容 `KEEP`) を
   上書きしないこと。単一ファイルの `cp`、複数入力の `cp` も見る。
 - `tools/tests/vfs_kind_host.c` + `test_vfs_kind.py` (新設、
-  `check-vfs-kind-host`)。実物の `fs/vfs.c` を `#include` し、境界
+  `check-fs-kind-host`)。実物の `fs/vfs.c` を `#include` し、境界
   (kstring / kmalloc) だけ差し替え。合成 `VfsOps` で stat / list_dir /
   get_file_size の戻り値を 1 つずつ指定する。**20 checks / 0 failures**。
   `get_file_size` は HostDrv と同じく**ディレクトリでも成功する**贋物。

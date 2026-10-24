@@ -2,7 +2,7 @@
 
 票: `docs/archive/shell/TASK_EXIT_STATUS.md`
 基点: `feat/gui` = `a11ee98` (設計レビュー 5 往復で Approve、設計凍結)
-試験: `make check-sh-status-host` (= `python3 -B tools/tests/test_sh_status.py --mutate`)
+試験: `make check-sh-input-host MUTATE=1` (うち `python3 -B tools/tests/test_sh_status.py --mutate`)
     肯定側だけ: `python3 -B tools/tests/test_sh_status.py`
 
 ## 0. この試験の形
@@ -128,5 +128,5 @@
 ```bash
 python3 -B tools/tests/test_sh_status.py            # 肯定側だけ (2 版)
 python3 -B tools/tests/test_sh_status.py --mutate   # 否定側つき
-make check-sh-status-host                           # 上と同じ (--mutate つき)
+make check-sh-input-host MUTATE=1                  # status と truncation の否定側つき
 ```

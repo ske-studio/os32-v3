@@ -37,7 +37,7 @@ python3 -B tools/tests/test_serialfs.py --target --mutate   # make check-serialf
 `hsync` の vmkernel.old の門は、純粋な判定 (`hsync_bootold.inc`) をこの試験で、
 実物の hsync.c を通した流れ (一致 → BACKUP してから置き換え / 不一致・記録なし →
 置き換えない / `--no-backup` / dry-run / 同じ内容なら作り直さない) を
-`tools/tests/hsync_h2_host.c` の `case_boot_old` (make check-hsync-h2-host) で見る。
+`tools/tests/hsync_h2_host.c` の `case_boot_old` (make check-hsync-host) で見る。
 既存の `/boot` の案件 (rename 後の sync 失敗) は贋カーネルが v53 で起動イメージを
 答えないので `--no-backup` を足した。
 

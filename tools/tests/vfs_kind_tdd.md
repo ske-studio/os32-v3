@@ -4,7 +4,7 @@
   (票 H1) / Codex 実装レビュー 往復 3 の **B6**、往復 4 の **B7**。退行が入ったのは `d574704`
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_vfs_kind.py [--target]`
-  (`make check-vfs-kind-host` が同じものを `--target` 付きで回す)
+  (`make check-fs-kind-host` が同じものを `--target` 付きで回す)
 - 対象: `fs/vfs.c` / `fs/vfs_fd.c` (実物を `#include`)
 - 仕様: [`docs/06_filesystem.md`](../../docs/06_filesystem.md) §6-1 (VFS エラーと種別)
 

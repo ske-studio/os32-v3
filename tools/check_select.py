@@ -914,6 +914,14 @@ class Extractor:
                 toks = shlex.split(line)
             except ValueError:
                 toks = line.split()
+            # Host groups pass script + arguments as one quoted --command
+            # value. Discover its paths just like ordinary recipe arguments.
+            for i, token in enumerate(toks[:-1]):
+                if token == '--command':
+                    try:
+                        toks.extend(shlex.split(toks[i + 1]))
+                    except ValueError:
+                        pass
             for i, t in enumerate(toks):
                 t = t.rstrip(";")
                 if t == "-s" and i + 1 < len(toks) and "-p" in toks:

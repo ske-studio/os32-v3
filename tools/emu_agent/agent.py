@@ -73,12 +73,12 @@ MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
                 "check-term-render", "check-tools-host",
                 "check-vfs-mount-dev-host", "check-multiapp-model-host",
                 "check-con-sink-host", "check-kbd-inject-host", "check-launch-host",
-                "check-sh-launch-host", "check-sh-shell-host",
-                "check-sh-truncation-host", "check-sh-status-host",
+                "check-sh-exec-host",
+                "check-sh-input-host",
                 "check-host-agent", "check-net-link-host",
-                "check-fs-kind-callers-host", "check-cat-linenum-host",
+                "check-fs-kind-host", "check-cat-linenum-host",
                 # 票 H2 (一時ファイル + 検証 + 置換)
-                "check-vfs-excl-host", "check-hsync-h2-host",
+                "check-vfs-excl-host", "check-hsync-host",
                 # 票 H4 (配備マニフェストと世代の確認)
                 "check-h4-manifest-host",
                 # 票 TASK_KSTRING_BENCH (kstring の実測プログラムの枠組み)
@@ -90,7 +90,7 @@ MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
                 # だけで完結しないので `make check` の列には入っていない)。
                 # check-guest-host はホストだけのランナー試験。
                 "check-guest", "check-guest-host",
-                "check-hsync-h1-host", "check-hsync-h3-host", "check-b8-open-host",
+                "check-b8-open-host",
                 "check-ring3-str-host", "nhd-pull", "nhd-umount", "nhd-init", "deploy-nhd", "deploy-kernel", "images/os32_boot.d88", "iso", "check-settings-protect-host", "check-cfg-host", "check-gui-host", "check-install-recover-host", "check-install-fresh-host", "clean-external")
 MAP_PATH = os.environ.get("OS32_KERNEL_MAP", os.path.join(ROOT, "build", "out", "kernel.map"))
 SELFTEST_SYMS = ("kselftest_pass", "kselftest_fail")

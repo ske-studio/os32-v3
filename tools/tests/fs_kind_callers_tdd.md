@@ -5,7 +5,7 @@
 - 原則: [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-35 —
   「読めなかった」を「無い / その型ではない」と読み替えない。判定関数ではなく**受け手**を試す
 - 実行: `python3 -B tools/tests/test_fs_kind_callers.py [--target] [--mutate]`
-  (`make check-fs-kind-callers-host` が同じものを `--target --mutate` 付きで回す)
+  (`make check-fs-kind-host MUTATE=1` がこの試験を `--target --mutate` 付きで回す)
 - 対象: `userland/shell/cmd_file.c` の呼び出し元 5 箇所 (`cmd_fs_shared.c` と一緒に実物を `#include`)
 - 贋 FS: [`fs_kind_fake.h`](fs_kind_fake.h) — [`fs_kind_host.c`](fs_kind_host.c) から切り出して共有
   (切り出しの前後で `fs_kind_host` は 21 checks, 0 failures のまま)

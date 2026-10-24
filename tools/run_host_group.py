@@ -3,6 +3,8 @@
 
 Each script is a separate make job. A host32 script still runs its normal
 control on every requested runner and mutations on the first runner only.
+Use --command 'script.py args...' for checks with their own argument policy;
+these arguments are passed literally, without adding --mutate or --runner.
 """
 import argparse
 import os
@@ -29,18 +31,26 @@ def main():
     parser.add_argument('--host32', action='append', default=[])
     parser.add_argument('--plain', action='append', default=[])
     parser.add_argument('--control', action='append', default=[])
+    parser.add_argument('--command', action='append', default=[])
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     scripts = ([(p, True, args.mutate) for p in args.host32] +
                [(p, False, args.mutate) for p in args.plain] +
                [(p, False, False) for p in args.control])
-    if not scripts:
+    if not scripts and not args.command:
         parser.error('at least one script is required')
     runners = os.environ.get('HOST32_RUNNERS', 'native qemu').split()
-    lines = ['.PHONY: all', 'all: ' + ' '.join(f'part-{i}' for i in range(len(scripts)))]
-    for i, (script, host32, mutate) in enumerate(scripts):
+    jobs = [commands(script, host32, mutate, runners)
+            for script, host32, mutate in scripts]
+    for command in args.command:
+        words = shlex.split(command)
+        if not words:
+            parser.error('--command must contain a script')
+        jobs.append([[sys.executable, '-B', *words]])
+    lines = ['.PHONY: all', 'all: ' + ' '.join(f'part-{i}' for i in range(len(jobs)))]
+    for i, job in enumerate(jobs):
         lines += [f'.PHONY: part-{i}', f'part-{i}:']
-        for command in commands(script, host32, mutate, runners):
+        for command in job:
             # make expands dollars before the shell parses its quoted arguments.
             lines.append('\t' + shlex.join(command).replace('$', '$$'))
     # GNU make's FIFO jobserver is inherited by name. Older pipe jobservers
