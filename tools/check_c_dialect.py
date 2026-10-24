@@ -375,7 +375,7 @@ def _internal_cache_key(src, argv, root):
         value = re.sub(re.escape(str(root)) + r'(?=/|$)', '<root>', value)
         return re.sub(r'[^\s]*/c_dialect_out_[^/]+/out/', '<out>/', value)
 
-    digest = hashlib.sha256(repr([name(src), *map(name, args)]).encode())
+    digest = hashlib.sha256(repr([_checker_source_digest(), name(src), *map(name, args)]).encode())
     # Dependencies alone miss __has_include and path/time predefined macros.
     # Normalize only compiler line-marker filenames, never expanded C strings.
     expanded = re.sub(r'^(# \d+ ")([^"]+)(".*)$',
@@ -394,6 +394,42 @@ def _internal_cache_key(src, argv, root):
     except (OSError, ValueError):
         return None  # An uncacheable input still receives the full check.
     return digest.hexdigest()
+
+
+SUITE_CACHE_OWNER = '.suite_owner_pid'
+
+
+def _suite_cache():
+    """The host suite's disposable cache, or None.
+
+    Honoured only while the suite that created the directory (its pid in
+    SUITE_CACHE_OWNER) is alive, so a leftover or hand-set directory cannot make
+    the product check skip translation units.
+    """
+    cache = os.environ.get('OS32_C_DIALECT_TEST_CACHE')
+    if not cache:
+        return None
+    try:
+        pid = int(pathlib.Path(cache, SUITE_CACHE_OWNER).read_text())
+        os.kill(pid, 0)
+    except (OSError, ValueError):
+        return None
+    return cache
+
+
+_SOURCE_DIGEST = []
+
+
+def _checker_source_digest():
+    """Checker logic is part of the key: an updated rule never reuses a pass."""
+    if _SOURCE_DIGEST:
+        return _SOURCE_DIGEST[0]
+    here = pathlib.Path(__file__).resolve()
+    digest = hashlib.sha256(here.read_bytes())
+    for p in sorted(pathlib.Path(ast.__file__).resolve().parent.glob('*.py')):
+        digest.update(p.name.encode() + b'\0' + p.read_bytes())
+    _SOURCE_DIGEST.append(digest.hexdigest())
+    return _SOURCE_DIGEST[0]
 
 
 def check_internal_units(units, root, jobs=None, cache=None):
@@ -493,7 +529,7 @@ def main(argv):
     lib_p, nlib = check_sdk_lib_headers(root)
     sample_p = check_sdk_sample(root)
     int_p, nint = ([], 0) if probs or sdk_p or lib_p or sample_p else check_internal_units(
-        summ.get("unit_list", []), root, cache=os.environ.get('OS32_C_DIALECT_TEST_CACHE'))
+        summ.get("unit_list", []), root, cache=_suite_cache())
     probs += sdk_p + lib_p + sample_p + int_p
     c = summ.get("counts", {})
     print("check_c_dialect: 翻訳単位 %d (gnu11 %d、gnu89 %d、他 %d)、旗の組 %d (探り %d)、"

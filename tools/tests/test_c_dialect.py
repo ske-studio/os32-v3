@@ -352,6 +352,26 @@ def case_internal(cd):
               'vendor は規則免除でも解析失敗を飛ばさない (fail closed、変異REDには数えない)')
 
 
+def case_suite_cache_owner(cd):
+    """The cache is honoured only while its owning suite is alive."""
+    old = os.environ.get('OS32_C_DIALECT_TEST_CACHE')
+    try:
+        with tempfile.TemporaryDirectory(prefix='c_dialect_owner_') as d:
+            os.environ['OS32_C_DIALECT_TEST_CACHE'] = d
+            check(cd._suite_cache() is None, "所有者の印の無いキャッシュは使わない")
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(os.getpid()))
+            check(cd._suite_cache() == d, "生きている suite のキャッシュは使う")
+            dead = subprocess.Popen([sys.executable, "-c", "pass"])
+            dead.wait()
+            pathlib.Path(d, cd.SUITE_CACHE_OWNER).write_text(str(dead.pid))
+            check(cd._suite_cache() is None, "終わった suite のキャッシュ (残骸・手で指定) は使わない")
+    finally:
+        if old is None:
+            os.environ.pop('OS32_C_DIALECT_TEST_CACHE', None)
+        else:
+            os.environ['OS32_C_DIALECT_TEST_CACHE'] = old
+
+
 def case_internal_cache(cd):
     from unittest import mock
     with tempfile.TemporaryDirectory(prefix='c_dialect_cache_test_') as td:
@@ -680,6 +700,7 @@ def main(argv):
     case_sdk(cd)
     case_internal(cd)
     case_internal_cache(cd)
+    case_suite_cache_owner(cd)
     case_build_coverage(cd)
     sys.path.insert(0, str(ROOT / "tools"))
     import check_select
@@ -702,5 +723,6 @@ if __name__ == "__main__":
     # Cache only successful internal TU checks, for this one suite invocation.
     # Every checker still reads its real make graph, flags, probes and SDK inputs.
     with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
+        pathlib.Path(cache, '.suite_owner_pid').write_text(str(os.getpid()))
         os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
         sys.exit(main(sys.argv[1:]))
