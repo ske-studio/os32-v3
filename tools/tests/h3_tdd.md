@@ -439,10 +439,10 @@ digest は「slot 213 までの名前」なので**末尾追記では動かな�
 | `test_sbrk_tier` | TARGET COMPILE PASS |
 | `test_sh_launch` | EXIT 0 |
 | `test_sh_shell` | EXIT 0 |
-| `test_sqlite_groups` | 32/32 |
+| `test_sqlite_groups` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) | 32/32 |
 | `test_stat_cmd` | 5/5 |
 | `test_tar_cmd` | 8/8 |
-| `test_vfs_fd_sqlite` | 15/15 |
+| `test_vfs_fd_sqlite` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) | 15/15 |
 | `test_vfs_kind` | 35 checks, 0 failures |
 | **`test_vfs_mount_dev`** | **6/6** (贋物 2 本を足して復旧) |
 

@@ -98,17 +98,14 @@ typedef struct {
  * transport or read-only permission alone never grants this capability. */
 #define VFS_SQLITE_UNSUPPORTED 0
 #define VFS_SQLITE_EXT2 1
-#define VFS_SQLITE_IMMUTABLE_CD 2
 typedef struct {
     int kind;
     int (*resize)(void *ctx, u32 ino, u32 size);
     int (*writable)(void *ctx);
-    int (*media_generation)(void *ctx, u32 *out);
 } VfsSqliteOps;
 typedef struct {
     u32 mount_generation;
     u32 file_id;
-    u32 media_generation;
     int kind;
     int readonly;
 } VfsSqliteIdentity;
@@ -240,11 +237,6 @@ int  vfs_rm(const char *path);
 int  vfs_rename(const char *oldpath, const char *newpath);
 
 /* ストリーム操作 (ファイルディスクリプタ・シーク対応) */
-/* Boot policy only: opt in a distribution CD mount, never inferred from RO.
- * The permit is pinned to its initial generation until unmount, with no rearm.
- * T4c/T5b boot coordinator calls this before opening distribution databases. */
-int vfs_sqlite_allow_immutable(const char *prefix);
-int vfs_sqlite_immutable_generation(void *ctx, u32 mount_generation, u32 *out);
 u32 vfs_path_mount_generation(const char *path);
 int vfs_sqlite_backend(const char *path);
 int vfs_sqlite_writable(const char *path);

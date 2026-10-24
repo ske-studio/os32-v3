@@ -798,11 +798,6 @@ int vfs_sqlite_backend(const char *path)
     if (rc != VFS_OK) return rc;
     ops = vfs_route(resolved, rel, sizeof(rel), &ctx);
     if (!ops) return VFS_ERR_NOMOUNT;
-    if (ops->sqlite && ops->sqlite->kind == VFS_SQLITE_IMMUTABLE_CD) {
-        u32 media;
-        rc = vfs_sqlite_immutable_generation(ctx, vfs_path_mount_generation(resolved), &media);
-        if (rc != VFS_OK) return rc;
-    }
     return ops->sqlite ? ops->sqlite->kind : VFS_SQLITE_UNSUPPORTED;
 }
 
@@ -829,28 +824,8 @@ int vfs_sqlite_fd_identity(int fd, VfsSqliteIdentity *out)
     out->mount_generation = f->mount_generation;
     out->kind = f->ops->sqlite->kind;
     out->readonly = !(f->mode & (O_RDWR | O_WRONLY));
-    out->media_generation = 0;
-    if (out->kind == VFS_SQLITE_IMMUTABLE_CD) {
-        OS32_Stat st;
-        u32 media;
-        int rc = vfs_sqlite_immutable_generation(f->fs_ctx, f->mount_generation, &media);
-        if (rc != VFS_OK) return rc;
-        if (f->sqlite_main) {
-            out->file_id = f->ino;
-            out->media_generation = media;
-            return VFS_OK;
-        }
-        if (!f->ops->stat) return VFS_ERR_NOSYS;
-        rc = f->ops->stat(f->fs_ctx, f->path, &st);
-        if (rc != VFS_OK) return rc;
-        rc = vfs_sqlite_immutable_generation(f->fs_ctx, f->mount_generation, &media);
-        if (rc != VFS_OK) return rc;
-        out->file_id = st.st_ino;
-        out->media_generation = media;
-    } else {
-        if (!f->has_ino) return VFS_ERR_NOSYS;
-        out->file_id = f->ino;
-    }
+    if (!f->has_ino) return VFS_ERR_NOSYS;
+    out->file_id = f->ino;
     return VFS_OK;
 }
 
@@ -864,8 +839,6 @@ int vfs_sqlite_claim_main(int fd)
         /* Include stale/quarantined/parked FDs until close completes. */
         if (i != fd && f->in_use && f->sqlite_main &&
             f->mount_generation == id.mount_generation && f->ino == id.file_id) {
-            if (id.kind == VFS_SQLITE_IMMUTABLE_CD && id.readonly &&
-                !(f->mode & (O_RDWR | O_WRONLY))) continue;
             return VFS_ERR_BUSY;
         }
     }

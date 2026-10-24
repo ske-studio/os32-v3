@@ -1,11 +1,9 @@
-"""T4b-4/4c: real SQLite callbacks/FD table; runtime mutation failures only."""
+"""T4b-4: real SQLite callbacks/FD table; runtime mutation failures only."""
 import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
-
-from test_cd_read import write_boot_submount
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
@@ -13,15 +11,11 @@ CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked'
 FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
-         'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_cd_host.c',
-         'tools/tests/cd_read_host.c', 'kernel/cd_body.c', 'kernel/cd_module.h', 'fs/vfs.c', 'fs/iso9660.c',
-         'drivers/atapi.c', 'tools/tests/atapi_hostshim/io.h',
-         'drivers/dev.c', 'kernel/kernel.c']
+         'tools/tests/vfs_fd_sqlite_host.c']
 INC = ['-I' + str(ROOT / p) for p in
        ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
 FD = 'fs/vfs_fd.c'
-CD_CASES = ['normal', 'unpermitted', 'journal', 'wal', 'generation', 'remount']
 MUTANTS = [
     ('path_comparison', 'alias', [
         (VFS, 'other->main_identity.file_id == id.file_id', '0'),
@@ -49,46 +43,24 @@ MUTANTS = [
         'if (p->readonly) return SQLITE_READONLY;\n    if (size < 0',
         'if (size < 0')]),
     ('backend_policy', 'unsupported', [(VFS,
-        'if (backend != VFS_SQLITE_EXT2 && backend != VFS_SQLITE_IMMUTABLE_CD)',
-        'if (0 && backend != VFS_SQLITE_EXT2 && backend != VFS_SQLITE_IMMUTABLE_CD)'),
+        'if (backend != VFS_SQLITE_EXT2)',
+        'if (0 && backend != VFS_SQLITE_EXT2)'),
         (VFS, 'if (flags & SQLITE_OPEN_READWRITE) {\n            rc = vfs_sqlite_writable(zName);',
          'if (0 && (flags & SQLITE_OPEN_READWRITE)) {\n            rc = vfs_sqlite_writable(zName);')]),
     ('relative_fullpath', 'fullpath', [(VFS,
         'return vfs_resolve_path(zName, zOut, nOut) == VFS_OK\n        ? SQLITE_OK : SQLITE_CANTOPEN;',
         'kstrncpy(zOut, zName, (u32)nOut); return SQLITE_OK;')]),
-    ('ro_is_immutable', 'cd:unpermitted', [('fs/vfs.c',
-        'if (!m->sqlite_immutable || !m->ops->sqlite ||',
-        'if (!m->ops->sqlite ||')]),
-    ('ignore_journal', 'cd:journal', [(VFS,
-        'if (rc == VFS_OK) return SQLITE_CANTOPEN;',
-        'if (rc == VFS_OK) continue;')]),
-    ('ignore_wal', 'cd:wal', [(VFS,
-        'if (rc == VFS_OK) return SQLITE_CANTOPEN;',
-        'if (rc == VFS_OK) continue;')]),
-    ('cd_lock_promotion', 'cd:normal', [(VFS,
-        'if (((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED)',
-        'if (0 && ((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED)')]),
-    ('cd_generation', 'cd:generation', [(VFS,
-        'if (vfs_sqlite_fd_identity(p->fd, &id) != VFS_OK) return 0;',
-        '(void)vfs_sqlite_fd_identity(p->fd, &id);')]),
 ]
 
 
-def compile_host(root, obj, exe, cd=False):
-    extra = []
-    if cd:
-        write_boot_submount(root, exe.parent / 'boot_submount.c')
-        extra = ['-I' + str(exe.parent), '-ffunction-sections', '-fdata-sections',
-                 '-Wl,--gc-sections', str(root / 'drivers/dev.c')]
+def compile_host(root, obj, exe):
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-Wno-unused-parameter', '-Wno-sign-compare',
                     '-Wno-pointer-to-int-cast', '-Wno-missing-field-initializers',
                     '-D__cdecl=', '-Wno-unused-function',
-                    '-I' + str(root / 'tools/tests/atapi_hostshim'),
                     '-I' + str(root), '-I' + str(ROOT), '-I' + str(ROOT / 'kernel'), *INC,
-                    str(root / ('tools/tests/sqlite_cd_host.c' if cd else
-                                'tools/tests/sqlite_vfs_identity_host.c')), str(obj),
-                    *extra, '-o', str(exe)], check=True)
+                    str(root / 'tools/tests/sqlite_vfs_identity_host.c'), str(obj),
+                    '-o', str(exe)], check=True)
 
 
 def main():
@@ -101,11 +73,7 @@ def main():
         compile_host(ROOT, obj, exe)
         for case in CASES:
             subprocess.run([str(exe), case], check=True)
-        cd_exe = work / 'cd'
-        compile_host(ROOT, obj, cd_exe, cd=True)
-        for case in CD_CASES:
-            subprocess.run([str(cd_exe), case], check=True)
-        print(f'GREEN {len(CASES) + len(CD_CASES)}/{len(CASES) + len(CD_CASES)}', flush=True)
+        print(f'GREEN {len(CASES)}/{len(CASES)}', flush=True)
         if os.environ.get('MUTATE', '0') != '1':
             return
         for name, case, changes in MUTANTS:
@@ -120,9 +88,8 @@ def main():
                 assert old in source, (name, old)
                 path.write_text(source.replace(old, new))
             mutant = tree / 'run'
-            is_cd = case.startswith('cd:')
-            compile_host(tree, obj, mutant, cd=is_cd)  # Compilation failure is never RED.
-            result = subprocess.run([str(mutant), case.removeprefix('cd:')], capture_output=True, text=True)
+            compile_host(tree, obj, mutant)  # Compilation failure is never RED.
+            result = subprocess.run([str(mutant), case], capture_output=True, text=True)
             assert result.returncode == 1 and 'FAIL ' in result.stderr, (name, result)
             print(f'RED runtime {name}: rc={result.returncode} {result.stderr.strip()}', flush=True)
 

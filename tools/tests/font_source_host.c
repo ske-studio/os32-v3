@@ -57,8 +57,6 @@ VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 int vfs_path_kind(const char *path) { return kind_rc; }
 u32 vfs_path_dev(const char *path) { return 1; }
 u32 vfs_path_mount_generation(const char *path) { return 1; }
-int vfs_sqlite_immutable_generation(void *ctx, u32 generation, u32 *out)
-{ return VFS_ERR_ROFS; }
 static int mock_size(void *ctx, const char *path, u32 *size)
 { *size = MOCK_FILE_SIZE; return size_rc; }
 static int mock_write(void *ctx, const char *path, const void *buf, u32 size)

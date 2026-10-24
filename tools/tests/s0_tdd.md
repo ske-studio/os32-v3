@@ -358,8 +358,8 @@ S0-D (配備保護) と S0-T (初期値 tsv) は別票が同じファイルに�
 python3 -B tools/tests/test_kapi_db_v50.py            # 9 件 + 回収順の本文検査
 python3 -B tools/tests/test_kapi_db_v50.py --target   # 上に i386-elf 単体コンパイル
 python3 -B -m unittest discover -s tools/tests -p 'test_kapi_db_owned.py'
-python3 tools/tests/test_vfs_fd_sqlite.py
-python3 tools/tests/test_sqlite_groups.py
+# tools/tests/test_vfs_fd_sqlite.py: 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)
+# tools/tests/test_sqlite_groups.py: 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)
 ```
 
 ## K. KAPI v50 / 境界検査 / 回収順序 (S0-K、2026-09-13)

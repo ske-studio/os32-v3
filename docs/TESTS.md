@@ -21,9 +21,9 @@
 - **件数** (表明の数)。数え方が種類ごとに違う — C は `check()` / `CHECK()` の呼び出し数、
   Rust は `#[test]` の数、Python は `def test*` または `CASES` の長さ。合算に意味が無い。
 - **実行時間**。**1 本も計測していない**。ソースから読める重さの根拠だけは分かっていて、
-  `check-cfg-host` / `check-db-v50-host` / `check-install-recover-host` /
-  `check-sqlite-groups-host` の 4 本は SQLite の amalgamation
+  `check-cfg-host` / `check-db-v50-host` / `check-install-recover-host` などは SQLite の amalgamation
   (`lib/sqlite3/sqlite3.c`、**267,757 行**) を**それぞれ独立に**毎回コンパイルする。
+  `check-sqlite-groups-host` / `check-vfs-fd-sqlite-host` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。
 - **試験の種類**。5 つある — 静的整合性 / ホスト模型 / 実物ソースを `#include` /
   ゲスト観測 / 起動時自己試験。「実物ソースを `#include`」は、出荷するソースをそのまま
   ホストで走らせる形 (模型ではない)。表の「対象ソース」列が埋まっているものはだいたいこれ。

@@ -13,7 +13,7 @@
  *  そのままコンパイルし、ID 2 と ID 3 が資源を持った状態で ID 2 だけを
  *  畳んで「2 の分だけ」消えることを見る。
  *
- *  FD (fs/vfs_fd.c の vfs_close_owned) は tools/tests/test_vfs_fd_sqlite.py が、
+ *  FD (fs/vfs_fd.c の vfs_close_owned) は 共有 fixture tools/tests/vfs_fd_sqlite_host.c が、
  *  DB (kapi/kapi_db.c の db_cleanup_owned) は tools/tests/test_kapi_db_owned.py
  *  が既に同じ形で見ているので、ここでは重複させない。
  * ======================================================================== */
