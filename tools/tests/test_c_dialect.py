@@ -352,6 +352,93 @@ def case_internal(cd):
               'vendor は規則免除でも解析失敗を飛ばさない (fail closed、変異REDには数えない)')
 
 
+def case_internal_cache(cd):
+    from unittest import mock
+    with tempfile.TemporaryDirectory(prefix='c_dialect_cache_test_') as td:
+        base = pathlib.Path(td)
+        cache = base / 'cache'
+        cache.mkdir()
+        source = base / 'source'
+        (source / 'kernel').mkdir(parents=True)
+        (source / 'include').mkdir()
+        (source / 'kernel/a.c').write_text('#include "probe.h"\n')
+        (source / 'include/probe.h').write_text('extern int value;\n')
+        unit = {'src': 'kernel/a.c', 'cc': cd.CC, 'sig': (),
+                'argv': ['-std=gnu11', '-ffreestanding', '-Iinclude', 'kernel/a.c']}
+
+        def scan(root, u=unit):
+            return cd.check_internal_units([u], root, cache=cache)
+
+        with mock.patch.object(cd.ast, 'parse', wraps=cd.ast.parse) as parse:
+            check(scan(source) == ([], 1), 'cache warmup scans the actual TU')
+            calls = parse.call_count
+            check(scan(source) == ([], 1) and parse.call_count == calls,
+                  'unchanged dependencies reuse the successful scan')
+            tree = mutpar.mutant_tree(source, base / 'copy', {},
+                                      real={'kernel/a.c', 'include/probe.h'})
+            check(scan(tree) == ([], 1) and parse.call_count == calls,
+                  'identical copied trees reuse the scan')
+            generated = []
+            for label in ('a', 'z'):
+                out = base / ('c_dialect_out_' + label) / 'out'
+                out.mkdir(parents=True)
+                h = out / 'generated.h'
+                h.write_text('extern int generated;\n')
+                generated.append(dict(unit, argv=unit['argv'] + ['-include', str(h)]))
+            check(scan(source, generated[0]) == ([], 1), 'generated dependency warms cache')
+            calls = parse.call_count
+            check(scan(tree, generated[1]) == ([], 1) and parse.call_count == calls,
+                  'identical generated headers reuse scans across dry-run directories')
+            (base / 'c_dialect_out_z/out/generated.h').write_text('this is not C;\n')
+            check(any('clang parse failure' in p for p in scan(tree, generated[1])[0]),
+                  'changed generated header invalidates the scan')
+            header = tree / 'include/probe.h'
+            saved = header.stat()
+            header.write_text('_Atomic int value;\n')
+            os.utime(header, ns=(saved.st_atime_ns, saved.st_mtime_ns))
+            check(any('_Atomic' in p for p in scan(tree)[0]) and parse.call_count > calls,
+                  'mutated header is reread even with the original timestamp')
+            check(any('_Atomic' in p for p in scan(tree)[0]),
+                  'a repeated policy failure never becomes a successful cache hit')
+            (tree / 'kernel/a.c').write_text('int f(int *restrict p);\n')
+            check(any('restrict' in p for p in scan(tree)[0]),
+                  'mutated source is reread across copied trees')
+            (tree / 'kernel/a.c').write_text('this is not C;\n')
+            check(any('clang parse failure' in p for p in scan(tree)[0]),
+                  'cache never hides a parse failure')
+            (tree / 'kernel/a.c').write_text('#ifdef BAD\n_Atomic int x;\n#endif\n')
+            check(scan(tree) == ([], 1), 'conditional source warms the cache')
+            changed = dict(unit, argv=unit['argv'] + ['-DBAD'])
+            check(any('_Atomic' in p for p in scan(tree, changed)[0]),
+                  'changed compiler flags invalidate the scan')
+            (tree / 'kernel/a.c').write_text('#include "probe.h"\n')
+            header.write_text('extern int value;\n')
+            check(scan(tree) == ([], 1), 'restored header reuses the clean scan')
+            (tree / 'kernel/probe.h').write_text('_Atomic int shadow;\n')
+            check(any('_Atomic' in p for p in scan(tree)[0]),
+                  'new shadowing header changes compiler-resolved dependencies')
+            (tree / 'kernel/probe.h').unlink()
+            header.unlink()
+            check(any('clang parse failure' in p for p in scan(tree)[0]),
+                  'deleted dependency is not a cache hit')
+            (tree / 'kernel/a.c').write_text(
+                '#if __has_include("optional.h")\n_Atomic int optional;\n#endif\n')
+            check(scan(tree) == ([], 1), '__has_include absence warms the cache')
+            (tree / 'kernel/optional.h').write_text('/* not actually included */\n')
+            check(any('_Atomic' in p for p in scan(tree)[0]),
+                  '__has_include change invalidates even without a new dependency')
+            (tree / 'kernel/a.c').write_text(
+                'typedef char root_length[(sizeof(__FILE__) == %d) ? 1 : -1];\n'
+                % (len(str(tree / 'kernel/a.c')) + 1))
+            check(scan(tree) == ([], 1), '__FILE__ dependent source warms cache')
+            copy = mutpar.mutant_tree(tree, base / 'longer-copy', {}, real={'kernel/a.c'})
+            check(any('clang parse failure' in p for p in scan(copy)[0]),
+                  'expanded __FILE__ strings retain their actual root')
+            broken = dict(unit, argv=unit['argv'] + ['-std=invalid'])
+            check(any('clang parse failure' in p for p in scan(tree, broken)[0]),
+                  'invalid compiler flags retain the full-check parse failure verdict')
+
+
 # --------------------------------------------------------------------------
 #  7. make の環境変数・override の変種
 # --------------------------------------------------------------------------
@@ -592,10 +679,14 @@ def main(argv):
     case_probe(cd)
     case_sdk(cd)
     case_internal(cd)
+    case_internal_cache(cd)
     case_build_coverage(cd)
     sys.path.insert(0, str(ROOT / "tools"))
     import check_select
     if "--mutate" in argv or check_select.dialect_variants_needed():
+        warm = run_checker(ROOT)
+        check(warm.returncode == 0, 'unmodified tree warms the disposable internal cache: '
+              + (warm.stdout + warm.stderr if warm.returncode else 'GREEN'))
         case_make_variants()
     else:
         print("make variants: unchanged build/checker; skipped", flush=True)
@@ -608,4 +699,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    # Cache only successful internal TU checks, for this one suite invocation.
+    # Every checker still reads its real make graph, flags, probes and SDK inputs.
+    with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
+        os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
+        sys.exit(main(sys.argv[1:]))

@@ -8,8 +8,10 @@ clang gnu89/C99/C11 diagnostics and compiler tokens for unexpanded macros and
 C99 comments. Parse failures are errors. --root selects an isolated test tree.
 """
 import os
+import hashlib
 import pathlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -348,7 +350,53 @@ def _is_vendor(rel):
     return any(rel == v or rel.startswith(v + "/") for v in VENDOR_DIRS)
 
 
-def check_internal_units(units, root, jobs=None):
+def _internal_cache_key(src, argv, root):
+    """Hash compiler-resolved dependencies, including system/generated headers.
+
+    Used only by the host suite's disposable cache. Always run the preprocessor:
+    changed includes, include search order, macros and saved build flags must all
+    invalidate a hit. Never rely on symlinks, timestamps or a list of mutant paths.
+    """
+    try:
+        args = ast.flags(argv, root)
+    except ast.ParseError:
+        return None
+    with tempfile.TemporaryDirectory(prefix='c_dialect_deps_') as tmp:
+        depfile = pathlib.Path(tmp, 'unit.d')
+        r = subprocess.run(['clang', *args, '-E', '-MD', '-MF', str(depfile),
+                            '-MT', 'unit', str(root / src)],
+                           cwd=root, capture_output=True, text=True)
+        dependencies = depfile.read_text() if depfile.is_file() else ''
+    if r.returncode:
+        return None
+    # Only the isolated root and dry_run's generated output directory vary
+    # between identical invocations. File contents are hashed without rewriting.
+    def name(value):
+        value = re.sub(re.escape(str(root)) + r'(?=/|$)', '<root>', value)
+        return re.sub(r'[^\s]*/c_dialect_out_[^/]+/out/', '<out>/', value)
+
+    digest = hashlib.sha256(repr([name(src), *map(name, args)]).encode())
+    # Dependencies alone miss __has_include and path/time predefined macros.
+    # Normalize only compiler line-marker filenames, never expanded C strings.
+    expanded = re.sub(r'^(# \d+ ")([^"]+)(".*)$',
+                      lambda m: m[1] + name(m[2]) + m[3], r.stdout, flags=re.M)
+    digest.update(expanded.encode())
+    try:
+        deps = shlex.split(dependencies.replace('\\\n', '').partition(':')[2])
+        if not deps:
+            return None
+        paths = [pathlib.Path(os.path.normpath(root / dep.replace('$$', '$')))
+                 for dep in set(deps)]
+        for p in sorted(paths, key=lambda p: name(str(p))):
+            digest.update(name(str(p)).encode() + b'\0')
+            data = p.read_bytes()
+            digest.update(len(data).to_bytes(8, 'little') + data)
+    except (OSError, ValueError):
+        return None  # An uncacheable input still receives the full check.
+    return digest.hexdigest()
+
+
+def check_internal_units(units, root, jobs=None, cache=None):
     root = pathlib.Path(root).absolute()
     probs = set()
     count = 0
@@ -364,14 +412,21 @@ def check_internal_units(units, root, jobs=None):
             continue
         seen.add(key)
         count += not vendor
+        cache_key = _internal_cache_key(src, argv, root) if cache is not None else None
+        marker = pathlib.Path(cache, cache_key) if cache_key else None
+        if marker is not None and marker.is_file():
+            continue
+        unit_probs = set()
         try:
             tu = ast.parse(src,argv,root)
-            if vendor:
-                continue  # Vendor policy is exempt; syntax errors still fail closed.
-            words = set(INTERNAL_FORBIDDEN) | {'VLA','anonymous record','old-style definition'}
-            for f,ln,w in ast_findings(tu,root,words,{'threads.h','stdatomic.h'}):
-                if not _is_vendor(f):
-                    probs.add('%s:%d: 内部実装に T0 で新規導入しない %s ([C1])' % (f,ln,w))
+            if not vendor:  # Vendor policy is exempt; parsing still fails closed.
+                words = set(INTERNAL_FORBIDDEN) | {'VLA','anonymous record','old-style definition'}
+                for f,ln,w in ast_findings(tu,root,words,{'threads.h','stdatomic.h'}):
+                    if not _is_vendor(f):
+                        unit_probs.add('%s:%d: 内部実装に T0 で新規導入しない %s ([C1])' % (f,ln,w))
+            probs.update(unit_probs)
+            if marker is not None and not unit_probs:
+                marker.touch()
         except ast.ParseError as e:
             probs.add('%s: clang parse failure — %s' % (src,e))
     return sorted(probs),count
@@ -437,7 +492,8 @@ def main(argv):
     sdk_p = check_sdk_headers(root)
     lib_p, nlib = check_sdk_lib_headers(root)
     sample_p = check_sdk_sample(root)
-    int_p, nint = ([], 0) if probs or sdk_p or lib_p or sample_p else check_internal_units(summ.get("unit_list", []), root)
+    int_p, nint = ([], 0) if probs or sdk_p or lib_p or sample_p else check_internal_units(
+        summ.get("unit_list", []), root, cache=os.environ.get('OS32_C_DIALECT_TEST_CACHE'))
     probs += sdk_p + lib_p + sample_p + int_p
     c = summ.get("counts", {})
     print("check_c_dialect: 翻訳単位 %d (gnu11 %d、gnu89 %d、他 %d)、旗の組 %d (探り %d)、"
