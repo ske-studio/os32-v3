@@ -103,6 +103,7 @@ jobs:
           make check-boot-splash-host
           make check-build-id-host
           make check-cfg-host
+          make check-db-errstr-host
           make check-ext2-empty-name-host
           make check-guest-host
           make check-gui-gate-host

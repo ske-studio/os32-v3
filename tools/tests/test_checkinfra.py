@@ -38,10 +38,15 @@ class CheckInfra(unittest.TestCase):
         with legacy.fixture(CS, files=files) as fx, \
                 mock.patch.object(CS, 'ROOT', fx.d), mock.patch.object(CS, '_TRACKED', None), \
                 mock.patch.object(CS, 'MAP_PATH', str(pathlib.Path(fx.d, 'tools/check_map.yaml'))), \
-                mock.patch.object(inventory, 'ROOT', fx.d), mock.patch.object(inventory, 'check_select', CS):
+                mock.patch.object(inventory, 'ROOT', fx.d), mock.patch.object(inventory, 'check_select', CS), \
+                mock.patch.object(CS, 'LOCAL_ONLY_ALLOWED', {'check-local'}, create=True):
             inventory.MK_FILES = CS.makefile_paths()
             mapping = CS.load_map()
             self.assertEqual(mapping['local_checks'], ['check-local'])
+            # local_only は承認済みの名前だけ (任意の検査を通常の検査から外す抜け道にしない)
+            with mock.patch.object(CS, 'LOCAL_ONLY_ALLOWED', set(), create=True):
+                with self.assertRaises(SystemExit):
+                    CS.load_map()
             rules, variables = CS.read_makefiles()
             self.assertIn('check-local', rules)
             for files_ in (['Makefile'], ['tools/tests/test_local.py'], []):

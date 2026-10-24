@@ -29,6 +29,9 @@ MAP_PATH = os.path.join(ROOT, "tools", "check_map.yaml")
 
 
 # ---------------------------------------------------------------- 共通
+# 通常の検査から外してよい検査 (ユーザー決定 2026-10-24、票 TASK_TEST_TIDY の a5: 現物が手に入らない LGY-98 系)。
+LOCAL_ONLY_ALLOWED = {"check-host-agent", "check-host-lib-host", "check-net-link-host", "check-lan-bridge-host"}
+
 def git(*args):
     p = subprocess.run(["git", "-C", ROOT] + list(args),
                        capture_output=True, text=True)
@@ -99,6 +102,8 @@ def load_map():
             raise SystemExit("check-map: duplicate: " + name)
         m.setdefault("checks", {})[name] = shard[name]
         if shard.get("local_only"):
+            if name not in LOCAL_ONLY_ALLOWED:
+                raise SystemExit("check-map: local_only は承認済みの検査だけ: " + name)
             m.setdefault("local_checks", []).append(name)
         if shard.get("artifact_reader"):
             m.setdefault("artifact_readers", []).append(name)
