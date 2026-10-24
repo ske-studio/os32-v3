@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)
 
-> 状態: **実装中 (2026-10-24)** — ユーザー決定 2026-10-24。調査は `~/os32-tmp/run/test_survey/REPORT.md` (2026-10-22、225 検査)。
+> 状態: **受入完了 (2026-10-24)** — TT1〜TT5 が main。検査は 225 → 197 本 + ローカルだけ 4 本、ケースと変異は減らしていない。残りの候補: c-dialect-host (TT1 で速くならなかった、1,037 秒)。調査は `~/os32-tmp/run/test_survey/REPORT.md`。
 
 ## 0. ユーザー決定 (2026-10-24)
 
@@ -22,4 +22,4 @@
 | TT2 | (PRE-1 は 2026-10-23 に閉じ済み — test_preflight は check-preflight-host、test_jobs は運用補助で載せない)。a5 を CHECK_PAR_ORDER から外してローカルだけに (ファイルは残す、台帳 LGY98-L12 に「保守外」)、a3 削除、a1・a2 | sol (保守の束 A の取り込みの後) | **main** (d0d4dce、astra 取り込み可・PM の直し 2 回) — a5 の 4 本はローカルだけ (local_only は承認済みの 4 本に限る)、a3 削除 (kstr_bench 本体は計測で使うので残す)、a1 は道具が使われているので残す、a2 の 39 ケース・変異 18 本を db-errstr-host へ移して削除 (CI の静的の列はホストだけで test_db_errstr.py) |
 | TT3 | b1〜b4 の束ね (gfx 4 本・font 5 本・access/caller 5 本・gfinit は現行 PAR の 6 本) | sol | **main** (a42bcf4、astra 取り込み可) — 20 検査を 4 登録へ (gfx・font・access・gfinit、tools/run_host_group.py が親の jobserver を共用)。ケース・変異・RED/GREEN の数は同じ。検査は 220→204 本 |
 | TT5 | T4B-CD の凍結コードと試験・a6 の削除 (カーネル層の fs/vfs に触るので候補の検査を全部 MUTATE=0) | sol | **main** (fb1c7f3、astra 取り込み可、台帳 T4B-CD は閉鎖台帳へ) |
-| TT4 | b5〜b7 の束ね (hsync・fs-kind・sh-input・sh-exec・sqlite-module-proto の 5 群) | sol | **実装中 (レビュー待ち)** — 12 登録を 5 登録へ。runner は TT3 の jobserver を共用し、既存の引数・ケース・変異を保持。SQLite は正常対照の重複を除き stack 容量変異を統合。検証証拠は `~/os32-tmp/run/tt4/` (前後の件数・時間、候補・静的・ビルドのログ) |
+| TT4 | b5〜b7 の束ね (hsync・fs-kind・sh-input・sh-exec・sqlite-module-proto の 5 群) | sol | **main** (e4681ff、astra 取り込み可) — 12 検査を 5 登録へ (hsync・fs-kind・sh-input・sh-exec・sqlite-module-proto、sqlite は同じ主試験の 2 回を 1 回に)。ケース・変異・RED/GREEN の数は同じ。b7 の +0.84 秒は 1 回ずつの計測の幅として束ねたまま (PM 判断) |
