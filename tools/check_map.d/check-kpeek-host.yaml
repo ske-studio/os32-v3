@@ -19,3 +19,4 @@ check-kpeek-host:
 - build/checks.d/check-kpeek-host.mk
 - kdebug/kdebug_window.c
 - kdebug/kdebug_window.h
+- kdebug/recover.h

@@ -150,8 +150,8 @@ static u32 kpeek_lan_send(const KdebugPeek *req)
     }
     for (i = 0; i < SFS_LAN_MAC_LEN; i++) f[i] = req->dst[i];
     e82557_get_mac(f + SFS_LAN_MAC_LEN);
-    f[12] = (u8)(SFS_LAN_ETHERTYPE >> 8);
-    f[13] = (u8)(SFS_LAN_ETHERTYPE & 0xFF);
+    f[2 * SFS_LAN_MAC_LEN] = (u8)(SFS_LAN_ETHERTYPE >> 8);
+    f[2 * SFS_LAN_MAC_LEN + 1] = (u8)(SFS_LAN_ETHERTYPE & 0xFF);
     sfs[0] = SFS_ENQ;
     sfs[1] = SFS_MAGIC1;
     sfs[2] = SFS_MAGIC2;

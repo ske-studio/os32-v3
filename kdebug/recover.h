@@ -2,6 +2,9 @@
 #define KDEBUG_RECOVER_H
 
 #include "types.h"
+#define PCI_DECODE_CONSTANTS_ONLY
+#include "../drivers/pci_decode.h"
+#undef PCI_DECODE_CONSTANTS_ONLY
 #include <stdbool.h>
 
 /* DESIGN.final §3–5, §7 T1/T2/T3.
@@ -10,14 +13,88 @@
  * poll/delay/instruction boundary. The owner initializes once per boot; FAILED
  * and cold-required cannot be cleared by starting a new session.
  */
+/* GeForce 6200 (NV44A) */
+#define KPEEK_NV_VENDOR      PCI_VENDOR_NVIDIA
+#define KPEEK_NV44A_DEVICE   PCI_DEVICE_NV44A
+#define KPEEK_NV_BAR_MMIO    0U       /* BAR0 = レジスタ空間 16MB */
+
+/* BAR0 内のオフセット (nouveau / envytools の名前) と長さ */
+#define KPEEK_NV_PMC_OFF        0x000000U   /* PMC: ID・有効化 */
+#define KPEEK_NV_PMC_LEN        0x000400U
+#define KPEEK_NV_PBUS_OFF       0x001800U   /* PBUS: PCI 設定の写し */
+#define KPEEK_NV_PBUS_LEN       0x000100U
+#define KPEEK_NV_PFB_OFF        0x100000U   /* PFB: メモリ制御 */
+#define KPEEK_NV_PFB_LEN        0x001000U
+#define KPEEK_NV_PSTRAPS_OFF    0x101000U   /* PEXTDEV の strap */
+#define KPEEK_NV_PSTRAPS_LEN    0x000010U
+#define KPEEK_NV_PCRTC0_OFF     0x600000U   /* PCRTC head 0 */
+#define KPEEK_NV_PCRTC1_OFF     0x602000U   /* PCRTC head 1 */
+#define KPEEK_NV_PCRTC_LEN      0x001000U
+#define KPEEK_NV_PRAMDAC0_OFF   0x680000U   /* PRAMDAC head 0 */
+#define KPEEK_NV_PRAMDAC1_OFF   0x682000U   /* PRAMDAC head 1 */
+#define KPEEK_NV_PRAMDAC_LEN    0x001000U
+#define KPEEK_NV_PROM_OFF       0x300000U   /* PROM: VBIOS の窓 */
+#define KPEEK_NV_PROM_LEN       0x020000U
+#define KPEEK_NV_PRMVIO0_OFF    0x0C0000U   /* NV_PRMVIO0_OFFSET */
+#define KPEEK_NV_PRMCIO0_OFF    0x601000U   /* NV_PRMCIO0_OFFSET */
+#define KPEEK_VGA_MISC_W        0x3C2U      /* NV_PRMVIO_MISC__WRITE */
+#define KPEEK_VGA_SRX           0x3C4U      /* NV_PRMVIO_SRX */
+#define KPEEK_VGA_SR            0x3C5U      /* NV_PRMVIO_SR */
+#define KPEEK_VGA_MISC_R        0x3CCU      /* NV_PRMVIO_MISC__READ */
+#define KPEEK_VGA_GRX           0x3CEU      /* NV_PRMVIO_GRX */
+#define KPEEK_VGA_GX            0x3CFU      /* NV_PRMVIO_GX */
+#define KPEEK_VGA_CRX           0x3D4U      /* NV_PRMCIO_CRX__COLOR */
+#define KPEEK_VGA_CR            0x3D5U      /* NV_PRMCIO_CR__COLOR */
+#define KPEEK_VGA_BYTE_LEN      1U
+
+/* Fixed NV44A at PCI 0:13.0; PCI IDs and bit layouts live in pci_decode.h.
+ * Keep RECOVER aliases used by the M5 script/PLL implementation. VGA/NV
+ * addresses are canonical here, shared with the kpeek read allowlist. */
+#define RECOVER_GF_BUS 0U
+#define RECOVER_GF_DEV 13U
+#define RECOVER_GF_FN 0U
+#define RECOVER_GF_BDF (RECOVER_GF_DEV << 3)
+#define RECOVER_GF_DEVICE ((PCI_DEVICE_NV44A << 16) | PCI_VENDOR_NVIDIA)
+#define RECOVER_GF_PMC_IRQ 0x0140U
+#define RECOVER_CR11 0x11U
+#define RECOVER_BAR_COUNT 3
+#define RECOVER_HEAD_COUNT 2U
+
+/* UART 8N1: start + eight data bits + stop, and time conversion units. */
+#define RECOVER_UART_FRAME_BITS 10U
+#define RECOVER_UART_US 1000000U
+#define RECOVER_UART_FRAME_US (RECOVER_UART_FRAME_BITS * RECOVER_UART_US)
+#define RECOVER_US_PER_MS 1000U
+
+/* Published S0 / PREPARE-RUN / SIZE_BARS budget envelopes. */
+#define RECOVER_BUDGET_BYTES_S0 4096U
+#define RECOVER_BUDGET_BYTES_RUN 8192U
+#define RECOVER_BUDGET_BYTES_SIZE_BARS 16384U
+#define RECOVER_BUDGET_EXEC_MS_S0 2000U
+#define RECOVER_BUDGET_EXEC_MS_RUN 4000U
+#define RECOVER_BUDGET_EXEC_MS_SIZE_BARS 6000U
+#define RECOVER_BUDGET_SECONDS_S0 10U
+#define RECOVER_BUDGET_SECONDS_RUN 18U
+#define RECOVER_BUDGET_SECONDS_SIZE_BARS 33U
+#define RECOVER_BUDGET_POLLS_S0 16384U
+#define RECOVER_BUDGET_POLLS_RUN 32768U
+#define RECOVER_BUDGET_POLLS_SIZE_BARS 65536U
+#define RECOVER_BUDGET_S0_WAIT_MS RECOVER_BUDGET_EXEC_MS_S0
+#define RECOVER_BUDGET_S0_POINTS 256U
+#define RECOVER_BUDGET_MARGIN_S 3U
+#define RECOVER_BUDGET_POINTS 1024U
+#define RECOVER_BUDGET_TRIAL_SECONDS 60U
+#define RECOVER_BUDGET_STEPS 4096U
+#define RECOVER_BUDGET_POLLS RECOVER_BUDGET_POLLS_SIZE_BARS
+
 #define RECOVER_MAX_REGS 32U
 #define RECOVER_PROFILE_VERSION 4U
 #define RECOVER_HALF_TICKS 0x80000000UL
 #define RECOVER_ROUTE_PORT 0x0FACU
 #define RECOVER_ROUTE_MASK 0x03U
 #define RECOVER_ROUTE_98 0U
-#define RECOVER_COMMAND_MEM 0x0002U
-#define RECOVER_COMMAND_DMA_MEM 0x0006U
+#define RECOVER_COMMAND_MEM PCI_CMD_MEM_ENABLE
+#define RECOVER_COMMAND_DMA_MEM (PCI_CMD_MEM_ENABLE | PCI_CMD_BUS_MASTER)
 
 enum recover_state {
     REC_IDLE, REC_SNAPSHOTTING, REC_ARMED, REC_RUNNING, REC_PAUSED,
@@ -42,30 +119,34 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_CTX_MAX 2048U
 #define RECOVER_DEP_MAX 64U
 #define RECOVER_ENTRY_MAX 32U
-#define RECOVER_BITS_WORDS (RECOVER_NODE_MAX / 32U)
+/* Preserve the existing unsigned literal spelling in the preprocessed HWDEV
+ * contract while taking the word width from types.h's single definition. */
+#define RECOVER_UNSIGNED_(n) n##U
+#define RECOVER_UNSIGNED(n) RECOVER_UNSIGNED_(n)
+#define RECOVER_BITS_WORDS (RECOVER_NODE_MAX / RECOVER_UNSIGNED(BITS_PER_U32))
 #define RECOVER_RANGE_MAX 256U
 #define RECOVER_EXPR_ARGS 32U
-#define RECOVER_PRMVIO 0x0c0000U
-#define RECOVER_PRMCIO 0x601000U
-#define RECOVER_HEAD_STRIDE 0x2000U
+#define RECOVER_PRMVIO KPEEK_NV_PRMVIO0_OFF
+#define RECOVER_PRMCIO KPEEK_NV_PRMCIO0_OFF
+#define RECOVER_HEAD_STRIDE (KPEEK_NV_PCRTC1_OFF - KPEEK_NV_PCRTC0_OFF)
 #define RECOVER_WINDOW_PAGES 2U /* a peek chunk (< one page) spans at most two PTEs */
-#define RECOVER_CFG_SIZE 256U
-#define RECOVER_COMMAND 0x04U
+#define RECOVER_CFG_SIZE PCI_CFG_SPACE_SIZE
+#define RECOVER_COMMAND PCI_CFG_COMMAND
 #define RECOVER_COMMAND_OVERRIDE 0x0102U
 #define RECOVER_CFG50 0x50U
 #define RECOVER_CFG54 0x54U
 #define RECOVER_PBUS1850 0x1850U
 #define RECOVER_PBUS1854 0x1854U
-#define RECOVER_SEQ 0x3c4U
-#define RECOVER_GFX 0x3ceU
+#define RECOVER_SEQ KPEEK_VGA_SRX
+#define RECOVER_GFX KPEEK_VGA_GRX
 #define RECOVER_CRTC_MONO 0x3b4U
 #define RECOVER_STATUS_MONO 0x3baU
 #define RECOVER_ATTR 0x3c0U
 #define RECOVER_FEATURE_READ 0x3caU
 #define RECOVER_STATUS 0x3daU
-#define RECOVER_CRTC 0x3d4U
-#define RECOVER_MISC_WRITE 0x3c2U
-#define RECOVER_MISC_READ 0x3ccU
+#define RECOVER_CRTC KPEEK_VGA_CRX
+#define RECOVER_MISC_WRITE KPEEK_VGA_MISC_W
+#define RECOVER_MISC_READ KPEEK_VGA_MISC_R
 #define RECOVER_VGA_ENABLE 0x3c3U
 #define RECOVER_DAC_DATA 0x3c9U
 #define RECOVER_IO_LAST 0xffffU
@@ -86,9 +167,9 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_N1_PBUS1854_BIT (1U << 3)
 #define RECOVER_N1_ALL_BITS (RECOVER_N1_CFG50_BIT | RECOVER_N1_CFG54_BIT | \
                              RECOVER_N1_PBUS1850_BIT | RECOVER_N1_PBUS1854_BIT)
-#define RECOVER_BAR_TYPE_MASK 0x07U
+#define RECOVER_BAR_TYPE_MASK PCI_BAR_TYPE_MASK
 #define RECOVER_N1_PC 0xe81eU
-#define RECOVER_BAR_MASK 0xfffffff0U
+#define RECOVER_BAR_MASK PCI_BAR_MEM_ADDR_MASK
 #define RECOVER_ADDRESS_END (1ULL << 32)
 
 enum recover_space { REC_PCI_CFG, REC_BAR_MMIO, REC_BAR_VRAM,
@@ -163,7 +244,7 @@ struct recover_identity {
 struct recover_bar_measurement {
     struct recover_identity identity;
     u32 measurement_session;
-    struct recover_bar_extent bar[3];
+    struct recover_bar_extent bar[RECOVER_BAR_COUNT];
 };
 struct recover_profile {
     u32 version, crc;
@@ -189,6 +270,8 @@ struct recover_token {
     struct recover_identity identity;
 };
 struct recover_local_saved { u32 key, dir_substep, value; };
+#define RECOVER_ABORT_SESSION_OFF 2U
+#define RECOVER_ABORT_CRC_OFF 6U
 #define RECOVER_ABORT_SIZE 10U
 #define RECOVER_ABORT_SYNC0 0xa5U
 #define RECOVER_ABORT_SYNC1 0x5aU
@@ -201,7 +284,7 @@ struct recover_ops {
     u32 (*ticks)(void *opaque);
     int (*identity)(void *opaque, struct recover_identity *out);
     int (*start_ready)(void *opaque); /* stopped device AND confirmed CUI */
-    int (*raw_config)(void *opaque, u32 *command, u32 bar[3]);
+    int (*raw_config)(void *opaque, u32 *command, u32 bar[RECOVER_BAR_COUNT]);
     int (*read)(void *opaque, const struct recover_bus_access *a, u32 *value);
     int (*write)(void *opaque, const struct recover_bus_access *a, u32 value);
     int (*route_read)(void *opaque, u32 *value); /* 0FACh byte */
@@ -235,7 +318,7 @@ struct recover {
     /* GF manifest-derived UART budget; zero preserves the generic budget. */
     u32 log_limit, tx_ticks, opcode_spent;
     u32 restore_polls, uart_polls, uart_bytes;
-    u32 restored_rules[RECOVER_RULE_MAX / 32U];
+    u32 restored_rules[RECOVER_RULE_MAX / RECOVER_UNSIGNED(BITS_PER_U32)];
     u32 command_saved, command_actual;
     bool in_s0, command_override;
     enum recover_state state;
@@ -252,7 +335,7 @@ struct recover {
     u32 capture_values[RECOVER_CAPTURE_MAX], capture_valid;
 
     struct recover_bar_measurement cache, measurement;
-    struct recover_bar_extent bars[3];
+    struct recover_bar_extent bars[RECOVER_BAR_COUNT];
     bool enabled, route_write_approved, valid, in_call, in_opcode;
     bool failed, access_blocked, cold_latched, s0_verified, s1_verified;
 };

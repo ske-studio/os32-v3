@@ -4,21 +4,9 @@
  * PCI lane semantics: drivers/pci.c and PC-98 UNDOCUMENTED io_pci.md.
  */
 #include "gfinit_bus.h"
-#define GF_BUS 0U
-#define GF_DEV 13U
-#define GF_FN 0U
-#define GF_BDF (GF_DEV << 3)
-#define GF_DEVICE 0x022110deU
-#define GF_CFG_ID 0U
-#define GF_CFG_REV 8U
-#define GF_CFG_BAR 0x10U
-#define GF_CFG_SUBSYS 0x2cU
-#define GF_BAR_FLAGS 15U
-#define GF_BAR_TYPE 7U
-#define GF_LEGACY_LO 0xa0000U
+#include "memmap.h"
+#define GF_LEGACY_LO MEM_CONV_END
 #define GF_LEGACY_HI 0xc0000U
-#define GF_CR_LOCK RECOVER_CR1F
-#define GF_CR_PROTECT 0x11U
 
 void gfinit_bus_init(struct gfinit_bus *b, const struct recover_profile *p,
                      const struct gfinit_pci_ops *pci)
@@ -27,33 +15,33 @@ void gfinit_bus_init(struct gfinit_bus *b, const struct recover_profile *p,
     recover_window_hal_init(&b->window);
 }
 static u32 cfg32(const struct gfinit_bus *b, u32 off)
-{ return b->pci->read32(GF_BUS, GF_DEV, GF_FN, off); }
+{ return b->pci->read32(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, off); }
 static int present(const struct gfinit_bus *b)
 {
     return b && b->pci && b->pci->read32 && b->pci->read16 &&
-        b->pci->write32 && b->pci->write16 && cfg32(b, GF_CFG_ID) == GF_DEVICE;
+        b->pci->write32 && b->pci->write16 && cfg32(b, PCI_CFG_VENDOR_ID) == RECOVER_GF_DEVICE;
 }
-int gfinit_bus_raw_config(void *opaque, u32 *command, u32 bars[3])
+int gfinit_bus_raw_config(void *opaque, u32 *command, u32 bars[RECOVER_BAR_COUNT])
 {
     struct gfinit_bus *b = opaque;
     if (!command || !bars || !present(b)) return -1;
-    *command = b->pci->read16(GF_BUS, GF_DEV, GF_FN, RECOVER_COMMAND);
-    for (u32 i = 0; i < 3; i++) bars[i] = cfg32(b, GF_CFG_BAR + 4 * i);
+    *command = b->pci->read16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, RECOVER_COMMAND);
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) bars[i] = cfg32(b, PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i);
     return 0;
 }
 int gfinit_bus_probe(struct gfinit_bus *b)
 {
-    u32 command, bars[3];
-    if (!b || b->ready || !b->profile || b->profile->expected_bdf != GF_BDF ||
-        b->profile->expected_device != GF_DEVICE || gfinit_bus_raw_config(b, &command, bars)) return -1;
-    for (u32 i = 0; i < 3; i++) {
-        if ((bars[i] & GF_BAR_TYPE) || !(bars[i] & ~GF_BAR_FLAGS)) return -1;
+    u32 command, bars[RECOVER_BAR_COUNT];
+    if (!b || b->ready || !b->profile || b->profile->expected_bdf != RECOVER_GF_BDF ||
+        b->profile->expected_device != RECOVER_GF_DEVICE || gfinit_bus_raw_config(b, &command, bars)) return -1;
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) {
+        if ((bars[i] & PCI_BAR_TYPE_MASK) || !(bars[i] & ~PCI_BAR_MEM_ATTR_MASK)) return -1;
     }
-    b->identity.bdf = GF_BDF; b->identity.device = GF_DEVICE;
-    b->identity.subsys = cfg32(b, GF_CFG_SUBSYS);
-    b->identity.revision = cfg32(b, GF_CFG_REV) & 255;
+    b->identity.bdf = RECOVER_GF_BDF; b->identity.device = RECOVER_GF_DEVICE;
+    b->identity.subsys = cfg32(b, PCI_CFG_SUBSYS_VENDOR);
+    b->identity.revision = cfg32(b, PCI_CFG_REVISION_ID) & PCI_REVISION_MASK;
     b->identity.bar0 = bars[0];
-    for (u32 i = 0; i < 3; i++) b->bars[i] = bars[i];
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) b->bars[i] = bars[i];
     b->ready = true;
     return 0;
 }
@@ -62,9 +50,9 @@ int gfinit_bus_identity(void *opaque, struct recover_identity *out)
     struct gfinit_bus *b = opaque;
     if (!out || !b || !b->ready || !present(b)) return -1;
     *out = b->identity;
-    out->subsys = cfg32(b, GF_CFG_SUBSYS);
-    out->revision = cfg32(b, GF_CFG_REV) & 255;
-    out->bar0 = cfg32(b, GF_CFG_BAR);
+    out->subsys = cfg32(b, PCI_CFG_SUBSYS_VENDOR);
+    out->revision = cfg32(b, PCI_CFG_REVISION_ID) & PCI_REVISION_MASK;
+    out->bar0 = cfg32(b, PCI_CFG_BAR0);
     return 0;
 }
 static int bus_access(struct gfinit_bus *b, const struct recover_bus_access *a,
@@ -78,20 +66,20 @@ static int bus_access(struct gfinit_bus *b, const struct recover_bus_access *a,
     if (a->space == REC_PCI_CFG) {
         if (!present(b)) return -1;
         if (a->width == 2) {
-            if (write) return b->pci->write16(GF_BUS, GF_DEV, GF_FN, a->offset, (u16)*value);
-            *value = b->pci->read16(GF_BUS, GF_DEV, GF_FN, a->offset);
+            if (write) return b->pci->write16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, a->offset, (u16)*value);
+            *value = b->pci->read16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, a->offset);
         } else if (a->width == 4) {
-            if (write) b->pci->write32(GF_BUS, GF_DEV, GF_FN, a->offset, *value);
+            if (write) b->pci->write32(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, a->offset, *value);
             else *value = cfg32(b, a->offset);
         } else return -1;
         return 0;
     }
     if (a->space != REC_BAR_MMIO && a->space != REC_BAR_VRAM &&
         a->space != REC_VGA_DIRECT && a->space != REC_VGA_INDEXED) return -1;
-    u32 command, bars[3];
+    u32 command, bars[RECOVER_BAR_COUNT];
     if (gfinit_bus_raw_config(b, &command, bars) || !(command & RECOVER_COMMAND_MEM)) return -1;
-    for (u32 i = 0; i < 3; i++) if (bars[i] != b->bars[i]) return -1;
-    u32 base = bars[a->bar] & ~GF_BAR_FLAGS;
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (bars[i] != b->bars[i]) return -1;
+    u32 base = bars[a->bar] & ~PCI_BAR_MEM_ATTR_MASK;
     if (a->offset > ~0U - base || a->width - 1 > ~0U - base - a->offset) return -1;
     u32 pa = base + a->offset;
     if (pa < GF_LEGACY_HI && pa + a->width > GF_LEGACY_LO) return -1;
@@ -108,14 +96,14 @@ int gfinit_bus_write(void *opaque, const struct recover_bus_access *a, u32 value
 int gfinit_bus_local_cleanup(struct gfinit_bus *b, struct recover *r)
 {
     int rc = recover_window_cleanup(&b->window);
-    const u32 order[] = {GF_CR_LOCK, GF_CR_PROTECT, RECOVER_CR44, GF_CR_LOCK};
+    const u32 order[] = {RECOVER_CR1F, RECOVER_CR11, RECOVER_CR44, RECOVER_CR1F};
     for (u32 k = 0; !rc && k < sizeof(order) / sizeof(order[0]); k++) {
         for (u32 i = 0; !rc && i < r->local_saved_count; i++) {
             const struct recover_local_saved *v = &r->local_saved[i];
             const struct recover_target *t = &r->profile->targets[v->key];
             if (v->dir_substep != REC_DATA || t->index != order[k]) continue;
             u32 index = t->index, value = v->value;
-            if (t->index == GF_CR_LOCK)
+            if (t->index == RECOVER_CR1F)
                 value = !k || v->value == RECOVER_CR1F_UNLOCKED ?
                     RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK;
             if (recover_restore_point(r) ||

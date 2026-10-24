@@ -11,3 +11,7 @@ check-v86-gcap-host:
 - tools/tests/serial_diag_host.h
 - kdebug/v86_gcap_diag.h
 - kernel/v86_gcap_math.h
+- kdebug/v86_gcap_defs.h
+- include/pegc.h
+- include/pc98.h
+- include/types.h

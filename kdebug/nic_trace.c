@@ -75,5 +75,5 @@ void nic_trace(u32 stage)
 failed:
     trace_off = 1;
     /* The void export reports through the kernel logger before probe's final line. */
-    kprintf(0x07, "[e82557] trace=off\n");
+    kprintf(KLOG_ATTR, "[e82557] trace=off\n");
 }

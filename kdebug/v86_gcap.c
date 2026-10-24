@@ -35,6 +35,8 @@
 #include "memmap.h"
 #include "v86_gcap.h"
 #include "v86_gcap_math.h"
+#include "v86_gcap_defs.h"
+#include "pegc.h"
 #include "v86.h"
 #include "v86_io.h"
 #include "display_restore.h"
@@ -270,7 +272,7 @@ static int gcap_run(V86Gcap *g, u32 entry, u32 phase, u16 ax, u16 bx,
     ctx.eip    = entry;
     ctx.cs     = (u32)(V86_TEST_CODE_ADDR >> 4);
     ctx.eflags = V86_EFLAGS_INIT | (keep_if ? EFLAGS_IF : 0);
-    ctx.esp    = 0x0FFE;
+    ctx.esp    = V86_TEST_STACK_TOP;
     ctx.ss     = (u32)(V86_TEST_STACK_ADDR >> 4);
     ctx.es     = ctx.ss;
     ctx.ds     = ctx.ss;
@@ -331,7 +333,7 @@ static void gcap_rom(V86Gcap *g)
     /* 1. AH=31h — 印 (FFh) を入れて呼ぶ */
     before = v86g_phase_counts(g);
     reason = gcap_run(g, GCAP_ENTRY_ROM, V86G_PH_READ31,
-                      (u16)(0x3100U | V86G_SENTINEL_AL),
+                      (u16)((V86G_INT18_GET_MODE << 8) | V86G_SENTINEL_AL),
                       (u16)(V86G_SENTINEL_BH << 8), &ax, &bx, &done,
                       1, GCAP_TICK_LIMIT);
     v86g_phase_diag(g, before, V86G_PH_READ31, reason, done, ax);
@@ -356,7 +358,7 @@ static void gcap_rom(V86Gcap *g)
     g->layout = (u32)dec;
 
     /* 3. AH=30h → 640x480 */
-    g->set_ax = (u16)(0x3000U | al480);
+    g->set_ax = (u16)((V86G_INT18_SET_MODE << 8) | al480);
     g->set_bx = (u16)(bh480 << 8);
     before = v86g_phase_counts(g);
     /* STOP/fault can bypass the ROM restore below. Arm the existing fallback
@@ -387,7 +389,7 @@ static void gcap_rom(V86Gcap *g)
         u32 keep_kind = g->abort_kind;
         u16 keep_cs = g->abort_cs, keep_ip = g->abort_ip;
 
-        g->rst_ax = (u16)(0x3000U | (g->r31_ax & 0xFFU));
+        g->rst_ax = (u16)((V86G_INT18_SET_MODE << 8) | (g->r31_ax & 0xFFU));
         g->rst_bx = g->r31_bx;
         g->abort_kind = V86G_ABORT_NONE;
         before = v86g_phase_counts(g);
@@ -441,10 +443,10 @@ static const struct {
     u16 value;
     u16 ip;
 } gcap_expect[] = {
-    { 0x0062, 1, 1, 0x0011, 0x0047 },
-    { 0x09A8, 1, 1, 0x0001, 0x004E },
-    { 0x00A2, 2, 1, 0x2233, 0x0052 },
-    { 0x0060, 2, 1, 0x4455, 0x005A },
+    { GDC_TEXT_CMD, 1, 1, 0x0011, 0x0047 },
+    { PEGC_HSYNC_PORT, 1, 1, 0x0001, 0x004E },
+    { GDC_GFX_CMD, 2, 1, 0x2233, 0x0052 },
+    { GDC_TEXT_PARAM, 2, 1, 0x4455, 0x005A },
     { 0x0000, 1, 0, 0x000B, 0x005D },
 };
 #define GCAP_EXPECT_N   (sizeof(gcap_expect) / sizeof(gcap_expect[0]))
@@ -472,7 +474,7 @@ static void gcap_selftest(V86Gcap *g)
                       0, GCAP_TICK_LIMIT);
     if (reason != V86_EXIT_HLT || !done || !g->overflow ||
         g->n_out != V86G_OUT_MAX || g->seq_next != V86G_OUT_MAX + 1U ||
-        g->out[V86G_OUT_MAX - 1].port != 0x0068U ||
+        g->out[V86G_OUT_MAX - 1].port != MODE_FF1_PORT ||
         g->out[V86G_OUT_MAX - 1].seq != V86G_OUT_MAX - 1U ||
         dry_n_out8 != V86G_OUT_MAX + 1U) {
         fail |= STF_OVF;
@@ -544,9 +546,9 @@ static void gcap_selftest(V86Gcap *g)
         fail |= STF_SEQ_INVAL;
     }
     if (g->in_total != 2 || g->n_in != 2 || g->in_other != 0 ||
-        g->in[0].port != 0x00A0U || g->in[0].widths != 1 ||
+        g->in[0].port != GDC_GFX_PARAM || g->in[0].widths != 1 ||
         g->in[0].count != 1 || !(g->in[0].flags & V86G_F_PASSED) ||
-        g->in[1].port != 0x006AU || g->in[1].widths != 2 ||
+        g->in[1].port != MODE_FF2_PORT || g->in[1].widths != 2 ||
         g->in[1].count != 1 || g->in[1].last != GCAP_DRY_IN16) {
         fail |= STF_SEQ_INTAB;
     }

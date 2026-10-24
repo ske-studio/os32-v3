@@ -68,8 +68,8 @@ static int bus_write_test(void *v,const struct recover_bus_access *a,u32 value)
 static void bus_setup(void)
 {
     setup();profile.layouts=recover_gf_template.layouts;profile.layout_count=recover_gf_template.layout_count;
-    profile.expected_bdf=GF_BDF;profile.expected_device=GF_DEVICE;ident.bdf=GF_BDF;
-    pci_id=GF_DEVICE;pci_status=0xa5a5;pci_writes=maps=restores=fault=0;
+    profile.expected_bdf=RECOVER_GF_BDF;profile.expected_device=RECOVER_GF_DEVICE;ident.bdf=RECOVER_GF_BDF;
+    pci_id=RECOVER_GF_DEVICE;pci_status=0xa5a5;pci_writes=maps=restores=fault=0;
     pte=0x876540a5;irq_state=1;window_failed=window_busy=false;
     gfinit_bus_init(&device,&profile,&pci_ops);
     CHECK(gfinit_bus_probe(&device)==0 && !pci_writes);
@@ -291,7 +291,7 @@ static void resource_tests(void)
     CHECK(resource_run(ranges,&n)<0 && n==0);
     resource_cfg[2][7][8]=0x21f02000;
     n=RECOVER_RANGE_MAX;
-    CHECK(resource_window(ranges,&n,2,7,GF_RES_MEM_WINDOW)<0);
+    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)<0);
     output("resources: live scan, unknown BAR reject, disabled/IO skip, bridge windows and bounds PASS\n");
 }
 
