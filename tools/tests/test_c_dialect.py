@@ -354,6 +354,11 @@ def case_internal(cd):
 
 def case_suite_cache_owner(cd):
     """The cache is honoured only while its owning suite is alive."""
+    try:
+        cd.process_start(os.getpid())
+    except OSError:
+        print("  skip キャッシュの所有者 (/proc が無い — キャッシュは使われず全部を検査する)", flush=True)
+        return
     old = os.environ.get('OS32_C_DIALECT_TEST_CACHE')
     try:
         with tempfile.TemporaryDirectory(prefix='c_dialect_owner_') as d:
@@ -730,7 +735,10 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
         sys.path.insert(0, str(ROOT / "tools"))
         import check_c_dialect as owner  # noqa: E402
-        pathlib.Path(cache, owner.SUITE_CACHE_OWNER).write_text(
-            '%d %s' % (os.getpid(), owner.process_start(os.getpid())))
-        os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
+        try:
+            pathlib.Path(cache, owner.SUITE_CACHE_OWNER).write_text(
+                '%d %s' % (os.getpid(), owner.process_start(os.getpid())))
+            os.environ['OS32_C_DIALECT_TEST_CACHE'] = cache
+        except OSError:
+            pass  # No /proc: run every translation unit without the cache.
         sys.exit(main(sys.argv[1:]))
