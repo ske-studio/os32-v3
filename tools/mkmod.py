@@ -26,9 +26,9 @@ def require(condition, message):
 
 
 def fnv1a(data):
-    value = 2166136261
+    value = CONSTANTS['NAME_HASH_BASIS']
     for byte in data:
-        value = ((value ^ byte) * 16777619) & 0xffffffff
+        value = ((value ^ byte) * CONSTANTS['NAME_HASH_PRIME']) & 0xffffffff
     return value
 
 
@@ -232,7 +232,9 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     for index, record in enumerate(imports):
         name = name_bytes(record['name'])
         kind, ver = record['kind'], record['type_ver']
-        require(record['index'] == index and 1 <= kind <= 5 and 1 <= ver <= 65535,
+        require(record['index'] == index and
+                CONSTANTS['SYM_KIND_MIN'] <= kind <= CONSTANTS['SYM_KIND_MAX'] and
+                1 <= ver <= 65535,
                 'invalid import metadata')
         require(name not in seen_names, 'duplicate import name')
         seen_names.add(name)

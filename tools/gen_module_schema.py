@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from module_schema import (CONSTANTS, HEADER_FIELDS, POLICIES, POLICY_FIELDS,
+from module_schema import (CONSTANTS, HEADER_FIELDS, PAIR_STRIDE, POLICIES, POLICY_FIELDS,
                            COMPONENTS, MODULE_RECORD_CAP, validate_components)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +28,7 @@ def render():
                         ('OPS_SLOTS', 'ops_slots')):
         lines.append(f'#define MODULE_{name} {kdebug[field]}U')
     lines += ['', '/* Wire word numbers; decode little-endian bytes explicitly. */',
+              f'#define MI_PAIR_STRIDE {PAIR_STRIDE}U',
               'enum module_field {']
     lines += [f'    MI_{name} = {index},' for index, name in enumerate(HEADER_FIELDS)]
     lines += [f'    MI_WORDS = {len(HEADER_FIELDS)}', '};', '',
