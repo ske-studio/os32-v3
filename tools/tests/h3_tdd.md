@@ -318,7 +318,7 @@ if (KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1) bad |= 1u << 0;
 #### 同じ罠を次の追加で踏まないための試験
 
 `tools/tests/kapi_db_v50_host.c` に **`slot_layout_append`** を新設し、
-`tools/tests/test_kapi_db_v50.py` の `CASES` に登録した (23 → **24 cases**)。
+`tools/tests/test_db_errstr.py` の `CASES` に登録した (23 → **24 cases**)。
 
 ```c
 CHECK(db_slot_layout_ok(KAPI_SLOT_COUNT));         /* いまの表 */
@@ -463,4 +463,4 @@ digest は「slot 213 までの名前」なので**末尾追記では動かな�
 - `kapi/kapi_db.c` — `db_slot_layout_ok()` の切り出しと下限判定化、host 帯の位置を明示
 - `kapi/kapi_db.h` — `db_slot_layout_ok()` の宣言
 - `tools/tests/kapi_db_v50_host.c` — `slot_layout_append` ケース
-- `tools/tests/test_kapi_db_v50.py` — `CASES` に `slot_layout_append`
+- `tools/tests/test_db_errstr.py` — `CASES` に `slot_layout_append`

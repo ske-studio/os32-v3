@@ -19,6 +19,52 @@ if '--before' in sys.argv:
 
 
 class CheckInfra(unittest.TestCase):
+    def test_local_only_selection_and_inventory(self):
+        import contextlib, io, types
+        from unittest import mock
+        files = {
+            'build/checks.d/check-local.mk': 'check-local:\n\tpython3 tools/tests/test_local.py\n',
+            'tools/tests/test_local.py': '',
+            'tools/check_map.yaml': 'checks: {}\nfull: [Makefile]\n',
+            'tools/check_map.d/check-a.yaml': 'check-a: [tools/tests/test_a.py]\n',
+            'tools/check_map.d/check-b.yaml': 'check-b: [tools/tests/test_b.py]\n',
+            'tools/check_map.d/check-local.yaml':
+                'check-local: [tools/tests/test_local.py]\nlocal_only: true\n',
+        }
+        inventory_path = legacy.ROOT / 'tools/gen_tests_inventory.py'
+        inventory = types.ModuleType('local_inventory_probe')
+        inventory.__file__ = str(inventory_path)
+        exec(compile(inventory_path.read_text(), str(inventory_path), 'exec'), inventory.__dict__)
+        with legacy.fixture(CS, files=files) as fx, \
+                mock.patch.object(CS, 'ROOT', fx.d), mock.patch.object(CS, '_TRACKED', None), \
+                mock.patch.object(CS, 'MAP_PATH', str(pathlib.Path(fx.d, 'tools/check_map.yaml'))), \
+                mock.patch.object(inventory, 'ROOT', fx.d), mock.patch.object(inventory, 'check_select', CS), \
+                mock.patch.object(CS, 'LOCAL_ONLY_ALLOWED', {'check-local'}, create=True):
+            inventory.MK_FILES = CS.makefile_paths()
+            mapping = CS.load_map()
+            self.assertEqual(mapping['local_checks'], ['check-local'])
+            # local_only は承認済みの名前だけ (任意の検査を通常の検査から外す抜け道にしない)
+            with mock.patch.object(CS, 'LOCAL_ONLY_ALLOWED', set(), create=True):
+                with self.assertRaises(SystemExit):
+                    CS.load_map()
+            rules, variables = CS.read_makefiles()
+            self.assertIn('check-local', rules)
+            for files_ in (['Makefile'], ['tools/tests/test_local.py'], []):
+                mode, stage, mutations, _ = CS.plan(files_)
+                self.assertNotIn('check-local', stage)
+                self.assertNotIn('check-local', mutations)
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(CS.lint(), 0)
+                self.assertEqual(inventory.check_registration(), 0)
+                fx.append('build/checks.d/check-local.mk', 'CHECK_PAR_ORDER += 999:check-local\n')
+                self.assertEqual(CS.lint(), 1)
+                self.assertEqual(inventory.check_registration(), 1)
+            # Retaining metadata must not conceal a deleted local recipe.
+            fx.write('build/checks.d/check-local.mk', '')
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(CS.lint(), 1)
+                self.assertEqual(inventory.check_registration(), 1)
+
     def test_directory_lookup_boundaries_and_refresh(self):
         from unittest import mock
         script = "INPUT = 'tools/tests/data'\n"

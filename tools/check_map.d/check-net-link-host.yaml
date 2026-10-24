@@ -10,3 +10,4 @@ check-net-link-host:
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-net-link-host.yaml
 - build/checks.d/check-net-link-host.mk
+local_only: true

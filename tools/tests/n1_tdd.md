@@ -266,7 +266,7 @@ v51 で `KAPI_SLOT_COUNT` = 213・`DB_ERROR_CODE` = 207・末尾は `HOST_CLOSE`
 → ヘッダ定数から導く形に ([C4]): `KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1` と
 `KAPI_SLOT_DB_ERROR_CODE != 207` (db 帯の末尾)。コメントも db 帯 201..207 + host 帯 208..212 に更新。
 
-- **RED**: `python3 -B tools/tests/test_kapi_db_v50.py v50_selftest` → `FAIL v50_selftest: db_v50_selftest() == 0`
+- **RED**: `python3 -B tools/tests/test_db_errstr.py v50_selftest` → `FAIL v50_selftest: db_v50_selftest() == 0`
 - **GREEN**: 同上 → `PASS v50_selftest` (23/23)
 
 ### 6-2. F2 (`check-net-l0` rt_ok=16 — L0〜L3 で累積)
@@ -298,8 +298,8 @@ v51 で `KAPI_SLOT_COUNT` = 213・`DB_ERROR_CODE` = 207・末尾は `HOST_CLOSE`
   - `n2_rt_ok_resets_between_selftest_sections` — `link_selftest(3)` → `link_l1_bulk(4,512)` で
     `link_rt_ok` が区間ごとに打ち直され、`link_l0_ok` が保たれる。
     **RED** (F2 revert): `FAIL: L1 区間で link_rt_ok が打ち直されず累積している` / **GREEN**: `ok`。
-- `kapi_db_v50_host.c` に `v50_selftest` ケース追加 (`test_kapi_db_v50.py`、計 23、`make check` の
-  `check-db-v50-host` 経由)。`db_v50_selftest() == 0` を踏む (F1 の回帰)。ホストは 64bit 幅なので
+- `kapi_db_v50_host.c` に `v50_selftest` ケース追加 (`test_db_errstr.py`、計 23、`make check` の
+  `check-db-errstr-host` 経由)。`db_v50_selftest() == 0` を踏む (F1 の回帰)。ホストは 64bit 幅なので
   (2) の `0xFFFFFF00` overflow が起きない → `host_cpl3 = 1` (帯 [BAND_LO,BAND_HI)) で帯外判定にする。
 
 ### 6-5. non-blocker
@@ -331,7 +331,7 @@ $ python3 -B tools/tests/test_net_link.py --target
 SUMMARY 31/31 PASS      (F4 + N2 の 2 ケース追加)
 $ python3 -B tools/tests/test_host_agent.py
 SUMMARY 25/25 PASS      (変更なし)
-$ python3 -B tools/tests/test_kapi_db_v50.py
+$ python3 -B tools/tests/test_db_errstr.py
 SUMMARY 23/23 PASS      (F1 + N2c の v50_selftest 追加)
 ```
 

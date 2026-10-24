@@ -21,7 +21,7 @@
 - **件数** (表明の数)。数え方が種類ごとに違う — C は `check()` / `CHECK()` の呼び出し数、
   Rust は `#[test]` の数、Python は `def test*` または `CASES` の長さ。合算に意味が無い。
 - **実行時間**。**1 本も計測していない**。ソースから読める重さの根拠だけは分かっていて、
-  `check-cfg-host` / `check-db-v50-host` / `check-install-recover-host` などは SQLite の amalgamation
+  `check-cfg-host` / `check-db-errstr-host` / `check-install-recover-host` などは SQLite の amalgamation
   (`lib/sqlite3/sqlite3.c`、**267,757 行**) を**それぞれ独立に**毎回コンパイルする。
   `check-sqlite-groups-host` / `check-vfs-fd-sqlite-host` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。
 - **試験の種類**。5 つある — 静的整合性 / ホスト模型 / 実物ソースを `#include` /
@@ -56,7 +56,12 @@
 ## 4. `make check` の外にある試験
 
 <!-- manual:outside -->
-`check-*` ターゲットを持たない試験。自動ゲートではないが、契約を守っているのはこちら
+a5 の `check-host-agent` / `check-host-lib-host` / `check-net-link-host` /
+`check-lan-bridge-host` は保守外 (2026-10-24 ユーザー決定、現物が手に入らない)。
+ファイル・入力対応表を保持し、`make <名前>` でだけ実行する。対応表の `local_only: true` は
+選択器と inventory の双方が通常の列から区別する。
+
+以下は `check-*` ターゲットを持たない試験。自動ゲートではないが、契約を守っているのはこちら
 という場面がある。
 
 | 名前 | 種類 | 何を守っているか | いつ走る |

@@ -462,7 +462,7 @@ userland/tests/cfg_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/tests/cfg_ben
 #
 # 名前の表はここが管理元。lib/kstring_asm.asm の global が増減したら
 # ここと userland/tests/kstr_bench.c の kb_build_table を直す
-# (tools/tests/test_kstr_bench.py が 3 者のずれを検出する)。
+# ホストの計測枠試験は TT2 (2026-10-24) で削除。実機の計測器は保持。
 KSTR_BENCH_FUNCS = kmemcpy memcpy kmemset memset kstrlen strlen kstrcmp \
                    strcmp kstrncmp strncmp kstrcpy kstrncpy memcmp
 

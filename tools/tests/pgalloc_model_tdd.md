@@ -69,7 +69,7 @@ exec/shlib/PEGC 呼出元は変更なし。PEGC の `sys_reserve_top` が永久�
 - `python3 tools/tests/test_pgalloc_range.py`: 全ケース PASS、target GNU89 `-Werror` PASS。
 - `python3 tools/tests/test_physmem.py`: 8 test methods PASS。
 - `python3 tools/tests/test_paging_bounds.py` と `--rebuild nonmaster` / `--rebuild rollback`: 全 PASS。
-- F1/F2: `test_sqlite_groups.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 32/32、`test_vfs_fd_sqlite.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 15/15、`test_kapi_db_owned.py` PASS。
+- F1/F2: `test_sqlite_groups.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 32/32、`test_vfs_fd_sqlite.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 15/15、`test_db_errstr.py` PASS。
 - `make kernel`, `make check`: exit 0。
 - `physmem.c`, `pgalloc.c`, `sys.c`: `i386-elf-gcc -std=gnu89 -m32 -march=i386 -O2 -Wall -Wextra -Werror -Wdeclaration-after-statement -D__KERNEL_BUILD__` compile PASS。
 

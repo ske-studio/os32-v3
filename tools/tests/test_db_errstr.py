@@ -3,11 +3,14 @@
 実 SQLite + 実 os32 SQLite VFS + 実 FD 表 + 実 `kapi/kapi_db.c` を RAM の
 バックエンドに載せて回す。DB は `:memory:` で開くので、ホストのファイル
 システム・sudo・mount・配備・エミュレータには一切触らない。
-記録は tools/tests/db_errstr_tdd.md。
+記録は tools/tests/db_errstr_tdd.md、tools/tests/kapi_db_owned_tdd.md。
 
   python3 -B tools/tests/test_db_errstr.py [--target] [--sanitize] [--mutate] [case ...]
 
-見るのは 2 つ (票 §5)。
+TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
+旧 db-owned の寿命/障害注入 8 ケース・所有者ガード変異もここから実行する。
+
+診断文字列で見るのは 2 つ (票 §5)。
 
   E6  `const char *` を返す KAPI の**全経路**で、返り先が共有メモリの
       範囲内であること。ホストでは番地の区別が付かないので、「読めた」では
@@ -36,6 +39,26 @@ import mutpar
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["errstr_range", "coltext_range", "errstr_truncate", "result_bound",
          "diag_layout", "module_absent"]
+API_CASES = ["group_callers", "open_existing", "prepare_only", "binds", "error_code",
+         # N2 (c): ブート自己診断 db_v50_selftest() を make check で踏む (F1 回帰)
+         "v50_selftest",
+         # 票 H3 の是正 (2026-09-15): slot 配置の検査が **末尾追記で落ちない**
+         # こと。KAPI をもう 1 本足した場合を引数で模して踏む
+         "slot_layout_append",
+         "shm_bound",
+         "user_range", "owner_isolation", "order_new", "order_old",
+         # 実装レビュー 往復 1 の blocker 6 件 + TRANSIENT (s0_tdd.md §K)
+         "shm_exact", "stat_faults", "journal_mode", "step_no_stmt",
+         "path_len", "transient",
+         # 実装レビュー 往復 2 の blocker 4 件 (s0_tdd.md §K)
+         "sql_tail_sqlite", "prepare_replaces", "materialize_fail",
+         "resolve_len",
+         # 実装レビュー 往復 3 の blocker (s0_tdd.md §K 2d)
+         "resolve_truncate",
+         # ユーザー承認の最終往復 (s0_tdd.md §K 2e)
+         "resolve_depth",
+         # 実機 K2 の回帰 (s0_tdd.md §K 2f)
+         "cpl3_paths"]
 INC = ["-I" + str(ROOT / p) for p in
        ("include", "fs", "drivers", "sdk/include/os32", "lib", "lib/sqlite3")]
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
@@ -51,6 +74,99 @@ HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter",
               "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
               "-Wno-missing-field-initializers", "-D__cdecl="]
+
+
+def check_reclaim_order():
+    """exec_reclaim_resources が DB を FD より先に回収しているか (票 §1c)。
+
+    並び自体は exec/exec.c の中の 1 か所にしかない。ホストでは exec.c を
+    そのままリンクできないので、ここは**本文の並び**を読んで固定する。
+    順序が入れ替わったら気付ける最小の番人。
+    """
+    src = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
+    m = re.search(r"static void exec_reclaim_resources\(int id\)\s*\{(.*?)\n\}",
+                  src, re.S)
+    assert m, "exec_reclaim_resources が見つからない"
+    body = m.group(1)
+    db = body.index("db_cleanup_owned(id);")
+    fd = body.index("vfs_close_owned(id);")
+    assert db < fd, "exec_reclaim_resources: db_cleanup_owned は vfs_close_owned より先"
+    m = re.search(r"static void exec_reclaim_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)
+    assert m, "exec_reclaim_owned が見つからない"
+    assert m.group(1).index("exec_reclaim_resources(id);") < m.group(1).index("exec_notify_owned(id, kind);")
+    print("ORDER SOURCE: db_cleanup_owned before vfs_close_owned PASS", flush=True)
+
+
+def run_owned_cases(mutate):
+    """Eight lifetime/fault cases need a deterministic SQLite fault boundary."""
+    with tempfile.TemporaryDirectory(prefix="os32-db-owned-") as tmp:
+        tmp = pathlib.Path(tmp)
+        (tmp / "memmap.h").write_text(
+            "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n")
+        (tmp / "kstring.h").write_text(
+            "#include <string.h>\n#define kstrncpy(d,s,n) strncpy(d,s,n)\n"
+            "char *host_strlcat(char *d, const char *s, unsigned long n);\n"
+            "#define kstrncat(d,s,n) host_strlcat(d,s,n)\n"
+            "#define kstrlen(s) ((u32)strlen(s))\n"
+            "#define kstrcmp(a,b) strcmp(a,b)\n"
+            "#define kstrncmp(a,b,n) strncmp(a,b,n)\n"
+            "#define kmemcpy(d,s,n) memcpy(d,s,n)\n")
+        # v50: kapi_db.c は exec 側のポインタ検証と vfs_stat を使う。
+        # どちらもこの票 (F1) の範囲外なので最小の模型で置く。
+        (tmp / "exec.h").write_text(
+            "int ring3_user_range_ok(u32 p, u32 len);\n")
+        (tmp / "kprintf.h").write_text("int kprintf(int color, const char *fmt, ...);\n")
+        exe = tmp / "db-owned"
+        command = [
+            "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+            "-Wno-unused-parameter", "-D__cdecl=", "-I" + str(ROOT / "tools/tests"),
+            "-I" + str(tmp), "-I" + str(ROOT / "sdk/include/os32"),
+            "-I" + str(ROOT / "include"), "-I" + str(ROOT / "fs"),
+            "-I" + str(ROOT / "lib/sqlite3"), "-I" + str(ROOT / "kapi"),
+            str(ROOT / "tools/tests/kapi_db_owned_host.c"), "-o", str(exe)
+        ]
+        subprocess.run(command, check=True, cwd=ROOT)
+        subprocess.run([str(exe)], check=True, cwd=ROOT)
+        if mutate:
+            fixture_text = (ROOT / "tools/tests/kapi_db_owned_host.c").read_text()
+            paths = ['kapi/kapi_db.c']
+            for path in paths:
+                source = (ROOT / path).read_text()
+                # Mutate each public guard independently: omitted, inverted,
+                # or incorrectly applied to TRUSTED calls.
+                guards = []
+                offset = 0
+                for line in source.splitlines(keepends=True):
+                    if "ring3_call_from_user() &&" in line:
+                        guards.append((offset, line.rstrip("\n")))
+                    offset += len(line)
+                for index, (begin, guard) in enumerate(guards):
+                    for label, new in (
+                        ("removed", guard.replace("ring3_call_from_user() &&", "0 &&")),
+                        ("inverted", guard.replace("!= res_owner_get()", "== res_owner_get()")),
+                        ("trusted-denied", guard.replace("ring3_call_from_user() &&", "")),
+                    ):
+                        mutated = tmp / pathlib.Path(path).name
+                        # Replace only this occurrence (SHM/DB guards repeat).
+                        offset = begin + len(guard)
+                        mutated.write_text(source[:begin] + new + source[offset:])
+                        host = fixture_text
+                        for included in paths:
+                            target = mutated if included == path else ROOT / included
+                            host = host.replace("../../" + included, str(target))
+                        host = host.replace('"../../', '"' + str(ROOT) + '/')
+                        host_path = tmp / "mutant_host.c"
+                        host_path.write_text(host)
+                        mutant_command = [str(host_path) if arg.endswith("/kapi_db_owned_host.c") else arg
+                                          for arg in command]
+                        compiled = subprocess.run(mutant_command, cwd=ROOT,
+                                                  capture_output=True, text=True)
+                        assert compiled.returncode == 0, compiled.stderr
+                        result = subprocess.run([str(exe)], cwd=ROOT,
+                                                capture_output=True, text=True)
+                        assert result.returncode != 0, f"surviving {path}:{index} {label}"
+                        assert "FAIL" in result.stdout or "Assertion" in result.stderr, result.stdout + result.stderr
+                        print(f"RED {path}:{index} {label}")
 
 
 def check_no_block_size(root=ROOT):
@@ -85,6 +201,43 @@ def build(tmp, tag, sqlite_obj, san, root=ROOT):
                          str(root / "tools/tests/db_errstr_host.c"), sqlite_obj,
                          "-o", exe])
     return exe if rc.returncode == 0 else None
+
+
+def build_api(tmp, sqlite_obj, san):
+    exe = str(tmp / "db-api")
+    subprocess.run(["gcc", *HOST_FLAGS, "-Wno-type-limits", *san,
+                    "-I" + str(tmp), *INC,
+                    str(ROOT / "tools/tests/kapi_db_v50_host.c"), sqlite_obj,
+                    "-o", exe], check=True)
+    return exe
+
+
+def run_api_mutations(tmp, sqlite_obj, exe):
+    original = (ROOT / "kapi/kapi_db.c").read_text()
+    guard = ("    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||\n"
+             "        !sql_copy_buf[0]) return -1;")
+    assert original.count(guard) == 3
+    vfs_original = (ROOT / "lib/sqlite3/os32_sqlite_vfs.c").read_text()
+    mutations = [
+        ("finalize before copy refusal", "kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
+        ("SQL truncation", "kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
+        ("late journal current owner", "lib/sqlite3/os32_sqlite_vfs.c", vfs_original.replace("vfs_open_sqlite(zName, oflags, g->owner,", "vfs_open_sqlite(zName, oflags, res_owner_get(),"), "group_callers"),
+    ]
+    for name, path, changed, case in mutations:
+        mutant = tmp / pathlib.Path(path).name
+        mutant.write_text(changed)
+        fixture = (ROOT / "tools/tests/kapi_db_v50_host.c").read_text()
+        fixture = fixture.replace('../../' + path, str(mutant))
+        fixture = fixture.replace('"../../', '"' + str(ROOT) + '/')
+        host = tmp / "mutant.c"
+        host.write_text(fixture)
+        subprocess.run(["gcc", "-std=gnu11", "-D__cdecl=",
+                        "-Wno-pointer-to-int-cast", "-I" + str(tmp), *INC,
+                        "-I" + str(ROOT / "tools/tests"), "-I" + str(ROOT / "kapi"),
+                        str(host), sqlite_obj, "-o", exe], check=True)
+        result = subprocess.run([exe, case], capture_output=True, text=True)
+        assert result.returncode != 0 and "FAIL" in result.stdout + result.stderr, result
+        print("RED (runtime): " + name, flush=True)
 
 
 def run_cases(exe, cases, root=ROOT):
@@ -206,6 +359,12 @@ def check_no_block_size_quiet(root=ROOT):
 
 
 if __name__ == "__main__":
+    selected = [x for x in sys.argv[1:] if not x.startswith("--")]
+    unknown = set(selected) - set(CASES) - set(API_CASES)
+    if unknown:
+        sys.exit("unknown cases: " + ", ".join(sorted(unknown)))
+    api_cases = [x for x in selected if x in API_CASES] if selected else API_CASES
+    cases = [x for x in selected if x in CASES] if selected else CASES
     with tempfile.TemporaryDirectory(prefix="os32-db-errstr-") as tmp:
         tmp = pathlib.Path(tmp)
         for name, text in SHIMS.items():
@@ -241,10 +400,16 @@ if __name__ == "__main__":
                             "-o", str(tmp / "kapi_db.o")], check=True, cwd=ROOT)
             print("TARGET i386-elf GNU11 compile PASS", flush=True)
 
-        cases = [x for x in sys.argv[1:] if not x.startswith("--")] or CASES
+        check_reclaim_order()
+        api_exe = build_api(tmp, sqlite_obj, san)
+        api_failed = run_cases(api_exe, api_cases)
+        print("API SUMMARY %d/%d PASS" % (len(api_cases) - api_failed, len(api_cases)), flush=True)
+        run_owned_cases("--mutate" in sys.argv)
         failed = run_cases(exe, cases)
         print("SUMMARY %d/%d PASS" % (len(cases) - failed, len(cases)), flush=True)
+        failed += api_failed
         failed += check_no_block_size()
         if "--mutate" in sys.argv:
             failed += run_mutations(tmp, sqlite_obj, san)
+            run_api_mutations(tmp, sqlite_obj, api_exe)
         sys.exit(bool(failed))
