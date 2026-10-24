@@ -225,7 +225,7 @@ static u32 le(const u8 *r, u32 at, u32 n)
     return v;
 }
 static int shift_ok(u32 s)
-{ return (s < 0x80U ? s : 0x100U - s) < 32U; }
+{ return (s < GF_SHIFT_LEFT ? s : GF_SHIFT_WRAP - s) < GF_SHIFT_BITS; }
 int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
                              struct gfinit_instruction *o)
 {
@@ -233,20 +233,20 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     *o = (struct gfinit_instruction){.pc = pc, .opcode = r[pc], .end_repeat = RECOVER_NONE};
     u32 len, fixed, off = 0, unit = 0;
     switch (o->opcode) {
-    case 0x32: case 0x4a: fixed = 11; off = 6; unit = 4; break;
-    case 0x51: fixed = 5; off = 4; unit = 1; break;
-    case 0x54: fixed = 2; off = 1; unit = 2; break;
-    case 0x58: fixed = 6; off = 5; unit = 4; break;
-    case 0x33: case 0x39: case 0x6b: case 0x6f: case 0x75: fixed = 2; break;
-    case 0x36: case 0x38: case 0x63: case 0x71: case 0x72: fixed = 1; break;
-    case 0x37: fixed = 11; break;
-    case 0x4b: case 0x7a: fixed = 9; break;
-    case 0x52: fixed = 4; break;
-    case 0x53: case 0x5b: case 0x74: fixed = 3; break;
-    case 0x5f: fixed = 22; break;
-    case 0x62: fixed = 5; break;
-    case 0x65: case 0x6e: fixed = 13; break;
-    case 0x78: fixed = 6; break;
+    case GF_INIT_IO_RESTRICT_PROG: case GF_INIT_IO_RESTRICT_PLL2: fixed = 11; off = 6; unit = 4; break;
+    case GF_INIT_CR_INDEX_ADDRESS_LATCHED: fixed = 5; off = 4; unit = 1; break;
+    case GF_INIT_ZM_CR_GROUP: fixed = 2; off = 1; unit = 2; break;
+    case GF_INIT_ZM_REG_SEQUENCE: fixed = 6; off = 5; unit = 4; break;
+    case GF_INIT_REPEAT: case GF_INIT_IO_FLAG_CONDITION: case GF_INIT_SUB: case GF_INIT_MACRO: case GF_INIT_CONDITION: fixed = 2; break;
+    case GF_INIT_END_REPEAT: case GF_INIT_NOT: case GF_INIT_COMPUTE_MEM: case GF_INIT_DONE: case GF_INIT_RESUME: fixed = 1; break;
+    case GF_INIT_COPY: fixed = 11; break;
+    case GF_INIT_PLL2: case GF_INIT_ZM_REG: fixed = 9; break;
+    case GF_INIT_CR: fixed = 4; break;
+    case GF_INIT_ZM_CR: case GF_INIT_SUB_DIRECT: case GF_INIT_TIME: fixed = 3; break;
+    case GF_INIT_COPY_NV_REG: fixed = 22; break;
+    case GF_INIT_ZM_INDEX_IO: fixed = 5; break;
+    case GF_INIT_RESET: case GF_INIT_NV_REG: fixed = 13; break;
+    case GF_INIT_INDEX_IO: fixed = 6; break;
     default: return -1;
     }
     if (span(size, pc, fixed)) return -1;
@@ -255,80 +255,81 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     if (span(size, pc, len)) return -1;
     o->length = len;
     switch (o->opcode) {
-    case 0x32: case 0x4a:
+    case GF_INIT_IO_RESTRICT_PROG: case GF_INIT_IO_RESTRICT_PLL2:
         o->port = le(r, pc + 1, 2); o->index = r[pc + 3];
         o->mask = r[pc + 4]; o->shift = r[pc + 5];
         o->target = le(r, pc + 7, 4); o->ref = pc + 11;
-        if (o->shift >= 32 || !o->count || (o->mask >> o->shift) >= o->count) return -1;
+        if (o->shift >= GF_SHIFT_BITS || !o->count || (o->mask >> o->shift) >= o->count) return -1;
         break;
-    case 0x33:
+    case GF_INIT_REPEAT:
         o->count = r[pc + 1];
         if (!o->count || o->count >= 255) return -1;
         break;
-    case 0x37: case 0x5f:
+    case GF_INIT_COPY: case GF_INIT_COPY_NV_REG:
         o->ref = le(r, pc + 1, 4); o->shift = r[pc + 5];
         if (!shift_ok(o->shift) || o->ref & 3U) return -1;
-        if (o->opcode == 0x37) {
+        if (o->opcode == GF_INIT_COPY) {
             o->mask = r[pc + 10]; o->value = r[pc + 6];
             o->port = le(r, pc + 7, 2); o->index = r[pc + 9];
         } else { o->target = le(r, pc + 14, 4); o->mask = le(r, pc + 18, 4); }
         break;
-    case 0x39: case 0x75: case 0x6f: {
+    case GF_INIT_IO_FLAG_CONDITION: case GF_INIT_CONDITION: case GF_INIT_MACRO: {
         u32 entry = r[pc + 1];
-        u32 base = o->opcode == 0x39 ? GF_INIT_IO_FLAG_TABLE : o->opcode == 0x75 ? GF_INIT_CONDITION_TABLE : GF_INIT_MACRO_TABLE;
-        u32 width = o->opcode == 0x39 ? 9 : o->opcode == 0x75 ? 12 : 8;
-        u32 count = o->opcode == 0x39 ? 8 : o->opcode == 0x75 ? 3 : 4;
+        u32 base = o->opcode == GF_INIT_IO_FLAG_CONDITION ? GF_INIT_IO_FLAG_TABLE : o->opcode == GF_INIT_CONDITION ? GF_INIT_CONDITION_TABLE : GF_INIT_MACRO_TABLE;
+        u32 width = o->opcode == GF_INIT_IO_FLAG_CONDITION ? GF_INIT_IO_FLAG_ENTRY : o->opcode == GF_INIT_CONDITION ? GF_INIT_CONDITION_ENTRY : GF_INIT_MACRO_ENTRY;
+        u32 count = o->opcode == GF_INIT_IO_FLAG_CONDITION ? GF_INIT_IO_FLAG_COUNT : o->opcode == GF_INIT_CONDITION ? GF_INIT_CONDITION_COUNT : GF_INIT_MACRO_COUNT;
         if (entry >= count) return -1;
         o->ref = base + entry * width; o->index = entry;
         if (span(size, o->ref, width)) return -1;
-        if (o->opcode == 0x39) {
-            o->port = le(r, o->ref, 2); o->index = r[o->ref + 2];
-            o->mask = r[o->ref + 3]; o->shift = r[o->ref + 4];
-            if (o->shift >= 32 || span(size, le(r, o->ref + 5, 2),
+        if (o->opcode == GF_INIT_IO_FLAG_CONDITION) {
+            o->port = le(r, o->ref, 2); o->index = r[o->ref + GF_INIT_IO_FLAG_INDEX];
+            o->mask = r[o->ref + GF_INIT_IO_FLAG_REG_MASK]; o->shift = r[o->ref + GF_INIT_IO_FLAG_SHIFT];
+            if (o->shift >= GF_SHIFT_BITS || span(size, le(r, o->ref + GF_INIT_IO_FLAG_DATA, 2),
                                       (o->mask >> o->shift) + 1)) return -1;
         } else {
             o->target = le(r, o->ref, 4);
-            o->mask = le(r, o->ref + 4, 4);
-            o->value = o->opcode == 0x75 ? le(r, o->ref + 8, 4) : o->mask;
+            o->mask = le(r, o->ref + (o->opcode == GF_INIT_CONDITION ?
+                GF_INIT_CONDITION_MASK : GF_INIT_MACRO_VALUE), 4);
+            o->value = o->opcode == GF_INIT_CONDITION ? le(r, o->ref + GF_INIT_CONDITION_VALUE, 4) : o->mask;
         }
         break;
     }
-    case 0x51:
+    case GF_INIT_CR_INDEX_ADDRESS_LATCHED:
         o->index = r[pc + 1]; o->value = r[pc + 2]; o->ref = pc + 5;
         o->mask = r[pc + 3]; o->port = RECOVER_CRTC;
         if (!o->count || o->count - 1 > 255 - o->mask) return -1;
         break;
-    case 0x52: case 0x53:
+    case GF_INIT_CR: case GF_INIT_ZM_CR:
         o->port = RECOVER_CRTC; o->index = r[pc + 1];
-        o->mask = o->opcode == 0x52 ? r[pc + 2] : 0;
+        o->mask = o->opcode == GF_INIT_CR ? r[pc + 2] : 0;
         o->value = r[pc + len - 1]; break;
-    case 0x58:
+    case GF_INIT_ZM_REG_SEQUENCE:
         o->target = le(r, pc + 1, 4); o->ref = pc + 6;
         if (!o->count || o->count - 1 > (0xffffffffU - o->target) / 4) return -1;
         break;
-    case 0x5b: o->ref = le(r, pc + 1, 2); break;
-    case 0x6b:
+    case GF_INIT_SUB_DIRECT: o->ref = le(r, pc + 1, 2); break;
+    case GF_INIT_SUB:
         o->index = r[pc + 1];
-        if (o->index != 6 && o->index != 7 && o->index != 8) return -1;
+        if (o->index != GF_INIT_SUB_FIRST && o->index != GF_INIT_SUB_FIRST + 1 && o->index != GF_INIT_SUB_LAST) return -1;
         if (span(size, GF_INIT_SCRIPT_TABLE + o->index * 2, 2)) return -1;
         o->ref = le(r, GF_INIT_SCRIPT_TABLE + o->index * 2, 2); break;
-    case 0x62: case 0x78:
+    case GF_INIT_ZM_INDEX_IO: case GF_INIT_INDEX_IO:
         o->port = le(r, pc + 1, 2); o->index = r[pc + 3];
-        o->mask = o->opcode == 0x78 ? r[pc + 4] : 0;
+        o->mask = o->opcode == GF_INIT_INDEX_IO ? r[pc + 4] : 0;
         o->value = r[pc + len - 1]; break;
-    case 0x65: case 0x6e:
+    case GF_INIT_RESET: case GF_INIT_NV_REG:
         o->target = le(r, pc + 1, 4); o->mask = le(r, pc + 5, 4);
         o->value = le(r, pc + 9, 4); break;
-    case 0x4b: case 0x7a:
+    case GF_INIT_PLL2: case GF_INIT_ZM_REG:
         o->target = le(r, pc + 1, 4); o->value = le(r, pc + 5, 4);
-        if (o->opcode == 0x7a && o->target == 0x200) o->value |= 1;
+        if (o->opcode == GF_INIT_ZM_REG && o->target == RECOVER_PMC_ENABLE) o->value |= RECOVER_PMC_ENABLE_BIT0;
         break;
-    case 0x74: o->value = le(r, pc + 1, 2); break;
+    case GF_INIT_TIME: o->value = le(r, pc + 1, 2); break;
     default: break;
     }
     if (o->target & 3U) return -1;
     if (o->port && o->port != RECOVER_CRTC && o->port != RECOVER_SEQ && o->port != RECOVER_GFX) return -1;
-    if (o->opcode == 0x4a || o->opcode == 0x4b) {
+    if (o->opcode == GF_INIT_IO_RESTRICT_PLL2 || o->opcode == GF_INIT_PLL2) {
         struct gfinit_pll_limits limits;
         if (gfinit_pll_parse(r, size, GF_INIT_PLL_TABLE, o->target, &limits)) return -1;
     }
@@ -359,17 +360,17 @@ static int schedule_block(struct gfinit_decode *d, u32 pc, u32 end, u32 ctx,
         struct gfinit_instruction *v = &d->insns[i];
         u32 at = d->schedule_count;
         if (schedule_add(d, i, ctx, main, 0, 0, 0)) return -1;
-        if (v->opcode == 0x71 || v->opcode == 0x36) return v->pc == end ? 0 : -1;
+        if (v->opcode == GF_INIT_DONE || v->opcode == GF_INIT_END_REPEAT) return v->pc == end ? 0 : -1;
         active[i] = 1;
-        if (v->opcode == 0x5b || v->opcode == 0x6b) {
+        if (v->opcode == GF_INIT_SUB_DIRECT || v->opcode == GF_INIT_SUB) {
             u32 target_end = RECOVER_NONE;
             for (u32 j = 0; j < GF_ARRAY(scripts); j++)
-                if (scripts[j].pc == v->ref && (v->opcode != 0x6b || scripts[j].id == v->index)) target_end = scripts[j].pc + scripts[j].length - 1;
+                if (scripts[j].pc == v->ref && (v->opcode != GF_INIT_SUB || scripts[j].id == v->index)) target_end = scripts[j].pc + scripts[j].length - 1;
             if (target_end == RECOVER_NONE || d->plan.ctx_count == RECOVER_CTX_MAX ||
                 schedule_block(d, v->ref, target_end, d->plan.ctx_count++, main, calls + 1, repeats, active)) return -1;
             if (schedule_add(d, i, ctx, main, 1, 0, 0)) return -1;
             d->schedule[at].jump = d->schedule_count;
-        } else if (v->opcode == 0x33) {
+        } else if (v->opcode == GF_INIT_REPEAT) {
             for (u32 k = 0; k < v->count; k++) {
                 if (d->plan.ctx_count == RECOVER_CTX_MAX) return -1;
                 u32 child = d->plan.ctx_count++;
@@ -397,7 +398,7 @@ static u32 key_for(const struct recover_profile *p, u32 reg, u32 port, u32 index
     return RECOVER_NONE;
 }
 #define GF_PENDING 0x80000000U
-static u32 destination(u32 step, u32 state) { return GF_PENDING | (step * 4 + state); }
+static u32 destination(u32 step, u32 state) { return GF_PENDING | (step * GF_STATE_COUNT + state); }
 static u32 emit(struct gfinit_decode *d, const struct recover_profile *p,
                 const struct gfinit_scheduled *s, u32 state, u32 sub, u32 dir,
                 const struct recover_plan_arg *a, u32 argc)
@@ -410,7 +411,7 @@ static u32 emit(struct gfinit_decode *d, const struct recover_profile *p,
     struct recover_plan_node *n = &d->nodes[id];
     *n = (struct recover_plan_node){.phase = REC_RUN, .main_id = s->main_id,
         .pc = v->pc, .opcode = v->opcode, .substep = sub, .ctx = s->ctx,
-        .head = state / 2, .skip = state % 2, .rule_id = RECOVER_NONE,
+        .head = GF_STATE_HEAD(state), .skip = state & GF_STATE_SKIP, .rule_id = RECOVER_NONE,
         .expr_id = RECOVER_NONE, .arg_first = d->plan.arg_count, .arg_count = argc,
         .next = {id + 1, id + 1}};
     for (u32 j = 0; j < argc; j++) d->args[d->plan.arg_count++] = a[j];
@@ -499,52 +500,52 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
 {
     const struct gfinit_scheduled *s = &d->schedule[step];
     const struct gfinit_instruction *v = &d->insns[s->instruction];
-    u32 op = v->opcode, pc = v->pc, e = v->effect_first, head = state / 2;
+    u32 op = v->opcode, pc = v->pc, e = v->effect_first, head = GF_STATE_HEAD(state);
     u32 next_state = state, next_step = step + 1, first = d->plan.node_count;
     u32 t = key_for(p, v->target, v->port, v->index, head);
     if (s->kind) {
         if (s->kind == 1) control(d, p, s, state, GF_INIT_C+1, pc+v->length, 0, 0, 1);
         if (s->kind == 2) control(d, p, s, state, GF_INIT_C+1+s->k, s->k, 0, 0, 1);
         if (s->kind == 3) control(d, p, s, state, GF_INIT_C+1+s->count, s->count, 0, 0, 1);
-    } else if ((state & 1) && op != 0x33 && op != 0x36 && op != 0x38 &&
-               op != 0x71 && op != 0x72 && op != 0x65 && op != 0x63) {
-        if (op != 0x53 && op != 0x54 && v->port == RECOVER_CRTC &&
-            (v->index == RECOVER_CR44 || (op == 0x51 && v->value == RECOVER_CR44))) return -1;
+    } else if ((state & GF_STATE_SKIP) && op != GF_INIT_REPEAT && op != GF_INIT_END_REPEAT && op != GF_INIT_NOT &&
+               op != GF_INIT_DONE && op != GF_INIT_RESUME && op != GF_INIT_RESET && op != GF_INIT_COMPUTE_MEM) {
+        if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port == RECOVER_CRTC &&
+            (v->index == RECOVER_CR44 || (op == GF_INIT_CR_INDEX_ADDRESS_LATCHED && v->value == RECOVER_CR44))) return -1;
         control(d, p, s, state, GF_INIT_K+pc, v->length, 0, 0, 1);
-        if (op == 0x5b || op == 0x6b) next_step = s->jump;
-        if (op == 0x53 && v->index == RECOVER_CR44) next_state = (v->value == 3 ? 2 : 0) | 1;
-        if (op == 0x54) for (u32 j = 0; j < v->count; j++)
-            if (r[pc+2+2*j] == RECOVER_CR44) next_state = (r[pc+3+2*j] == 3 ? 2 : 0) | 1;
+        if (op == GF_INIT_SUB_DIRECT || op == GF_INIT_SUB) next_step = s->jump;
+        if (op == GF_INIT_ZM_CR && v->index == RECOVER_CR44) next_state = (v->value == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0) | GF_STATE_SKIP;
+        if (op == GF_INIT_ZM_CR_GROUP) for (u32 j = 0; j < v->count; j++)
+            if (r[pc+2+2*j] == RECOVER_CR44) next_state = (r[pc+3+2*j] == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0) | GF_STATE_SKIP;
     } else switch (op) {
-    case 0x33: control(d, p, s, state, GF_INIT_C, v->count, v->end_repeat, 0, 2); break;
-    case 0x36: control(d, p, s, state, GF_INIT_C, s->jump, s->k, s->count, 3); break;
-    case 0x38: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state ^= 1; break;
-    case 0x72: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state &= ~1U; break;
-    case 0x63: case 0x71: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); break;
-    case 0x74: control(d, p, s, state, GF_INIT_C, v->value, 0, 0, 1); break;
-    case 0x5b: control(d, p, s, state, GF_INIT_C, v->ref, pc+v->length, 0, 2); break;
-    case 0x6b: control(d, p, s, state, GF_INIT_C, v->index, v->ref, pc+v->length, 3); break;
-    case 0x75: case 0x39: {
-        if (op == 0x39) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+    case GF_INIT_REPEAT: control(d, p, s, state, GF_INIT_C, v->count, v->end_repeat, 0, 2); break;
+    case GF_INIT_END_REPEAT: control(d, p, s, state, GF_INIT_C, s->jump, s->k, s->count, 3); break;
+    case GF_INIT_NOT: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state ^= GF_STATE_SKIP; break;
+    case GF_INIT_RESUME: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state &= ~GF_STATE_SKIP; break;
+    case GF_INIT_COMPUTE_MEM: case GF_INIT_DONE: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); break;
+    case GF_INIT_TIME: control(d, p, s, state, GF_INIT_C, v->value, 0, 0, 1); break;
+    case GF_INIT_SUB_DIRECT: control(d, p, s, state, GF_INIT_C, v->ref, pc+v->length, 0, 2); break;
+    case GF_INIT_SUB: control(d, p, s, state, GF_INIT_C, v->index, v->ref, pc+v->length, 3); break;
+    case GF_INIT_CONDITION: case GF_INIT_IO_FLAG_CONDITION: {
+        if (op == GF_INIT_IO_FLAG_CONDITION) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
         read_node(d, p, s, state, t);
         u32 branch;
-        if (op == 0x75) branch = control(d, p, s, state, GF_INIT_C, r[pc+1], v->mask, v->value, 3);
+        if (op == GF_INIT_CONDITION) branch = control(d, p, s, state, GF_INIT_C, r[pc+1], v->mask, v->value, 3);
         else {
             struct recover_plan_arg a[] = {IMM(r[pc+1]), IMM(v->mask), IMM(v->shift),
-                IMM(le(r, v->ref+5, 2)), IMM(r[v->ref+7]), IMM(r[v->ref+8])};
+                IMM(le(r, v->ref+GF_INIT_IO_FLAG_DATA, 2)), IMM(r[v->ref+GF_INIT_IO_FLAG_MASK]), IMM(r[v->ref+GF_INIT_IO_FLAG_VALUE])};
             branch = emit(d, p, s, state, GF_INIT_C, RECOVER_NONE, a, 6);
         }
         if (branch == RECOVER_NONE) return -1;
-        d->nodes[branch].next[0] = destination(next_step, state|1);
+        d->nodes[branch].next[0] = destination(next_step, state|GF_STATE_SKIP);
         d->nodes[branch].next[1] = destination(next_step, state);
-        d->reachable[next_step] |= (1U << (state|1)) | (1U << state);
+        d->reachable[next_step] |= (1U << (state|GF_STATE_SKIP)) | (1U << state);
         return d->error ? -1 : 0;
     }
-    case 0x32: case 0x4a: {
+    case GF_INIT_IO_RESTRICT_PROG: case GF_INIT_IO_RESTRICT_PLL2: {
         u32 src = key_for(p, 0, v->port, v->index, head);
         write_node(d, p, s, state, e++, REC_SELECT, src, 0, v->index, false);
         read_node(d, p, s, state, src);
-        u32 branches[256], ends[256];
+        u32 branches[GF_INIT_COUNT_MAX], ends[GF_INIT_COUNT_MAX];
         for (u32 k = 0; k < v->count; k++) {
             struct recover_plan_arg a[] = {IMM(v->mask), IMM(v->shift), IMM(k), IMM(v->count)};
             branches[k] = emit(d, p, s, state, GF_INIT_C+k, RECOVER_NONE, a, 4);
@@ -552,12 +553,12 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
         }
         for (u32 k = 0; k < v->count; k++) {
             d->nodes[branches[k]].next[0] = k+1 < v->count ? branches[k+1] : destination(next_step, state);
-            if (op == 0x4a && k && le(r, v->ref+4*k, 4) == le(r, v->ref, 4)) {
+            if (op == GF_INIT_IO_RESTRICT_PLL2 && k && le(r, v->ref+4*k, 4) == le(r, v->ref, 4)) {
                 d->nodes[branches[k]].next[1] = ends[0]; continue;
             }
             ends[k] = d->plan.node_count;
             d->nodes[branches[k]].next[1] = ends[k];
-            if (op == 0x32) write_node(d, p, s, state, e+k, REC_WRITE, key_for(p, v->target, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
+            if (op == GF_INIT_IO_RESTRICT_PROG) write_node(d, p, s, state, e+k, REC_WRITE, key_for(p, v->target, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
             else if (expand_pll(d, r, p, s, state, le(r, v->ref+4*k, 4))) return -1;
             if (d->error) return -1;
             d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, state);
@@ -565,48 +566,48 @@ static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recove
         d->reachable[next_step] |= 1U << state;
         return d->error ? -1 : 0;
     }
-    case 0x4b: if (expand_pll(d, r, p, s, state, v->value)) return -1; break;
-    case 0x6e: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
-    case 0x7a: case 0x6f: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
-    case 0x52: case 0x53: case 0x62: case 0x78:
+    case GF_INIT_PLL2: if (expand_pll(d, r, p, s, state, v->value)) return -1; break;
+    case GF_INIT_NV_REG: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
+    case GF_INIT_ZM_REG: case GF_INIT_MACRO: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
+    case GF_INIT_CR: case GF_INIT_ZM_CR: case GF_INIT_ZM_INDEX_IO: case GF_INIT_INDEX_IO:
         write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
-        write_node(d, p, s, state, e, REC_DATA, t, v->mask, v->value, op == 0x52 || op == 0x78);
-        if (v->port == RECOVER_CRTC && v->index == RECOVER_CR44) next_state = (v->value == 3 ? 2 : 0) | (state&1);
+        write_node(d, p, s, state, e, REC_DATA, t, v->mask, v->value, op == GF_INIT_CR || op == GF_INIT_INDEX_IO);
+        if (v->port == RECOVER_CRTC && v->index == RECOVER_CR44) next_state = (v->value == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0) | (state&GF_STATE_SKIP);
         break;
-    case 0x54:
+    case GF_INIT_ZM_CR_GROUP:
         for (u32 k = 0; k < v->count; k++) {
             u32 index = r[pc+2+2*k], value = r[pc+3+2*k];
-            t = key_for(p, 0, RECOVER_CRTC, index, next_state/2);
+            t = key_for(p, 0, RECOVER_CRTC, index, GF_STATE_HEAD(next_state));
             write_node(d, p, s, next_state, e++, REC_SELECT, t, 0, index, false);
             write_node(d, p, s, next_state, e++, REC_DATA, t, 0, value, false);
-            if (index == RECOVER_CR44) next_state = (value == 3 ? 2 : 0)|(state&1);
+            if (index == RECOVER_CR44) next_state = (value == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0)|(state&GF_STATE_SKIP);
         }
         break;
-    case 0x58:
+    case GF_INIT_ZM_REG_SEQUENCE:
         for (u32 k = 0; k < v->count; k++) write_node(d, p, s, state, e++, REC_WRITE,
             key_for(p, v->target+4*k, 0, 0, head), 0, le(r, v->ref+4*k, 4), false);
         break;
-    case 0x37: case 0x5f: {
-        if (op == 0x37) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
+    case GF_INIT_COPY: case GF_INIT_COPY_NV_REG: {
+        if (op == GF_INIT_COPY) write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
         u32 src = key_for(p, v->ref, 0, 0, head);
-        struct recover_plan_arg a[] = {IMM(t), READ(op == 0x37 ? t : src), READ(op == 0x37 ? src : t),
-            IMM(v->shift), IMM(op == 0x37 ? v->value : le(r, pc+6, 4)),
-            IMM(op == 0x37 ? v->mask : le(r, pc+10, 4)), IMM(v->mask)};
+        struct recover_plan_arg a[] = {IMM(t), READ(op == GF_INIT_COPY ? t : src), READ(op == GF_INIT_COPY ? src : t),
+            IMM(v->shift), IMM(op == GF_INIT_COPY ? v->value : le(r, pc+6, 4)),
+            IMM(op == GF_INIT_COPY ? v->mask : le(r, pc+10, 4)), IMM(v->mask)};
         if (src == RECOVER_NONE) return -1;
-        emit(d, p, s, state, e, op == 0x37 ? REC_DATA : REC_WRITE, a, op == 0x37 ? 6 : 7); break;
+        emit(d, p, s, state, e, op == GF_INIT_COPY ? REC_DATA : REC_WRITE, a, op == GF_INIT_COPY ? 6 : 7); break;
     }
-    case 0x65: {
-        u32 saved = key_for(p, 0x184c, 0, 0, head), producer = d->plan.node_count;
-        write_node(d, p, s, state, e++, REC_WRITE, saved, 0xfffff0ffU, 0, true);
+    case GF_INIT_RESET: {
+        u32 saved = key_for(p, RECOVER_PBUS184C, 0, 0, head), producer = d->plan.node_count;
+        write_node(d, p, s, state, e++, REC_WRITE, saved, GF_INIT_RESET_KEEP, 0, true);
         write_node(d, p, s, state, e++, REC_WRITE, t, 0, v->mask, false);
-        control(d, p, s, state, GF_INIT_C, 10, 0, 0, 1);
+        control(d, p, s, state, GF_INIT_C, GF_INIT_RESET_US, 0, 0, 1);
         write_node(d, p, s, state, e++, REC_WRITE, t, 0, v->value, false);
         struct recover_plan_arg a[] = {IMM(saved), SAVED(p->count)};
         u32 consumer = emit(d, p, s, state, e++, REC_WRITE, a, 2);
         d->captures[0] = (struct recover_capture){p->count, producer, consumer, saved, 0};
-        write_node(d, p, s, state, e, REC_WRITE, key_for(p, 0x1850, 0, 0, head), 0, 0, false); break;
+        write_node(d, p, s, state, e, REC_WRITE, key_for(p, RECOVER_PBUS1850, 0, 0, head), 0, 0, false); break;
     }
-    case 0x51: {
+    case GF_INIT_CR_INDEX_ADDRESS_LATCHED: {
         write_node(d, p, s, state, e++, REC_SELECT, t, 0, v->index, false);
         u32 producer = read_node(d, p, s, state, t);
         u32 other = key_for(p, 0, RECOVER_CRTC, v->value, head);
@@ -653,18 +654,18 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
             for (u32 j = 0; j < GF_ARRAY(effect_spans); j++) if (effect_spans[j].pc == pc) {
                 v->effect_first = effect_spans[j].first; v->effect_count = effect_spans[j].count;
             }
-            if (v->opcode == 0x33) {
+            if (v->opcode == GF_INIT_REPEAT) {
                 if (depth == GF_INIT_REPEAT_DEPTH) return -1;
                 stack[depth++] = id;
             }
-            if (v->opcode == 0x36) {
+            if (v->opcode == GF_INIT_END_REPEAT) {
                 if (!depth) return -1;
                 d->insns[stack[--depth]].end_repeat = pc;
             }
-            if (v->opcode == 0x71 && pc + 1 != s->pc + s->length) return -1;
+            if (v->opcode == GF_INIT_DONE && pc + 1 != s->pc + s->length) return -1;
             pc += v->length;
         }
-        if (depth || r[pc - 1] != 0x71) return -1;
+        if (depth || r[pc - 1] != GF_INIT_DONE) return -1;
     }
     if (d->instruction_count != GF_INIT_INSNS) return -1;
     u32 crc = CRC32_INIT;
@@ -678,14 +679,14 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
     }
     for (u32 i = 0; i < d->schedule_count; i++) {
         d->reachable[i] = 0;
-        for (u32 j = 0; j < 4; j++) d->heads[i][j] = RECOVER_NONE;
+        for (u32 j = 0; j < GF_STATE_COUNT; j++) d->heads[i][j] = RECOVER_NONE;
     }
     for (u32 main = 0; main < GF_INIT_MAINS; main++) {
         u32 end = main == GF_INIT_MAINS - 1 ? d->schedule_count : main_start[main + 1];
         d->reachable[main_start[main]] = 1;
         d->entries[main] = (struct recover_plan_entry){REC_RUN, main, d->plan.node_count};
         for (u32 step = main_start[main]; step < end; step++) {
-            for (u32 state = 0; state < 4; state++) if (d->reachable[step] & (1U << state)) {
+            for (u32 state = 0; state < GF_STATE_COUNT; state++) if (d->reachable[step] & (1U << state)) {
                 d->heads[step][state] = d->plan.node_count;
                 d->error_pc = d->insns[d->schedule[step].instruction].pc;
                 if (expand_step(d, r, p, step, state)) return -1;
@@ -696,7 +697,7 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
     for (u32 i = 0; i < d->plan.node_count; i++) for (u32 edge = 0; edge < 2; edge++) {
         u32 dest = d->nodes[i].next[edge];
         if (dest & GF_PENDING) {
-            u32 step = (dest & ~GF_PENDING) / 4, state = dest & 3;
+            u32 step = (dest & ~GF_PENDING) / GF_STATE_COUNT, state = dest & (GF_STATE_COUNT - 1);
             if (step == d->schedule_count) dest = RECOVER_NONE;
             else if (step > d->schedule_count) return -1;
             else {
@@ -718,7 +719,7 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
             if (d->schedule[next].k > max_steps) max_steps = d->schedule[next].k;
             if (d->schedule[next].count > max_wait) max_wait = d->schedule[next].count;
         }
-        u32 delay = (n->opcode == 0x74 || n->opcode == 0x65) && n->substep == GF_INIT_C ?
+        u32 delay = (n->opcode == GF_INIT_TIME || n->opcode == GF_INIT_RESET) && n->substep == GF_INIT_C ?
             d->args[n->arg_first].value : 0;
         u32 cost = 1;
         for (u32 j = 0; j < n->arg_count; j++)

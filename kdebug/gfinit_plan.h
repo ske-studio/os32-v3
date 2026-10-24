@@ -1,6 +1,13 @@
 #ifndef KDEBUG_GFINIT_PLAN_H
 #define KDEBUG_GFINIT_PLAN_H
 #include "gfinit_decode.h"
+#define GF_PLAN_SUB_SAVE 0
+#define GF_PLAN_SUB_LITERAL 1
+#define GF_PLAN_SUB_CHECK 2
+#define GF_PLAN_SUB_ALIAS_WRITE 3
+#define GF_PLAN_SUB_BRANCH 4
+#define GF_PLAN_SUB_EQUAL 5
+#define GF_PLAN_SUB_COUNT 6
 #define GF_PLAN_TARGETS 768U
 #define GF_PLAN_RULES 1280U
 #define GF_PLAN_LAYOUTS 1056U
