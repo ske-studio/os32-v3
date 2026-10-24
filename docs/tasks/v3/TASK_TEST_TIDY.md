@@ -18,7 +18,7 @@
 
 | 段 | 中身 | 実装 | 状態 |
 |---|---|---|---|
-| TT1 | 上位 4 本 (c-dialect-host・p2v・memmap-host・check-select-host) を測って軽くする。ケース・変異の検出力は減らさない (変異ごとの写しの木の作り直し・全体の再走査の重複を疑う) | sol | 未 |
+| TT1 | 上位 4 本 (c-dialect-host・p2v・memmap-host・check-select-host) を測って軽くする。ケース・変異の検出力は減らさない (変異ごとの写しの木の作り直し・全体の再走査の重複を疑う) | sol | **main** (2026-10-24、astra 取り込み可) — 変異込みの前→後 (秒): c-dialect-host 971→1,037 (効果なし)、p2v 1,076→287、memmap-host 282→170、check-select-host 703→237。4 本の合計 3,032→1,731。変異の RED/GREEN の数は 4 本とも前と同じ。測定は `~/os32-tmp/run/tt1/{before,after}-times.tsv`。c-dialect-host は次の段の候補 |
 | TT2 | (PRE-1 は 2026-10-23 に閉じ済み — test_preflight は check-preflight-host、test_jobs は運用補助で載せない)。a5 を CHECK_PAR_ORDER から外してローカルだけに (ファイルは残す、台帳 LGY98-L12 に「保守外」)、a3 削除、a1・a2 | sol (保守の束 A の取り込みの後) | 未 |
 | TT3 | b1〜b4 の束ね (gfx 4 本・font 5 本・access/caller 系・gfinit 7 本) | sol | 未 |
 | TT5 | T4B-CD の凍結コードと試験・a6 の削除 (カーネル層の fs/vfs に触るので候補の検査を全部 MUTATE=0) | sol | **main** (fb1c7f3、astra 取り込み可、台帳 T4B-CD は閉鎖台帳へ) |
