@@ -3,12 +3,12 @@
  * is claimed to emulate #PF. The low fixture executes actual x86 instructions.
  */
 #include "types.h"
+static u32 host_cr3;
+static void flush_low(void);
 #include "v86.h"
 #include "v86_call.h"
 #include "idt.h"
 #include "tvram.h"
-static u32 host_cr3;
-static void flush_low(void);
 #include "paging.c"
 #include "pgalloc.c"
 #include "pgalloc_host_fixture.h"

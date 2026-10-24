@@ -28,8 +28,8 @@ MUTANTS = [
     ('plane end unchecked', 1, 'plane_bytes > bytes - sf->plane_offset[i]', 'plane_bytes > bytes'),
     ('permission ignored', 2, '(access == LEDGER_PERM_RW && sf->perm_max != LEDGER_PERM_RW)', '0'),
     ('free before PDE invalidation', 0,
-     'if (j == PTE_COUNT) pd[(MEM_LEASE_BASE >> 22) + k] = 0;',
-     'if (j == PTE_COUNT) { pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1); pd[(MEM_LEASE_BASE >> 22) + k] = 0; }'),
+     'if (j == PTE_COUNT) pd[LEASE_PDE + k] = 0;',
+     'if (j == PTE_COUNT) { pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1); pd[LEASE_PDE + k] = 0; }'),
 ]
 
 def replace_once(body, old, new):

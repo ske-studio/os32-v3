@@ -9,6 +9,10 @@
 
 #define RING3_SYSCALL_VECTOR 0x80
 
+#define EXC_DOUBLE_FAULT 8
+#define EXC_PAGE_FAULT 14
+
+#ifndef __ASSEMBLER__
 /* ======== 基本型 ======== */
 #include "types.h"
 #include "pit_math.h"   /* struct pit_setup / pit_compute */
@@ -132,4 +136,5 @@ void pic_eoi(unsigned int irq);
 /* フレームカウンタ (タイマ割り込みで更新) */
 extern volatile u32 tick_count;
 
+#endif /* !__ASSEMBLER__ */
 #endif /* __IDT_H */

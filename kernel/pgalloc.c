@@ -11,7 +11,7 @@
  * FIXED: [MEM_LEDGER_META_BASE, MEM_LEDGER_META_END) in the kernel band).
  * There is no legacy allocator any more (T1a, TASK_T1_LEDGER §4-1): every
  * configuration boots through the model path. */
-#define WORKSPACE_WORDS ((PHYSMEM_LEGACY_MAX_PFN + 31) / 32)
+#define WORKSPACE_WORDS (BITMAP_WORDS(PHYSMEM_LEGACY_MAX_PFN))
 static u32 *eligible, *bitmap;
 static u32 limit_pfn, generic_end, total_pages, used_pages;
 static int initialized;
@@ -41,7 +41,7 @@ STATIC_ASSERT(LEDGER_MAX_OWNERS <= 256, ledger_owner_fits_u8);
 /* R1 の観測 (§3-5)。深さは isr_stub.asm / setjmp.asm が書く。 */
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 u32 ledger_irq_ops, ledger_exc_ops;
-u32 ledger_irq_last[3], ledger_exc_last[3];
+u32 ledger_irq_last[LEDGER_LAST_WORDS], ledger_exc_last[LEDGER_LAST_WORDS];
 u32 ledger_bad_free, ledger_retire_refused, ledger_claim_refused;
 u32 ledger_reclaim_pages, ledger_check_fail, ledger_res_overflow;
 const char *ledger_check_tag;
@@ -54,7 +54,7 @@ static const char ledger_fixed_names[LEDGER_OWNER_FIXED_LAST][LEDGER_NAME_LEN] =
 
 static int bit(const u32 *map, u32 pfn)
 {
-    return (map[pfn / 32] & (1UL << (pfn % 32))) != 0;
+    return (map[pfn / BITS_PER_U32] & (1UL << (pfn % BITS_PER_U32))) != 0;
 }
 int pgalloc_audit_ram(u32 pfn)
 {
@@ -67,21 +67,21 @@ int pgalloc_audit_ram(u32 pfn)
 }
 
 static int bmp_test(u32 pfn) { return !bit(eligible, pfn) || bit(bitmap, pfn); }
-static void bmp_set(u32 pfn) { bitmap[pfn / 32] |= 1UL << (pfn % 32); }
-static void bmp_clear(u32 pfn) { bitmap[pfn / 32] &= ~(1UL << (pfn % 32)); }
+static void bmp_set(u32 pfn) { bitmap[pfn / BITS_PER_U32] |= 1UL << (pfn % BITS_PER_U32); }
+static void bmp_clear(u32 pfn) { bitmap[pfn / BITS_PER_U32] &= ~(1UL << (pfn % BITS_PER_U32)); }
 
 /* Caller holds IRQ lock, owns backing, and has validated the model. */
 static void init_core(const struct physmem *m, u32 *storage, u32 limit)
 {
     u32 words, i, p;
     device_boot_map = *m;
-    words = (limit + 31) / 32;
+    words = BITMAP_WORDS(limit);
     eligible = storage;
     bitmap = storage + words;
-    owner_map = (u8 *)(storage + words * 2);
+    owner_map = (u8 *)(storage + words * PGALLOC_L1_BITMAPS);
     limit_pfn = limit;
     total_pages = used_pages = 0;
-    for (i = 0; i < words * 2; i++) storage[i] = 0;
+    for (i = 0; i < words * PGALLOC_L1_BITMAPS; i++) storage[i] = 0;
     for (p = 0; p < limit; p++) owner_map[p] = 0;
     /* 固定の owner (§3-1)。kernel〜staging は PERSIST、gfx は DEVICE。 */
     for (i = 0; i < LEDGER_MAX_OWNERS; i++) {
@@ -99,7 +99,7 @@ static void init_core(const struct physmem *m, u32 *storage, u32 limit)
     for (i = 0; i < m->count; i++) {
         if (m->ranges[i].kind != PHYSMEM_RAM) continue;
         for (p = m->ranges[i].first; p < m->ranges[i].end; p++) {
-            eligible[p / 32] |= 1UL << (p % 32);
+            eligible[p / BITS_PER_U32] |= 1UL << (p % BITS_PER_U32);
             total_pages++;
         }
     }
@@ -280,7 +280,7 @@ u32 pgalloc_alloc_pt(void)
         for (p = workspace_first; p < workspace_end; p++) {
             if (bit(workspace_used, p) ||
                 !paging_verify_identity(p, 1, P2V(p * PAGE_SIZE))) continue;
-            workspace_used[p / 32] |= 1UL << (p % 32);
+            workspace_used[p / BITS_PER_U32] |= 1UL << (p % BITS_PER_U32);
             result = p * PAGE_SIZE;
             break;
         }
@@ -297,7 +297,7 @@ void pgalloc_free_pt(u32 phys)
     flags = irq_save();
     p = phys / PAGE_SIZE;
     if (!(phys & (PAGE_SIZE - 1)) && p >= workspace_first && p < workspace_end)
-        workspace_used[p / 32] &= ~(1UL << (p % 32));
+        workspace_used[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));
     irq_restore(flags);
 }
 
@@ -374,9 +374,9 @@ static int __attribute__((noinline)) pfn_span_ok(u32 pfn, int n)
 
 static void note_last(u32 *last, u32 op, u32 owner, void *eip)
 {
-    last[0] = op;
-    last[1] = owner;
-    last[2] = (u32)(uptr)eip;
+    last[LEDGER_LAST_OP] = op;
+    last[LEDGER_LAST_OWNER] = owner;
+    last[LEDGER_LAST_EIP] = (u32)(uptr)eip;
 }
 /* R1 (§3-5、T2a): IRQ / 例外上の台帳操作を診断し、変更前に panic。
  * 失敗する要求も禁止。DMA プール内の割当はここを通らない (R4)。
@@ -860,7 +860,7 @@ int ledger_reserve_set(u32 owner, const struct ledger_span *spans, u32 n)
     for (i = 0; i < n; i++) {
         for (p = s[i].first; p < s[i].end && p < limit_pfn; p++) {
             if (bit(eligible, p)) {
-                eligible[p / 32] &= ~(1UL << (p % 32));
+                eligible[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));
                 total_pages--;
             }
         }
@@ -887,9 +887,9 @@ int ledger_surface_validate(const struct ledger_surface *sf)
     u32 p, i, bytes, plane_bytes;
     if (!sf || !owner_ok(sf->owner) || !sf->npages ||
         sf->first >= PHYSMEM_MAX_PFN || sf->npages > PHYSMEM_MAX_PFN - sf->first ||
-        sf->npages > 0xffffffffUL / PAGE_SIZE ||
+        sf->npages > U32_MAX / PAGE_SIZE ||
         !sf->backing || sf->backing > LEDGER_SB_MMIO ||
-        !sf->planes || sf->planes > 4 || !sf->width || !sf->height || !sf->pitch ||
+        !sf->planes || sf->planes > SURFACE_QUERY_MAX || !sf->width || !sf->height || !sf->pitch ||
         sf->perm_max > LEDGER_PERM_RO) return 0;
     bytes = sf->npages * PAGE_SIZE;
     plane_bytes = (u32)sf->pitch * sf->height;
@@ -984,7 +984,7 @@ int ledger_surface_regen(u32 sid, const struct ledger_surface *geom)
         next.pitch = geom->pitch;
         next.format = geom->format;
         next.planes = geom->planes;
-        for (u32 i = 0; i < 4; i++) next.plane_offset[i] = geom->plane_offset[i];
+        for (u32 i = 0; i < SURFACE_QUERY_MAX; i++) next.plane_offset[i] = geom->plane_offset[i];
         if (!ledger_surface_validate(&next)) goto done;
     }
     next.gen++;

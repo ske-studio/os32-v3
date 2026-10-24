@@ -7,6 +7,10 @@
 
 #include "types.h"
 
+#define AUDIT_TAG_MAX 32
+extern u32 audit_runs, audit_fail;
+extern char audit_first_fail_tag[AUDIT_TAG_MAX];
+
 /* カーネルが実際に使うプリミティブ (kstring_asm / kmalloc / kprintf) の
  * 境界ケースを実機上で検証する。ブート時に 1 回呼ぶ。
  * 戻り値: 失敗した項目数 (0 = 全て通過)。 */

@@ -22,3 +22,4 @@ check-h3-park-resume-host:
 - userland/gshell/src/startmenu.rs
 - userland/gshell/src/taskbar.rs
 - tools/np21w_mcp/np21w_client.py
+- kernel/cpu_flags.inc

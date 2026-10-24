@@ -16,6 +16,16 @@
 #include "os32_kapi_shared.h"
 #endif
 
+#define UTF8_IS_CONT(b) (((b) & 0xC0) == 0x80)
+#define JIS_CODE_MIN 0x21
+#define JIS_CODE_MAX 0x7E
+#define UCS_HIRAGANA_FIRST 0x3041
+#define UCS_HIRAGANA_LAST 0x3093
+#define UCS_KATAKANA_FIRST 0x30A1
+#define UCS_KATAKANA_LAST 0x30F6
+#define JIS_HIRAGANA_BASE 0x2421
+#define JIS_KATAKANA_BASE 0x2521
+
 /* UTF-8デコード結果 */
 typedef struct {
     u32 codepoint;    /* Unicodeコードポイント (0-0x10FFFF) */

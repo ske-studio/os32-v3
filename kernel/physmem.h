@@ -21,9 +21,10 @@
 #ifndef OS32_PHYSMEM_H
 #define OS32_PHYSMEM_H
 #include "types.h"
+#include "memmap.h"
 
 #define PHYSMEM_PAGE_SHIFT 12
-#define PHYSMEM_PAGE_SIZE (1UL << PHYSMEM_PAGE_SHIFT)
+#define PHYSMEM_PAGE_SIZE MEM_PAGE_SIZE
 #define PHYSMEM_MAX_PFN 1048576UL
 #define PHYSMEM_MAX_RANGES 64
 #define PHYSMEM_UNKNOWN 0UL

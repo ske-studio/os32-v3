@@ -194,7 +194,7 @@ int v86_module_load(void)
     int rc = module_load(&request, &v86_handle);
     if (!rc) rc = module_start(v86_handle);
     if (!rc && !module_exports(v86_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[v86] module rc=%d pair=%08x\n", rc, bi->img_crc);
+    kprintf(KLOG_ATTR, "[v86] module rc=%d pair=%08x\n", rc, bi->img_crc);
     return rc;
 }
 

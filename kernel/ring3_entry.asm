@@ -18,6 +18,8 @@
 ;; DS/ES/FS/GS が KERNEL_DS になっており、iretd はこれを戻さないため)。
 ;; ============================================================
 
+%include "kernel/cpu_flags.inc"
+
 cpu 386
 
 extern ring3_syscall_dispatch
@@ -47,7 +49,7 @@ int80_stub:
         ;; 待つため、IF=0 のままだと CPL=3 からの呼び出しで永久停止する
         ;; (2026-09-06、gdi_test の kbd_getchar と less の sys_halt で実測)。
         ;; iretd が EFLAGS をフレームから復元するので戻りの cli は不要。
-        test    dword [esp + 40], 0x00020000   ;; saved EFLAGS.VM
+        test    dword [esp + 40], EFLAGS_VM   ;; saved EFLAGS.VM
         jnz     .dispatch
         sti
 .dispatch:
@@ -74,7 +76,7 @@ ring3_iret_to_user:
 
         ;; --- IRETD_USER: CPL=3 へ戻るならユーザセグメントを復元 ---
         ;; popad 後 esp -> [EIP][CS][EFLAGS][userESP][userSS]
-        test    dword [esp + 8], 0x00020000   ;; EFLAGS.VM? (トランポリンは常に非V86)
+        test    dword [esp + 8], EFLAGS_VM   ;; EFLAGS.VM? (トランポリンは常に非V86)
         jnz     .do_iret
         test    dword [esp + 4], 3            ;; CS.RPL == 3 (CPL=3 へ戻る)?
         jz      .do_iret
@@ -114,7 +116,7 @@ ring3_resume:
         ;; STATIC_ASSERT(tss_esp0_at_offset_4) が固定している
         ;; (v86_entry.asm と同じ書き方)。
         mov     [edx + 4], ecx
-        mov     [edx + 28], eax         ;; static TSS.CR3: #DF diagnostic
+        mov     [edx + TSS_OFF_CR3], eax         ;; static TSS.CR3: #DF diagnostic
         mov     cr3, eax                ;; アプリ PD へ切替
         sub     esp, 13 * 4             ;; フレーム置き場
         mov     edi, esp

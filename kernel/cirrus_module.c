@@ -77,7 +77,7 @@ int cirrus_module_load(void)
     if (!rc) rc = module_start(cirrus_handle);
     if (!rc && !module_exports(cirrus_handle)) rc = MODULE_INIT_FAILED;
     if (!rc) gfx_backend_cirrus = candidate;
-    kprintf(0x07, "[cirrus] module rc=%d pair=%08x registered=%d\n",
+    kprintf(KLOG_ATTR, "[cirrus] module rc=%d pair=%08x registered=%d\n",
             rc, bi->img_crc, registered);
     return rc;
 }

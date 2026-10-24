@@ -1,4 +1,5 @@
 /* /sys/unicode.bin: headerless LE (u16 Unicode, u16 JIS) pairs. */
+#include "utf8.h"
 #include "unicode_file.h"
 #include "config.h"
 #include "endian_le.h"
@@ -45,7 +46,7 @@ void unicode_file_load(void)
         }
     }
     unicode_pairs = pairs;
-    kprintf(0x07, "[unicode] loaded pairs=%u pages=%u pfn=%u\n",
+    kprintf(KLOG_ATTR, "[unicode] loaded pairs=%u pages=%u pfn=%u\n",
             (u32)UNICODE_FILE_PAIRS, (u32)UNICODE_FILE_PAGES, phys / MEM_PAGE_SIZE);
     return;
 
@@ -53,16 +54,16 @@ unavailable:
     if (phys)
         pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / MEM_PAGE_SIZE,
                              UNICODE_FILE_PAGES);
-    kprintf(0x07, "[unicode] unavailable reason=%s; kana-only\n", reason);
+    kprintf(KLOG_ATTR, "[unicode] unavailable reason=%s; kana-only\n", reason);
 }
 
 u16 unicode_file_lookup(u32 cp)
 {
     /* Preserve lib/utf8.c arithmetic even when the file is unavailable. */
-    if (cp >= 0x3041 && cp <= 0x3093)
-        return (u16)(0x2421 + (cp - 0x3041));
-    if (cp >= 0x30A1 && cp <= 0x30F6)
-        return (u16)(0x2521 + (cp - 0x30A1));
+    if (cp >= UCS_HIRAGANA_FIRST && cp <= UCS_HIRAGANA_LAST)
+        return (u16)(JIS_HIRAGANA_BASE + (cp - UCS_HIRAGANA_FIRST));
+    if (cp >= UCS_KATAKANA_FIRST && cp <= UCS_KATAKANA_LAST)
+        return (u16)(JIS_KATAKANA_BASE + (cp - UCS_KATAKANA_FIRST));
     if (cp > 0xFFFF) return 0;
     if (!unicode_pairs) return 0;
 

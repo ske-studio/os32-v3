@@ -11,8 +11,15 @@
 #define __PGALLOC_H
 
 #include "types.h"
+#include "../exec/surface_limits.h"
 #include "sys.h"
 #include "paging.h"
+
+#define PGALLOC_L1_BITMAPS 2
+#define LEDGER_LAST_OP 0
+#define LEDGER_LAST_OWNER 1
+#define LEDGER_LAST_EIP 2
+#define LEDGER_LAST_WORDS 3
 
 /* 一般割当域は linker 由来の SLACK と MEM_POOL_BASE 以降の物理 pool。 */
 
@@ -148,7 +155,7 @@ u32 pgalloc_arena_end(void);
 /* L1 (2 bitmap) + L2 (1B/PFN) のバイト数。pgalloc_metadata_bytes (ページへ
  * 切り上げ)・memory_boot の置き場の計算・STATIC_ASSERT が同じ式を使う。 */
 #define PGALLOC_META_BYTES(limit) \
-    ((((limit) + 31UL) / 32UL) * 8UL + (u32)(limit))
+    (BITMAP_WORDS(limit) * PGALLOC_L1_BITMAPS * sizeof(u32) + (u32)(limit))
 
 struct ledger_owner {          /* 24B */
     u8  kind, id;
@@ -176,10 +183,10 @@ struct ledger_span { u32 first, end, kind, res; };
 #define LEDGER_FMT_TEXT  3
 /* Publisher availability follows a slot's lifetime, reset on create. */
 extern u32 gfx_surface_unready;
-#define LEDGER_SURFACE_GEN_MAX 0xffffffffUL
+#define LEDGER_SURFACE_GEN_MAX U32_MAX
 struct ledger_surface {        /* T2b: whole-page occupancy and stable references */
     u32 first, npages;         /* npages == 0 = 表の空き */
-    u32 gen, plane_offset[4];
+    u32 gen, plane_offset[SURFACE_QUERY_MAX];
     u16 lease_count;
     u16 width, height, pitch;
     u8  owner, backing, backend, role, format, planes, cache, perm_max, closing;
@@ -197,7 +204,7 @@ extern u32 ledger_region_count;
 extern volatile u32 kctx_irq_depth, kctx_exc_depth;
 /* R1 の計数 (診断)。last = {op, owner, 呼び出し元 EIP} の最後の 1 件。 */
 extern u32 ledger_irq_ops, ledger_exc_ops;
-extern u32 ledger_irq_last[3], ledger_exc_last[3];
+extern u32 ledger_irq_last[LEDGER_LAST_WORDS], ledger_exc_last[LEDGER_LAST_WORDS];
 /* 他の診断: 他 owner 混在の解放 / 参照の残る返却 / 他 owner 混在の claim /
  * 回収で掃除したページの累計 / 自己検査の失敗件数と最後の地点。 */
 extern u32 ledger_bad_free, ledger_retire_refused, ledger_claim_refused;

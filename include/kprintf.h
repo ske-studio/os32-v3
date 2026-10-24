@@ -7,6 +7,8 @@
 
 #include "types.h"
 
+#define KLOG_ATTR 0x07
+
 void __cdecl kprintf(u8 attr, const char *fmt, ...);
 /* Internal i386 word-vector entry; public KAPI remains variadic. */
 void kvprintf(u8 attr, const char *fmt, const u32 *args);

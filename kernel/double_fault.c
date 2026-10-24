@@ -2,6 +2,7 @@
  * This is the only hardware task switch in OS32. Never return from it. */
 #include <stddef.h>
 #include "double_fault.h"
+#include "cpu.h"
 #include "gdt.h"
 #include "tss.h"
 #include "memmap.h"
@@ -36,17 +37,20 @@ void double_fault_init(void)
     df_tss.cr3 = MEM_FIXED_PD_BASE;
     df_tss.eip = (u32)(uptr)double_fault_entry;
     df_tss.esp = (u32)(uptr)(df_stack + sizeof(df_stack));
-    df_tss.eflags = 2; /* reserved bit 1; IF/TF/DF/VM clear */
+    df_tss.eflags = EFLAGS_RESERVED1; /* reserved bit 1; IF/TF/DF/VM clear */
     df_tss.cs = GDT_KERNEL_CS;
     df_tss.ss = df_tss.ds = df_tss.es = df_tss.fs = df_tss.gs = GDT_KERNEL_DS;
     df_tss.iomap_base = sizeof(df_tss);
     gdt_set_df_tss((u32)(uptr)&df_tss, sizeof(df_tss) - 1);
 }
 
+enum { DF_COL_EIP = 23, DF_COL_ESP = 36, DF_COL_CR2 = 49, DF_COL_CR3 = 62 };
+enum { DF_HEX_DIGITS = 8, DF_HEX_MASK = 15, DF_HEX_SHIFT = 4 };
+
 static void hex_at(char *out, u32 value)
 {
     static const char hex[] = "0123456789ABCDEF";
-    for (int i = 7; i >= 0; i--) { out[i] = hex[value & 15]; value >>= 4; }
+    for (int i = DF_HEX_DIGITS - 1; i >= 0; i--) { out[i] = hex[value & DF_HEX_MASK]; value >>= DF_HEX_SHIFT; }
 }
 
 void double_fault_halt(u32 cr2)
@@ -61,10 +65,10 @@ void double_fault_halt(u32 cr2)
     if (cr2 >= MEM_STACK_GUARD && cr2 <= MEM_STACK_GUARD_END) guard = "kernel";
     else if (paging_sqlite_stack_guard && cr2 >= paging_sqlite_stack_guard &&
              cr2 - paging_sqlite_stack_guard < PAGE_SIZE) guard = "engine";
-    hex_at(line + 23, kernel_tss.eip);
-    hex_at(line + 36, kernel_tss.esp);
-    hex_at(line + 49, cr2);
-    hex_at(line + 62, kernel_tss.cr3);
+    hex_at(line + DF_COL_EIP, kernel_tss.eip);
+    hex_at(line + DF_COL_ESP, kernel_tss.esp);
+    hex_at(line + DF_COL_CR2, cr2);
+    hex_at(line + DF_COL_CR3, kernel_tss.cr3);
     volatile u16 *text = P2V_IO(TVRAM_BASE);
     volatile u16 *attr = P2V_IO(TVRAM_ATTR);
     unsigned int col = 0;

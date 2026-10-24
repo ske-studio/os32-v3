@@ -467,7 +467,7 @@ static void user_display_copy(char *out, const char *text, u32 cap)
     u32 n = text ? kstrlen(text) : 0;
     if (n >= cap) {
         n = cap - 1;
-        while (n && ((u8)text[n] & 0xc0) == 0x80) n--;
+        while (n && UTF8_IS_CONT((u8)text[n])) n--;
     }
     if (n) kmemcpy(out, text, n);
     out[n] = '\0';

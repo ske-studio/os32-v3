@@ -8,6 +8,7 @@
 #include "appslot.h"
 #include "v86.h"
 #include "os32_kapi_slots.h"
+#include "ring3_str.h"
 #include "kapi_print.h"
 #include "kapi_strings.h"
 #define __KSTRING_H

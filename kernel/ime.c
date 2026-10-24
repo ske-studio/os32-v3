@@ -331,7 +331,7 @@ static void commit_candidate(void)
  */
 static int ime_process_key(int keydata)
 {
-    u8 scancode = (u8)((keydata >> 8) & 0x7F);
+    u8 scancode = (u8)((keydata >> 8) & SCANCODE_KEY);
     u8 ascii = (u8)(keydata & 0xFF);
     int count;
     int n;
@@ -522,7 +522,7 @@ static int ime_process_key(int keydata)
 
             /* 1文字分戻る (UTF-8後続バイトをスキップ) */
             try_len--;
-            while (try_len > 0 && ((u8)g_ime.kana_buf[try_len] & 0xC0) == 0x80) {
+            while (try_len > 0 && UTF8_IS_CONT((u8)g_ime.kana_buf[try_len])) {
                 try_len--;
             }
         }
@@ -745,7 +745,7 @@ static int ime_getchar_wait(int interruptible)
         if (keydata < 0) return -1;
 
         /* Shift+Space: ON/OFF問わず常に検出 */
-        if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
+        if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
             (kbd_shift_state & SHIFT_SHIFT)) {
             ime_toggle();
             if (g_ime.commit_pos < g_ime.commit_len) {
@@ -798,7 +798,7 @@ int ime_trygetchar(void)
     if (keydata < 0) return -1;
     ime_note_cui_reader();
 
-    if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
+    if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
         (kbd_shift_state & SHIFT_SHIFT)) {
         ime_toggle();
         if (g_ime.commit_pos < g_ime.commit_len) {
@@ -845,7 +845,7 @@ int ime_feed_key(int keydata)
 
     /* WM input-target lifetime boundary: STOP cancels even an unread tail.
      * No dictionary access/learning, so this is also safe in X1. */
-    if (keydata >= 0 && ((keydata >> 8) & 0x7F) == KEY_STOP) {
+    if (keydata >= 0 && ((keydata >> 8) & SCANCODE_KEY) == KEY_STOP) {
         ime_cancel_input();
         return -1;
     }
@@ -915,7 +915,7 @@ static int ime_getkey_wait(int interruptible)
         if (keydata < 0) return -1; /* key wait interrupted */
 
         /* Shift+Space: ON/OFF問わず常に検出 */
-        if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
+        if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
             (kbd_shift_state & SHIFT_SHIFT)) {
             ime_toggle();
             if (g_ime.commit_pos < g_ime.commit_len) {
@@ -961,7 +961,7 @@ int ime_trygetkey(void)
     ime_note_cui_reader();
 
     /* Shift+Space: ON/OFF問わず常に検出 */
-    if (((keydata >> 8) & 0x7F) == KEY_SPACE &&
+    if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
         (kbd_shift_state & SHIFT_SHIFT)) {
         ime_toggle();
         if (g_ime.commit_pos < g_ime.commit_len) {

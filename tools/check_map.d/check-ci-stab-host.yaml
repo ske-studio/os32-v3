@@ -126,4 +126,5 @@ check-ci-stab-host:
 - build/out/kernel.bin
 - build/out/*
 - kernel/sqlite_engine.c
+- kernel/cpu_flags.inc
 artifact_reader: true

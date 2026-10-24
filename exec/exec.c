@@ -111,10 +111,10 @@ void exec_init(void) {
  * 収まらなくなったら **ここでビルドが落ちる** — 実機では「cd の直後に
  * pwd が化ける」としか見えないので、静的に止める。 */
 STATIC_ASSERT(MEM_PHYS_RAM_CEILING <= MEM_APP_BAND_BASE, ram_below_app_band);
-STATIC_ASSERT((MEM_EXEC_HEAP_BASE >> 22) >= (MEM_APP_BAND_BASE >> 22) &&
-              (MEM_EXEC_HEAP_BASE >> 22) < (MEM_APP_BAND_MAX_TOP >> 22), heap_pde_in_app_band);
-STATIC_ASSERT(((MEM_APP_STACK_TOP - 1) >> 22) >= (MEM_APP_BAND_BASE >> 22) &&
-              ((MEM_APP_STACK_TOP - 1) >> 22) < (MEM_APP_BAND_MAX_TOP >> 22), stack_pde_in_app_band);
+STATIC_ASSERT((MEM_EXEC_HEAP_BASE >> PDE_SHIFT) >= APP_BAND_PDE &&
+              (MEM_EXEC_HEAP_BASE >> PDE_SHIFT) < (MEM_APP_BAND_MAX_TOP >> PDE_SHIFT), heap_pde_in_app_band);
+STATIC_ASSERT(((MEM_APP_STACK_TOP - 1) >> PDE_SHIFT) >= APP_BAND_PDE &&
+              ((MEM_APP_STACK_TOP - 1) >> PDE_SHIFT) < (MEM_APP_BAND_MAX_TOP >> PDE_SHIFT), stack_pde_in_app_band);
 STATIC_ASSERT(RING3_USTR_OFF + RING3_USTR_CAP <= (u32)PAGE_SIZE,
               ring3_ustr_fits_in_trampoline_page);
 #define RING3_LS_SHIM_OFF (RING3_USTR_OFF + RING3_USTR_CAP)
@@ -134,7 +134,7 @@ STATIC_ASSERT((u32)KAPI_DATA_IDX_SBRK_HEAP_LIMIT * 4u == (u32)KAPI_DATA_FIELDS_O
 STATIC_ASSERT((u32)KAPI_DATA_IDX_SHM_BASE * 4u == (u32)KAPI_DATA_FIELDS_OFF + 4u,
               kapi_data_idx_shm);
 STATIC_ASSERT((u32)KAPI_FUNC_COUNT <= (u32)KAPI_FUNC_CAPACITY, kapi_func_capacity);
-STATIC_ASSERT(sizeof(KernelAPI) + (u32)KAPI_FUNC_CAPACITY * 8u + RING3_USTR_CAP
+STATIC_ASSERT(sizeof(KernelAPI) + (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE + RING3_USTR_CAP
               <= (u32)PAGE_SIZE, kapi_trampoline_one_page);
 /* 本物の表は KAPI_ADDR からの 4KB (MEM_KAPI_SIZE) に置く (include/memmap.h)。 */
 STATIC_ASSERT(sizeof(KernelAPI) <= (u32)MEM_KAPI_SIZE, kapi_table_fits_reserve);
@@ -160,9 +160,9 @@ static void ring3_trampoline_init(void)
      * とき 0 番地へ飛ぶ。スタブならディスパッチャが slot >= KAPI_FUNC_COUNT
      * でアプリだけ kill する。 */
     for (i = 0; i < KAPI_FUNC_CAPACITY; i++) {
-        u8 *st = (u8 *)P2V(stub_base + i * 8u);
+        u8 *st = (u8 *)P2V(stub_base + i * KAPI_STUB_SIZE);
         /* ユーザ可視表: entry[i] = スタブ i の番地 (KernelAPI fn[i] と同一 offset) */
-        tbl[2 + i] = stub_base + i * 8u;
+        tbl[KAPI_FN_TABLE_FIRST + i] = stub_base + i * KAPI_STUB_SIZE;
         /* スタブ: B8 <slot:imm32> CD 80 C3  (mov eax,slot; int 0x80; ret) */
         st[0] = 0xB8;
         st[1] = (u8)(i & 0xFF);
@@ -176,7 +176,7 @@ static void ring3_trampoline_init(void)
 
     kmemcpy(P2V(page + RING3_LS_SHIM_OFF), ring3_ls_start,
             (u32)(ring3_ls_end - ring3_ls_start));
-    tbl[2 + KAPI_SLOT_SYS_LS] = page + RING3_LS_SHIM_OFF;
+    tbl[KAPI_FN_TABLE_FIRST + KAPI_SLOT_SYS_LS] = page + RING3_LS_SHIM_OFF;
 
     /* データフィールド (値): KernelAPI 表と同一オフセット。v63 から
      * KAPI_DATA_FIELDS_OFF に固定 (関数の数ではなく容量の後ろ)。
@@ -547,14 +547,14 @@ u32 exec_kapi_layout_selftest(void)
 #endif
     /* (2) トランポリンの予約スロットは int 0x80 のスタブ (CPL=3 は kill) */
     for (i = (u32)KAPI_FUNC_COUNT; i < (u32)KAPI_FUNC_CAPACITY; i++) {
-        const u8 *st = (const u8 *)(ring3_tramp_page + RING3_USTR_STUB_OFF + i * 8u);
-        if (tbl[2 + i] != (u32)st || st[0] != 0xB8 || st[1] != (u8)(i & 0xFF) ||
+        const u8 *st = (const u8 *)(ring3_tramp_page + RING3_USTR_STUB_OFF + i * KAPI_STUB_SIZE);
+        if (tbl[KAPI_FN_TABLE_FIRST + i] != (u32)st || st[0] != 0xB8 || st[1] != (u8)(i & 0xFF) ||
             st[2] != (u8)((i >> 8) & 0xFF) || st[5] != 0xCD || st[6] != 0x80) {
             bad |= 1u << 2;
         }
     }
     /* Slot 12 must enter the relocated CPL3 shim, never the ordinary stub. */
-    if (tbl[2 + KAPI_SLOT_SYS_LS] != ring3_tramp_page + RING3_LS_SHIM_OFF) {
+    if (tbl[KAPI_FN_TABLE_FIRST + KAPI_SLOT_SYS_LS] != ring3_tramp_page + RING3_LS_SHIM_OFF) {
         bad |= 1u << 2;
     }
     for (i = 0; i < (u32)(ring3_ls_end - ring3_ls_start); i++) {
@@ -599,7 +599,7 @@ u32 exec_tramp_user_selftest(void)
     }
     /* スタブの領域と重ならない */
     if (addr < ring3_tramp_page + RING3_USTR_STUB_OFF +
-               (u32)KAPI_FUNC_CAPACITY * 8u) {
+               (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE) {
         bad |= 1u << 0;
     }
 
@@ -942,12 +942,12 @@ static u32 exec_ring3_pages(u32 load_base, u32 sbrk_end, u32 exec_heap_size,
     u32 pages = (sbrk_end - load_base + exec_heap_size + stack_size) / PAGE_SIZE
               + 2 /* PD + first lease PT */ + exec_ring3_extra_pages();
     /* 疎な PT の集合。image/shlib、heap/stack が同じ PDE を使っても 1 枚。 */
-    for (u32 pde = MEM_APP_BAND_BASE >> 22; pde < MEM_APP_STACK_TOP >> 22; pde++) {
-        if ((pde >= load_base >> 22 && pde <= (sbrk_end - 1) >> 22) ||
-            (pde >= MEM_EXEC_HEAP_BASE >> 22 &&
-             pde <= (MEM_EXEC_HEAP_BASE + exec_heap_size - 1) >> 22) ||
-            (pde >= (MEM_APP_STACK_TOP - stack_size) >> 22) ||
-            pde == MEM_SHLIB_BASE >> 22)
+    for (u32 pde = APP_BAND_PDE; pde < MEM_APP_STACK_TOP >> PDE_SHIFT; pde++) {
+        if ((pde >= PDE_INDEX(load_base) && pde <= (sbrk_end - 1) >> PDE_SHIFT) ||
+            (pde >= MEM_EXEC_HEAP_BASE >> PDE_SHIFT &&
+             pde <= (MEM_EXEC_HEAP_BASE + exec_heap_size - 1) >> PDE_SHIFT) ||
+            (pde >= (MEM_APP_STACK_TOP - stack_size) >> PDE_SHIFT) ||
+            pde == MEM_SHLIB_BASE >> PDE_SHIFT)
             pages++;
     }
     return pages;
@@ -1015,7 +1015,7 @@ static int exec_stack_bytes(u32 requested, u32 command_bytes, u32 *bytes)
 {
     u32 size = MEM_EXEC_STACK_SIZE;
     if (requested) {
-        if (requested > 0x7fffffffUL - (PAGE_SIZE - 1)) return -1;
+        if (requested > S32_MAX - (PAGE_SIZE - 1)) return -1;
         size = PAGE_ALIGN_UP(requested);
         if (size < MEM_APP_STACK_MIN) size = MEM_APP_STACK_MIN;
     }
@@ -1490,7 +1490,7 @@ void __cdecl kapi_sys_exit(int status)
 
 /* 可変長引数 (kprintf) を拾うためのコピー窓 (固定分より広めに取る)。 */
 #define RING3_ARG_WINDOW  64u
-STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - 8u) / 4u, print_arg_window);
+STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
 
 /* Fifth park origin: only after the entire KAPI/callback has returned.
  * No cleanup here; the existing WM top-level selects the owner to kill. */
@@ -1522,7 +1522,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         v86_int80(frame);
         return;
     }
-    u32 slot     = frame[7];         /* スタブが積んだ slot (eax) */
+    u32 slot     = frame[APP_FRAME_EAX];         /* スタブが積んだ slot (eax) */
     u32 user_esp = frame[11];        /* CPL=3 の ESP (int が積んだ) */
     const void *args_src;
     u32 nbytes;
@@ -1561,7 +1561,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * address crosses this boundary; raw public slot 12 is guarded as well. */
     if (slot == RING3_LS_CALL) {
         ring3_in_syscall = 1;
-        frame[7] = (u32)ring3_ls_dispatch(user_esp);
+        frame[APP_FRAME_EAX] = (u32)ring3_ls_dispatch(user_esp);
         goto syscall_complete;
     }
 
@@ -1571,14 +1571,14 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     }
 
     /* 本物の表から wrap_<slot> を取得 ([magic][version] の後が fn 表)。 */
-    wrapptr = ((const u32 *)KAPI_ADDR)[2 + slot];
+    wrapptr = ((const u32 *)KAPI_ADDR)[KAPI_FN_TABLE_FIRST + slot];
     args_src = (const void *)(user_esp + 4u);
     nbytes = (u32)kapi_argsize[slot];
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
     ring3_in_syscall = 1;
 
-    int vcall = v86_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[7]);
+    int vcall = v86_call_dispatch(slot, (void *)wrapptr, args_src, nbytes, &frame[APP_FRAME_EAX]);
     if (vcall < 0) ring3_fault_kill();
     if (vcall) goto syscall_complete;
 
@@ -1586,12 +1586,12 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
      * word past the caller's mapped argument tail, or emit a partial line. */
     if (slot == KAPI_SLOT_KPRINTF) {
         if (!kapi_print_call(args_src)) ring3_fault_kill();
-        frame[7] = 0;
+        frame[APP_FRAME_EAX] = 0;
         goto syscall_complete;
     }
 
     int strings = kapi_strings_call(slot, (void *)wrapptr, args_src,
-                                    nbytes, kapi_argptr[slot], &frame[7]);
+                                    nbytes, kapi_argptr[slot], &frame[APP_FRAME_EAX]);
     if (strings < 0) ring3_fault_kill();
     if (strings) goto syscall_complete;
 
@@ -1620,7 +1620,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* 本物の wrap を呼ぶ (現 CR3 = アプリ PD)。戻り値を eax スロットへ。
      * gui_call(OP_WAIT) → exec_park() はここから longjmp して戻らない。 */
-    frame[7] = kapi_invoke((void *)wrapptr, args_src, window);
+    frame[APP_FRAME_EAX] = kapi_invoke((void *)wrapptr, args_src, window);
 
 syscall_complete:
     /* 正常復帰: ガードを下ろす */
@@ -1748,7 +1748,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     u32 launcher_pd = paging_current_cr3();
     int launch_cmd_len = 0, launch_read_failed = 0;
     while (launch_read_byte(launcher_pd, cmdline + launch_cmd_len, &launch_read_failed)) {
-        if ((u32)launch_cmd_len == 0x7fffffffUL) return EXEC_ERR_INVALID;
+        if ((u32)launch_cmd_len == S32_MAX) return EXEC_ERR_INVALID;
         launch_cmd_len++;
     }
     if (launch_read_failed) {
@@ -2085,7 +2085,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     {
         u32 launch_argv[OS32_MAX_ARGS];
         u32 str_addr, argv_addr;
-        u32 frame[5];
+        u32 frame[EXEC_ENTRY_ARGS + 1];
         int argc = 0;
         int cmd_len = launch_cmd_len;
         const char *s = cmdline;
@@ -2147,7 +2147,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * app には 0 — T7b-b2 §3-1) も受ける。低位から argc, argv, kapi, aux
          * の順に並べる。call 時点で ESP を 16 バイト境界に揃えるのは
          * SysV i386 ABI の要求。 */
-        new_esp = (stack_top - 4 * sizeof(u32)) & ~(u32)15;
+        new_esp = (stack_top - EXEC_ENTRY_ARGS * sizeof(u32)) & ~(u32)(ABI_STACK_ALIGN - 1);
         frame[1] = (u32)argc;
         frame[2] = argv_addr;
         frame[3] = (u32)kapi;
@@ -2172,7 +2172,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         if (app_store(ctx, want_ring3 ? u_esp : new_esp,
                       want_ring3 ? frame : frame + 1,
-                      (want_ring3 ? 5 : 4) * sizeof(u32)))
+                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))
             return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
         /* The heap header needs its user VA; switch only after image and argv. */
         if (want_ring3) paging_load_cr3(ctx->as->pd_phys);

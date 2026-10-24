@@ -104,11 +104,11 @@ STATIC_ASSERT(MEM_SHM_GUARD_LO_MAX < MEM_KERNEL_BAND_END, kheap_kapi_within_band
  * K3 以降、この 1 枚の PDE が「共有ライブラリ帯域 + プログラム帯 +
  * ユーザスタック」を丸ごと覆う。3 つとも同じ PDE の内側であること
  * (別 PDE に出ると、PD ごとの差し替えから外れて共有されてしまう)。 */
-STATIC_ASSERT(APP_BAND_PDE == (MEM_APP_BAND_BASE >> 22), app_band_pde_matches);
+STATIC_ASSERT(APP_BAND_PDE == PDE_INDEX(MEM_APP_BAND_BASE), app_band_pde_matches);
 STATIC_ASSERT(APP_BAND_PDE < PAGING_PT_COUNT, app_band_pde_in_range);
-STATIC_ASSERT((MEM_SHLIB_BASE >> 22) == APP_BAND_PDE, shlib_base_in_app_band);
-STATIC_ASSERT((MEM_EXEC_LOAD_ADDR >> 22) == APP_BAND_PDE, exec_load_in_app_band);
-STATIC_ASSERT(((MEM_APP_BAND_TOP - 1) >> 22) == APP_BAND_PDE, app_band_top_in_pde);
+STATIC_ASSERT((MEM_SHLIB_BASE >> PDE_SHIFT) == APP_BAND_PDE, shlib_base_in_app_band);
+STATIC_ASSERT((MEM_EXEC_LOAD_ADDR >> PDE_SHIFT) == APP_BAND_PDE, exec_load_in_app_band);
+STATIC_ASSERT(((MEM_APP_BAND_TOP - 1) >> PDE_SHIFT) == APP_BAND_PDE, app_band_top_in_pde);
 STATIC_ASSERT(MEM_SHLIB_END <= MEM_EXEC_LOAD_ADDR, shlib_band_below_exec);
 
 /* 可変 PDE 化 (票 docs/archive/v3/APP_BAND_PDE.md)。帯は先頭 PDE から
@@ -117,7 +117,7 @@ STATIC_ASSERT(MEM_SHLIB_END <= MEM_EXEC_LOAD_ADDR, shlib_band_below_exec);
 STATIC_ASSERT(MEM_APP_BAND_MAX_PDES >= 1, app_band_at_least_one_pde);
 STATIC_ASSERT(MEM_APP_BAND_PDE_SIZE == (u32)PTE_COUNT * PAGE_SIZE,
               app_band_pde_size_is_one_pde);
-STATIC_ASSERT(APP_BAND_PDE + MEM_APP_BAND_MAX_PDES <= (MEM_LEASE_BASE >> 22), app_band_before_lease);
+STATIC_ASSERT(APP_BAND_PDE + MEM_APP_BAND_MAX_PDES <= LEASE_PDE, app_band_before_lease);
 STATIC_ASSERT(MEM_APP_BAND_MAX_TOP == MEM_APP_STACK_TOP, app_stack_at_band_top);
 
 /* K6-RAM (2026-09-11): 「実 RAM の上限」という概念は OS 側に持たない。
@@ -189,7 +189,7 @@ u32 paging_live_addrspaces(void) { return live_addrspaces; }
 static int boot_user_shared_done;
 /* Intended SHM permissions, recorded by the only post-boot RW-changing API.
  * Auditing must not infer the expected RW bit from the PTE being checked. */
-static u32 shm_audit_ro[(MEM_SHM_SIZE / PAGE_SIZE + 31) / 32];
+static u32 shm_audit_ro[BITMAP_WORDS(MEM_SHM_SIZE / PAGE_SIZE)];
 u32 paging_shm_user_missing_count;
 /* 逆転した範囲 (start > end) を渡されて撥ねた回数。
  *
@@ -203,7 +203,7 @@ u32 paging_range_reject_count = 0;
 /* paging_init が実際に恒等マップした範囲の上端 PFN (exclusive)。 */
 static u32 boot_identity_end;
 
-STATIC_ASSERT((MEM_SHELL_BAND_END >> 22) < APP_BAND_PDE, shell_outside_private_pt);
+STATIC_ASSERT((MEM_SHELL_BAND_END >> PDE_SHIFT) < APP_BAND_PDE, shell_outside_private_pt);
 
 /* CR3/PDE frame と固定枠全体 (使用11枚 + 予備) の恒等 sup/RW/WB を照合。A/D bit は無視する。
  * PDE0 の USER 単独は SHM/trampoline のため許可し、実効権限は PTE で拒否。 */
@@ -275,7 +275,7 @@ static int boot_layout_valid(void)
         boot_range_valid(MEM_LEDGER_META_BASE, MEM_LEDGER_META_END, 1) &&
         boot_range_valid(MEM_FIXED_PAGING_GUARD_BASE, MEM_FIXED_PAGING_BASE, 0) &&
         boot_range_valid(MEM_STACK_GUARD, MEM_KSTACK_BASE, 0) &&
-        boot_range_valid(MEM_KSTACK_BASE, MEM_KSTACK_TOP + 4, 1) &&
+        boot_range_valid(MEM_KSTACK_BASE, MEM_SHELL_LOAD_ADDR, 1) &&
         boot_range_valid(MEM_SHELL_LOAD_ADDR, MEM_SHELL_GUARD, 1) &&
         boot_range_valid(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE, 0) &&
         boot_range_valid(MEM_SHELL_GUARD + PAGE_SIZE, MEM_SHELL_BAND_END + 1, 1);
@@ -518,14 +518,14 @@ static int prepare_tables(u32 first, u32 count)
 
 static int set_page_noflush(u32 virt_addr, u32 phys_addr, u32 flags)
 {
-    u32 pdi = virt_addr >> 22;
-    u32 pti = (virt_addr >> 12) & 0x3FF;
+    u32 pdi = PDE_INDEX(virt_addr);
+    u32 pti = PTE_INDEX(virt_addr);
 
     /* マッピング範囲外。無言 no-op にすると「ガードページを置いたつもり」の
      * まま保護なしで走る (fail-open) ので、必ず失敗を返す。 */
     if (pdi >= PAGING_PT_COUNT) return -1;
 
-    page_tables[pdi][pti] = (phys_addr & 0xFFFFF000UL) | flags;
+    page_tables[pdi][pti] = (phys_addr & PTE_FRAME_MASK) | flags;
 
     /* 実効権限は PDE と PTE の論理積になる (i386 の仕様)。PTE だけ USER に
      * しても、その PDE に USER が無ければユーザ (V86 ゲスト) からは
@@ -611,7 +611,7 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
     if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||
         base >= end || ((base | end) & (PAGE_SIZE - 1))) return -1;
     for (a = base; a < end; a += PAGE_SIZE) {
-        pdi = a >> 22;
+        pdi = PDE_INDEX(a);
         if (!page_tables[pdi] ||
             (page_directory[pdi] & (mask | PTE_PRESENT | PTE_PS)) !=
             (V2P(page_tables[pdi]) | PTE_PRESENT)) return -1;
@@ -626,8 +626,8 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
         u32 page = (a - MEM_SHM_BASE) / PAGE_SIZE;
         set_page_noflush(a, a, (writable ? PAGE_RW : PAGE_RO) | PTE_USER);
         if (page >= MEM_SHM_SIZE / PAGE_SIZE) continue;
-        if (writable) shm_audit_ro[page / 32] &= ~(1UL << (page % 32));
-        else shm_audit_ro[page / 32] |= 1UL << (page % 32);
+        if (writable) shm_audit_ro[page / BITS_PER_U32] &= ~(1UL << (page % BITS_PER_U32));
+        else shm_audit_ro[page / BITS_PER_U32] |= 1UL << (page % BITS_PER_U32);
     }
     if (pg_enabled) arch_mmu_flush_tlb();
     return 0;
@@ -697,8 +697,8 @@ int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
 int paging_pde_clear_user(u32 start, u32 end)
 {
     u32 pdi;
-    u32 first = start >> 22;
-    u32 last  = end >> 22;
+    u32 first = PDE_INDEX(start);
+    u32 last  = PDE_INDEX(end);
 
     if (start > end) { paging_range_reject_count++; return -1; }
 
@@ -756,9 +756,9 @@ int paging_is_present(u32 virt_addr)
 {
     u32 pdi, pti;
     if (!pg_enabled) return 1;
-    pdi = virt_addr >> 22;
+    pdi = PDE_INDEX(virt_addr);
     if (!page_tables[pdi]) return 0;
-    pti = (virt_addr >> 12) & 0x3FF;
+    pti = PTE_INDEX(virt_addr);
     return (page_tables[pdi][pti] & PTE_PRESENT) ? 1 : 0;
 }
 
@@ -766,9 +766,9 @@ u32 paging_pte_flags(u32 virt_addr)
 {
     u32 pdi, pti;
     if (!pg_enabled) return 0;
-    pdi = virt_addr >> 22;
+    pdi = PDE_INDEX(virt_addr);
     if (!page_tables[pdi]) return 0;
-    pti = (virt_addr >> 12) & 0x3FF;
+    pti = PTE_INDEX(virt_addr);
     return page_tables[pdi][pti] & 0xFFFu;
 }
 
@@ -776,8 +776,8 @@ u32 paging_pte_flags(u32 virt_addr)
  * 張り替える前に退避する (TASK_KPEEK §2-4 4)。読むだけ。 */
 u32 paging_pte_raw(u32 virt_addr)
 {
-    u32 pdi = virt_addr >> 22;
-    u32 pti = (virt_addr >> 12) & 0x3FF;
+    u32 pdi = PDE_INDEX(virt_addr);
+    u32 pti = PTE_INDEX(virt_addr);
     if (!pg_enabled) return 0;   /* paging_pte_flags と同じ扱い */
     if (!page_tables[pdi]) return 0;
     return page_tables[pdi][pti];
@@ -787,8 +787,8 @@ u32 paging_pte_raw(u32 virt_addr)
  * PDE は触らない (窓の PDE は paging_init で present、live AS も同じ PT)。 */
 int paging_pte_restore(u32 virt_addr, u32 raw)
 {
-    u32 pdi = virt_addr >> 22;
-    u32 pti = (virt_addr >> 12) & 0x3FF;
+    u32 pdi = PDE_INDEX(virt_addr);
+    u32 pti = PTE_INDEX(virt_addr);
     if (!page_tables[pdi]) return -1;
     page_tables[pdi][pti] = raw;
     if (pg_enabled) arch_mmu_flush_tlb();
@@ -812,7 +812,7 @@ static int as_va_to_pa_flags(u32 pd_phys, u32 va, u32 *pa, u32 need)
     u32 pde, pt_phys, pte;
     if (!pd_phys || !paging_is_present((uptr)P2V(pd_phys)))
         return AS_VA_TABLE;
-    pde = ((const volatile u32 *)P2V_IO(pd_phys))[va >> 22];
+    pde = ((const volatile u32 *)P2V_IO(pd_phys))[PDE_INDEX(va)];
     if ((pde & need) != need || (pde & PTE_PS)) return AS_VA_PDE;
     pt_phys = pde & ~(u32)(PAGE_SIZE - 1);
     if (!paging_is_present((uptr)P2V(pt_phys))) return AS_VA_TABLE;
@@ -834,7 +834,7 @@ int as_va_to_pa_read(u32 pd_phys, u32 va, u32 *pa)
 
 u32 paging_registered_pt(u32 va)
 {
-    return V2P(page_tables[va >> 22]);
+    return V2P(page_tables[PDE_INDEX(va)]);
 }
 
 u32 paging_kernel_pd_phys(void)
@@ -870,7 +870,7 @@ int paging_addrspace_create_n(struct addrspace *as, u32 owner, u32 pde_count)
     /* APP_BAND より下の常駐シェルの PT (PDE 1) も写す。 */
     for (i = 0; i < PDE_COUNT; i++) pd[i] = page_directory[i];
     /* Never inherit a high user/device mapping into unused private bands. */
-    for (i = APP_BAND_PDE; i < (MEM_LEASE_END >> 22); i++) pd[i] = 0;
+    for (i = APP_BAND_PDE; i < (MEM_LEASE_END >> PDE_SHIFT); i++) pd[i] = 0;
     as->generation = ++as_generation;
     as->pd_phys = pd_phys;
     as->app_pde = APP_BAND_PDE;
@@ -936,8 +936,8 @@ void paging_addrspace_destroy(struct addrspace *as)
 static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
                                    u32 flags, int keep_cache)
 {
-    u32 pdi = virt >> 22;
-    u32 pti = (virt >> 12) & 0x3FF;
+    u32 pdi = PDE_INDEX(virt);
+    u32 pti = PTE_INDEX(virt);
     u32 *pd;
     u32 *pt;
 
@@ -963,7 +963,7 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
     }
 
     if (keep_cache) flags |= (pt[pti] & (u32)(PTE_PCD | PTE_PWT));
-    pt[pti] = (phys & 0xFFFFF000UL) | flags;
+    pt[pti] = (phys & PTE_FRAME_MASK) | flags;
 
     /* このアプリ PD の PDE にだけ USER を伝播 (master の PDE は触らない)。 */
     if (flags & PTE_USER) {
@@ -1097,8 +1097,8 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
 
     if (!as || as->appmem_poisoned || !as->pd_phys || !as->app_pde_count || vstart >= vend) return 0;
     /* Reject the entire request before freeing any private page. */
-    if ((vstart >> 22) < as->app_pde ||
-        ((vend - 1) >> 22) >= as->app_pde + as->app_pde_count) return 0;
+    if ((PDE_INDEX(vstart)) < as->app_pde ||
+        ((vend - 1) >> PDE_SHIFT) >= as->app_pde + as->app_pde_count) return 0;
     saved = paging_current_cr3();
     if (saved == as->pd_phys) paging_load_cr3(paging_kernel_pd_phys());
     first = vstart >> PAGE_SHIFT;
@@ -1211,7 +1211,7 @@ int paging_map_user_keep_selftest(void)
 {
     struct addrspace as;
     u32 va = PAGING_BOOT_MAP_SIZE - PAGE_SIZE;
-    u32 pdi = va >> 22, pti = (va >> PAGE_SHIFT) % PTE_COUNT;
+    u32 pdi = PDE_INDEX(va), pti = (va >> PAGE_SHIFT) % PTE_COUNT;
     u32 saved, master, app, expected;
     int rc = 0;
     if (!pg_enabled) return 0;
@@ -1324,7 +1324,7 @@ static u8 memmap_want_at(u32 a, u32 tramp)
         if (a >= MEM_SHM_GUARD_LO && a < MEM_SHM_BASE) return MM_NP;
         if (a >= MEM_SHM_BASE && a <= MEM_SHM_END) {
             u32 page = (a - MEM_SHM_BASE) / PAGE_SIZE;
-            return shm_audit_ro[page / 32] & (1UL << (page % 32)) ? MM_ROU : MM_RWU;
+            return shm_audit_ro[page / BITS_PER_U32] & (1UL << (page % BITS_PER_U32)) ? MM_ROU : MM_RWU;
         }
         if (a >= MEM_SHM_GUARD_HI && a < MEM_SHM_GUARD_HI + PAGE_SIZE)
             return MM_NP;
@@ -1431,7 +1431,7 @@ static int lease_context(const struct addrspace *as)
      * Validate managed frames and exact PDE rights before dereferencing PTs. */
     pd = P2V(as->pd_phys);
     for (i = 0; i < MEM_LEASE_MAX_PDES; i++) {
-        u32 phys = as->lease_pt_phys[i], d = pd[(MEM_LEASE_BASE >> 22) + i];
+        u32 phys = as->lease_pt_phys[i], d = pd[LEASE_PDE + i];
         if (!phys) { if (d) return 0; continue; }
         if (phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||
             (d & ~(PTE_ACCESSED | PTE_DIRTY)) != (phys | PAGE_RW | PTE_USER))
@@ -1451,9 +1451,9 @@ int paging_addrspace_create_lease(struct addrspace *as, u32 owner)
     if (!phys) { paging_addrspace_destroy(as); return -1; }
     for (i = 0; i < PTE_COUNT; i++) ((u32 *)P2V(phys))[i] = 0;
     pd = P2V(as->pd_phys);
-    for (i = 0; i < MEM_LEASE_MAX_PDES; i++) pd[(MEM_LEASE_BASE >> 22) + i] = 0;
+    for (i = 0; i < MEM_LEASE_MAX_PDES; i++) pd[LEASE_PDE + i] = 0;
     as->lease_pt_phys[0] = phys;
-    pd[MEM_LEASE_BASE >> 22] = phys | PAGE_RW | PTE_USER;
+    pd[LEASE_PDE] = phys | PAGE_RW | PTE_USER;
     return 0;
 }
 
@@ -1461,10 +1461,10 @@ u32 paging_lease_pte(const struct addrspace *as, u32 va)
 {
     u32 phys, d, index;
     if (!lease_root_context(as) || va < MEM_LEASE_BASE || va >= MEM_LEASE_END) return 0;
-    index = (va - MEM_LEASE_BASE) >> 22;
+    index = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
     phys = as->lease_pt_phys[index];
     if (!phys || phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner)) return 0;
-    d = ((u32 *)P2V(as->pd_phys))[(MEM_LEASE_BASE >> 22) + index];
+    d = ((u32 *)P2V(as->pd_phys))[LEASE_PDE + index];
     if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) != (phys | PAGE_RW | PTE_USER)) return 0;
     return ((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT];
 }
@@ -1501,11 +1501,11 @@ int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32
                  maps[j].base < m->base + m->npages * PAGE_SIZE)) goto fail;
         for (j = 0; j < m->npages; j++) {
             va = m->base + j * PAGE_SIZE;
-            k = (va - MEM_LEASE_BASE) >> 22;
+            k = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
             phys = as->lease_pt_phys[k];
             if (phys) {
                 if (!pgalloc_page_owned(phys / PAGE_SIZE, as->owner) ||
-                    (pd[(MEM_LEASE_BASE >> 22) + k] & ~0xfffUL) != phys ||
+                    (pd[LEASE_PDE + k] & PTE_FRAME_MASK) != phys ||
                     (((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] & PTE_PRESENT)) goto fail;
             } else if (!pending[k]) {
                 pending[k] = pgalloc_alloc_phys(as->owner, 1);
@@ -1517,11 +1517,11 @@ int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32
     saved = irq_save();
     for (k = 0; k < MEM_LEASE_MAX_PDES; k++) if (pending[k]) {
         as->lease_pt_phys[k] = pending[k];
-        pd[(MEM_LEASE_BASE >> 22) + k] = pending[k] | PAGE_RW | PTE_USER;
+        pd[LEASE_PDE + k] = pending[k] | PAGE_RW | PTE_USER;
     }
     for (i = 0; i < n; i++) for (j = 0; j < maps[i].npages; j++) {
         va = maps[i].base + j * PAGE_SIZE;
-        phys = as->lease_pt_phys[(va - MEM_LEASE_BASE) >> 22];
+        phys = as->lease_pt_phys[(va - MEM_LEASE_BASE) >> PDE_SHIFT];
         ((u32 *)P2V(phys))[(va >> PAGE_SHIFT) % PTE_COUNT] =
             (maps[i].phys + j * PAGE_SIZE) | maps[i].flags;
     }
@@ -1553,16 +1553,16 @@ int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages)
         base % PAGE_SIZE || !npages || npages > (MEM_LEASE_END - base) / PAGE_SIZE) return -1;
     for (j = 0; j < npages; j++) {
         u32 va = base + j * PAGE_SIZE;
-        k = (va - MEM_LEASE_BASE) >> 22;
+        k = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
         if (!as->lease_pt_phys[k] ||
             !pgalloc_page_owned(as->lease_pt_phys[k] / PAGE_SIZE, as->owner) ||
-            (((u32 *)P2V(as->pd_phys))[(MEM_LEASE_BASE >> 22) + k] & ~0xfffUL) !=
+            (((u32 *)P2V(as->pd_phys))[LEASE_PDE + k] & PTE_FRAME_MASK) !=
             as->lease_pt_phys[k]) return -1;
     }
     saved = irq_save();
     for (j = 0; j < npages; j++) {
         u32 va = base + j * PAGE_SIZE;
-        k = (va - MEM_LEASE_BASE) >> 22;
+        k = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
         if (as->lease_pt_phys[k])
             ((u32 *)P2V(as->lease_pt_phys[k]))[(va >> PAGE_SHIFT) % PTE_COUNT] = 0;
     }
@@ -1571,12 +1571,12 @@ int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages)
     for (k = 1; k < MEM_LEASE_MAX_PDES; k++) if (as->lease_pt_phys[k]) {
         pt = P2V(as->lease_pt_phys[k]);
         for (j = 0; j < PTE_COUNT && !pt[j]; j++) {}
-        if (j == PTE_COUNT) pd[(MEM_LEASE_BASE >> 22) + k] = 0;
+        if (j == PTE_COUNT) pd[LEASE_PDE + k] = 0;
     }
     if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);
     for (k = 1; k < MEM_LEASE_MAX_PDES; k++)
         if (!as->appmem_poisoned && as->lease_pt_phys[k] &&
-            !pd[(MEM_LEASE_BASE >> 22) + k]) {
+            !pd[LEASE_PDE + k]) {
             if (!pgalloc_free_n_owner(as->owner, as->lease_pt_phys[k] / PAGE_SIZE, 1)) {
                 paging_addrspace_poison(as);
                 continue;
@@ -1597,7 +1597,7 @@ int paging_master_audit(u32 tramp)
     if (!pg_enabled || !fixed_paging_valid()) return 1;
     for (u32 di = 0; di < PDE_COUNT; di++) {
         u32 d = page_directory[di];
-        if (di >= APP_BAND_PDE && di < (MEM_LEASE_END >> 22)) {
+        if (di >= APP_BAND_PDE && di < (MEM_LEASE_END >> PDE_SHIFT)) {
             if (d) bad++;
             continue;
         }
@@ -1651,10 +1651,10 @@ int paging_as_audit(const struct addrspace *as, int (*shared_ro)(u32, u32))
     pd = P2V(as->pd_phys);
     for (u32 di = 0; di < PDE_COUNT; di++) {
         u32 d = pd[di];
-        if (di < APP_BAND_PDE || di >= (MEM_LEASE_END >> 22)) {
+        if (di < APP_BAND_PDE || di >= (MEM_LEASE_END >> PDE_SHIFT)) {
             if ((d & ~(PTE_ACCESSED | PTE_DIRTY)) !=
                 (page_directory[di] & ~(PTE_ACCESSED | PTE_DIRTY))) return 1;
-        } else if (di < (MEM_LEASE_BASE >> 22)) {
+        } else if (di < LEASE_PDE) {
             if (di >= APP_BAND_PDE + MEM_APP_BAND_MAX_PDES) {
                 if (d) return 1;
                 continue;

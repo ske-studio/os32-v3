@@ -1,5 +1,11 @@
 /* Position-independent cdecl shim, copied into the RO+USER trampoline page.
  * All indirect callback calls execute after int80 returns to CPL3. */
+#include "../kernel/idt.h"
+#define LS_ARG_PATH 8
+#define LS_ARG_CB 12
+#define LS_ARG_CTX 16
+#define LS_SAVED_REGS 12
+#define LS_STAGED_WORDS_BYTES 8
 #include "ring3_ls.h"
 #include "os32_generations.h"
     .section .os32_generations,"",@progbits
@@ -14,10 +20,10 @@ ring3_ls_start:
     pushl %ebx
     pushl %esi
     pushl %edi
-    andl $-16, %esp
+    andl $-ABI_STACK_ALIGN, %esp
     subl $RING3_LS_STACK_SIZE, %esp
     /* Snapshot the path once, including NULL=cwd and overlong paths. */
-    movl 8(%ebp), %esi
+    movl LS_ARG_PATH(%ebp), %esi
     leal RING3_LS_PATH_OFF(%esp), %edi
     movl $RING3_LS_PATH_SIZE, %ecx
     testl %esi, %esi
@@ -37,11 +43,11 @@ ring3_ls_start:
     movl %esp, %eax
     pushl %eax                 /* output */
     pushl %ebx                 /* skip */
-    leal RING3_LS_PATH_OFF+8(%esp), %eax
+    leal RING3_LS_PATH_OFF+LS_STAGED_WORDS_BYTES(%esp), %eax
     pushl %eax                 /* snapshotted path */
     pushl $0                   /* dispatcher skips cdecl return address */
     movl $RING3_LS_CALL, %eax
-    int $0x80
+    int $RING3_SYSCALL_VECTOR
     addl $16, %esp
     testl %eax, %eax
     js .Lreturn
@@ -52,19 +58,19 @@ ring3_ls_start:
     testl %edi, %edi
     jz .Ldone
     subl $8, %esp              /* i386 ABI: align before call */
-    pushl 16(%ebp)             /* original ctx, never read by the kernel */
+    pushl LS_ARG_CTX(%ebp)             /* original ctx, never read by the kernel */
     pushl %esi
-    call *12(%ebp)             /* original callback, CPL3 */
+    call *LS_ARG_CB(%ebp)             /* original callback, CPL3 */
     addl $16, %esp
     addl $RING3_LS_ENTRY_SIZE, %esi
     decl %edi
     jmp .Lentry
 .Ldone:
-    cmpl $0, 8(%esp)
+    cmpl $0, RING3_LS_DONE_OFF(%esp)
     je .Lbatch
-    movl 4(%esp), %eax         /* preserve backend's return value */
+    movl RING3_LS_RESULT_OFF(%esp), %eax         /* preserve backend's return value */
 .Lreturn:
-    leal -12(%ebp), %esp
+    leal -LS_SAVED_REGS(%ebp), %esp
     popl %edi
     popl %esi
     popl %ebx

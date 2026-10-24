@@ -163,8 +163,7 @@ def preentry(tmp, headers, runner):
                       for h in headers)
     code = '''#include "os32api.h"
 #include "memmap.h"
-#define PAGE_SIZE MEM_PAGE_SIZE
-#define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+#include "paging.h"
 #define APP_ID_SHELL 1
 static int g_cur=APP_ID_SHELL, entered, errors, restored;
 static u32 available;
@@ -205,7 +204,7 @@ void _start(void) {
     src.write_text(code)
     host32.build(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                   '-ffreestanding', '-fno-pie', '-no-pie', '-fno-stack-protector',
-                  '-nostdlib', '-static', '-Iinclude', '-Isdk/include/os32', src, '-o', exe],
+                  '-nostdlib', '-static', '-Iinclude', '-Ikernel', '-Isdk/include/os32', src, '-o', exe],
                  cwd=ROOT, capture_output=True, text=True, check=True, timeout=30)
     r = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
     require(r.returncode == 0, 'real pre-entry budget gate '+str(r.returncode))

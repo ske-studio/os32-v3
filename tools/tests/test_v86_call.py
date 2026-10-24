@@ -41,7 +41,7 @@ def main():
                             '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                             '-ffunction-sections', '-fdata-sections', '-D__cdecl=',
                             *['-I' + str(ROOT / d) for d in
-                              ('include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')],
+                              ('include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86')],
                             '-I' + str(folder), '-nostdlib', '-static', '-no-pie',
                             '-Wl,--gc-sections', ROOT / 'tools/tests/v86_call_host.c',
                             '-o', exe], check=True)

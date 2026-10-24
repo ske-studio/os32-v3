@@ -11,6 +11,8 @@
 #include "tss.h"
 #include "kprintf.h"
 
+#define V86_CALL_MAX_PATHS 2
+
 extern volatile int ring3_in_syscall, ring3_wm_depth;
 extern u32 kapi_invoke(void *target, const void *args, u32 bytes);
 
@@ -20,7 +22,7 @@ static struct {
     struct caller_access caller;
     u32 cr3;
     int pinned;
-    char *path[2];
+    char *path[V86_CALL_MAX_PATHS];
     V86Gcap *capture;
 } call;
 
@@ -64,7 +66,7 @@ void v86_call_cleanup(void)
 {
     if (!call.pinned) return;
     paging_load_cr3(call.cr3);
-    for (u32 i = 0; i < 2; i++) {
+    for (u32 i = 0; i < V86_CALL_MAX_PATHS; i++) {
         if (call.path[i]) kfree(call.path[i]);
         call.path[i] = 0;
     }
@@ -76,13 +78,13 @@ void v86_call_cleanup(void)
 int v86_call_dispatch(u32 slot, void *target, const void *args, u32 bytes,
                       u32 *result)
 {
-    u32 staged[2] = {0}, output = 0;
+    u32 staged[V86_CALL_MAX_PATHS] = {0}, output = 0;
     int paths = 0, capture = 0, handled = 1;
     switch (slot) {
     case KAPI_SLOT_V86_SELFTEST: break;
     case KAPI_SLOT_V86_DISKTEST:
     case KAPI_SLOT_V86_BOOT: paths = 1; break;
-    case KAPI_SLOT_V86_BOOT2: paths = 2; break;
+    case KAPI_SLOT_V86_BOOT2: paths = V86_CALL_MAX_PATHS; break;
     case KAPI_SLOT_V86_GDC_CAPTURE: capture = 1; break;
     default: return 0;
     }

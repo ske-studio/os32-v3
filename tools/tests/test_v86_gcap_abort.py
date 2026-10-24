@@ -60,7 +60,7 @@ def main():
             handlers = handlers.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
             handlers = handlers.replace('    int row = 0;  /* 画面最上部から表示 (最大限の情報量) */', '')
             (work / 'fault.inc').write_text(handlers)
-            (work / 'cleanup.inc').write_text(function(parts[paths[3]], 'v86_call_cleanup'))
+            (work / 'cleanup.inc').write_text(next(line for line in parts[paths[3]].splitlines(keepends=True) if line.startswith('#define V86_CALL_MAX_PATHS ')) + function(parts[paths[3]], 'v86_call_cleanup'))
             (work / 'policy.inc').write_text(function(parts[paths[5]], 'v86_io_reset_policy'))
             exe = work / 'fixture'
             cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',

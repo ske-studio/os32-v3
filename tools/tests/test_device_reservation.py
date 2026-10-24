@@ -705,7 +705,7 @@ MUTATIONS = [
     ('ram-eligibility-unchecked', 'kernel/pgalloc.c',
      '(s[i].kind == LEDGER_CACHE_WB && !bit(eligible, p))) goto done;', '0) goto done;'),
     ('eligibility-not-dropped', 'kernel/pgalloc.c',
-     '                eligible[p / 32] &= ~(1UL << (p % 32));\n                total_pages--;\n',
+     '                eligible[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));\n                total_pages--;\n',
      ''),
     ('non-device-owner', 'kernel/pgalloc.c',
      '        ledger_owners[owner].kind != LEDGER_KIND_DEVICE || !spans || !n ||',

@@ -19,7 +19,7 @@ MUTANTS = [
      '        guard_a = sbrk_end; if (heap_sz > 0x00C00000UL - MEM_PHYS_EXEC_FLOOR - text_sz - MEM_EXEC_STACK_SIZE - 2 * PAGE_SIZE - 0x40000UL) return EXEC_ERR_NOMEM;'),
     ('old-libc-tier', 'sbrk_end = PAGE_ALIGN_UP(load_base + text_sz + bss_sz) + PAGE_SIZE;',
      'sbrk_end = PAGE_ALIGN_UP(load_base + text_sz + bss_sz) + 0x40000;'),
-    ('duplicate-shlib-PDE', '            pages++;', '            pages++;\n        if (pde == MEM_SHLIB_BASE >> 22) pages++;'),
+    ('duplicate-shlib-PDE', '            pages++;', '            pages++;\n        if (pde == MEM_SHLIB_BASE >> PDE_SHIFT) pages++;'),
     ('omit-extra', '+ exec_ring3_extra_pages();', '+ 0 * exec_ring3_extra_pages();'),
     ('resident-budget', '*exec_size = MEM_SHELL_HEAP_SIZE;', '*exec_size = MEM_EXEC_HEAP_MIN;'),
     ('resident-limit', 'ctx->sbrk_heap_limit = sbrk_end;',

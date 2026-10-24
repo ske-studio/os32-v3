@@ -13,12 +13,18 @@
 #include "memmap.h"   /* MEM_APP_BAND_* (struct addrspace の PT 配列長) */
 
 /* ページサイズ */
-#define PAGE_SIZE       4096
+#define PAGE_SIZE       MEM_PAGE_SIZE
 #define PAGE_SHIFT      12
+#define PDE_SHIFT       MEM_PDE_SHIFT
 
 /* ページディレクトリ/テーブルのエントリ数 */
 #define PDE_COUNT       1024
 #define PTE_COUNT       1024
+
+#define PDE_INDEX(va) ((u32)(va) >> PDE_SHIFT)
+#define PTE_INDEX(va) (((u32)(va) >> PAGE_SHIFT) & (PTE_COUNT - 1))
+#define PTE_FRAME_MASK (~(u32)(PAGE_SIZE - 1))
+#define LEASE_PDE (MEM_LEASE_BASE >> PDE_SHIFT)
 
 /* ページ属性ビット */
 #define PTE_PRESENT     0x001   /* P   : 存在 */
@@ -174,7 +180,7 @@ int paging_pte_restore(u32 virt_addr, u32 raw);
 /*  lease は [MEM_LEASE_BASE, MEM_LEASE_END) の私有 VA に張る。              */
 /*  デバイス窓 (MEM_DEVICE_APERTURE_BASE〜) は共有 supervisor+PCD。          */
 /*  旧 0x400000 アプリ帯とホットデプロイ窓は撤去済み。                       */
-/* アプリ帯域の **先頭** PDE インデックス (= MEM_APP_BAND_BASE >> 22 = 512)。
+/* アプリ帯域の **先頭** PDE インデックス (= MEM_APP_BAND_BASE >> PDE_SHIFT = 512)。
  * 共有ライブラリ帯域 (0x80000000-0x800FFFFF)・プログラム本体
  * (MEM_EXEC_LOAD_ADDR 0x80100000-)・ヒープ・ユーザスタックがここから載る。
  *
@@ -182,7 +188,7 @@ int paging_pte_restore(u32 virt_addr, u32 raw);
  * 1 枚固定ではなく [APP_BAND_PDE, APP_BAND_PDE + count) の連続 count 枚。
  * count は 1〜MEM_APP_BAND_MAX_PDES で、要求量に応じて exec が決める。
  * 整合は kernel/paging.c の STATIC_ASSERT が検査する。 */
-#define APP_BAND_PDE   (MEM_APP_BAND_BASE >> 22)
+#define APP_BAND_PDE   (MEM_APP_BAND_BASE >> PDE_SHIFT)
 
 /* Metadata only: never written into a PTE. */
 #define AS_LEASE_GFX_COMPAT 0x80000000U

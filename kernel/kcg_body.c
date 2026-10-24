@@ -1,6 +1,7 @@
 /* Existing PC-98 ROM port sequence moved from drivers/kcg.c unchanged.
  * Source: PC9800Bible §2-6-5; this is a relocation, no new hardware protocol. */
 #include "kcg_module.h"
+#include "utf8.h"
 #include "kcg.h"
 #include "io.h"
 #include "pc98.h"
@@ -8,7 +9,7 @@
 #include "kprintf.h"
 
 /* 64KiB accounting budget includes the tags. The final partial slot is unused. */
-typedef struct { u16 tag; u8 glyph[KCG_KANJI_H * 2]; } KcgCacheEntry;
+typedef struct { u16 tag; u8 glyph[KCG_KANJI_H * KCG_KANJI_BPL]; } KcgCacheEntry;
 #define KCG_CACHE_SLOTS (KCG_ROM_CACHE_BYTES / sizeof(KcgCacheEntry))
 #define KCG_ANK_TAG 0x8000u
 #define KCG_STATS_SAMPLE 1024u
@@ -33,7 +34,7 @@ static void rom_ank(u8 ch, u8 *buf)
     outp(KCG_CODE_HI, ch);          /* A3h ← ANK文字コード (下位) */
     kcg_wait();
 
-    for (line = 0; line < 16; line++) {
+    for (line = 0; line < KCG_ANK_H; line++) {
         outp(KCG_LINE_SEL, (u8)line);  /* A5h ← ライン (bit4=0でANK) */
         kcg_wait();
         buf[line] = (u8)inp(KCG_DATA); /* A9h → パターン */
@@ -46,21 +47,21 @@ static void rom_kanji(u16 jis_code, u8 *buf)
     /* 文字コード設定 */
     outp(KCG_CODE_LO, lo);          /* A1h ← JIS下位 */
     kcg_wait();
-    outp(KCG_CODE_HI, hi - 0x20);   /* A3h ← JIS上位 - 0x20 */
+    outp(KCG_CODE_HI, hi - TVRAM_JIS_HI_BIAS);   /* A3h ← JIS上位 - 0x20 */
     kcg_wait();
 
     /* 左半分 (8ドット×16ライン) — bit5=1 */
-    for (line = 0; line < 16; line++) {
-        outp(KCG_LINE_SEL, (u8)(line | 0x20));  /* bit5=1: 左 */
+    for (line = 0; line < KCG_KANJI_H; line++) {
+        outp(KCG_LINE_SEL, (u8)(line | KCG_LINE_LEFT));  /* bit5=1: 左 */
         kcg_wait();
-        buf[line * 2] = (u8)inp(KCG_DATA);
+        buf[line * KCG_KANJI_BPL] = (u8)inp(KCG_DATA);
     }
 
     /* 右半分 (8ドット×16ライン) — bit5=0 */
-    for (line = 0; line < 16; line++) {
+    for (line = 0; line < KCG_KANJI_H; line++) {
         outp(KCG_LINE_SEL, (u8)(line | 0x00));  /* bit5=0: 右 */
         kcg_wait();
-        buf[line * 2 + 1] = (u8)inp(KCG_DATA);
+        buf[line * KCG_KANJI_BPL + 1] = (u8)inp(KCG_DATA);
     }
 
 }
@@ -79,19 +80,19 @@ static void read_glyph(u16 tag, u8 *buf, u32 bytes)
     }
     /* One observed sample, no acceptance threshold and no per-glyph logging. */
     if (counters.hits + counters.misses == KCG_STATS_SAMPLE)
-        kprintf(0x07, "[KCG] cache hits=%u misses=%u (sample=%u)\n",
+        kprintf(KLOG_ATTR, "[KCG] cache hits=%u misses=%u (sample=%u)\n",
                 counters.hits, counters.misses, KCG_STATS_SAMPLE);
 }
 static void read_ank(u8 ch, u8 *buf) { read_glyph(KCG_ANK_TAG | ch, buf, KCG_ANK_H); }
 static void read_kanji(u16 jis, u8 *buf)
 {
     u8 hi = jis >> 8, lo = (u8)jis;
-    if (hi < 0x21 || hi > 0x7e || lo < 0x21 || lo > 0x7e) {
+    if (hi < JIS_CODE_MIN || hi > JIS_CODE_MAX || lo < JIS_CODE_MIN || lo > JIS_CODE_MAX) {
         ++counters.misses;
         rom_kanji(jis, buf);
         return;
     }
-    read_glyph(jis, buf, KCG_KANJI_H * 2);
+    read_glyph(jis, buf, KCG_KANJI_H * KCG_KANJI_BPL);
 }
 static void stats(KcgCacheStats *out) { *out = counters; }
 static void invalidate(void)

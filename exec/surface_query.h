@@ -5,7 +5,7 @@
 
 /* Kernel representation of the v70 public value ABI; layouts asserted in C.
  * No physical address, kernel alias, owner or cache in the values. */
-#define SURFACE_QUERY_MAX 4
+#include "surface_limits.h"
 struct surface_desc {
     struct surface_ref ref;
     u32 role, backend, format, width, height, pitch, planes;

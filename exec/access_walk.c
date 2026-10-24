@@ -7,8 +7,8 @@
 
 int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa)
 {
-    u32 d, table, expected, pdi = va >> 22, result, frame, i;
-    const u32 mask = ~(u32)(PAGE_SIZE - 1);
+    u32 d, table, expected, pdi = PDE_INDEX(va), result, frame, i;
+    const u32 mask = PTE_FRAME_MASK;
     if (!as->pd_phys || (as->pd_phys & ~mask) ||
         !pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner)) return 0;
     d = ((const u32 *)P2V(as->pd_phys))[pdi];
@@ -17,7 +17,7 @@ int as_access_page(const struct addrspace *as, u32 va, int write, u32 *pa)
     if (va >= MEM_APP_BAND_BASE && va < MEM_APP_BAND_MAX_TOP)
         expected = as->app_pt_phys[pdi - APP_BAND_PDE];
     else if (va >= MEM_LEASE_BASE && va < MEM_LEASE_END)
-        expected = as->lease_pt_phys[pdi - (MEM_LEASE_BASE >> 22)];
+        expected = as->lease_pt_phys[pdi - LEASE_PDE];
     else {
         expected = ((const u32 *)P2V(paging_kernel_pd_phys()))[pdi];
         if (!(expected & PTE_PRESENT) || (expected & PTE_PS)) return 0;

@@ -271,7 +271,11 @@
 #define TVRAM_COLS           80      /* 横桁数 */
 #define TVRAM_ROWS           25      /* 縦行数 (標準) */
 #define TVRAM_ROWS_30        30      /* 縦行数 (30行モード) */
-#define TVRAM_BPR            160     /* Bytes Per Row (80桁×2バイト) */
+#define TVRAM_CELL_BYTES 2
+#define TVRAM_JIS_HI_BIAS 0x20
+#define TVRAM_KANJI_RIGHT 0x80
+#define GVRAM_PLANES 4 /* B/R/G/I */
+#define TVRAM_BPR            (TVRAM_COLS * TVRAM_CELL_BYTES)     /* Bytes Per Row (80桁×2バイト) */
 
 /* テキストアトリビュートビット — PC9800Bible §2-6-1 図2-25 */
 #define TATTR_SECRET         0x00   /* D0: シークレット (0=表示) */

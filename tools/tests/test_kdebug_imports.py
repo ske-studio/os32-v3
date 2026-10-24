@@ -163,7 +163,7 @@ class ImportsTests(unittest.TestCase):
 
     def test_compile_all_generated_artifacts(self):
         includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx', 'fs', 'kapi',
-                    'arch/i386', 'platform/pc98', 'sdk/include/os32']
+                    'arch/x86', 'platform/pc98', 'sdk/include/os32']
         flags = ['-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-builtin', '-D__KERNEL_BUILD__',
                  '-Werror=implicit-function-declaration'] + ['-I' + str(ROOT / d) for d in includes]
         with tempfile.TemporaryDirectory(prefix='kdebug-imports-') as folder:

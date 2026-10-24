@@ -72,7 +72,7 @@ int ring3_user_ranges_writable(u32 a, u32 n, u32 b, u32 m)
 { (void)b; (void)m; return !ring3_call_from_user() || !n || (a && a <= ~(u32)0 - n && !reject_output); }
 #include "wrapper.inc"
 
-#define PAGE_SIZE 4096u
+STATIC_ASSERT(PAGE_SIZE == 4096u, callback_fixture_page_size);
 #define P2V(p) ((void *)(p))
 static u8 tramp[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */

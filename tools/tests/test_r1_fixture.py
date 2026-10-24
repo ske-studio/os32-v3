@@ -60,7 +60,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
     entry = entry.replace('    _disable();', '    (void)error_code;\n    _disable();')
     end = function(read('kernel/v86_mem.c'), 'void v86_session_end(')
     end = end[:end.index('    if (!v86_session.open)')] + '    irq_restore(flags);\n}\n'
-    (tmp / 'entry_source.c').write_text(entry + end)
+    (tmp / 'entry_source.c').write_text('#include "idt.h"\n' + entry + end)
     (tmp / 'timer_source.c').write_text(function(isr, 'void timer_handler('))
     cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',

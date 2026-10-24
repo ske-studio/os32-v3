@@ -19,7 +19,7 @@ volatile int font_guard_fixture_result;
 static int font_fixture_body(void *context)
 {
     u32 mode = (u32)(uptr)context;
-    kprintf(0x07, "[font-test] active=%u mode=%u\n", font_guard_active, mode);
+    kprintf(KLOG_ATTR, "[font-test] active=%u mode=%u\n", font_guard_active, mode);
     if (mode == 13) __asm__ volatile("mov $0xffff, %%ax; mov %%ax, %%ds" ::: "eax");
     if (mode == 14) (void)*(volatile u32 *)P2V(0); /* actual NP page0 */
     if (mode == 3) {
@@ -35,7 +35,7 @@ void font_guard_fixture(void)
     if (!mode) return;
     font_guard_fixture_request = 0;
     font_guard_fixture_result = font_guard_run(font_fixture_body, (void *)(uptr)mode);
-    kprintf(0x07, "[font-test] rc=%d active=%u stop=%u\n",
+    kprintf(KLOG_ATTR, "[font-test] rc=%d active=%u stop=%u\n",
             font_guard_fixture_result, font_guard_active, (u32)appslot_stop_pending());
 }
 #endif

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+#include "kprintf.h"
 #include "dma_pool.h"
 #include "pgalloc.h"
 #include "module.h"
@@ -26,7 +27,7 @@ static int debug_enabled = 1;
 static int dma_tested, dma_skipped, unicode_loads;
 static int cd_loaded, v86_loaded;
 static u32 boot_drive = BOOT_DRIVE_FDD;
-static void kprintf(int attr, const char *fmt, ...);
+void kprintf(u8 attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
 #include "selftest_dma_gate.c"
 static jmp_buf halt;
@@ -126,7 +127,7 @@ static int pcm_module_load(void)
     pcm++;
     return 0;
 }
-static void kprintf(int attr, const char *fmt, ...)
+void kprintf(u8 attr, const char *fmt, ...)
 {
     (void)attr;
     if (strstr(fmt, "[dma] RAM short")) diag++;

@@ -1063,7 +1063,7 @@ static u32 sasi_pos(u32 *frame, u16 cyls, u8 heads, u8 spt, u32 total_lba,
     if (al & 0x80U) {
         /* CHS: DL は 0 起算。範囲照合してから線形位置へ落とす。 */
         if (dl >= (u32)spt || dh >= (u32)heads || cx >= (u32)cyls) {
-            return 0xD0;
+            return V86_DISK_ST_IO;
         }
         pos = (cx * (u32)heads + dh) * (u32)spt + dl;
     } else {
@@ -1072,7 +1072,7 @@ static u32 sasi_pos(u32 *frame, u16 cyls, u8 heads, u8 spt, u32 total_lba,
         pos = (dl << 16) | cx;
     }
     if (pos >= total_lba) {
-        return 0xD0;
+        return V86_DISK_ST_IO;
     }
     *out_pos = pos;
     return 0;
@@ -1096,7 +1096,7 @@ static u32 sasi_rw(u32 *frame, int slot, int is_write,
     }
 
     if (is_write && !loop_dev_is_writable(slot)) {
-        return 0x70;            /* ライトプロテクト。黙って捨てない */
+        return V86_DISK_ST_WRITE_PROTECT;            /* ライトプロテクト。黙って捨てない */
     }
 
     while (size) {
@@ -1105,27 +1105,27 @@ static u32 sasi_rw(u32 *frame, int slot, int is_write,
             r = bps;
         }
         if (pos >= total_lba) {
-            return 0xD0;        /* 転送中に末尾を越えた */
+            return V86_DISK_ST_IO;        /* 転送中に末尾を越えた */
         }
         if (!guest_range_ok(addr, r)) {
             v86_disk_fail_n++; v86_disk_fail_why = 1;
             v86_disk_fail_dst = addr;
-            return 0x40;        /* 直接低位 (V86_LOW) の外。書くと カーネルが壊れる */
+            return V86_DISK_ST_RANGE;        /* 直接低位 (V86_LOW) の外。書くと カーネルが壊れる */
         }
         if (is_write) {
             /* 端数はセクタを読んでから前半だけ差し替える (RMW)。 */
             if (r < (u32)bps) {
                 if (loop_dev_read_lba(slot, pos, 1, sasi_bounce) != 0) {
-                    return 0xD0;
+                    return V86_DISK_ST_IO;
                 }
             }
             kmemcpy(sasi_bounce, (const void *)addr, r);
             if (loop_dev_write_lba(slot, pos, 1, sasi_bounce) != 0) {
-                return 0xD0;
+                return V86_DISK_ST_IO;
             }
         } else {
             if (loop_dev_read_lba(slot, pos, 1, sasi_bounce) != 0) {
-                return 0xD0;
+                return V86_DISK_ST_IO;
             }
             kmemcpy((void *)addr, sasi_bounce, r);
         }
@@ -1158,7 +1158,7 @@ static u32 sasi_sense(u32 *frame, u16 cyls, u8 heads, u8 spt, u16 bps)
         if (bytes < 41564160U)  return 3;   /* < 40MB */
         if (bytes == 41564160U) return 4;   /* = 40MB */
     }
-    return 0x0F;
+    return V86_DISK_ST_DONE;
 }
 
 /* INIT (nibble=3)。実機は BDA 0x55C の SASI ビットを接続台数で立て直す

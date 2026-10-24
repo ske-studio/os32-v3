@@ -20,6 +20,11 @@
 #include "tvram.h"
 #include "../gfx/gfx.h"
 
+
+enum { V86_RESTORE_COL_BAD = 17, V86_RESTORE_COL_PTE = 30,
+       V86_RESTORE_COL_PDE = 43, V86_RESTORE_COL_PCD = 56 };
+enum { V86_HEX_DIGITS = 8, V86_HEX_MASK = 15, V86_HEX_SHIFT = 4 };
+
 struct v86_session_state v86_session;
 u32 v86_restore_mismatch;
 
@@ -157,11 +162,11 @@ void v86_session_end(void)
         u32 counts[] = { v86_restore_mismatch, v86_session.restore_pte_bad,
             v86_session.restore_pde_bad, v86_restore_mismatch -
             v86_session.restore_pte_bad - v86_session.restore_pde_bad };
-        const unsigned int offsets[] = { 17, 30, 43, 56 };
-        for (unsigned int n = 0; n < 4; n++)
-            for (int i = 7; i >= 0; i--) {
-                line[offsets[n] + i] = "0123456789ABCDEF"[counts[n] & 15];
-                counts[n] >>= 4;
+        const unsigned int offsets[] = { V86_RESTORE_COL_BAD, V86_RESTORE_COL_PTE, V86_RESTORE_COL_PDE, V86_RESTORE_COL_PCD };
+        for (unsigned int n = 0; n < sizeof(offsets) / sizeof(offsets[0]); n++)
+            for (int i = V86_HEX_DIGITS - 1; i >= 0; i--) {
+                line[offsets[n] + i] = "0123456789ABCDEF"[counts[n] & V86_HEX_MASK];
+                counts[n] >>= V86_HEX_SHIFT;
             }
         volatile u16 *text = P2V_IO(TVRAM_BASE);
         volatile u16 *attr = P2V_IO(TVRAM_ATTR);

@@ -5,6 +5,8 @@
 ;; 全レジスタを保存・復帰し、IRETDで復帰する。
 ;; ============================================================
 
+%include "kernel/cpu_flags.inc"
+
 cpu 386
 
 ;; テキストVRAM直接書き込み用定数
@@ -96,7 +98,7 @@ extern kctx_exc_depth
 ;; 壊さない。CPL=0 割り込みも RPL=0 で素通し。追加コストは分岐 2 つのみ。
 ;; ============================================================
 %macro IRETD_USER 0
-        test    dword [esp + 8], 0x00020000    ;; EFLAGS.VM?
+        test    dword [esp + 8], EFLAGS_VM    ;; EFLAGS.VM?
         jnz     %%do_iret                      ;; V86 → iretd がフレームから復元
         test    dword [esp + 4], 3             ;; CS.RPL == 3 (CPL=3 へ戻る)?
         jz      %%do_iret                      ;; CPL=0 → KERNEL_DS のまま
@@ -140,7 +142,7 @@ extern ring3_abort_check
 ;; C 側が仮想 PIC に問い合わせて決める。マスクの判定も同じ場所。
 ;; ============================================================
 %macro V86_REFLECT 1
-        test    dword [esp + 40], 0x00020000    ;; EFLAGS.VM
+        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
         jz      %%skip
         push    dword %1                        ;; IRQ 番号
         lea     eax, [esp + 4]                  ;; frame 先頭 (PUSHAD)
@@ -189,7 +191,7 @@ extern v86_fault_handler
 global isr_stub_%1
 isr_stub_%1:
         cli
-        test    dword [esp + 8], 0x00020000  ;; EFLAGS.VM
+        test    dword [esp + 8], EFLAGS_VM  ;; EFLAGS.VM
         jnz     %%from_v86
 
         push    0               ;; ダミーエラーコード
@@ -227,7 +229,7 @@ isr_stub_%1:
 global isr_stub_%1
 isr_stub_%1:
         cli
-        test    dword [esp + 12], 0x00020000  ;; EFLAGS.VM
+        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
         jnz     %%from_v86
 
         push    %1              ;; 例外番号
@@ -303,7 +305,7 @@ extern v86_exit_to_kernel
 global isr_stub_13
 isr_stub_13:
         cli
-        test    dword [esp + 12], 0x00020000  ;; EFLAGS.VM
+        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
         jnz     .from_v86
 
         ;; --- 通常の #GP: 従来どおり例外ハンドラへ ---
@@ -397,7 +399,7 @@ isr_stub_14:
         EXC_ENTER               ;; 両分岐 (V86 は longjmp、通常は下の EXC_LEAVE)
         ;; V86 ゲストの #PF はカーネルのページフォルトではない。
         ;; 汎用ハンドラに渡すとカーネルのバグとして表示されてしまう。
-        test    dword [esp + 12], 0x00020000  ;; EFLAGS.VM
+        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
         jz      .not_v86
 
         pushad
@@ -520,7 +522,7 @@ irq_stub_0:
 
         ;; V86 セッションが長すぎたら畳む。暴走したゲストを無限に
         ;; 走らせないための保険。EOI も反射も済ませた後に判定する。
-        test    dword [esp + 40], 0x00020000    ;; EFLAGS.VM
+        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
         jz      .no_timeout
         call    v86_tick_and_check_timeout
         test    eax, eax
@@ -563,7 +565,7 @@ irq_stub_1:
 
         ;; 脱出ホットキー (CTRL+GRPH+DEL) が押されていたら畳む。
         ;; EOI と反射を済ませてから判定するのはタイマ側と同じ理由。
-        test    dword [esp + 40], 0x00020000    ;; EFLAGS.VM
+        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
         jz      .no_exit
         call    v86_check_exit_request
         test    eax, eax
@@ -578,7 +580,7 @@ irq_stub_1:
         ;; その場合は要求を残し ring3_syscall_dispatch の入口で畳む。
         ;; EOI と V86 反射を済ませてから判定するのは V86 の脱出と同じ理由。
         ;; フレーム: pushad(32B) の上に [esp+32]=EIP [esp+36]=CS [esp+40]=EFLAGS
-        test    dword [esp + 40], 0x00020000    ;; EFLAGS.VM (V86 は対象外)
+        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM (V86 は対象外)
         jnz     .no_abort
         test    dword [esp + 36], 3             ;; CS.RPL == 3 (CPL=3 を割り込んだ)?
         jz      .no_abort

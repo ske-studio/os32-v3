@@ -26,6 +26,12 @@
 #ifndef CPU_H
 #define CPU_H
 
+#define EFLAGS_IF 0x000200
+#define EFLAGS_VM 0x020000
+#define EFLAGS_RESERVED1 0x000002
+#define ABI_STACK_ALIGN 16
+
+#ifndef __ASSEMBLER__
 #include "types.h"
 
 /* ======================================================================== */
@@ -120,4 +126,5 @@ static inline void arch_mmu_enable(void);
 
 #include "arch_cpu.h"       /* arch/$(ARCH)/arch_cpu.h */
 
+#endif /* !__ASSEMBLER__ */
 #endif /* CPU_H */

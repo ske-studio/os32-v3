@@ -5,6 +5,8 @@
 #include "os32_kapi_shared.h"
 #include "io.h"
 
+STATIC_ASSERT(SURFACE_QUERY_MAX == OS32_SURFACE_MAX, abi_surface_max);
+
 STATIC_ASSERT(sizeof(struct surface_desc) == 60, surface_desc_size);
 STATIC_ASSERT(sizeof(struct surface_query_result) == 244, surface_query_size);
 

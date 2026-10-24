@@ -6,7 +6,7 @@
 int kapi_print_call(const void *user_args)
 {
     struct caller_access caller;
-    u32 fixed[2], args[KAPI_PRINT_ARG_LIMIT];
+    u32 fixed[KAPI_PRINT_FIXED_WORDS], args[KAPI_PRINT_ARG_LIMIT];
     char *strings[KAPI_PRINT_ARG_LIMIT] = {0};
     char format[KAPI_PRINT_FORMAT_CAP];
     const char *p;

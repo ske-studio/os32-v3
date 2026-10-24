@@ -38,7 +38,7 @@ def run(parts, work, name, expected=None):
                        for n, marker in (
                            ('exception_handler', '    /* 画面上部クリア */'),
                            ('page_fault_handler', '    /* 画面上部をクリア')))
-    (work / 'fault.inc').write_text(handlers.replace('    const char *name;', '    (void)error_code;\n    const char *name;'))
+    (work / 'fault.inc').write_text('#include "idt.h"\n' + handlers.replace('    const char *name;', '    (void)error_code;\n    const char *name;'))
     exe=work/'test'
     inc=['-I'+str(ROOT/p) for p in ('tools/tests/host_arch','include','kernel','exec','fs','lib','gfx','drivers','arch/x86','platform/pc98','sdk/include/os32')]
     cmd=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',

@@ -13,7 +13,7 @@ u32 memmap_audit_fail, as_audit_fail, memmap_audit_runs, as_audit_runs;
 u32 memmap_audit_skip, v86_return_audit_fail, v86_return_audit_runs;
 u32 audit_runs, audit_fail;
 u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count;
-char audit_first_fail_tag[32];
+char audit_first_fail_tag[AUDIT_TAG_MAX];
 int kselftest_run_audit(const char *tag)
 {
     int a, b, bad;

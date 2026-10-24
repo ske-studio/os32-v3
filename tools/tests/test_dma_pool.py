@@ -133,7 +133,7 @@ def boot_gate(tmp):
     end = kernel.index('    /* FDリダイレクト初期化', start)
     gate = kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
     (d / "kernel_dma_gate.c").write_text(
-        'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
+        '#include "kprintf.h"\nstatic void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
     selftests = (ROOT / "kdebug/kselftest.c").read_text()
     helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()
     gate = selftests[selftests.index('    if (selftest_dma_available()) test_dma_pool();'):]

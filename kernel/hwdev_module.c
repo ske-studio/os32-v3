@@ -126,6 +126,6 @@ int hwdev_module_load(struct module_handle core_handle)
             rc = MODULE_INIT_FAILED;
         }
     }
-    if (rc) kprintf(0x07, "[hwdev] rejected: %s\n", kdebug_state_name(rc));
+    if (rc) kprintf(KLOG_ATTR, "[hwdev] rejected: %s\n", kdebug_state_name(rc));
     return rc;
 }

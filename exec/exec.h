@@ -19,6 +19,8 @@
 #define __EXEC_H
 
 /* KernelAPI構造体・OS32Header・基本型は共有ヘッダから取得 */
+#define EXEC_ENTRY_ARGS 4
+
 #include "os32_kapi_shared.h"
 #include "memmap.h"
 

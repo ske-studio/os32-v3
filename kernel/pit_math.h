@@ -39,7 +39,7 @@
 
 /* i386 の u32 の上限。ホスト試験は 64bit の unsigned long で回るので、
  * 中間積が 32bit に収まるかは**この値と比べて**確かめる。 */
-#define PIT_U32_MAX      4294967295UL
+#define PIT_U32_MAX      U32_MAX
 
 /* pit_compute の戻り値 (負はすべて「頼まれた設定は出せない」)。 */
 #define PIT_ERR_ARG      (-1)   /* out == NULL */

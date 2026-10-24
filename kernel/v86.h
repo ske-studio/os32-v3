@@ -14,11 +14,10 @@
 #define __V86_H
 
 #include "types.h"
+#include "cpu.h"
 
 /* EFLAGS */
-#define EFLAGS_IF       0x000200UL
 #define EFLAGS_IOPL3    0x003000UL      /* IOPL=3 */
-#define EFLAGS_VM       0x020000UL      /* 仮想8086モード */
 
 /* ゲストに渡す初期 EFLAGS。
  *
@@ -229,6 +228,7 @@ int v86_disk_test(const char *path);
 
 /* スモークテストが使う低位メモリ (memmap.h の「空き 20KB」内) */
 #define V86_TEST_CODE_ADDR   0x8A000UL
+#define V86_TEST_STACK_TOP 0x0FFEU
 #define V86_TEST_STACK_ADDR  0x8B000UL
 #define V86_TEST_MAGIC_ADDR  0x8C000UL
 #define V86_TEST_MAGIC       0x1234U

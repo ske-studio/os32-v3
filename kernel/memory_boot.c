@@ -128,7 +128,7 @@ u32 memory_boot_detect(u32 mem_kb)
     if (!accepted) return mem_kb;
     boot_high_end = MEM_HIGH_RAM_BASE / PAGE_SIZE +
                     accepted * (MEM_1MB / PAGE_SIZE);
-    return MEM_HIGH_RAM_BASE / 1024UL + accepted * (MEM_1MB / 1024UL);
+    return MEM_HIGH_RAM_BASE / KIB + accepted * (MEM_1MB / KIB);
 }
 
 /* workspace が要るページ数 = 恒等 PT (ブート窓 PAGING_BOOT_MAP_SIZE より上の
@@ -192,7 +192,7 @@ static u32 memory_boot_sum_kb(u32 admitted_kb, u32 high_end)
     u32 base;
     base = MEM_HIGH_RAM_BASE / PAGE_SIZE;
     if (high_end <= base) return admitted_kb;
-    return admitted_kb + (high_end - base) * (PAGE_SIZE / 1024UL);
+    return admitted_kb + (high_end - base) * (PAGE_SIZE / KIB);
 }
 
 u32 memory_boot_ram_kb(void)
@@ -313,8 +313,8 @@ int memory_boot_init(u32 mem_kb)
     u32 admitted_kb, top, pages, ws_pages, high_end;
     if (MEM_SHM_RESV_START > MEM_FIXED_PAGING_GUARD_BASE) return 0;
     admitted_kb = mem_kb;
-    if (admitted_kb > MEMORY_BOOT_LEGACY_END / 1024UL)
-        admitted_kb = MEMORY_BOOT_LEGACY_END / 1024UL;
+    if (admitted_kb > MEMORY_BOOT_LEGACY_END / KIB)
+        admitted_kb = MEMORY_BOOT_LEGACY_END / KIB;
     physmem_bootstrap_legacy(&boot_memory, admitted_kb);
     top = physmem_legacy_end(&boot_memory);
     /* 16MB 超は別の供給源 (memory_boot_detect が検証した量) から来る。
@@ -431,7 +431,7 @@ void memory_boot_page_counts(u32 kdebug_first, u32 kdebug_pages,
     in.regions = ledger_regions;
     in.region_count = ledger_region_count;
     in.allocator_pages = pgalloc_total_pages();
-    in.phys_pages = memory_boot_ram_kb() / (PAGE_SIZE / 1024UL);
+    in.phys_pages = memory_boot_ram_kb() / (PAGE_SIZE / KIB);
     in.low_end = in.phys_pages;
     if (in.low_end > MEMORY_BOOT_LEGACY_END / PAGE_SIZE)
         in.low_end = MEMORY_BOOT_LEGACY_END / PAGE_SIZE;

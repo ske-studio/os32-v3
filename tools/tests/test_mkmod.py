@@ -88,7 +88,7 @@ scratch: .zero 8
         command([cross / 'i386-elf-gcc', '-m32', '-march=i386', '-ffreestanding',
                  '-O2', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__',
                  *['-I' + str(ROOT / d) for d in ('.', 'include', 'kernel', 'drivers',
-                    'exec', 'lib', 'gfx', 'fs', 'kapi', 'arch/i386',
+                    'exec', 'lib', 'gfx', 'fs', 'kapi', 'arch/x86',
                     'platform/pc98', 'sdk/include/os32')], '-c', src, '-o', obj])
         objs.append(obj)
     elf = directory / 'module.elf'

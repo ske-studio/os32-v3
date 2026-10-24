@@ -27,7 +27,7 @@ MUTATIONS = [
  ('argv-RO-rejected', 'as_va_to_pa_read(pd, (u32)p, &pa)', 'as_va_to_pa(pd, (u32)p, &pa)'),
  ('argv-failure-hidden', '        *failed = 1;', '        (void)failed;'),
  ('stack-default-wrong', '    u32 size = MEM_EXEC_STACK_SIZE;', '    u32 size = MEM_APP_STACK_MIN;'),
- ('stack-sign-unchecked', 'requested > 0x7fffffffUL - (PAGE_SIZE - 1)', '0'),
+ ('stack-sign-unchecked', 'requested > S32_MAX - (PAGE_SIZE - 1)', '0'),
  ('stack-min-unchecked', '        if (size < MEM_APP_STACK_MIN) size = MEM_APP_STACK_MIN;', '        (void)size;'),
  ('image-not-returned', '                                         a->sbrk_heap_limit);', '                                         a->load_addr);'),
  ('argv-to-wrong-AS', 'as_va_to_pa(a->as->pd_phys, va, &pa)', 'as_va_to_pa(paging_kernel_pd_phys(), va, &pa)'),

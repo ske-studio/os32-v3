@@ -1,8 +1,8 @@
 #include "font_guard_inactive.h"
 #include "types.h"
+static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "v86.h"
 #include "idt.h"
-static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "paging.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"

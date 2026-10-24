@@ -18,7 +18,7 @@ static KcgModuleApi candidate;
 
 /* The void glyph ABI uses blank pixels; TVRAM CUI does not need this reader. */
 static void stub_ank(u8 ch, u8 *buf) { (void)ch; kmemset(buf, 0, KCG_ANK_H); }
-static void stub_kanji(u16 jis, u8 *buf) { (void)jis; kmemset(buf, 0, KCG_KANJI_H * 2); }
+static void stub_kanji(u16 jis, u8 *buf) { (void)jis; kmemset(buf, 0, KCG_KANJI_H * KCG_KANJI_BPL); }
 static void stub_stats(KcgCacheStats *out) { kmemset(out, 0, sizeof(*out)); }
 static void stub_invalidate(void) {}
 static const KcgModuleApi stub_api = {stub_ank, stub_kanji, stub_stats, stub_invalidate};
@@ -79,9 +79,9 @@ int kcg_module_load(void)
     int rc = module_load(&request, &kcg_handle);
     if (!rc) rc = module_start(kcg_handle);
     if (!rc && !module_exports(kcg_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[KCG] ROM module rc=%d pair=%08x cache=%u\n",
+    kprintf(KLOG_ATTR, "[KCG] ROM module rc=%d pair=%08x cache=%u\n",
             rc, bi->img_crc, KCG_ROM_CACHE_BYTES);
-    if (rc) kprintf(0x07, "[KCG] ROM stub; TVRAM CUI retained\n");
+    if (rc) kprintf(KLOG_ATTR, "[KCG] ROM stub; TVRAM CUI retained\n");
     return rc;
 }
 int kcg_module_abort(void) { return module_abort(kcg_handle); }

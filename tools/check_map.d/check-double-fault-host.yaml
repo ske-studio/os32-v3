@@ -28,4 +28,5 @@ check-double-fault-host:
 - lib/kstring.h
 - tools/mkmod.py
 - tools/module_schema.py
+- kernel/cpu_flags.inc
 artifact_reader: true

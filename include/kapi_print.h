@@ -3,6 +3,7 @@
 
 /* Private staging bounds, including NUL. No public ABI/layout change.
  * Argument count is checked against the existing int80 64-byte window. */
+#define KAPI_PRINT_FIXED_WORDS 2
 #define KAPI_PRINT_ARG_LIMIT 14u
 #define KAPI_PRINT_FORMAT_CAP 1024u
 #define KAPI_PRINT_STRING_CAP 4096u

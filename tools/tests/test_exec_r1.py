@@ -39,10 +39,13 @@ def landing(s, start, buf, name):
 
 
 PRE = r'''
+#include "types.h"
+static u32 host_cr3;
 #include "font_guard_inactive.h"
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "appslot.h"
 #include "exec.h"
+#include "ring3_str.h"
 #include "exec_heap.h"
 #include "tss.h"
 #include "ring3_ls.h"

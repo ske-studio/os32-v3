@@ -23,8 +23,9 @@ def run(runner, mutant=None):
             engine = engine.replace(old, old + '\n    extern void ring3_abort_check(void);\n    ring3_abort_check();')
         (tmp / 'engine.c').write_text(engine)
         (tmp / 'io.h').write_text('extern unsigned long host_flags;\nvoid host_stop(void);\n'
-            'static inline unsigned int irq_save(void) { unsigned int f=host_flags; host_flags &= ~512u; return f; }\n'
-            'static inline void irq_restore(unsigned int f) { host_flags=f; }\n'
+            'static inline int _irq_enabled(void) { return (host_flags & 512u) != 0; }\n'
+            'static inline unsigned int irq_save(void) { unsigned int f=host_flags; host_flags &= ~512u; return f ^ 512u; }\n'
+            'static inline void irq_restore(unsigned int f) { host_flags=f ^ 512u; }\n'
             'static inline void _disable(void) { host_flags &= ~512u; }\n'
             'static inline void _stop(void) { host_stop(); }\n')
         (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth;\n')
@@ -47,7 +48,7 @@ def run(runner, mutant=None):
                 gate = re.sub(r'    if \(sqlite_engine_active\) sqlite_engine_fault\([^;]+;', '', gate)
             gate = gate.replace('__asm__ volatile("mov %%cr2, %0" : "=r"(cr2));', 'cr2 = test_cr2;')
             gates.append('static void '+name+'(void) {\nu32 vector=13, fault_eip=test_eip, fault_addr=test_cr2;\n'+gate+' kills++; }\n')
-        (tmp / 'fault_source.c').write_text('#include "io.h"\n'+'\n'.join(gates))
+        (tmp / 'fault_source.c').write_text('#include "io.h"\n#include "pc98.h"\n#include "idt.h"\n'+'\n'.join(gates))
         rows = json.loads((ROOT / 'tools/prototypes/sqlite_imports.def').read_text())['facade']
         mocks, calls, stub_calls, bindings, refused_calls, io_refused_calls = [], [], [], [], [], []
         for row in rows:

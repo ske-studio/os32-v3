@@ -27,6 +27,9 @@
 #define KCG_KANJI_W   16      /* 漢字幅 */
 #define KCG_KANJI_H   16      /* 漢字高 */
 
+#define KCG_KANJI_BPL (KCG_KANJI_W / 8)
+#define KCG_LINE_LEFT 0x20
+
 /* ======== API ======== */
 
 /* スケール初期化。ROM/cache は既存 KCG 部品が持つ。 */

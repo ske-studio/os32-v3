@@ -41,3 +41,4 @@ check-memmap-host:
 - sdk/link/app_sys.ld
 - sdk/os32_generations.py
 - tools/tests/mutpar.py
+- kernel/cpu_flags.inc

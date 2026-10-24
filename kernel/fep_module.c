@@ -154,7 +154,7 @@ int fep_module_load(struct module_handle sqlite)
     int rc = module_load(&request, &fep_handle);
     if (!rc) rc = module_start(fep_handle);
     if (!rc && !module_exports(fep_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[fep] module rc=%d pair=%08x pages=%u\n",
+    kprintf(KLOG_ATTR, "[fep] module rc=%d pair=%08x pages=%u\n",
             rc, bi->img_crc, fep_module_pages());
     return rc;
 }

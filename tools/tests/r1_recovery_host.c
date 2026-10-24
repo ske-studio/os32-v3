@@ -1,15 +1,15 @@
 #include "font_guard_inactive.h"
 /* Real paging/ledger/V86 and exec lifecycle slices; CPU and device edges only. */
 #include "types.h"
+static u32 host_cr3;
+static int forbid_app_pd;
+static void check_cr3(u32 root);
+#define HOST_MMU_LOAD_CHECK(root) check_cr3(root)
 #include "appslot.h"
 #include "exec.h"
 #include "r1_fixture.h"
 #include "v86.h"
 #include "tvram.h"
-static u32 host_cr3;
-static int forbid_app_pd;
-static void check_cr3(u32 root);
-#define HOST_MMU_LOAD_CHECK(root) check_cr3(root)
 #include "paging_source.c"
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
@@ -120,7 +120,7 @@ static void v86_call_cleanup(void) {}
 static void caller_access_leave(int *p) { (void)p; }
 static u32 *g_cur_frame;
 static void exec_park_stop(u32 *f) { (void)f; }
-static u32 tick_count;
+volatile u32 tick_count;
 static int kernel_tss;
 void ring3_resume(const u32 *f,u32 pd,void *tss) { (void)f;(void)pd;(void)tss; CHECK(0); }
 #include "tails_source.c"

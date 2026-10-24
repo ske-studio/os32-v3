@@ -3,6 +3,7 @@
  * The linker symbols and zero intervals come from the product linker fixture.
  */
 #include "memmap.h"
+#include "pc98.h"
 #include "fixture_values.h"
 #include "ksetjmp.h"
 #include "module_runtime.h"

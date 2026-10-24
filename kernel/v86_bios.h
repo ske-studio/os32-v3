@@ -67,6 +67,10 @@
 #define V86_DISK_SENSE      0x04
 #define V86_DISK_WRITE      0x05
 #define V86_DISK_READ       0x06
+#define V86_DISK_ST_RANGE 0x40
+#define V86_DISK_ST_IO 0xD0
+#define V86_DISK_ST_WRITE_PROTECT 0x70
+#define V86_DISK_ST_DONE 0x0F
 #define V86_DISK_RECAL      0x07
 #define V86_DISK_READID     0x0A        /* ID 読み込み (フォーマット判定) */
 

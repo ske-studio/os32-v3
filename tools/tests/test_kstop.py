@@ -10,10 +10,13 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRE = r'''
+#include "types.h"
+static u32 host_cr3;
 #include "font_guard_inactive.h"
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "appslot.h"
 #include "exec.h"
+#include "ring3_str.h"
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "fd_redirect.h"
@@ -277,7 +280,7 @@ def run(overrides=None):
         d=pathlib.Path(d); (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
-        inc=['-I'+str(ROOT/p) for p in ('tools/tests','include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
+        inc=['-I'+str(ROOT/p) for p in ('tools/tests','tools/tests/host_arch','include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
         r=subprocess.run(['gcc','-m32','-std=gnu11','-O0','-Wall','-Werror','-Wno-unused-function',
           '-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-ffreestanding','-fno-pie',
           '-fno-stack-protector','-nostdlib','-static','-no-pie',*inc,str(d/'t.c'),str(d/'s.o'),'-o',str(d/'t')],capture_output=True,text=True)
@@ -291,7 +294,7 @@ MUTATIONS = [
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
  ('no-request','exec/exec.c','        appslot_stop_request();','        /* missing request */'),
  ('no-safe-transfer','exec/exec.c','    exec_park_stop(frame);','    /* missing transfer */'),
- ('before-completion','exec/exec.c','    frame[7] = kapi_invoke','    exec_park_stop(frame);\n    frame[7] = kapi_invoke'),
+ ('before-completion','exec/exec.c','    frame[APP_FRAME_EAX] = kapi_invoke','    exec_park_stop(frame);\n    frame[APP_FRAME_EAX] = kapi_invoke'),
  ('eax-clobber','exec/exec.c','        /* STOP parked a completed syscall;', '        a->frame[APP_FRAME_EAX] = (u32)wait_ret;\n        /* STOP parked a completed syscall;'),
  ('wrong-owner','exec/appslot.c','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot.c','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),

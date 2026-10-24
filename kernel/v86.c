@@ -700,7 +700,7 @@ int v86_smoke_test(void)
     ctx.eip    = 0x0000;
     ctx.cs     = (u32)(V86_TEST_CODE_ADDR >> 4);
     ctx.eflags = V86_EFLAGS_INIT;
-    ctx.esp    = 0x0FFE;
+    ctx.esp    = V86_TEST_STACK_TOP;
     ctx.ss     = (u32)(V86_TEST_STACK_ADDR >> 4);
     ctx.es     = ctx.ss;
     ctx.ds     = ctx.ss;
@@ -822,7 +822,7 @@ int v86_disk_test(const char *path)
     ctx.eip    = 0x0000;
     ctx.cs     = (u32)(V86_TEST_CODE_ADDR >> 4);
     ctx.eflags = V86_EFLAGS_INIT;
-    ctx.esp    = 0x0FFE;
+    ctx.esp    = V86_TEST_STACK_TOP;
     ctx.ss     = (u32)(V86_TEST_STACK_ADDR >> 4);
     ctx.es     = ctx.ss;
     ctx.ds     = ctx.ss;
@@ -1015,7 +1015,7 @@ void display_restore_98(void)
     display_out(GDC_GFX_PARAM, 0x00);
 
     display_out(GDC_GFX_CMD, GDC_CMD_SCROLL);
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < sizeof(pram_400); i++) {
         display_out(GDC_GFX_PARAM, pram_400[i]);
     }
 

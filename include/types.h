@@ -8,6 +8,12 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#define U32_MAX 0xFFFFFFFFUL
+#define U16_MAX 0xFFFFu
+#define S32_MAX 0x7FFFFFFFL
+#define BITS_PER_U32 32
+#define BITMAP_WORDS(n) (((n) + BITS_PER_U32 - 1) / BITS_PER_U32)
+
 /* os32_kapi_shared.h で既に定義されている場合はスキップ */
 #ifndef OS32_KAPI_SHARED_H
 

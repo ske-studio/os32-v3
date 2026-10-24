@@ -4,6 +4,7 @@
 /*  ローマ字テーブル照合・促音処理・n待ち処理・ひらがなカタカナ変換           */
 /* ======================================================================== */
 
+#include "utf8.h"
 #include "ime.h"
 #include "kstring.h"
 
@@ -236,11 +237,11 @@ void ime_hira_to_kata(char *utf8_str)
     u8 *p = (u8 *)utf8_str;
     u16 code;
     while (*p) {
-        if ((p[0] & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 &&
-            (p[2] & 0xC0) == 0x80) {
+        if ((p[0] & 0xF0) == 0xE0 && UTF8_IS_CONT(p[1]) &&
+            UTF8_IS_CONT(p[2])) {
             code = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) |
                    (p[2] & 0x3F);
-            if (code >= 0x3041 && code <= 0x3096) {
+            if (code >= UCS_HIRAGANA_FIRST && code <= 0x3096) {
                 code += 0x0060;
                 p[0] = 0xE0 | ((code >> 12) & 0x0F);
                 p[1] = 0x80 | ((code >>  6) & 0x3F);

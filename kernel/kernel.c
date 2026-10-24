@@ -481,14 +481,14 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     /* 物理ページフレームアロケータ初期化 (paging_initの後) */
     if (!memory_boot_init(mem_kb)) {
-        kprintf(0x07, "[MEM] bootstrap/stage failed; boot halted\n");
+        kprintf(KLOG_ATTR, "[MEM] bootstrap/stage failed; boot halted\n");
         for (;;) { _stop(); }
     }
 
     /* 共有メモリ初期化 (ガードページ設定 + R/W設定) */
     shm_init();
     if (paging_boot_user_shared(exec_tramp_page_addr()) != 0) {
-        kprintf(0x07, "[MEM] shared USER boot failed; boot halted\n");
+        kprintf(KLOG_ATTR, "[MEM] shared USER boot failed; boot halted\n");
         for (;;) { _stop(); }
     }
 
@@ -497,7 +497,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     if (memory_boot_dma_available()) {
         dma_pool_init();
     } else {
-        kprintf(0x07, "[dma] RAM short; pool/PCI/PCM skipped\n");
+        kprintf(KLOG_ATTR, "[dma] RAM short; pool/PCI/PCM skipped\n");
     }
     v86_module_load(); /* Core facades are ready before kdebug selftests. */
     kdebug_load();
@@ -560,7 +560,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
 
     services_stage = SERVICES_ROOT_READY;
-    kprintf(0x07, "[services] ROOT_READY tick=%u\n", tick_count);
+    kprintf(KLOG_ATTR, "[services] ROOT_READY tick=%u\n", tick_count);
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
 
@@ -641,17 +641,17 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     /* IME (FEP) 初期化 — 辞書は IRQ 有効化後、アプリ起動前に開く */
     tvram_print(0, 4, "IME..", TATTR_GREEN);
-    kprintf(0x07, "[BOOT] ime_init...\n");
+    kprintf(KLOG_ATTR, "[BOOT] ime_init...\n");
     ime_init();
     tvram_print(5, 4, "OK ", TATTR_WHITE);
-    kprintf(0x07, "[BOOT] ime_init OK\n");
+    kprintf(KLOG_ATTR, "[BOOT] ime_init OK\n");
 
     /* サウンドエンジン初期化 */
     tvram_print(9, 4, "SND..", TATTR_GREEN);
-    kprintf(0x07, "[BOOT] snd_init...\n");
+    kprintf(KLOG_ATTR, "[BOOT] snd_init...\n");
     int snd_rc = fm_module_load();
     tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
-    kprintf(0x07, "[BOOT] snd module rc=%d\n", snd_rc);
+    kprintf(KLOG_ATTR, "[BOOT] snd module rc=%d\n", snd_rc);
 
     /* LAN (LGY-98)。CONFIG_LGY98_BASE=0 (既定) なら何もしない。
      * カード未装着・応答不良でも NIC だけ無効にして起動を続ける。 */

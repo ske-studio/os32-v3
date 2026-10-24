@@ -258,15 +258,16 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     (folder / 'io.h').write_text(
         'extern unsigned long host_flags;\n'
         'void host_stop(void);\n'
+        'static inline int _irq_enabled(void) { return (host_flags & 512UL) != 0; }\n'
         'static inline void _disable(void) { host_flags &= ~512UL; }\n'
         'static inline void _stop(void) { host_stop(); }\n'
         'static inline unsigned long irq_save(void) { unsigned long f=host_flags; '
-        'host_flags &= ~512UL; return f; }\n'
-        'static inline void irq_restore(unsigned long f) { host_flags=f; }\n')
+        'host_flags &= ~512UL; return f ^ 512UL; }\n'
+        'static inline void irq_restore(unsigned long f) { host_flags=f ^ 512UL; }\n')
     handlers = (ROOT / 'kernel/isr_handlers.c').read_text()
     start = handlers.index('void sqlite_engine_fault(')
     (folder / 'sqlite_fault.inc').write_text(
-        '#include "io.h"\n' + handlers[start:handlers.index('\n}', start) + 2])
+        '#include "io.h"\n#include "pc98.h"\n' + handlers[start:handlers.index('\n}', start) + 2])
     # Real contracts, with unneeded disk/heap imports bound to a failing probe.
     # :memory: still executes the actual module's VFS registry and MEMSYS5.
     exports = (generated / 'sqlite_kexports.c').read_text()

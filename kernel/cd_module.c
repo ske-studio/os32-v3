@@ -87,7 +87,7 @@ int cd_module_load(void)
     int rc = module_load(&request, &cd_handle);
     if (!rc) rc = module_start(cd_handle);
     if (!rc && !module_exports(cd_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[cd] module rc=%d pair=%08x fs=%d device=%d\n",
+    kprintf(KLOG_ATTR, "[cd] module rc=%d pair=%08x fs=%d device=%d\n",
             rc, bi->img_crc, fs_registered, device_registered);
     return rc;
 }

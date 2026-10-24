@@ -19,12 +19,12 @@ MUTANTS = (
     ('ls out guard', 'public_wrapper', 'KAPI_OUT_LEN(out, sizeof(OS32_LsPacket))', 'KAPI_OUT_LEN(out, 0)', 'FAIL:'),
     ('direct USER callback', 'wrapper',
      'if (ring3_call_from_user())', 'if (0)', 'FAIL: !user_call'),
-    ('drop one entry', 'shim', 'call *12(%ebp)',
-     'cmpl $1, %ebx\n    je .Lomit\n    call *12(%ebp)\n.Lomit:', 'FAIL:'),
+    ('drop one entry', 'shim', 'call *LS_ARG_CB(%ebp)',
+     'cmpl $1, %ebx\n    je .Lomit\n    call *LS_ARG_CB(%ebp)\n.Lomit:', 'FAIL:'),
     ('ignore skip', 'window', 'if (w->skip) { w->skip--; return; }',
      'if (0) { w->skip--; return; }', 'FAIL:'),
     ('ignore done', 'shim', 'je .Lbatch', 'nop', 'FAIL:'),
-    ('replace ctx', 'shim', 'pushl 16(%ebp)', 'pushl $0', 'FAIL: ctx == expected_ctx'),
+    ('replace ctx', 'shim', 'pushl LS_ARG_CTX(%ebp)', 'pushl $0', 'FAIL: ctx == expected_ctx'),
 )
 
 
@@ -51,7 +51,7 @@ def run(args, mutant=None):
         assert sources[key].count(old) == 1, (name, old)
         sources[key] = sources[key].replace(old, new)
     # The bridge is an absolute call so copying the shim tests relocation too.
-    sources['shim'] = sources['shim'].replace('int $0x80', 'movl $host_gate, %eax\n    call *%eax')
+    sources['shim'] = sources['shim'].replace('int $RING3_SYSCALL_VECTOR', 'movl $host_gate, %eax\n    call *%eax')
     with tempfile.TemporaryDirectory(prefix='kcallback-') as folder:
         tmp = pathlib.Path(folder)
         (tmp / 'wm.inc').write_text('\n'.join(function(source, 'void ' + n + '(void)') for n in ('ring3_wm_enter', 'ring3_wm_leave')))
@@ -67,7 +67,7 @@ def run(args, mutant=None):
         subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
                         *['-I' + str(ROOT / p) for p in
-                          ('include', 'fs', 'exec', 'kernel', 'lib', 'sdk/include/os32')],
+                          ('include', 'fs', 'exec', 'kernel', 'lib', 'sdk/include/os32', 'arch/x86')],
                         '-I' + str(tmp), str(ROOT / 'tools/tests/kcallback_host.c'),
                         str(tmp / 'shim.S'), '-o', str(exe)], check=True, capture_output=True)
         result = host32.run([str(exe)], runner=args.runner, timeout=30, capture_output=True, text=True)

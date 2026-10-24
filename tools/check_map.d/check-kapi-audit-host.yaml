@@ -36,3 +36,4 @@ check-kapi-audit-host:
 - include/con_sink.h
 - fs/fd_redirect.h
 - kernel/sqlite_engine.h
+- kernel/cpu_flags.inc

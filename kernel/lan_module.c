@@ -219,7 +219,7 @@ int lan_module_load(void)
     int rc = module_load(&request, &lan_handle);
     if (!rc) rc = module_start(lan_handle);
     if (!rc && !module_exports(lan_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->img_crc, tick_target != 0);
+    kprintf(KLOG_ATTR, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->img_crc, tick_target != 0);
     return rc;
 }
 /* Preserve a completed bind, including quarantine, when start failed later. */

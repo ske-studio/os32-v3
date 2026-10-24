@@ -61,4 +61,5 @@ check-memmap-audit-host:
 - tools/tests/shm_user_host.c
 - tools/tests/serial_diag_host.h
 - lib/serial_diag.h
+- kernel/cpu_flags.inc
 artifact_reader: true

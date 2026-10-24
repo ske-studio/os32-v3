@@ -33,10 +33,10 @@ static int alias_cache(const struct ledger_surface *sf)
     u32 p, want = sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0;
     u32 *pd = P2V(paging_kernel_pd_phys());
     for (p = sf->first; p < sf->first + sf->npages; p++) {
-        u32 pa = p * PAGE_SIZE, d = pd[pa >> 22], e;
+        u32 pa = p * PAGE_SIZE, d = pd[PDE_INDEX(pa)], e;
         if (!(d & PTE_PRESENT) || (d & PTE_PS)) return 0;
-        e = ((u32 *)P2V(d & ~0xfffUL))[p % PTE_COUNT];
-        if (!(e & PTE_PRESENT) || (e & ~0xfffUL) != pa ||
+        e = ((u32 *)P2V(d & PTE_FRAME_MASK))[p % PTE_COUNT];
+        if (!(e & PTE_PRESENT) || (e & PTE_FRAME_MASK) != pa ||
             (e & (PTE_PCD | PTE_PWT)) != want) return 0;
     }
     return 1;
@@ -106,7 +106,7 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *auth,
         out[i].token = as->leases[slots[i]].token;
         out[i].base = maps[i].base;
         out[i].bytes = maps[i].npages * PAGE_SIZE;
-        for (j = 0; j < 4; j++) out[i].planes[j] = j < sf->planes ? maps[i].base + sf->plane_offset[j] : 0;
+        for (j = 0; j < SURFACE_QUERY_MAX; j++) out[i].planes[j] = j < sf->planes ? maps[i].base + sf->plane_offset[j] : 0;
     }
     return 0;
 }
@@ -195,7 +195,7 @@ int lease_check(const struct addrspace *as)
         }
     }
     for (i = 0; i < MEM_LEASE_MAX_PDES; i++) {
-        u32 d = pd[(MEM_LEASE_BASE >> 22) + i];
+        u32 d = pd[LEASE_PDE + i];
         if (as->lease_pt_phys[i]) {
             if (as->lease_pt_phys[i] % PAGE_SIZE ||
                 !pgalloc_page_owned(as->lease_pt_phys[i] / PAGE_SIZE, as->owner)) return LEASE_INVAL;
@@ -210,8 +210,8 @@ int lease_check(const struct addrspace *as)
         if (!l->token) continue;
         if (l->generation != ledger_surfaces[l->sid].gen ||
             !ledger_surfaces[l->sid].lease_count) return LEASE_INVAL;
-        u32 first = (l->base - MEM_LEASE_BASE) >> 22;
-        u32 last = (l->base + (l->npages - 1) * PAGE_SIZE - MEM_LEASE_BASE) >> 22;
+        u32 first = (l->base - MEM_LEASE_BASE) >> PDE_SHIFT;
+        u32 last = (l->base + (l->npages - 1) * PAGE_SIZE - MEM_LEASE_BASE) >> PDE_SHIFT;
         for (u32 di = first; di <= last; di++)
             if (!as->lease_pt_phys[di]) return LEASE_INVAL;
     }
@@ -368,7 +368,7 @@ static int tables_image(u32 root, u32 *image, int compare)
         } else image[i] = pd[i];
     }
     for (i = 0; i < PDE_COUNT; i++) if (pd[i] & PTE_PRESENT) {
-        u32 *pt = P2V(pd[i] & ~0xfffUL);
+        u32 *pt = P2V(pd[i] & PTE_FRAME_MASK);
         for (j = 0; j < PTE_COUNT; j++) {
             if (compare) {
                 if ((pt[j] & ~(PTE_ACCESSED | PTE_DIRTY)) !=
@@ -427,10 +427,10 @@ int lease_selftest(void)
     }
     if (paging_as_audit(&a, shlib_read_page) || paging_as_audit(&b, shlib_read_page) ||
         lease_check(&a) || lease_check(&b) ||
-        (paging_lease_pte(&a, av[0].base) & ~0xfffUL) != frames[0] ||
-        (paging_lease_pte(&b, bv[0].base) & ~0xfffUL) != frames[1] ||
-        (paging_lease_pte(&a, av[1].base) & ~0xfffUL) != frames[2] ||
-        (paging_lease_pte(&b, bv[1].base) & ~0xfffUL) != frames[2]) goto done;
+        (paging_lease_pte(&a, av[0].base) & PTE_FRAME_MASK) != frames[0] ||
+        (paging_lease_pte(&b, bv[0].base) & PTE_FRAME_MASK) != frames[1] ||
+        (paging_lease_pte(&a, av[1].base) & PTE_FRAME_MASK) != frames[2] ||
+        (paging_lease_pte(&b, bv[1].base) & PTE_FRAME_MASK) != frames[2]) goto done;
 #ifndef PHYSMEM_HOST_TEST
     /* Synthetic ASes retain identity supervisor backing in T2b. The actual
      * lease aliases are dereferenced only under their corresponding CR3. */

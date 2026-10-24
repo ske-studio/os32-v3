@@ -200,7 +200,7 @@ int fm_module_load(void)
     int rc = module_load(&request, &fm_handle);
     if (!rc) rc = module_start(fm_handle);
     if (!rc && !module_exports(fm_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[fm] module rc=%d pair=%08x tick=%d\n",
+    kprintf(KLOG_ATTR, "[fm] module rc=%d pair=%08x tick=%d\n",
             rc, bi->img_crc, tick_target != 0);
     return rc;
 }

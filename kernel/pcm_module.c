@@ -180,7 +180,7 @@ int pcm_module_load(void)
     int rc = module_load(&request, &pcm_handle);
     if (!rc) rc = module_start(pcm_handle);
     if (!rc && !module_exports(pcm_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(0x07, "[pcm] module rc=%d pair=%08x tick=%d\n",
+    kprintf(KLOG_ATTR, "[pcm] module rc=%d pair=%08x tick=%d\n",
             rc, bi->img_crc, tick_target != 0);
     return rc;
 }

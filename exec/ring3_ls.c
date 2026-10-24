@@ -1,4 +1,5 @@
 #include "ring3_ls.h"
+#include "paging.h"
 #include "exec.h"
 #include "redir_access.h"
 #include "kstring.h"
@@ -11,8 +12,11 @@ struct ring3_ls_packet {
     VfsDirEntry entries[RING3_LS_BATCH];
 };
 
+STATIC_ASSERT(__builtin_offsetof(struct ring3_ls_packet, result) == RING3_LS_RESULT_OFF, ls_result_offset);
+STATIC_ASSERT(__builtin_offsetof(struct ring3_ls_packet, done) == RING3_LS_DONE_OFF, ls_done_offset);
+
 STATIC_ASSERT(VFS_MAX_PATH == RING3_LS_PATH_SIZE, ls_path_size);
-STATIC_ASSERT(RING3_LS_STACK_SIZE <= 4096, ls_stack_budget);
+STATIC_ASSERT(RING3_LS_STACK_SIZE <= PAGE_SIZE, ls_stack_budget);
 STATIC_ASSERT(sizeof(VfsDirEntry) == RING3_LS_ENTRY_SIZE, ls_entry_size);
 STATIC_ASSERT(__builtin_offsetof(struct ring3_ls_packet, entries) ==
               RING3_LS_ENTRIES_OFF, ls_entries_offset);

@@ -109,14 +109,15 @@ static void tvram_put_hex32(int row, int col, u32 val, u8 attr)
 /* SQLite faults cannot unwind or enter app resource cleanup. */
 void sqlite_engine_fault(u32 vector, u32 eip, u32 cr2)
 {
+    enum { SQLITE_FAULT_COL_VECTOR = 20, SQLITE_FAULT_COL_EIP = 33, SQLITE_FAULT_COL_CR2 = 46 };
     _disable();
     sputs("\n[SQLite] fault vector="); sput_hex32(vector);
     sputs(" EIP="); sput_hex32(eip);
     sputs(" CR2="); sput_hex32(cr2); sputs("\n");
-    tvram_puts_at(0, 0, "SQLite fault vector=         EIP=         CR2=", 0x41);
-    tvram_put_hex32(0, 20, vector, 0x41);
-    tvram_put_hex32(0, 33, eip, 0x41);
-    tvram_put_hex32(0, 46, cr2, 0x41);
+    tvram_puts_at(0, 0, "SQLite fault vector=         EIP=         CR2=", TATTR_RED);
+    tvram_put_hex32(0, SQLITE_FAULT_COL_VECTOR, vector, TATTR_RED);
+    tvram_put_hex32(0, SQLITE_FAULT_COL_EIP, eip, TATTR_RED);
+    tvram_put_hex32(0, SQLITE_FAULT_COL_CR2, cr2, TATTR_RED);
     for (;;) _stop();
 }
 
@@ -127,7 +128,7 @@ void font_guard_fault(u32 vector, u32 eip, u32 address)
     sputs("\n[font] fault vector="); sput_hex32(vector);
     sputs(" EIP="); sput_hex32(eip);
     sputs(" addr="); sput_hex32(address); sputs("\n");
-    tvram_puts_at(0, 0, "Font fault - system halted", 0x41);
+    tvram_puts_at(0, 0, "Font fault - system halted", TATTR_RED);
     for (;;) _stop();
 }
 
@@ -197,12 +198,12 @@ static void exc_dump_stack_trace(int row, u32 *regs, int max_row, int serial)
             !paging_is_present(ebp + 4)) break;
         prev_ebp = *(u32 *)ebp;
         ret_addr = *(u32 *)(ebp + 4);
-        tvram_puts_at(tr, 0, " #", 0xA1);
-        tvram_put_hex32(tr, 2, (u32)frame, 0xA1);
-        tvram_puts_at(tr, 10, " ret=", 0xA1);
-        tvram_put_hex32(tr, 15, ret_addr, 0xA1);
-        tvram_puts_at(tr, 26, " ebp=", 0xA1);
-        tvram_put_hex32(tr, 31, prev_ebp, 0xA1);
+        tvram_puts_at(tr, 0, " #", TATTR_CYAN);
+        tvram_put_hex32(tr, 2, (u32)frame, TATTR_CYAN);
+        tvram_puts_at(tr, 10, " ret=", TATTR_CYAN);
+        tvram_put_hex32(tr, 15, ret_addr, TATTR_CYAN);
+        tvram_puts_at(tr, 26, " ebp=", TATTR_CYAN);
+        tvram_put_hex32(tr, 31, prev_ebp, TATTR_CYAN);
         if (serial) {
             sputs("#"); sput_hex32((u32)frame);
             sputs(" ret="); sput_hex32(ret_addr);
@@ -287,7 +288,7 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     if (font_guard_active) font_guard_fault(vector, fault_eip, 0);
     if (sqlite_engine_active) {
         u32 cr2 = 0;
-        if (vector == 14)
+        if (vector == EXC_PAGE_FAULT)
             __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
         sqlite_engine_fault(vector, fault_eip, cr2);
     }
@@ -328,9 +329,9 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
         name = "Unknown Exception";
 
     /* 例外情報 */
-    tvram_puts_at(row,   0, "==== EXCEPTION ====", 0x41);
-    tvram_puts_at(row+1, 0, " Type: ", 0x41);
-    tvram_puts_at(row+1, 7, name, 0x41);
+    tvram_puts_at(row,   0, "==== EXCEPTION ====", TATTR_RED);
+    tvram_puts_at(row+1, 0, " Type: ", TATTR_RED);
+    tvram_puts_at(row+1, 7, name, TATTR_RED);
     tvram_puts_at(row+2, 0, " Vec: 0x", 0xE1);
     tvram_put_hex32(row+2, 8, vector, 0xE1);
     tvram_puts_at(row+2, 17, " ErrC: 0x", 0xE1);
@@ -341,10 +342,10 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
     /* EIPの領域判定 */
     {
         if (sqlite_fault_address(fault_eip)) {
-            tvram_puts_at(row+3, 17, "[sqlite]", 0xA1);
+            tvram_puts_at(row+3, 17, "[sqlite]", TATTR_CYAN);
         } else if (fault_eip >= KERNEL_LOAD_ADDR &&
             fault_eip < (u32)&__kernel_resident_end) {
-            tvram_puts_at(row+3, 17, "[.text]", 0xA1);
+            tvram_puts_at(row+3, 17, "[.text]", TATTR_CYAN);
         } else {
             tvram_puts_at(row+3, 17, "[OUT OF CODE!]", 0xC1);
         }
@@ -361,14 +362,14 @@ void exception_handler(u32 error_code, u32 vector, u32 fault_eip,
 
     /* exec実行中なら復帰、それ以外はシステム停止 */
     if (exec_nest_level > 0) {
-        tvram_puts_at(24, 0, " >> Returning to shell...               ", 0xA1);
+        tvram_puts_at(24, 0, " >> Returning to shell...               ", TATTR_CYAN);
         /* ここで _enable() してはいけない。IRQ ハンドラ内のフォルトだと
          * EOI 前に割り込みを開けて longjmp することになり、その IRQ が
          * 恒久ブロックされる。IF は exec_run の setjmp 復帰側で戻す。 */
         exec_fault_recover();
     }
 
-    tvram_puts_at(24, 0, " System halted.                         ", 0x41);
+    tvram_puts_at(24, 0, " System halted.                         ", TATTR_RED);
     for (;;) { /* hlt */ }
 }
 
@@ -386,8 +387,8 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     int row = 0;  /* 画面最上部から表示 (最大限の情報量) */
 
     _disable();
-    if (font_guard_active) font_guard_fault(14, fault_eip, fault_addr);
-    if (sqlite_engine_active) sqlite_engine_fault(14, fault_eip, fault_addr);
+    if (font_guard_active) font_guard_fault(EXC_PAGE_FAULT, fault_eip, fault_addr);
+    if (sqlite_engine_active) sqlite_engine_fault(EXC_PAGE_FAULT, fault_eip, fault_addr);
 
     /* ---- CPL=3 (リング3) 由来の #PF はアプリだけ kill (v2 M1e/V4) ----
      * #PF フレーム (isr_stub_14 .not_v86): regs[8]=error_code,
@@ -422,7 +423,7 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
         }
     }
 
-    tvram_puts_at(row,   0, "==== PAGE FAULT (#PF) ====", 0x41);
+    tvram_puts_at(row,   0, "==== PAGE FAULT (#PF) ====", TATTR_RED);
     sputs("\n\n==== PAGE FAULT (#PF) ====\n");
     
     tvram_puts_at(row+1, 0, " Addr: 0x", 0xE1);
@@ -440,11 +441,11 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
     /* EIPがコードセクション内かチェック */
     {
         if (sqlite_fault_address(fault_eip)) {
-            tvram_puts_at(row+2, 18, "[sqlite]", 0xA1);
+            tvram_puts_at(row+2, 18, "[sqlite]", TATTR_CYAN);
             sputs(" [sqlite]\n");
         } else if (fault_eip >= KERNEL_LOAD_ADDR &&
             fault_eip < (u32)&__kernel_resident_end) {
-            tvram_puts_at(row+2, 18, "[.text]", 0xA1);
+            tvram_puts_at(row+2, 18, "[.text]", TATTR_CYAN);
             sputs(" [.text]\n");
         } else {
             tvram_puts_at(row+2, 18, "[OUT OF CODE!]", 0xC1);
@@ -481,14 +482,14 @@ void page_fault_handler(u32 error_code, u32 fault_addr, u32 fault_eip, u32 *regs
 
     /* exec実行中なら復帰、それ以外はシステム停止 */
     if (exec_nest_level > 0) {
-        tvram_puts_at(24, 0, " >> Returning to shell...               ", 0xA1);
+        tvram_puts_at(24, 0, " >> Returning to shell...               ", TATTR_CYAN);
         /* ここで _enable() してはいけない。IRQ ハンドラ内のフォルトだと
          * EOI 前に割り込みを開けて longjmp することになり、その IRQ が
          * 恒久ブロックされる。IF は exec_run の setjmp 復帰側で戻す。 */
         exec_fault_recover();
     }
 
-    tvram_puts_at(24, 0, " System halted.                         ", 0x41);
+    tvram_puts_at(24, 0, " System halted.                         ", TATTR_RED);
     for (;;) { /* hlt */ }
 }
 

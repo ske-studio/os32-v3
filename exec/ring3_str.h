@@ -35,10 +35,12 @@
 
 /* 表の直後 (4B 整列) からスタブ。`ring3_trampoline_init` の stub_base と
  * **同じ式**でなければならない。 */
+#define KAPI_FN_TABLE_FIRST 2
+#define KAPI_STUB_SIZE 8u
 #define RING3_USTR_STUB_OFF  ((u32)((sizeof(KernelAPI) + 3u) & ~3u))
 /* スタブの終わり = 写し場の先頭 (4B 整列)。 */
 #define RING3_USTR_OFF       ((u32)((RING3_USTR_STUB_OFF + \
-                                     (u32)KAPI_FUNC_CAPACITY * 8u + 3u) & ~3u))
+                                     (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE + 3u) & ~3u))
 /* 写し場の大きさ。パス 1 本が入れば足りる。いま写しを返すのは 4 本
  * (sys_getcwd = vfs_cwd_user、vfs_devname_user、path_get_drive_user、
  * path_get_cwd_user — exec/exec.c の tramp_copy)。どれも OS32_MAX_PATH 以内。 */

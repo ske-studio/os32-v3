@@ -164,4 +164,5 @@ check-memory-host:
 - kernel/kaudit_boot.c
 - kernel/module.h
 - userland/lib/font/**
+- kernel/cpu_flags.inc
 artifact_reader: true

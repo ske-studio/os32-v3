@@ -21,6 +21,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
+import re
 import host32
 import pathlib
 import shutil
@@ -106,8 +107,8 @@ MUTATIONS = [
      "exec_finish の shell 分岐が retire しない"),
     (EXEC, "        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
      "        frame[4] = (u32)(uptr)&g_shell_service;\n", "app にも service 表の番地を渡す"),
-    (EXEC, "                      (want_ring3 ? 5 : 4) * sizeof(u32)))",
-     "                      (want_ring3 ? 4 : 3) * sizeof(u32)))", "entry frame を 4 語目なしで積む"),
+    (EXEC, "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
+     "                      (want_ring3 ? EXEC_ENTRY_ARGS : EXEC_ENTRY_ARGS - 1) * sizeof(u32)))", "entry frame を 4 語目なしで積む"),
 ]
 
 # exec/exec.c の結線を切り出す (wire_*.inc)。(名前, 始まり, 終わり, 終わりを含むか)
@@ -180,16 +181,20 @@ def static_checks(root, quiet=False):
         bad.append("build/kernel.mk: shell_service.c が C_KERNEL に無い / 順序だけの前提が残る")
     # S3b: exec/exec.c の字面 (組めない部分)
     ex = (root / EXEC).read_text(encoding="utf-8")
+    if not re.search(r"^#define EXEC_ENTRY_ARGS 4$", (root / "exec/exec.h").read_text(), re.M):
+        bad.append("EXEC_ENTRY_ARGS must remain four words")
+    if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "include/cpu.h").read_text(), re.M):
+        bad.append("ABI_STACK_ALIGN must remain sixteen bytes")
     disp = _func_body(ex, "void __cdecl ring3_syscall_dispatch(u32 *frame)")
     if "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;" not in disp:
         bad.append("dispatch 入口で ring3_wm_shell_gen を 0 にしない (深さの 0 の隣)")
     for want, why in (
-            ("        u32 frame[5];\n", "entry frame が 5 語でない"),
-            ("        new_esp = (stack_top - 4 * sizeof(u32)) & ~(u32)15;\n", "new_esp の式が設計と違う"),
+            ("        u32 frame[EXEC_ENTRY_ARGS + 1];\n", "entry frame が 5 語でない"),
+            ("        new_esp = (stack_top - EXEC_ENTRY_ARGS * sizeof(u32)) & ~(u32)(ABI_STACK_ALIGN - 1);\n", "new_esp の式が設計と違う"),
             ("        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
              "frame[4] が shell だけに表の番地を渡さない"),
             ("                      want_ring3 ? frame : frame + 1,\n"
-             "                      (want_ring3 ? 5 : 4) * sizeof(u32)))",
+             "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
              "shell は frame+1 から 4 語 / CPL=3 は frame から 5 語 でない")):
         if want not in ex:
             bad.append(why)

@@ -671,8 +671,8 @@ MUTATIONS = [
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
     ('longjmp-no-restore', 'kernel/setjmp.asm',
-     '        mov     ecx, [eax+24]\n        mov     [kctx_irq_depth], ecx\n'
-     '        mov     ecx, [eax+28]\n        mov     [kctx_exc_depth], ecx\n',
+     '        mov     ecx, [eax+JB_IRQ_DEPTH]\n        mov     [kctx_irq_depth], ecx\n'
+     '        mov     ecx, [eax+JB_EXC_DEPTH]\n        mov     [kctx_exc_depth], ecx\n',
      ''),
 ]
 

@@ -66,7 +66,7 @@ void kdebug_load(void)
     if (!rc && !exports) rc = MODULE_INIT_FAILED;
     if (rc) {
         kdebug.state = rc;
-        kprintf(0x07, "[kdebug] rejected: %s\n", kdebug_state_name(rc));
+        kprintf(KLOG_ATTR, "[kdebug] rejected: %s\n", kdebug_state_name(rc));
         return;
     }
     kmemcpy(&kdebug.ops, exports, sizeof(kdebug.ops));
@@ -75,5 +75,5 @@ void kdebug_load(void)
     kdebug.pages = record->pages;
     kdebug.state = KDEBUG_RUNNING;
     (void)hwdev_module_load(handle);
-    kprintf(0x07, "[kdebug] running pair %08x\n", kdebug.pair_crc);
+    kprintf(KLOG_ATTR, "[kdebug] running pair %08x\n", kdebug.pair_crc);
 }

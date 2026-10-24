@@ -17,6 +17,8 @@
 ;;  なく控えを jmpbuf に入れるので、longjmp 点が増えても漏れない (T1-R3)。
 ;; ======================================================================
 
+%include "kernel/cpu_flags.inc"
+
 cpu 386
 
 extern kctx_irq_depth
@@ -32,19 +34,19 @@ section .text
 global exec_setjmp
 exec_setjmp:
         mov     eax, [esp+4]    ;; buf ポインタをスタックから取得
-        mov     [eax+0],  esp
-        mov     [eax+4],  ebp
-        mov     [eax+8],  ebx
-        mov     [eax+12], esi
-        mov     [eax+16], edi
+        mov     [eax+JB_ESP],  esp
+        mov     [eax+JB_EBP],  ebp
+        mov     [eax+JB_EBX],  ebx
+        mov     [eax+JB_ESI], esi
+        mov     [eax+JB_EDI], edi
         ;; return address は [ESP] にある
         mov     ecx, [esp]
-        mov     [eax+20], ecx
+        mov     [eax+JB_EIP], ecx
         ;; 文脈の深さの控え (語 6・7)
         mov     ecx, [kctx_irq_depth]
-        mov     [eax+24], ecx
+        mov     [eax+JB_IRQ_DEPTH], ecx
         mov     ecx, [kctx_exc_depth]
-        mov     [eax+28], ecx
+        mov     [eax+JB_EXC_DEPTH], ecx
         ;; return 0
         xor     eax, eax
         ret
@@ -58,17 +60,17 @@ global exec_longjmp
 exec_longjmp:
         mov     eax, [esp+4]    ;; buf ポインタをスタックから取得
         ;; 文脈の深さを setjmp の時点へ戻す (語 6・7)
-        mov     ecx, [eax+24]
+        mov     ecx, [eax+JB_IRQ_DEPTH]
         mov     [kctx_irq_depth], ecx
-        mov     ecx, [eax+28]
+        mov     ecx, [eax+JB_EXC_DEPTH]
         mov     [kctx_exc_depth], ecx
-        mov     esi, [eax+12]
-        mov     edi, [eax+16]
-        mov     ebx, [eax+8]
-        mov     ebp, [eax+4]
-        mov     esp, [eax+0]    ;; ESP復元: 以降のスタック参照はsetjmp時のスタック
+        mov     esi, [eax+JB_ESI]
+        mov     edi, [eax+JB_EDI]
+        mov     ebx, [eax+JB_EBX]
+        mov     ebp, [eax+JB_EBP]
+        mov     esp, [eax+JB_ESP]    ;; ESP復元: 以降のスタック参照はsetjmp時のスタック
         ;; return address を復元
-        mov     ecx, [eax+20]
+        mov     ecx, [eax+JB_EIP]
         mov     [esp], ecx      ;; スタック上のreturn addressを書き換え
         ;; return 1 (setjmpの戻り値として)
         mov     eax, 1

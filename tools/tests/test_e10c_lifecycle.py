@@ -58,7 +58,7 @@ def run(runner, mutant=None):
         # Execute the actual saved-EFLAGS offset/branch; replace STI's privileged
         # effect with its observable IF-set result. Segment loads are outside it.
         branch=branch.replace('        sti','        inc dword [host_if]')
-        (tmp/'vm.asm').write_text('cpu 386\nsection .bss\nhost_if: resd 1\nsection .text\nglobal host_vm_gate\nhost_vm_gate:\n mov eax,[esp+4]\n mov dword [host_if],0\n push eax\n sub esp,40\n'+branch+' add esp,44\n mov eax,[host_if]\n ret\nsection .note.GNU-stack noalloc noexec nowrite progbits\n')
+        (tmp/'vm.asm').write_text('%include "kernel/cpu_flags.inc"\ncpu 386\nsection .bss\nhost_if: resd 1\nsection .text\nglobal host_vm_gate\nhost_vm_gate:\n mov eax,[esp+4]\n mov dword [host_if],0\n push eax\n sub esp,40\n'+branch+' add esp,44\n mov eax,[host_if]\n ret\nsection .note.GNU-stack noalloc noexec nowrite progbits\n')
         subprocess.run(['nasm','-f','elf32',str(tmp/'vm.asm'),'-o',str(tmp/'vm.o')],check=True)
         source=(ROOT/'tools/tests/e10c_gcap_host.c').read_text().replace('static void run(void) {','extern int host_vm_gate(u32 flags);\nstatic void run(void) {\n    CHECK(host_vm_gate(0x20000) == 0);\n    CHECK(host_vm_gate(0x202) == 1);')
         (tmp/'fixture.c').write_text(source)

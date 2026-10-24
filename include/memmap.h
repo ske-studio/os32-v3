@@ -28,6 +28,8 @@
 /* ====================================================================== */
 /*  カーネル配置                                                            */
 /* ====================================================================== */
+#define KIB 1024UL
+#define MEM_PDE_SHIFT 22
 #define MEM_PAGE_SIZE         0x1000UL    /* ページサイズ。paging.h の PAGE_SIZE と同値 */
 #define MEM_1MB               0x100000UL  /* 1MB */
 #define MEM_GUARD_SIZE        0x1000UL    /* ガードページ 1 枚 (= PAGE_SIZE) */
@@ -446,7 +448,7 @@ static inline u32 V2P(const volatile void *va) { return (u32)(uptr)va; }
 /* T2b: private lease VA, independent of physical/device boundaries. */
 #define MEM_LEASE_BASE        0xF0000000UL
 #define MEM_LEASE_END         0xFE000000UL
-#define MEM_LEASE_MAX_PDES    ((MEM_LEASE_END - MEM_LEASE_BASE) >> 22)
+#define MEM_LEASE_MAX_PDES    ((MEM_LEASE_END - MEM_LEASE_BASE) >> MEM_PDE_SHIFT)
 #define MEM_LEASE_MAX         8
 
 #endif /* MEMMAP_H */

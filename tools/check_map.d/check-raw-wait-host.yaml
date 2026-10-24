@@ -64,3 +64,4 @@ check-raw-wait-host:
 - tools/fep_to_sqlite.py
 - assets/ipadic/**
 - assets/joyo_kanji.txt
+- kernel/cpu_flags.inc

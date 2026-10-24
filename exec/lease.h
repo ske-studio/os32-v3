@@ -3,7 +3,7 @@
 #include "paging.h"
 #include "pgalloc.h"
 struct surface_ref { u32 sid, generation; };
-struct lease_view { u32 token, base, bytes, planes[4]; };
+struct lease_view { u32 token, base, bytes, planes[SURFACE_QUERY_MAX]; };
 /* Kernel-resolved authorization; no public caller or user-selected AS in T2b. */
 struct lease_authority { u32 owner, backend, role; };
 #define LEASE_INVAL (-1)

@@ -71,7 +71,7 @@ def run(src, quiet=False):
         result = subprocess.run([
             "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
             "-Wno-int-to-pointer-cast", "-Wno-pointer-to-int-cast", "-D__cdecl=",
-            *["-I" + str(ROOT / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32")],
+            *["-I" + str(ROOT / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32", "arch/x86")],
             str(host), "-o", str(exe),
         ], capture_output=True, text=True)
         if result.returncode:

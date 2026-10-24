@@ -50,7 +50,7 @@ def recovery(tmp, function, runner, mutation=None):
     entry = function(read('kernel/isr_handlers.c'), 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
-    stage('entry_source.c', entry)
+    stage('entry_source.c', '#include "idt.h"\n' + entry)
     stage('fixture_source.c', read('kernel/r1_fixture.c').replace('__asm__ volatile("ud2")', 'host_raise_ud()'))
     flags = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
