@@ -103,7 +103,7 @@ jobs:
           make check-boot-splash-host
           make check-build-id-host
           make check-cfg-host
-          make check-db-errstr-host
+          python3 -B tools/tests/test_db_errstr.py  # check-db-errstr-host のホスト部分 (--target は i386-elf-gcc が要るので外す)
           make check-ext2-empty-name-host
           make check-guest-host
           make check-gui-gate-host
