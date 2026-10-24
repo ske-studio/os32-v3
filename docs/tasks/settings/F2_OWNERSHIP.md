@@ -193,7 +193,7 @@ F2a の編集対象は `fs/vfs_fd.c`、`fs/vfs.h`、`tools/tests/` の専用 har
 - 既存 VFS の非再入呼出し前提を維持する。並行 open の同期を導入したとは主張しない。
   公開 read/write/seek 等の認可改修は行わず、SQLite callback が validate を使う統合は F2b。
 
-F2a の HOST 証跡は `tools/tests/vfs_fd_sqlite_tdd.md`。
+F2a の旧 HOST 証跡 `vfs_fd_sqlite_tdd.md` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。共有C fixtureは残存検査で維持する。
 F2 全体の R0/R1、実 SQLite、exec 終了、FEP、target link／guest の受入を代替しない。
 
 ## 4. teardown と quarantine の完了条件
@@ -303,8 +303,8 @@ callsite の静的検査も組み合わせる。新規 guest binary の必要性
 
 接続専用 VFS/group の内部基盤のみ実装済み。KAPI/FEP/exec 呼出し側は未移行で、
 default `os32` の legacy file open を維持する。呼出し側移行・配備の承認ではない。
-合格: scoped host・ASan・target object と F2a/F1 回帰。証拠と限界は
-[sqlite_groups_tdd.md](../../../tools/tests/sqlite_groups_tdd.md#最終実行結果) を参照。実装の契約差分は §3.1a。
+過去の合格記録: scoped host・ASan・target object と F2a/F1 回帰。
+旧証跡 `sqlite_groups_tdd.md` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。共有C fixtureは残存検査で維持する。実装の契約差分は §3.1a。
 未完了: F2b の F1 caller 接続、F2c/F2d、境界 prerequisite、独立レビュー R1、
 kernel link、make check、guest/FEP の実走。full F2 は未受入。
 §8 は統合全体の期待値であり、scoped host 結果で全項目を合格扱いしない。

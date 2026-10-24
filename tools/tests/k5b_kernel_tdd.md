@@ -105,7 +105,7 @@ RED exit code: 1
 - `shm_lock` 済みのブロックも所有者の回収で返る
 
 FD (`vfs_close_owned`) と DB (`db_cleanup_owned`) は既に
-`tools/tests/test_vfs_fd_sqlite.py` / `tools/tests/test_kapi_db_owned.py` が
+`tools/tests/test_vfs_fd_sqlite.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) / `tools/tests/test_kapi_db_owned.py` が
 同じ形で見ているので重複させていない。
 
 ---

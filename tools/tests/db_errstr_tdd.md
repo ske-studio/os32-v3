@@ -84,8 +84,8 @@ SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所
 ```
 
 既存の回帰も通した (`test_kapi_db_v50.py` 24/24、`test_cfg.py` 53/53、
-`test_install_recover.py` 14/14、`test_vfs_fd_sqlite.py` 15/15、
-`test_sqlite_groups.py` 32/32、`test_kapi_db_owned.py` 1/1)。
+`test_install_recover.py` 14/14、`test_vfs_fd_sqlite.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 15/15、
+`test_sqlite_groups.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 32/32、`test_kapi_db_owned.py` 1/1)。
 `kapi_db_v50_host.c` の `shm_bound` / `shm_exact` / `materialize_fail` は
 結果側の上限を `DB_SHM_RESULT_LIMIT` から引き直した (中身は変えていない)。
 

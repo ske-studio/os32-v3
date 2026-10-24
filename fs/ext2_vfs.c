@@ -499,7 +499,7 @@ static int ext2_sqlite_writable(void *ctx)
 }
 
 static const VfsSqliteOps ext2_sqlite_ops = {
-    VFS_SQLITE_EXT2, ext2_sqlite_resize, ext2_sqlite_writable, 0
+    VFS_SQLITE_EXT2, ext2_sqlite_resize, ext2_sqlite_writable
 };
 
 /* ext2操作テーブル */

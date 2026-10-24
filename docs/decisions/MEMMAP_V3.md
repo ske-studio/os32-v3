@@ -679,4 +679,4 @@ Codex は読み取りのみ (ビルド・試験・実機は未実施、反例は
 | **決定 (ユーザー 2026-10-16)**: HostDrv rootの管理DB配置 | **HostDrv を root にしない**。管理 DB は通常の root (NHD の ext2) に置く。§3-5 の `/persist` ext2 案と、HostDrv root のための移行手順は不要 | §3-5・§5。HostDrvはcoreの現行挙動を維持 |
 | **ユーザー決定 2026-10-18: CD はインストールの元だけで起動の媒体ではない。CD の RO FEP は作らない** | インストールは FD/HDD から起動して cdinst で CD を読む。CD root の起動・CD 上の FEP・CD の settings の経路は作らない | §3-5・T4c-3・T5b-5・本書 §4-5へ反映 |
 | **ユーザー決定2026-10-18: EARLYを作らない** | FAT/HostDrvはcore。VK32複数entry製品利用・bootinfo新形式・U19前倒し・同梱1MiB/所有移譲・対応ASM/hsync_bootoldは作らない。全媒体同一像、形式上限4は不変。ATAPI/iso9660はPOST_ROOTでMINIMALでもcdinst前に読む | §5、T5b-1〜3/6・T5c-5a削除、T5b-4縮小、T5c-0前倒し、T5b-5置換。本書 §3-5/4-5/6を同期 |
-| **ユーザー決定2026-10-18: 不変CDのRO SQLiteを凍結** | コードとhost試験を残しT4c/T5bの製品接続予定は取消。次にVFS/ISO境界を触るときに削除費用と像の差で判断 | §3-2・T4b-4cの履歴、台帳T4B-CD。通常CD読取はT5b-5 |
+| **不変CDのRO SQLite** | 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。専用コードとhost試験を撤去 | 台帳T4B-CDの閉鎖はPM。通常CD読取はT5b-5 |

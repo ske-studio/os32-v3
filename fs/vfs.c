@@ -232,8 +232,6 @@ typedef struct {
     int dev_type;
     int dev_id;
     u32 generation;
-    int sqlite_immutable;
-    u32 sqlite_media_generation;
     char dev_name[VFS_MAX_DEVNAME];
 } MountPoint;
 
@@ -430,7 +428,6 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
         return VFS_ERR_NOSPC;
     }
 
-    mounts[slot].sqlite_immutable = 0;
     mounts[slot].generation = ++mount_generation;
     mounts[slot].in_use = 1;
     kstrncpy(mounts[slot].prefix, prefix, VFS_MAX_PATH);
@@ -942,43 +939,4 @@ u32 vfs_path_mount_generation(const char *path)
     if (vfs_resolve_path(path, resolved, sizeof(resolved)) != VFS_OK) return 0;
     mnt = vfs_find_mount(resolved, (const char **)0);
     return mnt ? mnt->generation : 0;
-}
-
-int vfs_sqlite_immutable_generation(void *ctx, u32 generation, u32 *out)
-{
-    int i, rc;
-    u32 current;
-    for (i = 0; i < VFS_MAX_FS; i++) {
-        MountPoint *m = &mounts[i];
-        if (!m->in_use || m->fs_ctx != ctx || m->generation != generation) continue;
-        if (!m->sqlite_immutable || !m->ops->sqlite ||
-            !m->ops->sqlite->media_generation) return VFS_ERR_ROFS;
-        rc = m->ops->sqlite->media_generation(ctx, &current);
-        if (rc != VFS_OK || current != m->sqlite_media_generation) return VFS_ERR_IO;
-        *out = current;
-        return VFS_OK;
-    }
-    return VFS_ERR_STALE;
-}
-
-int vfs_sqlite_allow_immutable(const char *prefix)
-{
-    int i, rc;
-    u32 generation;
-    if (!prefix) return VFS_ERR_INVAL;
-    for (i = 0; i < VFS_MAX_FS; i++) {
-        MountPoint *m = &mounts[i];
-        if (!m->in_use || kstrcmp(m->prefix, prefix)) continue;
-        if (m->dev_type != VFS_DEV_CD || !m->ops->sqlite ||
-            m->ops->sqlite->kind != VFS_SQLITE_IMMUTABLE_CD ||
-            !m->ops->sqlite->media_generation) return VFS_ERR_NOSYS;
-        if (m->sqlite_immutable)
-            return vfs_sqlite_immutable_generation(m->fs_ctx, m->generation, &generation);
-        rc = m->ops->sqlite->media_generation(m->fs_ctx, &generation);
-        if (rc != VFS_OK) return rc;
-        m->sqlite_media_generation = generation;
-        m->sqlite_immutable = 1;
-        return VFS_OK;
-    }
-    return VFS_ERR_NOTFOUND;
 }

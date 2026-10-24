@@ -5,8 +5,8 @@
 /*  MEMSYS5 固定プールによるメモリ管理もここで初期化する。                    */
 /*                                                                          */
 /*  制約:                                                                   */
-/*    - single task: SHARED locks are no-op; immutable CD cannot promote    */
-/*    - mutable MAIN_DB: one connection per ext2 inode                      */
+/*    - single task: locks are no-op                                           */
+/*    - MAIN_DB: one connection per ext2 inode                              */
 /*    - ジャーナルモード: DELETE (デフォルト)                                 */
 /* ======================================================================== */
 
@@ -295,7 +295,6 @@ typedef struct Os32File {
     int fd;              /* OS32 VFS ファイルディスクリプタ */
     int managed;
     int readonly;
-    int immutable;
     VfsSqliteLease lease;
 } Os32File;
 
@@ -322,10 +321,6 @@ static int file_live(sqlite3_file *file)
 {
     Os32File *p = (Os32File *)file;
     if (!file_valid(file)) return 0;
-    if (p->immutable) {
-        VfsSqliteIdentity id;
-        if (vfs_sqlite_fd_identity(p->fd, &id) != VFS_OK) return 0;
-    }
     return p->fd >= 0 && !vfs_fd_is_stale(p->fd);
 }
 
@@ -364,7 +359,6 @@ static int os32Read(sqlite3_file *pFile, void *buf, int iAmt,
     if (!file_live(pFile)) return SQLITE_IOERR_READ;
     vfs_seek(p->fd, (int)iOfst, 0);  /* SEEK_SET */
     n = vfs_read_fd(p->fd, buf, (u32)iAmt);
-    if (p->immutable && !file_live(pFile)) return SQLITE_IOERR_READ;
     if (n < 0) return SQLITE_IOERR_READ;
     if (n < iAmt) {
         /* 不足分をゼロ埋め (SQLite 仕様) */
@@ -419,13 +413,11 @@ static int os32FileSize(sqlite3_file *pFile, sqlite3_int64 *pSize)
 static int os32Lock(sqlite3_file *f, int l)
 {
     if (!file_live(f)) return SQLITE_IOERR_LOCK;
-    if (((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED) return SQLITE_READONLY;
     return SQLITE_OK;
 }
 static int os32Unlock(sqlite3_file *f, int l)
 {
     if (!file_live(f)) return SQLITE_IOERR_UNLOCK;
-    if (((Os32File *)f)->immutable && l > SQLITE_LOCK_SHARED) return SQLITE_READONLY;
     return SQLITE_OK;
 }
 static int os32CheckReservedLock(sqlite3_file *f, int *pOut)
@@ -509,26 +501,6 @@ static int journal_name_fits(const char *name)
     return name_len(abs_name) + sfx + 1u <= (u32)VFS_MAX_PATH;
 }
 
-/* Immutable distribution databases must already be clean. Probe both sidecars
- * before SQLite can attempt recovery; NOTFOUND alone means absent. */
-static int immutable_clean(const char *name)
-{
-    const char *suffixes[2] = {"-journal", "-wal"};
-    char side[VFS_MAX_PATH];
-    OS32_Stat st;
-    int i, rc;
-    u32 n = name_len(name), j;
-    for (i = 0; i < 2; i++) {
-        kstrncpy(side, name, sizeof(side));
-        for (j = 0; suffixes[i][j]; j++) side[n + j] = suffixes[i][j];
-        side[n + j] = 0;
-        rc = vfs_stat(side, &st);
-        if (rc == VFS_OK) return SQLITE_CANTOPEN;
-        if (rc != VFS_ERR_NOTFOUND) return SQLITE_IOERR;
-    }
-    return vfs_sqlite_backend(name) == VFS_SQLITE_IMMUTABLE_CD ? SQLITE_OK : SQLITE_IOERR;
-}
-
 static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
                        sqlite3_file *pFile, int flags, int *pOutFlags)
 {
@@ -541,7 +513,6 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
     p->base.pMethods = (sqlite3_io_methods *)0;
     p->fd = -1;
     p->managed = g != 0;
-    p->immutable = 0;
 
     /* 一時ファイル (zName==NULL) はメモリストアで処理されるはず */
     if (zName == (const char *)0) return SQLITE_CANTOPEN;
@@ -551,16 +522,8 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
         return SQLITE_CANTOPEN;             /* 名前が長すぎる (NAMETOOLONG) */
 
     backend = vfs_sqlite_backend(zName);
-    if (backend == VFS_SQLITE_IMMUTABLE_CD) {
-        if (!(flags & SQLITE_OPEN_MAIN_DB) || !(flags & SQLITE_OPEN_READONLY) ||
-            (flags & (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE))) return SQLITE_READONLY;
-        rc = immutable_clean(zName);
-        if (rc != SQLITE_OK) return rc;
-        p->immutable = 1;
-    }
-    if (backend == VFS_ERR_IO) return SQLITE_IOERR;
     if (flags & SQLITE_OPEN_MAIN_DB) {
-        if (backend != VFS_SQLITE_EXT2 && backend != VFS_SQLITE_IMMUTABLE_CD)
+        if (backend != VFS_SQLITE_EXT2)
             return SQLITE_CANTOPEN;
         if (flags & SQLITE_OPEN_READWRITE) {
             rc = vfs_sqlite_writable(zName);
@@ -588,10 +551,6 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
                 if (other->has_main &&
                     other->main_identity.mount_generation == id.mount_generation &&
                     other->main_identity.file_id == id.file_id) {
-                    if (id.kind == VFS_SQLITE_IMMUTABLE_CD && id.readonly &&
-                        other->main_identity.kind == VFS_SQLITE_IMMUTABLE_CD &&
-                        other->main_identity.readonly &&
-                        other->main_identity.media_generation == id.media_generation) continue;
                     rc = VFS_ERR_BUSY;
                     break;
                 }
@@ -603,7 +562,7 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
             if (os32Close(pFile) != SQLITE_OK && g)
                 os32_sqlite_group_quarantine(&g->cookie,
                     OS32_SQLITE_STAGE_XCLOSE, SQLITE_IOERR_CLOSE);
-            return rc == VFS_ERR_IO ? SQLITE_IOERR : SQLITE_CANTOPEN;
+            return SQLITE_CANTOPEN;
         }
         if (g) { g->main_identity = id; g->has_main = 1; }
     }
@@ -620,7 +579,6 @@ static int os32VfsDelete(sqlite3_vfs *pVfs, const char *zPath, int dirSync)
         return SQLITE_IOERR_DELETE;
     rc = vfs_sqlite_backend(zPath);
     if (rc < 0) return SQLITE_IOERR_DELETE;
-    if (rc == VFS_SQLITE_IMMUTABLE_CD) return SQLITE_READONLY;
     rc = vfs_rm(zPath);
     if (rc == VFS_ERR_NOTFOUND) return SQLITE_IOERR_DELETE_NOENT;
     if (rc != VFS_OK) return SQLITE_IOERR_DELETE;
@@ -640,7 +598,6 @@ static int os32VfsAccess(sqlite3_vfs *pVfs, const char *zPath,
     rc = vfs_sqlite_backend(zPath);
     if (rc < 0) return SQLITE_IOERR_ACCESS;
     rc = vfs_stat(zPath, &st);
-    if (vfs_sqlite_backend(zPath) < 0) return SQLITE_IOERR_ACCESS;
     if (rc == VFS_ERR_NOTFOUND) { *pResOut = 0; return SQLITE_OK; }
     if (rc != VFS_OK) return SQLITE_IOERR_ACCESS;
     if (flags == SQLITE_ACCESS_EXISTS) *pResOut = 1;

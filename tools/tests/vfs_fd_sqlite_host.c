@@ -19,15 +19,6 @@ static int resolve_owner = 2;
  * どちらも作れる。F2a/F2b は "" のまま (絶対名しか渡さない)。 */
 static const char *resolve_cwd = "";
 static VfsOps mock_ops;
-static int immutable_permit, media_error;
-static u32 mock_media_generation = 1;
-int vfs_sqlite_immutable_generation(void *ctx, u32 generation, u32 *out)
-{
-    if (!immutable_permit) return VFS_ERR_ROFS;
-    if (media_error || mock_media_generation != 1) return VFS_ERR_IO;
-    *out = mock_media_generation;
-    return VFS_OK;
-}
 int res_owner_get(void) { return current_owner; }
 void res_owner_set(int owner) { owner_sets++; current_owner = owner; }
 /* fs/vfs.c の vfs_resolve_path の移植 (票 TASK_VFS_FD_PATH 以降の形)。
