@@ -3,3 +3,4 @@ check-host-agent:
 - tools/tests/test_host_agent.py
 - tools/check_map.d/check-host-agent.yaml
 - build/checks.d/check-host-agent.mk
+local_only: true

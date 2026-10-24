@@ -3,7 +3,7 @@
 票: [`docs/tasks/realhw/TASK_LAN_82557.md`](../../docs/tasks/realhw/TASK_LAN_82557.md) §2 **L-D** / §5-1
 対象: `tools/lan_bridge.py` (物理 NIC の AF_PACKET ↔ `tools/host_agent.py` の FrameStream)
 試験: `tools/tests/test_lan_bridge.py`
-実行: `make check-lan-bridge-host` (`check-par` の列)
+実行: `make check-lan-bridge-host` (TT2: 2026-10-24 ユーザー決定で保守外、ローカルだけ)
 
 ## 何のための橋か
 

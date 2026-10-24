@@ -54,6 +54,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 - 対応表 `tools/check_map.d/*.yaml` に新しいヘッダが無く、変更しても試験が選ばれない。
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
+- CI だけ落ちる (2): `.github/workflows/check.yml` は検査を**名前で直接**呼ぶ。手元の check-changed はこのファイルを見ないので、検査を消す・改名・束ねた取り込みは `grep -rn <検査名> .github` で参照が残っていないか見てから push する (2026-10-24、TT5 で消した 2 本の名前が残り CI が `No rule to make target` で落ちた)。
 
 ## 5. push と CI
 

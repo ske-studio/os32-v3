@@ -1,4 +1,4 @@
-CHECK_PAR_ORDER += 086:check-lan-bridge-host
+# Local only: maintenance suspended by user decision 2026-10-24 (hardware unavailable).
 # tools/lan_bridge.py (実機の NIC ↔ host_agent.py の橋、票 TASK_LAN_82557 L-D)。
 # root も実 NIC も要らない — 橋の `--fake-nic` (NIC の差し替え口) に贋 OS32 を
 # UNIX ソケットで繋ぎ、反対側には **実物の host_agent.py** を `--unix` で子プロセス

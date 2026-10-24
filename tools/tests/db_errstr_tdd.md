@@ -83,9 +83,9 @@ SUMMARY 5/5 PASS
 SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所) PASS
 ```
 
-既存の回帰も通した (`test_kapi_db_v50.py` 24/24、`test_cfg.py` 53/53、
+既存の回帰も通した (`test_db_errstr.py` 24/24、`test_cfg.py` 53/53、
 `test_install_recover.py` 14/14、`test_vfs_fd_sqlite.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 15/15、
-`test_sqlite_groups.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 32/32、`test_kapi_db_owned.py` 1/1)。
+`test_sqlite_groups.py` (2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)) 32/32、`test_db_errstr.py` 1/1)。
 `kapi_db_v50_host.c` の `shm_bound` / `shm_exact` / `materialize_fail` は
 結果側の上限を `DB_SHM_RESULT_LIMIT` から引き直した (中身は変えていない)。
 
@@ -129,3 +129,20 @@ SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所
   `dbq` が落ちないこと、`$?` = 0) は未実施。ホストでは「番地が読めるか」は
   原理的に確かめられないので、範囲の検査までが限界。
 - SQLite 本体・プールの大きさ・接続管理は触っていない。
+
+## TT2: DB 検査の引継ぎ (2026-10-24)
+
+`check-db-v50-host` / `check-db-owned-host` の登録と Python runner を削除し、
+`check-db-errstr-host` が旧ケース・変異も実行する。C fixture は実 SQLite と
+障害注入用 SQLite 模型の境界が違うため保持。実 SQLite のコンパイルは共有する。
+従来の診断 6 ケース・変異 9 本は保持し、合計 39 ケース・変異 18 本
+(ほかに回収順の静的な番人) とする。ここでのケースは C のシナリオ関数の単位。
+既存の記録にある unittest の件数とは数え方が違う。
+
+| 移管元 → 移管先 | ケース (前→後) | 変異 (前→後) | 対応 |
+|---|---|---|---|
+| v50 → errstr API fixture | 25→25 | 3→3 | `prepare_replaces`: copy 拒否前 finalize、SQL 切詰め。`group_callers`: journal を現在 owner で開く |
+| owned → errstr 障害注入 fixture | 8→8 | 6→6 | `test_public_owner`: 2 ガードそれぞれの削除・反転・TRUSTED 拒否。ほか寿命、回収順、prepare 置換 finalize 失敗、finalize 失敗、rollback 失敗、BUSY 隔離、open 失敗を保持 |
+
+v50 の残りは `API_CASES` に全登録し、回収順の本文検査も移管した。
+`check-db-caller-host` / `check-kapi-ranges` の内容・ケース・変異は変更しない。

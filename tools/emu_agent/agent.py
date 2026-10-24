@@ -66,7 +66,7 @@ MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
                 # `make check` の個別ターゲット。いずれもホスト側の読み取り専用試験で、
                 # 落ちた 1 本だけを回し直すのに要る。build/checks.d/*.mk に足したら
                 # ここにも足す (2026-09-09: 落ちていて回し直せなかった)。
-                "check-boot-splash-host", "check-constraints", "check-db-owned-host",
+                "check-boot-splash-host", "check-constraints", "check-db-errstr-host",
                 "check-gui-proto", "check-kapi-version", "check-manifests",
                 "check-memory-host", "check-privileged",
                 "check-t5a-host", "check-gshell-host", "check-term-model",
@@ -82,7 +82,7 @@ MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
                 # 票 H4 (配備マニフェストと世代の確認)
                 "check-h4-manifest-host",
                 # 票 TASK_KSTRING_BENCH (kstring の実測プログラムの枠組み)
-                "check-kstr-bench-host", "kstr_bench",
+                "kstr_bench",
                 # 票 TASK_TEST_RESULT (試験の合否を機械が読める形にする約束事)
                 "check-result-conv-host",
                 # 票 TASK_TEST_RUNNER (ゲストで一括実行してホストで集計する)。
@@ -91,7 +91,7 @@ MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
                 # check-guest-host はホストだけのランナー試験。
                 "check-guest", "check-guest-host",
                 "check-hsync-h1-host", "check-hsync-h3-host", "check-b8-open-host",
-                "check-ring3-str-host", "nhd-pull", "nhd-umount", "nhd-init", "deploy-nhd", "deploy-kernel", "images/os32_boot.d88", "iso", "check-settings-protect-host", "check-db-v50-host", "check-cfg-host", "check-gui-host", "check-install-recover-host", "check-install-fresh-host", "clean-external")
+                "check-ring3-str-host", "nhd-pull", "nhd-umount", "nhd-init", "deploy-nhd", "deploy-kernel", "images/os32_boot.d88", "iso", "check-settings-protect-host", "check-cfg-host", "check-gui-host", "check-install-recover-host", "check-install-fresh-host", "clean-external")
 MAP_PATH = os.environ.get("OS32_KERNEL_MAP", os.path.join(ROOT, "build", "out", "kernel.map"))
 SELFTEST_SYMS = ("kselftest_pass", "kselftest_fail")
 WAIT_MAX = 60

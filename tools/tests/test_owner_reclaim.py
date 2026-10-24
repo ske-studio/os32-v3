@@ -8,7 +8,7 @@ Compiles the shipped fs/fd_redirect.c, fs/pipe_buffer.c and kernel/shm.c
 (included verbatim by owner_reclaim_host.c) with a minimal kernel environment,
 then checks that folding ID 2 frees only ID 2's redirect / pipe / SHM.
 
-Same harness shape as test_kapi_db_owned.py: tiny shim headers in a temp dir,
+Same harness shape as test_db_errstr.py: tiny shim headers in a temp dir,
 one host binary, no Make / emulator / VFS.
 """
 import os

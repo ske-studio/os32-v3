@@ -512,7 +512,7 @@ def render():
              table(rows), "",
              "## 3. `check` の列に入っていない `check-*` ターゲット (%d)"
              % len(outside), "",
-             "門ではなく計測器・実機試験。`make check` からは呼ばれない。", "",
+             "ローカル専用の試験・計測器・実機試験。`make check` からは呼ばれない。", "",
              table(out_rows), ""]
     return "\n".join(parts).rstrip() + "\n"
 
@@ -522,10 +522,14 @@ def check_registration():
     rules = parse_makefiles()
     names = check_select.check_lists(parse_variables())
     errors = []
-    mapping = check_select.load_map()["checks"]
-    for name in sorted(set(names) ^ set(mapping)):
+    check_map = check_select.load_map()
+    mapping = check_map["checks"]
+    local = set(check_map.get("local_checks", []))
+    for name in sorted(local & set(names)):
+        errors.append("ローカル専用の検査が登録列にある: " + name)
+    for name in sorted((set(names) | local) ^ set(mapping)):
         errors.append("登録列と入力対応表が一致しない: " + name)
-    for name in names:
+    for name in set(names) | local:
         if name not in rules or not rules[name]["recipe"]:
             errors.append("登録された検査に recipe が無い: " + name)
     for name, info in rules.items():
