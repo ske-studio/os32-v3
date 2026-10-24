@@ -12,12 +12,12 @@ STATIC_ASSERT(E82557_DMA_END <= E82557_DMA_SIZE, dma_fits);
 STATIC_ASSERT((E82557_CB_OFF | E82557_TCB_OFF | E82557_RFD_OFF |
                E82557_RFD_STRIDE) % E82557_DMA_ALIGN == 0, dma_alignment);
 
-u8 e82557_scb_cmd(u8 cuc, u8 ruc) { return (u8)((cuc << 4) | ruc); }
+u8 e82557_scb_cmd(u8 cuc, u8 ruc) { return (u8)((cuc << E82557_SCB_CUC_SHIFT) | ruc); }
 void e82557_scb_decode(u16 st, u8 *cus, u8 *rus, u8 *stat)
 {
-    *cus = (u8)((st & E82557_CUS_MASK) >> 6);
-    *rus = (u8)((st & E82557_RUS_MASK) >> 2);
-    *stat = (u8)((st & E82557_STAT_MASK) >> 8);
+    *cus = (u8)((st & E82557_CUS_MASK) >> E82557_CUS_SHIFT);
+    *rus = (u8)((st & E82557_RUS_MASK) >> E82557_RUS_SHIFT);
+    *stat = (u8)((st & E82557_STAT_MASK) >> E82557_STAT_SHIFT);
 }
 void e82557_wr16(void *dst, u16 value)
 {
@@ -53,9 +53,9 @@ void e82557_cb_header(void *cb, u16 cmd, int el, int s, int i, u32 link)
 {
     u8 *p = cb;
     e82557_wr16(p, 0);
-    e82557_wr16(p + 2, cmd | (el ? E82557_CB_EL : 0) |
+    e82557_wr16(p + E82557_DESC_CMD, cmd | (el ? E82557_CB_EL : 0) |
                    (s ? E82557_CB_S : 0) | (i ? E82557_CB_I : 0));
-    e82557_wr32(p + 4, link);
+    e82557_wr32(p + E82557_DESC_LINK, link);
 }
 void e82557_cb_ia(void *cb, const u8 *mac)
 {
@@ -76,16 +76,16 @@ void e82557_config_bytes(u8 *out, int mode)
         0x00, 0x40, 0xF2, 0x80, 0x3F, 0x05
     };
     copy_bytes(out, cfg, E82557_CFG_LEN);
-    if (mode == E82557_CFG_LOOPBACK) out[10] = 0x6E;
+    if (mode == E82557_CFG_LOOPBACK) out[E82557_CFG_LB_BYTE] = E82557_CFG_LB_VALUE;
 }
 int e82557_tcb_build(void *tcb, const u8 *frame, u32 len, u8 thresh, u32 link, int i)
 {
     u8 *p = tcb;
-    if (len < E82557_FRAME_MIN || len > E82557_FRAME_MAX) return -1;
+    if (len < ETH_HLEN || len > E82557_FRAME_MAX) return -1;
     e82557_cb_header(p, E82557_CB_TX, 1, 0, i, link);
-    e82557_wr32(p + 8, E82557_TBD_NONE);
-    e82557_wr16(p + 12, (u16)len | E82557_TCB_EOF);
-    e82557_wr16(p + 14, thresh); /* TBD number = 0, simplified mode. */
+    e82557_wr32(p + E82557_DESC_TBD, E82557_TBD_NONE);
+    e82557_wr16(p + E82557_DESC_COUNT, (u16)len | E82557_TCB_EOF);
+    e82557_wr16(p + E82557_TCB_THRESH_OFF, thresh); /* TBD number = 0, simplified mode. */
     copy_bytes(p + E82557_TCB_HEADER, frame, len);
     return 0;
 }
@@ -97,8 +97,8 @@ int e82557_stop_evidence(const struct e82557_stop *stop, u32 before, u16 st)
 
 u32 e82557_mdi_ctl(u8 op, u8 phy, u8 reg, u16 data)
 {
-    return ((u32)op << 26) | ((u32)(phy & E82557_PHY_MASK) << 21) |
-           ((u32)(reg & E82557_PHY_MASK) << 16) | data;
+    return ((u32)op << E82557_MDI_OP_SHIFT) | ((u32)(phy & E82557_PHY_MASK) << E82557_MDI_PHY_SHIFT) |
+           ((u32)(reg & E82557_PHY_MASK) << E82557_MDI_REG_SHIFT) | data;
 }
 int e82557_mdi_ready(u32 ctl) { return !!(ctl & E82557_MDI_READY); }
 u16 e82557_mdi_data(u32 ctl) { return (u16)ctl; }
@@ -126,9 +126,9 @@ void e82557_rx_init(void *ring, u32 pa, struct e82557_rx *rx)
     rx->cons = rx->dev = rx->ready = 0;
     for (u32 i = 0; i < E82557_RFD_COUNT; i++) {
         u8 *rfd = e82557_rfd(ring, i);
-        e82557_wr32(rfd + 4, pa + rx_next(i) * E82557_RFD_STRIDE);
-        e82557_wr32(rfd + 8, E82557_TBD_NONE);
-        e82557_wr16(rfd + 14, E82557_RFD_SIZE);
+        e82557_wr32(rfd + E82557_DESC_LINK, pa + rx_next(i) * E82557_RFD_STRIDE);
+        e82557_wr32(rfd + E82557_RFD_RBD, E82557_TBD_NONE);
+        e82557_wr16(rfd + E82557_RFD_SIZE_OFF, E82557_RFD_SIZE);
     }
     e82557_rx_reown(ring, rx);
 }
@@ -140,9 +140,9 @@ void e82557_rx_reown(void *ring, const struct e82557_rx *rx)
     for (u32 n = 0, i = rx->dev; n < free; n++, i = rx_next(i)) {
         u8 *rfd = e82557_rfd(ring, i);
         e82557_wr16(rfd, 0);
-        e82557_wr16(rfd + 12, 0);
+        e82557_wr16(rfd + E82557_DESC_COUNT, 0);
         E82557_BARRIER(); /* reown zero before EL */
-        e82557_wr16(rfd + 2, n + 1 == free ? E82557_RFD_EL : 0);
+        e82557_wr16(rfd + E82557_DESC_CMD, n + 1 == free ? E82557_RFD_EL : 0);
     }
 }
 void e82557_rx_scan(void *ring, struct e82557_rx *rx, int *rnr)
@@ -161,18 +161,18 @@ void e82557_rfd_recycle(void *ring, struct e82557_rx *rx)
     u8 *rfd = e82557_rfd(ring, rx->cons);
     u8 *tail = e82557_rfd(ring, (rx->cons + E82557_RFD_COUNT - 1) % E82557_RFD_COUNT);
     e82557_wr16(rfd, 0);
-    e82557_wr16(rfd + 12, 0);
+    e82557_wr16(rfd + E82557_DESC_COUNT, 0);
     E82557_BARRIER(); /* recycle zero before EL */
     if (rx->ready == E82557_RFD_COUNT) {
         /* Full: RU stopped on the old EL. Remove it before publishing one slot. */
-        e82557_wr16(tail + 2, 0);
+        e82557_wr16(tail + E82557_DESC_CMD, 0);
         E82557_BARRIER(); /* full old before new */
-        e82557_wr16(rfd + 2, E82557_RFD_EL);
+        e82557_wr16(rfd + E82557_DESC_CMD, E82557_RFD_EL);
     } else {
         /* FreeBSD if_fxp.c:2679-2692: publish new tail before releasing old. */
-        e82557_wr16(rfd + 2, E82557_RFD_EL);
+        e82557_wr16(rfd + E82557_DESC_CMD, E82557_RFD_EL);
         E82557_BARRIER(); /* nonfull new before old */
-        e82557_wr16(tail + 2, 0);
+        e82557_wr16(tail + E82557_DESC_CMD, 0);
     }
     rx->cons = rx_next(rx->cons);
     rx->ready--;

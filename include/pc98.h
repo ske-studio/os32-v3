@@ -233,6 +233,13 @@
 #define GRCG_MODE_OFF        0x00
 #define EGC_ACCESS_PORT      0x4A0
 #define EGC_ACCESS_RESET     0xFFF0 /* EGC→GRCG 前に全プレーン有効へ */
+/* BIOS work addresses: CRT diagnostics and PEGC share this map. */
+#define BIOS_WORK_0400      0x0400UL
+#define BIOS_WORK_0402      0x0402UL
+#define BIOS_CRT_EXT_STS    0x0459UL
+#define BIOS_WORK_053C      0x053CUL
+#define BIOS_ARCH_FLAG      0x045CUL
+#define BIOS_MODE_FLAG      0x0597UL
 #define BIOS_CRT_FLAGS       0x054C
 #define BIOS_CRT_GRCG        0x02
 #define BIOS_GRAPH_FLAGS     0x054D

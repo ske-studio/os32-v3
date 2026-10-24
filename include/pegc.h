@@ -32,8 +32,8 @@
 /*  解錠中だけ有効で、06h で再施錠する ([B] の MATE サンプルは設定後に 06h)。 */
 /*  ポート番号は pc98.h の MODE_FF2_PORT (0x6A) を使う (定数の二重定義回避)。 */
 /* ------------------------------------------------------------------------ */
-#define PEGC_FF2_UNLOCK        0x07  /* 拡張モード変更可 (解錠) */
-#define PEGC_FF2_LOCK          0x06  /* 拡張モード変更不可 (施錠) */
+#define PEGC_FF2_UNLOCK        MFF2_UNLOCK  /* 拡張モード変更可 (解錠) */
+#define PEGC_FF2_LOCK          MFF2_LOCK  /* 拡張モード変更不可 (施錠) */
 #define PEGC_FF2_STD_GFX       0x20  /* 標準グラフィックモード (16 色) */
 #define PEGC_FF2_EXT_GFX       0x21  /* 拡張グラフィックモード (256 色) */
 
@@ -234,15 +234,15 @@
 /*  ページ 0 は paging_reclaim_conventional() で Read-Only present なので     */
 /*  そのまま読める。                                                          */
 /* ------------------------------------------------------------------------ */
-#define PEGC_BIOS_ARCH_FLAG    0x045CUL
+#define PEGC_BIOS_ARCH_FLAG    BIOS_ARCH_FLAG
 #define PEGC_BIOS_ARCH_EXTGFX  0x40   /* bit6: 拡張グラフアーキテクチャ機 */
-#define PEGC_BIOS_MODE_FLAG    0x0597UL
+#define PEGC_BIOS_MODE_FLAG    BIOS_MODE_FLAG
 #define PEGC_BIOS_MODE_EXTGFX  0x04   /* bit2: 拡張グラフィックスモード対応 */
 #define PEGC_BIOS_MODE_RESMASK 0x03   /* bit1,0: 解像度 (11b=640x480) */
 #define PEGC_BIOS_MODE_RES_480 0x03
-#define PEGC_BIOS_CRT_EXT_STS  0x0459UL
+#define PEGC_BIOS_CRT_EXT_STS  BIOS_CRT_EXT_STS
 #define PEGC_BIOS_CRT_480LINE  0x01   /* bit0: 1=640x480 */
-#define PEGC_BIOS_PRXDUPD      0x054DUL
+#define PEGC_BIOS_PRXDUPD      BIOS_GRAPH_FLAGS
 #define PEGC_BIOS_PRX_EXTGFX   0x80   /* bit7: 1=拡張グラフィックス (現在値) */
 /* 054Dh bit2「GDC クロック 1=5.0MHz / 0=2.5MHz — 現在の GDC クロック周波数」
  * ([US] memsys.md PRXDUPD)。診断表示の突き合わせにだけ使う (採るのは 09A0h)。 */
@@ -251,7 +251,7 @@
  * 0=24.83kHz(640x400) / 1=31.47kHz(640x400 または 640x480)。
  * ⚠ PC-9821 初代は 31kHz でも 0 のまま、対象外の機種は常に 0 ([US] 同項)。
  * なので **診断表示と、09A8h が読めなかったときの代わり** にだけ使う。 */
-#define PEGC_BIOS_PRXCRT       0x054CUL
+#define PEGC_BIOS_PRXCRT       BIOS_CRT_FLAGS
 #define PEGC_BIOS_PRXCRT_31KHZ 0x20   /* bit5: 1=31.47kHz */
 
 /* ------------------------------------------------------------------------ */

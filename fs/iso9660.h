@@ -22,6 +22,18 @@
 #define ISO_PVD_MAGIC         "CD001" /* PVD識別文字列 (5バイト) */
 #define ISO_MAX_NAME          128     /* ファイル名最大長 */
 
+#define ISO_PVD_TYPE_PRIMARY  1
+#define ISO_PVD_VERSION       1
+#define ISO_PVD_VOLUME_SIZE   80
+#define ISO_PVD_BLOCK_SIZE    128
+#define ISO_PVD_ROOT_REC      156
+#define ISO_ROOT_REC_LEN      34
+#define ISO_DR_EXTENT         2
+#define ISO_DR_DATA_LEN       10
+#define ISO_DR_FLAGS          25
+#define ISO_DR_NAME_LEN       32
+#define ISO_DR_NAME           33
+
 /* === Primary Volume Descriptor (LBA 16, 2048バイト) ===
  *
  * オフセットと主要フィールド:

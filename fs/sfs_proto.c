@@ -52,15 +52,15 @@ u16 sfs_encode_limit(u8 *out, u8 type, u32 sid, u16 seq,
 
     if (limit > SFS_LAN_MAX_PAYLOAD || len > limit) return 0;
     out[0] = SFS_ENQ;
-    out[1] = SFS_MAGIC1;
-    out[2] = SFS_MAGIC2;
-    out[3] = type;
+    out[SFS_OFF_MAGIC1] = SFS_MAGIC1;
+    out[SFS_OFF_MAGIC2] = SFS_MAGIC2;
+    out[SFS_OFF_TYPE] = type;
     sfs_put32(out + 4, sid);
     sfs_put16(out + 8, seq);
     sfs_put16(out + 10, len);
     for (i = 0; i < len; i++) out[SFS_HDR_LEN + i] = payload[i];
     /* CRC は種別 (off 3) からペイロードの末尾まで。ENQ と 'SF' は含めない */
-    crc = sfs_crc32(out + 3, (u32)(SFS_HDR_LEN - 3 + len));
+    crc = sfs_crc32(out + SFS_OFF_TYPE, (u32)(SFS_HDR_LEN - SFS_OFF_TYPE + len));
     sfs_put32(out + SFS_HDR_LEN + len, crc);
     return (u16)(SFS_HDR_LEN + len + SFS_CRC_LEN);
 }
@@ -95,8 +95,8 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
         if (byte == SFS_ENQ) d->buf[d->pos++] = byte;
         return 0;
     }
-    if (d->pos == 1 || d->pos == 2) {
-        u8 want = (d->pos == 1) ? SFS_MAGIC1 : SFS_MAGIC2;
+    if (d->pos == SFS_OFF_MAGIC1 || d->pos == SFS_OFF_MAGIC2) {
+        u8 want = (d->pos == SFS_OFF_MAGIC1) ? SFS_MAGIC1 : SFS_MAGIC2;
         if (byte != want) {
             /* 印が合わない。この 1 バイトが次の ENQ なら、そこから始め直す */
             d->pos = 0;
@@ -125,14 +125,14 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
 
     /* フレーム全体が揃った。ここで初めて判定する */
     len = (u16)(d->need - SFS_HDR_LEN - SFS_CRC_LEN);
-    crc = sfs_crc32(d->buf + 3, (u32)(SFS_HDR_LEN - 3 + len));
+    crc = sfs_crc32(d->buf + SFS_OFF_TYPE, (u32)(SFS_HDR_LEN - SFS_OFF_TYPE + len));
     d->pos = 0;
     d->need = 0;
     if (crc != sfs_get32(d->buf + SFS_HDR_LEN + len)) {
         d->bad_crc++;
         return -1;
     }
-    out->type = d->buf[3];
+    out->type = d->buf[SFS_OFF_TYPE];
     out->sid = sfs_get32(d->buf + 4);
     out->seq = sfs_get16(d->buf + 8);
     out->len = len;

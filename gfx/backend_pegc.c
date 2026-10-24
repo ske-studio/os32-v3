@@ -483,7 +483,7 @@ static void pegc_boot_sync_record(void)
     /* 09A8h と 054Ch bit5 の食い違いは行に出す (採るのは 09A8h)。
      * 054Ch bit5=0 は 9821 初代では 31kHz でも起きる ([US] memsys.md)。
      * 09a8= は生の読み値 (D7〜D1 は不定なので値そのものに意味は無い)。 */
-    kprintf(0x07, "[pegc] hsync=%s 09a8=%02x bios054c.b5=%d bios0459.b0=%d%s\n",
+    kprintf(KLOG_ATTR, "[pegc] hsync=%s 09a8=%02x bios054c.b5=%d bios0459.b0=%d%s\n",
             s_boot_hsync == PEGC_HSYNC_31KHZ ? "31k" : "24k",
             (unsigned int)raw, hs_bios,
             (crtext & PEGC_BIOS_CRT_480LINE) ? 1 : 0,
@@ -499,7 +499,7 @@ static void pegc_boot_sync_record(void)
     s_boot_clk1 = (clk & PEGC_STAT_BIT) ? 1 : 0;
     s_boot_clk2 = (clk & PEGC_STAT_RD_GDCCLK2) ? 1 : 0;
     dupd = bios_flag(PEGC_BIOS_PRXDUPD);
-    kprintf(0x07, "[pegc] gdcclk=%s clk1=%d clk2=%d bios054d.b2=%d pitch400=%d\n",
+    kprintf(KLOG_ATTR, "[pegc] gdcclk=%s clk1=%d clk2=%d bios054d.b2=%d pitch400=%d\n",
             (s_boot_clk1 && s_boot_clk2) ? "5M" : "2.5M",
             s_boot_clk1, s_boot_clk2,
             (dupd & PEGC_BIOS_PRX_GDC5M) ? 1 : 0,
@@ -620,7 +620,7 @@ static int __attribute__((cold, noinline)) pegc_linear_selftest(void)
     mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_OFF);
 restore_mode:
     ff2_locked_write(PEGC_FF2_STD_GFX);
-    kprintf(0x07, "[pegc] win=%s sys16m=%d f00=%s fff=%s force=%d disp=%s\n",
+    kprintf(KLOG_ATTR, "[pegc] win=%s sys16m=%d f00=%s fff=%s force=%d disp=%s\n",
             win, s_sys16m_ram, result[0], result[1], gfx_diag_altwin, disp);
     return ok;
 }
@@ -805,7 +805,7 @@ static void pegc_diag_take(PegcDiag *d)
 
 static void pegc_diag_print(const char *tag, const PegcDiag *d)
 {
-    kprintf(0x07, "[pegc] %s 09a8=%02x msk=%d dsp=%d lcd=%d clk=%x ext=%d "
+    kprintf(KLOG_ATTR, "[pegc] %s 09a8=%02x msk=%d dsp=%d lcd=%d clk=%x ext=%d "
             "800l=%d fifo_to=%u vs_to=%u\n", tag, (unsigned int)d->hs,
             (int)d->msk, (int)d->dsp, (int)d->lcd, (unsigned int)d->clk,
             (int)d->ext, (int)d->pgc, (unsigned int)d->fifo_to,

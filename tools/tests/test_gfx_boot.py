@@ -44,7 +44,7 @@ SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.
            'kdebug/kselftest.c')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
-SLICE_BEGIN = '#define GFX_CAND_PEGC'
+SLICE_BEGIN = 'enum { GFX_RES_PEGC'
 SLICE_END = '/* ======================================================================== */\n/*  KAPI: 画面能力の問い合わせ'
 # 切り出しの中だけ、台帳・写像の呼び出しを記録係へ付け替える。
 HOOKS = (
@@ -239,7 +239,7 @@ MUTATIONS = [
      '(void)sf;'),
 
     ('pegc-alt-resource-missing', 'gfx/gfx_core.c',
-     'for (i = n = 0; m && i < 4; i++)',
+     'for (i = n = 0; m && i < GFX_RES_COUNT; i++)',
      'for (i = n = 0; m && i < 3; i++)'),
     ('pegc-alt-map-missing', 'gfx/gfx_core.c',
      'if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&',
@@ -251,7 +251,7 @@ MUTATIONS = [
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_UC',
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_WB'),
     ('planar-last-plane-missing', 'gfx/gfx_core.c',
-     'for (i = 0; i < 4; i++) {\n        sf = gfx_planar_display;',
+     'for (i = 0; i < GVRAM_PLANES; i++) {\n        sf = gfx_planar_display;',
      'for (i = 0; i < 3; i++) {\n        sf = gfx_planar_display;'),
     # BB の探索範囲を池全体にする (高位 RAM へ行く、X14)
     ('bb-whole-pool', 'gfx/gfx_core.c',

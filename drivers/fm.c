@@ -334,6 +334,13 @@ static int wait_ms(u32 ms, int interruptible)
     return 1;
 }
 
+#define FM_BELL_NOTE_MS 120
+#define FM_BELL_GAP_MS 30
+#define FM_BELL_LAST_MS 400
+#define FM_MML_NOTE_MS 200
+#define FM_MML_REST_MS 200
+#define FM_MML_GAP_MS 20
+
 /* 起動ジングル — ベル音色でC-E-G-C(上) アルペジオ */
 void fm_startup_sound(void)
 {
@@ -344,25 +351,25 @@ void fm_startup_sound(void)
 
     /* C5 */
     fm_note_on(0, NOTE(5, N_C));
-    wait_ms(120, 0);
+    wait_ms(FM_BELL_NOTE_MS, 0);
     fm_note_off(0);
-    wait_ms(30, 0);
+    wait_ms(FM_BELL_GAP_MS, 0);
 
     /* E5 */
     fm_note_on(0, NOTE(5, N_E));
-    wait_ms(120, 0);
+    wait_ms(FM_BELL_NOTE_MS, 0);
     fm_note_off(0);
-    wait_ms(30, 0);
+    wait_ms(FM_BELL_GAP_MS, 0);
 
     /* G5 */
     fm_note_on(0, NOTE(5, N_G));
-    wait_ms(120, 0);
+    wait_ms(FM_BELL_NOTE_MS, 0);
     fm_note_off(0);
-    wait_ms(30, 0);
+    wait_ms(FM_BELL_GAP_MS, 0);
 
     /* C6 (長め) */
     fm_note_on(0, NOTE(6, N_C));
-    wait_ms(400, 0);
+    wait_ms(FM_BELL_LAST_MS, 0);
     fm_note_off(0);
 }
 
@@ -400,7 +407,7 @@ static void fm_play_mml_wait(const char *mml, int interruptible)
             note_idx = ch - 'a';
         } else if (ch == 'R' || ch == 'r') {
             /* 休符 */
-            if (!wait_ms(200, interruptible)) break;
+            if (!wait_ms(FM_MML_REST_MS, interruptible)) break;
             continue;
         } else if (ch == ' ' || ch == ',') {
             continue;  /* 区切り文字 */
@@ -416,9 +423,9 @@ static void fm_play_mml_wait(const char *mml, int interruptible)
 
         /* Key-OFF → Key-ON */
         fm_note_off(0);
-        if (!wait_ms(20, interruptible)) break;
+        if (!wait_ms(FM_MML_GAP_MS, interruptible)) break;
         fm_note_on(0, NOTE(octave, note_map[note_idx] + sharp));
-        if (!wait_ms(200, interruptible)) break;
+        if (!wait_ms(FM_MML_NOTE_MS, interruptible)) break;
     }
 
     fm_note_off(0);

@@ -33,7 +33,7 @@ static int iso_read_device(Device *dev, u32 lba, u32 count, void *buf)
     if (dev->sect_size <= 0 || dev->sect_size > ISO_SECTOR_SIZE ||
         ISO_SECTOR_SIZE % dev->sect_size) return VFS_ERR_IO;
     u32 ratio = ISO_SECTOR_SIZE / (u32)dev->sect_size;
-    if (lba > 0xffffffffU / ratio || count > 0x7fffffffU / ratio ||
+    if (lba > U32_MAX / ratio || count > (u32)S32_MAX / ratio ||
         (dev->bus_type != DEV_BUS_ATAPI &&
          (lba > dev->total_sects / ratio || count > dev->total_sects / ratio - lba)))
         return VFS_ERR_IO;
@@ -300,20 +300,20 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
             continue;
         }
 
-        name_len = rec[32];
+        name_len = rec[ISO_DR_NAME_LEN];
 
         /* "." (0x00) と ".." (0x01) はスキップ */
-        if (name_len == 1 && (rec[33] == 0x00 || rec[33] == 0x01)) {
+        if (name_len == 1 && (rec[ISO_DR_NAME] == 0x00 || rec[ISO_DR_NAME] == 0x01)) {
             offset += rec_len;
             continue;
         }
 
-        iso_clean_name(rec + 33, name_len, entry_name, ISO_MAX_NAME);
+        iso_clean_name(rec + ISO_DR_NAME, name_len, entry_name, ISO_MAX_NAME);
 
         if (iso_strcasecmp(entry_name, name) == 0) {
-            *out_lba   = iso_read_le32(rec + 2);
-            *out_size  = iso_read_le32(rec + 10);
-            *out_flags = rec[25];
+            *out_lba   = iso_read_le32(rec + ISO_DR_EXTENT);
+            *out_size  = iso_read_le32(rec + ISO_DR_DATA_LEN);
+            *out_flags = rec[ISO_DR_FLAGS];
             return 0;
         }
 
@@ -415,22 +415,23 @@ static void *iso9660_mount(int dev_id)
     if (!dev) return (void *)0;
 
     if (iso_read_device(dev, ISO_PVD_LBA, 1, pvd) != 0) {
-        kprintf(0x07, "[iso9660] %s: PVD read failed; mount unpublished\n", devname);
+        kprintf(KLOG_ATTR, "[iso9660] %s: PVD read failed; mount unpublished\n", devname);
         return (void *)0;
     }
-    u32 volume = iso_read_le32(pvd + 80);
-    u32 root_lba = iso_read_le32(pvd + 158);
-    u32 root_size = iso_read_le32(pvd + 166);
+    u32 volume = iso_read_le32(pvd + ISO_PVD_VOLUME_SIZE);
+    u32 root_lba = iso_read_le32(pvd + ISO_PVD_ROOT_REC + ISO_DR_EXTENT);
+    u32 root_size = iso_read_le32(pvd + ISO_PVD_ROOT_REC + ISO_DR_DATA_LEN);
     u32 root_sectors = root_size / ISO_SECTOR_SIZE + (root_size % ISO_SECTOR_SIZE != 0);
-    if (pvd[0] != 1 || pvd[1] != 'C' || pvd[2] != 'D' || pvd[3] != '0' ||
-        pvd[4] != '0' || pvd[5] != '1' || pvd[6] != 1 ||
-        iso_read_le16(pvd + 128) != ISO_SECTOR_SIZE ||
+    if (pvd[0] != ISO_PVD_TYPE_PRIMARY || pvd[1] != ISO_PVD_MAGIC[0] ||
+        pvd[2] != ISO_PVD_MAGIC[1] || pvd[3] != ISO_PVD_MAGIC[2] ||
+        pvd[4] != ISO_PVD_MAGIC[3] || pvd[5] != ISO_PVD_MAGIC[4] || pvd[6] != ISO_PVD_VERSION ||
+        iso_read_le16(pvd + ISO_PVD_BLOCK_SIZE) != ISO_SECTOR_SIZE ||
         volume <= ISO_PVD_LBA ||
         (dev->bus_type != DEV_BUS_ATAPI &&
          volume > dev->total_sects / (ISO_SECTOR_SIZE / dev->sect_size)) ||
-        pvd[156] < 34 || !(pvd[181] & ISO_FLAG_DIRECTORY) || !root_size ||
+        pvd[ISO_PVD_ROOT_REC] < ISO_ROOT_REC_LEN || !(pvd[ISO_PVD_ROOT_REC + ISO_DR_FLAGS] & ISO_FLAG_DIRECTORY) || !root_size ||
         root_lba >= volume || root_sectors > volume - root_lba) {
-        kprintf(0x07, "[iso9660] %s: invalid PVD; mount unpublished\n", devname);
+        kprintf(KLOG_ATTR, "[iso9660] %s: invalid PVD; mount unpublished\n", devname);
         return (void *)0;
     }
 
@@ -445,16 +446,16 @@ static void *iso9660_mount(int dev_id)
     ctx->ra_buf = (u8 *)kmalloc(ISO_RA_BYTES);
 
     /* ボリュームサイズ (pvd[80..83] = LE u32) */
-    ctx->volume_size = iso_read_le32(pvd + 80);
+    ctx->volume_size = iso_read_le32(pvd + ISO_PVD_VOLUME_SIZE);
 
     /* 論理ブロックサイズ (pvd[128..129] = LE u16) */
-    ctx->block_size = iso_read_le16(pvd + 128);
+    ctx->block_size = iso_read_le16(pvd + ISO_PVD_BLOCK_SIZE);
 
     /* ルートディレクトリレコード (pvd[156..189], 34バイト) */
     {
-        u8 *root_rec = pvd + 156;
-        ctx->root_lba  = iso_read_le32(root_rec + 2);
-        ctx->root_size = iso_read_le32(root_rec + 10);
+        u8 *root_rec = pvd + ISO_PVD_ROOT_REC;
+        ctx->root_lba  = iso_read_le32(root_rec + ISO_DR_EXTENT);
+        ctx->root_size = iso_read_le32(root_rec + ISO_DR_DATA_LEN);
     }
 
     return (void *)ctx;
@@ -549,14 +550,14 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
             continue;
         }
 
-        name_len = rec[32];
+        name_len = rec[ISO_DR_NAME_LEN];
 
         /* "." / ".." はスキップ */
-        if (!(name_len == 1 && (rec[33] == 0x00 || rec[33] == 0x01))) {
+        if (!(name_len == 1 && (rec[ISO_DR_NAME] == 0x00 || rec[ISO_DR_NAME] == 0x01))) {
             VfsDirEntry ent;
-            iso_clean_name(rec + 33, name_len, ent.name, VFS_MAX_PATH);
-            ent.size = iso_read_le32(rec + 10);
-            ent.type = (rec[25] & ISO_FLAG_DIRECTORY)
+            iso_clean_name(rec + ISO_DR_NAME, name_len, ent.name, VFS_MAX_PATH);
+            ent.size = iso_read_le32(rec + ISO_DR_DATA_LEN);
+            ent.type = (rec[ISO_DR_FLAGS] & ISO_FLAG_DIRECTORY)
                      ? VFS_TYPE_DIR : VFS_TYPE_FILE;
             cb(&ent, user_ctx);
             /* cb がこの FS を読んで媒体の交換を踏んだかもしれない */

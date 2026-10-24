@@ -14,11 +14,11 @@ MUTATIONS = [
     ('E82557_CB_EL : 0', 'E82557_CB_S : 0', 'EL position'),
     ('E82557_CB_S : 0', 'E82557_CB_EL : 0', 'S position'),
     ('E82557_CB_I : 0', '0 : 0', 'I omitted'),
-    ('e82557_wr32(p + 8, E82557_TBD_NONE);', 'e82557_wr32(p + 8, 0);', 'TBD zero'),
+    ('e82557_wr32(p + E82557_DESC_TBD, E82557_TBD_NONE);', 'e82557_wr32(p + E82557_DESC_TBD, 0);', 'TBD zero'),
     ('(u16)len | E82557_TCB_EOF', '(u16)((len >> 8) | (len << 8)) | E82557_TCB_EOF', 'count endian'),
     ('copy_bytes((u8 *)cb + E82557_CB_HEADER, cfg', 'copy_bytes((u8 *)cb + 16, cfg', 'Configure offset 16'),
     ('0x01, 0x00, 0x2E', '0x00, 0x00, 0x2E', 'MII off'),
-    ('out[10] = 0x6E', 'out[10] = 0x3E', 'loopback wrong bit'),
+    ('out[E82557_CFG_LB_BYTE] = E82557_CFG_LB_VALUE', 'out[E82557_CFG_LB_BYTE] = 0x3E', 'loopback wrong bit'),
     ('0x00, 0x40, 0xF2', '0x00, 0x40, 0x72', 'padding off'),
     ('cb, E82557_CB_IA,', 'cb, E82557_CB_CONFIG,', 'IA opcode'),
     ('cb, E82557_CB_CONFIG,', 'cb, E82557_CB_IA,', 'Configure opcode'),
@@ -28,8 +28,8 @@ MUTATIONS = [
 ]
 
 MUTATIONS += [
-    ('((u32)op << 26)', '((u32)(op == 2 ? 1 : op) << 26)', 'MDI read opcode'),
-    ('(phy & E82557_PHY_MASK) << 21', '(phy & E82557_PHY_MASK) << 16', 'MDI phy field'),
+    ('((u32)op << E82557_MDI_OP_SHIFT)', '((u32)(op == 2 ? 1 : op) << E82557_MDI_OP_SHIFT)', 'MDI read opcode'),
+    ('(phy & E82557_PHY_MASK) << E82557_MDI_PHY_SHIFT', '(phy & E82557_PHY_MASK) << 16', 'MDI phy field'),
     ('(phy & E82557_PHY_MASK)', '(phy)', 'MDI phy mask'),
     ('(reg & E82557_PHY_MASK)', '(reg)', 'MDI reg mask'),
     ('ctl & E82557_MDI_READY', 'ctl & (1u << 27)', 'MDI Ready bit'),

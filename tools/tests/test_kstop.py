@@ -299,7 +299,7 @@ MUTATIONS = [
  ('wrong-owner','exec/appslot.c','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot.c','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot.c','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
- ('raw-stop-retained','drivers/kbd.c','(raw & (SHIFT_CTRL << 9))) continue;', '(raw & (SHIFT_CTRL << 9))) { /* retain */ }'),
+ ('raw-stop-retained','drivers/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',

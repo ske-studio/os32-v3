@@ -66,7 +66,7 @@ static VfsFile open_files[VFS_MAX_OPEN_FILES];
 
 /* font FD の予算 (vfs.h、値は T7b-a6 の実測)。FD 0〜2 は標準入出力の予約 */
 STATIC_ASSERT(VFS_FONT_FD_MAX_APP_TOTAL + VFS_FONT_FD_MAX_SHELL +
-              VFS_FONT_FD_RESERVED <= VFS_MAX_OPEN_FILES - 3,
+              VFS_FONT_FD_RESERVED <= VFS_MAX_OPEN_FILES - VFS_FIRST_FILE_FD,
               vfs_font_fd_budget);
 STATIC_ASSERT(VFS_FONT_FD_MAX_APP <= VFS_FONT_FD_MAX_APP_TOTAL,
               vfs_font_fd_app_le_total);
@@ -180,7 +180,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     /* Preflight before even path probes. FD0-2 are reserved. A slot whose
      * generation reached MAX is retired on close, including GENERIC use.
      * Like the existing VFS, this path requires non-reentrant callers. */
-    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) {
+    for (i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++) {
         if (!open_files[i].in_use &&
             open_files[i].generation < VFS_FD_GENERATION_MAX) {
             fd = i;
@@ -307,7 +307,7 @@ int vfs_count_sqlite(const VfsSqliteCookie *cookie)
 {
     int fd, count = 0;
     if (!cookie) return VFS_ERR_INVAL;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         if (open_files[fd].in_use && open_files[fd].lifetime == VFS_FD_SQLITE &&
             sqlite_cookie_equal(&open_files[fd].cookie, cookie)) count++;
     }
@@ -318,7 +318,7 @@ int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie)
 {
     int fd;
     if (!cookie) return VFS_ERR_INVAL;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         if (open_files[fd].in_use && open_files[fd].lifetime == VFS_FD_SQLITE &&
             sqlite_cookie_equal(&open_files[fd].cookie, cookie))
             open_files[fd].quarantined = 1;
@@ -329,7 +329,7 @@ int vfs_quarantine_sqlite(const VfsSqliteCookie *cookie)
 int vfs_validate_sqlite(const VfsSqliteLease *lease)
 {
     const VfsFile *f;
-    if (!lease || lease->fd < 3 || lease->fd >= VFS_MAX_OPEN_FILES)
+    if (!lease || lease->fd < VFS_FIRST_FILE_FD || lease->fd >= VFS_MAX_OPEN_FILES)
         return VFS_ERR_INVAL;
     f = &open_files[lease->fd];
     if (!f->in_use || f->lifetime != VFS_FD_SQLITE || f->quarantined ||
@@ -372,7 +372,7 @@ int vfs_open_font(const char *path, int owner, u32 flags, VfsFontLease *out,
 int vfs_validate_font(const VfsFontLease *l)
 {
     const VfsFile *f;
-    if (!l || l->fd < 3 || l->fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (!l || l->fd < VFS_FIRST_FILE_FD || l->fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[l->fd];
     if (!f->in_use || f->lifetime != VFS_FD_FONT) return VFS_ERR_INVAL;
     if (f->generation != l->generation) return VFS_ERR_INVAL;
@@ -416,7 +416,7 @@ void vfs_close(int fd)
 void vfs_close_owned(int owner)
 {
     int fd;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         VfsFile *f = &open_files[fd];
         if (!f->in_use) continue;
         if (f->lifetime == VFS_FD_SQLITE) continue;
@@ -432,7 +432,7 @@ void vfs_close_owned(int owner)
  * FD一括クローズから除外したいFDに使用する) */
 int vfs_fd_set_protect(int fd, int on)
 {
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
     if (open_files[fd].lifetime == VFS_FD_SQLITE) return VFS_ERR_INVAL;
     if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
@@ -442,7 +442,7 @@ int vfs_fd_set_protect(int fd, int on)
 
 int vfs_fd_is_protected(int fd)
 {
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return 0;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return 0;
     if (!open_files[fd].in_use) return 0;
     return open_files[fd].protect;
 }
@@ -606,7 +606,7 @@ int vfs_fstat(int fd, OS32_Stat *buf)
          * st_dev は開いている FD の経路をそのまま通るので、`stat <path>` と
          * `fstat 1` が同じ値になる。 */
         if (ifmt == OS_S_IFREG) {
-            if (file_fd < 3 || file_fd >= VFS_MAX_OPEN_FILES) {
+            if (file_fd < VFS_FIRST_FILE_FD || file_fd >= VFS_MAX_OPEN_FILES) {
                 /* fd_redirect_to_file は vfs_open に失敗したら
                  * FD_TARGET_FILE にしないので、ここには来ないはず。
                  * 来たら「答えられない」— 作り話をしない。 */
@@ -664,7 +664,7 @@ void vfs_fd_invalidate_ino(void *fs_ctx, u32 ino)
 {
     int fd;
     if (!fs_ctx) return;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         VfsFile *f = &open_files[fd];
         if (f->in_use && f->has_ino && f->fs_ctx == fs_ctx && f->ino == ino)
             f->stale = 1;
@@ -675,7 +675,7 @@ void vfs_fd_invalidate_mount(void *fs_ctx)
 {
     int fd;
     if (!fs_ctx) return;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         VfsFile *f = &open_files[fd];
         if (f->in_use && f->fs_ctx == fs_ctx) {
             f->stale = 1;
@@ -689,14 +689,14 @@ void vfs_fd_invalidate_mount(void *fs_ctx)
 
 int vfs_fd_is_stale(int fd)
 {
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return 0;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return 0;
     if (!open_files[fd].in_use) return 0;
     return open_files[fd].stale;
 }
 
 int vfs_fd_set_pinned(int fd, int on)
 {
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
     if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
     open_files[fd].pinned = on ? 1 : 0;
@@ -705,7 +705,7 @@ int vfs_fd_set_pinned(int fd, int on)
 
 int vfs_fd_set_sqlite_db(int fd)
 {
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     if (!open_files[fd].in_use) return VFS_ERR_INVAL;
     open_files[fd].sqlite_db = 1;
     return VFS_OK;
@@ -745,7 +745,7 @@ int vfs_fd_rename_busy(void *fs_ctx, const char *rel_old, const char *rel_new)
 {
     int fd;
     if (!fs_ctx) return 0;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         const VfsFile *f = &open_files[fd];
         /* **失効 (stale) した FD も見る** (Codex 実装レビュー ラリー 1 の B3)。
          * unlink で FD が失効しても SQLite 接続は開いたままで、ジャーナルを
@@ -767,7 +767,7 @@ int vfs_fd_pinned_busy(void *fs_ctx, int has_ino, u32 ino, const char *rel)
 {
     int fd;
     if (!fs_ctx) return 0;
-    for (fd = 3; fd < VFS_MAX_OPEN_FILES; fd++) {
+    for (fd = VFS_FIRST_FILE_FD; fd < VFS_MAX_OPEN_FILES; fd++) {
         const VfsFile *f = &open_files[fd];
         if (!f->in_use || !f->pinned || f->stale || f->fs_ctx != fs_ctx) continue;
         if (f->has_ino) {
@@ -817,7 +817,7 @@ int vfs_sqlite_writable(const char *path)
 int vfs_sqlite_fd_identity(int fd, VfsSqliteIdentity *out)
 {
     VfsFile *f;
-    if (!out || fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (!out || fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use || f->stale) return VFS_ERR_STALE;
     if (!f->ops->sqlite || !f->mount_generation) return VFS_ERR_NOSYS;
@@ -834,7 +834,7 @@ int vfs_sqlite_claim_main(int fd)
     VfsSqliteIdentity id;
     int i, rc = vfs_sqlite_fd_identity(fd, &id);
     if (rc != VFS_OK) return rc;
-    for (i = 3; i < VFS_MAX_OPEN_FILES; i++) {
+    for (i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++) {
         VfsFile *f = &open_files[i];
         /* Include stale/quarantined/parked FDs until close completes. */
         if (i != fd && f->in_use && f->sqlite_main &&
@@ -851,7 +851,7 @@ int vfs_resize_fd(int fd, u32 size)
 {
     VfsFile *f;
     int rc;
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_STALE;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
@@ -867,7 +867,7 @@ int vfs_resize_fd(int fd, u32 size)
 int vfs_sync_fd(int fd)
 {
     VfsFile *f;
-    if (fd < 3 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_STALE;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;

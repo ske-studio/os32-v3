@@ -77,7 +77,7 @@ static void fdc_buf_setup(void)
      * 16MB より下) が、起きたら**黙って別の番地を壊さない**よう言う
      * (dma_chan_setup も同じ条件で断るので、転送は出ない)。 */
     if (!dma_range_ok(s_dma_pa, FDC_DMA_BUF_SIZE, DMA_PHYS_LIMIT))
-        kprintf(0x07, "[fdc] DMA window %08x crosses 64KB or 16MB\n",
+        kprintf(KLOG_ATTR, "[fdc] DMA window %08x crosses 64KB or 16MB\n",
                 s_dma_pa);
 }
 
@@ -746,7 +746,7 @@ static void fdc_report_fail(const char *op, int drv, int cyl, int head,
     }
     mark = (st0 & FDC_ST0_NR) ? " (NR)" : "";
 
-    kprintf(0x07,
+    kprintf(KLOG_ATTR,
             "[fdc] %s fail drv=%d chs=%d/%d/%d phase=%s st0=%02x st1=%02x st2=%02x%s\n",
             op, drv, cyl, head, sect, phase, st0, st1, st2, mark);
 }
@@ -1084,7 +1084,7 @@ fail:
     }
     s_stats.multi_fail++;
     if (s_stats.multi_fail <= FDC_MULTI_FAIL_REPORT_MAX) {
-        kprintf(0x07, "[fdc] multi-read n=%d falls back to single\n", count);
+        kprintf(KLOG_ATTR, "[fdc] multi-read n=%d falls back to single\n", count);
         fdc_report_fail("read-multi", drv, cyl, head, sect, phase,
                         have_results, results);
     }
@@ -1100,11 +1100,11 @@ void fdc_print_stats(const char *tag)
         return;
     }
     /* 80 桁に収めるため 2 行に分ける (1 行だと画面の幅で切れた)。 */
-    kprintf(0x07, "[fdc] %s: seek=%u skip=%u recal=%u tmo=%u foreign=%u rdy=%u\n",
+    kprintf(KLOG_ATTR, "[fdc] %s: seek=%u skip=%u recal=%u tmo=%u foreign=%u rdy=%u\n",
             tag, (unsigned int)t->seek_issued, (unsigned int)t->seek_skipped,
             (unsigned int)t->recal_issued, (unsigned int)t->seek_timeout,
             (unsigned int)t->sis_foreign, (unsigned int)t->ready_change);
-    kprintf(0x07, "[fdc] %s: multi=%u/%u nr=%u single=%u retry=%u write=%u\n",
+    kprintf(KLOG_ATTR, "[fdc] %s: multi=%u/%u nr=%u single=%u retry=%u write=%u\n",
             tag, (unsigned int)t->multi_ok, (unsigned int)t->multi_fail,
             (unsigned int)t->multi_nr, (unsigned int)t->single_reads,
             (unsigned int)t->single_retries, (unsigned int)t->writes);
@@ -1170,7 +1170,7 @@ int fdc_init(void)
     if (ret != 0) {
         /* [V4] 失敗はそのまま言う。ここで諦めると MOUNT の root panic に
          * なるが、画面には「なぜ」が出ていなかった。 */
-        kprintf(0x07, "[fdc] recalibrate drv=%d rc=%d st0=%02x\n", 0, ret, st0);
+        kprintf(KLOG_ATTR, "[fdc] recalibrate drv=%d rc=%d st0=%02x\n", 0, ret, st0);
     }
 
     /* ドライブ1は未接続時にタイムアウトするためエラーは無視する。

@@ -2,11 +2,12 @@
 #define FS_SFS_LAN_H
 
 #include "sfs_client.h"
+#include "net_eth.h"
 
-#define SFS_LAN_ETHERTYPE 0x88B5
-#define SFS_LAN_MAC_LEN 6
-#define SFS_LAN_HDR_LEN 14
-#define SFS_LAN_MIN_FRAME 60
+#define SFS_LAN_ETHERTYPE OS32_ETHERTYPE
+#define SFS_LAN_MAC_LEN ETH_ALEN
+#define SFS_LAN_HDR_LEN ETH_HLEN
+#define SFS_LAN_MIN_FRAME ETH_ZLEN
 #define SFS_LAN_MAX_FRAME (SFS_LAN_HDR_LEN + SFS_BUFFER_FRAME)
 #define SFS_LAN_RX_CAP 1536
 #define SFS_LAN_RX_BUDGET 8
