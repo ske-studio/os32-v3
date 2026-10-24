@@ -18,6 +18,7 @@ import fnmatch
 from functools import lru_cache
 import re
 import shlex
+from bisect import bisect_left
 import subprocess
 import sys
 
@@ -736,9 +737,16 @@ def is_tracked_file(rel):
     return rel in tracked()
 
 
-def tracked_under(d):
+def tracked_under(d, files=None):
+    """Directory members; files, when supplied, is a sorted tracked snapshot."""
     d = d.rstrip("/") + "/"
-    return [f for f in tracked() if f.startswith(d)]
+    files = sorted(tracked()) if files is None else files
+    i = bisect_left(files, d)
+    found = []
+    while i < len(files) and files[i].startswith(d):
+        found.append(files[i])
+        i += 1
+    return found
 
 
 class Extractor:
@@ -757,6 +765,9 @@ class Extractor:
         self.found = set()
         self.inc_dirs = set()
         self.pending = []
+        # One sorted snapshot per extraction, never shared between roots or
+        # fixture edits. Directory lookups visit only their matching range.
+        self._tracked = sorted(tracked())
 
     def add(self, rel):
         rel = norm(rel)
@@ -785,7 +796,7 @@ class Extractor:
             self.scan(self.pending.pop())
 
     def add_dir(self, rel):
-        for f in tracked_under(norm(rel)):
+        for f in tracked_under(norm(rel), self._tracked):
             self.add(f)
 
     def resolve(self, cand, base_dir):
@@ -794,7 +805,7 @@ class Extractor:
             rel = norm(os.path.join(base, cand))
             if is_tracked_file(rel):
                 return ("f", rel)
-            if tracked_under(rel) and rel not in (".", ""):
+            if tracked_under(rel, self._tracked) and rel not in (".", ""):
                 return ("d", rel)
         return None
 
@@ -833,7 +844,7 @@ class Extractor:
         if ("crate", d) in self.seen:
             return
         self.seen.add(("crate", d))
-        for f in tracked_under(d):
+        for f in tracked_under(d, self._tracked):
             if f.endswith((".rs", ".toml")):
                 self.add(f)
 

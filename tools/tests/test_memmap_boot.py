@@ -20,6 +20,7 @@
 そこを崩すと自己診断そのものが穴を隠す。
 """
 import host32
+import mutpar
 import os
 import argparse
 import pathlib
@@ -153,6 +154,25 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     return host32.run([str(exe)], capture_output=True, timeout=60)
 
 
+def mutation_result(name):
+    # **全部の場面で回す。** 1 場面だけだと、その場面では無害な変異を
+    # 「試験が見逃した」ではなく「変異が効かなかった」として取り違える
+    # (resv-blind は「予算ちょうど」でしか差が出ない)。
+    ok = True
+    where = ''
+    for case in CASES + [("IF=0", *CASES[0][1:]), ("PG-failure", *CASES[0][1:])]:
+        with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
+            try:
+                out = build_and_run(tmp, case, mutation=name, initial_if=2 if case[0] == "IF=0" else 0x202)
+                if out.returncode != 0:
+                    ok, where = False, case[0]
+                    break
+            except subprocess.CalledProcessError:
+                return name, 'NOT COUNTED: compile failure', False
+    return name, ('RED (%s で落ちた)' % where if not ok
+                  else '**GREEN — 試験が穴を見逃した**'), not ok
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--mutate', action='store_true')
@@ -204,26 +224,9 @@ def main():
     print('HOST ILP32 + TARGET GNU11 PASS')
     if args.mutate:
         red = 0
-        for name in MUTATIONS:
-            # **全部の場面で回す。** 1 場面だけだと、その場面では無害な変異を
-            # 「試験が見逃した」ではなく「変異が効かなかった」として取り違える
-            # (resv-blind は「予算ちょうど」でしか差が出ない)。
-            ok = True
-            where = ''
-            for case in CASES + [("IF=0", *CASES[0][1:]), ("PG-failure", *CASES[0][1:])]:
-                with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
-                    try:
-                        out = build_and_run(tmp, case, mutation=name, initial_if=2 if case[0] == "IF=0" else 0x202)
-                        if out.returncode != 0:
-                            ok, where = False, case[0]
-                            break
-                    except subprocess.CalledProcessError:
-                        print('NOT COUNTED: compile failure', name)
-                        return 1
-            print('  変異 %-14s %s' % (name, 'RED (%s で落ちた)' % where if not ok
-                                       else '**GREEN — 試験が穴を見逃した**'))
-            if not ok:
-                red += 1
+        for name, verdict, detected in mutpar.run_ordered(mutation_result, MUTATIONS):
+            print('  変異 %-14s %s' % (name, verdict))
+            red += detected
         print('%d/%d の変異が RED' % (red, len(MUTATIONS)))
         return 0 if red == len(MUTATIONS) else 1
 

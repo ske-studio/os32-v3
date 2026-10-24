@@ -167,14 +167,27 @@ def walk(cursor, function='<file>'):
     for child in cursor.get_children():
         yield from walk(child, function)
 
-def relpath(cursor, root=ROOT):
-    if not cursor.location.file:
-        return None
-    p = pathlib.Path(os.path.abspath(cursor.location.file.name))
+@functools.lru_cache(maxsize=4096)
+def _relative_file(filename, root):
+    # Purely lexical: cache names, never file contents or filesystem state.
+    p = pathlib.Path(os.path.abspath(filename))
     try:
         return p.relative_to(pathlib.Path(root).absolute()).as_posix()
     except ValueError:
         return None
+
+
+def relpath(cursor, root=ROOT):
+    file = cursor.location.file
+    if not file:
+        return None
+    # Relative inputs must remain sensitive to chdir between calls.
+    filename, root = file.name, os.fspath(root)
+    if not os.path.isabs(filename):
+        filename = os.path.abspath(filename)
+    if not os.path.isabs(root):
+        root = os.fspath(pathlib.Path(root).absolute())
+    return _relative_file(filename, root)
 
 def pointer(typ):
     return typ.get_canonical().kind == T.POINTER

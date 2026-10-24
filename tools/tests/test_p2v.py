@@ -213,11 +213,9 @@ def mutant(case):
                 + '#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'
                 + 'void p2v_mutant(' + params + ') {\n' + body + '\n}\n')
             expected = f'p2v_mutant: {rule}'
-        # A parse error must never satisfy the runtime RED assertion.
-        import clang_ast
-        for u in clang_ast.units(root):
-            if u['src'] == str(target.relative_to(root)):
-                clang_ast.parse(u['src'],u['argv'],root)
+        # The full checker parses this target too. Require its specific runtime
+        # finding below, and reject parse failures; a separate units()/parse()
+        # here would repeat the same make dry-run without adding a verdict.
         result = subprocess.run([sys.executable, str(ROOT / 'tools/check_p2v.py'), '--root', str(root)],
                                 capture_output=True, text=True)
         if result.returncode != 1 or expected not in result.stdout or 'clang parse failure' in result.stdout:

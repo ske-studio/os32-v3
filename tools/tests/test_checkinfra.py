@@ -19,6 +19,25 @@ if '--before' in sys.argv:
 
 
 class CheckInfra(unittest.TestCase):
+    def test_directory_lookup_boundaries_and_refresh(self):
+        from unittest import mock
+        script = "INPUT = 'tools/tests/data'\n"
+        files = {'tools/tests/test_a.py': script,
+                 'tools/tests/database/other.h': ''}
+        with legacy.fixture(CS, files=files) as fx:
+            fx.write('tools/tests/data/one.h', '')
+            rules = {'check-a': ['python3 tools/tests/test_a.py']}
+            with mock.patch.object(CS, 'ROOT', fx.d), mock.patch.object(CS, '_TRACKED', None):
+                first = CS.extract(rules, 'check-a')
+                self.assertIn('tools/tests/data/one.h', first)
+                self.assertNotIn('tools/tests/database/other.h', first)
+                pathlib.Path(fx.d, 'tools/tests/data/one.h').unlink()
+                fx.write('tools/tests/data/two.h', '')
+                CS._TRACKED = None
+                second = CS.extract(rules, 'check-a')
+                self.assertIn('tools/tests/data/two.h', second)
+                self.assertNotIn('tools/tests/data/one.h', second)
+
     def test_worktree_base(self):
         with legacy.fixture(CS) as fx:
             legacy.git(fx.d, 'checkout', '-qb', 'wt/new')
@@ -416,6 +435,29 @@ MUTATIONS = [
 ]
 
 
+def mutation_result(item):
+    # A fresh module per item; process isolation keeps CS and inventory edits local.
+    global CS, INVENTORY_SOURCE
+    import contextlib, io
+    i, mutation = item
+    source = legacy.SRC.read_text()
+    INVENTORY_SOURCE = None
+    if len(mutation) == 3:
+        path, old, new = mutation
+        original = (legacy.ROOT / path).read_text()
+        assert original.count(old) == 1, (i, path, old)
+        INVENTORY_SOURCE = original.replace(old, new)
+        CS = legacy.load(source)
+    else:
+        old, new = mutation
+        assert source.count(old) == 1, (i, old)
+        CS = legacy.load(source.replace(old, new))
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(CheckInfra)
+    with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+        result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)
+    return i, not result.wasSuccessful()
+
+
 def main():
     global CS, INVENTORY_SOURCE
     mutate = '--mutate' in sys.argv
@@ -426,27 +468,11 @@ def main():
     if not result.wasSuccessful():
         return 1
     if mutate:
-        import contextlib, io
-        source = legacy.SRC.read_text()
-        for i, mutation in enumerate(MUTATIONS, 1):
-            INVENTORY_SOURCE = None
-            if len(mutation) == 3:
-                path, old, new = mutation
-                original = (legacy.ROOT / path).read_text()
-                assert original.count(old) == 1, (i, path, old)
-                INVENTORY_SOURCE = original.replace(old, new)
-                CS = legacy.load(source)
-            else:
-                old, new = mutation
-                assert source.count(old) == 1, (i, old)
-                CS = legacy.load(source.replace(old, new))
-            suite = unittest.defaultTestLoader.loadTestsFromTestCase(CheckInfra)
-            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-                result = unittest.TextTestRunner(stream=io.StringIO()).run(suite)
-            if result.wasSuccessful():
-                print('MUTATION %d GREEN' % i)
+        for i, detected in legacy.mutpar.run_ordered(
+                mutation_result, enumerate(MUTATIONS, 1), processes=True):
+            print('MUTATION %d %s' % (i, 'RED' if detected else 'GREEN'))
+            if not detected:
                 return 1
-            print('MUTATION %d RED' % i)
     return 0
 
 

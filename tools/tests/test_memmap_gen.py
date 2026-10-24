@@ -27,6 +27,7 @@
                → memmap.h だけ直して他が古いまま通る
 """
 import argparse
+import mutpar
 import copy
 import hashlib
 import json
@@ -448,6 +449,21 @@ def layout_cases(script):
     return log + ['CEILING auto/explicit future constant PASS; stale artifact control PASS / mismatch FAIL']
 
 
+def mutation_result(item):
+    name, (old, new) = item
+    source = SCRIPT.read_text(encoding="utf-8")
+    if old not in source:
+        raise SystemExit("変異 %s の当て先が見つからない" % name)
+    with tempfile.TemporaryDirectory(prefix="os32-genmm-mut-") as tmp:
+        mutated = pathlib.Path(tmp) / "gen_memmap.py"
+        mutated.write_text(source.replace(old, new, 1), encoding="utf-8")
+        try:
+            cases(mutated)
+        except (AssertionError, subprocess.SubprocessError) as e:
+            return name, "RED (%s)" % e, True
+    return name, "**GREEN — 試験が穴を見逃した**", False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mutate", action="store_true")
@@ -457,24 +473,10 @@ def main():
         print("  " + line)
     print("gen_memmap PASS")
     if args.mutate:
-        source = SCRIPT.read_text(encoding="utf-8")
         red = 0
-        for name, (old, new) in MUTATIONS.items():
-            if old not in source:
-                raise SystemExit("変異 %s の当て先が見つからない" % name)
-            with tempfile.TemporaryDirectory(prefix="os32-genmm-mut-") as tmp:
-                mutated = pathlib.Path(tmp) / "gen_memmap.py"
-                mutated.write_text(source.replace(old, new, 1), encoding="utf-8")
-                try:
-                    cases(mutated)
-                    ok = True
-                except (AssertionError, subprocess.SubprocessError) as e:
-                    ok = False
-                    why = str(e)
-            print("  変異 %-12s %s" % (name, "RED (%s)" % why if not ok
-                                       else "**GREEN — 試験が穴を見逃した**"))
-            if not ok:
-                red += 1
+        for name, verdict, detected in mutpar.run_ordered(mutation_result, MUTATIONS.items()):
+            print("  変異 %-12s %s" % (name, verdict))
+            red += detected
         print("%d/%d の変異が RED" % (red, len(MUTATIONS)))
         return 0 if red == len(MUTATIONS) else 1
 

@@ -242,6 +242,10 @@ def check_sdk_headers(root, cc=None):
                 argv += ['-I',str(d)]
             try:
                 tu = ast.parse('sdk_scan.c',argv,root,text=body)
+            except ast.ParseError as e:
+                probs.append('%s: clang parse failure — %s' % (rel,e))
+                continue
+            try:
                 for f,ln,w in ast_findings(tu,root,words,heads,public=True):
                     if f.startswith(SDK_HDR_DIR + '/'):
                         probs.append('%s:%d: 公開 SDK ヘッダに C99/C11 の %s' % (f,ln,w))
@@ -249,10 +253,8 @@ def check_sdk_headers(root, cc=None):
                 probs.append('%s: clang parse failure — %s' % (rel,e))
             # Clang accepts GNU // even in gnu89 without an extension diagnostic;
             # use its lexer (including escaped-newline handling) for this C90 rule.
-            try:
-                lexical = ast.parse('sdk_comments.c',argv,root,text=body)
-            except ast.ParseError:
-                continue
+            # The already parsed TU contains these same physical header tokens.
+            lexical = tu
             for header in hs:
                 file = lexical.get_file(str(header.absolute()))
                 if not file:
