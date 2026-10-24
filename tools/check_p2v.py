@@ -36,7 +36,7 @@ def expression_nodes(c):
         yield from expression_nodes(child)
 
 
-def findings(tu, root=ROOT):
+def findings(tu, root=ROOT, files=None):
     nodes = list(ast.walk(tu.cursor))
     macros = [c for c, _ in nodes if c.kind == K.MACRO_INSTANTIATION]
     macro_files = collections.defaultdict(list)
@@ -125,6 +125,8 @@ def findings(tu, root=ROOT):
     ranges = []
     for c, f in nodes:
         rel = ast.relpath(c, root)
+        if files is not None:
+            files.add(rel)
         if c.kind == K.FUNCTION_DECL and c.is_definition() and rel:
             functions.add((rel,c.spelling))
             ranges.append((rel,c.extent.start.offset,c.extent.end.offset,c.spelling))
@@ -222,9 +224,9 @@ def audit(root):
             if u['src'].split('/')[0] not in ROOTS or EXCLUDED.intersection(pathlib.Path(u['src']).parts):
                 continue
             tu = ast.parse(u['src'],u['argv'],root)
-            hits, funcs = findings(tu,root)
+            # Collect exception-file coverage during the findings walk too.
+            hits, funcs = findings(tu,root,files)
             functions.update(funcs)
-            files.update(ast.relpath(c,root) for c,_ in ast.walk(tu.cursor))
             for rel,ln,func,rule in hits:
                 if rel.split('/')[0] not in ROOTS or EXCLUDED.intersection(pathlib.Path(rel).parts):
                     continue

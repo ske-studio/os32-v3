@@ -33,4 +33,6 @@ check-arch-asm:
 - kdebug/**
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/gen_memmap.py
+# Direct root/cwd regression in test_clang_ast.py.
+- tools/clang_ast/__init__.py
 artifact_reader: true

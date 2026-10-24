@@ -40,3 +40,4 @@ check-memmap-host:
 - build/**
 - sdk/link/app_sys.ld
 - sdk/os32_generations.py
+- tools/tests/mutpar.py

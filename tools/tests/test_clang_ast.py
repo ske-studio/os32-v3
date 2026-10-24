@@ -35,6 +35,17 @@ class ClangTest(unittest.TestCase):
         return a.parse('kernel/clang_probe.c', ['-std=gnu11','-ffreestanding']+list(flags),
                        ROOT,text=body)
 
+    def test_relative_paths_follow_root_and_cwd(self):
+        tu = self.tu('int probe;')
+        cursor = next(c for c, _ in a.walk(tu.cursor) if c.spelling == 'probe')
+        self.assertEqual(a.relpath(cursor, ROOT), 'kernel/clang_probe.c')
+        self.assertEqual(a.relpath(cursor, ROOT / 'kernel'), 'clang_probe.c')
+        self.assertIsNone(a.relpath(cursor, ROOT / 'sdk'))
+        with contextlib.chdir(ROOT):
+            self.assertEqual(a.relpath(cursor, '.'), 'kernel/clang_probe.c')
+        with contextlib.chdir(ROOT / 'kernel'):
+            self.assertEqual(a.relpath(cursor, '.'), 'clang_probe.c')
+
     def test_cross_free_build_commands(self):
         # Exercise the real make graph with neither cross GCC nor libc.a.
         env = {'PATH': '/usr/bin:/bin', 'CROSS_DIR': '/nonexistent',
@@ -113,7 +124,9 @@ class ClangTest(unittest.TestCase):
                     self.assertIsNotNone(location)
                     file, _ = a.spelling_position(location)
                     self.assertEqual((root / file).resolve(), root / 'conversion.h')
-            hits, _ = p2v.findings(tu, root)
+            files = set()
+            hits, _ = p2v.findings(tu, root, files)
+            self.assertTrue({'probe.c', 'conversion.h'} <= files)
             self.assertEqual([(f,r) for _,_,f,r in hits], [('bad','physical-cast')])
             # Simulate LLVM 18 collapsing the first position to the call site.
             # Keep single-token positions real, so the second-location wiring
