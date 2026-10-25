@@ -290,8 +290,11 @@ static void resource_tests(void)
     resource_cfg[2][7][8]=0xfff00000; /* 4 GiB length cannot fit u32 */
     CHECK(resource_run(ranges,&n)<0 && n==0);
     resource_cfg[2][7][8]=0x21f02000;
-    n=RECOVER_RANGE_MAX;
-    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)<0);
+    n=RECOVER_RANGE_MAX-1U;
+    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)==0 && n==RECOVER_RANGE_MAX);
+    CHECK(ranges[RECOVER_RANGE_MAX-1U].base==0x20000000 &&
+          ranges[RECOVER_RANGE_MAX-1U].len==0x2000000);
+    CHECK(resource_window(ranges,&n,2,7,PCI_CFG_MEM_WINDOW)<0 && n==RECOVER_RANGE_MAX);
     output("resources: live scan, unknown BAR reject, disabled/IO skip, bridge windows and bounds PASS\n");
 }
 
