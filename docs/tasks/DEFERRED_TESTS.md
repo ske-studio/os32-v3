@@ -30,7 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| SLIM-S2-GUEST | S2c の inspect 先行確保・解放後の実ゲスト T4B/CUI 復帰、normal/R1 の結線・実機ページ余裕 | S2c は host と kernel ビルドまで、NP21/W は操作しない依頼 | SLIM_HWDEV_DESIGN §7 の S2 最終統合・ゲスト受入 (S2e、分割時は S2f)、PM が実施 |
+| SLIM-S2-GUEST | S2 (recover_gf の表を詰める・gfinit_decode を -Os) の ROM の decode を i386 -Os の機械語で実際に通すこと (結果・plan が旧版と一致) | NP21/W に GeForce が無く inspect は ROM を読む前に rc=-1。2026-10-25 に PM が 852c895 の成果物で起動・部品の PAIR・`gfinit inspect 0` の 2 回 (先に確保した約 133KB の領域を失敗の後に解放、free pages・leftover・audit_fail は不変) を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s2/RESULT.md`)。kdebug.bin はバイト一致なので戻す処理の T4b は再試験しない | 実機の S8 の A1 (`gfinit size-bars` の前の inspect が ROM を decode する) で PM が確かめる (台本 tools/accept/gf_s8.md) |
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
 | T3C2-GUI | T3c2 の 6 命令を GUI の端末から回す (sentinel・20 回・ネスト) と、H-5 の Ra266 64MB での同条件比較 | v3 に GUI の端末アプリが無い (H-7)、H-5 は実機の条件。CUI の 6 命令・CUI/GUI の往復・PT の監査は NP21/W で合格 (2026-10-17、`~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`) | GUI の端末は H-7 の再開時、H-5 はハードウェアの実機の回 (T4T7-RH と同じ回) |
 | T4C1-GUEST | T4c-1のゲスト項目のうち未照合: 欠落/混在拒否・対更新・KDEBUG ON/OFF・監査、注入/QUARANTINED | 通常DB 9/9・42/42とservices順/diff0、部品なしMINIMALはT4c-2受入記録あり (`~/os32-tmp/evidence/2026-10-18/t4c2_np21w/RESULT.md`)。項目別に突合し、T4全体の状態行だけで一括閉鎖しない | T7着手時点の残件: 注入/QUARANTINED・欠落/混在拒否・同/異世代更新/別root復旧・KDEBUG ON/OFFの項目別照合は証拠未確認。通常起動・MINIMAL・監査diff0は `~/os32-tmp/evidence/2026-10-19/t5_milestone_np21w/RESULT.md` で確認済み |
