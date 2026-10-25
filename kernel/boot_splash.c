@@ -8,6 +8,11 @@
 /*  GFX初期化→描画→アニメーション→両ページ消去→テキストモード復帰を完結。     */
 /* ======================================================================== */
 
+#define SPLASH_HUE_SECTOR     60
+#define SPLASH_HUE_SECTORS    6
+#define SPLASH_HUE_CIRCLE     (SPLASH_HUE_SECTOR * SPLASH_HUE_SECTORS)
+#define SPLASH_COLOR_MAX      15
+#define SPLASH_GRAD_LINE_STEP 4
 #include "gfx.h"
 #include "gfx_internal.h"
 #include "gfx_hal.h"   /* g_backend / GFX_BB_*: 4 プレーン機かどうかの判定 */
@@ -54,7 +59,7 @@ static u8 s_grad_b[GRAD_STEPS];
 static void bb_clear(u8 color)
 {
     int p;
-    for (p = 0; p < 4; p++) {
+    for (p = 0; p < GVRAM_PLANES; p++) {
         u8 val = (color & (1 << p)) ? 0xFF : 0x00;
         kmemset(splash_fb.planes[p], val, GFX_PLANE_SZ);
     }
@@ -76,12 +81,12 @@ static void bb_fill_rect(int x, int y, int w, int h, u8 color)
 
     x1 = x;
     x2 = x + w - 1;
-    byte_start = x1 / 8;
-    byte_end   = x2 / 8;
-    mask_first = 0xFF >> (x1 & 7);
-    mask_last  = 0xFF << (7 - (x2 & 7));
+    byte_start = x1 / BITS_PER_BYTE;
+    byte_end   = x2 / BITS_PER_BYTE;
+    mask_first = 0xFF >> (x1 % BITS_PER_BYTE);
+    mask_last  = 0xFF << (BITS_PER_BYTE - 1 - (x2 % BITS_PER_BYTE));
 
-    for (p = 0; p < 4; p++) {
+    for (p = 0; p < GVRAM_PLANES; p++) {
         u8 *plane = splash_fb.planes[p];
         u8 set = (color & (1 << p)) ? 1 : 0;
 
@@ -173,11 +178,11 @@ static void splash_hsv(int h, int s, int v, u8 *r, u8 *g, u8 *b)
 {
     int hi, f, p, q, t;
     if (s == 0) { *r = *g = *b = (u8)v; return; }
-    hi = (h / 60) % 6;
-    f = h % 60;
-    p = v * (15 - s) / 15;
-    q = v * (15 - (s * f / 60)) / 15;
-    t = v * (15 - (s * (60 - f) / 60)) / 15;
+    hi = (h / SPLASH_HUE_SECTOR) % SPLASH_HUE_SECTORS;
+    f = h % SPLASH_HUE_SECTOR;
+    p = v * (SPLASH_COLOR_MAX - s) / SPLASH_COLOR_MAX;
+    q = v * (SPLASH_COLOR_MAX - (s * f / SPLASH_HUE_SECTOR)) / SPLASH_COLOR_MAX;
+    t = v * (SPLASH_COLOR_MAX - (s * (SPLASH_HUE_SECTOR - f) / SPLASH_HUE_SECTOR)) / SPLASH_COLOR_MAX;
     switch (hi) {
         case 0: *r = (u8)v; *g = (u8)t; *b = (u8)p; break;
         case 1: *r = (u8)q; *g = (u8)v; *b = (u8)p; break;
@@ -192,8 +197,8 @@ static void make_grad_table(void)
 {
     int i, h;
     for (i = 0; i < GRAD_STEPS; i++) {
-        h = i * 360 / GRAD_STEPS;
-        splash_hsv(h, 15, 15, &s_grad_r[i], &s_grad_g[i], &s_grad_b[i]);
+        h = i * SPLASH_HUE_CIRCLE / GRAD_STEPS;
+        splash_hsv(h, SPLASH_COLOR_MAX, SPLASH_COLOR_MAX, &s_grad_r[i], &s_grad_g[i], &s_grad_b[i]);
     }
 }
 
@@ -249,11 +254,11 @@ static void build_raster(GFX_RasterPalTable *tbl, int offset)
         if (tbl->count >= GFX_RASTER_MAX_ENTRIES) break;
         idx = (step + offset) % GRAD_STEPS;
         e = &tbl->entries[tbl->count];
-        e->line = (u16)(step * 4);
+        e->line = (u16)(step * SPLASH_GRAD_LINE_STEP);
         e->pal_idx = PAL_GRAD;
-        e->r = s_grad_r[idx] & 0x0F;
-        e->g = s_grad_g[idx] & 0x0F;
-        e->b = s_grad_b[idx] & 0x0F;
+        e->r = s_grad_r[idx] & SPLASH_COLOR_MAX;
+        e->g = s_grad_g[idx] & SPLASH_COLOR_MAX;
+        e->b = s_grad_b[idx] & SPLASH_COLOR_MAX;
         tbl->count++;
     }
 }

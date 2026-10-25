@@ -17,6 +17,9 @@
 /*  8KB を最大長で割ると 40 本しか入らないため。                             */
 /* ======================================================================== */
 
+/* PRINT wire header: type, color, payload length. */
+#define CON_SINK_PRINT_LEN_OFF 2
+#include "utf8.h"
 #include "os32_kapi_shared.h"
 #include "con_sink.h"
 
@@ -68,7 +71,7 @@ static u32 ring_rec_size(void)
 {
     u8 type = ring_peek(0);
     if (type == (u8)CON_SINK_REC_PRINT) {
-        return (u32)CON_SINK_HDR_PRINT + (u32)ring_peek(2);
+        return (u32)CON_SINK_HDR_PRINT + (u32)ring_peek(CON_SINK_PRINT_LEN_OFF);
     }
     if (type == (u8)CON_SINK_REC_CURSOR) {
         return (u32)CON_SINK_HDR_CURSOR;
@@ -156,7 +159,7 @@ static u32 utf8_chunk_len(const u8 *p, u32 avail, u32 max)
     u32 n;
     if (avail <= max) return avail;
     n = max;
-    while (n > 0 && (p[n] & 0xC0) == 0x80) n--;
+    while (n > 0 && UTF8_IS_CONT(p[n])) n--;
     if (n == 0) return max;
     return n;
 }
@@ -204,7 +207,7 @@ void con_sink_push_exit(int id)
     unsigned int f;
     if (!g_enabled) return;
     if (id < 0) id = 0;
-    if (id > 255) id = 255;
+    if (id > (int)U8_MAX) id = (int)U8_MAX;
     f = con_sink_lock();
     if (g_enabled && ring_reserve((u32)CON_SINK_HDR_EXIT)) {
         ring_put((u8)CON_SINK_REC_EXIT);
@@ -219,8 +222,8 @@ void con_sink_push_cursor(int x, int y)
     if (!g_enabled) return;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
-    if (x > 255) x = 255;
-    if (y > 255) y = 255;
+    if (x > (int)U8_MAX) x = (int)U8_MAX;
+    if (y > (int)U8_MAX) y = (int)U8_MAX;
     f = con_sink_lock();
     if (g_enabled && ring_reserve((u32)CON_SINK_HDR_CURSOR)) {
         ring_put((u8)CON_SINK_REC_CURSOR);

@@ -5,6 +5,7 @@
 /*  shell.cから分離。外部プログラム(shell.bin含む)はKernelAPI経由で利用。    */
 /* ======================================================================== */
 
+#define CONSOLE_TAB_COLS 4
 #include "memmap.h"
 #include "types.h"
 #include "serial.h"
@@ -106,7 +107,7 @@ void tvram_clear(void)
      * 論理カーソルだけ 0,0 に戻ると凍っている画面と食い違う)。 */
     if (con_sink_is_enabled()) return;
     for (i = 0; i < TVRAM_COLS * TVRAM_ROWS; i++) {
-        text[i] = 0x0020;
+        text[i] = TVRAM_SPACE;
         attr = (volatile u8 *)P2V_IO((TVRAM_ATTR + (u32)i * TVRAM_CELL_BYTES));
         *attr = ATTR_WHITE;
     }
@@ -157,7 +158,7 @@ int tvram_reverse_cell(int x, int y)
     /* 左半分の文字コードで幅を判定 */
     code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * TVRAM_CELL_BYTES));
     if ((code >> 8) != 0 && !(code & TVRAM_KANJI_RIGHT) && rx < TVRAM_COLS - 1) {
-        width = 2;  /* 漢字 */
+        width = TVRAM_WIDE_COLS;  /* 漢字 */
     } else {
         width = 1;  /* ANK */
     }
@@ -166,7 +167,7 @@ int tvram_reverse_cell(int x, int y)
     for (i = 0; i < width; i++) {
         u32 offset = (u32)y * TVRAM_BPR + (u32)(rx + i) * TVRAM_CELL_BYTES;
         volatile u8 *p = (volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
-        *p ^= 0x04;
+        *p ^= TATTR_REVERSE;
     }
 
     return width;
@@ -186,7 +187,7 @@ void tvram_scroll(void)
     }
     /* rows-1 行目を空白化 */
     for (i = TVRAM_COLS * (rows - 1); i < TVRAM_COLS * rows; i++) {
-        text[i] = 0x0020;
+        text[i] = TVRAM_SPACE;
         attr[i] = ATTR_WHITE;
     }
 }
@@ -217,7 +218,7 @@ static void putchar_raw(char ch, u8 color)
         cursor_y++;
     } else if (ch == '\r') {
         cursor_x = 0;
-    } else if (ch == 0x08) {
+    } else if (ch == ASCII_BS) {
         if (cursor_x > 0) {
             cursor_x--;
             tvram_putchar_at(cursor_x, cursor_y, ' ', ATTR_WHITE);
@@ -267,7 +268,7 @@ void shell_print(const char *str, u8 color)
 /* 10進表示 (変換は kprintf.h の kutoa_dec に統一) */
 void shell_print_dec(u32 val, u8 color)
 {
-    char buf[12];
+    char buf[U32_DEC_BUFSIZE + 1];
     kutoa_dec(val, buf, (int)sizeof(buf));
     shell_print(buf, color);
 }
@@ -276,15 +277,15 @@ void shell_print_dec(u32 val, u8 color)
 void shell_print_hex32(u32 val, u8 color)
 {
     static const char hex[] = "0123456789ABCDEF";
-    char buf[11];
+    char buf[HEX32_DIGITS + sizeof("0x")];
     int i;
     buf[0] = '0';
     buf[1] = 'x';
-    for (i = 9; i >= 2; i--) {
-        buf[i] = hex[val & 0xF];
-        val >>= 4;
+    for (i = HEX32_DIGITS + 1; i >= 2; i--) {
+        buf[i] = hex[val & ((1u << HEX_NIBBLE_BITS) - 1)];
+        val >>= HEX_NIBBLE_BITS;
     }
-    buf[10] = '\0';
+    buf[HEX32_DIGITS + 2] = '\0';
     shell_print(buf, color);
 }
 
@@ -318,13 +319,13 @@ void shell_print_utf8(const char *utf8_str, u8 color)
             continue;
         }
         if (*p == '\r') { cursor_x = 0; p++; continue; }
-        if (*p == '\t') { cursor_x = (cursor_x + 4) & ~3; p++; continue; }
+        if (*p == '\t') { cursor_x = (cursor_x + CONSOLE_TAB_COLS) & ~(CONSOLE_TAB_COLS - 1); p++; continue; }
 
         dec = utf8_decode(p);
         cp = dec.codepoint;
         p += dec.bytes_used;
 
-        if (cp == 0xFEFF || cp < 0x20) continue;
+        if (cp == UCS_BOM || cp < UCS_C0_END) continue;
 
         ank = unicode_to_ank(cp);
         if (ank) {
@@ -343,7 +344,7 @@ void shell_print_utf8(const char *utf8_str, u8 color)
                 if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
             }
             tvram_putkanji_at(cursor_x, cursor_y, jis, color);
-            cursor_x += 2;
+            cursor_x += TVRAM_WIDE_COLS;
             if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
             if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
             continue;
@@ -355,8 +356,8 @@ void shell_print_utf8(const char *utf8_str, u8 color)
             cursor_y++;
             if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
         }
-        tvram_putkanji_at(cursor_x, cursor_y, 0x2222, color);  /* □ (JIS 0x2222) */
-        cursor_x += 2;
+        tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
+        cursor_x += TVRAM_WIDE_COLS;
         if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
         if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
     }
@@ -396,10 +397,10 @@ void console_write(const char *buf, u32 size, u8 color)
             continue;
         }
         if (*p == '\r') { cursor_x = 0; p++; remaining--; continue; }
-        if (*p == '\t') { cursor_x = (cursor_x + 4) & ~3; p++; remaining--; continue; }
+        if (*p == '\t') { cursor_x = (cursor_x + CONSOLE_TAB_COLS) & ~(CONSOLE_TAB_COLS - 1); p++; remaining--; continue; }
 
-        if (remaining < 4) {
-            u8 tmp[4] = {0, 0, 0, 0};
+        if (remaining < UTF8_MAX_BYTES) {
+            u8 tmp[UTF8_MAX_BYTES] = {0, 0, 0, 0};
             u32 k;
             for (k = 0; k < remaining; k++) tmp[k] = p[k];
             dec = utf8_decode(tmp);
@@ -417,7 +418,7 @@ void console_write(const char *buf, u32 size, u8 color)
         p += dec.bytes_used;
         remaining -= dec.bytes_used;
 
-        if (cp == 0xFEFF || cp < 0x20) continue;
+        if (cp == UCS_BOM || cp < UCS_C0_END) continue;
 
         ank = unicode_to_ank(cp);
         if (ank) {
@@ -436,7 +437,7 @@ void console_write(const char *buf, u32 size, u8 color)
                 if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
             }
             tvram_putkanji_at(cursor_x, cursor_y, jis, color);
-            cursor_x += 2;
+            cursor_x += TVRAM_WIDE_COLS;
             if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
             if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
             continue;
@@ -448,8 +449,8 @@ void console_write(const char *buf, u32 size, u8 color)
             cursor_y++;
             if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
         }
-        tvram_putkanji_at(cursor_x, cursor_y, 0x2222, color);  /* □ (JIS 0x2222) */
-        cursor_x += 2;
+        tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
+        cursor_x += TVRAM_WIDE_COLS;
         if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
         if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
     }
@@ -488,7 +489,7 @@ void console_hw_cursor_enable(void)
     outp(GDC_TEXT_CMD, GDC_CMD_CSRFORM);
     outp(GDC_TEXT_PARAM, (u8)(GDC_CSRFORM_DC | (GDC_TEXT_LINES_PER_ROW - 1)));
     outp(GDC_TEXT_PARAM, (u8)GDC_TEXT_CSR_TOP);
-    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << 3) | GDC_TEXT_CSR_BR_HI));
+    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << GDC_TEXT_CSR_BOTTOM_SHIFT) | GDC_TEXT_CSR_BR_HI));
     console_hw_cursor_sync();
 }
 
@@ -508,7 +509,7 @@ void console_text_gdc_stop(void)
     outp(GDC_TEXT_CMD, GDC_CMD_CSRFORM);
     outp(GDC_TEXT_PARAM, (u8)(GDC_TEXT_LINES_PER_ROW - 1));   /* DC=0 → 非表示 */
     outp(GDC_TEXT_PARAM, (u8)GDC_TEXT_CSR_TOP);
-    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << 3) | GDC_TEXT_CSR_BR_HI));
+    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << GDC_TEXT_CSR_BOTTOM_SHIFT) | GDC_TEXT_CSR_BR_HI));
 }
 
 /* CUI モード復帰: GDC テキストカーソルを再表示して論理位置へ同期する。

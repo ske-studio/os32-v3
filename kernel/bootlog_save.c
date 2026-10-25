@@ -30,7 +30,7 @@ void bootlog_save(void)
     const char *data;
     int kind, stage, rc = 0;
     u32 len;
-    char build[32];
+    char build[BOOT_BUILD_TEXT_MAX];
     char header[BOOTLOG_HDR_MAX];
     BootImageInfo bi;
     BootlogHeaderInfo hi;
@@ -58,7 +58,7 @@ void bootlog_save(void)
 
     stage = bootlog_save_with(&g_bootlog_vfs_ops, kind, data, len, &rc);
     if (stage != BOOTLOG_ST_OK) {
-        kprintf(0xC1, "[bootlog] %s failed rc=%d (boot continues)\n",
+        kprintf(ATTR_YELLOW, "[bootlog] %s failed rc=%d (boot continues)\n",
                 bootlog_stage_name(stage), rc);
     } else {
         kprintf(KLOG_ATTR, "[bootlog] %s %u bytes (dropped %u)\n", SYS_BOOTLOG_FILE,

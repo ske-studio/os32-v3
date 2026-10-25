@@ -334,12 +334,12 @@ IME_MUTANTS = [
      '    if (result == 0 && step_rc != SQLITE_DONE) {\n'
      '        *io_error = is_ioerr(step_rc);\n'
      '        kprintf(ATTR_RED, "IME: export step failed (rc=%d)\\r\\n", step_rc);\n'
-     '        result = -4;\n'
+     '        result = IME_DICT_ERR_EXPORT_READ;\n'
      '    }\n\n'
      '    int final_rc = sqlite3_finalize(stmt);\n'
      '    if (!result && final_rc != SQLITE_OK) {\n'
      '        *io_error = is_ioerr(final_rc);\n'
-     '        result = -4;\n'
+     '        result = IME_DICT_ERR_EXPORT_READ;\n'
      '    }',
      '    sqlite3_finalize(stmt);'),
     ("clear が旧接続で先に SQL を流す",
@@ -358,7 +358,7 @@ IME_MUTANTS = [
      "        dict_recover(dict)) {\n        rc = sqlite3_exec",
      "        0) {\n        rc = sqlite3_exec"),
     ("list の prepare の失敗を 0 件にする",
-     '"IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\\r\\n", rc);\n        return -4;',
+     '"IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\\r\\n", rc);\n        return IME_DICT_ERR_USER_LIST;',
      '"IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\\r\\n", rc);\n        return 0;'),
     ("学習が旧接続で先に SQL を流す",
      "    if (!dict_ready(dict) || !dict->learn_stmt) return;",

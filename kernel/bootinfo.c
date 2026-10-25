@@ -8,6 +8,7 @@
 /*  票: docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0                           */
 /* ======================================================================== */
 
+#include "boot_devices.h"
 #include "bootinfo.h"
 #include "memmap.h"
 #include "ide.h"
@@ -113,7 +114,7 @@ void bootinfo_report(void)
     }
 
     /* IDENTIFY の値。hd0 / hd1 (バンク0 のマスタ・スレーブ) だけ。 */
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < (int)BOOTINFO_NDRIVES; i++) {
         IdeGeom g;
         struct bootinfo_ata a;
 
@@ -125,7 +126,7 @@ void bootinfo_report(void)
         a.cur_heads = g.cur_heads;
         a.cur_spt   = g.cur_spt;
         a.cur_valid = (u8)((g.w53 & 0x0001) ? 1 : 0);
-        a.lba       = (u8)((g.w49 & 0x0200) ? 1 : 0);
+        a.lba       = (u8)((g.w49 & IDE_IDENT_CAP_LBA) ? 1 : 0);
         a.total     = g.total;
         bootinfo_format_ata(&a, i, line, (int)sizeof(line));
         kprintf(KLOG_ATTR, "%s\n", line);
@@ -172,7 +173,7 @@ int hdd_geom_info(int drive, void *out_v)
     int da, i;
 
     if (!out) return OS32_ERR_INVAL;
-    if (drive < 0 || drive > 3) return OS32_ERR_INVAL;
+    if (drive < 0 || drive >= IDE_DRIVE_COUNT) return OS32_ERR_INVAL;
     kmemset(out, 0, sizeof(*out));
 
     da = bootinfo_da_of(drive);
@@ -235,7 +236,7 @@ int boot_image_info(void *out_v)
 
 void bootinfo_report_image(void)
 {
-    char build[32];
+    char build[BOOT_BUILD_TEXT_MAX];
 
     kapi_sys_get_build_info(build, (int)sizeof(build));
     kprintf(KLOG_ATTR, "[boot] Build: %s  Commit: %s\n", build, os32_build_commit);

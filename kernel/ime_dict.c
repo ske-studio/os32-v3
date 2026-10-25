@@ -9,6 +9,18 @@
 /*    - 3文字以上: 前方一致 (範囲検索でインデックス活用)                     */
 /* ======================================================================== */
 
+#define IME_SINGLE_KANJI_COST 300
+/* Dictionary variants and operation-specific failures retain their ABI values. */
+#define IME_DICT_ERR_EXACT_PREPARE (-2)
+#define IME_DICT_ERR_PREFIX_PREPARE (-3)
+#define IME_DICT_ERR_USER_LIST     (-4)
+#define IME_DICT_ERR_DELETE_PREPARE (-2)
+#define IME_DICT_ERR_DELETE_EXEC   (-3)
+#define IME_DICT_ERR_EXPORT_OPEN   (-2)
+#define IME_DICT_ERR_EXPORT_PREPARE (-3)
+#define IME_DICT_ERR_EXPORT_READ   (-4)
+#define IME_DICT_ERR_EXPORT_WRITE  (-5)
+#define IME_DICT_ERR_CLEAR         (-2)
 #include "ime.h"
 #include "sqlite_engine.h"
 #include "sqlite3.h"
@@ -130,7 +142,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare exact failed (rc=%d)\r\n", rc);
         (void)ime_dict_close(dict);
-        return -2;
+        return IME_DICT_ERR_EXACT_PREPARE;
     }
     dict->exact_stmt = (void *)stmt;
 
@@ -139,7 +151,7 @@ int ime_dict_open(IME_Dict *dict, const char *path)
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: prepare prefix failed (rc=%d)\r\n", rc);
         (void)ime_dict_close(dict);
-        return -3;
+        return IME_DICT_ERR_PREFIX_PREPARE;
     }
     dict->prefix_stmt = (void *)stmt;
 
@@ -210,7 +222,7 @@ static int dict_recover(IME_Dict *dict)
     if (!stale && dict->io_retried) return 0;
 
     n = kstrlen(dict->path);
-    if (n + 9u > sizeof(name)) return 0;   /* "-journal" + NUL */
+    if (n + sizeof("-journal") > sizeof(name)) return 0;   /* "-journal" + NUL */
     kstrncpy(name, dict->path, sizeof(name));
     kstrncat(name, "-journal", sizeof(name));
 
@@ -331,12 +343,12 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
             }
             kmemcpy(full_kanji[count], kanji_text, copy_len + 1);
         }
-        if (copy_len > 31) copy_len = 31;
+        if (copy_len > (int)sizeof(r->kanji) - 1) copy_len = (int)sizeof(r->kanji) - 1;
         kmemcpy(r->kanji, kanji_text, copy_len);
         r->kanji[copy_len] = '\0';
 
         /* 読みをコピー */
-        copy_len = yomi_len < 31 ? yomi_len : 31;
+        copy_len = yomi_len < (int)sizeof(r->yomi) - 1 ? yomi_len : (int)sizeof(r->yomi) - 1;
         kmemcpy(r->yomi, yomi, copy_len);
         r->yomi[copy_len] = '\0';
 
@@ -348,7 +360,7 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
 
         /* ひらがな/カタカナそのまま表記に対する動的ペナルティ */
         if (r->cost >= 0 && kstrlen(r->kanji) >= (u32)yomi_len) {
-            r->cost += 300;
+            r->cost += IME_SINGLE_KANJI_COST;
         }
 
         count++;
@@ -520,7 +532,7 @@ finish:
     if (rc != SQLITE_DONE) {
         *io_error = is_ioerr(rc);
         kprintf(ATTR_RED, "IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\r\n", rc);
-        return -4;
+        return IME_DICT_ERR_USER_LIST;
     }
     return count;
 }
@@ -559,7 +571,7 @@ static int user_delete_once(IME_Dict *dict, const char *yomi,
     if (rc != SQLITE_OK) {
         *io_error = is_ioerr(sqlite3_extended_errcode(db));
         kprintf(ATTR_RED, "IME: user_delete prepare failed (rc=%d)\r\n", rc);
-        return -2;
+        return IME_DICT_ERR_DELETE_PREPARE;
     }
 
     rc = sqlite3_bind_text(stmt, 1, yomi, (int)kstrlen(yomi), SQLITE_STATIC);
@@ -573,7 +585,7 @@ static int user_delete_once(IME_Dict *dict, const char *yomi,
     if (rc != SQLITE_DONE) {
         *io_error = is_ioerr(rc);
         kprintf(ATTR_RED, "IME: user_delete execute failed (rc=%d)\r\n", rc);
-        return -3;
+        return IME_DICT_ERR_DELETE_EXEC;
     }
 
     return 0;
@@ -609,7 +621,7 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
     fd = vfs_open(path, KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
     if (fd < 0) {
         kprintf(ATTR_RED, "IME: export open failed: %s (fd=%d)\r\n", path, fd);
-        return -2;
+        return IME_DICT_ERR_EXPORT_OPEN;
     }
 
     sql = "SELECT yomi, kanji, freq FROM dict_user ORDER BY freq DESC, yomi ASC";
@@ -619,7 +631,7 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
         kprintf(ATTR_RED, "IME: export prepare failed (rc=%d)\r\n", rc);
         if (stmt) sqlite3_finalize(stmt);
         (void)vfs_close(fd);
-        return -3;
+        return IME_DICT_ERR_EXPORT_PREPARE;
     }
 
     while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -633,20 +645,20 @@ static int user_export_once(IME_Dict *dict, const char *path, int *io_error)
         len = (u32)kstrlen(line);
         if (vfs_write_fd(fd, line, len) != (int)len) {
             kprintf(ATTR_RED, "IME: export write failed: %s\r\n", path);
-            result = -5;
+            result = IME_DICT_ERR_EXPORT_WRITE;
             break;
         }
     }
     if (result == 0 && step_rc != SQLITE_DONE) {
         *io_error = is_ioerr(step_rc);
         kprintf(ATTR_RED, "IME: export step failed (rc=%d)\r\n", step_rc);
-        result = -4;
+        result = IME_DICT_ERR_EXPORT_READ;
     }
 
     int final_rc = sqlite3_finalize(stmt);
     if (!result && final_rc != SQLITE_OK) {
         *io_error = is_ioerr(final_rc);
-        result = -4;
+        result = IME_DICT_ERR_EXPORT_READ;
     }
     vfs_close(fd); /* void API: no close status is exposed by VFS. */
     return result;
@@ -682,7 +694,7 @@ int ime_user_clear(IME_Dict *dict)
     }
     if (rc != SQLITE_OK) {
         kprintf(ATTR_RED, "IME: user_clear execute failed (rc=%d)\r\n", rc);
-        return -2;
+        return IME_DICT_ERR_CLEAR;
     }
     dict->io_retried = 0;
     return 0;

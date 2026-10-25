@@ -44,13 +44,13 @@ static int tvram_render_putw(int x, int y, u32 codepoint, u8 color)
             return 0;
         }
         tvram_putkanji_at(x, y, jis, color);
-        return 2;
+        return TVRAM_WIDE_COLS;
     }
 
     /* 変換不可: □ (JIS 0x2222) を表示 */
     if (x < TVRAM_COLS - 1) {
-        tvram_putkanji_at(x, y, 0x2222, color);
-        return 2;
+        tvram_putkanji_at(x, y, TVRAM_JIS_REPLACEMENT, color);
+        return TVRAM_WIDE_COLS;
     }
 
     return 0;

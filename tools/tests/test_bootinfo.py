@@ -30,7 +30,7 @@ CASES = ["good", "magic", "check_word", "version", "sum", "rules", "format",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / "include")]
+INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "lib")]
 
 # 否定側。(パターン, 置換, 説明)
 MUTATIONS = [
