@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・規則 [POLICY_DEV](../../POLICY_DEV.md) §1 (カーネル層の不具合が先)
 
-> 状態: **設計中 (2026-10-25)** — 段 S1 は設計なしで実装、S2〜S4 は設計の往復 (起草 astra → レビュー Opus) の後に実装。
+> 状態: **実装中 (2026-10-25)** — S1 は設計なしで実装、S2 は設計確定、S3・S4 は設計の往復 (起草 astra → レビュー Opus) 中。
 
 ## 0. ユーザー指示 (2026-10-25)
 
@@ -28,7 +28,7 @@
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
 | S1 | #3 の死んだローダを消し、行番号の参照を正しい所へ直す | 不要 | astra | 実装中 |
-| S2 | #1 の表を詰める (+ #6 を調べる) | SLIM_HWDEV (astra 起草) | astra | 設計中 |
+| S2 | #1 の表を詰める (+ #6: 原因は -O2 の展開、gfinit_decode だけ -Os)。hwdev の中で論理表へ展開し、recover.c・recover.h・HWDEV の契約・kdebug.bin は変えない。S2a (旧表の oracle) → S2c (展開 API・inspect で先に確保・試験の移し) → S2d (詰めた表) → S2e (-Os・総量) を直列 | [SLIM_HWDEV_DESIGN](../../decisions/realhw/SLIM_HWDEV_DESIGN.md) (確定 2026-10-25) | astra | 実装待ち |
 | S3 | #2・#7 の自己試験をカーネルの外へ (+ #4 を調べる) | SLIM_KERNEL (astra 起草) | astra | 設計中 |
 | S4 | #5 の長い関数を分ける (機械語の比べで確かめられる純粋な分割から) | SLIM_KERNEL | astra | 設計中 |
 
