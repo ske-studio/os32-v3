@@ -15,6 +15,7 @@ check-hwdev-audit-host:
 - kdebug/gfinit*.h
 - kdebug/recover*.h
 - kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
 - sdk/kapi.json
 - tools/tests/test_hwdev_audit.py
 artifact_reader: true

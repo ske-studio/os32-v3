@@ -1,5 +1,6 @@
 check-recover-tables-host:
 - kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
 - kdebug/recover_gf_expand.h
 - kdebug/recover_gf.h
 - kdebug/recover.h
@@ -21,3 +22,6 @@ check-recover-tables-host:
 - tools/tests/host32.py
 - build/checks.d/check-recover-tables-host.mk
 - tools/check_map.d/check-recover-tables-host.yaml
+- tools/gen_recover_tables.py
+- tools/tests/recover_tables_host.h
+- tools/tests/recover_tables_bounds.h

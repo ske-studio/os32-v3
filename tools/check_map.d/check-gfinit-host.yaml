@@ -4,6 +4,7 @@ check-gfinit-host:
 - kdebug/recover.c
 - kdebug/recover.h
 - kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
 - kdebug/recover_gf_expand.h
 - kdebug/recover_gf.h
 - tools/tests/gfinit_host.c

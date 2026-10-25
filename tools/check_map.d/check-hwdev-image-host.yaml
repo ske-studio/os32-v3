@@ -15,6 +15,7 @@ check-hwdev-image-host:
 - kdebug/gfinit*.h
 - kdebug/recover*.h
 - kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
 - kdebug/kpeek.h
 - build/hwdev.ld
 - build/hwdev.mk

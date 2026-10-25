@@ -273,3 +273,10 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
 - gf_release_rom は detach 拒否を戻り値 -1 で伝え、再 inspect はそこで中止する；そのとき backing・profile・lease を保持し、再確保や再展開で上書きしない。
 - host の include 階層は translation unit ごとに 1 個の展開済み fixture を共有し、各実行入口で初期化する；旧静的配列への直接参照も移し、ROM 診断ツールは既存の合成 ROM fixture で通す。
 - RUN の合成試験は展開先と plan_build の出力を同じ領域にして自己コピー・VRAM 追記・bind 後の node_layout/node_write の参照先を検査し、owner 試験は各確保点・展開/boot/probe 失敗・detach 拒否・前回 RUN を保持した SIZE_BARS の読み通知を検査する。
+
+## S2d の実装で設計者が決めたこと
+
+- 生成器の既定入力は S2a の固定 oracle だけを C で評価した schema=1 レコードとし、`--input` では保存済み抽出 JSON も受け取る；製品未生成でも生成でき、`--check` は全欄比較で採取した oracle JSON から再現を確認する。
+- 補助配列と式関数は recover_gf.c に残し、生成 include は 3 表と件数だけを持つ；範囲の結合には kinds の参照名も一致させ、ポインタの参照先と順序を保存する。
+- 範囲は書込み前に私有の検査関数で ordinal・端点・容量・展開総数を検査し、inclusive 長は差分で比較する；最後の substep を書いた直後に終了して u32 末尾の加算折返しを避ける。
+- host は固定 oracle との全欄比較に加え、私有の範囲検査へ先頭ずれ・範囲間ずれ・逆転・総数不足・容量超過・u32 末尾を入力し、生成器の u8/u16 上限と NONE 衝突も検査する；i386 のサイズ・整列は製品内 STATIC_ASSERT で検査する。

@@ -43,6 +43,7 @@ def wrapper(source, text, name):
     result += '    return "UNKNOWN";\n}\n'
     if name == 'product':
         result += '#define RT_EXPAND_PRODUCT 1\n'
+        result += f'#include "{TESTS / "recover_tables_bounds.h"}"\n'
     result += f'#define RT_DUMP recover_tables_dump_{name}\n#include "{TESTS / "recover_tables_host.h"}"\n'
     return result
 
@@ -74,6 +75,47 @@ def expression_bodies(text):
     # These functions are retained unchanged by S2. Compare preprocessed bodies
     # as well as symbolic eval bindings, never function addresses across TUs.
     return dict(re.findall(r'^static int (\w+)(\([^\n]+\)\n\{.*?^\})', text, re.M | re.S))
+
+
+def extract_oracle():
+    """Evaluate the frozen TU alone, also before a generated product exists."""
+    provenance = json.loads((TESTS / 'recover_tables_oracle.json').read_text())
+    if hashlib.sha256(ORACLE.read_bytes()).hexdigest() != provenance['oracle_sha256']:
+        raise ValueError('frozen oracle SHA256 mismatch')
+    with tempfile.TemporaryDirectory(prefix='recover-oracle-') as tmp:
+        temp = pathlib.Path(tmp)
+        unit = temp / 'oracle.c'
+        unit.write_text(wrapper(ORACLE, ORACLE.read_text(), 'oracle'))
+        main = temp / 'main.c'
+        main.write_text((TESTS / 'recover_tables_host.c').read_text().replace(
+            '    recover_tables_dump_product();', ''))
+        exe = temp / 'extract'
+        subprocess.run(['gcc', *FLAGS, '-nostdlib', '-static', '-no-pie',
+                        '-Wl,--gc-sections', str(unit), str(ROOT / 'kdebug/recover.c'),
+                        str(main), '-o', str(exe)], check=True)
+        run = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
+        if run.returncode or not run.stdout.endswith(b'END\n'):
+            raise RuntimeError(f'oracle extraction failed: {run.stderr!r}')
+        return {'schema': 1, 'provenance': provenance,
+                'records': records(run.stdout.decode()[:-4])}
+
+
+def check_generator_bounds():
+    import sys
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from gen_recover_tables import narrow
+    for bits in (8, 16):
+        limit = (1 << bits) - 1
+        assert narrow(0xffffffff, bits, True) == f'REC_TABLE_NONE{bits}'
+        assert narrow(0, bits, True) == '0x0U'
+        narrow(limit - 1, bits, True)
+        narrow(limit, bits)
+        for value, sentinel in [(limit, True), (limit + 1, False), (-1, False)]:
+            try:
+                narrow(value, bits, sentinel)
+            except ValueError:
+                continue
+            raise ValueError(f'narrow accepted {value}/{bits}/{sentinel}')
 
 
 def main():
@@ -112,6 +154,7 @@ def main():
             if values.get(('profile', 0, field, 0)) != count:
                 raise ValueError(f'oracle count mismatch: {field}')
         compare(old, new)
+        check_generator_bounds()
         if args.extract:
             args.extract.write_text(json.dumps({'schema': 1, 'provenance': provenance,
                                                'records': old}, indent=2) + '\n')

@@ -66,7 +66,7 @@ void RT_DUMP(void)
 #ifdef RT_EXPAND_PRODUCT
     static struct gfinit_plan buffer;
     struct recover_profile expanded;
-    if (recover_gf_profile_expand(&expanded, &buffer)) {
+    if (rt_bounds() || recover_gf_profile_expand(&expanded, &buffer)) {
         rt_text("expand failed\n"); rt_flush();
         return;
     }
