@@ -29,9 +29,9 @@
 | G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | **main** (675bb395、astra 取り込み可、機械語の差 0) |
 | G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [GFX_MODES_DESIGN](../../decisions/gui/GFX_MODES_DESIGN.md) | sol | **main** (astra 取り込み可、.o の差は Cirrus の 3 関数、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
 | G3 | 98 の 16 色のバックエンドがモードの表を申告 (gfx/backend_pc98.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-n16 合格) |
-| G4 | PEGC のバックエンドの表 (gfx/backend_pegc.c) | 同上 | sol | 実装中 |
-| G5 | Cirrus のバックエンドの表 (gfx/backend_cirrus.c) | 同上 | sol | 未着手 |
-| G6a | HAL のモードの選択と init / init_200 / prepare への反映 (gfx/gfx_core.c) | 同上 | sol (難所は astra) | 未着手 |
-| G6b | フレームバッファと query への反映、容量の照合 (gfx/gfx_core.c・gfx.h・gfx_internal.h) | 同上 | sol (難所は astra) | 未着手 |
+| G4 | PEGC のバックエンドの表 (gfx/backend_pegc.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-p480・p400 合格) |
+| G5 | Cirrus のバックエンドの表 (gfx/backend_cirrus.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト: Cirrus が無いときの PEGC への戻り。C480 は節目) |
+| G6a | HAL のモードの選択と init / init_200 / prepare への反映 (gfx/gfx_core.c) | 同上 | astra | 実装済み (Opus レビュー: 変異 1 本を PM が直して取り込み可) |
+| G6b | フレームバッファと query への反映、容量の照合 (gfx/gfx_core.c・gfx.h・gfx_internal.h) | 同上 | astra | 実装中 |
 
 段は小さい順の直列 (G0 → G2 → G3 → G4 → G5 → G6a → G6b、試験の照合先が重なるので並べない)。起動時の予約と面の型板は memmap の容量のまま変えない (表との照合はモジュールを読み込んだ後のモードの選択のときだけ)。高さの正典は `gfx_current_height`、問い合わせの高さは今の振る舞い (GUI を抜けた後・init の前も PEGC と Cirrus は 480) を変えない。ゲストは PM が NP21/W で (98 の 16 色・PEGC 480 と 400 の CUI からの出入り)。Cirrus を有効にする構成の試験 C480 は節目の関門で (DEFERRED_TESTS)。PEGC の 256 色 400 ラインは表に載せない (PM 決定、今の振る舞いのまま)。
