@@ -3,6 +3,14 @@
 /* ======================================================================== */
 
 #include "v86_pic.h"
+#include "idt.h"       /* OCW2_EOI */
+#include "irq_math.h"  /* IRQ_LINE_MAX */
+
+#define V86_PIC_OCW2_SPECIFIC (OCW2_EOI | 0x40)
+#define V86_PIC_ICW_IDLE      0
+#define V86_PIC_ICW_2         1
+#define V86_PIC_ICW_3         2
+#define V86_PIC_ICW_4         3
 
 struct pic {
     u8 imr;         /* OCW1 — ゲストのマスク (1 = 塞ぐ) */
@@ -60,7 +68,7 @@ static void pic_init_one(volatile struct pic *p, u8 imr, u8 base)
     p->irr = 0;
     p->isr = 0;
     p->base = base;
-    p->icw_step = 0;
+    p->icw_step = V86_PIC_ICW_IDLE;
     p->icw4_needed = 0;
     p->single = 0;
     p->read_isr = 0;
@@ -91,7 +99,7 @@ u32 v86_pic_state(int slave)
 static void clear_highest(volatile u8 *reg)
 {
     int i;
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < PIC_IRQS; i++) {
         if (*reg & (1 << i)) {
             *reg &= (u8)~(1 << i);
             return;
@@ -109,11 +117,11 @@ static void clear_highest(volatile u8 *reg)
 /* ------------------------------------------------------------------------ */
 static void pic_write_cmd(volatile struct pic *p, u8 v)
 {
-    if (v & 0x10) {
+    if (v & PIC_ICW1_INIT) {
         /* ICW1 */
-        p->icw_step = 1;
-        p->icw4_needed = (u8)(v & 0x01);
-        p->single = (u8)((v & 0x02) ? 1 : 0);
+        p->icw_step = V86_PIC_ICW_2;
+        p->icw4_needed = (u8)(v & PIC_ICW1_ICW4);
+        p->single = (u8)((v & PIC_ICW1_SINGLE) ? 1 : 0);
         p->isr = 0;
         p->irr = 0;
         p->read_isr = 0;
@@ -122,11 +130,11 @@ static void pic_write_cmd(volatile struct pic *p, u8 v)
         return;
     }
 
-    if (v & 0x08) {
+    if (v & PIC_OCW3_SELECT) {
         /* OCW3。bit1(RR) が立っているときだけ bit0(RIS) が意味を持つ。
          * ポーリングモード (bit2) は Ys では出てこないので未対応。 */
-        if (v & 0x02) {
-            p->read_isr = (u8)(v & 0x01);
+        if (v & PIC_OCW3_READ_REG) {
+            p->read_isr = (u8)(v & PIC_OCW3_READ_ISR);
         }
         return;
     }
@@ -136,9 +144,9 @@ static void pic_write_cmd(volatile struct pic *p, u8 v)
      *   0x60|n 特定 EOI      → ビット n を落とす
      *   0xA0 ローテート付き  → 落とすところは同じ (優先度回転は未実装) */
     v86_pic_ocw2_n++;
-    if ((v & 0x60) == 0x60) {
-        p->isr &= (u8)~(1 << (v & 0x07));
-    } else if (v & 0x20) {
+    if ((v & V86_PIC_OCW2_SPECIFIC) == V86_PIC_OCW2_SPECIFIC) {
+        p->isr &= (u8)~(1 << (v & PIC_IRQ_MASK));
+    } else if (v & OCW2_EOI) {
         clear_highest(&p->isr);
     }
 }
@@ -146,17 +154,17 @@ static void pic_write_cmd(volatile struct pic *p, u8 v)
 static void pic_write_data(volatile struct pic *p, u8 v)
 {
     switch (p->icw_step) {
-    case 1:                     /* ICW2 — ベクタベース */
-        p->base = (u8)(v & 0xF8);
-        p->icw_step = p->single ? (p->icw4_needed ? 3 : 0) : 2;
+    case V86_PIC_ICW_2:                     /* ICW2 — ベクタベース */
+        p->base = (u8)(v & PIC_VECTOR_MASK);
+        p->icw_step = p->single ? (p->icw4_needed ? V86_PIC_ICW_4 : V86_PIC_ICW_IDLE) : V86_PIC_ICW_3;
         return;
 
-    case 2:                     /* ICW3 — カスケード構成。値は使わない */
-        p->icw_step = p->icw4_needed ? 3 : 0;
+    case V86_PIC_ICW_3:                     /* ICW3 — カスケード構成。値は使わない */
+        p->icw_step = p->icw4_needed ? V86_PIC_ICW_4 : V86_PIC_ICW_IDLE;
         return;
 
-    case 3:                     /* ICW4 — 8086 モード等。値は使わない */
-        p->icw_step = 0;
+    case V86_PIC_ICW_4:                     /* ICW4 — 8086 モード等。値は使わない */
+        p->icw_step = V86_PIC_ICW_IDLE;
         return;
 
     default:                    /* OCW1 — IMR */
@@ -204,11 +212,11 @@ int v86_pic_should_inject(u32 irq, u32 *out_vector)
     volatile struct pic *p;
     u8 bit;
 
-    if (irq >= 16) {
+    if (irq >= IRQ_LINE_MAX) {
         return 0;
     }
-    p = (irq < 8) ? &pic_m : &pic_s;
-    bit = (u8)(1 << (irq & 7));
+    p = (irq < PIC_IRQS) ? &pic_m : &pic_s;
+    bit = (u8)(1 << (irq & PIC_IRQ_MASK));
 
     p->irr |= bit;
 
@@ -222,7 +230,7 @@ int v86_pic_should_inject(u32 irq, u32 *out_vector)
     v86_pic_inject_n++;
 
     if (out_vector) {
-        *out_vector = (u32)p->base + (irq & 7);
+        *out_vector = (u32)p->base + (irq & PIC_IRQ_MASK);
     }
     return 1;
 }

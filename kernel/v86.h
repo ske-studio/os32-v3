@@ -34,7 +34,21 @@
  * IF は立てない状態で渡す。ゲストが自分で STI するまで割り込みは来ない。
  * これは実機の起動直後と同じ挙動で、ゲストが IVT を整える前に割り込みが
  * 飛び込むのを防ぐ。IRQ スタブ側は Phase 1 で V86 安全化済み。 */
-#define V86_EFLAGS_INIT (EFLAGS_VM | EFLAGS_IOPL3 | 0x2)
+#define V86_EFLAGS_INIT (EFLAGS_VM | EFLAGS_IOPL3 | EFLAGS_RESERVED1)
+
+/* Real-mode addressing, interrupt frame and register-field writes. */
+#define X86_REAL_SEG_SHIFT      4
+#define V86_IRET_BYTES          6
+#define V86_IRET_FLAGS_WORD     2
+#define V86_IVT_ENTRY_BYTES     4
+#define V86_REG_AX_KEEP_MASK    (U32_MAX ^ U16_MAX)
+#define V86_REG_SET_AL(reg, value) \
+    (((reg) & (U32_MAX ^ U8_MAX)) | ((value) & U8_MAX))
+#define V86_REG_SET_AX(reg, value) \
+    (((reg) & V86_REG_AX_KEEP_MASK) | ((value) & U16_MAX))
+#define V86_REG_SET_AH(reg, value) \
+    (((reg) & (U32_MAX ^ ((u32)U8_MAX << BITS_PER_BYTE))) | \
+     (((value) & U8_MAX) << BITS_PER_BYTE))
 
 /* V86 突入時のコンテキスト。v86_entry.asm が iretd で積む順序と
  * 1:1 で対応するので、フィールドの並べ替え禁止。 */

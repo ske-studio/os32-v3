@@ -22,10 +22,11 @@
 #define __V86_KBD_H
 
 #include "types.h"
+#include "kbd.h"
 
 /* PC-98 のキーボードポート。0x41 がデータ、0x43 がコマンド/ステータス。 */
-#define V86_KBD_DATA    0x0041
-#define V86_KBD_CMD     0x0043
+#define V86_KBD_DATA    KBD_DATA
+#define V86_KBD_CMD     KBD_CMD
 
 /* セッション開始時に FIFO と修飾キー状態を捨てる */
 void v86_kbd_reset(void);

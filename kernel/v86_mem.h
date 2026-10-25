@@ -44,7 +44,7 @@
 #define V86_GVRAM_E_START   GVRAM_PLANE_I
 #define V86_GVRAM_E_END     GVRAM_I_END   /* GVRAM プレーン E (含まず) */
 #define V86_SOUNDROM_START  0xE8000UL
-#define V86_SOUNDROM_END    0xF0000UL   /* サウンド BIOS ROM (含まず) */
+#define V86_SOUNDROM_END    MEM_BIOS_ROM_START   /* サウンド BIOS ROM (含まず) */
 
 /* ------------------------------------------------------------------------ */
 /*  v86_guest_range_ok — ゲストのリニアアドレス範囲が直接低位 RAM に      */
@@ -78,7 +78,7 @@ static inline int v86_guest_range_ok(u32 linear, u32 len)
 /*  **書き込みの検証には使わないこと** — ゲストスタックへの書き込みは       */
 /*  v86_guest_range_ok() (直接低位 RAM 内) で検証する。                    */
 /* ------------------------------------------------------------------------ */
-#define V86_GUEST_MAP_END   0x100000UL
+#define V86_GUEST_MAP_END   MEM_1MB
 
 static inline int v86_guest_read_ok(u32 linear, u32 len)
 {
