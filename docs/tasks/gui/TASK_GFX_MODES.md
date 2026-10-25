@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・能力の問い合わせ [API_CONTRACTS](../../decisions/gui/API_CONTRACTS.md) G5・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
 
-> 状態: **実装中 (2026-10-26)** — G0 (小さい直し) を実装、G1 以降は設計の往復 (起草 astra → レビュー Opus) の後。
+> 状態: **実装中 (2026-10-26)** — G0 (小さい直し) を実装中。G2〜G6b は設計確定 (astra 起草・Opus 2 往復)。
 
 ## 0. ユーザー指示 (2026-10-26)
 
@@ -26,4 +26,11 @@
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
 | G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | 実装中 |
-| G1〜 | 形式の層・ドライバの能力の表・HAL のモードの選択。段の分け方は確定設計で決める (1 段は codex 1 回 2 時間以内、ファイルが重ならない段は並べる) | GFX_MODES (astra 起草) | 設計で決める | 設計中 |
+| G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [GFX_MODES_DESIGN](../../decisions/gui/GFX_MODES_DESIGN.md) | sol | G0 待ち |
+| G3 | 98 の 16 色のバックエンドがモードの表を申告 (gfx/backend_pc98.c) | 同上 | sol | 未着手 |
+| G4 | PEGC のバックエンドの表 (gfx/backend_pegc.c) | 同上 | sol | 未着手 |
+| G5 | Cirrus のバックエンドの表 (gfx/backend_cirrus.c) | 同上 | sol | 未着手 |
+| G6a | HAL のモードの選択と init / init_200 / prepare への反映 (gfx/gfx_core.c) | 同上 | sol (難所は astra) | 未着手 |
+| G6b | フレームバッファと query への反映、容量の照合 (gfx/gfx_core.c・gfx.h・gfx_internal.h) | 同上 | sol (難所は astra) | 未着手 |
+
+段は小さい順の直列 (G0 → G2 → G3 → G4 → G5 → G6a → G6b、試験の照合先が重なるので並べない)。起動時の予約と面の型板は memmap の容量のまま変えない (表との照合はモジュールを読み込んだ後のモードの選択のときだけ)。高さの正典は `gfx_current_height`、問い合わせの高さは今の振る舞い (GUI を抜けた後・init の前も PEGC と Cirrus は 480) を変えない。ゲストは PM が NP21/W で (98 の 16 色・PEGC 480 と 400 の CUI からの出入り)。Cirrus を有効にする構成の試験 C480 は節目の関門で (DEFERRED_TESTS)。PEGC の 256 色 400 ラインは表に載せない (PM 決定、今の振る舞いのまま)。
