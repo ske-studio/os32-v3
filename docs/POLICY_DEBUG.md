@@ -1246,6 +1246,7 @@ read-modify-write で保つ。
 - **なぜ気づかなかったか**: `/api/tvram` は**文字コード**を返すので、テスターも PM も文字の存在で判定していた。
   `/api/screenshot` で見た目を確かめると、エミュレータでも同じ行が黒かった。
 - **対策**: `lib/kprintf_attr.c` の `kprintf_attr_to_pc98()` を kprintf の入口で 1 回適用 (PC-98 流は素通し)。
+  2026-10-25 から 0x07 は名前 `KLOG_ATTR` (`os32_kapi_shared.h`) で書く (票 TASK_MAGIC_NUM)。
   kselftest とホスト試験 (`check-kprintf-attr-host`) で 256 通りの「必ず見える」を固定。
 - **教訓**: 「画面に出ている」は**文字コードではなく見た目**で確かめる。tvram を読む検証は属性を見ない。
   実機に持ち込む前に 1 度は `/api/screenshot` を人が見る。

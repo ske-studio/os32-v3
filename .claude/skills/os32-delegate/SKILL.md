@@ -32,6 +32,7 @@ cp assets/fonts/ipaex*.ttf ~/wt/os32-v3/<名>/assets/fonts/   # 同意済みの 
 ```
 
 - **カーネル・shell・kdebug・ビルド定義を触る段**: 完了条件に「レビューに出す前に `python3 tools/check_select.py --select --files <段の差分>` の候補を全部 `MUTATE=0`」を足す (差し替え定義・fixture の身代わりの追従漏れ、不要な P2V 例外、CI が `~/os32-tmp` に頼る試験、起動 FD の容量 — 2026-10-21 に取り込みの検査で初めて見つかった失敗はどれもここで拾えた。ユーザー承認)。
+- **名前の置き換え・式の書き換えを含む段** (2026-10-25、票 TASK_MAGIC_NUM で取り込みの検査に 6 本落ちた): 変異の置換の目印 (試験の中の元の式の文字列) が壊れても MUTATE=0 では見つからない。完了条件に「最後に `python3 ~/os32-tmp/bin/stale_anchor.py <基点>` を作業木で回し (試験の文字列のうち、基点では変えたファイルにあり今は無いものを挙げる)、目印なら直して、その試験を MUTATE=1 で 1 回回し RED の数が基点と同じこと」を足す。機械語を変えない段は、変える前後の ELF の `objdump -d` を比べる (`~/os32-tmp/run/magic/objcompare.py` が雛形)。
 - KAPI を触る段: スキル os32-kapi-add に従い、`make clean` → `make all` を完了条件に足す。
 - ゲスト受入を含める段: 配備はスキル run-os32 (作業木の成果物)、GUI は os32-gui-drive、カーネルの入れ替えは hsync + emu_reset、
   rshell 中の ESC は rshell を閉じる (閉じたら emu_key で `rshell` + RETURN)、MCP の emu_gui_launch / consink は本体の ELF を引くので

@@ -438,7 +438,7 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 | 0x1C | mem_alloc | `void *(u32 size)` |
 | 0x20 | mem_free | `void(void *ptr)` |
 | 0x24 | get_tick | `u32(void)` |
-| 0x28 | kprintf | `void(u8 attr, const char *fmt, ...)` |
+| 0x28 | kprintf | `void(u8 attr, const char *fmt, ...)` — attr は PC-98 流の `ATTR_*` か、ログ行の `KLOG_ATTR` (0x07、PC/AT 流。入口で PC-98 の属性に読み替える) |
 | 0x2C | sys_unlink | `int(const char *path)` |
 | 0x30 | sys_rename | `int(const char *oldpath, const char *newpath)` |
 | 0x34 | sys_mkdir | `int(const char *path)` |

@@ -129,6 +129,10 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 | Subsystem Layer | 各サブシステムヘッダ (`vfs.h`, `pc98.h` 等) | `VFS_MAX_PATH`, `TVRAM_COLS` |
 | Local Layer | 各モジュール内で定数化 | バッファオフセット等 (ハードコードの `500` 等は禁止) |
 
+- **1 つの意味に名前は 1 つ**。番地・帯は `include/memmap.h`、PC-98 の I/O と BIOS ワークは `include/pc98.h`、PCI は `drivers/pci_decode.h`、Ethernet は `include/net_eth.h`、u32 の上限などの基本の値は `include/types.h`、kprintf のログ行の属性 `KLOG_ATTR` は `os32_kapi_shared.h`、GeForce の回復処理は `kdebug/recover.h` が正典。別の名前で同じ値を定義せず、正典の名前を使う (2026-10-25、票 TASK_MAGIC_NUM)。
+- NASM の `.asm` は C のヘッダを読めないので、`kernel/cpu_flags.inc` に同じ値を置き、host 試験 (`check-double-fault-host`) で C 側との一致を固定する。GAS の `.S` は cpp を通るので `include/cpu.h` を読む (C の部分は `#ifndef __ASSEMBLER__`)。
+- kdebug・hwdev が読むヘッダには **enum を足さず `#define` で書く** — `tools/gen_hwdev_contract.py` が DWARF の列挙子を契約に数えるので、enum を足すと HWDEV の契約の CRC が変わる。
+
 ---
 
 ## §3. ハードウェア制約

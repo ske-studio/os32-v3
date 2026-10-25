@@ -210,3 +210,7 @@ helper の処理順:
 - C4 (P3): 「隣を選ぶ」計算の変異を 1 行足す (`next` を最小でなく最初に見つかった候補にする) — 基準構成の 5 区間の比較で殺す。
 - C5 (P3): 局所の bounds 1,028 B は実装の段で A1 の呼出し鎖の stack を測り、足りなければ static の bss に置く (+1 KiB を予算に)。
 - PM 決定: U1 は任意の精度改善に下げ、取らない。(b')・(b) (BAR への書込み) は採らない。上限が広すぎて実機で拒否されたら改めてユーザーに上げる。DEFERRED_TESTS には載せない (基準構成は上限で通る)。
+
+## 取り込みの後の名前の変更 (2026-10-25、票 TASK_MAGIC_NUM の M4)
+
+- 境目の設計コード (`resource_bar_specs`) の `GF_RES_FXP_ID` は `((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL)`、`GF_RES_ATTR_MEM32` は `PCI_BAR_MEM_TYPE32` (どちらも `drivers/pci_decode.h`) に置き換えた。値と動作は同じ (機械語の差 0)。
