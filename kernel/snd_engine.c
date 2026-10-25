@@ -13,7 +13,6 @@
 #include "os32_kapi_shared.h"   /* OS32_ERR_* */
 
 #define SND_NOTE_LETTERS     7
-#define SND_SEMITONES        12
 #define SND_BASE_OCTAVE      4
 #define SND_CHANNELS         (2 * OPN_CHANNEL_COUNT)
 /* PIT_HZ is the engine's tick rate; defaults retain the 120 BPM timing. */
@@ -52,7 +51,7 @@ static const int note_char_map[SND_NOTE_LETTERS] = {
 
 /* SSG周波数: ノート番号→period 簡易テーブル (オクターブ4基準) */
 /* Period = 62400 / freq, freq = 440 * 2^((note-57)/12) */
-static const u16 ssg_period_base[SND_SEMITONES] = {
+static const u16 ssg_period_base[FM_SEMITONES_PER_OCTAVE] = {
     956,  902,  851,  804,  758,  716,
     676,  638,  602,  568,  536,  506
 };
@@ -144,8 +143,8 @@ static int g_snd_owner = 1;
 
 static u16 ssg_period_from_note(int note)
 {
-    int octave = note / SND_SEMITONES;
-    int key = note % SND_SEMITONES;
+    int octave = note / FM_SEMITONES_PER_OCTAVE;
+    int key = note % FM_SEMITONES_PER_OCTAVE;
     u16 base = ssg_period_base[key];
     int shift;
 
@@ -477,7 +476,7 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
                 mml++;
             }
 
-            out[pos].note = (u8)(octave * SND_SEMITONES + idx + sharp);
+            out[pos].note = (u8)(octave * FM_SEMITONES_PER_OCTAVE + idx + sharp);
             out[pos].duration = (u8)(dur > (int)U8_MAX ? (int)U8_MAX : dur);
             out[pos].channel = (u8)channel;
             out[pos].tone = (u8)tone;

@@ -72,8 +72,8 @@ MUTATIONS = [
     (r"    if \(bytes < DMA_POOL_MIN_BYTES \|\| bytes > DMA_POOL_MAX_BYTES\)\n"
      r"        return DMA_POOL_ERR_ARG;\n", "",
      "33KB〜64KB を受ける (空の池でも必ず失敗するのに呼び手を待たせる)"),
-    (r"    if \(off % DMA_POOL_PAGE_SIZE != 0\) \{ s->bad_free\+\+; return DMA_POOL_ERR_ARG; \}\n\n    page = off / DMA_POOL_PAGE_SIZE;\n    slot = dma_pool_span_at\(s, page\);\n    if \(slot < 0\) \{ s->bad_free\+\+; return DMA_POOL_ERR_ARG; \}",
-     "    if (off % DMA_POOL_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }\n\n    page = off / DMA_POOL_PAGE_SIZE;\n    slot = dma_pool_span_at(s, page);\n    if (slot < 0) { slot = 0; }",
+    (r"    if \(off % MEM_PAGE_SIZE != 0\) \{ s->bad_free\+\+; return DMA_POOL_ERR_ARG; \}\n\n    page = off / MEM_PAGE_SIZE;\n    slot = dma_pool_span_at\(s, page\);\n    if \(slot < 0\) \{ s->bad_free\+\+; return DMA_POOL_ERR_ARG; \}",
+     "    if (off % MEM_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }\n\n    page = off / MEM_PAGE_SIZE;\n    slot = dma_pool_span_at(s, page);\n    if (slot < 0) { slot = 0; }",
      "span の先頭でなくても解放する (隣の span を巻き添えに外す)"),
     (r"    if \(s->span\[slot\].state != DMA_SPAN_USED\) \{\n        s->bad_free\+\+;\n        return DMA_POOL_ERR_ARG;\n    \}\n",
      "",

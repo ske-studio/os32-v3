@@ -132,13 +132,13 @@ static void no_overflow(void)
     unsigned long worst;
 
     /* 約分が等価 (10^4 × 10^2 = 10^6)。崩れると µs でなくなる。 */
-    CHECK(PIT_PERIOD_SCALE * PIT_CLOCK_DIV == PIT_US_PER_SEC);
+    CHECK(PIT_PERIOD_SCALE * PIT_CLOCK_DIV == USEC_PER_SEC);
 
     /* 最悪の中間積。**素直に 10^6 を掛けるとここが溢れる**
      * (65535 × 10^6 = 6.5535×10^10)。 */
     worst = PIT_RELOAD_MAX * PIT_PERIOD_SCALE;
     CHECK(worst <= PIT_U32_MAX);
-    CHECK(PIT_RELOAD_MAX * PIT_US_PER_SEC > PIT_U32_MAX);
+    CHECK(PIT_RELOAD_MAX * USEC_PER_SEC > PIT_U32_MAX);
 
     /* 実際に使う 2 つの値も当然収まる。 */
     CHECK(RELOAD_1997 * PIT_PERIOD_SCALE <= PIT_U32_MAX);

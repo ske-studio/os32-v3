@@ -1,6 +1,6 @@
-/* FS-local IDE selector until the driver header supplies the shared name. */
+/* FS-local selector mask using the IDE driver bounds. */
 #ifndef FS_IDE_LIMITS_H
 #define FS_IDE_LIMITS_H
-#define FS_IDE_DRIVE_COUNT 4
-#define FS_IDE_DRIVE_ID_MASK (FS_IDE_DRIVE_COUNT - 1)
+#include "ide.h"
+#define FS_IDE_DRIVE_ID_MASK (IDE_MAX_DRIVES - 1)
 #endif

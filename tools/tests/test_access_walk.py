@@ -84,7 +84,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                *(['-DHOST_HIGH_ENTRY_STACK=1'] if high_stack else []),
                '-static', '-no-pie', '-Wl,--gc-sections',
                *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                  'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
+                  'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'drivers', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
                str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
         host32.build(cmd, check=True, capture_output=True, text=True)

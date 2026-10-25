@@ -11,9 +11,9 @@
 
 #include "types.h"
 #include "config.h"
+#include "ide.h"
 
-/* Adapter-only SASI geometry; the IDE API still transfers HDD-sized units. */
-#define SASI_SECTOR_BYTES 256
+/* The IDE API still transfers HDD-sized units. */
 #define SASI_SECTORS_PER_IDE (SYS_HDD_SECTOR_SIZE / SASI_SECTOR_BYTES)
 
 void diskio_set_fdd_drive(int drv);

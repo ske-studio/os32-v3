@@ -16,6 +16,11 @@
 #include "types.h"
 #include "pc98.h"
 
+/* 00-79 -> 2000-2079; 80-99 -> 1980-1999. */
+#define RTC_YEAR_PIVOT 80
+#define RTC_YEAR_BASE_NEW 2000
+#define RTC_YEAR_BASE_OLD 1900
+
 #define RTC_MODE_MASK 0x07
 #define RTC_NIBBLE_BITS 4
 #define RTC_NIBBLE_COUNT (RTC_READ_BITS / RTC_NIBBLE_BITS)

@@ -71,7 +71,7 @@ DEFAULT_LIMIT_HEADER = os.path.join(ROOT, 'boot', 'boot_defs.h')
 
 
 def read_max_image_size(path):
-    """boot_defs.h の `#define MAX_IMAGE_SIZE (508*1024)` を読んで整数で返す。
+    """boot_defs.h の `MAX_IMAGE_SIZE` (KIB などの名前を含む式) を読んで整数で返す。
 
     読めない・式が想定外なら例外にする (上限を見ずに通すことはしない)。"""
     with open(path, encoding='utf-8') as f:
@@ -80,7 +80,13 @@ def read_max_image_size(path):
                   text, re.MULTILINE)
     if not m:
         raise ValueError('MAX_IMAGE_SIZE が見つからない: {}'.format(path))
-    expr = m.group(1).strip()
+    # A copied generator still resolves the units beside its limit header.
+    units = os.path.join(os.path.dirname(os.path.abspath(path)), '..',
+                         'include', 'memmap.h')
+    preincludes = ['-imacros', units] if os.path.isfile(units) else []
+    expr = subprocess.check_output(
+        ['cpp', '-E', '-P', *preincludes, '-imacros', os.path.abspath(path), '-'],
+        input='MAX_IMAGE_SIZE\n', text=True).strip()
     # 数字・空白・括弧・* + だけを許す (任意の式は評価しない)
     if not re.fullmatch(r'[0-9xXa-fA-FuUlL\s()*+]+', expr):
         raise ValueError('MAX_IMAGE_SIZE の式を解釈できない: {!r}'.format(expr))

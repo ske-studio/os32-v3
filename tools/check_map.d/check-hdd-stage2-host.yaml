@@ -1,4 +1,6 @@
 check-hdd-stage2-host:
+- tools/gen_memmap.py
+- include/memmap.h
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - boot/boot_hdd.asm

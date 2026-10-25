@@ -145,7 +145,7 @@ u32 sfs_byte_us(u32 baud)
 {
     if (baud == 0) baud = SYS_SERIAL_BAUD;
     /* 8N1 = スタート 1 + データ 8 + ストップ 1 = 10 ビット。切り上げ */
-    return (SFS_SERIAL_BITS_PER_BYTE * SFS_USEC_PER_SEC + baud - 1) / baud;
+    return (SFS_SERIAL_BITS_PER_BYTE * USEC_PER_SEC + baud - 1) / baud;
 }
 
 u32 sfs_ms_ticks(u32 ms)

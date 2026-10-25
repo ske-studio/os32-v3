@@ -399,7 +399,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         if (n > 0) {
             int d;
             tvram_print(5, 3, "OK", TATTR_WHITE);
-            for (d = 0; d < IDE_DRIVE_COUNT; d++) {
+            for (d = 0; d < IDE_MAX_DRIVES; d++) {
                 if (ide_drive_present(d)) dev_register_hdd(d);
             }
         } else {

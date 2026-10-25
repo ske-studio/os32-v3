@@ -18,7 +18,7 @@
 /* ------------------------------------------------------------------------ */
 static u32 dma_pool_pages_for(u32 bytes)
 {
-    return (bytes + DMA_POOL_PAGE_SIZE - 1) / DMA_POOL_PAGE_SIZE;
+    return (bytes + MEM_PAGE_SIZE - 1) / MEM_PAGE_SIZE;
 }
 
 static int dma_pool_align_ok(u32 align)
@@ -92,7 +92,7 @@ int dma_pool_state_alloc(struct dma_pool_state *s, u32 bytes, u32 align,
     if (need > s->npages) return DMA_POOL_ERR_ARG;
 
     for (page = 0; page + need <= s->npages; page++) {
-        addr = s->base + page * DMA_POOL_PAGE_SIZE;
+        addr = s->base + page * MEM_PAGE_SIZE;
         if (addr % align != 0) continue;
         /* **またぐ候補・limit を越える候補は飛ばす** (諦めない)。
          * 検査は commit の前 — 飛ばした候補の表は触らない。 */
@@ -154,13 +154,13 @@ int dma_pool_state_free(struct dma_pool_state *s, u32 pa)
     if (!s || !s->ready) return DMA_POOL_ERR_STATE;
     if (pa < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
     off = pa - s->base;
-    if (off >= s->npages * DMA_POOL_PAGE_SIZE) {
+    if (off >= s->npages * MEM_PAGE_SIZE) {
         s->bad_free++;
         return DMA_POOL_ERR_ARG;
     }
-    if (off % DMA_POOL_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
+    if (off % MEM_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
 
-    page = off / DMA_POOL_PAGE_SIZE;
+    page = off / MEM_PAGE_SIZE;
     slot = dma_pool_span_at(s, page);
     if (slot < 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
     /* LEAKED は**戻さない**。装置がまだ書いているかもしれない。 */
@@ -185,13 +185,13 @@ int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 pa)
     if (!s || !s->ready) return DMA_POOL_ERR_STATE;
     if (pa < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
     off = pa - s->base;
-    if (off >= s->npages * DMA_POOL_PAGE_SIZE) {
+    if (off >= s->npages * MEM_PAGE_SIZE) {
         s->bad_free++;
         return DMA_POOL_ERR_ARG;
     }
-    if (off % DMA_POOL_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
+    if (off % MEM_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
 
-    page = off / DMA_POOL_PAGE_SIZE;
+    page = off / MEM_PAGE_SIZE;
     slot = dma_pool_span_at(s, page);
     if (slot < 0 || s->span[slot].state != DMA_SPAN_USED) {
         s->bad_free++;

@@ -26,6 +26,8 @@
 
 #include "config.h"
 
+#define SASI_SECTOR_BYTES      256
+
 #define IDE_BANK_COUNT         2
 #define IDE_DRIVES_PER_BANK    2
 #define IDE_MAX_DRIVES         (IDE_BANK_COUNT * IDE_DRIVES_PER_BANK)

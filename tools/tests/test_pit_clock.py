@@ -53,7 +53,7 @@ MUTATIONS = [
      "",
      "知らないクロックで割る (0 除算・桁違いのリロード値)"),
     (r"period = \(reload \* PIT_PERIOD_SCALE\) / \(unsigned int\)\(clk_hz / PIT_CLOCK_DIV\);",
-     "period = (reload * PIT_US_PER_SEC) / (unsigned int)clk_hz;",
+     "period = (reload * USEC_PER_SEC) / (unsigned int)clk_hz;",
      "約分せず 10^6 を掛ける (32bit で溢れて period_us が桁違いになる)"),
     (r"    out->valid = 0;\n",
      "    out->valid = 1;\n",

@@ -16,7 +16,7 @@
  * unsigned long はホストでは 64bit になり、溢れが再現しない。 */
 STATIC_ASSERT(sizeof(unsigned int) == 4, pit_uint_is_32bit);
 /* 約分が等価であること。崩すと period_us が µs でなくなる。 */
-STATIC_ASSERT(PIT_PERIOD_SCALE * PIT_CLOCK_DIV == PIT_US_PER_SEC,
+STATIC_ASSERT(PIT_PERIOD_SCALE * PIT_CLOCK_DIV == USEC_PER_SEC,
               pit_period_scale_is_one_second);
 /* 中間積が 32bit に収まること。**i386 のビルドで効く** — 倍率を 10^6 に
  * 戻すと、ここが「負サイズの配列」でコンパイルエラーになる。 */

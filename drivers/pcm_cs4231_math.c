@@ -40,7 +40,7 @@ u32 pcm_half_ms(u32 rate)
 u32 pcm_watchdog_us(u32 rate)
 {
     if (rate == 0) return 0;
-    return (PCM_HALF_FRAMES * PCM_WATCHDOG_HALVES * PCM_US_PER_SEC) / rate;
+    return (PCM_HALF_FRAMES * PCM_WATCHDOG_HALVES * USEC_PER_SEC) / rate;
 }
 
 /* ======================================================================== */

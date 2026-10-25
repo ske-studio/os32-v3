@@ -1,4 +1,5 @@
 check-pcm-cs4231-host:
+- include/time_units.h
 - drivers/pcm_cs4231.c
 - drivers/pcm_cs4231_math.c
 - tools/tests/pcm_cs4231_host.c

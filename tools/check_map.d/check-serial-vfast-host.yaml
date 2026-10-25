@@ -1,4 +1,5 @@
 check-serial-vfast-host:
+- include/time_units.h
 - drivers/serial.c
 - drivers/serial_plan.c
 - tools/tests/serial_vfast_host.c

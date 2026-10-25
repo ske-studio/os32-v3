@@ -134,7 +134,7 @@ def case_dry_run_lifetime(cd):
     with tempfile.TemporaryDirectory(prefix="c_dialect_lifetime_") as td:
         root = pathlib.Path(td)
         (root / "include").mkdir()
-        (root / "include/memmap.h").write_text("#define MEM_TEST 123\n")
+        (root / "include/memmap.h").write_text("#define MEM_TEST 123\n#define KIB 1024UL\n")
         (root / "Makefile").write_text(
             "all:\n\t i386-elf-gcc -include $(BUILD_OUT)/memmap_layout.h "
             "-c probe.c -o probe.o\n")

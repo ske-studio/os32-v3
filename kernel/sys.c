@@ -2,9 +2,6 @@
 /*  SYS.C — システム制御およびブザー制御                                      */
 /* ======================================================================== */
 
-#define RTC_YEAR_PIVOT    80
-#define RTC_YEAR_BASE_NEW 2000
-#define RTC_YEAR_BASE_OLD 1900
 #include "sys.h"
 #include "pgalloc.h"
 #include "memmap.h"

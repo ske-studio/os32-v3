@@ -26,7 +26,6 @@ extern void irq_disable(unsigned int irq);
  * drive 3 = バンク1 Slave  (NP21/W IDE #3)
  */
 #define IDE_SASI_SPT          33
-#define IDE_SASI_SECTOR_BYTES 256
 #define IDE_SASI_HEADS_SMALL  4
 #define IDE_SASI_HEADS_MEDIUM 6
 #define IDE_SASI_HEADS_LARGE  8
@@ -316,7 +315,7 @@ int ide_identify(int drive, IdeInfo *info)
      * 内部LBAは256Bセクタ単位のまま */
     if (info->sectors == IDE_SASI_SPT &&
         (info->heads == IDE_SASI_HEADS_SMALL || info->heads == IDE_SASI_HEADS_MEDIUM || info->heads == IDE_SASI_HEADS_LARGE)) {
-        info->phys_sector_size = IDE_SASI_SECTOR_BYTES;
+        info->phys_sector_size = SASI_SECTOR_BYTES;
     } else {
         info->phys_sector_size = SYS_HDD_SECTOR_SIZE;
     }
