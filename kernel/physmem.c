@@ -91,9 +91,9 @@ void physmem_bootstrap_legacy(struct physmem *m, u32 mem_kb)
 {
     u32 end, low;
     physmem_init(m);
-    if (mem_kb > PHYSMEM_LEGACY_MAX_PFN * (PHYSMEM_PAGE_SIZE / 1024UL))
-        mem_kb = PHYSMEM_LEGACY_MAX_PFN * (PHYSMEM_PAGE_SIZE / 1024UL);
-    end = mem_kb / (PHYSMEM_PAGE_SIZE / 1024UL);
+    if (mem_kb > PHYSMEM_LEGACY_MAX_PFN * (PHYSMEM_PAGE_SIZE / KIB))
+        mem_kb = PHYSMEM_LEGACY_MAX_PFN * (PHYSMEM_PAGE_SIZE / KIB);
+    end = mem_kb / (PHYSMEM_PAGE_SIZE / KIB);
     low = MEM_POOL_BASE / PHYSMEM_PAGE_SIZE;
     /* ホットデプロイ窓の撤去 (2026-09-09) で末尾の予約は無くなった。
      * legacy アリーナは実 RAM の末尾までそのまま使える。 */

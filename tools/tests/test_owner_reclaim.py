@@ -33,7 +33,7 @@ class OwnerReclaimTests(unittest.TestCase):
                 if line.startswith("#define MEM_SHM_DB_")) + "\n"
             lease_defines = "\n".join(line for line in
                 (ROOT / "include/memmap.h").read_text().splitlines()
-                if line.startswith(("#define MEM_LEASE_", "#define MEM_PAGE_SIZE", "#define MEM_PDE_SHIFT"))) + "\n"
+                if line.startswith(("#define MEM_LEASE_", "#define MEM_PAGE_SIZE", "#define MEM_PDE_SHIFT", "#define KIB "))) + "\n"
             (tmp / "memmap.h").write_text(
                 "#ifndef OS32_TEST_MEMMAP_H\n"
                 "#define OS32_TEST_MEMMAP_H\n"

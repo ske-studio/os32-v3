@@ -300,8 +300,8 @@ void paging_init(u32 mem_kb)
      * 「OS32 が RAM として面倒を見る上限」ではない (K6-RAM)。これより上の
      * RAM は pgalloc_stage_online が paging_map_phys で張る。
      * mem_kb * 1024 の桁あふれ (mem_kb > 4194303) もこれで防げる。 */
-    if (mem_kb > PAGING_BOOT_MAP_SIZE / 1024) mem_kb = PAGING_BOOT_MAP_SIZE / 1024;
-    max_mem_bytes = mem_kb * 1024;
+    if (mem_kb > PAGING_BOOT_MAP_SIZE / KIB) mem_kb = PAGING_BOOT_MAP_SIZE / KIB;
+    max_mem_bytes = mem_kb * KIB;
     boot_identity_end = max_mem_bytes / PAGE_SIZE;
 
     /* アライン済みポインタを取得 (先頭だけ上げれば以降は 4KB 刻みで乗る) */
@@ -769,7 +769,7 @@ u32 paging_pte_flags(u32 virt_addr)
     pdi = PDE_INDEX(virt_addr);
     if (!page_tables[pdi]) return 0;
     pti = PTE_INDEX(virt_addr);
-    return page_tables[pdi][pti] & 0xFFFu;
+    return page_tables[pdi][pti] & ~PTE_FRAME_MASK;
 }
 
 /* PTE の生値 (番地 + フラグ)。ページング前・PT が無ければ 0。kdebug の peek が窓の PTE を
@@ -1362,7 +1362,7 @@ static u8 memmap_seen_at(u32 pte)
 
 /* 食い違った区間 (start, end, want<<4|seen) を先頭から最大 MM_BAD_MAX 本。
  * static にしないのは kselftest_pass と同じ理由 (ホストから読む)。 */
-u32 paging_memmap_bad[MM_BAD_MAX * 3];
+u32 paging_memmap_bad[MM_BAD_MAX * MM_BAD_WORDS];
 u32 paging_memmap_bad_count;
 
 /* 自己診断の変異専用 (paging.h の註)。PDE には触らない。 */
@@ -1402,9 +1402,9 @@ int paging_memmap_selftest(u32 tramp_page)
             if (memmap_seen_at(page_tables[j / PTE_COUNT][j % PTE_COUNT]) != seen) break;
         }
         if (runs < MM_BAD_MAX) {
-            paging_memmap_bad[runs * 3 + 0] = i * PAGE_SIZE;
-            paging_memmap_bad[runs * 3 + 1] = j * PAGE_SIZE - 1;
-            paging_memmap_bad[runs * 3 + 2] = ((u32)want << 4) | (u32)seen;
+            paging_memmap_bad[runs * MM_BAD_WORDS + MM_BAD_START] = i * PAGE_SIZE;
+            paging_memmap_bad[runs * MM_BAD_WORDS + MM_BAD_END] = j * PAGE_SIZE - 1;
+            paging_memmap_bad[runs * MM_BAD_WORDS + MM_BAD_KINDS] = ((u32)want << MM_BAD_KIND_SHIFT) | (u32)seen;
         }
         runs++;
         i = j;

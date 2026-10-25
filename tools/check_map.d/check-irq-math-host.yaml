@@ -5,3 +5,4 @@ check-irq-math-host:
 - tools/tests/test_irq_math.py
 - tools/check_map.d/check-irq-math-host.yaml
 - build/checks.d/check-irq-math-host.mk
+- include/pc98.h

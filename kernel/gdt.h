@@ -22,6 +22,9 @@
 #define GDT_USER_DS_IDX     5
 #define GDT_DF_TSS_IDX      6     /* append only: dedicated fail-stop task */
 
+#define X86_SEL_RPL_MASK    3
+#define X86_RPL_USER        3
+
 /* セレクタ値 (= idx<<3 | RPL)。カーネルは RPL=0、ユーザは RPL=3。 */
 #define GDT_KERNEL_CS       0x08    /* idx1, DPL=0  (= idt.h の KERNEL_CS) */
 #define GDT_KERNEL_DS       0x10    /* idx2, DPL=0 */
@@ -38,6 +41,9 @@
 #define GDT_ACCESS_TSS      0x89    /* P=1,DPL=0,S=0, 32bit TSS (avail) */
 
 /* 粒度: 4KB 粒度 + 32bit + リミット上位。フラット 4GB。 */
+#define GDT_LIMIT_HI_MASK   0x0F
+#define GDT_GRAN_FLAGS_MASK 0xF0
+
 #define GDT_GRAN_FLAT       0xCF
 
 /* ======== API ======== */

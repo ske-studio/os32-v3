@@ -6,6 +6,10 @@
 /* ======================================================================== */
 
 #include "irq_math.h"
+#include "pc98.h"
+
+#define IRQ_SHARED_MIN_HANDLERS 2
+#define IRQ_DISPATCH_PASSES     2
 
 /* 共通スタブに結ぶ線。**並びがそのまま表の添字**で、kernel/irq.c の
  * irq_lines[] / 診断の順序もこれに従う。固定スタブの線 (0 タイマ / 1 KBD /
@@ -102,9 +106,9 @@ int irq_dispatch_line(struct irq_line *ln, unsigned int irq)
     int pass;
 
     if (ln == 0) return 0;
-    if (ln->count >= 2) ln->shared_dispatch++;
+    if (ln->count >= IRQ_SHARED_MIN_HANDLERS) ln->shared_dispatch++;
 
-    for (pass = 0; pass < 2; pass++) {
+    for (pass = 0; pass < IRQ_DISPATCH_PASSES; pass++) {
         int round = 0;
         int i;
         int n = (int)ln->count;
@@ -148,11 +152,11 @@ int irq_eoi_plan(unsigned int irq, int slave_isr_bit7)
 {
     if (irq >= (unsigned int)IRQ_LINE_MAX) return IRQ_EOI_NONE;
 
-    if (irq == 15) {
+    if (irq == PIC_SLAVE_LAST_IRQ) {
         /* スレーブ側スプリアス: ISR の IR7 が立っていなければスレーブへは
          * 送らない (カスケード分のマスタだけ)。**handled とは無関係** —
          * 受け手が居たかどうかでスプリアスかどうかは決まらない。 */
         return slave_isr_bit7 ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;
     }
-    return (irq >= 8) ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;
+    return (irq >= PIC_IRQS) ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;
 }

@@ -27,7 +27,7 @@
 
 /* 3 回失敗したら諦める。1 回の読みは数 µs なので、同じ周期の中で境界を
  * 3 回も踏むことはない (踏むなら PIT が止まっているか mode が違う)。 */
-#define TIME_RETRY_MAX  3
+/* TIME_RETRY_MAX is shared with the feed declaration in ktime.h. */
 
 /* ------------------------------------------------------------------------ */
 /*  試験専用の注入口 (往復 8 の中継 1)                                       */
@@ -121,12 +121,12 @@ int sys_time_now(u32 *lo, u32 *hi)
      *    試験は「わざと前回より小さい値」を作るので、そこをクランプすると
      *    補間そのものを観測できなくなる。製品経路 (n = 0) では必ず通る。 */
     if (rc == 0 && time_test_feed_n == 0) {
-        unsigned long long us = ((unsigned long long)out_hi << 32) |
+        unsigned long long us = ((unsigned long long)out_hi << BITS_PER_U32) |
                                 (unsigned long long)out_lo;
         if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;
         s_last_us = us;
-        out_lo = (unsigned int)(us & 0xFFFFFFFFULL);
-        out_hi = (unsigned int)(us >> 32);
+        out_lo = (unsigned int)(us & (unsigned long long)U32_MAX);
+        out_hi = (unsigned int)(us >> BITS_PER_U32);
     }
     irq_restore(saved);
 

@@ -23,6 +23,7 @@
 #include "types.h"
 #include "memmap.h"
 
+/* PFN geometry; paging.h derives PAGE_SHIFT and PAGING_PFN_COUNT here. */
 #define PHYSMEM_PAGE_SHIFT 12
 #define PHYSMEM_PAGE_SIZE MEM_PAGE_SIZE
 #define PHYSMEM_MAX_PFN 1048576UL

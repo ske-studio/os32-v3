@@ -94,11 +94,11 @@ extern void int80_stub(void);
 static void idt_set_gate(int num, void (*handler)(void), u8 type_attr)
 {
     u32 addr = (u32)handler;
-    idt[num].offset_low  = (u16)(addr & 0xFFFF);
+    idt[num].offset_low  = (u16)(addr & U16_MAX);
     idt[num].selector    = KERNEL_CS;
     idt[num].zero        = 0;
     idt[num].type_attr   = type_attr;
-    idt[num].offset_high = (u16)((addr >> 16) & 0xFFFF);
+    idt[num].offset_high = (u16)((addr >> 16) & U16_MAX);
 }
 
 /* ======================================================================== */
@@ -115,7 +115,7 @@ void idt_init(void)
 
     /* CPU例外ハンドラ — 0-31 全ベクタを専用スタブで受ける */
     {
-        static void (*const exc_stubs[32])(void) = {
+        static void (*const exc_stubs[EXC_VECTOR_COUNT])(void) = {
             isr_stub_0,  isr_stub_1,  isr_stub_2,  isr_stub_3,
             isr_stub_4,  isr_stub_5,  isr_stub_6,  isr_stub_7,
             isr_stub_8,  isr_stub_9,  isr_stub_10, isr_stub_11,
@@ -125,7 +125,7 @@ void idt_init(void)
             isr_stub_24, isr_stub_25, isr_stub_26, isr_stub_27,
             isr_stub_28, isr_stub_29, isr_stub_30, isr_stub_31
         };
-        for (i = 0; i < 32; i++) {
+        for (i = 0; i < EXC_VECTOR_COUNT; i++) {
             idt_set_gate(i, exc_stubs[i], IDT_ATTR_INT_GATE32);
         }
     }
@@ -137,27 +137,27 @@ void idt_init(void)
     idt[EXC_DOUBLE_FAULT].type_attr = IDT_ATTR_TASK_GATE;
 
     /* IRQハンドラ (PIC再マッピング後) */
-    idt_set_gate(0x20, irq_stub_0, IDT_ATTR_INT_GATE32);  /* IRQ0: タイマ */
-    idt_set_gate(0x21, irq_stub_1, IDT_ATTR_INT_GATE32);  /* IRQ1: キーボード */
-    idt_set_gate(0x24, irq_stub_4, IDT_ATTR_INT_GATE32);  /* IRQ4: RS-232C */
-    idt_set_gate(0x27, irq_stub_7, IDT_ATTR_INT_GATE32);  /* IRQ7: スプリアス対策 */
-    idt_set_gate(0x2B, irq_stub_11, IDT_ATTR_INT_GATE32); /* IRQ11: FDD */
-    idt_set_gate(0x22, irq_stub_2,  IDT_ATTR_INT_GATE32); /* IRQ2:  VSYNC (V86ゲスト用) */
-    idt_set_gate(0x2C, irq_stub_12, IDT_ATTR_INT_GATE32); /* IRQ12: サウンド (V86ゲスト用) */
-    idt_set_gate(0x2D, irq_stub_13, IDT_ATTR_INT_GATE32); /* IRQ13: マウス */
+    idt_set_gate(IRQ_TO_INT(0), irq_stub_0, IDT_ATTR_INT_GATE32);  /* IRQ0: タイマ */
+    idt_set_gate(IRQ_TO_INT(1), irq_stub_1, IDT_ATTR_INT_GATE32);  /* IRQ1: キーボード */
+    idt_set_gate(IRQ_TO_INT(4), irq_stub_4, IDT_ATTR_INT_GATE32);  /* IRQ4: RS-232C */
+    idt_set_gate(IRQ_TO_INT(7), irq_stub_7, IDT_ATTR_INT_GATE32);  /* IRQ7: スプリアス対策 */
+    idt_set_gate(IRQ_TO_INT(11), irq_stub_11, IDT_ATTR_INT_GATE32); /* IRQ11: FDD */
+    idt_set_gate(IRQ_TO_INT(2), irq_stub_2,  IDT_ATTR_INT_GATE32); /* IRQ2:  VSYNC (V86ゲスト用) */
+    idt_set_gate(IRQ_TO_INT(12), irq_stub_12, IDT_ATTR_INT_GATE32); /* IRQ12: サウンド (V86ゲスト用) */
+    idt_set_gate(IRQ_TO_INT(13), irq_stub_13, IDT_ATTR_INT_GATE32); /* IRQ13: マウス */
 
     /* 動的登録を受ける IRQ (3/5/6/8/9/10/14/15) は共通スタブで受ける。
      * 登録が 0 件のあいだの挙動は従来の irq_stub_unexp_* と同じ
      * (EOI + 初回だけ診断) で、違うのは irq_register した driver が
      * 居れば呼ばれること。固定スタブの線はここに入れない。 */
-    idt_set_gate(0x23, irq_stub_common_3,  IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x25, irq_stub_common_5,  IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x26, irq_stub_common_6,  IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x28, irq_stub_common_8,  IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x29, irq_stub_common_9,  IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x2A, irq_stub_common_10, IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x2E, irq_stub_common_14, IDT_ATTR_INT_GATE32);
-    idt_set_gate(0x2F, irq_stub_common_15, IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(3), irq_stub_common_3,  IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(5), irq_stub_common_5,  IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(6), irq_stub_common_6,  IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(8), irq_stub_common_8,  IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(9), irq_stub_common_9,  IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(10), irq_stub_common_10, IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(14), irq_stub_common_14, IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(15), irq_stub_common_15, IDT_ATTR_INT_GATE32);
 
     /* リング3 システムコール (int 0x80): ゲート DPL=3 で CPL=3 から呼べる。
      * 他の例外/IRQ ゲートは DPL=0 のまま (ユーザから直接呼べない, C4)。 */
@@ -176,7 +176,7 @@ void idt_init(void)
 /* ======================================================================== */
 void idt_register_irq(unsigned int irq, void (*stub)(void))
 {
-    if (irq >= 16 || !stub) return;
+    if (irq >= IRQ_LINE_MAX || !stub) return;
     idt_set_gate(IRQ_TO_INT(irq), stub, IDT_ATTR_INT_GATE32);
 }
 
@@ -264,11 +264,11 @@ void irq_enable(unsigned int irq)
     u8 mask;
     unsigned int flags;
 
-    if (irq < 8) {
+    if (irq < PIC_IRQS) {
         port = PIC1_DATA;
     } else {
         port = PIC2_DATA;
-        irq -= 8;
+        irq -= PIC_IRQS;
     }
     flags = irq_save();
     mask = (u8)inp(port) & ~(1 << irq);
@@ -282,11 +282,11 @@ void irq_disable(unsigned int irq)
     u8 mask;
     unsigned int flags;
 
-    if (irq < 8) {
+    if (irq < PIC_IRQS) {
         port = PIC1_DATA;
     } else {
         port = PIC2_DATA;
-        irq -= 8;
+        irq -= PIC_IRQS;
     }
     flags = irq_save();
     mask = (u8)inp(port) | (1 << irq);
@@ -300,7 +300,7 @@ void irq_disable(unsigned int irq)
 /* ======================================================================== */
 void pic_eoi(unsigned int irq)
 {
-    if (irq >= 8) {
+    if (irq >= PIC_IRQS) {
         /* スレーブPICにEOI → マスタPICにもEOI */
         outp(PIC2_CMD, OCW2_EOI);
         outp(PIC1_CMD, OCW2_EOI);

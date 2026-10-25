@@ -26,6 +26,8 @@
 #include "kstring.h"
 #include "kprintf.h"
 
+#define KMALLOC_SPLIT_MIN_BYTES 8
+
 /* ======== ブロックヘッダ ======== */
 
 /* 8バイトアライメント。
@@ -82,7 +84,7 @@ void *kheap_alloc(KHeap *h, u32 size)
     BlkHdr *blk;
     BlkHdr *best_blk = (BlkHdr *)0;
     u8 *best_p = (u8 *)0;
-    u32 best_size = 0xFFFFFFFF;
+    u32 best_size = U32_MAX;
 
     /* size > h->size の除外はアライン時の整数オーバーフロー
      * (0xFFFFFFFD〜 が 0 に化ける) も同時に防ぐ */
@@ -125,7 +127,7 @@ void *kheap_alloc(KHeap *h, u32 size)
         p = best_p;
 
         /* 分割可能か？ (残り >= ヘッダ+最小データ8バイト) */
-        if (blk->size >= size + BLK_HDR_SIZE + 8) {
+        if (blk->size >= size + BLK_HDR_SIZE + KMALLOC_SPLIT_MIN_BYTES) {
             BlkHdr *next;
             u32 remain = blk->size - size - BLK_HDR_SIZE;
 
@@ -157,7 +159,7 @@ void kheap_free(KHeap *h, void *ptr)
     if ((u8 *)ptr < h->base + BLK_HDR_SIZE ||
         (u8 *)ptr >= h->base + h->size ||
         (((u32)ptr) & (BLK_ALIGN - 1)) != 0) {
-        kprintf(0xC1, "[%s] invalid free %x\n", h->name, (u32)ptr);
+        kprintf(ATTR_YELLOW, "[%s] invalid free %x\n", h->name, (u32)ptr);
         return;
     }
 
@@ -165,7 +167,7 @@ void kheap_free(KHeap *h, void *ptr)
 
     /* マジック検証 (double free / ヘッダ破壊の検出) */
     if (blk->magic != BLK_MAGIC_USED) {
-        kprintf(0xC1, "[%s] bad magic %x at %x (double free?)\n",
+        kprintf(ATTR_YELLOW, "[%s] bad magic %x at %x (double free?)\n",
                 h->name, blk->magic, (u32)ptr);
         return;
     }

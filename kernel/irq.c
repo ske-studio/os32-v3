@@ -100,13 +100,13 @@ void irq_finish(unsigned int irq, int handled_any)
     int bit7 = 0;
     int plan;
 
-    if (irq == 15) {
+    if (irq == PIC_SLAVE_LAST_IRQ) {
         /* handled に関係なくスレーブの ISR を見る (票 §1-1 の 5)。 */
         u8 slave_isr;
         outp(PIC2_CMD, OCW3_ISR);
         slave_isr = (u8)inp(PIC2_CMD);
         outp(PIC2_CMD, OCW3_IRR);       /* 既定の IRR 読み出しへ戻す */
-        bit7 = (slave_isr & 0x80) ? 1 : 0;
+        bit7 = (slave_isr & PIC_LAST_ISR_BIT) ? 1 : 0;
     }
 
     plan = irq_eoi_plan(irq, bit7);
@@ -138,7 +138,7 @@ void irq_dispatch(unsigned int irq)
             if (!(irq_storm_masked & (u32)(1u << irq))) {
                 irq_storm_masked |= (u32)(1u << irq);
                 if (!irq_test_quiet)
-                    kprintf(0xC1, "[irq] storm on IRQ%d (>%d/tick unclaimed) -> masked\n",
+                    kprintf(ATTR_YELLOW, "[irq] storm on IRQ%d (>%d/tick unclaimed) -> masked\n",
                             (int)irq, (int)IRQ_STORM_LIMIT);
             }
         }
@@ -167,7 +167,7 @@ int irq_quarantine_line(unsigned int irq)
         irq_disable(irq);
         irq_restore(saved);
         if (!irq_test_quiet)
-            kprintf(0xC1, "[irq] IRQ%d quarantined (%d registrant(s) fall back to their tick hook)\n",
+            kprintf(ATTR_YELLOW, "[irq] IRQ%d quarantined (%d registrant(s) fall back to their tick hook)\n",
                     (int)irq, (int)irq_lines[idx].count);
         return 0;
     }
