@@ -252,3 +252,19 @@ import表と既存利用者:
 - N2 (P3): KDI_ADDR は `kapi_reserved_nosys` だけに絞ってよい (`shlib_read_page` は stub 経由でも同じ関数に着く)。実装者の判断に任せる。
 - PM 決定 (段の順): S3 は S2 (票 TASK_SLIM、`SLIM_HWDEV_DESIGN`) と同じく hwdev の生成物と契約の照合に触れるので、**S2 を main に取り込んでから** S3a を始める。S4 は S2 と並べてよい。S4 の段はゲストの起動を使うので NP21/W を取り合わないよう 1 本ずつ出す。
 - 付表 (試験ごとの import の一覧) は同じ置き場の `IMPORTS.final.md`、リポジトリの写しは `docs/decisions/SLIM_KERNEL_IMPORTS.md`。
+
+## S4b の実装で設計者が決めたこと
+
+- 抽出範囲の自由変数は親の引数 `boot_drive` だけなので、補助は `static inline void kernel_mount_children(u32 boot_drive)` とし、`kcg_module_load()` と `SERVICES_ROOT_READY` の間から呼ぶ。列挙・root 判定・サブマウントの既存ブロックをそのまま移す。
+
+## S4c の実装で設計者が決めたこと
+
+- SB 専用の `inodes_count` の写しは抽出後に不要なので削除し、補助では設計どおり `lay` の各フィールドを読む。`ext2_layout_plan` の計算位置は維持し、`fmt_write_super` は `ext2_write_block` の結果をそのまま返し、呼元の同じ位置で `EXT2_ERR_IO` に変換する。
+
+## S4d の実装で設計者が決めたこと
+
+- root 専用の作業変数と `ret` は `static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)` のローカルとし、既存の I/O ごとの `EXT2_ERR_IO` と成功時 `EXT2_OK` を返す。呼元の元ブロック位置で非ゼロを `EXT2_ERR_IO` にし、`fmt_ctx`・`ext2_g_blk` の所有と計算・読書き順序を維持する。
+
+## S4e の実装で設計者が決めたこと
+
+- 現行ビルドの `kernel/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。

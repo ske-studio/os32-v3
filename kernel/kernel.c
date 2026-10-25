@@ -181,6 +181,11 @@ static u8 kernel_pci_line_bits(unsigned int irq)
     return b;
 }
 
+/* kernel_main から抜き出した補助。本体は kernel_main の後に置く
+ * (ホスト試験が kernel.c を文字の位置で切り出すため)。 */
+static inline void kernel_shell_loop(void);
+static inline void kernel_mount_children(u32 boot_drive);
+
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
     char tmp[16];
@@ -509,55 +514,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     cd_module_load();
     /* Page owners exist now; failure retains the TVRAM CUI. */
     kcg_module_load();
-    {
-        const char *names[MAX_DEVICES];
-        int num = dev_get_names(names, MAX_DEVICES);
-        const char *root_dev = (boot_drive == BOOT_DRIVE_FDD ||
-                                boot_drive == BOOT_DRIVE_FDD_144) ? "fd0" : "hd0";
-        /* 登録済みの部品を含めてサブマウント (ルート以外) */
-        for (int i = 0; i < num; i++) {
-            const char *dname = names[i];
-            char mnt[VFS_MNTPATH_MAX];
-            int j;
-            Device *d = dev_find(dname);
-
-            if (!d || d->type != DEV_BLOCK) continue;
-            if (!d->sect_size || !d->total_sects) continue;
-
-            /* ルートと一致する場合はスキップ */
-            {
-                int match = 1;
-                for (j = 0; root_dev[j] || dname[j]; j++) {
-                    if (root_dev[j] != dname[j]) { match = 0; break; }
-                }
-                if (match) continue;
-            }
-
-            /* パス生成: "/dname/" */
-            mnt[0] = '/';
-            for (j = 0; dname[j] && j < VFS_MNTPATH_MAX - 4; j++) {
-                mnt[1 + j] = dname[j];
-            }
-            mnt[1 + j] = '\0';
-
-            /* フォールバックしながらマウント試行 */
-            {
-                int mounted = 0;
-                /* CDデバイスにはiso9660のみ試行 */
-                if (dname[0] == 'c' && dname[1] == 'd') {
-                    if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
-                } else {
-                    if (vfs_mount(mnt, dname, "ext2") == VFS_OK) mounted = 1;
-                    if (!mounted) {
-                        if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
-                    }
-                    if (!mounted) {
-                        vfs_mount(mnt, dname, "fat");
-                    }
-                }
-            }
-        }
-    }
+    kernel_mount_children(boot_drive);
 
     services_stage = SERVICES_ROOT_READY;
     kprintf(KLOG_ATTR, "[services] ROOT_READY tick=%u\n", tick_count);
@@ -692,6 +649,73 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
 
+    kernel_shell_loop();
+
+    /* 失敗時フォールバック */
+    for (;;) {
+        _halt();
+    }
+}
+
+/* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは boot_drive
+ * から fd0 / hd0 を決めて除く。CD は iso9660 だけ、他は ext2 → iso9660 → fat の
+ * 順に試し、失敗しても起動は続ける。 */
+static inline void kernel_mount_children(u32 boot_drive)
+{
+    {
+        const char *names[MAX_DEVICES];
+        int num = dev_get_names(names, MAX_DEVICES);
+        const char *root_dev = (boot_drive == BOOT_DRIVE_FDD ||
+                                boot_drive == BOOT_DRIVE_FDD_144) ? "fd0" : "hd0";
+        /* 登録済みの部品を含めてサブマウント (ルート以外) */
+        for (int i = 0; i < num; i++) {
+            const char *dname = names[i];
+            char mnt[VFS_MNTPATH_MAX];
+            int j;
+            Device *d = dev_find(dname);
+
+            if (!d || d->type != DEV_BLOCK) continue;
+            if (!d->sect_size || !d->total_sects) continue;
+
+            /* ルートと一致する場合はスキップ */
+            {
+                int match = 1;
+                for (j = 0; root_dev[j] || dname[j]; j++) {
+                    if (root_dev[j] != dname[j]) { match = 0; break; }
+                }
+                if (match) continue;
+            }
+
+            /* パス生成: "/dname/" */
+            mnt[0] = '/';
+            for (j = 0; dname[j] && j < VFS_MNTPATH_MAX - 4; j++) {
+                mnt[1 + j] = dname[j];
+            }
+            mnt[1 + j] = '\0';
+
+            /* フォールバックしながらマウント試行 */
+            {
+                int mounted = 0;
+                /* CDデバイスにはiso9660のみ試行 */
+                if (dname[0] == 'c' && dname[1] == 'd') {
+                    if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
+                } else {
+                    if (vfs_mount(mnt, dname, "ext2") == VFS_OK) mounted = 1;
+                    if (!mounted) {
+                        if (vfs_mount(mnt, dname, "iso9660") == VFS_OK) mounted = 1;
+                    }
+                    if (!mounted) {
+                        vfs_mount(mnt, dname, "fat");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* シェルの起動ループ。戻らない (kernel_main の後ろの停止ループは保険)。 */
+static inline void kernel_shell_loop(void)
+{
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
      * (MEM_SHELL_LOAD_ADDR, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
      * 載らない。終了/クラッシュ時のフォールバックとして再起動ループにする。
@@ -856,10 +880,5 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             }
             tvram_clear();
         }
-    }
-
-    /* 失敗時フォールバック */
-    for (;;) {
-        _halt();
     }
 }
