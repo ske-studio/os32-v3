@@ -56,9 +56,7 @@ void kbd_inject_discard(void);
  * 捨てる (exec_reclaim_owned から con_sink_owner_exit の直前に呼ぶ)。 */
 void kbd_inject_owner_exit(int id);
 
-/* --- 自己診断 (kernel/kselftest.c) --------------------------------------- */
-/* リングの push/take/破棄/あふれと「読み手未確立の注入は拒否」を確かめる。
- * ビット 0..n が落ちた項目 (0 = 全部通った)。呼んだ後のリングは空。 */
-u32 kbd_inject_selftest(void);
+/* Observed drop counter; owned by the kernel. */
+extern volatile u32 kbd_inject_drop_count;
 
 #endif /* __KBD_INJECT_H */

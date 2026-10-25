@@ -58,7 +58,9 @@ struct v86_session_state *kdi_ptr_v86_session(void) { return &v86_session; }
 u32 *kdi_ptr_v86_gcap_phase(void) { return &v86_gcap_phase; }
 u32 *kdi_ptr_v86_gcap_alloc_count(void) { return &v86_gcap_alloc_count; }
 u32 *kdi_ptr_v86_gcap_free_count(void) { return &v86_gcap_free_count; }
+u32 kdi_get_kbd_inject_drop_count(void) { return kbd_inject_drop_count; }
 void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
+void kdi_set_kbd_inject_drop_count(u32 value) { kbd_inject_drop_count = value; }
 void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kprintf,
     (void (*)(void))appmem_init,
@@ -126,7 +128,6 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))irq_unregister,
     (void (*)(void))kapi_mem_stat,
     (void (*)(void))kbd_diag,
-    (void (*)(void))kbd_inject_selftest,
     (void (*)(void))kheap_alloc,
     (void (*)(void))kheap_block_size,
     (void (*)(void))kheap_free,
@@ -335,7 +336,18 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))con_sink_stat,
     (void (*)(void))con_sink_read,
     (void (*)(void))con_sink_owner_exit,
+    (void (*)(void))appslot_cur,
+    (void (*)(void))appslot_gfx_owner,
+    (void (*)(void))con_sink_reader_get,
+    (void (*)(void))kbd_inject,
+    (void (*)(void))kbd_inject_pending,
+    (void (*)(void))kbd_inject_take,
+    (void (*)(void))kbd_inject_peek,
+    (void (*)(void))kbd_inject_discard,
+    (void (*)(void))kdi_selftest_inj_push,
+    (void (*)(void))kdi_get_kbd_inject_drop_count,
     (void (*)(void))kdi_set_con_sink_drop_count,
+    (void (*)(void))kdi_set_kbd_inject_drop_count,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -406,7 +418,6 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xe3a43c4cu, 1, 1},
     {0x875dd74fu, 1, 1},
     {0x4b6adaaau, 1, 1},
-    {0x72281b03u, 1, 1},
     {0x411c4186u, 1, 1},
     {0x589e2f0eu, 1, 1},
     {0x8615770bu, 1, 1},
@@ -615,7 +626,18 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xd5f9a99au, 1, 1},
     {0xa16eec9cu, 1, 1},
     {0x7de5c4f0u, 1, 1},
+    {0x6f34dd8du, 1, 1},
+    {0x669680dcu, 1, 1},
+    {0x3249b368u, 1, 1},
+    {0x77a68158u, 1, 1},
+    {0x02d6067cu, 1, 1},
+    {0x49cfb596u, 1, 1},
+    {0xd2ea085eu, 1, 1},
+    {0xedf3c2c1u, 1, 1},
+    {0x6f4da691u, 1, 1},
+    {0xad12c57eu, 1, 2},
     {0x3702afabu, 1, 3},
+    {0x2707aa52u, 1, 3},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

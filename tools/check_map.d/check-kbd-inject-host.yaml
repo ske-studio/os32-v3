@@ -10,3 +10,6 @@ check-kbd-inject-host:
 - include/kbd_inject.h
 - include/con_sink.h
 - include/launch.h
+- kdebug/selftest_kbd_inject.c
+- include/kselftest_probe.h
+- kdebug/selftest_internal.h

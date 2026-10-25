@@ -280,3 +280,9 @@ import表と既存利用者:
 
 - con の移植先は `kdebug/selftest_con_sink.c`、内部宣言は `kdebug/selftest_internal.h` とし、この段では `kst_con_sink` だけを宣言する。S6 は con の 7 FUNC + 1 SETTER、S2 は 133 FUNC、全体は 276 枠とする。
 - con の既存ホスト fixture は移植ソースを直接取り込み、`KDEBUG_SELFTEST_HOST` のときだけ生成 import ヘッダを外して既存 owner と SETTER の接続を与える。旧名の転送関数は fixture 内だけに置き、本番の移植先は生成 import を使う。
+
+## S3c の実装で設計者が決めたこと
+
+- kbd の移植先は `kdebug/selftest_kbd_inject.c`、宣言は既存の `selftest_internal.h` に追加する。S2 は 132 FUNC、S6 は con/kbd の 16 FUNC + 1 GETTER + 2 SETTER、全体は 286 枠とし、付表の種類順に並べて HWDEV §3 の第 3 列も追従する。
+- `include/kselftest_probe.h` はこの段で必要な version と `kdi_selftest_inj_push` だけを宣言し、実体は元の `inj_push` を直返しする。drop 観測変数の既存実体はカーネルに残し、宣言を `include/kbd_inject.h` に置いて GETTER/SETTER を生成する。
+- kbd のホスト fixture は S3b と同じ `KDEBUG_SELFTEST_HOST` で移植ソースを直接取り込み、SETTER と旧名転送を fixture 内だけに置く。既存変異の移設先を追従し、非ゼロ drop 復元と移植 object の import 集合・非常駐を検査する。

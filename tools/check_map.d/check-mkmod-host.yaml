@@ -37,6 +37,7 @@ check-mkmod-host:
 - include/io.h
 - include/kbd.h
 - include/kbd_inject.h
+- include/kselftest_probe.h
 - include/kprintf.h
 - include/ksetjmp.h
 - include/launch.h

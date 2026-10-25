@@ -40,7 +40,7 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                 gen.check_nm(self.entries)
         altered = copy.deepcopy(self.entries)
-        altered[200].pop('retained')
+        altered[199].pop('retained')
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
 
@@ -96,17 +96,17 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 276)
-        self.assertEqual([e['name'] for e in self.entries[225:238]], [
+        self.assertEqual(len(self.entries), 286)
+        self.assertEqual([e['name'] for e in self.entries[224:237]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
-        self.assertEqual(gen.STAGES['S4'], 238)
-        self.assertEqual(gen.STAGES['S5'], 268)
-        self.assertEqual(gen.STAGES['S6'], 276)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 7 + ('SETTER',))
-        self.assertEqual([(e['stage'], e['name']) for e in self.entries[238:268]], [
+        self.assertEqual(gen.STAGES['S4'], 237)
+        self.assertEqual(gen.STAGES['S5'], 267)
+        self.assertEqual(gen.STAGES['S6'], 286)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 16 + ('GETTER',) + ('SETTER',) * 2)
+        self.assertEqual([(e['stage'], e['name']) for e in self.entries[237:267]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
             ('S5', 'e82557_send'), ('S5', 'e82557_get_mac'), ('S5', 'e82557_state'),
@@ -127,12 +127,12 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'pci_cfg_write16'),
             ('S5', 'hwdev_module_ops'),
         ])
-        self.assertEqual(self.entries[200]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[200]['source'], 'kernel/v86_io.h')
-        self.assertTrue(self.entries[200]['retained'])
-        self.assertEqual(self.entries[248]['name'], 'display_text_start')
+        self.assertEqual(self.entries[199]['name'], 'v86_cui_display_restore')
+        self.assertEqual(self.entries[199]['source'], 'kernel/v86_io.h')
+        self.assertTrue(self.entries[199]['retained'])
+        self.assertEqual(self.entries[247]['name'], 'display_text_start')
         self.assertEqual(self.entries[0]['name'], 'kprintf')
-        self.assertEqual(self.entries[209]['name'], 'kdi_ptr_v86_session')
+        self.assertEqual(self.entries[208]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
             'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
@@ -232,11 +232,15 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'nm mismatch.*kst_con_sink'):
                 gen.check_nm(self.entries)
 
-    def test_con_move_contract_and_residency(self):
+    def test_con_kbd_move_contract_and_residency(self):
         self.assertEqual([e['name'] for e in self.entries if e['stage'] == 'S6'], [
             'con_sink_push_print', 'con_sink_push_clear', 'con_sink_push_cursor',
             'con_sink_push_exit', 'con_sink_stat', 'con_sink_read',
-            'con_sink_owner_exit', 'kdi_set_con_sink_drop_count'])
+            'con_sink_owner_exit', 'appslot_cur', 'appslot_gfx_owner',
+            'con_sink_reader_get', 'kbd_inject', 'kbd_inject_pending',
+            'kbd_inject_take', 'kbd_inject_peek', 'kbd_inject_discard',
+            'kdi_selftest_inj_push', 'kdi_get_kbd_inject_drop_count',
+            'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count'])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
         moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
@@ -245,6 +249,17 @@ class ImportsTests(unittest.TestCase):
             self.assertNotIn(symbol, kernel)
         self.assertTrue({'kst_con_sink', 'g_self_buf', 'g_self_src'} <= module)
         self.assertIn('con_sink_drop_count', kernel)
+        kbd = ROOT / 'build/out/kdebug/selftest_kbd_inject.o'
+        self.assertIn('kst_kbd_inject', gen.symbols(nm, [kbd], False))
+        for symbol in ('kbd_inject_selftest', 'kst_kbd_inject'):
+            self.assertNotIn(symbol, kernel)
+            self.assertNotIn(symbol, {e['symbol'] for e in self.entries})
+        self.assertTrue({'kdi_selftest_inj_push', 'kbd_inject_drop_count'} <= kernel)
+        self.assertEqual(gen.symbols(nm, [kbd], True) - {gen.ABI_SYMBOL}, {
+            'appslot_cur', 'appslot_gfx_owner', 'con_sink_reader_get',
+            'kbd_inject', 'kbd_inject_pending', 'kbd_inject_take',
+            'kbd_inject_peek', 'kbd_inject_discard', 'kdi_selftest_inj_push',
+            'kdi_get_kbd_inject_drop_count', 'kdi_set_kbd_inject_drop_count'})
         self.assertNotIn('con_sink_selftest', {e['symbol'] for e in self.entries})
         original = gen.symbols
         def without_setter(nm, paths, undefined):

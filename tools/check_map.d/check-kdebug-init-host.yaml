@@ -71,4 +71,6 @@ check-kdebug-init-host:
 - kernel/hwdev_module.h
 - kdebug/recover_virtual.h
 - kdebug/recover_virtual.c
+- kdebug/selftest_kbd_inject.c
+- include/kselftest_probe.h
 artifact_reader: true

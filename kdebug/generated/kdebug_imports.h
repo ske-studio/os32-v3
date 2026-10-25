@@ -25,6 +25,7 @@
 #include "include/gfx_hal.h"
 #include "include/kbd_inject.h"
 #include "include/kprintf.h"
+#include "include/kselftest_probe.h"
 #include "include/launch.h"
 #include "include/redir_access.h"
 #include "include/sys.h"
@@ -124,9 +125,11 @@ struct v86_session_state *kdi_ptr_v86_session(void);
 u32 *kdi_ptr_v86_gcap_phase(void);
 u32 *kdi_ptr_v86_gcap_alloc_count(void);
 u32 *kdi_ptr_v86_gcap_free_count(void);
+u32 kdi_get_kbd_inject_drop_count(void);
 void kdi_set_con_sink_drop_count(u32 value);
-#define KDEBUG_IMPORT_COUNT 276
-#define KDEBUG_ABI_GEN 0x770f7d0eu
+void kdi_set_kbd_inject_drop_count(u32 value);
+#define KDEBUG_IMPORT_COUNT 286
+#define KDEBUG_ABI_GEN 0x31400021u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

@@ -453,7 +453,7 @@ static void test_con_sink_render_gate(void)
 /* ------------------------------------------------------------------------ */
 static void test_kbd_inject(void)
 {
-    u32 bad = kbd_inject_selftest();
+    u32 bad = kst_kbd_inject();
     check((bad & (1u << 0)) == 0, "kbd_inject boot has no fullscreen owner and refuses without reader");
     check((bad & (1u << 1)) == 0, "kbd_inject keeps UTF-8 byte order (FIFO)");
     check((bad & (1u << 2)) == 0, "kbd_inject take on empty ring returns 0");

@@ -40,6 +40,11 @@ AppSlot *appslot_get(int id) {
 #include "con_sink.c"
 #include "kbd_inject.c"
 
+#define KDEBUG_SELFTEST_HOST
+void kdi_set_kbd_inject_drop_count(u32 value) { kbd_inject_drop_count = value; }
+#include "selftest_kbd_inject.c"
+static u32 kbd_inject_selftest(void) { return kst_kbd_inject(); }
+
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
 
 static void die(int code)
@@ -355,9 +360,10 @@ static void case_selftest_agrees(void)
 {
     reset_all();
     report("6 kbd_inject_selftest (what kselftest runs on the guest)\n");
+    kbd_inject_drop_count = 17;
     check(kbd_inject_selftest() == 0, "6a 自己診断のビットマスクは 0");
     check(kbd_inject_pending() == 0, "6b 終わった後は空");
-    check(kbd_inject_drop_count == 0, "6c 捨てた累計を元に戻す");
+    check(kbd_inject_drop_count == 17, "6c 捨てた累計を元に戻す");
     host_gfx = 3; host_slots[3].parent = APP_ID_SHELL; host_cur = 4;
     check((kbd_inject_selftest() & 1u) != 0, "boot rejects fullscreen precondition");
     reset_all();

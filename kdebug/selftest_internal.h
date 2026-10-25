@@ -5,5 +5,6 @@
 
 /* Local module functions, outside the kernel import ABI. */
 u32 kst_con_sink(void);
+u32 kst_kbd_inject(void);
 
 #endif
