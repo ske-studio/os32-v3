@@ -17,6 +17,7 @@
 #define PALETTE_H
 
 #include "types.h"
+#include "pegc.h"
 
 /* パレットエントリ (各4bit: 0-15) */
 typedef struct {
@@ -25,12 +26,12 @@ typedef struct {
     u8 b;   /* 青輝度 (0-15) */
 } PaletteEntry;
 
-/* HAL RGB tuples and KAPI four-bit palette components. */
+/* HAL の RGB の組と、KAPI の 4bit のパレット輝度。 */
 #define GFX_RGB_COMPONENTS 3
 #define GFX_RGB_R 0
 #define GFX_RGB_G 1
 #define GFX_RGB_B 2
-#define GFX_PALETTE_COMPONENT_MASK 0x0F
+#define GFX_PALETTE_COMPONENT_MASK PEGC_PAL_KAPI_MASK /* 正典は include/pegc.h */
 #define GFX_PALETTE_CUBE_LEVELS 6
 
 #define PALETTE_COUNT 16   /* PC-98の標準16色パレット数 */
