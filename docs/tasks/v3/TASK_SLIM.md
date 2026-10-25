@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・規則 [POLICY_DEV](../../POLICY_DEV.md) §1 (カーネル層の不具合が先)
 
-> 状態: **実装中 (2026-10-25)** — S1 は設計なしで実装、S2 は設計確定、S3・S4 は設計の往復 (起草 astra → レビュー Opus) 中。
+> 状態: **実装中 (2026-10-25)** — S1 は設計なしで実装、S2〜S4 は設計確定 (astra 起草・Opus 2 往復)。
 
 ## 0. ユーザー指示 (2026-10-25)
 
@@ -29,7 +29,7 @@
 |---|---|---|---|---|
 | S1 | #3 の死んだローダを消し、行番号の参照を正しい所へ直す | 不要 | astra | 実装中 |
 | S2 | #1 の表を詰める (+ #6: 原因は -O2 の展開、gfinit_decode だけ -Os)。hwdev の中で論理表へ展開し、recover.c・recover.h・HWDEV の契約・kdebug.bin は変えない。S2a (旧表の oracle) → S2c (展開 API・inspect で先に確保・試験の移し) → S2d (詰めた表) → S2e (-Os・総量) を直列 | [SLIM_HWDEV_DESIGN](../../decisions/realhw/SLIM_HWDEV_DESIGN.md) (確定 2026-10-25) | astra | 実装待ち |
-| S3 | #2・#7 の自己試験をカーネルの外へ (+ #4 を調べる) | SLIM_KERNEL (astra 起草) | astra | 設計中 |
-| S4 | #5 の長い関数を分ける (機械語の比べで確かめられる純粋な分割から) | SLIM_KERNEL | astra | 設計中 |
+| S3 | #2・#7 の自己試験 5 本 (con・kbd・lease・exec 2 本) を kdebug へ移し、kdebug の import の番号を詰める (+ #4 の結論: FD ローダの C 化は LOADER.BIN < 32KiB が着手条件)。S3a → S3f を直列、**S2 の取り込みの後** | [SLIM_KERNEL_DESIGN](../../decisions/SLIM_KERNEL_DESIGN.md) (確定 2026-10-25) | astra | S2 待ち |
+| S4 | #5 の長い関数を分ける: kernel_main (S4a シェルループ・S4b サブマウント)、ext2_format_range (S4c SB・S4d root)、ime_process_key (S4e)。objdump の同一とゲストの起動で確かめる。他の長い関数は分けない (確定設計 §4) | 同上 | astra | 実装待ち (S2 と並列、NP21/W を使うので 1 本ずつ) |
 
 段の細分 (S2a… など) は確定設計で決める。各段の完了条件は ROLES §0 のとおり。大きさの減りは段ごとに像の大きさ (カーネル・hwdev.mod・kdebug.bin・起動 FD の空き) で記録する。
