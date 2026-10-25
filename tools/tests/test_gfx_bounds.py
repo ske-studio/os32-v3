@@ -7,11 +7,11 @@ import test_gfx_kernel_fb as base
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
  ('pegc', 'gfx/backend_pegc.c',
-  '    if (!gfx_clip_screen(&x, &y, &w, &h, PEGC_WIDTH, PEGC_HEIGHT_480)) return;',
+  '    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, mode->height)) return;',
   '''    if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
-    if (x + w > PEGC_WIDTH) w = PEGC_WIDTH - x;
-    if (y + h > PEGC_HEIGHT_480) h = PEGC_HEIGHT_480 - y;
+    if (x + w > mode->width) w = mode->width - x;
+    if (y + h > mode->height) h = mode->height - y;
     if (w <= 0 || h <= 0) return;'''),
  ('cirrus', 'gfx/backend_cirrus.c',
   '    return gfx_clip_screen(x, y, w, h, CIRRUS_WIDTH, CIRRUS_HEIGHT);',
