@@ -266,3 +266,10 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
 - oracle は旧 recover_gf.c のヘッダ・定数・参照配列・式関数を含む前処理済み C translation unit として固定し、元コミット・元ソースと fixture の SHA256・抽出コマンドを tools/tests/recover_tables_oracle.json に記録する（圧縮生成器から再生成しない）。
 - 抽出は別 translation unit の旧表／製品表を C で評価し、全欄を table・row・field・slot・value の名前付きレコードとして出力する；参照は NULL／シンボル名と全要素、式は eval の名前と前処理済み関数本文、profile は CRC も照合し、--extract で schema=1 の JSON を後続生成器へ渡す。
 - S2a の比較対象は現行 recover_gf_template とし、S2c で比較側だけを展開済み profile へ切り替える；check-recover-tables-host は build/checks.d に置き、B3 の gen_recover_tables.py --check は生成器を作る S2d で同ターゲットへ追加する。
+
+## S2c の実装で設計者が決めたこと
+
+- S2c の件数は旧論理配列の sizeof からローカル #define で求め、3 配列の容量を全て確認してからコピー・profile 公開する；生成 include の件数定義への移行は S2d で行う。
+- gf_release_rom は detach 拒否を戻り値 -1 で伝え、再 inspect はそこで中止する；そのとき backing・profile・lease を保持し、再確保や再展開で上書きしない。
+- host の include 階層は translation unit ごとに 1 個の展開済み fixture を共有し、各実行入口で初期化する；旧静的配列への直接参照も移し、ROM 診断ツールは既存の合成 ROM fixture で通す。
+- RUN の合成試験は展開先と plan_build の出力を同じ領域にして自己コピー・VRAM 追記・bind 後の node_layout/node_write の参照先を検査し、owner 試験は各確保点・展開/boot/probe 失敗・detach 拒否・前回 RUN を保持した SIZE_BARS の読み通知を検査する。

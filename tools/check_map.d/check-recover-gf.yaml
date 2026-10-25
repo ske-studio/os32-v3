@@ -2,6 +2,7 @@ check-recover-gf:
 - kdebug/recover.c
 - kdebug/recover.h
 - kdebug/recover_gf.c
+- kdebug/recover_gf_expand.h
 - kdebug/recover_gf.h
 - tools/tests/recover_gf_host.c
 - tools/tests/recover_gf_inventory.h

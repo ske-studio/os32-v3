@@ -13,6 +13,42 @@ static void print(const char *s)
     __asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
 #define CHECK(x) do { if (!(x)) { print("FAIL " #x "\n"); failures++; } } while (0)
+static struct gfinit_plan gf_fixture_buffer;
+static struct recover_profile gf_fixture_profile;
+static void gf_fixture_init(void)
+{
+    CHECK(!recover_gf_template.rules && !recover_gf_template.rule_count &&
+          !recover_gf_template.targets && !recover_gf_template.target_count &&
+          !recover_gf_template.layouts && !recover_gf_template.layout_count);
+    u8 *bytes = (u8 *)&gf_fixture_buffer;
+    for (u32 i = 0; i < sizeof(gf_fixture_buffer); i++) bytes[i] = 0xa5;
+    CHECK(recover_gf_profile_expand(&gf_fixture_profile, &gf_fixture_buffer) == 0);
+    CHECK(gf_fixture_profile.rules == gf_fixture_buffer.rules &&
+          gf_fixture_profile.targets == gf_fixture_buffer.targets &&
+          gf_fixture_profile.layouts == gf_fixture_buffer.layouts);
+    /* Only the occupied parts of the three arrays may be changed. */
+    for (u32 i = 0; i < sizeof(gf_fixture_buffer); i++) {
+        u8 *at = bytes + i;
+        if ((at >= (u8 *)gf_fixture_buffer.rules &&
+             at < (u8 *)(gf_fixture_buffer.rules + gf_fixture_profile.rule_count)) ||
+            (at >= (u8 *)gf_fixture_buffer.targets &&
+             at < (u8 *)(gf_fixture_buffer.targets + gf_fixture_profile.target_count)) ||
+            (at >= (u8 *)gf_fixture_buffer.layouts &&
+             at < (u8 *)(gf_fixture_buffer.layouts + gf_fixture_profile.layout_count))) continue;
+        CHECK(*at == 0xa5);
+    }
+    struct recover_profile reset = gf_fixture_profile;
+    CHECK(recover_gf_profile_expand(&reset, 0) == 0);
+    CHECK(!reset.rules && !reset.rule_count && !reset.targets && !reset.target_count &&
+          !reset.layouts && !reset.layout_count && reset.exprs == gf_fixture_profile.exprs);
+    u32 crc = recover_profile_crc(&gf_fixture_profile);
+    gf_fixture_buffer.rules[0].write_mask ^= 1;
+    gf_fixture_buffer.layouts[gf_fixture_profile.layout_count-1].substep ^= 1;
+    gf_fixture_buffer.targets[gf_fixture_profile.target_count-1].offset ^= 1;
+    gf_fixture_profile.rule_count++;
+    CHECK(recover_gf_profile_expand(&gf_fixture_profile, &gf_fixture_buffer) == 0);
+    CHECK(recover_profile_crc(&gf_fixture_profile) == crc);
+}
 static struct recover core;
 static struct recover_profile profile;
 static u32 flow[RECOVER_NODE_MAX * RECOVER_BITS_WORDS], valid[RECOVER_BITS_WORDS];
@@ -87,7 +123,7 @@ static u32 hash;
 static void setup(void)
 {
     rawcommand=0x102; rawbars[0]=0x24000000; rawbars[1]=0x30000008; rawbars[2]=0x25000000;
-    profile=recover_gf_template;
+    profile=gf_fixture_profile;
     profile.trial_limit=1000; profile.opcode_limit=1000; profile.restore_limit=1000;
     profile.max_steps=4096; profile.max_polls=65536; profile.restore_max_polls=65536;
     profile.layouts=layouts; profile.layout_count=ARRAY_SIZE(layouts);
@@ -102,7 +138,7 @@ static void setup(void)
 }
 static void inventory_test(void)
 {
-    CHECK(recover_profile_ok(&recover_gf_template)==0);
+    CHECK(recover_profile_ok(&gf_fixture_profile)==0);
     CHECK(ARRAY_SIZE(inventory)==619 && ARRAY_SIZE(gf_effects)==619);
     u32 counts[5]={0};
     for(u32 i=0;i<ARRAY_SIZE(inventory);i++) {
@@ -112,24 +148,24 @@ static void inventory_test(void)
         if(c->kind==REC_GF_PLL || c->kind==REC_GF_PLL_UNUSED) {
             CHECK(e->expression==GF_PLL);
             if(c->kind==REC_GF_PLL) {
-                const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
-                CHECK(w && w->phase==REC_RUN && w->pc==e->pc && targets[w->key].offset==e->reg);
+                const struct recover_rule *w=rule_by_id(&gf_fixture_profile,c->rule);
+                CHECK(w && w->phase==REC_RUN && w->pc==e->pc && gf_fixture_profile.targets[w->key].offset==e->reg);
             } else CHECK(c->rule==RECOVER_NONE &&
                 ((e->pc==0xe728 && (e->reg==0x4038 || e->reg==0x403c || e->reg==0x4600)) ||
                  (e->pc==0xe623 && e->reg==0x1584)));
             continue;
         }
         if(c->kind!=REC_GF_RULE) {
-            const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
+            const struct recover_rule *w=rule_by_id(&gf_fixture_profile,c->rule);
             CHECK(w && w->phase==REC_RUN && w->pc==e->pc && w->substep==i);
             CHECK(w && w->value.mode==REC_EXPR &&
                 (c->kind==REC_GF_COPY ? (w->value.expr_id==REC_GF_EXPR_COPY || w->value.expr_id==REC_GF_EXPR_COPY_NV) :
                  w->value.expr_id==REC_GF_SAVED_BAR));
             continue;
         }
-        const struct recover_rule *w=rule_by_id(&recover_gf_template,c->rule);
+        const struct recover_rule *w=rule_by_id(&gf_fixture_profile,c->rule);
         CHECK(w!=0); if(!w) continue;
-        const struct recover_target *t=&targets[w->key];
+        const struct recover_target *t=&gf_fixture_profile.targets[w->key];
         struct recover_bus_access bus;
         u32 dir=e->space ? (e->reg%2 ? REC_DATA : REC_SELECT) : REC_WRITE;
         CHECK(recover_target_address(t,dir,&bus)==0);
@@ -156,9 +192,9 @@ static void inventory_test(void)
         }
     }
     CHECK(counts[0]==513 && counts[1]==76 && counts[4]==25 && counts[2]==2 && counts[3]==3);
-    CHECK(recover_gf_template.vram_reserved.base==0 && recover_gf_template.vram_reserved.len==1024);
-    for(u32 i=0;i<recover_gf_template.target_count;i++) {
-        const struct recover_target *t=&targets[i];
+    CHECK(gf_fixture_profile.vram_reserved.base==0 && gf_fixture_profile.vram_reserved.len==1024);
+    for(u32 i=0;i<gf_fixture_profile.target_count;i++) {
+        const struct recover_target *t=&gf_fixture_profile.targets[i];
         if(t->space==REC_BAR_MMIO && t->offset!=0x1700) CHECK(t->access!=REC_RW);
     }
     for(u32 i=1;i<REC_GF_PREPARE_COUNT;i++) {
@@ -186,10 +222,10 @@ static void trace_plan(void)
 {
     setup();
     const struct recover_rule *n1=0,*sel=0;
-    for(u32 i=0;i<profile.rule_count;i++) if(rules[i].flags&REC_N1) n1=&rules[i];
+    for(u32 i=0;i<profile.rule_count;i++) if(gf_fixture_profile.rules[i].flags&REC_N1) n1=&gf_fixture_profile.rules[i];
     CHECK(n1); if(!n1) return;
     sel=rule_by_id(&profile,n1->requires[0]); n1key=n1->key; values[n1key]=0x25;
-    node(0,&rules[0],REC_WRITE,0); node(1,&rules[1],REC_WRITE,0);
+    node(0,&gf_fixture_profile.rules[0],REC_WRITE,0); node(1,&gf_fixture_profile.rules[1],REC_WRITE,0);
     entries[0]=(struct recover_plan_entry){REC_PREPARE,RECOVER_NONE,0};
     for(u32 i=0;i<3;i++) {
         nodes[2+i]=(struct recover_plan_node){.phase=REC_RUN,.main_id=i,.pc=0x100+i,
@@ -206,8 +242,8 @@ static void trace_plan(void)
         .opcode=256,.rule_id=RECOVER_NONE,.expr_id=RECOVER_NONE,
         .next={RECOVER_NONE,RECOVER_NONE}};
     entries[4]=(struct recover_plan_entry){REC_RUN,3,5};
-    links[0]=(struct recover_plan_dep){6,rules[0].id,0};
-    links[1]=(struct recover_plan_dep){6,rules[1].id,1};
+    links[0]=(struct recover_plan_dep){6,gf_fixture_profile.rules[0].id,0};
+    links[1]=(struct recover_plan_dep){6,gf_fixture_profile.rules[1].id,1};
     trace_layouts[0]=layouts[0]; trace_layouts[1]=layouts[1];
     trace_layouts[2]=(struct recover_opcode_layout){257,sel->substep,2,two,REC_SELECT,0};
     trace_layouts[3]=(struct recover_opcode_layout){257,n1->substep,4,four,REC_DATA,0};
@@ -227,7 +263,7 @@ static int operation(struct recover *r,void *arg)
         if(nodes[i].rule_id!=RECOVER_NONE) {
             const struct recover_opcode_layout *l=layout_for(&profile,&nodes[i]);
             u32 key=args[2*i].value, value=i==6 ? 5 : args[2*i+1].value;
-            if(recover_access(r,i,l->dir_substep,key,targets[key].width,&value)) return -1;
+            if(recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value)) return -1;
             if(i==6) n1_completed++;
         }
         if(recover_plan_leave(r,0)) return -1;
@@ -253,7 +289,7 @@ static int size_operation(struct recover *r,void *arg)
             const struct recover_rule *w=rule_by_id(&profile,n->rule_id);
             if(!evaluate(r,n,w,0,&value)) return -1;
         }
-        if(recover_access(r,i,l->dir_substep,key,targets[key].width,&value)) return -1;
+        if(recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value)) return -1;
         if(l->dir_substep==REC_READ) {
             u32 bar=key-7;
             if(recover_bar_probe(r,bar,r->bars[bar].raw,value,0,0,0,0)) return -1;
@@ -273,7 +309,7 @@ static int prepare_operation(struct recover *r,void *arg)
         if(n->expr_id==REC_GF_PMC_ENABLE) value=values[key]|1U;
         if(n->expr_id==REC_GF_CR11_UNLOCK) value=values[key]&0x7fU;
         if(recover_plan_enter(r,i) ||
-            recover_access(r,i,l->dir_substep,key,targets[key].width,&value) ||
+            recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value) ||
             recover_plan_leave(r,0)) return -1;
     }
     return 0;
@@ -281,8 +317,8 @@ static int prepare_operation(struct recover *r,void *arg)
 static void fixed_test(void)
 {
     setup();
-    profile.layouts=recover_gf_template.layouts;
-    profile.layout_count=recover_gf_template.layout_count;
+    profile.layouts=gf_fixture_profile.layouts;
+    profile.layout_count=gf_fixture_profile.layout_count;
     profile.crc=recover_profile_crc(&profile);
     plan=recover_gf_size_bars_plan; plan.profile_crc=profile.crc;
     CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)==0);
@@ -294,8 +330,8 @@ static void fixed_test(void)
     CHECK(trial_end(&core,&core.token,REC_NORMAL)==0);
     CHECK(core.cache.bar[0].valid && core.cache.bar[1].valid && core.cache.bar[2].valid);
     setup();
-    profile.layouts=recover_gf_template.layouts;
-    profile.layout_count=recover_gf_template.layout_count;
+    profile.layouts=gf_fixture_profile.layouts;
+    profile.layout_count=gf_fixture_profile.layout_count;
     profile.crc=recover_profile_crc(&profile);
     plan=recover_gf_prepare_plan; plan.profile_crc=profile.crc;
     CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)==0 && writes==0);
@@ -339,6 +375,7 @@ static void trace_test(void)
 }
 void _start(void)
 {
+    gf_fixture_init();
     setup(); inventory_test(); fixed_test(); trace_test();
     print(failures?"GF profile FAIL\n":"GF profile PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failures?1:0));

@@ -17,7 +17,8 @@ static void number(u32 x)
 static void field(const char *name, u32 value) { print(name); number(value); }
 void _start(void)
 {
-    int rc = gfinit_decode_rom(gf_private_rom, sizeof(gf_private_rom), &recover_gf_template, &decoded);
+    gf_fixture_init();
+    int rc = gfinit_decode_rom(gf_private_rom, sizeof(gf_private_rom), &gf_fixture_profile, &decoded);
     field("decode rc=", rc ? 1U : 0U);
     field(" size=", (u32)sizeof(gf_private_rom));
     field(" insns=", decoded.instruction_count);

@@ -7,6 +7,7 @@
  * S2 real opcode layouts follow the fixed expressions. Budgets/CRC are set by owner.
  */
 #include "recover_gf.h"
+#include "recover_gf_expand.h"
 #include "gfinit_plan.h"
 #include "gfinit_pll.h"
 static const struct recover_target targets[] = {
@@ -1978,15 +1979,32 @@ static const u32 index_saves[] = {REC_GF_T_CR44, REC_GF_T_SR01_HEAD1, REC_GF_T_S
 const struct recover_profile recover_gf_template = {
     .version = RECOVER_PROFILE_VERSION, .cold_required = true,
     .opcode_limit = REC_GF_OPCODE_TICKS, .max_polls = REC_GF_MAX_POLLS,
-    .targets = targets, .target_count = sizeof(targets) / sizeof(targets[0]),
-    .rules = rules, .rule_count = sizeof(rules) / sizeof(rules[0]),
     .regs = regs, .count = sizeof(regs) / sizeof(regs[0]),
     .quiesce = gf_quiesce, .quiesce_count = sizeof(gf_quiesce) / sizeof(gf_quiesce[0]),
     .exprs = exprs, .expr_count = sizeof(exprs) / sizeof(exprs[0]),
-    .layouts = fixed_layouts, .layout_count = sizeof(fixed_layouts) / sizeof(fixed_layouts[0]),
     .vram_reserved = {0, REC_GF_VRAM_RESERVED},
     .index_save_targets = index_saves, .index_save_count = sizeof(index_saves) / sizeof(index_saves[0]),
 };
+/* S2c retains the old logical tables. Publish only after all copies finish. */
+#define REC_GF_RULE_COUNT (sizeof(rules) / sizeof(rules[0]))
+#define REC_GF_TARGET_COUNT (sizeof(targets) / sizeof(targets[0]))
+#define REC_GF_LAYOUT_COUNT (sizeof(fixed_layouts) / sizeof(fixed_layouts[0]))
+int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf)
+{
+    struct recover_profile next = recover_gf_template;
+    if (!buf) { *p = next; return 0; }
+    if (REC_GF_RULE_COUNT > GF_PLAN_RULES ||
+        REC_GF_TARGET_COUNT > GF_PLAN_TARGETS ||
+        REC_GF_LAYOUT_COUNT > GF_PLAN_LAYOUTS) return -1;
+    for (u32 i = 0; i < REC_GF_RULE_COUNT; i++) buf->rules[i] = rules[i];
+    for (u32 i = 0; i < REC_GF_TARGET_COUNT; i++) buf->targets[i] = targets[i];
+    for (u32 i = 0; i < REC_GF_LAYOUT_COUNT; i++) buf->layouts[i] = fixed_layouts[i];
+    next.rules = buf->rules; next.rule_count = REC_GF_RULE_COUNT;
+    next.targets = buf->targets; next.target_count = REC_GF_TARGET_COUNT;
+    next.layouts = buf->layouts; next.layout_count = REC_GF_LAYOUT_COUNT;
+    *p = next;
+    return 0;
+}
 const u32 recover_gf_prepare[] = {
     REC_GF_R_PREPARE_PBUS1854,
     REC_GF_R_PREPARE_PBUS1850,

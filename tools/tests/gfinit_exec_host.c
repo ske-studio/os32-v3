@@ -49,19 +49,19 @@ static struct recover_ops executor_bus;
  * COPY/capture/PLL permissions as well as this synthetic control coverage. */
 static void synthetic_profile(void)
 {
-    profile=recover_gf_template;profile.regs=0;profile.count=0;
+    profile=gf_fixture_profile;profile.regs=0;profile.count=0;
     profile.quiesce=0;profile.quiesce_count=0;profile.index_save_targets=0;profile.index_save_count=0;
     profile.layouts=exec_layouts;
     profile.targets=exec_targets;
-    for(u32 i=0;i<profile.target_count;i++)exec_targets[i]=recover_gf_template.targets[i];
+    for(u32 i=0;i<profile.target_count;i++)exec_targets[i]=gf_fixture_profile.targets[i];
     for(u32 i=0;i<decoded.instruction_count;i++)if(decoded.insns[i].opcode==0x4a || decoded.insns[i].opcode==0x4b) {
         u32 reg=decoded.insns[i].target;
         if(key_for(&profile,reg,0,0,0)==RECOVER_NONE)
             exec_targets[profile.target_count++]=(struct recover_target){.space=REC_BAR_MMIO,.offset=reg,.width=4,.index=RECOVER_NONE,.access=REC_COLD};
     }
-    for(u32 i=0;i<decoded.plan.arg_count;i++)if(decoded.args[i].kind==REC_ARG_SAVED)decoded.args[i].value-=recover_gf_template.count;
-    for(u32 i=0;i<decoded.plan.capture_count;i++)decoded.captures[i].slot-=recover_gf_template.count;
-    for(u32 i=0;i<profile.layout_count;i++)exec_layouts[i]=fixed_layouts[i];
+    for(u32 i=0;i<decoded.plan.arg_count;i++)if(decoded.args[i].kind==REC_ARG_SAVED)decoded.args[i].value-=gf_fixture_profile.count;
+    for(u32 i=0;i<decoded.plan.capture_count;i++)decoded.captures[i].slot-=gf_fixture_profile.count;
+    for(u32 i=0;i<profile.layout_count;i++)exec_layouts[i]=gf_fixture_profile.layouts[i];
     profile.rules=exec_rules;profile.rule_count=0;
     for(u32 i=0;i<decoded.plan.node_count;i++) {
         struct recover_plan_node *n=&decoded.nodes[i];
@@ -255,7 +255,7 @@ static void compare_trace(void)
 }
 static void all_trace(void)
 {
-    setup();fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)==0);
+    setup();fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
     synthetic_profile();
     CHECK(recover_profile_ok(&profile)==0);
     for(u32 i=0;i<decoded.plan.node_count;i++)if(!node_ok(&profile,&decoded.plan,i)){output("bad node ");number(i);output(" pc ");number(decoded.nodes[i].pc);output("\n");CHECK(false);return;}
@@ -354,10 +354,10 @@ static void depth_tests(void)
 }
 static void budget_tests(void)
 {
-    CHECK(recover_gf_template.opcode_limit == 60U * PIT_HZ);
-    CHECK(recover_gf_template.max_polls == 65536U);
+    CHECK(gf_fixture_profile.opcode_limit == 60U * PIT_HZ);
+    CHECK(gf_fixture_profile.max_polls == 65536U);
     /* Production poll budget covers both sides of 4096 nodes and 5000 waits. */
-    CHECK(recover_gf_template.max_polls >= 2U * 4096U + 2U * 5000U);
+    CHECK(gf_fixture_profile.max_polls >= 2U * 4096U + 2U * 5000U);
     for(u32 extra=0;extra<2;extra++) {
         control_begin();append_control(0x71,GF_INIT_C,0x100,0,0,0,0,0);finish_controls();
         core.token.profile_crc=profile.crc;core.token.profile_version=profile.version;
@@ -519,7 +519,7 @@ static void force_reset_test(void)
     decoded.entries[0]=(struct recover_plan_entry){REC_RUN,0,0};decoded.instruction_count=1;decoded.schedule_count=1;
     CHECK(gfinit_decode_instruction(rom,sizeof(rom),0xdf10,&decoded.insns[0])==0);
     decoded.insns[0].effect_first=14;
-    CHECK(expand_step(&decoded,rom,&recover_gf_template,0,1)==0);
+    CHECK(expand_step(&decoded,rom,&gf_fixture_profile,0,1)==0);
     u32 last=decoded.plan.node_count-1;decoded.nodes[last].next[0]=decoded.nodes[last].next[1]=RECOVER_NONE;
     synthetic_profile();CHECK(contract_bind()==0);exec_arm();
     for(u32 i=0;i<profile.target_count;i++)reference_values[i]=values[i]=0;
@@ -535,6 +535,7 @@ static void force_reset_test(void)
 #endif
 void GF_S3_ENTRY(void)
 {
+    gf_fixture_init();
     all_trace();log_tests();depth_tests();budget_tests();condition_tests();selection_tests();force_reset_test();failure_tests();frame_mismatch_tests();pre_read_tests();
     output(failures?"GF S3 FAIL\n":"GF S3 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));__builtin_unreachable();

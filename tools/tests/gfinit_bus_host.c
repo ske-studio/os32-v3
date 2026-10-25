@@ -67,7 +67,7 @@ static int bus_write_test(void *v,const struct recover_bus_access *a,u32 value)
 {(void)v;active=a;return gfinit_bus_write(&device,a,value);}
 static void bus_setup(void)
 {
-    setup();profile.layouts=recover_gf_template.layouts;profile.layout_count=recover_gf_template.layout_count;
+    setup();profile.layouts=gf_fixture_profile.layouts;profile.layout_count=gf_fixture_profile.layout_count;
     profile.expected_bdf=RECOVER_GF_BDF;profile.expected_device=RECOVER_GF_DEVICE;ident.bdf=RECOVER_GF_BDF;
     pci_id=RECOVER_GF_DEVICE;pci_status=0xa5a5;pci_writes=maps=restores=fault=0;
     pte=0x876540a5;irq_state=1;window_failed=window_busy=false;
@@ -82,7 +82,7 @@ static struct recover_bus_access address(u32 key,u32 dir)
 }
 static void accessor_tests(void)
 {
-    for(u32 key=0;key<recover_gf_template.target_count;key++) {
+    for(u32 key=0;key<gf_fixture_profile.target_count;key++) {
         bus_setup();
         const struct recover_target *t=&profile.targets[key];
         if(t->space==REC_PCI_CFG)continue;
@@ -410,7 +410,7 @@ static int resource_size_operation(struct recover *r,void *arg)
             const struct recover_rule *w=rule_by_id(&profile,node->rule_id);
             if(!evaluate(r,node,w,0,&value))return -1;
         }
-        if(recover_access(r,i,l->dir_substep,key,targets[key].width,&value))return -1;
+        if(recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value))return -1;
         if(l->dir_substep==REC_READ && recover_bar_probe(r,key-7,r->bars[key-7].raw,
                 value,probe_ranges,probe_range_count,0,0))return -1;
         if(recover_plan_leave(r,0))return -1;
@@ -423,7 +423,7 @@ static void resource_probe(bool collision)
     setup();
     /* Separate synthetic BAR2 so BAR0 upper adjacency can be tested. */
     rawbars[2]=values[9]=0x26000000;core.cache.bar[2].raw=rawbars[2];
-    profile.layouts=recover_gf_template.layouts;profile.layout_count=recover_gf_template.layout_count;
+    profile.layouts=gf_fixture_profile.layouts;profile.layout_count=gf_fixture_profile.layout_count;
     profile.crc=recover_profile_crc(&profile);
     plan=recover_gf_size_bars_plan;plan.profile_crc=profile.crc;
     CHECK(recover_bind_plan(&core,&profile,&plan,&buffers,&hash)==0 && !writes);
@@ -467,6 +467,7 @@ static void resource_probe_tests(void)
 #endif
 void GF_S5_ENTRY(void)
 {
+    gf_fixture_init();
     resource_tests();resource_barlen_tests();resource_probe_tests();accessor_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
     output(failures?"GF S5 FAIL\n":"GF S5 PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}

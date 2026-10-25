@@ -1,5 +1,6 @@
 check-recover-tables-host:
 - kdebug/recover_gf.c
+- kdebug/recover_gf_expand.h
 - kdebug/recover_gf.h
 - kdebug/recover.h
 - include/types.h

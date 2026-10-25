@@ -4,6 +4,7 @@
 #include "gfinit_bus.h"
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
+#include "recover_gf_expand.h"
 #include "gfinit_resources.h"
 #include "kpeek.h"
 #include "kpeek_allow.h"
@@ -91,7 +92,9 @@ static int gf_read(void *opaque, const struct recover_bus_access *a, u32 *value)
 {
     if (!gf_owned(recover_owner())) return -1;
     int rc = gfinit_bus_read(opaque, a, value);
-    if (!rc && owner && owner->compiled) gfinit_plan_read(owner->compiled, recover_owner(), a, *value);
+    if (!rc && owner && owner->compiled &&
+        recover_owner()->plan == &owner->compiled->plan)
+        gfinit_plan_read(owner->compiled, recover_owner(), a, *value);
     return rc;
 }
 static int gf_write(void *opaque, const struct recover_bus_access *a, u32 value)
@@ -189,24 +192,25 @@ static int gf_read_rom(struct gfinit_owner *g, u32 *len, u32 *crc, u32 *chip)
     for (u32 i = 0; i < g->rom_size; i++) sum += g->rom[i];
     return sum || *chip != GF_VERSION_CHIP ? -1 : gfinit_decode_rom(g->rom, g->rom_size, &g->profile, g->decoded);
 }
-static void gf_release_rom(struct gfinit_owner *g)
+static int gf_release_rom(struct gfinit_owner *g)
 {
     struct recover *r = recover_owner();
     /* Detach even a partially bound plan before returning its backing pages.
      * INSPECT has not installed callbacks and therefore needs no detachment. */
     if ((r->ops == &g->ops || r->profile == &g->profile ||
          r->bound_profile == &g->profile) &&
-        recover_owner_configure(0, 0, 0, false)) return;
+        recover_owner_configure(0, 0, 0, false)) return -1;
     gf_free(g->rom, GF_ROM_MAX);
     gf_free(g->decoded, sizeof(*g->decoded));
     gf_free(g->compiled, sizeof(*g->compiled));
     gf_free(g->flow, g->flow_bytes);
     g->decoded = 0; g->compiled = 0; g->flow = 0; g->flow_bytes = 0;
     g->buffers = (struct recover_plan_buffers){0};
-    g->profile = recover_gf_template;
+    (void)recover_gf_profile_expand(&g->profile, 0);
     g->last_op = RECOVER_NONE;
     g->rom = 0; g->inspected = false;
     gf_lease.active = false;
+    return 0;
 }
 void gfinit_recover_end(void)
 {
@@ -222,14 +226,19 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     if (!owner) owner = &control;
     if (!owner) return -1;
     struct gfinit_owner *g = owner;
-    gf_release_rom(g);
+    if (gf_release_rom(g)) return -1;
     if (hwdev_claim(&gf_lease, &gf_device, r->token.session)) return -1;
     g->generation = gf_lease.generation;
-    g->profile = recover_gf_template;
+    g->compiled = gf_alloc(sizeof(*g->compiled));
+    if (!g->compiled || recover_gf_profile_expand(&g->profile, g->compiled)) {
+        gf_release_rom(g); return -1;
+    }
     g->profile.expected_bdf = RECOVER_GF_BDF; g->profile.expected_device = RECOVER_GF_DEVICE;
     gfinit_bus_init(&g->bus, &g->profile, &gf_pci);
     BootImageInfo boot;
-    if (boot_image_info(&boot) || !boot.crc_valid || gfinit_bus_probe(&g->bus)) return -1;
+    if (boot_image_info(&boot) || !boot.crc_valid || gfinit_bus_probe(&g->bus)) {
+        gf_release_rom(g); return -1;
+    }
     g->bus.identity.boot = 1; /* singleton lifetime is this boot, never persisted */
     g->bus.identity.image_version = boot.image_crc;
     g->bus.identity.kdebug_version = KDEBUG_OPS_VERSION;
@@ -305,7 +314,7 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
 {
     if (!g || !g->inspected || !gf_owned(r) || r->cold_latched ||
         (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
-    g->profile = recover_gf_template;
+    if (!g->compiled || recover_gf_profile_expand(&g->profile, g->compiled)) return -1;
     g->profile.expected_bdf = RECOVER_GF_BDF; g->profile.expected_device = RECOVER_GF_DEVICE;
     const struct recover_plan *plan;
     if (size) {
@@ -314,8 +323,7 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
         g->size_plan = recover_gf_size_bars_plan;
         plan = &g->size_plan;
     } else {
-        if (!g->compiled) g->compiled = gf_alloc(sizeof(*g->compiled));
-        if (!g->compiled || !r->cache.bar[1].valid || gfinit_decode_rom(g->rom, g->rom_size,
+        if (!r->cache.bar[1].valid || gfinit_decode_rom(g->rom, g->rom_size,
                 &g->profile, g->decoded) ||
             gfinit_plan_build(g->compiled, g->decoded, &g->profile, r->cache.bar[1].length)) return -1;
         plan = &g->compiled->plan;

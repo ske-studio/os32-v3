@@ -63,6 +63,33 @@ def main():
         result = host32.run([str(exe)], cwd=ROOT, timeout=120)
         if result.returncode:
             return result.returncode
+    with tempfile.TemporaryDirectory(prefix='gf-rom-fixture-') as td:
+        temp = pathlib.Path(td)
+        dump = temp / 'dump.c'
+        dump.write_text('#define GF_S2_ENTRY unused_entry\n'
+                        f'#include "{ROOT / "tools/tests/gfinit_host.c"}"\n'
+                        'void _start(void) { fixture(); u32 result;\n'
+                        '__asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), '
+                        '"c"(rom), "d"(sizeof(rom)) : "memory");\n'
+                        '__asm__ volatile("int $0x80" : : "a"(1), "b"(0)); '
+                        '__builtin_unreachable(); }\n')
+        exe = temp / 'dump'
+        cmd = command(exe)
+        cmd[cmd.index(str(ROOT / 'tools/tests/gfinit_host.c'))] = str(dump)
+        subprocess.run(cmd, cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
+        if result.returncode:
+            return result.returncode
+        header = temp / 'synthetic_rom.h'
+        header.write_text('static const u8 gf_private_rom[] = {' +
+                          ','.join(str(b) for b in result.stdout) + '};\n')
+        cmd = command(exe)
+        cmd[cmd.index(str(ROOT / 'tools/tests/gfinit_host.c'))] = str(ROOT / 'tools/tests/gfinit_romfile_host.c')
+        cmd.insert(1, '-DGF_ROM_HEADER="' + str(header) + '"')
+        subprocess.run(cmd, cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=60)
+        if result.returncode:
+            return result.returncode
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
             [('kdebug/gfinit_decode.c', *item) for item in MUTATIONS] +

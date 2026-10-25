@@ -51,12 +51,21 @@ static int plan_write(void *v,const struct recover_bus_access *a,u32 value)
 static void plan_case(u32 damage,u32 amount)
 {
     bus_setup();fixture();
+    /* Match the owner: decode and append into the same backing arrays. */
+    struct recover_profile expanded;
+    CHECK(recover_gf_profile_expand(&expanded,&composed)==0);
+    profile.targets=expanded.targets;profile.rules=expanded.rules;profile.layouts=expanded.layouts;
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0);
     CHECK(gfinit_plan_build(&composed,&decoded,&profile,0x1000000)==0);
     CHECK(composed.plan.node_count<=RECOVER_NODE_MAX && composed.plan.arg_count<=RECOVER_ARG_MAX);
     output("composed nodes/args ");number(composed.plan.node_count);output("/");number(composed.plan.arg_count);output("\n");
     decoded.plan=composed.plan;
-    CHECK(contract_bind()==0);composed.plan.profile_crc=profile.crc;exec_arm();core.plan=&composed.plan;
+    CHECK(contract_bind()==0);
+    for(u32 i=0;i<composed.plan.node_count;i++) {
+        CHECK(core.node_layout[i]>=composed.layouts && core.node_layout[i]<composed.layouts+profile.layout_count);
+        if(core.node_write[i])CHECK(core.node_write[i]>=composed.rules && core.node_write[i]<composed.rules+profile.rule_count);
+    }
+    composed.plan.profile_crc=profile.crc;exec_arm();core.plan=&composed.plan;
     core.token.profile_crc=profile.crc;core.token.profile_version=profile.version;
     core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
     executor_bus.read=plan_read;executor_bus.write=plan_write;
@@ -106,9 +115,14 @@ static void plan_case(u32 damage,u32 amount)
 }
 void _start(void)
 {
+    gf_fixture_init();
     plan_case(0,0);plan_case(1,0);plan_case(0,0x01000000U);
     plan_case(0,0x02000000U);plan_case(0,0x03000000U);plan_case(2,0x01000000U);plan_case(3,0);
     bus_setup();fixture();
+    /* Match the owner: decode and append into the same backing arrays. */
+    struct recover_profile expanded;
+    CHECK(recover_gf_profile_expand(&expanded,&composed)==0);
+    profile.targets=expanded.targets;profile.rules=expanded.rules;profile.layouts=expanded.layouts;
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0);
     CHECK(gfinit_plan_build(&composed,&decoded,&profile,0x80000000U)==0);
     CHECK(composed.plan.node_count<=RECOVER_NODE_MAX && composed.plan.arg_count<=RECOVER_ARG_MAX);

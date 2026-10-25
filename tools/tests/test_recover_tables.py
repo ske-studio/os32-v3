@@ -41,6 +41,8 @@ def wrapper(source, text, name):
     result += 'static const char *rt_eval_symbol(int (*p)(const u32 *, u32, u32 *))\n{\n    if (!p) return "NULL";\n'
     result += ''.join(f'    if (p == {symbol}) return "{symbol}";\n' for symbol in evaluators)
     result += '    return "UNKNOWN";\n}\n'
+    if name == 'product':
+        result += '#define RT_EXPAND_PRODUCT 1\n'
     result += f'#define RT_DUMP recover_tables_dump_{name}\n#include "{TESTS / "recover_tables_host.h"}"\n'
     return result
 

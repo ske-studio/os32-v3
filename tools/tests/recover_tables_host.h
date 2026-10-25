@@ -63,7 +63,17 @@ static void rt_array(const char *table, u32 row, const char *field,
 extern u32 recover_profile_crc(const struct recover_profile *p);
 void RT_DUMP(void)
 {
+#ifdef RT_EXPAND_PRODUCT
+    static struct gfinit_plan buffer;
+    struct recover_profile expanded;
+    if (recover_gf_profile_expand(&expanded, &buffer)) {
+        rt_text("expand failed\n"); rt_flush();
+        return;
+    }
+    const struct recover_profile *p = &expanded;
+#else
     const struct recover_profile *p = &recover_gf_template;
+#endif
     rt_value("profile", 0, "target_count", 0, p->target_count);
     rt_value("profile", 0, "rule_count", 0, p->rule_count);
     rt_value("profile", 0, "layout_count", 0, p->layout_count);
