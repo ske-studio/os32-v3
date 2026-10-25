@@ -252,3 +252,7 @@ import表と既存利用者:
 - N2 (P3): KDI_ADDR は `kapi_reserved_nosys` だけに絞ってよい (`shlib_read_page` は stub 経由でも同じ関数に着く)。実装者の判断に任せる。
 - PM 決定 (段の順): S3 は S2 (票 TASK_SLIM、`SLIM_HWDEV_DESIGN`) と同じく hwdev の生成物と契約の照合に触れるので、**S2 を main に取り込んでから** S3a を始める。S4 は S2 と並べてよい。S4 の段はゲストの起動を使うので NP21/W を取り合わないよう 1 本ずつ出す。
 - 付表 (試験ごとの import の一覧) は同じ置き場の `IMPORTS.final.md`、リポジトリの写しは `docs/decisions/SLIM_KERNEL_IMPORTS.md`。
+
+## S4b の実装で設計者が決めたこと
+
+- 抽出範囲の自由変数は親の引数 `boot_drive` だけなので、補助は `static inline void kernel_mount_children(u32 boot_drive)` とし、`kcg_module_load()` と `SERVICES_ROOT_READY` の間から呼ぶ。列挙・root 判定・サブマウントの既存ブロックをそのまま移す。

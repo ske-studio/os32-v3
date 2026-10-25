@@ -562,8 +562,15 @@ def make_tree(tmp, rel=None, text=None):
 def write_boot_submount(tree, dest):
     """Share the real boot fragment with consumers of cd_read_host.c."""
     kernel = (tree / "kernel/kernel.c").read_text()
-    start = kernel.index('    {', kernel.index('    cd_module_load();'))
-    end = kernel.index('    services_stage = SERVICES_ROOT_READY;', start)
+    call = kernel.index('    kernel_mount_children(boot_drive);')
+    assert (kernel.index('vfs_mount("/", root_dev, root_fs)') <
+            kernel.index('    cd_module_load();') <
+            kernel.index('    kcg_module_load();') < call <
+            kernel.index('    services_stage = SERVICES_ROOT_READY;'))
+    helper = kernel.index('static inline void kernel_mount_children(u32 boot_drive)\n{')
+    assert call < helper
+    start = kernel.index('    {', helper)
+    end = kernel.index('\n}\n', start)
     dest.write_text(
         'static void boot_submount(int boot_drive) {\n' + kernel[start:end] + '}\n')
 
