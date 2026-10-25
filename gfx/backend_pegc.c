@@ -60,6 +60,12 @@ STATIC_ASSERT(PEGC_LINEAR_ALT_BASE >= MEM_MMIO_TOP_PT_BASE &&
               MEM_DEVICE_APERTURE_PDE_SIZE - PEGC_LINEAR_SIZE,
               pegc_alt_window_in_mmio_top_pt);
 
+#define PEGC_DAC_BITS 8
+#define PEGC_MODE_480 0
+static const GfxMode pegc_modes[] = {
+    {PEGC_WIDTH, PEGC_HEIGHT_480, GFX_FMT_PACKED8, PEGC_DAC_BITS, PEGC_MODE_480, 0, PEGC_PITCH}
+};
+
 /* ------------------------------------------------------------------------ */
 /*  GDC 表示タイミング表 (値と出典は include/pegc.h §9)                      */
 /* ------------------------------------------------------------------------ */
@@ -869,9 +875,10 @@ static void __attribute__((cold, noinline)) pegc_diag_alias(void)
 static void __attribute__((cold, noinline)) pegc_diag_stripes(void)
 {
     if (!gfx_diag_stripes) return;
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pegc);
     volatile u8 *vram = P2V_IO(s_window_base);
-    for (u32 y = 0; y < PEGC_HEIGHT_480; y++)
-        for (u32 x = 0; x < PEGC_PITCH; x++)
+    for (u32 y = 0; y < mode->height; y++)
+        for (u32 x = 0; x < mode->pitch; x++)
             *vram++ = (x / PEGC_DIAG_STRIPE_WIDTH) & 15;
     u32 start = tick_count;
     for (u32 i = 0; i < 2; i++) {
@@ -887,6 +894,7 @@ static void __attribute__((cold, noinline)) pegc_diag_stripes(void)
 
 static void pegc_init(void)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pegc);
     if (!pegc_probe()) return;
 
     /* prepare を経ずに来た場合 (今の経路には無いが) も起動時の状態を先に
@@ -918,8 +926,8 @@ static void pegc_init(void)
      * #5 ②)。 */
 
     /* --- 画面をクリア --- */
-    kmemset((u8 *)P2V(s_bb_phys), 0, (u32)MEM_GFX_BB8_SIZE);
-    kmemset((u8 *)P2V_IO(s_window_base), 0, (u32)PEGC_FB_SIZE_480);
+    kmemset((u8 *)P2V(s_bb_phys), 0, mode->pitch * mode->height);
+    kmemset((u8 *)P2V_IO(s_window_base), 0, mode->pitch * mode->height);
 
     /* テキスト VRAM もクリアする (9801 の _gfx_common_init と同じ扱い)。
      * 480 ラインでは 30 行ぶんが見えるので 25 行では足りない (票 H2c)。
@@ -940,7 +948,8 @@ static void pegc_init(void)
 
     /* HAL 共通の状態。PEGC ではハードウェアページ切替を使わない
      * (800 ライン構成では 00A4h が使えない — pegc.h の PEGC_FF2_VRAM_800L)。 */
-    gfx_current_height = PEGC_HEIGHT_480;
+    gfx_current_height = mode->height;
+    gfx_backend_pegc.bb_pitch = mode->pitch;
     gfx_flip_enabled = 0;
     gfx_display_page = 0;
 
@@ -952,13 +961,15 @@ static void pegc_init(void)
 /* ------------------------------------------------------------------------ */
 static int pegc_query(GFX_ScreenInfo *info)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pegc);
+    GfxFormatDesc desc;
     int i;
-    if (!info) return OS32_ERR_INVAL;
+    if (!info || !mode || !gfx_format_desc(mode->format, &desc)) return OS32_ERR_INVAL;
 
-    info->width  = (u16)PEGC_WIDTH;
+    info->width  = mode->width;
     info->height = (u16)PEGC_HEIGHT_480;
-    info->bpp    = GFX_FMT_PACKED8_BPP;
-    info->format = GFX_FMT_PACKED8;
+    info->bpp    = desc.bpp;
+    info->format = mode->format;
 
     /* 能力ビット (票 7):
      *  TEXT_OVERLAY = 1。NP21/W で実測 (2026-09-06): 256 色モード中に TVRAM へ
@@ -991,6 +1002,7 @@ static int pegc_query(GFX_ScreenInfo *info)
 /* ------------------------------------------------------------------------ */
 static void pegc_present_rect(int x, int y, int w, int h)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pegc);
     u8 *src;
     u8 *dst;
     int row;
@@ -998,10 +1010,10 @@ static void pegc_present_rect(int x, int y, int w, int h)
 
     if (!s_active || s_bb_phys == 0) return;
 
-    if (!gfx_clip_screen(&x, &y, &w, &h, PEGC_WIDTH, PEGC_HEIGHT_480)) return;
+    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, mode->height)) return;
 
-    src = (u8 *)P2V(s_bb_phys) + (u32)y * PEGC_PITCH + (u32)x;
-    dst = (u8 *)P2V_IO(s_window_base) + (u32)y * PEGC_PITCH + (u32)x;
+    src = (u8 *)P2V(s_bb_phys) + (u32)y * mode->pitch + (u32)x;
+    dst = (u8 *)P2V_IO(s_window_base) + (u32)y * mode->pitch + (u32)x;
     bytes = (u32)w;
 
     for (row = 0; row < h; row++) {
@@ -1019,8 +1031,8 @@ static void pegc_present_rect(int x, int y, int w, int h)
         if (tail) kmemcpy(dst + head + (mid << COPY_WORD_SHIFT), src + head + (mid << COPY_WORD_SHIFT),
                           tail);
 
-        src += PEGC_PITCH;
-        dst += PEGC_PITCH;
+        src += mode->pitch;
+        dst += mode->pitch;
     }
 
     gfx_counters.present_bytes += bytes * (u32)h;   /* 1 バイト/画素 */
@@ -1136,6 +1148,7 @@ static void pegc_shutdown(void)
     pegc_text_sync_400(hs);
 
     gfx_current_height = GFX_HEIGHT;
+    gfx_backend_pegc.selected_mode = gfx_mode_pick(&gfx_backend_pegc, 0);
     s_active = 0;
     {
         PegcDiag d;
@@ -1195,8 +1208,8 @@ GfxBackend gfx_backend_pegc = {
     GFX_BB_PACKED8,
     0,                        /* bb_size:  init() が埋める */
     pegc_prepare,             /* 起動時: 予約・写像・同期の記録だけ */
-    (const GfxMode *)0,        /* modes: G4 で申告 */
-    0,                        /* mode_count */
+    pegc_modes,
+    sizeof(pegc_modes) / sizeof(pegc_modes[0]),
     0,                        /* default_mode */
     (const GfxMode *)0         /* selected_mode */
 };

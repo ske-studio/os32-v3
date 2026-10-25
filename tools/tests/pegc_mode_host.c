@@ -562,6 +562,7 @@ static void world_reset(void)
     s_window_base = PEGC_LINEAR_BASE;
     display_fail = release_calls = create_calls = win_logs = 0;
     kmemset(ledger_surfaces, 0, sizeof(ledger_surfaces));
+    kmemset(&gfx_counters, 0, sizeof(gfx_counters));
     fake_np2 = 0; fake_np2_pos = 0;
     tick_count = stripe_delays = 0;
     palette_writes = 0; watch_stripe_init = 0;
@@ -1430,6 +1431,7 @@ static void case_gate_24k_np2(void)
     pegc_prepare();
     CHECK(s_boot_hsync == PEGC_HSYNC_24KHZ && pegc_probe() == 1);
     CHECK(count_out(NP2PORT_STR) == 3 && fake_np2_pos == 3);
+    CHECK(count_out(PEGC_HSYNC_PORT) == 0 && count_gdc_out() == 0);
     CHECK(host_serial_find("[pegc] np2=1 fallback=none\r\n"));
     output(host_serial);
     ev_n = 0;
@@ -1447,6 +1449,7 @@ static void case_gate_31k_real(void)
     pegc_prepare();
     CHECK(s_boot_hsync == PEGC_HSYNC_31KHZ && pegc_probe() == 1);
     CHECK(count_out(NP2PORT_STR) == 0 && !fake_np2_pos);
+    CHECK(count_out(PEGC_HSYNC_PORT) == 0 && count_gdc_out() == 0);
     CHECK(!host_serial_find("[pegc] np2="));
     for (int i = 0; i < ev_n; i++) CHECK(ev_port[i] != NP2PORT_STR);
     ev_n = 0;
@@ -1458,11 +1461,66 @@ static void case_gate_31k_real(void)
     output("PASS gate_31k_real OUT 09a8=0 gdc=62 np2=0\n");
 }
 
+static void case_mode_layout(void)
+{
+    s_case = "mode_layout";
+    world_reset();
+    GfxBackend *be = &gfx_backend_pegc;
+    const GfxMode *mode = gfx_backend_mode(be);
+    CHECK(be->mode_count == 1 && be->default_mode == 0);
+    CHECK(mode->width == 640 && mode->height == 480 && mode->pitch == 640);
+    CHECK(mode->format == GFX_FMT_PACKED8 && mode->dac_bits == 8);
+    CHECK(mode->hw_mode == 0 && mode->reserved == 0);
+    CHECK(gfx_mode_pick(be, 1) == mode); /* legacy200 remains packed 480. */
+    GFX_ScreenInfo info;
+    CHECK(pegc_query(0) == OS32_ERR_INVAL);
+    CHECK(pegc_query(&info) == 0 && info.height == 480 && info.width == 640);
+    CHECK(info.bpp == 8 && info.format == GFX_FMT_PACKED8);
+    CHECK(info.flags == GFX_CAP_TEXT_OVERLAY && !info.lease_mask);
+    CHECK(info.lease_first == 16 && info.lease_count == 240);
+    for (u32 i = 0; i < sizeof(info.reserved)/sizeof(info.reserved[0]); i++)
+        CHECK(info.reserved[i] == 0);
+    /* The mapping was installed by case_serial_enter. Guard both clear ends. */
+    s_bb_phys = 0x6A000UL;
+    u8 *bb = P2V(s_bb_phys), *vram = (u8 *)P2V_IO(PEGC_LINEAR_BASE);
+    kmemset(bb - 1, 0xcc, 307202);
+    kmemset(vram - 1, 0xcc, 307202);
+    GfxMode selected = *mode;
+    be->selected_mode = &selected;
+    pegc_init();
+    CHECK(gfx_current_height == 480 && be->bb_pitch == 640);
+    for (u32 i = 0; i < 307200; i++) CHECK(bb[i] == 0 && vram[i] == 0);
+    CHECK(bb[-1] == 0xcc && bb[307200] == 0xcc);
+    CHECK(vram[-1] == 0xcc && vram[307200] == 0xcc);
+    kmemset(bb, 0x5a, 307200);
+    gfx_counters.commits = gfx_counters.present_bytes = 0;
+    pegc_present_rect(637, 478, 10, 10);
+    CHECK(gfx_counters.commits == 1 && gfx_counters.present_bytes == 6);
+    for (u32 i = 0; i < 307200; i++)
+        CHECK(vram[i] == ((i / 640 >= 478 && i % 640 >= 637) ? 0x5a : 0));
+    pegc_present_rect(0, 480, 640, 1);
+    CHECK(gfx_counters.commits == 1 && vram[307200] == 0xcc);
+    /* Actual DAC OUT order and 0..15 -> 0..255 rounding remain unchanged. */
+    const u8 rgb[] = {0, 7, 15};
+    ev_n = 0;
+    pegc_set_palette(16, 1, rgb);
+    CHECK(ev_n == 4);
+    CHECK(ev_port[0] == PAL_IDX_PORT && ev_val[0] == 16);
+    CHECK(ev_port[1] == PAL_G_PORT && ev_val[1] == 119);
+    CHECK(ev_port[2] == PAL_R_PORT && ev_val[2] == 0);
+    CHECK(ev_port[3] == PAL_B_PORT && ev_val[3] == 255);
+    pegc_shutdown();
+    CHECK(gfx_current_height == GFX_HEIGHT && be->selected_mode == mode);
+    CHECK(pegc_query(&info) == 0 && info.height == 480);
+    output("PASS mode_layout (480 table, clear guards, transfer edge, DAC, shutdown)\n");
+}
+
 void _start(void)
 {
     /* 資料の規則・記録の数値での検査を先に回す (変異がヘッダ由来の期待列では
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();
+    case_mode_layout();
     case_diag_alias();
     case_window_selection();
     case_diag_stripes();
@@ -1481,6 +1539,6 @@ void _start(void)
     case_fifo_busy();
     case_fifo_stuck();
     case_vsync_stuck();
-    output("PASS pegc_mode_host (19 cases)\n");
+    output("PASS pegc_mode_host (20 cases)\n");
     finish(0);
 }

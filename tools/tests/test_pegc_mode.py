@@ -53,6 +53,9 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("mode_height_400", MUT_TARGET,
+     "{PEGC_WIDTH, PEGC_HEIGHT_480, GFX_FMT_PACKED8, PEGC_DAC_BITS, PEGC_MODE_480, 0, PEGC_PITCH}",
+     "{PEGC_WIDTH, PEGC_HEIGHT_400, GFX_FMT_PACKED8, PEGC_DAC_BITS, PEGC_MODE_480, 0, PEGC_PITCH}"),
     ("window_restore_old_f00000", MUT_TARGET,
      "u32 base = which ? PEGC_LINEAR_ALT_BASE : PEGC_LINEAR_BASE;",
      "u32 base = PEGC_LINEAR_BASE;"),
@@ -307,7 +310,7 @@ def one_mutation(item):
         base = original_new
     else:
         base = original
-    if old not in base:
+    if old not in base or (name == "mode_height_400" and base.count(old) != 1):
         return "MUTATE %-34s SKIP (目印が見つからない)" % name, 1
     with tempfile.TemporaryDirectory(prefix="os32-pegc-mode-mut-") as td:
         exe = pathlib.Path(td) / ("mut-" + name)

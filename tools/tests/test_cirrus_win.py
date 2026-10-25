@@ -48,6 +48,9 @@ def target_cmd(obj):
 
 
 MUTATIONS = [
+    ("mode_pitch", MUT_TARGET,
+     "CIRRUS_MODE_480, 0, CIRRUS_PITCH}",
+     "CIRRUS_MODE_480, 0, CIRRUS_PITCH + 1}"),
     # (名前, 対象ファイル, 元, 変異後)
     # 1 = 本件の欠陥そのもの: RAM の上端 (sys_get_mem_kb) で窓を決める旧判定。
     ("top_of_ram", IDENTIFY,
@@ -100,8 +103,8 @@ MUTATIONS = [
 def one_mutation(item):
     name, target, old, new = item
     original = (ROOT / target).read_text(encoding="utf-8")
-    if old not in original:
-        return "MUTATE %-20s SKIP (目印が見つからない)" % name, 1
+    if name != "control" and original.count(old) != 1:
+        return "MUTATE %-20s FAIL (目印は1個必要)" % name, 1
     with tempfile.TemporaryDirectory(prefix="os32-cirrus-win-mut-") as td:
         exe = pathlib.Path(td) / ("mut-" + name)
         try:
