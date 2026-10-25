@@ -6,21 +6,10 @@
 ;; ============================================================
 
 %include "kernel/cpu_flags.inc"
+;; セレクタの正典は kernel/gdt.h (値の一致は host 試験で固定)。
+%include "kernel/entry_layout.inc"
 
 cpu 386
-
-;; テキストVRAM直接書き込み用定数
-TVRAM_CHAR  equ 0xA0000
-TVRAM_ATTR  equ 0xA2000
-
-;; PICポート (PC-98)
-PIC1_CMD    equ 0x00
-PIC2_CMD    equ 0x08
-OCW2_EOI    equ 0x20
-
-;; ユーザデータセグメント (CONTRACTS C1, kernel/gdt.h の USER_DS)。
-;; CPL=3 中断からの復帰でセグメントを再ロードするのに使う。
-USER_DS     equ 0x2B
 
 ;; ============================================================
 ;; V86 からの遷移では CPU が DS/ES/FS/GS を null セレクタにクリアする。
@@ -35,7 +24,7 @@ USER_DS     equ 0x2B
 ;; PUSHAD の後に置けば EAX を潰しても POPAD で戻るので安全。
 ;; ============================================================
 %macro RESTORE_KSEG 0
-        mov     ax, 0x10
+        mov     ax, GDT_KERNEL_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
@@ -98,9 +87,9 @@ extern kctx_exc_depth
 ;; 壊さない。CPL=0 割り込みも RPL=0 で素通し。追加コストは分岐 2 つのみ。
 ;; ============================================================
 %macro IRETD_USER 0
-        test    dword [esp + 8], EFLAGS_VM    ;; EFLAGS.VM?
+        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM?
         jnz     %%do_iret                      ;; V86 → iretd がフレームから復元
-        test    dword [esp + 4], 3             ;; CS.RPL == 3 (CPL=3 へ戻る)?
+        test    dword [esp + IRET_CS_OFF], X86_SEL_RPL_MASK  ;; CS.RPL == 3 (CPL=3 へ戻る)?
         jz      %%do_iret                      ;; CPL=0 → KERNEL_DS のまま
         push    eax
         mov     ax, USER_DS
@@ -142,13 +131,13 @@ extern ring3_abort_check
 ;; C 側が仮想 PIC に問い合わせて決める。マスクの判定も同じ場所。
 ;; ============================================================
 %macro V86_REFLECT 1
-        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jz      %%skip
         push    dword %1                        ;; IRQ 番号
-        lea     eax, [esp + 4]                  ;; frame 先頭 (PUSHAD)
+        lea     eax, [esp + ABI_WORD_BYTES]  ;; frame 先頭 (PUSHAD)
         push    eax
         call    v86_reflect_irq
-        add     esp, 8
+        add     esp, 2 * ABI_WORD_BYTES
 %%skip:
 %endmacro
 
@@ -191,7 +180,7 @@ extern v86_fault_handler
 global isr_stub_%1
 isr_stub_%1:
         cli
-        test    dword [esp + 8], EFLAGS_VM  ;; EFLAGS.VM
+        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jnz     %%from_v86
 
         push    0               ;; ダミーエラーコード
@@ -210,7 +199,7 @@ isr_stub_%1:
         push    dword %1                ;; 引数2: ベクタ
         push    eax                     ;; 引数1: フレーム先頭 (u32*)
         call    v86_fault_handler
-        add     esp, 8
+        add     esp, 2 * ABI_WORD_BYTES
 
         ;; 復帰できる種類の例外ではないのでセッションを畳む (戻らない)
         call    v86_exit_to_kernel
@@ -229,7 +218,7 @@ isr_stub_%1:
 global isr_stub_%1
 isr_stub_%1:
         cli
-        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
+        test    dword [esp + ISR_ERROR_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jnz     %%from_v86
 
         push    %1              ;; 例外番号
@@ -245,7 +234,7 @@ isr_stub_%1:
         push    dword %1                ;; 引数2: ベクタ
         push    eax                     ;; 引数1: フレーム先頭 (u32*)
         call    v86_fault_handler
-        add     esp, 8
+        add     esp, 2 * ABI_WORD_BYTES
 
         call    v86_exit_to_kernel
 %%hang:
@@ -305,7 +294,7 @@ extern v86_exit_to_kernel
 global isr_stub_13
 isr_stub_13:
         cli
-        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
+        test    dword [esp + ISR_ERROR_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jnz     .from_v86
 
         ;; --- 通常の #GP: 従来どおり例外ハンドラへ ---
@@ -321,7 +310,7 @@ isr_stub_13:
         mov     eax, esp
         push    eax                     ;; 引数: フレーム先頭 (u32*)
         call    v86_gp_handler
-        add     esp, 4
+        add     esp, ABI_WORD_BYTES
 
         test    eax, eax
         jnz     .v86_exit               ;; 戻らない (longjmp が深さを戻す)
@@ -329,7 +318,7 @@ isr_stub_13:
         ;; 0 が返った → V86 に復帰
         EXC_LEAVE
         popad
-        add     esp, 4                  ;; error_code をスキップ
+        add     esp, ISR_ERROR_BYTES  ;; error_code をスキップ
         IRETD_USER
 
 .v86_exit:
@@ -362,23 +351,23 @@ isr_common:
         push    eax             ;; ESP=base-4
 
         ;; 引数3: fault_eip
-        mov     eax, [esp + 4 + 32 + 4 + 4] ;; base-4+44 = base+40 ✓
+        mov     eax, [esp + ABI_WORD_BYTES + ISR_COMMON_EIP_OFF]  ;; base-4+44 = base+40 ✓
         push    eax             ;; ESP=base-8
 
         ;; 引数2: vector
-        mov     eax, [esp + 8 + 32]          ;; base-8+40 = base+32 ✓
+        mov     eax, [esp + 2 * ABI_WORD_BYTES + ISR_COMMON_VECTOR_OFF]  ;; base-8+40 = base+32 ✓
         push    eax             ;; ESP=base-12
 
         ;; 引数1: error_code
-        mov     eax, [esp + 12 + 32 + 4]     ;; base-12+48 = base+36 ✓
+        mov     eax, [esp + 3 * ABI_WORD_BYTES + ISR_COMMON_ERROR_OFF]  ;; base-12+48 = base+36 ✓
         push    eax             ;; ESP=base-16
 
         call    exception_handler   ;; fault kill は longjmp で戻らない
-        add     esp, 16
+        add     esp, 4 * ABI_WORD_BYTES
 
         EXC_LEAVE
         popad
-        add     esp, 8          ;; error_code + vector をスキップ
+        add     esp, ISR_COMMON_SKIP_BYTES  ;; error_code + vector をスキップ
         IRETD_USER
 
 ;; ============================================================
@@ -399,7 +388,7 @@ isr_stub_14:
         EXC_ENTER               ;; 両分岐 (V86 は longjmp、通常は下の EXC_LEAVE)
         ;; V86 ゲストの #PF はカーネルのページフォルトではない。
         ;; 汎用ハンドラに渡すとカーネルのバグとして表示されてしまう。
-        test    dword [esp + 12], EFLAGS_VM  ;; EFLAGS.VM
+        test    dword [esp + ISR_ERROR_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jz      .not_v86
 
         pushad
@@ -408,7 +397,7 @@ isr_stub_14:
         push    dword 14
         push    eax
         call    v86_fault_handler
-        add     esp, 8
+        add     esp, 2 * ABI_WORD_BYTES
         call    v86_exit_to_kernel
 .v86_hang:
         cli
@@ -424,7 +413,7 @@ isr_stub_14:
         push    eax             ;; 引数4: regs (PUSHAD配列先頭)
 
         ;; フォルト時EIP取得 (PUSHAD=32B + push×1=4B + error_code=4B の上)
-        mov     eax, [esp + 40] ;; EIP
+        mov     eax, [esp + ABI_WORD_BYTES + ISR_PF_EIP_OFF]  ;; EIP
         push    eax             ;; 引数3: fault_eip
 
         ;; CR2 (障害アドレス) 取得
@@ -432,15 +421,15 @@ isr_stub_14:
         push    eax             ;; 引数2: fault_addr (CR2)
 
         ;; エラーコード取得 (PUSHAD=32B + push×3=12B の上)
-        mov     eax, [esp + 44] ;; error_code
+        mov     eax, [esp + 3 * ABI_WORD_BYTES + ISR_PF_ERROR_OFF]  ;; error_code
         push    eax             ;; 引数1: error_code
 
         call    page_fault_handler
-        add     esp, 16
+        add     esp, 4 * ABI_WORD_BYTES
 
         EXC_LEAVE
         popad
-        add     esp, 4          ;; error_code をスキップ
+        add     esp, ISR_ERROR_BYTES  ;; error_code をスキップ
         IRETD_USER
 
 ;; ============================================================
@@ -483,7 +472,7 @@ irq_stub_common_%1:
         cld
         push    dword %1                ;; IRQ 番号 (ベクタではない)
         call    irq_dispatch
-        add     esp, 4
+        add     esp, ABI_WORD_BYTES
         IRQ_LEAVE
         popad
         IRETD_USER
@@ -522,7 +511,7 @@ irq_stub_0:
 
         ;; V86 セッションが長すぎたら畳む。暴走したゲストを無限に
         ;; 走らせないための保険。EOI も反射も済ませた後に判定する。
-        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jz      .no_timeout
         call    v86_tick_and_check_timeout
         test    eax, eax
@@ -565,7 +554,7 @@ irq_stub_1:
 
         ;; 脱出ホットキー (CTRL+GRPH+DEL) が押されていたら畳む。
         ;; EOI と反射を済ませてから判定するのはタイマ側と同じ理由。
-        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
         jz      .no_exit
         call    v86_check_exit_request
         test    eax, eax
@@ -580,9 +569,9 @@ irq_stub_1:
         ;; その場合は要求を残し ring3_syscall_dispatch の入口で畳む。
         ;; EOI と V86 反射を済ませてから判定するのは V86 の脱出と同じ理由。
         ;; フレーム: pushad(32B) の上に [esp+32]=EIP [esp+36]=CS [esp+40]=EFLAGS
-        test    dword [esp + 40], EFLAGS_VM    ;; EFLAGS.VM (V86 は対象外)
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM (V86 は対象外)
         jnz     .no_abort
-        test    dword [esp + 36], 3             ;; CS.RPL == 3 (CPL=3 を割り込んだ)?
+        test    dword [esp + ISR_IRQ_CS_OFF], X86_SEL_RPL_MASK  ;; CS.RPL == 3 (CPL=3 を割り込んだ)?
         jz      .no_abort
         call    ring3_abort_check               ;; 要求があれば longjmp (戻らない)
 .no_abort:
@@ -621,15 +610,15 @@ irq_stub_7:
         IRQ_ENTER
         push    eax
         ;; ISR読み出しでスプリアスか確認
-        mov     al, 0x0B        ;; OCW3: ISR読み出し指定
+        mov     al, OCW3_ISR  ;; OCW3: ISR読み出し指定
         out     PIC1_CMD, al
         in      al, PIC1_CMD
         mov     ah, al          ;; ISR 値を退避
         ;; OCW3 を IRR 読み出しに戻す (pic_init が設定した既定モード)。
         ;; 戻さないと以後の PIC1_CMD リードが全部 ISR を返してしまう。
-        mov     al, 0x0A        ;; OCW3: IRR読み出し指定
+        mov     al, OCW3_IRR  ;; OCW3: IRR読み出し指定
         out     PIC1_CMD, al
-        test    ah, 0x80        ;; IR7がセットされているか
+        test    ah, PIC_LAST_ISR_BIT  ;; IR7がセットされているか
         jnz     .real            ;; 本物の割り込みなら処理
 
         ;; スプリアス → EOIを送らずに無視

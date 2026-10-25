@@ -271,7 +271,7 @@ $(R1_OBJ)/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
-$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc
+$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc kernel/entry_layout.inc
 	@mkdir -p $(@D)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $@.asm
 	$(AS) -p sdk/crt/generations.inc -f elf32 $@.asm -o $@
@@ -343,7 +343,7 @@ $(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
 -include $(C_KERNEL_OBJ:.o=.d)
 endif
 
-$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc
+$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc kernel/entry_layout.inc
 	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $(BUILD_OUT)/asm/$<
 	$(AS) -p sdk/crt/generations.inc -f elf32 $(BUILD_OUT)/asm/$< -o $@

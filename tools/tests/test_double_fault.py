@@ -79,6 +79,71 @@ def check_asm_constants(folder):
     print('PASS NASM/C EFLAGS/ABI, TSS.CR3 and setjmp offsets/size')
 
 
+def check_entry_layout(folder):
+    # Assemble expressions with NASM itself; compile assertions against the real
+    # C headers with i386 sizes. No host pointer-size assumptions or C replicas.
+    expressions = {
+        'ABI_WORD_BYTES': 'ABI_WORD_BYTES',
+        'GDT_KERNEL_DS': 'GDT_KERNEL_DS',
+        'USER_DS': 'USER_DS',
+        'X86_SEL_RPL_MASK': 'X86_SEL_RPL_MASK',
+        'APP_FRAME_WORDS': 'APP_FRAME_WORDS',
+        'TVRAM_CHAR_BASE': 'TVRAM_CHAR_BASE',
+        'TVRAM_ATTR_BASE': 'TVRAM_ATTR_BASE',
+        'PIC1_CMD': 'PIC1_CMD',
+        'PIC2_CMD': 'PIC2_CMD',
+        'OCW2_EOI': 'OCW2_EOI',
+        'OCW3_ISR': 'OCW3_ISR',
+        'OCW3_IRR': 'OCW3_IRR',
+        'PIC_LAST_ISR_BIT': 'PIC_LAST_ISR_BIT',
+        'TSS_OFF_ESP0': 'offsetof(struct tss_entry, esp0)',
+        'PUSHAD_BYTES': '(ISR_REG_EAX + 1) * sizeof(u32)',
+        'IRET_CS_OFF': '(V86I_CS - V86I_EIP) * sizeof(u32)',
+        'IRET_EFLAGS_OFF': '(V86I_EFLAGS - V86I_EIP) * sizeof(u32)',
+        'ISR_ERROR_BYTES': '(V86F_EIP - V86F_ERRCODE) * sizeof(u32)',
+        'ISR_ERROR_EFLAGS_OFF': '(V86F_EFLAGS - V86F_ERRCODE) * sizeof(u32)',
+        'ISR_COMMON_VECTOR_OFF': '(ISR_COMMON_CS - 3) * sizeof(u32)',
+        'ISR_COMMON_ERROR_OFF': '(ISR_COMMON_CS - 2) * sizeof(u32)',
+        'ISR_COMMON_EIP_OFF': '(ISR_COMMON_CS - 1) * sizeof(u32)',
+        'ISR_COMMON_SKIP_BYTES': '(ISR_COMMON_CS - ISR_PF_CS + 1) * sizeof(u32)',
+        'ISR_PF_ERROR_OFF': '(ISR_PF_CS - 2) * sizeof(u32)',
+        'ISR_PF_EIP_OFF': '(ISR_PF_CS - 1) * sizeof(u32)',
+        'ISR_IRQ_CS_OFF': 'V86I_CS * sizeof(u32)',
+        'ISR_IRQ_EFLAGS_OFF': 'V86I_EFLAGS * sizeof(u32)',
+        'V86_CTX_EIP': 'offsetof(struct v86_context, eip)',
+        'V86_CTX_CS': 'offsetof(struct v86_context, cs)',
+        'V86_CTX_EFLAGS': 'offsetof(struct v86_context, eflags)',
+        'V86_CTX_ESP': 'offsetof(struct v86_context, esp)',
+        'V86_CTX_SS': 'offsetof(struct v86_context, ss)',
+        'V86_CTX_ES': 'offsetof(struct v86_context, es)',
+        'V86_CTX_DS': 'offsetof(struct v86_context, ds)',
+        'V86_CTX_FS': 'offsetof(struct v86_context, fs)',
+        'V86_CTX_GS': 'offsetof(struct v86_context, gs)',
+    }
+    definitions = set(re.findall(r'^%define (\w+) .+$',
+        (ROOT / 'kernel/entry_layout.inc').read_text(), re.M))
+    assert definitions == set(expressions), (definitions ^ set(expressions))
+    asm = folder / 'entry_layout.asm'
+    asm.write_text('%include "kernel/entry_layout.inc"\n' +
+                   ''.join('dd ' + name + '\n' for name in expressions))
+    binary = folder / 'entry_layout.bin'
+    subprocess.run(['nasm', '-f', 'bin', str(asm), '-o', str(binary)],
+                   cwd=ROOT, check=True)
+    values = struct.unpack('<' + 'I' * len(expressions), binary.read_bytes())
+    source = ('#include "cpu.h"\n#include "idt.h"\n#include "tss.h"\n'
+              '#include "v86.h"\n#include "exec/appslot.h"\n#include <stddef.h>\n')
+    for (name, expression), value in zip(expressions.items(), values):
+        source += f'STATIC_ASSERT(({expression}) == {value}, entry_{name});\n'
+    path = folder / 'entry_layout.c'
+    path.write_text(source)
+    subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding',
+                    '-I' + str(ROOT), '-I' + str(ROOT / 'include'),
+                    '-I' + str(ROOT / 'kernel'), '-I' + str(ROOT / 'lib'),
+                    '-I' + str(ROOT / 'arch/x86'),
+                    '-c', str(path), '-o', str(folder / 'entry_layout.o')], check=True)
+    print('PASS NASM/C entry constants, ISR frames, TSS and V86Context layout')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
@@ -94,6 +159,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='double-fault-') as tmp:
         folder = pathlib.Path(tmp)
         check_asm_constants(folder)
+        check_entry_layout(folder)
         run(folder)
         if args.mutate:
             for mutant in ('interrupt gate', 'wrong CR3'):

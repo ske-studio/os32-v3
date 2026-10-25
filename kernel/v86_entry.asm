@@ -14,6 +14,8 @@
 ;; この関数の中に閉じ込めてある。
 ;; ============================================================
 
+%include "kernel/entry_layout.inc"
+
 cpu 386
 
 extern kernel_tss                       ;; kernel/tss.c
@@ -38,20 +40,20 @@ v86_enter:
         ;; (終了は longjmp) ので、この領域が上書きされても困らない。
         ;; struct tss_entry の esp0 はオフセット 4。
         mov     eax, esp
-        mov     [kernel_tss + 4], eax
+        mov     [kernel_tss + TSS_OFF_ESP0], eax
 
         mov     esi, [esp + 4]          ;; ctx
 
         ;; iretd 用フレームを積む (高位→低位の順に push)
-        push    dword [esi + 32]        ;; GS
-        push    dword [esi + 28]        ;; FS
-        push    dword [esi + 24]        ;; DS
-        push    dword [esi + 20]        ;; ES
-        push    dword [esi + 16]        ;; SS
-        push    dword [esi + 12]        ;; ESP
-        push    dword [esi + 8]         ;; EFLAGS (VM=1, IOPL=3)
-        push    dword [esi + 4]         ;; CS
-        push    dword [esi + 0]         ;; EIP
+        push    dword [esi + V86_CTX_GS]  ;; GS
+        push    dword [esi + V86_CTX_FS]  ;; FS
+        push    dword [esi + V86_CTX_DS]  ;; DS
+        push    dword [esi + V86_CTX_ES]  ;; ES
+        push    dword [esi + V86_CTX_SS]  ;; SS
+        push    dword [esi + V86_CTX_ESP]  ;; ESP
+        push    dword [esi + V86_CTX_EFLAGS]  ;; EFLAGS (VM=1, IOPL=3)
+        push    dword [esi + V86_CTX_CS]  ;; CS
+        push    dword [esi + V86_CTX_EIP]  ;; EIP
 
         iretd                           ;; → V86 モードへ
 

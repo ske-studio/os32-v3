@@ -19,14 +19,12 @@
 ;; ============================================================
 
 %include "kernel/cpu_flags.inc"
+;; セレクタの正典は kernel/gdt.h (値の一致は host 試験で固定)。
+%include "kernel/entry_layout.inc"
 
 cpu 386
 
 extern ring3_syscall_dispatch
-
-;; ユーザデータセグメント (CONTRACTS C1, kernel/gdt.h の USER_DS)
-USER_DS     equ 0x2B
-KERNEL_DS   equ 0x10
 
 section .text
 
@@ -37,7 +35,7 @@ int80_stub:
 
         ;; C ハンドラはカーネルデータセグメント前提。CPL=3 由来では
         ;; DS/ES/FS/GS が USER_DS なので復元する (RESTORE_KSEG 相当)。
-        mov     ax, KERNEL_DS
+        mov     ax, GDT_KERNEL_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
@@ -49,7 +47,7 @@ int80_stub:
         ;; 待つため、IF=0 のままだと CPL=3 からの呼び出しで永久停止する
         ;; (2026-09-06、gdi_test の kbd_getchar と less の sys_halt で実測)。
         ;; iretd が EFLAGS をフレームから復元するので戻りの cli は不要。
-        test    dword [esp + 40], EFLAGS_VM   ;; saved EFLAGS.VM
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; saved EFLAGS.VM
         jnz     .dispatch
         sti
 .dispatch:
@@ -57,7 +55,7 @@ int80_stub:
         mov     eax, esp                ;; frame ptr (pushad 先頭)
         push    eax
         call    ring3_syscall_dispatch  ;; sys_exit/範囲外は戻らない (longjmp)
-        add     esp, 4
+        add     esp, ABI_WORD_BYTES
 
         ;; 出口は IF=0 で通す。USER_DS を DS/ES/FS/GS に載せてから iretd まで
         ;; の間に IRQ が入ると、IRQ スタブが RESTORE_KSEG で DS=KERNEL_DS に
@@ -76,9 +74,9 @@ ring3_iret_to_user:
 
         ;; --- IRETD_USER: CPL=3 へ戻るならユーザセグメントを復元 ---
         ;; popad 後 esp -> [EIP][CS][EFLAGS][userESP][userSS]
-        test    dword [esp + 8], EFLAGS_VM   ;; EFLAGS.VM? (トランポリンは常に非V86)
+        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM? (トランポリンは常に非V86)
         jnz     .do_iret
-        test    dword [esp + 4], 3            ;; CS.RPL == 3 (CPL=3 へ戻る)?
+        test    dword [esp + IRET_CS_OFF], X86_SEL_RPL_MASK  ;; CS.RPL == 3 (CPL=3 へ戻る)?
         jz      .do_iret
         push    eax
         mov     ax, USER_DS
@@ -115,12 +113,12 @@ ring3_resume:
         ;; TSS.ESP0 = 現在のカーネル ESP。offset 4 は kernel/tss.c の
         ;; STATIC_ASSERT(tss_esp0_at_offset_4) が固定している
         ;; (v86_entry.asm と同じ書き方)。
-        mov     [edx + 4], ecx
-        mov     [edx + TSS_OFF_CR3], eax         ;; static TSS.CR3: #DF diagnostic
+        mov     [edx + TSS_OFF_ESP0], ecx
+        mov     [edx + TSS_OFF_CR3], eax  ;; static TSS.CR3: #DF diagnostic
         mov     cr3, eax                ;; アプリ PD へ切替
-        sub     esp, 13 * 4             ;; フレーム置き場
+        sub     esp, APP_FRAME_WORDS * ABI_WORD_BYTES  ;; フレーム置き場
         mov     edi, esp
-        mov     ecx, 13
+        mov     ecx, APP_FRAME_WORDS
         cld
         rep     movsd                   ;; [esi] -> [edi] を 13 語
         jmp     ring3_iret_to_user      ;; popad; iretd (戻らない)

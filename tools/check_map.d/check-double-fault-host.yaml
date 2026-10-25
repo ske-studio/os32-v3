@@ -30,4 +30,9 @@ check-double-fault-host:
 - tools/mkmod.py
 - tools/module_schema.py
 - kernel/cpu_flags.inc
+- kernel/entry_layout.inc
+- kernel/v86_entry.asm
+- kernel/v86.h
+- exec/appslot.h
+- include/cpu.h
 artifact_reader: true
