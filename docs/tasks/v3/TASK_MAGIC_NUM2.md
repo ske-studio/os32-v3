@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2「定数定義の3層管理」)・前の票 [TASK_MAGIC_NUM](TASK_MAGIC_NUM.md) (v3 で足された行)
 
-> 状態: **実装中 (2026-10-25)** — N1〜N13 が main (どれも sol 実装・astra 取り込み可・機械語の差 0、N1 だけ SDK の定数で FEP の ABI 世代の値が変わる)。残りは追補の N14。洗い出しの表 (file:line・値・意味・直し) は `~/os32-tmp/run/magic2/survey_{k,d,f,b}.md`。
+> 状態: **受入完了 (2026-10-25)** — N1〜N14 が main。どの段も sol 実装・astra 取り込み可で、機械語の差は 0 (例外は ABI 世代の値だけ: N1 の FEP、N14 の CD・FM・PCM)。洗い出しの表は `~/os32-tmp/run/magic2/survey_{k,d,f,b}.md`。
 
 ## 0. ユーザー指示 (2026-10-25)
 
@@ -49,6 +49,11 @@ N1 が共有ヘッダの名前を作り、N2〜N13 は N1 の取り込みの後�
 | N11 | boot の C とヘッダ: boot_defs.h・ext2_mini.c・vk32_boot.c・lz4_mini.c・boot_debug.c・boot_main.c | b | **main** |
 | N12 | boot の asm: boot_fat.asm・boot_hdd.asm・loader_hdd.asm・loader.ld・bootinfo_rm.inc と新しい .inc (C との値の一致を host 試験で固定) | b | **main** |
 | N13 | boot の FAT ローダ: loader_fat_new.asm (最も密なので単独) | b | **main** |
-| N14 | 追補: 各段が持ち越したもの (ABI の世代の値が変わる vfs.h の世代の上限・dma_pool.h の DMA_POOL_PAGE_SIZE・fm.h の SSG_PERIOD と NOTE、道具が数字しか読めない boot_defs.h の MAX_IMAGE_SIZE) と、各段が挙げた「共有に足したい名前」の重複の整理。ABI の世代の値は変わってよい (前の票の M2・K3 と同じ扱い、PM 決定) | 各段の報告 | 未着手 |
+| N14 | 追補: 各段が持ち越したもの (ABI の世代の値が変わる vfs.h の世代の上限・dma_pool.h の DMA_POOL_PAGE_SIZE・fm.h の SSG_PERIOD と NOTE、道具が数字しか読めない boot_defs.h の MAX_IMAGE_SIZE) と、各段が挙げた「共有に足したい名前」の重複の整理。ABI の世代の値は変わってよい (前の票の M2・K3 と同じ扱い、PM 決定) | 各段の報告 | **main** (sol 実装・astra 取り込み可・PM の直し: Cirrus のパレット数を戻す) — 機械語の差は CD・FM・PCM の ABI 世代の値 3 つだけ |
 
 各段の完了条件は前の票 §3 と同じ: `make all` rc=0、機械語の比べ、`check_select.py --select --files <差分>` の候補を全部 `MUTATE=0` で rc=0、`check_select.py --lint` rc=0、`stale_anchor.py`。2 時間に収まらなければ A を先にし、残りを報告の「未了」に書く (PM が追補の段に回す)。
+
+## 4. 取り込みで分かったこと
+
+- 名前を寄せるとヘッダが別のヘッダを読むようになり、変異の試験の写しの木 (MIRROR などの一覧) に足りないヘッダが出る (N9 の ext2_layout.h → ext2.h で test_hdd_stage2 の変異 133 本が組めなかった)。MUTATE=0 の候補検査では見つからず、取り込みの変異込みの検査で初めて落ちる。新しく include を足した段は、変異の写しの一覧を grep で確かめる。
+- 値が同じでも別の装置の仕様は名前を分ける (N14 で Cirrus の VGA DAC の数を PEGC の名前に寄せかけた)。
