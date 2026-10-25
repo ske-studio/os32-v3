@@ -5,6 +5,7 @@
 #include "kselftest_probe.h"
 #include "selftest_internal.h"
 
+/* ホスト fixture はデータの SETTER だけを自前でつなぐ。 */
 #ifdef KDEBUG_SELFTEST_HOST
 extern void kdi_set_kbd_inject_drop_count(u32 value);
 #else

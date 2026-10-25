@@ -1,9 +1,16 @@
+/* ======================================================================== */
+/*  SELFTEST_LEASE.C — 私用 lease の起動自己試験 (票 TASK_SLIM S3d)           */
+/*                                                                          */
+/*  元は exec/lease.c の lease_selftest。結果は kdi_selftest_lease_result で  */
+/*  カーネルの lease_selftest_result へ戻す (道具はその番地を読む)。          */
+/* ======================================================================== */
 #include "lease.h"
 #include "shlib.h"
 #include "io.h"
 #include "kselftest_probe.h"
 #include "selftest_internal.h"
 
+/* ホスト fixture は本物の関数番地をそのまま渡す。 */
 #ifdef KDEBUG_SELFTEST_HOST
 #define KDI_ADDR_shlib_read_page shlib_read_page
 #else

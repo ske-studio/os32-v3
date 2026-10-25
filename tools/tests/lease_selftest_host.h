@@ -1,4 +1,5 @@
-/* Link the moved boot test to real paging/ledger/lease, with host-only checks. */
+/* kdebug へ移した lease 自己試験を本物の paging・台帳・lease とつなぎ、
+ * 旧名 lease_selftest の前後でホストだけの不変条件を比べる。 */
 #define KDEBUG_SELFTEST_HOST
 #include "../../kdebug/selftest_lease.c"
 #ifndef LEASE_SELFTEST_AS

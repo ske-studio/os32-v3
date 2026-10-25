@@ -181,7 +181,7 @@ def case_capacity_full(tmp, kj):
           "(kapi_reserved の参照は #if KAPI_FUNC_RESERVED > 0 の中)")
     if r.returncode != 0:
         print("\n".join(r.stderr.splitlines()[:8]))
-    # Also compile the moved body against the zero-reserved generated layout.
+    # kdebug へ移した kst_exec_kapi_layout も予約 0 本の生成物で構文検査する。
     moved = gk / "selftest_exec.c"
     moved.write_text((ROOT / "kdebug/selftest_exec.c").read_text().replace(
         '#include "generated/kdebug_import_macros.h"',
@@ -191,7 +191,6 @@ def case_capacity_full(tmp, kj):
     check(r.returncode == 0, "予約 0 本でも移植した kst_exec_kapi_layout がコンパイルできる")
     if r.returncode != 0:
         print(r.stderr)
-
 
 
 # --------------------------------------------------------------------------

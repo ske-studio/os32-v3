@@ -56,7 +56,8 @@ void kbd_inject_discard(void);
  * 捨てる (exec_reclaim_owned から con_sink_owner_exit の直前に呼ぶ)。 */
 void kbd_inject_owner_exit(int id);
 
-/* Observed drop counter; owned by the kernel. */
+/* あふれで捨てたバイト数の累計 (実体は kernel/kbd_inject.c)。kdebug の自己試験は
+ * 生成した GETTER/SETTER を通して読み書きする。 */
 extern volatile u32 kbd_inject_drop_count;
 
 #endif /* __KBD_INJECT_H */

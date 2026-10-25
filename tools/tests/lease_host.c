@@ -141,7 +141,7 @@ void _start(void) {
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     before = used_pages;
     CHECK(!lease_selftest()); CHECK(used_pages == before);
-    /* Two ASes each allocate a PD and the initial lease PT. */
+    /* AS 2 つがそれぞれ PD と最初の lease PT を確保する — その各回で失敗させる。 */
     for (int fail = 0; fail < 2 * 2; fail++) {
         fail_after = fail;
         CHECK(lease_selftest() != 0); CHECK(used_pages == before);

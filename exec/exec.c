@@ -507,7 +507,7 @@ u32 exec_tramp_page_addr(void)
 
 extern i32 __cdecl kapi_reserved_nosys(void);
 
-/* Snapshot initialized state; the aligned raw address is not readiness. */
+/* kdebug の exec 自己試験へ写す口 (include/kselftest_probe.h)。 */
 void kdi_selftest_exec_view(struct kselftest_exec_view *out)
 {
     out->tramp_page = ring3_tramp_page;

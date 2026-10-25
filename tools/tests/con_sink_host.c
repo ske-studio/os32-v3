@@ -28,7 +28,7 @@ void res_owner_set(int owner) { g_owner = owner; }
 void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
 #define KDEBUG_SELFTEST_HOST
 #include "../../kdebug/selftest_con_sink.c"
-/* Keep the existing host test entry; production has no old-name wrapper. */
+/* 旧名の入口は fixture の中だけ (本番は kst_con_sink を直に呼ぶ)。 */
 static u32 con_sink_selftest(void) { return kst_con_sink(); }
 
 /* ======================================================================== */

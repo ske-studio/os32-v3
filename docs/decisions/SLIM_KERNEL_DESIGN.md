@@ -299,7 +299,6 @@ import表と既存利用者:
 - `RING3_LS_SHIM_OFF` は式を変えず `exec/ring3_str.h` へ移し、構築側と移植先の共通定義にする。`kapi_reserved_nosys` の宣言は既存の exec.c に残し、生成器の source=.c 経路で取得する。
 - 新しい exec fixture は実 exec.c を関数セクション単位でリンクし、snapshot・ページ構築・文字列・WM の実経路を生成 import table/stub に接続する。未初期化・復元・失敗ビット・予約関数の実番地と stub の相違・配列の末尾・リンカ記号の番地を確認し、予約 0 本は test_kapi_layout で移植ソースも構文検査する。
 
-
 ## S3f の実装で設計者が決めたこと
 
 - 容量の基準は付表末尾の S3a (25aeb119) とする。純減は ELF の text+data、追加常駐コストは前後 nm の新規・増大した t/T/r/R/d/D 記号の正の差の総和で判定し、コンパイラが改名した記号も保守的に含める (実測 7,288 B 減・1,135 B 増、BSS は別記録)。

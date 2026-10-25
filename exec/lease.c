@@ -358,6 +358,7 @@ int surface_lease_bundle(const struct surface_query_source *source,
     return 0;
 }
 
+/* kdebug の lease 自己試験 (kst_lease) が結果を観測変数へ戻す口。 */
 void kdi_selftest_lease_result(u32 result)
 {
     lease_selftest_result = result;

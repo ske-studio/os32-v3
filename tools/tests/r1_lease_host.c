@@ -47,7 +47,7 @@ static void run(void)
         r1_fixture_id[R1_FIXTURE_LEASE_FAIL]=2;
         r1_fixture_generation[R1_FIXTURE_LEASE_FAIL]=space.generation;
     }
-    /* The boot test also preserves a live application AS and its owners. */
+    /* 起動自己試験は生きているアプリの AS と所有者も壊さない。 */
     paging_load_cr3(paging_kernel_pd_phys());
     CHECK(!lease_selftest());
     paging_load_cr3(space.pd_phys);

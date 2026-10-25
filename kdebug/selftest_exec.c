@@ -1,3 +1,10 @@
+/* ======================================================================== */
+/*  SELFTEST_EXEC.C — exec の起動自己試験 2 本 (票 TASK_SLIM S3e)             */
+/*                                                                          */
+/*  元は exec/exec.c の exec_kapi_layout_selftest・exec_tramp_user_selftest。 */
+/*  踏み台ページと KAPI 表は kdi_selftest_exec_view で入口ごとに 1 回写す。   */
+/*  どちらも exec_init の後 (kselftest_run_post_exec) に呼ぶ。                */
+/* ======================================================================== */
 #include "exec.h"
 #include "os32x_hdr.h"
 #include "ring3_str.h"
@@ -11,16 +18,20 @@
 #include "selftest_internal.h"
 #include "generated/kdebug_import_macros.h"
 
-/* Post-exec layout check: bits 0..3 retain their original meanings. */
+/* データ欄の固定配置と予約スロット (票 TASK_KAPI_DATA_FIELDS)。
+ * ビット 0 = 固定オフセット、1 = 本物の表の予約 (NOSYS)、2 = トランポリンの
+ * 予約スタブ、3 = ヘッダ v3 の照合。0 = 全部通った。 */
 u32 kst_exec_kapi_layout(void)
 {
     struct kselftest_exec_view view;
-    kdi_selftest_exec_view(&view);
     u32 bad = 0;
     const u32 *real = (const u32 *)KAPI_ADDR;
-    const u32 *tbl = (const u32 *)view.tramp_page;
+    const u32 *tbl;
     u32 i;
     OS32Header h;
+
+    kdi_selftest_exec_view(&view);
+    tbl = (const u32 *)view.tramp_page;
 
     if (view.tramp_page == 0) return 0xFu;     /* exec_init より前 */
 
@@ -76,16 +87,18 @@ u32 kst_exec_kapi_layout(void)
     return bad;
 }
 
-/* Post-exec string page check: bits 0..5 retain their original meanings. */
+/* 写し場の番地とページ属性 (票 T9 §12 R1)。ビット 0..5 が落ちた項目
+ * (0 = 全部通った)。 */
 u32 kst_exec_tramp_user(void)
 {
     struct kselftest_exec_view view;
-    kdi_selftest_exec_view(&view);
     u32 bad = 0;
     u32 addr;
     u32 flags;
     const char *before;
     int saved = ring3_in_syscall;
+
+    kdi_selftest_exec_view(&view);
 
     if (view.tramp_page == 0) return 1u;    /* exec_init より前 */
     addr = view.tramp_page + RING3_USTR_OFF;

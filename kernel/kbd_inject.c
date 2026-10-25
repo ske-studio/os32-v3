@@ -304,7 +304,7 @@ void kbd_inject_owner_exit(int id)
     kbd_inject_unlock(f);
 }
 
-/* Boot selftest only: same calling conditions as the former local inj_push. */
+/* 起動自己試験 (kdebug/selftest_kbd_inject.c) だけが使う。呼べる条件は inj_push と同じ。 */
 u32 kdi_selftest_inj_push(const u8 *p, u32 len, int dest)
 {
     return inj_push(p, len, dest);

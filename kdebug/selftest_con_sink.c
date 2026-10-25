@@ -2,7 +2,7 @@
 #include "con_sink.h"
 #include "selftest_internal.h"
 
-/* Host fixture supplies only the owner and data-accessor connections. */
+/* ホスト fixture は所有者とデータの SETTER だけを自前でつなぐ。 */
 #ifdef KDEBUG_SELFTEST_HOST
 extern int res_owner_get(void);
 extern void res_owner_set(int owner);

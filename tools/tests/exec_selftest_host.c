@@ -1,9 +1,9 @@
-/* Kernel half of the exec fixture. The module half uses generated imports. */
+/* exec fixture のカーネル側。モジュール側は生成した import 表と stub を通る。 */
 #include "exec/exec.c"
 #include "exec/ring3_str.c"
 #include "exec/os32x_hdr.c"
 
-/* Back the dynamic KAPI address with ordinary ILP32 process memory. */
+/* KAPI の番地を ILP32 のプロセスの普通のメモリで裏打ちする。 */
 u8 host_arena[KHEAP_SIZE + MEM_KAPI_SIZE + PAGE_SIZE]
     __asm__("__kernel_resident_end") __attribute__((aligned(PAGE_SIZE)));
 
