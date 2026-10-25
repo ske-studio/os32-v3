@@ -181,6 +181,8 @@ static u8 kernel_pci_line_bits(unsigned int irq)
     return b;
 }
 
+/* kernel_main から抜き出した補助。本体は kernel_main の後に置く
+ * (ホスト試験が kernel.c を文字の位置で切り出すため)。 */
 static inline void kernel_shell_loop(void);
 static inline void kernel_mount_children(u32 boot_drive);
 
@@ -655,6 +657,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
 }
 
+/* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは boot_drive
+ * から fd0 / hd0 を決めて除く。CD は iso9660 だけ、他は ext2 → iso9660 → fat の
+ * 順に試し、失敗しても起動は続ける。 */
 static inline void kernel_mount_children(u32 boot_drive)
 {
     {
@@ -708,6 +713,7 @@ static inline void kernel_mount_children(u32 boot_drive)
     }
 }
 
+/* シェルの起動ループ。戻らない (kernel_main の後ろの停止ループは保険)。 */
 static inline void kernel_shell_loop(void)
 {
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯

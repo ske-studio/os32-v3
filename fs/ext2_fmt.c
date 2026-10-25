@@ -42,22 +42,25 @@ typedef struct {
  * (規則の正典は fs/ext2_layout.c — 必要量の計算と同じ関数を使う) */
 #define is_sparse_group(g)  ext2_layout_is_sparse(g)
 
+/* ===== Block 1: スーパーブロック =====
+ * lay (ext2_layout_plan の結果) から SB を組んで block 1 に書く。
+ * ext2_write_block の結果をそのまま返し、EXT2_ERR_IO への変換は呼び手がする。
+ * s_free_blocks_count はここでは仮値 0 (ext2_format_range が後で埋める)。 */
 static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
 {
-    /* ===== Block 1: スーパーブロック ===== */
     ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-    le32_wr(&ext2_g_blk[0], lay->inodes_count);              /* s_inodes_count */
-    le32_wr(&ext2_g_blk[4], lay->total_blocks);              /* s_blocks_count */
+    le32_wr(&ext2_g_blk[0], lay->inodes_count);         /* s_inodes_count */
+    le32_wr(&ext2_g_blk[4], lay->total_blocks);         /* s_blocks_count */
     le32_wr(&ext2_g_blk[8], 0);                         /* s_r_blocks_count */
     /* s_free_blocks_count は後で計算 (仮値) */
     le32_wr(&ext2_g_blk[12], 0);
-    le32_wr(&ext2_g_blk[16], lay->inodes_count - 10);        /* s_free_inodes_count (予約inode 1-10) */
+    le32_wr(&ext2_g_blk[16], lay->inodes_count - 10);   /* s_free_inodes_count (予約inode 1-10) */
     le32_wr(&ext2_g_blk[20], 1);                        /* s_first_data_block (1 for 1KB block) */
     le32_wr(&ext2_g_blk[24], 0);                        /* s_log_block_size (0 = 1KB) */
     le32_wr(&ext2_g_blk[28], 0);                        /* s_log_frag_size */
     le32_wr(&ext2_g_blk[32], EXT2_BLOCKS_PER_GROUP_MAX); /* s_blocks_per_group */
     le32_wr(&ext2_g_blk[36], EXT2_BLOCKS_PER_GROUP_MAX); /* s_frags_per_group */
-    le32_wr(&ext2_g_blk[40], lay->inodes_per_group);         /* s_inodes_per_group */
+    le32_wr(&ext2_g_blk[40], lay->inodes_per_group);    /* s_inodes_per_group */
     le32_wr(&ext2_g_blk[44], 0);                        /* s_mtime */
     le32_wr(&ext2_g_blk[48], ext2_current_time());      /* s_wtime */
     le16_wr(&ext2_g_blk[52], 0);                        /* s_mnt_count */
@@ -87,7 +90,10 @@ static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
     return ext2_write_block(ctx, 1, ext2_g_blk);
 }
 
-/* ===== グループ0: inode 2 (ルートディレクトリ) ===== */
+/* ===== グループ0: inode 2 (ルートディレクトリ) =====
+ * inode テーブルの inode 2 を読み書きして root を作り、直後のデータブロックに
+ * "." と ".." を書く。ext2_g_blk を作業域に使う。I/O が失敗したら EXT2_ERR_IO、
+ * 成功で EXT2_OK。 */
 static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
                                  u32 inode_tbl_blocks_per_group)
 {

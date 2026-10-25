@@ -326,7 +326,9 @@ static void commit_candidate(void)
 /*  IME コアロジック: キー処理                                               */
 /* ======================================================================== */
 
-/* 候補の戻り値は通常入力へ流さず、呼び手へそのまま返す。 */
+/* === 変換候補表示中 (IME_ST_CONVERT / IME_ST_CANDLIST) の操作 ===
+ * 戻り値は ime_process_key と同じ。その他のキーは候補を確定して -1 (透過) を返し、
+ * 通常入力の処理には回さない。 */
 static inline int ime_candidate_key(u8 ascii, u8 scancode)
 {
     int n;
@@ -481,11 +483,11 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
     return -1;
 }
 
+/* === 通常入力中 (IME_ST_INPUT) の操作 ===
+ * 戻り値は ime_process_key と同じ。 */
 static inline int ime_input_key(u8 ascii, u8 scancode)
 {
     int count;
-
-    /* === 通常入力中 === */
 
     /* スペースキー: 変換開始 (最長一致法) */
     if (scancode == KEY_SPACE && g_ime.kana_len > 0) {
