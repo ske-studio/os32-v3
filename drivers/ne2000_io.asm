@@ -13,6 +13,10 @@
 ;; ============================================================
 
 cpu 386
+%define ARG_PORT    8
+%define ARG_BUF     12
+%define ARG_NBYTES  16
+
 
 section .text
 
@@ -23,12 +27,12 @@ ne2k_pio_read:
         mov     ebp, esp
         push    edi
         cld
-        mov     edx, [ebp + 8]          ;; port
-        mov     edi, [ebp + 12]         ;; buf
-        mov     ecx, [ebp + 16]         ;; nbytes
+        mov     edx, [ebp + ARG_PORT]          ;; port
+        mov     edi, [ebp + ARG_BUF]         ;; buf
+        mov     ecx, [ebp + ARG_NBYTES]         ;; nbytes
         shr     ecx, 1                  ;; word 数
         rep     insw
-        test    dword [ebp + 16], 1
+        test    dword [ebp + ARG_NBYTES], 1
         jz      .done
         in      ax, dx                  ;; 奇数末尾: word を読んで
         mov     [edi], al               ;; 下位 1 バイトだけ格納
@@ -44,12 +48,12 @@ ne2k_pio_write:
         mov     ebp, esp
         push    esi
         cld
-        mov     edx, [ebp + 8]          ;; port
-        mov     esi, [ebp + 12]         ;; buf
-        mov     ecx, [ebp + 16]         ;; nbytes
+        mov     edx, [ebp + ARG_PORT]          ;; port
+        mov     esi, [ebp + ARG_BUF]         ;; buf
+        mov     ecx, [ebp + ARG_NBYTES]         ;; nbytes
         shr     ecx, 1
         rep     outsw
-        test    dword [ebp + 16], 1
+        test    dword [ebp + ARG_NBYTES], 1
         jz      .done
         mov     al, [esi]               ;; 奇数末尾: 1 バイトだけ読み
         xor     ah, ah                  ;; 上位ゼロの word で送る

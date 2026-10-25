@@ -10,6 +10,7 @@
 #define NE2000_H
 
 #include "types.h"
+#include "net_eth.h"
 
 /* ---- 結果コード (負値)。KAPI 化するときに OS32_ERR_* へ写像する ---- */
 #define NE2K_OK             0
@@ -128,7 +129,7 @@ int  ne2k_is_busy(void);
 
 void ne2k_get_stats(struct ne2k_stats *stats);
 int  ne2k_state(void);
-void ne2k_get_mac(u8 mac[6]);
+void ne2k_get_mac(u8 mac[ETH_ALEN]);
 unsigned int ne2k_ram_bytes(void);   /* probe で確定した NIC RAM 容量 */
 
 /* ---- ne2000_io.asm (System V i386, cdecl) ----

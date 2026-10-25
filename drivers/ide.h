@@ -24,6 +24,20 @@
 
 #include "types.h"
 
+#include "config.h"
+
+#define IDE_BANK_COUNT         2
+#define IDE_DRIVES_PER_BANK    2
+#define IDE_MAX_DRIVES         (IDE_BANK_COUNT * IDE_DRIVES_PER_BANK)
+#define IDE_PIO_WORDS          (SYS_HDD_SECTOR_SIZE / sizeof(u16))
+#define IDE_IDENTIFY_WORDS     256
+#define IDE_ID_MODEL_WORD      27
+#define IDE_MODEL_LEN          40
+#define IDE_ID_SERIAL_WORD     10
+#define IDE_SERIAL_LEN         20
+#define IDE_ID_FIRMWARE_WORD   23
+#define IDE_FIRMWARE_LEN       8
+
 /* IDE I/Oポート (PC-98) */
 #define IDE_DATA       0x640   /* データレジスタ (16-bit) */
 #define IDE_ERROR      0x642   /* エラーレジスタ (R) */
@@ -57,9 +71,6 @@
 #define IDE_CMD_WRITE      0x30   /* WRITE SECTOR(S) */
 #define IDE_CMD_IDENTIFY   0xEC   /* IDENTIFY DEVICE */
 
-/* ドライブ選択 — PC-98ではCHS専用 (UNDOCUMENTED: bit6は常に0) */
-#define IDE_DRV_SEL_CHS    0xA0   /* CHSモード: bit5=1, bit6=0, bit7=1 */
-
 #define IDE_TIMEOUT_LOOP   1000000 /* BSY/DRQ待ちループカウント (長い) */
 #define IDE_TIMEOUT_BSY    500000  /* 一般的なBSY等のループカウント */
 #define IDE_NIEN           0x02   /* nIEN: 割り込み無効 */
@@ -87,9 +98,9 @@ typedef struct {
     u16 heads;           /* ヘッド数 */
     u16 sectors;         /* セクタ数/トラック */
     u32 size_mb;         /* サイズ(MB) */
-    char model[41];      /* モデル名 */
-    char serial[21];     /* シリアル番号 */
-    char firmware[9];    /* ファームウェアリビジョン */
+    char model[IDE_MODEL_LEN + 1];      /* モデル名 */
+    char serial[IDE_SERIAL_LEN + 1];     /* シリアル番号 */
+    char firmware[IDE_FIRMWARE_LEN + 1];    /* ファームウェアリビジョン */
     int  lba_supported;  /* LBAサポート有無 */
     u16  phys_sector_size; /* 物理セクタサイズ (SASI=256, IDE=512) */
 } IdeInfo;

@@ -11,6 +11,7 @@
 #define LGY98_H
 
 #include "types.h"
+#include "ne2000_regs.h"
 
 /* ---- BASE からのオフセット ---- */
 #define LGY98_OFS_REGS      0x000   /* DP8390 レジスタ 0x00〜0x0F (8bit) */
@@ -37,7 +38,7 @@
  * 先頭ページ 0x40 (バイトアドレス 0x4000)。容量は 16KB (実カードの想定) か
  * 32KB (NP21/W) で、初期化時の probe で決める。 */
 #define LGY98_RAM_PAGE_FIRST 0x40
-#define LGY98_RAM_PAGES_16K  0x40
+#define LGY98_RAM_PAGES_16K  NE2K_RAM_PAGES_16K
 #define LGY98_RAM_PAGES_32K  0x80
 
 /* ---- 起動設定 (include/config.h の CONFIG_LGY98_*) に対する flags ---- */

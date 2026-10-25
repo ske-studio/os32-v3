@@ -24,6 +24,10 @@
 #ifndef PCI_DECODE_CONSTANTS_H
 #define PCI_DECODE_CONSTANTS_H
 
+#define PCI_CFG_WORD_LANE_MASK  2
+#define PCI_CFG_BYTE_LANE_MASK  3
+#define PCI_CFG_BYTE_BITS       BITS_PER_BYTE
+
 #include "types.h"
 
 /* ======================================================================== */

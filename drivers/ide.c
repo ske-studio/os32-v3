@@ -13,6 +13,7 @@
 #include "io.h"
 #include "pc98.h"
 #include "kprintf.h"
+#include "memmap.h"
 
 /* 外部: irq_disable (kernel/idt.c で定義)。drivers/ は -Ikernel を
  * 持たないため、kbd.c の irq_enable と同じ扱いでここに宣言する。 */
@@ -24,7 +25,11 @@ extern void irq_disable(unsigned int irq);
  * drive 2 = バンク1 Master (NP21/W IDE #2)
  * drive 3 = バンク1 Slave  (NP21/W IDE #3)
  */
-#define IDE_MAX_DRIVES 4
+#define IDE_SASI_SPT          33
+#define IDE_SASI_SECTOR_BYTES 256
+#define IDE_SASI_HEADS_SMALL  4
+#define IDE_SASI_HEADS_MEDIUM 6
+#define IDE_SASI_HEADS_LARGE  8
 static int drive_present[IDE_MAX_DRIVES] = { 0, 0, 0, 0 };
 static IdeInfo drive_info[IDE_MAX_DRIVES];
 /* IdeInfo に無い IDENTIFY の語 (word 53-56 ほか)。IdeInfo は KAPI の並びなので
@@ -96,10 +101,10 @@ static int ide_wait_ready(void)
  * またI/Oバンク (0 or 1) も同時に切り替える。 */
 static void ide_select_drive(int drive)
 {
-    int bank = drive / 2;        /* 0 or 1 */
-    int slave = drive % 2;       /* 0=Master, 1=Slave */
+    int bank = drive / IDE_DRIVES_PER_BANK;        /* 0 or 1 */
+    int slave = drive % IDE_DRIVES_PER_BANK;       /* 0=Master, 1=Slave */
     ide_select_bank(bank);
-    outp(IDE_DRV_HEAD, IDE_DRV_SEL_CHS | (slave ? 0x10 : 0x00));
+    outp(IDE_DRV_HEAD, IDE_DRVHEAD_BASE | (slave ? IDE_DRVHEAD_SLAVE : 0x00));
     /* ドライブ選択後、400ns待ち（ダミーリード） */
     {
         int i;
@@ -126,8 +131,8 @@ static void ide_chs_addr(int drive, u16 cyl, u8 head, u8 sect, IdeAddr *a)
     a->sect_num = sect;
     a->cyl_lo   = (u8)(cyl & 0xFF);
     a->cyl_hi   = (u8)((cyl >> 8) & 0xFF);
-    a->drv_head = (u8)(IDE_DRV_SEL_CHS | (head & 0x0F)
-                       | ((drive % 2) ? 0x10 : 0x00));
+    a->drv_head = (u8)(IDE_DRVHEAD_BASE | (head & IDE_DRVHEAD_ADDR_MASK)
+                       | ((drive % IDE_DRIVES_PER_BANK) ? IDE_DRVHEAD_SLAVE : 0x00));
 }
 
 /* 1 セクタ読み / 書き (指定は呼び手が作る) */
@@ -135,7 +140,7 @@ static int ide_pio_read(int drive, const IdeAddr *a, void *buf)
 {
     int ret;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
 
     ide_select_drive(drive);
     ret = ide_wait_bsy();
@@ -151,7 +156,7 @@ static int ide_pio_read(int drive, const IdeAddr *a, void *buf)
     {
         u16 *dst = (u16 *)buf;
         int w;
-        for (w = 0; w < 256; w++) {
+        for (w = 0; w < IDE_PIO_WORDS; w++) {
             dst[w] = (u16)inpw(IDE_DATA);
         }
     }
@@ -168,7 +173,7 @@ static int ide_pio_write(int drive, const IdeAddr *a, const void *buf)
     const u16 *data = (const u16 *)buf;
     int i;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
 
     ide_select_drive(drive);
     ret = ide_wait_bsy();
@@ -181,7 +186,7 @@ static int ide_pio_write(int drive, const IdeAddr *a, const void *buf)
     ret = ide_wait_drq();
     if (ret != IDE_OK) return ret;
 
-    for (i = 0; i < 256; i++) {
+    for (i = 0; i < IDE_PIO_WORDS; i++) {
         outpw(IDE_DATA, (unsigned)data[i]);
     }
 
@@ -208,10 +213,10 @@ int ide_init(void)
     /* PC-98スレーブPICでIRQ9をマスク。
        IRQ9 = スレーブPIC bit1。未処理IRQによるシステム破壊を防止。
        手書きの IMR RMW は割り込みに分断されると危険なので共通 API を使う。 */
-    irq_disable(9);
+    irq_disable(PC98_IRQ_IDE);
 
     /* 全バンクの全ドライブをスキャン */
-    for (bank = 0; bank < 2; bank++) {
+    for (bank = 0; bank < IDE_BANK_COUNT; bank++) {
         u8 probe;
 
         ide_select_bank(bank);
@@ -221,13 +226,13 @@ int ide_init(void)
          * 注: 0x00 はスレーブドライブ選択前の正常値なのでスキップしない */
         probe = (u8)inp(IDE_ALT_STATUS);
         kprintf(KLOG_ATTR, "[ide] bank%d probe=0x%02x\n", bank, probe);
-        if (probe == 0xFF) continue;
+        if (probe == PC98_IO_OPEN_BUS8) continue;
 
         /* 割り込み無効 (nIEN=1) — ポーリングモード */
         outp(IDE_DEV_CTRL, IDE_NIEN);
 
-        for (drv = 0; drv < 2; drv++) {
-            int idx = bank * 2 + drv; /* 0-3 */
+        for (drv = 0; drv < IDE_DRIVES_PER_BANK; drv++) {
+            int idx = bank * IDE_DRIVES_PER_BANK + drv; /* 0-3 */
             int ret;
 
             /* IDENTIFYコマンドで直接検出。ステータスだけでは
@@ -249,13 +254,13 @@ int ide_init(void)
 
 int ide_identify(int drive, IdeInfo *info)
 {
-    u16 buf[256];
+    u16 buf[IDE_IDENTIFY_WORDS];
     int i, ret;
 
     /* drive_geom は I/O の方式 (ide_addr.c) の元なので、**成功したときだけ**
      * 書き換える。KAPI の ide_identify (シェルの `ide N`) が一時的に失敗しても、
      * 起動時に得た値で読み書きが続けられる。起動時の初期値は 0 (valid = 0)。 */
-    ide_select_drive(drive & 3);
+    ide_select_drive(drive & (IDE_MAX_DRIVES - 1));
     ret = ide_wait_bsy();
     if (ret != IDE_OK) return ret;
 
@@ -269,7 +274,7 @@ int ide_identify(int drive, IdeInfo *info)
     /* 256ワード読み出し (個別inpwループ) */
     {
         int w;
-        for (w = 0; w < 256; w++) {
+        for (w = 0; w < IDE_IDENTIFY_WORDS; w++) {
             buf[w] = (u16)inpw(IDE_DATA);
         }
     }
@@ -281,75 +286,75 @@ int ide_identify(int drive, IdeInfo *info)
     /* 幾何の生の語。I/O の指定の方式 (LBA28 / 現在の CHS / 既定の CHS) は
      * drivers/ide_addr.c がこの値から決める (票 TASK_HDD_INSTALL 段 1)。 */
     {
-        IdeGeom *g = &drive_geom[drive & 3];
-        g->def_cyl   = buf[1];
-        g->def_heads = buf[3];
-        g->def_spt   = buf[6];
-        g->w49       = buf[49];
-        g->w53       = buf[53];
-        g->cur_cyl   = buf[54];
-        g->cur_heads = buf[55];
-        g->cur_spt   = buf[56];
-        g->total     = (u32)buf[60] | ((u32)buf[61] << 16);
+        IdeGeom *g = &drive_geom[drive & (IDE_MAX_DRIVES - 1)];
+        g->def_cyl   = buf[IDE_ID_DEF_CYL_WORD];
+        g->def_heads = buf[IDE_ID_DEF_HEADS_WORD];
+        g->def_spt   = buf[IDE_ID_DEF_SPT_WORD];
+        g->w49       = buf[IDE_ID_CAP_WORD];
+        g->w53       = buf[IDE_ID_VALID_WORD];
+        g->cur_cyl   = buf[IDE_ID_CUR_CYL_WORD];
+        g->cur_heads = buf[IDE_ID_CUR_HEADS_WORD];
+        g->cur_spt   = buf[IDE_ID_CUR_SPT_WORD];
+        g->total     = (u32)buf[IDE_ID_TOTAL_WORD] | ((u32)buf[IDE_ID_TOTAL_WORD + 1] << 16);
         g->valid     = 1;
     }
 
     /* 情報抽出 */
-    info->cylinders = buf[1];
-    info->heads = buf[3];
-    info->sectors = buf[6];
+    info->cylinders = buf[IDE_ID_DEF_CYL_WORD];
+    info->heads = buf[IDE_ID_DEF_HEADS_WORD];
+    info->sectors = buf[IDE_ID_DEF_SPT_WORD];
 
     /* LBAサポート確認 (word 49 bit 9) */
-    info->lba_supported = (buf[49] & 0x0200) ? 1 : 0;
+    info->lba_supported = (buf[IDE_ID_CAP_WORD] & IDE_ID_CAP_LBA) ? 1 : 0;
 
     /* LBA総セクタ数 (word 60-61) */
-    info->total_sectors = (u32)buf[60] | ((u32)buf[61] << 16);
+    info->total_sectors = (u32)buf[IDE_ID_TOTAL_WORD] | ((u32)buf[IDE_ID_TOTAL_WORD + 1] << 16);
 
     /* SASI標準ジオメトリ判定 (NP21/W sasihdd[]テーブルと一致)
      * SPT=33, Heads∈{4,6,8} → SASI 256B/セクタ形式 (HDI)
      * NP21/WはSASI形式HDIをIDE経由で提供するが、
      * 内部LBAは256Bセクタ単位のまま */
-    if (info->sectors == 33 &&
-        (info->heads == 4 || info->heads == 6 || info->heads == 8)) {
-        info->phys_sector_size = 256;
+    if (info->sectors == IDE_SASI_SPT &&
+        (info->heads == IDE_SASI_HEADS_SMALL || info->heads == IDE_SASI_HEADS_MEDIUM || info->heads == IDE_SASI_HEADS_LARGE)) {
+        info->phys_sector_size = IDE_SASI_SECTOR_BYTES;
     } else {
-        info->phys_sector_size = 512;
+        info->phys_sector_size = SYS_HDD_SECTOR_SIZE;
     }
 
     /* サイズ(MB) = 総セクタ数 / (1MB あたりのセクタ数)。
      * 総セクタ数 × セクタ長を先に掛けると 4GB 超 (実機の 8GB = 16,514,063
      * セクタ) で 32bit が溢れる。1MB はどちらのセクタ長でも割り切れる。 */
     info->size_mb = info->total_sectors
-                    / ((1024UL * 1024UL) / (u32)info->phys_sector_size);
+                    / ((KIB * KIB) / (u32)info->phys_sector_size);
 
     /* モデル名 (word 27-46): ATA文字列はバイトスワップ */
-    for (i = 0; i < 20; i++) {
-        info->model[i * 2]     = (char)(buf[27 + i] >> 8);
-        info->model[i * 2 + 1] = (char)(buf[27 + i] & 0xFF);
+    for (i = 0; i < IDE_MODEL_LEN / (int)sizeof(u16); i++) {
+        info->model[i * 2]     = (char)(buf[IDE_ID_MODEL_WORD + i] >> 8);
+        info->model[i * 2 + 1] = (char)(buf[IDE_ID_MODEL_WORD + i] & 0xFF);
     }
-    info->model[40] = '\0';
+    info->model[IDE_MODEL_LEN] = '\0';
     /* 末尾空白除去 */
-    for (i = 39; i >= 0 && info->model[i] == ' '; i--) {
+    for (i = IDE_MODEL_LEN - 1; i >= 0 && info->model[i] == ' '; i--) {
         info->model[i] = '\0';
     }
 
     /* シリアル番号 (word 10-19) */
-    for (i = 0; i < 10; i++) {
-        info->serial[i * 2]     = (char)(buf[10 + i] >> 8);
-        info->serial[i * 2 + 1] = (char)(buf[10 + i] & 0xFF);
+    for (i = 0; i < IDE_SERIAL_LEN / (int)sizeof(u16); i++) {
+        info->serial[i * 2]     = (char)(buf[IDE_ID_SERIAL_WORD + i] >> 8);
+        info->serial[i * 2 + 1] = (char)(buf[IDE_ID_SERIAL_WORD + i] & 0xFF);
     }
-    info->serial[20] = '\0';
-    for (i = 19; i >= 0 && info->serial[i] == ' '; i--) {
+    info->serial[IDE_SERIAL_LEN] = '\0';
+    for (i = IDE_SERIAL_LEN - 1; i >= 0 && info->serial[i] == ' '; i--) {
         info->serial[i] = '\0';
     }
 
     /* ファームウェア (word 23-26) */
-    for (i = 0; i < 4; i++) {
-        info->firmware[i * 2]     = (char)(buf[23 + i] >> 8);
-        info->firmware[i * 2 + 1] = (char)(buf[23 + i] & 0xFF);
+    for (i = 0; i < IDE_FIRMWARE_LEN / (int)sizeof(u16); i++) {
+        info->firmware[i * 2]     = (char)(buf[IDE_ID_FIRMWARE_WORD + i] >> 8);
+        info->firmware[i * 2 + 1] = (char)(buf[IDE_ID_FIRMWARE_WORD + i] & 0xFF);
     }
-    info->firmware[8] = '\0';
-    for (i = 7; i >= 0 && info->firmware[i] == ' '; i--) {
+    info->firmware[IDE_FIRMWARE_LEN] = '\0';
+    for (i = IDE_FIRMWARE_LEN - 1; i >= 0 && info->firmware[i] == ' '; i--) {
         info->firmware[i] = '\0';
     }
 
@@ -380,7 +385,7 @@ int ide_write_sector_chs(int drive, u16 cyl, u8 head, u8 sect,
 
 int ide_drive_present(int drive)
 {
-    return drive_present[drive & 3];
+    return drive_present[drive & (IDE_MAX_DRIVES - 1)];
 }
 
 int ide_get_geom(int drive, IdeGeom *out)
@@ -396,11 +401,11 @@ int ide_get_geom(int drive, IdeGeom *out)
 
 int ide_get_info(int drive, IdeInfo *info)
 {
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
     if (info) {
         int i;
         u8 *dst = (u8 *)info;
-        u8 *src = (u8 *)&drive_info[drive & 3];
+        u8 *src = (u8 *)&drive_info[drive & (IDE_MAX_DRIVES - 1)];
         for (i = 0; i < sizeof(IdeInfo); i++) {
             dst[i] = src[i];
         }
@@ -435,10 +440,10 @@ int ide_read_sector(int drive, u32 lba, void *buf)
     IdeAddr a;
     int ret;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
-    ret = ide_addr_make(&drive_geom[drive & 3], drive & 3, lba, &a);
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
+    ret = ide_addr_make(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], drive & (IDE_MAX_DRIVES - 1), lba, &a);
     if (ret != IDE_OK) return ret;
-    return ide_pio_read(drive & 3, &a, buf);
+    return ide_pio_read(drive & (IDE_MAX_DRIVES - 1), &a, buf);
 }
 
 int ide_write_sector(int drive, u32 lba, const void *buf)
@@ -446,10 +451,10 @@ int ide_write_sector(int drive, u32 lba, const void *buf)
     IdeAddr a;
     int ret;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
-    ret = ide_addr_make(&drive_geom[drive & 3], drive & 3, lba, &a);
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
+    ret = ide_addr_make(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], drive & (IDE_MAX_DRIVES - 1), lba, &a);
     if (ret != IDE_OK) return ret;
-    return ide_pio_write(drive & 3, &a, buf);
+    return ide_pio_write(drive & (IDE_MAX_DRIVES - 1), &a, buf);
 }
 
 int ide_read_sectors(int drive, u32 lba, u32 count, void *buf)
@@ -457,11 +462,11 @@ int ide_read_sectors(int drive, u32 lba, u32 count, void *buf)
     u32 i;
     u8 *dst = (u8 *)buf;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
-    if (!ide_addr_range_ok(&drive_geom[drive & 3], lba, count))
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
+    if (!ide_addr_range_ok(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], lba, count))
         return IDE_ERR_RANGE;
     for (i = 0; i < count; i++) {
-        int ret = ide_read_sector(drive, lba + i, dst + i * 512);
+        int ret = ide_read_sector(drive, lba + i, dst + i * SYS_HDD_SECTOR_SIZE);
         if (ret != IDE_OK) return ret;
     }
     return IDE_OK;
@@ -472,11 +477,11 @@ int ide_write_sectors(int drive, u32 lba, u32 count, const void *buf)
     u32 i;
     const u8 *src = (const u8 *)buf;
 
-    if (!drive_present[drive & 3]) return IDE_ERR_NO_DRIVE;
-    if (!ide_addr_range_ok(&drive_geom[drive & 3], lba, count))
+    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
+    if (!ide_addr_range_ok(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], lba, count))
         return IDE_ERR_RANGE;
     for (i = 0; i < count; i++) {
-        int ret = ide_write_sector(drive, lba + i, src + i * 512);
+        int ret = ide_write_sector(drive, lba + i, src + i * SYS_HDD_SECTOR_SIZE);
         if (ret != IDE_OK) return ret;
     }
     return IDE_OK;

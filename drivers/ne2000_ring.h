@@ -9,6 +9,8 @@
 #ifndef NE2000_RING_H
 #define NE2000_RING_H
 
+#include "ne2000_regs.h"
+
 #ifdef NE2K_HOST_TEST
 typedef unsigned char  u8;
 typedef unsigned short u16;
@@ -30,7 +32,7 @@ struct ne2k_rx_hdr {
 #define NE2K_RING_BAD_COUNT  -2   /* 長さが範囲外、またはページ進行と矛盾 */
 #define NE2K_RING_RX_ERROR   -3   /* status に PRX が無い (エラーフレーム)。next は妥当 */
 
-void ne2k_ring_decode_hdr(const u8 raw[4], struct ne2k_rx_hdr *h);
+void ne2k_ring_decode_hdr(const u8 raw[NE2K_RX_HDR_LEN], struct ne2k_rx_hdr *h);
 
 /* 現在ページ cur にあるフレームのヘッダを検証し、上位へ渡す長さを返す。
  * fcs_in_count: count に FCS 4B が含まれるなら 1。

@@ -44,7 +44,7 @@ int pci_bar_kind(u32 raw)
     switch ((raw & PCI_BAR_MEM_TYPE) >> 1) {
     case 0: return PCI_BAR_MEM32;   /* 00b: 32 ビット空間のどこでも */
     case 1: return PCI_BAR_MEM1M;   /* 01b: 1MB 未満 (旧式) */
-    case 2: return PCI_BAR_MEM64;   /* 10b: 64 ビット (次の BAR が上位) */
+    case (PCI_BAR_MEM_TYPE64 >> 1): return PCI_BAR_MEM64;   /* 10b: 64 ビット (次の BAR が上位) */
     default: break;                 /* 11b: 予約 */
     }
     return PCI_BAR_MEMRSV;
@@ -107,7 +107,7 @@ const char *pci_vendor_name(u16 vendor)
      * PCI ボードの表) に出るベンダだけ。表示の補助なので、知らなければ
      * 空文字でよい — 行には vendor:device の 16 進が必ず出る。 */
     switch (vendor) {
-    case 0x8086: return "Intel";
+    case PCI_VENDOR_INTEL: return "Intel";
     case 0x1033: return "NEC";
     case 0x102B: return "Matrox";
     case 0x9004: return "Adaptec";
@@ -143,7 +143,7 @@ int pci_header_layout(u8 header_type)
 /* ======================================================================== */
 u8 pci_extract8(u32 dword, u32 reg)
 {
-    return (u8)(dword >> ((reg & 3) * 8));
+    return (u8)(dword >> ((reg & PCI_CFG_BYTE_LANE_MASK) * PCI_CFG_BYTE_BITS));
 }
 
 u16 pci_extract16(u32 dword, u32 reg)
@@ -151,5 +151,5 @@ u16 pci_extract16(u32 dword, u32 reg)
     /* u16 の欄は PCI では必ず偶数オフセットに置かれ、バイト境界を
      * またがない。マスクを 3 にすると奇数オフセットで 8 ビットずれた値を
      * 返し、Vendor ID と Device ID が混ざる。 */
-    return (u16)(dword >> ((reg & 2) * 8));
+    return (u16)(dword >> ((reg & PCI_CFG_WORD_LANE_MASK) * PCI_CFG_BYTE_BITS));
 }

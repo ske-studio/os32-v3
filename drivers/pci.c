@@ -80,7 +80,7 @@ u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
 
     /* PCI が無い機械では 0CFCh も無い。読むと機種によっては別の機器に
      * 当たるので、**触らずに**「不在」と同じ全ビット 1 を返す。 */
-    if (!g_pci_present) return 0xFFFFFFFFUL;
+    if (!g_pci_present) return U32_MAX;
 
     /* アドレスを置いてからデータを読むまでが 1 つの手続き。あいだに
      * 割り込みが入り、ハンドラが PCI を触るとアドレスが差し替わる。 */
@@ -138,7 +138,7 @@ int pci_cfg_write16(u32 bus, u32 dev, u32 fn, u32 reg, u16 value)
 
     flags = irq_save();
     outpd(PCI_CFG_ADDR_PORT, pci_cfg_addr(bus, dev, fn, reg));
-    outpw(PCI_CFG_DATA_PORT + (reg & 2u), value);
+    outpw(PCI_CFG_DATA_PORT + (reg & PCI_CFG_WORD_LANE_MASK), value);
     irq_restore(flags);
     return 0;
 }
@@ -204,7 +204,7 @@ static void pci_record(u32 bus, u32 dev, u32 fn, u16 vendor, u32 id_dword)
      * 0 か未定義が返るだけで害は無い (**書かない**のが効いている)。 */
     for (i = 0; i < PCI_CFG_BAR_COUNT; i++) {
         d->bar[i] = pci_cfg_read32(bus, dev, fn,
-                                   (u32)(PCI_CFG_BAR0 + 4 * i));
+                                   (u32)(PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i));
     }
 
     w = pci_cfg_read32(bus, dev, fn, PCI_CFG_INT_LINE);

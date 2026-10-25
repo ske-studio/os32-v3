@@ -19,6 +19,12 @@
 #include "kstring.h"
 #include "link.h"
 
+#define LGY_MAC_HEX_DIGITS    2
+#define LGY_MAC_TEXT_STRIDE   (LGY_MAC_HEX_DIGITS + 1)
+#define LGY_MAC_TEXT_LEN      (ETH_ALEN * LGY_MAC_TEXT_STRIDE)
+#define LGY_LINKTEST_PAYLOAD  512
+#define LGY_REFLECT_BUDGET    2
+
 /* IRQ 入口は共通スタブ (kernel/isr_stub.asm の irq_stub_common_*) に移した。
  * どの線に結ぶかは irq_register() が決める (票 TASK_HAL_WIRING §1-1)。 */
 
@@ -26,7 +32,7 @@
 static int lgy98_reflect_on = 0;
 u32 lgy98_reflected = 0;
 u32 lgy98_reflect_fail = 0;
-static u8 lgy98_reflect_buf[1514 + 2];
+static u8 lgy98_reflect_buf[ETH_FRAME_MAX - ETH_FCS_LEN + NE2K_PIO_PAD_BYTES];
 
 int lgy98_validate_base(unsigned int base)
 {
@@ -47,12 +53,12 @@ int lgy98_validate_irq(unsigned int irq)
 static void print_mac(const u8 *mac)
 {
     static const char hex[] = "0123456789abcdef";
-    char buf[18];
+    char buf[LGY_MAC_TEXT_LEN];
     int i;
-    for (i = 0; i < 6; i++) {
-        buf[i * 3]     = hex[mac[i] >> 4];
-        buf[i * 3 + 1] = hex[mac[i] & 0x0F];
-        buf[i * 3 + 2] = (i == 5) ? '\0' : ':';
+    for (i = 0; i < ETH_ALEN; i++) {
+        buf[i * LGY_MAC_TEXT_STRIDE]     = hex[mac[i] >> 4];
+        buf[i * LGY_MAC_TEXT_STRIDE + 1] = hex[mac[i] & 0x0F];
+        buf[i * LGY_MAC_TEXT_STRIDE + LGY_MAC_HEX_DIGITS] = (i == ETH_ALEN - 1) ? '\0' : ':';
     }
     kprintf(KLOG_ATTR, "%s", buf);
 }
@@ -61,17 +67,17 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
 {
     struct ne2k_config cfg;
     struct ne2k_stats st;
-    u8 mac[6];
+    u8 mac[ETH_ALEN];
     int rc;
 
     rc = lgy98_validate_base(base);
     if (rc) {
-        kprintf(0xC1, "[lgy98] invalid base 0x%x (0x00D0 + n*0x1000, n=0..7)\n", base);
+        kprintf(ATTR_YELLOW, "[lgy98] invalid base 0x%x (0x00D0 + n*0x1000, n=0..7)\n", base);
         return rc;
     }
     rc = lgy98_validate_irq(irq);
     if (rc) {
-        kprintf(0xC1, "[lgy98] irq %d not usable (3/5/6 only; 12 is reserved)\n", (int)irq);
+        kprintf(ATTR_YELLOW, "[lgy98] irq %d not usable (3/5/6 only; 12 is reserved)\n", (int)irq);
         return rc;
     }
 
@@ -91,7 +97,7 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
 
     rc = ne2k_init(&cfg);
     if (rc) {
-        kprintf(0xC1, "[lgy98] init failed rc=%d (base 0x%x irq %d) -> NIC disabled\n",
+        kprintf(ATTR_YELLOW, "[lgy98] init failed rc=%d (base 0x%x irq %d) -> NIC disabled\n",
                 rc, base, (int)irq);
         return rc;
     }
@@ -126,7 +132,7 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
              * ⚠ 票 §1-1 は「登録を拒否された装置はこの票では利用不可」と
              * 書いている (往復 7 B1)。あちらは PCI の probe 経路の決定で、
              * ここは PM の指示に従って従来どおり NIC を落とさない。 */
-            kprintf(0xC1, "[lgy98] irq %d registration refused (rc=%d) -> polling only\n",
+            kprintf(ATTR_YELLOW, "[lgy98] irq %d registration refused (rc=%d) -> polling only\n",
                     (int)irq, irc);
         } else {
             ne2k_irq_enable();
@@ -134,13 +140,13 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
     }
     if (flags & LGY98_FLAG_LINKTEST) {
         link_selftest(10);          /* L0: HELLO + PING/PONG */
-        link_l1_bulk(200, 512);     /* L1: WINDOW/Credit で 200 フレームを溢れさせず受ける */
-        link_l2_stream(131072, 512, 100);  /* L2: 128KB を再結合なしで消費、seq100 で欠落→Go-Back-N 回復 */
+        link_l1_bulk(200, LGY_LINKTEST_PAYLOAD);     /* L1: WINDOW/Credit で 200 フレームを溢れさせず受ける */
+        link_l2_stream(131072, LGY_LINKTEST_PAYLOAD, 100);  /* L2: 128KB を再結合なしで消費、seq100 で欠落→Go-Back-N 回復 */
         link_l3_service();                 /* L3: Host Services (GET / 404 / 実HTTP / TIME) */
     }
     if (flags & LGY98_FLAG_DIAG) {
         ne2k_get_stats(&st);
-        kprintf(st.diag_ram_errors || st.diag_dma_errors ? 0xC1 : 0x07,
+        kprintf(st.diag_ram_errors || st.diag_dma_errors ? ATTR_YELLOW : KLOG_ATTR,
                 "[lgy98] diag: ram errors %d, dma errors %d, rdc timeouts %d\n",
                 (int)st.diag_ram_errors, (int)st.diag_dma_errors, (int)st.rdc_timeout);
     }
@@ -162,15 +168,15 @@ void lgy98_tick(void)
     if (!lgy98_reflect_on) return;
     if (ne2k_state() != NE2K_STATE_RUNNING) return;
     if (ne2k_is_busy()) return;                 /* foreground の send/recv を中断した tick では触らない */
-    for (n = 0; n < 2; n++) {
+    for (n = 0; n < LGY_REFLECT_BUDGET; n++) {
         unsigned int len = 0;
-        u8 tmp[6];
+        u8 tmp[ETH_ALEN];
         int rc = ne2k_recv(lgy98_reflect_buf, sizeof(lgy98_reflect_buf), &len);
         if (rc != NE2K_OK) break;
-        if (len < 14) { lgy98_reflect_fail++; continue; }
-        kmemcpy(tmp, lgy98_reflect_buf, 6);
-        kmemcpy(lgy98_reflect_buf, lgy98_reflect_buf + 6, 6);
-        kmemcpy(lgy98_reflect_buf + 6, tmp, 6);
+        if (len < ETH_HLEN) { lgy98_reflect_fail++; continue; }
+        kmemcpy(tmp, lgy98_reflect_buf, ETH_ALEN);
+        kmemcpy(lgy98_reflect_buf, lgy98_reflect_buf + ETH_ALEN, ETH_ALEN);
+        kmemcpy(lgy98_reflect_buf + ETH_ALEN, tmp, ETH_ALEN);
         if (ne2k_send(lgy98_reflect_buf, len) == NE2K_OK) lgy98_reflected++;
         else lgy98_reflect_fail++;
     }

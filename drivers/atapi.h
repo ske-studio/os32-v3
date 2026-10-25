@@ -18,6 +18,22 @@
 /* ======== CD-ROM セクタサイズ ======== */
 #define ATAPI_SECTOR_SIZE    2048
 
+/* Packet and response byte layout. */
+#define ATAPI_CDB_BYTES                   12
+#define ATAPI_CAPACITY_BYTES              8
+#define ATAPI_CAPACITY_LAST_LBA_OFF       0
+#define ATAPI_CAPACITY_BLOCK_BYTES_OFF    4
+#define ATAPI_SENSE_KEY_OFF               2
+#define ATAPI_SENSE_KEY_MASK              0x0F
+#define ATAPI_SENSE_ASC_OFF               12
+#define ATAPI_SENSE_ASCQ_OFF              13
+#define ATAPI_CDB_ALLOC_OFF               4
+#define ATAPI_CDB_SSU_OFF                 4
+#define ATAPI_READ10_LBA_OFF              2
+#define ATAPI_READ10_COUNT_OFF            7
+
+
+
 /* ======== 1 回の READ(10) で読むセクタ数の上限 ========
  * atapi_read_sectors() は連続する count セクタを、この数ずつの READ(10) に
  * 分けて出す (1 セクタずつ出していた頃は、実機の cdinst が 20KB/s を切った)。

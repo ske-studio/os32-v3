@@ -15,7 +15,7 @@ int ide_addr_mode(const IdeGeom *g, u16 *out_heads, u16 *out_spt,
 
     if (!g || !g->valid) return IDE_AMODE_NONE;
 
-    if (g->w49 & 0x0200) {
+    if (g->w49 & IDE_ID_CAP_LBA) {
         /* LBA28。総数 (word 60-61) が 0 の申告は信じず 2^28 を上限にする */
         mode  = IDE_AMODE_LBA28;
         heads = 0;
@@ -78,7 +78,7 @@ int ide_addr_make(const IdeGeom *g, int drive, u32 lba, IdeAddr *out)
         out->cyl_lo   = (u8)((lba >> 8) & 0xFFUL);
         out->cyl_hi   = (u8)((lba >> 16) & 0xFFUL);
         out->drv_head = (u8)(IDE_DRVHEAD_BASE | IDE_DRVHEAD_LBA | slave |
-                             (u8)((lba >> 24) & 0x0FUL));
+                             (u8)((lba >> 24) & IDE_DRVHEAD_ADDR_MASK));
         return IDE_OK;
     }
 
@@ -91,6 +91,6 @@ int ide_addr_make(const IdeGeom *g, int drive, u32 lba, IdeAddr *out)
     out->sect_num = (u8)sect;
     out->cyl_lo   = (u8)(cyl & 0xFFUL);
     out->cyl_hi   = (u8)((cyl >> 8) & 0xFFUL);
-    out->drv_head = (u8)(IDE_DRVHEAD_BASE | slave | (u8)(head & 0x0FUL));
+    out->drv_head = (u8)(IDE_DRVHEAD_BASE | slave | (u8)(head & IDE_DRVHEAD_ADDR_MASK));
     return IDE_OK;
 }
