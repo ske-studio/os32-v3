@@ -298,3 +298,11 @@ import表と既存利用者:
 - exec の 2 本は `kdebug/selftest_exec.c` へ移し、各入口で snapshot を 1 回取る。S2 は 129 FUNC、S6 は 38 FUNC + 1 GETTER + 2 SETTER + 3 PTR、全体 308 枠とし、HWDEV §3 の第 3 列は旧 exec 2 枠の削除分を詰める。
 - `RING3_LS_SHIM_OFF` は式を変えず `exec/ring3_str.h` へ移し、構築側と移植先の共通定義にする。`kapi_reserved_nosys` の宣言は既存の exec.c に残し、生成器の source=.c 経路で取得する。
 - 新しい exec fixture は実 exec.c を関数セクション単位でリンクし、snapshot・ページ構築・文字列・WM の実経路を生成 import table/stub に接続する。未初期化・復元・失敗ビット・予約関数の実番地と stub の相違・配列の末尾・リンカ記号の番地を確認し、予約 0 本は test_kapi_layout で移植ソースも構文検査する。
+
+
+## S3f の実装で設計者が決めたこと
+
+- 容量の基準は付表末尾の S3a (25aeb119) とする。純減は ELF の text+data、追加常駐コストは前後 nm の新規・増大した t/T/r/R/d/D 記号の正の差の総和で判定し、コンパイラが改名した記号も保守的に含める (実測 7,288 B 減・1,135 B 増、BSS は別記録)。
+- 両 FD は現行 packages.yaml の同梱方針で新規生成した候補だけを保存し、FAT を読み戻して全ファイルのサイズ・SHA-256・空きクラスタを採取する。移植前 FD は無いため、旧圧縮 kernel だけを同じ集合へ置いた場合の空きは容量比較用の計算値 (両 FD +4,096 B の効果) と明記し、移植前の起動可能な像の実測とは扱わない。
+- 混在は既存 test_kdebug_init.py の実ローダ fixture に任意の --pair-baseline を追加し、改変しない保存済み旧 kdebug と現行 kernel の CRC は既存の import 数検査が先に ABI_MISMATCH を返す。現行 kdebug と旧 boot CRC は PAIR_MISMATCH を確認する。本文の「旧像を pair CRC で拒否」の想定とは診断理由が異なるが、既存の検査順序は変更しない。同版現行像の RUNNING を対照とし、旧ローダの実行やゲストの合格とは数えない。
+- 道具の確認は既存 SymbolTable に新旧の各 kernel.map を渡し、pt0_snapshot の全観測記号と lease_selftest_result・kselftest_pass/fail の番地を各 ELF の nm と照合する。測定スクリプトと生の証拠は ~/os32-tmp/run/slim-s3/s3f-measure.py・s3f-evidence/ に保存し、実ゲストの読取りは PM に残す。

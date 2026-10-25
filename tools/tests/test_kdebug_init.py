@@ -1,6 +1,7 @@
 """S1a: actual init has no imports; actual loader rejects and recovers.
 記録: tools/tests/kdebug_init_tdd.md
 """
+import argparse
 import json
 import os
 import re
@@ -50,6 +51,12 @@ def boot_dispatch(kernel):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--mutate-running', action='store_true')
+    parser.add_argument('--pair-baseline', type=Path,
+                        help='saved vmkernel.lz4/kdebug.bin before import migration')
+    args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='kdebug-init-') as td:
         folder = Path(td)
         meta = gen.generate(gen.load_def(), folder, gen.LAST_STAGE)
@@ -202,6 +209,27 @@ def main():
                 result = host32.run([str(exe)], input=payload, runner=runner)
                 assert result.returncode == 0, (label, result.returncode)
             print('PASS loader', label, flush=True)
+        if args.pair_baseline:
+            # Use unmodified product images, not a synthetic CRC-bit flip.
+            # The current real loader must reject the old contract at the ABI
+            # gate, before importing slots or executing init.
+            current = ROOT / 'build/out'
+            old_pair = mkmod.pair_crc((args.pair_baseline / 'vmkernel.lz4').read_bytes())
+            new_pair = mkmod.pair_crc((current / 'vmkernel.lz4').read_bytes())
+            old_image = (args.pair_baseline / 'kdebug.bin').read_bytes()
+            new_image = (current / 'kdebug.bin').read_bytes()
+            assert old_pair != new_pair
+            assert struct.unpack_from('<I', old_image, 31 * 4)[0] == old_pair
+            assert struct.unpack_from('<I', new_image, 31 * 4)[0] == new_pair
+            for label, data, boot_pair, state in (
+                    ('product-current', new_image, new_pair, 1),
+                    ('product-old-module-abi', old_image, new_pair, 6),
+                    ('product-old-boot-crc', new_image, old_pair, 4)):
+                payload = struct.pack('<5I', 1, 0, state, len(data), boot_pair) + data
+                for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
+                    result = host32.run([str(exe)], input=payload, runner=runner)
+                    assert result.returncode == 0, (label, result.returncode)
+                print('PASS loader', label, f'boot pair={boot_pair:08x}', flush=True)
         if '--mutate' in sys.argv or '--mutate-running' in sys.argv:
             module_source = (ROOT / 'kernel/module.c').read_text()
             assignment = '    kdebug.state = KDEBUG_RUNNING;'
