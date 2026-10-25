@@ -19,6 +19,7 @@ static struct recover_ops base;
 static struct recover_profile s0;
 static u8 image[GF_ROM_MAX];
 static u32 failures, allocations, frees, reads, writes, begins, steps, ends, cleans;
+static u32 expand_fail, expand_calls, detach_fail, plan_reads, boot_fail;
 static u32 run_mask, run_fail, step_fail, decode_fail, probe_fail, peek_fail, verify_calls;
 static char events[64]; static u32 event_count;
 static void output(const char *s)
@@ -63,7 +64,7 @@ u32 pci_cfg_read32(u32 b,u32 d,u32 f,u32 o) { (void)b;(void)d;(void)f;(void)o;re
 u16 pci_cfg_read16(u32 b,u32 d,u32 f,u32 o) { return pci_cfg_read32(b,d,f,o); }
 void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v) { (void)b;(void)d;(void)f;(void)o;(void)v;writes++; }
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v) { pci_cfg_write32(b,d,f,o,v);return 0; }
-int boot_image_info(void *v) { BootImageInfo *b=v;zero(b,sizeof(*b));b->crc_valid=1;b->image_crc=42;return 0; }
+int boot_image_info(void *v) { BootImageInfo *b=v;zero(b,sizeof(*b));b->crc_valid=1;b->image_crc=42;return boot_fail?-1:0; }
 static const struct serial_setup serial={.actual=9600};
 const struct serial_setup *serial_get_setup(void) { return &serial; }
 void gfinit_bus_init(struct gfinit_bus *b,const struct recover_profile *p,const struct gfinit_pci_ops *pci)
@@ -89,12 +90,22 @@ i32 kpeek_call(u32 op,void *v,u32 size)
 int gfinit_decode_rom(const u8 *rom,u32 size,const struct recover_profile *p,struct gfinit_decode *d)
 { CHECK(rom==owner->rom && size==512 && p);zero(d,sizeof(*d));return decode_fail?-1:0; }
 int gfinit_resources(struct recover_range *ranges,u32 *n) { ranges[0]=(struct recover_range){0};*n=1;return 0; }
-const struct recover_profile recover_gf_template={.trial_limit=6000,.opcode_limit=6000,.max_polls=65536};
+int recover_gf_profile_expand(struct recover_profile *p,struct gfinit_plan *buf)
+{
+    if(buf) { expand_calls++;if(expand_fail)return -1; }
+    *p=(struct recover_profile){.trial_limit=6000,.opcode_limit=6000,.max_polls=65536};
+    if(buf) {
+        p->targets=buf->targets;p->target_count=1;
+        p->rules=buf->rules;p->rule_count=1;
+        p->layouts=buf->layouts;p->layout_count=1;
+    }
+    return 0;
+}
 const struct recover_plan recover_gf_size_bars_plan={.version=1,.node_count=32};
 int gfinit_plan_build(struct gfinit_plan *p,struct gfinit_decode *d,struct recover_profile *profile,u32 length)
-{ (void)d;(void)profile;CHECK(length==0x100000);zero(p,sizeof(*p));p->plan.version=1;p->plan.node_count=plan_nodes;return 0; }
+{ (void)d;CHECK(profile->rules==p->rules && profile->rule_count==1);profile->rule_count++;CHECK(length==0x100000);zero(p,sizeof(*p));p->plan.version=1;p->plan.node_count=plan_nodes;return 0; }
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
-{ CHECK(p==owner->compiled && r==&core && a);(void)value; }
+{ CHECK(p==owner->compiled && r==&core && a);plan_reads++;(void)value; }
 int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==owner->compiled);verify_calls++;return 0; }
 int recover_budget_apply(struct recover_profile *p,u32 kind,u32 hz,u32 baud,u32 bits,const struct recover_static_work *w)
 { CHECK(kind==REC_BUDGET_SIZE_BARS || kind==REC_BUDGET_GF);CHECK(hz==PIT_HZ && baud==9600 && bits==10 && w->bytes);p->crc=1;return 0; }
@@ -103,6 +114,7 @@ struct recover *recover_owner(void) { return &core; }
 int recover_owner_configure(const struct recover_ops *ops,void *opaque,const struct recover_profile *s0,bool approved)
 { CHECK(!approved);
   if(!ops) {
+      if(detach_fail)return -1;
       CHECK(core.state==REC_IDLE || core.state==REC_VERIFIED || core.state==REC_FAILED);
       core.ops=&base;core.opaque=0;core.profile=core.s0_profile;
       core.plan=0;core.bound_profile=0;core.buffers=(struct recover_plan_buffers){0};
@@ -111,6 +123,8 @@ int recover_owner_configure(const struct recover_ops *ops,void *opaque,const str
   core.ops=ops;core.opaque=opaque;core.s0_profile=s0;return 0; }
 int recover_bind_plan(struct recover *r,const struct recover_profile *p,const struct recover_plan *plan,struct recover_plan_buffers *b,u32 *hash)
 { CHECK(r==&core && b->valid_bits && b->flow_bits);
+  CHECK(p->rules==owner->compiled->rules && p->targets==owner->compiled->targets && p->layouts==owner->compiled->layouts);
+  CHECK(p->rule_count==(plan==&owner->size_plan?1U:2U));
   CHECK(block_start[((u8 *)b->flow_bits-arena)/PAGE_SIZE]==PAGE_ALIGN_UP(plan->node_count*RECOVER_BITS_WORDS*4)/PAGE_SIZE);r->profile=p;r->plan=plan;*hash=123;return 0; }
 int trial_begin(struct recover *r,const struct recover_profile *p,u32 hash,u32 budget)
 { CHECK((r->state==REC_IDLE || r->state==REC_VERIFIED) && p==r->profile && hash==123 && budget==p->trial_limit);begins++;event('B');r->token.session=++r->next_session;r->state=REC_PAUSED;r->expected_node=RECOVER_NONE;return 0; }
@@ -147,6 +161,7 @@ static void setup(void)
     for(u32 i=0;i<TEST_ARENA_PAGES;i++)CHECK(page_owner[i]!=1);
     zero(page_owner,sizeof(page_owner));zero(block_start,sizeof(block_start));
     alloc_calls=fail_alloc=peak_pages=0;plan_nodes=1790;
+    expand_fail=expand_calls=detach_fail=plan_reads=boot_fail=0;
     zero(&control,sizeof(control));owner=0;zero(&gf_lease,sizeof(gf_lease));gf_device.generation=1;gf_device.state=HWDEV_STOPPED_UNOWNED;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
@@ -271,25 +286,63 @@ static void allocation_test(void)
     for(u32 fail=1;fail<=5;fail++) {
         setup();plan_nodes=RECOVER_NODE_MAX;
         int rc=0;
-        if(fail>2)rc=call(GF_OP_INSPECT,0,0);
-        if(fail>3)rc=call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0);
+        if(fail>3)rc=call(GF_OP_INSPECT,0,0);
+        if(fail>4)rc=call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0);
         CHECK(rc==0);
-        /* For second INSPECT allocation, retain a hole for decode only. */
-        u32 keep=fail==2 ? PAGE_ALIGN_UP(sizeof(struct gfinit_decode))/PAGE_SIZE : 0;
-        /* For fifth allocation retain one hole for the compiled plan. */
-        if(fail==5)keep=PAGE_ALIGN_UP(sizeof(struct gfinit_plan))/PAGE_SIZE;
+        /* INSPECT now allocates compiled, decode, then ROM. Leave exactly
+         * the preceding blocks contiguous, fragment the requested block. */
+        u32 keep=0;
+        if(fail==2 || fail==3)keep=PAGE_ALIGN_UP(sizeof(struct gfinit_plan))/PAGE_SIZE;
+        if(fail==3)keep+=PAGE_ALIGN_UP(sizeof(struct gfinit_decode))/PAGE_SIZE;
         u32 first=0;
         while(first<TEST_ARENA_PAGES && page_owner[first])first++;
         for(u32 i=first+keep;i<TEST_ARENA_PAGES;i++)
             if(!page_owner[i] && (i-first-keep)%2==0)page_owner[i]=2;
         u32 available=0;for(u32 i=0;i<TEST_ARENA_PAGES;i++)available+=page_owner[i]==0;
         CHECK(available>=128);
-        if(fail<=2)rc=call(GF_OP_INSPECT,0,0);
-        else if(fail==3)rc=call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0);
+        if(fail<=3)rc=call(GF_OP_INSPECT,0,0);
+        else if(fail==4)rc=call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0);
         else rc=call(GF_OP_PREPARE,GF_ALLOW_WRITE,0);
         CHECK(rc<0 && alloc_calls==fail && writes==0 && live_pages==0);
         for(u32 i=0;i<TEST_ARENA_PAGES;i++)CHECK(page_owner[i]!=1);
     }
+}
+static void expansion_lifetime_test(void)
+{
+    setup();CHECK(call(GF_OP_INSPECT,0,0)==0);
+    CHECK(owner->compiled && expand_calls==1);
+    u32 inspect_pages=PAGE_ALIGN_UP(sizeof(struct gfinit_plan))/PAGE_SIZE +
+        PAGE_ALIGN_UP(sizeof(struct gfinit_decode))/PAGE_SIZE + GF_ROM_MAX/PAGE_SIZE;
+    CHECK(live_pages==inspect_pages);
+    struct gfinit_plan *backing=owner->compiled;
+    CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0 && expand_calls==2);
+    CHECK(owner->compiled==backing);
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)==0 && expand_calls==3);
+    struct recover_bus_access access={0};u32 value;
+    CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
+    /* B4: retain a previous RUN plan and enter SIZE_BARS without end release. */
+    core.state=REC_VERIFIED;
+    CHECK(gf_begin(&core,owner,&transport,true)==0 && expand_calls==4);
+    core.plan=&owner->size_plan;
+    CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
+    CHECK(owner->compiled==backing && owner->profile.rule_count==1);
+    /* A refused detach must leave all backing, profile and lease intact. */
+    u32 held=live_pages, calls=alloc_calls;
+    detach_fail=1;
+    CHECK(gf_release_rom(owner)<0 && live_pages==held && gf_lease.active);
+    CHECK(owner->compiled==backing && owner->profile.rules==backing->rules);
+    CHECK(gf_inspect(&core,&base,&transport,&s0)<0 && alloc_calls==calls);
+    CHECK(live_pages==held && owner->compiled==backing && gf_lease.active);
+    detach_fail=0;CHECK(gf_release_rom(owner)==0 && !live_pages && !gf_lease.active);
+    CHECK(!owner->compiled && !owner->profile.rules && !owner->profile.rule_count);
+    setup();expand_fail=1;CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(!live_pages && !gf_lease.active && !owner->inspected && !reads);
+    setup();boot_fail=1;CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(!live_pages && !gf_lease.active && !owner->inspected);
+    setup();probe_fail=1;CHECK(call(GF_OP_INSPECT,0,0)<0);
+    CHECK(!live_pages && !gf_lease.active && !owner->inspected);
+    setup();CHECK(call(GF_OP_INSPECT,0,0)==0);expand_fail=1;
+    CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)<0 && !live_pages && !gf_lease.active);
 }
 static void inspection_test(void)
 {
@@ -451,4 +504,4 @@ static void cli_write_test(void)
     output("S7c single-op CLI / main range / write gate / NOSYS PASS checks complete\n");
 }
 void _start(void)
-{ cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

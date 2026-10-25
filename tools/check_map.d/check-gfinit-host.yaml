@@ -4,6 +4,8 @@ check-gfinit-host:
 - kdebug/recover.c
 - kdebug/recover.h
 - kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
+- kdebug/recover_gf_expand.h
 - kdebug/recover_gf.h
 - tools/tests/gfinit_host.c
 - tools/tests/gfinit_fixture.h
@@ -75,3 +77,4 @@ check-gfinit-host:
 - tools/tests/test_gfinit_plan.py
 - kdebug/recover_profile.c
 - tools/run_host_group.py
+- tools/tests/gfinit_romfile_host.c

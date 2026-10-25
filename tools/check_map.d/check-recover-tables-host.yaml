@@ -1,0 +1,26 @@
+check-recover-tables-host:
+- kdebug/recover_gf.c
+- kdebug/generated/recover_gf_tables.inc
+- kdebug/recover_gf_expand.h
+- kdebug/recover_gf.h
+- kdebug/recover.h
+- include/types.h
+- drivers/pci_decode.h
+- include/memmap.h
+- kdebug/gfinit_plan.h
+- kdebug/gfinit_decode.h
+- kdebug/gfinit_wire.h
+- kdebug/gfinit_pll.h
+- kdebug/recover.c
+- kdebug/recover_wire.h
+- lib/crc32_core.inc
+- tools/tests/recover_tables_oracle.c
+- tools/tests/recover_tables_oracle.json
+- tools/tests/recover_tables_host.c
+- tools/tests/recover_tables_host.h
+- tools/tests/test_recover_tables.py
+- tools/tests/host32.py
+- build/checks.d/check-recover-tables-host.mk
+- tools/check_map.d/check-recover-tables-host.yaml
+- tools/gen_recover_tables.py
+- tools/tests/recover_tables_bounds.h

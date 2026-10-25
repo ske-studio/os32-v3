@@ -13,6 +13,7 @@ ROOT = module.ROOT
 # Host C still supplies static helpers used by existing white-box tests. All
 # public calls below each implementation include enter the loaded production body.
 FUNCTIONS = {
+    'recover_gf': ['recover_gf_profile_expand'],
     'gfinit_decode': ['gfinit_decode_rom', 'gfinit_decode_instruction'],
     'gfinit_exec': ['gfinit_exec_run'],
     'gfinit_pll': ['gfinit_pll_parse', 'gfinit_pll_solve'],
@@ -50,7 +51,9 @@ def run(folder, image=None):
     pll = (ROOT/'tools/tests/gfinit_pll_host.c').read_text()
     pll = pll[pll.index('static void pll_parser_tests'):pll.index('void _start(void)')]
     prefix, suffix = source.rsplit('void _start(void)\n{', 1)
+    suffix = suffix.replace('    gf_fixture_init();\n', '', 1)
     source = prefix + pll + ('\nvoid trace_entry(void)\n{\n'
+        '    gf_fixture_init();\n'
         '    all_trace(); log_tests(); depth_tests(); budget_tests(); condition_tests();\n'
         '    selection_tests(); force_reset_test(); failure_tests(); frame_mismatch_tests(); pre_read_tests();\n'
         '    pll_parser_tests(); pll_solver_tests(); pll_execution_tests();\n'

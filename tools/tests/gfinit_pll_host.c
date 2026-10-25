@@ -94,7 +94,7 @@ static void pll_plan(u32 pc)
         put(at+6,400,2);put(at+8,400,2);put(at+10,1000,2);put(at+14,25,2);put(at+18,200,2);
         put(at+24,4,1);put(at+25,40,1);put(at+26,1,1);put(at+27,4,1);
     }
-    profile.layouts=recover_gf_template.layouts;profile.layout_count=recover_gf_template.layout_count;
+    profile.layouts=gf_fixture_profile.layouts;profile.layout_count=gf_fixture_profile.layout_count;
     decoded=(struct gfinit_decode){0};
     u32 main=pc==0xe623?2:0;
     decoded.plan=(struct recover_plan){.version=1,.rom_size=sizeof(rom),.nodes=decoded.nodes,.args=decoded.args,
@@ -149,6 +149,7 @@ static void pll_execution_tests(void)
 }
 void _start(void)
 {
+    gf_fixture_init();
     pll_parser_tests();pll_solver_tests();pll_execution_tests();
     output(failures?"GF S4 FAIL\n":"GF S4 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));__builtin_unreachable();

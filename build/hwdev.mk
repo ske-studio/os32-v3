@@ -3,6 +3,8 @@ HWDEV_OUT := $(BUILD_OUT)/hwdev
 HWDEV_GF := gfinit_bus gfinit gfinit_plan gfinit_resources gfinit_decode gfinit_exec gfinit_pll recover_gf
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
+# Normal and R1 share this decoder object; keep all other units at -O2.
+$(HWDEV_OUT)/gfinit_decode.o: private KERNEL_CFLAGS += -Os
 $(HWDEV_OUT)/%.o: kdebug/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -c $< -o $@

@@ -87,8 +87,8 @@ static void parser_tests(void)
     rom[0]=0x39;rom[1]=8;CHECK(gfinit_decode_instruction(rom,sizeof(rom),0,&ins)<0);
     rom[0]=0x6b;rom[1]=5;CHECK(gfinit_decode_instruction(rom,sizeof(rom),0,&ins)<0);
     fixture();rom[0xe81e + 5]^=1;
-    CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)<0);
-    fixture(); CHECK(gfinit_decode_rom(rom,0xe832,&recover_gf_template,&decoded)<0);
+    CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)<0);
+    fixture(); CHECK(gfinit_decode_rom(rom,0xe832,&gf_fixture_profile,&decoded)<0);
     u32 a[]={0xab,0x0c,0xfe,0xf0,0x0f}, result;
     CHECK(gf_copy(a,5,&result)==0 && result==0x3b);
     a[2]=32;CHECK(gf_copy(a,5,&result)<0);
@@ -98,26 +98,26 @@ static void parser_tests(void)
 }
 static void decode_inventory(void)
 {
-    fixture(); CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)==0);
+    fixture(); CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
     CHECK(decoded.instruction_count==193 && decoded.plan.node_count==972);
     CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==0);
-    CHECK(recover_profile_ok(&recover_gf_template)==0);
+    CHECK(recover_profile_ok(&gf_fixture_profile)==0);
     for(u32 i=0;i<decoded.plan.node_count;i++) {
         const struct recover_plan_node *n=&decoded.nodes[i];
-        const struct recover_opcode_layout *l=layout_for(&recover_gf_template,n);
+        const struct recover_opcode_layout *l=layout_for(&gf_fixture_profile,n);
         CHECK(l && l->argc==n->arg_count);
         if(!l || l->argc!=n->arg_count) {output("layout pc=");number(n->pc);output(" sub=");number(n->substep);output(" argc=");number(n->arg_count);output("\n");}
         if(l) for(u32 j=0;j<n->arg_count;j++) CHECK(l->kinds[j]==decoded.args[n->arg_first+j].kind);
         if(n->rule_id!=RECOVER_NONE) {
-            const struct recover_rule *w=rule_by_id(&recover_gf_template,n->rule_id);
+            const struct recover_rule *w=rule_by_id(&gf_fixture_profile,n->rule_id);
             CHECK(w && node_rule(n,w) && w->key==decoded.args[n->arg_first].value);
-            CHECK(node_ok(&recover_gf_template,&decoded.plan,i));
+            CHECK(node_ok(&gf_fixture_profile,&decoded.plan,i));
         }
         for(u32 edge=0;edge<2;edge++)CHECK(n->next[edge]==RECOVER_NONE || n->next[edge]>i);
     }
     for(u32 i=0;i<3;i++) {
         const struct recover_capture *c=&decoded.captures[i];
-        CHECK(c->slot==recover_gf_template.count+i && c->producer_node<c->consumer_node);
+        CHECK(c->slot==gf_fixture_profile.count+i && c->producer_node<c->consumer_node);
         CHECK(decoded.nodes[c->producer_node].pc==decoded.nodes[c->consumer_node].pc);
     }
     const u32 step_bounds[]={208,281,143,127,1};
@@ -126,7 +126,7 @@ static void decode_inventory(void)
         output("main=");number(m);output(" nodes=");number(decoded.main_nodes[m]);
         output(" steps=");number(decoded.main_steps[m]);output(" wait_us=");number(decoded.main_wait[m]);output("\n");
     }
-    output("layouts=");number(recover_gf_template.layout_count);output(" rules=");number(recover_gf_template.rule_count);
+    output("layouts=");number(gf_fixture_profile.layout_count);output(" rules=");number(gf_fixture_profile.rule_count);
     output(" nodes=");number(decoded.plan.node_count);output(" args=");number(decoded.plan.arg_count);
     output(" ctx=");number(decoded.plan.ctx_count);output(" deps=");number(decoded.plan.dep_count);
     output(" entries=");number(decoded.plan.entry_count);output(" call_depth=");number(decoded.max_call);
@@ -135,7 +135,7 @@ static void decode_inventory(void)
      * args retain kind (IMM=0, READ=1, SAVED=2), no inferred read values. */
     for(u32 i=0;failures && i<decoded.plan.node_count;i++) {
         const struct recover_plan_node *n=&decoded.nodes[i];
-        const struct recover_opcode_layout *l=layout_for(&recover_gf_template,n);
+        const struct recover_opcode_layout *l=layout_for(&gf_fixture_profile,n);
         output("node ");number(i);output(" pc ");number(n->pc);output(" op ");number(n->opcode);
         output(" sub ");number(n->substep);output(" dir ");number(l?l->dir_substep:RECOVER_NONE);
         output(" ctx ");number(n->ctx);output(" head/skip ");number(n->head);output("/");number(n->skip);
@@ -286,7 +286,7 @@ static void rejection_tests(void)
         if(bad==8)decoded.plan.unresolved_count=1;
         CHECK(contract_bind()<0 && writes==0);
     }
-    fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&recover_gf_template,&decoded)==0);
+    fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
     u32 active[GF_INIT_INSNS]={0};
     u32 call=instruction_at(&decoded,0xe780);
     for(u32 i=0;i<decoded.instruction_count;i++) if(decoded.insns[i].opcode==0x5b)call=i;
@@ -311,8 +311,8 @@ static void benchmark(u32 count)
     contract_setup(3);
     contract_targets[0]=(struct recover_target){.space=REC_VGA_INDEXED,.port=RECOVER_SEQ,
         .index=1,.width=1,.access=REC_COLD,.read_safe=1};
-    u32 nr=count==2048?2048:recover_gf_template.rule_count;
-    u32 nl=count==2048?2048:recover_gf_template.layout_count;
+    u32 nr=count==2048?2048:gf_fixture_profile.rule_count;
+    u32 nl=count==2048?2048:gf_fixture_profile.layout_count;
     for(u32 i=0;i<nr;i++) {
         stress_rules[i]=contract_rules[0];stress_rules[i].id=200+i;
         stress_rules[i].substep=i>=nr-2?nl-2+i-(nr-2):i;
@@ -405,7 +405,7 @@ static void logical_head_tests(void)
         decoded.plan.node_count=decoded.plan.arg_count=decoded.error=0;
         decoded.insns[0]=(struct gfinit_instruction){.opcode=unsupported[i],.port=RECOVER_CRTC,.index=RECOVER_CR44};
         decoded.schedule[0]=(struct gfinit_scheduled){0};
-        CHECK(expand_step(&decoded,rom,&recover_gf_template,0,1)<0);
+        CHECK(expand_step(&decoded,rom,&gf_fixture_profile,0,1)<0);
     }
     contract_setup(1);profile.rule_count=1;
     contract_targets[0]=(struct recover_target){.space=REC_VGA_INDEXED,.port=RECOVER_SEQ,
@@ -423,6 +423,7 @@ static void logical_head_tests(void)
 #endif
 void GF_S2_ENTRY(void)
 {
+    gf_fixture_init();
     parser_tests();decode_inventory();capture_tests();port_tests();copy_order_tests();logical_head_tests();rejection_tests();benchmark(972);benchmark(2048);
     output(failures?"GF S2 FAIL\n":"GF S2 PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));
