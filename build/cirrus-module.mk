@@ -1,7 +1,7 @@
 # T5c-5b: reuse T4 function imports, VA0 packing and paired distribution.
 CIRRUS_OUT := $(BUILD_OUT)/cirrus
 CIRRUS_GEN := $(addprefix $(CIRRUS_OUT)/,cirrus_imports.h cirrus_imports.json cirrus_import_slots.c cirrus_import_stubs.S cirrus_provider_types.c cirrus_kexports.c)
-CIRRUS_DEF_SOURCES := kernel/cirrus_module.h include/gfx_hal.h drivers/wab_glue.h
+CIRRUS_DEF_SOURCES := kernel/cirrus_module.h include/gfx_hal.h include/gfx_mode.h drivers/wab_glue.h
 $(CIRRUS_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/cirrus_imports.def $(CIRRUS_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module cirrus --out-dir $(CIRRUS_OUT)
 

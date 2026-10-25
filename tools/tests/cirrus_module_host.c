@@ -21,10 +21,16 @@ static void present(int x, int y, int w, int h) { (void)x; (void)y; (void)w; (vo
 static void palette(int x, int n, const u8 *p) { (void)x; (void)n; (void)p; }
 static int fill(int x, int y, int w, int h, u8 c) { present(x,y,w,h); (void)c; return 0; }
 static int blit(int x, int y, int sx, int sy, int w, int h) { present(x,y,w,h); (void)sx; (void)sy; return 0; }
+static const GfxMode fixture_modes[] = {
+    {640, 480, GFX_FMT_PACKED8, 6, 0, 0, 640},
+    {640, 400, GFX_FMT_PLANAR4, 4, 0, 0, 80}
+};
 GfxBackend cirrus_backend_ops = {
     .name = "fixture", .probe = probe, .init = enable, .query = query,
     .shutdown = enable, .present_rect = present, .set_palette = palette,
-    .enter = enable, .leave = enable, .fill_rect = fill, .blit = blit
+    .enter = enable, .leave = enable, .fill_rect = fill, .blit = blit,
+    .modes = fixture_modes, .mode_count = 2, .default_mode = 1,
+    .selected_mode = &fixture_modes[0]
 };
 static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 {
@@ -58,6 +64,9 @@ void _start(void)
     CHECK(!rc && registered && r->registration_refs == 1);
     gfx_backend_cirrus = candidate; /* Same publication as cirrus_module_load. */
     CHECK(cirrus_context->backend == &gfx_backend_cirrus);
+    CHECK(gfx_backend_cirrus.modes == fixture_modes && gfx_backend_cirrus.mode_count == 2);
+    CHECK(gfx_backend_cirrus.default_mode == 1 &&
+          gfx_backend_mode(&gfx_backend_cirrus) == &fixture_modes[0]);
     CHECK(!enables && !probes);
     CHECK(gfx_backend_cirrus.probe());
     gfx_backend_cirrus.init();
@@ -72,6 +81,8 @@ void _start(void)
     } else {
         CHECK(!rc && !registered && !r->registration_refs);
         CHECK(gfx_backend_cirrus.probe == missing_probe);
+        CHECK(!gfx_backend_cirrus.modes && !gfx_backend_cirrus.mode_count &&
+              !gfx_backend_cirrus.default_mode && !gfx_backend_cirrus.selected_mode);
         CHECK(!cirrus_module_abort()); empty();
     }
     finish(0);

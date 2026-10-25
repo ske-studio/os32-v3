@@ -1194,5 +1194,9 @@ GfxBackend gfx_backend_pegc = {
     (u32)PEGC_PITCH,          /* bb_pitch: 640 バイト/ライン */
     GFX_BB_PACKED8,
     0,                        /* bb_size:  init() が埋める */
-    pegc_prepare              /* 起動時: 予約・写像・同期の記録だけ */
+    pegc_prepare,             /* 起動時: 予約・写像・同期の記録だけ */
+    (const GfxMode *)0,        /* modes: G4 で申告 */
+    0,                        /* mode_count */
+    0,                        /* default_mode */
+    (const GfxMode *)0         /* selected_mode */
 };

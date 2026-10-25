@@ -38,6 +38,8 @@ check-cirrus-module-host:
 - sdk/include/os32/os32_generations.h
 - include/bootinfo.h
 - include/gfx_hal.h
+- include/gfx_mode.h
+- include/gfx_format.h
 - gfx/gfx_internal.h
 - gfx/backend_cirrus.c
 - gfx/cirrus_identify.c
@@ -53,6 +55,7 @@ check-cirrus-module-host:
 - tools/check_map.d/check-cirrus-module-host.yaml
 - build/checks.d/check-cirrus-module-host.mk
 - build/cirrus-module.ld
+- build/cirrus-module.mk
 - tools/mkmod.py
 - tools/gen_kdebug_imports.py
 - sdk/kapi.json
