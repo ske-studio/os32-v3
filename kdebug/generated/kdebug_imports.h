@@ -46,6 +46,7 @@
 #include "kernel/memory_boot.h"
 #include "kernel/paging.h"
 #include "kernel/pgalloc.h"
+#include "kernel/shlib.h"
 #include "kernel/sysclk.h"
 #include "kernel/time_math.h"
 #include "kernel/unicode_file.h"
@@ -128,8 +129,8 @@ u32 *kdi_ptr_v86_gcap_free_count(void);
 u32 kdi_get_kbd_inject_drop_count(void);
 void kdi_set_con_sink_drop_count(u32 value);
 void kdi_set_kbd_inject_drop_count(u32 value);
-#define KDEBUG_IMPORT_COUNT 286
-#define KDEBUG_ABI_GEN 0x31400021u
+#define KDEBUG_IMPORT_COUNT 296
+#define KDEBUG_ABI_GEN 0x0da74001u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

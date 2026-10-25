@@ -1,4 +1,5 @@
 check-mkmod-host:
+- kdebug/selftest_lease.c
 - kdebug/*.c
 - kdebug/selftest_internal.h
 - hwdev/generated/hwdev_core.c

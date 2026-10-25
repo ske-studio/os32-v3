@@ -1,4 +1,8 @@
 check-r1-fixture-host:
+- kdebug/selftest_lease.c
+- include/kselftest_probe.h
+- kdebug/selftest_internal.h
+- tools/tests/lease_selftest_host.h
 - tools/tests/font_guard_inactive.h
 - kernel/v86_module.h
 - kernel/r1_fixture.c

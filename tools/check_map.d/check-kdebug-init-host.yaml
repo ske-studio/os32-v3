@@ -1,4 +1,5 @@
 check-kdebug-init-host:
+- kdebug/selftest_lease.c
 - kernel/module_schema.h
 - tools/module_schema.py
 - tools/gen_module_schema.py

@@ -1,4 +1,8 @@
 check-memory-host:
+- kdebug/selftest_lease.c
+- include/kselftest_probe.h
+- kdebug/selftest_internal.h
+- tools/tests/lease_selftest_host.h
 - tools/tests/font_guard_inactive.h
 - tools/tests/test_t3c2.py
 - tools/tests/layout_cycle_host.c

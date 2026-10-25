@@ -90,14 +90,14 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 |---|---|---|
 | 25 | kprintf | 0 |
 | 26 | kmemset | 71 |
-| 27 | pgalloc_alloc_phys | 112 |
-| 28 | boot_image_info | 215 |
-| 29 | pgalloc_free_n_owner | 217 |
-| 30 | serial_get_setup | 248 |
-| 31 | pci_cfg_read32 | 262 |
-| 32 | pci_cfg_read16 | 263 |
-| 33 | pci_cfg_write32 | 264 |
-| 34 | pci_cfg_write16 | 265 |
+| 27 | pgalloc_alloc_phys | 111 |
+| 28 | boot_image_info | 214 |
+| 29 | pgalloc_free_n_owner | 216 |
+| 30 | serial_get_setup | 247 |
+| 31 | pci_cfg_read32 | 261 |
+| 32 | pci_cfg_read16 | 262 |
+| 33 | pci_cfg_write32 | 263 |
+| 34 | pci_cfg_write16 | 264 |
 
 `boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 

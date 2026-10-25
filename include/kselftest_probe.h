@@ -8,4 +8,7 @@
 /* Private boot selftest ABI. Same calling conditions as inj_push; no new lock. */
 u32 kdi_selftest_inj_push(const u8 *p, u32 len, int dest);
 
+/* Preserve the kernel observation used by boot diagnostics and tools. */
+void kdi_selftest_lease_result(u32 result);
+
 #endif

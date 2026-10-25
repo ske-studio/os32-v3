@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import host32
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,7 +41,7 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                 gen.check_nm(self.entries)
         altered = copy.deepcopy(self.entries)
-        altered[199].pop('retained')
+        altered[198].pop('retained')
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
 
@@ -96,17 +97,17 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 286)
-        self.assertEqual([e['name'] for e in self.entries[224:237]], [
+        self.assertEqual(len(self.entries), 296)
+        self.assertEqual([e['name'] for e in self.entries[223:236]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
-        self.assertEqual(gen.STAGES['S4'], 237)
-        self.assertEqual(gen.STAGES['S5'], 267)
-        self.assertEqual(gen.STAGES['S6'], 286)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 16 + ('GETTER',) + ('SETTER',) * 2)
-        self.assertEqual([(e['stage'], e['name']) for e in self.entries[237:267]], [
+        self.assertEqual(gen.STAGES['S4'], 236)
+        self.assertEqual(gen.STAGES['S5'], 266)
+        self.assertEqual(gen.STAGES['S6'], 296)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 27 + ('GETTER',) + ('SETTER',) * 2)
+        self.assertEqual([(e['stage'], e['name']) for e in self.entries[236:266]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
             ('S5', 'e82557_send'), ('S5', 'e82557_get_mac'), ('S5', 'e82557_state'),
@@ -127,12 +128,12 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'pci_cfg_write16'),
             ('S5', 'hwdev_module_ops'),
         ])
-        self.assertEqual(self.entries[199]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[199]['source'], 'kernel/v86_io.h')
-        self.assertTrue(self.entries[199]['retained'])
-        self.assertEqual(self.entries[247]['name'], 'display_text_start')
+        self.assertEqual(self.entries[198]['name'], 'v86_cui_display_restore')
+        self.assertEqual(self.entries[198]['source'], 'kernel/v86_io.h')
+        self.assertTrue(self.entries[198]['retained'])
+        self.assertEqual(self.entries[246]['name'], 'display_text_start')
         self.assertEqual(self.entries[0]['name'], 'kprintf')
-        self.assertEqual(self.entries[208]['name'], 'kdi_ptr_v86_session')
+        self.assertEqual(self.entries[207]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
             'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
@@ -165,7 +166,7 @@ class ImportsTests(unittest.TestCase):
 
     def test_s6_preparation_with_future_contracts(self):
         # Exercise future kinds without adding unused imports to the live ABI.
-        additions = [('FUNC', 'shlib_read_page', 'kernel/shlib.h'),
+        additions = [('FUNC', 'vfs_cwd', 'fs/vfs.h'),
                      ('GETTER', 'con_sink_drop_count', 'include/con_sink.h'),
                      ('PTR', 'ring3_ls_start', 'exec/ring3_ls.h')]
         with tempfile.TemporaryDirectory(prefix='kdebug-s6-') as folder:
@@ -182,7 +183,8 @@ class ImportsTests(unittest.TestCase):
                 meta = gen.generate(entries, out, 'S6')
                 self.assertEqual(meta['count'], len(self.entries) + len(additions))
                 macros = (out / 'kdebug_import_macros.h').read_text()
-                self.assertIn(f'#define KDI_INDEX_shlib_read_page {len(self.entries)}', macros)
+                reader = next(e for e in self.entries if e['name'] == 'shlib_read_page')
+                self.assertIn(f"#define KDI_INDEX_shlib_read_page {reader['index']}", macros)
                 self.assertIn('__typeof__(&shlib_read_page)', macros)
                 self.assertNotIn('KDI_ADDR_kprintf', macros)
                 includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx',
@@ -239,7 +241,12 @@ class ImportsTests(unittest.TestCase):
             'con_sink_owner_exit', 'appslot_cur', 'appslot_gfx_owner',
             'con_sink_reader_get', 'kbd_inject', 'kbd_inject_pending',
             'kbd_inject_take', 'kbd_inject_peek', 'kbd_inject_discard',
-            'kdi_selftest_inj_push', 'kdi_get_kbd_inject_drop_count',
+            'kdi_selftest_inj_push',
+            'ledger_surface_create', 'ledger_surface_release', 'lease_acquire',
+            'lease_check', 'lease_release', 'lease_revoke_all', 'paging_as_audit',
+            'paging_lease_pte', 'paging_load_cr3', 'shlib_read_page',
+            'kdi_selftest_lease_result',
+            'kdi_get_kbd_inject_drop_count',
             'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count'])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
@@ -271,6 +278,27 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*kdi_set_con_sink_drop_count'):
                 gen.check_nm(self.entries)
 
+    def test_lease_move_contract_and_residency(self):
+        nm = str(self.cross / 'i386-elf-nm')
+        kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
+        obj = ROOT / 'build/out/kdebug/selftest_lease.o'
+        module = gen.symbols(nm, [obj], False)
+        self.assertTrue({'kst_lease', 'tables_image'} <= module)
+        for symbol in ('lease_selftest', 'kst_lease', 'tables_image'):
+            self.assertNotIn(symbol, kernel)
+            self.assertNotIn(symbol, {e['symbol'] for e in self.entries})
+        self.assertTrue({'lease_selftest_result', 'kdi_selftest_lease_result'} <= kernel)
+        self.assertEqual(gen.symbols(nm, [obj], True) - {gen.ABI_SYMBOL}, {
+            'paging_kernel_pd_phys', 'paging_current_cr3', 'ledger_owner_new',
+            'ledger_owner_retire', 'pgalloc_alloc_phys', 'pgalloc_free_n_owner',
+            'ledger_surface_create', 'ledger_surface_release',
+            'paging_addrspace_create_lease', 'paging_addrspace_destroy',
+            'lease_acquire', 'lease_check', 'lease_release', 'lease_revoke_all',
+            'paging_as_audit', 'paging_lease_pte', 'paging_load_cr3',
+            'kdi_selftest_lease_result', 'kdi_ptr_ledger_surfaces',
+            'kdebug_import_slots'})
+        self.assertEqual(gen.address_references(self.entries, [obj], ROOT), {'shlib_read_page'})
+
     def test_address_manifest_uses_only_linked_moved_sources(self):
         entries = [dict(name=name, kind_name='FUNC') for name in gen.ADDRESS_IMPORTS]
         with tempfile.TemporaryDirectory(prefix='kdebug-address-') as folder:
@@ -289,6 +317,33 @@ class ImportsTests(unittest.TestCase):
             source.write_text('return KDI_ADDR_shlib_read_page;\n')
             with self.assertRaisesRegex(ValueError, 'invalid address import'):
                 gen.address_references(entries, [obj], root)
+
+    def test_lease_callback_from_generated_slot(self):
+        with tempfile.TemporaryDirectory(prefix='lease-import-address-') as folder:
+            out = Path(folder)
+            gen.generate(self.entries, out, 'S6')
+            probe = out / 'callback.c'
+            probe.write_text('#include "kdebug_import_macros.h"\n'
+                'static int reader(u32 va, u32 frame) { return va == frame; }\n'
+                'void _start(void) {\n'
+                ' kdebug_import_slots[KDI_INDEX_shlib_read_page] = (uptr)reader;\n'
+                ' int (*callback)(u32, u32) = KDI_ADDR_shlib_read_page;\n'
+                ' int bad = callback != reader || callback == shlib_read_page ||\n'
+                '     !callback(PAGE_SIZE, PAGE_SIZE) || callback(PAGE_SIZE, 0) ||\n'
+                '     !shlib_read_page(PAGE_SIZE, PAGE_SIZE);\n'
+                ' __asm__ volatile("int $0x80" : : "a"(1), "b"(bad));\n'
+                ' for (;;) {}\n}\n')
+            includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib',
+                        'gfx', 'fs', 'kapi', 'arch/x86', 'platform/pc98', 'sdk/include/os32']
+            exe = out / 'callback'
+            subprocess.run([str(self.cross / 'i386-elf-gcc'), '-m32', '-march=i386',
+                '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                '-nostdlib', '-static', '-D__KERNEL_BUILD__',
+                '-Wl,--defsym=' + gen.ABI_SYMBOL + '=0',
+                *['-I' + str(ROOT / d) for d in includes], str(probe),
+                str(out / 'kdebug_import_slots.c'), str(out / 'kdebug_import_stubs.S'),
+                '-o', str(exe)], check=True, capture_output=True)
+            self.assertEqual(host32.run([str(exe)], capture_output=True, timeout=60).returncode, 0)
 
     def test_compile_all_generated_artifacts(self):
         includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx', 'fs', 'kapi',

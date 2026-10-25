@@ -1368,7 +1368,7 @@ int kselftest_run_post_exec(void)
     if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;
 
     check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0, "post-exec: lifecycle audit");
-    check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
+    check(kst_lease() == 0, "post-exec: synthetic AS S/T/U");
     check((kstack_high_water() & 0xffffU) < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
           "kstack bound");
     check(resident_heap_peak >= exec_heap_used(), "resident peak");
@@ -2453,7 +2453,7 @@ int kselftest_run(void)
     test_ring3_pd();
     test_map_user_keep();
     test_app_band_pde();
-    check(lease_selftest() == 0, "private lease S/T/U, master unchanged, owner zero");
+    check(kst_lease() == 0, "private lease S/T/U, master unchanged, owner zero");
     test_con_sink();
     test_con_sink_render_gate();
     test_kbd_inject();
