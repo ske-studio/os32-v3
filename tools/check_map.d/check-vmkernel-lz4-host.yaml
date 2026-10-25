@@ -1,4 +1,6 @@
 check-vmkernel-lz4-host:
+- boot/boot_defs.h
+- include/memmap.h
 - sdk/link/app_sys.ld
 - tools/tests/host32.py
 - boot/loader_fat_new.asm

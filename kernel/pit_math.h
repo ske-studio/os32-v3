@@ -14,6 +14,7 @@
 #define PIT_MATH_H
 
 #include "types.h"
+#include "time_units.h"
 #include "memmap.h"   /* PIT_HZ (タイマ割り込み周波数 100Hz) */
 
 /* 8254 のカウンタは 16bit。0 は「65536」を意味するが、この票の範囲では
@@ -21,16 +22,15 @@
 #define PIT_RELOAD_MAX   ((unsigned long)U16_MAX)
 
 /* 1 秒 = 10^6 µs。**`unsigned int` で持つ** — `UL` にすると 64bit ホストでは
- * `reload × PIT_US_PER_SEC` が溢れず、ホスト試験が「素直に 10^6 を掛ける」
+ * `reload × USEC_PER_SEC` が溢れず、ホスト試験が「素直に 10^6 を掛ける」
  * 退行を見逃す (変異 4)。i386 では unsigned long も 32bit なので同じ。 */
-#define PIT_US_PER_SEC   1000000U
 
 /* period_us = reload × 10^6 ÷ clk_hz を **32bit で溢れずに** 出すための分解。
  * `reload × 10^6` は 24576 でも 2.4576×10^10 で u32 (i386 の unsigned long)
  * を越える。クロックは必ず PIT_CLOCK_DIV で割り切れるので、先に両辺を
  * 約して `reload × PIT_PERIOD_SCALE ÷ (clk_hz ÷ PIT_CLOCK_DIV)` にする。
  * 中間積の最大は PIT_RELOAD_MAX × PIT_PERIOD_SCALE = 6.5535×10^8。
- * **PIT_PERIOD_SCALE × PIT_CLOCK_DIV == PIT_US_PER_SEC** が前提
+ * **PIT_PERIOD_SCALE × PIT_CLOCK_DIV == USEC_PER_SEC** が前提
  * (kernel/pit_math.c の STATIC_ASSERT で固定)。
  * **倍率は `unsigned int` (どの環境でも 32bit)** で持つ。`unsigned long` に
  * すると 64bit ホストでは溢れが再現せず、ホスト試験が素通しになる。 */

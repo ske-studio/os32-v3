@@ -123,7 +123,7 @@ u32 serial_tx_budget_us(unsigned long baud)
     if (baud == 0) {
         baud = SER_BAUD_DEFAULT;
     }
-    us = (SER_TX_BUDGET_CHARS * SER_CHAR_BITS * SER_US_PER_SEC) / baud;
+    us = (SER_TX_BUDGET_CHARS * SER_CHAR_BITS * USEC_PER_SEC) / baud;
     /* **0 にしない** — 1 回も TxRDY を見ないうちに hlt へ落ちると、
      * 10ms tick を待たないようにした意味が消える。 */
     if (us < SER_TX_BUDGET_MIN_US) {

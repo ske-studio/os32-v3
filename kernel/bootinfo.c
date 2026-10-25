@@ -126,7 +126,7 @@ void bootinfo_report(void)
         a.cur_heads = g.cur_heads;
         a.cur_spt   = g.cur_spt;
         a.cur_valid = (u8)((g.w53 & 0x0001) ? 1 : 0);
-        a.lba       = (u8)((g.w49 & IDE_IDENT_CAP_LBA) ? 1 : 0);
+        a.lba       = (u8)((g.w49 & IDE_ID_CAP_LBA) ? 1 : 0);
         a.total     = g.total;
         bootinfo_format_ata(&a, i, line, (int)sizeof(line));
         kprintf(KLOG_ATTR, "%s\n", line);
@@ -173,7 +173,7 @@ int hdd_geom_info(int drive, void *out_v)
     int da, i;
 
     if (!out) return OS32_ERR_INVAL;
-    if (drive < 0 || drive >= IDE_DRIVE_COUNT) return OS32_ERR_INVAL;
+    if (drive < 0 || drive >= IDE_MAX_DRIVES) return OS32_ERR_INVAL;
     kmemset(out, 0, sizeof(*out));
 
     da = bootinfo_da_of(drive);

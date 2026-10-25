@@ -14,6 +14,7 @@ typedef unsigned char uchar;
 
 /* FM and SSG each have channels 0 through 2 on YM2203. */
 #define OPN_CHANNEL_COUNT 3
+#define FM_SEMITONES_PER_OCTAVE 12
 
 /* ======== OPN I/O ポート (PC9800Bible §2-13) ======== */
 #define OPN_ADDR      0x0188   /* レジスタアドレス (Write) */
@@ -72,10 +73,11 @@ typedef unsigned char uchar;
 
 /* ======== SSG周波数マクロ ======== */
 /* Period = 3993600 / (4 × 16 × freq) = 62400 / freq */
-#define SSG_PERIOD(freq)  ((u16)(62400UL / (freq)))
+#define SSG_PERIOD_CLOCK_HZ 62400UL
+#define SSG_PERIOD(freq)  ((u16)(SSG_PERIOD_CLOCK_HZ / (freq)))
 
 /* ======== ノート番号ヘルパー ======== */
-#define NOTE(oct,key)  ((uchar)((oct)*12+(key)))
+#define NOTE(oct,key)  ((uchar)((oct)*FM_SEMITONES_PER_OCTAVE+(key)))
 #define N_C  0
 #define N_CS 1
 #define N_D  2

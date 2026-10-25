@@ -18,6 +18,7 @@
 #define PCM_CS4231_H
 
 #include "types.h"
+#include "time_units.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* (エラーは共通体系) */
 
 /* ======================================================================== */
@@ -146,7 +147,6 @@
 #define PCM_MS_PER_TICK    10U
 #define PCM_US_PER_TICK    10000U
 #define PCM_MS_PER_SEC     1000U
-#define PCM_US_PER_SEC     1000000U
 
 /*  起動時の表示に出す版の番号 (CS4231 = 100、CS4231A = 101)。 */
 #define PCM_VER_NAME_4231  100

@@ -25,6 +25,7 @@
 #define FS_SFS_PROTO_H
 
 #include "types.h"
+#include "time_units.h"
 #include "memmap.h"
 
 #define SFS_ENQ            0x05
@@ -72,8 +73,7 @@
 #define SFS_EXIT_FLAGS_OFF 8
 #define SFS_SERIAL_BITS_PER_BYTE 10UL
 #define SFS_LOGICAL_BLOCK_SIZE 512
-/* Local until shared time-unit names are provided. */
-#define SFS_USEC_PER_SEC 1000000UL
+/* Only this protocol converts microseconds to milliseconds. */
 #define SFS_USEC_PER_MSEC 1000UL
 
 #define SFS_WRITE_HDR_LEN   5

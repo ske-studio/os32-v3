@@ -1,6 +1,6 @@
-/* Boot coordinator's IDE bounds. Move to drivers/ when its constants land. */
+/* Boot coordinator's IDE driver definitions. */
 #ifndef OS32_BOOT_DEVICES_H
 #define OS32_BOOT_DEVICES_H
-#define IDE_DRIVE_COUNT 4
-#define IDE_IDENT_CAP_LBA 0x0200
+#include "ide.h"
+#include "ide_addr.h"
 #endif

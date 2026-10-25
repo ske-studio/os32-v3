@@ -39,6 +39,8 @@ import tempfile
 import mutpar  # noqa: E402  (tools/tests/mutpar.py、同じディレクトリ)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+import gen_memmap as gen
 PURE = ROOT / "tools/tests/hdd_stage2_host.c"
 CDI = ROOT / "tools/tests/cdinst_host.c"
 INS = ROOT / "tools/tests/install_fresh_host.c"
@@ -122,6 +124,8 @@ REBUILD = {
 def _commands(tmp, root):
     """ハーネスごとの gcc のコマンド。"""
     tmp = pathlib.Path(tmp)
+    layout = tmp / "memmap_layout.h"
+    gen.write_layout_header(ROOT, str(layout))
     inc = ["-I" + str(root), "-I" + str(root / "include"), "-I" + str(ROOT / "include")]
     cinc = ["-I" + str(root), "-I" + str(root / "userland/lib"),
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
@@ -138,7 +142,8 @@ def _commands(tmp, root):
                 "-Wno-pointer-to-int-cast", "-D__cdecl=", "-D__OS32_USERLAND__", "-O0",
                 *iinc, str(_harness(INS, tmp, root)),
                 *[str(root / f) for f in INS_SHARED], "-o", str(tmp / "ins")],
-        "mini": [*ILP32, "-I" + str(root / "boot"), str(_harness(MINI, tmp, root)),
+        "mini": [*ILP32, "-include", str(layout), "-I" + str(root / "boot"),
+                 str(_harness(MINI, tmp, root)),
                  "-o", str(tmp / "mini")],
     }
 
@@ -245,9 +250,12 @@ def consts_cross_check(pure_exe):
     got = run([str(pure_exe), "consts"], capture_output=True, text=True).stdout.split()
     kmax, lmax, groups, off_h, off_s = (int(x) for x in got)
     bad = 0
-    bd = (ROOT / "boot/boot_defs.h").read_text(encoding="utf-8")
-    m = re.search(r"#define\s+MAX_IMAGE_SIZE\s+\((\d+)\s*\*\s*(\d+)\)", bd)
-    bad += not (m and int(m.group(1)) * int(m.group(2)) == kmax)
+    expr = subprocess.check_output(
+        ["cpp", "-E", "-P", "-imacros", str(ROOT / "include/memmap.h"),
+         "-imacros", str(ROOT / "boot/boot_defs.h"), "-"],
+        input="MAX_IMAGE_SIZE\n", text=True).strip()
+    expr = re.sub(r"(?<=[0-9a-fA-F])[uUlL]+", "", expr)
+    bad += eval(expr, {"__builtins__": {}}, {}) != kmax
     ctx = (ROOT / "fs/ext2_ctx.h").read_text(encoding="utf-8")
     m = re.search(r"#define\s+EXT2_MAX_GROUPS\s+(\d+)", ctx)
     bad += not (m and int(m.group(1)) == groups)
@@ -350,6 +358,8 @@ def str_return_guard():
 
 
 def build_target(tmp):
+    layout = pathlib.Path(tmp) / "memmap_layout.h"
+    gen.write_layout_header(ROOT, str(layout))
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
             "-O2", "-Wall", "-Wextra", "-Werror", 
@@ -361,7 +371,8 @@ def build_target(tmp):
         run([*base, *extra, "-c", rel, "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
             check=True)
     run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
-         "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Werror", "-Iboot", "-c",
+         "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Werror",
+         "-include", str(layout), "-Iboot", "-c",
          "boot/ext2_mini.c", "-o", str(pathlib.Path(tmp) / "em.o")], check=True)
     print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 

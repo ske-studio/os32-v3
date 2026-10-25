@@ -1,4 +1,5 @@
 check-serialfs-host:
+- include/time_units.h
 - tools/lanfs_host.py
 - tools/lan_bridge.py
 - tools/tests/mutpar.py

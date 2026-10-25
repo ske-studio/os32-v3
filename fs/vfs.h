@@ -261,7 +261,7 @@ int  vfs_fd_set_protect(int fd, int on);
 int  vfs_fd_is_protected(int fd);
 
 /* Kernel-internal FD leases; not a KAPI/SDK interface. */
-#define VFS_FD_GENERATION_MAX 0xffffffffUL
+#define VFS_FD_GENERATION_MAX U32_MAX
 #define VFS_FD_GENERIC 0
 #define VFS_FD_SQLITE  1
 typedef struct {

@@ -1,4 +1,5 @@
 check-pit-clock-host:
+- include/time_units.h
 - kernel/idt.c
 - kernel/pit_math.c
 - kernel/sysclk.c

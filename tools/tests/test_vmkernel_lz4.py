@@ -25,6 +25,7 @@ import os
 import pathlib
 import random
 import re
+import runpy
 import shutil
 import struct
 import subprocess
@@ -229,11 +230,14 @@ def parse_vk32(img):
 
 
 def max_image_size():
-    text = LIMIT_HEADER.read_text(encoding="utf-8")
-    m = re.search(r"^#define\s+MAX_IMAGE_SIZE\s+\((\d+)\s*\*\s*(\d+)\)", text, re.MULTILINE)
-    if not m:
-        raise Fail("boot_defs.h の MAX_IMAGE_SIZE の形が想定外")
-    return int(m.group(1)) * int(m.group(2))
+    expr = subprocess.check_output(
+        ["cpp", "-E", "-P", "-imacros", str(ROOT / "include/memmap.h"),
+         "-imacros", str(LIMIT_HEADER), "-"],
+        input="MAX_IMAGE_SIZE\n", text=True).strip()
+    expr = re.sub(r"(?<=[0-9a-fA-F])[uUlL]+", "", expr)
+    if not re.fullmatch(r"[0-9xXa-fA-F\s()*+]+", expr):
+        raise Fail("MAX_IMAGE_SIZE が整数式でない")
+    return eval(expr, {"__builtins__": {}}, {})
 
 
 # ---------------------------------------------------------------- ケース
@@ -277,6 +281,29 @@ def check_image(exe, script, work, kernel, sqlite, label, need_features):
                     label, name, mname, ret, raw, pos))
         lines.append("    3 実装とも {} バイト一致".format(raw))
     return len(img), lines
+
+
+def case_limit_names(script, work):
+    read_limit = runpy.run_path(str(script))["read_max_image_size"]
+    if read_limit(LIMIT_HEADER) != 508 * 1024:
+        raise Fail("正典の MAX_IMAGE_SIZE が 508 KiB と一致しない")
+    header = pathlib.Path(work) / "limit.h"
+    for expr, expected in [("(508*1024)", 520192),
+                           ("(LIMIT_KIB*KIB)", 520192),
+                           ("(0x10UL + 2U)", 18),
+                           ("0", None), ("UNKNOWN_UNIT", None),
+                           ("(508 / 2)", None)]:
+        header.write_text("#define KIB 1024UL\n#define LIMIT_KIB 508\n"
+                          "#define MAX_IMAGE_SIZE " + expr + "\n", encoding="utf-8")
+        try:
+            value = read_limit(header)
+        except ValueError:
+            if expected is not None:
+                raise Fail("MAX_IMAGE_SIZE の有効な式を拒否: " + expr)
+        else:
+            if expected is None or value != expected:
+                raise Fail("MAX_IMAGE_SIZE の式の判定違い: " + expr)
+    return ["[limit names] 正典・数値式・名前の式・未定義・0・式の制限: PASS"]
 
 
 def case_oversize(script, work):
@@ -355,6 +382,7 @@ def run_all(srcs, script, target, real):
             lines += ln
             lines.append("[real] 上限 {} まで残り {} B".format(max_image_size(),
                                                            max_image_size() - size))
+        lines += case_limit_names(script, work)
         lines += case_oversize(script, work)
         lines += case_boundary(script, work)
         return lines

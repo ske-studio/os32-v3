@@ -15,6 +15,7 @@
 #ifndef __SERIAL_PLAN_H
 #define __SERIAL_PLAN_H
 
+#include "time_units.h"
 #include "serial.h"   /* ポート番地とステータスビット (互換 / FIFO の両方) */
 
 #include "os32_kapi_shared.h"
@@ -60,7 +61,6 @@
 /* ======================================================================== */
 #define SER_CHAR_BITS         10UL    /* 8N1 の 1 文字 = 10 ビット */
 #define SER_TX_BUDGET_CHARS    2UL    /* 予算は 1 文字時間の 2 倍 */
-#define SER_US_PER_SEC   1000000UL
 
 /* ポーリングの刻み。短すぎると I/O ポートの読みで CPU を占有し、長すぎると
  * 115200 の予算 (173µs) を数回で使い切る。5µs なら 115200 でも 30 回以上見る。

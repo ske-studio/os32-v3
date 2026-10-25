@@ -1205,10 +1205,10 @@ static void h4_dma_pool(void)
     int ok = 1;
     while (count < before) {
         struct dma_buf *b = &buffers[count];
-        if (dma_alloc(DMA_POOL_PAGE_SIZE, 0, DMA_PHYS_LIMIT, b) != 0) break;
+        if (dma_alloc(MEM_PAGE_SIZE, 0, DMA_PHYS_LIMIT, b) != 0) break;
         int valid = b->pa >= MEM_DMA_POOL_BASE &&
                     b->pa < MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE &&
-                    b->size == DMA_POOL_PAGE_SIZE &&
+                    b->size == MEM_PAGE_SIZE &&
                     b->size <= MEM_DMA_POOL_BASE + MEM_DMA_POOL_SIZE - b->pa &&
                     b->va == P2V(b->pa) &&
                     dma_range_ok(b->pa, b->size, DMA_PHYS_LIMIT);

@@ -26,10 +26,7 @@
 #include "kstring.h"
 #include "kprintf.h"
 
-/* Local until RTC/DOS wire names are supplied by their shared headers. */
-#define RTC_YEAR_PIVOT 80
-#define RTC_CENTURY_LO 2000
-#define RTC_CENTURY_HI 1900
+/* DOS timestamp fields used by this adapter. */
 #define DOS_YEAR_BASE 1980
 #define DOS_DATE_WORD_SHIFT 16
 #define DOS_DATE_YEAR_SHIFT 9
@@ -396,8 +393,8 @@ DWORD get_fattime(void)
 
     /* RTC_Time.year は 00-99 (2桁) → 2000年代として扱う */
     year = (int)t.year;
-    if (year < RTC_YEAR_PIVOT) year += RTC_CENTURY_LO;  /* 00-79 → 2000-2079 */
-    else           year += RTC_CENTURY_HI;  /* 80-99 → 1980-1999 */
+    if (year < RTC_YEAR_PIVOT) year += RTC_YEAR_BASE_NEW;  /* 00-79 → 2000-2079 */
+    else           year += RTC_YEAR_BASE_OLD;  /* 80-99 → 1980-1999 */
 
     /* FAT時刻フォーマット:
      *   bit[31:25] = 年 (1980年起点, 0-127)

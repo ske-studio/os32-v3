@@ -29,15 +29,14 @@
 #include "os32_kapi_shared.h"   /* OS32_ERR_* (エラーは共通体系) */
 #include "dma8237.h"            /* dma_range_ok / DMA_PHYS_LIMIT */
 
-#define DMA_POOL_PAGE_SIZE   0x1000UL
-#define DMA_POOL_PAGES       ((u32)(MEM_DMA_POOL_SIZE / DMA_POOL_PAGE_SIZE))
+#define DMA_POOL_PAGES       ((u32)(MEM_DMA_POOL_SIZE / MEM_PAGE_SIZE))
 #define DMA_POOL_SPANS       16
 
 /* 受付上限 32KB。池は 64KB 整列で境界をまたがないが、64KB 境界を
  * またいでいた頃の割当/返却の契約 (33〜64KB は断る) を維持する (票 §1-3)。 */
 #define DMA_POOL_MAX_BYTES   0x8000UL    /* 32KB */
 #define DMA_POOL_MIN_BYTES   1UL
-#define DMA_POOL_DEF_ALIGN   DMA_POOL_PAGE_SIZE
+#define DMA_POOL_DEF_ALIGN   MEM_PAGE_SIZE
 
 /* span の状態 */
 #define DMA_SPAN_FREE        0

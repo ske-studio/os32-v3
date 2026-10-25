@@ -2,6 +2,7 @@
 #define OS_TIME_H
 
 #include "os32_kapi_shared.h"
+#include "time_units.h"
 
 /* 日時から UNIX Epoch への変換 */
 /* 注意 (既知の制約): os_time_t は符号なし 32bit の UNIX epoch 秒。
