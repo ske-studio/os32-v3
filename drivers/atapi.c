@@ -186,11 +186,11 @@ static void atapi_note_ex(const char *what, int with_asc, u8 asc, u8 ascq,
     if (s_note_lines >= ATAPI_DIAG_MAX) return;
     s_note_lines++;
     if (with_asc) {
-        kprintf(0x07, "[atapi] %s drv=%d st=%02x asc/ascq=%02x/%02x\n", what,
+        kprintf(KLOG_ATTR, "[atapi] %s drv=%d st=%02x asc/ascq=%02x/%02x\n", what,
                 (s_cursel == ATAPI_DRV_SLAVE) ? 1 : 0, (unsigned)s_diag_st,
                 (unsigned)asc, (unsigned)ascq);
     } else {
-        kprintf(0x07, "[atapi] %s drv=%d st=%02x limit=%us\n", what,
+        kprintf(KLOG_ATTR, "[atapi] %s drv=%d st=%02x limit=%us\n", what,
                 (s_cursel == ATAPI_DRV_SLAVE) ? 1 : 0, (unsigned)s_diag_st,
                 (unsigned)(limit_us / 1000000UL));
     }
@@ -764,7 +764,7 @@ static void atapi_diag_fail(u32 req_lba, u32 req_n, int ret)
 {
     if (s_diag_lines >= ATAPI_DIAG_MAX) return;
     s_diag_lines++;
-    kprintf(0x07, "[atapi] READ(10) drv=%d lba=%u n=%u ret=%d st=%02x err=%02x sense=%x got=%u req=%u+%u\n",
+    kprintf(KLOG_ATTR, "[atapi] READ(10) drv=%d lba=%u n=%u ret=%d st=%02x err=%02x sense=%x got=%u req=%u+%u\n",
             atapi_drive_index(), (unsigned)s_diag_lba, (unsigned)s_diag_n, ret,
             (unsigned)s_diag_st, (unsigned)s_diag_err, (unsigned)s_last_sense,
             (unsigned)s_diag_got, (unsigned)req_lba, (unsigned)req_n);

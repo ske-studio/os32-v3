@@ -14,7 +14,7 @@ SOURCE = 'tools/tests/fep_standard_host.c'
 # fall back to ROOT. All regressions run normally before any mutant.
 FILES = [SOURCE, 'lib/sqlite3/os32_sqlite_vfs.c', 'kernel/ime_dict.c']
 RESERVE_FLOOR = r'''        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
-            kprintf(0x07, "[SQT] FEP reserve below minimum; using %d bytes\n",
+            kprintf(KLOG_ATTR, "[SQT] FEP reserve below minimum; using %d bytes\n",
                     OS32_SQLITE_FEP_RESERVE_MIN);
             reserve = OS32_SQLITE_FEP_RESERVE_MIN;
         }

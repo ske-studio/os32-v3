@@ -516,7 +516,7 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
     dev = dev_find(devname);
     if (!dev) return 0;
 
-    kprintf(0x07, "[pc98pt] drv=%d geom: C=%d H=%d S=%d total=%lu phys=%d\n",
+    kprintf(KLOG_ATTR, "[pc98pt] drv=%d geom: C=%d H=%d S=%d total=%lu phys=%d\n",
             drv, info.cylinders, heads, spt,
             (unsigned long)info.total_sectors, phys_sec_size);
 
@@ -548,7 +548,7 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
         /* 空エントリの検出: sys_idとbootableが共に0なら終了 */
         if (pe->sys_id == 0 && pe->bootable == 0) break;
 
-        kprintf(0x07, "[pc98pt] entry %d: sys=%02x boot=%02x "
+        kprintf(KLOG_ATTR, "[pc98pt] entry %d: sys=%02x boot=%02x "
                 "chs=%d/%d/%d\n",
                 i, pe->sys_id, pe->bootable,
                 pe->start_cyl, pe->start_head, pe->start_sector);
@@ -557,7 +557,7 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
         if (pc98_is_fat_sysid(pe->sys_id)) {
             lba = chs_to_lba(pe->start_cyl, pe->start_head,
                              pe->start_sector, heads, spt);
-            kprintf(0x07, "[pc98pt] FAT partition at LBA %lu "
+            kprintf(KLOG_ATTR, "[pc98pt] FAT partition at LBA %lu "
                     "(C=%d H=%d S=%d)\n",
                     (unsigned long)lba, pe->start_cyl,
                     pe->start_head, pe->start_sector);
@@ -579,7 +579,7 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
                 type == 0x0B || type == 0x0C || type == 0x0E) {
                 lba = (u32)pe[8] | ((u32)pe[9] << 8) |
                       ((u32)pe[10] << 16) | ((u32)pe[11] << 24);
-                kprintf(0x07, "[mbr] FAT partition at LBA %lu "
+                kprintf(KLOG_ATTR, "[mbr] FAT partition at LBA %lu "
                         "(type=%02x)\n", (unsigned long)lba, type);
                 return lba;
             }
@@ -656,7 +656,7 @@ static void *fatfs_vfs_mount(int dev_id)
         if (part_lba > 0) {
             u8 dbg[512];
             u16 bps = 512;
-            kprintf(0x07, "[fatfs] retrying with partition offset LBA=%lu "
+            kprintf(KLOG_ATTR, "[fatfs] retrying with partition offset LBA=%lu "
                     "(phys=%d)\n",
                     (unsigned long)part_lba, phys_sec_size);
             /* パーティション先頭セクタを直接読んでBPS取得。
@@ -664,7 +664,7 @@ static void *fatfs_vfs_mount(int dev_id)
              * dev_blk_read_lbaは512B返すのでBPBの先頭は含まれる。 */
             if (blkdev && dev_blk_read_lba(blkdev, (u32)part_lba, 1, dbg) == 0) {
                 bps = (u16)dbg[11] | ((u16)dbg[12] << 8);
-                kprintf(0x07, "[fatfs] sector %lu: jmp=%02x BPS=%d\n",
+                kprintf(KLOG_ATTR, "[fatfs] sector %lu: jmp=%02x BPS=%d\n",
                         (unsigned long)part_lba, dbg[0], bps);
             }
             diskio_set_hdd_partition(part_lba);
@@ -679,7 +679,7 @@ static void *fatfs_vfs_mount(int dev_id)
     }
 
     if (fr != FR_OK) {
-        kprintf(0x07, "[fatfs] mount failed: type=%d drv=%d pdrv=%d err=%d\n",
+        kprintf(KLOG_ATTR, "[fatfs] mount failed: type=%d drv=%d pdrv=%d err=%d\n",
                 dev_type, drv_num, fc->pdrv, (int)fr);
         /* FatFs[] に登録済みの fc->fatfs を解除してから解放する
          * (解除しないと解放済み領域への参照が残る) */
@@ -690,7 +690,7 @@ static void *fatfs_vfs_mount(int dev_id)
 
     pdrv_busy[fc->pdrv] = 1;
 
-    kprintf(0x07, "[fatfs] mounted: type=%d drv=%d pdrv=%d FAT%s\n",
+    kprintf(KLOG_ATTR, "[fatfs] mounted: type=%d drv=%d pdrv=%d FAT%s\n",
             dev_type, drv_num, fc->pdrv,
             fc->fatfs.fs_type == 1 ? "12" :
             fc->fatfs.fs_type == 2 ? "16" :

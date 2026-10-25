@@ -72,7 +72,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n)
             g_bind[i].result == PCI_BIND_QUARANTINED ||
             (g_bind[i].result == PCI_BIND_DECLINED &&
              g_bind[i].reason != PCI_BIND_OK)) {
-            kprintf(0x07, "[pci] %02x:%02x.%x %04x:%04x %s (%s) irq=%02x\n",
+            kprintf(KLOG_ATTR, "[pci] %02x:%02x.%x %04x:%04x %s (%s) irq=%02x\n",
                     d.bus, d.dev, d.fn, d.vendor, d.device,
                     pci_bind_result_name(g_bind[i].result),
                     pci_bind_reason_name(g_bind[i].reason),
@@ -81,7 +81,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n)
     }
 
     if (count > 0) {
-        kprintf(0x07, "[pci] bind: %d bound, %d quarantined of %d\n",
+        kprintf(KLOG_ATTR, "[pci] bind: %d bound, %d quarantined of %d\n",
                 bound, g_quarantined, count);
     }
     return bound;
