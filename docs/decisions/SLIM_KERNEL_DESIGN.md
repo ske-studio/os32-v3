@@ -260,3 +260,7 @@ import表と既存利用者:
 ## S4c の実装で設計者が決めたこと
 
 - SB 専用の `inodes_count` の写しは抽出後に不要なので削除し、補助では設計どおり `lay` の各フィールドを読む。`ext2_layout_plan` の計算位置は維持し、`fmt_write_super` は `ext2_write_block` の結果をそのまま返し、呼元の同じ位置で `EXT2_ERR_IO` に変換する。
+
+## S4d の実装で設計者が決めたこと
+
+- root 専用の作業変数と `ret` は `static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)` のローカルとし、既存の I/O ごとの `EXT2_ERR_IO` と成功時 `EXT2_OK` を返す。呼元の元ブロック位置で非ゼロを `EXT2_ERR_IO` にし、`fmt_ctx`・`ext2_g_blk` の所有と計算・読書き順序を維持する。

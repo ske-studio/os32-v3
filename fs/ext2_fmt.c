@@ -87,6 +87,56 @@ static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
     return ext2_write_block(ctx, 1, ext2_g_blk);
 }
 
+/* ===== グループ0: inode 2 (ルートディレクトリ) ===== */
+static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
+                                 u32 inode_tbl_blocks_per_group)
+{
+    int ret;
+    u32 itable_g0, ino_block, ino_offset, root_data_blk;
+
+    itable_g0 = 1 + 1 + gdt_blocks + 1 + 1; /* boot+SB+GDT+bmap+imap */
+    ino_block = itable_g0 + (1 * 128) / EXT2_BLOCK_SIZE;  /* inode 2 = index 1 */
+    ino_offset = (1 * 128) % EXT2_BLOCK_SIZE;
+    root_data_blk = itable_g0 + inode_tbl_blocks_per_group; /* オーバーヘッド直後 */
+
+    ret = ext2_read_block(ctx, ino_block, ext2_g_blk);
+    if (ret != 0) return EXT2_ERR_IO;
+
+    le16_wr(&ext2_g_blk[ino_offset + 0], (u16)(EXT2_S_IFDIR | 0755));
+    le16_wr(&ext2_g_blk[ino_offset + 2], 0);
+    le32_wr(&ext2_g_blk[ino_offset + 4], EXT2_BLOCK_SIZE);
+    {
+        u32 now = ext2_current_time();
+        le32_wr(&ext2_g_blk[ino_offset + 8], now);
+        le32_wr(&ext2_g_blk[ino_offset + 12], now);
+        le32_wr(&ext2_g_blk[ino_offset + 16], now);
+    }
+    le16_wr(&ext2_g_blk[ino_offset + 26], 2);   /* links_count */
+    le32_wr(&ext2_g_blk[ino_offset + 28], 2);   /* blocks (512B単位) */
+    le32_wr(&ext2_g_blk[ino_offset + 40], root_data_blk); /* block[0] */
+
+    ret = ext2_write_block(ctx, ino_block, ext2_g_blk);
+    if (ret != 0) return EXT2_ERR_IO;
+
+    /* ルートディレクトリデータブロック */
+    ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
+    le32_wr(&ext2_g_blk[0], 2);                 /* "." → inode 2 */
+    le16_wr(&ext2_g_blk[4], 12);
+    ext2_g_blk[6] = 1;
+    ext2_g_blk[7] = EXT2_FT_DIR;
+    ext2_g_blk[8] = '.';
+    le32_wr(&ext2_g_blk[12], 2);                /* ".." → inode 2 */
+    le16_wr(&ext2_g_blk[16], (u16)(EXT2_BLOCK_SIZE - 12));
+    ext2_g_blk[18] = 2;
+    ext2_g_blk[19] = EXT2_FT_DIR;
+    ext2_g_blk[20] = '.'; ext2_g_blk[21] = '.';
+
+    ret = ext2_write_block(ctx, root_data_blk, ext2_g_blk);
+    if (ret != 0) return EXT2_ERR_IO;
+
+    return EXT2_OK;
+}
+
 /* [base_lba, base_lba + part_len) の中に sectors 分の ext2 を作る。
  * 呼び手 (ext2_format / ext2_format_at) が範囲を検証済みであること。
  * 大きさは ext2_layout_plan の固定点 — 最終グループに全メタデータが
@@ -309,50 +359,8 @@ static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
             }
         }
 
-        /* ===== グループ0: inode 2 (ルートディレクトリ) ===== */
-        {
-            u32 itable_g0, ino_block, ino_offset, root_data_blk;
-
-            itable_g0 = 1 + 1 + gdt_blocks + 1 + 1; /* boot+SB+GDT+bmap+imap */
-            ino_block = itable_g0 + (1 * 128) / EXT2_BLOCK_SIZE;  /* inode 2 = index 1 */
-            ino_offset = (1 * 128) % EXT2_BLOCK_SIZE;
-            root_data_blk = itable_g0 + inode_tbl_blocks_per_group; /* オーバーヘッド直後 */
-
-            ret = ext2_read_block(&fmt_ctx, ino_block, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-
-            le16_wr(&ext2_g_blk[ino_offset + 0], (u16)(EXT2_S_IFDIR | 0755));
-            le16_wr(&ext2_g_blk[ino_offset + 2], 0);
-            le32_wr(&ext2_g_blk[ino_offset + 4], EXT2_BLOCK_SIZE);
-            {
-                u32 now = ext2_current_time();
-                le32_wr(&ext2_g_blk[ino_offset + 8], now);
-                le32_wr(&ext2_g_blk[ino_offset + 12], now);
-                le32_wr(&ext2_g_blk[ino_offset + 16], now);
-            }
-            le16_wr(&ext2_g_blk[ino_offset + 26], 2);   /* links_count */
-            le32_wr(&ext2_g_blk[ino_offset + 28], 2);   /* blocks (512B単位) */
-            le32_wr(&ext2_g_blk[ino_offset + 40], root_data_blk); /* block[0] */
-
-            ret = ext2_write_block(&fmt_ctx, ino_block, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-
-            /* ルートディレクトリデータブロック */
-            ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            le32_wr(&ext2_g_blk[0], 2);                 /* "." → inode 2 */
-            le16_wr(&ext2_g_blk[4], 12);
-            ext2_g_blk[6] = 1;
-            ext2_g_blk[7] = EXT2_FT_DIR;
-            ext2_g_blk[8] = '.';
-            le32_wr(&ext2_g_blk[12], 2);                /* ".." → inode 2 */
-            le16_wr(&ext2_g_blk[16], (u16)(EXT2_BLOCK_SIZE - 12));
-            ext2_g_blk[18] = 2;
-            ext2_g_blk[19] = EXT2_FT_DIR;
-            ext2_g_blk[20] = '.'; ext2_g_blk[21] = '.';
-
-            ret = ext2_write_block(&fmt_ctx, root_data_blk, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-        }
+        ret = fmt_write_root(&fmt_ctx, gdt_blocks, inode_tbl_blocks_per_group);
+        if (ret != 0) return EXT2_ERR_IO;
     }
 
     return EXT2_OK;
