@@ -106,6 +106,7 @@ def main():
                     ROOT / 'kdebug/selftest_con_sink.c',
                     ROOT / 'kdebug/selftest_kbd_inject.c',
                     ROOT / 'kdebug/selftest_lease.c',
+                    ROOT / 'kdebug/selftest_exec.c',
                     ROOT / 'kdebug/nic_trace.c', ROOT / 'kdebug/v86_gcap.c',
                     ROOT / 'kdebug/v86_gcap_math.c', ROOT / 'kdebug/kpeek.c', ROOT / 'kdebug/kdebug_window.c',
                     ROOT / 'kdebug/kpeek_allow.c', ROOT / 'kdebug/recover.c',

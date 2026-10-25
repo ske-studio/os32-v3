@@ -8,4 +8,7 @@ u32 kst_con_sink(void);
 u32 kst_kbd_inject(void);
 int kst_lease(void);
 
+u32 kst_exec_tramp_user(void);
+u32 kst_exec_kapi_layout(void);
+
 #endif

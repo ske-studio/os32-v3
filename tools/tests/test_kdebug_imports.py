@@ -41,7 +41,7 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                 gen.check_nm(self.entries)
         altered = copy.deepcopy(self.entries)
-        altered[198].pop('retained')
+        altered[196].pop('retained')
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
 
@@ -97,17 +97,17 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 296)
-        self.assertEqual([e['name'] for e in self.entries[223:236]], [
+        self.assertEqual(len(self.entries), 308)
+        self.assertEqual([e['name'] for e in self.entries[221:234]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
-        self.assertEqual(gen.STAGES['S4'], 236)
-        self.assertEqual(gen.STAGES['S5'], 266)
-        self.assertEqual(gen.STAGES['S6'], 296)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 27 + ('GETTER',) + ('SETTER',) * 2)
-        self.assertEqual([(e['stage'], e['name']) for e in self.entries[236:266]], [
+        self.assertEqual(gen.STAGES['S4'], 234)
+        self.assertEqual(gen.STAGES['S5'], 264)
+        self.assertEqual(gen.STAGES['S6'], 308)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3)
+        self.assertEqual([(e['stage'], e['name']) for e in self.entries[234:264]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
             ('S5', 'e82557_send'), ('S5', 'e82557_get_mac'), ('S5', 'e82557_state'),
@@ -128,12 +128,12 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'pci_cfg_write16'),
             ('S5', 'hwdev_module_ops'),
         ])
-        self.assertEqual(self.entries[198]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[198]['source'], 'kernel/v86_io.h')
-        self.assertTrue(self.entries[198]['retained'])
-        self.assertEqual(self.entries[246]['name'], 'display_text_start')
+        self.assertEqual(self.entries[196]['name'], 'v86_cui_display_restore')
+        self.assertEqual(self.entries[196]['source'], 'kernel/v86_io.h')
+        self.assertTrue(self.entries[196]['retained'])
+        self.assertEqual(self.entries[244]['name'], 'display_text_start')
         self.assertEqual(self.entries[0]['name'], 'kprintf')
-        self.assertEqual(self.entries[207]['name'], 'kdi_ptr_v86_session')
+        self.assertEqual(self.entries[205]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
             'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
@@ -166,9 +166,9 @@ class ImportsTests(unittest.TestCase):
 
     def test_s6_preparation_with_future_contracts(self):
         # Exercise future kinds without adding unused imports to the live ABI.
-        additions = [('FUNC', 'vfs_cwd', 'fs/vfs.h'),
+        additions = [('FUNC', 'os32x_layout_reason', 'exec/os32x_hdr.h'),
                      ('GETTER', 'con_sink_drop_count', 'include/con_sink.h'),
-                     ('PTR', 'ring3_ls_start', 'exec/ring3_ls.h')]
+                     ('PTR', 'ring3_wm_shell_gen', 'exec/shell_service.h')]
         with tempfile.TemporaryDirectory(prefix='kdebug-s6-') as folder:
             out = Path(folder)
             document = json.loads(gen.DEFAULT_DEF.read_text())
@@ -246,8 +246,14 @@ class ImportsTests(unittest.TestCase):
             'lease_check', 'lease_release', 'lease_revoke_all', 'paging_as_audit',
             'paging_lease_pte', 'paging_load_cr3', 'shlib_read_page',
             'kdi_selftest_lease_result',
+            'kdi_selftest_exec_view', 'vfs_cwd_user', 'vfs_cwd',
+            'vfs_devname_user', 'vfs_devname', 'path_get_drive_user',
+            'path_get_drive', 'path_get_cwd_user', 'path_get_cwd',
+            'kapi_reserved_nosys', 'os32x_layout_check',
             'kdi_get_kbd_inject_drop_count',
-            'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count'])
+            'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count',
+            'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
+            'kdi_ptr___kernel_resident_end'])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
         moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
@@ -298,6 +304,23 @@ class ImportsTests(unittest.TestCase):
             'kdi_selftest_lease_result', 'kdi_ptr_ledger_surfaces',
             'kdebug_import_slots'})
         self.assertEqual(gen.address_references(self.entries, [obj], ROOT), {'shlib_read_page'})
+
+    def test_exec_move_contract_and_residency(self):
+        from test_exec_selftest import IMPORTS
+        nm = str(self.cross / 'i386-elf-nm')
+        obj = ROOT / 'build/out/kdebug/selftest_exec.o'
+        kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
+        module = gen.symbols(nm, [obj], False)
+        for symbol in ('exec_tramp_user_selftest', 'exec_kapi_layout_selftest',
+                       'kst_exec_tramp_user', 'kst_exec_kapi_layout'):
+            self.assertNotIn(symbol, kernel)
+            self.assertNotIn(symbol, {e['symbol'] for e in self.entries})
+        self.assertTrue({'kst_exec_tramp_user', 'kst_exec_kapi_layout'} <= module)
+        self.assertIn('kdi_selftest_exec_view', kernel)
+        self.assertEqual(gen.symbols(nm, [obj], True) - {gen.ABI_SYMBOL},
+                         set(IMPORTS) - {'kapi_reserved_nosys'} | {'kdebug_import_slots'})
+        self.assertEqual(gen.address_references(self.entries, [obj], ROOT),
+                         {'kapi_reserved_nosys'})
 
     def test_address_manifest_uses_only_linked_moved_sources(self):
         entries = [dict(name=name, kind_name='FUNC') for name in gen.ADDRESS_IMPORTS]

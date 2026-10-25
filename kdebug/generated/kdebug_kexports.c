@@ -61,6 +61,9 @@ u32 *kdi_ptr_v86_gcap_free_count(void) { return &v86_gcap_free_count; }
 u32 kdi_get_kbd_inject_drop_count(void) { return kbd_inject_drop_count; }
 void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
 void kdi_set_kbd_inject_drop_count(u32 value) { kbd_inject_drop_count = value; }
+const u8 *kdi_ptr_ring3_ls_start(void) { return ring3_ls_start; }
+const u8 *kdi_ptr_ring3_ls_end(void) { return ring3_ls_end; }
+u32 *kdi_ptr___kernel_resident_end(void) { return &__kernel_resident_end; }
 void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kprintf,
     (void (*)(void))appmem_init,
@@ -111,9 +114,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))dma_pool_init,
     (void (*)(void))dma_pool_leaked,
     (void (*)(void))exec_heap_used,
-    (void (*)(void))exec_kapi_layout_selftest,
     (void (*)(void))exec_tramp_page_addr,
-    (void (*)(void))exec_tramp_user_selftest,
     (void (*)(void))fd_is_redirected,
     (void (*)(void))fd_redirect_buf_write_ok,
     (void (*)(void))fd_redirect_to_buffer,
@@ -355,9 +356,23 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))paging_load_cr3,
     (void (*)(void))shlib_read_page,
     (void (*)(void))kdi_selftest_lease_result,
+    (void (*)(void))kdi_selftest_exec_view,
+    (void (*)(void))vfs_cwd_user,
+    (void (*)(void))vfs_cwd,
+    (void (*)(void))vfs_devname_user,
+    (void (*)(void))vfs_devname,
+    (void (*)(void))path_get_drive_user,
+    (void (*)(void))path_get_drive,
+    (void (*)(void))path_get_cwd_user,
+    (void (*)(void))path_get_cwd,
+    (void (*)(void))kapi_reserved_nosys,
+    (void (*)(void))os32x_layout_check,
     (void (*)(void))kdi_get_kbd_inject_drop_count,
     (void (*)(void))kdi_set_con_sink_drop_count,
     (void (*)(void))kdi_set_kbd_inject_drop_count,
+    (void (*)(void))kdi_ptr_ring3_ls_start,
+    (void (*)(void))kdi_ptr_ring3_ls_end,
+    (void (*)(void))kdi_ptr___kernel_resident_end,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -411,9 +426,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0x6f9ecc13u, 1, 1},
     {0x264b88afu, 1, 1},
     {0x5da92239u, 1, 1},
-    {0xe6f9f0d4u, 1, 1},
     {0xfb61026fu, 1, 1},
-    {0xa58e164eu, 1, 1},
     {0x6fda2a20u, 1, 1},
     {0xcbfb2289u, 1, 1},
     {0xdd20c32fu, 1, 1},
@@ -655,9 +668,23 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0x995132fbu, 1, 1},
     {0x00690988u, 1, 1},
     {0x62262d03u, 1, 1},
+    {0xda27cf6cu, 1, 1},
+    {0x51f73b1bu, 1, 1},
+    {0x96284f57u, 1, 1},
+    {0x930ccb59u, 1, 1},
+    {0x0c7ddcddu, 1, 1},
+    {0x57e87614u, 1, 1},
+    {0xaeb11cc2u, 1, 1},
+    {0x474a11d6u, 1, 1},
+    {0x97014a2cu, 1, 1},
+    {0x5dbb95d8u, 1, 1},
+    {0xfe104e3au, 1, 1},
     {0xad12c57eu, 1, 2},
     {0x3702afabu, 1, 3},
     {0x2707aa52u, 1, 3},
+    {0xb08892ebu, 1, 4},
+    {0x2d938daeu, 1, 4},
+    {0xc5098221u, 1, 4},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

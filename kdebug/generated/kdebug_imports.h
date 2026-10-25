@@ -14,6 +14,8 @@
 #include "exec/exec.h"
 #include "exec/exec_heap.h"
 #include "exec/lease.h"
+#include "exec/os32x_hdr.h"
+#include "exec/ring3_ls.h"
 #include "fs/fd_redirect.h"
 #include "fs/serialfs.h"
 #include "fs/vfs.h"
@@ -27,6 +29,7 @@
 #include "include/kprintf.h"
 #include "include/kselftest_probe.h"
 #include "include/launch.h"
+#include "include/memmap.h"
 #include "include/redir_access.h"
 #include "include/sys.h"
 #include "include/tvram.h"
@@ -56,10 +59,12 @@
 #include "kernel/v86_mem.h"
 #include "kernel/v86_pic.h"
 #include "lib/kstring.h"
+#include "lib/path.h"
 #include "lib/serial_diag.h"
 extern u32 v86_gp_cs;
 extern u32 v86_gp_ip;
 extern volatile int ring3_in_syscall;
+i32 __cdecl kapi_reserved_nosys(void);
 i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 u32 kdi_get_kctx_irq_depth(void);
 u32 kdi_get_kctx_exc_depth(void);
@@ -129,8 +134,11 @@ u32 *kdi_ptr_v86_gcap_free_count(void);
 u32 kdi_get_kbd_inject_drop_count(void);
 void kdi_set_con_sink_drop_count(u32 value);
 void kdi_set_kbd_inject_drop_count(u32 value);
-#define KDEBUG_IMPORT_COUNT 296
-#define KDEBUG_ABI_GEN 0x0da74001u
+const u8 *kdi_ptr_ring3_ls_start(void);
+const u8 *kdi_ptr_ring3_ls_end(void);
+u32 *kdi_ptr___kernel_resident_end(void);
+#define KDEBUG_IMPORT_COUNT 308
+#define KDEBUG_ABI_GEN 0x30998a85u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

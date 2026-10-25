@@ -1,4 +1,6 @@
 check-kdebug-init-host:
+- kdebug/selftest_exec.c
+- exec/ring3_str.h
 - kdebug/selftest_lease.c
 - kernel/module_schema.h
 - tools/module_schema.py

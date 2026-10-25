@@ -542,7 +542,7 @@ static void test_launch(void)
 /* ------------------------------------------------------------------------ */
 static void test_tramp_user_str(void)
 {
-    u32 bad = exec_tramp_user_selftest();
+    u32 bad = kst_exec_tramp_user();
     check((bad & (1u << 0)) == 0, "getcwd scratch fits after the KAPI stubs");
     check((bad & (1u << 1)) == 0, "getcwd scratch page is present and USER");
     check((bad & (1u << 2)) == 0, "sys_getcwd copies only for CPL=3 callers");
@@ -974,7 +974,7 @@ static void test_pcm(void)
  * NULL だと旧 SDK の呼び出しが 0 番地へ飛ぶ。 */
 static void test_kapi_layout(void)
 {
-    u32 bad = exec_kapi_layout_selftest();
+    u32 bad = kst_exec_kapi_layout();
     check((bad & (1u << 0)) == 0, "kapi:data@fixed");
     check((bad & (1u << 1)) == 0, "kapi:rsv nosys");
     check((bad & (1u << 2)) == 0, "kapi:rsv stubs");

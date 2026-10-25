@@ -147,7 +147,7 @@ KERNEL_CFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pi
 def case_capacity_full(tmp, kj):
     """関数数 = 容量 (予約 0 本) で生成し、exec/exec.c がコンパイルできるか。
 
-    生成器は予約 0 本なら kapi_reserved を作らない。exec_kapi_layout_selftest が
+    生成器は予約 0 本なら kapi_reserved を作らない。kst_exec_kapi_layout が
     それを無条件に参照していると 300 本目の追加でカーネルが作れなくなる
     (実装レビュー R1)。本物の木は書き換えない — 生成器と exec.c を一時の木へ
     写し、そこで生成して、その生成物を先に探す -I で exec.c を構文検査する。"""
@@ -181,6 +181,17 @@ def case_capacity_full(tmp, kj):
           "(kapi_reserved の参照は #if KAPI_FUNC_RESERVED > 0 の中)")
     if r.returncode != 0:
         print("\n".join(r.stderr.splitlines()[:8]))
+    # Also compile the moved body against the zero-reserved generated layout.
+    moved = gk / "selftest_exec.c"
+    moved.write_text((ROOT / "kdebug/selftest_exec.c").read_text().replace(
+        '#include "generated/kdebug_import_macros.h"',
+        '#include "kdebug/generated/kdebug_import_macros.h"'))
+    r = run([TCC, *KERNEL_CFLAGS, *inc, "-I" + str(ROOT / "kdebug"),
+             "-Werror", "-fsyntax-only", moved])
+    check(r.returncode == 0, "予約 0 本でも移植した kst_exec_kapi_layout がコンパイルできる")
+    if r.returncode != 0:
+        print(r.stderr)
+
 
 
 # --------------------------------------------------------------------------

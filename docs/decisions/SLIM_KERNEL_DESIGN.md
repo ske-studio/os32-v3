@@ -292,3 +292,9 @@ import表と既存利用者:
 - lease と tables_image の移植先は `kdebug/selftest_lease.c`、宣言は既存 `selftest_internal.h` とし、S2 は 131 FUNC、S6 は 27 FUNC + 1 GETTER + 2 SETTER、全体は 296 枠とする。HWDEV §3 の第 3 列も旧 lease 枠の削除分だけ追従する。
 - `kdi_selftest_lease_result` は `exec/lease.c` に既存観測変数への 1 代入として置く。shlib callback は付表どおり KDI_ADDR を使い、tables_image と既存の判定・復元順序・token の副作用は変えない。
 - lease・memmap_audit・r1 のホスト fixture は共通の `lease_selftest_host.h` から移植ソースを取り込み、旧名転送はその中だけに置く。転送の前後で結果反映・CR3・master/既存 AS の表・AS 構造体・owner 台帳・free pages を比較し、lease fixture では AS 確保失敗時の後始末も確認する。
+
+## S3e の実装で設計者が決めたこと
+
+- exec の 2 本は `kdebug/selftest_exec.c` へ移し、各入口で snapshot を 1 回取る。S2 は 129 FUNC、S6 は 38 FUNC + 1 GETTER + 2 SETTER + 3 PTR、全体 308 枠とし、HWDEV §3 の第 3 列は旧 exec 2 枠の削除分を詰める。
+- `RING3_LS_SHIM_OFF` は式を変えず `exec/ring3_str.h` へ移し、構築側と移植先の共通定義にする。`kapi_reserved_nosys` の宣言は既存の exec.c に残し、生成器の source=.c 経路で取得する。
+- 新しい exec fixture は実 exec.c を関数セクション単位でリンクし、snapshot・ページ構築・文字列・WM の実経路を生成 import table/stub に接続する。未初期化・復元・失敗ビット・予約関数の実番地と stub の相違・配列の末尾・リンカ記号の番地を確認し、予約 0 本は test_kapi_layout で移植ソースも構文検査する。

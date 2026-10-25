@@ -31,8 +31,8 @@ kernel/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅�
 kernel/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
 exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec.c:exec_kapi_layout_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec.c:exec_tramp_user_selftest:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+kdebug/selftest_exec.c:kst_exec_kapi_layout:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+kdebug/selftest_exec.c:kst_exec_tramp_user:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec.c:ring3_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/ring3_ls.c:ring3_ls_dispatch:USER ESP と引数は呼び手の仮想番地。caller access が所属・PTE を検証して物理へ変換する

@@ -119,15 +119,6 @@ const char *vfs_devname_user(const char *prefix);
 const char *path_get_drive_user(void);
 const char *path_get_cwd_user(void);
 
-/* 上の写し場の番地とページ属性をブート時に踏む (票 T9 §12 R1)。
- * kselftest_run() は exec_init() より前に走るので、この項だけ
- * kselftest_run_post_exec() から呼ぶ。0 = 全部通った。 */
-u32 exec_tramp_user_selftest(void);
-/* データ欄の固定配置と予約スロット (票 TASK_KAPI_DATA_FIELDS)。
- * ビット 0 = 固定オフセット、1 = 本物の表の予約 (NOSYS)、2 = トランポリンの
- * 予約スタブ、3 = ヘッダ v3 の照合。0 = 全部通った。exec_init の後に呼ぶ。 */
-u32 exec_kapi_layout_selftest(void);
-
 /* KAPI 踏み台ページ (RO+USER、全 PD 共有) の番地。exec_init 前も静的 BSS の番地を返す。
  * ページ表と memmap.h の照合 (paging_memmap_selftest) が期待値に使う —
  * ここは .bss の中なのでビルドごとに動き、定数では書けない。 */

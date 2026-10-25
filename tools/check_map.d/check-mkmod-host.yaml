@@ -1,4 +1,16 @@
 check-mkmod-host:
+- exec/exec_kapi_init.inc
+- kdebug/generated/kdebug_import_slots.c
+- kdebug/generated/kdebug_import_stubs.S
+- kdebug/selftest_exec.c
+- exec/ring3_str.h
+- tools/tests/exec_selftest_host.c
+- tools/tests/test_exec_selftest.py
+- exec/exec.c
+- exec/ring3_str.c
+- exec/os32x_hdr.c
+- exec/ring3_ls.S
+- lib/path.h
 - kdebug/selftest_lease.c
 - kdebug/*.c
 - kdebug/selftest_internal.h
