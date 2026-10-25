@@ -42,16 +42,26 @@ static int pc98_probe(void)
 /* ------------------------------------------------------------------------ */
 #define PC98_LEASE_MASK 0xFF7E
 #define PC98_PALETTE_IO_WRITES 4u
+#define PC98_DAC_BITS 4
+#define PC98_MODE_400 0
+#define PC98_MODE_200 1
+
+static const GfxMode pc98_modes[] = {
+    {GFX_WIDTH, GFX_HEIGHT, GFX_FMT_PLANAR4, PC98_DAC_BITS, PC98_MODE_400, 0, GFX_BPL},
+    {GFX_WIDTH, GFX_HEIGHT_200, GFX_FMT_PLANAR4, PC98_DAC_BITS, PC98_MODE_200, 0, GFX_BPL}
+};
 
 static int pc98_query(GFX_ScreenInfo *info)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pc98);
+    GfxFormatDesc desc;
     int i;
-    if (!info) return OS32_ERR_INVAL;
+    if (!info || !mode || !gfx_format_desc(mode->format, &desc)) return OS32_ERR_INVAL;
 
-    info->width  = (u16)GFX_WIDTH;
+    info->width  = mode->width;
     info->height = (u16)gfx_current_height;      /* 400 or 200 */
-    info->bpp    = GFX_FMT_PLANAR4_BPP;
-    info->format = GFX_FMT_PLANAR4;
+    info->bpp    = desc.bpp;
+    info->format = mode->format;
     info->flags  = GFX_CAP_TEXT_OVERLAY |
                    (gfx_flip_enabled ? GFX_CAP_PAGE_FLIP : 0);
     /* パレットのリース (G8): 16 色機は index 1-6, 8-15 の 14 項目を貸せる。
@@ -75,7 +85,8 @@ static void pc98_shutdown(void)
         gfx_flip_enabled = 0;
         gfx_display_page = 0;
     }
-    gfx_current_height = GFX_HEIGHT;
+    gfx_backend_pc98.selected_mode = gfx_mode_pick(&gfx_backend_pc98, 0);
+    gfx_current_height = gfx_backend_mode(&gfx_backend_pc98)->height;
     _out(GDC_GFX_CMD, GDC_CMD_STOP);
 }
 
@@ -89,14 +100,15 @@ static void pc98_shutdown(void)
 /* ------------------------------------------------------------------------ */
 static void pc98_count_present(int x, int y, int w, int h)
 {
-    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pc98);
+    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, gfx_current_height)) return;
     int right = x + w;
     int ax = x & ~(BITS_PER_U32 - 1);
     int aw = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - ax;
 
     if (ax < 0) { aw += ax; ax = 0; }
     if (y < 0) { h += y; y = 0; }
-    if (ax + aw > GFX_WIDTH) aw = GFX_WIDTH - ax;
+    if (ax + aw > mode->width) aw = mode->width - ax;
     if (y + h > gfx_current_height) h = gfx_current_height - y;
     if (aw <= 0 || h <= 0) return;
 
@@ -161,8 +173,8 @@ GfxBackend gfx_backend_pc98 = {
     GFX_BB_PLANAR4,
     (u32)MEM_GFX_BB_SIZE,    /* bb_size: 4 プレーン分 128KB (boot pool CLIENT) */
     (void (*)(void))0,       /* prepare: 9801 は起動時の下ごしらえが無い */
-    (const GfxMode *)0,      /* modes: G3 で申告 */
-    0,                      /* mode_count */
-    0,                      /* default_mode */
+    pc98_modes,
+    sizeof(pc98_modes) / sizeof(pc98_modes[0]),
+    PC98_MODE_400,           /* default_mode */
     (const GfxMode *)0       /* selected_mode */
 };
