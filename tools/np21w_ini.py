@@ -39,7 +39,8 @@ import uuid
 # (既存の 3 キーはたまたま全大文字だったのでこの区別が要らなかった)。
 # MB 単位の拡張メモリ (win9x/ini.cpp:477, PFTYPE_UINT16。
 # SUPPORT_LARGE_MEMORY 無効時は UINT8、どちらも MEMORY_MAXSIZE でクランプ)。
-# ブートローダが 1MB から 512KB 刻みで実測するので (boot/loader_fat.asm:248)、
+# ブートローダが 1MB から 512KB 刻みで実測するので
+# (NHD 起動は boot/loader_hdd.asm、FD は boot/loader_fat_new.asm の .probe_loop、同じ算法)、
 # ゲストの総容量はこの値で決まる。値は 2 つだけ通す:
 #   16 = 現行構成 (ゲスト 15360KB = 15MB。実測 2026-09-09)
 #    7 = ゲスト 8MB。memory_boot の legacy フォールバックを通す

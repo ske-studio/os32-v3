@@ -101,7 +101,10 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 - NASM (`-f elf32` / ブートセクタは `-f bin`)。ローカルラベル `.loop:` は使ってよい
   (wasm 時代の制約は無い: [10_notes §10-11](10_notes.md))
 - `boot_fat.asm` は `.8086`: 即値シフト不可 (`mov cl, N` / `shr ax, cl`)。IPL (`boot_hdd.asm`) の INT 1Bh は
-  16 回 (上限の理由は未確認、[10_notes §10-2](10_notes.md))。`loader_fat.asm` の PM 遷移は分割禁止 (アドレス重なり)
+  16 回 (上限の理由は未確認、[10_notes §10-2](10_notes.md))。
+- FD の PM 遷移は `boot/loader_fat_new.asm` の `.load_done` → `pm_entry32`。
+  `org 8000h` の同じバイナリに GDT と 16/32bit コードを置く。
+  この遷移は分割禁止 (現行でも守る。旧版の理由「アドレス重なり」は現行実装では未確認)。
 
 ### 数値演算は整数を第一選択にする (ユーザー決定 2026-10-20)
 

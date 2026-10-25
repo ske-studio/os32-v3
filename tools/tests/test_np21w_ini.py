@@ -180,7 +180,7 @@ class Crt31k(unittest.TestCase):
 class ExMemory(unittest.TestCase):
     """ExMemory は MB 単位の拡張メモリ (win9x/ini.cpp:477, PFTYPE_UINT16、
     SUPPORT_LARGE_MEMORY 有効時)。ブートローダが 1MB から 512KB 刻みで実測するので
-    (boot/loader_fat.asm:248)、ゲストの総容量はこの値から決まる。
+    (NHD 起動は boot/loader_hdd.asm、FD は boot/loader_fat_new.asm の .probe_loop、同じ算法)、ゲストの総容量はこの値から決まる。
     8MB は CUI の最低動作環境。memory_boot は低容量でもモデル経路を使う。"""
 
     def test_switch_between_proven_sizes(self):
