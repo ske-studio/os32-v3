@@ -162,7 +162,7 @@ int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u
 
     now = ext2_current_time();
     ext2_mem_zero(&inode, sizeof(inode));
-    inode.mode = (u16)(EXT2_S_IFREG | 0644);
+    inode.mode = (u16)(EXT2_S_IFREG | OS32_DEFAULT_FILE_PERM);
     inode.size = size;
     inode.atime = now; inode.ctime = now; inode.mtime = now;
     inode.links_count = 1;
@@ -197,7 +197,7 @@ int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u
             return EXT2_ERR_IO;
         }
 
-        inode.blocks += 2;
+        inode.blocks += EXT2_SECTORS_PER_BLOCK;
         remaining -= to_write;
     }
 
@@ -290,7 +290,7 @@ int ext2_write(Ext2Ctx *ctx, u32 ino, const void *data, u32 size)
         ret = ext2_write_data_block(ctx, (u32)blk, ext2_g_aux);
         if (ret != 0) { ret = EXT2_ERR_IO; goto fail; }
 
-        inode.blocks += 2;
+        inode.blocks += EXT2_SECTORS_PER_BLOCK;
         remaining -= to_write;
     }
 
@@ -349,14 +349,14 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
          * 既にあった割り当てを捨てて中身を失う** (票 B8)。書き込みを止める。 */
         ret = ext2_bmap(ctx, &inode, bi, &phys);
         if (ret != 0) {
-            kprintf(0x0C, "[E2W] bmap FAIL bi=%d\n", (int)bi);
+            kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] bmap FAIL bi=%d\n", (int)bi);
             io_err = 1;
             break;
         }
         if (phys == 0) {
             int new_blk = ext2_alloc_block(ctx);
             if (new_blk < 0) {
-                kprintf(0x0C, "[E2W] alloc FAIL bi=%d rem=%d\n",
+                kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] alloc FAIL bi=%d rem=%d\n",
                         (int)bi, (int)remaining);
                 /* 満杯なら従来どおり短い書き込み。ビットマップの I/O エラーは
                  * 1 バイトも書けていなければ 0 ではなく IO にする (往復 6) */
@@ -365,7 +365,7 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
             }
             ret = ext2_bmap_set(ctx, &inode, bi, (u32)new_blk);
             if (ret != 0) {
-                kprintf(0x0C, "[E2W] bmap_set FAIL bi=%d ret=%d\n",
+                kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] bmap_set FAIL bi=%d ret=%d\n",
                         (int)bi, ret);
                 /* 既存ファイルの表は媒体上の inode から辿れる。IO なら
                  * new_blk が表に載ったかもしれないので**返さない** (漏れで
@@ -375,7 +375,7 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
                 io_err = 1;
                 break;
             }
-            inode.blocks += 2;
+            inode.blocks += EXT2_SECTORS_PER_BLOCK;
             phys = (u32)new_blk;
             /* 部分ブロック書き込み: 新規ブロックをゼロ初期化 */
             if (byte_in_blk > 0 || remaining < EXT2_BLOCK_SIZE) {
@@ -386,7 +386,7 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
             if (byte_in_blk > 0 || remaining < EXT2_BLOCK_SIZE) {
                 ret = ext2_read_data_block(ctx, phys, ext2_g_dat);
                 if (ret != 0) {
-                    kprintf(0x0C, "[E2W] rblk FAIL bi=%d phys=%d\n",
+                    kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] rblk FAIL bi=%d phys=%d\n",
                             (int)bi, (int)phys);
                     io_err = 1;          /* 1 バイトも書けていなければ IO (往復 5) */
                     break;
@@ -401,7 +401,7 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
 
         ret = ext2_write_data_block(ctx, phys, ext2_g_dat);
         if (ret != 0) {
-            kprintf(0x0C, "[E2W] wblk FAIL bi=%d phys=%d\n",
+            kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] wblk FAIL bi=%d phys=%d\n",
                     (int)bi, (int)phys);
             io_err = 1;                  /* 1 バイトも書けていなければ IO (往復 5) */
             break;
@@ -417,7 +417,7 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
 
     /* 防御ログ: 書き込み不完全の場合は警告 */
     if (remaining > 0) {
-        kprintf(0x0C, "[E2W] INCOMPLETE ino=%d rem=%d/%d off=%d\n",
+        kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] INCOMPLETE ino=%d rem=%d/%d off=%d\n",
                 (int)ino, (int)remaining, (int)size, (int)offset);
     }
 
@@ -437,12 +437,12 @@ int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offs
      * ようにする (同じ offset へ同じ内容なので再実行は安全)。 */
     ret = ext2_write_inode(ctx, ino, &inode);
     if (ret != 0) {
-        kprintf(0x0C, "[E2W] inode FAIL ino=%d\n", (int)ino);
+        kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] inode FAIL ino=%d\n", (int)ino);
         return EXT2_ERR_IO;
     }
     ret = ext2_sync(ctx);
     if (ret != 0) {
-        kprintf(0x0C, "[E2W] sync FAIL ino=%d\n", (int)ino);
+        kprintf(KLOG_LEGACY_LIGHT_RED, "[E2W] sync FAIL ino=%d\n", (int)ino);
         return EXT2_ERR_IO;
     }
     /* 1 バイトも書けていないなら、0 (「書けた」) ではなくエラーを返す。

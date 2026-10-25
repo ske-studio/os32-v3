@@ -26,6 +26,18 @@
 #include "kstring.h"
 #include "kprintf.h"
 
+/* Local until RTC/DOS wire names are supplied by their shared headers. */
+#define RTC_YEAR_PIVOT 80
+#define RTC_CENTURY_LO 2000
+#define RTC_CENTURY_HI 1900
+#define DOS_YEAR_BASE 1980
+#define DOS_DATE_WORD_SHIFT 16
+#define DOS_DATE_YEAR_SHIFT 9
+#define DOS_DATE_MONTH_SHIFT 5
+#define DOS_TIME_HOUR_SHIFT 11
+#define DOS_TIME_MIN_SHIFT 5
+#define DOS_TIME_SECOND_UNIT 2
+
 /* 物理ドライブ番号 */
 #define DRV_FDD   0
 #define DRV_HDD   1
@@ -41,12 +53,12 @@ static int hdd_drive = 0;
 /* HDDパーティションオフセット (LBA, IDE物理セクタ単位) — PC-98パーティション対応 */
 static u32 hdd_part_offset = 0;
 /* HDD論理セクタサイズ (PC-98 DOSでは1024、通常は512) */
-static u16 hdd_sector_size = 512;
+static u16 hdd_sector_size = SYS_HDD_SECTOR_SIZE;
 /* HDD IDE物理セクタサイズ (SASI HDI=256, IDE=512)
  * NP21/WはSASI形式HDIをIDE経由で提供するが、内部LBAは256B単位。
  * IDE転送は常に512Bだが、連続セクタでオーバーラップが発生するため
  * 256B時はLBAを2刻みで進める必要がある。 */
-static u16 hdd_ide_phys_size = 512;
+static u16 hdd_ide_phys_size = SYS_HDD_SECTOR_SIZE;
 /* Device API ポインタ (diskio_set_hdd_drive時に取得) */
 static Device *hdd_dev = 0;
 
@@ -140,7 +152,7 @@ void diskio_set_fdd_drive(int drv) { fdd_drive = drv; fdd_status = STA_NOINIT; }
 void diskio_set_hdd_drive(int drv) {
     char devname[8];
     hdd_drive = drv; hdd_status = STA_NOINIT;
-    hdd_part_offset = 0; hdd_sector_size = 512; hdd_ide_phys_size = 512;
+    hdd_part_offset = 0; hdd_sector_size = SYS_HDD_SECTOR_SIZE; hdd_ide_phys_size = SYS_HDD_SECTOR_SIZE;
     devname[0] = 'h'; devname[1] = 'd';
     devname[2] = '0' + (char)drv; devname[3] = '\0';
     hdd_dev = dev_find(devname);
@@ -218,25 +230,25 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
     case DRV_HDD:
         if (hdd_status & STA_NOINIT) return RES_NOTRDY;
         if (!hdd_dev) return RES_ERROR;
-        if (hdd_ide_phys_size == 256) {
+        if (hdd_ide_phys_size == SASI_SECTOR_BYTES) {
             /* SASI 256Bセクタ: NP21/WのIDE LBAは256B単位だが転送は512B。
              * 連続LBAでは256Bずつしか進まずオーバーラップするため、
              * LBAを2刻みで進めて非重複の512Bを取得する。 */
-            u32 sasi_lba = (u32)sector * (hdd_sector_size / 256)
+            u32 sasi_lba = (u32)sector * (hdd_sector_size / SASI_SECTOR_BYTES)
                          + hdd_part_offset;
-            u32 total_256 = (u32)count * (hdd_sector_size / 256);
-            u32 ide_reads = total_256 / 2;  /* 512B = 2x256B */
+            u32 total_256 = (u32)count * (hdd_sector_size / SASI_SECTOR_BYTES);
+            u32 ide_reads = total_256 / SASI_SECTORS_PER_IDE;  /* 512B = 2x256B */
             u32 j;
             for (j = 0; j < ide_reads; j++) {
-                rc = dev_blk_read_lba(hdd_dev, sasi_lba + j * 2, 1,
-                                      buff + j * 512);
+                rc = dev_blk_read_lba(hdd_dev, sasi_lba + j * SASI_SECTORS_PER_IDE, 1,
+                                      buff + j * SYS_HDD_SECTOR_SIZE);
                 if (rc != 0) return RES_ERROR;
             }
         } else {
             /* 通常IDE 512Bセクタ */
-            u32 phys_sector = (u32)sector * (hdd_sector_size / 512)
+            u32 phys_sector = (u32)sector * (hdd_sector_size / SYS_HDD_SECTOR_SIZE)
                             + hdd_part_offset;
-            u32 phys_count  = (u32)count  * (hdd_sector_size / 512);
+            u32 phys_count  = (u32)count  * (hdd_sector_size / SYS_HDD_SECTOR_SIZE);
             rc = dev_blk_read_lba(hdd_dev, phys_sector, (int)phys_count, buff);
             if (rc != 0) return RES_ERROR;
         }
@@ -287,23 +299,23 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
     case DRV_HDD:
         if (hdd_status & STA_NOINIT) return RES_NOTRDY;
         if (!hdd_dev) return RES_ERROR;
-        if (hdd_ide_phys_size == 256) {
+        if (hdd_ide_phys_size == SASI_SECTOR_BYTES) {
             /* SASI 256Bセクタ: LBA 2刻み書き込み */
-            u32 sasi_lba = (u32)sector * (hdd_sector_size / 256)
+            u32 sasi_lba = (u32)sector * (hdd_sector_size / SASI_SECTOR_BYTES)
                          + hdd_part_offset;
-            u32 total_256 = (u32)count * (hdd_sector_size / 256);
-            u32 ide_writes = total_256 / 2;
+            u32 total_256 = (u32)count * (hdd_sector_size / SASI_SECTOR_BYTES);
+            u32 ide_writes = total_256 / SASI_SECTORS_PER_IDE;
             u32 j;
             for (j = 0; j < ide_writes; j++) {
-                rc = dev_blk_write_lba(hdd_dev, sasi_lba + j * 2, 1,
-                                       buff + j * 512);
+                rc = dev_blk_write_lba(hdd_dev, sasi_lba + j * SASI_SECTORS_PER_IDE, 1,
+                                       buff + j * SYS_HDD_SECTOR_SIZE);
                 if (rc != 0) return RES_ERROR;
             }
         } else {
             /* 通常IDE 512Bセクタ */
-            u32 phys_sector = (u32)sector * (hdd_sector_size / 512)
+            u32 phys_sector = (u32)sector * (hdd_sector_size / SYS_HDD_SECTOR_SIZE)
                             + hdd_part_offset;
-            u32 phys_count  = (u32)count  * (hdd_sector_size / 512);
+            u32 phys_count  = (u32)count  * (hdd_sector_size / SYS_HDD_SECTOR_SIZE);
             rc = dev_blk_write_lba(hdd_dev, phys_sector, (int)phys_count, buff);
             if (rc != 0) return RES_ERROR;
         }
@@ -384,8 +396,8 @@ DWORD get_fattime(void)
 
     /* RTC_Time.year は 00-99 (2桁) → 2000年代として扱う */
     year = (int)t.year;
-    if (year < 80) year += 2000;  /* 00-79 → 2000-2079 */
-    else           year += 1900;  /* 80-99 → 1980-1999 */
+    if (year < RTC_YEAR_PIVOT) year += RTC_CENTURY_LO;  /* 00-79 → 2000-2079 */
+    else           year += RTC_CENTURY_HI;  /* 80-99 → 1980-1999 */
 
     /* FAT時刻フォーマット:
      *   bit[31:25] = 年 (1980年起点, 0-127)
@@ -395,12 +407,12 @@ DWORD get_fattime(void)
      *   bit[10:5]  = 分 (0-59)
      *   bit[4:0]   = 秒/2 (0-29)
      */
-    fattime = ((DWORD)(year - 1980) << 25)
-            | ((DWORD)t.month << 21)
-            | ((DWORD)t.day << 16)
-            | ((DWORD)t.hour << 11)
-            | ((DWORD)t.min << 5)
-            | ((DWORD)(t.sec / 2));
+    fattime = ((DWORD)(year - DOS_YEAR_BASE) << (DOS_DATE_WORD_SHIFT + DOS_DATE_YEAR_SHIFT))
+            | ((DWORD)t.month << (DOS_DATE_WORD_SHIFT + DOS_DATE_MONTH_SHIFT))
+            | ((DWORD)t.day << DOS_DATE_WORD_SHIFT)
+            | ((DWORD)t.hour << DOS_TIME_HOUR_SHIFT)
+            | ((DWORD)t.min << DOS_TIME_MIN_SHIFT)
+            | ((DWORD)(t.sec / DOS_TIME_SECOND_UNIT));
 
     return fattime;
 }

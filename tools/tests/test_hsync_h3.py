@@ -267,7 +267,7 @@ MUTATIONS = [
      "    secs = ft / HDRV_FT_PER_SEC;"),
     # 変異 5: os_time_t の範囲外を切り詰めてしまう (wrap する) 版。
     ("filetime_wrap",
-     "    if (secs > HDRV_STAT_MAX_TIME) return 0;         /* (c) 範囲外 */",
+     "    if (secs > ((unsigned long long)U32_MAX)) return 0;         /* (c) 範囲外 */",
      "    /* mutated: 範囲検査を外す */"),
 ]
 

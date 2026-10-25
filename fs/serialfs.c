@@ -123,10 +123,10 @@ static int sfs_stat_raw(SfsClient *c, const char *path, u8 *kind,
     if (n < 0) return OS32_ERR_NAMETOOLONG;
     rc = sfs_rpc(c, SFS_T_STAT, pl, (u16)n, &body, &blen);
     if (rc < 0) return rc;
-    if (rc != 0 || blen != 9) return OS32_ERR_IO;
+    if (rc != 0 || blen != SFS_STAT_RSP_LEN) return OS32_ERR_IO;
     *kind = body[0];
     *size = sfs_get32(body + 1);
-    *mtime = sfs_get32(body + 5);
+    *mtime = sfs_get32(body + SFS_STAT_MTIME_OFF);
     return 0;
 }
 
@@ -140,9 +140,9 @@ static int sfs_stat(void *ctx, const char *path, OS32_Stat *buf)
     rc = sfs_stat_raw((SfsClient *)ctx, path, &kind, &size, &mtime);
     if (rc != 0) return rc;
     if (kind == SFS_KIND_DIR) {
-        buf->st_mode = (u16)(OS_S_IFDIR | 0755);
+        buf->st_mode = (u16)(OS_S_IFDIR | OS32_DEFAULT_DIR_PERM);
     } else if (kind == SFS_KIND_FILE) {
-        buf->st_mode = (u16)(OS_S_IFREG | 0644);
+        buf->st_mode = (u16)(OS_S_IFREG | OS32_DEFAULT_FILE_PERM);
     } else if (kind == SFS_KIND_OTHER) {
         /* 種別不明。ゼロの st_mode のまま返す (hsync は type_unknown) */
         buf->st_mode = 0;
@@ -185,51 +185,51 @@ static int sfs_list_dir(void *ctx, const char *path, vfs_dir_cb cb,
 
     for (pages = 0; pages < SFS_LIST_MAX_PAGES; pages++) {
         sfs_put32(pl, cookie);
-        n = sfs_put_path(pl + 4, (u16)(sizeof(pl) - 4), path);
+        n = sfs_put_path(pl + SFS_LIST_REQ_COOKIE_LEN, (u16)(sizeof(pl) - SFS_LIST_REQ_COOKIE_LEN), path);
         if (n < 0) return OS32_ERR_NAMETOOLONG;
-        rc = sfs_rpc(c, SFS_T_LIST, pl, (u16)(4 + n), &body, &blen);
+        rc = sfs_rpc(c, SFS_T_LIST, pl, (u16)(SFS_LIST_REQ_COOKIE_LEN + n), &body, &blen);
         if (rc < 0) return rc;
-        if (rc != 0 || blen < 4) return OS32_ERR_IO;
+        if (rc != 0 || blen < SFS_LIST_RSP_COOKIE_LEN) return OS32_ERR_IO;
         next = sfs_get32(body);
 
         /* **コールバックの前に頁を写す。** コールバックが FS に触れば
          * 受信器 (body の指す先) は次の応答で上書きされる。 */
-        for (pos = 0; pos < (u16)(blen - 4); pos++) page[pos] = body[4 + pos];
-        blen = (u16)(blen - 4);
+        for (pos = 0; pos < (u16)(blen - SFS_LIST_RSP_COOKIE_LEN); pos++) page[pos] = body[SFS_LIST_RSP_COOKIE_LEN + pos];
+        blen = (u16)(blen - SFS_LIST_RSP_COOKIE_LEN);
 
         /* まず頁全体を検査する (途中まで流してから IO にしない) */
         pos = 0;
         while (pos < blen) {
             u8 kind, nl;
             u16 k;
-            if ((u32)pos + 6 > blen) return OS32_ERR_IO;
+            if ((u32)pos + SFS_LIST_ENTRY_NAME_OFF > blen) return OS32_ERR_IO;
             kind = page[pos];
-            nl = page[pos + 5];
+            nl = page[pos + SFS_LIST_ENTRY_NAME_LEN_OFF];
             if (kind != SFS_KIND_FILE && kind != SFS_KIND_DIR &&
                 kind != SFS_KIND_OTHER) return OS32_ERR_IO;
             /* 名前は 1〜255 バイト (u8) なので VfsDirEntry.name[256] に収まる */
-            if (nl == 0 || (u32)pos + 6 + nl > blen) return OS32_ERR_IO;
+            if (nl == 0 || (u32)pos + SFS_LIST_ENTRY_NAME_OFF + nl > blen) return OS32_ERR_IO;
             for (k = 0; k < nl; k++) {
-                u8 ch = page[pos + 6 + k];
+                u8 ch = page[pos + SFS_LIST_ENTRY_NAME_OFF + k];
                 if (ch == 0 || ch == '/') return OS32_ERR_IO;
             }
-            if (page[pos + 6] == '.' &&
-                (nl == 1 || (nl == 2 && page[pos + 7] == '.')))
+            if (page[pos + SFS_LIST_ENTRY_NAME_OFF] == '.' &&
+                (nl == 1 || (nl == 2 && page[pos + SFS_LIST_ENTRY_NAME_OFF + 1] == '.')))
                 return OS32_ERR_IO;
-            pos = (u16)(pos + 6 + nl);
+            pos = (u16)(pos + SFS_LIST_ENTRY_NAME_OFF + nl);
         }
 
         pos = 0;
         while (pos < blen) {
-            u8 nl = page[pos + 5];
+            u8 nl = page[pos + SFS_LIST_ENTRY_NAME_LEN_OFF];
             u16 k;
-            for (k = 0; k < nl; k++) e.name[k] = (char)page[pos + 6 + k];
+            for (k = 0; k < nl; k++) e.name[k] = (char)page[pos + SFS_LIST_ENTRY_NAME_OFF + k];
             e.name[nl] = '\0';
             e.size = sfs_get32(page + pos + 1);
             /* OTHER はファイル扱いで見せる (開けば stat が種別不明を返す) */
             e.type = (page[pos] == SFS_KIND_DIR) ? VFS_TYPE_DIR : VFS_TYPE_FILE;
             cb(&e, user_ctx);
-            pos = (u16)(pos + 6 + nl);
+            pos = (u16)(pos + SFS_LIST_ENTRY_NAME_OFF + nl);
         }
 
         if (next == 0) return 0;
@@ -259,10 +259,10 @@ static int sfs_read_stream(void *ctx, const char *path, void *buf,
         want = (u16)((size - done > read_max)
                      ? read_max : (size - done));
         sfs_put32(pl, offset + done);
-        sfs_put16(pl + 4, want);
-        n = sfs_put_path(pl + 6, (u16)(sizeof(pl) - 6), path);
+        sfs_put16(pl + SFS_READ_COUNT_OFF, want);
+        n = sfs_put_path(pl + SFS_READ_PATH_OFF, (u16)(sizeof(pl) - SFS_READ_PATH_OFF), path);
         if (n < 0) return OS32_ERR_NAMETOOLONG;
-        rc = sfs_rpc(c, SFS_T_READ, pl, (u16)(6 + n), &body, &blen);
+        rc = sfs_rpc(c, SFS_T_READ, pl, (u16)(SFS_READ_PATH_OFF + n), &body, &blen);
         if (rc < 0) return rc;
         /* **要求より多く返さない。** 長さ欄と本体の長さも一致させる */
         if ((u32)rc > want || (u32)rc != blen) return OS32_ERR_IO;
@@ -299,7 +299,7 @@ static int sfs_write_at(SfsClient *c, const char *path, const u8 *src,
     while (first || done < size) {
         chunk = (u16)((size - done > room) ? room : (size - done));
         sfs_put32(pl, offset + done);
-        pl[4] = (u8)((first && first_trunc) ? SFS_WF_TRUNC : 0);
+        pl[SFS_WRITE_FLAGS_OFF] = (u8)((first && first_trunc) ? SFS_WF_TRUNC : 0);
         for (k = 0; k < chunk; k++) pl[SFS_WRITE_HDR_LEN + n + k] = src[done + k];
         rc = sfs_rpc(c, SFS_T_WRITE, pl, (u16)(SFS_WRITE_HDR_LEN + n + chunk), &body, &blen);
         if (rc < 0) return rc;
@@ -358,7 +358,7 @@ static int sfs_rename(void *ctx, const char *oldp, const char *newp)
 static int sfs_sync(void *ctx) { (void)ctx; return 0; }
 static u32 sfs_total_blocks(void *ctx) { (void)ctx; return 0; }
 static u32 sfs_free_blocks(void *ctx) { (void)ctx; return 0; }
-static u32 sfs_block_size(void *ctx) { (void)ctx; return 512; }
+static u32 sfs_block_size(void *ctx) { (void)ctx; return SFS_LOGICAL_BLOCK_SIZE; }
 
 static VfsOps g_serialfs_ops = {
     SERIALFS_NAME,

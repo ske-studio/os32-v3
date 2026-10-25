@@ -26,16 +26,7 @@
 #ifndef FS_HOSTDRV_STAT_RULES_INC
 #define FS_HOSTDRV_STAT_RULES_INC
 
-/* FILE_ATTRIBUTE_DIRECTORY。hostdrvfs.c 側で NP2_FILE_ATTRIBUTE_DIRECTORY
- * と一致することを STATIC_ASSERT で固定している ([C4])。 */
-#ifndef HDRV_STAT_ATTR_DIRECTORY
-#define HDRV_STAT_ATTR_DIRECTORY 0x00000010UL
-#endif
-
-/* st_size (u32) で表せる上限。これを越える EndOfFile は切り詰めずに断る。 */
-#ifndef HDRV_STAT_MAX_SIZE
-#define HDRV_STAT_MAX_SIZE 0xFFFFFFFFULL
-#endif
+#include "hostdrvfs_proto.h"
 
 /* ---- FILETIME -> Unix 秒 (票 H3 / 設計書 §5.1) -------------------------
  *
@@ -52,12 +43,6 @@
 #ifndef HDRV_FT_PER_SEC
 #define HDRV_FT_PER_SEC 10000000ULL
 #endif
-/* os_time_t は u32 (sdk/include/os32/os32_kapi_shared.h)。これを越える秒は
- * 回り込むので、切り詰めずに「判定できない」にする。 */
-#ifndef HDRV_STAT_MAX_TIME
-#define HDRV_STAT_MAX_TIME 0xFFFFFFFFULL
-#endif
-
 /* この .inc は「hdrv_stat の純規則」の置き場で、取り込む側が全部を使うとは
  * 限らない (票 H1 のホスト試験は時刻の規則を呼ばない)。-Wunused-function で
  * 落とさないよう印を付ける。GNU89 なので attribute は使える ([C1])。 */
@@ -92,7 +77,7 @@ hdrv_filetime_to_unix(unsigned long long ft, u32 *out)
     if (ft == 0ULL) return 0;                        /* (a) 未提供 */
     if (ft < HDRV_FT_EPOCH_DIFF_100NS) return 0;     /* (b) 1970 年より前 */
     secs = (ft - HDRV_FT_EPOCH_DIFF_100NS) / HDRV_FT_PER_SEC;
-    if (secs > HDRV_STAT_MAX_TIME) return 0;         /* (c) 範囲外 */
+    if (secs > ((unsigned long long)U32_MAX)) return 0;         /* (c) 範囲外 */
     *out = (u32)secs;
     return 1;
 }
@@ -117,12 +102,12 @@ hdrv_stat_fill(int basic_rc, u32 attributes,
     /* サイズが分からない。ゼロを「空ファイル」と読ませない */
     if (std_rc != 0) return OS32_ERR_IO;
     /* 64bit -> u32 の切り詰めは検出して断る (設計書 §4.3) */
-    if (end_of_file > HDRV_STAT_MAX_SIZE) return OS32_ERR_IO;
+    if (end_of_file > ((unsigned long long)U32_MAX)) return OS32_ERR_IO;
 
-    if (attributes & HDRV_STAT_ATTR_DIRECTORY) {
-        buf->st_mode = (u16)(OS_S_IFDIR | 0755);
+    if (attributes & NP2_FILE_ATTRIBUTE_DIRECTORY) {
+        buf->st_mode = (u16)(OS_S_IFDIR | OS32_DEFAULT_DIR_PERM);
     } else {
-        buf->st_mode = (u16)(OS_S_IFREG | 0644);
+        buf->st_mode = (u16)(OS_S_IFREG | OS32_DEFAULT_FILE_PERM);
     }
     buf->st_size = (u32)end_of_file;
     return 0;
@@ -179,32 +164,21 @@ hdrv_size_result(int std_rc, int is_directory)
  * エミュレータが応答しなかったとき (番兵 0xDEADBEEF) も既定の IO に落ちる。
  * **既定が OS32_ERR_IO であること**が安全性の要 — 知らない状態を
  * 「無い」と言わない。 */
-#ifndef HDRV_NT_SUCCESS
-#define HDRV_NT_SUCCESS                 0x00000000UL
-#define HDRV_NT_OBJECT_NAME_INVALID     0xC0000033UL
-#define HDRV_NT_OBJECT_NAME_NOT_FOUND   0xC0000034UL
-#define HDRV_NT_OBJECT_NAME_COLLISION   0xC0000035UL
-#define HDRV_NT_OBJECT_PATH_NOT_FOUND   0xC000003AUL
-#define HDRV_NT_FILE_IS_A_DIRECTORY     0xC00000BAUL
-#define HDRV_NT_NOT_A_DIRECTORY         0xC0000103UL
-#define HDRV_NT_DIRECTORY_NOT_EMPTY     0xC0000101UL
-#endif
-
 static HDRV_STAT_MAYBE_UNUSED int
 hdrv_create_status_to_vfs(unsigned long status)
 {
-    if (status == HDRV_NT_SUCCESS) return 0;
+    if (status == NP2_STATUS_SUCCESS) return 0;
 
     /* **ここだけが「無い」** */
-    if (status == HDRV_NT_OBJECT_NAME_NOT_FOUND ||
-        status == HDRV_NT_OBJECT_PATH_NOT_FOUND) return OS32_ERR_NOTFOUND;
+    if (status == NP2_STATUS_OBJECT_NAME_NOT_FOUND ||
+        status == NP2_STATUS_OBJECT_PATH_NOT_FOUND) return OS32_ERR_NOTFOUND;
 
     /* 意味がはっきりしているものはその意味で返す */
-    if (status == HDRV_NT_OBJECT_NAME_COLLISION) return OS32_ERR_EXIST;
-    if (status == HDRV_NT_FILE_IS_A_DIRECTORY)   return OS32_ERR_ISDIR;
-    if (status == HDRV_NT_NOT_A_DIRECTORY)       return OS32_ERR_NOTDIR;
-    if (status == HDRV_NT_DIRECTORY_NOT_EMPTY)   return OS32_ERR_NOTEMPTY;
-    if (status == HDRV_NT_OBJECT_NAME_INVALID)   return OS32_ERR_INVAL;
+    if (status == NP2_STATUS_OBJECT_NAME_COLLISION) return OS32_ERR_EXIST;
+    if (status == NP2_STATUS_FILE_IS_A_DIRECTORY)   return OS32_ERR_ISDIR;
+    if (status == NP2_STATUS_NOT_A_DIRECTORY)       return OS32_ERR_NOTDIR;
+    if (status == NP2_STATUS_DIRECTORY_NOT_EMPTY)   return OS32_ERR_NOTEMPTY;
+    if (status == NP2_STATUS_OBJECT_NAME_INVALID)   return OS32_ERR_INVAL;
 
     /* 知らない失敗は**必ず I/O エラー**。「無い」に落とさない。
      * 応答が無かったとき (番兵) もここに来る。 */

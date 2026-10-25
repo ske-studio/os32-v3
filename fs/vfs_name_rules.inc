@@ -53,6 +53,8 @@
  * ======================================================================== */
 
 #ifndef VFS_NAME_RULES_INC
+#include "utf8.h"
+
 #define VFS_NAME_RULES_INC
 
 #define VFS_NAME_RULE_WIN32  0   /* HostDrv: 途中の空白は通す */
@@ -64,14 +66,14 @@
 static u32 vfs_name_utf8_len(const u8 *p)
 {
     u8 c = p[0];
-    if (c < 0x80) return 1;
-    if (c >= 0xC2 && c <= 0xDF)
-        return ((p[1] & 0xC0) == 0x80) ? 2 : 0;
-    if (c >= 0xE0 && c <= 0xEF) {
-        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80) return 0;
-        if (c == 0xE0 && p[1] < 0xA0) return 0;     /* 冗長 (< U+0800) */
-        if (c == 0xED && p[1] >= 0xA0) return 0;    /* サロゲート */
-        return 3;
+    if (c < UTF8_ASCII_LIMIT) return 1;
+    if (c >= UTF8_LEAD2_MIN && c <= UTF8_LEAD2_MAX)
+        return UTF8_IS_CONT(p[1]) ? UTF8_LEN2 : 0;
+    if (c >= UTF8_LEAD3_MIN && c <= UTF8_LEAD3_MAX) {
+        if (!UTF8_IS_CONT(p[1]) || !UTF8_IS_CONT(p[2])) return 0;
+        if (c == UTF8_LEAD3_MIN && p[1] < UTF8_SECOND3_MIN) return 0;     /* 冗長 (< U+0800) */
+        if (c == UTF8_LEAD3_SURROGATE && p[1] >= UTF8_SECOND3_MIN) return 0;    /* サロゲート */
+        return UTF8_LEN3;
     }
     return 0;   /* 単独の継続バイト、0xC0 / 0xC1、4 バイト以上 */
 }

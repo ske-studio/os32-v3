@@ -710,7 +710,8 @@ static void case_a11_rules(void)
           "u32 上限ちょうどは通る (通常ファイル)");
 
     memset(&st, 0, sizeof(st));
-    check(hdrv_stat_fill(0, HDRV_STAT_ATTR_DIRECTORY, 0, 4096ULL, &st) == 0 &&
+    check(hdrv_stat_fill(0, 0x10UL /* NT wire FILE_ATTRIBUTE_DIRECTORY */,
+                         0, 4096ULL, &st) == 0 &&
               (st.st_mode & OS_S_IFMT) == OS_S_IFDIR,
           "DIRECTORY 属性 -> ディレクトリ");
 

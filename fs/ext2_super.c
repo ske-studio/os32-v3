@@ -9,11 +9,15 @@
 /*    ext2ブロックN → IDEセクタ (N*2)                                      */
 /* ======================================================================== */
 
+#include "ide_limits.h"
 #include "ext2_priv.h"
 #include "ide.h"    /* ide_drive_present, ide_get_info — 存在と総セクタ数 */
 #include "kprintf.h"
 #include "bootinfo.h" /* bootinfo_part_geom — 区画表の CHS の幾何 */
 #include "pc98pt.h"   /* 区画表の共有部 (票 TASK_HDD_INSTALL 段 1-4) */
+
+#define EXT2_FALLBACK_EPOCH 0x67E8E800UL /* 2025-03-30 06:43:12 UTC */
+#define EXT2_DEVICE_NAME_CAP 8
 
 /* 共有静的バッファ (スタックオーバーフロー防止)
  * シングルタスクOSのため全インスタンスで共有可能。
@@ -30,10 +34,10 @@ u8 ext2_g_dat[EXT2_BLOCK_SIZE];
 
 /* ブロック block_num (1KB = 2 セクタ) が区画の中か。part_len は区画の長さ
  * (セクタ)。媒体から読んだブロック番号は壊れていることがあるので、掛け算の
- * 前に割り算の側で比べる (block_num * 2 の桁あふれで範囲内に化けない)。 */
+ * 前に割り算の側で比べる (block_num * EXT2_SECTORS_PER_BLOCK の桁あふれで範囲内に化けない)。 */
 static int ext2_block_in_part(const Ext2Ctx *ctx, u32 block_num)
 {
-    return (block_num < ctx->part_len / 2U) ? 1 : 0;
+    return (block_num < ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) ? 1 : 0;
 }
 
 /* ---- 生の 1KB ブロック I/O (エラー状態に触らない) ---- */
@@ -44,14 +48,14 @@ static int ext2_raw_read_block(Ext2Ctx *ctx, u32 block_num, void *buf)
     int ret;
 
     if (!ext2_block_in_part(ctx, block_num)) return EXT2_ERR_IO;
-    sector = ctx->base_lba + block_num * 2;
+    sector = ctx->base_lba + block_num * EXT2_SECTORS_PER_BLOCK;
 
     /* セクタ0 → buf[0..511] */
     ret = dev_blk_read_lba(ctx->dev, sector, 1, dst);
     if (ret != 0) return ret;
 
     /* セクタ1 → buf[512..1023] */
-    ret = dev_blk_read_lba(ctx->dev, sector + 1, 1, dst + 512);
+    ret = dev_blk_read_lba(ctx->dev, sector + 1, 1, dst + EXT2_SECTOR_SIZE);
     return ret;
 }
 
@@ -61,10 +65,10 @@ static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)
     int ret;
 
     if (!ext2_block_in_part(ctx, block_num)) return EXT2_ERR_IO;
-    sector = ctx->base_lba + block_num * 2;
+    sector = ctx->base_lba + block_num * EXT2_SECTORS_PER_BLOCK;
     ret = dev_blk_write_lba(ctx->dev, sector, 1, buf);
     if (ret != 0) return ret;
-    ret = dev_blk_write_lba(ctx->dev, sector + 1, 1, (const u8 *)buf + 512);
+    ret = dev_blk_write_lba(ctx->dev, sector + 1, 1, (const u8 *)buf + EXT2_SECTOR_SIZE);
     return ret;
 }
 
@@ -116,14 +120,14 @@ int ext2_write_data_block(Ext2Ctx *ctx, u32 block_num, const void *buf)
 int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf)
 {
     if (!ext2_block_in_part(ctx, block_num) || sect > 1) return EXT2_ERR_IO;
-    return dev_blk_read_lba(ctx->dev, ctx->base_lba + block_num * 2 + sect,
+    return dev_blk_read_lba(ctx->dev, ctx->base_lba + block_num * EXT2_SECTORS_PER_BLOCK + sect,
                             1, buf);
 }
 
 int ext2_write_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, const void *buf)
 {
     if (!ext2_block_in_part(ctx, block_num) || sect > 1) return EXT2_ERR_IO;
-    return dev_blk_write_lba(ctx->dev, ctx->base_lba + block_num * 2 + sect,
+    return dev_blk_write_lba(ctx->dev, ctx->base_lba + block_num * EXT2_SECTORS_PER_BLOCK + sect,
                              1, buf);
 }
 
@@ -135,7 +139,7 @@ int ext2_write_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, const void *buf)
  * 使ってはいけない** — ext2_fs_error は操作の途中 (例えば二重間接表を g_blk に
  * 載せたまま内側の表の読み取りが落ちた瞬間) に呼ばれるので、共有バッファを
  * 潰すと呼び手が走査中の表が化ける (gotcha §4-24 と同じ壊れ方)。 */
-static u8 ext2_g_err_sect[512];
+static u8 ext2_g_err_sect[EXT2_SECTOR_SIZE];
 
 void ext2_fs_error(Ext2Ctx *ctx)
 {
@@ -149,14 +153,14 @@ void ext2_fs_error(Ext2Ctx *ctx)
     /* フォーマット中の一時 ctx など、マウントしていない ctx は媒体に書かない */
     if (!ctx->mounted) return;
 
-    kprintf(0x0C, "[EXT2] I/O error on metadata: writes disabled until remount "
+    kprintf(KLOG_LEGACY_LIGHT_RED, "[EXT2] I/O error on metadata: writes disabled until remount "
                   "(run e2fsck)\n");
 
     /* スーパーブロック = ブロック 1 = セクタ base+2 の先頭 512B に s_state が居る。
      * **そのセクタだけ**を読み直して 1 フィールドだけ変えて書く。空き数などの
      * メモリ上の値は書かない (操作の途中で、ビットマップと合っている保証が無い)。
      * 失敗しても何もしない — メモリ上のエラー状態は立っている。 */
-    sector = ctx->base_lba + 2;
+    sector = ctx->base_lba + EXT2_SUPER_LBA;
     if (dev_blk_read_lba(ctx->dev, sector, 1, ext2_g_err_sect) != 0) return;
     state = le16_rd(&ext2_g_err_sect[EXT2_SB_STATE_OFF]);
     if (state & EXT2_ERROR_FS) return;  /* 既に立っている */
@@ -250,7 +254,7 @@ void ext2_path_memo_put(Ext2Ctx *ctx, const char *path, u32 ino)
 
 u32 ext2_current_time(void)
 {
-    return 0x67E8E800UL;  /* 2025-01-01 00:00:00 UTC 近似 */
+    return EXT2_FALLBACK_EPOCH;
 }
 
 /* ======================================================================== */
@@ -262,8 +266,8 @@ int ext2_write_super_raw(Ext2Ctx *ctx)
     int ret;
     ret = ext2_read_block(ctx, 1, ext2_g_blk);
     if (ret != 0) return EXT2_ERR_IO;
-    le32_wr(&ext2_g_blk[12], ctx->sb_info.free_blocks_count);
-    le32_wr(&ext2_g_blk[16], ctx->sb_info.free_inodes_count);
+    le32_wr(&ext2_g_blk[EXT2_SB_FREE_BLOCKS_COUNT_OFF], ctx->sb_info.free_blocks_count);
+    le32_wr(&ext2_g_blk[EXT2_SB_FREE_INODES_COUNT_OFF], ctx->sb_info.free_inodes_count);
     return ext2_write_block(ctx, 1, ext2_g_blk);
 }
 
@@ -276,8 +280,8 @@ int ext2_write_gd_raw(Ext2Ctx *ctx)
 
     /* GDTが占めるブロック数を計算 (32B × num_groups) */
     for (g = 0; g < ctx->num_groups; g++) {
-        gd_block = 2 + (g * 32) / EXT2_BLOCK_SIZE;
-        offset = (g * 32) % EXT2_BLOCK_SIZE;
+        gd_block = EXT2_GDT_FIRST_BLOCK + (g * EXT2L_GD_SIZE) / EXT2_BLOCK_SIZE;
+        offset = (g * EXT2L_GD_SIZE) % EXT2_BLOCK_SIZE;
 
         /* ブロックの先頭エントリの場合のみ読み込み */
         if (offset == 0) {
@@ -285,15 +289,15 @@ int ext2_write_gd_raw(Ext2Ctx *ctx)
             if (ret != 0) return EXT2_ERR_IO;
         }
 
-        le32_wr(&ext2_g_blk[offset + 0], ctx->gd_table[g].block_bitmap);
-        le32_wr(&ext2_g_blk[offset + 4], ctx->gd_table[g].inode_bitmap);
-        le32_wr(&ext2_g_blk[offset + 8], ctx->gd_table[g].inode_table);
-        le16_wr(&ext2_g_blk[offset + 12], ctx->gd_table[g].free_blocks);
-        le16_wr(&ext2_g_blk[offset + 14], ctx->gd_table[g].free_inodes);
-        le16_wr(&ext2_g_blk[offset + 16], ctx->gd_table[g].used_dirs);
+        le32_wr(&ext2_g_blk[offset + EXT2_GD_BLOCK_BITMAP_OFF], ctx->gd_table[g].block_bitmap);
+        le32_wr(&ext2_g_blk[offset + EXT2_GD_INODE_BITMAP_OFF], ctx->gd_table[g].inode_bitmap);
+        le32_wr(&ext2_g_blk[offset + EXT2_GD_INODE_TABLE_OFF], ctx->gd_table[g].inode_table);
+        le16_wr(&ext2_g_blk[offset + EXT2_GD_FREE_BLOCKS_OFF], ctx->gd_table[g].free_blocks);
+        le16_wr(&ext2_g_blk[offset + EXT2_GD_FREE_INODES_OFF], ctx->gd_table[g].free_inodes);
+        le16_wr(&ext2_g_blk[offset + EXT2_GD_USED_DIRS_OFF], ctx->gd_table[g].used_dirs);
 
         /* ブロック末尾のエントリ or 最後のグループの場合に書き込み */
-        if (offset + 32 >= EXT2_BLOCK_SIZE || g == ctx->num_groups - 1) {
+        if (offset + EXT2L_GD_SIZE >= EXT2_BLOCK_SIZE || g == ctx->num_groups - 1) {
             ret = ext2_write_block(ctx, gd_block, ext2_g_blk);
             if (ret != 0) return EXT2_ERR_IO;
         }
@@ -307,7 +311,7 @@ int ext2_write_gd_raw(Ext2Ctx *ctx)
 
 Device *ext2_dev_for(int ide_drive)
 {
-    char devname[8];
+    char devname[EXT2_DEVICE_NAME_CAP];
     devname[0] = 'h';
     devname[1] = 'd';
     devname[2] = (char)('0' + (ide_drive & 0xFF));
@@ -392,49 +396,49 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
         if (ret == EXT2_ERR_NOPART && legacy) {
             /* v63 までの OS32 が書いた旧配置。v64 は読まない (票 段 1-4) ので、
              * NOPART だけでは直し方が分からない — 何をすればよいかを出す (Opus M2) */
-            kprintf(0x0C, "[EXT2] hd%d: partition table is in the pre-v64 OS32 layout; "
+            kprintf(KLOG_LEGACY_LIGHT_RED, "[EXT2] hd%d: partition table is in the pre-v64 OS32 layout; "
                           "migrate it (host: make nhd-migrate-pt) or reinstall\n",
-                    ide_drive & 3);
+                    ide_drive & FS_IDE_DRIVE_ID_MASK);
         }
         if (ret != EXT2_OK) return ret;
         /* どちらの幾何で区画の位置を決めたか (BIOS が無いと IDENTIFY に落ちる。m3) */
         kprintf(KLOG_ATTR, "[EXT2] hd%d: partition LBA %u +%u (CHS geometry from %s)\n",
-                ide_drive & 3, ctx->base_lba, ctx->part_len,
+                ide_drive & FS_IDE_DRIVE_ID_MASK, ctx->base_lba, ctx->part_len,
                 src == BOOTINFO_GEOM_BIOS ? "BIOS" : "IDENTIFY");
     }
-    if (ctx->part_len < 4) return EXT2_ERR_NOPART;   /* ブロック 0〜1 も無い */
+    if (ctx->part_len < EXT2_MIN_PART_SECTORS) return EXT2_ERR_NOPART;   /* ブロック 0〜1 も無い */
 
     /* スーパーブロック読み込み: Device API 経由 */
     {
-        u8 sb_sect[512];
-        ret = dev_blk_read_lba(ctx->dev, ctx->base_lba + 2, 1, sb_sect);
+        u8 sb_sect[EXT2_SECTOR_SIZE];
+        ret = dev_blk_read_lba(ctx->dev, ctx->base_lba + EXT2_SUPER_LBA, 1, sb_sect);
         if (ret != 0) return EXT2_ERR_IO;
-        kmemcpy(ext2_g_blk, sb_sect, 512);
+        kmemcpy(ext2_g_blk, sb_sect, EXT2_SECTOR_SIZE);
         
-        ret = dev_blk_read_lba(ctx->dev, ctx->base_lba + 3, 1, sb_sect);
+        ret = dev_blk_read_lba(ctx->dev, ctx->base_lba + EXT2_SUPER_LBA + 1, 1, sb_sect);
         if (ret != 0) return EXT2_ERR_IO;
-        kmemcpy(ext2_g_blk + 512, sb_sect, 512);
+        kmemcpy(ext2_g_blk + EXT2_SECTOR_SIZE, sb_sect, EXT2_SECTOR_SIZE);
     }
 
     {
-        u16 magic = le16_rd(&ext2_g_blk[56]);
+        u16 magic = le16_rd(&ext2_g_blk[EXT2_SB_MAGIC_OFF]);
         if (magic != EXT2_SUPER_MAGIC) return EXT2_ERR_MAGIC;
     }
 
-    ctx->sb_info.total_inodes     = le32_rd(&ext2_g_blk[0]);
-    ctx->sb_info.total_blocks     = le32_rd(&ext2_g_blk[4]);
-    ctx->sb_info.free_blocks_count = le32_rd(&ext2_g_blk[12]);
-    ctx->sb_info.free_inodes_count = le32_rd(&ext2_g_blk[16]);
-    ctx->sb_info.first_data_block = le32_rd(&ext2_g_blk[20]);
-    ctx->sb_info.block_size       = 1024U << le32_rd(&ext2_g_blk[24]);
-    ctx->sb_info.blocks_per_group = le32_rd(&ext2_g_blk[32]);
-    ctx->sb_info.inodes_per_group = le32_rd(&ext2_g_blk[40]);
-    ctx->sb_info.magic            = le16_rd(&ext2_g_blk[56]);
-    ctx->sb_info.first_ino        = le32_rd(&ext2_g_blk[84]);
+    ctx->sb_info.total_inodes     = le32_rd(&ext2_g_blk[EXT2_SB_INODES_COUNT_OFF]);
+    ctx->sb_info.total_blocks     = le32_rd(&ext2_g_blk[EXT2_SB_BLOCKS_COUNT_OFF]);
+    ctx->sb_info.free_blocks_count = le32_rd(&ext2_g_blk[EXT2_SB_FREE_BLOCKS_COUNT_OFF]);
+    ctx->sb_info.free_inodes_count = le32_rd(&ext2_g_blk[EXT2_SB_FREE_INODES_COUNT_OFF]);
+    ctx->sb_info.first_data_block = le32_rd(&ext2_g_blk[EXT2_SB_FIRST_DATA_BLOCK_OFF]);
+    ctx->sb_info.block_size       = (unsigned int)EXT2_BLOCK_SIZE << le32_rd(&ext2_g_blk[EXT2_SB_LOG_BLOCK_SIZE_OFF]);
+    ctx->sb_info.blocks_per_group = le32_rd(&ext2_g_blk[EXT2_SB_BLOCKS_PER_GROUP_OFF]);
+    ctx->sb_info.inodes_per_group = le32_rd(&ext2_g_blk[EXT2_SB_INODES_PER_GROUP_OFF]);
+    ctx->sb_info.magic            = le16_rd(&ext2_g_blk[EXT2_SB_MAGIC_OFF]);
+    ctx->sb_info.first_ino        = le32_rd(&ext2_g_blk[EXT2_SB_FIRST_INO_OFF]);
     /* ファイルシステムが区画より大きい = 区画表と中身が食い違っている。
      * マウントすると区画の外 (次の区画・ディスクの外) を割り当てに使う。 */
-    if (ctx->sb_info.total_blocks > ctx->part_len / 2U) {
-        kprintf(0x0C, "[EXT2] fs (%u blocks) exceeds partition (%u sectors)\n",
+    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {
+        kprintf(KLOG_LEGACY_LIGHT_RED, "[EXT2] fs (%u blocks) exceeds partition (%u sectors)\n",
                 ctx->sb_info.total_blocks, ctx->part_len);
         return EXT2_ERR_NOPART;
     }
@@ -444,16 +448,16 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
     ctx->mounted_with_errors =
         (le16_rd(&ext2_g_blk[EXT2_SB_STATE_OFF]) & EXT2_ERROR_FS) ? 1 : 0;
     if (ctx->mounted_with_errors) {
-        kprintf(0x0E, "[EXT2] warning: mounting fs with errors, "
+        kprintf(KLOG_LEGACY_YELLOW, "[EXT2] warning: mounting fs with errors, "
                       "running e2fsck is recommended\n");
     }
-    ctx->sb_info.inode_size       = le16_rd(&ext2_g_blk[88]);
-    if (ctx->sb_info.inode_size == 0) ctx->sb_info.inode_size = 128;
+    ctx->sb_info.inode_size       = le16_rd(&ext2_g_blk[EXT2_SB_INODE_SIZE_OFF]);
+    if (ctx->sb_info.inode_size == 0) ctx->sb_info.inode_size = EXT2L_INODE_SIZE;
 
-    for (i = 0; i < 16; i++) {
-        ctx->sb_info.volume_name[i] = (char)ext2_g_blk[120 + i];
+    for (i = 0; i < EXT2_VOLUME_NAME_LEN; i++) {
+        ctx->sb_info.volume_name[i] = (char)ext2_g_blk[EXT2_SB_VOLUME_NAME_OFF + i];
     }
-    ctx->sb_info.volume_name[16] = '\0';
+    ctx->sb_info.volume_name[EXT2_VOLUME_NAME_LEN] = '\0';
 
     /* グループ数を計算 */
     ctx->num_groups = (ctx->sb_info.total_blocks - ctx->sb_info.first_data_block
@@ -466,8 +470,8 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
     {
         u32 g, gd_block, offset;
         for (g = 0; g < ctx->num_groups; g++) {
-            gd_block = 2 + (g * 32) / EXT2_BLOCK_SIZE;
-            offset = (g * 32) % EXT2_BLOCK_SIZE;
+            gd_block = EXT2_GDT_FIRST_BLOCK + (g * EXT2L_GD_SIZE) / EXT2_BLOCK_SIZE;
+            offset = (g * EXT2L_GD_SIZE) % EXT2_BLOCK_SIZE;
 
             /* ブロックの先頭エントリの場合のみ読み込み */
             if (offset == 0) {
@@ -475,12 +479,12 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
                 if (ret != 0) return EXT2_ERR_IO;
             }
 
-            ctx->gd_table[g].block_bitmap = le32_rd(&ext2_g_blk[offset + 0]);
-            ctx->gd_table[g].inode_bitmap = le32_rd(&ext2_g_blk[offset + 4]);
-            ctx->gd_table[g].inode_table  = le32_rd(&ext2_g_blk[offset + 8]);
-            ctx->gd_table[g].free_blocks  = le16_rd(&ext2_g_blk[offset + 12]);
-            ctx->gd_table[g].free_inodes  = le16_rd(&ext2_g_blk[offset + 14]);
-            ctx->gd_table[g].used_dirs    = le16_rd(&ext2_g_blk[offset + 16]);
+            ctx->gd_table[g].block_bitmap = le32_rd(&ext2_g_blk[offset + EXT2_GD_BLOCK_BITMAP_OFF]);
+            ctx->gd_table[g].inode_bitmap = le32_rd(&ext2_g_blk[offset + EXT2_GD_INODE_BITMAP_OFF]);
+            ctx->gd_table[g].inode_table  = le32_rd(&ext2_g_blk[offset + EXT2_GD_INODE_TABLE_OFF]);
+            ctx->gd_table[g].free_blocks  = le16_rd(&ext2_g_blk[offset + EXT2_GD_FREE_BLOCKS_OFF]);
+            ctx->gd_table[g].free_inodes  = le16_rd(&ext2_g_blk[offset + EXT2_GD_FREE_INODES_OFF]);
+            ctx->gd_table[g].used_dirs    = le16_rd(&ext2_g_blk[offset + EXT2_GD_USED_DIRS_OFF]);
         }
     }
 

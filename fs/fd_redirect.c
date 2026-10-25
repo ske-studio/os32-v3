@@ -13,7 +13,7 @@
 #include "os32_kapi_shared.h"
 
 /* FD 0/1/2 のリダイレクト状態テーブル */
-static FdRedirect redir_table[3];
+static FdRedirect redir_table[FD_REDIRECT_SLOTS];
 
 /* Buffer write refusals (including a failed per-page recheck), not capacity
  * truncation or read/registration failures. Diagnostic only; no KAPI. */
@@ -32,7 +32,7 @@ int  res_owner_get(void)      { return cur_res_owner; }
 void fd_redirect_init(void)
 {
     int i;
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < FD_REDIRECT_SLOTS; i++) {
         redir_table[i].target_type = FD_TARGET_CONSOLE;
         redir_table[i].file_fd = -1;
         redir_table[i].buffer = (u8 *)0;
@@ -53,7 +53,7 @@ int fd_redirect_to_file(int fd, const char *path, int mode)
     int file_fd;
     int open_mode;
 
-    if (fd < 0 || fd > 2) return -1;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return -1;
     if (!path) return -1;
 
     /* 既存のリダイレクトを解除 */
@@ -93,7 +93,7 @@ int fd_redirect_to_buffer(int fd, u8 *buf, u32 size, u32 len)
 {
     RedirAccess access;
 
-    if (fd < 0 || fd > 2) return -1;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return -1;
     if (!buf || size == 0 || len > size || size - 1 > ~(u32)0 - (u32)(uptr)buf)
         return -1;
     if (!redir_access_capture(&access) ||
@@ -120,7 +120,7 @@ int fd_redirect_to_buffer(int fd, u8 *buf, u32 size, u32 len)
 
 void fd_redirect_reset(int fd)
 {
-    if (fd < 0 || fd > 2) return;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return;
 
     /* ファイルリダイレクト中ならクローズ */
     if (redir_table[fd].target_type == FD_TARGET_FILE) {
@@ -160,7 +160,7 @@ void fd_redirect_reset_owned(int owner)
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 {
     if (out_file_fd) *out_file_fd = -1;
-    if (fd < 0 || fd > 2) return OS_S_IFCHR;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return OS_S_IFCHR;
 
     switch (redir_table[fd].target_type) {
     case FD_TARGET_FILE:
@@ -177,7 +177,7 @@ u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 
 int fd_is_redirected(int fd)
 {
-    if (fd < 0 || fd > 2) return 0;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return 0;
     return (fd_redirect_ifmt(fd, (int *)0) != OS_S_IFCHR);
 }
 
@@ -189,7 +189,7 @@ int fd_redirect_read(int fd, void *buf, u32 size)
 {
     FdRedirect *r;
 
-    if (fd < 0 || fd > 2) return -1;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return -1;
     r = &redir_table[fd];
 
     if (r->target_type == FD_TARGET_FILE) {
@@ -222,7 +222,7 @@ int fd_redirect_write(int fd, const void *buf, u32 size)
 {
     FdRedirect *r;
 
-    if (fd < 0 || fd > 2) return -1;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return -1;
     r = &redir_table[fd];
 
     if (r->target_type == FD_TARGET_FILE) {
@@ -254,7 +254,7 @@ int fd_redirect_write(int fd, const void *buf, u32 size)
 
 u32 fd_redirect_get_buf_len(int fd)
 {
-    if (fd < 0 || fd > 2) return 0;
+    if (fd < 0 || fd >= FD_REDIRECT_SLOTS) return 0;
     if (redir_table[fd].target_type != FD_TARGET_BUFFER) return 0;
     return redir_table[fd].buf_len;
 }

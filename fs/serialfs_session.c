@@ -45,10 +45,12 @@
 extern volatile u32 tick_count;
 extern int res_owner_get(void);
 
-/* kprintf の属性 (PC/AT 流。kprintf が入口で PC-98 流へ直す) */
-#define SFS_ATTR_INFO  0x0B
-#define SFS_ATTR_WARN  0x0E
-#define SFS_ATTR_ERR   0x0C
+/* 保留ログを生出力する際の排出バッファ容量。 */
+#define SFS_HOLD_FLUSH_BUF_SIZE 64
+
+/* セッション nonce の分散係数。 */
+#define SFS_NONCE_MIX 0x9E3779B9UL
+
 #define SFS_LAN_READY_MS 100
 
 static SfsClient g_cli;
@@ -109,7 +111,7 @@ static void sfs_send_log(void)
 /* ゲートを下ろした後に、溜めた文字をそのまま流す (HELLO が通らなかった回) */
 static void sfs_flush_hold_raw(void)
 {
-    u8 buf[64];
+    u8 buf[SFS_HOLD_FLUSH_BUF_SIZE];
     u32 n, i;
 
     for (;;) {
@@ -135,7 +137,7 @@ static int sfs_finish(int code)
     int quiet;
     u32 flags = 0;
     u32 dropped;
-    u8 pl[12];
+    u8 pl[SFS_EXIT_LEN];
 
     if (g_cli.sid != 0) (void)sfs_client_oneway(&g_cli, SFS_T_BYE, 0, 0);
     /* 子が /host を付け替えていたら、それは外さない */
@@ -153,16 +155,16 @@ static int sfs_finish(int code)
         g_lan.clock_ctx = 0;
         lan_module_session_release();
         if (g_cli.dead != SFS_DEAD_NONE)
-            kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
+            kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: line declared dead (%s)\n",
                     sfs_dead_name(g_cli.dead));
-        kprintf(SFS_ATTR_INFO,
+        kprintf(KLOG_LEGACY_CYAN,
                 "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u rxfull=%u avg_us=%u max_us=%u\n",
                 g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
                 g_cli.dec.bad_crc, g_cli.dec.bad_len,
                 g_lan_rxfull,
                 g_cli.rtt_samples ? (u32)(g_cli.rtt_total_us / g_cli.rtt_samples) : 0,
                 g_cli.rtt_max_us);
-        kprintf(SFS_ATTR_INFO, "sfs: exit=%d\n", code);
+        kprintf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", code);
         sfs_dec_reset(&g_cli.dec);
         g_cli.sid = 0;
         g_active = g_use_lan = 0;
@@ -172,17 +174,17 @@ static int sfs_finish(int code)
     quiet = sfs_client_quiesce(&g_cli, SFS_QUIET_MS, SFS_QUIET_MAX_MS);
     if (!quiet) {
         flags |= SFS_XF_NOT_QUIET;
-        kprintf(SFS_ATTR_WARN,
+        kprintf(KLOG_LEGACY_YELLOW,
                 "sfs: line not quiet after %ums; closing the session anyway\n",
                 (u32)SFS_QUIET_MAX_MS);
     }
     if (g_cli.dead != SFS_DEAD_NONE) {
         flags |= SFS_XF_DEAD;
-        kprintf(SFS_ATTR_ERR, "sfs: line declared dead (%s)\n",
+        kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: line declared dead (%s)\n",
                 sfs_dead_name(g_cli.dead));
     }
     if (g_cli.sid != 0) {
-        kprintf(SFS_ATTR_INFO,
+        kprintf(KLOG_LEGACY_CYAN,
                 "sfs: requests=%u resent=%u timeouts=%u stray=%u bad_crc=%u bad_len=%u avg_us=%u max_us=%u\n",
                 g_cli.calls, g_cli.resends, g_cli.timeouts, g_cli.stray,
                 g_cli.dec.bad_crc, g_cli.dec.bad_len,
@@ -191,15 +193,15 @@ static int sfs_finish(int code)
         sfs_send_log();
         dropped = serial_hold_dropped();
         if (dropped)
-            kprintf(SFS_ATTR_WARN, "sfs: log dropped %u bytes (oldest)\n", dropped);
-        kprintf(SFS_ATTR_INFO, "sfs: exit=%d\n", code);
+            kprintf(KLOG_LEGACY_YELLOW, "sfs: log dropped %u bytes (oldest)\n", dropped);
+        kprintf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", code);
         sfs_send_log();
         sfs_put32(pl, (u32)code);
-        sfs_put32(pl + 4, dropped);
-        sfs_put32(pl + 8, flags);
+        sfs_put32(pl + SFS_EXIT_DROPPED_OFF, dropped);
+        sfs_put32(pl + SFS_EXIT_FLAGS_OFF, flags);
         /* ここから下ろすまでに保留へ入った文字 (ISR の kprintf) は、下ろした
          * 後に sfs_flush_hold_raw が生で流す (もう一度汲んでも窓は残る) */
-        (void)sfs_client_oneway(&g_cli, SFS_T_EXIT, pl, 12);
+        (void)sfs_client_oneway(&g_cli, SFS_T_EXIT, pl, SFS_EXIT_LEN);
     }
 
     serial_gate_set(0);
@@ -231,7 +233,7 @@ int serialfs_session_begin(void)
     g_use_lan = sysconfig_get_int(SYS_SYSTEM_CFG, "SFS_LAN", 0) == 1;
     if (g_use_lan) {
         if (!lan_module_session_acquire()) {
-            kprintf(SFS_ATTR_ERR, "sfs: lan.mod unavailable (sfs lan off for serial)\n");
+            kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: lan.mod unavailable (sfs lan off for serial)\n");
             g_use_lan = 0;
             return OS32_ERR_IO;
         }
@@ -251,14 +253,14 @@ int serialfs_session_begin(void)
         (void)sysconfig_get_str(SYS_SYSTEM_CFG, "SFS_LAN_PEER", peer, sizeof(peer));
         if ((state != E82557_RUNNING && state != E82557_RX_WAIT) ||
             sfs_lan_set_peer(&g_lan, peer) != 0) {
-            kprintf(SFS_ATTR_ERR, "sfs: LAN unavailable or invalid SFS_LAN_PEER\n");
+            kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: LAN unavailable or invalid SFS_LAN_PEER\n");
             (void)sfs_finish(OS32_ERR_IO);
             return OS32_ERR_IO;
         }
         start = tick_count;
         while (!e82557_rx_ready()) {
             if ((u32)(tick_count - start) >= sfs_ms_ticks(SFS_LAN_READY_MS)) {
-                kprintf(SFS_ATTR_WARN,
+                kprintf(KLOG_LEGACY_YELLOW,
                         "sfs: LAN RX not ready after %ums; trying HELLO anyway\n",
                         (u32)SFS_LAN_READY_MS);
                 break;
@@ -276,11 +278,11 @@ int serialfs_session_begin(void)
     /* (2) ゲート → (3) HELLO */
     if (!g_use_lan) serial_gate_set(1);
     g_nonce_ctr++;
-    rc = sfs_client_hello(&g_cli, tick_count ^ (g_nonce_ctr * 0x9E3779B9UL));
+    rc = sfs_client_hello(&g_cli, tick_count ^ (g_nonce_ctr * SFS_NONCE_MIX));
     if (rc != 0) {
         if (g_use_lan)
-            kprintf(SFS_ATTR_ERR, "sfs: no answer to LAN HELLO\n");
-        else kprintf(SFS_ATTR_ERR,
+            kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: no answer to LAN HELLO\n");
+        else kprintf(KLOG_LEGACY_LIGHT_RED,
                 "sfs: no answer to HELLO at %ubps (host must run "
                 "rshell_serial.py --serve-host)\n", baud);
         (void)sfs_finish(rc);
@@ -292,13 +294,13 @@ int serialfs_session_begin(void)
     rc = vfs_mount(SERIALFS_PREFIX, SERIALFS_DEVNAME, SERIALFS_NAME);
     serialfs_forbid();
     if (rc != VFS_OK) {
-        kprintf(SFS_ATTR_ERR, "sfs: mount %s failed (%d)\n",
+        kprintf(KLOG_LEGACY_LIGHT_RED, "sfs: mount %s failed (%d)\n",
                 SERIALFS_PREFIX, rc);
         (void)sfs_finish(rc);
         return rc;
     }
     if (g_use_lan)
-        kprintf(SFS_ATTR_INFO,
+        kprintf(KLOG_LEGACY_CYAN,
                 "sfs: transport=lan nic=82557 peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
                 (u32)g_lan.peer[0], (u32)g_lan.peer[1], (u32)g_lan.peer[2],
                 (u32)g_lan.peer[3], (u32)g_lan.peer[4], (u32)g_lan.peer[5], g_cli.sid);

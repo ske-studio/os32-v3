@@ -6,6 +6,11 @@
 
 #include "ext2_layout.h"
 
+#define EXT2_SPARSE_BASE3 3
+#define EXT2_SPARSE_BASE5 5
+#define EXT2_SPARSE_BASE7 7
+#define EXT2_GROUP_BITMAPS 2UL
+
 static int is_power_of(u32 n, u32 base)
 {
     u32 v = base;
@@ -16,12 +21,12 @@ static int is_power_of(u32 n, u32 base)
 int ext2_layout_is_sparse(u32 g)
 {
     if (g <= 1) return 1;
-    return (is_power_of(g, 3) || is_power_of(g, 5) || is_power_of(g, 7)) ? 1 : 0;
+    return (is_power_of(g, EXT2_SPARSE_BASE3) || is_power_of(g, EXT2_SPARSE_BASE5) || is_power_of(g, EXT2_SPARSE_BASE7)) ? 1 : 0;
 }
 
 u32 ext2_layout_group_overhead(const Ext2Layout *l, u32 g)
 {
-    u32 n = 2UL + l->itable_blocks;               /* bitmap 2 + inode 表 */
+    u32 n = EXT2_GROUP_BITMAPS + l->itable_blocks;               /* bitmap 2 + inode 表 */
     if (ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;   /* SB + GDT */
     return n;
 }
@@ -42,7 +47,7 @@ static int layout_fill(u32 total_blocks, u32 max_groups, Ext2Layout *l)
     inodes = total_blocks / EXT2L_BLOCKS_PER_INODE;
     if (inodes < EXT2L_MIN_INODES) inodes = EXT2L_MIN_INODES;
     l->inodes_per_group = (inodes + l->num_groups - 1UL) / l->num_groups;
-    l->inodes_per_group = (l->inodes_per_group + 7UL) & ~7UL;
+    l->inodes_per_group = (l->inodes_per_group + BITS_PER_BYTE - 1UL) & ~(BITS_PER_BYTE - 1UL);
     l->inodes_count = l->inodes_per_group * l->num_groups;
     l->itable_blocks = (l->inodes_per_group * EXT2L_INODE_SIZE
                         + EXT2L_BLOCK_SIZE - 1UL) / EXT2L_BLOCK_SIZE;
@@ -64,7 +69,7 @@ int ext2_layout_plan(u32 sectors, u32 max_groups, Ext2Layout *out)
     int rc, iter;
 
     if (!out) return EXT2L_ERR_SMALL;
-    tb = sectors / 2UL;                           /* 512 B → 1 KB */
+    tb = sectors / (unsigned long)EXT2_SECTORS_PER_BLOCK;                           /* 512 B → 1 KB */
 
     for (iter = 0; iter < EXT2L_MAX_ITER; iter++) {
         rc = layout_fill(tb, max_groups, &l);

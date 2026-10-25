@@ -12,6 +12,21 @@
 
 #include "types.h"
 
+#define HOSTDRV_NAME_BUF_WORDS 260 /* UTF-16 MAX_PATH, including NUL */
+#define HOSTDRV_SHORT_NAME_WORDS 12
+#define HOSTDRV_FSCONTEXT_RESERVED_WORDS 15
+#define HOSTDRV_RENAME_PAD_BYTES 3
+#define HOSTDRV_WIRE_ALIGN 4
+#define HOSTDRV_SECTION_OBJECT_POINTERS 3
+#define HOSTDRV_LOGICAL_BLOCK_SIZE 512
+#define NP2_DO_BUFFERED_IO 0x00000010UL
+#define NP2_FILE_DEVICE_IS_MOUNTED 0x00000020UL
+#define NP2_CREATE_OPTIONS_MASK 0x00FFFFFFUL
+#define NP2_FILE_SHARE_READ 0x01
+#define NP2_FILE_SHARE_WRITE 0x02
+#define NP2_FILE_SHARE_DELETE 0x04
+#define NP2_FILE_SHARE_ALL (NP2_FILE_SHARE_READ | NP2_FILE_SHARE_WRITE | NP2_FILE_SHARE_DELETE)
+
 /* types.h に定義されていない追加型 */
 typedef unsigned long long u64;
 typedef signed char        s8;
@@ -265,7 +280,7 @@ typedef struct {
  */
 typedef struct {
     u32 fileIndex;                    /* エミュレータが管理するファイルID (offset 0) */
-    u32 reserved[15];                 /* 予約 (64バイト以上確保) */
+    u32 reserved[HOSTDRV_FSCONTEXT_RESERVED_WORDS];                 /* 予約 (64バイト以上確保) */
 } __attribute__((packed)) Np2FsContext;
 
 /* IO_STATUS_BLOCK 互換 */
@@ -309,8 +324,8 @@ typedef struct {
     u32 EaSize;
     s8  ShortNameLength;
     u8  _pad;               /* pack(4)アラインメント用パディング */
-    u16 ShortName[12];
-    u16 FileName[260];      /* UTF-16LE, MAX_PATH */
+    u16 ShortName[HOSTDRV_SHORT_NAME_WORDS];
+    u16 FileName[HOSTDRV_NAME_BUF_WORDS];      /* UTF-16LE, MAX_PATH */
 } __attribute__((packed)) Np2FileBothDirInfo;
 
 /* FILE_DIRECTORY_INFORMATION 互換 */
@@ -325,7 +340,7 @@ typedef struct {
     u64 AllocationSize;
     u32 FileAttributes;
     u32 FileNameLength;     /* バイト数 */
-    u16 FileName[260];      /* UTF-16LE */
+    u16 FileName[HOSTDRV_NAME_BUF_WORDS];      /* UTF-16LE */
 } __attribute__((packed)) Np2FileDirInfo;
 
 /* ===================================================================== */
@@ -368,10 +383,10 @@ typedef struct {
 /* FILE_RENAME_INFORMATION (pack(8)) */
 typedef struct {
     u8  ReplaceIfExists;
-    u8  _pad[3];         /* pack(8) align */
+    u8  _pad[HOSTDRV_RENAME_PAD_BYTES];         /* pack(8) align */
     u32 RootDirectory;
     u32 FileNameLength;  /* バイト数 */
-    u16 FileName[260];
+    u16 FileName[HOSTDRV_NAME_BUF_WORDS];
 } __attribute__((packed)) Np2FileRenameInfo;
 
 /* IO_SECURITY_CONTEXT (CREATE時にポインタとして渡す) */

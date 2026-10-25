@@ -1446,8 +1446,8 @@ C_MUTATIONS = [
      "", "cookie が進まない相手で回り続ける"),
     ("fs/serialfs.c", r"    if \(kind == SFS_KIND_DIR\) return OS32_ERR_ISDIR;",
      "", "get_file_size がディレクトリにサイズを返す"),
-    ("fs/serialfs.c", r"        pl\[4\] = \(u8\)\(\(first && first_trunc\) \? SFS_WF_TRUNC : 0\);",
-     "        pl[4] = (u8)(first_trunc ? SFS_WF_TRUNC : 0);",
+    ("fs/serialfs.c", r"        pl\[SFS_WRITE_FLAGS_OFF\] = \(u8\)\(\(first && first_trunc\) \? SFS_WF_TRUNC : 0\);",
+     "        pl[SFS_WRITE_FLAGS_OFF] = (u8)(first_trunc ? SFS_WF_TRUNC : 0);",
      "write_file の 2 回目以降も TRUNC (前の塊を消す)"),
     ("fs/serialfs.c", r"    if \(size == 0 && !first_trunc\) return 0;\n", "",
      "0 バイトの write_stream が要求を出す"),
@@ -1539,7 +1539,7 @@ GATE_MUTATIONS = CHECKED_MUTATIONS + [
 ]
 SESSION_MUTATIONS = [
     ("fs/serialfs_session.c",
-     r'            kprintf\(SFS_ATTR_ERR, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
+     r'            kprintf\(KLOG_LEGACY_LIGHT_RED, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
      "", "lan.mod 不在の診断を消す"),
     ("fs/serialfs_session.c", r"            sfs_lan_reset\(&g_lan\);",
      "            ;", "LAN start の読み捨てを外す"),

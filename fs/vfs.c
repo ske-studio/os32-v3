@@ -8,6 +8,7 @@
 /*  各ディスパッチ関数がFSドライバにコンテキストを渡す。                     */
 /* ======================================================================== */
 
+#include "ide_limits.h"
 #include "vfs.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "kstring.h"
@@ -491,7 +492,7 @@ int vfs_dev_mount_count(int drive)
 {
     int i, n = 0;
 
-    if (drive < 0 || drive > 3) return VFS_ERR_INVAL;
+    if (drive < 0 || drive >= FS_IDE_DRIVE_COUNT) return VFS_ERR_INVAL;
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (mounts[i].in_use && mounts[i].dev_type == VFS_DEV_HD &&
             mounts[i].dev_id == drive)
