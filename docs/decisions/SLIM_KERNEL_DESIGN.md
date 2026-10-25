@@ -256,3 +256,7 @@ import表と既存利用者:
 ## S4b の実装で設計者が決めたこと
 
 - 抽出範囲の自由変数は親の引数 `boot_drive` だけなので、補助は `static inline void kernel_mount_children(u32 boot_drive)` とし、`kcg_module_load()` と `SERVICES_ROOT_READY` の間から呼ぶ。列挙・root 判定・サブマウントの既存ブロックをそのまま移す。
+
+## S4c の実装で設計者が決めたこと
+
+- SB 専用の `inodes_count` の写しは抽出後に不要なので削除し、補助では設計どおり `lay` の各フィールドを読む。`ext2_layout_plan` の計算位置は維持し、`fmt_write_super` は `ext2_write_block` の結果をそのまま返し、呼元の同じ位置で `EXT2_ERR_IO` に変換する。
