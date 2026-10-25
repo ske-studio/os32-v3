@@ -505,6 +505,7 @@ u32 exec_tramp_page_addr(void)
     return (V2P(ring3_tramp_raw) + PAGE_SIZE - 1) & ~(u32)(PAGE_SIZE - 1);
 }
 
+/* exec.c では呼ばないが、tools/gen_kdebug_imports.py がこの宣言から型を読む (消すと生成が止まる)。 */
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 /* kdebug の exec 自己試験へ写す口 (include/kselftest_probe.h)。 */
