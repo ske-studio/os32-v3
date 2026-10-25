@@ -53,6 +53,8 @@
  * ======================================================================== */
 
 #ifndef VFS_NAME_RULES_INC
+#include "utf8.h"
+
 #define VFS_NAME_RULES_INC
 
 #define VFS_NAME_RULE_WIN32  0   /* HostDrv: 途中の空白は通す */
@@ -66,9 +68,9 @@ static u32 vfs_name_utf8_len(const u8 *p)
     u8 c = p[0];
     if (c < 0x80) return 1;
     if (c >= 0xC2 && c <= 0xDF)
-        return ((p[1] & 0xC0) == 0x80) ? 2 : 0;
+        return UTF8_IS_CONT(p[1]) ? 2 : 0;
     if (c >= 0xE0 && c <= 0xEF) {
-        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80) return 0;
+        if (!UTF8_IS_CONT(p[1]) || !UTF8_IS_CONT(p[2])) return 0;
         if (c == 0xE0 && p[1] < 0xA0) return 0;     /* 冗長 (< U+0800) */
         if (c == 0xED && p[1] >= 0xA0) return 0;    /* サロゲート */
         return 3;

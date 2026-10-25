@@ -24,15 +24,14 @@
 #define EXT2_LAYOUT_H
 
 #include "types.h"
+#include "ext2.h"
 
 /* 1KB ブロック、1 グループ 8192 ブロック、inode 128 B、4 ブロックに 1 inode */
-#define EXT2L_BLOCK_SIZE        1024UL
-#define EXT2L_BLOCKS_PER_GROUP  8192UL
-#define EXT2L_INODE_SIZE        128UL
+#define EXT2L_BLOCK_SIZE        ((unsigned long)EXT2_BLOCK_SIZE)
+#define EXT2L_BLOCKS_PER_GROUP  ((unsigned long)EXT2_BLOCKS_PER_GROUP_MAX)
 #define EXT2L_BLOCKS_PER_INODE  4UL
 #define EXT2L_MIN_INODES        16UL
 #define EXT2L_MIN_BLOCKS        64UL    /* 旧 ext2_format と同じ下限 */
-#define EXT2L_GD_SIZE           32UL
 #define EXT2L_FIRST_DATA_BLOCK  1UL     /* 1KB ブロックでは 1 */
 #define EXT2L_ROOT_DATA_BLOCKS  1UL     /* グループ 0 のルートのデータ */
 /* 固定点の繰り返しの上限 (1 回落とすごとにグループが 1 つ減るので、
@@ -40,7 +39,7 @@
 #define EXT2L_MAX_ITER          40
 
 /* g グループに収まる最大の長さ (セクタ)。ブロック 0 + g × 8192 ブロック */
-#define EXT2L_MAX_SECTORS(g)    ((EXT2L_FIRST_DATA_BLOCK + (u32)(g) * EXT2L_BLOCKS_PER_GROUP) * 2UL)
+#define EXT2L_MAX_SECTORS(g)    ((EXT2L_FIRST_DATA_BLOCK + (u32)(g) * EXT2L_BLOCKS_PER_GROUP) * (unsigned long)EXT2_SECTORS_PER_BLOCK)
 
 #define EXT2L_OK                0
 #define EXT2L_ERR_SMALL       (-1)   /* 収まる大きさが無い (64 ブロック未満) */

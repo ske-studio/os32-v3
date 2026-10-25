@@ -6,6 +6,7 @@
 /*  カーネルの外 (ホスト試験) でもそのまま組めるよう、依存は crc32 だけ。   */
 /* ======================================================================== */
 #include "sfs_proto.h"
+#include "config.h"
 #include "crc32.h"
 
 void sfs_put16(u8 *p, u16 v)
@@ -55,9 +56,9 @@ u16 sfs_encode_limit(u8 *out, u8 type, u32 sid, u16 seq,
     out[SFS_OFF_MAGIC1] = SFS_MAGIC1;
     out[SFS_OFF_MAGIC2] = SFS_MAGIC2;
     out[SFS_OFF_TYPE] = type;
-    sfs_put32(out + 4, sid);
-    sfs_put16(out + 8, seq);
-    sfs_put16(out + 10, len);
+    sfs_put32(out + SFS_OFF_SID, sid);
+    sfs_put16(out + SFS_OFF_SEQ, seq);
+    sfs_put16(out + SFS_OFF_LEN, len);
     for (i = 0; i < len; i++) out[SFS_HDR_LEN + i] = payload[i];
     /* CRC は種別 (off 3) からペイロードの末尾まで。ENQ と 'SF' は含めない */
     crc = sfs_crc32(out + SFS_OFF_TYPE, (u32)(SFS_HDR_LEN - SFS_OFF_TYPE + len));
@@ -111,7 +112,7 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
     d->buf[d->pos++] = byte;
     if (d->pos == SFS_HDR_LEN) {
         /* **長さは確保・コピーの前に上限と照合する** (§1-v2 B-5') */
-        len = sfs_get16(d->buf + 10);
+        len = sfs_get16(d->buf + SFS_OFF_LEN);
         if (len > d->max_payload || len > SFS_LAN_MAX_PAYLOAD) {
             d->bad_len++;
             d->pos = 0;
@@ -133,8 +134,8 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
         return -1;
     }
     out->type = d->buf[SFS_OFF_TYPE];
-    out->sid = sfs_get32(d->buf + 4);
-    out->seq = sfs_get16(d->buf + 8);
+    out->sid = sfs_get32(d->buf + SFS_OFF_SID);
+    out->seq = sfs_get16(d->buf + SFS_OFF_SEQ);
     out->len = len;
     out->payload = d->buf + SFS_HDR_LEN;
     return 1;
@@ -142,9 +143,9 @@ int sfs_dec_feed(SfsDec *d, u8 byte, SfsFrame *out)
 
 u32 sfs_byte_us(u32 baud)
 {
-    if (baud == 0) baud = 9600;
+    if (baud == 0) baud = SYS_SERIAL_BAUD;
     /* 8N1 = スタート 1 + データ 8 + ストップ 1 = 10 ビット。切り上げ */
-    return (10000000UL + baud - 1) / baud;
+    return (SFS_SERIAL_BITS_PER_BYTE * SFS_USEC_PER_SEC + baud - 1) / baud;
 }
 
 u32 sfs_ms_ticks(u32 ms)
@@ -160,7 +161,7 @@ u32 sfs_trial_ticks(u32 baud)
 u32 sfs_trial_ticks_limit(u32 baud, u16 limit)
 {
     u32 frame_ms = ((u32)(SFS_HDR_LEN + limit + SFS_CRC_LEN) * sfs_byte_us(baud) * 2UL + 999UL)
-                   / 1000UL;
+                   / SFS_USEC_PER_MSEC;
     return sfs_ms_ticks((u32)SFS_FIRST_BYTE_MS + frame_ms + (u32)SFS_SLACK_MS);
 }
 

@@ -20,6 +20,9 @@
 #define ISO_SECTOR_SIZE       2048
 #define ISO_PVD_LBA           16      /* Primary Volume Descriptor の位置 */
 #define ISO_PVD_MAGIC         "CD001" /* PVD識別文字列 (5バイト) */
+#define ISO_IO_ATTEMPTS 2
+#define ISO_DEVICE_NAME_CAP 8
+
 #define ISO_MAX_NAME          128     /* ファイル名最大長 */
 
 #define ISO_PVD_TYPE_PRIMARY  1
@@ -120,7 +123,7 @@ typedef struct {
     u32    volume_size;       /* ボリューム総セクタ数 */
     u16    block_size;        /* 論理ブロックサイズ (通常2048) */
 
-    char   devname[8];        /* "cd0" … (mount が組み立てた名前) */
+    char   devname[ISO_DEVICE_NAME_CAP];        /* "cd0" … (mount が組み立てた名前) */
 
     /* 直前に解決したパス 1 本 */
     int    pc_valid;

@@ -18,9 +18,6 @@
 #define ext2_str_len(s)       ((int)kstrlen(s))
 #define ext2_str_ncmp(a,b,n)  kstrncmp((a),(b),(u32)(n))
 
-/* 1KBブロック時、1グループあたりの最大ブロック数 (ビットマップ1ブロック = 8192ビット) */
-#define EXT2_BLOCKS_PER_GROUP_MAX  8192
-
 /* 共有バッファ (シングルタスクのため全インスタンスで共有)
  * 注意: 将来マルチタスク化する場合はインスタンスごとに分離が必要 */
 extern u8 ext2_g_blk[EXT2_BLOCK_SIZE];
@@ -109,7 +106,6 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
  * 書く (fs/ext2_super.c)。1 回の書き込みが途中で落ちると「前半だけ届いた」
  * 状態が媒体に残る。ディレクトリの更新はこの境界を意識して順序を決める
  * (票 B8 往復 4、fs/ext2_dir.c の ext2_add_entry)。 */
-#define EXT2_SECTOR_SIZE  (EXT2_BLOCK_SIZE / 2)
 
 /* ---- ブロックの解放 (票 B8 往復 3) ----
  * 不変条件: **媒体上のどの参照も解放済みのブロックを指さない。**

@@ -9,6 +9,7 @@
 /* ======================================================================== */
 
 #include "iso9660.h"
+
 #include "dev.h"
 #include "atapi.h"
 #include "kmalloc.h"
@@ -403,7 +404,7 @@ static void *iso9660_mount(int dev_id)
     u8 pvd[ISO_SECTOR_SIZE];
     Iso9660Ctx *ctx;
     Device *dev;
-    char devname[8];
+    char devname[ISO_DEVICE_NAME_CAP];
 
     int type = VFS_MOUNT_DEV_TYPE(dev_id);
     if (type != VFS_DEV_CD) return (void *)0;
@@ -485,7 +486,7 @@ static int iso_resolve_checked(Iso9660Ctx *ctx, const char *path,
 {
     int attempt;
 
-    for (attempt = 0; attempt < 2; attempt++) {
+    for (attempt = 0; attempt < ISO_IO_ATTEMPTS; attempt++) {
         u32 gen0;
         int ret;
 
@@ -579,7 +580,7 @@ static int iso_read_range(Iso9660Ctx *ctx, const char *path,
 {
     int attempt;
 
-    for (attempt = 0; attempt < 2; attempt++) {
+    for (attempt = 0; attempt < ISO_IO_ATTEMPTS; attempt++) {
         u32 file_lba, file_size, gen0;
         u32 to_read = 0;
         u8 flags;

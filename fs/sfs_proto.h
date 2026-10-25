@@ -54,6 +54,28 @@
 #define SFS_HELLO_RSP_MAX   6
 #define SFS_HELLO_RSP_NONCE 8
 #define SFS_HELLO_RSP_LEN   12
+#define SFS_OFF_SID 4
+#define SFS_OFF_SEQ 8
+#define SFS_OFF_LEN 10
+#define SFS_STAT_RSP_LEN 9
+#define SFS_STAT_MTIME_OFF 5
+#define SFS_LIST_REQ_COOKIE_LEN 4
+#define SFS_LIST_RSP_COOKIE_LEN 4
+#define SFS_LIST_ENTRY_NAME_LEN_OFF 5
+#define SFS_LIST_ENTRY_NAME_OFF 6
+#define SFS_LIST_ENTRY_HEADER_LEN SFS_LIST_ENTRY_NAME_OFF
+#define SFS_READ_COUNT_OFF 4
+#define SFS_READ_PATH_OFF 6
+#define SFS_WRITE_FLAGS_OFF 4
+#define SFS_EXIT_LEN 12
+#define SFS_EXIT_DROPPED_OFF 4
+#define SFS_EXIT_FLAGS_OFF 8
+#define SFS_SERIAL_BITS_PER_BYTE 10UL
+#define SFS_LOGICAL_BLOCK_SIZE 512
+/* Local until shared time-unit names are provided. */
+#define SFS_USEC_PER_SEC 1000000UL
+#define SFS_USEC_PER_MSEC 1000UL
+
 #define SFS_WRITE_HDR_LEN   5
 
 /* ---- 種別 ---- */

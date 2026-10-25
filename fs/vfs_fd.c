@@ -474,14 +474,14 @@ int vfs_read_fd(int fd, void *buf, u32 size)
             return (int)i;
         }
     }
-    if (fd == 1 || fd == 2) return VFS_ERR_INVAL;
+    if (fd >= 1 && fd < VFS_FIRST_FILE_FD) return VFS_ERR_INVAL;
 
     if (fd < 0 || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
     f = &open_files[fd];
     if (!f->in_use) return VFS_ERR_INVAL;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
     if (f->stale) return VFS_ERR_STALE;   /* fs_ctx より先に見る */
-    if ((f->mode & 3) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */
+    if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */
 
     if (f->offset >= f->size) return 0; /* EOF */
     if (f->offset + size > f->size) {
@@ -498,7 +498,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
     int rc;
     VfsFile *f;
 
-    if (fd == 1 || fd == 2) {
+    if (fd >= 1 && fd < VFS_FIRST_FILE_FD) {
         /* リダイレクト中ならリダイレクト先へ書く */
         if (fd_is_redirected(fd)) {
             return fd_redirect_write(fd, buf, size);
@@ -514,7 +514,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
     if (!f->in_use) return VFS_ERR_INVAL;
     if (f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL; /* lease 経由だけ */
     if (f->stale) return VFS_ERR_STALE;   /* 書かない。fs_ctx より先に見る */
-    if ((f->mode & 3) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */
+    if ((f->mode & KAPI_O_ACCMODE) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */
 
     if (f->has_ino || f->ops->write_stream) {
         /* inode を持つ FS はパスを引き直さない (票 TASK_VFS_FD_PATH 欠陥 1:
@@ -577,7 +577,7 @@ u32 vfs_get_size(int fd)
 
 int vfs_isatty(int fd)
 {
-    if (fd == 0 || fd == 1 || fd == 2) {
+    if (fd >= 0 && fd < VFS_FIRST_FILE_FD) {
         /* 「端末か」は「種別がキャラクタデバイスか」と同じ問い。判定は
          * fd_redirect_ifmt() 1 か所から引く — vfs_fstat も同じ関数を引くので、
          * 2 つの API が食い違えない ([C4]、票 TASK_FSTAT_REDIR §3-1)。 */
@@ -593,7 +593,7 @@ int vfs_fstat(int fd, OS32_Stat *buf)
 {
     if (!buf) return VFS_ERR_INVAL;
 
-    if (fd == 0 || fd == 1 || fd == 2) {
+    if (fd >= 0 && fd < VFS_FIRST_FILE_FD) {
         /* 種別は vfs_isatty と**同じ 1 か所**から引く ([C4])。
          * 2026-09-17 まで無条件で S_IFCHR と答えていたので、`prog > file` の
          * 間だけ isatty と食い違っていた (票 TASK_FSTAT_REDIR §1)。 */

@@ -21,12 +21,30 @@
 
 #include "fatfs/diskio_os32.h"   /* diskio_set_* */
 
+#define FAT_VOLUME_PREFIX_LEN 2
+#define FAT_VOLUME_NAME_CAP 4 /* prefix, optional root slash, NUL */
+#define FAT_RESERVED_CLUSTERS 2
+#define MBR_SIGNATURE_OFF 510
+#define MBR_SIGNATURE_LO 0x55
+#define MBR_SIGNATURE_HI 0xAA
+#define MBR_PART_TABLE_OFF 446
+#define MBR_PART_ENTRY_SIZE 16
+#define MBR_PART_COUNT 4
+#define MBR_PART_TYPE_OFF 4
+#define MBR_PART_LBA_OFF 8
+#define FAT_BPB_BPS_OFF 11
+#define FAT_BPS_LARGE 1024
+#define FATFS_TYPE_FAT12 1
+#define FATFS_TYPE_FAT16 2
+#define FATFS_TYPE_FAT32 3
+#define FAT_UPPER_EXT_FIRST 0x80
+
 /* ======== FatFs VFSコンテキスト ======== */
 typedef struct {
     FATFS  fatfs;     /* FatFsワークエリア */
     int    dev_id;    /* OS32デバイスID */
     BYTE   pdrv;      /* FatFs物理ドライブ番号 */
-    char   vol[4];    /* ボリューム文字列 "0:" or "1:" */
+    char   vol[FAT_VOLUME_NAME_CAP];    /* ボリューム文字列 "0:" or "1:" */
 } FatFsCtx;
 
 /* 物理ドライブ占有フラグ (pdrv 0=FDD, 1=HDD)。
@@ -120,16 +138,16 @@ static int ff_make_path(const FatFsCtx *fc, const char *path, char *out, int max
     /* 要る大きさ: "0:" + (先頭に '/' が無ければ 1) + path + NUL。
      * 空の path は "0:/" (4 バイト) */
     if (path && path[0]) {
-        need = 2u + (path[0] != '/' ? 1u : 0u) + kstrlen(path) + 1u;
+        need = (u32)FAT_VOLUME_PREFIX_LEN + (path[0] != '/' ? 1u : 0u) + kstrlen(path) + 1u;
     } else {
-        need = 4u;
+        need = FAT_VOLUME_NAME_CAP;
     }
     if (max < 0 || need > (u32)max) return VFS_ERR_NAMETOOLONG;
     /* "0:/path..." のような FatFs パスを構築 */
     out[0] = fc->vol[0];
     out[1] = ':';
-    out[2] = '\0';
-    len = 2;
+    out[FAT_VOLUME_PREFIX_LEN] = '\0';
+    len = FAT_VOLUME_PREFIX_LEN;
 
     if (path && path[0]) {
         if (path[0] != '/') {
@@ -403,11 +421,11 @@ static int fatfs_vfs_stat(void *ctx, const char *path, OS32_Stat *buf)
     buf->st_size = fno.fsize;
     /* FAT属性 → POSIXモードへの簡易変換 */
     if (fno.fattrib & AM_DIR) {
-        buf->st_mode = 0040755; /* drwxr-xr-x */
+        buf->st_mode = (OS_S_IFDIR | OS32_DEFAULT_DIR_PERM); /* drwxr-xr-x */
     } else if (fno.fattrib & AM_RDO) {
-        buf->st_mode = 0100444; /* -r--r--r-- */
+        buf->st_mode = (OS_S_IFREG | OS32_DEFAULT_READONLY_PERM); /* -r--r--r-- */
     } else {
-        buf->st_mode = 0100644; /* -rw-r--r-- */
+        buf->st_mode = (OS_S_IFREG | OS32_DEFAULT_FILE_PERM); /* -rw-r--r-- */
     }
     buf->st_mtime = dos_time_to_epoch(fno.fdate, fno.ftime);
     buf->st_atime = buf->st_mtime;
@@ -430,7 +448,7 @@ static int fatfs_vfs_sync(void *ctx)
 static u32 fatfs_vfs_total_blocks(void *ctx)
 {
     FatFsCtx *fc = (FatFsCtx *)ctx;
-    return fc->fatfs.n_fatent - 2; /* 総クラスタ数 */
+    return fc->fatfs.n_fatent - FAT_RESERVED_CLUSTERS; /* 総クラスタ数 */
 }
 
 static u32 fatfs_vfs_free_blocks(void *ctx)
@@ -438,11 +456,11 @@ static u32 fatfs_vfs_free_blocks(void *ctx)
     FatFsCtx *fc = (FatFsCtx *)ctx;
     DWORD nclst;
     FATFS *fs;
-    char vol[4];
+    char vol[FAT_VOLUME_NAME_CAP];
 
     vol[0] = fc->vol[0];
     vol[1] = ':';
-    vol[2] = '\0';
+    vol[FAT_VOLUME_PREFIX_LEN] = '\0';
 
     if (f_getfree(vol, &nclst, &fs) != FR_OK) return 0;
     return (u32)nclst;
@@ -496,7 +514,7 @@ static u32 chs_to_lba(u16 cyl, u8 head, u8 sector, u16 nheads, u16 nspt)
  * phys_sec_size: IDE物理セクタサイズ (256=SASI, 512=IDE) */
 static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
 {
-    u8 buf[512];
+    u8 buf[SYS_HDD_SECTOR_SIZE];
     IdeInfo info;
     u16 heads, spt;
     int i;
@@ -525,16 +543,16 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
      * IDEは512B転送なのLBA 0を読むとHDI sec 0+1が結合される。
      * よってbufの後半256Bにパーティションテーブルがある。
      * IDE 512Bセクタの場合: 従来通りセクタ1を読む。 */
-    if (phys_sec_size == 256) {
+    if (phys_sec_size == SASI_SECTOR_BYTES) {
         /* SASI: LBA 0を読んで後半256Bからパース */
         if (dev_blk_read_lba(dev, 0, 1, buf) != 0) return 0;
-        pt_offset = 256;
-        pt_max = 8;  /* (512-256)/32 = 8エントリ */
+        pt_offset = SASI_SECTOR_BYTES;
+        pt_max = (SYS_HDD_SECTOR_SIZE - SASI_SECTOR_BYTES) / PC98PT_ENTRY_SIZE;  /* (512-256)/32 = 8エントリ */
     } else {
         /* IDE: セクタ1を読む */
         if (dev_blk_read_lba(dev, 1, 1, buf) != 0) return 0;
         pt_offset = 0;
-        pt_max = 16;  /* 512/32 = 16エントリ */
+        pt_max = PC98PT_MAX_ENTRIES;  /* 512/32 = 16エントリ */
     }
 
     /* パーティションエントリをスキャン */
@@ -567,18 +585,18 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
 
     /* PC-98形式で見つからなかった場合、IBM PC MBRも試す */
     if (dev_blk_read_lba(dev, 0, 1, buf) != 0) return 0;
-    if (buf[510] == 0x55 && buf[511] == 0xAA) {
+    if (buf[MBR_SIGNATURE_OFF] == MBR_SIGNATURE_LO && buf[MBR_SIGNATURE_OFF + 1] == MBR_SIGNATURE_HI) {
         /* 標準MBRパーティションテーブル (offset 446) */
-        for (i = 0; i < 4; i++) {
-            u8 *pe = buf + 446 + i * 16;
-            u8 type = pe[4];
+        for (i = 0; i < MBR_PART_COUNT; i++) {
+            u8 *pe = buf + MBR_PART_TABLE_OFF + i * MBR_PART_ENTRY_SIZE;
+            u8 type = pe[MBR_PART_TYPE_OFF];
             u32 lba;
             if (type == 0) continue;
             /* FAT系: 01,04,06,0B,0C,0E,0F */
             if (type == 0x01 || type == 0x04 || type == 0x06 ||
                 type == 0x0B || type == 0x0C || type == 0x0E) {
-                lba = (u32)pe[8] | ((u32)pe[9] << 8) |
-                      ((u32)pe[10] << 16) | ((u32)pe[11] << 24);
+                lba = (u32)pe[MBR_PART_LBA_OFF] | ((u32)pe[MBR_PART_LBA_OFF + 1] << 8) |
+                      ((u32)pe[MBR_PART_LBA_OFF + 2] << 16) | ((u32)pe[MBR_PART_LBA_OFF + 3] << 24);
                 kprintf(KLOG_ATTR, "[mbr] FAT partition at LBA %lu "
                         "(type=%02x)\n", (unsigned long)lba, type);
                 return lba;
@@ -626,7 +644,7 @@ static void *fatfs_vfs_mount(int dev_id)
 
     fc->vol[0] = '0' + fc->pdrv;
     fc->vol[1] = ':';
-    fc->vol[2] = '\0';
+    fc->vol[FAT_VOLUME_PREFIX_LEN] = '\0';
 
     /* FatFsにマウント要求 */
     fr = f_mount(&fc->fatfs, fc->vol, 1); /* 1 = 即座にマウント */
@@ -634,7 +652,7 @@ static void *fatfs_vfs_mount(int dev_id)
     /* マウント失敗かつHDDの場合、パーティションテーブルを解析してリトライ */
     if (fr == FR_NO_FILESYSTEM && dev_type == 0) {
         IdeInfo ide_info;
-        u16 phys_sec_size = 512;
+        u16 phys_sec_size = SYS_HDD_SECTOR_SIZE;
         u32 part_lba;
         Device *blkdev = (Device *)0;
 
@@ -654,8 +672,8 @@ static void *fatfs_vfs_mount(int dev_id)
 
         part_lba = pc98_find_fat_partition(drv_num, phys_sec_size);
         if (part_lba > 0) {
-            u8 dbg[512];
-            u16 bps = 512;
+            u8 dbg[SYS_HDD_SECTOR_SIZE];
+            u16 bps = SYS_HDD_SECTOR_SIZE;
             kprintf(KLOG_ATTR, "[fatfs] retrying with partition offset LBA=%lu "
                     "(phys=%d)\n",
                     (unsigned long)part_lba, phys_sec_size);
@@ -663,13 +681,13 @@ static void *fatfs_vfs_mount(int dev_id)
              * part_lbaはphys_sec_size単位のLBA。
              * dev_blk_read_lbaは512B返すのでBPBの先頭は含まれる。 */
             if (blkdev && dev_blk_read_lba(blkdev, (u32)part_lba, 1, dbg) == 0) {
-                bps = (u16)dbg[11] | ((u16)dbg[12] << 8);
+                bps = (u16)dbg[FAT_BPB_BPS_OFF] | ((u16)dbg[FAT_BPB_BPS_OFF + 1] << 8);
                 kprintf(KLOG_ATTR, "[fatfs] sector %lu: jmp=%02x BPS=%d\n",
                         (unsigned long)part_lba, dbg[0], bps);
             }
             diskio_set_hdd_partition(part_lba);
             /* BPBの論理セクタサイズをdiskioに反映 (PC-98 DOSでは1024) */
-            if (bps == 1024 || bps == 512) {
+            if (bps == FAT_BPS_LARGE || bps == SYS_HDD_SECTOR_SIZE) {
                 diskio_set_hdd_sector_size(bps);
             }
             /* unmount してからリトライ */
@@ -692,9 +710,9 @@ static void *fatfs_vfs_mount(int dev_id)
 
     kprintf(KLOG_ATTR, "[fatfs] mounted: type=%d drv=%d pdrv=%d FAT%s\n",
             dev_type, drv_num, fc->pdrv,
-            fc->fatfs.fs_type == 1 ? "12" :
-            fc->fatfs.fs_type == 2 ? "16" :
-            fc->fatfs.fs_type == 3 ? "32" : "??");
+            fc->fatfs.fs_type == FATFS_TYPE_FAT12 ? "12" :
+            fc->fatfs.fs_type == FATFS_TYPE_FAT16 ? "16" :
+            fc->fatfs.fs_type == FATFS_TYPE_FAT32 ? "32" : "??");
 
     return (void *)fc;
 }
@@ -752,7 +770,7 @@ static const u8 fat_upper_ext[128] = {
 static u8 fat_name_fold(u8 c)
 {
     if (c >= 'a' && c <= 'z') return (u8)(c - 'a' + 'A');
-    if (c >= 0x80) return fat_upper_ext[c - 0x80];
+    if (c >= FAT_UPPER_EXT_FIRST) return fat_upper_ext[c - FAT_UPPER_EXT_FIRST];
     return c;
 }
 

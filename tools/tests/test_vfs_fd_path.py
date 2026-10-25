@@ -244,7 +244,7 @@ MUTANTS = [
     ("Win32 の規則がサロゲートを通す", "fs/vfs_name_rules.inc",
      "        if (c == 0xED && p[1] >= 0xA0) return 0;", ""),
     ("Win32 の規則が途中で切れた列を通す", "fs/vfs_name_rules.inc",
-     "        return ((p[1] & 0xC0) == 0x80) ? 2 : 0;", "        return p[1] ? 2 : 1;"),
+     "        return UTF8_IS_CONT(p[1]) ? 2 : 0;", "        return p[1] ? 2 : 1;"),
     ("FAT にも UTF-8 の規則をかける", "fs/vfs_name_rules.inc",
      "        if (rule == VFS_NAME_RULE_WIN32) {", "        if (1) {"),
     ("変換が途中で切れた列で打ち切る", "lib/kutf16.c",

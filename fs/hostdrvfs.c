@@ -31,8 +31,6 @@
  *   hdrv_create_status_to_vfs         … CREATE の NTSTATUS 変換 (票 B8 P1-4)
  * hostdrv_create() が使うので、**この位置で**取り込む。 */
 #include "hostdrv_stat_rules.inc"
-STATIC_ASSERT(HDRV_STAT_ATTR_DIRECTORY == NP2_FILE_ATTRIBUTE_DIRECTORY,
-              hdrv_stat_attr_dir);
 
 /* 名前の入口検査 (TASK_VFS_FD_PATH 実装レビュー ラリー 2)。Win32 は '\' を
  * 区切りと読み、名前の**末尾の**空白と '.' を落とす ("disk.img " も
@@ -47,7 +45,6 @@ STATIC_ASSERT(HDRV_STAT_ATTR_DIRECTORY == NP2_FILE_ATTRIBUTE_DIRECTORY,
 /*  内部定数                                                              */
 /* ===================================================================== */
 #define HOSTDRV_DATA_BUF_SIZE  4096
-#define HOSTDRV_NAME_BUF_WORDS  260   /* MAX_PATH */
 #define HOSTDRV_MAX_DIR_ENTRIES 1000  /* 列挙上限 (無限ループ防止) */
 
 /* エミュレータ未応答検出用の番兵値 */
@@ -58,17 +55,17 @@ STATIC_ASSERT(HDRV_STAT_ATTR_DIRECTORY == NP2_FILE_ATTRIBUTE_DIRECTORY,
 /* ===================================================================== */
 
 /* 通信バッファ群 — エミュレータが直接読み書きするため volatile 必須 */
-static volatile Np2InvokeInfo      g_invoke  __attribute__((aligned(4)));
-static volatile Np2IoStackLocation g_stack   __attribute__((aligned(4)));
-static volatile Np2FileObject      g_fobj    __attribute__((aligned(4)));
-static volatile Np2FsContext       g_fsctx   __attribute__((aligned(4)));
-static volatile Np2IoStatusBlock   g_iostatus __attribute__((aligned(4)));
-static volatile Np2IoSecurityContext g_secctx __attribute__((aligned(4)));
-static volatile u16  g_namebuf[HOSTDRV_NAME_BUF_WORDS] __attribute__((aligned(4)));
-static volatile u8   g_databuf[HOSTDRV_DATA_BUF_SIZE]  __attribute__((aligned(4)));
+static volatile Np2InvokeInfo      g_invoke  __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile Np2IoStackLocation g_stack   __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile Np2FileObject      g_fobj    __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile Np2FsContext       g_fsctx   __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile Np2IoStatusBlock   g_iostatus __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile Np2IoSecurityContext g_secctx __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile u16  g_namebuf[HOSTDRV_NAME_BUF_WORDS] __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
+static volatile u8   g_databuf[HOSTDRV_DATA_BUF_SIZE]  __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
 
 /* SectionObjectPointers ダミー (12バイト: DataSectionObject, SharedCacheMap, ImageSectionObject) */
-static u32 g_sop[3] __attribute__((aligned(4)));
+static u32 g_sop[HOSTDRV_SECTION_OBJECT_POINTERS] __attribute__((aligned(HOSTDRV_WIRE_ALIGN)));
 
 /* マウント状態 */
 static int g_mounted = 0;
@@ -130,7 +127,7 @@ static void hostdrv_hypercall(void)
 /* セッション開始: CREATE前に1回だけ呼ぶ。全バッファを初期化する。
  *
  * NTドライバとの差異分析に基づき、以下を正しく設定:
- *   - deviceFlags = 0x30 (DO_BUFFERED_IO | FILE_DEVICE_IS_MOUNTED)
+ *   - deviceFlags = NP2_DO_BUFFERED_IO | NP2_FILE_DEVICE_IS_MOUNTED (DO_BUFFERED_IO | FILE_DEVICE_IS_MOUNTED)
  *   - sectionObjectPointerAddr = ダミーSOPバッファ
  *   - g_fobj.SectionObjectPointer = ダミーSOPバッファ
  *   - g_fobj.Flags = NP2_FO_SYNCHRONOUS_IO
@@ -151,7 +148,7 @@ static void session_begin(void)
     g_invoke.inBufferAddr = (u32)g_databuf;
     g_invoke.outBufferAddr = (u32)g_databuf;
     g_invoke.sectionObjectPointerAddr = (u32)g_sop;
-    g_invoke.deviceFlags = 0x30; /* DO_BUFFERED_IO | FILE_DEVICE_IS_MOUNTED */
+    g_invoke.deviceFlags = NP2_DO_BUFFERED_IO | NP2_FILE_DEVICE_IS_MOUNTED; /* DO_BUFFERED_IO | FILE_DEVICE_IS_MOUNTED */
     g_invoke.version = 1;
 
     /* FILE_OBJECT 固定フィールド */
@@ -171,7 +168,7 @@ static void session_begin(void)
 static int session_set_path(const char *path)
 {
     int words;
-    char ntpath[260];
+    char ntpath[HOSTDRV_NAME_BUF_WORDS];
     int i;
 
     if (kstrlen(path) >= sizeof(ntpath)) return VFS_ERR_NAMETOOLONG;
@@ -192,8 +189,8 @@ static int session_set_path(const char *path)
         return VFS_ERR_INVAL;
     }
     /* UNICODE_STRING: Length はNULL終端を含まないバイト数 */
-    g_fobj.FileName.Length = (u16)((words - 1) * 2);
-    g_fobj.FileName.MaximumLength = (u16)(words * 2);
+    g_fobj.FileName.Length = (u16)((words - 1) * sizeof(u16));
+    g_fobj.FileName.MaximumLength = (u16)(words * sizeof(u16));
     g_fobj.FileName.Buffer = (u32)g_namebuf;
     return VFS_OK;
 }
@@ -216,8 +213,8 @@ static int setup_create(const char *path, u32 disposition,
     g_stack.fileObject = (u32)&g_fobj;  /* 再設定必須 */
     /* options: 上位8bit = disposition, 下位24bit = options */
     g_stack.parameters.create.options =
-        (disposition << 24) | (options_flags & 0x00FFFFFFUL);
-    g_stack.parameters.create.shareAccess = 0x07; /* 全共有 */
+        (disposition << 24) | (options_flags & NP2_CREATE_OPTIONS_MASK);
+    g_stack.parameters.create.shareAccess = NP2_FILE_SHARE_ALL; /* 全共有 */
 
     /* SecurityContext: エミュレータは +8 から DesiredAccess を読む */
     kmemset((void*)&g_secctx, 0, sizeof(g_secctx));
@@ -521,7 +518,7 @@ static void *hdrv_mount(int dev_id)
         return (void *)0;
     }
     g_mounted = 1;
-    kprintf(0x0A, "[HDRV] HostDrv(NT) mounted on /host\n");
+    kprintf(KLOG_LEGACY_GREEN, "[HDRV] HostDrv(NT) mounted on /host\n");
     return (void *)1;  /* コンテキストは静的グローバル */
 }
 
@@ -565,7 +562,7 @@ static void hdrv_list_emit(void *ctx)
     HdrvListCtx *lc = (HdrvListCtx *)ctx;
     Np2FileBothDirInfo *info;
     VfsDirEntry entry;
-    char namebuf[260];
+    char namebuf[HOSTDRV_NAME_BUF_WORDS];
     int namelen;
 
     info = (Np2FileBothDirInfo *)g_databuf;
@@ -866,7 +863,7 @@ static int hdrv_rename(void *ctx, const char *old_path, const char *new_path)
 {
     int rc;
     Np2FileRenameInfo rename_info;
-    char ntpath[260];
+    char ntpath[HOSTDRV_NAME_BUF_WORDS];
     int i, words;
     (void)ctx;
 
@@ -886,9 +883,9 @@ static int hdrv_rename(void *ctx, const char *old_path, const char *new_path)
     kmemset(&rename_info, 0, sizeof(rename_info));
     rename_info.ReplaceIfExists = 1;
     rename_info.RootDirectory = 0;
-    words = kutf8_to_utf16le(ntpath, (u16*)rename_info.FileName, 260);
+    words = kutf8_to_utf16le(ntpath, (u16*)rename_info.FileName, HOSTDRV_NAME_BUF_WORDS);
     if (words < 1) return VFS_ERR_INVAL;
-    rename_info.FileNameLength = (u32)((words - 1) * 2);
+    rename_info.FileNameLength = (u32)((words - 1) * sizeof(u16));
 
     session_begin();
     rc = hostdrv_create(old_path, NP2_FILE_OPEN,
@@ -897,7 +894,7 @@ static int hdrv_rename(void *ctx, const char *old_path, const char *new_path)
     if (rc < 0) return rc;   /* **畳まない** (票 B8 / P1-4) */
 
     rc = hostdrv_set_info(NP2_FileRenameInformation, &rename_info,
-                          sizeof(rename_info) - 520 + rename_info.FileNameLength);
+                          sizeof(rename_info) - sizeof(rename_info.FileName) + rename_info.FileNameLength);
 
     hostdrv_cleanup_close();
 
@@ -934,7 +931,7 @@ static u32 hdrv_free_blocks(void *ctx)
 { (void)ctx; return 0; }
 
 static u32 hdrv_block_size(void *ctx)
-{ (void)ctx; return 512; }
+{ (void)ctx; return HOSTDRV_LOGICAL_BLOCK_SIZE; }
 
 /* 名前の比較規則 (BUSY / pinned、Codex 実装レビュー ラリー 1 の B4)。
  * ホストの Windows は英字の大文字小文字を区別しない。ASCII だけを畳む
