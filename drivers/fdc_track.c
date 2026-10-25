@@ -244,7 +244,7 @@ static int fdc_track_read_inner(struct fdc_track_cache *c,
             mrc = (eot > 0)
                 ? ops->read_multi(ops->ctx, drv, run.cyl, run.head, run.sect,
                                   eot - run.sect + 1, g, t->buf)
-                : -2;
+                : FDC_MULTI_ERR_RANGE;
             if (mrc == 0) {
                 t->drv = drv;
                 t->cyl = run.cyl;
@@ -259,7 +259,7 @@ static int fdc_track_read_inner(struct fdc_track_cache *c,
                 t->valid = 1;
                 c->fills++;
                 ops->copy(dst, t->buf, bytes);
-            } else if (mrc == -3) {
+            } else if (mrc == FDC_MULTI_ERR_NOT_READY) {
                 /* NR (媒体無し)。1 セクタずつ読んでも同じなので打ち切る
                  * (ラリー 2 の Codex)。 */
                 return -1;

@@ -9,6 +9,7 @@
 /* ======================================================================== */
 
 #include "fdc.h"
+#include "pc98.h"
 #include "dma8237.h"   /* 8237 の共通部 (票 TASK_HAL_WIRING §1-2)、dma_range_ok */
 #include "memmap.h"    /* V2P (TASK_T1_LEDGER §3-4) */
 #include "io.h"
@@ -402,7 +403,7 @@ static void fdc_motor_on(void)
     if (!motor_running) {
         /* 初回のみ 約300ms スピンアップ待ち (100Hzタイマで30tick) */
         u32 start = tick_count;
-        while ((tick_count - start) < 30) { /* 何もしない */ }
+        while ((tick_count - start) < FDC_MOTOR_SPINUP_TICKS) { /* 何もしない */ }
         motor_running = 1;
     }
 }
@@ -642,9 +643,9 @@ static int fdc_recalibrate_st0(int drv, u8 *out_st0)
 
     if (out_st0) *out_st0 = st0;
     if (rc == FDC_SEEK_NOT_READY) return FDC_RC_NOT_READY;
-    if (rc == FDC_SEEK_PENDING)  return -2;
-    if (rc == FDC_SEEK_RETRY_EC) return -3;
-    return -4;
+    if (rc == FDC_SEEK_PENDING)  return FDC_SEEK_ERR_PENDING;
+    if (rc == FDC_SEEK_RETRY_EC) return FDC_SEEK_ERR_RETRY;
+    return FDC_SEEK_ERR_IO;
 }
 
 static int fdc_recalibrate(int drv)
@@ -702,15 +703,15 @@ static int fdc_seek(int drv, int cyl, int head)
     fdc_irq_fired = 0;
     s_stats.seek_issued++;
     if (fdc_send_byte(FDC_CMD_SEEK) != 0) return -1;
-    if (fdc_send_byte((u8)((head << 2) | drv)) != 0) return -1;
+    if (fdc_send_byte((u8)((head << FDC_HEAD_SHIFT) | drv)) != 0) return -1;
     if (fdc_send_byte((u8)cyl) != 0) return -1;
 
     /* 完了待ち。PCN が要求シリンダと一致することまで見る。 */
     rc = fdc_wait_seek_end(drv, &st0, &result_cyl, cyl);
     /* NR = 媒体もドライブも無い。**リトライも回復もしない** ので分けて返す。 */
     if (rc == FDC_SEEK_NOT_READY) return FDC_RC_NOT_READY;
-    if (rc == FDC_SEEK_PENDING) return -2;
-    if (rc != FDC_SEEK_OK) return -4;
+    if (rc == FDC_SEEK_PENDING) return FDC_SEEK_ERR_PENDING;
+    if (rc != FDC_SEEK_OK) return FDC_SEEK_ERR_IO;
 
     /* ヘッド安定待ち: 約15ms */
     fdc_head_settle();
@@ -742,7 +743,7 @@ static void fdc_report_fail(const char *op, int drv, int cyl, int head,
     } else {
         st0 = results[0];
         st1 = results[1];
-        st2 = results[2];
+        st2 = results[FDC_RESULT_ST2];
     }
     mark = (st0 & FDC_ST0_NR) ? " (NR)" : "";
 
@@ -757,7 +758,7 @@ static void fdc_report_fail(const char *op, int drv, int cyl, int head,
 int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
                          const struct fdc_geom *g, void *buf)
 {
-    u8 results[7];
+    u8 results[FDC_RESULT_BYTES];
     int n, retry;
     u32 phys = fdc_dma_phys();
     u16 bps = g->bps;
@@ -805,7 +806,7 @@ int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
         /* 3. Read Data コマンド送信 */
         fdc_irq_fired = 0;
         if (fdc_send_byte(FDC_OPT_MF | FDC_CMD_READ_DATA) != 0) continue;
-        if (fdc_send_byte((u8)((head << 2) | drv)) != 0) continue;
+        if (fdc_send_byte((u8)((head << FDC_HEAD_SHIFT) | drv)) != 0) continue;
         if (fdc_send_byte((u8)cyl) != 0) continue;      /* C */
         if (fdc_send_byte((u8)head) != 0) continue;     /* H */
         if (fdc_send_byte((u8)sect) != 0) continue;     /* R (1始まり) */
@@ -820,9 +821,9 @@ int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
 
         /* 5. リザルト読み出し (7バイト) */
         phase = "result";
-        n = fdc_read_results(results, 7);
+        n = fdc_read_results(results, FDC_RESULT_BYTES);
         have_results = (n > 0);
-        if (n < 7) continue;
+        if (n < FDC_RESULT_BYTES) continue;
 
         /* 6. エラーチェック: ST0のbit6-7が00なら成功 */
         if ((results[0] & FDC_ST0_IC_MASK) == FDC_ST0_IC_NORMAL) {
@@ -860,7 +861,7 @@ int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
 int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
                           const struct fdc_geom *g, const void *buf)
 {
-    u8 results[7];
+    u8 results[FDC_RESULT_BYTES];
     int n, retry;
     u32 phys = fdc_dma_phys();
     u16 bps = g->bps;
@@ -908,7 +909,7 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
         /* 3. Write Data コマンド送信 */
         fdc_irq_fired = 0;
         if (fdc_send_byte(FDC_OPT_MF | FDC_CMD_WRITE_DATA) != 0) continue;
-        if (fdc_send_byte((u8)((head << 2) | drv)) != 0) continue;
+        if (fdc_send_byte((u8)((head << FDC_HEAD_SHIFT) | drv)) != 0) continue;
         if (fdc_send_byte((u8)cyl) != 0) continue;      /* C */
         if (fdc_send_byte((u8)head) != 0) continue;     /* H */
         if (fdc_send_byte((u8)sect) != 0) continue;     /* R */
@@ -923,9 +924,9 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
 
         /* 5. リザルト読み出し */
         phase = "result";
-        n = fdc_read_results(results, 7);
+        n = fdc_read_results(results, FDC_RESULT_BYTES);
         have_results = (n > 0);
-        if (n < 7) continue;
+        if (n < FDC_RESULT_BYTES) continue;
 
         /* 6. エラーチェック */
         if ((results[0] & FDC_ST0_IC_MASK) == FDC_ST0_IC_NORMAL) {
@@ -987,7 +988,7 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
 int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
                      const struct fdc_geom *g, void *buf)
 {
-    u8 results[7];
+    u8 results[FDC_RESULT_BYTES];
     int n, eot;
     u32 bytes, timeout;
     u32 phys = fdc_dma_phys();
@@ -996,11 +997,11 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     int dma_armed = 0;
     int seek_failed = 0;
 
-    if (g == 0 || count < 1 || sect < 1) return -2;
+    if (g == 0 || count < 1 || sect < 1) return FDC_MULTI_ERR_RANGE;
     eot = sect + count - 1;
-    if (eot > (int)g->spt) return -2;          /* トラックをまたぐ (MT 無し) */
+    if (eot > (int)g->spt) return FDC_MULTI_ERR_RANGE;          /* トラックをまたぐ (MT 無し) */
     bytes = (u32)count * (u32)g->bps;
-    if (bytes > FDC_DMA_BUF_SIZE) return -2;    /* 受け皿に入らない */
+    if (bytes > FDC_DMA_BUF_SIZE) return FDC_MULTI_ERR_RANGE;    /* 受け皿に入らない */
 
     kmemset(results, 0, sizeof(results));
     timeout = fdc_rw_timeout_ticks((int)g->spt, count, FDC_ROT_TICKS_WORST,
@@ -1014,7 +1015,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
         if (seek_rc == FDC_RC_NOT_READY) {
             fdc_forget_cyl(drv);
             s_stats.multi_nr++;
-            return -3;
+            return FDC_MULTI_ERR_NOT_READY;
         }
         if (seek_rc != 0) { seek_failed = 1; goto fail; }
     }
@@ -1028,7 +1029,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     /* 3. READ DATA (MT = 0) */
     fdc_irq_fired = 0;
     if (fdc_send_byte(FDC_OPT_MF | FDC_CMD_READ_DATA) != 0) goto fail;
-    if (fdc_send_byte((u8)((head << 2) | drv)) != 0) goto fail;
+    if (fdc_send_byte((u8)((head << FDC_HEAD_SHIFT) | drv)) != 0) goto fail;
     if (fdc_send_byte((u8)cyl) != 0) goto fail;      /* C */
     if (fdc_send_byte((u8)head) != 0) goto fail;     /* H */
     if (fdc_send_byte((u8)sect) != 0) goto fail;     /* R (1始まり) */
@@ -1043,9 +1044,9 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
 
     /* 5. リザルト */
     phase = "result";
-    n = fdc_read_results(results, 7);
+    n = fdc_read_results(results, FDC_RESULT_BYTES);
     have_results = (n > 0);
-    if (n < 7) goto fail;
+    if (n < FDC_RESULT_BYTES) goto fail;
     /* リザルトを読み終えた = 実行フェーズは終わっている。DMA を閉じる。 */
     dma_chan_mask(FDC_DMA_CHANNEL);
     dma_armed = 0;
@@ -1054,7 +1055,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
         if ((results[0] & FDC_ST0_NR) != 0) {
             fdc_forget_cyl(drv);
             s_stats.multi_nr++;
-            return -3;
+            return FDC_MULTI_ERR_NOT_READY;
         }
         goto fail;
     }
@@ -1164,7 +1165,7 @@ int fdc_init(void)
     ret = fdc_recalibrate_st0(0, &st0);
     if (ret != 0) {
         u32 start = tick_count;
-        while ((tick_count - start) < 10) { /* 100ms ウェイト */ }
+        while ((tick_count - start) < FDC_RECAL_RESET_SETTLE_TICKS) { /* 100ms ウェイト */ }
         ret = fdc_recalibrate_st0(0, &st0);
     }
     if (ret != 0) {
@@ -1224,7 +1225,7 @@ const struct fdc_geom fdc_geom_144 = {
 /*                                                                          */
 /*  既定は 2HD 1232KB — 既存構成 (1232KB の FD / NHD 起動) を変えない。      */
 /* ======================================================================== */
-static const struct fdc_geom *s_geom[2] = {
+static const struct fdc_geom *s_geom[FDC_DRIVE_COUNT] = {
     &fdc_geom_2hd, &fdc_geom_2hd
 };
 
@@ -1232,7 +1233,7 @@ static const struct fdc_geom *s_geom[2] = {
  * **触っていないポートを戻そうとしない**ため。2HD だけの機種で 04BEh を
  * 書くと、00BEh のデコードイメージが出る機種では 1MB/640KB I/F の切替に
  * 化ける恐れがある (io_fdd.md の注意)。 */
-static int s_3mode_on[2] = { 0, 0 };
+static int s_3mode_on[FDC_DRIVE_COUNT] = { 0, 0 };
 
 /* ======================================================================== */
 /*  3モードFD I/F (I/O 04BEh) — 1.44MB アクセスモードの切り替え             */
@@ -1314,9 +1315,9 @@ int fdc_set_media_by_daua(int drv, u32 daua)
     /* DA/UA の上位ニブルが装置種別。0x30 / 0xB0 系が 1.44MB
      * (undocumented/memsys.md の 0000:0584h DISK_BOOT)。
      * 知らない値では 2HD のままにする — 起動経路を勝手に変えない。 */
-    switch (daua & 0xF0) {
-    case 0x30:
-    case 0xB0:
+    switch (daua & BIOS_DA_TYPE_MASK) {
+    case BOOT_DRIVE_FDD_144:
+    case BIOS_DA_FD_144_ALT:
         return fdc_set_media(drv, FDC_MEDIA_2HD_1440);
     default:
         return 0;

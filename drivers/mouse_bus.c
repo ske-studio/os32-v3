@@ -13,6 +13,9 @@
 #include "pc98.h"
 #include "io.h"
 
+#define MOUSE_COUNTER_NIBBLE_MASK 0x0F
+#define MOUSE_COUNTER_NIBBLE_SHIFT 4
+
 /* ====================================================================== */
 /*  8255 ポートC 制御ビット                                                */
 /* ====================================================================== */
@@ -69,28 +72,28 @@ void mouse_irq_handler(void)
     /* X軸 下位4bit (SXY=0, SHL=0) */
     outp(MOUSE_CTRL, PORTC_HC | 0x00);
     data = (u8)inp(MOUSE_DATA);
-    xl = data & 0x0F;
+    xl = data & MOUSE_COUNTER_NIBBLE_MASK;
     /* ボタンも同時に読取 */
-    bus_btn_raw = data & 0xE0;
+    bus_btn_raw = data & (MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT);
 
     /* X軸 上位4bit (SXY=0, SHL=1) */
     outp(MOUSE_CTRL, PORTC_HC | PORTC_SHL);
     data = (u8)inp(MOUSE_DATA);
-    xh = data & 0x0F;
+    xh = data & MOUSE_COUNTER_NIBBLE_MASK;
 
     /* Y軸 下位4bit (SXY=1, SHL=0) */
     outp(MOUSE_CTRL, PORTC_HC | PORTC_SXY);
     data = (u8)inp(MOUSE_DATA);
-    yl = data & 0x0F;
+    yl = data & MOUSE_COUNTER_NIBBLE_MASK;
 
     /* Y軸 上位4bit (SXY=1, SHL=1) */
     outp(MOUSE_CTRL, PORTC_HC | PORTC_SXY | PORTC_SHL);
     data = (u8)inp(MOUSE_DATA);
-    yh = data & 0x0F;
+    yh = data & MOUSE_COUNTER_NIBBLE_MASK;
 
     /* 8bit符号付き差分に合成 */
-    dx = (i8)((xh << 4) | xl);
-    dy = (i8)((yh << 4) | yl);
+    dx = (i8)((xh << MOUSE_COUNTER_NIBBLE_SHIFT) | xl);
+    dy = (i8)((yh << MOUSE_COUNTER_NIBBLE_SHIFT) | yl);
 
     /* 累積に加算 */
     bus_accum_dx += dx;
@@ -107,10 +110,10 @@ int bus_mouse_init(void)
     /* 累積値クリア */
     bus_accum_dx = 0;
     bus_accum_dy = 0;
-    bus_btn_raw = 0xE0; /* 全ボタン解放 (負論理) */
+    bus_btn_raw = (MOUSE_LEFT | MOUSE_MIDDLE | MOUSE_RIGHT); /* 全ボタン解放 (負論理) */
 
     /* 8255 モード設定: モード0, PortA入力, PortB入力, PortCH出力, PortCL入力 */
-    outp(MOUSE_MODE, 0x93);
+    outp(MOUSE_MODE, MOUSE_8255_MODE_INPUT);
 
     /* 割り込み周期: 120Hz (T1:T0 = 00) — UNDOCUMENTED: リセット時初期値 */
     outp(MOUSE_INTERVAL, 0x00);

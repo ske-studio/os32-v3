@@ -9,6 +9,26 @@
 
 #include "fm.h"
 #include "io.h"
+#include "memmap.h"
+
+#define OPN_OPERATOR_COUNT 4
+#define OPN_OPERATOR_REG_STRIDE 4
+#define OPN_BLOCK_SHIFT 3
+#define OPN_FNUM_HI_MASK 0x07
+#define SSG_PERIOD_HI_MASK 0x0F
+#define SSG_VOLUME_MASK 0x1F
+#define SSG_NOISE_MASK 0x1F
+#define SSG_TONE_REG_STRIDE 2
+#define FM_SEMITONES_PER_OCTAVE 12
+
+#define OPN_ADDR_WAIT_COUNT 6
+#define OPN_DATA_WAIT_COUNT 20
+#define FM_TONE_TL_OFF 4
+#define FM_TONE_KS_AR_OFF 8
+#define FM_TONE_DR_OFF 12
+#define FM_TONE_SR_OFF 16
+#define FM_TONE_SL_RR_OFF 20
+#define FM_TONE_FB_CON_OFF 24
 
 /* drivers/ does not include exec headers (same boundary as kbd.c). */
 extern void ring3_abort_check(void);
@@ -52,13 +72,13 @@ static int opn_write_checked(uchar reg, uchar val)
     outp(OPN_ADDR, reg);
 
     /* ウェイト: 約 3.6μs */
-    io_wait_n(6);
+    io_wait_n(OPN_ADDR_WAIT_COUNT);
 
     /* データ送信 */
     outp(OPN_DATA, val);
 
     /* データ書込み後のウェイト: 約 12μs */
-    io_wait_n(20);
+    io_wait_n(OPN_DATA_WAIT_COUNT);
 
     irq_restore(flags);
     return 1;
@@ -89,7 +109,7 @@ void opn_init(void)
     int i;
 
     /* SSGレジスタクリア (00H-0DH) */
-    for (i = 0; i <= 0x0D; i++) {
+    for (i = 0; i <= SSG_REG_ENV_SHAPE; i++) {
         opn_write((uchar)i, 0);
     }
 
@@ -99,18 +119,18 @@ void opn_init(void)
     /* FM全チャンネル Key-OFF */
     opn_write(OPN_REG_KEY_ONOFF, 0x00);
     opn_write(OPN_REG_KEY_ONOFF, 0x01);
-    opn_write(OPN_REG_KEY_ONOFF, 0x02);
+    opn_write(OPN_REG_KEY_ONOFF, OPN_CHANNEL_COUNT - 1);
 
     /* FMレジスタクリア (30H-B2H) */
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < OPN_CHANNEL_COUNT; i++) {
         int s;
-        for (s = 0; s < 4; s++) {
-            opn_write(OPN_REG_DT_ML + s * 4 + i, 0);         /* DT/ML */
-            opn_write(OPN_REG_TL   + s * 4 + i, OPN_TL_MAX); /* TL=最大減衰 */
-            opn_write(OPN_REG_KS_AR + s * 4 + i, 0);         /* KS/AR */
-            opn_write(OPN_REG_DR   + s * 4 + i, 0);          /* DR */
-            opn_write(OPN_REG_SR   + s * 4 + i, 0);          /* SR */
-            opn_write(OPN_REG_SL_RR + s * 4 + i, 0xFF);      /* SL/RR */
+        for (s = 0; s < OPN_OPERATOR_COUNT; s++) {
+            opn_write(OPN_REG_DT_ML + s * OPN_OPERATOR_REG_STRIDE + i, 0);         /* DT/ML */
+            opn_write(OPN_REG_TL   + s * OPN_OPERATOR_REG_STRIDE + i, OPN_TL_MAX); /* TL=最大減衰 */
+            opn_write(OPN_REG_KS_AR + s * OPN_OPERATOR_REG_STRIDE + i, 0);         /* KS/AR */
+            opn_write(OPN_REG_DR   + s * OPN_OPERATOR_REG_STRIDE + i, 0);          /* DR */
+            opn_write(OPN_REG_SR   + s * OPN_OPERATOR_REG_STRIDE + i, 0);          /* SR */
+            opn_write(OPN_REG_SL_RR + s * OPN_OPERATOR_REG_STRIDE + i, 0xFF);      /* SL/RR */
         }
         opn_write(OPN_REG_FNUM_LO + i, 0);   /* F-Number下位 */
         opn_write(OPN_REG_FNUM_HI + i, 0);   /* Block/F-Number上位 */
@@ -189,7 +209,7 @@ static const uchar *tone_table[] = {
 #define NUM_TONES  5
 
 /* F-Numberテーブル (オクターブ4基準) — snddrv から移植 */
-static const u16 fnumber_table[12] = {
+static const u16 fnumber_table[FM_SEMITONES_PER_OCTAVE] = {
     617,   /* C   */
     653,   /* C#  */
     692,   /* D   */
@@ -212,16 +232,16 @@ void fm_set_tone(int ch, const uchar *tone_data)
     int s;
     static const int slot_offset[] = {0, 8, 4, 12};
 
-    for (s = 0; s < 4; s++) {
+    for (s = 0; s < OPN_OPERATOR_COUNT; s++) {
         int ofs = slot_offset[s];
         opn_write(OPN_REG_DT_ML + ofs + ch, tone_data[s]);       /* DT/ML */
-        opn_write(OPN_REG_TL    + ofs + ch, tone_data[4 + s]);   /* TL */
-        opn_write(OPN_REG_KS_AR + ofs + ch, tone_data[8 + s]);   /* KS/AR */
-        opn_write(OPN_REG_DR    + ofs + ch, tone_data[12 + s]);  /* DR */
-        opn_write(OPN_REG_SR    + ofs + ch, tone_data[16 + s]);  /* SR */
-        opn_write(OPN_REG_SL_RR + ofs + ch, tone_data[20 + s]);  /* SL/RR */
+        opn_write(OPN_REG_TL    + ofs + ch, tone_data[FM_TONE_TL_OFF + s]);   /* TL */
+        opn_write(OPN_REG_KS_AR + ofs + ch, tone_data[FM_TONE_KS_AR_OFF + s]);   /* KS/AR */
+        opn_write(OPN_REG_DR    + ofs + ch, tone_data[FM_TONE_DR_OFF + s]);  /* DR */
+        opn_write(OPN_REG_SR    + ofs + ch, tone_data[FM_TONE_SR_OFF + s]);  /* SR */
+        opn_write(OPN_REG_SL_RR + ofs + ch, tone_data[FM_TONE_SL_RR_OFF + s]);  /* SL/RR */
     }
-    opn_write(OPN_REG_FB_CON + ch, tone_data[24]);               /* FB/CON */
+    opn_write(OPN_REG_FB_CON + ch, tone_data[FM_TONE_FB_CON_OFF]);               /* FB/CON */
 }
 
 /* FM音色設定 (番号指定) */
@@ -241,14 +261,14 @@ void fm_note_on(int ch, int note)
     u16 fnum;
 
     if (note < 0) return;
-    block = note / 12;
-    key = note % 12;
+    block = note / FM_SEMITONES_PER_OCTAVE;
+    key = note % FM_SEMITONES_PER_OCTAVE;
     if (block > 7) block = 7;
 
     fnum = fnumber_table[key];
 
     /* F-Number上位(+Block)を先に書く (PC9800Bible指定) */
-    opn_write(OPN_REG_FNUM_HI + ch, (uchar)((block << 3) | ((fnum >> 8) & 0x07)));
+    opn_write(OPN_REG_FNUM_HI + ch, (uchar)((block << OPN_BLOCK_SHIFT) | ((fnum >> 8) & OPN_FNUM_HI_MASK)));
     opn_write(OPN_REG_FNUM_LO + ch, (uchar)(fnum & 0xFF));
 
     /* Key-ON: 全4スロットON */
@@ -279,22 +299,22 @@ void ssg_tone(int ch, u16 period)
 {
     if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
 
-    uchar lo_reg = (uchar)(ch * 2);
-    uchar hi_reg = (uchar)(ch * 2 + 1);
+    uchar lo_reg = (uchar)(ch * SSG_TONE_REG_STRIDE);
+    uchar hi_reg = (uchar)(ch * SSG_TONE_REG_STRIDE + 1);
     opn_write(lo_reg, (uchar)(period & 0xFF));
-    opn_write(hi_reg, (uchar)((period >> 8) & 0x0F));
+    opn_write(hi_reg, (uchar)((period >> 8) & SSG_PERIOD_HI_MASK));
 }
 
 void ssg_volume(int ch, uchar vol)
 {
     if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
 
-    opn_write(SSG_REG_VOL_A + (uchar)ch, vol & 0x1F);
+    opn_write(SSG_REG_VOL_A + (uchar)ch, vol & SSG_VOLUME_MASK);
 }
 
 void ssg_noise(uchar period)
 {
-    opn_write(SSG_REG_NOISE, period & 0x1F);
+    opn_write(SSG_REG_NOISE, period & SSG_NOISE_MASK);
 }
 
 void ssg_mixer(uchar mask)
@@ -324,7 +344,7 @@ extern volatile u32 tick_count;
 #endif
 static int wait_ms(u32 ms, int interruptible)
 {
-    u32 ticks = ms / 10;   /* 100Hz → 10ms/tick */
+    u32 ticks = ms / TICK_MS;   /* 100Hz → 10ms/tick */
     u32 start = tick_count;
     if (ticks == 0) ticks = 1;
     while ((tick_count - start) < ticks) {

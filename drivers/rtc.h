@@ -14,10 +14,31 @@
 #define __RTC_H
 
 #include "types.h"
+#include "pc98.h"
+
+#define RTC_MODE_MASK 0x07
+#define RTC_NIBBLE_BITS 4
+#define RTC_NIBBLE_COUNT (RTC_READ_BITS / RTC_NIBBLE_BITS)
+#define RTC_NIB_SEC_ONES 0
+#define RTC_NIB_SEC_TENS 1
+#define RTC_NIB_MIN_ONES 2
+#define RTC_NIB_MIN_TENS 3
+#define RTC_NIB_HOUR_ONES 4
+#define RTC_NIB_HOUR_TENS 5
+#define RTC_NIB_DAY_ONES 6
+#define RTC_NIB_DAY_TENS 7
+#define RTC_NIB_WDAY 8
+#define RTC_NIB_MONTH 9
+#define RTC_NIB_YEAR_ONES 10
+#define RTC_NIB_YEAR_TENS 11
+#define RTC_SECMIN_TENS_MASK 0x07
+#define RTC_HOURDAY_TENS_MASK 0x03
+#define RTC_WDAY_MASK 0x07
+#define RTC_DIGIT_MASK 0x0F
+#define RTC_SECMIN_MAX 59
 
 /* ======== I/Oポート定義 ======== */
-#define RTC_SET    0x20    /* コマンド/データ書込みポート */
-#define RTC_READ   0x33    /* ポートB読み出し (bit0 = CDAT = DATA OUT) */
+#define RTC_READ   SYSPORT_B    /* ポートB読み出し (bit0 = CDAT = DATA OUT) */
 
 /* ======== ポート0x20 ビット配置 (PC9800Bible §4-3) ======== */
 /*   bit5: DI  (Data Input — シフトレジスタへのデータ入力)  */

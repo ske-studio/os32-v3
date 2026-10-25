@@ -7,6 +7,7 @@
 
 #include "mouse.h"
 #include "kbd.h"
+#include "kcg.h"
 #include "np2sysp.h"
 #include "pc98.h"
 #include "io.h"
@@ -25,8 +26,8 @@ static i16 cursor_y;
 /* クリッピング領域 */
 static i16 bound_x_min = 0;
 static i16 bound_y_min = 0;
-static i16 bound_x_max = 639;
-static i16 bound_y_max = 399;
+static i16 bound_x_max = GFX_SCREEN_W - 1;
+static i16 bound_y_max = GFX_SCREEN_H - 1;
 
 /* シームレスモード: 前回の絶対座標 (差分計算用) */
 static i16 prev_abs_x;
@@ -59,21 +60,21 @@ void mouse_init(void)
     if (np2_detect()) {
         if (seamless_mouse_init()) {
             mouse_mode_current = MOUSE_MODE_SEAMLESS;
-            kprintf(0x0A, "[mouse] seamless mode (NP21/W)\n");
+            kprintf(KLOG_LEGACY_GREEN, "[mouse] seamless mode (NP21/W)\n");
             return;
         }
     }
 
     /* 実機 or フォールバック → バスマウスモード */
     if (bus_mouse_init()) {
-        irq_enable(13);  /* IRQ13 (スレーブ IR5) をPICで許可 */
+        irq_enable(PC98_IRQ_MOUSE);  /* IRQ13 (スレーブ IR5) をPICで許可 */
         mouse_mode_current = MOUSE_MODE_BUS;
-        kprintf(0x0A, "[mouse] bus mouse mode (IRQ13)\n");
+        kprintf(KLOG_LEGACY_GREEN, "[mouse] bus mouse mode (IRQ13)\n");
         return;
     }
 
     mouse_mode_current = MOUSE_MODE_NONE;
-    kprintf(0x04, "[mouse] no mouse available\n");
+    kprintf(KLOG_LEGACY_RED, "[mouse] no mouse available\n");
 }
 
 /* ====================================================================== */
@@ -100,9 +101,9 @@ void mouse_poll(MouseState *state)
          * 比例配分する。決め打ちの 639/399 だと 480 ラインで下端に届かない。 */
         if (seamless_mouse_poll(&abs_x, &abs_y)) {
             abs_x = (i16)(bound_x_min +
-                          (long)abs_x * (long)(bound_x_max - bound_x_min) / 32767L);
+                          (long)abs_x * (long)(bound_x_max - bound_x_min) / MOUSE_ABS_MAX);
             abs_y = (i16)(bound_y_min +
-                          (long)abs_y * (long)(bound_y_max - bound_y_min) / 32767L);
+                          (long)abs_y * (long)(bound_y_max - bound_y_min) / MOUSE_ABS_MAX);
             if (prev_abs_valid) {
                 dx = abs_x - prev_abs_x;
                 dy = abs_y - prev_abs_y;
@@ -182,7 +183,7 @@ u8 mouse_get_mode(void)
 /* ====================================================================== */
 /*  カーソル表示レイヤー                                                   */
 /* ====================================================================== */
-static int  cursor_display_mode = 0;  /* MOUSE_CURSOR_NONE */
+static int  cursor_display_mode = MOUSE_CURSOR_NONE;  /* MOUSE_CURSOR_NONE */
 static int  cursor_visible = 0;
 static int  cursor_prev_cx = -1;
 static int  cursor_prev_cy = -1;
@@ -207,14 +208,14 @@ void mouse_cursor_show(void)
 {
     int cx, cy;
 
-    if (cursor_display_mode == 0) return;  /* NONE */
+    if (cursor_display_mode == MOUSE_CURSOR_NONE) return;  /* NONE */
 
-    cx = cursor_x / 8;
-    cy = cursor_y / 16;
-    if (cx > 79) cx = 79;
-    if (cy > 24) cy = 24;
+    cx = cursor_x / KCG_ANK_W;
+    cy = cursor_y / KCG_ANK_H;
+    if (cx > TVRAM_COLS - 1) cx = TVRAM_COLS - 1;
+    if (cy > TVRAM_ROWS - 1) cy = TVRAM_ROWS - 1;
 
-    if (cursor_display_mode == 1) {
+    if (cursor_display_mode == MOUSE_CURSOR_TEXT) {
         /* TEXT: TVRAM属性反転 */
         if (cursor_visible && cursor_prev_cx >= 0) {
             /* 前位置と同じなら何もしない */
@@ -225,7 +226,7 @@ void mouse_cursor_show(void)
         cursor_prev_width = tvram_reverse_cell(cx, cy);
         cursor_prev_cx = cx;
         cursor_prev_cy = cy;
-    } else if (cursor_display_mode == 2) {
+    } else if (cursor_display_mode == MOUSE_CURSOR_GFX) {
         /* GFX: スタブ (将来実装) */
     }
 
@@ -236,12 +237,12 @@ void mouse_cursor_hide(void)
 {
     if (!cursor_visible) return;
 
-    if (cursor_display_mode == 1 && cursor_prev_cx >= 0) {
+    if (cursor_display_mode == MOUSE_CURSOR_TEXT && cursor_prev_cx >= 0) {
         /* TEXT: 反転解除 */
         tvram_reverse_cell(cursor_prev_cx, cursor_prev_cy);
         cursor_prev_cx = -1;
         cursor_prev_cy = -1;
-    } else if (cursor_display_mode == 2) {
+    } else if (cursor_display_mode == MOUSE_CURSOR_GFX) {
         /* GFX: スタブ (将来実装) */
     }
 

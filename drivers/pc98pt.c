@@ -8,6 +8,11 @@
 
 #include "pc98pt.h"
 
+#define PC98PT_LEGACY_OFF_SSECT 6
+#define PC98PT_LEGACY_OFF_SHEAD 7
+#define PC98PT_LEGACY_OFF_SCYL 8
+#define PC98PT_LEGACY_OFF_ECYL 12
+
 static unsigned short rd16(const unsigned char *p)
 {
     return (unsigned short)((unsigned short)p[0] | ((unsigned short)p[1] << 8));
@@ -173,10 +178,10 @@ int pc98pt_os32_is_legacy(const unsigned char *sect,
             return 0;                       /* 標準配置で読める */
         p = sect + i * PC98PT_ENTRY_SIZE;
         /* 旧: +6 開始セクタ、+7 開始ヘッド、+8-9 開始シリンダ、+12-13 終了シリンダ */
-        if (pc98pt_chs_to_lba(rd16(p + 8), p[7], p[6], heads, spt, &lstart)
+        if (pc98pt_chs_to_lba(rd16(p + PC98PT_LEGACY_OFF_SCYL), p[PC98PT_LEGACY_OFF_SHEAD], p[PC98PT_LEGACY_OFF_SSECT], heads, spt, &lstart)
             != PC98PT_OK)
             return 0;
-        lend = ((unsigned long)rd16(p + 12) + 1UL) * heads * spt;
+        lend = ((unsigned long)rd16(p + PC98PT_LEGACY_OFF_ECYL) + 1UL) * heads * spt;
         if (lend <= lstart) return 0;
         if (disk_total != 0 && lend > disk_total) return 0;
         return 1;

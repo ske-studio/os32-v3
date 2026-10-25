@@ -13,6 +13,13 @@
 
 #include "types.h"
 
+/* Numeric return codes retain each interface's existing contract. */
+#define LOOP_ERR_FORMAT (-2)
+#define LOOP_ERR_BUSY (-3)
+#define LOOP_ERR_IO (-4)
+#define LOOP_ERR_UNSUPPORTED (-2)
+#define LOOP_ERR_WRITE_PROTECTED (-3)
+
 /* ループバックデバイス初期化 (lo0..lo3 を dev_register) */
 void loop_dev_init(void);
 

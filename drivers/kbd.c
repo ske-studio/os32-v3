@@ -111,7 +111,7 @@ STATIC_ASSERT(KBD_DLOG_BREAK == SCANCODE_BREAK, kbd_dlog_break_matches);
 
 /* ======== キー押下状態ビットマップ (128キー分) ======== */
 /* ビット1 = 押下中, ビット0 = 離されている */
-static volatile u8 kbd_key_pressed[16]; /* 128bit = 16bytes */
+static volatile u8 kbd_key_pressed[KBD_BITMAP_BYTES]; /* 128bit = 16bytes */
 
 /* ======== リングバッファ (u16: 上位=スキャンコード, 下位=ASCII) ======== */
 static volatile u16 kbd_buf[KBD_BUF_SIZE];
@@ -160,7 +160,7 @@ static u8 kbd_stop_mouse_buttons;
 /* ======================================================================== */
 
 /* 通常状態 (Shift なし) */
-static const u8 scancode_to_ascii[128] = {
+static const u8 scancode_to_ascii[KBD_KEY_COUNT] = {
     /* 0x00-0x0F */
     0x1B, '1', '2', '3', '4', '5', '6', '7',   /* ESC, 1-7 */
     '8',  '9', '0', '-', '^', '\\', 0x08, 0x09, /* 8-0,-,^,\,BS,TAB */
@@ -188,7 +188,7 @@ static const u8 scancode_to_ascii[128] = {
 };
 
 /* Shift状態 */
-static const u8 scancode_to_ascii_shift[128] = {
+static const u8 scancode_to_ascii_shift[KBD_KEY_COUNT] = {
     /* 0x00-0x0F */
     0x1B, '!', '"', '#', '$', '%', '&', '\'',
     '(',  ')', 0,   '=', '`', '|', 0x08, 0x09,
@@ -394,9 +394,9 @@ static void kbd_deliver(u8 scancode)
 
     /* キー押下状態ビットマップの更新 (全キー対象) */
     if (is_break) {
-        kbd_key_pressed[keycode >> 3] &= ~(1 << (keycode & 7));
+        kbd_key_pressed[keycode / BITS_PER_BYTE] &= ~(1 << (keycode % BITS_PER_BYTE));
     } else {
-        kbd_key_pressed[keycode >> 3] |=  (1 << (keycode & 7));
+        kbd_key_pressed[keycode / BITS_PER_BYTE] |=  (1 << (keycode % BITS_PER_BYTE));
     }
 
     /* 生イベントを raw リングへ (make も break も、全キー。IRQ 内なので保護不要)。
@@ -460,8 +460,8 @@ static void kbd_deliver(u8 scancode)
 
     /* CAPS時の大文字小文字切替 */
     if (kbd_shift_state & SHIFT_CAPS) {
-        if (ascii >= 'a' && ascii <= 'z') ascii -= 32;
-        else if (ascii >= 'A' && ascii <= 'Z') ascii += 32;
+        if (ascii >= 'a' && ascii <= 'z') ascii -= ('a' - 'A');
+        else if (ascii >= 'A' && ascii <= 'Z') ascii += ('a' - 'A');
     }
 
     /* CTRL+文字 → コントロールコード */
@@ -541,7 +541,7 @@ void kbd_init(void)
     /* キー状態ビットマップクリア */
     {
         int i;
-        for (i = 0; i < 16; i++) kbd_key_pressed[i] = 0;
+        for (i = 0; i < KBD_BITMAP_BYTES; i++) kbd_key_pressed[i] = 0;
         kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
     }
 
@@ -590,7 +590,7 @@ int kbd_diag(KbdDiag *out)
      * ステータスの読みは 8251A の状態を変えない。 */
     out->now_st         = (u8)inp(KBD_CMD);
     /* u16 に収まらなければ 0xFFFF で止める (折り返すと 0 に見える) */
-    out->overrun_count  = (u16)(overrun > 0xFFFFu ? 0xFFFFu : overrun);
+    out->overrun_count  = (u16)(overrun > U16_MAX ? U16_MAX : overrun);
     return 0;
 }
 
@@ -873,8 +873,8 @@ u32 kbd_get_modifiers(void)
 /* 指定スキャンコードのキーが現在押されているかを返す (1=押下中, 0=離されている) */
 int kbd_is_pressed(int scancode)
 {
-    if (scancode < 0 || scancode > 127) return 0;
-    return (kbd_key_pressed[scancode >> 3] >> (scancode & 7)) & 1;
+    if (scancode < 0 || scancode >= KBD_KEY_COUNT) return 0;
+    return (kbd_key_pressed[scancode / BITS_PER_BYTE] >> (scancode % BITS_PER_BYTE)) & 1;
 }
 
 /* mouse_poll supplies physical button samples, including during WM Pump.
