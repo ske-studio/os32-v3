@@ -22,6 +22,23 @@ typedef unsigned long  u32;
 #define EXT2_IND_BLOCK     12
 #define EXT2_DIND_BLOCK    13
 
+/* 1KiB 固定のローダ用 ext2 形式。fs/ext2.h と同名の定数は独立用の写し。 */
+#define EXT2_ADDR_PER_BLOCK          (EXT2_BLOCK_SIZE / 4)
+#define EXT2_SECTORS_PER_BLOCK       (EXT2_BLOCK_SIZE / BOOTINFO_SECLEN)
+#define EXT2_GDT_BLOCK               2
+#define EXT2_GROUP_DESC_BYTES        32
+#define EXT2_GD_INODE_TABLE_OFF      8
+#define EXT2_INODE_BASE_BYTES        128
+#define EXT2_SB_MAGIC_OFF            56
+#define EXT2_SB_BLOCKS_PER_GROUP_OFF 32
+#define EXT2_SB_INODES_PER_GROUP_OFF 40
+#define EXT2_SB_INODE_SIZE_OFF       88
+#define EXT2_INODE_SIZE_OFF          4
+#define EXT2_INODE_BLOCKS_OFF        40
+#define EXT2_DIRENT_RECLEN_OFF       4
+#define EXT2_DIRENT_NAMELEN_OFF      6
+#define EXT2_DIRENT_NAME_OFF         8
+
 /* VK32 ヘッダ (v2、票 TASK_SERIAL_HOSTFS 部品 A-4)
  *
  *   0x00          magic 'VK32'
@@ -44,10 +61,18 @@ typedef unsigned long  u32;
 #define VK32_MAX_ENTRIES   4
 #define VK32_COMMON_SIZE   16UL
 #define VK32_ENTRY_SIZE    16UL
-#define VK32_HEADER_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + 4UL) + 8UL)
+#define VK32_WORD_BYTES     4UL
+#define VK32_TRAILER_BYTES  (2 * VK32_WORD_BYTES)
+#define VK32_OFF_HEADER_SIZE 4
+#define VK32_OFF_VERSION     8
+#define VK32_OFF_ENTRY_COUNT 12
+#define VK32_ENTRY_OFF_RAW_SIZE        4
+#define VK32_ENTRY_OFF_DATA_OFFSET     8
+#define VK32_ENTRY_OFF_COMPRESSED_SIZE 12
+#define VK32_HEADER_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + VK32_WORD_BYTES) + VK32_TRAILER_BYTES)
 #define VK32_OFF_ENTRY_CRC(n) (VK32_COMMON_SIZE + (u32)(n) * VK32_ENTRY_SIZE)
-#define VK32_OFF_IMAGE_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + 4UL))
-#define VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + 4UL)
+#define VK32_OFF_IMAGE_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + VK32_WORD_BYTES))
+#define VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + VK32_WORD_BYTES)
 
 /* 展開先の帯 [MIN, END)。正典は include/memmap.h。
  * build/boot.mk が共通生成 memmap_layout.h を preinclude する。
@@ -84,7 +109,7 @@ typedef unsigned long  u32;
 #define BOOTINFO_IMG_KEY       0x43474D49UL  /* 'I','M','G','C' (LE) */
 
 /* メモリアドレス */
-#define LOAD_BUF           0x10000UL   /* vmkernel.lz4 一時読み込み先 */
+#define LOAD_BUF           LAYOUT_MEM_BOOT_COMPRESSED_BASE   /* vmkernel.lz4 一時読み込み先 */
 /* ステージング先の上限は **ブート時スタック (0x9FFFC)** の手前。
  * カーネルスタックを 0x1FC000 へ移した後もローダーは低位スタックを
  * 使い続けるので、ここは広げられない。 */
@@ -107,6 +132,15 @@ u32  ext2m_lookup(const char *path);
 int  ext2m_read_file(u32 ino, u8 *buf, u32 max_size);
 #define EXT2M_ERR_TOO_BIG  (-2)   /* i_size > max_size (切り詰めない、N8) */
 #define EXT2M_ERR_SHORT    (-3)   /* 穴で最後まで読めない */
+
+/* boot_main の区画未発見 (VK32 の CRC エラーとは別の契約)。 */
+#define BOOT_ERR_NOPART (-7)
+
+/* LZ4 token の長さ欄と little-endian match offset。 */
+#define LZ4_TOKEN_BITS      4
+#define LZ4_LENGTH_MASK     ((1 << LZ4_TOKEN_BITS) - 1)
+#define LZ4_OFFSET_BYTES    2
+#define BOOT_LZ4_ERR_OUTPUT (-2)
 
 /* LZ4 デコーダ */
 int  boot_lz4_decode(const u8 *src, int compressed_size,

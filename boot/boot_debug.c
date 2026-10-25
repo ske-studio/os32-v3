@@ -15,7 +15,18 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
+#include "../include/bootinfo.h"
+#include "../include/pc98.h"
 #include "pc98pt.h"   /* 区画表の共有部 (標準配置) */
+
+/* lib/kstring.h と同名の写し。boot の include パスは lib/ の型ヘッダを
+ * 読めないため独立させる。test_hdd_stage1.py の -Werror コンパイルで照合。 */
+#define HEX_NIBBLE_BITS   4
+#define HEX32_DIGITS      (BITS_PER_U32 / HEX_NIBBLE_BITS)
+#define HEX_DIGIT_MASK ((1 << HEX_NIBBLE_BITS) - 1)
+#define HEX8_DIGITS    (BITS_PER_BYTE / HEX_NIBBLE_BITS)
+#define DECIMAL_RADIX  10
+#define BOOT_DUMP_BYTES 16
 
 /* ================================================================ */
 /*  16進表示ユーティリティ                                           */
@@ -24,27 +35,27 @@
 static void hex8(u8 val, char *buf)
 {
     static const char h[] = "0123456789ABCDEF";
-    buf[0] = h[(val >> 4) & 0x0F];
-    buf[1] = h[val & 0x0F];
-    buf[2] = '\0';
+    buf[0] = h[(val >> HEX_NIBBLE_BITS) & HEX_DIGIT_MASK];
+    buf[1] = h[val & HEX_DIGIT_MASK];
+    buf[HEX8_DIGITS] = '\0';
 }
 
 static void hex32(u32 val, char *buf)
 {
     int i;
     static const char h[] = "0123456789ABCDEF";
-    for (i = 7; i >= 0; i--) {
-        buf[i] = h[val & 0x0F];
-        val >>= 4;
+    for (i = HEX32_DIGITS - 1; i >= 0; i--) {
+        buf[i] = h[val & HEX_DIGIT_MASK];
+        val >>= HEX_NIBBLE_BITS;
     }
-    buf[8] = '\0';
+    buf[HEX32_DIGITS] = '\0';
 }
 
 /* prefix + 8桁hex を1行に表示 */
 static void show_val(u32 tvram, const char *prefix, u32 val)
 {
     char msg[64];
-    char hx[9];
+    char hx[HEX32_DIGITS + 1];
     int i = 0;
     const char *p = prefix;
 
@@ -60,7 +71,7 @@ static void show_val(u32 tvram, const char *prefix, u32 val)
 static void show_dump(u32 tvram, const char *prefix, u8 *data, int n)
 {
     char msg[80];
-    char hx[3];
+    char hx[HEX8_DIGITS + 1];
     int i = 0, j;
     const char *p = prefix;
 
@@ -81,7 +92,7 @@ static void show_dump(u32 tvram, const char *prefix, u8 *data, int n)
 /* ================================================================ */
 int boot_main(void)
 {
-    u8 buf[512];
+    u8 buf[BOOTINFO_SECLEN];
     u32 row;
     u32 part_lba = 0;
     int i;
@@ -91,12 +102,12 @@ int boot_main(void)
     /* 行2: [0.5]BSS CLR (ASM側)                                */
     /* 行3: [1]CALL MAIN (ASM側)                                */
     /* ここから行4 (offset 640) を使用                           */
-    row = 0xA0000 + 640;
+    row = TVRAM_CHAR_BASE + 4 * TVRAM_BPR;
 
     /* ---- Step 0: ジオメトリ表示 ---- */
     {
         char geo[40];
-        char h1[3], h2[3], h3[3];
+        char h1[HEX8_DIGITS + 1], h2[HEX8_DIGITS + 1], h3[HEX8_DIGITS + 1];
         int p = 0;
         geo[p++] = '['; geo[p++] = 'G'; geo[p++] = ']';
         geo[p++] = 'D'; geo[p++] = 'A'; geo[p++] = '=';
@@ -110,28 +121,28 @@ int boot_main(void)
         geo[p++] = h3[0]; geo[p++] = h3[1];
         geo[p] = '\0';
         boot_print_asm(row, geo);
-        row += 160;
+        row += TVRAM_BPR;
     }
 
     /* ---- Step 1: LBA 0 読み出し (MBR/IPL) ---- */
     boot_print_asm(row, "[1]Read LBA0...");
-    row += 160;
+    row += TVRAM_BPR;
 
     boot_read_sector_asm(0, buf);
-    show_dump(row, " LBA0:", buf, 16);
-    row += 160;
+    show_dump(row, " LBA0:", buf, BOOT_DUMP_BYTES);
+    row += TVRAM_BPR;
 
     /* ---- Step 2: LBA 1 読み出し (パーティションテーブル) ---- */
     boot_print_asm(row, "[2]Read LBA1 (PT)...");
-    row += 160;
+    row += TVRAM_BPR;
 
     boot_read_sector_asm(1, buf);
-    show_dump(row, " PT:", buf, 16);
-    row += 160;
+    show_dump(row, " PT:", buf, BOOT_DUMP_BYTES);
+    row += TVRAM_BPR;
 
     /* ---- Step 3: パーティション解析 ---- */
-    for (i = 0; i < 16; i++) {
-        u8 *ent = &buf[i * 32];
+    for (i = 0; i < PC98PT_MAX_ENTRIES; i++) {
+        u8 *ent = &buf[i * PC98PT_ENTRY_SIZE];
         u8 bootable = ent[0];
         u8 sys_type = ent[1];
 
@@ -140,12 +151,12 @@ int boot_main(void)
         /* 最初の有効エントリを表示 */
         {
             char info[50];
-            char h1[3], h2[3];
+            char h1[HEX8_DIGITS + 1], h2[HEX8_DIGITS + 1];
             int p = 0;
             info[p++] = '['; info[p++] = '3'; info[p++] = ']';
             info[p++] = '#';
-            if (i >= 10) { info[p++] = '0' + (i / 10); }
-            info[p++] = '0' + (i % 10);
+            if (i >= DECIMAL_RADIX) { info[p++] = '0' + (i / DECIMAL_RADIX); }
+            info[p++] = '0' + (i % DECIMAL_RADIX);
             info[p++] = ' '; info[p++] = 'B'; info[p++] = '=';
             hex8(bootable, h1);
             info[p++] = h1[0]; info[p++] = h1[1];
@@ -154,12 +165,12 @@ int boot_main(void)
             info[p++] = h2[0]; info[p++] = h2[1];
             info[p] = '\0';
             boot_print_asm(row, info);
-            row += 160;
+            row += TVRAM_BPR;
         }
 
         /* 先頭エントリのバイト列もダンプ */
-        show_dump(row, " ent:", ent, 16);
-        row += 160;
+        show_dump(row, " ent:", ent, BOOT_DUMP_BYTES);
+        row += TVRAM_BPR;
 
         if (sys_type == PC98PT_SID_OS32) {
             PC98PartEntry pe;
@@ -172,7 +183,7 @@ int boot_main(void)
                 part_lba = st;
 
             show_val(row, " CHS->LBA=", part_lba);
-            row += 160;
+            row += TVRAM_BPR;
             break;
         }
     }
@@ -180,37 +191,37 @@ int boot_main(void)
     if (part_lba == 0) {
         /* 以前は LBA 1088 を仮定した。本物のローダ (boot_main.c) と同じく止まる */
         boot_print_asm(row, "[3]No OS32 partition in LBA 1!");
-        return -7;
+        return BOOT_ERR_NOPART;
     }
 
     /* ---- Step 4: ext2 スーパーブロック読み出し ---- */
     /* ext2 SB はパーティション先頭から 1024B (= 2セクタ目) */
     {
-        u32 sb_lba = part_lba + 2;
+        u32 sb_lba = part_lba + EXT2_SECTORS_PER_BLOCK;
         u16 magic;
 
         show_val(row, "[4]SB LBA=", sb_lba);
-        row += 160;
+        row += TVRAM_BPR;
 
         boot_read_sector_asm(sb_lba, buf);
 
         /* マジック: SBの先頭から offset 56 (0x38) */
-        show_dump(row, " SB@0:", buf, 16);
-        row += 160;
+        show_dump(row, " SB@0:", buf, BOOT_DUMP_BYTES);
+        row += TVRAM_BPR;
 
-        show_dump(row, " SB@48:", &buf[48], 16);
-        row += 160;
+        show_dump(row, " SB@48:", &buf[48], BOOT_DUMP_BYTES);
+        row += TVRAM_BPR;
 
-        magic = (u16)buf[56] | ((u16)buf[57] << 8);
+        magic = (u16)buf[EXT2_SB_MAGIC_OFF] | ((u16)buf[EXT2_SB_MAGIC_OFF + 1] << 8);
         show_val(row, "[4]magic=", (u32)magic);
-        row += 160;
+        row += TVRAM_BPR;
 
-        if (magic == 0xEF53) {
+        if (magic == EXT2_SUPER_MAGIC) {
             boot_print_asm(row, "[4]ext2 OK!");
         } else {
             boot_print_asm(row, "[4]NOT ext2! Check partition LBA");
         }
-        row += 160;
+        row += TVRAM_BPR;
     }
 
     boot_print_asm(row, "=== DEBUG HALT ===");

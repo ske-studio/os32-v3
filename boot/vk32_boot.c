@@ -31,12 +31,12 @@ static u32 rd32(const u8 *p)
 /* ファイル全体の CRC32。[crc_off, crc_off + 4) は 0 として送る。 */
 static u32 vk32_file_crc(const u8 *file, u32 size, u32 crc_off)
 {
-    static const u8 zero4[4] = { 0, 0, 0, 0 };
+    static const u8 zero4[VK32_WORD_BYTES] = { 0, 0, 0, 0 };
     u32 s = CRC32_INIT;
 
     s = crc32_core_update(s, file, crc_off);
-    s = crc32_core_update(s, zero4, 4);
-    s = crc32_core_update(s, file + crc_off + 4, size - crc_off - 4);
+    s = crc32_core_update(s, zero4, VK32_WORD_BYTES);
+    s = crc32_core_update(s, file + crc_off + VK32_WORD_BYTES, size - crc_off - VK32_WORD_BYTES);
     return crc32_core_final(s);
 }
 
@@ -54,12 +54,12 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
 
     /* 2. 共通部 */
     if (rd32(file) != VK32_MAGIC) return VK32_ERR_MAGIC;
-    if (rd32(file + 8) != VK32_VERSION) return VK32_ERR_VERSION;
-    n = rd32(file + 12);
+    if (rd32(file + VK32_OFF_VERSION) != VK32_VERSION) return VK32_ERR_VERSION;
+    n = rd32(file + VK32_OFF_ENTRY_COUNT);
     if (n < 1 || n > (u32)VK32_MAX_ENTRIES) return VK32_ERR_COUNT;
 
     /* 3. header_size (n <= 4 なので VK32_HEADER_SIZE は溢れない) */
-    hsz = rd32(file + 4);
+    hsz = rd32(file + VK32_OFF_HEADER_SIZE);
     if (hsz != VK32_HEADER_SIZE(n) || hsz > file_size) return VK32_ERR_HEADER;
 
     /* 4. 完全長 */
@@ -76,9 +76,9 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
 
         ent  = file + VK32_COMMON_SIZE + i * VK32_ENTRY_SIZE;
         addr = rd32(ent + 0);
-        raw  = rd32(ent + 4);
-        off  = rd32(ent + 8);
-        csz  = rd32(ent + 12);
+        raw  = rd32(ent + VK32_ENTRY_OFF_RAW_SIZE);
+        off  = rd32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
+        csz  = rd32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
 
         if (off < hsz || off > file_size || csz > file_size - off)
             return VK32_ERR_SRC;
@@ -89,7 +89,7 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
         for (j = 0; j < i; j++) {
             const u8 *e2 = file + VK32_COMMON_SIZE + j * VK32_ENTRY_SIZE;
             u32 a2 = rd32(e2 + 0);
-            u32 r2 = rd32(e2 + 4);
+            u32 r2 = rd32(e2 + VK32_ENTRY_OFF_RAW_SIZE);
             if (addr < a2 + r2 && a2 < addr + raw) return VK32_ERR_DST;
         }
     }
@@ -102,16 +102,16 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
 
         ent  = file + VK32_COMMON_SIZE + i * VK32_ENTRY_SIZE;
         addr = rd32(ent + 0);
-        raw  = rd32(ent + 4);
-        off  = rd32(ent + 8);
-        csz  = rd32(ent + 12);
+        raw  = rd32(ent + VK32_ENTRY_OFF_RAW_SIZE);
+        off  = rd32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
+        csz  = rd32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
         dst  = window + (addr - VK32_LOAD_MIN);
 
         decoded = boot_lz4_decode(file + off, (int)csz, dst, (int)raw);
         if (decoded < 0) return VK32_ERR_DECODE;
         if ((u32)decoded != raw) return VK32_ERR_RAW_SIZE;
         if (crc32_core_final(crc32_core_update(CRC32_INIT, dst, raw)) !=
-            rd32(file + VK32_OFF_ENTRY_CRC(n) + i * 4))
+            rd32(file + VK32_OFF_ENTRY_CRC(n) + i * VK32_WORD_BYTES))
             return VK32_ERR_ENTRY_CRC;
     }
 

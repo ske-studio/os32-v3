@@ -27,8 +27,8 @@ int boot_lz4_decode(const u8 *src, int compressed_size,
         token = *ip++;
 
         /* リテラル */
-        lit_len = (token >> 4) & 0x0F;
-        if (lit_len == 15) {
+        lit_len = (token >> LZ4_TOKEN_BITS) & LZ4_LENGTH_MASK;
+        if (lit_len == LZ4_LENGTH_MASK) {
             int s;
             do {
                 if (ip >= ip_end) return -1;
@@ -42,21 +42,21 @@ int boot_lz4_decode(const u8 *src, int compressed_size,
         /* ip + lit_len 形式はポインタが上位アドレスでラップすると
          * すり抜けるので、差分 (ip_end - ip) と比較する */
         if (lit_len > (int)(ip_end - ip)) return -1;
-        if (lit_len > (int)(op_end - op)) return -2;
+        if (lit_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;
         for (i = 0; i < lit_len; i++) *op++ = *ip++;
 
         if (ip >= ip_end) break;
 
         /* オフセット (2B LE) */
-        if (ip + 2 > ip_end) return -1;
+        if (ip + LZ4_OFFSET_BYTES > ip_end) return -1;
         offset = (int)ip[0] | ((int)ip[1] << 8);
-        ip += 2;
+        ip += LZ4_OFFSET_BYTES;
         if (offset == 0) return -1;
         if (op - dst < offset) return -1;
 
         /* マッチ */
-        match_len = (token & 0x0F) + LZ4_MINMATCH;
-        if ((token & 0x0F) == 15) {
+        match_len = (token & LZ4_LENGTH_MASK) + LZ4_MINMATCH;
+        if ((token & LZ4_LENGTH_MASK) == LZ4_LENGTH_MASK) {
             int s;
             do {
                 if (ip >= ip_end) return -1;
@@ -65,7 +65,7 @@ int boot_lz4_decode(const u8 *src, int compressed_size,
                 if (match_len > dst_capacity) return -1;
             } while (s == 255);
         }
-        if (match_len > (int)(op_end - op)) return -2;
+        if (match_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;
         match_src = op - offset;
         for (i = 0; i < match_len; i++) *op++ = match_src[i];
     }

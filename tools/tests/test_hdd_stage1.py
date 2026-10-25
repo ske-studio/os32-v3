@@ -827,11 +827,15 @@ def build_target(tmp):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
         run([*base, "-c", str(ROOT / rel), "-o", str(out)], check=True)
     # ローダと同じフラグ (-Os、-Iboot の型) でも共有部が通る
-    run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
-         "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
-         "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers",
-         "-include", str(layout), "-c",
-         str(ROOT / "boot/boot_main.c"), "-o", str(pathlib.Path(tmp) / "bm.o")], check=True)
+    for rel in ("boot/boot_main.c", "boot/boot_debug.c"):
+        # 同名の HEX_* の写しが正典と違えば macro redefinition が -Werror で落ちる。
+        extra = ["-Iinclude", "-include", "lib/kstring.h"] if rel.endswith("boot_debug.c") else []
+        run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
+             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
+             "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers",
+             "-include", str(layout), *extra, "-c",
+             str(ROOT / rel), "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
+            check=True)
     print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
 

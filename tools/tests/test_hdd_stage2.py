@@ -77,6 +77,7 @@ MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "drivers/pc98pt.c", "drivers/pc98pt.h", "fs/ext2_layout.c", "fs/ext2_layout.h",
           "boot/ext2_mini.c", "boot/boot_defs.h",
+          "include/bootinfo.h", "include/types.h",
           "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h", "userland/lib/rt/dbgserial.h"]
 
 
