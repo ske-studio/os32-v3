@@ -9,8 +9,8 @@
 /*    - 3文字以上: 前方一致 (範囲検索でインデックス活用)                     */
 /* ======================================================================== */
 
-#define IME_SINGLE_KANJI_COST 300
-/* Dictionary variants and operation-specific failures retain their ABI values. */
+#define IME_NONSHORTENING_COST_PENALTY 300 /* 非負のコストで、候補のバイト長が読み以上のときに足す */
+/* 辞書の種類と操作ごとの失敗の値は ABI の値のまま。 */
 #define IME_DICT_ERR_EXACT_PREPARE (-2)
 #define IME_DICT_ERR_PREFIX_PREPARE (-3)
 #define IME_DICT_ERR_USER_LIST     (-4)
@@ -360,7 +360,7 @@ static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
 
         /* ひらがな/カタカナそのまま表記に対する動的ペナルティ */
         if (r->cost >= 0 && kstrlen(r->kanji) >= (u32)yomi_len) {
-            r->cost += IME_SINGLE_KANJI_COST;
+            r->cost += IME_NONSHORTENING_COST_PENALTY;
         }
 
         count++;
