@@ -264,3 +264,7 @@ import表と既存利用者:
 ## S4d の実装で設計者が決めたこと
 
 - root 専用の作業変数と `ret` は `static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)` のローカルとし、既存の I/O ごとの `EXT2_ERR_IO` と成功時 `EXT2_OK` を返す。呼元の元ブロック位置で非ゼロを `EXT2_ERR_IO` にし、`fmt_ctx`・`ext2_g_blk` の所有と計算・読書き順序を維持する。
+
+## S4e の実装で設計者が決めたこと
+
+- 現行ビルドの `kernel/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。

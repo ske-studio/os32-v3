@@ -1,6 +1,6 @@
 # SLIM_KERNEL 付表 — 移す自己試験ごとの kdebug の import
 
-> 状態: **現行 (2026-10-25)** — [SLIM_KERNEL_DESIGN](SLIM_KERNEL_DESIGN.md) の付表。出所: ~/os32-tmp/run/slim-kernel/IMPORTS.final.md。
+> 状態: **現行 (2026-10-25)** — 確定設計 SLIM_KERNEL_DESIGN の付表。出所: ~/os32-tmp/run/slim-kernel/IMPORTS.final.md。
 
 # IMPORTS.r2 — S3移植5試験のimport契約
 

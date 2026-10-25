@@ -326,167 +326,164 @@ static void commit_candidate(void)
 /*  IME コアロジック: キー処理                                               */
 /* ======================================================================== */
 
-/*
- * 戻り値: 1=commit_bufに確定データあり, 0=未確定, -1=キーを消費せず透過
- */
-static int ime_process_key(int keydata)
+/* 候補の戻り値は通常入力へ流さず、呼び手へそのまま返す。 */
+static inline int ime_candidate_key(u8 ascii, u8 scancode)
 {
-    u8 scancode = (u8)((keydata >> 8) & SCANCODE_KEY);
-    u8 ascii = (u8)(keydata & 0xFF);
-    int count;
     int n;
     int target;
     int max_page;
 
-    /* === 変換候補表示中の操作 === */
-    if (g_ime.state != IME_ST_INPUT) {
-        /* 1..9 キーのハンドリング (CANDLIST 中のみ有効) */
-        if (g_ime.state == IME_ST_CANDLIST && ascii >= '1' && ascii <= '9') {
-            n = ascii - '0';
-            target = g_ime.page * g_ime.per_page + (n - 1);
-            if (target < g_ime.result_count) {
-                g_ime.candidate_idx = target;
-                commit_candidate();
-                g_ime.state = IME_ST_INPUT;
-                g_ime.converting = 0;
-                tvram_set_scroll_reserve(1); /* インライン保護に戻す */
-                candlist_clear(); /* リスト領域を消去 */
-                if (g_ime.kana_len > 0) {
-                    preedit_draw();
-                } else {
-                    preedit_clear();
-                }
-                return 1;
-            }
-            return 0;
-        }
-
-        /* Space キー (次候補送り) */
-        if (scancode == KEY_SPACE) {
-            g_ime.candidate_idx++;
-            if (g_ime.candidate_idx >= g_ime.result_count) {
-                g_ime.candidate_idx = 0;
-            }
-            /* 表示ページを同期 */
-            g_ime.page = g_ime.candidate_idx / g_ime.per_page;
-            preedit_draw();
-            return 0;
-        }
-
-        /* Down または XFER キー (変換キー) */
-        if (scancode == KEY_DOWN || scancode == KEY_XFER) {
-            if (g_ime.state == IME_ST_CONVERT) {
-                /* 候補リストウィンドウ展開 */
-                candlist_save();
-                g_ime.state = IME_ST_CANDLIST;
-                g_ime.page = g_ime.candidate_idx / g_ime.per_page;
-                /* 3行+インライン1行で計4行を保護 */
-                tvram_set_scroll_reserve(4);
-                preedit_draw();
-            } else {
-                /* CANDLIST 中は次候補 */
-                g_ime.candidate_idx++;
-                if (g_ime.candidate_idx >= g_ime.result_count) {
-                    g_ime.candidate_idx = 0;
-                }
-                g_ime.page = g_ime.candidate_idx / g_ime.per_page;
-                preedit_draw();
-            }
-            return 0;
-        }
-
-        /* Up キー (前候補) */
-        if (scancode == KEY_UP) {
-            if (g_ime.state == IME_ST_CONVERT) {
-                /* リスト展開して前候補 */
-                candlist_save();
-                g_ime.state = IME_ST_CANDLIST;
-                g_ime.candidate_idx = (g_ime.candidate_idx == 0) ? (g_ime.result_count - 1) : (g_ime.candidate_idx - 1);
-                g_ime.page = g_ime.candidate_idx / g_ime.per_page;
-                tvram_set_scroll_reserve(4);
-                preedit_draw();
-            } else {
-                /* CANDLIST 中は前候補 */
-                g_ime.candidate_idx = (g_ime.candidate_idx == 0) ? (g_ime.result_count - 1) : (g_ime.candidate_idx - 1);
-                g_ime.page = g_ime.candidate_idx / g_ime.per_page;
-                preedit_draw();
-            }
-            return 0;
-        }
-
-        /* RollDown / Right (次ページ) */
-        if (scancode == KEY_ROLLDOWN || scancode == KEY_RIGHT) {
-            if (g_ime.state == IME_ST_CANDLIST) {
-                max_page = (g_ime.result_count - 1) / g_ime.per_page;
-                if (g_ime.page < max_page) {
-                    g_ime.page++;
-                    g_ime.candidate_idx = g_ime.page * g_ime.per_page;
-                    preedit_draw();
-                }
-            }
-            return 0;
-        }
-
-        /* RollUp / Left (前ページ) */
-        if (scancode == KEY_ROLLUP || scancode == KEY_LEFT) {
-            if (g_ime.state == IME_ST_CANDLIST) {
-                if (g_ime.page > 0) {
-                    g_ime.page--;
-                    g_ime.candidate_idx = g_ime.page * g_ime.per_page;
-                    preedit_draw();
-                }
-            }
-            return 0;
-        }
-
-        /* Return (確定) */
-        if (scancode == KEY_RETURN) {
+    /* 1..9 キーのハンドリング (CANDLIST 中のみ有効) */
+    if (g_ime.state == IME_ST_CANDLIST && ascii >= '1' && ascii <= '9') {
+        n = ascii - '0';
+        target = g_ime.page * g_ime.per_page + (n - 1);
+        if (target < g_ime.result_count) {
+            g_ime.candidate_idx = target;
             commit_candidate();
             g_ime.state = IME_ST_INPUT;
             g_ime.converting = 0;
             tvram_set_scroll_reserve(1); /* インライン保護に戻す */
             candlist_clear(); /* リスト領域を消去 */
             if (g_ime.kana_len > 0) {
-                preedit_draw();  /* 残りかなを表示 */
+                preedit_draw();
             } else {
                 preedit_clear();
             }
             return 1;
         }
+        return 0;
+    }
 
-        /* ESC / BS (キャンセル / 畳む) */
-        if (ascii == 0x1B || scancode == KEY_BS) {
-            if (g_ime.state == IME_ST_CANDLIST) {
-                /* CANDLIST -> CONVERT に戻す (リストを畳む) */
-                candlist_clear();
-                g_ime.state = IME_ST_CONVERT;
-                tvram_set_scroll_reserve(1); /* 1行保護に戻す */
-                preedit_draw();
-            } else {
-                /* 変換自体をキャンセル */
-                g_ime.state = IME_ST_INPUT;
-                g_ime.converting = 0;
+    /* Space キー (次候補送り) */
+    if (scancode == KEY_SPACE) {
+        g_ime.candidate_idx++;
+        if (g_ime.candidate_idx >= g_ime.result_count) {
+            g_ime.candidate_idx = 0;
+        }
+        /* 表示ページを同期 */
+        g_ime.page = g_ime.candidate_idx / g_ime.per_page;
+        preedit_draw();
+        return 0;
+    }
+
+    /* Down または XFER キー (変換キー) */
+    if (scancode == KEY_DOWN || scancode == KEY_XFER) {
+        if (g_ime.state == IME_ST_CONVERT) {
+            /* 候補リストウィンドウ展開 */
+            candlist_save();
+            g_ime.state = IME_ST_CANDLIST;
+            g_ime.page = g_ime.candidate_idx / g_ime.per_page;
+            /* 3行+インライン1行で計4行を保護 */
+            tvram_set_scroll_reserve(4);
+            preedit_draw();
+        } else {
+            /* CANDLIST 中は次候補 */
+            g_ime.candidate_idx++;
+            if (g_ime.candidate_idx >= g_ime.result_count) {
                 g_ime.candidate_idx = 0;
-                g_ime.result_count = 0;
-                g_ime.convert_len = 0;
+            }
+            g_ime.page = g_ime.candidate_idx / g_ime.per_page;
+            preedit_draw();
+        }
+        return 0;
+    }
+
+    /* Up キー (前候補) */
+    if (scancode == KEY_UP) {
+        if (g_ime.state == IME_ST_CONVERT) {
+            /* リスト展開して前候補 */
+            candlist_save();
+            g_ime.state = IME_ST_CANDLIST;
+            g_ime.candidate_idx = (g_ime.candidate_idx == 0) ? (g_ime.result_count - 1) : (g_ime.candidate_idx - 1);
+            g_ime.page = g_ime.candidate_idx / g_ime.per_page;
+            tvram_set_scroll_reserve(4);
+            preedit_draw();
+        } else {
+            /* CANDLIST 中は前候補 */
+            g_ime.candidate_idx = (g_ime.candidate_idx == 0) ? (g_ime.result_count - 1) : (g_ime.candidate_idx - 1);
+            g_ime.page = g_ime.candidate_idx / g_ime.per_page;
+            preedit_draw();
+        }
+        return 0;
+    }
+
+    /* RollDown / Right (次ページ) */
+    if (scancode == KEY_ROLLDOWN || scancode == KEY_RIGHT) {
+        if (g_ime.state == IME_ST_CANDLIST) {
+            max_page = (g_ime.result_count - 1) / g_ime.per_page;
+            if (g_ime.page < max_page) {
+                g_ime.page++;
+                g_ime.candidate_idx = g_ime.page * g_ime.per_page;
                 preedit_draw();
             }
-            return 0;
         }
+        return 0;
+    }
 
-        /* その他のキーは候補確定後にフォールスルー */
+    /* RollUp / Left (前ページ) */
+    if (scancode == KEY_ROLLUP || scancode == KEY_LEFT) {
+        if (g_ime.state == IME_ST_CANDLIST) {
+            if (g_ime.page > 0) {
+                g_ime.page--;
+                g_ime.candidate_idx = g_ime.page * g_ime.per_page;
+                preedit_draw();
+            }
+        }
+        return 0;
+    }
+
+    /* Return (確定) */
+    if (scancode == KEY_RETURN) {
         commit_candidate();
         g_ime.state = IME_ST_INPUT;
         g_ime.converting = 0;
         tvram_set_scroll_reserve(1); /* インライン保護に戻す */
         candlist_clear(); /* リスト領域を消去 */
         if (g_ime.kana_len > 0) {
-            preedit_draw();
+            preedit_draw();  /* 残りかなを表示 */
         } else {
             preedit_clear();
         }
-        return -1;
+        return 1;
     }
+
+    /* ESC / BS (キャンセル / 畳む) */
+    if (ascii == 0x1B || scancode == KEY_BS) {
+        if (g_ime.state == IME_ST_CANDLIST) {
+            /* CANDLIST -> CONVERT に戻す (リストを畳む) */
+            candlist_clear();
+            g_ime.state = IME_ST_CONVERT;
+            tvram_set_scroll_reserve(1); /* 1行保護に戻す */
+            preedit_draw();
+        } else {
+            /* 変換自体をキャンセル */
+            g_ime.state = IME_ST_INPUT;
+            g_ime.converting = 0;
+            g_ime.candidate_idx = 0;
+            g_ime.result_count = 0;
+            g_ime.convert_len = 0;
+            preedit_draw();
+        }
+        return 0;
+    }
+
+    /* その他のキーは候補確定後にフォールスルー */
+    commit_candidate();
+    g_ime.state = IME_ST_INPUT;
+    g_ime.converting = 0;
+    tvram_set_scroll_reserve(1); /* インライン保護に戻す */
+    candlist_clear(); /* リスト領域を消去 */
+    if (g_ime.kana_len > 0) {
+        preedit_draw();
+    } else {
+        preedit_clear();
+    }
+    return -1;
+}
+
+static inline int ime_input_key(u8 ascii, u8 scancode)
+{
+    int count;
 
     /* === 通常入力中 === */
 
@@ -587,6 +584,19 @@ static int ime_process_key(int keydata)
 
     /* その他のキー: 透過 */
     return -1;
+}
+
+/*
+ * 戻り値: 1=commit_bufに確定データあり, 0=未確定, -1=キーを消費せず透過
+ */
+static int ime_process_key(int keydata)
+{
+    u8 scancode = (u8)((keydata >> 8) & SCANCODE_KEY);
+    u8 ascii = (u8)(keydata & 0xFF);
+
+    if (g_ime.state != IME_ST_INPUT)
+        return ime_candidate_key(ascii, scancode);
+    return ime_input_key(ascii, scancode);
 }
 
 /* ======================================================================== */
