@@ -3,7 +3,7 @@ ifeq ($(origin KERNEL_CFLAGS),undefined)
 include build/config.mk
 endif
 KDEBUG_OUT ?= $(BUILD_OUT)/kdebug
-KDEBUG_STAGE := S5
+KDEBUG_STAGE := S6
 KDEBUG_GEN := kdebug/generated
 MODULE_SCHEMA := kernel/module_schema.h
 $(MODULE_SCHEMA): tools/module_schema.py tools/gen_module_schema.py
@@ -23,7 +23,7 @@ KDEBUG_DEF_SOURCES := $(shell python3 -c 'import json; print(" ".join(sorted({e[
 # static checks (including CI without a cross compiler) need these under -n.
 KDEBUG_GENERATED := $(addprefix $(KDEBUG_GEN)/,kdebug_imports.h kdebug_imports.json \
     kdebug_kexports.c kdebug_import_slots.c kdebug_import_stubs.S kdebug_import_macros.h)
-$(KDEBUG_GENERATED) &: kernel/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py tools/module_schema.py $(MODULE_SCHEMA) $(KDEBUG_DEF_SOURCES)
+$(KDEBUG_GENERATED) &: kernel/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py tools/module_schema.py build/kdebug.mk $(MODULE_SCHEMA) $(KDEBUG_DEF_SOURCES)
 	python3 tools/gen_kdebug_imports.py --stage $(KDEBUG_STAGE) --out-dir $(KDEBUG_GEN)
 
 kernel/module.o: kernel/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h $(MODULE_SCHEMA)

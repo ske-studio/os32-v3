@@ -26,14 +26,23 @@ STAGE_KINDS = {
     'S3': ('FUNC',) * 14 + ('GETTER',) * 2 + ('PTR',) * 4,
     'S4': ('FUNC',) * 25,
     'S5': ('FUNC',) * 30,
+    # S3a prepares generation; later moves append only their actual imports.
+    'S6': (),
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
     STAGES[_stage] = (list(STAGES.values())[-1] if STAGES else 0) + len(_kinds)
 LAST_STAGE = list(STAGE_KINDS)[-1]
 GENERATIONS = json.loads((ROOT / 'sdk/kapi.json').read_text())['generations']
-# Slots 264..267 were called only by the GF body, which M3c moved to HWDEV.
-GF_ONLY_SLOTS = range(264, 268)
+# Identify contracts by symbol: S3b..S3e compact the old selftest slots.
+GF_ONLY_SYMBOLS = frozenset(('pci_cfg_read32', 'pci_cfg_read16',
+                             'pci_cfg_write32', 'pci_cfg_write16'))
+# Raw function addresses do not create an nm -u reference to the function.
+# This manifest also fixes which moved object may consume each address.
+ADDRESS_IMPORTS = {'kapi_reserved_nosys': 'selftest_exec',
+                   'shlib_read_page': 'selftest_lease'}
+SELFTEST_OBJECTS = ('selftest_con_sink', 'selftest_kbd_inject',
+                    'selftest_lease', 'selftest_exec')
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
 
@@ -146,15 +155,40 @@ def symbols(nm, paths, undefined):
     return result
 
 
+def address_references(entries, callers, root):
+    """Account for raw slots in linked moved sources, not stale output files."""
+    names = {e['name'] for e in entries if e['kind_name'] == 'FUNC'}
+    refs = set()
+    for path in callers:
+        if path.stem not in SELFTEST_OBJECTS:
+            continue
+        source = clean_source((root / 'kdebug' / (path.stem + '.c')).read_text())
+        used = set(re.findall(r'\bKDI_ADDR_(\w+)\b', source))
+        for name in used:
+            if ADDRESS_IMPORTS.get(name) != path.stem or name not in names:
+                raise ValueError('invalid address import: ' + name)
+        required = {name for name, stem in ADDRESS_IMPORTS.items()
+                    if stem == path.stem and name in names}
+        if required - used:
+            raise ValueError('missing address import: ' + str(sorted(required - used)))
+        refs |= used
+    return refs
+
+
 def check_nm(entries, nm=None, root=ROOT):
     nm = nm or str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-nm')
     root = Path(root)
+    map_text = (root / 'build/out/kdebug/kdebug.map').read_text()
+    linked = [root / p for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
+    moved = [p for p in linked if p.stem in SELFTEST_OBJECTS]
     groups = {'S1': ['crt_diag'], 'S2': ['kselftest'], 'S3': ['v86_gcap', 'v86_gcap_math']}
     cumulative = set()
     for stage, stems in groups.items():
         paths = ([root / 'build/out/kdebug/crt_diag.o'] if stage == 'S1' else
                  [root / 'build/out/kdebug/kselftest.o', root / 'kernel/kaudit.o'] if stage == 'S2' else
                  [root / 'build/out/kdebug' / (name + '.o') for name in stems])
+        if stage == 'S2':
+            paths += moved
         missing = [str(p) for p in paths if not p.exists()]
         if missing:
             raise SystemExit('gen_kdebug_imports: run make kernel first (missing: ' + ', '.join(missing) + ')')
@@ -162,6 +196,11 @@ def check_nm(entries, nm=None, root=ROOT):
         # Linker contracts are not imports: module.ld defines the ABI marker;
         # __bss_end belongs to the retained kernel SHM boot observation.
         refs.discard(ABI_SYMBOL)
+        if stage == 'S2':
+            raw_addresses = address_references(entries, moved, root)
+            if raw_addresses:
+                refs.discard('kdebug_import_slots')
+                refs |= raw_addresses
         if stage == 'S2':
             refs.discard('__bss_end')
             refs.discard('__kernel_resident_end')
@@ -175,8 +214,8 @@ def check_nm(entries, nm=None, root=ROOT):
                     for name in refs - operations}
         if stage in ('S1', 'S3'):
             refs = {next((e['symbol'] for e in entries if e['name'] == name), name) for name in refs}
-        # Append-only extensions can be used by older units in the current
-        # module without renumbering the original S1..S3 slots.
+        # Later-stage imports may be used by the original units and the
+        # moved selftests; stage boundaries follow the current compact table.
         later = {e['symbol'] for e in entries[STAGES[stage]:]}
         cumulative |= refs - later
         expected = {e['symbol'] for e in entries[:STAGES[stage]] if e['kind_name'] != 'OP'}
@@ -188,19 +227,26 @@ def check_nm(entries, nm=None, root=ROOT):
             raise ValueError(f'{stage} nm mismatch: missing={sorted(missing)}, unexpected={sorted(cumulative-expected)}')
     # M3c: read actual linked inputs, never stale GF .o files left in the
     # output directory. Their old kernel slots remain callable ABI entries.
-    map_text = (root / 'build/out/kdebug/kdebug.map').read_text()
-    paths = [root / p for p in re.findall(r'^LOAD (.+\.o)$', map_text, re.M)]
+    paths = linked
     if any(p.stem in hwdev_gf_objects(root) for p in paths):
         raise ValueError('GF object still linked into kdebug')
     callers = [p for p in paths if p.stem not in ('kdebug_import_slots', 'kdebug_import_stubs')]
     refs = symbols(nm, callers, True) - symbols(nm, callers, False) - {ABI_SYMBOL}
+    raw_addresses = address_references(entries, callers, root)
+    if raw_addresses:
+        refs.discard('kdebug_import_slots')
+        refs |= raw_addresses
     expected = {e['name'] for e in entries}
     if refs - expected:
         raise ValueError('unexpected core references: ' + str(sorted(refs - expected)))
     for e in entries:
-        if e['index'] in GF_ONLY_SLOTS:
+        if e['symbol'] in GF_ONLY_SYMBOLS:
             if not e.get('retained') or e['name'] in refs:
                 raise ValueError('GF-only slot must be retained without core callers: ' + e['name'])
+    # S6 includes data accessors; compare generated names, retaining kind.
+    missing_s6 = {e['name'] for e in entries if e['stage'] == 'S6' and not e.get('retained')} - refs
+    if missing_s6:
+        raise ValueError('S6 nm mismatch: missing=' + str(sorted(missing_s6)))
     retained = {e['symbol'] for e in entries if e.get('retained')}
     absent = retained - symbols(nm, [root / 'build/out/kernel.elf'], False)
     if absent:
@@ -229,6 +275,9 @@ def generate(entries, out_dir, stage=LAST_STAGE):
     macros = ['/* Include after original headers; assignments use explicit setters. */', '#include "kdebug_imports.h"']
     for e in selected:
         kind, name, symbol = e['kind_name'], e['name'], e['symbol']
+        if kind == 'FUNC' and name in ADDRESS_IMPORTS:
+            macros += [f'#define KDI_INDEX_{name} {e["index"]}',
+                       f'#define KDI_ADDR_{name} ((__typeof__(&{name}))(uptr)kdebug_import_slots[KDI_INDEX_{name}])']
         if kind in ('GETTER', 'SETTER', 'PTR'):
             body = f'{symbol} = value;' if kind == 'SETTER' else f'return {"&" if kind == "PTR" and not e["array"] else ""}{symbol};'
             kernel.append(e['signature'][:-1] + ' { ' + body + ' }')
@@ -245,7 +294,8 @@ def generate(entries, out_dir, stage=LAST_STAGE):
     from mkmod import OPS_NAMES
     slots = {'S1': [5], 'S2': list(range(1, 6)),
              'S3': list(range(1, 17)), 'S4': list(range(1, 17)) + [18],
-             'S5': list(range(1, 17)) + [18, 19, 20]}[stage]
+             'S5': list(range(1, 17)) + [18, 19, 20],
+             'S6': list(range(1, 17)) + [18, 19, 20]}[stage]
     kernel += [f'    [{slot - 1}] = {{0x{fnv1a(OPS_NAMES[slot - 1].encode()):08x}u, 1, 0}},' for slot in slots]
     kernel += ['};']
     (out / 'kdebug_kexports.c').write_text('\n'.join(kernel) + '\n')
@@ -273,7 +323,9 @@ def main():
         entries = load_def(args.definition)
         if args.check_nm:
             check_nm(entries, args.nm)
-            print('kdebug imports: actual nm -u sets match S1=1 S2=194 S3=214 (data -> accessors, six new operations)')
+            print('kdebug imports: actual nm -u sets match ' +
+                  ' '.join(f'{stage}={count}' for stage, count in STAGES.items()) +
+                  ' (linked core, data accessors and address manifest)')
         if args.out_dir:
             generate(entries, args.out_dir, args.stage)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:

@@ -268,3 +268,10 @@ import表と既存利用者:
 ## S4e の実装で設計者が決めたこと
 
 - 現行ビルドの `kernel/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。
+
+## S3a の実装で設計者が決めたこと
+
+- 未移植の S3a は S6 を空で開始し、269 枠・旧 5 FUNC・HWDEV §3 の番号を維持する。生成 stage だけ S6 にし、S3b〜S3e で実際の移動に合わせて S2/S6 の種類列と .def を更新する。
+- GF 専用枠は番号でなく既存 4 symbol で同定する。check_nm は実リンク map の移植 4.o を S2 の参照解決にも加え、S6 は accessor 名で照合して同じデータの GETTER と SETTER を区別する。
+- 関数番地は付表どおり 2 記号の KDI_ADDR/KDI_INDEX を、その FUNC が追加された時点で生成する。manifest は symbol と使用する移植 object を対応させ、実リンク対象のソースにある番地参照を nm 照合へ加える。
+- 基準値は基点 25aeb119 を同じ環境で make kernel した成果物から保存し、付表の末尾に数値と証拠の所在を記す。作業木に無い FD 像は未測定とし、S3f の候補像集計へ持ち越す。

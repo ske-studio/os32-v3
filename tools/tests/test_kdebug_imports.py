@@ -45,7 +45,7 @@ class ImportsTests(unittest.TestCase):
             gen.check_nm(altered)
 
     def test_gf_slots_retained_without_core_callers(self):
-        for index in gen.GF_ONLY_SLOTS:
+        for index in (e['index'] for e in self.entries if e['symbol'] in gen.GF_ONLY_SYMBOLS):
             altered = copy.deepcopy(self.entries)
             altered[index].pop('retained')
             with self.assertRaisesRegex(ValueError, 'GF-only slot must be retained'):
@@ -104,6 +104,8 @@ class ImportsTests(unittest.TestCase):
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
         self.assertEqual(gen.STAGES['S4'], 239)
         self.assertEqual(gen.STAGES['S5'], 269)
+        self.assertEqual(gen.STAGES['S6'], 269)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ())
         self.assertEqual([(e['stage'], e['name']) for e in self.entries[239:]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
@@ -160,6 +162,107 @@ class ImportsTests(unittest.TestCase):
             path.write_text(json.dumps(document))
             with self.assertRaisesRegex(ValueError, 'index/stage/kind'):
                 gen.load_def(path)
+
+    def test_s6_preparation_with_future_contracts(self):
+        # Exercise future kinds without adding unused imports to the live ABI.
+        additions = [('FUNC', 'shlib_read_page', 'kernel/shlib.h'),
+                     ('GETTER', 'con_sink_drop_count', 'include/con_sink.h'),
+                     ('SETTER', 'con_sink_drop_count', 'include/con_sink.h'),
+                     ('PTR', 'ring3_ls_start', 'exec/ring3_ls.h')]
+        with tempfile.TemporaryDirectory(prefix='kdebug-s6-') as folder:
+            out = Path(folder)
+            document = json.loads(gen.DEFAULT_DEF.read_text())
+            for kind, symbol, source in additions:
+                document['imports'].append(dict(index=len(document['imports']),
+                    stage='S6', kind=kind, symbol=symbol, source=source, context_safe=False))
+            definition = out / 'imports.def'
+            definition.write_text(json.dumps(document))
+            with patch.dict(gen.STAGE_KINDS, S6=tuple(row[0] for row in additions)), \
+                 patch.dict(gen.STAGES, S6=len(document['imports'])):
+                entries = gen.load_def(definition)
+                meta = gen.generate(entries, out, 'S6')
+                self.assertEqual(meta['count'], len(self.entries) + len(additions))
+                macros = (out / 'kdebug_import_macros.h').read_text()
+                self.assertIn('#define KDI_INDEX_shlib_read_page 269', macros)
+                self.assertIn('__typeof__(&shlib_read_page)', macros)
+                self.assertNotIn('KDI_ADDR_kprintf', macros)
+                includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx',
+                            'fs', 'kapi', 'arch/x86', 'platform/pc98', 'sdk/include/os32']
+                flags = ['-std=gnu11', '-ffreestanding', '-fno-pie', '-D__KERNEL_BUILD__']
+                flags += ['-I' + str(ROOT / d) for d in includes]
+                for name in ('kdebug_kexports.c', 'kdebug_import_slots.c', 'kdebug_import_stubs.S'):
+                    subprocess.run([str(self.cross / 'i386-elf-gcc'), *flags, '-c',
+                                    str(out / name), '-o', str(out / (name + '.o'))],
+                                   check=True, capture_output=True)
+                probe = out / 'probe.c'
+                probe.write_text('#include "kdebug_import_macros.h"\n'
+                    'int (*probe(void))(u32,u32) { kdi_set_con_sink_drop_count(0); '
+                    'return KDI_ADDR_shlib_read_page; }\n')
+                subprocess.run([str(self.cross / 'i386-elf-gcc'), *flags, '-c',
+                                str(probe), '-o', str(out / 'probe.o')], check=True, capture_output=True)
+                refs = gen.symbols(str(self.cross / 'i386-elf-nm'), [out / 'probe.o'], True)
+                self.assertIn('kdebug_import_slots', refs)
+                self.assertNotIn('shlib_read_page', refs)
+                # Both data operations must be used: GETTER cannot mask a lost SETTER.
+                original = gen.symbols
+                new_names = {e['name'] for e in entries[len(self.entries):]}
+                def with_s6(nm, paths, undefined):
+                    refs = original(nm, paths, undefined)
+                    if undefined and ROOT / 'build/out/kdebug/kselftest.o' in paths:
+                        refs |= new_names
+                    return refs
+                with patch.object(gen, 'symbols', side_effect=with_s6):
+                    self.assertTrue(gen.check_nm(entries))
+                    new_names.remove('kdi_set_con_sink_drop_count')
+                    with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*kdi_set_con_sink_drop_count'):
+                        gen.check_nm(entries)
+
+    def test_nm_resolves_moved_objects_from_link_map(self):
+        original_symbols, original_read = gen.symbols, Path.read_text
+        moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
+        def read_map(path, *args, **kwargs):
+            if path == ROOT / 'kdebug/selftest_con_sink.c':
+                return '/* fixture: no raw address import */'
+            text = original_read(path, *args, **kwargs)
+            if path == ROOT / 'build/out/kdebug/kdebug.map':
+                text += '\nLOAD build/out/kdebug/selftest_con_sink.o\n'
+            return text
+        def moved_symbols(nm, paths, undefined):
+            refs = original_symbols(nm, [p for p in paths if p != moved], undefined)
+            if undefined and ROOT / 'build/out/kdebug/kselftest.o' in paths:
+                refs.add('kst_con_sink')
+                refs.discard('con_sink_selftest')
+            if moved in paths:
+                refs.add('con_sink_selftest' if undefined else 'kst_con_sink')
+            return refs
+        original_exists = Path.exists
+        with patch.object(Path, 'read_text', read_map), \
+             patch.object(Path, 'exists', lambda p: p == moved or original_exists(p)), \
+             patch.object(gen, 'symbols', side_effect=moved_symbols):
+            self.assertTrue(gen.check_nm(self.entries))
+        # Without the linked moved body, the local call must not become an import.
+        with patch.object(gen, 'symbols', side_effect=moved_symbols):
+            with self.assertRaisesRegex(ValueError, 'nm mismatch.*kst_con_sink'):
+                gen.check_nm(self.entries)
+
+    def test_address_manifest_uses_only_linked_moved_sources(self):
+        entries = [dict(name=name, kind_name='FUNC') for name in gen.ADDRESS_IMPORTS]
+        with tempfile.TemporaryDirectory(prefix='kdebug-address-') as folder:
+            root = Path(folder)
+            (root / 'kdebug').mkdir()
+            source = root / 'kdebug/selftest_exec.c'
+            source.write_text('return KDI_ADDR_kapi_reserved_nosys;\n')
+            obj = root / 'build/out/kdebug/selftest_exec.o'
+            self.assertEqual(gen.address_references(entries, [obj], root), {'kapi_reserved_nosys'})
+            self.assertEqual(gen.address_references(entries, [], root), set())
+            with self.assertRaisesRegex(ValueError, 'invalid address import'):
+                gen.address_references([], [obj], root)
+            source.write_text('return kapi_reserved_nosys;\n')
+            with self.assertRaisesRegex(ValueError, 'missing address import'):
+                gen.address_references(entries, [obj], root)
+            source.write_text('return KDI_ADDR_shlib_read_page;\n')
+            with self.assertRaisesRegex(ValueError, 'invalid address import'):
+                gen.address_references(entries, [obj], root)
 
     def test_compile_all_generated_artifacts(self):
         includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx', 'fs', 'kapi',

@@ -52,7 +52,7 @@ def boot_dispatch(kernel):
 def main():
     with tempfile.TemporaryDirectory(prefix='kdebug-init-') as td:
         folder = Path(td)
-        meta = gen.generate(gen.load_def(), folder, 'S5')
+        meta = gen.generate(gen.load_def(), folder, gen.LAST_STAGE)
         for generated in (ROOT / 'kdebug/generated').iterdir():
             if generated.suffix in ('.c', '.h', '.S', '.json'):
                 assert generated.read_bytes() == (folder / generated.name).read_bytes(), generated

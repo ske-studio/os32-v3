@@ -97,6 +97,8 @@ check-mkmod-host:
 - tools/tests/mkmod_tdd.md
 - tools/tests/module_image_host.c
 - tools/tests/module_image_tdd.md
+- kernel/shlib.h
+- exec/ring3_ls.h
 - tools/tests/test_kdebug_imports.py
 - tools/tests/test_mkmod.py
 - tools/tests/test_module_image.py
