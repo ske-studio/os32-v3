@@ -7,6 +7,7 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
+#include "../include/bootinfo.h"
 
 /* 内部状態 */
 static u32 s_base_lba;         /* パーティション開始LBA */
@@ -23,9 +24,9 @@ static u8 aux_buf[EXT2_BLOCK_SIZE];
 /* ---------------------------------------------------------------- */
 static void read_block(u32 block_num, u8 *buf)
 {
-    u32 sector = s_base_lba + block_num * 2;
+    u32 sector = s_base_lba + block_num * EXT2_SECTORS_PER_BLOCK;
     boot_read_sector_asm(sector,     buf);
-    boot_read_sector_asm(sector + 1, buf + 512);
+    boot_read_sector_asm(sector + 1, buf + BOOTINFO_SECLEN);
 }
 
 /* ---------------------------------------------------------------- */
@@ -45,10 +46,10 @@ static int name_eq(const char *a, const char *b, int len)
 /* ---------------------------------------------------------------- */
 static u32 get_inode_table(u32 group)
 {
-    u32 gd_block = 2 + (group * 32) / EXT2_BLOCK_SIZE;
-    u32 offset   = (group * 32) % EXT2_BLOCK_SIZE;
+    u32 gd_block = EXT2_GDT_BLOCK + (group * EXT2_GROUP_DESC_BYTES) / EXT2_BLOCK_SIZE;
+    u32 offset   = (group * EXT2_GROUP_DESC_BYTES) % EXT2_BLOCK_SIZE;
     read_block(gd_block, blk_buf);
-    return *(u32 *)&blk_buf[offset + 8];  /* bg_inode_table */
+    return *(u32 *)&blk_buf[offset + EXT2_GD_INODE_TABLE_OFF];  /* bg_inode_table */
 }
 
 /* ---------------------------------------------------------------- */
@@ -64,7 +65,7 @@ static void read_inode(u32 ino, u8 *out_inode)
     int i;
 
     read_block(blk, blk_buf);
-    for (i = 0; i < (int)s_inode_size && i < 128; i++)
+    for (i = 0; i < (int)s_inode_size && i < EXT2_INODE_BASE_BYTES; i++)
         out_inode[i] = blk_buf[off + i];
 }
 
@@ -74,7 +75,7 @@ static void read_inode(u32 ino, u8 *out_inode)
 /* ---------------------------------------------------------------- */
 static u32 bmap(u32 *iblocks, u32 fblock)
 {
-    u32 ptrs_per_block = EXT2_BLOCK_SIZE / 4;  /* 256 */
+    u32 ptrs_per_block = EXT2_ADDR_PER_BLOCK;  /* 256 */
 
     /* 直接ブロック */
     if (fblock < EXT2_NDIR_BLOCKS)
@@ -116,14 +117,14 @@ int ext2m_init(u32 part_lba)
     /* スーパーブロックはブロック1 (オフセット1024B) */
     read_block(1, blk_buf);
 
-    magic = *(u16 *)&blk_buf[56];
+    magic = *(u16 *)&blk_buf[EXT2_SB_MAGIC_OFF];
     if (magic != EXT2_SUPER_MAGIC)
         return -1;
 
-    s_blocks_per_group = *(u32 *)&blk_buf[32];
-    s_inodes_per_group = *(u32 *)&blk_buf[40];
-    s_inode_size       = *(u16 *)&blk_buf[88];
-    if (s_inode_size == 0) s_inode_size = 128;
+    s_blocks_per_group = *(u32 *)&blk_buf[EXT2_SB_BLOCKS_PER_GROUP_OFF];
+    s_inodes_per_group = *(u32 *)&blk_buf[EXT2_SB_INODES_PER_GROUP_OFF];
+    s_inode_size       = *(u16 *)&blk_buf[EXT2_SB_INODE_SIZE_OFF];
+    if (s_inode_size == 0) s_inode_size = EXT2_INODE_BASE_BYTES;
 
     return 0;
 }
@@ -135,7 +136,7 @@ u32 ext2m_lookup(const char *path)
 {
     u32 cur_ino = EXT2_ROOT_INO;
     const char *p = path;
-    u8 inode_raw[128];
+    u8 inode_raw[EXT2_INODE_BASE_BYTES];
 
     /* 先頭の '/' をスキップ */
     if (*p == '/') p++;
@@ -157,8 +158,8 @@ u32 ext2m_lookup(const char *path)
 
         /* ディレクトリエントリを走査 */
         {
-            u32 dir_size = *(u32 *)&inode_raw[4]; /* i_size */
-            u32 *blocks  = (u32 *)&inode_raw[40]; /* i_block */
+            u32 dir_size = *(u32 *)&inode_raw[EXT2_INODE_SIZE_OFF]; /* i_size */
+            u32 *blocks  = (u32 *)&inode_raw[EXT2_INODE_BLOCKS_OFF]; /* i_block */
             u32 fblk;
             int found = 0;
 
@@ -170,9 +171,9 @@ u32 ext2m_lookup(const char *path)
                 offset = 0;
                 while (offset < EXT2_BLOCK_SIZE) {
                     u32 d_ino    = *(u32 *)&blk_buf[offset];
-                    u16 d_reclen = *(u16 *)&blk_buf[offset + 4];
-                    u8  d_namlen = blk_buf[offset + 6];
-                    char *d_name = (char *)&blk_buf[offset + 8];
+                    u16 d_reclen = *(u16 *)&blk_buf[offset + EXT2_DIRENT_RECLEN_OFF];
+                    u8  d_namlen = blk_buf[offset + EXT2_DIRENT_NAMELEN_OFF];
+                    char *d_name = (char *)&blk_buf[offset + EXT2_DIRENT_NAME_OFF];
 
                     if (d_reclen == 0) break;
                     if (d_ino != 0 && d_namlen == (u8)comp_len) {
@@ -205,7 +206,7 @@ u32 ext2m_lookup(const char *path)
 /* ================================================================ */
 int ext2m_read_file(u32 ino, u8 *buf, u32 max_size)
 {
-    u8 inode_raw[128];
+    u8 inode_raw[EXT2_INODE_BASE_BYTES];
     u32 file_size;
     u32 *blocks;
     u32 fblk;
@@ -214,8 +215,8 @@ int ext2m_read_file(u32 ino, u8 *buf, u32 max_size)
     int i;
 
     read_inode(ino, inode_raw);
-    file_size = *(u32 *)&inode_raw[4]; /* i_size */
-    blocks    = (u32 *)&inode_raw[40]; /* i_block */
+    file_size = *(u32 *)&inode_raw[EXT2_INODE_SIZE_OFF]; /* i_size */
+    blocks    = (u32 *)&inode_raw[EXT2_INODE_BLOCKS_OFF]; /* i_block */
 
     if (file_size > max_size) return EXT2M_ERR_TOO_BIG;
     remain = file_size;

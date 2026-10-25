@@ -3,6 +3,7 @@ check-hdd-stage2-host:
 - tools/tests/mutpar.py
 - boot/boot_hdd.asm
 - boot/boot_main.c
+- boot/boot_debug.c
 - boot/ext2_mini.c
 - build/core.yaml
 - drivers/ide_addr.c

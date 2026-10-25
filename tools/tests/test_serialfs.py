@@ -1283,8 +1283,9 @@ def const_check(h):
             print(f"  FAIL const: {a}={va} vs {b}={vb}", flush=True)
             bad += 1
     # image_crc の位置の式が boot_defs.h と同じ (16 + 20n + 4)
-    if "VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + 4UL)" not in boot or \
-            "(VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + 4UL))" not in boot:
+    if header_consts(boot, ["VK32_WORD_BYTES"])["VK32_WORD_BYTES"] != 4 or \
+            "VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + VK32_WORD_BYTES)" not in boot or \
+            "(VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + VK32_WORD_BYTES))" not in boot:
         print("  FAIL const: boot_defs.h の image_crc の位置の式が変わった", flush=True)
         bad += 1
     print(f"EXIT xc:consts={int(bool(bad))}", flush=True)

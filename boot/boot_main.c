@@ -9,7 +9,13 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
+#include "../include/pc98.h"
 #include "pc98pt.h"   /* 区画表の共有部 (drivers/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
+
+#define BOOT_ERR_NOT_FOUND (-2)
+#define BOOT_ERR_TOO_BIG   (-6)
+#define BOOT_ERR_READ      (-3)
+#define BOOT_ERR_IMAGE     (-5)
 
 /* ================================================================ */
 /*  パーティション検索 (PC-98 区画表: LBA 1、標準配置)               */
@@ -62,24 +68,24 @@ int boot_main(void)
     int rc;
 
     /* 1. パーティション検索 */
-    boot_print_asm(0xA0000 + 160, "Finding partition...");
+    boot_print_asm(TVRAM_CHAR_BASE + TVRAM_BPR, "Finding partition...");
     if (find_partition(&part_lba) != 0) {
-        boot_print_asm(0xA0000 + 320, "No OS32 partition in LBA 1 (PC-98 table)!");
-        return -7;
+        boot_print_asm(TVRAM_CHAR_BASE + 2 * TVRAM_BPR, "No OS32 partition in LBA 1 (PC-98 table)!");
+        return BOOT_ERR_NOPART;
     }
 
     /* 2. ext2初期化 */
     if (ext2m_init(part_lba) != 0) {
-        boot_print_asm(0xA0000 + 320, "ext2 mount FAIL!");
+        boot_print_asm(TVRAM_CHAR_BASE + 2 * TVRAM_BPR, "ext2 mount FAIL!");
         return -1;
     }
 
     /* 3. /boot/vmkernel.lz4 を検索 */
-    boot_print_asm(0xA0000 + 320, "Loading vmkernel.lz4...");
+    boot_print_asm(TVRAM_CHAR_BASE + 2 * TVRAM_BPR, "Loading vmkernel.lz4...");
     ino = ext2m_lookup("/boot/vmkernel.lz4");
     if (ino == 0) {
-        boot_print_asm(0xA0000 + 480, "/boot/vmkernel.lz4 NOT FOUND!");
-        return -2;
+        boot_print_asm(TVRAM_CHAR_BASE + 3 * TVRAM_BPR, "/boot/vmkernel.lz4 NOT FOUND!");
+        return BOOT_ERR_NOT_FOUND;
     }
 
     /* 4. ファイルを LOAD_BUF (0x10000) に読み込み */
@@ -88,22 +94,22 @@ int boot_main(void)
     if (file_size == EXT2M_ERR_TOO_BIG) {
         /* 上限 (0x10000〜0x8EFFF、ブート時スタックの手前) を超えるイメージは
          * 切り詰めて展開せずに止まる (N8)。 */
-        boot_print_asm(0xA0000 + 480, "vmkernel.lz4 too large (> 508KiB)");
-        return -6;
+        boot_print_asm(TVRAM_CHAR_BASE + 3 * TVRAM_BPR, "vmkernel.lz4 too large (> 508KiB)");
+        return BOOT_ERR_TOO_BIG;
     }
     if (file_size <= 0) {
-        boot_print_asm(0xA0000 + 480, "File read FAIL!");
-        return -3;
+        boot_print_asm(TVRAM_CHAR_BASE + 3 * TVRAM_BPR, "File read FAIL!");
+        return BOOT_ERR_READ;
     }
 
     /* 5. VK32 v2 の検査と展開 (boot/vk32_boot.c)。外れたら画面に出して止まる
      *    (完全長・entry_count・範囲・decoded == raw_size・CRC32、部品 A-4)。 */
-    boot_print_asm(0xA0000 + 480, "Checking + decompressing...");
+    boot_print_asm(TVRAM_CHAR_BASE + 3 * TVRAM_BPR, "Checking + decompressing...");
     rc = vk32_boot(file_base, (u32)file_size, (u8 *)VK32_LOAD_MIN, &img_crc);
     if (rc != VK32_OK) {
         /* 5 行目 (+800)。4 行目 (+640) は ASM が戻り値の表示で上書きする */
-        boot_print_asm(0xA0000 + 800, vk32_strerror(rc));
-        return -5;
+        boot_print_asm(TVRAM_CHAR_BASE + 5 * TVRAM_BPR, vk32_strerror(rc));
+        return BOOT_ERR_IMAGE;
     }
 
     /* 6. 起動したイメージの CRC をブート情報域へ (include/bootinfo.h の
@@ -111,6 +117,6 @@ int boot_main(void)
      *    チェック語を**最後に**書く。 */
     bootinfo_set_image(img_crc, (u32)file_size);
 
-    boot_print_asm(0xA0000 + 640, "Kernel loaded. Booting...");
+    boot_print_asm(TVRAM_CHAR_BASE + 4 * TVRAM_BPR, "Kernel loaded. Booting...");
     return 0;
 }
