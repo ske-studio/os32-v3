@@ -15,6 +15,18 @@
 
 #include "types.h"
 
+/* Four-u32 trap-log record. */
+#define V86_IOLOG_N          64
+#define V86_IOLOG_KEY        0
+#define V86_IOLOG_VALUE      1
+#define V86_IOLOG_LOCATION   2
+#define V86_IOLOG_REPEAT     3
+#define V86_IOLOG_WORDS      (V86_IOLOG_REPEAT + 1)
+#define V86_IOLOG_DIR_SHIFT  24
+#define V86_IOLOG_SIZE_SHIFT 16
+#define V86_IOLOG_CS_SHIFT   16
+#define V86_CAPTURE_PORT_END 0x0A00U
+
 /* I/O 許可ビットマップに V86 用ポリシーを適用する (セッション開始時)。 */
 void v86_io_apply_policy(void);
 

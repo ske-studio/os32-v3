@@ -20,6 +20,7 @@
 #define __V86_BIOS_H
 
 #include "types.h"
+#include "pc98.h"
 
 /* ゲストに申告するコンベンショナルメモリ量。
  *
@@ -33,7 +34,7 @@
  * カーネルスタックが 0x90000 に居た頃は 572KB 張っても 512KB しか
  * 申告できなかった。 */
 #define V86_GUEST_MEM_CODE  4           /* (4+1) × 128KB = 640KB */
-#define V86_GUEST_MEM_KB    ((V86_GUEST_MEM_CODE + 1) * 128)
+#define V86_GUEST_MEM_KB    ((V86_GUEST_MEM_CODE + 1) * BIOS_MEM_UNIT_KIB)
 
 /* ゲストにブートさせる装置の DA/UA。
  *
@@ -46,8 +47,8 @@
  * → docs/archive/v21/v86v2/08_dos5.md §2
  * HDD イメージから起動するときは逆に 0x80 を「意図的に」渡す。
  * → docs/archive/v21/v86v2/10_dos_hdd.md */
-#define V86_DAUA_FDD        0x90        /* 2HD FDD (上位ニブル) */
-#define V86_DAUA_HDD        0x80        /* SASI/IDE HDD (上位ニブル) */
+#define V86_DAUA_FDD        BOOT_DRIVE_FDD        /* 2HD FDD (上位ニブル) */
+#define V86_DAUA_HDD        BOOT_DRIVE_HDD        /* SASI/IDE HDD (上位ニブル) */
 
 /* ディスク BIOS が使う loop_dev スロット。
  * ブートイメージ → slot 0、2 台目 (v86_boot2 の第 2 引数) → slot 1。
@@ -66,7 +67,7 @@
 #define V86_DISK_INIT       0x03
 #define V86_DISK_SENSE      0x04
 #define V86_DISK_WRITE      0x05
-#define V86_DISK_READ       0x06
+#define V86_DISK_READ       BIOS_DISK_READ
 #define V86_DISK_ST_RANGE 0x40
 #define V86_DISK_ST_IO 0xD0
 #define V86_DISK_ST_WRITE_PROTECT 0x70
@@ -84,6 +85,43 @@
  *   0x60 装置なし / 0x70 ライトプロテクト / 0xD0 範囲外。
  * CF は戻り AH >= 0x20 のときだけ立てる。 */
 #define V86_SASI_RETRACT2   0x0F
+
+/* AH bit7 continues an FDD transfer onto the second physical head.
+ * AL bit7 (BIOS_DISK_CMD_2HD/CHS) is a separate field. */
+#define V86_DISK_CMD_MULTI_TRACK  0x80U
+
+/* BIOS response kinds remain distinct from RANGE and SASI I/O errors. */
+#define V86_DISK_ST_NOT_READY     0x60
+#define V86_DISK_ST_DMA_BOUNDARY  0x20
+#define V86_DISK_ST_INCOMPLETE    0xC0
+#define V86_DISK_ST_ID_NOT_FOUND  0xE0
+
+/* Diagnostic reason codes (also packed into the disk log result byte). */
+#define V86_DISK_FAIL_RANGE       1
+#define V86_DISK_FAIL_SECTOR_SIZE 2
+#define V86_DISK_FAIL_NO_SECTOR   3
+#define V86_DISK_FAIL_NO_DEVICE   4
+
+#define V86_SECTOR_BUFFER_BYTES  1024
+#define V86_SASI_BOUNCE_BYTES    4096
+#define V86_BIOS_COUNT_ZERO_BYTES 0x10000
+#define V86_HDD_IPL_BYTES        1024U
+
+/* Eight-u32 disk-log record, shared by producers and diagnostic readers. */
+#define V86_DISKLOG_N            32
+#define V86_DISKLOG_AX           0
+#define V86_DISKLOG_CX           1
+#define V86_DISKLOG_DX           2
+#define V86_DISKLOG_BX           3
+#define V86_DISKLOG_ADDRESS      4
+#define V86_DISKLOG_PHYS         5
+#define V86_DISKLOG_DONE         6
+#define V86_DISKLOG_RESULT       7
+#define V86_DISKLOG_WORDS        (V86_DISKLOG_RESULT + 1)
+#define V86_DISKLOG_RESULT_MASK  U8_MAX
+#define V86_DISKLOG_REPEAT_SHIFT BITS_PER_BYTE
+#define V86_DISKLOG_REPEAT_ONE   (1U << V86_DISKLOG_REPEAT_SHIFT)
+#define V86_DISKLOG_CF_ERROR     0x80U
 
 /* ======== API ======== */
 

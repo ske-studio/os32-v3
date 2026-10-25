@@ -78,6 +78,11 @@ u32 v86_gp_ip = 0;
 u32 v86_gp_fl = 0;
 u32 v86_gp_n  = 0;
 
+#define V86_FAULT_OP_BYTES       4
+#define V86_FAULT_STACK_WORDS    4
+#define V86_FETCH_BYTES          16
+#define V86_PREFIX_MAX           14
+
 /* #GP 以外の例外が V86 中に起きたときの観測値。
  * v86_fault_handler() が埋める。 */
 u32 v86_flt_vec = 0;            /* 例外ベクタ */
@@ -88,7 +93,7 @@ u32 v86_flt_op  = 0;            /* CS:IP の先頭 4 バイト */
 u32 v86_flt_n   = 0;            /* 発生回数 */
 u32 v86_flt_ss  = 0;            /* ゲストの SS:SP。飛び先を追うのに要る */
 u32 v86_flt_sp  = 0;
-u32 v86_flt_stk[4];             /* SS:SP から 4 ワード (戻り先の手がかり) */
+u32 v86_flt_stk[V86_FAULT_STACK_WORDS]; /* SS:SP から 4 ワード (戻り先の手がかり) */
 
 enum v86_exit_reason v86_get_exit_reason(void) { return v86_exit_reason; }
 u32 v86_last_gp_cs(void) { return v86_gp_cs; }
@@ -101,7 +106,7 @@ u32 v86_gp_count(void)   { return v86_gp_n; }
  * アイデンティティマッピングなので物理アドレスと一致する。 */
 static u8 *v86_ptr(u32 seg, u32 off)
 {
-    return (u8 *)(((seg & 0xFFFF) << 4) + (off & 0xFFFF));
+    return (u8 *)(((seg & U16_MAX) << X86_REAL_SEG_SHIFT) + (off & U16_MAX));
 }
 
 /* ======================================================================== */
@@ -121,18 +126,18 @@ static u8 *v86_ptr(u32 seg, u32 off)
 /* ゲストの IP を n バイト進める。V86 の IP は 16bit なのでラップさせる。 */
 static void v86_advance_ip(u32 *frame, u32 n)
 {
-    frame[V86F_EIP] = (frame[V86F_EIP] + n) & 0xFFFFU;
+    frame[V86F_EIP] = (frame[V86F_EIP] + n) & U16_MAX;
 }
 
 /* AL / AX への書き戻し (PUSHAD 配列の EAX を直接触る) */
 static void v86_set_al(u32 *frame, u32 v)
 {
-    frame[V86F_EAX] = (frame[V86F_EAX] & 0xFFFFFF00UL) | (v & 0xFFU);
+    frame[V86F_EAX] = V86_REG_SET_AL(frame[V86F_EAX], v);
 }
 
 static void v86_set_ax(u32 *frame, u32 v)
 {
-    frame[V86F_EAX] = (frame[V86F_EAX] & 0xFFFF0000UL) | (v & 0xFFFFU);
+    frame[V86F_EAX] = V86_REG_SET_AX(frame[V86F_EAX], v);
 }
 
 /* ======================================================================== */
@@ -150,7 +155,7 @@ void v86_fault_handler(u32 *frame, u32 vector)
 {
     u32 cs = frame[V86F_CS];
     u32 ip = frame[V86F_EIP];
-    u32 pc_lin = ((cs & 0xFFFFU) << 4) + (ip & 0xFFFFU);
+    u32 pc_lin = ((cs & U16_MAX) << X86_REAL_SEG_SHIFT) + (ip & U16_MAX);
 
     v86_flt_n++;
     v86_flt_vec = vector;
@@ -159,12 +164,12 @@ void v86_fault_handler(u32 *frame, u32 vector)
     v86_flt_fl  = frame[V86F_EFLAGS];
 
     /* 診断値の読み出しでも範囲外は読まない (0x10FFEF はカーネル内)。 */
-    if (v86_guest_read_ok(pc_lin, 4)) {
+    if (v86_guest_read_ok(pc_lin, V86_FAULT_OP_BYTES)) {
         const u8 *pc = v86_ptr(cs, ip);
         v86_flt_op  = (u32)pc[0] | ((u32)pc[1] << 8) |
                       ((u32)pc[2] << 16) | ((u32)pc[3] << 24);
     } else {
-        v86_flt_op  = 0xFFFFFFFFUL;
+        v86_flt_op  = U32_MAX;
     }
 
     /* ゲストのスタック先頭も残す。
@@ -173,16 +178,16 @@ void v86_fault_handler(u32 *frame, u32 vector)
     v86_flt_ss = frame[V86F_SS];
     v86_flt_sp = frame[V86F_ESP];
     {
-        u32 sp_lin = ((v86_flt_ss & 0xFFFFU) << 4) + (v86_flt_sp & 0xFFFFU);
+        u32 sp_lin = ((v86_flt_ss & U16_MAX) << X86_REAL_SEG_SHIFT) + (v86_flt_sp & U16_MAX);
         int i;
-        if (v86_guest_read_ok(sp_lin, 8)) {
+        if (v86_guest_read_ok(sp_lin, V86_FAULT_STACK_WORDS * sizeof(u16))) {
             const u16 *sp = (const u16 *)v86_ptr(v86_flt_ss, v86_flt_sp);
-            for (i = 0; i < 4; i++) {
+            for (i = 0; i < V86_FAULT_STACK_WORDS; i++) {
                 v86_flt_stk[i] = sp[i];
             }
         } else {
-            for (i = 0; i < 4; i++) {
-                v86_flt_stk[i] = 0xFFFFFFFFUL;
+            for (i = 0; i < V86_FAULT_STACK_WORDS; i++) {
+                v86_flt_stk[i] = U32_MAX;
             }
         }
     }
@@ -208,7 +213,7 @@ int v86_gp_handler(u32 *frame)
     /* CS:IP がゲストにマップされた 1MB の外を指しているなら命令は読めない
      * (0x10FFEF まで届き得て、それはカーネル内)。デコードせず畳む。
      * ROM (0xC0000-) のコードも実行される (IPL 実測) ので RAM に限らない。 */
-    if (!v86_guest_read_ok(((cs & 0xFFFFU) << 4) + (ip & 0xFFFFU), 16)) {
+    if (!v86_guest_read_ok(((cs & U16_MAX) << X86_REAL_SEG_SHIFT) + (ip & U16_MAX), V86_FETCH_BYTES)) {
         v86_exit_reason = V86_EXIT_FAULT;
         return 1;
     }
@@ -236,7 +241,7 @@ int v86_gp_handler(u32 *frame)
      * デコードを打ち切る (範囲チェック済みの 16 バイトからもはみ出さない)。 */
     for (;;) {
         u8 b;
-        if (len >= 14) {
+        if (len >= V86_PREFIX_MAX) {
             v86_exit_reason = V86_EXIT_UNKNOWN_OP;
             return 1;
         }
@@ -274,13 +279,13 @@ int v86_gp_handler(u32 *frame)
         return 0;
 
     case 0xEC:  /* IN AL, DX */
-        port = (u16)(frame[V86F_EDX] & 0xFFFFU);
+        port = (u16)(frame[V86F_EDX] & U16_MAX);
         v86_set_al(frame, v86_io_in(port, 1));
         v86_advance_ip(frame, len + 1);
         return 0;
 
     case 0xED:  /* IN AX, DX */
-        port = (u16)(frame[V86F_EDX] & 0xFFFFU);
+        port = (u16)(frame[V86F_EDX] & U16_MAX);
         v86_set_ax(frame, v86_io_in(port, 2));
         v86_advance_ip(frame, len + 1);
         return 0;
@@ -288,25 +293,25 @@ int v86_gp_handler(u32 *frame)
     /* ---- OUT ---- */
     case 0xE6:  /* OUT imm8, AL */
         port = pc[len + 1];
-        v86_io_out(port, 1, frame[V86F_EAX] & 0xFFU);
+        v86_io_out(port, 1, frame[V86F_EAX] & U8_MAX);
         v86_advance_ip(frame, len + 2);
         return 0;
 
     case 0xE7:  /* OUT imm8, AX */
         port = pc[len + 1];
-        v86_io_out(port, 2, frame[V86F_EAX] & 0xFFFFU);
+        v86_io_out(port, 2, frame[V86F_EAX] & U16_MAX);
         v86_advance_ip(frame, len + 2);
         return 0;
 
     case 0xEE:  /* OUT DX, AL */
-        port = (u16)(frame[V86F_EDX] & 0xFFFFU);
-        v86_io_out(port, 1, frame[V86F_EAX] & 0xFFU);
+        port = (u16)(frame[V86F_EDX] & U16_MAX);
+        v86_io_out(port, 1, frame[V86F_EAX] & U8_MAX);
         v86_advance_ip(frame, len + 1);
         return 0;
 
     case 0xEF:  /* OUT DX, AX */
-        port = (u16)(frame[V86F_EDX] & 0xFFFFU);
-        v86_io_out(port, 2, frame[V86F_EAX] & 0xFFFFU);
+        port = (u16)(frame[V86F_EDX] & U16_MAX);
+        v86_io_out(port, 2, frame[V86F_EAX] & U16_MAX);
         v86_advance_ip(frame, len + 1);
         return 0;
 
@@ -393,29 +398,29 @@ static int v86_do_int(u32 *frame, u32 vector,
     const u16 *ivt;
 
     /* ゲストスタックに 3 ワード積む。SP は 16bit なのでラップさせる。 */
-    sp = (frame[i_esp] - 6) & 0xFFFFU;
-    sp_lin = ((frame[i_ss] & 0xFFFFU) << 4) + sp;
-    if (!v86_guest_range_ok(sp_lin, 6)) {
+    sp = (frame[i_esp] - V86_IRET_BYTES) & U16_MAX;
+    sp_lin = ((frame[i_ss] & U16_MAX) << X86_REAL_SEG_SHIFT) + sp;
+    if (!v86_guest_range_ok(sp_lin, V86_IRET_BYTES)) {
         return 0;
     }
     gstack = (u16 *)v86_ptr(frame[i_ss], sp);
 
     /* ゲストには VM ビットを見せない (下位 16bit だけ積む) */
-    gstack[0] = (u16)(frame[i_eip] & 0xFFFFU);
-    gstack[1] = (u16)(frame[i_cs]  & 0xFFFFU);
-    gstack[2] = (u16)(frame[i_eflags] & 0xFFFFU);
+    gstack[0] = (u16)(frame[i_eip] & U16_MAX);
+    gstack[1] = (u16)(frame[i_cs]  & U16_MAX);
+    gstack[V86_IRET_FLAGS_WORD] = (u16)(frame[i_eflags] & U16_MAX);
 
     frame[i_esp] = sp;
 
     /* IVT からハンドラを引く。IVT はゲストの物理 0 番地にある。
      * vector は u8 由来なので vector*4+4 <= 0x400 で常に範囲内。 */
-    ivt = (const u16 *)(vector * 4);
+    ivt = (const u16 *)(vector * V86_IVT_ENTRY_BYTES);
     frame[i_eip] = ivt[0];
     frame[i_cs]  = ivt[1];
 
     /* 実機の割り込み受理と同じく IF と TF を落とす。
      * ゲストの IRET がスタックから FLAGS を戻すので IF は自動で復帰する。 */
-    frame[i_eflags] &= ~(keep_if ? 0x100UL : (EFLAGS_IF | 0x100UL));
+    frame[i_eflags] &= ~(keep_if ? EFLAGS_TF : (EFLAGS_IF | EFLAGS_TF));
     return 1;
 }
 
@@ -643,7 +648,7 @@ static const u8 v86_test_code[] = {
 /* スモークテストの結果を外から観測できるように残す。
  * 直接低位 (V86_LOW) はセッション終了で復元されるので、
  * 判定に使った値をカーネル側にコピーしておく (kernel.map 経由で読める)。 */
-u32 v86_smoke_result = 0xFFFFFFFFUL;
+u32 v86_smoke_result = U32_MAX;
 u32 v86_smoke_magic  = 0;
 u32 v86_smoke_reason = 0;
 u32 v86_smoke_magic2 = 0;   /* 拒否ポート #GP 後も継続できたか */
@@ -761,7 +766,7 @@ static const u8 v86_disk_code[] = {
 };
 
 /* 検証用に外へ出す値 */
-u32 v86_disk_result = 0xFFFFFFFFUL;
+u32 v86_disk_result = U32_MAX;
 u32 v86_disk_marker = 0;        /* ゲストが書いた成功マーカー */
 u32 v86_disk_cmp    = 0;        /* 直読との一致バイト数 */
 u32 v86_disk_reason = 0;
@@ -777,7 +782,7 @@ int v86_disk_test(const char *path)
 
     if (v86_gui_refuse()) return -1;    /* 票 T8-2 */
 
-    v86_disk_result = 0xFFFFFFFFUL;
+    v86_disk_result = U32_MAX;
     v86_disk_marker = 0;
     v86_disk_cmp    = 0;
 
@@ -896,7 +901,7 @@ int v86_boot2(const char *path, const char *second)
      * HDD: **LBA 0 から 1024 バイト** (bios1b.c boot_hd() の
      *      `sxsi_read(..., 0, mem + 0x1fc00, 0x400)`)。
      *      1 セクタだけ読むと IPL 後半が欠けて静かに壊れる。 */
-    if ((v86_bios_boot_daua() & 0xF0U) == V86_DAUA_HDD) {
+    if ((v86_bios_boot_daua() & BIOS_DA_TYPE_MASK) == V86_DAUA_HDD) {
         u16 bps = 0;
         u32 count;
         if (loop_dev_get_geometry(V86_DISK_SLOT, 0, 0, 0, &bps, 0) != 0 ||
@@ -905,7 +910,7 @@ int v86_boot2(const char *path, const char *second)
             v86_bios_detach_disk();
             return -3;
         }
-        count = 1024U / bps;
+        count = V86_HDD_IPL_BYTES / bps;
         if (count == 0) {
             count = 1;
         }

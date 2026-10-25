@@ -48,9 +48,8 @@ u32 v86_disk_ident_n  = 0;      /* 物理=論理 (フォールバック) で読�
  * 要求されたか」が分からず、推測が始まってしまう。1 コール 8 ワードの
  * リングにそのまま積んでおけば、ホストから emu_read_mem 一発で
  * 呼び出し列を復元できる。 */
-#define V86_DISKLOG_N   32
 u32 v86_disklog_w = 0;                          /* 積んだエントリ数 */
-u32 v86_disklog[V86_DISKLOG_N * 8];
+u32 v86_disklog[V86_DISKLOG_N * V86_DISKLOG_WORDS];
 /*  [0] AX  [1] CX  [2] DX  [3] BX
  *  [4] ES:BP のリニアアドレス
  *  [5] 呼び出し時の物理位置 (head<<8 | cyl)
@@ -73,42 +72,42 @@ u32 v86_disklog[V86_DISKLOG_N * 8];
 
 static void disklog(u32 *frame, u32 ax_in, u32 phys, u32 done, u32 result)
 {
-    u32 rec[7];
+    u32 rec[V86_DISKLOG_RESULT];
     u32 *e;
     u32 back;
     int i;
 
     /* AX は処理の中で AH (ステータス) を書き換えるので、
      * 呼び出し時点の値を別に受け取る。 */
-    rec[0] = ax_in;
-    rec[1] = frame[V86F_ECX] & 0xFFFFU;
-    rec[2] = frame[V86F_EDX] & 0xFFFFU;
-    rec[3] = frame[V86F_EBX] & 0xFFFFU;
-    rec[4] = ((frame[V86F_ES] & 0xFFFFU) << 4) + (frame[V86F_EBP] & 0xFFFFU);
-    rec[5] = phys;
-    rec[6] = done;
+    rec[V86_DISKLOG_AX] = ax_in;
+    rec[V86_DISKLOG_CX] = frame[V86F_ECX] & U16_MAX;
+    rec[V86_DISKLOG_DX] = frame[V86F_EDX] & U16_MAX;
+    rec[V86_DISKLOG_BX] = frame[V86F_EBX] & U16_MAX;
+    rec[V86_DISKLOG_ADDRESS] = ((frame[V86F_ES] & U16_MAX) << X86_REAL_SEG_SHIFT) + (frame[V86F_EBP] & U16_MAX);
+    rec[V86_DISKLOG_PHYS] = phys;
+    rec[V86_DISKLOG_DONE] = done;
 
     for (back = 1; back <= DISKLOG_LOOKBACK && back <= v86_disklog_w; back++) {
-        e = &v86_disklog[((v86_disklog_w - back) % V86_DISKLOG_N) * 8];
-        if ((e[7] & 0xFFU) != (result & 0xFFU)) {
+        e = &v86_disklog[((v86_disklog_w - back) % V86_DISKLOG_N) * V86_DISKLOG_WORDS];
+        if ((e[V86_DISKLOG_RESULT] & V86_DISKLOG_RESULT_MASK) != (result & V86_DISKLOG_RESULT_MASK)) {
             continue;
         }
-        for (i = 0; i < 7; i++) {
+        for (i = 0; i < V86_DISKLOG_RESULT; i++) {
             if (e[i] != rec[i]) {
                 break;
             }
         }
-        if (i == 7) {
-            e[7] += 0x100U;             /* 回数だけ増やす */
+        if (i == V86_DISKLOG_RESULT) {
+            e[V86_DISKLOG_RESULT] += V86_DISKLOG_REPEAT_ONE; /* 回数だけ増やす */
             return;
         }
     }
 
-    e = &v86_disklog[(v86_disklog_w % V86_DISKLOG_N) * 8];
-    for (i = 0; i < 7; i++) {
+    e = &v86_disklog[(v86_disklog_w % V86_DISKLOG_N) * V86_DISKLOG_WORDS];
+    for (i = 0; i < V86_DISKLOG_RESULT; i++) {
         e[i] = rec[i];
     }
-    e[7] = 0x100U | (result & 0xFFU);
+    e[V86_DISKLOG_RESULT] = V86_DISKLOG_REPEAT_ONE | (result & V86_DISKLOG_RESULT_MASK);
     v86_disklog_w++;
 }
 
@@ -182,7 +181,7 @@ static int drive_register(const char *path, int slot, int idx)
     type = loop_dev_is_hdd(slot) ? V86_DAUA_HDD : V86_DAUA_FDD;
     unit = 0;
     for (i = 0; i < V86_DRIVE_MAX; i++) {
-        if (v86_drives[i].in_use && (v86_drives[i].daua & 0xF0U) == type) {
+        if (v86_drives[i].in_use && (v86_drives[i].daua & BIOS_DA_TYPE_MASK) == type) {
             unit++;
         }
     }
@@ -238,7 +237,7 @@ void v86_bios_detach_disk(void)
 /* HLE する割り込みベクタ。ここに無いものは実機の IVT の値
  * (ほとんどが BIOS ROM) がそのままゲストに渡る。 */
 static const u8 hle_vectors[] = {
-    0x1B        /* ディスク BIOS */
+    BIOS_INT_DISK        /* ディスク BIOS */
 };
 
 void v86_bios_setup(void)
@@ -271,13 +270,13 @@ void v86_bios_setup(void)
      * 嘘をついていた。 */
 
     /* コンベンショナルメモリ量 (0x0501 = MEMB_BIOS_FLAG1 の下位 3bit) */
-    guest[0x0501] = (u8)((guest[0x0501] & ~0x07U) | V86_GUEST_MEM_CODE);
+    guest[BIOS_WORK_SYSCLK] = (u8)((guest[BIOS_WORK_SYSCLK] & ~BIOS_MEM_CODE_MASK) | V86_GUEST_MEM_CODE);
 
     /* 拡張メモリは無い。
      *   0x0401  MEMB_EXPMMSZ  128KB 単位 << 3 (16MB まで)
      *   0x0594                16MB を超える分 (word) */
-    guest[0x0401] = 0x00;
-    *(u16 *)(guest + 0x0594) = 0;
+    guest[BIOS_WORK_MEM_128KB] = 0x00;
+    *(u16 *)(guest + BIOS_WORK_MEM_HIGH_MB) = 0;
 
     /* ブートデバイスと装置構成。
      *   0x0584  MEMB_DISK_BOOT    起動した装置の DA/UA
@@ -299,21 +298,21 @@ void v86_bios_setup(void)
             if (!v86_drives[i].in_use) {
                 continue;
             }
-            if ((v86_drives[i].daua & 0xF0U) == V86_DAUA_HDD) {
-                equip |= (u16)(0x0100U << (v86_drives[i].daua & 0x03U));
+            if ((v86_drives[i].daua & BIOS_DA_TYPE_MASK) == V86_DAUA_HDD) {
+                equip |= (u16)(BIOS_DISK_SASI_BIT0 << (v86_drives[i].daua & BIOS_DA_UNIT_MASK));
             } else {
-                equip |= (u16)(0x0001U << (v86_drives[i].daua & 0x03U));
+                equip |= (u16)(0x0001U << (v86_drives[i].daua & BIOS_DA_UNIT_MASK));
             }
         }
         if (equip == 0) {
             equip = 0x0001;     /* ディスク無しセッションは従来どおり */
         }
-        guest[0x0584] = v86_boot_daua_v;
-        *(u16 *)(guest + 0x055C) = equip;
+        guest[BIOS_WORK_BOOT_DAUA] = v86_boot_daua_v;
+        *(u16 *)(guest + BIOS_WORK_DISK_EQUIP) = equip;
     }
-    guest[0x0482] = 0x00;
-    guest[0x0480] = (u8)(guest[0x0480] & ~0x80U);
-    guest[0x05AE] = 0x00;
+    guest[BIOS_WORK_SCSI_EQUIP] = 0x00;
+    guest[BIOS_WORK_SYS_TYPE] = (u8)(guest[BIOS_WORK_SYS_TYPE] & ~BIOS_SYS_IDE_PRESENT);
+    guest[BIOS_WORK_F144] = 0x00;
 
     bios_calls = 0;
     bios_last_vec = 0;
@@ -360,7 +359,7 @@ static void bios_set_cf(u32 *frame, int cf)
 
 static void bios_set_ah(u32 *frame, u32 ah)
 {
-    frame[V86F_EAX] = (frame[V86F_EAX] & 0xFFFF00FFUL) | ((ah & 0xFFU) << 8);
+    frame[V86F_EAX] = V86_REG_SET_AH(frame[V86F_EAX], ah);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -400,8 +399,8 @@ static void bios_set_ah(u32 *frame, u32 ah)
  * 126/130 がこれ)。ここを落とすと IO.SYS のロードで止まる。 */
 static int daua_to_slot(u32 al)
 {
-    u8 t = (u8)(al & 0xF0U);
-    u8 unit = (u8)(al & 0x03U);
+    u8 t = (u8)(al & BIOS_DA_TYPE_MASK);
+    u8 unit = (u8)(al & BIOS_DA_UNIT_MASK);
     int i;
 
     if (!disk_attached) {
@@ -433,14 +432,14 @@ static int cur_fdd_slot = V86_DISK_SLOT;
  * 常に 0x00 を返していた頃は「2DD の片用ドライブ」と判定されていた。 */
 static void disk_sense(u32 *frame)
 {
-    u32 ax = frame[V86F_EAX] & 0xFFFFU;
+    u32 ax = frame[V86F_EAX] & U16_MAX;
     u32 ah = 0x00;
 
-    if (ax & 0x0080U) {
+    if (ax & BIOS_DISK_CMD_2HD) {
         ah |= 0x01U;                    /* AL bit7 = 2HD */
     }
-    if ((ax & 0x8F40U) == 0x8400U) {
-        ah |= 0x08U;                    /* 1MB/640KB 両用ドライブ */
+    if ((ax & BIOS_DISK_SENSE_AX_MASK) == BIOS_DISK_SENSE_AX_DUAL) {
+        ah |= BIOS_DISK_STATUS_DUAL;    /* 1MB/640KB 両用ドライブ */
         /* 1.44MB (0x04) は用意していないので立てない */
     }
 
@@ -505,27 +504,27 @@ static int d88_read_sector(u32 phys_cyl, u32 head,
  * `MEML_WRITES()` の有無しか違わない。 */
 static void disk_read_common(u32 *frame, int transfer)
 {
-    u32 cyl   = (frame[V86F_ECX] >> 0) & 0xFFU;     /* CL */
-    u32 n     = (frame[V86F_ECX] >> 8) & 0xFFU;     /* CH: セクタ長コード */
-    u32 head  = (frame[V86F_EDX] >> 8) & 0xFFU;     /* DH */
-    u32 sect  = (frame[V86F_EDX] >> 0) & 0xFFU;     /* DL (1 起算) */
-    u32 count = frame[V86F_EBX] & 0xFFFFU;          /* BX: バイト数 */
-    u32 dst   = ((frame[V86F_ES] & 0xFFFFU) << 4) +
-                (frame[V86F_EBP] & 0xFFFFU);
+    u32 cyl   = (frame[V86F_ECX] >> 0) & U8_MAX;     /* CL */
+    u32 n     = (frame[V86F_ECX] >> 8) & U8_MAX;     /* CH: セクタ長コード */
+    u32 head  = (frame[V86F_EDX] >> 8) & U8_MAX;     /* DH */
+    u32 sect  = (frame[V86F_EDX] >> 0) & U8_MAX;     /* DL (1 起算) */
+    u32 count = frame[V86F_EBX] & U16_MAX;          /* BX: バイト数 */
+    u32 dst   = ((frame[V86F_ES] & U16_MAX) << X86_REAL_SEG_SHIFT) +
+                (frame[V86F_EBP] & U16_MAX);
     u16 cyls; u8 heads, spt; u16 bps; u32 total;
     u32 seclen;
-    u32 ah    = (frame[V86F_EAX] >> 8) & 0xFFU;
-    u32 al    = frame[V86F_EAX] & 0xFFU;            /* DA/UA */
+    u32 ah    = (frame[V86F_EAX] >> 8) & U8_MAX;
+    u32 al    = frame[V86F_EAX] & U8_MAX;            /* DA/UA */
     u32 phys_cyl;
     u32 phys_head = V86_FDC_HEAD(head, al);
     int is_d88 = (loop_dev_get_format(cur_fdd_slot) == LOOP_FMT_D88);
     /* PC-98 のセクタ長は最大 1024 バイト (N=3)。 */
-    static u8 secbuf[1024];
+    static u8 secbuf[V86_SECTOR_BUFFER_BYTES];
 
     /* AH bit4 が立っていたら READ 自身がシークする (bios1b.c:375
      * `if (CPU_AH & 0x10) biosfd_seek(CPU_CL, ...)`)。
      * 立っていなければ直前の SEEK が決めた位置のまま読む。 */
-    if (ah & 0x10) {
+    if (ah & BIOS_DISK_CMD_SEEK) {
         cur_cyl = (u8)cyl;
     }
     phys_cyl = cur_cyl;
@@ -536,8 +535,8 @@ static void disk_read_common(u32 *frame, int transfer)
     xfer_done = 0;
 
     if (!disk_attached) {
-        v86_disk_fail_n++; v86_disk_fail_why = 4;
-        bios_set_ah(frame, 0x60);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         return;
     }
@@ -550,21 +549,21 @@ static void disk_read_common(u32 *frame, int transfer)
     /* 実機は 64KB 境界を跨ぐ転送をエラーにする (bios1b.c: AH=0x20)。
      * ES:BP のオフセットは 16bit なので、跨いだ瞬間にゲストが意図した
      * 場所と違うところへ落ちる。素通しにすると壊れ方が静かになる。 */
-    if ((dst & 0xFFFFU) > ((dst + count - 1) & 0xFFFFU)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 1;
-        bios_set_ah(frame, 0x20);
+    if ((dst & U16_MAX) > ((dst + count - 1) & U16_MAX)) {
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
+        bios_set_ah(frame, V86_DISK_ST_DMA_BOUNDARY);
         bios_set_cf(frame, 1);
         return;
     }
     if (transfer && !guest_range_ok(dst, count)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 1;
-        bios_set_ah(frame, 0x40);       /* パラメータ異常 */
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
+        bios_set_ah(frame, V86_DISK_ST_RANGE);       /* パラメータ異常 */
         bios_set_cf(frame, 1);
         return;
     }
     if (loop_dev_get_geometry(cur_fdd_slot, &cyls, &heads, &spt,
                               &bps, &total) != 0 || spt == 0) {
-        bios_set_ah(frame, 0x60);
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         return;
     }
@@ -580,10 +579,10 @@ static void disk_read_common(u32 *frame, int transfer)
      * ただし loop_dev はセクタの実長ぶんを書き込むので、ゲストのバッファへ
      * 直接読ませるとサイズが食い違ったときに溢れる。いったんカーネル側の
      * バウンスバッファへ受けてから、ゲストが要求した長さだけ渡す。 */
-    seclen = 128UL << (n & 3);
+    seclen = (unsigned long)BIOS_SECTOR_BASE_BYTES << (n & BIOS_SECTOR_N_MASK);
     if (seclen > sizeof(secbuf)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 2;
-        bios_set_ah(frame, 0x40);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
+        bios_set_ah(frame, V86_DISK_ST_RANGE);
         bios_set_cf(frame, 1);
         return;
     }
@@ -613,10 +612,10 @@ static void disk_read_common(u32 *frame, int transfer)
                 r = d88_read_sector(cyl, head, cyl, head, sect,
                                     seclen, secbuf, seclen, &trk_spt);
                 if (r < 0) {
-                    v86_disk_fail_n++; v86_disk_fail_why = 3;
+                    v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
                     v86_disk_fail_chs = (phys_cyl << 24) | (phys_head << 28) |
                                         (cyl << 16) | (head << 8) | sect;
-                    bios_set_ah(frame, 0x40);   /* セクタ不在 */
+                    bios_set_ah(frame, V86_DISK_ST_RANGE);   /* セクタ不在 */
                     bios_set_cf(frame, 1);
                     return;
                 }
@@ -641,17 +640,17 @@ static void disk_read_common(u32 *frame, int transfer)
              * (docs/archive/v21/v86v2/08_dos5.md §2)。
              * セクタ長を照合しておけば secbuf の溢れも同時に閉じる。 */
             if (seclen != (u32)bps) {
-                v86_disk_fail_n++; v86_disk_fail_why = 2;
+                v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
                 v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
-                bios_set_ah(frame, 0x40);
+                bios_set_ah(frame, V86_DISK_ST_RANGE);
                 bios_set_cf(frame, 1);
                 return;
             }
             if (loop_dev_read_chs(cur_fdd_slot, (u16)cyl, (u8)head,
                                   (u8)sect, secbuf) != 0) {
-                v86_disk_fail_n++; v86_disk_fail_why = 3;
+                v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
                 v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
-                bios_set_ah(frame, 0x40);   /* セクタ不在 */
+                bios_set_ah(frame, V86_DISK_ST_RANGE);   /* セクタ不在 */
                 bios_set_cf(frame, 1);
                 return;
             }
@@ -683,7 +682,7 @@ static void disk_read_common(u32 *frame, int transfer)
          * 物理位置も同じ歩幅で動かす。ID のずれは連続領域では一定なので、
          * 差を保ったまま動かせば整合が取れる。 */
         if (sect >= spt) {
-            if ((ah & 0x80U) && phys_head == 0 && heads > 1) {
+            if ((ah & V86_DISK_CMD_MULTI_TRACK) && phys_head == 0 && heads > 1) {
                 head      = 1;
                 phys_head = 1;
                 sect      = 1;
@@ -696,9 +695,9 @@ static void disk_read_common(u32 *frame, int transfer)
     }
 
     if (count) {
-        v86_disk_fail_n++; v86_disk_fail_why = 3;
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
         v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
-        bios_set_ah(frame, 0xC0);       /* 転送しきれなかった */
+        bios_set_ah(frame, V86_DISK_ST_INCOMPLETE);       /* 転送しきれなかった */
         bios_set_cf(frame, 1);
         return;
     }
@@ -719,23 +718,23 @@ static void disk_verify(u32 *frame) { disk_read_common(frame, 0); }
  * 0xC0 転送しきれず。 */
 static void disk_write(u32 *frame)
 {
-    u32 cyl   = (frame[V86F_ECX] >> 0) & 0xFFU;     /* CL */
-    u32 n     = (frame[V86F_ECX] >> 8) & 0xFFU;     /* CH: セクタ長コード */
-    u32 head  = (frame[V86F_EDX] >> 8) & 0xFFU;     /* DH */
-    u32 sect  = (frame[V86F_EDX] >> 0) & 0xFFU;     /* DL (1 起算) */
-    u32 count = frame[V86F_EBX] & 0xFFFFU;          /* BX: バイト数 */
-    u32 src   = ((frame[V86F_ES] & 0xFFFFU) << 4) +
-                (frame[V86F_EBP] & 0xFFFFU);
+    u32 cyl   = (frame[V86F_ECX] >> 0) & U8_MAX;     /* CL */
+    u32 n     = (frame[V86F_ECX] >> 8) & U8_MAX;     /* CH: セクタ長コード */
+    u32 head  = (frame[V86F_EDX] >> 8) & U8_MAX;     /* DH */
+    u32 sect  = (frame[V86F_EDX] >> 0) & U8_MAX;     /* DL (1 起算) */
+    u32 count = frame[V86F_EBX] & U16_MAX;          /* BX: バイト数 */
+    u32 src   = ((frame[V86F_ES] & U16_MAX) << X86_REAL_SEG_SHIFT) +
+                (frame[V86F_EBP] & U16_MAX);
     u16 cyls; u8 heads, spt; u16 bps; u32 total;
     u32 seclen;
-    u32 ah    = (frame[V86F_EAX] >> 8) & 0xFFU;
+    u32 ah    = (frame[V86F_EAX] >> 8) & U8_MAX;
     u32 phys_head;
-    static u8 secbuf[1024];
+    static u8 secbuf[V86_SECTOR_BUFFER_BYTES];
 
-    if (ah & 0x10) {
+    if (ah & BIOS_DISK_CMD_SEEK) {
         cur_cyl = (u8)cyl;
     }
-    phys_head = V86_FDC_HEAD(head, frame[V86F_EAX] & 0xFFU);
+    phys_head = V86_FDC_HEAD(head, frame[V86F_EAX] & U8_MAX);
 
     v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
     v86_disk_fail_len = (n << 16) | count;
@@ -743,8 +742,8 @@ static void disk_write(u32 *frame)
     xfer_done = 0;
 
     if (!disk_attached) {
-        v86_disk_fail_n++; v86_disk_fail_why = 4;
-        bios_set_ah(frame, 0x60);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         return;
     }
@@ -753,40 +752,40 @@ static void disk_write(u32 *frame)
         bios_set_cf(frame, 0);
         return;
     }
-    if ((src & 0xFFFFU) > ((src + count - 1) & 0xFFFFU)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 1;
-        bios_set_ah(frame, 0x20);
+    if ((src & U16_MAX) > ((src + count - 1) & U16_MAX)) {
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
+        bios_set_ah(frame, V86_DISK_ST_DMA_BOUNDARY);
         bios_set_cf(frame, 1);
         return;
     }
     if (!guest_range_ok(src, count)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 1;
-        bios_set_ah(frame, 0x40);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
+        bios_set_ah(frame, V86_DISK_ST_RANGE);
         bios_set_cf(frame, 1);
         return;
     }
     if (loop_dev_get_geometry(cur_fdd_slot, &cyls, &heads, &spt,
                               &bps, &total) != 0 || spt == 0) {
-        bios_set_ah(frame, 0x60);
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         return;
     }
     if (!loop_dev_is_writable(cur_fdd_slot)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 1;
-        bios_set_ah(frame, 0x70);       /* ライトプロテクト */
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
+        bios_set_ah(frame, V86_DISK_ST_WRITE_PROTECT);       /* ライトプロテクト */
         bios_set_cf(frame, 1);
         return;
     }
     if (loop_dev_get_format(cur_fdd_slot) == LOOP_FMT_D88) {
-        v86_disk_fail_n++; v86_disk_fail_why = 2;
-        bios_set_ah(frame, 0x40);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
+        bios_set_ah(frame, V86_DISK_ST_RANGE);
         bios_set_cf(frame, 1);
         return;
     }
-    seclen = 128UL << (n & 3);
+    seclen = (unsigned long)BIOS_SECTOR_BASE_BYTES << (n & BIOS_SECTOR_N_MASK);
     if (seclen != (u32)bps || seclen > sizeof(secbuf)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 2;
-        bios_set_ah(frame, 0x40);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
+        bios_set_ah(frame, V86_DISK_ST_RANGE);
         bios_set_cf(frame, 1);
         return;
     }
@@ -800,8 +799,8 @@ static void disk_write(u32 *frame)
         if (xfer < seclen) {
             if (loop_dev_read_chs(cur_fdd_slot, (u16)cyl, (u8)head,
                                   (u8)sect, secbuf) != 0) {
-                v86_disk_fail_n++; v86_disk_fail_why = 3;
-                bios_set_ah(frame, 0x40);
+                v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
+                bios_set_ah(frame, V86_DISK_ST_RANGE);
                 bios_set_cf(frame, 1);
                 return;
             }
@@ -811,9 +810,9 @@ static void disk_write(u32 *frame)
         }
         if (loop_dev_write_chs(cur_fdd_slot, (u16)cyl, (u8)head,
                                (u8)sect, secbuf) != 0) {
-            v86_disk_fail_n++; v86_disk_fail_why = 3;
+            v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
             v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
-            bios_set_ah(frame, 0x40);
+            bios_set_ah(frame, V86_DISK_ST_RANGE);
             bios_set_cf(frame, 1);
             return;
         }
@@ -823,7 +822,7 @@ static void disk_write(u32 *frame)
 
         /* READ と同じ: トラックは跨がない。AH bit7 + 表面なら裏面へ。 */
         if (sect >= spt) {
-            if ((ah & 0x80U) && phys_head == 0 && heads > 1) {
+            if ((ah & V86_DISK_CMD_MULTI_TRACK) && phys_head == 0 && heads > 1) {
                 head      = 1;
                 phys_head = 1;
                 sect      = 1;
@@ -836,8 +835,8 @@ static void disk_write(u32 *frame)
     }
 
     if (count) {
-        v86_disk_fail_n++; v86_disk_fail_why = 3;
-        bios_set_ah(frame, 0xC0);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_SECTOR;
+        bios_set_ah(frame, V86_DISK_ST_INCOMPLETE);
         bios_set_cf(frame, 1);
         return;
     }
@@ -864,22 +863,22 @@ static void disk_write(u32 *frame)
  * (フォーマット判定に使う限り一周する前に答えが出る) */
 static void disk_readid(u32 *frame)
 {
-    u32 ah  = (frame[V86F_EAX] >> 8) & 0xFFU;
-    u32 al  = frame[V86F_EAX] & 0xFFU;
-    u32 cyl = frame[V86F_ECX] & 0xFFU;              /* CL */
+    u32 ah  = (frame[V86F_EAX] >> 8) & U8_MAX;
+    u32 al  = frame[V86F_EAX] & U8_MAX;
+    u32 cyl = frame[V86F_ECX] & U8_MAX;              /* CL */
     u32 head;
     u16 cyls; u8 heads, spt; u16 bps; u32 total;
     u8  id_c, id_h, id_r, id_n;
     u16 trk_spt = 0;
 
-    if (ah & 0x10) {                                /* AH bit4 = シーク付き */
+    if (ah & BIOS_DISK_CMD_SEEK) { /* AH bit4 = シーク付き */
         cur_cyl = (u8)cyl;
     }
-    head = V86_FDC_HEAD((frame[V86F_EDX] >> 8) & 0xFFU, al);
+    head = V86_FDC_HEAD((frame[V86F_EDX] >> 8) & U8_MAX, al);
 
     if (loop_dev_get_geometry(cur_fdd_slot, &cyls, &heads, &spt,
                               &bps, &total) != 0 || spt == 0) {
-        bios_set_ah(frame, 0x60);
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         return;
     }
@@ -890,7 +889,7 @@ static void disk_readid(u32 *frame)
                                   &id_c, &id_h, &id_r, &id_n,
                                   &trk_spt) != 0) {
             cur_id_idx = 0;
-            bios_set_ah(frame, 0xE0);               /* ID が見つからない */
+            bios_set_ah(frame, V86_DISK_ST_ID_NOT_FOUND); /* ID が見つからない */
             bios_set_cf(frame, 1);
             return;
         }
@@ -898,7 +897,7 @@ static void disk_readid(u32 *frame)
     } else {
         /* RAW/FDI は全トラック同じ書式。ID は物理位置そのもの。 */
         if (cur_cyl >= (u8)cyls || head >= (u32)heads) {
-            bios_set_ah(frame, 0xE0);
+            bios_set_ah(frame, V86_DISK_ST_ID_NOT_FOUND);
             bios_set_cf(frame, 1);
             return;
         }
@@ -913,9 +912,9 @@ static void disk_readid(u32 *frame)
     }
 
     /* CL=C / DH=H / DL=R / CH=N を返す (bios1b.c case 0x0a の末尾と同じ) */
-    frame[V86F_ECX] = (frame[V86F_ECX] & 0xFFFF0000UL) |
+    frame[V86F_ECX] = (frame[V86F_ECX] & V86_REG_AX_KEEP_MASK) |
                       ((u32)id_n << 8) | (u32)id_c;
-    frame[V86F_EDX] = (frame[V86F_EDX] & 0xFFFF0000UL) |
+    frame[V86F_EDX] = (frame[V86F_EDX] & V86_REG_AX_KEEP_MASK) |
                       ((u32)id_h << 8) | (u32)id_r;
     bios_set_ah(frame, 0x00);
     bios_set_cf(frame, 0);
@@ -923,9 +922,9 @@ static void disk_readid(u32 *frame)
 
 static void bios_fdd_int1b(u32 *frame)
 {
-    u32 cmd = (frame[V86F_EAX] >> 8) & 0x0FU;   /* AH の下位ニブル */
-    u32 ax_in = frame[V86F_EAX] & 0xFFFFU;
-    u32 phys_in = ((u32)V86_FDC_HEAD((ax_in >> 8) & 0xFFU, ax_in & 0xFFU) << 8)
+    u32 cmd = (frame[V86F_EAX] >> 8) & BIOS_DISK_CMD_MASK;   /* AH の下位ニブル */
+    u32 ax_in = frame[V86F_EAX] & U16_MAX;
+    u32 phys_in = ((u32)V86_FDC_HEAD((ax_in >> 8) & U8_MAX, ax_in & U8_MAX) << 8)
                   | cur_cyl;
     u32 fails_before = v86_disk_fail_n;
     int slot;
@@ -942,10 +941,10 @@ static void bios_fdd_int1b(u32 *frame)
      *
      * 初期化 (AH=03h) だけは実機も装置の有無を見ずに答えるので通す
      * (bios1b.c: `if ((CPU_AH & 0x0f) != 0x03) { ...ready チェック... }`)。 */
-    slot = daua_to_slot(ax_in & 0xFFU);
+    slot = daua_to_slot(ax_in & U8_MAX);
     if (cmd != V86_DISK_INIT && slot < 0) {
-        v86_disk_fail_n++; v86_disk_fail_why = 4;
-        bios_set_ah(frame, 0x60);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
+        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
         disklog(frame, ax_in, phys_in, 0, v86_disk_fail_why);
         return;
@@ -980,14 +979,14 @@ static void bios_fdd_int1b(u32 *frame)
          * 「ここに居る物理トラック上で ID を照合する」ためにこれを使う。
          * ヘッドも憶える — シリンダだけだと Ys の 3 番目のロードが
          * 物理トラック 0 を見に行って空振りする。 */
-        cur_cyl  = (u8)(frame[V86F_ECX] & 0xFFU);
+        cur_cyl  = (u8)(frame[V86F_ECX] & U8_MAX);
         /* DH はそのまま憶える。**1 ビットにマスクしてはいけない。**
          * 実測で DH=3 の SEEK が来ることがあり、マスクするとヘッド 1 の
          * 別トラックが「それらしく」読めてしまう。ID は合っているので
          * 成功として返ってしまい、中身だけが違う — いちばん質の悪い壊れ方。
          * マスクしなければ範囲外トラックとして読みが失敗し、ゲストは
          * 自分で DH=0 に直して読み直す。その結果が正しい。 */
-        cur_head = (u8)((frame[V86F_EDX] >> 8) & 0xFFU);
+        cur_head = (u8)((frame[V86F_EDX] >> 8) & U8_MAX);
         v86_disk_seek_n++;
         v86_disk_seek_cyl = ((u32)cur_head << 8) | cur_cyl;
         bios_set_ah(frame, 0x00);
@@ -1012,14 +1011,14 @@ static void bios_fdd_int1b(u32 *frame)
     default:
         /* WRITE (05) / FORMAT (0D) / 密度設定 (0E) は未実装。
          * CF=1 / AH=0x86 (機能なし) で返せばゲストは自前の代替手段に進める。 */
-        bios_set_ah(frame, 0x86);
+        bios_set_ah(frame, BIOS_DISK_STATUS_UNSUPPORTED);
         bios_set_cf(frame, 1);
         break;
     }
 
     disklog(frame, ax_in, phys_in, xfer_done,
             (v86_disk_fail_n != fails_before) ? v86_disk_fail_why
-          : ((frame[V86F_EFLAGS] & 1UL) ? 0x80U : 0U));
+          : ((frame[V86F_EFLAGS] & 1UL) ? V86_DISKLOG_CF_ERROR : 0U));
 }
 
 /* ======================================================================== */
@@ -1047,20 +1046,20 @@ static void bios_fdd_int1b(u32 *frame)
 static void sasi_done(u32 *frame, u32 ret)
 {
     bios_set_ah(frame, ret);
-    bios_set_cf(frame, ret >= 0x20U);
+    bios_set_cf(frame, ret >= BIOS_DISK_STATUS_ERROR_MIN);
 }
 
 /* アドレッシング。sxsi_pos() の移植。範囲外は 0xD0。 */
 static u32 sasi_pos(u32 *frame, u16 cyls, u8 heads, u8 spt, u32 total_lba,
                     u32 *out_pos)
 {
-    u32 al = frame[V86F_EAX] & 0xFFU;
-    u32 cx = frame[V86F_ECX] & 0xFFFFU;
-    u32 dh = (frame[V86F_EDX] >> 8) & 0xFFU;
-    u32 dl = frame[V86F_EDX] & 0xFFU;
+    u32 al = frame[V86F_EAX] & U8_MAX;
+    u32 cx = frame[V86F_ECX] & U16_MAX;
+    u32 dh = (frame[V86F_EDX] >> 8) & U8_MAX;
+    u32 dl = frame[V86F_EDX] & U8_MAX;
     u32 pos;
 
-    if (al & 0x80U) {
+    if (al & BIOS_DISK_CMD_CHS) {
         /* CHS: DL は 0 起算。範囲照合してから線形位置へ落とす。 */
         if (dl >= (u32)spt || dh >= (u32)heads || cx >= (u32)cyls) {
             return V86_DISK_ST_IO;
@@ -1081,18 +1080,18 @@ static u32 sasi_pos(u32 *frame, u16 cyls, u8 heads, u8 spt, u32 total_lba,
 /* READ (06) / WRITE (05)。バウンスバッファ 1 セクタで pos++ の線形転送。
  * ゲスト側アドレスは ES:BP からリニアに進み、セグメントの繰り上がりは
  * 気にしない (実機の MEML_READS/WRITES も物理線形)。 */
-static u8 sasi_bounce[4096];
+static u8 sasi_bounce[V86_SASI_BOUNCE_BYTES];
 
 static u32 sasi_rw(u32 *frame, int slot, int is_write,
                    u16 bps, u32 pos, u32 total_lba)
 {
-    u32 size = frame[V86F_EBX] & 0xFFFFU;
-    u32 addr = ((frame[V86F_ES] & 0xFFFFU) << 4)
-             + (frame[V86F_EBP] & 0xFFFFU);
+    u32 size = frame[V86F_EBX] & U16_MAX;
+    u32 addr = ((frame[V86F_ES] & U16_MAX) << X86_REAL_SEG_SHIFT)
+             + (frame[V86F_EBP] & U16_MAX);
     u32 r;
 
     if (size == 0) {
-        size = 0x10000;         /* BX=0 は 64KB。FDD と逆 (sxsibios.c) */
+        size = V86_BIOS_COUNT_ZERO_BYTES;         /* BX=0 は 64KB。FDD と逆 (sxsibios.c) */
     }
 
     if (is_write && !loop_dev_is_writable(slot)) {
@@ -1108,7 +1107,7 @@ static u32 sasi_rw(u32 *frame, int slot, int is_write,
             return V86_DISK_ST_IO;        /* 転送中に末尾を越えた */
         }
         if (!guest_range_ok(addr, r)) {
-            v86_disk_fail_n++; v86_disk_fail_why = 1;
+            v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_RANGE;
             v86_disk_fail_dst = addr;
             return V86_DISK_ST_RANGE;        /* 直接低位 (V86_LOW) の外。書くと カーネルが壊れる */
         }
@@ -1142,12 +1141,12 @@ static u32 sasi_rw(u32 *frame, int slot, int is_write,
  * 0x0F (CF=0)。NHD/HDI (SPT=17 等) は常に 0x0F — 実測どおり。 */
 static u32 sasi_sense(u32 *frame, u16 cyls, u8 heads, u8 spt, u16 bps)
 {
-    u32 ah = (frame[V86F_EAX] >> 8) & 0xFFU;
+    u32 ah = (frame[V86F_EAX] >> 8) & U8_MAX;
 
-    if (ah == 0x84U) {
-        frame[V86F_EBX] = (frame[V86F_EBX] & 0xFFFF0000UL) | bps;
-        frame[V86F_ECX] = (frame[V86F_ECX] & 0xFFFF0000UL) | cyls;
-        frame[V86F_EDX] = (frame[V86F_EDX] & 0xFFFF0000UL)
+    if (ah == BIOS_DISK_SENSE) {
+        frame[V86F_EBX] = (frame[V86F_EBX] & V86_REG_AX_KEEP_MASK) | bps;
+        frame[V86F_ECX] = (frame[V86F_ECX] & V86_REG_AX_KEEP_MASK) | cyls;
+        frame[V86F_EDX] = (frame[V86F_EDX] & V86_REG_AX_KEEP_MASK)
                         | ((u32)heads << 8) | spt;
     }
     if (spt == 33 && heads <= 8) {
@@ -1166,24 +1165,24 @@ static u32 sasi_sense(u32 *frame, u16 cyls, u8 heads, u8 spt, u16 bps)
 static u32 sasi_init(void)
 {
     u8 *guest = (u8 *)0;
-    u16 equip = *(u16 *)(guest + 0x055C);
+    u16 equip = *(u16 *)(guest + BIOS_WORK_DISK_EQUIP);
     int i;
 
-    equip &= 0xF0FF;
+    equip &= BIOS_DISK_SASI_MASK;
     for (i = 0; i < V86_DRIVE_MAX; i++) {
         if (v86_drives[i].in_use &&
-            (v86_drives[i].daua & 0xF0U) == V86_DAUA_HDD) {
-            equip |= (u16)(0x0100U << (v86_drives[i].daua & 0x03U));
+            (v86_drives[i].daua & BIOS_DA_TYPE_MASK) == V86_DAUA_HDD) {
+            equip |= (u16)(BIOS_DISK_SASI_BIT0 << (v86_drives[i].daua & BIOS_DA_UNIT_MASK));
         }
     }
-    *(u16 *)(guest + 0x055C) = equip;
+    *(u16 *)(guest + BIOS_WORK_DISK_EQUIP) = equip;
     return 0;
 }
 
 static void bios_sasi_int1b(u32 *frame)
 {
-    u32 cmd = (frame[V86F_EAX] >> 8) & 0x0FU;
-    u32 ax_in = frame[V86F_EAX] & 0xFFFFU;
+    u32 cmd = (frame[V86F_EAX] >> 8) & BIOS_DISK_CMD_MASK;
+    u32 ax_in = frame[V86F_EAX] & U16_MAX;
     u32 fails_before = v86_disk_fail_n;
     u32 ret;
     u32 pos = 0;
@@ -1195,7 +1194,7 @@ static void bios_sasi_int1b(u32 *frame)
     xfer_done = 0;
 
     /* INIT 以外は装置の有無を先に見る (sasibios_operate と同じ)。 */
-    slot = daua_to_slot(ax_in & 0xFFU);
+    slot = daua_to_slot(ax_in & U8_MAX);
     if (cmd == V86_DISK_INIT) {
         ret = sasi_init();
         sasi_done(frame, ret);
@@ -1203,8 +1202,8 @@ static void bios_sasi_int1b(u32 *frame)
         return;
     }
     if (slot < 0 || !loop_dev_is_hdd(slot)) {
-        v86_disk_fail_n++; v86_disk_fail_why = 4;
-        sasi_done(frame, 0x60);
+        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
+        sasi_done(frame, V86_DISK_ST_NOT_READY);
         disklog(frame, ax_in, 0, 0, v86_disk_fail_why);
         return;
     }
@@ -1234,24 +1233,24 @@ static void bios_sasi_int1b(u32 *frame)
         /* SEEK(0)/READ_DIAG(2)/READID(A)/FORMAT(D)/密度(E) その他。
          * SASI では失敗が正 — 実測でも AH=8E が飛んできて 0x40 で
          * 流している (10_dos_hdd.md §2-2)。 */
-        ret = 0x40;
+        ret = V86_DISK_ST_RANGE;
         break;
     }
 
     sasi_done(frame, ret);
     disklog(frame, ax_in, pos & 0xFFFFFFU, xfer_done,
             (v86_disk_fail_n != fails_before) ? v86_disk_fail_why
-          : ((ret >= 0x20U) ? 0x80U : 0U));
+          : ((ret >= BIOS_DISK_STATUS_ERROR_MIN) ? V86_DISKLOG_CF_ERROR : 0U));
 }
 
 /* devtype (AL の上位ニブル) で FDD 規約と SASI 規約に振り分ける。
  * bios1b.c `bios0x1b()` の switch(devtype) と同じ構造。 */
 static void bios_int1b(u32 *frame)
 {
-    u32 al = frame[V86F_EAX] & 0xFFU;
-    u32 devtype = al & 0xF0U;
+    u32 al = frame[V86F_EAX] & U8_MAX;
+    u32 devtype = al & BIOS_DA_TYPE_MASK;
 
-    if (devtype == 0x80U || devtype == 0x00U) {
+    if (devtype == V86_DAUA_HDD || devtype == 0x00U) {
         bios_sasi_int1b(frame);
         return;
     }
@@ -1264,14 +1263,14 @@ void v86_bios_dispatch(u32 *frame, u32 vector)
     bios_last_vec = vector;
 
     switch (vector) {
-    case 0x1B:
+    case BIOS_INT_DISK:
         bios_int1b(frame);
         break;
 
     default:
         /* 未対応の BIOS コールは CF=1 / AH=0x86 (機能なし) を返す。
          * 落とさずに返せば、ゲストは自前のフォールバックに進める。 */
-        bios_set_ah(frame, 0x86);
+        bios_set_ah(frame, BIOS_DISK_STATUS_UNSUPPORTED);
         bios_set_cf(frame, 1);
         break;
     }

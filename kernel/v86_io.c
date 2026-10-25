@@ -45,9 +45,8 @@ u16 v86_io_last_port(void)  { return io_last_port; }
 /*  埋まり、**知りたい初期化部分が押し出されて消える**。                    */
 /* ------------------------------------------------------------------------ */
 #define IOLOG_LOOKBACK  8
-#define V86_IOLOG_N     64
 u32 v86_iolog_w = 0;                    /* 積んだエントリ数 (回り込む前) */
-u32 v86_iolog[V86_IOLOG_N * 4];
+u32 v86_iolog[V86_IOLOG_N * V86_IOLOG_WORDS];
 /*  [0] dir<<24 | size<<16 | port      dir: 0=IN, 1=OUT
  *  [1] value                          IN なら返した値、OUT なら書かれた値
  *  [2] cs<<16 | ip                    どの命令から来たか
@@ -59,25 +58,25 @@ u32 v86_iolog[V86_IOLOG_N * 4];
 
 static void iolog(u16 port, int size, int dir, u32 value)
 {
-    u32 key = ((u32)dir << 24) | ((u32)size << 16) | port;
-    u32 loc = ((v86_last_gp_cs() & 0xFFFFU) << 16) | (v86_last_gp_ip() & 0xFFFFU);
+    u32 key = ((u32)dir << V86_IOLOG_DIR_SHIFT) | ((u32)size << V86_IOLOG_SIZE_SHIFT) | port;
+    u32 loc = ((v86_last_gp_cs() & U16_MAX) << V86_IOLOG_CS_SHIFT) | (v86_last_gp_ip() & U16_MAX);
     u32 *e;
 
     {
         u32 back;
         for (back = 1; back <= IOLOG_LOOKBACK && back <= v86_iolog_w; back++) {
-            e = &v86_iolog[((v86_iolog_w - back) % V86_IOLOG_N) * 4];
-            if (e[0] == key && e[1] == value && e[2] == loc) {
-                e[3]++;
+            e = &v86_iolog[((v86_iolog_w - back) % V86_IOLOG_N) * V86_IOLOG_WORDS];
+            if (e[V86_IOLOG_KEY] == key && e[V86_IOLOG_VALUE] == value && e[V86_IOLOG_LOCATION] == loc) {
+                e[V86_IOLOG_REPEAT]++;
                 return;
             }
         }
     }
-    e = &v86_iolog[(v86_iolog_w % V86_IOLOG_N) * 4];
-    e[0] = key;
-    e[1] = value;
-    e[2] = loc;
-    e[3] = 1;
+    e = &v86_iolog[(v86_iolog_w % V86_IOLOG_N) * V86_IOLOG_WORDS];
+    e[V86_IOLOG_KEY] = key;
+    e[V86_IOLOG_VALUE] = value;
+    e[V86_IOLOG_LOCATION] = loc;
+    e[V86_IOLOG_REPEAT] = 1;
     v86_iolog_w++;
 }
 
@@ -100,14 +99,14 @@ static const struct io_range v86_io_allow[] = {
     { 0x0188, 0x018F, 1 },
 
     /* I/O ウェイト。ダミーライトでバスを待つだけなので害がない。 */
-    { 0x005F, 0x005F, 1 },
+    { PC98_IO_WAIT_PORT, PC98_IO_WAIT_PORT, 1 },
 
     /* テキスト GDC (status/data) と VSYNC トリガ、モードフリップフロップ。
      * 0x0064 は実測で 52/s = 1 フレーム 1 回叩かれていた。 */
-    { 0x0060, 0x0060, 1 },
-    { 0x0062, 0x0062, 1 },
-    { 0x0064, 0x0064, 1 },
-    { 0x0068, 0x0068, 1 },
+    { GDC_TEXT_STAT, GDC_TEXT_STAT, 1 },
+    { GDC_TEXT_DATA, GDC_TEXT_DATA, 1 },
+    { GDC_TEXT_CRTIRQ, GDC_TEXT_CRTIRQ, 1 },
+    { MODE_FF1_PORT, MODE_FF1_PORT, 1 },
     { 0x006A, 0x006A, 1 },
     { 0x006C, 0x006C, 1 },
     { 0x006E, 0x006E, 1 },
@@ -128,7 +127,7 @@ static const struct io_range v86_io_allow[] = {
     { 0x0037, 0x0037, 1 },
 
     /* カレンダ */
-    { 0x0020, 0x0020, 1 },
+    { RTC_SET, RTC_SET, 1 },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -216,7 +215,7 @@ static void gfx_state_for_guest(void)
      * OS32 は gfx_scroll_init() で LEN=400 を入れているので、
      * 消さないと 200 ライン表示と噛み合わない。 */
     io_out(GDC_GFX_CMD, GDC_CMD_SCROLL);
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < GDC_PRAM_BYTES; i++) {
         io_out(GDC_GFX_PARAM, 0x00);
     }
 
@@ -285,7 +284,7 @@ static void snd_state_for_os32(void)
 u32 v86_io_observe = 0;
 
 static const struct io_range v86_io_observe_list[] = {
-    { 0x0060, 0x006E, 2 },      /* テキスト GDC / モード F/F / ボーダー */
+    { GDC_TEXT_STAT, 0x006E, 2 },      /* テキスト GDC / モード F/F / ボーダー */
     { 0x0070, 0x007A, 2 },      /* CRTC */
     { 0x007C, 0x007E, 2 },      /* GRCG */
     { 0x00A0, 0x00AE, 2 },      /* グラフィック GDC / パレット / ページ */
@@ -343,7 +342,7 @@ void v86_io_apply_policy(void)
      * 表の正本は v86g_port_passed (0x0A00 未満にしか無い)。観測モードは使わない。 */
     if (capture) {
         u32 p;
-        for (p = 0; p < 0x0A00U; p++) {
+        for (p = 0; p < V86_CAPTURE_PORT_END; p++) {
             if (v86_debug_ops()->gcap_port_passed(p)) {
                 tss_iomap_deny((u16)p);
             }
@@ -398,7 +397,7 @@ u32 v86_io_in(u16 port, int size)
     } else if (v86_kbd_is_port(port)) {
         v = v86_kbd_in(port);
     } else {
-        v = (size == 1) ? 0xFFU : 0xFFFFU;
+        v = (size == 1) ? 0xFFU : U16_MAX;
     }
     /* 採取中だけ・通さなかったポートだけ数える (通したものは上で数えた) */
     if (v86_debug_ops()->gcap_note_in) v86_debug_ops()->gcap_note_in(port, size, v);

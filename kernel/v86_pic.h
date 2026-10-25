@@ -22,12 +22,13 @@
 #define __V86_PIC_H
 
 #include "types.h"
+#include "pc98.h"
 
 /* PC-98 の PIC ポート。マスタが 0x00/0x02、スレーブが 0x08/0x0A。 */
-#define V86_PIC_M_CMD   0x0000
-#define V86_PIC_M_DATA  0x0002
-#define V86_PIC_S_CMD   0x0008
-#define V86_PIC_S_DATA  0x000A
+#define V86_PIC_M_CMD   PIC1_CMD
+#define V86_PIC_M_DATA  PIC1_DATA
+#define V86_PIC_S_CMD   PIC2_CMD
+#define V86_PIC_S_DATA  PIC2_DATA
 
 /* IPL 直後の IMR。素の NP21/W で Ys.D88 を起動して実測した値
  * (`emu_pic`)。ゲストは PIC を初期化しないので、これを用意するのは

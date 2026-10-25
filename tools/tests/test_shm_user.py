@@ -134,7 +134,7 @@ def run(runner, mutation=None):
         consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')
         (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
         (work/'v86_unwind_slice.inc').write_text(function(sources['kernel/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
-        (work/'v86_int_slice.inc').write_text((function(sources['kernel/v86.c'], 'v86_do_int') + function(sources['kernel/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * 4)', '(const u16 *)(host_page0 + vector * 4)'))
+        (work/'v86_int_slice.inc').write_text((function(sources['kernel/v86.c'], 'v86_do_int') + function(sources['kernel/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
         arch = (ROOT/'tools/tests/host_arch/arch_cpu.h').read_text()
         arch = arch.replace('static inline void arch_mmu_flush_tlb(void)\n{\n}',
                             'static inline void arch_mmu_flush_tlb(void)\n{\n    host_flushes++; host_flushed_cr3 = host_cr3;\n}')
