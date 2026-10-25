@@ -66,7 +66,7 @@
 
 ## 5. 追補: fork 前からある `kprintf(0x07, …)` (ユーザー指示 2026-10-25「出してください。タスクの粒度が大きく成りすぎないように」)
 
-残りは約 145 か所。次の 2 つは除く。
+残りは約 145 か所 (受入完了 2026-10-25、残り 0 か所)。次の 2 つは除く。
 
 - `lib/sqlite3/sqlite3.c`: 取り込んだ SQLite の合本で、手を入れる行を増やさない。
 - `apps/`: H-7 で再開待ち。
@@ -77,6 +77,6 @@ PM 決定: 名前は 1 つにする。`KLOG_ATTR` を共有の層 `sdk/include/o
 
 | 段 | 中身 | 触る所 | 実装 | 状態 |
 |---|---|---|---|---|
-| K1 | kdebug の自己試験 25 か所 | kdebug/kselftest.c | sol | 未着手 |
-| K2 | カーネル側 約 35 か所 | kernel/・drivers/・fs/・net/・lib/os32_sqlite_vfs.c・lib/kprintf_attr.c (コメント) | sol | 未着手 |
-| K3 | 名前を共有の層へ移し、ユーザーランド側 約 70 か所 | sdk/include/os32/os32_kapi_shared.h・include/kprintf.h・userland/・sdk/example/・tools/tests/ の host の .c | sol | 未着手 |
+| K1 | kdebug の自己試験 25 か所 | kdebug/kselftest.c | sol | **main** (2ac5fc6c、astra 取り込み可・PM の直し: 試験の偽ヘッダに定義 1 行ずつ) — .text は差 0 (K3 は FEP の ABI 世代の値だけ) |
+| K2 | カーネル側 約 35 か所 | kernel/・drivers/・fs/・net/・lib/os32_sqlite_vfs.c・lib/kprintf_attr.c (コメント) | sol | **main** (2ac5fc6c、astra 取り込み可・PM の直し: 試験の偽ヘッダに定義 1 行ずつ) — .text は差 0 (K3 は FEP の ABI 世代の値だけ) |
+| K3 | 名前を共有の層へ移し、ユーザーランド側 約 70 か所 | sdk/include/os32/os32_kapi_shared.h・include/kprintf.h・userland/・sdk/example/・tools/tests/ の host の .c | sol | **main** (2ac5fc6c、astra 取り込み可・PM の直し: 試験の偽ヘッダに定義 1 行ずつ) — .text は差 0 (K3 は FEP の ABI 世代の値だけ) |
