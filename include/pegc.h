@@ -22,6 +22,7 @@
 #define __PEGC_H
 
 #include "types.h"
+#include "gfx_format.h"
 #include "pc98.h"    /* MODE_FF2_PORT (0x6A) — モード F/F2 は 9801 と共通 */
 
 /* ------------------------------------------------------------------------ */
@@ -184,7 +185,6 @@
 #define PEGC_WIDTH             640
 #define PEGC_HEIGHT_480        480
 #define PEGC_HEIGHT_400        400
-#define PEGC_BPP               8
 #define PEGC_PITCH             PEGC_WIDTH            /* 1 バイト/画素 */
 #define PEGC_FB_SIZE_480       (PEGC_PITCH * PEGC_HEIGHT_480)  /* 307200 */
 
@@ -208,7 +208,6 @@
 /*  **0〜15** (契約 G6/G8 の GuiRgb = PC-98 16 色の流儀)。                    */
 /*  そこでバックエンドは KAPI 値を ×17 で 8bit へ伸ばす (15→255, 0→0)。      */
 /* ------------------------------------------------------------------------ */
-#define PEGC_PALETTE_COUNT     256
 #define PEGC_PALETTE_MAX       255   /* 各輝度の最大値 (16 色機は 15) */
 #define PEGC_PAL_KAPI_MASK     0x0F  /* KAPI 側の輝度は 4bit (0〜15) */
 #define PEGC_PAL_KAPI_SCALE    17    /* 4bit → 8bit の伸張係数 (15*17 = 255) */
@@ -216,7 +215,7 @@
 /* GUI がフォーカスアプリに貸せる範囲 (契約 G8)。0〜15 はシステム色として
  * 不可侵、16〜255 の 240 本を貸す。 */
 #define PEGC_LEASE_FIRST       16
-#define PEGC_LEASE_COUNT       (PEGC_PALETTE_COUNT - PEGC_LEASE_FIRST)
+#define PEGC_LEASE_COUNT       (GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP) - PEGC_LEASE_FIRST)
 
 /* ------------------------------------------------------------------------ */
 /*  8. 機種判別 (BIOS ワークエリア、物理 0000:0400h〜05FFh)                   */

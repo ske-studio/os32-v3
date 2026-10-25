@@ -1,4 +1,5 @@
 check-pegc-mode-host:
+- include/gfx_format.h
 - tools/tests/host32.py
 - gfx/backend_pegc.c
 - drivers/np2sysp.c

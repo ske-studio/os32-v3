@@ -785,7 +785,7 @@ int __cdecl gfx_lease_palette(int first, int count, const u8 *rgb)
             return OS32_ERR_INVAL;
     } else {
         /* 16 色機: lease_mask のビットが立つ index だけ貸せる */
-        if (first >= PALETTE_COUNT || count > PALETTE_COUNT - first) return OS32_ERR_INVAL;
+        if (first >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) || count > GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) - first) return OS32_ERR_INVAL;
         for (i = first; i < first + count; i++) {
             if (!(si.lease_mask & (u16)(1u << i))) return OS32_ERR_INVAL;
         }

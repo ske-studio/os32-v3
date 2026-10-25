@@ -17,6 +17,7 @@
 #define PALETTE_H
 
 #include "types.h"
+#include "gfx_format.h"
 #include "pegc.h"
 
 /* パレットエントリ (各4bit: 0-15) */
@@ -34,7 +35,6 @@ typedef struct {
 #define GFX_PALETTE_COMPONENT_MASK PEGC_PAL_KAPI_MASK /* 正典は include/pegc.h */
 #define GFX_PALETTE_CUBE_LEVELS 6
 
-#define PALETTE_COUNT 16   /* PC-98の標準16色パレット数 */
 
 /* パレット初期化 (デフォルト16色セット) */
 void palette_init(void);

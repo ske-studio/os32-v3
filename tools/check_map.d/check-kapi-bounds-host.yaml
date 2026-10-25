@@ -1,4 +1,5 @@
 check-kapi-bounds-host:
+- include/gfx_format.h
 - drivers/fm.c
 - exec/access_walk.c
 - exec/lease.c

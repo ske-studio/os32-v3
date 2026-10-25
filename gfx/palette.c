@@ -9,10 +9,10 @@
 #include "io.h"
 
 /* シャドウパレット */
-static PaletteEntry shadow[PALETTE_COUNT];
+static PaletteEntry shadow[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)];
 
 /* PC-98デフォルト16色パレット */
-static const PaletteEntry default_palette[PALETTE_COUNT] = {
+static const PaletteEntry default_palette[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)] = {
     /* idx  R   G   B   色名 */
     {  0,  0,  0 },  /*  0: 黒 */
     {  0,  0,  7 },  /*  1: 青 */
@@ -44,7 +44,7 @@ static void hw_set_palette(int idx, u8 r, u8 g, u8 b)
 void palette_init(void)
 {
     int i;
-    for (i = 0; i < PALETTE_COUNT; i++) {
+    for (i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); i++) {
         shadow[i] = default_palette[i];
         hw_set_palette(i, shadow[i].r, shadow[i].g, shadow[i].b);
     }
@@ -52,7 +52,7 @@ void palette_init(void)
 
 void palette_set(int idx, u8 r, u8 g, u8 b)
 {
-    if (idx < 0 || idx >= PALETTE_COUNT) return;
+    if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) return;
     shadow[idx].r = r & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].g = g & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].b = b & GFX_PALETTE_COMPONENT_MASK;
@@ -66,7 +66,7 @@ void palette_set(int idx, u8 r, u8 g, u8 b)
  * 0〜15 のシステム色を書いたときはここで台帳を合わせる (票 H2c)。 */
 void palette_shadow_set(int idx, u8 r, u8 g, u8 b)
 {
-    if (idx < 0 || idx >= PALETTE_COUNT) return;
+    if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) return;
     shadow[idx].r = r & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].g = g & GFX_PALETTE_COMPONENT_MASK;
     shadow[idx].b = b & GFX_PALETTE_COMPONENT_MASK;
@@ -74,7 +74,7 @@ void palette_shadow_set(int idx, u8 r, u8 g, u8 b)
 
 void palette_get(int idx, u8 *r, u8 *g, u8 *b)
 {
-    if (idx < 0 || idx >= PALETTE_COUNT) return;
+    if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) return;
     if (r) *r = shadow[idx].r;
     if (g) *g = shadow[idx].g;
     if (b) *b = shadow[idx].b;

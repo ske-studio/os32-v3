@@ -294,7 +294,7 @@ int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
     return 1;
 }
 void palette_init(void) { }
-const PaletteEntry *palette_get_all(void) { static const PaletteEntry p[PALETTE_COUNT]; return p; }
+const PaletteEntry *palette_get_all(void) { static const PaletteEntry p[GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)]; return p; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }
 
 /* ========================================================================

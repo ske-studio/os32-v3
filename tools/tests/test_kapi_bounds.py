@@ -18,7 +18,7 @@ MUTATIONS = [
     ('note', 1, 'fm_note_on', '    if (note < 0) return;\n', '', 'note bounds'),
     ('db-col', 2, 'kapi_db_column_text', '(u32)col >=\n        (DB_SHM_RESULT_LIMIT - sizeof(DB_ResultHeader)) / sizeof(DB_ColumnInfo) ||\n        ', '', 'DB column bounds'),
     ('db-offset', 2, 'kapi_db_column_text', 'info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT', 'info->data_offset == 0', 'DB offset bounds'),
-    ('palette16', 3, 'gfx_lease_palette', 'first >= PALETTE_COUNT || count > PALETTE_COUNT - first', 'first + count > PALETTE_COUNT', 'palette count bounds'),
+    ('palette16', 3, 'gfx_lease_palette', 'first >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) || count > GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) - first', 'first + count > GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)', 'palette count bounds'),
     ('palette256', 3, 'gfx_lease_palette', 'first > (int)si.lease_first + (int)si.lease_count ||\n            count > (int)si.lease_first + (int)si.lease_count - first', 'first + count > (int)si.lease_first + (int)si.lease_count', 'palette first bounds'),
     ('dirty', 4, 'gfx_add_dirty_rect', '    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;\n', '', 'dirty clipped'),
     ('raster', 4, 'gfx_present_raster', 'table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES', 'table->count == 0', 'raster negative count'),
