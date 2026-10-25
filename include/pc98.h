@@ -385,7 +385,7 @@
 /* INT 1Bh commands and DA/UA fields; NASM aliases are maintained in N12. */
 #define BIOS_INT_DISK              0x1B
 #define BIOS_DISK_READ             0x06
-#define BIOS_DISK_SEEK_RETRY_READ  0x76
+#define BIOS_DISK_READ_SEEK_MFM_NO_RETRY 0x76 /* READ + SEEK + MFM、リトライ禁止 (AH bit5=1) */
 #define BIOS_DISK_SENSE            0x84
 #define BIOS_DA_TYPE_MASK          0xF0
 #define BIOS_DA_UNIT_MASK          0x03
