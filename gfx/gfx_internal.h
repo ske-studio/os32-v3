@@ -29,7 +29,7 @@ extern u8 *bb_g;
 extern u8 *bb_i;
 
 extern int vram_scroll_y;
-extern int gfx_current_height;  /* 200 or 400 (gfx_init / gfx_init_200 で設定) */
+extern int gfx_current_height;  /* 現在高さ: planar 200/400、packed 480。終了後は400 */
 
 /* ページフリッピング状態 (200/400ライン共通) */
 extern int gfx_flip_enabled;     /* 0=無効, 1=有効 */

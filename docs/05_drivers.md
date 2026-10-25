@@ -126,6 +126,14 @@ Cirrus → PEGC → 9801** で最初に通ったものを使う。`/etc/system.c
 (`gfxmode` コマンドが書く) で強制できる。能力は `gfx_screen_info()` (契約 G5) で問い合わせ、
 GUI もアプリも 400 ライン / 16 色 / プレーンを決め打ちしない。
 
+表示能力は `GfxBackend` のモード表、形式の bpp・面数は `gfx_format.h` が持つ。
+選択時に CLIENT / DISPLAY の予約容量と照合し、不足する候補はハード設定前に標準 planar へ戻す。
+起動予約と SURFACE の型板は固定で、planar 200 でも面間隔は 32,000 bytes のまま。
+開始後の FB は選択行の幅・pitch と現在高さを使い、未開始の内部 FB は起動時の planar 400 を返す。
+KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から選択行の幅・pitch と既定の高さを返す。
+`gfx_screen_info()` の高さは描画中は現在高さ、開始前・終了後は既定行 (planar 400 / packed 480)。
+高解像度の予約拡大・ハード設定は対象外。詳細は [GFX_MODES 設計](decisions/gui/GFX_MODES_DESIGN.md) §3・§4。
+
 | バックエンド | 画面 | バックバッファ (CPU が描く面) | 表示面へ | 能力ビット |
 |---|---|---|---|---|
 | `backend_pc98.c` (9801) | 640×400×16 (4 プレーン) | pool から確保した 32 頁 (SURFACE) | CPU 転送 + ページフリップ | TEXT_OVERLAY, PAGE_FLIP |

@@ -18,6 +18,19 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('pc98-display-required',
+  '    return backend == LEDGER_SF_PC98 || displays == 1;',
+  '    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);',
+  'FAIL bb[0] && gfx_backend_pc98.bb_base'),
+ ('mode-capacity-disabled',
+  '    if (!gfx_mode_fits(be, mode)) return 0;',
+  '    if (0) return 0;',
+  'FAIL g_backend == &gfx_backend_pc98'),
+
+ ('forced-cirrus-to-pegc',
+  '        gfx_select_mode(&gfx_backend_pc98, legacy200);\n        g_backend = &gfx_backend_pc98;\n        return;\n    }\n\n    for',
+  '        gfx_select_mode(&gfx_backend_pegc, legacy200);\n        g_backend = &gfx_backend_pegc;\n        return;\n    }\n\n    for',
+  'FAIL expected[i] == mode_trace[i]'),  # 最初に落ちるのは強制 PEGC・PEGC 無しの行の init の記録 (Opus レビュー P2)
  ('last-plane-old', 'bb_i = bb[3];',
   'bb_i = P2V(0x6A000UL + 3 * GFX_PLANE_SZ);',
   'FAIL bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ'),
@@ -50,8 +63,8 @@ MUTANTS = [
  # Missing CLIENT emits L2 with started=0 before returning.
  ('init200-rebind', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */', '',
   'FAIL host_serial_find(" started=1 bb=")'),
- ('preinit-screen-pc98', '    if (g_backend && g_backend->query)\n        g_backend->query((GFX_ScreenInfo *)out);',
-  '    (gfx_started ? g_backend : &gfx_backend_pc98)->query((GFX_ScreenInfo *)out);',
+ ('preinit-screen-pc98', '    if (g_backend && g_backend->query && !g_backend->query(info)) {',
+  '    if (g_backend && g_backend->query && !(gfx_started ? g_backend : &gfx_backend_pc98)->query(info)) {',
   'FAIL si.format == selected_info.format && si.format == client->format'),
  ('preinit-public-pc98', '(void)gfx_client_framebuffer(&kernel, 1);',
   '(void)gfx_kernel_framebuffer(&kernel);',
@@ -108,7 +121,7 @@ static inline void io_wait_n(int n) {(void)n;}
                         assert body.count(old) == 1
                         body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
-                body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(); }\n'
+                body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'gfx/backend_pegc.c':
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''

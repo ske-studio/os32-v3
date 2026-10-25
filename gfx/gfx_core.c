@@ -30,7 +30,7 @@ extern int appslot_gfx_owner(void);
 /* ======================================================================== */
 u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
-int gfx_current_height = GFX_HEIGHT;  /* 200 or 400 */
+int gfx_current_height = GFX_HEIGHT;  /* current display: 200/400/480 */
 
 u8 *bb[SURFACE_QUERY_MAX];
 
@@ -50,6 +50,8 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
+/* Boot binds PC98 before DISPLAY registration; selection validates thereafter. */
+static int gfx_mode_ready = 1;
 u32 gfx_init_gen;
 static u32 present_logged_gen;
 
@@ -77,7 +79,7 @@ void __attribute__((cold)) gfx_diag_first_present(u32 before)
 /* probe 順のバックエンド一覧。速い/高機能な順に前から並べ、最初に probe() が
  * 1 を返したものを使う (Cirrus → PEGC → 9801)。
  * 9801 の probe は常に 1 なので、末尾が必ず受け皿になる。 */
-static const GfxBackend *const g_backend_list[] = {
+static GfxBackend *const g_backend_list[] = {
     &gfx_backend_cirrus, /* Cirrus GD54xx アクセラレータ (H3)。ID 5Bh のみ */
     &gfx_backend_pegc,   /* 9821 PEGC 256 色 (H2)。9801 では probe が 0 */
     &gfx_backend_pc98    /* 9801 標準グラフィック (H1)。最後の受け皿 */
@@ -117,12 +119,59 @@ int gfx_cirrus_probed(void)
 
 static int gfx_probe_backend(const GfxBackend *backend)
 {
-    if (!backend->probe) return 0;
+    if (!backend->modes || !backend->probe) return 0;
     if (backend == &gfx_backend_cirrus && backend->init) cirrus_probed = 1;
     return backend->probe();
 }
 
-static void gfx_select_backend(void)
+/* Compare display usage with existing reservation capacity, never resize it.
+ * PC98 CLIENT planes retain their 400-line offsets even in 200-line mode. */
+static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
+{
+    u32 plane, total, displays = 0;
+    u32 backend = be == &gfx_backend_pc98 ? LEDGER_SF_PC98 :
+                  be == &gfx_backend_pegc ? LEDGER_SF_PEGC : LEDGER_SF_CIRRUS;
+    const struct ledger_surface *client = ledger_surface_find(backend, LEDGER_ROLE_CLIENT);
+    GfxFormatDesc format;
+    if (!gfx_mode_layout(mode, &plane, &total) ||
+        !gfx_format_desc(mode->format, &format) || !client || client->closing ||
+        client->format != mode->format || client->planes != format.planes ||
+        client->npages > U32_MAX / PAGE_SIZE || total > client->npages * PAGE_SIZE)
+        return 0;
+    for (u32 i = 0; i < client->planes; i++) {
+        u32 end = i + 1 < client->planes ? client->plane_offset[i + 1] :
+                                         client->npages * PAGE_SIZE;
+        if (client->plane_offset[i] > end || plane > end - client->plane_offset[i])
+            return 0;
+    }
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (!sf->npages || sf->backend != backend || sf->role != LEDGER_ROLE_DISPLAY)
+            continue;
+        if (sf->closing || sf->npages > U32_MAX / PAGE_SIZE ||
+            (backend == LEDGER_SF_PC98 ? plane : total) > sf->npages * PAGE_SIZE)
+            return 0;
+        displays++;
+    }
+    /* PC98 can draw from CLIENT alone when boot DISPLAY registration fails.
+     * Existing DISPLAY records still have to fit; packed requires its record. */
+    return backend == LEDGER_SF_PC98 || displays == 1;
+}
+
+/* Select only registered data after probe, before any hardware setup. */
+static int gfx_select_mode(GfxBackend *be, int legacy200)
+{
+    const GfxMode *mode = gfx_mode_pick(be, legacy200);
+    GfxFormatDesc format;
+    gfx_mode_ready = 0;
+    if (!mode || !gfx_format_desc(mode->format, &format)) return 0;
+    if (!gfx_mode_fits(be, mode)) return 0;
+    gfx_mode_ready = 1;
+    be->selected_mode = mode;
+    return 1;
+}
+
+static void gfx_select_backend(int legacy200)
 {
     int i;
     int n = (int)(sizeof(g_backend_list) / sizeof(g_backend_list[0]));
@@ -132,6 +181,7 @@ static void gfx_select_backend(void)
      * pegc は probe だけは通す — 実機に PEGC が無ければ描けないので、
      * 失敗したら従来どおり 9801 へ落とす。 */
     if (g_backend_pref == GFX_PREF_PC98) {
+        gfx_select_mode(&gfx_backend_pc98, legacy200);
         g_backend = &gfx_backend_pc98;
         return;
     }
@@ -144,12 +194,14 @@ static void gfx_select_backend(void)
             /* weak 宣言なので未リンクなら要素が 0 (→ 9801 へ落ちる) */
             if (!g_backend_list[i]) continue;
             if (g_backend_list[i] != want) continue;
-            if (gfx_probe_backend(g_backend_list[i])) {
+            if (gfx_probe_backend(g_backend_list[i]) &&
+                gfx_select_mode(g_backend_list[i], legacy200)) {
                 g_backend = g_backend_list[i];
                 return;
             }
             break;
         }
+        gfx_select_mode(&gfx_backend_pc98, legacy200);
         g_backend = &gfx_backend_pc98;
         return;
     }
@@ -159,10 +211,12 @@ static void gfx_select_backend(void)
          * → include/gfx_hal.h の gfx_backend_pegc の注記 */
         if (!g_backend_list[i]) continue;
         if (gfx_probe_backend(g_backend_list[i])) {
+            if (!gfx_select_mode(g_backend_list[i], legacy200)) break;
             g_backend = g_backend_list[i];
             return;
         }
     }
+    gfx_select_mode(&gfx_backend_pc98, legacy200);
     g_backend = &gfx_backend_pc98;   /* フォールバック */
 }
 
@@ -178,7 +232,7 @@ static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
 {
     struct gfx_kernel_fb fb = {0};
     const struct ledger_surface *sf;
-    GFX_ScreenInfo si;
+    const GfxMode *mode = gfx_backend_mode(g_backend);
     u8 *base;
     u32 i;
     if (!out) return OS32_ERR_INVAL;
@@ -193,11 +247,11 @@ static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
         fb.height = sf->height;
         fb.pitch = sf->pitch;
         fb.format = sf->format;
-        if (selected && g_backend->query && !g_backend->query(&si)) {
-            fb.width = si.width;
-            fb.height = si.height;
-            fb.pitch = g_backend->bb_pitch; /* query has no pitch field */
-            fb.format = si.format;
+        if (selected && mode) {
+            fb.width = mode->width;
+            fb.height = gfx_started ? gfx_current_height : mode->height;
+            fb.pitch = mode->pitch;
+            fb.format = mode->format;
         }
         base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
              ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
@@ -235,7 +289,7 @@ static void gfx_bind_client(void)
                           gfx_sf_backend() == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus : &gfx_backend_pc98;
     u8 *base = 0;
     u32 i;
-    if (sf && !sf->closing)
+    if (gfx_mode_ready && sf && !sf->closing)
         base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
              ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
     for (i = 0; i < SURFACE_QUERY_MAX; i++) bb[i] = base && i < sf->planes ? base + sf->plane_offset[i] : 0;
@@ -700,11 +754,14 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
 /* ======================================================================== */
 void __cdecl gfx_screen_info(void *out)
 {
+    GFX_ScreenInfo *info = out;
     if (!out) return;
-    /* 決め打ちせずバックエンドに問い合わせる (契約 G5)。9801 だけの現状でも
-     * 400/200 ラインやフリップ有無はバックエンドが正直に申告する。 */
-    if (g_backend && g_backend->query)
-        g_backend->query((GFX_ScreenInfo *)out);
+    /* Flags and palette leases remain backend-owned. After shutdown the
+     * default row describes the next mode, not the restored CUI height. */
+    if (g_backend && g_backend->query && !g_backend->query(info)) {
+        const GfxMode *mode = gfx_backend_mode(g_backend);
+        if (mode) info->height = gfx_started ? gfx_current_height : mode->height;
+    }
 }
 
 /* ======================================================================== */
@@ -842,17 +899,18 @@ static void _gfx_common_init(int plane_sz)
 /*          0 = init が NULL = 9801。呼び出し側が従来の GDC 初期化を行う。   */
 /*  9801 では従来とまったく同じ経路を通る (回帰ゼロ)。                       */
 /* ======================================================================== */
-static int gfx_select_and_init_backend(void)
+static int gfx_select_and_init_backend(int legacy200)
 {
     gfx_started = 0;
     gfx_reinit_surfaces(0);
-    gfx_select_backend();
+    gfx_select_backend(legacy200);
     gfx_reinit_surfaces(0);
     if (g_backend && g_backend->init) {
         g_backend->init();
         /* init が失敗して probe が取り下げられた場合は 9801 へ落とす
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
+            gfx_select_mode(&gfx_backend_pc98, legacy200);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);
             gfx_bind_client(); /* bind init failure fallback */
@@ -879,7 +937,7 @@ void gfx_prepare_backend(void)
 {
     gfx_started = 0;
     gfx_reinit_surfaces(0);
-    gfx_select_backend();
+    gfx_select_backend(0);
     gfx_reinit_surfaces(0);
     gfx_bind_client();
     if (!g_backend) goto done;
@@ -889,6 +947,7 @@ void gfx_prepare_backend(void)
     if (g_backend->prepare) {
         g_backend->prepare();
         if (g_backend->probe && !g_backend->probe()) {
+            gfx_select_mode(&gfx_backend_pc98, 0);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);
             gfx_bind_client();
@@ -899,6 +958,7 @@ void gfx_prepare_backend(void)
     g_backend->init();
     /* init が失敗して probe が取り下げられたら 9801 へ落とす (gfx_init と同じ)。 */
     if (g_backend->probe && !g_backend->probe()) {
+        gfx_select_mode(&gfx_backend_pc98, 0);
         g_backend = &gfx_backend_pc98;
         gfx_reinit_surfaces(0);
         gfx_bind_client();
@@ -931,7 +991,7 @@ void gfx_init(void)
 {
     gfx_init_gen++;
     /* ⑤: GDC 初期化より前にバックエンドを決める */
-    if (gfx_select_and_init_backend()) {
+    if (gfx_select_and_init_backend(0)) {
         gfx_bind_client(); /* bind packed init */
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
@@ -940,7 +1000,7 @@ void gfx_init(void)
         return;   /* 9821 等: モード設定もバックバッファも init() が済ませた */
     }
 
-    gfx_current_height = GFX_HEIGHT;  /* 400ラインモード */
+    gfx_current_height = gfx_backend_mode(g_backend)->height;  /* selected planar mode */
     gfx_display_page = 0;
     prev_dirty.count = 0;
 
@@ -979,7 +1039,7 @@ void gfx_init_200(void)
      * 200 ラインは 9801 プレーン専用のモードなので、パックド系が選ばれた
      * ときはそのバックエンドのネイティブ解像度で立ち上げる (200 ラインの
      * 縦 2 倍表示は 16 色プレーンの機能で、PEGC には対応物が無い)。 */
-    if (gfx_select_and_init_backend()) {
+    if (gfx_select_and_init_backend(1)) {
         gfx_bind_client();
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
@@ -988,7 +1048,7 @@ void gfx_init_200(void)
         return;
     }
 
-    gfx_current_height = GFX_HEIGHT_200;  /* 200ラインモード */
+    gfx_current_height = gfx_backend_mode(g_backend)->height;  /* selected legacy mode */
 
     gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */
     if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
