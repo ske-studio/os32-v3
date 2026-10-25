@@ -96,6 +96,12 @@ STATIC_ASSERT(CIRRUS_CLIENT_OFF == MEM_GFX_BB8_SIZE &&
               CIRRUS_SURFACE_SIZE == MEM_GFX_BB8_SIZE && CIRRUS_VIS_OFF == 0,
               cirrus_surfaces_match_ledger);
 
+#define CIRRUS_DAC_BITS 6
+#define CIRRUS_MODE_480 0
+static const GfxMode cirrus_modes[] = {
+    {CIRRUS_WIDTH, CIRRUS_HEIGHT, GFX_FMT_PACKED8, CIRRUS_DAC_BITS, CIRRUS_MODE_480, 0, CIRRUS_PITCH}
+};
+
 /* パレット (契約 G8)。0〜15 はシステム色、16〜255 を貸す。 */
 #define CIRRUS_LEASE_FIRST  16
 #define CIRRUS_LEASE_COUNT  (GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP) - CIRRUS_LEASE_FIRST)
@@ -279,6 +285,7 @@ static void cirrus_palette_init(void)
 /* ------------------------------------------------------------------------ */
 static void cirrus_init(void)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
     u8 pattern[CIRRUS_PATTERN_LEN];
     int i;
 
@@ -306,8 +313,8 @@ static void cirrus_init(void)
      * 写像でも backing の PCD/PWT を保持する。 */
     s_lin = (u8 *)P2V(s_glue->lin_base);
 
-    if (wab_cirrus_setup_8bpp(s_glue, CIRRUS_WIDTH, CIRRUS_HEIGHT,
-                              (u32)CIRRUS_PITCH, CIRRUS_VIS_OFF) != 0) {
+    if (wab_cirrus_setup_8bpp(s_glue, mode->width, mode->height,
+                              mode->pitch, CIRRUS_VIS_OFF) != 0) {
         kprintf(ATTR_YELLOW, "[cirrus] mode setup failed\n");
         /* ここで諦めると gfx_core は 9801 へ落ち、以後 leave() も
          * shutdown() も呼ばれない。リレーは自分で 98 側へ戻しておく
@@ -331,10 +338,10 @@ static void cirrus_init(void)
      * ([N] cirrus_reset の memset(vram_ptr, 0xff, …))、消さないと真っ白から
      * 始まる。リニア窓越しに CPU で消すこともできるが 600KB のバス転送に
      * なるので、エンジンの塗りで消す (アクセラレータの正しい使い方)。 */
-    wab_cirrus_fill(s_glue, CIRRUS_VIS_OFF, (u32)CIRRUS_PITCH,
-                    CIRRUS_WIDTH, CIRRUS_HEIGHT, 0);
-    wab_cirrus_fill(s_glue, CIRRUS_CLIENT_OFF, (u32)CIRRUS_PITCH,
-                    CIRRUS_WIDTH, CIRRUS_HEIGHT, 0);
+    wab_cirrus_fill(s_glue, CIRRUS_VIS_OFF, mode->pitch,
+                    mode->width, mode->height, 0);
+    wab_cirrus_fill(s_glue, CIRRUS_CLIENT_OFF, mode->pitch,
+                    mode->width, mode->height, 0);
     gfx_counters.hw_ops += CIRRUS_INIT_FILL_OPS;
 
     cirrus_palette_init();
@@ -355,7 +362,8 @@ static void cirrus_init(void)
 
     /* HAL 共通の状態。ハードウェアページ切替は使わない
      * (表と裏の入れ替えではなく、非表示面から表示面への BLT で commit する)。 */
-    gfx_current_height = CIRRUS_HEIGHT;
+    gfx_current_height = mode->height;
+    gfx_backend_cirrus.bb_pitch = mode->pitch;
     gfx_flip_enabled = 0;
     gfx_display_page = 0;
 
@@ -368,13 +376,15 @@ static void cirrus_init(void)
 /* ------------------------------------------------------------------------ */
 static int cirrus_query(GFX_ScreenInfo *info)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
+    GfxFormatDesc desc;
     int i;
-    if (!info) return OS32_ERR_INVAL;
+    if (!info || !mode || !gfx_format_desc(mode->format, &desc)) return OS32_ERR_INVAL;
 
-    info->width  = (u16)CIRRUS_WIDTH;
+    info->width  = mode->width;
     info->height = (u16)CIRRUS_HEIGHT;
-    info->bpp    = GFX_FMT_PACKED8_BPP;
-    info->format = GFX_FMT_PACKED8;
+    info->bpp    = desc.bpp;
+    info->format = mode->format;
 
     /* 能力ビット (票 H3 作業 4):
      *  HW_FILL / HW_BLT = 1。初めて立つ。塗りと矩形転送を 2D エンジンが行う。
@@ -393,7 +403,8 @@ static int cirrus_query(GFX_ScreenInfo *info)
 /* 画面矩形へのクリップ。戻り値 0 = 空になった。 */
 static int cirrus_clip(int *x, int *y, int *w, int *h)
 {
-    return gfx_clip_screen(x, y, w, h, CIRRUS_WIDTH, CIRRUS_HEIGHT);
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
+    return gfx_clip_screen(x, y, w, h, mode->width, mode->height);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -408,14 +419,15 @@ static int cirrus_clip(int *x, int *y, int *w, int *h)
 /* ------------------------------------------------------------------------ */
 static void cirrus_present_rect(int x, int y, int w, int h)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
     u32 off;
 
     if (!s_active) return;
     if (!cirrus_clip(&x, &y, &w, &h)) return;
 
-    off = (u32)y * CIRRUS_PITCH + (u32)x;
+    off = (u32)y * mode->pitch + (u32)x;
     wab_cirrus_copy(s_glue, CIRRUS_VIS_OFF + off, CIRRUS_CLIENT_OFF + off,
-                    (u32)CIRRUS_PITCH, (u32)CIRRUS_PITCH, w, h);
+                    mode->pitch, mode->pitch, w, h);
     gfx_counters.hw_ops++;
     gfx_counters.commits++;
     cirrus_sync_io();
@@ -450,18 +462,19 @@ static void cirrus_set_palette(int first, int count, const u8 *rgb)
 /* ------------------------------------------------------------------------ */
 static int cirrus_fill_rect(int x, int y, int w, int h, u8 color)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
     u32 off;
 
     if (!s_active) return OS32_ERR_NOSYS;
     if (!cirrus_clip(&x, &y, &w, &h)) return 0;
 
-    off = CIRRUS_CLIENT_OFF + (u32)y * CIRRUS_PITCH + (u32)x;
+    off = CIRRUS_CLIENT_OFF + (u32)y * mode->pitch + (u32)x;
 
     if (w * h <= CIRRUS_CPU_DIRECT_PIXELS) {
         if (wab_cirrus_wait_idle(s_glue) != 0) return OS32_ERR_IO;
-        cirrus_cpu_fill(off, (u32)CIRRUS_PITCH, w, h, color);
+        cirrus_cpu_fill(off, mode->pitch, w, h, color);
     } else {
-        if (wab_cirrus_fill(s_glue, off, (u32)CIRRUS_PITCH, w, h, color) != 0) {
+        if (wab_cirrus_fill(s_glue, off, mode->pitch, w, h, color) != 0) {
             cirrus_sync_io();
             return OS32_ERR_IO;
         }
@@ -473,6 +486,7 @@ static int cirrus_fill_rect(int x, int y, int w, int h, u8 color)
 
 static int cirrus_blit(int dx, int dy, int sx, int sy, int w, int h)
 {
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
     u32 doff, soff;
     int cw, ch;
 
@@ -480,22 +494,22 @@ static int cirrus_blit(int dx, int dy, int sx, int sy, int w, int h)
     /* 負の座標は受け付けない (原点をずらすと転送元と転送先の対応が崩れる)。
      * 幅と高さは「両方の矩形が画面に収まる」ところまで縮める。 */
     if (dx < 0 || dy < 0 || sx < 0 || sy < 0) return OS32_ERR_INVAL;
-    if (dx >= CIRRUS_WIDTH || sx >= CIRRUS_WIDTH) return 0;
-    if (dy >= CIRRUS_HEIGHT || sy >= CIRRUS_HEIGHT) return 0;
+    if (dx >= mode->width || sx >= mode->width) return 0;
+    if (dy >= mode->height || sy >= mode->height) return 0;
 
     cw = w;
     ch = h;
-    if (cw > CIRRUS_WIDTH - dx)  cw = CIRRUS_WIDTH - dx;
-    if (cw > CIRRUS_WIDTH - sx)  cw = CIRRUS_WIDTH - sx;
-    if (ch > CIRRUS_HEIGHT - dy) ch = CIRRUS_HEIGHT - dy;
-    if (ch > CIRRUS_HEIGHT - sy) ch = CIRRUS_HEIGHT - sy;
+    if (cw > mode->width - dx)  cw = mode->width - dx;
+    if (cw > mode->width - sx)  cw = mode->width - sx;
+    if (ch > mode->height - dy) ch = mode->height - dy;
+    if (ch > mode->height - sy) ch = mode->height - sy;
     if (cw <= 0 || ch <= 0) return 0;
 
-    doff = CIRRUS_CLIENT_OFF + (u32)dy * CIRRUS_PITCH + (u32)dx;
-    soff = CIRRUS_CLIENT_OFF + (u32)sy * CIRRUS_PITCH + (u32)sx;
+    doff = CIRRUS_CLIENT_OFF + (u32)dy * mode->pitch + (u32)dx;
+    soff = CIRRUS_CLIENT_OFF + (u32)sy * mode->pitch + (u32)sx;
 
-    if (wab_cirrus_copy(s_glue, doff, soff, (u32)CIRRUS_PITCH,
-                        (u32)CIRRUS_PITCH, cw, ch) != 0) {
+    if (wab_cirrus_copy(s_glue, doff, soff, mode->pitch,
+                        mode->pitch, cw, ch) != 0) {
         cirrus_sync_io();
         return OS32_ERR_IO;
     }
@@ -556,6 +570,7 @@ static void cirrus_shutdown(void)
     wab_cirrus_shutdown(s_glue);
     cirrus_sync_io();
     gfx_current_height = GFX_HEIGHT;
+    gfx_backend_cirrus.selected_mode = gfx_mode_pick(&gfx_backend_cirrus, 0);
     s_active = 0;
 }
 
@@ -584,8 +599,8 @@ GfxBackend CIRRUS_BACKEND_TABLE = {
     GFX_BB_PACKED8,
     0,                        /* bb_size: init() が埋める (300KB) */
     (void (*)(void))0,        /* prepare: 従来どおり init → shutdown */
-    (const GfxMode *)0,        /* modes: G5 で申告 */
-    0,                        /* mode_count */
+    cirrus_modes,
+    sizeof(cirrus_modes) / sizeof(cirrus_modes[0]),
     0,                        /* default_mode */
     (const GfxMode *)0         /* selected_mode */
 };

@@ -101,7 +101,9 @@ struct ledger_surface *ledger_surface_find(u32 backend, u32 role)
 static int glue_probe_calls, enable_calls;
 static void fake_enable(void) { enable_calls++; }
 static int fake_glue_probe(void) { glue_probe_calls++; return 0; }
-static void fake_linear_enable(int on) { (void)on; }
+static int linear_off_calls, relay_value, relay_calls;
+static void fake_linear_enable(int on) { if (!on) linear_off_calls++; }
+static void fake_relay(int on) { relay_value = on; relay_calls++; }
 WabGlue wab_glue_xe10;
 
 static void glue_reset(u32 win_base, u32 win_size, u32 lin_base, u32 lin_size)
@@ -141,19 +143,36 @@ void *memset(void *dst, int val, u32 n) { return kmemset(dst, val, n); }
 void kprintf(unsigned char attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int paging_map_phys(u32 v, u32 p, u32 n, u32 f)
 { (void)v; (void)p; (void)n; (void)f; fail("paging_map_phys"); return -1; }
+/* Record real HAL command arguments; hardware itself is the seam. */
+static int setup_rc, idle_rc, draw_rc, setup_w, setup_h, fills, copies;
+static u32 setup_pitch, draw_dst, draw_src, draw_pitch, source_pitch;
+static int draw_w, draw_h;
 int wab_cirrus_probe(WabGlue *g) { (void)g; return 0; }
 int wab_cirrus_setup_8bpp(WabGlue *g, int w, int h, u32 p, u32 st)
-{ (void)g; (void)w; (void)h; (void)p; (void)st; return 0; }
+{
+    (void)g; CHECK(st == 0);
+    setup_w=w; setup_h=h; setup_pitch=p; return setup_rc;
+}
 void wab_cirrus_shutdown(WabGlue *g) { (void)g; }
 void wab_cirrus_dac_set(WabGlue *g, int i, u8 r, u8 gg, u8 b)
-{ (void)g; (void)i; (void)r; (void)gg; (void)b; }
-void wab_cirrus_set_fill_pattern(WabGlue *g, u32 o) { (void)g; (void)o; }
+{ (void)g; CHECK(i >= 0 && i < 256 && r <= 63 && gg <= 63 && b <= 63); }
+void wab_cirrus_set_fill_pattern(WabGlue *g, u32 o)
+{ (void)g; CHECK(o == 0x96000); }
 int wab_cirrus_fill(WabGlue *g, u32 d, u32 p, int w, int h, u8 c)
-{ (void)g; (void)d; (void)p; (void)w; (void)h; (void)c; return 0; }
+{
+    (void)g; (void)c; fills++;
+    CHECK(d == (fills == 1 ? 0UL : 0x4b000UL) || fills > 2);
+    draw_dst=d; draw_pitch=p; draw_w=w; draw_h=h; return draw_rc;
+}
 int wab_cirrus_copy(WabGlue *g, u32 d, u32 s, u32 dp, u32 sp, int w, int h)
-{ (void)g; (void)d; (void)s; (void)dp; (void)sp; (void)w; (void)h; return 0; }
-int wab_cirrus_wait_idle(WabGlue *g) { (void)g; return 0; }
-const PaletteEntry *palette_get_all(void) { return (const PaletteEntry *)0; }
+{
+    (void)g; copies++;
+    draw_dst=d; draw_src=s; draw_pitch=dp; source_pitch=sp;
+    draw_w=w; draw_h=h; return draw_rc;
+}
+int wab_cirrus_wait_idle(WabGlue *g) { (void)g; return idle_rc; }
+const PaletteEntry *palette_get_all(void)
+{ static const PaletteEntry colors[16] = {{0}}; return colors; }
 void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }
 
 /* ---- 構成 ---- */
@@ -342,6 +361,82 @@ static void probe_stages(void)
     fake_pref = GFX_PREF_AUTO;
 }
 
+/* G5: fixed reservation, mode-driven setup/drawing, and relay rollback. */
+static u8 card[0x96000 + PAGE_SIZE] __attribute__((aligned(4096)));
+static void mode_drawing(void)
+{
+    GFX_ScreenInfo info;
+    u32 plane, total;
+    GfxMode alternate = {632, 472, GFX_FMT_PACKED8, 6, 0, 0, 648};
+    CHECK(gfx_backend_cirrus.mode_count == 1 && gfx_backend_cirrus.default_mode == 0);
+    const GfxMode *mode = gfx_backend_mode(&gfx_backend_cirrus);
+    CHECK(mode->width == 640 && mode->height == 480);
+    CHECK(mode->dac_bits == 6 && mode->format == GFX_FMT_PACKED8);
+    CHECK(gfx_mode_layout(mode, &plane, &total) && total == MEM_GFX_BB8_SIZE);
+    CHECK(gfx_mode_pick(&gfx_backend_cirrus, 1) == mode);
+    glue_reset(BANK, BANK_N, V2P(card), sizeof(card));
+    wab_glue_xe10.relay = fake_relay;
+    fake_surface=1; fake_client.first=V2P(card + 0x4b000)/PAGE_SIZE;
+    fake_client.npages=MEM_GFX_BB8_SIZE/PAGE_SIZE;
+    s_probed=1; s_probe_ok=1; s_active=0;
+    cirrus_init();
+    CHECK(s_active && setup_w == 640 && setup_h == 480 && setup_pitch == 640);
+    CHECK(fills == 2 && draw_w == 640 && draw_h == 480 && draw_pitch == 640);
+    CHECK(gfx_current_height == 480 && gfx_backend_cirrus.bb_pitch == 640);
+    CHECK(gfx_backend_cirrus.bb_base == card + 0x4b000);
+    CHECK(card[0x96000] == 255 && card[0x96007] == 255 && card[0x96008] == 0);
+    CHECK(cirrus_query(&info) == 0 && info.width == 640 && info.height == 480);
+    CHECK(info.bpp == 8 && info.format == GFX_FMT_PACKED8);
+    CHECK(info.flags == (GFX_CAP_HW_FILL | GFX_CAP_HW_BLT));
+    CHECK(info.lease_mask == 0 && info.lease_first == 16 && info.lease_count == 240);
+    for (u32 i=0; i<sizeof(info.reserved)/sizeof(info.reserved[0]); i++) CHECK(!info.reserved[i]);
+    cirrus_present_rect(639,479,50,50);
+    CHECK(draw_dst == 307199 && draw_src == 0x4b000 + 307199);
+    CHECK(draw_w == 1 && draw_h == 1 && draw_pitch == 640 && source_pitch == 640);
+    CHECK(cirrus_blit(638,478,639,479,30,30) == 0);
+    CHECK(draw_dst == 0x4b000 + 478*640 + 638 && draw_src == 0x4b000 + 307199);
+    CHECK(draw_w == 1 && draw_h == 1);
+    int prior=copies;
+    CHECK(cirrus_blit(640,0,0,0,1,1) == 0 && copies == prior);
+    CHECK(cirrus_fill_rect(639,479,20,20,37) == 0);
+    CHECK(card[0x4b000+307199] == 37 && card[0x96000] == 255);
+    idle_rc=-1;
+    CHECK(cirrus_fill_rect(0,0,1,1,19) == OS32_ERR_IO && card[0x4b000] == 0);
+    idle_rc=0;
+    CHECK(cirrus_fill_rect(620,460,30,30,3) == 0);
+    CHECK(draw_w == 20 && draw_h == 20 && draw_dst == 0x4b000+460*640+620);
+    draw_rc=-1;
+    CHECK(cirrus_fill_rect(0,0,20,20,0) == OS32_ERR_IO);
+    CHECK(cirrus_blit(0,0,1,1,20,20) == OS32_ERR_IO);
+    draw_rc=0;
+    /* A different selected row proves reads do not silently use default constants. */
+    gfx_backend_cirrus.selected_mode=&alternate;
+    cirrus_init();
+    CHECK(setup_w == 632 && setup_h == 472 && setup_pitch == 648);
+    CHECK(gfx_current_height == 472 && gfx_backend_cirrus.bb_pitch == 648);
+    CHECK(cirrus_query(&info) == 0 && info.width == 632 && info.height == 480);
+    CHECK(cirrus_fill_rect(630,470,2,2,29) == 0);
+    CHECK(card[0x4b000+470*648+630] == 29 && card[0x4b000+470*648+632] == 0);
+    cirrus_present_rect(631,471,2,2);
+    CHECK(draw_dst == 471*648+631 && draw_pitch == 648 && draw_w == 1 && draw_h == 1);
+    CHECK(cirrus_fill_rect(631,471,2,2,29) == 0);
+    CHECK(card[0x4b000+471*648+631] == 29 && card[0x4b000+471*648+632] == 0);
+    CHECK(cirrus_blit(630,470,631,471,3,3) == 0 && draw_w == 1 && draw_h == 1);
+    CHECK(draw_dst == 0x4b000+470*648+630 && source_pitch == 648);
+    cirrus_enter(); CHECK(relay_value == 1);
+    cirrus_shutdown();
+    CHECK(relay_value == 0 && gfx_current_height == GFX_HEIGHT);
+    CHECK(gfx_backend_mode(&gfx_backend_cirrus) == mode && s_lin == card);
+    CHECK(cirrus_query(&info) == 0 && info.height == 480);
+    /* Setup failure is before active: init itself must restore relay and descriptor. */
+    setup_rc=-1; prior=relay_calls;
+    cirrus_init();
+    CHECK(!s_active && !s_probe_ok && !s_lin && !gfx_backend_cirrus.bb_base);
+    CHECK(gfx_backend_cirrus.bb_size == 0 && linear_off_calls == 1);
+    CHECK(relay_calls == prior+1 && relay_value == 0 && !cirrus_probe());
+    output("PASS Cirrus mode setup, BLT/CPU edges, selected pitch, shutdown and failure relay rollback\n");
+}
+
 void _start(void)
 {
     CHECK(sizeof(u32) == 4);
@@ -359,5 +454,6 @@ void _start(void)
     output("PASS size 0 / 4GB end / overflow\n");
     probe_stages();
     output("PASS probe stages (17MB reaches the ID on NP21/W only; GFX=cirrus forces; RAM blocks; no SURFACE blocks)\n");
+    mode_drawing();
     finish(0);
 }
