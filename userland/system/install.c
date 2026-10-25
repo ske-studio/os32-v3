@@ -547,7 +547,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
     }
 
     /* IDEの初期化とディスク情報の取得 (表示用。判定は hdd_geom_info) */
-    api->kprintf(0x07, "%s", "Initializing IDE controller...\n");
+    api->kprintf(KLOG_ATTR, "%s", "Initializing IDE controller...\n");
     api->ide_init();
 
     if (!api->ide_drive_present(IDE_DRIVE)) {

@@ -235,7 +235,7 @@ static void run_leak(const char *path)
 {
     u32 id = 0, size = 0;
     if (open_or_skip(path, &id, &size)) return;
-    g_api->kprintf(0x07, "font_lease_test: leak id=%x (exit without close)\n", id);
+    g_api->kprintf(KLOG_ATTR, "font_lease_test: leak id=%x (exit without close)\n", id);
     check(1, "open and leave it to the reclaim", 0);
 }
 
@@ -243,7 +243,7 @@ static void run_fault(const char *path)
 {
     u32 id = 0, size = 0;
     if (open_or_skip(path, &id, &size)) return;
-    g_api->kprintf(0x07, "font_lease_test: fault id=%x (expect #PF kill)\n", id);
+    g_api->kprintf(KLOG_ATTR, "font_lease_test: fault id=%x (expect #PF kill)\n", id);
     *(volatile u32 *)KERNEL_LOAD_ADDR = id;
     check(0, "survived the #PF", 0);
 }

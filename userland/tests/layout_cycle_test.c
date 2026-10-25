@@ -31,7 +31,7 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     if (!strncmp(mode, "nested-", 7)) { nested = 1; mode += 7; }
     if (strcmp(mode, "exit") && strcmp(mode, "fault") && strcmp(mode, "stop")) {
-        api->kprintf(0x07, "layout_cycle_test: FAIL usage: exit|fault|stop|nested-exit|nested-fault|nested-stop\n");
+        api->kprintf(KLOG_ATTR, "layout_cycle_test: FAIL usage: exit|fault|stop|nested-exit|nested-fault|nested-stop\n");
         return os32_test_summary_skip(api, "layout_cycle_test", "invalid mode");
     }
     passed = run_cycles(api, mode, rounds, nested, &total);
@@ -71,7 +71,7 @@ static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested, 
         libc_probe[j] = (u8)(j ^ 0x3c);
         exec_probe[j] = (u8)(j ^ 0xc3);
     }
-    api->kprintf(0x07, "layout_cycle_test: begin mode=%s nested=%d rounds=%d\n", mode, nested, rounds);
+    api->kprintf(KLOG_ATTR, "layout_cycle_test: begin mode=%s nested=%d rounds=%d\n", mode, nested, rounds);
     CHECK(api->mem_stat(-1, &before, sizeof(before)) == (int)sizeof(before));
     for (int i = 0; i < rounds; i++) {
         int kind = EXEC_KIND_NONE, code = 0;
@@ -83,11 +83,11 @@ static int run_cycles(KernelAPI *api, const char *mode, int rounds, int nested, 
                   libc_probe[j] == (u8)(j ^ 0x3c) && exec_probe[j] == (u8)(j ^ 0xc3));
         }
         CHECK(api->mem_stat(-1, &after, sizeof(after)) == (int)sizeof(after));
-        api->kprintf(0x07, "layout_cycle_test: usage cycle=%d pool=%u owner=%u exec=%u resident=%u kheap=%u\n",
+        api->kprintf(KLOG_ATTR, "layout_cycle_test: usage cycle=%d pool=%u owner=%u exec=%u resident=%u kheap=%u\n",
             i + 1, after.phys_free_pages, after.owner_pages, after.exec_heap_used,
             after.resident_heap_used, after.kheap_used);
         CHECK(same_usage(&before, &after));
-        api->kprintf(0x07, "layout_cycle_test: cycle=%d mode=%s nested=%d sentinel=PASS usage=PASS\n",
+        api->kprintf(KLOG_ATTR, "layout_cycle_test: cycle=%d mode=%s nested=%d sentinel=PASS usage=PASS\n",
             i + 1, mode, nested);
     }
 done:

@@ -773,6 +773,9 @@ typedef void (*DirCallback)(const DirEntry_Ext *entry, void *ctx);
  * launch_req は OS32_ERR_FULL を返す (1 要求 1 token なので事実上到達しない)。 */
 #define LAUNCH_TOKEN_MAX     0x7FFFFFFF
 
+/* 通常ログの属性 (kprintf の入口で PC-98 属性へ変換) */
+#define KLOG_ATTR 0x07
+
 /* コンソール属性色 */
 #define ATTR_WHITE   0xE1
 #define ATTR_CYAN    0xA1

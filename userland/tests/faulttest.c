@@ -125,7 +125,7 @@ static unsigned parse_uint(const char *s)
 
 static void usage(KernelAPI *api)
 {
-    api->kprintf(0x07, "%s",
+    api->kprintf(KLOG_ATTR, "%s",
         "usage: faulttest  select g/d/u/p/l/k with one key (sec=0)\n"
         "       faulttest gp|de|ud|pf\n"
         "       faulttest loop [sec]   pure CPL=3 loop (no KAPI)\n"
@@ -191,13 +191,13 @@ static int do_loop(KernelAPI *api, unsigned sec)
     if (took == 0) took = 1;
     chunks = (sec * (unsigned)PIT_HZ + took - 1u) / took;
     if (chunks == 0) chunks = 1;
-    api->kprintf(0x07, "faulttest: calibrated %u iters = %u ticks, %u chunks\n",
+    api->kprintf(KLOG_ATTR, "faulttest: calibrated %u iters = %u ticks, %u chunks\n",
                  iters, took, chunks);
 
     api->kprintf(0x0E, "faulttest: looping %u s (CTRL+STOP to kill)\n", sec);
     t0 = api->get_tick();
     for (i = 0; i < chunks; i++) spin(iters);   /* ここは KAPI を呼ばない */
-    api->kprintf(0x07, "faulttest: loop done after %u ticks\n",
+    api->kprintf(KLOG_ATTR, "faulttest: loop done after %u ticks\n",
                  api->get_tick() - t0);
     return 0;
 }
@@ -215,7 +215,7 @@ static int do_kloop(KernelAPI *api, unsigned sec)
         calls++;
         if (limit != 0 && now - t0 >= limit) break;
     }
-    api->kprintf(0x07, "faulttest: kloop done after %u ticks, %u calls\n",
+    api->kprintf(KLOG_ATTR, "faulttest: kloop done after %u ticks, %u calls\n",
                  now - t0, calls);
     return 0;
 }
