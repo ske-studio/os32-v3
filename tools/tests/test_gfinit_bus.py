@@ -41,7 +41,8 @@ RESOURCE_MUTATIONS = [
     ('resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
     ('resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
     ('resource_window_len', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
-    ('resource_count', '*used == RECOVER_RANGE_MAX', 'false'),
+    # Reject the last valid slot instead of writing beyond a full array.
+    ('resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
     ('resource_cap_align_only', 'cap = b->base[i] - base;', 'cap = cap;'),
     ('resource_next_first', 'if (b->base[i] > base && b->base[i] - base < cap)\n            cap = b->base[i] - base;',
      'if (b->base[i] > base) { cap = b->base[i] - base; break; }'),

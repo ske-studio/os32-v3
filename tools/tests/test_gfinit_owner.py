@@ -17,7 +17,8 @@ MUTATIONS = [
     ('read_plan_identity', 'recover_owner()->plan == &owner->compiled->plan', 'true'),
     ('begin_expand', 'if (!g->compiled || recover_gf_profile_expand(&g->profile, g->compiled)) return -1;',
      'if (!g->compiled) return -1;'),
-    ('inspect_detach_refusal', 'if (gf_release_rom(g)) return -1;', '(void)gf_release_rom(g);'),
+    # Ignoring the refusal is equivalent: hwdev_claim rejects the retained lease.
+    ('inspect_detach_refusal', 'if (gf_release_rom(g)) return -1;', 'if (gf_release_rom(g)) return 0;'),
     ('cli_write_gate', 'argc != expected || !str_eq(argv[argc - 1], "--allow-write")',
      'argc != expected && !str_eq(argv[argc - 1], "--allow-write")', 'userland/shell/cmd_gfinit.c'),
     ('cli_main_range', 'q.script_id >= GF_INIT_MAINS', '0', 'userland/shell/cmd_gfinit.c'),
