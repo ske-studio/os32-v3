@@ -277,3 +277,5 @@ static const GfxMode pegc_modes[] = {
 
 - `build/cirrus-module.mk` の Cirrus の ABI の値の生成の依存一覧に `include/gfx_mode.h` を足す (G2 の触ってよいファイルに加える)。生成器は contracts の本文から値を出すので、この依存が無いと gfx_mode.h だけを変えたときに値が作り直されない (G2 の実装者の「設計の欠け」の報告)。
 - G2 で `gfx/backend_pc98.c`・`backend_pegc.c`・`backend_cirrus.c` の既存の初期化子に、新しい末尾の欄を明示の 0 (NULL) で書き足す (G2 の触ってよいファイルに加える、この 3 ファイルでは初期化子の追記だけ)。host の `-Wextra -Werror` が省いた欄を落とすため。製品の像はゼロ初期化で同じ。表の中身は G3〜G5 が入れる (段は直列なので衝突しない)。
+- **G3 の実装で PM が決めたこと (2026-10-26)**: 確定の B1 の高さの式 (`gfx_started ? gfx_current_height : gfx_backend_mode(be)->height`) は gfx_core.c の static な `gfx_started` を使うので、**入れるのは G6b (gfx_core.c の問い合わせ)**。G3〜G5 のバックエンドは表を申告し、init で選んだ行の height を `gfx_current_height` に書くところまでで、各バックエンドの問い合わせの高さは今の形 (`gfx_current_height` などを読む既存の式) のまま変えない。G3 の host 試験の「init→shutdown→query=400」は、今の振る舞いのまま成り立つことを確かめる形にする。
+- **G3 の取り込みで PM が決めたこと (2026-10-26)**: 98 の 16 色のバックエンドは init の関数を持たない (gfx_core.c が init=NULL を見て GDC を初期化する)。そのため「init で選んだ行の height を `gfx_current_height` に書く」のは、98 の分は **G6a (gfx_core.c のモードの選択と init への反映)** で入れる。G4・G5 は各バックエンドの init で書く。
