@@ -160,5 +160,9 @@ GfxBackend gfx_backend_pc98 = {
     (u32)GFX_BPL,            /* bb_pitch: 80 バイト/ライン */
     GFX_BB_PLANAR4,
     (u32)MEM_GFX_BB_SIZE,    /* bb_size: 4 プレーン分 128KB (boot pool CLIENT) */
-    (void (*)(void))0        /* prepare: 9801 は起動時の下ごしらえが無い */
+    (void (*)(void))0,       /* prepare: 9801 は起動時の下ごしらえが無い */
+    (const GfxMode *)0,      /* modes: G3 で申告 */
+    0,                      /* mode_count */
+    0,                      /* default_mode */
+    (const GfxMode *)0       /* selected_mode */
 };

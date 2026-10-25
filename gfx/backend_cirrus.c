@@ -583,5 +583,9 @@ GfxBackend CIRRUS_BACKEND_TABLE = {
     (u32)CIRRUS_PITCH,
     GFX_BB_PACKED8,
     0,                        /* bb_size: init() が埋める (300KB) */
-    (void (*)(void))0         /* prepare: 従来どおり init → shutdown */
+    (void (*)(void))0,        /* prepare: 従来どおり init → shutdown */
+    (const GfxMode *)0,        /* modes: G5 で申告 */
+    0,                        /* mode_count */
+    0,                        /* default_mode */
+    (const GfxMode *)0         /* selected_mode */
 };

@@ -19,6 +19,10 @@ def product_image(folder):
     """Real mkmod product: PAIR/phase and relocation, with write-free rejection."""
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     metadata = json.loads((ROOT / 'build/out/cirrus/cirrus_imports.json').read_text())
+    planned = subprocess.check_output(
+        ['make', '-n', '-W', 'include/gfx_mode.h', 'build/out/cirrus/cirrus_imports.h'],
+        cwd=ROOT, text=True)
+    assert 'tools/gen_sqlite_imports.py --module cirrus' in planned
     data = (ROOT / 'build/out/cirrus.mod').read_bytes()
     kernel = (ROOT / 'build/out/vmkernel.lz4').read_bytes()
     # Use the existing packer for the boot loader's paired image CRC.
@@ -48,7 +52,8 @@ def product_image(folder):
             assert result.returncode == bool(rc), result
             assert result.stdout == (b'GREEN\n' if not rc else f'RED {rc:02}\n'.encode()), result
         check(data, 0)
-        for field, value, rc in ((9, 0, 3), (31, pair ^ 1, 4), (8, 1, 3)):
+        for field, value, rc in ((9, 0, 3), (31, pair ^ 1, 4), (8, 1, 3),
+                                 (6, metadata['module_abi_gen'] ^ 1, 6)):
             bad = bytearray(data)
             word(bad, field, value)
             check(crc(bad), rc)
@@ -56,7 +61,7 @@ def product_image(folder):
         bad = bytearray(data)
         bad[-1] ^= 1
         check(bad, 9)
-    print('PASS product Cirrus: paired POST_ROOT, relocate, truncated/corrupt rejection, core identification / module drivers', flush=True)
+    print('PASS product Cirrus: mode-header regeneration, ABI/PAIR, paired POST_ROOT, relocate, truncated/corrupt rejection, core identification / module drivers', flush=True)
 
 
 def hal_context(unguarded=False, cui_first=False):

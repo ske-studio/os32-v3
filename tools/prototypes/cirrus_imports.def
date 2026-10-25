@@ -3,6 +3,7 @@
   "contracts": [
     "kernel/cirrus_module.h",
     "include/gfx_hal.h",
+    "include/gfx_mode.h",
     "drivers/wab_glue.h"
   ],
   "imports": [

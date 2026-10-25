@@ -15,6 +15,8 @@
 
 #include "types.h"             /* u8, u16, u32 */
 #include "os32_kapi_shared.h"  /* GFX_ScreenInfo, GFX_FMT_*, GFX_CAP_* */
+#include "gfx_mode.h"
+#include "../gfx/gfx.h"        /* Existing GFX_HEIGHT_200 mode constant. */
 
 /* ------------------------------------------------------------------------ */
 /*  バックバッファの画素形式 (ソフトウェア系バックエンドの記述子 bb_format)    */
@@ -77,7 +79,28 @@ typedef struct GfxBackend {
      * backend_pegc.c の pegc_prepare の注記)。終わって probe() が 0 を返したら
      * 9801 へ落ちる。 */
     void (*prepare)(void);
+
+    const GfxMode *modes;
+    u16 mode_count, default_mode;
+    const GfxMode *selected_mode;
 } GfxBackend;
+
+static inline const GfxMode *gfx_mode_pick(const GfxBackend *be, int legacy200)
+{
+    if (!be || !be->modes || !be->mode_count ||
+        be->default_mode >= be->mode_count) return NULL;
+    if (legacy200) {
+        for (u16 i = 0; i < be->mode_count; ++i)
+            if (be->modes[i].format == GFX_FMT_PLANAR4 &&
+                be->modes[i].height == GFX_HEIGHT_200) return &be->modes[i];
+    }
+    return &be->modes[be->default_mode];
+}
+
+static inline const GfxMode *gfx_backend_mode(const GfxBackend *be)
+{
+    return be && be->selected_mode ? be->selected_mode : gfx_mode_pick(be, 0);
+}
 
 /* ------------------------------------------------------------------------ */
 /*  カウンタ (契約 G7 / DESIGN §8)。                                        */
