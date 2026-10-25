@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "kutf16.h"
+#include "utf8.h"
 
 /* ------------------------------------------------------------------------ */
 /*  kutf8_to_utf16le — UTF-8 → UTF-16LE 変換                               */
@@ -35,23 +36,25 @@ int kutf8_to_utf16le(const char *utf8, u16 *utf16, int max_words)
 
     while (*s) {
         c = *s;
-        if (c < 0x80) {
+        if (c < UTF8_ASCII_LIMIT) {
             cp = c;
             s += 1;
-        } else if (c >= 0xC2 && c <= 0xDF) {
+        } else if (c >= UTF8_LEAD2_MIN && c <= UTF8_LEAD2_MAX) {
             /* 2 バイト: U+0080〜U+07FF (0xC0 / 0xC1 は冗長な符号化) */
-            if ((s[1] & 0xC0) != 0x80) return -1;
-            cp = ((u32)(c & 0x1F) << 6) | (u32)(s[1] & 0x3F);
-            s += 2;
-        } else if (c >= 0xE0 && c <= 0xEF) {
+            if (!UTF8_IS_CONT(s[1])) return -1;
+            cp = ((u32)(c & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS) |
+                 (u32)(s[1] & UTF8_CONT_PAYLOAD_MASK);
+            s += UTF8_LEN2;
+        } else if (c >= UTF8_LEAD3_MIN && c <= UTF8_LEAD3_MAX) {
             /* 3 バイト: U+0800〜U+FFFF (サロゲートを除く) */
-            if ((s[1] & 0xC0) != 0x80) return -1;
-            if ((s[2] & 0xC0) != 0x80) return -1;
-            cp = ((u32)(c & 0x0F) << 12) | ((u32)(s[1] & 0x3F) << 6) |
-                 (u32)(s[2] & 0x3F);
-            if (cp < 0x800) return -1;                      /* 冗長 */
-            if (cp >= 0xD800 && cp <= 0xDFFF) return -1;    /* サロゲート */
-            s += 3;
+            if (!UTF8_IS_CONT(s[1])) return -1;
+            if (!UTF8_IS_CONT(s[2])) return -1;
+            cp = ((u32)(c & UTF8_LEAD3_PAYLOAD_MASK) << (2 * UTF8_CONT_PAYLOAD_BITS)) |
+                 ((u32)(s[1] & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS) |
+                 (u32)(s[2] & UTF8_CONT_PAYLOAD_MASK);
+            if (cp < UCS_UTF8_3_MIN) return -1;                      /* 冗長 */
+            if (cp >= UCS_SURROGATE_FIRST && cp <= UCS_SURROGATE_LAST) return -1;    /* サロゲート */
+            s += UTF8_LEN3;
         } else {
             /* 単独の継続バイト (0x80〜0xBF)、0xC0 / 0xC1、4 バイト以上
              * (BMP 外: UTF-16 ではサロゲートペアが要るが未対応) */
@@ -81,21 +84,21 @@ int kutf16le_to_utf8(const u16 *utf16, int utf16_len,
         cp = utf16[i];
         if (cp == 0) break;
 
-        if (cp < 0x80) {
+        if (cp < UTF8_ASCII_LIMIT) {
             /* ASCII */
             if (out + 1 >= max_bytes) break;
             utf8[out++] = (char)cp;
-        } else if (cp < 0x800) {
+        } else if (cp < UCS_UTF8_3_MIN) {
             /* 2バイトUTF-8 */
-            if (out + 2 >= max_bytes) break;
-            utf8[out++] = (char)(0xC0 | (cp >> 6));
-            utf8[out++] = (char)(0x80 | (cp & 0x3F));
+            if (out + UTF8_LEN2 >= max_bytes) break;
+            utf8[out++] = (char)(UTF8_LEAD2_TAG | (cp >> UTF8_CONT_PAYLOAD_BITS));
+            utf8[out++] = (char)(UTF8_CONT_TAG | (cp & UTF8_CONT_PAYLOAD_MASK));
         } else {
             /* 3バイトUTF-8 */
-            if (out + 3 >= max_bytes) break;
-            utf8[out++] = (char)(0xE0 | (cp >> 12));
-            utf8[out++] = (char)(0x80 | ((cp >> 6) & 0x3F));
-            utf8[out++] = (char)(0x80 | (cp & 0x3F));
+            if (out + UTF8_LEN3 >= max_bytes) break;
+            utf8[out++] = (char)(UTF8_LEAD3_TAG | (cp >> (2 * UTF8_CONT_PAYLOAD_BITS)));
+            utf8[out++] = (char)(UTF8_CONT_TAG | ((cp >> UTF8_CONT_PAYLOAD_BITS) & UTF8_CONT_PAYLOAD_MASK));
+            utf8[out++] = (char)(UTF8_CONT_TAG | (cp & UTF8_CONT_PAYLOAD_MASK));
         }
     }
     utf8[out++] = '\0';

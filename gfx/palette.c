@@ -36,9 +36,9 @@ static const PaletteEntry default_palette[PALETTE_COUNT] = {
 static void hw_set_palette(int idx, u8 r, u8 g, u8 b)
 {
     outp(PAL_IDX_PORT, (u8)idx);
-    outp(PAL_G_PORT, g & 0x0F);
-    outp(PAL_R_PORT, r & 0x0F);
-    outp(PAL_B_PORT, b & 0x0F);
+    outp(PAL_G_PORT, g & GFX_PALETTE_COMPONENT_MASK);
+    outp(PAL_R_PORT, r & GFX_PALETTE_COMPONENT_MASK);
+    outp(PAL_B_PORT, b & GFX_PALETTE_COMPONENT_MASK);
 }
 
 void palette_init(void)
@@ -53,9 +53,9 @@ void palette_init(void)
 void palette_set(int idx, u8 r, u8 g, u8 b)
 {
     if (idx < 0 || idx >= PALETTE_COUNT) return;
-    shadow[idx].r = r & 0x0F;
-    shadow[idx].g = g & 0x0F;
-    shadow[idx].b = b & 0x0F;
+    shadow[idx].r = r & GFX_PALETTE_COMPONENT_MASK;
+    shadow[idx].g = g & GFX_PALETTE_COMPONENT_MASK;
+    shadow[idx].b = b & GFX_PALETTE_COMPONENT_MASK;
     hw_set_palette(idx, shadow[idx].r, shadow[idx].g, shadow[idx].b);
 }
 
@@ -67,9 +67,9 @@ void palette_set(int idx, u8 r, u8 g, u8 b)
 void palette_shadow_set(int idx, u8 r, u8 g, u8 b)
 {
     if (idx < 0 || idx >= PALETTE_COUNT) return;
-    shadow[idx].r = r & 0x0F;
-    shadow[idx].g = g & 0x0F;
-    shadow[idx].b = b & 0x0F;
+    shadow[idx].r = r & GFX_PALETTE_COMPONENT_MASK;
+    shadow[idx].g = g & GFX_PALETTE_COMPONENT_MASK;
+    shadow[idx].b = b & GFX_PALETTE_COMPONENT_MASK;
 }
 
 void palette_get(int idx, u8 *r, u8 *g, u8 *b)

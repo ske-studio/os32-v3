@@ -81,7 +81,7 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 
     /* マージ判定用のギャップ閾値 (px)。
      * この距離以内の矩形は統合する (32pxアライメントに合わせる) */
-    int gap = 32;
+    int gap = BITS_PER_U32;
 
     int new_x, new_y, new_r, new_b;
 
@@ -91,8 +91,8 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
     /* 32ピクセル境界 (4バイト) にアライメント:
      * xは切り捨て、幅は切り上げ
      */
-    aligned_x = x & ~31;
-    aligned_w = ((right + 31) & ~31) - aligned_x;
+    aligned_x = x & ~(BITS_PER_U32 - 1);
+    aligned_w = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - aligned_x;
 
     /* 画面クリッピング */
     if (aligned_x < 0) {
@@ -180,8 +180,8 @@ static void _flush_dirty_queue(void)
 
     for (i = 0; i < dirty_queue.count; i++) {
         GFX_Rect *r = &dirty_queue.rects[i];
-        int byte_x = r->x >> 3;           /* 横は何バイト目か */
-        int byte_w = r->w >> 3;           /* 横幅のバイト数 */
+        int byte_x = r->x >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横は何バイト目か */
+        int byte_w = r->w >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横幅のバイト数 */
         int words  = byte_w >> 1;         /* 16bit転送するワード数 */
         int physical_y;
         unsigned long phys_off, base_off;
@@ -190,7 +190,7 @@ static void _flush_dirty_queue(void)
 
         /* 実 VRAM 書き込み量を数える (レビュー ⑦)。1 行 = words ワード ×2B ×4 プレーン、
          * ×r->h 行。ステイルページのマージ (prev_dirty) 分もここで正しく積まれる。 */
-        gfx_counters.present_bytes += (u32)words * 2u * 4u * (u32)r->h;
+        gfx_counters.present_bytes += (u32)words * 2u * GVRAM_PLANES * (u32)r->h;
 
         physical_y = (r->y + vram_scroll_y) % gfx_current_height;
         phys_off = (unsigned long)physical_y * GFX_BPL + byte_x;
@@ -262,7 +262,7 @@ void __cdecl gfx_present_dirty(void)
         if (dirty_queue.count == 0) goto diag;
         gfx_counters.commits++;
         /* VSYNC期間になるまで待つ */
-        while ((_in(0x60) & 0x20) == 0) { }
+        while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
         _flush_dirty_queue();
     }
 diag:
@@ -345,8 +345,8 @@ static void _flush_dirty_line(int line)
         /* このdirty rectにこのラインが含まれるかチェック */
         if (line < r->y || line >= r->y + r->h) continue;
 
-        byte_x = r->x >> 3;
-        byte_w = r->w >> 3;
+        byte_x = r->x >> GVRAM_PIXELS_PER_BYTE_SHIFT;
+        byte_w = r->w >> GVRAM_PIXELS_PER_BYTE_SHIFT;
         words  = byte_w >> 1;
         if (words <= 0) continue;
 
@@ -441,15 +441,15 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
             _flip_page();
         }
         /* VSYNC待ち → パレット書き換えのみ */
-        while ((_in(0x60) & 0x20) == 0) { }
+        while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
         flags = irq_save();
-        while (_in(GDC_STATUS_PORT) & 0x20) { }
+        while (_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) { }
         for (entry_idx = 0; entry_idx < table->count; entry_idx++) {
             GFX_RasterPalEntry *e = &table->entries[entry_idx];
             _out(PAL_IDX_PORT, e->pal_idx);
-            _out(PAL_G_PORT, e->g & 0x0F);
-            _out(PAL_R_PORT, e->r & 0x0F);
-            _out(PAL_B_PORT, e->b & 0x0F);
+            _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
+            _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
+            _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
             _raster_delay_open(&flags);
         }
         irq_restore(flags);
@@ -459,13 +459,13 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
     has_dirty = (dirty_queue.count > 0);
 
     /* VSYNC期間になるまで待つ */
-    while ((_in(0x60) & 0x20) == 0) { }
+    while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
 
     /* 割り込み禁止 (全ラスタ期間を通じて安定させる) */
     flags = irq_save();
 
     /* VSYNC終了を待つ → アクティブ表示領域が始まる */
-    while (_in(GDC_STATUS_PORT) & 0x20) { }
+    while (_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) { }
 
     entry_idx = 0;
 
@@ -478,9 +478,9 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
                    table->entries[entry_idx].line <= (u16)line) {
                 GFX_RasterPalEntry *e = &table->entries[entry_idx];
                 _out(PAL_IDX_PORT, e->pal_idx);
-                _out(PAL_G_PORT, e->g & 0x0F);
-                _out(PAL_R_PORT, e->r & 0x0F);
-                _out(PAL_B_PORT, e->b & 0x0F);
+                _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
+                _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
+                _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
                 entry_idx++;
             }
             _raster_delay_open(&flags);
@@ -490,9 +490,9 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
         for (entry_idx = 0; entry_idx < table->count; entry_idx++) {
             GFX_RasterPalEntry *e = &table->entries[entry_idx];
             _out(PAL_IDX_PORT, e->pal_idx);
-            _out(PAL_G_PORT, e->g & 0x0F);
-            _out(PAL_R_PORT, e->r & 0x0F);
-            _out(PAL_B_PORT, e->b & 0x0F);
+            _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
+            _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
+            _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
             _raster_delay_open(&flags);
         }
     }

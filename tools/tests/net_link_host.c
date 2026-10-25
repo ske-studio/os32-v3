@@ -41,6 +41,9 @@ typedef unsigned int   u32;
 typedef signed char    i8;
 typedef signed short   i16;
 typedef signed int     i32;
+/* Match the canonical limits with the fixture's ILP32-width types. */
+#define U16_MAX ((u16)-1)
+#define U32_MAX ((u32)-1)
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
@@ -61,6 +64,7 @@ typedef signed int     i32;
 #define __KSTRING_H
 #define __KPRINTF_H
 #define KLOG_ATTR 0x07
+#define ATTR_YELLOW 0xC1
 static void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 static void *kmemset(void *d, int v, u32 n) { return memset(d, v, n); }
 static int kprintf_quiet = 1;

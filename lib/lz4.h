@@ -11,6 +11,8 @@
 
 #include "types.h"
 
+#define LZ4_ERR_OUTPUT (-2)
+
 /*
  * LZ4ブロック展開 (Safe版)
  *

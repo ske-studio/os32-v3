@@ -715,8 +715,8 @@ void __cdecl gfx_screen_info(void *out)
 /* ======================================================================== */
 void __cdecl gfx_set_palette_hal(int idx, u8 r, u8 g, u8 b)
 {
-    u8 rgb[3];
-    rgb[0] = r; rgb[1] = g; rgb[2] = b;
+    u8 rgb[GFX_RGB_COMPONENTS];
+    rgb[GFX_RGB_R] = r; rgb[GFX_RGB_G] = g; rgb[GFX_RGB_B] = b;
     if (g_backend && g_backend->set_palette) {
         g_backend->set_palette(idx, 1, rgb);
     } else {

@@ -105,7 +105,11 @@ STATIC_ASSERT(CIRRUS_CLIENT_OFF == MEM_GFX_BB8_SIZE &&
 /* KAPI の輝度は 4bit (0〜15)、VGA DAC は 6bit (0〜63)。
  * (v<<2)|(v>>2) で両端がぴったり合う (0→0, 15→63)。
  * PEGC (8bit DAC) の ×17 と同じ趣旨のスケーリング (票 H2c)。 */
-#define CIRRUS_PAL_KAPI_MASK 0x0F
+#define CIRRUS_PAL6_REPLICATE_SHIFT 2
+#define CIRRUS_GRAY_FIRST 2
+#define CIRRUS_GRAY_STEP 2
+#define CIRRUS_DAC_MAX 63
+#define CIRRUS_INIT_FILL_OPS 2
 
 /* CPU 直書きに切り替える閾値 (画素数)。
  * BLT 1 回はレジスタ書き込み 20 本前後 (blt_setup + モード + ROP + 起動) で、
@@ -236,15 +240,15 @@ static int cirrus_probe(void)
 /* ------------------------------------------------------------------------ */
 static u8 cirrus_pal6(u8 v)
 {
-    u8 x = (u8)(v & CIRRUS_PAL_KAPI_MASK);
-    return (u8)((x << 2) | (x >> 2));
+    u8 x = (u8)(v & GFX_PALETTE_COMPONENT_MASK);
+    return (u8)((x << CIRRUS_PAL6_REPLICATE_SHIFT) | (x >> CIRRUS_PAL6_REPLICATE_SHIFT));
 }
 
 static void cirrus_palette_init(void)
 {
     /* 6x6x6 立方の各段 (0〜63 の 6 段) と灰色 24 段。PEGC の 0〜255 表を
      * 6bit へ落としたもの (51/255 ≒ 12/63)。 */
-    static const u8 cube[6] = { 0, 12, 25, 38, 50, 63 };
+    static const u8 cube[GFX_PALETTE_CUBE_LEVELS] = { 0, 12, 25, 38, 50, 63 };
     const PaletteEntry *sys = palette_get_all();
     int i, r, g, b;
 
@@ -254,16 +258,16 @@ static void cirrus_palette_init(void)
     }
 
     i = CIRRUS_LEASE_FIRST;
-    for (r = 0; r < 6; r++) {
-        for (g = 0; g < 6; g++) {
-            for (b = 0; b < 6; b++) {
+    for (r = 0; r < GFX_PALETTE_CUBE_LEVELS; r++) {
+        for (g = 0; g < GFX_PALETTE_CUBE_LEVELS; g++) {
+            for (b = 0; b < GFX_PALETTE_CUBE_LEVELS; b++) {
                 wab_cirrus_dac_set(s_glue, i++, cube[r], cube[g], cube[b]);
             }
         }
     }
     for (b = 0; i < CIRRUS_PAL_COUNT; i++, b++) {
-        u8 v = (u8)(2 + b * 2);
-        if (v > 63) v = 63;
+        u8 v = (u8)(CIRRUS_GRAY_FIRST + b * CIRRUS_GRAY_STEP);
+        if (v > CIRRUS_DAC_MAX) v = CIRRUS_DAC_MAX;
         wab_cirrus_dac_set(s_glue, i, v, v, v);
     }
 }
@@ -306,7 +310,7 @@ static void cirrus_init(void)
 
     if (wab_cirrus_setup_8bpp(s_glue, CIRRUS_WIDTH, CIRRUS_HEIGHT,
                               (u32)CIRRUS_PITCH, CIRRUS_VIS_OFF) != 0) {
-        kprintf(0xC1, "[cirrus] mode setup failed\n");
+        kprintf(ATTR_YELLOW, "[cirrus] mode setup failed\n");
         /* ここで諦めると gfx_core は 9801 へ落ち、以後 leave() も
          * shutdown() も呼ばれない。リレーは自分で 98 側へ戻しておく
          * (glue->init の FF82h が NP21/W ではリレーを倒しているため)。
@@ -333,7 +337,7 @@ static void cirrus_init(void)
                     CIRRUS_WIDTH, CIRRUS_HEIGHT, 0);
     wab_cirrus_fill(s_glue, CIRRUS_CLIENT_OFF, (u32)CIRRUS_PITCH,
                     CIRRUS_WIDTH, CIRRUS_HEIGHT, 0);
-    gfx_counters.hw_ops += 2;
+    gfx_counters.hw_ops += CIRRUS_INIT_FILL_OPS;
 
     cirrus_palette_init();
 
@@ -384,7 +388,7 @@ static int cirrus_query(GFX_ScreenInfo *info)
     info->lease_mask  = 0;
     info->lease_first = (u16)CIRRUS_LEASE_FIRST;
     info->lease_count = (u16)CIRRUS_LEASE_COUNT;
-    for (i = 0; i < 5; i++) info->reserved[i] = 0;
+    for (i = 0; i < (int)(sizeof(info->reserved) / sizeof(info->reserved[0])); i++) info->reserved[i] = 0;
     return 0;
 }
 
@@ -428,9 +432,9 @@ static void cirrus_set_palette(int first, int count, const u8 *rgb)
     if (!s_active || !rgb) return;
     for (k = 0; k < count; k++) {
         int idx = first + k;
-        u8 r = rgb[k * 3 + 0];
-        u8 g = rgb[k * 3 + 1];
-        u8 b = rgb[k * 3 + 2];
+        u8 r = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R];
+        u8 g = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G];
+        u8 b = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B];
         if (idx < 0 || idx >= CIRRUS_PAL_COUNT) continue;
         wab_cirrus_dac_set(s_glue, idx, cirrus_pal6(r), cirrus_pal6(g),
                            cirrus_pal6(b));

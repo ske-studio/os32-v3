@@ -15,10 +15,20 @@
 /* ======================================================================== */
 
 #include "link.h"
+
 #include "ne2000.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* ([C4] 共有定数の正典) */
+
+#define LINK_RX_BUFFER_SIZE 1520
+#define LINK_CTRL_RELEASE 0
+#define LINK_CTRL_ACK 1
+#define LINK_CTRL_WINDOW 2
+#define LINK_CTRL_STATUS 3
+#define LINK_CTRL_KIND_COUNT 4
+#define LINK_TX_CLASS_COUNT 2
+#define LINK_HANDSHAKE_BUDGET 2
 
 /* ------------------------------------------------------------------------ */
 /*  カーネル / ホスト試験の切り替え                                          */
@@ -60,22 +70,22 @@ static void wr32(u8 *p, u32 v)
     p[0] = (u8)v; p[1] = (u8)(v >> 8); p[2] = (u8)(v >> 16); p[3] = (u8)(v >> 24);
 }
 
-static const u8 link_bcast[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+static const u8 link_bcast[ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static int mac_eq(const u8 *a, const u8 *b)
 {
     int i;
-    for (i = 0; i < 6; i++) if (a[i] != b[i]) return 0;
+    for (i = 0; i < ETH_ALEN; i++) if (a[i] != b[i]) return 0;
     return 1;
 }
 
 /* ======================================================================== */
 /*  状態                                                                    */
 /* ======================================================================== */
-static u8  link_my_mac[6];
+static u8  link_my_mac[ETH_ALEN];
 static int link_ready = 0;          /* link_init 済み (= link_tick が働く) */
 static u8  link_txbuf[LINK_ETH_HDR_LEN + LINK_HDR_LEN + LINK_MAX_PAYLOAD];
-static u8  link_rxbuf[1520];
+static u8  link_rxbuf[LINK_RX_BUFFER_SIZE];
 
 /* ---- セッション ---- */
 u16 link_sess = 0;
@@ -153,7 +163,7 @@ u32 link_l0_fail = 0;
 u32 link_retransmits = 0;
 u32 link_rx_frames = 0;
 u32 link_rx_dropped = 0;
-u8  link_peer_mac[6] = { 0, 0, 0, 0, 0, 0 };
+u8  link_peer_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 u32 link_resyncs = 0;
 u32 link_tombstones = 0;
 u32 link_no_slots = 0;
@@ -225,11 +235,11 @@ static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
 
     if (len > LINK_MAX_PAYLOAD) return 1;    /* 呼び手の誤り。捨てる (再送しない) */
     dst = link_hello_ok ? link_peer_mac : link_bcast;
-    kmemcpy(p, dst, 6);
-    kmemcpy(p + 6, link_my_mac, 6);
+    kmemcpy(p, dst, ETH_ALEN);
+    kmemcpy(p + ETH_ALEN, link_my_mac, ETH_ALEN);
     /* EtherType はワイヤ上 big-endian。以降の自前ヘッダは LE。 */
-    p[12] = (u8)(LINK_ETHERTYPE >> 8);
-    p[13] = (u8)(LINK_ETHERTYPE & 0xFF);
+    p[ETH_TYPE_OFF] = (u8)(LINK_ETHERTYPE >> 8);
+    p[ETH_TYPE_OFF + 1] = (u8)(LINK_ETHERTYPE & 0xFF);
     h = p + LINK_ETH_HDR_LEN;
     h[LINK_OFF_OP] = op;
     h[LINK_OFF_FLAGS] = flags;
@@ -291,7 +301,7 @@ static void link_resync(void)
 {
     link_resyncs++;
     link_drop_all();
-    if (link_sess == 0 || link_epoch >= 0xFFFF || link_next_rid >= 0xFFFFFFFFu)
+    if (link_sess == 0 || link_epoch >= U16_MAX || link_next_rid >= U32_MAX)
         link_start_hello(0, 1);
     else
         link_start_hello(link_sess, (u16)(link_epoch + 1));
@@ -339,17 +349,17 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
     if (flags == LINK_HS_SYNACK) {
         if (link_state != LINK_S_SYN) return;
         if (seq != link_nonce) return;                  /* 自分の SYN の応答か */
-        if (rd16(pl + 2) != link_syn_sess) return;      /* req_sess の写し */
-        if (rd16(pl + 4) != link_syn_epoch) return;     /* req_epoch の写し */
+        if (rd16(pl + LINK_HELLO_REQ_SESS_OFF) != link_syn_sess) return;      /* req_sess の写し */
+        if (rd16(pl + LINK_HELLO_REQ_EPOCH_OFF) != link_syn_epoch) return;     /* req_epoch の写し */
         link_agent_gen = rd16(pl);
         link_agent_nonce = ack;
-        kmemcpy(link_peer_mac, src, 6);
+        kmemcpy(link_peer_mac, src, ETH_ALEN);
         if (sess != link_sess) link_next_rid = 1;       /* 新セッション */
         link_sess = sess;
         link_epoch = epoch;                             /* CONFIRM 送出で切替 */
         link_state = LINK_S_CONFIRM;
         link_hs_tries = 0;
-        link_hs_due = 2;
+        link_hs_due = LINK_HS_CONFIRM;
         return;
     }
     if (flags == LINK_HS_ESTAB) {
@@ -369,7 +379,7 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
 static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
 {
     u16 st = rd16(pl);
-    u32 ln = rd32(pl + 2);
+    u32 ln = rd32(pl + LINK_RESPONSE_LENGTH_OFF);
 
     e->last_rx_tick = tick_count;
     e->probes = 0;
@@ -423,7 +433,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     struct link_handle *e;
 
     if (flen < LINK_ETH_HDR_LEN + LINK_HDR_LEN) { link_rx_dropped++; return; }
-    if ((((u16)f[12] << 8) | f[13]) != LINK_ETHERTYPE) { link_rx_dropped++; return; }
+    if ((((u16)f[ETH_TYPE_OFF] << 8) | f[ETH_TYPE_OFF + 1]) != LINK_ETHERTYPE) { link_rx_dropped++; return; }
     if (!mac_eq(f, link_my_mac) && !mac_eq(f, link_bcast)) { link_rx_dropped++; return; }
 
     h = f + LINK_ETH_HDR_LEN;
@@ -443,12 +453,12 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     link_rx_frames++;
 
     if (op == LINK_OP_HELLO) {
-        link_on_hello(f + 6, flags, epoch, seq, ack, sess, pl);
+        link_on_hello(f + ETH_ALEN, flags, epoch, seq, ack, sess, pl);
         return;
     }
     /* HELLO 以外は sess / epoch が控えと一致し、相手が peer のものだけ。 */
     if (link_state != LINK_S_UP || sess != link_sess || epoch != link_epoch ||
-        !mac_eq(f + 6, link_peer_mac)) {
+        !mac_eq(f + ETH_ALEN, link_peer_mac)) {
         link_rx_dropped++;
         return;
     }
@@ -573,7 +583,7 @@ static void link_timers(void)
                 link_hs_tries++;
                 link_retransmits++;
             } else {
-                link_hs_due = 2;            /* ESTABLISHED 待ち → CONFIRM 再送 */
+                link_hs_due = LINK_HS_CONFIRM;            /* ESTABLISHED 待ち → CONFIRM 再送 */
                 link_hs_tries++;
                 link_retransmits++;
             }
@@ -649,17 +659,17 @@ static int link_tx_control(void)
     for (n = 0; n < LINK_HANDLES; n++) {
         struct link_handle *e = &link_h[(link_ctrl_next + n) % LINK_HANDLES];
         /* rid ごとに種類を巡回する (STATUS を WINDOW / ACK より後回しにしない) */
-        for (k = 0; k < 4; k++) {
-            u8 kind = (u8)((e->ctrl_cursor + k) % 4);
-            if (kind == 0 && e->rel_due) {
+        for (k = 0; k < LINK_CTRL_KIND_COUNT; k++) {
+            u8 kind = (u8)((e->ctrl_cursor + k) % LINK_CTRL_KIND_COUNT);
+            if (kind == LINK_CTRL_RELEASE && e->rel_due) {
                 if (!link_send_ex(LINK_OP_RELEASE, 0, link_sess, e->rel_epoch,
                                   0, 0, e->rel_rid, 0, 0)) return -1;
                 e->rel_due = 0;
                 e->rel_tick = tick_count;
-            } else if (kind == 1 && e->want_ack) {
+            } else if (kind == LINK_CTRL_ACK && e->want_ack) {
                 if (!link_send(LINK_OP_ACK, 0, 0, e->ack_seq, e->rid, 0, 0)) return -1;
                 e->want_ack = 0;
-            } else if (kind == 2 && e->want_window) {
+            } else if (kind == LINK_CTRL_WINDOW && e->want_window) {
                 u8 pl[LINK_WINDOW_LEN];
                 u16 credit = link_credit_pages();
                 wr16(pl, credit);
@@ -670,13 +680,13 @@ static int link_tx_control(void)
                 if (credit > link_l1_max_credit) link_l1_max_credit = credit;
                 if (credit && (link_l1_min_credit == 0 || credit < link_l1_min_credit))
                     link_l1_min_credit = credit;
-            } else if (kind == 3 && e->want_status) {
+            } else if (kind == LINK_CTRL_STATUS && e->want_status) {
                 if (!link_send(LINK_OP_STATUS, 0, 0, 0, e->rid, 0, 0)) return -1;
                 e->want_status = 0;
             } else {
                 continue;
             }
-            e->ctrl_cursor = (u8)((kind + 1) % 4);
+            e->ctrl_cursor = (u8)((kind + 1) % LINK_CTRL_KIND_COUNT);
             link_ctrl_next = (int)(((link_ctrl_next + n) % LINK_HANDLES) + 1) % LINK_HANDLES;
             return 1;
         }
@@ -716,8 +726,8 @@ static int link_tx_normal(void)
 static void link_tx_round(void)
 {
     int idle = 0;
-    int budget = 2 * (LINK_HANDLES * 4 + 2);
-    while (budget-- > 0 && idle < 2) {
+    int budget = LINK_TX_CLASS_COUNT * (LINK_HANDLES * LINK_CTRL_KIND_COUNT + LINK_HANDSHAKE_BUDGET);
+    while (budget-- > 0 && idle < LINK_TX_CLASS_COUNT) {
         int rc = link_tx_turn ? link_tx_normal() : link_tx_control();
         if (rc < 0) { link_tx_deferred++; return; } /* NIC busy → 位置を進めず次の周回へ */
         link_tx_turn ^= 1;                          /* 送れた / 空のときだけ次の種類へ */
@@ -741,11 +751,11 @@ void link_tick(void)
 /* ======================================================================== */
 /*  初期化                                                                  */
 /* ======================================================================== */
-void link_init(const u8 my_mac[6])
+void link_init(const u8 my_mac[ETH_ALEN])
 {
     int i;
-    kmemcpy(link_my_mac, my_mac, 6);
-    kmemset(link_peer_mac, 0, 6);
+    kmemcpy(link_my_mac, my_mac, ETH_ALEN);
+    kmemset(link_peer_mac, 0, ETH_ALEN);
     kmemset((void *)link_h, 0, sizeof(link_h));
     for (i = 0; i < LINK_HANDLES; i++) link_h[i].owner = -1;
     link_sess = 0;
@@ -856,7 +866,7 @@ i32 link_host_open(const char *req, u32 len, int owner)
 
     f = LINK_IRQ_SAVE();
     if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
-    if (link_next_rid >= 0xFFFFFFFFu) {          /* rid 枯渇 = 新セッションへ */
+    if (link_next_rid >= U32_MAX) {          /* rid 枯渇 = 新セッションへ */
         link_resync();
         LINK_IRQ_RESTORE(f);
         return OS32_ERR_STALE;
@@ -1154,7 +1164,7 @@ void link_selftest(int rounds)
 
     if (!link_ready) return;
     if (!link_wait_up(LINK_PROBE_TICKS * 5)) {
-        kprintf(0xC1, "[link] HELLO failed (no Host Agent?) — L0 selftest skipped\n");
+        kprintf(ATTR_YELLOW, "[link] HELLO failed (no Host Agent?) — L0 selftest skipped\n");
         return;
     }
     kprintf(KLOG_ATTR, "[link] session %d epoch %d agent %d, peer "
@@ -1176,7 +1186,7 @@ void link_selftest(int rounds)
      * net_l0_test.py の最終読み出しは link_l0_ok / link_l0_fail を見る)。*/
     link_l0_ok = link_rt_ok;
     link_l0_fail = link_rt_fail;
-    kprintf(link_rt_fail ? 0xC1 : 0x07,
+    kprintf(link_rt_fail ? ATTR_YELLOW : KLOG_ATTR,
             "[link] L0 selftest: %d/%d round trips ok, %d retransmit\n",
             (int)link_rt_ok, rounds, (int)link_retransmits);
 }
@@ -1191,7 +1201,7 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
     i32 h;
 
     if (!link_ready || link_state != LINK_S_UP) {
-        kprintf(0xC1, "[link] L1 skipped (no peer)\n");
+        kprintf(ATTR_YELLOW, "[link] L1 skipped (no peer)\n");
         return;
     }
     link_counters_reset();
@@ -1206,7 +1216,7 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
     i += (unsigned int)kutoa_dec(payload, req + i, (int)(sizeof(req) - i));
 
     h = link_wait_open(req, i, LINK_PROBE_TICKS * 2);
-    if (h < 0) { kprintf(0xC1, "[link] L1 open failed %d\n", (int)h); return; }
+    if (h < 0) { kprintf(ATTR_YELLOW, "[link] L1 open failed %d\n", (int)h); return; }
     (void)link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 10);
     got = link_wait_read_all(h, LINK_PROBE_TICKS * 15, 0);
     link_host_close(h, LINK_SELF_OWNER);
@@ -1217,7 +1227,7 @@ void link_l1_bulk(unsigned int count, unsigned int payload)
         u32 dp = sn.rx_pages_total - pages0;
         if (df) link_l1_meas_pages = (dp * 100) / df;
     }
-    kprintf((link_l1_recv == count && link_l1_ooo == 0) ? 0x07 : 0xC1,
+    kprintf((link_l1_recv == count && link_l1_ooo == 0) ? KLOG_ATTR : ATTR_YELLOW,
             "[link] L1 bulk: %d/%d frames, %dB, ooo %d, windows %d, "
             "credit %d..%d pages, meas %d.%02d pages/frame\n",
             (int)link_l1_recv, (int)count, (int)got, (int)link_l1_ooo,
@@ -1233,7 +1243,7 @@ void link_l2_stream(unsigned int total, unsigned int plen, unsigned int dropseq)
     i32 h;
 
     if (!link_ready || link_state != LINK_S_UP) {
-        kprintf(0xC1, "[link] L2 skipped (no peer)\n");
+        kprintf(ATTR_YELLOW, "[link] L2 skipped (no peer)\n");
         return;
     }
     link_counters_reset();
@@ -1246,12 +1256,12 @@ void link_l2_stream(unsigned int total, unsigned int plen, unsigned int dropseq)
     i += (unsigned int)kutoa_dec(dropseq, req + i, (int)(sizeof(req) - i));
 
     h = link_wait_open(req, i, LINK_PROBE_TICKS * 2);
-    if (h < 0) { kprintf(0xC1, "[link] L2 open failed %d\n", (int)h); return; }
+    if (h < 0) { kprintf(ATTR_YELLOW, "[link] L2 open failed %d\n", (int)h); return; }
     (void)link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 10);
     (void)link_wait_read_all(h, LINK_PROBE_TICKS * 30, 1);
     link_host_close(h, LINK_SELF_OWNER);
 
-    kprintf((link_l2_read == total && link_l2_bad == 0) ? 0x07 : 0xC1,
+    kprintf((link_l2_read == total && link_l2_bad == 0) ? KLOG_ATTR : ATTR_YELLOW,
             "[link] L2 stream: read %d/%d bytes, gaps %d, bad %d, overflow %d%s\n",
             (int)link_l2_read, (int)total, (int)link_l2_gaps, (int)link_l2_bad,
             (int)link_l2_overflow, link_l2_eof ? " (EOF)" : " (no EOF)");
@@ -1282,7 +1292,7 @@ void link_l3_service(void)
     u32 st, ln, rd;
 
     if (!link_ready || link_state != LINK_S_UP) {
-        kprintf(0xC1, "[link] L3 skipped (no peer)\n");
+        kprintf(ATTR_YELLOW, "[link] L3 skipped (no peer)\n");
         return;
     }
     link_counters_reset();
@@ -1303,7 +1313,7 @@ void link_l3_service(void)
     link_l3_time_len = ln;
 
     kprintf((link_l3_get_status == 200 && link_l3_get_read == 65536 &&
-             link_l3_get_bad == 0) ? 0x07 : 0xC1,
+             link_l3_get_bad == 0) ? KLOG_ATTR : ATTR_YELLOW,
             "[link] L3: GET /pattern -> %d %d/%dB bad %d; /notfound -> %d; "
             "http -> %d %dB; TIME -> %dB\n",
             (int)link_l3_get_status, (int)link_l3_get_read, (int)link_l3_get_len,

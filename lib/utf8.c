@@ -35,10 +35,10 @@ extern KernelAPI *kapi;
 /* UTF-8文字列の先頭1文字のバイト数を返す (1~4) */
 int utf8_char_bytes(const u8 *p)
 {
-    if ((*p & 0x80) == 0)    return 1;
-    if ((*p & 0xE0) == 0xC0) return 2;
-    if ((*p & 0xF0) == 0xE0) return 3;
-    if ((*p & 0xF8) == 0xF0) return 4;
+    if ((*p & UTF8_ASCII_LIMIT) == 0)    return 1;
+    if ((*p & UTF8_LEAD2_MASK) == UTF8_LEAD2_TAG) return UTF8_LEN2;
+    if ((*p & UTF8_LEAD3_MASK) == UTF8_LEAD3_TAG) return UTF8_LEN3;
+    if ((*p & UTF8_LEAD4_MASK) == UTF8_LEAD4_TAG) return UTF8_LEN4;
     return 1; /* 不正バイトは1バイトとして扱う */
 }
 
@@ -64,15 +64,15 @@ int utf8_char_bytes(const u8 *p)
 u32 utf8_pack32(const u8 *p)
 {
     u8 b0 = p[0];
-    if (b0 < 0x80) {
+    if (b0 < UTF8_ASCII_LIMIT) {
         /* ASCII — u32読み出し不要 */
         return (u32)b0;
     }
-    if ((b0 & 0xE0) == 0xC0) {
-        return le32_rd(p) & 0x0000FFFFu;
+    if ((b0 & UTF8_LEAD2_MASK) == UTF8_LEAD2_TAG) {
+        return le32_rd(p) & UTF8_PACKED2_MASK;
     }
-    if ((b0 & 0xF0) == 0xE0) {
-        return le32_rd(p) & 0x00FFFFFFu;
+    if ((b0 & UTF8_LEAD3_MASK) == UTF8_LEAD3_TAG) {
+        return le32_rd(p) & UTF8_PACKED3_MASK;
     }
     /* 4バイトシーケンス */
     return le32_rd(p);
@@ -120,7 +120,7 @@ utf8_decode_t utf8_decode(const u8 *src)
     u8 b0 = src[0];
     u8 b1, b2, b3;
 
-    if (b0 < 0x80) {
+    if (b0 < UTF8_ASCII_LIMIT) {
         /* ASCII (1バイト) — u32読み出し不要 */
         result.codepoint = b0;
         result.bytes_used = 1;
@@ -134,44 +134,45 @@ utf8_decode_t utf8_decode(const u8 *src)
     b2 = (b1 != 0) ? src[2] : 0;
     b3 = (b2 != 0) ? src[3] : 0;
 
-    if ((b0 & 0xE0) == 0xC0) {
+    if ((b0 & UTF8_LEAD2_MASK) == UTF8_LEAD2_TAG) {
         /* 2バイトシーケンス */
-        if ((b1 & 0xC0) == 0x80) {
-            result.codepoint = ((u32)(b0 & 0x1F) << 6) | (b1 & 0x3F);
-            result.bytes_used = 2;
+        if (UTF8_IS_CONT(b1)) {
+            result.codepoint = ((u32)(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS) |
+                               (b1 & UTF8_CONT_PAYLOAD_MASK);
+            result.bytes_used = UTF8_LEN2;
         } else {
-            result.codepoint = 0xFFFD;  /* 置換文字 */
+            result.codepoint = UCS_REPLACEMENT_CHAR;  /* 置換文字 */
             result.bytes_used = 1;
         }
     }
-    else if ((b0 & 0xF0) == 0xE0) {
+    else if ((b0 & UTF8_LEAD3_MASK) == UTF8_LEAD3_TAG) {
         /* 3バイトシーケンス (日本語はここ) */
-        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
-            result.codepoint = ((u32)(b0 & 0x0F) << 12) |
-                               ((u32)(b1 & 0x3F) << 6)  |
-                               (b2 & 0x3F);
-            result.bytes_used = 3;
+        if (UTF8_IS_CONT(b1) && UTF8_IS_CONT(b2)) {
+            result.codepoint = ((u32)(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (2 * UTF8_CONT_PAYLOAD_BITS)) |
+                               ((u32)(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS)  |
+                               (b2 & UTF8_CONT_PAYLOAD_MASK);
+            result.bytes_used = UTF8_LEN3;
         } else {
-            result.codepoint = 0xFFFD;
+            result.codepoint = UCS_REPLACEMENT_CHAR;
             result.bytes_used = 1;
         }
     }
-    else if ((b0 & 0xF8) == 0xF0) {
+    else if ((b0 & UTF8_LEAD4_MASK) == UTF8_LEAD4_TAG) {
         /* 4バイトシーケンス (絵文字等) */
-        if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80) {
-            result.codepoint = ((u32)(b0 & 0x07) << 18) |
-                               ((u32)(b1 & 0x3F) << 12) |
-                               ((u32)(b2 & 0x3F) << 6)  |
-                               (b3 & 0x3F);
-            result.bytes_used = 4;
+        if (UTF8_IS_CONT(b1) && UTF8_IS_CONT(b2) && UTF8_IS_CONT(b3)) {
+            result.codepoint = ((u32)(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (3 * UTF8_CONT_PAYLOAD_BITS)) |
+                               ((u32)(b1 & UTF8_CONT_PAYLOAD_MASK) << (2 * UTF8_CONT_PAYLOAD_BITS)) |
+                               ((u32)(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS)  |
+                               (b3 & UTF8_CONT_PAYLOAD_MASK);
+            result.bytes_used = UTF8_LEN4;
         } else {
-            result.codepoint = 0xFFFD;
+            result.codepoint = UCS_REPLACEMENT_CHAR;
             result.bytes_used = 1;
         }
     }
     else {
         /* 不正バイト */
-        result.codepoint = 0xFFFD;
+        result.codepoint = UCS_REPLACEMENT_CHAR;
         result.bytes_used = 1;
     }
 
@@ -182,25 +183,27 @@ utf8_decode_t utf8_decode(const u8 *src)
 /*  Unicode → ANKコード変換                                                 */
 /*  ANK描画可能なら文字コードを返す、不可なら0                                */
 /* ======================================================================== */
+#define UCS_YEN_SIGN 0x00A5
+
 u8 unicode_to_ank(u32 cp)
 {
     /* ASCII */
-    if (cp >= 0x20 && cp <= 0x7E) {
+    if (cp >= UCS_ASCII_PRINT_FIRST && cp <= UCS_ASCII_PRINT_LAST) {
         return (u8)cp;
     }
 
     /* 全角英数 → 半角ASCII にフォールバック */
-    if (cp >= 0xFF01 && cp <= 0xFF5E) {
-        return (u8)(cp - 0xFF01 + 0x21);
+    if (cp >= UCS_FULLWIDTH_ASCII_FIRST && cp <= UCS_FULLWIDTH_ASCII_LAST) {
+        return (u8)(cp - UCS_FULLWIDTH_ASCII_FIRST + '!');
     }
 
     /* 半角カナ (U+FF61-U+FF9F → ANK 0xA1-0xDF) */
-    if (cp >= 0xFF61 && cp <= 0xFF9F) {
-        return (u8)(cp - 0xFF61 + 0xA1);
+    if (cp >= UCS_HALFWIDTH_KANA_FIRST && cp <= UCS_HALFWIDTH_KANA_LAST) {
+        return (u8)(cp - UCS_HALFWIDTH_KANA_FIRST + JIS_KANA_FIRST);
     }
 
     /* バックスラッシュ/円記号 */
-    if (cp == 0x00A5) return 0x5C;  /* ¥ → \ */
+    if (cp == UCS_YEN_SIGN) return '\\';  /* ¥ → \ */
 
     return 0;
 }
@@ -249,7 +252,7 @@ void utf8_delete_last(u8 *s)
 
     /* 継続バイト(10xxxxxx)を巻き戻して先頭バイトを見つける */
     end--;
-    while (end > s && (*end & 0xC0) == 0x80) {
+    while (end > s && UTF8_IS_CONT(*end)) {
         end--;
     }
     *end = '\0';
