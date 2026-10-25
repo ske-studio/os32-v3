@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2「定数定義の3層管理」)・前の票 [TASK_MAGIC_NUM](TASK_MAGIC_NUM.md) (v3 で足された行)
 
-> 状態: **実装中 (2026-10-25)** — 洗い出し済み、段 N1 から。洗い出しの表 (file:line・値・意味・直し) は `~/os32-tmp/run/magic2/survey_{k,d,f,b}.md`。
+> 状態: **実装中 (2026-10-25)** — N1〜N13 が main (どれも sol 実装・astra 取り込み可・機械語の差 0、N1 だけ SDK の定数で FEP の ABI 世代の値が変わる)。残りは追補の N14。洗い出しの表 (file:line・値・意味・直し) は `~/os32-tmp/run/magic2/survey_{k,d,f,b}.md`。
 
 ## 0. ユーザー指示 (2026-10-25)
 
@@ -36,18 +36,19 @@ N1 が共有ヘッダの名前を作り、N2〜N13 は N1 の取り込みの後�
 
 | 段 | 触る所 | 調べ | 状態 |
 |---|---|---|---|
-| N1 | 共有の名前: include/{types,cpu,pc98,memmap,kprintf,tvram,bootinfo,config,net_eth}.h、sdk/include/os32/os32_kapi_shared.h、arch/x86/*.h、lib/utf8.h、lib/kstring.h (4 本の調べの「新しい名前」のうち、これらに置くもの) | k・d・f・b | 未着手 |
-| N2 | kernel の CPU とメモリ: gdt・tss・idt・irq・irq_math・isr_handlers・paging・physmem・kmalloc・ktime・time_math・cpu_calibrate とそれらのヘッダ | k | 未着手 |
-| N3 | kernel の asm: isr_stub.asm・ring3_entry.asm・v86_entry.asm と新しい .inc (C との値の一致を host 試験で固定) | k | 未着手 |
-| N4 | kernel の v86: v86*.c・v86*.h | k | 未着手 |
-| N5 | kernel の残り: bootinfo*・bootlog*・con_sink・console・ime*・kernel.c・sys.c・boot_splash・snd_engine とそれらのヘッダ | k | 未着手 |
-| N6 | exec・kapi (生成物を除く) | k | 未着手 |
-| N7 | drivers の NIC・PCI・ディスク: lgy98・ne2000*・pci*・dev・ide*・atapi | d | 未着手 |
-| N8 | drivers の残り: fdc*・dma8237*・loop_dev・kbd・serial・mouse*・rtc・fm・pcm_cs4231*・wab_*・pc98pt・kcg、platform/ | d | 未着手 |
-| N9 | fs (FatFs の本体を除く) | f | 未着手 |
-| N10 | gfx・net・lib (外部由来を除く) | f | 未着手 |
-| N11 | boot の C とヘッダ: boot_defs.h・ext2_mini.c・vk32_boot.c・lz4_mini.c・boot_debug.c・boot_main.c | b | 未着手 |
-| N12 | boot の asm: boot_fat.asm・boot_hdd.asm・loader_hdd.asm・loader.ld・bootinfo_rm.inc と新しい .inc (C との値の一致を host 試験で固定) | b | 未着手 |
-| N13 | boot の FAT ローダ: loader_fat_new.asm (最も密なので単独) | b | 未着手 |
+| N1 | 共有の名前: include/{types,cpu,pc98,memmap,kprintf,tvram,bootinfo,config,net_eth}.h、sdk/include/os32/os32_kapi_shared.h、arch/x86/*.h、lib/utf8.h、lib/kstring.h (4 本の調べの「新しい名前」のうち、これらに置くもの) | k・d・f・b | **main** |
+| N2 | kernel の CPU とメモリ: gdt・tss・idt・irq・irq_math・isr_handlers・paging・physmem・kmalloc・ktime・time_math・cpu_calibrate とそれらのヘッダ | k | **main** |
+| N3 | kernel の asm: isr_stub.asm・ring3_entry.asm・v86_entry.asm と新しい .inc (C との値の一致を host 試験で固定) | k | **main** |
+| N4 | kernel の v86: v86*.c・v86*.h | k | **main** |
+| N5 | kernel の残り: bootinfo*・bootlog*・con_sink・console・ime*・kernel.c・sys.c・boot_splash・snd_engine とそれらのヘッダ | k | **main** |
+| N6 | exec・kapi (生成物を除く) | k | **main** |
+| N7 | drivers の NIC・PCI・ディスク: lgy98・ne2000*・pci*・dev・ide*・atapi | d | **main** |
+| N8 | drivers の残り: fdc*・dma8237*・loop_dev・kbd・serial・mouse*・rtc・fm・pcm_cs4231*・wab_*・pc98pt・kcg、platform/ | d | **main** |
+| N9 | fs (FatFs の本体を除く) | f | **main** |
+| N10 | gfx・net・lib (外部由来を除く) | f | **main** |
+| N11 | boot の C とヘッダ: boot_defs.h・ext2_mini.c・vk32_boot.c・lz4_mini.c・boot_debug.c・boot_main.c | b | **main** |
+| N12 | boot の asm: boot_fat.asm・boot_hdd.asm・loader_hdd.asm・loader.ld・bootinfo_rm.inc と新しい .inc (C との値の一致を host 試験で固定) | b | **main** |
+| N13 | boot の FAT ローダ: loader_fat_new.asm (最も密なので単独) | b | **main** |
+| N14 | 追補: 各段が持ち越したもの (ABI の世代の値が変わる vfs.h の世代の上限・dma_pool.h の DMA_POOL_PAGE_SIZE・fm.h の SSG_PERIOD と NOTE、道具が数字しか読めない boot_defs.h の MAX_IMAGE_SIZE) と、各段が挙げた「共有に足したい名前」の重複の整理。ABI の世代の値は変わってよい (前の票の M2・K3 と同じ扱い、PM 決定) | 各段の報告 | 未着手 |
 
 各段の完了条件は前の票 §3 と同じ: `make all` rc=0、機械語の比べ、`check_select.py --select --files <差分>` の候補を全部 `MUTATE=0` で rc=0、`check_select.py --lint` rc=0、`stale_anchor.py`。2 時間に収まらなければ A を先にし、残りを報告の「未了」に書く (PM が追補の段に回す)。
