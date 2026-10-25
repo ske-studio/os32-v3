@@ -6,6 +6,11 @@
  * Phase 2+: IDT/PIC/PIT + キーボード + ミニシェル
  * ============================================================ */
 
+#define GUI_FAULT_STREAK_MAX 3
+/* Preserve the boot status helpers' existing scratch capacities. */
+#define BOOT_STATUS_NUM_BUFSIZE 16
+#define BOOT_BYTE_HEX_BUFSIZE    8
+#include "boot_devices.h"
 #include "serial_diag.h"
 #include "idt.h"
 #include "tss.h"
@@ -116,7 +121,7 @@ static void tvram_print(int x, int y, const char *str, u8 color)
     while (*str) {
         if (x >= TVRAM_COLS) { x = 0; y++; }
         if (y >= TVRAM_ROWS) break;
-        offset = (u32)y * TVRAM_BPR + (u32)x * 2;
+        offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
         *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = (u16)(u8)*str;
         *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
         str++; x++;
@@ -137,7 +142,7 @@ static char *tv_cat(char *dst, const char *src)
  * (0x0F → "f")、足りない分だけ '0' を先に置く。 */
 static char *tv_cat_hex2(char *dst, u8 val)
 {
-    char tmp[8];
+    char tmp[BOOT_BYTE_HEX_BUFSIZE];
     int len;
 
     len = kutoa_hex((u32)val, tmp, (int)sizeof(tmp), 0);
@@ -148,7 +153,7 @@ static char *tv_cat_hex2(char *dst, u8 val)
 /* 符号付き 10 進を連結する。 */
 static char *tv_cat_dec(char *dst, int val)
 {
-    char tmp[16];
+    char tmp[BOOT_STATUS_NUM_BUFSIZE];
 
     if (val < 0) {
         *dst = '-'; dst++; *dst = '\0';
@@ -188,7 +193,7 @@ static inline void kernel_mount_children(u32 boot_drive);
 
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
-    char tmp[16];
+    char tmp[BOOT_STATUS_NUM_BUFSIZE];
     int mb;
 
     kstack_hw_init();
@@ -207,7 +212,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * **paging_init より前** に済ませる: ページングを張る範囲も pgalloc の
      * 表の大きさも、ここで決まった量から導かれる。 */
     mem_kb = memory_boot_detect(mem_kb);
-    mb = mem_kb / 1024;
+    mb = mem_kb / KIB;
     sys_mem_kb = mem_kb;
     
     tvram_clear();
@@ -355,7 +360,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 00BEh のデコードイメージで嘘をつく機種がある (io_fdd.md)。
      * 表示だけ残して進む ([V4]: 黙って成功にしない)。 */
     fdc_set_media_by_daua(0, boot_drive);
-    if ((boot_drive & 0xF0) == 0x30 || (boot_drive & 0xF0) == 0xB0) {
+    if ((boot_drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144 || (boot_drive & BIOS_DA_TYPE_MASK) == BIOS_DA_FD_144_ALT) {
         u8 m3 = (u8)inp(FDC_IO_3MODE);
         tvram_print(69, 1, "144", TATTR_GREEN);
         tvram_print(72, 1, (m3 & FDC_3M_CUR_144) ? "M" : "?",
@@ -394,7 +399,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         if (n > 0) {
             int d;
             tvram_print(5, 3, "OK", TATTR_WHITE);
-            for (d = 0; d < 4; d++) {
+            for (d = 0; d < IDE_DRIVE_COUNT; d++) {
                 if (ide_drive_present(d)) dev_register_hdd(d);
             }
         } else {
@@ -415,7 +420,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     {
         /* KHEAP_SIZE から出す (決め打ちの "320K" が 2026-09-23 の切り直しで嘘になった) */
         char hb[8];
-        kutoa_dec((u32)(KHEAP_SIZE / 1024UL), hb, (int)sizeof(hb));
+        kutoa_dec((u32)(KHEAP_SIZE / KIB), hb, (int)sizeof(hb));
         kstrncat(hb, "K", sizeof(hb));
         tvram_print(31, 2, hb, TATTR_WHITE);
     }
@@ -479,7 +484,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     {
         u32 cr0_val;
         __asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));
-        cr0_val &= ~((u32)0x0C);  /* EM(bit2) と TS(bit3) をクリア */
+        cr0_val &= ~((u32)(CR0_EM | CR0_TS));  /* EM(bit2) と TS(bit3) をクリア */
         __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
         __asm__ volatile("fninit");
     }
@@ -765,7 +770,7 @@ static inline void kernel_shell_loop(void)
              *              (実装レビュー ラリー 2 の B1。以前は案内が無く、
              *              gshell の読み込み失敗としか出なかった) */
             if (is_gui && shlib_reject_reason() == SHLIB_REJECT_LAYOUT) {
-                kprintf(0xC1, "[boot] %s: rebuild required (KAPI data layout)"
+                kprintf(ATTR_YELLOW, "[boot] %s: rebuild required (KAPI data layout)"
                         " -> CUI shell. rebuild /sys and deploy\n", SYS_SHLIB_GUI);
                 console_text_gdc_start();
                 tvram_clear();
@@ -774,7 +779,7 @@ static inline void kernel_shell_loop(void)
                 cur_shell = SYS_SHELL_BIN;
                 is_gui = 0;
             } else if (is_gui && shlib_reject_reason() == SHLIB_REJECT_MIN_API) {
-                kprintf(0xC1, "[boot] %s: needs KAPI v%u > kernel v%u -> CUI shell."
+                kprintf(ATTR_YELLOW, "[boot] %s: needs KAPI v%u > kernel v%u -> CUI shell."
                         " update the kernel first\n", SYS_SHLIB_GUI,
                         shlib_reject_min_api(), (u32)KAPI_VERSION);
                 console_text_gdc_start();
@@ -832,7 +837,7 @@ static inline void kernel_shell_loop(void)
             if (is_gui) {
                 if (rc == EXEC_ERR_FAULT) {
                     gui_fault_streak++;
-                    if (gui_fault_streak >= 3) {
+                    if (gui_fault_streak >= GUI_FAULT_STREAK_MAX) {
                         tvram_print(0, 0, "gshell crashed 3x -> CUI shell", TATTR_RED);
                         cur_shell = SYS_SHELL_BIN;
                         gui_fault_streak = 0;
@@ -851,7 +856,7 @@ static inline void kernel_shell_loop(void)
                          * TASK_KAPI_DATA_FIELDS)。走らせても malloc が壊れる
                          * ので止める。直し方は /sys の作り直しと配備 — NHD は
                          * エミュレータ停止中に一式、実機は FD / CD の入れ直し。 */
-                        kprintf(0xC1, "[boot] FATAL: shell.bin was built for another"
+                        kprintf(ATTR_YELLOW, "[boot] FATAL: shell.bin was built for another"
                                 " KAPI data layout (kernel %x)\n",
                                 (u32)KAPI_DATA_FIELDS_OFF);
                         tvram_print(0, 0, "FATAL: shell.bin: rebuild required (KAPI data layout)",

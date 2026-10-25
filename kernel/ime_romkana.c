@@ -237,19 +237,19 @@ void ime_hira_to_kata(char *utf8_str)
     u8 *p = (u8 *)utf8_str;
     u16 code;
     while (*p) {
-        if ((p[0] & 0xF0) == 0xE0 && UTF8_IS_CONT(p[1]) &&
+        if ((p[0] & UTF8_LEAD3_MASK) == UTF8_LEAD3_TAG && UTF8_IS_CONT(p[1]) &&
             UTF8_IS_CONT(p[2])) {
-            code = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) |
-                   (p[2] & 0x3F);
+            code = ((p[0] & UTF8_LEAD3_PAYLOAD_MASK) << (2 * UTF8_CONT_PAYLOAD_BITS)) | ((p[1] & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS) |
+                   (p[2] & UTF8_CONT_PAYLOAD_MASK);
             if (code >= UCS_HIRAGANA_FIRST && code <= 0x3096) {
-                code += 0x0060;
-                p[0] = 0xE0 | ((code >> 12) & 0x0F);
-                p[1] = 0x80 | ((code >>  6) & 0x3F);
-                p[2] = 0x80 | (code & 0x3F);
+                code += UCS_KATAKANA_FIRST - UCS_HIRAGANA_FIRST;
+                p[0] = UTF8_LEAD3_TAG | ((code >> (2 * UTF8_CONT_PAYLOAD_BITS)) & UTF8_LEAD3_PAYLOAD_MASK);
+                p[1] = UTF8_CONT_TAG | ((code >> UTF8_CONT_PAYLOAD_BITS) & UTF8_CONT_PAYLOAD_MASK);
+                p[2] = UTF8_CONT_TAG | (code & UTF8_CONT_PAYLOAD_MASK);
             }
-            p += 3;
-        } else if ((p[0] & 0xE0) == 0xC0) {
-            p += 2;
+            p += UTF8_LEN3;
+        } else if ((p[0] & UTF8_LEAD2_MASK) == UTF8_LEAD2_TAG) {
+            p += UTF8_LEN2;
         } else {
             p += 1;
         }

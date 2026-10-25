@@ -6,10 +6,24 @@
 /*  SE 発火時は FM Ch2 / SSG ChC を一時借用し、終了後にBGM復帰。           */
 /* ======================================================================== */
 
+#include "memmap.h"
 #include "snd_engine.h"
 #include "fm.h"
 #include "io.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* */
+
+#define SND_NOTE_LETTERS     7
+#define SND_SEMITONES        12
+#define SND_BASE_OCTAVE      4
+#define SND_CHANNELS         (2 * OPN_CHANNEL_COUNT)
+/* PIT_HZ is the engine's tick rate; defaults retain the 120 BPM timing. */
+#define SND_TICKS_PER_MIN    (60 * PIT_HZ)
+#define SND_DEFAULT_DURATION (PIT_HZ / 2)
+#define SND_WHOLE_TICKS      (2 * PIT_HZ)
+/* Local until the driver header owns these shared hardware constants. */
+#define SSG_VOLUME_MAX       15
+#define SSG_MIXER_TONE_ONLY  0x38
+
 
 /* ======================================================================== */
 /*  外部参照                                                                */
@@ -32,13 +46,13 @@ extern int res_owner_get(void);
 
 /* ノート文字→音名インデックス変換テーブル */
 /*  C=0, D=2, E=4, F=5, G=7, A=9, B=11 */
-static const int note_char_map[7] = {
+static const int note_char_map[SND_NOTE_LETTERS] = {
     9, 11, 0, 2, 4, 5, 7   /* A, B, C, D, E, F, G */
 };
 
 /* SSG周波数: ノート番号→period 簡易テーブル (オクターブ4基準) */
 /* Period = 62400 / freq, freq = 440 * 2^((note-57)/12) */
-static const u16 ssg_period_base[12] = {
+static const u16 ssg_period_base[SND_SEMITONES] = {
     956,  902,  851,  804,  758,  716,
     676,  638,  602,  568,  536,  506
 };
@@ -130,13 +144,13 @@ static int g_snd_owner = 1;
 
 static u16 ssg_period_from_note(int note)
 {
-    int octave = note / 12;
-    int key = note % 12;
+    int octave = note / SND_SEMITONES;
+    int key = note % SND_SEMITONES;
     u16 base = ssg_period_base[key];
     int shift;
 
     /* オクターブ4基準。4以上なら右シフト(高音)、4未満なら左シフト(低音) */
-    shift = octave - 4;
+    shift = octave - SND_BASE_OCTAVE;
     if (shift > 0) {
         while (shift > 0) { base >>= 1; shift--; }
     } else if (shift < 0) {
@@ -192,13 +206,13 @@ static void snd_bgm_start_note(SndBGMTrack *bgm)
     /* 発音 or 休符 */
     if (note->note != SND_REST) {
         if (!snd_ch_is_borrowed(note->channel)) {
-            if (note->channel < 3) {
+            if (note->channel < OPN_CHANNEL_COUNT) {
                 fm_set_tone_num(note->channel, note->tone);
                 fm_note_on(note->channel, note->note);
             } else {
-                int ssg_ch = note->channel - 3;
+                int ssg_ch = note->channel - OPN_CHANNEL_COUNT;
                 ssg_tone(ssg_ch, ssg_period_from_note(note->note));
-                ssg_volume(ssg_ch, 15);
+                ssg_volume(ssg_ch, SSG_VOLUME_MAX);
             }
         }
         /* 借用中でも保存情報を更新 */
@@ -248,10 +262,10 @@ static void snd_bgm_tick(void)
     if (cur->note != SND_REST && cur->note != SND_END &&
         cur->note != SND_LOOP_MARK) {
         if (!snd_ch_is_borrowed(cur->channel)) {
-            if (cur->channel < 3) {
+            if (cur->channel < OPN_CHANNEL_COUNT) {
                 fm_note_off(cur->channel);
             } else {
-                ssg_volume(cur->channel - 3, 0);
+                ssg_volume(cur->channel - OPN_CHANNEL_COUNT, 0);
             }
         }
     }
@@ -319,7 +333,7 @@ static void snd_ssg_se_tick(void)
                 ssg_tone(SND_SSG_SE_CH,
                          ssg_period_from_note(
                              g_snd.ssg_borrow.saved_note));
-                ssg_volume(SND_SSG_SE_CH, 15);
+                ssg_volume(SND_SSG_SE_CH, SSG_VOLUME_MAX);
             }
         }
     }
@@ -343,8 +357,8 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
                           int *out_loop_pos)
 {
     int pos = 0;
-    int octave = 4;
-    int default_dur = 50;   /* 4分音符 = 500ms @ 120BPM */
+    int octave = SND_BASE_OCTAVE;
+    int default_dur = SND_DEFAULT_DURATION;   /* 4分音符 = 500ms @ 120BPM */
     int channel = 0;
     int tone = 0;
     int loop_pos = -1;
@@ -360,7 +374,7 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
         if (ch == 'T' || ch == 't') {
             int bpm = parse_mml_number(&mml);
             if (bpm > 0) {
-                default_dur = 6000 / bpm;
+                default_dur = SND_TICKS_PER_MIN / bpm;
                 if (default_dur < 1) default_dur = 1;
             }
             continue;
@@ -383,7 +397,7 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
         if (ch == 'L' || ch == 'l') {
             int len = parse_mml_number(&mml);
             if (len > 0) {
-                default_dur = 200 / len;  /* 全音符=200tick基準 */
+                default_dur = SND_WHOLE_TICKS / len;  /* 全音符=200tick基準 */
                 if (default_dur < 1) default_dur = 1;
             }
             continue;
@@ -394,7 +408,7 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
             if (*mml == 'C' || *mml == 'c') {
                 mml++;
                 channel = parse_mml_number(&mml);
-                if (channel > 5) channel = 0;
+                if (channel >= SND_CHANNELS) channel = 0;
             } else if (*mml == 'T' || *mml == 't') {
                 mml++;
                 tone = parse_mml_number(&mml);
@@ -423,11 +437,11 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
             int dur = default_dur;
             int num = parse_mml_number(&mml);
             if (num > 0) {
-                dur = 200 / num;
+                dur = SND_WHOLE_TICKS / num;
                 if (dur < 1) dur = 1;
             }
             out[pos].note = SND_REST;
-            out[pos].duration = (u8)(dur > 255 ? 255 : dur);
+            out[pos].duration = (u8)(dur > (int)U8_MAX ? (int)U8_MAX : dur);
             out[pos].channel = (u8)channel;
             out[pos].tone = 0;
             pos++;
@@ -453,7 +467,7 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
             /* 個別の音符長 */
             num = parse_mml_number(&mml);
             if (num > 0) {
-                dur = 200 / num;
+                dur = SND_WHOLE_TICKS / num;
                 if (dur < 1) dur = 1;
             }
 
@@ -463,8 +477,8 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
                 mml++;
             }
 
-            out[pos].note = (u8)(octave * 12 + idx + sharp);
-            out[pos].duration = (u8)(dur > 255 ? 255 : dur);
+            out[pos].note = (u8)(octave * SND_SEMITONES + idx + sharp);
+            out[pos].duration = (u8)(dur > (int)U8_MAX ? (int)U8_MAX : dur);
             out[pos].channel = (u8)channel;
             out[pos].tone = (u8)tone;
             pos++;
@@ -709,7 +723,7 @@ void snd_bgm_play(const char *mml)
 
     /* OPN初期化 + SSGミキサーを全チャンネルトーンONに設定 */
     opn_init();
-    ssg_mixer(0x38);   /* bit0-2=0: ChA/B/CトーンON, bit3-5=1: ノイズOFF */
+    ssg_mixer(SSG_MIXER_TONE_ONLY);   /* bit0-2=0: ChA/B/CトーンON, bit3-5=1: ノイズOFF */
 
     /* 最初のノートを即座に発音開始 */
     snd_bgm_start_note(&g_snd.bgm);
@@ -767,7 +781,7 @@ void snd_se_play_raw(int note, int duration_ticks, int tone)
     if (!g_snd.master_enable) return;
     if (owner > 0 && owner < SND_OWNER_MAX && owner != g_snd_owner) return;
     if (duration_ticks < 1) duration_ticks = 1;
-    if (duration_ticks > 255) duration_ticks = 255;
+    if (duration_ticks > (int)U8_MAX) duration_ticks = (int)U8_MAX;
 
     flags = irq_save();
     snd_fm_se_start(tone, note, duration_ticks);
@@ -847,7 +861,7 @@ i32 snd_focus(int app_id)
         g_snd.bgm.playing = 1;
         if (g_snd.master_enable) {
             opn_init();
-            ssg_mixer(0x38);
+            ssg_mixer(SSG_MIXER_TONE_ONLY);
             /* いまのノートを鳴らし直す (next_tick は tick_count から張り直る) */
             snd_bgm_start_note(&g_snd.bgm);
         }

@@ -10,6 +10,7 @@
 /*  重ねて読むと試験が i386 と違う並びを見る。                              */
 /* ======================================================================== */
 
+#include "kstring.h"
 #include "bootinfo.h"
 
 static u16 rd16(const u8 *p)
@@ -174,7 +175,7 @@ static void lb_str(struct linebuf *lb, const char *s)
 
 static void lb_dec(struct linebuf *lb, u32 v)
 {
-    char t[12];
+    char t[U32_DEC_BUFSIZE + 1];
     int n = 0;
 
     do {
@@ -190,7 +191,7 @@ static void lb_hex(struct linebuf *lb, u32 v, int digits)
     int i;
 
     for (i = digits - 1; i >= 0; i--) {
-        lb_ch(lb, hx[(v >> (i * 4)) & 0xFUL]);
+        lb_ch(lb, hx[(v >> (i * HEX_NIBBLE_BITS)) & ((1UL << HEX_NIBBLE_BITS) - 1)]);
     }
 }
 
@@ -222,7 +223,7 @@ int bootinfo_format_bios(const struct bootinfo *bi, int slot,
     if (lb_init(&lb, buf, size) != 0) return 0;
     if (bi == 0 || bi->status != BOOTINFO_OK) {
         lb_str(&lb, "[hdd] bios geom: none (magic ");
-        lb_hex(&lb, bi ? bi->magic : 0UL, 8);
+        lb_hex(&lb, bi ? bi->magic : 0UL, HEX32_DIGITS);
         lb_str(&lb, " err=");
         if (bi && bi->status < 0) {
             lb_ch(&lb, '-');

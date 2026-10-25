@@ -55,7 +55,12 @@ def main():
         shim.mkdir()
         (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'include/memmap.h') + '"\n'
             'extern unsigned char test_shm[];\n#undef MEM_SHM_BASE\n#define MEM_SHM_BASE test_shm\n')
-        (work / 'fep_boundary_host.c').write_text((ROOT / 'tools/tests/fep_boundary_host.c').read_text())
+        # ime_dict_host suppresses kstring.h's libc declarations. Keep its
+        # ASCII constants from the real header without duplicating their values.
+        ascii_constants = '\n'.join(line for line in (ROOT / 'lib/kstring.h').read_text().splitlines()
+                                    if line.startswith('#define ASCII_'))
+        (work / 'fep_boundary_host.c').write_text(ascii_constants + '\n' +
+            (ROOT / 'tools/tests/fep_boundary_host.c').read_text())
         sources = {p: (ROOT / p).read_text() for p in ('kernel/ime.c', 'kernel/ime_dict.c')}
         cases = [('normal', None)]
         if args.mutate:

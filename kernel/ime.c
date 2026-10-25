@@ -5,6 +5,13 @@
 /*  ローマ字変換は ime_romkana.c、辞書検索は ime_dict.c に分離               */
 /* ======================================================================== */
 
+#define IME_DICT_LARGE      2
+#define IME_CAND_COLS       3
+#define IME_CAND_COL_WIDTH  26
+#define IME_CAND_LABEL_COLS 2
+#define IME_PAGE_COL        74
+/* "dd/dd)" after the opening parenthesis. */
+#define IME_COUNT_TEXT_COLS ((int)sizeof("00/00)") - 1)
 #include "memmap.h"
 #include "ime.h"
 #include "sqlite_engine.h"
@@ -77,7 +84,6 @@ static int page_count(const IME_State *s)
 }
 
 #define CANDLIST_SAVE_ROWS  3
-#define CANDLIST_SAVE_COLS  80
 
 static u16 *g_cand_save_text = NULL;
 static u8  *g_cand_save_attr = NULL;
@@ -89,7 +95,7 @@ static void candlist_save(void)
     int top;
     int y, x;
 
-    rows = (g_ime.per_page + 2) / 3;
+    rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
     top = IME_PREEDIT_ROW - rows;
 
     if (g_cand_has_saved) return;
@@ -98,8 +104,8 @@ static void candlist_save(void)
     for (y = 0; y < rows; y++) {
         for (x = 0; x < TVRAM_COLS; x++) {
             tvram_readchar_at(x, top + y,
-                              &g_cand_save_text[y * CANDLIST_SAVE_COLS + x],
-                              &g_cand_save_attr[y * CANDLIST_SAVE_COLS + x]);
+                              &g_cand_save_text[y * TVRAM_COLS + x],
+                              &g_cand_save_attr[y * TVRAM_COLS + x]);
         }
     }
     g_cand_has_saved = 1;
@@ -114,14 +120,14 @@ static void candlist_restore(void)
     if (!g_cand_has_saved) return;
     if (!g_cand_save_text || !g_cand_save_attr) return;
 
-    rows = (g_ime.per_page + 2) / 3;
+    rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
     top = IME_PREEDIT_ROW - rows;
 
     for (y = 0; y < rows; y++) {
         for (x = 0; x < TVRAM_COLS; x++) {
-            u32 offset = (u32)(top + y) * TVRAM_BPR + (u32)x * 2;
-            *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = g_cand_save_text[y * CANDLIST_SAVE_COLS + x];
-            *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = g_cand_save_attr[y * CANDLIST_SAVE_COLS + x];
+            u32 offset = (u32)(top + y) * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
+            *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = g_cand_save_text[y * TVRAM_COLS + x];
+            *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = g_cand_save_attr[y * TVRAM_COLS + x];
         }
     }
     g_cand_has_saved = 0;
@@ -136,7 +142,7 @@ static void candlist_clear(void)
 
 static void candlist_draw(void)
 {
-    int rows = (g_ime.per_page + 2) / 3;
+    int rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
     int top  = IME_PREEDIT_ROW - rows;
     int base = g_ime.page * g_ime.per_page;
     int n    = page_count(&g_ime);
@@ -157,14 +163,14 @@ static void candlist_draw(void)
     for (i = 0; i < n; i++) {
         int gi = base + i;
         u8  col = (gi == g_ime.candidate_idx) ? ATTR_YELLOW : ATTR_WHITE;
-        y = top + (i / 3);
-        x = (i % 3) * 26;
+        y = top + (i / IME_CAND_COLS);
+        x = (i % IME_CAND_COLS) * IME_CAND_COL_WIDTH;
 
         /* 番号 "1 " */
         g_ime.render->putc(x, y, '1' + i, ATTR_CYAN);
         g_ime.render->putc(x + 1, y, ' ', col);
         /* 候補文字列 */
-        draw_utf8(x + 2, y, g_ime.results[gi].kanji, col);
+        draw_utf8(x + IME_CAND_LABEL_COLS, y, g_ime.results[gi].kanji, col);
     }
 
     /* ページ位置表示 "1/2" などを末尾（右端付近）に表示 */
@@ -173,7 +179,7 @@ static void candlist_draw(void)
     pbuf[1] = '/';
     pbuf[2] = '0' + max_page;
     pbuf[3] = '\0';
-    draw_utf8(74, IME_PREEDIT_ROW - 1, pbuf, ATTR_CYAN);
+    draw_utf8(IME_PAGE_COL, IME_PREEDIT_ROW - 1, pbuf, ATTR_CYAN);
 }
 
 static void preedit_clear(void)
@@ -214,7 +220,7 @@ static void preedit_draw(void)
         }
 
         /* 候補番号表示 */
-        if (g_ime.result_count > 1 && x < TVRAM_COLS - 6) {
+        if (g_ime.result_count > 1 && x < TVRAM_COLS - IME_COUNT_TEXT_COLS) {
             char nbuf[8];
             int ni;
             g_ime.render->putc(x++, IME_PREEDIT_ROW, '(', ATTR_CYAN);
@@ -254,7 +260,7 @@ static void preedit_draw(void)
 static void append_rk_output(void)
 {
     int olen = (int)kstrlen(g_ime.rk.output);
-    if (g_ime.kana_len + olen < 127) {
+    if (g_ime.kana_len + olen < (int)sizeof(g_ime.kana_buf) - 1) {
         kmemcpy(g_ime.kana_buf + g_ime.kana_len, g_ime.rk.output, olen);
         g_ime.kana_len += olen;
         g_ime.kana_buf[g_ime.kana_len] = '\0';
@@ -290,7 +296,7 @@ static void commit_candidate(void)
 {
     if (g_ime.candidate_idx < g_ime.result_count) {
         int len = (int)kstrlen(g_ime.results[g_ime.candidate_idx].kanji);
-        if (len > 255) len = 255;
+        if (len > (int)sizeof(g_ime.commit_buf) - 1) len = (int)sizeof(g_ime.commit_buf) - 1;
         kmemcpy(g_ime.commit_buf, g_ime.results[g_ime.candidate_idx].kanji, len);
         g_ime.commit_len = len;
         g_ime.commit_pos = 0;
@@ -450,7 +456,7 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
     }
 
     /* ESC / BS (キャンセル / 畳む) */
-    if (ascii == 0x1B || scancode == KEY_BS) {
+    if (ascii == ASCII_ESC || scancode == KEY_BS) {
         if (g_ime.state == IME_ST_CANDLIST) {
             /* CANDLIST -> CONVERT に戻す (リストを畳む) */
             candlist_clear();
@@ -544,7 +550,7 @@ static inline int ime_input_key(u8 ascii, u8 scancode)
     }
 
     /* ESC: かなバッファをクリア */
-    if (ascii == 0x1B) {
+    if (ascii == ASCII_ESC) {
         if (g_ime.kana_len > 0 || g_ime.rk.preedit[0] != '\0') {
             g_ime.kana_buf[0] = '\0';
             g_ime.kana_len = 0;
@@ -576,7 +582,7 @@ static inline int ime_input_key(u8 ascii, u8 scancode)
     }
 
     /* 英字/記号: ローマ字変換 */
-    if (ascii >= 0x20 && ascii <= 0x7E && scancode != KEY_SPACE) {
+    if (ascii >= ASCII_PRINT_FIRST && ascii <= ASCII_PRINT_LAST && scancode != KEY_SPACE) {
         if (ime_rk_append(&g_ime.rk, (char)ascii)) {
             append_rk_output();
         }
@@ -611,7 +617,7 @@ void ime_init(void)
     g_ime.mode = IME_MODE_OFF;
     g_ime.dict_loaded = 0;
     g_ime.state = IME_ST_INPUT;
-    g_ime.per_page = 9;
+    g_ime.per_page = IME_CAND_COLS * CANDLIST_SAVE_ROWS;
     g_ime.render = &g_ime_render_tvram;
     ime_rk_init(&g_ime.rk);
 
@@ -628,10 +634,10 @@ int ime_dict_boot(void)
 {
     if (g_ime.dict_loaded) return 0;
     if (services_boot_fault != SERVICES_FAULT_FEP_TEXT)
-        g_cand_save_text = kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u16));
+        g_cand_save_text = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u16));
     if (!g_cand_save_text) return -1;
     if (services_boot_fault != SERVICES_FAULT_FEP_ATTR)
-        g_cand_save_attr = kmalloc(CANDLIST_SAVE_ROWS * CANDLIST_SAVE_COLS * sizeof(u8));
+        g_cand_save_attr = kmalloc(CANDLIST_SAVE_ROWS * TVRAM_COLS * sizeof(u8));
     if (!g_cand_save_attr) return -1;
     if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
         services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
@@ -1008,7 +1014,7 @@ int ime_switch_dict(int variant)
         path = "/db/fep_s.db";
     } else if (variant == 1) {
         path = "/db/fep.db";
-    } else if (variant == 2) {
+    } else if (variant == IME_DICT_LARGE) {
         path = "/db/fep_l.db";
     } else {
         return -1;

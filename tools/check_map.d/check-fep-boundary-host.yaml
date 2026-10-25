@@ -11,6 +11,7 @@ check-fep-boundary-host:
 - kernel/ime.c
 - kernel/ime.h
 - kernel/ime_dict.c
+- lib/kstring.h
 - include/redir_access.h
 - include/io.h
 - fs/vfs_fd.c

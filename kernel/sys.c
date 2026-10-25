@@ -2,6 +2,9 @@
 /*  SYS.C — システム制御およびブザー制御                                      */
 /* ======================================================================== */
 
+#define RTC_YEAR_PIVOT    80
+#define RTC_YEAR_BASE_NEW 2000
+#define RTC_YEAR_BASE_OLD 1900
 #include "sys.h"
 #include "pgalloc.h"
 #include "memmap.h"
@@ -43,7 +46,7 @@ void buz_off(void)
     outp(SYSPORT_C_BSR, BSR_BUZ_OFF);
 }
 
-u32 sys_mem_kb = 1024; /* 初期値(1MB) */
+u32 sys_mem_kb = KIB; /* 初期値(1MB) */
 
 u32 sys_get_mem_kb(void)
 {
@@ -139,9 +142,9 @@ static u32 sys_phys_end(void)
     u32 kb;
     if (sys_frozen_end) return sys_frozen_end;
     kb = sys_mem_kb;
-    if (kb > PHYSMEM_LEGACY_MAX_PFN * (PAGE_SIZE / 1024))
-        kb = PHYSMEM_LEGACY_MAX_PFN * (PAGE_SIZE / 1024);
-    return (kb / (PAGE_SIZE / 1024)) * PAGE_SIZE;
+    if (kb > PHYSMEM_LEGACY_MAX_PFN * (PAGE_SIZE / KIB))
+        kb = PHYSMEM_LEGACY_MAX_PFN * (PAGE_SIZE / KIB);
+    return (kb / (PAGE_SIZE / KIB)) * PAGE_SIZE;
 }
 
 /* 割り当ててよい上限 (バイト)。子プロセスのスタックはここから下へ伸びる。
@@ -166,7 +169,7 @@ os_time_t sys_time(void)
     rtc_read(&t);
     y = t.year;
     /* PC-98のRTCは年号下2桁のみ。80以上なら1900年代、未満なら2000年代と仮定 */
-    if (y < 80) y += 2000;
-    else y += 1900;
+    if (y < RTC_YEAR_PIVOT) y += RTC_YEAR_BASE_NEW;
+    else y += RTC_YEAR_BASE_OLD;
     return datetime_to_epoch(y, t.month, t.day, t.hour, t.min, t.sec);
 }

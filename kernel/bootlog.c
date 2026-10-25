@@ -14,6 +14,8 @@
 
 #include "os32_kapi_shared.h"   /* OS32_ERR_EXIST / OS32_ERR_NOTFOUND (types.h より先) */
 #include "bootlog.h"
+#include "utf8.h"
+#include "kstring.h"
 
 /* 割込み禁止区間。ホスト試験は CPL=3 で走り cli/popfl を実行できないので、
  * 錠は試験側が用意する (呼んだ回数と順序、lock が返した札を unlock が
@@ -44,10 +46,10 @@ static int  g_bl_stopped;      /* bootlog_stop 後は 1。BSS なので最初か
 /* UTF-8 の先頭バイトが示す文字の長さ (継続バイト 10xxxxxx は 0、不正は 1)。 */
 static u32 bl_utf8_len(u8 c)
 {
-    if ((c & 0xC0u) == 0x80u) return 0;
-    if ((c & 0xE0u) == 0xC0u) return 2;
-    if ((c & 0xF0u) == 0xE0u) return 3;
-    if ((c & 0xF8u) == 0xF0u) return 4;
+    if (UTF8_IS_CONT(c)) return 0;
+    if ((c & UTF8_LEAD2_MASK) == UTF8_LEAD2_TAG) return UTF8_LEN2;
+    if ((c & UTF8_LEAD3_MASK) == UTF8_LEAD3_TAG) return UTF8_LEN3;
+    if ((c & UTF8_LEAD4_MASK) == UTF8_LEAD4_TAG) return UTF8_LEN4;
     return 1;
 }
 
@@ -61,8 +63,8 @@ static u32 bl_trim_partial_tail(void)
     u32 cont = 0, need;
     const char *t = &g_bl_buf[BL_TEXT_OFF];
 
-    while (cont < g_bl_len && cont < 3 &&
-           ((u8)t[g_bl_len - 1 - cont] & 0xC0u) == 0x80u) cont++;
+    while (cont < g_bl_len && cont < UTF8_MAX_BYTES - 1 &&
+           UTF8_IS_CONT((u8)t[g_bl_len - 1 - cont])) cont++;
     if (cont >= g_bl_len) return 0;                 /* 頭が無い (不正) — 触らない */
     need = bl_utf8_len((u8)t[g_bl_len - 1 - cont]);
     if (need == 0 || cont + 1 >= need) return 0;    /* 完結している (か不正) */
@@ -120,9 +122,9 @@ static void bl_put_str(char *dst, u32 cap, u32 *pos, const char *s)
 
 static void bl_put_dec(char *dst, u32 cap, u32 *pos, u32 v)
 {
-    char t[11];
+    char t[U32_DEC_BUFSIZE];
     int n = 0;
-    do { t[n++] = (char)('0' + (int)(v % 10u)); v /= 10u; } while (v && n < 10);
+    do { t[n++] = (char)('0' + (int)(v % 10u)); v /= 10u; } while (v && n < U32_DEC_DIGITS);
     while (n > 0 && *pos + 1 < cap) dst[(*pos)++] = t[--n];
 }
 
@@ -130,8 +132,8 @@ static void bl_put_hex8(char *dst, u32 cap, u32 *pos, u32 v)
 {
     static const char hx[] = "0123456789ABCDEF";
     int sh;
-    for (sh = 28; sh >= 0 && *pos + 1 < cap; sh -= 4)
-        dst[(*pos)++] = hx[(v >> sh) & 0xFu];
+    for (sh = (HEX32_DIGITS - 1) * HEX_NIBBLE_BITS; sh >= 0 && *pos + 1 < cap; sh -= HEX_NIBBLE_BITS)
+        dst[(*pos)++] = hx[(v >> sh) & ((1u << HEX_NIBBLE_BITS) - 1)];
 }
 
 u32 bootlog_format_header(char *buf, u32 cap, const BootlogHeaderInfo *hi)

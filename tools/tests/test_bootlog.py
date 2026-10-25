@@ -32,7 +32,7 @@ CASES = ["collect", "overflow", "utf8_latch", "stop", "header", "compose",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=", "-DBOOTLOG_NO_IRQ_LOCK"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "sdk/include/os32")]
+INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "lib", "sdk/include/os32")]
 
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
                 "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
@@ -72,7 +72,7 @@ MUTATIONS = [
      "", "本文が行の途中で終わると末尾行がくっつく"),
     (r"    buf\[pos\+\+\] = '\\n';", "    buf[pos++] = ' ';",
      "ヘッダが改行で終わらない"),
-    (r"for \(sh = 28;", "for (sh = 24;",
+    (r"for \(sh = \(HEX32_DIGITS - 1\) \* HEX_NIBBLE_BITS;", "for (sh = (HEX32_DIGITS - 2) * HEX_NIBBLE_BITS;",
      "Image CRC の上位桁を落とす (ver の %08x と突き合わせられない)"),
     (r"    if \(kind == BOOTLOG_FS_FAT\)  return SYS_BOOTLOG_OLD_83;",
      "    if (kind == BOOTLOG_FS_FAT)  return SYS_BOOTLOG_OLD;",

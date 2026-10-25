@@ -2,6 +2,7 @@ check-bootinfo-host:
 - boot/bootinfo.inc
 - drivers/ide.c
 - kernel/bootinfo.c
+- kernel/boot_devices.h
 - kernel/bootinfo_check.c
 - tools/tests/bootinfo_host.c
 - tools/tests/test_bootinfo.py
