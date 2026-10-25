@@ -71,6 +71,8 @@
 #define APP_FRAME_WORDS    13
 /* pushad の EAX スロット = 戻り値 (resume の wait_ret を書く先) */
 #define APP_FRAME_EAX      7
+/* CPL=3 の int80 が保存したユーザ ESP。 */
+#define APP_FRAME_ESP      11
 
 typedef struct {
     int  state;               /* APP_STATE_* */

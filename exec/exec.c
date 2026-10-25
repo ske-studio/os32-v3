@@ -75,7 +75,9 @@ static KernelAPI *kapi;
 /*    KAPI_FUNC_CAPACITY 本) / KAPI_DATA_FIELDS_OFF: データフィールド (値、   */
 /*    v63 から固定) / STUB_BASE: 各 8B スタブ B8<slot>CD80C3                 */
 /* ======================================================================== */
-static u8  ring3_tramp_raw[PAGE_SIZE * 2];   /* 4KB アライン用に 2 ページ分 */
+/* 4KB アライン用に 2 ページ分。 */
+#define EXEC_TRAMP_RAW_PAGES 2
+static u8  ring3_tramp_raw[PAGE_SIZE * EXEC_TRAMP_RAW_PAGES];
 static u32 ring3_tramp_page = 0;             /* 4KB 境界に揃えた実アドレス (=物理) */
 static void ring3_trampoline_init(void);
 
@@ -188,9 +190,6 @@ static void ring3_trampoline_init(void)
      * RO でも実行可能 (スタブ実行 OK)。ユーザは書けない = スタブ改竄不可。
      * CR0.WP=0 により、この初期化と per-launch のデータ更新も RO に書ける。 */
 }
-
-/* スタックを4バイト境界に揃えるためのマスク */
-#define STACK_ALIGN_MASK 3
 
 /* ======================================================================== */
 /*  コンテキストは exec/appslot.{h,c} の AppSlot 表 (K5b、票 D2/I14)         */
@@ -1386,7 +1385,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         return;
     }
     u32 slot     = frame[APP_FRAME_EAX];         /* スタブが積んだ slot (eax) */
-    u32 user_esp = frame[11];        /* CPL=3 の ESP (int が積んだ) */
+    u32 user_esp = frame[APP_FRAME_ESP];        /* CPL=3 の ESP (int が積んだ) */
     const void *args_src;
     u32 nbytes;
     u32 window;
@@ -1435,7 +1434,7 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
 
     /* 本物の表から wrap_<slot> を取得 ([magic][version] の後が fn 表)。 */
     wrapptr = ((const u32 *)KAPI_ADDR)[KAPI_FN_TABLE_FIRST + slot];
-    args_src = (const void *)(user_esp + 4u);
+    args_src = (const void *)(user_esp + sizeof(u32));
     nbytes = (u32)kapi_argsize[slot];
 
     /* --- (核) フォールトガードを立てる (v2 M2e) --- */
@@ -1463,9 +1462,9 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         u16 ptrmask = kapi_argptr[slot];
         if (ptrmask) {
             const u32 *a = (const u32 *)args_src;
-            u32 nfixed = nbytes / 4u;   /* 固定引数の個数 */
+            u32 nfixed = nbytes / sizeof(u32);   /* 固定引数の個数 */
             u32 k;
-            for (k = 0; k < nfixed && k < 16u; k++) {
+            for (k = 0; k < nfixed && k < sizeof(ptrmask) * BITS_PER_BYTE; k++) {
                 if ((ptrmask & (u16)(1u << k)) && !ring3_ptr_ok(a[k])) {
                     ring3_fault_kill();   /* 範囲外ポインタ → kill、戻らない */
                 }
@@ -1717,7 +1716,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         int lrc = os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
         if (lrc != OS32X_LAYOUT_OK) {
             if (is_shell) g_layout_reject = 1;
-            kprintf(0xC1, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
+            kprintf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
                     os32x_layout_reason(lrc),
                     (lrc == OS32X_LAYOUT_MISMATCH) ? hdr->kapi_data_off : 0u,
                     (u32)KAPI_DATA_FIELDS_OFF);
@@ -1792,11 +1791,11 @@ static int exec_launch(const char *cmdline, int gui_arg)
     if (want_ring3) {
         need_pages = exec_ring3_pages(load_base, sbrk_end, exec_heap_size, stack_size);
         if (appslot_start_admit(gui, need_pages, pgalloc_free_pages()) < 0) {
-            shell_print("[DBG] NOMEM: need pages=", 0xE1);
-            shell_print_dec(need_pages, 0xE1);
-            shell_print(" free=", 0xE1);
-            shell_print_dec(pgalloc_free_pages(), 0xE1);
-            shell_print("\n", 0xE1);
+            shell_print("[DBG] NOMEM: need pages=", ATTR_WHITE);
+            shell_print_dec(need_pages, ATTR_WHITE);
+            shell_print(" free=", ATTR_WHITE);
+            shell_print_dec(pgalloc_free_pages(), ATTR_WHITE);
+            shell_print("\n", ATTR_WHITE);
             exec_restore_band(launcher_id);
             return EXEC_ERR_NOMEM;
         }
@@ -1962,7 +1961,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         static u32 saved_esp_stack[APP_SLOT_COUNT];
 
         stack_top -= (cmd_len + 1);
-        stack_top &= ~((u32)STACK_ALIGN_MASK);
+        stack_top &= ~((u32)(ABI_WORD_ALIGN - 1));
         str_addr = stack_top;
 
         stack_top -= sizeof(char *) * OS32_MAX_ARGS;

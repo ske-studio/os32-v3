@@ -805,7 +805,7 @@ int appslot_state(int id)
     /* 4 = ポーリングの譲り (票 T8 D8)。WM は「常に ready、優先度は最下位」
      * として扱う — 3 と違い、注入リングが空でも起こしてよい。 */
     if (a->state == APP_STATE_WAIT_POLL) return APP_STATE_WAIT_POLL;
-    return 2;
+    return APP_STATE_PARKED;
 }
 
 /* ======================================================================== */
