@@ -11,6 +11,7 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 import tempfile
 
 import host32
@@ -77,11 +78,16 @@ def expression_bodies(text):
     return dict(re.findall(r'^static int (\w+)(\([^\n]+\)\n\{.*?^\})', text, re.M | re.S))
 
 
-def extract_oracle():
-    """Evaluate the frozen TU alone, also before a generated product exists."""
+def load_provenance():
     provenance = json.loads((TESTS / 'recover_tables_oracle.json').read_text())
     if hashlib.sha256(ORACLE.read_bytes()).hexdigest() != provenance['oracle_sha256']:
         raise ValueError('frozen oracle SHA256 mismatch')
+    return provenance
+
+
+def extract_oracle():
+    """Evaluate the frozen TU alone, also before a generated product exists."""
+    provenance = load_provenance()
     with tempfile.TemporaryDirectory(prefix='recover-oracle-') as tmp:
         temp = pathlib.Path(tmp)
         unit = temp / 'oracle.c'
@@ -101,7 +107,6 @@ def extract_oracle():
 
 
 def check_generator_bounds():
-    import sys
     sys.path.insert(0, str(ROOT / 'tools'))
     from gen_recover_tables import narrow
     for bits in (8, 16):
@@ -122,9 +127,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--extract', type=pathlib.Path)
     args = parser.parse_args()
-    provenance = json.loads((TESTS / 'recover_tables_oracle.json').read_text())
-    if hashlib.sha256(ORACLE.read_bytes()).hexdigest() != provenance['oracle_sha256']:
-        raise ValueError('frozen oracle SHA256 mismatch')
+    provenance = load_provenance()
     old_text = ORACLE.read_text()
     source = ROOT / 'kdebug/recover_gf.c'
     new_text = preprocess(source)

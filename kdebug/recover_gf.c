@@ -5,6 +5,8 @@
  * envytools f102b82 display/nv3_prmvio.xml:11-15, nv3_pcrtc.xml:23-30.
  * Literal/trigger data has no speculative readback; PLL/PFB is never SAVED.
  * S2 real opcode layouts follow the fixed expressions. Budgets/CRC are set by owner.
+ * Rules/targets/layouts are stored narrowed in generated/recover_gf_tables.inc;
+ * recover_gf_profile_expand() widens them into the owner's plan buffer.
  */
 #include "recover_gf.h"
 #include "recover_gf_expand.h"

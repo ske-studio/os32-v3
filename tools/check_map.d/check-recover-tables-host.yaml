@@ -23,5 +23,4 @@ check-recover-tables-host:
 - build/checks.d/check-recover-tables-host.mk
 - tools/check_map.d/check-recover-tables-host.yaml
 - tools/gen_recover_tables.py
-- tools/tests/recover_tables_host.h
 - tools/tests/recover_tables_bounds.h

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate GF storage tables from compiler-evaluated, frozen oracle records.
 
-No C initializer parsing and no oracle rewriting. Without --input, evaluate
-that independent translation unit with the S2a extractor. Auxiliary arrays
-and expression functions stay in recover_gf.c; references retain their names.
+No C initializer parsing and no oracle rewriting. Without --input, the frozen
+oracle translation unit is evaluated by test_recover_tables.extract_oracle().
+Auxiliary arrays and expression functions stay in recover_gf.c; references
+retain their names.
 """
 import argparse
 import json
