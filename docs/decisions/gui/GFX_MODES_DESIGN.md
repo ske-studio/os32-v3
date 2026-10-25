@@ -276,3 +276,4 @@ static const GfxMode pegc_modes[] = {
 ## G2 の実装で PM が決めたこと (2026-10-26)
 
 - `build/cirrus-module.mk` の Cirrus の ABI の値の生成の依存一覧に `include/gfx_mode.h` を足す (G2 の触ってよいファイルに加える)。生成器は contracts の本文から値を出すので、この依存が無いと gfx_mode.h だけを変えたときに値が作り直されない (G2 の実装者の「設計の欠け」の報告)。
+- G2 で `gfx/backend_pc98.c`・`backend_pegc.c`・`backend_cirrus.c` の既存の初期化子に、新しい末尾の欄を明示の 0 (NULL) で書き足す (G2 の触ってよいファイルに加える、この 3 ファイルでは初期化子の追記だけ)。host の `-Wextra -Werror` が省いた欄を落とすため。製品の像はゼロ初期化で同じ。表の中身は G3〜G5 が入れる (段は直列なので衝突しない)。
