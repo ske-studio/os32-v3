@@ -633,6 +633,34 @@ static void mode_selection_check(void)
     gfx_backend_cirrus.modes = mode_saved[2].modes;
     gfx_backend_cirrus.mode_count = mode_saved[2].mode_count;
     gfx_backend_cirrus.default_mode = mode_saved[2].default_mode;
+    /* Boot may fail to register some/all PC98 DISPLAY records. CLIENT still
+     * supports drawing, while an existing undersized DISPLAY must reject. */
+    {
+        u32 pages[LEDGER_MAX_SURFACES] = {0};
+        gfx_set_backend_pref(GFX_PREF_PC98);
+        for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+            struct ledger_surface *sf = &ledger_surfaces[i];
+            if (!sf->npages || sf->backend != LEDGER_SF_PC98 ||
+                sf->role != LEDGER_ROLE_DISPLAY) continue;
+            pages[i] = sf->npages;
+            sf->npages = 1;
+            gfx_init();
+            CHECK(!bb[0] && !gfx_backend_pc98.bb_base);
+            sf->npages = 0;
+            gfx_init();
+            CHECK(bb[0] && gfx_backend_pc98.bb_base);
+            struct gfx_kernel_fb fb;
+            CHECK(!gfx_kernel_framebuffer(&fb) && fb.height == GFX_HEIGHT);
+            u32 bytes = gfx_counters.present_bytes;
+            gfx_present();
+            CHECK(gfx_counters.present_bytes > bytes);
+            gfx_init_200();
+            CHECK(!gfx_kernel_framebuffer(&fb) && fb.height == GFX_HEIGHT_200);
+            gfx_shutdown();
+        }
+        for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++)
+            if (pages[i]) ledger_surfaces[i].npages = pages[i];
+    }
     /* 401 lines fit the page-rounded CLIENT total, but overlap the fixed
      * 32,000-byte plane slots. No PC98 hardware initialization is allowed. */
     {

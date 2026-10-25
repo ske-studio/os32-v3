@@ -18,6 +18,10 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('pc98-display-required',
+  '    return backend == LEDGER_SF_PC98 || displays == 1;',
+  '    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);',
+  'FAIL bb[0] && gfx_backend_pc98.bb_base'),
  ('mode-capacity-disabled',
   '    if (!gfx_mode_fits(be, mode)) return 0;',
   '    if (0) return 0;',

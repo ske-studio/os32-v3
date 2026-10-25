@@ -153,7 +153,9 @@ static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
             return 0;
         displays++;
     }
-    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);
+    /* PC98 can draw from CLIENT alone when boot DISPLAY registration fails.
+     * Existing DISPLAY records still have to fit; packed requires its record. */
+    return backend == LEDGER_SF_PC98 || displays == 1;
 }
 
 /* Select only registered data after probe, before any hardware setup. */
