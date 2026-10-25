@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・版数の正典 [VERSIONS](../../decisions/VERSIONS.md)・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
 
-> 状態: **設計中 (2026-10-26)** — 設計の往復 (起草 astra → レビュー Opus) の後に実装。
+> 状態: **実装中 (2026-10-26)** — 設計確定 (astra 起草・Opus 2 往復)、版の表記 3.0-dev はユーザー決定。
 
 ## 0. ユーザー指示 (2026-10-26)
 
@@ -21,4 +21,12 @@
 
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
-| V1〜 | 版数の正典と、装置の行を実際の状態から出す口、CUI と GUI で同じ出所を使う形。段の分け方は確定設計で決める | VER_INFO (astra 起草) | 設計で決める | 設計中 |
+| V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [VER_INFO_DESIGN](../../decisions/VER_INFO_DESIGN.md) | sol | 実装中 |
+| V6 | GFX の保存の状態を取る口 (gfx_hal.h・gfx_core.c) | 同上 | sol | 実装中 |
+| V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h) | 同上 | sol | 未着手 |
+| V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | 未着手 |
+| V9・V2 | 新しい KAPI と版の文書 (一緒に取り込む) | 同上 | sol | 未着手 |
+| V10・V11 | CUI の ver と GUI の About を新しい行の読み手に (直列、取り込みは 1 回) | 同上 | sol | 未着手 |
+| V12 | 試験の注記と全体の受入の登録 | 同上 | sol | 未着手 |
+
+新しいユーザーランドは新しいカーネル専用 (KAPI の版が上がる)。旧ユーザーランドは新しいカーネルで動く。実機は boot を先に入れる順 (スキル os32-realhw-update)。ver の `services: SERVICES_READY` の行は残す (実機の更新の判定に使う)。
