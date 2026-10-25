@@ -260,3 +260,9 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
 - B2 (P3): 試験の移し方は、各ファイルの冒頭で展開済みの profile を 1 つ作り、名前を置き換える機械的な手順。§6 の試験の行数は 60〜90 より多くてよい。
 - B3 (P3): `generated/recover_gf_tables.inc` の再現は `gen_recover_tables.py --check` を check-recover-tables-host から呼んで検査する (生成物を手で直さない)。
 - B4 (P3): gf_read の条件 (`r->plan == &g->compiled->plan`) の追加で、前の RUN の compiled が残ったまま SIZE_BARS に入る組み合わせを owner 試験で 1 件確かめる (gfinit_recover_end が VERIFIED/FAILED で解放するので到達しない見込み)。
+
+## S2a の実装で設計者が決めたこと
+
+- oracle は旧 recover_gf.c のヘッダ・定数・参照配列・式関数を含む前処理済み C translation unit として固定し、元コミット・元ソースと fixture の SHA256・抽出コマンドを tools/tests/recover_tables_oracle.json に記録する（圧縮生成器から再生成しない）。
+- 抽出は別 translation unit の旧表／製品表を C で評価し、全欄を table・row・field・slot・value の名前付きレコードとして出力する；参照は NULL／シンボル名と全要素、式は eval の名前と前処理済み関数本文、profile は CRC も照合し、--extract で schema=1 の JSON を後続生成器へ渡す。
+- S2a の比較対象は現行 recover_gf_template とし、S2c で比較側だけを展開済み profile へ切り替える；check-recover-tables-host は build/checks.d に置き、B3 の gen_recover_tables.py --check は生成器を作る S2d で同ターゲットへ追加する。
