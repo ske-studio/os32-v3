@@ -41,7 +41,7 @@ kentry:
         ;; ローダーは far jmp の前に
         ;;   [esp+0] ダミーリターンアドレス / [esp+4] mem_kb /
         ;;   [esp+8] boot_drive
-        ;; を積んでいる (boot/loader_hdd.asm / loader_fat*.asm の 3 本とも同じ)。
+        ;; を積んでいる (boot/loader_hdd.asm / loader_fat_new.asm (FD144 も同じソース) の 2 本とも同じ)。
         ;; ESP を張り替えるだけだと引数が消え、kernel_main が拾う mem_kb が
         ;; ゴミになる。**症状はブート失敗ではなく `mem` の表示が
         ;; 3229946883 KB になるだけ**なので気づきにくい (実際これで一度踏んだ)。

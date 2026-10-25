@@ -164,7 +164,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - SQLite はカーネル内 (core BSS の直後) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
 - 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は KAPI `unicode_to_jis` で引く (T3d1〜、表の準備は要らない。`/sys/unicode.bin` が無いとかなだけになる)。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
 - 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1
-- ブートローダ: PM 遷移は `loader_fat.asm` に内蔵、`boot_fat.asm` は `.8086`、HDD IPL の INT 1Bh は 16 回 (上限の理由は未確認)。→ [`docs/10_notes.md`](10_notes.md) §10-2、§10-3
+- ブートローダ: FD の PM 遷移は `boot/loader_fat_new.asm` の `.load_done` → `pm_entry32` に内蔵、`boot_fat.asm` は `.8086`、HDD IPL の INT 1Bh は 16 回 (上限の理由は未確認)。→ [`docs/10_notes.md`](10_notes.md) §10-2、§10-3
 
 **GUI・入力・道具**
 - filer の起動時のフォーカスは右の一覧。木の枝を開くには TAB → →。→ `userland/rust/filer/src/lib.rs:250`

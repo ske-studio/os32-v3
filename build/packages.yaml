@@ -120,7 +120,7 @@ fd:
   rename:
     - guest: /boot/vmkernel.lz4
       fd: /VMKRNL.LZ4
-      reason: FAT ローダ (boot/loader_fat*.asm) はルートの VMKRNL.LZ4 を読む。install.bin は Phase 3 で /hd0/boot/vmkernel.lz4 へ写す (ディレクトリの写しでは扱わない)
+      reason: FAT ローダ (boot/loader_fat_new.asm、2HD / 1.44MB 共通) はルートの VMKRNL.LZ4 を読む。install.bin は Phase 3 で /hd0/boot/vmkernel.lz4 へ写す (ディレクトリの写しでは扱わない)
     - guest: /boot/boot_hdd.bin
       fd: /sys/boot_hdd.bin
       reason: install.bin (SRC_BOOT_HDD) が HDD の LBA 0 へ書く元。ファイルとしては HDD へ写さない (CD の BOOT.PKG と同じ扱い)

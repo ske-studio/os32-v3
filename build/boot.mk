@@ -5,7 +5,7 @@
 # === スタンドアロン ASM (flat binary) ===
 BOOT_OUT = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/boot,boot)
 
-ASM_STANDALONE = boot/boot_fat.asm boot/loader_fat.asm boot/loader_fat_new.asm boot/boot_hdd.asm boot/loader_hdd.asm
+ASM_STANDALONE = boot/boot_fat.asm boot/loader_fat_new.asm boot/boot_hdd.asm boot/loader_hdd.asm
 BIN_STANDALONE = $(patsubst boot/%.asm,$(BOOT_OUT)/%.bin,$(ASM_STANDALONE))
 
 # ブート情報域 (0x7E00) の NASM 側。2 本のローダが %include するので、
@@ -88,6 +88,8 @@ boot: $(BIN_STANDALONE) $(BIN_FD144) $(BOOT_OUT)/loader_hdd.bin
 # === クリーン ===
 clean-boot:
 	rm -f $(BIN_STANDALONE) $(BIN_FD144) $(BOOT_ALL_OBJ) $(BOOT_OUT)/loader_hdd.elf $(BOOT_OUT)/loader_hdd.bin
+	# 削除済みの旧 FAT ローダの成果物も掃除する。
+	rm -f $(BOOT_OUT)/loader_fat.bin
 
 # === デバッグ版HDDローダー (ext2読み出しステップ確認用) ===
 BOOT_DBG_C_SRC = boot/boot_debug.c
