@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・能力の問い合わせ [API_CONTRACTS](../../decisions/gui/API_CONTRACTS.md) G5・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
 
-> 状態: **実装中 (2026-10-26)** — G0 (小さい直し) を実装中。G2〜G6b は設計確定 (astra 起草・Opus 2 往復)。
+> 状態: **実装中 (2026-10-26)** — G0 が main。G2〜G6b は設計確定 (astra 起草・Opus 2 往復)、G2 を実装中。
 
 ## 0. ユーザー指示 (2026-10-26)
 
@@ -26,7 +26,7 @@
 
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
-| G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | 実装中 |
+| G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | **main** (675bb395、astra 取り込み可、機械語の差 0) |
 | G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [GFX_MODES_DESIGN](../../decisions/gui/GFX_MODES_DESIGN.md) | sol | G0 待ち |
 | G3 | 98 の 16 色のバックエンドがモードの表を申告 (gfx/backend_pc98.c) | 同上 | sol | 未着手 |
 | G4 | PEGC のバックエンドの表 (gfx/backend_pegc.c) | 同上 | sol | 未着手 |
