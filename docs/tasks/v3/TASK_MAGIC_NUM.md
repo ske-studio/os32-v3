@@ -63,3 +63,20 @@
 - 取り込みで分かったこと: 名前の置き換えは、変異の置換の目印 (試験の中の元の式の文字列) を壊す。MUTATE=0 の候補検査では見つからず、取り込みの変異込みの検査で初めて落ちた (M1 で 5 本)。確かめる道具は `~/os32-tmp/run/magic/stale_anchor.py <基点>` — 試験の文字列のうち、基点では変えたファイルにあり今は無いものを挙げる。M4 以後は実装者が最後に回した。
 
 - リポジトリ全体の `kprintf(0x07` 約 170 か所 (fork 前の行) を `KLOG_ATTR` にする。機械的に置き換えられるので、M1〜M5 の後に 1 段で出す候補。
+
+## 5. 追補: fork 前からある `kprintf(0x07, …)` (ユーザー指示 2026-10-25「出してください。タスクの粒度が大きく成りすぎないように」)
+
+残りは約 145 か所。次の 2 つは除く。
+
+- `lib/sqlite3/sqlite3.c`: 取り込んだ SQLite の合本で、手を入れる行を増やさない。
+- `apps/`: H-7 で再開待ち。
+
+段は触るファイルが重ならないように 3 つに分け、並べて出す。機械語の比べは §2 と同じ。
+
+PM 決定: 名前は 1 つにする。`KLOG_ATTR` を共有の層 `sdk/include/os32/os32_kapi_shared.h` (`ATTR_*` の隣) へ移し、`include/kprintf.h` はそれを使う。FEP の ABI 世代の値は、このヘッダの全文から作るので変わってよい (M2 の CD と同じ扱い)。
+
+| 段 | 中身 | 触る所 | 実装 | 状態 |
+|---|---|---|---|---|
+| K1 | kdebug の自己試験 25 か所 | kdebug/kselftest.c | sol | 未着手 |
+| K2 | カーネル側 約 35 か所 | kernel/・drivers/・fs/・net/・lib/os32_sqlite_vfs.c・lib/kprintf_attr.c (コメント) | sol | 未着手 |
+| K3 | 名前を共有の層へ移し、ユーザーランド側 約 70 か所 | sdk/include/os32/os32_kapi_shared.h・include/kprintf.h・userland/・sdk/example/・tools/tests/ の host の .c | sol | 未着手 |
