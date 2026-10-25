@@ -124,40 +124,40 @@ static int hd_write(Device *self, int lba, int count, const void *buf)
  * I/O には使わない — blk_read / blk_write があるので dev_blk_read_lba は
  * CHS の経路を通らない。 */
 static Device hd0_dev = {
-    "hd0", DEV_BLOCK, DEV_BUS_IDE, 0, 512, 0,
+    "hd0", DEV_BLOCK, DEV_BUS_IDE, 0, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,   /* blk_read/write(LBA), chr, ioctl, priv */
     0, 0,                            /* blk_read_chs/write_chs = NULL */
     0, 0, 0                          /* cyls/heads/spt: dev_register_hdd で設定 */
 };
 
 static Device hd1_dev = {
-    "hd1", DEV_BLOCK, DEV_BUS_IDE, 1, 512, 0,
+    "hd1", DEV_BLOCK, DEV_BUS_IDE, 1, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
     0, 0, 0
 };
 
 static Device hd2_dev = {
-    "hd2", DEV_BLOCK, DEV_BUS_IDE, 2, 512, 0,
+    "hd2", DEV_BLOCK, DEV_BUS_IDE, IDE_DRIVES_PER_BANK, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
     0, 0, 0
 };
 
 static Device hd3_dev = {
-    "hd3", DEV_BLOCK, DEV_BUS_IDE, 3, 512, 0,
+    "hd3", DEV_BLOCK, DEV_BUS_IDE, IDE_DRIVES_PER_BANK + 1, SYS_HDD_SECTOR_SIZE, 0,
     hd_read, hd_write, 0, 0, 0, 0,
     0, 0,
     0, 0, 0
 };
 
 /* HDDを登録するユーティリティ (4ドライブ対応) */
-static Device *hd_devs[4] = { &hd0_dev, &hd1_dev, &hd2_dev, &hd3_dev };
+static Device *hd_devs[IDE_MAX_DRIVES] = { &hd0_dev, &hd1_dev, &hd2_dev, &hd3_dev };
 
 void dev_register_hdd(int drive)
 {
     IdeInfo info;
-    if (drive < 0 || drive > 3) return;
+    if (drive < 0 || drive > IDE_MAX_DRIVES - 1) return;
     if (ide_get_info(drive, &info) == IDE_OK) {
         hd_devs[drive]->total_sects = info.total_sectors;
         hd_devs[drive]->cyls  = info.cylinders;
@@ -187,7 +187,7 @@ static int dev_span_ok(u32 lba, int count)
 {
     if (count < 0) return 0;
     if (count == 0) return 1;
-    return ((u32)count - 1U <= 0xFFFFFFFFUL - lba) ? 1 : 0;
+    return ((u32)count - 1U <= U32_MAX - lba) ? 1 : 0;
 }
 
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)

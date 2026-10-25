@@ -49,6 +49,20 @@
 #define IDE_DRVHEAD_LBA     0x40   /* bit6 = LBA */
 #define IDE_DRVHEAD_SLAVE   0x10   /* bit4 = スレーブ */
 
+#define IDE_DRVHEAD_ADDR_MASK   0x0FUL
+
+/* IDENTIFY DEVICE word indices and capability bits. */
+#define IDE_ID_DEF_CYL_WORD     1
+#define IDE_ID_DEF_HEADS_WORD   3
+#define IDE_ID_DEF_SPT_WORD     6
+#define IDE_ID_CAP_WORD         49
+#define IDE_ID_VALID_WORD       53
+#define IDE_ID_CUR_CYL_WORD     54
+#define IDE_ID_CUR_HEADS_WORD   55
+#define IDE_ID_CUR_SPT_WORD     56
+#define IDE_ID_TOTAL_WORD       60
+#define IDE_ID_CAP_LBA          0x0200
+
 /* 1 セクタ分の指定 (レジスタに書く値) */
 typedef struct {
     u8  mode;       /* IDE_AMODE_* */

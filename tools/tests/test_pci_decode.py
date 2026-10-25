@@ -67,7 +67,7 @@ MUTATIONS = [
     ("drivers/pci_decode.c", r"return \(int\)\(header_type & PCI_HDR_LAYOUT_MASK\);",
      "return (int)header_type;",
      "Header Type の bit7 を落とさない (マルチファンクションのブリッヂを見落とす)"),
-    ("drivers/pci_decode.c", r"return \(u16\)\(dword >> \(\(reg & 2\) \* 8\)\);",
+    ("drivers/pci_decode.c", r"return \(u16\)\(dword >> \(\(reg & PCI_CFG_WORD_LANE_MASK\) \* PCI_CFG_BYTE_BITS\)\);",
      "return (u16)(dword >> ((reg & 3) * 8));",
      "16 ビットの切り出しをバイト境界で行う (奇数オフセットで値がずれる)"),
     ("drivers/pci_decode.c", r'if \(sub == PCI_SUB_BRIDGE_ISA\) return "Bridge/ISA";',

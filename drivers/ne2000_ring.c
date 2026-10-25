@@ -8,14 +8,11 @@
 #include "ne2000_ring.h"
 #include "../include/net_eth.h"
 
-#define RING_PAGE_SIZE   256
-#define RING_HDR_LEN     4
-#define RING_FCS_LEN     4
 #define RING_ETH_MIN     ETH_ZLEN
-#define RING_ETH_MAX     (ETH_FRAME_MAX - RING_FCS_LEN)
+#define RING_ETH_MAX     (ETH_FRAME_MAX - ETH_FCS_LEN)
 #define RING_STATUS_PRX  0x01
 
-void ne2k_ring_decode_hdr(const u8 raw[4], struct ne2k_rx_hdr *h)
+void ne2k_ring_decode_hdr(const u8 raw[NE2K_RX_HDR_LEN], struct ne2k_rx_hdr *h)
 {
     h->status = raw[0];
     h->next   = raw[1];
@@ -24,7 +21,7 @@ void ne2k_ring_decode_hdr(const u8 raw[4], struct ne2k_rx_hdr *h)
 
 u8 ne2k_ring_pages_for(u16 count_on_ring)
 {
-    return (u8)((count_on_ring + RING_PAGE_SIZE - 1) / RING_PAGE_SIZE);
+    return (u8)((count_on_ring + NE2K_PAGE_SIZE - 1) / NE2K_PAGE_SIZE);
 }
 
 u8 ne2k_ring_advance(u8 pstart, u8 pstop, u8 cur, u8 pages)
@@ -65,10 +62,10 @@ int ne2k_ring_check(u8 pstart, u8 pstop, u8 cur,
     /* 長さ: ヘッダ + データ (+ FCS)。実カードは count に FCS を含み、
      * NP21/W は含まないが、どちらもリング上には FCS 分の場所を取る。 */
     on_ring = h->count;
-    if (!fcs_in_count) on_ring += RING_FCS_LEN;
-    if (on_ring < RING_HDR_LEN + RING_ETH_MIN + RING_FCS_LEN) return NE2K_RING_BAD_COUNT;
-    if (on_ring > RING_HDR_LEN + RING_ETH_MAX + RING_FCS_LEN) return NE2K_RING_BAD_COUNT;
-    dlen = on_ring - RING_HDR_LEN - RING_FCS_LEN;
+    if (!fcs_in_count) on_ring += ETH_FCS_LEN;
+    if (on_ring < NE2K_RX_HDR_LEN + RING_ETH_MIN + ETH_FCS_LEN) return NE2K_RING_BAD_COUNT;
+    if (on_ring > NE2K_RX_HDR_LEN + RING_ETH_MAX + ETH_FCS_LEN) return NE2K_RING_BAD_COUNT;
+    dlen = on_ring - NE2K_RX_HDR_LEN - ETH_FCS_LEN;
 
     /* ページ進行との整合: next は cur + 占有ページ数 でなければならない */
     pages = ne2k_ring_pages_for((u16)on_ring);

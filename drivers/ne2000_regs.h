@@ -14,6 +14,13 @@
 #ifndef NE2000_REGS_H
 #define NE2000_REGS_H
 
+#define NE2K_RAM_PAGES_16K   0x40   /* 16KiB / NIC page size */
+#define NE2K_PIO_PAD_BYTES   2      /* word PIO tail padding */
+#define NE2K_PROM_STRIDE     2      /* duplicated bytes on 16-bit cards */
+#define NE2K_PROM_RAW_LEN    (NE2K_PROM_LEN / NE2K_PROM_STRIDE)
+#define NE2K_PROM_SIG_OFF    14
+#define NE2K_MAR_BYTES       8
+
 /* ---- Command Register (全ページ共通, offset 0) ---- */
 #define NE2K_CR             0x00
 #define NE2K_CR_STP         0x01    /* STOP: 送受信停止 (リセット状態) */
@@ -133,11 +140,11 @@
 #define NE2K_PROM_SIG       0x57    /* PROM byte 14/15 = 'W' (NE2000 署名) */
 
 /* ---- Ethernet フレーム ---- */
-#include "net_eth.h"
+#include "../include/net_eth.h"
 #define NE2K_ETH_HDR_LEN    ETH_HLEN
 #define NE2K_ETH_MIN_LEN    ETH_ZLEN      /* FCS を除く最小長 (padding 後) */
 #define NE2K_ETH_MAX_LEN    (ETH_FRAME_MAX - NE2K_ETH_FCS_LEN)    /* FCS を除く最大長 (非 VLAN) */
-#define NE2K_ETH_FCS_LEN    4
+#define NE2K_ETH_FCS_LEN    ETH_FCS_LEN
 #define NE2K_ETH_ADDR_LEN   ETH_ALEN
 
 #endif /* NE2000_REGS_H */

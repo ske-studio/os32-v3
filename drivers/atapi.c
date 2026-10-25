@@ -14,10 +14,14 @@
 /* ======================================================================== */
 
 #include "atapi.h"
+
 #include "io.h"
 #include "pc98.h"
 #include "kprintf.h"
 #include "cpu_calibrate.h"   /* cpu_delay_us / CPU_DELAY_US_MAX (INC_KERNEL で通す。build/kernel.mk) */
+#define ATAPI_DRIVE_COUNT     2
+#define ATAPI_PRESENT_SLAVE   0x02
+#define ATAPI_PIO_BCL_MIN     2
 
 /* === 内部状態 === */
 static int cdrom_present = 0;
@@ -153,7 +157,7 @@ static void atapi_settle(void)
 static void atapi_clear_cdb(u8 *cdb)
 {
     int i;
-    for (i = 0; i < 12; i++) cdb[i] = 0;
+    for (i = 0; i < ATAPI_CDB_BYTES; i++) cdb[i] = 0;
 }
 
 /* us だけ待つ。cpu_delay_us は 1 回で CPU_DELAY_US_MAX (100ms) までしか待たず、
@@ -173,7 +177,7 @@ static void atapi_delay_us(u32 us)
 static int atapi_sel_present(u8 sel)
 {
     if (sel == 0x00) return (s_present_mask & 0x01) ? 1 : 0;
-    if (sel == ATAPI_DRV_SLAVE) return (s_present_mask & 0x02) ? 1 : 0;
+    if (sel == ATAPI_DRV_SLAVE) return (s_present_mask & ATAPI_PRESENT_SLAVE) ? 1 : 0;
     return 0;
 }
 
@@ -330,8 +334,8 @@ static int atapi_send_cdb(const u8 *cdb, u32 bcl)
     if (ret == ATAPI_ERR_IO) atapi_note_error();
     if (ret != ATAPI_OK) return ret;
 
-    for (i = 0; i < 6; i++) {
-        u16 w = (u16)cdb[i * 2] | ((u16)cdb[i * 2 + 1] << 8);
+    for (i = 0; i < ATAPI_CDB_BYTES / (int)sizeof(u16); i++) {
+        u16 w = (u16)cdb[i * sizeof(u16)] | ((u16)cdb[i * sizeof(u16) + 1] << 8);
         outpw(IDE_DATA, (unsigned)w);
     }
     atapi_settle();
@@ -393,7 +397,7 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
     /* byte count limit: 1 回の DRQ の上限。偶数で、ATAPI_PIO_BCL_MAX 以下 */
     bcl = (buf_size < ATAPI_PIO_BCL_MAX) ? buf_size : ATAPI_PIO_BCL_MAX;
     bcl &= ~1UL;
-    if (bcl == 0) bcl = 2;
+    if (bcl == 0) bcl = ATAPI_PIO_BCL_MIN;
 
     ret = atapi_send_cdb(cdb, bcl);
     if (ret != ATAPI_OK) return ret;
@@ -431,11 +435,11 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
 
         /* ワード単位で読み出す (奇数なら 1 ワード多い)。有効なのは xfer_size
          * バイトまで。buf_size を超えた分は読み捨てる */
-        words = ((u32)xfer_size + 1) / 2;
+        words = ((u32)xfer_size + sizeof(u16) - 1) / sizeof(u16);
         end = total_read + xfer_size;
         for (k = 0; k < words; k++) {
             u16 w = (u16)inpw(IDE_DATA);
-            u32 b = total_read + k * 2;
+            u32 b = total_read + k * sizeof(u16);
             if (b < end && b < buf_size) p[b] = (u8)(w & 0xFF);
             if (b + 1 < end && b + 1 < buf_size) p[b + 1] = (u8)(w >> 8);
         }
@@ -477,27 +481,27 @@ static int atapi_probe_sig(u8 sel)
 /* READ CAPACITY (バンクは呼び手が選んでおく)。8 バイトちょうど来なければ失敗 */
 static int atapi_capacity_raw(AtapiCapacity *cap)
 {
-    u8 cdb[12];
-    u8 buf[8];
+    u8 cdb[ATAPI_CDB_BYTES];
+    u8 buf[ATAPI_CAPACITY_BYTES];
     u32 got = 0;
     int ret;
 
     atapi_clear_cdb(cdb);
     cdb[0] = SCSI_CMD_READ_CAPACITY;
-    ret = atapi_packet_read(cdb, buf, 8, &got);
+    ret = atapi_packet_read(cdb, buf, ATAPI_CAPACITY_BYTES, &got);
     /* 受け皿の残りを容量として読まない (7 バイトも 9 バイトも失敗) */
-    if (ret == ATAPI_OK && got != 8) ret = ATAPI_ERR_IO;
+    if (ret == ATAPI_OK && got != ATAPI_CAPACITY_BYTES) ret = ATAPI_ERR_IO;
     if (ret != ATAPI_OK) return ret;
 
     /* READ CAPACITY応答: ビッグエンディアン
      * bytes 0-3: 最終LBA (NP21/W は総数を返す。空のドライブは 0)
      * bytes 4-7: セクタサイズ */
-    cap->total_sectors = ((u32)buf[0] << 24) | ((u32)buf[1] << 16)
-                       | ((u32)buf[2] << 8)  |  (u32)buf[3];
+    cap->total_sectors = ((u32)buf[ATAPI_CAPACITY_LAST_LBA_OFF] << 24) | ((u32)buf[ATAPI_CAPACITY_LAST_LBA_OFF + 1] << 16)
+                       | ((u32)buf[ATAPI_CAPACITY_LAST_LBA_OFF + 2] << 8)  |  (u32)buf[ATAPI_CAPACITY_LAST_LBA_OFF + 3];
     cap->total_sectors += 1;  /* 最終LBA → 総セクタ数 */
 
-    cap->sector_size   = ((u32)buf[4] << 24) | ((u32)buf[5] << 16)
-                       | ((u32)buf[6] << 8)  |  (u32)buf[7];
+    cap->sector_size   = ((u32)buf[ATAPI_CAPACITY_BLOCK_BYTES_OFF] << 24) | ((u32)buf[ATAPI_CAPACITY_BLOCK_BYTES_OFF + 1] << 16)
+                       | ((u32)buf[ATAPI_CAPACITY_BLOCK_BYTES_OFF + 2] << 8)  |  (u32)buf[ATAPI_CAPACITY_BLOCK_BYTES_OFF + 3];
     return ATAPI_OK;
 }
 
@@ -505,20 +509,20 @@ static int atapi_capacity_raw(AtapiCapacity *cap)
  * 読めなければ ATAPI_ERR_IO (sk / asc / ascq は触らない) */
 static int atapi_request_sense(u8 *sk, u8 *asc, u8 *ascq)
 {
-    u8 cdb[12];
+    u8 cdb[ATAPI_CDB_BYTES];
     u8 buf[ATAPI_SENSE_LEN];
     u32 got = 0;
     int ret;
 
     atapi_clear_cdb(cdb);
     cdb[0] = SCSI_CMD_REQUEST_SENSE;
-    cdb[4] = ATAPI_SENSE_LEN;
+    cdb[ATAPI_CDB_ALLOC_OFF] = ATAPI_SENSE_LEN;
     ret = atapi_packet_read(cdb, buf, ATAPI_SENSE_LEN, &got);
     if (ret != ATAPI_OK) return ret;
     if (got < ATAPI_SENSE_MIN) return ATAPI_ERR_IO;
-    *sk   = (u8)(buf[2] & 0x0F);
-    *asc  = buf[12];
-    *ascq = buf[13];
+    *sk   = (u8)(buf[ATAPI_SENSE_KEY_OFF] & ATAPI_SENSE_KEY_MASK);
+    *asc  = buf[ATAPI_SENSE_ASC_OFF];
+    *ascq = buf[ATAPI_SENSE_ASCQ_OFF];
     return ATAPI_OK;
 }
 
@@ -526,10 +530,10 @@ static int atapi_request_sense(u8 *sk, u8 *asc, u8 *ascq)
  * 上限 (ATAPI_CMD_TIMEOUT_US) */
 static int atapi_start_unit(void)
 {
-    u8 cdb[12];
+    u8 cdb[ATAPI_CDB_BYTES];
     atapi_clear_cdb(cdb);
     cdb[0] = SCSI_CMD_START_STOP_UNIT;
-    cdb[4] = SCSI_SSU_START;
+    cdb[ATAPI_CDB_SSU_OFF] = SCSI_SSU_START;
     s_stats.start_units++;
     return atapi_packet_nodata(cdb);
 }
@@ -598,8 +602,8 @@ static int atapi_has_media(void)
 
 int atapi_init(void)
 {
-    static const u8 sels[2] = { 0x00, ATAPI_DRV_SLAVE };
-    u8 found[2] = { 0, 0 };
+    static const u8 sels[ATAPI_DRIVE_COUNT] = { 0x00, ATAPI_DRV_SLAVE };
+    u8 found[ATAPI_DRIVE_COUNT] = { 0, 0 };
     int n = 0;
     int i;
 
@@ -622,7 +626,7 @@ int atapi_init(void)
      * スレーブに ISO を付けると、マスターの空の CD ドライブだけを見ていて
      * 1 セクタも読めなかった) */
     s_present_mask = 0;
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < ATAPI_DRIVE_COUNT; i++) {
         if (atapi_probe_sig(sels[i])) {
             found[n++] = sels[i];
             s_present_mask |= (u8)(1 << i);
@@ -633,7 +637,7 @@ int atapi_init(void)
         /* シグネチャが出ない場合、ソフトリセット後に再確認。SRST の後も
          * マスターが BSY のまま (31 秒) なら諦める (BSY の装置が選ばれている
          * あいだは DRV_HEAD を書いても届かない) */
-        for (i = 0; i < 2; i++) {
+        for (i = 0; i < ATAPI_DRIVE_COUNT; i++) {
             if (atapi_probe_sig(sels[i])) {
                 found[n++] = sels[i];
                 s_present_mask |= (u8)(1 << i);
@@ -648,7 +652,7 @@ int atapi_init(void)
          * 容量を読むのはシグネチャを全部見た後 (PACKET で CylLo/Hi が変わる)。
          * 装置の選び直しと待ちは PACKET の共通路 (atapi_select_device) が
          * 容量確認ごとに行う */
-        if (n == 2) {
+        if (n == ATAPI_DRIVE_COUNT) {
             for (i = 0; i < n; i++) {
                 s_drvsel = found[i];
                 if (atapi_has_media()) break;
@@ -678,7 +682,7 @@ int atapi_present(void)
 
 int atapi_test_unit_ready(void)
 {
-    u8 cdb[12];
+    u8 cdb[ATAPI_CDB_BYTES];
     int ret;
 
     if (!cdrom_present) return ATAPI_ERR_NO_DRIVE;
@@ -721,19 +725,19 @@ static int atapi_read10(u32 lba, u32 n, u8 *dst)
     int ret = ATAPI_ERR_IO;
 
     for (attempt = 0; attempt <= ATAPI_UA_RETRIES; attempt++) {
-        u8 cdb[12];
+        u8 cdb[ATAPI_CDB_BYTES];
         u32 got = 0;
 
         atapi_clear_cdb(cdb);
         cdb[0] = SCSI_CMD_READ_10;
         /* LBA (ビッグエンディアン, bytes 2-5) */
-        cdb[2] = (u8)(lba >> 24);
-        cdb[3] = (u8)(lba >> 16);
-        cdb[4] = (u8)(lba >> 8);
-        cdb[5] = (u8)(lba & 0xFF);
+        cdb[ATAPI_READ10_LBA_OFF] = (u8)(lba >> 24);
+        cdb[ATAPI_READ10_LBA_OFF + 1] = (u8)(lba >> 16);
+        cdb[ATAPI_READ10_LBA_OFF + 2] = (u8)(lba >> 8);
+        cdb[ATAPI_READ10_LBA_OFF + 3] = (u8)(lba & 0xFF);
         /* 転送セクタ数 (ビッグエンディアン, bytes 7-8) */
-        cdb[7] = (u8)(n >> 8);
-        cdb[8] = (u8)(n & 0xFF);
+        cdb[ATAPI_READ10_COUNT_OFF] = (u8)(n >> 8);
+        cdb[ATAPI_READ10_COUNT_OFF + 1] = (u8)(n & 0xFF);
 
         s_last_sense = 0;
         s_stats.read10_cmds++;

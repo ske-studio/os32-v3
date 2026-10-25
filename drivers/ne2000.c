@@ -27,18 +27,21 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "cpu_calibrate.h"
+#include "cpu.h"
 
 /* ====================================================================== */
 /*  ローカル定数                                                            */
 /* ====================================================================== */
 
-#define NE2K_RAM_PAGES_16K   0x40   /* 16KB / 256 */
+#define NE2K_RDMA_ATTEMPTS  2
+#define NE2K_RAM_TEST_SEED_BASE 0x11
+#define NE2K_DMA_GUARD_BYTE  0xA5
 #define NE2K_PROBE_PSTOP     0xFF   /* probe 中の PSTOP (Remote DMA が途中で折り返さないよう上限へ) */
 #define NE2K_TX_PAGES        6      /* 1536B = 1 スロット。TX 二重化はしない */
-#define NE2K_TX_BUF_LEN      (NE2K_ETH_MAX_LEN + 2)     /* 偶数丸めの余白 */
+#define NE2K_TX_BUF_LEN      (NE2K_ETH_MAX_LEN + NE2K_PIO_PAD_BYTES)     /* 偶数丸めの余白 */
 
 #define NE2K_RXQ_SLOTS       8
-#define NE2K_RXQ_SLOT_BYTES  (NE2K_ETH_MAX_LEN + 2)     /* 奇数末尾 word の余白 */
+#define NE2K_RXQ_SLOT_BYTES  (NE2K_ETH_MAX_LEN + NE2K_PIO_PAD_BYTES)     /* 奇数末尾 word の余白 */
 
 /* 待ち時間の上限 (M0 で決めた値。実機余裕は M5 で見直す) */
 #define NE2K_RESET_WAIT_US   20000  /* DP8390 のリセット完了 ~1.6ms に対し 10 倍 */
@@ -145,7 +148,7 @@ static int eflags_if(void)
 {
     unsigned int f;
     __asm__ volatile("pushfl\n\tpopl %0" : "=r"(f));
-    return (int)((f >> 9) & 1);
+    return (f & EFLAGS_IF) != 0;
 }
 
 /* ====================================================================== */
@@ -249,7 +252,7 @@ static int dma_read(u16 addr, void *buf, u16 len)
     u16 n = (u16)((len + 1) & ~1);
     int try_i;
     if (len == 0) return NE2K_OK;
-    for (try_i = 0; try_i < 2; try_i++) {
+    for (try_i = 0; try_i < NE2K_RDMA_ATTEMPTS; try_i++) {
         wr(NE2K_P0_ISR, NE2K_ISR_RDC);      /* 古い RDC を消す */
         wr(NE2K_P0_RBCR0, (u8)(n & 0xFF));
         wr(NE2K_P0_RBCR1, (u8)(n >> 8));
@@ -268,7 +271,7 @@ static int dma_write(u16 addr, const void *buf, u16 len)
     u16 n = (u16)((len + 1) & ~1);
     int try_i;
     if (len == 0) return NE2K_OK;
-    for (try_i = 0; try_i < 2; try_i++) {
+    for (try_i = 0; try_i < NE2K_RDMA_ATTEMPTS; try_i++) {
         wr(NE2K_P0_ISR, NE2K_ISR_RDC);
         wr(NE2K_P0_RBCR0, (u8)(n & 0xFF));
         wr(NE2K_P0_RBCR1, (u8)(n >> 8));
@@ -337,20 +340,20 @@ static int read_prom(void)
     rc = dma_read(0, prom, NE2K_PROM_LEN);
     if (rc) return rc;
 
-    for (i = 0; i < 16; i++) {
-        if (prom[2 * i] != prom[2 * i + 1]) doubled = 0;
+    for (i = 0; i < NE2K_PROM_RAW_LEN; i++) {
+        if (prom[NE2K_PROM_STRIDE * i] != prom[NE2K_PROM_STRIDE * i + 1]) doubled = 0;
     }
     nic.prom_doubled = (u8)doubled;
     for (i = 0; i < NE2K_ETH_ADDR_LEN; i++) {
-        nic.mac[i] = doubled ? prom[2 * i] : prom[i];
+        nic.mac[i] = doubled ? prom[NE2K_PROM_STRIDE * i] : prom[i];
         if (nic.mac[i] != 0x00) all0 = 0;
         if (nic.mac[i] != 0xFF) allf = 0;
     }
     /* 署名 'W' (byte 14/15、重複なら 28..31) */
     if (doubled) {
-        if (prom[28] != NE2K_PROM_SIG || prom[30] != NE2K_PROM_SIG) return NE2K_ERR_NODEV;
+        if (prom[NE2K_PROM_STRIDE * NE2K_PROM_SIG_OFF] != NE2K_PROM_SIG || prom[NE2K_PROM_STRIDE * (NE2K_PROM_SIG_OFF + 1)] != NE2K_PROM_SIG) return NE2K_ERR_NODEV;
     } else {
-        if (prom[14] != NE2K_PROM_SIG || prom[15] != NE2K_PROM_SIG) return NE2K_ERR_NODEV;
+        if (prom[NE2K_PROM_SIG_OFF] != NE2K_PROM_SIG || prom[NE2K_PROM_SIG_OFF + 1] != NE2K_PROM_SIG) return NE2K_ERR_NODEV;
     }
     /* OUI だけで判定しない: 全 0 / 全 1 / multicast ビットを拒否 */
     if (all0 || allf || (nic.mac[0] & 0x01)) return NE2K_ERR_NODEV;
@@ -421,13 +424,13 @@ static void diag_ram_test(void)
     u8 first = nic.cfg.ram_page_first;
 
     for (p = 0; p < nic.ram_pages; p++) {
-        fill_pattern(w, NE2K_PAGE_SIZE, (u8)(0x11 + p));
+        fill_pattern(w, NE2K_PAGE_SIZE, (u8)(NE2K_RAM_TEST_SEED_BASE + p));
         if (dma_write((u16)(first + p) << 8, w, NE2K_PAGE_SIZE)) {
             nic.st.diag_ram_errors += NE2K_PAGE_SIZE;
         }
     }
     for (p = 0; p < nic.ram_pages; p++) {
-        fill_pattern(w, NE2K_PAGE_SIZE, (u8)(0x11 + p));
+        fill_pattern(w, NE2K_PAGE_SIZE, (u8)(NE2K_RAM_TEST_SEED_BASE + p));
         kmemset(r, 0, NE2K_PAGE_SIZE);
         if (dma_read((u16)(first + p) << 8, r, NE2K_PAGE_SIZE)) {
             nic.st.diag_ram_errors += NE2K_PAGE_SIZE;
@@ -454,12 +457,12 @@ static void diag_dma_test(void)
         fill_pattern(w, len, (u8)(0x80 + k));
         w[len] = 0xEE;                          /* 書き側の末尾余白 (読み越し検出用) */
         if (dma_write(base, w, len)) { nic.st.diag_dma_errors++; continue; }
-        kmemset(r, 0xA5, NE2K_RXQ_SLOT_BYTES);
+        kmemset(r, NE2K_DMA_GUARD_BYTE, NE2K_RXQ_SLOT_BYTES);
         if (dma_read(base, r, len)) { nic.st.diag_dma_errors++; continue; }
         for (i = 0; i < len; i++) {
             if (r[i] != w[i]) { bad = 1; break; }
         }
-        if (r[len] != 0xA5) bad = 1;            /* 奇数末尾で余白に書いた */
+        if (r[len] != NE2K_DMA_GUARD_BYTE) bad = 1;            /* 奇数末尾で余白に書いた */
         if (bad) nic.st.diag_dma_errors++;
     }
 }
@@ -488,7 +491,7 @@ static void program_ring(void)
 
     wr(NE2K_CR, NE2K_CR_PAGE1 | NE2K_CR_RD2 | NE2K_CR_STP);
     for (i = 0; i < NE2K_ETH_ADDR_LEN; i++) wr((u8)(NE2K_P1_PAR0 + i), nic.mac[i]);
-    for (i = 0; i < 8; i++) wr((u8)(NE2K_P1_MAR0 + i), 0);
+    for (i = 0; i < NE2K_MAR_BYTES; i++) wr((u8)(NE2K_P1_MAR0 + i), 0);
     wr(NE2K_P1_CURR, (u8)(nic.rx_start + 1));
     nic.rx_next = (u8)(nic.rx_start + 1);
 
@@ -1038,7 +1041,7 @@ int ne2k_state(void)
     return nic.state;
 }
 
-void ne2k_get_mac(u8 mac[6])
+void ne2k_get_mac(u8 mac[ETH_ALEN])
 {
     kmemcpy(mac, nic.mac, NE2K_ETH_ADDR_LEN);
 }
