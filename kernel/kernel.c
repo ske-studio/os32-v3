@@ -181,6 +181,8 @@ static u8 kernel_pci_line_bits(unsigned int irq)
     return b;
 }
 
+static inline void kernel_shell_loop(void);
+
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
     char tmp[16];
@@ -692,6 +694,16 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
 
+    kernel_shell_loop();
+
+    /* 失敗時フォールバック */
+    for (;;) {
+        _halt();
+    }
+}
+
+static inline void kernel_shell_loop(void)
+{
     /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
      * (MEM_SHELL_LOAD_ADDR, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
      * 載らない。終了/クラッシュ時のフォールバックとして再起動ループにする。
@@ -856,10 +868,5 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
             }
             tvram_clear();
         }
-    }
-
-    /* 失敗時フォールバック */
-    for (;;) {
-        _halt();
     }
 }
