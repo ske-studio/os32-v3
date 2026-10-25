@@ -13,18 +13,18 @@ int main(int argc, char **argv, KernelAPI *api)
     (void)argc; (void)argv;
     kapi = api;
 
-    kapi->kprintf(0x07, "=== SND Engine Test ===\n");
+    kapi->kprintf(KLOG_ATTR, "=== SND Engine Test ===\n");
 
     /* BGM再生開始 (非ブロッキング — 即座にリターン) */
-    kapi->kprintf(0x07, "Starting BGM (non-blocking)...\n");
+    kapi->kprintf(KLOG_ATTR, "Starting BGM (non-blocking)...\n");
     kapi->snd_bgm_play("T120 @C0 @T0 O4 L8 [CDEFGAB>C<]");
 
     /* BGM再生中にカウンタを表示 */
-    kapi->kprintf(0x07, "BGM playing, counting:\n");
+    kapi->kprintf(KLOG_ATTR, "BGM playing, counting:\n");
     start = kapi->get_tick();
     for (i = 0; i < 30; i++) {
         u32 now = kapi->get_tick();
-        kapi->kprintf(0x07, "  tick %d (elapsed %dms) playing=%d\n",
+        kapi->kprintf(KLOG_ATTR, "  tick %d (elapsed %dms) playing=%d\n",
                       i, (now - start) * 10, kapi->snd_bgm_is_playing());
 
         /* 10カウント目でSEを割り込ませる */
@@ -48,9 +48,9 @@ int main(int argc, char **argv, KernelAPI *api)
         }
     }
 
-    kapi->kprintf(0x07, "Stopping BGM...\n");
+    kapi->kprintf(KLOG_ATTR, "Stopping BGM...\n");
     kapi->snd_bgm_stop();
 
-    kapi->kprintf(0x07, "Test complete!\n");
+    kapi->kprintf(KLOG_ATTR, "Test complete!\n");
     return 0;
 }

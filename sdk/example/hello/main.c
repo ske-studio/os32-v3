@@ -15,10 +15,10 @@ void main(int argc, char **argv, KernelAPI *api)
     u32 until;
     (void)argc; (void)argv;
 
-    api->kprintf(0x07, "hello3p: start\n");
+    api->kprintf(KLOG_ATTR, "hello3p: start\n");
 
     libos32gfx_init(api);
-    api->kprintf(0x07, "hello3p: gfx ready\n");
+    api->kprintf(KLOG_ATTR, "hello3p: gfx ready\n");
 
     gfx_clear(0);
     for (i = 0; i < 16; i++) {
@@ -29,7 +29,7 @@ void main(int argc, char **argv, KernelAPI *api)
        実際に VRAM へ転送するのは KAPI の gfx_present_dirty()。 */
     gfx_present();
     api->gfx_present_dirty();
-    api->kprintf(0x07, "hello3p: presented\n");
+    api->kprintf(KLOG_ATTR, "hello3p: presented\n");
 
     /* 5 秒表示を保持 (PIT 100Hz) */
     until = api->get_tick() + 500;
@@ -38,5 +38,5 @@ void main(int argc, char **argv, KernelAPI *api)
     }
 
     libos32gfx_shutdown();
-    api->kprintf(0x07, "hello3p: done\n");
+    api->kprintf(KLOG_ATTR, "hello3p: done\n");
 }

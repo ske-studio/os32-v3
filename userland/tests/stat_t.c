@@ -60,7 +60,7 @@ int main(int argc, char **argv, KernelAPI *api)
     g_total = 0;
     g_passed = 0;
 
-    api->kprintf(0x07, "%s", "=== stat API test ===\r\n");
+    api->kprintf(KLOG_ATTR, "%s", "=== stat API test ===\r\n");
 
     /* テスト1: 存在するファイルの sys_stat。
      * 2026-09-17 まで `HELLO.BIN` を見ていたが、これは FAT 時代の名残で

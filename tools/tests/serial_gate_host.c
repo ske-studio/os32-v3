@@ -129,7 +129,7 @@ static void gate_tx(void)
     g_tx_n = 0;
     serial_putchar('x');
     serial_puts("yz");
-    kprintf(0x07, "k\n");
+    kprintf(KLOG_ATTR, "k\n");
     CHECK(g_tx_n == 0);                              /* 何も線に出ない */
     n = serial_hold_take(buf, sizeof(buf));
     CHECK(n == 5 && memcmp(buf, "xyzk\n", 5) == 0);

@@ -8,13 +8,13 @@ int main(int argc, char **argv, KernelAPI *api)
 {
     (void)argc; (void)argv;
 
-    api->kprintf(0x07, "=== BGM Persist Test ===\n");
+    api->kprintf(KLOG_ATTR, "=== BGM Persist Test ===\n");
 
     /* 直接MML文字列を渡す (クォートなし) */
     api->snd_bgm_set_persist(1);
     api->snd_bgm_play("T120 O4 L4 [CDEFGAB>C<]");
 
-    api->kprintf(0x07, "playing=%d (should be 1)\n", api->snd_bgm_is_playing());
+    api->kprintf(KLOG_ATTR, "playing=%d (should be 1)\n", api->snd_bgm_is_playing());
     api->kprintf(0x02, "BGM started with persist=1. Exiting...\n");
 
     return 0;

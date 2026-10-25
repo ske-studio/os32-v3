@@ -105,7 +105,7 @@ void dma8237_init(void)
 
     /* 起動行。fdc_init の `[fdc] dma>1MB: 0439h xx -> yy` と同じ中身に
      * 3 値を足したもの。**書かなかった場合が無くなった**ので必ず出る。 */
-    kprintf(0x07, "[dma] 0439h %02x -> %02x state=%s\n", v, after,
+    kprintf(KLOG_ATTR, "[dma] 0439h %02x -> %02x state=%s\n", v, after,
             (s_a20_state == DMA_A20_VERIFIED)   ? "VERIFIED" :
             (s_a20_state == DMA_A20_UNREADABLE) ? "UNREADABLE" : "BLOCKED");
 }

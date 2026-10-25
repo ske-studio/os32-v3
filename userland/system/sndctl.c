@@ -36,17 +36,17 @@ static int str_to_int(const char *s)
 
 static void show_usage(void)
 {
-    kapi->kprintf(0x07, "sndctl - Sound Engine Control\n");
-    kapi->kprintf(0x07, "Usage:\n");
-    kapi->kprintf(0x07, "  sndctl play \"MML\"  BGM play (non-blocking)\n");
-    kapi->kprintf(0x07, "  sndctl stop        BGM stop\n");
-    kapi->kprintf(0x07, "  sndctl status      Show playback status\n");
-    kapi->kprintf(0x07, "  sndctl se <id>     Play SE (0-15)\n");
-    kapi->kprintf(0x07, "  sndctl mute        Master mute\n");
-    kapi->kprintf(0x07, "  sndctl unmute      Master unmute\n");
-    kapi->kprintf(0x07, "\nSE IDs:\n");
-    kapi->kprintf(0x07, "  0: Cursor  1: Select  2: Cancel\n");
-    kapi->kprintf(0x07, "  3: Error   4: Coin    5: Beep\n");
+    kapi->kprintf(KLOG_ATTR, "sndctl - Sound Engine Control\n");
+    kapi->kprintf(KLOG_ATTR, "Usage:\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl play \"MML\"  BGM play (non-blocking)\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl stop        BGM stop\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl status      Show playback status\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl se <id>     Play SE (0-15)\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl mute        Master mute\n");
+    kapi->kprintf(KLOG_ATTR, "  sndctl unmute      Master unmute\n");
+    kapi->kprintf(KLOG_ATTR, "\nSE IDs:\n");
+    kapi->kprintf(KLOG_ATTR, "  0: Cursor  1: Select  2: Cancel\n");
+    kapi->kprintf(KLOG_ATTR, "  3: Error   4: Coin    5: Beep\n");
 }
 
 int main(int argc, char **argv, KernelAPI *api)
@@ -78,7 +78,7 @@ int main(int argc, char **argv, KernelAPI *api)
 
     if (str_eq(argv[1], "status")) {
         int playing = kapi->snd_bgm_is_playing();
-        kapi->kprintf(0x07, "BGM: %s\n", playing ? "playing" : "stopped");
+        kapi->kprintf(KLOG_ATTR, "BGM: %s\n", playing ? "playing" : "stopped");
         return 0;
     }
 

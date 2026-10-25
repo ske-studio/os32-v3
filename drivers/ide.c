@@ -220,7 +220,7 @@ int ide_init(void)
          * が返る → 即スキップ
          * 注: 0x00 はスレーブドライブ選択前の正常値なのでスキップしない */
         probe = (u8)inp(IDE_ALT_STATUS);
-        kprintf(0x07, "[ide] bank%d probe=0x%02x\n", bank, probe);
+        kprintf(KLOG_ATTR, "[ide] bank%d probe=0x%02x\n", bank, probe);
         if (probe == 0xFF) continue;
 
         /* 割り込み無効 (nIEN=1) — ポーリングモード */
@@ -233,7 +233,7 @@ int ide_init(void)
             /* IDENTIFYコマンドで直接検出。ステータスだけでは
              * スレーブドライブを見逃す場合がある */
             ret = ide_identify(idx, &drive_info[idx]);
-            kprintf(0x07, "[ide] drive%d identify=%d\n", idx, ret);
+            kprintf(KLOG_ATTR, "[ide] drive%d identify=%d\n", idx, ret);
             if (ret == IDE_OK) {
                 drive_present[idx] = 1;
                 found++;

@@ -41,7 +41,7 @@ void bootlog_save(void)
     fs = vfs_fstype("/");
     kind = bootlog_plan(fs);
     if (kind == BOOTLOG_FS_SKIP) {
-        kprintf(0x07, "[bootlog] not saved (root is %s)\n", fs ? fs : "unmounted");
+        kprintf(KLOG_ATTR, "[bootlog] not saved (root is %s)\n", fs ? fs : "unmounted");
         return;
     }
 
@@ -61,7 +61,7 @@ void bootlog_save(void)
         kprintf(0xC1, "[bootlog] %s failed rc=%d (boot continues)\n",
                 bootlog_stage_name(stage), rc);
     } else {
-        kprintf(0x07, "[bootlog] %s %u bytes (dropped %u)\n", SYS_BOOTLOG_FILE,
+        kprintf(KLOG_ATTR, "[bootlog] %s %u bytes (dropped %u)\n", SYS_BOOTLOG_FILE,
                 (unsigned)len, (unsigned)bootlog_dropped());
     }
 }

@@ -54,7 +54,7 @@ static void print_mac(const u8 *mac)
         buf[i * 3 + 1] = hex[mac[i] & 0x0F];
         buf[i * 3 + 2] = (i == 5) ? '\0' : ':';
     }
-    kprintf(0x07, "%s", buf);
+    kprintf(KLOG_ATTR, "%s", buf);
 }
 
 int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
@@ -97,14 +97,14 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
     }
 
     ne2k_get_mac(mac);
-    kprintf(0x07, "[lgy98] base 0x%x irq %d mac ", base, (int)irq);
+    kprintf(KLOG_ATTR, "[lgy98] base 0x%x irq %d mac ", base, (int)irq);
     print_mac(mac);
-    kprintf(0x07, " ram %dKB%s%s\n", (int)(ne2k_ram_bytes() / 1024),
+    kprintf(KLOG_ATTR, " ram %dKB%s%s\n", (int)(ne2k_ram_bytes() / 1024),
             (cfg.flags & NE2K_CFG_RX_COUNT_NO_FCS) ? " (np21w)" : "",
             (cfg.flags & NE2K_CFG_LOOPBACK) ? " loopback" : "");
     if (flags & LGY98_FLAG_REFLECT) {
         lgy98_reflect_on = 1;
-        kprintf(0x07, "[lgy98] reflect mode (M2 test): rx frames are sent back with MACs swapped\n");
+        kprintf(KLOG_ATTR, "[lgy98] reflect mode (M2 test): rx frames are sent back with MACs swapped\n");
     }
     /* 反射モードではリンク層を起こさない — RX キューの消費者は反射か
      * リンク層のどちらか 1 つ (TASK_N0 §2a、往復 2 の R10)。link_init を

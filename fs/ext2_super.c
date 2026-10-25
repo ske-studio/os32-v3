@@ -398,7 +398,7 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
         }
         if (ret != EXT2_OK) return ret;
         /* どちらの幾何で区画の位置を決めたか (BIOS が無いと IDENTIFY に落ちる。m3) */
-        kprintf(0x07, "[EXT2] hd%d: partition LBA %u +%u (CHS geometry from %s)\n",
+        kprintf(KLOG_ATTR, "[EXT2] hd%d: partition LBA %u +%u (CHS geometry from %s)\n",
                 ide_drive & 3, ctx->base_lba, ctx->part_len,
                 src == BOOTINFO_GEOM_BIOS ? "BIOS" : "IDENTIFY");
     }

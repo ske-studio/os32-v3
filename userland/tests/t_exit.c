@@ -37,7 +37,7 @@ int main(int argc, char **argv, KernelAPI *api)
         }
     }
 
-    api->kprintf(0x07, "t_exit: exiting with %d\n", code);
+    api->kprintf(KLOG_ATTR, "t_exit: exiting with %d\n", code);
     return code;
 }
 

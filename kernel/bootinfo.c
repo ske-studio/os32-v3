@@ -103,12 +103,12 @@ void bootinfo_report(void)
 
     if (s_bootinfo.status != BOOTINFO_OK) {
         bootinfo_format_bios(&s_bootinfo, 0, line, (int)sizeof(line));
-        kprintf(0x07, "%s\n", line);
+        kprintf(KLOG_ATTR, "%s\n", line);
     } else {
         for (i = 0; i < (int)BOOTINFO_NDRIVES; i++) {
             if (!s_bootinfo.drive[i].queried) continue;
             bootinfo_format_bios(&s_bootinfo, i, line, (int)sizeof(line));
-            kprintf(0x07, "%s\n", line);
+            kprintf(KLOG_ATTR, "%s\n", line);
         }
     }
 
@@ -128,7 +128,7 @@ void bootinfo_report(void)
         a.lba       = (u8)((g.w49 & 0x0200) ? 1 : 0);
         a.total     = g.total;
         bootinfo_format_ata(&a, i, line, (int)sizeof(line));
-        kprintf(0x07, "%s\n", line);
+        kprintf(KLOG_ATTR, "%s\n", line);
     }
 }
 
@@ -238,13 +238,13 @@ void bootinfo_report_image(void)
     char build[32];
 
     kapi_sys_get_build_info(build, (int)sizeof(build));
-    kprintf(0x07, "[boot] Build: %s  Commit: %s\n", build, os32_build_commit);
+    kprintf(KLOG_ATTR, "[boot] Build: %s  Commit: %s\n", build, os32_build_commit);
     if (s_bootinfo.status == BOOTINFO_OK && s_bootinfo.img_valid) {
-        kprintf(0x07, "[boot] Image CRC: %08x (%u bytes, src=%s)\n",
+        kprintf(KLOG_ATTR, "[boot] Image CRC: %08x (%u bytes, src=%s)\n",
                 s_bootinfo.img_crc, s_bootinfo.img_size,
                 s_bootinfo.source == BOOTINFO_SRC_HDD ? "hdd" :
                 s_bootinfo.source == BOOTINFO_SRC_FD ? "fd" : "?");
     } else {
-        kprintf(0x07, "[boot] Image CRC: none (loader did not record)\n");
+        kprintf(KLOG_ATTR, "[boot] Image CRC: none (loader did not record)\n");
     }
 }

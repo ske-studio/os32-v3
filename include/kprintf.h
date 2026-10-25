@@ -5,9 +5,8 @@
 #ifndef __KPRINTF_H
 #define __KPRINTF_H
 
+#include "../sdk/include/os32/os32_kapi_shared.h"
 #include "types.h"
-
-#define KLOG_ATTR 0x07
 
 void __cdecl kprintf(u8 attr, const char *fmt, ...);
 /* Internal i386 word-vector entry; public KAPI remains variadic. */

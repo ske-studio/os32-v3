@@ -1157,7 +1157,7 @@ void link_selftest(int rounds)
         kprintf(0xC1, "[link] HELLO failed (no Host Agent?) — L0 selftest skipped\n");
         return;
     }
-    kprintf(0x07, "[link] session %d epoch %d agent %d, peer "
+    kprintf(KLOG_ATTR, "[link] session %d epoch %d agent %d, peer "
                   "%02x:%02x:%02x:%02x:%02x:%02x\n",
             (int)link_sess, (int)link_epoch, (int)link_agent_gen,
             link_peer_mac[0], link_peer_mac[1], link_peer_mac[2],

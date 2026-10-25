@@ -452,7 +452,7 @@ static void flow(void)
     /* セッション中はもう一度始められない */
     CHECK(serialfs_session_begin() == OS32_ERR_BUSY);
     /* 子の出力は線に出ず保留へ */
-    kprintf(0x07, "child out %d\n", 42);
+    kprintf(KLOG_ATTR, "child out %d\n", 42);
     CHECK(memmem(g_tx, (size_t)g_tx_n, "child out", 9) == NULL);
 
     rc = serialfs_session_end(7);
@@ -552,7 +552,7 @@ static void end_late_hold(void)
 
     reset();
     CHECK(serialfs_session_begin() == 0);
-    kprintf(0x07, "child out\n");
+    kprintf(KLOG_ATTR, "child out\n");
     g_inject_y = 1;
     g_inject_z = 1;
     rc = serialfs_session_end(0);

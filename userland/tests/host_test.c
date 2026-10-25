@@ -107,7 +107,7 @@ int main(int argc, char **argv, KernelAPI *api)
     ok(len == 19 && got == 19, "TIME body is 19 bytes");
     if (got == 19) {
         body[19] = '\0';
-        api->kprintf(0x07, "  host time = %s\n", (const char *)body);
+        api->kprintf(KLOG_ATTR, "  host time = %s\n", (const char *)body);
     }
 
     /* ---- (4) ECHO 5 + host_write --------------------------------------- */

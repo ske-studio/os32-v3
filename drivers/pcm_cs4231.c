@@ -452,11 +452,11 @@ void pcm_init(void)
 {
     g_pcm.state = PCM_ST_CLOSED;
     if (!pcm_detect()) {
-        kprintf(0x07, "[pcm] none\n");
+        kprintf(KLOG_ATTR, "[pcm] none\n");
         return;
     }
     s_present = 1;
-    kprintf(0x07, "[pcm] CS4231 v=%d irq %d dma %d fmt 0x%X\n",
+    kprintf(KLOG_ATTR, "[pcm] CS4231 v=%d irq %d dma %d fmt 0x%X\n",
             (int)(s_version == PCM_VER_CS4231 ? PCM_VER_NAME_4231
                                               : PCM_VER_NAME_4231A),
             (int)PCM_IRQ, (int)PCM_DMA_CHAN, (int)PCM_FMT_44100);

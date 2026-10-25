@@ -271,7 +271,7 @@ int os32_sqlite_boot_check(int live, int reserve)
     if (!live && !reserve) budget->reserve = 0;
     if (reserve) {
         if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
-            kprintf(0x07, "[SQT] FEP reserve below minimum; using %d bytes\n",
+            kprintf(KLOG_ATTR, "[SQT] FEP reserve below minimum; using %d bytes\n",
                     OS32_SQLITE_FEP_RESERVE_MIN);
             reserve = OS32_SQLITE_FEP_RESERVE_MIN;
         }
@@ -809,7 +809,7 @@ int os32_sqlite_init(void)
         canary_after[i] = CANARY_VALUE;
     }
 
-    kprintf(0x07, "[SQT] init: pool=%x size=%x\n",
+    kprintf(KLOG_ATTR, "[SQT] init: pool=%x size=%x\n",
             (unsigned)sqlite_mem_pool, SQLITE_MEMSYS5_SIZE);
 
     /* MEMSYS5 固定プール設定 */
@@ -818,7 +818,7 @@ int os32_sqlite_init(void)
                         BUDGET_HEAP_BYTES,
                         BUDGET_ATOM_BYTES);  /* 最小アロケーション粒度 */
 
-    kprintf(0x07, "[SQT] sqlite3_config rc=%d\n", rc);
+    kprintf(KLOG_ATTR, "[SQT] sqlite3_config rc=%d\n", rc);
     if (rc != SQLITE_OK) return rc;
 
     rc = sqlite3_config(SQLITE_CONFIG_GETMALLOC, &budget->backing);
@@ -829,7 +829,7 @@ int os32_sqlite_init(void)
     /* SQLite 初期化 (内部で sqlite3_os_init が呼ばれる) */
     rc = sqlite3_initialize();
 
-    kprintf(0x07, "[SQT] sqlite3_initialize rc=%d\n", rc);
+    kprintf(KLOG_ATTR, "[SQT] sqlite3_initialize rc=%d\n", rc);
     return rc;
 }
 
@@ -838,12 +838,12 @@ int os32_sqlite_init(void)
 /* ======================================================================== */
 void os32_sqlite_dump_vfs(void)
 {
-    kprintf(0x07, "[VFS] io_methods=%x\n", (unsigned)&os32_io_methods);
-    kprintf(0x07, "[VFS] xClose=%x xRead=%x xWrite=%x\n",
+    kprintf(KLOG_ATTR, "[VFS] io_methods=%x\n", (unsigned)&os32_io_methods);
+    kprintf(KLOG_ATTR, "[VFS] xClose=%x xRead=%x xWrite=%x\n",
             (unsigned)os32_io_methods.xClose,
             (unsigned)os32_io_methods.xRead,
             (unsigned)os32_io_methods.xWrite);
-    kprintf(0x07, "[VFS] xTruncate=%x xSync=%x xFileSize=%x\n",
+    kprintf(KLOG_ATTR, "[VFS] xTruncate=%x xSync=%x xFileSize=%x\n",
             (unsigned)os32_io_methods.xTruncate,
             (unsigned)os32_io_methods.xSync,
             (unsigned)os32_io_methods.xFileSize);

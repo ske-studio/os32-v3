@@ -118,7 +118,7 @@ int main(int argc, char **argv, KernelAPI *api)
     /* ---- (2) db_error_code(-1) に直前の open 失敗が残る ----------------- */
     code = api->db_error_code(-1);
     ok(code != 0, "db_error_code(-1) keeps the open failure");
-    api->kprintf(0x07, "  open failure code = %d\n", code);
+    api->kprintf(KLOG_ATTR, "  open failure code = %d\n", code);
     ok(api->db_error_code(999) != 0, "an out-of-range handle is MISUSE");
 
     /* ---- 作業 DB を用意して RW で開く ---------------------------------- */
@@ -135,18 +135,18 @@ int main(int argc, char **argv, KernelAPI *api)
     {
         OS32_Stat fst;
         int frc = api->sys_stat(work, &fst);
-        api->kprintf(0x07, "  fixture %s stat=%d size=%d\n",
+        api->kprintf(KLOG_ATTR, "  fixture %s stat=%d size=%d\n",
                      work, frc, (int)fst.st_size);
         ok(frc == 0 && fst.st_size > 0, "the fixture db exists and is non-empty");
     }
     /* RO でも開けるか (RW 固有の段 = journal_mode の照会を切り分ける)。 */
     h = api->db_open_existing(work, 0);
-    api->kprintf(0x07, "  existing RO handle=%d\n", h);
+    api->kprintf(KLOG_ATTR, "  existing RO handle=%d\n", h);
     ok(h >= 0, "RO open of an existing db");
     if (h >= 0) api->db_close(h);
 
     h = api->db_open_existing(work, 1);
-    api->kprintf(0x07, "  existing RW handle=%d\n", h);
+    api->kprintf(KLOG_ATTR, "  existing RW handle=%d\n", h);
     ok(h >= 0, "RW open of an existing db");
     if (h < 0) {
         api->kprintf(0x41, "db_v50_test: aborted\n");

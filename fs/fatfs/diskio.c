@@ -87,7 +87,7 @@ static void fdd_track_setup(void)
 void diskio_print_fdd_cache(const char *tag)
 {
     if (fdd_track.sec_hits + fdd_track.trk_hits + fdd_track.fills == 0) return;
-    kprintf(0x07, "[fdc] %s: cache sec_hit=%u trk_hit=%u fill=%u idle=%u\n",
+    kprintf(KLOG_ATTR, "[fdc] %s: cache sec_hit=%u trk_hit=%u fill=%u idle=%u\n",
             tag, (unsigned int)fdd_track.sec_hits,
             (unsigned int)fdd_track.trk_hits, (unsigned int)fdd_track.fills,
             (unsigned int)fdd_track.idle_drops);
