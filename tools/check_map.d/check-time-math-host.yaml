@@ -5,3 +5,5 @@ check-time-math-host:
 - tools/tests/time_math_host.c
 - tools/check_map.d/check-time-math-host.yaml
 - build/checks.d/check-time-math-host.mk
+- include/types.h
+- kernel/ktime.h

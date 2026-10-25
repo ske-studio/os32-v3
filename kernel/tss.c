@@ -4,6 +4,7 @@
 
 #include <stddef.h>     /* offsetof (整数定数式。旧式の &((T*)0)->m は定数式でない) */
 #include "tss.h"
+#include "gdt.h"
 #include "kstring.h"
 #include "x86_desc.h"   /* x86_load_tr (arch/x86/、契約なし) */
 
@@ -25,8 +26,6 @@ struct tss_entry kernel_tss;
 /* gdt.c が TSS ディスクリプタを設定してから ltr する */
 extern void gdt_set_tss(u32 base, u32 limit);
 
-#define TSS_SELECTOR    0x18    /* GDT エントリ 3 */
-#define KERNEL_DS       0x10
 
 void tss_init(u32 kernel_esp0)
 {
@@ -35,7 +34,7 @@ void tss_init(u32 kernel_esp0)
 
     kmemset(&kernel_tss, 0, sizeof(kernel_tss));
 
-    kernel_tss.ss0  = KERNEL_DS;
+    kernel_tss.ss0  = GDT_KERNEL_DS;
     kernel_tss.esp0 = kernel_esp0;
 
     /* iomap_base は TSS 先頭からのオフセット。ディスクリプタのリミットが
@@ -54,7 +53,7 @@ void tss_init(u32 kernel_esp0)
     limit = sizeof(kernel_tss) - 1;
     gdt_set_tss(base, limit);
 
-    x86_load_tr(TSS_SELECTOR);
+    x86_load_tr(GDT_TSS_SEL);
 }
 
 void tss_set_esp0(u32 esp0)
@@ -69,12 +68,12 @@ u32 tss_get_esp0(void)
 
 void tss_iomap_allow(u16 port)
 {
-    kernel_tss.iomap[port >> 3] &= (u8)~(1 << (port & 7));
+    kernel_tss.iomap[port / BITS_PER_BYTE] &= (u8)~(1 << (port % BITS_PER_BYTE));
 }
 
 void tss_iomap_deny(u16 port)
 {
-    kernel_tss.iomap[port >> 3] |= (u8)(1 << (port & 7));
+    kernel_tss.iomap[port / BITS_PER_BYTE] |= (u8)(1 << (port % BITS_PER_BYTE));
 }
 
 void tss_iomap_allow_range(u16 start, u16 end)
@@ -101,5 +100,5 @@ void tss_iomap_deny_all(void)
 
 int tss_iomap_is_allowed(u16 port)
 {
-    return (kernel_tss.iomap[port >> 3] & (1 << (port & 7))) ? 0 : 1;
+    return (kernel_tss.iomap[port / BITS_PER_BYTE] & (1 << (port % BITS_PER_BYTE))) ? 0 : 1;
 }

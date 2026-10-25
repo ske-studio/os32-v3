@@ -38,11 +38,11 @@ struct gdt_ptr gp;
 /* GDTエントリ設定 */
 static void gdt_set_gate(int num, u32 base, u32 limit, u8 access, u8 gran)
 {
-    gdt[num].base_low = (base & 0xFFFF);
+    gdt[num].base_low = (base & U16_MAX);
     gdt[num].base_middle = (base >> 16) & 0xFF;
     gdt[num].base_high = (base >> 24) & 0xFF;
-    gdt[num].limit_low = (limit & 0xFFFF);
-    gdt[num].granularity = ((limit >> 16) & 0x0F) | (gran & 0xF0);
+    gdt[num].limit_low = (limit & U16_MAX);
+    gdt[num].granularity = ((limit >> 16) & GDT_LIMIT_HI_MASK) | (gran & GDT_GRAN_FLAGS_MASK);
     gdt[num].access = access;
 }
 
@@ -54,7 +54,7 @@ static void gdt_set_gate(int num, u32 base, u32 limit, u8 access, u8 gran)
  *                終端が曖昧になるので、バイト粒度で正確に指定する。 */
 void gdt_set_tss(u32 base, u32 limit)
 {
-    gdt_set_gate(GDT_TSS_IDX, base, limit, 0x89, 0x00);
+    gdt_set_gate(GDT_TSS_IDX, base, limit, GDT_ACCESS_TSS, 0x00);
 }
 
 void gdt_set_df_tss(u32 base, u32 limit)
@@ -73,12 +73,12 @@ void gdt_init(void)
 
     /* カーネルコードセグメント (idx1, DPL=0): ベース=0, リミット=4GB,
      * 実行/読み込み可能, 32ビット, 4KB グラニュラリティ */
-    gdt_set_gate(GDT_KERNEL_CS_IDX, 0, 0xFFFFFFFF,
+    gdt_set_gate(GDT_KERNEL_CS_IDX, 0, U32_MAX,
                  GDT_ACCESS_KCODE, GDT_GRAN_FLAT);
 
     /* カーネルデータセグメント (idx2, DPL=0): ベース=0, リミット=4GB,
      * 読み書き可能, 32ビット, 4KB グラニュラリティ */
-    gdt_set_gate(GDT_KERNEL_DS_IDX, 0, 0xFFFFFFFF,
+    gdt_set_gate(GDT_KERNEL_DS_IDX, 0, U32_MAX,
                  GDT_ACCESS_KDATA, GDT_GRAN_FLAT);
 
     /* TSS (idx3) は tss_init() が gdt_set_tss() で埋める。
@@ -88,12 +88,12 @@ void gdt_init(void)
     /* ユーザコードセグメント (idx4, DPL=3, USER_CS=0x23): フラット 4GB。
      * 保護はページ単位 (PTE_USER) で行うのでセグメントはフラットのまま。
      * CPL=3 プログラムの CS になる (M1d の iret フレーム)。 */
-    gdt_set_gate(GDT_USER_CS_IDX, 0, 0xFFFFFFFF,
+    gdt_set_gate(GDT_USER_CS_IDX, 0, U32_MAX,
                  GDT_ACCESS_UCODE, GDT_GRAN_FLAT);
 
     /* ユーザデータセグメント (idx5, DPL=3, USER_DS=0x2B): フラット 4GB。
      * CPL=3 プログラムの SS/DS/ES になる。 */
-    gdt_set_gate(GDT_USER_DS_IDX, 0, 0xFFFFFFFF,
+    gdt_set_gate(GDT_USER_DS_IDX, 0, U32_MAX,
                  GDT_ACCESS_UDATA, GDT_GRAN_FLAT);
 
     /* GDTのロードとセグメントレジスタの再設定 */

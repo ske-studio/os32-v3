@@ -18,7 +18,7 @@
 
 /* 8254 のカウンタは 16bit。0 は「65536」を意味するが、この票の範囲では
  * どちらのクロックでも 19968 / 24576 なので使わない。 */
-#define PIT_RELOAD_MAX   65535UL
+#define PIT_RELOAD_MAX   ((unsigned long)U16_MAX)
 
 /* 1 秒 = 10^6 µs。**`unsigned int` で持つ** — `UL` にすると 64bit ホストでは
  * `reload × PIT_US_PER_SEC` が溢れず、ホスト試験が「素直に 10^6 を掛ける」

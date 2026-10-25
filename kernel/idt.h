@@ -15,6 +15,9 @@
 #ifndef __ASSEMBLER__
 /* ======== 基本型 ======== */
 #include "types.h"
+#include "gdt.h"
+#include "pc98.h"
+#include "irq_math.h"
 #include "pit_math.h"   /* struct pit_setup / pit_compute */
 
 /* ======================================================================== */
@@ -42,10 +45,24 @@ struct idt_ptr {
                                        * (CPL=3 から int 0x80 を呼ぶ用, v2 M2/C4) */
 
 /* GDTコードセグメントセレクタ */
-#define KERNEL_CS  0x08
+#define KERNEL_CS  GDT_KERNEL_CS
 
 /* IDTエントリ数 */
 #define IDT_ENTRIES  256
+#define EXC_VECTOR_COUNT 32
+
+/* PUSHAD words shared by the common exception and dedicated #PF paths. */
+#define ISR_REG_EDI 0
+#define ISR_REG_ESI 1
+#define ISR_REG_EBP 2
+#define ISR_REG_ESP 3
+#define ISR_REG_EBX 4
+#define ISR_REG_EDX 5
+#define ISR_REG_ECX 6
+#define ISR_REG_EAX 7
+/* Common: vector, error, EIP, CS. Dedicated #PF: error, EIP, CS. */
+#define ISR_COMMON_CS 11
+#define ISR_PF_CS     10
 
 /* ======================================================================== */
 /*  PIC (8259A) — PC-98固有ポートアドレス                                   */
@@ -53,12 +70,10 @@ struct idt_ptr {
 /* ======================================================================== */
 
 /* マスタPIC (IO_ICU1 = 0x00) */
-#define PIC1_CMD   0x00    /* ICW1/OCW2/OCW3 ライト, IRR/ISR リード */
-#define PIC1_DATA  0x02    /* ICW2-4/OCW1(IMR) ライト, IMR リード */
+/* PIC1_CMD / PIC1_DATA are defined in pc98.h. */
 
 /* スレーブPIC (IO_ICU2 = 0x08) */
-#define PIC2_CMD   0x08
-#define PIC2_DATA  0x0A
+/* PIC2_CMD / PIC2_DATA are defined in pc98.h. */
 
 /* PC-98: カスケードはIR7 (PC/ATはIR2) */
 #define ICU_SLAVEID  7
@@ -87,18 +102,18 @@ struct idt_ptr {
 #define PIC_SLAVE_OFFSET   0x28   /* IRQ8-15 → INT 0x28-0x2F */
 
 /* IRQ番号 → INTベクタ */
-#define IRQ_TO_INT(irq)  ((irq) < 8 ? PIC_MASTER_OFFSET + (irq) \
-                                     : PIC_SLAVE_OFFSET + (irq) - 8)
+#define IRQ_TO_INT(irq)  ((irq) < PIC_IRQS ? PIC_MASTER_OFFSET + (irq) \
+                                     : PIC_SLAVE_OFFSET + (irq) - PIC_IRQS)
 
 /* ======================================================================== */
 /*  PIT (8254) — PC-98固有ポートアドレス                                    */
 /*  出典: FreeBSD sys/pc98/include/timerreg.h, PC9800Bible §2-3            */
 /* ======================================================================== */
 
-#define PIT_CNTR0    0x71  /* カウンタ#0 (インターバルタイマ) */
-#define PIT_CNTR1    0x3FDB /* カウンタ#1 (スピーカー) — 特殊アドレス */
-#define PIT_CNTR2    0x75  /* カウンタ#2 (RS-232C) */
-#define PIT_MODE     0x77  /* モードレジスタ */
+#define PIT_CNTR0    PIT_CNT0  /* カウンタ#0 (インターバルタイマ) */
+#define PIT_CNTR1    PIT_CNT1_BEEP /* カウンタ#1 (スピーカー) — 特殊アドレス */
+#define PIT_CNTR2    PIT_CNT2  /* カウンタ#2 (RS-232C) */
+/* PIT_MODE is defined in pc98.h. */
 
 /* システムクロックは機種で 2 通り (1.9968MHz / 2.4576MHz)。**決め打ちしない** */
 /* — 判定は kernel/sysclk.c、分周の算数は kernel/pit_math.c。               */

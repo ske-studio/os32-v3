@@ -37,6 +37,10 @@
 #include "cpu_calibrate_math.h"
 #include "io.h"
 
+/* PIT_HZ=100: one tick is 10000 us. Preserve the two-stage division
+ * (and its rounding) while keeping the intermediate product bounded. */
+#define CPU_DELAY_SCALE 100UL
+
 /* タイマーティックカウンタ (isr_stub.asm でインクリメント) */
 extern volatile u32 tick_count;
 
@@ -130,7 +134,7 @@ void cpu_delay_us(u32 us)
     }
 
     /* (lpt/100) * us / 100 でオーバーフロー回避しつつ精度確保 */
-    loops = (s_loops_per_tick / 100UL) * us / 100UL;
+    loops = (s_loops_per_tick / CPU_DELAY_SCALE) * us / CPU_DELAY_SCALE;
 
     if (loops == 0) return;
 

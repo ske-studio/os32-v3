@@ -14,7 +14,7 @@
 
 /* ページサイズ */
 #define PAGE_SIZE       MEM_PAGE_SIZE
-#define PAGE_SHIFT      12
+#define PAGE_SHIFT      PHYSMEM_PAGE_SHIFT
 #define PDE_SHIFT       MEM_PDE_SHIFT
 
 /* ページディレクトリ/テーブルのエントリ数 */
@@ -27,6 +27,8 @@
 #define LEASE_PDE (MEM_LEASE_BASE >> PDE_SHIFT)
 
 /* ページ属性ビット */
+#define PF_ERR_WRITE    0x002   /* #PF error-code W/R bit, independent of PTE_RW */
+
 #define PTE_PRESENT     0x001   /* P   : 存在 */
 #define PTE_RW          0x002   /* R/W : 書き込み可 */
 #define PTE_USER        0x004   /* U/S : ユーザアクセス可 */
@@ -52,7 +54,7 @@
  * tables with identity supervisor RW, cacheable PTEs qualify. New PTs still
  * require master CR3 and no live address spaces; no high RAM is auto-mapped.
  * No optional device guard policy is introduced here. */
-#define PAGING_PFN_COUNT 1048576UL
+#define PAGING_PFN_COUNT PHYSMEM_MAX_PFN
 #define PAGING_PT_COUNT PDE_COUNT
 #define PAGING_BOOT_PT_COUNT MEM_FIXED_BOOT_PT_COUNT
 #define PAGING_BOOT_MAP_SIZE (PAGING_BOOT_PT_COUNT * PTE_COUNT * PAGE_SIZE)
@@ -354,12 +356,18 @@ int paging_app_band_selftest(void);
 
 /* 記録する食い違い区間の上限。ここを超えた分は数だけ数える。 */
 #define MM_BAD_MAX 8
+#define MM_BAD_WORDS      3
+#define MM_BAD_START      0
+#define MM_BAD_END        1
+#define MM_BAD_KINDS      2
+#define MM_BAD_KIND_SHIFT 4
 
 /* 食い違った区間を 3 ワードずつ: [start, end(inclusive), (期待<<4)|実物]。
  * 期待 / 実物のコードは paging.c の MM_NP / MM_RW / MM_RO / MM_ROU / MM_RWU。
  * 件数は paging_memmap_bad_count (MM_BAD_MAX を超えても数え続ける)。
  * static にしないのは kselftest_pass と同じ理由 — 画面が流れても
  * kernel.map の番地から emu_read_mem で読めるようにするため。 */
+/* Preserve import ABI declaration spelling; the C definition uses MM_BAD_WORDS. */
 extern u32 paging_memmap_bad[MM_BAD_MAX * 3];
 extern u32 paging_memmap_bad_count;
 
@@ -383,5 +391,9 @@ int paging_poke_user_bit(u32 virt, int set_user);
 /* 逆転した範囲 (start > end) を撥ねた回数。範囲 API は前から -1 を返して
  * いたが呼び側が見ていないので、空振りが成功に見えていた (票 §4 の 2)。 */
 extern u32 paging_range_reject_count;
+
+/* Only the macros above need PFN geometry. Keep these declarations last:
+ * HWDEV hashes the preprocessed order of the shared header declarations. */
+#include "physmem.h"
 
 #endif /* __PAGING_H */

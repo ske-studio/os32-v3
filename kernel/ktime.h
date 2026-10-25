@@ -14,6 +14,9 @@
 #ifndef __KTIME_H
 #define __KTIME_H
 
+/* Three failed snapshots exhaust one call; shared with the injection array. */
+#define TIME_RETRY_MAX 3
+
 struct time_test_feed {
     int p1;      /* 0 / 1 */
     int p2;      /* 0 / 1 */
@@ -22,6 +25,8 @@ struct time_test_feed {
 
 /* 試行 i は feed[min(i, n-1)] を使う (最後の要素を繰り返す)。
  * n = 0 (既定) なら注入しない。3 = sys_time_now の再試行上限。 */
+/* Import ABI hashes this declaration spelling; the C definition uses
+ * TIME_RETRY_MAX and the compiler checks that both array bounds agree. */
 extern struct time_test_feed time_test_feed[3];
 extern volatile int time_test_feed_n;
 

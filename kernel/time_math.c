@@ -4,6 +4,7 @@
 /* ======================================================================== */
 
 #include "time_math.h"
+#include "types.h"
 
 unsigned int time_branch_hits[TIME_BR_COUNT];
 
@@ -58,8 +59,8 @@ void time_us_from(unsigned int tick, unsigned int count, unsigned int reload,
     us = (unsigned long long)tick * (unsigned long long)period_us +
          (unsigned long long)frac;
 
-    if (lo) *lo = (unsigned int)(us & 0xFFFFFFFFULL);
-    if (hi) *hi = (unsigned int)(us >> 32);
+    if (lo) *lo = (unsigned int)(us & (unsigned long long)U32_MAX);
+    if (hi) *hi = (unsigned int)(us >> BITS_PER_U32);
 }
 
 int time_clamp(unsigned long long us, unsigned long long last,

@@ -53,7 +53,9 @@ entry_bp: dd 0
              'int result=0; sqlite_call_on_alt_stack(sqlite_body, test_stack_top, &result); return result; }\n')
     # Execute each product diagnostic classification block with boundary EIPs.
     isr = (ROOT / 'kernel/isr_handlers.c').read_text()
-    classify = '''
+    # The extracted recovery block also uses this product-local row constant.
+    classify = re.search(r'^#define EXC_SCREEN_STATUS_ROW[^\n]+$', isr, re.M).group() + '\n'
+    classify += '''
 static const char *label;
 static void tvram_puts_at(int row, int col, const char *s, int attr)
 { (void)row; (void)col; (void)attr; label = s; }
