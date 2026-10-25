@@ -673,7 +673,7 @@ static void pegc_palette_init(void)
     int i, r, g, b;
 
     /* 0-15: 9801 の 16 色をそのまま (4bit 輝度 → 8bit) */
-    for (i = 0; i < PALETTE_COUNT; i++) {
+    for (i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); i++) {
         pegc_write_palette(i, pegc_pal8(sys[i].r), pegc_pal8(sys[i].g),
                            pegc_pal8(sys[i].b));
     }
@@ -689,7 +689,7 @@ static void pegc_palette_init(void)
     }
 
     /* 232-255: グレースケール 24 段 */
-    for (b = 0; i < PEGC_PALETTE_COUNT; i++, b++) {
+    for (b = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP); i++, b++) {
         u8 v = (u8)(PEGC_GRAY_FIRST + b * PEGC_GRAY_STEP);
         pegc_write_palette(i, v, v, v);
     }
@@ -957,7 +957,7 @@ static int pegc_query(GFX_ScreenInfo *info)
 
     info->width  = (u16)PEGC_WIDTH;
     info->height = (u16)PEGC_HEIGHT_480;
-    info->bpp    = PEGC_BPP;
+    info->bpp    = GFX_FMT_PACKED8_BPP;
     info->format = GFX_FMT_PACKED8;
 
     /* 能力ビット (票 7):
@@ -1047,9 +1047,9 @@ static void pegc_set_palette(int first, int count, const u8 *rgb)
         u8 r = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R];
         u8 g = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G];
         u8 b = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B];
-        if (idx < 0 || idx >= PEGC_PALETTE_COUNT) continue;
+        if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP)) continue;
         pegc_write_palette(idx, pegc_pal8(r), pegc_pal8(g), pegc_pal8(b));
-        if (idx < PALETTE_COUNT) palette_shadow_set(idx, r, g, b);
+        if (idx < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) palette_shadow_set(idx, r, g, b);
     }
 }
 

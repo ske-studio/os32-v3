@@ -1,4 +1,5 @@
 check-gfx-host:
+- include/gfx_format.h
 - exec/access_walk.c
 - exec/lease.c
 - exec/redir_access.c
@@ -8,6 +9,7 @@ check-gfx-host:
 - gfx/backend_pc98.c
 - gfx/backend_pegc.c
 - gfx/gfx_core.c
+- gfx/palette.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
 - kernel/paging.c

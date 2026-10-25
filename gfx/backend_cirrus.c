@@ -71,7 +71,6 @@
 /* ------------------------------------------------------------------------ */
 #define CIRRUS_WIDTH        640
 #define CIRRUS_HEIGHT       480
-#define CIRRUS_BPP          8
 #define CIRRUS_PITCH        CIRRUS_WIDTH          /* 1 バイト/画素 */
 #define CIRRUS_SURFACE_SIZE ((u32)CIRRUS_PITCH * CIRRUS_HEIGHT)
 
@@ -98,9 +97,8 @@ STATIC_ASSERT(CIRRUS_CLIENT_OFF == MEM_GFX_BB8_SIZE &&
               cirrus_surfaces_match_ledger);
 
 /* パレット (契約 G8)。0〜15 はシステム色、16〜255 を貸す。 */
-#define CIRRUS_PAL_COUNT    256
 #define CIRRUS_LEASE_FIRST  16
-#define CIRRUS_LEASE_COUNT  (CIRRUS_PAL_COUNT - CIRRUS_LEASE_FIRST)
+#define CIRRUS_LEASE_COUNT  (GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP) - CIRRUS_LEASE_FIRST)
 
 /* KAPI の輝度は 4bit (0〜15)、VGA DAC は 6bit (0〜63)。
  * (v<<2)|(v>>2) で両端がぴったり合う (0→0, 15→63)。
@@ -252,7 +250,7 @@ static void cirrus_palette_init(void)
     const PaletteEntry *sys = palette_get_all();
     int i, r, g, b;
 
-    for (i = 0; i < PALETTE_COUNT; i++) {
+    for (i = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP); i++) {
         wab_cirrus_dac_set(s_glue, i, cirrus_pal6(sys[i].r),
                            cirrus_pal6(sys[i].g), cirrus_pal6(sys[i].b));
     }
@@ -265,7 +263,7 @@ static void cirrus_palette_init(void)
             }
         }
     }
-    for (b = 0; i < CIRRUS_PAL_COUNT; i++, b++) {
+    for (b = 0; i < GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP); i++, b++) {
         u8 v = (u8)(CIRRUS_GRAY_FIRST + b * CIRRUS_GRAY_STEP);
         if (v > CIRRUS_DAC_MAX) v = CIRRUS_DAC_MAX;
         wab_cirrus_dac_set(s_glue, i, v, v, v);
@@ -375,7 +373,7 @@ static int cirrus_query(GFX_ScreenInfo *info)
 
     info->width  = (u16)CIRRUS_WIDTH;
     info->height = (u16)CIRRUS_HEIGHT;
-    info->bpp    = CIRRUS_BPP;
+    info->bpp    = GFX_FMT_PACKED8_BPP;
     info->format = GFX_FMT_PACKED8;
 
     /* 能力ビット (票 H3 作業 4):
@@ -435,10 +433,10 @@ static void cirrus_set_palette(int first, int count, const u8 *rgb)
         u8 r = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R];
         u8 g = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G];
         u8 b = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B];
-        if (idx < 0 || idx >= CIRRUS_PAL_COUNT) continue;
+        if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PACKED8_BPP)) continue;
         wab_cirrus_dac_set(s_glue, idx, cirrus_pal6(r), cirrus_pal6(g),
                            cirrus_pal6(b));
-        if (idx < PALETTE_COUNT) palette_shadow_set(idx, r, g, b);
+        if (idx < GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) palette_shadow_set(idx, r, g, b);
     }
     cirrus_sync_io();
 }

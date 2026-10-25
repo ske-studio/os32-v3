@@ -40,7 +40,6 @@ static int pc98_probe(void)
 /*  現在のモード (400/200 ライン, フリップ有無) を正直に申告する — GUI が      */
 /*  gfx_screen_info() を信じられるのはここが決め打ちしないから (DESIGN §7-2)。 */
 /* ------------------------------------------------------------------------ */
-#define PC98_BPP GVRAM_PLANES
 #define PC98_LEASE_MASK 0xFF7E
 #define PC98_PALETTE_IO_WRITES 4u
 
@@ -51,7 +50,7 @@ static int pc98_query(GFX_ScreenInfo *info)
 
     info->width  = (u16)GFX_WIDTH;
     info->height = (u16)gfx_current_height;      /* 400 or 200 */
-    info->bpp    = PC98_BPP;
+    info->bpp    = GFX_FMT_PLANAR4_BPP;
     info->format = GFX_FMT_PLANAR4;
     info->flags  = GFX_CAP_TEXT_OVERLAY |
                    (gfx_flip_enabled ? GFX_CAP_PAGE_FLIP : 0);
@@ -128,7 +127,7 @@ static void pc98_set_palette(int first, int count, const u8 *rgb)
     if (!rgb) return;
     for (k = 0; k < count; k++) {
         int idx = first + k;
-        if (idx < 0 || idx >= PALETTE_COUNT) continue;
+        if (idx < 0 || idx >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)) continue;
         palette_set(idx, rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R], rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G], rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B]);
     }
     /* パレット 1 項目あたり OUT 4 本 (番号 + G/R/B)。 */
