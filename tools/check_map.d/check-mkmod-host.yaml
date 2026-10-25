@@ -1,5 +1,19 @@
 check-mkmod-host:
+- exec/exec_kapi_init.inc
+- kdebug/generated/kdebug_import_slots.c
+- kdebug/generated/kdebug_import_stubs.S
+- kdebug/selftest_exec.c
+- exec/ring3_str.h
+- tools/tests/exec_selftest_host.c
+- tools/tests/test_exec_selftest.py
+- exec/exec.c
+- exec/ring3_str.c
+- exec/os32x_hdr.c
+- exec/ring3_ls.S
+- lib/path.h
+- kdebug/selftest_lease.c
 - kdebug/*.c
+- kdebug/selftest_internal.h
 - hwdev/generated/hwdev_core.c
 - kernel/module_schema.h
 - tools/module_schema.py
@@ -36,6 +50,7 @@ check-mkmod-host:
 - include/io.h
 - include/kbd.h
 - include/kbd_inject.h
+- include/kselftest_probe.h
 - include/kprintf.h
 - include/ksetjmp.h
 - include/launch.h
@@ -97,6 +112,8 @@ check-mkmod-host:
 - tools/tests/mkmod_tdd.md
 - tools/tests/module_image_host.c
 - tools/tests/module_image_tdd.md
+- kernel/shlib.h
+- exec/ring3_ls.h
 - tools/tests/test_kdebug_imports.py
 - tools/tests/test_mkmod.py
 - tools/tests/test_module_image.py

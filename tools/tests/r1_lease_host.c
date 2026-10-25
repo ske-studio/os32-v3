@@ -5,6 +5,8 @@ volatile int ring3_in_syscall;
 static void host_raise_ud(void) { CHECK(0); }
 #undef slot
 #include "fixture_source.c"
+#define LEASE_SELFTEST_AS (&space)
+#include "lease_selftest_host.h"
 #define slot host_slots[2]
 static int waits;
 static void __cdecl wait_once(void) { waits++; }
@@ -45,6 +47,10 @@ static void run(void)
         r1_fixture_id[R1_FIXTURE_LEASE_FAIL]=2;
         r1_fixture_generation[R1_FIXTURE_LEASE_FAIL]=space.generation;
     }
+    /* 起動自己試験は生きているアプリの AS と所有者も壊さない。 */
+    paging_load_cr3(paging_kernel_pd_phys());
+    CHECK(!lease_selftest());
+    paging_load_cr3(space.pd_phys);
     u32 pages=ledger_owner_pages(owner), free0=pgalloc_free_pages();
     r1_fixture_arm[R1_FIXTURE_LEASE_FAIL]=R1_FIXTURE_ARM;
     CHECK(libos32gfx_attach_checked()==OS32_ERR_FULL);

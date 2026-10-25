@@ -61,7 +61,8 @@ def run(args, mutant=None):
         (tmp / 'ls_source.inc').write_text(sources['ls'])
         (tmp / 'shim.S').write_text(sources['shim'])
         (tmp / 'client_source.inc').write_bytes((ROOT / 'userland/lib/rt/ls.c').read_bytes())
-        offset = next(line for line in source.splitlines() if line.startswith('#define RING3_LS_SHIM_OFF'))
+        offset = next(line for line in (ROOT / 'exec/ring3_str.h').read_text().splitlines()
+                      if line.startswith('#define RING3_LS_SHIM_OFF'))
         (tmp / 'trampoline.inc').write_text(offset + '\n' + function(source, 'static void ring3_trampoline_init(void)'))
         exe = tmp / 'test'
         subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',

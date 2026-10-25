@@ -30,6 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| SLIM-S3C-GUEST | S3 (自己試験 5 本を kdebug へ) の KDEBUG OFF の起動 (skipped と常駐の監査)・両 FD の起動・道具の実読取り | 2026-10-25 に PM が 43984e35 の成果物で KDEBUG ON の起動・自己試験 (fail=0、pass 1823 → 1829、229/229)・ブートログの比べ・mem の監査を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s3/RESULT.md`)。OFF と FD は設定と媒体の差し替えが要る。基準は `~/os32-tmp/run/slim-s3/baseline/`、候補と同梱一覧は `s3f-evidence/` | 次に KDEBUG OFF か FD 起動の試験を回すときに PM が同じ経路を通す |
 | SLIM-S2-GUEST | S2 (recover_gf の表を詰める・gfinit_decode を -Os) の ROM の decode を i386 -Os の機械語で実際に通すこと (結果・plan が旧版と一致) | NP21/W に GeForce が無く inspect は ROM を読む前に rc=-1。2026-10-25 に PM が 852c895 の成果物で起動・部品の PAIR・`gfinit inspect 0` の 2 回 (先に確保した約 133KB の領域を失敗の後に解放、free pages・leftover・audit_fail は不変) を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s2/RESULT.md`)。kdebug.bin はバイト一致なので戻す処理の T4b は再試験しない | 実機の S8 の A1 (`gfinit size-bars` の前の inspect が ROM を decode する) で PM が確かめる (台本 tools/accept/gf_s8.md) |
 | SLIM-S4AB-GUEST | S4a・S4b (kernel_main のシェルループ・サブマウントの抽出) の GUI 失敗→CUI・shell の読み込み失敗の経路と、媒体を入れたサブマウントの読み出し・FD 起動 | 2026-10-25 に PM が S4a・S4b の成果物で起動・root・/host・サブマウントの試行 (ブートログが元の kernel_main と一致)・db_test・CUI→GUI→CUI・mem の監査を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s4a/RESULT.md`)。残りは故障の注入か媒体の差し替え (ini) が要る。機械語は S4a が CFG 等価、S4b が cmp の左右の入れ替え 1 命令 | 次に FD 起動か媒体を入れたゲスト試験を回すときに PM が同じ経路を通す |
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |

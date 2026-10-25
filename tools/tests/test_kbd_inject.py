@@ -28,12 +28,15 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # 同じものをここでも渡す。
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "exec", "lib", "sdk/include/os32")]
+                      "kernel", "exec", "lib", "kdebug", "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/kbd_inject_host.c"
 KERNEL_SRC = ROOT / "kernel/kbd_inject.c"
 
-def run(tmp, source):
+MOVED_SRC = ROOT / "kdebug/selftest_kbd_inject.c"
+
+def run(tmp, source, moved):
     (tmp / "kbd_inject.c").write_text(source)
+    (tmp / "selftest_kbd_inject.c").write_text(moved)
     exe = tmp / "kbd-inject"
     subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
                     "-DKBD_INJECT_NO_IRQ_LOCK", "-D__KERNEL_BUILD__",
@@ -46,15 +49,18 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true')
     args = p.parse_args()
     source = KERNEL_SRC.read_text()
+    moved = MOVED_SRC.read_text()
     with tempfile.TemporaryDirectory(prefix="os32-kbd-inject-") as directory:
         tmp = pathlib.Path(directory)
-        result = run(tmp, source)
+        result = run(tmp, source, moved)
         print(result.stdout, end=''); assert result.returncode == 0
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__", *INCLUDES,
                         "-O2", "-c", str(KERNEL_SRC), "-o", str(tmp / "kbd_inject.o")],
                        cwd=ROOT, check=True)
         if args.mutate:
             for old, new, expected in [
+                ('return inj_push(p, len, dest);', 'return inj_push(p, len, dest) - 1;',
+                 'FAIL 6a'),
                 ('    int reader = con_sink_reader_get();\n'
                  '    if (reader >= APP_ID_SHELL && reader <= APP_ID_MAX && allowed[reader])\n'
                  '        allowed[0] = 1;',
@@ -83,8 +89,8 @@ if __name__ == "__main__":
                 ('if (id == APP_ID_SHELL) return 1;', 'if (id == APP_ID_SHELL) return 0;',
                  'FAIL fullscreen WM without reader'),
             ]:
-                assert source.count(old) == 1
-                result = run(tmp, source.replace(old, new))
+                assert source.count(old) + moved.count(old) == 1
+                result = run(tmp, source.replace(old, new), moved.replace(old, new))
                 assert result.returncode != 0 and expected in result.stdout, result.stdout
                 print('RED runtime:', expected)
         print('PASS kbd inject and target compile')

@@ -31,6 +31,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 int shlib_read_page(u32 va, u32 frame) { (void)va; (void)frame; return 0; }
 #include "lease_host_source.c"
+#include "lease_selftest_host.h"
 void *kmemcpy(void *dst, const void *src, u32 n) {
     u8 *d = dst; const u8 *s = src; while (n--) *d++ = *s++; return dst;
 }
@@ -139,6 +140,13 @@ void _start(void) {
     CHECK(result == KERNEL_LOAD_ADDR);
     host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     before = used_pages;
+    CHECK(!lease_selftest()); CHECK(used_pages == before);
+    /* AS 2 つがそれぞれ PD と最初の lease PT を確保する — その各回で失敗させる。 */
+    for (int fail = 0; fail < 2 * 2; fail++) {
+        fail_after = fail;
+        CHECK(lease_selftest() != 0); CHECK(used_pages == before);
+    }
+    fail_after = -1;
     CHECK(!lease_selftest()); CHECK(used_pages == before);
     CHECK(ledger_owner_new(LEDGER_KIND_AS,0,"A",&oa));
     CHECK(ledger_owner_new(LEDGER_KIND_AS,0,"B",&ob));

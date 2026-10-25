@@ -89,15 +89,15 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | HWDEV index | 関数 | 既存 kdebug index |
 |---|---|---|
 | 25 | kprintf | 0 |
-| 26 | kmemset | 73 |
-| 27 | pgalloc_alloc_phys | 114 |
-| 28 | boot_image_info | 217 |
-| 29 | pgalloc_free_n_owner | 219 |
-| 30 | serial_get_setup | 250 |
-| 31 | pci_cfg_read32 | 264 |
-| 32 | pci_cfg_read16 | 265 |
-| 33 | pci_cfg_write32 | 266 |
-| 34 | pci_cfg_write16 | 267 |
+| 26 | kmemset | 69 |
+| 27 | pgalloc_alloc_phys | 109 |
+| 28 | boot_image_info | 212 |
+| 29 | pgalloc_free_n_owner | 214 |
+| 30 | serial_get_setup | 245 |
+| 31 | pci_cfg_read32 | 259 |
+| 32 | pci_cfg_read16 | 260 |
+| 33 | pci_cfg_write32 | 261 |
+| 34 | pci_cfg_write16 | 262 |
 
 `boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 

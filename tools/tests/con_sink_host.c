@@ -25,6 +25,12 @@ void res_owner_set(int owner) { g_owner = owner; }
 /* 実物。CON_SINK_NO_IRQ_LOCK は test_con_sink.py が -D で渡す。 */
 #include "con_sink.c"
 
+void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
+#define KDEBUG_SELFTEST_HOST
+#include "../../kdebug/selftest_con_sink.c"
+/* 旧名の入口は fixture の中だけ (本番は kst_con_sink を直に呼ぶ)。 */
+static u32 con_sink_selftest(void) { return kst_con_sink(); }
+
 /* ======================================================================== */
 /*  kernel/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
@@ -539,6 +545,9 @@ static void case_selftest_agrees(void)
     reset_all();
     report("8 con_sink_selftest (what kselftest runs on the guest)\n");
     check(con_sink_selftest() == 0, "8a 自己診断のビットマスクは 0");
+    check(con_sink_reader_get() == CON_SINK_NO_READER,
+          "8e 自己診断後は読み手の所有を返す");
+    check(con_sink_drop_count == 0, "8f 自己診断後は drop 0");
     check(con_sink_is_enabled() == 0, "8b 終わった後は無効 (CUI に戻る)");
     check(pending_now() == 0, "8c 終わった後は空");
     check(res_owner_get() == 0, "8d 所有者タグを元に戻す");

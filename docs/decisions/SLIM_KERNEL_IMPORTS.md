@@ -157,3 +157,12 @@
 - test_clang_ast.py、test_dma_pool.py、test_module_policy.py、test_kdebug_init.py、test_shm_user.py。
 - test_cirrus_module.py、test_c_dialect.py、test_device_reservation.py、test_bootlog.py。
 - 文字位置の不一致が残れば、意味が等価な抽出先を追う最小修正だけを試験側へ行い、旧来の順序条件を保持する。
+
+## S3a の基準値 (2026-10-25、25aeb119、S2/S4 統合後)
+
+- `CROSS_DIR=/home/hight/opt/cross HOST32_RUNNERS=qemu TMPDIR=/home/hight/os32-tmp/run/slim-s3`、既定の `make kernel`。以下は移植前の測定値で、§1 の設計時点の値と区別する。
+- kernel.elf: text=338,467 B、data=30,487 B、合計=368,954 B、BSS=210,616 B。vmkernel.lz4=224,278 B。
+- kdebug.elf: text=93,650 B、data=1,136 B、BSS=31,369 B。kdebug.bin=111,172 B。kselftest.o: text=35,115 B、BSS=2,368 B。
+- 移動予定の本体: con=1,689 B、kbd=1,661 B、lease=2,152 B、exec tramp=1,380 B、exec layout=465 B、計7,347 B。S3a の import は269枠、S6追加0、旧5枠は存続。
+- 生の証拠: `~/os32-tmp/run/slim-s3/baseline/` の kernel.elf・kernel.map・kdebug.map・nm.txt・size.txt・vmkernel.lz4・kdebug.bin・kdebug_imports.json・本付表の変更前コピー。ビルドログは同親ディレクトリの `baseline-build.log`。
+- `images/` が無いため両FDの空きクラスタ・同梱一覧は未測定。設計時点の値を今回の基準値に流用せず、S3fで候補像から採取する。ゲストの自己試験件数・結果もこの段では未確認。

@@ -47,5 +47,13 @@
 #define v86_gcap_phase (*kdi_ptr_v86_gcap_phase())
 #define v86_gcap_alloc_count (*kdi_ptr_v86_gcap_alloc_count())
 #define v86_gcap_free_count (*kdi_ptr_v86_gcap_free_count())
+#define KDI_INDEX_shlib_read_page 289
+#define KDI_ADDR_shlib_read_page ((__typeof__(&shlib_read_page))(uptr)kdebug_import_slots[KDI_INDEX_shlib_read_page])
+#define KDI_INDEX_kapi_reserved_nosys 300
+#define KDI_ADDR_kapi_reserved_nosys ((__typeof__(&kapi_reserved_nosys))(uptr)kdebug_import_slots[KDI_INDEX_kapi_reserved_nosys])
+#define kbd_inject_drop_count (kdi_get_kbd_inject_drop_count())
+#define ring3_ls_start (kdi_ptr_ring3_ls_start())
+#define ring3_ls_end (kdi_ptr_ring3_ls_end())
+#define __kernel_resident_end (*kdi_ptr___kernel_resident_end())
 #define ksel_pass (kdi_get_kselftest_pass())
 #define ksel_fail (kdi_get_kselftest_fail())

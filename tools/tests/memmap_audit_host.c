@@ -4,6 +4,8 @@ unsigned int host_arch_if = 0x202U;
 #define HOST_SERIAL_CUSTOM
 #define run e4_run
 #include "gfx_kernel_fb_host.c"
+#define LEASE_SELFTEST_AS (&space)
+#include "lease_selftest_host.h"
 #undef run
 #include "../../kernel/kselftest_report.c"
 /* This lifecycle fixture exercises the KDEBUG=0 reset path only. */

@@ -21,6 +21,7 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "selftest_internal.h"
 #include "kstack_hw.h"
 #include "exec_heap.h"
 #include "serial.h"
@@ -396,7 +397,7 @@ static void test_app_band_pde(void)
 /* ------------------------------------------------------------------------ */
 static void test_con_sink(void)
 {
-    u32 bad = con_sink_selftest();
+    u32 bad = kst_con_sink();
     check((bad & (1u << 0)) == 0, "con_sink push/read (record round-trip)");
     check((bad & (1u << 1)) == 0, "con_sink CLEAR / CURSOR records");
     check((bad & (1u << 2)) == 0, "con_sink read cuts on a record boundary");
@@ -452,7 +453,7 @@ static void test_con_sink_render_gate(void)
 /* ------------------------------------------------------------------------ */
 static void test_kbd_inject(void)
 {
-    u32 bad = kbd_inject_selftest();
+    u32 bad = kst_kbd_inject();
     check((bad & (1u << 0)) == 0, "kbd_inject boot has no fullscreen owner and refuses without reader");
     check((bad & (1u << 1)) == 0, "kbd_inject keeps UTF-8 byte order (FIFO)");
     check((bad & (1u << 2)) == 0, "kbd_inject take on empty ring returns 0");
@@ -541,7 +542,7 @@ static void test_launch(void)
 /* ------------------------------------------------------------------------ */
 static void test_tramp_user_str(void)
 {
-    u32 bad = exec_tramp_user_selftest();
+    u32 bad = kst_exec_tramp_user();
     check((bad & (1u << 0)) == 0, "getcwd scratch fits after the KAPI stubs");
     check((bad & (1u << 1)) == 0, "getcwd scratch page is present and USER");
     check((bad & (1u << 2)) == 0, "sys_getcwd copies only for CPL=3 callers");
@@ -973,7 +974,7 @@ static void test_pcm(void)
  * NULL だと旧 SDK の呼び出しが 0 番地へ飛ぶ。 */
 static void test_kapi_layout(void)
 {
-    u32 bad = exec_kapi_layout_selftest();
+    u32 bad = kst_exec_kapi_layout();
     check((bad & (1u << 0)) == 0, "kapi:data@fixed");
     check((bad & (1u << 1)) == 0, "kapi:rsv nosys");
     check((bad & (1u << 2)) == 0, "kapi:rsv stubs");
@@ -1367,7 +1368,7 @@ int kselftest_run_post_exec(void)
     if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;
 
     check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0, "post-exec: lifecycle audit");
-    check(lease_selftest() == 0, "post-exec: synthetic AS S/T/U");
+    check(kst_lease() == 0, "post-exec: synthetic AS S/T/U");
     check((kstack_high_water() & 0xffffU) < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
           "kstack bound");
     check(resident_heap_peak >= exec_heap_used(), "resident peak");
@@ -2452,7 +2453,7 @@ int kselftest_run(void)
     test_ring3_pd();
     test_map_user_keep();
     test_app_band_pde();
-    check(lease_selftest() == 0, "private lease S/T/U, master unchanged, owner zero");
+    check(kst_lease() == 0, "private lease S/T/U, master unchanged, owner zero");
     test_con_sink();
     test_con_sink_render_gate();
     test_kbd_inject();

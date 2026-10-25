@@ -45,6 +45,7 @@
  * (sys_getcwd = vfs_cwd_user、vfs_devname_user、path_get_drive_user、
  * path_get_cwd_user — exec/exec.c の tramp_copy)。どれも OS32_MAX_PATH 以内。 */
 #define RING3_USTR_CAP       ((u32)OS32_MAX_PATH)
+#define RING3_LS_SHIM_OFF (RING3_USTR_OFF + RING3_USTR_CAP)
 
 /* カーネル帯の文字列を CPL=3 の呼び手へ返してよい形に直す。
  *   in_syscall : `ring3_in_syscall` (1 = int 0x80 ディスパッチ中 = CPL=3 由来)

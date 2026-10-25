@@ -1,4 +1,7 @@
 check-surface-lease-host:
+- kdebug/selftest_lease.c
+- include/kselftest_probe.h
+- kdebug/selftest_internal.h
 - userland/lib/rt/ls.c
 - sdk/include/os32/ls.h
 - exec/access_walk.c

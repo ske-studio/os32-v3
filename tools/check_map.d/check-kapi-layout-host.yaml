@@ -1,4 +1,7 @@
 check-kapi-layout-host:
+- kdebug/selftest_exec.c
+- include/kselftest_probe.h
+- exec/ring3_str.h
 - sdk/rustc_stamp.py
 - sdk/link_guard.py
 - exec/exec.c

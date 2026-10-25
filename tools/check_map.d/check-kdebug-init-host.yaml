@@ -1,4 +1,7 @@
 check-kdebug-init-host:
+- kdebug/selftest_exec.c
+- exec/ring3_str.h
+- kdebug/selftest_lease.c
 - kernel/module_schema.h
 - tools/module_schema.py
 - tools/gen_module_schema.py
@@ -35,6 +38,8 @@ check-kdebug-init-host:
 - kernel/display_restore.h
 - kernel/kdebug_call.c
 - kdebug/kselftest.c
+- kdebug/selftest_con_sink.c
+- kdebug/selftest_internal.h
 - kernel/kselftest.h
 - kdebug/crt_diag.c
 - tools/gen_kdebug_imports.py
@@ -69,4 +74,6 @@ check-kdebug-init-host:
 - kernel/hwdev_module.h
 - kdebug/recover_virtual.h
 - kdebug/recover_virtual.c
+- kdebug/selftest_kbd_inject.c
+- include/kselftest_probe.h
 artifact_reader: true

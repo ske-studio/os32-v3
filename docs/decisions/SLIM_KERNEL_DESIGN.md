@@ -268,3 +268,40 @@ import表と既存利用者:
 ## S4e の実装で設計者が決めたこと
 
 - 現行ビルドの `kernel/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。
+
+## S3a の実装で設計者が決めたこと
+
+- 未移植の S3a は S6 を空で開始し、269 枠・旧 5 FUNC・HWDEV §3 の番号を維持する。生成 stage だけ S6 にし、S3b〜S3e で実際の移動に合わせて S2/S6 の種類列と .def を更新する。
+- GF 専用枠は番号でなく既存 4 symbol で同定する。check_nm は実リンク map の移植 4.o を S2 の参照解決にも加え、S6 は accessor 名で照合して同じデータの GETTER と SETTER を区別する。
+- 関数番地は付表どおり 2 記号の KDI_ADDR/KDI_INDEX を、その FUNC が追加された時点で生成する。manifest は symbol と使用する移植 object を対応させ、実リンク対象のソースにある番地参照を nm 照合へ加える。
+- 基準値は基点 25aeb119 を同じ環境で make kernel した成果物から保存し、付表の末尾に数値と証拠の所在を記す。作業木に無い FD 像は未測定とし、S3f の候補像集計へ持ち越す。
+
+## S3b の実装で設計者が決めたこと
+
+- con の移植先は `kdebug/selftest_con_sink.c`、内部宣言は `kdebug/selftest_internal.h` とし、この段では `kst_con_sink` だけを宣言する。S6 は con の 7 FUNC + 1 SETTER、S2 は 133 FUNC、全体は 276 枠とする。
+- con の既存ホスト fixture は移植ソースを直接取り込み、`KDEBUG_SELFTEST_HOST` のときだけ生成 import ヘッダを外して既存 owner と SETTER の接続を与える。旧名の転送関数は fixture 内だけに置き、本番の移植先は生成 import を使う。
+
+## S3c の実装で設計者が決めたこと
+
+- kbd の移植先は `kdebug/selftest_kbd_inject.c`、宣言は既存の `selftest_internal.h` に追加する。S2 は 132 FUNC、S6 は con/kbd の 16 FUNC + 1 GETTER + 2 SETTER、全体は 286 枠とし、付表の種類順に並べて HWDEV §3 の第 3 列も追従する。
+- `include/kselftest_probe.h` はこの段で必要な version と `kdi_selftest_inj_push` だけを宣言し、実体は元の `inj_push` を直返しする。drop 観測変数の既存実体はカーネルに残し、宣言を `include/kbd_inject.h` に置いて GETTER/SETTER を生成する。
+- kbd のホスト fixture は S3b と同じ `KDEBUG_SELFTEST_HOST` で移植ソースを直接取り込み、SETTER と旧名転送を fixture 内だけに置く。既存変異の移設先を追従し、非ゼロ drop 復元と移植 object の import 集合・非常駐を検査する。
+
+## S3d の実装で設計者が決めたこと
+
+- lease と tables_image の移植先は `kdebug/selftest_lease.c`、宣言は既存 `selftest_internal.h` とし、S2 は 131 FUNC、S6 は 27 FUNC + 1 GETTER + 2 SETTER、全体は 296 枠とする。HWDEV §3 の第 3 列も旧 lease 枠の削除分だけ追従する。
+- `kdi_selftest_lease_result` は `exec/lease.c` に既存観測変数への 1 代入として置く。shlib callback は付表どおり KDI_ADDR を使い、tables_image と既存の判定・復元順序・token の副作用は変えない。
+- lease・memmap_audit・r1 のホスト fixture は共通の `lease_selftest_host.h` から移植ソースを取り込み、旧名転送はその中だけに置く。転送の前後で結果反映・CR3・master/既存 AS の表・AS 構造体・owner 台帳・free pages を比較し、lease fixture では AS 確保失敗時の後始末も確認する。
+
+## S3e の実装で設計者が決めたこと
+
+- exec の 2 本は `kdebug/selftest_exec.c` へ移し、各入口で snapshot を 1 回取る。S2 は 129 FUNC、S6 は 38 FUNC + 1 GETTER + 2 SETTER + 3 PTR、全体 308 枠とし、HWDEV §3 の第 3 列は旧 exec 2 枠の削除分を詰める。
+- `RING3_LS_SHIM_OFF` は式を変えず `exec/ring3_str.h` へ移し、構築側と移植先の共通定義にする。`kapi_reserved_nosys` の宣言は既存の exec.c に残し、生成器の source=.c 経路で取得する。
+- 新しい exec fixture は実 exec.c を関数セクション単位でリンクし、snapshot・ページ構築・文字列・WM の実経路を生成 import table/stub に接続する。未初期化・復元・失敗ビット・予約関数の実番地と stub の相違・配列の末尾・リンカ記号の番地を確認し、予約 0 本は test_kapi_layout で移植ソースも構文検査する。
+
+## S3f の実装で設計者が決めたこと
+
+- 容量の基準は付表末尾の S3a (25aeb119) とする。純減は ELF の text+data、追加常駐コストは前後 nm の新規・増大した t/T/r/R/d/D 記号の正の差の総和で判定し、コンパイラが改名した記号も保守的に含める (実測 7,288 B 減・1,135 B 増、BSS は別記録)。
+- 両 FD は現行 packages.yaml の同梱方針で新規生成した候補だけを保存し、FAT を読み戻して全ファイルのサイズ・SHA-256・空きクラスタを採取する。移植前 FD は無いため、旧圧縮 kernel だけを同じ集合へ置いた場合の空きは容量比較用の計算値 (両 FD +4,096 B の効果) と明記し、移植前の起動可能な像の実測とは扱わない。
+- 混在は既存 test_kdebug_init.py の実ローダ fixture に任意の --pair-baseline を追加し、改変しない保存済み旧 kdebug と現行 kernel の CRC は既存の import 数検査が先に ABI_MISMATCH を返す。現行 kdebug と旧 boot CRC は PAIR_MISMATCH を確認する。本文の「旧像を pair CRC で拒否」の想定とは診断理由が異なるが、既存の検査順序は変更しない。同版現行像の RUNNING を対照とし、旧ローダの実行やゲストの合格とは数えない。
+- 道具の確認は既存 SymbolTable に新旧の各 kernel.map を渡し、pt0_snapshot の全観測記号と lease_selftest_result・kselftest_pass/fail の番地を各 ELF の nm と照合する。測定スクリプトと生の証拠は ~/os32-tmp/run/slim-s3/s3f-measure.py・s3f-evidence/ に保存し、実ゲストの読取りは PM に残す。
