@@ -30,8 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| SLIM-S4B-GUEST | S4b の起動・root/サブマウントと S4a からの復旧経路のゲスト確認 | 実装者は NP21/W を操作しない。確認手順は `~/os32-tmp/run/slim-s4/guest_s4b.txt`、機械語の照合は同所 `objdiff_s4b.txt` | S4b の受入時に PM が実施 (S4a の残り 2 経路も同時に確認) |
-| SLIM-S4A-GUEST | S4a (kernel_main のシェルループの抽出) の GUI 失敗→CUI と shell の読み込み失敗の経路をゲストで | 2026-10-25 に PM が同じ作業木の成果物で hsync boot → 再起動し、起動・SERVICES_READY・root・db_test 9/9・CUI→GUI→CUI の往復・mem の leftover/audit_fail 0 を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s4a/RESULT.md` の末尾)。失敗を起こす 2 経路は故障の注入が要るので残す (機械語は CFG 等価) | S4b のゲスト確認で同じ関数の周りを回すときに PM が実施 |
+| SLIM-S4AB-GUEST | S4a・S4b (kernel_main のシェルループ・サブマウントの抽出) の GUI 失敗→CUI・shell の読み込み失敗の経路と、媒体を入れたサブマウントの読み出し・FD 起動 | 2026-10-25 に PM が S4a・S4b の成果物で起動・root・/host・サブマウントの試行 (ブートログが元の kernel_main と一致)・db_test・CUI→GUI→CUI・mem の監査を確かめた (証拠 `~/os32-tmp/evidence/2026-10-25/slim-s4a/RESULT.md`)。残りは故障の注入か媒体の差し替え (ini) が要る。機械語は S4a が CFG 等価、S4b が cmp の左右の入れ替え 1 命令 | 次に FD 起動か媒体を入れたゲスト試験を回すときに PM が同じ経路を通す |
 | T3AB-R1 | T3ab の R1 像の一式のゲスト受入 | 実機の回帰 T3bR は 2026-10-17 に全項目 PASS (閉鎖台帳)。R1 像だけ未実施 | 次の R1 の回 |
 | T3C2-GUI | T3c2 の 6 命令を GUI の端末から回す (sentinel・20 回・ネスト) と、H-5 の Ra266 64MB での同条件比較 | v3 に GUI の端末アプリが無い (H-7)、H-5 は実機の条件。CUI の 6 命令・CUI/GUI の往復・PT の監査は NP21/W で合格 (2026-10-17、`~/os32-tmp/evidence/2026-10-17/t3c2_t3d1_np21w/RESULT.md`) | GUI の端末は H-7 の再開時、H-5 はハードウェアの実機の回 (T4T7-RH と同じ回) |
 | T4C1-GUEST | T4c-1のゲスト項目のうち未照合: 欠落/混在拒否・対更新・KDEBUG ON/OFF・監査、注入/QUARANTINED | 通常DB 9/9・42/42とservices順/diff0、部品なしMINIMALはT4c-2受入記録あり (`~/os32-tmp/evidence/2026-10-18/t4c2_np21w/RESULT.md`)。項目別に突合し、T4全体の状態行だけで一括閉鎖しない | T7着手時点の残件: 注入/QUARANTINED・欠落/混在拒否・同/異世代更新/別root復旧・KDEBUG ON/OFFの項目別照合は証拠未確認。通常起動・MINIMAL・監査diff0は `~/os32-tmp/evidence/2026-10-19/t5_milestone_np21w/RESULT.md` で確認済み |
