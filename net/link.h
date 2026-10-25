@@ -20,11 +20,12 @@
 #define OS32_NET_LINK_H
 
 #include "types.h"
+#include "net_eth.h"
 
 /* 独自 EtherType (IEEE 802.1 local experimental 1)。Host Agent と共通。 */
-#define LINK_ETHERTYPE      0x88B5
-#define LINK_ETH_ADDR_LEN   6
-#define LINK_ETH_HDR_LEN    14      /* dst(6) + src(6) + type(2) */
+#define LINK_ETHERTYPE      OS32_ETHERTYPE
+#define LINK_ETH_ADDR_LEN   ETH_ALEN
+#define LINK_ETH_HDR_LEN    ETH_HLEN      /* dst(6) + src(6) + type(2) */
 
 /* ---- opcode (ヘッダ @0) ------------------------------------------------ */
 #define LINK_OP_HELLO       1       /* 3 way handshake / 再同期 */
@@ -55,7 +56,7 @@
 
 /* 1 フレームに載せる payload の上限 (契約値。物理上限 1480 より小さく取る)。 */
 #define LINK_MAX_PAYLOAD    1400
-#define LINK_MIN_FRAME      60      /* 60B 未満はドライバがゼロ padding する */
+#define LINK_MIN_FRAME      ETH_ZLEN      /* 60B 未満はドライバがゼロ padding する */
 
 /* ---- HELLO の段階 (flags) ---------------------------------------------- */
 #define LINK_HS_SYN         0       /* OS32→Host  payload 0 */
@@ -64,6 +65,9 @@
 #define LINK_HS_ESTAB       3       /* Host→OS32  payload 2 (agent) */
 #define LINK_HELLO_SA_LEN   6
 #define LINK_HELLO_ES_LEN   2
+#define LINK_HELLO_REQ_SESS_OFF 2
+#define LINK_HELLO_REQ_EPOCH_OFF 4
+#define LINK_RESPONSE_LENGTH_OFF 2
 
 /* ---- flags bit0 -------------------------------------------------------- */
 #define LINK_F_CTRL         0x01    /* RESPONSE: 制御結果 (業務結果ではない) */
@@ -121,7 +125,7 @@
 
 /* リンク層を初期化する (ドライバ attach 後に呼ぶ)。my_mac は NIC の MAC。
  * 反射モードでは呼ばない (link_tick も起動しない)。 */
-void link_init(const u8 my_mac[6]);
+void link_init(const u8 my_mac[ETH_ALEN]);
 
 /* 100Hz タイマ (kernel/isr_handlers.c の `ne2k_timer_tick()` の直後)。
  * **プロトコルを進めるのはここだけ** — 受信 dispatch、再送、制御の送出、
@@ -173,7 +177,7 @@ extern u32 link_l0_fail;        /* L0 selftest 専用の失敗往復数 */
 extern u32 link_retransmits;    /* 再送回数 (REQUEST / WDATA / RELEASE / CONFIRM) */
 extern u32 link_rx_frames;      /* 受け取ったリンクフレーム数 */
 extern u32 link_rx_dropped;     /* 検査に落ちて捨てた数 */
-extern u8  link_peer_mac[6];    /* 確立した Host Agent の MAC */
+extern u8  link_peer_mac[ETH_ALEN];    /* 確立した Host Agent の MAC */
 extern u16 link_epoch;          /* 現在の再同期世代 */
 
 /* v2 で増えた観測点 */

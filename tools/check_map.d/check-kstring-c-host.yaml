@@ -2,6 +2,10 @@ check-kstring-c-host:
 - tools/tests/host32.py
 - lib/kstring_asm.asm
 - lib/kstring_c.c
+- include/types.h
+- include/cpu.h
+- arch/x86/arch_cpu.h
+- arch/x86/x86_flags.h
 - tools/tests/kstring_c_host.c
 - tools/tests/test_kstring_c.py
 - tools/tests/mutpar.py

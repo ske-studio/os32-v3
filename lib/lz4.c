@@ -18,6 +18,11 @@
 #include "lz4.h"
 
 /* LZ4定数 */
+#define LZ4_TOKEN_BITS 4
+#define LZ4_TOKEN_MASK 0x0F
+#define LZ4_LEN_EXT LZ4_TOKEN_MASK
+#define LZ4_OFFSET_BYTES 2
+
 #define LZ4_MINMATCH  4   /* マッチの最小長 */
 
 /*
@@ -63,8 +68,8 @@ int lz4_decode(const u8 *src, int compressed_size,
         token = *ip++;
 
         /* --- リテラル --- */
-        lit_len = (token >> 4) & 0x0F;
-        if (lit_len == 15) {
+        lit_len = (token >> LZ4_TOKEN_BITS) & LZ4_TOKEN_MASK;
+        if (lit_len == LZ4_LEN_EXT) {
             /* 拡張リテラル長 */
             int s;
             do {
@@ -79,7 +84,7 @@ int lz4_decode(const u8 *src, int compressed_size,
         /* リテラルバイト列をコピー。
          * ip + lit_len 形式はポインタラップですり抜けるので差分比較 */
         if (lit_len > (int)(ip_end - ip)) return -1;
-        if (lit_len > (int)(op_end - op)) return -2;
+        if (lit_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;
         for (i = 0; i < lit_len; i++) {
             *op++ = *ip++;
         }
@@ -89,16 +94,16 @@ int lz4_decode(const u8 *src, int compressed_size,
             break;
 
         /* --- Offset (2バイト LE) --- */
-        if (ip + 2 > ip_end) return -1;
+        if (ip + LZ4_OFFSET_BYTES > ip_end) return -1;
         offset = (int)ip[0] | ((int)ip[1] << 8);
-        ip += 2;
+        ip += LZ4_OFFSET_BYTES;
 
         if (offset == 0) return -1;        /* offset 0 は不正 */
         if (op - dst < offset) return -1;   /* 出力バッファ先頭を超える参照 */
 
         /* --- マッチ --- */
-        match_len = (token & 0x0F) + LZ4_MINMATCH;
-        if ((token & 0x0F) == 15) {
+        match_len = (token & LZ4_TOKEN_MASK) + LZ4_MINMATCH;
+        if ((token & LZ4_TOKEN_MASK) == LZ4_LEN_EXT) {
             /* 拡張マッチ長 */
             int s;
             do {
@@ -110,7 +115,7 @@ int lz4_decode(const u8 *src, int compressed_size,
         }
 
         /* マッチコピー (オーバーラップ対応: 1バイトずつコピー) */
-        if (match_len > (int)(op_end - op)) return -2;
+        if (match_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;
         match_src = op - offset;
         for (i = 0; i < match_len; i++) {
             *op++ = match_src[i];

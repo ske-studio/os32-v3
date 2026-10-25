@@ -30,10 +30,7 @@
 #define VRAM_PLANE_I  GVRAM_PLANE_I   /* 輝度 / Plane 3 */
 
 /* ======== パレットI/O (16色モード) ======== */
-#define PAL_IDX_PORT  0xA8
-#define PAL_G_PORT    0xAA
-#define PAL_R_PORT    0xAC
-#define PAL_B_PORT    0xAE
+/* PAL_*_PORT are defined by pc98.h. */
 
 /* ======== データ構造 ======== */
 

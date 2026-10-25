@@ -1,5 +1,16 @@
 #include "os_time.h"
 
+/* Calendar and unit constants local until the shared time header adopts them. */
+#define OS_TIME_EPOCH_YEAR 1970
+#define DAYS_PER_YEAR 365
+#define DAYS_PER_LEAP_YEAR 366
+#define MONTHS_PER_YEAR 12
+#define HOURS_PER_DAY 24
+#define MINS_PER_HOUR 60
+#define SECS_PER_MIN 60
+#define SEC_PER_HOUR (SECS_PER_MIN * MINS_PER_HOUR * 1UL)
+#define SEC_PER_DAY (SEC_PER_HOUR * HOURS_PER_DAY)
+
 static int is_leap_year(int y) {
     if (y % 400 == 0) return 1;
     if (y % 100 == 0) return 0;
@@ -21,18 +32,18 @@ os_time_t datetime_to_epoch(int year, int month, int day, int hour, int min, int
     /* 範囲外の値をクランプする。RTC の読み損ないや壊れた FAT の
      * タイムスタンプで負値が来ると、u32 演算に混ざって巨大な
      * epoch に化ける (符号昇格)。1970 未満は epoch 0 相当に丸める。 */
-    if (year < 1970) year = 1970;
-    if (hour < 0) hour = 0; else if (hour > 23) hour = 23;
-    if (min  < 0) min  = 0; else if (min  > 59) min  = 59;
-    if (sec  < 0) sec  = 0; else if (sec  > 59) sec  = 59;
+    if (year < OS_TIME_EPOCH_YEAR) year = OS_TIME_EPOCH_YEAR;
+    if (hour < 0) hour = 0; else if (hour > HOURS_PER_DAY - 1) hour = HOURS_PER_DAY - 1;
+    if (min  < 0) min  = 0; else if (min  > MINS_PER_HOUR - 1) min  = MINS_PER_HOUR - 1;
+    if (sec  < 0) sec  = 0; else if (sec  > SECS_PER_MIN - 1) sec  = SECS_PER_MIN - 1;
 
     /* 1970年からの経過日数を計算 */
-    for (y = 1970; y < year; y++) {
-        days += is_leap_year(y) ? 366 : 365;
+    for (y = OS_TIME_EPOCH_YEAR; y < year; y++) {
+        days += is_leap_year(y) ? DAYS_PER_LEAP_YEAR : DAYS_PER_YEAR;
     }
     
     /* 年内の経過日数を計算 */
-    m = (month < 1) ? 1 : ((month > 12) ? 12 : month);
+    m = (month < 1) ? 1 : ((month > MONTHS_PER_YEAR) ? MONTHS_PER_YEAR : month);
     leap = is_leap_year(year);
     for (i = 0; i < m - 1; i++) {
         days += days_in_month[leap][i];
@@ -41,9 +52,9 @@ os_time_t datetime_to_epoch(int year, int month, int day, int hour, int min, int
     days += (day > 0 ? day - 1 : 0);
     
     /* 日数を秒に変換し、時間・分・秒を足す */
-    epoch = days * 86400UL;
-    epoch += hour * 3600UL;
-    epoch += min * 60UL;
+    epoch = days * SEC_PER_DAY;
+    epoch += hour * SEC_PER_HOUR;
+    epoch += min * (SECS_PER_MIN * 1UL);
     epoch += sec;
     
     return epoch;

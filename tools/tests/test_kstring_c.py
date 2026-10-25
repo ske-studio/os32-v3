@@ -87,6 +87,37 @@ def symbols(obj, nm="nm"):
     return defined, undef
 
 
+def check_asm_constants(tmp):
+    """Compare NASM values with canonical C widths and cdecl argument slots."""
+    names = ["U32_MAX", "DWORD_BYTES", "DWORD_MASK", "DWORD_SHIFT",
+             "ARG1_OFF", "ARG2_OFF", "ARG3_OFF", "BYTE_REPLICATE_U32"]
+    source = tmp / "asm-constants.asm"
+    obj = tmp / "asm-constants.o"
+    raw = tmp / "asm-constants.bin"
+    source.write_text('%include "' + str(ASM_SRC) + '"\nsection .rodata\n' +
+                      "".join("dd " + name + "\n" for name in names))
+    run(["nasm", "-f", "elf32", str(source), "-o", str(obj)])
+    run(["objcopy", "-O", "binary", "--only-section=.rodata", str(obj), str(raw)])
+    data = raw.read_bytes()
+    assert len(data) == len(names) * 4
+    values = [int.from_bytes(data[i:i + 4], "little")
+              for i in range(0, len(data), 4)]
+    expressions = ["U32_MAX", "ABI_WORD_BYTES", "ABI_WORD_BYTES - 1",
+                   "(1U << %d) == ABI_WORD_BYTES" % values[3],
+                   "2 * ABI_WORD_BYTES", "3 * ABI_WORD_BYTES", "4 * ABI_WORD_BYTES",
+                   "U32_MAX / U8_MAX"]
+    c = tmp / "asm-constants.c"
+    c.write_text('#include "types.h"\n#define __ASSEMBLER__\n'
+                 '#include "cpu.h"\n#undef __ASSEMBLER__\n' + "".join(
+        '_Static_assert((%s) == %dUL, "%s");\n' %
+        (expr, 1 if name == "DWORD_SHIFT" else val, name)
+        for name, expr, val in zip(names, expressions, values)))
+    run(["gcc", *COMMON_FLAGS, *X86_FLAGS, *INCLUDES,
+         "-c", str(c),
+         "-o", str(tmp / "asm-constants-c.o")])
+    print("ASM constants: canonical widths and cdecl offsets match", flush=True)
+
+
 def check_symbol_set(obj, label, nm="nm"):
     """13 本が揃っていること、**外部呼び出しが 1 本も無い**ことを見る。
 
@@ -252,6 +283,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-kstring-c-") as tmp:
         tmp = pathlib.Path(tmp)
         failed = 0
+        check_asm_constants(tmp)
 
         exe, asm_o, c_o = build_exe(tmp, C_SRC, "kstring-c")
         failed += check_symbol_set(asm_o, "asm (nasm)")

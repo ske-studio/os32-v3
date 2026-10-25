@@ -22,7 +22,7 @@ static inline int gfx_clip_screen(int *x, int *y, int *w, int *h,
 /* ======================================================================== */
 /*  内部変数アクセス                                                        */
 /* ======================================================================== */
-extern u8 *bb[4];
+extern u8 *bb[GVRAM_PLANES];
 extern u8 *bb_b;
 extern u8 *bb_r;
 extern u8 *bb_g;
@@ -56,10 +56,6 @@ void gfx_clear_planar_pages(u32 plane_size);
 /* ======================================================================== */
 /*  I/O・メモリ操作インライン                                               */
 /* ======================================================================== */
-#define GDC_STATUS_PORT 0xA0  /* bit5=VSYNC, bit6=HBLANK */
-#define GDC_CMD_PORT    0xA2
-#define GDC_PRM_PORT    0xA0
-#define GDC_CMD_SCROLL  0x70
 
 /* ポート I/O は include/io.h の共通実装を使う。
  * かつてはここに同一のインライン asm が重複定義されていた (IR3)。

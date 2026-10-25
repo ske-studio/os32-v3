@@ -659,12 +659,16 @@ static void pegc_write_palette(int idx, u8 r, u8 g, u8 b)
 /* KAPI の 4bit 輝度 (0〜15) → PEGC の 8bit 輝度 (0〜255)。15*17 = 255。 */
 static u8 pegc_pal8(u8 v)
 {
-    return (u8)((v & PEGC_PAL_KAPI_MASK) * PEGC_PAL_KAPI_SCALE);
+    return (u8)((v & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE);
 }
+
+#define PEGC_GRAY_FIRST 8
+#define PEGC_GRAY_STEP 10
+#define COPY_WORD_SHIFT 2
 
 static void pegc_palette_init(void)
 {
-    static const u8 cube[6] = { 0, 51, 102, 153, 204, 255 };
+    static const u8 cube[GFX_PALETTE_CUBE_LEVELS] = { 0, 51, 102, 153, 204, 255 };
     const PaletteEntry *sys = palette_get_all();
     int i, r, g, b;
 
@@ -676,9 +680,9 @@ static void pegc_palette_init(void)
 
     /* 16-231: 6x6x6 色立方 */
     i = PEGC_LEASE_FIRST;
-    for (r = 0; r < 6; r++) {
-        for (g = 0; g < 6; g++) {
-            for (b = 0; b < 6; b++) {
+    for (r = 0; r < GFX_PALETTE_CUBE_LEVELS; r++) {
+        for (g = 0; g < GFX_PALETTE_CUBE_LEVELS; g++) {
+            for (b = 0; b < GFX_PALETTE_CUBE_LEVELS; b++) {
                 pegc_write_palette(i++, cube[r], cube[g], cube[b]);
             }
         }
@@ -686,7 +690,7 @@ static void pegc_palette_init(void)
 
     /* 232-255: グレースケール 24 段 */
     for (b = 0; i < PEGC_PALETTE_COUNT; i++, b++) {
-        u8 v = (u8)(8 + b * 10);
+        u8 v = (u8)(PEGC_GRAY_FIRST + b * PEGC_GRAY_STEP);
         pegc_write_palette(i, v, v, v);
     }
 }
@@ -970,7 +974,7 @@ static int pegc_query(GFX_ScreenInfo *info)
     info->lease_mask  = 0;
     info->lease_first = (u16)PEGC_LEASE_FIRST;
     info->lease_count = (u16)PEGC_LEASE_COUNT;
-    for (i = 0; i < 5; i++) info->reserved[i] = 0;
+    for (i = 0; i < (int)(sizeof(info->reserved) / sizeof(info->reserved[0])); i++) info->reserved[i] = 0;
     return 0;
 }
 
@@ -1003,16 +1007,16 @@ static void pegc_present_rect(int x, int y, int w, int h)
     for (row = 0; row < h; row++) {
         /* 先頭の端数 → dword 単位 → 末尾の端数。x と w が 4 の倍数なら
          * 端数ループは 0 回で、丸ごと rep movsd になる。 */
-        u32 head = ((4u - ((u32)dst & 3u)) & 3u);
+        u32 head = ((sizeof(u32) - ((u32)dst & (sizeof(u32) - 1))) & (sizeof(u32) - 1));
         u32 mid;
         u32 tail;
         if (head > bytes) head = bytes;
-        mid  = (bytes - head) >> 2;
-        tail = (bytes - head) - (mid << 2);
+        mid  = (bytes - head) >> COPY_WORD_SHIFT;
+        tail = (bytes - head) - (mid << COPY_WORD_SHIFT);
 
         if (head) kmemcpy(dst, src, head);
         if (mid)  _memcpy_d(dst + head, src + head, mid);
-        if (tail) kmemcpy(dst + head + (mid << 2), src + head + (mid << 2),
+        if (tail) kmemcpy(dst + head + (mid << COPY_WORD_SHIFT), src + head + (mid << COPY_WORD_SHIFT),
                           tail);
 
         src += PEGC_PITCH;
@@ -1040,9 +1044,9 @@ static void pegc_set_palette(int first, int count, const u8 *rgb)
     if (!rgb) return;
     for (k = 0; k < count; k++) {
         int idx = first + k;
-        u8 r = rgb[k * 3 + 0];
-        u8 g = rgb[k * 3 + 1];
-        u8 b = rgb[k * 3 + 2];
+        u8 r = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R];
+        u8 g = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G];
+        u8 b = rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B];
         if (idx < 0 || idx >= PEGC_PALETTE_COUNT) continue;
         pegc_write_palette(idx, pegc_pal8(r), pegc_pal8(g), pegc_pal8(b));
         if (idx < PALETTE_COUNT) palette_shadow_set(idx, r, g, b);

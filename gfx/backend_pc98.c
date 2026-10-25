@@ -40,6 +40,10 @@ static int pc98_probe(void)
 /*  現在のモード (400/200 ライン, フリップ有無) を正直に申告する — GUI が      */
 /*  gfx_screen_info() を信じられるのはここが決め打ちしないから (DESIGN §7-2)。 */
 /* ------------------------------------------------------------------------ */
+#define PC98_BPP GVRAM_PLANES
+#define PC98_LEASE_MASK 0xFF7E
+#define PC98_PALETTE_IO_WRITES 4u
+
 static int pc98_query(GFX_ScreenInfo *info)
 {
     int i;
@@ -47,16 +51,16 @@ static int pc98_query(GFX_ScreenInfo *info)
 
     info->width  = (u16)GFX_WIDTH;
     info->height = (u16)gfx_current_height;      /* 400 or 200 */
-    info->bpp    = 4;
+    info->bpp    = PC98_BPP;
     info->format = GFX_FMT_PLANAR4;
     info->flags  = GFX_CAP_TEXT_OVERLAY |
                    (gfx_flip_enabled ? GFX_CAP_PAGE_FLIP : 0);
     /* パレットのリース (G8): 16 色機は index 1-6, 8-15 の 14 項目を貸せる。
      * 不可侵は 0 (TEXT 黒) と 7 (WINDOW 白)。lease_first/count は 256 色機用。 */
-    info->lease_mask  = 0xFF7E;   /* index 1-6 と 8-15 の 14 色 (契約 G8)。0 と 7 のみ不可侵 */
+    info->lease_mask  = PC98_LEASE_MASK;   /* index 1-6 と 8-15 の 14 色 (契約 G8)。0 と 7 のみ不可侵 */
     info->lease_first = 0;
     info->lease_count = 0;
-    for (i = 0; i < 5; i++) info->reserved[i] = 0;
+    for (i = 0; i < (int)(sizeof(info->reserved) / sizeof(info->reserved[0])); i++) info->reserved[i] = 0;
     return 0;
 }
 
@@ -88,8 +92,8 @@ static void pc98_count_present(int x, int y, int w, int h)
 {
     if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;
     int right = x + w;
-    int ax = x & ~31;
-    int aw = ((right + 31) & ~31) - ax;
+    int ax = x & ~(BITS_PER_U32 - 1);
+    int aw = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - ax;
 
     if (ax < 0) { aw += ax; ax = 0; }
     if (y < 0) { h += y; y = 0; }
@@ -125,10 +129,10 @@ static void pc98_set_palette(int first, int count, const u8 *rgb)
     for (k = 0; k < count; k++) {
         int idx = first + k;
         if (idx < 0 || idx >= PALETTE_COUNT) continue;
-        palette_set(idx, rgb[k * 3 + 0], rgb[k * 3 + 1], rgb[k * 3 + 2]);
+        palette_set(idx, rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_R], rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_G], rgb[k * GFX_RGB_COMPONENTS + GFX_RGB_B]);
     }
     /* パレット 1 項目あたり OUT 4 本 (番号 + G/R/B)。 */
-    if (count > 0) gfx_counters.io_accesses += (u32)count * 4u;
+    if (count > 0) gfx_counters.io_accesses += (u32)count * PC98_PALETTE_IO_WRITES;
 }
 
 /* ------------------------------------------------------------------------ */

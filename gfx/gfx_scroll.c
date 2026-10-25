@@ -4,8 +4,8 @@ int vram_scroll_y = 0;
 
 void gfx_vsync_wait(void)
 {
-    while ((_in(GDC_PRM_PORT) & 0x20) != 0);
-    while ((_in(GDC_PRM_PORT) & 0x20) == 0);
+    while ((_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) != 0);
+    while ((_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) == 0);
 }
 
 void gfx_scroll_init(void)
@@ -20,7 +20,7 @@ void gfx_hardware_scroll(int lines)
     int sad1, sl1, sad2, sl2;
     int line_mul;
     int sad_base;
-    u8 params[8];
+    u8 params[GDC_PRAM_BYTES];
     int i;
 
     vram_scroll_y += lines % gfx_current_height;
@@ -35,11 +35,11 @@ void gfx_hardware_scroll(int lines)
     line_mul = GFX_HEIGHT / gfx_current_height;  /* 1(400line) or 2(200line) */
 
     /* ページフリッピング時: 表示ページのVRAMオフセットを加算
-     * 1ページ分 = gfx_current_height * GFX_BPL / 2 ワード
+     * 1ページ分 = gfx_current_height * GFX_WPL ワード
      * 200line: 200*80/2 = 8000w, 400line: 400*80/2 = 16000w */
     sad_base = 0;
     if (gfx_flip_enabled) {
-        sad_base = gfx_display_page * (gfx_current_height * GFX_BPL / 2);
+        sad_base = gfx_display_page * (gfx_current_height * GFX_WPL);
     }
 
     sad1 = sad_base + vram_scroll_y * GFX_WPL;
@@ -49,17 +49,17 @@ void gfx_hardware_scroll(int lines)
 
     params[0] = sad1 & 0xFF;
     params[1] = (sad1 >> 8) & 0xFF;
-    params[2] = (sl1 & 0x0F) << 4;
-    params[3] = (sl1 >> 4) & 0x3F;
+    params[2] = (sl1 & GDC_SCROLL_LINES_LO_MASK) << GDC_SCROLL_LINES_SHIFT;
+    params[3] = (sl1 >> GDC_SCROLL_LINES_SHIFT) & GDC_SCROLL_LINES_HI_MASK;
 
-    params[4] = sad2 & 0xFF;
-    params[5] = (sad2 >> 8) & 0xFF;
-    params[6] = (sl2 & 0x0F) << 4;
-    params[7] = (sl2 >> 4) & 0x3F;
+    params[GDC_SCROLL_PART_BYTES] = sad2 & 0xFF;
+    params[GDC_SCROLL_PART_BYTES + 1] = (sad2 >> 8) & 0xFF;
+    params[GDC_SCROLL_PART_BYTES + 2] = (sl2 & GDC_SCROLL_LINES_LO_MASK) << GDC_SCROLL_LINES_SHIFT;
+    params[GDC_SCROLL_PART_BYTES + 3] = (sl2 >> GDC_SCROLL_LINES_SHIFT) & GDC_SCROLL_LINES_HI_MASK;
 
-    _out(GDC_CMD_PORT, GDC_CMD_SCROLL);
+    _out(GDC_GFX_CMD, GDC_CMD_SCROLL);
     gfx_vsync_wait();
-    for (i = 0; i < 8; i++) {
-        _out(GDC_PRM_PORT, params[i]);
+    for (i = 0; i < GDC_SCROLL_PART_BYTES * GDC_SCROLL_PARTS; i++) {
+        _out(GDC_GFX_PARAM, params[i]);
     }
 }

@@ -1,4 +1,14 @@
 bits 32
+; Mirrors include/types.h U32_MAX and include/cpu.h ABI_WORD_BYTES.
+%define U32_MAX 0xFFFFFFFF
+%define DWORD_BYTES 4
+%define DWORD_MASK (DWORD_BYTES - 1)
+%define DWORD_SHIFT 2
+%define ARG1_OFF (2 * DWORD_BYTES)
+%define ARG2_OFF (3 * DWORD_BYTES)
+%define ARG3_OFF (4 * DWORD_BYTES)
+%define BYTE_REPLICATE_U32 0x01010101
+
 section .text
 
 global kmemcpy
@@ -27,34 +37,34 @@ memcpy:
     push esi
     cld
     
-    mov edi, [ebp+8]    ; dst
-    mov esi, [ebp+12]   ; src
-    mov ecx, [ebp+16]   ; n
+    mov edi, [ebp+ARG1_OFF]    ; dst
+    mov esi, [ebp+ARG2_OFF]   ; src
+    mov ecx, [ebp+ARG3_OFF]   ; n
     
     mov eax, edi        ; 戻り値 eax = dst
 
-    cmp ecx, 4
+    cmp ecx, DWORD_BYTES
     jb .do_bytes        ; n は u32 なので符号なし比較 (jl だと 2GB 超で誤判定)
 
     ; dst アライメント (4バイト境界になるまで1バイトずつ)
-    test edi, 3
+    test edi, DWORD_MASK
     jz .aligned
 .align_loop:
     movsb
     dec ecx
-    test edi, 3
+    test edi, DWORD_MASK
     jnz .align_loop
 
 .aligned:
     ; DWORD単位の転送
     mov edx, ecx
-    shr ecx, 2
+    shr ecx, DWORD_SHIFT
     jz .do_bytes_recover
     rep movsd
 
 .do_bytes_recover:
     mov ecx, edx
-    and ecx, 3
+    and ecx, DWORD_MASK
     jz .done
 
 .do_bytes:
@@ -77,38 +87,38 @@ memset:
     push edi
     cld
     
-    mov edi, [ebp+8]    ; dst
-    mov eax, [ebp+12]   ; val
-    mov ecx, [ebp+16]   ; n
+    mov edi, [ebp+ARG1_OFF]    ; dst
+    mov eax, [ebp+ARG2_OFF]   ; val
+    mov ecx, [ebp+ARG3_OFF]   ; n
     
     mov edx, edi        ; 戻り値のために保存
 
     ; valueを4バイト(DWORD)に拡張 (imul は 80386以降で有効)
     and eax, 0xFF
-    imul eax, eax, 0x01010101
+    imul eax, eax, BYTE_REPLICATE_U32
     
-    cmp ecx, 4
+    cmp ecx, DWORD_BYTES
     jb .do_bytes        ; n は u32 なので符号なし比較 (jl だと 2GB 超で誤判定)
 
     ; dst アライメント
-    test edi, 3
+    test edi, DWORD_MASK
     jz .aligned
 .align_loop:
     stosb
     dec ecx
-    test edi, 3
+    test edi, DWORD_MASK
     jnz .align_loop
 
 .aligned:
     ; DWORD単位の書き込み
     push ecx
-    shr ecx, 2
+    shr ecx, DWORD_SHIFT
     jz .ms_pop_recover      ; ECX>>2==0 でも pop ecx を必ず通過させる
     rep stosd
 
 .ms_pop_recover:
     pop ecx                 ; push ecx と対になる pop (常に実行)
-    and ecx, 3
+    and ecx, DWORD_MASK
     jz .done
 
 .do_bytes:
@@ -134,9 +144,9 @@ strlen:
     push edi
     cld
 
-    mov edi, [ebp+8]    ; s
+    mov edi, [ebp+ARG1_OFF]    ; s
     xor eax, eax        ; AL = 0 (NUL文字を探す)
-    mov ecx, 0xFFFFFFFF ; 最大カウント
+    mov ecx, U32_MAX ; 最大カウント
     repne scasb          ; EDI を進めつつ AL と比較
 
     ; ECX = 0xFFFFFFFF - 長さ - 1
@@ -162,8 +172,8 @@ kstrcmp:
     push esi
     push edi
 
-    mov esi, [ebp+8]    ; a
-    mov edi, [ebp+12]   ; b
+    mov esi, [ebp+ARG1_OFF]    ; a
+    mov edi, [ebp+ARG2_OFF]   ; b
 
 .sc_loop:
     lodsb               ; AL = *a++
@@ -202,9 +212,9 @@ kstrncmp:
     push edi
     push ebx
 
-    mov esi, [ebp+8]    ; a
-    mov edi, [ebp+12]   ; b
-    mov ebx, [ebp+16]   ; n
+    mov esi, [ebp+ARG1_OFF]    ; a
+    mov edi, [ebp+ARG2_OFF]   ; b
+    mov ebx, [ebp+ARG3_OFF]   ; n
 
     test ebx, ebx
     jz .snc_equal       ; n==0: 常に等しい
@@ -250,19 +260,19 @@ kstrcpy:
     cld
 
     ; まず src の長さを計測 (NUL含む)
-    mov edi, [ebp+12]   ; src
+    mov edi, [ebp+ARG2_OFF]   ; src
     xor eax, eax
-    mov ecx, 0xFFFFFFFF
+    mov ecx, U32_MAX
     repne scasb
     not ecx             ; ECX = 長さ + 1 (NUL含む)
 
     ; コピー実行
-    mov esi, [ebp+12]   ; src
-    mov edi, [ebp+8]    ; dst
+    mov esi, [ebp+ARG2_OFF]   ; src
+    mov edi, [ebp+ARG1_OFF]    ; dst
     ; ECX は既にNUL含む長さ
     rep movsb
 
-    mov eax, [ebp+8]    ; 戻り値 = dst
+    mov eax, [ebp+ARG1_OFF]    ; 戻り値 = dst
 
     pop esi
     pop edi
@@ -284,9 +294,9 @@ kstrncpy:
     push ebx
     cld
 
-    mov edi, [ebp+8]    ; dst
-    mov esi, [ebp+12]   ; src
-    mov ebx, [ebp+16]   ; n
+    mov edi, [ebp+ARG1_OFF]    ; dst
+    mov esi, [ebp+ARG2_OFF]   ; src
+    mov ebx, [ebp+ARG3_OFF]   ; n
 
     test ebx, ebx
     jz .sncpy_done      ; n==0: 何もしない
@@ -320,7 +330,7 @@ kstrncpy:
     mov byte [edi], 0
 
 .sncpy_done:
-    mov eax, [ebp+8]    ; 戻り値 = dst
+    mov eax, [ebp+ARG1_OFF]    ; 戻り値 = dst
     pop ebx
     pop esi
     pop edi
@@ -339,23 +349,23 @@ memcmp:
     push edi
     cld
 
-    mov esi, [ebp+8]    ; a
-    mov edi, [ebp+12]   ; b
-    mov ecx, [ebp+16]   ; n
+    mov esi, [ebp+ARG1_OFF]    ; a
+    mov edi, [ebp+ARG2_OFF]   ; b
+    mov ecx, [ebp+ARG3_OFF]   ; n
 
     test ecx, ecx
     jz .mc_equal        ; n==0: 常に等しい
 
     ; DWORD単位で高速比較
     mov edx, ecx
-    shr ecx, 2
+    shr ecx, DWORD_SHIFT
     jz .mc_bytes
     repe cmpsd
     jne .mc_diff_dword
 
 .mc_bytes:
     mov ecx, edx
-    and ecx, 3
+    and ecx, DWORD_MASK
     jz .mc_equal
     repe cmpsb
     jne .mc_diff_byte
@@ -366,9 +376,9 @@ memcmp:
 
 .mc_diff_dword:
     ; 差異がDWORD内にあるので、4バイト戻してバイト単位で再比較
-    sub esi, 4
-    sub edi, 4
-    mov ecx, 4
+    sub esi, DWORD_BYTES
+    sub edi, DWORD_BYTES
+    mov ecx, DWORD_BYTES
     repe cmpsb
     ; フォールスルー
 

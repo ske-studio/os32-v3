@@ -22,6 +22,8 @@
 /* ======================================================================== */
 
 #include "kprintf.h"
+
+#define KPRINTF_NUMBUF_SIZE 16
 #include "console.h"
 
 /* ======== 数値→文字列変換 (kprintf.h で公開) ======== */
@@ -164,7 +166,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
             int width = 0;
             int left_align = 0;
             char pad_char = ' ';
-            char numbuf[16];
+            char numbuf[KPRINTF_NUMBUF_SIZE];
             int len;
 
             p++;  /* '%' をスキップ */
@@ -186,7 +188,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                     } else {
                         uval = (u32)val;
                     }
-                    len = kutoa_dec(uval, numbuf + 1, 14);
+                    len = kutoa_dec(uval, numbuf + 1, sizeof(numbuf) - 2);
                     if (neg) {
                         /* 符号の処理 */
                         if (pad_char == '0' && !left_align) {
@@ -207,7 +209,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                 }
                 case 'u': {
                     u32 val = args[ai++];
-                    len = kutoa_dec(val, numbuf, 15);
+                    len = kutoa_dec(val, numbuf, sizeof(numbuf) - 1);
                     emit_padded(numbuf, len, width,
                                 pad_char, left_align, attr);
                     break;
@@ -216,7 +218,7 @@ void kvprintf(u8 attr, const char *fmt, const u32 *args)
                 case 'X': {
                     u32 val = args[ai++];
                     int upper = (*p == 'X');
-                    len = kutoa_hex(val, numbuf, 15, upper);
+                    len = kutoa_hex(val, numbuf, sizeof(numbuf) - 1, upper);
                     emit_padded(numbuf, len, width,
                                 pad_char, left_align, attr);
                     break;
