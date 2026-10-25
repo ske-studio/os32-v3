@@ -372,7 +372,7 @@ static void pc98_modes_check(void)
 {
     GfxBackend *be = &gfx_backend_pc98;
     CHECK(be->mode_count == 2 && be->default_mode == 0 && !be->selected_mode);
-    CHECK(!be->init); /* core still owns PC98 GDC init (selection is G6a). */
+    CHECK(!be->init); /* core owns PC98 GDC init. */
     CHECK(gfx_backend_mode(be) == &be->modes[0]);
     for (u32 i = 0; i < be->mode_count; i++) {
         const GfxMode *m = &be->modes[i];
@@ -474,6 +474,142 @@ static void diag_present_check(int empty)
     diag_px_check();
 }
 
+/* Observe the real core; callbacks retain real backend init/cleanup. */
+static GfxBackend mode_saved[3];
+static char mode_trace[32];
+static u32 mode_trace_len;
+static int mode_legacy, mode_fail;
+static void mode_event(char event)
+{
+    CHECK(mode_trace_len + 1 < sizeof(mode_trace));
+    mode_trace[mode_trace_len++] = event;
+    mode_trace[mode_trace_len] = 0;
+}
+static void mode_trace_check(const char *expected)
+{
+    u32 i = 0;
+    while (expected[i] && expected[i] == mode_trace[i]) i++;
+    CHECK(expected[i] == mode_trace[i]);
+}
+static int mode_pc_probe(void) { mode_event('n'); return mode_saved[0].probe(); }
+static int mode_pegc_probe(void) { mode_event('p'); return mode_saved[1].probe(); }
+static int mode_cirrus_probe(void) { mode_event('c'); return mode_saved[2].probe(); }
+static void mode_callback(int index, int prepare)
+{
+    GfxBackend *be = index == 1 ? &gfx_backend_pegc : &gfx_backend_cirrus;
+    CHECK(be->selected_mode == gfx_mode_pick(be, mode_legacy));
+    if (prepare) mode_saved[index].prepare(); else mode_saved[index].init();
+    if (mode_fail == index) {
+        /* Failure cleanup belongs to the backend, before core's re-probe. */
+        mode_saved[index].shutdown();
+        mode_event('x');
+        if (index == 1) host_pegc_available = 0; else host_cirrus_available = 0;
+    }
+}
+static void mode_pegc_init(void) { mode_event('j'); mode_callback(1, 0); }
+static void mode_cirrus_init(void) { mode_event('i'); mode_callback(2, 0); }
+static void mode_pegc_prepare(void) { mode_event('t'); mode_callback(1, 1); }
+static void mode_cirrus_shutdown(void) { mode_event('s'); mode_saved[2].shutdown(); }
+static void mode_operation(int op)
+{
+    mode_trace_len = 0; mode_trace[0] = 0;
+    mode_legacy = op == 1;
+    if (op == 2) gfx_prepare_backend();
+    else if (op == 1) gfx_init_200();
+    else gfx_init();
+    CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, mode_legacy));
+    if (op != 2) CHECK(gfx_current_height == g_backend->selected_mode->height);
+}
+static void mode_selection_check(void)
+{
+    mode_saved[0] = gfx_backend_pc98;
+    mode_saved[1] = gfx_backend_pegc;
+    mode_saved[2] = gfx_backend_cirrus;
+    gfx_backend_pc98.probe = mode_pc_probe;
+    gfx_backend_pegc.probe = mode_pegc_probe;
+    gfx_backend_pegc.init = mode_pegc_init;
+    gfx_backend_pegc.prepare = mode_pegc_prepare;
+    gfx_backend_cirrus.probe = mode_cirrus_probe;
+    gfx_backend_cirrus.init = mode_cirrus_init;
+    gfx_backend_cirrus.shutdown = mode_cirrus_shutdown;
+    /* Boot reaches prepare before cirrus.mod registers its table. */
+    int probed_before = gfx_cirrus_probed();
+    gfx_backend_cirrus.modes = 0;
+    gfx_set_backend_pref(GFX_PREF_AUTO);
+    mode_operation(2);
+    CHECK(gfx_cirrus_probed() == probed_before && g_backend == &gfx_backend_pegc);
+    mode_trace_check("ptp");
+    gfx_backend_cirrus.modes = mode_saved[2].modes;
+    for (int op = 0; op < 3; op++) {
+        for (int pref = -1; pref <= GFX_PREF_CIRRUS; pref++) {
+            for (int available = 0; available < 4; available++) {
+                host_cirrus_available = available & 1;
+                host_pegc_available = available & 2;
+                gfx_set_backend_pref(pref);
+                int automatic = pref <= GFX_PREF_AUTO;
+                int selected = pref == GFX_PREF_PC98 ? 0 :
+                    (automatic || pref == GFX_PREF_CIRRUS) && host_cirrus_available ? 2 :
+                    (automatic || pref == GFX_PREF_PEGC) && host_pegc_available ? 1 : 0;
+                mode_operation(op);
+                CHECK(g_backend == (selected == 2 ? &gfx_backend_cirrus :
+                                      selected == 1 ? &gfx_backend_pegc : &gfx_backend_pc98));
+                const char *expected;
+                if (selected == 2) expected = op == 2 ? "cics" : "cic";
+                else if (selected == 1) expected = automatic ?
+                    (op == 2 ? "cptp" : "cpjp") : (op == 2 ? "ptp" : "pjp");
+                else expected = pref == GFX_PREF_PC98 ? "" :
+                    pref == GFX_PREF_CIRRUS ? "c" : pref == GFX_PREF_PEGC ? "p" : "cpn";
+                mode_trace_check(expected);
+                gfx_shutdown();
+                CHECK(gfx_current_height == GFX_HEIGHT);
+                CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 0));
+            }
+        }
+        /* Both candidates exist: post-init/prepare failure must go straight
+         * to PC98, selecting 200 only for the legacy entry. */
+        for (int failed = 1; failed <= 2; failed++) {
+            host_cirrus_available = host_pegc_available = 1;
+            mode_fail = failed;
+            gfx_set_backend_pref(failed == 1 ? GFX_PREF_PEGC : GFX_PREF_CIRRUS);
+            mode_operation(op);
+            CHECK(g_backend == &gfx_backend_pc98);
+            mode_trace_check(failed == 2 ? "cixc" : op == 2 ? "ptxp" : "pjxp");
+            gfx_shutdown();
+        }
+        mode_fail = 0;
+    }
+    /* Registered but unusable rows fail before init, including AUTO. */
+    for (int invalid = 0; invalid < 3; invalid++) {
+        GfxMode bad = mode_saved[2].modes[0];
+        bad.format = 0xff;
+        gfx_backend_cirrus.mode_count = invalid == 0 ? 0 : mode_saved[2].mode_count;
+        gfx_backend_cirrus.default_mode = invalid == 1 ? mode_saved[2].mode_count : 0;
+        gfx_backend_cirrus.modes = invalid == 2 ? &bad : mode_saved[2].modes;
+        for (int forced = 0; forced < 2; forced++) {
+            host_cirrus_available = host_pegc_available = 1;
+            gfx_set_backend_pref(forced ? GFX_PREF_CIRRUS : GFX_PREF_AUTO);
+            mode_operation(1);
+            CHECK(g_backend == &gfx_backend_pc98);
+            mode_trace_check("c");
+            gfx_shutdown();
+        }
+    }
+    gfx_backend_cirrus.modes = mode_saved[2].modes;
+    gfx_backend_cirrus.mode_count = mode_saved[2].mode_count;
+    gfx_backend_cirrus.default_mode = mode_saved[2].default_mode;
+    gfx_backend_pc98.probe = mode_saved[0].probe;
+    gfx_backend_pegc.probe = mode_saved[1].probe;
+    gfx_backend_pegc.init = mode_saved[1].init;
+    gfx_backend_pegc.prepare = mode_saved[1].prepare;
+    gfx_backend_cirrus.probe = mode_saved[2].probe;
+    gfx_backend_cirrus.init = mode_saved[2].init;
+    gfx_backend_cirrus.shutdown = mode_saved[2].shutdown;
+    host_cirrus_available = host_pegc_available = 1;
+    gfx_set_backend_pref(GFX_PREF_PC98);
+    gfx_prepare_backend();
+    diag_previous_gen = gfx_init_gen;
+}
+
 static u8 stack[65536] __attribute__((aligned(16),used));
 static void run(void) __attribute__((used));
 __asm__(".text\n.globl _start\n_start: lea stack+65536,%esp\ncall run\n");
@@ -527,6 +663,7 @@ static void run(void)
     host_cr3=space.pd_phys;
     CHECK(caller_access_enter(&previous,CALLER_USER));
     /* Run the real selection/lifecycle for every preference, plus AUTO. */
+    mode_selection_check();
     for(int pref=GFX_PREF_PC98;pref<=GFX_PREF_CIRRUS;pref++) {
         u32 selected=pref == GFX_PREF_PC98 ? LEDGER_SF_PC98 :
           pref == GFX_PREF_PEGC ? LEDGER_SF_PEGC : LEDGER_SF_CIRRUS;
@@ -537,6 +674,7 @@ static void run(void)
         bridge_check(0);
         host_serial_reset();
         gfx_init();
+        CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 0));
         if (selected == LEDGER_SF_PC98) pc98_query_check(GFX_HEIGHT, 1);
         diag_present_check(1);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT : MEM_GFX_BB8_HEIGHT,1);
@@ -553,9 +691,7 @@ static void run(void)
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT_200 : MEM_GFX_BB8_HEIGHT,1);
         bridge_check(1);
         display_check(selected);
-        /* Exercise the selected-row reset before G6a wires mode selection. */
-        if (selected == LEDGER_SF_PC98)
-            gfx_backend_pc98.selected_mode = gfx_mode_pick(&gfx_backend_pc98, 1);
+        CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 1));
         gfx_shutdown();
         if (selected == LEDGER_SF_PC98) {
             CHECK(gfx_current_height == GFX_HEIGHT);

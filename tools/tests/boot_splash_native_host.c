@@ -76,13 +76,18 @@ static void optional_init(void)
     optional_inits++;
     if (init_fail) { cirrus_ok = 0; pegc_ok = 0; }
 }
+static const GfxMode optional_modes[] = {
+    {PEGC_WIDTH, PEGC_HEIGHT_480, GFX_FMT_PACKED8, 8, 0, 0, PEGC_PITCH}
+};
 GfxBackend gfx_backend_cirrus = {
     .name = "test-cirrus", .probe = cirrus_probe_stub,
-    .init = optional_init, .bb_format = GFX_BB_PACKED8
+    .init = optional_init, .bb_format = GFX_BB_PACKED8,
+    .modes = optional_modes, .mode_count = 1
 };
 GfxBackend gfx_backend_pegc = {
     .name = "test-pegc", .probe = pegc_probe_stub,
-    .init = optional_init, .bb_format = GFX_BB_PACKED8
+    .init = optional_init, .bb_format = GFX_BB_PACKED8,
+    .modes = optional_modes, .mode_count = 1
 };
 static void outp(unsigned int port, unsigned int value)
 {

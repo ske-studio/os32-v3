@@ -197,6 +197,8 @@ static void run(void)
         CHECK(!lease_release(&space,space.leases[1].token));
         CHECK(draws && (gfx_packed || asm_calls));
         gfx_init_200();
+        CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 1));
+        CHECK(gfx_current_height == g_backend->selected_mode->height);
         CHECK(!live());
         CHECK(!libos32gfx_check() && live()==1 && space.leases[0].token!=token);
         CHECK((u32)gfx_fb.height==(pref==GFX_PREF_PC98 ? GFX_HEIGHT_200 : MEM_GFX_BB8_HEIGHT));

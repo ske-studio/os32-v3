@@ -18,6 +18,10 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('forced-cirrus-to-pegc',
+  '        gfx_select_mode(&gfx_backend_pc98, legacy200);\n        g_backend = &gfx_backend_pc98;\n        return;\n    }\n\n    for',
+  '        gfx_select_mode(&gfx_backend_pegc, legacy200);\n        g_backend = &gfx_backend_pegc;\n        return;\n    }\n\n    for',
+  'FAIL g_backend == (selected == 2 ? &gfx_backend_cirrus :'),
  ('last-plane-old', 'bb_i = bb[3];',
   'bb_i = P2V(0x6A000UL + 3 * GFX_PLANE_SZ);',
   'FAIL bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ'),
@@ -108,7 +112,7 @@ static inline void io_wait_n(int n) {(void)n;}
                         assert body.count(old) == 1
                         body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
-                body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(); }\n'
+                body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'gfx/backend_pegc.c':
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''

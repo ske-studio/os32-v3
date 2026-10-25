@@ -74,6 +74,8 @@ static void run(void)
         u32 gen=space.leases[0].generation;
         CHECK(return_both() && live()==2);
         gfx_init_200();
+        CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 1));
+        CHECK(gfx_current_height == g_backend->selected_mode->height);
         CHECK(!live());
         CHECK(return_both());
         int both_new_generation = live()==2 && space.leases[0].generation!=gen &&
