@@ -26,7 +26,7 @@ MUTANTS = [
  ('forced-cirrus-to-pegc',
   '        gfx_select_mode(&gfx_backend_pc98, legacy200);\n        g_backend = &gfx_backend_pc98;\n        return;\n    }\n\n    for',
   '        gfx_select_mode(&gfx_backend_pegc, legacy200);\n        g_backend = &gfx_backend_pegc;\n        return;\n    }\n\n    for',
-  'FAIL g_backend == (selected == 2 ? &gfx_backend_cirrus :'),
+  'FAIL expected[i] == mode_trace[i]'),  # 最初に落ちるのは強制 PEGC・PEGC 無しの行の init の記録 (Opus レビュー P2)
  ('last-plane-old', 'bb_i = bb[3];',
   'bb_i = P2V(0x6A000UL + 3 * GFX_PLANE_SZ);',
   'FAIL bb_r-bb_b == GFX_PLANE_SZ && bb_g-bb_b == 2*GFX_PLANE_SZ && bb_i-bb_b == 3*GFX_PLANE_SZ'),
