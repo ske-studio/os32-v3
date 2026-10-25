@@ -8,6 +8,7 @@
  *  巻戻し、PT/PD の返却、8/17MB の boot ledger と先頭 lease PT を検査。
  * ======================================================================== */
 #include "types.h"
+#include "kprintf.h"
 static u32 host_cr3;
 #define pgalloc_alloc_phys test_failphys
 #include "paging_host_source.c"

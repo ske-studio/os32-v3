@@ -299,14 +299,14 @@ static void test_heap(void)
 /* ------------------------------------------------------------------------ */
 static void test_kprintf(void)
 {
-    kprintf(0x07, "%0");
-    kprintf(0x07, "%-04l");
+    kprintf(KLOG_ATTR, "%0");
+    kprintf(KLOG_ATTR, "%-04l");
     check(1, "kprintf incomplete modifiers return at NUL");
-    kprintf(0x07, "");
-    kprintf(0x07, "%");             /* 末尾 % — 旧実装はここで無限ループ */
-    kprintf(0x07, "%%");
-    kprintf(0x07, "%z", 1);         /* 未知指定子 (vararg を消費する) */
-    kprintf(0x07, "\n");
+    kprintf(KLOG_ATTR, "");
+    kprintf(KLOG_ATTR, "%");             /* 末尾 % — 旧実装はここで無限ループ */
+    kprintf(KLOG_ATTR, "%%");
+    kprintf(KLOG_ATTR, "%z", 1);         /* 未知指定子 (vararg を消費する) */
+    kprintf(KLOG_ATTR, "\n");
     check(1, "kprintf returns (no hang)");
 }
 
@@ -857,7 +857,7 @@ static void test_ledger(void)
     }
     check(ledger_persist_total() == persist, "ledger:persist unchanged (R5b)");
     check(ledger_selfcheck("boot"), "ledger:selfcheck after AS");
-    kprintf(0x07, "[ledger] irq_ops=%u exc_ops=%u check_fail=%u bad_free=%u\n",
+    kprintf(KLOG_ATTR, "[ledger] irq_ops=%u exc_ops=%u check_fail=%u bad_free=%u\n",
             ledger_irq_ops, ledger_exc_ops, ledger_check_fail, ledger_bad_free);
 }
 
@@ -1020,10 +1020,10 @@ static void test_kcg_display_return(void)
               (PTE_PRESENT | (i ? PTE_PCD : 0)),
               "display:CG WB VRAM UC");
     }
-    kprintf(0x07, "[display] kcg=%u A9 code=%02x dot=%02x restored=%02x vsync=%u/%u/%u miss=%u/%u\n",
+    kprintf(KLOG_ATTR, "[display] kcg=%u A9 code=%02x dot=%02x restored=%02x vsync=%u/%u/%u miss=%u/%u\n",
             ready, code, dot, restored, code_vsync, dot_vsync, restored_vsync,
             cold.misses, warm.misses);
-    kprintf(0x07, "[display] PTE CG=%x B=%x R=%x G=%x I=%x\n",
+    kprintf(KLOG_ATTR, "[display] PTE CG=%x B=%x R=%x G=%x I=%x\n",
             before[0], before[1], before[2], before[3], before[4]);
 }
 
@@ -1080,7 +1080,7 @@ static int h4_collect_pfns(struct addrspace *as, int high, u32 *pfns)
         int range = high ? pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE :
                            pfns[i] < H4_PHYS_BOUNDARY / PAGE_SIZE;
         valid &= mapped && range;
-        kprintf(0x07, "[h4] %s page=%u va=%08X pfn=%08X user_rw=%u range=%u\n",
+        kprintf(KLOG_ATTR, "[h4] %s page=%u va=%08X pfn=%08X user_rw=%u range=%u\n",
                 kind, i, va, pfns[i], mapped, range);
     }
     return valid;
@@ -1188,7 +1188,7 @@ out:
         if (!removed) { ok = 0; stage = "remove"; }
     }
     if (available) check(ok, "h4: I/O roundtrip and cleanup");
-    kprintf(0x07, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n",
+    kprintf(KLOG_ATTR, "[h4] io %s backend=%s result=%s stage=%s bytes=%u removed=%u\n",
             high ? "high" : "low", backend,
             !available ? "SKIP" : ok ? "PASS" : "FAIL",
             stage, H4_BUFFER_BYTES, removed);
@@ -1213,7 +1213,7 @@ static void h4_dma_pool(void)
                     dma_range_ok(b->pa, b->size, DMA_PHYS_LIMIT);
         check(valid, "h4: DMA allocation range/bank");
         ok &= valid;
-        kprintf(0x07, "[h4] io dma pool pa=%08X bytes=%u range_bank=%u\n",
+        kprintf(KLOG_ATTR, "[h4] io dma pool pa=%08X bytes=%u range_bank=%u\n",
                 b->pa, b->size, valid);
         count++;
     }
@@ -1230,7 +1230,7 @@ static void h4_dma_pool(void)
     int restored = dma_pool_free_pages() == before;
     check(restored, "h4: DMA free pages restored");
     ok &= restored;
-    kprintf(0x07, "[h4] io dma pool result=%s allocated=%u free_restored=%u transfer=none\n",
+    kprintf(KLOG_ATTR, "[h4] io dma pool result=%s allocated=%u free_restored=%u transfer=none\n",
             !ok ? "FAIL" : !count ? "SKIP" : "PASS",
             count, restored);
 }
@@ -1274,7 +1274,7 @@ static int h4_backing_case(int high)
     int pattern = h4_buffer_entry(&as, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET,
                                  H4_BUFFER_BYTES);
     check(pattern, "h4: page-crossing pattern");
-    kprintf(0x07, "[h4] %s entry va=%08X bytes=%u pages=%u pattern=%s\n",
+    kprintf(KLOG_ATTR, "[h4] %s entry va=%08X bytes=%u pages=%u pattern=%s\n",
             kind, MEM_EXEC_LOAD_ADDR + H4_BUFFER_OFFSET,
             H4_BUFFER_BYTES, H4_BUFFER_PAGES, pattern ? "ok" : "FAIL");
     if (pattern) {
@@ -1284,7 +1284,7 @@ static int h4_backing_case(int high)
     }
 out:
     if (!result && !entered)
-        kprintf(0x07, "[h4] %s SKIP (not run): %s allocation failed\n", kind, stage);
+        kprintf(KLOG_ATTR, "[h4] %s SKIP (not run): %s allocation failed\n", kind, stage);
     if (created) paging_addrspace_destroy(&as);
     if (owner) {
         int reclaimed = ledger_reclaim_owner(owner, &left);
@@ -1292,13 +1292,13 @@ out:
         int retired = ledger_owner_retire(owner);
         check(reclaimed && !pages && retired, "h4: owner pages 0 and retired");
         if (!reclaimed || pages || !retired) result = -1;
-        kprintf(0x07, "[h4] %s cleanup owner=%u pages=%u retired=%u\n",
+        kprintf(KLOG_ATTR, "[h4] %s cleanup owner=%u pages=%u retired=%u\n",
                 kind, owner, pages, retired);
     }
     int restored = pgalloc_free_pages() == before;
     check(restored, "h4: free pages restored");
     if (!restored) result = -1;
-    kprintf(0x07, "[h4] %s result=%s entered=%u free_restored=%u\n", kind,
+    kprintf(KLOG_ATTR, "[h4] %s result=%s entered=%u free_restored=%u\n", kind,
             result > 0 ? "PASS" : result < 0 ? "FAIL" : "SKIP", entered, restored);
     return result;
 }
@@ -1357,7 +1357,7 @@ static void test_slack_cycle(void)
     check(pgalloc_free_pages() == before && ledger_owner_pages(owner) == 0,
           "slack_cycle: free count restored");
     check(ledger_owner_retire(owner), "slack_cycle: retire");
-    kprintf(0x07, "[selftest] slack_cycle free=%u busy=%u taken=%u fail=%u\n",
+    kprintf(KLOG_ATTR, "[selftest] slack_cycle free=%u busy=%u taken=%u fail=%u\n",
             free, busy, taken, ksel_fail - failures);
 }
 
@@ -1916,7 +1916,7 @@ static void test_irq_dynamic(void)
     irq_restore(saved);
 
     if (pending)
-        kprintf(0x07, "[selftest] irq: IRQ%d pending in IRR -> unmask part "
+        kprintf(KLOG_ATTR, "[selftest] irq: IRQ%d pending in IRR -> unmask part "
                 "skipped %d checks (not a failure)\n", KSEL_IRQ_LINE,
                 (int)KSEL_IRQ_UNMASK_SKIPPED);
 
@@ -2120,7 +2120,7 @@ static void test_time_now(void)
     }
     check(back == 0, "time:10k reads monotonic");
     clamp0 = ktime_clamp_count - clamp0;
-    kprintf(0x07, "[selftest] time: clamped %u of %d reads\n",
+    kprintf(KLOG_ATTR, "[selftest] time: clamped %u of %d reads\n",
             (unsigned int)clamp0, (int)KSEL_TIME_READS);
     /* 全部がクランプなら時計が止まっている (補間が効いていない)。 */
     check(clamp0 < (u32)KSEL_TIME_READS, "time:clamp count sane");
@@ -2136,7 +2136,7 @@ static void test_time_now(void)
     /* 外れたら測った値を出す (2026-09-24 の NP21/W で 1 回だけ FAIL。
      * cpu_delay_us の校正がずれたのか、時計の補間がずれたのかを分ける)。 */
     if (!(t1hi == t0hi && t1lo > t0lo + 200 && t1lo < t0lo + 20000)) {
-        kprintf(0x07, "[selftest] time: 1ms delay measured %u us (hi %u->%u)\n",
+        kprintf(KLOG_ATTR, "[selftest] time: 1ms delay measured %u us (hi %u->%u)\n",
                 (unsigned int)(t1lo - t0lo), (unsigned int)t0hi,
                 (unsigned int)t1hi);
     }
@@ -2215,14 +2215,14 @@ static void test_time_now(void)
     /* **踏めなかった分岐は失敗にしない** — 網羅は注入が持つ。 */
     if (hit_t0 == 0 || hit_t1 == 0 || hit_retry == 0) {
         /* 踏めなかった分岐は実機では UNVERIFIED。網羅は注入の表が持つ。 */
-        kprintf(0x07, "[selftest] time: real-PIT t0=%d t1=%d retry=%d"
+        kprintf(KLOG_ATTR, "[selftest] time: real-PIT t0=%d t1=%d retry=%d"
                       " (unhit = UNVERIFIED)\n",
                 (int)hit_t0, (int)hit_t1, (int)hit_retry);
     }
     /* 位相窓を 1 度も捕まえられなくても失敗にしない (実装レビュー往復 1 の
      * 非 blocker 3: 正常な時計でも狭い窓は取り逃がし得る。網羅は注入の表)。 */
     if (hit_t0 + hit_t1 + hit_retry == 0) {
-        kprintf(0x07, "[selftest] time: real-PIT phase window not caught (UNVERIFIED)\n");
+        kprintf(KLOG_ATTR, "[selftest] time: real-PIT phase window not caught (UNVERIFIED)\n");
     }
     time_branch_reset();
 
@@ -2243,7 +2243,7 @@ static void test_time_now(void)
         for (i = 0; i < 1000; i++) (void)sys_time_now(&lo, &hi);
         if (sys_time_now(&t1lo, &t1hi) == 0 && t1hi == t0hi && t1lo > t0lo) {
             /* 1 回あたりの µs = この時計の IF=0 区間そのもの。 */
-            kprintf(0x07, "[selftest] time: 1000 reads %u us (%u us/call)\n",
+            kprintf(KLOG_ATTR, "[selftest] time: 1000 reads %u us (%u us/call)\n",
                     (unsigned int)(t1lo - t0lo),
                     (unsigned int)((t1lo - t0lo) / 1000u));
         }

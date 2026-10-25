@@ -1,5 +1,6 @@
 /* Real fixed diagnostic; mock ROM/timing only, no claim about real A9h timing. */
 #include <stdarg.h>
+#include "kprintf.h"
 #include "kcg_module.h"
 #include "kcg.h"
 #include "pc98.h"
