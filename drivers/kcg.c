@@ -26,6 +26,8 @@
 #include "../kernel/kcg_module.h"
 #include "os32_kapi_shared.h"
 
+#define KCG_SCALE_MAX 4
+
 int kcg_scale = 1;
 
 void kcg_init(void)
@@ -36,7 +38,7 @@ void kcg_init(void)
 void kcg_set_scale(int scale)
 {
     if (scale < 1) scale = 1;
-    if (scale > 4) scale = 4;
+    if (scale > KCG_SCALE_MAX) scale = KCG_SCALE_MAX;
     kcg_scale = scale;
 }
 

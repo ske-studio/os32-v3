@@ -20,6 +20,7 @@
 
 #include "dma8237.h"
 #include "io.h"
+#include "pc98.h"
 #include "kprintf.h"
 
 /* ------------------------------------------------------------------------ */
@@ -94,7 +95,7 @@ void dma8237_init(void)
     s_a20_post = after;
     if (!(after & SYSPORT_DMA_MASK_1MB)) {
         s_a20_state = DMA_A20_VERIFIED;
-    } else if (after == 0xFF) {
+    } else if (after == PC98_IO_OPEN_BUS8) {
         s_a20_state = DMA_A20_UNREADABLE;
     } else {
         s_a20_state = DMA_A20_BLOCKED;

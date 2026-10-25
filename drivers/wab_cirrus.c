@@ -39,6 +39,44 @@
 #include "wab_glue.h"
 #include "wab_cirrus.h"
 
+#define CIRRUS_PATTERN_ALIGN 8UL
+#define CIRRUS_PITCH_UNIT_SHIFT 3
+#define CIRRUS_PITCH_UNIT_BYTES (1U << CIRRUS_PITCH_UNIT_SHIFT)
+#define CIRRUS_START_UNIT_SHIFT 2
+#define VGA_CHAR_CLOCK_PIXELS 8
+#define CIRRUS_PITCH_FIELD_MAX 0x1FF
+#define VGA_VDE_MAX 0x3FF
+#define SR_RESET_RUN 0x03
+#define SR_PLANEMASK_ALL 0x0F
+#define GR_COLOR_COMPARE 0x02
+#define GR_DATA_ROTATE 0x03
+#define GR_READ_MAP 0x04
+#define GR_COLOR_DONT_CARE 0x07
+#define GR_BIT_MASK 0x08
+#define GR_MODE_SHIFT256 0x40
+#define GR_COLORCARE_ALL 0x0F
+#define CR_VDE_BIT8 0x100
+#define CR_VDE_BIT9 0x200
+#define CR_EXT_DISP_BASE 0x02
+#define CR_START_BIT16 0x10000UL
+#define CR_START_BIT19 0x80000UL
+#define CR_START_PAIR_SHIFT 17
+#define CR_START_PAIR_MASK 0x03
+#define CR_EXT_DISP_START16 0x01
+#define CR_EXT_DISP_START_PAIR_SHIFT 2
+#define CR_PITCH_BIT8 0x100
+#define CR_OVERLAY_START19 0x80
+#define AR_MODE 0x10
+#define AR_OVERSCAN 0x11
+#define AR_PLANES 0x12
+#define AR_HPAN 0x13
+#define AR_COLOR_SELECT 0x14
+#define AR_MODE_256 0x41
+#define AR_PLANES_ALL 0x0F
+#define AR_DISPLAY_ENABLE 0x20
+#define BLT_DIM_HI_MASK 0x1F
+#define BLT_ADDR_HI_MASK 0x3F
+
 /* ------------------------------------------------------------------------ */
 /*  レジスタ番号 (Cirrus / VGA の資料上の番号。PC-98 のポートではない)        */
 /* ------------------------------------------------------------------------ */
@@ -200,7 +238,7 @@ static u8 cr_r(WabGlue *g, u8 idx)
 /* ------------------------------------------------------------------------ */
 /*  内部状態 (チップは 1 個しか居ない前提。9821 内蔵 1 枚 = 票 H3 の範囲)    */
 /* ------------------------------------------------------------------------ */
-static u32 s_bank_base   = 0xFFFFFFFFUL; /* 現在のバンクの先頭 VRAM オフセット */
+static u32 s_bank_base   = U32_MAX; /* 現在のバンクの先頭 VRAM オフセット */
 static u32 s_pattern_off = 0;            /* 塗りつぶし用 8x8 パターンの位置 */
 static u8  s_chip_id     = 0;
 
@@ -281,7 +319,7 @@ void wab_cirrus_set_fill_pattern(WabGlue *g, u32 vram_off)
     (void)g;
     /* 8 バイト境界に落とす。色展開パターンの開始行は srcaddr の下位 3 ビットで
      * 決まる ([N] cirrus_colorexpand_pattern_*: pattern_y = srcaddr & 7)。 */
-    s_pattern_off = vram_off & ~7UL;
+    s_pattern_off = vram_off & ~(CIRRUS_PATTERN_ALIGN - 1UL);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -311,25 +349,25 @@ void wab_cirrus_set_fill_pattern(WabGlue *g, u32 vram_off)
 int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
                           u32 pitch, u32 start)
 {
-    u32 offset = pitch >> 3;   /* CR13 は「ピッチ / 8」 */
+    u32 offset = pitch >> CIRRUS_PITCH_UNIT_SHIFT;   /* CR13 は「ピッチ / 8」 */
     u32 vde    = (u32)height - 1;
-    u32 sa     = start >> 2;   /* 表示先頭は dword 単位 ([N] addroffset * 4) */
+    u32 sa     = start >> CIRRUS_START_UNIT_SHIFT;   /* 表示先頭は dword 単位 ([N] addroffset * 4) */
     u8  ov;
 
     if (!g || width <= 0 || height <= 0) return -1;
-    if ((width & 7) != 0) return -1;               /* 幅は 8 の倍数 */
-    if ((pitch & 7) != 0) return -1;               /* ピッチも 8 の倍数 */
-    if (offset > 0x1FF) return -1;                 /* CR13 + CR1B bit4 で 9bit */
-    if (vde > 0x3FF) return -1;
+    if ((width & (VGA_CHAR_CLOCK_PIXELS - 1)) != 0) return -1;               /* 幅は 8 の倍数 */
+    if ((pitch & (CIRRUS_PITCH_UNIT_BYTES - 1)) != 0) return -1;               /* ピッチも 8 の倍数 */
+    if (offset > CIRRUS_PITCH_FIELD_MAX) return -1;                 /* CR13 + CR1B bit4 で 9bit */
+    if (vde > VGA_VDE_MAX) return -1;
 
     /* --- チップの入口 --- */
     g->out(VGA_MISC_W, MSR_640X480);
     sr_w(g, SR_UNLOCK, SR_UNLOCK_KEY);
 
     /* --- Sequencer --- */
-    sr_w(g, SR_RESET, 0x03);        /* 同期/非同期リセット解除 */
+    sr_w(g, SR_RESET, SR_RESET_RUN);        /* 同期/非同期リセット解除 */
     sr_w(g, SR_CLOCKING, 0x01);     /* 8 ドット文字クロック / 画面 ON */
-    sr_w(g, SR_PLANEMASK, 0x0F);    /* 全プレーン書き込み可 */
+    sr_w(g, SR_PLANEMASK, SR_PLANEMASK_ALL);    /* 全プレーン書き込み可 */
     sr_w(g, SR_CHARMAP, 0x00);
     sr_w(g, SR_MEMMODE,
          (u8)(SR_MEMMODE_EXTMEM | SR_MEMMODE_ODDEVEN | SR_MEMMODE_CHAIN4));
@@ -344,13 +382,13 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
     /* --- Graphics Controller --- */
     gr_w(g, GR_SETRESET, 0x00);
     gr_w(g, GR_SETRESET_EN, 0x00);
-    gr_w(g, 0x02, 0x00);            /* Color Compare */
-    gr_w(g, 0x03, 0x00);            /* Data Rotate */
-    gr_w(g, 0x04, 0x00);            /* Read Map Select */
-    gr_w(g, GR_MODE, 0x40);         /* 256 色シフト */
+    gr_w(g, GR_COLOR_COMPARE, 0x00);            /* Color Compare */
+    gr_w(g, GR_DATA_ROTATE, 0x00);            /* Data Rotate */
+    gr_w(g, GR_READ_MAP, 0x00);            /* Read Map Select */
+    gr_w(g, GR_MODE, GR_MODE_SHIFT256);         /* 256 色シフト */
     gr_w(g, GR_MISC, 0x01);         /* グラフィックモード */
-    gr_w(g, 0x07, 0x0F);            /* Color Don't Care */
-    gr_w(g, 0x08, 0xFF);            /* Bit Mask */
+    gr_w(g, GR_COLOR_DONT_CARE, GR_COLORCARE_ALL);            /* Color Don't Care */
+    gr_w(g, GR_BIT_MASK, 0xFF);            /* Bit Mask */
     gr_w(g, GR_MODEEXT, 0x00);      /* 単一バンク / 4KB 粒度 */
     gr_w(g, GR_OFFSET0, 0x00);
     gr_w(g, GR_OFFSET1, 0x00);
@@ -362,7 +400,7 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
     cr_w(g, CR_V_SYNCEND, 0x0C);
 
     cr_w(g, CR_H_TOTAL,      0x5F);
-    cr_w(g, CR_H_DISPEND,    (u8)((width / 8) - 1));
+    cr_w(g, CR_H_DISPEND,    (u8)((width / VGA_CHAR_CLOCK_PIXELS) - 1));
     cr_w(g, CR_H_BLANKSTART, 0x50);
     cr_w(g, CR_H_BLANKEND,   0x82);
     cr_w(g, CR_H_SYNCSTART,  0x54);
@@ -370,8 +408,8 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
     cr_w(g, CR_V_TOTAL,      0x0B);
 
     ov = 0x3E & (u8)~(CR_OVERFLOW_VDE8 | CR_OVERFLOW_VDE9);
-    if (vde & 0x100) ov |= CR_OVERFLOW_VDE8;
-    if (vde & 0x200) ov |= CR_OVERFLOW_VDE9;
+    if (vde & CR_VDE_BIT8) ov |= CR_OVERFLOW_VDE8;
+    if (vde & CR_VDE_BIT9) ov |= CR_OVERFLOW_VDE9;
     cr_w(g, CR_OVERFLOW, ov);
 
     cr_w(g, CR_PRESETROW,    0x00);
@@ -395,13 +433,13 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
      * bit1 は Cirrus の拡張表示アドレス有効。表示先頭 0 / ピッチ 640 の
      * 現状ではどれも 0 だが、式どおりに組み立てておく。 */
     {
-        u8 b1b = 0x02;
-        if (sa & 0x10000UL) b1b |= 0x01;
-        b1b |= (u8)(((sa >> 17) & 0x03) << 2);
-        if (offset & 0x100) b1b |= CR_EXT_DISP_PITCH8;
+        u8 b1b = CR_EXT_DISP_BASE;
+        if (sa & CR_START_BIT16) b1b |= CR_EXT_DISP_START16;
+        b1b |= (u8)(((sa >> CR_START_PAIR_SHIFT) & CR_START_PAIR_MASK) << CR_EXT_DISP_START_PAIR_SHIFT);
+        if (offset & CR_PITCH_BIT8) b1b |= CR_EXT_DISP_PITCH8;
         cr_w(g, CR_EXT_DISP, b1b);
     }
-    cr_w(g, CR_OVERLAY, (u8)((sa & 0x80000UL) ? 0x80 : 0x00));
+    cr_w(g, CR_OVERLAY, (u8)((sa & CR_START_BIT19) ? CR_OVERLAY_START19 : 0x00));
 
     /* --- Attribute Controller ---
      * 3C0h は「索引 → データ」を 1 本のポートで交互に出す。トグルの位相は
@@ -414,13 +452,13 @@ int wab_cirrus_setup_8bpp(WabGlue *g, int width, int height,
             g->out(VGA_ATTR_IDX, (u8)i);
             g->out(VGA_ATTR_IDX, (u8)i);
         }
-        g->out(VGA_ATTR_IDX, 0x10); g->out(VGA_ATTR_IDX, 0x41); /* 256 色 */
-        g->out(VGA_ATTR_IDX, 0x11); g->out(VGA_ATTR_IDX, 0x00);
-        g->out(VGA_ATTR_IDX, 0x12); g->out(VGA_ATTR_IDX, 0x0F);
-        g->out(VGA_ATTR_IDX, 0x13); g->out(VGA_ATTR_IDX, 0x00);
-        g->out(VGA_ATTR_IDX, 0x14); g->out(VGA_ATTR_IDX, 0x00);
+        g->out(VGA_ATTR_IDX, AR_MODE); g->out(VGA_ATTR_IDX, AR_MODE_256); /* 256 色 */
+        g->out(VGA_ATTR_IDX, AR_OVERSCAN); g->out(VGA_ATTR_IDX, 0x00);
+        g->out(VGA_ATTR_IDX, AR_PLANES); g->out(VGA_ATTR_IDX, AR_PLANES_ALL);
+        g->out(VGA_ATTR_IDX, AR_HPAN); g->out(VGA_ATTR_IDX, 0x00);
+        g->out(VGA_ATTR_IDX, AR_COLOR_SELECT); g->out(VGA_ATTR_IDX, 0x00);
     }
-    g->out(VGA_ATTR_IDX, 0x20);   /* パレットアドレスソース = 表示 ON */
+    g->out(VGA_ATTR_IDX, AR_DISPLAY_ENABLE);   /* パレットアドレスソース = 表示 ON */
 
     return 0;
 }
@@ -433,7 +471,7 @@ void wab_cirrus_shutdown(WabGlue *g)
     sr_w(g, SR_UNLOCK, SR_UNLOCK_KEY);
     sr_w(g, SR_EXTMODE, (u8)(sr_r(g, SR_EXTMODE) & (u8)~SR_EXTMODE_SVGA));
     sr_w(g, SR_UNLOCK, SR_UNLOCK_LOCK);
-    s_bank_base = 0xFFFFFFFFUL;
+    s_bank_base = U32_MAX;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -457,19 +495,19 @@ static void blt_setup(WabGlue *g, u32 dst, u32 src,
     u32 hm1 = (u32)h - 1;
 
     gr_w(g, GR_BLT_W_LO,  (u8)(wm1 & 0xFF));
-    gr_w(g, GR_BLT_W_HI,  (u8)((wm1 >> 8) & 0x1F));
+    gr_w(g, GR_BLT_W_HI,  (u8)((wm1 >> 8) & BLT_DIM_HI_MASK));
     gr_w(g, GR_BLT_H_LO,  (u8)(hm1 & 0xFF));
-    gr_w(g, GR_BLT_H_HI,  (u8)((hm1 >> 8) & 0x1F));
+    gr_w(g, GR_BLT_H_HI,  (u8)((hm1 >> 8) & BLT_DIM_HI_MASK));
     gr_w(g, GR_BLT_DPITCH_LO, (u8)(dpitch & 0xFF));
-    gr_w(g, GR_BLT_DPITCH_HI, (u8)((dpitch >> 8) & 0x1F));
+    gr_w(g, GR_BLT_DPITCH_HI, (u8)((dpitch >> 8) & BLT_DIM_HI_MASK));
     gr_w(g, GR_BLT_SPITCH_LO, (u8)(spitch & 0xFF));
-    gr_w(g, GR_BLT_SPITCH_HI, (u8)((spitch >> 8) & 0x1F));
+    gr_w(g, GR_BLT_SPITCH_HI, (u8)((spitch >> 8) & BLT_DIM_HI_MASK));
     gr_w(g, GR_BLT_DST_LO,  (u8)(dst & 0xFF));
     gr_w(g, GR_BLT_DST_MID, (u8)((dst >> 8) & 0xFF));
-    gr_w(g, GR_BLT_DST_HI,  (u8)((dst >> 16) & 0x3F));
+    gr_w(g, GR_BLT_DST_HI,  (u8)((dst >> 16) & BLT_ADDR_HI_MASK));
     gr_w(g, GR_BLT_SRC_LO,  (u8)(src & 0xFF));
     gr_w(g, GR_BLT_SRC_MID, (u8)((src >> 8) & 0xFF));
-    gr_w(g, GR_BLT_SRC_HI,  (u8)((src >> 16) & 0x3F));
+    gr_w(g, GR_BLT_SRC_HI,  (u8)((src >> 16) & BLT_ADDR_HI_MASK));
 }
 
 /* GR31 の START を 0→1 にして起動する。

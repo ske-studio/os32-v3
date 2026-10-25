@@ -11,6 +11,10 @@
 #include "types.h"
 #include "wab_glue.h"
 
+#define VGA_PORT_GROUP_3CX 0x03C0
+#define VGA_PORT_GROUP_3DX 0x03D0
+#define VGA_PORT_GROUP_3BX 0x03B0
+
 /* CPU から VRAM を覗く窓のバンク粒度 (GR0B bit5 = 0 のとき 4KB)。
  * バックエンドが「この矩形は窓 1 枚に収まるか」を判断するのに使う。 */
 #define WAB_CIRRUS_BANK_GRAN   4096UL

@@ -12,6 +12,9 @@
 #include "os32_kapi_shared.h"   /* KbdDiag / OS32_ERR_* */
 #include "kbd_status.h"        /* KBD_STAT_* / kbd_status_classify */
 
+#define KBD_KEY_COUNT (SCANCODE_KEY + 1)
+#define KBD_BITMAP_BYTES BITMAP_BYTES(KBD_KEY_COUNT)
+
 /* ======== I/Oポート ======== */
 #define KBD_DATA    0x41    /* データリード */
 #define KBD_CMD     0x43    /* コマンドライト / ステータスリード */

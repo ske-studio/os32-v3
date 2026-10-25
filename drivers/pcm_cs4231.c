@@ -185,7 +185,7 @@ static unsigned long long pcm_clock_us(void)
 
     if (sys_time_now(&lo, &hi) != 0)
         return (unsigned long long)tick_count * PCM_US_PER_TICK;
-    return ((unsigned long long)hi << 32) | (unsigned long long)lo;
+    return ((unsigned long long)hi << BITS_PER_U32) | (unsigned long long)lo;
 }
 
 /* 単調性の基準を今に置く (open と TIMEBASE)。 */

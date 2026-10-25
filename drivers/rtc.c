@@ -51,15 +51,15 @@ static void rtc_wait(void)
 static void rtc_set_mode(u8 mode)
 {
     /* STB=0, CLK=0, DI=0, C2C1C0=mode */
-    outp(RTC_SET, mode & 0x07);
+    outp(RTC_SET, mode & RTC_MODE_MASK);
     rtc_wait();
 
     /* STBパルス (0→1でモードセット) */
-    outp(RTC_SET, (mode & 0x07) | RTC_STB);
+    outp(RTC_SET, (mode & RTC_MODE_MASK) | RTC_STB);
     rtc_wait();
 
     /* STB=0に戻す */
-    outp(RTC_SET, mode & 0x07);
+    outp(RTC_SET, mode & RTC_MODE_MASK);
     rtc_wait();
 }
 
@@ -93,10 +93,10 @@ static void rtc_read_48bits(u8 *nibbles)
         bit = (u8)(inp(RTC_READ) & 0x01);
 
         /* ニブル配列に格納 */
-        if ((i & 3) == 0) {
-            nibbles[i >> 2] = bit;
+        if ((i % RTC_NIBBLE_BITS) == 0) {
+            nibbles[i / RTC_NIBBLE_BITS] = bit;
         } else {
-            nibbles[i >> 2] |= (bit << (i & 3));
+            nibbles[i / RTC_NIBBLE_BITS] |= (bit << (i % RTC_NIBBLE_BITS));
         }
     }
 }
@@ -113,7 +113,7 @@ void rtc_init(void)
 
 void rtc_read(RTC_Time *t)
 {
-    u8 nib[12];   /* 12ニブル (48ビット) */
+    u8 nib[RTC_NIBBLE_COUNT];   /* 12ニブル (48ビット) */
 
     /* 1. タイムリード: カウンタの現在値をシフトレジスタにコピー */
     rtc_set_mode(RTC_MODE_TIMEREAD);
@@ -138,17 +138,17 @@ void rtc_read(RTC_Time *t)
      *  nib[8]  = 曜日   nib[9]  = 月
      *  nib[10] = 1年    nib[11] = 10年
      */
-    t->sec   = (nib[1] & 0x07) * 10 + (nib[0] & 0x0F);
-    t->min   = (nib[3] & 0x07) * 10 + (nib[2] & 0x0F);
-    t->hour  = (nib[5] & 0x03) * 10 + (nib[4] & 0x0F);
-    t->day   = (nib[7] & 0x03) * 10 + (nib[6] & 0x0F);
-    t->wday  = nib[8] & 0x07;
-    t->month = nib[9] & 0x0F;
-    t->year  = (nib[11] & 0x0F) * 10 + (nib[10] & 0x0F);
+    t->sec   = (nib[RTC_NIB_SEC_TENS] & RTC_SECMIN_TENS_MASK) * 10 + (nib[RTC_NIB_SEC_ONES] & RTC_DIGIT_MASK);
+    t->min   = (nib[RTC_NIB_MIN_TENS] & RTC_SECMIN_TENS_MASK) * 10 + (nib[RTC_NIB_MIN_ONES] & RTC_DIGIT_MASK);
+    t->hour  = (nib[RTC_NIB_HOUR_TENS] & RTC_HOURDAY_TENS_MASK) * 10 + (nib[RTC_NIB_HOUR_ONES] & RTC_DIGIT_MASK);
+    t->day   = (nib[RTC_NIB_DAY_TENS] & RTC_HOURDAY_TENS_MASK) * 10 + (nib[RTC_NIB_DAY_ONES] & RTC_DIGIT_MASK);
+    t->wday  = nib[RTC_NIB_WDAY] & RTC_WDAY_MASK;
+    t->month = nib[RTC_NIB_MONTH] & RTC_DIGIT_MASK;
+    t->year  = (nib[RTC_NIB_YEAR_TENS] & RTC_DIGIT_MASK) * 10 + (nib[RTC_NIB_YEAR_ONES] & RTC_DIGIT_MASK);
 
     /* 範囲チェック */
-    if (t->sec > 59) t->sec = 0;
-    if (t->min > 59) t->min = 0;
+    if (t->sec > RTC_SECMIN_MAX) t->sec = 0;
+    if (t->min > RTC_SECMIN_MAX) t->min = 0;
     if (t->hour > 23) t->hour = 0;
     if (t->day < 1 || t->day > 31) t->day = 1;
     if (t->month < 1 || t->month > 12) t->month = 1;

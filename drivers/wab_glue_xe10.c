@@ -20,6 +20,8 @@
 #include "types.h"
 #include "io.h"
 #include "wab_glue.h"
+#include "wab_cirrus.h"
+#include "pc98.h"
 #include "wab_glue_xe10.h"
 #include "wab_xe10.h"
 
@@ -156,9 +158,9 @@ static unsigned int xe10_map(u16 reg)
     unsigned int group = (unsigned int)reg & WAB_XE10_VGA_GROUP_MASK;
     unsigned int low   = (unsigned int)reg & WAB_XE10_VGA_LOW_MASK;
 
-    if (group == 0x03C0) return WAB_XE10_VGA_3CX_BASE + low;
-    if (group == 0x03D0) return WAB_XE10_VGA_3DX_BASE + low;
-    if (group == 0x03B0) return WAB_XE10_VGA_3BX_BASE + low;
+    if (group == VGA_PORT_GROUP_3CX) return WAB_XE10_VGA_3CX_BASE + low;
+    if (group == VGA_PORT_GROUP_3DX) return WAB_XE10_VGA_3DX_BASE + low;
+    if (group == VGA_PORT_GROUP_3BX) return WAB_XE10_VGA_3BX_BASE + low;
     return 0;
 }
 
@@ -173,7 +175,7 @@ static void xe10_out(u16 reg, u8 val)
 static u8 xe10_in(u16 reg)
 {
     unsigned int port = xe10_map(reg);
-    if (port == 0) return 0xFF;
+    if (port == 0) return PC98_IO_OPEN_BUS8;
     wab_glue_xe10.io_count++;
     return (u8)inp(port);
 }

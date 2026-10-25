@@ -153,6 +153,7 @@ def host_build(tmp, mutated=None):
     exe = work / "serial-portc-host"
     cmd = ["gcc", *FLAGS, "-I" + str(work),
            "-I" + str(ROOT / "include"), "-I" + str(ROOT / "drivers"),
+           "-I" + str(ROOT / "lib"),
            "-I" + str(ROOT / "sdk/include/os32"),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,

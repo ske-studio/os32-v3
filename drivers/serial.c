@@ -21,6 +21,10 @@
 #include "io.h"
 #include "pc98.h"
 #include "kprintf.h"
+#include "kstring.h"
+
+#define SER_MODE2_COUNT 3
+#define SER_POLL_WAIT_MASK 0xF
 
 /* 外部: 起動時に判定したシステムクロック (kernel/sysclk.h)。drivers/ は
  * カーネルヘッダを見ない作法なので extern で引く (kbd.c / ide.c と同じ)。
@@ -241,7 +245,7 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     /*  報告は区間を出てから行う。                                          */
     /* ==================================================================== */
     irqf = irq_save();
-    irq_disable(4);
+    irq_disable(PC98_IRQ_SERIAL);
 
     /* ---- FIFO 搭載判定 (1 回だけ。0136h を読むだけで何も書かない) ---- */
     serial_probe_fifo();
@@ -268,15 +272,15 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     if (plan.mode == SER_MODE_COMPAT && !plan.exact) {
         keep = s_setup.actual;
         if (ser_initialized) {
-            irq_enable(4);   /* いまの設定を生かしたままにする */
+            irq_enable(PC98_IRQ_SERIAL);   /* いまの設定を生かしたままにする */
         }
         irq_restore(irqf);
         if (ser_initialized) {
-            kprintf(0x0E,
+            kprintf(KLOG_LEGACY_YELLOW,
                     "[ser] refuse %ubps: 8253 では %ubps になる (現状維持 %ubps)\n",
                     (u32)baud, (u32)plan.actual, (u32)keep);
         } else {
-            kprintf(0x0E,
+            kprintf(KLOG_LEGACY_YELLOW,
                     "[ser] refuse %ubps: 8253 では %ubps になる (未初期化のまま)\n",
                     (u32)baud, (u32)plan.actual);
         }
@@ -363,7 +367,7 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     if (plan.mode == SER_MODE_COMPAT) {
         /* PIT モード設定: カウンタ#2, LSB+MSB, Mode 3(方形波) */
         /* FreeBSD: count==3 のときだけ Mode 2 */
-        if (plan.count != 3)
+        if (plan.count != SER_MODE2_COUNT)
             outp(SER_TIMER_MODE, PIT_SER_MODE3);
         else
             outp(SER_TIMER_MODE, PIT_SER_MODE2);
@@ -399,7 +403,7 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     ser_ien_bsr(s_mask_ien, s_mask_ien);
 
     /* ---- PIC IRQ4 有効化 ---- */
-    irq_enable(4);
+    irq_enable(PC98_IRQ_SERIAL);
 
     /* ---- BUZ OFF 再確認 (PIT設定の副作用対策) ---- */
     outp(SYSPORT_C_BSR, BSR_BUZ_OFF);  /* 07h = 停止 (UNDOCUMENTED) */
@@ -414,10 +418,10 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
      * `serial_putchar` が予算を使い切ると `_halt()` する ([V4] の報告より
      * 先に、IF=0 の hlt で止まらないことが要る)。 */
     if (plan.mode == SER_MODE_VFAST) {
-        kprintf(0x0A, "[ser] %ubps (V-FAST div %u, FIFO)\n",
+        kprintf(KLOG_LEGACY_GREEN, "[ser] %ubps (V-FAST div %u, FIFO)\n",
                 (u32)s_setup.actual, (u32)plan.div);
     } else {
-        kprintf(0x0A, "[ser] %ubps (clk %uHz, count %u)%s\n",
+        kprintf(KLOG_LEGACY_GREEN, "[ser] %ubps (clk %uHz, count %u)%s\n",
                 (u32)baud, (u32)clk, (u32)plan.count,
                 s_setup.has_fifo ? " [FIFO available]" : "");
     }
@@ -430,7 +434,7 @@ void serial_init(unsigned long baud)
     /* **セッション中は速度を変えない** (§1-v3)。ホストは今の速度で
      * フレームを待っている。報告の kprintf は保留リングへ入る。 */
     if (s_gate) {
-        kprintf(0x0E, "[ser] refuse serial_init during SerialFS session\n");
+        kprintf(KLOG_LEGACY_YELLOW, "[ser] refuse serial_init during SerialFS session\n");
         return;
     }
     /* **従来の経路のまま。** 票の決裁「起動時の既定 9600 は互換モード」。
@@ -442,7 +446,7 @@ int serial_init_vfast(unsigned long baud)
 {
     if (s_checked) return SER_INIT_REFUSED;
     if (s_gate) {
-        kprintf(0x0E, "[ser] refuse serial_init during SerialFS session\n");
+        kprintf(KLOG_LEGACY_YELLOW, "[ser] refuse serial_init during SerialFS session\n");
         return SER_INIT_REFUSED;
     }
     /* FIFO 非搭載 / 表に無い速度なら serial_plan が互換を返すので、
@@ -893,7 +897,7 @@ void serial_puts_polled(const char *str)
         }
         str++;
         count++;
-        if ((count & 0xF) == 0) {
+        if ((count & SER_POLL_WAIT_MASK) == 0) {
             io_wait();
             io_wait();
         }
@@ -903,15 +907,15 @@ void serial_puts_polled(const char *str)
 void serial_put_hex32_polled(u32 val)
 {
     static const char hex[] = "0123456789ABCDEF";
-    char buf[11];
+    char buf[HEX32_DIGITS + sizeof("0x")];
     int i;
     buf[0] = '0';
     buf[1] = 'x';
-    for (i = 7; i >= 0; i--) {
-        buf[i+2] = hex[val & 0xF];
-        val >>= 4;
+    for (i = HEX32_DIGITS - 1; i >= 0; i--) {
+        buf[i + sizeof("0x") - 1] = hex[val & ((1U << HEX_NIBBLE_BITS) - 1)];
+        val >>= HEX_NIBBLE_BITS;
     }
-    buf[10] = '\0';
+    buf[HEX32_DIGITS + sizeof("0x") - 1] = '\0';
     serial_puts_polled(buf);
 }
 

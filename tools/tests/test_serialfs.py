@@ -131,7 +131,8 @@ def gate_build(tmp, mutated=None, name="gate"):
     (work / "serial.c").write_text(text, encoding="utf-8")
     exe = work / "serial-gate-host"
     cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "sdk/include/os32"),
+           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
+           "-I" + str(ROOT / "sdk/include/os32"),
            str(GATE_HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,
                    stderr=subprocess.DEVNULL if mutated is not None else None)
@@ -161,9 +162,13 @@ def session_build(tmp, mutated=None, name="session"):
     work.mkdir(parents=True)
     (work / "arch_io.h").write_text(FAKE_ARCH_IO_SESSION, encoding="utf-8")
     (work / "platform_io.h").write_text(FAKE_PLATFORM_IO, encoding="utf-8")
+    hex_defs = [line for line in (ROOT / "lib/kstring.h").read_text().splitlines()
+                if line.startswith(("#define HEX_NIBBLE_BITS ", "#define HEX32_DIGITS "))]
+    assert len(hex_defs) == 2, "canonical hex constants missing"
     (work / "kstring.h").write_text(
-        "#ifndef KSTRING_H\n#define KSTRING_H\n"
-        "int kstrcmp(const char *a, const char *b);\n#endif\n", encoding="utf-8")
+        "#ifndef KSTRING_H\n#define KSTRING_H\n#include \"types.h\"\n"
+        + "\n".join(hex_defs) + "\n"
+        + "int kstrcmp(const char *a, const char *b);\n#endif\n", encoding="utf-8")
     (work / "appslot.h").write_text(
         "#ifndef APPSLOT_H\n#define APPSLOT_H\n#define APP_ID_SHELL 1\n#endif\n",
         encoding="utf-8")
@@ -1530,7 +1535,7 @@ GATE_MUTATIONS = CHECKED_MUTATIONS + [
     ("drivers/serial.c", r"        s_hold_head = \(s_hold_head \+ 1\) % \(u32\)SER_HOLD_SIZE;\n        s_hold_count--;\n        s_hold_dropped\+\+;\n    \}\n    s_hold\[",
      "        s_hold_dropped++;\n        irq_restore(f);\n        return;\n    }\n    s_hold[",
      "保留リングが溢れたら新しい方を捨てる (結果行と exit が消える)"),
-    ("drivers/serial.c", r"    if \(s_gate\) \{\n        kprintf\(0x0E, \"\[ser\] refuse serial_init during SerialFS session\\n\"\);\n        return;\n    \}",
+    ("drivers/serial.c", r"    if \(s_gate\) \{\n        kprintf\(KLOG_LEGACY_YELLOW, \"\[ser\] refuse serial_init during SerialFS session\\n\"\);\n        return;\n    \}",
      "", "セッション中に速度を変えられる"),
     ("drivers/serial.c", r"(void serial_irq_handler\(void\)[\s\S]*?)            if \(sts & serial_oe_mask\(s_setup.mode\)\) ser_err_oe\+\+;\n            if \(sts & serial_fe_mask",
      r"\1            if (sts & serial_fe_mask", "ISR が OE を数えない"),

@@ -85,7 +85,7 @@ typedef struct {
     unsigned char  end_sector;      /* +12 */
     unsigned char  end_head;        /* +13 */
     unsigned short end_cyl;         /* +14 */
-    char           name[16];        /* +16 */
+    char           name[PC98PT_NAME_LEN];        /* +16 */
 } PC98PartEntry;
 
 /* ---- 戻り値 ------------------------------------------------------------- */

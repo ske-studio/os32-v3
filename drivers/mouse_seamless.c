@@ -15,6 +15,9 @@
 #include "np2sysp.h"
 #include "io.h"
 
+#define SEAMLESS_RESPONSE_BYTES 32
+#define SEAMLESS_DRAIN_BUDGET 64
+
 /* ====================================================================== */
 /*  seamless_mouse_init — シームレスモード初期化                            */
 /*                                                                          */
@@ -23,7 +26,7 @@
 /* ====================================================================== */
 int seamless_mouse_init(void)
 {
-    char buf[32];
+    char buf[SEAMLESS_RESPONSE_BYTES];
     int len;
 
     /* mode=0 パラメータ送信 (4バイト、全て0) */
@@ -70,7 +73,7 @@ static int parse_decimal(const char *str, int *pos)
 /* ====================================================================== */
 int seamless_mouse_poll(i16 *abs_x, i16 *abs_y)
 {
-    char buf[32];
+    char buf[SEAMLESS_RESPONSE_BYTES];
     int len;
     int pos;
     int x_raw, y_raw;
@@ -78,7 +81,7 @@ int seamless_mouse_poll(i16 *abs_x, i16 *abs_y)
     /* 古いレスポンスがあれば掃く */
     {
         int i;
-        for (i = 0; i < 64; i++) {
+        for (i = 0; i < SEAMLESS_DRAIN_BUDGET; i++) {
             u8 ch = (u8)inp(NP2PORT_STR);
             if (ch == 0) break;
         }
@@ -109,8 +112,8 @@ int seamless_mouse_poll(i16 *abs_x, i16 *abs_y)
      * 639/399 に決め打ちしていたため、480 ラインのバックエンド (PEGC / Cirrus、
      * gshell は bounds を 479 にする) で下 80 ラインにカーソルが届かなかった
      * (2026-09-06)。 */
-    if (x_raw > 65535) x_raw = 65535;
-    if (y_raw > 65535) y_raw = 65535;
+    if (x_raw > (int)U16_MAX) x_raw = U16_MAX;
+    if (y_raw > (int)U16_MAX) y_raw = U16_MAX;
     *abs_x = (i16)(x_raw >> 1);
     *abs_y = (i16)(y_raw >> 1);
 

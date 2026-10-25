@@ -104,14 +104,14 @@ int dma_port_bank(unsigned int ch, u16 *port)
 
 u8 dma_mask_byte(unsigned int ch, int set)
 {
-    u8 v = (u8)(ch & 0x03);
+    u8 v = (u8)(ch & DMA8237_CHANNEL_MASK);
     if (set) v |= DMA8237_MASK_SET_BIT;
     return v;
 }
 
 u8 dma_mode_byte(unsigned int ch, int dir, int mode)
 {
-    u8 v = (u8)(DMA8237_MODE_SINGLE_SEL | (ch & 0x03));
+    u8 v = (u8)(DMA8237_MODE_SINGLE_SEL | (ch & DMA8237_CHANNEL_MASK));
 
     /* dir は 8237 の呼び方と逆向きなので取り違えやすい。
      * 装置 → メモリ は 8237 にとって **ライト転送** (メモリへ書く)。 */

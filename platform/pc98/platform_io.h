@@ -14,6 +14,8 @@
 #ifndef PLATFORM_IO_H
 #define PLATFORM_IO_H
 
+#include "pc98.h"
+
 /* ---- I/Oポート操作 (8-bit) ---- */
 static inline unsigned int inp(unsigned int port) {
     unsigned char ret;
@@ -63,7 +65,7 @@ static inline void insw_rep(unsigned int port, void *buf, unsigned int count) {
 /* ---- PC-98 I/Oウェイト (ポート0x5Fダミーアクセス, 約0.6µs) ---- */
 /* PC9800Bible §4-4 準拠。                                          */
 static inline void io_wait(void) {
-    outp(0x5F, 0);
+    outp(PC98_IO_WAIT_PORT, 0);
 }
 
 /* n 回ウェイト (約 0.6µs × n)。 */

@@ -11,6 +11,7 @@
 #define __KCG_H
 
 #include "types.h"
+#include "pc98.h"
 
 /* ======== I/Oポート ======== */
 #define KCG_CODE_LO   0xA1    /* 文字コード第2バイト (JIS下位) */
@@ -19,7 +20,7 @@
 #define KCG_DATA      0xA9    /* パターンデータ読出し/書込み */
 
 /* ======== CGウィンドウ ======== */
-#define CG_WINDOW     0xA4000UL   /* CGウィンドウ先頭アドレス */
+#define CG_WINDOW     TVRAM_CG_WINDOW   /* CGウィンドウ先頭アドレス */
 
 /* ======== フォントサイズ ======== */
 #define KCG_ANK_W     8       /* ANK文字幅 */

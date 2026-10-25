@@ -13,6 +13,9 @@
 
 #include "pcm_cs4231.h"
 
+#define PCM_WATCHDOG_HALVES 2U
+#define PCM_DRAIN_EXTRA_HALVES 3U
+
 /* ======================================================================== */
 /*  レート                                                                  */
 /* ======================================================================== */
@@ -37,7 +40,7 @@ u32 pcm_half_ms(u32 rate)
 u32 pcm_watchdog_us(u32 rate)
 {
     if (rate == 0) return 0;
-    return (PCM_HALF_FRAMES * 2U * PCM_US_PER_SEC) / rate;
+    return (PCM_HALF_FRAMES * PCM_WATCHDOG_HALVES * PCM_US_PER_SEC) / rate;
 }
 
 /* ======================================================================== */
@@ -54,7 +57,7 @@ u32 pcm_close_ticks(u32 staged_frames, u32 rate)
 
     if (rate == 0) return PCM_STOP_TICKS;
     halves = (staged_frames + PCM_HALF_FRAMES - 1U) / PCM_HALF_FRAMES;
-    num = (halves + 3U) * PCM_HALF_FRAMES * PCM_MS_PER_SEC;
+    num = (halves + PCM_DRAIN_EXTRA_HALVES) * PCM_HALF_FRAMES * PCM_MS_PER_SEC;
     den = rate * PCM_MS_PER_TICK;
     return ((num + den - 1U) / den) + PCM_STOP_TICKS;
 }

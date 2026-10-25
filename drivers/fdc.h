@@ -14,6 +14,18 @@
 #include "types.h"       /* u8, u16, u32 型定義 */
 #include "fdc_decide.h"  /* ST0 のビット定義と純粋な判定 (ホストで試験する) */
 
+#define FDC_HEAD_SHIFT 2
+#define FDC_RESULT_ST2 2
+#define FDC_RESULT_BYTES 7
+#define FDC_SEEK_ERR_PENDING (-2)
+#define FDC_SEEK_ERR_RETRY (-3)
+#define FDC_SEEK_ERR_IO (-4)
+#define FDC_MULTI_ERR_RANGE (-2)
+#define FDC_MULTI_ERR_NOT_READY (-3)
+#define FDC_MOTOR_SPINUP_TICKS 30
+#define FDC_RECAL_RESET_SETTLE_TICKS 10
+#define FDC_DRIVE_COUNT 2
+
 /* ======================================================================== */
 /*  µPD765A FDC I/Oポート (PC-98 1MB FDD)                                  */
 /* ======================================================================== */
