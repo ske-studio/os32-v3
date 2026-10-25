@@ -15,6 +15,7 @@
 #include "sqlite3.h"
 #include "os32_sqlite_outer.h"
 #include "kstring.h"
+#include "utf8.h"
 #include "kprintf.h"
 #include "os32_sqlite_vfs.h"
 #include "memmap.h"
@@ -133,7 +134,7 @@ static const char *db_shm_diag(const char *msg)
 
     /* 切る。印の分を空けてから、継続バイトの上で止まらないよう戻す。 */
     len = cap - mark;
-    while (len > 0u && ((u8)msg[len] & 0xC0u) == 0x80u) len--;
+    while (len > 0u && UTF8_IS_CONT((u8)msg[len])) len--;
     kmemcpy(dst, msg, len);
     kmemcpy(dst + len, DB_SHM_DIAG_ELLIPSIS, mark);
     dst[len + mark] = '\0';
@@ -323,7 +324,7 @@ static int shm_row_check(sqlite3 *db, sqlite3_stmt *stmt, int ncol)
         switch (sqlite3_column_type(stmt, i)) {
         case SQLITE_INTEGER:
         case SQLITE_FLOAT:
-            add = 4u;
+            add = sizeof(i32);
             break;
         case SQLITE_TEXT:
         case SQLITE_BLOB:
@@ -415,10 +416,10 @@ static int shm_write_row(DbSlot *slot)
         case SQLITE_INTEGER: {
             i32 val = (i32)sqlite3_column_int(slot->active_stmt, i);
             cols[i].type = DB_TYPE_INT;
-            cols[i].length = 4;
-            if (remaining >= 4) {
+            cols[i].length = sizeof(i32);
+            if (remaining >= (i32)sizeof(i32)) {
                 *(i32 *)(DB_SHM_PTR + data_offset) = val;
-                data_offset += 4;
+                data_offset += (i32)sizeof(i32);
             }
             break;
         }
@@ -446,10 +447,10 @@ static int shm_write_row(DbSlot *slot)
             double dval = sqlite3_column_double(slot->active_stmt, i);
             i32 ival = (i32)dval;
             cols[i].type = DB_TYPE_FLOAT;
-            cols[i].length = 4;
-            if (remaining >= 4) {
+            cols[i].length = sizeof(i32);
+            if (remaining >= (i32)sizeof(i32)) {
                 *(i32 *)(DB_SHM_PTR + data_offset) = ival;
-                data_offset += 4;
+                data_offset += (i32)sizeof(i32);
             }
             break;
         }
@@ -647,7 +648,7 @@ int __cdecl kapi_db_exec(int handle, const char *sql)
 
     rc = sqlite3_prepare_v2(slot->db, sql_copy_buf, -1, &stmt, 0);
     if (rc != SQLITE_OK || !stmt) {
-        kprintf(0x04, "[DB] prepare fail rc=%d\n", rc);
+        kprintf(KLOG_LEGACY_RED, "[DB] prepare fail rc=%d\n", rc);
         slot_note(slot, slot_ext(slot, rc != SQLITE_OK ? rc : SQLITE_MISUSE));
         shm_write_error(slot);
         return -1;

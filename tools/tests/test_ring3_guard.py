@@ -40,7 +40,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INC_DIRS = ("include", "kernel", "lib", "exec", "fs", "sdk/include/os32")
+INC_DIRS = ("include", "arch/x86", "kernel", "lib", "exec", "fs", "sdk/include/os32")
 HOST_SRC = ROOT / "tools/tests/ring3_guard_host.c"
 KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_redirect.c"]
 

@@ -3,11 +3,11 @@
  * exec's actual launch mapping block must never expose low Unicode or BB.
  * Run through test_app_bb_overlap.py, GNU11 ILP32. */
 #include "types.h"
+static u32 host_cr3;
 #include "ring3_str.h"
 #include "redir_access.h"
 static u32 test_tramp;
 u32 exec_tramp_page_addr(void) { return test_tramp; }
-static u32 host_cr3;
 /* (e): paging.c が返す物理を数える口。pgalloc.h の宣言も同じ名に変わるので、
  * paging.c の呼び出しは全部この関数へ来る (本物へ転送する)。 */
 #define pgalloc_free_n_owner host_free_hook

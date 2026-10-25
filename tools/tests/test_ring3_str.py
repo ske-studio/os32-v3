@@ -22,7 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "kernel", "lib", "exec", "sdk/include/os32")]
+            for p in ("include", "arch/x86", "kernel", "lib", "exec", "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/ring3_str_host.c"
 KERNEL_SRC = ROOT / "exec/ring3_str.c"
 

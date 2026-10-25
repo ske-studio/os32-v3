@@ -122,7 +122,7 @@ def run_owned_cases(mutate):
             "-Wno-unused-parameter", "-D__cdecl=", "-I" + str(ROOT / "tools/tests"),
             "-I" + str(tmp), "-I" + str(ROOT / "sdk/include/os32"),
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "fs"),
-            "-I" + str(ROOT / "lib/sqlite3"), "-I" + str(ROOT / "kapi"),
+            "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "lib/sqlite3"), "-I" + str(ROOT / "kapi"),
             str(ROOT / "tools/tests/kapi_db_owned_host.c"), "-o", str(exe)
         ]
         subprocess.run(command, check=True, cwd=ROOT)
