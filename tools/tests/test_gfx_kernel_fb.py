@@ -18,6 +18,11 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
                'exec/redir_access.c', 'kernel/shlib.c', 'kernel/paging.c',
                'kernel/pgalloc.c', 'kernel/sys.c', 'kernel/physmem.c']
 MUTANTS = [
+ ('mode-capacity-disabled',
+  '    if (!gfx_mode_fits(be, mode)) return 0;',
+  '    if (0) return 0;',
+  'FAIL g_backend == &gfx_backend_pc98'),
+
  ('forced-cirrus-to-pegc',
   '        gfx_select_mode(&gfx_backend_pc98, legacy200);\n        g_backend = &gfx_backend_pc98;\n        return;\n    }\n\n    for',
   '        gfx_select_mode(&gfx_backend_pegc, legacy200);\n        g_backend = &gfx_backend_pegc;\n        return;\n    }\n\n    for',
@@ -54,8 +59,8 @@ MUTANTS = [
  # Missing CLIENT emits L2 with started=0 before returning.
  ('init200-rebind', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */', '',
   'FAIL host_serial_find(" started=1 bb=")'),
- ('preinit-screen-pc98', '    if (g_backend && g_backend->query)\n        g_backend->query((GFX_ScreenInfo *)out);',
-  '    (gfx_started ? g_backend : &gfx_backend_pc98)->query((GFX_ScreenInfo *)out);',
+ ('preinit-screen-pc98', '    if (g_backend && g_backend->query && !g_backend->query(info)) {',
+  '    if (g_backend && g_backend->query && !(gfx_started ? g_backend : &gfx_backend_pc98)->query(info)) {',
   'FAIL si.format == selected_info.format && si.format == client->format'),
  ('preinit-public-pc98', '(void)gfx_client_framebuffer(&kernel, 1);',
   '(void)gfx_kernel_framebuffer(&kernel);',

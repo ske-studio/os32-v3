@@ -30,7 +30,7 @@ extern int appslot_gfx_owner(void);
 /* ======================================================================== */
 u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
-int gfx_current_height = GFX_HEIGHT;  /* 200 or 400 */
+int gfx_current_height = GFX_HEIGHT;  /* current display: 200/400/480 */
 
 u8 *bb[SURFACE_QUERY_MAX];
 
@@ -50,6 +50,8 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
+/* Boot binds PC98 before DISPLAY registration; selection validates thereafter. */
+static int gfx_mode_ready = 1;
 u32 gfx_init_gen;
 static u32 present_logged_gen;
 
@@ -122,13 +124,47 @@ static int gfx_probe_backend(const GfxBackend *backend)
     return backend->probe();
 }
 
-/* Select only registered data after probe, before any hardware setup.
- * Reservation/layout capacity checks are added at this boundary in G6b. */
+/* Compare display usage with existing reservation capacity, never resize it.
+ * PC98 CLIENT planes retain their 400-line offsets even in 200-line mode. */
+static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
+{
+    u32 plane, total, displays = 0;
+    u32 backend = be == &gfx_backend_pc98 ? LEDGER_SF_PC98 :
+                  be == &gfx_backend_pegc ? LEDGER_SF_PEGC : LEDGER_SF_CIRRUS;
+    const struct ledger_surface *client = ledger_surface_find(backend, LEDGER_ROLE_CLIENT);
+    GfxFormatDesc format;
+    if (!gfx_mode_layout(mode, &plane, &total) ||
+        !gfx_format_desc(mode->format, &format) || !client || client->closing ||
+        client->format != mode->format || client->planes != format.planes ||
+        client->npages > U32_MAX / PAGE_SIZE || total > client->npages * PAGE_SIZE)
+        return 0;
+    for (u32 i = 0; i < client->planes; i++) {
+        u32 end = i + 1 < client->planes ? client->plane_offset[i + 1] :
+                                         client->npages * PAGE_SIZE;
+        if (client->plane_offset[i] > end || plane > end - client->plane_offset[i])
+            return 0;
+    }
+    for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) {
+        const struct ledger_surface *sf = &ledger_surfaces[i];
+        if (!sf->npages || sf->backend != backend || sf->role != LEDGER_ROLE_DISPLAY)
+            continue;
+        if (sf->closing || sf->npages > U32_MAX / PAGE_SIZE ||
+            (backend == LEDGER_SF_PC98 ? plane : total) > sf->npages * PAGE_SIZE)
+            return 0;
+        displays++;
+    }
+    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);
+}
+
+/* Select only registered data after probe, before any hardware setup. */
 static int gfx_select_mode(GfxBackend *be, int legacy200)
 {
     const GfxMode *mode = gfx_mode_pick(be, legacy200);
     GfxFormatDesc format;
+    gfx_mode_ready = 0;
     if (!mode || !gfx_format_desc(mode->format, &format)) return 0;
+    if (!gfx_mode_fits(be, mode)) return 0;
+    gfx_mode_ready = 1;
     be->selected_mode = mode;
     return 1;
 }
@@ -194,7 +230,7 @@ static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
 {
     struct gfx_kernel_fb fb = {0};
     const struct ledger_surface *sf;
-    GFX_ScreenInfo si;
+    const GfxMode *mode = gfx_backend_mode(g_backend);
     u8 *base;
     u32 i;
     if (!out) return OS32_ERR_INVAL;
@@ -209,11 +245,11 @@ static int gfx_client_framebuffer(struct gfx_kernel_fb *out, int selected)
         fb.height = sf->height;
         fb.pitch = sf->pitch;
         fb.format = sf->format;
-        if (selected && g_backend->query && !g_backend->query(&si)) {
-            fb.width = si.width;
-            fb.height = si.height;
-            fb.pitch = g_backend->bb_pitch; /* query has no pitch field */
-            fb.format = si.format;
+        if (selected && mode) {
+            fb.width = mode->width;
+            fb.height = gfx_started ? gfx_current_height : mode->height;
+            fb.pitch = mode->pitch;
+            fb.format = mode->format;
         }
         base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
              ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
@@ -251,7 +287,7 @@ static void gfx_bind_client(void)
                           gfx_sf_backend() == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus : &gfx_backend_pc98;
     u8 *base = 0;
     u32 i;
-    if (sf && !sf->closing)
+    if (gfx_mode_ready && sf && !sf->closing)
         base = (sf->backing == LEDGER_SB_MMIO || sf->backing == LEDGER_SB_VRAM)
              ? (u8 *)P2V_IO(sf->first * PAGE_SIZE) : (u8 *)P2V(sf->first * PAGE_SIZE);
     for (i = 0; i < SURFACE_QUERY_MAX; i++) bb[i] = base && i < sf->planes ? base + sf->plane_offset[i] : 0;
@@ -716,11 +752,14 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
 /* ======================================================================== */
 void __cdecl gfx_screen_info(void *out)
 {
+    GFX_ScreenInfo *info = out;
     if (!out) return;
-    /* 決め打ちせずバックエンドに問い合わせる (契約 G5)。9801 だけの現状でも
-     * 400/200 ラインやフリップ有無はバックエンドが正直に申告する。 */
-    if (g_backend && g_backend->query)
-        g_backend->query((GFX_ScreenInfo *)out);
+    /* Flags and palette leases remain backend-owned. After shutdown the
+     * default row describes the next mode, not the restored CUI height. */
+    if (g_backend && g_backend->query && !g_backend->query(info)) {
+        const GfxMode *mode = gfx_backend_mode(g_backend);
+        if (mode) info->height = gfx_started ? gfx_current_height : mode->height;
+    }
 }
 
 /* ======================================================================== */

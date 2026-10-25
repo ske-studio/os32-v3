@@ -238,7 +238,8 @@ static void view_check(u32 backend, u32 height, int started)
     CHECK(!g_backend->query(&selected_info));
     /* pegcchk/hal_test query before gfx_init to decide the backend format. */
     CHECK(si.format == selected_info.format && si.format == client->format);
-    CHECK(si.width == selected_info.width && si.height == selected_info.height);
+    CHECK(si.width == selected_info.width);
+    CHECK(si.height == (started ? (u32)gfx_current_height : gfx_backend_mode(g_backend)->height));
     CHECK(fb.width == sf->width && fb.height == height);
     CHECK(fb.pitch == sf->pitch && fb.format == sf->format);
     CHECK(public_fb.width == si.width && public_fb.height == si.height && public_fb.pitch == client->pitch);
@@ -563,6 +564,9 @@ static void mode_selection_check(void)
                 gfx_shutdown();
                 CHECK(gfx_current_height == GFX_HEIGHT);
                 CHECK(g_backend->selected_mode == gfx_mode_pick(g_backend, 0));
+                GFX_ScreenInfo info;
+                gfx_screen_info(&info);
+                CHECK(info.height == (selected ? MEM_GFX_BB8_HEIGHT : GFX_HEIGHT));
             }
         }
         /* Both candidates exist: post-init/prepare failure must go straight
@@ -594,9 +598,58 @@ static void mode_selection_check(void)
             gfx_shutdown();
         }
     }
+    /* B4: replace the backend table, not a source constant. Both packed
+     * candidates must reject the oversized row before init/prepare. */
+    gfx_backend_cirrus.mode_count = mode_saved[2].mode_count;
+    gfx_backend_cirrus.default_mode = mode_saved[2].default_mode;
+    for (int index = 1; index <= 2; index++) {
+        GfxBackend *be = index == 1 ? &gfx_backend_pegc : &gfx_backend_cirrus;
+        GfxMode oversized = mode_saved[index].modes[0];
+        oversized.height++;
+        be->modes = &oversized;
+        for (int op = 0; op < 3; op++) {
+            host_cirrus_available = host_pegc_available = 1;
+            gfx_set_backend_pref(index == 1 ? GFX_PREF_PEGC : GFX_PREF_CIRRUS);
+            mode_operation(op);
+            CHECK(g_backend == &gfx_backend_pc98); /* capacity fallback */
+            mode_trace_check(index == 1 ? "p" : "c");
+            gfx_shutdown();
+        }
+        be->modes = mode_saved[index].modes;
+    }
+    /* Each reserved side independently limits an otherwise valid mode. */
+    for (int role = LEDGER_ROLE_CLIENT; role <= LEDGER_ROLE_DISPLAY; role++) {
+        struct ledger_surface *sf = ledger_surface_find(LEDGER_SF_PEGC, role);
+        u32 pages = sf->npages;
+        sf->npages--;
+        host_pegc_available = 1;
+        gfx_set_backend_pref(GFX_PREF_PEGC);
+        mode_operation(0);
+        CHECK(g_backend == &gfx_backend_pc98); /* capacity fallback */
+        mode_trace_check("p");
+        gfx_shutdown();
+        sf->npages = pages;
+    }
     gfx_backend_cirrus.modes = mode_saved[2].modes;
     gfx_backend_cirrus.mode_count = mode_saved[2].mode_count;
     gfx_backend_cirrus.default_mode = mode_saved[2].default_mode;
+    /* 401 lines fit the page-rounded CLIENT total, but overlap the fixed
+     * 32,000-byte plane slots. No PC98 hardware initialization is allowed. */
+    {
+        GfxMode rows[2] = {mode_saved[0].modes[0], mode_saved[0].modes[1]};
+        rows[0].height++;
+        gfx_backend_pc98.modes = rows;
+        gfx_set_backend_pref(GFX_PREF_PC98);
+        gfx_init();
+        CHECK(!bb[0] && !gfx_backend_pc98.bb_base);
+        struct surface_query_source source;
+        CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT, &source) == OS32_ERR_INVAL);
+        CHECK(!gfx_surface_unready);
+        gfx_backend_pc98.modes = mode_saved[0].modes;
+        gfx_init();
+        CHECK(bb[0] && gfx_current_height == GFX_HEIGHT);
+        gfx_shutdown();
+    }
     gfx_backend_pc98.probe = mode_saved[0].probe;
     gfx_backend_pegc.probe = mode_saved[1].probe;
     gfx_backend_pegc.init = mode_saved[1].init;
@@ -680,6 +733,23 @@ static void run(void)
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT : MEM_GFX_BB8_HEIGHT,1);
         bridge_check(1);
         display_check(selected);
+        {
+            GfxBackend *be = selected == LEDGER_SF_PC98 ? &gfx_backend_pc98 :
+                             selected == LEDGER_SF_PEGC ? &gfx_backend_pegc : &gfx_backend_cirrus;
+            const GfxMode *saved = be->selected_mode;
+            GfxMode row = *saved;
+            row.width /= 2;
+            row.pitch /= 2;
+            row.height /= 2; /* active height must still come from current_height */
+            be->selected_mode = &row;
+            CHECK(!gfx_kernel_framebuffer(&fb));
+            CHECK(fb.width == row.width && fb.pitch == row.pitch);
+            CHECK(fb.height == (u32)gfx_current_height);
+            GFX_ScreenInfo info;
+            gfx_screen_info(&info);
+            CHECK(info.width == row.width && info.height == fb.height);
+            be->selected_mode = saved;
+        }
         /* Poison aliases: init_200 must rebind, even on the same backend. */
         bb[0]=bb_b=0;
         host_serial_reset();
@@ -765,7 +835,7 @@ static void run(void)
         if (mode) CHECK(gen == failed_gen + 1);
         failed_gen=gen;
         CHECK(host_serial_find(" started=0 bb=00000000 "));
-        CHECK(host_serial_value(" h=") == (mode ? GFX_HEIGHT_200 : GFX_HEIGHT));
+        CHECK(host_serial_value(" h=") == GFX_HEIGHT); /* rejected selection keeps prior row */
     }
     CHECK(!bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base);
     CHECK(gfx_kernel_framebuffer(&fb) == OS32_ERR_INVAL && !fb.planes[0]);

@@ -12,7 +12,7 @@
 #include "../exec/surface_limits.h"
 #include "types.h"  /* u8, u16, u32 */
 
-/* ======== 画面定数 ======== */
+/* ======== 標準 planar の収納定数 (現在の表示寸法は mode から得る) ======== */
 #define GFX_WIDTH    640
 #define GFX_HEIGHT   400
 #define GFX_BPL      80     /* bytes per line (640/8) */
@@ -49,8 +49,8 @@ int gfx_kernel_framebuffer(struct gfx_kernel_fb *out);
 struct surface_query_source;
 int gfx_surface_source(u32 role, struct surface_query_source *out);
 int gfx_selected_selfcheck(void);
-void gfx_init(void);       /* 640x400x16初期化 + バックバッファ確保 */
-void gfx_init_200(void);   /* 640x200x16初期化 (縦はHWが2倍表示) */
+void gfx_init(void);       /* 選択モードで開始 (planar 400 / packed 480)、起動予約を使う */
+void gfx_init_200(void);   /* planar は200 (HW縦2倍)、packed は通常の480 */
 /* KAPI スロット gfx_init / gfx_init_200 の実体 (票 T8 D1 / D1a)。
  * 画面の所有者を確かめてから本体を呼ぶ「門」で、sdk/kapi.json の
  * "target" がここを指す。GUI 中に宣言 (OS32X_FLAG_GFX) の無い CPL=3 が
@@ -62,7 +62,7 @@ void gfx_kapi_init_200(void);
 /* 画面の所有者 (KAPI v48)。1 = シェル帯 (WM) / 2〜5 = アプリ。誰でも呼べる。 */
 i32  gfx_screen_owner(void);
 void gfx_shutdown(void);   /* テキスト復帰 */
-int  gfx_get_height(void); /* 現在のGFX高さ (200 or 400) を返す */
+int  gfx_get_height(void); /* 現在のGFX高さ (200/400/480)、終了後は400 */
 
 /* ======== ハードウェアスクロール ======== */
 void gfx_hardware_scroll(int lines);

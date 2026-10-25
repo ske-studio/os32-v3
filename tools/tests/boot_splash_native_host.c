@@ -126,7 +126,7 @@ int appslot_gfx_owner(void) { return 1; }   /* APP_ID_SHELL = GFX_OWNER_WM */
 void shell_print(const char *str, u8 color) { (void)str; (void)color; }
 /* 起動時の ⑥ / ⑨ (gfx_boot_reserve / gfx_client_to_gshell、TASK_T1_LEDGER
  * §3-8) が引く台帳と写像。このハーネスは ⑥ を走らせない (試験は
- * tools/tests/test_gfx_boot.py)。描画用 CLIENT だけ実型板から返す。 */
+ * tools/tests/test_gfx_boot.py)。CLIENT / DISPLAY の容量は実型板から用意する。 */
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
 struct ledger_resource ledger_resources[LEDGER_MAX_RESOURCES];
 int ledger_surface_validate(const struct ledger_surface *sf) { return sf != 0; }
@@ -134,10 +134,12 @@ u32 gfx_surface_unready; /* production definition lives in pgalloc */
 struct ledger_surface *ledger_surface_find(u32 b, u32 r)
 {
     static struct ledger_surface client;
-    if (b != LEDGER_SF_PC98 || r != LEDGER_ROLE_CLIENT) return 0;
-    client = gfx_sf[0];
-    client.first = MEM_POOL_BASE / PAGE_SIZE; /* simulated boot pool CLIENT */
-    if (native_state_fault && starts) client.planes = 2;
+    if (r != LEDGER_ROLE_CLIENT) return 0;
+    client = gfx_sf[b == LEDGER_SF_PC98 ? GFX_SF_PC98 :
+                    b == LEDGER_SF_PEGC ? GFX_SF_PEGC : GFX_SF_CIRRUS_CLIENT];
+    /* Optional init callbacks do not draw; all simulated CLIENTs use this pool. */
+    client.first = MEM_POOL_BASE / PAGE_SIZE;
+    if (b == LEDGER_SF_PC98 && native_state_fault && starts) client.planes = 2;
     return &client;
 }
 u32 paging_current_cr3(void) { return 0; }
@@ -194,7 +196,14 @@ int main(int argc, char **argv)
     CHECK(argc == 2 || argc == 3, "preference argument");
     pref = atoi(argv[1]);
     expected_pref = pref;
-    map_region(MEM_POOL_BASE, MEM_GFX_BB_SIZE);
+    map_region(MEM_POOL_BASE, MEM_GFX_BB8_SIZE);
+    /* G6b validates DISPLAY capacity before hardware setup, including splash. */
+    for (u32 i = 0; i < GVRAM_PLANES; i++) {
+        ledger_surfaces[i] = gfx_planar_display;
+        ledger_surfaces[i].first = gfx_display_planes[i] / PAGE_SIZE;
+    }
+    ledger_surfaces[GVRAM_PLANES] = gfx_pegc_display;
+    ledger_surfaces[GVRAM_PLANES + 1] = gfx_sf[GFX_SF_CIRRUS_DISPLAY];
     map_region(TVRAM_BASE, VRAM_PLANE_B - TVRAM_BASE);
     map_region(VRAM_PLANE_B, 0x18000);
     map_region(VRAM_PLANE_I, 0x8000);
