@@ -280,3 +280,8 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
 - 補助配列と式関数は recover_gf.c に残し、生成 include は 3 表と件数だけを持つ；範囲の結合には kinds の参照名も一致させ、ポインタの参照先と順序を保存する。
 - 範囲は書込み前に私有の検査関数で ordinal・端点・容量・展開総数を検査し、inclusive 長は差分で比較する；最後の substep を書いた直後に終了して u32 末尾の加算折返しを避ける。
 - host は固定 oracle との全欄比較に加え、私有の範囲検査へ先頭ずれ・範囲間ずれ・逆転・総数不足・容量超過・u32 末尾を入力し、生成器の u8/u16 上限と NONE 衝突も検査する；i386 のサイズ・整列は製品内 STATIC_ASSERT で検査する。
+
+## S2e の実装で設計者が決めたこと
+
+- decode の target-specific KERNEL_CFLAGS は private とし、末尾の -Os が共有の契約生成などの前提ターゲットへ継承されないようにする；通常版と R1 は従来どおり同じ gfinit_decode.o を使う。
+- 総量比較は S2 前の 81d7f253 の gfinit.c・recover_gf.c と -O2 の decode を同じ GCC・ABI・unit stamp で再コンパイルし、残りの入力・kernel/core の対を最終ビルドと揃えて再リンクする；コミット識別の差はサイズ比較に混ぜず、FD は同じ搭載ファイル集合と両形式の空き cluster 数で比較する。
