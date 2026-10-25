@@ -1,6 +1,7 @@
 check-trim-back-rs-host:
 - tools/tests/font_guard_inactive.h
 - arch/x86/arch_cpu.h
+- arch/x86/x86_flags.h
 - arch/x86/arch_io.h
 - build/checks.d/check-trim-back-rs-host.mk
 - build/checks.d/check-trim-kernel-host.mk

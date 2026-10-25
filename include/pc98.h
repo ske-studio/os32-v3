@@ -22,10 +22,33 @@
 /*  PIC (8259相当) — PC9800Bible §1-4, §4-3 #1/#2                         */
 /* ====================================================================== */
 /*  マスタ: IRQ0-7, スレーブ: IRQ8-15 (カスケード IRQ7)                     */
-/*  ポート定数は kernel/idt.h (PIC1_CMD, PIC1_DATA, PIC2_xxx, OCW2_EOI)     */
-/*  が正。                                                                  */
-/*  かつてはここに別名の重複定義があり 3 か所 (idt.h/pc98.h/isr_stub.asm)   */
-/*  で食い違うリスクがあった。C 側は idt.h を使うこと。                     */
+/* ポート値の正典。kernel/idt.h の同名の写しの除去は N2 で行う。 */
+#define PIC1_CMD   0x00
+#define PIC1_DATA  0x02
+#define PIC2_CMD   0x08
+#define PIC2_DATA  0x0A
+
+
+/* 8259 の線数と制御欄。 */
+#define PIC_IRQS             8
+#define PIC_IRQ_MASK         (PIC_IRQS - 1)
+#define PIC_SLAVE_LAST_IRQ   (2 * PIC_IRQS - 1)
+#define PIC_LAST_ISR_BIT     (1U << PIC_IRQ_MASK)
+#define PIC_ICW1_INIT        0x10
+#define PIC_ICW1_ICW4        0x01
+#define PIC_ICW1_SINGLE      0x02
+#define PIC_OCW3_SELECT      0x08
+#define PIC_OCW3_READ_REG    0x02
+#define PIC_OCW3_READ_ISR    0x01
+#define PIC_VECTOR_MASK      0xF8
+
+#define PC98_IRQ_SERIAL      4
+#define PC98_IRQ_IDE         9
+#define PC98_IRQ_MOUSE       13
+#define PC98_IO_OPEN_BUS8    0xFF
+
+/* RTC 書込みポート (drivers/rtc.h の同名の写しの除去は N8)。 */
+#define RTC_SET    0x20
 
 
 /* ====================================================================== */
@@ -86,6 +109,8 @@
 /* ====================================================================== */
 #define CPU_RESET_PORT      0xF0    /* CPUリセット (ライトでリセット) */
 #define CPU_A20_PORT        0xF2    /* A20ゲート制御 */
+
+#define CPU_A20_ENABLE      0x03    /* A20 ゲート有効化の書込み値 */
 
 /* x86 制御レジスタのビット (CR0_PE / CR0_PG) は CPU の持ち物なので
  * arch/x86/arch_cpu.h へ移した (移植準備 順序 5)。 */
@@ -183,6 +208,14 @@
 #define GDC_TEXT_CSR_TOP     14     /* カーソル上端ラスタ (2 ライン下線) */
 #define GDC_TEXT_CSR_BOTTOM  15     /* カーソル下端ラスタ */
 #define GDC_TEXT_CSR_BR_HI   0x03   /* 点滅周期 上位 3bit (BIOS 既定値と同じ) */
+#define GDC_TEXT_CSR_BOTTOM_SHIFT 3
+#define GDC_PRAM_BYTES      8
+/* SCROLL PRAM: 2 partitions, four bytes each. */
+#define GDC_SCROLL_PART_BYTES 4
+#define GDC_SCROLL_PARTS      2
+#define GDC_SCROLL_LINES_LO_MASK 0x0F
+#define GDC_SCROLL_LINES_HI_MASK 0x3F
+#define GDC_SCROLL_LINES_SHIFT   4
 #define GDC_CMD_WRITE        0x20   /* メモリ書込み準備 */
 #define GDC_CMD_READ         0xA0   /* メモリ読出し指示 */
 
@@ -266,6 +299,13 @@
 #define GDC_GFX_400LINE      0x4B   /* CSRFORM: L/R で 400/200 ラインを選ぶ */
 
 
+/* 16 色パレットの実 I/O ポート (gfx/gfx.h の同名定義も同値)。 */
+#define PAL_IDX_PORT  0xA8
+#define PAL_G_PORT    0xAA
+#define PAL_R_PORT    0xAC
+#define PAL_B_PORT    0xAE
+
+
 /* ====================================================================== */
 /*  テキストVRAM — PC9800Bible §2-6-1, §4-2                               */
 /* ====================================================================== */
@@ -279,8 +319,12 @@
 #define TVRAM_ROWS           25      /* 縦行数 (標準) */
 #define TVRAM_ROWS_30        30      /* 縦行数 (30行モード) */
 #define TVRAM_CELL_BYTES 2
+#define TVRAM_SPACE 0x0020
+#define TVRAM_JIS_REPLACEMENT 0x2222
+#define TVRAM_WIDE_COLS 2
 #define TVRAM_JIS_HI_BIAS 0x20
 #define TVRAM_KANJI_RIGHT 0x80
+#define GVRAM_PIXELS_PER_BYTE_SHIFT 3
 #define GVRAM_PLANES 4 /* B/R/G/I */
 #define TVRAM_BPR            (TVRAM_COLS * TVRAM_CELL_BYTES)     /* Bytes Per Row (80桁×2バイト) */
 
@@ -338,6 +382,40 @@
 #define BOOT_DRIVE_HDD_IDE    0xA0    /* IDE HDD */
 
 
+/* INT 1Bh commands and DA/UA fields; NASM aliases are maintained in N12. */
+#define BIOS_INT_DISK              0x1B
+#define BIOS_DISK_READ             0x06
+#define BIOS_DISK_SEEK_RETRY_READ  0x76
+#define BIOS_DISK_SENSE            0x84
+#define BIOS_DA_TYPE_MASK          0xF0
+#define BIOS_DA_UNIT_MASK          0x03
+#define BIOS_DA_FD_144_ALT         0xB0 /* 0x30 uses BOOT_DRIVE_FDD_144 */
+#define BIOS_DISK_CMD_MASK         0x0F
+#define BIOS_DISK_CMD_SEEK         0x10
+#define BIOS_DISK_CMD_CHS          0x80 /* AL bit7, HDD address mode */
+#define BIOS_DISK_CMD_2HD          0x80 /* AL bit7, FDD density */
+#define BIOS_DISK_SENSE_AX_MASK    0x8F40
+#define BIOS_DISK_SENSE_AX_DUAL    0x8400
+#define BIOS_DISK_STATUS_DUAL      0x08
+#define BIOS_DISK_STATUS_WRITE_PROTECT 0x10
+#define BIOS_DISK_STATUS_UNSUPPORTED   0x86
+#define BIOS_DISK_STATUS_ERROR_MIN     0x20
+#define BIOS_SECTOR_BASE_BYTES     128
+#define BIOS_SECTOR_N_MASK         0x03
+#define BIOS_MEM_UNIT_KIB          128
+#define BIOS_MEM_CODE_MASK         0x07
+#define BIOS_DISK_SASI_BIT0        0x0100
+/* Bits retained when clearing SASI equipment (bits 8..11). */
+#define BIOS_DISK_SASI_MASK        0xF0FF
+#define BIOS_SYS_IDE_PRESENT       0x80
+#define BIOS_WORK_BOOT_DAUA        0x00000584UL
+#define BIOS_WORK_DISK_EQUIP       0x0000055CUL
+#define BIOS_WORK_SCSI_EQUIP       0x00000482UL
+#define BIOS_WORK_SYS_TYPE         0x00000480UL
+#define BIOS_WORK_F144             0x000005AEUL
+/* Extended memory work uses existing BIOS_WORK_MEM_128KB/MEM_HIGH_MB. */
+
+
 /* ====================================================================== */
 /*  BIOS ROM — PC9800Bible §4-2                                           */
 /* ====================================================================== */
@@ -386,6 +464,7 @@
 #define MOUSE_DIPSW          0x7FDBUL  /* ポートB: クロック/DIPSW */
 #define MOUSE_CTRL           0x7FDDUL  /* ポートC: 制御 */
 #define MOUSE_MODE           0x7FDFUL  /* 8255モード/PortC個別 */
+#define MOUSE_8255_MODE_INPUT 0x93 /* A/B 入力、C 出力 */
 #define MOUSE_INTERVAL       0xBFDBUL  /* 割り込み間隔設定 */
 
 /* マウスデータ ビット (7FD9Hリード) — UNDOCUMENTED io_mouse.md 準拠       */

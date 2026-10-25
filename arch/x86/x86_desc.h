@@ -15,6 +15,7 @@
 #define X86_DESC_H
 
 #include "types.h"
+#include "gdt.h"
 
 /* GDT をロードし、CS を far jump で、DS/ES/FS/GS/SS を再ロードする。
  * `ptr` は limit(16) + base(32) の 6 バイトの GDT ポインタ。
@@ -24,15 +25,16 @@ static inline void x86_load_gdt(u32 ptr)
 {
     __asm__ volatile (
         "lgdt (%0)\n\t"
-        "ljmp $0x08, $1f\n\t"
+        "ljmp %[kcs], $1f\n\t"
         "1:\n\t"
-        "mov $0x10, %%ax\n\t"
+        "mov %[kds], %%ax\n\t"
         "mov %%ax, %%ds\n\t"
         "mov %%ax, %%es\n\t"
         "mov %%ax, %%fs\n\t"
         "mov %%ax, %%gs\n\t"
         "mov %%ax, %%ss\n\t"
-        : : "r"(ptr) : "memory", "eax"
+        : : "r"(ptr), [kcs] "i"(GDT_KERNEL_CS),
+            [kds] "i"(GDT_KERNEL_DS) : "memory", "eax"
     );
 }
 

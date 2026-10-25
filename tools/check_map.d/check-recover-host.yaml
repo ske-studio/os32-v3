@@ -18,6 +18,7 @@ check-recover-host:
 - kernel/pit_math.h
 - platform/pc98/platform_io.h
 - arch/x86/arch_io.h
+- arch/x86/x86_flags.h
 - include/pc98.h
 - kernel/paging.h
 - include/io.h

@@ -26,9 +26,11 @@
 #ifndef CPU_H
 #define CPU_H
 
-#define EFLAGS_IF 0x000200
-#define EFLAGS_VM 0x020000
-#define EFLAGS_RESERVED1 0x000002
+/* CPU flag bits are also used by io.h without the MMU/TSS implementation. */
+#include "../arch/x86/x86_flags.h"
+/* i386 cdecl argument word size/alignment; stack alignment is separate. */
+#define ABI_WORD_BYTES 4
+#define ABI_WORD_ALIGN ABI_WORD_BYTES
 #define ABI_STACK_ALIGN 16
 
 #ifndef __ASSEMBLER__

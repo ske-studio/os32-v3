@@ -16,7 +16,52 @@
 #include "os32_kapi_shared.h"
 #endif
 
-#define UTF8_IS_CONT(b) (((b) & 0xC0) == 0x80)
+/* UTF-8 wire bytes. LEADn_MASK/TAG recognize prefixes; MIN/MAX are strict. */
+#define UTF8_ASCII_LIMIT       0x80
+#define UTF8_CONT_MASK         0xC0
+#define UTF8_CONT_TAG          0x80
+#define UTF8_CONT_PAYLOAD_MASK 0x3F
+#define UTF8_CONT_PAYLOAD_BITS 6
+#define UTF8_LEAD2_MASK        0xE0
+#define UTF8_LEAD2_TAG         0xC0
+#define UTF8_LEAD2_MIN         0xC2
+#define UTF8_LEAD2_MAX         0xDF
+#define UTF8_LEAD2_PAYLOAD_MASK 0x1F
+#define UTF8_LEAD3_MASK        0xF0
+#define UTF8_LEAD3_TAG         0xE0
+#define UTF8_LEAD3_MIN         UTF8_LEAD3_TAG
+#define UTF8_LEAD3_MAX         0xEF
+#define UTF8_LEAD3_PAYLOAD_MASK 0x0F
+#define UTF8_LEAD4_MASK        0xF8
+#define UTF8_LEAD4_TAG         0xF0
+#define UTF8_LEAD4_MIN         UTF8_LEAD4_TAG
+#define UTF8_LEAD4_MAX         0xF4
+#define UTF8_LEAD4_PAYLOAD_MASK 0x07
+#define UTF8_LEN2              2
+#define UTF8_LEN3              3
+#define UTF8_LEN4              4
+#define UTF8_MAX_BYTES         UTF8_LEN4
+#define UTF8_PACKED2_MASK      0x0000FFFF
+#define UTF8_PACKED3_MASK      0x00FFFFFF
+/* Strict BMP validation: E0 needs a second byte >= A0; ED needs < A0. */
+#define UTF8_LEAD3_SURROGATE   0xED
+#define UTF8_SECOND3_MIN       0xA0
+#define UTF8_IS_CONT(b) (((b) & UTF8_CONT_MASK) == UTF8_CONT_TAG)
+
+/* Unicode codepoint ranges (distinct from encoded byte values). */
+#define UCS_BOM                      0xFEFF
+#define UCS_C0_END                   0x20
+#define UCS_REPLACEMENT_CHAR         0xFFFD
+#define UCS_UTF8_3_MIN               0x800
+#define UCS_SURROGATE_FIRST          0xD800
+#define UCS_SURROGATE_LAST           0xDFFF
+#define UCS_ASCII_PRINT_FIRST        UCS_C0_END
+#define UCS_ASCII_PRINT_LAST         0x7E
+#define UCS_FULLWIDTH_ASCII_FIRST    0xFF01
+#define UCS_FULLWIDTH_ASCII_LAST     0xFF5E
+#define UCS_HALFWIDTH_KANA_FIRST     0xFF61
+#define UCS_HALFWIDTH_KANA_LAST      0xFF9F
+#define JIS_KANA_FIRST               0xA1
 #define JIS_CODE_MIN 0x21
 #define JIS_CODE_MAX 0x7E
 #define UCS_HIRAGANA_FIRST 0x3041

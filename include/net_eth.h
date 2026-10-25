@@ -5,6 +5,7 @@
 #define ETH_HLEN       14
 #define ETH_ZLEN       60
 #define ETH_FRAME_MAX  1518 /* Includes the four-byte FCS. */
+#define ETH_FCS_LEN    4
 #define ETH_TYPE_OFF   12
 #define OS32_ETHERTYPE 0x88B5
 #endif

@@ -32,10 +32,13 @@
 
 #include "types.h"
 
+/* kapi_sys_get_build_info の日時表示用容量 (NUL 込み)。コミット ID とは別。 */
+#define BOOT_BUILD_TEXT_MAX 32
+
 /* ---- 識別 ---------------------------------------------------------------- */
 #define BOOTINFO_MAGIC        0x49544F42UL  /* 'B','O','T','I' (LE) */
 #define BOOTINFO_VERSION      2U            /* v2 = イメージ欄 (0x30〜0x3F) を足した */
-#define BOOTINFO_CHECK        ((~(BOOTINFO_MAGIC ^ (u32)BOOTINFO_VERSION)) & 0xFFFFFFFFUL)
+#define BOOTINFO_CHECK        ((~(BOOTINFO_MAGIC ^ (u32)BOOTINFO_VERSION)) & U32_MAX)
 #define BOOTINFO_NDRIVES      2U            /* DA 80h / 81h */
 
 /* 取得元 (どのローダが書いたか) */
@@ -158,7 +161,7 @@ struct bootinfo {
 
 /* イメージ欄のチェック語 (ローダと同じ計算)。 */
 #define BOOTINFO_IMG_CHECK_OF(crc, size) \
-    ((u32)(((u32)(crc) ^ (u32)(size) ^ (u32)BOOTINFO_IMG_KEY) & 0xFFFFFFFFUL))
+    ((u32)(((u32)(crc) ^ (u32)(size) ^ (u32)BOOTINFO_IMG_KEY) & U32_MAX))
 
 /* バイト列 raw[0..len) を検証して out を埋める。戻り値 BOOTINFO_OK / ERR_*。
  * 失敗しても out->status と out->magic は埋める (全ドライブ valid = 0)。 */
