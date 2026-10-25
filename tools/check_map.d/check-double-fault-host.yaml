@@ -11,6 +11,7 @@ check-double-fault-host:
 - kernel/ring3_entry.asm
 - kernel/kernel.c
 - arch/x86/arch_cpu.h
+- arch/x86/x86_flags.h
 - tools/tests/test_double_fault.py
 - tools/tests/double_fault_host.c
 - tools/tests/host32.py

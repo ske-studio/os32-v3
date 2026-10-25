@@ -12,6 +12,8 @@
 #ifndef ARCH_IO_H
 #define ARCH_IO_H
 
+#include "x86_flags.h"
+
 /* ---- 割り込み制御 ---- */
 static inline void _enable(void) {
     __asm__ volatile("sti" : : : "memory");
@@ -35,11 +37,10 @@ static inline void irq_restore(unsigned int flags) {
 /* EFLAGS の IF (bit 9) を**読むだけ**。cli も sti もしない。
  * irq_save() と違って状態を変えないので、「いま hlt してよいか」の
  * 判定に使える (IF=0 の hlt は二度と起きない)。 */
-#define X86_EFLAGS_IF  0x00000200U
 static inline int _irq_enabled(void) {
     unsigned int flags;
     __asm__ volatile("pushfl\n\tpopl %0" : "=r"(flags) : : "memory");
-    return (flags & X86_EFLAGS_IF) ? 1 : 0;
+    return (flags & EFLAGS_IF) ? 1 : 0;
 }
 
 /* ---- 特権命令 ---- */

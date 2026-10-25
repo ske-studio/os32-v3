@@ -10,6 +10,16 @@
 
 #include "types.h"
 
+/* ASCII byte codes and integer text widths (excluding prefixes). */
+#define ASCII_BS          0x08
+#define ASCII_ESC         0x1B
+#define ASCII_PRINT_FIRST 0x20
+#define ASCII_PRINT_LAST  0x7E
+#define U32_DEC_DIGITS    10
+#define U32_DEC_BUFSIZE   (U32_DEC_DIGITS + 1)
+#define HEX_NIBBLE_BITS   4
+#define HEX32_DIGITS      (BITS_PER_U32 / HEX_NIBBLE_BITS)
+
 /* ======== メモリ操作 ======== */
 /* 注意: kmemcpy はオーバーラップ時の動作を保証しない (rep movsd 実装)。
  * 重なる可能性がある範囲のコピーは memmove を使うこと。 */

@@ -776,6 +776,13 @@ typedef void (*DirCallback)(const DirEntry_Ext *entry, void *ctx);
 /* 通常ログの属性 (kprintf の入口で PC-98 属性へ変換) */
 #define KLOG_ATTR 0x07
 
+/* kprintf 入口で変換する PC/AT (CGA) 形式の色。PC-98 属性とは別。 */
+#define KLOG_LEGACY_GREEN  0x0A
+#define KLOG_LEGACY_CYAN   0x0B
+#define KLOG_LEGACY_LIGHT_RED 0x0C
+#define KLOG_LEGACY_YELLOW 0x0E
+#define KLOG_LEGACY_RED    0x04
+
 /* コンソール属性色 */
 #define ATTR_WHITE   0xE1
 #define ATTR_CYAN    0xA1
@@ -799,6 +806,11 @@ typedef u32 os_time_t;
 #define OS_S_IFCHR  0x2000 /* キャラクタデバイス */
 #define OS_S_IFDIR  0x4000 /* ディレクトリ */
 #define OS_S_IFREG  0x8000 /* 通常ファイル */
+
+/* 作成・擬似 stat の既定 permission。ファイル種別とは別に合成する。 */
+#define OS32_DEFAULT_DIR_PERM      0755
+#define OS32_DEFAULT_FILE_PERM     0644
+#define OS32_DEFAULT_READONLY_PERM 0444
 
 /* パーミッションフラグ */
 #define OS_S_IRUSR  00400  /* User (システムではエンドユーザー) Read */
@@ -834,6 +846,7 @@ typedef struct {
 /* ======================================================================== */
 
 /* オープンモード API定数 */
+#define KAPI_O_ACCMODE   0x03 /* RDONLY / WRONLY / RDWR の選択欄 */
 #define KAPI_O_RDONLY    0x00
 #define KAPI_O_WRONLY    0x01
 #define KAPI_O_RDWR      0x02
@@ -847,6 +860,10 @@ typedef struct {
  * OS32_ERR_NOSYS を返す (呼び手は黙って通常の作成へ落ちないこと)。
  * ホスト側が同時に書ける FS (HostDrv) では排他性は成り立たない。 */
 #define KAPI_O_EXCL      0x0400
+
+#ifndef O_ACCMODE
+#define O_ACCMODE   KAPI_O_ACCMODE
+#endif
 
 #ifndef O_RDONLY
 #define O_RDONLY    KAPI_O_RDONLY

@@ -37,6 +37,7 @@ check-mem-stat-host:
 - kernel/gdt.h
 - kernel/tss.h
 - arch/x86/arch_cpu.h
+- arch/x86/x86_flags.h
 - arch/x86/arch_io.h
 - lib/kstring.h
 - tools/tests/appmem_map_host.c

@@ -82,6 +82,17 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
  * (V86 セッションはブートの遥か後なので競合しない)。 */
 #define MEM_BOOT_STACK_TOP    0x9FFFCUL
 
+/* ローダ専用の低位番地。NASM の写しへの適用は N12。地図として数値を保つ。 */
+#define MEM_BOOT_RM_STACK_TOP  0x07C00UL
+#define MEM_BOOT_FAT_BUF       0x06000UL
+#define MEM_BOOT_COMPRESSED_BASE 0x10000UL
+#define MEM_BOOT_BIOS_PARAM_BASE 0x07F00UL
+#define MEM_HDD_IPL_BASE       0x1FC00UL
+#define MEM_BOOT_PROBE_END     0x1000000UL /* 現行 RAM probe の上限 (排他) */
+
+/* 例外診断の旧来の stack trace 上限。メモリ帯を広げる変更は別件。 */
+#define MEM_TRACE_STACK_LIMIT  0xF00000UL
+
 /* BIOS ROM: Read-Only */
 #define MEM_BIOS_ROM_START    0xF0000UL
 #define MEM_BIOS_ROM_END      0xFFFFFUL

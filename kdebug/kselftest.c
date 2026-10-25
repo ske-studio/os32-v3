@@ -809,7 +809,7 @@ static void test_caller_boot(struct addrspace *as, u32 phys)
     }
     flags = irq_save();
     irq_restore(flags);
-    check(((flags ^ entry_flags) & X86_EFLAGS_IF) == 0 && paging_current_cr3() == root,
+    check(((flags ^ entry_flags) & EFLAGS_IF) == 0 && paging_current_cr3() == root,
           "caller:boot IF/CR3 unchanged");
 }
 

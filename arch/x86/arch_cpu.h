@@ -20,6 +20,8 @@
 /* x86 制御レジスタのビット。CPU の持ち物なので機種ヘッダ (pc98.h) ではなく
  * ここに置く (順序 5 で include/pc98.h から移した)。 */
 #define CR0_PE              0x00000001UL  /* プロテクトモード有効 */
+#define CR0_EM              0x00000004UL  /* x87 エミュレーション */
+#define CR0_TS              0x00000008UL  /* タスク切替済み */
 #define CR0_PG              0x80000000UL  /* ページング有効 */
 
 /* ---- アドレス空間 (CR3 / CR0) ---- */
@@ -82,7 +84,7 @@ do {                                                                    \
         "movw %%ax, %%gs\n\t"                                           \
         "pushl %[uds]\n\t"         /* SS = USER_DS */                   \
         "pushl %[uesp]\n\t"        /* ESP = ユーザスタック */           \
-        "pushl $0x202\n\t"         /* EFLAGS: IF=1, IOPL=0 */           \
+        "pushl %[uflags]\n\t"      /* EFLAGS: IF=1, IOPL=0 */           \
         "pushl %[ucs]\n\t"         /* CS = USER_CS */                   \
         "pushl %[eip]\n\t"         /* EIP = エントリポイント */         \
         "iret\n\t"                                                      \
@@ -92,7 +94,8 @@ do {                                                                    \
           [uesp]"r"(user_sp),                                           \
           [eip] "r"(entry),                                             \
           [uds] "i"(USER_DS),                                           \
-          [ucs] "i"(USER_CS)                                            \
+          [ucs] "i"(USER_CS),                                           \
+          [uflags] "i"(EFLAGS_IF | EFLAGS_RESERVED1)                    \
         : "eax", "memory"                                               \
     );                                                                  \
 } while (0)
