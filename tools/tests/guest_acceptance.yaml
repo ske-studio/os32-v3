@@ -2706,3 +2706,50 @@
     crc32: シリアル版と一致
     seconds: 記録 (115200 の約 16 秒との比)
   evidence: ~/os32-tmp/evidence/<日付>/kpeek-T5-lan-82557/
+- id: gfx-modes-n16
+  gate: GFX-MODES
+  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  mode: manual
+  prereq: "9821, GFX=pc98, the stage's paired kernel and modules (hsync boot); kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  entry: "GUI (os32gui) と既存の 200 ラインのアプリ"
+  observe:
+  - 'gfx_screen_info: width/height/bpp/format'
+  - 'screenshot: 16 colors, four corners, page flip'
+  - 'after a 200-line app exits: query height'
+  expect:
+    screen: 640x400/4/PLANAR4
+    after_200_app: query height 400
+    reentry: GUI and CUI round trip
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: gfx-modes-p480
+  gate: GFX-MODES
+  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  mode: manual
+  prereq: "64MB, GFX=pegc, the stage's paired kernel and modules (hsync boot); kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  entry: "GUI (os32gui)"
+  observe:
+  - 'gfx_screen_info: width/height/bpp/format'
+  - 'screenshot: bottom line 479, 256 colors, TVRAM overlay'
+  - 'after leaving GUI: query height'
+  expect:
+    screen: 640x480/8/PACKED8
+    after_leave: query height 480
+    reentry: GUI and CUI round trip
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: gfx-modes-p400
+  gate: GFX-MODES
+  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  mode: manual
+  prereq: "400-line CUI, GFX=pegc, the stage's paired kernel and modules; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  entry: "CUI から os32gui、GUI から CUI"
+  observe:
+  - 'sync and line count on entering and leaving the GUI'
+  expect:
+    enter: 480 lines
+    leave: original sync restored
+    note: 256-color 400-line drawing is not a pass condition
+  evidence: ~/os32-tmp/evidence/<日付>/<case id>/
+- id: gfx-modes-c480
+  mode: manual
+  status: deferred
+  contract: docs/tasks/DEFERRED_TESTS.md#GFX-MODES-C480

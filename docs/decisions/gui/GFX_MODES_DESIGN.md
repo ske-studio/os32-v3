@@ -149,7 +149,7 @@ static const GfxMode pegc_modes[] = {
 - 登録後の graphics 境界だけで Cirrus の表を読む。G6b はその選択点で既存予約容量を照合し、未登録表への参照を一切行わない。
 - gfx_mode_pick は通常 default、legacy200 は planar の既存 200 行だけ選ぶ。面積最大・色数最大の探索はしない。
 - 未知形式/空表/容量不足はハード設定前に不成立とし、pc98 へ戻す。pc98 自体の資源不足は描画未開始の既存経路へ。
-- PM 決定により shutdown 後も query の高さは現在値400とする（packed の旧固定480からも変更）。他の format/flags は従来の backend 問合せのまま。200→shutdown→query=400を回帰試験にする。
+- **(確定の B1 で差し替え)** query の高さは `gfx_started ? gfx_current_height : gfx_backend_mode(be)->height`。pc98 は 200→shutdown→query=400、packed (PEGC・Cirrus) は GUI を抜けた後も init の前も 480 (今と同じ)。他の format/flags は従来の backend 問合せのまま。
 - GFX_CAP は PC98 の PAGE_FLIP の実状態、PEGC の TEXT_OVERLAY、Cirrus の HW_FILL/HW_BLT を維持する。
 - パレットリースは PC98 mask=0xFF7E、packed は first=16/count=240、reserved はゼロ。G5 のアプリ契約を変えない。
 
@@ -250,7 +250,7 @@ static const GfxMode pegc_modes[] = {
 | 短名（登録ID末尾） | PMがNP21/Wで見るもの |
 |---|---|
 | N16 (n16) | 9821＋GFX=pc98。640×400/4/PLANAR4、全16色、四隅、flip。既存200アプリ→shutdown→query=400、再入場 |
-| P480 (p480) | 64MB、GFX=pegc。640×480/8/PACKED8、下端479、256色、TVRAM合成、CUI復帰・再入場。query高さは復帰時400 |
+| P480 (p480) | 64MB、GFX=pegc。640×480/8/PACKED8、下端479、256色、TVRAM合成、CUI復帰・再入場。query の高さは復帰後も 480 (確定の B1) |
 | P400 (p400) | 400ラインCUIからPEGCに入ると480、終了で元の同期へ戻る。256色400描画を合格条件にしない。通常構成で実行、別周波数構成の追加は節目へ |
 | C480 (c480) | **段ごとには行わずv3最終段の構成別関門**。GD5430有効、対のkernel/cirrus.modで480/256色、HW fill/blit、CPU代替、終了/CTRL+STOP後リレー・再入場 |
 - G4で docs/tasks/DEFERRED_TESTS.md §2へ加える行案: `| GFX-MODES-C480 | gfx-modes-c480（対のkernel/cirrus.mod、480下端、BLT/CPU代替、リレー復帰・再入場）、別周波数のP480/P400 | 構成変更を段ごとに行わずまとめるPM決定。未実行は未合格 | v3最終段・H-4の構成別関門でPMが採証 |`。
