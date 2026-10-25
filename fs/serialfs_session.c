@@ -45,8 +45,10 @@
 extern volatile u32 tick_count;
 extern int res_owner_get(void);
 
-/* kprintf の属性 (PC/AT 流。kprintf が入口で PC-98 流へ直す) */
-#define SFS_NONCE_INPUT_CAP 64
+/* 保留ログを生出力する際の排出バッファ容量。 */
+#define SFS_HOLD_FLUSH_BUF_SIZE 64
+
+/* セッション nonce の分散係数。 */
 #define SFS_NONCE_MIX 0x9E3779B9UL
 
 #define SFS_LAN_READY_MS 100
@@ -109,7 +111,7 @@ static void sfs_send_log(void)
 /* ゲートを下ろした後に、溜めた文字をそのまま流す (HELLO が通らなかった回) */
 static void sfs_flush_hold_raw(void)
 {
-    u8 buf[SFS_NONCE_INPUT_CAP];
+    u8 buf[SFS_HOLD_FLUSH_BUF_SIZE];
     u32 n, i;
 
     for (;;) {

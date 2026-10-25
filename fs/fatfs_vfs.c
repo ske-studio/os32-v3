@@ -34,9 +34,6 @@
 #define MBR_PART_LBA_OFF 8
 #define FAT_BPB_BPS_OFF 11
 #define FAT_BPS_LARGE 1024
-#define FATFS_TYPE_FAT12 1
-#define FATFS_TYPE_FAT16 2
-#define FATFS_TYPE_FAT32 3
 #define FAT_UPPER_EXT_FIRST 0x80
 
 /* ======== FatFs VFSコンテキスト ======== */
@@ -710,9 +707,9 @@ static void *fatfs_vfs_mount(int dev_id)
 
     kprintf(KLOG_ATTR, "[fatfs] mounted: type=%d drv=%d pdrv=%d FAT%s\n",
             dev_type, drv_num, fc->pdrv,
-            fc->fatfs.fs_type == FATFS_TYPE_FAT12 ? "12" :
-            fc->fatfs.fs_type == FATFS_TYPE_FAT16 ? "16" :
-            fc->fatfs.fs_type == FATFS_TYPE_FAT32 ? "32" : "??");
+            fc->fatfs.fs_type == FS_FAT12 ? "12" :
+            fc->fatfs.fs_type == FS_FAT16 ? "16" :
+            fc->fatfs.fs_type == FS_FAT32 ? "32" : "??");
 
     return (void *)fc;
 }
