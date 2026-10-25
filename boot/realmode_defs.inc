@@ -4,4 +4,5 @@
 ; Real-mode segment granularity, independent of operand size.
 RM_SEGMENT_SHIFT EQU 4
 RM_SEGMENT_OFFSET_MASK EQU (1 << RM_SEGMENT_SHIFT) - 1
+RM_SEGMENT_WINDOW_BYTES EQU 0x10000
 %endif

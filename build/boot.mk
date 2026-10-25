@@ -18,7 +18,7 @@ BOOT_NAMED_COMMON_INC = boot/memmap_defs.inc boot/pc98_defs.inc boot/realmode_de
 $(BOOT_OUT)/boot_fat.bin $(BOOT_OUT)/boot_fat144.bin: $(BOOT_NAMED_COMMON_INC) boot/fat12_defs.inc
 $(BOOT_OUT)/boot_hdd.bin: $(BOOT_NAMED_COMMON_INC) boot/bootinfo.inc
 $(BOOT_OUT)/loader_hdd.o: $(BOOT_NAMED_COMMON_INC) boot/gdt_defs.inc boot/hex_defs.inc boot/boot_probe.inc
-$(BOOT_OUT)/loader_fat_new.bin $(BOOT_OUT)/loader_fat144.bin: boot/pc98_defs.inc
+$(BOOT_OUT)/loader_fat_new.bin $(BOOT_OUT)/loader_fat144.bin: $(BOOT_NAMED_COMMON_INC) boot/fat12_defs.inc boot/gdt_defs.inc boot/boot_probe.inc boot/vk32_defs.inc boot/lz4_defs.inc boot/crc32_defs.inc
 
 # === 新HDDローダー (ASM + C リンク) ===
 CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS) -m32 -march=i386 -ffreestanding -fno-pie \

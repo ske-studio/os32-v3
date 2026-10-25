@@ -28,4 +28,9 @@ check-vmkernel-lz4-host:
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
 # T3a1: build/out の kernel.elf を丸ごと読む (成果物の読み手)。
+- boot/vk32_defs.inc
+- boot/lz4_defs.inc
+- boot/crc32_defs.inc
+- boot/fat12_defs.inc
+- boot/pc98_defs.inc
 artifact_reader: true

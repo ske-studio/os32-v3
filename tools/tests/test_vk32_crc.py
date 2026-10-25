@@ -98,7 +98,7 @@ def geometry_block(text, geom):
     blk = between(text, "\n%ifdef FD144\n", "MAX_CLUSTER EQU")
     line = re.search(r"^MAX_CLUSTER EQU.*$", text, re.MULTILINE).group(0)
     pre = "%define FD144\n" if geom == "144" else ""
-    return pre + blk + line + "\n"
+    return '%include "boot/pc98_defs.inc"\n%include "boot/fat12_defs.inc"\n' + pre + blk + line + "\n"
 
 
 def asm_fat(text, geom):
@@ -768,8 +768,8 @@ MUTATIONS = [
     ("asm", "        cmp     eax, ecx\n        ja      .lz4_err_in\n        mov     ecx, edx",
      "        cmp     eax, ecx\n        nop\n        mov     ecx, edx", 0,
      "ASM lz4: リテラルの入力境界を見ない"),
-    ("asm", "        cmp     eax, ecx\n        ja      .lz4_err_in\n        mov     [ebp-28], eax",
-     "        cmp     eax, ecx\n        nop\n        mov     [ebp-28], eax", 0,
+    ("asm", "        cmp     eax, ecx\n        ja      .lz4_err_in\n        mov     [ebp+LZ4_FRAME_OFFSET], eax",
+     "        cmp     eax, ecx\n        nop\n        mov     [ebp+LZ4_FRAME_OFFSET], eax", 0,
      "ASM lz4: offset が出力済みより遠いのを見ない"),
     ("asm_old_lz4", "", "", 0,
      "ASM lz4: 基点 3e22825 の旧 pm_lz4_decode に戻す (延長読みの終端で .lz4_err が"
@@ -779,16 +779,16 @@ MUTATIONS = [
      "        cmp     eax, MAX_CLUSTER\n        nop", 0, "FAT: 開始クラスタが MAX_CLUSTER 以上 (EOC 含む) を通す"),
     ("asm", "        cmp     eax, MAX_CLUSTER\n        jae     .out",
      "        cmp     eax, MAX_CLUSTER\n        nop", 1, "FAT: 途中のクラスタが MAX_CLUSTER 以上を通す"),
-    ("asm", "        mov     ebp, FATCHK_LONG\n        cmp     eax, 0FF8h\n        jb      .out",
-     "        mov     ebp, FATCHK_LONG\n        cmp     eax, 0FF8h\n        nop", 0,
+    ("asm", "        mov     ebp, FATCHK_LONG\n        cmp     eax, FAT12_EOC_MIN\n        jb      .out",
+     "        mov     ebp, FATCHK_LONG\n        cmp     eax, FAT12_EOC_MIN\n        nop", 0,
      "FAT: 必要な数の次が EOC でなくても通す (循環を見逃す)"),
-    ("asm", "        cmp     eax, 2\n        jb      .out", "        cmp     eax, 2\n        nop", 0,
+    ("asm", "        cmp     eax, FAT12_FIRST_CLUSTER\n        jb      .out", "        cmp     eax, FAT12_FIRST_CLUSTER\n        nop", 0,
      "FAT: 開始クラスタ 0 / 1 を通す"),
-    ("asm", "        cmp     eax, 2\n        jb      .out", "        cmp     eax, 2\n        nop", 1,
+    ("asm", "        cmp     eax, FAT12_FIRST_CLUSTER\n        jb      .out", "        cmp     eax, FAT12_FIRST_CLUSTER\n        nop", 1,
      "FAT: 途中のクラスタ 0 / 1 を通す"),
     ("asm", "        mov     ebp, FATCHK_START\n", "        mov     ebp, FATCHK_RANGE\n", 0,
      "FAT: 開始クラスタの壊れを範囲外と同じ文言にする"),
-    ("asm", "        shr     edx, 4\n.even:", "        nop\n.even:", 0,
+    ("asm", "        shr     edx, FAT12_ODD_SHIFT\n.even:", "        nop\n.even:", 0,
      "FAT: 奇数クラスタの上位 12 ビットを取らない"),
     ("asm", "        jz      .out\n        cmp     edx, MAX_IMAGE_SIZE",
      "        nop\n        cmp     edx, MAX_IMAGE_SIZE", 0, "FAT: 長さ 0 を通す"),
