@@ -665,8 +665,8 @@ MUTATIONS = [
      '        ;; マスタPICにEOI送出 (PC-98: ポート 0x00)\n'
      '        mov     al, OCW2_EOI\n        out     PIC1_CMD, al\n\n'),
     ('exc-return-leave-missing', 'kernel/isr_stub.asm',
-     '        EXC_LEAVE\n        popad\n        add     esp, 8',
-     '        popad\n        add     esp, 8'),
+     '        EXC_LEAVE\n        popad\n        add     esp, ISR_COMMON_SKIP_BYTES',
+     '        popad\n        add     esp, ISR_COMMON_SKIP_BYTES'),
     ('reclaim-device', 'kernel/pgalloc.c',
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
