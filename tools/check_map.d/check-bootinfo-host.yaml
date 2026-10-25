@@ -26,3 +26,10 @@ check-bootinfo-host:
 - include/types.h
 - kernel/gdt.h
 - lib/kstring.h
+- boot/vk32_defs.inc
+- boot/lz4_defs.inc
+- boot/crc32_defs.inc
+- boot/loader_fat_new.asm
+- lib/crc32_core.inc
+- boot/boot_defs.h
+- include/bootinfo.h

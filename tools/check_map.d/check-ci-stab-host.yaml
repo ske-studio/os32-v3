@@ -127,4 +127,9 @@ check-ci-stab-host:
 - build/out/*
 - kernel/sqlite_engine.c
 - kernel/cpu_flags.inc
+- boot/fat12_defs.inc
+- boot/lz4_defs.inc
+- boot/pc98_defs.inc
+- boot/vk32_defs.inc
+- boot/crc32_defs.inc
 artifact_reader: true

@@ -28,6 +28,16 @@
 
 cpu 386
 
+%include "boot/memmap_defs.inc"
+%include "boot/pc98_defs.inc"
+%include "boot/realmode_defs.inc"
+%include "boot/fat12_defs.inc"
+%include "boot/gdt_defs.inc"
+%include "boot/boot_probe.inc"
+
+; Canonical: include/bootinfo.h (checked by test_boot_named_constants.py).
+BOOTINFO_DA_HD1 EQU 0x81
+
 
 ;; ジオメトリ — `-DFD144` で 1.44MB 版。正典は tools/mkfat12.py の GEOMETRIES。
 ;; **boot/boot_fat.asm と必ず同じ値にすること** (片方だけ直すと静かにずれる)。
@@ -36,7 +46,7 @@ SECT_SZ     EQU     0200h
 SECT_SHIFT  EQU     9           ;; log2(SECT_SZ)
 SECT_N      EQU     02h
 SPT         EQU     18
-DA_UA       EQU     030h        ;; 1.44MB 対応両用 I/F ユニット0
+DA_UA       EQU     BOOT_DRIVE_FDD_144 ;; 1.44MB 対応両用 I/F ユニット0
 ROOT_START  EQU     19
 ROOT_SECTS  EQU     12
 FAT_SECTS   EQU     9
@@ -47,7 +57,7 @@ SECT_SZ     EQU     0400h
 SECT_SHIFT  EQU     10          ;; log2(SECT_SZ)
 SECT_N      EQU     03h
 SPT         EQU     8
-DA_UA       EQU     090h
+DA_UA       EQU     BOOT_DRIVE_FDD
 ROOT_START  EQU     5
 ROOT_SECTS  EQU     6
 FAT_SECTS   EQU     2
@@ -55,10 +65,10 @@ DATA_START  EQU     11
 TOTAL_SECTS EQU     1232
 %endif
 ;; 有効なクラスタ番号は [2, MAX_CLUSTER)。1 クラスタ = 1 セクタ (mkfat12 の spc=1)
-MAX_CLUSTER EQU     TOTAL_SECTS - DATA_START + 2
+MAX_CLUSTER EQU     TOTAL_SECTS - DATA_START + FAT12_FIRST_CLUSTER
 
 ROOT_ENTS   EQU     192
-FAT_BUF     EQU     6000h
+FAT_BUF     EQU     MEM_BOOT_FAT_BUF
 FAT_START   EQU     1
 
 ;; ブート情報域 (0x7E00) の番地とオフセット。正典は include/bootinfo.h。
@@ -67,19 +77,19 @@ FAT_START   EQU     1
 section .text
 
 
-        org 8000h
+        org MEM_LOADER_START
 
 global loader_start
 loader_start:
         xor     ax, ax
         mov     ds, ax
         mov     ss, ax
-        mov     sp, 7C00h
+        mov     sp, MEM_BOOT_RM_STACK_TOP
 
         ;; TVRAM表示
-        mov     ax, 0A000h
+        mov     ax, TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT
         mov     es, ax
-        mov     di, 160
+        mov     di, TVRAM_BPR
         mov     si, msg_loader
         call    print16
 
@@ -99,10 +109,10 @@ loader_start:
         sti
         mov     al, BOOTINFO_SRC_FD
         call    bi_clear
-        mov     al, 80h
+        mov     al, BOOT_DRIVE_HDD
         mov     si, MEM_BOOTINFO_BASE + BI_OFF_DRIVE0
         call    bi_sense
-        mov     al, 81h
+        mov     al, BOOTINFO_DA_HD1
         mov     si, MEM_BOOTINFO_BASE + BI_OFF_DRIVE0 + BI_DRIVE_SIZE
         call    bi_sense
         call    bi_seal
@@ -134,26 +144,26 @@ loader_start:
         mov     al, es:[di]
         cmp     al, 0
         je      .no_kernel
-        cmp     al, 0E5h
+        cmp     al, FAT12_DIRENT_DELETED
         je      .scan_knext
 
         push    cx
         push    di
         mov     si, kern_name
-        mov     cx, 11
+        mov     cx, FAT12_NAME_BYTES
         repe    cmpsb
         pop     di
         pop     cx
         je      .found_kern
 
 .scan_knext:
-        add     di, 32
+        add     di, FAT12_DIRENT_BYTES
         loop    .scan_kern
 
 .no_kernel:
-        mov     ax, 0A000h
+        mov     ax, TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT
         mov     es, ax
-        mov     di, 320
+        mov     di, 2 * TVRAM_BPR
         mov     si, msg_nokernel
         call    print16
 .halt16:
@@ -162,9 +172,9 @@ loader_start:
 
 .found_kern:
         ;; 開始クラスタとサイズ取得
-        mov     ax, es:[di + 1Ah]
+        mov     ax, es:[di + FAT12_DIRENT_CLUSTER_OFF]
         mov     word [var_cluster], ax
-        mov     eax, es:[di + 1Ch]      ;; ファイル長 (u32、ディレクトリの 1Ch〜1Fh)
+        mov     eax, es:[di + FAT12_DIRENT_SIZE_OFF]      ;; ファイル長 (u32、ディレクトリの 1Ch〜1Fh)
         mov     dword [var_size], eax
 
         ;; ============================================================
@@ -205,12 +215,12 @@ loader_start:
         ;; 1000:0000h〜 (物理0x10000以降, 64KB毎にセグメント切替)
         ;; ============================================================
         movzx   eax, word [var_cluster]
-        mov     word [var_load_seg], 1000h
+        mov     word [var_load_seg], MEM_BOOT_COMPRESSED_BASE >> RM_SEGMENT_SHIFT
         xor     bp, bp
 
 .load_kern:
         push    ax
-        sub     ax, 2
+        sub     ax, FAT12_FIRST_CLUSTER
         add     ax, DATA_START
 
         push    es
@@ -230,7 +240,7 @@ loader_start:
 
         ;; セグメント切替
         mov     bx, word [var_load_seg]
-        add     bx, 1000h       ;; +64KB
+        add     bx, RM_SEGMENT_WINDOW_BYTES >> RM_SEGMENT_SHIFT       ;; +64KB
         mov     word [var_load_seg], bx
 
 .seg_ok:
@@ -258,9 +268,9 @@ loader_start:
         je      .fat_err
         mov     si, msg_fatlong
 .fat_err:
-        mov     ax, 0A000h
+        mov     ax, TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT
         mov     es, ax
-        mov     di, 320
+        mov     di, 2 * TVRAM_BPR
         call    print16
 .fat_halt:
         hlt
@@ -271,25 +281,25 @@ loader_start:
         ;; PM遷移
         ;; ============================================================
         push    es
-        mov     ax, 0A000h
+        mov     ax, TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT
         mov     es, ax
-        mov     di, 320
+        mov     di, 2 * TVRAM_BPR
         mov     si, msg_pm
         call    print16
         pop     es
 
         ;; A20ゲート有効化
-        mov     al, 3
-        out     0F2h, al
+        mov     al, CPU_A20_ENABLE
+        out     CPU_A20_PORT, al
 
         cli
         xor     al, al
-        out     50h, al
+        out     NMI_RESET, al
 
         ;; GDTロード
         xor     eax, eax
         mov     ax, cs
-        shl     eax, 4
+        shl     eax, RM_SEGMENT_SHIFT
         add     eax, gdt
         mov     dword [gdtr_base], eax
         lgdt    [gdtr]
@@ -302,7 +312,7 @@ loader_start:
         db      066h
         db      0EAh
         dd      pm_entry32
-        dw      0008h
+        dw      GDT_KERNEL_CS
 
 
 ;; ============================================================
@@ -312,20 +322,20 @@ loader_start:
 bits 32
 
 pm_entry32:
-        mov     eax, 10h
+        mov     eax, GDT_KERNEL_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
         mov     gs, ax
         mov     ss, ax
-        mov     esp, 0009FFFCh
+        mov     esp, MEM_BOOT_STACK_TOP
 
         ;; ファイルは 0x10000 (1000:0000h) 以降に直接配置されている。
         ;; === VK32 v2 の検査 + LZ4展開 (pm_vk32_boot) ===
         push    dword vk32_img_crc              ;; out_crc
         push    dword VK32_LOAD_MIN             ;; window = 帯の先頭そのもの
         push    dword [var_size]                ;; ファイル長 (ディレクトリの値)
-        push    dword 10000h                    ;; file
+        push    dword MEM_BOOT_COMPRESSED_BASE ;; file
         call    pm_vk32_boot
         add     esp, 16
         test    eax, eax
@@ -342,26 +352,26 @@ pm_entry32:
         mov     [MEM_BOOTINFO_BASE + BI_OFF_IMG_CHECK], eax
 
         ;; TVRAM: デコード完了
-        mov     edi, 0A0000h + 480
+        mov     edi, TVRAM_CHAR_BASE + 3 * TVRAM_BPR
         mov     esi, msg_ok32
         call    pm_print32
 
         ;; === メモリプロービング ===
-        mov     esi, 00100000h
-        mov     ecx, 1024
+        mov     esi, MEM_1MB
+        mov     ecx, MEM_1MB / KIB
 
 .probe_loop:
         mov     eax, [esi]
-        mov     dword [esi], 0AA55AA55h
-        cmp     dword [esi], 0AA55AA55h
+        mov     dword [esi], BOOT_PROBE_PATTERN_A
+        cmp     dword [esi], BOOT_PROBE_PATTERN_A
         jne     .probe_done
-        mov     dword [esi], 055AA55AAh
-        cmp     dword [esi], 055AA55AAh
+        mov     dword [esi], BOOT_PROBE_PATTERN_B
+        cmp     dword [esi], BOOT_PROBE_PATTERN_B
         jne     .probe_done
         mov     [esi], eax
-        add     ecx, 512
-        add     esi, 00080000h
-        cmp     esi, 01000000h
+        add     ecx, BOOT_PROBE_STEP_KIB
+        add     esi, BOOT_PROBE_STEP_KIB * KIB
+        cmp     esi, MEM_BOOT_PROBE_END
         jb      .probe_loop
 
 .probe_done:
@@ -372,8 +382,8 @@ pm_entry32:
         push    dword 0         ;; ダミーリターンアドレス
 
         db      0EAh
-        dd      00100000h
-        dw      0008h
+        dd      KERNEL_LOAD_ADDR
+        dw      GDT_KERNEL_CS
 
 .vk32_fail:
         ;; EAX = VK32_ERR_* (-1〜VK32_ERR_MIN)。表の外は汎用の文言
@@ -383,7 +393,7 @@ pm_entry32:
         xor     eax, eax
 .vk32_msg:
         mov     esi, [vk32_msgs + eax * 4]
-        mov     edi, 0A0000h + 480
+        mov     edi, TVRAM_CHAR_BASE + 3 * TVRAM_BPR
         call    pm_print32
         jmp     pm_halt
 
@@ -393,9 +403,39 @@ pm_entry32:
 ;; ここから VK32_HOST_END までを tools/tests/test_vk32_crc.py (と
 ;; test_vmkernel_lz4.py) が**そのまま切り出して** nasm -f elf32 で組み、
 ;; HDD 側の C (boot/vk32_boot.c) と同じ壊れたイメージを渡す。
-;; 外の番地・EQU に頼らないこと (必要な値はこの中に置く)。
+;; 外の番地・EQU に頼らないこと (必要な値・include はこの中に置く)。
 ;; ============================================================
 bits 32
+%include "boot/vk32_defs.inc"
+%include "boot/lz4_defs.inc"
+%include "boot/crc32_defs.inc"
+
+;; >>> FRAME_DEFS_BEGIN
+; cdecl frames, offsets relative to EBP after saving caller EBP.
+VK_ARG_FILE EQU 8
+VK_ARG_SIZE EQU 12
+VK_ARG_WINDOW EQU 16
+VK_ARG_OUT_CRC EQU 20
+VK_FRAME_COUNT EQU -4
+VK_FRAME_HEADER_SIZE EQU -8
+VK_FRAME_CRC_OFF EQU -12
+VK_FRAME_INDEX EQU -16
+VK_FRAME_DST EQU -20
+VK_FRAME_RAW_SIZE EQU -24
+VK_FRAME_BYTES EQU 24
+VK_SAVED_BYTES EQU 12
+CRC_ARG_STATE EQU 8
+CRC_ARG_DATA EQU 12
+CRC_ARG_SIZE EQU 16
+LZ4_ARG_SRC EQU 8
+LZ4_ARG_SIZE EQU 12
+LZ4_ARG_DST EQU 16
+LZ4_ARG_CAP EQU 20
+LZ4_SAVED_BYTES EQU 20
+LZ4_FRAME_TOKEN EQU -(LZ4_SAVED_BYTES + 4)
+LZ4_FRAME_OFFSET EQU -(LZ4_SAVED_BYTES + 8)
+LZ4_FRAME_BYTES EQU 8
+;; <<< FRAME_DEFS_END
 
 ;; VK32 v2 (正典は boot/boot_defs.h。名前ごとの一致は test_vk32_crc.py)
 VK32_MAGIC          EQU 32334B56h
@@ -435,58 +475,58 @@ LZ4_MINMATCH        EQU 4
 pm_vk32_boot:
         push    ebp
         mov     ebp, esp
-        sub     esp, 24
+        sub     esp, VK_FRAME_BYTES
         push    ebx
         push    esi
         push    edi
         cld
 
-        mov     esi, [ebp+8]            ;; file
-        mov     ecx, [ebp+12]           ;; size
+        mov     esi, [ebp+VK_ARG_FILE]            ;; file
+        mov     ecx, [ebp+VK_ARG_SIZE]           ;; size
         ;; 1. 長さ
-        cmp     ecx, 16
+        cmp     ecx, VK32_COMMON_SIZE
         jb      .e_size
         cmp     ecx, MAX_IMAGE_SIZE
         ja      .e_size
         ;; 2. 共通部
         cmp     dword [esi], VK32_MAGIC
         jne     .e_magic
-        cmp     dword [esi + 8], VK32_VERSION
+        cmp     dword [esi + VK32_OFF_VERSION], VK32_VERSION
         jne     .e_version
-        mov     edx, [esi + 12]
+        mov     edx, [esi + VK32_OFF_ENTRY_COUNT]
         test    edx, edx
         jz      .e_count
         cmp     edx, VK32_MAX_ENTRIES
         ja      .e_count
-        mov     [ebp-4], edx
+        mov     [ebp+VK_FRAME_COUNT], edx
         ;; 3. header_size = 16 + 20n + 8
-        lea     ebx, [edx + edx * 4]    ;; 5n
-        lea     ebx, [ebx * 4 + 24]     ;; 20n + 24
-        cmp     [esi + 4], ebx
+        lea     ebx, [edx + edx * (VK32_ENTRY_SIZE / VK32_WORD_BYTES)]    ;; 5n
+        lea     ebx, [ebx * VK32_WORD_BYTES + VK32_COMMON_SIZE + VK32_TRAILER_BYTES]     ;; 20n + 24
+        cmp     [esi + VK32_OFF_HEADER_SIZE], ebx
         jne     .e_header
         cmp     ebx, ecx
         ja      .e_header
-        mov     [ebp-8], ebx
+        mov     [ebp+VK_FRAME_HEADER_SIZE], ebx
         ;; 4. 完全長 (image_size は hsz - 8)
-        cmp     [esi + ebx - 8], ecx
+        cmp     [esi + ebx - VK32_TRAILER_BYTES], ecx
         jne     .e_length
         ;; 5. ファイル全体の CRC32 (image_crc = hsz - 4 の欄を 0 として)
-        lea     edi, [ebx - 4]
-        mov     [ebp-12], edi
+        lea     edi, [ebx - VK32_WORD_BYTES]
+        mov     [ebp+VK_FRAME_CRC_OFF], edi
         push    edi
         push    esi
-        push    dword 0FFFFFFFFh
+        push    dword CRC32_INIT
         call    pm_crc32_update
         add     esp, 12
-        push    dword 4
+        push    dword VK32_WORD_BYTES
         push    dword vk32_zero4
         push    eax
         call    pm_crc32_update
         add     esp, 12
-        mov     edx, [ebp+12]
+        mov     edx, [ebp+VK_ARG_SIZE]
         sub     edx, edi
-        sub     edx, 4
-        lea     ecx, [esi + edi + 4]
+        sub     edx, VK32_WORD_BYTES
+        lea     ecx, [esi + edi + VK32_WORD_BYTES]
         push    edx
         push    ecx
         push    eax
@@ -497,26 +537,26 @@ pm_vk32_boot:
         jne     .e_file_crc
 
         ;; 6. 全エントリの範囲 (展開の前に)
-        mov     dword [ebp-16], 0
+        mov     dword [ebp+VK_FRAME_INDEX], 0
 .rng_loop:
-        mov     ebx, [ebp-16]
-        cmp     ebx, [ebp-4]
+        mov     ebx, [ebp+VK_FRAME_INDEX]
+        cmp     ebx, [ebp+VK_FRAME_COUNT]
         jae     .rng_done
-        shl     ebx, 4
-        lea     edi, [esi + ebx + 16]   ;; &entry[i]
+        shl     ebx, VK32_ENTRY_SHIFT
+        lea     edi, [esi + ebx + VK32_COMMON_SIZE]   ;; &entry[i]
         ;; 入力: hsz <= off <= size かつ csz <= size - off
-        mov     edx, [edi + 8]
-        cmp     edx, [ebp-8]
+        mov     edx, [edi + VK32_ENTRY_OFF_DATA_OFFSET]
+        cmp     edx, [ebp+VK_FRAME_HEADER_SIZE]
         jb      .e_src
-        mov     ecx, [ebp+12]
+        mov     ecx, [ebp+VK_ARG_SIZE]
         cmp     edx, ecx
         ja      .e_src
         sub     ecx, edx
-        cmp     [edi + 12], ecx
+        cmp     [edi + VK32_ENTRY_OFF_COMPRESSED_SIZE], ecx
         ja      .e_src
         ;; 展開先: raw != 0、MIN <= addr < END、raw <= END - addr
         mov     edx, [edi]
-        mov     ecx, [edi + 4]
+        mov     ecx, [edi + VK32_ENTRY_OFF_RAW_SIZE]
         test    ecx, ecx
         jz      .e_dst
         cmp     edx, VK32_LOAD_MIN
@@ -527,74 +567,74 @@ pm_vk32_boot:
         sub     eax, edx
         cmp     ecx, eax
         ja      .e_dst
-        mov     [ebp-20], edx
-        mov     [ebp-24], ecx
+        mov     [ebp+VK_FRAME_DST], edx
+        mov     [ebp+VK_FRAME_RAW_SIZE], ecx
         ;; 前のエントリと重ならない: addr < a2 + r2 かつ a2 < addr + raw なら重なる
         xor     eax, eax
 .ovl_loop:
-        cmp     eax, [ebp-16]
+        cmp     eax, [ebp+VK_FRAME_INDEX]
         jae     .ovl_done
         mov     ecx, eax
-        shl     ecx, 4
-        lea     ecx, [esi + ecx + 16]
+        shl     ecx, VK32_ENTRY_SHIFT
+        lea     ecx, [esi + ecx + VK32_COMMON_SIZE]
         mov     edx, [ecx]
-        add     edx, [ecx + 4]
-        cmp     [ebp-20], edx
+        add     edx, [ecx + VK32_ENTRY_OFF_RAW_SIZE]
+        cmp     [ebp+VK_FRAME_DST], edx
         jae     .ovl_next
-        mov     edx, [ebp-20]
-        add     edx, [ebp-24]
+        mov     edx, [ebp+VK_FRAME_DST]
+        add     edx, [ebp+VK_FRAME_RAW_SIZE]
         cmp     [ecx], edx
         jb      .e_dst
 .ovl_next:
         inc     eax
         jmp     .ovl_loop
 .ovl_done:
-        inc     dword [ebp-16]
+        inc     dword [ebp+VK_FRAME_INDEX]
         jmp     .rng_loop
 .rng_done:
 
         ;; 7. 展開 → decoded == raw_size → 展開後の CRC32
-        mov     dword [ebp-16], 0
+        mov     dword [ebp+VK_FRAME_INDEX], 0
 .dec_loop:
-        mov     ebx, [ebp-16]
-        cmp     ebx, [ebp-4]
+        mov     ebx, [ebp+VK_FRAME_INDEX]
+        cmp     ebx, [ebp+VK_FRAME_COUNT]
         jae     .dec_done
-        shl     ebx, 4
-        lea     edi, [esi + ebx + 16]   ;; &entry[i]
+        shl     ebx, VK32_ENTRY_SHIFT
+        lea     edi, [esi + ebx + VK32_COMMON_SIZE]   ;; &entry[i]
         mov     edx, [edi]
         sub     edx, VK32_LOAD_MIN
-        add     edx, [ebp+16]           ;; dst = window + (addr - MIN)
-        mov     [ebp-20], edx
-        mov     eax, [edi + 8]
+        add     edx, [ebp+VK_ARG_WINDOW]           ;; dst = window + (addr - MIN)
+        mov     [ebp+VK_FRAME_DST], edx
+        mov     eax, [edi + VK32_ENTRY_OFF_DATA_OFFSET]
         add     eax, esi                ;; src = file + data_offset
-        push    dword [edi + 4]         ;; cap = raw_size
+        push    dword [edi + VK32_ENTRY_OFF_RAW_SIZE]         ;; cap = raw_size
         push    edx
-        push    dword [edi + 12]
+        push    dword [edi + VK32_ENTRY_OFF_COMPRESSED_SIZE]
         push    eax
         call    pm_lz4_decode
         add     esp, 16
         test    eax, eax
         js      .e_decode
-        cmp     eax, [edi + 4]
+        cmp     eax, [edi + VK32_ENTRY_OFF_RAW_SIZE]
         jne     .e_raw_size
-        push    dword [edi + 4]
-        push    dword [ebp-20]
-        push    dword 0FFFFFFFFh
+        push    dword [edi + VK32_ENTRY_OFF_RAW_SIZE]
+        push    dword [ebp+VK_FRAME_DST]
+        push    dword CRC32_INIT
         call    pm_crc32_update
         add     esp, 12
         not     eax
-        mov     ebx, [ebp-16]
-        mov     edx, [ebp-4]
-        shl     edx, 4
+        mov     ebx, [ebp+VK_FRAME_INDEX]
+        mov     edx, [ebp+VK_FRAME_COUNT]
+        shl     edx, VK32_ENTRY_SHIFT
         add     edx, esi                ;; edx + 16 = &entry_crc[0]
-        cmp     eax, [edx + ebx * 4 + 16]
+        cmp     eax, [edx + ebx * VK32_WORD_BYTES + VK32_COMMON_SIZE]
         jne     .e_entry_crc
-        inc     dword [ebp-16]
+        inc     dword [ebp+VK_FRAME_INDEX]
         jmp     .dec_loop
 .dec_done:
-        mov     edi, [ebp-12]
+        mov     edi, [ebp+VK_FRAME_CRC_OFF]
         mov     eax, [esi + edi]
-        mov     edx, [ebp+20]
+        mov     edx, [ebp+VK_ARG_OUT_CRC]
         mov     [edx], eax
         xor     eax, eax
         jmp     .ret
@@ -624,7 +664,7 @@ pm_vk32_boot:
 .e_entry_crc:   mov     eax, VK32_ERR_ENTRY_CRC
 .ret:
         ;; どの出口でも ebp から戻す (途中の push が残っていても正しい)
-        lea     esp, [ebp - 24 - 12]
+        lea     esp, [ebp - VK_FRAME_BYTES - VK_SAVED_BYTES]
         pop     edi
         pop     esi
         pop     ebx
@@ -645,22 +685,22 @@ pm_crc32_update:
         mov     ebp, esp
         push    ebx
         push    esi
-        mov     eax, [ebp+8]
-        mov     esi, [ebp+12]
-        mov     ecx, [ebp+16]
+        mov     eax, [ebp+CRC_ARG_STATE]
+        mov     esi, [ebp+CRC_ARG_DATA]
+        mov     ecx, [ebp+CRC_ARG_SIZE]
         test    ecx, ecx
         jz      .done
 .lp:
         xor     al, [esi]
         inc     esi
         mov     ebx, eax
-        and     ebx, 0Fh
-        shr     eax, 4
-        xor     eax, [crc32_nib + ebx * 4]
+        and     ebx, CRC32_NIBBLE_MASK
+        shr     eax, CRC32_NIBBLE_BITS
+        xor     eax, [crc32_nib + ebx * CRC32_TABLE_WORD_BYTES]
         mov     ebx, eax
-        and     ebx, 0Fh
-        shr     eax, 4
-        xor     eax, [crc32_nib + ebx * 4]
+        and     ebx, CRC32_NIBBLE_MASK
+        shr     eax, CRC32_NIBBLE_BITS
+        xor     eax, [crc32_nib + ebx * CRC32_TABLE_WORD_BYTES]
         dec     ecx
         jnz     .lp
 .done:
@@ -689,16 +729,16 @@ pm_lz4_decode:
         push    edx
         push    esi
         push    edi
-        sub     esp, 8
+        sub     esp, LZ4_FRAME_BYTES
         cld
 
-        mov     esi, [ebp+8]    ;; src (ip)
-        mov     ecx, [ebp+12]   ;; compressed_size
+        mov     esi, [ebp+LZ4_ARG_SRC]    ;; src (ip)
+        mov     ecx, [ebp+LZ4_ARG_SIZE]   ;; compressed_size
         test    ecx, ecx
         js      .lz4_err_in
         lea     ebx, [esi+ecx]  ;; ip_end
-        mov     edi, [ebp+16]   ;; dst (op)
-        mov     ecx, [ebp+20]   ;; cap
+        mov     edi, [ebp+LZ4_ARG_DST]   ;; dst (op)
+        mov     ecx, [ebp+LZ4_ARG_CAP]   ;; cap
         test    ecx, ecx
         js      .lz4_err_in
         lea     edx, [edi+ecx]  ;; op_end
@@ -710,11 +750,11 @@ pm_lz4_decode:
         ;; トークン
         movzx   eax, byte [esi]
         inc     esi
-        mov     [ebp-24], eax
+        mov     [ebp+LZ4_FRAME_TOKEN], eax
 
         ;; リテラル長
-        shr     eax, 4
-        cmp     eax, 15
+        shr     eax, LZ4_TOKEN_BITS
+        cmp     eax, LZ4_LENGTH_MASK
         jne     .lz4_lit_copy
 .lz4_lit_ext:
         cmp     esi, ebx
@@ -722,7 +762,7 @@ pm_lz4_decode:
         movzx   ecx, byte [esi]
         inc     esi
         add     eax, ecx
-        cmp     eax, [ebp+20]   ;; 長さの累積が容量を超えたら正当な流れではない
+        cmp     eax, [ebp+LZ4_ARG_CAP]   ;; 長さの累積が容量を超えたら正当な流れではない
         ja      .lz4_err_in
         cmp     ecx, 255
         je      .lz4_lit_ext
@@ -747,23 +787,23 @@ pm_lz4_decode:
         ;; オフセット (2B LE)。0 と、出力済みより遠いものは不正
         mov     ecx, ebx
         sub     ecx, esi
-        cmp     ecx, 2
+        cmp     ecx, LZ4_OFFSET_BYTES
         jb      .lz4_err_in
         movzx   eax, word [esi]
-        add     esi, 2
+        add     esi, LZ4_OFFSET_BYTES
         test    eax, eax
         jz      .lz4_err_in
         mov     ecx, edi
-        sub     ecx, [ebp+16]
+        sub     ecx, [ebp+LZ4_ARG_DST]
         cmp     eax, ecx
         ja      .lz4_err_in
-        mov     [ebp-28], eax
+        mov     [ebp+LZ4_FRAME_OFFSET], eax
 
         ;; マッチ長 = token の下位 4bit + MINMATCH
-        mov     ecx, [ebp-24]
-        and     ecx, 0Fh
+        mov     ecx, [ebp+LZ4_FRAME_TOKEN]
+        and     ecx, LZ4_LENGTH_MASK
         add     ecx, LZ4_MINMATCH
-        cmp     ecx, 15 + LZ4_MINMATCH
+        cmp     ecx, LZ4_LENGTH_MASK + LZ4_MINMATCH
         jne     .lz4_match_copy
 .lz4_match_ext:
         cmp     esi, ebx
@@ -771,7 +811,7 @@ pm_lz4_decode:
         movzx   eax, byte [esi]
         inc     esi
         add     ecx, eax
-        cmp     ecx, [ebp+20]
+        cmp     ecx, [ebp+LZ4_ARG_CAP]
         ja      .lz4_err_in
         cmp     eax, 255
         je      .lz4_match_ext
@@ -784,22 +824,22 @@ pm_lz4_decode:
         ja      .lz4_err_out
         mov     eax, esi        ;; ip 保存
         mov     esi, edi
-        sub     esi, [ebp-28]   ;; match_src = op - offset
+        sub     esi, [ebp+LZ4_FRAME_OFFSET]   ;; match_src = op - offset
         rep     movsb
         mov     esi, eax
         jmp     .lz4_loop
 
 .lz4_end:
         mov     eax, edi
-        sub     eax, [ebp+16]   ;; 展開バイト数
+        sub     eax, [ebp+LZ4_ARG_DST]   ;; 展開バイト数
         jmp     .lz4_ret
 .lz4_err_out:
-        mov     eax, -2
+        mov     eax, BOOT_LZ4_ERR_OUTPUT
         jmp     .lz4_ret
 .lz4_err_in:
         mov     eax, -1
 .lz4_ret:
-        lea     esp, [ebp-20]
+        lea     esp, [ebp-LZ4_SAVED_BYTES]
         pop     edi
         pop     esi
         pop     edx
@@ -833,10 +873,10 @@ pm_print32:
         mov     ah, 0
         mov     [edi], ax
         push    edi
-        add     edi, 2000h
-        mov     byte [edi], 0E1h
+        add     edi, TVRAM_ATTR_BASE - TVRAM_CHAR_BASE
+        mov     byte [edi], TATTR_WHITE
         pop     edi
-        add     edi, 2
+        add     edi, TVRAM_CELL_BYTES
         jmp     .loop
 .done:
         pop     eax
@@ -864,11 +904,11 @@ read_sect16:
         and     dh, 1           ;; DH = head
         shr     ax, 1           ;; AX = cylinder
         mov     cl, al
-        mov     ah, 76h
+        mov     ah, BIOS_DISK_READ_SEEK_MFM_NO_RETRY
         mov     al, DA_UA
         mov     bx, SECT_SZ
         mov     ch, SECT_N
-        int     1Bh
+        int     BIOS_INT_DISK
         pop     ax
         jc      disk_err16
         ret
@@ -876,9 +916,9 @@ read_sect16:
 disk_err16:
         push    cs
         pop     ds
-        mov     ax, 0A000h
+        mov     ax, TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT
         mov     es, ax
-        mov     di, 320
+        mov     di, 2 * TVRAM_BPR
         mov     si, msg_diskerr
         call    print16
 .halt:
@@ -910,9 +950,9 @@ fat12_next32:
         movzx   edx, word [esi + ebx]
         test    al, 1
         jz      .even
-        shr     edx, 4
+        shr     edx, FAT12_ODD_SHIFT
 .even:
-        and     edx, 0FFFh
+        and     edx, FAT12_CLUSTER_MASK
         mov     eax, edx
         ret
 
@@ -933,16 +973,16 @@ fat_chain_check:
         ;; 開始クラスタはディレクトリの値。EOC や 0/1 はチェーンの途中の
         ;; 「早期終端・範囲外」とは別の壊れ方なので別の文言にする
         mov     ebp, FATCHK_START
-        cmp     eax, 2
+        cmp     eax, FAT12_FIRST_CLUSTER
         jb      .out
         cmp     eax, MAX_CLUSTER
         jae     .out
 .walk:
         mov     ebp, FATCHK_SHORT
-        cmp     eax, 0FF8h
+        cmp     eax, FAT12_EOC_MIN
         jae     .out
         mov     ebp, FATCHK_RANGE
-        cmp     eax, 2
+        cmp     eax, FAT12_FIRST_CLUSTER
         jb      .out
         cmp     eax, MAX_CLUSTER
         jae     .out
@@ -950,7 +990,7 @@ fat_chain_check:
         dec     ecx
         jnz     .walk
         mov     ebp, FATCHK_LONG
-        cmp     eax, 0FF8h
+        cmp     eax, FAT12_EOC_MIN
         jb      .out
         mov     ebp, FATCHK_OK
 .out:
@@ -973,10 +1013,10 @@ print16:
         mov     ah, 0
         mov     es:[di], ax
         push    di
-        add     di, 2000h
-        mov     byte es:[di], 0E1h
+        add     di, TVRAM_ATTR_BASE - TVRAM_CHAR_BASE
+        mov     byte es:[di], TATTR_WHITE
         pop     di
-        add     di, 2
+        add     di, TVRAM_CELL_BYTES
         jmp     print16
 .done:
         ret

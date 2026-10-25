@@ -69,6 +69,10 @@ def extract_asm(text):
     if not m:
         raise Fail("LZ4_MINMATCH EQU が見つからない")
     equ = m.group(0)
+    if ";; >>> FRAME_DEFS_BEGIN" in text:
+        start_defs = text.index(";; >>> FRAME_DEFS_BEGIN")
+        end_defs = text.index(";; <<< FRAME_DEFS_END", start_defs)
+        equ += '\n%include "boot/lz4_defs.inc"\n' + text[start_defs:end_defs]
     lines = text.splitlines()
     try:
         start = next(i for i, ln in enumerate(lines) if ln.startswith("pm_lz4_decode:"))
