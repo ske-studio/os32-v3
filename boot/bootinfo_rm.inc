@@ -1,3 +1,5 @@
+%include "boot/pc98_defs.inc"
+
 ;; ============================================================
 ;; bootinfo_rm.inc — ブート情報域を書く 16 ビット実モードの手続き
 ;;
@@ -38,7 +40,7 @@ bi_clear:
 bi_sense:
         mov     [si + BI_DRV_DA], al
         mov     byte [si + BI_DRV_QUERIED], 1
-        mov     ah, 84h
+        mov     ah, BIOS_DISK_SENSE
         xor     bx, bx          ;; 失敗時に前の値が残って見えないよう 0 から
         xor     cx, cx
         xor     dx, dx
@@ -46,7 +48,7 @@ bi_sense:
         push    bp
         push    es
         push    ds
-        int     1Bh
+        int     BIOS_INT_DISK
         pop     ds              ;; pop はフラグを変えない (CF をこの後で読む)
         pop     es
         pop     bp

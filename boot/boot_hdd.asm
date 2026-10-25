@@ -1,3 +1,8 @@
+%include "boot/memmap_defs.inc"
+%include "boot/pc98_defs.inc"
+%include "boot/realmode_defs.inc"
+%include "boot/bootinfo.inc"
+
 ;; ========================================================================
 ;;  boot_hdd.asm — OS32 HDD IPL (512B, BIOS INT 1Bh)
 ;;
@@ -35,25 +40,25 @@ boot_entry:
         ;; --- ジオメトリパッチ領域 (offset 8-10) ---
 geo_heads:  db  8               ;; ヘッド数
 geo_spt:    db  17              ;; セクタ/トラック
-geo_da:     db  80h             ;; DA/UA
+geo_da:     db  BOOT_DRIVE_HDD  ;; DA/UA
 
 boot_main:
         ;; CS:IP 正規化 (BIOS が CS=0/IP=1FC00h で呼ぶ場合に対応)
         db      0EAh
         dw      boot_init
-        dw      1FC0h
+        dw      (MEM_HDD_IPL_BASE >> RM_SEGMENT_SHIFT)
 
 boot_init:
         cli
-        mov     ax, 1FC0h
+        mov     ax, (MEM_HDD_IPL_BASE >> RM_SEGMENT_SHIFT)
         mov     ds, ax
         xor     ax, ax
         mov     ss, ax
-        mov     sp, 7C00h
+        mov     sp, MEM_BOOT_RM_STACK_TOP
         sti
 
         ;; 起動メッセージ表示
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
         xor     di, di
         mov     si, msg_boot
@@ -62,7 +67,7 @@ boot_init:
         ;; ローダーロード先: 0000:8000
         xor     ax, ax
         mov     es, ax
-        mov     di, 8000h           ;; ES:BP 用バッファポインタ
+        mov     di, MEM_LOADER_START  ;; ES:BP 用バッファポインタ
 
         ;; LBA 2 から 16セクタ (8KB) をロード
         mov     ax, 2               ;; 開始LBA
@@ -90,17 +95,17 @@ load_loop:
         mov     dl, al              ;; DL = セクタ (0ベース)
 
         mov     bp, di              ;; ES:BP = バッファ
-        mov     bx, 512             ;; 転送バイト数
+        mov     bx, BOOTINFO_SECLEN  ;; 転送バイト数
 
-        mov     ah, 06h
+        mov     ah, BIOS_DISK_READ
         mov     al, [geo_da]
-        int     1Bh
+        int     BIOS_INT_DISK
         jc      boot_error
 
         pop     cx
         pop     ax
         inc     ax
-        add     di, 512
+        add     di, BOOTINFO_SECLEN
         dec     cx
         jnz     load_loop
 
@@ -110,12 +115,12 @@ load_loop:
         mov     ah, [geo_heads]
         mov     bl, [geo_spt]
         db      0EAh
-        dw      8000h, 0000h
+        dw      MEM_LOADER_START, 0000h
 
 boot_error:
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
-        mov     di, 160
+        mov     di, TVRAM_BPR
         mov     si, msg_err
         call    print_msg
 boot_halt:
@@ -133,10 +138,10 @@ pr_loop:
         mov     ah, 0
         mov     es:[di], ax
         push    di
-        add     di, 2000h
-        mov     byte es:[di], 0E1h
+        add     di, (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)
+        mov     byte es:[di], TATTR_WHITE
         pop     di
-        add     di, 2
+        add     di, TVRAM_CELL_BYTES
         jmp     pr_loop
 pr_done:
         pop     di
