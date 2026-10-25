@@ -69,6 +69,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 検査の整理 (重い検査を軽く・重複を束ねる・古い試験を削る、2026-10-24 ユーザー決定) は [TASK_TEST_TIDY](tasks/v3/TASK_TEST_TIDY.md)。
 低レベルのマジックナンバーに名前を付ける段 ([C4]、v3 で足された行が中心、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM](tasks/v3/TASK_MAGIC_NUM.md)。
 fork 前からある行のマジックナンバー (OS 側、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM2](tasks/v3/TASK_MAGIC_NUM2.md)。
+ver と About の表示を実際の版と装置の状態から出す見直し (CUI・GUI、2026-10-26 ユーザー指示) は [TASK_VER_INFO](tasks/v3/TASK_VER_INFO.md)。
 OS の肥大化したコードを削る段 (表を詰める・カーネル常駐の自己試験を外へ・死んだローダ・長い関数、2026-10-25 ユーザー指示、実装は astra) は [TASK_SLIM](tasks/v3/TASK_SLIM.md)。
 
 ## 生成文書の見方
