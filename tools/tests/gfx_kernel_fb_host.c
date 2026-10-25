@@ -324,6 +324,7 @@ static void bridge_check(int started)
             CHECK(phys == sf->first*PAGE_SIZE + sf->plane_offset[plane]);
             for (u32 j = 0; j < span; j++)
                 ((u8 *)P2V(phys))[j] = (u8)(j + plane*37);
+            kmemset((void *)P2V_IO(vram[plane]), 0xa5, GVRAM_PLANE_SIZE);
         }
         CHECK(!lease_release(&space,token));
         gfx_framebuffer_bridge((void *)(MEM_EXEC_LOAD_ADDR+512));
@@ -337,6 +338,8 @@ static void bridge_check(int started)
                 CHECK(((u8 *)P2V(phys))[j] == (u8)(j + plane*37));
                 CHECK(((u8 *)P2V_IO(vram[plane]))[j] == (u8)(j + plane*37));
             }
+            for (u32 j = span; j < GVRAM_PLANE_SIZE; j++)
+                CHECK(((u8 *)P2V_IO(vram[plane]))[j] == 0xa5);
         }
     }
     /* GUI initialization failures must disable drawing without killing it. */
@@ -352,6 +355,40 @@ static void bridge_check(int started)
     CHECK(!lease_release(&space,token));
 }
 static u32 diag_previous_gen;
+static void pc98_query_check(u16 height, int flip)
+{
+    GFX_ScreenInfo info;
+    kmemset(&info, 0xa5, sizeof(info));
+    CHECK(!gfx_backend_pc98.query(&info));
+    CHECK(info.width == GFX_WIDTH && info.height == height);
+    CHECK(info.bpp == GFX_FMT_PLANAR4_BPP && info.format == GFX_FMT_PLANAR4);
+    CHECK(info.flags == (GFX_CAP_TEXT_OVERLAY | (flip ? GFX_CAP_PAGE_FLIP : 0)));
+    CHECK(info.lease_mask == 0xFF7E && !info.lease_first && !info.lease_count);
+    for (u32 i = 0; i < sizeof(info.reserved) / sizeof(info.reserved[0]); i++)
+        CHECK(!info.reserved[i]);
+}
+
+static void pc98_modes_check(void)
+{
+    GfxBackend *be = &gfx_backend_pc98;
+    CHECK(be->mode_count == 2 && be->default_mode == 0 && !be->selected_mode);
+    CHECK(!be->init); /* core still owns PC98 GDC init (selection is G6a). */
+    CHECK(gfx_backend_mode(be) == &be->modes[0]);
+    for (u32 i = 0; i < be->mode_count; i++) {
+        const GfxMode *m = &be->modes[i];
+        u32 plane, total;
+        CHECK(m->width == GFX_WIDTH && m->height == (i ? GFX_HEIGHT_200 : GFX_HEIGHT));
+        CHECK(m->format == GFX_FMT_PLANAR4 && m->pitch == GFX_BPL);
+        CHECK(m->dac_bits == 4 && m->hw_mode == i && !m->reserved);
+        CHECK(gfx_mode_layout(m, &plane, &total));
+        CHECK(plane == (i ? GFX_PLANE_SZ_200 : GFX_PLANE_SZ));
+        CHECK(total == plane * GVRAM_PLANES);
+    }
+    CHECK(gfx_mode_pick(be, 1) == &be->modes[1]);
+    CHECK(be->query(0) == OS32_ERR_INVAL);
+    pc98_query_check(GFX_HEIGHT, 0);
+}
+
 static void diag_px_check(void)
 {
     host_serial_reset();
@@ -446,6 +483,7 @@ static void run(void)
     struct surface_query_source source;
     u32 owner;
     CallerAccessFrame previous;
+    pc98_modes_check();
     CHECK(!bb_b && !bb_r && !bb_g && !bb_i && !gfx_backend_pc98.bb_base);
     CHECK(gfx_kernel_framebuffer(&fb) == OS32_ERR_INVAL && !fb.planes[0]);
     gfx_present(); gfx_present_dirty(); gfx_present_nosync(); gfx_present_raster(0);
@@ -499,6 +537,7 @@ static void run(void)
         bridge_check(0);
         host_serial_reset();
         gfx_init();
+        if (selected == LEDGER_SF_PC98) pc98_query_check(GFX_HEIGHT, 1);
         diag_present_check(1);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT : MEM_GFX_BB8_HEIGHT,1);
         bridge_check(1);
@@ -507,13 +546,23 @@ static void run(void)
         bb[0]=bb_b=0;
         host_serial_reset();
         gfx_init_200();
+        if (selected == LEDGER_SF_PC98) pc98_query_check(GFX_HEIGHT_200, 1);
         diag_present_check(0);
         CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->height == GFX_HEIGHT);
         CHECK(ledger_surface_find(LEDGER_SF_PC98,LEDGER_ROLE_CLIENT)->plane_offset[1] == GFX_PLANE_SZ);
         view_check(selected,selected == LEDGER_SF_PC98 ? GFX_HEIGHT_200 : MEM_GFX_BB8_HEIGHT,1);
         bridge_check(1);
         display_check(selected);
+        /* Exercise the selected-row reset before G6a wires mode selection. */
+        if (selected == LEDGER_SF_PC98)
+            gfx_backend_pc98.selected_mode = gfx_mode_pick(&gfx_backend_pc98, 1);
         gfx_shutdown();
+        if (selected == LEDGER_SF_PC98) {
+            CHECK(gfx_current_height == GFX_HEIGHT);
+            CHECK(gfx_backend_pc98.selected_mode == &gfx_backend_pc98.modes[0]);
+            CHECK(!gfx_flip_enabled && !gfx_display_page);
+            pc98_query_check(GFX_HEIGHT, 0);
+        }
         view_check(LEDGER_SF_PC98,GFX_HEIGHT,0);
         bridge_check(0);
     }

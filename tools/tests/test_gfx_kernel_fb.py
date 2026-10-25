@@ -187,6 +187,10 @@ def main():
             return 'RED '+m[0]
         for message in run_ordered(one,MUTANTS): print(message)
         for name,unit,old,new,expected in [
+            ('pc98-shutdown-height','gfx/backend_pc98.c',
+             'gfx_current_height = gfx_backend_mode(&gfx_backend_pc98)->height;',
+             'gfx_current_height = GFX_HEIGHT_200;',
+             'FAIL gfx_current_height == GFX_HEIGHT'),
             ('display-authorization','exec/surface_query.c',
              'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))', 'if (0)',
              'FAIL surface_lease(&source,'),
@@ -196,5 +200,5 @@ def main():
             result=run_case(None,args.runner,[(unit,old,new)])
             assert result.returncode == 1 and expected in result.stdout,(name,result.stdout,result.stderr)
             print('RED '+name)
-        print(f'PASS {len(MUTANTS)+2}/{len(MUTANTS)+2} runtime mutants')
+        print(f'PASS {len(MUTANTS)+3}/{len(MUTANTS)+3} runtime mutants')
 if __name__ == '__main__': main()
