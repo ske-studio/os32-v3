@@ -13,6 +13,13 @@ BIN_STANDALONE = $(patsubst boot/%.asm,$(BOOT_OUT)/%.bin,$(ASM_STANDALONE))
 BOOTINFO_INC = boot/bootinfo.inc boot/bootinfo_rm.inc
 $(BOOT_OUT)/loader_fat_new.bin $(BOOT_OUT)/loader_fat144.bin $(BOOT_OUT)/loader_hdd.o: $(BOOTINFO_INC)
 
+# C の正典の値を写した NASM の .inc (FD ローダと共有する BIOS の補助を含む)。変えたら読む側を組み直す。
+BOOT_NAMED_COMMON_INC = boot/memmap_defs.inc boot/pc98_defs.inc boot/realmode_defs.inc
+$(BOOT_OUT)/boot_fat.bin $(BOOT_OUT)/boot_fat144.bin: $(BOOT_NAMED_COMMON_INC) boot/fat12_defs.inc
+$(BOOT_OUT)/boot_hdd.bin: $(BOOT_NAMED_COMMON_INC) boot/bootinfo.inc
+$(BOOT_OUT)/loader_hdd.o: $(BOOT_NAMED_COMMON_INC) boot/gdt_defs.inc boot/hex_defs.inc boot/boot_probe.inc
+$(BOOT_OUT)/loader_fat_new.bin $(BOOT_OUT)/loader_fat144.bin: boot/pc98_defs.inc
+
 # === 新HDDローダー (ASM + C リンク) ===
 CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS) -m32 -march=i386 -ffreestanding -fno-pie \
               -fno-stack-protector -nostdlib -mno-red-zone -Os -Wall -fcommon \
@@ -52,8 +59,8 @@ $(BOOT_OUT)/vk32_boot.o: boot/vk32_boot.c boot/boot_defs.h lib/crc32_core.inc
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
 
-$(BOOT_OUT)/loader_hdd.elf: $(BOOT_ALL_OBJ)
-	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $^ \
+$(BOOT_OUT)/loader_hdd.elf: $(BOOT_ALL_OBJ) boot/loader.ld
+	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $(filter %.o,$^) \
 		-L$(shell $(CC) -print-libgcc-file-name | xargs dirname) -lgcc
 
 $(BOOT_OUT)/loader_hdd.bin: $(BOOT_OUT)/loader_hdd.elf
@@ -100,8 +107,8 @@ $(BOOT_OUT)/boot_debug.o: boot/boot_debug.c boot/boot_defs.h drivers/pc98pt.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BOOT) -Idrivers -c -o $@ $<
 
-$(BOOT_OUT)/loader_hdd_debug.elf: $(BOOT_DBG_ALL_OBJ)
-	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $^ \
+$(BOOT_OUT)/loader_hdd_debug.elf: $(BOOT_DBG_ALL_OBJ) boot/loader.ld
+	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $(filter %.o,$^) \
 		-L$(shell $(CC) -print-libgcc-file-name | xargs dirname) -lgcc
 
 $(BOOT_OUT)/loader_hdd_debug.bin: $(BOOT_OUT)/loader_hdd_debug.elf

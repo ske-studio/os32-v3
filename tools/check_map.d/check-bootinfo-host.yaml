@@ -7,3 +7,22 @@ check-bootinfo-host:
 - tools/tests/test_bootinfo.py
 - tools/check_map.d/check-bootinfo-host.yaml
 - build/checks.d/check-bootinfo-host.mk
+# N12 NASM/ld mirrors are checked by the bootinfo host entry point.
+- tools/tests/test_boot_named_constants.py
+- boot/boot_fat.asm
+- boot/boot_hdd.asm
+- boot/loader_hdd.asm
+- boot/loader.ld
+- boot/bootinfo_rm.inc
+- boot/memmap_defs.inc
+- boot/pc98_defs.inc
+- boot/realmode_defs.inc
+- boot/gdt_defs.inc
+- boot/hex_defs.inc
+- boot/boot_probe.inc
+- boot/fat12_defs.inc
+- include/memmap.h
+- include/pc98.h
+- include/types.h
+- kernel/gdt.h
+- lib/kstring.h

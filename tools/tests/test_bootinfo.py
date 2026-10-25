@@ -218,6 +218,8 @@ def mutate(tmp):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    from test_boot_named_constants import main as check_named_constants
+    check_named_constants()
     with tempfile.TemporaryDirectory(prefix="os32-bootinfo-") as tmp:
         exe = host_build(tmp)
         print("HOST GNU11 -Werror compile PASS (real kernel/bootinfo_check.c)",

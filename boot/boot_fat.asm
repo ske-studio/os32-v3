@@ -1,3 +1,8 @@
+%include "boot/memmap_defs.inc"
+%include "boot/pc98_defs.inc"
+%include "boot/realmode_defs.inc"
+%include "boot/fat12_defs.inc"
+
 ;; ============================================================
 ;; boot_fat.asm — PC-98 FAT12 IPLブートセクタ
 ;;
@@ -37,7 +42,7 @@ cpu 8086
 SECT_SZ     EQU     0200h       ;; セクタ長 512B
 SECT_N      EQU     02h         ;; INT 1Bh のセクタ長コード (2 = 512B)
 SPT         EQU     18          ;; セクタ/トラック
-DA_UA       EQU     030h        ;; DA/UA: 1.44MB 対応両用 I/F ユニット0
+DA_UA       EQU     BOOT_DRIVE_FDD_144  ;; DA/UA: 1.44MB 対応両用 I/F ユニット0
 ROOT_START  EQU     19          ;; ルートDir開始LBA (1 + 2*9)
 ROOT_SECTS  EQU     12          ;; ルートDirセクタ数 (192 エントリ)
 FAT_SECTS   EQU     9           ;; FAT1 本あたりのセクタ数
@@ -46,7 +51,7 @@ DATA_START  EQU     31          ;; データ領域開始LBA
 SECT_SZ     EQU     0400h       ;; セクタ長 1024B
 SECT_N      EQU     03h         ;; INT 1Bh のセクタ長コード (3 = 1024B)
 SPT         EQU     8           ;; セクタ/トラック
-DA_UA       EQU     090h        ;; DA/UA: 1MB FDD ユニット0
+DA_UA       EQU     BOOT_DRIVE_FDD  ;; DA/UA: 1MB FDD ユニット0
 ROOT_START  EQU     5           ;; ルートDir開始LBA
 ROOT_SECTS  EQU     6           ;; ルートDirセクタ数
 FAT_SECTS   EQU     2           ;; FAT1 本あたりのセクタ数
@@ -54,8 +59,8 @@ DATA_START  EQU     11          ;; データ領域開始LBA
 %endif
 
 ROOT_ENTS   EQU     192         ;; ルートDirエントリ数 (両ジオメトリ共通)
-LOAD_DEST   EQU     8000h       ;; LOADER.BIN ロード先
-FAT_BUF     EQU     6000h       ;; FAT/RootDir一時バッファ
+LOAD_DEST   EQU     MEM_LOADER_START  ;; LOADER.BIN ロード先
+FAT_BUF     EQU     MEM_BOOT_FAT_BUF  ;; FAT/RootDir一時バッファ
 FAT_START   EQU     1           ;; FAT開始LBA
 
 section .text
@@ -101,7 +106,7 @@ boot_main:
         xor     ax, ax
         mov     es, ax          ;; ES = 0 (データ読込先)
         mov     ss, ax
-        mov     sp, 7C00h
+        mov     sp, MEM_BOOT_RM_STACK_TOP
         sti
 
         ;; 起動メッセージ表示
@@ -135,21 +140,21 @@ boot_main:
         mov     al, es:[di]
         cmp     al, 0           ;; 終端?
         je      .no_loader
-        cmp     al, 0E5h        ;; 削除済み?
+        cmp     al, FAT12_DIRENT_DELETED  ;; 削除済み?
         je      .scan_next
 
         ;; 11バイト比較
         push    cx
         push    di
         mov     si, loader_name
-        mov     cx, 11
+        mov     cx, FAT12_NAME_BYTES
         repe    cmpsb
         pop     di
         pop     cx
         je      .found_loader
 
 .scan_next:
-        add     di, 32          ;; 次のエントリ
+        add     di, FAT12_DIRENT_BYTES  ;; 次のエントリ
         loop    .scan_dir
 
 .no_loader:
@@ -160,7 +165,7 @@ boot_main:
 
 .found_loader:
         ;; 開始クラスタ取得 (DirEntry 0x1A)
-        mov     ax, es:[di + 1Ah]
+        mov     ax, es:[di + FAT12_DIRENT_CLUSTER_OFF]
         mov     word [var_cluster], ax
 
         ;; ============================================================
@@ -191,7 +196,7 @@ boot_main:
 .load_chain:
         ;; クラスタ→LBA: LBA = DATA_START + (cluster - 2)
         push    ax
-        sub     ax, 2
+        sub     ax, FAT12_FIRST_CLUSTER
         add     ax, DATA_START
         call    read_sector
         pop     ax
@@ -203,7 +208,7 @@ boot_main:
         call    fat12_next      ;; AX = next cluster
 
         ;; EOC (>= 0xFF8) ?
-        cmp     ax, 0FF8h
+        cmp     ax, FAT12_EOC_MIN
         jb      .load_chain
 
         ;; ============================================================
@@ -240,11 +245,11 @@ read_sector:
         mov     cl, al          ;; CL = cylinder
 
         ;; INT 1Bh: FDD読み込み
-        mov     ah, 76h         ;; SEEK+RETRY+READ
+        mov     ah, BIOS_DISK_READ_SEEK_MFM_NO_RETRY  ;; SEEK+RETRY+READ
         mov     al, DA_UA
         mov     bx, SECT_SZ     ;; 転送バイト数
         mov     ch, SECT_N      ;; セクタ長コード
-        int     1Bh
+        int     BIOS_INT_DISK
 
         pop     ax
         jc      disk_error
@@ -272,12 +277,12 @@ fat12_next:
         ;; 奇数/偶数で上位/下位4bit選択
         test    ax, 1
         jnz     .odd
-        and     dx, 0FFFh
+        and     dx, FAT12_CLUSTER_MASK
         jmp     .done
 .odd:
-        mov     cl, 4
+        mov     cl, FAT12_ODD_SHIFT
         shr     dx, cl
-        and     dx, 0FFFh
+        and     dx, FAT12_CLUSTER_MASK
 .done:
         mov     ax, dx
 
@@ -300,7 +305,7 @@ disk_error:
 ;; ============================================================
 show_boot_msg:
         push    es
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
         xor     di, di          ;; 0行目先頭
         mov     si, msg_boot
@@ -313,9 +318,9 @@ show_boot_msg:
 ;; ============================================================
 show_error:
         push    es
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
-        mov     di, 160         ;; 2行目 (80文字×2バイト)
+        mov     di, TVRAM_BPR  ;; 2行目 (80文字×2バイト)
         call    print_str
         pop     es
         ret
@@ -331,10 +336,10 @@ print_str:
         mov     ah, 0
         mov     es:[di], ax
         push    di
-        add     di, 2000h
-        mov     byte es:[di], 0E1h
+        add     di, (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)
+        mov     byte es:[di], TATTR_WHITE
         pop     di
-        add     di, 2
+        add     di, TVRAM_CELL_BYTES
         jmp     print_str
 .done:
         ret

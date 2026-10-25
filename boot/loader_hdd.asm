@@ -1,3 +1,10 @@
+%include "boot/memmap_defs.inc"
+%include "boot/pc98_defs.inc"
+%include "boot/realmode_defs.inc"
+%include "boot/gdt_defs.inc"
+%include "boot/hex_defs.inc"
+%include "boot/boot_probe.inc"
+
 ;; ============================================================
 ;; loader_hdd_new.asm — OS32 HDD 新ローダー (ext2 + LZ4)
 ;;
@@ -20,9 +27,18 @@
 
 cpu 386
 
+; HDD-only GDT entries (not the kernel user/TSS selectors).
+BOOT_PM16_CS EQU 0x18
+BOOT_RM_DS EQU 0x20
+; cdecl arguments: saved EBP + return address precede the first word.
+READ_ARG_LBA EQU 8
+READ_ARG_BUF EQU 12
+PRINT_ARG_TVRAM EQU 8
+PRINT_ARG_MSG EQU 12
+
 ;; 16bit→32bit パラメータ受け渡し用の固定アドレス
 ;; (ELFシンボル参照を16bitコードで回避するため)
-PARAM_AREA      EQU     7F00h
+PARAM_AREA      EQU     MEM_BOOT_BIOS_PARAM_BASE
 PARAM_DA_OFF    EQU     0       ;; 7F00h
 PARAM_HEADS_OFF EQU     1       ;; 7F01h
 PARAM_SPT_OFF   EQU     2       ;; 7F02h
@@ -58,7 +74,7 @@ loader_entry:
         xor     ax, ax
         mov     ds, ax
         mov     ss, ax
-        mov     sp, 7C00h
+        mov     sp, MEM_BOOT_RM_STACK_TOP
 
         ;; ============================================================
         ;; ブート情報域 (票 TASK_HDD_INSTALL 段 0 / N2)。
@@ -94,9 +110,9 @@ loader_entry:
         jmp     .geo_ok
 
 .geo_unknown:
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
-        mov     di, 1120                ;; 7 行目 (PM の表示は 5 行目まで)
+        mov     di, 7 * TVRAM_BPR  ;; 7 行目 (PM の表示は 5 行目まで)
         mov     si, msg_geo_unknown
         call    rm_print
         xor     ax, ax
@@ -106,9 +122,9 @@ loader_entry:
 .geo_mismatch:
         ;; "HDD geom mismatch: IPL H/S=hh/ss BIOS H/S=hh/ss" を出して止まる
         push    si
-        mov     ax, 0A000h
+        mov     ax, (TVRAM_CHAR_BASE >> RM_SEGMENT_SHIFT)
         mov     es, ax
-        mov     di, 960                 ;; 6 行目
+        mov     di, 6 * TVRAM_BPR  ;; 6 行目
         mov     si, msg_geo_mis1
         call    rm_print
         mov     al, [PARAM_AREA + PARAM_HEADS_OFF]
@@ -136,13 +152,13 @@ loader_entry:
 .geo_ok:
 
         ;; A20 ゲート有効化 (PC-98: ポート 0xF2)
-        mov     al, 3
-        out     0F2h, al
+        mov     al, CPU_A20_ENABLE
+        out     CPU_A20_PORT, al
 
         ;; 割り込み・NMI 禁止
         cli
         xor     al, al
-        out     50h, al
+        out     NMI_RESET, al
 
         ;; GDT ロード (インラインGDT — ELFシンボル参照を回避)
         ;; CS=0なのでGDTの線形アドレス = GDTのオフセットアドレス
@@ -150,7 +166,7 @@ loader_entry:
         ;; ここでは即値で計算して書き込む
         xor     eax, eax
         mov     ax, cs
-        shl     eax, 4              ;; CS ベースアドレス (= 0)
+        shl     eax, RM_SEGMENT_SHIFT  ;; CS ベースアドレス (= 0)
         add     eax, dword gdt16    ;; GDTの線形アドレス
         mov     [dword gdtr16_base], eax
         lgdt    [dword gdtr16]
@@ -164,7 +180,7 @@ loader_entry:
         db      066h
         db      0EAh
         dd      pm_entry
-        dw      0008h
+        dw      GDT_KERNEL_CS
 
 ;; --- 16bitセクション内のインラインGDT ---
 ;; (bits 16 セクションに配置。リンカ配置アドレスは dword 参照で解決)
@@ -205,7 +221,7 @@ gdtr16_base:    dd      0
 ;; --- BIOS トランポリン (16bit PM -> RM -> BIOS -> PM) ---
 pm16_trampoline:
         ;; 16bitデータセグメント (0x20)
-        mov     ax, 20h
+        mov     ax, BOOT_RM_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
@@ -229,15 +245,15 @@ rm_trampoline:
         
         ;; BIOSパラメータセット
         mov     al, [PARAM_AREA + PARAM_DA_OFF]
-        mov     bx, 512
+        mov     bx, BOOTINFO_SECLEN
         mov     cx, [PARAM_AREA + PARAM_CYL_OFF]
         mov     dh, [PARAM_AREA + PARAM_HEAD_OFF]
         mov     dl, [PARAM_AREA + PARAM_SEC_OFF]
         mov     es, [PARAM_AREA + PARAM_BUF_SEG]
         mov     bp, [PARAM_AREA + PARAM_BUF_OFF_16]
         
-        mov     ah, 06h
-        int     1Bh
+        mov     ah, BIOS_DISK_READ
+        int     BIOS_INT_DISK
         ;; CF と AH を残す (PM 側の pm_read_sector が見て、失敗なら止まる。
         ;; F14 / Codex B9 — 以前は CF を見ずに読めたことにしていた)。
         ;; DS は BIOS が保存する。setc / mov はフラグを変えない順で。
@@ -255,7 +271,7 @@ rm_trampoline:
         db      066h
         db      0EAh
         dd      pm32_return_trampoline
-        dw      0008h
+        dw      GDT_KERNEL_CS
 
 ;; ============================================================
 ;; 実モードの表示 (ES = A000h、DI = TVRAM オフセット、SI = 文字列)
@@ -268,8 +284,8 @@ rm_print:
         jz      .done
         mov     ah, 0
         mov     es:[di], ax
-        mov     byte es:[di + 2000h], 0E1h
-        add     di, 2
+        mov     byte es:[di + (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)], TATTR_WHITE
+        add     di, TVRAM_CELL_BYTES
         jmp     .loop
 .done:
         pop     ax
@@ -279,24 +295,24 @@ rm_print:
 rm_hex8:
         push    ax
         push    ax
-        shr     al, 4
+        shr     al, HEX_NIBBLE_BITS
         call    .nib
         pop     ax
-        and     al, 0Fh
+        and     al, HEX_DIGIT_MASK
         call    .nib
         pop     ax
         ret
 .nib:
-        and     al, 0Fh
+        and     al, HEX_DIGIT_MASK
         add     al, '0'
         cmp     al, '9'
         jbe     .put
-        add     al, 7
+        add     al, HEX_ALPHA_BIAS
 .put:
         mov     ah, 0
         mov     es:[di], ax
-        mov     byte es:[di + 2000h], 0E1h
-        add     di, 2
+        mov     byte es:[di + (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)], TATTR_WHITE
+        add     di, TVRAM_CELL_BYTES
         ret
 
 ;; ブート情報域を書く手続き (bi_clear / bi_sense / bi_seal)。
@@ -311,13 +327,13 @@ bits 32
 
 pm_entry:
         ;; セグメントレジスタ初期化 (フラットモデル)
-        mov     eax, 10h
+        mov     eax, GDT_KERNEL_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
         mov     gs, ax
         mov     ss, ax
-        mov     esp, 0009FFFCh
+        mov     esp, MEM_BOOT_STACK_TOP
 
         ;; 固定アドレスからパラメータを読み出してELFシンボルに保存
         mov     al, [PARAM_AREA + PARAM_DA_OFF]
@@ -328,7 +344,7 @@ pm_entry:
         mov     [param_spt], al
 
         ;; 起動メッセージ
-        mov     edi, 0A0000h
+        mov     edi, TVRAM_CHAR_BASE
         mov     esi, msg_title
         call    pm_print
 
@@ -345,7 +361,7 @@ pm_entry:
         rep     stosd
 
         ;; デバッグ: BSS OK
-        mov     edi, 0A0000h + 320
+        mov     edi, TVRAM_CHAR_BASE + 2 * TVRAM_BPR
         mov     esi, msg_dbg05
         call    pm_print
 
@@ -359,7 +375,7 @@ pm_entry:
 
 
         ;; デバッグ: Cメイン呼び出し前
-        mov     edi, 0A0000h + 480
+        mov     edi, TVRAM_CHAR_BASE + 3 * TVRAM_BPR
         mov     esi, msg_dbg1
         call    pm_print
 
@@ -370,23 +386,23 @@ pm_entry:
         ;; デバッグ: boot_main戻り値をTVRAMに表示
         ;; EAXの値を16進1桁で表示 (0=成功, FD/FE/FF=エラー)
         push    eax
-        mov     edi, 0A0000h + 640
+        mov     edi, TVRAM_CHAR_BASE + 4 * TVRAM_BPR
         mov     esi, msg_dbg2
         call    pm_print
         ;; 戻り値の下位ニブルを16進文字で表示
         pop     eax
         push    eax
-        and     al, 0Fh
+        and     al, HEX_DIGIT_MASK
         add     al, '0'
         cmp     al, '9'
         jbe     .hex_ok
-        add     al, 7            ;; 'A'-'9'-1
+        add     al, HEX_ALPHA_BIAS  ;; 'A'-'9'-1
 .hex_ok:
         mov     ah, 0
         mov     [edi], ax
         push    edi
-        add     edi, 2000h
-        mov     byte [edi], 0E1h
+        add     edi, (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)
+        mov     byte [edi], TATTR_WHITE
         pop     edi
 
         pop     eax
@@ -396,21 +412,21 @@ pm_entry:
         jnz     pm_halt
 
         ;; === メモリプロービング (1MB以上, 512KB刻み, 16MB上限) ===
-        mov     esi, 00100000h
-        mov     ecx, 1024        ;; 初期値 1024KB
+        mov     esi, MEM_1MB
+        mov     ecx, MEM_1MB / KIB  ;; 初期値 1024KB
 
 probe_loop:
         mov     eax, [esi]
-        mov     dword [esi], 0AA55AA55h
-        cmp     dword [esi], 0AA55AA55h
+        mov     dword [esi], BOOT_PROBE_PATTERN_A
+        cmp     dword [esi], BOOT_PROBE_PATTERN_A
         jne     probe_done
-        mov     dword [esi], 055AA55AAh
-        cmp     dword [esi], 055AA55AAh
+        mov     dword [esi], BOOT_PROBE_PATTERN_B
+        cmp     dword [esi], BOOT_PROBE_PATTERN_B
         jne     probe_done
         mov     [esi], eax
-        add     ecx, 512
-        add     esi, 00080000h
-        cmp     esi, 01000000h
+        add     ecx, BOOT_PROBE_STEP_KIB
+        add     esi, BOOT_PROBE_STEP_KIB * KIB
+        cmp     esi, MEM_BOOT_PROBE_END
         jb      probe_loop
 
 probe_done:
@@ -422,13 +438,13 @@ probe_done:
         push    dword 0          ;; ダミーリターンアドレス
 
         ;; カーネルにジャンプ
-        mov     edi, 0A0000h + 800
+        mov     edi, TVRAM_CHAR_BASE + 5 * TVRAM_BPR
         mov     esi, msg_booting
         call    pm_print
 
         db      0EAh
-        dd      00100000h        ;; kentry (1MB)
-        dw      0008h            ;; CS セレクタ
+        dd      KERNEL_LOAD_ADDR  ;; kentry (1MB)
+        dw      GDT_KERNEL_CS  ;; CS セレクタ
 
 
 ;; ============================================================
@@ -441,8 +457,8 @@ boot_read_sector_asm:
         push    ebp
         mov     ebp, esp
         push    edi
-        mov     eax, [ebp+8]     ;; lba
-        mov     edi, [ebp+12]    ;; buf
+        mov     eax, [ebp+READ_ARG_LBA]  ;; lba
+        mov     edi, [ebp+READ_ARG_BUF]  ;; buf
         call    pm_read_sector
         pop     edi
         pop     ebp
@@ -460,8 +476,8 @@ boot_print_asm:
         mov     ebp, esp
         push    edi
         push    esi
-        mov     edi, [ebp+8]     ;; tvram_addr
-        mov     esi, [ebp+12]    ;; msg
+        mov     edi, [ebp+PRINT_ARG_TVRAM]  ;; tvram_addr
+        mov     esi, [ebp+PRINT_ARG_MSG]  ;; msg
         call    pm_print
         pop     esi
         pop     edi
@@ -471,7 +487,7 @@ boot_print_asm:
 
 pm32_return_trampoline:
         ;; 32bitデータセグメントに戻す
-        mov     ax, 10h
+        mov     ax, GDT_KERNEL_DS
         mov     ds, ax
         mov     es, ax
         mov     fs, ax
@@ -493,10 +509,10 @@ pm_read_sector:
         
         ;; バッファアドレス変換 (EDI -> ES:BP)
         mov     ebx, edi
-        shr     ebx, 4
+        shr     ebx, RM_SEGMENT_SHIFT
         mov     [PARAM_AREA + PARAM_BUF_SEG], bx
         mov     ebx, edi
-        and     ebx, 0Fh
+        and     ebx, RM_SEGMENT_OFFSET_MASK
         mov     [PARAM_AREA + PARAM_BUF_OFF_16], bx
         
         ;; LBA (EAX) -> CHS 変換
@@ -517,7 +533,7 @@ pm_read_sector:
         mov     dword [PARAM_AREA + PARAM_RET_EIP], .return_here
         
         ;; 16bit PMトランポリンへジャンプ
-        jmp     0018h:pm16_trampoline
+        jmp     BOOT_PM16_CS:pm16_trampoline
         
 .return_here:
         ;; 読みの CF を見る (F14)。失敗なら LBA と AH を出して止まる —
@@ -526,24 +542,24 @@ pm_read_sector:
         cmp     byte [PARAM_AREA + PARAM_ST_CF], 0
         jne     .read_fail
         popad
-        add     edi, 512
+        add     edi, BOOTINFO_SECLEN
         ret
 
 .read_fail:
         popad
         push    eax                     ;; LBA (pushad の前の EAX)
-        mov     edi, 0A0000h + 960      ;; 6 行目
+        mov     edi, TVRAM_CHAR_BASE + 6 * TVRAM_BPR  ;; 6 行目
         mov     esi, msg_read_err
         call    pm_print
         mov     esi, msg_ah
         call    pm_print
         movzx   eax, byte [PARAM_AREA + PARAM_ST_AH]
-        mov     ecx, 2
+        mov     ecx, HEX8_DIGITS
         call    pm_hex
         mov     esi, msg_lba
         call    pm_print
         pop     eax
-        mov     ecx, 8
+        mov     ecx, HEX32_DIGITS
         call    pm_hex
         jmp     pm_halt
 
@@ -562,10 +578,10 @@ ppr_loop:
         mov     ah, 0
         mov     [edi], ax
         push    edi
-        add     edi, 2000h
-        mov     byte [edi], 0E1h
+        add     edi, (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)
+        mov     byte [edi], TATTR_WHITE
         pop     edi
-        add     edi, 2
+        add     edi, TVRAM_CELL_BYTES
         jmp     ppr_loop
 ppr_done:
         pop     eax
@@ -580,24 +596,24 @@ pm_hex:
         push    ebx
         push    edx
         mov     ebx, ecx
-        shl     ebx, 2                  ;; 桁数 × 4 ビット
+        shl     ebx, HEX_NIBBLE_SHIFT  ;; 桁数 × 4 ビット
 .next:
-        sub     ebx, 4
+        sub     ebx, HEX_NIBBLE_BITS
         mov     edx, eax
         push    ecx
         mov     ecx, ebx
         shr     edx, cl
         pop     ecx
-        and     edx, 0Fh
+        and     edx, HEX_DIGIT_MASK
         add     dl, '0'
         cmp     dl, '9'
         jbe     .put
-        add     dl, 7
+        add     dl, HEX_ALPHA_BIAS
 .put:
         mov     dh, 0
         mov     [edi], dx
-        mov     byte [edi + 2000h], 0E1h
-        add     edi, 2
+        mov     byte [edi + (TVRAM_ATTR_BASE - TVRAM_CHAR_BASE)], TATTR_WHITE
+        add     edi, TVRAM_CELL_BYTES
         dec     ecx
         jnz     .next
         pop     edx
