@@ -58,6 +58,7 @@ struct v86_session_state *kdi_ptr_v86_session(void) { return &v86_session; }
 u32 *kdi_ptr_v86_gcap_phase(void) { return &v86_gcap_phase; }
 u32 *kdi_ptr_v86_gcap_alloc_count(void) { return &v86_gcap_alloc_count; }
 u32 *kdi_ptr_v86_gcap_free_count(void) { return &v86_gcap_free_count; }
+void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
 void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kprintf,
     (void (*)(void))appmem_init,
@@ -86,7 +87,6 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))caller_access_leave,
     (void (*)(void))con_sink_disable,
     (void (*)(void))con_sink_enable,
-    (void (*)(void))con_sink_selftest,
     (void (*)(void))console_get_cursor_x,
     (void (*)(void))console_get_cursor_y,
     (void (*)(void))console_set_cursor,
@@ -328,6 +328,14 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))pci_cfg_write32,
     (void (*)(void))pci_cfg_write16,
     (void (*)(void))hwdev_module_ops,
+    (void (*)(void))con_sink_push_print,
+    (void (*)(void))con_sink_push_clear,
+    (void (*)(void))con_sink_push_cursor,
+    (void (*)(void))con_sink_push_exit,
+    (void (*)(void))con_sink_stat,
+    (void (*)(void))con_sink_read,
+    (void (*)(void))con_sink_owner_exit,
+    (void (*)(void))kdi_set_con_sink_drop_count,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -359,7 +367,6 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xe8ca711du, 1, 1},
     {0x458c7054u, 1, 1},
     {0x35586727u, 1, 1},
-    {0xe002fcd2u, 1, 1},
     {0x6535ddefu, 1, 1},
     {0x6435dc5cu, 1, 1},
     {0xeb796cbcu, 1, 1},
@@ -601,6 +608,14 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xbba6498fu, 1, 1},
     {0x47aba321u, 1, 1},
     {0x7c742f03u, 1, 1},
+    {0x924a8674u, 1, 1},
+    {0x547c48ceu, 1, 1},
+    {0x60dd1a53u, 1, 1},
+    {0xecd5f7d9u, 1, 1},
+    {0xd5f9a99au, 1, 1},
+    {0xa16eec9cu, 1, 1},
+    {0x7de5c4f0u, 1, 1},
+    {0x3702afabu, 1, 3},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

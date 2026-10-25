@@ -58,9 +58,4 @@ int con_sink_reader_get(void);
 /* --- 回収 (exec_reclaim_owned から) -------------------------------------- */
 void con_sink_owner_exit(int id);
 
-/* --- 自己診断 (kernel/kselftest.c) --------------------------------------- */
-/* リングの push/pop/レコード境界/あふれ/破棄を確かめる。ビット 0..n が
- * 落ちた項目 (0 = 全部通った)。呼んだ後のリングは空・無効に戻る。 */
-u32 con_sink_selftest(void);
-
 #endif /* __CON_SINK_H */

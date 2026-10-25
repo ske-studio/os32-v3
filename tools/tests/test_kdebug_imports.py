@@ -40,7 +40,7 @@ class ImportsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                 gen.check_nm(self.entries)
         altered = copy.deepcopy(self.entries)
-        altered[201].pop('retained')
+        altered[200].pop('retained')
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
 
@@ -96,17 +96,17 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 269)
-        self.assertEqual([e['name'] for e in self.entries[226:239]], [
+        self.assertEqual(len(self.entries), 276)
+        self.assertEqual([e['name'] for e in self.entries[225:238]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
             'kcg_rom_read_ank', 'kcg_cache_stats', 'v86_io_reset_policy', 'paging_pte_flags'])
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
-        self.assertEqual(gen.STAGES['S4'], 239)
-        self.assertEqual(gen.STAGES['S5'], 269)
-        self.assertEqual(gen.STAGES['S6'], 269)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ())
-        self.assertEqual([(e['stage'], e['name']) for e in self.entries[239:]], [
+        self.assertEqual(gen.STAGES['S4'], 238)
+        self.assertEqual(gen.STAGES['S5'], 268)
+        self.assertEqual(gen.STAGES['S6'], 276)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 7 + ('SETTER',))
+        self.assertEqual([(e['stage'], e['name']) for e in self.entries[238:268]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
             ('S5', 'e82557_send'), ('S5', 'e82557_get_mac'), ('S5', 'e82557_state'),
@@ -127,12 +127,12 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'pci_cfg_write16'),
             ('S5', 'hwdev_module_ops'),
         ])
-        self.assertEqual(self.entries[201]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[201]['source'], 'kernel/v86_io.h')
-        self.assertTrue(self.entries[201]['retained'])
-        self.assertEqual(self.entries[249]['name'], 'display_text_start')
+        self.assertEqual(self.entries[200]['name'], 'v86_cui_display_restore')
+        self.assertEqual(self.entries[200]['source'], 'kernel/v86_io.h')
+        self.assertTrue(self.entries[200]['retained'])
+        self.assertEqual(self.entries[248]['name'], 'display_text_start')
         self.assertEqual(self.entries[0]['name'], 'kprintf')
-        self.assertEqual(self.entries[210]['name'], 'kdi_ptr_v86_session')
+        self.assertEqual(self.entries[209]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
             'serial_puts_polled', 'kdi_get_kctx_irq_depth', 'kdi_get_kctx_exc_depth',
             'kdi_ptr_v86_gcap_phase', 'kdi_get_v86_gp_cs', 'kdi_get_v86_gp_ip', 'kdi_ptr_v86_session'})
@@ -167,7 +167,6 @@ class ImportsTests(unittest.TestCase):
         # Exercise future kinds without adding unused imports to the live ABI.
         additions = [('FUNC', 'shlib_read_page', 'kernel/shlib.h'),
                      ('GETTER', 'con_sink_drop_count', 'include/con_sink.h'),
-                     ('SETTER', 'con_sink_drop_count', 'include/con_sink.h'),
                      ('PTR', 'ring3_ls_start', 'exec/ring3_ls.h')]
         with tempfile.TemporaryDirectory(prefix='kdebug-s6-') as folder:
             out = Path(folder)
@@ -177,13 +176,13 @@ class ImportsTests(unittest.TestCase):
                     stage='S6', kind=kind, symbol=symbol, source=source, context_safe=False))
             definition = out / 'imports.def'
             definition.write_text(json.dumps(document))
-            with patch.dict(gen.STAGE_KINDS, S6=tuple(row[0] for row in additions)), \
+            with patch.dict(gen.STAGE_KINDS, S6=gen.STAGE_KINDS['S6'] + tuple(row[0] for row in additions)), \
                  patch.dict(gen.STAGES, S6=len(document['imports'])):
                 entries = gen.load_def(definition)
                 meta = gen.generate(entries, out, 'S6')
                 self.assertEqual(meta['count'], len(self.entries) + len(additions))
                 macros = (out / 'kdebug_import_macros.h').read_text()
-                self.assertIn('#define KDI_INDEX_shlib_read_page 269', macros)
+                self.assertIn(f'#define KDI_INDEX_shlib_read_page {len(self.entries)}', macros)
                 self.assertIn('__typeof__(&shlib_read_page)', macros)
                 self.assertNotIn('KDI_ADDR_kprintf', macros)
                 includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx',
@@ -206,43 +205,55 @@ class ImportsTests(unittest.TestCase):
                 # Both data operations must be used: GETTER cannot mask a lost SETTER.
                 original = gen.symbols
                 new_names = {e['name'] for e in entries[len(self.entries):]}
+                omit_setter = False
                 def with_s6(nm, paths, undefined):
                     refs = original(nm, paths, undefined)
                     if undefined and ROOT / 'build/out/kdebug/kselftest.o' in paths:
                         refs |= new_names
+                    if undefined and omit_setter:
+                        refs.discard('kdi_set_con_sink_drop_count')
                     return refs
                 with patch.object(gen, 'symbols', side_effect=with_s6):
                     self.assertTrue(gen.check_nm(entries))
-                    new_names.remove('kdi_set_con_sink_drop_count')
+                    omit_setter = True
                     with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*kdi_set_con_sink_drop_count'):
                         gen.check_nm(entries)
 
     def test_nm_resolves_moved_objects_from_link_map(self):
-        original_symbols, original_read = gen.symbols, Path.read_text
-        moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
-        def read_map(path, *args, **kwargs):
-            if path == ROOT / 'kdebug/selftest_con_sink.c':
-                return '/* fixture: no raw address import */'
+        self.assertTrue(gen.check_nm(self.entries))
+        original_read = Path.read_text
+        def without_moved(path, *args, **kwargs):
             text = original_read(path, *args, **kwargs)
             if path == ROOT / 'build/out/kdebug/kdebug.map':
-                text += '\nLOAD build/out/kdebug/selftest_con_sink.o\n'
+                text = '\n'.join(line for line in text.splitlines()
+                    if not (line.startswith('LOAD ') and 'selftest_con_sink.o' in line))
             return text
-        def moved_symbols(nm, paths, undefined):
-            refs = original_symbols(nm, [p for p in paths if p != moved], undefined)
-            if undefined and ROOT / 'build/out/kdebug/kselftest.o' in paths:
-                refs.add('kst_con_sink')
-                refs.discard('con_sink_selftest')
-            if moved in paths:
-                refs.add('con_sink_selftest' if undefined else 'kst_con_sink')
-            return refs
-        original_exists = Path.exists
-        with patch.object(Path, 'read_text', read_map), \
-             patch.object(Path, 'exists', lambda p: p == moved or original_exists(p)), \
-             patch.object(gen, 'symbols', side_effect=moved_symbols):
-            self.assertTrue(gen.check_nm(self.entries))
-        # Without the linked moved body, the local call must not become an import.
-        with patch.object(gen, 'symbols', side_effect=moved_symbols):
+        with patch.object(Path, 'read_text', without_moved):
             with self.assertRaisesRegex(ValueError, 'nm mismatch.*kst_con_sink'):
+                gen.check_nm(self.entries)
+
+    def test_con_move_contract_and_residency(self):
+        self.assertEqual([e['name'] for e in self.entries if e['stage'] == 'S6'], [
+            'con_sink_push_print', 'con_sink_push_clear', 'con_sink_push_cursor',
+            'con_sink_push_exit', 'con_sink_stat', 'con_sink_read',
+            'con_sink_owner_exit', 'kdi_set_con_sink_drop_count'])
+        nm = str(self.cross / 'i386-elf-nm')
+        kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
+        moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
+        module = gen.symbols(nm, [moved], False)
+        for symbol in ('con_sink_selftest', 'kst_con_sink', 'g_self_buf', 'g_self_src'):
+            self.assertNotIn(symbol, kernel)
+        self.assertTrue({'kst_con_sink', 'g_self_buf', 'g_self_src'} <= module)
+        self.assertIn('con_sink_drop_count', kernel)
+        self.assertNotIn('con_sink_selftest', {e['symbol'] for e in self.entries})
+        original = gen.symbols
+        def without_setter(nm, paths, undefined):
+            refs = original(nm, paths, undefined)
+            if undefined:
+                refs.discard('kdi_set_con_sink_drop_count')
+            return refs
+        with patch.object(gen, 'symbols', side_effect=without_setter):
+            with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*kdi_set_con_sink_drop_count'):
                 gen.check_nm(self.entries)
 
     def test_address_manifest_uses_only_linked_moved_sources(self):

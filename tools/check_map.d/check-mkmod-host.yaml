@@ -1,5 +1,6 @@
 check-mkmod-host:
 - kdebug/*.c
+- kdebug/selftest_internal.h
 - hwdev/generated/hwdev_core.c
 - kernel/module_schema.h
 - tools/module_schema.py

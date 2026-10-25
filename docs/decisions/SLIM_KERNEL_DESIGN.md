@@ -275,3 +275,8 @@ import表と既存利用者:
 - GF 専用枠は番号でなく既存 4 symbol で同定する。check_nm は実リンク map の移植 4.o を S2 の参照解決にも加え、S6 は accessor 名で照合して同じデータの GETTER と SETTER を区別する。
 - 関数番地は付表どおり 2 記号の KDI_ADDR/KDI_INDEX を、その FUNC が追加された時点で生成する。manifest は symbol と使用する移植 object を対応させ、実リンク対象のソースにある番地参照を nm 照合へ加える。
 - 基準値は基点 25aeb119 を同じ環境で make kernel した成果物から保存し、付表の末尾に数値と証拠の所在を記す。作業木に無い FD 像は未測定とし、S3f の候補像集計へ持ち越す。
+
+## S3b の実装で設計者が決めたこと
+
+- con の移植先は `kdebug/selftest_con_sink.c`、内部宣言は `kdebug/selftest_internal.h` とし、この段では `kst_con_sink` だけを宣言する。S6 は con の 7 FUNC + 1 SETTER、S2 は 133 FUNC、全体は 276 枠とする。
+- con の既存ホスト fixture は移植ソースを直接取り込み、`KDEBUG_SELFTEST_HOST` のときだけ生成 import ヘッダを外して既存 owner と SETTER の接続を与える。旧名の転送関数は fixture 内だけに置き、本番の移植先は生成 import を使う。

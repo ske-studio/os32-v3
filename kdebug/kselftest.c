@@ -21,6 +21,7 @@
 /* ======================================================================== */
 
 #include "kselftest.h"
+#include "selftest_internal.h"
 #include "kstack_hw.h"
 #include "exec_heap.h"
 #include "serial.h"
@@ -396,7 +397,7 @@ static void test_app_band_pde(void)
 /* ------------------------------------------------------------------------ */
 static void test_con_sink(void)
 {
-    u32 bad = con_sink_selftest();
+    u32 bad = kst_con_sink();
     check((bad & (1u << 0)) == 0, "con_sink push/read (record round-trip)");
     check((bad & (1u << 1)) == 0, "con_sink CLEAR / CURSOR records");
     check((bad & (1u << 2)) == 0, "con_sink read cuts on a record boundary");
