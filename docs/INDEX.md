@@ -71,6 +71,7 @@ T3 の前のデバッグ環境の整理 (起動時に読むデバッグ部品 `/
 fork 前からある行のマジックナンバー (OS 側、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM2](tasks/v3/TASK_MAGIC_NUM2.md)。
 ver と About の表示を実際の版と装置の状態から出す見直し (CUI・GUI、2026-10-26 ユーザー指示) は [TASK_VER_INFO](tasks/v3/TASK_VER_INFO.md)。
 OS の肥大化したコードを削る段 (表を詰める・カーネル常駐の自己試験を外へ・死んだローダ・長い関数、2026-10-25 ユーザー指示、実装は astra) は [TASK_SLIM](tasks/v3/TASK_SLIM.md)。
+カーネルから具体ドライバへの依存を登録の口に寄せて外す段 (移植性、2026-10-26 ユーザー指示) は [TASK_DEP_DIR](tasks/v3/TASK_DEP_DIR.md)。
 
 ## 生成文書の見方
 
