@@ -58,6 +58,7 @@ static int test(void)
     CHECK(!pointer_seen);
     KbdDiag diag;
     KbdDiagLogEnt log;
+    CHECK(input_irq() == 0);
     CHECK(input_getchar() == -1 && input_getkey() == -1);
     CHECK(input_trygetchar() == -1 && input_trygetkey() == -1);
     CHECK(input_peekkey() == -1 && input_trygetchar_local() == -1);
@@ -67,7 +68,7 @@ static int test(void)
     CHECK(!input_get_modifiers() && !input_dropped_count() && !input_shift_state());
     CHECK(input_diag(&diag) == OS32_ERR_NOSYS);
     CHECK(input_diag_log(1, &log, 1) == OS32_ERR_NOSYS);
-    input_set_gui_mode(1); input_discard_stop(); input_owner_exit(1);
+    input_set_gui_mode(1); input_discard_stop();
     u32 mode = 99, baud = 99, fifo = 99, overflow = 99;
     SerialDiag serial_diag;
     CHECK(port_getchar_kapi() == -1 && port_trygetchar() == -1);
@@ -112,9 +113,8 @@ static int test(void)
     CHECK(fep_kbd_shift_state() == (SHIFT_KANA | SHIFT_CTRL));
     input_set_gui_mode(1); CHECK(seen == 16 && arg == 1);
     input_set_gui_mode(0); CHECK(arg == 0);
-    input_owner_exit(0); CHECK(!discarded);
-    input_owner_exit(1); CHECK(discarded == 1 && seen == 17);
-    input_discard_stop(); CHECK(discarded == 2);
+    CHECK(input_irq() == KBD_IRQ);
+    input_discard_stop(); CHECK(discarded == 1 && seen == 17);
     CHECK(input_diag(&diag) == -18 && seen == 18 && output == &diag);
     CHECK(input_diag_log(0xff123456u, &log, -3) == -19 && seen == 19);
     CHECK(sequence == 0xff123456u && output == &log && arg == -3);

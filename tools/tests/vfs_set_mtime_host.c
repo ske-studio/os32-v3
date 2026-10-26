@@ -52,6 +52,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
 }
 
 #include "../../fs/vfs.c"
+#include "../platform/pc98/boot_names.c"
 /* fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
 void vfs_fd_invalidate_ino(void *c, u32 i) { (void)c; (void)i; }
 void vfs_fd_invalidate_mount(void *c) { (void)c; }
@@ -151,6 +152,7 @@ static void reset(int with_hook)
     num_fs = 0;
     for (i = 0; i < VFS_MAX_FS; i++) kmemset(&mounts[i], 0, sizeof(mounts[i]));
     vfs_register_fs(&drv_ops);
+    pc98_boot_names_bind();
     if (vfs_mount("/synth", "hostdrv", "synth") != VFS_OK) {
         printf("  (harness) vfs_mount failed\n");
         exit(2);
@@ -193,6 +195,7 @@ int main(void)
         for (i = 0; i < VFS_MAX_FS; i++)
             kmemset(&mounts[i], 0, sizeof(mounts[i]));
         vfs_register_fs(&drv_ops_positional);
+        pc98_boot_names_bind();
         if (vfs_mount("/synth", "hostdrv", "synth_pos") != VFS_OK) {
             printf("  (harness) vfs_mount failed\n");
             return 2;

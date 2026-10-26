@@ -16,3 +16,7 @@ check-vfs-excl-host:
 - include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h

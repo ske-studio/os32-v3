@@ -96,6 +96,7 @@ extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
 
+#include "../platform/pc98/boot_names.h"
 extern void pc98_d2_bind(void);
 
 /* 次に起動するシェルのパス (契約 T9)。実体は kernel/gui.c (K1)。
@@ -200,6 +201,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     kstack_hw_init();
     pc98_d2_bind();
+    pc98_boot_names_bind(); /* D3c will fold this into pc98_boot_bind. */
 
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・

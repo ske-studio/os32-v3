@@ -8,7 +8,7 @@
 /*  各ディスパッチ関数がFSドライバにコンテキストを渡す。                     */
 /* ======================================================================== */
 
-#include "ide_limits.h"
+#include "vfs_device.h"
 #include "vfs.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "kstring.h"
@@ -324,36 +324,33 @@ static int vfs_rel_is_root(const char *rel_path)
 
 /* ======== デバイス名パース ======== */
 
+static const struct vfs_device_name *device_names;
+static unsigned device_name_count;
+
+void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n)
+{
+    device_names = rows;
+    device_name_count = n;
+}
+
 int vfs_dev_parse(const char *name, int *dev_type, int *dev_id)
 {
-    /* "hd0", "hd1", "fd0", "fd1" */
-    if (name[0] == 'h' && name[1] == 'd' && name[2] >= '0' && name[2] <= '3') {
-        *dev_type = VFS_DEV_HD;
-        *dev_id = name[2] - '0';
-        return VFS_OK;
-    }
-    if (name[0] == 'f' && name[1] == 'd' && name[2] >= '0' && name[2] <= '3') {
-        *dev_type = VFS_DEV_FD;
-        *dev_id = name[2] - '0';
-        return VFS_OK;
-    }
-    /* "COM1" etc */
-    if (name[0] == 'C' && name[1] == 'O' && name[2] == 'M') {
-        *dev_type = VFS_DEV_SERIAL;
-        *dev_id = 1;
-        return VFS_OK;
-    }
-    /* "cd0" - "cd3" */
-    if (name[0] == 'c' && name[1] == 'd' && name[2] >= '0' && name[2] <= '3') {
-        *dev_type = VFS_DEV_CD;
-        *dev_id = name[2] - '0';
-        return VFS_OK;
-    }
-    /* "hostdrv" — 仮想デバイス (HostDrvFS) */
-    if (name[0] == 'h' && name[1] == 'o' && name[2] == 's' && name[3] == 't' &&
-        name[4] == 'd' && name[5] == 'r' && name[6] == 'v' && name[7] == '\0') {
-        *dev_type = VFS_DEV_HOSTDRV;
-        *dev_id = 0;
+    unsigned i;
+    for (i = 0; i < device_name_count; i++) {
+        const struct vfs_device_name *row = &device_names[i];
+        unsigned len = 0;
+        int id = row->first;
+        while (row->prefix[len] && name[len] == row->prefix[len]) len++;
+        if (row->prefix[len]) continue;
+        if (row->mode == VFS_NAME_DIGIT_PREFIX) {
+            if (name[len] < '0' || name[len] > '9') continue;
+            id = name[len] - '0';
+            if (id < row->first || id - row->first >= row->count) continue;
+        } else if (row->mode == VFS_NAME_EXACT && name[len]) {
+            continue;
+        }
+        *dev_type = row->type;
+        *dev_id = id;
         return VFS_OK;
     }
     return VFS_ERR_INVAL;
@@ -492,7 +489,7 @@ int vfs_dev_mount_count(int drive)
 {
     int i, n = 0;
 
-    if (drive < 0 || drive >= IDE_MAX_DRIVES) return VFS_ERR_INVAL;
+    if (drive < 0 || drive >= VFS_DEV_UNIT_MAX) return VFS_ERR_INVAL;
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (mounts[i].in_use && mounts[i].dev_type == VFS_DEV_HD &&
             mounts[i].dev_id == drive)

@@ -45,6 +45,7 @@ static const InputOps empty_input = {
 };
 static const InputOps *input_provider = &empty_input;
 
+u32 input_irq(void) { return input_provider->irq; }
 void input_register(const InputOps *ops) { input_provider = ops; }
 int input_getchar(void) { return input_provider->getchar(); }
 int input_getkey(void) { return input_provider->getkey(); }
@@ -65,7 +66,6 @@ void input_set_gui_mode(int on) { input_provider->gui_mode(on); }
 void input_discard_stop(void) { input_provider->discard_stop(); }
 int input_diag(KbdDiag *out) { return input_provider->diag(out); }
 int input_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max) { return input_provider->diag_log(after_seq, out, max); }
-void input_owner_exit(int aborted) { if (aborted) input_provider->discard_stop(); }
 
 static void empty_pointer_poll(MouseState *state)
 {

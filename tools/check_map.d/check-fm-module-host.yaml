@@ -15,7 +15,6 @@ check-fm-module-host:
 - drivers/dev.c
 - drivers/dev.h
 - drivers/disk.h
-- drivers/ide.h
 - drivers/atapi.h
 - drivers/fdc.h
 - include/console.h
@@ -58,4 +57,8 @@ check-fm-module-host:
 - build/out/fm.mod
 - build/out/vmkernel.lz4
 - build/out/kernel.elf
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h
 artifact_reader: true

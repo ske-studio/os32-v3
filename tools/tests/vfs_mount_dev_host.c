@@ -9,6 +9,7 @@
 #include "vfs.h"
 #include "ext2_priv.h"
 #include "../../fs/vfs.c"
+#include "../platform/pc98/boot_names.c"
 /* fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
 void vfs_fd_invalidate_ino(void *c, u32 i) { (void)c; (void)i; }
 void vfs_fd_invalidate_mount(void *c) { (void)c; }
@@ -153,6 +154,7 @@ static void reset(void)
 static void encode(void)
 {
     reset();
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     CHECK(ext2_mount_calls == 1);
     CHECK(ext2_mount_drive[0] == 0);
@@ -188,9 +190,12 @@ static void boot_sequence_has_one_ext2(void)
 {
     int i, ext2_mounts = 0;
     reset();
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     /* kernel.c の自動マウントループ相当 */
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/fd0", "fd0", "ext2") != VFS_OK);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/cd0", "cd0", "ext2") != VFS_OK);
     for (i = 0; i < VFS_MAX_FS; i++)
         if (mounts[i].in_use && mounts[i].ops == &ext2_ops) ext2_mounts++;
@@ -204,10 +209,13 @@ static void boot_sequence_has_one_ext2(void)
 static void duplicate_device_refused(void)
 {
     reset();
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/again", "hd0", "ext2") == VFS_ERR_EXIST);
     CHECK(ext2_mount_calls == 1);
     /* 別 unit は通る */
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/hd1", "hd1", "ext2") == VFS_OK);
     CHECK(ext2_mount_calls == 2 && ext2_mount_drive[1] == 1);
     CHECK(vfs_sync() == VFS_OK);
@@ -224,7 +232,9 @@ static void stat_dev_identifies_mount(void)
 
     reset();
     stub_ino = 12;
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/hd1", "hd1", "ext2") == VFS_OK);
 
     CHECK(vfs_stat("/a", &a) == VFS_OK);
@@ -250,7 +260,9 @@ static void stat_dev_on_synth_root(void)
     reset();
     stub_ino = 12;
     stub_inode_rc = -1;            /* ext2 の stat を失敗させる */
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/hd1", "hd1", "ext2") == VFS_OK);
 
     CHECK(vfs_stat("/", &r0) == VFS_OK);

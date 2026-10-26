@@ -53,6 +53,7 @@ void _start(void)
         CHECK(rc == MODULE_INIT_FAILED);
         CHECK(r->state == MODULE_ABSENT && !r->registration_refs);
         CHECK(!fs_registered && !device_registered && !dev_find("cd0"));
+        pc98_boot_names_bind();
         CHECK(vfs_mount("/cd0", "cd0", "fixture") == VFS_ERR_INVAL);
         empty(); finish(0);
     }
@@ -60,6 +61,7 @@ void _start(void)
     CHECK(r->registration_refs == (mode == 4 ? 1U : 2U));
     CHECK(!r->prefix_pages && mask[0] == 2);
     CHECK((dev_find("cd0") != 0) == (mode != 4));
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/cd0", "cd0", "fixture") == VFS_OK);
     if (mode == 6) {
         u32 before = returned;
@@ -72,6 +74,7 @@ void _start(void)
     vfs_umount("/cd0");
     CHECK(!cd_module_abort());
     CHECK(!r->registration_refs && !dev_find("cd0"));
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/cd0", "cd0", "fixture") == VFS_ERR_INVAL);
     CHECK(!cd_module_abort());
     empty(); finish(0);

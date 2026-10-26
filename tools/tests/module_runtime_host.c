@@ -3,6 +3,7 @@
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"
+#include "../platform/pc98/boot_names.c"
 #include "dev.h"
 #include "kstring.h"
 
@@ -144,6 +145,7 @@ int ledger_reclaim_owner(u32 owner, u32 *pages)
     u32 i = index_of(owner);
     if (input[0] == 11) {
         CHECK(!dev_find("cd0") && !cached_device);
+        pc98_boot_names_bind();
         CHECK(vfs_mount("/fixture", "cd0", "fixture") == VFS_ERR_INVAL);
     }
     if (input[0] == 9) {
@@ -245,6 +247,7 @@ static int start(struct module_record *r, u32 entry, u32 *ops)
         CHECK(vfs_register_fs(&fs_ops) == VFS_ERR_EXIST);
         CHECK(module_ref_release(current, MODULE_REF_REGISTRATION));
         CHECK(r->registration_refs == 2); /* Failed publication owns no ref. */
+        pc98_boot_names_bind();
         CHECK(vfs_mount("/fixture", "cd0", "fixture") == VFS_OK);
         if (input[1] >= 3) fail_cleanup = input[1] - 2;
         return 1; /* Fail after publication, while still STARTING. */
@@ -301,14 +304,18 @@ static void registry_limits(void)
     }
     CHECK(vfs_register_fs(&ops[0]) == VFS_ERR_EXIST);
     CHECK(vfs_unregister_fs(&ops[VFS_MAX_FS]) == VFS_ERR_NOTFOUND);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/fixture", "cd0", names[VFS_MAX_FS]) == VFS_ERR_INVAL);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/fixture", "cd0", names[1]) == VFS_OK);
     CHECK(vfs_unregister_fs(&ops[1]) == VFS_ERR_BUSY);
     vfs_umount("/fixture");
     CHECK(vfs_unregister_fs(&ops[1]) == VFS_OK);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/fixture", "cd0", names[1]) == VFS_ERR_INVAL);
     CHECK(vfs_register_fs(&ops[VFS_MAX_FS]) == VFS_OK);
     for (u32 i = 0; i <= VFS_MAX_FS; i++) if (i != 1) {
+        pc98_boot_names_bind();
         CHECK(vfs_mount("/fixture", "cd0", names[i]) == VFS_OK);
         vfs_umount("/fixture");
         CHECK(vfs_unregister_fs(&ops[i]) == VFS_OK);

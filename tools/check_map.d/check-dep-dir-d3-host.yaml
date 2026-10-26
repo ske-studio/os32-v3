@@ -1,0 +1,18 @@
+check-dep-dir-d3-host:
+- fs/vfs.h
+- fs/vfs.c
+- fs/ext2_vfs.c
+- kernel/kernel.c
+- include/input_service.h
+- kernel/input_service.c
+- kernel/ver_format.c
+- tools/tests/test_dep_dir_d3.py
+- tools/tests/dep_dir_d3_host.c
+- tools/tests/vfs_mount_dev_host.c
+- tools/tests/test_vfs_mount_dev.py
+- build/checks.d/check-dep-dir-d3-host.mk
+- tools/check_map.d/check-dep-dir-d3-host.yaml
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h

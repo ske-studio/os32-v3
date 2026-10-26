@@ -245,6 +245,7 @@ int res_owner_get(void) { return 0; }
 #include "ext2_file.c"
 #include "ext2_fmt.c"
 #include "ext2_vfs.c"
+#include "../platform/pc98/boot_names.c"
 #include "vfs.c"
 #include "vfs_fd.c"
 #include "rt/pkg.c"
@@ -314,6 +315,7 @@ static void disk_setup(void)
     }
     kstrncpy(cwd, "/", VFS_MAX_PATH);
     ext2_init();
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/hd0", "hd0", "ext2") == VFS_OK);
     g_ec = (Ext2Ctx *)mounts[0].fs_ctx;
     CHECK(g_ec != (Ext2Ctx *)0);
@@ -815,6 +817,7 @@ static void case_nocase(void)
     g_ci_ops.ino = (const VfsInoOps *)0;      /* FAT と同じくパスで動く */
     g_ci_ops.name_fold = ci_fold;
     vfs_register_fs(&g_ci_ops);
+    pc98_boot_names_bind();
     EQ(vfs_mount("/ci", "hd0", "ext2ci"), VFS_OK);
 
     cookie.group_index = 1;
@@ -995,6 +998,7 @@ static void case_path(void)
 
     /* ---- mount prefix は切り詰めて登録しない ---- */
     mk_long(g_p1, 251, 'm', 0);                   /* 256 */
+    pc98_boot_names_bind();
     EQ(vfs_mount(g_p1, "hd1", "ext2"), VFS_ERR_NAMETOOLONG);
     for (i = 1; i < VFS_MAX_FS; i++) CHECK(!mounts[i].in_use);
 
@@ -1523,6 +1527,7 @@ static void case_fatroot(void)
     int fd, fd2;
 
     report("case fatroot\n");
+    pc98_boot_names_bind();
     EQ(vfs_mount("/", "fd0", "fat"), VFS_OK);
     /* P = "/" + "abcdefgh/" x 27 (244 バイト、27 階層) */
     n = 0;
@@ -1689,6 +1694,7 @@ static void case_fatwp(void)
         CHECK(f_mkfs("0:", &opt, work, sizeof(work)) == FR_OK);
         pdrv_busy[0] = pdrv_busy[1] = 0;
         fatfs_init();
+        pc98_boot_names_bind();
         EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
         EQ(vfs_mkdir("/fd0/sys"), VFS_OK);
         EQ(vfs_write("/fd0/sys/shell.bin", "SHELL", 5), 5);
@@ -1770,6 +1776,7 @@ static void case_fatname(void)
     pdrv_busy[0] = 0;
     pdrv_busy[1] = 0;
     fatfs_init();
+    pc98_boot_names_bind();
     EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
 
     /* ---- 正当な 8.3 名は従来どおり (FD 起動の /sys・/bin の *.bin・/etc) ---- */
@@ -1944,6 +1951,7 @@ static void case_hostname(void)
     g_win_ops.write_stream = win_write_stream;
     g_win_ops.stat = win_stat;
     vfs_register_fs(&g_win_ops);
+    pc98_boot_names_bind();
     EQ(vfs_mount("/hw", "hd0", "ext2win"), VFS_OK);
 
     fd = vfs_open("/hw/disk.img", O_RDWR);
@@ -2140,6 +2148,7 @@ static void case_filedir(void)
     CHECK(f_mkfs("0:", &opt, work, sizeof(work)) == FR_OK);
     pdrv_busy[0] = pdrv_busy[1] = 0;
     fatfs_init();
+    pc98_boot_names_bind();
     EQ(vfs_mount("/fd0", "fd0", "fat"), VFS_OK);
     {
         OS32_Stat st;

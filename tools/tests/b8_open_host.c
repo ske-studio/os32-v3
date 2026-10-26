@@ -480,6 +480,7 @@ int res_owner_get(void) { return 0; }
 #include "../../fs/ext2_file.c"
 #include "../../fs/ext2_fmt.c"
 #include "../../fs/ext2_vfs.c"
+#include "../platform/pc98/boot_names.c"
 #include "../../fs/vfs.c"
 #include "../../fs/vfs_fd.c"
 
@@ -600,6 +601,7 @@ static void disk_setup(void)
 
     vfs_tables_reset();
     ext2_init();                               /* 実物の登録 */
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     g_ec = (Ext2Ctx *)mounts[0].fs_ctx;
     CHECK(g_ec != (Ext2Ctx *)0);
@@ -4819,6 +4821,7 @@ static void synth_reset(void)
     s_ops.stat = s_stat;
 
     vfs_register_fs(&s_ops);
+    pc98_boot_names_bind();
     if (vfs_mount("/synth", "hostdrv", "synth") != VFS_OK) {
         report("  (harness) synth vfs_mount failed\n");
         g_failures++;
@@ -4943,6 +4946,7 @@ static void synth_normal(void)
     s_ops.stat = 0;
     vfs_tables_reset();
     vfs_register_fs(&s_ops);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/synth", "hostdrv", "synth") == VFS_OK);
     s_size_rc = VFS_ERR_ISDIR;
     CHECK(vfs_path_kind("/synth/d") == VFS_KIND_DIR);

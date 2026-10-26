@@ -237,6 +237,7 @@ int res_owner_get(void) { return 0; }
 #include "ext2_file.c"
 #include "ext2_fmt.c"
 #include "ext2_vfs.c"
+#include "../platform/pc98/boot_names.c"
 #include "vfs.c"
 #include "vfs_fd.c"
 /* cdinst / fdinst が使う展開ライブラリそのもの */
@@ -275,6 +276,7 @@ static void disk_setup(const char *mount_at)
     }
     kstrncpy(cwd, "/", VFS_MAX_PATH);
     ext2_init();
+    pc98_boot_names_bind();
     CHECK(vfs_mount(mount_at, "hd0", "ext2") == VFS_OK);
     g_ec = (Ext2Ctx *)mounts[0].fs_ctx;
     CHECK(g_ec != (Ext2Ctx *)0);
@@ -625,6 +627,7 @@ static void case_synth(void)
     s_ops.write_file = s_write;
     s_ops.rename = s_rename;
     vfs_register_fs(&s_ops);
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/syn", "hostdrv", "synth") == VFS_OK);
 
     s_calls = 0;

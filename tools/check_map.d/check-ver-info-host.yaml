@@ -14,7 +14,9 @@ check-ver-info-host:
 - build/checks.d/check-ver-state-name-host.mk
 - build/checks.d/check-ver-version-host.mk
 - docs/decisions/VERSIONS.md
-- drivers/kbd.h
+- include/input_service.h
+- kernel/input_service.c
+- platform/pc98/d2_bind.c
 - drivers/pcm_cs4231.h
 - drivers/serial.h
 - exec/exec.c

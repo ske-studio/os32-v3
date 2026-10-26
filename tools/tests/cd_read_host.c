@@ -21,6 +21,7 @@
 #include <stdarg.h>
 
 #include "vfs.h"
+#include "../../platform/pc98/boot_names.c"
 #include "dev.h"
 #include "kmalloc.h"
 #include "lib/kstring.h"
@@ -2334,6 +2335,7 @@ static void t_iso_devices(void)
         CHECK(!dev_register(&image));
         g_klog_n = 0; g_klog[0] = '\0';
         u32 reads = M.n_read10;
+        pc98_boot_names_bind();
         CHECK(vfs_mount("/image", names[i], "iso9660") != VFS_OK);
         CHECK(M.n_read10 == reads && !g_klog_n);
         CHECK(!dev_unregister(&image));
@@ -2383,6 +2385,7 @@ static void t_iso_bad_pvd(void)
 
 int main(int argc, char **argv)
 {
+    pc98_boot_names_bind();
     const char *cs = (argc > 1) ? argv[1] : "";
     const char *bs = getenv("CD_READ_BIGSIZE");
     if (bs) g_big_size = (u32)strtoul(bs, NULL, 10);

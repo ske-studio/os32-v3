@@ -12,7 +12,6 @@ check-module-runtime-host:
 - drivers/dev.c
 - drivers/dev.h
 - drivers/disk.h
-- drivers/ide.h
 - drivers/atapi.h
 - drivers/fdc.h
 - include/console.h
@@ -30,3 +29,7 @@ check-module-runtime-host:
 - tools/tests/host32.py
 - build/checks.d/check-module-runtime-host.mk
 - tools/check_map.d/check-module-runtime-host.yaml
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h

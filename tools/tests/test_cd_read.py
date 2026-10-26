@@ -37,7 +37,8 @@ READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
 TREE_FILES = ["kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
-              "fs/vfs.c", "fs/vfs.h", "drivers/dev.c", "drivers/dev.h",
+              "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
+              "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ide.h", "drivers/dev.c", "drivers/dev.h",
               "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, PKG_HARNESS, SHIM + "/io.h"]
@@ -84,6 +85,7 @@ REBUILD = {
     "kernel/cd_body.c": ("read", "wide"),
     "kernel/kernel.c": ("read", "wide"),
     "fs/vfs.c": ("read", "wide"),
+    "platform/pc98/boot_names.c": ("read", "wide"),
     "drivers/dev.c": ("read", "wide"),
     "drivers/atapi.c": ("read", "wide"),
     "fs/iso9660.c": ("read", "wide"),
@@ -538,9 +540,9 @@ MUTATIONS = [
      "R1: 空トレイで cd0 を登録せず後挿入 sys_mount が失敗"),
     ("kernel/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
      "            if (0) continue;", "R2: 未 attach/容量なし装置も自動 mount"),
-    ("fs/vfs.c", r"    /\* \"COM1\" etc \*/",
-     "    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }\n"
-     "    /* \"COM1\" etc */", "R3: loop を ISO mount の対象に戻す"),
+    ("fs/vfs.c", r"(int vfs_dev_parse\(const char \*name, int \*dev_type, int \*dev_id\)\n\{)",
+     r"\1" + "\n    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }",
+     "R3: loop を ISO mount の対象に戻す"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("fs/iso9660.c", r"(#include \"iso9660\.h\")", r"\1", "対照 (何も変えない)"),
 ]
