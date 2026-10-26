@@ -14,5 +14,6 @@ check-install-recover-host:
 - build/checks.d/check-install-recover-host.mk
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h

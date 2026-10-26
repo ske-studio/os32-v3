@@ -20,5 +20,6 @@ check-fep-budget-host:
 - tools/accept/t4a4.md
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h

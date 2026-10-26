@@ -43,7 +43,7 @@
     "fd_redirect.h",
     "pipe_buffer.h",
     "snd_engine.h",
-    "mouse.h",
+    "pointer_service.h",
     "kapi_db.h",
     "loop_dev.h",
     "v86.h",
@@ -1072,15 +1072,17 @@
       "args": [
         "void *info"
       ],
-      "body": "mouse_poll((MouseState *)info);"
+      "body": "pointer_poll((MouseState *)info);"
     },
     {
       "name": "mouse_available",
+      "target": "pointer_available",
       "ret": "int",
       "args": []
     },
     {
       "name": "mouse_set_bounds",
+      "target": "pointer_set_bounds",
       "ret": "void",
       "args": [
         "i16 x_min",
@@ -1111,6 +1113,7 @@
     },
     {
       "name": "mouse_cursor_set_mode",
+      "target": "pointer_cursor_set_mode",
       "ret": "void",
       "args": [
         "int mode"
@@ -1118,11 +1121,13 @@
     },
     {
       "name": "mouse_cursor_show",
+      "target": "pointer_cursor_show",
       "ret": "void",
       "args": []
     },
     {
       "name": "mouse_cursor_hide",
+      "target": "pointer_cursor_hide",
       "ret": "void",
       "args": []
     },

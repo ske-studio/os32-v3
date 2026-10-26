@@ -21,5 +21,6 @@ check-db-errstr-host:
 - tools/tests/db_group_shim.h
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h

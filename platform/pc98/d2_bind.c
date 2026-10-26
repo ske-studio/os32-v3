@@ -1,5 +1,7 @@
 /* PC-9821 resident input wiring. Registration performs no device I/O. */
 #include "input_service.h"
+#include "pointer_service.h"
+#include "../../drivers/mouse.h"
 #include "../../drivers/kbd.h"
 
 static u8 pc98_shift_state(void) { return kbd_shift_state; }
@@ -25,7 +27,17 @@ static const InputOps pc98_input = {
     .diag_log = kbd_diag_log,
 };
 
+static const PointerOps pc98_pointer = {
+    .poll = mouse_poll,
+    .available = mouse_available,
+    .bounds = mouse_set_bounds,
+    .cursor_mode = mouse_cursor_set_mode,
+    .cursor_show = mouse_cursor_show,
+    .cursor_hide = mouse_cursor_hide,
+};
+
 void pc98_d2_bind(void)
 {
     input_register(&pc98_input);
+    pointer_register(&pc98_pointer);
 }

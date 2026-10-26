@@ -38,8 +38,11 @@ check-kapi-audit-host:
 - kernel/sqlite_engine.h
 - kernel/cpu_flags.inc
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
 - platform/pc98/d2_bind.c
 - drivers/kbd_dlog.c
 - drivers/kbd_dlog.h
+- drivers/mouse.h
+- tools/tests/pointer_fixture_host.h

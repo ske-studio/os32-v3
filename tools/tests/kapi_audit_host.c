@@ -77,6 +77,7 @@ void appslot_poll_yield_reset(void) {}
 #include "kbd_source.inc"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
+#include "pointer_fixture_host.h"
 #include "../../platform/pc98/d2_bind.c"
 #include "rshell_source.inc"
 #include "kstring.c"

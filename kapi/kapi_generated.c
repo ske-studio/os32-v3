@@ -27,7 +27,7 @@
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "snd_engine.h"
-#include "mouse.h"
+#include "pointer_service.h"
 #include "kapi_db.h"
 #include "loop_dev.h"
 #include "v86.h"
@@ -1538,19 +1538,19 @@ void __cdecl wrap_mouse_poll(void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    mouse_poll((MouseState *)info);
+    pointer_poll((MouseState *)info);
 }
 
 int __cdecl wrap_mouse_available(void)
 {
     KAPI_HIT(133);
-    return mouse_available();
+    return pointer_available();
 }
 
 void __cdecl wrap_mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 {
     KAPI_HIT(134);
-    mouse_set_bounds(x_min, y_min, x_max, y_max);
+    pointer_set_bounds(x_min, y_min, x_max, y_max);
 }
 
 void __cdecl wrap_tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
@@ -1574,19 +1574,19 @@ int __cdecl wrap_tvram_reverse_cell(int x, int y)
 void __cdecl wrap_mouse_cursor_set_mode(int mode)
 {
     KAPI_HIT(137);
-    mouse_cursor_set_mode(mode);
+    pointer_cursor_set_mode(mode);
 }
 
 void __cdecl wrap_mouse_cursor_show(void)
 {
     KAPI_HIT(138);
-    mouse_cursor_show();
+    pointer_cursor_show();
 }
 
 void __cdecl wrap_mouse_cursor_hide(void)
 {
     KAPI_HIT(139);
-    mouse_cursor_hide();
+    pointer_cursor_hide();
 }
 
 int __cdecl wrap_db_open(const char *path)

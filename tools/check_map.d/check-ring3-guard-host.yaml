@@ -15,5 +15,6 @@ check-ring3-guard-host:
 - tools/tests/serial_diag_host.h
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h

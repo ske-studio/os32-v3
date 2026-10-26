@@ -58,6 +58,11 @@ class KapiCli(unittest.TestCase):
                 target = entry.get('target', '')
                 if target.startswith('input_'):
                     entry['target'] = 'kbd_' + target[len('input_'):]
+                elif target.startswith('pointer_'):
+                    entry['target'] = 'mouse_' + target[len('pointer_'):]
+                elif entry['name'] == 'mouse_poll':
+                    self.assertEqual(entry['body'], 'pointer_poll((MouseState *)info);')
+                    entry['body'] = 'mouse_poll((MouseState *)info);'
             spec_path.write_text(json.dumps(spec))
             result = run([])
             self.assertEqual(result.returncode, 0, result.stderr)

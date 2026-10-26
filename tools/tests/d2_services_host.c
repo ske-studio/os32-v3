@@ -27,6 +27,7 @@ void kbd_discard_stop(void) { seen = 17; discarded++; }
 int kbd_diag(KbdDiag *out) { seen = 18; output = out; return -18; }
 int kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
 { seen = 19; sequence = after_seq; output = out; arg = max; return -19; }
+#include "pointer_fixture_host.h"
 #include "../../platform/pc98/d2_bind.c"
 /* Generated wrappers retain real output guards and slot numbers. */
 static int hit;
@@ -36,8 +37,22 @@ int ring3_user_ranges_writable(u32 p, u32 n, u32 q, u32 m)
 void ring3_fault_kill(void) { __builtin_trap(); }
 #include "input_wrappers.inc"
 #include "input_shift.inc"
+#include "pointer_wrappers.inc"
+_Static_assert(sizeof(MouseState) == 10, "MouseState ABI size");
+#define OFFSET(field, value) _Static_assert(__builtin_offsetof(MouseState, field) == value, "MouseState " #field)
+OFFSET(x, 0); OFFSET(y, 2); OFFSET(dx, 4); OFFSET(dy, 6);
+OFFSET(buttons, 8); OFFSET(mode, 9);
 static int test(void)
 {
+    MouseState state = {1, 2, 3, 4, 5, 6};
+    pointer_poll((MouseState *)0);
+    pointer_poll(&state);
+    CHECK(!state.x && !state.y && !state.dx && !state.dy && !state.buttons && !state.mode);
+    CHECK(!pointer_available());
+    pointer_set_bounds(-11, -22, 333, 444);
+    pointer_cursor_set_mode(MOUSE_CURSOR_TEXT);
+    pointer_cursor_show(); pointer_cursor_hide();
+    CHECK(!pointer_seen);
     KbdDiag diag;
     KbdDiagLogEnt log;
     CHECK(input_getchar() == -1 && input_getkey() == -1);
@@ -73,6 +88,21 @@ static int test(void)
     CHECK(input_diag(&diag) == -18 && seen == 18 && output == &diag);
     CHECK(input_diag_log(0xff123456u, &log, -3) == -19 && seen == 19);
     CHECK(sequence == 0xff123456u && output == &log && arg == -3);
+    pointer_poll((MouseState *)0);
+    CHECK(pointer_seen == 1 && !pointer_output);
+    pointer_poll(&state);
+    CHECK(pointer_seen == 1 && pointer_output == &state);
+    CHECK(state.x == -123 && state.y == 456 && state.dx == 7 && state.dy == -8);
+    CHECK(state.buttons == (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) && state.mode == MOUSE_MODE_SEAMLESS);
+    CHECK(pointer_available() == 1 && pointer_seen == 2);
+    pointer_set_bounds(-11, -22, 333, 444);
+    CHECK(pointer_seen == 3 && pointer_bounds[0] == -11 && pointer_bounds[1] == -22);
+    CHECK(pointer_bounds[2] == 333 && pointer_bounds[3] == 444);
+    pointer_cursor_set_mode(MOUSE_CURSOR_GFX);
+    CHECK(pointer_seen == 4 && pointer_mode == MOUSE_CURSOR_GFX);
+    pointer_cursor_show(); CHECK(pointer_seen == 5);
+    pointer_cursor_hide(); CHECK(pointer_seen == 6);
+#include "pointer_wrapper_checks.inc"
 #include "input_wrapper_checks.inc"
     return 0;
 }

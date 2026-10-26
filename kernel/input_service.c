@@ -1,5 +1,6 @@
 /* Stateless forwarding; rings, waits and IRQ policy remain in the provider. */
 #include "input_service.h"
+#include "pointer_service.h"
 
 static int empty_getchar(void) { return -1; }
 static int empty_getkey(void) { return -1; }
@@ -65,3 +66,34 @@ void input_discard_stop(void) { input_provider->discard_stop(); }
 int input_diag(KbdDiag *out) { return input_provider->diag(out); }
 int input_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max) { return input_provider->diag_log(after_seq, out, max); }
 void input_owner_exit(int aborted) { if (aborted) input_provider->discard_stop(); }
+
+static void empty_pointer_poll(MouseState *state)
+{
+    if (!state) return;
+    state->x = state->y = state->dx = state->dy = 0;
+    state->buttons = state->mode = 0;
+}
+static int empty_pointer_available(void) { return 0; }
+static void empty_pointer_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
+{ (void)x_min; (void)y_min; (void)x_max; (void)y_max; }
+static void empty_pointer_mode(int mode) { (void)mode; }
+static void empty_pointer_show(void) { }
+static void empty_pointer_hide(void) { }
+static const PointerOps empty_pointer = {
+    .poll = empty_pointer_poll,
+    .available = empty_pointer_available,
+    .bounds = empty_pointer_bounds,
+    .cursor_mode = empty_pointer_mode,
+    .cursor_show = empty_pointer_show,
+    .cursor_hide = empty_pointer_hide,
+};
+static const PointerOps *pointer_provider = &empty_pointer;
+
+void pointer_register(const PointerOps *ops) { pointer_provider = ops; }
+void pointer_poll(MouseState *state) { pointer_provider->poll(state); }
+int pointer_available(void) { return pointer_provider->available(); }
+void pointer_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
+{ pointer_provider->bounds(x_min, y_min, x_max, y_max); }
+void pointer_cursor_set_mode(int mode) { pointer_provider->cursor_mode(mode); }
+void pointer_cursor_show(void) { pointer_provider->cursor_show(); }
+void pointer_cursor_hide(void) { pointer_provider->cursor_hide(); }

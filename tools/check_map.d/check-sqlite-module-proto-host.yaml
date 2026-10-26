@@ -96,6 +96,7 @@ check-sqlite-module-proto-host:
 - build/out/fep/*.o
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
 artifact_reader: true

@@ -173,4 +173,5 @@ check-memory-host:
 - include/kbd.h
 - drivers/kbd.h
 - kernel/input_service.c
+- include/pointer_service.h
 artifact_reader: true

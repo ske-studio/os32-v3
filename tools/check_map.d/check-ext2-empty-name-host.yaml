@@ -21,6 +21,7 @@ check-ext2-empty-name-host:
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
+- include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
 artifact_reader: true
