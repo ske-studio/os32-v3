@@ -22,7 +22,7 @@
 | T7 | X-1 の一部、E10-4、H-6b、H-5 (CG 窓 WB・68h)、T7-V86CTX | — |
 | [TASK_PCM_CS4231](v3/TASK_PCM_CS4231.md) | R7-2、H-4 (b)(c) | — |
 | 保守 (道具・媒体) | LZSS-1、PRIO-1、S-1、X-20 | 次にその道具・媒体を触る段 |
-| 実機の回 (T4T7-RH) | KSTK-DF・T4T7-RH | NP21/Wの#DF受入済み。実機の#DF等、下表の残件をまとめて確認 |
+| 実機の回 (T4T7-RH) | KSTK-DF・T4T7-RH・DEPDIR-D1-FD | NP21/Wの#DF受入済み。実機の#DF等、下表の残件をまとめて確認。DEPDIR-D1-FD = TASK_DEP_DIR の D1 の後に Ra266 で FD 起動 (IRQ11 を共通の入口に移した、NP21/W の 1232/1440 は D1c で PM) |
 | 決定による持越し | H-7、S-4、E11-A3 | 再開時ゲート (H-7) / U6 で足さない (E11-A3) |
 | 記録 | R7-3、R7-4 | — |
 
