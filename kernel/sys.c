@@ -6,7 +6,7 @@
 #include "pgalloc.h"
 #include "memmap.h"
 #include "io.h"
-#include "pc98.h"
+#include "platform_sys.h"
 #include "clock_service.h"
 #include "os_time.h"
 
@@ -15,10 +15,7 @@ static u32 sys_phys_end(void);
 
 void sys_reboot(void)
 {
-    /* PC-98 ハードウェアリセット (FreeBSD実装準拠) */
-    outp(SYSPORT_C_BSR, BSR_SHUT0_SET);  /* SHUT0 = 1 */
-    outp(SYSPORT_C_BSR, BSR_SHUT1_SET);  /* SHUT1 = 1 */
-    outp(CPU_RESET_PORT, 0x00);           /* CPUリセット */
+    platform_reset();
     /* ここには来ない */
     for (;;) { _halt(); }
 }
@@ -28,19 +25,14 @@ void sys_halt(void)
     _halt();
 }
 
-/* 内蔵ブザー。0037h の BSR で 0035h bit3 (BUZ) だけを操作する。
- * **極性は UNDOCUMENTED** (bit3 = 1 で停止、06h = 鳴動 / 07h = 停止)。
- * 2026-09-24 までは pc98.h が Bible の向きで名前を付けていたので、
- * buz_off() は実機で**鳴らし**、buz_on() は止めていた (rshell は応答の
- * たびに buz_off() を呼ぶ — POLICY_DEBUG §4-59)。 */
 void buz_on(void)
 {
-    outp(SYSPORT_C_BSR, BSR_BUZ_ON);
+    platform_buzzer_on();
 }
 
 void buz_off(void)
 {
-    outp(SYSPORT_C_BSR, BSR_BUZ_OFF);
+    platform_buzzer_off();
 }
 
 u32 sys_mem_kb = KIB; /* 初期値(1MB) */

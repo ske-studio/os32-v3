@@ -7,7 +7,7 @@ CHECK_PAR_ORDER += 049:check-serial-portc-host
 # 偽の outp で 8255 を模型にし、初期化と ISR が 0035h を書かないこと・
 # 上位 5 ビットが保たれること・ISR が RXRE を落として戻すこと (汲み残し時に
 # IRQ4 の立ち上がりが出ること)・初期化が 1 のビットだけ落とすこと・V･FAST
-# 経路・kernel/sys.c の buz_on/buz_off が書く値 (06h/07h) を見る。
+# 経路・platform/pc98/system.c の platform_buzzer_on/off が書く値 (06h/07h) を見る。
 # --mutate は写しの上で変異させるので並列 (check-par) で回せる。
 check-serial-portc-host:
 	python3 -B tools/tests/test_serial_portc.py $(MUT)
