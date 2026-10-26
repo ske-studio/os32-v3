@@ -1,105 +1,86 @@
-/* =========================================================================
- *  VER_ABOUT_HOST.C — 実物の `ver` (userland/shell/cmd_base.c の cmd_ver) を
- *  ホストで回し、出た行をそのまま標準出力へ書く
- *
- *  実行: python3 -B tools/tests/test_about_info.py [--mutate]
- *  記録: tools/tests/about_info_tdd.md
- *
- *  About (userland/rust/about) は `ver` と同じ中身を出す (ユーザー指示
- *  2026-09-29)。試験はこのハーネスの出力と About の info.rs の出力を
- *  同じ入力で突き合わせ、どちらかの文言・条件が変わったら落ちる。
- *
- *  cmd_base.c を 1 行も写さずに #include し、KernelAPI の 3 本 (kprintf /
- *  sys_get_build_info / boot_image_info) と version だけを贋物にする。
- *  シェル側の関数 (help / 表の登録 / execute_command …) は cmd_ver が
- *  使わないので、リンクを通すだけの空の実体を置く。
- *
- *  引数 (全部 10 進、文字列はそのまま):
- *    ver_about_host <kapi> <build> <bi_rc> <crc_valid> <crc> <size> <source> <commit>
- *  bi_rc は boot_image_info の戻り値 (0 = 成功)。
- *  出力: kprintf に出た文字列をそのまま (改行区切り)。
- *
- *  エミュレータ・実配備・make には一切触れない。
- * ========================================================================= */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/* V11: real formatter -> real cmd_ver and Rust About, using the same snapshot.
+ * Source slices are supplied by test_about_info.py; ILP32, no GUI or devices. */
+#include "support.h"
+#include "ver_info.h"
+#include "../lib/kstring.h"
 #include <stdarg.h>
-
-#include "os32api.h"
-
-static KernelAPI g_fake;
-KernelAPI *g_api = &g_fake;
-
-static const char *fk_build;
-static int         fk_bi_rc;
-static BootImageInfo fk_bi;
-
-static void fk_kprintf(u8 attr, const char *fmt, ...)
-{
-    va_list ap;
+#include "ver_format_source.c"
+#include "ver_state_source.c"
+#define SH_STATUS_ERROR 1
+static OS32_VerInfo report;
+static u32 calls;
+static void print(u8 attr, const char *fmt, ...) {
     (void)attr;
+    CHECK(equal(fmt, "%s"));
+    va_list ap;
     va_start(ap, fmt);
-    vprintf(fmt, ap);
+    say(va_arg(ap, const char *));
     va_end(ap);
 }
-
-static void fk_sys_get_build_info(char *buf, int size)
-{
-    if (size <= 0) return;
-    strncpy(buf, fk_build, (size_t)size - 1);
-    buf[size - 1] = '\0';
+static int get_report(void *out, u32 size) {
+    CHECK(size == sizeof(report));
+    calls++;
+    *(OS32_VerInfo *)out = report;
+    return 0;
 }
-
-static int fk_boot_image_info(BootImageInfo *out)
-{
-    if (fk_bi_rc == 0) *out = fk_bi;
-    return fk_bi_rc;
+static struct {
+    void (*kprintf)(u8, const char *, ...);
+    int (*sys_ver_info)(void *, u32);
+} api = {print, get_report}, *g_api = &api;
+#include "ver_shell_source.c"
+static void number(u32 n) {
+    char buf[11]; u32 i = sizeof(buf)-1;
+    buf[i] = 0;
+    do { buf[--i] = '0' + n % 10; n /= 10; } while (n);
+    say(buf+i);
 }
-
-static i32 fk_mem_stat(i32 id, void *out, u32 size)
-{
-    MemStat st = {0};
-    if (id != 0 || size != sizeof(st)) return OS32_ERR_INVAL;
-    st.size = sizeof(st);
-    memcpy(out, &st, sizeof(st));
-    return sizeof(st);
-}
-
-/* 変異試験は cmd_base.c の写しを -DVER_CMD_BASE_C="\"<写し>\"" で差し替える。 */
-#ifndef VER_CMD_BASE_C
-#define VER_CMD_BASE_C "../../userland/shell/cmd_base.c"
-#endif
-#include VER_CMD_BASE_C
-
-/* cmd_base.c の他のコマンドが参照するシェル側の関数 (cmd_ver は使わない)。 */
-int  os32_help_show(const char *name) { (void)name; return -1; }
-int  os32_help_exists(const char *name) { (void)name; return 0; }
-const ShellCmd *shell_get_cmds(int *count) { *count = 0; return base_cmds; }
-void shell_register_cmds(const ShellCmd *cmds) { (void)cmds; }
-int  execute_command(const char *cmd) { (void)cmd; return 0; }
-void sh_refuse(const char *what, int limit) { (void)what; (void)limit; }
-
-int main(int argc, char **argv)
-{
-    if (argc != 9) {
-        fprintf(stderr, "usage: %s kapi build bi_rc crc_valid crc size source commit\n",
-                argv[0]);
-        return 2;
+void _start(void) {
+    CHECK(sizeof(OS32_VerInfo) == 1364 && sizeof(OS32_VerLine) == 68);
+    for (u32 c = 0; c < 26; c++) {
+        VerSnapshot s;
+        kmemset(&s, 0, sizeof(s));
+        s.cpu_measured = s.pit_valid = s.ser_ready = s.ser_fifo = s.pcm_present = 1;
+        s.pit_hz = 100; s.pit_input = 1996800; s.ser_baud = 9600;
+        s.gfx.width = 640; s.gfx.height = 480; s.gfx.bpp = 8;
+        s.gfx_kind = 2; s.gfx_active = 1; s.api_version = KAPI_VERSION;
+        kstrncpy(s.build, "Oct 26 2026 12:34:56", sizeof(s.build));
+        s.boot_ok = s.debug_ok = 1;
+        s.boot.crc_valid = 1; s.boot.source = 2;
+        s.boot.image_crc = 0x0123abcd; s.boot.image_size = 123456;
+        kstrncpy(s.boot.commit, "0acd73e4-dirty", sizeof(s.boot.commit));
+        s.debug.kdebug_state = c < 17 ? c : 1;
+        s.debug.kdebug_pair_crc = 0x12ab;
+        s.services.stack_used = 1234; s.services.stack_size = 32768;
+        s.services.public = 1;
+        kstrncpy(s.services.state, "SERVICES_READY", sizeof(s.services.state));
+        if (c == 17) s.boot_ok = 0;
+        if (c == 18) s.boot.crc_valid = 0;
+        if (c == 19) s.boot.source = 1;
+        if (c == 20) s.boot.source = 0;
+        if (c == 21) s.debug_ok = 0;
+        if (c == 22) {
+            s.pit_valid = s.ser_ready = s.pcm_present = 0;
+            s.gfx_kind = 0; s.gfx.width = 0;
+        }
+        if (c == 23) {
+            s.pit_hz = s.pit_input = s.ser_baud = s.api_version = ~0u;
+            s.boot.image_crc = s.boot.image_size = ~0u;
+            s.debug.kdebug_pages = s.debug.kdebug_owner_pages = ~0u;
+            s.services.stack_used = s.services.stack_size = s.services.public = ~0u;
+            kmemset(s.build, 'B', sizeof(s.build)-1);
+            kmemset(s.boot.commit, 'C', sizeof(s.boot.commit)-1);
+        }
+        if (c == 24) { s.gfx_kind = 1; s.gfx.height = 400; s.gfx.bpp = 4; s.gfx_active = 0; }
+        if (c == 25) { s.gfx_kind = 3; s.gfx_active = 0; }
+        ver_format(&s, &report);
+        say("REPORT\n");
+        for (u32 i = 0; i < report.count; i++) {
+            number(report.lines[i].kind); say("\t"); say(report.lines[i].text); say("\n");
+        }
+        say("CUI\n");
+        calls = 0;
+        CHECK(cmd_ver(0, 0) == 0 && calls == 1);
+        say("END\n");
     }
-    g_fake.kprintf = fk_kprintf;
-    g_fake.sys_get_build_info = fk_sys_get_build_info;
-    g_fake.boot_image_info = fk_boot_image_info;
-    g_fake.mem_stat = fk_mem_stat;
-    g_fake.version = (u32)strtoul(argv[1], NULL, 10);
-    fk_build = argv[2];
-    fk_bi_rc = atoi(argv[3]);
-    memset(&fk_bi, 0, sizeof(fk_bi));
-    fk_bi.crc_valid = (u8)atoi(argv[4]);
-    fk_bi.image_crc = (u32)strtoul(argv[5], NULL, 10);
-    fk_bi.image_size = (u32)strtoul(argv[6], NULL, 10);
-    fk_bi.source = (u8)atoi(argv[7]);
-    strncpy(fk_bi.commit, argv[8], sizeof(fk_bi.commit) - 1);
-    return cmd_ver(1, argv);
+    die(0);
 }
