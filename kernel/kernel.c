@@ -13,7 +13,6 @@
 #include "v86.h"
 #include "io.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
-#include "disk.h"
 /* fs.h 削除 — レガシーFS廃止 */
 #include "kmalloc.h"
 #include "palette.h"
