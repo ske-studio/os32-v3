@@ -16,3 +16,17 @@ check-dep-dir-d3-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- include/bootinfo.h
+- kernel/bootinfo.c
+- kernel/bootinfo_check.c
+- platform/pc98/boot_disk.c
+- platform/pc98/boot_disk.h
+- tools/tests/dep_dir_d3_disk_host.c
+- tools/tests/test_dep_dir_d3_disk.py
+- drivers/ide_addr.h
+- sdk/include/os32/os32_kapi_shared.h
+- include/build_id.h
+- include/memmap.h
+- lib/kstring.h
+- tools/tests/host32.py
+- kernel/boot_disk.h

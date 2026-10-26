@@ -106,10 +106,8 @@ static void unicode_file_load(void)
     CHECK(reserved && tested == 1 && loaded == 1 && cd_loaded == 1 && !bound && !pcm);
     unicode_loads++;
 }
-u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
-u32 ledger_res_overflow;
-static void kernel_pci_line_bits(void) { }
-static void pci_bind_set_line_state_hook(void (*hook)(void)) { (void)hook; }
+static void pc98_boot_pci_resources(void) { CHECK(reserved); }
+
 static int lan_module_load(void)
 {
     struct dma_buf b;

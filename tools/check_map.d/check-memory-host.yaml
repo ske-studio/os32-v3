@@ -42,7 +42,8 @@ check-memory-host:
 - kernel/memory_boot.c
 - kernel/paging.c
 - kernel/pgalloc.c
-- kernel/ledger_pci.c
+- platform/pc98/pci_resources.c
+- platform/pc98/pci_resources.h
 - drivers/pci.c
 - drivers/pci_decode.c
 - kernel/physmem.c
@@ -174,4 +175,7 @@ check-memory-host:
 - drivers/kbd.h
 - kernel/input_service.c
 - include/pointer_service.h
+- drivers/pci_bind.h
+- kernel/irq.h
+- kernel/irq_math.h
 artifact_reader: true

@@ -157,6 +157,10 @@ struct bootinfo {
 #define BOOTINFO_ERR_NDRIVES  (-6)   /* ドライブ数が違う */
 #define BOOTINFO_ERR_NONE     (-7)   /* まだ写していない */
 
+/* Internal adapter contract is defined in kernel/boot_disk.h. */
+struct boot_disk_ops;
+void bootinfo_disk_register(const struct boot_disk_ops *ops);
+
 /* ---- 純粋関数 (kernel/bootinfo_check.c、ホスト試験の対象) ----------------- */
 
 /* イメージ欄のチェック語 (ローダと同じ計算)。 */

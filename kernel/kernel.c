@@ -10,7 +10,6 @@
 /* Preserve the boot status helpers' existing scratch capacities. */
 #define BOOT_STATUS_NUM_BUFSIZE 16
 #define BOOT_BYTE_HEX_BUFSIZE    8
-#include "boot_devices.h"
 #include "serial_diag.h"
 #include "idt.h"
 #include "tss.h"
@@ -50,7 +49,6 @@
 #include "irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
 #include "dma8237.h"    /* 8237 の共通部 + 0439h (同 §1-2) */
 #include "dma_pool.h"   /* DMA プール (同 §1-3) */
-#include "ide.h"
 #include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
 #include "cd_module.h"
 #include "vfs.h"
@@ -97,6 +95,8 @@ extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカ�
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
 
 #include "../platform/pc98/boot_names.h"
+#include "../platform/pc98/boot_disk.h"
+#include "../platform/pc98/pci_resources.h"
 extern void pc98_d2_bind(void);
 
 /* 次に起動するシェルのパス (契約 T9)。実体は kernel/gui.c (K1)。
@@ -180,15 +180,6 @@ static int dev_find_validator(const char *name)
 extern u32 sys_mem_kb;
 
 
-/* 結線表 (実装 B) が読む「線の様子」を実装 A の隔離ビットから答える (合流時に PM が差した 3 行)。 */
-static u8 kernel_pci_line_bits(unsigned int irq)
-{
-    u8 b = 0;
-    if (irq_line_quarantined & (1u << irq)) b |= PCI_LINE_BIT_QUARANTINED;
-    if (irq_storm_masked & (1u << irq)) b |= PCI_LINE_BIT_STORM;
-    return b;
-}
-
 /* kernel_main から抜き出した補助。本体は kernel_main の後に置く
  * (ホスト試験が kernel.c を文字の位置で切り出すため)。 */
 static inline void kernel_shell_loop(void);
@@ -201,6 +192,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     kstack_hw_init();
     pc98_d2_bind();
+    pc98_boot_disk_bind();
     pc98_boot_names_bind(); /* D3c will fold this into pc98_boot_bind. */
 
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
@@ -532,14 +524,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
      * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
-    {
-        /* 取り込みを先に済ませてから溢れを読む (引数の評価順は決まっていない)。 */
-        u32 pci_raw;
-        pci_raw = ledger_resource_import_pci();
-        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\n",
-                pci_raw, ledger_res_overflow);
-    }
-    pci_bind_set_line_state_hook(kernel_pci_line_bits);
+    pc98_boot_pci_resources();
     if (memory_boot_dma_available()) {
         lan_module_load();
     }

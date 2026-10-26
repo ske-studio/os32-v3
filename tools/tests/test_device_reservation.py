@@ -6,7 +6,7 @@
 票 docs/archive/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
 核 (pgalloc_device_reserve / sys_device_reserve_core) を台帳の ledger_reserve_set
 に載せ直したので、その試験をここで流用・拡張する。kernel/pgalloc.c と
-kernel/ledger_pci.c を丸ごと、drivers/pci.c からは読み口 pci_get だけを
+platform/pc98/pci_resources.c を丸ごと、drivers/pci.c からは読み口 pci_get だけを
 切り出して取り込む (特権命令の irq_save / irq_restore だけを贋物にし、
 irq_restore の度に L1 / L2 の不変条件を全ページ検査する — test_ledger.py と同じ
 足場)。見るもの:
@@ -26,7 +26,7 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
   - RAW / PROBE_UNVERIFIED は予約権限にならない
   - 合成 g_pci からの取り込み (メモリ BAR だけ、I/O と 0 を除く、64 ビットの
     上位、ブリッヂの 18h 以降、未知のヘッダ型、溢れは res_overflow、RAW は予約に
-    使えない、B4) と、kernel.c の実物の表示の経路 (取り込みの後の溢れを出す)
+    使えない、B4) と、platform の実物の表示の経路 (取り込みの後の溢れを出す)
   - 失敗時は L1・L2・区間の表・資源の表・会計が全部不変 (表は中身まで比べる)
   - 実 paging + sys + pgalloc の段つき起動で RAM + 窓の一括予約 (段の試験)
 
@@ -47,7 +47,7 @@ import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
 SOURCES = ('kernel/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
-           'kernel/ledger_pci.c', 'drivers/pci.c', 'kernel/paging.c', 'kernel/sys.c',
+           'platform/pc98/pci_resources.c', 'drivers/pci.c', 'kernel/paging.c', 'kernel/sys.c',
            'kernel/kernel.c')
 
 
@@ -68,11 +68,10 @@ def pci_reader(pci_c):
     return head + body.split('\n}\n', 1)[0] + '\n}\n'
 
 
-def print_path(kernel_c):
-    """kernel/kernel.c の ⑥-0 (取り込み + [ledger] の 1 行) の塊を切り出す。"""
-    head = '    {\n        /* 取り込みを先に済ませてから溢れを読む'
-    body = kernel_c.split(head, 1)[1]
-    return head + body.split('\n    }\n', 1)[0] + '\n    }\n'
+def pci_source(text):
+    # Compile every real adapter function; supply only external services below.
+    return '\n'.join(line for line in text.splitlines()
+                     if not line.startswith('#include '))
 
 
 # 合成 g_pci・切り出した列挙・台帳の取り込み・試験の足場 (ファイル有効範囲)
@@ -81,16 +80,22 @@ EXTRA = r'''
 static struct pci_dev g_pci[PCI_MAX_DEVS];
 static int g_pci_count;
 @PCI_READER@
-@LEDGER_PCI@
-/* kernel.c の ⑥-0 の塊を実物のまま走らせ、表示に渡った値を控える */
+/* platform の ⑥-0 wrapperを実物のまま走らせ、表示に渡った値を控える */
+#include "pci_bind.h"
+#include "irq.h"
 #define TATTR_WHITE 0
+u32 irq_line_quarantined, irq_storm_masked;
+static pci_bind_line_state_fn host_hook;
 static u32 kp_raw, kp_ovf, kp_calls;
 static void kprintf(int attr, const char *fmt, u32 raw, u32 ovf) {
     (void)attr; (void)fmt; kp_raw = raw; kp_ovf = ovf; kp_calls++;
 }
-static void host_print_path(void) {
-@PRINT_PATH@
+void pci_bind_set_line_state_hook(pci_bind_line_state_fn hook) {
+    if (kp_calls != 1) __builtin_trap();
+    host_hook = hook;
 }
+@LEDGER_PCI@
+static void host_print_path(void) { pc98_boot_pci_resources(); }
 static struct ledger_region snap_reg[LEDGER_MAX_REGIONS];
 static struct ledger_resource snap_res[LEDGER_MAX_RESOURCES];
 static void snap2(void) {
@@ -541,21 +546,41 @@ BODIES['import_pci'] = r'''
     rec.bus = LEDGER_BUS_FIXED; rec.width_basis = LEDGER_WB_DATASHEET;
     for (i = host_resources(); i < LEDGER_MAX_RESOURCES - 1; i++)
         CHECK(ledger_resource_add(&rec, &rid));
-    /* 起動の表示の経路 (kernel.c の実物): 取り込みの後の溢れを出す (Codex P2) */
+    /* 起動の表示の経路 (platform の実物): 取り込みの後の溢れを出す (Codex P2) */
     host_print_path();
     CHECK(kp_calls == 1 && kp_raw == 1 && kp_ovf == 3 && ledger_res_overflow == 3);
     CHECK(host_resources() == LEDGER_MAX_RESOURCES);
+    CHECK(host_hook != 0);
+    CHECK(host_hook(9) == 0);
+    irq_line_quarantined = 1u << 9;
+    CHECK(host_hook(9) == PCI_LINE_BIT_QUARANTINED);
+    irq_storm_masked = 1u << 9;
+    CHECK(host_hook(9) == (PCI_LINE_BIT_QUARANTINED | PCI_LINE_BIT_STORM));
+    CHECK(host_hook(10) == 0);
+    irq_line_quarantined = 0;
+    CHECK(host_hook(9) == PCI_LINE_BIT_STORM);
     /* PCI が無い (NP21/W) なら 0 本 */
     g_pci_count = 0;
     CHECK(ledger_resource_import_pci() == 0 && ledger_res_overflow == 3);
 '''
 
 
+BODIES['cardbus'] = r"""
+    host_pool_boot(8192);
+    CHECK(host_regions());
+    g_pci_count = 1;
+    g_pci[0].header = PCI_HDR_LAYOUT_CARDBUS;
+    g_pci[0].bar[0] = 0x21000000UL;
+    g_pci[0].bar[1] = 0x22000000UL;
+    CHECK(ledger_resource_import_pci() == 1 && host_resources() == 1);
+    CHECK(ledger_resources[0].bar == 0 && ledger_resources[0].raw_bar == 0x21000000UL);
+"""
+
+
 def run_c(texts, body):
     """本体を組んで実行し、(成功, 出力) を返す。"""
     extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['drivers/pci.c']))
-             .replace('@LEDGER_PCI@', texts['kernel/ledger_pci.c'])
-             .replace('@PRINT_PATH@', print_path(texts['kernel/kernel.c'])))
+             .replace('@LEDGER_PCI@', pci_source(texts['platform/pc98/pci_resources.c'])))
     post = L.POST.replace('static int test(void) {', extra + 'static int test(void) {', 1)
     with tempfile.TemporaryDirectory(prefix='os32-devres-') as tmp:
         tmp = pathlib.Path(tmp)
@@ -651,6 +676,9 @@ class DeviceReservation(unittest.TestCase):
     def test_arguments_and_context(self):
         self.run_body('arguments_and_context')
 
+    def test_cardbus(self):
+        self.run_body('cardbus')
+
     def test_import_pci(self):
         self.run_body('import_pci')
 
@@ -670,7 +698,7 @@ class DeviceReservation(unittest.TestCase):
     def test_import_is_before_bind(self):
         # ⑥-0 は PCI bind を行う LAN 部品の起動前 (B4)、台帳より後。
         k = (ROOT / 'kernel/kernel.c').read_text()
-        imp = k.index('ledger_resource_import_pci()')
+        imp = k.index('pc98_boot_pci_resources()')
         self.assertLess(k.index('memory_boot_init(mem_kb)'), imp)
         self.assertLess(imp, k.index('lan_module_load()'))
 
@@ -717,19 +745,19 @@ MUTATIONS = [
      '        ledger_res_overflow++;\n', ''),
     ('record-map-unchecked', 'kernel/pgalloc.c',
      '        rec->map_first > rec->map_end ||\n', ''),
-    ('import-width-verified', 'kernel/ledger_pci.c',
+    ('import-width-verified', 'platform/pc98/pci_resources.c',
      '    r.width_basis = LEDGER_WB_RAW;', '    r.width_basis = LEDGER_WB_SIZING;'),
-    ('import-io-bars', 'kernel/ledger_pci.c',
+    ('import-io-bars', 'platform/pc98/pci_resources.c',
      '            if (k < PCI_BAR_MEM32 || k > PCI_BAR_MEM64 ||',
      '            if (k < PCI_BAR_IO || k > PCI_BAR_MEM64 ||'),
-    ('import-mem64-high-kept', 'kernel/ledger_pci.c',
+    ('import-mem64-high-kept', 'platform/pc98/pci_resources.c',
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || d.bar[++b])) continue;',
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || !d.bar[++b])) continue;'),
-    ('import-bridge-all-six', 'kernel/ledger_pci.c',
+    ('import-bridge-all-six', 'platform/pc98/pci_resources.c',
      '    PCI_CFG_BAR_COUNT, 2, 1\n', '    PCI_CFG_BAR_COUNT, PCI_CFG_BAR_COUNT, 1\n'),
-    ('import-unknown-header-read', 'kernel/ledger_pci.c',
+    ('import-unknown-header-read', 'platform/pc98/pci_resources.c',
      'ledger_pci_bars[layout] : 0;', 'ledger_pci_bars[layout] : 1;'),
-    ('print-overflow-before-import', 'kernel/kernel.c',
+    ('print-overflow-before-import', 'platform/pc98/pci_resources.c',
      '        pci_raw = ledger_resource_import_pci();\n'
      '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
      '                pci_raw, ledger_res_overflow);\n',
@@ -737,7 +765,7 @@ MUTATIONS = [
      '        pci_raw = ledger_resource_import_pci();\n'
      '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
      '                pci_raw, early);\n'),
-    ('import-overflow-counted-as-added', 'kernel/ledger_pci.c',
+    ('import-overflow-counted-as-added', 'platform/pc98/pci_resources.c',
      '            if (ledger_resource_add(&r, &rid)) n++;',
      '            ledger_resource_add(&r, &rid); n++;'),
 ]

@@ -8,12 +8,10 @@
 /*  票: docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0                           */
 /* ======================================================================== */
 
-#include "boot_devices.h"
 #include "bootinfo.h"
+#include "boot_disk.h"
 #include "memmap.h"
-#include "ide.h"
 #include "kprintf.h"
-#include "ide_addr.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"   /* HddGeom (KAPI v64) / BootImageInfo (v65) */
 #include "build_id.h"           /* os32_build_commit (生成物 build/out/build_id.c) */
@@ -45,13 +43,17 @@ STATIC_ASSERT(BI_OFFSETOF(struct bootinfo_wire_drive, queried) == BI_DRV_QUERIED
 /* hdd_geom_info の出力は KAPI の契約 (32 バイト、os32_kapi_shared.h) */
 STATIC_ASSERT(sizeof(HddGeom) == 32, hdd_geom_size);
 STATIC_ASSERT(BI_OFFSETOF(HddGeom, ata_total) == 24, hdd_geom_total);
-STATIC_ASSERT(HDD_AMODE_LBA28 == IDE_AMODE_LBA28 &&
-              HDD_AMODE_CHS_CUR == IDE_AMODE_CHS_CUR &&
-              HDD_AMODE_CHS_DEF == IDE_AMODE_CHS_DEF, hdd_amode_same);
 /* 域はブート情報域の予約 (256B) に収まる。 */
 STATIC_ASSERT(BOOTINFO_WIRE_SIZE <= MEM_BOOTINFO_SIZE, bi_fits);
 
-static struct bootinfo s_bootinfo = { BOOTINFO_ERR_NONE };
+static const struct boot_disk_ops *s_disk;
+
+void bootinfo_disk_register(const struct boot_disk_ops *ops)
+{
+    s_disk = ops;
+}
+
+static struct bootinfo s_bootinfo = { .status = BOOTINFO_ERR_NONE };
 static u8 s_raw[BOOTINFO_WIRE_SIZE];    /* 生の写し (kselftest・調査用) */
 static int s_captured;
 
@@ -115,19 +117,9 @@ void bootinfo_report(void)
 
     /* IDENTIFY の値。hd0 / hd1 (バンク0 のマスタ・スレーブ) だけ。 */
     for (i = 0; i < (int)BOOTINFO_NDRIVES; i++) {
-        IdeGeom g;
         struct bootinfo_ata a;
 
-        if (ide_get_geom(i, &g) != IDE_OK) continue;
-        a.def_cyl   = g.def_cyl;
-        a.def_heads = g.def_heads;
-        a.def_spt   = g.def_spt;
-        a.cur_cyl   = g.cur_cyl;
-        a.cur_heads = g.cur_heads;
-        a.cur_spt   = g.cur_spt;
-        a.cur_valid = (u8)((g.w53 & 0x0001) ? 1 : 0);
-        a.lba       = (u8)((g.w49 & IDE_ID_CAP_LBA) ? 1 : 0);
-        a.total     = g.total;
+        if (!s_disk || s_disk->report_ata(i, &a) != 0) continue;
         bootinfo_format_ata(&a, i, line, (int)sizeof(line));
         kprintf(KLOG_ATTR, "%s\n", line);
     }
@@ -137,20 +129,13 @@ void bootinfo_report(void)
 /*  区画表の幾何 (票 TASK_HDD_INSTALL 段 1)                                  */
 /* ======================================================================== */
 
-/* IDE ドライブ番号 → BIOS の DA。バンク 0 のマスタ = 80h、スレーブ = 81h。
- * バンク 1 (ドライブ 2/3) は BIOS の HDD として数えない (0 = 無し)。 */
-static int bootinfo_da_of(int ide_drive)
-{
-    if (ide_drive == 0) return BOOTINFO_DA_HDD0;
-    if (ide_drive == 1) return BOOTINFO_DA_HDD0 + 1;
-    return 0;
-}
-
 int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 {
     u8 h, s;
-    int da = bootinfo_da_of(ide_drive);
-    IdeInfo info;
+    int da;
+
+    if (!s_disk || !s_disk->valid(ide_drive)) return -1;
+    da = s_disk->bios_da(ide_drive);
 
     if (da != 0 && bootinfo_hdd_geom(da, (u16 *)0, &h, &s, (u16 *)0) == 0) {
         if (heads) *heads = h;
@@ -159,24 +144,20 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
     }
     /* BIOS 幾何が無い (FD 起動で問い合わせなかった / 規則に外れる) ときは
      * IDENTIFY の既定。NP21/W の NHD はどちらも同じ値なので従来どおり。 */
-    if (ide_get_info(ide_drive, &info) != IDE_OK) return -1;
-    if (info.heads == 0 || info.sectors == 0) return -1;
-    if (heads) *heads = info.heads;
-    if (spt)   *spt = info.sectors;
+    if (s_disk->default_geom(ide_drive, heads, spt) != 0) return -1;
     return BOOTINFO_GEOM_IDENTIFY;
 }
 
 int hdd_geom_info(int drive, void *out_v)
 {
     HddGeom *out = (HddGeom *)out_v;
-    IdeGeom g;
     int da, i;
 
     if (!out) return OS32_ERR_INVAL;
-    if (drive < 0 || drive >= IDE_MAX_DRIVES) return OS32_ERR_INVAL;
+    if (!s_disk || !s_disk->valid(drive)) return OS32_ERR_INVAL;
     kmemset(out, 0, sizeof(*out));
 
-    da = bootinfo_da_of(drive);
+    da = s_disk->bios_da(drive);
     out->bios_da = (u8)da;
     if (da != 0 && s_bootinfo.status == BOOTINFO_OK) {
         for (i = 0; i < (int)BOOTINFO_NDRIVES; i++) {
@@ -192,19 +173,7 @@ int hdd_geom_info(int drive, void *out_v)
         }
     }
 
-    if (ide_get_geom(drive, &g) == IDE_OK && ide_drive_present(drive)) {
-        out->ata_present   = 1;
-        out->ata_def_cyl   = g.def_cyl;
-        out->ata_def_heads = g.def_heads;
-        out->ata_def_spt   = g.def_spt;
-        out->ata_cur_cyl   = g.cur_cyl;
-        out->ata_cur_heads = g.cur_heads;
-        out->ata_cur_spt   = g.cur_spt;
-        out->ata_w49       = g.w49;
-        out->ata_w53       = g.w53;
-        out->ata_total     = g.total;
-        out->addr_mode     = (u8)ide_addr_mode_of(drive);
-    }
+    s_disk->fill_ata(drive, out);
     return 0;
 }
 

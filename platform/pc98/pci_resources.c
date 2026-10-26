@@ -11,8 +11,8 @@
 /*  ため (pgalloc.c を取り込むホスト試験の探索パスを増やさない)。g_pci は    */
 /*  既存の読み口 pci_get (写しを返す) で読む — 列挙の順序も config も触らない。*/
 /* ======================================================================== */
-#include "pgalloc.h"
-#include "pci.h"
+#include "../../kernel/pgalloc.h"
+#include "../../drivers/pci.h"
 
 /* 記録した各デバイスの**メモリ BAR** (メモリ種別で番地が 0 でないもの) を
  * 1 本ずつ RAW のレコードにする。I/O BAR・生値 0・予約種別は飛ばす。64 ビット
@@ -57,4 +57,31 @@ u32 ledger_resource_import_pci(void)
         }
     }
     return n;
+}
+
+#include "pci_resources.h"
+#include "../../drivers/pci_bind.h"
+#include "../../kernel/irq.h"
+#include "kprintf.h"
+#include "pc98.h"
+
+/* 結線表 (実装 B) が読む「線の様子」を実装 A の隔離ビットから答える (合流時に PM が差した 3 行)。 */
+static u8 pc98_pci_line_bits(unsigned int irq)
+{
+    u8 b = 0;
+    if (irq_line_quarantined & (1u << irq)) b |= PCI_LINE_BIT_QUARANTINED;
+    if (irq_storm_masked & (1u << irq)) b |= PCI_LINE_BIT_STORM;
+    return b;
+}
+
+void pc98_boot_pci_resources(void)
+{
+    {
+        /* 取り込みを先に済ませてから溢れを読む (引数の評価順は決まっていない)。 */
+        u32 pci_raw;
+        pci_raw = ledger_resource_import_pci();
+        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\n",
+                pci_raw, ledger_res_overflow);
+    }
+    pci_bind_set_line_state_hook(pc98_pci_line_bits);
 }
