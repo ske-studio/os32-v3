@@ -1,0 +1,9 @@
+check-ver-version-host:
+- include/config.h
+- docs/decisions/VERSIONS.md
+- tools/tests/test_ver_version.py
+- tools/tests/ver_test_utils.py
+- tools/tests/host32.py
+- build/checks.d/check-ver-version-host.mk
+- tools/check_map.d/check-ver-version-host.yaml
+- kernel/module.c
