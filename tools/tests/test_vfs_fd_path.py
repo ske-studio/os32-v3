@@ -427,7 +427,9 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
             fdhost = tmp / f"{exe_name}_fdhost.c"
             fdhost.write_text((ROOT / "tools/tests/vfs_fd_sqlite_host.c").read_text(
                 encoding="utf-8").replace('#include "../../fs/vfs_fd.c"',
-                                          f'#include "{overrides["fs/vfs_fd.c"]}"'),
+                                          f'#include "{overrides["fs/vfs_fd.c"]}"').replace(
+                '#include "input_fixture_host.h"',
+                f'#include "{ROOT}/tools/tests/input_fixture_host.h"'),
                 encoding="utf-8")
         text = text.replace('#include "vfs_fd_sqlite_host.c"',
                             f'#include "{fdhost}"')
