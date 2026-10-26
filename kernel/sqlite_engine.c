@@ -337,6 +337,14 @@ static const char *services_state_name(void)
     }
 }
 
+void services_ver_state(ServicesVerState *out)
+{
+    out->stack_used = sqlite_engine_stack_high_water();
+    out->stack_size = SQLITE_ENGINE_STACK_SIZE;
+    out->public = (u32)services_public;
+    kstrncpy(out->state, services_state_name(), sizeof(out->state));
+}
+
 void services_report(void)
 {
     struct module_record *r = module_record_get(sqlite_handle);
