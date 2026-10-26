@@ -40,11 +40,23 @@ static int resource_reject(const char *reason, u32 dev, u32 fn, u32 reg, u32 raw
     return -1;
 }
 
+/* Match the kernel scan: absent fn0 means absent device; single-function
+ * devices may alias fn0 configuration at fn1..7 (Ra266 Trident). */
+static u32 resource_function_count(u32 dev)
+{
+    u32 id = pci_cfg_read32(0, dev, 0, PCI_CFG_VENDOR_ID);
+    if ((id & 0xffffU) == PCI_VENDOR_NONE) return 0;
+    u8 hdr0 = pci_cfg_read32(0, dev, 0, PCI_CFG_CACHE_LINE) >>
+        ((PCI_CFG_HEADER_TYPE - PCI_CFG_CACHE_LINE) * 8);
+    return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;
+}
+
 static int resource_collect_bounds(struct resource_bounds *b)
 {
     b->count = 0;
     for (u32 dev = 0; dev < PCI_DEV_COUNT; dev++) {
-        for (u32 fn = 0; fn < PCI_FN_COUNT; fn++) {
+        u32 nfn = resource_function_count(dev);
+        for (u32 fn = 0; fn < nfn; fn++) {
             u32 id = pci_cfg_read32(0, dev, fn, PCI_CFG_VENDOR_ID);
             if ((id & 0xffffU) == PCI_VENDOR_NONE ||
                 (dev == GF_RES_GPU_DEV && fn == 0)) continue;
@@ -160,11 +172,12 @@ int gfinit_resources(struct recover_range *exclude, u32 *count)
     if (resource_collect_bounds(&bounds)) return -1;
     u32 used = 0;
     bool gpu = false;
-    /* Read every bus-0 function: the boot cache can be truncated/depth-limited.
+    /* Read every present bus-0 function: the boot cache can be truncated/depth-limited.
      * All bridges are off the GPU's path, so their exact forwarding windows
      * exclude the complete downstream memory space, including child devices. */
     for (u32 dev = 0; dev < PCI_DEV_COUNT; dev++) {
-        for (u32 fn = 0; fn < PCI_FN_COUNT; fn++) {
+        u32 nfn = resource_function_count(dev);
+        for (u32 fn = 0; fn < nfn; fn++) {
             u32 id = pci_cfg_read32(0, dev, fn, PCI_CFG_VENDOR_ID);
             if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;
             if (dev == GF_RES_GPU_DEV && fn == 0) {

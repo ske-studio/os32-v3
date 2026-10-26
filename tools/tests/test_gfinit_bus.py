@@ -36,6 +36,8 @@ SHARED_MUTATIONS = [
      'v->key == target && *value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
+    ('resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;',
+     '(void)hdr0; return PCI_FN_COUNT;'),
     ('resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
     ('resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
     ('resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),

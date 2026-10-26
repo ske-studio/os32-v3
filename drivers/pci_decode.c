@@ -125,11 +125,6 @@ const char *pci_vendor_name(u16 vendor)
     return "";
 }
 
-int pci_is_multifunction(u8 header_type)
-{
-    return (header_type & PCI_HDR_MULTIFUNCTION) ? 1 : 0;
-}
-
 int pci_header_layout(u8 header_type)
 {
     /* **bit7 を落としてから比べる。** 落とさないとマルチファンクションの

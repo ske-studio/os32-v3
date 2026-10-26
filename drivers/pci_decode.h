@@ -220,7 +220,10 @@ const char *pci_class_name(u8 cls, u8 sub);
 const char *pci_vendor_name(u16 vendor);
 
 /* Header Type bit7。fn0 を読んだあと fn1〜7 を走査するかの判定。 */
-int pci_is_multifunction(u8 header_type);
+static inline int pci_is_multifunction(u8 header_type)
+{
+    return (header_type & PCI_HDR_MULTIFUNCTION) ? 1 : 0;
+}
 
 /* Header Type bit6〜0 (PCI_HDR_LAYOUT_*)。 */
 int pci_header_layout(u8 header_type);
