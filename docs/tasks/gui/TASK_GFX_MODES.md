@@ -35,3 +35,7 @@
 | G6b | フレームバッファと query への反映、容量の照合 (gfx/gfx_core.c・gfx.h・gfx_internal.h) | 同上 | astra | **main** (Opus 取り込み可・P3 の 2 件を astra が直す — 98 は DISPLAY の記録が足りなくても前と同じく描ける、PM のゲスト n16・p480・p400 合格) |
 
 段は小さい順の直列 (G0 → G2 → G3 → G4 → G5 → G6a → G6b、試験の照合先が重なるので並べない)。起動時の予約と面の型板は memmap の容量のまま変えない (表との照合はモジュールを読み込んだ後のモードの選択のときだけ)。高さの正典は `gfx_current_height`、問い合わせの高さは今の振る舞い (GUI を抜けた後・init の前も PEGC と Cirrus は 480) を変えない。ゲストは PM が NP21/W で (98 の 16 色・PEGC 480 と 400 の CUI からの出入り)。Cirrus を有効にする構成の試験 C480 は節目の関門で (DEFERRED_TESTS)。PEGC の 256 色 400 ラインは表に載せない (PM 決定、今の振る舞いのまま)。
+
+## 4. 実機の確認
+
+- 2026-10-26: 実機 Ra266 (c125a73e、G0〜G6b を含む) で、ユーザーが os32gui を PEGC で起動し、見切れずに表示されることを確かめた (目視)。Ra266 に Cirrus は無い (表示は Trident と GeForce 6200、RA266 §1-1) — Cirrus の受入 C480 は NP21/W の GD5430 の構成で (DEFERRED_TESTS の GFX-MODES-C480)。
