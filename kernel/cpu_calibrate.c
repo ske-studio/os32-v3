@@ -46,6 +46,8 @@ extern volatile u32 tick_count;
 
 /* キャリブレーション結果 (静的変数) */
 static u32 s_loops_per_tick = 0;
+/* No completed measurement yet. Never infer this flag from the LPT value. */
+static int s_used_fallback = 1;
 
 /* 何周回ったか / 何 tick 測れたか。**kernel.map 越しに読めるよう意図的に
  * グローバル** (実機で「本当に 5 tick 測れたか」を確かめる唯一の手段)。 */
@@ -104,6 +106,7 @@ void cpu_calibrate(void)
     cpu_calib_rounds = rounds;
     cpu_calib_ticks = ticks;
     s_loops_per_tick = cpu_calibrate_compute(total, ticks);
+    s_used_fallback = ticks == 0 || total / ticks < (u32)CALIBRATE_MIN_LPT;
 }
 
 /* ======================================================================== */
@@ -112,6 +115,11 @@ void cpu_calibrate(void)
 u32 cpu_loops_per_tick(void)
 {
     return s_loops_per_tick;
+}
+
+int cpu_calibrate_used_fallback(void)
+{
+    return s_used_fallback;
 }
 
 /* ======================================================================== */

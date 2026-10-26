@@ -16,6 +16,10 @@ void cpu_calibrate(void);
 /* キャリブレーション結果: 1 tick (10ms) あたりの NOP ループ回数 */
 u32 cpu_loops_per_tick(void);
 
+/* Saved outcome: 1 before calibration or when it used the fallback, 0 when
+ * measured (even if the measured LPT equals CALIBRATE_FALLBACK_LPT). */
+int cpu_calibrate_used_fallback(void);
+
 /* 校正が実際に何周回って何 tick 測れたか (診断用)。**kernel.map 越しに
  * 読めるよう意図的にグローバル** — 実機で「丸めが起きていない」ことを
  * 確かめる唯一の手段 (266MHz なら rounds ≒ 50 / ticks = 5、
