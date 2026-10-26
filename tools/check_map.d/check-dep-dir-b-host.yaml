@@ -10,3 +10,13 @@ check-dep-dir-b-host:
 - tools/tests/host32.py
 - tools/check_map.d/check-dep-dir-b-host.yaml
 - build/checks.d/check-dep-dir-b-host.mk
+- kernel/platform_irq.h
+- platform/pc98/pic.c
+- kernel/idt.c
+- kernel/idt.h
+- kernel/irq.c
+- kernel/irq_math.c
+- kernel/irq_math.h
+- tools/tests/test_dep_dir_b_pic.py
+- tools/tests/dep_dir_b_pic_host.c
+- tools/tests/dep_dir_b_l12_baseline.json

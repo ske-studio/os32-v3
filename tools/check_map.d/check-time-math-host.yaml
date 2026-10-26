@@ -7,3 +7,5 @@ check-time-math-host:
 - build/checks.d/check-time-math-host.mk
 - include/types.h
 - kernel/ktime.h
+- kernel/platform_irq.h
+- platform/pc98/pic.c

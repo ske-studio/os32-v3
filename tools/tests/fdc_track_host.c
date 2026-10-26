@@ -30,7 +30,7 @@
 #define irq_register host_irq_register
 #include "irq.c"
 #undef irq_register
-/* test_fdc_track.py が実 idt.c から切り出す pic_eoi。 */
+/* test_fdc_track.py が実 pic.c から切り出す EOI と ISR 操作。 */
 #include "fdc_pic_source.c"
 #include "clock_service.c"
 #include "../../fs/fatfs/diskio.c"

@@ -459,10 +459,15 @@ def host_build(tmp, mutated=None):
     mutated = (相対パス, 本文) なら、変異させた写しの木から組む。"""
     tmpd = pathlib.Path(tmp)
     exe = tmpd / "fdc-track-host"
-    idt = (ROOT / "kernel/idt.c").read_text()
-    pic = idt[idt.index('void pic_eoi('):]
-    pic = pic[:pic.index('\n}') + 2]
-    (tmpd / 'fdc_pic_source.c').write_text(pic)
+    source = (ROOT / "platform/pc98/pic.c").read_text()
+    pic = []
+    for name in ('pic_eoi', 'platform_irq_slave_last_in_service',
+                 'platform_irq_eoi_master'):
+        body = re.search(r'^(?:void|int) ' + name + r'\([^\n]*\)\n\{.*?^\}',
+                         source, re.M | re.S)
+        assert body, name
+        pic.append(body[0])
+    (tmpd / 'fdc_pic_source.c').write_text('\n'.join(pic))
     if mutated is None:
         cmd = ["gcc", *FLAGS, "-I" + str(tmpd), *includes(), str(HARNESS), "-o", str(exe)]
     else:
