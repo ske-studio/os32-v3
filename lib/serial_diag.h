@@ -1,7 +1,8 @@
 #ifndef OS32_SERIAL_DIAG_H
 #define OS32_SERIAL_DIAG_H
 
-/* Cooperative-context diagnostics: callers check the serial protocol gate
+/* These names are the common emergency facade, available before registration.
+ * Cooperative-context diagnostics: callers check the serial protocol gate
  * once before starting a line. Keep formatting away from console sinks. */
 extern void serial_puts_polled(const char *str);
 extern int serial_gate_active(void);

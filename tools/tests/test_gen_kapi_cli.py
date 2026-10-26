@@ -58,6 +58,8 @@ class KapiCli(unittest.TestCase):
                 target = entry.get('target', '')
                 if target.startswith('input_'):
                     entry['target'] = 'kbd_' + target[len('input_'):]
+                elif target.startswith('port_'):
+                    entry['target'] = 'serial_' + target[len('port_'):]
                 elif target.startswith('pointer_'):
                     entry['target'] = 'mouse_' + target[len('pointer_'):]
                 elif entry['name'] == 'mouse_poll':

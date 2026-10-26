@@ -1,4 +1,4 @@
-"""D2 A: real input table, all public wrappers, wiring and ABI stability."""
+"""D2 A/B: real service tables, public wrappers, wiring and ABI stability."""
 import argparse
 import json
 from pathlib import Path
@@ -74,6 +74,38 @@ def run(runner, mutation=None):
                        'wrap_mouse_set_bounds(-1, -2, 3, 4);',
                        'wrap_mouse_cursor_set_mode(MOUSE_CURSOR_NONE);',
                        'wrap_mouse_cursor_show(); wrap_mouse_cursor_hide();']
+    port_selected, port_checks = [], []
+    port_calls = {
+        'serial_init': ('0xfedcba98u', 'port_seen == 1 && port_baud == 0xfedcba98ul', None),
+        'serial_puts': ('"port"', "port_seen == 2 && port_string[0] == 'p' && port_string[4] == 0", None),
+        'serial_getchar': ('', 'port_seen == 3', '-123'),
+        'serial_putchar': ("'X'", "port_seen == 4 && port_char == 'X'", None),
+        'serial_trygetchar': ('', 'port_seen == 5', '-125'),
+        'serial_is_initialized': ('', 'port_seen == 6', '126'),
+        'serial_init_vfast': ('0x87654321u', 'port_seen == 7 && port_baud == 0x87654321ul', '-127'),
+        'serial_get_status': ('&mode, &baud, &fifo', 'port_seen == 8 && mode == 11 && baud == 12 && fifo == 13', '-128'),
+        'serial_diag': ('&serial_diag', 'port_seen == 9 && serial_diag.oe == 21 && serial_diag.fe == 22 && serial_diag.pe == 23 && serial_diag.overflow == 24', '0'),
+    }
+    for name, (call_args, check, result) in port_calls.items():
+        slot = next(i for i, e in enumerate(spec['api']) if e['name'] == name)
+        entry = spec['api'][slot]
+        if name != 'serial_diag':
+            assert entry['target'].startswith('port_'), name
+        match = re.search(r'^(?:int|void) __cdecl wrap_' + name +
+                          r'\([^\n]*\)\n\{.*?^\}', wrappers, re.M | re.S)
+        assert match, name
+        port_selected.append(match[0])
+        call = f'wrap_{name}({call_args})'
+        port_checks.append((f'CHECK({call} == {result});' if result else call + ';') +
+                           f'CHECK({check} && hit == {slot});')
+    sys_source = (ROOT / 'kapi/kapi_sys.c').read_text()
+    diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', sys_source, re.M | re.S)
+    assert diag_body
+    port_selected.insert(0, diag_body[0])
+    port_checks += ['CHECK(kapi_serial_diag(0) == OS32_ERR_INVAL);',
+                    "CHECK(port_putchar_kapi('Z') == -124 && port_char == 'Z');",
+                    'port_diag_get(0, 0, 0, 0); CHECK(port_seen == 9);',
+                    'CHECK(port_get_status(0, 0, 0) == -128);']
     if mutation == 'unbound':
         assert 'input_register(&pc98_input);' in bind
         bind = bind.replace('input_register(&pc98_input);', '')
@@ -95,6 +127,8 @@ def run(runner, mutation=None):
         fixture = fixture.replace('#include "../../drivers/kbd.h"', '#include "' + str(ROOT / 'drivers/kbd.h') + '"')
         fixture = fixture.replace('#include "../../drivers/mouse.h"', '#include "' + str(ROOT / 'drivers/mouse.h') + '"')
         fixture = fixture.replace('#include \"pointer_fixture_host.h\"', '#include \"' + str(ROOT / 'tools/tests/pointer_fixture_host.h') + '\"')
+        fixture = fixture.replace('#include "port_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/port_fixture_host.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/serial.h"', '#include "' + str(ROOT / 'drivers/serial.h') + '"')
         (work / 'fixture.c').write_text(fixture)
         helper = wrappers[wrappers.index('#define KAPI_OUT_LEN('):wrappers.index('static int kapi_in_range(')]
         (work / 'input_wrappers.inc').write_text(helper + '\n'.join(selected))
@@ -103,10 +137,12 @@ def run(runner, mutation=None):
                           (ROOT / 'kernel/fep_module.c').read_text(), re.M)
         assert shift
         (work / 'input_shift.inc').write_text(shift[0])
+        (work / 'port_wrappers.inc').write_text('\n'.join(port_selected))
+        (work / 'port_wrapper_checks.inc').write_text('\n'.join(port_checks))
         (work / 'pointer_wrappers.inc').write_text('\n'.join(pointer_selected))
         (work / 'pointer_wrapper_checks.inc').write_text('\n'.join(pointer_checks))
         exe = work / 'test'
-        includes = ['-I' + str(ROOT / p) for p in ('include', 'sdk/include/os32')]
+        includes = ['-I' + str(ROOT / p) for p in ('include', 'lib', 'sdk/include/os32')]
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-Wall', '-Wextra', '-Werror', '-Wno-unused-const-variable',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
@@ -114,7 +150,7 @@ def run(runner, mutation=None):
                         str(work / 'fixture.c'), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner=runner, timeout=30)
         assert result.returncode == (1 if mutation else 0), result.returncode
-    print('PASS D2 A input/pointer' + (' RED ' + mutation if mutation else ' (25 operations / 18 wrappers)'))
+    print('PASS D2 A/B input/pointer/port/emergency' + (' RED ' + mutation if mutation else ' (35 operations / 27 wrappers)'))
 
 
 def contracts():
@@ -138,7 +174,7 @@ def contracts():
     # The common header must resolve without the drivers include search path.
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Werror', '-fsyntax-only', '-x', 'c',
                     '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-'],
-                   input='#include "input_service.h"\n#include "pointer_service.h"\n', text=True, check=True)
+                   input='#include "input_service.h"\n#include "pointer_service.h"\n#include "port_service.h"\n#include "console_output.h"\n', text=True, check=True)
     with tempfile.TemporaryDirectory(prefix='d2-symbols-') as directory:
         obj = Path(directory) / 'input_service.o'
         subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
@@ -146,7 +182,26 @@ def contracts():
                         '-c', str(ROOT / 'kernel/input_service.c'), '-o', str(obj)], check=True)
         symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
         assert not symbols.strip(), symbols
-    print('PASS D2 A dependency, symbols and boot wiring contracts')
+    bind = (ROOT / 'platform/pc98/d2_bind.c').read_text()
+    for registration in ('port_register(&pc98_port);', 'con_output_register(&pc98_console_output);'):
+        assert registration in bind
+    assert 'const EmergencyOps emergency_output' in bind
+    for name in ('kernel/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
+                 'exec/exec.c', 'kernel/isr_handlers.c', 'kernel/double_fault.c'):
+        source = (ROOT / name).read_text()
+        assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name
+    for header in ('port_service.h', 'console_output.h'):
+        assert 'drivers/' not in (ROOT / 'include' / header).read_text()
+    with tempfile.TemporaryDirectory(prefix='d2-port-symbols-') as directory:
+        for source in ('port_service', 'serial_diag'):
+            obj = Path(directory) / (source + '.o')
+            subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
+                            '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'lib'),
+                            '-I' + str(ROOT / 'sdk/include/os32'), '-c',
+                            str(ROOT / ('kernel/' + source + '.c')), '-o', str(obj)], check=True)
+            symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
+            assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
+    print('PASS D2 A/B dependency, symbols and boot wiring contracts')
 
 
 if __name__ == '__main__':

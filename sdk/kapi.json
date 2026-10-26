@@ -31,7 +31,7 @@
     "tvram.h",
     "vfs.h",
     "ext2.h",
-    "serial.h",
+    "port_service.h",
     "console.h",
     "dev.h",
     "kcg.h",
@@ -311,6 +311,7 @@
     },
     {
       "name": "serial_init",
+      "target": "port_init",
       "ret": "void",
       "args": [
         "u32 baud"
@@ -322,13 +323,13 @@
       "args": [
         "const char *s"
       ],
-      "target": "serial_puts_kapi"
+      "target": "port_puts_kapi"
     },
     {
       "name": "serial_getchar",
       "ret": "int",
       "args": [],
-      "target": "serial_getchar_kapi"
+      "target": "port_getchar_kapi"
     },
     {
       "name": "serial_putchar",
@@ -336,15 +337,17 @@
       "args": [
         "u8 ch"
       ],
-      "target": "serial_putchar_kapi"
+      "target": "port_putchar_kapi"
     },
     {
       "name": "serial_trygetchar",
+      "target": "port_trygetchar",
       "ret": "int",
       "args": []
     },
     {
       "name": "serial_is_initialized",
+      "target": "port_is_initialized",
       "ret": "int",
       "args": []
     },
@@ -1594,11 +1597,13 @@
     },
     {
       "name": "serial_init_vfast",
+      "target": "port_init_vfast",
       "ret": "int",
       "args": ["u32 baud"]
     },
     {
       "name": "serial_get_status",
+      "target": "port_get_status",
       "out": [{"arg": "mode", "size": "sizeof(u32)"}, {"arg": "baud", "size": "sizeof(u32)"}, {"arg": "fifo", "size": "sizeof(u32)"}],
       "ret": "int",
       "args": ["u32 *mode", "u32 *baud", "u32 *fifo"]

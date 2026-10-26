@@ -15,7 +15,7 @@
 #include "tvram.h"
 #include "vfs.h"
 #include "ext2.h"
-#include "serial.h"
+#include "port_service.h"
 #include "console.h"
 #include "dev.h"
 #include "kcg.h"
@@ -831,37 +831,37 @@ int __cdecl wrap_sys_rmdir(const char *path)
 void __cdecl wrap_serial_init(u32 baud)
 {
     KAPI_HIT(33);
-    serial_init(baud);
+    port_init(baud);
 }
 
 void __cdecl wrap_serial_puts(const char *s)
 {
     KAPI_HIT(34);
-    serial_puts_kapi(s);
+    port_puts_kapi(s);
 }
 
 int __cdecl wrap_serial_getchar(void)
 {
     KAPI_HIT(35);
-    return serial_getchar_kapi();
+    return port_getchar_kapi();
 }
 
 int __cdecl wrap_serial_putchar(u8 ch)
 {
     KAPI_HIT(36);
-    return serial_putchar_kapi(ch);
+    return port_putchar_kapi(ch);
 }
 
 int __cdecl wrap_serial_trygetchar(void)
 {
     KAPI_HIT(37);
-    return serial_trygetchar();
+    return port_trygetchar();
 }
 
 int __cdecl wrap_serial_is_initialized(void)
 {
     KAPI_HIT(38);
-    return serial_is_initialized();
+    return port_is_initialized();
 }
 
 int __cdecl wrap_exec_run(const char *path)
@@ -2119,7 +2119,7 @@ int __cdecl wrap_exec_last_result(int *kind, int *code)
 int __cdecl wrap_serial_init_vfast(u32 baud)
 {
     KAPI_HIT(216);
-    return serial_init_vfast(baud);
+    return port_init_vfast(baud);
 }
 
 int __cdecl wrap_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
@@ -2132,7 +2132,7 @@ int __cdecl wrap_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return serial_get_status(mode, baud, fifo);
+    return port_get_status(mode, baud, fifo);
 }
 
 int __cdecl wrap_kbd_trygetchar_local(void)

@@ -8,7 +8,7 @@
 #define CONSOLE_TAB_COLS 4
 #include "memmap.h"
 #include "types.h"
-#include "serial.h"
+#include "console_output.h"
 #include "utf8.h"
 #include "tvram.h"
 #include "io.h"
@@ -259,7 +259,7 @@ void shell_print(const char *str, u8 color)
     bootlog_push(str, kstrlen(str));  /* 起動ログ (色は捨てる) */
     while (*str) {
         if (render) putchar_raw(*str, color);
-        if (rshell_active) serial_putchar(*str);
+        if (rshell_active) con_output_putchar(*str);
         str++;
     }
     if (render) console_hw_cursor_sync();
@@ -298,7 +298,7 @@ void shell_print_utf8(const char *utf8_str, u8 color)
     bootlog_push(utf8_str, kstrlen(utf8_str));
     if (rshell_active) {
         const char *s = utf8_str;
-        while (*s) serial_putchar(*s++);
+        while (*s) con_output_putchar(*s++);
     }
     /* 描画抑止 (シリアルとシンクには出した)。票 K6C-2 で GUI 中も含む。 */
     if (!console_render_allowed()) return;
@@ -374,7 +374,7 @@ void console_write(const char *buf, u32 size, u8 color)
     bootlog_push(buf, size);
     if (rshell_active) {
         u32 i;
-        for (i = 0; i < size; i++) serial_putchar(buf[i]);
+        for (i = 0; i < size; i++) con_output_putchar(buf[i]);
     }
 
     /* 描画抑止 (シリアルとシンクには出した)。票 K6C-2 で GUI 中も含む。 */

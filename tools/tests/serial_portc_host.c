@@ -107,6 +107,7 @@ void ring3_abort_check(void) {}
 int ring3_wait_pending(void) { return 0; }
 
 #include "serial.c"          /* 変異の写しを引けるよう -I で探させる */
+#include "serial_emergency_host.h"
 #include "../../drivers/serial_plan.c"
 #include "sys_buz.inc"       /* kernel/sys.c の buz_on / buz_off (実物の写し) */
 

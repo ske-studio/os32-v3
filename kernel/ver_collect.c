@@ -2,7 +2,7 @@
 #include "ver_info.h"
 #include "cpu_calibrate.h"
 #include "idt.h"
-#include "serial.h"
+#include "port_service.h"
 #include "pcm_cs4231.h" /* pcm_present is the resident pcm_module.c facade. */
 #include "gfx_hal.h"
 #include "bootinfo.h"
@@ -21,7 +21,7 @@ void ver_collect(VerSnapshot *s)
     s->pit_valid = pit->valid;
     s->pit_hz = pit->hz;
     s->pit_input = pit->clk_hz;
-    s->ser_ready = serial_get_status(&s->ser_mode, &s->ser_baud,
+    s->ser_ready = port_get_status(&s->ser_mode, &s->ser_baud,
                                      &s->ser_fifo) >= 0;
     s->pcm_present = pcm_present();
     gfx_ver_state(&s->gfx, &s->gfx_kind, &s->gfx_active);

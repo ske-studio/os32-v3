@@ -46,3 +46,10 @@ check-kapi-audit-host:
 - drivers/kbd_dlog.h
 - drivers/mouse.h
 - tools/tests/pointer_fixture_host.h
+- include/port_service.h
+- include/console_output.h
+- kernel/port_service.c
+- kernel/serial_diag.c
+- lib/serial_diag.h
+- drivers/serial_plan.c
+- drivers/serial_plan.h

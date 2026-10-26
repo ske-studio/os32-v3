@@ -10,7 +10,7 @@
 #include "io.h"
 #include "tvram.h"
 #include "pc98.h"
-#include "serial.h"
+#include "serial_diag.h"
 #include "sqlite_engine.h"
 
 /* Core BSS, below APP_BAND: shared supervisor identity PTs in every PD.

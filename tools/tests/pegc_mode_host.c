@@ -222,7 +222,10 @@ void con_sink_push_cursor(int x, int y) { (void)x; (void)y; }
 void kbd_inject_discard(void) { }
 u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
 int kutoa_dec(u32 val, char *buf, int bufsz) { (void)val; if (bufsz > 0) buf[0] = 0; return 0; }
-int serial_putchar(char c) { (void)c; return 0; }
+#include "../../kernel/port_service.c"
+static int capture_putchar(char c) { (void)c; return 0; }
+static const ConOutputOps capture_output = { .putchar = capture_putchar };
+
 u16 unicode_to_jis(u32 cp) { (void)cp; return 0; }
 u8 unicode_to_ank(u32 cp) { (void)cp; return 0; }
 utf8_decode_t utf8_decode(const u8 *src) { utf8_decode_t d; (void)src; kmemset(&d, 0, sizeof(d)); return d; }
@@ -1517,6 +1520,7 @@ static void case_mode_layout(void)
 
 void _start(void)
 {
+    con_output_register(&capture_output);
     /* 資料の規則・記録の数値での検査を先に回す (変異がヘッダ由来の期待列では
      * なくこちらで落ちることを --mutate の行で見られるように) */
     case_serial_enter();

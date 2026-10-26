@@ -50,9 +50,9 @@ MUTATIONS += [
 ]
 
 # Public wrapper names are stable; provider names need not match them.
-for old, new in (('serial_putchar_kapi', 'serial_putchar'),
-                 ('serial_puts_kapi', 'serial_puts'),
-                 ('serial_getchar_kapi', 'serial_getchar'),
+for old, new in (('port_putchar_kapi', 'serial_putchar'),
+                 ('port_puts_kapi', 'serial_puts'),
+                 ('port_getchar_kapi', 'serial_getchar'),
                  ('input_getchar_kapi', 'input_getchar'),
                  ('input_getkey_kapi', 'input_getkey'),
                  ('ime_getchar_kapi', 'ime_getchar'),

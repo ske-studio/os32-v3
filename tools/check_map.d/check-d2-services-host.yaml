@@ -25,3 +25,15 @@ check-d2-services-host:
 - exec/exec_kapi_init.inc
 - drivers/mouse.h
 - tools/tests/pointer_fixture_host.h
+- include/port_service.h
+- include/console_output.h
+- kernel/port_service.c
+- kernel/serial_diag.c
+- lib/serial_diag.h
+- drivers/serial.h
+- tools/tests/port_fixture_host.h
+- kapi/kapi_sys.c
+- kernel/console.c
+- kernel/ver_collect.c
+- kernel/isr_handlers.c
+- kernel/double_fault.c

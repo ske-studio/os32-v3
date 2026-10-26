@@ -71,3 +71,10 @@ check-raw-wait-host:
 - include/kbd.h
 - platform/pc98/d2_bind.c
 - drivers/kbd_dlog.c
+- kernel/port_service.c
+- kernel/serial_diag.c
+- include/port_service.h
+- include/console_output.h
+- lib/serial_diag.h
+- drivers/serial_plan.c
+- drivers/serial_plan.h

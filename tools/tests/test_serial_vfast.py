@@ -158,7 +158,8 @@ def host_build(tmp, mutated=None):
     # ハーネスが #include している 2 本と、その巻き込むヘッダを写す。
     tree = src_dir / "tree"
     for rel in ("drivers/serial_plan.c", "drivers/serial_plan.h",
-                "drivers/serial.h",
+                "drivers/serial.h", "lib/serial_diag.h",
+                "tools/tests/serial_diag_host.h",
                 "userland/shell/serial_watchdog.c",
                 "userland/shell/serial_watchdog.h"):
         dst = tree / rel
@@ -170,7 +171,8 @@ def host_build(tmp, mutated=None):
     shim.write_text(
         HARNESS.read_text(encoding="utf-8")
                .replace('"../../drivers/', '"drivers/')
-               .replace('"../../userland/', '"userland/'),
+               .replace('"../../userland/', '"userland/')
+               .replace('"serial_diag_host.h"', '"tools/tests/serial_diag_host.h"'),
         encoding="utf-8")
     cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
            "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(tree),

@@ -1,5 +1,8 @@
 /* PC-9821 resident input wiring. Registration performs no device I/O. */
 #include "input_service.h"
+#include "port_service.h"
+#include "console_output.h"
+#include "../../drivers/serial.h"
 #include "pointer_service.h"
 #include "../../drivers/mouse.h"
 #include "../../drivers/kbd.h"
@@ -36,8 +39,24 @@ static const PointerOps pc98_pointer = {
     .cursor_hide = mouse_cursor_hide,
 };
 
+static void pc98_port_init(u32 baud) { serial_init((unsigned long)baud); }
+static int pc98_port_init_vfast(u32 baud) { return serial_init_vfast((unsigned long)baud); }
+static const PortOps pc98_port = {
+    .init = pc98_port_init, .puts_kapi = serial_puts_kapi,
+    .getchar_kapi = serial_getchar_kapi, .putchar_kapi = serial_putchar_kapi,
+    .trygetchar = serial_trygetchar, .is_initialized = serial_is_initialized,
+    .init_vfast = pc98_port_init_vfast, .get_status = serial_get_status,
+    .diag = serial_diag_get,
+};
+static const ConOutputOps pc98_console_output = { .putchar = serial_putchar };
+const EmergencyOps emergency_output = {
+    .puts_polled = pc98_serial_puts_polled, .gate_active = pc98_serial_gate_active,
+};
+
 void pc98_d2_bind(void)
 {
     input_register(&pc98_input);
     pointer_register(&pc98_pointer);
+    port_register(&pc98_port);
+    con_output_register(&pc98_console_output);
 }

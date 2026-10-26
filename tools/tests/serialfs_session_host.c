@@ -53,6 +53,7 @@ int ring3_wait_pending(void) { return 1; }
 void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort(); }
 
 #include "serial.c"
+#include "serial_emergency_host.h"
 #include "../../drivers/serial_plan.c"
 #include "crc32.c"
 #include "sfs_proto.c"

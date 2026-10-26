@@ -6,3 +6,7 @@ check-serial-portc-host:
 - tools/tests/test_serial_portc.py
 - tools/check_map.d/check-serial-portc-host.yaml
 - build/checks.d/check-serial-portc-host.mk
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h

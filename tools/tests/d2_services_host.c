@@ -28,6 +28,7 @@ int kbd_diag(KbdDiag *out) { seen = 18; output = out; return -18; }
 int kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
 { seen = 19; sequence = after_seq; output = out; arg = max; return -19; }
 #include "pointer_fixture_host.h"
+#include "port_fixture_host.h"
 #include "../../platform/pc98/d2_bind.c"
 /* Generated wrappers retain real output guards and slot numbers. */
 static int hit;
@@ -38,6 +39,7 @@ void ring3_fault_kill(void) { __builtin_trap(); }
 #include "input_wrappers.inc"
 #include "input_shift.inc"
 #include "pointer_wrappers.inc"
+#include "port_wrappers.inc"
 _Static_assert(sizeof(MouseState) == 10, "MouseState ABI size");
 #define OFFSET(field, value) _Static_assert(__builtin_offsetof(MouseState, field) == value, "MouseState " #field)
 OFFSET(x, 0); OFFSET(y, 2); OFFSET(dx, 4); OFFSET(dy, 6);
@@ -65,7 +67,27 @@ static int test(void)
     CHECK(input_diag(&diag) == OS32_ERR_NOSYS);
     CHECK(input_diag_log(1, &log, 1) == OS32_ERR_NOSYS);
     input_set_gui_mode(1); input_discard_stop(); input_owner_exit(1);
+    u32 mode = 99, baud = 99, fifo = 99, overflow = 99;
+    SerialDiag serial_diag;
+    CHECK(port_getchar_kapi() == -1 && port_trygetchar() == -1);
+    CHECK(!port_is_initialized());
+    CHECK(port_putchar_kapi('X') == OS32_ERR_NOSYS);
+    CHECK(port_init_vfast(9600) == OS32_ERR_NOSYS);
+    CHECK(port_get_status(&mode, &baud, &fifo) == OS32_ERR_NOSYS);
+    CHECK(!mode && !baud && !fifo);
+    port_diag_get(&mode, &baud, &fifo, &overflow);
+    CHECK(!mode && !baud && !fifo && !overflow);
+    port_diag_get(0, 0, 0, 0); port_get_status(0, 0, 0);
+    port_init(9600); port_puts_kapi("ignored");
+    CHECK(con_output_putchar('X') == OS32_ERR_NOSYS && !port_seen);
+    /* Emergency wiring works even before pc98_d2_bind and ignores the gate. */
+    emergency_gate = 1;
+    CHECK(serial_gate_active());
+    serial_puts_polled("panic"); CHECK(emergency_seen == 1 && port_string[0] == 'p');
+    emergency_gate = 0; CHECK(!serial_gate_active());
     pc98_d2_bind();
+    CHECK(con_output_putchar('C') == -130 && port_seen == 10 && port_char == 'C');
+#include "port_wrapper_checks.inc"
 #define CALL(name, id) CHECK(input_##name() == id + 100 && seen == id)
     CALL(getchar, 1); CALL(getkey, 2); CALL(trygetchar, 3);
     CALL(trygetkey, 4); CALL(peekkey, 5); CALL(trygetchar_local, 6);

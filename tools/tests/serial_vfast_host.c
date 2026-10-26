@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "serial_diag_host.h"
 #include "../../drivers/serial_plan.c"
 /* 番犬はシェル側 (userland/shell) に住む — 戻す判断をするのは
  * ゲストのシェルで、カーネルには周期フックが無いため。 */

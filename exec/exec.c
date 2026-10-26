@@ -4,7 +4,7 @@
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
 #endif
-#include "../drivers/serial.h"
+#include "serial_diag.h"
 #include "appmem.h"
 #include "v86.h"
 #include "memmap.h"

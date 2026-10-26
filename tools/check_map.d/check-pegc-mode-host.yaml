@@ -11,3 +11,6 @@ check-pegc-mode-host:
 - build/checks.d/check-pegc-mode-host.mk
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
+- include/port_service.h
+- include/console_output.h
+- kernel/port_service.c

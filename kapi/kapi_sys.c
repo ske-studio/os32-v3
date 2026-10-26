@@ -8,7 +8,7 @@
 #include "exec.h"             /* ring3_user_range_ok (CPL=3 ポインタ検証) */
 #include "sys.h"              /* sys_time_now (票 TASK_HAL_WIRING §1-5) */
 #include "pci_bind.h"         /* pci_bind_info_get (票 TASK_HAL_WIRING §1-4) */
-#include "serial.h"           /* serial_diag_get (票 TASK_SERIAL_HOSTFS §1-v2) */
+#include "port_service.h"
 #include "appslot.h"
 #include "redir_access.h"
 #include "exec_heap.h"
@@ -350,6 +350,6 @@ int kapi_pci_bind_info(u32 idx, void *out)
 int kapi_serial_diag(SerialDiag *out)
 {
     if (!out) return OS32_ERR_INVAL;
-    serial_diag_get(&out->oe, &out->fe, &out->pe, &out->overflow);
+    port_diag_get(&out->oe, &out->fe, &out->pe, &out->overflow);
     return 0;
 }

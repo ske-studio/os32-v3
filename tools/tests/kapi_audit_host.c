@@ -66,6 +66,11 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #include "console_source.inc"
 #include "fm_source.inc"
 #include "serial_source.inc"
+#include "../../drivers/serial_plan.c"
+unsigned long sysclk_hz(void) { return SYSCLK_2458; }
+int sysclk_is_8mhz(void) { return 0; }
+void irq_enable(unsigned int irq) { (void)irq; }
+void irq_disable(unsigned int irq) { (void)irq; }
 #include "ime_log_source.inc"
 #define KAPI_HIT(n) ((void)(n))
 #include "../../drivers/kbd.h"
@@ -77,6 +82,8 @@ void appslot_poll_yield_reset(void) {}
 #include "kbd_source.inc"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
+#include "../../kernel/port_service.c"
+#include "../../kernel/serial_diag.c"
 #include "pointer_fixture_host.h"
 #include "../../platform/pc98/d2_bind.c"
 #include "rshell_source.inc"

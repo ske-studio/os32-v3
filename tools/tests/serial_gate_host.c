@@ -30,6 +30,7 @@ static unsigned char g_rxq[4096];
 static int g_rxq_head, g_rxq_n;
 static unsigned g_sts_err;          /* 次の 0032h 読みに乗せる誤りビット */
 static int g_checked_status = -1;
+static unsigned polled_reads;
 static int g_cmd_writes;            /* 0032h への書き込み (モード設定の検出) */
 
 void fake_outp(unsigned port, unsigned val)
@@ -45,7 +46,7 @@ void fake_outp(unsigned port, unsigned val)
 unsigned fake_inp(unsigned port)
 {
     unsigned r = 0xFF;
-    if (g_checked_status >= 0 && (port == 0x32 || port == 0x132)) return (unsigned)g_checked_status;
+    if (g_checked_status >= 0 && (port == 0x32 || port == 0x132)) { polled_reads++; return (unsigned)g_checked_status; }
     if (port == 0x32) {
         /* TxRDY 常に 1、RxRDY = 待ち行列にある */
         r = 0x01 | (g_rxq_n ? 0x02 : 0) | g_sts_err;
@@ -86,6 +87,7 @@ void ring3_abort_check(void) {}
 int ring3_wait_pending(void) { return 0; }
 
 #include "serial.c"
+#include "serial_emergency_host.h"
 #include "../../drivers/serial_plan.c"
 
 void cpu_delay_us(u32 us) { (void)us; }
@@ -139,6 +141,12 @@ static void gate_tx(void)
     /* パニックの口も通る */
     serial_puts_polled("P");
     CHECK(g_tx_n == 4 && g_tx[3] == 'P');
+    serial_puts_polled("\n");
+    CHECK(g_tx_n == 6 && g_tx[4] == '\n' && g_tx[5] == '\r');
+    g_checked_status = 0; polled_reads = 0;
+    serial_puts_polled("X\n");
+    CHECK(g_tx_n == 6 && polled_reads == 3 * SER_POLLED_SPIN_MAX);
+    g_checked_status = -1;
     serial_gate_set(0);
     g_tx_n = 0;
     serial_putchar('b');
