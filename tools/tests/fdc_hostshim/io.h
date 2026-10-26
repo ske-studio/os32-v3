@@ -20,6 +20,9 @@ static inline unsigned int inp(unsigned int port) { return fdc_shim_inp(port); }
 static inline void outp(unsigned int port, unsigned int value)
 { fdc_shim_outp(port, value); }
 
+unsigned int irq_save(void);
+void irq_restore(unsigned int saved);
+
 static inline void io_wait(void) { }
 
 #endif /* IO_H */

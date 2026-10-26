@@ -1943,8 +1943,8 @@ static void test_irq_dynamic_body(int skip_unmask)
     /* --- 拒否規則 (配線の確認。網羅はホスト試験) --- */
     check(irq_register(0, ksel_fake_irq, &ksel_dev[0], 0) == IRQ_ERR_NOTSUP,
           "irq:reg0=NOTSUP");
-    check(irq_register(11, ksel_fake_irq, &ksel_dev[0], 0) == IRQ_ERR_NOTSUP,
-          "irq:reg11=NOTSUP");
+    check(irq_register(12, ksel_fake_irq, &ksel_dev[0], 0) == IRQ_ERR_NOTSUP,
+          "irq:reg12=NOTSUP");
     check(irq_register(16, ksel_fake_irq, &ksel_dev[0], 0) == IRQ_ERR_INVAL,
           "irq:reg16=INVAL");
     check(irq_register(KSEL_IRQ_LINE, 0, &ksel_dev[0], 0) == IRQ_ERR_INVAL,

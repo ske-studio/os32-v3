@@ -105,6 +105,10 @@ exec/exec_heap.o exec/appmem.o exec/appmem_map.o exec/appmem_unmap.o: exec/%.o: 
 kernel/paging_app.o: kernel/paging_app.c
 	$(CC) $(CFLAGS_BASE) -Os $(INC_KERNEL) -c $< -o $@
 
+# FDC は IRQ11 の登録口 (kernel/irq.h) を使う。
+drivers/fdc.o: drivers/fdc.c
+	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
+
 # net/ (リンク層。ne2000.h / idt.h / kstring.h を参照するため INC_KERNEL)
 net/%.o: net/%.c
 	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@

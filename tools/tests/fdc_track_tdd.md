@@ -47,7 +47,7 @@ PM の実測: フォントの読み込みは 4a8fad4 とほぼ同じ約 3 分。
   `[fdc] font: ... tmo=` の行で確かめる
 - **IF=0 に見えたもの**: 0x244 は IF (bit9 = 0x200) が立っている (0x200 + ZF 0x40 + PF 0x04)。
   0x214 と同じく IF=1 で、割り込み禁止の区間ではない
-- 模型は **INT 線をレベルで持ち、立ち上がりだけ `fdc_irq_fired` を立てる**形にした
+- 模型は **INT 線をレベルで持ち、立ち上がりだけ IRQ11 を配送する (D1a: 実 irq.c → driver 内の static 完了フラグ)**形にした
   (pending の SIS 結果か、読み終わっていない READ/WRITE のリザルトがあるあいだ上がったまま)。
   これで「省略を排水より先に置く」変異が RED になる (`drain_before_skip`)
 - レビューの major:
@@ -231,3 +231,13 @@ Ready 変化の SIS でも行うので三重 (3 つとも消す形にして RED)
   fatfs_vfs.c) は通さず、読み方を写して回す (形は静的に照合)
 - 実機の速度、エミュレータでの起動、実機での MT なしのまとめ読みの挙動 (TC と EOT が
   同時に来て正常終了すること) は未確認
+
+## D1a の IRQ11 登録試験
+
+`fdc_irq_registration` は実 fdc.c / irq.c / irq_math.c と、idt.c から抽出した
+pic_eoi を同じ I/O 模型で通す。初回・再初期化、排他登録の公開後に PIC を開く順序、
+登録拒否時の motor/reset 未発行、装置初期化失敗後の登録維持、未登録配送、
+slave → master 各 1 回の EOI と IF 保存を確認する。IRQ 深さは ASM 相当の
+試験入口で増減し、ASM 本体は Python の限定検査で配線・深さ・反射なしを確認する。
+フラグは製品へ公開せず、同じ翻訳単位の試験からのみ観測する。
+H4 backing が切り出す `s_fdbuf`〜`fdc_dma_buf` の区間には IRQ callback を置かない。

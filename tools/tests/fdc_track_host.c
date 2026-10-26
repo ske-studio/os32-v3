@@ -25,6 +25,13 @@
  * (TASK_T1_LEDGER §4-3)。 */
 #include "../../drivers/dma8237_math.c"
 #include "../../drivers/fdc.c"
+/* 実表・公開順・2 巡・EOI 経路を同じ装置模型で通す。 */
+#include "irq_math.c"
+#define irq_register host_irq_register
+#include "irq.c"
+#undef irq_register
+/* test_fdc_track.py が実 idt.c から切り出す pic_eoi。 */
+#include "fdc_pic_source.c"
 #include "../../fs/fatfs/diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の
  * 厳しい警告だけ外す (カーネルのビルドでは元の警告のまま)。 */
@@ -48,6 +55,54 @@ static int failed;
 /*  カーネルの下請けの差し替え                                              */
 /* ======================================================================== */
 static u32 s_now;
+static unsigned int s_if = 1;
+static int s_irq_error;
+static int s_irq_enabled;
+static int s_irq_calls;
+static int s_eoi_n;
+static int s_ctrl_writes;
+static unsigned int s_eoi[4];
+volatile u32 kctx_irq_depth;
+
+unsigned int irq_save(void)
+{
+    unsigned int saved = s_if;
+    s_if = 0;
+    return saved;
+}
+void irq_restore(unsigned int saved) { s_if = saved; }
+void irq_enable(unsigned int irq)
+{
+    int idx = irq_dyn_index(irq);
+    CHECK(s_if == 0);
+    CHECK(idx >= 0 && irq_lines[idx].count > 0);
+    if (irq == FDC_IRQ) {
+        CHECK(irq_lines[idx].slot[0].fn != 0);
+        s_irq_enabled = 1;
+    }
+}
+void irq_disable(unsigned int irq)
+{
+    if (irq == FDC_IRQ) s_irq_enabled = 0;
+}
+void isr_unexpected_report(u32 irq) { (void)irq; }
+int irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
+{
+    s_irq_calls++;
+    if (s_irq_error) return s_irq_error;
+    return host_irq_register(irq, fn, arg, flags);
+}
+static void model_deliver_irq(void)
+{
+    unsigned int saved;
+    if (!s_irq_enabled) return;
+    saved = irq_save();
+    kctx_irq_depth++;
+    irq_dispatch(FDC_IRQ);
+    CHECK(kctx_irq_depth == 1);
+    kctx_irq_depth--;
+    irq_restore(saved);
+}
 volatile u32 *fdc_fake_tick_ptr()
 {
     s_now++;            /* 読むたびに 1 tick 進む */
@@ -202,14 +257,14 @@ static struct {
 static void model_line(void)
 {
     int up = (M.pend_n > 0) || M.rw_int;
-    if (up && !M.line) fdc_irq_fired = 1;
+    if (up && !M.line) model_deliver_irq();
     M.line = up;
 }
 
 /* 完了の通知。NP21/W の形なら線に関係なく毎回 IRQ を出す。 */
 static void model_irq(void)
 {
-    if (M.np21_irq) fdc_irq_fired = 1;
+    if (M.np21_irq) model_deliver_irq();
     model_line();
 }
 
@@ -383,6 +438,15 @@ unsigned int fdc_shim_inp(unsigned int port)
 void fdc_shim_outp(unsigned int port, unsigned int value)
 {
     u8 v = (u8)value;
+    if ((port == PIC1_CMD || port == PIC2_CMD) && v == OCW2_EOI) {
+        if (s_eoi_n < 4) s_eoi[s_eoi_n] = port;
+        s_eoi_n++;
+        return;
+    }
+    if (port == FDC_CTRL) {
+        CHECK(s_irq_enabled);
+        s_ctrl_writes++;
+    }
     if (port == 0x92) {
         if (M.ncmd == 0) M.need = model_cmd_len(v);
         M.cmd[M.ncmd++] = v;
@@ -409,6 +473,11 @@ static const struct fdc_geom *model_geom(int drv) { return fdc_get_geom(drv); }
 /* 模型と fdc.c を起動直後に戻して fdc_init() を通す。 */
 static void model_boot(int drv1_present)
 {
+    memset(irq_lines, 0, sizeof(irq_lines));
+    s_irq_enabled = 0;
+    s_irq_error = 0;
+    s_irq_calls = 0;
+    s_if = 1;
     memset(&M, 0, sizeof(M));
     memset(&D, 0, sizeof(D));
     memset(s_written, 0, sizeof(s_written));
@@ -422,6 +491,77 @@ static void model_boot(int drv1_present)
     if (fdc_init() != 0) { fprintf(stderr, "model: fdc_init failed\n"); exit(2); }
     s_kprintf_lines = 0;
     memset(&s_stats, 0, sizeof(s_stats));
+}
+
+static int foreign_irq(unsigned int irq, void *arg)
+{
+    (void)irq;
+    (void)arg;
+    return IRQ_NONE;
+}
+
+/* D1a: 初回 reset の IRQ も登録済みの実表を経由する。 */
+static void fdc_irq_registration(void)
+{
+    int idx = irq_dyn_index(FDC_IRQ);
+    int before, rc;
+    u32 unexpected;
+    u8 st0;
+    model_boot(1);
+    CHECK(s_irq_calls == 1 && s_irq_enabled);
+    CHECK(irq_lines[idx].count == 1);
+    CHECK(irq_lines[idx].slot[0].flags == 0);
+    CHECK(s_if == 1);
+    CHECK(fdc_init() == 0);              /* EXIST を許す再初期化 */
+    CHECK(s_irq_calls == 2 && irq_lines[idx].count == 1);
+
+    fdc_irq_fired = 0;
+    s_eoi_n = 0;
+    before = M.ncmd;
+    model_deliver_irq();
+    CHECK(fdc_irq_fired == 1);           /* 同じフラグに 2 巡代入 */
+    CHECK(irq_lines[idx].shared_dispatch == 0);
+    CHECK(M.ncmd == before);            /* handler は装置へ命令しない */
+    CHECK(s_eoi_n == 2 && s_eoi[0] == PIC2_CMD && s_eoi[1] == PIC1_CMD);
+    CHECK(s_if == 1 && kctx_irq_depth == 0);
+    s_if = 0;
+    CHECK(fdc_init() == 0 && s_if == 0); /* 登録で IF を勝手に立てない */
+    s_if = 1;
+
+    /* 登録失敗では motor/reset を出さず、観測値を失敗へ戻す。 */
+    for (rc = IRQ_ERR_INVAL; rc >= IRQ_ERR_NOENT; rc--) {
+        if (rc == IRQ_ERR_EXIST) continue;
+        s_irq_error = rc;
+        before = s_ctrl_writes;
+        CHECK(fdc_init() == -1);
+        CHECK(s_ctrl_writes == before);
+        CHECK(fdc_get_last_init_status(&st0, 0, 0) == -1 && st0 == 0);
+        CHECK(irq_lines[idx].count == 1);
+    }
+    s_irq_error = 0;
+
+    /* 成功後の装置失敗で登録を消さず、そのまま再試行できる。 */
+    M.present[0] = 0;
+    CHECK(fdc_init() != 0);
+    CHECK(irq_lines[idx].count == 1 && s_irq_enabled);
+    M.present[0] = 1;
+    CHECK(fdc_init() == 0);
+
+    /* 他の排他所有者との競合も実 irq_register の判定で断る。 */
+    memset(&irq_lines[idx], 0, sizeof(irq_lines[idx]));
+    CHECK(host_irq_register(FDC_IRQ, foreign_irq, 0, 0) == 0);
+    before = s_ctrl_writes;
+    CHECK(fdc_init() == -1 && s_ctrl_writes == before);
+    CHECK(irq_lines[idx].count == 1 && irq_lines[idx].slot[0].fn == foreign_irq);
+
+    /* 未登録 IRQ11 は共通経路で EOI だけを送る。 */
+    memset(&irq_lines[idx], 0, sizeof(irq_lines[idx]));
+    unexpected = irq_unexpected;
+    fdc_irq_fired = 0;
+    s_eoi_n = 0;
+    model_deliver_irq();
+    CHECK(fdc_irq_fired == 0 && irq_unexpected == unexpected + 1);
+    CHECK(s_eoi_n == 2 && s_eoi[0] == PIC2_CMD && s_eoi[1] == PIC1_CMD);
 }
 
 static int check_bytes(const u8 *p, int drv, int c, int h, int r, int bps)
@@ -1593,6 +1733,7 @@ int main(int argc, char **argv)
 {
     int i;
     static const struct { const char *name; void (*fn)(void); } cases[] = {
+        { "fdc_irq_registration", fdc_irq_registration },
         { "split_2hd", split_2hd },
         { "split_144", split_144 },
         { "readahead_count1", readahead_count1 },

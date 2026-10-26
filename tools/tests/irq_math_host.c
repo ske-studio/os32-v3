@@ -147,6 +147,16 @@ static void dispatch_two_pass(void)
     CHECK(ln.deferred_count == 2);
     CHECK(ln.shared_dispatch == 0);      /* 1 登録だけなら共有ではない */
 
+    /* FDC の排他通知も最大 2 巡。常に HANDLED でも 3 巡しない。 */
+    memset(&ln, 0, sizeof(ln));
+    reset_devs();
+    g_dev[0].ret[0] = IRQ_HANDLED;
+    g_dev[0].ret[1] = IRQ_HANDLED;
+    put(&ln, 0, 0);
+    CHECK(irq_dispatch_line(&ln, 11) == 1);
+    CHECK(g_dev[0].calls == 2 && g_last_irq == 11);
+    CHECK(ln.shared_dispatch == 0);
+
     /* --- 登録 0 件でも落ちない (誰も受けない = EOI だけ) --- */
     memset(&ln, 0, sizeof(ln));
     reset_devs();
@@ -169,7 +179,7 @@ static void register_rules(void)
     CHECK(irq_dyn_index(2) < 0);         /* VSYNC (V86) */
     CHECK(irq_dyn_index(4) < 0);         /* シリアル */
     CHECK(irq_dyn_index(7) < 0);         /* スプリアス */
-    CHECK(irq_dyn_index(11) < 0);        /* FDC */
+    CHECK(irq_dyn_index(11) == 6);        /* FDC */
     CHECK(irq_dyn_index(12) < 0);        /* サウンド (V86) */
     CHECK(irq_dyn_index(13) < 0);        /* マウス */
     CHECK(irq_dyn_index(16) < 0);
@@ -178,12 +188,14 @@ static void register_rules(void)
     memset(&ln, 0, sizeof(ln));
     reset_devs();
 
+    CHECK(irq_register_check(11, &ln, fake_handler, &g_dev[0], 0, 0) == 0);
+
     /* ISR 文脈からは何であれ断る (契約違反)。 */
     CHECK(irq_register_check(3, &ln, fake_handler, &g_dev[0], IRQ_F_SHARED, 1)
           == IRQ_ERR_CTX);
     /* 固定 IRQ / 範囲外 */
     CHECK(irq_register_check(0, 0, fake_handler, &g_dev[0], 0, 0) == IRQ_ERR_NOTSUP);
-    CHECK(irq_register_check(11, 0, fake_handler, &g_dev[0], 0, 0) == IRQ_ERR_NOTSUP);
+    CHECK(irq_register_check(12, 0, fake_handler, &g_dev[0], 0, 0) == IRQ_ERR_NOTSUP);
     CHECK(irq_register_check(16, 0, fake_handler, &g_dev[0], 0, 0) == IRQ_ERR_INVAL);
     CHECK(irq_register_check(0xFF, 0, fake_handler, &g_dev[0], 0, 0) == IRQ_ERR_INVAL);
     /* NULL の fn / 知らない flags */

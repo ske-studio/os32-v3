@@ -30,7 +30,7 @@ SHIM = ROOT / "tools/tests/fdc_hostshim"
 SOURCES = ["drivers/fdc_track.c", "drivers/fdc.c", "drivers/fdc_decide.c",
            "fs/fatfs/diskio.c"]
 
-CASES = ["split_2hd", "split_144", "readahead_count1", "cross_boundary",
+CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "fallback_single", "single_fail", "cache_rules", "oversize_geom",
          "timeout_math", "fdc_multi_cmd", "fdc_seek_skip", "fdc_forget_rules",
          "fdc_end_to_end", "fat_data_interleave", "gen_and_lru",
@@ -206,6 +206,24 @@ def check_read_stream_shape():
     return all(x >= 0 for x in order) and order == sorted(order)
 
 
+def check_irq_entry():
+    """D1a の配線: 共通入口だけが深さ管理と配送を担い、EOI は C 側。"""
+    asm = (ROOT / "kernel/isr_stub.asm").read_text()
+    common = asm.split('%macro IRQ_COMMON 1', 1)[1].split('%endmacro', 1)[0]
+    code = "\n".join(line.split(';;', 1)[0].strip() for line in common.splitlines())
+    order = ['IRQ_ENTER', 'cld', 'call    irq_dispatch', 'IRQ_LEAVE', 'IRETD_USER']
+    assert [code.index(x) for x in order] == sorted(code.index(x) for x in order)
+    assert not re.search(r'\b(?:out|V86_REFLECT)\b', code)
+    assert len(re.findall(r'^IRQ_COMMON 11\s', asm, re.M)) == 1
+    assert 'irq_stub_11' not in asm and 'fdc_irq_handler' not in asm
+    idt = (ROOT / "kernel/idt.c").read_text()
+    assert re.search(r'idt_set_gate\(IRQ_TO_INT\(11\), irq_stub_common_11,', idt)
+    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "kernel/kernel.c").read_text()
+    assert 'fdc_irq' not in (ROOT / "kernel/isr_handlers.c").read_text()
+    assert 'fdc_irq_fired' not in (ROOT / "drivers/fdc.h").read_text()
+    print('IRQ11 common entry / no V86 reflection / single EOI owner PASS', flush=True)
+
+
 def prepare_font(tmp):
     """font_replay の材料を tmp に置いて env を返す。無ければ None (SKIP)。"""
     if not D88.exists():
@@ -236,7 +254,7 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
 def includes(first=None):
     dirs = ([first] if first else []) + [SHIM] + [
         ROOT / p for p in ("include", "drivers", "lib", "sdk/include/os32",
-                           "fs/fatfs")]
+                           "fs/fatfs", "kernel")]
     return ["-I" + str(d) for d in dirs]
 
 
@@ -441,8 +459,12 @@ def host_build(tmp, mutated=None):
     mutated = (相対パス, 本文) なら、変異させた写しの木から組む。"""
     tmpd = pathlib.Path(tmp)
     exe = tmpd / "fdc-track-host"
+    idt = (ROOT / "kernel/idt.c").read_text()
+    pic = idt[idt.index('void pic_eoi('):]
+    pic = pic[:pic.index('\n}') + 2]
+    (tmpd / 'fdc_pic_source.c').write_text(pic)
     if mutated is None:
-        cmd = ["gcc", *FLAGS, *includes(), str(HARNESS), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(tmpd), *includes(), str(HARNESS), "-o", str(exe)]
     else:
         rel, text = mutated
         tree = tmpd / "tree"
@@ -458,7 +480,7 @@ def host_build(tmp, mutated=None):
         (tree / rel).write_text(text, encoding="utf-8")
         harness = tree / "tools/tests/fdc_track_host.c"
         harness.write_text(HARNESS.read_text(encoding="utf-8"), encoding="utf-8")
-        cmd = ["gcc", *FLAGS, *includes(tree / "drivers"), str(harness),
+        cmd = ["gcc", *FLAGS, "-I" + str(tmpd), *includes(tree / "drivers"), str(harness),
                "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
@@ -544,6 +566,7 @@ if __name__ == "__main__":
         sys.path.insert(0, str(ROOT / 'tools'))
         from check_artifacts import require_fresh
         require_fresh(ROOT, ['images/os32_boot.d88'])
+    check_irq_entry()
     tmp_root = os.environ.get("TMPDIR") or None
     with tempfile.TemporaryDirectory(prefix="os32-fdc-track-", dir=tmp_root) as tmp:
         exe = host_build(tmp)

@@ -109,7 +109,6 @@ extern timer_handler
 extern kbd_irq_handler
 extern serial_irq_handler
 extern tick_count
-extern fdc_irq_handler
 extern mouse_irq_handler
 extern v86_reflect_irq
 extern v86_tick_and_check_timeout
@@ -484,6 +483,7 @@ IRQ_COMMON 6                    ;; INT 0x26
 IRQ_COMMON 8                    ;; INT 0x28
 IRQ_COMMON 9                    ;; INT 0x29
 IRQ_COMMON 10                   ;; INT 0x2A
+IRQ_COMMON 11                   ;; INT 0x2B (FDC、V86 反射なし)
 IRQ_COMMON 14                   ;; INT 0x2E
 IRQ_COMMON 15                   ;; INT 0x2F
 
@@ -632,29 +632,6 @@ irq_stub_7:
         out     PIC1_CMD, al
         IRQ_LEAVE
         pop     eax
-        IRETD_USER
-
-;; ============================================================
-;; IRQ11: FDD割り込み (INT 0x2B) — スレーブPIC IR11
-;; ============================================================
-global irq_stub_11
-irq_stub_11:
-        IRQ_ENTER
-        pushad
-        RESTORE_KSEG
-        cld
-
-        ;; Cハンドラを呼び出し
-        call    fdc_irq_handler
-
-        ;; スレーブPICにEOI送出 (PC-98: ポート 0x08)
-        mov     al, OCW2_EOI
-        out     PIC2_CMD, al
-        ;; マスタPICにもEOI送出 (カスケード)
-        out     PIC1_CMD, al
-
-        IRQ_LEAVE
-        popad
         IRETD_USER
 
 ;; ============================================================

@@ -309,8 +309,6 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     /* FDC初期化 (I/Oポート直接制御) */
     tvram_print(60, 1, "FDC...", TATTR_GREEN);
-    /* IRQ11 (FDD) 有効化 */
-    irq_enable(FDC_IRQ);
     _enable();  /* FDC初期化前にIRQを許可 */
     {
         int fdc_ret = fdc_init();
