@@ -46,3 +46,9 @@ check-d2-services-host:
 - tools/tests/clock_fixture_host.h
 - lib/os_time.c
 - include/os_time.h
+- kernel/boot_platform.h
+- kernel/boot_platform.c
+- kernel/boot_display.h
+- kernel/boot_display.c
+- platform/pc98/boot.h
+- platform/pc98/boot.c

@@ -112,6 +112,7 @@ int ide_get_info(int drive, IdeInfo *info)
 #include "../../fs/ext2_file.c"
 #include "../../fs/ext2_fmt.c"
 #include "../../fs/ext2_vfs.c"
+#include "../platform/pc98/boot_names.c"
 #include "../../fs/vfs.c"
 #include "../../fs/vfs_fd.c"
 #include "../../lib/sqlite3/sqlite3.h"
@@ -137,6 +138,7 @@ static void setup(void)
     hd0.heads = 8; hd0.spt = 17;
     CHECK(ext2_format(0, DISK_FS_SECTORS) == EXT2_OK);
     ext2_init();
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     CHECK(vfs_mkdir("/db") == VFS_OK);
     CHECK(vfs_sqlite_backend("/db/fep.db") == VFS_SQLITE_EXT2);
@@ -356,6 +358,7 @@ static void learning(IME_Dict *dict)
     CHECK(ime_dict_close(dict) == 0);
     CHECK(vfs_sync() == VFS_OK);
     vfs_umount("/");
+    pc98_boot_names_bind();
     CHECK(vfs_mount("/", "hd0", "ext2") == VFS_OK);
     open_dict(dict);
     learned(dict, 2);

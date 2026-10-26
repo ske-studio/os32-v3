@@ -35,3 +35,4 @@ check-sh-input-host:
 - tools/tests/sh_truncation_host.c
 - tools/tests/test_sh_truncation.py
 - tools/run_host_group.py
+- platform/pc98/boot.c

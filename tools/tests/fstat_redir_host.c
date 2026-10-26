@@ -54,6 +54,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
 }
 
 #include "../../fs/vfs.c"
+#include "../platform/pc98/boot_names.c"
 
 /* ---- fs/vfs_fd.c の境界 (コンソール / キーボード) --------------------------
  * リダイレクトは**贋物を置かない** — この票の主題そのものなので、
@@ -167,6 +168,7 @@ static void reset(void)
     num_fs = 0;
     for (i = 0; i < VFS_MAX_FS; i++) kmemset(&mounts[i], 0, sizeof(mounts[i]));
     vfs_register_fs(&drv_ops);
+    pc98_boot_names_bind();
     if (vfs_mount("/synth", "hostdrv", "synth") != VFS_OK) {
         printf("  (harness) vfs_mount failed\n");
         exit(2);

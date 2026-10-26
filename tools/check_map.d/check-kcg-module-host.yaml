@@ -16,7 +16,6 @@ check-kcg-module-host:
 - drivers/dev.c
 - drivers/dev.h
 - drivers/disk.h
-- drivers/ide.h
 - drivers/kcg.h
 - drivers/kcg.c
 - tools/tests/kcg_body_host.c
@@ -114,4 +113,9 @@ check-kcg-module-host:
 - include/pc98.h
 - include/io.h
 - platform/pc98/platform_io.h
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h
+- platform/pc98/boot.c
 artifact_reader: true

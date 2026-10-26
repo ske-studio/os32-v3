@@ -59,4 +59,8 @@ check-vfs-fd-path-host:
 - kernel/serial_diag.c
 - include/console_output.h
 - lib/serial_diag.h
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h
 artifact_reader: true

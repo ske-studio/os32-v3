@@ -5,7 +5,9 @@ check-ver-format-host:
 - kernel/module.h
 - kernel/sqlite_engine.h
 - kernel/idt.h
-- drivers/kbd.h
+- include/input_service.h
+- kernel/input_service.c
+- platform/pc98/d2_bind.c
 - include/bootinfo.h
 - include/config.h
 - include/types.h

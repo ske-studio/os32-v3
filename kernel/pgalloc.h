@@ -255,7 +255,7 @@ int ledger_resource_set_map(u32 rid, u32 first, u32 end);
 int ledger_resource_add(const struct ledger_resource *rec, u32 *rid);
 /* ⑥-0 (pci_bind_all の直前): g_pci のメモリ BAR を width_basis = RAW で
  * 取り込む (採取値。予約権限にならない、B4)。載せた本数を返す。
- * 実体は kernel/ledger_pci.c (drivers/pci.h を引くのはそちらだけ)。 */
+ * 実体は platform/pc98/pci_resources.c (PCI の解釈は platform 側)。 */
 u32 ledger_resource_import_pci(void);
 /* MMIO / 永久 RAM の一括予約 (旧 DEVICE_RESERVATION の broker の核を載せ直した
  * もの、D33)。起動時 (ONLINE・paging_boot_context) だけ、owner は

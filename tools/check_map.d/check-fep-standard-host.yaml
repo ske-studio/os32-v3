@@ -13,7 +13,6 @@ check-fep-standard-host:
 - fs/ext2*.h
 - drivers/pc98pt.c
 - drivers/pc98pt.h
-- drivers/ide.h
 - drivers/dev.h
 - lib/sqlite3/**
 - build/checks.d/check-fep-standard-host.mk
@@ -23,3 +22,7 @@ check-fep-standard-host:
 - include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h

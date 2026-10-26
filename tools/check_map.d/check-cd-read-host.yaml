@@ -19,7 +19,6 @@ check-cd-read-host:
 - fs/vfs.c
 - drivers/dev.c
 - drivers/disk.h
-- drivers/ide.h
 - drivers/fdc.h
 - drivers/fdc_decide.h
 - include/console.h
@@ -28,3 +27,7 @@ check-cd-read-host:
 - include/types.h
 - lib/kstring.h
 - tools/tests/atapi_hostshim/io.h
+- fs/vfs_device.h
+- platform/pc98/boot_names.h
+- platform/pc98/boot_names.c
+- drivers/ide.h

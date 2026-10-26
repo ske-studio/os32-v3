@@ -2,6 +2,7 @@
 #include "support.h"
 #include "ver_info.h"
 #include "../lib/kstring.h"
+u32 input_irq(void) { return 1; }
 #include "ver_format_source.c"
 #include "ver_state_source.c"
 

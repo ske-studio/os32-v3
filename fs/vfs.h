@@ -22,6 +22,7 @@
 #define VFS_MAX_PATH       OS32_MAX_PATH
 #define VFS_MAX_PATH_DEPTH 32
 #define VFS_MAX_DEVNAME    16
+#define VFS_DEV_UNIT_MAX   4 /* Lexical units; independent of device presence. */
 #define VFS_MAX_FS         8
 #define VFS_FIRST_FILE_FD 3 /* stdin, stdout and stderr occupy 0..2. */
 #define VFS_MAX_OPEN_FILES 16

@@ -183,7 +183,7 @@ def check_wiring():
 
     k = (ROOT / "kernel/kernel.c").read_text(encoding="utf-8")
     n = k.count("bootlog_save();")
-    root = k.find('vfs_mount("/", root_dev, root_fs)')
+    root = k.find('vfs_mount("/", boot.root_dev, boot.root_fs)')
     call = k.find("bootlog_save();")
     shell = k.find("rc = exec_run(kcg_unavailable")
     selftest = k.find("kdebug.ops.selftest_run();")

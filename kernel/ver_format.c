@@ -3,7 +3,7 @@
 #include "config.h"
 #include "idt.h"
 #include "module.h"
-#include "../drivers/kbd.h"
+#include "input_service.h"
 #include "bootinfo.h"
 #include "../lib/kstring.h"
 
@@ -111,7 +111,7 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     } else ver_text(&b, "unknown");
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "KBD");
-    ver_text(&b, "8251-compatible; IRQ"); ver_number(&b, KBD_IRQ, 0);
+    ver_text(&b, "8251-compatible; IRQ"); ver_number(&b, input_irq(), 0);
     ver_text(&b, " (configured)");
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "SER");

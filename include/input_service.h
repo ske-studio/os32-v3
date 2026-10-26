@@ -8,6 +8,7 @@
 #include "kbd.h"
 
 typedef struct InputOps {
+    u32 irq; /* Configured line, supplied by the platform; no hardware probe. */
     int (*getchar)(void);
     int (*getkey)(void);
     int (*trygetchar)(void);
@@ -29,6 +30,7 @@ typedef struct InputOps {
     int (*diag_log)(u32 after_seq, KbdDiagLogEnt *out, int max);
 } InputOps;
 
+u32 input_irq(void);
 void input_register(const InputOps *ops);
 int input_getchar(void);
 int input_getkey(void);
@@ -49,6 +51,5 @@ void input_set_gui_mode(int on);
 void input_discard_stop(void);
 int input_diag(KbdDiag *out);
 int input_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max);
-void input_owner_exit(int aborted);
 
 #endif /* OS32_INPUT_SERVICE_H */

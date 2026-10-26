@@ -57,6 +57,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
 }
 
 #include "../../fs/vfs.c"
+#include "../platform/pc98/boot_names.c"
 
 /* ---- fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
 int fd_is_redirected(int fd) { (void)fd; return 0; }
@@ -186,6 +187,7 @@ static void reset(int has_excl)
     num_fs = 0;
     for (i = 0; i < VFS_MAX_FS; i++) kmemset(&mounts[i], 0, sizeof(mounts[i]));
     vfs_register_fs(has_excl ? &drv_ops_excl : &drv_ops_noexcl);
+    pc98_boot_names_bind();
     if (vfs_mount("/synth", "hostdrv", "synth") != VFS_OK) {
         printf("  (harness) vfs_mount failed\n");
         exit(2);

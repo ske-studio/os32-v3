@@ -11,6 +11,7 @@
 
 static u8 pc98_shift_state(void) { return kbd_shift_state; }
 static const InputOps pc98_input = {
+    .irq = KBD_IRQ,
     .getchar = kbd_getchar,
     .getkey = kbd_getkey,
     .trygetchar = kbd_trygetchar,

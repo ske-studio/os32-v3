@@ -2,7 +2,8 @@ check-bootinfo-host:
 - boot/bootinfo.inc
 - drivers/ide.c
 - kernel/bootinfo.c
-- kernel/boot_devices.h
+- platform/pc98/boot_disk.c
+- platform/pc98/boot_disk.h
 - kernel/bootinfo_check.c
 - tools/tests/bootinfo_host.c
 - tools/tests/test_bootinfo.py
@@ -34,3 +35,4 @@ check-bootinfo-host:
 - lib/crc32_core.inc
 - boot/boot_defs.h
 - include/bootinfo.h
+- kernel/boot_disk.h

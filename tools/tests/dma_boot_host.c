@@ -13,6 +13,7 @@
 #include "dev.h"
 #include "../../fs/vfs.h"
 #include "pc98.h"
+#include "boot_platform.h"
 enum services_stage services_stage;
 volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
@@ -26,7 +27,6 @@ static int available, conflict, reserved, tested, bound, pcm, diag, loaded;
 static int debug_enabled = 1;
 static int dma_tested, dma_skipped, unicode_loads;
 static int cd_loaded, v86_loaded;
-static u32 boot_drive = BOOT_DRIVE_FDD;
 void kprintf(u8 attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
 #include "selftest_dma_gate.c"
@@ -106,10 +106,9 @@ static void unicode_file_load(void)
     CHECK(reserved && tested == 1 && loaded == 1 && cd_loaded == 1 && !bound && !pcm);
     unicode_loads++;
 }
-u32 ledger_resource_import_pci(void) { CHECK(reserved); return 0; }
-u32 ledger_res_overflow;
-static void kernel_pci_line_bits(void) { }
-static void pci_bind_set_line_state_hook(void (*hook)(void)) { (void)hook; }
+void boot_platform_run(enum boot_point point, const struct boot_context *ctx)
+{ (void)ctx; CHECK(point == BOOT_PCI_RESOURCES && reserved); }
+
 static int lan_module_load(void)
 {
     struct dma_buf b;
