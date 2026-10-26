@@ -171,6 +171,16 @@ int  gfx_get_backend_pref(void);
 /* Cirrus の実 probe が graphics 境界で試行済みか (成功・失敗とも記録)。 */
 int gfx_cirrus_probed(void);
 
+/* ver/About: internal backend identity, not a hardware detection result. */
+#define GFX_VER_UNKNOWN 0
+#define GFX_VER_PC98    1
+#define GFX_VER_PEGC    2
+#define GFX_VER_CIRRUS  3
+/* Saved query only: active height while started, selected GUI target otherwise.
+ * No probe, mode switch or allocation. All outputs required (INVAL if NULL);
+ * otherwise failure leaves zeros/UNKNOWN and returns NOSYS or the query error. */
+int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active);
+
 /* 起動時は Cirrus 登録前に master PD で PEGC を準備する。
  * Cirrus 未 probe の最初の GUI 境界でも呼ぶ。CUI 描画アプリは gfx_init が境界。
  * 窓・BB は gfx_boot_reserve が確保済み。表示はテキストへ戻す。 */
