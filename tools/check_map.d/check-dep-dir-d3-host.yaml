@@ -30,3 +30,11 @@ check-dep-dir-d3-host:
 - lib/kstring.h
 - tools/tests/host32.py
 - kernel/boot_disk.h
+- kernel/boot_platform.h
+- kernel/boot_platform.c
+- kernel/boot_display.h
+- kernel/boot_display.c
+- platform/pc98/boot.h
+- platform/pc98/boot.c
+- tools/tests/test_dep_dir_d3_boot.py
+- tools/tests/dep_dir_d3_boot_host.c

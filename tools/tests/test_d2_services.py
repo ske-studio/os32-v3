@@ -175,17 +175,20 @@ def run(runner, mutation=None):
 
 def contracts():
     boot = (ROOT / 'kernel/kernel.c').read_text()
-    assert re.search(r'kstack_hw_init\(\);\s*pc98_d2_bind\(\);', boot)
-    assert boot.index('pc98_d2_bind();') < boot.index('kbd_init();')
+    assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
+    platform = (ROOT / 'platform/pc98/boot.c').read_text()
+    assert '    pc98_d2_bind();' in platform
+    assert boot.index('pc98_boot_bind(&boot, boot_drive);') < boot.index('boot_platform_run(BOOT_INPUT, &boot);')
     for name in ('fs/vfs_fd.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/fep_module.c'):
         source = (ROOT / name).read_text()
         assert '#include "input_service.h"' in source
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name in ('kernel/ime.c', 'kdebug/kselftest.c', 'kernel/kernel.c'):
+    for name in ('kernel/ime.c', 'kdebug/kselftest.c'):
         assert '#include "../drivers/kbd.h"' in (ROOT / name).read_text()
-    assert '#include "../drivers/mouse.h"' in boot
+    assert '#include "../../drivers/mouse.h"' in platform
+    assert 'drivers/mouse.h' not in boot and 'drivers/kbd.h' not in boot
     assert '#include "../include/pointer_service.h"' in (ROOT / 'drivers/mouse.h').read_text()
     assert 'drivers/' not in (ROOT / 'include/pointer_service.h').read_text()
     common = (ROOT / 'include/kbd.h').read_text()

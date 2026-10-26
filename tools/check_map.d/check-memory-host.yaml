@@ -178,4 +178,6 @@ check-memory-host:
 - drivers/pci_bind.h
 - kernel/irq.h
 - kernel/irq_math.h
+- kernel/boot_platform.h
+- platform/pc98/boot.c
 artifact_reader: true

@@ -7,27 +7,18 @@
  * ============================================================ */
 
 #define GUI_FAULT_STREAK_MAX 3
-/* Preserve the boot status helpers' existing scratch capacities. */
-#define BOOT_STATUS_NUM_BUFSIZE 16
-#define BOOT_BYTE_HEX_BUFSIZE    8
 #include "serial_diag.h"
 #include "idt.h"
 #include "tss.h"
 #include "v86.h"
 #include "io.h"
-#include "../drivers/kbd.h"
-#include "fdc.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
 #include "disk.h"
-#include "dev.h"
-#include "path.h"
 /* fs.h 削除 — レガシーFS廃止 */
-#include "rtc.h"
 #include "kmalloc.h"
 #include "palette.h"
 #include "gfx.h"
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
-#include "kcg.h"
 #include "kcg_module.h"
 #include "boot_splash.h"
 #include "cpu_calibrate.h"
@@ -43,23 +34,14 @@
 #include "kselftest.h"
 #include "kstack_hw.h"
 #include "exec.h"
-#include "pci.h"
-#include "e82557.h"
-#include "pci_bind.h"   /* PCI の結線表 (票 TASK_HAL_WIRING §1-4) */
 #include "irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
-#include "dma8237.h"    /* 8237 の共通部 + 0439h (同 §1-2) */
 #include "dma_pool.h"   /* DMA プール (同 §1-3) */
 #include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
 #include "cd_module.h"
 #include "vfs.h"
-#include "ext2.h"
-#include "loop_dev.h"
 
-/* FatFs VFSドライバ (fs/fatfs_vfs.c) */
-extern int fatfs_init(void);
 
-#include "hostdrvfs.h"
-#include "serialfs.h"
+#include "dev.h"
 #include "tvram.h"
 #include "pc98.h"
 #include "memmap.h"
@@ -74,8 +56,6 @@ extern int fatfs_init(void);
 #include "snd_engine.h"
 #include "fm_module.h"
 #include "v86_module.h"
-#include "../drivers/mouse.h"
-#include "lgy98.h"
 #include "pcm_module.h"
 #include "lan_module.h"
 #include "cirrus_module.h"
@@ -94,10 +74,9 @@ extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
 
-#include "../platform/pc98/boot_names.h"
-#include "../platform/pc98/boot_disk.h"
-#include "../platform/pc98/pci_resources.h"
-extern void pc98_d2_bind(void);
+#include "../platform/pc98/boot.h"
+#include "boot_platform.h"
+#include "boot_display.h"
 
 /* 次に起動するシェルのパス (契約 T9)。実体は kernel/gui.c (K1)。
  * gui.h を丸ごと取り込むと os32_gui_shared.h まで引くので、
@@ -118,62 +97,6 @@ static void __attribute__((cold)) boot_diag_exec(const char *path, int rc, int g
     serial_puts_polled("\r\n");
 }
 
-static void tvram_print(int x, int y, const char *str, u8 color)
-{
-    u32 offset;
-    while (*str) {
-        if (x >= TVRAM_COLS) { x = 0; y++; }
-        if (y >= TVRAM_ROWS) break;
-        offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-        *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = (u16)(u8)*str;
-        *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
-        str++; x++;
-    }
-}
-
-/* 文字列を連結して終端の次を返す (状態行を組み立てる小道具)。
- * [C2] libc は使わない。kstrncat は毎回長さを数え直すので、
- * 組み立てのあいだは末尾の位置を持ち回る。 */
-static char *tv_cat(char *dst, const char *src)
-{
-    while (*src) { *dst = *src; dst++; src++; }
-    *dst = '\0';
-    return dst;
-}
-
-/* 1 バイトを 2 桁の 16 進 (小文字) で連結する。kutoa_hex は桁を詰めるので
- * (0x0F → "f")、足りない分だけ '0' を先に置く。 */
-static char *tv_cat_hex2(char *dst, u8 val)
-{
-    char tmp[BOOT_BYTE_HEX_BUFSIZE];
-    int len;
-
-    len = kutoa_hex((u32)val, tmp, (int)sizeof(tmp), 0);
-    if (len < 2) { *dst = '0'; dst++; *dst = '\0'; }
-    return tv_cat(dst, tmp);
-}
-
-/* 符号付き 10 進を連結する。 */
-static char *tv_cat_dec(char *dst, int val)
-{
-    char tmp[BOOT_STATUS_NUM_BUFSIZE];
-
-    if (val < 0) {
-        *dst = '-'; dst++; *dst = '\0';
-        /* 符号反転は u32 で行う — int で -INT_MIN を作ると未定義。 */
-        kutoa_dec(0u - (u32)val, tmp, (int)sizeof(tmp));
-    } else {
-        kutoa_dec((u32)val, tmp, (int)sizeof(tmp));
-    }
-    return tv_cat(dst, tmp);
-}
-
-/* dev_findをPathDeviceValidatorとして使用するラッパー */
-static int dev_find_validator(const char *name)
-{
-    return (dev_find(name) != (void *)0) ? 1 : 0;
-}
-
 /* ============================================================
  * カーネルメイン — エントリポイント
  * ============================================================ */
@@ -189,11 +112,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
     char tmp[BOOT_STATUS_NUM_BUFSIZE];
     int mb;
+    struct boot_context boot;
 
     kstack_hw_init();
-    pc98_d2_bind();
-    pc98_boot_disk_bind();
-    pc98_boot_names_bind(); /* D3c will fold this into pc98_boot_bind. */
+    pc98_boot_bind(&boot, boot_drive);
 
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・
@@ -260,10 +182,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * 前なので PG=0、低位物理がそのまま見える (票 §1-0、§4-54)。 */
     sysclk_detect();
 
-    /* 8237 の共通部。0439h bit2 (1MB 超への DMA 禁止) を落とすのはここ —
-     * **fdc_init より前**。プールもカーネルも 1MB 超にあるので、FDC だけの
-     * 都合ではない (票 §1-2)。起動行 `[dma] 0439h xx -> yy state=…` を出す。 */
-    dma8237_init();
+    boot_platform_run(BOOT_DMA, &boot);
 
     tvram_print(36, 1, "PIT...", TATTR_GREEN);
     pit_init(PIT_HZ);
@@ -295,112 +214,19 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         tvram_print(6, 2, cpubuf, TATTR_WHITE);
     }
 
-    /* キーボード初期化。カナ・CAPS の初期値は保存済み BDA (053Ah) から取る。
-     * page0 は通常 NP (include/pc98.h BIOS_WORK_KB_SHIFT、memmap.h)。 */
-    tvram_print(48, 1, "KBD...", TATTR_GREEN);
-    kbd_init();
-    tvram_print(54, 1, "OK", TATTR_WHITE);
+    boot_platform_run(BOOT_INPUT, &boot);
 
-    /* マウスドライバ初期化 (NP21/W検出→モード自動選択) */
-    mouse_init();
+    boot_platform_run(BOOT_FLOPPY, &boot);
 
-    /* FDC初期化 (I/Oポート直接制御) */
-    tvram_print(60, 1, "FDC...", TATTR_GREEN);
-    _enable();  /* FDC初期化前にIRQを許可 */
-    {
-        int fdc_ret = fdc_init();
-        if (fdc_ret == 0) {
-            tvram_print(66, 1, "OK", TATTR_WHITE);
-        } else {
-            tvram_print(66, 1, "ER", TATTR_RED);
-        }
-    }
-    /* FDC の中身を状態行にも出す。**成功しても出す**。
-     * kprintf の [fdc] 行は属性が PC/AT 流のまま属性 VRAM へ書かれていて、
-     * 実機 PC-9821Ra266 では 1 行も読めなかった (2026-09-22、lib/kprintf_attr.c)。
-     * 変換を入れて直したが、ここは属性を直に指定する tvram_print なので
-     * 同じ穴に落ちない — 保険としてこの 1 行を残す ([V4])。
-     * 書式: FDC rc=<n> st0=<xx> 0439h=<xx>-><xx> */
-    {
-        char line[48];
-        char *q = line;
-        u8 st0 = 0, dma_before = 0, dma_after = 0;
-        int frc = fdc_get_last_init_status(&st0, &dma_before, &dma_after);
-
-        q = tv_cat(q, "FDC rc=");
-        q = tv_cat_dec(q, frc);
-        q = tv_cat(q, " st0=");
-        q = tv_cat_hex2(q, st0);
-        q = tv_cat(q, " 0439h=");
-        q = tv_cat_hex2(q, dma_before);
-        q = tv_cat(q, "->");
-        q = tv_cat_hex2(q, dma_after);
-        *q = '\0';   /* 念のための終端 (tv_cat も写す) */
-        /* 最下行に置く。console の通常出力は行 0 から進むので、行 5 だと IDE の
-         * probe ログに root panic の前に上書きされる (Codex 往復 3 の指摘)。
-         * 最下行は console が 19 行以上流れるまで無事で、root panic までに
-         * それだけ流れることはない。 */
-        tvram_print(0, TVRAM_ROWS - 1, line, (frc == 0) ? TATTR_WHITE : TATTR_YELLOW);
-        /* 流れる側 (kprintf) にも同じ内容を残す — 属性変換で実機でも読める。 */
-        kprintf(TATTR_WHITE, "[fdc] %s\n", line);
-    }
-    /* FD から起動したなら、その DA/UA でメディアを選ぶ。
-     * 1.44MB (DA/UA 0x30 系) は 512B×18セクタで、2HD のまま読むと
-     * ゴミを掴んで root マウントが落ちる (2026-09-18 に実測)。
-     * **dev_init() より前**でなければデバイス記述子が古い値で登録される。
-     *
-     * 1.44MB を選ぶと fdc_set_media が 04BEh でアクセスモードも切り替える。
-     * **失敗しても起動は止めない** — BIOS が起動時に既に正しいモードへ
-     * 入れている場合があり (エミュレータはそう)、しかも 04BEh の読みは
-     * 00BEh のデコードイメージで嘘をつく機種がある (io_fdd.md)。
-     * 表示だけ残して進む ([V4]: 黙って成功にしない)。 */
-    fdc_set_media_by_daua(0, boot_drive);
-    if ((boot_drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144 || (boot_drive & BIOS_DA_TYPE_MASK) == BIOS_DA_FD_144_ALT) {
-        u8 m3 = (u8)inp(FDC_IO_3MODE);
-        tvram_print(69, 1, "144", TATTR_GREEN);
-        tvram_print(72, 1, (m3 & FDC_3M_CUR_144) ? "M" : "?",
-                    (m3 & FDC_3M_CUR_144) ? TATTR_WHITE : TATTR_RED);
-    }
-
-    /* デバイス・パスシステム初期化 */
-    tvram_print(58, 1, "DEV...", TATTR_GREEN);
-    dev_init();
-    loop_dev_init();  /* lo0..lo3 ループバックデバイス登録 */
-    path_init();
-    int fs_registration_failed = ext2_init() != VFS_OK;
-    fs_registration_failed |= fatfs_init() != VFS_OK;
-    fs_registration_failed |= hostdrvfs_init() != VFS_OK;
-    fs_registration_failed |= serialfs_init() != VFS_OK;
-    path_set_device_validator(dev_find_validator);
-    tvram_print(64, 1, fs_registration_failed ? "NG" : "OK", TATTR_WHITE);
-    if (fs_registration_failed)
-        kprintf(TATTR_WHITE, "VFS: filesystem registration failed\n");
+    boot_platform_run(BOOT_DEV_FS, &boot);
 
     /* パレット初期化 */
     palette_init();
 
 
-    /* PCI の列挙 (読むだけ)。**IDE より前**に置く: 実機 PC-9821Ra266 の
-     * 内蔵 LAN (Intel 82557) を見つけるのが目的で、IDE の probe ログに
-     * 流される前に [pci] の行を出したい (票 TASK_LAN_82557 §2 L-A)。
-     * NP21/W には 0CF8h が無いので「mech#1 absent」の 1 行で終わる —
-     * 失敗ではなく正しい報告 ([V4])。 */
-    pci_init();
+    boot_platform_run(BOOT_PCI_ENUM, &boot);
 
-    /* IDE/HDD 初期化と登録 (4ドライブ: IDE#0-#3) */
-    tvram_print(0, 3, "IDE...", TATTR_GREEN);
-    {
-        int n = ide_init();
-        if (n > 0) {
-            int d;
-            tvram_print(5, 3, "OK", TATTR_WHITE);
-            for (d = 0; d < IDE_MAX_DRIVES; d++) {
-                if (ide_drive_present(d)) dev_register_hdd(d);
-            }
-        } else {
-            tvram_print(5, 3, "no drive", TATTR_CYAN);
-        }
-    }
+    boot_platform_run(BOOT_DISK, &boot);
 
     /* HDD の幾何: BIOS (ローダの AH=84h) と IDENTIFY を 1 行ずつ。
      * 段 1 の設計値はこの 2 つで決める (票 TASK_HDD_INSTALL 段 0)。 */
@@ -443,24 +269,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         }
         tvram_print(23, 3, "root OK", TATTR_WHITE);
 
-        /* HostDrv(NT) 自動マウント (/host) */
-        if (hostdrvfs_detect()) {
-            int hrc = vfs_mount("/host", "hostdrv", "hostdrv");
-            if (hrc == VFS_OK) {
-                tvram_print(32, 3, "HDRV OK", TATTR_WHITE);
-            } else {
-                tvram_print(32, 3, "HDRV NG", TATTR_RED);
-            }
-        } else {
-            tvram_print(32, 3, "HDRV --", TATTR_CYAN);
-        }
+        boot_platform_run(BOOT_AUTO_MOUNT, &boot);
     }
 
-    /* RTC初期化 */
-    tvram_print(26, 3, "RTC...", TATTR_GREEN);
-    rtc_init();
-    tvram_print(32, 3, "OK", TATTR_WHITE);
-
+    boot_platform_run(BOOT_CLOCK, &boot);
 
     /* ページング初期化 (メモリ保護有効化) */
     tvram_print(37, 2, "PAGE...", TATTR_GREEN);
@@ -470,8 +282,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* コンベンショナルメモリ再利用 (ブート後のローダー領域等を解放) */
     paging_reclaim_conventional();
 
-    /* ROM/cache storage belongs to the POST_ROOT KCG module. */
-    kcg_init();
+    boot_platform_run(BOOT_FONT, &boot);
 
     /* FPU 初期化 (paging_init の後で CR0 に対して設定)
      * CR0.EM=0 (ネイティブFPU使用), CR0.TS=0 (タスクスイッチ不要)
@@ -521,10 +332,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     unicode_file_load();
     services_stage = SERVICES_UNICODE;
 
-    /* ⑥-0 (TASK_T1_LEDGER §3-3、B4): pci_init は台帳より前に走るので、g_pci の
-     * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
-     * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
-    pc98_boot_pci_resources();
+    boot_platform_run(BOOT_PCI_RESOURCES, &boot);
+
     if (memory_boot_dma_available()) {
         lan_module_load();
     }
@@ -603,9 +412,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
     kprintf(KLOG_ATTR, "[BOOT] snd module rc=%d\n", snd_rc);
 
-    /* LAN (LGY-98)。CONFIG_LGY98_BASE=0 (既定) なら何もしない。
-     * カード未装着・応答不良でも NIC だけ無効にして起動を続ける。 */
-    lgy98_init();
+    boot_platform_run(BOOT_NIC_LEGACY, &boot);
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);

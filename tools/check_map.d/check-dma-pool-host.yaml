@@ -19,3 +19,9 @@ check-dma-pool-host:
 - drivers/dev.h
 - fs/vfs.h
 - include/pc98.h
+- kernel/boot_platform.h
+- kernel/boot_platform.c
+- kernel/boot_display.h
+- kernel/boot_display.c
+- platform/pc98/boot.h
+- platform/pc98/boot.c

@@ -698,7 +698,7 @@ class DeviceReservation(unittest.TestCase):
     def test_import_is_before_bind(self):
         # ⑥-0 は PCI bind を行う LAN 部品の起動前 (B4)、台帳より後。
         k = (ROOT / 'kernel/kernel.c').read_text()
-        imp = k.index('pc98_boot_pci_resources()')
+        imp = k.index('boot_platform_run(BOOT_PCI_RESOURCES, &boot)')
         self.assertLess(k.index('memory_boot_init(mem_kb)'), imp)
         self.assertLess(imp, k.index('lan_module_load()'))
 

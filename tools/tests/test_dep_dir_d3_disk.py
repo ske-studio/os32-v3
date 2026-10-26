@@ -38,7 +38,7 @@ def build(tmp, mutation=None):
 
 def main():
     kernel = (ROOT / 'kernel/kernel.c').read_text()
-    assert kernel.index('pc98_boot_disk_bind();') < kernel.index('bootinfo_report();')
+    assert kernel.index('pc98_boot_bind(&boot, boot_drive);') < kernel.index('bootinfo_report();')
     for rel in ('kernel/bootinfo.c', 'kernel/kernel.c'):
         text = (ROOT / rel).read_text()
         assert '#include "ide.h"' not in text

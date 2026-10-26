@@ -13,6 +13,7 @@
 #include "dev.h"
 #include "../../fs/vfs.h"
 #include "pc98.h"
+#include "boot_platform.h"
 enum services_stage services_stage;
 volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
@@ -106,7 +107,8 @@ static void unicode_file_load(void)
     CHECK(reserved && tested == 1 && loaded == 1 && cd_loaded == 1 && !bound && !pcm);
     unicode_loads++;
 }
-static void pc98_boot_pci_resources(void) { CHECK(reserved); }
+void boot_platform_run(enum boot_point point, const struct boot_context *ctx)
+{ (void)ctx; CHECK(point == BOOT_PCI_RESOURCES && reserved); }
 
 static int lan_module_load(void)
 {

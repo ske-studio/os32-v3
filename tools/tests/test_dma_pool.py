@@ -131,7 +131,7 @@ def boot_gate(tmp):
     kernel = (ROOT / "kernel/kernel.c").read_text()
     start = kernel.index('    if (!memory_boot_init(mem_kb))')
     end = kernel.index('    /* FDリダイレクト初期化', start)
-    gate = kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
+    gate = '    struct boot_context boot = {0};\n' + kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
     mount_helper = re.search(
         r"static inline void kernel_mount_children\(u32 boot_drive\)\n\{.*?\n}\n",
         kernel, re.S).group()
@@ -157,7 +157,7 @@ def boot_gate(tmp):
     fdc = (ROOT / "drivers/fdc.c").read_text()
     assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
     assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)
-    assert kernel.index('fdc_init(') < start
+    assert kernel.index('boot_platform_run(BOOT_FLOPPY, &boot)') < start
     print("BOOT reservation/init/selftest/probe, short RAM, conflict, FDC PASS")
 
 
