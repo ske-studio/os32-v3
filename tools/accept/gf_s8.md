@@ -31,13 +31,14 @@
 3. **ユーザーの目視**: 98 のテキストが表示されていて更新されること (G1)。映らない・崩れたら次の 4 で止める。
 4. 止め方 (main 0 はこの回に進めない): PAUSED の継続として同じ state と log で
    `rshell_recover.py --port /dev/ttyUSB0 --session <A2 の sid> --state a2.json --image-crc <CRC> --log a2.raw --command 'gfinit abort <A2 の sid> --allow-write'`
-   → `result=OK` (終端の ② で 98 復帰)。応答が無ければ `recover now <sid>`、それも無ければユーザーが電源を入れ直す。
+   → 期待は **`result=PARTIAL target=S0 verified=1 unknown=1 trial=1 lost_lines=0`** (2026-10-26 に訂正。A2 は cold-required なので、98 の側 (S0) を確かめても GeForce の側 (S1) は成功にしない — `unknown=1` は「S1 が成功でない」印、`reason=1` は利用者の中止。PMC.ENABLE bit0 は安全な逆操作を保証しないので設計として戻さない。根拠 `~/os32-tmp/run/s8-a2/ANALYSIS.md`)。`recover status` は state=6・reason=1・verified=1。`rshell_recover.py` の成功判定は OK/unknown=0 専用なので rc=1 (`missing/failed verification`) になる — 終端の行・連番・EOT・S0 を見て判定し、G1 (目視) は別の欄。応答が無ければ `recover now <sid>`、それも無ければユーザーが電源を入れ直す。
 5. 記録: CR・head0/1 の SR/GR/MISC の別名の読み、PSTRAPS から導く RAM 選択 (組 3 の見込み)、PAUSED に入るまでの時間と poll 数。
 
 ## 3. 終わり
 
 - `recover status` (IDLE または VERIFIED)、`ver`、`mem` (leftover・audit_fail が 0)。
 - CUI のまま、最後に **GRPH+2+RESET** (31kHz)、再起動後の `ver` と 09A8h。
+- **A2 をやり直す前と route-test の前は、ユーザーが電源を切って入れ直す** (CPU のリセットが PCI の RST# を出す保証は無く、A2 の PMC.ENABLE bit0 などが残りうる。GRPH+2+RESET は 31kHz の設定と新しい起動のためで、冷えた状態への戻りの代わりにしない)。入れ直した後に ver・Image CRC・recover status (IDLE・sid 0) と PMC・1850h・1854h の初期値を記録し、inspect → A1 からやり直す (新しい起動では前の snapshot を使わない)。
 - 0FACh の初めての書込み — 承認 3 (A2 を止めた後、IDLE・session 0 の新しい起動で。route-test は session 0 だけ受ける):
   `rshell_serial.py … cmd 'recover route-test 0 --approve'` → route の step 0→1→0 が 1 組ずつ、終端 `PARTIAL target=S0 verified=1`。
   直後にユーザーが 98 画面を目視。戻らなければユーザーがリセット。口は [RECOVER_ROUTE_TEST](../../docs/decisions/realhw/RECOVER_ROUTE_TEST.md)。
