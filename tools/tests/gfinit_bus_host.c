@@ -230,7 +230,7 @@ static void production_plan(u32 initial_lock)
 #include "../../kdebug/gfinit_resources.c"
 #include "gfinit_resources_ra266.h"
 static u32 resource_cfg[32][8][16];
-static u32 resource_writes;
+static u32 resource_writes, resource_extra_reads;
 void pci_cfg_write32(u32 bus,u32 dev,u32 fn,u32 reg,u32 value)
 {(void)bus;(void)dev;(void)fn;(void)reg;(void)value;resource_writes++;}
 int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
@@ -251,12 +251,12 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     __builtin_va_end(ap);
 }
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
-{CHECK(bus==0 && dev<32 && fn<8 && reg<64);return resource_cfg[dev][fn][reg/4];}
+{CHECK(bus==0 && dev<32 && fn<8 && reg<64);if(fn)resource_extra_reads++;return resource_cfg[dev][fn][reg/4];}
 u16 pci_cfg_read16(u32 bus,u32 dev,u32 fn,u32 reg)
 {return (u16)(pci_cfg_read32(bus,dev,fn,reg&~3U)>>((reg&2)*8));}
 static void resource_setup(void)
 {
-    CHECK(resource_writes==0);resource_writes=0;resource_reason=0;
+    CHECK(resource_writes==0);resource_writes=0;resource_reason=0;resource_extra_reads=0;
     for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++)for(u32 r=0;r<16;r++)resource_cfg[d][f][r]=r?0:~0U;
 }
 static void resource_tests(void)
@@ -265,6 +265,8 @@ static void resource_tests(void)
     resource_setup();CHECK(resource_run(ranges,&n)<0 && n==0);
     resource_cfg[13][0][0]=GF_RES_GPU_ID;
     CHECK(resource_run(ranges,&n)==0 && n==0);
+    resource_cfg[2][0][0]=0x12348086;
+    resource_cfg[2][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     resource_cfg[2][7][0]=0x12298086;resource_cfg[2][7][1]=2;
     resource_cfg[2][7][4]=0x20410000;
     CHECK(resource_run(ranges,&n)<0 && n==0); /* Known ID, incorrect prefetch attribute. */
@@ -327,6 +329,25 @@ static void resource_barlen_tests(void)
         {0x20410000,0x1000},{0x20500000,0x100000}};
     resource_snapshot();CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
     for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
+    /* Ra266 single-function Trident aliases fn0 at every higher function.
+     * Both passes must skip those reads and preserve all BARLEN ranges. */
+    for(u32 f=1;f<PCI_FN_COUNT;f++)for(u32 r=0;r<16;r++)
+        resource_cfg[8][f][r]=resource_cfg[8][0][r];
+    resource_extra_reads=0;
+    CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
+    CHECK(resource_extra_reads==0);
+    for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
+    /* With bit7 set fn1 is real, and overlapping BARs still reject. */
+    resource_cfg[8][0][3]|=PCI_HDR_MULTIFUNCTION<<16;
+    resource_expect("memory_bar_alias",8,1,PCI_CFG_BAR0,0x20000000);
+    /* An absent fn0 skips even a responding higher function. */
+    resource_snapshot();resource_cfg[2][1][0]=0x12348086;
+    resource_cfg[2][1][1]=2;resource_cfg[2][1][4]=0x20000000;
+    resource_extra_reads=0;
+    CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
+    CHECK(resource_extra_reads==0);
+    output("resources: single-function aliases skipped, multifunction overlap rejected, absent fn0 skipped PASS\n");
+    resource_snapshot();
     resource_cfg[8][0][1]=0; /* B2: only Command changes. */
     CHECK(resource_run(ranges,&n)==0 && n==2);
     for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i+3].base && ranges[i].len==expected[i+3].len);
@@ -375,8 +396,10 @@ static void resource_barlen_tests(void)
     for(u32 d=0;d<32;d++)for(u32 f=0;f<8;f++){
         if(d==13 && f==0)continue;
         resource_cfg[d][f][0]=0x12348086;resource_cfg[d][f][1]=2;
+        resource_cfg[d][0][3]=PCI_HDR_MULTIFUNCTION<<16;
         resource_cfg[d][f][4]=(++assigned)*0x1000;
     }
+    resource_cfg[13][0][0]=GF_RES_GPU_ID;
     resource_cfg[0][0][5]=(++assigned)*0x1000;
     CHECK(resource_collect_bounds(&b)==0 && b.count==RECOVER_RANGE_MAX);
     resource_cfg[0][0][6]=(++assigned)*0x1000;
