@@ -1,4 +1,4 @@
-"""D3c1 B: real static table/dispatcher/wrappers and kernel boundary order."""
+"""D3c B/C: real static table/dispatcher/wrappers and kernel boundary order."""
 from pathlib import Path
 import re
 import subprocess
@@ -24,12 +24,12 @@ def kernel_order(kernel=None):
         'boot_platform_run(BOOT_PCI_ENUM, &boot);',
         'boot_platform_run(BOOT_DISK, &boot);', 'bootinfo_report();',
         'bootinfo_report_image();', '"HEAP..."', 'kmalloc_init(', '"MOUNT..."',
-        'rc = vfs_mount("/", root_dev, root_fs);', '"root OK"',
+        'rc = vfs_mount("/", boot.root_dev, boot.root_fs);', '"root OK"',
         'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
         'boot_platform_run(BOOT_CLOCK, &boot);', 'paging_init(mem_kb);',
         'paging_reclaim_conventional();', 'boot_platform_run(BOOT_FONT, &boot);',
         '"fninit"', 'memory_boot_init(mem_kb)', 'cd_module_load();',
-        'kcg_module_load();', 'kernel_mount_children(boot_drive);',
+        'kcg_module_load();', 'kernel_mount_children(boot.root_dev);',
         'services_stage = SERVICES_ROOT_READY;', 'unicode_file_load();',
         'boot_platform_run(BOOT_PCI_RESOURCES, &boot);', 'lan_module_load();',
         'lan_module_pci_bind_fallback();', 'pcm_module_load();',
@@ -41,13 +41,13 @@ def kernel_order(kernel=None):
     for m in markers:
         assert kernel.count(m) == 1, m
     assert 'pc98_d2_bind' not in kernel
-    assert not re.search(r'#include.*(?:kbd|mouse|fdc|rtc|kcg|pci|dma8237|ide|lgy98|e82557)\.h', kernel)
+    assert not re.search(r'#include.*(?:kbd|mouse|fdc|rtc|kcg|pci|pci_bind|dma8237|ide|lgy98|e82557)\.h', kernel)
     print('PASS kernel boundaries and retained operations in original order')
 
 
 def build(work, mutation=None):
     # Positive and mutation copies use the same headers and include paths.
-    for rel in (*SOURCES, *HEADERS):
+    for rel in (*SOURCES, *HEADERS, 'kernel/kernel.c'):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             _, old, new = mutation
@@ -59,6 +59,14 @@ def build(work, mutation=None):
     for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
+    kernel = (work / 'kernel/kernel.c').read_text()
+    start = kernel.index('    {\n        int rc;', kernel.index('"MOUNT..."'))
+    end = kernel.index('    boot_platform_run(BOOT_CLOCK, &boot);', start)
+    child = re.search(r'static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n', kernel, re.S)
+    assert child
+    (work / 'kernel_mount_source.inc').write_text(
+        'static void host_root_mount(struct boot_context boot) {\n' +
+        kernel[start:end] + '}\n' + child.group())
     exe = work / 'boot'
     cmd = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
            '-I' + str(work), '-I' + str(work / 'kernel')]
@@ -82,6 +90,17 @@ def main():
             print('RED PCI_ENUM/DISK boundary swap')
         else:
             raise AssertionError('boot boundary swap escaped order check')
+
+        for mutation in (
+            ('platform/pc98/boot.c',
+             'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
+             '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),
+            ('kernel/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
+        ):
+            with tempfile.TemporaryDirectory(prefix='dep-dir-d3-c-mut-') as td:
+                rc = subprocess.run([str(build(Path(td), mutation))]).returncode
+                assert rc != 0, mutation
+                print('RED', mutation[1])
 
 
 if __name__ == '__main__':

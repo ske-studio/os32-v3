@@ -27,7 +27,6 @@ static int available, conflict, reserved, tested, bound, pcm, diag, loaded;
 static int debug_enabled = 1;
 static int dma_tested, dma_skipped, unicode_loads;
 static int cd_loaded, v86_loaded;
-static u32 boot_drive = BOOT_DRIVE_FDD;
 void kprintf(u8 attr, const char *fmt, ...);
 static void test_dma_pool(void) { dma_tested++; }
 #include "selftest_dma_gate.c"

@@ -243,9 +243,13 @@ static const struct boot_platform pc98_boot_ops = {
 void pc98_boot_bind(struct boot_context *ctx, u32 drive)
 {
     ctx->drive = drive;
-    /* Root selection is connected in D3c2. */
-    ctx->root_dev = 0;
-    ctx->root_fs = 0;
+    if (drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144) {
+        ctx->root_dev = "fd0";
+        ctx->root_fs = "fat";
+    } else {
+        ctx->root_dev = "hd0";
+        ctx->root_fs = "ext2";
+    }
     pc98_d2_bind();
     pc98_boot_disk_bind();
     pc98_boot_names_bind();

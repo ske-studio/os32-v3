@@ -2299,7 +2299,7 @@ static void t_empty_insert(void)
         if (api.device) CHECK(!dev_register(api.device));
         if (api.device) CHECK(api.device->total_sects == 0);
         u32 reads = M.n_read10;
-        boot_submount(0); /* HDD boot; empty cd0 must not be auto-mounted. */
+        boot_submount("hd0"); /* HDD boot; empty cd0 must not be auto-mounted. */
         CHECK(M.n_read10 == reads);
         char rel[VFS_MAX_PATH];
         void *ctx;
@@ -2352,7 +2352,7 @@ static void t_iso_devices(void)
     for (unsigned i = 0; i < sizeof(empty) / sizeof(empty[0]); i++)
         CHECK(!dev_register(&empty[i]));
     g_klog_n = 0; g_klog[0] = '\0';
-    boot_submount(0);
+    boot_submount("hd0");
     CHECK(!g_klog_n);
     CHECK(!vfs_unregister_fs(&iso9660_ops));
 }

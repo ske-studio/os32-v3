@@ -37,11 +37,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 def fd_root_dev():
-    """kernel/kernel.c が FD 起動でルートに使うデバイス名 (試験で決め打ちしない)"""
-    src = (ROOT / "kernel/kernel.c").read_text(encoding="utf-8")
-    m = re.search(r'BOOT_DRIVE_FDD[^{]*\{\s*root_dev\s*=\s*"(\w+)";', src)
+    """platform/pc98/boot.c が FD 起動でルートに使うデバイス名 (試験で決め打ちしない)"""
+    src = (ROOT / "platform/pc98/boot.c").read_text(encoding="utf-8")
+    m = re.search(r'BOOT_DRIVE_FDD[^{]*\{\s*ctx->root_dev\s*=\s*"(\w+)";', src)
     if not m:
-        sys.exit("kernel.c から FD ルートのデバイス名を読めない")
+        sys.exit("platform/pc98/boot.c から FD ルートのデバイス名を読めない")
     return m.group(1)
 
 

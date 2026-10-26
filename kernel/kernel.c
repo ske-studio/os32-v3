@@ -106,7 +106,7 @@ extern u32 sys_mem_kb;
 /* kernel_main から抜き出した補助。本体は kernel_main の後に置く
  * (ホスト試験が kernel.c を文字の位置で切り出すため)。 */
 static inline void kernel_shell_loop(void);
-static inline void kernel_mount_children(u32 boot_drive);
+static inline void kernel_mount_children(const char *root_dev);
 
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
@@ -250,19 +250,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     tvram_print(14, 3, "MOUNT...", TATTR_GREEN);
     {
         int rc;
-        const char *root_dev;
-        const char *root_fs;
-
-        if (boot_drive == BOOT_DRIVE_FDD || boot_drive == BOOT_DRIVE_FDD_144) {
-            root_dev = "fd0";
-            root_fs = "fat";
-        } else {
-            root_dev = "hd0";
-            root_fs = "ext2";
-        }
-
         /* 1. ルートマウント */
-        rc = vfs_mount("/", root_dev, root_fs);
+        rc = vfs_mount("/", boot.root_dev, boot.root_fs);
         if (rc != VFS_OK) {
             tvram_print(23, 3, "root panic", TATTR_RED);
             for (;;) _halt();
@@ -325,7 +314,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     cd_module_load();
     /* Page owners exist now; failure retains the TVRAM CUI. */
     kcg_module_load();
-    kernel_mount_children(boot_drive);
+    kernel_mount_children(boot.root_dev);
 
     services_stage = SERVICES_ROOT_READY;
     kprintf(KLOG_ATTR, "[services] ROOT_READY tick=%u\n", tick_count);
@@ -457,16 +446,14 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     }
 }
 
-/* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは boot_drive
- * から fd0 / hd0 を決めて除く。CD は iso9660 だけ、他は ext2 → iso9660 → fat の
+/* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは起動情報で選んだ名前
+ * を受け取り除く。CD は iso9660 だけ、他は ext2 → iso9660 → fat の
  * 順に試し、失敗しても起動は続ける。 */
-static inline void kernel_mount_children(u32 boot_drive)
+static inline void kernel_mount_children(const char *root_dev)
 {
     {
         const char *names[MAX_DEVICES];
         int num = dev_get_names(names, MAX_DEVICES);
-        const char *root_dev = (boot_drive == BOOT_DRIVE_FDD ||
-                                boot_drive == BOOT_DRIVE_FDD_144) ? "fd0" : "hd0";
         /* 登録済みの部品を含めてサブマウント (ルート以外) */
         for (int i = 0; i < num; i++) {
             const char *dname = names[i];

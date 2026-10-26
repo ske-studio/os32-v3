@@ -133,7 +133,7 @@ def boot_gate(tmp):
     end = kernel.index('    /* FDリダイレクト初期化', start)
     gate = '    struct boot_context boot = {0};\n' + kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
     mount_helper = re.search(
-        r"static inline void kernel_mount_children\(u32 boot_drive\)\n\{.*?\n}\n",
+        r"static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n",
         kernel, re.S).group()
     (d / "kernel_dma_gate.c").write_text(
         '#include "kprintf.h"\n' + mount_helper +

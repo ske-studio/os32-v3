@@ -96,7 +96,7 @@ typedef struct PointerOps {
 - 状態の持ち主: cooked/rawリング・STOP集約・押下/修飾・GUIモードはkbd driver、座標/範囲/前回poll/カーソルはmouse driver、注入リングとownerは既存kernel。
 - 文脈: 転送は協調文脈/KAPI内のみ。IRQは既存driver handlerが同じ状態を更新。getkey_waitのinterruptible・park・ring3_abort_checkの位置は移さない。新たにcli/stiを足さない。
 - GUIの118/146行だけ `input_set_gui_mode(1/0)`。cooked抑止開始/解除の順序、登録失敗時・終了時の復帰位置を保つ。
-- driverヘッダの直読は装置部品（kernel/ime.c・kdebug/kselftest.c）とD3までの起動配線（kernel/kernel.c）に許容し、kbdは `"../drivers/kbd.h"`、起動のmouseは `"../drivers/mouse.h"` を明示する。ime.cのkbd_getkey_wait/trygetkey/trygetcharは保持し、fep.mod importを改名しない。
+- driverヘッダの直読は装置部品（kernel/ime.c・kdebug/kselftest.c）に許容し、kbdは `"../drivers/kbd.h"` を明示する。D3c2 で起動配線の例外（kernel/kernel.c の kbd・mouse）は解消し、platform/pc98/boot.c が読む。ime.cのkbd_getkey_wait/trygetkey/trygetcharは保持し、fep.mod importを改名しない。
 - kernel/fep_module.cのshift getterとfallback/関数表をinputへ。`getkey_wait(1)`→負値→abort_check、con_sink時の生バイト、拡張キー除外を維持。fep.mod import名・世代は変更しない。
 - execではSTOP掃除の位置だけ転送。`kbd_inject_owner_exit(id)`（1091）とdiscard（1112）の順序・対象ownerを変更しない。
 - stdinは既存canonical処理をVFSに残す。新しいTTY・Deviceインスタンスは不要。
