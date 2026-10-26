@@ -29,4 +29,11 @@ enum services_fault {
 extern volatile u32 services_boot_fault;
 void services_boot(void);
 void services_report(void);
+/* Saved diagnostic values only; no output or engine entry. */
+#define SERVICES_VER_STATE_TEXT 24
+typedef struct {
+    u32 stack_used, stack_size, public;
+    char state[SERVICES_VER_STATE_TEXT];
+} ServicesVerState;
+void services_ver_state(ServicesVerState *out);
 #endif

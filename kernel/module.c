@@ -33,6 +33,8 @@ const char *kdebug_state_name(int state)
         "BAD_CRC", "INIT_FAILED", "RELOC_INVALID", "IMPORT_INVALID",
         "RECORD_FULL", "BAD_DEPENDENCY", "BUSY", "QUARANTINED"
     };
+    if (state < 0 || (u32)state >= sizeof(names) / sizeof(names[0]))
+        return "UNKNOWN";
     return names[state];
 }
 
