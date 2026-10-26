@@ -225,6 +225,8 @@ def mutate():
                 shutil.copytree(ROOT / d, copy / d, dirs_exist_ok=True)
             (copy / HOST).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / HOST, copy / HOST)
+            shutil.copy2(ROOT / "tools/tests/input_fixture_host.h",
+                         copy / "tools/tests/input_fixture_host.h")
             src = copy / rel
             text = src.read_text(encoding="utf-8")
             if text.count(old) != 1:
