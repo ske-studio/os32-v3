@@ -21,10 +21,10 @@
 
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
-| V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [VER_INFO_DESIGN](../../decisions/VER_INFO_DESIGN.md) | sol | 実装中 |
-| V6 | GFX の保存の状態を取る口 (gfx_hal.h・gfx_core.c) | 同上 | sol | 実装中 |
-| V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h) | 同上 | sol | 未着手 |
-| V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | 未着手 |
+| V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [VER_INFO_DESIGN](../../decisions/VER_INFO_DESIGN.md) | sol | **main** (astra 取り込み可、試験 2 本を直してから) |
+| V6 | GFX の保存の状態を取る口 (gfx_hal.h・gfx_core.c) | 同上 | sol | **main** (astra 取り込み可、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
+| V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h、CPU の既定かどうかの口は cpu_calibrate) | 同上 | sol | 実装中 |
+| V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | 実装中 |
 | V9・V2 | 新しい KAPI と版の文書 (一緒に取り込む) | 同上 | sol | 未着手 |
 | V10・V11 | CUI の ver と GUI の About を新しい行の読み手に (直列、取り込みは 1 回) | 同上 | sol | 未着手 |
 | V12 | 試験の注記と全体の受入の登録 | 同上 | sol | 未着手 |
