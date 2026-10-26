@@ -547,7 +547,7 @@ def run_kdebug_cli(runner, mutate=False):
                      'RELOC_INVALID', 'IMPORT_INVALID', 'UNKNOWN')
             for code, name in enumerate(names, 2):
                 assert f'rejected ({code} {name}, file pair 1234abcd)' in output
-            assert 'Image CRC: 1234abcd (0 bytes, HDD loader)\nkdebug: on' in output
+            assert '  Image CRC: 1234abcd (0 bytes, HDD loader)\nkdebug: on (pair 1234abcd)\nkdebug pages: body=2 owner=3\n  services: SERVICES_READY public=1\n' in output
             print('PASS kdebug CLI CPL3' if app else 'PASS kdebug CLI CPL0')
 
 

@@ -10,7 +10,7 @@ RING3_WINDOW_DEFINE
 static KernelAPI api, *g_api = &api;
 static char file[CFG_OUT_MAX] = "GUI=0\n KDEBUG = 1\nKDEBUG=0\n# keep\n";
 static u32 file_len = sizeof("GUI=0\n KDEBUG = 1\nKDEBUG=0\n# keep\n") - 1;
-static u32 offset, calls, opens, writes, write_opens, state, version = 75;
+static u32 offset, calls, opens, writes, write_opens, state, version = KAPI_VERSION;
 static int missing, open_fail, read_fail, probe_fail, write_fail, stat_fail;
 static int refusals, refused_limit;
 static void emit(char c) {
@@ -76,10 +76,28 @@ static i32 stat(i32 id, void *out, u32 size) {
     for (u32 i = 0; i < sizeof(s); i++) ((u8 *)out)[i] = ((u8 *)&s)[i];
     return sizeof(s);
 }
-static void build_info(char *out, int size) { CHECK(size >= 8); out[0] = 'x'; out[1] = 0; }
-static int image_info(BootImageInfo *out) {
-    *out = (BootImageInfo){0}; out->crc_valid = 1; out->image_crc = 0x1234abcd;
-    out->source = 2; return 0;
+static u32 ver_calls;
+static int ver_info(void *out, u32 size) {
+    CHECK(size == sizeof(OS32_VerInfo)); ver_calls++;
+    OS32_VerInfo *report = out;
+    *report = (OS32_VerInfo){0};
+    const char *texts[] = {
+        "Image CRC: 1234abcd (0 bytes, HDD loader)",
+        "kdebug: on (pair 1234abcd)",
+        "kdebug pages: body=2 owner=3",
+        "services: SERVICES_READY public=1"
+    };
+    const u32 kinds[] = {
+        OS32_VER_IDENTITY | OS32_VER_INDENT, OS32_VER_DEBUG,
+        OS32_VER_DEBUG, OS32_VER_DEBUG | OS32_VER_INDENT
+    };
+    report->count = sizeof(texts) / sizeof(texts[0]);
+    for (u32 i = 0; i < report->count; i++) {
+        report->lines[i].kind = kinds[i];
+        u32 n = 0;
+        do { report->lines[i].text[n] = texts[i][n]; } while (texts[i][n++]);
+    }
+    return 0;
 }
 static void sh_refuse(const char *what, int limit) {
     CHECK(str_eq(what, "system.cfg")); refusals++; refused_limit = limit;
@@ -129,12 +147,14 @@ void _start(void) {
     api.version = version; api.kprintf = print; api.mem_stat = stat;
     api.sys_open = open_file; api.sys_close = close_file;
     api.sys_read = read_file; api.sys_write = write_file;
-    api.sys_get_build_info = build_info; api.boot_image_info = image_info;
+    api.sys_ver_info = ver_info;
     int value;
     CHECK(!cfg_get_kdebug(&value) && value == 1);
     char *show[] = {"kdebug"}, *on[] = {"kdebug", "on"}, *off[] = {"kdebug", "off"};
     for (state = 0; state <= 13; state++) CHECK(!cmd_kdebug(1, show));
-    state = 1; CHECK(!cmd_ver(0, 0));
+    state = 1;
+    u32 before_ver = calls;
+    CHECK(!cmd_ver(0, 0) && calls == before_ver && ver_calls == 1);
     u32 before = calls;
     CHECK(!cmd_kdebug(2, off) && calls == before && state == 1);
     CHECK(str_eq(file, "GUI=0\n# keep\nKDEBUG=0\n"));
@@ -149,7 +169,6 @@ void _start(void) {
     CHECK(cmd_kdebug(2, bad) == SH_STATUS_USAGE && opens == before);
     CHECK(cmd_kdebug(3, on) == SH_STATUS_USAGE && opens == before);
     version = api.version = 74; before = calls;
-    CHECK(!cmd_ver(0, 0) && calls == before);
     CHECK(cmd_kdebug(1, show) == SH_STATUS_ERROR && calls == before);
     config_failures_and_limits();
     print(0, "%s", "PASS kdebug CLI config/state/version/errors\n");

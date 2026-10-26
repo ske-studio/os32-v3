@@ -8,6 +8,9 @@ check-ver-version-host:
 - tools/check_map.d/check-ver-version-host.yaml
 - kernel/module.c
 - tools/tests/mutpar.py
-- userland/shell/cmd_base.c
+- kernel/ver_format.c
+- kernel/ver_info.h
+- sdk/include/os32/os32_ver_info.h
+- sdk/include/os32/os32_kapi_shared.h
 # Actual make outputs are built and inspected only in the private tree.
 artifact_reader: true
