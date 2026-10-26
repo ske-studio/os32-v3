@@ -437,6 +437,8 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
         text = text.replace('#include "../../lib/sqlite3/', f'#include "{ROOT}/lib/sqlite3/')
         text = text.replace('#include "sqlite_groups_backend.h"',
                             f'#include "{ROOT}/tools/tests/sqlite_groups_backend.h"')
+        text = text.replace('#include "serial_emergency_host.h"',
+                            f'#include "{ROOT}/tools/tests/serial_emergency_host.h"')
         src.write_text(text, encoding="utf-8")
     exe = tmp / exe_name
     res = subprocess.run(
