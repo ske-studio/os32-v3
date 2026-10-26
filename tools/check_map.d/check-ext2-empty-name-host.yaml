@@ -19,4 +19,8 @@ check-ext2-empty-name-host:
 - tools/check_map.d/check-ext2-empty-name-host.yaml
 - build/checks.d/check-ext2-empty-name-host.mk
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
 artifact_reader: true

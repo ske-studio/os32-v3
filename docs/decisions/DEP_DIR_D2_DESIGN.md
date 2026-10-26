@@ -259,3 +259,7 @@ static void pc98_read_date(ClockDate *d) {
 
 - r1 の指摘 F1〜F10 は r2 で直った (REVIEW.r1.md)。F8 (#45 の PCI 側を票の「後」の行へ) は PM が票に入れた。
 - PM 決定: F5 (FatFs の get_fattime を clock_read_date 経由) と F6 (ver_collect を port_get_status) は入れる。D1 → D2 の直列、D2 の実装の基点は D1 を取り込んだ main。
+
+## A1 の実装で埋めたこと (2026-10-26、PM が F1 の規則を当てはめた)
+
+- `kernel/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "../drivers/kbd.h" を明示して読む」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。

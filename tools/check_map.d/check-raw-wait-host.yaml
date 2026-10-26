@@ -65,3 +65,8 @@ check-raw-wait-host:
 - assets/ipadic/**
 - assets/joyo_kanji.txt
 - kernel/cpu_flags.inc
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
+- platform/pc98/d2_bind.c
+- drivers/kbd_dlog.c

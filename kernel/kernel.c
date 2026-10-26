@@ -16,7 +16,7 @@
 #include "tss.h"
 #include "v86.h"
 #include "io.h"
-#include "kbd.h"
+#include "../drivers/kbd.h"
 #include "fdc.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
 #include "disk.h"
@@ -76,7 +76,7 @@ extern int fatfs_init(void);
 #include "snd_engine.h"
 #include "fm_module.h"
 #include "v86_module.h"
-#include "mouse.h"
+#include "../drivers/mouse.h"
 #include "lgy98.h"
 #include "pcm_module.h"
 #include "lan_module.h"
@@ -95,6 +95,8 @@ extern int fatfs_init(void);
 extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
+
+extern void pc98_d2_bind(void);
 
 /* 次に起動するシェルのパス (契約 T9)。実体は kernel/gui.c (K1)。
  * gui.h を丸ごと取り込むと os32_gui_shared.h まで引くので、
@@ -197,6 +199,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     int mb;
 
     kstack_hw_init();
+    pc98_d2_bind();
 
     /* **最初に** ブート情報域 (0x7E00、ローダが INT 1Bh AH=84h の結果を
      * 書いた) を写す。0x7E00 はフォントキャッシュの内側で、フォント・

@@ -103,4 +103,8 @@ check-trim-flow-host:
 - tools/gen_g16.py
 - tools/g16/**
 - assets/ipadic/*.csv
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
 artifact_reader: true

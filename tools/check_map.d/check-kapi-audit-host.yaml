@@ -37,3 +37,9 @@ check-kapi-audit-host:
 - fs/fd_redirect.h
 - kernel/sqlite_engine.h
 - kernel/cpu_flags.inc
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
+- platform/pc98/d2_bind.c
+- drivers/kbd_dlog.c
+- drivers/kbd_dlog.h

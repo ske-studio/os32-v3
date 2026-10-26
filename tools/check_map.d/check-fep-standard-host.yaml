@@ -18,3 +18,7 @@ check-fep-standard-host:
 - lib/sqlite3/**
 - build/checks.d/check-fep-standard-host.mk
 - tools/check_map.d/check-fep-standard-host.yaml
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

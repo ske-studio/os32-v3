@@ -420,8 +420,12 @@ static void quarantine_capacity(void)
     CHECK(probes == 0 && !memcmp(before, open_files, sizeof(before)));
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(int argc, char **argv)
 {
+    input_fixture_init();
     mock_ops.get_file_size = mock_size;
     mock_ops.write_file = mock_write;
     mock_ops.read_stream = mock_read_stream;

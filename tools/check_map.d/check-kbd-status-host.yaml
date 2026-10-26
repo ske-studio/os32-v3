@@ -1,4 +1,7 @@
 check-kbd-status-host:
+- include/kbd.h
+- drivers/kbd.h
+- kernel/v86_kbd.h
 - drivers/kbd.c
 - drivers/kbd_status.c
 - kernel/v86_kbd.c

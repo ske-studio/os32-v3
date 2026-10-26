@@ -61,10 +61,12 @@ char *kstrncat(char *dst, const char *src, u32 n)
 static u32 con_written;
 static int stdin_prefix;
 static int stdin_interrupt;
+static int stdin_calls, stdin_eol = '\n';
 int kbd_getchar_kapi(void)
 {
+    stdin_calls++;
     if (stdin_prefix) { stdin_prefix--; return 'A'; }
-    return stdin_interrupt ? -1 : '\n';
+    return stdin_interrupt ? -1 : stdin_eol;
 }
 void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)color; con_written += size; }
@@ -397,8 +399,12 @@ static void case_regress(void)
           "コンソールへの write は従来どおり");
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(void)
 {
+    input_fixture_init();
     printf("=== 票 TASK_FSTAT_REDIR: fstat がリダイレクトに従い isatty と"
            "一致する ===\n");
     {
@@ -410,6 +416,16 @@ int main(void)
         check(vfs_read_fd(0, buf, sizeof(buf)) == 1 && buf[0]=='A' && !buf[1],
               "stdin interrupt returns partial data without FF");
         stdin_interrupt=0;
+        stdin_calls = 0;
+        check(vfs_read_fd(0, buf, 0) == 0 && stdin_calls == 0,
+              "zero size does not consume input");
+        static unsigned char large[65536];
+        stdin_prefix = 1; stdin_eol = '\r';
+        check(vfs_read_fd(0, large, sizeof(large)) == 2 && large[0] == 'A' && large[1] == '\n',
+              "64KB request returns at CR normalized to LF");
+        stdin_eol = '\n';
+        check(vfs_read_fd(0, buf, sizeof(buf)) == 1 && buf[0] == '\n',
+              "LF returns a line immediately");
     }
     case_f4();
     case_f5();

@@ -366,8 +366,12 @@ static void learning(IME_Dict *dict)
     puts("PASS ext2 RW learning insert/update remount freq=2 ranking journal_deleted exact/prefix unique");
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(int argc, char **argv)
 {
+    input_fixture_init();
     IME_Dict dict = {0};
     CHECK(argc == 2);
     setup();

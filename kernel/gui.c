@@ -9,7 +9,7 @@
 #include "serial_diag.h"
 #include "gui.h"
 #include "kstring.h"
-#include "kbd.h"      /* kbd_set_gui_mode (K2-B) */
+#include "input_service.h"      /* input_set_gui_mode (K2-B) */
 #include "ime.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
 
 /* res_owner_get() は fs/fd_redirect.c。FD と同じ「確保した実行レベル」。
@@ -115,7 +115,7 @@ i32 gui_register(void *handler, void *pump)
      * WM は raw リングだけを読むので、cooked リング (kbd_buf) に積み続けると
      * 32 打鍵で溢れて kbd_dropped が増え、実際には落ちていない打鍵が
      * 偽の OVERFLOW として WM → アプリへ伝わる。GUI 中は積まない。 */
-    kbd_set_gui_mode(1);
+    input_set_gui_mode(1);
     gui_diag_register();
     return 0;
 }
@@ -143,7 +143,7 @@ void gui_owner_exit(int owner, int kind)
         g_gui_pump    = 0;
         /* CUI に戻るのでキーボードを元に戻す (cooked リングを再開)。
          * これをしないと shell.bin が載っても打鍵が届かない (K2-B)。 */
-        kbd_set_gui_mode(0);
+        input_set_gui_mode(0);
         /* FEP の描画先を TVRAM 版へ戻す (レビュー #4 ①)。gshell は自分でも
          * NULL を渡すが、クラッシュで抜けた場合もシェル帯の旧コードを
          * 指したままにしない。 */

@@ -9,7 +9,7 @@
 #include "fd_redirect.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "console.h"
-#include "kbd.h"
+#include "input_service.h"
 
 #ifndef ATTR_WHITE
 #define ATTR_WHITE   TATTR_WHITE
@@ -465,7 +465,7 @@ int vfs_read_fd(int fd, void *buf, u32 size)
             u8 *p = (u8 *)buf;
             u32 i = 0;
             while (i < size) {
-                int c = kbd_getchar_kapi();
+                int c = input_getchar_kapi();
                 if (c < 0) return i ? (int)i : c;
                 if (c == '\r') c = '\n';
                 p[i++] = (u8)c;

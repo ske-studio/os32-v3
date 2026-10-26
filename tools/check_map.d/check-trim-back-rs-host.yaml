@@ -98,4 +98,8 @@ check-trim-back-rs-host:
 - tools/tests/kernel_layout.py
 - kernel/kaudit_boot.c
 - kernel/memory_boot.c
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
 artifact_reader: true

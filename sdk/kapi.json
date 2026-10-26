@@ -18,7 +18,7 @@
   "includes": [
     "gfx.h",
     "palette.h",
-    "kbd.h",
+    "input_service.h",
     "exec_heap.h",
     "kmalloc.h",
     "paging.h",
@@ -94,6 +94,7 @@
     },
     {
       "name": "kbd_trygetchar",
+      "target": "input_trygetchar",
       "ret": "int",
       "args": []
     },
@@ -233,16 +234,17 @@
       "name": "kbd_getchar",
       "ret": "int",
       "args": [],
-      "target": "kbd_getchar_kapi"
+      "target": "input_getchar_kapi"
     },
     {
       "name": "kbd_getkey",
       "ret": "int",
       "args": [],
-      "target": "kbd_getkey_kapi"
+      "target": "input_getkey_kapi"
     },
     {
       "name": "kbd_trygetkey",
+      "target": "input_trygetkey",
       "ret": "int",
       "args": []
     },
@@ -659,6 +661,7 @@
     },
     {
       "name": "kbd_get_modifiers",
+      "target": "input_get_modifiers",
       "ret": "u32",
       "args": []
     },
@@ -1011,6 +1014,7 @@
     },
     {
       "name": "kbd_is_pressed",
+      "target": "input_is_pressed",
       "ret": "int",
       "args": [
         "int scancode"
@@ -1344,11 +1348,13 @@
     },
     {
       "name": "kbd_dropped_count",
+      "target": "input_dropped_count",
       "ret": "u32",
       "args": []
     },
     {
       "name": "kbd_trygetrawkey",
+      "target": "input_trygetrawkey",
       "ret": "int",
       "args": []
     },
@@ -1571,6 +1577,7 @@
     },
     {
       "name": "kbd_peekkey",
+      "target": "input_peekkey",
       "ret": "int",
       "args": []
     },
@@ -1593,6 +1600,7 @@
     },
     {
       "name": "kbd_trygetchar_local",
+      "target": "input_trygetchar_local",
       "ret": "int",
       "args": []
     },
@@ -1656,6 +1664,7 @@
     },
     {
       "name": "kbd_diag",
+      "target": "input_diag",
       "out": [{"arg": "out", "size": "sizeof(KbdDiag)"}],
       "ret": "int",
       "args": ["KbdDiag *out"]
@@ -1713,6 +1722,7 @@
     },
     {
       "name": "kbd_diag_log",
+      "target": "input_diag_log",
       "out": [{"arg": "out", "len": "max", "unit": "sizeof(KbdDiagLogEnt)"}],
       "ret": "int",
       "args": ["u32 after_seq", "KbdDiagLogEnt *out", "int max"]

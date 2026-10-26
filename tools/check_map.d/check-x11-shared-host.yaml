@@ -35,3 +35,9 @@ check-x11-shared-host:
 - build/checks.d/check-x11-shared-host.mk
 - kernel/sqlite_engine.h
 - kernel/cpu_flags.inc
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
+- platform/pc98/d2_bind.c
+- drivers/kbd_dlog.c
+- drivers/kbd_dlog.h

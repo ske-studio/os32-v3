@@ -22,7 +22,7 @@
 #include "vfs.h"
 #include "gfx.h"
 #include "gfx_hal.h"   /* gfx_bb_phys_range: CPL=3 へ USER マップする範囲 */
-#include "kbd.h"
+#include "input_service.h"
 #include "ime.h"
 #include "kmalloc.h"
 #include "kprintf.h"
@@ -1082,7 +1082,7 @@ static void exec_notify_owned(int id, int kind)
     /* (7) GUI リソース回収 (契約 T4 / U8)。WM がこの owner のウィンドウ・
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
-    if (kind == EXEC_KIND_ABORTED) kbd_discard_stop();
+    if (kind == EXEC_KIND_ABORTED) input_discard_stop();
     ime_owner_exit(id);
     gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、

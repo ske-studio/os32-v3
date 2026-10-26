@@ -94,4 +94,8 @@ check-sqlite-module-proto-host:
 - include/redir_access.h
 - build/fep-module.ld
 - build/out/fep/*.o
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h
 artifact_reader: true

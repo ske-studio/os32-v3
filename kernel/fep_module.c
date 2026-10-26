@@ -5,7 +5,7 @@
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"
-#include "kbd.h"
+#include "input_service.h"
 #include "con_sink.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -19,7 +19,7 @@ extern const struct module_symbol_contract fep_export_contracts[];
 int fep_services_public(void) { return services_public; }
 int fep_services_stage(void) { return services_stage; }
 u32 fep_services_boot_fault(void) { return services_boot_fault; }
-u8 fep_kbd_shift_state(void) { return kbd_shift_state; }
+u8 fep_kbd_shift_state(void) { return input_shift_state(); }
 
 static void stub_void(void) {}
 static void stub_mode(int mode) { (void)mode; }
@@ -42,7 +42,7 @@ static int stub_getchar_wait(int interruptible)
 {
     int c;
     do {
-        c = kbd_getkey_wait(interruptible);
+        c = input_getkey_wait(interruptible);
         if (c < 0 || con_sink_is_enabled()) return c;
     } while (!(c & 0xff));
     return c & 0xff;
@@ -56,8 +56,8 @@ static int stub_getchar_kapi(void)
 }
 static int stub_trygetchar(void)
 {
-    if (con_sink_is_enabled()) return kbd_trygetchar();
-    int c = kbd_trygetkey();
+    if (con_sink_is_enabled()) return input_trygetchar();
+    int c = input_trygetkey();
     return c < 0 || !(c & 0xff) ? -1 : c & 0xff;
 }
 static const FepModuleApi stub_api = {
@@ -65,11 +65,11 @@ static const FepModuleApi stub_api = {
     .toggle = stub_void, .feed_key = stub_feed_key, .set_render = stub_render,
     .is_active = stub_zero, .set_mode = stub_mode, .get_mode = stub_zero,
     .getchar = stub_getchar, .trygetchar = stub_trygetchar,
-    .getkey = kbd_getkey, .trygetkey = kbd_trygetkey,
+    .getkey = input_getkey, .trygetkey = input_trygetkey,
     .switch_dict = stub_switch, .user_list = stub_list,
     .user_delete = stub_delete, .user_export = stub_export,
     .user_clear = stub_clear, .owner_exit = stub_mode,
-    .getchar_kapi = stub_getchar_kapi, .getkey_kapi = kbd_getkey_kapi
+    .getchar_kapi = stub_getchar_kapi, .getkey_kapi = input_getkey_kapi
 };
 static FepModuleApi candidate;
 static struct module_handle fep_handle;

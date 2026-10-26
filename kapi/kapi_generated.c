@@ -2,7 +2,7 @@
 #include "os32_kapi_shared.h"
 #include "gfx.h"
 #include "palette.h"
-#include "kbd.h"
+#include "input_service.h"
 #include "exec_heap.h"
 #include "kmalloc.h"
 #include "paging.h"
@@ -651,7 +651,7 @@ void __cdecl wrap_gfx_present(void)
 int __cdecl wrap_kbd_trygetchar(void)
 {
     KAPI_HIT(4);
-    return kbd_trygetchar();
+    return input_trygetchar();
 }
 
 void * __cdecl wrap_mem_alloc(u32 size)
@@ -765,19 +765,19 @@ void __cdecl wrap_tvram_scroll(void)
 int __cdecl wrap_kbd_getchar(void)
 {
     KAPI_HIT(22);
-    return kbd_getchar_kapi();
+    return input_getchar_kapi();
 }
 
 int __cdecl wrap_kbd_getkey(void)
 {
     KAPI_HIT(23);
-    return kbd_getkey_kapi();
+    return input_getkey_kapi();
 }
 
 int __cdecl wrap_kbd_trygetkey(void)
 {
     KAPI_HIT(24);
-    return kbd_trygetkey();
+    return input_trygetkey();
 }
 
 int __cdecl wrap_sys_mount(const char *prefix, const char *dev, const char *fs)
@@ -1170,7 +1170,7 @@ void __cdecl wrap_console_get_size(int *w, int *h)
 u32 __cdecl wrap_kbd_get_modifiers(void)
 {
     KAPI_HIT(79);
-    return kbd_get_modifiers();
+    return input_get_modifiers();
 }
 
 u32 __cdecl wrap_sys_get_mem_kb(void)
@@ -1491,7 +1491,7 @@ void __cdecl wrap_snd_bgm_set_persist(int persist)
 int __cdecl wrap_kbd_is_pressed(int scancode)
 {
     KAPI_HIT(125);
-    return kbd_is_pressed(scancode);
+    return input_is_pressed(scancode);
 }
 
 void __cdecl wrap_fm_note_on(int ch, int note)
@@ -1838,13 +1838,13 @@ int __cdecl wrap_sys_switch_shell(const char *path)
 u32 __cdecl wrap_kbd_dropped_count(void)
 {
     KAPI_HIT(176);
-    return kbd_dropped_count();
+    return input_dropped_count();
 }
 
 int __cdecl wrap_kbd_trygetrawkey(void)
 {
     KAPI_HIT(177);
-    return kbd_trygetrawkey();
+    return input_trygetrawkey();
 }
 
 int __cdecl wrap_ime_feed_key(int keydata)
@@ -2102,7 +2102,7 @@ int __cdecl wrap_sys_set_mtime(const char *path, u32 mtime)
 int __cdecl wrap_kbd_peekkey(void)
 {
     KAPI_HIT(214);
-    return kbd_peekkey();
+    return input_peekkey();
 }
 
 int __cdecl wrap_exec_last_result(int *kind, int *code)
@@ -2138,7 +2138,7 @@ int __cdecl wrap_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
 int __cdecl wrap_kbd_trygetchar_local(void)
 {
     KAPI_HIT(218);
-    return kbd_trygetchar_local();
+    return input_trygetchar_local();
 }
 
 int __cdecl wrap_pci_count(void)
@@ -2226,7 +2226,7 @@ int __cdecl wrap_kbd_diag(KbdDiag *out)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return kbd_diag(out);
+    return input_diag(out);
 }
 
 int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)
@@ -2302,7 +2302,7 @@ int __cdecl wrap_kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
             (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return kbd_diag_log(after_seq, out, max);
+    return input_diag_log(after_seq, out, max);
 }
 
 int __cdecl wrap_v86_gdc_capture(int mode, V86Gcap *out)

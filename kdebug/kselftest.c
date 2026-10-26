@@ -38,7 +38,7 @@
 #include "tvram.h"
 #include "console.h"
 #include "kbd_inject.h"
-#include "kbd.h"          /* kbd_diag / KBD_CMD_* (POLICY_DEBUG §4-57) */
+#include "../drivers/kbd.h"          /* kbd_diag / KBD_CMD_* (POLICY_DEBUG §4-57) */
 #include "appslot.h"
 #include "launch.h"
 #include "exec.h"

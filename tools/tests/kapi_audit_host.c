@@ -68,8 +68,16 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #include "serial_source.inc"
 #include "ime_log_source.inc"
 #define KAPI_HIT(n) ((void)(n))
+#include "../../drivers/kbd.h"
+#include "../../drivers/kbd_dlog.c"
+static int injected_byte = -1;
+u32 kbd_inject_pending(void) { return injected_byte >= 0; }
+int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }
+void appslot_poll_yield_reset(void) {}
 #include "kbd_source.inc"
 #include "ime_source.inc"
+#include "../../kernel/input_service.c"
+#include "../../platform/pc98/d2_bind.c"
 #include "rshell_source.inc"
 #include "kstring.c"
 #include "kstring_c.c"
@@ -89,7 +97,6 @@ int exec_park_kbd(void) {
     return 0;
 }
 int exec_park_poll(u32 tick) { (void)tick; return 0; }
-static int injected_byte = -1;
 int kbd_inject_take(u8 *b) {
     if (injected_byte < 0) return 0;
     *b = (u8)injected_byte; injected_byte = -1; return 1;
@@ -499,6 +506,7 @@ static int test(void)
 }
 void _start(void)
 {
+    pc98_d2_bind();
     int rc=test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();

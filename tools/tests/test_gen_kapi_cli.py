@@ -1,5 +1,6 @@
 """X-8: CLI の読み取り操作は生成物の内容・mtime を変えない。"""
 import os
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -47,6 +48,30 @@ class KapiCli(unittest.TestCase):
                     if args == ['--help']:
                         self.assertIn('usage:', result.stdout)
                     self.assertEqual(state(), before, '生成物が書き換わった')
+
+            # Provider retargeting changes only the kernel wrapper artifact.
+            # Public names, slots, SDK/Rust declarations and exec init stay fixed.
+            spec_path = root / 'sdk/kapi.json'
+            original = spec_path.read_bytes()
+            spec = json.loads(original)
+            for entry in spec['api']:
+                target = entry.get('target', '')
+                if target.startswith('input_'):
+                    entry['target'] = 'kbd_' + target[len('input_'):]
+            spec_path.write_text(json.dumps(spec))
+            result = run([])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            legacy = state()
+            for name, (data, _) in before.items():
+                if name not in ('sdk/kapi.json', 'kapi/kapi_generated.c'):
+                    self.assertEqual(legacy[name][0], data, name)
+            self.assertNotEqual(legacy['kapi/kapi_generated.c'][0],
+                                before['kapi/kapi_generated.c'][0])
+            spec_path.write_bytes(original)
+            self.assertEqual(run([]).returncode, 0)
+            first = {name: data for name, (data, _) in state().items()}
+            self.assertEqual(run([]).returncode, 0)
+            self.assertEqual(first, {name: data for name, (data, _) in state().items()})
 
 
 if __name__ == '__main__':

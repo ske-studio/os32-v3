@@ -46,6 +46,7 @@ int v86_is_active(void) { return 0; }
 int v86_kbd_push(u8 code) { (void)code; return 0; }
 void v86_request_exit(void) {}
 int serial_trygetchar(void) { return -1; }
+int serial_peekchar(void) { return -1; }
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
 void ring3_wm_enter(void) { wm_depth++; ring3_wm_depth++; }
@@ -119,8 +120,12 @@ int ime_user_export(IME_Dict *d, const char *p)
 int ime_user_clear(IME_Dict *d)
 { management++; return d == shared_dict ? storage_rc : -99; }
 
+#include "../../drivers/kbd.h"
+#include "../../drivers/kbd_dlog.c"
 #include "kbd_source.inc"
 #include "ime_source.inc"
+#include "../../kernel/input_service.c"
+#include "../../platform/pc98/d2_bind.c"
 #include "gui_source.inc"
 #include "sink_source.inc"
 #include "inject_source.inc"
@@ -503,6 +508,7 @@ static int unpublished(void)
 }
 void _start(void)
 {
+    pc98_d2_bind();
     int rc = unpublished() || modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");

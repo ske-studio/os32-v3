@@ -573,8 +573,12 @@ static void pf_diagnostic(void) {
     }
     check(found, "PF err=00000007");
 }
+#define INPUT_FIXTURE_SETUP fixture_input.gui_mode = kbd_set_gui_mode;
+#include "input_fixture_host.h"
+
 int main(void)
 {
+    input_fixture_init();
     pf_diagnostic();
     case_table();
     case_gui_call();

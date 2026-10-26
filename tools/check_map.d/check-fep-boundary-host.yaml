@@ -20,3 +20,7 @@ check-fep-boundary-host:
 - sdk/kapi.json
 - build/checks.d/check-fep-boundary-host.mk
 - tools/check_map.d/check-fep-boundary-host.yaml
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

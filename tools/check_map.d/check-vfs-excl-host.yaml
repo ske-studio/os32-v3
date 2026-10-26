@@ -11,3 +11,7 @@ check-vfs-excl-host:
 - tools/check_map.d/check-vfs-excl-host.yaml
 - build/checks.d/check-vfs-excl-host.mk
 - sdk/kapi.json
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

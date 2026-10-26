@@ -12,3 +12,7 @@ check-install-recover-host:
 - userland/system/install_recover.inc
 - tools/check_map.d/check-install-recover-host.yaml
 - build/checks.d/check-install-recover-host.mk
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

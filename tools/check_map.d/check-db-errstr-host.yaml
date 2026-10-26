@@ -19,3 +19,7 @@ check-db-errstr-host:
 - kernel/ime.h
 - tools/tests/kapi_db_owned_host.c
 - tools/tests/db_group_shim.h
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

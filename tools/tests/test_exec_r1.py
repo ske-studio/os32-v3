@@ -144,7 +144,7 @@ static void shm_free_owned(int id) { resource(id, 4); }
 static void snd_owner_exit(int id) { resource(id, 5); }
 static void pcm_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
-static void kbd_discard_stop(void) { stop_discards++; }
+static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
 void ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
 static void gui_owner_exit(int id, int kind) {
@@ -503,7 +503,7 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
-    ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) kbd_discard_stop();', ''),
+    ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
     ('ime-owner-exit', '    ime_owner_exit(id);', ''),
     ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',

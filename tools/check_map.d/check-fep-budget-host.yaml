@@ -18,3 +18,7 @@ check-fep-budget-host:
 - build/checks.d/check-fep-budget-host.mk
 - tools/check_map.d/check-fep-budget-host.yaml
 - tools/accept/t4a4.md
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/input_service.h
+- include/kbd.h

@@ -20,7 +20,8 @@ static u32 host_cr3;
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "fd_redirect.h"
-#include "kbd.h"
+#include "../drivers/kbd.h"
+#include "input_service.h"
 #include "gui.h"
 #include "v86.h"
 void v86_int80(u32 *frame) { (void)frame; __builtin_trap(); }
@@ -275,7 +276,9 @@ def run(overrides=None):
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
     code += function(kbd, 'kbd_discard_stop') + '\n'
-    code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n' + POST
+    code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
+    code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
+    code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
     with tempfile.TemporaryDirectory(prefix='os32-kstop-') as d:
         d=pathlib.Path(d); (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
