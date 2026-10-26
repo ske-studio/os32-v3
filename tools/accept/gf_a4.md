@@ -112,4 +112,4 @@ S0は98 CUI・legacy解放・予約テキストセル復元検証、S1は安全�
 - **F2**: alias の点は **52 (うち 16 点は先頭 1KiB の中で重なる)** — alias_offsets(2^28) は {0,4,8} と 2^k−4・2^k (k=4..27) と 2^28−4 (kdebug/gfinit_plan.c:36-45)。1KiB の中は 0,4,8,12,16,28,32,60,64,124,128,252,256,508,512,1020 の 16 点、外は 36 点、和集合 292 (16MiB のとき 284) は本文どおり。
 - **F3**: ノートの `rshell_recover.py` は result=OK のときだけ成功とするので (tools/rshell_recover.py:68-73,123-128,236-238)、**正常な A4 でも必ず rc=1 と `recover: missing/failed verification or lost logs` が出る**。final の行で判定する。
 - **F4**: VERIFY の中で saved_count≠256 のときは trial_end を通らず、REC_OPERATION (trial=3) の FAIL になる (gfinit_plan.c:248、recover.c:1250-1251)。終端の表の trial の値に 3 も加える。
-- ユーザーに上げる未決は **A4 を同じ立会い・同じ試行で続けるか** の 1 件 (gf_main.md の N3 と同じ)。
+- ユーザー決定 (2026-10-26): **A4 は同じ立会い・同じ試行で続ける** (推奨どおり)。実施は次に実機の前に行くとき。
