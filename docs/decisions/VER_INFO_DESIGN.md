@@ -256,3 +256,7 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 - G1 (P2): **`OS32_VER_LINES` は 20** (構造体は約 1364B の固定、表示は count の行だけで窓は広げない)。16 では見出し 1 + 機器 7 + API・Build・Commit・CRC 4 + kdebug 2 + sqlite・services 2 で満杯になり、NIC などを足す余裕が無い。§3 の 16 は 20 と読む。
 - G2 (P3): `kernel/ver_info.h` は V5 の ServicesVerState を参照するので、**作るのは V7** (V3 は公開ヘッダ sdk/include/os32/os32_ver_info.h だけ)。§6・§7 の V3 の担当から外し V7 に足す。
 - G3 (P3): V12 の見込みは 40〜60 分。並べる順は V1 → V3〜V8 (並列可) → V9 + V2 (一緒に取り込む) → V10 → V11 (V10 と V11 は直列で取り込みは 1 回) → V12。
+
+## V7 の実装で PM が決めたこと (2026-10-26)
+
+- CPU の行の「実測か既定か」は値からは見分けない (正しい実測値が既定の 10000 と同じになりうる)。**`kernel/cpu_calibrate.c`・`.h` が、計測の結果を決めたときに「既定の値に落ちたか」(ticks=0 か、計算値が最小より小さくて CALIBRATE_FALLBACK_LPT を使った) を static に記録し、それを返す口 (例 `int cpu_calibrate_used_fallback(void)`) を足す**。V7 の触ってよいファイルに cpu_calibrate.c・.h を加える (この 2 つでは記録と口の追加だけ、計算の式は変えない)。表示は記録が 1 なら既定の値と分かる書き方、0 なら実測の値 (書式は formatter の V8 が決める)。
