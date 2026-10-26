@@ -7,3 +7,7 @@ check-ver-version-host:
 - build/checks.d/check-ver-version-host.mk
 - tools/check_map.d/check-ver-version-host.yaml
 - kernel/module.c
+- tools/tests/mutpar.py
+- userland/shell/cmd_base.c
+# Actual make outputs are built and inspected only in the private tree.
+artifact_reader: true
