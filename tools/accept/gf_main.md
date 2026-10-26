@@ -1,6 +1,6 @@
 # GeForce 6200 の main 0〜3 (A3) 立会いの台本と承認の資料
 
-> 正典: 票 TASK_HWDEV §3-1 の 6、確定設計 [GF6200_4A_DESIGN](../../docs/decisions/realhw/GF6200_4A_DESIGN.md) §7 (実機 A3-0〜4)・U2・N1。前の段の台本は [gf_s8.md](gf_s8.md)。本ファイルは受入の台本で、確定設計を変えない。
+> 正典: 票 TASK_HWDEV §3-1 の 6、確定設計 [GF6200_4A_DESIGN](../../docs/decisions/realhw/GF6200_4A_DESIGN.md) §7 (実機 A3-0〜4)・U2・N1。前の段の台本は [gf_s8.md](gf_s8.md)、次の A4 は [gf_a4.md](gf_a4.md)。本ファイルは受入の台本で、確定設計を変えない。
 > 出所: ~/os32-tmp/run/s9-main/MAIN_PLAN.final.md (astra 起草・Opus 2 往復・PM が条件 N1〜N3 を反映、2026-10-26)。末尾の「確定」が本文の該当の行より優先する。**書込みを伴う段 (A1・A2・main ごと・A4) はユーザーの承認を取る。**
 
 
