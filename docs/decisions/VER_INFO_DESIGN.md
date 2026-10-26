@@ -260,3 +260,7 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 ## V7 の実装で PM が決めたこと (2026-10-26)
 
 - CPU の行の「実測か既定か」は値からは見分けない (正しい実測値が既定の 10000 と同じになりうる)。**`kernel/cpu_calibrate.c`・`.h` が、計測の結果を決めたときに「既定の値に落ちたか」(ticks=0 か、計算値が最小より小さくて CALIBRATE_FALLBACK_LPT を使った) を static に記録し、それを返す口 (例 `int cpu_calibrate_used_fallback(void)`) を足す**。V7 の触ってよいファイルに cpu_calibrate.c・.h を加える (この 2 つでは記録と口の追加だけ、計算の式は変えない)。表示は記録が 1 なら既定の値と分かる書き方、0 なら実測の値 (書式は formatter の V8 が決める)。
+
+## V9 の実装で PM が決めたこと (2026-10-26)
+
+- KernelAPI に `sys_ver_info` を足し公開の型 (OS32_VerInfo・OS32_VerLine) が増えると、HWDEV の契約の型の一覧 `tools/hwdev_layout.json` と合わずにビルドが止まる。**既存の手順 `tools/gen_hwdev_contract.py --seed-inventory` で一覧を作り直してよい** (V9 の触ってよいファイルに hwdev_layout.json を加える、手で直さない)。HWDEV の契約の値は変わるが、hwdev.mod はカーネルと対で配るので扱いは同じ。
