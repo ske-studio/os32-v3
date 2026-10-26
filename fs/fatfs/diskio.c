@@ -19,7 +19,7 @@
 
 #include "dev.h"
 #include "ide.h"    /* ide_drive_present, ide_get_info — 初期化/ioctl用 */
-#include "rtc.h"
+#include "clock_service.h"
 #include "fdc.h"
 #include "fdc_track.h"  /* FD の読みをトラック単位に束ねる (純粋な層) */
 #include "diskio_os32.h"
@@ -385,16 +385,12 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
 
 DWORD get_fattime(void)
 {
-    RTC_Time t;
+    ClockDate t;
     DWORD fattime;
     int year;
 
-    rtc_read(&t);
-
-    /* RTC_Time.year は 00-99 (2桁) → 2000年代として扱う */
-    year = (int)t.year;
-    if (year < RTC_YEAR_PIVOT) year += RTC_YEAR_BASE_NEW;  /* 00-79 → 2000-2079 */
-    else           year += RTC_YEAR_BASE_OLD;  /* 80-99 → 1980-1999 */
+    clock_read_date(&t);
+    year = t.year;
 
     /* FAT時刻フォーマット:
      *   bit[31:25] = 年 (1980年起点, 0-127)

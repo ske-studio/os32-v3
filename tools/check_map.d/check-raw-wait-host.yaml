@@ -78,3 +78,6 @@ check-raw-wait-host:
 - lib/serial_diag.h
 - drivers/serial_plan.c
 - drivers/serial_plan.h
+- include/clock_service.h
+- kernel/clock_service.c
+- drivers/rtc.h

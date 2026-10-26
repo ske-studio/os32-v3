@@ -158,3 +158,22 @@ u32 rtc_uptime_sec(void)
 {
     return tick_count / PIT_HZ;  /* PIT_HZ Hz → 秒変換 */
 }
+
+/* PC-9821 calendar adapter: one hardware read, one two-digit year pivot. */
+static void pc98_read_date(ClockDate *date)
+{
+    RTC_Time time;
+    rtc_read(&time);
+    date->year = time.year + (time.year < RTC_YEAR_PIVOT ?
+                             RTC_YEAR_BASE_NEW : RTC_YEAR_BASE_OLD);
+    date->month = time.month;
+    date->day = time.day;
+    date->wday = time.wday;
+    date->hour = time.hour;
+    date->min = time.min;
+    date->sec = time.sec;
+}
+
+const ClockOps pc98_clock = {
+    .read_date = pc98_read_date, .read_legacy = rtc_read,
+};

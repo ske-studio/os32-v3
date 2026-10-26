@@ -7,7 +7,7 @@
 #include "memmap.h"
 #include "io.h"
 #include "pc98.h"
-#include "rtc.h"
+#include "clock_service.h"
 #include "os_time.h"
 
 /* 管理する物理 RAM の末尾 (バイト)。legacy アリーナの上端そのもの。 */
@@ -161,12 +161,7 @@ u32 sys_usable_mem_end(void)
 
 os_time_t sys_time(void)
 {
-    RTC_Time t;
-    int y;
-    rtc_read(&t);
-    y = t.year;
-    /* PC-98のRTCは年号下2桁のみ。80以上なら1900年代、未満なら2000年代と仮定 */
-    if (y < RTC_YEAR_PIVOT) y += RTC_YEAR_BASE_NEW;
-    else y += RTC_YEAR_BASE_OLD;
-    return datetime_to_epoch(y, t.month, t.day, t.hour, t.min, t.sec);
+    ClockDate t;
+    clock_read_date(&t);
+    return datetime_to_epoch(t.year, t.month, t.day, t.hour, t.min, t.sec);
 }

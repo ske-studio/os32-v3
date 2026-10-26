@@ -126,6 +126,11 @@ int ime_user_clear(IME_Dict *d)
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
+/* This fixture exercises input/serial; supply a fake calendar provider. */
+#include "../../kernel/clock_service.c"
+const ClockOps pc98_clock = {
+    .read_date = clock_empty_date, .read_legacy = clock_empty_legacy,
+};
 #include "../../platform/pc98/d2_bind.c"
 #include "gui_source.inc"
 #include "sink_source.inc"

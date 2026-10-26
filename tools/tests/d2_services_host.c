@@ -40,6 +40,7 @@ void ring3_fault_kill(void) { __builtin_trap(); }
 #include "input_shift.inc"
 #include "pointer_wrappers.inc"
 #include "port_wrappers.inc"
+#include "clock_fixture_host.h"
 _Static_assert(sizeof(MouseState) == 10, "MouseState ABI size");
 #define OFFSET(field, value) _Static_assert(__builtin_offsetof(MouseState, field) == value, "MouseState " #field)
 OFFSET(x, 0); OFFSET(y, 2); OFFSET(dx, 4); OFFSET(dy, 6);
@@ -85,7 +86,14 @@ static int test(void)
     CHECK(serial_gate_active());
     serial_puts_polled("panic"); CHECK(emergency_seen == 1 && port_string[0] == 'p');
     emergency_gate = 0; CHECK(!serial_gate_active());
+    ClockDate date = {2026, 1, 2, 3, 4, 5, 6};
+    RTC_Time legacy = {26, 1, 2, 3, 4, 5, 6};
+    clock_read_date(&date); clock_read_legacy(&legacy);
+    CHECK(!date.year && !date.month && !date.day && !date.wday && !date.hour && !date.min && !date.sec);
+    CHECK(!legacy.year && !legacy.month && !legacy.day && !legacy.wday && !legacy.hour && !legacy.min && !legacy.sec);
+    CHECK(!clock_reads);
     pc98_d2_bind();
+    CHECK(clock_check() == 0);
     CHECK(con_output_putchar('C') == -130 && port_seen == 10 && port_char == 'C');
 #include "port_wrapper_checks.inc"
 #define CALL(name, id) CHECK(input_##name() == id + 100 && seen == id)

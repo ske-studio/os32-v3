@@ -37,3 +37,12 @@ check-d2-services-host:
 - kernel/ver_collect.c
 - kernel/isr_handlers.c
 - kernel/double_fault.c
+- include/clock_service.h
+- kernel/clock_service.c
+- drivers/rtc.h
+- drivers/rtc.c
+- kernel/sys.c
+- fs/fatfs/diskio.c
+- tools/tests/clock_fixture_host.h
+- lib/os_time.c
+- include/os_time.h

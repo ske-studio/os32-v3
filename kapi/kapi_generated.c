@@ -6,7 +6,7 @@
 #include "exec_heap.h"
 #include "kmalloc.h"
 #include "paging.h"
-#include "rtc.h"
+#include "clock_service.h"
 #include "exec.h"
 #include "fm.h"
 #include "np2sysp.h"
@@ -735,7 +735,7 @@ void __cdecl wrap_rtc_read(void *rtc_time)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    rtc_read((RTC_Time *)rtc_time);
+    clock_read_legacy((RTC_Time *)rtc_time);
 }
 
 void __cdecl wrap_tvram_clear(void)

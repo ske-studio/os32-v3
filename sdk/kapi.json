@@ -22,7 +22,7 @@
     "exec_heap.h",
     "kmalloc.h",
     "paging.h",
-    "rtc.h",
+    "clock_service.h",
     "exec.h",
     "fm.h",
     "np2sysp.h",
@@ -198,7 +198,7 @@
       "args": [
         "void *rtc_time"
       ],
-      "body": "rtc_read((RTC_Time *)rtc_time);"
+      "body": "clock_read_legacy((RTC_Time *)rtc_time);"
     },
     {
       "name": "tvram_clear",

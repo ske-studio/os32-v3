@@ -1,5 +1,7 @@
 /* PC-9821 resident input wiring. Registration performs no device I/O. */
 #include "input_service.h"
+#include "clock_service.h"
+#include "../../drivers/rtc.h"
 #include "port_service.h"
 #include "console_output.h"
 #include "../../drivers/serial.h"
@@ -58,5 +60,6 @@ void pc98_d2_bind(void)
     input_register(&pc98_input);
     pointer_register(&pc98_pointer);
     port_register(&pc98_port);
+    clock_register(&pc98_clock);
     con_output_register(&pc98_console_output);
 }

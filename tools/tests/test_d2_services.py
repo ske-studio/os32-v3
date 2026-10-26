@@ -1,4 +1,4 @@
-"""D2 A/B: real service tables, public wrappers, wiring and ABI stability."""
+"""D2 A/B/C: real service tables, public wrappers, wiring and ABI stability."""
 import argparse
 import json
 from pathlib import Path
@@ -119,6 +119,21 @@ def run(runner, mutation=None):
     elif mutation == 'target':
         assert 'input_getchar_kapi()' in selected[1]
         selected[1] = selected[1].replace('input_getchar_kapi()', 'kbd_getchar_kapi()')
+    rtc = (ROOT / 'drivers/rtc.c').read_text()
+    adapter = rtc[rtc.index('static void pc98_read_date('):]
+    if mutation == 'clock_pivot':
+        assert 'time.year < RTC_YEAR_PIVOT' in adapter
+        adapter = adapter.replace('time.year < RTC_YEAR_PIVOT', 'time.year <= RTC_YEAR_PIVOT')
+    clock_slot = next(i for i, e in enumerate(spec['api']) if e['name'] == 'rtc_read')
+    assert spec['api'][clock_slot]['body'] == 'clock_read_legacy((RTC_Time *)rtc_time);'
+    clock_wrapper = re.search(r'^void __cdecl wrap_rtc_read\([^\n]*\)\n\{.*?^\}', wrappers, re.M | re.S)
+    assert clock_wrapper
+    sys_time = re.search(r'^os_time_t sys_time\(void\)\n\{.*?^\}',
+                         (ROOT / 'kernel/sys.c').read_text(), re.M | re.S)
+    diskio = (ROOT / 'fs/fatfs/diskio.c').read_text()
+    fattime = re.search(r'^DWORD get_fattime\(void\)\n\{.*?^\}', diskio, re.M | re.S)
+    assert sys_time and fattime
+    constants = '\n'.join(re.findall(r'^#define DOS_.*$', diskio, re.M))
     with tempfile.TemporaryDirectory(prefix='d2-input-') as directory:
         work = Path(directory)
         fixture = (ROOT / 'tools/tests/d2_services_host.c').read_text()
@@ -129,6 +144,11 @@ def run(runner, mutation=None):
         fixture = fixture.replace('#include \"pointer_fixture_host.h\"', '#include \"' + str(ROOT / 'tools/tests/pointer_fixture_host.h') + '\"')
         fixture = fixture.replace('#include "port_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/port_fixture_host.h') + '"')
         fixture = fixture.replace('#include "../../drivers/serial.h"', '#include "' + str(ROOT / 'drivers/serial.h') + '"')
+        fixture = fixture.replace('#include "clock_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/clock_fixture_host.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/rtc.h"', '#include "' + str(ROOT / 'drivers/rtc.h') + '"')
+        (work / 'clock_adapter.inc').write_text(adapter)
+        (work / 'clock_consumers.inc').write_text('typedef u32 DWORD;\n' + constants + '\n' + sys_time[0] + '\n' + fattime[0])
+        (work / 'clock_wrapper.inc').write_text(f'#define CLOCK_SLOT {clock_slot}\n' + clock_wrapper[0])
         (work / 'fixture.c').write_text(fixture)
         helper = wrappers[wrappers.index('#define KAPI_OUT_LEN('):wrappers.index('static int kapi_in_range(')]
         (work / 'input_wrappers.inc').write_text(helper + '\n'.join(selected))
@@ -142,15 +162,15 @@ def run(runner, mutation=None):
         (work / 'pointer_wrappers.inc').write_text('\n'.join(pointer_selected))
         (work / 'pointer_wrapper_checks.inc').write_text('\n'.join(pointer_checks))
         exe = work / 'test'
-        includes = ['-I' + str(ROOT / p) for p in ('include', 'lib', 'sdk/include/os32')]
+        includes = ['-I' + str(ROOT / p) for p in ('include', 'lib', 'platform/pc98', 'sdk/include/os32')]
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-Wall', '-Wextra', '-Werror', '-Wno-unused-const-variable',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
-                        '-nostdlib', '-static', '-no-pie', *includes,
+                        '-nostdlib', '-static', '-no-pie', *includes, '-I' + str(work),
                         str(work / 'fixture.c'), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner=runner, timeout=30)
         assert result.returncode == (1 if mutation else 0), result.returncode
-    print('PASS D2 A/B input/pointer/port/emergency' + (' RED ' + mutation if mutation else ' (35 operations / 27 wrappers)'))
+    print('PASS D2 A/B/C input/pointer/port/emergency/clock' + (' RED ' + mutation if mutation else ' (28 public wrappers)'))
 
 
 def contracts():
@@ -174,7 +194,7 @@ def contracts():
     # The common header must resolve without the drivers include search path.
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Werror', '-fsyntax-only', '-x', 'c',
                     '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-'],
-                   input='#include "input_service.h"\n#include "pointer_service.h"\n#include "port_service.h"\n#include "console_output.h"\n', text=True, check=True)
+                   input='#include "input_service.h"\n#include "pointer_service.h"\n#include "port_service.h"\n#include "console_output.h"\n#include "clock_service.h"\n', text=True, check=True)
     with tempfile.TemporaryDirectory(prefix='d2-symbols-') as directory:
         obj = Path(directory) / 'input_service.o'
         subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
@@ -193,7 +213,7 @@ def contracts():
     for header in ('port_service.h', 'console_output.h'):
         assert 'drivers/' not in (ROOT / 'include' / header).read_text()
     with tempfile.TemporaryDirectory(prefix='d2-port-symbols-') as directory:
-        for source in ('port_service', 'serial_diag'):
+        for source in ('port_service', 'serial_diag', 'clock_service'):
             obj = Path(directory) / (source + '.o')
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
                             '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'lib'),
@@ -201,8 +221,43 @@ def contracts():
                             str(ROOT / ('kernel/' + source + '.c')), '-o', str(obj)], check=True)
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
-    print('PASS D2 A/B dependency, symbols and boot wiring contracts')
+    assert 'clock_register(&pc98_clock);' in bind
+    for name in ('kernel/sys.c', 'fs/fatfs/diskio.c'):
+        source = (ROOT / name).read_text()
+        assert '#include "clock_service.h"' in source
+        assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source
+    assert 'drivers/' not in (ROOT / 'include/clock_service.h').read_text()
+    print('PASS D2 A/B/C dependency, symbols and boot wiring contracts')
 
+
+
+def generation_contract():
+    # Recreate the old RTC call in a temporary tree; public generated bytes stay equal.
+    spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
+    with tempfile.TemporaryDirectory(prefix='d2-clock-gen-') as directory:
+        work = Path(directory)
+        for path in ('sdk/include/os32', 'kapi', 'exec', 'sdk/rust/os32api/src'):
+            (work / path).mkdir(parents=True)
+        source = work / 'sdk/kapi.json'
+        source.write_text(json.dumps(spec))
+        def generate():
+            subprocess.run(['python3', str(ROOT / 'sdk/gen_kapi.py')], cwd=work,
+                           check=True, stdout=subprocess.DEVNULL)
+            return {str(p.relative_to(work)): p.read_bytes() for p in work.rglob('*')
+                    if p.is_file() and p != source}
+        first = generate()
+        assert first == generate(), 'generation must be deterministic'
+        rtc = next(e for e in spec['api'] if e['name'] == 'rtc_read')
+        rtc['body'] = 'rtc_read((RTC_Time *)rtc_time);'
+        spec['includes'] = ['rtc.h' if h == 'clock_service.h' else h for h in spec['includes']]
+        source.write_text(json.dumps(spec))
+        old = generate()
+        for name, data in first.items():
+            if name != 'kapi/kapi_generated.c':
+                assert old[name] == data, name
+        assert b'clock_read_legacy((RTC_Time *)rtc_time);' in first['kapi/kapi_generated.c']
+        assert b'rtc_read((RTC_Time *)rtc_time);' in old['kapi/kapi_generated.c']
+    print('PASS D2 clock generator target-only change and repeat generation')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -210,7 +265,8 @@ if __name__ == '__main__':
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     contracts()
+    generation_contract()
     run(args.runner)
     if args.mutate:
-        for mutation in ('unbound', 'shift', 'target', 'pointer_bounds'):
+        for mutation in ('unbound', 'shift', 'target', 'pointer_bounds', 'clock_pivot'):
             run(args.runner, mutation)

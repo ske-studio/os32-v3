@@ -44,3 +44,6 @@ check-x11-shared-host:
 - drivers/kbd_dlog.h
 - drivers/mouse.h
 - tools/tests/pointer_fixture_host.h
+- include/clock_service.h
+- kernel/clock_service.c
+- drivers/rtc.h

@@ -53,4 +53,6 @@ check-vfs-fd-path-host:
 - include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
+- include/clock_service.h
+- kernel/clock_service.c
 artifact_reader: true
