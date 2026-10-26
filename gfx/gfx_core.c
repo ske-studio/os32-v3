@@ -752,6 +752,30 @@ void __attribute__((cold)) gfx_client_to_gshell(void)
 /*  KAPI: 画面能力の問い合わせ (GUI HAL, docs/decisions/gui/API_CONTRACTS.md G5)  */
 /*  現在の唯一のバックエンドは 9801 プレーン: CPU 直書き、HW 塗り/転送なし。   */
 /* ======================================================================== */
+int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active)
+{
+    GFX_ScreenInfo info = {0};
+    int rc;
+
+    if (!out || !kind || !active) return OS32_ERR_INVAL;
+    *out = info;
+    *kind = GFX_VER_UNKNOWN;
+    *active = 0;
+    if (!g_backend || !g_backend->query) return OS32_ERR_NOSYS;
+    rc = g_backend->query(&info);
+    if (rc) return rc;
+
+    const GfxMode *mode = gfx_backend_mode(g_backend);
+    if (gfx_started) info.height = gfx_current_height;
+    else if (mode) info.height = mode->height;
+    if (g_backend == &gfx_backend_pc98) *kind = GFX_VER_PC98;
+    else if (g_backend == &gfx_backend_pegc) *kind = GFX_VER_PEGC;
+    else if (g_backend == &gfx_backend_cirrus) *kind = GFX_VER_CIRRUS;
+    *active = gfx_started != 0;
+    *out = info;
+    return 0;
+}
+
 void __cdecl gfx_screen_info(void *out)
 {
     GFX_ScreenInfo *info = out;
