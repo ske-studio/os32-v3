@@ -10,6 +10,13 @@
 #define LAN_ADAPTER "../../kernel/lan_module.c"
 #endif
 #include LAN_ADAPTER
+#include "../../kernel/tick.c"
+volatile u32 kctx_irq_depth;
+const u32 lan_kexports[] = {0};
+const struct module_symbol_contract lan_import_contracts[] = {{0}};
+const struct module_symbol_contract lan_export_contracts[] = {{0}};
+const struct bootinfo *bootinfo_get(void) { finish(2); }
+
 
 enum { NORMAL, DECLINE, QUARANTINE, ACTIVE, PREFIX_FAIL, START_FAIL, CLEAN_DECLINE, MISSING, INIT_FAIL };
 static u32 mode, ticks, probes, sends, gets, quiet_calls, release_calls;
@@ -62,7 +69,7 @@ static int body_probe(const struct pci_dev *dev)
     CHECK(!lan_module_dma_alloc(PAGE_SIZE, PAGE_SIZE, DMA_PHYS_LIMIT, &ring));
     CHECK(!lan_module_irq_register(5, body_irq, 0, IRQ_F_SHARED));
     CHECK(irq_target(5, 0) == IRQ_HANDLED);
-    e82557_tick();
+    tick_dispatch();
     CHECK(e82557_send("x", 1) == OS32_ERR_NOSYS);
     if (mode == CLEAN_DECLINE) {
         CHECK(!lan_module_irq_unregister(5, body_irq, 0));
@@ -154,6 +161,18 @@ static void no_refs(struct module_record *r)
 }
 void _start(void)
 {
+    kctx_irq_depth = 1;
+    CHECK(lan_module_load() == MODULE_INIT_FAILED);
+    CHECK(!lan_handle.generation && !slots[PC98_TICK_E82557].fn);
+    CHECK(tick_register(PC98_TICK_E82557, e82557_tick) == TICK_ERR_CTX);
+    kctx_irq_depth = 0;
+    /* The retry reaches the existing busy check after publishing the facade. */
+    lan_handle.generation = 1;
+    CHECK(lan_module_load() == MODULE_BUSY);
+    lan_handle.generation = 0;
+    CHECK(slots[PC98_TICK_E82557].fn == e82557_tick);
+    CHECK(!tick_register(PC98_TICK_E82557, e82557_tick));
+    CHECK(!tick_register(PC98_TICK_E82557, e82557_tick));
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     mode = input[1];
     kmemcpy(&imports[0].name_hash, file + 152, 4);
@@ -166,7 +185,7 @@ void _start(void)
     CHECK(e82557_send("x", 1) == OS32_ERR_NOSYS && !lan_module_session_acquire());
     CHECK(e82557_recv(mac, sizeof(mac), &n) == OS32_ERR_NOSYS && !n);
     CHECK(e82557_state() == E82557_OFF && sfs_lan_io.get(&nic) == -1);
-    e82557_tick(); CHECK(!ticks);
+    tick_dispatch(); CHECK(!ticks);
     if (mode == MISSING) { check_fallback(); finish(0); }
     CHECK(!module_load(&q, &lan_handle));
     struct module_record *r = module_record_get(lan_handle);
@@ -227,7 +246,7 @@ void _start(void)
     } else {
         CHECK(!rc && r->state == MODULE_ABSENT); no_refs(r);
         CHECK(!dma_live && !irq_live && dma_freed == 1 && release_calls == 1);
-        e82557_tick(); CHECK(ticks == 1);
+        tick_dispatch(); CHECK(ticks == 1);
         CHECK(e82557_send("x", 1) == OS32_ERR_NOSYS && sfs_lan_io.get(&nic) == -1);
         CHECK(!lan_module_abort()); empty();
     }

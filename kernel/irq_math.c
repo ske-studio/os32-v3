@@ -13,10 +13,10 @@
 
 /* 共通スタブに結ぶ線。**並びがそのまま表の添字**で、kernel/irq.c の
  * irq_lines[] / 診断の順序もこれに従う。固定スタブの線 (0 タイマ / 1 KBD /
- * 2 VSYNC / 4 シリアル / 7 スプリアス / 11 FDC / 12 サウンド / 13 マウス) は
+ * 2 VSYNC / 4 シリアル / 7 スプリアス / 12 サウンド / 13 マウス) は
  * ここに無く、irq_register は -NOTSUP で断る。 */
 static const unsigned char irq_dyn_lines[IRQ_DYN_COUNT] = {
-    3, 5, 6, 8, 9, 10, 14, 15
+    3, 5, 6, 8, 9, 10, 11, 14, 15
 };
 
 int irq_dyn_index(unsigned int irq)

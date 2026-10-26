@@ -63,7 +63,6 @@ extern void irq_stub_0(void);     /* IRQ0: タイマ (INT 0x20) */
 extern void irq_stub_1(void);     /* IRQ1: キーボード (INT 0x21) */
 extern void irq_stub_4(void);     /* IRQ4: RS-232C (INT 0x24) */
 extern void irq_stub_7(void);     /* IRQ7: スプリアス (INT 0x27) */
-extern void irq_stub_11(void);    /* IRQ11: FDD (INT 0x2B) */
 extern void irq_stub_2(void);     /* IRQ2:  VSYNC (INT 0x22) — V86 ゲスト専用 */
 extern void irq_stub_12(void);    /* IRQ12: サウンドボード (INT 0x2C) */
 extern void irq_stub_13(void);    /* IRQ13: マウス (INT 0x2D) */
@@ -78,6 +77,7 @@ extern void irq_stub_common_6(void);
 extern void irq_stub_common_8(void);
 extern void irq_stub_common_9(void);
 extern void irq_stub_common_10(void);
+extern void irq_stub_common_11(void);
 extern void irq_stub_common_14(void);
 extern void irq_stub_common_15(void);
 
@@ -141,12 +141,11 @@ void idt_init(void)
     idt_set_gate(IRQ_TO_INT(1), irq_stub_1, IDT_ATTR_INT_GATE32);  /* IRQ1: キーボード */
     idt_set_gate(IRQ_TO_INT(4), irq_stub_4, IDT_ATTR_INT_GATE32);  /* IRQ4: RS-232C */
     idt_set_gate(IRQ_TO_INT(7), irq_stub_7, IDT_ATTR_INT_GATE32);  /* IRQ7: スプリアス対策 */
-    idt_set_gate(IRQ_TO_INT(11), irq_stub_11, IDT_ATTR_INT_GATE32); /* IRQ11: FDD */
     idt_set_gate(IRQ_TO_INT(2), irq_stub_2,  IDT_ATTR_INT_GATE32); /* IRQ2:  VSYNC (V86ゲスト用) */
     idt_set_gate(IRQ_TO_INT(12), irq_stub_12, IDT_ATTR_INT_GATE32); /* IRQ12: サウンド (V86ゲスト用) */
     idt_set_gate(IRQ_TO_INT(13), irq_stub_13, IDT_ATTR_INT_GATE32); /* IRQ13: マウス */
 
-    /* 動的登録を受ける IRQ (3/5/6/8/9/10/14/15) は共通スタブで受ける。
+    /* 動的登録を受ける IRQ (3/5/6/8/9/10/11/14/15) は共通スタブで受ける。
      * 登録が 0 件のあいだの挙動は従来の irq_stub_unexp_* と同じ
      * (EOI + 初回だけ診断) で、違うのは irq_register した driver が
      * 居れば呼ばれること。固定スタブの線はここに入れない。 */
@@ -156,6 +155,7 @@ void idt_init(void)
     idt_set_gate(IRQ_TO_INT(8), irq_stub_common_8,  IDT_ATTR_INT_GATE32);
     idt_set_gate(IRQ_TO_INT(9), irq_stub_common_9,  IDT_ATTR_INT_GATE32);
     idt_set_gate(IRQ_TO_INT(10), irq_stub_common_10, IDT_ATTR_INT_GATE32);
+    idt_set_gate(IRQ_TO_INT(11), irq_stub_common_11, IDT_ATTR_INT_GATE32); /* FDC */
     idt_set_gate(IRQ_TO_INT(14), irq_stub_common_14, IDT_ATTR_INT_GATE32);
     idt_set_gate(IRQ_TO_INT(15), irq_stub_common_15, IDT_ATTR_INT_GATE32);
 

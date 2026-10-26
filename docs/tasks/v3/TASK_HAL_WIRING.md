@@ -63,6 +63,7 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 ### 1-1. 割り込みの動的登録 — `kernel/irq.c` / `kernel/irq.h`
 
 今の約束 (登録・共有・`irq_dispatch`・ハンドラ・ストーム・IF=0 区間・寿命) は [04_interrupts §4-4](../../04_interrupts.md#4-4-割り込みの動的登録と-irq_dispatch-の約束)。以下は設計の往復の記録。
+D1a の契約追記: IRQ11 は FDC が排他登録する。常駐で解除しない完了通知だけは tick 回収の例外とし、既存 timeout/retry で回復する。以下の固定 IRQ11 の記述は変更前の設計記録。
 
 ```c
 #define IRQ_NONE      0   /* 自分の要因ではない */

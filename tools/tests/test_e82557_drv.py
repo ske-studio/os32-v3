@@ -394,10 +394,13 @@ def run_case(exe, case, only=0):
 
 
 def target_build(tmp):
-    isr = (ROOT / "kernel/isr_handlers.c").read_text()
-    calls = [isr.index(call) for call in ("    ne2k_timer_tick();", "    e82557_tick();", "    link_tick();")]
-    if calls != sorted(calls) or '#include "e82557.h"' not in isr:
-        raise RuntimeError("82557 timer wiring missing/out of order")
+    order = (ROOT / "platform/pc98/tick_order.h").read_text()
+    positions = [order.index(name) for name in
+                 ("PC98_TICK_NE2K", "PC98_TICK_E82557", "PC98_TICK_LINK")]
+    facade = (ROOT / "kernel/lan_module.c").read_text()
+    if positions != sorted(positions) or "tick_register(PC98_TICK_E82557, e82557_tick)" not in facade:
+        raise RuntimeError("82557 tick registration missing/out of order")
+    # The real registry dispatch is exercised by check-tick-host.
     if '#define E82557_BARRIER() __asm__ volatile("" ::: "memory")' not in (ROOT / "drivers/e82557_desc.h").read_text():
         raise RuntimeError("production compiler barrier missing")
     cross = pathlib.Path(os.environ.get("CROSS_DIR", "/home/hight/opt/cross")) / "bin/i386-elf-gcc"

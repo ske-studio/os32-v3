@@ -461,8 +461,5 @@ u8 *fdc_sector_slot(int j);
 /* 覚えている現在のシリンダ (診断と試験用)。-1 = 知らない (次はシークする)。 */
 int fdc_get_known_cyl(int drv);
 
-/* IRQ11完了フラグ (isr_handlers.cからセット) */
-extern volatile u32 fdc_irq_fired;
-
 #endif /* FDC_H */
 

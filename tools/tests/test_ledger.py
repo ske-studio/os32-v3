@@ -429,7 +429,7 @@ BODIES['regions_and_selfcheck'] = r'''
 # ---- asm の静的検査 -------------------------------------------------------
 
 IRQ_LABELS = ['irq_stub_common_%1', 'irq_stub_0', 'irq_stub_1', 'irq_stub_2',
-              'irq_stub_4', 'irq_stub_7', 'irq_stub_11', 'irq_stub_12', 'irq_stub_13']
+              'irq_stub_4', 'irq_stub_7', 'irq_stub_12', 'irq_stub_13']
 
 
 def _code(line):

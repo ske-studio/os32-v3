@@ -10,6 +10,14 @@
 #define PCM_ADAPTER "../../kernel/pcm_module.c"
 #endif
 #include PCM_ADAPTER
+#include "../../kernel/tick.c"
+volatile u32 kctx_irq_depth;
+const u32 pcm_kexports[] = {0};
+const struct module_symbol_contract pcm_import_contracts[] = {{0}};
+const struct module_symbol_contract pcm_export_contracts[] = {{0}};
+const struct bootinfo *bootinfo_get(void) { finish(2); }
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+
 
 static u32 ticks, mode, public_calls, dma_live, dma_freed, irq_live;
 static struct dma_buf ring;
@@ -75,7 +83,7 @@ static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
     if (!rc && mode == 1) {
         body_open(PCM_RATE_44100);
         CHECK(r->irq_refs == 1 && r->dma_refs == 1 && !module_exports(pcm_handle));
-        pcm_tick();
+        tick_dispatch();
         CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
         CHECK(ticks == 1 && public_calls == 1);
         return MODULE_INIT_FAILED;
@@ -84,6 +92,18 @@ static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 }
 void _start(void)
 {
+    kctx_irq_depth = 1;
+    CHECK(pcm_module_load() == MODULE_INIT_FAILED);
+    CHECK(!pcm_handle.generation && !slots[PC98_TICK_PCM].fn);
+    CHECK(tick_register(PC98_TICK_PCM, pcm_tick) == TICK_ERR_CTX);
+    kctx_irq_depth = 0;
+    /* The retry reaches the existing busy check after publishing the facade. */
+    pcm_handle.generation = 1;
+    CHECK(pcm_module_load() == MODULE_BUSY);
+    pcm_handle.generation = 0;
+    CHECK(slots[PC98_TICK_PCM].fn == pcm_tick);
+    CHECK(!tick_register(PC98_TICK_PCM, pcm_tick));
+    CHECK(!tick_register(PC98_TICK_PCM, pcm_tick));
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     mode = input[1];
     kmemcpy(&imports[0].name_hash, file + 152, 4);
@@ -97,7 +117,7 @@ void _start(void)
     CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
     CHECK(pcm_state() == PCM_ST_CLOSED && !pcm_present());
     CHECK(pcm_write(0, 0) == OS32_ERR_INVAL && pcm_close() == OS32_ERR_INVAL);
-    pcm_tick(); CHECK(!ticks);
+    tick_dispatch(); CHECK(!ticks);
     CHECK(!module_load(&q, &pcm_handle));
     struct module_record *r = module_record_get(pcm_handle);
     r->init = (u32)(uptr)init_pcm;
@@ -112,13 +132,13 @@ void _start(void)
         empty(); finish(0);
     }
     CHECK(!rc && r->tick_refs == 1 && tick_target);
-    CHECK(!pcm_open(PCM_RATE_44100)); pcm_tick();
+    CHECK(!pcm_open(PCM_RATE_44100)); tick_dispatch();
     CHECK(pcm_open(PCM_RATE_44100 + 1) == PCM_ERR_BUSY);
     CHECK(ticks == 1 && public_calls == 1 && r->dma_refs == 1 && r->irq_refs == 1);
     u32 before = returned;
     rc = pcm_module_abort();
     CHECK(!tick_target && !r->tick_refs && !irq_target && !r->irq_refs && !irq_live);
-    pcm_tick(); CHECK(ticks == 1);
+    tick_dispatch(); CHECK(ticks == 1);
     CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
     if (mode == 2) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);

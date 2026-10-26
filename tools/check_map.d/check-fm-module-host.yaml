@@ -1,4 +1,7 @@
 check-fm-module-host:
+- kernel/tick.c
+- kernel/tick.h
+- platform/pc98/tick_order.h
 - kernel/module_runtime.c
 - kernel/module_runtime.h
 - kernel/module_image.c

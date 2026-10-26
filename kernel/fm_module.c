@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and tick registration; all playback state is in fm.mod. */
 #include "fm_module.h"
 #include "fm_imports.h"
@@ -184,6 +187,7 @@ static int fm_quiesce(struct module_record *r)
 
 int fm_module_load(void)
 {
+    if (tick_register(PC98_TICK_SND, snd_tick) != 0) return MODULE_INIT_FAILED;
     if (fm_handle.generation) return MODULE_BUSY;
     const struct bootinfo *bi = bootinfo_get();
     const struct module_request request = {

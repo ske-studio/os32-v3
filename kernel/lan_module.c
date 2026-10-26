@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* T5c-4: resident PCI/session facade using the T5c-0 reference record. */
 #include "lan_module.h"
 #include "lan_imports.h"
@@ -203,6 +206,7 @@ static int lan_stop_dma(struct module_record *r)
 }
 int lan_module_load(void)
 {
+    if (tick_register(PC98_TICK_E82557, e82557_tick) != 0) return MODULE_INIT_FAILED;
     if (lan_handle.generation) return MODULE_BUSY;
     const struct bootinfo *bi = bootinfo_get();
     const struct module_request request = {

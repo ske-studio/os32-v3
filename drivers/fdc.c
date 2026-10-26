@@ -13,6 +13,7 @@
 #include "dma8237.h"   /* 8237 の共通部 (票 TASK_HAL_WIRING §1-2)、dma_range_ok */
 #include "memmap.h"    /* V2P (TASK_T1_LEDGER §3-4) */
 #include "io.h"
+#include "irq.h"
 #include "kstring.h"
 #include "kprintf.h"
 
@@ -24,7 +25,16 @@
 extern volatile u32 tick_count;
 
 /* IRQ11完了フラグ */
-volatile u32 fdc_irq_fired = 0;
+static volatile u32 fdc_irq_fired = 0;
+
+/* 排他の完了通知。SIS と装置待ちは前景で行う。2 巡でも代入は冪等。 */
+static int fdc_irq(unsigned int irq, void *arg)
+{
+    (void)irq;
+    (void)arg;
+    fdc_irq_fired = 1;
+    return IRQ_HANDLED;
+}
 
 /* 最後に SEEK / RECALIBRATE で見た ST0。診断行でしか使わない。
  * R/W が seek フェーズで失敗したとき、READ/WRITE の results[] は空のままな
@@ -1143,6 +1153,15 @@ int fdc_init(void)
      * 落としている** (票 §1-2)。FDC だけの都合ではなくなったので、ここは
      * 起動時の状態行の書式を変えないための**写し**だけ。 */
     dma_above_1mb_raw(&s_init_0439_before, &s_init_0439_after);
+
+    /* 表の公開と IRQ11 の有効化を motor/reset より先に済ませる。
+     * 同一登録での再初期化と、reset/recalibrate 失敗後も登録を維持する。 */
+    ret = irq_register(FDC_IRQ, fdc_irq, 0, 0);
+    if (ret != 0 && ret != IRQ_ERR_EXIST) {
+        s_init_rc = -1;
+        s_init_st0 = 0;
+        return -1;
+    }
 
     /* 前回の取りこぼし IRQ をクリア (冪等化対策) */
     fdc_irq_fired = 0;

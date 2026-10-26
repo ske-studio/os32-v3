@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* ======================================================================== */
 /*  LGY98.C — メルコ LGY-98 (NE2000 互換 C バス LAN) の OS32 接続             */
 /*                                                                          */
@@ -80,6 +83,8 @@ int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags)
         kprintf(ATTR_YELLOW, "[lgy98] irq %d not usable (3/5/6 only; 12 is reserved)\n", (int)irq);
         return rc;
     }
+
+    if (tick_register(PC98_TICK_LGY98, lgy98_tick) != 0) return NE2K_ERR_IO;
 
     cfg.reg_base       = (u16)(base + LGY98_OFS_REGS);
     cfg.data_port      = (u16)(base + LGY98_OFS_DATA);

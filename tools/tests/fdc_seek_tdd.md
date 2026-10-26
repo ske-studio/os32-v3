@@ -12,7 +12,7 @@
   **模型が 1 つも要らない**
 - KAPI は動かしていない。既存 API (`fdc_read_sector` / `_geom`、
   `fdc_write_sector` / `_geom`、`fdc_init`、`fdc_set_media*`、`fdc_get_geom`、
-  `fdc_irq_fired`) のシグネチャもそのまま
+  `fdc_irq_fired`) の待機動作もそのまま (D1a でフラグは driver 内の static、IRQ11 は排他登録へ移行)
 
 ## 1. なぜエミュレータで見つからなかったか
 

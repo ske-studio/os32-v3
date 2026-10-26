@@ -96,7 +96,7 @@ def build_target(tmp):
                "-I" + str(ROOT), "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
                "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "drivers"),
-               "-I" + str(ROOT / "lib"),
+               "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "kernel"),
                *extra, "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

@@ -1,5 +1,16 @@
 check-fdc-track-host:
 - drivers/fdc.c
+- drivers/fdc.h
+- kernel/irq.c
+- kernel/irq.h
+- kernel/irq_math.c
+- kernel/irq_math.h
+- kernel/idt.c
+- kernel/idt.h
+- kernel/isr_handlers.c
+- kernel/kernel.c
+- kernel/isr_stub.asm
+- tools/tests/fdc_hostshim/**
 - drivers/fdc_decide.c
 - drivers/fdc_track.c
 - fs/fatfs/diskio.c

@@ -1,4 +1,7 @@
 check-net-link-host:
+- kernel/tick.c
+- kernel/tick.h
+- platform/pc98/tick_order.h
 - drivers/lgy98.c
 - exec/exec.c
 - kapi/kapi_generated.c
