@@ -884,6 +884,9 @@ class OcrTests(unittest.TestCase):
         result=gui.read_ascii(Image.open(RECORDED),self.font)
         # Visually transcribed About window only. Exclude the taskbar Japanese
         # region (y>=456); full-screen OCR does not have a ground-truth claim.
+        # gui_about.png records the historical v2.0 / API v72 display, not the
+        # current OS version. Keep its OCR oracle unchanged. Current ver/About
+        # acceptance is check-ver-info-host plus PM's live 400/480 screen check.
         expectations = [('About OS32', []),
                         ('CPU: ?nte? 386+ (Protected Mode + Paging)', [(5,'Il'),(9,'Il')]),
                         ('AP?: v72', [(2,'Il')]),
