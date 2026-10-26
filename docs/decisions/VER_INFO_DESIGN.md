@@ -264,3 +264,4 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 ## V9 の実装で PM が決めたこと (2026-10-26)
 
 - KernelAPI に `sys_ver_info` を足し公開の型 (OS32_VerInfo・OS32_VerLine) が増えると、HWDEV の契約の型の一覧 `tools/hwdev_layout.json` と合わずにビルドが止まる。**既存の手順 `tools/gen_hwdev_contract.py --seed-inventory` で一覧を作り直してよい** (V9 の触ってよいファイルに hwdev_layout.json を加える、手で直さない)。HWDEV の契約の値は変わるが、hwdev.mod はカーネルと対で配るので扱いは同じ。
+- **V9 の実装で PM が決めたこと 2 (2026-10-26)**: `sdk/include/os32/os32_ver_info.h` の大きさの typedef の検査 (68・1364) は **`#if defined(__i386__)` の中に置く**。64 ビットの host の試験の多くが自前で `u32` を 8 バイトに定義して os32_kapi_shared.h を読むため、検査がそこで落ちる (43 本)。大きさと offset は 32 ビットで組む専用の host 試験 (V3 の ver_layout_host・test_ver_layout) と i386 の製品のビルドで確かめる。MemStat の試験の切り出しの範囲が新しい関数を含むようになった分 (4 本) は、V9 の中で試験の範囲を追従させる (検出力は減らさない)。
