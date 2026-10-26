@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)・版数の正典 [VERSIONS](../../decisions/VERSIONS.md)・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
 
-> 状態: **実装中 (2026-10-26)** — 設計確定 (astra 起草・Opus 2 往復)、版の表記 3.0-dev はユーザー決定。
+> 状態: **受入完了 (2026-10-26)** — V1〜V12 が main (6741ab19 ほか)。ver と About の 1 行目は「PC-9821 OS32 v3.0-dev (Ring3 Native)」、装置の行はカーネルが実際の状態から作り (formatter 1 つ、上限 20 行・52 桁)、新しい KAPI sys_ver_info (v79) で CUI と GUI が同じ行を読む。PM のゲスト (98 の 16 色と PEGC 480 の CUI・GUI) 合格、証拠 ~/os32-tmp/evidence/2026-10-26/ver-info/RESULT.md。KAPI が上がったので実機は boot を先に入れる。
 
 ## 0. ユーザー指示 (2026-10-26)
 
@@ -23,10 +23,10 @@
 |---|---|---|---|---|
 | V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [VER_INFO_DESIGN](../../decisions/VER_INFO_DESIGN.md) | sol | **main** (astra 取り込み可、試験 2 本を直してから) |
 | V6 | GFX の保存の状態を取る口 (gfx_hal.h・gfx_core.c) | 同上 | sol | **main** (astra 取り込み可、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
-| V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h、CPU の既定かどうかの口は cpu_calibrate) | 同上 | sol | 実装中 |
-| V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | 実装中 |
-| V9・V2 | 新しい KAPI と版の文書 (一緒に取り込む) | 同上 | sol | 未着手 |
-| V10・V11 | CUI の ver と GUI の About を新しい行の読み手に (直列、取り込みは 1 回) | 同上 | sol | 未着手 |
-| V12 | 試験の注記と全体の受入の登録 | 同上 | sol | 未着手 |
+| V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h、CPU の既定かどうかの口は cpu_calibrate) | 同上 | sol | **main** |
+| V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | **main** |
+| V9・V2 | 新しい KAPI と版の文書 (一緒に取り込む) | 同上 | sol | **main** |
+| V10・V11 | CUI の ver と GUI の About を新しい行の読み手に (直列、取り込みは 1 回) | 同上 | sol | **main** |
+| V12 | 試験の注記と全体の受入の登録 | 同上 | sol | **main** |
 
 新しいユーザーランドは新しいカーネル専用 (KAPI の版が上がる)。旧ユーザーランドは新しいカーネルで動く。実機は boot を先に入れる順 (スキル os32-realhw-update)。ver の `services: SERVICES_READY` の行は残す (実機の更新の判定に使う)。

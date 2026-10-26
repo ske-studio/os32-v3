@@ -306,7 +306,7 @@ def one_mutation(item):
         env[ENV_OF[rel]] = str(copy)
         r = subprocess.run([sys.executable, '-B', str(pathlib.Path(__file__).resolve())],
                            env=env, capture_output=True, text=True, timeout=300)
-    return 'MUTATE %s %s' % (name, 'RED' if r.returncode else 'MISSED'), int(r.returncode == 0)
+    return 'MUTATE %s %s' % (name, 'RED' if r.returncode else '**GREEN のまま = 試験が見ていない**'), int(r.returncode == 0)
 
 
 if __name__ == '__main__':
