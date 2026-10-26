@@ -211,3 +211,7 @@ int vfs_device_id_valid(int type, int id);
 - **F10**: ledger_pci.c を消す段の依頼に「消したソースの .d を消してから組み直す」を書く。
 - **F11 (PM 決定)**: 名前のレジストリの登録を mount の前提にしない。装置の番号の上限は VFS 側の定数 (`VFS_DEV_UNIT_MAX` 等) にし、platform 側で `STATIC_ASSERT(IDE_MAX_DRIVES == …)` を置く (仕組みを最小に、mount を呼ぶ host 試験 11 本に boot_names.c と -Idrivers を足さない)。§5 のレジストリは名前→装置の解決だけに絞る。
 - **#15 (DMA の制約)** は D3 に入れず、票の「後」の行へ (PM が票に足す)。
+
+## D2 から受け取る項目 (2026-10-26)
+
+- DEP_DIR_D2_DESIGN の末尾「D2 の取り込みで D3 へ送る項目」の 2 件 (input_owner_exit を消す、ver_format.c の KBD_IRQ の直読) を D3a に入れる。

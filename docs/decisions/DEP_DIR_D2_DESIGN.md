@@ -263,3 +263,8 @@ static void pc98_read_date(ClockDate *d) {
 ## A1 の実装で埋めたこと (2026-10-26、PM が F1 の規則を当てはめた)
 
 - `kernel/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "../drivers/kbd.h" を明示して読む」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。
+
+## D2 の取り込みで D3 へ送る項目 (2026-10-26、astra のレビュー P3 2 件)
+
+- `kernel/input_service.c:68` の `input_owner_exit` は製品のコードから使われず試験だけが呼ぶ — 宣言・定義・専用の試験を消し、実際の exec の終了の経路の検査を残す (D3a で)。
+- `kernel/ver_format.c:6` が `KBD_IRQ` のためにドライバのヘッダを直接読む (F1 の例外の一覧の外) — D3 で kernel.c の例外を解くときに、ver の装置の行の値を input の口か platform から取る形にする。
