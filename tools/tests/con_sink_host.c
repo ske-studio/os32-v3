@@ -65,7 +65,13 @@ static void host_outp(unsigned int port, unsigned int value)
 /* console.c が引く外部シンボル (カーネル側の本物の代わり) */
 static int g_v86;
 int v86_is_active(void) { return g_v86; }
-int serial_putchar(char c) { (void)c; return 0; }
+#include "../../kernel/port_service.c"
+static char copied[128];
+static u32 copied_len;
+static int capture_putchar(char c)
+{ if (copied_len < sizeof(copied)) copied[copied_len++] = c; return 0; }
+static const ConOutputOps capture_output = { .putchar = capture_putchar };
+
 
 /* --- 打鍵の注入リング (票 N4 の貼り付け) の代わり ------------------------
  * exec_reclaim_owned (9a) は端末**配下の子**の退場で残りを捨てる。ホストで
@@ -852,10 +858,33 @@ static void case_inject_discard_scope(void)
           "11g 読み手不在なら子らしき ID の退場でも捨てない");
 }
 
+static void case_output_copy(void)
+{
+    reset_all();
+    g_v86 = 1; /* No hardware rendering; copying must still happen. */
+    con_sink_enable();
+    copied_len = 0;
+    rshell_active = 0;
+    console_write("off", 3, 7);
+    check(copied_len == 0, "rshell off does not duplicate");
+    rshell_active = 1;
+    console_write("A\n", 2, 7);
+    shell_print("B\n", 7);
+    /* UTF-8 console path */
+    shell_print_utf8("C\n", 7);
+    check(copied_len == 6, "all console paths copy every byte once");
+    check(copied[0]=='A' && copied[1]=='\n' && copied[2]=='B' &&
+          copied[3]=='\n' && copied[4]=='C' && copied[5]=='\n',
+          "copy order and newline bytes are preserved");
+    rshell_active = 0; g_v86 = 0;
+}
+
 int main(void)
 {
+    con_output_register(&capture_output);
     failures = 0;
     report("con_sink ring (K6C)\n");
+    case_output_copy();
     case_disabled_is_silent();
     case_record_shape();
     case_read_cuts_on_record();

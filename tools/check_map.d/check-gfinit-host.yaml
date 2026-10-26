@@ -78,3 +78,6 @@ check-gfinit-host:
 - kdebug/recover_profile.c
 - tools/run_host_group.py
 - tools/tests/gfinit_romfile_host.c
+- include/port_service.h
+- include/console_output.h
+- kernel/port_service.c

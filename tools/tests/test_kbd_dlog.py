@@ -129,6 +129,11 @@ def host_build(tmp, mutated=None):
     先頭に置いてハーネスの #include をそちらへ向ける。io.h は shim が先。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-dlog-host"
+    # Keep driver-local and explicit ../drivers/kbd.h includes in the fixture.
+    for rel in ("kernel/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
+        dst = src_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
     for key, rel in SOURCES.items():
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +144,7 @@ def host_build(tmp, mutated=None):
     cmd = ["gcc", *FLAGS, "-I" + str(SHIM), "-I" + str(src_dir),
            "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
            "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "kernel"),
+           "-I" + str(ROOT / "lib"),
            "-I" + str(ROOT / "userland/shell"), "-I" + str(ROOT),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)

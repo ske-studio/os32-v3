@@ -1,4 +1,7 @@
 check-kbd-dlog-host:
+- include/kbd.h
+- drivers/kbd.h
+- kernel/v86_kbd.h
 - drivers/kbd.c
 - drivers/kbd_dlog.c
 - drivers/kbd_status.c
@@ -9,3 +12,7 @@ check-kbd-dlog-host:
 - build/checks.d/check-kbd-dlog-host.mk
 - tools/tests/mutpar.py
 - drivers/mouse.c
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h

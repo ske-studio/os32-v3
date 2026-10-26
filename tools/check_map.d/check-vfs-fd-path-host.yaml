@@ -48,4 +48,15 @@ check-vfs-fd-path-host:
 - sdk/include/os32/ls.h
 - sdk/allocator/nano_adapter.c
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/pointer_service.h
+- include/input_service.h
+- include/kbd.h
+- include/clock_service.h
+- kernel/clock_service.c
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h
 artifact_reader: true

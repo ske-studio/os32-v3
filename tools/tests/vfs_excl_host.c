@@ -341,8 +341,12 @@ static void case_regression(void)
     check(rc >= 3 && drv_write_calls == 1, "O_TRUNC は従来どおり切り詰める");
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(void)
 {
+    input_fixture_init();
     printf("=== 票 H2 §2-1: 排他的作成 O_EXCL (KAPI v53) ===\n");
     case_x1();
     case_x2();

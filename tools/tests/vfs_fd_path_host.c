@@ -1337,7 +1337,8 @@ static u8 g_fatdisk[FAT_SECTORS * 512u];
 
 /* FDWP: FatFs と diskio は実物。FDC の媒体だけ RAM に置く。 */
 #include "fdc.h"
-#include "rtc.h"
+#include "clock_service.h"
+#include "clock_service.c"
 static int g_fat_nw, g_fat_writes, g_fat_disk_writes;
 static u32 g_fat_gen;
 static u8 g_fat_tracks[FDC_TRACK_SLOTS][FDC_TRACK_MAX_BYTES];
@@ -1372,8 +1373,11 @@ int fdc_write_sector(int drv, int cyl, int head, int sect, const void *buf)
     kmemcpy(g_fatdisk + lba * 512u, buf, 512);
     return 0;
 }
-void rtc_read(RTC_Time *t)
+static void fat_clock_date(ClockDate *t)
+{ kmemset(t, 0, sizeof(*t)); t->year = 2026; t->month = 10; t->day = 17; }
+static void fat_clock_legacy(RTC_Time *t)
 { kmemset(t, 0, sizeof(*t)); t->year = 26; t->month = 10; t->day = 17; }
+static const ClockOps fat_clock = { fat_clock_date, fat_clock_legacy };
 #include "drivers/fdc_track.c"
 #define disk_write fatwp_disk_write_impl
 #include "fatfs/diskio.c"
@@ -2195,8 +2199,15 @@ __asm__(".text\n"
         "  call fdp_start_c\n"
         "  hlt\n");
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 void fdp_start_c(long *sp)
 {
+    input_fixture_init();
+#ifndef FDP_RED
+    clock_register(&fat_clock);
+#endif
     long argc = sp[0];
     const char *sel = (const char *)0;
     if (argc >= 2) g_dump_dir = (const char *)sp[2];

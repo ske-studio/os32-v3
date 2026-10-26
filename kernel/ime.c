@@ -15,7 +15,7 @@
 #include "memmap.h"
 #include "ime.h"
 #include "sqlite_engine.h"
-#include "kbd.h"
+#include "../drivers/kbd.h"
 #include "tvram.h"
 #include "console.h"
 #include "utf8.h"

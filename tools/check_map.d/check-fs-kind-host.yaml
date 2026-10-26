@@ -13,3 +13,8 @@ check-fs-kind-host:
 - tools/tests/test_vfs_kind.py
 - tools/tests/vfs_kind_host.c
 - tools/run_host_group.py
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/pointer_service.h
+- include/input_service.h
+- include/kbd.h

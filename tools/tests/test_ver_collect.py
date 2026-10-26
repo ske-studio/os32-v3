@@ -96,7 +96,7 @@ def main():
     assert build_run(fixture, args.runner, collector=collector).returncode == 0
     assert build_run(CALIBRATION_FIXTURE, args.runner, calibration=calibration).returncode == 0
     if args.mutate:
-        old = ('s->ser_ready = serial_get_status(&s->ser_mode, &s->ser_baud,\n'
+        old = ('s->ser_ready = port_get_status(&s->ser_mode, &s->ser_baud,\n'
                '                                     &s->ser_fifo) >= 0;')
         assert collector.count(old) == 1
         mutant = collector.replace(old, old + '\n    s->ser_ready = 1;')

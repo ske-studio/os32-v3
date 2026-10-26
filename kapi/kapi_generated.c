@@ -2,11 +2,11 @@
 #include "os32_kapi_shared.h"
 #include "gfx.h"
 #include "palette.h"
-#include "kbd.h"
+#include "input_service.h"
 #include "exec_heap.h"
 #include "kmalloc.h"
 #include "paging.h"
-#include "rtc.h"
+#include "clock_service.h"
 #include "exec.h"
 #include "fm.h"
 #include "np2sysp.h"
@@ -15,7 +15,7 @@
 #include "tvram.h"
 #include "vfs.h"
 #include "ext2.h"
-#include "serial.h"
+#include "port_service.h"
 #include "console.h"
 #include "dev.h"
 #include "kcg.h"
@@ -27,7 +27,7 @@
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
 #include "snd_engine.h"
-#include "mouse.h"
+#include "pointer_service.h"
 #include "kapi_db.h"
 #include "loop_dev.h"
 #include "v86.h"
@@ -651,7 +651,7 @@ void __cdecl wrap_gfx_present(void)
 int __cdecl wrap_kbd_trygetchar(void)
 {
     KAPI_HIT(4);
-    return kbd_trygetchar();
+    return input_trygetchar();
 }
 
 void * __cdecl wrap_mem_alloc(u32 size)
@@ -735,7 +735,7 @@ void __cdecl wrap_rtc_read(void *rtc_time)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    rtc_read((RTC_Time *)rtc_time);
+    clock_read_legacy((RTC_Time *)rtc_time);
 }
 
 void __cdecl wrap_tvram_clear(void)
@@ -765,19 +765,19 @@ void __cdecl wrap_tvram_scroll(void)
 int __cdecl wrap_kbd_getchar(void)
 {
     KAPI_HIT(22);
-    return kbd_getchar_kapi();
+    return input_getchar_kapi();
 }
 
 int __cdecl wrap_kbd_getkey(void)
 {
     KAPI_HIT(23);
-    return kbd_getkey_kapi();
+    return input_getkey_kapi();
 }
 
 int __cdecl wrap_kbd_trygetkey(void)
 {
     KAPI_HIT(24);
-    return kbd_trygetkey();
+    return input_trygetkey();
 }
 
 int __cdecl wrap_sys_mount(const char *prefix, const char *dev, const char *fs)
@@ -831,37 +831,37 @@ int __cdecl wrap_sys_rmdir(const char *path)
 void __cdecl wrap_serial_init(u32 baud)
 {
     KAPI_HIT(33);
-    serial_init(baud);
+    port_init(baud);
 }
 
 void __cdecl wrap_serial_puts(const char *s)
 {
     KAPI_HIT(34);
-    serial_puts_kapi(s);
+    port_puts_kapi(s);
 }
 
 int __cdecl wrap_serial_getchar(void)
 {
     KAPI_HIT(35);
-    return serial_getchar_kapi();
+    return port_getchar_kapi();
 }
 
 int __cdecl wrap_serial_putchar(u8 ch)
 {
     KAPI_HIT(36);
-    return serial_putchar_kapi(ch);
+    return port_putchar_kapi(ch);
 }
 
 int __cdecl wrap_serial_trygetchar(void)
 {
     KAPI_HIT(37);
-    return serial_trygetchar();
+    return port_trygetchar();
 }
 
 int __cdecl wrap_serial_is_initialized(void)
 {
     KAPI_HIT(38);
-    return serial_is_initialized();
+    return port_is_initialized();
 }
 
 int __cdecl wrap_exec_run(const char *path)
@@ -1170,7 +1170,7 @@ void __cdecl wrap_console_get_size(int *w, int *h)
 u32 __cdecl wrap_kbd_get_modifiers(void)
 {
     KAPI_HIT(79);
-    return kbd_get_modifiers();
+    return input_get_modifiers();
 }
 
 u32 __cdecl wrap_sys_get_mem_kb(void)
@@ -1491,7 +1491,7 @@ void __cdecl wrap_snd_bgm_set_persist(int persist)
 int __cdecl wrap_kbd_is_pressed(int scancode)
 {
     KAPI_HIT(125);
-    return kbd_is_pressed(scancode);
+    return input_is_pressed(scancode);
 }
 
 void __cdecl wrap_fm_note_on(int ch, int note)
@@ -1538,19 +1538,19 @@ void __cdecl wrap_mouse_poll(void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    mouse_poll((MouseState *)info);
+    pointer_poll((MouseState *)info);
 }
 
 int __cdecl wrap_mouse_available(void)
 {
     KAPI_HIT(133);
-    return mouse_available();
+    return pointer_available();
 }
 
 void __cdecl wrap_mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 {
     KAPI_HIT(134);
-    mouse_set_bounds(x_min, y_min, x_max, y_max);
+    pointer_set_bounds(x_min, y_min, x_max, y_max);
 }
 
 void __cdecl wrap_tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
@@ -1574,19 +1574,19 @@ int __cdecl wrap_tvram_reverse_cell(int x, int y)
 void __cdecl wrap_mouse_cursor_set_mode(int mode)
 {
     KAPI_HIT(137);
-    mouse_cursor_set_mode(mode);
+    pointer_cursor_set_mode(mode);
 }
 
 void __cdecl wrap_mouse_cursor_show(void)
 {
     KAPI_HIT(138);
-    mouse_cursor_show();
+    pointer_cursor_show();
 }
 
 void __cdecl wrap_mouse_cursor_hide(void)
 {
     KAPI_HIT(139);
-    mouse_cursor_hide();
+    pointer_cursor_hide();
 }
 
 int __cdecl wrap_db_open(const char *path)
@@ -1838,13 +1838,13 @@ int __cdecl wrap_sys_switch_shell(const char *path)
 u32 __cdecl wrap_kbd_dropped_count(void)
 {
     KAPI_HIT(176);
-    return kbd_dropped_count();
+    return input_dropped_count();
 }
 
 int __cdecl wrap_kbd_trygetrawkey(void)
 {
     KAPI_HIT(177);
-    return kbd_trygetrawkey();
+    return input_trygetrawkey();
 }
 
 int __cdecl wrap_ime_feed_key(int keydata)
@@ -2102,7 +2102,7 @@ int __cdecl wrap_sys_set_mtime(const char *path, u32 mtime)
 int __cdecl wrap_kbd_peekkey(void)
 {
     KAPI_HIT(214);
-    return kbd_peekkey();
+    return input_peekkey();
 }
 
 int __cdecl wrap_exec_last_result(int *kind, int *code)
@@ -2119,7 +2119,7 @@ int __cdecl wrap_exec_last_result(int *kind, int *code)
 int __cdecl wrap_serial_init_vfast(u32 baud)
 {
     KAPI_HIT(216);
-    return serial_init_vfast(baud);
+    return port_init_vfast(baud);
 }
 
 int __cdecl wrap_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
@@ -2132,13 +2132,13 @@ int __cdecl wrap_serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return serial_get_status(mode, baud, fifo);
+    return port_get_status(mode, baud, fifo);
 }
 
 int __cdecl wrap_kbd_trygetchar_local(void)
 {
     KAPI_HIT(218);
-    return kbd_trygetchar_local();
+    return input_trygetchar_local();
 }
 
 int __cdecl wrap_pci_count(void)
@@ -2226,7 +2226,7 @@ int __cdecl wrap_kbd_diag(KbdDiag *out)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return kbd_diag(out);
+    return input_diag(out);
 }
 
 int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)
@@ -2302,7 +2302,7 @@ int __cdecl wrap_kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
             (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return kbd_diag_log(after_seq, out, max);
+    return input_diag_log(after_seq, out, max);
 }
 
 int __cdecl wrap_v86_gdc_capture(int mode, V86Gcap *out)

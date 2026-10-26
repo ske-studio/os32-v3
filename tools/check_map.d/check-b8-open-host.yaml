@@ -22,3 +22,8 @@ check-b8-open-host:
 - fs/ext2_layout.c
 - tools/check_map.d/check-b8-open-host.yaml
 - build/checks.d/check-b8-open-host.mk
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/pointer_service.h
+- include/input_service.h
+- include/kbd.h

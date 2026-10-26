@@ -3,7 +3,8 @@
 #include "../../kernel/console.c"
 static char serial_output[4096];
 static u32 serial_length;
-int serial_putchar(char c)
+#include "../../kernel/port_service.c"
+static int capture_putchar(char c)
 {
     if (serial_length + 1 < sizeof(serial_output)) {
         serial_output[serial_length++] = c;
@@ -11,6 +12,8 @@ int serial_putchar(char c)
     }
     return 0;
 }
+static const ConOutputOps capture_output = { .putchar = capture_putchar };
+
 int v86_is_active(void) { return 1; }
 int con_sink_is_enabled(void) { return 0; }
 void con_sink_push_print(const char *s, u32 n, u8 c) { (void)s; (void)n; (void)c; }
@@ -23,4 +26,4 @@ static int equal(const char *a, const char *b)
 { while (*a && *a==*b) {a++;b++;} return *a==*b; }
 static int contains(const char *a, const char *b)
 { for (;*a;a++) {u32 n=0;while(b[n] && a[n]==b[n])n++;if(!b[n])return 1;}return 0; }
-static void clear_output(void) { serial_length=0;serial_output[0]=0;rshell_active=1; }
+static void clear_output(void) { con_output_register(&capture_output); serial_length=0;serial_output[0]=0;rshell_active=1; }

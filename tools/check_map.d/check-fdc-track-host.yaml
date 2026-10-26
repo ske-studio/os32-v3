@@ -24,4 +24,6 @@ check-fdc-track-host:
 - build/checks.d/check-fdc-track-host.mk
 - tools/check_artifacts.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- include/clock_service.h
+- kernel/clock_service.c
 artifact_reader: true

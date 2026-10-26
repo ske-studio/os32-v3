@@ -552,3 +552,8 @@ int IME_DICT_HOST_MAIN(int argc, char **argv)
     printf("SUMMARY ime_dict PASS\n");
     return 0;
 }
+
+/* D2: keep the diagnostic boundary behind the real emergency facade. */
+void pc98_serial_puts_polled(const char *s) { (void)s; }
+int pc98_serial_gate_active(void) { return 0; }
+#include "serial_emergency_host.h"

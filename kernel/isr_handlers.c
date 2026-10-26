@@ -57,7 +57,7 @@ extern volatile int ring3_in_syscall;
  * ここと ring3_wm_fault_count (exec.c) が「WM の中だった」を残す唯一の印。 */
 extern volatile int ring3_wm_depth;
 
-#include "serial.h"
+#include "serial_diag.h"
 #include "tvram.h"
 
 /* シリアルポートにもログを出力するためのヘルパー */

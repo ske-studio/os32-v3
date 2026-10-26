@@ -169,4 +169,9 @@ check-memory-host:
 - kernel/module.h
 - userland/lib/font/**
 - kernel/cpu_flags.inc
+- include/input_service.h
+- include/kbd.h
+- drivers/kbd.h
+- kernel/input_service.c
+- include/pointer_service.h
 artifact_reader: true

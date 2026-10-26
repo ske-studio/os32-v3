@@ -32,6 +32,7 @@
 #undef irq_register
 /* test_fdc_track.py が実 idt.c から切り出す pic_eoi。 */
 #include "fdc_pic_source.c"
+#include "clock_service.c"
 #include "../../fs/fatfs/diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の
  * 厳しい警告だけ外す (カーネルのビルドでは元の警告のまま)。 */
@@ -133,7 +134,14 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 { (void)dev; (void)lba; (void)count; (void)buf; return -1; }
 int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
 { (void)dev; (void)lba; (void)count; (void)buf; return -1; }
-void rtc_read(RTC_Time *t) { memset(t, 0, sizeof(*t)); }
+static int clock_reads;
+static void track_clock_date(ClockDate *t)
+{
+    *t = (ClockDate){1980, 1, 2, 3, 4, 5, 59};
+    clock_reads++;
+}
+static void track_clock_legacy(RTC_Time *t) { memset(t, 0, sizeof(*t)); }
+static const ClockOps track_clock = { track_clock_date, track_clock_legacy };
 
 /* ======================================================================== */
 /*  DMA (µPD8237A) の模型: マスクと積んだ番地・長さだけ覚える              */
@@ -1731,6 +1739,9 @@ static u8 *load_file(const char *env, long *len)
 
 int main(int argc, char **argv)
 {
+    clock_register(&track_clock);
+    CHECK(get_fattime() == ((1u << 21) | (2u << 16) | (4u << 11) | (5u << 5) | 29u));
+    CHECK(clock_reads == 1);
     int i;
     static const struct { const char *name; void (*fn)(void); } cases[] = {
         { "fdc_irq_registration", fdc_irq_registration },

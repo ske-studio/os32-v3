@@ -49,9 +49,16 @@ MUTATIONS += [
     ('rshell user', 3, 'if (ring3_call_from_user()) return;', ''),
 ]
 
-for fn in ('serial_putchar', 'serial_puts', 'serial_getchar', 'kbd_getchar',
-           'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml'):
-    MUTATIONS.append((fn + ' public target', 3, fn + '_kapi(', fn + '('))
+# Public wrapper names are stable; provider names need not match them.
+for old, new in (('port_putchar_kapi', 'serial_putchar'),
+                 ('port_puts_kapi', 'serial_puts'),
+                 ('port_getchar_kapi', 'serial_getchar'),
+                 ('input_getchar_kapi', 'input_getchar'),
+                 ('input_getkey_kapi', 'input_getkey'),
+                 ('ime_getchar_kapi', 'ime_getchar'),
+                 ('ime_getkey_kapi', 'ime_getkey'),
+                 ('fm_play_mml_kapi', 'fm_play_mml')):
+    MUTATIONS.append((old + ' public target', 3, old + '(', new + '('))
 
 def run(runner, mutation=None, case=0, expected=None):
     sources = [(ROOT / p).read_text() for p in SOURCES]

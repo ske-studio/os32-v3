@@ -103,6 +103,11 @@ def host_build(tmp, mutated=None):
     -I tmp を先頭に置いてハーネスの #include をそちらへ向ける。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-status-host"
+    # Preserve the component's explicit ../drivers/kbd.h dependency.
+    for rel in ("kernel/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
+        dst = src_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
     for key, rel in SOURCES.items():
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)

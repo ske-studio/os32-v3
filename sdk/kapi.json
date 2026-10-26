@@ -18,11 +18,11 @@
   "includes": [
     "gfx.h",
     "palette.h",
-    "kbd.h",
+    "input_service.h",
     "exec_heap.h",
     "kmalloc.h",
     "paging.h",
-    "rtc.h",
+    "clock_service.h",
     "exec.h",
     "fm.h",
     "np2sysp.h",
@@ -31,7 +31,7 @@
     "tvram.h",
     "vfs.h",
     "ext2.h",
-    "serial.h",
+    "port_service.h",
     "console.h",
     "dev.h",
     "kcg.h",
@@ -43,7 +43,7 @@
     "fd_redirect.h",
     "pipe_buffer.h",
     "snd_engine.h",
-    "mouse.h",
+    "pointer_service.h",
     "kapi_db.h",
     "loop_dev.h",
     "v86.h",
@@ -94,6 +94,7 @@
     },
     {
       "name": "kbd_trygetchar",
+      "target": "input_trygetchar",
       "ret": "int",
       "args": []
     },
@@ -197,7 +198,7 @@
       "args": [
         "void *rtc_time"
       ],
-      "body": "rtc_read((RTC_Time *)rtc_time);"
+      "body": "clock_read_legacy((RTC_Time *)rtc_time);"
     },
     {
       "name": "tvram_clear",
@@ -233,16 +234,17 @@
       "name": "kbd_getchar",
       "ret": "int",
       "args": [],
-      "target": "kbd_getchar_kapi"
+      "target": "input_getchar_kapi"
     },
     {
       "name": "kbd_getkey",
       "ret": "int",
       "args": [],
-      "target": "kbd_getkey_kapi"
+      "target": "input_getkey_kapi"
     },
     {
       "name": "kbd_trygetkey",
+      "target": "input_trygetkey",
       "ret": "int",
       "args": []
     },
@@ -309,6 +311,7 @@
     },
     {
       "name": "serial_init",
+      "target": "port_init",
       "ret": "void",
       "args": [
         "u32 baud"
@@ -320,13 +323,13 @@
       "args": [
         "const char *s"
       ],
-      "target": "serial_puts_kapi"
+      "target": "port_puts_kapi"
     },
     {
       "name": "serial_getchar",
       "ret": "int",
       "args": [],
-      "target": "serial_getchar_kapi"
+      "target": "port_getchar_kapi"
     },
     {
       "name": "serial_putchar",
@@ -334,15 +337,17 @@
       "args": [
         "u8 ch"
       ],
-      "target": "serial_putchar_kapi"
+      "target": "port_putchar_kapi"
     },
     {
       "name": "serial_trygetchar",
+      "target": "port_trygetchar",
       "ret": "int",
       "args": []
     },
     {
       "name": "serial_is_initialized",
+      "target": "port_is_initialized",
       "ret": "int",
       "args": []
     },
@@ -659,6 +664,7 @@
     },
     {
       "name": "kbd_get_modifiers",
+      "target": "input_get_modifiers",
       "ret": "u32",
       "args": []
     },
@@ -1011,6 +1017,7 @@
     },
     {
       "name": "kbd_is_pressed",
+      "target": "input_is_pressed",
       "ret": "int",
       "args": [
         "int scancode"
@@ -1068,15 +1075,17 @@
       "args": [
         "void *info"
       ],
-      "body": "mouse_poll((MouseState *)info);"
+      "body": "pointer_poll((MouseState *)info);"
     },
     {
       "name": "mouse_available",
+      "target": "pointer_available",
       "ret": "int",
       "args": []
     },
     {
       "name": "mouse_set_bounds",
+      "target": "pointer_set_bounds",
       "ret": "void",
       "args": [
         "i16 x_min",
@@ -1107,6 +1116,7 @@
     },
     {
       "name": "mouse_cursor_set_mode",
+      "target": "pointer_cursor_set_mode",
       "ret": "void",
       "args": [
         "int mode"
@@ -1114,11 +1124,13 @@
     },
     {
       "name": "mouse_cursor_show",
+      "target": "pointer_cursor_show",
       "ret": "void",
       "args": []
     },
     {
       "name": "mouse_cursor_hide",
+      "target": "pointer_cursor_hide",
       "ret": "void",
       "args": []
     },
@@ -1344,11 +1356,13 @@
     },
     {
       "name": "kbd_dropped_count",
+      "target": "input_dropped_count",
       "ret": "u32",
       "args": []
     },
     {
       "name": "kbd_trygetrawkey",
+      "target": "input_trygetrawkey",
       "ret": "int",
       "args": []
     },
@@ -1571,6 +1585,7 @@
     },
     {
       "name": "kbd_peekkey",
+      "target": "input_peekkey",
       "ret": "int",
       "args": []
     },
@@ -1582,17 +1597,20 @@
     },
     {
       "name": "serial_init_vfast",
+      "target": "port_init_vfast",
       "ret": "int",
       "args": ["u32 baud"]
     },
     {
       "name": "serial_get_status",
+      "target": "port_get_status",
       "out": [{"arg": "mode", "size": "sizeof(u32)"}, {"arg": "baud", "size": "sizeof(u32)"}, {"arg": "fifo", "size": "sizeof(u32)"}],
       "ret": "int",
       "args": ["u32 *mode", "u32 *baud", "u32 *fifo"]
     },
     {
       "name": "kbd_trygetchar_local",
+      "target": "input_trygetchar_local",
       "ret": "int",
       "args": []
     },
@@ -1656,6 +1674,7 @@
     },
     {
       "name": "kbd_diag",
+      "target": "input_diag",
       "out": [{"arg": "out", "size": "sizeof(KbdDiag)"}],
       "ret": "int",
       "args": ["KbdDiag *out"]
@@ -1713,6 +1732,7 @@
     },
     {
       "name": "kbd_diag_log",
+      "target": "input_diag_log",
       "out": [{"arg": "out", "len": "max", "unit": "sizeof(KbdDiagLogEnt)"}],
       "ret": "int",
       "args": ["u32 after_seq", "KbdDiagLogEnt *out", "int max"]

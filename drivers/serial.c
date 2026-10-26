@@ -772,7 +772,7 @@ void serial_gate_set(int on)
     irq_restore(f);
 }
 
-int serial_gate_active(void)
+int pc98_serial_gate_active(void)
 {
     return s_gate;
 }
@@ -887,7 +887,7 @@ static void serial_putchar_polled(char c)
     }
 }
 
-void serial_puts_polled(const char *str)
+void pc98_serial_puts_polled(const char *str)
 {
     int count = 0;
     while (*str) {
@@ -916,7 +916,7 @@ void serial_put_hex32_polled(u32 val)
         val >>= HEX_NIBBLE_BITS;
     }
     buf[HEX32_DIGITS + sizeof("0x") - 1] = '\0';
-    serial_puts_polled(buf);
+    pc98_serial_puts_polled(buf);
 }
 
 /* Public KAPI waits only. Internal logs and SerialFS never unwind here.

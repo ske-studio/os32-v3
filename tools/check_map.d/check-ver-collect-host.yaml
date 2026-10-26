@@ -23,3 +23,6 @@ check-ver-collect-host:
 - tools/tests/host32.py
 - build/checks.d/check-ver-collect-host.mk
 - tools/check_map.d/check-ver-collect-host.yaml
+- include/port_service.h
+- include/console_output.h
+- kernel/port_service.c

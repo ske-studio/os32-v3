@@ -106,4 +106,13 @@ check-check-select-host:
 - kernel/ime_dict.c
 - tools/tests/kapi_db_owned_host.c
 - tools/tests/kapi_db_v50_host.c
+- tools/tests/input_fixture_host.h
+- kernel/input_service.c
+- include/pointer_service.h
+- include/input_service.h
+- include/kbd.h
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h
 artifact_reader: true

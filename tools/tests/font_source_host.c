@@ -780,8 +780,12 @@ static void lease_shell(void)
     CHECK(slot_of(aid)->kind == FONT_LEASE_APP);
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(int argc, char **argv)
 {
+    input_fixture_init();
     u32 i;
     for (i = 0; i < MOCK_FILE_SIZE; i++) file_data[i] = (u8)(i * 7u + 3u);
     mock_ops.get_file_size = mock_size;

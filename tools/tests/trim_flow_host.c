@@ -350,8 +350,12 @@ static void regrow(void)
           extent_count(&b, APPMEM_EXEC_ARENA) == 1);
     line("regrow ok EXACT +65536 ARENA=1");
 }
+#define INPUT_FIXTURE_SETUP fixture_input.gui_mode = kbd_set_gui_mode;
+#include "input_fixture_host.h"
+
 void _start(void)
 {
+    input_fixture_init();
     heap_ram(); host_map_fixed_paging(); paging_init(17408); host_pool_boot(17408);
     roots[0] = paging_kernel_pd_phys(); integration = heap_alias_on = 1;
     heap_mmap(MEM_SHELL_HEAP_BASE, MEM_SHELL_HEAP_SIZE, 0);

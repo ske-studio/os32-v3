@@ -827,8 +827,12 @@ __asm__(".text\n"
         "  call ename_start_c\n"
         "  hlt\n");
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 void ename_start_c(long *sp)
 {
+    input_fixture_init();
     long argc = sp[0];
     const char *sel = (const char *)0;
     if (argc >= 2) g_dump_dir = (const char *)sp[2];

@@ -188,8 +188,12 @@ static void reset(int has_stat)
     }
 }
 
+#define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
+#include "input_fixture_host.h"
+
 int main(void)
 {
+    input_fixture_init();
     printf("=== vfs_path_kind (票 H1 / 往復 3 の B6) ===\n");
 
     printf("== stat を持つドライバ: stat の答えが最終判断 ==\n");

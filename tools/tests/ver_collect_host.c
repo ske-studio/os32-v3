@@ -4,7 +4,7 @@
 #include "ver_info.h"
 #include "cpu_calibrate.h"
 #include "idt.h"
-#include "serial.h"
+#include "port_service.h"
 #include "pcm_cs4231.h"
 #include "gfx_hal.h"
 #include "bootinfo.h"
@@ -21,13 +21,16 @@ static ServicesVerState saved_services;
 
 int cpu_calibrate_used_fallback(void) { calls[0]++; return fallback; }
 const struct pit_setup *pit_get_setup(void) { calls[1]++; return &saved_pit; }
-int serial_get_status(u32 *m, u32 *b, u32 *f)
+static int fake_port_status(u32 *m, u32 *b, u32 *f)
 {
     calls[2]++;
     CHECK(*m == 0 && *b == 0 && *f == 0);
     *m = mode; *b = baud; *f = fifo;
     return serial_rc;
 }
+#include "port_service.c"
+static const PortOps test_port = { .get_status = fake_port_status };
+
 int pcm_present(void) { calls[3]++; return pcm; }
 int gfx_ver_state(GFX_ScreenInfo *out, u32 *k, u32 *a)
 {
@@ -71,6 +74,7 @@ static void snapshot(void)
     kmemset(&guarded, 0xcc, sizeof(guarded));
     kmemset(calls, 0, sizeof(calls));
     guarded.before = 0x12345678; guarded.after = 0x87654321;
+    port_register(&test_port);
     ver_collect(s);
     CHECK(guarded.before == 0x12345678 && guarded.after == 0x87654321);
     for (u32 i = 0; i < sizeof(calls) / sizeof(calls[0]); i++) CHECK(calls[i] == 1);

@@ -9,6 +9,7 @@
 #define __SERIAL_H
 
 #include "types.h"
+#include "../lib/serial_diag.h"
 
 /* ======== I/Oポート (FreeBSD if_8251_type[COM_IF_INTERNAL]) ======== */
 #define SER_DATA    0x30    /* [0] 送受信データ */
@@ -275,7 +276,7 @@ int serial_get_status(u32 *mode, u32 *baud, u32 *fifo);
  * 外部プログラムから見た ABI は変わっていない ([ABI2])。 */
 int serial_putchar(char c);
 void serial_puts(const char *str);
-void serial_puts_polled(const char *str);
+void pc98_serial_puts_polled(const char *str);
 void serial_put_hex32_polled(u32 val);
 int  serial_getchar(void);     /* ブロッキング */
 int  serial_trygetchar(void);  /* ノンブロッキング: -1=なし */
@@ -296,7 +297,7 @@ int  serial_is_initialized(void);
 /* ゲートを上げ下げする。どちらでも受信リングを空にする。上げると保留
  * リングも空にする (下ろしても保留リングは残す — 呼び手が汲む)。 */
 void serial_gate_set(int on);
-int  serial_gate_active(void);
+int  pc98_serial_gate_active(void);
 /* ゲートを通らずに線へ出す (SerialFS のフレーム)。SER_TX_OK / DROPPED */
 int  serial_gate_put(const u8 *buf, u32 n);
 /* ゲートを通らずに 1 バイト受ける (RxRDY を直接見て FIFO の残りも汲む)。

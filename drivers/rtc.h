@@ -13,7 +13,7 @@
 #ifndef __RTC_H
 #define __RTC_H
 
-#include "types.h"
+#include "../include/clock_service.h"
 #include "pc98.h"
 
 /* 00-79 -> 2000-2079; 80-99 -> 1980-1999. */
@@ -63,18 +63,9 @@
 
 #define RTC_READ_BITS      48     /* RTCから読み出すビット数 */
 
-/* ======== 時刻構造体 ======== */
-typedef struct {
-    u8 year;     /* 00-99 (BCD → 変換済み10進) */
-    u8 month;    /* 1-12 */
-    u8 day;      /* 1-31 */
-    u8 wday;     /* 0=日, 1=月, ..., 6=土 */
-    u8 hour;     /* 0-23 */
-    u8 min;      /* 0-59 */
-    u8 sec;      /* 0-59 */
-} RTC_Time;
-
 /* ======== API ======== */
+
+extern const ClockOps pc98_clock;
 
 /* RTC初期化 (レジスタホールドモードに設定) */
 void rtc_init(void);

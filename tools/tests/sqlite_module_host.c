@@ -797,8 +797,13 @@ static void boot_transaction(void)
     }
     finish(0);
 }
+static u8 fixture_shift_state(void) { return kbd_shift_state; }
+#define INPUT_FIXTURE_SETUP fixture_input.getchar = kbd_getchar; fixture_input.getkey = kbd_getkey; fixture_input.trygetchar = kbd_trygetchar; fixture_input.trygetkey = kbd_trygetkey; fixture_input.getchar_kapi = kbd_getchar_kapi; fixture_input.getkey_kapi = kbd_getkey_kapi; fixture_input.getkey_wait = kbd_getkey_wait; fixture_input.shift_state = fixture_shift_state;
+#include "input_fixture_host.h"
+
 void _start(void)
 {
+    input_fixture_init();
     read_input(input, sizeof(input)); CHECK(input[1] <= IMAGE_CAP);
     read_input(file, input[1]);
     read_input(&fep_size, sizeof(fep_size)); CHECK(fep_size <= IMAGE_CAP);
