@@ -23,6 +23,6 @@
 | 段 | 群 (SURVEY の #) | 中身 | 大きさ | 状態 |
 |---|---|---|---|---|
 | D1 | 16・17 | FDC の IRQ を FDC が irq_register で持つ、NIC・通信の周期処理を登録表に。設計 [DEP_DIR_D1_DESIGN](../../decisions/DEP_DIR_D1_DESIGN.md)、段は D1a (FDC/IRQ11) → D1b (tick の表) を sol、D1c (ゲスト・変異) は PM | 小〜中 | 実装中 |
-| D2 | 18〜25・33〜35・38・45 | 入力・コンソール出力・時計・シリアル診断を口の後ろへ (VFS の stdin・exec・GUI・KAPI の内側) | 中 (設計で 2〜3 段に割る) | — |
+| D2 | 18〜25・33〜35・38・45 (ポート側) | 入力・コンソール出力・時計・シリアル診断を口の後ろへ (VFS の stdin・exec・GUI・KAPI の内側、FatFs の時刻も)。D1 の取り込みの後の main を基点に直列 | 中 (A1・A2・B・C の 4 段)。設計 [DEP_DIR_D2_DESIGN](../../decisions/DEP_DIR_D2_DESIGN.md) | 設計確定・D1 待ち |
 | D3 | 1〜14・31・32 | 起動の配線を platform の登録一覧に、root の選び方と装置名の解決をレジストリに | 中 (同上) | — |
-| 後 | 26〜30・36〜44・46〜54 | 部品の match/IRQ 記述・専用 KAPI、PIC/PIT・メモリ地図・reset・clock、表示・障害出力・復旧・splash | 大 | D3 の後に粒度を決めてユーザーに出す |
+| 後 | 26〜30・36〜44・45 の PCI 側・46〜54 | 部品の match/IRQ 記述・専用 KAPI、PIC/PIT・メモリ地図・reset・clock、表示・障害出力・復旧・splash | 大 | D3 の後に粒度を決めてユーザーに出す |
