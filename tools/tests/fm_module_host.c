@@ -11,6 +11,14 @@
 #define FM_ADAPTER "../../kernel/fm_module.c"
 #endif
 #include FM_ADAPTER
+#include "../../kernel/tick.c"
+volatile u32 kctx_irq_depth;
+const u32 fm_kexports[] = {0};
+const struct module_symbol_contract fm_import_contracts[] = {{0}};
+const struct module_symbol_contract fm_export_contracts[] = {{0}};
+const struct bootinfo *bootinfo_get(void) { finish(2); }
+void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+
 
 static u32 ticks, silence, mode, public_calls;
 static void body_tick(void) { ticks++; }
@@ -39,7 +47,7 @@ static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
     int rc = fm_start(r, entry, ops);
     if (!rc && mode == 1) {
         CHECK(r->tick_refs == 1 && !module_exports(fm_handle));
-        snd_tick();
+        tick_dispatch();
         fm_note_on(0, 60);
         CHECK(ticks == 1 && !public_calls);
         return MODULE_INIT_FAILED;
@@ -48,6 +56,18 @@ static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 }
 void _start(void)
 {
+    kctx_irq_depth = 1;
+    CHECK(fm_module_load() == MODULE_INIT_FAILED);
+    CHECK(!fm_handle.generation && !slots[PC98_TICK_SND].fn);
+    CHECK(tick_register(PC98_TICK_SND, snd_tick) == TICK_ERR_CTX);
+    kctx_irq_depth = 0;
+    /* The retry reaches the existing busy check after publishing the facade. */
+    fm_handle.generation = 1;
+    CHECK(fm_module_load() == MODULE_BUSY);
+    fm_handle.generation = 0;
+    CHECK(slots[PC98_TICK_SND].fn == snd_tick);
+    CHECK(!tick_register(PC98_TICK_SND, snd_tick));
+    CHECK(!tick_register(PC98_TICK_SND, snd_tick));
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     mode = input[1];
     kmemcpy(&imports[0].name_hash, file + 152, 4);
@@ -56,7 +76,7 @@ void _start(void)
     struct module_request q = request();
     q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = fm_quiesce, .detach = fm_detach};
     /* Facade stubs must be harmless before load. */
-    fm_note_on(0, 60); snd_tick();
+    fm_note_on(0, 60); tick_dispatch();
     CHECK(!ticks && !public_calls && !snd_bgm_is_playing());
     CHECK(!module_load(&q, &fm_handle));
     struct module_record *r = module_record_get(fm_handle);
@@ -70,17 +90,17 @@ void _start(void)
         CHECK(rc == MODULE_INIT_FAILED);
         CHECK(!tick_target && !r->tick_refs && silence == 1);
         CHECK(r->state == MODULE_ABSENT);
-        snd_tick(); fm_note_on(0, 60);
+        tick_dispatch(); fm_note_on(0, 60);
         CHECK(ticks == (mode == 1 ? 1U : 0U) && !public_calls);
         empty(); finish(0);
     }
     CHECK(!rc && r->tick_refs == 1 && tick_target);
-    snd_tick(); fm_note_on(0, 60);
+    tick_dispatch(); fm_note_on(0, 60);
     CHECK(ticks == 1 && public_calls == 1);
     u32 before = returned;
     rc = fm_module_abort();
     CHECK(!tick_target && !r->tick_refs && silence == 1);
-    snd_tick(); fm_note_on(0, 60);
+    tick_dispatch(); fm_note_on(0, 60);
     CHECK(ticks == 1 && public_calls == 1);
     if (mode == 2) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);

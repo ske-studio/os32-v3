@@ -1,4 +1,7 @@
 check-e82557-drv-host:
+- kernel/tick.c
+- kernel/tick.h
+- platform/pc98/tick_order.h
 - drivers/e82557.c
 - drivers/e82557.h
 - drivers/e82557_regs.h

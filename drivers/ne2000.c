@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* ======================================================================== */
 /*  NE2000.C — DP8390 (NE2000 互換) ドライバ本体                              */
 /*                                                                          */
@@ -556,6 +559,8 @@ int ne2k_init(const struct ne2k_config *config)
     if (!config) return NE2K_ERR_INVAL;
     if (config->reg_base == 0 || config->data_port == 0) return NE2K_ERR_INVAL;
     if (config->ram_page_first == 0 || config->ram_pages_max < NE2K_RAM_PAGES_16K) return NE2K_ERR_INVAL;
+
+    if (tick_register(PC98_TICK_NE2K, ne2k_timer_tick) != 0) return NE2K_ERR_IO;
 
     kmemset(&nic, 0, sizeof(nic));
     nic.cfg = *config;

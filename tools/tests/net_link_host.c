@@ -232,6 +232,13 @@ static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 /*  実物                                                                    */
 /* ======================================================================== */
 #define LINK_HOST_TEST 1
+#include "tick.h"
+static int tick_register_result;
+int tick_register(unsigned int slot, tick_fn fn)
+{
+    (void)slot; (void)fn;
+    return tick_register_result;
+}
 #include "../../net/link.c"
 
 static void link_tick_fwd(void) { link_tick(); }
@@ -405,6 +412,7 @@ static void reset_all(const char *name)
     nic_up = 1; nic_busy = 0; nic_tx_allow = 1;
     nic_ring_pages = 120; nic_queue_free = 30;
     memset(&nic_stats, 0, sizeof(nic_stats));
+    tick_register_result = 0;
     txn = 0;
     tx_hook = 0;
     wire_pump_fn = 0;
@@ -1603,10 +1611,32 @@ static struct testcase cases[] = {
     { "n1fix2_scripted_inorder_over_64k",           n1fix2_scripted_inorder_over_64k }
 };
 
+static void registration_failure(void)
+{
+    reset_all("tick-registration-failure");
+    u8 saved_mac[ETH_ALEN];
+    memcpy(saved_mac, link_my_mac, sizeof(saved_mac));
+    u32 saved_nonce = link_nonce;
+    int saved_txn = txn;
+    int saved_state = link_state;
+    tick_register_result = TICK_ERR_BUSY;
+    link_init((const u8 *)"abcdef");
+    check(link_ready && link_state == saved_state && link_nonce == saved_nonce &&
+          txn == saved_txn && !memcmp(saved_mac, link_my_mac, sizeof(saved_mac)),
+          "failed tick registration changed live link state");
+    link_ready = 0;
+    link_init(my_mac);
+    check(!link_ready, "failed tick registration enabled link");
+    tick_register_result = 0;
+}
+
 int main(int argc, char **argv)
 {
     unsigned int i;
     int ran = 0, bad = 0;
+
+    registration_failure();
+    if (failures) return 1;
 
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
         int want = (argc <= 1);

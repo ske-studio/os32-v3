@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* ======================================================================== */
 /*  LINK.C — OS32 リンクプロトコル v2 (非ブロッキング)                        */
 /*                                                                          */
@@ -753,6 +756,10 @@ void link_tick(void)
 /* ======================================================================== */
 void link_init(const u8 my_mac[ETH_ALEN])
 {
+    if (tick_register(PC98_TICK_LINK, link_tick) != 0) {
+        kprintf(ATTR_YELLOW, "[link] tick registration failed\n");
+        return;
+    }
     int i;
     kmemcpy(link_my_mac, my_mac, ETH_ALEN);
     kmemset(link_peer_mac, 0, ETH_ALEN);

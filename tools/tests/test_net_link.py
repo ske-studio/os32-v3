@@ -29,7 +29,7 @@ GENERATED = ROOT / "kapi/kapi_generated.c"
 # ヘッダは実物の置き場を通す。ホストに持ち込めないものは net_link_host.c が
 # **include ガードを先に define して**中身を自前のものに差し替える。
 INC = ["-I" + str(ROOT / p) for p in ("include", "net", "kapi", "lib", "kernel",
-                                      "drivers", "exec", "fs", "sdk/include/os32")]
+                                      "drivers", "exec", "fs", "sdk/include/os32", "platform/pc98")]
 FLAGS = ["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror",
          "-Wno-pointer-to-int-cast",
          "-Wno-unused-parameter"]
@@ -90,13 +90,16 @@ def check_reclaim_has_host_owner_exit():
 
 
 def check_timer_calls_link_tick():
-    """link_tick が 100Hz タイマ (ne2k_timer_tick の直後) からだけ呼ばれるか。"""
-    isr = (ROOT / "kernel/isr_handlers.c").read_text(encoding="utf-8")
-    m = re.search(r"void timer_handler\(void\)\s*\{(.*?)\n\}", isr, re.S)
-    assert m, "timer_handler が見つからない"
-    body = m.group(1)
-    assert "ne2k_timer_tick();" in body and "link_tick();" in body
-    assert body.index("ne2k_timer_tick();") < body.index("link_tick();")
+    """link_tick の枠順と登録の所有者を検査する。"""
+    order = (ROOT / "platform/pc98/tick_order.h").read_text()
+    assert order.index("PC98_TICK_NE2K") < order.index("PC98_TICK_LINK")
+    registrations = []
+    for directory in ("kernel", "drivers", "net"):
+        for path in (ROOT / directory).glob("*.c"):
+            if re.search(r"tick_register\s*\([^,]+,\s*link_tick\s*\)", path.read_text()):
+                registrations.append(path.relative_to(ROOT).as_posix())
+    assert registrations == ["net/link.c"], registrations
+    assert "tick_register(PC98_TICK_LINK, link_tick)" in (ROOT / "net/link.c").read_text()
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"
     link = re.sub(r"/\*.*?\*/", "", (ROOT / "net/link.c").read_text(encoding="utf-8"),
@@ -106,7 +109,7 @@ def check_timer_calls_link_tick():
     lgy = (ROOT / "drivers/lgy98.c").read_text(encoding="utf-8")
     assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
         "反射モードで link_init を止めていない"
-    print("DRIVE SOURCE: link_tick only from timer_handler PASS", flush=True)
+    print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
 
 
 def run_fixture(args, timeout=600):

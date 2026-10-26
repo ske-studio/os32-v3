@@ -1,4 +1,7 @@
 check-r1-fixture-host:
+- kernel/tick.c
+- kernel/tick.h
+- platform/pc98/tick_order.h
 - kdebug/selftest_lease.c
 - include/kselftest_probe.h
 - kdebug/selftest_internal.h

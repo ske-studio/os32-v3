@@ -56,12 +56,8 @@ static void __attribute__((unused)) host_raise_ud(void) {
     fail(__LINE__);
 }
 #include "fixture_source.c"
-static void snd_tick(void) {}
-static void pcm_tick(void) {}
-static void ne2k_timer_tick(void) {}
-static void e82557_tick(void) {}
-static void link_tick(void) {}
-static void lgy98_tick(void) {}
+static u32 dispatch_calls;
+static void tick_dispatch(void) { dispatch_calls++; }
 #include "timer_source.c"
 
 static int test(void)
@@ -77,16 +73,18 @@ static int test(void)
         CHECK(!ledger_irq_ops && !ledger_exc_ops && !exec_stop_count);
         CHECK(pgalloc_free_pages() == free0);
     }
+    u32 dispatch_before = dispatch_calls;
     r1_fixture_arm[1] = R1_FIXTURE_ARM;
     kctx_irq_depth = 1;
     if (!__builtin_setjmp(stop_jmp)) { timer_handler(); fail(__LINE__); }
+    CHECK(dispatch_calls == dispatch_before);
     CHECK(!r1_fixture_arm[1] && ledger_irq_ops == 1 && !ledger_exc_ops);
     CHECK(equal(ledger_check_tag, "R1 context"));
     CHECK(ledger_irq_last[0] == LEDGER_OP_ALLOC && ledger_irq_last[1] == LEDGER_OWNER_KERNEL && ledger_irq_last[2]);
     CHECK(ledger_irq_last[2] >= (u32)r1_fixture_timer &&
           ledger_irq_last[2] < (u32)r1_fixture_exception);
     CHECK(pgalloc_free_pages() == free0);
-    timer_handler(); CHECK(ledger_irq_ops == 1); kctx_irq_depth = 0;
+    timer_handler(); CHECK(dispatch_calls == dispatch_before + 1); CHECK(ledger_irq_ops == 1); kctx_irq_depth = 0;
 
     r1_fixture_arm[2] = R1_FIXTURE_ARM;
     kctx_exc_depth = 1;

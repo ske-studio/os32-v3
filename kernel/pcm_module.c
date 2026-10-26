@@ -1,3 +1,6 @@
+#include "tick.h"
+#include "tick_order.h"
+_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
 #include "pcm_imports.h"
@@ -163,6 +166,7 @@ static int pcm_stop_dma(struct module_record *r)
 
 int pcm_module_load(void)
 {
+    if (tick_register(PC98_TICK_PCM, pcm_tick) != 0) return MODULE_INIT_FAILED;
     if (pcm_handle.generation) return MODULE_BUSY;
     const struct bootinfo *bi = bootinfo_get();
     const struct module_request request = {
