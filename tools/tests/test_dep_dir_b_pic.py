@@ -22,7 +22,7 @@ HEADERS = ('kernel/platform_irq.h', 'kernel/irq.h', 'kernel/irq_math.h',
            'kernel/idt.h', 'kernel/gdt.h', 'kernel/pit_math.h')
 MUTATIONS = (
     ('platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
-    ('platform/pc98/pic.c', '    irq_restore(flags);', '    /* restore removed */'),
+    ('platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),
     ('platform/pc98/pic.c', '    outp(PIC2_CMD, OCW3_IRR);\n    return', '    /* IRR restore removed */\n    return'),
     ('kernel/irq.c', '        platform_irq_eoi_master();', '        pic_eoi(irq);'),
 )
