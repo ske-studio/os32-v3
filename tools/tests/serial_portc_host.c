@@ -16,8 +16,8 @@
 /*  IRQ4 の線も模型にする: 線 = RXRE (bit0) かつ受信データあり。立ち上がり */
 /*  を数えて、ISR が汲み残したときに次の割り込みが作られるかを見る。       */
 /*  0136h は FIFO 搭載機の真似もできる (bit6 が読むたびに反転)。             */
-/*  kernel/sys.c の buz_on / buz_off は、test_serial_portc.py が関数本体を  */
-/*  そのまま切り出した sys_buz.inc で通す。                                 */
+/*  platform/pc98/system.c のブザー実体を test_serial_portc.py が切り出す。 */
+/*  関数本体をそのまま写した sys_buz.inc で通す。                           */
 /*                                                                          */
 /*  NP21/W の sound/beepc.c も BUZ を bit3 = 0 で鳴らす (UNDOCUMENTED と同じ */
 /*  向き)。エミュレータで鳴らなかった理由はここでは扱わない。               */
@@ -109,7 +109,7 @@ int ring3_wait_pending(void) { return 0; }
 #include "serial.c"          /* 変異の写しを引けるよう -I で探させる */
 #include "serial_emergency_host.h"
 #include "../../drivers/serial_plan.c"
-#include "sys_buz.inc"       /* kernel/sys.c の buz_on / buz_off (実物の写し) */
+#include "sys_buz.inc"       /* platform/pc98/system.c のブザー実体の写し */
 
 void cpu_delay_us(u32 us) { (void)us; }
 volatile u32 tick_count;
@@ -349,19 +349,19 @@ static void vfast_fifo_path(void)
     CHECK((g_portc & 0x07) == IEN_RX);
 }
 
-/* ---- kernel/sys.c の buz_on / buz_off が書く値 ---- */
+/* ---- platform/pc98/system.c の platform_buzzer_on / platform_buzzer_off が書く値 ---- */
 static void sys_buz_values(void)
 {
     reset_model(PORTC_BOOT);
-    buz_off();
+    platform_buzzer_off();
     CHECK(g_log_n == 1);
     CHECK(g_log[0].port == 0x37 && g_log[0].val == 0x07);
     CHECK((g_portc & 0x08) == 0x08);            /* 停止 */
-    buz_on();
+    platform_buzzer_on();
     CHECK(g_log_n == 2);
     CHECK(g_log[1].port == 0x37 && g_log[1].val == 0x06);
     CHECK((g_portc & 0x08) == 0x00);            /* 鳴動 */
-    buz_off();
+    platform_buzzer_off();
     CHECK((g_portc & 0xFFu) == PORTC_BOOT);     /* ほかのビットは触らない */
     CHECK(g_portc_full_writes == 0);
 }

@@ -7,3 +7,5 @@ check-pit-clock-host:
 - tools/tests/test_pit_clock.py
 - tools/check_map.d/check-pit-clock-host.yaml
 - build/checks.d/check-pit-clock-host.mk
+- kernel/platform_irq.h
+- platform/pc98/pic.c

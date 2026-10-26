@@ -27,22 +27,22 @@ HARNESS = ROOT / "tools/tests/serial_portc_host.c"
 SRCS = {
     "drivers/serial.c": ROOT / "drivers/serial.c",
     "include/pc98.h": ROOT / "include/pc98.h",
-    "kernel/sys.c": ROOT / "kernel/sys.c",
+    "platform/pc98/system.c": ROOT / "platform/pc98/system.c",
 }
 CASES = ["bsr_polarity", "init_bsr_only", "isr_edge_bsr", "real_hw_story",
          "init_from_all_ones", "isr_drain_limit_edge", "vfast_fifo_path",
          "sys_buz_values"]
 
-# kernel/sys.c は pgalloc や rtc まで引くので丸ごとは載せない。buz_on /
-# buz_off の関数本体を**そのまま**切り出して sys_buz.inc にする (写経しない)。
-BUZ_RE = re.compile(r"^void buz_on\(void\)\n\{.*?^\}\n\s*^void buz_off\(void\)\n\{.*?^\}\n",
+# platform/pc98/system.c の platform_buzzer_on/off の関数本体を
+# **そのまま**切り出して sys_buz.inc にする (転送関数を写さない)。
+BUZ_RE = re.compile(r"^void platform_buzzer_on\(void\)\n\{.*?^\}\n\s*^void platform_buzzer_off\(void\)\n\{.*?^\}\n",
                     re.S | re.M)
 
 
 def extract_buz(sys_c):
     m = BUZ_RE.search(sys_c)
     if not m:
-        raise SystemExit("kernel/sys.c に buz_on / buz_off が見つからない")
+        raise SystemExit("platform/pc98/system.c に platform_buzzer_on / platform_buzzer_off が見つからない")
     return m.group(0)
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=",
@@ -92,10 +92,10 @@ MUTATIONS = [
      "        ser_ien_bsr((u8)(IEN_RX | IEN_TXEMP | IEN_TX), 0);\n",
      "初期化で 0 のビットにも落とす BSR を書く (TXRE への 04h が NP21/W で"
      "余分な IRQ4 を起こしうる)"),
-    ("kernel/sys.c",
-     r"(void buz_off\(void\)\n\{\n    outp\(SYSPORT_C_BSR, )BSR_BUZ_OFF",
+    ("platform/pc98/system.c",
+     r"(void platform_buzzer_off\(void\)\n\{\n    outp\(SYSPORT_C_BSR, )BSR_BUZ_OFF",
      r"\1BSR_BUZ_ON",
-     "kernel/sys.c の buz_off() が 06h (鳴動) を書く (rshell が応答のたびに鳴らす)"),
+     "platform/pc98/system.c の platform_buzzer_off() が 06h (鳴動) を書く (rshell が応答のたびに鳴らす)"),
     ("drivers/serial.c",
      r"    ser_ien_bsr\(s_mask_ien, 0\);\n    ser_ien_bsr\(s_mask_ien, s_mask_ien\);\n",
      "    outp(SER_MASK, 0x00);\n    outp(SER_MASK, s_mask_ien);\n",
@@ -121,7 +121,7 @@ MUTATIONS = [
     ("include/pc98.h",
      r"#define BSR_BUZ_ON          0x06(.*)\n#define BSR_BUZ_OFF         0x07",
      r"#define BSR_BUZ_ON          0x07\1\n#define BSR_BUZ_OFF         0x06",
-     "pc98.h の BUZ の名前を Bible の向きに戻す (buz_off() が鳴らす)"),
+     "pc98.h の BUZ の名前を Bible の向きに戻す (platform_buzzer_off() が鳴らす)"),
     ("drivers/serial.c",
      r"(ien & IEN_RX\)    \? )BSR_RXRE_ON : BSR_RXRE_OFF",
      r"\1BSR_TXEE_ON : BSR_RXRE_OFF",
@@ -145,7 +145,7 @@ def host_build(tmp, mutated=None):
     (work / "platform_io.h").write_text(FAKE_PLATFORM_IO, encoding="utf-8")
     for rel, path in SRCS.items():
         text = (mutated or {}).get(rel, path.read_text(encoding="utf-8"))
-        if rel == "kernel/sys.c":
+        if rel == "platform/pc98/system.c":
             (work / "sys_buz.inc").write_text(extract_buz(text),
                                               encoding="utf-8")
             continue

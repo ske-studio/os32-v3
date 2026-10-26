@@ -26,4 +26,6 @@ check-fdc-track-host:
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - include/clock_service.h
 - kernel/clock_service.c
+- kernel/platform_irq.h
+- platform/pc98/pic.c
 artifact_reader: true

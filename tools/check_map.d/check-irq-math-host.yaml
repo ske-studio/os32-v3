@@ -6,3 +6,5 @@ check-irq-math-host:
 - tools/check_map.d/check-irq-math-host.yaml
 - build/checks.d/check-irq-math-host.mk
 - include/pc98.h
+- kernel/platform_irq.h
+- platform/pc98/pic.c

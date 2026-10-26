@@ -11,6 +11,7 @@
 
 #include "irq.h"
 #include "idt.h"
+#include "platform_irq.h"
 #include "io.h"
 #include "kprintf.h"
 
@@ -102,18 +103,14 @@ void irq_finish(unsigned int irq, int handled_any)
 
     if (irq == PIC_SLAVE_LAST_IRQ) {
         /* handled に関係なくスレーブの ISR を見る (票 §1-1 の 5)。 */
-        u8 slave_isr;
-        outp(PIC2_CMD, OCW3_ISR);
-        slave_isr = (u8)inp(PIC2_CMD);
-        outp(PIC2_CMD, OCW3_IRR);       /* 既定の IRR 読み出しへ戻す */
-        bit7 = (slave_isr & PIC_LAST_ISR_BIT) ? 1 : 0;
+        bit7 = platform_irq_slave_last_in_service();
     }
 
     plan = irq_eoi_plan(irq, bit7);
     if (plan == IRQ_EOI_SLAVE_MASTER) {
         pic_eoi(irq);                   /* スレーブ → マスタ */
     } else if (plan == IRQ_EOI_MASTER) {
-        outp(PIC1_CMD, OCW2_EOI);
+        platform_irq_eoi_master();
     }
 
     if (!handled_any && !irq_test_quiet) isr_unexpected_report((u32)irq);

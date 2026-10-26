@@ -10,3 +10,5 @@ check-serial-portc-host:
 - kernel/serial_diag.c
 - include/console_output.h
 - lib/serial_diag.h
+- kernel/platform_sys.h
+- platform/pc98/system.c
