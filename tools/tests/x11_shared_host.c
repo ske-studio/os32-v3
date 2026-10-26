@@ -45,10 +45,7 @@ void appslot_poll_yield_reset(void) {}
 int v86_is_active(void) { return 0; }
 int v86_kbd_push(u8 code) { (void)code; return 0; }
 void v86_request_exit(void) {}
-int serial_trygetchar(void) { return -1; }
 int serial_peekchar(void) { return -1; }
-int serial_gate_active(void) { return 1; }
-void serial_puts_polled(const char *s) { (void)s; }
 void ring3_wm_enter(void) { wm_depth++; ring3_wm_depth++; }
 void ring3_wm_leave(void) { wm_depth--; ring3_wm_depth--; }
 void appslot_gui_op_enter(int wait) { wait_depth = wait ? 1 : 2; }
@@ -126,6 +123,7 @@ int ime_user_clear(IME_Dict *d)
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
+#include "port_fixture_host.h"
 /* This fixture exercises input/serial; supply a fake calendar provider. */
 #include "../../kernel/clock_service.c"
 const ClockOps pc98_clock = {
@@ -514,6 +512,7 @@ static int unpublished(void)
 }
 void _start(void)
 {
+    emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
     int rc = unpublished() || modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();

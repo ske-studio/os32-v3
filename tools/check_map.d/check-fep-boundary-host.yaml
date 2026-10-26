@@ -25,3 +25,7 @@ check-fep-boundary-host:
 - include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h

@@ -144,6 +144,7 @@ def host_build(tmp, mutated=None):
     cmd = ["gcc", *FLAGS, "-I" + str(SHIM), "-I" + str(src_dir),
            "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
            "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "kernel"),
+           "-I" + str(ROOT / "lib"),
            "-I" + str(ROOT / "userland/shell"), "-I" + str(ROOT),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)

@@ -55,4 +55,8 @@ check-vfs-fd-path-host:
 - include/kbd.h
 - include/clock_service.h
 - kernel/clock_service.c
+- tools/tests/serial_emergency_host.h
+- kernel/serial_diag.c
+- include/console_output.h
+- lib/serial_diag.h
 artifact_reader: true
