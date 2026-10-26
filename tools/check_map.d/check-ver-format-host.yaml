@@ -1,0 +1,21 @@
+check-ver-format-host:
+- kernel/ver_format.c
+- kernel/ver_info.h
+- kernel/module.c
+- kernel/module.h
+- kernel/sqlite_engine.h
+- kernel/idt.h
+- drivers/kbd.h
+- include/bootinfo.h
+- include/config.h
+- include/types.h
+- lib/kstring.h
+- lib/kstring_asm.asm
+- sdk/include/os32/os32_kapi_shared.h
+- sdk/include/os32/os32_ver_info.h
+- tools/tests/ver_format_host.c
+- tools/tests/test_ver_format.py
+- tools/tests/ver_test_utils.py
+- tools/tests/host32.py
+- build/checks.d/check-ver-format-host.mk
+- tools/check_map.d/check-ver-format-host.yaml
