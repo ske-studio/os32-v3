@@ -18,6 +18,7 @@
 #include "kstack_hw.h"
 #include "sqlite_engine.h"
 #include "module.h"
+#include "ver_info.h"
 extern u32 exec_as_leftover_pages;
 extern volatile u32 fault_kill_count;
 extern u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
@@ -149,14 +150,32 @@ done:
     return result;
 }
 
+/* Copy this translation unit's kernel build time without diagnostic output. */
+static void build_time_copy(char *buf, u32 size)
+{
+    kstrncpy(buf, __DATE__ " " __TIME__, size);
+}
+
 /* カーネルビルド時の日時文字列を返す */
 void kapi_sys_get_build_info(char *buf, int size)
 {
     /* int の size を無検証で u32 に渡すと負値が巨大長に化ける */
     if (!buf || size <= 0) return;
-    kstrncpy(buf, __DATE__ " " __TIME__, (u32)size);
+    build_time_copy(buf, (u32)size);
     sqlite_engine_stack_report();
     services_report();
+}
+
+/* The generated __cdecl wrapper supplies the existing output-range check. */
+int __cdecl kapi_sys_ver_info(void *out, u32 size)
+{
+    VerSnapshot s;
+
+    if (!out || size != sizeof(OS32_VerInfo)) return OS32_ERR_INVAL;
+    ver_collect(&s);
+    build_time_copy(s.build, sizeof(s.build));
+    ver_format(&s, (OS32_VerInfo *)out);
+    return 0;
 }
 
 /* ======================================================================== */
