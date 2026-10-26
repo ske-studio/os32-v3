@@ -60,11 +60,12 @@ extern int kapi_pci_bind_info(u32 idx, void *out);
 extern int kapi_serial_diag(SerialDiag *out);
 extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 extern i32 kdebug_call(u32 op, void *buf, u32 size);
+extern int kapi_sys_ver_info(void *out, u32 size);
 
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[254];
+volatile u32 kapi_hits[255];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -324,6 +325,7 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     16,  /* font_source_read_at */
     4,  /* font_source_close */
     12,  /* kdebug_call */
+    8,  /* sys_ver_info */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -583,6 +585,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* font_source_read_at */
     0x0000,  /* font_source_close */
     0x0000,  /* kdebug_call */
+    0x0000,  /* sys_ver_info */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -2456,5 +2459,16 @@ i32 __cdecl wrap_kdebug_call(u32 op, void *buf, u32 size)
         ring3_fault_kill();   /* 戻らない */
     }
     return kdebug_call(op, buf, size);
+}
+
+int __cdecl wrap_sys_ver_info(void *out, u32 size)
+{
+    KAPI_HIT(254);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, size),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return kapi_sys_ver_info(out, size);
 }
 

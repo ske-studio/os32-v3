@@ -388,6 +388,7 @@
       "sys_umount",
       "sys_umount_checked",
       "sys_unlink",
+      "sys_ver_info",
       "sys_write",
       "sys_yield",
       "tvram_clear",
@@ -547,6 +548,14 @@
     "OS32_SurfaceRef": [
       "generation",
       "sid"
+    ],
+    "OS32_VerInfo": [
+      "count",
+      "lines"
+    ],
+    "OS32_VerLine": [
+      "kind",
+      "text"
     ],
     "RTC_Time_Ext": [
       "day",

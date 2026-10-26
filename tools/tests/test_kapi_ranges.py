@@ -55,7 +55,7 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['resolve'] = ('#include "' + str(ROOT / 'fs/vfs.h') + '"\n' +
                               'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
         memstat = (ROOT / 'kapi/kapi_sys.c').read_text()
-        sources['memstat'] = memstat[memstat.index('STATIC_ASSERT(sizeof(MemStat)'):memstat.index('/* カーネルビルド時')].replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
+        sources['memstat'] = memstat[memstat.index('STATIC_ASSERT(sizeof(MemStat)'):memstat.index('static void build_time_copy(')].replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
         if mutant and not no_out:
             name, key, old, new, expected = mutant
             assert old in sources[key], name

@@ -232,8 +232,9 @@ def pair_runtime_suite(folder, mutate=False):
 def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=False, fep_mutate=False, policy_mutate=False):
     """Execute the product module with the full adapter and real stack switch."""
     generated = ROOT / 'lib/sqlite3/generated'
-    (folder / 'sys_build_info.inc').write_text(function(
-        (ROOT / 'kapi/kapi_sys.c').read_text(), 'kapi_sys_get_build_info'))
+    (folder / 'sys_build_info.inc').write_text(
+        function((ROOT / 'kapi/kapi_sys.c').read_text(), 'build_time_copy') + '\n' +
+        function((ROOT / 'kapi/kapi_sys.c').read_text(), 'kapi_sys_get_build_info'))
     fep_directory = ROOT / 'build/out/fep'
     fep_elf = mkmod.Elf((fep_directory / 'fep.elf').read_bytes())
     (folder / 'fep_host_offsets.h').write_text(

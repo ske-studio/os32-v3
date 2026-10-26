@@ -25,8 +25,10 @@ typedef struct {
     OS32_VerLine lines[OS32_VER_LINES];
 } OS32_VerInfo;
 
+#if defined(__i386__)
 /* Fixed ILP32 ABI; typedef assertions also work with C89 consumers. */
 typedef char os32_ver_line_size_68[(sizeof(OS32_VerLine) == 68) ? 1 : -1];
 typedef char os32_ver_info_size_1364[(sizeof(OS32_VerInfo) == 1364) ? 1 : -1];
+#endif
 
 #endif

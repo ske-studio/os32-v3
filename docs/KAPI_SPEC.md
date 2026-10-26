@@ -1,4 +1,4 @@
-# KernelAPI v78 仕様書
+# KernelAPI v79 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 (票 TASK_T2_APPBAND §4) |
 | プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
 | プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
-| 現在のバージョン | **78** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 254・予約 46) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **79** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 255・予約 45) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -126,6 +126,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v76 | **受入済み (T3、2026-10-18 — 実装は T3d1b)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
+| v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[VER_INFO_DESIGN](decisions/VER_INFO_DESIGN.md) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -291,7 +292,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 254〜299 (`kapi_reserved[46]`、v78 時点。v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 255〜299 (`kapi_reserved[45]`、v79 時点。v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -1672,9 +1673,34 @@ realloc は失敗時に旧内容を保ち、成功した再試行で copy と旧
 resident C CRT にはこの欄を組み込まず、gshell の Rust flag も偽のまま。
 詳細なアプリ契約は 決定 `decisions/gui/API_CONTRACTS.md` T5a。
 
+### sys_ver_info (v79)
+
+ver / About 用に、実行中カーネルの版・装置の保存値・識別情報・診断の行を返す。
+公開型は `sdk/include/os32/os32_ver_info.h` (`os32_kapi_shared.h` から include)。
+
+- slot 254 / offset 0x400、`int sys_ver_info(void *out, u32 size)`。
+- `out` は `OS32_VerInfo`、`size` は正確に `sizeof(OS32_VerInfo)` (1364 バイト)。
+  NULL またはサイズ不一致は `OS32_ERR_INVAL`、書込みなし。成功は 0。
+  生成ラッパーの既存 out 範囲検査を適用する。
+- `OS32_VerLine` は kind (u32) + text[64] の 68 バイト。
+  `OS32_VerInfo` は count (u32) + lines[20]。全体をゼロ初期化し、
+  count 件だけが有効。各 text は NUL 終端、改行・字下げなし、52 桁以内。
+- kind の低 8 bit は HEAD=0 / DEVICE=1 / IDENTITY=2 / DEBUG=3。
+  `OS32_VER_INDENT` (bit 8) は CUI の先頭 2 空白を指示する独立 bit。
+- 行順は見出し、CPU/PIC/PIT/KBD/SER/SND/GFX、API、Build、Commit、Image CRC、
+  kdebug (必要時は詳細の継続 1 行)、sqlite stack、services。
+  boot 情報の取得失敗時だけ Commit/CRC を省略する。
+- 版の正典は `include/config.h` の SYS_VERSION (`3.0-dev`)。
+  Build は旧 `sys_get_build_info` と同じコンパイル日時。
+  保存値の取得と整形だけを行い、再検出・待ち・割当・印字は行わない。
+  旧 `sys_get_build_info` の sqlite stack / services の印字副作用は維持する。
+- 新ユーザーランドは新カーネル専用。生成済み OS32X_MIN_API により要求版が
+  v79 に上がるため、この移行で app.conf は変更しない。旧ユーザーランドは
+  新カーネルで動く。更新は boot を先に行う。
+
 ### 予約スロット (v63〜)
 
-0x400〜0x4B4 (slot 254〜299、46 本、v78 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x404〜0x4B4 (slot 255〜299、45 本、v79 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2036,6 +2062,7 @@ app の終了・fault で残った lease は回収で閉じる (結線は T7b-b2
 | オフセット | 名前 | 型 |
 |---|---|---|
 | 0x3FC | kdebug_call | `i32(u32 op, void *buf, u32 size)` |
+| 0x400 | sys_ver_info | `int(void *out, u32 size)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/kdebug_call.c`)。部品が動いていない・slot 19 が

@@ -103,7 +103,7 @@ void fd_redirect_restore(const FdRedirectState *s) { (void)s; }
     (tmp / 'trim_exec_source.c').write_text(fn(sources['exec/exec.c'], 'i32 exec_trim_done('))
     (tmp / 'trim_gui_source.c').write_text(sources['kernel/gui.c'])
     stat = sources['kapi/kapi_sys.c']
-    (tmp / 'mem_stat_source.c').write_text(stat[stat.index('STATIC_ASSERT(sizeof(MemStat)'):stat.index('/* カーネルビルド時')])
+    (tmp / 'mem_stat_source.c').write_text(stat[stat.index('STATIC_ASSERT(sizeof(MemStat)'):stat.index('static void build_time_copy(')])
     setters = ('appslot_trim_epoch', 'appslot_trim_request_count', 'appslot_trim_mark_count',
                'appslot_trim_done_count', 'appslot_trim_done_reject_count',
                'appslot_reclaim_count', 'appslot_last_reclaim_id')

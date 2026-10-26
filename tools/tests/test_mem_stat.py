@@ -64,6 +64,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     (tmp / 'services_report_source.c').write_text(
         function(read('kernel/sqlite_engine.c'), 'void services_report('))
     (tmp / 'build_info_source.c').write_text(
+        function(read('kapi/kapi_sys.c'), 'static void build_time_copy(') + '\n' +
         function(read('kapi/kapi_sys.c'), 'void kapi_sys_get_build_info('))
     (tmp / 'mem_fixture.c').write_text(fixture)
     heap = read('tools/tests/exec_heap_host.h')
@@ -155,7 +156,7 @@ def run_body(runner, mutate):
     boot = (ROOT / 'kernel/kernel.c').read_text()
     assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('bootinfo_capture();')
     source = (ROOT / 'kapi/kapi_sys.c').read_text()
-    source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('/* カーネルビルド時')]
+    source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('static void build_time_copy(')]
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)
@@ -546,7 +547,7 @@ def run_kdebug_cli(runner, mutate=False):
                      'RELOC_INVALID', 'IMPORT_INVALID', 'UNKNOWN')
             for code, name in enumerate(names, 2):
                 assert f'rejected ({code} {name}, file pair 1234abcd)' in output
-            assert 'Image CRC: 1234abcd (0 bytes, HDD loader)\nkdebug: on' in output
+            assert '  Image CRC: 1234abcd (0 bytes, HDD loader)\nkdebug: on (pair 1234abcd)\nkdebug pages: body=2 owner=3\n  services: SERVICES_READY public=1\n' in output
             print('PASS kdebug CLI CPL3' if app else 'PASS kdebug CLI CPL0')
 
 

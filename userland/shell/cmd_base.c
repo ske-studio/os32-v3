@@ -56,7 +56,7 @@ static int cmd_tick(int argc, char **argv)
     return 0;
 }
 
-/* Names follow TASK_DBGREF §3-7; one table for ver and kdebug. */
+/* Names for the standalone kdebug command (TASK_DBGREF §3-7). */
 static const char *const kdebug_state_names[] = {
     "OFF", "RUNNING", "NOT_FOUND", "BAD_HEADER", "PAIR_MISMATCH",
     "NO_IMAGE_CRC", "ABI_MISMATCH", "NO_PAGES", "SHORT_READ", "BAD_CRC",
@@ -96,37 +96,26 @@ int shell_print_kdebug(int detail)
 
 static int cmd_ver(int argc, char **argv)
 {
+    OS32_VerInfo report;
+    u32 i;
     (void)argc; (void)argv;
-    g_api->kprintf(ATTR_GREEN, "PC-9801 OS32 v%s (Ring3 Native)\n",
-                   SYS_VERSION);
-    g_api->kprintf(ATTR_CYAN, "%s", "  CPU: Intel 386+ (Protected Mode + Paging)\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  PIC: 8259A x2 (remapped to INT 20h+)\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  PIT: 8254 @ 100Hz\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  KBD: uPD8251A (IRQ1)\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  SER: uPD8251A RS-232C (IRQ4)\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  SND: YM2203 (OPN) FM3+SSG3\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "  GFX: 640x400x16 CPU direct\n");
-    g_api->kprintf(ATTR_WHITE, "  API: v%u\n", g_api->version);
-    /* Build はカーネルを組んだ日時 (以前はシェル自身の __DATE__ だった)。
-     * Commit / Image CRC は票 TASK_SERIAL_HOSTFS A-4 (KAPI v65)。
-     * 更新の証拠は Image CRC (ローダが検査して起動した vmkernel.lz4)。 */
-    {
-        char build[32];
-        BootImageInfo bi;
 
-        g_api->sys_get_build_info(build, (int)sizeof(build));
-        g_api->kprintf(ATTR_WHITE, "  Build: %s\n", build);
-        if (g_api->version >= 65 && g_api->boot_image_info(&bi) == 0) {
-            g_api->kprintf(ATTR_WHITE, "  Commit: %s\n", bi.commit);
-            if (bi.crc_valid)
-                g_api->kprintf(ATTR_WHITE, "  Image CRC: %08x (%u bytes, %s loader)\n",
-                               bi.image_crc, bi.image_size,
-                               bi.source == 2 ? "HDD" : bi.source == 1 ? "FD" : "?");
-            else
-                g_api->kprintf(ATTR_WHITE, "%s", "  Image CRC: none (loader did not record)\n");
-        }
+    if (g_api->sys_ver_info(&report, sizeof(report)) != 0) {
+        g_api->kprintf(ATTR_RED, "%s", "ver: sys_ver_info failed\n");
+        return SH_STATUS_ERROR;
     }
-    if (g_api->version >= 75) (void)shell_print_kdebug(0);
+    for (i = 0; i < report.count; i++) {
+        const OS32_VerLine *line = &report.lines[i];
+        u8 attr = ATTR_WHITE;
+        switch (line->kind & OS32_VER_KIND_MASK) {
+        case OS32_VER_HEAD: attr = ATTR_GREEN; break;
+        case OS32_VER_DEVICE: attr = ATTR_CYAN; break;
+        }
+        if (line->kind & OS32_VER_INDENT)
+            g_api->kprintf(attr, "%s", "  ");
+        g_api->kprintf(attr, "%s", line->text);
+        g_api->kprintf(attr, "%s", "\n");
+    }
     return 0;
 }
 

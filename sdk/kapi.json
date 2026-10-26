@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 4, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 78,
+  "version": 79,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -66,7 +66,8 @@
     "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern int kapi_serial_diag(SerialDiag *out);",
     "extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);",
-    "extern i32 kdebug_call(u32 op, void *buf, u32 size);"
+    "extern i32 kdebug_call(u32 op, void *buf, u32 size);",
+    "extern int kapi_sys_ver_info(void *out, u32 size);"
   ],
   "api": [
     {
@@ -1910,6 +1911,13 @@
       "ret": "i32",
       "args": ["u32 op", "void *buf", "u32 size"],
       "out": [{"arg": "buf", "len": "size"}]
+    },
+    {
+      "name": "sys_ver_info",
+      "ret": "int",
+      "args": ["void *out", "u32 size"],
+      "out": [{"arg": "out", "len": "size"}],
+      "target": "kapi_sys_ver_info"
     }
   ]
 }
