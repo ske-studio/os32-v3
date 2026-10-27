@@ -125,49 +125,107 @@ static int pll_fail_write(void *v,const struct recover_bus_access *a,u32 value)
     return exec_bus_write(v,a,value);
 }
 /* Model Ra266's 4600h readback independently of its write latch. */
+static u32 pll_reads[RECOVER_NODE_MAX], pll_old[RECOVER_NODE_MAX];
 static u32 mismatch_key, mismatch_after, mismatch_seen;
 static int pll_readback(void *v,const struct recover_bus_access *a,u32 *value)
 {
     int rc=exec_bus_read(v,a,value);
     if(a->offset==GF_PLL_MEMORY_POWER)*value=0;
+    if(core.state==REC_RUNNING && core.cursor<decoded.plan.node_count &&
+       a->key==decoded.args[decoded.nodes[core.cursor].arg_first].value) {
+        pll_reads[core.cursor]++;pll_old[core.cursor]=*value;
+    }
     if(core.state==REC_RUNNING && a->key==mismatch_key && actual_count>=mismatch_after) {
         if(!mismatch_seen)mismatch_seen=actual_count;
         *value^=1U;
     }
     return rc;
 }
+/* Retain one complete BEGIN line, discarding unrelated capture/guard logs. */
+static int pll_log_put(void *opaque,u32 byte)
+{
+    int rc=exec_log_put(opaque,byte);
+    if(byte=='\n' && !exec_log_has("phase=gf_bus event=BEGIN")) {
+        exec_log_n=0;exec_log[0]=0;
+    }
+    return rc;
+}
+static const struct recover_transport pll_transport={
+    .get=exec_log_get,.uart={exec_log_ready,pll_log_put,exec_log_wait},.frame_us=1042,.max_polls=100000
+};
+/* BEGIN must contain the actual pre-write read, before the bus write occurs. */
+static int pll_logged_write(void *v,const struct recover_bus_access *a,u32 value)
+{
+    if(core.state!=REC_RUNNING)return exec_bus_write(v,a,value);
+    u32 node=core.cursor;
+    CHECK(node<decoded.plan.node_count);
+    if(node>=decoded.plan.node_count)return -1;
+    CHECK(pll_reads[node]==1);
+    CHECK(exec_log_has("phase=gf_bus event=BEGIN"));
+    struct rec_row row={.n=0};
+    row_number(&row," pc=",decoded.nodes[node].pc);
+    row_number(&row," bar=",a->bar);row_number(&row," off=",a->offset);
+    row_number(&row," width=",a->width);row_number(&row," old=",pll_old[node]);
+    row_number(&row," new=",value);row_text(&row,"\n");row.data[row.n]=0;
+    CHECK(exec_log_has(row.data));
+    /* Clear only the host buffer so each write's BEGIN is checked separately. */
+    exec_log_n=0;exec_log[0]=0;
+    return exec_bus_write(v,a,value);
+}
 static void pll_readback_tests(void)
 {
-    for(pll_double=0;pll_double<2;pll_double++) {
-        pll_plan(0xe754);
+    const u32 pcs[]={0xe728,0xe754},counts[]={6,15};
+    for(pll_double=0;pll_double<2;pll_double++) for(u32 k=0;k<2;k++) {
+        pll_plan(pcs[k]);
         u32 power=key_for(&profile,GF_PLL_MEMORY_POWER,0,0,0);
         reference_values[power]=0;
-        reference_pll(GF_PLL_MEMORY,400000);
-        /* Keep the complete baseline trace across the fault runs below. */
-        struct trace_item baseline[15];
-        CHECK(expected_count==15);
-        for(u32 i=0;i<15;i++)baseline[i]=expected[i];
+        reference_pll(k?GF_PLL_MEMORY:GF_PLL_CORE,k?400000:200000);
         mismatch_key=RECOVER_NONE;mismatch_after=0;
-        executor_bus.read=pll_readback;
+        for(u32 i=0;i<RECOVER_NODE_MAX;i++)pll_reads[i]=pll_old[i]=0;
+        exec_log_n=0;exec_log[0]=0;exec_log_busy=false;core.transport=&pll_transport;
+        executor_bus.read=pll_readback;executor_bus.write=pll_logged_write;
         CHECK(gfinit_exec_run(&core,&execution)==0);compare_trace();
-        CHECK(actual_count==15 && actual[0].key==power && actual[0].value==0x80000000U);
-        CHECK(actual[11].key==power && actual[11].value==0 && values[power]==0);
-        /* Every other PLL row retains full verification and stops immediately
-         * when bit 0 differs after its write (captures still read cleanly). */
-        for(u32 j=0;j<15;j++) {
-            if(j==0 || j==11)continue;
-            pll_plan(0xe754);
+        CHECK(actual_count==counts[k]);
+        u32 writes=0,reads=0;
+        for(u32 i=0;i<decoded.plan.node_count;i++) {
+            reads+=pll_reads[i];
+            if(decoded.nodes[i].rule_id==RECOVER_NONE)continue;
+            const struct recover_rule *rule=&profile.rules[decoded.nodes[i].rule_id];
+            CHECK(rule->verify_mask==0 && profile.targets[rule->key].read_safe);
+            /* One old read, with no extra verification read after the write. */
+            CHECK(pll_reads[i]==1);writes++;
+            u32 old=rule->key==power?0:0xa5a55a5a;
+            for(u32 j=0;j+1<writes;j++)
+                if(expected[j].key==rule->key && rule->key!=power)old=expected[j].value;
+            CHECK(pll_old[i]==old);
+        }
+        /* Captures (gate/control, plus MEM power) still precede the old reads. */
+        CHECK(writes==counts[k] && reads==counts[k]+(k?3U:2U));
+        CHECK(values[key_for(&profile,GF_PLL_GATE,0,0,0)]==0xa5a55a5a);
+        if(k) {
+            CHECK(actual[0].key==power && actual[0].value==0x80000000U);
+            CHECK(actual[11].key==power && actual[11].value==0 && values[power]==0);
+        }
+        core.transport=0;
+    }
+    /* VIDEO is outside SUB6/SUB7: all five nonzero masks still stop on mismatch. */
+    for(pll_double=0;pll_double<2;pll_double++) {
+        pll_plan(0xe623);reference_pll(GF_PLL_VIDEO,36000);
+        struct trace_item baseline[5];
+        CHECK(expected_count==5);
+        for(u32 i=0;i<5;i++)baseline[i]=expected[i];
+        for(u32 j=0;j<5;j++) {
+            pll_plan(0xe623);
             mismatch_key=baseline[j].key;mismatch_after=j+1;mismatch_seen=0;
             executor_bus.read=pll_readback;
             CHECK(gfinit_exec_run(&core,&execution)<0 && core.reason==REC_VERIFY);
-            /* Common failure cleanup adds its own writes after this prefix. */
             CHECK(core.first_key==mismatch_key && mismatch_seen==j+1);
-            for(u32 i=0;i<mismatch_seen && i<15;i++)
+            for(u32 i=0;i<mismatch_seen && i<5;i++)
                 CHECK(actual[i].key==baseline[i].key && actual[i].value==baseline[i].value &&
                       actual[i].dir==baseline[i].dir);
         }
     }
-    output("PLL readback: 4600h fixed zero passes both writes; all other masks reject mismatch; ordered trace and saved restore unchanged\n");
+    output("PLL readback: SUB6/SUB7 21 old reads and gf_bus old fields, no verify reads; ordered writes/restores unchanged; VIDEO masks reject mismatch\n");
 }
 static void pll_execution_tests(void)
 {

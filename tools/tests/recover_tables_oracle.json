@@ -2,7 +2,7 @@
   "revision": "81d7f2531037b93f58bd6398cc06a87980d1d6b5",
   "source": "kdebug/recover_gf.c",
   "source_sha256": "c663abb80ed56cfcc573b0afedd2ecba5b1400fe84806d4f6b9303d4d2a9ea84",
-  "oracle_sha256": "07cf3ff43e9a521bd2ce8cc768d512fd31424a30584f1de893b2199e77e8cbd3",
+  "oracle_sha256": "021e56dbb56997ae9d52f1161846b2a98bf0813981bc93ca54551417dbd138da",
   "extraction": [
     "gcc",
     "-std=gnu11",
@@ -12,5 +12,5 @@
     "-Iinclude",
     "kdebug/recover_gf.c"
   ],
-  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation. Approved GF6200_4A_DESIGN main 0 delta (2026-10-27): only rules 550/561 verify_mask changed to zero; original source provenance retained."
+  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation. Approved GF6200_4A_DESIGN final section main 0 retry delta (2026-10-27): SUB6/SUB7 rules 544-564 (substeps 0x12000-0x12005 and 0x12020-0x1202e) verify_mask are zero, including previously zero rules 550/561. MIT nouveau setPLL_double_lowregs does not read back these writes; rnndb defines no readable bits. Write masks, values, order, captures and original source provenance retained."
 }
