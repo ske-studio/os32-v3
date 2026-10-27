@@ -49,7 +49,7 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 | PCRTC 600858h、PCRTC 602858h（32bit） | R(1FFFh,1FFFh) | 0h | T:40,550；T:602,731 |
 | h0 CR44（8bit） | index選択＋data：3h；0h | 0h | T:43–44,47–48；T:597 |
 | h1 SR01、h0 SR01（8bit） | index選択＋data：R(20h,20h) | 0h | T:45–46,49–50；T:603–604 |
-| PBUS 00184Ch（32bit） | R(F00h,0h)→退避値（実機で決まる） | 0h/FFFFFFFFh | T:51,580；T:605 |
+| PBUS 00184Ch（32bit） | R(F00h,0h)→退避値（実機で決まる） | 0h | T:51,580；T:605 |
 | PMC.ENABLE 000200h（32bit） | 1100000h→5110111h；R(2100000h,2100000h)。RESETでA2の03010101hを上書きしエンジン状態を変更。98維持を期待するが停止・崩れは中止、元値再生で戻さず電源再投入（D:132,170–171） | 0h | T:52–53,81；T:592 |
 | PBUS 001850h、MMIO 00C020h、PFB 100210h、MMIO 001508h、PMC割込み 000140h（32bit） | 0h | 0h | T:54,59–60,73,78；T:589,591,609–610,619 |
 | PSTRAPS 101000h（32bit） | R(80000C00h,80000000h)。bit31を立てbits10–11を落とし冷間strapを変更。98維持を期待するが異常時は中止、冷間値への復帰は電源再投入（docs/tasks/realhw/GEFORCE6200_VBIOS.md:126,215） | 0h | T:55；T:606 |
@@ -136,14 +136,14 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 | h0 CR1A（8bit） | index選択＋data：3Fh | 0h | T:389–390；T:682 |
 | h0 CR21、h1 CR21（8bit） | index選択＋data：FAh | 0h | T:395–396,448–449；T:685,698 |
 | h0 CR2B（8bit） | index選択＋data：R(DFh,0h) | 0h | T:397–398；T:686 |
-| h0 CR57（8bit） | index選択＋data：0h→1h→2h→3h→4h→5h→6h→退避値（実機で決まる） | 0h/FFh | T:411–412,415–416,419–420,423–424,427–428,431–432,435–436,439,582；T:693 |
+| h0 CR57（8bit） | index選択＋data：0h→1h→2h→3h→4h→5h→6h→退避値（実機で決まる） | 0h | T:411–412,415–416,419–420,423–424,427–428,431–432,435–436,439,582；T:693 |
 | h0 CR58（8bit） | index選択＋data：7Fh→0h→0h→0h→0h→0h→0h | 0h | T:413–414,417–418,421–422,425–426,429–430,433–434,437–438；T:694 |
 | h0 CR43、h1 CR43（8bit） | index選択＋data：1h | 0h | T:440–441,483–484；T:695,711 |
 | h0 CR85、h1 CR85（8bit） | index選択＋data：R(FFh,FFh) | 0h | T:442–443,450–451；T:696,699 |
 | h0 CR86、h1 CR86（8bit） | index選択＋data：R(FFh,1h) | 0h | T:444–445,452–453；T:697,700 |
 | h0 CR44（8bit） | index選択＋data：3h；0h | 0h | T:446–447,485–486；T:597 |
 | h1 CR2B（8bit） | index選択＋data：R(EFh,0h) | 0h | T:454–455；T:701 |
-| h1 CR57（8bit） | index選択＋data：0h→1h→2h→退避値（実機で決まる） | 0h/FFh | T:470–471,474–475,478–479,482,583；T:709 |
+| h1 CR57（8bit） | index選択＋data：0h→1h→2h→退避値（実機で決まる） | 0h | T:470–471,474–475,478–479,482,583；T:709 |
 | h1 CR58（8bit） | index選択＋data：7Fh→0h→0h | 0h | T:472–473,476–477,480–481；T:710 |
 | h0 CR52（8bit） | index選択＋data：4h | 0h | T:487–488；T:712 |
 | h0 CR53（8bit） | index選択＋data：40h | 0h | T:489–490；T:713 |
@@ -153,8 +153,8 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 | MMIO 68252Ch（32bit） | R(101h,101h) | 0h | T:494；T:715 |
 | MMIO 680848h、MMIO 682848h（32bit） | R(100000h,100000h) | 0h | T:495–496；T:716–717 |
 | MMIO 001200h（32bit） | 3103Ch | 0h | T:497；T:718 |
-| PLL gate 00C040h（32bit） | PLL補助（実機で決まる）→PLL補助（実機で決まる） | FFFFFFFFh | T:572,576；T:612 |
-| VPLL段制御 680580h、VPLL係数 680578h、VPLL 680508h（32bit） | PLL補助（実機で決まる） | FFFFFFFFh | T:573–575；T:615,739–740 |
+| PLL gate 00C040h（32bit） | PLL補助（実機で決まる）→PLL補助（実機で決まる） | 0h | T:572,576；T:612 |
+| VPLL段制御 680580h、VPLL係数 680578h、VPLL 680508h（32bit） | PLL補助（実機で決まる） | 0h | T:573–575；T:615,739–740 |
 
 ノート：承認後 `gfinit run-one <sid> 2 --allow-write` を下記monitorで1回。RECのmain=2・gf_pre/gf_bus BEGIN/END・rc・PAUSED・同じsid・連番欠落なしを確認し、差分と直後の98表示/更新をユーザーへ提示（S:38,41,53、D:163–168）。
 
@@ -182,7 +182,7 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 | h0 CR44（8bit） | index選択＋data：R(FFh,0h) | 0h | T:533–534；T:597 |
 | PFB 1002CCh（32bit） | R(1h,1h)；R(1h,0h)；R(40h,40h)；R(40h,0h) | 0h | T:536,538,541,543；T:671 |
 | PFB 1002C4h（32bit） | R(1h,1h)；R(1h,0h)；R(40h,40h)；R(40h,0h) | 0h | T:537,539,542,544；T:670 |
-| 容量写し 001700h（32bit） | COPY（実機で決まる） | FFFFFFFFh | T:584；T:732 |
+| 容量写し 001700h（32bit） | COPY（実機で決まる） | 0h | T:584；T:732 |
 
 ノート：承認後 `gfinit run-one <sid> 3 --allow-write` を下記monitorで1回。RECのmain=3・gf_pre/gf_bus BEGIN/END・rc・PAUSED・同じsid・連番欠落なしを確認し、差分と直後の98表示/更新をユーザーへ提示（S:38,41,53、D:163–168）。
 
