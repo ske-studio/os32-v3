@@ -68,6 +68,8 @@ check-mem-stat-host:
 - kernel/kselftest.h
 - kernel/memory_boot.c
 - kernel/memory_boot.h
+- kernel/platform_memory.h
+- platform/pc98/platform_memory_desc.h
 - include/kprintf.h
 - kernel/sysconfig.c
 - tools/check_map.d/check-mem-stat-host.yaml

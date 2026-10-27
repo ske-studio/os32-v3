@@ -5,6 +5,7 @@ fixture manifest for revisions, inputs, shim/source hashes and procedure.
 All positive and later mutation builds use the same copied directory tree.
 """
 import gzip
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -22,6 +23,28 @@ SOURCES = tuple('kernel/' + name + '.c' for name in
 HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib',
                'drivers', 'exec', 'sdk/include/os32')
 HARNESS = 'tools/tests/dep_dir_c_memory_host.c'
+
+# L14 only: L15 cache/ROM mutations belong to the next hardware gate.
+# name, source, literal target, replacement, fixed input
+MUTATIONS = (
+    ('bios-high-byte', 'platform/pc98/memory.c',
+     'bios[BIOS_WORK_MEM_HIGH_MB + 1] << 8',
+     'bios[BIOS_WORK_MEM_HIGH_MB + 1] << 0', 'bios-256'),
+    ('low-restore', 'platform/pc98/memory.c',
+     '*low = saved;', '*low = pattern;', 'wrap-later'),
+    ('second-pass', 'platform/pc98/memory.c',
+     'if (*(volatile u32 *)P2V_BOOT(addr) != (addr ^ MEMORY_BOOT_PROBE_XOR))',
+     'if (*(volatile u32 *)P2V_BOOT(addr) == (addr ^ MEMORY_BOOT_PROBE_XOR))',
+     'alias-middle'),
+    ('legacy-clamp', 'platform/pc98/platform_memory_desc.h',
+     'MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,',
+     'MEM_HIGH_RAM_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,',
+     'legacy-16384'),
+    ('background-end', 'kernel/memory_boot.c',
+     '                                  platform_memory_geometry.system_end / PAGE_SIZE,',
+     '                                  platform_memory_geometry.system_end / PAGE_SIZE - 1,',
+     'bios-5'),
+)
 
 
 def replace_once(text, old, new):
@@ -42,15 +65,21 @@ def instrument_probe(text):
         ('saved = *low;', 'saved = host_read((u32)low);'),
         ('*cell = pattern;', 'host_write((u32)cell, pattern);'),
         ('if (*low != saved)', 'if (host_read((u32)low) != saved)'),
-        ('*low = saved;', 'host_write((u32)low, saved);'),
         ('if (*cell != pattern)', 'if (host_read((u32)cell) != pattern)'),
         ('*(volatile u32 *)host_boot_ptr(addr)', 'host_read(addr)'),
     ):
         text = replace_once(text, old, new)
+    # The restore mutation writes the pattern instead, retaining saved in the
+    # preceding comparison. Both variants must compile with the same -Werror.
+    import re
+    text, count = re.subn(r'\*low = (saved|pattern);',
+                          r'host_write((u32)low, \1);', text)
+    if count != 1:
+        raise AssertionError('low restore site count != 1')
     return text
 
 
-def build(work, sample, source_root=ROOT):
+def build(work, sample, source_root=ROOT, mutation=None):
     # N1: retain kernel/ and platform/pc98/, including every transitive header.
     # No copied source can resolve a sibling header from the original kernel.
     for directory in HEADER_DIRS:
@@ -58,12 +87,17 @@ def build(work, sample, source_root=ROOT):
             dest = work / source.relative_to(source_root)
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, dest)
+    if mutation and mutation[1].endswith('.h'):
+        path = work / mutation[1]
+        path.write_text(replace_once(path.read_text(), mutation[2], mutation[3]))
     for source in (ROOT / 'tools/tests/host_arch').glob('*.h'):
         dest = work / 'host_arch' / source.name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
     for rel in SOURCES:
         text = (source_root / rel).read_text()
+        if mutation and rel == mutation[1]:
+            text = replace_once(text, mutation[2], mutation[3])
         unit = Path(rel).stem
         if unit in ('paging', 'pgalloc', 'sys'):
             text = text.replace('irq_save()', 'host_irq_save()')
@@ -194,5 +228,35 @@ def verify():
     print('PASS fixed traces / full PDE+PTE coverage / comparator bit flip', flush=True)
 
 
+def mutations(compile_only=False):
+    samples = {s['name']: s for s in json.loads((FIXTURES / 'inputs.json').read_text())}
+    for mutation in MUTATIONS:
+        name, rel, old, _, sample_name = mutation
+        if (ROOT / rel).read_text().count(old) != 1:
+            raise AssertionError('mutation target count != 1: ' + name)
+        with tempfile.TemporaryDirectory(prefix='dep-dir-c-mutation-') as td:
+            exe = build(Path(td), samples[sample_name], mutation=mutation)
+            if compile_only:
+                print('COMPILED -Werror ' + name, flush=True)
+                continue
+            actual = trace(exe)  # A signal/compile failure is never a detection.
+        expected = gzip.decompress((FIXTURES / (sample_name + '.trace.gz')).read_bytes())
+        try:
+            compare(actual, expected)
+        except AssertionError:
+            print('RED trace comparison ' + name, flush=True)
+        else:
+            raise AssertionError('mutation survived: ' + name)
+
+
 if __name__ == '__main__':
-    verify()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--compile-mutations', action='store_true')
+    args = parser.parse_args()
+    if args.compile_mutations:
+        mutations(compile_only=True)
+    else:
+        verify()
+        if args.mutate:
+            mutations()

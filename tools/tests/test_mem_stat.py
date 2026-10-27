@@ -8,6 +8,7 @@ from kernel_layout import linker_flags
 import argparse
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
 import unicodedata
@@ -22,6 +23,7 @@ TARGET_SRCS = base.TARGET_SRCS + [
     'kernel/sqlite_engine.c', 'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
     'kernel/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
     'kernel/module_runtime.h', 'kernel/module_image.h', 'kernel/sqlite_engine.h',
+    'kernel/platform_memory.h', 'platform/pc98/platform_memory_desc.h',
 ]
 
 
@@ -160,8 +162,14 @@ def run_body(runner, mutate):
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)
+        # Preserve the descriptor's relative include in normal and mutant
+        # stages; the extracted counter now uses platform geometry (L14).
+        for rel in ('kernel/platform_memory.h', 'platform/pc98/platform_memory_desc.h'):
+            dest = tmp / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / rel, dest)
         memory = (ROOT / 'kernel/memory_boot.c').read_text()
-        (tmp / 'page_count_source.c').write_text('\n'.join(function(memory, sig) for sig in
+        (tmp / 'page_count_source.c').write_text('#include "kernel/platform_memory.h"\n' + '\n'.join(function(memory, sig) for sig in
             ('static u32 memory_page_overlap(', 'void memory_boot_count_pages(')))
         objs = []
         for i, path in enumerate(['exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
