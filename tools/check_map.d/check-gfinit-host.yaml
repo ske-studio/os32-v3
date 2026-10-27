@@ -69,6 +69,8 @@ check-gfinit-host:
 - tools/tests/gfinit_output_host.h
 - lib/kprintf.c
 - lib/kprintf_attr.c
+- include/console_attr.h
+- platform/pc98/console_attr.c
 - kernel/console.c
 - kernel/kdebug_call.c
 - hwdev/hwdev_imports.def

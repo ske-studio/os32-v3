@@ -53,6 +53,7 @@ void kfree(void *p)
 
 #include "format_host_source.c"
 #include "attr_host_source.c"
+#include "attr_backend_host_source.c"
 #include "print_host_source.c"
 
 static void *kill_escape[5];

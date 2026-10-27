@@ -1,0 +1,15 @@
+{
+  "source_revision": "b400acb6fcd9fb326c9bcf4b8acaff3ddfed37fa",
+  "inputs": "Every u8 input 0..255 in ascending order; one output byte per input.",
+  "trace_sha256": "3957a5d93ce229a0a91e36e12842c98f0cd588b11a02356514a59e3924bfcedb",
+  "harness_sha256": "e50cc4836a16622ea6b179a6b0276b443830b548552dbb22d952774fa33a47cb",
+  "sources_sha256": {
+    "lib/kprintf_attr.c": "22870da621cbd9307237bbd7041e60d8fafacd63dbe9109890bbfd2b0cc3d00a",
+    "include/pc98.h": "1e26fafaf7f9a3fc18770a9ebdfbae0b8084c66e18abd0c75a363cf2fe52c506",
+    "include/types.h": "3cced2621c912c9563e7452356639eaded98e1323a72e0d9bc152dc17da6d815",
+    "include/kprintf.h": "6d42a724590459d4773ec2b70420c4bb6584f2fa50ee4454172812e5e0d710da",
+    "sdk/include/os32/os32_kapi_shared.h": "3a6148d9731701600f76038b7e895718a388c18197bc0dabcdfd4a3e3f634544"
+  },
+  "capture": "run/depdir-l16a/capture.py: pre-move git sources, same harness with BASELINE (wrapper only).",
+  "capture_script_sha256": "63b238115232bab87660cf5db9f1c6c6660246dca213b6a29e248b29b0bb1f68"
+}

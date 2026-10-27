@@ -8,7 +8,8 @@ import test_access_walk as walk
 
 ROOT = walk.ROOT
 TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_print.c', 'lib/kprintf.c',
-              'lib/kprintf_attr.c', 'exec/exec.c']
+              'lib/kprintf_attr.c', 'platform/pc98/console_attr.c',
+              'include/console_attr.h', 'exec/exec.c']
 MUTANTS = [
     ('format raw pointer', 'print',
      'format, sizeof(format))) return 0;',
@@ -40,7 +41,8 @@ def run(runner, mutant=None):
     setup = setup.replace('    caller_copy_tests();', '    caller_copy_tests();\n    die(0);')
     sources['setup'] = setup
     for key, path in [('print', 'kapi/kapi_print.c'), ('format', 'lib/kprintf.c'),
-                      ('attr', 'lib/kprintf_attr.c')]:
+                      ('attr', 'lib/kprintf_attr.c'),
+                      ('attr_backend', 'platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
     dispatch = (ROOT / 'exec/exec.c').read_text()
     start = dispatch.index('    if (slot == KAPI_SLOT_KPRINTF) {')

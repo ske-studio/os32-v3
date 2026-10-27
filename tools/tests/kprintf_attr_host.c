@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../lib/kprintf_attr.c"
+#include "pc98.h"
+#define KPRINTF_PC98_COLOR_MASK (TATTR_B_GREEN | TATTR_B_RED | TATTR_B_BLUE)
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
