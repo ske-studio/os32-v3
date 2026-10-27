@@ -34,8 +34,8 @@ MUTATIONS = (
     for index in range(7)
 )
 
-LOW_ROW = """    { 0, MB_PFN(MEM_CONV_END),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },"""
+LOW_ROW = """        { 0, MB_PFN(MEM_CONV_END),
+          LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },"""
 MUTATIONS += (
     ('kernel/memory_boot.c', LOW_ROW, LOW_ROW + """
     { 0x6A, 0x8A, LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },""", 'old-low-reservation'),
@@ -95,7 +95,13 @@ def main():
                 (work / Path(path).name).write_text(source)
             (work / 'bios_consumer_slice.inc').write_text(function(parts['drivers/kbd.c'], 'kbd_bios_shift_peek'))
             memory = parts['kernel/memory_boot.c']
-            (work / 'low_reservation.inc').write_text(memory[memory.index('#define MB_PFN'):memory.index('STATIC_ASSERT(MEM_SHELL_BAND_END')])
+            # L15 keeps the two-row table inside memory_boot_regions. Copy
+            # that initializer into the host's corresponding local scope.
+            start = memory.index('    const struct {', memory.index('static int memory_boot_regions('))
+            end = memory.index('    u32 i;', start)
+            (work / 'low_reservation.inc').write_text(
+                memory[memory.index('#define MB_PFN'):memory.index('STATIC_ASSERT(MEM_SHELL_BAND_END')] +
+                memory[start:end])
             exe = work / 'fixture'
             cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2',
                    '-Wall', '-Wextra', '-Werror', '-Wno-array-bounds', '-Wno-discarded-qualifiers', '-Wno-stringop-overflow',

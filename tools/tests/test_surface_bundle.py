@@ -28,7 +28,7 @@ MUTANTS = [
     ('lease', '                lease_rollback_fail_count++;',
      '                (void)0;', 'bundle rollback failure count'),
     ('lease', 'if (!failed) {', 'if (1) {', 'failed release must retain slots'),
-    ('paging', '(PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0)', '0', 'initial native UC'),
+    ('paging', 'native_cache_bits(phys)', '0', 'initial native UC'),
     ('lease', '(sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0);', '0;', 'lease loses UC'),
     ('v86', 'e->setup_flags) != 0', '(e->setup_flags & ~PTE_PCD)) != 0', 'V86 setup loses UC'),
     ('v86', 'e->teardown_flags & PTE_PCD', '(e->teardown_flags & ~PTE_PCD) & PTE_PCD', 'V86 teardown table loses UC'),

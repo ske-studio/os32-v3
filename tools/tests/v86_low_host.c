@@ -12,7 +12,6 @@ static void flush_low(void);
 #include "paging.c"
 #include "pgalloc.c"
 #include "pgalloc_host_fixture.h"
-#include "low_reservation.inc"
 #include "module.h"
 #include "kstring.h"
 
@@ -211,6 +210,7 @@ void _start(void) {
     v86_bios_save_real();
     paging_init(16384);
     host_pool_boot(16384);
+#include "low_reservation.inc"
     for (u32 i = 0; i < sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]); i++) {
         CHECK(ledger_register_region(memory_boot_fixed[i].type, memory_boot_fixed[i].owner,
               memory_boot_fixed[i].first, memory_boot_fixed[i].end,

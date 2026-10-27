@@ -155,8 +155,40 @@ static void dump_ptes(u32 phase)
         }
     }
 }
+#ifdef TEST_PLATFORM_ATTRIBUTES
+/* Independent numeric boundaries plus the unchanged legacy macro. These
+ * checks do not derive their expectations from the platform description. */
+static void check_platform_attributes(void)
+{
+    const struct platform_memory_attributes *a = &platform_memory_attributes;
+    REQUIRE(PLATFORM_MEMORY_NATIVE_UC_COUNT == 3);
+    REQUIRE(a->native_uc[0].first == 0x000a0000UL);
+    REQUIRE(a->native_uc[0].end == 0x000a4000UL);
+    REQUIRE(a->native_uc[1].first == 0x000a8000UL);
+    REQUIRE(a->native_uc[1].end == 0x000c0000UL);
+    REQUIRE(a->native_uc[2].first == 0x000e0000UL);
+    REQUIRE(a->native_uc[2].end == 0x000e8000UL);
+    REQUIRE(a->bios_rom.first == 0x000f0000UL);
+    REQUIRE(a->bios_rom.end == 0x00100000UL);
+    REQUIRE(a->low_device.first == 0x000a0000UL);
+    REQUIRE(a->low_device.end == 0x00100000UL);
+    /* Include both byte sides of every interval boundary, not just PFNs.
+     * The CG window and non-native device pages must retain WB / PWT=0. */
+    for (u32 phys = 0; phys <= 0x00100000UL; phys++)
+        REQUIRE(native_cache_bits(phys) == (PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0));
+    REQUIRE(memmap_want_at(0x000effffUL, 0) == MM_RW);
+    REQUIRE(memmap_want_at(0x000f0000UL, 0) == MM_RO);
+    REQUIRE(memmap_want_at(0x000fffffUL, 0) == MM_RO);
+    REQUIRE(memmap_want_at(0, 0) == MM_NP);
+    REQUIRE(memmap_want_at(0x000f0000UL, 0x000f0000UL) == MM_ROU);
+}
+#endif
+
 void _start(void)
 {
+#ifdef TEST_PLATFORM_ATTRIBUTES
+    check_platform_attributes();
+#endif
     for (u32 i = 0; i < HOST_LOW_WORDS; i++) {
         low[i] = 0x12340000U + i;
         record('l', i, low[i], 0, 0);

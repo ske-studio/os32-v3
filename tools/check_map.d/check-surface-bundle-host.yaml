@@ -10,6 +10,8 @@ check-surface-bundle-host:
 - exec/surface_query.c
 - kdebug/kselftest.c
 - kernel/paging.c
+- platform/pc98/platform_memory_desc.h
+- kernel/platform_memory.h
 - kernel/pgalloc.c
 - kernel/physmem.c
 - kernel/shlib.c

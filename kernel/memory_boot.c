@@ -132,17 +132,7 @@ u32 memory_boot_ram_kb(void)
  * 正典から引く。bootinfo は起動時に保存済み。固定 PD/PT は
  * shell heap 後方の画像外区間として専用の行に登録する。 */
 #define MB_PFN(a) ((u16)((a) / PAGE_SIZE))
-static const struct {
-    u16 first, end;
-    u8 type, owner, cache, pad;
-} memory_boot_fixed[] = {
-    /* V86_LOW: all 160 PFNs stay reserved, including page0 and mailbox. */
-    { 0, MB_PFN(MEM_CONV_END),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
-    /* VRAM と BIOS ROM */
-    { MB_PFN(MEM_CONV_END), MB_PFN(KERNEL_LOAD_ADDR),
-      LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_UC, 0 },
-};
+STATIC_ASSERT(MEM_BIOS_ROM_END + 1 == KERNEL_LOAD_ADDR, bios_rom_ends_at_kernel);
 STATIC_ASSERT(MEM_SHELL_BAND_END + 1 == MEM_POOL_BASE, fixed_regions_end_at_pool);
 STATIC_ASSERT(MEM_SHELL_BAND_END / PAGE_SIZE < 0x10000UL, fixed_regions_fit_u16);
 
@@ -200,6 +190,20 @@ int memory_boot_boot_areas(u32 first, u32 end)
  * ws_first = ARENA_TOP の workspace の先頭 (0 = FIXED 型)。0 = 失敗。 */
 static int memory_boot_regions(u32 top, u32 ws_first)
 {
+    /* Runtime initializer: the platform description is static const.
+     * Preserve the low WB row, device UC row, then symbol-derived rows. */
+    const struct {
+        u16 first, end;
+        u8 type, owner, cache, pad;
+    } memory_boot_fixed[] = {
+        /* V86_LOW: all 160 PFNs stay reserved, including page0 and mailbox. */
+        { 0, MB_PFN(MEM_CONV_END),
+          LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },
+        /* VRAM と BIOS ROM */
+        { MB_PFN(platform_memory_attributes.low_device.first),
+          MB_PFN(platform_memory_attributes.low_device.end),
+          LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_UC, 0 },
+    };
     u32 i;
     for (i = 0; i < sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]); i++)
         if (!ledger_register_region(memory_boot_fixed[i].type,
