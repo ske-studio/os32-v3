@@ -37,7 +37,7 @@
 #include "memory_boot.h"
 #include "launch.h"
 #include "kapi_host.h"
-#include "pci.h"
+#include "pci_dev_contract.h"
 #include "pcm_contract.h"
 #include "bootinfo.h"
 #include "serialfs.h"
@@ -2144,7 +2144,7 @@ int __cdecl wrap_kbd_trygetchar_local(void)
 int __cdecl wrap_pci_count(void)
 {
     KAPI_HIT(219);
-    return pci_count();
+    return platform_pci_count();
 }
 
 int __cdecl wrap_pci_get(u32 idx, void *out)
@@ -2155,13 +2155,13 @@ int __cdecl wrap_pci_get(u32 idx, void *out)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return pci_get(idx, out);
+    return platform_pci_get(idx, out);
 }
 
 u32 __cdecl wrap_pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
 {
     KAPI_HIT(221);
-    return pci_cfg_read32(bus, dev, fn, reg);
+    return platform_pci_cfg_read32(bus, dev, fn, reg);
 }
 
 int __cdecl wrap_sys_time_now(u32 *lo, u32 *hi)

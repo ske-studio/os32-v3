@@ -482,6 +482,34 @@ class InfrastructureTests(unittest.TestCase):
                 expected += ['mutant-build', 'mutant-run']
             self.assertEqual(stages, expected)
 
+    def test_dep_dir_l08_controls_precede_mutation(self):
+        """Register L08 dispatch without executing or compiling a mutation."""
+        import contextlib
+        import io
+        from types import SimpleNamespace
+        import test_dep_dir_a_l08 as suite
+        for mutate in (False, True):
+            stages = []
+            def build(folder, body, wrappers):
+                changed = suite.NEW in body
+                stages.append('mutant-build' if changed else 'control-build')
+                return folder / ('mutant' if changed else 'control')
+            def run(command, **kwargs):
+                changed = str(command[-1]).endswith('mutant')
+                stages.append('mutant-run' if changed else 'control-run')
+                return SimpleNamespace(returncode=int(changed))
+            with patch.object(suite.argparse.ArgumentParser, 'parse_args',
+                              return_value=SimpleNamespace(prepare=False, mutate=mutate)), \
+                 patch.object(suite, 'contracts', side_effect=lambda: stages.append('contracts')), \
+                 patch.object(suite, 'build', side_effect=build), \
+                 patch.object(suite.subprocess, 'run', side_effect=run), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                suite.main()
+            expected = ['contracts', 'control-build', 'control-run']
+            if mutate:
+                expected += ['mutant-build', 'mutant-run']
+            self.assertEqual(stages, expected)
+
     def test_memmap_controls_are_a_prefix_of_mutation_stages(self):
         import contextlib
         import io

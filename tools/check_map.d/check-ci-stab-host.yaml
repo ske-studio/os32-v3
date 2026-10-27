@@ -179,4 +179,14 @@ check-ci-stab-host:
 - kernel/v86_mem.c
 - kernel/v86_snapshot.c
 - tools/tests/shm_user_host.c
+- tools/tests/test_dep_dir_a_l08.py
+- tools/tests/dep_dir_a_l08_host.c
+- tools/tests/fixtures/dep_dir_a/l08.json
+- platform/pc98/device_pci.c
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
+- drivers/pci.h
+- drivers/pci_decode.h
+- drivers/pci_bind.h
+- kapi/kapi_sys.c
 artifact_reader: true

@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
+    "pci_dev_contract.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -1619,17 +1619,20 @@
     },
     {
       "name": "pci_count",
+      "target": "platform_pci_count",
       "ret": "int",
       "args": []
     },
     {
       "name": "pci_get",
+      "target": "platform_pci_get",
       "out": [{"arg": "out", "size": "PCI_DEV_STRUCT_SIZE"}],
       "ret": "int",
       "args": ["u32 idx", "void *out"]
     },
     {
       "name": "pci_cfg_read32",
+      "target": "platform_pci_cfg_read32",
       "ret": "u32",
       "args": ["u32 bus", "u32 dev", "u32 fn", "u32 reg"]
     },

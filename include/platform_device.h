@@ -35,4 +35,11 @@ int platform_ext2_format_at(int drv, u32 start_lba, u32 length);
 int platform_serialfs_session_begin(void);
 int platform_serialfs_session_end(int exit_code);
 
+/* PCI owns enumeration/config/bind state; D3 owns BAR resources. */
+struct pci_bind_info;
+int platform_pci_count(void);
+int platform_pci_get(u32 idx, void *out);
+u32 platform_pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg);
+int platform_pci_bind_info_get(int idx, struct pci_bind_info *out);
+
 #endif /* PLATFORM_DEVICE_H */
