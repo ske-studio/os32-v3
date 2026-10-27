@@ -47,9 +47,9 @@ int platform_ide_write_sector(int drv, u32 lba, const void *buf)
 { (void)drv; (void)lba; (void)buf; reached++; return 7; }
 int platform_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
 { (void)drv; (void)lba; (void)cnt; (void)buf; reached++; return 7; }
-int ext2_format(int drv, u32 sectors)
+int platform_ext2_format(int drv, u32 sectors)
 { (void)drv; (void)sectors; reached++; return 7; }
-int ext2_format_at(int drv, u32 start, u32 length)
+int platform_ext2_format_at(int drv, u32 start, u32 length)
 { (void)drv; (void)start; (void)length; reached++; return 7; }
 static Device disk = { .sect_size = 512 };
 Device *dev_find(const char *name) { (void)name; return &disk; }

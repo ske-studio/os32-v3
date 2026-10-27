@@ -29,4 +29,10 @@ struct platform_disk_geometry {
 int platform_ide_range_ok(int drv, u32 lba, u32 count);
 int platform_disk_geometry_get(int drv, struct platform_disk_geometry *out);
 
+/* FS owns format registration and serialfs session state. */
+int platform_ext2_format(int drv, u32 sectors);
+int platform_ext2_format_at(int drv, u32 start_lba, u32 length);
+int platform_serialfs_session_begin(void);
+int platform_serialfs_session_end(int exit_code);
+
 #endif /* PLATFORM_DEVICE_H */

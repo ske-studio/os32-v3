@@ -1,0 +1,9 @@
+{
+  "baseline": "b400acb6",
+  "wrappers": {
+    "ext2_format": "int __cdecl wrap_ext2_format(int drv, u32 sectors)\n{\n    KAPI_HIT(58);\n    if (!exec_disk_write_allowed()) return -1;\n    return ext2_format(drv, sectors);\n}\n",
+    "ext2_format_at": "int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)\n{\n    KAPI_HIT(230);\n    if (!exec_disk_write_allowed()) return -1;\n    return ext2_format_at(drv, start_lba, length);\n}\n",
+    "sfs_begin": "int __cdecl wrap_sfs_begin(void)\n{\n    KAPI_HIT(235);\n    return serialfs_session_begin();\n}\n",
+    "sfs_end": "int __cdecl wrap_sfs_end(int exit_code)\n{\n    KAPI_HIT(236);\n    return serialfs_session_end(exit_code);\n}\n"
+  }
+}

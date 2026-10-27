@@ -508,7 +508,7 @@
         "int drv",
         "u32 sectors"
       ],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format(drv, sectors);"
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn platform_ext2_format(drv, sectors);"
     },
     {
       "name": "kcg_init",
@@ -1686,7 +1686,7 @@
       "name": "ext2_format_at",
       "ret": "int",
       "args": ["int drv", "u32 start_lba", "u32 length"],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format_at(drv, start_lba, length);"
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn platform_ext2_format_at(drv, start_lba, length);"
     },
     {
       "name": "dev_mount_count",
@@ -1718,13 +1718,13 @@
       "name": "sfs_begin",
       "ret": "int",
       "args": [],
-      "target": "serialfs_session_begin"
+      "target": "platform_serialfs_session_begin"
     },
     {
       "name": "sfs_end",
       "ret": "int",
       "args": ["int exit_code"],
-      "target": "serialfs_session_end"
+      "target": "platform_serialfs_session_end"
     },
     {
       "name": "serial_diag",

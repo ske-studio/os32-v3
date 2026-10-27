@@ -1024,7 +1024,7 @@ int __cdecl wrap_ext2_format(int drv, u32 sectors)
 {
     KAPI_HIT(58);
     if (!exec_disk_write_allowed()) return -1;
-    return ext2_format(drv, sectors);
+    return platform_ext2_format(drv, sectors);
 }
 
 void __cdecl wrap_kcg_init(void)
@@ -2233,7 +2233,7 @@ int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)
 {
     KAPI_HIT(230);
     if (!exec_disk_write_allowed()) return -1;
-    return ext2_format_at(drv, start_lba, length);
+    return platform_ext2_format_at(drv, start_lba, length);
 }
 
 int __cdecl wrap_dev_mount_count(int drv)
@@ -2273,13 +2273,13 @@ int __cdecl wrap_boot_image_info(BootImageInfo *out)
 int __cdecl wrap_sfs_begin(void)
 {
     KAPI_HIT(235);
-    return serialfs_session_begin();
+    return platform_serialfs_session_begin();
 }
 
 int __cdecl wrap_sfs_end(int exit_code)
 {
     KAPI_HIT(236);
-    return serialfs_session_end(exit_code);
+    return platform_serialfs_session_end(exit_code);
 }
 
 int __cdecl wrap_serial_diag(SerialDiag *out)

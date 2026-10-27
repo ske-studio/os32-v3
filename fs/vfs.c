@@ -13,7 +13,6 @@
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "kstring.h"
 #include "console.h"
-#include "kbd.h"
 
 #ifndef ATTR_WHITE
 #define ATTR_WHITE   TATTR_WHITE
