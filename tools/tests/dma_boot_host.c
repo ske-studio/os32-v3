@@ -19,7 +19,7 @@ volatile u32 tick_count;
 struct ledger_region ledger_regions[LEDGER_MAX_REGIONS];
 u32 ledger_region_count;
 #include "dma_pool_source.c"
-#include "dma8237_math.c"
+#include "../../lib/dma_contract.c"
 #include "dma_pool_math.c"
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %d: %s\n", __LINE__, #x); exit(1); } } while (0)

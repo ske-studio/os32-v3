@@ -16,7 +16,7 @@ from kernel_layout import linker_flags
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kdebug/kselftest.c', 'kernel/paging.c', 'kernel/pgalloc.c',
               'exec/access_walk.c', 'kernel/physmem.c', 'kernel/dma_pool.c',
-              'kernel/dma_pool_math.c', 'drivers/dma8237_math.c',
+              'kernel/dma_pool_math.c', 'lib/dma_contract.c',
               'drivers/fdc.c', 'drivers/fdc_decide.c']
 MUTANTS = [
     ('VA-only high classification', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
@@ -86,7 +86,7 @@ def run(body, runner):
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
                    *[str(ROOT / path) for path in ('kernel/physmem.c',
                        'kernel/dma_pool_math.c',
-                       'drivers/dma8237_math.c', 'drivers/fdc_decide.c')],
+                       'lib/dma_contract.c', 'drivers/fdc_decide.c')],
                    '-o', str(exe)]
         host32.build(command, check=True, capture_output=True, text=True)
         return host32.run([str(exe)], runner=runner, capture_output=True,

@@ -8,9 +8,8 @@
 #include "paging.h"
 #include "clock_service.h"
 #include "exec.h"
-#include "fm.h"
-#include "np2sysp.h"
-#include "ide.h"
+#include "fm_contract.h"
+#include "ide_contract.h"
 #include "path.h"
 #include "tvram.h"
 #include "vfs.h"
@@ -18,7 +17,7 @@
 #include "port_service.h"
 #include "console.h"
 #include "dev.h"
-#include "kcg.h"
+#include "kcg_contract.h"
 #include "sys.h"
 #include "kprintf.h"
 #include "io.h"
@@ -29,7 +28,7 @@
 #include "snd_engine.h"
 #include "pointer_service.h"
 #include "kapi_db.h"
-#include "loop_dev.h"
+#include "platform_device.h"
 #include "v86.h"
 #include "gui.h"
 #include "con_sink.h"
@@ -37,8 +36,8 @@
 #include "memory_boot.h"
 #include "launch.h"
 #include "kapi_host.h"
-#include "pci.h"
-#include "pcm_cs4231.h"
+#include "pci_dev_contract.h"
+#include "pcm_contract.h"
 #include "bootinfo.h"
 #include "serialfs.h"
 #include "v86_gcap.h"
@@ -904,7 +903,7 @@ void __cdecl wrap_fm_play_mml(const char *mml)
 int __cdecl wrap_np2_detect(void)
 {
     KAPI_HIT(44);
-    return np2_detect();
+    return platform_np2_detect();
 }
 
 void __cdecl wrap_np2_get_version(char *buf, int size)
@@ -915,7 +914,7 @@ void __cdecl wrap_np2_get_version(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_version(buf, size);
+    platform_np2_get_version(buf, size);
 }
 
 void __cdecl wrap_np2_get_cpu(char *buf, int size)
@@ -926,7 +925,7 @@ void __cdecl wrap_np2_get_cpu(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_cpu(buf, size);
+    platform_np2_get_cpu(buf, size);
 }
 
 void __cdecl wrap_np2_get_clock(char *buf, int size)
@@ -937,7 +936,7 @@ void __cdecl wrap_np2_get_clock(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_clock(buf, size);
+    platform_np2_get_clock(buf, size);
 }
 
 int __cdecl wrap_np2_check_hostdrv(char *buf, int size)
@@ -948,19 +947,19 @@ int __cdecl wrap_np2_check_hostdrv(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return np2_check_hostdrv(buf, size);
+    return platform_np2_check_hostdrv(buf, size);
 }
 
 void __cdecl wrap_ide_init(void)
 {
     KAPI_HIT(49);
-    ide_init();
+    platform_ide_init();
 }
 
 int __cdecl wrap_ide_drive_present(int drv)
 {
     KAPI_HIT(50);
-    return ide_drive_present(drv);
+    return platform_ide_drive_present(drv);
 }
 
 int __cdecl wrap_ide_identify(int drv, void *info)
@@ -971,7 +970,7 @@ int __cdecl wrap_ide_identify(int drv, void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_identify(drv, (IdeInfo *)info);
+    return platform_ide_identify(drv, (IdeInfo *)info);
 }
 
 int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)
@@ -982,7 +981,7 @@ int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_read_sector(drv, lba, buf);
+    return platform_ide_read_sector(drv, lba, buf);
 }
 
 const char * __cdecl wrap_path_get_drive(void)
@@ -1024,19 +1023,19 @@ int __cdecl wrap_ext2_format(int drv, u32 sectors)
 {
     KAPI_HIT(58);
     if (!exec_disk_write_allowed()) return -1;
-    return ext2_format(drv, sectors);
+    return platform_ext2_format(drv, sectors);
 }
 
 void __cdecl wrap_kcg_init(void)
 {
     KAPI_HIT(59);
-    kcg_init();
+    platform_kcg_init();
 }
 
 void __cdecl wrap_kcg_set_scale(int s)
 {
     KAPI_HIT(60);
-    kcg_set_scale(s);
+    platform_kcg_set_scale(s);
 }
 
 void __cdecl wrap_buz_on(void)
@@ -1063,7 +1062,7 @@ int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)
     KAPI_HIT(64);
     if (!exec_disk_write_allowed()) return -1;
     if (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();
-    return ide_write_sector(drv, lba, buf);
+    return platform_ide_write_sector(drv, lba, buf);
 }
 
 int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
@@ -1072,7 +1071,7 @@ int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
     if (!exec_disk_write_allowed()) return -1;
     if (cnt == 0) return 0;
     if (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();
-    return ide_write_sectors(drv, lba, cnt, buf);
+    return platform_ide_write_sectors(drv, lba, cnt, buf);
 }
 
 void __cdecl wrap_sys_reboot(void)
@@ -1652,7 +1651,7 @@ u32 __cdecl wrap_db_mem_used(void)
 int __cdecl wrap_kcg_load_font(const char *path)
 {
     KAPI_HIT(150);
-    return kcg_load_font(path);
+    return platform_kcg_load_font(path);
 }
 
 int __cdecl wrap_ide_get_info(int drv, void *info)
@@ -1663,7 +1662,7 @@ int __cdecl wrap_ide_get_info(int drv, void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_get_info(drv, (IdeInfo *)info);
+    return platform_ide_get_info(drv, (IdeInfo *)info);
 }
 
 void __cdecl wrap_sys_get_build_info(char *buf, int size)
@@ -1680,13 +1679,13 @@ void __cdecl wrap_sys_get_build_info(char *buf, int size)
 int __cdecl wrap_loop_attach(const char *path, int slot)
 {
     KAPI_HIT(153);
-    return loop_dev_attach(path, slot);
+    return platform_loop_dev_attach(path, slot);
 }
 
 void __cdecl wrap_loop_detach(int slot)
 {
     KAPI_HIT(154);
-    loop_dev_detach(slot);
+    platform_loop_dev_detach(slot);
 }
 
 int __cdecl wrap_loop_status(int slot, u32 *total, int *bps)
@@ -1697,7 +1696,7 @@ int __cdecl wrap_loop_status(int slot, u32 *total, int *bps)
                                     (u32)bps, KAPI_OUT_LEN(bps, sizeof(int)))) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return loop_dev_status(slot, total, bps);
+    return platform_loop_dev_status(slot, total, bps);
 }
 
 int __cdecl wrap_dev_blk_read(const char *dev_name, u32 lba, int count, void *buf)
@@ -2144,7 +2143,7 @@ int __cdecl wrap_kbd_trygetchar_local(void)
 int __cdecl wrap_pci_count(void)
 {
     KAPI_HIT(219);
-    return pci_count();
+    return platform_pci_count();
 }
 
 int __cdecl wrap_pci_get(u32 idx, void *out)
@@ -2155,13 +2154,13 @@ int __cdecl wrap_pci_get(u32 idx, void *out)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return pci_get(idx, out);
+    return platform_pci_get(idx, out);
 }
 
 u32 __cdecl wrap_pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
 {
     KAPI_HIT(221);
-    return pci_cfg_read32(bus, dev, fn, reg);
+    return platform_pci_cfg_read32(bus, dev, fn, reg);
 }
 
 int __cdecl wrap_sys_time_now(u32 *lo, u32 *hi)
@@ -2233,7 +2232,7 @@ int __cdecl wrap_ext2_format_at(int drv, u32 start_lba, u32 length)
 {
     KAPI_HIT(230);
     if (!exec_disk_write_allowed()) return -1;
-    return ext2_format_at(drv, start_lba, length);
+    return platform_ext2_format_at(drv, start_lba, length);
 }
 
 int __cdecl wrap_dev_mount_count(int drv)
@@ -2273,13 +2272,13 @@ int __cdecl wrap_boot_image_info(BootImageInfo *out)
 int __cdecl wrap_sfs_begin(void)
 {
     KAPI_HIT(235);
-    return serialfs_session_begin();
+    return platform_serialfs_session_begin();
 }
 
 int __cdecl wrap_sfs_end(int exit_code)
 {
     KAPI_HIT(236);
-    return serialfs_session_end(exit_code);
+    return platform_serialfs_session_end(exit_code);
 }
 
 int __cdecl wrap_serial_diag(SerialDiag *out)

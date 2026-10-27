@@ -27,7 +27,7 @@
 #include "types.h"
 #include "memmap.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* (エラーは共通体系) */
-#include "dma8237.h"            /* dma_range_ok / DMA_PHYS_LIMIT */
+#include "dma_contract.h"            /* dma_range_ok / DMA_PHYS_LIMIT */
 
 #define DMA_POOL_PAGES       ((u32)(MEM_DMA_POOL_SIZE / MEM_PAGE_SIZE))
 #define DMA_POOL_SPANS       16
@@ -88,7 +88,7 @@ struct dma_buf {
 void dma_pool_state_init(struct dma_pool_state *s, u32 base, u32 npages);
 
 /* 最初適合 + 整列 + 候補ごとの dma_range_ok (64KB 非またぎと limit、
- * drivers/dma8237.h)。
+ * drivers/dma_contract.h)。
  *   0 = *out に先頭番地 / 負 = 取れない (*out = 0 — **この出力を外へ直接
  *   つながない**。外への口は dma_pool_state_alloc_buf)
  * align は 2 の冪で DMA_POOL_MAX_BYTES 以下。0 は DMA_POOL_DEF_ALIGN。 */

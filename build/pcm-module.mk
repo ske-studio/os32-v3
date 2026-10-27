@@ -1,7 +1,7 @@
 # T5c-2b: reuse T4 function imports, VA0 packing and paired distribution.
 PCM_OUT := $(BUILD_OUT)/pcm
 PCM_GEN := $(addprefix $(PCM_OUT)/,pcm_imports.h pcm_imports.json pcm_import_slots.c pcm_import_stubs.S pcm_provider_types.c pcm_kexports.c)
-PCM_DEF_SOURCES := kernel/pcm_module.h drivers/pcm_cs4231.h kernel/irq.h kernel/dma_pool.h
+PCM_DEF_SOURCES := include/pcm_contract.h include/dma_contract.h kernel/pcm_module.h drivers/pcm_cs4231.h kernel/irq.h kernel/dma_pool.h
 $(PCM_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/pcm_imports.def $(PCM_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module pcm --out-dir $(PCM_OUT)
 

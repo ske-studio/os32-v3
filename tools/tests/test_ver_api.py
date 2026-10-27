@@ -103,10 +103,10 @@ def generated_layout(runner):
     assert data['api'][-1] == dict(name='sys_ver_info', ret='int',
         args=['void *out', 'u32 size'], out=[dict(arg='out', len='size')],
         target='kapi_sys_ver_info')
-    # Frozen v78 prefix, including D2 internal targets/bodies: reordered slots,
+    # Frozen v78 prefix, including approved group A/D internal targets/bodies: reordered slots,
     # changed signatures and unexpected implementation routes must also fail.
     assert hashlib.sha256(json.dumps(data['api'][:-1], sort_keys=True).encode()).hexdigest() == \
-        'ad883a8ec1ab333031cbfbacbe0be44e532bae1520d1b157c79fc7be640058e2'
+        '6e8ac5b63eeda8ecdc22676cd86e0859772cab314370f60dfceafc7dc5f7ac19'
     with tempfile.TemporaryDirectory(prefix='ver-api-gen-') as directory:
         tmp = Path(directory)
         for folder in ('sdk/include/os32', 'sdk/rust/os32api/src', 'kapi', 'exec'):

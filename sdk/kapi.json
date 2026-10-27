@@ -24,9 +24,8 @@
     "paging.h",
     "clock_service.h",
     "exec.h",
-    "fm.h",
-    "np2sysp.h",
-    "ide.h",
+    "fm_contract.h",
+    "ide_contract.h",
     "path.h",
     "tvram.h",
     "vfs.h",
@@ -34,7 +33,7 @@
     "port_service.h",
     "console.h",
     "dev.h",
-    "kcg.h",
+    "kcg_contract.h",
     "sys.h",
     "kprintf.h",
     "io.h",
@@ -45,7 +44,7 @@
     "snd_engine.h",
     "pointer_service.h",
     "kapi_db.h",
-    "loop_dev.h",
+    "platform_device.h",
     "v86.h",
     "gui.h",
     "con_sink.h",
@@ -53,7 +52,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
+    "pci_dev_contract.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",
@@ -391,11 +390,13 @@
     },
     {
       "name": "np2_detect",
+      "target": "platform_np2_detect",
       "ret": "int",
       "args": []
     },
     {
       "name": "np2_get_version",
+      "target": "platform_np2_get_version",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -405,6 +406,7 @@
     },
     {
       "name": "np2_get_cpu",
+      "target": "platform_np2_get_cpu",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -414,6 +416,7 @@
     },
     {
       "name": "np2_get_clock",
+      "target": "platform_np2_get_clock",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -423,6 +426,7 @@
     },
     {
       "name": "np2_check_hostdrv",
+      "target": "platform_np2_check_hostdrv",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "int",
       "args": [
@@ -432,11 +436,13 @@
     },
     {
       "name": "ide_init",
+      "target": "platform_ide_init",
       "ret": "void",
       "args": []
     },
     {
       "name": "ide_drive_present",
+      "target": "platform_ide_drive_present",
       "ret": "int",
       "args": [
         "int drv"
@@ -450,10 +456,11 @@
         "int drv",
         "void *info"
       ],
-      "body": "return ide_identify(drv, (IdeInfo *)info);"
+      "body": "return platform_ide_identify(drv, (IdeInfo *)info);"
     },
     {
       "name": "ide_read_sector",
+      "target": "platform_ide_read_sector",
       "out": [{"arg": "buf", "size": 512}],
       "ret": "int",
       "args": [
@@ -505,15 +512,17 @@
         "int drv",
         "u32 sectors"
       ],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format(drv, sectors);"
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn platform_ext2_format(drv, sectors);"
     },
     {
       "name": "kcg_init",
+      "target": "platform_kcg_init",
       "ret": "void",
       "args": []
     },
     {
       "name": "kcg_set_scale",
+      "target": "platform_kcg_set_scale",
       "ret": "void",
       "args": [
         "int s"
@@ -540,7 +549,7 @@
     {
       "name": "ide_write_sector",
       "in": [{"arg": "buf", "size": 512, "target": true}],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nif (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\nreturn ide_write_sector(drv, lba, buf);",
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\nreturn platform_ide_write_sector(drv, lba, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -551,7 +560,7 @@
     {
       "name": "ide_write_sectors",
       "in": [{"arg": "buf", "len": "cnt", "unit": 512, "target": true}],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nif (cnt == 0) return 0;\nif (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\nreturn ide_write_sectors(drv, lba, cnt, buf);",
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (cnt == 0) return 0;\nif (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\nreturn platform_ide_write_sectors(drv, lba, cnt, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -1196,6 +1205,7 @@
     },
     {
       "name": "kcg_load_font",
+      "target": "platform_kcg_load_font",
       "ret": "int",
       "args": ["const char *path"]
     },
@@ -1204,7 +1214,7 @@
       "out": [{"arg": "info", "size": "sizeof(IdeInfo)"}],
       "ret": "int",
       "args": ["int drv", "void *info"],
-      "body": "return ide_get_info(drv, (IdeInfo *)info);"
+      "body": "return platform_ide_get_info(drv, (IdeInfo *)info);"
     },
     {
       "name": "sys_get_build_info",
@@ -1217,20 +1227,20 @@
       "name": "loop_attach",
       "ret": "int",
       "args": ["const char *path", "int slot"],
-      "target": "loop_dev_attach"
+      "target": "platform_loop_dev_attach"
     },
     {
       "name": "loop_detach",
       "ret": "void",
       "args": ["int slot"],
-      "target": "loop_dev_detach"
+      "target": "platform_loop_dev_detach"
     },
     {
       "name": "loop_status",
       "out": [{"arg": "total", "size": "sizeof(u32)"}, {"arg": "bps", "size": "sizeof(int)"}],
       "ret": "int",
       "args": ["int slot", "u32 *total", "int *bps"],
-      "target": "loop_dev_status"
+      "target": "platform_loop_dev_status"
     },
     {
       "name": "dev_blk_read",
@@ -1616,17 +1626,20 @@
     },
     {
       "name": "pci_count",
+      "target": "platform_pci_count",
       "ret": "int",
       "args": []
     },
     {
       "name": "pci_get",
+      "target": "platform_pci_get",
       "out": [{"arg": "out", "size": "PCI_DEV_STRUCT_SIZE"}],
       "ret": "int",
       "args": ["u32 idx", "void *out"]
     },
     {
       "name": "pci_cfg_read32",
+      "target": "platform_pci_cfg_read32",
       "ret": "u32",
       "args": ["u32 bus", "u32 dev", "u32 fn", "u32 reg"]
     },
@@ -1683,7 +1696,7 @@
       "name": "ext2_format_at",
       "ret": "int",
       "args": ["int drv", "u32 start_lba", "u32 length"],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn ext2_format_at(drv, start_lba, length);"
+      "body": "if (!exec_disk_write_allowed()) return -1;\nreturn platform_ext2_format_at(drv, start_lba, length);"
     },
     {
       "name": "dev_mount_count",
@@ -1715,13 +1728,13 @@
       "name": "sfs_begin",
       "ret": "int",
       "args": [],
-      "target": "serialfs_session_begin"
+      "target": "platform_serialfs_session_begin"
     },
     {
       "name": "sfs_end",
       "ret": "int",
       "args": ["int exit_code"],
-      "target": "serialfs_session_end"
+      "target": "platform_serialfs_session_end"
     },
     {
       "name": "serial_diag",

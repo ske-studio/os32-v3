@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "contracts": [
+    "include/pcm_contract.h",
+    "include/dma_contract.h",
     "kernel/pcm_module.h",
     "drivers/pcm_cs4231.h",
     "kernel/irq.h",

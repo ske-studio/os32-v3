@@ -1,6 +1,6 @@
 #include "kcg_module.h"
 #include "kcg_imports.h"
-#include "kcg.h"
+#include "kcg_contract.h"
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"

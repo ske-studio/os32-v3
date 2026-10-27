@@ -1,0 +1,15 @@
+{
+  "base": "b400acb6",
+  "api_sha256": "808377fc90b706dbd283e1406cf800eaf2b1e86a66364dc5a503e75d62141441",
+  "v86_functions": {
+    "v86_disk_test": "89de7da75c882ac36ff9e3c92dccd4e249eeda5ee06e6b28f5d08258c9f27c4c",
+    "v86_boot2": "b3bf579fce6d3393be6a4f1931cf1e16271913243020d607d6276458d79df8a8"
+  },
+  "generated": {
+    "sdk/include/os32/os32_kapi_generated.h": "bdbc18057c58a5d78f5ef670acb69f2ca662ffd1a7ab0e0b29a2089e523634c6",
+    "sdk/include/os32/os32_kapi_slots.h": "f1d64934e77a7ced64b7fb9ea36a2e6ae7c532e595a4f99cf968a3d94074c7d0",
+    "exec/exec_kapi_init.inc": "025800c2db2553575d50add6a4da51b24d7243bae3a4a1677f7cff198380f56e",
+    "sdk/rust/os32api/src/kapi_generated.rs": "3831bc99e95f30df457d26741a67c1a9ce3a01b593371fb58a64fb7c8d345bdc"
+  },
+  "v86_detach_sha256": "38d0f72795d2b8e37afc7331b88f39cd1dd4701139730a1d2d81931a818409df"
+}

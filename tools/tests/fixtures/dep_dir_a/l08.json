@@ -1,0 +1,10 @@
+{
+  "baseline": "b400acb6",
+  "wrappers": {
+    "pci_count": "int __cdecl wrap_pci_count(void)\n{\n    KAPI_HIT(219);\n    return pci_count();\n}\n",
+    "pci_get": "int __cdecl wrap_pci_get(u32 idx, void *out)\n{\n    KAPI_HIT(220);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, PCI_DEV_STRUCT_SIZE),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return pci_get(idx, out);\n}\n",
+    "pci_cfg_read32": "u32 __cdecl wrap_pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)\n{\n    KAPI_HIT(221);\n    return pci_cfg_read32(bus, dev, fn, reg);\n}\n",
+    "pci_bind_info": "int __cdecl wrap_pci_bind_info(u32 idx, void *out)\n{\n    KAPI_HIT(223);\n    return kapi_pci_bind_info(idx, out);\n}\n"
+  },
+  "diagnostic": "int kapi_pci_bind_info(u32 idx, void *out)\n{\n    struct pci_bind_info snap;\n    const u8 *src;\n    u8 *dst;\n    int i, rc;\n\n    if (!out) return OS32_ERR_INVAL;\n    if ((u32)out + (u32)PCI_BIND_INFO_SIZE < (u32)out) return OS32_ERR_INVAL;\n    if (!ring3_user_range_ok((u32)out, (u32)PCI_BIND_INFO_SIZE))\n        return OS32_ERR_INVAL;\n\n    /* **\u66f8\u304f\u524d\u306b**\u66f8\u3051\u308b\u3053\u3068\u3092\u78ba\u304b\u3081\u308b (\u8aad\u307f\u53d6\u308a\u5c02\u7528\u306e USER \u30da\u30fc\u30b8\u306f kill)\u3002 */\n    if (!ring3_user_ranges_writable((u32)out, (u32)PCI_BIND_INFO_SIZE, 0, 0)) {\n        ring3_fault_kill();                 /* \u623b\u3089\u306a\u3044 (longjmp) */\n    }\n\n    rc = pci_bind_info_get((int)idx, &snap);\n    if (rc != 0) return OS32_ERR_INVAL;     /* \u7bc4\u56f2\u5916 \u2014 \u51fa\u529b\u306f\u66f8\u304b\u306a\u3044 */\n\n    src = (const u8 *)&snap;\n    dst = (u8 *)out;\n    for (i = 0; i < PCI_BIND_INFO_SIZE; i++) dst[i] = src[i];\n    return 0;\n}\n"
+}

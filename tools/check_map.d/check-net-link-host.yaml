@@ -13,4 +13,9 @@ check-net-link-host:
 - exec/exec_kapi_init.inc
 - tools/check_map.d/check-net-link-host.yaml
 - build/checks.d/check-net-link-host.mk
+- include/platform_host.h
+- include/platform_device.h
+- platform/pc98/device_host.c
+- drivers/np2sysp.h
+- net/link.h
 local_only: true

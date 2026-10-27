@@ -7,7 +7,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ('platform/pc98/boot.c', 'kernel/boot_platform.c', 'kernel/boot_display.c', 'platform/pc98/emergency.c')
-HEADERS = ('kernel/boot_platform.h', 'kernel/boot_display.h', 'kernel/platform_emergency.h')
+HEADERS = ('include/ide_contract.h', 'kernel/boot_platform.h', 'kernel/boot_display.h', 'kernel/platform_emergency.h')
 
 
 def kernel_order(kernel=None):
@@ -69,7 +69,7 @@ def build(work, mutation=None):
         kernel[start:end] + '}\n' + child.group())
     exe = work / 'boot'
     cmd = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
-           '-I' + str(work), '-I' + str(work / 'kernel')]
+           '-I' + str(work), '-I' + str(work / 'include'), '-I' + str(work / 'kernel')]
     cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
     subprocess.run([*cmd, str(ROOT / 'tools/tests/dep_dir_d3_boot_host.c'), '-o', str(exe)], check=True)
     return exe

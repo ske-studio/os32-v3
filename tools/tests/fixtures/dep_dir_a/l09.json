@@ -1,0 +1,19 @@
+{
+  "baseline": "b400acb6",
+  "wrappers": {
+    "np2_detect": "int __cdecl wrap_np2_detect(void)\n{\n    KAPI_HIT(44);\n    return np2_detect();\n}\n",
+    "np2_get_version": "void __cdecl wrap_np2_get_version(char *buf, int size)\n{\n    KAPI_HIT(45);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN_S(buf, size),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    np2_get_version(buf, size);\n}\n",
+    "np2_get_cpu": "void __cdecl wrap_np2_get_cpu(char *buf, int size)\n{\n    KAPI_HIT(46);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN_S(buf, size),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    np2_get_cpu(buf, size);\n}\n",
+    "np2_get_clock": "void __cdecl wrap_np2_get_clock(char *buf, int size)\n{\n    KAPI_HIT(47);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN_S(buf, size),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    np2_get_clock(buf, size);\n}\n",
+    "np2_check_hostdrv": "int __cdecl wrap_np2_check_hostdrv(char *buf, int size)\n{\n    KAPI_HIT(48);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN_S(buf, size),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    return np2_check_hostdrv(buf, size);\n}\n"
+  },
+  "host": {
+    "host_range_ok": "static int host_range_ok(const void *p, u32 len)\n{\n    u32 a = (u32)p;\n    if (!p) return 0;\n    if (a + len < a) return 0;              /* 加算 overflow */\n    return ring3_user_range_ok(a, len);\n}\n",
+    "kapi_host_open": "i32 kapi_host_open(const char *req, u32 len)\n{\n    if (req == 0 || len == 0 || len > LINK_MAX_PAYLOAD) return OS32_ERR_INVAL;\n    if (!host_range_ok(req, len)) return OS32_ERR_INVAL;\n    kmemcpy(host_req_buf, req, len);\n    return link_host_open(host_req_buf, len, res_owner_get());\n}\n",
+    "kapi_host_status": "i32 kapi_host_status(i32 h, u32 *status, u32 *length)\n{\n    u32 st = 0, ln = 0;\n    i32 rc;\n\n    /* **書く前に全部の出力ポインタを検証する** */\n    if (status && !host_range_ok(status, sizeof(u32))) return OS32_ERR_INVAL;\n    if (length && !host_range_ok(length, sizeof(u32))) return OS32_ERR_INVAL;\n    rc = link_host_status(h, &st, &ln, res_owner_get());\n    if (rc != 0) return rc;                 /* 失敗時は出力を書かない */\n    if (status) *status = st;\n    if (length) *length = ln;\n    return 0;\n}\n",
+    "kapi_host_read": "i32 kapi_host_read(i32 h, void *buf, u32 cap)\n{\n    const u8 *src = 0;\n    i32 n;\n\n    if (buf == 0 || cap == 0) return OS32_ERR_INVAL;\n    if (!host_range_ok(buf, cap)) return OS32_ERR_INVAL;\n    /* 成功確定点は link 側の最初の cli 区間。戻った時点で n は確定していて、\n     * この写しの途中で再同期 / close が起きても戻り値は変えない\n     * (次の呼び出しが STALE / INVAL を返す。往復 4 の R4)。 */\n    n = link_host_read_stage(h, cap, &src, res_owner_get());\n    if (n > 0) kmemcpy(buf, src, (u32)n);\n    return n;\n}\n",
+    "kapi_host_write": "i32 kapi_host_write(i32 h, const void *buf, u32 len)\n{\n    u32 n;\n\n    if (buf == 0 || len == 0) return OS32_ERR_INVAL;\n    if (!host_range_ok(buf, len)) return OS32_ERR_INVAL;\n    /* 1 フレームに載る分だけ写す。受け付ける長さ (= min(len, 1400)) と\n     * 「残り宣言長を超えたら INVAL」の判定は link 側が len を見て決める。 */\n    n = (len > LINK_MAX_PAYLOAD) ? LINK_MAX_PAYLOAD : len;\n    kmemcpy(host_wr_buf, buf, n);\n    return link_host_write(h, host_wr_buf, len, res_owner_get());\n}\n",
+    "kapi_host_close": "i32 kapi_host_close(i32 h)\n{\n    return link_host_close(h, res_owner_get());\n}\n",
+    "host_owner_exit": "void host_owner_exit(int id)\n{\n    link_host_owner_exit(id);\n}\n"
+  }
+}

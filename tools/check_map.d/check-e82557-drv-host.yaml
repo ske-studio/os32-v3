@@ -26,3 +26,6 @@ check-e82557-drv-host:
 - kernel/isr_handlers.c
 - kernel/irq.h
 - kernel/irq_math.h
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
+- platform/pc98/lan_match.c

@@ -2,6 +2,7 @@
  * Physical RAM is redirected only in this fixture. No guest mailbox access.
  */
 #include "memmap.h"
+#include "kcg_contract.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
 static u8 ram[MEM_CONV_END];

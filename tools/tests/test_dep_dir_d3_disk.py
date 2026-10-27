@@ -8,7 +8,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ('kernel/bootinfo.c', 'kernel/bootinfo_check.c',
            'platform/pc98/boot_disk.c')
-HEADERS = ('platform/pc98/boot_disk.h', 'kernel/boot_disk.h')
+HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_disk.h', 'kernel/boot_disk.h')
 
 
 def build(tmp, mutation=None):
@@ -29,7 +29,7 @@ def build(tmp, mutation=None):
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
            '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
-           '-D__cdecl=', '-I' + str(tmp), '-I' + str(ROOT)]
+           '-D__cdecl=', '-I' + str(tmp), '-I' + str(tmp / 'include'), '-I' + str(ROOT)]
     cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers',
                                          'sdk/include/os32')]
     subprocess.run([*cmd, str(src), '-o', str(exe)], check=True)

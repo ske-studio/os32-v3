@@ -148,7 +148,7 @@ C_MUTATIONS = [
      "現在の CHS の容量を計画の上限にしない (C4)"),
     ("userland/shell/hdprep_plan.c", "        if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;",
      "        (void)0;", "LBA28 の上限を計画の上限にしない (C4)"),
-    ("fs/ext2_fmt.c", "    if (!ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
      "format_at が ATA の方式の上限を見ない (C4)"),
     ("fs/ext2_fmt.c", "        if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
      "ext2_format が IDENTIFY の幾何で見つけた区画に書く (m3)"),
@@ -157,7 +157,7 @@ C_MUTATIONS = [
     ("drivers/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "        return 0;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "旧配置を検出しない (カーネルが移行の案内を出せない、M2)"),
-    ("fs/ext2_fmt.c", "    if (!ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("drivers/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
@@ -843,7 +843,7 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["drivers/ide.h", "drivers/pc98pt.c", "drivers/pc98pt.h", "drivers/ide_addr.c",
+MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ide.h", "drivers/pc98pt.c", "drivers/pc98pt.h", "drivers/ide_addr.c",
           "drivers/ide_addr.h", "fs/ext2_layout.c", "fs/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2_super.c", "fs/ext2_fmt.c", "fs/ext2_inode.c", "fs/ext2_dir.c",

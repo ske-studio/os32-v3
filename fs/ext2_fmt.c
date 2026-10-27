@@ -1,7 +1,8 @@
 #include "ide_limits.h"
 #include "ext2_priv.h"
 #include "ext2_layout.h"   /* 大きさの固定点 (票 TASK_HDD_INSTALL N7) */
-#include "ide.h"
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "bootinfo.h"   /* BOOTINFO_GEOM_BIOS */
 #include "kprintf.h"
 
@@ -164,7 +165,7 @@ static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
      * フォーマットが同時に 2 本走ることはない。 */
     static Ext2Ctx fmt_ctx;
 
-    if (!ide_drive_present(ide_drive)) return EXT2_ERR_IO;
+    if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
     if (sectors > part_len) sectors = part_len;
 
     if (ext2_layout_plan(sectors, EXT2_MAX_GROUPS, &lay) != EXT2L_OK)
@@ -173,7 +174,7 @@ static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
      * 入口 (ext2_format / ext2_format_at) に関係なく、最初の書き込みの前に
      * **この 1 か所**で見る (Codex ラリー 2 の 3: ext2_format は 32 グループへの
      * 頭打ちで、以前は大きすぎて断っていた入力もここへ来る)。 */
-    if (!ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))
+    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))
         return EXT2_ERR_INVAL;
 
     /* 一時コンテキストを初期化
@@ -382,7 +383,7 @@ int ext2_format(int ide_drive, u32 total_sectors)
     u32 start, len;
     int ret;
 
-    if (!ide_drive_present(ide_drive)) return EXT2_ERR_IO;
+    if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
     /* 区画表の OS32 区画に作る。区画が無ければ作らない (以前は LBA 1088 を
      * 仮定して書き始めた、F12)。長さは区画で頭打ち — インストーラは
      * 「総数 - 1632」を渡すが、区画はシリンダ単位で切り下げてある。 */
@@ -407,10 +408,10 @@ int ext2_format(int ide_drive, u32 total_sectors)
 
 int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
 {
-    IdeInfo info;
+    struct platform_disk_geometry info;
 
-    if (!ide_drive_present(ide_drive)) return EXT2_ERR_IO;
-    if (ide_get_info(ide_drive, &info) != IDE_OK) return EXT2_ERR_IO;
+    if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
+    if (platform_disk_geometry_get(ide_drive, &info) != IDE_OK) return EXT2_ERR_IO;
     /* 範囲の検査。**どれか 1 つでも外れたら 1 バイトも書かない**。
      *   - 長さ 0 / 開始が IPL・区画表・ローダ (LBA 0〜17) に掛かる
      *   - 総数が分からない / 開始 + 長さがディスクの外 (足し算の桁あふれも) */
@@ -422,6 +423,6 @@ int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
     /* 総数だけでなく、ATA の指定の方式で**本当に指せる**範囲か (LBA28 の上限・
      * 現在の CHS の容量・シリンダ 16 ビット)。最初の書き込みの前に範囲全体で
      * 照合する (Codex C4)。 */
-    if (!ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;
+    if (!platform_ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;
     return ext2_format_range(ide_drive, start_lba, length, length);
 }

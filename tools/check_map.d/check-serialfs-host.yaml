@@ -37,3 +37,5 @@ check-serialfs-host:
 - lib/serial_diag.h
 - kernel/platform_sys.h
 - platform/pc98/system.c
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h

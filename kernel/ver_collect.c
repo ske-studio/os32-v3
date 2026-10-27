@@ -3,7 +3,7 @@
 #include "cpu_calibrate.h"
 #include "idt.h"
 #include "port_service.h"
-#include "pcm_cs4231.h" /* pcm_present is the resident pcm_module.c facade. */
+#include "pcm_contract.h" /* pcm_present is the resident pcm_module.c facade. */
 #include "gfx_hal.h"
 #include "bootinfo.h"
 #include "kstring.h"

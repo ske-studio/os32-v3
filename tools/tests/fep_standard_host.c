@@ -34,7 +34,8 @@ char *kstrncat(char *d, const char *s, u32 n)
 } } while (0)
 
 #include "ext2_priv.h"
-#include "ide.h"
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "kmalloc.h"
 #include "hdd_pt_fake.h"
 
@@ -97,8 +98,8 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
     disk_writes += count;
     return 0;
 }
-int ide_drive_present(int drive) { return drive == 0; }
-int ide_get_info(int drive, IdeInfo *info)
+int platform_ide_drive_present(int drive) { return drive == 0; }
+int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 {
     if (drive != 0) return IDE_ERR_NO_DRIVE;
     memset(info, 0, sizeof(*info));

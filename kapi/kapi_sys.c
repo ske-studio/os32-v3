@@ -7,7 +7,8 @@
 #include "vfs.h"
 #include "exec.h"             /* ring3_user_range_ok (CPL=3 ポインタ検証) */
 #include "sys.h"              /* sys_time_now (票 TASK_HAL_WIRING §1-5) */
-#include "pci_bind.h"         /* pci_bind_info_get (票 TASK_HAL_WIRING §1-4) */
+#include "pci_bind_contract.h"
+#include "platform_device.h"
 #include "port_service.h"
 #include "appslot.h"
 #include "redir_access.h"
@@ -334,7 +335,7 @@ int kapi_pci_bind_info(u32 idx, void *out)
         ring3_fault_kill();                 /* 戻らない (longjmp) */
     }
 
-    rc = pci_bind_info_get((int)idx, &snap);
+    rc = platform_pci_bind_info_get((int)idx, &snap);
     if (rc != 0) return OS32_ERR_INVAL;     /* 範囲外 — 出力は書かない */
 
     src = (const u8 *)&snap;

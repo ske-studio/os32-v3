@@ -4,7 +4,8 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /* T5c-4: resident PCI/session facade using the T5c-0 reference record. */
 #include "lan_module.h"
 #include "lan_imports.h"
-#include "e82557_regs.h"
+#include "pci_bind_contract.h"
+#include "pci_bind.h"
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"
@@ -136,7 +137,7 @@ static void lan_detach_tick(void)
     }
     irq_restore(flags);
 }
-static int lan_probe(const struct pci_dev *dev)
+int lan_module_probe(const struct pci_dev *dev)
 {
     struct module_record *r = module_record_get(lan_handle);
     if (!candidate_valid || !r || (r->state != MODULE_STARTING && r->state != MODULE_RUNNING))
@@ -163,10 +164,6 @@ static int lan_probe(const struct pci_dev *dev)
     }
     return rc;
 }
-const struct pci_driver e82557_driver = {
-    sizeof(struct pci_driver), E82557_VENDOR, E82557_DEVICE,
-    PCI_CLASS_NETWORK, PCI_SUB_NET_ETHERNET, "e82557", lan_probe
-};
 static int lan_start_module(struct module_record *r, u32 entry, u32 *exports)
 {
     (void)exports;
@@ -180,7 +177,7 @@ static int lan_start_module(struct module_record *r, u32 entry, u32 *exports)
             return MODULE_INIT_FAILED;
     candidate_valid = 1;
     if (rc) return rc;
-    const struct pci_driver *const drivers[] = {&e82557_driver};
+    const struct pci_driver *const drivers[] = {platform_lan_driver()};
     pci_bound = 1;
     pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));
     return pci_quarantined() ? MODULE_INIT_FAILED : 0;

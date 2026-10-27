@@ -108,6 +108,7 @@ def runtime_checks(folder, mutations=False):
                         '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         ROOT / 'tools/tests/lan_module_host.c',
                         ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                        ROOT / 'platform/pc98/lan_match.c',
                         ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
 
     def run(modes, expected=0):

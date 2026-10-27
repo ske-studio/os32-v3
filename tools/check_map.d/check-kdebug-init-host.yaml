@@ -78,6 +78,8 @@ check-kdebug-init-host:
 - include/kselftest_probe.h
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
 - kernel/platform_display.h
 - platform/pc98/display_private.h
 - platform/pc98/display.c

@@ -21,4 +21,6 @@ check-h4-backing-host:
 - drivers/fdc_decide.c
 - drivers/fdc_decide.h
 - fs/vfs.h
+- include/dma_contract.h
+- lib/dma_contract.c
 artifact_reader: true

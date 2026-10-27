@@ -1,7 +1,8 @@
 /* Private paired LAN facade; public KAPI and core PCI/VFS remain unchanged. */
 #ifndef LAN_MODULE_H
 #define LAN_MODULE_H
-#include "e82557.h"
+#include "lan_contract.h"
+#include "pci_bind_contract.h"
 #include "sfs_lan.h"
 #include "module_runtime.h"
 #include "irq.h"
@@ -26,6 +27,8 @@ typedef struct {
     SfsIo io;
 } LanModuleApi;
 #define LAN_MODULE_API_SLOTS 20u
+int lan_module_probe(const struct pci_dev *dev);
+const struct pci_driver *platform_lan_driver(void);
 int lan_module_load(void);
 void lan_module_pci_bind_fallback(void);
 int lan_module_abort(void);

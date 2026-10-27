@@ -33,7 +33,7 @@
 #include "os32_kapi_shared.h"
 #include "sfs_lan.h"
 #include "sys.h"
-#include "e82557.h"
+#include "lan_contract.h"
 #include "lan_module.h"
 #include "sysconfig.h"
 #include "config.h"

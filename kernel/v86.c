@@ -16,7 +16,7 @@
 #include "v86_pic.h"
 #include "v86_bios.h"
 #include "module.h"
-#include "loop_dev.h"
+#include "platform_device.h"
 #include "idt.h"
 #include "kprintf.h"
 #include "io.h"
@@ -793,7 +793,7 @@ int v86_disk_test(const char *path)
     /* ゲスト側のテストコードは 256 バイト/セクタ固定で書いてある
      * (PC-98 2HD のブートトラックは 256B x 16 が標準)。
      * イメージがそれ以外なら、突き合わせが成立しないので弾く。 */
-    if (loop_dev_get_geometry(V86_DISK_SLOT, &cyls, &heads, &spt,
+    if (platform_loop_dev_get_geometry(V86_DISK_SLOT, &cyls, &heads, &spt,
                               &bps, &total) != 0) {
         v86_bios_detach_disk();
         v86_disk_result = 0x8004;
@@ -804,7 +804,7 @@ int v86_disk_test(const char *path)
         v86_disk_result = 0x8005;
         return -1;
     }
-    if (loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1, ref) != 0) {
+    if (platform_loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1, ref) != 0) {
         v86_bios_detach_disk();
         v86_disk_result = 0x8002;
         return -1;
@@ -901,7 +901,7 @@ int v86_boot2(const char *path, const char *second)
     if ((v86_bios_boot_daua() & BIOS_DA_TYPE_MASK) == V86_DAUA_HDD) {
         u16 bps = 0;
         u32 count;
-        if (loop_dev_get_geometry(V86_DISK_SLOT, 0, 0, 0, &bps, 0) != 0 ||
+        if (platform_loop_dev_get_geometry(V86_DISK_SLOT, 0, 0, 0, &bps, 0) != 0 ||
             bps == 0) {
             v86_mem_teardown();
             v86_bios_detach_disk();
@@ -911,13 +911,13 @@ int v86_boot2(const char *path, const char *second)
         if (count == 0) {
             count = 1;
         }
-        if (loop_dev_read_lba(V86_DISK_SLOT, 0, count,
+        if (platform_loop_dev_read_lba(V86_DISK_SLOT, 0, count,
                               (void *)V86_IPL_ADDR) != 0) {
             v86_mem_teardown();
             v86_bios_detach_disk();
             return -3;
         }
-    } else if (loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,
+    } else if (platform_loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,
                                  (void *)V86_IPL_ADDR) != 0) {
         v86_mem_teardown();
         v86_bios_detach_disk();

@@ -2,7 +2,7 @@
 /*  DMA_POOL_HOST.C — kernel/dma_pool_math.c をそのままホストで回す         */
 /*                                                                          */
 /*  表の算数だけを見る。実物を 1 行も写さずに #include する                 */
-/*  (64KB またぎの規則は drivers/dma8237_math.c の dma_crosses_64k が正典   */
+/*  (64KB またぎの規則は lib/dma_contract.c の dma_crosses_64k が正典   */
 /*  なので、そちらも同じ実行ファイルに入れる)。                             */
 /*                                                                          */
 /*  **NP21/W では踏めない**のが 64KB またぎの飛ばし — エミュレータは 8237   */
@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../drivers/dma8237_math.c"
+#include "../../lib/dma_contract.c"
 #include "../../kernel/dma_pool_math.c"
 
 #define CHECK(x) do { if (!(x)) { \

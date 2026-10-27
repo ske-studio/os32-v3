@@ -19,7 +19,8 @@
  * ======================================================================== */
 
 #include "ext2_priv.h"
-#include "ide.h"
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "kmalloc.h"
 #include "../../drivers/pc98pt.h"
 #include "../../drivers/pc98pt.c"
@@ -192,10 +193,10 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
     return 0;
 }
 
-int ide_drive_present(int drive) { return (drive & 3) == 0; }
+int platform_ide_drive_present(int drive) { return (drive & 3) == 0; }
 
 /* IDENTIFY は 8/17 と答える (区画表の幾何とは別。F4 の取り違えを見る) */
-int ide_get_info(int drive, IdeInfo *info)
+int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 {
     if ((drive & 3) != 0) return IDE_ERR_NO_DRIVE;
     if (info) {
@@ -213,7 +214,7 @@ int ide_get_info(int drive, IdeInfo *info)
  * LBA28 の上限や現在の CHS の容量が総数より小さいドライブを g_ata_limit で作る */
 static u32 g_ata_limit = DISK_TOTAL;
 
-int ide_range_ok(int drive, u32 lba, u32 count)
+int platform_ide_range_ok(int drive, u32 lba, u32 count)
 {
     if ((drive & 3) != 0) return 0;
     if (count == 0) return 1;

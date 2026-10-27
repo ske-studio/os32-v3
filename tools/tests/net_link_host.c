@@ -278,6 +278,13 @@ int ring3_user_range_ok(u32 p, u32 len)
     return (u32)(user_hi - q) >= len;
 }
 
+/* NP2 is outside this protocol fixture; dedicated L09 tests cover it. */
+int np2_detect(void) { return 0; }
+int np2_get_version(char *b, int n) { (void)b; (void)n; return 0; }
+int np2_get_cpu(char *b, int n) { (void)b; (void)n; return 0; }
+int np2_get_clock(char *b, int n) { (void)b; (void)n; return 0; }
+int np2_check_hostdrv(char *b, int n) { (void)b; (void)n; return 0; }
+#include "../../platform/pc98/device_host.c"
 #include "../../kapi/kapi_host.c"
 #include "kapi_profile.h"
 #include "generated_host_open.inc"

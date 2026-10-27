@@ -22,24 +22,15 @@
 #ifndef IDE_H
 #define IDE_H
 
-#include "types.h"
+#include "ide_contract.h"
 
 #include "config.h"
 
-#define SASI_SECTOR_BYTES      256
-
-#define IDE_BANK_COUNT         2
-#define IDE_DRIVES_PER_BANK    2
-#define IDE_MAX_DRIVES         (IDE_BANK_COUNT * IDE_DRIVES_PER_BANK)
 #define IDE_PIO_WORDS          (SYS_HDD_SECTOR_SIZE / sizeof(u16))
 #define IDE_IDENTIFY_WORDS     256
 #define IDE_ID_MODEL_WORD      27
-#define IDE_MODEL_LEN          40
 #define IDE_ID_SERIAL_WORD     10
-#define IDE_SERIAL_LEN         20
 #define IDE_ID_FIRMWARE_WORD   23
-#define IDE_FIRMWARE_LEN       8
-
 /* IDE I/Oポート (PC-98) */
 #define IDE_DATA       0x640   /* データレジスタ (16-bit) */
 #define IDE_ERROR      0x642   /* エラーレジスタ (R) */
@@ -84,28 +75,6 @@
 #define IDE_WAIT_NS             400    /* ドライブ選択等の必要ウェイト時間 (ns) */
 #define IDE_BUS_CYCLE_NS        100    /* I/Oバスサイクル時間概算 (ns) */
 #define IDE_SEL_SETTLE          (IDE_WAIT_NS / IDE_BUS_CYCLE_NS) /* 4回 */
-
-/* エラー定義 */
-#define IDE_OK              0
-#define IDE_ERR_TIMEOUT    -1
-#define IDE_ERR_NO_DRIVE   -2
-#define IDE_ERR_IO         -3
-#define IDE_ERR_RANGE      -4    /* 指定の方式で指せないセクタ (LBA28 上限・総数・
-                                  * シリンダ 16 ビット・lba + count の桁あふれ) */
-
-/* IDENTIFY DEVICE情報 */
-typedef struct {
-    u32 total_sectors;   /* LBA総セクタ数 */
-    u16 cylinders;       /* シリンダ数 */
-    u16 heads;           /* ヘッド数 */
-    u16 sectors;         /* セクタ数/トラック */
-    u32 size_mb;         /* サイズ(MB) */
-    char model[IDE_MODEL_LEN + 1];      /* モデル名 */
-    char serial[IDE_SERIAL_LEN + 1];     /* シリアル番号 */
-    char firmware[IDE_FIRMWARE_LEN + 1];    /* ファームウェアリビジョン */
-    int  lba_supported;  /* LBAサポート有無 */
-    u16  phys_sector_size; /* 物理セクタサイズ (SASI=256, IDE=512) */
-} IdeInfo;
 
 /* IDENTIFY の幾何まわりの生の値 (票 TASK_HDD_INSTALL 段 0)。
  * **IdeInfo は KAPI の out 構造体 (96 B、インストーラが並びに依存) なので

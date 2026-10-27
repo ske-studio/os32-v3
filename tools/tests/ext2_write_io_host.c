@@ -25,7 +25,8 @@
  * ======================================================================== */
 
 #include "ext2_priv.h"
-#include "ide.h"
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "kmalloc.h"
 #include "hdd_pt_fake.h"   /* LBA 1 に OS32 区画 (票 TASK_HDD_INSTALL 段 1、1088 の廃止) */
 
@@ -245,9 +246,9 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
 }
 
 /* ---- IDE の境界 (ext2_super.c / ext2_fmt.c が存在確認とジオメトリに使う) */
-int ide_drive_present(int drive) { return (drive & 3) == 0; }
+int platform_ide_drive_present(int drive) { return (drive & 3) == 0; }
 
-int ide_get_info(int drive, IdeInfo *info)
+int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 {
     if ((drive & 3) != 0) return IDE_ERR_NO_DRIVE;
     if (info) {

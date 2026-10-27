@@ -11,7 +11,8 @@
 
 #include "ide_limits.h"
 #include "ext2_priv.h"
-#include "ide.h"    /* ide_drive_present, ide_get_info — 存在と総セクタ数 */
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "kprintf.h"
 #include "bootinfo.h" /* bootinfo_part_geom — 区画表の CHS の幾何 */
 #include "pc98pt.h"   /* 区画表の共有部 (票 TASK_HDD_INSTALL 段 1-4) */
@@ -328,13 +329,13 @@ static int ext2_find_partition_ex(int ide_drive, u32 *out_start, u32 *out_len,
     u8 pt_sect[PC98PT_SECTOR_SIZE];
     u16 heads, spt;
     unsigned long start, len;
-    IdeInfo info;
+    struct platform_disk_geometry info;
     Device *dev;
     int src;
 
     if (legacy) *legacy = 0;
     if (!out_start || !out_len) return EXT2_ERR_INVAL;
-    if (ide_get_info(ide_drive, &info) != IDE_OK) return EXT2_ERR_IO;
+    if (platform_disk_geometry_get(ide_drive, &info) != IDE_OK) return EXT2_ERR_IO;
 
     dev = ext2_dev_for(ide_drive);
     if (!dev) return EXT2_ERR_IO;
@@ -381,7 +382,7 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
     int ret, i;
 
     if (ctx->mounted) ext2_unmount(ctx);
-    if (!ide_drive_present(ide_drive)) return EXT2_ERR_IO;
+    if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
     ctx->drive_num = ide_drive;
 
     /* Device API ポインタを取得 */

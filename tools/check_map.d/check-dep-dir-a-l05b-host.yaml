@@ -1,0 +1,18 @@
+check-dep-dir-a-l05b-host:
+- fs/vfs_name_rules.inc
+- include/types.h
+- include/config.h
+- include/ide_contract.h
+- include/platform_device.h
+- drivers/ide.h
+- platform/pc98/device_ide.c
+- tools/tests/dep_dir_a_l05b_host.c
+- tools/tests/test_dep_dir_a_l05b.py
+- fs/ext2_super.c
+- fs/ext2_fmt.c
+- fs/fatfs_vfs.c
+- fs/fatfs/diskio.c
+- fs/fatfs/diskio_os32.h
+- fs/ide_limits.h
+- build/checks.d/check-dep-dir-a-l05b-host.mk
+- tools/check_map.d/check-dep-dir-a-l05b-host.yaml

@@ -9,6 +9,8 @@
 #ifndef LAN_ADAPTER
 #define LAN_ADAPTER "../../kernel/lan_module.c"
 #endif
+#include "e82557_regs.h"
+#include "e82557.h"
 #include LAN_ADAPTER
 #include "../../kernel/tick.c"
 volatile u32 kctx_irq_depth;

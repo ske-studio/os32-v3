@@ -1,0 +1,7 @@
+{
+  "wrappers": {
+    "kcg_init": "void __cdecl wrap_kcg_init(void)\n{\n    KAPI_HIT(59);\n    kcg_init();\n}\n",
+    "kcg_set_scale": "void __cdecl wrap_kcg_set_scale(int s)\n{\n    KAPI_HIT(60);\n    kcg_set_scale(s);\n}\n",
+    "kcg_load_font": "int __cdecl wrap_kcg_load_font(const char *path)\n{\n    KAPI_HIT(150);\n    return kcg_load_font(path);\n}\n"
+  }
+}
