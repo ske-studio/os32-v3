@@ -307,6 +307,36 @@ def is_mounted():
     return result.returncode == 0
 
 
+def verify_mounted_nhd():
+    """マウント元を照合する。確認できない場合も既存の mount は操作しない。"""
+    backing = None
+    try:
+        result = subprocess.run(
+            ['findmnt', '--noheadings', '--raw', '--output', 'SOURCE',
+             '--mountpoint', MOUNT_POINT], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            result = subprocess.run(
+                ['losetup', '--json', '--output', 'BACK-FILE',
+                 result.stdout.strip()], capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                path = json.loads(result.stdout)['loopdevices'][0]['back-file']
+                if isinstance(path, str) and path:
+                    backing = os.path.realpath(path)
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+        print("Error: マウント元を確認できません: {}".format(exc), file=sys.stderr)
+    expected = os.path.realpath(NHD_LOCAL)
+    if backing is not None and backing == expected:
+        return True
+    print("Error: {} のマウント元 NHD が一致しません".format(MOUNT_POINT), file=sys.stderr)
+    print("  マウント中の NHD: {}".format(backing or '(確認できません)'), file=sys.stderr)
+    print("  自分の NHD_LOCAL: {}".format(expected), file=sys.stderr)
+    command = "python3 tools/nhd_deploy.py umount"
+    if PROFILE == 't2h':
+        command += " --profile t2h"
+    print("  マウントした元の作業木で {} を実行してください".format(command), file=sys.stderr)
+    return False
+
+
 def get_loop_device():
     """現在NHD_LOCALに紐づいているループデバイスを返す (なければNone)"""
     result = subprocess.run(
@@ -358,6 +388,8 @@ _GUARD_NEXT_MOUNT = False
 def do_mount():
     """ext2パーティションをマウント"""
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         print("既にマウント済みです: " + MOUNT_POINT)
         return True
 
@@ -413,6 +445,9 @@ def do_umount():
             print("ループデバイス {} を解放しました".format(loop_dev))
         return True
 
+    if not verify_mounted_nhd():
+        return False
+
     # sync — 失敗をここで握り潰すと「書いたつもり」でイメージを配る
     sync_ok = run_sync()  # sync 失敗でもマウント解除は試みる
 
@@ -439,6 +474,8 @@ def do_umount():
 def ensure_mounted():
     """マウントされていなければ自動マウントする"""
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         return True
     print("自動マウント中...")
     return do_mount()
@@ -454,6 +491,8 @@ def ensure_mounted_for_kernel():
     """
     global _GUARD_NEXT_MOUNT
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         return legacy_pt_guard() and ensure_mounted()
     _GUARD_NEXT_MOUNT = True
     try:
@@ -620,6 +659,8 @@ def do_deploy(force=False):
     """
     # まずアンマウント
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         if not do_umount():
             return False
 
@@ -712,6 +753,8 @@ def do_write_boot(loader_bin):
 def do_format():
     """ext2パーティションを再フォーマット (データ全消去)"""
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         print("マウント中のためアンマウントします...")
         if not do_umount():
             return False
@@ -955,8 +998,9 @@ def do_migrate_pt(loader_bin, kernel_file, push=True):
     ローダ → 区画表 (最後) → push。検査で断ったら NHD は 1 バイトも変わらない。
     書き始めた後に落ちたら push しない (ローカルの作業用 NHD だけが途中の状態)。
     """
-    if is_mounted() and not do_umount():
-        return False
+    if is_mounted():
+        if not verify_mounted_nhd() or not do_umount():
+            return False
     if not ensure_local_nhd():
         return False
     try:
@@ -1127,15 +1171,18 @@ def do_pull():
     フォーマットを伴いゲスト側で作られたデータ (home/db/save) を消すので、
     作業を再開したいだけのときはこちらを使う。
     """
-    # 来歴は**入口で**消す。早期 return (マウント中 / remote 欠損) や
+    # 他の木の mount は何も変更せず拒否。それ以外は来歴を入口で消す。
+    # 早期 return (自分の NHD がマウント中 / remote 欠損) や
     # コピー後の do_mount() 失敗で古い stamp が残ると、中身の違う local で
     # 全体上書きが通ってしまう (往復 1 の B8)。
-    remove_pull_stamp()
-
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
+        remove_pull_stamp()
         print("マウント中です。先に umount してください。", file=sys.stderr)
         return False
 
+    remove_pull_stamp()
     if not os.path.isfile(NHD_REMOTE):
         print("Error: {} が見つかりません".format(NHD_REMOTE), file=sys.stderr)
         return False
@@ -1171,6 +1218,8 @@ def do_pull():
 def do_init():
     """Windows側NHDを/tmpにコピー + パーティション更新 + フォーマット + マウント"""
     if is_mounted():
+        if not verify_mounted_nhd():
+            return False
         print("既にマウント済みです。先にumountしてください。")
         return False
 
@@ -1298,6 +1347,8 @@ def do_sync(tag_filter=None):
     2. ブートローダー書き込み (write-boot)
     3. ディレクトリ構造作成・全ファイルコピー
     """
+    if is_mounted() and not verify_mounted_nhd():
+        return False
     if tag_filter:
         print("sync --tag: 部分同期のため deploy-set は再生成しない。"
               "更新後の一式とは不一致になり得る。")
@@ -1690,6 +1741,8 @@ def do_verify_set(set_file):
             files[guest] = item
         if not is_mounted():
             raise ValueError('local is not mounted; umount → pull --profile t2h first')
+        if not verify_mounted_nhd():
+            return False
         if not guard_root():
             return False
         root = Path(MOUNT_POINT)

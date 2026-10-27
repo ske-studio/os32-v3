@@ -12,12 +12,17 @@ NHD_LOCAL を決め、do_sync は旧配置の門 (legacy_pt_guard) でそれを�
 向け、各試験でも NHD_LOCAL を差し替えて門を贋物にする (門そのものの試験は
 tools/tests/test_hdd_stage1.py)。
 """
+import contextlib
+import inspect
+import io
+import json
 import os
 import pathlib
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -124,5 +129,137 @@ class SyncFailure(unittest.TestCase):
         self.assertFalse(self.saved['NHD_LOCAL'].startswith(real), self.saved['NHD_LOCAL'])
 
 
+class MountedImage(unittest.TestCase):
+    """DEPLOY-BOOT-1: real entry points, only host commands are replaced."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='nhd-mounted-')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = pathlib.Path(self.tmp.name)
+        self.mount = self.root / 'mount'
+        self.mount.mkdir()
+        self.local = self.root / 'own tree/os32.nhd'
+        self.local.parent.mkdir()
+        self.local.write_bytes(b'own image')
+        self.other = self.root / 'other tree/os32.nhd'
+        self.other.parent.mkdir()
+        self.other.write_bytes(b'other image')
+        self.source = self.root / 'kernel'
+        self.source.write_bytes(b'new kernel')
+        self.target = self.mount / 'kernel'
+        self.target.write_bytes(b'old kernel')
+        self.backing = str(self.local)
+        self.mounted = True
+        self.calls = []
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        for name, value in [('NHD_LOCAL', str(self.local)),
+                            ('NHD_REMOTE', str(self.other)),
+                            ('MOUNT_POINT', str(self.mount)), ('PROFILE', None),
+                            ('legacy_pt_guard', lambda: True)]:
+            self.stack.enter_context(patch.object(nd, name, value))
+        self.stack.enter_context(patch.object(nd.subprocess, 'run', self.command))
+        self.stack.enter_context(patch.dict(os.environ, {'HOSTDRV_DIR': str(self.root)}))
+
+    def command(self, args, **kwargs):
+        self.calls.append(args)
+        output = ''
+        rc = 0
+        if args[0] == 'mountpoint':
+            rc = 0 if self.mounted else 1
+        elif args[0] == 'findmnt':
+            self.assertEqual(args[-1], str(self.mount))
+            output = '/dev/loop-test\n'
+        elif args[0] == 'losetup':
+            if args[1] != '-j':
+                self.assertEqual(args[-1], '/dev/loop-test')
+                output = json.dumps({'loopdevices': [{'back-file': self.backing}]})
+        elif args[:3] == ['sudo', 'losetup', '-f']:
+            self.assertEqual(args[-1], str(self.local))
+            output = '/dev/loop-test\n'
+        elif args[:2] == ['sudo', 'mount']:
+            self.assertEqual(args[-2:], ['/dev/loop-test', str(self.mount)])
+            self.mounted = True
+        elif args[0] == 'sync':
+            pass
+        elif args[:2] == ['sudo', 'cp']:
+            pathlib.Path(args[-1]).write_bytes(pathlib.Path(args[-2]).read_bytes())
+        else:
+            raise AssertionError('unexpected host command: ' + repr(args))
+        return subprocess.CompletedProcess(args, rc, output, '')
+
+    def test_own_image_continues(self):
+        alias = self.root / 'alias.nhd'
+        alias.symlink_to(self.local)
+        self.backing = str(alias)
+        self.assertTrue(nd.do_mount())
+        self.assertTrue(nd.ensure_mounted_for_kernel())
+        self.assertTrue(nd.do_copy([str(self.source)]))
+        self.assertEqual(self.target.read_bytes(), b'new kernel')
+        self.assertFalse(any(c[:2] == ['sudo', 'mount'] for c in self.calls))
+
+    def test_foreign_image_stops_without_writes(self):
+        actions = [nd.do_mount, nd.ensure_mounted, nd.ensure_mounted_for_kernel,
+                   nd.do_umount, nd.do_deploy, nd.do_format, nd.do_pull, nd.do_init,
+                   lambda: nd.do_migrate_pt('loader', 'kernel'),
+                   lambda: nd.do_copy([str(self.source)]),
+                   nd.do_sync, nd.do_sync_from_hostdrv]
+        for profile_name in (None, 't2h'):
+            with patch.object(nd, 'PROFILE', profile_name):
+                for action in actions:
+                    with self.subTest(profile=profile_name, action=action):
+                        self.calls.clear()
+                        self.backing = str(self.other)
+                        stamp = pathlib.Path(nd.stamp_path())
+                        stamp.write_bytes(b'keep stamp')
+                        log = io.StringIO()
+                        with contextlib.redirect_stderr(log):
+                            self.assertFalse(action())
+                        self.assertIn(str(self.other), log.getvalue())
+                        self.assertIn(str(self.local), log.getvalue())
+                        self.assertIn('python3 tools/nhd_deploy.py umount', log.getvalue())
+                        self.assertTrue(all(c[0] in ('mountpoint', 'findmnt', 'losetup')
+                                            for c in self.calls), self.calls)
+                        self.assertEqual(self.target.read_bytes(), b'old kernel')
+                        self.assertEqual(self.local.read_bytes(), b'own image')
+                        self.assertEqual(self.other.read_bytes(), b'other image')
+                        self.assertEqual(stamp.read_bytes(), b'keep stamp')
+
+    def test_unmounted_mounts_own_image(self):
+        self.mounted = False
+        self.assertTrue(nd.ensure_mounted())
+        self.assertTrue(self.mounted)
+        self.assertTrue(any(c[:3] == ['sudo', 'losetup', '-f'] for c in self.calls))
+        self.assertFalse(any(c[0] == 'findmnt' for c in self.calls))
+
+    def test_unknown_backing_refuses(self):
+        with patch.object(nd.subprocess, 'run', return_value=
+                          subprocess.CompletedProcess([], 1, '', 'unavailable')):
+            self.assertFalse(nd.verify_mounted_nhd())
+
+
+def main():
+    suite = lambda: unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
+    result = unittest.TextTestRunner().run(suite())
+    if not result.wasSuccessful():
+        return 1
+    if '--mutate' in sys.argv:
+        source = inspect.getsource(nd.verify_mounted_nhd)
+        original = 'if backing is not None and backing == expected:'
+        assert source.count(original) == 1
+        namespace = dict(nd.__dict__)
+        exec(source.replace(original, 'if True:'), namespace)
+        with patch.object(nd, 'verify_mounted_nhd', namespace['verify_mounted_nhd']), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            result = unittest.TextTestRunner(stream=io.StringIO()).run(
+                unittest.defaultTestLoader.loadTestsFromName(
+                    'test_foreign_image_stops_without_writes', MountedImage))
+        if result.wasSuccessful():
+            raise AssertionError('survived: mounted NHD comparison removed')
+        if result.errors:
+            raise AssertionError('mutation must fail assertions, not crash: ' + str(result.errors))
+        print('RED: mounted NHD comparison removed (one line)')
+    return 0
+
+
 if __name__ == '__main__':
-    unittest.main()
+    raise SystemExit(main())
