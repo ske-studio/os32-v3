@@ -40,6 +40,9 @@ check-memory-host:
 - kernel/shlib.c
 - kernel/kernel.c
 - kernel/memory_boot.c
+- platform/pc98/memory.c
+- kernel/platform_memory.h
+- platform/pc98/platform_memory_desc.h
 - kernel/paging.c
 - kernel/pgalloc.c
 - platform/pc98/pci_resources.c

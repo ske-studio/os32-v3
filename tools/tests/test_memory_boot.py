@@ -16,6 +16,7 @@ import host32
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -48,9 +49,9 @@ MUTATIONS = [
      "        top - pages - ws_pages > MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
      ("arena", 12296)),
     # D11 (T1a の Codex P3、T1b で追加): プローブの上限を外す (2GB を越えて数える)。
-    ("detect-cap-removed", "kernel/memory_boot.c",
-     "    if (reported > (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB)\n"
-     "        reported = (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / MEM_1MB;\n",
+    ("detect-cap-removed", "platform/pc98/memory.c",
+     "    if (reported > (platform_memory_geometry.ram_ceiling - platform_memory_geometry.high_first) / MEM_1MB)\n"
+     "        reported = (platform_memory_geometry.ram_ceiling - platform_memory_geometry.high_first) / MEM_1MB;\n",
      "", ("detect_cap", 16384)),
     # exec の最小域の fail-stop の境界を 1 ページずらす (0x550000 で起動してしまう)。
     ("minimum-off-by-page", "kernel/sys.c",
@@ -83,12 +84,19 @@ MUTATIONS += [
 ]
 
 
-def run_case(case='default', kb=16384, defines=(), mutation=None):
+def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=False):
     with tempfile.TemporaryDirectory(prefix='os32-memory-boot-') as tmp:
         d = pathlib.Path(tmp)
+        # Keep the platform descriptor relative to the copied kernel header,
+        # including in mutation stages (N1).
+        (d / 'kernel').mkdir()
+        (d / 'platform/pc98').mkdir(parents=True)
+        for rel in ('kernel/platform_memory.h',
+                    'platform/pc98/platform_memory_desc.h'):
+            shutil.copyfile(ROOT / rel, d / rel)
         texts = {}
         for rel in ('kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c',
-                    'kernel/memory_boot.c', 'include/memmap.h',
+                    'kernel/memory_boot.c', 'platform/pc98/memory.c', 'include/memmap.h',
                     'tools/tests/layout_boot_fixture.h'):
             texts[rel] = (ROOT / rel).read_text()
         if mutation:
@@ -99,7 +107,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         for unit in ('paging', 'pgalloc', 'sys'):
             s = texts[f'kernel/{unit}.c']
             s = s.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
-            (d / f'{unit}_host_source.c').write_text(s)
+            (d / 'kernel' / f'{unit}_host_source.c').write_text(s)
         # 写しの memmap.h を -I の先頭に置く (変異を当てたときだけ中身が違う)。
         (d / 'memmap.h').write_text(texts['include/memmap.h'])
         (d / 'layout_boot_fixture.h').write_text(texts['tools/tests/layout_boot_fixture.h'])
@@ -113,13 +121,14 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
             'static void __attribute__((unused)) host_kernel_boot(u32 mem_kb) {\n'
             '#define kprintf(...) ((void)0)\n#define shm_init() die(7)\n' + gate +
             '\n#undef kprintf\n#undef shm_init\n}\n')
-        mb = texts['kernel/memory_boot.c']
+        probe = texts['platform/pc98/memory.c']
         if case == 'detect_cap':
             # BIOS ワークと書き込み検証をホストの配列で受ける (memory_boot_host.c)。
-            if mb.count('P2V_BOOT(') != 3:
+            if probe.count('P2V_BOOT(') != 3:
                 raise AssertionError('P2V_BOOT probe sites changed')
-            mb = mb.replace('P2V_BOOT(', 'host_boot_ptr(')
-        (d / 'memory_boot_host_source.c').write_text(mb)
+            probe = probe.replace('P2V_BOOT(', 'host_boot_ptr(')
+        (d / 'platform/pc98/memory_host_source.c').write_text(probe)
+        (d / 'kernel/memory_boot_host_source.c').write_text(texts['kernel/memory_boot.c'])
         selftest = (ROOT / 'kdebug/kselftest.c').read_text()
         start = selftest.index('static void test_slack_cycle(void)')
         end = selftest.index('\nint kselftest_run_post_exec(void)', start)
@@ -131,10 +140,10 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
-        cmd += ['-I' + str(d), '-I' + str(ROOT / 'tools/tests/host_arch')]
+        cmd += ['-I' + str(d / 'kernel'), '-I' + str(d / 'platform/pc98'), '-I' + str(d), '-I' + str(ROOT / 'tools/tests/host_arch')]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
         # physmem.c も写しから組む ("memmap.h" を同じ写しで引かせるため)。
-        physmem = d / 'physmem.c'
+        physmem = d / 'kernel/physmem.c'
         physmem.write_text((ROOT / 'kernel/physmem.c').read_text())
         build = subprocess.run(cmd + [str(ROOT / 'tools/tests/memory_boot_host.c'), str(physmem), '-o', str(d / 'test')],
                                capture_output=bool(mutation))
@@ -142,6 +151,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None):
             if mutation:
                 return 'compile'
             raise subprocess.CalledProcessError(build.returncode, cmd)
+        if compile_only:
+            return 'compiled'
         out = host32.run([str(d / 'test')], timeout=120, capture_output=bool(mutation))
         if mutation:
             return 'ok' if out.returncode == 0 else 'fail'
