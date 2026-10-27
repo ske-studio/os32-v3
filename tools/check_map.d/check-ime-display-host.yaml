@@ -1,0 +1,14 @@
+check-ime-display-host:
+- tools/tests/test_ime_display.py
+- tools/tests/ime_display_host.c
+- tools/tests/con_sink_host.c
+- tools/tests/host32.py
+- kdebug/selftest_con_sink.c
+- kernel/con_sink.c
+- kernel/port_service.c
+- kernel/ime.c
+- kernel/ime_render_tvram.c
+- kernel/console.c
+- platform/pc98/console.c
+- build/checks.d/check-ime-display-host.mk
+- tools/check_map.d/check-ime-display-host.yaml

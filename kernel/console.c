@@ -77,6 +77,14 @@ void tvram_set_scroll_reserve(int rows)
     if (rows >= TVRAM_ROWS) {
         rows = TVRAM_ROWS - 1;
     }
+    /* When the IME first reserves the last row, move an existing input
+     * line out of it before the preedit renderer overwrites that row. */
+    if (g_scroll_reserve == 0 && rows == 1 &&
+        cursor_y == TVRAM_ROWS - 1 && console_render_allowed()) {
+        con_backend_scroll(TVRAM_ROWS);
+        cursor_y--;
+        console_hw_cursor_sync();
+    }
     g_scroll_reserve = rows;
 }
 
