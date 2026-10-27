@@ -189,4 +189,14 @@ check-ci-stab-host:
 - drivers/pci_decode.h
 - drivers/pci_bind.h
 - kapi/kapi_sys.c
+- include/platform_host.h
+- include/net_eth.h
+- drivers/np2sysp.h
+- net/link.h
+- platform/pc98/device_host.c
+- tools/tests/dep_dir_a_l09_host.c
+- tools/tests/test_dep_dir_a_l09.py
+- tools/tests/fixtures/dep_dir_a/l09.json
+- build/checks.d/check-dep-dir-a-l09-host.mk
+- tools/check_map.d/check-dep-dir-a-l09-host.yaml
 artifact_reader: true

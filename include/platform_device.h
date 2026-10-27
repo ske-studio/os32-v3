@@ -42,4 +42,11 @@ int platform_pci_get(u32 idx, void *out);
 u32 platform_pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg);
 int platform_pci_bind_info_get(int idx, struct pci_bind_info *out);
 
+/* NP2 detection and information keep the driver's absent-device behavior. */
+int platform_np2_detect(void);
+int platform_np2_get_version(char *buf, int maxlen);
+int platform_np2_get_cpu(char *buf, int maxlen);
+int platform_np2_get_clock(char *buf, int maxlen);
+int platform_np2_check_hostdrv(char *buf, int maxlen);
+
 #endif /* PLATFORM_DEVICE_H */

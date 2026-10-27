@@ -9,7 +9,6 @@
 #include "clock_service.h"
 #include "exec.h"
 #include "fm_contract.h"
-#include "np2sysp.h"
 #include "ide_contract.h"
 #include "path.h"
 #include "tvram.h"
@@ -904,7 +903,7 @@ void __cdecl wrap_fm_play_mml(const char *mml)
 int __cdecl wrap_np2_detect(void)
 {
     KAPI_HIT(44);
-    return np2_detect();
+    return platform_np2_detect();
 }
 
 void __cdecl wrap_np2_get_version(char *buf, int size)
@@ -915,7 +914,7 @@ void __cdecl wrap_np2_get_version(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_version(buf, size);
+    platform_np2_get_version(buf, size);
 }
 
 void __cdecl wrap_np2_get_cpu(char *buf, int size)
@@ -926,7 +925,7 @@ void __cdecl wrap_np2_get_cpu(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_cpu(buf, size);
+    platform_np2_get_cpu(buf, size);
 }
 
 void __cdecl wrap_np2_get_clock(char *buf, int size)
@@ -937,7 +936,7 @@ void __cdecl wrap_np2_get_clock(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    np2_get_clock(buf, size);
+    platform_np2_get_clock(buf, size);
 }
 
 int __cdecl wrap_np2_check_hostdrv(char *buf, int size)
@@ -948,7 +947,7 @@ int __cdecl wrap_np2_check_hostdrv(char *buf, int size)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return np2_check_hostdrv(buf, size);
+    return platform_np2_check_hostdrv(buf, size);
 }
 
 void __cdecl wrap_ide_init(void)

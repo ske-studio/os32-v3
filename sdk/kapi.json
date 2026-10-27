@@ -25,7 +25,6 @@
     "clock_service.h",
     "exec.h",
     "fm_contract.h",
-    "np2sysp.h",
     "ide_contract.h",
     "path.h",
     "tvram.h",
@@ -391,11 +390,13 @@
     },
     {
       "name": "np2_detect",
+      "target": "platform_np2_detect",
       "ret": "int",
       "args": []
     },
     {
       "name": "np2_get_version",
+      "target": "platform_np2_get_version",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -405,6 +406,7 @@
     },
     {
       "name": "np2_get_cpu",
+      "target": "platform_np2_get_cpu",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -414,6 +416,7 @@
     },
     {
       "name": "np2_get_clock",
+      "target": "platform_np2_get_clock",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "void",
       "args": [
@@ -423,6 +426,7 @@
     },
     {
       "name": "np2_check_hostdrv",
+      "target": "platform_np2_check_hostdrv",
       "out": [{"arg": "buf", "len": "size"}],
       "ret": "int",
       "args": [
