@@ -45,7 +45,7 @@
     "snd_engine.h",
     "pointer_service.h",
     "kapi_db.h",
-    "loop_dev.h",
+    "platform_device.h",
     "v86.h",
     "gui.h",
     "con_sink.h",
@@ -1217,20 +1217,20 @@
       "name": "loop_attach",
       "ret": "int",
       "args": ["const char *path", "int slot"],
-      "target": "loop_dev_attach"
+      "target": "platform_loop_dev_attach"
     },
     {
       "name": "loop_detach",
       "ret": "void",
       "args": ["int slot"],
-      "target": "loop_dev_detach"
+      "target": "platform_loop_dev_detach"
     },
     {
       "name": "loop_status",
       "out": [{"arg": "total", "size": "sizeof(u32)"}, {"arg": "bps", "size": "sizeof(int)"}],
       "ret": "int",
       "args": ["int slot", "u32 *total", "int *bps"],
-      "target": "loop_dev_status"
+      "target": "platform_loop_dev_status"
     },
     {
       "name": "dev_blk_read",

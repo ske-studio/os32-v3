@@ -29,7 +29,7 @@
 #include "snd_engine.h"
 #include "pointer_service.h"
 #include "kapi_db.h"
-#include "loop_dev.h"
+#include "platform_device.h"
 #include "v86.h"
 #include "gui.h"
 #include "con_sink.h"
@@ -1680,13 +1680,13 @@ void __cdecl wrap_sys_get_build_info(char *buf, int size)
 int __cdecl wrap_loop_attach(const char *path, int slot)
 {
     KAPI_HIT(153);
-    return loop_dev_attach(path, slot);
+    return platform_loop_dev_attach(path, slot);
 }
 
 void __cdecl wrap_loop_detach(int slot)
 {
     KAPI_HIT(154);
-    loop_dev_detach(slot);
+    platform_loop_dev_detach(slot);
 }
 
 int __cdecl wrap_loop_status(int slot, u32 *total, int *bps)
@@ -1697,7 +1697,7 @@ int __cdecl wrap_loop_status(int slot, u32 *total, int *bps)
                                     (u32)bps, KAPI_OUT_LEN(bps, sizeof(int)))) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return loop_dev_status(slot, total, bps);
+    return platform_loop_dev_status(slot, total, bps);
 }
 
 int __cdecl wrap_dev_blk_read(const char *dev_name, u32 lba, int count, void *buf)

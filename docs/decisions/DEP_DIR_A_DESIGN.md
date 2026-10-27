@@ -220,8 +220,8 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 |段|新規ファイル（概算行数）|変更ファイル（各概算行数、生成物は再生成）|
 |---|---|---|
-|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、kernel/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/kdebug_imports.def 7、build/pcm-module.mk・fm-module.mk・lan-module.mk の *_DEF_SOURCES 各1、kernel/lan_body.c 1・kernel/pcm_module.c 1（L02 の probe 表・L03 の IRQ 配線が残る間の具体 include）。hwdev の def は変更しない (B3)|
-|L02|include/pci_dev_contract.h・pci_bind_contract.h 計150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・e82557.c 1・pci.h/pci_bind.h 各30–100・pci_decode.h 4、tools/prototypes/lan_imports.def 2、build/kernel.mk 2・lan-module.mk の LAN_DEF_SOURCES 2、tools/tests/test_lan_module.py・lan_module_host.c・test_e82557_drv.py とコピー一覧、新規 test_dep_dir_a_l02.py・dep_dir_a_l02_host.c、対応 checks.d/check_map.d|
+|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、kernel/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
+|L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
 |L03|なし|kernel/pcm_module.c 15、drivers/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
 |L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|
 |L05a|include/ide_contract.h 70、platform/pc98/device_ide.c 45|include/platform_device.h 15、drivers/ide.h 70、sdk/kapi.json 12、build/kernel.mk 2、disk_auth_host.c 2|
@@ -233,7 +233,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 |共通試験|tools/tests/test_dep_dir_a.py 180、dep_dir_a_host.c 250、fixtures/dep_dir_a/基点列/ABI寸法 80、tools/check_map.d/check-dep-dir-a-host.yaml 25|下記既存test_*.py/host.c各5–40、sdk生成のkapi_generated.c/公開ヘッダ/初期化includeは再生成差分確認|
 
 - sdk/kapi.json の includes 差分: L01 fm.h→fm_contract.h、pcm_cs4231.h→pcm_contract.h。L04 loop_dev.h→platform_device.h（以後共用）。L05a ide.h→ide_contract.h とし :447,1204 の sizeof(IdeInfo) を維持。L05b/L06 は追加差分なし。L08 pci.h→pci_contract.h。L09 np2sysp.h を除去し platform_device.h の宣言を使用。L10 kcg.h→kcg_contract.h。L02/L03もJSON includesの追加差分なし。
-- 生成追従: kdebug_imports.def の新sourceに合わせ gen_kdebug_imports.py・各部品のgen_sqlite_imports.py経由の出力を再生成する。L01 は hwdev/hwdev_imports.def を変更せず (B3)、hwdev 契約 CRC を維持する。世代/CRCの基点との差を記録し、make allで宣言所在・hwdev定義一致を確認。旧世代拒否と対応世代の組合せ成功を試験し、型配置/スロット列は従来値を固定する。
+- 生成追従: kdebug_imports.def の新sourceに合わせ hwdev/hwdev_imports.def の該当sourceも更新し、gen_kdebug_imports.py・gen_hwdev_contract.py・各部品のgen_sqlite_imports.py経由の出力を再生成する。世代/CRCの基点との差を記録し、make allで宣言所在・hwdev定義一致を確認。旧世代拒否と対応世代の組合せ成功を試験し、型配置/スロット列は従来値を固定する。
 
 ## 11. 受入 → 試験・変異、利用者回帰、段の分け方
 - H=host、N=NP21/W。各段2時間以内は実装＋関連host検査まで。Nは段ごとに統合基点で行い証拠を保存、未実施を合格扱いしない。新試験は段ごとに追加して単一巨大試験にしない。
@@ -283,3 +283,8 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 - **B6 (P3)**: 順序に「群 D の L19 → 群 A の L10」(kernel/kcg_module.c を同時に触らない、PM)。
 - 回帰の一覧に test_hdd_stage1・test_cd_read を足す (L05a/L05b の境目)。
 - 世代の扱い (PM 決定、REVIEW.r1.md): PCM・FM・LAN の部品の ABI の世代と KDEBUG_ABI_GEN は変わってよい (カーネルと対の部品で hsync boot で常に組で配る)。B1 の分け方で hwdev の契約 CRC は変えない。
+
+## L04 の実装で埋めたこと (2026-10-28、PM — §6 の「HLE の依存を変えない」を当てはめた)
+
+- 食い違い: §11 の detach の付け替えで `platform_loop_dev_detach` を呼び先にすると、v86.mod (HLE) が import する旧名 `loop_dev_detach` が未解決になる。§6 は HLE の依存の変更を禁じている。
+- 決定: **旧い呼び出しを残す** — drivers の `loop_dev_detach` はそのまま (v86.mod の import と部品の ABI は変えない)。`platform_loop_dev_detach` は KAPI の target 用の薄い関数で、中で `loop_dev_detach` を呼ぶだけ。attach・status も同じ形 (HLE が import する名前は残し、KAPI の target だけ platform の薄い関数へ)。
