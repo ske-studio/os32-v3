@@ -1,3 +1,4 @@
+#include "platform_device.h"
 /* ======================================================================== */
 /*  HDD_PT_FAKE.H — ext2 の RAM ディスク試験に区画表を置く共通の足場        */
 /*                                                                          */
@@ -34,7 +35,7 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 
 /* ATA の方式の上限 (ide.c の ide_range_ok)。これらの試験は ext2_format_at の範囲を
  * 見ないので、hd0 なら通す (範囲は RAM ディスクの dev_blk_* が断る)。 */
-int ide_range_ok(int drive, u32 lba, u32 count)
+int platform_ide_range_ok(int drive, u32 lba, u32 count)
 {
     (void)lba; (void)count;
     return (drive & 3) == 0 ? 1 : 0;

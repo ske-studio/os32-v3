@@ -47,7 +47,6 @@ check-vfs-fd-path-host:
 - userland/lib/rt/ls.c
 - sdk/include/os32/ls.h
 - sdk/allocator/nano_adapter.c
-# Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
 - include/pointer_service.h
@@ -63,4 +62,7 @@ check-vfs-fd-path-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- include/platform_device.h
+- include/ide_contract.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
 artifact_reader: true

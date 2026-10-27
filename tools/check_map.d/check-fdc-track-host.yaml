@@ -1,4 +1,6 @@
 check-fdc-track-host:
+- lib/dma_contract.c
+- include/dma_contract.h
 - drivers/fdc.c
 - drivers/fdc.h
 - kernel/irq.c
@@ -23,9 +25,11 @@ check-fdc-track-host:
 - tools/check_map.d/check-fdc-track-host.yaml
 - build/checks.d/check-fdc-track-host.mk
 - tools/check_artifacts.py
-# Conservative artifact-path audit (including indirect helpers/fixtures).
 - include/clock_service.h
 - kernel/clock_service.c
 - kernel/platform_irq.h
 - platform/pc98/pic.c
+- include/platform_device.h
+- include/ide_contract.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
 artifact_reader: true

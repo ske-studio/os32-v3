@@ -21,4 +21,12 @@ int platform_ide_write_sector(int drv, u32 lba, const void *buf);
 int platform_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf);
 int platform_ide_get_info(int drv, void *info);
 
+/* Value-only FS geometry; partition arithmetic remains in the caller. */
+struct platform_disk_geometry {
+    u32 total_sectors;
+    u16 cylinders, heads, sectors, phys_sector_size;
+};
+int platform_ide_range_ok(int drv, u32 lba, u32 count);
+int platform_disk_geometry_get(int drv, struct platform_disk_geometry *out);
+
 #endif /* PLATFORM_DEVICE_H */

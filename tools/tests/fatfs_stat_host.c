@@ -19,7 +19,8 @@
 #include "fatfs/ff.h"
 #include "fatfs/diskio.h"
 #include "vfs.h"
-#include "ide.h"
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "dev.h"
 #include "os_time.h"
 
@@ -152,7 +153,7 @@ void diskio_set_hdd_partition(u32 offset) { (void)offset; }
 void diskio_set_hdd_sector_size(u16 sz) { (void)sz; }
 void diskio_set_hdd_ide_phys_size(u16 sz) { (void)sz; }
 
-int ide_get_info(int drive, IdeInfo *info)
+int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 { (void)drive; (void)info; return -1; }
 Device *dev_find(const char *name) { (void)name; return (Device *)0; }
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)

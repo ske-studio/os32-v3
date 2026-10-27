@@ -15,6 +15,8 @@ static u32 length;
 static IdeInfo info;
 static u8 buffer[1024];
 
+int ide_range_ok(int drv, u32 lba, u32 count)
+{ (void)drv; (void)lba; (void)count; return 0; }
 int ide_init(void) { calls++; return result; }
 int ide_drive_present(int drv)
 { CHECK(drv == drive); calls++; return result; }

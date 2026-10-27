@@ -35,3 +35,21 @@ int platform_ide_get_info(int drv, void *info)
 {
     return ide_get_info(drv, (IdeInfo *)info);
 }
+
+int platform_ide_range_ok(int drv, u32 lba, u32 count)
+{
+    return ide_range_ok(drv, lba, count);
+}
+
+int platform_disk_geometry_get(int drv, struct platform_disk_geometry *out)
+{
+    IdeInfo info;
+    int rc = ide_get_info(drv, &info);
+    if (rc) return rc;
+    out->total_sectors = info.total_sectors;
+    out->cylinders = info.cylinders;
+    out->heads = info.heads;
+    out->sectors = info.sectors;
+    out->phys_sector_size = info.phys_sector_size;
+    return rc;
+}

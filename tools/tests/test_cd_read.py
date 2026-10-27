@@ -36,7 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["include/ide_contract.h", "kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
+TREE_FILES = ["include/platform_device.h", "include/ide_contract.h", "kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ide.h", "drivers/dev.c", "drivers/dev.h",
               "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",

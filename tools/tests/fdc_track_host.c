@@ -1,3 +1,4 @@
+#include "platform_device.h"
 /* ======================================================================== */
 /*  FDC_TRACK_HOST.C — FD のトラック単位の読み出しをホストで回す            */
 /*                                                                          */
@@ -24,6 +25,7 @@
 /* fdc.c の DMA の窓の検査 (dma_range_ok) は dma_alloc と同じ関数 — 実物を通す
  * (TASK_T1_LEDGER §4-3)。 */
 #include "../../drivers/dma8237_math.c"
+#include "../../lib/dma_contract.c"
 #include "../../drivers/fdc.c"
 /* 実表・公開順・2 巡・EOI 経路を同じ装置模型で通す。 */
 #include "irq_math.c"
@@ -126,9 +128,17 @@ void kprintf(u8 attr, const char *fmt, ...)
 void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, n); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
 
-/* diskio.c の HDD 側の下請け (FD の試験では呼ばれない) */
-int ide_drive_present(int drive) { (void)drive; return 0; }
-int ide_get_info(int drive, IdeInfo *info) { (void)drive; (void)info; return -1; }
+/* HDD queries are isolated from the FD hardware model. */
+static int hdd_present, hdd_geometry_rc = -1, hdd_query_drive;
+static struct platform_disk_geometry hdd_geometry;
+int platform_ide_drive_present(int drive)
+{ hdd_query_drive = drive; return hdd_present; }
+int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
+{
+    hdd_query_drive = drive;
+    if (!hdd_geometry_rc) *info = hdd_geometry;
+    return hdd_geometry_rc;
+}
 Device *dev_find(const char *name) { (void)name; return (Device *)0; }
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 { (void)dev; (void)lba; (void)count; (void)buf; return -1; }
@@ -1371,6 +1381,38 @@ static void multi_nr_quiet(void)
 /* diskio.c の結線: 読む → 書く → 読む。FatFs の disk_write でも、dev.c や
  * KAPI の dev_blk_write と同じ fdc_write_sector 直でも、古い先読みを返さない。
  * disk_initialize は (Ready 変化の無い) 媒体の入れ替えでも読み直させる。 */
+/* Keep partition subtraction and logical/physical conversion in diskio. */
+static void hdd_geometry_query(void)
+{
+    LBA_t count = 77;
+    WORD size = 0;
+    diskio_set_hdd_drive(3);
+    CHECK(disk_initialize(DRV_HDD) & STA_NOINIT);
+    CHECK(hdd_query_drive == 3);
+    CHECK(disk_ioctl(DRV_HDD, GET_SECTOR_COUNT, &count) == RES_NOTRDY);
+    CHECK(count == 77);
+    hdd_present = 1;
+    diskio_set_hdd_partition(19);
+    CHECK(disk_initialize(DRV_HDD) == 0);
+    hdd_geometry.total_sectors = 1000;
+    hdd_geometry_rc = 0;
+    for (unsigned phys = SASI_SECTOR_BYTES; phys <= SYS_HDD_SECTOR_SIZE; phys *= 2) {
+        diskio_set_hdd_ide_phys_size((u16)phys);
+        for (unsigned logical = SYS_HDD_SECTOR_SIZE; logical <= SYS_HDD_SECTOR_SIZE * 2; logical *= 2) {
+            diskio_set_hdd_sector_size((u16)logical);
+            CHECK(disk_ioctl(DRV_HDD, GET_SECTOR_COUNT, &count) == RES_OK);
+            CHECK(count == (1000u - 19u) / (logical / phys));
+            CHECK(hdd_query_drive == 3);
+            CHECK(disk_ioctl(DRV_HDD, GET_SECTOR_SIZE, &size) == RES_OK);
+            CHECK(size == logical);
+        }
+    }
+    hdd_geometry_rc = -3;
+    count = 77;
+    CHECK(disk_ioctl(DRV_HDD, GET_SECTOR_COUNT, &count) == RES_ERROR);
+    CHECK(count == 77);
+}
+
 static void diskio_rw(void)
 {
     static u8 buf[1024], data[1024];
@@ -1765,6 +1807,7 @@ int main(int argc, char **argv)
         { "readychange_invalidates", readychange_invalidates },
         { "multi_nr_quiet", multi_nr_quiet },
         { "diskio_rw", diskio_rw },
+        { "hdd_geometry_query", hdd_geometry_query },
         { "buf_layout", buf_layout },
         { "font_replay", font_replay },
         { "recal_settle", recal_settle },

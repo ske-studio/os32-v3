@@ -18,7 +18,8 @@
  * FDD は fdc_read_sector/fdc_write_sector を直接使用する。 */
 
 #include "dev.h"
-#include "ide.h"    /* ide_drive_present, ide_get_info — 初期化/ioctl用 */
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "clock_service.h"
 #include "fdc.h"
 #include "fdc_track.h"  /* FD の読みをトラック単位に束ねる (純粋な層) */
@@ -193,7 +194,7 @@ DSTATUS disk_initialize(BYTE pdrv)
 
     case DRV_HDD:
         /* IDEはカーネル起動時に ide_init() で初期化済み */
-        if (ide_drive_present(hdd_drive)) {
+        if (platform_ide_drive_present(hdd_drive)) {
             hdd_status = 0;
         } else {
             hdd_status = STA_NOINIT;
@@ -330,7 +331,7 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
 {
-    IdeInfo ide_info;
+    struct platform_disk_geometry ide_info;
 
     switch (pdrv) {
     case DRV_FDD:
@@ -361,7 +362,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
         case CTRL_SYNC:
             return RES_OK;
         case GET_SECTOR_COUNT:
-            if (ide_get_info(hdd_drive, &ide_info) != 0) return RES_ERROR;
+            if (platform_disk_geometry_get(hdd_drive, &ide_info) != 0) return RES_ERROR;
             /* パーティションオフセット分を差し引き、論理セクタ単位に変換 */
             *(LBA_t *)buff = (LBA_t)((ide_info.total_sectors - hdd_part_offset)
                                      / (hdd_sector_size / hdd_ide_phys_size));

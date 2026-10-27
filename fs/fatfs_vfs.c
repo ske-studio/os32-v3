@@ -13,7 +13,8 @@
 #include "kmalloc.h"
 #include "kstring.h"
 #include "kprintf.h"
-#include "ide.h"    /* ide_get_info, ide_drive_present — ジオメトリ情報取得のみ */
+#include "ide_contract.h"
+#include "platform_device.h"
 #include "dev.h"
 #include "os_time.h"
 #include "pc98pt.h"   /* PC98PartEntry (票 TASK_HDD_INSTALL 段 1-4) */
@@ -512,7 +513,7 @@ static u32 chs_to_lba(u16 cyl, u8 head, u8 sector, u16 nheads, u16 nspt)
 static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
 {
     u8 buf[SYS_HDD_SECTOR_SIZE];
-    IdeInfo info;
+    struct platform_disk_geometry info;
     u16 heads, spt;
     int i;
     int pt_offset;  /* パーティションテーブルのbuf内オフセット */
@@ -522,7 +523,7 @@ static u32 pc98_find_fat_partition(int drv, u16 phys_sec_size)
 
     /* ジオメトリ取得。区画表の CHS → LBA は ext2 と同じ規則 (BIOS 幾何、無ければ
      * IDENTIFY の既定) で読む — 票 TASK_HDD_INSTALL 段 1 (m4)。 */
-    if (ide_get_info(drv, &info) != 0) return 0;
+    if (platform_disk_geometry_get(drv, &info) != 0) return 0;
     if (bootinfo_part_geom(drv, &heads, &spt) < 0) return 0;
 
     /* Device API ポインタ取得 */
@@ -648,13 +649,13 @@ static void *fatfs_vfs_mount(int dev_id)
 
     /* マウント失敗かつHDDの場合、パーティションテーブルを解析してリトライ */
     if (fr == FR_NO_FILESYSTEM && dev_type == 0) {
-        IdeInfo ide_info;
+        struct platform_disk_geometry ide_info;
         u16 phys_sec_size = SYS_HDD_SECTOR_SIZE;
         u32 part_lba;
         Device *blkdev = (Device *)0;
 
         /* IDE物理セクタサイズを取得 (SASI 256B判定) */
-        if (ide_get_info(drv_num, &ide_info) == 0) {
+        if (platform_disk_geometry_get(drv_num, &ide_info) == 0) {
             phys_sec_size = ide_info.phys_sector_size;
         }
         diskio_set_hdd_ide_phys_size(phys_sec_size);

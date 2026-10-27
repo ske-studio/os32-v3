@@ -1,4 +1,8 @@
 check-ci-stab-host:
+- tools/tests/dep_dir_a_l05b_host.c
+- fs/fatfs/diskio.c
+- fs/ext2_super.c
+- fs/ext2_fmt.c
 - tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
@@ -132,4 +136,6 @@ check-ci-stab-host:
 - boot/pc98_defs.inc
 - boot/vk32_defs.inc
 - boot/crc32_defs.inc
+- tools/tests/test_dep_dir_a_l05b.py
+- platform/pc98/device_ide.c
 artifact_reader: true

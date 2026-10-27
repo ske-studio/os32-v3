@@ -11,7 +11,7 @@
 
 #include "types.h"
 #include "config.h"
-#include "ide.h"
+#include "ide_contract.h"
 
 /* The IDE API still transfers HDD-sized units. */
 #define SASI_SECTORS_PER_IDE (SYS_HDD_SECTOR_SIZE / SASI_SECTOR_BYTES)

@@ -35,7 +35,7 @@ CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "
          "timeout_math", "fdc_multi_cmd", "fdc_seek_skip", "fdc_forget_rules",
          "fdc_end_to_end", "fat_data_interleave", "gen_and_lru",
          "seek_edge_foreign", "drain_before_skip", "readychange_invalidates",
-         "multi_nr_quiet", "diskio_rw", "buf_layout", "font_replay",
+         "multi_nr_quiet", "diskio_rw", "hdd_geometry_query", "buf_layout", "font_replay",
          "recal_settle", "idle_rule", "track_nr_stop", "single_nr_no_recover",
          "sis_edge_limit", "write_nr_no_recover", "write_protection"]
 
@@ -473,12 +473,12 @@ def host_build(tmp, mutated=None):
     else:
         rel, text = mutated
         tree = tmpd / "tree"
-        for sub in ("drivers", "tools/tests", "fs/fatfs"):
+        for sub in ("drivers", "tools/tests", "fs/fatfs", "lib"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
         for rel_ in ("drivers/fdc_track.c", "drivers/fdc_track.h",
                      "drivers/fdc.c", "drivers/fdc.h",
                      "drivers/fdc_decide.c", "drivers/fdc_decide.h",
-                     "drivers/dma8237_math.c",
+                     "drivers/dma8237_math.c", "lib/dma_contract.c",
                      "fs/fatfs/diskio.c"):
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")

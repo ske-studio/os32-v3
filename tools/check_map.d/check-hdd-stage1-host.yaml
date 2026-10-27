@@ -25,7 +25,6 @@ check-hdd-stage1-host:
 - build/checks.d/check-hdd-stage1-host.mk
 - tools/nhd_profile.py
 - tools/gen_deploy_set.py
-# Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/gen_memmap.py
 - include/memmap.h
 - boot/boot_defs.h
@@ -49,4 +48,6 @@ check-hdd-stage1-host:
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
 - include/ide_contract.h
+- include/platform_device.h
+# Conservative artifact-path audit (including indirect helpers/fixtures).
 artifact_reader: true
