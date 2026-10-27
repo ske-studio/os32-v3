@@ -188,9 +188,9 @@ MUTATIONS = [
     ("cursor_before_start", MUT_TARGET,
      "    gdc_cmd(&s_gdc_text, PEGC_GDC_CMD_START2);\n    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n",
      "    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n    gdc_cmd(&s_gdc_text, PEGC_GDC_CMD_START2);\n"),
-    ("console_cursor_no_dc", "kernel/console.c",
-     "    outp(GDC_TEXT_PARAM, (u8)(GDC_CSRFORM_DC | (GDC_TEXT_LINES_PER_ROW - 1)));",
-     "    outp(GDC_TEXT_PARAM, (u8)(GDC_TEXT_LINES_PER_ROW - 1));"),
+    ("console_cursor_no_dc", "platform/pc98/console.c",
+     "    outp(GDC_TEXT_PARAM, (u8)((visible ? GDC_CSRFORM_DC : 0) | (GDC_TEXT_LINES_PER_ROW - 1)));",
+     "    outp(GDC_TEXT_PARAM, (u8)((visible ? 0 : 0) | (GDC_TEXT_LINES_PER_ROW - 1)));"),
     ("cursor_in_gui", MUT_TARGET,
      "    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n",
      "    console_hw_cursor_enable();\n"),
@@ -310,7 +310,7 @@ def one_mutation(item):
         base = original_new
     else:
         base = original
-    if old not in base or (name == "mode_height_400" and base.count(old) != 1):
+    if old not in base or (name in ("mode_height_400", "console_cursor_no_dc") and base.count(old) != 1):
         return "MUTATE %-34s SKIP (目印が見つからない)" % name, 1
     with tempfile.TemporaryDirectory(prefix="os32-pegc-mode-mut-") as td:
         exe = pathlib.Path(td) / ("mut-" + name)

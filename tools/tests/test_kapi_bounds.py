@@ -8,12 +8,12 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console.c', 'drivers/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c')
+SOURCES = ('platform/pc98/console.c', 'drivers/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c')
 GUARD = '    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n'
 MUTATIONS = [
-    ('putchar', 0, 'tvram_putchar_at', GUARD, '', 'putchar bounds'),
-    ('readchar', 0, 'tvram_readchar_at', GUARD, '', 'readchar bounds'),
-    ('kanji', 0, 'tvram_putkanji_at', GUARD.replace('x >= TVRAM_COLS', 'x >= TVRAM_COLS - 1'), '', 'kanji bounds'),
+    ('putchar', 0, 'con_backend_putchar', GUARD, '', 'putchar bounds'),
+    ('readchar', 0, 'con_backend_readchar', GUARD, '', 'readchar bounds'),
+    ('kanji', 0, 'con_backend_putkanji', GUARD.replace('x >= TVRAM_COLS', 'x >= TVRAM_COLS - 1'), '', 'kanji bounds'),
     ('tone', 1, 'fm_set_tone_num', 'tone_num >= 0 && ', '', 'tone bounds'),
     ('note', 1, 'fm_note_on', '    if (note < 0) return;\n', '', 'note bounds'),
     ('db-col', 2, 'kapi_db_column_text', '(u32)col >=\n        (DB_SHM_RESULT_LIMIT - sizeof(DB_ResultHeader)) / sizeof(DB_ColumnInfo) ||\n        ', '', 'DB column bounds'),

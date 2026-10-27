@@ -6,18 +6,16 @@
 /* ======================================================================== */
 
 #define CONSOLE_TAB_COLS 4
-#include "memmap.h"
 #include "types.h"
 #include "console_output.h"
 #include "utf8.h"
 #include "tvram.h"
-#include "io.h"
-#include "pc98.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"
 #include "bootlog.h"
 #include "console.h"
+#include "console_backend.h"
 #include "kbd_inject.h"
 
 /* V86 セッション中の画面描画抑止 (kernel/v86.c)。
@@ -27,16 +25,9 @@
  * 描画だけを抑止し、シリアル出力 (rshell ログ) は通す。 */
 extern int v86_is_active(void);
 
-/* テキストVRAM定義 (tvram.hとpc98.hの定義を使用) */
-#define TVRAM_TEXT  TVRAM_BASE
-STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_ATTR_BASE - TVRAM_CHAR_BASE,
-              console_text_within_plane);
-STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_CG_WINDOW - TVRAM_ATTR_BASE,
-              console_attr_within_plane);
-
-/* デフォルト属性 (os32_kapi_shared.h で定義済みの場合はスキップ) */
+/* デフォルトの通常console属性。 */
 #ifndef ATTR_WHITE
-#define ATTR_WHITE   TATTR_WHITE
+#define ATTR_WHITE TATTR_WHITE
 #endif
 
 /* rshellフラグ (外部から設定可) */
@@ -69,12 +60,8 @@ static int console_render_allowed(void)
  * 握っているので触らない。 */
 static void console_hw_cursor_sync(void)
 {
-    u16 offset;
     if (v86_is_active()) return;
-    offset = (u16)(cursor_y * TVRAM_COLS + cursor_x);
-    outp(GDC_TEXT_CMD, GDC_CMD_CSRW);
-    outp(GDC_TEXT_PARAM, (u8)(offset & 0xFF));
-    outp(GDC_TEXT_PARAM, (u8)((offset >> 8) & 0xFF));
+    con_backend_cursor_at(cursor_x, cursor_y);
 }
 
 /* スクロール保護行数 (下から数えた固定行)。0=全行 */
@@ -99,18 +86,11 @@ void tvram_set_scroll_reserve(int rows)
 
 void tvram_clear(void)
 {
-    volatile u16 *text = (volatile u16 *)P2V_IO(TVRAM_TEXT);
-    volatile u8  *attr;
-    int i;
     con_sink_push_clear();      /* 票 K6C: 画面クリアの経路 (CLEAR レコード) */
     /* 票 K6C-2: GUI 中はテキスト面を消さない (消す相手が見えていない上に、
      * 論理カーソルだけ 0,0 に戻ると凍っている画面と食い違う)。 */
     if (con_sink_is_enabled()) return;
-    for (i = 0; i < TVRAM_COLS * TVRAM_ROWS; i++) {
-        text[i] = TVRAM_SPACE;
-        attr = (volatile u8 *)P2V_IO((TVRAM_ATTR + (u32)i * TVRAM_CELL_BYTES));
-        *attr = ATTR_WHITE;
-    }
+    con_backend_clear();
     cursor_x = 0;
     cursor_y = 0;
     console_hw_cursor_sync();
@@ -120,19 +100,13 @@ void tvram_clear(void)
  * Reject before unsigned address arithmetic; a kanji must fit both cells. */
 void tvram_putchar_at(int x, int y, char ch, u8 color)
 {
-    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;
-    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset) = (u16)(u8)ch;
-    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
+    con_backend_putchar(x, y, ch, color);
 }
 
 /* TVRAM 1セル読み取り (文字コード + 属性) */
 void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
 {
-    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;
-    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-    if (code) *code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + offset));
-    if (attr) *attr = *(volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
+    con_backend_readchar(x, y, code, attr);
 }
 
 /* TVRAM 反転トグル (漢字対応)
@@ -141,69 +115,19 @@ void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
  * 戻り値: 反転したセル数 (1=ANK, 2=漢字) */
 int tvram_reverse_cell(int x, int y)
 {
-    u16 code;
-    u8 attr;
-    int width, i, rx;
-
-    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return 0;
-
-    rx = x;
-
-    /* 漢字判定: 右半分 (bit7セット) なら左半分に揃える */
-    code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * TVRAM_CELL_BYTES));
-    if ((code >> 8) != 0 && (code & TVRAM_KANJI_RIGHT)) {
-        if (rx > 0) rx--;
-    }
-
-    /* 左半分の文字コードで幅を判定 */
-    code = *(volatile u16 *)P2V_IO((TVRAM_TEXT + (u32)y * TVRAM_BPR + (u32)rx * TVRAM_CELL_BYTES));
-    if ((code >> 8) != 0 && !(code & TVRAM_KANJI_RIGHT) && rx < TVRAM_COLS - 1) {
-        width = TVRAM_WIDE_COLS;  /* 漢字 */
-    } else {
-        width = 1;  /* ANK */
-    }
-
-    /* 反転ビットをトグル */
-    for (i = 0; i < width; i++) {
-        u32 offset = (u32)y * TVRAM_BPR + (u32)(rx + i) * TVRAM_CELL_BYTES;
-        volatile u8 *p = (volatile u8 *)P2V_IO((TVRAM_ATTR + offset));
-        *p ^= TATTR_REVERSE;
-    }
-
-    return width;
+    return con_backend_reverse(x, y);
 }
 
 void tvram_scroll(void)
 {
-    volatile u16 *text = (volatile u16 *)P2V_IO(TVRAM_TEXT);
-    volatile u16 *attr = (volatile u16 *)P2V_IO(TVRAM_ATTR);
-    int rows = TVRAM_ROWS - g_scroll_reserve;
-    int i;
-
-    /* 0 .. rows-2 行目までを1行引き上げ */
-    for (i = 0; i < TVRAM_COLS * (rows - 1); i++) {
-        text[i] = text[i + TVRAM_COLS];
-        attr[i] = attr[i + TVRAM_COLS];
-    }
-    /* rows-1 行目を空白化 */
-    for (i = TVRAM_COLS * (rows - 1); i < TVRAM_COLS * rows; i++) {
-        text[i] = TVRAM_SPACE;
-        attr[i] = ATTR_WHITE;
-    }
+    con_backend_scroll(TVRAM_ROWS - g_scroll_reserve);
 }
 
 /* 全角漢字1文字をTVRAMに書き込み
  * PC9800Bible §2-6-2 */
 void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
 {
-    if (x < 0 || x >= TVRAM_COLS - 1 || y < 0 || y >= TVRAM_ROWS) return;
-    u32 offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-    u8 jh = (u8)((jis >> 8) & 0xFF);
-    u8 jl = (u8)(jis & 0xFF);
-    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset) = (u16)(jh - TVRAM_JIS_HI_BIAS) | ((u16)jl << 8);
-    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
-    *(volatile u16 *)P2V_IO(TVRAM_TEXT + offset + TVRAM_CELL_BYTES) = (u16)(jh - TVRAM_JIS_HI_BIAS + TVRAM_KANJI_RIGHT) | ((u16)jl << 8);
-    *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset + TVRAM_CELL_BYTES) = color;
+    con_backend_putkanji(x, y, jis, color);
 }
 
 /* ======================================================================== */
@@ -486,10 +410,7 @@ void console_set_cursor(int x, int y)
 void console_hw_cursor_enable(void)
 {
     if (v86_is_active()) return;
-    outp(GDC_TEXT_CMD, GDC_CMD_CSRFORM);
-    outp(GDC_TEXT_PARAM, (u8)(GDC_CSRFORM_DC | (GDC_TEXT_LINES_PER_ROW - 1)));
-    outp(GDC_TEXT_PARAM, (u8)GDC_TEXT_CSR_TOP);
-    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << GDC_TEXT_CSR_BOTTOM_SHIFT) | GDC_TEXT_CSR_BR_HI));
+    con_backend_cursor_shape(1);
     console_hw_cursor_sync();
 }
 
@@ -506,10 +427,7 @@ void console_text_gdc_stop(void)
      * 変わらないので、溜め始める側は抑止しない。 */
     con_sink_enable();
     if (v86_is_active()) return;
-    outp(GDC_TEXT_CMD, GDC_CMD_CSRFORM);
-    outp(GDC_TEXT_PARAM, (u8)(GDC_TEXT_LINES_PER_ROW - 1));   /* DC=0 → 非表示 */
-    outp(GDC_TEXT_PARAM, (u8)GDC_TEXT_CSR_TOP);
-    outp(GDC_TEXT_PARAM, (u8)((GDC_TEXT_CSR_BOTTOM << GDC_TEXT_CSR_BOTTOM_SHIFT) | GDC_TEXT_CSR_BR_HI));
+    con_backend_cursor_shape(0);
 }
 
 /* CUI モード復帰: GDC テキストカーソルを再表示して論理位置へ同期する。

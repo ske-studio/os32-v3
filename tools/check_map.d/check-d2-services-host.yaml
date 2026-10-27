@@ -52,3 +52,6 @@ check-d2-services-host:
 - kernel/boot_display.c
 - platform/pc98/boot.h
 - platform/pc98/boot.c
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h
