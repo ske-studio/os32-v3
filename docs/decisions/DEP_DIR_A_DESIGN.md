@@ -283,3 +283,8 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 - **B6 (P3)**: 順序に「群 D の L19 → 群 A の L10」(kernel/kcg_module.c を同時に触らない、PM)。
 - 回帰の一覧に test_hdd_stage1・test_cd_read を足す (L05a/L05b の境目)。
 - 世代の扱い (PM 決定、REVIEW.r1.md): PCM・FM・LAN の部品の ABI の世代と KDEBUG_ABI_GEN は変わってよい (カーネルと対の部品で hsync boot で常に組で配る)。B1 の分け方で hwdev の契約 CRC は変えない。
+
+## L04 の実装で埋めたこと (2026-10-28、PM — §6 の「HLE の依存を変えない」を当てはめた)
+
+- 食い違い: §11 の detach の付け替えで `platform_loop_dev_detach` を呼び先にすると、v86.mod (HLE) が import する旧名 `loop_dev_detach` が未解決になる。§6 は HLE の依存の変更を禁じている。
+- 決定: **旧い呼び出しを残す** — drivers の `loop_dev_detach` はそのまま (v86.mod の import と部品の ABI は変えない)。`platform_loop_dev_detach` は KAPI の target 用の薄い関数で、中で `loop_dev_detach` を呼ぶだけ。attach・status も同じ形 (HLE が import する名前は残し、KAPI の target だけ platform の薄い関数へ)。
