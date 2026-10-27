@@ -14,6 +14,7 @@ temp dir と mock だけで走る。sudo / mount / losetup / mkfs / 実配備は
 import errno
 import hashlib
 import io
+import json
 import os
 import pathlib
 import shutil
@@ -132,6 +133,12 @@ class FakeRun(object):
             argv = argv[1:]
         prog = os.path.basename(argv[0])
 
+        # 読取り専用の mount 元照会だけを模す。sudo の実操作は引き続き拒否。
+        if argv == ['findmnt', '--noheadings', '--raw', '--output', 'SOURCE',
+                    '--mountpoint', nd.MOUNT_POINT]:
+            return R(stdout='/dev/loop-test\n')
+        if cmd == ['losetup', '--json', '--output', 'BACK-FILE', '/dev/loop-test']:
+            return R(stdout=json.dumps({'loopdevices': [{'back-file': nd.NHD_LOCAL}]}))
         if prog in self.BLOCKED:
             raise AssertionError('実配備の操作が呼ばれた: %r' % (cmd,))
         if prog == 'mountpoint':
@@ -662,6 +669,7 @@ class Prune(Base):
     def test_unmount_after_sync_failure(self):
         with mock.patch.object(nd, 'is_mounted', return_value=True), \
              mock.patch.object(nd, 'run_sync', return_value=False), \
+             mock.patch.object(nd, 'verify_mounted_nhd', return_value=True), \
              mock.patch.object(nd, 'get_loop_device', return_value=None), \
              mock.patch.object(subprocess, 'run', return_value=R()) as run:
             self.assertFalse(REAL_UMOUNT())

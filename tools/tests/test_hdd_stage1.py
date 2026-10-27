@@ -734,7 +734,17 @@ def py_migrate_cases(pc98pt, nhd, tmp, quiet=False):
         return True
     nhd.ensure_local_nhd = fake_pull
     nhd.is_mounted = lambda: False
-    nhd.subprocess.run = lambda *a, **k: runs.append(a) or subprocess.CompletedProcess(a, 1, "", "")
+    def fake_mount_query(args, **kwargs):
+        runs.append(args)
+        if args[0] == 'findmnt':
+            return subprocess.CompletedProcess(args, 0, '/dev/loop-test\n', '')
+        if args[:4] == ['losetup', '--json', '--output', 'BACK-FILE']:
+            return subprocess.CompletedProcess(args, 0, nhd.json.dumps(
+                {'loopdevices': [{'back-file': str(pulled)}]}), '')
+        return subprocess.CompletedProcess(args, 1, '', '')
+
+    # 同じ NHD の照合は通し、この試験は旧配置の門の効きを検査する。
+    nhd.subprocess.run = fake_mount_query
     try:
         r1 = _silent_err(nhd.legacy_pt_guard)          # sync-from-hostdrv の最初の門 (無いので通る)
         r2 = _silent_err(nhd.ensure_mounted_for_kernel)

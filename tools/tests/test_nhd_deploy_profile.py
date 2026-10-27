@@ -56,6 +56,10 @@ class ProfileTests(unittest.TestCase):
             # Real generation is covered by test_deploy_set; these fixtures
             # use an in-memory deploy definition without YAML/generation files.
             pass
+        elif args[0] == 'findmnt':
+            return subprocess.CompletedProcess(args, 0, '/dev/loop-test\n', '')
+        elif args[0] == 'losetup':
+            return subprocess.CompletedProcess(args, 0, json.dumps({'loopdevices': [{'back-file': str(self.local)}]}), '')
         elif args[0] == 'sync':
             pass
         elif args[:3] == ['sudo', 'cp', '--']:
@@ -180,6 +184,32 @@ class ProfileTests(unittest.TestCase):
         self.assertFalse(nd.do_verify_set(str(self.set_file)))
         self.assertTrue(nd.do_pull())
         self.assertTrue(nd.do_verify_set(str(self.set_file)))
+
+    def test_verify_set_foreign_mount_refuses(self):
+        self.assertTrue(nd.do_pull())
+        self.manifest()
+        self.assertTrue(nd.do_sync())
+        other = self.root / 'other-tree/os32_t2h.nhd'
+        other.parent.mkdir()
+        other.write_bytes(b'other image')
+        command = self.command
+
+        def foreign(args, **kw):
+            if args[0] == 'losetup':
+                return subprocess.CompletedProcess(args, 0, json.dumps(
+                    {'loopdevices': [{'back-file': str(other)}]}), '')
+            return command(args, **kw)
+
+        before = self.local.read_bytes()
+        log = io.StringIO()
+        with patch.object(nd.subprocess, 'run', foreign), contextlib.redirect_stderr(log):
+            with patch.object(sys, 'argv', ['nhd_deploy.py', 'verify-set',
+                                           '--set', str(self.set_file)]):
+                self.assertFalse(nd.main())
+        self.assertIn(str(other), log.getvalue())
+        self.assertIn(str(self.local), log.getvalue())
+        self.assertEqual(self.local.read_bytes(), before)
+        self.assertEqual(other.read_bytes(), b'other image')
 
     def test_start_invalidates_without_remote_write(self):
         self.assertTrue(nd.do_pull())
