@@ -49,4 +49,6 @@ check-disk-auth-host:
 - build/out/lib/**
 - build/sdk/lib/**
 - sdk/crt/**
+- include/ide_contract.h
+- include/platform_device.h
 artifact_reader: true

@@ -10,7 +10,7 @@
 #include "exec.h"
 #include "fm_contract.h"
 #include "np2sysp.h"
-#include "ide.h"
+#include "ide_contract.h"
 #include "path.h"
 #include "tvram.h"
 #include "vfs.h"
@@ -954,13 +954,13 @@ int __cdecl wrap_np2_check_hostdrv(char *buf, int size)
 void __cdecl wrap_ide_init(void)
 {
     KAPI_HIT(49);
-    ide_init();
+    platform_ide_init();
 }
 
 int __cdecl wrap_ide_drive_present(int drv)
 {
     KAPI_HIT(50);
-    return ide_drive_present(drv);
+    return platform_ide_drive_present(drv);
 }
 
 int __cdecl wrap_ide_identify(int drv, void *info)
@@ -971,7 +971,7 @@ int __cdecl wrap_ide_identify(int drv, void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_identify(drv, (IdeInfo *)info);
+    return platform_ide_identify(drv, (IdeInfo *)info);
 }
 
 int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)
@@ -982,7 +982,7 @@ int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_read_sector(drv, lba, buf);
+    return platform_ide_read_sector(drv, lba, buf);
 }
 
 const char * __cdecl wrap_path_get_drive(void)
@@ -1063,7 +1063,7 @@ int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)
     KAPI_HIT(64);
     if (!exec_disk_write_allowed()) return -1;
     if (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();
-    return ide_write_sector(drv, lba, buf);
+    return platform_ide_write_sector(drv, lba, buf);
 }
 
 int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
@@ -1072,7 +1072,7 @@ int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
     if (!exec_disk_write_allowed()) return -1;
     if (cnt == 0) return 0;
     if (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();
-    return ide_write_sectors(drv, lba, cnt, buf);
+    return platform_ide_write_sectors(drv, lba, cnt, buf);
 }
 
 void __cdecl wrap_sys_reboot(void)
@@ -1663,7 +1663,7 @@ int __cdecl wrap_ide_get_info(int drv, void *info)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return ide_get_info(drv, (IdeInfo *)info);
+    return platform_ide_get_info(drv, (IdeInfo *)info);
 }
 
 void __cdecl wrap_sys_get_build_info(char *buf, int size)

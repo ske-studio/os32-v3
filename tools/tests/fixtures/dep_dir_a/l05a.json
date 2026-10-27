@@ -1,0 +1,45 @@
+{
+  "base": "b400acb6",
+  "public_sha256": "e4f60296488815d41aa15a7df31f002057d54e3b495ee7e68de2d3f233ceb062",
+  "wrappers": {
+    "ide_init": "void __cdecl wrap_ide_init(void)\n{\n    KAPI_HIT(49);\n    ide_init();\n}\n",
+    "ide_drive_present": "int __cdecl wrap_ide_drive_present(int drv)\n{\n    KAPI_HIT(50);\n    return ide_drive_present(drv);\n}\n",
+    "ide_identify": "int __cdecl wrap_ide_identify(int drv, void *info)\n{\n    KAPI_HIT(51);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_identify(drv, (IdeInfo *)info);\n}\n",
+    "ide_read_sector": "int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)\n{\n    KAPI_HIT(52);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN(buf, 512u),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_read_sector(drv, lba, buf);\n}\n",
+    "ide_write_sector": "int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)\n{\n    KAPI_HIT(64);\n    if (!exec_disk_write_allowed()) return -1;\n    if (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\n    return ide_write_sector(drv, lba, buf);\n}\n",
+    "ide_write_sectors": "int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)\n{\n    KAPI_HIT(65);\n    if (!exec_disk_write_allowed()) return -1;\n    if (cnt == 0) return 0;\n    if (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\n    return ide_write_sectors(drv, lba, cnt, buf);\n}\n",
+    "ide_get_info": "int __cdecl wrap_ide_get_info(int drv, void *info)\n{\n    KAPI_HIT(151);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_get_info(drv, (IdeInfo *)info);\n}\n"
+  },
+  "generated": {
+    "sdk/include/os32/os32_kapi_generated.h": "bdbc18057c58a5d78f5ef670acb69f2ca662ffd1a7ab0e0b29a2089e523634c6",
+    "sdk/include/os32/os32_kapi_slots.h": "f1d64934e77a7ced64b7fb9ea36a2e6ae7c532e595a4f99cf968a3d94074c7d0",
+    "exec/exec_kapi_init.inc": "025800c2db2553575d50add6a4da51b24d7243bae3a4a1677f7cff198380f56e",
+    "sdk/rust/os32api/src/kapi_generated.rs": "3831bc99e95f30df457d26741a67c1a9ce3a01b593371fb58a64fb7c8d345bdc"
+  },
+  "offsets": {
+    "total_sectors": 0,
+    "cylinders": 4,
+    "heads": 6,
+    "sectors": 8,
+    "size_mb": 12,
+    "model": 16,
+    "serial": 57,
+    "firmware": 78,
+    "lba_supported": 88,
+    "phys_sector_size": 92
+  },
+  "constants": {
+    "SASI_SECTOR_BYTES": 256,
+    "IDE_BANK_COUNT": 2,
+    "IDE_DRIVES_PER_BANK": 2,
+    "IDE_MAX_DRIVES": 4,
+    "IDE_MODEL_LEN": 40,
+    "IDE_SERIAL_LEN": 20,
+    "IDE_FIRMWARE_LEN": 8,
+    "IDE_OK": 0,
+    "IDE_ERR_TIMEOUT": -1,
+    "IDE_ERR_NO_DRIVE": -2,
+    "IDE_ERR_IO": -3,
+    "IDE_ERR_RANGE": -4
+  }
+}

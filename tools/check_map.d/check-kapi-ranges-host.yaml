@@ -30,4 +30,6 @@ check-kapi-ranges-host:
 - kapi/kapi_sys.c
 # Finite include search roots in test_kapi_ranges.resolve.
 - sdk/include/os32/*.h
+- include/ide_contract.h
+- include/platform_device.h
 artifact_reader: true

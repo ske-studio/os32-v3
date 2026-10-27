@@ -26,7 +26,7 @@
     "exec.h",
     "fm_contract.h",
     "np2sysp.h",
-    "ide.h",
+    "ide_contract.h",
     "path.h",
     "tvram.h",
     "vfs.h",
@@ -432,11 +432,13 @@
     },
     {
       "name": "ide_init",
+      "target": "platform_ide_init",
       "ret": "void",
       "args": []
     },
     {
       "name": "ide_drive_present",
+      "target": "platform_ide_drive_present",
       "ret": "int",
       "args": [
         "int drv"
@@ -450,10 +452,11 @@
         "int drv",
         "void *info"
       ],
-      "body": "return ide_identify(drv, (IdeInfo *)info);"
+      "body": "return platform_ide_identify(drv, (IdeInfo *)info);"
     },
     {
       "name": "ide_read_sector",
+      "target": "platform_ide_read_sector",
       "out": [{"arg": "buf", "size": 512}],
       "ret": "int",
       "args": [
@@ -540,7 +543,7 @@
     {
       "name": "ide_write_sector",
       "in": [{"arg": "buf", "size": 512, "target": true}],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nif (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\nreturn ide_write_sector(drv, lba, buf);",
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\nreturn platform_ide_write_sector(drv, lba, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -551,7 +554,7 @@
     {
       "name": "ide_write_sectors",
       "in": [{"arg": "buf", "len": "cnt", "unit": 512, "target": true}],
-      "body": "if (!exec_disk_write_allowed()) return -1;\nif (cnt == 0) return 0;\nif (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\nreturn ide_write_sectors(drv, lba, cnt, buf);",
+      "body": "if (!exec_disk_write_allowed()) return -1;\nif (cnt == 0) return 0;\nif (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\nreturn platform_ide_write_sectors(drv, lba, cnt, buf);",
       "ret": "int",
       "args": [
         "int drv",
@@ -1204,7 +1207,7 @@
       "out": [{"arg": "info", "size": "sizeof(IdeInfo)"}],
       "ret": "int",
       "args": ["int drv", "void *info"],
-      "body": "return ide_get_info(drv, (IdeInfo *)info);"
+      "body": "return platform_ide_get_info(drv, (IdeInfo *)info);"
     },
     {
       "name": "sys_get_build_info",

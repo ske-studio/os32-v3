@@ -36,7 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
+TREE_FILES = ["include/ide_contract.h", "kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ide.h", "drivers/dev.c", "drivers/dev.h",
               "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
@@ -65,7 +65,7 @@ SAN = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g"]
 
 
 def read_includes(tree):
-    return ["-I" + str(tree / SHIM), "-I" + str(tree / "drivers"), "-I" + str(tree / "fs"),
+    return ["-I" + str(tree / "include"), "-I" + str(tree / SHIM), "-I" + str(tree / "drivers"), "-I" + str(tree / "fs"),
             "-I" + str(tree)] + ["-I" + str(ROOT / p) for p in
                                  ("include", "drivers", "fs", "lib", "kernel",
                                   "sdk/include/os32")] + ["-I" + str(ROOT)]

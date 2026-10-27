@@ -12,4 +12,13 @@ int platform_loop_dev_attach(const char *path, int slot);
 void platform_loop_dev_detach(int slot);
 int platform_loop_dev_status(int slot, u32 *total, int *bps);
 
+/* IDE state stays in the driver; KAPI range/authorization checks stay above. */
+void platform_ide_init(void);
+int platform_ide_drive_present(int drv);
+int platform_ide_identify(int drv, void *info);
+int platform_ide_read_sector(int drv, u32 lba, void *buf);
+int platform_ide_write_sector(int drv, u32 lba, const void *buf);
+int platform_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf);
+int platform_ide_get_info(int drv, void *info);
+
 #endif /* PLATFORM_DEVICE_H */

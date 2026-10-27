@@ -43,8 +43,8 @@ int vfs_read_fd(int fd, void *buf, u32 size) { (void)fd; (void)buf; (void)size; 
 int vfs_write_fd(int fd, const void *buf, u32 size) { (void)fd; (void)buf; (void)size; return touch(); }
 int np2_get_version(char *buf, int size) { (void)buf; (void)size; return touch(); }
 void kcg_read_ank(u8 ch, u8 *buf) { (void)ch; (void)buf; (void)touch(); }
-int ide_write_sector(int drv, u32 lba, const void *buf) { (void)drv; (void)lba; (void)buf; return touch(); }
-int ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf) { (void)drv; (void)lba; (void)cnt; (void)buf; return touch(); }
+int platform_ide_write_sector(int drv, u32 lba, const void *buf) { (void)drv; (void)lba; (void)buf; return touch(); }
+int platform_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf) { (void)drv; (void)lba; (void)cnt; (void)buf; return touch(); }
 static Device disk;
 Device *dev_find(const char *name) { (void)name; return &disk; }
 int dev_blk_read_lba(Device *d, u32 lba, int n, void *buf) { (void)d; (void)lba; (void)n; (void)buf; return touch(); }

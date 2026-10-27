@@ -43,9 +43,9 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
 #include "generated_host_source.c"
 static int reached;
 void ring3_fault_kill(void) { SAY("FAIL: unexpected pointer fault"); die(1); }
-int ide_write_sector(int drv, u32 lba, const void *buf)
+int platform_ide_write_sector(int drv, u32 lba, const void *buf)
 { (void)drv; (void)lba; (void)buf; reached++; return 7; }
-int ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
+int platform_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)
 { (void)drv; (void)lba; (void)cnt; (void)buf; reached++; return 7; }
 int ext2_format(int drv, u32 sectors)
 { (void)drv; (void)sectors; reached++; return 7; }

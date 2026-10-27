@@ -31,3 +31,4 @@ check-cd-read-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- include/ide_contract.h

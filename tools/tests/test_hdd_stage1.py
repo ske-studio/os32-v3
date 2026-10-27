@@ -843,7 +843,7 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["drivers/ide.h", "drivers/pc98pt.c", "drivers/pc98pt.h", "drivers/ide_addr.c",
+MIRROR = ["include/ide_contract.h", "drivers/ide.h", "drivers/pc98pt.c", "drivers/pc98pt.h", "drivers/ide_addr.c",
           "drivers/ide_addr.h", "fs/ext2_layout.c", "fs/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2_super.c", "fs/ext2_fmt.c", "fs/ext2_inode.c", "fs/ext2_dir.c",
