@@ -240,3 +240,10 @@
 - **割込み禁止の区間** (§2 の「index/data と RMW は一組の間だけ割込み禁止」): 実装は REALHW_RECOVER_ADDENDUM.md の S5 の決定 (区間を分ける) に従う。S5 のレビューの P3 で送った文言の直しをこの注記で閉じる。
 - **S7** (§8 の行の「KAPI 共有ヘッダと版更新」): 先にできた `recover` は部品の private な wire ヘッダを shell が直接読み KAPI を変えていない。S7 もそれに揃える — **2026-10-23 確定**: private な `kdebug/gfinit_wire.h` を shell (`cmd_gfinit.c`) が直接読み、既存の kdebug_call の op 5〜10 を使う。KAPI の版・slot・生成元は変えない。§8 の S7 行より [GF6200_S7_SHELL.md](GF6200_S7_SHELL.md) (段 S7a・S7b・S7c) を正とする。trial の外の INSPECT は例外として通常の 1 行と終わりの行を出す (同 §3)。
 - **A1 の他装置の BAR**: Ra266 の基準構成 ([RA266.md](RA266.md) §1-1) では Trident 0:8.0 と 82557 0:11.0 が「長さ不明のメモリ BAR」で拒否に当たる。根拠の設計は票 TASK_HWDEV §3-1 の BARLEN。
+
+## main 0 の実機 FAIL で決めたこと (2026-10-27、PM が設計者 astra の調査を採る)
+
+- 観測: Ra266 (69321ce) の main 0 が SUB7 (MEM PLL、pc=0xE754 の op 0x4A、substep 0x12020) で停止 — 4600h に (saved=0)|80000000h を書いた後の照合の読み戻しが 0、verify mask FFFFFFFFh で REC_VERIFY 停止 (kdebug/recover.c:1915-1928)。PLL の lock 待ちの時間切れではない。98 は正常、電源の入れ直しで IDLE。
+- 根拠: nouveau (MIT、drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c の setPLL_double_lowregs、NV44 は devinit=nv1a・pll_set=nv04) の MEM PLL の列は、4600h を書込みの前に読んで bit31 を立て、係数と制御の後に保存値へ戻す — OS32 の kdebug/gfinit_pll.c:219・237 と同じ。nouveau は 4600h を書いた後に読み戻さない。envytools の rnndb (MIT) に 4600h の定義は無い。bit31 の意味と読み戻せるかは未確認 (WO とも断定しない)。調査の全文は ~/os32-tmp/run/gf-main0-fail/ANALYSIS.md・EVIDENCE.md。
+- 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の T:557・T:568) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/accept/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。ほかの PLL の verify は変えない。verify=0 の成功は PLL の lock や VRAM の成功を意味しない (§159 のまま)。
+- 受入: host で「4600h が 0 固定でも 2 規則で止まらない」「他の非零 mask の不一致では止まる」「書込みの順と復元値は同じ」。実機は次の立会いで inspect → A1 → A2 → main 0 をやり直し (各段の承認)、後続の到達を見る。
