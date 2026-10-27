@@ -23,3 +23,5 @@ check-display-cleanup-host:
 - kernel/display_restore.h
 - platform/pc98/display.c
 - platform/pc98/display_private.h
+- kernel/platform_splash.h
+- platform/pc98/splash.c

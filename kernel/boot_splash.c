@@ -14,18 +14,14 @@
 #define SPLASH_COLOR_MAX      15
 #define SPLASH_GRAD_LINE_STEP 4
 #include "gfx.h"
-#include "gfx_internal.h"
-#include "gfx_hal.h"   /* g_backend / GFX_BB_*: 4 プレーン機かどうかの判定 */
+#include "platform_splash.h"
 #include "palette.h"
 #include "tvram.h"
 #include "types.h"
 #include "os32_kapi_shared.h"
-#include "io.h"
-#include "kstring.h"
 
 /* ======== 外部参照 ======== */
 extern volatile u32 tick_count;
-static struct gfx_kernel_fb splash_fb;
 extern void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
 
 /* ======== パレット番号 ======== */
@@ -50,73 +46,6 @@ extern void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
 static u8 s_grad_r[GRAD_STEPS];
 static u8 s_grad_g[GRAD_STEPS];
 static u8 s_grad_b[GRAD_STEPS];
-
-/* ======================================================================== */
-/*  バックバッファ描画プリミティブ (カーネル用)                               */
-/* ======================================================================== */
-
-/* バックバッファ全面を指定色で塗る — kmemset (rep stosd) で高速化 */
-static void bb_clear(u8 color)
-{
-    int p;
-    for (p = 0; p < GVRAM_PLANES; p++) {
-        u8 val = (color & (1 << p)) ? 0xFF : 0x00;
-        kmemset(splash_fb.planes[p], val, GFX_PLANE_SZ);
-    }
-}
-
-/* バックバッファに矩形を塗る */
-static void bb_fill_rect(int x, int y, int w, int h, u8 color)
-{
-    int p, row;
-    int x1, x2, byte_start, byte_end;
-    u8 mask_first, mask_last;
-
-    /* クリッピング */
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (x + w > GFX_WIDTH) w = GFX_WIDTH - x;
-    if (y + h > GFX_HEIGHT) h = GFX_HEIGHT - y;
-    if (w <= 0 || h <= 0) return;
-
-    x1 = x;
-    x2 = x + w - 1;
-    byte_start = x1 / BITS_PER_BYTE;
-    byte_end   = x2 / BITS_PER_BYTE;
-    mask_first = 0xFF >> (x1 % BITS_PER_BYTE);
-    mask_last  = 0xFF << (BITS_PER_BYTE - 1 - (x2 % BITS_PER_BYTE));
-
-    for (p = 0; p < GVRAM_PLANES; p++) {
-        u8 *plane = splash_fb.planes[p];
-        u8 set = (color & (1 << p)) ? 1 : 0;
-
-        for (row = y; row < y + h; row++) {
-            u8 *line = plane + row * GFX_BPL;
-
-            if (byte_start == byte_end) {
-                u8 mask = mask_first & mask_last;
-                if (set)
-                    line[byte_start] |= mask;
-                else
-                    line[byte_start] &= ~mask;
-            } else {
-                int b;
-                if (set)
-                    line[byte_start] |= mask_first;
-                else
-                    line[byte_start] &= ~mask_first;
-
-                for (b = byte_start + 1; b < byte_end; b++)
-                    line[b] = set ? 0xFF : 0x00;
-
-                if (set)
-                    line[byte_end] |= mask_last;
-                else
-                    line[byte_end] &= ~mask_last;
-            }
-        }
-    }
-}
 
 /* ======================================================================== */
 /*  グリフデータ                                                             */
@@ -211,7 +140,7 @@ static void draw_rects(int ox, int oy,
 {
     int i;
     for (i = 0; i < n; i++)
-        bb_fill_rect(ox + r[i].x, oy + r[i].y, r[i].w, r[i].h, col);
+        platform_splash_fill_rect(ox + r[i].x, oy + r[i].y, r[i].w, r[i].h, col);
 }
 
 static void draw_outline(int ox, int oy,
@@ -219,7 +148,7 @@ static void draw_outline(int ox, int oy,
 {
     int i;
     for (i = 0; i < n; i++)
-        bb_fill_rect(ox + r[i].x - pad, oy + r[i].y - pad,
+        platform_splash_fill_rect(ox + r[i].x - pad, oy + r[i].y - pad,
                      r[i].w + pad * 2, r[i].h + pad * 2, col);
 }
 
@@ -228,8 +157,8 @@ static void draw_highlight(int ox, int oy,
 {
     int i;
     for (i = 0; i < n; i++) {
-        bb_fill_rect(ox + r[i].x, oy + r[i].y, r[i].w, w, col);
-        bb_fill_rect(ox + r[i].x, oy + r[i].y, w, r[i].h, col);
+        platform_splash_fill_rect(ox + r[i].x, oy + r[i].y, r[i].w, w, col);
+        platform_splash_fill_rect(ox + r[i].x, oy + r[i].y, w, r[i].h, col);
     }
 }
 
@@ -263,17 +192,6 @@ static void build_raster(GFX_RasterPalTable *tbl, int offset)
     }
 }
 
-/* ブートでは必ず存在する PC98 標準表示だけを使う。任意デバイスの probe /
- * init は後の通常 gfx_init に任せ、GFX= の希望値は描画前に戻す。
- * 起動中の同期呼び出し専用。設定ファイルや公開 ABI は変更しない。 */
-static void splash_gfx_init(void)
-{
-    int saved_pref = gfx_get_backend_pref();
-    gfx_set_backend_pref(GFX_PREF_PC98);
-    gfx_init();
-    gfx_set_backend_pref(saved_pref);
-}
-
 /* ======================================================================== */
 /*  boot_splash - メインエントリ                                              */
 /* ======================================================================== */
@@ -291,16 +209,8 @@ void boot_splash(void)
     gdata[2] = glyph_3;  gcount[2] = GLYPH_3_N;
     gdata[3] = glyph_2;  gcount[3] = GLYPH_2_N;
 
-    /* GUI の設定とは独立に、任意デバイスを probe しない標準表示で起動。 */
-    splash_gfx_init();
-
-    /* 標準ハードの存在とソフトウェア状態の正常性は別。gfx_init は void
-     * なので、描画に必要な状態が無ければ任意デバイスへ逃げず表示を終了。
-     * 初期化中の fault や I/O 障害そのものを検出する API ではない。 */
-    if (gfx_kernel_framebuffer(&splash_fb) || splash_fb.format != GFX_BB_PLANAR4 ||
-        !splash_fb.planes[0] || !splash_fb.planes[1] ||
-        !splash_fb.planes[2] || !splash_fb.planes[3]) {
-        gfx_shutdown();
+    /* The platform restores the preference and shuts down on failure. */
+    if (platform_splash_begin()) {
         tvram_clear();
         return;
     }
@@ -314,7 +224,7 @@ void boot_splash(void)
     palette_set(PAL_HIGHLIGHT,   15, 15, 15);
 
     /* 全画面をグラデーションカラーで塗りつぶし */
-    bb_clear(PAL_GRAD);
+    platform_splash_clear(PAL_GRAD);
 
     /* 3D文字描画: O S 3 2 */
     cx = TEXT_X;
@@ -341,7 +251,7 @@ void boot_splash(void)
     }
 
     /* クリーンアップ: VRAM全クリア → テキストモード復帰 */
-    gfx_clear_planar_pages(GFX_PLANE_SZ);
+    platform_splash_clear_pages();
     gfx_shutdown();
     palette_init();
     tvram_clear();

@@ -11,7 +11,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c')
+TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c')
 
 
 def function(text, name):
@@ -81,13 +81,13 @@ MUTATIONS = [
     ('gcap-no-restore', TARGET_SRCS[1], '    display_text_start();', '', 1, 'v86', 'FAIL: capture rebuild'),
     ('gcap-full-restore', TARGET_SRCS[1], '    display_text_start();',
      '    v86_cui_display_restore();', 1, 'v86', 'FAIL: capture rebuild'),
-    ('old-splash-cleanup', TARGET_SRCS[2], '    gfx_clear_planar_pages(GFX_PLANE_SZ);',
-     '    bb_clear(0);\n    gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);\n    gfx_present();', 1, 'splash', 'FAIL: residual logo page=0'),
+    ('old-splash-cleanup', TARGET_SRCS[2], '    platform_splash_clear_pages();',
+     '    platform_splash_clear(0);\n    gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);\n    gfx_present();', 1, 'splash', 'FAIL: residual logo page=0'),
     ('clear-page-zero-twice', TARGET_SRCS[3], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset',
      '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset', 1, 'splash', 'FAIL: residual logo page=1'),
     ('clear-page-one-twice', TARGET_SRCS[3], '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset',
      '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', 1, 'splash', 'FAIL: residual logo page=0'),
-    ('clear-half-plane', TARGET_SRCS[2], 'gfx_clear_planar_pages(GFX_PLANE_SZ);',
+    ('clear-half-plane', TARGET_SRCS[5], 'gfx_clear_planar_pages(GFX_PLANE_SZ);',
      'gfx_clear_planar_pages(GFX_PLANE_SZ_200);', 1, 'splash', 'FAIL: residual logo page=0'),
 ]
 MUTATIONS += [
@@ -110,8 +110,10 @@ def main():
         for result in results:
             assert result.returncode == 0, result.stdout + result.stderr
         print(f'{kind}: {len(results)} runtime cases PASS')
+    compile_only = '--compile-mutations' in sys.argv
     if '--mutate' not in sys.argv:
-        return
+        if not compile_only:
+            return
     with tempfile.TemporaryDirectory(prefix='display-mut-') as td:
         tree = Path(td)
         # Only source/header files, never build outputs or hardware documents.
@@ -128,17 +130,26 @@ def main():
         for name in ('display_cleanup_host.c', 'boot_splash_native_host.c', 'serial_diag_host.h'):
             shutil.copyfile(ROOT / 'tools/tests' / name, tree / 'tools/tests' / name)
         for name, path, old, new, hits, kind, expected_fail in MUTATIONS:
+            if compile_only and name not in ('old-splash-cleanup', 'clear-half-plane'):
+                continue
             target = tree / path
             original = target.read_text()
             assert original.count(old) == hits, (name, original.count(old), hits)
-            target.write_text(original.replace(old, new))
+            changed = original.replace(old, new)
+            if name in ('old-splash-cleanup', 'clear-half-plane'):
+                assert hits == 1 and changed.count(old) == 0 and changed.count(new) == 1
+            target.write_text(changed)
             try:
-                results = build_run(tree, kind, cases[kind])
+                results = build_run(tree, kind, cases[kind], execute=not compile_only)
+                if compile_only:
+                    print(name + ': unique anchor, isolated -Werror compile PASS')
+                    continue
                 assert any(r.returncode == 1 and expected_fail in r.stderr for r in results), name + ' survived'
                 print(name + ': runtime RED')
             finally:
                 target.write_text(original)
-    print(f'{len(MUTATIONS)} mutants: runtime RED')
+    if '--mutate' in sys.argv:
+        print(f'{len(MUTATIONS)} mutants: runtime RED')
 
 
 if __name__ == '__main__':
