@@ -1,4 +1,7 @@
 #include "types.h"
+#include "pc98.h"
+/* Independent pre-move legacy expectation; do not derive it from geometry. */
+#define HOST_LEGACY_END (15UL * MEM_1MB)
 static u32 host_cr3;
 static unsigned int host_if = 0x202U;
 static unsigned int host_irq_save(void)
@@ -60,6 +63,7 @@ static void *host_boot_ptr(u32 addr)
     return &host_low[(addr / MEM_1MB) % 16];
 }
 #endif
+#include "memory_host_source.c"
 #include "memory_boot_host_source.c"
 #undef sys_memory_bootstrap_model
 #undef sys_memory_stage_online
@@ -649,7 +653,7 @@ die(0);
      * 上端 (sys_mem_kb) ではない。差は 15-16MiB のシステム空間ちょうど。 */
     {
         u32 low, high, mb;
-        low = MEMORY_BOOT_LEGACY_END / 1024UL;      /* 低位 RAM の上端 = 15MiB */
+        low = HOST_LEGACY_END / 1024UL;      /* 低位 RAM の上端 = 15MiB */
         high = MEM_HIGH_RAM_BASE / PAGE_SIZE;
         mb = MEM_1MB / PAGE_SIZE;
         /* 上端は生の申告のまま。定義は変えない (K6-RAM)。 */
@@ -694,7 +698,7 @@ die(0);
         CHECK(count == PHYSMEM_MAX_PFN - ceil);
         CHECK(!pgalloc_range_has_ram(ceil, PHYSMEM_MAX_PFN));
         CHECK(pgalloc_range_has_ram(ceil - 1, ceil));
-        CHECK(memory_boot_ram_kb() == MEMORY_BOOT_LEGACY_END / 1024UL +
+        CHECK(memory_boot_ram_kb() == HOST_LEGACY_END / 1024UL +
               (MEM_PHYS_RAM_CEILING - MEM_HIGH_RAM_BASE) / 1024UL);
         CHECK(pgalloc_arena_end() == workspace_first);
         CHECK(sys_usable_mem_end() == workspace_first * PAGE_SIZE);
@@ -799,8 +803,8 @@ die(0);
     /* 低位の上端が 3,074 PFN 以上 (12MB + 8KB〜15MB)、高位 RAM なし:
      * ARENA_TOP 型。置き場は今と同じ低位 RAM の末尾 (回帰なし)。 */
     {
-        u32 top = (TEST_KB < MEMORY_BOOT_LEGACY_END / 1024UL ? TEST_KB :
-                   MEMORY_BOOT_LEGACY_END / 1024UL) / (PAGE_SIZE / 1024UL);
+        u32 top = (TEST_KB < HOST_LEGACY_END / 1024UL ? TEST_KB :
+                   HOST_LEGACY_END / 1024UL) / (PAGE_SIZE / 1024UL);
         CHECK(top > MEMORY_BOOT_FIXED_MAX_TOP);
         CHECK(pgalloc_model_state() == PGALLOC_ONLINE);
         CHECK(!ledger_backing_mapped);

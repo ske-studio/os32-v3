@@ -105,6 +105,7 @@ static int observe_online(void)
 }
 #define sys_memory_bootstrap_model observe_bootstrap
 #define sys_memory_stage_online observe_online
+#include "platform/pc98/memory_host_source.c"
 #include "memory_boot_host_source.c"
 #undef sys_memory_bootstrap_model
 #undef sys_memory_stage_online

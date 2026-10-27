@@ -17,7 +17,8 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tools/tests/fixtures/dep_dir_c'
 SOURCES = tuple('kernel/' + name + '.c' for name in
-                ('paging', 'pgalloc', 'sys', 'memory_boot', 'physmem'))
+                ('paging', 'pgalloc', 'sys', 'memory_boot', 'physmem')) + (
+                    'platform/pc98/memory.c',)
 HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib',
                'drivers', 'exec', 'sdk/include/os32')
 HARNESS = 'tools/tests/dep_dir_c_memory_host.c'
@@ -67,9 +68,9 @@ def build(work, sample, source_root=ROOT):
         if unit in ('paging', 'pgalloc', 'sys'):
             text = text.replace('irq_save()', 'host_irq_save()')
             text = text.replace('irq_restore(flags)', 'host_irq_restore(flags)')
-        if unit == 'memory_boot':
+        if rel == 'platform/pc98/memory.c':
             text = instrument_probe(text)
-        dest = work / 'kernel' / (unit + '_host_source.c')
+        dest = work / Path(rel).parent / (unit + '_host_source.c')
         dest.write_text(text)
     shutil.copyfile(ROOT / HARNESS, work / 'harness.c')
     exe = work / 'memory-test'
