@@ -135,7 +135,8 @@ void console_hw_cursor_enable(void);    /* console.c の中で前方参照され
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wsign-compare"
-#include "console.c"
+#include "../../kernel/console.c"
+#include "../../platform/pc98/console.c"
 #pragma GCC diagnostic pop
 
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */

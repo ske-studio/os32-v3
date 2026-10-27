@@ -9,3 +9,5 @@ check-boot-splash-host:
 - build/checks.d/check-boot-splash-host.mk
 - tools/tests/serial_diag_host.h
 - lib/serial_diag.h
+- kernel/platform_splash.h
+- platform/pc98/splash.c

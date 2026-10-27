@@ -132,6 +132,11 @@ class ImportsTests(unittest.TestCase):
         self.assertEqual(self.entries[196]['source'], 'kernel/v86_io.h')
         self.assertTrue(self.entries[196]['retained'])
         self.assertEqual(self.entries[244]['name'], 'display_text_start')
+        for index, name in ((244, 'display_text_start'), (250, 'display_restore_98'),
+                            (251, 'display_recover_ready'), (252, 'display_recover_cell_read'),
+                            (253, 'display_recover_cell_write')):
+            self.assertEqual((self.entries[index]['name'], self.entries[index]['source']),
+                             (name, 'kernel/display_restore.h'))
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[205]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {

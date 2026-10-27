@@ -40,3 +40,5 @@ check-dep-dir-d3-host:
 - tools/tests/dep_dir_d3_boot_host.c
 - include/platform_device.h
 - include/ide_contract.h
+- kernel/platform_emergency.h
+- platform/pc98/emergency.c

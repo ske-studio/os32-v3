@@ -9,8 +9,7 @@
 #define KCG_ADAPTER "../../kernel/kcg_module.c"
 #endif
 #define IO_H
-static void outp(unsigned p, unsigned v) { (void)p; (void)v; }
-static void io_wait(void) {}
+void platform_display_kcg_code(void) {}
 #include KCG_ADAPTER
 static u32 mode, initialized, stub_logs;
 static const struct bootinfo boot = {.img_valid = 1};

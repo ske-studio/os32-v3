@@ -43,4 +43,7 @@ check-unicode-surface-host:
 - kapi/kapi_generated.c
 - tools/tests/unicode_lookup_host.c
 - tools/tests/unicode_lookup_sdk.c
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h
 artifact_reader: true

@@ -81,3 +81,6 @@ check-raw-wait-host:
 - include/clock_service.h
 - kernel/clock_service.c
 - drivers/rtc.h
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h

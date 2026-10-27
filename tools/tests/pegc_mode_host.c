@@ -52,6 +52,7 @@ static volatile void *host_pegc_window(u32 pa)
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #include "../../kernel/console.c"
+#include "../../platform/pc98/console.c"
 #pragma GCC diagnostic pop
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80) ---- */

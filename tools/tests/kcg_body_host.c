@@ -21,6 +21,7 @@ static inline unsigned inp(unsigned port)
 }
 static inline void io_wait(void) { ++waits; }
 #include "kcg_body_source.inc"
+#include "kcg_display_code.inc"
 #include KCG_ADAPTER
 static int published;
 const u32 *module_exports(struct module_handle h)
@@ -40,6 +41,14 @@ void *kmemcpy(void *dst, const void *src, u32 n)
 void *kmemset(void *dst, int value, u32 n)
 { u8 *d=dst; while(n--) *d++=(u8)value; return dst; }
 void kprintf(u8 a, const char *f, ...) { (void)a; (void)f; ++logs; }
+static u32 invalidate_calls, restore_waits;
+static void observed_invalidate(void)
+{
+    CHECK(kac_mode == MFF1_KCG_CODE && waits == restore_waits,
+          "platform CODE and wait precede invalidate");
+    ++invalidate_calls;
+    invalidate();
+}
 void _start(void)
 {
     KcgModuleApi again = {0};
@@ -111,7 +120,10 @@ void _start(void)
     KcgCacheStats before; api.stats(&before);
     rom_epoch = 1;
     outp(MODE_FF1_PORT, MFF1_KCG_BITMAP);
+    candidate.invalidate = observed_invalidate;
+    restore_waits = waits + 1;
     kcg_v86_restore();
+    CHECK(invalidate_calls == 1, "loaded invalidate once");
     CHECK(kac_mode == MFF1_KCG_CODE, "return CODE");
     api.read_ank('A', glyph);
     CHECK(glyph[0] == (u8)('A'*11+1), "fresh ANK");
@@ -122,7 +134,9 @@ void _start(void)
           "return invalidates cache");
     published = 0;
     outp(MODE_FF1_PORT, MFF1_KCG_BITMAP);
+    restore_waits = waits + 1;
     kcg_v86_restore();
+    CHECK(waits == restore_waits && invalidate_calls == 1, "stub CODE wait without cache");
     CHECK(kac_mode == MFF1_KCG_CODE && reads == old_reads + 48,
           "missing body CODE only");
     output("PASS KCG body: glyphs/ports, double init, collision; sample hit=1022/1024 (99.80%)\n",

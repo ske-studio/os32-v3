@@ -35,4 +35,6 @@ check-double-fault-host:
 - kernel/v86.h
 - exec/appslot.h
 - include/cpu.h
+- kernel/platform_emergency.h
+- platform/pc98/emergency.c
 artifact_reader: true

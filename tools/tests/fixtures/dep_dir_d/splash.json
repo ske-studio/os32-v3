@@ -1,0 +1,7 @@
+{
+  "baseline": "b400acb6",
+  "source_sha256": "5b90f39ebfe92a05e689fa962fd39283fb9a6dcc13066d9f63f72f8e989ae2d4",
+  "harness_sha256": "42d15e9b0d77b2ddba5113210d1075100795ad75e257801f68acb7a45d649503",
+  "trace_sha256": "1c51cb997b2f4f5e2f626d8d0511a4bfa67f8027d02f0563ce036583ff3210bd",
+  "inputs": "pref 0..3; framebuffer rc/format/each missing plane; retry and alternating buffers; all 16 clear colors; single/cross byte, clipped and empty rectangles; full palette/raster/cleanup order"
+}

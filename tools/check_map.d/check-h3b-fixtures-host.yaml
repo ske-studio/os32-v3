@@ -45,4 +45,7 @@ check-h3b-fixtures-host:
 - userland/tests/shutdown_probe.c
 - tools/gen_deploy_set.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h
 artifact_reader: true

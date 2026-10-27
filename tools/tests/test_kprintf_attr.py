@@ -23,11 +23,12 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/kprintf_attr_host.c"
-SRC = ROOT / "lib/kprintf_attr.c"
+SRC = ROOT / "platform/pc98/console_attr.c"
 
 # カーネルと同じ i386-elf で通す実ソース。
 TARGET_SRCS = [
     ("lib/kprintf_attr.c", []),
+    ("platform/pc98/console_attr.c", []),
     ("lib/kprintf.c", []),
 ]
 
@@ -35,7 +36,6 @@ CASES = ["real_callers", "pc98_passthrough", "invariants", "cga_bits"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "lib")]
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (パターン, 置換, 説明)
@@ -62,19 +62,23 @@ def host_build(tmp, source_text=None):
     """ハーネスをコンパイルして実行ファイルのパスを返す。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kprintf-attr-host"
-    cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
+    # Copy the complete closure, also for mutants; no original include paths.
+    files = ("tools/tests/kprintf_attr_host.c", "lib/kprintf_attr.c",
+             "platform/pc98/console_attr.c", "include/console_attr.h",
+             "include/types.h", "include/pc98.h", "include/kprintf.h",
+             "sdk/include/os32/os32_kapi_shared.h",
+             "sdk/include/os32/os32_ver_info.h", "sdk/include/os32/os32_generations.h",
+             "sdk/include/os32/os32_surface.h", "sdk/include/os32/os32_ls.h",
+             "sdk/include/os32/os32_kapi_generated.h")
+    for rel in files:
+        dest = src_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes((ROOT / rel).read_bytes())
     if source_text is not None:
-        # 変異させた写しを一時の lib/ に置いて、そちらを引かせる。
-        mut = src_dir / "lib"
-        mut.mkdir(exist_ok=True)
-        (mut / "kprintf_attr.c").write_text(source_text, encoding="utf-8")
-        shim = src_dir / "harness.c"
-        shim.write_text(
-            HARNESS.read_text(encoding="utf-8").replace(
-                '"../../lib/kprintf_attr.c"', '"lib/kprintf_attr.c"'),
-            encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
-               str(shim), "-o", str(exe)]
+        (src_dir / "platform/pc98/console_attr.c").write_text(source_text)
+    cmd = ["gcc", *FLAGS, "-I" + str(src_dir / "include"),
+           str(src_dir / "tools/tests/kprintf_attr_host.c"),
+           str(src_dir / "platform/pc98/console_attr.c"), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -133,8 +137,8 @@ def mutate(tmp):
         try:
             exe = host_build(tmp, mutated)
         except subprocess.CalledProcessError:
-            # コンパイルが通らない変異も「見つけた」に数える。
-            print(f"MUTATION {i} RED (compile): {why}", flush=True)
+            print(f"MUTATION {i} BUILD FAILED: {why}", flush=True)
+            bad += 1
             continue
         hits = sum(subprocess.run([str(exe), c], cwd=ROOT,
                                   stderr=subprocess.DEVNULL).returncode != 0

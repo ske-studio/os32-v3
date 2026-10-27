@@ -6,8 +6,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/boot.c', 'kernel/boot_platform.c', 'kernel/boot_display.c')
-HEADERS = ('include/ide_contract.h', 'kernel/boot_platform.h', 'kernel/boot_display.h')
+SOURCES = ('platform/pc98/boot.c', 'kernel/boot_platform.c', 'kernel/boot_display.c', 'platform/pc98/emergency.c')
+HEADERS = ('include/ide_contract.h', 'kernel/boot_platform.h', 'kernel/boot_display.h', 'kernel/platform_emergency.h')
 
 
 def kernel_order(kernel=None):
@@ -56,7 +56,7 @@ def build(work, mutation=None):
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
-    for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc')):
+    for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
     kernel = (work / 'kernel/kernel.c').read_text()

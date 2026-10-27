@@ -41,6 +41,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):
+            for rel in ('kernel/platform_emergency.h', 'platform/pc98/emergency.c'):
+                (work / Path(rel).name).write_text((ROOT / rel).read_text())
             (work / 'session.c').write_text(parts[paths[0]])
             # The production import thunks are replaced by direct fixture edges;
             # the complete recorder and math still compile and execute.

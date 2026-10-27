@@ -64,6 +64,7 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #define io_wait_n(n) ((void)(n))
 #define _halt() host_wait()
 #include "console_source.inc"
+#include "../../platform/pc98/console.c"
 #include "fm_source.inc"
 #include "serial_source.inc"
 #include "../../drivers/serial_plan.c"

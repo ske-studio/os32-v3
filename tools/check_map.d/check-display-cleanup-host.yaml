@@ -21,3 +21,7 @@ check-display-cleanup-host:
 - include/pegc.h
 - kernel/v86_bios.h
 - kernel/display_restore.h
+- platform/pc98/display.c
+- platform/pc98/display_private.h
+- kernel/platform_splash.h
+- platform/pc98/splash.c

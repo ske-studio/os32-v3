@@ -17,7 +17,7 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('fs/pipe_buffer.c', 'kernel/console.c', 'userland/tests/pipe_owner_test.c',
+SOURCES = ('fs/pipe_buffer.c', 'platform/pc98/console.c', 'userland/tests/pipe_owner_test.c',
            'userland/tests/audit_test.c', 'userland/tests/kout_test.c',
            'tools/gen_v86_int80.py', 'tools/deploy_manifests.py', 'tools/hostdrv_deploy.py',
            'tools/nhd_deploy.py')
@@ -39,9 +39,12 @@ def function(source, name):
 def run_harness(mutation=None, pipe_mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-h3b-') as directory:
         tmp = Path(directory)
-        console = (ROOT / 'kernel/console.c').read_text()
-        console = '\n'.join(function(console, name) for name in
-                            ('tvram_putchar_at', 'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell'))
+        console = (ROOT / 'platform/pc98/console.c').read_text()
+        console = '\n'.join(function(console, name).replace(name, public, 1)
+                            for name, public in (('con_backend_putchar', 'tvram_putchar_at'),
+                            ('con_backend_putkanji', 'tvram_putkanji_at'),
+                            ('con_backend_readchar', 'tvram_readchar_at'),
+                            ('con_backend_reverse', 'tvram_reverse_cell')))
         if mutation:
             old, new = mutation
             assert console.count(old) == 1, old

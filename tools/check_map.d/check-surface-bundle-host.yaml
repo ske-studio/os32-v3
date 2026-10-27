@@ -1,4 +1,5 @@
 check-surface-bundle-host:
+- kernel/platform_emergency.h
 - kernel/v86_module.h
 - userland/lib/rt/ls.c
 - sdk/include/os32/ls.h
