@@ -146,3 +146,49 @@ diagも失われた場合は新sidを開始せずrecover statusのRAM診断を�
 - sol の算出: local cleanup の容量の最大 (RECOVER_MAX_REGS=32) で数えると 512 行 × 94 B = 48,128 B、9600bps で約 51 秒、余裕と S0 を足すと restore_limit は 87 秒以上 (部分集計、~/os32-tmp/run/reclog/budget-stop.json) で N2 の 60 秒を超えた。
 - **ユーザー決定 (推奨どおり): 上限は容量の最大ではなく、その回の実際の行数から計算する** — cleanup に入るときに、実行時の `local_saved_count` (と quiesce・index の保存の数) から P (S0 の前のバイト数)・時間・poll の上限をその回ごとに出す。式は本文 §5 と確定 N1 の形のまま、容量 32 の代わりに実際の数を入れる。S0 の取り置きは今のまま。今回の A4 の量 (S0 の前 65 行・約 4.3 KB) なら 10 秒台で収まる見込み。
 - 算出した値は REC の cleanup の始まり (RESTORING か final) の欄 1 つに出し、ノートはその値で `--cleanup-timeout` が足りるかを確かめる (足りなければ警告)。ノートの既定の待ちは、容量の最大のときの値 (約 90〜120 秒) を上回るように上げる (止まったときに諦めるまでが延びるだけで、普段の速さは変わらない)。
+
+## 実装で埋めた設計の欠け (2026-10-27、設計者 astra — sol が動的な上限と profile CRC の衝突で止まった)
+
+対象: `/home/hight/os32-v3` main、`docs/decisions/realhw/GF6200_RECLOG_DESIGN.md` §2・§5・確定N4・末尾決定。以下を該当記述より優先する。
+決定: profile の復元上限6欄は **既定値**。GF のその回の算出値を制限する天井ではなく、非GF/S0単独の従来経路にも使う。
+profile・profile_crc・token・metadata freeze は一切書き換えない。CRC の対象から既存欄を除外する変更もしない。
+`recover_budget_apply()` は従来どおりセッション開始前の既定値設定のみ。cleanup から呼ばない。N4 は既定値そのものを変更した版だけに適用する。
+内部予算は recover.c の単一所有者用 static 枠。共有 `struct recover` / profile / ops の配置・署名は変えない。
+```c
+struct rec_cleanup_budget {             /* recover.c 内部専用、単位は名前どおり */
+    u32 ticks, polls, bytes;
+    u32 s0_ticks, s0_polls, s0_bytes;
+    u32 seconds;                       /* ceil(ticks / tick_hz)、REC用 */
+};
+static struct rec_cleanup_budget cb;    /* 28 B追加。動的確保なし */
+static int cleanup_budget_prepare(struct recover *r); /* 下記の算出・検査 */
+/* cleanup(): 既存の再入拒否の直後、local_cleanup/最初のsafe pointより前 */
+/* prepareはまずprofileの6欄をcbへコピーし、GF時だけ検査済み候補で置換する。 */
+if (cleanup_budget_prepare(r)) {
+    fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0); /* 既定値で有限cleanupを続行 */
+}
+/* 続いてRESTORING設定、restore_tick取得、既存3カウンタを0化。 */
+/* state(r, REC_RESTORING)をlocal_cleanupより前へ移し、従来位置から削除。 */
+/* recover_uart_byte(): recover.c:785-808相当 */
+u32 bytes = cb.bytes - (r->in_s0 ? 0 : cb.s0_bytes);
+if (r->uart_bytes >= bytes) break;       /* REC_RESTORING時のみ */
+/* restore_time(): put/wait前後・restore_pointから従来どおり呼ぶ */
+u32 limit = cb.ticks - (r->in_s0 ? 0 : cb.s0_ticks);
+u32 polls = cb.polls - (r->in_s0 ? 0 : cb.s0_polls);
+/* tick差 < limit && r->restore_polls < polls の既存比較へ渡す。 */
+```
+`cleanup_budget_prepare()` はGFのRUN/SIZE_BARSで、入口のlocal_saved_count・saved_count・実際のquiesce/index保存対象を読んで一度だけ算出する（容量32を代入しない）。
+その対象集合から出しうる行数を数える。送信済み行数による後追いではない。CR1F二訪問・失敗分岐・補償LF・移動後RESTORING行を含める。
+§5のP/Q/S・T・N3の式を内部候補へ適用し、cb.bytes=P+S、cb.s0_bytes=S、時間/pollも前段とS0の和・予約で保持する。
+S0予約の規則S=max(4096,Q)と時間/poll予約を維持。local_cleanupが保存数を減らしても再計算しない。S0移行でもカウンタを戻さない。
+u32積/和、予約≤合計、時間<HALF_TICKS、有限pollを候補公開前に検査。初期化失敗時は候補を部分適用せず、既定値のS0予約で復帰を試み、成功扱いにしない。
+全許容入力での算術成立とtransport容量は開始前に検査する（容量最大の計算は検査専用で、その回の実効上限に採用しない）。
+`transport.max_polls` は開始前に最大候補を収容できる値に設定・検証しcleanup中は不変。UARTの引数max_pollsとの既存比較も残す。
+実効poll制限はbyte/flushともrestore_point→restore_timeのcb比較が担う。時間/byte/pollの失敗出口、lost_lines、S0予約は既存契約を維持する。
+cbは全cleanup入口（S0単独・部分snapshot・abort含む）で初期化し、終端diag/final送信まで保持。再入時は上書きせず、別runでは必ず作り直す。
+REC: `transport_state()` の `phase=state event=RESTORING` 行だけに必須u32欄 `cleanup_seconds=cb.seconds` を1つ追加し、当該行の最大長もPに含める。
+ノートはこの欄をmetadataの4欄から分離して検証・保存し、`--cleanup-timeout < cleanup_seconds + 余裕` を警告する。freeze条件は変更しない。
+待ちの既定値は容量最大で求めた秒数＋余裕を上回る値にし、--timeoutも整合させる。実効秒数と既定待ち秒数は実装報告に記す。
+host受入（ゲスト）: 同一profileでlocal件数0/実数/32・CR1F二訪問を比較し、cbだけ変化、CRC/token不変、境界+1のbyte/poll/tickで非成功・S0継続、再入不変・次run初期化・算術拒否を確認する。
+host受入（ノート）: PAUSED保存→再読込→RESTORING→finalで同一CRCとcleanup_secondsを受理し、不足待ちを警告、欄欠落/不正値とCRC変更は拒否、既存diag/final・LIFO検査を維持する。
+§5の「上限は既存profile欄を使いRAM増なし」を撤回し、上記28 Bをサイズ実測へ加える。本追記は設計のみ、リポジトリ変更・試験実行なし。
