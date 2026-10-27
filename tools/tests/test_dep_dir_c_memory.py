@@ -24,7 +24,6 @@ HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib',
                'drivers', 'exec', 'sdk/include/os32')
 HARNESS = 'tools/tests/dep_dir_c_memory_host.c'
 
-# L14 only: L15 cache/ROM mutations belong to the next hardware gate.
 # name, source, literal target, replacement, fixed input
 MUTATIONS = (
     ('bios-high-byte', 'platform/pc98/memory.c',
@@ -44,6 +43,14 @@ MUTATIONS = (
      '                                  platform_memory_geometry.system_end / PAGE_SIZE,',
      '                                  platform_memory_geometry.system_end / PAGE_SIZE - 1,',
      'bios-5'),
+    ('native-uc-end', 'platform/pc98/platform_memory_desc.h',
+     '{TVRAM_CHAR_BASE, TVRAM_CG_WINDOW}',
+     '{TVRAM_CHAR_BASE, TVRAM_CG_WINDOW + MEM_PAGE_SIZE}', 'bios-5'),
+    ('native-pwt', 'kernel/paging.c',
+     '            return PTE_PCD;', '            return PTE_PWT;', 'bios-5'),
+    ('rom-end', 'platform/pc98/platform_memory_desc.h',
+     '{MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1}',
+     '{MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1 - MEM_PAGE_SIZE}', 'bios-5'),
 )
 
 
@@ -79,7 +86,7 @@ def instrument_probe(text):
     return text
 
 
-def build(work, sample, source_root=ROOT, mutation=None):
+def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
     # N1: retain kernel/ and platform/pc98/, including every transitive header.
     # No copied source can resolve a sibling header from the original kernel.
     for directory in HEADER_DIRS:
@@ -114,6 +121,8 @@ def build(work, sample, source_root=ROOT, mutation=None):
            '-Wl,--gc-sections']
     cmd += [f'-DTEST_{key.upper()}={sample[key]}UL' for key in
             ('kb', 'reported', 'mode', 'fail', 'repeat')]
+    if attributes:
+        cmd += ['-DTEST_PLATFORM_ATTRIBUTES']
     cmd += ['-I' + str(work / 'kernel'), '-I' + str(work / 'host_arch')]
     cmd += ['-I' + str(work / p) for p in HEADER_DIRS if p != 'kernel']
     cmd += [str(work / 'harness.c'), str(work / 'kernel/physmem_host_source.c'),
@@ -226,6 +235,14 @@ def verify():
         compare(actual, expected)
         print('PASS L14a ' + sample['name'], flush=True)
     print('PASS fixed traces / full PDE+PTE coverage / comparator bit flip', flush=True)
+    # L15a direct checks run separately, preserving the capture harness's
+    # trace format and allowing L14 sources to use build(source_root=...).
+    sample = next(s for s in inputs if s['name'] == 'bios-5')
+    with tempfile.TemporaryDirectory(prefix='dep-dir-c-attributes-') as td:
+        actual = trace(build(Path(td), sample, attributes=True))
+    compare(actual, gzip.decompress((FIXTURES / 'bios-5.trace.gz').read_bytes()))
+    print('PASS L15a attributes / byte boundaries / legacy native UC / ROM priority',
+          flush=True)
 
 
 def mutations(compile_only=False):

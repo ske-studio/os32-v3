@@ -45,7 +45,22 @@
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"
-#include "pc98.h"
+#include "platform_memory.h"
+
+STATIC_ASSERT(MEM_BIOS_ROM_END + 1 == KERNEL_LOAD_ADDR, bios_rom_ends_at_kernel);
+
+static int platform_span_has(const struct platform_memory_span *s, u32 a)
+{
+    return a >= s->first && a < s->end;
+}
+
+static u32 native_cache_bits(u32 a)
+{
+    for (u32 i = 0; i < PLATFORM_MEMORY_NATIVE_UC_COUNT; i++)
+        if (platform_span_has(&platform_memory_attributes.native_uc[i], a))
+            return PTE_PCD;
+    return 0;
+}
 
 u32 paging_sqlite_stack_guard;
 
@@ -326,10 +341,11 @@ void paging_init(u32 mem_kb)
         for (j = 0; j < PTE_COUNT; j++) {
             phys = (u32)(i * PTE_COUNT + j) * PAGE_SIZE;
             if ((phys < max_mem_bytes || phys < MEM_1MB) &&
-                !(phys >= MEM_SYSTEM_SPACE_BASE && phys < MEM_SYSTEM_SPACE_END)) {
+                !(phys >= platform_memory_geometry.system_first &&
+                  phys < platform_memory_geometry.system_end)) {
                 /* コンベンショナルメモリ(0-1MB)またはプローブ範囲内 */
                 page_tables[i][j] = phys | PAGE_RW |
-                    (PC98_NATIVE_VRAM(phys) ? PTE_PCD : 0);
+                    native_cache_bits(phys);
             } else {
                 /* 未実装領域 */
                 page_tables[i][j] = PAGE_NOT_PRESENT;
@@ -376,7 +392,8 @@ void paging_init(u32 mem_kb)
     paging_set_not_present(MEM_SHELL_GUARD, MEM_SHELL_GUARD + PAGE_SIZE - 1);
 
     /* BIOS ROM: Read-Only */
-    paging_set_readonly(MEM_BIOS_ROM_START, MEM_BIOS_ROM_END);
+    paging_set_readonly(platform_memory_attributes.bios_rom.first,
+                        platform_memory_attributes.bios_rom.end - 1);
 
     /* ========================================================
      *  変換表の根 (CR3) にページディレクトリをセット → 変換を有効化 (CR0.PG)
@@ -680,7 +697,7 @@ int paging_v86_restore(struct v86_session_state *s)
 int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
 {
     u32 a;
-    if (!v86_map_session || base >= end || end > MEM_BIOS_ROM_END + 1 ||
+    if (!v86_map_session || base >= end || end > platform_memory_attributes.bios_rom.end ||
         ((base | end | phys) & (PAGE_SIZE - 1)) ||
         phys > ~(u32)0 - (end - base - 1) || !page_tables[0]) return -1;
     for (a = base; a < end; a += PAGE_SIZE, phys += PAGE_SIZE)
@@ -1308,8 +1325,8 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     /* コンベンショナルメモリ */
     if (a <= MEM_NULL_GUARD_END) return MM_NP;
     if (a < MEM_CONV_END) return MM_RW;
-    if (a < MEM_BIOS_ROM_START) return MM_RW;   /* VRAM */
-    if (a <= MEM_BIOS_ROM_END) return MM_RO;
+    if (a < platform_memory_attributes.bios_rom.first) return MM_RW;   /* VRAM */
+    if (a < platform_memory_attributes.bios_rom.end) return MM_RO;
 
     if (a >= MEM_FIXED_PAGING_GUARD_BASE && a < MEM_FIXED_PAGING_BASE) return MM_NP;
     if (a >= MEM_FIXED_PAGING_BASE && a < MEM_FIXED_PAGING_FRAME_END) return MM_RW;
@@ -1617,9 +1634,10 @@ int paging_master_audit(u32 tramp)
                 if (kind != MM_NP) want = PTE_PRESENT;
                 if (kind == MM_RW || kind == MM_RWU) want |= PTE_RW;
                 if (kind == MM_RWU || kind == MM_ROU) want |= PTE_USER;
-                if (PC98_NATIVE_VRAM(a)) want |= PTE_PCD;
+                want |= native_cache_bits(a);
             } else if ((p < boot_identity_end || pgalloc_audit_ram(p)) &&
-                       !(a >= MEM_SYSTEM_SPACE_BASE && a < MEM_SYSTEM_SPACE_END)) want = PAGE_RW;
+                       !(a >= platform_memory_geometry.system_first &&
+                         a < platform_memory_geometry.system_end)) want = PAGE_RW;
             for (u32 ri = 0; ri < ledger_region_count; ri++) {
                 const struct ledger_region *r = &ledger_regions[ri];
                 if (r->type != LEDGER_R_DEVICE || p < r->first || p >= r->end) continue;
