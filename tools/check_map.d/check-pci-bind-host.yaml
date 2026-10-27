@@ -5,3 +5,10 @@ check-pci-bind-host:
 - tools/tests/test_pci_bind.py
 - tools/check_map.d/check-pci-bind-host.yaml
 - build/checks.d/check-pci-bind-host.mk
+- drivers/pci.h
+- drivers/pci_bind.h
+- drivers/pci_decode.h
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
+- include/types.h
+- sdk/include/os32/os32_kapi_shared.h

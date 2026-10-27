@@ -15,3 +15,4 @@ check-e82557-desc-host:
 - kernel/lan_module.c
 - tools/tests/e82557_drv_host.c
 - kernel/isr_handlers.c
+- platform/pc98/lan_match.c

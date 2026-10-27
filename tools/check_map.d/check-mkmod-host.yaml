@@ -118,4 +118,6 @@ check-mkmod-host:
 - tools/tests/test_mkmod.py
 - tools/tests/test_module_image.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
 artifact_reader: true

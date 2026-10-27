@@ -1,5 +1,6 @@
 /* LB-3: probe loopback, bounded IRQ/tick service and foreground packet API. */
 #include "e82557.h"
+#include "pci_bind.h"
 #include "e82557_eeprom.h"
 #include "e82557_desc.h"
 #include "kernel/dma_pool.h"

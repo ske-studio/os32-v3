@@ -25,6 +25,10 @@ FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffr
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
 MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "kernel/dma_pool.h"]
+MIRROR += ["include/pci_dev_contract.h", "include/pci_bind_contract.h",
+           "include/lan_contract.h", "drivers/pci_bind.h", "drivers/pci.h",
+           "drivers/pci_decode.h", "include/types.h", "kernel/lan_module.h",
+           "platform/pc98/lan_match.c"]
 MUTATIONS = [('drivers/e82557.c',
   'if (nic.tx == TX_ISSUED) tx_complete();',
   '/* send completion omitted */', 'send completion omitted'),
@@ -376,16 +380,24 @@ def host_build(tmp, mutated=None):
             dst = root / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(mutated[1] if rel == mutated[0] else (ROOT / rel).read_text())
-    # Compile the actual module bind table, preserving the LB PCI regression.
+    # Use the actual resident machine table with the real driver probe seam.
     facade = (ROOT / "kernel/lan_module.c").read_text()
     table = re.search(r"const struct pci_driver \*const drivers\[\] = \{.*?\};", facade, re.S)
     if not table or "pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));" not in facade:
         raise RuntimeError("LAN module bind table/call missing")
     (pathlib.Path(tmp) / "pci_table.h").write_text(
-        table.group().replace("drivers[]", "pci_drivers[]") +
-        "\n#define PCI_DRIVER_COUNT (sizeof(pci_drivers) / sizeof(pci_drivers[0]))\n")
+        '#define lan_module_probe e82557_probe\n#define e82557_driver platform_test_e82557_driver\n' +
+        '#include "' + str(root / 'platform/pc98/lan_match.c') + '"\n' +
+        '#undef e82557_driver\n#undef lan_module_probe\n' +
+        "static const struct pci_driver *platform_test_selected(void) {\n" +
+        table.group() + "\nreturn drivers[0];\n}\n" +
+        "#define pci_drivers ((const struct pci_driver *const[]){platform_test_selected()})\n" +
+        "#define PCI_DRIVER_COUNT (sizeof(pci_drivers) / sizeof(pci_drivers[0]))\n")
     exe = pathlib.Path(tmp) / "drv-host"
-    subprocess.run(["gcc", *FLAGS, *INCLUDES, "-I" + str(tmp), str(root / HARNESS.relative_to(ROOT)), "-o", str(exe)], check=True)
+    subprocess.run(["gcc", *FLAGS,
+                    *["-I" + str(root / p) for p in ("include", "drivers", "kernel")],
+                    *INCLUDES, "-I" + str(tmp), str(root / HARNESS.relative_to(ROOT)),
+                    "-o", str(exe)], check=True)
     return exe
 
 

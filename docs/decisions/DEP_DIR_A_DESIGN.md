@@ -221,7 +221,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 |段|新規ファイル（概算行数）|変更ファイル（各概算行数、生成物は再生成）|
 |---|---|---|
 |L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、kernel/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/kdebug_imports.def 7、build/pcm-module.mk・fm-module.mk・lan-module.mk の *_DEF_SOURCES 各1、kernel/lan_body.c 1・kernel/pcm_module.c 1（L02 の probe 表・L03 の IRQ 配線が残る間の具体 include）。hwdev の def は変更しない (B3)|
-|L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
+|L02|include/pci_dev_contract.h・pci_bind_contract.h 計150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・e82557.c 1・pci.h/pci_bind.h 各30–100・pci_decode.h 4、tools/prototypes/lan_imports.def 2、build/kernel.mk 2・lan-module.mk の LAN_DEF_SOURCES 2、tools/tests/test_lan_module.py・lan_module_host.c・test_e82557_drv.py とコピー一覧、新規 test_dep_dir_a_l02.py・dep_dir_a_l02_host.c、対応 checks.d/check_map.d|
 |L03|なし|kernel/pcm_module.c 15、drivers/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
 |L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|
 |L05a|include/ide_contract.h 70、platform/pc98/device_ide.c 45|include/platform_device.h 15、drivers/ide.h 70、sdk/kapi.json 12、build/kernel.mk 2、disk_auth_host.c 2|

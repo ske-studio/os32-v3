@@ -23,6 +23,9 @@
 
 #ifndef PCI_DECODE_CONSTANTS_H
 #define PCI_DECODE_CONSTANTS_H
+#define PCI_DEV_CONSTANTS_ONLY
+#include "pci_dev_contract.h"
+#undef PCI_DEV_CONSTANTS_ONLY
 
 #define PCI_CFG_WORD_LANE_MASK  2
 #define PCI_CFG_BYTE_LANE_MASK  3
@@ -85,7 +88,6 @@
 #define PCI_CFG_HEADER_TYPE     0x0E  /* u8。bit7 = マルチファンクション */
 #define PCI_CFG_BIST            0x0F  /* u8  */
 #define PCI_CFG_BAR0            0x10  /* u32 × 6 (0x10〜0x24) */
-#define PCI_CFG_BAR_COUNT       6
 #define PCI_CFG_BAR_STRIDE      4U
 #define PCI_BRIDGE_BAR_COUNT    2
 #define PCI_REVISION_MASK       0xffU

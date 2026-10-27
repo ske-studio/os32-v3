@@ -2,6 +2,8 @@
   "schema": 1,
   "contracts": [
     "include/lan_contract.h",
+    "include/pci_dev_contract.h",
+    "include/pci_bind_contract.h",
     "kernel/lan_module.h"
   ],
   "imports": [

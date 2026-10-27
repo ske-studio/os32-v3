@@ -26,3 +26,4 @@ check-recover-tables-host:
 - tools/tests/recover_tables_bounds.h
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
+- include/pci_dev_contract.h

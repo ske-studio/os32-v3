@@ -81,4 +81,7 @@ check-lan-module-host:
 - drivers/ide.h
 - include/lan_contract.h
 - include/dma_contract.h
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
+- platform/pc98/lan_match.c
 artifact_reader: true

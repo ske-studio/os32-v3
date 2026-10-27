@@ -53,4 +53,6 @@ check-dep-dir-a-l01-host:
 - kdebug/kselftest.c
 - kernel/dma_pool.c
 - kernel/kernel.c
+- include/pci_dev_contract.h
+- include/pci_bind_contract.h
 artifact_reader: true
