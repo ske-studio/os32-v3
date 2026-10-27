@@ -20,6 +20,7 @@
 #include "types.h"
 #include "idt.h"
 #include "io.h"
+#include "platform_timer.h"
 #include "sys.h"
 #include "time_math.h"
 #include "ktime.h"          /* 試験専用の注入口 (kselftest だけが使う) */
@@ -77,22 +78,13 @@ int sys_time_now(u32 *lo, u32 *hi)
     saved = irq_save();
     for (attempt = 0; attempt < TIME_RETRY_MAX; attempt++) {
         unsigned int count, t;
-        u8 c_lo, c_hi;
+        struct platform_timer_sample hw;
         int p1, p2;
 
-        /* 1. ラッチ前の IRR bit0 (既定も IRR だが明示する) */
-        outp(PIC1_CMD, OCW3_IRR);
-        p1 = (inp(PIC1_CMD) & 0x01) ? 1 : 0;
-
-        /* 2. カウンタ#0 をラッチして下位 → 上位 */
-        outp(PIT_MODE, PIT_LATCH_TIMER0);
-        c_lo = (u8)inp(PIT_CNTR0);
-        c_hi = (u8)inp(PIT_CNTR0);
-        count = ((unsigned int)c_hi << 8) | (unsigned int)c_lo;
-
-        /* 3. ラッチ後の IRR bit0 */
-        outp(PIC1_CMD, OCW3_IRR);
-        p2 = (inp(PIC1_CMD) & 0x01) ? 1 : 0;
+        platform_timer_sample(&hw);
+        p1 = hw.p1;
+        count = hw.count;
+        p2 = hw.p2;
 
         /* 4. tick (IF=0 の中なので 1〜3 の間は不変) */
         t = (unsigned int)tick_count;

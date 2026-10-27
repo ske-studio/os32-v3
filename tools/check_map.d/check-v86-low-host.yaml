@@ -63,4 +63,6 @@ check-v86-low-host:
 - tools/tests/owner_reclaim_host.c
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
+- kernel/platform_timer.h
+- platform/pc98/clock.c
 artifact_reader: true

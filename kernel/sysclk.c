@@ -2,14 +2,13 @@
 /*  SYSCLK.C — BIOS ワークエリア 0000:0501h bit7 のクロック判定             */
 /*                                                                          */
 /*  読むのは起動時の 1 回だけ (kernel.c、paging_init より前)。以後の利用者   */
-/*  (kernel/idt.c の pit_init / drivers/serial.c) は保存値だけを見る。       */
+/*  (kernel/pit.c の pit_init / drivers/serial.c) は保存値だけを見る。       */
 /*  経緯と検証は docs/POLICY_DEBUG.md §4-54。                               */
 /* ======================================================================== */
 
 #include "sysclk.h"
-#include "memmap.h"
 #include "pc98.h"
-#include "v86_bios.h"
+#include "platform_timer.h"
 
 /* 未判定のときの既定は従来どおり 1.9968MHz (NP21/W と 8MHz 系の値)。
  * ここを 0 にすると、万一 detect を呼び忘れたときに分周が 0 になる。 */
@@ -19,14 +18,14 @@ static u8 s_detected = 0;
 
 void sysclk_detect(void)
 {
-    u8 v;
+    struct platform_clock_value v;
 
     if (s_detected) {
         return;
     }
-    v = v86_bios_real_lowmem()[BIOS_WORK_SYSCLK];
-    s_is_8mhz = (u8)((v & BIOS_SYSCLK_8MHZ) ? 1 : 0);
-    s_hz = s_is_8mhz ? (unsigned long)SYSCLK_1997 : (unsigned long)SYSCLK_2458;
+    platform_clock_read(&v);
+    s_is_8mhz = v.is_8mhz;
+    s_hz = v.hz;
     s_detected = 1;
 }
 

@@ -9,3 +9,7 @@ check-time-math-host:
 - kernel/ktime.h
 - kernel/platform_irq.h
 - platform/pc98/pic.c
+- kernel/platform_timer.h
+- platform/pc98/clock.c
+- kernel/pit.c
+- platform/pc98/timer.c
