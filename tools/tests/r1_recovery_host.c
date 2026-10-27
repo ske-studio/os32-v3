@@ -143,6 +143,12 @@ void gfx_v86_return(void) { CHECK(!v86_session.open); }
 void kselftest_audit_v86_return(void) { CHECK(!v86_restore_mismatch); }
 static u8 host_low[MEM_CONV_END], host_mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
 void *v86_call_mailbox(void) { return host_mailbox; }
+/* A restore failure is outside these successful-return lifecycle cases. */
+void platform_fault_cell(u32 pos, u16 code, u8 attr)
+{
+    (void)pos; (void)code; (void)attr;
+    CHECK(0);
+}
 #include "v86_source.c"
 static void sputs(const char *s) { (void)s; }
 static void sput_hex32(u32 n) { (void)n; }

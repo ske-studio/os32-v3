@@ -29,4 +29,7 @@ check-tvram-auth-host:
 - kapi/kapi_sys.c
 # Finite include search roots in test_kapi_ranges.resolve.
 - sdk/include/os32/*.h
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h
 artifact_reader: true

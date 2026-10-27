@@ -14,6 +14,8 @@ from mkmod import Elf
 
 
 def run(folder, mutant=None):
+    (folder / 'platform_emergency.h').write_text((ROOT / 'kernel/platform_emergency.h').read_text())
+    (folder / 'emergency.c').write_text((ROOT / 'platform/pc98/emergency.c').read_text())
     for name in ('gdt', 'tss', 'idt', 'double_fault'):
         source = (ROOT / 'kernel' / (name + '.c')).read_text()
         if mutant == 'interrupt gate' and name == 'idt':
@@ -152,7 +154,8 @@ def main():
     end = elf.symbol('__kernel_resident_end')['value']
     symbols = {s['name']: s for table in elf.symtabs.values() for s in table}
     for name in ('gdt', 'idt', 'kernel_tss', 'df_tss', 'df_stack',
-                 'double_fault_entry', 'double_fault_halt', 'serial_puts_polled'):
+                 'double_fault_entry', 'double_fault_halt', 'serial_puts_polled',
+                 'platform_boot_puts', 'platform_fault_cell'):
         symbol = symbols[name]
         assert 0x100000 <= symbol['value'] and symbol['value'] + symbol['size'] <= end < 0x3e0000, name
     print('PASS product #DF code/GDT/IDT/TSS/stack in shared resident core')

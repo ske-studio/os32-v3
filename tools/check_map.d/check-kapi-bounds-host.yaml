@@ -32,4 +32,7 @@ check-kapi-bounds-host:
 - build/checks.d/check-kapi-bounds-host.mk
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h
 artifact_reader: true

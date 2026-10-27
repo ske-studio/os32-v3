@@ -4,6 +4,8 @@ check-kapi-print-host:
 - include/kprintf.h
 - lib/kprintf.c
 - lib/kprintf_attr.c
+- include/console_attr.h
+- platform/pc98/console_attr.c
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - exec/redir_access.c

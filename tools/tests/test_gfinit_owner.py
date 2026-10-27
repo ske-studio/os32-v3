@@ -51,7 +51,8 @@ MUTATIONS = [
 
 def command(exe):
     return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-            str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'lib/kprintf.c'), '-o', str(exe)]
+            str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'lib/kprintf.c'),
+            str(ROOT/'platform/pc98/console_attr.c'), str(ROOT/'platform/pc98/console.c'), '-o', str(exe)]
 
 def mutation(item):
     name, old, new = item[:3]

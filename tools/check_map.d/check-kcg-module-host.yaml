@@ -118,4 +118,6 @@ check-kcg-module-host:
 - platform/pc98/boot_names.c
 - drivers/ide.h
 - platform/pc98/boot.c
+- kernel/platform_display.h
+- platform/pc98/display.c
 artifact_reader: true

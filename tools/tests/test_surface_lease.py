@@ -64,6 +64,9 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
     sources = {k: (ROOT / p).read_text() for k, p in files.items()}
     with tempfile.TemporaryDirectory(prefix='os32-e2-') as directory:
         tmp = pathlib.Path(directory)
+        if 'v86' in files:
+            (tmp / 'platform_emergency.h').write_text(
+                (ROOT / 'kernel/platform_emergency.h').read_text())
         for key, body in sources.items():
             if key in ('lease', 'surface_query'): continue
             if key == 'v86':

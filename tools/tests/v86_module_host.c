@@ -58,6 +58,12 @@ int paging_v86_restore(struct v86_session_state *s)
 }
 void gfx_v86_return(void) { CHECK(restored && detached && session_ref); }
 void kselftest_audit_v86_return(void) { CHECK(session_ref); audited++; }
+/* A restore failure is outside these successful-return lifecycle cases. */
+void platform_fault_cell(u32 pos, u16 code, u8 attr)
+{
+    (void)pos; (void)code; (void)attr;
+    CHECK(0);
+}
 #include "v86_mem.c"
 
 void _start(void)

@@ -5,6 +5,15 @@ static void bundle_root_check(unsigned long root);
 #include "access_walk_host.c"
 #include "surface_query.h"
 #include "v86_mem.h"
+#include "platform_emergency.h"
+#include "memmap.h"
+#include "tvram.h"
+/* Keep fault output in the fixture's mapped TVRAM, without normal console. */
+void platform_fault_cell(u32 pos, u16 code, u8 attr)
+{
+    ((volatile u16 *)P2V_IO(TVRAM_BASE))[pos] = code;
+    ((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;
+}
 void *kmemset(void *dst, int value, u32 size)
 {
     for (u32 i = 0; i < size; i++) ((u8 *)dst)[i] = (u8)value;

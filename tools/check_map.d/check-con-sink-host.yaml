@@ -11,3 +11,6 @@ check-con-sink-host:
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
+- kernel/console_backend.h
+- platform/pc98/console.c
+- include/console_attr.h

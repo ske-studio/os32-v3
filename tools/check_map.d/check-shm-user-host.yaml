@@ -1,4 +1,5 @@
 check-shm-user-host:
+- kernel/platform_emergency.h
 - tools/tests/font_guard_inactive.h
 - gfx/backend_pegc.c
 - gfx/gfx_core.c

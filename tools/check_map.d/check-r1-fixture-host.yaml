@@ -84,4 +84,5 @@ check-r1-fixture-host:
 - tools/tests/mutpar.py
 - tools/gen_deploy_set.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- kernel/display_restore.h
 artifact_reader: true

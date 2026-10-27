@@ -66,4 +66,5 @@ check-v86-low-host:
 - userland/rust/libos32gui/src/shlib.rs
 - kernel/platform_timer.h
 - platform/pc98/clock.c
+- kernel/platform_emergency.h
 artifact_reader: true

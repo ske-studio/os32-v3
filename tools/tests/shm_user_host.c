@@ -3,6 +3,15 @@
 static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "v86.h"
 #include "idt.h"
+#include "platform_emergency.h"
+#include "memmap.h"
+#include "tvram.h"
+/* Keep fault output in the fixture's mapped TVRAM, without normal console. */
+void platform_fault_cell(u32 pos, u16 code, u8 attr)
+{
+    ((volatile u16 *)P2V_IO(TVRAM_BASE))[pos] = code;
+    ((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;
+}
 #include "paging.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"

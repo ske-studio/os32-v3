@@ -1,6 +1,7 @@
 """T5c-1: real KCG body, typed adapter/runtime, paired product and runtime RED."""
 import json
 import os
+import shutil
 from pathlib import Path
 import struct
 import subprocess
@@ -190,9 +191,16 @@ def product(folder):
 def main():
     with tempfile.TemporaryDirectory(prefix='kcg-module-') as td:
         folder = Path(td)
+        shutil.copyfile(ROOT / 'kernel/platform_display.h', folder / 'platform_display.h')
         product(folder)
         display_diagnostic(folder)
         adapter = (ROOT / 'kernel/kcg_module.c').read_text()
+        display = (ROOT / 'platform/pc98/display.c').read_text()
+        signature = 'void platform_display_kcg_code(void)\n{'
+        assert display.count(signature) == 1
+        start = display.index(signature)
+        end = display.index('\n}', start) + 2
+        (folder / 'kcg_display_code.inc').write_text(display[start:end] + '\n')
         body = (ROOT / 'kernel/kcg_body.c').read_text()
 
         def run(source, kind, modes, expected=0):
@@ -230,7 +238,7 @@ def main():
             graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
             boot_notice(folder, remove_notice=True)
             saved_adapter = adapter
-            for old in ('outp(MODE_FF1_PORT, MFF1_KCG_CODE);', 'public_api()->invalidate();'):
+            for old in ('platform_display_kcg_code();', 'public_api()->invalidate();'):
                 assert adapter.count(old) == 1
                 adapter = saved_adapter.replace(old, '')
                 run(body, 'body', [0], expected=1)

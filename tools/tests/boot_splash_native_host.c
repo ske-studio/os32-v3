@@ -34,6 +34,7 @@ const u8 *v86_bios_real_lowmem(void)
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
 #include "../../gfx/gfx_vram.c"
 #pragma GCC diagnostic pop
+#include "../../platform/pc98/splash.c"
 #include "../../kernel/boot_splash.c"
 
 volatile u32 tick_count;

@@ -18,3 +18,4 @@ check-recover-virtual:
 - build/kdebug.mk
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
+- kernel/display_restore.h

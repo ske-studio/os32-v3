@@ -128,6 +128,8 @@ def run(runner, mutation=None):
         raise
     with tempfile.TemporaryDirectory(prefix='e10a-shm-') as directory:
         work = Path(directory)
+        (work/'platform_emergency.h').write_text(
+            (ROOT/'kernel/platform_emergency.h').read_text())
         (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86_snapshot.c'], 'v86_bios_restore_real') + function(sources['kernel/v86_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
         consumer = function(sources['gfx/backend_pegc.c'], 'bios_flag')
         consumer += function(sources['gfx/backend_pegc.c'], 'pegc_identify')
