@@ -7,6 +7,7 @@
 #include "kpeek.h"
 
 #include "recover.h"
+#include "recover_diag.h"
 #include "recover_wire.h"
 #include "recover_virtual.h"
 #include "gfinit.h"
@@ -78,7 +79,7 @@ static int recovery_tx_end(struct recover *r, void *opaque, int rc)
     serial_checked_end();
     return rc;
 }
-#define RECOVERY_UART_POLL_LIMIT 65536U
+#define RECOVERY_UART_POLL_LIMIT RECOVER_CLEANUP_TRANSPORT_POLLS
 static struct recover_transport recovery_transport = {
     .get = recovery_rx,
     .uart = {recovery_tx_ready, recovery_tx_put, recover_hal_wait_frame},
@@ -156,6 +157,12 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
             if (ops) ops->release_work();
         }
         if (rc) return -1;
+    }
+    if (op == KDEBUG_OP_RECOVER_STATUS) {
+        const struct rec_tx_diag *d = recover_diag_get();
+        kprintf(ATTR_WHITE, "txd sid=%u valid=%u seq=%u pos=%u fn=%s rc=%d where=%s sent=%u polls=%u bytes=%u\n",
+            d->sid, d->valid, d->seq, d->pos, recover_diag_fn(d->fn), d->rc,
+            recover_diag_where(d->where), d->sent, d->polls, d->bytes);
     }
     *out = (KdebugRecover){r->token.session, r->state, r->reason,
         (r->s0_verified ? 1U : 0U) | (r->s1_verified ? 2U : 0U),

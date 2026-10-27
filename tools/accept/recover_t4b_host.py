@@ -62,15 +62,15 @@ def main(argv=None, clock=time.monotonic):
     parser.add_argument('--log', type=Path, required=True)
     parser.add_argument('--raw', type=Path, required=True)
     parser.add_argument('--drop', choices=('none', 'final', 'eot'), required=True)
-    parser.add_argument('--timeout', type=float, default=60)
-    parser.add_argument('--cleanup-timeout', type=float, default=40)
+    parser.add_argument('--timeout', type=float, default=recover.DEFAULT_TIMEOUT)
+    parser.add_argument('--cleanup-timeout', type=float, default=recover.DEFAULT_CLEANUP_TIMEOUT)
     args = parser.parse_args(argv)
     def save(data):
         args.state.write_text(json.dumps(data, sort_keys=True) + '\n')
 
     try:
         previous = json.loads(args.state.read_text())
-        records = recover.Records(args.session, previous)
+        records = recover.Records(args.session, previous, virtual=True)
         if previous.get('image_crc') != args.image_crc.lower():
             raise recover.RecoverError('saved boot CRC differs')
         with closing(recover.open_port(args.port, args.baud)) as port, \

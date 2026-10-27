@@ -145,6 +145,25 @@ static void accessor_tests(void)
 }
 static struct recover_plan_entry combined_entries[6];
 static struct recover_plan_dep combined_deps[2];
+static void cr1f_two_visit_test(u32 first, u32 initial_lock)
+{
+    u32 selects=0, data=0;
+    for(u32 i=first;i<actual_count;i++) {
+        const struct recover_target *t=&profile.targets[actual[i].key];
+        if(t->space!=REC_VGA_INDEXED || t->port!=RECOVER_CRTC ||
+           t->index!=RECOVER_CR1F)continue;
+        if(actual[i].dir==REC_SELECT)selects++;
+        if(actual[i].dir==REC_DATA) {
+            CHECK(actual[i].value==(data==0 || initial_lock==RECOVER_CR1F_UNLOCKED ?
+                RECOVER_CR1F_UNLOCK:RECOVER_CR1F_LOCK));
+            data++;
+        }
+    }
+    /* k=0 unlock and k=3 restore both visit CR1F. Each visit performs
+     * SELECT and DATA, each with write/readback BEGIN/END: 16 REC rows. */
+    CHECK(selects==2 && data==2);
+    output("bus: CR1F two visits, SELECT/DATA twice, 16 access REC rows\n");
+}
 static void production_plan(u32 initial_lock)
 {
     bus_setup();fixture();
@@ -204,12 +223,14 @@ static void production_plan(u32 initial_lock)
     }
     CHECK(total>100 && !core.capture_valid && pte==0x876540a5 && irq_state==1);
     core.state=REC_RESTORING;core.auth_phase=REC_RESTORE;core.in_opcode=false;core.restore_tick=0;
+    CHECK(!cleanup_budget_prepare(&core));
     CHECK(core.local_saved_count>0);
     u32 saved_count=core.local_saved_count;
     struct recover_local_saved saved[RECOVER_MAX_REGS];
     for(u32 i=0;i<saved_count;i++)saved[i]=core.local_saved[i];
     u32 cleanup_first=actual_count;
     CHECK(gfinit_bus_local_cleanup(&device,&core)==0 && !core.local_saved_count);
+    cr1f_two_visit_test(cleanup_first,initial_lock);
     const u32 cleanup_keys[]={11,12,10,11};
     const u32 cleanup_values[]={RECOVER_CR1F_UNLOCK,0,0,
         initial_lock==RECOVER_CR1F_UNLOCKED?RECOVER_CR1F_UNLOCK:RECOVER_CR1F_LOCK};

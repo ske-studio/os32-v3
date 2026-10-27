@@ -126,7 +126,7 @@ static void t3_access_tests(void)
 {
     t3_setup(true);
     CHECK(trial_step(&r, &r.token, true, t3_begin_failure, 0) < 0);
-    CHECK(t3_contains("event=RUNNING") && r.lost_lines && f.local_calls == 1);
+    CHECK(t3_contains("event=RUNNING") && r.lost_lines && f.local_calls == 0);
     /* Abort after the old-value read BEGIN, write BEGIN and verify BEGIN. */
     for (u32 at = 1; at <= 3; at++) {
         t3_setup(true); wire.mode = 2; wire.trigger = at;
@@ -175,6 +175,7 @@ static void t3_flush_tests(void)
         r.emitting = false;
     }
     t3_setup(false); r.profile = &profile; r.state = REC_RESTORING; r.in_s0 = true;
+    CHECK(!cleanup_budget_prepare(&r));
     t3_empty_calls = t3_empty_mode = 0;
     CHECK(recover_uart_flush(&r, t3_empty, &wire, 1042, 4) == 0);
     CHECK(r.uart_bytes == 0 && r.uart_polls == 3);
@@ -235,7 +236,7 @@ static void t3_safe_tests(void)
     /* A dead UART with frozen ticks must still leave the trial and cleanup. */
     t3_setup(true); wire.busy = true;
     CHECK(trial_step(&r, &r.token, true, change, 0) < 0);
-    CHECK(r.state == REC_FAILED && r.lost_lines > 0 && f.local_calls == 1);
+    CHECK(r.state == REC_FAILED && r.lost_lines > 0 && f.local_calls == 0);
     CHECK(wire.waits > 0 && wire.waits <= 32768 && f.tick == 0);
     /* Paused now only accepts the current token; disabled means no writes. */
     t3_setup(true); CHECK(recover_now_session(&r, r.token.session + 1) < 0 && writes() == 0);
@@ -294,6 +295,7 @@ static void t3_log_tests(void)
 static void t3_s0_tests(void)
 {
     t3_setup(false); r.profile = &profile; r.state = REC_RESTORING; r.in_s0 = true;
+    CHECK(!cleanup_budget_prepare(&r));
     struct text_fake text = {.cell = 0x1234};
     CHECK(recover_screen_98(&r, &text_ops, &text) == 0);
     CHECK(t3_contains("phase=screen event=BEGIN step=4") &&

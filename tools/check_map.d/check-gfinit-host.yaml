@@ -81,3 +81,6 @@ check-gfinit-host:
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
+- kdebug/recover_cleanup.h
+- kdebug/recover_diag.h
+- tools/tests/recover_cleanup_host.inc

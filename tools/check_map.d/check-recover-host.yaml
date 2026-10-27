@@ -28,3 +28,6 @@ check-recover-host:
 - kdebug/recover_wire.h
 - drivers/pci_decode.h
 - include/config.h
+- kdebug/recover_diag.h
+- tools/tests/recover_diag_host.inc
+- kdebug/recover_cleanup.h

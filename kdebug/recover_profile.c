@@ -4,6 +4,7 @@
  * only one latch/read. Never use tick/PIC-derived time for UART frame waits.
  */
 #include "recover.h"
+#include "recover_diag.h"
 #include "config.h"
 #include "memmap.h"
 #include "../kernel/idt.h"
@@ -116,24 +117,24 @@ int recover_hal_wait_frame(void *opaque, u32 frame_us)
     const struct pit_setup *ps=pit_get_setup();
     if (!ps || !ps->valid || ps->mode != PIT_MODE_TIMER0 || !ps->reload ||
         (ps->clk_hz != SYSCLK_1997 && ps->clk_hz != SYSCLK_2458) ||
-        !frame_us || frame_us >= ps->period_us) return -1;
+        !frame_us || frame_us >= ps->period_us) return REC_TX_PIT_CONFIG;
     /* Max accepted frame <10000us, clock <=2457600Hz. Split the
      * product to keep i386 arithmetic in u32 and round UP, never truncate. */
     if (ps->hz != PIT_HZ || ps->period_us != RECOVER_UART_US/PIT_HZ ||
-        ps->reload != ps->clk_hz/PIT_HZ) return -1;
+        ps->reload != ps->clk_hz/PIT_HZ) return REC_TX_PIT_CONFIG;
     u32 scaled=frame_us*(ps->clk_hz/PIT_CLOCK_DIV);
     u32 counts=scaled/PIT_PERIOD_SCALE+(scaled%PIT_PERIOD_SCALE!=0);
-    if (!counts || counts >= ps->reload) return -1;
+    if (!counts || counts >= ps->reload) return REC_TX_PIT_CONFIG;
     u32 previous=recover_pit_count(), elapsed=0;
-    if (previous > ps->reload) return -1;
+    if (previous > ps->reload) return REC_TX_PIT_COUNT;
     for (u32 i=0;i<RECOVER_WAIT_SAMPLES;i++) {
         u32 current=recover_pit_count();
-        if (current > ps->reload) return -1;
+        if (current > ps->reload) return REC_TX_PIT_COUNT;
         u32 delta=previous>=current ? previous-current:previous+ps->reload-current;
         if (delta >= counts-elapsed) return 0;
         elapsed+=delta; previous=current;
     }
-    return -1; /* finite even if the PIT stops */
+    return REC_TX_PIT_SAMPLES; /* finite even if the PIT stops */
 }
 
 int recover_indexed_cleanup(struct recover *r, const struct recover_local_step *steps,

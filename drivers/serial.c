@@ -25,6 +25,8 @@
 
 #define SER_MODE2_COUNT 3
 #define SER_POLL_WAIT_MASK 0xF
+#define SER_CHECKED_NOT_OWNED (-21)
+#define SER_CHECKED_NOT_READY (-22)
 
 /* 外部: 起動時に判定したシステムクロック (kernel/sysclk.h)。drivers/ は
  * カーネルヘッダを見ない作法なので extern で引く (kbd.c / ide.c と同じ)。
@@ -719,7 +721,8 @@ int serial_checked_ready(void)
 int serial_checked_put(u32 byte)
 {
     unsigned int f = irq_save();
-    if (serial_checked_ready() != 1) { irq_restore(f); return -1; }
+    int ready = serial_checked_ready();
+    if (ready != 1) { irq_restore(f); return ready < 0 ? SER_CHECKED_NOT_OWNED : SER_CHECKED_NOT_READY; }
     outp(s_port_data, (u8)byte);
     irq_restore(f);
     return 0;

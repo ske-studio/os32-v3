@@ -17,9 +17,10 @@ MUTATIONS = [
     ('raw_not_recorded', 'self.raw.write(chunk)', "self.raw.write(b'')"),
 ]
 ECHO = b'> recover virtual end 7\n'
-STATE = b'REC sid=7 seq=3 phase=state event=RESTORING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n'
-FINAL = b'REC sid=7 seq=4 phase=final event=END result=OK target=S0 verified=1 unknown=0 override=0 trial=0 lost_lines=0 discarded_bytes=0\n'
-DATA = ECHO + STATE + FINAL + b'\x04'
+STATE = b'REC sid=7 seq=3 phase=state event=RESTORING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13 cleanup_seconds=1\n'
+DIAG = b'REC sid=7 seq=4 phase=diag event=TX fail_seq=0 pos=0 fn=NONE rc=0 where=NONE sent=0 polls=0 bytes=0\n'
+FINAL = b'REC sid=7 seq=5 phase=final event=END result=OK target=S0 verified=1 unknown=0 override=0 saved=0 actual=0 trial=0 lost_lines=0 discarded_bytes=0 txd=0\n'
+DATA = ECHO + STATE + DIAG + FINAL + b'\x04'
 
 
 class PartialPort(Port):
@@ -38,16 +39,18 @@ def cases(module):
         with tempfile.TemporaryDirectory(prefix='t4b-host-case-') as directory:
             path = Path(directory)
             state, log, raw = [path / x for x in ('state', 'log', 'raw')]
-            state.write_text(json.dumps(dict(sid=7, seq=2, image_crc='1234abcd',
+            previous = module.recover.Records(7).data
+            previous.update(seq=2, image_crc='1234abcd',
                 crc=dict(version=1, profile_crc=11, plan_hash=12, snapshot_crc=13),
-                metadata_frozen=True, last_begin=None)))
+                metadata_frozen=True, paused=True)
+            state.write_text(json.dumps(previous))
             if scenario == 'bad-json':
                 state.write_text('{')
             elif scenario == 'bad-sid':
                 previous = json.loads(state.read_text())
                 previous['sid'] = 8
                 state.write_text(json.dumps(previous))
-            data = (ECHO + STATE.replace(b'RESTORING', b'PAUSED') + b'\x04'
+            data = (ECHO + STATE.replace(b'RESTORING', b'PAUSED').replace(b' cleanup_seconds=1', b'') + b'\x04'
                     if scenario == 'paused' else DATA)
             port = (PartialPort if scenario == 'partial' else Port)(data, split=split)
             closed = []
@@ -55,7 +58,7 @@ def cases(module):
             args = ['--port', 'fake', '--session', '7', '--image-crc', '1234abcd',
                     '--state', str(state), '--log', str(log), '--raw', str(raw),
                     '--drop', drop,
-                    '--timeout', '10', '--cleanup-timeout', '1']
+                    '--timeout', '10', '--cleanup-timeout', '6']
             printed = []
             module.print = printed.append  # per module: mutations run in threads
             errors = io.StringIO()
@@ -85,7 +88,7 @@ def cases(module):
             else:
                 assert port.writes == writes
             assert 'abort_frames=%d' % aborts in printed
-            assert port.t < 12 and closed == [True]
+            assert port.t < 17 and closed == [True]
             opened.assert_called_once_with('fake', 9600)
 
 

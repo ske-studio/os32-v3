@@ -23,3 +23,6 @@ check-recover-t3:
 - tools/rshell_peek.py
 - tools/rshell_serial.py
 - tools/serialfs_host.py
+- kdebug/recover_diag.h
+- tools/tests/recover_diag_host.inc
+- kdebug/recover_cleanup.h

@@ -134,7 +134,7 @@ static int local_cleanup(void *v)
 {
     struct fake *f = v; f->local_calls++;
     int rc = 0;
-    CHECK(f->core->restore_tick == f->tick);
+    CHECK((u32)(f->tick - f->core->restore_tick) < cb.ticks);
     if (f->owned) {
         CHECK(!f->screen_done);
         if (f->restore_index) {
@@ -550,10 +550,12 @@ static void owner_detach_tests(void)
     }
 }
 
+#include "recover_diag_host.inc"
+
 void _start(void)
 {
     preconditions(); normal(); mismatches(); timing(); callback_timing();
-    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests(); owner_detach_tests();
+    failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests(); owner_detach_tests(); diag_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");
     for (;;) { }

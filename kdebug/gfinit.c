@@ -284,6 +284,8 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
         bytes > (~0U - 1024U) / 2U) return -1;
     r->log_limit = (seconds * 2U + RECOVER_BUDGET_MARGIN_S) * PIT_HZ;
     transport->max_polls = bytes * 2U + 1024U;
+    if (transport->max_polls < RECOVER_CLEANUP_TRANSPORT_POLLS)
+        transport->max_polls = RECOVER_CLEANUP_TRANSPORT_POLLS;
     g->profile.crc = recover_profile_crc(&g->profile);
     return 0;
 }

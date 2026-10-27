@@ -17,6 +17,18 @@ def command(exe):
             '-o', str(exe)]
 
 MUTATIONS = [
+    ('cleanup_capacity_instead_actual', 'kdebug/recover_cleanup.h',
+     'cleanup_budget_compute(r, p, false, &next)', 'cleanup_budget_compute(r, p, true, &next)'),
+    ('cleanup_old_4096_pre', 'kdebug/recover_cleanup.h',
+     '    cb = next;', '    next.bytes = next.s0_bytes + 4096; cb = next;'),
+    ('cleanup_reserve_invaded', 'kdebug/recover.c',
+     'if (!r->in_s0) bytes -= cb.s0_bytes;', 'if (!r->in_s0) bytes -= 0;'),
+    ('cleanup_missing_local', 'kdebug/recover_cleanup.h',
+     'i < r->local_saved_count; i++', 'i < 0 * r->local_saved_count; i++'),
+    ('cleanup_cr1f_once', 'kdebug/recover_cleanup.h',
+     'pairs += t->index == RECOVER_CR1F ? 2 * n : n;', 'pairs += n;'),
+    ('cleanup_overflow_allowed', 'kdebug/recover_cleanup.h',
+     'count >= RECOVER_HALF_TICKS', 'false'),
     ('indexed_read_rejected', 'kdebug/recover.c',
      'return a->value < p->target_count && p->targets[a->value].read_safe;',
      'return a->value < p->target_count && p->targets[a->value].read_safe && p->targets[a->value].space != REC_VGA_INDEXED;'),

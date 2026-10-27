@@ -264,7 +264,7 @@ static void checked_tx(void)
     reset();
     ser_initialized=0;
     CHECK(serial_checked_begin()<0);
-    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')<0);
+    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')==-21);
     ser_initialized=1;
     serial_gate_set(1);CHECK(serial_checked_begin()<0);serial_gate_set(0);
     CHECK(serial_checked_begin()==0 && serial_checked_begin()<0);
@@ -279,7 +279,7 @@ static void checked_tx(void)
         s_setup.mode=mode;s_port_cmd=serial_cmd_port(mode);
         s_port_data=serial_data_port(mode);s_mask_txrdy=serial_txrdy_mask(mode);
         g_checked_status=0;
-        CHECK(serial_checked_ready()==0 && serial_checked_put('x')<0 && !serial_checked_empty());
+        CHECK(serial_checked_ready()==0 && serial_checked_put('x')==-22 && !serial_checked_empty());
         int before=g_tx_n;
         g_checked_status=s_mask_txrdy;
         CHECK(serial_checked_ready()==1 && serial_checked_empty()==0);
@@ -288,7 +288,7 @@ static void checked_tx(void)
         CHECK(serial_checked_empty()==1 && serial_checked_ready()==0);
     }
     serial_checked_end();
-    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')<0);
+    CHECK(serial_checked_ready()<0 && serial_checked_empty()<0 && serial_checked_put('x')==-21);
     g_checked_status=-1;
     serial_init(9600);g_tx_n=0;serial_putchar('z');CHECK(g_tx_n==1 && g_tx[0]=='z');
 }
