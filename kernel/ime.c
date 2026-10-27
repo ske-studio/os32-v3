@@ -334,7 +334,7 @@ static void commit_candidate(void)
 
 /* === 変換候補表示中 (IME_ST_CONVERT / IME_ST_CANDLIST) の操作 ===
  * 戻り値は ime_process_key と同じ。その他のキーは候補を確定して -1 (透過) を返し、
- * 通常入力の処理には回さない。 */
+ * 通常入力の処理には回さない。印字可能文字は確定文字列の末尾へ積む。 */
 static inline int ime_candidate_key(u8 ascii, u8 scancode)
 {
     int n;
@@ -485,6 +485,16 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
         preedit_draw();
     } else {
         preedit_clear();
+    }
+    /* Deliver the confirmed candidate before the printable key, through the
+     * same queue for CUI readers and the WM. Candidate storage leaves room
+     * for one ASCII byte and the terminator. */
+    STATIC_ASSERT(sizeof(g_ime.commit_buf) > sizeof(g_ime.results[0].kanji),
+                  ime_candidate_ascii_capacity);
+    if (ascii >= ASCII_PRINT_FIRST && ascii <= ASCII_PRINT_LAST) {
+        g_ime.commit_buf[g_ime.commit_len++] = (char)ascii;
+        g_ime.commit_buf[g_ime.commit_len] = '\0';
+        return 1;
     }
     return -1;
 }

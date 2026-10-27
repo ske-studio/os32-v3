@@ -99,10 +99,10 @@ int ime_dict_reopen(IME_Dict *d, const char *p)
 { reopens++; return ime_dict_open(d, p); }
 int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int max)
 {
-    (void)y; (void)max;
+    (void)max;
     if (d != shared_dict) return 0;
     searches++;
-    kstrncpy(r[0].kanji, "亜", sizeof(r[0].kanji));
+    kstrncpy(r[0].kanji, kstrcmp(y, "かんじ") == 0 ? "換字" : "亜", sizeof(r[0].kanji));
     kstrncpy(r[1].kanji, "阿", sizeof(r[1].kanji));
     return 2;
 }
@@ -229,6 +229,45 @@ static int delivery(void)
     CHECK(kbd_inject((const u8 *)"ki", 2) == 2 && ime_getkey_kapi() == 'k' &&
           ime_getchar_kapi() == 'i' && equal_state(&saved), "GUI blocking readers bypass FEP");
     say("PASS X11 CUI/WM delivery\n"); return 0;
+}
+
+/* Candidate confirmation must precede the printable key that ends conversion.
+ * Exercise all CUI readers through the real cooked queue, plus the WM feed.
+ * Dictionary storage/rendering remain the fixture seams described above. */
+static int candidate_order(void)
+{
+    int (*readers[])(void) = {ime_trygetchar, ime_trygetkey,
+                             ime_getchar, ime_getkey,
+                             ime_getchar_kapi, ime_getkey_kapi};
+    const u8 spelling[] = {0x24, 0x1d, 0x2e, 0x23, 0x17}; /* kanji */
+    const u8 expected[] = "換字a";
+    for (int list = 0; list < 2; list++) {
+        for (u32 reader = 0; reader <= sizeof(readers)/sizeof(readers[0]); reader++) {
+            int gui = reader == sizeof(readers)/sizeof(readers[0]);
+            reset(); ime_toggle();
+            for (u32 i = 0; i < sizeof(spelling); i++) key(spelling[i]);
+            key(KEY_SPACE);
+            if (list) key(KEY_XFER);
+            /* Polls build the real preedit/candidate state without blocking. */
+            while (kbd_count) CHECK(ime_trygetkey() == -1, "IMEORDER composing consumed");
+            CHECK(g_ime.state == (list ? IME_ST_CANDLIST : IME_ST_CONVERT) &&
+                  kstrcmp(g_ime.results[0].kanji, "換字") == 0,
+                  "IMEORDER kanji conversion ready");
+            if (!gui) key(0x1d); /* a */
+            int before_learns = learns;
+            for (u32 i = 0; i < sizeof(expected) - 1; i++) {
+                int ch = gui ? ime_feed_key(i ? -1 : (0x1d << 8) | 'a') : readers[reader]();
+                CHECK(ch == expected[i], "IMEORDER candidate before typed ASCII");
+            }
+            CHECK(learns == before_learns + 1 && !g_ime.kana_len &&
+                  g_ime.state == IME_ST_INPUT && !g_ime.result_count,
+                  "IMEORDER confirmed once without new preedit");
+            CHECK((gui ? ime_feed_key(-1) : ime_trygetkey()) == -1,
+                  "IMEORDER no duplicate tail");
+        }
+    }
+    say("PASS IMEORDER six CUI readers and WM feed: 換字a, CONVERT/CANDLIST\n");
+    return 0;
 }
 
 /* IMEIND-1: real CUI keyboard/FEP path; renderer cells model the visible row.
@@ -514,7 +553,7 @@ void _start(void)
 {
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
-    int rc = unpublished() || modes() || delivery() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
+    int rc = unpublished() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
