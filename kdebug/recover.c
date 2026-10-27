@@ -1,5 +1,6 @@
 #include "recover.h"
 #include "recover_wire.h"
+#include "recover_diag.h"
 #include "../lib/crc32_core.inc"
 
 static int cleanup(struct recover *r);
@@ -16,6 +17,38 @@ static bool raw_matches(struct recover *r, bool memory);
 static void select_record(const struct recover *r, u32 node, u32 *bits);
 static bool extent_ok(const struct recover_profile *p, const struct recover_target *t,
                       const struct recover_bar_extent bars[RECOVER_BAR_COUNT]);
+
+static struct rec_tx_diag txd;
+static u32 tx_pos, tx_sent, tx_where;
+const struct rec_tx_diag *recover_diag_get(void) { return &txd; }
+const char *recover_diag_fn(u32 fn)
+{
+    static const char *const names[] = {"NONE", "READY", "PUT", "WAIT_FRAME",
+        "PIT_WAIT", "BEGIN", "EMPTY", "BUDGET", "ROW"};
+    return fn <= REC_TX_ROW ? names[fn] : names[0];
+}
+const char *recover_diag_where(u32 where)
+{
+    static const char *const names[] = {"NONE", "BYTE", "BUSY_WAIT", "AFTER_PUT",
+        "FLUSH", "SEPARATOR", "BUILD"};
+    return where <= REC_TX_BUILD ? names[where] : names[0];
+}
+static void tx_fail(struct recover *r, u32 fn, int rc)
+{
+    if (!txd.active || txd.valid) return;
+    txd.sid = r->token.session; txd.seq = r->seq; txd.pos = tx_pos;
+    txd.fn = fn; txd.rc = rc; txd.where = tx_where; txd.sent = tx_sent;
+    txd.polls = r->uart_polls; txd.bytes = r->uart_bytes; txd.valid = 1;
+}
+static void tx_wait_fail(struct recover *r, int rc)
+{
+    tx_fail(r, rc <= REC_TX_PIT_CONFIG && rc >= REC_TX_PIT_SAMPLES ?
+        REC_TX_PIT_WAIT : REC_TX_WAIT_FRAME, rc);
+}
+
+static u32 width_mask(u32 n);
+static bool zero_target(const struct recover_target *t);
+#include "recover_cleanup.h"
 
 /* CRC words have canonical little-endian encoding, never C padding/pointers. */
 static u32 crc_word(u32 crc, u32 word)
@@ -242,21 +275,24 @@ static void receive_boundary(struct recover *r)
     fail(r, REC_CONTRACT, REC_PHASE_NONE, 0);
 }
 
-struct rec_row { char data[RECOVER_ROW_MAX]; u32 n; };
+struct rec_row { char data[RECOVER_ROW_MAX]; u32 n, overflow; };
 static void row_text(struct rec_row *b, const char *s)
 {
-    while (*s && b->n < sizeof(b->data) - 1) b->data[b->n++] = *s++;
+    while (*s) {
+        if (b->n >= sizeof(b->data) - 1) { b->overflow = 1; return; }
+        b->data[b->n++] = *s++;
+    }
 }
 static void row_number(struct rec_row *b, const char *name, u32 v)
 {
     char digits[10]; u32 n = 0;
     row_text(b, name);
     do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v);
-    while (n && b->n < sizeof(b->data) - 1) b->data[b->n++] = digits[--n];
+    while (n) { char digit[2] = {digits[--n], 0}; row_text(b, digit); }
 }
 static void row_start(struct recover *r, struct rec_row *b, const char *phase, const char *event)
 {
-    b->n = 0;
+    b->n = 0; b->overflow = 0;
     row_number(b, "REC sid=", r->token.session);
     row_number(b, " seq=", ++r->seq);
     row_text(b, " phase="); row_text(b, phase);
@@ -266,30 +302,43 @@ static int row_send(struct recover *r, struct rec_row *b)
 {
     const struct recover_transport *t = r->transport;
     if (!t) return 0;
+    txd.active = 1; tx_pos = tx_sent = 0; tx_where = REC_TX_BUILD;
     row_text(b, "\n");
+    if (b->overflow) {
+        tx_fail(r, REC_TX_ROW, REC_TX_OVERFLOW); txd.active = 0;
+        r->lost_lines++; fail(r, REC_LOG, REC_PHASE_NONE, 0); return -1;
+    }
     /* Close the preceding execution interval before attributing UART time. */
     bool timed = r->log_limit && r->in_call;
     if (timed) account(r);
     r->emitting = true;
+    tx_where = REC_TX_NOWHERE;
     int rc = t->begin ? t->begin(t->opaque) : 0;
+    if (rc) tx_fail(r, REC_TX_BEGIN, rc);
     bool owned = !rc;
     /* A truncated row must not absorb the next restore record. Charge the
      * separator to the same checked UART allocation as that next record. */
     if (!rc && r->log_partial) {
+        tx_pos = tx_sent = 0; tx_where = REC_TX_SEPARATOR;
         rc = recover_uart_byte(r, &t->uart, t->opaque, '\n', t->frame_us, t->max_polls);
         if (!rc) r->log_partial = false;
     }
     for (u32 i = 0; !rc && i < b->n; i++) {
+        tx_pos = i + 1; tx_sent = 0; tx_where = REC_TX_BYTE;
         if (recover_uart_byte(r, &t->uart, t->opaque, (u8)b->data[i], t->frame_us, t->max_polls)) {
             rc = -1; break;
         }
     }
-    if (owned && t->end && t->end(r, t->opaque, rc)) rc = -1;
+    tx_pos = b->n + 1; tx_sent = 0; tx_where = REC_TX_FLUSH;
+    if (owned && t->end && t->end(r, t->opaque, rc)) {
+        tx_fail(r, REC_TX_EMPTY, -1); rc = -1;
+    }
+    txd.active = 0;
     if (timed) account(r);
     r->emitting = false;
     if (rc) r->log_partial = true;
     if (rc) { r->lost_lines++; fail(r, REC_LOG, REC_PHASE_NONE, 0); }
-    return rc;
+    return rc ? -1 : 0;
 }
 int recover_record(struct recover *r, const char *phase, const char *event,
                    u32 step, u32 addr, int rc, u32 elapsed)
@@ -355,6 +404,21 @@ static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
     }
     return row_send(r, &b);
 }
+static void transport_diag(struct recover *r)
+{
+    if (txd.attempted) return;
+    txd.attempted = 1;
+    struct rec_row b;
+    row_start(r, &b, "diag", "TX");
+    row_number(&b, " fail_seq=", txd.seq); row_number(&b, " pos=", txd.pos);
+    row_text(&b, " fn="); row_text(&b, recover_diag_fn(txd.fn));
+    row_text(&b, " rc="); if (txd.rc < 0) row_text(&b, "-");
+    row_number(&b, "", txd.rc < 0 ? 0U - (u32)txd.rc : (u32)txd.rc);
+    row_text(&b, " where="); row_text(&b, recover_diag_where(txd.where));
+    row_number(&b, " sent=", txd.sent); row_number(&b, " polls=", txd.polls);
+    row_number(&b, " bytes=", txd.bytes);
+    (void)row_send(r, &b);
+}
 static int transport_state(struct recover *r, enum recover_state s)
 {
     if (!r->transport) return 0;
@@ -365,6 +429,7 @@ static int transport_state(struct recover *r, enum recover_state s)
             row_number(&b, " discarded_bytes=", r->discarded_bytes);
             (void)row_send(r, &b);
         }
+        transport_diag(r);
         row_start(r, &b, "final", "END");
         row_text(&b, r->failed ? " result=FAIL" : r->s1_verified ? " result=OK" : " result=PARTIAL");
         row_text(&b, " target=S0");
@@ -376,6 +441,7 @@ static int transport_state(struct recover *r, enum recover_state s)
         row_number(&b, " trial=", r->reason);
         row_number(&b, " lost_lines=", r->lost_lines);
         row_number(&b, " discarded_bytes=", r->discarded_bytes);
+        row_number(&b, " txd=", txd.valid);
     } else {
         static const char *const names[] = {"IDLE", "SNAPSHOTTING", "ARMED", "RUNNING", "PAUSED", "RESTORING"};
         row_start(r, &b, "state", names[s]);
@@ -383,6 +449,7 @@ static int transport_state(struct recover *r, enum recover_state s)
         row_number(&b, " profile_crc=", r->token.profile_crc);
         row_number(&b, " plan_hash=", r->token.plan_hash);
         row_number(&b, " snapshot_crc=", r->token.snapshot_crc);
+        if (s == REC_RESTORING) row_number(&b, " cleanup_seconds=", cb.seconds);
     }
     return row_send(r, &b);
 }
@@ -412,6 +479,7 @@ int recover_now_session(struct recover *r, u32 session)
         !p->restore_log_bytes || p->s0_reserve_ticks || p->s0_reserve_polls ||
         p->s0_reserve_bytes) return -1;
     r->profile = p;
+    txd = (struct rec_tx_diag){0};
     r->token = (struct recover_token){ .session = ++r->next_session,
         .profile_version = r->profile->version, .profile_crc = r->profile->crc };
     r->s0_only = true; r->reason = REC_ABORT;
@@ -752,14 +820,15 @@ static void account(struct recover *r)
 
 static bool restore_time(struct recover *r)
 {
-    u32 limit = r->profile->restore_limit;
-    u32 polls = r->profile->restore_max_polls;
+    u32 limit = cb.ticks;
+    u32 polls = cb.polls;
     if (!r->in_s0) {
-        limit -= r->profile->s0_reserve_ticks;
-        polls -= r->profile->s0_reserve_polls;
+        limit -= cb.s0_ticks;
+        polls -= cb.s0_polls;
     }
     if ((u32)(r->ops->ticks(r->opaque) - r->restore_tick) < limit &&
         r->restore_polls < polls) return true;
+    tx_fail(r, REC_TX_BUDGET, r->restore_polls >= polls ? REC_TX_POLLS : REC_TX_TIME);
     fail(r, REC_TIMEOUT, REC_PHASE_RESTORE, 0);
     return false;
 }
@@ -774,36 +843,56 @@ int recover_restore_point(struct recover *r)
 /* The initial TxRDY check is part of this character's poll, not an extra
  * poll. Each unsuccessful frame consumes one more unit. No serial driver is
  * called here; T3 supplies these bounded UART callbacks. */
+static int tx_point(struct recover *r)
+{
+    int rc = r->state == REC_RESTORING ? recover_restore_point(r) : call_point(r, false);
+    if (rc) tx_fail(r, REC_TX_BUDGET, REC_TX_POINT);
+    return rc;
+}
+static int tx_time(struct recover *r)
+{
+    int rc = r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r);
+    if (rc) tx_fail(r, REC_TX_BUDGET, REC_TX_TIME);
+    return rc;
+}
 int recover_uart_byte(struct recover *r, const struct recover_uart_ops *ops,
                       void *opaque, u32 byte, u32 frame_us, u32 max_polls)
 {
     if (!ops || !ops->ready || !ops->put || !ops->wait_frame ||
         !frame_us || !max_polls || byte > 255) return -1;
     for (;;) {
-        if (r->uart_polls >= max_polls) break;
-        if (r->state == REC_RESTORING) {
-            u32 bytes = r->profile->restore_log_bytes;
-            if (!r->in_s0) bytes -= r->profile->s0_reserve_bytes;
-            if (r->uart_bytes >= bytes) break;
+        if (r->uart_polls >= max_polls) {
+            tx_fail(r, REC_TX_BUDGET, REC_TX_POLLS); break;
         }
         if (r->state == REC_RESTORING) {
-            if (recover_restore_point(r)) return -1;
-        } else {
-            if (call_point(r, false)) return -1;
+            u32 bytes = cb.bytes;
+            if (!r->in_s0) bytes -= cb.s0_bytes;
+            if (r->uart_bytes >= bytes) {
+                tx_fail(r, REC_TX_BUDGET, REC_TX_BYTES); break;
+            }
         }
+        if (tx_point(r)) return -1;
         r->uart_polls++;
         int ready = ops->ready(opaque);
-        if (ready < 0) break;
-        if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
+        if (ready < 0) { tx_fail(r, REC_TX_READY, ready); break; }
+        if (tx_time(r)) return -1;
         if (ready) {
             r->uart_bytes++;
-            if (ops->put(opaque, byte)) break;
-            if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
-            if (ops->wait_frame(opaque, frame_us)) break;
-            if (r->state == REC_RESTORING) return restore_time(r) ? 0 : -1;
-            return check_deadline(r);
+            tx_sent = 0;
+            int rc = ops->put(opaque, byte);
+            if (rc) { tx_fail(r, REC_TX_PUT, rc); break; }
+            tx_sent = 1;
+            if (tx_where != REC_TX_SEPARATOR) tx_where = REC_TX_AFTER_PUT;
+            if (tx_time(r)) return -1;
+            rc = ops->wait_frame(opaque, frame_us);
+            if (rc) { tx_wait_fail(r, rc); break; }
+            return tx_time(r);
         }
-        if (ops->wait_frame(opaque, frame_us)) break;
+        if (tx_where != REC_TX_SEPARATOR) tx_where = REC_TX_BUSY_WAIT;
+        tx_sent = 0;
+        int rc = ops->wait_frame(opaque, frame_us);
+        if (rc) { tx_wait_fail(r, rc); break; }
+        if (tx_where != REC_TX_SEPARATOR) tx_where = REC_TX_BYTE;
     }
     fail(r, REC_LOG, REC_PHASE_NONE, 0);
     return -1;
@@ -815,14 +904,16 @@ int recover_uart_flush(struct recover *r, int (*empty)(void *), void *opaque,
     if (!r->transport || !r->transport->uart.wait_frame || !empty ||
         !frame_us || !max_polls) return -1;
     while (r->uart_polls < max_polls) {
-        if (r->state == REC_RESTORING ? recover_restore_point(r) : call_point(r, false)) return -1;
+        if (tx_point(r)) return -1;
         r->uart_polls++;
         int ready = empty(opaque);
-        if (ready < 0) break;
-        if (r->state == REC_RESTORING ? !restore_time(r) : check_deadline(r)) return -1;
+        if (ready < 0) { tx_fail(r, REC_TX_EMPTY, ready); break; }
+        if (tx_time(r)) return -1;
         if (ready) return 0;
-        if (r->transport->uart.wait_frame(opaque, frame_us)) break;
+        int rc = r->transport->uart.wait_frame(opaque, frame_us);
+        if (rc) { tx_wait_fail(r, rc); break; }
     }
+    tx_fail(r, REC_TX_BUDGET, REC_TX_POLLS);
     fail(r, REC_LOG, REC_PHASE_NONE, 0);
     return -1;
 }
@@ -995,6 +1086,7 @@ static int cleanup(struct recover *r)
      * Only the first entry owns restoration and its deadline/poll budget. */
     if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
         r->state == REC_FAILED) return -1;
+    if (cleanup_budget_prepare(r)) fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0);
     r->in_call = false; r->in_opcode = false;
     r->cursor = RECOVER_NONE; r->entered = false;
     r->auth_phase = REC_RESTORE;
@@ -1002,10 +1094,10 @@ static int cleanup(struct recover *r)
     r->restore_tick = r->ops->ticks(r->opaque);
     for (u32 i = 0; i < RECOVER_RULE_MAX / BITS_PER_U32; i++) r->restored_rules[i] = 0;
     r->restore_polls = 0; r->uart_polls = 0; r->uart_bytes = 0; r->in_s0 = false;
+    state(r, REC_RESTORING);
     if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
-    state(r, REC_RESTORING);
     bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
     /* A partial snapshot is usable only for its completed safe entries. Never
      * execute trial writes unless valid; preparation failure still cleans up. */
@@ -1111,6 +1203,13 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
         !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) {
         release_plan(r); return -1;
     }
+    if (p->expected_device == RECOVER_GF_DEVICE) {
+        struct rec_cleanup_budget maximum;
+        if (cleanup_budget_compute(r, p, true, &maximum) ||
+            (r->transport && maximum.polls > r->transport->max_polls)) {
+            release_plan(r); return -1;
+        }
+    }
     struct recover_identity id;
     if (r->ops->identity(r->opaque, &id) ||
         (p->expected_device && (id.bdf != p->expected_bdf || id.device != p->expected_device)) ||
@@ -1159,6 +1258,7 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     r->s0_only = false;
     r->seq = 0; r->lost_lines = 0; r->discarded_bytes = 0;
     r->profile = p;
+    txd = (struct rec_tx_diag){0};
     r->token = (struct recover_token){ .session = ++r->next_session,
         .profile_crc = p->crc, .profile_version = p->version,
         .plan_hash = plan_hash, .identity = id };

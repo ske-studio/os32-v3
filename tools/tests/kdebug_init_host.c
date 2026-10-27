@@ -5,11 +5,17 @@
 #include "kernel/v86_gcap.h"
 #include "kdebug/kpeek.h"
 #include "kdebug/recover.h"
+#include "kdebug/recover_diag.h"
 #include "drivers/serial.h"
 #include "hwdev_private.h"
 #include "kdebug/gfinit.h"
 #include "kdebug/recover_wire.h"
 static unsigned calls;
+static unsigned status_diag_lines;
+const struct rec_tx_diag *recover_diag_get(void)
+{ static const struct rec_tx_diag diag={0}; return &diag; }
+const char *recover_diag_fn(u32 fn) { (void)fn; return "NONE"; }
+const char *recover_diag_where(u32 where) { (void)where; return "NONE"; }
 #ifdef HWDEV_DISPATCH
 static int dispatch_tests(const struct kdebug_ops *);
 static unsigned loaded, recover_done, release_calls, module_calls, attach_calls;
@@ -18,6 +24,12 @@ static int recover_rc;
 void kprintf(unsigned char color, const char *format, ...)
 {
     (void)color; (void)format;
+    if(format[0]=='t' && format[1]=='x' && format[2]=='d' && format[3]==' ') {
+        const char *expected="txd sid=%u valid=%u seq=%u pos=%u fn=%s rc=%d where=%s sent=%u polls=%u bytes=%u\n";
+        unsigned i=0;
+        while(expected[i] && expected[i]==format[i])i++;
+        status_diag_lines+=expected[i]==format[i] ? 1:100;
+    }
     calls++;
 }
 void crt_diag_bootlog(void) { calls++; }
@@ -175,6 +187,7 @@ static int dispatch_tests(const struct kdebug_ops *ops)
         if (ops->dbg_call(op, buf, sizeof(buf)) != -1 || module_calls || attach_calls || buf[0] != 0) return 1;
     }
     if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf))) return 1;
+    if (status_diag_lines != 1) return 1;
     if (ops->dbg_call(KDEBUG_OP_RECOVER_NOW, buf, sizeof(buf)) || release_calls) return 1;
     loaded = 1;
     for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {

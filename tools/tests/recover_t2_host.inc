@@ -68,6 +68,7 @@ static void texts(void)
     /* 8 callbacks: decode, restore, save, test W/R, restore W/R, redraw. */
     for (u32 fault=0;fault<=8;fault++) {
         setup(false); r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
         struct text_fake t={.cell=0x1234,.saved=0x1234,.fail_at=fault};
         int rc=recover_screen_98(&r,&text_ops,&t);
         CHECK((rc==0)==(fault==0));
@@ -77,10 +78,12 @@ static void texts(void)
     }
     for(u32 corrupt=5;corrupt<=7;corrupt+=2) {
         setup(false); r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
         struct text_fake t={.cell=0x42,.corrupt_at=corrupt};
         CHECK(recover_screen_98(&r,&text_ops,&t)<0 && t.cell==0x42);
     }
     setup(false); r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
     struct text_fake t={.gui=true};
     CHECK(recover_screen_98(&r,&text_ops,&t)<0 && !t.calls && !t.writes);
 }
@@ -199,6 +202,7 @@ static void budgets(void)
         CHECK(profile.s0_reserve_ticks==(kind ? 10000000U:0U));
         CHECK(profile.s0_reserve_polls==(kind ? 16384U:0U));
         r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
         struct uart_fake u={0};
         for(u32 i=0;i<bytes[kind];i++) CHECK(!recover_uart_byte(&r,&uart_ops,&u,65,1042,polls[kind]));
         CHECK(r.uart_polls==bytes[kind] && r.restore_polls==bytes[kind]);
@@ -227,9 +231,10 @@ static void budgets(void)
     CHECK(recover_budget_apply(&profile,0,100,4800,10,&work)<0);
     CHECK(!recover_budget_apply(&profile,0,100,9600,10,&work) && profile.restore_limit==1000);
     r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
     struct uart_fake u={.busy=2};
     /* µs fake clock here, independent of the 100Hz conversion assertion. */
-    profile.restore_limit=10000000;
+    profile.restore_limit=10000000; CHECK(!cleanup_budget_prepare(&r));
     CHECK(!recover_uart_byte(&r,&uart_ops,&u,65,1042,10));
     CHECK(r.uart_polls==3 && u.waits==3 && u.puts==1 && r.restore_polls==3);
     u.busy=~0U; f.tick=0; r.restore_tick=0;
@@ -244,10 +249,11 @@ static void delays(void)
 {
     setup(false); profile.restore_limit=10000000;
     r.profile=&profile; r.state=REC_RESTORING; r.in_s0=true;
+        CHECK(!cleanup_budget_prepare(&r));
     struct uart_fake u={0};
     CHECK(!recover_delay_ms(&r,3,uart_wait,&u));
     CHECK(u.waits==3 && u.frame==1000 && f.tick==3000 && r.restore_polls==3);
-    profile.restore_limit=4500;
+    profile.restore_limit=4500; CHECK(!cleanup_budget_prepare(&r));
     CHECK(recover_delay_ms(&r,10,uart_wait,&u)<0 && u.waits==5 && r.failed);
     CHECK(r.reason==REC_TIMEOUT);
 }
@@ -304,6 +310,7 @@ static void a1_failed_config(void)
 static void size_tail_setup(u32 max_polls)
 {
     setup(false); CHECK(!recover_gf_profile(&profile,false,REC_BUDGET_SIZE_BARS,100));
+    profile.expected_device=0; /* synthetic default-budget tail boundaries */
     profile.restore_limit=33; profile.s0_reserve_ticks=10;
     profile.s0_reserve_polls=0; profile.restore_max_polls=max_polls;
     profile.layouts=layouts; profile.layout_count=1; profile.crc=recover_profile_crc(&profile);

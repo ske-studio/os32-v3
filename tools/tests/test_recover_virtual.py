@@ -9,8 +9,8 @@ import mutpar
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/recover_virtual.c'
 MUTATIONS = [
-    ('uart_poll_limit_removed', 'if (r->uart_polls >= max_polls) break;',
-     'if (r->uart_polls >= max_polls && 0) break;'),
+    ('uart_poll_limit_removed', 'if (r->uart_polls >= max_polls) {',
+     'if (r->uart_polls >= max_polls && 0) {'),
     ('tx_injection_not_cleared', 'tx_busy = false;', '(void)tx_busy;'),
     ('step_poll_limit_removed',
      '++r->polls > r->profile->max_polls)',

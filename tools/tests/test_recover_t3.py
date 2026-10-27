@@ -19,8 +19,8 @@ MUTATIONS = [
     ('t3_flush_busy_ignored', 'int ready = empty(opaque);', 'int ready = 1; (void)empty(opaque);'),
     ('t3_flush_poll_limit', 'while (r->uart_polls < max_polls) {', 'while (r->uart_polls <= max_polls) {'),
     ('t3_row_acquire_ignored', 'int rc = t->begin ? t->begin(t->opaque) : 0;', 'int rc = 0;'),
-    ('t3_row_release_omitted', 'if (owned && t->end && t->end(r, t->opaque, rc)) rc = -1;', '(void)owned;'),
-    ('t3_row_flush_failure_ignored', 'if (owned && t->end && t->end(r, t->opaque, rc)) rc = -1;', 'if (owned && t->end) (void)t->end(r, t->opaque, rc);'),
+    ('t3_row_release_omitted', 'if (owned && t->end && t->end(r, t->opaque, rc)) {\n        tx_fail(r, REC_TX_EMPTY, -1); rc = -1;\n    }', '(void)owned;'),
+    ('t3_row_flush_failure_ignored', 'if (owned && t->end && t->end(r, t->opaque, rc)) {\n        tx_fail(r, REC_TX_EMPTY, -1); rc = -1;\n    }', 'if (owned && t->end) (void)t->end(r, t->opaque, rc);'),
     ('t3_gf_bus_end_omitted', 'if (r->state == REC_RUNNING && gf_bus_record(r, &a, "END", old, *value, actual, 0))', 'if (false)'),
     ('t3_read_begin_failed', 'if (log && r->state != REC_RESTORING) return -1;\n    if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;\n    if (r->state != REC_RESTORING && call_point(r, false)) return -1;\n    int rc = r->ops->read', 'if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;\n    if (r->state != REC_RESTORING && call_point(r, false)) return -1;\n    int rc = r->ops->read'),
     ('t3_write_begin_failed', 'if (log && r->state != REC_RESTORING) return -1;\n    if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;\n    if (r->state != REC_RESTORING && call_point(r, false)) return -1;\n    int rc = r->ops->write', 'if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;\n    if (r->state != REC_RESTORING && call_point(r, false)) return -1;\n    int rc = r->ops->write'),
@@ -34,7 +34,7 @@ MUTATIONS = [
     ('t3_rx_cap', 'n < RECOVER_RX_LIMIT; n++', 'n < RECOVER_RX_LIMIT + 1; n++'),
     ('t3_crc', 'rx_word(r->rx + RECOVER_ABORT_CRC_OFF) == crc32_core_final(crc32_core_update(CRC32_INIT, r->rx, RECOVER_ABORT_CRC_OFF))', 'true'),
     ('t3_abort_ignored', 'bool abort = wire_abort || (r->ops->abort_requested &&', 'bool abort = (wire_abort && false) || (r->ops->abort_requested &&'),
-    ('t3_lost_not_counted', 'r->lost_lines++; fail(r, REC_LOG, REC_PHASE_NONE, 0);', 'fail(r, REC_LOG, REC_PHASE_NONE, 0);'),
+    ('t3_lost_not_counted', 'if (rc) { r->lost_lines++; fail(r, REC_LOG, REC_PHASE_NONE, 0); }', 'if (rc) { fail(r, REC_LOG, REC_PHASE_NONE, 0); }'),
     ('t3_partial_retained', 'discard(r, r->rx_used); r->rx_used = 0;', 'discard(r, r->rx_used);'),
 ]
 

@@ -24,3 +24,5 @@ check-recover-tables-host:
 - tools/check_map.d/check-recover-tables-host.yaml
 - tools/gen_recover_tables.py
 - tools/tests/recover_tables_bounds.h
+- kdebug/recover_cleanup.h
+- kdebug/recover_diag.h

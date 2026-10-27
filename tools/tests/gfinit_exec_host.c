@@ -459,6 +459,7 @@ static void pre_read_tests(void)
             .value={.mode=REC_LITERAL,.mask=0x7f,.bits=1,.max=255,.expr_id=RECOVER_NONE}};
         contract_arm();core.profile=&profile;core.state=REC_RESTORING;core.auth_phase=REC_RESTORE;
         core.restore_tick=0;core.restore_polls=0;
+        CHECK(!cleanup_budget_prepare(&core));
         executor_bus=ops;executor_bus.read=count_unsafe_read;core.ops=&executor_bus;
         core.index_port[0]=0;core.port_selected[0]=unclassified?0:RECOVER_NONE;
         if(unclassified)contract_targets[0].access=REC_UNCLASSIFIED;

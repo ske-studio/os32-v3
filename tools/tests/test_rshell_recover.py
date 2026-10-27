@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fake serial/time tests of the actual recover host; --mutate kills guards."""
 import argparse
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 import importlib.util
 import io
 from pathlib import Path
@@ -48,7 +48,8 @@ class Port:
 
 
 META = 'REC sid=7 seq=1 phase=state event=PAUSED version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n'
-FINAL = 'REC sid=7 seq=2 phase=final event=END result=OK target=S0 verified=1 unknown=0 override=0 trial=0 lost_lines=0 discarded_bytes=5\n'
+DIAG = 'REC sid=7 seq=2 phase=diag event=TX fail_seq=0 pos=0 fn=NONE rc=0 where=NONE sent=0 polls=0 bytes=0\n'
+FINAL = DIAG + 'REC sid=7 seq=3 phase=final event=END result=OK target=S0 verified=1 unknown=0 override=0 saved=0 actual=0 trial=0 lost_lines=0 discarded_bytes=5 txd=0\n'
 ECHO = '> recover now 7\n'
 
 
@@ -75,9 +76,11 @@ def cases(m):
     for split in (1, 7, 256):
         run('\x04'+ECHO+META+FINAL+'\x04', good=True, split=split)
     run(ECHO+META+'\x04', good=True)
-    for old, new in [('sid=7','sid=6'), ('seq=2','seq=3'), ('lost_lines=0','lost_lines=1'),
+    for old, new in [('sid=7','sid=6'), ('seq=3','seq=4'), ('lost_lines=0','lost_lines=1'),
                      ('verified=1','verified=0'), ('result=OK','result=FAIL'),
-                     ('unknown=0','unknown=1'), ('override=0','override=1')]:
+                     ('unknown=0','unknown=1'), ('override=0','override=1'),
+                     ('txd=0','txd=1'), ('trial=0','trial=1'),
+                     ('result=OK','result=PARTIAL'), ('fn=NONE','fn=PUT')]:
         run(ECHO+META+FINAL.replace(old,new)+'\x04')
     run(ECHO+META+FINAL+'recover: rejected rc=-1\n\x04')
     run(ECHO+FINAL+'\x04')
@@ -104,7 +107,8 @@ def cases(m):
 
 def status_cases(m):
     reply = ('recover sid=0 state=0 reason=0 verified=0 profile=00000000 '
-             'plan=00000000 snapshot=00000000 seq=0 lost=0 discarded=0')
+             'plan=00000000 snapshot=00000000 seq=0 lost=0 discarded=0\n'
+             'txd sid=0 valid=0 seq=0 pos=0 fn=NONE rc=0 where=NONE sent=0 polls=0 bytes=0')
     data = ('\x04> recover status\n' + reply + '\n\x04').encode()
     for split in (1, 7, 256):
         port = Port(data, split=split)
@@ -198,15 +202,165 @@ def gfinit_cases(m):
         raise AssertionError('stale session accepted')
 
 
+def protocol_cases(m):
+    def row(seq, phase, event, extra=''):
+        return 'REC sid=7 seq=%d phase=%s event=%s%s\n' % (seq, phase, event, ' '+extra if extra else '')
+    def fields(seq, phase, event, extra=''):
+        return row(seq, phase, event, extra).rstrip('\n')
+    meta = 'version=1 profile_crc=11 plan_hash=12 snapshot_crc=13'
+    diag = 'fail_seq=0 pos=0 fn=NONE rc=0 where=NONE sent=0 polls=0 bytes=0'
+    final = 'result=OK target=S0 verified=1 unknown=0 override=0 saved=0 actual=0 trial=0 lost_lines=0 discarded_bytes=0 txd=0'
+    # phase-based LIFO accepts same-phase recursion and bus/access nesting.
+    nested = [('gf_pre', 'BEGIN', 'main=0 pc=1 opcode=2 exec=1 substep=3'),
+              ('gf_bus', 'BEGIN', 'pc=1 bar=0 off=2 width=4 old=0 new=1'),
+              ('access', 'BEGIN', 'step=0 addr=2'), ('access', 'END', 'rc=0 elapsed=0'),
+              ('gf_bus', 'END', 'pc=1 bar=0 off=2 width=4 readback=1 rc=0'),
+              ('gf_pre', 'END', 'main=0 pc=1 opcode=2 exec=1 substep=3 rc=0'),
+              ('screen', 'BEGIN', 'step=0 addr=0'), ('screen', 'BEGIN', 'step=1 addr=0'),
+              ('screen', 'END', 'rc=0 elapsed=0'), ('screen', 'END', 'rc=0 elapsed=0')]
+    r = m.Records(7)
+    for seq, args in enumerate(nested, 1):
+        r.line(fields(seq, *args))
+    assert r.data['stack'] == []
+    # All structurally invalid records preserve both the first error and seq.
+    invalid = [
+        fields(1, 'state', 'PAUSE', meta), fields(1, 'state', 'PAUSED', meta+' x=0'),
+        fields(1, 'state', 'PAUSED', meta+' sid=7'), fields(1, 'state', 'PAUSED', meta+' bare'),
+        fields(1, 'state', 'PAUSED', meta.replace('profile_crc=11', '')),
+        fields(1, 'state', 'PAUSED', meta.replace('profile_crc=11', 'profile_crc=4294967296')),
+        fields(1, 'state', 'PAUSED', meta.replace('profile_crc=11', 'profile_crc=-1')),
+        fields(1, 'state', 'PAUSED', meta)+'\r\r',
+        fields(1, 'state', 'PAUSED', meta)+'é',
+        fields(1, 'access', 'END', 'rc=0 elapsed=0'),
+        fields(1, 'inject', 'BEGIN', 'step=0 addr=0'),
+        fields(1, 'diag', 'TX', diag.replace('sent=0', 'sent=2')),
+        fields(1, 'diag', 'TX', diag.replace('rc=0', 'rc=-2147483649')),
+        fields(1, 'diag', 'TX', diag.replace('fn=NONE', 'fn=other')),
+        fields(1, 'state', 'RESTORING', meta),
+        fields(1, 'state', 'RESTORING', meta+' cleanup_seconds=-1'),
+    ]
+    for text in invalid:
+        r = m.Records(7)
+        try:
+            r.line(text)
+        except m.RecoverError as exc:
+            first = str(exc)
+        else:
+            raise AssertionError('accepted malformed '+text)
+        assert r.data['seq'] == 0 and r.data['invalid'] == first
+        try:
+            r.line(fields(1, 'state', 'PAUSED', meta))
+        except m.RecoverError as exc:
+            assert str(exc) == first
+        else:
+            raise AssertionError('sticky error cleared')
+        try:
+            m.Records(7, r.data)
+        except m.RecoverError as exc:
+            assert str(exc) == first
+        else:
+            raise AssertionError('saved corruption accepted')
+    virtual = m.Records(7, virtual=True)
+    virtual.line(fields(1, 'inject', 'BEGIN', 'step=0 addr=0'))
+    assert virtual.data['stack'] == []
+    continued = m.Records(7, virtual.data)
+    continued.line(fields(2, 'inject', 'BEGIN', 'step=0 addr=0'))
+    assert continued.data['virtual'] is True
+    # END identity equality and exact stack order, with singleton rows not popping.
+    for begin, end in [
+        (nested[0], ('gf_pre', 'END', 'main=0 pc=2 opcode=2 exec=1 substep=3 rc=0')),
+        (nested[1], ('gf_bus', 'END', 'pc=1 bar=1 off=2 width=4 readback=1 rc=0')),
+        (nested[2], ('screen', 'END', 'rc=0 elapsed=0')),
+        (nested[2], ('state', 'PAUSED', meta)),
+        (nested[2], ('final', 'END', final)),
+    ]:
+        r = m.Records(7); r.line(fields(1, *begin))
+        r.line(fields(2, 'receive', 'DISCARD', 'discarded_bytes=0'))
+        assert len(r.data['stack']) == 1
+        try:
+            r.line(fields(3, *end))
+        except m.RecoverError:
+            pass
+        else:
+            raise AssertionError('mismatched end accepted')
+    # Resume stores the stack and leaves profile metadata frozen across RESTORING.
+    r = m.Records(7);r.line(fields(1, 'state', 'PAUSED', meta))
+    resumed = m.Records(7, r.data)
+    resumed.line(fields(2, 'state', 'RESTORING', meta+' cleanup_seconds=17'))
+    assert resumed.data['cleanup_seconds'] == 17
+    resumed.line(fields(3, 'diag', 'TX', diag));resumed.line(fields(4, 'final', 'END', final))
+    assert resumed.success()
+    for text in (fields(5, 'final', 'END', final), fields(5, 'state', 'PAUSED', meta)):
+        fresh = m.Records(7, resumed.data)
+        try:
+            fresh.line(text)
+        except m.RecoverError:
+            pass
+        else:
+            raise AssertionError('REC after final accepted')
+    r = m.Records(7);r.line(fields(1, 'state', 'PAUSED', meta))
+    fresh = m.Records(7, r.data)
+    try:
+        fresh.line(fields(2, 'state', 'RESTORING', meta.replace('profile_crc=11', 'profile_crc=12')+' cleanup_seconds=17'))
+    except m.RecoverError:
+        pass
+    else:
+        raise AssertionError('cleanup metadata changed')
+    for previous in ({'sid':7, 'seq':1, 'crc':{}}, [], {'format':2}):
+        try:
+            m.Records(7, previous)
+        except m.RecoverError:
+            pass
+        else:
+            raise AssertionError('old state accepted')
+    def exchange(data, good=False, split=256):
+        p = Port(data, split=split);raw = io.BytesIO();saved=[]
+        r = m.Records(7)
+        with redirect_stderr(io.StringIO()) as warnings:
+            try:
+                result = m.exchange(p, 'recover now 7', r, 10, 1, raw, lambda d: saved.append(dict(d)), p.clock)
+            except m.RecoverError as exc:
+                assert not good, str(exc)
+            else:
+                assert good, result
+        assert raw.getvalue() == data
+        return saved, warnings.getvalue()
+    body = row(1, 'state', 'RESTORING', meta+' cleanup_seconds=17')+row(2, 'diag', 'TX', diag)+row(3, 'final', 'END', final)
+    for split in (1, 256):
+        saved, warning = exchange((ECHO+body+'\x04').encode(), good=True, split=split)
+        assert '--cleanup-timeout' in warning and '22' in warning
+        assert saved[-1]['cleanup_seconds'] == 17
+        exchange((ECHO+body.replace('\n', '\r\n')+'\x04').encode(), good=True, split=split)
+        # Missing diagnostic, missing prefix/LF, partial token, empty row deletion.
+        for damaged in (body.replace(row(2, 'diag', 'TX', diag), ''), body.replace('REC sid=7 seq=2', 'sid=7 seq=2'),
+                        body.replace('event=TX ', 'event=T '), body.replace('\nREC sid=7 seq=2', 'REC sid=7 seq=2'),
+                        body.replace('seq=3', 'seq=4'), body.replace('phase=diag event=TX', 'phase=diag event=TX')+'REC sid=7',
+                        body.replace('fn=NONE', 'fn=PUT')):
+            exchange((ECHO+damaged+'\x04').encode(), split=split)
+    saved, _ = exchange((ECHO+'x'*(m.MAX_LINE+1)+'\n'+body+'\x04').encode())
+    assert saved[-1]['invalid'] == 'overlong serial line'
+    # Main catches damaged persisted JSON before opening the serial port.
+    with tempfile.TemporaryDirectory(prefix='recover_state_') as tmp:
+        state=Path(tmp)/'state';state.write_text('{')
+        argv=['rshell_recover', '--session', '7', '--image-crc', '1234abcd', '--state', str(state), '--log', str(Path(tmp)/'raw')]
+        with patch.object(sys, 'argv', argv), patch.object(m, 'open_port') as opened, redirect_stdout(io.StringIO()):
+            assert m.main() == 1
+            opened.assert_not_called()
+
+
 MUTATIONS = [
-    ('session', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
-    ('sequence', "sid != self.data['sid'] or seq != self.data['seq'] + 1", "sid != self.data['sid']"),
+    ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
+    ('sequence', "sid != candidate_sid or seq != self.data['seq'] + 1", "sid != candidate_sid"),
+    ('required', "if name not in fields:  # Mandatory fields must precede state updates.", "if False:  # Mandatory fields must precede state updates."),
+    ('pop', '                stack.pop()', '                pass'),
+    ('identity', "or any(stack[-1][key] != fields[key] for key in ids)", 'or False'),
+    ('fragment', "if line or dropping:\n                    record_failure('truncated line before EOT/deadline')", "if False:\n                    record_failure('truncated line before EOT/deadline')"),
     ('loss', "f.get('lost_lines') == '0'", 'True'),
     ('verify', "f.get('verified') == '1'", 'True'),
     ('echo', 'if not echo:', 'if False:'),
     ('status-body', "raise RecoverError('missing/malformed status reply')", "return 'accepted'"),
     ('serial-owner', 'exclusive=True', 'exclusive=False'),
-    ('timeout', "failure = failure or 'host timeout'", 'failure = failure'),
+    ('timeout', "record_failure('host timeout')", 'pass'),
     ('gfinit-rejected', "'gfinit: rejected rc='", "'gfinit: ignored rc='"),
 ]
 
@@ -224,6 +378,7 @@ def mutation(item):
             cases(mutant)
             status_cases(mutant)
             gfinit_cases(mutant)
+            protocol_cases(mutant)
         except (AssertionError, mutant.RecoverError):
             return name + ': RED', 0
         return name + ': GREEN', 1
@@ -236,6 +391,7 @@ def main():
     cases(load(SRC))
     status_cases(load(SRC))
     gfinit_cases(load(SRC))
+    protocol_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.

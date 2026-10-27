@@ -74,9 +74,10 @@ static int serial_checked_begin(void)
 {
     if (poll_test && recover_owner()->state==REC_RESTORING && !restore_clock_checked) {
         struct recover *r=recover_owner();
-        CHECK(!clock_frozen && r->ops->ticks(r->opaque)==r->restore_tick);
+        CHECK(r->ops->ticks(r->opaque)==r->restore_tick);
         CHECK(r->restore_tick==freeze_tick);
-        restore_clock_checked=true;
+        /* RESTORING is now emitted before local cleanup thaws the fake clock. */
+        if(!clock_frozen)restore_clock_checked=true;
     }
     if (tx_test) {
         CHECK(!uart_owned);
@@ -85,7 +86,7 @@ static int serial_checked_begin(void)
             polls_before_busy=recover_owner()->uart_polls;
             busy_bytes=used;
             CHECK(clock_frozen);
-        } else if (recover_owner()->state==REC_RESTORING) {
+        } else if (recover_owner()->state==REC_RESTORING && !clock_frozen) {
             CHECK(!tx_busy && !clock_frozen);
         }
     }
@@ -139,16 +140,18 @@ static const struct hwdev_ops *hwdev_module_ops(void)
 static int kpeek_call(u32 op,void *p,u32 sz) {(void)op;(void)p;(void)sz;peek_calls++;return 0;}
 #define GF_OP_INSPECT 5U
 #define GF_OP_ABORT 10U
+#define ATTR_RED 1
+#define ATTR_WHITE 2
+static void print(int attr,const char *fmt,...) {(void)attr;(void)fmt;}
+#define kprintf print
 #define recover_hal_wait_frame fake_wait
 #define tick_count fake_ticks()
 #include "virtual_dispatch.inc"
 #undef tick_count
 #undef recover_hal_wait_frame
+#undef kprintf
 #define SHELL_H
-#define ATTR_RED 1
-#define ATTR_WHITE 2
 static int str_eq(const char *a,const char *b) {while(*a && *a==*b){a++;b++;}return *a==*b;}
-static void print(int attr,const char *fmt,...) {(void)attr;(void)fmt;}
 static struct api {u32 version;void (*kprintf)(int,const char *,...);i32 (*kdebug_call)(u32,void *,u32);}
     api={78,print,recovery_call}, *g_api=&api;
 #include "../../userland/shell/cmd_recover.c"
@@ -218,6 +221,10 @@ static void run(void)
     CHECK(contains("result=OK target=S0 verified=1 unknown=0"));
     CHECK(contains(" trial=0 lost_lines=0"));
     CHECK(contains("phase=state event=RESTORING"));
+    CHECK(contains(" cleanup_seconds="));
+    CHECK(contains("phase=diag event=TX fail_seq=0 pos=0 fn=NONE rc=0 where=NONE sent=0 polls=0 bytes=0\n"));
+    CHECK(contains(" txd=0\n"));
+    CHECK(trace_at("phase=diag event=TX")<trace_at("phase=final event=END"));
     CHECK(begins==ends && !r->lost_lines);
     /* A failed start must give back transport/ops without consuming a session. */
     u32 session=r->token.session;
@@ -354,8 +361,10 @@ static void run_txbusy(void)
     CHECK(contains("phase=inject event=BEGIN step=4 addr=0\n"));
     CHECK(contains("result=FAIL target=S0 verified=1 unknown=1"));
     CHECK(contains(" trial=9 lost_lines=1"));
-    /* All received REC sequence numbers are consecutive except the one row
-     * immediately after inject (seq 6): state PAUSED is seq 7, restoration starts at 8. */
+    CHECK(contains("phase=diag event=TX fail_seq=7 pos=1 fn=BUDGET rc=-31 where=BYTE sent=0"));
+    CHECK(contains(" txd=1\n"));
+    /* PAUSED (7) is lost; virtual_tx_end clears busy before RESTORING (8),
+     * while local cleanup subsequently thaws the virtual clock. */
     u32 last=0, gaps=0;
     for (u32 i=0;i+5<used;i++) {
         if (trace[i]!=' ' || trace[i+1]!='s' || trace[i+2]!='e' ||

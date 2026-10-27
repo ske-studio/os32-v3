@@ -69,4 +69,7 @@ check-hwdev-image-host:
 - tools/tests/gfinit_plan_host.c
 - tools/tests/test_gfinit_plan.py
 - kdebug/recover_virtual.h
+- kdebug/recover_cleanup.h
+- kdebug/recover_diag.h
+- tools/tests/recover_cleanup_host.inc
 artifact_reader: true

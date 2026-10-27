@@ -15,3 +15,6 @@ check-recover-gf:
 - lib/crc32_core.inc
 - build/checks.d/check-recover-gf.mk
 - tools/check_map.d/check-recover-gf.yaml
+- kdebug/recover_cleanup.h
+- kdebug/recover_diag.h
+- tools/tests/recover_cleanup_host.inc

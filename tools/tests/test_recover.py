@@ -63,9 +63,7 @@ MUTATIONS = [
     ("local_cleanup_after_quiesce", """    if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
-    state(r, REC_RESTORING);
-    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);""", """    state(r, REC_RESTORING);
-    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
+    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);""", """    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
     if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }"""),
@@ -122,15 +120,15 @@ MUTATIONS += [
         if (complete) r->cache = r->measurement;
         else r->cache = (struct recover_bar_measurement){0};
     }"""),
-    ("t2_s0_reserve_removed", "limit -= r->profile->s0_reserve_ticks;", "/* no reservation */"),
+    ("t2_s0_reserve_removed", "limit -= cb.s0_ticks;", "/* no reservation */"),
     ("t2_poll_removed", "r->restore_polls++;\n    return 0;", "return 0;"),
     ("t2_delay_truncated", "wait_us(opaque, RECOVER_US_PER_MS)", "wait_us(opaque, 999U)"),
     ("t2_uart_1ms", "    for (;;) {", "    frame_us = 1000;\n    for (;;) {"),
     ("t2_uart_double_poll", "        r->uart_polls++;\n        int ready = ops->ready(opaque);", "        r->uart_polls += 2;\n        int ready = ops->ready(opaque);"),
-    ("t2_trial_budget_reused", "u32 limit = r->profile->restore_limit;", "u32 limit = r->budget - r->spent;"),
-    ("t2_log_reserve_removed", "bytes -= r->profile->s0_reserve_bytes;", "bytes -= 0;"),
+    ("t2_trial_budget_reused", "u32 limit = cb.ticks;", "u32 limit = r->budget - r->spent;"),
+    ("t2_log_reserve_removed", "bytes -= cb.s0_bytes;", "bytes -= 0;"),
     ("t2_uart_poll_removed", "        r->uart_polls++;\n        int ready = ops->ready(opaque);", "        /* omitted */\n        int ready = ops->ready(opaque);"),
-    ("t2_restore_reextended", "u32 limit = r->profile->restore_limit;", "r->restore_tick = r->ops->ticks(r->opaque); u32 limit = r->profile->restore_limit;"),
+    ("t2_restore_reextended", "u32 limit = cb.ticks;", "r->restore_tick = r->ops->ticks(r->opaque); u32 limit = cb.ticks;"),
     ("t2_failed_verified", "state(r, r->failed ? REC_FAILED : REC_VERIFIED);", "r->failed = false; state(r, REC_VERIFIED);"),
     ("t2_restore_wrap_inverted", "r->restore_tick) < limit", "r->restore_tick) > limit"),
     ("t2_pit_round_down", "+(scaled%PIT_PERIOD_SCALE!=0)", "", "kdebug/recover_profile.c"),
@@ -143,6 +141,18 @@ MUTATIONS += [
     ("t2_index_order_unchecked", "(i && steps[i].role < steps[i-1].role)", "false", "kdebug/recover_profile.c"),
 ]
 
+
+DIAG_MUTATIONS = [
+    ("txdiag_disabled", "if (!txd.active || txd.valid) return;", "if (txd.active || txd.valid) return;"),
+    ("txdiag_overwrite", "if (!txd.active || txd.valid) return;", "if (!txd.active) return;"),
+    ("txdiag_pos", "tx_pos = i + 1; tx_sent = 0;", "tx_pos = i; tx_sent = 0;"),
+    ("txdiag_raw_rc", "tx_fail(r, REC_TX_PUT, rc);", "tx_fail(r, REC_TX_PUT, -1);"),
+    ("txdiag_put_retry", "int rc = ops->put(opaque, byte);", "int rc = ops->put(opaque, byte); if (rc) rc = ops->put(opaque, byte);"),
+    ("txdiag_row_overflow", "if (b->overflow) {", "if (false && b->overflow) {"),
+    ("txdiag_final_before_diag", '        transport_diag(r);\n        row_start(r, &b, "final", "END");', '        row_start(r, &b, "final", "END");\n        transport_diag(r);'),
+
+]
+MUTATIONS += DIAG_MUTATIONS
 
 def one_mutation(item):
     name, old, new = item[:3]

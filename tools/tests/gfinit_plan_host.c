@@ -110,6 +110,7 @@ static void plan_case(u32 damage,u32 amount)
             }
         }
         core.state=REC_RESTORING;core.restore_tick=0;core.in_opcode=false;
+        CHECK(!cleanup_budget_prepare(&core));
         CHECK(recover_gf_screen_safe(&core)==0);
     } else CHECK(core.reason==REC_VERIFY && cleanup_calls==1 && (damage==1?vram_writes==256:vram_writes>512));
 }

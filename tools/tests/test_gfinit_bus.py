@@ -17,6 +17,7 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('cr1f_second_visit', 'k < sizeof(order) / sizeof(order[0])', 'k + 1 < sizeof(order) / sizeof(order[0])'),
     ('cr1f_restore', 'value = !k || v->value == RECOVER_CR1F_UNLOCKED ?', 'value = true ?'),
     ('cleanup_order', '{RECOVER_CR1F, RECOVER_CR11, RECOVER_CR44, RECOVER_CR1F}', '{RECOVER_CR1F, RECOVER_CR11, RECOVER_CR1F, RECOVER_CR44}'),
     ('cfg_present', 'if (!present(b)) return -1;', 'if (false) return -1;'),

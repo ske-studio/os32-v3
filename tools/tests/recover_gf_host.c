@@ -373,10 +373,12 @@ static void trace_test(void)
     }
     print("trace: N1 normal; 8 pre/post failures; unknown/value/pc/main/dependency/alias deny\n");
 }
+#include "recover_cleanup_host.inc"
+
 void _start(void)
 {
     gf_fixture_init();
-    setup(); inventory_test(); fixed_test(); trace_test();
+    setup(); inventory_test(); fixed_test(); trace_test(); cleanup_envelope_tests();
     print(failures?"GF profile FAIL\n":"GF profile PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failures?1:0));
     __builtin_unreachable();

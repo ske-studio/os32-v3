@@ -16,3 +16,5 @@ check-recover-virtual:
 - tools/check_map.d/check-recover-virtual.yaml
 - tools/tests/mutpar.py
 - build/kdebug.mk
+- kdebug/recover_cleanup.h
+- kdebug/recover_diag.h

@@ -11,6 +11,8 @@ A saved session skips ver (PAUSED forbids ordinary commands); reset detection th
 relies on session/sequence/metadata. --session 0 requests untested S0 recovery.
 """
 import argparse
+import copy
+import sys
 from contextlib import closing
 import io
 import json
@@ -30,48 +32,198 @@ class RecoverError(Exception):
     pass
 
 
+# Serial frame bounds and protocol enums are kept beside the parser.
+STATE_VERSION = 2
+MAX_LINE = 4096
+CLEANUP_MARGIN = 5
+DEFAULT_CLEANUP_TIMEOUT = 180
+DEFAULT_TIMEOUT = 240
+METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
+PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route')
+PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
+BUS_ID = ('pc', 'bar', 'off', 'width')
+DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
+DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
+BOOL_FIELDS = ('exec', 'minimal', 'capacity_known', 'full_capacity', 'verified',
+               'unknown', 'override', 'txd', 'sent')
+
+
 class Records:
-    def __init__(self, session, previous=None):
-        self.data = previous or dict(sid=session, seq=0, crc={}, last_begin=None)
-        if self.data['sid'] != session:
+    def __init__(self, session, previous=None, virtual=None):
+        self.virtual = (previous.get('virtual', False)
+                        if virtual is None and isinstance(previous, dict) else bool(virtual))
+        self.data = copy.deepcopy(previous) if previous is not None else dict(
+            format=STATE_VERSION, virtual=self.virtual, sid=session, seq=0, crc={}, stack=[], invalid=None,
+            diag=None, final=None, paused=False, cleanup_seconds=None)
+        d = self.data
+        if isinstance(d, dict):
+            d['virtual'] = self.virtual
+        if (not isinstance(d, dict) or d.get('format') != STATE_VERSION
+                or not isinstance(d.get('stack'), list) or not isinstance(d.get('crc'), dict)
+                or any(k not in d for k in ('invalid', 'diag', 'final', 'paused', 'cleanup_seconds', 'sid', 'seq'))):
+            raise RecoverError('invalid/old saved state')
+        if (any(type(d[k]) is not int or not 0 <= d[k] <= 4294967295 for k in ('sid', 'seq'))
+                or type(d['paused']) is not bool
+                or (d['invalid'] is not None and not isinstance(d['invalid'], str))
+                or any(k not in METADATA or type(v) is not int or not 0 <= v <= 4294967295
+                       for k, v in d['crc'].items())
+                or (d['cleanup_seconds'] is not None and
+                    (type(d['cleanup_seconds']) is not int or not 0 <= d['cleanup_seconds'] <= 4294967295))):
+            raise RecoverError('invalid saved state')
+        if d['sid'] != session:
             raise RecoverError('saved session differs')
-        self.final = None
-        self.paused = False
+        if d['invalid']:
+            raise RecoverError(d['invalid'])
+        for fields in d['stack'] + [f for f in (d['diag'], d['final']) if f is not None]:
+            if not isinstance(fields, dict) or any(not isinstance(k, str) or not isinstance(v, str)
+                                                  for k, v in fields.items()):
+                raise RecoverError('invalid saved record')
+            self._fields('REC ' + ' '.join(k + '=' + v for k, v in fields.items()))
+            if int(fields['sid']) != session or int(fields['seq']) > d['seq']:
+                raise RecoverError('invalid saved record sequence')
+        if any(f['event'] != 'BEGIN' or f['phase'] not in PAIRED + ('gf_pre', 'gf_bus')
+               for f in d['stack']):
+            raise RecoverError('invalid saved stack')
+        if ((d['diag'] is not None and d['diag']['phase'] != 'diag')
+                or (d['final'] is not None and d['final']['phase'] != 'final')
+                or ((d['paused'] or d['final'] is not None) and d['stack'])):
+            raise RecoverError('invalid saved terminal state')
+        self.final = d['final']
+        self.paused = d['paused']
+
+    def invalidate(self, message):
+        if not self.data['invalid']:
+            self.data['invalid'] = message
+        return self.data['invalid']
+
+    def _fields(self, line):
+        fields = {}
+        def malformed(field):
+            return RecoverError('malformed REC sid=%s seq=%s field=%s' %
+                                (fields.get('sid', '?'), fields.get('seq', '?'), field))
+        if line.endswith('\n'):
+            line = line[:-1]
+        if line.endswith('\r'):
+            line = line[:-1]
+        if not line.isascii() or '\r' in line:
+            raise malformed('ascii')
+        for part in line.split(' ')[1:]:
+            if part.count('=') != 1:
+                raise malformed('token')
+            key, value = part.split('=')
+            if not key or not value or key in fields:
+                raise malformed(key or 'token')
+            fields[key] = value
+        for name in ('sid', 'seq', 'phase', 'event'):
+            if name not in fields:
+                raise malformed(name)
+        phase, event = fields['phase'], fields['event']
+        required = ()
+        if phase == 'state' and event in ('IDLE', 'SNAPSHOTTING', 'ARMED', 'RUNNING', 'PAUSED', 'RESTORING'):
+            required = METADATA + (('cleanup_seconds',) if event == 'RESTORING' else ())
+        elif phase in PAIRED and event in ('BEGIN', 'END'):
+            required = ('step', 'addr') if event == 'BEGIN' else ('rc', 'elapsed')
+        elif phase == 'gf_pre' and event in ('BEGIN', 'END'):
+            required = PRE_ID + (('rc',) if event == 'END' else ())
+        elif phase == 'gf_bus' and event in ('BEGIN', 'END'):
+            required = BUS_ID + (('old', 'new') if event == 'BEGIN' else ('readback', 'rc'))
+        elif phase == 'gf_verify' and event == 'END':
+            required = ('saved_words', 'minimal', 'capacity_known', 'full_capacity', 'capacity_bytes', 'tested_bytes')
+        elif phase == 'receive' and event == 'DISCARD':
+            required = ('discarded_bytes',)
+        elif phase == 'diag' and event == 'TX':
+            required = ('fail_seq', 'pos', 'fn', 'rc', 'where', 'sent', 'polls', 'bytes')
+        elif phase == 'final' and event == 'END':
+            required = ('result', 'target', 'verified', 'unknown', 'override', 'saved', 'actual', 'trial', 'lost_lines', 'discarded_bytes', 'txd')
+        elif phase == 'inject' and event == 'BEGIN' and self.virtual:
+            required = ('step', 'addr')
+        else:
+            raise malformed('phase/event')
+        allowed = set(('sid', 'seq', 'phase', 'event') + required)
+        for name in required:
+            if name not in fields:  # Mandatory fields must precede state updates.
+                raise malformed(name)
+        for name, value in fields.items():
+            if name not in allowed:
+                raise malformed(name)
+            enum = {'fn': DIAG_FN, 'where': DIAG_WHERE,
+                    'result': ('OK', 'FAIL', 'PARTIAL'), 'target': ('S0',)}.get(name)
+            if enum is not None:
+                if value not in enum:
+                    raise malformed(name)
+            elif name not in ('phase', 'event'):
+                if not re.fullmatch(r'-?[0-9]+' if name == 'rc' else r'[0-9]+', value):
+                    raise malformed(name)
+                low, high = (-2147483648, 2147483647) if name == 'rc' else (0, 4294967295)
+                if name in BOOL_FIELDS:
+                    high = 1
+                if name == 'trial':
+                    high = 9
+                if not low <= int(value) <= high:
+                    raise malformed(name)
+        return fields
 
     def line(self, line):
         if not line.startswith('REC '):
             return
-        fields = dict(part.split('=', 1) for part in line.split()[1:] if '=' in part)
+        if self.data['invalid']:
+            raise RecoverError(self.data['invalid'])
         try:
+            fields = self._fields(line)
             sid, seq = int(fields['sid']), int(fields['seq'])
-            if self.data['sid'] == 0 and self.data['seq'] == 0 and sid > 0:
-                self.data['sid'] = sid
-            if sid != self.data['sid'] or seq != self.data['seq'] + 1:
+            candidate_sid = self.data['sid']
+            if candidate_sid == 0 and self.data['seq'] == 0 and sid > 0:
+                candidate_sid = sid
+            if sid != candidate_sid or seq != self.data['seq'] + 1:
                 raise RecoverError('session/sequence mismatch or missing REC')
-            self.data['seq'] = seq
-            for name in ('version', 'profile_crc', 'plan_hash', 'snapshot_crc'):
+            if self.final is not None:
+                raise RecoverError('REC after final')
+            phase, event = fields['phase'], fields['event']
+            stack = copy.deepcopy(self.data['stack'])
+            paired = phase in PAIRED or phase in ('gf_pre', 'gf_bus')
+            if paired and event == 'BEGIN':
+                stack.append(fields)
+            elif paired and event == 'END':
+                ids = PRE_ID if phase == 'gf_pre' else BUS_ID if phase == 'gf_bus' else ()
+                if (not stack or stack[-1]['phase'] != phase
+                        or any(stack[-1][key] != fields[key] for key in ids)):
+                    raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, phase))
+                stack.pop()
+            if (event == 'PAUSED' or phase == 'final') and stack:
+                raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, stack[-1]['phase']))
+            crc = dict(self.data['crc'])
+            for name in METADATA:
                 if name in fields:
                     value = int(fields[name])
-                    if self.data.get('metadata_frozen') and name in self.data['crc'] and self.data['crc'][name] != value:
+                    if self.data.get('metadata_frozen') and name in crc and crc[name] != value:
                         raise RecoverError('session metadata changed')
-                    self.data['crc'][name] = value
-            if fields.get('event') == 'BEGIN':
-                self.data['last_begin'] = fields
-            self.paused = fields.get('event') == 'PAUSED'
+                    crc[name] = value
+            if phase == 'diag' and self.data['diag'] is not None:
+                raise RecoverError('duplicate diagnostic')
+            self.data.update(sid=candidate_sid, seq=seq, stack=stack, crc=crc)
+            self.paused = event == 'PAUSED'
+            self.data['paused'] = self.paused
             if self.paused:
                 self.data['metadata_frozen'] = True
-            if fields.get('phase') == 'final' and fields.get('event') == 'END':
+            if event == 'RESTORING':
+                self.data['cleanup_seconds'] = int(fields['cleanup_seconds'])
+            if phase == 'diag':
+                self.data['diag'] = fields
+            if phase == 'final':
                 self.final = fields
-        except (ValueError, KeyError) as exc:
-            raise RecoverError('malformed REC') from exc
+                self.data['final'] = fields
+        except RecoverError as exc:
+            raise RecoverError(self.invalidate(str(exc))) from exc
 
     def success(self):
         f = self.final or {}
-        return (f.get('result') == 'OK' and f.get('target') == 'S0'
+        return (not self.data['invalid'] and not self.data['stack']
+                and self.data['diag'] is not None and self.data['diag']['fn'] == 'NONE'
+                and f.get('txd') == '0' and f.get('trial') == '0'
+                and f.get('result') == 'OK' and f.get('target') == 'S0'
                 and f.get('verified') == '1' and f.get('unknown') == '0'
                 and f.get('override') == '0' and f.get('lost_lines') == '0'
-                and all(k in self.data['crc'] for k in
-                        ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')))
+                and all(k in self.data['crc'] for k in METADATA))
 
 
 def write_bounded(port, data, deadline, clock):
@@ -97,17 +249,27 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
     failure = None
     echo = False
     line = bytearray()
+    dropping = False
+    warned_seconds = None
+    def record_failure(message):
+        nonlocal failure
+        failure = failure or message
+        if records is not None:
+            records.invalidate(failure)
+            save(records.data)
     while True:
         if clock() >= deadline:
+            if line or dropping:
+                record_failure('truncated line before EOT/deadline')
             if records is None or aborted:
                 raise RecoverError(failure or 'terminal/EOT missing after deadline')
             aborted = True
-            failure = failure or 'host timeout'
+            record_failure('host timeout')
             deadline = clock() + cleanup_timeout
             try:
                 write_bounded(port, abort_frame(records.data['sid']), deadline, clock)
             except RecoverError as exc:
-                failure = str(exc)
+                record_failure(str(exc))
         chunk = port.read(256)
         if chunk:
             raw.write(chunk)
@@ -116,34 +278,51 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
             if byte == 4:
                 if not echo:
                     continue  # Initial rshell EOT is not this command's reply.
+                if line or dropping:
+                    record_failure('truncated line before EOT/deadline')
                 if failure:
                     raise RecoverError(failure)
                 if records is None:
                     return
                 if records.success():
                     return 'OK'
-                if records.paused and records.final is None:
+                if records.paused and records.final is None and not records.data['stack']:
                     if len(records.data['crc']) == 4:
                         return 'PAUSED'
                 raise RecoverError('missing/failed verification or lost logs')
             if byte == 10:
-                text = line.decode('ascii', errors='replace').rstrip('\r')
+                text = line.decode('ascii', errors='replace')
                 line.clear()
-                if text == '> ' + command:
+                if dropping:
+                    dropping = False
+                    continue
+                if text == '> ' + command or text == '> ' + command + '\r':
                     echo = True
                 if echo:
                     if text.startswith(('recover: rejected', 'gfinit: rejected rc=')):
-                        failure = 'guest rejected recovery'
+                        record_failure('guest rejected recovery')
                     try:
                         if records is not None:
                             records.line(text)
+                            seconds = records.data['cleanup_seconds']
+                            if seconds is not None and seconds != warned_seconds:
+                                warned_seconds = seconds
+                                if cleanup_timeout < seconds + CLEANUP_MARGIN:
+                                    print('recover: warning: --cleanup-timeout requires at least %s seconds' %
+                                          (seconds + CLEANUP_MARGIN), file=sys.stderr)
+                                if timeout < seconds + CLEANUP_MARGIN:
+                                    print('recover: warning: --timeout requires cleanup time plus command time (%s seconds minimum)' %
+                                          (seconds + CLEANUP_MARGIN), file=sys.stderr)
                             save(records.data)
                     except RecoverError as exc:
-                        failure = str(exc)
+                        record_failure(str(exc))
                 continue
-            line.append(byte)
-            if len(line) > 4096:
-                raise RecoverError('overlong serial line')
+            if not dropping:
+                line.append(byte)
+                if len(line) > MAX_LINE:
+                    record_failure('overlong serial line')
+                    line.clear()
+                    dropping = True
 
 
 def verify_boot(port, expected_crc, timeout, raw, clock=time.monotonic):
@@ -168,14 +347,23 @@ def status(port, timeout, raw, clock=time.monotonic):
         raw.write(capture.getvalue())
         raw.flush()
     lines = capture.getvalue().decode('ascii', errors='replace').replace('\x04', '\n').splitlines()
-    echo = lines.index('> recover status')
+    try:
+        echo = lines.index('> recover status')
+    except ValueError as exc:
+        raise RecoverError('missing status echo') from exc
     pattern = (r'recover sid=\d+ state=\d+ reason=\d+ verified=\d+ '
                r'profile=[0-9A-Fa-f]{8} plan=[0-9A-Fa-f]{8} '
                r'snapshot=[0-9A-Fa-f]{8} seq=\d+ lost=\d+ discarded=\d+')
     replies = [line for line in lines[echo + 1:] if re.fullmatch(pattern, line)]
     if len(replies) != 1:
         raise RecoverError('missing/malformed status reply')
-    return replies[0]
+    diag_pattern = (r'txd sid=[0-9]+ valid=[01] seq=[0-9]+ pos=[0-9]+ fn=('
+                    + '|'.join(DIAG_FN) + r') rc=-?[0-9]+ where=('
+                    + '|'.join(DIAG_WHERE) + r') sent=[01] polls=[0-9]+ bytes=[0-9]+')
+    diagnostics = [line for line in lines[echo + 1:] if re.fullmatch(diag_pattern, line)]
+    if len(diagnostics) != 1:
+        raise RecoverError('missing/malformed status diagnostic')
+    return replies[0] + '\n' + diagnostics[0]
 
 
 def open_port(name, baud):
@@ -194,8 +382,8 @@ def main():
     parser.add_argument('--image-crc')
     parser.add_argument('--state', type=Path)
     parser.add_argument('--log', type=Path, required=True)
-    parser.add_argument('--timeout', type=float, default=60)
-    parser.add_argument('--cleanup-timeout', type=float, default=40)
+    parser.add_argument('--timeout', type=float, default=DEFAULT_TIMEOUT)
+    parser.add_argument('--cleanup-timeout', type=float, default=DEFAULT_CLEANUP_TIMEOUT)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--command')
     mode.add_argument('--status', action='store_true')
@@ -210,12 +398,14 @@ def main():
     command = 'recover status' if args.status else (args.command or 'recover now %d' % args.session)
     if any(c in command for c in '\r\n\x04'):
         parser.error('one command only')
-    previous = (json.loads(args.state.read_text())
-                if not args.status and args.state.exists() else None)
-    records = None if args.status else Records(args.session, previous)
     def save(data):
         args.state.write_text(json.dumps(data, sort_keys=True) + '\n')
     try:
+        previous = (json.loads(args.state.read_text())
+                    if not args.status and args.state.exists() else None)
+        records = None if args.status else Records(
+            args.session, previous,
+            virtual=command.startswith('recover virtual ') if args.command else None)
         with closing(open_port(args.port, args.baud)) as port, args.log.open('ab') as raw:
             if args.status:
                 print(status(port, args.timeout, raw))
@@ -230,7 +420,7 @@ def main():
                               args.cleanup_timeout, raw, save)
             print(result)
             return 0
-    except (RecoverError, OSError) as exc:
+    except (RecoverError, OSError, ValueError, TypeError, KeyError) as exc:
         print('recover: ' + str(exc))
         return 1
 
