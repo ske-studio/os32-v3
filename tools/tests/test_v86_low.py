@@ -82,7 +82,7 @@ def check_generated_map():
 
 def main():
     check_generated_map()
-    paths = ('kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
+    paths = ('kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)

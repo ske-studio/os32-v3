@@ -23,7 +23,7 @@
 
 #include "types.h"
 
-/* BIOS ワークエリアを 1 回だけ読んで保存する。2 回目以降は何もしない。
+/* platform/pc98/clock.c 経由で BIOS ワークエリアを 1 回だけ読んで保存する。2 回目以降は何もしない。
  * **paging_init より前に呼ぶこと** (PG=0 のあいだだけが安全)。 */
 void sysclk_detect(void);
 

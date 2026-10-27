@@ -140,7 +140,7 @@ void pic_init(void);
  * 以外を受けない (票 TASK_HAL_WIRING §1-0)。 */
 int pit_init(unsigned int hz);
 
-/* 直前の pit_init が積んだ設定。valid = 0 なら一度も積んでいない。 */
+/* kernel/pit.c が所有する、直前の pit_init が積んだ設定。valid = 0 なら一度も積んでいない。 */
 const struct pit_setup *pit_get_setup(void);
 
 void idt_register_irq(unsigned int irq, void (*stub)(void));

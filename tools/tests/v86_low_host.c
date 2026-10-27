@@ -85,6 +85,7 @@ static int checked_map(u32 base, u32 end, u32 phys, u32 flags) {
 }
 #include "v86_bios.c"
 #include "v86_snapshot.c"
+#include "clock.c"
 #include "sysclk.c"
 #include "bios_consumer_slice.inc"
 static void checked_bios(void) {

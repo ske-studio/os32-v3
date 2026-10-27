@@ -29,6 +29,9 @@ TARGET_SRCS = [
     ("kernel/pit_math.c", []),
     ("kernel/sysclk.c", []),
     ("kernel/idt.c", []),
+    ("kernel/pit.c", []),
+    ("platform/pc98/clock.c", []),
+    ("platform/pc98/timer.c", []),
 ]
 
 CASES = ["both_clocks", "reject_hz", "reject_clock", "no_overflow",
