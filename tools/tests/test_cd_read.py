@@ -65,7 +65,9 @@ SAN = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g"]
 
 
 def read_includes(tree):
-    return ["-I" + str(tree / "include"), "-I" + str(tree / SHIM), "-I" + str(tree / "drivers"), "-I" + str(tree / "fs"),
+    # The host shim must win over include/ (io.h) for both the copied tree and the
+    # dependency scan over ROOT, so it comes first.
+    return ["-I" + str(tree / SHIM), "-I" + str(tree / "include"), "-I" + str(tree / "drivers"), "-I" + str(tree / "fs"),
             "-I" + str(tree)] + ["-I" + str(ROOT / p) for p in
                                  ("include", "drivers", "fs", "lib", "kernel",
                                   "sdk/include/os32")] + ["-I" + str(ROOT)]
