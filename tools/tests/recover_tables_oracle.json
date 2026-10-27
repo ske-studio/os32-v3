@@ -2,7 +2,7 @@
   "revision": "81d7f2531037b93f58bd6398cc06a87980d1d6b5",
   "source": "kdebug/recover_gf.c",
   "source_sha256": "c663abb80ed56cfcc573b0afedd2ecba5b1400fe84806d4f6b9303d4d2a9ea84",
-  "oracle_sha256": "17bb8a3fbc89d629a535d08c94f8dd1fb894e7b42747ef2a07a5309602205a42",
+  "oracle_sha256": "375ebf2684c3b6675e6cc0615e8b516539594267a1753a425718787d991e4abb",
   "extraction": [
     "gcc",
     "-std=gnu11",
@@ -12,5 +12,5 @@
     "-Iinclude",
     "kdebug/recover_gf.c"
   ],
-  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation."
+  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation. Approved GF6200_4A_DESIGN final section main 0 retry delta (2026-10-27): SUB6/SUB7 rules 544-564 (substeps 0x12000-0x12005 and 0x12020-0x1202e) verify_mask are zero, including previously zero rules 550/561. MIT nouveau setPLL_double_lowregs does not read back these writes; rnndb defines no readable bits. Write masks, values, order, captures and original source provenance retained. Approved GF6200_4A_DESIGN main 2 VIDEO PLL decision (2026-10-27): rules 565-569, 573, 575-577 (T:572-576,580,582-584) verify_mask are zero. MIT nouveau nv04.c does not read back VIDEO PLL writes; 184Ch and CR57 restores do not protect the 98 display; MIT rnndb pbus.xml BAR1_VRAM_SIZE alignment is 0x100000. Rule 574 (T:581 CR3C COPY) retains FFh for subsequent table selection. All old reads/read_safe flags, write sequences and the 31 nonzero main_id NONE rules are retained."
 }
