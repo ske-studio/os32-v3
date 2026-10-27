@@ -107,6 +107,7 @@ static u32 checked_alloc(u32 owner, int pages) {
 #define paging_v86_map_range checked_map
 #define v86_bios_setup checked_bios
 #define _stop restore_stop
+#include "emergency.c"
 #include "v86_mem.c"
 #undef _stop
 #undef v86_bios_setup

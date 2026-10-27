@@ -139,6 +139,7 @@ static void snd_state_for_os32(void) {}
 void v86_io_apply_policy(void) { policy_deny = 0; boundary(); }
 static void restore_stop(void) { CHECK(0, "unexpected restore stop"); }
 #define _stop restore_stop
+#include "emergency.c"
 #include "session.c"
 #undef _stop
 /* First boundary precedes opening the low mapping. Last boundary follows its

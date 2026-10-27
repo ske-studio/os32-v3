@@ -18,6 +18,7 @@
 #include "module.h"
 #include "kselftest.h"
 #include "tvram.h"
+#include "platform_emergency.h"
 #include "../gfx/gfx.h"
 
 
@@ -168,11 +169,9 @@ void v86_session_end(void)
                 line[offsets[n] + i] = "0123456789ABCDEF"[counts[n] & V86_HEX_MASK];
                 counts[n] >>= V86_HEX_SHIFT;
             }
-        volatile u16 *text = P2V_IO(TVRAM_BASE);
-        volatile u16 *attr = P2V_IO(TVRAM_ATTR);
         unsigned int col = 0;
-        for (; line[col]; col++) { text[col] = (u8)line[col]; attr[col] = TATTR_RED; }
-        while (col < TVRAM_COLS) { text[col] = ' '; attr[col++] = TATTR_RED; }
+        for (; line[col]; col++) { platform_fault_cell(col, (u8)line[col], TATTR_RED); }
+        while (col < TVRAM_COLS) { platform_fault_cell(col++, ' ', TATTR_RED); }
         for (;;) _stop();
     }
     /* Guest permissions are gone before owner reclamation can run. */

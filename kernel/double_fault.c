@@ -9,6 +9,7 @@
 #include "paging.h"
 #include "io.h"
 #include "tvram.h"
+#include "platform_emergency.h"
 #include "pc98.h"
 #include "serial_diag.h"
 #include "sqlite_engine.h"
@@ -69,12 +70,10 @@ void double_fault_halt(u32 cr2)
     hex_at(line + DF_COL_ESP, kernel_tss.esp);
     hex_at(line + DF_COL_CR2, cr2);
     hex_at(line + DF_COL_CR3, kernel_tss.cr3);
-    volatile u16 *text = P2V_IO(TVRAM_BASE);
-    volatile u16 *attr = P2V_IO(TVRAM_ATTR);
     unsigned int col = 0;
-    for (const char *p = line; *p; p++, col++) { text[col] = (u8)*p; attr[col] = TATTR_RED; }
-    for (const char *p = guard; *p; p++, col++) { text[col] = (u8)*p; attr[col] = TATTR_RED; }
-    while (col < TVRAM_COLS) { text[col] = ' '; attr[col++] = TATTR_RED; }
+    for (const char *p = line; *p; p++, col++) { platform_fault_cell(col, (u8)*p, TATTR_RED); }
+    for (const char *p = guard; *p; p++, col++) { platform_fault_cell(col, (u8)*p, TATTR_RED); }
+    while (col < TVRAM_COLS) { platform_fault_cell(col++, ' ', TATTR_RED); }
     serial_puts_polled(line);
     serial_puts_polled(guard);
     serial_puts_polled("\n");

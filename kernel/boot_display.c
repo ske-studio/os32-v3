@@ -1,21 +1,11 @@
 /* Shared boot status rendering, moved without changing layout. */
 #include "boot_display.h"
-#include "tvram.h"
-#include "pc98.h"
-#include "memmap.h"
+#include "platform_emergency.h"
 #include "kprintf.h"
 
 void tvram_print(int x, int y, const char *str, u8 color)
 {
-    u32 offset;
-    while (*str) {
-        if (x >= TVRAM_COLS) { x = 0; y++; }
-        if (y >= TVRAM_ROWS) break;
-        offset = (u32)y * TVRAM_BPR + (u32)x * TVRAM_CELL_BYTES;
-        *(volatile u16 *)P2V_IO(TVRAM_BASE + offset) = (u16)(u8)*str;
-        *(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;
-        str++; x++;
-    }
+    platform_boot_puts(x, y, str, color);
 }
 
 /* 文字列を連結して終端の次を返す (状態行を組み立てる小道具)。

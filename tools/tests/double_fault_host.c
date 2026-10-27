@@ -3,6 +3,7 @@
 #include "gdt.c"
 #include "tss.c"
 #include "idt.c"
+#include "emergency.c"
 #include "double_fault.c"
 #include "cpu_shadow.h"
 u32 host_observed_cr3;

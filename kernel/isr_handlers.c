@@ -59,6 +59,7 @@ extern volatile int ring3_wm_depth;
 
 #include "serial_diag.h"
 #include "tvram.h"
+#include "platform_emergency.h"
 
 /* シリアルポートにもログを出力するためのヘルパー */
 static void sputs(const char *str)
@@ -84,10 +85,6 @@ static void sput_hex32(u32 val)
     serial_puts_polled(buf);
 }
 
-/* テキストVRAM直接アクセス (ベアメタル) — tvram.h のマクロを使用 */
-#define TVRAM_CHAR  ((volatile u16 *)P2V_IO_CONST(TVRAM_BASE))
-#define TVRAM_ATRP  ((volatile u16 *)P2V_IO_CONST(TVRAM_ATTR))
-
 /* ------------------------------------------------------------------------ */
 /*  tvram_puts_at — テキストVRAMに文字列を直接書き込み                     */
 /* ------------------------------------------------------------------------ */
@@ -95,8 +92,7 @@ static void tvram_puts_at(int row, int col, const char *str, u8 attr)
 {
     int pos = row * TVRAM_COLS + col;
     while (*str) {
-        TVRAM_CHAR[pos] = (u16)(u8)*str;
-        TVRAM_ATRP[pos] = (u16)attr;
+        platform_fault_cell(pos, (u16)(u8)*str, attr);
         str++;
         pos++;
     }

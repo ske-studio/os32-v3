@@ -19,7 +19,7 @@ MUTATIONS = (
     ('kernel/v86_mem.c', '    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),\n            MEM_AUTOPLAY_MAILBOX_SIZE);', '', 'mailbox-restore'),
     ('kernel/v86_mem.c', '    kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);', '', 'fresh-zero'),
     ('kernel/v86_mem.c', '        for (;;) _stop();', '', 'restore-fail-stop'),
-    ('kernel/v86_mem.c', 'text[col] = (u8)line[col];', '', 'restore-diagnostic'),
+    ('kernel/v86_mem.c', 'platform_fault_cell(col, (u8)line[col], TATTR_RED);', '(void)line[col];', 'restore-diagnostic'),
     ('kernel/paging.c', 'paging_set_not_present(0, MEM_NULL_GUARD_END);',
      'paging_set_readonly(0, MEM_NULL_GUARD_END);', 'page0-NP'),
     ('kernel/v86_mem.c',
@@ -82,7 +82,7 @@ def check_generated_map():
 
 def main():
     check_generated_map()
-    paths = ('kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
+    paths = ('kernel/platform_emergency.h', 'platform/pc98/emergency.c', 'kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)

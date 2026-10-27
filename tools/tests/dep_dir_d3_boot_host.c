@@ -43,6 +43,7 @@ static int kutoa_dec(u32 v, char *b, int n) { return snprintf(b, n, "%lu", v); }
 static int kutoa_hex(u32 v, char *b, int n, int upper)
 { return snprintf(b, n, upper ? "%lX" : "%lx", v); }
 #define tvram_print render_tvram
+#include "emergency_source.inc"
 #include "boot_display_source.inc"
 #undef tvram_print
 void tvram_print(int x, int y, const char *s, u8 attr)
