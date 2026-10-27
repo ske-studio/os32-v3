@@ -124,6 +124,51 @@ static int pll_fail_write(void *v,const struct recover_bus_access *a,u32 value)
     if(write_attempt++==fail_at)return -1;
     return exec_bus_write(v,a,value);
 }
+/* Model Ra266's 4600h readback independently of its write latch. */
+static u32 mismatch_key, mismatch_after, mismatch_seen;
+static int pll_readback(void *v,const struct recover_bus_access *a,u32 *value)
+{
+    int rc=exec_bus_read(v,a,value);
+    if(a->offset==GF_PLL_MEMORY_POWER)*value=0;
+    if(core.state==REC_RUNNING && a->key==mismatch_key && actual_count>=mismatch_after) {
+        if(!mismatch_seen)mismatch_seen=actual_count;
+        *value^=1U;
+    }
+    return rc;
+}
+static void pll_readback_tests(void)
+{
+    for(pll_double=0;pll_double<2;pll_double++) {
+        pll_plan(0xe754);
+        u32 power=key_for(&profile,GF_PLL_MEMORY_POWER,0,0,0);
+        reference_values[power]=0;
+        reference_pll(GF_PLL_MEMORY,400000);
+        /* Keep the complete baseline trace across the fault runs below. */
+        struct trace_item baseline[15];
+        CHECK(expected_count==15);
+        for(u32 i=0;i<15;i++)baseline[i]=expected[i];
+        mismatch_key=RECOVER_NONE;mismatch_after=0;
+        executor_bus.read=pll_readback;
+        CHECK(gfinit_exec_run(&core,&execution)==0);compare_trace();
+        CHECK(actual_count==15 && actual[0].key==power && actual[0].value==0x80000000U);
+        CHECK(actual[11].key==power && actual[11].value==0 && values[power]==0);
+        /* Every other PLL row retains full verification and stops immediately
+         * when bit 0 differs after its write (captures still read cleanly). */
+        for(u32 j=0;j<15;j++) {
+            if(j==0 || j==11)continue;
+            pll_plan(0xe754);
+            mismatch_key=baseline[j].key;mismatch_after=j+1;mismatch_seen=0;
+            executor_bus.read=pll_readback;
+            CHECK(gfinit_exec_run(&core,&execution)<0 && core.reason==REC_VERIFY);
+            /* Common failure cleanup adds its own writes after this prefix. */
+            CHECK(core.first_key==mismatch_key && mismatch_seen==j+1);
+            for(u32 i=0;i<mismatch_seen && i<15;i++)
+                CHECK(actual[i].key==baseline[i].key && actual[i].value==baseline[i].value &&
+                      actual[i].dir==baseline[i].dir);
+        }
+    }
+    output("PLL readback: 4600h fixed zero passes both writes; all other masks reject mismatch; ordered trace and saved restore unchanged\n");
+}
 static void pll_execution_tests(void)
 {
     const u32 pcs[]={0xe728,0xe754,0xe623},counts[]={6,15,5};
@@ -145,6 +190,7 @@ static void pll_execution_tests(void)
         decoded.nodes[first-1].next[0]=decoded.nodes[first-1].next[1]=first+1;
         CHECK(contract_bind()<0);
     }
+    pll_readback_tests();
     output("PLL production rules: core 6 / memory 15 / video 5 writes, source captures, failure at every write, ordered dependencies\n");
 }
 void _start(void)

@@ -2,7 +2,7 @@
   "revision": "81d7f2531037b93f58bd6398cc06a87980d1d6b5",
   "source": "kdebug/recover_gf.c",
   "source_sha256": "c663abb80ed56cfcc573b0afedd2ecba5b1400fe84806d4f6b9303d4d2a9ea84",
-  "oracle_sha256": "17bb8a3fbc89d629a535d08c94f8dd1fb894e7b42747ef2a07a5309602205a42",
+  "oracle_sha256": "07cf3ff43e9a521bd2ce8cc768d512fd31424a30584f1de893b2199e77e8cbd3",
   "extraction": [
     "gcc",
     "-std=gnu11",
@@ -12,5 +12,5 @@
     "-Iinclude",
     "kdebug/recover_gf.c"
   ],
-  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation."
+  "note": "Full preprocessed old translation unit freezes headers, constants and referenced arrays. Prefix the one-line comment above to reproduce. Compile separately from product; never refresh as part of table generation. Approved GF6200_4A_DESIGN main 0 delta (2026-10-27): only rules 550/561 verify_mask changed to zero; original source provenance retained."
 }

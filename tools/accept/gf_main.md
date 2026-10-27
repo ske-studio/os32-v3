@@ -81,7 +81,7 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 | PFB 100234h（32bit） | 選択[266633h,266633h,266633h,266622h,B6FF44h,266622h,266622h,266622h] | 0h | T:136–143；T:637 |
 | PFB 100238h（32bit） | 選択[140200h,140200h,140200h,140200h,3F0200h,140200h,140200h,140200h] | 0h | T:145–152；T:638 |
 | CORE係数 004004h、MEM係数 004024h、MEM係数mirror 00403Ch（32bit） | PLL係数（実機で決まる） | FFFFFFFFh | T:554,563–564；T:734–735,737 |
-| MEM電源補助 004600h（32bit） | PLL補助（実機で決まる）→PLL補助（実機で決まる） | FFFFFFFFh | T:557,568；T:738 |
+| MEM電源補助 004600h（32bit） | PLL補助（実機で決まる）→PLL補助（実機で決まる） | 0 | T:557,568；T:738 |
 | MEM制御mirror 004038h（32bit） | PLL補助（実機で決まる）→PLL補助（実機で決まる）→PLL補助（実機で決まる） | FFFFFFFFh | T:561,567,571；T:736 |
 
 ノート：承認後 `gfinit run-one <sid> 0 --allow-write` を下記monitorで1回。RECのmain=0・gf_pre/gf_bus BEGIN/END・rc・PAUSED・同じsid・連番欠落なしを確認し、差分と直後の98表示/更新をユーザーへ提示（S:38,41,53、D:163–168）。
