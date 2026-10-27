@@ -1,6 +1,6 @@
 {
   "base": "466010d7",
-  "kapi_sha256": "7bc5ec574aea0edb4554cfc3861d95d783bacf6c0e228ef20bab9b1a81df0a90",
+  "kapi_sha256": "f486734b19a5db4d9c386a43f940d54cba4357ec399147011499ff791e225dfe",
   "apis": {
     "pcm": {
       "type": "PcmModuleApi",
