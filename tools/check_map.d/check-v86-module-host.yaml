@@ -75,4 +75,7 @@ check-v86-module-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- kernel/display_restore.h
+- kernel/platform_display.h
+- platform/pc98/display.c
 artifact_reader: true

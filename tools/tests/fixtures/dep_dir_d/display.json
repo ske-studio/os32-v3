@@ -1,0 +1,7 @@
+{
+  "baseline": "b400acb6",
+  "inputs": "8 saved BDA combinations; sink 0/1, height 200/400/480, flip 0/1, HSYNC 0..255; NULL and 0/ffff/10000/ffffffff cell values; KCG CODE",
+  "trace_sha256": "9e380f658f5d08fd699393068ecd78d2aad69d85d9fc09905fbf0bb6bf75825e",
+  "harness_sha256": "a1b2912622a10aca441b86218c5e28cb9e0a58aa89bc42ea8cdedf52ac445aa9",
+  "seam": "I/O width/value/wait/order and state at each event; MMIO access width/value; KCG hardware seam excludes facade invalidation (covered by test_kcg_module)"
+}

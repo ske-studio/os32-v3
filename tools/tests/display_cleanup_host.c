@@ -29,6 +29,7 @@ struct kdebug kdebug = { .ops = { .gcap_active = v86_gcap_active } };
 static void snd_state_for_os32(void) { sound++; }
 static void tv_restore(const u16 *tv) { CHECK(*tv == 123, "saved TVRAM"); restored++; }
 #include "display_restore.h"
+#include "display_private.h"
 static u16 reserved_cell;
 static int gui;
 static u32 sync_read=0x81;

@@ -67,4 +67,5 @@ check-memmap-audit-host:
 - lib/serial_diag.h
 - kernel/cpu_flags.inc
 - kernel/entry_layout.inc
+- kernel/display_restore.h
 artifact_reader: true

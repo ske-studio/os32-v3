@@ -118,4 +118,7 @@ check-mkmod-host:
 - tools/tests/test_mkmod.py
 - tools/tests/test_module_image.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- kernel/platform_display.h
+- platform/pc98/display_private.h
+- platform/pc98/display.c
 artifact_reader: true

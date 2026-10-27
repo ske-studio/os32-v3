@@ -7,8 +7,7 @@
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "kprintf.h"
-#include "pc98.h"
-#include "io.h"
+#include "platform_display.h"
 
 extern const u32 kcg_kexports[];
 extern const struct module_symbol_contract kcg_import_contracts[];
@@ -35,8 +34,7 @@ void kcg_v86_restore(void)
 {
     /* Bible §2-6-5 / UNDOCUMENTED io_disp 0068h KAC Mode.
      * The mode belongs to core; absent/failed modules retain no cache. */
-    outp(MODE_FF1_PORT, MFF1_KCG_CODE);
-    io_wait();
+    platform_display_kcg_code();
     public_api()->invalidate();
 }
 
