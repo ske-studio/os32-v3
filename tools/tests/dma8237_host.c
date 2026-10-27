@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../drivers/dma8237_math.c"
+#include "../../lib/dma_contract.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

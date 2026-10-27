@@ -17,7 +17,7 @@
 #ifndef PCM_CS4231_H
 #define PCM_CS4231_H
 
-#include "types.h"
+#include "pcm_contract.h"
 #include "time_units.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* (エラーは共通体系) */
 
@@ -116,7 +116,6 @@
 /* ======================================================================== */
 /*  3. リングとステージングの寸法 (票 §2-1)                                  */
 /* ======================================================================== */
-#define PCM_FRAME_BYTES    4U       /* 16 ビット × 2ch */
 #define PCM_RING_FRAMES    4096U
 #define PCM_HALF_FRAMES    2048U
 #define PCM_RING_BYTES     (PCM_RING_FRAMES * PCM_FRAME_BYTES)   /* 16KB */
@@ -131,10 +130,6 @@
  *  写す (512 frame = 11.6ms @44.1k。コピー 8KB + I/O の最悪より十分長い)。 */
 #define PCM_REFILL_MARGIN  512U
 
-/*  レート。この 2 つだけ (票 §4)。 */
-#define PCM_RATE_44100     44100U
-#define PCM_RATE_22050     22050U
-
 /*  待ちの期限 (tick = 10ms)。全部 IF=1 の poll。 */
 #define PCM_WAIT_TICKS     5U   /* INIT / 再同期 / ACI (foreground) */
 #define PCM_STOP_TICKS     3U   /* DRS の落ちるのを tick で待つ */
@@ -147,10 +142,6 @@
 #define PCM_MS_PER_TICK    10U
 #define PCM_US_PER_TICK    10000U
 #define PCM_MS_PER_SEC     1000U
-
-/*  起動時の表示に出す版の番号 (CS4231 = 100、CS4231A = 101)。 */
-#define PCM_VER_NAME_4231  100
-#define PCM_VER_NAME_4231A 101
 
 /* ------------------------------------------------------------------------ */
 /*  診断 (kernel.map から読む。E3 の切り分け) — 番号の意味                   */
@@ -183,40 +174,9 @@
 #define PCM_PP_CLOSE_TIMEOUT  2   /* close: 期限切れで STOP_REQ を公開した後、停止の入口の前 */
 #define PCM_PP_WAIT           3   /* close: 停止待ちのループの 1 周 */
 
-/* ------------------------------------------------------------------------ */
-/*  エラーの写し (票 §2-2 の BUSY / NOMEM)                                  */
-/*                                                                          */
-/*  `OS32_ERR_*` には BUSY も NOMEM も無いので、意味のいちばん近い既存の     */
-/*  番号へ写す。**新しい番号は足さない** (KAPI_SPEC §3-2 の予約表を汚さない)。*/
-/*    BUSY  = 他の owner が open 中 / IRQ10 に結べない → 資源が満杯          */
-/*    NOMEM = DMA プールが取れない                    → 空き不足            */
-/* ------------------------------------------------------------------------ */
-#define PCM_ERR_BUSY   OS32_ERR_FULL    /* -13 */
-#define PCM_ERR_NOMEM  OS32_ERR_NOSPC   /* -4  */
-
-/*  音量: percent 1〜100 を 6 ビットの減衰へ線形に写す。 */
-#define PCM_VOL_MAX        100U
-
-/*  カウンタの飽和 (pcm_status の詰め方)。 */
-#define PCM_CNT_U8_MAX     255U
-#define PCM_CNT_U16_MAX    65535U
-#define PCM_CNT_UND_SHIFT  24
-#define PCM_CNT_REP_SHIFT  16
-
 /* ======================================================================== */
 /*  4. 状態機械 (票 §2-1 の表)                                               */
 /* ======================================================================== */
-#define PCM_ST_CLOSED      0
-#define PCM_ST_OPENING     1
-#define PCM_ST_OPEN        2
-#define PCM_ST_RUNNING     3
-#define PCM_ST_DRAINING    4
-#define PCM_ST_RS_STOP     5
-#define PCM_ST_RS_RESTART  6
-#define PCM_ST_STOP_REQ    7
-#define PCM_ST_STOP_DONE   8
-#define PCM_ST_FAULTED     9
-
 /*  drain の 3 段階 (+ 出た)。 */
 #define PCM_DRAIN_WAIT     0   /* last_data_half に入るのを待つ */
 #define PCM_DRAIN_IN       1   /* 読んでいる */
@@ -374,28 +334,5 @@ int pcm_seq_init(u8 fmt, struct pcm_op *out);      /* open の (8)〜(10) */
 /*  I/O を出す側 (drivers/pcm_cs4231.c)                                     */
 /* ------------------------------------------------------------------------ */
 
-/* 起動時 (pci_bind_all の後)。検出だけ。装置が無くても静かに戻る。 */
-void pcm_init(void);
-
-/* tick フック (kernel/isr_handlers.c の timer_handler)。 */
-void pcm_tick(void);
-
-/* 所有者の回収 (exec/exec.c の exec_reclaim_owned)。 */
-void pcm_reclaim(int owner);
-
-/* KAPI の実体 (kapi/ の __cdecl ラッパから呼ばれる — [C3])。 */
-int pcm_open(u32 rate);
-/* write の受付の検査だけ (owner と状態)。0 / OS32_ERR_INVAL。
- * KAPI の wrapper が**入力の検査より先に**呼ぶ — 未 open・非 owner は
- * bytes = 0 でも負を返す契約 (票 §2-2)。 */
-int pcm_write_check(void);
-int pcm_write(const void *buf, u32 bytes);
-int pcm_status(u32 *free_bytes, u32 *counters);
-int pcm_close(void);
-int pcm_set_volume(u32 percent);
-
-/* kselftest / 診断の覗き口 (KAPI にはしない)。 */
-int pcm_state(void);
-int pcm_present(void);
 
 #endif /* PCM_CS4231_H */

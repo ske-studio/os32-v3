@@ -7,3 +7,5 @@ check-pcm-cs4231-host:
 - tools/check_map.d/check-pcm-cs4231-host.yaml
 - build/checks.d/check-pcm-cs4231-host.mk
 - tools/tests/mutpar.py
+
+- include/pcm_contract.h

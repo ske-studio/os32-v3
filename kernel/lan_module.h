@@ -1,7 +1,7 @@
 /* Private paired LAN facade; public KAPI and core PCI/VFS remain unchanged. */
 #ifndef LAN_MODULE_H
 #define LAN_MODULE_H
-#include "e82557.h"
+#include "lan_contract.h"
 #include "sfs_lan.h"
 #include "module_runtime.h"
 #include "irq.h"

@@ -24,7 +24,7 @@
     "paging.h",
     "clock_service.h",
     "exec.h",
-    "fm.h",
+    "fm_contract.h",
     "np2sysp.h",
     "ide.h",
     "path.h",
@@ -53,7 +53,7 @@
     "memory_boot.h",
     "launch.h",
     "kapi_host.h",
-    "pci.h", "pcm_cs4231.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
+    "pci.h", "pcm_contract.h", "bootinfo.h", "serialfs.h", "v86_gcap.h", "surface_query.h", "ring3_ls.h", "redir_access.h", "appmem.h", "unicode_file.h", "font_source.h"
   ],
   "externs": [
     "extern volatile u32 tick_count;",

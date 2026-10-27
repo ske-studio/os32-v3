@@ -1,4 +1,5 @@
 #include "lan_module.h"
+#include "e82557.h" /* Device probe table; moved only in L02. */
 
 int lan_module_init(LanModuleApi *out)
 {

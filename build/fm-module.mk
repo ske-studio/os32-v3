@@ -1,7 +1,7 @@
 # T5c-2a: reuse T4 function imports, VA0 packing and paired distribution.
 FM_OUT := $(BUILD_OUT)/fm
 FM_GEN := $(addprefix $(FM_OUT)/,fm_imports.h fm_imports.json fm_import_slots.c fm_import_stubs.S fm_provider_types.c fm_kexports.c)
-FM_DEF_SOURCES := kernel/fm_module.h drivers/fm.h kernel/snd_engine.h
+FM_DEF_SOURCES := include/fm_contract.h kernel/fm_module.h drivers/fm.h kernel/snd_engine.h
 $(FM_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/fm_imports.def $(FM_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module fm --out-dir $(FM_OUT)
 

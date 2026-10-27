@@ -1,0 +1,95 @@
+{
+  "base": "466010d7",
+  "kapi_sha256": "7bc5ec574aea0edb4554cfc3861d95d783bacf6c0e228ef20bab9b1a81df0a90",
+  "apis": {
+    "pcm": {
+      "type": "PcmModuleApi",
+      "size": 44,
+      "members": [
+        "open",
+        "write_check",
+        "write",
+        "status",
+        "close",
+        "set_volume",
+        "state",
+        "present",
+        "reclaim",
+        "tick",
+        "quiet"
+      ],
+      "body": "int (*open)(u32 rate); int (*write_check)(void); int (*write)(const void *buf, u32 bytes); int (*status)(u32 *free_bytes, u32 *counters); int (*close)(void); int (*set_volume)(u32 percent); int (*state)(void); int (*present)(void); void (*reclaim)(int owner); void (*tick)(void); int (*quiet)(void);"
+    },
+    "fm": {
+      "type": "FmModuleApi",
+      "size": 116,
+      "members": [
+        "opn_write",
+        "opn_init",
+        "fm_set_tone",
+        "fm_set_tone_num",
+        "fm_note_on",
+        "fm_note_off",
+        "fm_all_off",
+        "ssg_tone",
+        "ssg_volume",
+        "ssg_noise",
+        "ssg_mixer",
+        "ssg_all_off",
+        "fm_startup_sound",
+        "fm_play_mml",
+        "fm_play_mml_kapi",
+        "snd_bgm_play",
+        "snd_bgm_stop",
+        "snd_bgm_is_playing",
+        "snd_se_play",
+        "snd_se_play_raw",
+        "snd_set_master",
+        "snd_cleanup",
+        "snd_bgm_set_persist",
+        "snd_focus",
+        "snd_focus_owner",
+        "snd_owner_exit",
+        "snd_bgm_get_persist",
+        "tick",
+        "quiet"
+      ],
+      "body": "void (*opn_write)(uchar reg, uchar val); void (*opn_init)(void); void (*fm_set_tone)(int ch, const uchar *tone_data); void (*fm_set_tone_num)(int ch, int tone_num); void (*fm_note_on)(int ch, int note); void (*fm_note_off)(int ch); void (*fm_all_off)(void); void (*ssg_tone)(int ch, u16 period); void (*ssg_volume)(int ch, uchar vol); void (*ssg_noise)(uchar period); void (*ssg_mixer)(uchar mask); void (*ssg_all_off)(void); void (*fm_startup_sound)(void); void (*fm_play_mml)(const char *mml); void (*fm_play_mml_kapi)(const char *mml); void (*snd_bgm_play)(const char *mml); void (*snd_bgm_stop)(void); int (*snd_bgm_is_playing)(void); void (*snd_se_play)(int se_id); void (*snd_se_play_raw)(int note, int duration_ticks, int tone); void (*snd_set_master)(int enable); void (*snd_cleanup)(void); void (*snd_bgm_set_persist)(int persist); i32 (*snd_focus)(int app_id); int (*snd_focus_owner)(void); void (*snd_owner_exit)(int owner); int (*snd_bgm_get_persist)(void); void (*tick)(void); int (*quiet)(void);"
+    },
+    "lan": {
+      "type": "LanModuleApi",
+      "size": 80,
+      "members": [
+        "probe",
+        "send",
+        "recv",
+        "mac",
+        "state",
+        "rx_free",
+        "rx_ready",
+        "loopback",
+        "stat",
+        "tick",
+        "quiet",
+        "release",
+        "lan_init",
+        "lan_peer",
+        "lan_reset",
+        "io"
+      ],
+      "body": "int (*probe)(const struct pci_dev *dev); int (*send)(const void *buf, u32 len); int (*recv)(void *buf, u32 cap, u32 *len); void (*mac)(u8 *mac); int (*state)(void); u32 (*rx_free)(void); int (*rx_ready)(void); int (*loopback)(int on); u32 (*stat)(u32 idx); void (*tick)(void); int (*quiet)(void); int (*release)(void); void (*lan_init)(SfsLan *, const SfsLanNic *, const SfsIo *, void *); int (*lan_peer)(SfsLan *, const char *); void (*lan_reset)(SfsLan *); SfsIo io;"
+    }
+  },
+  "old_generations": {
+    "pcm": 302387204,
+    "fm": 4048783084,
+    "lan": 1851563776,
+    "kdebug": 815368837
+  },
+  "imports_sha256": {
+    "pcm": "3434cbffe02404f83ea2e62f1d18e3cdb38e2da619b90af87cb4eff78ea07e16",
+    "fm": "78fb135af8b858bf87eb388f46a9f4add4a21ba66ae5314a380a9308c58fcd66",
+    "lan": "21c9c654c0080108c760c38174397c934e6f53628474a376f4b1c8fe283a7a03",
+    "kdebug": "1b18292db271757079af7ee8fc7589730631e51859e61af580339fe60b1d7cd6"
+  }
+}

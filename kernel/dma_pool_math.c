@@ -11,7 +11,7 @@
 
 #include "memmap.h"
 #include "dma_pool.h"
-#include "dma8237.h"   /* dma_crosses_64k — 境界の規則は 8237 側が正典 */
+#include "dma_contract.h"   /* dma_crosses_64k — 境界の規則は 8237 側が正典 */
 
 /* ------------------------------------------------------------------------ */
 /*  内部の小物                                                              */

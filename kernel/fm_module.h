@@ -1,7 +1,7 @@
 /* Private paired FM/snd facade. Public KAPI signatures stay unchanged. */
 #ifndef FM_MODULE_H
 #define FM_MODULE_H
-#include "fm.h"
+#include "fm_contract.h"
 #include "snd_engine.h"
 #include "module_runtime.h"
 #define FM_MODULE_OPS_VERSION 1u

@@ -1,7 +1,7 @@
 /* Private paired PCM facade; public KAPI and S4 signatures stay unchanged. */
 #ifndef PCM_MODULE_H
 #define PCM_MODULE_H
-#include "pcm_cs4231.h"
+#include "pcm_contract.h"
 #include "module_runtime.h"
 #include "irq.h"
 #include "dma_pool.h"

@@ -79,4 +79,6 @@ check-lan-module-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- include/lan_contract.h
+- include/dma_contract.h
 artifact_reader: true

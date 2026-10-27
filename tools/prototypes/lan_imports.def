@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "contracts": [
+    "include/lan_contract.h",
     "kernel/lan_module.h"
   ],
   "imports": [

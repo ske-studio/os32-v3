@@ -333,7 +333,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma_crosses_64k",
-      "source": "drivers/dma8237.h",
+      "source": "include/dma_contract.h",
       "context_safe": false,
       "index": 41
     },
@@ -861,7 +861,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "pcm_open",
-      "source": "drivers/pcm_cs4231.h",
+      "source": "include/pcm_contract.h",
       "context_safe": false,
       "index": 107
     },
@@ -869,7 +869,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "pcm_state",
-      "source": "drivers/pcm_cs4231.h",
+      "source": "include/pcm_contract.h",
       "context_safe": false,
       "index": 108
     },
@@ -1838,7 +1838,7 @@
       "stage": "S4",
       "kind": "FUNC",
       "symbol": "dma_range_ok",
-      "source": "drivers/dma8237.h",
+      "source": "include/dma_contract.h",
       "context_safe": false,
       "index": 229
     },
@@ -1926,7 +1926,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "e82557_send",
-      "source": "drivers/e82557.h",
+      "source": "include/lan_contract.h",
       "context_safe": false,
       "index": 240
     },
@@ -1934,7 +1934,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "e82557_get_mac",
-      "source": "drivers/e82557.h",
+      "source": "include/lan_contract.h",
       "context_safe": false,
       "index": 241
     },
@@ -1942,7 +1942,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "e82557_state",
-      "source": "drivers/e82557.h",
+      "source": "include/lan_contract.h",
       "context_safe": false,
       "index": 242
     },

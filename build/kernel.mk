@@ -36,7 +36,7 @@ C_KERNEL = \
     kernel/ver_collect.c kernel/ver_format.c \
     kernel/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/hwdev_module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
-    drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/disk.c drivers/dma8237.c drivers/dma8237_math.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
+    drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/disk.c drivers/dma8237.c drivers/dma8237_math.c lib/dma_contract.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
     drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
     drivers/lgy98.c drivers/ne2000.c drivers/ne2000_ring.c \
     kernel/pcm_module.c kernel/lan_module.c \

@@ -8,7 +8,7 @@
 
 #include "memmap.h"
 #include "snd_engine.h"
-#include "fm.h"
+#include "fm_contract.h"
 #include "io.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* */
 

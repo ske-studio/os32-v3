@@ -24,7 +24,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/dma8237_host.c"
 SRC = ROOT / "drivers/dma8237_math.c"
-TARGET_SRCS = ["drivers/dma8237_math.c", "drivers/dma8237.c"]
+COMMON = ROOT / "lib/dma_contract.c"
+TARGET_SRCS = ["lib/dma_contract.c", "drivers/dma8237_math.c", "drivers/dma8237.c"]
 
 CASES = ["port_table", "split_addr", "crosses", "count_bytes",
          "accept_pair", "check_args", "mode_bytes"]
@@ -37,10 +38,10 @@ INCLUDES = ["-I" + str(ROOT / p)
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
     (r"    if \(bytes == 0\) return 1;\n", "",
-     "0 バイトを「またがない」と答える (積むと 65536 バイト転送になる)"),
+     "0 バイトを「またがない」と答える (積むと 65536 バイト転送になる)", COMMON),
     (r"    if \(bytes > \(u32\)\(DMA_BANK_SIZE - off\)\) return 1;",
      "    if (bytes > (u32)(DMA_BANK_SIZE - off) + 1) return 1;",
-     "またぎ判定が 1 バイトぶん緩い (末尾 1 バイトが別バンクへ折り返す)"),
+     "またぎ判定が 1 バイトぶん緩い (末尾 1 バイトが別バンクへ折り返す)", COMMON),
     (r"    if \(c1 > limit \|\| c2 > limit\) return 0;\n", "    (void)limit;\n",
      "設定長を超えた読みを採用する (TC 後の FFFFh を残量と読む)"),
     (r"    if \(c1 < c2\) return 0;",
@@ -64,11 +65,17 @@ MUTATIONS = [
 ]
 
 
-def host_build(tmp, source_text=None):
+def host_build(tmp, source_text=None, contract_text=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "dma8237-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
-    if source_text is not None:
+    if source_text is not None or contract_text is not None:
+        if source_text is None:
+            source_text = SRC.read_text()
+        if contract_text is None:
+            contract_text = COMMON.read_text()
+        common = src_dir / "dma_contract.c"
+        common.write_text(contract_text)
         mut = src_dir / "drivers"
         mut.mkdir(exist_ok=True)
         (mut / "dma8237_math.c").write_text(source_text, encoding="utf-8")
@@ -78,7 +85,8 @@ def host_build(tmp, source_text=None):
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../drivers/dma8237_math.c"', '"drivers/dma8237_math.c"'),
+                '"../../drivers/dma8237_math.c"', '"drivers/dma8237_math.c"')
+            .replace('"../../lib/dma_contract.c"', '"' + str(common) + '"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
                "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(src_dir),
@@ -116,16 +124,19 @@ def build_target(tmp):
 
 
 def mutate(tmp):
-    original = SRC.read_text(encoding="utf-8")
     bad = 0
-    for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
+    for i, (pattern, repl, why, *where) in enumerate(MUTATIONS, 1):
+        target = where[0] if where else SRC
+        original = target.read_text()
+        assert len(re.findall(pattern, original)) == 1, why
         mutated, n = re.subn(pattern, repl, original, count=1)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
             continue
         try:
-            exe = host_build(tmp, mutated)
+            exe = host_build(tmp, mutated if target == SRC else None,
+                             mutated if target == COMMON else None)
         except subprocess.CalledProcessError:
             print(f"MUTATION {i} NOT COUNTED (compile): {why}", flush=True)
             bad += 1

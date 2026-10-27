@@ -3,6 +3,7 @@
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
+#include "pcm_cs4231.h" /* Fixed IRQ wiring remains here until L03. */
 #include "pcm_imports.h"
 #include "bootinfo.h"
 #include "config.h"

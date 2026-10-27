@@ -5,7 +5,7 @@
       docs/archive/v3/TASK_T1_LEDGER.md §3-7 / §4-3 (T1c: dma_alloc の limit、
       {pa, va} の組、失敗時 *out 不変、R4 の最悪の並び)
 
-実物の kernel/dma_pool_math.c と drivers/dma8237_math.c を 1 行も写さずに
+実物の kernel/dma_pool_math.c と lib/dma_contract.c を 1 行も写さずに
 #include して回す。表を触るだけなので I/O も割り込みも要らない。
 
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
@@ -27,11 +27,11 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/dma_pool_host.c"
 SRC = ROOT / "kernel/dma_pool_math.c"
-# dma_range_ok (dma_alloc と FDC の BSS が共有する検査) は 8237 側にある。
+# dma_range_ok (dma_alloc と FDC の BSS が共有する検査) は独立契約にある。
 # 変異の 4 番目の要素でこちらを指す (無ければ SRC)。
-D8237 = ROOT / "drivers/dma8237_math.c"
+D8237 = ROOT / "lib/dma_contract.c"
 TARGET_SRCS = ["kernel/dma_pool_math.c", "kernel/dma_pool.c",
-               "drivers/dma8237_math.c"]
+               "lib/dma_contract.c"]
 
 CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
          "leaked", "exhaust", "range_ok", "limit", "keep_out", "worst"]
@@ -101,7 +101,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
             source_text = SRC.read_text(encoding="utf-8")
         d8237 = D8237
         if d8237_text is not None:
-            d8237 = src_dir / "dma8237_math.c"
+            d8237 = src_dir / "dma_contract.c"
             d8237.write_text(d8237_text, encoding="utf-8")
         mut = src_dir / "kernel"
         mut.mkdir(exist_ok=True)
@@ -110,13 +110,13 @@ def host_build(tmp, source_text=None, d8237_text=None):
             (ROOT / "kernel/dma_pool.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
-        # 変異させた写しを先に引かせる。dma8237_math.c は変異させないので、
+        # 変異させた写しを先に引かせる。共通実体も別に差し替えられるので、
         # **絶対パスに直す** — 相対のままだと tmp からは辿れず、
         # 全部の変異が「コンパイルできない」で RED に見えてしまう。
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
             .replace('"../../kernel/dma_pool_math.c"', '"kernel/dma_pool_math.c"')
-            .replace('"../../drivers/dma8237_math.c"',
+            .replace('"../../lib/dma_contract.c"',
                      '"%s"' % d8237),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
@@ -193,6 +193,7 @@ def mutate(tmp):
     for i, (pattern, repl, why, *where) in enumerate(MUTATIONS, 1):
         target = where[0] if where else SRC
         original = target.read_text(encoding="utf-8")
+        assert len(re.findall(pattern, original)) == 1, why
         mutated, n = re.subn(pattern, repl, original, count=1)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
