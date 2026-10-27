@@ -3,7 +3,6 @@
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
-#include "pcm_cs4231.h" /* Fixed IRQ wiring remains here until L03. */
 #include "pcm_imports.h"
 #include "bootinfo.h"
 #include "config.h"
@@ -20,6 +19,7 @@ static PcmModuleApi candidate;
 static int candidate_valid;
 static void (*tick_target)(void);
 static irq_handler_fn irq_target;
+static unsigned int irq_line;
 
 void pcm_tick(void)
 {
@@ -75,13 +75,13 @@ void pcm_reclaim(int owner)
 int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
 {
     struct module_record *r = module_record_get(pcm_handle);
-    if (irq != PCM_IRQ || arg || irq_target || !r) return IRQ_ERR_INVAL;
+    if (arg || irq_target || !r) return IRQ_ERR_INVAL;
     unsigned int saved = irq_save();
     int rc = IRQ_ERR_BUSY;
     if (module_ref_acquire(pcm_handle, r->owner, MODULE_REF_IRQ, (u32)(uptr)fn)) {
         rc = irq_register(irq, fn, arg, flags);
         if (rc) module_ref_release(pcm_handle, MODULE_REF_IRQ);
-        else irq_target = fn;
+        else { irq_line = irq; irq_target = fn; }
     }
     irq_restore(saved);
     return rc;
@@ -89,11 +89,12 @@ int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsi
 
 int pcm_module_irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 {
-    if (irq != PCM_IRQ || arg || !irq_target || irq_target != fn) return IRQ_ERR_INVAL;
+    if (arg || !irq_target || irq_line != irq || irq_target != fn) return IRQ_ERR_INVAL;
     unsigned int saved = irq_save();
     int rc = irq_unregister(irq, fn, arg);
     if (!rc) {
         irq_target = 0;
+        irq_line = 0;
         module_ref_release(pcm_handle, MODULE_REF_IRQ);
     }
     irq_restore(saved);
@@ -155,7 +156,7 @@ static int pcm_detach(struct module_record *r)
         tick_target = 0;
         module_ref_release(pcm_handle, MODULE_REF_TICK);
     }
-    int rc = !irq_target || !pcm_module_irq_unregister(PCM_IRQ, irq_target, 0);
+    int rc = !irq_target || !pcm_module_irq_unregister(irq_line, irq_target, 0);
     irq_restore(flags);
     return rc;
 }

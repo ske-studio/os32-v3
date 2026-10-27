@@ -244,7 +244,7 @@ int irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int fl
 
 int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 {
-    (void)irq; (void)fn; (void)arg;
+    CHECK(irq == PCM_IRQ && fn && !arg);
     sim_irq_unreg_calls++;
     sim_irq_registered = 0;
     return 0;

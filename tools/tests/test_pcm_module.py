@@ -13,10 +13,13 @@ from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/pcm_module.c'
-CASES = ['normal-detach', 'failure-after-irq', 'dma-stop-failure-isolates', 'prefix-failure']
+CASES = ['normal-detach-reload', 'failure-after-irq', 'dma-stop-failure-isolates',
+         'prefix-failure', 'irq-line-failures-detach-reload', 'irq-detach-failure-retains']
 
 def product_image(folder):
     """Real mkmod product: PAIR/phase and relocation, with write-free rejection."""
+    facade = SOURCE.read_text()
+    assert 'pcm_cs4231.h' not in facade and 'PCM_IRQ' not in facade
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     metadata = json.loads((ROOT / 'build/out/pcm/pcm_imports.json').read_text())
     data = (ROOT / 'build/out/pcm.mod').read_bytes()
@@ -130,19 +133,23 @@ def main():
         build(SOURCE)
         run(range(len(CASES)))
         driver_checks(folder, False)
-        if '--mutate' in sys.argv:
+        if '--mutate' in sys.argv or '--prepare' in sys.argv:
             source = SOURCE.read_text()
             for label, old, new, modes in (
                 ('tick-detach', 'tick_target = 0;', '/* omitted tick detach */', [1]),
                 ('irq-detach', 'irq_target = 0;', '/* omitted IRQ detach */', [1]),
+                ('irq-line', 'irq_line = irq;', 'irq_line = irq ^ 1U;', [4]),
             ):
                 assert source.count(old) == 1, label
                 mutant = folder / (label + '.c')
                 mutant.write_text(source.replace(old, new))
                 build(mutant)
-                run(modes, expected=1)
-                print('MUTATE ' + label + ' RED (runtime assertions; compiled)', flush=True)
-            driver_checks(folder, True)
+                print('PASS prepare ' + label + ': unique anchor, compiled -Werror', flush=True)
+                if '--mutate' in sys.argv:
+                    run(modes, expected=1)
+                    print('MUTATE ' + label + ' RED (runtime assertions; compiled)', flush=True)
+            if '--mutate' in sys.argv:
+                driver_checks(folder, True)
     return 0
 
 if __name__ == '__main__':
