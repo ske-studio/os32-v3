@@ -85,6 +85,9 @@ def run(mutation=None):
 
 
 MUTATIONS = [
+    ('IMEORDER-key-before-candidate', 'ime_source.inc',
+     '    if (ascii >= ASCII_PRINT_FIRST && ascii <= ASCII_PRINT_LAST) {',
+     '    if (0) {', 'FAIL IMEORDER candidate before typed ASCII'),
     ('MINIMAL-scan-only-poll', 'ime_source.inc',
      'int ime_trygetchar(void)\n{',
      'int ime_trygetchar(void)\n{\n    if (!services_public) return kbd_trygetchar();',
