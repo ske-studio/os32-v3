@@ -5,6 +5,7 @@ check-v86-low-host:
 - tools/tests/test_shm_user.py
 - tools/tests/mutpar.py
 - kernel/paging.*
+- kernel/platform_memory.h
 - kernel/v86_mem.*
 - kernel/v86_bios.*
 - kernel/v86_snapshot.c

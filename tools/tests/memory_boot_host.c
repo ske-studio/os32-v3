@@ -219,7 +219,9 @@ static void check_v5_ledger(void)
     u32 p, i, hits, got, owner, before = pgalloc_free_pages();
     CHECK(ledger_selfcheck("v5-boot"));
     /* The real boot adapter must publish one reservation, never pool supply. */
-    CHECK(memory_boot_fixed[0].first == 0 && memory_boot_fixed[0].end == 160);
+    for (i = 0; i < ledger_region_count; i++)
+        if (ledger_regions[i].first == 0) break;
+    CHECK(i < ledger_region_count && ledger_regions[i].end == 160);
     for (p = 0; p < 160; p++) {
         hits = 0;
         CHECK(!bit(eligible, p));
@@ -535,7 +537,10 @@ die(0);
     {
         u32 k, n, bg, backing = 0, fixed = 0;
         CHECK(ledger_selfcheck("boot"));
-        n = sizeof(memory_boot_fixed) / sizeof(memory_boot_fixed[0]);
+        /* The table is function-local now; observe its published low rows. */
+        n = 0;
+        for (k = 0; k < ledger_region_count; k++)
+            if (ledger_regions[k].end <= MEM_1MB / PAGE_SIZE) n++;
         CHECK(n == 2);
         CHECK(ledger_region_count == n + 2 + (ledger_backing_mapped ? 0 : 1) +
               (7 + memory_boot_dma_available()));
