@@ -1,0 +1,21 @@
+check-dep-dir-c-memory-host:
+- kernel/memory_boot.c
+- kernel/paging.c
+- kernel/pgalloc.c
+- kernel/sys.c
+- kernel/physmem.c
+- kernel/*.h
+- platform/pc98/*.h
+- include/*.h
+- arch/x86/*.h
+- lib/*.h
+- drivers/*.h
+- exec/*.h
+- sdk/include/os32/*.h
+- tools/tests/host_arch/*.h
+- tools/tests/host32.py
+- tools/tests/dep_dir_c_memory_host.c
+- tools/tests/test_dep_dir_c_memory.py
+- tools/tests/fixtures/dep_dir_c/**
+- build/checks.d/check-dep-dir-c-memory-host.mk
+- tools/check_map.d/check-dep-dir-c-memory-host.yaml

@@ -1,0 +1,194 @@
+[
+  {
+    "name": "legacy-8192",
+    "kb": 8192,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-9216",
+    "kb": 9216,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-12288",
+    "kb": 12288,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-12292",
+    "kb": 12292,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-12296",
+    "kb": 12296,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-15360",
+    "kb": 15360,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "legacy-16384",
+    "kb": 16384,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "bios-1",
+    "kb": 15360,
+    "reported": 1,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "bios-5",
+    "kb": 15360,
+    "reported": 5,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "bios-256",
+    "kb": 15360,
+    "reported": 256,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "bios-2032",
+    "kb": 15360,
+    "reported": 2032,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "bios-4000",
+    "kb": 15360,
+    "reported": 4000,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "wrap-first",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 1,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "wrap-later",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 1,
+    "fail": 3,
+    "repeat": 0
+  },
+  {
+    "name": "write-first",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 2,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "write-short",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 2,
+    "fail": 3,
+    "repeat": 0
+  },
+  {
+    "name": "alias-first",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 3,
+    "fail": 3,
+    "repeat": 0
+  },
+  {
+    "name": "alias-middle",
+    "kb": 15360,
+    "reported": 8,
+    "mode": 4,
+    "fail": 3,
+    "repeat": 0
+  },
+  {
+    "name": "repeat-zero",
+    "kb": 15360,
+    "reported": 5,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 1
+  },
+  {
+    "name": "high-no-fit",
+    "kb": 12288,
+    "reported": 5,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "high-tight-fit",
+    "kb": 12296,
+    "reported": 256,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "huge-hint",
+    "kb": 4294967295,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "minimum-fail",
+    "kb": 5440,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  },
+  {
+    "name": "dma-absent",
+    "kb": 8088,
+    "reported": 0,
+    "mode": 0,
+    "fail": 0,
+    "repeat": 0
+  }
+]
