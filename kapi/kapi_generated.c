@@ -17,7 +17,7 @@
 #include "port_service.h"
 #include "console.h"
 #include "dev.h"
-#include "kcg.h"
+#include "kcg_contract.h"
 #include "sys.h"
 #include "kprintf.h"
 #include "io.h"
@@ -1029,13 +1029,13 @@ int __cdecl wrap_ext2_format(int drv, u32 sectors)
 void __cdecl wrap_kcg_init(void)
 {
     KAPI_HIT(59);
-    kcg_init();
+    platform_kcg_init();
 }
 
 void __cdecl wrap_kcg_set_scale(int s)
 {
     KAPI_HIT(60);
-    kcg_set_scale(s);
+    platform_kcg_set_scale(s);
 }
 
 void __cdecl wrap_buz_on(void)
@@ -1651,7 +1651,7 @@ u32 __cdecl wrap_db_mem_used(void)
 int __cdecl wrap_kcg_load_font(const char *path)
 {
     KAPI_HIT(150);
-    return kcg_load_font(path);
+    return platform_kcg_load_font(path);
 }
 
 int __cdecl wrap_ide_get_info(int drv, void *info)

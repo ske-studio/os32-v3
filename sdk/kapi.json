@@ -33,7 +33,7 @@
     "port_service.h",
     "console.h",
     "dev.h",
-    "kcg.h",
+    "kcg_contract.h",
     "sys.h",
     "kprintf.h",
     "io.h",
@@ -516,11 +516,13 @@
     },
     {
       "name": "kcg_init",
+      "target": "platform_kcg_init",
       "ret": "void",
       "args": []
     },
     {
       "name": "kcg_set_scale",
+      "target": "platform_kcg_set_scale",
       "ret": "void",
       "args": [
         "int s"
@@ -1203,6 +1205,7 @@
     },
     {
       "name": "kcg_load_font",
+      "target": "platform_kcg_load_font",
       "ret": "int",
       "args": ["const char *path"]
     },

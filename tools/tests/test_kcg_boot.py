@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 from mutpar import run_ordered
 import host32
@@ -29,6 +30,7 @@ def run(runner, mutation=None):
         sources[path] = sources[path].replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='e8b-kcg-') as directory:
         work = Path(directory)
+        shutil.copyfile(ROOT / 'include/kcg_contract.h', work / 'kcg_contract.h')
         source = sources['drivers/kcg.c'].replace('"../fs/vfs.h"', '"vfs.h"').replace(
             '"../lib/lz4.h"', '"lz4.h"')
         (work / 'kcg_source.inc').write_text(source)

@@ -199,4 +199,12 @@ check-ci-stab-host:
 - tools/tests/fixtures/dep_dir_a/l09.json
 - build/checks.d/check-dep-dir-a-l09-host.mk
 - tools/check_map.d/check-dep-dir-a-l09-host.yaml
+- tools/tests/fixtures/dep_dir_a/l10.json
+- tools/tests/test_dep_dir_a_l10.py
+- build/checks.d/check-dep-dir-a-l10-host.mk
+- tools/check_map.d/check-dep-dir-a-l10-host.yaml
+- tools/tests/dep_dir_a_l10_host.c
+- drivers/kcg.c
+- kernel/kcg_module.c
+- platform/pc98/device_kcg.c
 artifact_reader: true

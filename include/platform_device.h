@@ -49,4 +49,9 @@ int platform_np2_get_cpu(char *buf, int maxlen);
 int platform_np2_get_clock(char *buf, int maxlen);
 int platform_np2_check_hostdrv(char *buf, int maxlen);
 
+/* Legacy KCG controls stay in the resident facade, independent of ROM loading. */
+void platform_kcg_init(void);
+void platform_kcg_set_scale(int scale);
+int platform_kcg_load_font(const char *path);
+
 #endif /* PLATFORM_DEVICE_H */

@@ -10,3 +10,4 @@ check-kcg-boot-host:
 - tools/check_map.d/check-kcg-boot-host.yaml
 - build/checks.d/check-kcg-boot-host.mk
 - tools/tests/mutpar.py
+- include/kcg_contract.h

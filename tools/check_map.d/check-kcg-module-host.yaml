@@ -120,4 +120,5 @@ check-kcg-module-host:
 - platform/pc98/boot.c
 - kernel/platform_display.h
 - platform/pc98/display.c
+- include/kcg_contract.h
 artifact_reader: true
