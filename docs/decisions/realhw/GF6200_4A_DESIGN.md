@@ -247,3 +247,11 @@
 - 根拠: nouveau (MIT、drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c の setPLL_double_lowregs、NV44 は devinit=nv1a・pll_set=nv04) の MEM PLL の列は、4600h を書込みの前に読んで bit31 を立て、係数と制御の後に保存値へ戻す — OS32 の kdebug/gfinit_pll.c:219・237 と同じ。nouveau は 4600h を書いた後に読み戻さない。envytools の rnndb (MIT) に 4600h の定義は無い。bit31 の意味と読み戻せるかは未確認 (WO とも断定しない)。調査の全文は ~/os32-tmp/run/gf-main0-fail/ANALYSIS.md・EVIDENCE.md。
 - 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の T:557・T:568) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/accept/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。ほかの PLL の verify は変えない。verify=0 の成功は PLL の lock や VRAM の成功を意味しない (§159 のまま)。
 - 受入: host で「4600h が 0 固定でも 2 規則で止まらない」「他の非零 mask の不一致では止まる」「書込みの順と復元値は同じ」。実機は次の立会いで inspect → A1 → A2 → main 0 をやり直し (各段の承認)、後続の到達を見る。
+
+## main 0 のやり直しで決めたこと (2026-10-27、PM 決定 — 上の節の「ほかの PLL の verify は変えない」「7FFFFFFFh にはしない」を差し替える)
+
+- 観測: 4600h の verify を 0 にした版 (wt/gf4600 04e1e93e) の実機のやり直しで、4600h は通り、次の 4020h (substep 12023h) で 0x30C1001C を書いて読み戻し 0x3041001C (bit23 だけ 0) で停止。98 は正常。
+- 決定 (Opus のレビューの案 B): **SUB7 (MEM、12020h〜1202Eh) と SUB6 (CORE、12000h〜12005h) の書込み 21 本の verify mask をすべて 0 にする**。nouveau (MIT、nv04.c の setPLL_double_lowregs) はこれらを書いた後に読み戻さず、rnndb にも読み戻せるビットの定義が無い。実機の 1 回の観測で一部の照合を残す案は、値の組が変わると次回また止まりうるので採らない。書込みの列・値・順・保存値の復元は変えない。
+- 根拠の集め方: 書込み先はどれも read_safe=1 (表の T:612-616・T:734-738) なので、verify が 0 でも kdebug/recover.c:1854-1855 が書く前に old を読んで gf_bus の行に残す。次の同じ番地への書込みの old で、前の書込みが効いたかを止めずに後から見る (例: 12028h の old で 12023h〜12027h の後の 4020h、1202Bh の old で 12020h の bit31)。次回の実機の受入に「書込みごとの期待値と次の old を並べた表」を入れる。
+- 失う安全: CORE (SUB6) の 6 本と MEM の全部で、書込みの直後の照合は無くなる (係数・制御・mirror・gate・4600h の復元の不成立をその場で止めない)。もとの全ビット照合でも PLL の lock・実周波数・DRAM の正常は保証していない。書込みの失敗・許可・値・順の検査・期限・終端の cleanup と、98 側 (S0) の復帰の検証 (§163-171・§195) は変えない。
+- 受入 (host): 21 規則とも verify の追加の読み取りが無く、old の読み取りと gf_bus の old 欄は従来どおり / 書込みの順と値と復元値は同じ / 21 本以外の非零 mask の不一致はこれまでどおり止まる。生成元 tools/tests/recover_tables_oracle.c から生成し直し、承認表 tools/accept/gf_main.md の SUB6・SUB7 の行を 0 に同期。
