@@ -33,7 +33,7 @@ def kernel_list():
 def once(text, old, new):
     assert text.count(old) == 1, old
     result = text.replace(old, new, 1)
-    assert result.count(old) == 0 and result.count(new) == 1
+    assert result.count(old) == 0 and (new == '' or result.count(new) == text.count(new) + 1)
     return result
 
 

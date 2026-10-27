@@ -150,7 +150,9 @@ def mutations(parts, expected):
     mutation_builds(parts, expected, execute=True)
     text = kernel_list()
     try:
-        resident_check(text.replace('platform/pc98/emergency.c ', '', 1))
+        resident_check(re.sub(r'^C_KERNEL = (.*)$',
+                              lambda m: m[0].replace('platform/pc98/emergency.c ', '', 1),
+                              text, count=1, flags=re.M))
     except AssertionError:
         pass
     else:
