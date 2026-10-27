@@ -1517,7 +1517,7 @@ C_MUTATIONS = [
 ]
 CHECKED_MUTATIONS = [
     ("drivers/serial.c", r"!ser_initialized \|\| s_gate \|\| s_checked", "0", "checked ownership excluded"),
-    ("drivers/serial.c", r"if \(serial_checked_ready\(\) != 1\)", "if (0)", "checked put ignores TxRDY"),
+    ("drivers/serial.c", r"if \(ready != 1\) \{ irq_restore\(f\); return ready < 0", "if (0) { irq_restore(f); return ready < 0", "checked put ignores TxRDY"),
     ("drivers/serial.c", r"SER_FSTS_TXEMP : STS_TXE", "SER_FSTS_TXRDY : STS_TXRDY", "checked wire completion uses TxRDY"),
     ("drivers/serial.c", r"if \(s_checked\) \{\n        ser_hold_push", "if (0) {\n        ser_hold_push", "checked ordinary output interleaves"),
     ("drivers/serial.c", r"if \(s_checked\) return SER_TX_DROPPED;", "if (0) return SER_TX_DROPPED;", "checked gate output interleaves"),

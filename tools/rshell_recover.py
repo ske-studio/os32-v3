@@ -206,6 +206,8 @@ class Records:
             if self.paused:
                 self.data['metadata_frozen'] = True
             if event == 'RESTORING':
+                if 'cleanup_seconds' not in fields:
+                    raise RecoverError('RESTORING without cleanup_seconds')
                 self.data['cleanup_seconds'] = int(fields['cleanup_seconds'])
             if phase == 'diag':
                 self.data['diag'] = fields
