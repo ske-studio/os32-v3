@@ -255,3 +255,12 @@
 - 根拠の集め方: 書込み先はどれも read_safe=1 (表の T:612-616・T:734-738) なので、verify が 0 でも kdebug/recover.c:1854-1855 が書く前に old を読んで gf_bus の行に残す。次の同じ番地への書込みの old で、前の書込みが効いたかを止めずに後から見る (例: 12028h の old で 12023h〜12027h の後の 4020h、1202Bh の old で 12020h の bit31)。次回の実機の受入に「書込みごとの期待値と次の old を並べた表」を入れる。
 - 失う安全: CORE (SUB6) の 6 本と MEM の全部で、書込みの直後の照合は無くなる (係数・制御・mirror・gate・4600h の復元の不成立をその場で止めない)。もとの全ビット照合でも PLL の lock・実周波数・DRAM の正常は保証していない。書込みの失敗・許可・値・順の検査・期限・終端の cleanup と、98 側 (S0) の復帰の検証 (§163-171・§195) は変えない。
 - 受入 (host): 21 規則とも verify の追加の読み取りが無く、old の読み取りと gf_bus の old 欄は従来どおり / 書込みの順と値と復元値は同じ / 21 本以外の非零 mask の不一致はこれまでどおり止まる。生成元 tools/tests/recover_tables_oracle.c から生成し直し、承認表 tools/accept/gf_main.md の SUB6・SUB7 の行を 0 に同期。
+
+## main 2 の VIDEO PLL で決めたこと (2026-10-27、PM 決定 — 本文の D:191・D:195 の「PLL 一致」と、前の 2 節の範囲を差し替える)
+
+- 観測: SUB6・SUB7 の 21 本の verify を 0 にした版 (wt/gf4600 24f3d89f) で、実機の main 0 (216 秒)・main 1 (251 秒) は PAUSED に戻り、main 2 が PRAMDAC 680578h (pc=0xE623、op 0x4B、substep 12042h) で停止: 0x80001003 を書いて読み戻し 0x80000E02 (bit31 は立ち下位は old のまま)。98 は正常。調べ ~/os32-tmp/run/gf-main0-fail/VERIFY_PLAN2.md (astra)、Opus のレビュー。
+- 決定: main 0〜3 で verify が非零のまま残る 10 規則のうち **9 本を 0 にする** — VIDEO PLL の 5 本 (T:572-576、C040h・680580h・680578h・680508h・C040h、SUB6/7 と同じ PLL の列で nouveau の nv04.c は書いた後に読まない)、RESET の 184Ch の戻し (T:580、PCI config の写しで 98 側の安全に効かない、実機では一致していた)、h0/h1 CR57 の戻し (T:582-583、間接 index を戻すだけで後続の選択にも 98 側にも効かない、実機で未到達)、1700h の容量の写し (T:584、rnndb の pbus.xml で BAR1_VRAM_SIZE は align=0x100000、下位 20bit は保持されない見込みで全ビット照合は誤停止しうる、容量は A4 の BAR1 の試験で間接に見る)。
+- **残す: h0 CR3C (T:581、COPY の写し) の verify FFh**。nouveau も CR3C を書いた後に IO_RESTRICT_* の選択の添字として読み直し、VBIOS は値が保たれる前提。実機で 3 回とも照合を通った。COPY の後は index の選択だけで data の書込みが無く、選択の読取りも REC に値を残さないので、old による後からの観測ができない — ここを外すと組の誤りを止めずに別の組の PFB を書き、原因を辿れない。
+- 受入の言い替え (D:191・D:195): PLL は書込み列の完了と算出値・old の記録まで。正しさは A4 の VRAM の最小試験で間接に見る。PLL の lock と周波数は未検証と別に書く。
+- 失う検出: VIDEO の係数・段・gate の誤反映と gate の復元の失敗、184Ch の復元の失敗、CR57 の復元の失敗、1700h の写しの不成立をその場で止めない。98 側 (S0) の復帰の検証は変えない。
+- 受入 (host): 9 規則とも verify の追加の読取りが無く、old の読取りと gf_bus の old 欄は残る / CR3C は不一致で止まる / 書込みの順・値・復元は同じ / main_id が NONE の非零 31 本は変えない。生成元 tools/tests/recover_tables_oracle.c から生成し、承認表 tools/accept/gf_main.md の該当行を同期。
