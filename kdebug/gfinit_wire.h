@@ -12,6 +12,7 @@
 #define GF_OP_RUN_ONE 8U
 #define GF_OP_VERIFY 9U
 #define GF_OP_ABORT 10U
+#define GF_OP_MODESET 13U
 struct gfinit_request {
     u32 version, size, flags, session, script_id, max_steps;
     u32 status, fail_pc, fail_reg, steps;

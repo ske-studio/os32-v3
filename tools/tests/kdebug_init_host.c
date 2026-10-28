@@ -198,7 +198,8 @@ static int dispatch_tests(const struct kdebug_ops *ops)
     for (u32 op = GF_OP_INSPECT; op <= GF_OP_ABORT; op++) {
         if (ops->dbg_call(op, buf, sizeof(buf)) != (int)op || buf[0] != op) return 1;
     }
-    if (module_calls != 6) return 1;
+    if (ops->dbg_call(GF_OP_MODESET, buf, sizeof(buf)) != (int)GF_OP_MODESET || buf[0] != GF_OP_MODESET) return 1;
+    if (module_calls != 7) return 1;
     owner.state = REC_PAUSED;
     if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf)) != -1) return 1;
     recover_done = 0;
