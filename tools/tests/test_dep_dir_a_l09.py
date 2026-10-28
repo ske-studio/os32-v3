@@ -60,10 +60,10 @@ def contracts():
     assert '#include "platform_host.h"' in text
     reclaim = function((ROOT / 'exec/exec.c').read_text(), 'exec_notify_owned')
     assert reclaim.index('launch_owner_exit(id);') < reclaim.index('host_owner_exit(id);') < reclaim.index('con_sink_owner_exit(id);')
-    # GF4c/2a explicitly changes the private C plan/capture layout; public ABI stays fixed.
+    # GF4c/2b1 adds the private fixed-VRAM callback/type; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x7d90586cU' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0xe0c871d7U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0xf9e69ac4U' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x3b6a5992U' in hwdev
     print('PASS baseline public ABI/generated files, NP2 guards, host validation/copy order, owner cleanup position, hwdev CRC')
     return wrappers
 

@@ -8,6 +8,68 @@
 #include "../../kdebug/gfinit_mode.c"
 #include "../../kdebug/gfinit_plan_c.c"
 static struct gfinit_plan composed;
+static u8 frame[GF_MODE_VRAM_BYTES];
+static u32 frame_writes, frame_reads, drains, frame_fail_at, frame_abort_at, frame_points;
+static bool vram_active;
+/* Independent pixel oracle: frame > 8x8 checker > eight vertical bands. */
+static u32 frame_pixel(u32 off)
+{
+    u32 x=off%640,y=off/640;
+    if(x<8 || x>=632 || y<8 || y>=472)return 4;
+    if(x<72 && y<72)return (((x-8)/8+(y-8)/8)&1)?0:4;
+    return x/80;
+}
+static int frame_load(void *v,u32 va,u32 width,u32 *value)
+{
+    u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE,base=rawbars[1]&~15U;
+    if(pa>=base && pa-base<sizeof(frame)) {
+        u32 off=pa-base;
+        CHECK(!irq_state && width==4 && mapped_flags==(PTE_PRESENT|PTE_PCD));
+        CHECK(frame_writes==sizeof(frame) && drains==1 && off==frame_reads);
+        *value=0;
+        for(u32 i=0;i<4;i++)*value|=(u32)frame[off+i]<<(8*i);
+        frame_reads+=4;
+        return off==frame_fail_at?-1:0;
+    }
+    if(vram_active && pa==(rawbars[0]&~15U)+GF_PLAN_PFB_AMOUNT) {
+        CHECK(!irq_state && width==4 && frame_writes==sizeof(frame) && !frame_reads);
+        drains++;*value=0x10000000;return 0;
+    }
+    return memory_read(v,va,width,value);
+}
+static int frame_store(void *v,u32 va,u32 width,u32 value)
+{
+    u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE,base=rawbars[1]&~15U;
+    if(pa>=base && pa-base<sizeof(frame)) {
+        u32 off=pa-base;
+        CHECK(!irq_state && width==4 && mapped_flags==(PTE_PRESENT|PTE_PCD|PTE_RW));
+        CHECK(off==frame_writes && !frame_reads);
+        for(u32 i=0;i<4;i++) {
+            frame[off+i]=(u8)(value>>(8*i));
+            CHECK(frame[off+i]==frame_pixel(off+i));
+        }
+        frame_writes+=4;
+        return off==frame_fail_at?-1:0;
+    }
+    return memory_write(v,va,width,value);
+}
+static int frame_point(void *v,u32 sid)
+{
+    (void)v;(void)sid;
+    if(vram_active) {
+        CHECK(irq_state==1 && pte==0x876540a5 && !device.window.owned && !window_busy);
+        frame_points++;
+        if(frame_writes==frame_abort_at || frame_reads==frame_abort_at)return 1;
+    }
+    return 0;
+}
+static int frame_operation(void *v,struct recover *r,bool write,u32 *bad,u32 *want,u32 *got)
+{
+    (void)v;vram_active=true;
+    int rc=gfinit_plan_c_vram(&device,r,write,bad,want,got);
+    vram_active=false;
+    return rc;
+}
 static void field(const char *s,u32 v){output(s);output("=");number(v);output("\n");}
 static void val(u32 v){number(v);output(" ");}
 /* Record reads as well as the existing write/delay trace with logging on. */
@@ -76,6 +138,10 @@ static void c_build(void)
     CHECK(recover_gf_profile_expand(&profile,&composed)==0);
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0);
     CHECK(gfinit_plan_build_c(&composed,&decoded,&profile,0x1000000,rom,sizeof(rom))==0);
+    /* Synthetic clock stays at zero. These fixture limits let trial_step
+     * exercise the existing cleanup; production C budgeting remains 2c. */
+    profile.trial_limit=profile.restore_limit=1000;
+    profile.max_steps=4096;profile.restore_max_polls=65536;profile.restore_log_bytes=65536;
     decoded.plan=composed.plan;
     CHECK(contract_bind()==0);
 }
@@ -94,6 +160,10 @@ static void c_arm(void)
         execution.main_id=main;CHECK(gfinit_exec_run(&core,&execution)==0);
     }
     CHECK(core.expected_node==composed.c_node);
+    executor_bus.mode_vram=frame_operation;executor_bus.abort_requested=frame_point;
+    memory_ops.load=frame_load;memory_ops.store=frame_store;
+    frame_writes=frame_reads=drains=frame_points=0;
+    frame_fail_at=frame_abort_at=RECOVER_NONE;vram_active=false;
 }
 static u32 saved_value(const struct recover_target *t,u32 variant)
 {
@@ -182,7 +252,6 @@ static void c_walk(u32 variant,bool fp_on)
                     dump_row(rows++,v,0,RECOVER_NONE);
                 } else {
                     CHECK((a[0].value==GF_C_PENDING_CHECK && sections==1 && rows==0) ||
-                          (a[0].value==GF_C_PENDING_VRAM && sections==4 && rows==15) ||
                           (a[0].value==GF_C_PENDING_CELL && sections==10 && rows==205) ||
                           (a[0].value==GF_C_PENDING_EXIT && sections==11 && rows==206));
                 }
@@ -198,6 +267,9 @@ static void c_walk(u32 variant,bool fp_on)
             CHECK(!recover_plan_check(&core,&edge));
             CHECK(edge==(u32)fp_on);
             if(!edge)rows++; /* conditional Q FP_OFF and its wait are skipped */
+        } else if(l->flags & REC_LAYOUT_MODE_VRAM) {
+            CHECK(sections==4 && rows==15);
+            CHECK(!recover_plan_access(&core,&value));
         } else if(l->dir_substep!=RECOVER_NONE) {
             CHECK(!recover_plan_access(&core,&value));
             if(n->substep>=REC_GF_C_RULE_FIRST) {
@@ -212,6 +284,7 @@ static void c_walk(u32 variant,bool fp_on)
     CHECK(rows==206 && sections==GF_C_SECTION_COUNT && pending+3==composed.c_unbound);
     CHECK(waits==(fp_on?70U:20U));
     CHECK(data_writes==(fp_on?178U:177U));
+    CHECK(frame_writes==sizeof(frame) && frame_reads==sizeof(frame) && drains==1);
     /* C data on shared RW keys must not add local DATA restoration. */
     for(u32 i=saved_count;i<core.local_saved_count;i++)CHECK(core.local_saved[i].dir_substep==REC_SELECT);
     CHECK(core.capture_valid==0);
@@ -268,9 +341,126 @@ static void contracts(void)
     for(u32 i=0;i<composed.plan.node_count;i++)CHECK(composed.plan.nodes[i].phase!=REC_MODE_C);
     CHECK(composed.plan.entry_count==7 && composed.plan.entries[6].phase==REC_VRAM_TEST);
 }
+static char frame_log[RECOVER_ROW_MAX], frame_records[4][RECOVER_ROW_MAX];
+static u32 frame_log_used, frame_record_count, frame_damage;
+static bool frame_contains(const char *s,const char *part)
+{
+    for(u32 i=0;s[i];i++) {
+        u32 j=0;while(part[j] && s[i+j]==part[j])j++;
+        if(!part[j])return true;
+    }
+    return false;
+}
+static int frame_put(void *v,u32 ch)
+{
+    (void)v;
+    CHECK(irq_state==1 && !device.window.owned);
+    if(frame_log_used+1>=sizeof(frame_log))return -1;
+    frame_log[frame_log_used++]=(char)ch;frame_log[frame_log_used]=0;
+    if(ch=='\n') {
+        if(frame_contains(frame_log,"phase=gf_bus") && frame_contains(frame_log," len=")) {
+            CHECK(frame_record_count<4);
+            if(frame_record_count<4)for(u32 i=0;i<=frame_log_used;i++)
+                frame_records[frame_record_count][i]=frame_log[i];
+            frame_record_count++;
+        }
+        frame_log_used=0;
+    }
+    return 0;
+}
+static const struct recover_transport frame_transport={
+    .uart={exec_log_ready,frame_put,exec_log_wait},.frame_us=1,.max_polls=1048576};
+static int frame_step(struct recover *r,void *v)
+{
+    (void)v;
+    for(u32 direction=0;direction<2;direction++) {
+        u32 id=r->expected_node,value=0;
+        if(recover_plan_enter(r,id) || recover_plan_access(r,&value) || recover_plan_leave(r,0))return -1;
+        if(!direction) {
+            if(frame_damage==1)frame[0]^=1;
+            if(frame_damage==2)frame[640*23+65]^=1;
+            if(frame_damage==3)frame[sizeof(frame)-1]^=1;
+            if(frame_damage==4) {frame[17]^=1;frame[sizeof(frame)-1]^=2;}
+            if(frame_damage==6)frame_fail_at=1280;
+            if(frame_damage==8)frame_abort_at=1280;
+        }
+    }
+    return 0;
+}
+static void frame_cases(void)
+{
+    for(frame_damage=0;frame_damage<=8;frame_damage++) {
+        c_build();c_arm();
+        /* Only this test bypasses the still-unbound entry/Q/P waits. The
+         * actual two-node section, accessors, trial_step and cleanup run. */
+        u32 first=composed.c_node;
+        while(composed.plan.nodes[first].substep!=GF_C_VRAM_WRITE)first++;
+        CHECK(composed.plan.nodes[first+1].substep==GF_C_VRAM_COMPARE);
+        CHECK(composed.plan.nodes[first-1].substep==GF_C_SECTION);
+        CHECK(composed.plan.args[composed.plan.nodes[first-1].arg_first].value==GF_C_VRAM);
+        CHECK(composed.plan.nodes[first+2].substep==GF_C_SECTION);
+        CHECK(composed.plan.args[composed.plan.nodes[first+2].arg_first].value==GF_C_SD);
+        core.expected_node=first;core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        core.transport=&frame_transport;exec_log_busy=false;
+        frame_log_used=frame_record_count=0;
+        if(frame_damage==5)frame_fail_at=1280;
+        if(frame_damage==7)frame_abort_at=1280;
+        u32 before_maps=maps,before_restores=restores;
+        CHECK(core.enabled && core.valid && token_matches(&core,&core.token) && live_matches(&core));
+        int rc=trial_step(&core,&core.token,true,frame_step,0);
+        CHECK((rc!=0)==(frame_damage!=0));
+        CHECK(maps-before_maps==restores-before_restores);
+        CHECK(pte==0x876540a5 && irq_state==1 && !device.window.owned && !window_busy);
+        CHECK(frame_points>=3);
+        if(frame_damage<=4) {
+            CHECK(frame_writes==307200 && frame_reads==307200 && drains==1);
+            CHECK(frame_record_count==4);
+            for(u32 i=0;i<4;i++) {
+                CHECK(frame_contains(frame_records[i]," bar=1 off=0 len=307200"));
+                CHECK(frame_contains(frame_records[i],i<2?" dir=1":" dir=0"));
+                CHECK(frame_contains(frame_records[i],(i&1)?"event=END":"event=BEGIN"));
+            }
+            if(frame_damage) {
+                const char *bad[]={"","bad_off=0 expected=4 actual=5",
+                    "bad_off=14785 expected=4 actual=5","bad_off=307199 expected=4 actual=5",
+                    "bad_off=17 expected=4 actual=5"};
+                CHECK(frame_contains(frame_records[3],bad[frame_damage]));
+                CHECK(frame_contains(frame_records[3],"rc=-1"));
+                CHECK(core.reason==REC_VERIFY && core.state==REC_FAILED && cleanup_calls==1);
+            } else {
+                CHECK(core.state==REC_PAUSED && core.expected_node==first+2 && !cleanup_calls);
+                CHECK(frame_contains(frame_records[3],"bad_off=4294967295") && frame_contains(frame_records[3],"rc=0"));
+                CHECK(frame_points>=2*480);
+            }
+        } else {
+            CHECK(core.state!=REC_RUNNING && core.state!=REC_PAUSED && cleanup_calls==1);
+            CHECK(frame_record_count<=4);
+            if(frame_damage==5 || frame_damage==6) {
+                CHECK(core.reason==REC_BUS);
+                CHECK(frame_contains(frame_records[frame_record_count-1],"rc=-1"));
+            } else CHECK(core.reason==REC_ABORT);
+            if(frame_damage==5)CHECK(frame_writes==1284 && !frame_reads && !drains);
+            if(frame_damage==6)CHECK(frame_reads==1284);
+            if(frame_damage==7)CHECK(frame_writes==1280 && !frame_reads && !drains);
+            if(frame_damage==8)CHECK(frame_reads==1280);
+        }
+        output("VRAM case=");number(frame_damage);output(" writes=");number(frame_writes);
+        output(" reads=");number(frame_reads);output(" gf_bus_rows=");number(frame_record_count);output("\n");
+        if(frame_damage<=4)output(frame_records[3]);
+    }
+    /* A typed operation cannot become a successful NOP. */
+    c_build();c_arm();u32 id=composed.c_node;
+    while(composed.plan.nodes[id].substep!=GF_C_VRAM_WRITE)id++;
+    core.expected_node=id;CHECK(!recover_plan_enter(&core,id));
+    CHECK(recover_plan_leave(&core,0)<0 && cleanup_calls==1 && !frame_writes);
+    c_build();core.plan=0;
+    decoded.args[decoded.nodes[id].arg_first+2].value--;
+    CHECK(contract_bind()<0);
+    output("VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS\n");
+}
 void _start(void)
 {
-    gf_fixture_init();prefix_equivalence();contracts();barriers();c_walk(0,true);c_walk(1,true);c_walk(1,false);
+    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

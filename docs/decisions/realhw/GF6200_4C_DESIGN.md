@@ -156,3 +156,8 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - 完成時の C の出口は CHECK→NONE→trial_step の PAUSED であり trial_end は呼ばない；段 2a で C 全体の実行成功はまだ提供せず、試験だけが明示的に未結線を飛ばして後続の規則・値・順を検査する。
 - 許可表の row ID 578〜783 を保って書込み 178 行を規則化し、未結線の型付き 28 行と区別する；同じ target への別操作も固有 substep を保ち、旧 phase/rule/trace は変更しない。
 - target 608 は今の 4a の最大 471〜472・C の 234 に足りるので 768 から減らした（余り 136）。layout 枠は 1056→1280、capture 枠は 32→48（valid は64bit）とし、最大 BAR1 の旧 A4 と C をそれぞれ検査する。足りなくなれば既存の利用を減らさず、物理的な制約に当たらない範囲で owner の頁数を広げる（ユーザー決定 2026-10-28、HWDEV_CORE_API §9）；絵全体の埋込みは行わない。
+
+## 段 2b1 の結線
+- VRAM の未結線節だけを、BAR1+[0,307200) の転送・比較の 2 node に置換する。`gfinit_mode_row` の 640 B 行を480行、A4と同じDWORD窓アクセスで処理し、窓/PTE/IRQ復元後の行間に既存safe pointを置く。全行転送後は既存read-safeなPFB容量レジスタの読取りでposted writeを排出する。
+- `recover_plan_access` が固定範囲・方向の型を扱い、`recover_ops.mode_vram` へ渡す。正常時はgf_busが方向ごとにBEGIN/ENDの計4行（bar/off/len/dir）。比較は不一致後も全域を読み、最初のbyteのBAR1相対off/期待値/実値だけをENDに保持し、既存のREC_VERIFY失敗出口へ進む。
+- 未結線は35→34節。AR/DAC・route/98セル・入口/出口CHECK・待ち・cleanup/REC予算とop13は後段のまま。旧phase/許可表の番号は変えず、共有callback/型の契約CRC・layoutは生成器で追随する。

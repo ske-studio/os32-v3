@@ -26,5 +26,8 @@ int gfinit_bus_raw_config(void *opaque, u32 *command, u32 bars[RECOVER_BAR_COUNT
 /* recover_ops accessors, only after recover has authorized the resolved tuple. */
 int gfinit_bus_read(void *opaque, const struct recover_bus_access *a, u32 *value);
 int gfinit_bus_write(void *opaque, const struct recover_bus_access *a, u32 value);
+/* Only the fixed C frame executor calls this after recover authorization. */
+int gfinit_bus_mode_row(struct gfinit_bus *b, u32 y, bool write, const u8 *row,
+                        u32 *bad_offset, u32 *expected, u32 *actual);
 int gfinit_bus_local_cleanup(struct gfinit_bus *b, struct recover *r);
 #endif

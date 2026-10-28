@@ -2,6 +2,7 @@
  * Hardware values/order come from the stage-1 table (nouveau MIT references
  * there); this file only lowers it to existing recover accesses/captures. */
 #include "gfinit_plan_c.h"
+#include "gfinit_bus.h"
 #include "recover_gf_c.h"
 #if !GF_VPLL_PROBE
 #define C_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -27,6 +28,7 @@ static const u32 c_live[] = {REC_IMM, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM, R
 static const u32 c_saved[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 c_branch[] = {REC_ARG_READ};
 static const u32 c_pending[C_PENDING_WORDS] = {REC_IMM};
+static const u32 c_vram_kinds[] = {REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 /* REC_IMM=0: all of the pending payload is immutable metadata, never reads. */
 STATIC_ASSERT(REC_IMM == 0, c_pending_immediates);
 STATIC_ASSERT(REC_GF_C_PHASE == REC_MODE_C, c_phase_contract);
@@ -87,6 +89,17 @@ static void c_wait(struct c_builder *b, u32 ms)
     struct recover_plan_arg a = {REC_IMM,ms};
     c_emit(b, GF_C_WAIT, RECOVER_NONE, RECOVER_NONE, &a, 1);
     b->out->c_unbound++;
+}
+static void c_vram(struct c_builder *b)
+{
+    for (u32 i = 0; i < 2; i++) {
+        u32 sub = i ? GF_C_VRAM_COMPARE : GF_C_VRAM_WRITE;
+        struct recover_plan_arg a[] = {{REC_IMM,GF_MODE_VRAM_BAR},
+            {REC_IMM,GF_MODE_VRAM_OFFSET},{REC_IMM,GF_MODE_VRAM_BYTES},
+            {REC_IMM,i ? REC_READ : REC_WRITE}};
+        c_layout(b,sub,C_COUNT(a),c_vram_kinds,RECOVER_NONE,REC_LAYOUT_MODE_VRAM);
+        c_emit(b,sub,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+    }
 }
 static u32 c_key(struct c_builder *b, u32 kind, u32 reg, u32 index, u32 width)
 {
@@ -214,7 +227,7 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         const struct recover_gf_c_row *row=&recover_gf_c_rows[i];
         /* Stage-1 row boundaries: Q, P, S/D, L1, L2, L3, commit, R. */
         if(i==C_ROW_P)c_marker(&b,GF_C_P);
-        if(i==C_ROW_SD) {c_marker(&b,GF_C_VRAM);c_unbound(&b,GF_C_PENDING_VRAM,0);c_marker(&b,GF_C_SD);}
+        if(i==C_ROW_SD) {c_marker(&b,GF_C_VRAM);c_vram(&b);c_marker(&b,GF_C_SD);}
         if(i==C_ROW_L1)c_marker(&b,GF_C_L1);
         if(i==C_ROW_L2)c_marker(&b,GF_C_L2);
         if(i==C_ROW_L3)c_marker(&b,GF_C_L3);
@@ -279,4 +292,37 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     p->crc=recover_profile_crc(p);out->plan.profile_crc=p->crc;
     return 0;
 #endif
+}
+
+/* Internal finite operation only: op13 and the other C barriers stay closed.
+ * DESIGN §§3-4: all writes, safe GPU read to drain posted writes, all reads.
+ * Row data comes from the stage-1 generator; no frame-sized image or bulk API. */
+int gfinit_plan_c_vram(void *bus, struct recover *r, bool write,
+                       u32 *bad_offset, u32 *expected, u32 *actual)
+{
+    struct gfinit_bus *b = bus;
+    u8 row[GF_MODE_WIDTH];
+    for (u32 y = 0; y < GF_MODE_HEIGHT; y++) {
+        if (recover_safe_point(r) || gfinit_mode_row(y,row) ||
+            gfinit_bus_mode_row(b,y,write,row,bad_offset,expected,actual)) return -1;
+    }
+    if (recover_safe_point(r)) return -1;
+    if (write) {
+        /* Existing A4 read-safe PFB amount descriptor; no new MMIO permission. */
+        bool drained = false;
+        for (u32 key = 0; key < b->profile->target_count; key++) {
+            const struct recover_target *t = &b->profile->targets[key];
+            if (t->space != REC_BAR_MMIO || t->bar || t->offset != GF_PLAN_PFB_AMOUNT ||
+                t->width != GF_MODE_VRAM_WORD_BYTES || !t->read_safe) continue;
+            struct recover_bus_access a;
+            u32 value;
+            if (recover_target_address(t,REC_READ,&a)) return -1;
+            a.key = key;
+            if (gfinit_bus_read(b,&a,&value)) return -1;
+            drained = true;
+            break;
+        }
+        if (!drained) return -1;
+    }
+    return *bad_offset == RECOVER_NONE ? 0 : -1;
 }
