@@ -241,8 +241,6 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         '#define HOST_FEP_STATE ' + str(next(sym['value'] for table in fep_elf.symtabs.values() for sym in table if sym['name'] == 'g_ime')) + 'u\n')
     (folder / 'fep_module.c').write_bytes((ROOT / 'kernel/fep_module.c').read_bytes())
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
-    smoke = smoke.replace(function(smoke, 'tv_put'),
-        'static void tv_put(int r, int c, char v, u8 a) { (void)r; (void)c; (void)v; (void)a; }')
     (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
         source = (ROOT / 'kernel' / (name + '.c')).read_text()
