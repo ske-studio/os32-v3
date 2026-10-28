@@ -77,7 +77,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 
 ## 5. 詳細設計 (確定 2026-10-21、astra 起草・Opus 3 往復・PM が最終修正)
 
-全文: 段 4a [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: `TASK_REALHW_RECOVER`。
+段 4c [GF6200_4C_DESIGN.md](../../decisions/realhw/GF6200_4C_DESIGN.md) (2026-10-28 確定、nouveau の modeset を手本に、head A・ANALOG OR0・640x480 8bpp 25.175MHz の静止した模様、0FACh で RGB-IN に切り替えて目視)。全文: 段 4a [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) (S2 の引数配置は [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md))、戻す処理 [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) と追記 [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md)・[ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) (2026-10-21 に `~/os32-tmp/run/` の確定版を写した。往復の r1〜r3・REVIEW は ~/os32-tmp に残る)。戻す処理の段・決定・送り項目の票: `TASK_REALHW_RECOVER`。
 
 - **ユーザー決定**: N1 main3 の E81E (SR01 bit5 の解除) だけを cfg 50h/54h=0 の保持を条件に許す。U1 固まったら当面ユーザーが手で戻し、書込みの段は立会い。U2 A1 (BAR の測定) → A2 (準備) → main 0〜3 の script ごと → A4 (VRAM の確認) を、結果を見て段ごとに承認。U3 4a はモニタ無し、モニタは 4b の前に決める。
 - **S7 以降の段の並べ替え (2026-10-22)**: 装置ごとの部分を別の部品に分ける段 (M1〜M5) を先に入れた。順序は `TASK_HWDEV` §3 が正。
