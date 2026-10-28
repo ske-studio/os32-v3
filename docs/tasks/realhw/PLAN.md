@@ -15,6 +15,7 @@
 | [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
 | [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) |
 | [TASK_HWDEV.md](TASK_HWDEV.md) | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) |
+| [TASK_CCU2_MOUSE.md](TASK_CCU2_MOUSE.md) | 2nd CCU (2 本目のシリアル) でシリアルマウスを使う — 計画、余暇でやる (資料集めは済み、手元のマウスは PS/2 専用の見込み) |
 | `docs/archive/realhw_v3/TASK_FDRECOV.md` | FD 起動から LAN で HDD 一式を復旧する (FDRECOV-1) |
 
 残件 (票の無いもの): ディスクの健全性と 8GB 全域の読み書きの検証 (RA266 §2)。
