@@ -10,3 +10,4 @@ check-recover-wire-host:
 - tools/check_map.d/check-recover-wire-host.yaml
 - kdebug/recover_virtual.h
 - tools/tests/recover_hostshim/io.h
+- kdebug/recover.h

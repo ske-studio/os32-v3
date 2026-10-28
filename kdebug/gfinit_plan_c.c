@@ -7,8 +7,6 @@
 #if !GF_VPLL_PROBE
 #define C_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define C_OFF(f) __builtin_offsetof(struct gfinit_mode, f)
-#define C_ROW_WORDS 14U
-#define C_PENDING_WORDS (C_ROW_WORDS + 1U)
 #define C_EXTRA_NODES 540U
 #define C_EXTRA_ARGS 2100U
 #define C_EXTRA_LAYOUTS 194U
@@ -41,12 +39,9 @@ static const u32 c_imm[] = {REC_IMM, REC_IMM};
 static const u32 c_live[] = {REC_IMM, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 c_saved[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 c_branch[] = {REC_ARG_READ};
-static const u32 c_pending[C_PENDING_WORDS] = {REC_IMM};
 static const u32 c_vram_kinds[] = {REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 c_check_kinds[] = {REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
 static const u32 c_check_saved_kinds[] = {REC_IMM,REC_IMM,REC_IMM,REC_ARG_SAVED,REC_IMM,REC_IMM};
-/* REC_IMM=0: all of the pending payload is immutable metadata, never reads. */
-STATIC_ASSERT(REC_IMM == 0, c_pending_immediates);
 STATIC_ASSERT(REC_GF_C_PHASE == REC_MODE_C, c_phase_contract);
 static int c_value(const u32 *a, u32 n, u32 *v)
 {
@@ -87,19 +82,6 @@ static void c_marker(struct c_builder *b, u32 section)
 {
     struct recover_plan_arg a[] = {{REC_IMM,section},{REC_IMM,GF_MODE_C}};
     c_emit(b, GF_C_SECTION, RECOVER_NONE, RECOVER_NONE, a, C_COUNT(a));
-}
-static u32 c_unbound(struct c_builder *b, u32 pending, const struct recover_gf_c_row *row)
-{
-    struct recover_plan_arg a[C_PENDING_WORDS] = {{REC_IMM,pending}};
-    if (row) {
-        const u32 values[C_ROW_WORDS] = {row->id,row->key,row->phase,row->kind,
-            row->reg,row->index,row->width,row->expr,row->source,row->keep,
-            row->bits,row->verify,row->count,row->flags};
-        for (u32 i=0;i<C_ROW_WORDS;i++) a[i+1].value=values[i];
-    }
-    u32 id=c_emit(b, GF_C_UNBOUND, RECOVER_NONE, RECOVER_NONE, a, C_COUNT(a));
-    b->out->c_unbound++;
-    return id;
 }
 static void c_wait(struct c_builder *b, u32 ms)
 {
@@ -189,6 +171,13 @@ static void c_check(struct c_builder *b,u32 source,u32 key,u32 mask,
     }
     c_emit(b,saved?GF_C_CHECK_SAVED:GF_C_CHECK,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
 }
+/* The two reserved exit slots do not renumber the 2c1 CHECK items. */
+static void c_check_exit(struct c_builder *b,u32 source,u32 mask,u32 expected,u32 slot)
+{
+    c_check(b,source,RECOVER_NONE,mask,expected,~0U,RECOVER_NONE,0);
+    u32 id=b->out->plan.node_count-1;
+    b->d->args[b->d->nodes[id].arg_first+REC_CHECK_SLOT].value=slot;
+}
 static void c_check_literal(struct c_builder *b,u32 key,u32 mask,u32 expected)
 { c_check(b,REC_CHECK_TARGET,key,mask,expected,~0U,RECOVER_NONE,0); }
 static void c_check_mmio(struct c_builder *b,u32 reg,u32 mask,u32 expected)
@@ -258,11 +247,8 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
     c_check_mmio(b,C_TEST,GF_MODE_TEST_CONTROL,m->test_control);
     for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
     c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
-    /* 2c2 fills these result slots and replaces these rejecting barriers. */
-    u32 route=c_unbound(b,GF_C_PENDING_EXIT,0);
-    b->d->args[b->d->nodes[route].arg_first+1].value=GF_C_EXIT_ROUTE_SLOT;
-    u32 cell=c_unbound(b,GF_C_PENDING_CELL,0);
-    b->d->args[b->d->nodes[cell].arg_first+1].value=GF_C_EXIT_CELL_SLOT;
+    c_check_exit(b,REC_CHECK_ROUTE,RECOVER_ROUTE_MASK,RECOVER_ROUTE_RGB_IN,GF_C_EXIT_ROUTE_SLOT);
+    c_check_exit(b,REC_CHECK_CELL,~0U,1,GF_C_EXIT_CELL_SLOT);
 }
 #endif
 int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
@@ -303,8 +289,8 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     c_layout(&b,GF_C_SELECT,2,c_imm,REC_SELECT,0);
     c_layout(&b,GF_C_READ,1,c_imm,REC_READ,0);
     c_layout(&b,GF_C_SECTION,2,c_imm,RECOVER_NONE,0);
-    c_layout(&b,GF_C_UNBOUND,C_PENDING_WORDS,c_pending,RECOVER_NONE,REC_LAYOUT_UNBOUND);
     c_layout(&b,GF_C_WAIT,1,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_WAIT);
+    c_layout(&b,GF_C_ROUTE_SET,2,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_ROUTE);
     c_layout(&b,GF_C_CHECK,REC_CHECK_ARGS,c_check_kinds,RECOVER_NONE,REC_LAYOUT_MODE_CHECK);
     c_layout(&b,GF_C_CHECK_SAVED,REC_CHECK_ARGS,c_check_saved_kinds,RECOVER_NONE,REC_LAYOUT_MODE_CHECK);
     c_layout(&b,GF_C_BRANCH,1,c_branch,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR);
@@ -332,7 +318,7 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         if(i==C_ROW_L2)c_marker(&b,GF_C_L2);
         if(i==C_ROW_L3)c_marker(&b,GF_C_L3);
         if(i==C_ROW_COMMIT)c_marker(&b,GF_C_COMMIT);
-        if(row->kind==GF_C_ROUTE) {c_marker(&b,GF_C_R);c_unbound(&b,GF_C_PENDING_CELL,0);}
+        if(row->kind==GF_C_ROUTE)c_marker(&b,GF_C_R);
         if (row->kind==GF_C_AR || row->kind==GF_C_AR_GATE || row->kind==GF_C_DAC_MASK) {
             u32 value = row->expr==GF_C_STATE ? ((const u8 *)&mode)[row->source] : row->bits;
             struct recover_plan_arg a[]={{REC_IMM,i},{REC_IMM,value}};
@@ -341,7 +327,8 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         }
         if (row->kind==GF_C_DAC_INDEX || row->kind==GF_C_DAC_DATA) continue;
         if(row->kind==GF_C_ROUTE) {
-            c_unbound(&b,GF_C_PENDING_ROW,row);continue;
+            struct recover_plan_arg a[]={{REC_IMM,RECOVER_ROUTE_RGB_IN},{REC_IMM,RECOVER_ROUTE_MASK}};
+            c_emit(&b,GF_C_ROUTE_SET,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));continue;
         }
         u32 key=c_key(&b,row->kind,row->reg,row->index,row->width);
         u32 branch=RECOVER_NONE;
@@ -405,12 +392,12 @@ int gfinit_plan_c_control(struct gfinit_plan *out, struct recover *r)
     if(!out || r->plan!=&out->plan || !r->entered || r->cursor>=out->plan.node_count)return -1;
     const struct recover_plan_node *n=&out->plan.nodes[r->cursor];
     if(n->phase!=REC_MODE_C || n->opcode!=GF_C_OPCODE)return -1;
-    if(n->substep==GF_C_WAIT) {
+    if(n->substep==GF_C_WAIT || n->substep==GF_C_ROUTE_SET) {
         u32 ignored;return recover_plan_access(r,&ignored);
     }
     if(n->substep!=GF_C_CHECK && n->substep!=GF_C_CHECK_SAVED)return -1;
     u32 slot=out->plan.args[n->arg_first+REC_CHECK_SLOT].value,actual=RECOVER_NONE;
-    if(slot>=GF_C_EXIT_ROUTE_SLOT)return -1;
+    if(slot>=GF_C_CHECK_MAX)return -1;
     int rc=recover_plan_access(r,&actual);
     out->c_checks[slot]=(struct gfinit_c_check_result){actual,!rc || r->reason==REC_VERIFY};
     return rc;

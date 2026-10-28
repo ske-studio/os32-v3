@@ -96,6 +96,11 @@ int recover_budget_apply(struct recover_profile *p, u32 k, u32 hz, u32 baud,
     return -1;
 #endif
 }
+static bool mode_route_active;
+bool recover_mode_route_active(const struct recover *r)
+{ (void)r; calls++; return mode_route_active; }
+int recover_cell_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
+{ (void)r; (void)ops; (void)opaque; calls++; return -1; }
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 { (void)r; (void)ops; (void)opaque; calls++; return -1; }
 int recover_hal_wait_frame(void *opaque, u32 us)

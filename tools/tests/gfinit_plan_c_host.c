@@ -1,12 +1,12 @@
-/* Production lowering/bind/access with synthetic device values. The walk
- * below explicitly bypasses staging barriers ONLY to inspect later writes;
- * separate tests prove recover refuses every barrier in normal execution. */
+/* Production lowering/bind/access with synthetic device values. Every C
+ * section runs through its real access/control operation, without barriers. */
 #define GF_S5_ENTRY c_old_bus_entry
 #include "gfinit_bus_host.c"
 #undef GF_S5_ENTRY
 #include "../../kdebug/gfinit_plan.c"
 #include "../../kdebug/gfinit_mode.c"
 #include "../../kdebug/gfinit_plan_c.c"
+#include "../../kdebug/recover_profile.c"
 static struct gfinit_plan composed;
 static u8 frame[GF_MODE_VRAM_BYTES];
 static u32 frame_writes, frame_reads, drains, frame_fail_at, frame_abort_at, frame_points;
@@ -85,6 +85,37 @@ static int frame_operation(void *v,struct recover *r,bool write,u32 *bad,u32 *wa
     int rc=gfinit_plan_c_vram(&device,r,write,bad,want,got);
     vram_active=false;
     return rc;
+}
+/* Same reservation callbacks as S0; forbid whole-screen operations in RUN. */
+static u32 route_value,route_writes,route_reads,route_fault,route_mode_reads,route_mode_writes,route_noise;
+static u32 cell_value,cell_calls,cell_writes,cell_fault,cell_runs,cell_trace[8];
+static int c_route_read(void *v,u32 *value)
+{ (void)v;route_reads++;if(recover_mode_route_active(&core))route_mode_reads++;*value=(route_value | route_noise) ^ (route_fault==1 ? 2U : 0U);return route_fault==3 ? -1 : 0; }
+static int c_route_write(void *v,u32 value)
+{
+    (void)v;
+    if(value!=0 && (value!=1 || !recover_mode_route_active(&core)))return -1;
+    route_writes++;if(value==1)route_mode_writes++;route_value=value;return route_fault==2 ? -1 : 0;
+}
+static int cell_read(void *v,u32 *value)
+{
+    (void)v;CHECK(cell_calls<8);cell_trace[cell_calls++]=0;
+    *value=cell_value;
+    if((cell_fault==1 && cell_calls==3) || (cell_fault==3 && cell_calls==5))*value^=1;
+    return cell_fault==4 && cell_calls==1 ? -1 : 0;
+}
+static int cell_write(void *v,u32 value)
+{
+    (void)v;CHECK(cell_calls<8);cell_trace[cell_calls++]=value;
+    cell_writes++;cell_value=value;
+    return cell_fault==2 && cell_writes==1 ? -1 : 0;
+}
+static const struct recover_screen_ops cell_ops={.read_cell=cell_read,.write_cell=cell_write};
+static int c_cell(void *v,struct recover *r,u32 *actual)
+{
+    (void)v;CHECK(r->state==REC_RUNNING && (route_value&3)==1);
+    cell_runs++;
+    int rc=recover_cell_98(r,&cell_ops,0);*actual=!rc;return rc;
 }
 static void field(const char *s,u32 v){output(s);output("=");number(v);output("\n");}
 static void val(u32 v){number(v);output(" ");}
@@ -180,6 +211,9 @@ static void c_arm(void)
     CHECK(core.expected_node==composed.c_node);
     executor_bus.mode_wait=exec_delay;executor_bus.mode_vram=frame_operation;executor_bus.mode_color=color_operation;executor_bus.abort_requested=frame_point;
     memory_ops.load=frame_load;memory_ops.store=frame_store;
+    executor_bus.route_read=c_route_read;executor_bus.route_write=c_route_write;executor_bus.mode_cell=c_cell;
+    route_value=route_writes=route_reads=route_fault=route_mode_reads=route_mode_writes=route_noise=0;
+    cell_value=0x1234;cell_calls=cell_writes=cell_fault=cell_runs=0;
     frame_writes=frame_reads=drains=frame_points=0;
     frame_fail_at=frame_abort_at=color_fail_at=RECOVER_NONE;vram_active=color_active=false;color_count=0;
 }
@@ -266,22 +300,6 @@ static void c_walk(u32 variant,bool fp_on)
             CHECK(sections<sizeof(first_row)/sizeof(*first_row) && rows==first_row[sections]);
             CHECK(a[0].value==sections++ && a[1].value==GF_MODE_C);
         }
-        if(l->flags & REC_LAYOUT_UNBOUND) {
-            /* Explicit test-only bypass. Do not call a production executor. */
-            pending++;
-            if(a[0].value==GF_C_PENDING_ROW) {
-                const struct recover_gf_c_row *row=&recover_gf_c_rows[rows];
-                const u32 payload[]={row->id,row->key,row->phase,row->kind,row->reg,
-                    row->index,row->width,row->expr,row->source,row->keep,row->bits,
-                    row->verify,row->count,row->flags};
-                for(u32 j=0;j<sizeof(payload)/sizeof(*payload);j++)CHECK(a[j+1].value==payload[j]);
-                dump_row(rows++,row->bits,0,RECOVER_NONE);
-            } else {
-                CHECK((a[0].value==GF_C_PENDING_CELL && sections==10 && rows==205) ||
-                      ((a[0].value==GF_C_PENDING_EXIT || a[0].value==GF_C_PENDING_CELL) && sections==11 && rows==206));
-            }
-            core.expected_node=n->next[0];continue;
-        }
         /* Restore row 34 must see the now disconnected C040 if incorrectly
          * lowered to LIVE: do not hide that defect by resetting the fake GPU. */
         if(n->expr_id==GF_C_EXPR_LIVE && n->rule_id!=578+34) {
@@ -292,7 +310,11 @@ static void c_walk(u32 variant,bool fp_on)
                 values[a[0].value]=0xa5a55a5aU & width_mask(t->width);
         }
         CHECK(!recover_plan_enter(&core,id));
-        if(l->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) {
+        if(l->flags & REC_LAYOUT_MODE_ROUTE) {
+            CHECK(sections==10 && rows==205 && !cell_runs);
+            CHECK(!gfinit_plan_c_control(&composed,&core));
+            dump_row(rows++,route_value,1,RECOVER_NONE);
+        } else if(l->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) {
             if(n->substep==GF_C_WAIT) {
                 CHECK((a[0].value==50 && rows==2) ||
                       (a[0].value==10 && (rows==6 || rows==201)));
@@ -329,6 +351,10 @@ static void c_walk(u32 variant,bool fp_on)
         if(core.state!=REC_RUNNING)break;
     }
     CHECK(rows==206 && sections==GF_C_SECTION_COUNT && pending==composed.c_unbound);
+    CHECK(!pending && route_writes==1 && route_value==1 && cell_runs==1);
+    CHECK(cell_calls==5 && cell_writes==2 && cell_value==0x1234);
+    CHECK(composed.c_checks[94].valid && composed.c_checks[94].actual==1);
+    CHECK(composed.c_checks[95].valid && composed.c_checks[95].actual==1);
     CHECK(waits==(fp_on?70U:20U));
     CHECK(wait_total-wait_before==waits*1000);
     CHECK(data_writes==(fp_on?178U:177U));
@@ -358,22 +384,6 @@ static void c_walk(u32 variant,bool fp_on)
     field("pending",composed.c_unbound);field("c_nodes",composed.plan.node_count-composed.c_node);
     field("prefix_nodes",composed.c_node);
     field("plan_bytes",sizeof(composed));field("decode_bytes",sizeof(decoded));
-}
-static void barriers(void)
-{
-    c_build();
-    for(u32 i=composed.c_node;i<composed.plan.node_count;i++) {
-        if(!(core.node_layout[i]->flags & REC_LAYOUT_UNBOUND))continue;
-        /* No dependency/identity shortcut can turn a pending node into NOP. */
-        core.state=REC_RUNNING;core.valid=true;core.entered=false;core.expected_node=i;
-        core.plan=&composed.plan;core.profile=&profile;core.head=0;
-        core.in_call=true;core.in_opcode=false;core.budget=100000;
-        u32 before=actual_count;
-        CHECK(recover_plan_enter(&core,i)<0 && core.state!=REC_RUNNING);
-        CHECK(actual_count==before);
-        /* Cleanup detaches: restore only the test fixture's bind state. */
-        c_build();
-    }
 }
 static void contracts(void)
 {
@@ -581,6 +591,7 @@ static void color_cases(void)
 }
 static u32 check_damage_slot, check_damage_mask, check_record_count, check_line_used;
 static u32 wait_begin,wait_end,wait_ms;
+static char route_record[RECOVER_ROW_MAX];
 static char check_line[RECOVER_ROW_MAX], check_records[GF_C_CHECK_MAX][RECOVER_ROW_MAX];
 static bool damaged_check(void)
 {
@@ -602,7 +613,9 @@ static int check_identity(void *v,struct recover_identity *id)
     return rc;
 }
 static int check_route(void *v,u32 *value)
-{ (void)v;*value=damaged_check()?check_damage_mask:0;return 0; }
+{ (void)v;*value=(core.expected_node>=exit_fixture.r.expected_node?1U:0U) ^ (damaged_check()?check_damage_mask:0U);return 0; }
+static int check_cell(void *v,struct recover *r,u32 *actual)
+{ (void)v;(void)r;*actual=1U ^ (damaged_check()?check_damage_mask:0U);return 0; }
 static int check_put(void *v,u32 ch)
 {
     (void)v;CHECK(irq_state==1 && !device.window.owned);
@@ -614,6 +627,8 @@ static int check_put(void *v,u32 ch)
             CHECK(frame_contains(check_line,wait_ms==50?" addr=50\n":" addr=10\n"));
         }
         if(frame_contains(check_line,"phase=wait event=END"))wait_end++;
+        if(frame_contains(check_line,"phase=route event=END") && frame_contains(check_line," mask="))
+            for(u32 i=0;i<=check_line_used;i++)route_record[i]=check_line[i];
         if(frame_contains(check_line,"phase=check event=END")) {
             CHECK(check_record_count<GF_C_CHECK_MAX);
             for(u32 i=0;i<=check_line_used;i++)check_records[check_record_count][i]=check_line[i];
@@ -631,7 +646,7 @@ static void restore_checks(const struct check_fixture *f)
     for(u32 i=0;i<RECOVER_TARGET_MAX;i++){values[i]=f->values[i];indices[i]=f->indices[i];}
     for(u32 i=0;i<RECOVER_BITS_WORDS;i++)valid[i]=f->valid[i];
     core.state=REC_PAUSED;core.in_call=core.in_opcode=false;core.transport=&check_transport;
-    executor_bus.read=check_read;executor_bus.identity=check_identity;executor_bus.route_read=check_route;
+    executor_bus.read=check_read;executor_bus.identity=check_identity;executor_bus.route_read=check_route;executor_bus.mode_cell=check_cell;
     cleanup_calls=actual_count=check_record_count=check_line_used=0;exec_log_busy=false;
     for(u32 i=0;i<GF_C_CHECK_MAX;i++)composed.c_checks[i]=(struct gfinit_c_check_result){0};
 }
@@ -643,7 +658,7 @@ static int checks_step(struct recover *r,void *v)
         const struct recover_plan_node *n=&composed.plan.nodes[id];
         const struct recover_opcode_layout *l=r->node_layout[id];
         const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
-        /* Exactly the entry or exit section; 2c2 barriers remain real. */
+        /* Exactly the entry or exit section. */
         if((l->flags & REC_LAYOUT_UNBOUND) ||
            (n->substep==GF_C_SECTION && a[0].value==GF_C_Q))return 0;
         if(recover_plan_enter(r,id))return -1;
@@ -675,6 +690,7 @@ static void check_contracts(void)
         const struct recover_plan_node *n=&composed.plan.nodes[id];
         if(!(exit_fixture.r.node_layout[id]->flags & REC_LAYOUT_MODE_CHECK))continue;
         const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
+        if(a[REC_CHECK_SOURCE].value!=REC_CHECK_TARGET)continue;
         const struct recover_target *t=&profile.targets[a[REC_CHECK_KEY].value];
         u32 mask=a[REC_CHECK_MASK].value,expected=a[REC_CHECK_EXPECTED].value;
         if(t->space==REC_BAR_MMIO) switch(t->offset) {
@@ -697,7 +713,7 @@ static void check_contracts(void)
             if(t->port==0x3c4 && t->index==1)CHECK(expected==1);
         }
     }
-    CHECK(seen==2047 && composed.c_check_count==64);
+    CHECK(seen==2047 && composed.c_check_count==66);
 }
 static void check_cases(void)
 {
@@ -755,7 +771,8 @@ static void check_cases(void)
                 CHECK(check_number(check_records[i]," mask=")==a[REC_CHECK_MASK].value);
                 CHECK(check_number(check_records[i]," actual=")==composed.c_checks[slot].actual);
             }
-            CHECK(!composed.c_checks[GF_C_EXIT_ROUTE_SLOT].valid && !composed.c_checks[GF_C_EXIT_CELL_SLOT].valid);
+            if(!section)CHECK(!composed.c_checks[94].valid && !composed.c_checks[95].valid);
+            if(section && !bad)CHECK(composed.c_checks[94].valid && composed.c_checks[95].valid);
             output(section?"CHECK exit case=":"CHECK entry case=");number(c);
             output(" excluded=");number(pass);output(" records=");number(check_record_count);output("\n");
             if(c && !pass)output(check_records[c-1]);
@@ -811,9 +828,75 @@ static void wait_cases(void)
     }
     output("WAIT lengths positions, conditional FP, REC, callback failure and abort PASS\n");
 }
+static int route_cell_step(struct recover *r,void *v)
+{
+    u32 count=(u32)(uptr)v;
+    for(u32 i=0;i<count;i++) {
+        u32 id=r->expected_node;
+        if(recover_plan_enter(r,id) || gfinit_plan_c_control(&composed,r) || recover_plan_leave(r,0))return -1;
+    }
+    return 0;
+}
+static void route_cell_cases(void)
+{
+    for(u32 fault_kind=0;fault_kind<4;fault_kind++) {
+        c_build();c_arm();u32 id=composed.c_node;
+        while(composed.plan.nodes[id].substep!=GF_C_ROUTE_SET)id++;
+        CHECK(!c_route_write(0,0) && c_route_write(0,1)<0 && route_writes==1);
+        CHECK(!recover_plan_enter(&core,composed.c_node));
+        CHECK(c_route_write(0,1)<0 && route_writes==1);
+        CHECK(!recover_plan_leave(&core,0));
+        route_writes=0;route_fault=fault_kind;route_noise=0x80;
+        core.transport=&check_transport;check_line_used=0;route_record[0]=0;exec_log_busy=false;
+        core.expected_node=id;core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        CHECK(!recover_mode_route_active(&core));
+        int rc=trial_step(&core,&core.token,true,route_cell_step,(void *)(uptr)1);
+        CHECK((rc!=0)==(fault_kind!=0) && cleanup_calls==(u32)(fault_kind!=0));
+        CHECK(route_mode_writes==1 && route_mode_reads==(fault_kind==2?0U:1U) && !cell_runs);
+        CHECK(frame_contains(route_record," mask=3 expected=1 actual="));
+        CHECK(frame_contains(route_record,fault_kind ? " rc=-1" : " actual=129 rc=0"));
+        if(!fault_kind)CHECK(core.state==REC_PAUSED && (route_value&3)==1);
+        if(fault_kind==1)CHECK(core.reason==REC_VERIFY);
+        if(fault_kind>=2)CHECK(core.reason==REC_BUS);
+    }
+    for(u32 fault_kind=0;fault_kind<5;fault_kind++) {
+        c_build();c_arm();u32 id=composed.c_node;
+        while(composed.plan.nodes[id].substep!=GF_C_CHECK ||
+              composed.plan.args[composed.plan.nodes[id].arg_first+REC_CHECK_SLOT].value!=94)id++;
+        const struct recover_plan_arg *a=&composed.plan.args[composed.plan.nodes[id].arg_first];
+        CHECK(a[REC_CHECK_SOURCE].value==REC_CHECK_ROUTE && a[REC_CHECK_MASK].value==3 && a[REC_CHECK_EXPECTED].value==1);
+        a=&composed.plan.args[composed.plan.nodes[id+1].arg_first];
+        CHECK(a[REC_CHECK_SOURCE].value==REC_CHECK_CELL && a[REC_CHECK_SLOT].value==95);
+        route_value=0x81;cell_fault=fault_kind;
+        core.expected_node=id;core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        int rc=trial_step(&core,&core.token,true,route_cell_step,(void *)(uptr)2);
+        CHECK((rc!=0)==(fault_kind!=0) && cleanup_calls==(u32)(fault_kind!=0));
+        CHECK(cell_runs==1 && composed.c_checks[94].valid && composed.c_checks[94].actual==0x81);
+        CHECK(cell_value==0x1234 && cell_writes==(fault_kind==4?0U:2U));
+        CHECK(cell_calls==(fault_kind==4?1U:fault_kind==2?4U:5U));
+        if(fault_kind!=4)CHECK(cell_trace[cell_calls-2]==0x1234);
+        if(!fault_kind)CHECK(composed.c_checks[95].valid && composed.c_checks[95].actual==1);
+        else CHECK(core.state==REC_FAILED);
+    }
+    /* Generic I/O targets retain the original prohibition, and only the
+     * fixed phase/value/mask route node binds. */
+    struct recover_target t={.space=REC_PC98_IO,.offset=0xfac,.index=RECOVER_NONE,.width=1,.access=REC_RW,.read_safe=1};
+    struct recover_bus_access access;CHECK(recover_target_address(&t,REC_WRITE,&access)<0);
+    for(u32 bad=0;bad<3;bad++) {
+        c_build();u32 id=composed.c_node;while(decoded.nodes[id].substep!=GF_C_ROUTE_SET)id++;
+        if(bad==0)decoded.nodes[id].phase=REC_RESTORE;
+        else decoded.args[decoded.nodes[id].arg_first+bad-1].value=bad==1?0U:1U;
+        core.plan=0;CHECK(contract_bind()<0);
+    }
+    c_build();c_arm();u32 id=composed.c_node;while(composed.plan.nodes[id].substep!=GF_C_ROUTE_SET)id++;
+    core.expected_node=id;CHECK(!recover_plan_enter(&core,id));
+    CHECK(recover_plan_leave(&core,0)<0 && cleanup_calls==1);
+    output("ROUTE fixed 01 mask03 match/mismatch/bus failures, exclusive operation and slots94/95 PASS\n");
+    output("CELL RUN match/mismatch/test-write failure restore once, no HAL restore/redraw PASS\n");
+}
 void _start(void)
 {
-    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();
+    gf_fixture_init();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

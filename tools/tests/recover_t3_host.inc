@@ -292,14 +292,106 @@ static void t3_log_tests(void)
     CHECK(recover_owner_configure(&ops, &f, &profile, true) < 0);
     CHECK(recover_owner()->opaque == &f && !recover_owner()->route_write_approved);
 }
+static struct {
+    struct text_fake text;
+    u32 interrupt_at, order, restored, cleanup, local, s0;
+    bool timeout;
+} cell_trial;
+static void cell_trial_interrupt(void)
+{
+    if (r.state!=REC_RUNNING || cell_trial.text.calls!=cell_trial.interrupt_at) return;
+    CHECK(cell_trial.text.cell==0xedcb && !f.local_calls);
+    if (cell_trial.timeout) f.tick+=profile.opcode_limit;
+    else f.abort=true;
+}
+static int cell_trial_read(void *v,u32 *value)
+{
+    int rc=text_read(v,value);
+    cell_trial_interrupt();
+    return rc;
+}
+static int cell_trial_write(void *v,u32 value)
+{
+    int rc=text_write(v,value);
+    if (r.state==REC_RUNNING && value==0x1234) cell_trial.restored=++cell_trial.order;
+    cell_trial_interrupt();
+    return rc;
+}
+static int cell_trial_event(void *v,enum recover_state state,u32 session)
+{
+    if (state==REC_RESTORING) {
+        CHECK(cell_trial.text.cell==0x1234 && cell_trial.restored==1);
+        cell_trial.cleanup=++cell_trial.order;
+    }
+    return event(v,state,session);
+}
+static int cell_trial_local(void *v)
+{
+    CHECK(cell_trial.text.cell==0x1234 && cell_trial.cleanup==2);
+    cell_trial.local=++cell_trial.order;
+    return local_cleanup(v);
+}
+static int cell_trial_screen(void *v)
+{
+    (void)v;
+    CHECK(r.in_s0 && cell_trial.text.cell==0x1234 && cell_trial.local==3);
+    cell_trial.s0=++cell_trial.order;
+    return recover_screen_98(&r,&text_ops,&cell_trial.text);
+}
+static int cell_trial_run(struct recover *core,void *arg)
+{
+    (void)arg;
+    struct recover_screen_ops screen_ops=text_ops;
+    screen_ops.read_cell=cell_trial_read; screen_ops.write_cell=cell_trial_write;
+    return recover_cell_98(core,&screen_ops,&cell_trial.text);
+}
+static void t3_cell_interrupt_tests(void)
+{
+    /* Real trial_step -> cell -> cleanup -> S0, sharing the same TVRAM word.
+     * Inject immediately after test W and test R, with and without UART.
+     * Failed W/R callbacks must also restore before accepting interruption. */
+    for(u32 transport=0;transport<2;transport++)
+    for(u32 at=2;at<=3;at++) for(u32 timeout=0;timeout<2;timeout++)
+    for(u32 fault=0;fault<2;fault++) {
+        t3_setup(true);
+        if (!transport) r.transport=0;
+        cell_trial.text=(struct text_fake){.cell=0x1234,.fail_at=fault ? at:0};
+        cell_trial.interrupt_at=at; cell_trial.timeout=timeout;
+        cell_trial.order=cell_trial.restored=cell_trial.cleanup=cell_trial.local=cell_trial.s0=0;
+        struct recover_ops trial_ops=ops;
+        trial_ops.event=cell_trial_event; trial_ops.local_cleanup=cell_trial_local;
+        trial_ops.screen_restore_verify=cell_trial_screen; r.ops=&trial_ops;
+        CHECK(trial_step(&r,&r.token,true,cell_trial_run,0)<0);
+        CHECK(cell_trial.text.cell==0x1234 && cell_trial.restored==1);
+        CHECK(cell_trial.cleanup==2 && cell_trial.local==3 && cell_trial.s0==4);
+        CHECK(f.local_calls==1 && r.s0_verified);
+        CHECK(r.reason==(timeout ? REC_TIMEOUT:REC_ABORT));
+        CHECK(r.state==(timeout ? REC_FAILED:REC_VERIFIED));
+        CHECK(cell_trial.text.writes==4 && cell_trial.text.redraws==1);
+    }
+    output("RUN cell abort/timeout after W/R: restore -> cleanup -> S0 PASS\n");
+}
 static void t3_s0_tests(void)
 {
+    t3_cell_interrupt_tests();
     t3_setup(false); r.profile = &profile; r.state = REC_RESTORING; r.in_s0 = true;
     CHECK(!cleanup_budget_prepare(&r));
     struct text_fake text = {.cell = 0x1234};
     CHECK(recover_screen_98(&r, &text_ops, &text) == 0);
-    CHECK(t3_contains("phase=screen event=BEGIN step=4") &&
-          t3_contains("phase=screen event=BEGIN step=7"));
+    /* Preserve the complete pre-2c2 S0 screen trace, including the unusual
+     * restore-read step 7 before redraw step 6. */
+    static const char steps[]="01234576";
+    const char *marker="phase=screen event=BEGIN step=";
+    u32 seen=0,ends=0;
+    for(u32 i=0;i<wire.out;i++) {
+        u32 j=0;while(marker[j] && wire.output[i+j]==marker[j])j++;
+        if(!marker[j]) { CHECK(seen<sizeof(steps)-1 && wire.output[i+j]==steps[seen]);seen++; }
+        const char *end="phase=screen event=END rc=0";
+        j=0;while(end[j] && wire.output[i+j]==end[j])j++;
+        if(!end[j])ends++;
+    }
+    CHECK(seen==8 && ends==8 && text.calls==8 && text.writes==2 && text.redraws==1);
+    CHECK(text.cell==0x1234);
     for (u32 mode = 0; mode < 3; mode++) {
         t3_setup(false);
         struct recover_profile s0 = profile;

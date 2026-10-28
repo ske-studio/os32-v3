@@ -28,8 +28,9 @@ static int recovery_route(void *opaque, u32 *value)
 static int recovery_route_write(void *opaque, u32 value)
 {
     (void)opaque;
-    if (value != RECOVER_ROUTE_98) return -1;
-    outp(RECOVER_ROUTE_PORT, RECOVER_ROUTE_98);
+    if (value != RECOVER_ROUTE_98 &&
+        (value != RECOVER_ROUTE_RGB_IN || !recover_mode_route_active(recover_owner()))) return -1;
+    outp(RECOVER_ROUTE_PORT, value);
     return 0;
 }
 static int recovery_cui(void *opaque)
@@ -56,11 +57,18 @@ static const struct recover_screen_ops recovery_screen = {
 };
 static int recovery_screen_verify(void *opaque)
 { (void)opaque; return recover_screen_98(recover_owner(), &recovery_screen, 0); }
+static int recovery_mode_cell(void *opaque, struct recover *r, u32 *actual)
+{
+    (void)opaque;
+    int rc=recover_cell_98(r,&recovery_screen,0);
+    *actual=!rc;
+    return rc;
+}
 static const struct recover_ops recovery_ops = {
     .ticks = recovery_ticks, .start_ready = recovery_cui,
     .route_read = recovery_route, .route_write = recovery_route_write,
     .screen_safe = recovery_ready, .screen_restore_verify = recovery_screen_verify,
-    .local_cleanup = recovery_local
+    .mode_cell = recovery_mode_cell, .local_cleanup = recovery_local
 };
 static int recovery_rx(void *opaque)
 { (void)opaque; return serial_gate_active() ? -1 : serial_trygetchar(); }

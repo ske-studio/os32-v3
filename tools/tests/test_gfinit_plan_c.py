@@ -23,11 +23,13 @@ def check_output(text, verbose=True):
     assert 'COLOR order values log and bus failure cleanup PASS' in text
     assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
     assert 'WAIT lengths positions, conditional FP, REC, callback failure and abort PASS' in text
+    assert 'ROUTE fixed 01 mask03 match/mismatch/bus failures, exclusive operation and slots94/95 PASS' in text
+    assert 'CELL RUN match/mismatch/test-write failure restore once, no HAL restore/redraw PASS' in text
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
         for line in text.splitlines():
-            if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'REC sid=')):
+            if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'ROUTE ', 'CELL ', 'REC sid=')):
                 print(line)
     groups = text.split('CHECK entry case=')[0].split('variant=')[1:]
     assert len(groups) == 3
@@ -53,19 +55,28 @@ def check_output(text, verbose=True):
         for row, (ordinal, want) in zip(rows, enumerate(expected) if fp_on else
                                       [(i, v) for i, v in enumerate(expected) if i != 1]):
             assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
-            assert row[-1] == int(want[0] != 10)
+            assert row[-1] == 1
         assert fields['entries'] == [7] and fields['captures'] == [39]
-        assert fields['pending'] == [4]
+        assert fields['pending'] == [0]
         assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
         assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
         assert fields['layouts'][0] <= 1280
         if verbose:
             print(f'PASS C bind/bus variant={variant} FP_ON={int(fp_on)}: '
-                  f'{len(rows)} rows agree with stage-1 independent oracle; 4 typed barriers')
+                  f'{len(rows)} rows agree with stage-1 independent oracle; route/cell wired')
             print(' '.join(f'{k}={v[0]}' for k, v in fields.items() if k != 'pll'))
 
 
 MUTATIONS = [
+    ('kdebug/recover.c', 'route_readback_mask',
+     '((actual ^ RECOVER_ROUTE_RGB_IN) & RECOVER_ROUTE_MASK)',
+     '((actual ^ RECOVER_ROUTE_RGB_IN) & 0U)'),
+    ('kdebug/recover_profile.c', 'cell_skip_restore',
+     'cell_access(r,ops,opaque,run,5,true,&saved)',
+     'cell_access(r,ops,opaque,run,5,true,&test)'),
+    ('kdebug/recover.c', 'route_callback_scope',
+     'r->node_layout[r->cursor]->flags==REC_LAYOUT_MODE_ROUTE &&',
+     'r->node_layout[r->cursor]->flags!=REC_LAYOUT_MODE_ROUTE &&'),
     ('kdebug/gfinit_plan_c.c', 'check_pll_mask',
      'c_check_mmio(b,GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);',
      'c_check_mmio(b,GF_PLL_VIDEO,0,q[C_PLL_PRIMARY_WRITE].value);'),
@@ -84,8 +95,6 @@ MUTATIONS = [
      't->read_safe && logged_read(r, &a, &old)'),
     ('kdebug/gfinit_plan_c.c', 'pll_restore_live',
      'expr=GF_C_EXPR_SAVED;producer=pll_first;', 'expr=GF_C_EXPR_LIVE;producer=pll_first;'),
-    ('kdebug/recover.c', 'unbound_enter',
-     '(r->node_layout[node]->flags & REC_LAYOUT_UNBOUND) ||', 'false ||'),
     ('kdebug/gfinit_bus.c', 'misc_read_alias',
      'offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;', 'offset += 0;'),
     ('kdebug/gfinit_plan_c.c', 'vram_last_row',

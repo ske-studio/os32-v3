@@ -150,7 +150,7 @@ static int local_cleanup(void *v)
 }
 static const struct recover_ops ops = {
     ticks, identity, ready, config, read_bus, write_bus, route_read, route_write,
-    screen_safe, screen_restore, abort_requested, local_cleanup, event, 0, 0, 0
+    screen_safe, screen_restore, abort_requested, local_cleanup, event, 0, 0, 0, 0
 };
 static struct recover_reg regs[2];
 static struct recover_write quiet[3];
