@@ -143,7 +143,7 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 **規則と理由の正典は [CONSTRAINTS.md](CONSTRAINTS.md)** — [HW1] (EGC / GRCG / GDC の描画コマンドを使わず、HAL 経由で描画)、[HW2] (DMA 64KB 境界)、[HW3] (新しいハードウェアは BSD 系など参照しやすい既存の実装と資料を先に見る) を参照。ここには実装上の補足だけを置く。
 
 - `disk.c` の DMA バッファは BSS 配置により 64KB 境界またぎを回避している ([HW2])。
-- [HW3] の参照先の例: FreeBSD の `sys/dev/<装置>/` (BSD-2-Clause)、NetBSD の `sys/dev/ic/`・`sys/dev/pci/`。メーカーの資料は `docs/hw/` のミラー (著作権物、コミットしない)。取ってきたソースは `~/os32-tmp/ref/<OS>-<版>/` に置き、リポジトリには入れない。
+- [HW3] の参照先の例: FreeBSD の `sys/dev/<装置>/` (BSD-2-Clause)、NetBSD の `sys/dev/ic/`・`sys/dev/pci/`。GeForce (NV4x) の手本は nouveau (MIT、`~/os32-tmp/refs/geforce6200/nouveau/` の `nvkm/subdev/devinit/`・`drivers/gpu/drm/nouveau/dispnv04/`) と envytools の rnndb (MIT)。メーカーの資料は `docs/hw/` のミラー (著作権物、コミットしない)。取ってきたソースは `~/os32-tmp/ref/<OS>-<版>/` に置き、リポジトリには入れない。
 
 ---
 
