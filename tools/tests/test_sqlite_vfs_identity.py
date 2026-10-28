@@ -11,7 +11,7 @@ CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked'
 FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
-         'tools/tests/vfs_fd_sqlite_host.c']
+         'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/input_fixture_host.h']
 INC = ['-I' + str(ROOT / p) for p in
        ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
