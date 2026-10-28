@@ -128,3 +128,9 @@ read追加の時間的影響、実クロックと読出し像の一致、係数�
 - 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c:273-288)。cleanup の restore_limit・P/S の予約・diag/final は変えない。試験の値: Δrows=10、ΔB=3850、read +5、call_point +5、restore_limit/P/S 不変。
 - 入口: `make GF_VPLL_PROBE=1 gf-vpll-probe` → `$(BUILD_OUT)/gf-vpll-probe/{kdebug.bin,hwdev.mod}`。診断の object・ELF・map・pair.h はその下に分け、-DGF_VPLL_PROBE=1 は診断の対象のレシピだけ。既定の all と成果物は変えない。診断の core は既定の vmkernel.lz4 に対して pack し、gen_hwdev_pair.py で組を作る (カーネルは組み直さない)。世代は据置き、GF profile の version=56504C03h と profile CRC・image/pair の CRC は既存の生成器で出す (build/kdebug.mk:34-58、build/hwdev.mk:11-38、tools/gen_hwdev_pair.py:11-26)。
 - 配るもの: 診断の kdebug.bin・hwdev.mod (同じ vmkernel.lz4 の組)、対応する tools/rshell_recover.py。組の一覧 (フラグ・版・各 CRC・元の commit) を証拠に残す。
+
+## 段 1 の実機の結果 (2026-10-28、Ra266)
+- 版: カーネル・ユーザーランドは CI main 03aa4033、kdebug.bin・hwdev.mod だけ wt/vpll1 70ca0630 の診断版 (pair=896f9a6f、GF profile version 56504C03h)。WSL から scp で渡し、名札の 2 行を書き換えて hsync。証拠はノートの `~/os32-tmp/evidence/2026-10-28/vpll-probe/` (b_summary.txt・a2.raw・main2_vpll.txt・kpeek_*.txt)。
+- 電源の入れ直し → inspect match=1 → A1 OK → PSTRAPS 0x234D7A8F (組=3) → A2 PAUSED → main 0/1/2 PAUSED (216/251/200 秒、REC の連番の抜け 0、各本の後 ver 応答) → abort は PARTIAL target=S0 verified=1 trial=1 lost_lines=0 txd=0 (設計どおり)。
+- 5 本 (old → new → 直後の readback): C040h 3C0BC003→3C08C003→**3C08C003**、680580h 01F0001F→01F0001F→01F0001F、680578h 00000E02→80001003→**80000E02**、680508h 00051104→00040802→**00051104**、C040h 3C08C003→3C0BC003→3C0BC003。68050Ch は A1 の後と abort の後とも 00000004。abort の後の kpeek も 508h=00051104・578h=80000E02・580h=01F0001F・C040h=3C0BC003。
+- 帰結 (PM): **係数は書いた直後から残らない** — H3 (後で戻る)・H4 (読み戻しの遅れ) は外れ、H1/H2 (書込みの抑え) に絞れた。同じ列の C040h は書いたとおりに残るので、MMIO の書込み自体は届いている。抑えているのは 508h の全体と 578h の bit31 以外。
