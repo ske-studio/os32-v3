@@ -134,3 +134,4 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - 出所: ノートの `~/os32-tmp/evidence/2026-10-28/gf-dcb/DCB.txt` (10/21 の envytools nvbios の出力 s3_nvbios.txt から、ROM のデータの表のデコードした欄だけ。生のバイトは出さない)。
 - DCB 0x96ac 版 3.0 の 4 エントリ: **0 = ANALOG・I2C 0・heads 0 1・CONN 0・OR 0・LOCAL・maxfreq 400000kHz**、1 = ANALOG・I2C 1・heads 0 1・CONN 1・OR 1、2 = TMDS・I2C 1・heads 0 1・CONN 1・OR 0、3 = TV・heads 0 1・CONN 2・OR 1。CONN 0x97da: 0 VGA・1 DVI_I (HPD_1)・2 COMPOSITE・3 S_VIDEO・4 RGB。
 - 帰結: エントリ 0 は head A (0) を許し OR 0・CONN 0 (VGA) なので、**§1・§2 の「head A・ANALOG OR0」の仮の選択は ROM の表と合う** (確定)。RGB-IN に繋がるのが VGA の端子 (CONN 0) か DVI-I のアナログ (CONN 1・OR 1) かは配線の確認 (§10 の未確認) のまま — 映像が出なければ §7 の切り分けに OR 1 を足す。
+- 配線 (ユーザー 2026-10-28): **GeForce は VGA の端子で 98 の切替回路 (RGB-IN) に繋いでいる** → DCB のエントリ 0 (ANALOG・OR 0・CONN 0 VGA) が RGB-IN の経路で確定。ボードには DVI の端子もある (ユーザーは DVI-D と言う、ROM の CONN 1 は DVI_I・TMDS OR 0 と ANALOG OR 1 が載る) — 4c では使わない。§7 の切り分けの「OR 1」は外してよい。
