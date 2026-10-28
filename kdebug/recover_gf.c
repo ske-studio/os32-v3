@@ -199,7 +199,11 @@ static const u32 pll_saved_layout[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM}
  * This grants no COLD data restore. */
 static const u32 index_saves[] = {REC_GF_T_CR44, REC_GF_T_SR01_HEAD1, REC_GF_T_SR01_HEAD0, REC_GF_T_CR21_HEAD1};
 const struct recover_profile recover_gf_template = {
+#if GF_VPLL_PROBE
+    .version = RECOVER_PROFILE_VPLL_VERSION, .cold_required = true,
+#else
     .version = RECOVER_PROFILE_VERSION, .cold_required = true,
+#endif
     .opcode_limit = REC_GF_OPCODE_TICKS, .max_polls = REC_GF_MAX_POLLS,
     .regs = regs, .count = sizeof(regs) / sizeof(regs[0]),
     .quiesce = gf_quiesce, .quiesce_count = sizeof(gf_quiesce) / sizeof(gf_quiesce[0]),

@@ -47,14 +47,15 @@ def cross_gcc():
     return shutil.which("i386-elf-gcc")
 
 
-def host_cmd(exe):
+def host_cmd(exe, probe=False):
     # ILP32 (u32 = unsigned long が 32 bit)、libc なし (cirrus_win と同じ)。
-    return ["gcc", *FLAGS, "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+    return ["gcc", *FLAGS, *(["-DGF_VPLL_PROBE=1"] if probe else []), "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
             "-fno-stack-protector", "-O0", "-nostdlib", "-static", "-no-pie",
             *INCLUDES, str(SRC), "-o", str(exe)]
 
 
 MUTATIONS = [
+    ("vpll_allow", ALLOW, "    NV_ROW(KPEEK_NV_VPLL_CONTROL_OFF, KPEEK_NV_VPLL_CONTROL_LEN, KPEEK_W4),", ""),
     # (名前, 対象, 元, 変異後)
     ("chunk_ge", KPEEK,
      "req->len > KDEBUG_PEEK_CHUNK", "req->len >= KDEBUG_PEEK_CHUNK"),
@@ -108,7 +109,7 @@ def one_mutation(item):
         try:
             tree = mutpar.build_in_tree(
                 ROOT, td, {target: original.replace(old, new, 1)},
-                [host_cmd(exe)], capture_output=True)
+                [host_cmd(exe, name == "vpll_allow")], capture_output=True)
         except subprocess.CalledProcessError:
             return "MUTATE %-20s RED (コンパイルが通らない)" % name, 0
         out = host32.run([str(exe)], cwd=str(tree), timeout=60,
@@ -130,6 +131,9 @@ def main():
         print("HOST ILP32 GNU11 COMPILE PASS (real kdebug/kpeek.c + kpeek_allow.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
+        if rc == 0:
+            subprocess.run(host_cmd(exe, True), cwd=ROOT, check=True)
+            rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT kpeek_host=%d" % rc, flush=True)
         failed += rc != 0
         gcc = cross_gcc()

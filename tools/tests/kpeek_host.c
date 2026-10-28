@@ -326,6 +326,13 @@ static void t_ram(void)
 static void t_allow(void)
 {
     reset();
+#if GF_VPLL_PROBE
+    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF, 4, 4) == KDEBUG_PEEK_OK);
+    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF - 4, 4, 4) == KDEBUG_PEEK_DENY);
+    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF + 4, 4, 4) == KDEBUG_PEEK_DENY);
+#else
+    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF, 4, 4) == KDEBUG_PEEK_DENY);
+#endif
     CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF, 4, 0x10) == KDEBUG_PEEK_OK);
     CHECK(data_is(NV_BAR0, 0x10));
     CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF + 0x3F0, 4, 0x10) == KDEBUG_PEEK_OK);  /* 行の末尾ちょうど */

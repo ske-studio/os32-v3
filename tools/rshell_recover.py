@@ -42,6 +42,11 @@ METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
 PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route')
 PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
 BUS_ID = ('pc', 'bar', 'off', 'width')
+VPLL_VERSION = 0x56504c03
+VPLL_PC = 0xe623
+VPLL_OFFSETS = (0xc040, 0x680580, 0x680578, 0x680508, 0xc040)
+VPLL_FIRST = 0x12040
+READBACK_NONE = 0xffffffff
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
 BOOL_FIELDS = ('exec', 'minimal', 'capacity_known', 'full_capacity', 'verified',
@@ -188,6 +193,18 @@ class Records:
                 if (not stack or stack[-1]['phase'] != phase
                         or any(stack[-1][key] != fields[key] for key in ids)):
                     raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, phase))
+                if phase == 'gf_bus':
+                    pre = next((item for item in reversed(stack[:-1]) if item['phase'] == 'gf_pre'), None)
+                    if pre is not None:
+                        substep = int(pre['substep']) - VPLL_FIRST
+                        if (int(pre['main']) == 2 and int(pre['pc']) == VPLL_PC
+                                and 0 <= substep < len(VPLL_OFFSETS)
+                                and int(fields['pc']) == VPLL_PC and int(fields['bar']) == 0
+                                and int(fields['off']) == VPLL_OFFSETS[substep]
+                                and int(fields['width']) == 4
+                                and self.data['crc'].get('version') != VPLL_VERSION
+                                and int(fields['readback']) != READBACK_NONE):
+                            raise RecoverError('unexpected VPLL readback for profile version')
                 stack.pop()
             if (event == 'PAUSED' or phase == 'final') and stack:
                 raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, stack[-1]['phase']))

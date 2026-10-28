@@ -275,6 +275,12 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
     rows += plan->node_count * 12U;
     if (plan->arg_count > (~0U - rows) / 4U) return -1;
     rows += plan->arg_count * 4U;
+#if GF_VPLL_PROBE
+    if (kind == REC_BUDGET_GF) {
+        if (rows > ~0U - RECOVER_VPLL_ROWS) return -1;
+        rows += RECOVER_VPLL_ROWS;
+    }
+#endif
     if (rows > ~0U / (RECOVER_ROW_MAX + 1U)) return -1;
     u32 bytes = rows * (RECOVER_ROW_MAX + 1U);
     u32 seconds = bytes / serial->actual;

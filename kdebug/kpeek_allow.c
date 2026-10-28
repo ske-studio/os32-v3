@@ -10,6 +10,9 @@
 #define NV_VGA(base, port) NV_ROW((base) + (port), KPEEK_VGA_BYTE_LEN, KPEEK_W1)
 
 const KpeekAllowRow kpeek_allow_rows[] = {
+#if GF_VPLL_PROBE
+    NV_ROW(KPEEK_NV_VPLL_CONTROL_OFF, KPEEK_NV_VPLL_CONTROL_LEN, KPEEK_W4),
+#endif
     NV_ROW(KPEEK_NV_PMC_OFF,      KPEEK_NV_PMC_LEN,      KPEEK_W4),
     NV_ROW(KPEEK_NV_PBUS_OFF,     KPEEK_NV_PBUS_LEN,     KPEEK_W4),
     NV_ROW(KPEEK_NV_PFB_OFF,      KPEEK_NV_PFB_LEN,      KPEEK_W4),

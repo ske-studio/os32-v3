@@ -38,3 +38,52 @@ $(BUILD_OUT)/hwdev.mod: $(HWDEV_OUT)/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json $
 	$(call pack_hwdev,$(HWDEV_OUT),$(BUILD_OUT))
 all: $(BUILD_OUT)/hwdev.mod
 -include $(HWDEV_OBJS:.o=.d) $(R1_HWDEV_OUT)/hwdev_main.d
+
+# Isolated diagnostic pair; it is packed against the normal kernel image.
+VPLL_OUT := $(BUILD_OUT)/gf-vpll-probe
+VPLL_CORE_OBJS := $(patsubst $(KDEBUG_OUT)/%.o,$(VPLL_OUT)/core/%.o,$(KDEBUG_OBJS)) $(VPLL_OUT)/core/hwdev_core.o
+VPLL_HW_OBJS := $(patsubst $(HWDEV_OUT)/%.o,$(VPLL_OUT)/hw/%.o,$(HWDEV_OBJS))
+ifeq ($(GF_VPLL_PROBE),1)
+.PHONY: gf-vpll-probe vpll-force
+vpll-force:
+gf-vpll-probe: $(VPLL_OUT)/kdebug.bin $(VPLL_OUT)/hwdev.mod
+$(VPLL_OUT)/core/%.o: kdebug/%.c $(KDEBUG_GENERATED) $(HWDEV_GENERATED) build/kdebug.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DGF_VPLL_PROBE=1 $(if $(filter recover_profile,$*),-DRECOVER_MODULE) -c $< -o $@
+$(VPLL_OUT)/core/%.o: $(KDEBUG_GEN)/%.c $(KDEBUG_GENERATED) build/kdebug.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/core/kdebug_import_stubs.o: $(KDEBUG_GEN)/kdebug_import_stubs.S $(KDEBUG_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
+$(VPLL_OUT)/core/hwdev_core.o: $(HWDEV_GEN)/hwdev_core.c $(HWDEV_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(HWDEV_GEN) -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/core/kdebug.elf: $(VPLL_CORE_OBJS) build/module.ld sdk/link/generations.ld
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -Map=$(VPLL_OUT)/core/kdebug.map -T build/module.ld $(VPLL_CORE_OBJS) -o $@
+$(VPLL_OUT)/kdebug.bin: $(VPLL_OUT)/core/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json tools/mkmod.py vpll-force
+	python3 tools/mkmod.py --elf $< --metadata $(KDEBUG_GEN)/kdebug_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+$(VPLL_OUT)/hw/%.o: kdebug/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(if $(filter gfinit_decode,$*),-Os) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/hw/hwdev_pair.h: $(VPLL_OUT)/kdebug.bin tools/gen_hwdev_pair.py
+	mkdir -p $(@D)
+	python3 tools/gen_hwdev_pair.py --kernel $(BUILD_OUT)/vmkernel.lz4 --core $(VPLL_OUT)/kdebug.bin --out $@
+$(VPLL_OUT)/hw/hwdev_main.o: hwdev/hwdev_main.c $(VPLL_OUT)/hw/hwdev_pair.h $(HWDEV_GENERATED)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(@D) -Werror -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/hw/hwdev_import_slots.o: $(HWDEV_GEN)/hwdev_import_slots.c $(HWDEV_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DGF_VPLL_PROBE=1 -c $< -o $@
+$(VPLL_OUT)/hw/hwdev_import_stubs.o: $(HWDEV_GEN)/hwdev_import_stubs.S $(HWDEV_GENERATED)
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
+$(VPLL_OUT)/hw/hwdev.elf: $(VPLL_HW_OBJS) build/hwdev.ld sdk/link/generations.ld
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/hwdev.ld -Map=$(VPLL_OUT)/hw/hwdev.map $(VPLL_HW_OBJS) -o $@
+$(VPLL_OUT)/hwdev.mod: $(VPLL_OUT)/hw/hwdev.elf $(HWDEV_GEN)/hwdev_imports.json tools/mkmod.py
+	$(call pack_hwdev,$(VPLL_OUT)/hw,$(BUILD_OUT))
+-include $(VPLL_CORE_OBJS:.o=.d) $(VPLL_HW_OBJS:.o=.d)
+else
+.PHONY: gf-vpll-probe
+gf-vpll-probe:
+	@echo 'Use make GF_VPLL_PROBE=1 gf-vpll-probe' >&2; exit 1
+endif

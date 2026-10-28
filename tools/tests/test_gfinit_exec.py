@@ -11,8 +11,8 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 
 
-def command(exe):
-    return ['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
+def command(exe, probe=False):
+    return ['gcc', *FLAGS, *(['-DGF_VPLL_PROBE=1'] if probe else []), '-O2', '-nostdlib', '-static', '-no-pie',
             '-I'+str(ROOT/'include'), str(ROOT/'tools/tests/gfinit_exec_host.c'), '-o', str(exe)]
 
 
@@ -41,6 +41,7 @@ PRECHECK = """        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rul
             return access_error(r, target);
 """
 SHARED_MUTATIONS = [
+    ('vpll_read', '|| (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&', '|| (false && r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&'),
     ('timeout_reason', 'r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION', 'REC_OPERATION'),
     ('pre_read_order', PRECHECK + "        if (w->write_mask", "        if (!w) return access_error(r, target);\n        if (w->write_mask"),
     ('fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
@@ -60,7 +61,7 @@ def mutation(item):
             if name == 'pre_read_order':
                 mutated = mutated.replace(PLANNED, PLANNED + PRECHECK, 1)
             tree = mutpar.build_in_tree(ROOT, td, {file: mutated},
-                                       [command(exe)], capture_output=True)
+                                       [command(exe, name == "vpll_read")], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1
         result = host32.run([str(exe)], cwd=tree, timeout=60, capture_output=True)
@@ -71,6 +72,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gfinit-') as td:
         exe = pathlib.Path(td)/'host'
         subprocess.run(command(exe), cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=120)
+        if result.returncode:
+            return result.returncode
+        subprocess.run(command(exe, True), cwd=ROOT, check=True)
         result = host32.run([str(exe)], cwd=ROOT, timeout=120)
         if result.returncode:
             return result.returncode

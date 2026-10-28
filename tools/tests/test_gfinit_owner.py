@@ -14,6 +14,7 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('vpll_budget_rows', 'rows += RECOVER_VPLL_ROWS;', 'rows += 0;'),
     ('read_plan_identity', 'recover_owner()->plan == &owner->compiled->plan', 'true'),
     ('begin_expand', 'if (!g->compiled || recover_gf_profile_expand(&g->profile, g->compiled)) return -1;',
      'if (!g->compiled) return -1;'),
@@ -49,8 +50,8 @@ MUTATIONS = [
     ('size_end', 'if (size) return trial_end(r, &r->token, REC_NORMAL);', 'if (size) return 0;'),
 ]
 
-def command(exe):
-    return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+def command(exe, probe=False):
+    return ['gcc', *FLAGS, *(['-DGF_VPLL_PROBE=1'] if probe else []), *INCLUDES, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
             str(ROOT/'tools/tests/gfinit_owner_host.c'), str(ROOT/'lib/kprintf.c'),
             str(ROOT/'platform/pc98/console_attr.c'), str(ROOT/'platform/pc98/console.c'), '-o', str(exe)]
 
@@ -64,7 +65,7 @@ def mutation(item):
         exe = pathlib.Path(td)/'host'
         try:
             tree = mutpar.build_in_tree(ROOT, td, {path: source.replace(old, new, 1) if old else source},
-                                       [command(exe)], capture_output=True)
+                                       [command(exe, name == "vpll_budget_rows")], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return f'{name}: compile failed {exc.stderr!r}', 1
         try:
@@ -85,6 +86,10 @@ def main():
         assert '"gfinit", shell_cmd_gfinit,' in (ROOT/'userland/shell/cmd_sys.c').read_text()
         assert 'kdebug/gfinit_wire.h' in (ROOT/'build/programs.mk').read_text()
         subprocess.run(command(exe), check=True, cwd=ROOT)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=30)
+        if result.returncode:
+            return result.returncode
+        subprocess.run(command(exe, True), check=True, cwd=ROOT)
         result = host32.run([str(exe)], cwd=ROOT, timeout=30)
         if result.returncode:
             return result.returncode

@@ -503,5 +503,22 @@ static void cli_write_test(void)
     }
     output("S7c single-op CLI / main range / write gate / NOSYS PASS checks complete\n");
 }
+static void vpll_budget_test(void)
+{
+    struct gfinit_owner g = {0}; struct recover r = {0};
+    struct recover_transport t = {0};
+    struct recover_plan p = {.node_count=100, .arg_count=200};
+    u32 rows=128+100*12+200*4;
+#if GF_VPLL_PROBE
+    rows += RECOVER_VPLL_ROWS;
+#endif
+    u32 bytes=rows*(RECOVER_ROW_MAX+1U);
+    u32 seconds=(bytes*RECOVER_UART_FRAME_BITS+serial.actual-1)/serial.actual;
+    CHECK(gf_budget(&g,&r,&t,REC_BUDGET_GF,&p)==0);
+    CHECK(r.log_limit==(seconds*2+RECOVER_BUDGET_MARGIN_S)*PIT_HZ);
+    CHECK(t.max_polls==bytes*2+1024);
+    p.node_count=~0U; CHECK(gf_budget(&g,&r,&t,REC_BUDGET_GF,&p)!=0);
+    output("VPLL budget rows and overflow PASS\n");
+}
 void _start(void)
-{ cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ vpll_budget_test();cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
