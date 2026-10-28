@@ -545,8 +545,8 @@ static void cli_test(void)
 }
 static void cli_write_test(void)
 {
-    const char *names[]={"size-bars","prepare","run-one","verify","abort"};
-    const u32 ops[]={6,7,8,9,10};
+    const char *names[]={"size-bars","prepare","run-one","verify","abort","modeset"};
+    const u32 ops[]={6,7,8,9,10,13};
     const char *bad[]={"", "-1", "+1", "4294967296", "1x", " 1"};
     cli_live=0;api.version=78;api.kdebug_call=kdebug_call;
     for(u32 i=0;i<sizeof(ops)/sizeof(*ops);i++) {
@@ -594,6 +594,12 @@ static void cli_write_test(void)
         api.version=78;api.kdebug_call=0;
         CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);api.kdebug_call=kdebug_call;
     }
+    char *mode[]={"gfinit","prepare","5","--mode-c","--allow-write","extra"};
+    cli_result=0;kdebug.ops.dbg_call=cli_dispatch;
+    CHECK(shell_cmd_gfinit(5,mode)==0 && cli_op==GF_OP_PREPARE && cli_request.flags==(GF_ALLOW_WRITE|GF_MODE_C));
+    mode[1]="modeset";CHECK(shell_cmd_gfinit(5,mode)==2);
+    mode[1]="prepare";mode[3]="--unknown";CHECK(shell_cmd_gfinit(5,mode)==2);
+    mode[3]="--mode-c";mode[4]="--unknown";CHECK(shell_cmd_gfinit(5,mode)==2);
     output("S7c single-op CLI / main range / write gate / NOSYS PASS checks complete\n");
 }
 static void vpll_budget_test(void)

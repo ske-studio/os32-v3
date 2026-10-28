@@ -4,6 +4,7 @@ import argparse
 from contextlib import redirect_stdout, redirect_stderr
 import importlib.util
 import io
+import json
 from pathlib import Path
 import struct
 import sys
@@ -371,7 +372,124 @@ def vpll_cases(m):
         rec.line('REC sid=7 seq=4 phase=gf_bus event=END pc=58915 bar=0 off=6817036 width=4 readback=516 rc=0')
         assert rec.data['vpll_comparison_valid'] == (old == 4)
 
+def mode_c_cases(m):
+    assert m.mode_c_timeout(9600, 23) == 1026
+    assert m.mode_c_timeout(19200, 23) == 557
+    def run(fault=None):
+        rec = m.Records(7)
+        rec.data['mode_c_active'] = True
+        rec.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
+        rows = []
+        def add(phase, event, fields):
+            rows.append('phase=%s event=%s %s' % (phase, event, fields))
+        def pair(phase, fields, end):
+            add(phase, 'BEGIN', fields)
+            add(phase, 'END', end)
+        for direction in (1, 0):
+            f = 'pc=4294967295 bar=1 off=0 len=307200 dir=%d' % direction
+            pair('gf_bus', f, f + ' bad_off=4294967295 expected=4294967295 actual=4294967295 rc=0')
+        pair('gf_bus', 'pc=4294967295 bar=0 row=1 off=6296512 len=1 dir=1',
+             'pc=4294967295 bar=0 row=1 off=6296512 len=1 dir=1 rc=0')
+        pair('wait', 'step=1 addr=10', 'rc=0 elapsed=1')
+        for step in (2, 7):
+            pair('cell', 'step=%d addr=0' % step, 'rc=0 elapsed=1')
+        pair('route', 'step=9 addr=4012', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
+        for key, off, mask, value in ((10, 0x68050c, 0xffffffff, 0x10000204),
+                                      (11, 0x680508, 0x7ffff, 123),
+                                      (12, 0x680578, 0x8000ffff, 456)):
+            pair('access', 'step=%d addr=%d' % (key, off), 'rc=0 elapsed=1')
+            add('check', 'END', 'source=0 key=%d mask=%d expected=%d actual=%d rc=0' % (key, mask, value, value))
+        for i in range(61):
+            add('check', 'END', 'source=1 key=4294967295 mask=4294967295 expected=1 actual=1 rc=0')
+        add('check', 'END', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
+        add('check', 'END', 'source=3 key=4294967295 mask=4294967295 expected=1 actual=1 rc=0')
+        if fault == 'check':
+            i = next(i for i, x in enumerate(rows) if 'source=1 ' in x)
+            rows[i] = rows[i].replace('actual=1', 'actual=0')
+        if fault == 'route': rows = [x.replace('mask=3 expected=1 actual=1', 'mask=3 expected=1 actual=0') for x in rows]
+        if fault == 'cell': rows[-1] = rows[-1].replace('actual=1', 'actual=0')
+        if fault == 'missing': rows.pop(1)
+        try:
+            for seq, row in enumerate(rows, 1):
+                rec.line('REC sid=7 seq=%d %s' % (seq, row))
+            assert rec.mode_c_success()
+        except (m.RecoverError, AssertionError):
+            assert fault is not None
+        else:
+            assert fault is None
+            lines = ['REC sid=7 seq=%d %s\n' % (i, row) for i, row in enumerate(rows, 1)]
+            lines.append('REC sid=7 seq=%d phase=state event=PAUSED version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n' % (len(rows) + 1))
+            port = Port(('> gfinit modeset 7 --allow-write\n' + ''.join(lines) + '\x04').encode())
+            fresh = m.Records(7)
+            fresh.data['mode_c_active'] = True
+            fresh.data['mode_c_trial'] = True
+            fresh.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
+            with redirect_stdout(io.StringIO()) as output:
+                assert m.exchange(port, 'gfinit modeset 7 --allow-write', fresh, 100, 23, io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
+            assert '機械項目合格・映像保留' in output.getvalue()
+            assert not fresh.data['mode_c_active'] and fresh.data['mode_c_trial']
+            cleanup_cases(m, fresh.data)
+
+    for fault in (None, 'check', 'route', 'cell', 'missing'):
+        run(fault)
+
+
+def cleanup_cases(m, saved):
+    class DelayedPort(Port):
+        def __init__(self, command, seq):
+            super().__init__(('> '+command+'\n').encode())
+            self.seq, self.stage = seq, 0
+            self.last = 0
+        def read(self, count):
+            if not self.data and self.stage == 0:
+                self.data.extend(('REC sid=7 seq=%d phase=state event=RESTORING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13 cleanup_seconds=3\n' % self.seq).encode())
+                self.stage = 1
+                self.last = self.t
+            elif not self.data and self.stage == 1 and self.t > self.last + 2:
+                self.data.extend((DIAG.replace('seq=2', 'seq=%d' % (self.seq+1)) + FINAL.split('\n', 1)[1].replace('seq=3', 'seq=%d' % (self.seq+2)) + '\x04').encode())
+                self.stage = 2
+            return super().read(count)
+    for is_c in (True, False):
+        for abort in (True, False):
+            state = dict(saved)
+            state['mode_c_trial'] = is_c
+            records = m.Records(7, state)
+            command = 'gfinit abort 7 --allow-write' if abort else 'recover now 7'
+            port = DelayedPort(command, state['seq'] + 1)
+            raw = io.BytesIO()
+            try:
+                with redirect_stderr(io.StringIO()):
+                    result = m.exchange(port, command, records, 1, 1, raw, lambda _: None, port.clock)
+            except m.RecoverError:
+                assert not is_c
+            else:
+                assert is_c and result == 'OK'
+            assert (b'phase=final' in raw.getvalue()) == is_c, (is_c, abort, port.t, raw.getvalue(), records.data['invalid'])
+            assert (m.abort_frame(7) in port.writes) == (not is_c)
+
+
+def mode_c_cli_cases(m):
+    with tempfile.TemporaryDirectory(prefix='recover_cli_') as tmp:
+        state = Path(tmp)/'state'
+        log = Path(tmp)/'log'
+        for whitespace in ('  ', '\t'):
+            command = 'gfinit' + whitespace + 'modeset 7 --allow-write'
+            previous = m.Records(7).data
+            previous['image_crc'] = '1234abcd'
+            state.write_text(json.dumps(previous))
+            port = Port(('> '+command+'\n'+META+'\x04').encode())
+            port.close = lambda: None
+            argv = ['rshell_recover', '--session', '7', '--image-crc', '1234abcd', '--state', str(state), '--log', str(log), '--command', command, '--timeout', '1', '--cleanup-timeout', '23']
+            with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), patch.object(m, 'exchange', wraps=m.exchange) as exchange, redirect_stdout(io.StringIO()):
+                assert m.main() == 1  # PAUSED without C evidence is rejected.
+            assert exchange.call_args.args[3] == m.mode_c_timeout(9600, 23)
+            assert json.loads(state.read_text())['mode_c_trial']
+
+
 MUTATIONS = [
+    ('mode_c_split', "' '.join(command.split())", 'command'),
+    ('mode_c_cleanup', "if records.data.get('mode_c_trial'):", "if records.data.get('mode_c_active'):"),
+    ('mode_c_check', '(actual ^ expected) & mask', '0'),
     ('vpll_version', 'version not in (VPLL_VERSION_1, VPLL_VERSION)', 'False'),
     ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
     ('sequence', "sid != candidate_sid or seq != self.data['seq'] + 1", "sid != candidate_sid"),
@@ -404,6 +522,8 @@ def mutation(item):
             gfinit_cases(mutant)
             protocol_cases(mutant)
             vpll_cases(mutant)
+            mode_c_cases(mutant)
+            mode_c_cli_cases(mutant)
         except (AssertionError, mutant.RecoverError):
             return name + ': RED', 0
         return name + ': GREEN', 1
@@ -418,6 +538,8 @@ def main():
     gfinit_cases(load(SRC))
     protocol_cases(load(SRC))
     vpll_cases(load(SRC))
+    mode_c_cases(load(SRC))
+    mode_c_cli_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.
