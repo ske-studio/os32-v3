@@ -9,16 +9,30 @@
 #define C_OFF(f) __builtin_offsetof(struct gfinit_mode, f)
 #define C_ROW_WORDS 14U
 #define C_PENDING_WORDS (C_ROW_WORDS + 1U)
-#define C_EXTRA_NODES 400U
-#define C_EXTRA_ARGS 1500U
-#define C_EXTRA_LAYOUTS 190U
+#define C_EXTRA_NODES 540U
+#define C_EXTRA_ARGS 2100U
+#define C_EXTRA_LAYOUTS 194U
 #define C_EXTRA_RULES 260U
-#define C_EXTRA_CAPTURES 10U
+#define C_EXTRA_CAPTURES 13U
 #define C_FP_ON_MASK 0x10000011U
 #define C_PLL_RESTORE 4U
 #define C_GPIO_EXT 0x60081cU
 #define C_CRTC850 0x600850U
 #define C_SEL_CLK 0x680524U
+#define C_PLL_SELECT 0x68050cU
+#define C_PLL_STATUS 0x680510U
+#define C_CONFIG 0x600804U
+#define C_START 0x600800U
+#define C_DACCLK 0x68052cU
+#define C_TEST 0x680608U
+#define C_GENERAL 0x680600U
+#define C_DACCLK_MASK 0x101U
+#define C_CONFIG_MASK 3U
+#define C_CR_LOCK 0x80U
+#define C_CR_PITCH_EXTRA 0x47U
+#define C_PLL_STAGE_WRITE 1U
+#define C_PLL_COEFF_WRITE 2U
+#define C_PLL_PRIMARY_WRITE 3U
 /* Boundaries in the fixed stage-1 row contract (not ROM offsets). */
 enum c_row_boundary { C_ROW_P=2, C_ROW_SD=15, C_ROW_L1=26,
     C_ROW_L2=46, C_ROW_L3=120, C_ROW_COMMIT=190,
@@ -29,6 +43,8 @@ static const u32 c_saved[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM, REC_IMM,
 static const u32 c_branch[] = {REC_ARG_READ};
 static const u32 c_pending[C_PENDING_WORDS] = {REC_IMM};
 static const u32 c_vram_kinds[] = {REC_IMM, REC_IMM, REC_IMM, REC_IMM};
+static const u32 c_check_kinds[] = {REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
+static const u32 c_check_saved_kinds[] = {REC_IMM,REC_IMM,REC_IMM,REC_ARG_SAVED,REC_IMM,REC_IMM};
 /* REC_IMM=0: all of the pending payload is immutable metadata, never reads. */
 STATIC_ASSERT(REC_IMM == 0, c_pending_immediates);
 STATIC_ASSERT(REC_GF_C_PHASE == REC_MODE_C, c_phase_contract);
@@ -72,7 +88,7 @@ static void c_marker(struct c_builder *b, u32 section)
     struct recover_plan_arg a[] = {{REC_IMM,section},{REC_IMM,GF_MODE_C}};
     c_emit(b, GF_C_SECTION, RECOVER_NONE, RECOVER_NONE, a, C_COUNT(a));
 }
-static void c_unbound(struct c_builder *b, u32 pending, const struct recover_gf_c_row *row)
+static u32 c_unbound(struct c_builder *b, u32 pending, const struct recover_gf_c_row *row)
 {
     struct recover_plan_arg a[C_PENDING_WORDS] = {{REC_IMM,pending}};
     if (row) {
@@ -81,14 +97,14 @@ static void c_unbound(struct c_builder *b, u32 pending, const struct recover_gf_
             row->bits,row->verify,row->count,row->flags};
         for (u32 i=0;i<C_ROW_WORDS;i++) a[i+1].value=values[i];
     }
-    c_emit(b, GF_C_UNBOUND, RECOVER_NONE, RECOVER_NONE, a, C_COUNT(a));
+    u32 id=c_emit(b, GF_C_UNBOUND, RECOVER_NONE, RECOVER_NONE, a, C_COUNT(a));
     b->out->c_unbound++;
+    return id;
 }
 static void c_wait(struct c_builder *b, u32 ms)
 {
     struct recover_plan_arg a = {REC_IMM,ms};
     c_emit(b, GF_C_WAIT, RECOVER_NONE, RECOVER_NONE, &a, 1);
-    b->out->c_unbound++;
 }
 static void c_vram(struct c_builder *b)
 {
@@ -155,6 +171,45 @@ static u32 c_read(struct c_builder *b,u32 key)
     struct recover_plan_arg a={REC_IMM,key};
     return c_emit(b,GF_C_READ,RECOVER_NONE,RECOVER_NONE,&a,1);
 }
+/* CHECK metadata is immutable plan input. Each item reads exactly once;
+ * recover owns comparison/logging/failure, and the caller retains the value.
+ * Saved operands reuse the existing single-use capture contract. */
+static void c_check(struct c_builder *b,u32 source,u32 key,u32 mask,
+                    u32 expected,u32 keep,u32 producer,u32 saved_key)
+{
+    if (source==REC_CHECK_TARGET)c_select(b,key);
+    bool saved=producer!=RECOVER_NONE;
+    struct recover_plan_arg a[]={{REC_IMM,source},{REC_IMM,key},{REC_IMM,mask},
+        {REC_IMM,expected},{REC_IMM,keep},{REC_IMM,b->out->c_check_count++}};
+    u32 id=b->out->plan.node_count;
+    if(saved) {
+        u32 slot=b->out->plan.capture_count++;
+        a[REC_CHECK_EXPECTED]=(struct recover_plan_arg){REC_ARG_SAVED,b->p->count+slot};
+        b->d->captures[slot]=(struct recover_capture){b->p->count+slot,producer,id,saved_key,0};
+    }
+    c_emit(b,saved?GF_C_CHECK_SAVED:GF_C_CHECK,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+}
+static void c_check_literal(struct c_builder *b,u32 key,u32 mask,u32 expected)
+{ c_check(b,REC_CHECK_TARGET,key,mask,expected,~0U,RECOVER_NONE,0); }
+static void c_check_mmio(struct c_builder *b,u32 reg,u32 mask,u32 expected)
+{ c_check_literal(b,c_key(b,GF_C_MMIO,reg,0,4),mask,expected); }
+static void c_check_in(struct c_builder *b)
+{
+    /* Recheck identity and decode before the pre-Q saved reads. */
+    c_check(b,REC_CHECK_IDENTITY,RECOVER_NONE,~0U,1,~0U,RECOVER_NONE,0);
+    /* The three BAR snapshot entries are the existing recover_gf regs. */
+    for(u32 i=0;i<b->p->count;i++) {
+        u32 key=b->p->regs[i].key;
+        if(key<REC_GF_T_BAR0 || key>REC_GF_T_BAR2)continue;
+        c_select(b,key);
+        struct recover_plan_arg a[]={{REC_IMM,REC_CHECK_TARGET},{REC_IMM,key},
+            {REC_IMM,~0U},{REC_ARG_SAVED,i},{REC_IMM,~0U},{REC_IMM,b->out->c_check_count++}};
+        c_emit(b,GF_C_CHECK_SAVED,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+    }
+    c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
+    for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
+    c_check(b,REC_CHECK_ROUTE,RECOVER_NONE,RECOVER_ROUTE_MASK,0,~0U,RECOVER_NONE,0);
+}
 /* s(x): one read before Q, independent single-use captures for each consumer.
  * The value transformations are the saved fields in gfinit_mode_calc. */
 struct c_saved_field { u32 offset, kind, reg, index, width, keep, add, bits; };
@@ -168,6 +223,47 @@ static const struct c_saved_field c_fields[] = {
     {C_OFF(crtc850),GF_C_MMIO,C_CRTC850,0,4,~0U,0,0},
     {C_OFF(sel_clk),GF_C_MMIO,C_SEL_CLK,0,4,~GF_MODE_SEL_CLK_CLEAR,0,0}
 };
+static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
+                         const u32 *producers,const u32 *keys,u32 pll_first)
+{
+    /* DESIGN §§3-4: coefficients are checked only after 50C selection.
+     * 510 is evidence only; TEST excludes sense and compares bit20 only. */
+    c_check_mmio(b,C_PLL_SELECT,~0U,m->pllsel);
+    c_check_mmio(b,C_PLL_STATUS,0,0);
+    const struct gfinit_pll_write *q=m->sequence.writes;
+    c_check_mmio(b,GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);
+    c_check_mmio(b,GF_PLL_VIDEO_COEFF,~GF_PLL_VIDEO_S2_KEEP,q[C_PLL_COEFF_WRITE].value);
+    c_check_mmio(b,GF_PLL_VIDEO_STAGE,GF_PLL_CTRL_SINGLE,q[C_PLL_STAGE_WRITE].value);
+    for(u32 i=0;i<C_COUNT(c_fields);i++)if(c_fields[i].reg==C_SEL_CLK)
+        c_check(b,REC_CHECK_TARGET,keys[i],~0U,0,~GF_MODE_SEL_CLK_CLEAR,producers[i],keys[i]);
+    u32 gate=c_key(b,GF_C_MMIO,GF_PLL_GATE,0,4);
+    c_check(b,REC_CHECK_TARGET,gate,~0U,0,~0U,pll_first,gate);
+    c_check_mmio(b,C_CONFIG,C_CONFIG_MASK,m->config);
+    c_check_mmio(b,C_START,~0U,m->start);
+    for(u32 index=0;index<=GF_MODE_CR_LINE_COMPARE;index++) {
+        u32 expected=m->cr[index];
+        if(index==GF_MODE_CR_VE || index==GF_MODE_CR_MODE)expected|=C_CR_LOCK;
+        c_check_literal(b,c_key(b,GF_C_CR,0,index,1),GF_MODE_BYTE_MASK,expected);
+    }
+    const u32 extra[]={GF_MODE_CR_PITCH_HI,GF_MODE_CR_RPC1,GF_MODE_CR_LSR,
+        GF_MODE_CR_PIXEL,RECOVER_CR44,GF_MODE_CR_PITCH11,GF_MODE_CR_BURST,GF_MODE_CR_LWM,C_CR_PITCH_EXTRA};
+    for(u32 i=0;i<C_COUNT(extra);i++)
+        c_check_literal(b,c_key(b,GF_C_CR,0,extra[i],1),GF_MODE_BYTE_MASK,m->cr[extra[i]]);
+    for(u32 i=0;i<C_COUNT(c_fields);i++)if(c_fields[i].index==GF_MODE_CR_LCD && c_fields[i].kind==GF_C_CR)
+        c_check(b,REC_CHECK_TARGET,keys[i],GF_MODE_BYTE_MASK,0,~GF_MODE_LCD_CLEAR,producers[i],keys[i]);
+    c_check_literal(b,c_key(b,GF_C_SR,0,1,1),GF_MODE_BYTE_MASK,GF_MODE_DAC_ENABLE);
+    c_check_literal(b,c_key(b,GF_C_MISC,0,0,1),GF_MODE_BYTE_MASK,m->misc);
+    c_check_mmio(b,C_GENERAL,~0U,m->general);
+    c_check_mmio(b,C_DACCLK,C_DACCLK_MASK,m->dacclk);
+    c_check_mmio(b,C_TEST,GF_MODE_TEST_CONTROL,m->test_control);
+    for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
+    c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
+    /* 2c2 fills these result slots and replaces these rejecting barriers. */
+    u32 route=c_unbound(b,GF_C_PENDING_EXIT,0);
+    b->d->args[b->d->nodes[route].arg_first+1].value=GF_C_EXIT_ROUTE_SLOT;
+    u32 cell=c_unbound(b,GF_C_PENDING_CELL,0);
+    b->d->args[b->d->nodes[cell].arg_first+1].value=GF_C_EXIT_CELL_SLOT;
+}
 #endif
 int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
                         struct recover_profile *p, u32 bar1_length,
@@ -195,6 +291,8 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
        p->layout_count+C_EXTRA_LAYOUTS>GF_PLAN_LAYOUTS || p->expr_count+3>GF_PLAN_EXPRS) return -1;
     struct c_builder b={out,d,p,out->plan.ctx_count++,REC_GF_C_RULE_FIRST+recover_gf_c_row_count};
     out->mode_flags=GF_MODE_C;out->c_node=out->plan.node_count;out->c_unbound=0;
+    out->c_check_count=0;
+    for(u32 i=0;i<GF_C_CHECK_MAX;i++)out->c_checks[i]=(struct gfinit_c_check_result){0};
     out->vram_node=RECOVER_NONE;out->bar1_length=bar1_length;
     out->entries[out->plan.entry_count++]=(struct recover_plan_entry){REC_MODE_C,RECOVER_NONE,out->c_node};
     for(u32 i=0;i<out->c_node;i++)for(u32 j=0;j<2;j++)
@@ -206,8 +304,9 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     c_layout(&b,GF_C_READ,1,c_imm,REC_READ,0);
     c_layout(&b,GF_C_SECTION,2,c_imm,RECOVER_NONE,0);
     c_layout(&b,GF_C_UNBOUND,C_PENDING_WORDS,c_pending,RECOVER_NONE,REC_LAYOUT_UNBOUND);
-    /* Wait is also unbound in 2a: only the executor added with C can pay it. */
-    c_layout(&b,GF_C_WAIT,1,c_imm,RECOVER_NONE,REC_LAYOUT_UNBOUND);
+    c_layout(&b,GF_C_WAIT,1,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_WAIT);
+    c_layout(&b,GF_C_CHECK,REC_CHECK_ARGS,c_check_kinds,RECOVER_NONE,REC_LAYOUT_MODE_CHECK);
+    c_layout(&b,GF_C_CHECK_SAVED,REC_CHECK_ARGS,c_check_saved_kinds,RECOVER_NONE,REC_LAYOUT_MODE_CHECK);
     c_layout(&b,GF_C_BRANCH,1,c_branch,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR);
     c_layout(&b,GF_C_COLOR,2,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_COLOR);
     for(u32 i=0;i<recover_gf_c_target_count;i++) {
@@ -216,7 +315,7 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
             (void)c_key(&b,t->kind,t->reg,t->index,t->width);
     }
     c_marker(&b,GF_C_CHECK_IN);
-    c_unbound(&b,GF_C_PENDING_CHECK,0); /* identity/route + cleanup/budget gate (2c) */
+    c_check_in(&b);
     u32 producers[C_COUNT(c_fields)], keys[C_COUNT(c_fields)], pll_first=RECOVER_NONE;
     for(u32 i=0;i<C_COUNT(c_fields);i++) {
         const struct c_saved_field *f=&c_fields[i];
@@ -290,7 +389,8 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         }
         if(i==C_ROW_DPMS_OFF_WAIT || i==C_ROW_DPMS_ON_WAIT)c_wait(&b,GF_C_DPMS_WAIT_MS);
     }
-    c_marker(&b,GF_C_CHECK_OUT);c_unbound(&b,GF_C_PENDING_EXIT,0);
+    c_marker(&b,GF_C_CHECK_OUT);c_check_out(&b,&mode,producers,keys,pll_first);
+    if(out->c_check_count>GF_C_EXIT_ROUTE_SLOT)return -1;
     u32 last=out->plan.node_count-1;
     d->nodes[last].next[0]=d->nodes[last].next[1]=RECOVER_NONE;
     p->vram_reserved=(struct recover_range){0,GF_MODE_PITCH*GF_MODE_HEIGHT};
@@ -298,6 +398,22 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     p->crc=recover_profile_crc(p);out->plan.profile_crc=p->crc;
     return 0;
 #endif
+}
+
+int gfinit_plan_c_control(struct gfinit_plan *out, struct recover *r)
+{
+    if(!out || r->plan!=&out->plan || !r->entered || r->cursor>=out->plan.node_count)return -1;
+    const struct recover_plan_node *n=&out->plan.nodes[r->cursor];
+    if(n->phase!=REC_MODE_C || n->opcode!=GF_C_OPCODE)return -1;
+    if(n->substep==GF_C_WAIT) {
+        u32 ignored;return recover_plan_access(r,&ignored);
+    }
+    if(n->substep!=GF_C_CHECK && n->substep!=GF_C_CHECK_SAVED)return -1;
+    u32 slot=out->plan.args[n->arg_first+REC_CHECK_SLOT].value,actual=RECOVER_NONE;
+    if(slot>=GF_C_EXIT_ROUTE_SLOT)return -1;
+    int rc=recover_plan_access(r,&actual);
+    out->c_checks[slot]=(struct gfinit_c_check_result){actual,!rc || r->reason==REC_VERIFY};
+    return rc;
 }
 
 /* Internal finite operation only: op13 and the other C barriers stay closed.

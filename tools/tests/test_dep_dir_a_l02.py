@@ -44,10 +44,10 @@ def contracts():
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
     assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
-    # GF4c/2b2 adds the private fixed AR/DAC callback/type; public ABI stays fixed.
+    # GF4c/2c1 adds private CHECK results and the fixed wait callback/type; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x0dbe9e7dU' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x772927aaU' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x63363415U' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x8f5a07d8U' in hwdev
     assert 'e82557_regs.h' not in (ROOT / 'kernel/lan_module.c').read_text()
     print('PASS B1/B2: fixed hwdev inventory/CRCs, both LAN contract dependencies')
 
@@ -107,6 +107,6 @@ def main():
             print('RED runtime: machine device ID changed (compiled successfully)')
 
 
-HWDEV_SHA = 'bd0588aa8bbb77d7e260778160b3b76cea66ade4219ae1b5bc680cd9bfc17e12'
+HWDEV_SHA = '48a2284a9bc0e57dcf851b4a4190ae38e89304bb8f7013726e153cf874cfc17a'
 if __name__ == '__main__':
     main()

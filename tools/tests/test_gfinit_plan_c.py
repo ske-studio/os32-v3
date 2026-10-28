@@ -1,4 +1,4 @@
-"""4c/2a bind/legacy trace and 2b1 fixed VRAM transfer/compare with cleanup."""
+"""4c composition: legacy trace, VRAM/AR/DAC and 2c1 CHECK/wait evidence."""
 import pathlib
 import subprocess
 import sys
@@ -21,13 +21,15 @@ def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
+    assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
+    assert 'WAIT lengths positions, conditional FP, REC, callback failure and abort PASS' in text
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
         for line in text.splitlines():
-            if line.startswith(('VRAM ', 'COLOR ', 'REC sid=')):
+            if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'REC sid=')):
                 print(line)
-    groups = text.split('variant=')[1:]
+    groups = text.split('CHECK entry case=')[0].split('variant=')[1:]
     assert len(groups) == 3
     for section, (variant, fp_on) in zip(groups, [(0, True), (1, True), (1, False)]):
         rows, fields = [], {}
@@ -42,23 +44,37 @@ def check_output(text, verbose=True):
             else:
                 fields[name] = values
         expected = test_gfinit_mode.expected_trace(test_gfinit_mode.expected_state(variant), fields['pll'])
+        # This execution fixture keeps the CR11 just loaded before locking it;
+        # the stage-1 expression-only fixture supplies LIVE separately per row.
+        lock = max(i for i, row in enumerate(expected) if row[0] == 1 and row[2] == 0x11)
+        kind, reg, index, width, _, count = expected[lock]
+        expected[lock] = (kind, reg, index, width, 0xab, count)
         assert len(expected) == 206 and len(rows) == 206 - (not fp_on)
         for row, (ordinal, want) in zip(rows, enumerate(expected) if fp_on else
                                       [(i, v) for i, v in enumerate(expected) if i != 1]):
             assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
             assert row[-1] == int(want[0] != 10)
-        assert fields['entries'] == [7] and fields['captures'] == [36]
-        assert fields['pending'] == [7]
+        assert fields['entries'] == [7] and fields['captures'] == [39]
+        assert fields['pending'] == [4]
         assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
         assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
         assert fields['layouts'][0] <= 1280
         if verbose:
             print(f'PASS C bind/bus variant={variant} FP_ON={int(fp_on)}: '
-                  f'{len(rows)} rows agree with stage-1 independent oracle; 7 typed barriers')
+                  f'{len(rows)} rows agree with stage-1 independent oracle; 4 typed barriers')
             print(' '.join(f'{k}={v[0]}' for k, v in fields.items() if k != 'pll'))
 
 
 MUTATIONS = [
+    ('kdebug/gfinit_plan_c.c', 'check_pll_mask',
+     'c_check_mmio(b,GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);',
+     'c_check_mmio(b,GF_PLL_VIDEO,0,q[C_PLL_PRIMARY_WRITE].value);'),
+    ('kdebug/gfinit_plan_c.c', 'check_test_sense',
+     'c_check_mmio(b,C_TEST,GF_MODE_TEST_CONTROL,m->test_control);',
+     'c_check_mmio(b,C_TEST,~0U,m->test_control);'),
+    ('kdebug/recover.c', 'wait_short',
+     'recover_delay_ms(r,ms,r->ops->mode_wait,r->opaque);',
+     'recover_delay_ms(r,ms-1,r->ops->mode_wait,r->opaque);'),
     ('kdebug/gfinit_bus.c', 'ar_reset',
      'mode_byte(b,base,GF_MODE_AR_STATUS,false,&ignored)', 'mode_byte(b,base,GF_MODE_AR_PORT,false,&ignored)'),
     ('kdebug/gfinit_bus.c', 'dac_palette',

@@ -714,7 +714,7 @@ int recover_profile_ok(const struct recover_profile *p)
     for (u32 i = 0; i < p->layout_count; i++) {
         const struct recover_opcode_layout *l = &p->layouts[i];
         if (l->argc > RECOVER_EXPR_ARGS + 1 || (l->argc && !l->kinds) ||
-            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND | REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR)) ||
+            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND | REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) ||
             (l->flags && l->dir_substep != RECOVER_NONE) ||
             (l->dir_substep != RECOVER_NONE && l->dir_substep > REC_DATA)) return -1;
         for (u32 j = 0; j < l->argc; j++) if (l->kinds[j] > REC_ARG_SAVED) return -1;
@@ -1441,6 +1441,9 @@ static bool dependencies(const struct recover *r, const struct recover_profile *
         const struct recover_plan_arg *arg = &plan->args[n->arg_first + i];
         bool target_read = i == 0 && layout &&
             (layout->dir_substep == REC_DATA || layout->dir_substep == REC_READ);
+        if (layout && (layout->flags & REC_LAYOUT_MODE_CHECK) &&
+            i == REC_CHECK_KEY && plan->args[n->arg_first + REC_CHECK_SOURCE].value == REC_CHECK_TARGET)
+            target_read = true;
         if (!target_read && arg->kind != REC_ARG_READ) continue;
         u32 key = arg->value;
         if (key >= p->target_count) return false;
@@ -1528,6 +1531,19 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
         if (args[i].kind != l->kinds[i] || !arg_ok(p, plan, id, &args[i])) return false;
     if (l->dir_substep == RECOVER_NONE) {
         if (n->rule_id != RECOVER_NONE) return false;
+        if (l->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) {
+            if (n->phase != REC_MODE_C || n->head || n->skip || n->expr_id != RECOVER_NONE) return false;
+            if (l->flags == REC_LAYOUT_MODE_WAIT)
+                return n->arg_count == 1 && args[0].kind == REC_IMM && args[0].value;
+            if (l->flags != REC_LAYOUT_MODE_CHECK || n->arg_count != REC_CHECK_ARGS) return false;
+            for (u32 i=0;i<REC_CHECK_ARGS;i++)
+                if (i != REC_CHECK_EXPECTED && args[i].kind != REC_IMM) return false;
+            if (args[REC_CHECK_EXPECTED].kind != REC_IMM && args[REC_CHECK_EXPECTED].kind != REC_ARG_SAVED) return false;
+            u32 source=args[REC_CHECK_SOURCE].value, key=args[REC_CHECK_KEY].value;
+            if (source == REC_CHECK_TARGET)
+                return key < p->target_count && p->targets[key].read_safe;
+            return key == RECOVER_NONE && (source == REC_CHECK_IDENTITY || source == REC_CHECK_ROUTE);
+        }
         if (l->flags & REC_LAYOUT_MODE_COLOR) {
             if (l->flags != REC_LAYOUT_MODE_COLOR || n->phase != REC_MODE_C ||
                 n->head || n->skip || n->expr_id != RECOVER_NONE || n->arg_count != 2 ||
@@ -2187,6 +2203,78 @@ static int mode_color_access(struct recover *r)
     bit_set(r->buffers.valid_bits,r->cursor);
     return 0;
 }
+/* One place for C's read, masked comparison, evidence and failure exit.
+ * Route reads use the existing callback; no route write/I/O target is added. */
+static int mode_check_access(struct recover *r, u32 *actual)
+{
+    const struct recover_plan_node *n=&r->plan->nodes[r->cursor];
+    const struct recover_plan_arg *a=&r->plan->args[n->arg_first];
+    if (r->state != REC_RUNNING || !r->valid || r->accessed ||
+        !node_ok(r->profile,r->plan,r->cursor)) return access_error(r,r->cursor);
+    *actual=RECOVER_NONE;
+    u32 source=a[REC_CHECK_SOURCE].value, key=a[REC_CHECK_KEY].value;
+    u32 mask=a[REC_CHECK_MASK].value, expected=a[REC_CHECK_EXPECTED].value;
+    if (a[REC_CHECK_EXPECTED].kind == REC_ARG_SAVED) {
+        if (expected < r->profile->count) expected=r->saved[expected];
+        else {
+            u32 slot=expected-r->profile->count;
+            if (!(r->capture_valid & (1ULL << slot))) return access_error(r,key);
+            expected=r->capture_values[slot];
+        }
+    }
+    expected &= a[REC_CHECK_KEEP].value;
+    if (recover_safe_point(r)) return -1;
+    int rc;
+    if (source == REC_CHECK_IDENTITY) {
+        struct recover_identity id;
+        rc=r->ops->identity(r->opaque,&id);
+        if (!rc) *actual=same_identity(&id,&r->token.identity);
+    } else if (source == REC_CHECK_ROUTE) rc=r->ops->route_read(r->opaque,actual);
+    else {
+        const struct recover_target *t=&r->profile->targets[key];
+        if (t->space == REC_VGA_INDEXED && r->port_selected[r->index_port[key]] != key)
+            return access_error(r,key);
+        rc=bus_read(r,key,actual);
+    }
+    if (r->state != REC_RUNNING) return -1;
+    bool mismatch=!rc && ((*actual ^ expected) & mask);
+    int log=0;
+    if (r->transport) {
+        struct rec_row row;
+        row_start(r,&row,"check","END");
+        row_number(&row," source=",source); row_number(&row," key=",key);
+        row_number(&row," mask=",mask); row_number(&row," expected=",expected);
+        row_number(&row," actual=",*actual);
+        row_text(&row,rc || mismatch ? " rc=-1" : " rc=0");
+        log=row_send(r,&row);
+    }
+    if (rc || mismatch || log) {
+        fail(r,log ? REC_LOG : rc ? REC_BUS : REC_VERIFY,REC_PHASE_VERIFY,key);
+        return access_error(r,key);
+    }
+    for (u32 i=0;i<r->plan->capture_count;i++)
+        if (r->plan->captures[i].consumer_node == r->cursor) r->capture_valid &= ~(1ULL << i);
+    r->accessed=true;
+    bit_set(r->buffers.valid_bits,r->cursor);
+    return 0;
+}
+static int mode_wait_access(struct recover *r)
+{
+    if (r->state != REC_RUNNING || !r->plan || !r->entered || r->accessed ||
+        r->cursor >= r->plan->node_count ||
+        r->node_layout[r->cursor]->flags != REC_LAYOUT_MODE_WAIT ||
+        !node_ok(r->profile,r->plan,r->cursor)) return -1;
+    u32 ms=r->plan->args[r->plan->nodes[r->cursor].arg_first].value;
+    if (recover_record(r,"wait","BEGIN",r->cursor,ms,0,0)) return access_error(r,r->cursor);
+    u32 tick=r->ops->ticks(r->opaque);
+    int rc=recover_delay_ms(r,ms,r->ops->mode_wait,r->opaque);
+    if (r->state != REC_RUNNING) return -1;
+    int log=recover_record(r,"wait","END",r->cursor,ms,rc,r->ops->ticks(r->opaque)-tick);
+    if (rc || log) return access_error(r,r->cursor);
+    r->accessed=true;
+    bit_set(r->buffers.valid_bits,r->cursor);
+    return 0;
+}
 int recover_plan_access(struct recover *r, u32 *value)
 {
     if (!r->plan || !r->entered || r->cursor >= r->plan->node_count || !value) return -1;
@@ -2194,6 +2282,8 @@ int recover_plan_access(struct recover *r, u32 *value)
     const struct recover_opcode_layout *l = r->node_layout[r->cursor];
     if (l && (l->flags & REC_LAYOUT_MODE_VRAM)) return mode_vram_access(r);
     if (l && (l->flags & REC_LAYOUT_MODE_COLOR)) return mode_color_access(r);
+    if (l && (l->flags & REC_LAYOUT_MODE_CHECK)) return mode_check_access(r,value);
+    if (l && (l->flags & REC_LAYOUT_MODE_WAIT)) return mode_wait_access(r);
     if (!l || l->dir_substep == RECOVER_NONE || !n->arg_count) return -1;
     u32 key = r->plan->args[n->arg_first].value;
     if (key >= r->profile->target_count) return -1;
@@ -2240,7 +2330,7 @@ int recover_plan_leave(struct recover *r, u32 edge)
     if (r->state != REC_RUNNING || !r->plan || !r->entered || edge > 1) return access_error(r, edge);
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = layout_for(r->profile, n);
-    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || (((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) || (l->flags & (REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR))) && !r->accessed)) return access_error(r, r->cursor);
+    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || (((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) || (l->flags & (REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT))) && !r->accessed)) return access_error(r, r->cursor);
     if (n->phase == REC_RUN && r->zero_hold && !zero_guards(r)) return access_error(r, r->cursor);
     u32 next = n->next[edge];
     if (n->phase == REC_PREPARE && (next == RECOVER_NONE || r->plan->nodes[next].phase != REC_PREPARE)) {

@@ -1348,6 +1348,12 @@ offset	struct gfinit_bus.ready	84
 member_size	struct gfinit_bus.ready	1
 offset	struct gfinit_bus.window	8
 member_size	struct gfinit_bus.window	32
+size	struct gfinit_c_check_result	8
+align	struct gfinit_c_check_result	4
+offset	struct gfinit_c_check_result.actual	0
+member_size	struct gfinit_c_check_result.actual	4
+offset	struct gfinit_c_check_result.valid	4
+member_size	struct gfinit_c_check_result.valid	1
 size	struct gfinit_decode	274120
 align	struct gfinit_decode	4
 offset	struct gfinit_decode.args	114752
@@ -1476,17 +1482,21 @@ offset	struct gfinit_pci_ops.write16	12
 member_size	struct gfinit_pci_ops.write16	4
 offset	struct gfinit_pci_ops.write32	8
 member_size	struct gfinit_pci_ops.write32	4
-size	struct gfinit_plan	162672
+size	struct gfinit_plan	163444
 align	struct gfinit_plan	4
-offset	struct gfinit_plan.bar1_length	162652
+offset	struct gfinit_plan.bar1_length	163424
 member_size	struct gfinit_plan.bar1_length	4
+offset	struct gfinit_plan.c_check_count	163416
+member_size	struct gfinit_plan.c_check_count	4
+offset	struct gfinit_plan.c_checks	162648
+member_size	struct gfinit_plan.c_checks	768
 offset	struct gfinit_plan.c_node	162640
 member_size	struct gfinit_plan.c_node	4
 offset	struct gfinit_plan.c_unbound	162644
 member_size	struct gfinit_plan.c_unbound	4
-offset	struct gfinit_plan.capacity_bytes	162656
+offset	struct gfinit_plan.capacity_bytes	163428
 member_size	struct gfinit_plan.capacity_bytes	4
-offset	struct gfinit_plan.capacity_known	162664
+offset	struct gfinit_plan.capacity_known	163436
 member_size	struct gfinit_plan.capacity_known	4
 offset	struct gfinit_plan.deps	448
 member_size	struct gfinit_plan.deps	768
@@ -1494,13 +1504,13 @@ offset	struct gfinit_plan.entries	64
 member_size	struct gfinit_plan.entries	384
 offset	struct gfinit_plan.exprs	161344
 member_size	struct gfinit_plan.exprs	256
-offset	struct gfinit_plan.full_capacity	162668
+offset	struct gfinit_plan.full_capacity	163440
 member_size	struct gfinit_plan.full_capacity	4
 offset	struct gfinit_plan.layouts	130624
 member_size	struct gfinit_plan.layouts	30720
 offset	struct gfinit_plan.mode_flags	162636
 member_size	struct gfinit_plan.mode_flags	4
-offset	struct gfinit_plan.pfb_key	162648
+offset	struct gfinit_plan.pfb_key	163420
 member_size	struct gfinit_plan.pfb_key	4
 offset	struct gfinit_plan.plan	0
 member_size	struct gfinit_plan.plan	64
@@ -1512,7 +1522,7 @@ offset	struct gfinit_plan.saved_vram	161600
 member_size	struct gfinit_plan.saved_vram	1024
 offset	struct gfinit_plan.targets	1216
 member_size	struct gfinit_plan.targets	21888
-offset	struct gfinit_plan.tested_bytes	162660
+offset	struct gfinit_plan.tested_bytes	163432
 member_size	struct gfinit_plan.tested_bytes	4
 offset	struct gfinit_plan.vram_first	162624
 member_size	struct gfinit_plan.vram_first	4
@@ -2182,7 +2192,7 @@ offset	struct recover_opcode_layout.opcode	0
 member_size	struct recover_opcode_layout.opcode	4
 offset	struct recover_opcode_layout.substep	4
 member_size	struct recover_opcode_layout.substep	4
-size	struct recover_ops	60
+size	struct recover_ops	64
 align	struct recover_ops	4
 offset	struct recover_ops.abort_requested	40
 member_size	struct recover_ops.abort_requested	4
@@ -2196,6 +2206,8 @@ offset	struct recover_ops.mode_color	56
 member_size	struct recover_ops.mode_color	4
 offset	struct recover_ops.mode_vram	52
 member_size	struct recover_ops.mode_vram	4
+offset	struct recover_ops.mode_wait	60
+member_size	struct recover_ops.mode_wait	4
 offset	struct recover_ops.raw_config	12
 member_size	struct recover_ops.raw_config	4
 offset	struct recover_ops.read	16
@@ -2600,8 +2612,10 @@ enum	EXEC_ERR_NOMEM	4294967292
 enum	EXEC_ERR_NOT_FOUND	4294967293
 enum	EXEC_SUCCESS	0
 enum	GF_C_BRANCH	5
+enum	GF_C_CHECK	9
 enum	GF_C_CHECK_IN	0
 enum	GF_C_CHECK_OUT	10
+enum	GF_C_CHECK_SAVED	10
 enum	GF_C_COLOR	8
 enum	GF_C_COMMIT	8
 enum	GF_C_L1	5
@@ -2637,6 +2651,16 @@ enum	REC_BUDGET_GF	1
 enum	REC_BUDGET_S0	0
 enum	REC_BUDGET_SIZE_BARS	2
 enum	REC_BUS	7
+enum	REC_CHECK_ARGS	6
+enum	REC_CHECK_EXPECTED	3
+enum	REC_CHECK_IDENTITY	1
+enum	REC_CHECK_KEEP	4
+enum	REC_CHECK_KEY	1
+enum	REC_CHECK_MASK	2
+enum	REC_CHECK_ROUTE	2
+enum	REC_CHECK_SLOT	5
+enum	REC_CHECK_SOURCE	0
+enum	REC_CHECK_TARGET	0
 enum	REC_COLD	1
 enum	REC_CONFIG	6
 enum	REC_CONTRACT	4

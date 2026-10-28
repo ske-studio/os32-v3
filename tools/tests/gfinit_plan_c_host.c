@@ -163,6 +163,8 @@ static void c_build(void)
 }
 static void c_arm(void)
 {
+    for(u32 i=0;i<profile.count;i++)core.saved[i]=rawbars[i];
+    core.saved_count=profile.count;
     composed.plan.profile_crc=profile.crc;exec_arm();core.plan=&composed.plan;
     core.token.profile_crc=profile.crc;core.token.profile_version=profile.version;
     core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
@@ -176,7 +178,7 @@ static void c_arm(void)
         execution.main_id=main;CHECK(gfinit_exec_run(&core,&execution)==0);
     }
     CHECK(core.expected_node==composed.c_node);
-    executor_bus.mode_vram=frame_operation;executor_bus.mode_color=color_operation;executor_bus.abort_requested=frame_point;
+    executor_bus.mode_wait=exec_delay;executor_bus.mode_vram=frame_operation;executor_bus.mode_color=color_operation;executor_bus.abort_requested=frame_point;
     memory_ops.load=frame_load;memory_ops.store=frame_store;
     frame_writes=frame_reads=drains=frame_points=0;
     frame_fail_at=frame_abort_at=color_fail_at=RECOVER_NONE;vram_active=color_active=false;color_count=0;
@@ -224,12 +226,26 @@ static void dump_row(u32 ordinal,u32 value,u32 bound,u32 key)
     output("row=");val(ordinal);val(kind);val(reg);val(index);
     val(width);val(value);val(row->count);val(bound);output("\n");
 }
+/* Snapshot only test device/core state, so each CHECK fault uses the exact
+ * state produced by the real C writes/captures without repeating VRAM. */
+struct check_fixture {
+    struct recover r;
+    u32 values[RECOVER_TARGET_MAX], indices[RECOVER_TARGET_MAX], valid[RECOVER_BITS_WORDS];
+};
+static struct check_fixture entry_fixture, exit_fixture;
+static void save_checks(struct check_fixture *f)
+{
+    f->r=core;
+    for(u32 i=0;i<RECOVER_TARGET_MAX;i++){f->values[i]=values[i];f->indices[i]=indices[i];}
+    for(u32 i=0;i<RECOVER_BITS_WORDS;i++)f->valid[i]=valid[i];
+}
 static void c_walk(u32 variant,bool fp_on)
 {
     c_build();c_arm();
     output("variant=");number(variant);output("\n");
     for(u32 i=0;i<profile.target_count;i++)values[i]=saved_value(&profile.targets[i],variant);
     u32 rows=0, sections=0, pending=0, waits=0, data_writes=0, saved_count=core.local_saved_count;
+    u32 wait_before=wait_total;
     u32 fp_key=key_for(&profile,0x680848,0,0,0);
     values[fp_key]=fp_on?0x10000000:0x20000022;
     struct gfinit_pll_limits limits;struct gfinit_mode mode;const struct gfinit_mode_saved empty={0};
@@ -244,42 +260,48 @@ static void c_walk(u32 variant,bool fp_on)
         const struct recover_opcode_layout *l=core.node_layout[id];
         const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
         if(n->substep==GF_C_SECTION) {
+            if(a[0].value==GF_C_CHECK_IN)save_checks(&entry_fixture);
+            if(a[0].value==GF_C_CHECK_OUT)save_checks(&exit_fixture);
             const u32 first_row[]={0,0,2,15,15,26,46,120,190,205,206};
             CHECK(sections<sizeof(first_row)/sizeof(*first_row) && rows==first_row[sections]);
             CHECK(a[0].value==sections++ && a[1].value==GF_MODE_C);
         }
         if(l->flags & REC_LAYOUT_UNBOUND) {
             /* Explicit test-only bypass. Do not call a production executor. */
-            if(n->substep==GF_C_WAIT) {
-                CHECK((a[0].value==50 && rows==2) ||
-                      (a[0].value==10 && (rows==6 || rows==201)));
-                waits+=a[0].value;
-            }
-            else {
-                pending++;
-                if(a[0].value==GF_C_PENDING_ROW) {
-                    const struct recover_gf_c_row *row=&recover_gf_c_rows[rows];
-                    const u32 payload[]={row->id,row->key,row->phase,row->kind,row->reg,
-                        row->index,row->width,row->expr,row->source,row->keep,row->bits,
-                        row->verify,row->count,row->flags};
-                    for(u32 j=0;j<sizeof(payload)/sizeof(*payload);j++)CHECK(a[j+1].value==payload[j]);
-                    u32 v=row->bits;
-                    if(row->expr==GF_C_STATE)v=((const u8 *)&mode)[row->source];
-                    dump_row(rows++,v,0,RECOVER_NONE);
-                } else {
-                    CHECK((a[0].value==GF_C_PENDING_CHECK && sections==1 && rows==0) ||
-                          (a[0].value==GF_C_PENDING_CELL && sections==10 && rows==205) ||
-                          (a[0].value==GF_C_PENDING_EXIT && sections==11 && rows==206));
-                }
+            pending++;
+            if(a[0].value==GF_C_PENDING_ROW) {
+                const struct recover_gf_c_row *row=&recover_gf_c_rows[rows];
+                const u32 payload[]={row->id,row->key,row->phase,row->kind,row->reg,
+                    row->index,row->width,row->expr,row->source,row->keep,row->bits,
+                    row->verify,row->count,row->flags};
+                for(u32 j=0;j<sizeof(payload)/sizeof(*payload);j++)CHECK(a[j+1].value==payload[j]);
+                dump_row(rows++,row->bits,0,RECOVER_NONE);
+            } else {
+                CHECK((a[0].value==GF_C_PENDING_CELL && sections==10 && rows==205) ||
+                      ((a[0].value==GF_C_PENDING_EXIT || a[0].value==GF_C_PENDING_CELL) && sections==11 && rows==206));
             }
             core.expected_node=n->next[0];continue;
         }
         /* Restore row 34 must see the now disconnected C040 if incorrectly
          * lowered to LIVE: do not hide that defect by resetting the fake GPU. */
-        if(n->expr_id==GF_C_EXPR_LIVE && n->rule_id!=578+34)
-            values[a[0].value]=0xa5a55a5aU & width_mask(profile.targets[a[0].value].width);
+        if(n->expr_id==GF_C_EXPR_LIVE && n->rule_id!=578+34) {
+            const struct recover_target *t=&profile.targets[a[0].value];
+            /* Preserve the just-loaded CR11 for its final lock RMW. */
+            if(!(t->space==REC_VGA_INDEXED && t->port==RECOVER_CRTC &&
+                 t->index==0x11 && a[4].value==0x80))
+                values[a[0].value]=0xa5a55a5aU & width_mask(t->width);
+        }
         CHECK(!recover_plan_enter(&core,id));
-        if(l->flags & REC_LAYOUT_CHECK_EXPR) {
+        if(l->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) {
+            if(n->substep==GF_C_WAIT) {
+                CHECK((a[0].value==50 && rows==2) ||
+                      (a[0].value==10 && (rows==6 || rows==201)));
+                waits+=a[0].value;
+            }
+            int rc=gfinit_plan_c_control(&composed,&core);
+            if(rc) {output("control failure sub/key/slot/actual ");val(n->substep);val(a[REC_CHECK_KEY].value);val(a[REC_CHECK_SLOT].value);val(composed.c_checks[a[REC_CHECK_SLOT].value].actual);output("\n");}
+            CHECK(!rc);
+        } else if(l->flags & REC_LAYOUT_CHECK_EXPR) {
             CHECK(!recover_plan_check(&core,&edge));
             CHECK(edge==(u32)fp_on);
             if(!edge)rows++; /* conditional Q FP_OFF and its wait are skipped */
@@ -306,8 +328,9 @@ static void c_walk(u32 variant,bool fp_on)
         CHECK(!recover_plan_leave(&core,edge));
         if(core.state!=REC_RUNNING)break;
     }
-    CHECK(rows==206 && sections==GF_C_SECTION_COUNT && pending+3==composed.c_unbound);
+    CHECK(rows==206 && sections==GF_C_SECTION_COUNT && pending==composed.c_unbound);
     CHECK(waits==(fp_on?70U:20U));
+    CHECK(wait_total-wait_before==waits*1000);
     CHECK(data_writes==(fp_on?178U:177U));
     CHECK(frame_writes==sizeof(frame) && frame_reads==sizeof(frame) && drains==1);
     /* Independent physical-byte oracle: gate-off, full DAC, AR pairs, gates. */
@@ -432,7 +455,7 @@ static void frame_cases(void)
 {
     for(frame_damage=0;frame_damage<=8;frame_damage++) {
         c_build();c_arm();
-        /* Only this test bypasses the still-unbound entry/Q/P waits. The
+        /* Only this test bypasses the entry and Q/P (this test starts at VRAM). The
          * actual two-node section, accessors, trial_step and cleanup run. */
         u32 first=composed.c_node;
         while(composed.plan.nodes[first].substep!=GF_C_VRAM_WRITE)first++;
@@ -556,9 +579,241 @@ static void color_cases(void)
     CHECK(recover_plan_leave(&core,0)<0 && cleanup_calls==1);
     output("COLOR order values log and bus failure cleanup PASS\n");
 }
+static u32 check_damage_slot, check_damage_mask, check_record_count, check_line_used;
+static u32 wait_begin,wait_end,wait_ms;
+static char check_line[RECOVER_ROW_MAX], check_records[GF_C_CHECK_MAX][RECOVER_ROW_MAX];
+static bool damaged_check(void)
+{
+    if(!core.entered || !core.plan)return false;
+    const struct recover_plan_node *n=&core.plan->nodes[core.cursor];
+    return (n->substep==GF_C_CHECK || n->substep==GF_C_CHECK_SAVED) &&
+        core.plan->args[n->arg_first+REC_CHECK_SLOT].value==check_damage_slot;
+}
+static int check_read(void *v,const struct recover_bus_access *a,u32 *value)
+{
+    int rc=bus_read_test(v,a,value);
+    if(!rc && damaged_check())*value^=check_damage_mask;
+    return rc;
+}
+static int check_identity(void *v,struct recover_identity *id)
+{
+    int rc=identity(v,id);
+    if(!rc && damaged_check())id->device^=1;
+    return rc;
+}
+static int check_route(void *v,u32 *value)
+{ (void)v;*value=damaged_check()?check_damage_mask:0;return 0; }
+static int check_put(void *v,u32 ch)
+{
+    (void)v;CHECK(irq_state==1 && !device.window.owned);
+    CHECK(check_line_used+1<sizeof(check_line));
+    check_line[check_line_used++]=(char)ch;check_line[check_line_used]=0;
+    if(ch=='\n') {
+        if(frame_contains(check_line,"phase=wait event=BEGIN")) {
+            wait_begin++;
+            CHECK(frame_contains(check_line,wait_ms==50?" addr=50\n":" addr=10\n"));
+        }
+        if(frame_contains(check_line,"phase=wait event=END"))wait_end++;
+        if(frame_contains(check_line,"phase=check event=END")) {
+            CHECK(check_record_count<GF_C_CHECK_MAX);
+            for(u32 i=0;i<=check_line_used;i++)check_records[check_record_count][i]=check_line[i];
+            check_record_count++;
+        }
+        check_line_used=0;
+    }
+    return 0;
+}
+static const struct recover_transport check_transport={
+    .uart={exec_log_ready,check_put,exec_log_wait},.frame_us=1,.max_polls=1048576};
+static void restore_checks(const struct check_fixture *f)
+{
+    core=f->r;
+    for(u32 i=0;i<RECOVER_TARGET_MAX;i++){values[i]=f->values[i];indices[i]=f->indices[i];}
+    for(u32 i=0;i<RECOVER_BITS_WORDS;i++)valid[i]=f->valid[i];
+    core.state=REC_PAUSED;core.in_call=core.in_opcode=false;core.transport=&check_transport;
+    executor_bus.read=check_read;executor_bus.identity=check_identity;executor_bus.route_read=check_route;
+    cleanup_calls=actual_count=check_record_count=check_line_used=0;exec_log_busy=false;
+    for(u32 i=0;i<GF_C_CHECK_MAX;i++)composed.c_checks[i]=(struct gfinit_c_check_result){0};
+}
+static int checks_step(struct recover *r,void *v)
+{
+    (void)v;
+    while(r->expected_node!=RECOVER_NONE) {
+        u32 id=r->expected_node,value=0;
+        const struct recover_plan_node *n=&composed.plan.nodes[id];
+        const struct recover_opcode_layout *l=r->node_layout[id];
+        const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
+        /* Exactly the entry or exit section; 2c2 barriers remain real. */
+        if((l->flags & REC_LAYOUT_UNBOUND) ||
+           (n->substep==GF_C_SECTION && a[0].value==GF_C_Q))return 0;
+        if(recover_plan_enter(r,id))return -1;
+        if(l->flags & REC_LAYOUT_MODE_CHECK) {
+            if(gfinit_plan_c_control(&composed,r))return -1;
+        } else if(l->dir_substep!=RECOVER_NONE) {
+            if(recover_plan_access(r,&value))return -1;
+        } else CHECK(n->substep==GF_C_SECTION);
+        if(recover_plan_leave(r,0))return -1;
+    }
+    return 0;
+}
+static u32 check_number(const char *line,const char *key)
+{
+    for(u32 i=0;line[i];i++) {
+        u32 j=0;while(key[j] && line[i+j]==key[j])j++;
+        if(key[j])continue;
+        u32 v=0;while(line[i+j]>='0' && line[i+j]<='9')v=v*10+line[i+j++]-'0';
+        return v;
+    }
+    CHECK(false);return 0;
+}
+/* These masks/values are the design contract, independent of plan metadata
+ * used to enumerate fault injection below. */
+static void check_contracts(void)
+{
+    u32 seen=0;
+    for(u32 id=exit_fixture.r.expected_node;id<composed.plan.node_count;id++) {
+        const struct recover_plan_node *n=&composed.plan.nodes[id];
+        if(!(exit_fixture.r.node_layout[id]->flags & REC_LAYOUT_MODE_CHECK))continue;
+        const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
+        const struct recover_target *t=&profile.targets[a[REC_CHECK_KEY].value];
+        u32 mask=a[REC_CHECK_MASK].value,expected=a[REC_CHECK_EXPECTED].value;
+        if(t->space==REC_BAR_MMIO) switch(t->offset) {
+        case 0x68050c:CHECK(mask==~0U && expected==0x10000204);seen|=1;break;
+        case 0x680510:CHECK(mask==0);seen|=2;break;
+        case 0x680508:CHECK(mask==0x0007ffff);seen|=4;break;
+        case 0x680578:CHECK(mask==0x8000ffff);seen|=8;break;
+        case 0x680580:CHECK(mask==0x100 && expected==0x100);seen|=16;break;
+        case 0x680524:CHECK(mask==~0U && a[REC_CHECK_EXPECTED].kind==REC_ARG_SAVED && a[REC_CHECK_KEEP].value==0xfffaffff);seen|=32;break;
+        case 0xc040:CHECK(mask==~0U && a[REC_CHECK_EXPECTED].kind==REC_ARG_SAVED && a[REC_CHECK_KEEP].value==~0U);seen|=64;break;
+        case 0x600804:CHECK(mask==3 && expected==2);seen|=128;break;
+        case 0x600800:CHECK(mask==~0U && expected==0);seen|=256;break;
+        case 0x68052c:CHECK(mask==0x101 && expected==1);seen|=512;break;
+        case 0x680608:CHECK(mask==0x100000 && expected==0x100000);seen|=1024;break;
+        }
+        if(t->space==REC_VGA_INDEXED) {
+            CHECK(mask==255);
+            if(t->port==0x3d4 && t->index==0x11)CHECK(expected==0xab);
+            if(t->port==0x3d4 && t->index==0x17)CHECK(expected==0xc3);
+            if(t->port==0x3c4 && t->index==1)CHECK(expected==1);
+        }
+    }
+    CHECK(seen==2047 && composed.c_check_count==64);
+}
+static void check_cases(void)
+{
+    check_contracts();
+    u32 total=0;
+    for(u32 section=0;section<2;section++) {
+        const struct check_fixture *f=section?&exit_fixture:&entry_fixture;
+        u32 nodes[GF_C_CHECK_MAX],count=0;
+        for(u32 id=f->r.expected_node;id<composed.plan.node_count;id++) {
+            const struct recover_plan_node *n=&composed.plan.nodes[id];
+            const struct recover_plan_arg *a=&composed.plan.args[n->arg_first];
+            if(f->r.node_layout[id]->flags & REC_LAYOUT_UNBOUND)break;
+            if(n->substep==GF_C_SECTION && a[0].value==GF_C_Q)break;
+            if(f->r.node_layout[id]->flags & REC_LAYOUT_MODE_CHECK)nodes[count++]=id;
+        }
+        CHECK(count>0);
+        /* Baseline, every compared item wrong in isolation, and every mask's
+         * first excluded bit (including read-only 510 and TEST sense). */
+        for(u32 pass=0;pass<3;pass++)for(u32 c=0;c<=count;c++) {
+            if(pass && !c)continue;
+            restore_checks(f);check_damage_slot=RECOVER_NONE;check_damage_mask=0;
+            bool bad=false;
+            if(c) {
+                const struct recover_plan_arg *a=&composed.plan.args[composed.plan.nodes[nodes[c-1]].arg_first];
+                u32 mask=a[REC_CHECK_MASK].value;
+                if(pass) {
+                    if(a[REC_CHECK_SOURCE].value!=REC_CHECK_TARGET || mask==~0U)continue;
+                    const struct recover_target *t=&profile.targets[a[REC_CHECK_KEY].value];
+                    u32 excluded=~mask & width_mask(t->width);
+                    if(!excluded)continue;
+                    if(pass==2) {
+                        if(t->space!=REC_BAR_MMIO || t->offset!=0x680608)continue;
+                        check_damage_mask=0xf0000000; /* sense bits, not bit20 */
+                    } else check_damage_mask=excluded & (0U-excluded);
+                } else {
+                    check_damage_mask=mask ? mask & (0U-mask) : ~0U;
+                    bad=mask!=0;
+                }
+                check_damage_slot=a[REC_CHECK_SLOT].value;
+            }
+            int rc=trial_step(&core,&core.token,true,checks_step,0);
+            CHECK((rc!=0)==bad && cleanup_calls==(u32)bad);
+            if(bad) {
+                CHECK(core.state==REC_FAILED && core.reason==REC_VERIFY);
+                CHECK(check_record_count==c && composed.c_checks[check_damage_slot].valid);
+                CHECK(frame_contains(check_records[c-1]," rc=-1"));
+            } else {
+                CHECK(core.state==REC_PAUSED && check_record_count==count);
+                CHECK(frame_contains(check_records[count-1]," rc=0"));
+            }
+            for(u32 i=0;i<check_record_count;i++) {
+                const struct recover_plan_arg *a=&composed.plan.args[composed.plan.nodes[nodes[i]].arg_first];
+                u32 slot=a[REC_CHECK_SLOT].value;
+                CHECK(composed.c_checks[slot].valid);
+                CHECK(check_number(check_records[i]," mask=")==a[REC_CHECK_MASK].value);
+                CHECK(check_number(check_records[i]," actual=")==composed.c_checks[slot].actual);
+            }
+            CHECK(!composed.c_checks[GF_C_EXIT_ROUTE_SLOT].valid && !composed.c_checks[GF_C_EXIT_CELL_SLOT].valid);
+            output(section?"CHECK exit case=":"CHECK entry case=");number(c);
+            output(" excluded=");number(pass);output(" records=");number(check_record_count);output("\n");
+            if(c && !pass)output(check_records[c-1]);
+        }
+        total+=count;
+    }
+    CHECK(total==composed.c_check_count);
+    output("CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS\n");
+}
+static u32 wait_calls,wait_fault;
+static int wait_delay(void *v,u32 us)
+{
+    (void)v;CHECK(us==1000 && irq_state==1 && !device.window.owned);
+    wait_calls++;return wait_fault==1 && wait_calls==3 ? -1 : 0;
+}
+static int wait_abort(void *v,u32 sid)
+{ (void)v;(void)sid;return wait_fault==2 && wait_calls==2; }
+static int wait_step(struct recover *r,void *v)
+{
+    (void)v;u32 id=r->expected_node;
+    if(recover_plan_enter(r,id) || gfinit_plan_c_control(&composed,r))return -1;
+    return recover_plan_leave(r,0);
+}
+static void wait_cases(void)
+{
+    for(u32 which=0;which<3;which++)for(u32 fault_kind=0;fault_kind<3;fault_kind++) {
+        c_build();c_arm();u32 id=composed.c_node,seen=0;
+        while(id<composed.plan.node_count) {
+            if(composed.plan.nodes[id].substep==GF_C_WAIT && seen++==which)break;
+            id++;
+        }
+        CHECK(id<composed.plan.node_count);
+        wait_ms=composed.plan.args[composed.plan.nodes[id].arg_first].value;
+        CHECK(wait_ms==(which?10U:50U));
+        core.expected_node=id;core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        core.transport=&check_transport;executor_bus.abort_requested=wait_abort;executor_bus.mode_wait=wait_delay;
+        wait_calls=wait_begin=wait_end=check_line_used=0;wait_fault=fault_kind;
+        int rc=trial_step(&core,&core.token,true,wait_step,0);
+        CHECK((rc!=0)==(fault_kind!=0) && cleanup_calls==(u32)(fault_kind!=0));
+        CHECK(wait_begin==1 && wait_end==(fault_kind==2?0U:1U));
+        if(!fault_kind)CHECK(core.state==REC_PAUSED && wait_calls==wait_ms && core.expected_node==id+1);
+        if(fault_kind==1)CHECK(core.state==REC_FAILED && core.reason==REC_BUS && wait_calls==3);
+        if(fault_kind==2)CHECK(core.reason==REC_ABORT && wait_calls==2);
+        output("WAIT ordinal=");number(which);output(" ms=");number(wait_ms);
+        output(" fault=");number(fault_kind);output(" calls=");number(wait_calls);output("\n");
+    }
+    /* Neither a check nor a wait may be left as a successful NOP. */
+    for(u32 type=0;type<2;type++) {
+        c_build();c_arm();u32 id=composed.c_node;
+        while(composed.plan.nodes[id].substep!=(type?GF_C_WAIT:GF_C_CHECK))id++;
+        core.expected_node=id;CHECK(!recover_plan_enter(&core,id));
+        CHECK(recover_plan_leave(&core,0)<0 && cleanup_calls==1 && core.reason==REC_CONTRACT);
+    }
+    output("WAIT lengths positions, conditional FP, REC, callback failure and abort PASS\n");
+}
 void _start(void)
 {
-    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);
+    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }
