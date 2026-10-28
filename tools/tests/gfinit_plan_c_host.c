@@ -10,7 +10,21 @@
 static struct gfinit_plan composed;
 static u8 frame[GF_MODE_VRAM_BYTES];
 static u32 frame_writes, frame_reads, drains, frame_fail_at, frame_abort_at, frame_points;
-static bool vram_active;
+static bool vram_active, color_active;
+static u32 color_count, color_fail_at, color_row, color_events[850][3];
+static int color_operation(void *v,struct recover *r,u32 row,u32 value)
+{
+    (void)v;color_active=true;color_row=row;
+    int rc=gfinit_plan_c_color(&device,r,row,value);
+    color_active=false;return rc;
+}
+static int color_memory(bool write,u32 va,u32 width,u32 *value)
+{
+    u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE, off=pa-(rawbars[0]&~15U);
+    CHECK(width==1 && !irq_state && color_count<850);
+    color_events[color_count][0]=write;color_events[color_count][1]=off;color_events[color_count][2]=*value;
+    return color_count++==color_fail_at ? -1 : 0;
+}
 /* Independent pixel oracle: frame > 8x8 checker > eight vertical bands. */
 static u32 frame_pixel(u32 off)
 {
@@ -21,6 +35,7 @@ static u32 frame_pixel(u32 off)
 }
 static int frame_load(void *v,u32 va,u32 width,u32 *value)
 {
+    if(color_active)return color_memory(false,va,width,value);
     u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE,base=rawbars[1]&~15U;
     if(pa>=base && pa-base<sizeof(frame)) {
         u32 off=pa-base;
@@ -39,6 +54,7 @@ static int frame_load(void *v,u32 va,u32 width,u32 *value)
 }
 static int frame_store(void *v,u32 va,u32 width,u32 value)
 {
+    if(color_active)return color_memory(true,va,width,&value);
     u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE,base=rawbars[1]&~15U;
     if(pa>=base && pa-base<sizeof(frame)) {
         u32 off=pa-base;
@@ -160,10 +176,10 @@ static void c_arm(void)
         execution.main_id=main;CHECK(gfinit_exec_run(&core,&execution)==0);
     }
     CHECK(core.expected_node==composed.c_node);
-    executor_bus.mode_vram=frame_operation;executor_bus.abort_requested=frame_point;
+    executor_bus.mode_vram=frame_operation;executor_bus.mode_color=color_operation;executor_bus.abort_requested=frame_point;
     memory_ops.load=frame_load;memory_ops.store=frame_store;
     frame_writes=frame_reads=drains=frame_points=0;
-    frame_fail_at=frame_abort_at=RECOVER_NONE;vram_active=false;
+    frame_fail_at=frame_abort_at=color_fail_at=RECOVER_NONE;vram_active=color_active=false;color_count=0;
 }
 static u32 saved_value(const struct recover_target *t,u32 variant)
 {
@@ -189,7 +205,7 @@ static void dump_row(u32 ordinal,u32 value,u32 bound,u32 key)
 {
     const struct recover_gf_c_row *row=&recover_gf_c_rows[ordinal];
     u32 kind=row->kind,reg=row->reg,index=row->index,width=row->width;
-    if(bound) {
+    if(bound && key!=RECOVER_NONE) {
         const struct recover_target *t=&profile.targets[key];
         struct recover_bus_access a;
         CHECK(t->bar==0 && t->head==0);
@@ -270,6 +286,15 @@ static void c_walk(u32 variant,bool fp_on)
         } else if(l->flags & REC_LAYOUT_MODE_VRAM) {
             CHECK(sections==4 && rows==15);
             CHECK(!recover_plan_access(&core,&value));
+        } else if(l->flags & REC_LAYOUT_MODE_COLOR) {
+            u32 count = a[0].value==GF_MODE_ROW_DAC ? 3 : 1;
+            CHECK(a[0].value==rows);
+            CHECK(!recover_plan_access(&core,&value));
+            for (u32 j=0;j<count;j++) {
+                const struct recover_gf_c_row *row=&recover_gf_c_rows[rows];
+                u32 v=row->expr==GF_C_STATE ? ((const u8 *)&mode)[row->source] : row->bits;
+                dump_row(rows++,v,1,RECOVER_NONE);
+            }
         } else if(l->dir_substep!=RECOVER_NONE) {
             CHECK(!recover_plan_access(&core,&value));
             if(n->substep>=REC_GF_C_RULE_FIRST) {
@@ -285,6 +310,22 @@ static void c_walk(u32 variant,bool fp_on)
     CHECK(waits==(fp_on?70U:20U));
     CHECK(data_writes==(fp_on?178U:177U));
     CHECK(frame_writes==sizeof(frame) && frame_reads==sizeof(frame) && drains==1);
+    /* Independent physical-byte oracle: gate-off, full DAC, AR pairs, gates. */
+    static const u8 colors[8][3]={{0,0,0},{255,0,0},{0,255,0},{0,0,255},
+        {255,255,255},{0,255,255},{255,0,255},{255,255,0}};
+    u32 at=0;
+#define COLOR_EVENT(w,o,v) do { CHECK(color_events[at][0]==(w) && color_events[at][1]==(o) && color_events[at][2]==(v)); at++; } while(0)
+    COLOR_EVENT(0,GF_MODE_AR_STATUS,0);COLOR_EVENT(1,GF_MODE_AR_PORT,0);
+    COLOR_EVENT(1,GF_MODE_DAC_MASK,255);COLOR_EVENT(1,GF_MODE_DAC_INDEX,0);
+    for(u32 i=0;i<256;i++)for(u32 c=0;c<3;c++)
+        COLOR_EVENT(1,GF_MODE_DAC_DATA,i<8?colors[i][c]:0);
+    for(u32 i=0;i<21;i++) {
+        COLOR_EVENT(0,GF_MODE_AR_STATUS,0);COLOR_EVENT(1,GF_MODE_AR_PORT,i);
+        COLOR_EVENT(1,GF_MODE_AR_PORT,i<16?i:i==16?1:i==18?15:0);
+    }
+    for(u32 i=0;i<2;i++) {COLOR_EVENT(0,GF_MODE_AR_STATUS,0);COLOR_EVENT(1,GF_MODE_AR_PORT,32);}
+    CHECK(color_count==at);
+#undef COLOR_EVENT
     /* C data on shared RW keys must not add local DATA restoration. */
     for(u32 i=saved_count;i<core.local_saved_count;i++)CHECK(core.local_saved[i].dir_substep==REC_SELECT);
     CHECK(core.capture_valid==0);
@@ -458,9 +499,66 @@ static void frame_cases(void)
     CHECK(contract_bind()<0);
     output("VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS\n");
 }
+static u32 color_log_rows, color_begin, color_end;
+static char color_log[RECOVER_ROW_MAX];
+static u32 color_log_used;
+static int color_put(void *v,u32 ch)
+{
+    (void)v;
+    CHECK(irq_state==1 && !device.window.owned);
+    if(color_log_used+1>=sizeof(color_log))return -1;
+    color_log[color_log_used++]=(char)ch;color_log[color_log_used]=0;
+    if(ch=='\n') {
+        if(frame_contains(color_log,"phase=gf_bus")) {
+            color_log_rows++;
+            if(frame_contains(color_log,"event=BEGIN"))color_begin++;
+            if(frame_contains(color_log,"event=END"))color_end++;
+            CHECK(frame_contains(color_log," bar=0 "));
+            if(color_row==GF_MODE_ROW_DAC) CHECK(frame_contains(color_log," len=768 "));
+        }
+        color_log_used=0;
+    }
+    return 0;
+}
+static const struct recover_transport color_transport={
+    .uart={exec_log_ready,color_put,exec_log_wait},.frame_us=1,.max_polls=1048576};
+static int color_step(struct recover *r,void *v)
+{
+    (void)v;u32 id=r->expected_node,value=0;
+    return recover_plan_enter(r,id) || recover_plan_access(r,&value) || recover_plan_leave(r,0) ? -1 : 0;
+}
+static void color_cases(void)
+{
+    static const u32 rows[]={GF_MODE_ROW_DAC,GF_MODE_ROW_DAC,GF_MODE_ROW_DAC,
+        GF_MODE_ROW_DAC,GF_MODE_ROW_AR_FIRST,GF_MODE_ROW_AR_FIRST,
+        GF_MODE_ROW_AR_FIRST,GF_MODE_ROW_GATE_ON,GF_MODE_ROW_DAC};
+    static const u32 failures_at[]={RECOVER_NONE,0,1,400,0,1,2,1,769};
+    for(u32 c=0;c<sizeof(rows)/sizeof(*rows);c++) {
+        c_build();c_arm();u32 id=composed.c_node;
+        while(composed.plan.nodes[id].substep!=GF_C_COLOR ||
+              composed.plan.args[composed.plan.nodes[id].arg_first].value!=rows[c])id++;
+        core.expected_node=id;core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        core.transport=&color_transport;color_row=rows[c];color_fail_at=failures_at[c];
+        color_log_rows=color_begin=color_end=color_log_used=0;exec_log_busy=false;
+        u32 old_maps=maps,old_restores=restores;
+        int rc=trial_step(&core,&core.token,true,color_step,0);
+        CHECK((rc!=0)==(c!=0));
+        CHECK(color_log_rows==2 && color_begin==1 && color_end==1);
+        CHECK(maps-old_maps==restores-old_restores && pte==0x876540a5 && irq_state==1 && !device.window.owned);
+        if(c)CHECK(cleanup_calls==1 && core.state!=REC_RUNNING && color_count==failures_at[c]+1);
+        else CHECK(color_count==770);
+        output("COLOR case=");number(c);output(" accesses=");number(color_count);
+        output(" gf_bus_rows=");number(color_log_rows);output("\n");
+    }
+    c_build();c_arm();u32 id=composed.c_node;
+    while(composed.plan.nodes[id].substep!=GF_C_COLOR)id++;
+    core.expected_node=id;CHECK(!recover_plan_enter(&core,id));
+    CHECK(recover_plan_leave(&core,0)<0 && cleanup_calls==1);
+    output("COLOR order values log and bus failure cleanup PASS\n");
+}
 void _start(void)
 {
-    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);
+    gf_fixture_init();prefix_equivalence();contracts();barriers();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

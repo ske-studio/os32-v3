@@ -65,10 +65,10 @@ def abi(folder, fixture):
                                      f'build/out/{name}/{name}_imports.h'], cwd=ROOT,
                                     capture_output=True, text=True, check=True)
             assert f'gen_sqlite_imports.py --module {name} ' in result.stdout, result.stdout
-    # GF4c/2b1 adds the private fixed-VRAM callback/type; public ABI stays fixed.
+    # GF4c/2b2 adds the private fixed AR/DAC callback/type; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0xf9e69ac4U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x3b6a5992U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x0dbe9e7dU' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x772927aaU' in hwdev
     print('PASS fixed KAPI spec, ILP32 sizes/offsets/slots, OPS_VERSION, hwdev CRC, make dependencies')
 
 

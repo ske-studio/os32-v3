@@ -161,3 +161,8 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - VRAM の未結線節だけを、BAR1+[0,307200) の転送・比較の 2 node に置換する。`gfinit_mode_row` の 640 B 行を480行、A4と同じDWORD窓アクセスで処理し、窓/PTE/IRQ復元後の行間に既存safe pointを置く。全行転送後は既存read-safeなPFB容量レジスタの読取りでposted writeを排出する。
 - `recover_plan_access` が固定範囲・方向の型を扱い、`recover_ops.mode_vram` へ渡す。正常時はgf_busが方向ごとにBEGIN/ENDの計4行（bar/off/len/dir）。比較は不一致後も全域を読み、最初のbyteのBAR1相対off/期待値/実値だけをENDに保持し、既存のREC_VERIFY失敗出口へ進む。
 - 未結線は35→34節。AR/DAC・route/98セル・入口/出口CHECK・待ち・cleanup/REC予算とop13は後段のまま。旧phase/許可表の番号は変えず、共有callback/型の契約CRC・layoutは生成器で追随する。
+
+## 段 2b2 の結線
+- AR の 21 行と gate 3 行は専用の C 操作とし、各行で 6013DA を読んで FF を reset、AR は 6013C0 に index→data、gate は同 port に 00 または 20 を書く。値・順は段 1 の生成表と mode state を使う。
+- DAC の mask/index/data 3 行は固定 1 操作にまとめ、6813C6=FF→6813C8=00→6813C9 に `gfinit_mode_palette` の RGB 768 byte を書く。操作ごとに gf_bus BEGIN/END 1 組、失敗は既存 trial_end に渡す。通常の read-safe MMIO target や汎用 bulk は追加しない。
+- 未結線は 34→7 節。route・98 セル・入口/出口 CHECK・待ち・cleanup/REC 予算と op13 は後段のまま。旧 phase/許可表の番号は維持し、専用 callback の HWDEV 契約 CRC・layout は生成器で追随する。

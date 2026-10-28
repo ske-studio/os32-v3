@@ -12,7 +12,7 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
 
 
 def command(exe):
-    return ['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
+    return ['gcc', *FLAGS, '-O2', '-ffunction-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
             '-I'+str(ROOT/'tools/tests/recover_hostshim'), '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_bus_host.c'), '-o', str(exe)]
 
 

@@ -30,4 +30,6 @@ int gfinit_bus_write(void *opaque, const struct recover_bus_access *a, u32 value
 int gfinit_bus_mode_row(struct gfinit_bus *b, u32 y, bool write, const u8 *row,
                         u32 *bad_offset, u32 *expected, u32 *actual);
 int gfinit_bus_local_cleanup(struct gfinit_bus *b, struct recover *r);
+int gfinit_bus_mode_ar(struct gfinit_bus *b, bool data, u32 index, u32 value);
+int gfinit_bus_mode_dac(struct gfinit_bus *b, struct recover *r);
 #endif

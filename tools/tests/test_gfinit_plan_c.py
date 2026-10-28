@@ -20,11 +20,12 @@ def command(exe):
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
+    assert 'COLOR order values log and bus failure cleanup PASS' in text
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
         for line in text.splitlines():
-            if line.startswith(('VRAM ', 'REC sid=')):
+            if line.startswith(('VRAM ', 'COLOR ', 'REC sid=')):
                 print(line)
     groups = text.split('variant=')[1:]
     assert len(groups) == 3
@@ -45,19 +46,23 @@ def check_output(text, verbose=True):
         for row, (ordinal, want) in zip(rows, enumerate(expected) if fp_on else
                                       [(i, v) for i, v in enumerate(expected) if i != 1]):
             assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
-            assert row[-1] == int(want[0] not in (4, 6, 7, 8, 9, 10))
+            assert row[-1] == int(want[0] != 10)
         assert fields['entries'] == [7] and fields['captures'] == [36]
-        assert fields['pending'] == [34]
+        assert fields['pending'] == [7]
         assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
         assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
         assert fields['layouts'][0] <= 1280
         if verbose:
             print(f'PASS C bind/bus variant={variant} FP_ON={int(fp_on)}: '
-                  f'{len(rows)} rows agree with stage-1 independent oracle; 34 typed barriers')
+                  f'{len(rows)} rows agree with stage-1 independent oracle; 7 typed barriers')
             print(' '.join(f'{k}={v[0]}' for k, v in fields.items() if k != 'pll'))
 
 
 MUTATIONS = [
+    ('kdebug/gfinit_bus.c', 'ar_reset',
+     'mode_byte(b,base,GF_MODE_AR_STATUS,false,&ignored)', 'mode_byte(b,base,GF_MODE_AR_PORT,false,&ignored)'),
+    ('kdebug/gfinit_bus.c', 'dac_palette',
+     'gfinit_mode_palette(i,rgb);', 'gfinit_mode_palette(0,rgb);'),
     ('kdebug/recover.c', 'run_uses_c_read_safe',
      't->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)',
      't->read_safe && logged_read(r, &a, &old)'),

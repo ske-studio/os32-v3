@@ -209,6 +209,7 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     /* Wait is also unbound in 2a: only the executor added with C can pay it. */
     c_layout(&b,GF_C_WAIT,1,c_imm,RECOVER_NONE,REC_LAYOUT_UNBOUND);
     c_layout(&b,GF_C_BRANCH,1,c_branch,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR);
+    c_layout(&b,GF_C_COLOR,2,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_COLOR);
     for(u32 i=0;i<recover_gf_c_target_count;i++) {
         const struct recover_gf_c_target *t=&recover_gf_c_targets[i];
         if(t->kind<=GF_C_GR || t->kind==GF_C_MISC)
@@ -233,9 +234,14 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         if(i==C_ROW_L3)c_marker(&b,GF_C_L3);
         if(i==C_ROW_COMMIT)c_marker(&b,GF_C_COMMIT);
         if(row->kind==GF_C_ROUTE) {c_marker(&b,GF_C_R);c_unbound(&b,GF_C_PENDING_CELL,0);}
-        if(row->kind==GF_C_AR || row->kind==GF_C_AR_GATE ||
-           row->kind==GF_C_DAC_MASK || row->kind==GF_C_DAC_INDEX ||
-           row->kind==GF_C_DAC_DATA || row->kind==GF_C_ROUTE) {
+        if (row->kind==GF_C_AR || row->kind==GF_C_AR_GATE || row->kind==GF_C_DAC_MASK) {
+            u32 value = row->expr==GF_C_STATE ? ((const u8 *)&mode)[row->source] : row->bits;
+            struct recover_plan_arg a[]={{REC_IMM,i},{REC_IMM,value}};
+            c_emit(&b,GF_C_COLOR,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+            continue;
+        }
+        if (row->kind==GF_C_DAC_INDEX || row->kind==GF_C_DAC_DATA) continue;
+        if(row->kind==GF_C_ROUTE) {
             c_unbound(&b,GF_C_PENDING_ROW,row);continue;
         }
         u32 key=c_key(&b,row->kind,row->reg,row->index,row->width);
@@ -325,4 +331,18 @@ int gfinit_plan_c_vram(void *bus, struct recover *r, bool write,
         if (!drained) return -1;
     }
     return *bad_offset == RECOVER_NONE ? 0 : -1;
+}
+
+/* Only the fixed stage-1 AR and palette rows are reachable through this path. */
+int gfinit_plan_c_color(void *bus, struct recover *r, u32 ordinal, u32 value)
+{
+    const struct recover_gf_c_row *row = &recover_gf_c_rows[ordinal];
+    if (ordinal == GF_MODE_ROW_DAC) {
+        if (row->kind != GF_C_DAC_MASK || row->bits != value ||
+            recover_gf_c_rows[ordinal+1].kind != GF_C_DAC_INDEX ||
+            recover_gf_c_rows[ordinal+2].kind != GF_C_DAC_DATA) return -1;
+        return gfinit_bus_mode_dac(bus,r);
+    }
+    if (row->kind != GF_C_AR && row->kind != GF_C_AR_GATE) return -1;
+    return gfinit_bus_mode_ar(bus,row->kind == GF_C_AR, row->index, value);
 }

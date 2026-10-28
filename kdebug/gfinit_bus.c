@@ -169,3 +169,43 @@ int gfinit_bus_local_cleanup(struct gfinit_bus *b, struct recover *r)
     if (!rc) r->local_saved_count = 0;
     return rc;
 }
+
+/* Fixed VGA aliases, not recover MMIO targets. Each window is released before
+ * a safe point; AR flip-flop reset precedes every index or gate write. */
+static int mode_byte(struct gfinit_bus *b, u32 base, u32 off, bool write, u32 *value)
+{
+    return recover_window_access(&b->window,base+off,1,write,value);
+}
+static int mode_base(struct gfinit_bus *b, u32 *base)
+{
+    u32 bars[RECOVER_BAR_COUNT];
+    if (!b || !b->ready || memory_config(b,bars)) return -1;
+    *base=bars[GF_MODE_REGISTER_BAR] & ~PCI_BAR_MEM_ATTR_MASK;
+    if (*base > ~0U-GF_MODE_DAC_DATA ||
+        (*base < GF_LEGACY_HI && *base+GF_MODE_DAC_DATA >= GF_LEGACY_LO)) return -1;
+    return 0;
+}
+int gfinit_bus_mode_ar(struct gfinit_bus *b, bool data, u32 index, u32 value)
+{
+    u32 base, ignored=0;
+    if (mode_base(b,&base) || mode_byte(b,base,GF_MODE_AR_STATUS,false,&ignored)) return -1;
+    if (data && mode_byte(b,base,GF_MODE_AR_PORT,true,&index)) return -1;
+    return mode_byte(b,base,GF_MODE_AR_PORT,true,&value);
+}
+int gfinit_bus_mode_dac(struct gfinit_bus *b, struct recover *r)
+{
+    u32 base, value=GF_MODE_BYTE_MASK;
+    if (mode_base(b,&base) || mode_byte(b,base,GF_MODE_DAC_MASK,true,&value)) return -1;
+    value=0;
+    if (mode_byte(b,base,GF_MODE_DAC_INDEX,true,&value)) return -1;
+    for (u32 i=0;i<GF_MODE_PALETTE_SIZE;i++) {
+        u8 rgb[GF_MODE_RGB];
+        if (recover_safe_point(r)) return -1;
+        gfinit_mode_palette(i,rgb);
+        for (u32 c=0;c<GF_MODE_RGB;c++) {
+            value=rgb[c];
+            if (mode_byte(b,base,GF_MODE_DAC_DATA,true,&value)) return -1;
+        }
+    }
+    return 0;
+}
