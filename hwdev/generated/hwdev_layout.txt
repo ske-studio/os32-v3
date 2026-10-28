@@ -1348,43 +1348,43 @@ offset	struct gfinit_bus.ready	84
 member_size	struct gfinit_bus.ready	1
 offset	struct gfinit_bus.window	8
 member_size	struct gfinit_bus.window	32
-size	struct gfinit_decode	273800
+size	struct gfinit_decode	274120
 align	struct gfinit_decode	4
 offset	struct gfinit_decode.args	114752
 member_size	struct gfinit_decode.args	49152
 offset	struct gfinit_decode.captures	163964
-member_size	struct gfinit_decode.captures	640
+member_size	struct gfinit_decode.captures	960
 offset	struct gfinit_decode.entries	163904
 member_size	struct gfinit_decode.entries	60
-offset	struct gfinit_decode.error	273728
+offset	struct gfinit_decode.error	274048
 member_size	struct gfinit_decode.error	4
-offset	struct gfinit_decode.error_pc	273724
+offset	struct gfinit_decode.error_pc	274044
 member_size	struct gfinit_decode.error_pc	4
-offset	struct gfinit_decode.heads	232756
+offset	struct gfinit_decode.heads	233076
 member_size	struct gfinit_decode.heads	32768
-offset	struct gfinit_decode.insns	164604
+offset	struct gfinit_decode.insns	164924
 member_size	struct gfinit_decode.insns	10808
-offset	struct gfinit_decode.instruction_count	273716
+offset	struct gfinit_decode.instruction_count	274036
 member_size	struct gfinit_decode.instruction_count	4
-offset	struct gfinit_decode.main_nodes	273732
+offset	struct gfinit_decode.main_nodes	274052
 member_size	struct gfinit_decode.main_nodes	20
-offset	struct gfinit_decode.main_steps	273752
+offset	struct gfinit_decode.main_steps	274072
 member_size	struct gfinit_decode.main_steps	20
-offset	struct gfinit_decode.main_wait	273772
+offset	struct gfinit_decode.main_wait	274092
 member_size	struct gfinit_decode.main_wait	20
-offset	struct gfinit_decode.max_call	273792
+offset	struct gfinit_decode.max_call	274112
 member_size	struct gfinit_decode.max_call	4
-offset	struct gfinit_decode.max_repeat	273796
+offset	struct gfinit_decode.max_repeat	274116
 member_size	struct gfinit_decode.max_repeat	4
 offset	struct gfinit_decode.nodes	64
 member_size	struct gfinit_decode.nodes	114688
 offset	struct gfinit_decode.plan	0
 member_size	struct gfinit_decode.plan	64
-offset	struct gfinit_decode.reachable	265524
+offset	struct gfinit_decode.reachable	265844
 member_size	struct gfinit_decode.reachable	8192
-offset	struct gfinit_decode.schedule	175412
+offset	struct gfinit_decode.schedule	175732
 member_size	struct gfinit_decode.schedule	57344
-offset	struct gfinit_decode.schedule_count	273720
+offset	struct gfinit_decode.schedule_count	274040
 member_size	struct gfinit_decode.schedule_count	4
 size	struct gfinit_exec	348
 align	struct gfinit_exec	4
@@ -1476,41 +1476,47 @@ offset	struct gfinit_pci_ops.write16	12
 member_size	struct gfinit_pci_ops.write16	4
 offset	struct gfinit_pci_ops.write32	8
 member_size	struct gfinit_pci_ops.write32	4
-size	struct gfinit_plan	163044
+size	struct gfinit_plan	162672
 align	struct gfinit_plan	4
-offset	struct gfinit_plan.bar1_length	163024
+offset	struct gfinit_plan.bar1_length	162652
 member_size	struct gfinit_plan.bar1_length	4
-offset	struct gfinit_plan.capacity_bytes	163028
+offset	struct gfinit_plan.c_node	162640
+member_size	struct gfinit_plan.c_node	4
+offset	struct gfinit_plan.c_unbound	162644
+member_size	struct gfinit_plan.c_unbound	4
+offset	struct gfinit_plan.capacity_bytes	162656
 member_size	struct gfinit_plan.capacity_bytes	4
-offset	struct gfinit_plan.capacity_known	163036
+offset	struct gfinit_plan.capacity_known	162664
 member_size	struct gfinit_plan.capacity_known	4
 offset	struct gfinit_plan.deps	448
 member_size	struct gfinit_plan.deps	768
 offset	struct gfinit_plan.entries	64
 member_size	struct gfinit_plan.entries	384
-offset	struct gfinit_plan.exprs	161728
+offset	struct gfinit_plan.exprs	161344
 member_size	struct gfinit_plan.exprs	256
-offset	struct gfinit_plan.full_capacity	163040
+offset	struct gfinit_plan.full_capacity	162668
 member_size	struct gfinit_plan.full_capacity	4
-offset	struct gfinit_plan.layouts	136384
-member_size	struct gfinit_plan.layouts	25344
-offset	struct gfinit_plan.pfb_key	163020
+offset	struct gfinit_plan.layouts	130624
+member_size	struct gfinit_plan.layouts	30720
+offset	struct gfinit_plan.mode_flags	162636
+member_size	struct gfinit_plan.mode_flags	4
+offset	struct gfinit_plan.pfb_key	162648
 member_size	struct gfinit_plan.pfb_key	4
 offset	struct gfinit_plan.plan	0
 member_size	struct gfinit_plan.plan	64
-offset	struct gfinit_plan.rules	28864
+offset	struct gfinit_plan.rules	23104
 member_size	struct gfinit_plan.rules	107520
-offset	struct gfinit_plan.saved_count	163016
+offset	struct gfinit_plan.saved_count	162632
 member_size	struct gfinit_plan.saved_count	4
-offset	struct gfinit_plan.saved_vram	161984
+offset	struct gfinit_plan.saved_vram	161600
 member_size	struct gfinit_plan.saved_vram	1024
 offset	struct gfinit_plan.targets	1216
-member_size	struct gfinit_plan.targets	27648
-offset	struct gfinit_plan.tested_bytes	163032
+member_size	struct gfinit_plan.targets	21888
+offset	struct gfinit_plan.tested_bytes	162660
 member_size	struct gfinit_plan.tested_bytes	4
-offset	struct gfinit_plan.vram_first	163008
+offset	struct gfinit_plan.vram_first	162624
 member_size	struct gfinit_plan.vram_first	4
-offset	struct gfinit_plan.vram_node	163012
+offset	struct gfinit_plan.vram_node	162628
 member_size	struct gfinit_plan.vram_node	4
 size	struct gfinit_pll_limits	76
 align	struct gfinit_pll_limits	4
@@ -1912,15 +1918,15 @@ offset	struct physmem_range.kind	8
 member_size	struct physmem_range.kind	4
 offset	struct physmem_range.sources	12
 member_size	struct physmem_range.sources	4
-size	struct recover	25944
+size	struct recover	26012
 align	struct recover	4
-offset	struct recover.access_blocked	25938
+offset	struct recover.access_blocked	26006
 member_size	struct recover.access_blocked	1
 offset	struct recover.accessed	1001
 member_size	struct recover.accessed	1
 offset	struct recover.auth_phase	996
 member_size	struct recover.auth_phase	4
-offset	struct recover.bars	25884
+offset	struct recover.bars	25952
 member_size	struct recover.bars	48
 offset	struct recover.bound_hash	980
 member_size	struct recover.bound_hash	4
@@ -1930,15 +1936,15 @@ offset	struct recover.budget	628
 member_size	struct recover.budget	4
 offset	struct recover.buffers	972
 member_size	struct recover.buffers	8
-offset	struct recover.cache	25716
+offset	struct recover.cache	25784
 member_size	struct recover.cache	84
 offset	struct recover.call_tick	636
 member_size	struct recover.call_tick	4
-offset	struct recover.capture_valid	25712
-member_size	struct recover.capture_valid	4
+offset	struct recover.capture_valid	25776
+member_size	struct recover.capture_valid	8
 offset	struct recover.capture_values	25584
-member_size	struct recover.capture_values	128
-offset	struct recover.cold_latched	25939
+member_size	struct recover.capture_values	192
+offset	struct recover.cold_latched	26007
 member_size	struct recover.cold_latched	1
 offset	struct recover.command_actual	944
 member_size	struct recover.command_actual	4
@@ -1952,13 +1958,13 @@ offset	struct recover.discarded_bytes	28
 member_size	struct recover.discarded_bytes	4
 offset	struct recover.emitting	40
 member_size	struct recover.emitting	1
-offset	struct recover.enabled	25932
+offset	struct recover.enabled	26000
 member_size	struct recover.enabled	1
 offset	struct recover.entered	1000
 member_size	struct recover.entered	1
 offset	struct recover.expected_node	988
 member_size	struct recover.expected_node	4
-offset	struct recover.failed	25937
+offset	struct recover.failed	26005
 member_size	struct recover.failed	1
 offset	struct recover.first_key	656
 member_size	struct recover.first_key	4
@@ -1968,9 +1974,9 @@ offset	struct recover.gpu_written	1003
 member_size	struct recover.gpu_written	1
 offset	struct recover.head	992
 member_size	struct recover.head	4
-offset	struct recover.in_call	25935
+offset	struct recover.in_call	26003
 member_size	struct recover.in_call	1
-offset	struct recover.in_opcode	25936
+offset	struct recover.in_opcode	26004
 member_size	struct recover.in_opcode	1
 offset	struct recover.in_s0	948
 member_size	struct recover.in_s0	1
@@ -1986,7 +1992,7 @@ offset	struct recover.log_partial	41
 member_size	struct recover.log_partial	1
 offset	struct recover.lost_lines	36
 member_size	struct recover.lost_lines	4
-offset	struct recover.measurement	25800
+offset	struct recover.measurement	25868
 member_size	struct recover.measurement	84
 offset	struct recover.measuring	1004
 member_size	struct recover.measuring	1
@@ -2020,7 +2026,7 @@ offset	struct recover.restore_tick	644
 member_size	struct recover.restore_tick	4
 offset	struct recover.restored_rules	684
 member_size	struct recover.restored_rules	256
-offset	struct recover.route_write_approved	25933
+offset	struct recover.route_write_approved	26001
 member_size	struct recover.route_write_approved	1
 offset	struct recover.rx	12
 member_size	struct recover.rx	10
@@ -2030,9 +2036,9 @@ offset	struct recover.s0_only	42
 member_size	struct recover.s0_only	1
 offset	struct recover.s0_profile	8
 member_size	struct recover.s0_profile	4
-offset	struct recover.s0_verified	25940
+offset	struct recover.s0_verified	26008
 member_size	struct recover.s0_verified	1
-offset	struct recover.s1_verified	25941
+offset	struct recover.s1_verified	26009
 member_size	struct recover.s1_verified	1
 offset	struct recover.saved	104
 member_size	struct recover.saved	128
@@ -2056,7 +2062,7 @@ offset	struct recover.uart_bytes	680
 member_size	struct recover.uart_bytes	4
 offset	struct recover.uart_polls	676
 member_size	struct recover.uart_polls	4
-offset	struct recover.valid	25934
+offset	struct recover.valid	26002
 member_size	struct recover.valid	1
 offset	struct recover.zero_hold	1002
 member_size	struct recover.zero_hold	1
@@ -2589,6 +2595,29 @@ enum	EXEC_ERR_INVALID	4294967291
 enum	EXEC_ERR_NOMEM	4294967292
 enum	EXEC_ERR_NOT_FOUND	4294967293
 enum	EXEC_SUCCESS	0
+enum	GF_C_BRANCH	5
+enum	GF_C_CHECK_IN	0
+enum	GF_C_CHECK_OUT	10
+enum	GF_C_COMMIT	8
+enum	GF_C_L1	5
+enum	GF_C_L2	6
+enum	GF_C_L3	7
+enum	GF_C_P	2
+enum	GF_C_PENDING_CELL	4
+enum	GF_C_PENDING_CHECK	1
+enum	GF_C_PENDING_EXIT	5
+enum	GF_C_PENDING_ROW	3
+enum	GF_C_PENDING_VRAM	2
+enum	GF_C_Q	1
+enum	GF_C_R	9
+enum	GF_C_READ	1
+enum	GF_C_SD	4
+enum	GF_C_SECTION	2
+enum	GF_C_SECTION_COUNT	11
+enum	GF_C_SELECT	0
+enum	GF_C_UNBOUND	3
+enum	GF_C_VRAM	3
+enum	GF_C_WAIT	4
 enum	REC_ABORT	1
 enum	REC_AFTER	2
 enum	REC_ARG_READ	1
@@ -2617,6 +2646,7 @@ enum	REC_LOCAL_INDEX	3
 enum	REC_LOCAL_LOCK	2
 enum	REC_LOCAL_UNLOCK	0
 enum	REC_LOG	9
+enum	REC_MODE_C	9
 enum	REC_N1	1
 enum	REC_NORMAL	0
 enum	REC_OPERATION	3
@@ -2641,6 +2671,7 @@ enum	REC_RESTORING	5
 enum	REC_ROUTE	6
 enum	REC_RUN	2
 enum	REC_RUNNING	3
+enum	REC_RUN_NO_PREREAD	8
 enum	REC_RW	0
 enum	REC_SAVED	4
 enum	REC_SCREEN	7

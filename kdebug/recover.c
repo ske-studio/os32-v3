@@ -694,7 +694,7 @@ int recover_profile_ok(const struct recover_profile *p)
     for (u32 i = 0; i < p->layout_count; i++) {
         const struct recover_opcode_layout *l = &p->layouts[i];
         if (l->argc > RECOVER_EXPR_ARGS + 1 || (l->argc && !l->kinds) ||
-            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR)) ||
+            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND)) ||
             (l->flags && l->dir_substep != RECOVER_NONE) ||
             (l->dir_substep != RECOVER_NONE && l->dir_substep > REC_DATA)) return -1;
         for (u32 j = 0; j < l->argc; j++) if (l->kinds[j] > REC_ARG_SAVED) return -1;
@@ -703,12 +703,13 @@ int recover_profile_ok(const struct recover_profile *p)
     }
     for (u32 i = 0; i < p->rule_count; i++) {
         const struct recover_rule *w = &p->rules[i];
-        if (w->id == RECOVER_NONE || w->key >= p->target_count || w->phase > REC_VERIFY_PHASE ||
+        if (w->id == RECOVER_NONE || w->key >= p->target_count || w->phase > REC_MODE_C ||
             (w->phase == REC_RUN ? (w->main_id > RECOVER_MAIN_MAX || w->pc == RECOVER_NONE) :
              (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
             w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
             w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
-            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE))) return -1;
+            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_RUN_NO_PREREAD)) ||
+            ((w->flags & REC_RUN_NO_PREREAD) && w->phase != REC_RUN)) return -1;
         const struct recover_target *t = &p->targets[w->key];
         const struct recover_value *v = &w->value;
         u32 mask = width_mask(t->width);
@@ -1474,7 +1475,7 @@ static bool arg_ok(const struct recover_profile *p, const struct recover_plan *p
     if (a->kind == REC_ARG_SAVED && a->value >= p->count) {
         u32 i = a->value - p->count;
         return i < plan->capture_count && plan->captures[i].slot == a->value &&
-            plan->captures[i].consumer_node == id && plan->nodes[id].phase == REC_RUN;
+            plan->captures[i].consumer_node == id && (plan->nodes[id].phase == REC_RUN || plan->nodes[id].phase == REC_MODE_C);
     }
     return a->kind == REC_ARG_SAVED && a->value < p->count &&
         p->regs[a->value].kind == REC_RW && p->regs[a->value].read_safe;
@@ -1483,7 +1484,7 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
 {
     const struct recover_plan_node *n = &plan->nodes[id];
     const struct recover_opcode_layout *l = layout_for(p, n);
-    if (!l || n->phase > REC_VERIFY_PHASE || n->ctx >= plan->ctx_count ||
+    if (!l || n->phase > REC_MODE_C || n->ctx >= plan->ctx_count ||
         n->head >= RECOVER_HEAD_COUNT || n->skip > 1 || n->arg_first > plan->arg_count ||
         n->arg_count > plan->arg_count - n->arg_first || n->arg_count != l->argc ||
         (n->phase == REC_RUN ? n->main_id > RECOVER_MAIN_MAX || n->pc == RECOVER_NONE :
@@ -1637,7 +1638,7 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
         const struct recover_plan_node *a = &plan->nodes[c->producer_node];
         const struct recover_plan_node *b = &plan->nodes[c->consumer_node];
         if (!node_ok(p, plan, c->producer_node) || !node_ok(p, plan, c->consumer_node) ||
-            a->phase != REC_RUN || b->phase != REC_RUN || a->main_id != b->main_id ||
+            (a->phase != REC_RUN && a->phase != REC_MODE_C) || b->phase != a->phase || a->main_id != b->main_id ||
             a->pc != b->pc || a->ctx != b->ctx || a->head != b->head ||
             b->arg_count < 2) return -1;
         bool uses_slot = false;
@@ -1811,7 +1812,7 @@ static void capture_read(struct recover *r, u32 target, u32 ordinal, u32 value)
     for (u32 i = 0; i < r->plan->capture_count; i++) {
         const struct recover_capture *c = &r->plan->captures[i];
         if (c->producer_node == r->cursor && c->target == target && c->read_ordinal == ordinal) {
-            r->capture_values[i] = value; r->capture_valid |= 1U << i;
+            r->capture_values[i] = value; r->capture_valid |= 1ULL << i;
         }
     }
 }
@@ -1837,7 +1838,7 @@ static bool evaluate(struct recover *r, const struct recover_plan_node *n,
                     values[i] = r->saved[a->value];
                 } else {
                     u32 slot = a->value - r->profile->count;
-                    if (slot >= r->plan->capture_count || !(r->capture_valid & (1U << slot)) ||
+                    if (slot >= r->plan->capture_count || !(r->capture_valid & (1ULL << slot)) ||
                         r->plan->captures[slot].consumer_node != r->cursor) return false;
                     values[i] = r->capture_values[slot];
                 }
@@ -1959,7 +1960,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
         if (w->write_mask != width_mask(width) && (dir == REC_SELECT || bus_read(r, target, &old)))
             return access_error(r, target);
         if (r->transport && r->state == REC_RUNNING && w->write_mask == width_mask(width) &&
-            t->read_safe && logged_read(r, &a, &old)) return access_error(r, target);
+            t->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)) return access_error(r, target);
         if (n && !evaluate(r, n, w, old, &expected)) return access_error(r, target);
         if (planned) *value = expected;
         if (!value_ok(&w->value, width, *value)) return access_error(r, target);
@@ -1997,7 +1998,8 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             if (!found) return access_error(r, target);
         }
         if (t->space == REC_VGA_INDEXED && r->state == REC_RUNNING &&
-            (t->access == REC_RW || (dir == REC_SELECT && index_save_safe(r->profile, target)))) {
+            ((t->access == REC_RW && r->auth_phase != REC_MODE_C) ||
+             (dir == REC_SELECT && index_save_safe(r->profile, target)))) {
             bool saved = false;
             for (u32 i = 0; i < r->local_saved_count; i++)
                 if (r->local_saved[i].dir_substep == dir &&
@@ -2056,7 +2058,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
     }
     if (node != RECOVER_NONE) {
         for (u32 i = 0; i < r->plan->capture_count; i++)
-            if (r->plan->captures[i].consumer_node == node) r->capture_valid &= ~(1U << i);
+            if (r->plan->captures[i].consumer_node == node) r->capture_valid &= ~(1ULL << i);
         bit_set(r->buffers.valid_bits, node);
     }
     r->accessed = true;
@@ -2102,7 +2104,8 @@ int recover_plan_enter(struct recover *r, u32 node)
     if (r->state != REC_RUNNING || !r->plan || !r->valid || r->entered ||
         node >= r->plan->node_count || node != r->expected_node) return access_error(r, node);
     const struct recover_plan_node *n = &r->plan->nodes[node];
-    if (n->head != r->head || !dependencies(r, r->profile, r->plan, node, r->buffers.valid_bits)) return access_error(r, node);
+    if ((r->node_layout[node]->flags & REC_LAYOUT_UNBOUND) ||
+        n->head != r->head || !dependencies(r, r->profile, r->plan, node, r->buffers.valid_bits)) return access_error(r, node);
     r->cursor = node; r->entered = true; r->accessed = false; r->auth_phase = n->phase;
     if (n->phase == REC_RUN) {
         for (u32 i = 0; i < r->profile->target_count; i++)
@@ -2116,7 +2119,7 @@ int recover_plan_leave(struct recover *r, u32 edge)
     if (r->state != REC_RUNNING || !r->plan || !r->entered || edge > 1) return access_error(r, edge);
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = layout_for(r->profile, n);
-    if (!l || ((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) && !r->accessed)) return access_error(r, r->cursor);
+    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || ((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) && !r->accessed)) return access_error(r, r->cursor);
     if (n->phase == REC_RUN && r->zero_hold && !zero_guards(r)) return access_error(r, r->cursor);
     u32 next = n->next[edge];
     if (n->phase == REC_PREPARE && (next == RECOVER_NONE || r->plan->nodes[next].phase != REC_PREPARE)) {

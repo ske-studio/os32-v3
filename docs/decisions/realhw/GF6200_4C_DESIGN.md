@@ -143,3 +143,16 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 
 ## 容量の扱い (ユーザー決定 2026-10-28)
 - 「特に物理的な（フロッピーディスクに入らない）などがなければ拡張していいですよ」— owner の作業領域 (HWDEV_CORE_API §9 の 267 頁) と計画の表の大きさは、物理的な制約 (起動 FD・部品の像の上限・番地の配置) に当たらなければ広げてよい。段 2a で astra が 267 頁に収めるため GF_PLAN_TARGETS を 768→608 に減らした件は、今の 4a・S0 の利用が足りるかをレビューで確かめ、足りなければ減らさずに枠を広げる。
+
+## 段 2a の実装で設計者が決めたこと
+- MODE_C=2 は prepare だけが受理し owner に保存する；ALLOW_WRITE は承認の条件、MODE_C は C 節の即値と専用 profile の対象・規則・layout に反映して plan hash/profile_crc を分け、再送 cache は flags 全体の一致を要する。
+- A2 と main 0〜4 は旧 builder と同じ prefix を使い、REC_RUN の書込み前の読取りは 4a の read_safe を規則に保持して判定する（C の phase 9 だけ C の read_safe を使う）；C entry (phase=9、main/pc=NONE) と全 C 節を初回に bind する；旧 A4 を含めず、MODE_C の旧 verify は拒否し、main4 後は PAUSED で C 入口を待つ（op13 は段 3、旧 prepare に C は後付けしない）。
+- s(x) の 8 値は main4 後・入口 CHECK の後・Q 前に READ/SELECT で採取し、既存 recover capture を消費先ごとに割り当てる；CR52 は (s+4)&FF、CR1C/33/4B と SEL_CLK の変換は §3 の式のまま（nouveau crtc.c:494,532,542–565,685–689、保存時刻だけ OS32 の cold 起動に合わせる）。
+- r(x) は既存 REC_ARG_READ でその操作直前に評価し、PLL は既存 parser/solver/sequence で 25,175 kHz を bind 時に解く；C040 の末尾だけは先頭の C040 読取りを capture して復元し、係数直後 verify=0 は維持する（nouveau nvkm/subdev/devinit/nv04.c:197–272、§3 の 4a 再利用差分）。
+- CR/SR/GR は既存 target を共有し、各 READ/DATA の直前に同じ ctx/phase の SELECT を置く；C の DATA は共有 RW key でも local 保存を増やさず COLD とし、従来の index/lock 保存は保つ（nouveau hw.c:712–772,564–586、旧 timing を再生しない §4 の契約）。
+- MISC は専用 VGA_DIRECT target とし、ログの書込み先 C03C2 を保ちつつ bus の読取りだけ C03CC 別名へ写す（nouveau dispnv04/nvreg.h:129,137）；AR/DAC をこの型や通常 MMIO に置換しない。
+- Q の FP_ON 条件は (r(680848)&10000011)!=0、真の枝だけ OFF 書込み→50ms を置き、P/C の SR01 の後に各10msを置く（nouveau dfp.c:93–110、crtc.c:175–234）；待ちは専用実行部が未実装なので段 2a では未結線とする。
+- 2b の VRAM と AR/DAC、2c の route・98 セル・入口/出口 CHECK（cleanup と REC 予算を含む）は、種類・206 行表の全欄を即値にした REC_LAYOUT_UNBOUND 節として hash に含める；bind は通るが enter/leave は必ず拒否し、成功 NOP にしない（段の分割による OS32 の実装契約、nouveau に相当なし）。
+- 完成時の C の出口は CHECK→NONE→trial_step の PAUSED であり trial_end は呼ばない；段 2a で C 全体の実行成功はまだ提供せず、試験だけが明示的に未結線を飛ばして後続の規則・値・順を検査する。
+- 許可表の row ID 578〜783 を保って書込み 178 行を規則化し、未結線の型付き 28 行と区別する；同じ target への別操作も固有 substep を保ち、旧 phase/rule/trace は変更しない。
+- target 608 は今の 4a の最大 471〜472・C の 234 に足りるので 768 から減らした（余り 136）。layout 枠は 1056→1280、capture 枠は 32→48（valid は64bit）とし、最大 BAR1 の旧 A4 と C をそれぞれ検査する。足りなくなれば既存の利用を減らさず、物理的な制約に当たらない範囲で owner の頁数を広げる（ユーザー決定 2026-10-28、HWDEV_CORE_API §9）；絵全体の埋込みは行わない。

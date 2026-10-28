@@ -1,0 +1,111 @@
+"""4c/2a production bind, captures, typed barriers and independent C trace."""
+import pathlib
+import subprocess
+import sys
+import tempfile
+
+import host32
+import mutpar
+import test_gfinit_mode
+import test_gfinit_plan
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+
+def command(exe):
+    return [s.replace('gfinit_plan_host.c', 'gfinit_plan_c_host.c')
+            for s in test_gfinit_plan.command(exe)]
+
+
+def check_output(text, verbose=True):
+    assert 'FAIL' not in text and 'C PASS' in text, text
+    prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
+    if verbose:
+        print('PASS MODE_C == legacy ' + prefix)
+    groups = text.split('variant=')[1:]
+    assert len(groups) == 3
+    for section, (variant, fp_on) in zip(groups, [(0, True), (1, True), (1, False)]):
+        rows, fields = [], {}
+        assert int(section.splitlines()[0]) == variant
+        for line in section.splitlines()[1:]:
+            if '=' not in line:
+                continue
+            name, values = line.split('=', 1)
+            values = list(map(int, values.split()))
+            if name == 'row':
+                rows.append(values)
+            else:
+                fields[name] = values
+        expected = test_gfinit_mode.expected_trace(test_gfinit_mode.expected_state(variant), fields['pll'])
+        assert len(expected) == 206 and len(rows) == 206 - (not fp_on)
+        for row, (ordinal, want) in zip(rows, enumerate(expected) if fp_on else
+                                      [(i, v) for i, v in enumerate(expected) if i != 1]):
+            assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
+            assert row[-1] == int(want[0] not in (4, 6, 7, 8, 9, 10))
+        assert fields['entries'] == [7] and fields['captures'] == [36]
+        assert fields['pending'] == [35]
+        assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
+        assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
+        assert fields['layouts'][0] <= 1280
+        if verbose:
+            print(f'PASS C bind/bus variant={variant} FP_ON={int(fp_on)}: '
+                  f'{len(rows)} rows agree with stage-1 independent oracle; 35 typed barriers')
+            print(' '.join(f'{k}={v[0]}' for k, v in fields.items() if k != 'pll'))
+
+
+MUTATIONS = [
+    ('kdebug/recover.c', 'run_uses_c_read_safe',
+     't->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)',
+     't->read_safe && logged_read(r, &a, &old)'),
+    ('kdebug/gfinit_plan_c.c', 'pll_restore_live',
+     'expr=GF_C_EXPR_SAVED;producer=pll_first;', 'expr=GF_C_EXPR_LIVE;producer=pll_first;'),
+    ('kdebug/recover.c', 'unbound_enter',
+     '(r->node_layout[node]->flags & REC_LAYOUT_UNBOUND) ||', 'false ||'),
+    ('kdebug/gfinit_bus.c', 'misc_read_alias',
+     'offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;', 'offset += 0;'),
+]
+
+
+def mutation(item):
+    file, name, old, new = item
+    source = (ROOT / file).read_text()
+    if old and source.count(old) != 1:
+        return name + ': ambiguous anchor', 1
+    with tempfile.TemporaryDirectory(prefix='gf-plan-c-mut-') as td:
+        exe = pathlib.Path(td) / 'host'
+        try:
+            tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1) if old else source},
+                                       [command(exe)], capture_output=True)
+        except subprocess.CalledProcessError as exc:
+            return name + ': compile failed ' + str(exc.stderr), 1
+        # gcc dependency closure must copy the new units, not follow source-tree symlinks.
+        for dependency in ('kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h',
+                           'hwdev/gfinit_mode.h', 'kdebug/generated/recover_gf_c_tables.inc'):
+            assert (tree / dependency).is_file() and not (tree / dependency).is_symlink()
+        result = host32.run([str(exe)], cwd=tree, timeout=60, capture_output=True)
+        failed = result.returncode != 0
+        if not failed:
+            try:
+                check_output(result.stdout.decode(), verbose=False)
+            except AssertionError:
+                failed = True
+        return name + (': RED' if failed else ': GREEN'), int(not failed)
+
+
+def main():
+    with tempfile.TemporaryDirectory(prefix='gf-plan-c-') as td:
+        exe = pathlib.Path(td) / 'host'
+        subprocess.run(command(exe), check=True, cwd=ROOT)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
+        if result.returncode:
+            print(result.stdout.decode())
+            return result.returncode
+        check_output(result.stdout.decode())
+    if '--mutate' in sys.argv:
+        return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
+                        ('kdebug/gfinit_plan_c.c', 'control', '', ''))))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

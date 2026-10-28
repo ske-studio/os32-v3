@@ -1,6 +1,6 @@
 # GF body lives only in HWDEV; S0 recovery stays in kdebug.
 HWDEV_OUT := $(BUILD_OUT)/hwdev
-HWDEV_GF := gfinit_bus gfinit gfinit_plan gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf
+HWDEV_GF := gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
 # Normal and R1 share this decoder object; keep all other units at -O2.

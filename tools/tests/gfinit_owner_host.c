@@ -104,6 +104,16 @@ int recover_gf_profile_expand(struct recover_profile *p,struct gfinit_plan *buf)
 const struct recover_plan recover_gf_size_bars_plan={.version=1,.node_count=32};
 int gfinit_plan_build(struct gfinit_plan *p,struct gfinit_decode *d,struct recover_profile *profile,u32 length)
 { (void)d;CHECK(profile->rules==p->rules && profile->rule_count==1);profile->rule_count++;CHECK(length==0x100000);zero(p,sizeof(*p));p->plan.version=1;p->plan.node_count=plan_nodes;return 0; }
+int gfinit_plan_build_c(struct gfinit_plan *p,struct gfinit_decode *d,struct recover_profile *profile,
+                        u32 length,const u8 *rom,u32 size)
+{
+    CHECK(rom==owner->rom && size==owner->rom_size);
+#if GF_VPLL_PROBE
+    (void)p;(void)d;(void)profile;(void)length;return -1;
+#else
+    int rc=gfinit_plan_build(p,d,profile,length);p->mode_flags=GF_MODE_C;return rc;
+#endif
+}
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
 { CHECK(p==owner->compiled && r==&core && a);plan_reads++;(void)value; }
 int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==owner->compiled);verify_calls++;return 0; }
@@ -175,6 +185,44 @@ static void setup(void)
 }
 static void prepared(void)
 { CHECK(call(GF_OP_INSPECT,0,0)==0);CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)==0); }
+static void mode_c_test(void)
+{
+    setup();prepared();
+    CHECK(owner->prepare_flags==GF_ALLOW_WRITE && !owner->compiled->mode_flags);
+    u32 before=begins;
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)<0 && begins==before);
+    CHECK(owner->prepare_flags==GF_ALLOW_WRITE && !owner->compiled->mode_flags);
+    /* Stage 2a exposes neither op13 nor an upgrade of an old prepare. */
+    CHECK(call(13,GF_ALLOW_WRITE,0)<0);
+    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0);
+    setup();
+    CHECK(call(GF_OP_INSPECT,GF_MODE_C,0)<0 && !reads);
+    CHECK(call(GF_OP_INSPECT,0,0)==0);
+    CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE|GF_MODE_C,0)<0 && !begins);
+    CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);
+    CHECK(call(GF_OP_PREPARE,GF_MODE_C,0)<0);
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|4,0)<0); /* BUS50_ONE deferred */
+#if GF_VPLL_PROBE
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)<0 && !live_pages);
+#else
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)==0);
+    CHECK(owner->prepare_flags==(GF_ALLOW_WRITE|GF_MODE_C));
+    CHECK(owner->compiled->mode_flags==GF_MODE_C && core.state==REC_PAUSED);
+    before=begins;
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)==0 && begins==before);
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)<0 && begins==before);
+    CHECK(owner->prepare_flags==(GF_ALLOW_WRITE|GF_MODE_C));
+    for(u32 main=0;main<GF_INIT_MAINS;main++) {
+        CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE|GF_MODE_C,main)<0);
+        CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE,main)==0 && core.state==REC_PAUSED);
+    }
+    CHECK(owner->next_main==5);
+    CHECK(call(GF_OP_VERIFY,GF_ALLOW_WRITE,0)<0 && !verify_calls && core.state==REC_PAUSED);
+    CHECK(call(13,GF_ALLOW_WRITE,0)<0 && core.state==REC_PAUSED);
+    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && !live_pages && !owner->prepare_flags);
+#endif
+    output("MODE_C flags / cache / old prepare refusal / PAUSED PASS\n");
+}
 static void lifecycle(void)
 {
     setup();CHECK(call(GF_OP_INSPECT,0,0)==0 && writes==0 && reads>0 && owner->inspected);
@@ -322,7 +370,7 @@ static void expansion_lifetime_test(void)
     CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
     /* B4: retain a previous RUN plan and enter SIZE_BARS without end release. */
     core.state=REC_VERIFIED;
-    CHECK(gf_begin(&core,owner,&transport,true)==0 && expand_calls==4);
+    CHECK(gf_begin(&core,owner,&transport,true,GF_ALLOW_WRITE)==0 && expand_calls==4);
     core.plan=&owner->size_plan;
     CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
     CHECK(owner->compiled==backing && owner->profile.rule_count==1);
@@ -352,6 +400,8 @@ static void inspection_test(void)
     CHECK(contains(serial_output," chip=44 expect=44 match=1\n"));
     CHECK(!writes && !begins && core.token.session==5 && core.seq==0);
     clear_output();CHECK(call(GF_OP_INSPECT,0,0)==0 && !serial_length);
+    /* A request with different flags is not the cached response. */
+    CHECK(call(GF_OP_INSPECT,GF_ALLOW_WRITE,0)==0 && serial_length);
     CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && !writes && !gf_lease.active && !live_pages);
     setup();image[0x62]=0x43;image[511]++;
     CHECK(call(GF_OP_INSPECT,0,0)<0 && !writes && !live_pages);
@@ -522,4 +572,4 @@ static void vpll_budget_test(void)
     output("VPLL budget rows and overflow PASS\n");
 }
 void _start(void)
-{ vpll_budget_test();cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ vpll_budget_test();mode_c_test();cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

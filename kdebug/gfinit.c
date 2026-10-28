@@ -4,6 +4,7 @@
 #include "gfinit_bus.h"
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
+#include "gfinit_plan_c.h"
 #include "gfinit_resources.h"
 #include "recover_gf_expand.h"
 #include "kpeek.h"
@@ -55,7 +56,7 @@ struct gfinit_owner {
     struct gfinit_request last;
     u8 *rom;
     bool inspected;
-    u32 generation;
+    u32 generation, prepare_flags;
 };
 static struct gfinit_owner control; /* small, stable callbacks survive terminal status */
 static struct gfinit_owner *owner;
@@ -208,6 +209,7 @@ static int gf_release_rom(struct gfinit_owner *g)
     g->buffers = (struct recover_plan_buffers){0};
     (void)recover_gf_profile_expand(&g->profile, 0);
     g->last_op = RECOVER_NONE;
+    g->prepare_flags = 0;
     g->rom = 0; g->inspected = false;
     gf_lease.active = false;
     return 0;
@@ -318,7 +320,7 @@ static int gf_fixed(struct recover *r, void *arg)
     return 0;
 }
 static int gf_begin(struct recover *r, struct gfinit_owner *g,
-                    struct recover_transport *transport, bool size)
+                    struct recover_transport *transport, bool size, u32 flags)
 {
     if (!g || !g->inspected || !gf_owned(r) || r->cold_latched ||
         (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
@@ -332,8 +334,13 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
         plan = &g->size_plan;
     } else {
         if (!r->cache.bar[1].valid || gfinit_decode_rom(g->rom, g->rom_size,
-                &g->profile, g->decoded) ||
-            gfinit_plan_build(g->compiled, g->decoded, &g->profile, r->cache.bar[1].length)) return -1;
+                &g->profile, g->decoded)) return -1;
+        g->prepare_flags = flags;
+        if (flags & GF_MODE_C) {
+            if (gfinit_plan_build_c(g->compiled, g->decoded, &g->profile,
+                    r->cache.bar[1].length, g->rom, g->rom_size)) return -1;
+        } else if (gfinit_plan_build(g->compiled, g->decoded, &g->profile,
+                                     r->cache.bar[1].length)) return -1;
         plan = &g->compiled->plan;
     }
     if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;
@@ -363,7 +370,7 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     struct gfinit_request q = *(const struct gfinit_request *)buf;
     struct recover *r = recover_owner();
     if (q.version != GF_INIT_VERSION || q.size != sizeof(q) ||
-        (q.flags & ~GF_ALLOW_WRITE) || q.max_steps != GF_INIT_SCHEDULE ||
+        (q.flags & ~(GF_ALLOW_WRITE | (op == GF_OP_PREPARE ? GF_MODE_C : 0U))) || q.max_steps != GF_INIT_SCHEDULE ||
         q.status || q.fail_pc || q.fail_reg || q.steps ||
         (op != GF_OP_RUN_ONE && q.script_id) ||
         (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
@@ -372,12 +379,14 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         return -1;
     }
     if (owner && q.session && q.session == r->token.session && owner->last_op == op &&
-        owner->last_main == q.script_id) { *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0; }
+        owner->last_main == q.script_id && owner->last.flags == q.flags) {
+        *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0;
+    }
     if (q.session != r->token.session) return -1;
     int rc = -1;
     if (op == GF_OP_INSPECT) rc = gf_inspect(r, base, transport, s0);
     else if (op == GF_OP_SIZE_BARS || op == GF_OP_PREPARE)
-        rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS);
+        rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS, q.flags);
     else if (owner && owner->inspected && op == GF_OP_RUN_ONE &&
              q.script_id == owner->next_main && q.script_id < GF_INIT_MAINS) {
         struct gfinit_exec e = {.rom = owner->rom, .rom_size = owner->rom_size,
@@ -385,7 +394,8 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         rc = trial_step(r, &r->token, true, gfinit_exec_run, &e);
         q.steps = e.steps; q.fail_pc = e.fail_pc;
         if (!rc) owner->next_main++;
-    } else if (owner && op == GF_OP_VERIFY && owner->next_main == GF_INIT_MAINS) {
+    } else if (owner && op == GF_OP_VERIFY && owner->next_main == GF_INIT_MAINS &&
+               !(owner->prepare_flags & GF_MODE_C)) {
         rc = trial_step(r, &r->token, true, gfinit_plan_verify, owner->compiled);
         if (!rc) rc = trial_end(r, &r->token, REC_NORMAL);
     } else if (op == GF_OP_ABORT) {

@@ -120,3 +120,22 @@ void gfinit_mode_palette(u32 index, u8 rgb[GF_MODE_RGB])
     for (u32 c = 0; c < GF_MODE_RGB; c++)
         rgb[c] = index < GF_MODE_PALETTE_COLORS ? colors[index][c] : 0;
 }
+
+int gfinit_mode_row(u32 y, u8 row[GF_MODE_WIDTH])
+{
+    if (!row || y >= GF_MODE_HEIGHT) return -1;
+    for (u32 x = 0; x < GF_MODE_WIDTH; x++) {
+        u32 color = x / GF_MODE_BAND_WIDTH;
+        if (x >= GF_MODE_FRAME_WIDTH && x < GF_MODE_FRAME_WIDTH + GF_MODE_CHECK_SIZE &&
+            y >= GF_MODE_FRAME_WIDTH && y < GF_MODE_FRAME_WIDTH + GF_MODE_CHECK_SIZE) {
+            u32 cx = (x - GF_MODE_FRAME_WIDTH) / GF_MODE_CHECK_CELL;
+            u32 cy = (y - GF_MODE_FRAME_WIDTH) / GF_MODE_CHECK_CELL;
+            color = ((cx + cy) & 1U) ? GF_MODE_COLOR_BLACK : GF_MODE_COLOR_WHITE;
+        }
+        if (x < GF_MODE_FRAME_WIDTH || x >= GF_MODE_WIDTH - GF_MODE_FRAME_WIDTH ||
+            y < GF_MODE_FRAME_WIDTH || y >= GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)
+            color = GF_MODE_COLOR_WHITE;
+        row[x] = (u8)color;
+    }
+    return 0;
+}

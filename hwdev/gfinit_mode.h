@@ -23,6 +23,12 @@
 #define GF_MODE_RGB 3U
 #define GF_MODE_BYTE_MASK 0xffU
 #define GF_MODE_CHAR_SHIFT 3U
+#define GF_MODE_FRAME_WIDTH 8U
+#define GF_MODE_CHECK_SIZE 64U
+#define GF_MODE_CHECK_CELL 8U
+#define GF_MODE_BAND_WIDTH 80U
+#define GF_MODE_COLOR_BLACK 0U
+#define GF_MODE_COLOR_WHITE 4U
 #define GF_MODE_DCB_ENTRY 0U
 #define GF_MODE_DCB_ANALOG 0U
 #define GF_MODE_DCB_HEADS 3U
@@ -107,4 +113,6 @@ struct gfinit_mode {
 int gfinit_mode_calc(const struct gfinit_pll_limits *limits,
                      const struct gfinit_mode_saved *saved, struct gfinit_mode *out);
 void gfinit_mode_palette(u32 index, u8 rgb[GF_MODE_RGB]);
+/* Diagnostic row, with caller-owned GF_MODE_WIDTH byte buffer. */
+int gfinit_mode_row(u32 y, u8 row[GF_MODE_WIDTH]);
 #endif

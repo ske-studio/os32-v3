@@ -5,6 +5,7 @@
 #define GF_INIT_SCHEDULE 4096U
 #define GF_INIT_VERSION 1U
 #define GF_ALLOW_WRITE 1U
+#define GF_MODE_C 2U
 #define GF_OP_INSPECT 5U
 #define GF_OP_SIZE_BARS 6U
 #define GF_OP_PREPARE 7U

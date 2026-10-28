@@ -14,6 +14,9 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('cache_flags', ' && owner->last.flags == q.flags', ''),
+    ('cache_flags_subset', 'owner->last.flags == q.flags',
+     '(owner->last.flags & q.flags) == owner->last.flags'),
     ('vpll_budget_rows', 'rows += RECOVER_VPLL_ROWS;', 'rows += 0;'),
     ('read_plan_identity', 'recover_owner()->plan == &owner->compiled->plan', 'true'),
     ('begin_expand', 'if (!g->compiled || recover_gf_profile_expand(&g->profile, g->compiled)) return -1;',

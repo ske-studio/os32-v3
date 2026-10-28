@@ -49,9 +49,10 @@ def contracts():
         wrappers += body + '\n'
     for path, expected in fixture['generated'].items():
         assert digest((ROOT / path).read_bytes()) == expected, path
+    # GF4c/2a explicitly changes the private C plan/capture layout; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    for crc in ('#define HWDEV_CONTRACT_CRC 0x7a941bb8U',
-                '#define HWDEV_LAYOUT_CRC 0x39731fc6U'):
+    for crc in ('#define HWDEV_CONTRACT_CRC 0x7d90586cU',
+                '#define HWDEV_LAYOUT_CRC 0xe0c871d7U'):
         assert crc in hwdev
     print('PASS fixed b400acb6 public API/version/slots/signatures/out/in/generated ABI; hwdev CRC')
     return fixture, wrappers
