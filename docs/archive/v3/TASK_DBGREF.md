@@ -1,6 +1,6 @@
 # DBGREF — デバッグ環境の整理「対象を絞った 1 段目」: 起動時に読み込むデバッグ部品 (`/boot/kdebug.bin`) 設計票 r4a (確定版)
 
-> 状態: **受入完了 (2026-10-16)** — S0〜S3・G1〜G3 と実機受入 (4) は合格。証拠: `~/os32-tmp/evidence/2026-10-15/dbgref_g1/`、`dbgref_g2/RESULT.md`、`~/os32-tmp/evidence/2026-10-16/dbgref_s3_realhw/` (86ba40c)。採取途中の CTRL+STOP は [持越し台帳 E10-4](../DEFERRED_TESTS.md) の T7 残件。設計・レビュー記録は `~/os32-tmp/run/dbgref/`。
+> 状態: **受入完了 (2026-10-16)** — S0〜S3・G1〜G3 と実機受入 (4) は合格。証拠: `~/os32-tmp/evidence/2026-10-15/dbgref_g1/`、`dbgref_g2/RESULT.md`、`~/os32-tmp/evidence/2026-10-16/dbgref_s3_realhw/` (86ba40c)。採取途中の CTRL+STOP は [持越し台帳 E10-4](../../tasks/DEFERRED_TESTS.md) の T7 残件。設計・レビュー記録は `~/os32-tmp/run/dbgref/`。
 
 書き手: Fable 5.1 (`claude-fable-5-1`)、2026-10-14。基点: main `78207df`。数字は `build/out/kernel.map`・`.o` (`nm -S` / `nm -u` / `readelf -S`)・`ls -l`・ヘッダの `extern` 宣言から取った。
 r4a = r4 + astra r4 の確認 (判定「依頼パックで直せば実装に出してよい」、P1 なし、P2 ①〜⑥) の反映 (`fable_r4_response.md`)。ユーザーの決定 (2026-10-14、推奨どおり): Q1 製品の既定は `KDEBUG=0`、受入と採取は「対の部品が RUNNING」を前提、1 段目は「対象を絞った 1 段目」と記録し全面達成とは書かない / Q2 L-B は S1+S2 後の実測で残り ≥ 19,456 B なら着手、SHM 削りは予備 / Q3 部品の形式は今回 T4 と同じ形式に確定。**この版は本文を全部持つ。前の版を参照しない。これ以上の往復はしない。**

@@ -800,7 +800,7 @@ auto のときの低位区間は `[0xF00000, 0xF80000)` (`res_mask`=0x3 = PEGC +
 
 **呼出し時の CR3 とアプリバッファ**: `kernel/ring3_entry.asm:32-54` の int80 入口は CR3 を変えず、`exec/exec.c:1645` も wrap 呼出し時はアプリ PD と明記。出力範囲検査が一時 master を使っても `exec/exec.c:914-920` で元へ戻す。`kernel/paging.c:801-812` の PD 作成は master の PDE をコピーし、カーネル帯 PT を共有するため、通信バッファは master / アプリ AS のどちらでも同じ番地で読める。shell / 起動時の I/O も master の同帯を使う。
 
-KAPI `wrap_sys_read/write` (`kapi/kapi_generated.c:1074-1089`) → `fs/vfs_fd.c:408-409,441-446` → `hdrv_read_stream/write_stream` → `hostdrv_read/write`。caller buf は `fs/hostdrvfs.c` の CPU `kmemcpy` (`:403,423`、T1f 時点は `:398,418`) だけが触り、hypercall に渡る read/write データは常に `g_databuf`。パスも `g_namebuf` へ変換される。**CPL=3 アプリのバッファを直接 hypercall へ渡す経路は無い**。T2 の [TASK_T2_APPBAND](../../tasks/v3/TASK_T2_APPBAND.md) §6 R2 / §4 の caller AS 上でのコピー契約と一致し、物理連続 bounce の追加は不要。T2c/T2h の高位・非恒等・ページ跨ぎ buffer 回帰は引き続き必要。
+KAPI `wrap_sys_read/write` (`kapi/kapi_generated.c:1074-1089`) → `fs/vfs_fd.c:408-409,441-446` → `hdrv_read_stream/write_stream` → `hostdrv_read/write`。caller buf は `fs/hostdrvfs.c` の CPU `kmemcpy` (`:403,423`、T1f 時点は `:398,418`) だけが触り、hypercall に渡る read/write データは常に `g_databuf`。パスも `g_namebuf` へ変換される。**CPL=3 アプリのバッファを直接 hypercall へ渡す経路は無い**。T2 の [TASK_T2_APPBAND](TASK_T2_APPBAND.md) §6 R2 / §4 の caller AS 上でのコピー契約と一致し、物理連続 bounce の追加は不要。T2c/T2h の高位・非恒等・ページ跨ぎ buffer 回帰は引き続き必要。
 
 **一覧の実数補正**: 元の 13 エントリのうち `hostdrv_set_info` にはポインタ→整数キャストが無く、不要な例外を削除した。24 件は残る 12 関数にある (一覧全体は基点の 64 から 63 エントリ)。過去の T1f 記録の数値は当時の記録として保持する。
 

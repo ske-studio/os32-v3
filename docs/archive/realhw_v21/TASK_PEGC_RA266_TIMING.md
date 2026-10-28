@@ -1,8 +1,8 @@
 # v2.1 PEGC 実機タイミング修正 — PC-9821Ra266
 
-> 状態: **完了記録 (2026-09-29)** — 同じ課題の正典は [TASK_PEGC480_REALHW](../../tasks/realhw/TASK_PEGC480_REALHW.md) (記録本体と受け入れ)。この票は v2.1 の課題の起票として残す。(2026-09-29 の棚卸しで更新)
+> 状態: **完了記録 (2026-09-29)** — 同じ課題の正典は [TASK_PEGC480_REALHW](../realhw/TASK_PEGC480_REALHW.md) (記録本体と受け入れ)。この票は v2.1 の課題の起票として残す。(2026-09-29 の棚卸しで更新)
 >
-> 発行: 2026-09-28 / それまでの状態: **完了 (画面を見ない条件で受け入れ、2026-09-29)** — 実機の目視確認だけ残る。記録と受け入れは [TASK_PEGC480_REALHW](../../tasks/realhw/TASK_PEGC480_REALHW.md) §3-3・§5、[RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1
+> 発行: 2026-09-28 / それまでの状態: **完了 (画面を見ない条件で受け入れ、2026-09-29)** — 実機の目視確認だけ残る。記録と受け入れは [TASK_PEGC480_REALHW](../realhw/TASK_PEGC480_REALHW.md) §3-3・§5、[RELEASE_v2.1](../../RELEASE_v2.1.md) §2-1
 > 対象リリース: **kernel v2.1**
 > 対象: PC-9821Ra266 実機 / PEGC 640x480x256
 > 関連: [GUI設計](../../decisions/gui/DESIGN.md) / [PEGC完了記録](../gui_v11/TASK_H2_pegc.md) / [ドライバ仕様](../../05_drivers.md#5-5-グラフィック-gfx-hal--libos32gfx)
@@ -113,12 +113,12 @@ NP21/W の固定値より **実機 BIOS の設定を優先する**。
 > **下準備 (2026-09-29、wt/pegc480-prep)**: PITCH・GDC クロックを明示して書き、順序を `pegc_apply_timing` 1 か所、
 > 値を `include/pegc.h` §10 1 か所に集めた (今は NP21/W 由来の値。実機の `v86 -g` の記録で差し替える)。
 > `gdc_send` は FIFO を待つ。詳細と実機の 1 回目の `v86 -g` の結果は
-> [TASK_PEGC480_REALHW](../../tasks/realhw/TASK_PEGC480_REALHW.md) §3「段 1 の実機での記録」「段 2 の下準備」・§4。
+> [TASK_PEGC480_REALHW](../realhw/TASK_PEGC480_REALHW.md) §3「段 1 の実機での記録」「段 2 の下準備」・§4。
 
 > **実機 ROM の記録と段 2 (2026-09-29、wt/pegc480-real)**: 実機の `v86 -g` で ROM の INT 18h AH=30h の OUT 列が全部取れた。
 > SYNC の値は NP21/W 由来の値と一致 (PITCH・クロックも一致)、違いは順序と OS32 が出していなかったコマンド (RESET・CSRFORM・
 > テキスト GDC の PITCH/SCROLL・CRTC・6Eh・表示停止) と SCROLL の LEN。`pegc_apply_timing` を ROM の列に合わせた。比較表と原因は
-> [TASK_PEGC480_REALHW](../../tasks/realhw/TASK_PEGC480_REALHW.md) §3-3、v2.1 の受け入れ (画面を見ずに確かめる A/B/C) は同 §5。
+> [TASK_PEGC480_REALHW](../realhw/TASK_PEGC480_REALHW.md) §3-3、v2.1 の受け入れ (画面を見ずに確かめる A/B/C) は同 §5。
 
 ## 5. 受入条件
 

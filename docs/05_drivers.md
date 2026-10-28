@@ -148,7 +148,7 @@ KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から
 `drivers/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
-`kernel/v86_gcap.c`、票 TASK_PEGC480_REALHW §3 段 1):
+`kernel/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):
 `include/pegc.h` の 480 ラインの SYNC は実機 Ra266 の ROM から採った値を使う。uPD7220 の SYNC は読み戻せないため、
 採取には V86 の監視部で**実機の ROM の INT 18h** を呼ぶ — AH=31h で今のモードを読み、その値の bit の並び
 (NP21/W の bit2 / Bible 3-2 の bit3。その並びとして正しい値になるのがちょうど 1 つのときだけ決め、決まらなければ 30h を呼ばない。
@@ -164,16 +164,21 @@ AL bit0 = ラスタスキャンはどちらの並びでも許して 30h へ保�
 (画面を 200 ライン / 400 ライン・16 色へ決め打ち) は通らず、最後に CUI を作り直す。出力は画面と rshell の
 両方に出る 1 件 1 行の形。`v86 -g -t` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。
 NP21/W の ROM は SYNC を内部状態へ直接書くので、エミュレータでは SYNC の列は採れない (件数は構成次第)。
-純粋部 (記録・判定) のホスト試験は `make check-v86-gcap-host`。
+純粋部 (記録・判定) のホスト試験は `make check-v86-gcap-host`。記録器は KDEBUG 部品の中なので `KDEBUG=1` の起動でだけ動く (OFF は NOSYS)。
+[未] ROM の AH=30h の後は VSYNC 割り込みが止まり 0064h への書き込みで再開する ([U] io_disp.md) が、`v86 -g` は CUI を作り直すだけで 0064h を書かない。
 
-**PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らない** (2026-09-29〜、票
-票 TASK_PEGC480_REALHW §2 H2・H3・H5):
+**PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる** (2026-09-29〜、経緯は POLICY_DEBUG §4-62):
 `pegc_apply_timing` が 1 か所で 09A8h → 6Ah GDC クロック (83h・85h = 5MHz) → 両 GDC の SYNC → グラフィック GDC の
 PITCH (80) → SCROLL → 表示開始の順に書く (クロックは SYNC の前 — Bible 3-2 表3-2)。戻りは起動時に 09A0h
 (sel 09h の bit0 = CLOCK-1、読み値 bit1 = CLOCK-2) で読んだクロックへ戻し、PITCH (書き込み専用)・グラフィック GDC の SYNC・
-SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [include/pegc.h](../include/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う (採取記録は 票 TASK_PEGC480_REALHW §3)。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
+SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [include/pegc.h](../include/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
 上限 2µs × 5000 回で打ち切って数える — `pegc_gdc_fifo_timeouts`、kernel.map から読める)。09A8h へは bit1,0 だけを書く
 (実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。ホスト試験は `make check-pegc-mode-host`。
+
+- **順序と中身**: 入る (`pegc_enter_480_ports`) と戻る (`pegc_text_sync_400`) は同じ `pegc_apply_timing` を値だけ替えて通り、実機 Ra266 の ROM (INT 18h AH=30h) の列の順に書く — 6Ah 拡張モード (07h・21h・06h) と 41h → 表示停止 (68h 0Eh) → 09A8h (今の D0 が目標と違うときだけ、bit1,0 だけ) → GDC クロック → 両 GDC の RESET・MASTER/SLAVE と SYNC → テキスト CSRFORM・グラフィック CSRFORM (L/R = 0) → STOP2 → 両 GDC の PITCH・ZOOM・SCROLL (グラフィック LEN 3FFh) → 68h 08h・6Ah 69h (800 ライン構成)・6Eh (拡張アトリビュート、各書き込みの後に 5Fh の待ち)・テキスト CRTC (70h〜7Ah) → 68h 0Fh → START (ROM は両 GDC を止めたまま返すので、OS32 が呼び手として 480 では両 GDC、戻りではテキストだけ 6Bh)。ROM の待ちに合わせて 7 か所で VSYNC を待ち、1 回 50ms で打ち切って `pegc_vsync_timeouts` を数える。CUI へ戻るときは ROM の CSRFORM がカーソル非表示なので `console_hw_cursor_enable()` で戻す。
+- **ROM の記録が期待値**: 実機 ROM の 480 / 戻りの OUT 列 (各 94 行) は `tools/tests/pegc_mode_host.c` の `ROM_S480` / `ROM_BACK` に数値のまま置き、`check-pegc-mode-host` の `rom_s480` / `rom_back` が実物の列と 1 行ずつ比べる。比べるのは `pegc_enter_480_ports()` と `pegc_text_sync_400()` の頭から終わりまで (MMIO・VRAM クリア・パレット・起動時の記録・診断の 09A0h の読みは外す)。違えてよい行は同じ試験の除外表 (`EDIT_COMMON` / `EDIT_BACK` / `ADD_*`) に理由付きで置く: 09A0h 03h の読み、PC-98GS 用の A46Eh・A660h と ROM バンク 063Ch (記録器が実機へ通していない)、描画コマンド A2h 20h・78h ([HW1])、戻りの 68h 09h (OS32 のグラフィックは 400 ライン)。**6Ah 07h・A0h DFh・A2h 28h・6Ah 06h の組は意味が資料に無い未解明の差分で、送っていない** — 実機で表示が崩れたら最初に疑う。
+- **画面を見ずに確かめる道具 `pegcchk [秒数]`** (`/usr/bin/pegcchk.bin`、rshell から): PEGC で 640x480 へ入り、テスト画 (枠・縦線 x=0/1/320/638/639・16 ラインごとの横線・対角線) を描いて待ち、CUI へ戻って `[pegc] enter …` / `[pegc] exit …` (入った直後と戻った後の 09A8h・09A0h の読み、FIFO / VSYNC の打ち切り数 `fifo_to` / `vs_to`)、`R mode` / `R back`、`pegcchk done` を出す。Ra266 では 09a8 が 81 のまま、clk が 3 → 0、`fifo_to` / `vs_to` が 0 になるのが正常。戻った後の AH=31h は続けて `v86 -g` の `R 31h` 行で見る (Ra266 は `AX=310d BX=0100`)。期待の全行は [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1。
+- 480 ラインのときの液晶の OSD (水平・垂直周波数) は未採取 (TASK_TRIDENT_DRIVER の段 0 の残件)。
 
 | 項目 | 仕様 (9801 バックエンド) |
 |------|------|

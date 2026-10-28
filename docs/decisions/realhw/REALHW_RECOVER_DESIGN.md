@@ -39,7 +39,7 @@
 |---|---|
 | `R/tools/rshell_serial.py:236`、`:253`、`R/userland/shell/rshell.c:491` | シリアルでコマンドと EOT を受け渡す。ホスト timeout は待つのをやめるだけで、ゲストの命令を止めない |
 | `R/userland/shell/rshell.c:95`、`:113`、`:402` | 既存 watchdog は速度変更後の ack 不着でシリアル設定を戻すもの。装置試験の deadman ではない |
-| `docs/tasks/v3/TASK_KPEEK.md:9`、`:21`、`:22`、`:25` | KDEBUG=1 の部品、kdebug_call・ops の入口、許可リスト、LAN ダンプがある。peek 自体は読み専用のまま |
+| `docs/archive/v3/TASK_KPEEK.md:9`、`:21`、`:22`、`:25` | KDEBUG=1 の部品、kdebug_call・ops の入口、許可リスト、LAN ダンプがある。peek 自体は読み専用のまま |
 | `R/kdebug/kpeek.c:134` | PTE を退避→短い irq_save 内で写像→読出し→PTE 復元→irq_restore。復元失敗は WINDOW。CPU/バス停止から戻す仕組みではない |
 | `R/kernel/v86.c:957` | コア側の `v86_cui_display_restore` は kdebug から利用可能で、 graphics STOP・表示許可・text START 等。6Ah/EGC/GRCG 全体の復帰ではない |
 | `R/kernel/v86_io.c:240`、`:254`、`:282` | static の `gfx_state_for_os32` が起動時 BIOS flags を用いて EGC/GRCG/6Ah、ページ、パレット、カーソルを復元。`R/build/v86-module.mk:8` の v86_io.o として v86.mod 側にあり、共通部品へ切り出す必要がある。`v86_bios_real_lowmem` はコア側 (`R/kernel/v86_snapshot.c:24`) |
@@ -64,7 +64,7 @@
 
 - S0 と S1 は別の保証。既定の復帰は S1 のうち安全な項目を戻した後 S0 に収束する。S1 が VGA 窓を再び開く値なら S0 を優先し、その項目を `override` と記録、S1 完全一致を宣言しない。
 - write-only の設定記録は読戻しの代用ではない。`verified / shadow / unknown / override` を分け、必須項目が unknown なら成功にしない。
-- GeForce 冷間観測の PMC_ENABLE=03010000 は記録値であり初期化解除用の命令ではない (`docs/tasks/v3/TASK_KPEEK.md:33`)。
+- GeForce 冷間観測の PMC_ENABLE=03010000 は記録値であり初期化解除用の命令ではない (`docs/archive/v3/TASK_KPEEK.md:33`)。
 
 ## 3. 軽い順の復帰階梯
 
@@ -186,7 +186,7 @@
 
 - 必須変異: snapshot valid を早める、cleanup を除去、W1C を許可、mask を全 bit にする、restore 順序を交換、PTE 戻しを省く、deadline 比較を反転、stale session を許可、verify 失敗を OK にする、cold-required 項目を保存値で書き戻す。各変異を対応ケースが検出すること。
 - sol は関連 host 試験を MUTATE=0 で実行し、変異実行は repo 運用どおり PM のレビュー後にまとめる。今回の設計作業ではコード試験は未実行。
-- NP21/W には PCI バスがなく (`docs/tasks/v3/TASK_KPEEK.md:32`)、NV44A/82557/内蔵 Trident の電気的な復帰、実バス停止、モニタ入力切替は証明できない。host 模型で証明した順序と実機結果を混同しない。
+- NP21/W には PCI バスがなく (`docs/archive/v3/TASK_KPEEK.md:32`)、NV44A/82557/内蔵 Trident の電気的な復帰、実バス停止、モニタ入力切替は証明できない。host 模型で証明した順序と実機結果を混同しない。
 - 実機の画面受入: decode 解放の読戻し後に A0000h の予約した空きテキストセル 1 つで保存→異なる試験値の書込み→読戻し→元値復元→再照合を行い、98 側への不達・復元不一致・検査不能は S0=FAIL。98 の A0000h テキスト継続、page 0、31kHz、PEGC の既定構成を確認。0FACh の読み戻し (mask 03h=00b) とユーザーの目視で 98 表示を確かめる。ケーブルの抜き差しはユーザー。終了時は **GRPH+2+RESET**、再起動後の ver と 09A8h を記録する。
 
 ## 8. 未決 — ユーザー判断 0 件

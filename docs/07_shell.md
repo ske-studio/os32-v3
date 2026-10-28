@@ -36,6 +36,7 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `os32gui` | `os32gui [on\|off]` | GUI シェル (/bin/gshell.bin) へ切り替え / 起動時 GUI の既定を `/etc/system.cfg` に書く (GUI v1.1 K4) |
 | `gfxmode` | `gfxmode pc98\|pegc\|cirrus\|auto` | 次回起動のグラフィクスバックエンドを `/etc/system.cfg` の `GFX=` に書く (GUI v1.1 H2b) |
 | `kdebug` | `kdebug [on\|off]` | 設定値と部品の実状態を表示 / 次回起動の `KDEBUG=1`・`0` を `/etc/system.cfg` に書く (KAPI v75) |
+| `peek` | `peek [-k\|-p\|-m] [-w1\|-w2\|-w4] [-l[<mac>]\|--lan] addr [len]` | kdebug 部品でメモリを読んで 16 進で出す (`KDEBUG=1` のときだけ、読むだけ、KAPI v78 `kdebug_call`)。番地空間・拒否・ホストの照合は [POLICY_DEBUG.md](POLICY_DEBUG.md) §5「実機でメモリを読む」 |
 | `kbdstat` | `kbdstat [-w]` | キーボード 8251 の診断カウンタ (IRQ1 回数・空 IRQ・エラー・オーバーラン・起動時の 0043h・書いたコマンド語・直近のステータスとスキャンコード・いまの 0043h) を 1 行で。KAPI v62 `kbd_diag`。**`-w`** は受信 1 バイトごとの行 (`seq` / 生の `code` と make・break / 処理後の修飾) を ESC か 30 秒まで出し続ける (KAPI v67 `kbd_diag_log`、seq が飛べば `LOST` 行)。rshell から読める。読み方は [POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57 |
 
 **PCI コマンド** (cmd_pci.c):

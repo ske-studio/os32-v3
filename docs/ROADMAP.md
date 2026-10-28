@@ -241,7 +241,7 @@ v3 の新しい設計へ進む前に、現行系で判明した実機依存の�
 
 - **実機 Ra266 の PEGC 640x480**: 実機の ROM (INT 18h AH=30h) が 480 ラインへ入る・戻るときの OUT 列を `v86 -g` で記録し、
   `pegc_apply_timing` をその順序と値に合わせた。画面を見ない条件 (ROM の OUT 列との一致・NP21/W 回帰・実機 `pegcchk`) で受け入れ
-  ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、正典の票は [tasks/realhw/TASK_PEGC480_REALHW.md](tasks/realhw/TASK_PEGC480_REALHW.md)、起票は
+  ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、今の仕様は [05_drivers.md §5-5](05_drivers.md)、票はアーカイブ (`docs/archive/realhw/TASK_PEGC480_REALHW.md`)、起票は
   `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md`)。
 - **v2.1 の後に残った確認** (新機能ではない。v3 と並行、実機の前に居るときなど): ~~PEGC の GUI の目視~~ (2026-09-30 合格)、KBD_NAV の K3、FD144 の実機、
   HAL_WIRING の W7、PCM の E4〜E6、APP_BAND_PDE の §5 のゲスト受入。一覧は最新の引き継ぎ (INDEX 正典表の「引き継ぎ」) の残件表。
@@ -349,7 +349,7 @@ image viewer (MGX は `mgxview` が既にある。VBZ / VDP / BMP を足す)、m
 
 ### その他の長期テーマ
 
-- **PCI などの外部デバイスの実装方法のモデルを、専用の文書群として最終的に作る** (ユーザー決定 2026-10-20)。前例は実機の内蔵 82557 (LAN、[tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md)) で、GeForce 6200 の観測 ([tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md)) と 実機のメモリの読み出し ([tasks/v3/TASK_KPEEK.md](tasks/v3/TASK_KPEEK.md)) もその材料にする。中身の見込み: 資料と参照実装の集め方とライセンスの確かめ方 ([HW3])、PCI の資源と C バスブリッジの確かめ方、読み取りだけの観測から書き込みの段へ進む手順と承認地点、kdebug の peek による実機観測、エミュレータ (NP21/W) 側の模型の作り方、HAL・module への結線、受入 (NP21/W と実機) の型。今ある票から一般化して書き、個々の装置の票はその実例として参照させる。
+- **PCI などの外部デバイスの実装方法のモデルを、専用の文書群として最終的に作る** (ユーザー決定 2026-10-20)。前例は実機の内蔵 82557 (LAN、[tasks/realhw/TASK_LAN_82557.md](tasks/realhw/TASK_LAN_82557.md)) で、GeForce 6200 の観測 ([tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md)) と 実機のメモリの読み出し (peek、[POLICY_DEBUG.md](POLICY_DEBUG.md) §5「実機でメモリを読む」) もその材料にする。中身の見込み: 資料と参照実装の集め方とライセンスの確かめ方 ([HW3])、PCI の資源と C バスブリッジの確かめ方、読み取りだけの観測から書き込みの段へ進む手順と承認地点、kdebug の peek による実機観測、エミュレータ (NP21/W) 側の模型の作り方、HAL・module への結線、受入 (NP21/W と実機) の型。今ある票から一般化して書き、個々の装置の票はその実例として参照させる。
 - PC-98 NIC (C-bus LAN) / network: [tasks/network/PLAN.md](tasks/network/PLAN.md) — LGY-98 は**エミュレータで回帰を取る経路**として残る (実機は内蔵 82557)
 
 ---

@@ -56,9 +56,12 @@ NP21/W 上でコード変更が反映されていないように見える場合�
 `/api/mem`) で読む。**番地は新しい `build/out/kernel.map` から引くこと** —
 古い map の番地で読んだ値や、初期化前のゼロ値を合格と判定しない。
 
-デバッグ部品 (`/boot/kdebug.bin`、票 TASK_DBGREF) が入ってからは、`ver` の `kdebug:` 行で前提を先に確かめる。
+デバッグ部品 (`/boot/kdebug.bin`、形式と口は [08_build.md §8-2](08_build.md#起動時に読む部品の形式-kmod-v1)) が入ってからは、`ver` の `kdebug:` 行で前提を先に確かめる。
 受入と採取は `kdebug on` → `reboot` の後に、`kdebug: on (pair <CRC>, …)` の CRC が同じ `ver` の Image CRC と一致する状態で行う。
-`rejected (<code> …)` は OFF と同じに扱わず、理由コードを記録する。OFF の起動の到達確認は、`ver` の Image CRC と `boot.log` で行う。
+`rejected (<code> …)` は OFF と同じに扱わず、理由コードを記録する (コードは [KAPI_SPEC.md](KAPI_SPEC.md) の MemStat v75 欄)。OFF の起動の到達確認は、`ver` の Image CRC と `boot.log` で行う。
+本体と部品は Image CRC の対なので、NHD へは停止 → `deploy-kernel` (vmkernel.lz4 と kdebug.bin を一緒に) → 起動 ([D1])、実機は `hsync boot` で対ごと入れる。
+拒否の経路を確かめるときは、1 つ前のビルドの `kdebug.bin` を置いて起動すると `rejected (4 PAIR_MISMATCH)` になる (確かめたら対を戻す)。
+NP21/W では `kernel.map` の記号 `kdebug` (record `struct kdebug`、`kernel/module.h`: state・pair_crc・base・base_pa・pages・owner・open_count・ops) と `ledger_owners[owner]` を `/api/mem` で読める。拒否の後に漏れが無いことは `ledger_owners[owner]` の kind と pages が 0 (retire 済み) で見る。
 
 - `kstring` / `kmalloc` / `kprintf` のプリミティブを触ったら、kselftest に項目を足す。
 - `userland/tests/klibc_test` は newlib をリンクするので、カーネル側の検証にはならない。
@@ -915,6 +918,19 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
 | `ring3_wm_fault_count` | `exec/exec.c` | WM (gshell) のコードへ入っている間 (`ring3_wm_depth` 1 以上) にアプリをフォールトで畳んだ数。WM の中の #PF/#GP も KAPI の門の拒否もアプリの kill として畳まれ、`fault_kill_count` しか増えない (§4-61) — これが一緒に増えたら落ちた場所は WM の文脈。ISR の kill の行にも ` (in WM)` が付く |
 | `kselftest_pass` / `kselftest_fail` | `kernel/kselftest_report.c` (計数は本体、試験は `kdebug/kselftest.c`) | 起動時の自己試験 (§2) |
 
+### 実機でメモリを読む — `peek` (kdebug、`KDEBUG=1`)
+
+実機には `emu_read_mem` に当たる口が無いので、kdebug 部品 (`/boot/kdebug.bin`) の peek でシリアル (または LAN) からメモリを読む。
+`KDEBUG=1` で起動し、`ver` の `kdebug: on` の pair が Image CRC と一致する状態で使う (部品が無ければ `peek: err NOSYS`)。製品の像に増えるのは KAPI `kdebug_call` の受け口だけ ([KAPI_SPEC §4-15](KAPI_SPEC.md#4-15-kdebug_call-v78))。
+
+- **ゲスト**: `peek [-k|-p|-m] [-w1|-w2|-w4] [-l[<mac>]|--lan] <hex 番地> [<hex 長さ>]` (`userland/shell/cmd_peek.c`、1 回 64KB まで)。読むだけで、書き込みは持たない。
+  - `-k` (既定) カーネル VA。ページごとに写像を確かめ、無ければ `NOMAP`。PCD/PWT のページと `[A0000h, E8000h)` は `DENY`。`-p` は `-k` の別名 (恒等写像)。
+  - `-m` MMIO。`-w` の幅が必須。PCI の BAR を確かめ (I/O BAR・未割当・Memory 無効は `DENY`)、`kdebug/kpeek_allow.c` の許可リストの範囲だけを読む (読むだけで状態が変わるレジスタがあるため)。デバイス窓の先頭 4MB の PT を irq_save の中で読み専用に付け替え、触った 2 PTE を戻す。4MB 境界をまたぐ要求は `ARG`。
+  - 出力は 16 B ごとの行 (番地・16 進・8 bit 和 `|s=`) と最後の `peek: ok len= crc32= frames=`。誤りは `peek: err <名> at <番地>` の 1 行だけで、読めた分も出さない。
+  - `-l` は 82557 の lan.mod から SerialFS の片道フレーム (`SFS_T_DUMP`、通し番号付き) でホストのペアへ流し、シリアルには見出しと `ok` の行だけを出す。LAN が使えなければ `peek: lan unavailable (…), serial` を出してシリアルで読む (NP21/W の LGY-98 では常にシリアル — 持越し台帳 KPEEK-LGY98)。
+- **ホスト**: `python3 tools/rshell_serial.py peek [--elf F] [--out F] [-m] [-w N] [--lan --iface IF] <記号|hex>[+off] [len]` (照合は `tools/rshell_peek.py`)。行の連番・和・CRC・len を全部照合する。記号名は、ELF の `os32_build_commit` と Image CRC が動いているカーネルの `ver` と両方一致したときだけ番地に直す。CI の成果物の `kernel.elf` は strip しない (`.github/workflows/build.yml`)。LAN の受け口は `lanfs_host.py`。
+- 実測 (Ra266、2026-10-21): 64KB でシリアル 115200bps が約 46 秒、LAN が約 3 秒。
+
 ### 有用なゲスト側コマンド
 
 | コマンド | 用途 |
@@ -1512,7 +1528,7 @@ read-modify-write で保つ。
   実機 ROM (INT 18h AH=30h) の OUT 列を `v86 -g` で全部記録して比べると、NP21/W では出なかった違いが並んだ:
   GDC の RESET と表示の停止をしていない、グラフィック GDC の CSRFORM・SCROLL の長さ (3FFh)、テキスト GDC の 480 ライン設定
   (SYNC・PITCH 80・CSRFORM・SCROLL)、6Eh とテキスト CRTC、09A8h を毎回書いて bit7 を落としていた、GDC クロック 5MHz は 6Ah の
-  83h・85h の両方 ([TASK_PEGC480_REALHW](tasks/realhw/TASK_PEGC480_REALHW.md) §3-3 の比較表)。
+  83h・85h の両方 (比較表は TASK_PEGC480_REALHW §3-3、アーカイブ: `docs/archive/realhw/TASK_PEGC480_REALHW.md`。今の順序は [05_drivers.md §5-5](05_drivers.md))。
 - **直し**: 入り・戻りの順序と値を実機 ROM の記録 (各 94 行) に合わせ、`gdc_send` は FIFO を有界に待つ。
   受け入れは**画面を見ない条件**: (A) 実物の `backend_pegc.c` の OUT 列が ROM の記録と一致するホスト試験 (意図的な違いは理由付きの除外表、
   **A0h DFh / A2h 28h の組は未解明の差分**)、(B) NP21/W の回帰、(C) 実機で `pegcchk` ([RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1)。

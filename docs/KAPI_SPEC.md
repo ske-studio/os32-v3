@@ -13,9 +13,9 @@
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
 | KAPIマジック | 0x4B415049 ('KAPI') |
 | プログラムロード先 | 0x80100000 (shlib 0x80000000、常駐 shell 0x400000) |
-| 最大プログラムサイズ | image と暫定 heap 予算を起動時に検査 (票 TASK_T2_APPBAND §4) |
-| プログラム専用ヒープ | 動的配置 (sbrk_heap_limit, exec_heap 管理下) |
-| プログラム専用スタック | 動的配置 (メモリ終端付近、下向き展開) |
+| 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
+| プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
+| プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
 | 現在のバージョン | **79** |
 | 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 255・予約 45) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
@@ -2068,5 +2068,5 @@ slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む)
 `dbg_call` へそのまま渡す受け口 (`kernel/kdebug_call.c`)。部品が動いていない・slot 19 が
 空なら `OS32_ERR_NOSYS`。`buf` は `size` バイトの入出力 (生成ラッパの出力検査)。
 op は `KDEBUG_OP_*` (`os32_kapi_shared.h`)、peek の要求は `KdebugPeek` (1064 バイト、
-LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる
-(設計 TASK_KPEEK §1)。
+LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる。
+peek の使い方は [POLICY_DEBUG.md](POLICY_DEBUG.md) §5「実機でメモリを読む」(設計の記録は `docs/archive/v3/TASK_KPEEK.md`)。
