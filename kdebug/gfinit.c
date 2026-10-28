@@ -5,6 +5,7 @@
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
 #include "gfinit_plan_c.h"
+#include "gfinit_budget.inc"
 #include "gfinit_resources.h"
 #include "recover_gf_expand.h"
 #include "kpeek.h"
@@ -285,11 +286,10 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
     };
     if (!serial || !serial->actual || recover_budget_apply(&g->profile, kind,
             PIT_HZ, serial->actual, RECOVER_UART_FRAME_BITS, &work)) return -1;
-    u32 rows = 128;
-    if (plan->node_count > (~0U - rows) / 12U) return -1;
-    rows += plan->node_count * 12U;
-    if (plan->arg_count > (~0U - rows) / 4U) return -1;
-    rows += plan->arg_count * 4U;
+    u32 rows, first = RECOVER_NONE;
+    if (kind == REC_BUDGET_GF && (g->compiled->mode_flags & GF_MODE_C))
+        first = g->compiled->c_node;
+    if (gfinit_log_rows(&g->profile, plan, first, &rows)) return -1;
 #if GF_VPLL_PROBE
     if (kind == REC_BUDGET_GF) {
         if (rows > ~0U - RECOVER_VPLL_ROWS) return -1;
@@ -368,6 +368,8 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     u32 hash;
     if (recover_owner_configure(&g->ops, &g->bus, g->s0, false) ||
         recover_bind_plan(r, &g->profile, plan, &g->buffers, &hash)) return -1;
+    /* The approved fixed C route must also be returned to 98 by S0. */
+    if (!size && (flags & GF_MODE_C)) r->route_write_approved = true;
     /* Snapshot callbacks run after trial_begin advances the core session. */
     gf_lease.session = r->next_session + 1U;
     if (trial_begin(r, &g->profile, hash, g->profile.trial_limit)) return -1;

@@ -894,7 +894,10 @@ static void route_cell_cases(void)
     output("ROUTE fixed 01 mask03 match/mismatch/bus failures, exclusive operation and slots94/95 PASS\n");
     output("CELL RUN match/mismatch/test-write failure restore once, no HAL restore/redraw PASS\n");
 }
-void _start(void)
+#ifndef GF_C_ENTRY
+#define GF_C_ENTRY _start
+#endif
+void GF_C_ENTRY(void)
 {
     gf_fixture_init();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();
     output(failures?"C FAIL\n":"C PASS\n");

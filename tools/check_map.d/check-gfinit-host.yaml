@@ -100,3 +100,6 @@ check-gfinit-host:
 - tools/tests/gfinit_plan_c_host.c
 - tools/tests/test_gfinit_mode.py
 - tools/tests/gfinit_mode_host.c
+- kdebug/gfinit_budget.inc
+- tools/tests/test_gfinit_budget.py
+- tools/tests/gfinit_budget_host.c
