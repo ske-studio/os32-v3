@@ -12,6 +12,7 @@
 #include "recover_gf_expand.h"
 #include "gfinit_plan.h"
 #include "gfinit_pll.h"
+#include "recover_gf_c.h"
 static const struct recover_guard n1_guards[] = {
     {REC_GF_T_CFG50, 0xffffffffU, 0, REC_BEFORE | REC_AFTER},
     {REC_GF_T_CFG54, 0xffffffffU, 0, REC_BEFORE | REC_AFTER},
@@ -241,6 +242,8 @@ STATIC_ASSERT(__alignof__(struct recover_target_small) == 4, gf_target_storage_a
 STATIC_ASSERT(__alignof__(struct recover_layout_range) == 4, gf_layout_storage_align);
 #endif
 #include "generated/recover_gf_tables.inc"
+/* Unbound C-only contracts; default expansion below is intentionally unchanged. */
+#include "generated/recover_gf_c_tables.inc"
 
 /* Subtraction bounds the inclusive length without overflowing at UINT32_MAX. */
 static int gf_layout_ranges_valid(const struct recover_layout_range *ranges,

@@ -27,3 +27,7 @@ check-recover-tables-host:
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
 - include/pci_dev_contract.h
+- tools/gfinit_mode_tables.py
+- hwdev/gfinit_mode.h
+- kdebug/recover_gf_c.h
+- kdebug/generated/recover_gf_c_tables.inc

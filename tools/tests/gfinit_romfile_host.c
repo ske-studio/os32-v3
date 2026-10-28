@@ -4,7 +4,10 @@
 #undef _start
 #include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_decode.c"
+#include "../../kdebug/gfinit_mode.c"
 #include GF_ROM_HEADER
+#define GF_MODE_ERROR_SCALE 10000U /* hundredths of one percent */
+#define GF_MODE_ERROR_DIVISOR 200U
 static struct gfinit_decode decoded;
 static void number(u32 x)
 {
@@ -45,6 +48,8 @@ static int solve(const char *p, const struct gfinit_pll_limits *l, u32 khz)
 #define S(f) print(p); field("." #f, s.f)
     S(n1); S(m1); S(n2); S(m2); S(p); S(actual); S(error);
 #undef S
+    print(p); field(".error_percent_hundredths", s.error * GF_MODE_ERROR_SCALE / khz);
+    print(p); field(".within_half_percent", s.error <= khz / GF_MODE_ERROR_DIVISOR);
     print(p); field(".vco1_khz", l->ref * s.n1 / s.m1);
     print(p); field(".vco2_khz", (l->ref * s.n1 / s.m1) * s.n2 / s.m2);
     for (u32 i=0; i<q.count; i++) {
@@ -97,6 +102,12 @@ static int diagnostic(void)
     if (found!=1 || !khz) return -1;
     field("video.pc", pc); field("video.request_khz", khz);
     if (solve("two", &l, khz)) return -1;
+    struct gfinit_mode mode;
+    const struct gfinit_mode_saved saved = {0};
+    if (gfinit_mode_calc(&l, &saved, &mode)) return -1;
+    field("mode.request_khz", GF_MODE_CLOCK_KHZ);
+    field("mode.single_stage", mode.single);
+    if (solve("mode", &mode.limits, GF_MODE_CLOCK_KHZ)) return -1;
     l.vco2=(struct gfinit_pll_vco){0};
     if (solve("single", &l, khz)) return -1;
     u32 writes=0;
