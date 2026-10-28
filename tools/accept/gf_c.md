@@ -27,6 +27,11 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 6. **98 の画面が戻らない・固まったとき**は、電源を入れ直す (S0 か OS32 の再起動で GeForce は元に戻る、固まったときだけ電源)。
 7. 最後に OS32 を再起動する (GeForce のリセット)。kpeek で既定値に戻ったことは PM とノートが確かめる。
 
+## 当日の前に済ませたこと (2026-10-29、PM)
+- NP21/W (np21x64w.ini、main 24b00c7 = コードは 87b6499d): ゲストの試験 21/21、gfinit・recover の入口は固まらずに断る — ~/os32-tmp/evidence/2026-10-29/gf4c-np21w/RESULT.md。
+- 実 ROM の 25.175MHz の係数: 単段 26/7・P=2、25,071kHz (0.41%) — 設計の末尾。
+- 実機 Ra266 を main **87b6499d** に更新 (CI build 成功、ノートで hsync boot → 全体 → sys): ver Commit 87b6499・Image CRC 9a835bff・SERVICES_READY、部品 9 本 rc=0 pair=9a835bff、mem leftover=0・audit_fail=0、db_test 9/9、GeForce の既定値 68050Ch=4・680508h=00051104・680578h=00000E02・680580h=01F0001F・PMC 200h=03010000 — ノートの ~/os32-tmp/evidence/2026-10-29/realhw-87b6499/。VPLL の診断版の部品は通常の版に戻った。
+
 ## 前提と当日の manifest
 | 欄 | 当日記入・確認する内容 |
 |---|---|
