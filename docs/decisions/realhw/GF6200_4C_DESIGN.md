@@ -172,3 +172,6 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - CHECK の node は source/key/mask/expected/keep/result-slot を hash に含める。`recover.c` の `mode_check_access` に読取り・mask 比較・項目ごとの CHECK REC・不一致時の既存 REC_VERIFY 失敗出口をまとめる。524・CR33・C040 は既存 single-use capture を使い、結果は `gfinit_plan.c_checks` に保持する。510 は mask=0、TEST は bit20 のみで sense を除外する。
 - 待ち 3 本は専用の型と `recover_ops.mode_wait` から既存 `recover_delay_ms` の 1ms 分割・safe point へ結ぶ。手本の順序は nouveau c03c1a1 MIT `dispnv04/dfp.c:93–110` (FP_ON 時の OFF→50ms)、`crtc.c:175–234` (P/C の SR01→10ms→CR17)。実行せず leave する CHECK/待ちは拒否する。共有 callback/型の契約 CRC・layout は生成器で追随する。
 - 出口の route とセル結果は `GF_C_EXIT_ROUTE_SLOT` / `GF_C_EXIT_CELL_SLOT` を未成立のまま予約し、対応する未結線 node に slot を記す。R の route/セルも未結線のままなので C 全体の成功はまだ提供しない。cleanup 接続・REC 予算の再計数は 2c3、公開 op13 は段 3。
+
+## 作りの大きさ (ユーザー決定 2026-10-28)
+- 段 1〜2c1 で製品のコードが約 1,260 行 (gfinit_plan_c.c 464・recover.c +227・gfinit_mode.c/.h 281・gfinit_bus.c +88 ほか、生成の表と試験は別) — 大半は 4a と同じ「戻せる試行」の枠組み (許可表・capture・書く前の読取り・REC・safe point・S0) への載せ替えで、nouveau の load_state そのものは 200〜300 行。ユーザー「もっと細かくシンプルに実装したほうが良いのでは？」→ 選択肢 3 (折衷) を決定: **4c の実機の回までは今の作りで残り (2c2・2c3・op 13) を小さく仕上げ、映像が出ることを確かめた後、本番の画面ドライバは nouveau の load_state に近い簡素な作り** (許可表と行ごとの capture を使わず、戻し方は OS32 の reboot での GeForce のリセット (GF6200_VPLL_PROBE の kpeek2) に任せる案) で書く。以後の段は細かくシンプルに切る。
