@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-28)** — GeForce 6200 段 4a は Ra266 で合格 (2026-10-27、§3-1 の T5 → … → A4 の行)。次は VIDEO PLL の係数が効かない件 (680578h=0x80000E02) の調べ、4b の前 — 調べの設計は確定 ([GF6200_VPLL_PROBE](../../decisions/realhw/GF6200_VPLL_PROBE.md)、2026-10-28)、段 0 (ホストの solver の道具) から。それまでの状態: M1〜M5・BARLEN・T4b・T5 の無書込み・route-test・S8 は済み (2026-10-23 に順序を見直した §3-1、ユーザー承認)
+> 状態: **実装中 (2026-10-28)** — GeForce 6200 段 4a は Ra266 で合格 (2026-10-27、§3-1 の T5 → … → A4 の行)。次は VIDEO PLL の係数が効かない件 (680578h=0x80000E02) の調べ、4b の前 — 調べは**結論済み** ([GF6200_VPLL_PROBE](../../decisions/realhw/GF6200_VPLL_PROBE.md)、2026-10-28): 係数の書込みは受け付けられていて、読出しの像が 68050Ch bit9 (VPLL_PROG) に従って切り替わる (bit9=0 では固定の源の値が見える)。4a の不具合ではなく、PLL を表示に使う選択 (50Ch に bit9・bit28、係数 → 50Ch の順) は 4b/4c の表示の設定に入れる。それまでの状態: M1〜M5・BARLEN・T4b・T5 の無書込み・route-test・S8 は済み (2026-10-23 に順序を見直した §3-1、ユーザー承認)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
