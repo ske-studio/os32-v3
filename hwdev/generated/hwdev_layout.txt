@@ -2182,7 +2182,7 @@ offset	struct recover_opcode_layout.opcode	0
 member_size	struct recover_opcode_layout.opcode	4
 offset	struct recover_opcode_layout.substep	4
 member_size	struct recover_opcode_layout.substep	4
-size	struct recover_ops	56
+size	struct recover_ops	60
 align	struct recover_ops	4
 offset	struct recover_ops.abort_requested	40
 member_size	struct recover_ops.abort_requested	4
@@ -2192,6 +2192,8 @@ offset	struct recover_ops.identity	4
 member_size	struct recover_ops.identity	4
 offset	struct recover_ops.local_cleanup	44
 member_size	struct recover_ops.local_cleanup	4
+offset	struct recover_ops.mode_color	56
+member_size	struct recover_ops.mode_color	4
 offset	struct recover_ops.mode_vram	52
 member_size	struct recover_ops.mode_vram	4
 offset	struct recover_ops.raw_config	12
@@ -2600,6 +2602,7 @@ enum	EXEC_SUCCESS	0
 enum	GF_C_BRANCH	5
 enum	GF_C_CHECK_IN	0
 enum	GF_C_CHECK_OUT	10
+enum	GF_C_COLOR	8
 enum	GF_C_COMMIT	8
 enum	GF_C_L1	5
 enum	GF_C_L2	6

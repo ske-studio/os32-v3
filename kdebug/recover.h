@@ -231,6 +231,8 @@ struct recover_expr {
 #define REC_LAYOUT_UNBOUND 4U
 /* Fixed MODE_C diagnostic frame, never a general bulk accessor. */
 #define REC_LAYOUT_MODE_VRAM 8U
+/* Fixed C AR row or complete write-only DAC sequence. */
+#define REC_LAYOUT_MODE_COLOR 16U
 struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
@@ -332,6 +334,7 @@ struct recover_ops {
      * Each short-lived aperture is released before calling a safe point. */
     int (*mode_vram)(void *opaque, struct recover *r, bool write,
                      u32 *bad_offset, u32 *expected, u32 *actual);
+    int (*mode_color)(void *opaque, struct recover *r, u32 row, u32 value);
 };
 struct recover {
     const struct recover_ops *ops;
