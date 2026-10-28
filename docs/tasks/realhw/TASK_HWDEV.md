@@ -1,6 +1,6 @@
 # TASK_HWDEV — 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) を分ける
 
-> 状態: **実装中 (2026-10-28)** — GeForce 6200 段 4a は Ra266 で合格 (2026-10-27、§3-1 の T5 → … → A4 の行)。次は VIDEO PLL の係数が効かない件 (680578h=0x80000E02) の調べ、4b の前。それまでの状態: M1〜M5・BARLEN・T4b・T5 の無書込み・route-test・S8 は済み (2026-10-23 に順序を見直した §3-1、ユーザー承認)
+> 状態: **実装中 (2026-10-28)** — GeForce 6200 段 4a は Ra266 で合格 (2026-10-27、§3-1 の T5 → … → A4 の行)。次は VIDEO PLL の係数が効かない件 (680578h=0x80000E02) の調べ、4b の前 — 調べの設計は確定 ([GF6200_VPLL_PROBE](../../decisions/realhw/GF6200_VPLL_PROBE.md)、2026-10-28)、段 0 (ホストの solver の道具) から。それまでの状態: M1〜M5・BARLEN・T4b・T5 の無書込み・route-test・S8 は済み (2026-10-23 に順序を見直した §3-1、ユーザー承認)
 
 kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover と GeForce 6200 段 4a の gfinit) のうち、装置ごとの部分を別の部品 `/boot/hwdev.mod` に分け、kdebug には装置に依らない核を残す。安全の約束 (許可・保存・復帰・N1・承認) は `TASK_REALHW_RECOVER` と `TASK_GEFORCE6200` のまま変えず、変えるのは置き場・境界・寿命だけ。
 
@@ -78,6 +78,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - [GF6200_S7_SHELL.md](../../decisions/realhw/GF6200_S7_SHELL.md) — 旧 S7 (2026-10-23 確定): シェルの `gfinit` コマンドで GF の op 5〜10 を呼ぶ。private な kdebug/gfinit_wire.h、KAPI 不変。INSPECT は ROM・version.chip の 1 行、書込みを伴う op は `--allow-write` 必須
 - [CRT31K_DESIGN.md](../../decisions/realhw/CRT31K_DESIGN.md) — CRT31K (2026-10-23 確定): NP21/W フォークに 31kHz で起動する ini 鍵 `CRT31K` (既定 false) を足し、T4b の S0 を NP21/W で回せるようにする。INT18h の修正は範囲外 (bios18.c:567 の AH=31h の rate は別票)。ctl の停止では ini が保存されないので、鍵は原本の写しに足してから `np21w_ini.py derive … crt31k-on`
 - [BARLEN_DESIGN.md](../../decisions/realhw/BARLEN_DESIGN.md) — BARLEN (2026-10-23 確定): 他の装置のメモリ BAR は正確な長さではなく**上限** (番地の整列と、Mem が有効な装置の隣の BAR までの距離の小さい方) と、根拠のある既知の長さの表 (82557) で GeForce の窓との重なりを判定する。BAR への書込み・Trident の資料は採らない (ユーザー承認)。実装は M4 の後 (host の試験のファイルが重なる)
+- [GF6200_VPLL_PROBE.md](../../decisions/realhw/GF6200_VPLL_PROBE.md) — VIDEO PLL の調べ (2026-10-28 確定): 仮説 H1〜H6 (H6 は nouveau modeset の低クロックの単段)、段 0 = 実 ROM でホストの solver を回し表の行・limits・係数・要求値を出す (ノート)、段 1 = 対象 5 規則の記録だけの読み戻し (`GF_VPLL_PROBE=1`、既定は無効、REC +10 行を予算に足す)、段 2 = 単段の比較 (個別承認)
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
 
