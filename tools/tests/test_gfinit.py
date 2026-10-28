@@ -36,7 +36,8 @@ SHARED_MUTATIONS = [
     ('skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
     ('capture_ordinal', 'c->read_ordinal)', '0)'),
     ('capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
-    ('capture_consumed', 'r->capture_valid &= ~(1ULL << i);', 'r->capture_valid |= 1ULL << i;'),
+    ('capture_consumed', 'consumer_node == node) r->capture_valid &= ~(1ULL << i);',
+     'consumer_node == node) r->capture_valid |= 1ULL << i;'),
     ('unresolved_bind', '!plan->entries || plan->unresolved_count ||', '!plan->entries ||'),
 ]
 
