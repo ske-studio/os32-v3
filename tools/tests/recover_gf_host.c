@@ -105,7 +105,7 @@ static int cleanup_fake(void *v) { (void)v; cleanup_calls++; return 0; }
 static int event_fake(void *v,enum recover_state s,u32 session)
 { (void)v; (void)s; (void)session; return 0; }
 static const struct recover_ops ops = {tick,identity,ok,raw,read_fake,write_fake,
-    route_read_fake,route_write_fake,ok,ok,abort_fake,cleanup_fake,event_fake,0,0,0};
+    route_read_fake,route_write_fake,ok,ok,abort_fake,cleanup_fake,event_fake,0,0,0,0};
 static const u32 four[] = {REC_IMM,REC_ARG_READ,REC_IMM,REC_IMM};
 static const u32 two[] = {REC_IMM,REC_IMM};
 static const struct recover_opcode_layout layouts[] = {

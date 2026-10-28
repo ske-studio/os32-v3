@@ -5,7 +5,7 @@
 #undef serial_get_setup
 static unsigned wire_attach_calls, io_reads, io_writes, io_bad;
 void recover_test_outp(u32 port, u32 value)
-{ io_writes++; if (port != RECOVER_ROUTE_PORT || value != RECOVER_ROUTE_98) io_bad++; }
+{ io_writes++; if (port != RECOVER_ROUTE_PORT || (value != RECOVER_ROUTE_98 && value != RECOVER_ROUTE_RGB_IN)) io_bad++; }
 u32 recover_test_inp(u32 port)
 { io_reads++; if (port != RECOVER_ROUTE_PORT) io_bad++; return 0xfc; }
 const struct serial_setup *serial_get_setup(void)
@@ -44,6 +44,13 @@ static int wire_tests(void)
     if (owner.ops->route_write(0, RECOVER_ROUTE_98) || io_writes != 1 || io_bad) return 1;
     u32 value;
     if (owner.ops->route_read(0, &value) || value != 0xfc || io_reads != 1 || io_bad) return 1;
+    /* Actual hardware callback admits 01 only when the core identifies its
+     * fixed route operation; 00 remains available for S0. */
+    mode_route_active=true;
+    if (owner.ops->route_write(0,1) || io_writes!=2 || io_bad) return 1;
+    if (owner.ops->route_write(0,2)!=-1 || io_writes!=2) return 1;
+    mode_route_active=false;
+    if (owner.ops->route_write(0,1)!=-1 || io_writes!=2) return 1;
     KdebugRecoverVirtual req = {.version = RECOVER_VIRTUAL_VERSION};
     for (u32 action = RECOVER_VIRTUAL_BEGIN; action <= RECOVER_VIRTUAL_END; action++) {
         req.action = action;

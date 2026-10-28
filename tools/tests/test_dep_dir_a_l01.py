@@ -65,10 +65,10 @@ def abi(folder, fixture):
                                      f'build/out/{name}/{name}_imports.h'], cwd=ROOT,
                                     capture_output=True, text=True, check=True)
             assert f'gen_sqlite_imports.py --module {name} ' in result.stdout, result.stdout
-    # GF4c/2c1 adds private CHECK results and the fixed wait callback/type; public ABI stays fixed.
+    # GF4c/2c2 adds the private output-time cell callback and fixed route step; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x63363415U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x8f5a07d8U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x2d465a0cU' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0xf9110bbcU' in hwdev
     print('PASS fixed KAPI spec, ILP32 sizes/offsets/slots, OPS_VERSION, hwdev CRC, make dependencies')
 
 

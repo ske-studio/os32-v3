@@ -16,13 +16,48 @@
 #endif
 
 #define RECOVER_WAIT_SAMPLES 1048576U
+#define RECOVER_CELL_MASK 0xffffU
 
+/* The cell round trip is shared by S0 and the output-time CHECK. S0 keeps
+ * its step numbers/clock; RUN defers safe points until the cell is restored. */
+static int cell_access(struct recover *r, const struct recover_screen_ops *ops,
+                        void *opaque, bool run, u32 step, bool write, u32 *value)
+{
+    if (run && r->state!=REC_RUNNING) return -1;
+    /* RUN's test W/R/restore W is one bounded interval. Even UART records
+     * contain safe points, so defer those too while the test value is live. */
+    if (run && step>=3 && step<=5) {
+        if (step==3 && recover_safe_point(r)) return -1;
+        return write ? ops->write_cell(opaque,*value) : ops->read_cell(opaque,value);
+    }
+    if (run ? recover_safe_point(r) : recover_restore_point(r)) return -1;
+    u32 tick=run ? r->ops->ticks(r->opaque) : r->restore_tick;
+    const char *phase=run ? "cell" : "screen";
+    (void)recover_record(r,phase,"BEGIN",step,0,0,0);
+    int rc=(r->transport && (run ? recover_safe_point(r) : recover_restore_point(r))) ? -1 :
+        write ? ops->write_cell(opaque,*value) : ops->read_cell(opaque,value);
+    (void)recover_record(r,phase,"END",step,0,rc,r->ops->ticks(r->opaque)-tick);
+    return rc;
+}
+int recover_cell_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
+{
+    u32 saved,actual;
+    bool run=r->state==REC_RUNNING;
+    if (!ops || !ops->read_cell || !ops->write_cell ||
+        cell_access(r,ops,opaque,run,2,false,&saved)) return -1;
+    u32 test=(saved ^ RECOVER_CELL_MASK) & RECOVER_CELL_MASK;
+    int rc=cell_access(r,ops,opaque,run,3,true,&test);
+    /* A failed test write can still change VRAM. Restore once, preserving
+     * the first failure, exactly as in the original S0 sequence. */
+    if (!rc && (cell_access(r,ops,opaque,run,4,false,&actual) || actual!=test)) rc=-1;
+    if (cell_access(r,ops,opaque,run,5,true,&saved)) return -1;
+    if (cell_access(r,ops,opaque,run,7,false,&actual) || actual!=saved) return -1;
+    return rc;
+}
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {
-    u32 saved, actual;
     int screen_rc;
-    /* Each synchronous screen action has a bounded BEGIN/END pair. Logging
-     * cannot authorize an access after its allocation has expired. */
+    /* Each synchronous screen action has a bounded BEGIN/END pair. */
 #define SCREEN_CALL(step, expression) \
     ((void)recover_record(r, "screen", "BEGIN", step, 0, 0, 0), \
      screen_rc = (r->transport && recover_restore_point(r)) ? -1 : (expression), \
@@ -32,18 +67,8 @@ int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, v
         !ops->write_cell || !ops->redraw || ops->cui(opaque)) return -1;
     if (recover_restore_point(r) || SCREEN_CALL(0, ops->safe(opaque)) ||
         recover_restore_point(r) || SCREEN_CALL(1, ops->restore(opaque)) ||
-        recover_restore_point(r) || SCREEN_CALL(2, ops->read_cell(opaque, &saved))) return -1;
-    u32 test = (saved ^ 0xffffU) & 0xffffU;
-    if (recover_restore_point(r)) return -1;
-    int rc = SCREEN_CALL(3, ops->write_cell(opaque, test));
-    /* Even a write reporting failure may have changed VRAM. Restore once,
-     * preserving the first error. No retry of the failed access. */
-    if (!rc) {
-        if (recover_restore_point(r) || SCREEN_CALL(4, ops->read_cell(opaque, &actual)) || actual != test) rc = -1;
-    }
-    if (recover_restore_point(r) || SCREEN_CALL(5, ops->write_cell(opaque, saved))) return -1;
-    if (recover_restore_point(r) || SCREEN_CALL(7, ops->read_cell(opaque, &actual)) || actual != saved) return -1;
-    if (rc || recover_restore_point(r) || SCREEN_CALL(6, ops->redraw(opaque))) return -1;
+        recover_cell_98(r,ops,opaque)) return -1;
+    if (recover_restore_point(r) || SCREEN_CALL(6, ops->redraw(opaque))) return -1;
     return 0;
 #undef SCREEN_CALL
 }

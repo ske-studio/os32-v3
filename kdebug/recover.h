@@ -117,6 +117,7 @@
 #define RECOVER_ROUTE_PORT 0x0FACU
 #define RECOVER_ROUTE_MASK 0x03U
 #define RECOVER_ROUTE_98 0U
+#define RECOVER_ROUTE_RGB_IN 1U
 #define RECOVER_COMMAND_MEM PCI_CMD_MEM_ENABLE
 #define RECOVER_COMMAND_DMA_MEM (PCI_CMD_MEM_ENABLE | PCI_CMD_BUS_MASTER)
 
@@ -237,7 +238,8 @@ struct recover_expr {
  * Expected may name one existing snapshot or single-use capture. */
 #define REC_LAYOUT_MODE_CHECK 32U
 #define REC_LAYOUT_MODE_WAIT 64U
-enum recover_check_source { REC_CHECK_TARGET, REC_CHECK_IDENTITY, REC_CHECK_ROUTE };
+#define REC_LAYOUT_MODE_ROUTE 128U
+enum recover_check_source { REC_CHECK_TARGET, REC_CHECK_IDENTITY, REC_CHECK_ROUTE, REC_CHECK_CELL };
 enum recover_check_arg { REC_CHECK_SOURCE, REC_CHECK_KEY, REC_CHECK_MASK,
     REC_CHECK_EXPECTED, REC_CHECK_KEEP, REC_CHECK_SLOT, REC_CHECK_ARGS };
 struct recover_opcode_layout {
@@ -343,6 +345,7 @@ struct recover_ops {
                      u32 *bad_offset, u32 *expected, u32 *actual);
     int (*mode_color)(void *opaque, struct recover *r, u32 row, u32 value);
     int (*mode_wait)(void *opaque, u32 us);
+    int (*mode_cell)(void *opaque, struct recover *r, u32 *actual);
 };
 struct recover {
     const struct recover_ops *ops;
@@ -487,6 +490,8 @@ struct recover_screen_ops {
     int (*write_cell)(void *opaque, u32 value);
     int (*redraw)(void *opaque);
 };
+bool recover_mode_route_active(const struct recover *r);
+int recover_cell_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque);
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque);
 
 /* Provisional values from ADDENDUM.r2 §1. Hz is the real HAL frequency.

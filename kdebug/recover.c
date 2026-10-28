@@ -714,7 +714,7 @@ int recover_profile_ok(const struct recover_profile *p)
     for (u32 i = 0; i < p->layout_count; i++) {
         const struct recover_opcode_layout *l = &p->layouts[i];
         if (l->argc > RECOVER_EXPR_ARGS + 1 || (l->argc && !l->kinds) ||
-            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND | REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) ||
+            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND | REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT | REC_LAYOUT_MODE_ROUTE)) ||
             (l->flags && l->dir_substep != RECOVER_NONE) ||
             (l->dir_substep != RECOVER_NONE && l->dir_substep > REC_DATA)) return -1;
         for (u32 j = 0; j < l->argc; j++) if (l->kinds[j] > REC_ARG_SAVED) return -1;
@@ -1531,6 +1531,10 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
         if (args[i].kind != l->kinds[i] || !arg_ok(p, plan, id, &args[i])) return false;
     if (l->dir_substep == RECOVER_NONE) {
         if (n->rule_id != RECOVER_NONE) return false;
+        if (l->flags & REC_LAYOUT_MODE_ROUTE)
+            return l->flags==REC_LAYOUT_MODE_ROUTE && n->phase==REC_MODE_C &&
+                !n->head && !n->skip && n->expr_id==RECOVER_NONE && n->arg_count==2 &&
+                args[0].value==RECOVER_ROUTE_RGB_IN && args[1].value==RECOVER_ROUTE_MASK;
         if (l->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT)) {
             if (n->phase != REC_MODE_C || n->head || n->skip || n->expr_id != RECOVER_NONE) return false;
             if (l->flags == REC_LAYOUT_MODE_WAIT)
@@ -1542,7 +1546,7 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
             u32 source=args[REC_CHECK_SOURCE].value, key=args[REC_CHECK_KEY].value;
             if (source == REC_CHECK_TARGET)
                 return key < p->target_count && p->targets[key].read_safe;
-            return key == RECOVER_NONE && (source == REC_CHECK_IDENTITY || source == REC_CHECK_ROUTE);
+            return key == RECOVER_NONE && (source == REC_CHECK_IDENTITY || source == REC_CHECK_ROUTE || source == REC_CHECK_CELL);
         }
         if (l->flags & REC_LAYOUT_MODE_COLOR) {
             if (l->flags != REC_LAYOUT_MODE_COLOR || n->phase != REC_MODE_C ||
@@ -2203,8 +2207,50 @@ static int mode_color_access(struct recover *r)
     bit_set(r->buffers.valid_bits,r->cursor);
     return 0;
 }
+static int mode_check_record(struct recover *r,const char *phase,u32 source,u32 key,
+                              u32 mask,u32 expected,u32 actual,int rc)
+{
+    if (!r->transport) return 0;
+    struct rec_row row;
+    row_start(r,&row,phase,"END");
+    row_number(&row," source=",source); row_number(&row," key=",key);
+    row_number(&row," mask=",mask); row_number(&row," expected=",expected);
+    row_number(&row," actual=",actual);
+    row_text(&row,rc ? " rc=-1" : " rc=0");
+    return row_send(r,&row);
+}
+/* Used by the hardware callback too: 01 is valid only while executing
+ * this already-entered, fixed C route operation. S0 still writes only 00. */
+bool recover_mode_route_active(const struct recover *r)
+{
+    return r && r->state==REC_RUNNING && r->valid && r->entered && !r->accessed &&
+        r->plan && r->cursor<r->plan->node_count &&
+        r->node_layout[r->cursor]->flags==REC_LAYOUT_MODE_ROUTE &&
+        node_ok(r->profile,r->plan,r->cursor);
+}
+static int mode_route_access(struct recover *r)
+{
+    if (!recover_mode_route_active(r) || !r->ops->route_write || !r->ops->route_read)
+        return access_error(r,r->cursor);
+    if (recover_record(r,"route","BEGIN",r->cursor,RECOVER_ROUTE_PORT,0,0) ||
+        recover_safe_point(r)) return access_error(r,r->cursor);
+    u32 actual=RECOVER_NONE;
+    int rc=r->ops->route_write(r->opaque,RECOVER_ROUTE_RGB_IN);
+    if (!rc && !recover_safe_point(r)) rc=r->ops->route_read(r->opaque,&actual);
+    if (r->state!=REC_RUNNING) return -1;
+    bool mismatch=!rc && ((actual ^ RECOVER_ROUTE_RGB_IN) & RECOVER_ROUTE_MASK);
+    int log=mode_check_record(r,"route",REC_CHECK_ROUTE,RECOVER_NONE,
+        RECOVER_ROUTE_MASK,RECOVER_ROUTE_RGB_IN,actual,rc || mismatch);
+    if (rc || mismatch || log) {
+        fail(r,log ? REC_LOG : rc ? REC_BUS : REC_VERIFY,REC_PHASE_VERIFY,RECOVER_ROUTE_PORT);
+        return access_error(r,RECOVER_ROUTE_PORT);
+    }
+    r->accessed=true;
+    bit_set(r->buffers.valid_bits,r->cursor);
+    return 0;
+}
 /* One place for C's read, masked comparison, evidence and failure exit.
- * Route reads use the existing callback; no route write/I/O target is added. */
+ * Route and cell use fixed callbacks; no route I/O target is added. */
 static int mode_check_access(struct recover *r, u32 *actual)
 {
     const struct recover_plan_node *n=&r->plan->nodes[r->cursor];
@@ -2230,6 +2276,7 @@ static int mode_check_access(struct recover *r, u32 *actual)
         rc=r->ops->identity(r->opaque,&id);
         if (!rc) *actual=same_identity(&id,&r->token.identity);
     } else if (source == REC_CHECK_ROUTE) rc=r->ops->route_read(r->opaque,actual);
+    else if (source == REC_CHECK_CELL) rc=r->ops->mode_cell ? r->ops->mode_cell(r->opaque,r,actual) : -1;
     else {
         const struct recover_target *t=&r->profile->targets[key];
         if (t->space == REC_VGA_INDEXED && r->port_selected[r->index_port[key]] != key)
@@ -2238,16 +2285,7 @@ static int mode_check_access(struct recover *r, u32 *actual)
     }
     if (r->state != REC_RUNNING) return -1;
     bool mismatch=!rc && ((*actual ^ expected) & mask);
-    int log=0;
-    if (r->transport) {
-        struct rec_row row;
-        row_start(r,&row,"check","END");
-        row_number(&row," source=",source); row_number(&row," key=",key);
-        row_number(&row," mask=",mask); row_number(&row," expected=",expected);
-        row_number(&row," actual=",*actual);
-        row_text(&row,rc || mismatch ? " rc=-1" : " rc=0");
-        log=row_send(r,&row);
-    }
+    int log=mode_check_record(r,"check",source,key,mask,expected,*actual,rc || mismatch);
     if (rc || mismatch || log) {
         fail(r,log ? REC_LOG : rc ? REC_BUS : REC_VERIFY,REC_PHASE_VERIFY,key);
         return access_error(r,key);
@@ -2280,6 +2318,7 @@ int recover_plan_access(struct recover *r, u32 *value)
     if (!r->plan || !r->entered || r->cursor >= r->plan->node_count || !value) return -1;
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = r->node_layout[r->cursor];
+    if (l && (l->flags & REC_LAYOUT_MODE_ROUTE)) return mode_route_access(r);
     if (l && (l->flags & REC_LAYOUT_MODE_VRAM)) return mode_vram_access(r);
     if (l && (l->flags & REC_LAYOUT_MODE_COLOR)) return mode_color_access(r);
     if (l && (l->flags & REC_LAYOUT_MODE_CHECK)) return mode_check_access(r,value);
@@ -2330,7 +2369,7 @@ int recover_plan_leave(struct recover *r, u32 edge)
     if (r->state != REC_RUNNING || !r->plan || !r->entered || edge > 1) return access_error(r, edge);
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = layout_for(r->profile, n);
-    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || (((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) || (l->flags & (REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT))) && !r->accessed)) return access_error(r, r->cursor);
+    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || (((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) || (l->flags & (REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR | REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT | REC_LAYOUT_MODE_ROUTE))) && !r->accessed)) return access_error(r, r->cursor);
     if (n->phase == REC_RUN && r->zero_hold && !zero_guards(r)) return access_error(r, r->cursor);
     u32 next = n->next[edge];
     if (n->phase == REC_PREPARE && (next == RECOVER_NONE || r->plan->nodes[next].phase != REC_PREPARE)) {
