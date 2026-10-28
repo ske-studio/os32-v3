@@ -10,7 +10,7 @@
 |---|---|
 | [TASK_LAN_82557.md](TASK_LAN_82557.md) | 内蔵 Intel 82557 の LAN (PCI の最初の利用者、RA266 §5・§6) |
 | [TASK_TRIDENT_DRIVER.md](TASK_TRIDENT_DRIVER.md) | 内蔵 Trident の画面ドライバ (RA266 §7) |
-| [TASK_PEGC480_REALHW.md](TASK_PEGC480_REALHW.md) | 実機の PEGC 640x480 のずれ |
+| `docs/archive/realhw/TASK_PEGC480_REALHW.md` | 実機の PEGC 640x480 のずれ — 受入完了 (2026-09-30)、アーカイブ。今の仕様は [05_drivers.md §5-5](../../05_drivers.md) |
 | [TASK_FD144.md](TASK_FD144.md) | 1.44MB フロッピー (RA266 §3) |
 | [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
 | [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) |

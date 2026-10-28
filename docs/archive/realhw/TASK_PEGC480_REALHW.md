@@ -1,6 +1,6 @@
 # TASK_PEGC480_REALHW — 実機の PEGC 640x480 で桁がずれる (v2.1 で受け入れ)
 
-> 上位: [実機の計画](PLAN.md)
+> 上位: [実機の計画](../../tasks/realhw/PLAN.md)
 
 > 状態: **受入完了 (2026-09-30)** — 実機 Ra266 で `gfxmode pegc` の GUI が正しい位置に出て、GUI から CUI へも正しく戻ることをユーザーが目視で確認した (§5 P1、末尾の記録)。480 ライン時の液晶 OSD (周波数) は未採取 — `TASK_TRIDENT_DRIVER` 段 0 の残件へ。
 >

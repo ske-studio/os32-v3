@@ -1,6 +1,6 @@
 # v86_gcap — RED → GREEN の記録
 
-票: [`docs/tasks/realhw/TASK_PEGC480_REALHW.md`](../../docs/tasks/realhw/TASK_PEGC480_REALHW.md) §3 段 1
+票: `docs/archive/realhw/TASK_PEGC480_REALHW.md` (アーカイブ) §3 段 1
 対象: `kdebug/v86_gcap_math.c` (記録・通すポート・打ち切る命令・並びの判定・戻しの判定) /
 `kdebug/v86_gcap.c` (段取り、`--target` で i386-elf に通すだけ) / `kdebug/v86_test16_gcap.asm` (ゲスト)
 試験: `tools/tests/test_v86_gcap.py` + `tools/tests/v86_gcap_host.c`

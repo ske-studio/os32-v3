@@ -159,6 +159,8 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
   - export (`:178`): slot が 1〜ops の口数の外か重複、入口が text の外、ver・name_hash が契約と違う、名前が hash と合わない、name_hash の重複。名前表を import→export の順に読み切って長さがちょうど合わない (`:193`)。
   - reloc (`:197`): 書込位置の 4 B が payload の外、元の値 (VA 0 基点) が mem_size を超える (one-past は可)、reloc どうしの 4 B が重なる、import slot と重なる。再配置のときも base + mem_size の overflow を断る (`:228`)。
 - **KDEBUG (ID 1)**: POST_ROOT・対の CRC 必須・stop 無し・ops は版 4・20 口 (`KDEBUG_OPS_VERSION`、`tools/module_schema.py` の `KDEBUG_OPS_NAMES`)。他の部品は ops 1 口 (`initialize`)。大きさと表の件数の上限は次の表。
+- **KDEBUG の口と呼ぶ文脈** (slot は `KDEBUG_OPS_NAMES` の順で 1 から): 1〜4 `selftest_*`・5 `crt_diag_bootlog` は起動の通常文脈、6 `gcap_capture` と 19 `dbg_call` は KAPI (slot 239 `v86_gdc_capture`・253 `kdebug_call`) の通常文脈、7〜15 `gcap_*` は #GP・V86 入場・IRQ 停止中の例外文脈 (`.def` で印を付けた import だけを呼べる — `check-kdebug-ctx-host`)、16 `gcap_release` と 17〜18 `nic_*` は通常文脈だけ (IRQ・tick・irq_save の中は不可)、20 `hwdev_core_get` は HWDEV の核 (`docs/decisions/realhw/HWDEV_CORE_API.md`)。部品が無い・口が空のときは本体が呼ばずに OFF の振る舞い (KAPI は `OS32_ERR_NOSYS`、他は 0 か何もしない) をする。部品の `init` は候補表を埋めて返すだけで、割当・登録・装置の操作・import の呼出しをしない (`check-kdebug-init-host`)。そのため init が失敗しても回収だけで元に戻る。
+- **KDEBUG=0 でも本体に残るもの**: lifecycle の監査 (`kernel/kaudit.c`、`audit_runs` の回数は ON と同じ) と自己試験の計数 (`kernel/kselftest_report.c`)。部品に移したのは kselftest の試験本体・`v86 -g` の記録器・crt_diag で、OFF ではファイルを開かず 0 B。
 
 #### 起動時に読む部品の大きさの上限と由来
 

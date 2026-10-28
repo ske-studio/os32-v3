@@ -1,6 +1,6 @@
 # KMOD image validator host regression record
 
-票: `docs/tasks/v3/TASK_DBGREF.md` §3-2・§4、依頼パック `~/os32-tmp/run/dbgref/PACK_s0.md`。
+票: `docs/archive/v3/TASK_DBGREF.md` §3-2・§4、依頼パック `~/os32-tmp/run/dbgref/PACK_s0.md`。
 実行: `make check-module-image-host MUTATE=1 HOST32_RUNNERS=qemu`。
 
 The host harness calls the unconnected production validator with an independently
