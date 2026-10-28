@@ -36,7 +36,7 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 | 退行の記録 | NP21/W の入口、非Cの既存 prepare/verify、recover/S0 復帰、CLI/peek 門の確認結果・版・証拠［ ］。未実施は未実施と記す。NP21/W を GeForce の映像の代替にしない（D:110–122）。 |
 | 前回と配線 | 4a 合格の証拠［ ］。Ra266・GeForce VGA端子→98 RGB-IN、head A/ANALOG OR0。DCB entry0 は heads0/1・CONN0 VGA。OR1比較は今回不要（D:16,135–137）。 |
 | ROMと資源 | 当日 inspect の ROM長/CRC/chip/match、ID/BAR/Command［ ］。照合用既知値：63488 B・E9A60DE3・chip44、BAR0=24000000h/16MiB、BAR1=30000008h/256MiB窓、BAR2=25000000h/16MiB、A1後Command=0102h（M:19–20）。窓容量を実装VRAM容量と呼ばない。 |
-| mode | 640×480・8bpp・pitch640・25,175kHz・負H/負V、H=640/656/752/800、V=480/490/492/525。実ROMの limits/ref・N/M/P・actual/error・誤差率［ ］を末尾手順で埋める（D:13,61–64）。 |
+| mode | 640×480・8bpp・pitch640・25,175kHz・負H/負V、H=640/656/752/800、V=480/490/492/525。**実 ROM (2026-10-29、ノート)**: 単段 N1/M1=26/7・P=2、actual 25,071kHz (0.41%)、680508h=00021A07h・680578h=8000011Fh・580 bit8=1、同期の見込み 約 31.34kHz/59.7Hz (D の末尾)。 |
 
 ## 段ごとの操作・承認・期待
 `i`=inspectに渡した現在sid、`a`=A1で発行されたsid、`c`=A2で発行されたsid。数値は当日の受信値に置換する。A1/A2のmonitorはsession=0・別の新state、A2以降は同一state/log/CRC/sidを引き継ぐ（S:16–33、M:207）。

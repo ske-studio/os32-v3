@@ -178,3 +178,4 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 
 ## 実機の台本 (2026-10-29)
 - 段 1〜3b は main (b8483170)。段 4 の台本と承認の資料は `tools/accept/gf_c.md` (astra 起草・Opus レビュー確定可・PM が「当日ユーザーがすること」を冒頭に)。立会いの回はユーザーの承認と目視が要る。
+- 実 ROM での 25.175MHz の係数 (2026-10-29、ノートで tools/gfinit_rom_decode.py、24b00c7a、ROM 63488B sha256 db7457d8…、rom_crc=3919973859、証拠はノートの ~/os32-tmp/evidence/2026-10-29/gf-4c-rom/DECODE.txt): VIDEO の行は先頭の行への fallback (前と同じ limits)。**単段 N1/M1=26/7・N2=M2=1・P=2、actual 25,071kHz (誤差 104kHz・0.41%、±0.5% の内)**、vco1 100,285kHz (下限 100,000 のすぐ上)。5 本: C040h←(keep FFFCFFFF)、680580h bit8=1、680578h=8000011Fh、680508h=00021A07h、C040h 復元。同期の見込み 水平 約 31.34kHz・垂直 約 59.7Hz (VGA 640x480 の 31.47kHz・59.94Hz より 0.4% 低い、モニタは同期できる見込み — 推測)。
