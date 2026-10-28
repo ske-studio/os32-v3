@@ -39,8 +39,15 @@ CLEANUP_MARGIN = 5
 DEFAULT_CLEANUP_TIMEOUT = 180
 DEFAULT_TIMEOUT = 240
 METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
-PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route')
+PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route', 'wait', 'cell')
 PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
+MODE_C_BYTES = 900130
+UART_FRAME_BITS = 10
+MODE_C_WORK_SECONDS = 60
+MODE_C_CHECK_COUNT = 66
+MODE_C_VRAM_BYTES = 307200
+MODE_C_REGISTERS = {0x68050c: (0xffffffff, 0x10000204),
+                    0x680508: (0x0007ffff, None), 0x680578: (0x8000ffff, None)}
 BUS_ID = ('pc', 'bar', 'off', 'width')
 VPLL_VERSION_1 = 0x56504c03
 VPLL_VERSION = 0x56504c04
@@ -130,12 +137,21 @@ class Records:
         required = ()
         if phase == 'state' and event in ('IDLE', 'SNAPSHOTTING', 'ARMED', 'RUNNING', 'PAUSED', 'RESTORING'):
             required = METADATA + (('cleanup_seconds',) if event == 'RESTORING' else ())
-        elif phase in PAIRED and event in ('BEGIN', 'END'):
+        elif phase in PAIRED and event in ('BEGIN', 'END') and not (phase == 'route' and event == 'END' and 'source' in fields):
             required = ('step', 'addr') if event == 'BEGIN' else ('rc', 'elapsed')
         elif phase == 'gf_pre' and event in ('BEGIN', 'END'):
             required = PRE_ID + (('rc',) if event == 'END' else ())
         elif phase == 'gf_bus' and event in ('BEGIN', 'END'):
-            required = BUS_ID + (('old', 'new') if event == 'BEGIN' else ('readback', 'rc'))
+            if 'len' in fields:
+                required = ('pc', 'bar', 'off', 'len', 'dir')
+                if 'row' in fields:
+                    required += ('row',)
+                if event == 'END':
+                    required += ('rc',) if 'row' in fields else ('bad_off', 'expected', 'actual', 'rc')
+            else:
+                required = BUS_ID + (('old', 'new') if event == 'BEGIN' else ('readback', 'rc'))
+        elif phase == 'check' and event == 'END' or phase == 'route' and event == 'END' and 'source' in fields:
+            required = ('source', 'key', 'mask', 'expected', 'actual', 'rc')
         elif phase == 'gf_verify' and event == 'END':
             required = ('saved_words', 'minimal', 'capacity_known', 'full_capacity', 'capacity_bytes', 'tested_bytes')
         elif phase == 'receive' and event == 'DISCARD':
@@ -193,7 +209,9 @@ class Records:
             if paired and event == 'BEGIN':
                 stack.append(fields)
             elif paired and event == 'END':
-                ids = PRE_ID if phase == 'gf_pre' else BUS_ID if phase == 'gf_bus' else ()
+                ids = (PRE_ID if phase == 'gf_pre' else
+                       (('pc', 'bar', 'off', 'len', 'dir') + (('row',) if 'row' in fields else ())
+                        if 'len' in fields else BUS_ID) if phase == 'gf_bus' else ())
                 if (not stack or stack[-1]['phase'] != phase
                         or any(stack[-1][key] != fields[key] for key in ids)):
                     raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, phase))
@@ -224,6 +242,8 @@ class Records:
                                 if not valid:
                                     print('VPLL: 比較として無効 (68050Ch old != 00000004h)', file=sys.stderr)
                 stack.pop()
+            if self.data.get('mode_c_active'):
+                self.mode_c_record(fields)
             if (event == 'PAUSED' or phase == 'final') and stack:
                 raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, stack[-1]['phase']))
             crc = dict(self.data['crc'])
@@ -251,6 +271,54 @@ class Records:
                 self.data['final'] = fields
         except RecoverError as exc:
             raise RecoverError(self.invalidate(str(exc))) from exc
+
+    def mode_c_record(self, fields):
+        evidence = self.data['mode_c_evidence']
+        phase, event = fields['phase'], fields['event']
+        if phase == 'access' and event == 'END':
+            begin = self.data['stack'][-1]
+            evidence['last_access'] = [int(begin['step']), int(begin['addr'])]
+        if phase == 'gf_bus' and event == 'END':
+            if int(fields['rc']):
+                raise RecoverError('MODE_C gf_bus failed')
+            if 'len' in fields and 'row' not in fields:
+                if (int(fields['bar']), int(fields['off']), int(fields['len'])) != (1, 0, MODE_C_VRAM_BYTES):
+                    raise RecoverError('MODE_C VRAM range mismatch')
+                if int(fields['bad_off']) != READBACK_NONE:
+                    raise RecoverError('MODE_C VRAM mismatch')
+                evidence['vram'].append(int(fields['dir']))
+        if phase in ('check', 'route') and event == 'END' and 'source' in fields:
+            mask, expected, actual = (int(fields[k]) for k in ('mask', 'expected', 'actual'))
+            if int(fields['rc']) or (actual ^ expected) & mask:
+                raise RecoverError('MODE_C %s mismatch' % phase)
+            source = int(fields['source'])
+            if phase == 'route' or (source == 2 and expected == 1):
+                if mask != 3 or expected != 1 or actual & 3 != 1:
+                    raise RecoverError('MODE_C route mismatch')
+                evidence['route'] += 1
+            elif source == 3:
+                if mask != 0xffffffff or expected != 1 or actual != 1:
+                    raise RecoverError('MODE_C cell mismatch')
+                evidence['cell'] = True
+            elif source == 0 and evidence.get('last_access', [None])[0] == int(fields['key']):
+                off = evidence['last_access'][1]
+                if off in MODE_C_REGISTERS:
+                    required_mask, required_value = MODE_C_REGISTERS[off]
+                    if mask != required_mask or (required_value is not None and actual != required_value):
+                        raise RecoverError('MODE_C register mismatch')
+                    evidence['registers'][str(off)] = [mask, expected, actual]
+            if phase == 'check':
+                evidence['checks'] += 1
+        if phase == 'cell' and event == 'END':
+            if int(fields['rc']):
+                raise RecoverError('MODE_C cell access failed')
+            evidence['cell_steps'].append(int(self.data['stack'][-1]['step']))
+
+    def mode_c_success(self):
+        e = self.data['mode_c_evidence']
+        return (e['vram'] == [1, 0] and e['route'] >= 2 and e['cell']
+                and e['cell_steps'] == [2, 7] and e['checks'] == MODE_C_CHECK_COUNT
+                and all(str(off) in e['registers'] for off in MODE_C_REGISTERS))
 
     def success(self):
         f = self.final or {}
@@ -325,6 +393,18 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                     return 'OK'
                 if records.paused and records.final is None and not records.data['stack']:
                     if len(records.data['crc']) == 4:
+                        if records.data.get('mode_c_active'):
+                            if not records.mode_c_success():
+                                raise RecoverError('MODE_C missing evidence')
+                            records.data['mode_c_active'] = False
+                            save(records.data)
+                            e = records.data['mode_c_evidence']
+                            for off in MODE_C_REGISTERS:
+                                mask, expected, actual = e['registers'][str(off)]
+                                print('MODE_C %06X mask=%08X expected=%08X actual=%08X' %
+                                      (off, mask, expected, actual))
+                            print('MODE_C CHECK=%s route=01 cell=OK VRAM=OK' % e['checks'])
+                            print('MODE_C: 機械項目合格・映像保留')
                         return 'PAUSED'
                 raise RecoverError('missing/failed verification or lost logs')
             if byte == 10:
@@ -344,6 +424,8 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                             seconds = records.data['cleanup_seconds']
                             if seconds is not None and seconds != warned_seconds:
                                 warned_seconds = seconds
+                                if records.data.get('mode_c_trial'):
+                                    deadline = max(deadline, clock() + seconds + CLEANUP_MARGIN)
                                 if cleanup_timeout < seconds + CLEANUP_MARGIN:
                                     print('recover: warning: --cleanup-timeout requires at least %s seconds' %
                                           (seconds + CLEANUP_MARGIN), file=sys.stderr)
@@ -411,6 +493,11 @@ def open_port(name, baud):
     return serial.Serial(name, baud, timeout=.1, write_timeout=.2, exclusive=True)
 
 
+def mode_c_timeout(baud, cleanup_seconds):
+    tlog = (MODE_C_BYTES * UART_FRAME_BITS + baud - 1) // baud
+    return MODE_C_WORK_SECONDS + tlog + cleanup_seconds + CLEANUP_MARGIN
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', default='/dev/ttyUSB0')
@@ -425,7 +512,7 @@ def main():
     mode.add_argument('--command')
     mode.add_argument('--status', action='store_true')
     args = parser.parse_args()
-    if min(args.timeout, args.cleanup_timeout) <= 0 or (
+    if args.baud <= 0 or min(args.timeout, args.cleanup_timeout) <= 0 or (
             args.session is not None and not 0 <= args.session <= 0xffffffff):
         parser.error('session must fit in u32 and deadlines must be positive')
     if not args.status and (args.session is None or args.state is None or args.image_crc is None):
@@ -452,6 +539,11 @@ def main():
                 records.data['image_crc'] = args.image_crc.lower()
             elif previous.get('image_crc') != args.image_crc.lower():
                 raise RecoverError('saved boot CRC differs')
+            if re.fullmatch(r'gfinit modeset [0-9]+ --allow-write', ' '.join(command.split())):
+                records.data['mode_c_trial'] = True
+                records.data['mode_c_active'] = True
+                records.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
+                args.timeout = max(args.timeout, mode_c_timeout(args.baud, args.cleanup_timeout))
             save(records.data)
             result = exchange(port, command, records, args.timeout,
                               args.cleanup_timeout, raw, save)

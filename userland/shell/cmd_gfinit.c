@@ -1,5 +1,5 @@
-/* cmd_gfinit.c — `gfinit inspect <sid>` / `gfinit size-bars|prepare|verify|abort <sid> --allow-write` /
- * `gfinit run-one <sid> <main> --allow-write` (GF6200_S7_SHELL S7a/S7c)。
+/* cmd_gfinit.c — `gfinit inspect <sid>` / `gfinit size-bars|prepare|modeset|verify|abort <sid> --allow-write` /
+ * `gfinit prepare <sid> --mode-c --allow-write` / `gfinit run-one <sid> <main> --allow-write` (GF6200_S7_SHELL S7a/S7c)。
  * kdebug_call の私有 op (kdebug/gfinit_wire.h) を呼ぶ。試験: tools/tests/gfinit_owner_host.c */
 #include "shell.h"
 #include "../../kdebug/gfinit_wire.h"
@@ -25,7 +25,8 @@ int shell_cmd_gfinit(int argc, char **argv)
     if (argc == 3 && str_eq(argv[1], "inspect")) op = GF_OP_INSPECT;
     else {
         int run_one = argc >= 2 && str_eq(argv[1], "run-one");
-        int expected = run_one ? 5 : 4;
+        int mode_c = argc == 5 && str_eq(argv[1], "prepare") && str_eq(argv[3], "--mode-c");
+        int expected = run_one || mode_c ? 5 : 4;
         if (argc != expected || !str_eq(argv[argc - 1], "--allow-write")) goto usage;
         if (str_eq(argv[1], "size-bars")) op = GF_OP_SIZE_BARS;
         else if (str_eq(argv[1], "prepare")) op = GF_OP_PREPARE;
@@ -33,10 +34,12 @@ int shell_cmd_gfinit(int argc, char **argv)
             op = GF_OP_RUN_ONE;
             if (gfinit_session(argv[3], &q.script_id) ||
                 q.script_id >= GF_INIT_MAINS) goto usage;
-        } else if (str_eq(argv[1], "verify")) op = GF_OP_VERIFY;
+        } else if (str_eq(argv[1], "modeset")) op = GF_OP_MODESET;
+        else if (str_eq(argv[1], "verify")) op = GF_OP_VERIFY;
         else if (str_eq(argv[1], "abort")) op = GF_OP_ABORT;
         else goto usage;
         q.flags = GF_ALLOW_WRITE;
+        if (mode_c) q.flags |= GF_MODE_C;
     }
     if (gfinit_session(argv[2], &q.session)) goto usage;
     if (g_api->version < GFINIT_KAPI_MIN || !g_api->kdebug_call) {
@@ -53,7 +56,7 @@ int shell_cmd_gfinit(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "gfinit: rejected rc=%d\n", rc);
     return rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gfinit inspect <sid> | gfinit {size-bars|prepare|verify|abort} <sid> --allow-write | gfinit run-one <sid> <main:0-%u> --allow-write\n",
+    g_api->kprintf(ATTR_WHITE, "Usage: gfinit inspect <sid> | gfinit {size-bars|prepare|modeset|verify|abort} <sid> --allow-write | gfinit prepare <sid> --mode-c --allow-write | gfinit run-one <sid> <main:0-%u> --allow-write\n",
                    GF_INIT_MAINS - 1U);
     return 2;
 }
