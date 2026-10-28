@@ -135,3 +135,8 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - DCB 0x96ac 版 3.0 の 4 エントリ: **0 = ANALOG・I2C 0・heads 0 1・CONN 0・OR 0・LOCAL・maxfreq 400000kHz**、1 = ANALOG・I2C 1・heads 0 1・CONN 1・OR 1、2 = TMDS・I2C 1・heads 0 1・CONN 1・OR 0、3 = TV・heads 0 1・CONN 2・OR 1。CONN 0x97da: 0 VGA・1 DVI_I (HPD_1)・2 COMPOSITE・3 S_VIDEO・4 RGB。
 - 帰結: エントリ 0 は head A (0) を許し OR 0・CONN 0 (VGA) なので、**§1・§2 の「head A・ANALOG OR0」の仮の選択は ROM の表と合う** (確定)。RGB-IN に繋がるのが VGA の端子 (CONN 0) か DVI-I のアナログ (CONN 1・OR 1) かは配線の確認 (§10 の未確認) のまま — 映像が出なければ §7 の切り分けに OR 1 を足す。
 - 配線 (ユーザー 2026-10-28): **GeForce は VGA の端子で 98 の切替回路 (RGB-IN) に繋いでいる** → DCB のエントリ 0 (ANALOG・OR 0・CONN 0 VGA) が RGB-IN の経路で確定。ボードには DVI の端子もある (ユーザーは DVI-D と言う、ROM の CONN 1 は DVI_I・TMDS OR 0 と ANALOG OR 1 が載る) — 4c では使わない。§7 の切り分けの「OR 1」は外してよい。
+
+## 段 2 の前に PM が決めたこと (2026-10-28、terra の設計の欠けの報告 — §3 の市松)
+- 市松は **1 マス 8×8 px** (64×64 px の中に 8×8 マス)、**左上のマスは白**で白・黒を交互 (palette の番号は段 1 の kdebug/gfinit_mode.c の表で白=4・黒=0)。位置は外周の白枠 (8 px) の内側の左上 x=8〜71・y=8〜71。
+- 重なりの優先は **白枠 > 市松 > 縦の帯** (帯は全幅 640 px に 80 px ずつ 8 色を敷き、市松と枠が上書きする)。行のデータは y ごとにこの規則で決まる 640 B の固定の列 (480 行で 3 種類: 枠の行 (y<8・y>=472)・市松の行 (8<=y<72)・帯の行)。
+- 理由: 目視で同期のずれ (16 dot など) と色の取り違えが一目で分かることを優先 — 8 px のマスは文字 1 字分で数えやすい。
