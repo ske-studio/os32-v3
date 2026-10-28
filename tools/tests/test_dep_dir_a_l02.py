@@ -44,10 +44,10 @@ def contracts():
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
     assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
-    # GF4c/2a explicitly changes the private C plan/capture layout; public ABI stays fixed.
+    # GF4c/2b1 adds the private fixed-VRAM callback/type; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x7d90586cU' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0xe0c871d7U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0xf9e69ac4U' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x3b6a5992U' in hwdev
     assert 'e82557_regs.h' not in (ROOT / 'kernel/lan_module.c').read_text()
     print('PASS B1/B2: fixed hwdev inventory/CRCs, both LAN contract dependencies')
 
@@ -107,6 +107,6 @@ def main():
             print('RED runtime: machine device ID changed (compiled successfully)')
 
 
-HWDEV_SHA = 'f300230a026e513b6ea3875b57aca9a2c8c3afb1c342b8dbb15e71c71790dfcd'
+HWDEV_SHA = '8b104f9e3dc1d7f159aac30bd09e4487606c96d871c6998440347084fcce230a'
 if __name__ == '__main__':
     main()

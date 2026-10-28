@@ -229,6 +229,8 @@ struct recover_expr {
 #define REC_LAYOUT_CHECK_EXPR 2U
 /* Bindable staging barrier: entering/leaving it is never a successful no-op. */
 #define REC_LAYOUT_UNBOUND 4U
+/* Fixed MODE_C diagnostic frame, never a general bulk accessor. */
+#define REC_LAYOUT_MODE_VRAM 8U
 struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
@@ -326,6 +328,10 @@ struct recover_ops {
      * Operation returns immediately after any nonzero accessor/safe-point. */
     int (*local_cleanup)(void *opaque);
     int (*event)(void *opaque, enum recover_state state, u32 session);
+    /* Full fixed frame in one direction; first differing byte, or NONE.
+     * Each short-lived aperture is released before calling a safe point. */
+    int (*mode_vram)(void *opaque, struct recover *r, bool write,
+                     u32 *bad_offset, u32 *expected, u32 *actual);
 };
 struct recover {
     const struct recover_ops *ops;

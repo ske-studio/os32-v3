@@ -117,6 +117,8 @@ int gfinit_plan_build_c(struct gfinit_plan *p,struct gfinit_decode *d,struct rec
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
 { CHECK(p==owner->compiled && r==&core && a);plan_reads++;(void)value; }
 int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==owner->compiled);verify_calls++;return 0; }
+int gfinit_plan_c_vram(void *v,struct recover *r,bool write,u32 *bad,u32 *want,u32 *got)
+{ (void)v;(void)r;(void)write;(void)bad;(void)want;(void)got;CHECK(false);return -1; }
 int recover_budget_apply(struct recover_profile *p,u32 kind,u32 hz,u32 baud,u32 bits,const struct recover_static_work *w)
 { CHECK(kind==REC_BUDGET_SIZE_BARS || kind==REC_BUDGET_GF);CHECK(hz==PIT_HZ && baud==9600 && bits==10 && w->bytes);p->crc=1;return 0; }
 u32 recover_profile_crc(const struct recover_profile *p) { (void)p;return 1; }

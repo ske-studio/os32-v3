@@ -105,6 +105,12 @@ static int gf_write(void *opaque, const struct recover_bus_access *a, u32 value)
 }
 static int gf_local(void *opaque)
 { return gfinit_bus_local_cleanup(opaque, recover_owner()); }
+static int gf_mode_vram(void *opaque, struct recover *r, bool write,
+                         u32 *bad_offset, u32 *expected, u32 *actual)
+{
+    if (!gf_owned(r)) return -1;
+    return gfinit_plan_c_vram(opaque,r,write,bad_offset,expected,actual);
+}
 static int gf_screen_safe(void *opaque)
 { (void)opaque; return recover_gf_screen_safe(recover_owner()); }
 static int gf_clock(void *opaque, u32 *value)
@@ -247,6 +253,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     g->ops = *base;
     g->ops.identity = gfinit_bus_identity; g->ops.raw_config = gfinit_bus_raw_config;
     g->ops.read = gf_read; g->ops.write = gf_write;
+    g->ops.mode_vram = gf_mode_vram;
     g->ops.local_cleanup = gf_local; g->ops.screen_safe = gf_screen_safe;
     g->s0 = s0;
     r->transport = transport;

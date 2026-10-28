@@ -1,4 +1,4 @@
-"""4c/2a production bind, captures, typed barriers and independent C trace."""
+"""4c/2a bind/legacy trace and 2b1 fixed VRAM transfer/compare with cleanup."""
 import pathlib
 import subprocess
 import sys
@@ -19,9 +19,13 @@ def command(exe):
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
+    assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
+        for line in text.splitlines():
+            if line.startswith(('VRAM ', 'REC sid=')):
+                print(line)
     groups = text.split('variant=')[1:]
     assert len(groups) == 3
     for section, (variant, fp_on) in zip(groups, [(0, True), (1, True), (1, False)]):
@@ -43,13 +47,13 @@ def check_output(text, verbose=True):
             assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
             assert row[-1] == int(want[0] not in (4, 6, 7, 8, 9, 10))
         assert fields['entries'] == [7] and fields['captures'] == [36]
-        assert fields['pending'] == [35]
+        assert fields['pending'] == [34]
         assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
         assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
         assert fields['layouts'][0] <= 1280
         if verbose:
             print(f'PASS C bind/bus variant={variant} FP_ON={int(fp_on)}: '
-                  f'{len(rows)} rows agree with stage-1 independent oracle; 35 typed barriers')
+                  f'{len(rows)} rows agree with stage-1 independent oracle; 34 typed barriers')
             print(' '.join(f'{k}={v[0]}' for k, v in fields.items() if k != 'pll'))
 
 
@@ -63,6 +67,11 @@ MUTATIONS = [
      '(r->node_layout[node]->flags & REC_LAYOUT_UNBOUND) ||', 'false ||'),
     ('kdebug/gfinit_bus.c', 'misc_read_alias',
      'offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;', 'offset += 0;'),
+    ('kdebug/gfinit_plan_c.c', 'vram_last_row',
+     'y < GF_MODE_HEIGHT; y++', 'y + 1 < GF_MODE_HEIGHT; y++'),
+    ('kdebug/gfinit_bus.c', 'vram_compare',
+     '!write && value != wanted && *bad_offset == RECOVER_NONE',
+     '!write && value != wanted && *bad_offset != RECOVER_NONE'),
 ]
 
 

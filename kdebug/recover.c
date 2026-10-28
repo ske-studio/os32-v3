@@ -1,6 +1,7 @@
 #include "recover.h"
 #include "recover_wire.h"
 #include "recover_diag.h"
+#include "../hwdev/gfinit_mode.h"
 #include "../lib/crc32_core.inc"
 
 static int cleanup(struct recover *r);
@@ -404,6 +405,25 @@ static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
     }
     return row_send(r, &b);
 }
+static int mode_vram_record(struct recover *r, const char *event, u32 dir,
+                             u32 bad_offset, u32 expected, u32 actual, int rc)
+{
+    if (!r->transport) return 0;
+    struct rec_row b;
+    row_start(r, &b, "gf_bus", event);
+    row_number(&b, " pc=", RECOVER_NONE);
+    row_number(&b, " bar=", GF_MODE_VRAM_BAR);
+    row_number(&b, " off=", GF_MODE_VRAM_OFFSET);
+    row_number(&b, " len=", GF_MODE_VRAM_BYTES);
+    row_number(&b, " dir=", dir);
+    if (event[0] == 'E') {
+        row_number(&b, " bad_off=", bad_offset);
+        row_number(&b, " expected=", expected); row_number(&b, " actual=", actual);
+        row_text(&b, " rc="); if (rc < 0) row_text(&b, "-");
+        row_number(&b, "", rc < 0 ? 0U - (u32)rc : (u32)rc);
+    }
+    return row_send(r, &b);
+}
 static void transport_diag(struct recover *r)
 {
     if (txd.attempted) return;
@@ -694,7 +714,7 @@ int recover_profile_ok(const struct recover_profile *p)
     for (u32 i = 0; i < p->layout_count; i++) {
         const struct recover_opcode_layout *l = &p->layouts[i];
         if (l->argc > RECOVER_EXPR_ARGS + 1 || (l->argc && !l->kinds) ||
-            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND)) ||
+            (l->flags & ~(REC_LAYOUT_SKIP_HEAD | REC_LAYOUT_CHECK_EXPR | REC_LAYOUT_UNBOUND | REC_LAYOUT_MODE_VRAM)) ||
             (l->flags && l->dir_substep != RECOVER_NONE) ||
             (l->dir_substep != RECOVER_NONE && l->dir_substep > REC_DATA)) return -1;
         for (u32 j = 0; j < l->argc; j++) if (l->kinds[j] > REC_ARG_SAVED) return -1;
@@ -1244,6 +1264,13 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     for (u32 i = 0; i < r->plan->node_count; i++) {
         const struct recover_plan_node *n = &r->plan->nodes[i];
         const struct recover_opcode_layout *l = layout_for(p, n);
+        if (l->flags & REC_LAYOUT_MODE_VRAM) {
+            const struct recover_bar_extent *b = &r->bars[GF_MODE_VRAM_BAR];
+            if (!b->valid || b->length < GF_MODE_VRAM_BYTES ||
+                (unsigned long long)b->base + GF_MODE_VRAM_BYTES > RECOVER_ADDRESS_END) {
+                release_plan(r); return -1;
+            }
+        }
         for (u32 j = 0; j < n->arg_count; j++) {
             const struct recover_plan_arg *a = &r->plan->args[n->arg_first + j];
             if ((j == 0 && l->dir_substep != RECOVER_NONE) || a->kind == REC_ARG_READ)
@@ -1494,6 +1521,14 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
         if (args[i].kind != l->kinds[i] || !arg_ok(p, plan, id, &args[i])) return false;
     if (l->dir_substep == RECOVER_NONE) {
         if (n->rule_id != RECOVER_NONE) return false;
+        if (l->flags & REC_LAYOUT_MODE_VRAM)
+            return l->flags == REC_LAYOUT_MODE_VRAM && n->phase == REC_MODE_C &&
+                !n->head && !n->skip && n->expr_id == RECOVER_NONE && n->arg_count == 4 &&
+                args[0].kind == REC_IMM && args[0].value == GF_MODE_VRAM_BAR &&
+                args[1].kind == REC_IMM && args[1].value == GF_MODE_VRAM_OFFSET &&
+                args[2].kind == REC_IMM && args[2].value == GF_MODE_VRAM_BYTES &&
+                args[3].kind == REC_IMM && args[3].value <= REC_WRITE &&
+                p->vram_reserved.base == GF_MODE_VRAM_OFFSET && p->vram_reserved.len == GF_MODE_VRAM_BYTES;
         if (!(l->flags & REC_LAYOUT_CHECK_EXPR)) return n->expr_id == RECOVER_NONE;
         const struct recover_expr *e = expr_by_id(p, n->expr_id);
         if (!e || e->argc != n->arg_count || n->skip) return false;
@@ -2068,11 +2103,37 @@ int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, 
 {
     return access_impl(r, node, dir, target, width, value, false);
 }
+static int mode_vram_access(struct recover *r)
+{
+    const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
+    const struct recover_bar_extent *b = &r->bars[GF_MODE_VRAM_BAR];
+    if (r->state != REC_RUNNING || !r->valid || r->accessed || !r->ops->mode_vram ||
+        !node_ok(r->profile,r->plan,r->cursor) || !b->valid || b->length < GF_MODE_VRAM_BYTES ||
+        (unsigned long long)b->base + GF_MODE_VRAM_BYTES > RECOVER_ADDRESS_END ||
+        !raw_matches(r,true)) return access_error(r,r->cursor);
+    u32 dir = r->plan->args[n->arg_first + 3].value;
+    u32 bad_offset = RECOVER_NONE, expected = RECOVER_NONE, actual = RECOVER_NONE;
+    if (mode_vram_record(r,"BEGIN",dir,bad_offset,expected,actual,0) || recover_safe_point(r))
+        return access_error(r,r->cursor);
+    if (dir == REC_WRITE) r->gpu_written = true;
+    int rc = r->ops->mode_vram(r->opaque,r,dir == REC_WRITE,&bad_offset,&expected,&actual);
+    if (r->state != REC_RUNNING) return -1; /* safe point already cleaned up */
+    int log = mode_vram_record(r,"END",dir,bad_offset,expected,actual,rc);
+    if (rc || log) {
+        fail(r,log ? REC_LOG : bad_offset == RECOVER_NONE ? REC_BUS : REC_VERIFY,
+             REC_PHASE_VERIFY,bad_offset);
+        return access_error(r,bad_offset);
+    }
+    r->accessed = true;
+    bit_set(r->buffers.valid_bits,r->cursor);
+    return 0;
+}
 int recover_plan_access(struct recover *r, u32 *value)
 {
     if (!r->plan || !r->entered || r->cursor >= r->plan->node_count || !value) return -1;
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = r->node_layout[r->cursor];
+    if (l && (l->flags & REC_LAYOUT_MODE_VRAM)) return mode_vram_access(r);
     if (!l || l->dir_substep == RECOVER_NONE || !n->arg_count) return -1;
     u32 key = r->plan->args[n->arg_first].value;
     if (key >= r->profile->target_count) return -1;
@@ -2119,7 +2180,7 @@ int recover_plan_leave(struct recover *r, u32 edge)
     if (r->state != REC_RUNNING || !r->plan || !r->entered || edge > 1) return access_error(r, edge);
     const struct recover_plan_node *n = &r->plan->nodes[r->cursor];
     const struct recover_opcode_layout *l = layout_for(r->profile, n);
-    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || ((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) && !r->accessed)) return access_error(r, r->cursor);
+    if (!l || (l->flags & REC_LAYOUT_UNBOUND) || (((l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR)) || (l->flags & REC_LAYOUT_MODE_VRAM)) && !r->accessed)) return access_error(r, r->cursor);
     if (n->phase == REC_RUN && r->zero_hold && !zero_guards(r)) return access_error(r, r->cursor);
     u32 next = n->next[edge];
     if (n->phase == REC_PREPARE && (next == RECOVER_NONE || r->plan->nodes[next].phase != REC_PREPARE)) {
