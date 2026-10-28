@@ -36,7 +36,8 @@ static int exec_bus_read(void *v,const struct recover_bus_access *a,u32 *value)
         const struct recover_plan_node *n = &core.plan->nodes[core.cursor];
         if (a->key == core.plan->args[n->arg_first].value &&
             n->main_id == RECOVER_VPLL_MAIN && n->pc == RECOVER_VPLL_PC &&
-            n->substep >= RECOVER_VPLL_FIRST && n->substep <= RECOVER_VPLL_LAST)
+            ((n->substep >= RECOVER_VPLL_FIRST && n->substep <= RECOVER_VPLL_LAST) ||
+             (n->substep >= RECOVER_VPLL_REPEAT_FIRST && n->substep <= RECOVER_VPLL_REPEAT_LAST)))
             vpll_reads++;
     }
     *value=a->dir_substep==REC_SELECT?indices[a->key]:values[a->key];
@@ -162,6 +163,14 @@ static void reference_pll(u32 reg,u32 khz)
         PW(GF_PLL_VIDEO_STAGE,(stage&0xfffffeffU)|(s.n2==s.m2?0x100:0));
         PW(GF_PLL_VIDEO_COEFF,(coeff&0x7fff0000U)|0x80000000U|nm2|(s.n2==s.m2?0x11f:0));
         PW(reg,(old&0xfff80000U)|(s.p<<16)|nm1);PW(GF_PLL_GATE,gate);
+#if GF_VPLL_PROBE
+        PW(RECOVER_VPLL_SWITCH_OFF, RECOVER_VPLL_SWITCH_ON);
+        PW(GF_PLL_GATE,gate&0xfffcffffU);
+        PW(GF_PLL_VIDEO_STAGE,(stage&0xfffffeffU)|(s.n2==s.m2?0x100:0));
+        PW(GF_PLL_VIDEO_COEFF,(coeff&0x7fff0000U)|0x80000000U|nm2|(s.n2==s.m2?0x11f:0));
+        PW(reg,(old&0xfff80000U)|(s.p<<16)|nm1);PW(GF_PLL_GATE,gate);
+        PW(RECOVER_VPLL_SWITCH_OFF, RECOVER_VPLL_SWITCH_DEFAULT);
+#endif
     } else {
         bool mem=reg==GF_PLL_MEMORY;
         u32 power=mem?ref_read(ref_key(GF_PLL_MEMORY_POWER,0,0)):0;
@@ -264,6 +273,18 @@ static void compare_trace(void)
 static void all_trace(void)
 {
     setup();fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
+    CHECK(recover_profile_ok(&gf_fixture_profile)==0);
+#if GF_VPLL_PROBE
+    CHECK(gf_fixture_profile.version==RECOVER_PROFILE_VPLL_VERSION);
+    CHECK(gf_fixture_profile.target_count==REC_GF_TARGET_COUNT+1);
+    CHECK(gf_fixture_profile.rule_count==REC_GF_RULE_COUNT+7);
+    CHECK(gf_fixture_profile.targets[REC_GF_TARGET_COUNT].read_safe);
+    for(u32 i=0;i<7;i++) {
+        const struct recover_rule *w=&gf_fixture_profile.rules[REC_GF_RULE_COUNT+i];
+        CHECK(w->substep==RECOVER_VPLL_STAGE2_FIRST+i);
+        CHECK(w->verify_mask==((i==0 || i==6)?~0U:0));
+    }
+#endif
     synthetic_profile();
     CHECK(recover_profile_ok(&profile)==0);
     for(u32 i=0;i<decoded.plan.node_count;i++)if(!node_ok(&profile,&decoded.plan,i)){output("bad node ");number(i);output(" pc ");number(decoded.nodes[i].pc);output("\n");CHECK(false);return;}
@@ -284,7 +305,7 @@ static void all_trace(void)
     }
 #if GF_VPLL_PROBE
     output("VPLL reads ");number(vpll_reads);output("\n");
-    CHECK(vpll_reads==5);
+    CHECK(vpll_reads==10);
 #else
     output("VPLL reads ");number(vpll_reads);output("\n");
     CHECK(vpll_reads==0);

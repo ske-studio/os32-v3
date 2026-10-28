@@ -493,6 +493,27 @@ static int expand_pll(struct gfinit_decode *d, const u8 *r, const struct recover
             d->plan.capture_count++;
         }
     }
+#if GF_VPLL_PROBE
+    if (s->main_id == RECOVER_VPLL_MAIN && v->pc == RECOVER_VPLL_PC && v->target == GF_PLL_VIDEO) {
+        u32 switch_key = key_for(p, RECOVER_VPLL_SWITCH_OFF, 0, 0, 0);
+        if (switch_key == RECOVER_NONE || q.count != 5) return -1;
+        write_node(d, p, s, state, RECOVER_VPLL_STAGE2_FIRST, REC_WRITE, switch_key, 0, RECOVER_VPLL_SWITCH_ON, false);
+        for (u32 i = 0; i < q.count; i++) {
+            const struct gfinit_pll_write *w = &q.writes[i];
+            u32 c = d->plan.capture_count, j = 0;
+            if (!w->source || c == RECOVER_CAPTURE_MAX) return -1;
+            for (; j < count; j++) if (sources[j] == w->source) break;
+            if (j == count) return -1;
+            u32 key = key_for(p, w->reg, 0, 0, 0);
+            struct recover_plan_arg a[] = {IMM(key), SAVED(p->count + c), IMM(w->keep), IMM(w->value)};
+            u32 consumer = emit(d, p, s, state, RECOVER_VPLL_REPEAT_FIRST + i, REC_WRITE, a, 4);
+            d->captures[c] = (struct recover_capture){p->count + c, producers[j], consumer,
+                key_for(p, w->source, 0, 0, 0), 0};
+            d->plan.capture_count++;
+        }
+        write_node(d, p, s, state, RECOVER_VPLL_STAGE2_LAST, REC_WRITE, switch_key, 0, RECOVER_VPLL_SWITCH_DEFAULT, false);
+    }
+#endif
     return d->error ? -1 : 0;
 }
 static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recover_profile *p,

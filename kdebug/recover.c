@@ -2025,7 +2025,8 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
 #if GF_VPLL_PROBE
             || (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&
                 w->main_id == RECOVER_VPLL_MAIN && w->pc == RECOVER_VPLL_PC &&
-                w->substep >= RECOVER_VPLL_FIRST && w->substep <= RECOVER_VPLL_LAST)
+                ((w->substep >= RECOVER_VPLL_FIRST && w->substep <= RECOVER_VPLL_LAST) ||
+                 (w->substep >= RECOVER_VPLL_REPEAT_FIRST && w->substep <= RECOVER_VPLL_REPEAT_LAST)))
 #endif
             ) {
             /* SELECT readback reads the index port, not its data register. */

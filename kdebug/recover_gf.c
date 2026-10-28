@@ -257,6 +257,11 @@ static int gf_layout_ranges_valid(const struct recover_layout_range *ranges,
     return count == total ? 0 : -1;
 }
 
+#if GF_VPLL_PROBE
+#define VPLL_EXTRA_RULES 7U
+#define VPLL_ORIGINAL_RULE_FIRST 565U
+static const u32 vpll_deps[VPLL_EXTRA_RULES] = {569U, 578U, 579U, 580U, 581U, 582U, 583U};
+#endif
 /* Validate ranges before writes; publish the profile only after all expansion. */
 int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf)
 {
@@ -300,9 +305,40 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
             if (substep == s->last) break;
         }
     }
+#if GF_VPLL_PROBE
+    if (REC_GF_RULE_COUNT + VPLL_EXTRA_RULES > GF_PLAN_RULES ||
+        REC_GF_TARGET_COUNT + 1U > GF_PLAN_TARGETS ||
+        REC_GF_LAYOUT_COUNT + VPLL_EXTRA_RULES > GF_PLAN_LAYOUTS) return -1;
+    buf->targets[REC_GF_TARGET_COUNT] = (struct recover_target){
+        REC_BAR_MMIO, 0, RECOVER_VPLL_SWITCH_OFF, 0, 0, RECOVER_NONE, 4, REC_COLD, true};
+    for (u32 i = 0; i < VPLL_EXTRA_RULES; i++) {
+        struct recover_rule *w = &buf->rules[REC_GF_RULE_COUNT + i];
+        struct recover_opcode_layout *l = &buf->layouts[REC_GF_LAYOUT_COUNT + i];
+        if (i > 0 && i < VPLL_EXTRA_RULES - 1) {
+            *w = buf->rules[VPLL_ORIGINAL_RULE_FIRST + i - 1];
+            *l = (struct recover_opcode_layout){GF_INIT_PLL2, RECOVER_VPLL_STAGE2_FIRST + i,
+                                                4, pll_saved_layout, 1, 0};
+        } else {
+            *w = (struct recover_rule){.key = REC_GF_TARGET_COUNT, .phase = REC_RUN,
+                .main_id = RECOVER_VPLL_MAIN, .pc = RECOVER_VPLL_PC,
+                .write_mask = ~0U, .verify_mask = ~0U,
+                .value = {.mode = REC_LITERAL, .mask = ~0U, .bits = i ? RECOVER_VPLL_SWITCH_DEFAULT : RECOVER_VPLL_SWITCH_ON,
+                          .expr_id = RECOVER_NONE}};
+            *l = (struct recover_opcode_layout){GF_INIT_PLL2, RECOVER_VPLL_STAGE2_FIRST + i,
+                                                2, fixed_literal, 1, 0};
+        }
+        w->id = REC_GF_RULE_COUNT + i; w->substep = RECOVER_VPLL_STAGE2_FIRST + i;
+        w->requires = &vpll_deps[i]; w->requires_count = 1;
+    }
+#endif
     next.rules = buf->rules; next.rule_count = REC_GF_RULE_COUNT;
     next.targets = buf->targets; next.target_count = REC_GF_TARGET_COUNT;
     next.layouts = buf->layouts; next.layout_count = REC_GF_LAYOUT_COUNT;
+#if GF_VPLL_PROBE
+    next.rule_count += VPLL_EXTRA_RULES;
+    next.target_count++;
+    next.layout_count += VPLL_EXTRA_RULES;
+#endif
     *p = next;
     return 0;
 }
