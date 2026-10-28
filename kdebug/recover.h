@@ -199,12 +199,13 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 enum recover_space { REC_PCI_CFG, REC_BAR_MMIO, REC_BAR_VRAM,
     REC_PC98_IO, REC_VGA_DIRECT, REC_VGA_INDEXED };
 enum recover_auth_phase { REC_SIZE_BARS, REC_PREPARE, REC_RUN, REC_VRAM_TEST,
-    REC_QUIESCE, REC_RESTORE, REC_ROUTE, REC_SCREEN, REC_VERIFY_PHASE };
+    REC_QUIESCE, REC_RESTORE, REC_ROUTE, REC_SCREEN, REC_VERIFY_PHASE, REC_MODE_C };
 enum recover_direction { REC_READ, REC_WRITE, REC_SELECT, REC_DATA };
 enum recover_value_mode { REC_LITERAL, REC_SET, REC_RANGE, REC_EXPR, REC_SAVED };
 enum recover_arg_kind { REC_IMM, REC_ARG_READ, REC_ARG_SAVED };
 enum recover_guard_when { REC_BEFORE = 1, REC_AFTER = 2 };
-enum recover_rule_flag { REC_N1 = 1, REC_LOCAL = 2, REC_FORCE = 4 };
+enum recover_rule_flag { REC_N1 = 1, REC_LOCAL = 2, REC_FORCE = 4,
+    REC_RUN_NO_PREREAD = 8 /* preserve the original RUN target read_safe */ };
 struct recover_target {
     u32 space, bar, offset, head, port, index, width, access, read_safe;
 };
@@ -226,6 +227,8 @@ struct recover_expr {
 };
 #define REC_LAYOUT_SKIP_HEAD 1U
 #define REC_LAYOUT_CHECK_EXPR 2U
+/* Bindable staging barrier: entering/leaving it is never a successful no-op. */
+#define REC_LAYOUT_UNBOUND 4U
 struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
@@ -236,8 +239,8 @@ struct recover_plan_node {
 };
 struct recover_plan_dep { u32 consumer, required_rule, producer; };
 struct recover_plan_entry { u32 phase, main_id, first; };
-#define RECOVER_CAPTURE_MAX 32U
-STATIC_ASSERT(RECOVER_CAPTURE_MAX <= 32U, recover_capture_bits);
+#define RECOVER_CAPTURE_MAX 48U /* 4a plus pre-Q/C040 single-use captures */
+STATIC_ASSERT(RECOVER_CAPTURE_MAX <= 64U, recover_capture_bits);
 struct recover_capture { u32 slot, producer_node, consumer_node, target, read_ordinal; };
 struct recover_plan {
     u32 version, profile_crc, rom_crc, rom_size;
@@ -356,7 +359,8 @@ struct recover {
     const struct recover_opcode_layout *node_layout[RECOVER_NODE_MAX];
     const struct recover_rule *node_write[RECOVER_NODE_MAX];
     u32 index_port[RECOVER_TARGET_MAX], port_selected[RECOVER_TARGET_MAX];
-    u32 capture_values[RECOVER_CAPTURE_MAX], capture_valid;
+    u32 capture_values[RECOVER_CAPTURE_MAX];
+    unsigned long long capture_valid;
 
     struct recover_bar_measurement cache, measurement;
     struct recover_bar_extent bars[RECOVER_BAR_COUNT];

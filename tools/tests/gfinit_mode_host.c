@@ -71,6 +71,19 @@ static void dump(u32 variant)
 }
 void _start(void)
 {
+    u8 row[640];
+    CHECK(gfinit_mode_row(480, row) < 0);
+    CHECK(gfinit_mode_row(0, 0) < 0);
+    for (u32 y = 0; y < 480; y++) {
+        CHECK(gfinit_mode_row(y, row) == 0);
+        for (u32 x = 0; x < 640; x++) {
+            u32 expected = x / 80;
+            if (x >= 8 && x < 72 && y >= 8 && y < 72)
+                expected = (((x - 8) / 8 + (y - 8) / 8) % 2) ? 0 : 4;
+            if (x < 8 || x >= 632 || y < 8 || y >= 472) expected = 4;
+            CHECK(row[x] == expected);
+        }
+    }
     gf_fixture_init();
     CHECK(gf_fixture_profile.rule_count==578 && gf_fixture_profile.target_count==154);
     CHECK(GF_MODE_DCB_ENTRY==0 && GF_MODE_DCB_ANALOG==0 && GF_MODE_DCB_HEADS==3 &&

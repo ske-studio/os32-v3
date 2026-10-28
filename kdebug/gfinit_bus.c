@@ -80,8 +80,14 @@ static int bus_access(struct gfinit_bus *b, const struct recover_bus_access *a,
     if (gfinit_bus_raw_config(b, &command, bars) || !(command & RECOVER_COMMAND_MEM)) return -1;
     for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (bars[i] != b->bars[i]) return -1;
     u32 base = bars[a->bar] & ~PCI_BAR_MEM_ATTR_MASK;
-    if (a->offset > ~0U - base || a->width - 1 > ~0U - base - a->offset) return -1;
-    u32 pa = base + a->offset;
+    u32 offset = a->offset;
+    /* nouveau dispnv04/nvreg.h:129,137: MISC has distinct read/write aliases.
+     * Keep the logged target/write address; only the physical read differs. */
+    const struct recover_target *t = &b->profile->targets[a->key];
+    if (!write && t->space == REC_VGA_DIRECT && t->port == RECOVER_MISC_WRITE)
+        offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;
+    if (offset > ~0U - base || a->width - 1 > ~0U - base - offset) return -1;
+    u32 pa = base + offset;
     if (pa < GF_LEGACY_HI && pa + a->width > GF_LEGACY_LO) return -1;
     return recover_window_access(&b->window, pa, a->width, write, value);
 }

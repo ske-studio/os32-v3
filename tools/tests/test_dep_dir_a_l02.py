@@ -44,9 +44,10 @@ def contracts():
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
     assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
+    # GF4c/2a explicitly changes the private C plan/capture layout; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x7a941bb8U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x39731fc6U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x7d90586cU' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0xe0c871d7U' in hwdev
     assert 'e82557_regs.h' not in (ROOT / 'kernel/lan_module.c').read_text()
     print('PASS B1/B2: fixed hwdev inventory/CRCs, both LAN contract dependencies')
 
@@ -106,6 +107,6 @@ def main():
             print('RED runtime: machine device ID changed (compiled successfully)')
 
 
-HWDEV_SHA = 'aeef74ae4d0b84f15ae8d8537556debe5a304adb7543259245a682299dac07ab'
+HWDEV_SHA = 'f300230a026e513b6ea3875b57aca9a2c8c3afb1c342b8dbb15e71c71790dfcd'
 if __name__ == '__main__':
     main()

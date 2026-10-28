@@ -7,6 +7,7 @@ check-gfinit-host:
 	    --plain tools/tests/test_gfinit_pll.py \
 	    --plain tools/tests/test_gfinit_bus.py \
 	    --plain tools/tests/test_gfinit_owner.py \
-	    --plain tools/tests/test_gfinit_plan.py
+	    --plain tools/tests/test_gfinit_plan.py \
+	    --plain tools/tests/test_gfinit_plan_c.py
 
 .PHONY: check-gfinit-host

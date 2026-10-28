@@ -21,9 +21,12 @@
 #define GF_PLAN_SUB_BRANCH 4
 #define GF_PLAN_SUB_EQUAL 5
 #define GF_PLAN_SUB_COUNT 6
-#define GF_PLAN_TARGETS 768U
+/* 608 targets (down from 768) cover 4a's maximum 471-472 and C's 234,
+ * leaving 136 slots. If needed, grow the owner's pages instead of cutting
+ * existing use (user decision 2026-10-28). Both plans are checked. */
+#define GF_PLAN_TARGETS 608U
 #define GF_PLAN_RULES 1280U
-#define GF_PLAN_LAYOUTS 1056U
+#define GF_PLAN_LAYOUTS 1280U
 #define GF_PLAN_EXPRS 16U
 #define GF_PLAN_VRAM_WORDS 256U
 #define GF_PLAN_CHECK_WORDS 8U
@@ -37,10 +40,13 @@ struct gfinit_plan {
     struct recover_expr exprs[GF_PLAN_EXPRS];
     u32 saved_vram[GF_PLAN_VRAM_WORDS];
     u32 vram_first, vram_node, saved_count;
+    u32 mode_flags, c_node, c_unbound;
     u32 pfb_key, bar1_length, capacity_bytes, tested_bytes, capacity_known, full_capacity;
 };
 /* Consumes fresh decoded arrays in place; out.plan borrows their lifetime.
  * Profile tables become owned by out. Recompute CRC after owner budgets. */
+int gfinit_plan_prefix(struct gfinit_plan *out, struct gfinit_decode *decoded,
+                       struct recover_profile *profile);
 int gfinit_plan_build(struct gfinit_plan *out, struct gfinit_decode *decoded,
                       struct recover_profile *profile, u32 bar1_length);
 void gfinit_plan_read(struct gfinit_plan *out, const struct recover *r,

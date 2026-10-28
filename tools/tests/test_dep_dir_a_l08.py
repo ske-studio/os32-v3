@@ -50,9 +50,10 @@ def contracts():
     wrappers = diagnostic + '\n' + wrappers
     assert 'pci.h' not in spec['includes'] and 'pci_dev_contract.h' in spec['includes']
     assert '#include "pci_bind.h"' not in (ROOT / 'kapi/kapi_sys.c').read_text()
+    # GF4c/2a explicitly changes the private C plan/capture layout; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x7a941bb8U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x39731fc6U' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x7d90586cU' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0xe0c871d7U' in hwdev
     print('PASS fixed baseline public ABI/generated files, wrapper guards/snapshot, A4/B5 and hwdev CRC')
     return wrappers
 

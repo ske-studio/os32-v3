@@ -43,7 +43,10 @@ int paging_pte_restore(u32 va,u32 raw)
 static void physical(u32 va,u32 width,bool write)
 {
     CHECK(active && !irq_state && width==active->width);
-    CHECK(mapped_pa+(va-MEM_DEVICE_APERTURE_BASE)==(rawbars[active->bar]&~15U)+active->offset);
+    u32 offset=active->offset;
+    const struct recover_target *t=&profile.targets[active->key];
+    if(!write && t->space==REC_VGA_DIRECT && t->port==0x3c2)offset+=0x3cc-0x3c2;
+    CHECK(mapped_pa+(va-MEM_DEVICE_APERTURE_BASE)==(rawbars[active->bar]&~15U)+offset);
     CHECK(mapped_flags==(PTE_PRESENT|PTE_PCD|(write?PTE_RW:0)));
 }
 static int memory_read(void *v,u32 va,u32 width,u32 *out)
