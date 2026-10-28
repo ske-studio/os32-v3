@@ -129,3 +129,8 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 25,175 kHzの実ROM limitsでの係数/誤差、PLL lock/実周波数、510 bit9=1時の像、POST無しで§3のstateが十分かは未確認。実装前のmanifestと実機の映像を区別する。
 初版はanalog専用の省略列を採った。FP/TV停止値、未計算CRのzero state、読戻しmaskは実装時に各targetの資料と照合し、読出し副作用のあるAR/DACに一律verifyを付けない。
 方向単位ログのREC時間/容量と既存cleanupの実対象数による秒数、C出力中の98セル・S0・reboot後の値は未実測。設計作成完了を4cの実機合格とは呼ばない。
+
+## 段 1 の前に PM が埋めたこと (2026-10-28、terra の設計の欠けの報告 — §2 の DCB の照合)
+- 出所: ノートの `~/os32-tmp/evidence/2026-10-28/gf-dcb/DCB.txt` (10/21 の envytools nvbios の出力 s3_nvbios.txt から、ROM のデータの表のデコードした欄だけ。生のバイトは出さない)。
+- DCB 0x96ac 版 3.0 の 4 エントリ: **0 = ANALOG・I2C 0・heads 0 1・CONN 0・OR 0・LOCAL・maxfreq 400000kHz**、1 = ANALOG・I2C 1・heads 0 1・CONN 1・OR 1、2 = TMDS・I2C 1・heads 0 1・CONN 1・OR 0、3 = TV・heads 0 1・CONN 2・OR 1。CONN 0x97da: 0 VGA・1 DVI_I (HPD_1)・2 COMPOSITE・3 S_VIDEO・4 RGB。
+- 帰結: エントリ 0 は head A (0) を許し OR 0・CONN 0 (VGA) なので、**§1・§2 の「head A・ANALOG OR0」の仮の選択は ROM の表と合う** (確定)。RGB-IN に繋がるのが VGA の端子 (CONN 0) か DVI-I のアナログ (CONN 1・OR 1) かは配線の確認 (§10 の未確認) のまま — 映像が出なければ §7 の切り分けに OR 1 を足す。
