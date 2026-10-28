@@ -233,6 +233,13 @@ struct recover_expr {
 #define REC_LAYOUT_MODE_VRAM 8U
 /* Fixed C AR row or complete write-only DAC sequence. */
 #define REC_LAYOUT_MODE_COLOR 16U
+/* Fixed C checks: source/key/mask/expected/keep/result slot, all bound.
+ * Expected may name one existing snapshot or single-use capture. */
+#define REC_LAYOUT_MODE_CHECK 32U
+#define REC_LAYOUT_MODE_WAIT 64U
+enum recover_check_source { REC_CHECK_TARGET, REC_CHECK_IDENTITY, REC_CHECK_ROUTE };
+enum recover_check_arg { REC_CHECK_SOURCE, REC_CHECK_KEY, REC_CHECK_MASK,
+    REC_CHECK_EXPECTED, REC_CHECK_KEEP, REC_CHECK_SLOT, REC_CHECK_ARGS };
 struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
@@ -335,6 +342,7 @@ struct recover_ops {
     int (*mode_vram)(void *opaque, struct recover *r, bool write,
                      u32 *bad_offset, u32 *expected, u32 *actual);
     int (*mode_color)(void *opaque, struct recover *r, u32 row, u32 value);
+    int (*mode_wait)(void *opaque, u32 us);
 };
 struct recover {
     const struct recover_ops *ops;

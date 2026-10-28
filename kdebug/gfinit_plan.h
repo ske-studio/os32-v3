@@ -30,6 +30,8 @@
 #define GF_PLAN_EXPRS 16U
 #define GF_PLAN_VRAM_WORDS 256U
 #define GF_PLAN_CHECK_WORDS 8U
+#define GF_C_CHECK_MAX 96U
+struct gfinit_c_check_result { u32 actual; bool valid; };
 struct gfinit_plan {
     struct recover_plan plan;
     struct recover_plan_entry entries[RECOVER_ENTRY_MAX];
@@ -41,6 +43,9 @@ struct gfinit_plan {
     u32 saved_vram[GF_PLAN_VRAM_WORDS];
     u32 vram_first, vram_node, saved_count;
     u32 mode_flags, c_node, c_unbound;
+    /* Exit route and cell slots stay invalid until stage 2c2 is connected. */
+    struct gfinit_c_check_result c_checks[GF_C_CHECK_MAX];
+    u32 c_check_count;
     u32 pfb_key, bar1_length, capacity_bytes, tested_bytes, capacity_known, full_capacity;
 };
 /* Consumes fresh decoded arrays in place; out.plan borrows their lifetime.

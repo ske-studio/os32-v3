@@ -49,10 +49,10 @@ def contracts():
         wrappers += body + '\n'
     for path, expected in fixture['generated'].items():
         assert digest((ROOT / path).read_bytes()) == expected, path
-    # GF4c/2b2 adds the private fixed AR/DAC callback/type; public ABI stays fixed.
+    # GF4c/2c1 adds private CHECK results and the fixed wait callback/type; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    for crc in ('#define HWDEV_CONTRACT_CRC 0x0dbe9e7dU',
-                '#define HWDEV_LAYOUT_CRC 0x772927aaU'):
+    for crc in ('#define HWDEV_CONTRACT_CRC 0x63363415U',
+                '#define HWDEV_LAYOUT_CRC 0x8f5a07d8U'):
         assert crc in hwdev
     print('PASS fixed b400acb6 public API/version/slots/signatures/out/in/generated ABI; hwdev CRC')
     return fixture, wrappers

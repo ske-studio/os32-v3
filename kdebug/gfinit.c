@@ -259,6 +259,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     g->ops.identity = gfinit_bus_identity; g->ops.raw_config = gfinit_bus_raw_config;
     g->ops.read = gf_read; g->ops.write = gf_write;
     g->ops.mode_vram = gf_mode_vram; g->ops.mode_color = gf_mode_color;
+    g->ops.mode_wait = recover_hal_wait_frame;
     g->ops.local_cleanup = gf_local; g->ops.screen_safe = gf_screen_safe;
     g->s0 = s0;
     r->transport = transport;

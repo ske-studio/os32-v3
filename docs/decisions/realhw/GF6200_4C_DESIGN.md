@@ -166,3 +166,9 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - AR の 21 行と gate 3 行は専用の C 操作とし、各行で 6013DA を読んで FF を reset、AR は 6013C0 に index→data、gate は同 port に 00 または 20 を書く。値・順は段 1 の生成表と mode state を使う。
 - DAC の mask/index/data 3 行は固定 1 操作にまとめ、6813C6=FF→6813C8=00→6813C9 に `gfinit_mode_palette` の RGB 768 byte を書く。操作ごとに gf_bus BEGIN/END 1 組、失敗は既存 trial_end に渡す。通常の read-safe MMIO target や汎用 bulk は追加しない。
 - 未結線は 34→7 節。route・98 セル・入口/出口 CHECK・待ち・cleanup/REC 予算と op13 は後段のまま。旧 phase/許可表の番号は維持し、専用 callback の HWDEV 契約 CRC・layout は生成器で追随する。
+
+## 段 2c1 の結線
+- 入口 CHECK は既存 token の identity、保存した BAR 3 本、Command=0102、cfg50/54・1850/1854=0、route&3=0 を比較する。main4 後の C entry から Q 前の採取へ進む。出口 CHECK は §§3–4 の必須値と 510 の読取りを保持し、係数は 50C 選択後だけ比較する。CR11 は最終 AB、CR17 は C3、SR01 は 01 を比較する。
+- CHECK の node は source/key/mask/expected/keep/result-slot を hash に含める。`recover.c` の `mode_check_access` に読取り・mask 比較・項目ごとの CHECK REC・不一致時の既存 REC_VERIFY 失敗出口をまとめる。524・CR33・C040 は既存 single-use capture を使い、結果は `gfinit_plan.c_checks` に保持する。510 は mask=0、TEST は bit20 のみで sense を除外する。
+- 待ち 3 本は専用の型と `recover_ops.mode_wait` から既存 `recover_delay_ms` の 1ms 分割・safe point へ結ぶ。手本の順序は nouveau c03c1a1 MIT `dispnv04/dfp.c:93–110` (FP_ON 時の OFF→50ms)、`crtc.c:175–234` (P/C の SR01→10ms→CR17)。実行せず leave する CHECK/待ちは拒否する。共有 callback/型の契約 CRC・layout は生成器で追随する。
+- 出口の route とセル結果は `GF_C_EXIT_ROUTE_SLOT` / `GF_C_EXIT_CELL_SLOT` を未成立のまま予約し、対応する未結線 node に slot を記す。R の route/セルも未結線のままなので C 全体の成功はまだ提供しない。cleanup 接続・REC 予算の再計数は 2c3、公開 op13 は段 3。
