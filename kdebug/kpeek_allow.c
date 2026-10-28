@@ -12,6 +12,9 @@
 const KpeekAllowRow kpeek_allow_rows[] = {
 #if GF_VPLL_PROBE
     NV_ROW(KPEEK_NV_VPLL_CONTROL_OFF, KPEEK_NV_VPLL_CONTROL_LEN, KPEEK_W4),
+    /* nouveau nvkm/subdev/clk/nv40.c reads these PLL registers normally (MIT). */
+    NV_ROW(KPEEK_NV_CORE_PLL_OFF, KPEEK_NV_PLL_LEN, KPEEK_W4),
+    NV_ROW(KPEEK_NV_MEM_PLL_OFF, KPEEK_NV_PLL_LEN, KPEEK_W4),
 #endif
     NV_ROW(KPEEK_NV_PMC_OFF,      KPEEK_NV_PMC_LEN,      KPEEK_W4),
     NV_ROW(KPEEK_NV_PBUS_OFF,     KPEEK_NV_PBUS_LEN,     KPEEK_W4),
