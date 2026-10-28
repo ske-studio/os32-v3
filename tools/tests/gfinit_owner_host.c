@@ -510,7 +510,8 @@ static void vpll_budget_test(void)
     struct recover_plan p = {.node_count=100, .arg_count=200};
     u32 rows=128+100*12+200*4;
 #if GF_VPLL_PROBE
-    rows += RECOVER_VPLL_ROWS;
+    CHECK(RECOVER_VPLL_ROWS==20U);
+    rows += 20U;
 #endif
     u32 bytes=rows*(RECOVER_ROW_MAX+1U);
     u32 seconds=(bytes*RECOVER_UART_FRAME_BITS+serial.actual-1)/serial.actual;

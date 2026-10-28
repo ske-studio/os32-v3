@@ -42,10 +42,14 @@ METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
 PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route')
 PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
 BUS_ID = ('pc', 'bar', 'off', 'width')
-VPLL_VERSION = 0x56504c03
+VPLL_VERSION_1 = 0x56504c03
+VPLL_VERSION = 0x56504c04
 VPLL_PC = 0xe623
 VPLL_OFFSETS = (0xc040, 0x680580, 0x680578, 0x680508, 0xc040)
 VPLL_FIRST = 0x12040
+VPLL_STAGE2_FIRST = 0x12045
+VPLL_STAGE2_OFFSETS = (0x68050c, *VPLL_OFFSETS, 0x68050c)
+VPLL_BASELINE = 4
 READBACK_NONE = 0xffffffff
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
@@ -197,14 +201,28 @@ class Records:
                     pre = next((item for item in reversed(stack[:-1]) if item['phase'] == 'gf_pre'), None)
                     if pre is not None:
                         substep = int(pre['substep']) - VPLL_FIRST
+                        stage2 = int(pre['substep']) - VPLL_STAGE2_FIRST
+                        version = self.data['crc'].get('version')
                         if (int(pre['main']) == 2 and int(pre['pc']) == VPLL_PC
                                 and 0 <= substep < len(VPLL_OFFSETS)
                                 and int(fields['pc']) == VPLL_PC and int(fields['bar']) == 0
                                 and int(fields['off']) == VPLL_OFFSETS[substep]
                                 and int(fields['width']) == 4
-                                and self.data['crc'].get('version') != VPLL_VERSION
+                                and version not in (VPLL_VERSION_1, VPLL_VERSION)
                                 and int(fields['readback']) != READBACK_NONE):
                             raise RecoverError('unexpected VPLL readback for profile version')
+                        if (int(pre['main']) == 2 and int(pre['pc']) == VPLL_PC
+                                and 0 <= stage2 < len(VPLL_STAGE2_OFFSETS)
+                                and int(fields['pc']) == VPLL_PC and int(fields['bar']) == 0
+                                and int(fields['off']) == VPLL_STAGE2_OFFSETS[stage2]
+                                and int(fields['width']) == 4):
+                            if version != VPLL_VERSION:
+                                raise RecoverError('unexpected VPLL stage 2 for profile version')
+                            if stage2 == 0:
+                                valid = int(stack[-1]['old']) == VPLL_BASELINE
+                                self.data['vpll_comparison_valid'] = valid
+                                if not valid:
+                                    print('VPLL: 比較として無効 (68050Ch old != 00000004h)', file=sys.stderr)
                 stack.pop()
             if (event == 'PAUSED' or phase == 'final') and stack:
                 raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, stack[-1]['phase']))

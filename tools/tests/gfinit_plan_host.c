@@ -22,10 +22,17 @@ static bool contains(const char *text,const char *wanted)
     for(u32 i=0;text[i];i++) { u32 j=0;while(wanted[j] && text[i+j]==wanted[j])j++;if(!wanted[j])return true; }
     return false;
 }
+static u32 switch_written;
 static u32 corrupt, vram_reads, vram_writes, alias_reads, minimum_reads, alias_maxoffset;
 static int plan_read(void *v,const struct recover_bus_access *a,u32 *value)
 {
     int rc=bus_read_test(v,a,value);
+#if GF_VPLL_PROBE
+    if (!rc && a->space==REC_BAR_MMIO && a->offset==RECOVER_VPLL_SWITCH_OFF &&
+        switch_written && ((corrupt==4 && switch_written==1) || (corrupt==5 && switch_written==2))) {
+        *value ^= 1; switch_written = 0;
+    }
+#endif
     if(!rc && a->space==REC_BAR_VRAM) {
         vram_reads++;
         u32 sub=core.plan->nodes[core.cursor].substep;
@@ -39,6 +46,9 @@ static int plan_read(void *v,const struct recover_bus_access *a,u32 *value)
 }
 static int plan_write(void *v,const struct recover_bus_access *a,u32 value)
 {
+#if GF_VPLL_PROBE
+    if (a->space==REC_BAR_MMIO && a->offset==RECOVER_VPLL_SWITCH_OFF) switch_written++;
+#endif
     if(a->space==REC_BAR_VRAM) {
         /* Both passes write all 256 before their group readback begins. */
         if(vram_writes<512)CHECK(minimum_reads==(vram_writes<256?0:256));
@@ -55,6 +65,7 @@ static void plan_case(u32 damage,u32 amount)
     struct recover_profile expanded;
     CHECK(recover_gf_profile_expand(&expanded,&composed)==0);
     profile.targets=expanded.targets;profile.rules=expanded.rules;profile.layouts=expanded.layouts;
+    profile.target_count=expanded.target_count;profile.rule_count=expanded.rule_count;profile.layout_count=expanded.layout_count;
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0);
     CHECK(gfinit_plan_build(&composed,&decoded,&profile,0x1000000)==0);
     CHECK(composed.plan.node_count<=RECOVER_NODE_MAX && composed.plan.arg_count<=RECOVER_ARG_MAX);
@@ -70,14 +81,21 @@ static void plan_case(u32 damage,u32 amount)
     core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
     executor_bus.read=plan_read;executor_bus.write=plan_write;
     for(u32 i=0;i<profile.target_count;i++)values[i]=0;
-    corrupt=damage;vram_reads=vram_writes=alias_reads=minimum_reads=alias_maxoffset=0;
+    switch_written=0;corrupt=damage;vram_reads=vram_writes=alias_reads=minimum_reads=alias_maxoffset=0;
     for(u32 i=0;i<recover_gf_prepare_plan.node_count;i++) {
         u32 value;
         CHECK(!recover_plan_enter(&core,i));CHECK(!recover_plan_access(&core,&value));CHECK(!recover_plan_leave(&core,0));
     }
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;
-        CHECK(gfinit_exec_run(&core,&execution)==0);
+        int run_rc=gfinit_exec_run(&core,&execution);
+#if GF_VPLL_PROBE
+        if (damage>=4 && main==2) {
+            CHECK(run_rc<0 && core.reason==REC_VERIFY && cleanup_calls==1 && !core.plan);
+            return;
+        }
+#endif
+        CHECK(run_rc==0);
     }
     for(u32 i=0;i<GF_PLAN_VRAM_WORDS;i++)values[composed.vram_first+i]=0x12340000U+i;
     values[composed.pfb_key]=amount;
@@ -117,6 +135,9 @@ static void plan_case(u32 damage,u32 amount)
 void _start(void)
 {
     gf_fixture_init();
+#if GF_VPLL_PROBE
+    plan_case(4,0);plan_case(5,0);
+#endif
     plan_case(0,0);plan_case(1,0);plan_case(0,0x01000000U);
     plan_case(0,0x02000000U);plan_case(0,0x03000000U);plan_case(2,0x01000000U);plan_case(3,0);
     bus_setup();fixture();
@@ -124,6 +145,7 @@ void _start(void)
     struct recover_profile expanded;
     CHECK(recover_gf_profile_expand(&expanded,&composed)==0);
     profile.targets=expanded.targets;profile.rules=expanded.rules;profile.layouts=expanded.layouts;
+    profile.target_count=expanded.target_count;profile.rule_count=expanded.rule_count;profile.layout_count=expanded.layout_count;
     CHECK(gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded)==0);
     CHECK(gfinit_plan_build(&composed,&decoded,&profile,0x80000000U)==0);
     CHECK(composed.plan.node_count<=RECOVER_NODE_MAX && composed.plan.arg_count<=RECOVER_ARG_MAX);

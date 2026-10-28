@@ -7,8 +7,8 @@ import host32
 import mutpar
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-def command(exe):
-    return ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
+def command(exe, probe=False):
+    return ['gcc', *(['-DGF_VPLL_PROBE=1'] if probe else []), '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-O2', '-nostdlib',
             '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-I'+str(ROOT/'tools/tests/recover_hostshim'),
             '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_plan_host.c'), '-o', str(exe)]
@@ -42,6 +42,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gf-plan-') as td:
         exe=pathlib.Path(td)/'host'
         subprocess.run(command(exe),check=True,cwd=ROOT)
+        result=host32.run([str(exe)],cwd=ROOT,timeout=60)
+        if result.returncode:return result.returncode
+        subprocess.run(command(exe, True),check=True,cwd=ROOT)
         result=host32.run([str(exe)],cwd=ROOT,timeout=60)
         if result.returncode:return result.returncode
     if '--mutate' in sys.argv:
