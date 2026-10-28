@@ -223,3 +223,17 @@ PAUSEDは正常な途中帰還でfinal OKを要求しない。RECを保存し、
 - **N3 (A4)**: 立会いの前に A4 の資料が揃っていなければ、**main 4 の DONE の確認の後は abort (期待 PARTIAL) → 電源の入れ直しで終わる**。A4 は資料を別に用意して個別に承認したときだけ同じ試行で続ける (cold-required なので、続けなければ次回は電源 → A1 → A2 → main 0〜4 のやり直し)。
 - 補足 (第 2 回): ノートのタイムアウトで自動 abort した場合の終端は reason=REC_ABORT で `result=PARTIAL` (FAIL ではない、recover.c:1219)。RUN_ONE が自分で止まったとき (読み戻しの不一致など) は `result=FAIL target=S0 unknown=1` (recover.c:369-372) で、abort を重ねずに電源の入れ直しへ進む。
 - ユーザーに上げる未決は **A4 を同じ立会い・同じ試行で続けるか** の 1 件だけ (推奨: A4 の資料を別に用意し、個別に承認したときだけ続ける。今回は用意していないので main 4 の後に終わる)。
+
+### VIDEO PLL 直後の観測 (GF_VPLL_PROBE)
+
+[確定設計](../../docs/decisions/realhw/GF6200_VPLL_PROBE.md) の段 1 では、
+`make GF_VPLL_PROBE=1 gf-vpll-probe` で作る `build/out/gf-vpll-probe/kdebug.bin` と
+`hwdev.mod` を同じ `vmkernel.lz4` の組として使い、対応する `tools/rshell_recover.py` を使う。
+証拠に元 commit、フラグ、GF profile version `56504C03h`、各成果物と image の CRC を記録する。
+main 2 の pc=E623h、substep=12040h〜12044h の END.readback は順に C040h、
+680580h、680578h、680508h、C040h の各書込み直後の 32bit 実測である。
+要求と旧値を併記し、不一致でも続行する。`FFFFFFFFh` も診断版では実測値であり、
+他版のこの 5 規則では未採取を表す。読戻し一致は PLL lock の証明ではない。
+A1 後・A2 前に 68050Ch を、final/EOT 後・電源再投入前に 680508h、680578h、
+680580h、C040h、68050Ch を kpeek し、sid・時点・順序を記録する。
+PAUSED 中の kpeek は行わない。時点の違う値を同時値として扱わない。

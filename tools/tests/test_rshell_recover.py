@@ -348,7 +348,24 @@ def protocol_cases(m):
             opened.assert_not_called()
 
 
+def vpll_cases(m):
+    for version in (4, m.VPLL_VERSION):
+        for i, offset in enumerate(m.VPLL_OFFSETS):
+            for value in (0xffffffff, 0x80000e02):
+                rec = m.Records(7)
+                rec.line(META.replace('version=1', 'version=%d' % version))
+                rec.line('REC sid=7 seq=2 phase=gf_pre event=BEGIN main=2 pc=58915 opcode=75 exec=1 substep=%d' % (m.VPLL_FIRST+i))
+                rec.line('REC sid=7 seq=3 phase=gf_bus event=BEGIN pc=58915 bar=0 off=%d width=4 old=1 new=2' % offset)
+                try:
+                    rec.line('REC sid=7 seq=4 phase=gf_bus event=END pc=58915 bar=0 off=%d width=4 readback=%d rc=0' % (offset, value))
+                except m.RecoverError:
+                    assert version != m.VPLL_VERSION and value != 0xffffffff
+                else:
+                    assert version == m.VPLL_VERSION or value == 0xffffffff
+
+
 MUTATIONS = [
+    ('vpll_version', "self.data['crc'].get('version') != VPLL_VERSION", 'False'),
     ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
     ('sequence', "sid != candidate_sid or seq != self.data['seq'] + 1", "sid != candidate_sid"),
     ('required', "if name not in fields:  # Mandatory fields must precede state updates.", "if False:  # Mandatory fields must precede state updates."),
@@ -379,6 +396,7 @@ def mutation(item):
             status_cases(mutant)
             gfinit_cases(mutant)
             protocol_cases(mutant)
+            vpll_cases(mutant)
         except (AssertionError, mutant.RecoverError):
             return name + ': RED', 0
         return name + ': GREEN', 1
@@ -392,6 +410,7 @@ def main():
     status_cases(load(SRC))
     gfinit_cases(load(SRC))
     protocol_cases(load(SRC))
+    vpll_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.

@@ -473,7 +473,11 @@ int recover_now_session(struct recover *r, u32 session)
     if (session || !r->s0_profile || !r->ops->ticks || !r->ops->start_ready ||
         !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) return -1;
     const struct recover_profile *p = r->s0_profile;
-    if (p->version != RECOVER_PROFILE_VERSION || p->crc != recover_profile_crc(p) ||
+    if ((p->version != RECOVER_PROFILE_VERSION
+#if GF_VPLL_PROBE
+        && p->version != RECOVER_PROFILE_VPLL_VERSION
+#endif
+        ) || p->crc != recover_profile_crc(p) ||
         p->count || p->quiesce_count || !p->restore_limit ||
         p->restore_limit >= RECOVER_HALF_TICKS || !p->restore_max_polls ||
         !p->restore_log_bytes || p->s0_reserve_ticks || p->s0_reserve_polls ||
@@ -656,7 +660,11 @@ static bool index_save_safe(const struct recover_profile *p, u32 key)
 }
 int recover_profile_ok(const struct recover_profile *p)
 {
-    if (!p || p->version != RECOVER_PROFILE_VERSION || p->count > RECOVER_MAX_REGS || (p->count && !p->regs) ||
+    if (!p || (p->version != RECOVER_PROFILE_VERSION
+#if GF_VPLL_PROBE
+        && p->version != RECOVER_PROFILE_VPLL_VERSION
+#endif
+        ) || p->count > RECOVER_MAX_REGS || (p->count && !p->regs) ||
         p->quiesce_count > RECOVER_MAX_REGS || (p->quiesce_count && !p->quiesce) ||
         !p->targets || !p->target_count || p->target_count > RECOVER_TARGET_MAX ||
         p->rule_count > RECOVER_RULE_MAX || (p->rule_count && !p->rules) ||
@@ -2013,7 +2021,13 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
         if (dir == REC_SELECT) r->port_selected[r->index_port[target]] =
             *value == t->index ? target : RECOVER_NONE;
         u32 actual = RECOVER_NONE;
-        if (w->verify_mask) {
+        if (w->verify_mask
+#if GF_VPLL_PROBE
+            || (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&
+                w->main_id == RECOVER_VPLL_MAIN && w->pc == RECOVER_VPLL_PC &&
+                w->substep >= RECOVER_VPLL_FIRST && w->substep <= RECOVER_VPLL_LAST)
+#endif
+            ) {
             /* SELECT readback reads the index port, not its data register. */
             if (!t->read_safe) return access_error(r, target);
             if ((r->state == REC_RESTORING && recover_restore_point(r)) ||

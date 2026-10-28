@@ -9,6 +9,7 @@ struct trace_item {u32 dir,key,value;};
 static struct trace_item expected[TRACE_MAX], actual[TRACE_MAX];
 static u32 expected_count,actual_count, reference_values[RECOVER_TARGET_MAX];
 static u32 clock_value,clock_jump,wait_total,clock_fail,wait_fail,bus_fail;
+static u32 vpll_reads;
 static u32 seen[256], ref_head,ref_skip;
 static struct recover_target exec_targets[RECOVER_TARGET_MAX];
 static struct recover_rule exec_rules[RECOVER_NODE_MAX];
@@ -31,6 +32,13 @@ static int exec_bus_read(void *v,const struct recover_bus_access *a,u32 *value)
 {
     (void)v;
     if(bus_fail)return -1;
+    if (core.entered && core.plan && core.cursor < core.plan->node_count) {
+        const struct recover_plan_node *n = &core.plan->nodes[core.cursor];
+        if (a->key == core.plan->args[n->arg_first].value &&
+            n->main_id == RECOVER_VPLL_MAIN && n->pc == RECOVER_VPLL_PC &&
+            n->substep >= RECOVER_VPLL_FIRST && n->substep <= RECOVER_VPLL_LAST)
+            vpll_reads++;
+    }
     *value=a->dir_substep==REC_SELECT?indices[a->key]:values[a->key];
     return 0;
 }
@@ -264,6 +272,7 @@ static void all_trace(void)
     }
     CHECK(contract_bind()==0);exec_arm();
     for(u32 i=0;i<profile.target_count;i++)reference_values[i]=values[i]=0;
+    vpll_reads=0;
     for(u32 main=0;main<5;main++) {
         ref_head=ref_skip=0;actual_count=expected_count=0;
         u32 pc=decoded.nodes[decoded.entries[main].first].pc;
@@ -273,6 +282,13 @@ static void all_trace(void)
         CHECK(rc==0);if(rc)return;
         compare_trace();output("main trace ");number(main);output(" events ");number(actual_count);output(" steps ");number(execution.steps);output("\n");
     }
+#if GF_VPLL_PROBE
+    output("VPLL reads ");number(vpll_reads);output("\n");
+    CHECK(vpll_reads==5);
+#else
+    output("VPLL reads ");number(vpll_reads);output("\n");
+    CHECK(vpll_reads==0);
+#endif
     u32 kinds=0;for(u32 i=0;i<256;i++)if(seen[i])kinds++;
     CHECK(kinds==27);output("opcode traces ");number(kinds);output("\n");
 }

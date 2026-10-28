@@ -113,3 +113,6 @@ S0は98 CUI・legacy解放・予約テキストセル復元検証、S1は安全�
 - **F3**: ノートの `rshell_recover.py` は result=OK のときだけ成功とするので (tools/rshell_recover.py:68-73,123-128,236-238)、**正常な A4 でも必ず rc=1 と `recover: missing/failed verification or lost logs` が出る**。final の行で判定する。
 - **F4**: VERIFY の中で saved_count≠256 のときは trial_end を通らず、REC_OPERATION (trial=3) の FAIL になる (gfinit_plan.c:248、recover.c:1250-1251)。終端の表の trial の値に 3 も加える。
 - ユーザー決定 (2026-10-26): **A4 は同じ立会い・同じ試行で続ける** (推奨どおり)。実施は次に実機の前に行くとき。
+
+VIDEO PLL 診断版を用いる回は、[main の観測手順](gf_main.md#video-pll-直後の観測-gf_vpll_probe)に従い、
+final/EOT 後の kpeek に C040h と 68050Ch を含め、各値の採取時点と順序を残す。
