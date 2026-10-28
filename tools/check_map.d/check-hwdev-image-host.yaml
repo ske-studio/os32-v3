@@ -13,6 +13,7 @@ check-hwdev-image-host:
 - include/hwdev_private.h
 - kdebug/gfinit*.c
 - kdebug/gfinit*.h
+- kdebug/gfinit_budget.inc
 - kdebug/recover*.h
 - kdebug/recover_gf.c
 - kdebug/generated/recover_gf_tables.inc

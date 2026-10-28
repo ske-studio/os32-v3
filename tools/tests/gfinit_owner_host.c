@@ -111,7 +111,11 @@ int gfinit_plan_build_c(struct gfinit_plan *p,struct gfinit_decode *d,struct rec
 #if GF_VPLL_PROBE
     (void)p;(void)d;(void)profile;(void)length;return -1;
 #else
-    int rc=gfinit_plan_build(p,d,profile,length);p->mode_flags=GF_MODE_C;return rc;
+    int rc=gfinit_plan_build(p,d,profile,length);p->mode_flags=GF_MODE_C;
+    p->c_node=plan_nodes-1;p->plan.nodes=d->nodes;p->plan.args=d->args;
+    d->nodes[p->c_node]=(struct recover_plan_node){.opcode=GF_C_OPCODE,.substep=GF_C_SECTION};
+    p->layouts[0]=(struct recover_opcode_layout){.opcode=GF_C_OPCODE,.substep=GF_C_SECTION,.dir_substep=RECOVER_NONE};
+    return rc;
 #endif
 }
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
@@ -192,6 +196,7 @@ static void prepared(void)
 static void mode_c_test(void)
 {
     setup();prepared();
+    CHECK(!core.route_write_approved);
     CHECK(owner->prepare_flags==GF_ALLOW_WRITE && !owner->compiled->mode_flags);
     u32 before=begins;
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)<0 && begins==before);
@@ -212,6 +217,11 @@ static void mode_c_test(void)
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)==0);
     CHECK(owner->prepare_flags==(GF_ALLOW_WRITE|GF_MODE_C));
     CHECK(owner->compiled->mode_flags==GF_MODE_C && core.state==REC_PAUSED);
+    CHECK(core.route_write_approved);
+    u32 budget_bytes=(128+(plan_nodes-1)*12)*(RECOVER_ROW_MAX+1U);
+    u32 budget_seconds=(budget_bytes*10+9599)/9600;
+    CHECK(core.log_limit==(budget_seconds*2+RECOVER_BUDGET_MARGIN_S)*PIT_HZ);
+    CHECK(transport.max_polls==budget_bytes*2+1024);
     before=begins;
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)==0 && begins==before);
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)<0 && begins==before);
@@ -559,7 +569,8 @@ static void cli_write_test(void)
 }
 static void vpll_budget_test(void)
 {
-    struct gfinit_owner g = {0}; struct recover r = {0};
+    static struct gfinit_plan budget_plan;
+    struct gfinit_owner g = {.compiled=&budget_plan}; struct recover r = {0};
     struct recover_transport t = {0};
     struct recover_plan p = {.node_count=100, .arg_count=200};
     u32 rows=128+100*12+200*4;
