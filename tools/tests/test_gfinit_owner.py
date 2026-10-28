@@ -14,6 +14,8 @@ INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
 MUTATIONS = [
+    ('modeset_flag', 'op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C)', 'op == GF_OP_MODESET'),
+    ('modeset_order', 'owner->next_main == GF_INIT_MAINS && r->state == REC_PAUSED', 'true'),
     ('cache_flags', ' && owner->last.flags == q.flags', ''),
     ('cache_flags_subset', 'owner->last.flags == q.flags',
      '(owner->last.flags & q.flags) == owner->last.flags'),

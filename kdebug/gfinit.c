@@ -332,6 +332,25 @@ static int gf_fixed(struct recover *r, void *arg)
     }
     return 0;
 }
+static int gf_modeset(struct recover *r, void *arg)
+{
+    struct gfinit_plan *plan = arg;
+    while (r->expected_node != RECOVER_NONE) {
+        u32 id = r->expected_node, value = 0, edge = 0;
+        const struct recover_opcode_layout *layout = r->node_layout[id];
+        if (recover_safe_point(r) || recover_plan_enter(r, id)) return -1;
+        int rc = 0;
+        if (layout->flags & (REC_LAYOUT_MODE_CHECK | REC_LAYOUT_MODE_WAIT | REC_LAYOUT_MODE_ROUTE))
+            rc = gfinit_plan_c_control(plan, r);
+        else if (layout->flags & REC_LAYOUT_CHECK_EXPR)
+            rc = recover_plan_check(r, &edge);
+        else if (layout->dir_substep != RECOVER_NONE ||
+                 (layout->flags & (REC_LAYOUT_MODE_VRAM | REC_LAYOUT_MODE_COLOR)))
+            rc = recover_plan_access(r, &value);
+        if (rc || recover_plan_leave(r, edge)) return -1;
+    }
+    return 0;
+}
 static int gf_begin(struct recover *r, struct gfinit_owner *g,
                     struct recover_transport *transport, bool size, u32 flags)
 {
@@ -409,6 +428,9 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         rc = trial_step(r, &r->token, true, gfinit_exec_run, &e);
         q.steps = e.steps; q.fail_pc = e.fail_pc;
         if (!rc) owner->next_main++;
+    } else if (owner && op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C) &&
+               owner->next_main == GF_INIT_MAINS && r->state == REC_PAUSED) {
+        rc = trial_step(r, &r->token, true, gf_modeset, owner->compiled);
     } else if (owner && op == GF_OP_VERIFY && owner->next_main == GF_INIT_MAINS &&
                !(owner->prepare_flags & GF_MODE_C)) {
         rc = trial_step(r, &r->token, true, gfinit_plan_verify, owner->compiled);

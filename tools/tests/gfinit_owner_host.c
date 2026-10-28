@@ -21,6 +21,7 @@ static u8 image[GF_ROM_MAX];
 static u32 failures, allocations, frees, reads, writes, begins, steps, ends, cleans;
 static u32 expand_fail, expand_calls, detach_fail, plan_reads, boot_fail;
 static u32 run_mask, run_fail, step_fail, decode_fail, probe_fail, peek_fail, verify_calls;
+static u32 mode_calls, mode_fail;
 static char events[64]; static u32 event_count;
 static void output(const char *s)
 { u32 n=0,result;while(s[n])n++;__asm__ volatile("int $0x80":"=a"(result):"0"(4),"b"(1),"c"(s),"d"(n):"memory");(void)result; }
@@ -158,10 +159,14 @@ int trial_end(struct recover *r,const struct recover_token *token,enum recover_r
 { CHECK(token==&r->token);if(r->state!=REC_PAUSED)return -1;ends++;event('E');r->reason=reason;r->ops->local_cleanup(r->opaque);r->state=REC_VERIFIED;r->plan=0;r->cache.bar[1].valid=true;r->cache.bar[1].length=0x100000;return 0; }
 int gfinit_exec_run(struct recover *r,void *arg)
 { struct gfinit_exec *e=arg;CHECK(r==&core && e->rom==owner->rom && e->rom_size==512);CHECK(e->main_id<5);run_mask|=1U<<e->main_id;e->steps=9;e->fail_pc=0;if(run_fail==e->main_id+1)return -1;writes++;return 0; }
+int gfinit_plan_c_control(struct gfinit_plan *p,struct recover *r)
+{ CHECK(p==owner->compiled && r==&core);mode_calls++;writes++;return mode_fail?-1:0; }
+int recover_plan_check(struct recover *r,u32 *edge)
+{ (void)r;(void)edge;CHECK(false);return -1; }
 int recover_safe_point(struct recover *r) { return r->state==REC_RUNNING?0:-1; }
-int recover_plan_enter(struct recover *r,u32 node) { (void)r;(void)node;CHECK(false);return -1; }
+int recover_plan_enter(struct recover *r,u32 node) { CHECK(r==&core && node==owner->compiled->c_node);return 0; }
 int recover_plan_access(struct recover *r,u32 *value) { (void)r;(void)value;CHECK(false);return -1; }
-int recover_plan_leave(struct recover *r,u32 edge) { (void)r;(void)edge;CHECK(false);return -1; }
+int recover_plan_leave(struct recover *r,u32 edge) { CHECK(r==&core && !edge);r->expected_node=RECOVER_NONE;return 0; }
 int recover_bar_probe(struct recover *r,u32 bar,u32 raw,u32 mask,const struct recover_range *exclude,u32 n,const struct recover_range *allowed,u32 m)
 { (void)r;(void)bar;(void)raw;(void)mask;(void)exclude;(void)n;(void)allowed;(void)m;CHECK(false);return -1; }
 static int base_cleanup(void *opaque) { (void)opaque;cleans++;return 0; }
@@ -182,6 +187,7 @@ static void setup(void)
     expand_fail=expand_calls=detach_fail=plan_reads=boot_fail=0;
     zero(&control,sizeof(control));owner=0;zero(&gf_lease,sizeof(gf_lease));gf_device.generation=1;gf_device.state=HWDEV_STOPPED_UNOWNED;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
+    mode_calls=mode_fail=0;
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
     image[0x40]=0xff;image[0x41]=0xb8;image[0x42]='B';image[0x43]='I';image[0x44]='T';
@@ -201,8 +207,9 @@ static void mode_c_test(void)
     u32 before=begins;
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)<0 && begins==before);
     CHECK(owner->prepare_flags==GF_ALLOW_WRITE && !owner->compiled->mode_flags);
-    /* Stage 2a exposes neither op13 nor an upgrade of an old prepare. */
-    CHECK(call(13,GF_ALLOW_WRITE,0)<0);
+    for(u32 main=0;main<GF_INIT_MAINS;main++) CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE,main)==0);
+    u32 old_writes=writes;
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)<0 && writes==old_writes && !mode_calls);
     CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0);
     setup();
     CHECK(call(GF_OP_INSPECT,GF_MODE_C,0)<0 && !reads);
@@ -227,15 +234,37 @@ static void mode_c_test(void)
     CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)<0 && begins==before);
     CHECK(owner->prepare_flags==(GF_ALLOW_WRITE|GF_MODE_C));
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
+        u32 old_writes=writes;
+        CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)<0 && writes==old_writes && !mode_calls);
         CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE|GF_MODE_C,main)<0);
         CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE,main)==0 && core.state==REC_PAUSED);
     }
     CHECK(owner->next_main==5);
     CHECK(call(GF_OP_VERIFY,GF_ALLOW_WRITE,0)<0 && !verify_calls && core.state==REC_PAUSED);
-    CHECK(call(13,GF_ALLOW_WRITE,0)<0 && core.state==REC_PAUSED);
+    struct gfinit_request wrong=request(GF_ALLOW_WRITE,0);wrong.session++;
+    old_writes=writes;
+    CHECK(gfinit_call(GF_OP_MODESET,&wrong,sizeof(wrong),&base,&transport,&s0)<0 && writes==old_writes);
+    CHECK(call(GF_OP_MODESET,0,0)<0 && writes==old_writes);
+    core.state=REC_RUNNING;
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)<0 && writes==old_writes && !mode_calls);
+    core.state=REC_PAUSED;owner->last_op=RECOVER_NONE;
+    core.expected_node=owner->compiled->c_node;
+    owner->compiled->layouts[0].flags=REC_LAYOUT_MODE_CHECK;
+    core.node_layout[core.expected_node]=&owner->compiled->layouts[0];
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)==0 && mode_calls==1 && writes==old_writes+1 && core.state==REC_PAUSED);
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)==0 && mode_calls==1); /* retransmit */
     CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && !live_pages && !owner->prepare_flags);
 #endif
-    output("MODE_C flags / cache / old prepare refusal / PAUSED PASS\n");
+#if !GF_VPLL_PROBE
+    setup();CHECK(call(GF_OP_INSPECT,0,0)==0);CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_MODE_C,0)==0);
+    for(u32 main=0;main<GF_INIT_MAINS;main++) CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE,main)==0);
+    core.expected_node=owner->compiled->c_node;
+    owner->compiled->layouts[0].flags=REC_LAYOUT_MODE_CHECK;
+    core.node_layout[core.expected_node]=&owner->compiled->layouts[0];mode_fail=1;
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)<0 && mode_calls==1 && core.state==REC_FAILED && cleans==2 && !live_pages);
+#endif
+    output("MODE_C modeset gates / PAUSED / failure / cache PASS\n");
 }
 static void lifecycle(void)
 {

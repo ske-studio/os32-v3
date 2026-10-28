@@ -120,7 +120,7 @@ static int recovery_attach(void)
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
     struct recover *r = recover_owner();
-    if (op >= GF_OP_INSPECT && op <= GF_OP_ABORT) {
+    if ((op >= GF_OP_INSPECT && op <= GF_OP_ABORT) || op == GF_OP_MODESET) {
         const struct hwdev_ops *ops = hwdev_module_ops();
         if (!ops || recovery_attach()) return -1;
         int rc = ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);
