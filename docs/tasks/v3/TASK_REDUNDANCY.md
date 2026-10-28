@@ -1,18 +1,19 @@
 # TASK_REDUNDANCY — ユーザーランド外の冗長コードの整理
 
 > 状態: **計画 (2026-10-29)** — 調査・裏取りを段へ分解した票。実装・受入は未着手。
-> 上位: [ROADMAP](../../ROADMAP.md)・開発規約 [POLICY_DEV](../../POLICY_DEV.md) §2「ソースファイルの大きさ」。先行: [TASK_GEFORCE6200](../realhw/TASK_GEFORCE6200.md)・[TASK_HWDEV](../realhw/TASK_HWDEV.md)。調査の原文 (`REPORT.md`・`VERIFY.md` の行番号の引用先) は `~/os32-tmp/run/redundancy/`。
+> 上位: [ROADMAP](../../ROADMAP.md)・開発規約 [POLICY_DEV](../../POLICY_DEV.md) §2「ソースファイルの大きさ」。先行: [TASK_GEFORCE6200](../realhw/TASK_GEFORCE6200.md)・[TASK_HWDEV](../realhw/TASK_HWDEV.md)。調査の原文 (`REPORT.md`・`VERIFY.md`・`REPORT2.md`・`VERIFY2.md` の引用先) は `~/os32-tmp/run/redundancy/`。
 >
-> 作成: sol (gpt-6.1-sol) が起草、Opus のレビュー 1 回 (要修正 (軽微)、P2 1 件・P3 5 件を全部採って r2)。実装は GeForce の後、§2 の 2 段 (A01・A06) を sol と terra に並行で出して比べる (ユーザー 2026-10-29)。
+> 作成: sol (gpt-6.1-sol) が起草、Opus のレビュー 1 回を反映した r2 を元に、票に載っていないファイルの再調査 (REPORT2・REPORT3、ユーザー指示 2026-10-29) と Opus の裏取り (VERIFY2) の訂正を取り込んだ **r3**。実装は GeForce の後、§2 の 2 段 (A01・A06) を sol と terra に並行で出して比べる (ユーザー 2026-10-29)。
 
 OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定しない。目的は、使わない定義と重複を減らし、既存の振る舞いを保って大きいソースを分けること。新しい防御・権限分離は足さない。
-対象は手書きの kernel・exec・KAPI・drivers・FS・gfx・kdebug・boot・共通ライブラリ。ユーザーランド、生成物、第三者コード、フォント表は除く。ヘッダ・ビルド定義・試験は対象変更に必要な追従だけ含める。
+対象は BRIEF の kernel/・kdebug/・hwdev/・drivers/・fs/・exec/・lib/・gfx/・kapi/・platform/・net/・arch/・boot/ の手書きコード。ユーザーランド、生成物、第三者コード、フォント表は除く。ヘッダ・ビルド定義・試験は対象変更に必要な追従だけ含める。
 **着手は GeForce の実装（4c の実機の回と本番の画面ドライバ）の後**（`docs/POLICY_DEV.md:131`）。この票の作成ではリポジトリを読み、ビルド・試験・NP21/W・実機操作・コード修正を行わない。
-基点は main `e7302178`。調査の基点 `a839233d`（`REPORT.md:2`）とは異なる。以下の現行行数は今回のソースの物理行を数え直した値。
+基点は main **`7dc9bcbd`**（作業木差分なし）。REPORT は `a839233d`、REPORT2 は `b836a3f1`、r2 票は `e7302178`。以下の現行行数は今回再計数した物理行。
+**r3 要約:** 既存の段・ID と分割対象 14 本を保持し、REPORT2 の 28 件中 27 件を F/G/H 群の 24 段へ追加（G02a は試験補強）。U2-02 は F11 (pack32/cmp32 だけ除去、char_at は残す)。既存段の純減 366〜517 行＋追加 333〜435 行＝**計 699〜952 行 [推]**（F11 の約 30 行・REPORT3・試験追従・移動は除外）。
 
 ## 1. 根拠と読み方
 
-- 件 ID と元の根拠は `REPORT.md:24`〜`:110`。採否・順・危険度は `VERIFY.md:3`〜`:9` を優先する。本文のリポジトリ内パスはリポジトリの根が起点、REPORT/VERIFY は `~/os32-tmp/run/redundancy/` にある。
+- 件 ID と元の根拠は `REPORT.md:24`〜`:110` および `REPORT2.md` の各件。採否・順・危険度は `VERIFY.md:3`〜`:9` と `VERIFY2.md:2`〜`:14` を優先する。本文のリポジトリ内パスはリポジトリの根が起点、REPORT/VERIFY は `~/os32-tmp/run/redundancy/` にある。
 - 規則は `CLAUDE.md:53`〜`:75` の [C1]〜[D4]、割当て・完了条件は `docs/tasks/agents/ROLES.md:12`・`:17`〜`:24`、分割は `docs/POLICY_DEV.md:129`〜`:131`。状態行は同 `:347`〜`:362`。
 - GNU11・既存 kstring・既存 KAPI の番号/ABI・P2V/V2P・DMA の境界と寿命・HAL の制約を保つ。SDK の公開互換と生成物の扱いも従来どおり。分割のために契約の enum を増やさない（`docs/POLICY_DEV.md:143`）。
 - 表の `path:入口 (N)` は根拠の入口行と**ファイル全体の現行 N 行**。`0` は新規候補。削減は追加ヘルパを引いた純減の**推測**。試験の追従分と移動は削減に数えない。数値は着手時に再確認する。
@@ -28,7 +29,7 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 
 ## 3. 未使用・共通化の段（上から実施）
 
-各行は 1 回の依頼。§2 の A01・A06 を先行し、残りは A 群 → B 群 → C 群 → D 群 → E 群（抽出）→ S 群（分割）→ L 群（後回し）の順。同じソースを触る段は直列。各段の状態はすべて計画。旧 A03/B06 は A03、旧 B03〜B05 は B03 に統合し、他の ID は保つ。
+各行は 1 回の依頼。§2 の A01・A06 を先行し、残り A → B → F01〜09 → G01 → G02a/b → F10 → G03〜11 → C → D → E（抽出）→ S（分割）→ L/H（後回し）の順。同じソースを触る段は直列。各段の状態はすべて計画。旧 A03/B06 は A03、旧 B03〜B05 は B03 に統合し、他の ID は保つ。
 
 | 段 | 中身・件 ID | 触るファイルと現行行数（入口が根拠） | 実装者の候補 | 削減の推測 | 退行の危険 | 直接の試験 / 変異の目印への影響 | ゲスト受入 |
 |---|---|---|---|---|---|---|---|
@@ -59,6 +60,38 @@ D05 は `lib/kstring.h:30`・`:33`・`:50` の型・容量契約に従う。kstr
 D11 は型付き init・API 表のコピー・candidate_valid・rc 判定・IRQ/tick/DMA 参照を各入口に残し、既存の text 判定だけを共用する。PCM/FM は init の rc より範囲検証が先、KCG は rc が先（`pcm_module.c:127`・`:134`、`kcg_module.c:45`）。順をそろえない。
 **8 か所は API 表の検証入口**（PCM/FM/KCG/FEP/Cirrus/V86/LAN/SQLite）。さらに `kernel/module_runtime.c:221` の handler 用同式にも同じ述語を使う。`VERIFY.md:4` の拡張範囲を全て含め、参照取得・DMA ラッパそのものの共通化は本段に混ぜない。
 
+### 3.1 REPORT2 の追加段（VERIFY2 の推奨順）
+
+F は未使用・形、G は重複。F01 → F02 → F03 → 未使用アクセサ F04〜08 → F09 → G01 → G02a/b を優先する。F10 は G02b 後、同じ snd_engine.c の G08 より前。新規段もすべて計画。字面依存と実ソース include の追従は §4 の T-R3 群を同段に含める。
+
+| 段 | 中身・件 ID | 触るファイルと現行行数（入口が根拠） | 実装者の候補 | 削減の推測 | 退行の危険 | 直接の試験 / 変異の目印への影響 | ゲスト受入 |
+|---|---|---|---|---|---|---|---|
+| F01 | R2-03、無効な pc98_count_present と呼出し・旧説明を除去 | `gfx/backend_pc98.c:101・:127 (180)`。T-R3-P | terra 可 | 19〜27 | 低 | `test_gfx_kernel_fb.py`・`test_boot_splash_native.py`・`test_gfx_bounds.py`。削除名の直接参照なし。backend を組む fixture と実転送点の計数 M を維持 | 束: F09 で PC-98 表示・present_bytes |
+| F02 | U2-03/U2-12、空の disk.c と未展開 ISR_NOERR を除去 | `drivers/disk.c:14 (14)`、`build/kernel.mk:39 (366)`、`kernel/isr_stub.asm:150 (759)`。T-R3-ASM | terra 可 | 22〜23 | 低 | `test_dep_dir_d3_disk.py`・`test_ledger.py`・`test_fdc_track.py`。disk.h (26) は維持。ASM 字面解析の IRQ/例外入口と M は不変、古い .d の削除ソース参照も扱う | 束: F09 で起動・disk・IRQ/FDD |
+| F03 | U2-01/U2-08、GUI weak 既定 2 本と旧 peek の gui_next_shell を除去 | `kernel/gui.c:221・:256 (270)`、`kernel/gui.h:56 (59)`。T-R3-GUI | terra 可 | 22〜29 | 低（VERIFY2） | `test_ring3_guard.py`・`test_font_source.py`・`test_d2_services.py`。gui.c の実 include とヘッダの字面抽出を確認。強い gfx 本体と gui_take_next_shell を残す、M 維持 | 束: F09 で GUI/CUI・同一シェル再要求 |
+| F04 | U2-04/U2-05、mouse_buttons/set_rate/get_mode と np2_recv_val の実体・宣言を除去 | `drivers/mouse.c:137・:160・:178 (250)`・`mouse.h:29 (69)`、`drivers/np2sysp.c:62 (120)`・`np2sysp.h:28 (36)`。T-R3-MOUSE | sol か astra（PEGC fixture 超過） | 28 | 中 | `test_kbd_dlog.py`・`test_d2_services.py`・`test_pegc_mode.py`。mouse/np2 実 include・pointer fixture を追従、mouse_read_buttons・送信・NP2PORT_VAL と M は維持 | 束: F09 で通常/seamless mouse |
+| F05 | U2-07/U2-09/U2-11、rtc_uptime_sec・shlib_version/text_end・TSS range 2 本を除去 | `drivers/rtc.c:157 (179)`・`rtc.h:77 (79)`、`kernel/shlib.c:14・:65・:84 (132)`・`shlib.h:32 (56)`、`kernel/tss.c:79・:87 (104)`・`tss.h:67 (74)`。T-R3-STATE | terra 可 | 25〜26 | 高（shlib/TSS） | `test_d2_services.py`・`test_shlib_high.py`・`test_double_fault.py`・`test_exec_r1.py`。g_version と専用代入も除去、g_text_pages・port 単位/deny_all/is_allowed を残す。字面/include と M 維持 | 要: 起動・時刻・shlib アプリ・ring3 I/O、次を積む前 |
+| F06 | U2-06、pci_present/seen・pci_bind_reason_get のアクセサだけ除去 | `drivers/pci.c:298・:308 (340)`・`pci.h:36・:63 (80)`、`drivers/pci_bind_match.c:29 (164)`・`pci_bind.h:75 (92)`。T-R3-PCI | terra 可 | 15〜18 | 中 | `test_pci_decode.py`・`test_pci_bind.py`・`test_device_reservation.py`・`test_e82557_drv.py`・`test_lan_module.py`。PCI の字面抽出/include・M を維持。g_pci_present/seen・s_reason は残し pci.h の説明を直す | 束: F09 で PCI 列挙・NIC 部品 |
+| F07 | U2-10、crc32_stream_init/update/final と専用説明・宣言を除去 | `lib/crc32.c:20 (33)`・`crc32.h:26 (30)`。T-R3-CRC | sol か astra（CRC fixture 超過） | 15〜21 | 中 | `test_hsync_h1.py`・`test_lanfs.py`・`test_serialfs.py`。関数名の試験参照なし、実 core include と calc の M を維持、CRC32_INIT/core は残す | 束: F09 で CRC を伴う読込・同期 |
+| F08 | U2-13、atapi_present だけを除去 | `drivers/atapi.c:678 (825)`・`atapi.h:163 (218)`。T-R3-CD | sol か astra（CD fixture 超過） | 約 5 | 中 | `test_cd_read.py`。`cd_read_host.c:76` は atapi.c を include、`:2132` の atapi_test_unit_ready 呼出しは残す。媒体確認/再試行・既存 M 維持 | 束: F09 で CD 起動/読出し・媒体無し |
+| F09 | R2-02、clip 成功後の重複検査と再 clip だけ除去 | `gfx/gfx_vram.c:88・:98 (506)`。T-R3-P | terra 可 | 12 | 中 | `test_gfx_bounds.py`・`test_kapi_bounds.py`・`test_gfx_kernel_fb.py`。入口 gfx_clip_screen を残し、幅 640・32px 整列の事後条件を確認。実ソース fixture/M を維持 | 要: F01〜08 の束＋400/200 行・負座標/端の矩形 |
+| G01 | D2-01、shell_print_utf8/console_write の復号後の描画を共用 | `kernel/console.c:260・:353 (466)`。T-R3-CON | terra 可 | 35〜50 | 高 | `test_con_sink.py`・`test_dep_dir_d_console.py`・`test_bootlog.py`・`test_ime_display.py`。実 console include の fixture と M を維持、NUL/長さ入力・不完全 UTF-8・sink/bootlog/RSHELL・cursor 同期は各入口に残す | 要: ANK/漢字/代替・折返し/scroll・入力表示 |
+| G02a | D2-03 の前提、read_file/read_stream の違いを試験で固定 | `tools/tests/test_ext2_read_bound.py (51)`・`ext2_read_bound_host.c (240)` | terra 可 | 0 | 低（試験のみ） | 同試験の実 ext2_file.c include を拡充。端数・全ブロック・範囲外を書かない境界・hole 打切り・エラー・stream だけの通常ファイル判定を固定。新 M は一意 | 不要: G02b の受入へ |
+| G02b | D2-03、inode 内の範囲読込を共用（G02a の後） | `fs/ext2_file.c:7・:60 (538)`、同試験 2 本、T-R3-EXT | sol か astra（試験追従が超過） | 25〜35 | 高 | `test_ext2_read_bound.py`・`test_ext2_write_io.py`・`test_b8_open.py`・`test_vfs_fd_path.py`。実 include の複数 fixture と M を追従、read_file に通常ファイル検査を足さず、hole/戻り値/累積を維持 | 要: ext2 一括/stream・exec のヘッダ/本体読込 |
+| F10 | R2-01、SE 定数表へ整理し snd_init 直前の二重 duration ゼロ化を除去 | `kernel/snd_engine.c:501・:655 (912)`、`tools/tests/fm_playback_host.c (84)`・`test_fm_module.py (111)` | terra 可 | 15〜25 | 中 | `test_fm_module.py` が実 snd_engine.c を include する上記 fixture を組む（`:91`）。6 定義・未定義 ID の duration=0・可変表を保持するケースを補う。対象名の字面解析/既存 M は未検出、FM 側の M は維持 | 要: FM/SSG の既存 SE と未定義 ID |
+| G03 | D2-02、present_dirty/nosync の共通部 | `gfx/gfx_vram.c:246・:279 (506)`。T-R3-P | terra 可 | 12〜18 | 高 | `test_gfx_kernel_fb.py`・`test_gfx_attach.py`・`test_boot_splash_native.py`。実ソース fixture の M を追従。非 flip の VSYNC、dirty だけの gfx_diag_px、snapshot/merge/flush/flip・commits 順は維持 | 要: 同期/非同期・flip 有無・dirty 診断 |
+| G04 | D2-04 前半、FAT 一括/stream の読込だけ共用 | `fs/fatfs_vfs.c:211・:348 (807)`、`tools/tests/test_fdc_track.py:195 (603)`、T-R3-FAT | sol か astra（T-FD 超過） | G05 と合算 | 高 | `test_fatfs_stat.py`・`test_fdc_track.py`・`test_vfs_fd_path.py`。字面の open→seek→read→close 検査を helper/入口の両方へ追従。full 側は seek せず、失敗/close 順と M 維持 | 要: FAT 一括/stream・FDD 読込 |
+| G05 | D2-04 後半、FAT 一括/stream の書込だけ共用 | `fs/fatfs_vfs.c:235・:375 (807)`、`tools/tests/test_bootlog.py:216 (291)`、T-R3-FAT | sol か astra（T-FD 超過） | G04〜05 計 20〜30 | 高 | `test_fatfs_stat.py`・`test_bootlog.py`・`test_fdc_track.py`・`test_vfs_fd_path.py`。字面の return (int)bw と close エラー検査を追従。CREATE_ALWAYS/OPEN_ALWAYS・full 側 seek 無し・remount・M 維持 | 要: FAT 上書き/offset 書込・bootlog・close 失敗 |
+| G06 | D2-05、inode の位置計算と既存ブロック読込だけ共用 | `fs/ext2_inode.c:12・:55 (584)`。T-R3-EXT | sol か astra（試験追従が超過） | 8〜12 | 高 | `test_ext2_write_io.py`・`test_b8_open.py`・`test_ext2_empty_name.py`・`test_vfs_fd_path.py`。実 inode include と M を追従。decode/encode/write-back と同一ブロックの他 inode を保持 | 要: ext2 inode 更新・同一ブロックの他ファイル |
+| G07 | D2-06、free/mark_leaked の span 探索を共用 | `kernel/dma_pool_math.c:154・:185 (203)`、`tools/tests/test_dma_pool.py:82 (234)`・`dma_pool_host.c:16 (460)` | terra 可 | 6〜10 | 高 | `test_dma_pool.py`・`test_h4_backing.py`。test_dma_pool.py の span/state の字面 M と実 include の free/leaked ケースを同時追従（VERIFY2 の dma_pool_host.c 指摘を含む）。bad_free・USED 限定・LEAKED 非再配布、呼び側 IRQ 保護を維持 | 要: DMA 確保/解放・音源/NIC、次を積む前 |
+| G08 | D2-07、FM/SSG SE の BGM 借用保存だけ共用 | `kernel/snd_engine.c:572・:610 (912)`、`tools/tests/fm_playback_host.c (84)`・`test_fm_module.py (111)` | terra 可 | 10〜16 | 高 | `test_fm_module.py`。実 snd_engine include の fixture を FM/SSG の逆走査・再借用・復元で補強。関数名の字面依存なし、音源側の M 維持。発音停止/volume/period/decay と IRQ 区間は各入口に残す | 要: SE 割込み前後の BGM 復元 |
+| G09 | D2-08、IRETD_USER を内部 .inc に置き ring3 でも展開 | `kernel/isr_stub.asm:89 (759)`・`ring3_entry.asm:75 (153)`、`kernel/iret_user.inc (0)`、`build/kernel.mk:283・:355 (366)`、T-R3-ASM | terra 可 | 約 12（VERIFY2） | 高 | `test_ledger.py`・`test_fdc_track.py`・`test_e10c_lifecycle.py`。字面解析は .inc と入口を分けて読む形へ追従し M を一意に保つ。マクロは元名、cli/popad の位置・VM/RPL・DS 復元を保ち、展開後命令を照合 | 要: IRQ/例外・ring3/V86 復帰、次を積む前 |
+| G10 | D2-09、kutoa_dec/hex の基数変換と詰め直しを共用 | `lib/kprintf.c:33・:63 (296)`、`tools/tests/test_kprintf_attr.py (164)`・`test_kapi_print.py (91)`・`kapi_print_host.c (215)` | terra 可 | 15〜22 | 中 | `test_kprintf_attr.py`・`test_kapi_print.py`・`test_gfinit_owner.py`。実 kprintf.c を組む kapi_print_host.c に kutoa の直接ケースを足し、0・有効な小容量（2 以上）・切詰め・大小文字・hex shift を固定。kprintf 入口の字面カウント (`:122`) と attr M は別関数で維持。公開入口と戻り値を保つ | 束: G11 で数値/ログ表示 |
+| G11 | D2-10、seamless mode=0 の OUT 2 組を np2_send_val(0) へ | `drivers/mouse_seamless.c:33・:91 (121)`、`drivers/np2sysp.c:51 (120)`、T-R3-MOUSE | sol か astra（PEGC fixture 超過） | 6 | 中 | `test_pegc_mode.py`・`test_kbd_dlog.py`。np2 実 include に加え seamless 経路の mode=0/4 OUT/コマンド前順を同 fixture で固定。変更関数の直接字面依存は未検出、既存 M 維持 | 要: seamless 有効/無効・G10 の数値表示 |
+
+**F11 (U2-02、ユーザー決定 2026-10-29)** — utf8_pack32・utf8_cmp32 と、その専用の定義 utf8_bswap32・utf8_eq32・UTF8_PACKED2_MASK・UTF8_PACKED3_MASK を除去。**utf8_char_at は残す** (アプリ開発者向けの UTF-8 文字列の補助として SDK に置く、ユーザーと PM の判断)。触るファイル: `lib/utf8.c:64・:93 (271)`・`lib/utf8.h:44-45・:88-104 (132)`。実装者 terra 可。削減 約 30 行 [推]。危険 中 (SDK 公開ヘッダ・libos32gfx.a、apps/・game/ に利用なし — Opus 確認、H-7 の再開時に再ビルド)。試験: lib/utf8.[ch] を組む・字面で読む `test_gfx_attach.py`・`test_dep_dir_d_console.py`・`test_unicode_surface.py`・`test_unicode_lookup.py`・`test_x11_shared.py`・`con_sink_host.c`・`kapi_audit_host.c`・`gui_text_host.rs` を回す (関数名の直接参照は無い — PM が grep で確認)。SDK のヘッダの差分は sdk/README.md の記載と合わせる。束: F09 で文字表示。
+U2-08 の `kernel/kernel.c:533` の呼出しは **gui_take_next_shell**（消費する入口）で、削除対象 gui_next_shell ではない。kernel.c は F03 の編集対象に加えない。U2-13 の atapi_test_unit_ready は試験が使うので削除対象から外す。
+
 ## 4. 試験・ビルド追従の範囲
 
 次は表から参照する編集候補。必要な追従を 1 段のソース変更と同じ依頼に入れる。未変更の試験を無用に書き換えない。名前の省略部分は同じディレクトリを指す。
@@ -81,6 +114,27 @@ D11 は型付き init・API 表のコピー・candidate_valid・rc 判定・IRQ/
 各 S 段の依頼前に `rg -n` でパス・basename・関数名を `tools/tests/`、対応表、ビルド定義から列挙し、実際に直す**各ファイルの行数**を付けてパックへ固定する。列挙が終わるまでは実装依頼を出さない。追従はソース移動と同段で完結させる。
 `tools/tests/test_vfs_fd_path.py:492`・`:911` のように文字列一致数を確認する試験がある。include 先だけ替えても変異が元のパスを指せば不十分。変更後の実ソースと同じ試験経路で当たることを確認する。
 T-P2V の「6 行」は現基点では **exec/exec.c の 6 エントリ**（`:32`・`:33`・`:36`・`:37`・`:40`・`:41`）。VERIFY の exec/paging/recover という説明を固定の配分とせず、paging/recover も移動関数名で再検索する。V86・kselftest・kernel_main の既存エントリも移動時に追従する（同 `:2`〜`:12`・`:25`）。
+
+
+### r3 の検索と追従候補（T-R3）
+
+既存表の各行と REPORT2 の全件で、`rg -n/-l -F/-w` により **関数名とファイル名の両方**を `tools/tests/` から検索した。以下は追加段の実ソース include・字面依存を具体化したもの。試験名だけの一致や同名 stub は本番の呼出しと数えない。追従候補は各行の編集許可範囲で、不要な変更はしない。ここにない利用者も着手時に再列挙する。
+
+| 群 | 追従候補と現行行数・検索で確認した依存 |
+|---|---|
+| T-R3-P | `tools/tests/test_gfx_kernel_fb.py (217)`・`gfx_kernel_fb_host.c (897)`、`test_gfx_attach.py (154)`・`test_unicode_surface.py (135)`、`test_boot_splash_native.py (45)`・`boot_splash_native_host.c (293)`、`test_gfx_bounds.py (55)`・`test_kapi_bounds.py (67)`。backend/vram の実ソースを組む。gfx_bounds_cases.inc の矩形ケース、gfx_add_dirty_rect の字面 M (`test_kapi_bounds.py`) の意味と一意性を維持 |
+| T-R3-ASM | `tools/tests/test_ledger.py:464・:484・:495 (713)`・`test_fdc_track.py:211・:214 (603)`・`test_e10c_lifecycle.py (85)`。isr_stub.asm の字面の復帰点/マクロ/入口順を読む。G09 の新 .inc を入力/依存に加え、入口の検査と M を弱めない。F02 は未使用マクロだけで入口名を変えない |
+| T-R3-GUI | `tools/tests/test_ring3_guard.py (250)`・`ring3_guard_host.c:142 (602)` は gui.c を実 include。`test_font_source.py:164 (261)` が gui.h の宣言を抽出、`test_d2_services.py (275)` も参照。weak の代替が要る単体リンクと強い製品実装を確認。`test_kapi_bounds.py` の gfx_* stub は別物で削らない |
+| T-R3-MOUSE | `tools/tests/test_kbd_dlog.py (224)`・`kbd_dlog_host.c:38 (568)` が mouse.c、`test_pegc_mode.py (354)`・`pegc_mode_host.c:47 (1549)` が np2sysp.c を実 include。`test_d2_services.py (275)` の mouse.h 配線抽出と pointer_fixture_host.h も参照。同小ヘッダは `tools/tests/pointer_fixture_host.h (25)`。G11 は fixture に実 mouse_seamless.c の include と送受信モデルを足す。kbd の stub_mouse_buttons は mouse_read_buttons 用で消さない |
+| T-R3-STATE | `tools/tests/test_d2_services.py (275)` の RTC ヘッダ、`test_shlib_high.py (74)` の shlib 実ソース、`test_double_fault.py (173)`・`double_fault_host.c:4 (86)` の実 tss.c include と `test_exec_r1.py (577)` の TSS ヘッダ構成を確認。削除名を直接読む試験は未検出、shlib/TSS の検証・M を残す。別 fixture の同名 g_version は対象外 |
+| T-R3-PCI | `tools/tests/test_pci_bind.py (153)`・`pci_bind_host.c:14 (477)`、`test_device_reservation.py (804)`（`:582` の pci.c 抽出）、`test_pci_decode.py (208)`、`test_e82557_drv.py (460)`・`test_lan_module.py (156)`。pci_bind_match.c の実 include と M を追従。lspci_cmd_host.c の g_pci_present は別の試験状態で残す |
+| T-R3-CRC | `tools/tests/test_hsync_h1.py (138)`・`hsync_h1_host.c (1853)`、`test_lanfs.py (567)`・`test_serialfs.py (1775)`。実 crc32_core.inc と calc 経路の include/字面 M を確認。stream 3 関数の試験参照は未検出。core を動かさず、これらの期待 CRC と既存 M は維持 |
+| T-R3-CD | `tools/tests/test_cd_read.py (705)`・`cd_read_host.c (2440)`。`:76・:77` で atapi.c/iso9660.c を実 include。ソース置換の M と媒体世代・callback 前後を保持。atapi_test_unit_ready の `:2132` を追従削除しない |
+| T-R3-CON | `tools/tests/test_con_sink.py (61)`・`con_sink_host.c (913)` と `test_dep_dir_d_console.py (227)`・`dep_dir_d_console_grid_host.c (119)` が実 console.c、`test_bootlog.py (291)`・`test_ime_display.py (53)` も結線/実ソースを組む。sink の再入・順序と M を維持。文字列出力の stub 群は共用対象外 |
+| T-R3-EXT | T-FD に加え `tools/tests/test_ext2_write_io.py (59)`・`ext2_write_io_host.c (818)`、`test_b8_open.py (286)`・`b8_open_host.c (5411)`、`test_ext2_empty_name.py (259)`・`test_hdd_stage1.py (1044)`。ext2_file/inode/vfs を実 include する各 fixture とソース置換を確認。G02a/b・G06・H02 の変更経路に当たる M のみ同時追従 |
+| T-R3-FAT | T-FD と `tools/tests/test_fatfs_stat.py (57)`・`fatfs_stat_host.c:200 (602)` の実 include。`test_fdc_track.py:198 (603)` の read_stream 本体抽出、`test_bootlog.py:221 (291)` の write 本体抽出・戻り値/close 検査が必須追従。fatfold の表抽出 (`test_vfs_fd_path.py:548`) は別部で維持 |
+
+G02a/G08/F10/G11 の補強も既存 fixture に不足する対象契約だけを足す。新しい変異の登録が必要なら同名 check の YAML/mk・check-ci-stab-host に追従し、各登録の実行時行数をパックへ固定する。G09 は新 .inc の NASM 依存も build/kernel.mk で保持する。1,000 行を超える追従候補がある F04/F07/F08/G02b/G04/G05/G06/G11/H01/H02 は sol か astra とした。
 
 ## 5. 長関数の抽出と、大きい 14 ファイルの分割
 
@@ -144,9 +198,9 @@ static を別の翻訳単位へ移すと、インライン化や定数伝播が�
 8. カーネル層の受入は PM が実施する。最小回帰は ver の Commit/Image CRC/PAIR・起動自己試験/SERVICES_READY・mem の失敗/残留/監査・db_test/db_v50_test。表の段固有項目を加え、exec/STOP は raw_wait、入力/FEP は入力の約束、起動/部品は MINIMAL（ROLES `:86`）。heap/exec/paging の高危険段はゲストを通す前に次を積まない。
 9. host だけ、SKIP、環境不足、未結線は完了にしない。延期は `docs/tasks/DEFERRED_TESTS.md` の 1 か所へ理由と必ず回収する関門を書く。実機の構成差（NE2000/82557、PCM/FM、PEGC/Cirrus 等）は該当する既存の関門にまとめる。受入結果は票に合否と証拠パスだけ残す。
 
-## 7. 最後の群（VERIFY が後回しとした件）
+## 7. 最後の群（VERIFY / VERIFY2 が後回しとした件）
 
-S 群が受け入れられた後に実施する。ここでの元ファイル行数は現基点の値で、実装時には S 群の移動先と行数に置き換えて依頼する。**抽出/共通化と S 群を混ぜない**。割当ては元の状態共有の大きさも考慮し sol か astra を候補とする。
+S 群が受け入れられた後に L 群 → H01 → H02 を実施する。H01/H02 は削減が小さく、VERIFY2 が優先を下げた件。ここでの元ファイル行数は現基点の値で、実装時には S 群の移動先と行数に置き換えて依頼する。**抽出/共通化と S 群を混ぜない**。割当ては元の状態共有の大きさも考慮し sol か astra を候補とする。
 
 | 段 | 件 ID / 中身 | 触る現基点のファイルと行数（S 後は移動先） | 実装者 | 削減の推測 / 危険 | 直接試験・変異の目印への影響 | ゲスト |
 |---|---|---|---|---|---|---|
@@ -155,6 +209,8 @@ S 群が受け入れられた後に実施する。ここでの元ファイル行
 | L03 | D07、400/200 行初期化の共通部 | `gfx/gfx_core.c:1014 (1251)`、`tools/tests/test_gfx_reinit.py (79)` | sol か astra | 25〜40 / 高 | `test_gfx_reinit.py`・`test_gfx_boot.py`・`test_gfx_kernel_fb.py`。geometry/clear-range の M を維持/移設 | 要: 400/200 行・packed native・再初期化 |
 | L04 | R09、候補確定後の同一更新列 | `kernel/ime.c:338 (1159)`、T-FD、`tools/tests/test_ime_display.py (53)` | sol か astra | 15〜25 / 高 | `test_ime_display.py`・`test_vfs_fd_path.py` の ime。通常キーの追送/返値と M を維持 | 要: 候補確定・次の入力先 |
 | L05a → L05b | D10、a=確定バイト取得、b=キー 1 件の変換だけ共用 | `kernel/ime.c:757 (1159)`、T-FD、`tools/tests/test_ime_display.py (53)`・`test_fep_boundary.py (106)` | sol か astra | 合計 55〜85 / 高 | 各段同試験。待機/非待機・ASCII/scan code・services_public・入力 owner の差と M を維持 | 各段要: IMECAND/IMEIND/IMEDUP/GUIRUNKEY |
+| H01 | D2-11、ISO レコード位置計算だけ共用 | `fs/iso9660.c:290・:543 (743)`、T-R3-CD | sol か astra（fixture 超過） | 4〜6 / 高 | `test_cd_read.py`・`test_hsync_h3.py`・`test_vfs_fd_path.py`。実 iso include とソース置換 M を追従。continue は各入口に残し、検索 cache/list のコピー・callback 前後の世代検査を保持 | 要: CD 検索/一覧・媒体交換 |
+| H02 | D2-12、ext2 unlink/rmdir の親解決〜最終操作だけ共用 | `fs/ext2_vfs.c:173・:263 (528)`、T-R3-EXT | sol か astra（fixture 超過） | 数行（2〜4 [推]）/ 高 | `test_ext2_write_io.py`・`test_b8_open.py`・`test_ext2_empty_name.py`・`test_vfs_fd_path.py`。型付き最終操作・薄い VfsOps 入口、字面の callback 検査 (`tools/tests/test_kcallback.py (131)`) と実 include/M を維持。mkdir/create_excl/rename は巻き込まない | 要: ext2 unlink/rmdir・失敗時 |
 
 D06 の差は契約として残す: read だけが single_reads/single_retries を数える（`drivers/fdc.c:780`・`:790`）、write は事前コピー/世代更新、read は成功時コピー。write の NW を NR より先に判定し（`:946`・`:956`）、DMA を閉じ、FDC_RC_WRITE_PROTECTED を返す（`:968`）。NR の回復前打切りも維持する。
 この差を保ったまま共通化できる範囲だけ採る。既存の READ/WRITE 固有コメントを使う変異は、共通化後も方向ごとの振る舞いを壊して実行時 RED にできる位置へ移す（`tools/tests/test_fdc_track.py:397`〜`:411`）。重複が減るだけでは受入にしない。
@@ -162,11 +218,13 @@ D06 の差は契約として残す: read だけが single_reads/single_retries �
 ## 8. 未確認と持越し
 
 - **nm・kernel.map の主張は今回照合していない**。元調査の成果物は HEAD より古い（`REPORT.md:17`〜`:18`、`VERIFY.md:2`）。現ソースの参照検索を主根拠とし、U06〜U09 の削除時にはその段の新しい成果物で参照を確かめる。ツリー外の直接リンク利用者は未確認（REPORT `:117`）。
-- 削減行数はすべて見積もり。元調査の約 370〜520 行は全候補採用時の概数で、保証値ではない。分割/抽出の移動を二重計上せず、D11 の拡張範囲は C05 で再見積もりする（REPORT `:4`・`:19`、VERIFY `:2`・`:4`）。
+- `.inc` の追加調査 (REPORT3、手書き 19 本・未読 0) の新規 2 件は**見送り**: D3-01 (vfs_name_rules.inc と kutf16.c の UTF-8 の受理規則、5〜12 行で FS の名前の同一性に触れ危険が高い)・D3-02 (gfinit_budget.inc と recover.c の layout の探索、0〜4 行で recover 側は試験の計数を挟む)。PM が実物で同じ形を確かめたうえで、効果に対して危険が大きいと判断 (2026-10-29)。
+- 削減行数はすべて見積もり。r3 表の既存 366〜517 行＋REPORT2 修正後 333〜435 行＝699〜952 行（重複 403〜610、未使用 235〜253、形 61〜89）。REPORT の約 370〜520、REPORT2 の 399〜526 は原見積もりで、r3 は U2-02 を F11 (合計に未算入)・U2-13/D2-08/11/12 の訂正を反映。分割/抽出は 0、D11 は C05 で再見積もり。
 - U05 の宣言残存による GCC -Wunused-function は**推測**で未再現（VERIFY `:5`）。宣言・実体・shim 3 か所を一つの段で扱い、警告抑止を足して通す案にはしない。
 - 試験のパス依存の全追従先、分割後の正確な行数、static 移動後の機械語一致、ビルド/ゲスト/速度の前後差は未確認。票は計画であり、実装パックと前後の証拠で確定する。
 - `lib/path.c` の未使用除去に直接対応する既存 host 試験は今回の検索で見つからなかった。A03 のパス操作のゲスト受入を B03 で回収し、別の path 実装を試す試験を代用として合格に数えない。
 - 分割対象は POLICY_DEV の一覧から userland/system/hsync.c を除く 14 本だけ。現時点で別に 1,000 行超の `kapi/kapi_db.c`・`net/link.c`・`boot/loader_fat_new.asm` を分割対象に追加しない（REPORT `:112`）。D04 の LE 共用は既出候補の範囲だけ。
 - 未使用でもレジスタの説明のために残す定義、C/ASM の代替実装、既存 CRC 共用、返値/切詰め契約が異なる整形処理は本票の整理対象に追加しない（REPORT `:118`〜`:123`）。
+- REPORT2 の古い成果物の不一致も未解消（build_id は 24b00c7）。U2 系の現ソース参照は再検索したが、現 HEAD の ELF/nm・SDK のツリー外利用者・全構成のリンクは未確認。U2-02 はユーザー決定 (2026-10-29、char_at は残す)。
 
-この作成依頼の成果物はこの票と修正一覧 `TASK_r2_response.md`。実装・ビルド・試験・ゲスト/実機受入は未実施。
+この作成依頼の成果物はこの r3 票・別調査 `REPORT3.md`・修正一覧 `TASK_r3_response.md`。実装・ビルド・試験・ゲスト/実機受入は未実施。
