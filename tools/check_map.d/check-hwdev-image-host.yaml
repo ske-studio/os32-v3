@@ -73,4 +73,5 @@ check-hwdev-image-host:
 - kdebug/recover_diag.h
 - tools/tests/recover_cleanup_host.inc
 - include/pci_dev_contract.h
+- kdebug/generated/recover_gf_c_tables.inc
 artifact_reader: true

@@ -140,6 +140,14 @@ def main():
         assert fields['video.row'] == '2' and fields['video.matches'] == '1'
         assert fields['video.fallback'] == '0' and fields['video.request_khz'] == '36000'
         assert fields['limits.vco2.max_freq'] == '1000000'
+        assert fields['mode.request_khz'] == '25175' and fields['mode.single_stage'] == '1'
+        assert fields['mode.n2'] == '1' and fields['mode.m2'] == '1'
+        assert int(fields['mode.error']) == abs(int(fields['mode.actual']) - 25175)
+        assert int(fields['mode.error_percent_hundredths']) == int(fields['mode.error']) * 10000 // 25175
+        assert fields['mode.within_half_percent'] == '1'
+        for coeff in ('n1', 'm1'):
+            assert int(fields['limits.vco1.min_' + coeff[0]]) <= int(fields['mode.' + coeff]) <= int(fields['limits.vco1.max_' + coeff[0]])
+        assert int(fields['mode.error']) * 200 <= 25175
         assert int(fields['decode.rom_crc']) == zlib.crc32(result_rom)
         assert fields['later.count'] == '0'
         subprocess.run(cmd[:1] + ['-DGF_TEST_LATER'] + cmd[1:], cwd=ROOT, check=True)

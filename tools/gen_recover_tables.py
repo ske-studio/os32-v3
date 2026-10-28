@@ -96,12 +96,18 @@ def main():
     args = parser.parse_args()
     data = json.loads(args.input.read_text()) if args.input else extract_oracle()
     result = generate(data)
+    from gfinit_mode_tables import generate as generate_mode
+    mode_output = ROOT / "kdebug/generated/recover_gf_c_tables.inc"
+    mode_result = generate_mode(data)
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != result:
             raise SystemExit('recover GF generated tables are stale')
-        print('PASS recover GF generated tables reproducible')
+        if not mode_output.exists() or mode_output.read_text() != mode_result:
+            raise SystemExit('recover GF C generated tables are stale')
+        print('PASS recover GF default/C generated tables reproducible')
     else:
         OUTPUT.write_text(result)
+        mode_output.write_text(mode_result)
 
 
 if __name__ == '__main__':

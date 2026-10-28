@@ -18,3 +18,4 @@ check-recover-gf:
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
 - tools/tests/recover_cleanup_host.inc
+- kdebug/generated/recover_gf_c_tables.inc

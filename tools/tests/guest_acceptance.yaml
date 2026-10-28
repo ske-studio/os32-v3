@@ -2680,7 +2680,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R7b-gui/
 - id: kpeek-T5-lan-fallback
   gate: KPEEK
-  contract: docs/tasks/v3/TASK_KPEEK.md
+  contract: docs/POLICY_DEBUG.md
   mode: manual
   prereq: "NP21/W (LGY-98、lan.mod は 82557 だけなので載らない); KDEBUG=1、kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: peek -l 000F0000 40
@@ -2692,7 +2692,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/kpeek-T5-lan-fallback/
 - id: kpeek-T5-lan-82557
   gate: KPEEK
-  contract: docs/tasks/v3/TASK_KPEEK.md
+  contract: docs/POLICY_DEBUG.md
   mode: manual
   prereq: "実機 Ra266 (82557、lan.mod RUNNING)、ノートの AF_PACKET (lan_bridge.py / lanfs_host.py と同じ IF); KDEBUG=1、kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: rshell_serial.py --port <COM> --fast 115200 peek --lan --iface <IF> --out f.bin 000F0000 10000

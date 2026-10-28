@@ -35,3 +35,4 @@ check-guest-acceptance-host:
 - tools/rshell_serial.py
 - tools/rshell_peek.py
 - tools/serialfs_host.py
+- docs/POLICY_DEBUG.md

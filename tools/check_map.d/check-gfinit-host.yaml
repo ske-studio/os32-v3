@@ -90,3 +90,5 @@ check-gfinit-host:
 - include/pci_dev_contract.h
 - kernel/console_backend.h
 - platform/pc98/console.c
+- kdebug/generated/recover_gf_c_tables.inc
+- kdebug/gfinit_mode.c
