@@ -80,6 +80,8 @@ BAR0相対hex、MMIO32bit・indexed/port8bit。sはmain4後Q前、rは直前読�
 | cleanup | local→quiesce（1850=0→1854=0→PMC140=0・照合）→screen。PCI同定不能ならGF MMIOを省きFAIL、独立な98復帰を試みる。decode解放未確認時はA0000hに触れない（D:95–98）。 | S0は98復帰まで。mode/DAC/PLL/PFB/VRAMを逆順再生しない。reboot、固まれば電源。 |
 
 ## ノートのREC採取・時間の見込み
+2026-10-29 の回: main 4 の PAUSED (sid c=2、seq 11820) で C を立会いまで待機 (ユーザー判断)。途中で reboot・電源断があれば A2 から。
+
 A1は新 `a1.json/a1.raw`、A2は新 `c.json/c.raw`。以降同じファイルへ追記し、受信者は1つ。生REC、monitor出力、開始/PAUSED/final時刻、行数・経過秒、sid/seq・version/profile_crc/plan_hash/snapshot_crcを保存（M:193,207–208、W:41,533–550）。
 共通形：`python3 tools/rshell_recover.py --port /dev/ttyUSB0 --baud 9600 --session <sid> --state <state> --image-crc <当日CRC> --log <raw> --timeout 900 --cleanup-timeout 180 --command '<表のコマンド>'`。
 A1/A2開始だけ `<sid>=0`、コマンド内のsidはそれぞれi/a。A2後は両方c。既定240秒に任せず、A1/A2/mainは既存台本の900秒を保つ（S:19,27、M:222、W:39–40）。

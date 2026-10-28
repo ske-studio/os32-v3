@@ -128,7 +128,7 @@ KernelAPI・共有ライブラリの読み込みを指す。アプリ 1 本の�
 
 - **1 ファイルは 500 行程度までを目安にする**。新しく書く・大きく触るファイルが超えるなら、意味の切れ目 (状態と終端・バスのアクセス・計画の組立て・ログの送信など) で分ける。
 - 理由: 実装者のモデルは**ソースを読むだけで文脈の窓を使い切る**。1,000 行を超えるファイルに触る段は terra では処理できず、sol か astra に出す (割当ては docs/tasks/agents/ROLES.md §0)。GeForce 4c で terra が止まった段は、どれも recover.c (2,200 行超) に触っていた。
-- **大きいソースの分割は GeForce の実装 (4c の実機の回と本番の画面ドライバ) の後に行う** (ユーザー指示 2026-10-28)。振る舞いを変えない機械的な分割にし、分ける前後で関数ごとの機械語が同じことを objdump で確かめる。冗長な所 (同じ形の処理の繰り返し・使われない定義) はその機会に整える (段の分解は票 [TASK_REDUNDANCY](tasks/v3/TASK_REDUNDANCY.md))。2026-10-28 の時点で 1,000 行を超える .c: userland/system/hsync.c 3,039、exec/exec.c 2,534、kdebug/kselftest.c 2,495、kdebug/recover.c 2,374、kernel/paging.c 1,696、drivers/fdc.c 1,345、kernel/v86_bios.c 1,277、gfx/gfx_core.c 1,251、fs/ext2_dir.c 1,228、gfx/backend_pegc.c 1,215、drivers/loop_dev.c 1,177、kernel/ime.c 1,159、exec/appslot.c 1,136、kernel/pgalloc.c 1,098、drivers/ne2000.c 1,057。分割の段は 1 ファイルずつ (sol か astra)、カーネル層 (paging・pgalloc・exec) は退行の危険が大きいので、ゲスト受入と組にする。
+- **大きいソースの分割は GeForce の実装 (4c の実機の回と本番の画面ドライバ) の後に行う** (ユーザー指示 2026-10-28)。振る舞いを変えない機械的な分割にし、分ける前後で関数ごとの機械語が同じことを objdump で確かめる。冗長な所 (同じ形の処理の繰り返し・使われない定義) はその機会に整える (段の分解は票 TASK_REDUNDANCY、docs/tasks/v3/)。2026-10-28 の時点で 1,000 行を超える .c: userland/system/hsync.c 3,039、exec/exec.c 2,534、kdebug/kselftest.c 2,495、kdebug/recover.c 2,374、kernel/paging.c 1,696、drivers/fdc.c 1,345、kernel/v86_bios.c 1,277、gfx/gfx_core.c 1,251、fs/ext2_dir.c 1,228、gfx/backend_pegc.c 1,215、drivers/loop_dev.c 1,177、kernel/ime.c 1,159、exec/appslot.c 1,136、kernel/pgalloc.c 1,098、drivers/ne2000.c 1,057。分割の段は 1 ファイルずつ (sol か astra)、カーネル層 (paging・pgalloc・exec) は退行の危険が大きいので、ゲスト受入と組にする。
 
 ### 定数定義の3層管理
 
