@@ -121,3 +121,10 @@ read追加の時間的影響、実クロックと読出し像の一致、係数�
 - PLL 表 5BC8h: 版 21h・header 5・entry 35・4 行、key は 0・4020h・4008h・402Ch。VIDEO は一致 0 で先頭の行 (key=0) へ fallback。limits: vco1 100〜405MHz・入力 3〜25MHz・N/M 1〜255、vco2 400〜1000MHz・入力 35〜100MHz・N/M 1〜31、ref 27MHz・max_p 7・bias_p 0。
 - 要求は計画の pc=E623h から 36000kHz。二段の解 N1/M1=8/2・N2/M2=16/3・P=4 (vco1 108MHz、vco2 の入力 36MHz・出力 576MHz、誤差 0) は実機の REC の new (680508h=00040802h、680578h=80001003h) と一致 — **係数の計算と書いた値は正しい**。単段の解は N1/M1=16/3・P=2 (vco1 144MHz、誤差 0、580h に 100h、578h=8000011Fh、508h=00021003h)。後続の書込み (main 2 の残り〜main 4) は 0。
 - 帰結 (PM): 原因は値ではなく、**書いた係数が 508h・578h の両方で残らない**こと (bit31 だけ残る)。H6 (単段) は 36MHz≤vco1.max/2 で nouveau の modeset なら単段を選ぶ条件には当たるが、第 1 段の 508h が残らないことを説明しないので順位を下げる。次は段 1 (直後の読み戻し) で「書いた瞬間から残らない (書込みの抑え)」と「後で戻る」を分ける。§4 の単段の比較は段 1 の結果を見てから要否を決め直す。
+
+## 段 1 の設計の欠けの埋め (2026-10-28、astra の GAP1・PM の決定)
+- 出所: ~/os32-tmp/run/gf-vpll/GAP1.md (astra)。実装者の停止の報告は ~/os32-tmp/run/vpll1/impl.log。
+- **PM 決定 (§6 の「実行 ms に有限 5 read 分を足す」を差し替える)**: 5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c:2016-2020・943-956) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同:312-338・808-818)、期限の検査 (同:1168-1183) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c:86-88) は変えない。
+- 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c:273-288)。cleanup の restore_limit・P/S の予約・diag/final は変えない。試験の値: Δrows=10、ΔB=3850、read +5、call_point +5、restore_limit/P/S 不変。
+- 入口: `make GF_VPLL_PROBE=1 gf-vpll-probe` → `$(BUILD_OUT)/gf-vpll-probe/{kdebug.bin,hwdev.mod}`。診断の object・ELF・map・pair.h はその下に分け、-DGF_VPLL_PROBE=1 は診断の対象のレシピだけ。既定の all と成果物は変えない。診断の core は既定の vmkernel.lz4 に対して pack し、gen_hwdev_pair.py で組を作る (カーネルは組み直さない)。世代は据置き、GF profile の version=56504C03h と profile CRC・image/pair の CRC は既存の生成器で出す (build/kdebug.mk:34-58、build/hwdev.mk:11-38、tools/gen_hwdev_pair.py:11-26)。
+- 配るもの: 診断の kdebug.bin・hwdev.mod (同じ vmkernel.lz4 の組)、対応する tools/rshell_recover.py。組の一覧 (フラグ・版・各 CRC・元の commit) を証拠に残す。
