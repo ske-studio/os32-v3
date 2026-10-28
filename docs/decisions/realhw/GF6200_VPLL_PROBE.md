@@ -143,3 +143,8 @@ read追加の時間的影響、実クロックと読出し像の一致、係数�
 - 照合: 5 本 (seq 7060〜7163) は CR44=0 の間 (main 0 seq 375 で 0 に戻してから main 2 seq 8659 まで書込み無し)、head B への書込み 38 件はすべて main 2 の CR44=3 の期間 (seq 8683〜9523) → **② は外れ**。PMC 200h は main 0 で 01100000h→05110111h→07110111h (bit24・25 PCRTC は 1、次の old で残っていることを確認) → ⑤ の単純な無効は弱い。68050Ch は回の全体で書込みも読取りも無い。
 - CORE/MEM の PLL: 制御 4000h の bit28・4020h の bit23 は書いても残らない (前からの既知と同じ)、係数 4004h・4024h は 1 回だけ書いたので REC では残ったか分からない → kpeek で読む (4000h〜4007h・4020h〜4027h の許可を診断版に足す)。
 - kpeek2 (2026-10-28、wt/vpll2 0d3ab280 の診断版、hsync boot → OS32 の reboot の後、電源の入れ直し無し、ノートの kpeek2.txt): 4000h=0001001Fh・4004h=01010C01h・4020h=2000011Ch・4024h=05010E01h・680508h=00051104h・680578h=00000E02h・680580h=01F0001Fh・C040h=00000000h・68050Ch=00000004h・200h=03010000h — **どれも試行の前の値** (PMC も A2 の前の値)。OS32 の reboot で GeForce がリセットされる (PCI のリセットと推測)。CORE/MEM の係数が残るかは、試行の後に reboot せずに kpeek で読む必要がある。
+
+## 2 回目の実機の回 (2026-10-28、wt/vpll2 0d3ab280 の診断版、電源の入れ直し無し — OS32 の reboot で GeForce は試行の前の値、ユーザー承認)
+- 証拠: ノートの `~/os32-tmp/evidence/2026-10-28/vpll-probe2/` (b_summary.txt・kpeek_vs_written.txt・main2_vpll.txt)。inspect match=1 → A1 OK → 68050Ch=4 → 組=3 → A2 PAUSED → main 0/1/2 PAUSED (216/252/201 秒) → abort PARTIAL target=S0 verified=1 trial=1 lost_lines=0。5 本の old/new/readback は 1 回目と同じ。
+- **abort の後、reboot せずに kpeek**: 4000h=C002001Ch・4004h=14032809h・4020h=E041001Ch・4024h=14032809h・200h=07110111h・C040h=3C0BC003h・680580h=01F0001Fh — **書いた値のまま残る**。680508h=00051104h (書いたのは 00040802h)・680578h=80000E02h (80001003h) — **VIDEO PLL の係数だけ残らない**。68050Ch=00000004h (書込み無し)。
+- 帰結 (PM): CORE・MEM の PLL の係数は同じ書き方で残る → PLL 全体に共通する抑え (候補 ③ のうち PLL 共通の部分) は外れ、**VIDEO PLL (表示側) に固有の条件**に絞れた。残る候補は ① 68050Ch の源の選択 (bit9 VPLL_PROG=0) と、表示側に固有の未知のラッチ。次は ① の一条件の比較 (68050Ch bit9) の設計を確定する。
