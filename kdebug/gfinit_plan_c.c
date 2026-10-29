@@ -18,6 +18,7 @@
 #define C_CRTC850 0x600850U
 #define C_SEL_CLK 0x680524U
 #define C_PLL_SELECT 0x68050cU
+#define C_CR_RPC1_MASK 0xd7U /* CR1A bits 3/5 read back set on NV44A */
 #define C_PLL_STATUS 0x680510U
 #define C_CONFIG 0x600804U
 #define C_START 0x600800U
@@ -237,7 +238,8 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
     const u32 extra[]={GF_MODE_CR_PITCH_HI,GF_MODE_CR_RPC1,GF_MODE_CR_LSR,
         GF_MODE_CR_PIXEL,RECOVER_CR44,GF_MODE_CR_PITCH11,GF_MODE_CR_BURST,GF_MODE_CR_LWM,C_CR_PITCH_EXTRA};
     for(u32 i=0;i<C_COUNT(extra);i++)
-        c_check_literal(b,c_key(b,GF_C_CR,0,extra[i],1),GF_MODE_BYTE_MASK,m->cr[extra[i]]);
+        c_check_literal(b,c_key(b,GF_C_CR,0,extra[i],1),
+            extra[i]==GF_MODE_CR_RPC1 ? C_CR_RPC1_MASK : GF_MODE_BYTE_MASK,m->cr[extra[i]]);
     for(u32 i=0;i<C_COUNT(c_fields);i++)if(c_fields[i].index==GF_MODE_CR_LCD && c_fields[i].kind==GF_C_CR)
         c_check(b,REC_CHECK_TARGET,keys[i],GF_MODE_BYTE_MASK,0,~GF_MODE_LCD_CLEAR,producers[i],keys[i]);
     c_check_literal(b,c_key(b,GF_C_SR,0,1,1),GF_MODE_BYTE_MASK,GF_MODE_DAC_ENABLE);

@@ -707,7 +707,7 @@ static void check_contracts(void)
         case 0x680608:CHECK(mask==0x100000 && expected==0x100000);seen|=1024;break;
         }
         if(t->space==REC_VGA_INDEXED) {
-            CHECK(mask==255);
+            CHECK(mask==(t->port==0x3d4 && t->index==0x1a ? 0xd7U : 255U));
             if(t->port==0x3d4 && t->index==0x11)CHECK(expected==0xab);
             if(t->port==0x3d4 && t->index==0x17)CHECK(expected==0xc3);
             if(t->port==0x3c4 && t->index==1)CHECK(expected==1);

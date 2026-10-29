@@ -18,6 +18,8 @@ NONE = 'REC_GF_C_NO_INDEX'
 # Registers nouveau only writes (no readback) and DESIGN §4 does not list as
 # required CHECKs: record the write, do not compare the readback. Ra266
 # 2026-10-29: 680A24 wrote 000FFFFF and read 0 on NV44A.
+# CR1A bits 3/5 read back set on NV44A (Ra266 2026-10-29: wrote 04, read 2C).
+CR1A_VERIFY = '0xd7'
 NOUVEAU_WRITE_ONLY = ('0x680404', '0x680630', '0x680634', '0x680700', '0x680848',
                       '0x6808c0', '0x680a20', '0x680a24', '0x680a34', '0x600860',
                       '0x8704', '0x8140', '0x1588', '0x600810', '0x600830',
@@ -121,7 +123,7 @@ def initializers():
     mm('0x600804', 'config', verify=3)
     for i in ('0x19','0x1a','0x25','0x28','0x33','0x2d','0x1c','0x1b',
               '0x20','0x47','0x9f','0x49','0x30','0x31','0x2f'):
-        cr(i, verify='0' if i in ('0x1c','0x33','0x49') else '0xff')
+        cr(i, verify='0' if i in ('0x1c','0x33','0x49') else CR1A_VERIFY if i == '0x1a' else '0xff')
     live('MMIO', '0x680300', FULL, 0, verify=0)
     cr('0x39')
     for i in ('0x3b','0x3c','0x41','0x45','0x4b','0x52','0x42','0x53','0x54'):
@@ -159,7 +161,7 @@ def initializers():
     for i in ('0x1b','0x20','0x47'):
         cr(i)
     sr(0, 1); sr(1, 1)
-    cr('0x17', '0xc3'); sr(0, 3); cr('0x1a', 4)
+    cr('0x17', '0xc3'); sr(0, 3); cr('0x1a', 4, verify=CR1A_VERIFY)
     live('MMIO', '0x68052c', FULL, 1, verify='0x101')
     # R: OS32-only PC-98 route callback, DESIGN §3 (not a generic MMIO target).
     literal('ROUTE', '0xfac', 1, verify=3)
