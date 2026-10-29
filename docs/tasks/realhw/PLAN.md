@@ -13,6 +13,7 @@
 | `docs/archive/realhw/TASK_PEGC480_REALHW.md` | 実機の PEGC 640x480 のずれ — 受入完了 (2026-09-30)、アーカイブ。今の仕様は [05_drivers.md §5-5](../../05_drivers.md) |
 | [TASK_FD144.md](TASK_FD144.md) | 1.44MB フロッピー (RA266 §3) |
 | [TASK_GEFORCE6200.md](TASK_GEFORCE6200.md) | 増設の GeForce 6200 (0:13.0) |
+| [TASK_GF_DRIVER.md](TASK_GF_DRIVER.md) | GeForce 6200 の本番の画面ドライバ — 1 機能 1 ファイル + 抽象化の層 + HAL、計画 (2026-10-29) |
 | [TASK_GF_STAGES.md](TASK_GF_STAGES.md) | GeForce の実機の試験を段ごとの小さなバイナリ + 共通部分に分ける — 計画 (2026-10-29 の反省会) |
 | [TASK_REALHW_RECOVER.md](TASK_REALHW_RECOVER.md) | 実機試験を決まった状態へ戻す処理 (realhw_recover) |
 | [TASK_HWDEV.md](TASK_HWDEV.md) | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV) |
