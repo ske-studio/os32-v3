@@ -418,11 +418,6 @@ static void fdc_motor_on(void)
     }
 }
 
-static void fdc_motor_off(void)
-{
-    outp(FDC_CTRL, 0);
-}
-
 /* ======================================================================== */
 /*  シーク完了待ち (SEEK / RECALIBRATE 共通)                                */
 /*                                                                          */
