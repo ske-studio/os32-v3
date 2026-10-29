@@ -72,7 +72,6 @@ void pci_bind_set_reason(u8 reason);
 
 /* pci_bind_one が probe を呼ぶ直前に理由をリセットする内部用 (試験も使う)。 */
 void pci_bind_reason_reset(void);
-u8   pci_bind_reason_get(void);
 
 /* ======================================================================== */
 /*  結線の実行 (drivers/pci_bind.c)                                         */
