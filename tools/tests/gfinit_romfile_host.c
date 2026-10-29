@@ -5,6 +5,7 @@
 #include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_decode.c"
 #include "../../kdebug/gfinit_mode.c"
+#include "gf_display_calc_host.inc"
 #include GF_ROM_HEADER
 #define GF_MODE_ERROR_SCALE 10000U /* hundredths of one percent */
 #define GF_MODE_ERROR_DIVISOR 200U

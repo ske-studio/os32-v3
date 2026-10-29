@@ -4,7 +4,6 @@ check-gf-runner-host:
 - kdebug/gfinit_decode/*.inc
 - kdebug/gfinit_op/*.inc
 - kdebug/gfinit/*.inc
-- kdebug/gfinit_mode/*.inc
 - kdebug/gfinit_plan_c/*.inc
 - kdebug/gfinit_pll/*.inc
 - kdebug/gfinit_resources/*.inc
@@ -134,3 +133,19 @@ check-gf-runner-host:
 - build/checks.d/check-gf-runner-host.mk
 - tools/check_map.d/check-gf-runner-host.yaml
 - hwdev/gf/scripts.h
+- hwdev/gf/display/calc.h
+- hwdev/gf/display/calc.c
+- hwdev/gf/display/timing.c
+- hwdev/gf/display/format.c
+- hwdev/gf/display/pitch.c
+- hwdev/gf/display/start.c
+- hwdev/gf/display/dac_format.c
+- hwdev/gf/display/output.c
+- hwdev/gf/display/cursor.c
+- hwdev/gf/display/fifo.c
+- hwdev/gf/display/extended.c
+- hwdev/gf/display/pll_program.c
+- tools/tests/gf_display_calc_host.inc
+- hwdev/gf/display/state.h
+- hwdev/gf/display/checks.inc
+- hwdev/gf/quiesce_rows.h

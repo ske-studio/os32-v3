@@ -35,3 +35,4 @@ check-recover-tables-host:
 - kdebug/gfinit_pll.h
 - hwdev/gf_load_state.c
 - hwdev/gf_load_state.h
+- hwdev/gf/quiesce_rows.h

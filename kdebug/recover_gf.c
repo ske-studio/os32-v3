@@ -122,11 +122,10 @@ static const struct recover_reg regs[] = {
     {REC_GF_T_BAR1, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, REC_GF_R_RESTORE_BAR1},
     {REC_GF_T_BAR2, 4, 0xffffffffU, 0xffffffffU, REC_RW, true, REC_GF_R_RESTORE_BAR2},
 };
-static const struct recover_write gf_quiesce[] = {
-    {REC_GF_T_PBUS1850, 4, 0, 0xffffffffU, REC_GF_R_QUIESCE_PBUS1850},
-    {REC_GF_T_PBUS1854, 4, 0, 0xffffffffU, REC_GF_R_QUIESCE_PBUS1854},
-    {REC_GF_T_PMC_IRQ, 4, 0, 0xffffffffU, REC_GF_R_QUIESCE_PMC_IRQ},
-};
+#include "../hwdev/gf/quiesce_rows.h"
+#define GF_QUIESCE_REC(key,offset,rule) {key,4,0,0xffffffffU,rule},
+static const struct recover_write gf_quiesce[] = { GF_QUIESCE_ROWS(GF_QUIESCE_REC) };
+#undef GF_QUIESCE_REC
 static const u32 saved_kind[] = {REC_ARG_SAVED};
 static int saved_bar(const u32 *a, u32 n, u32 *v)
 {

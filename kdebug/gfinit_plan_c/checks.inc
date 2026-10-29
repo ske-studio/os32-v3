@@ -54,37 +54,17 @@ static void c_check_in(struct c_builder *b)
 static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
                          const u32 *producers,const u32 *keys,u32 pll_first)
 {
-    /* DESIGN §§3-4: coefficients are checked only after 50C selection.
-     * 510 is evidence only; TEST excludes sense and compares bit20 only. */
-    c_check_mmio(b,C_PLL_SELECT,~GF_MODE_PLLSEL_VPLL_A,m->pllsel); /* bit28 reads 0 on NV44A */
-    c_check_mmio(b,C_PLL_STATUS,0,0);
-    const struct gfinit_pll_write *q=m->sequence.writes;
-    c_check_mmio(b,GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);
-    c_check_mmio(b,GF_PLL_VIDEO_COEFF,~GF_PLL_VIDEO_S2_KEEP,q[C_PLL_COEFF_WRITE].value);
-    c_check_mmio(b,GF_PLL_VIDEO_STAGE,GF_PLL_CTRL_SINGLE,q[C_PLL_STAGE_WRITE].value);
-    for(u32 i=0;i<C_COUNT(c_fields);i++)if(c_fields[i].reg==C_SEL_CLK)
-        c_check(b,REC_CHECK_TARGET,keys[i],~0U,0,~GF_MODE_SEL_CLK_CLEAR,producers[i],keys[i]);
-    u32 gate=c_key(b,GF_C_MMIO,GF_PLL_GATE,0,4);
-    c_check(b,REC_CHECK_TARGET,gate,~0U,0,~0U,pll_first,gate);
-    c_check_mmio(b,C_CONFIG,C_CONFIG_MASK,m->config);
-    c_check_mmio(b,C_START,~0U,m->start);
-    for(u32 index=0;index<=GF_MODE_CR_LINE_COMPARE;index++) {
-        u32 expected=m->cr[index];
-        if(index==GF_MODE_CR_VE || index==GF_MODE_CR_MODE)expected|=C_CR_LOCK;
-        c_check_literal(b,c_key(b,GF_C_CR,0,index,1),GF_MODE_BYTE_MASK,expected);
-    }
-    const u32 extra[]={GF_MODE_CR_PITCH_HI,GF_MODE_CR_RPC1,GF_MODE_CR_LSR,
-        GF_MODE_CR_PIXEL,RECOVER_CR44,GF_MODE_CR_PITCH11,GF_MODE_CR_BURST,GF_MODE_CR_LWM,C_CR_PITCH_EXTRA};
-    for(u32 i=0;i<C_COUNT(extra);i++)
-        c_check_literal(b,c_key(b,GF_C_CR,0,extra[i],1),
-            extra[i]==GF_MODE_CR_RPC1 ? C_CR_RPC1_MASK : GF_MODE_BYTE_MASK,m->cr[extra[i]]);
-    for(u32 i=0;i<C_COUNT(c_fields);i++)if(c_fields[i].index==GF_MODE_CR_LCD && c_fields[i].kind==GF_C_CR)
-        c_check(b,REC_CHECK_TARGET,keys[i],GF_MODE_BYTE_MASK,0,~GF_MODE_LCD_CLEAR,producers[i],keys[i]);
-    c_check_literal(b,c_key(b,GF_C_SR,0,1,1),GF_MODE_BYTE_MASK,GF_MODE_DAC_ENABLE);
-    c_check_literal(b,c_key(b,GF_C_MISC,0,0,1),GF_MODE_BYTE_MASK,m->misc);
-    c_check_mmio(b,C_GENERAL,~0U,m->general);
-    c_check_mmio(b,C_DACCLK,C_DACCLK_MASK,m->dacclk);
-    c_check_mmio(b,C_TEST,GF_MODE_TEST_CONTROL,m->test_control);
+#define CHECK_MMIO(reg,mask,value) c_check_mmio(b,reg,mask,value)
+#define CHECK_INDEX(kind,index,mask,value) c_check_literal(b,c_key(b,kind,0,index,1),mask,value)
+#define CHECK_SAVED(i,mask,keep) do { \
+    u32 key=(i)==GF_DISPLAY_COUNT(c_fields) ? c_key(b,GF_C_MMIO,GF_PLL_GATE,0,4) : keys[i]; \
+    u32 producer=(i)==GF_DISPLAY_COUNT(c_fields) ? pll_first : producers[i]; \
+    c_check(b,REC_CHECK_TARGET,key,mask,0,keep,producer,key); \
+} while (0)
+#include "../../hwdev/gf/display/checks.inc"
+#undef CHECK_MMIO
+#undef CHECK_INDEX
+#undef CHECK_SAVED
     for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
     c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
     c_check_exit(b,REC_CHECK_ROUTE,RECOVER_ROUTE_MASK,RECOVER_ROUTE_RGB_IN,GF_C_EXIT_ROUTE_SLOT);

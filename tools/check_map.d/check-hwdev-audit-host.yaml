@@ -15,7 +15,6 @@ check-hwdev-audit-host:
 - kdebug/gfinit_decode/*.inc
 - kdebug/gfinit_op/*.inc
 - kdebug/gfinit/*.inc
-- kdebug/gfinit_mode/*.inc
 - kdebug/gfinit_plan_c/*.inc
 - kdebug/gfinit_pll/*.inc
 - kdebug/gfinit_resources/*.inc
@@ -27,4 +26,5 @@ check-hwdev-audit-host:
 - tools/tests/test_hwdev_audit.py
 - kdebug/gf_stage_state.c
 - kdebug/gf_stage_state.h
+- hwdev/gf/quiesce_rows.h
 artifact_reader: true

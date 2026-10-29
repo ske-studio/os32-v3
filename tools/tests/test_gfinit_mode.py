@@ -194,9 +194,9 @@ MUTATIONS = [
     ('checker_polarity', '? GF_MODE_COLOR_BLACK : GF_MODE_COLOR_WHITE', '? GF_MODE_COLOR_WHITE : GF_MODE_COLOR_BLACK'),
     ('frame_bottom', 'y >= GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)', 'y > GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)'),
     ('immediate_verify', '0x0U, 0x1U, 0x0U},', '0x7ffffU, 0x1U, 0x0U},'),
-    ('cr05', 'mode_bit(t->hbe, 5, 7)', 'mode_bit(t->hbe, 5, 6)'),
-    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;', 'kdebug/gfinit_mode/pll_program.inc'),
-    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;', 'kdebug/gfinit_mode/pll_program.inc'),
+    ('cr05', 'mode_bit(t->hbe, 5, 7)', 'mode_bit(t->hbe, 5, 6)', 'hwdev/gf/display/timing.c'),
+    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;', 'hwdev/gf/display/pll_program.c'),
+    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;', 'hwdev/gf/display/pll_program.c'),
 ]
 
 

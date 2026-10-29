@@ -134,6 +134,9 @@ struct gfinit_mode {
  * Does not read hardware or bind/execute a recover plan. */
 int gfinit_mode_calc(const struct gfinit_pll_limits *limits,
                      const struct gfinit_mode_saved *saved, struct gfinit_mode *out);
+/* PLL error ceiling after calc, shared by diagnostic C and the video service. */
+static inline int gfinit_mode_pll_ok(const struct gfinit_mode *m)
+{ return m->pll.error <= GF_MODE_CLOCK_KHZ / GF_PLL_MARGIN_DIV; }
 void gfinit_mode_palette(u32 index, u8 rgb[GF_MODE_RGB]);
 /* Diagnostic row, with caller-owned GF_MODE_WIDTH byte buffer. */
 int gfinit_mode_row(u32 y, u8 row[GF_MODE_WIDTH]);

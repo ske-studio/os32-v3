@@ -16,24 +16,7 @@
 #define C_EXTRA_TARGETS 107U
 #define C_EXTRA_CAPTURES 13U
 #define C_PLL_RESTORE 4U
-#define C_GPIO_EXT 0x60081cU
-#define C_CRTC850 0x600850U
-#define C_SEL_CLK 0x680524U
-#define C_PLL_SELECT 0x68050cU
-#define C_CR_RPC1_MASK 0xd7U /* CR1A bits 3/5 read back set on NV44A */
-#define C_PLL_STATUS 0x680510U
-#define C_CONFIG 0x600804U
-#define C_START 0x600800U
-#define C_DACCLK 0x68052cU
-#define C_TEST 0x680608U
-#define C_GENERAL 0x680600U
-#define C_DACCLK_MASK 0x101U
-#define C_CONFIG_MASK 3U
-#define C_CR_LOCK 0x80U
-#define C_CR_PITCH_EXTRA 0x47U
-#define C_PLL_STAGE_WRITE 1U
-#define C_PLL_COEFF_WRITE 2U
-#define C_PLL_PRIMARY_WRITE 3U
+#include "../hwdev/gf/display/state.h"
 static const u32 base_kinds[]={REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
 static const u32 c_imm[] = {REC_IMM, REC_IMM};
 static const u32 c_live[] = {REC_IMM, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
@@ -155,7 +138,6 @@ static u32 c_read(struct c_builder *b,u32 key)
     struct recover_plan_arg a={REC_IMM,key};
     return c_emit(b,GF_C_READ,RECOVER_NONE,RECOVER_NONE,&a,1);
 }
-struct c_saved_field { u32 offset, kind, reg, index, width, keep, add, bits; };
 #include "gfinit_plan_c/baseline.inc"
 #include "gfinit_plan_c/checks.inc"
 static int c_load_section(void *saved, u32 section)
@@ -247,8 +229,7 @@ static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
     struct gfinit_mode mode;
     const struct gfinit_mode_saved empty={0};
     if (!out || !d || !p || bar1_length < GF_MODE_PITCH*GF_MODE_HEIGHT ||
-        gfinit_mode_calc(limits,&empty,&mode) ||
-        mode.pll.error > GF_MODE_CLOCK_KHZ/GF_PLL_MARGIN_DIV) return -1;
+        gfinit_mode_calc(limits,&empty,&mode) || !gfinit_mode_pll_ok(&mode)) return -1;
     if(out->plan.node_count+C_EXTRA_NODES>RECOVER_NODE_MAX ||
        out->plan.arg_count+C_EXTRA_ARGS>GF_INIT_ARGS ||
        out->plan.capture_count+C_EXTRA_CAPTURES>RECOVER_CAPTURE_MAX ||
