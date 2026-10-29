@@ -507,11 +507,6 @@ void ext2_unmount(Ext2Ctx *ctx)
 
 int ext2_is_mounted_ctx(Ext2Ctx *ctx) { return ctx->mounted; }
 
-const Ext2Super *ext2_get_super_ctx(Ext2Ctx *ctx)
-{
-    return ctx->mounted ? &ctx->sb_info : (const Ext2Super *)0;
-}
-
 int ext2_sync(Ext2Ctx *ctx)
 {
     int ret;

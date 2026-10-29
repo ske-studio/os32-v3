@@ -250,7 +250,6 @@ typedef void (*ext2_dir_callback)(const Ext2DirEntry *entry, void *ctx);
 int ext2_mount(Ext2Ctx *ctx, int ide_drive);
 void ext2_unmount(Ext2Ctx *ctx);
 int ext2_is_mounted_ctx(Ext2Ctx *ctx);
-const Ext2Super *ext2_get_super_ctx(Ext2Ctx *ctx);
 
 /* ---- 同期 ---- */
 int ext2_sync(Ext2Ctx *ctx);
