@@ -1,4 +1,18 @@
 check-dep-dir-a-l05a-host:
+- drivers/pci.h
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/bootinfo.h
+- include/gf_production.h
+- include/kprintf.h
+- kdebug/kpeek.h
+- kdebug/recover.h
+- kernel/kdebug_imports.def
+- kernel/pgalloc.h
+- lib/kstring.h
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/module_schema.py
 - tools/tests/hwdev_contract_fixture.py
 - include/types.h
 - include/config.h
@@ -34,4 +48,6 @@ check-dep-dir-a-l05a-host:
 - kernel/v86_mem.c
 - kernel/v86_snapshot.c
 - tools/tests/shm_user_host.c
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

@@ -38,3 +38,5 @@ check-gfinit-mode-host:
 - hwdev/gf/display/pll_program.c
 - tools/tests/gf_display_calc_host.inc
 - hwdev/gf/quiesce_rows.h
+- tools/tests/recover_gf_cases_host.inc
+- tools/tests/recover_gf_fixture_host.inc

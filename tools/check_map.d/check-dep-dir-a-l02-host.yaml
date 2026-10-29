@@ -1,4 +1,9 @@
 check-dep-dir-a-l02-host:
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/gf_production.h
+- kdebug/kpeek.h
+- kdebug/recover.h
 - tools/tests/hwdev_contract_fixture.py
 - kernel/tick.c
 - kernel/tick.h
@@ -99,4 +104,6 @@ check-dep-dir-a-l02-host:
 - drivers/e82557_desc.c
 - drivers/e82557_eeprom.c
 - drivers/pci_decode.c
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

@@ -45,8 +45,9 @@ def contracts():
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
     assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
+    # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
-    print('PASS B1/B2: fixed hwdev inventory/CRCs, both LAN contract dependencies')
+    print('PASS B1/B2: fixed hwdev inventory/current private pair, both LAN contract dependencies')
 
 
 def generation(folder):

@@ -1,4 +1,16 @@
 check-dep-dir-a-l01-host:
+- drivers/pci.h
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/bootinfo.h
+- include/gf_production.h
+- include/kprintf.h
+- kdebug/kpeek.h
+- kdebug/recover.h
+- kernel/kdebug_imports.def
+- kernel/pgalloc.h
+- lib/kstring.h
+- tools/gen_kdebug_imports.py
 - tools/tests/hwdev_contract_fixture.py
 - tools/tests/test_dep_dir_a_l01.py
 - tools/tests/dep_dir_a_l01_host.c
@@ -56,4 +68,6 @@ check-dep-dir-a-l01-host:
 - kernel/kernel.c
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

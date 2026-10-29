@@ -9,6 +9,7 @@ check-gfinit-host:
 	    --plain tools/tests/test_gfinit_owner.py \
 	    --plain tools/tests/test_gfinit_plan.py \
 	    --plain tools/tests/test_gfinit_plan_c.py \
+	    --plain tools/tests/test_gfinit_stages.py \
 	    --plain tools/tests/test_gfinit_budget.py
 
 .PHONY: check-gfinit-host

@@ -1,4 +1,18 @@
 check-dep-dir-a-l10-host:
+- drivers/pci.h
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/bootinfo.h
+- include/gf_production.h
+- include/kprintf.h
+- kdebug/kpeek.h
+- kdebug/recover.h
+- kernel/kdebug_imports.def
+- kernel/pgalloc.h
+- lib/kstring.h
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/module_schema.py
 - tools/tests/hwdev_contract_fixture.py
 - include/types.h
 - include/platform_device.h
@@ -47,4 +61,6 @@ check-dep-dir-a-l10-host:
 - tools/tests/kernel_layout.py
 - tools/tests/mutpar.py
 - tools/tests/shm_user_host.c
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true
