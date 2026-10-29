@@ -1,4 +1,5 @@
 check-kapi-audit-host:
+- gfx/pc98_route.h
 - tools/tests/font_guard_inactive.h
 - kernel/ime.c
 - drivers/kbd.c

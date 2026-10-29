@@ -25,7 +25,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # 同じものをここでも渡す。
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "lib", "drivers", "sdk/include/os32")]
+                      "kernel", "gfx", "lib", "drivers", "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/con_sink_host.c"
 KERNEL_SRC = ROOT / "kernel/con_sink.c"
 # K6C-2: 描画抑止は kernel/console.c 側なので、そちらもカーネルと同じ

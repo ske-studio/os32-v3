@@ -32,6 +32,8 @@ void _halt(void)
     event('H', 0, 0);
     if (rebooting && ++halts == 2) finish(0);
 }
+/* L11 has no selected GF device or registered return callback. */
+int gf_production_return(void) { return 0; }
 #include "sys_control.inc"
 void _start(void)
 {

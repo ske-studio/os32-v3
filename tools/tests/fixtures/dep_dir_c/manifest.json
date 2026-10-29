@@ -9,20 +9,20 @@
     "legacy-12296": "b3635a16ab146ec63bf88bf1575ed579807dc025cf5f93c8f543c6c5305b2934",
     "legacy-15360": "7518ea86d447d7d4838aed34bcba23daa888a6821833d5d2c14bc55e080574bf",
     "legacy-16384": "ca7a760f5bae20e549cae0ce644ad382d1954014f8027820b40ada63693867ba",
-    "bios-1": "678ca79f12721188563364de1906199179134a6ee287c41721d6aa09fcc468a6",
-    "bios-5": "c5ce533e7de40f19b559deecf8968c06d1b5c0bf583864acfd6fbe75ec464462",
-    "bios-256": "5a498815128bae422542c01891fa87196e5e6b9fce1b0fca0ec72954e37352c4",
-    "bios-2032": "709af2f5913e7d65336529b1fa8f8aef7d9a1656872d23c03833882bf4e9c1eb",
-    "bios-4000": "3e0560370e2f40139b0ca72b5ed8be55751d22a71df0069ae96fb5bc9a8b3f2d",
+    "bios-1": "59840a09465700220364c416ae488ecd86a817ffed8203ddce294c2d739d46e9",
+    "bios-5": "10ab3173740071c1112ec78d19a7fbc067230f7735d365276726fe20b2247e89",
+    "bios-256": "bdd1736b7034ad9be23ffa1b0d4c7f4fcd13accb9c002ff0837f1a522ee29053",
+    "bios-2032": "a570250423bf099eb03a33ef46da21c351ec6c82047508fd607852334c8415da",
+    "bios-4000": "87268d3f58f61df8e95ad8dcaccd66a0511908cdc0308f28d0658c6930d810ea",
     "wrap-first": "b0b34d7264fe0b35b116e1916bb20939aadebe4c65eb34d29acb2b2ef1a4180b",
-    "wrap-later": "6f2338561df0112a40020c2b196ea012c7029de0523b24e0b4da449cb6e6ee65",
+    "wrap-later": "25c5d5f65e2afa50e448fa9e4f7322cfdbeed350228534dcf0556041e60ea370",
     "write-first": "0fd8b9afc96986265774341dfc2fe574ceba8f8338f34665ae97d021761cead4",
-    "write-short": "41a744db9fb6a8c1bca336289fefbfc5177e2b8cf36dde14695e5cc4e727b68a",
+    "write-short": "60e072794491b01e148d2339d6b71ee34a4bc49c6de948621935e33bb6fae019",
     "alias-first": "47aa62bf5278a269e55bd8bbcca9aa43f16993556969073c86b8228ff2f78c5f",
-    "alias-middle": "a0540c12fcf43f0f62921db7f46922d9976b4c8844c360ac4a7f472ffa03a5dd",
-    "repeat-zero": "88a60fea8a33555516c7179aa181179382c0a7cde79dc6248ffed475345ee35a",
-    "high-no-fit": "6fce0012a97df8bca8d2f29de08d6b4f04077e02d22963bfae4c0743105528c7",
-    "high-tight-fit": "5e7a397a72bf081db3cb1c8659a40ea72de2e04c34112c8f113ab45deb7272d7",
+    "alias-middle": "c9a33b5a709a891b5c4049def8cc5b05c4644675c8193299b985449921e04e85",
+    "repeat-zero": "6ce89667d74ecc3525b11f907b980df994ede77db0d53c3da0939caa2bfa5c28",
+    "high-no-fit": "3433a222f8663a5448d0a0baf8305f92737da3b2e118b8a674311e623118438a",
+    "high-tight-fit": "548532792e60c9583422c5ca37fafceb3e4b8b785c0f0eda6896a6c85ea6cb7f",
     "huge-hint": "62e38005e1b7cbf30bd9c70fffd783089713ffc80e0362cd8894fa3b529855fa",
     "minimum-fail": "aabb970ead20618add031afc11558ff8e17f09f0fe65b2997bdfadb4b73203da",
     "dma-absent": "77e85875fbea73f02451791476049b299154a86b4bef0166682fe514efadb536"
@@ -236,5 +236,26 @@
     "runner": "qemu-i386",
     "log": "/home/hight/os32-tmp/run/depdir-l14a/capture.log",
     "script": "/home/hight/os32-tmp/run/depdir-l14a/capture.py"
+  },
+  "gf_workspace_update": {
+    "base_sha": "0093b22e",
+    "reason": "GF_DRIVER P4 reserves five additional PT pages on boots with attested high RAM; only derived workspace/arena/count/PDE addresses change. Low-RAM traces remain unchanged.",
+    "previous_traces": {
+      "alias-middle": "a0540c12fcf43f0f62921db7f46922d9976b4c8844c360ac4a7f472ffa03a5dd",
+      "bios-1": "678ca79f12721188563364de1906199179134a6ee287c41721d6aa09fcc468a6",
+      "bios-2032": "709af2f5913e7d65336529b1fa8f8aef7d9a1656872d23c03833882bf4e9c1eb",
+      "bios-256": "5a498815128bae422542c01891fa87196e5e6b9fce1b0fca0ec72954e37352c4",
+      "bios-4000": "3e0560370e2f40139b0ca72b5ed8be55751d22a71df0069ae96fb5bc9a8b3f2d",
+      "bios-5": "c5ce533e7de40f19b559deecf8968c06d1b5c0bf583864acfd6fbe75ec464462",
+      "high-no-fit": "6fce0012a97df8bca8d2f29de08d6b4f04077e02d22963bfae4c0743105528c7",
+      "high-tight-fit": "5e7a397a72bf081db3cb1c8659a40ea72de2e04c34112c8f113ab45deb7272d7",
+      "repeat-zero": "88a60fea8a33555516c7179aa181179382c0a7cde79dc6248ffed475345ee35a",
+      "wrap-later": "6f2338561df0112a40020c2b196ea012c7029de0523b24e0b4da449cb6e6ee65",
+      "write-short": "41a744db9fb6a8c1bca336289fefbfc5177e2b8cf36dde14695e5cc4e727b68a"
+    },
+    "source_sha256": {
+      "kernel/memory_boot.c": "3510c450dbf00f9ec013278e22e17aa75a78a6fe09a907b7f7d6eeeec634eb2d",
+      "include/gf_production.h": "5940f951507c8929cd2c9da660e8e06b8aa59c80b92ea8bb2a62d161a6173b6a"
+    }
   }
 }

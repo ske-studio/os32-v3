@@ -1,4 +1,5 @@
 check-con-sink-host:
+- gfx/pc98_route.h
 - tools/tests/host32.py
 - kernel/con_sink.c
 - kdebug/selftest_con_sink.c

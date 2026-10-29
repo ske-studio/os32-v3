@@ -13,6 +13,16 @@ static unsigned int inp(unsigned int port) { return port == 0x60 ? 0x20 : 0; }
 static unsigned int irq_save(void) { return 0; }
 static void irq_restore(unsigned int flags) { (void)flags; }
 static void outp(unsigned int port, unsigned int value);
+/* This fixture is LP64. Read the GUI wire layouts with their target widths;
+ * keep their assertions active. gfx_vram only needs the shared coordinates. */
+#include "types.h"
+#include "os32_kapi_shared.h"
+#include <stdint.h>
+#define u32 uint32_t
+#define i32 int32_t
+#include "os32_gui_shared.h"
+#undef i32
+#undef u32
 #include "../../gfx/gfx_core.c"
 #include "../../gfx/backend_pc98.c"
 const u8 *v86_bios_real_lowmem(void)
@@ -22,14 +32,6 @@ const u8 *v86_bios_real_lowmem(void)
     };
     return bios;
 }
-/* This fixture is LP64. Read the GUI wire layouts with their target widths;
- * keep their assertions active. gfx_vram only needs the shared coordinates. */
-#include <stdint.h>
-#define u32 uint32_t
-#define i32 int32_t
-#include "os32_gui_shared.h"
-#undef i32
-#undef u32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
 #include "../../gfx/gfx_vram.c"
@@ -37,6 +39,8 @@ const u8 *v86_bios_real_lowmem(void)
 #include "../../platform/pc98/splash.c"
 #include "../../kernel/boot_splash.c"
 
+GfxBackend gfx_backend_geforce = { .name = "geforce-unavailable" };
+void gui_display_failed(void) { abort(); }
 volatile u32 tick_count;
 int vram_scroll_y;
 static int cirrus_probes, pegc_probes, optional_inits;

@@ -1,4 +1,5 @@
 check-dep-dir-a-l02-host:
+- tools/tests/hwdev_contract_fixture.py
 - kernel/tick.c
 - kernel/tick.h
 - platform/pc98/tick_order.h

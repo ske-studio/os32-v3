@@ -1,4 +1,5 @@
 check-c-dialect:
+- tools/prototypes/geforce_imports.def
 - tools/prototypes/v86_imports.def
 - tools/clang_ast/**
 - tools/gen_hwdev_pair.py

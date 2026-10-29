@@ -847,11 +847,11 @@ def case_mk_real_tree(cs):
         shutil.rmtree(os.path.join(fx.d, "tools"))
         os.symlink(os.path.join(cs.ROOT, "tools"), os.path.join(fx.d, "tools"))
         r = fx.plan(files=["build/sdk.mk", "Makefile"], map_=m)
-        # Layout/SQLite prototype artifact readers and the per-check timing test
+        # Layout/paired-module artifact readers and the per-check timing test
         # select SDK build changes even with no recipe delta (the prototype was
-        # added in T4a-2, the timing test with check_times.tsv).
+        # added in T4a-2, GeForce in P5, timing with check_times.tsv).
         _only(r, "check-memmap-host", "check-sqlite-module-proto-host",
-              "check-check-times-host")
+              "check-check-times-host", "check-geforce-host")
         assert any("新しい検査 0 本" in l and "追加選択なし" in l for l in r[3]), r[3]
         rel = "build/checks.d/check-time-math-host.mk"
         text = pathlib.Path(fx.d, rel).read_text()

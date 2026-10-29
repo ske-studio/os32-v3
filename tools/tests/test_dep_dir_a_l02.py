@@ -3,6 +3,7 @@
 --prepare compiles copied substitutions only; it does not execute mutants.
 """
 import argparse
+from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
 import json
 from pathlib import Path
@@ -44,11 +45,7 @@ def contracts():
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
     assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
-    # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
-    hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x50a115a8U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x1eae31dcU' in hwdev
-    assert 'e82557_regs.h' not in (ROOT / 'kernel/lan_module.c').read_text()
+    assert_hwdev_contract(ROOT)
     print('PASS B1/B2: fixed hwdev inventory/CRCs, both LAN contract dependencies')
 
 

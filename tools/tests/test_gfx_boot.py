@@ -275,7 +275,8 @@ MUTATIONS = [
      '    if ((m | 1) &&\n        pgalloc_alloc_n_owner'),
     # GFX=pc98 でも識別して予約する
     ('pc98-pref-ignored', 'gfx/gfx_core.c',
-     '    if (g_backend_pref == GFX_PREF_PC98 ||\n', '    if (0 ||\n'),
+     '    if (g_backend_pref == GFX_PREF_PC98 || g_backend_pref == GFX_PREF_GEFORCE ||\n',
+     '    if (0 || g_backend_pref == GFX_PREF_GEFORCE ||\n'),
     # e11a: authorized DISPLAY lease must now be possible
     ('display-unlendable', 'gfx/gfx_core.c',
      '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW }',

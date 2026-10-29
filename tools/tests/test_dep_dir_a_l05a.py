@@ -3,6 +3,7 @@
 --prepare compiles a copied mutation with -Werror; it never runs that mutation.
 """
 import argparse
+from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
 import json
 from pathlib import Path
@@ -49,11 +50,7 @@ def contracts():
         wrappers += body + '\n'
     for path, expected in fixture['generated'].items():
         assert digest((ROOT / path).read_bytes()) == expected, path
-    # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
-    hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    for crc in ('#define HWDEV_CONTRACT_CRC 0x50a115a8U',
-                '#define HWDEV_LAYOUT_CRC 0x1eae31dcU'):
-        assert crc in hwdev
+    assert_hwdev_contract(ROOT)
     print('PASS fixed b400acb6 public API/version/slots/signatures/out/in/generated ABI; hwdev CRC')
     return fixture, wrappers
 

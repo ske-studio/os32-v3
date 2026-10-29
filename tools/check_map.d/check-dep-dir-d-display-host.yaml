@@ -33,3 +33,4 @@ check-dep-dir-d-display-host:
 - tools/check_map.d/check-dep-dir-d-display-host.yaml
 - tools/check_map.yaml
 - kernel/v86.c
+- gfx/pc98_route.h
