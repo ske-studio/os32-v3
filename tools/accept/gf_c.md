@@ -80,7 +80,7 @@ BAR0相対hex、MMIO32bit・indexed/port8bit。sはmain4後Q前、rは直前読�
 | cleanup | local→quiesce（1850=0→1854=0→PMC140=0・照合）→screen。PCI同定不能ならGF MMIOを省きFAIL、独立な98復帰を試みる。decode解放未確認時はA0000hに触れない（D:95–98）。 | S0は98復帰まで。mode/DAC/PLL/PFB/VRAMを逆順再生しない。reboot、固まれば電源。 |
 
 ## ノートのREC採取・時間の見込み
-2026-10-29 の回: main 4 の PAUSED (sid c=2、seq 11820) で C を立会いまで待機 (ユーザー判断)。途中で reboot・電源断があれば A2 から。
+2026-10-29 の回 (結果): C は 4 回目で完走し、映像を目視 (8 色の縦帯・市松・白枠、位置のずれはモニタ側)。1 回目 50C bit28、2 回目 680A24、3 回目 CR1A bit3/5 の読み返しの食い違いで止まり、そのつど照合から外して版を入れ直した (作業木 gf-c-50c、ed924ee9→f5953909→debd2ad5)。4 回目は monitor が 50C の値を mask なしで比べて誤って断り、状態のファイルに誤判定が残って abort も断ったので、`gfinit abort 2 --allow-write` を rshell_serial で直接送った (final PARTIAL target=S0 verified=1 unknown=1 trial=1 lost_lines=0 txd=0)。終端後の kpeek は C の値のまま (50C=204・508=00021A07・578=8000011F・1850/1854/PMC140=0)、reboot 後は既定値 (50C=4・508=00051104・578=00000E02・200=03010000)。証拠はノートの ~/os32-tmp/evidence/2026-10-29/gf-c-run4/ ほか (gf4c・gf-c-50c・gf-c-run3)。次の回は `--verify required` (記録だけ) で回せる (作業木 gf-c-noverify)。
 
 A1は新 `a1.json/a1.raw`、A2は新 `c.json/c.raw`。以降同じファイルへ追記し、受信者は1つ。生REC、monitor出力、開始/PAUSED/final時刻、行数・経過秒、sid/seq・version/profile_crc/plan_hash/snapshot_crcを保存（M:193,207–208、W:41,533–550）。
 共通形：`python3 tools/rshell_recover.py --port /dev/ttyUSB0 --baud 9600 --session <sid> --state <state> --image-crc <当日CRC> --log <raw> --timeout 900 --cleanup-timeout 180 --command '<表のコマンド>'`。
