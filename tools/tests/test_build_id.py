@@ -105,6 +105,16 @@ def run_all(script):
         git(repo, "commit", "-q", "-m", "one")
         want = git(repo, "rev-parse", "--short=7", "HEAD")
 
+        fixed_env = dict(os.environ, OS32_BUILD_COMMIT="layout-fixed")
+        if gen(script, repo, env=fixed_env) != "layout-fixed":
+            raise Fail("fixed commit override ignored")
+        invalid = subprocess.run([sys.executable, "-B", str(script), "--print"],
+                                 env=dict(os.environ, OS32_BUILD_COMMIT='"bad'),
+                                 capture_output=True, text=True)
+        if invalid.returncode == 0:
+            raise Fail("invalid fixed commit accepted")
+        lines.append("fixed override: environment ID / invalid ID rejected")
+
         got = gen(script, repo)
         if got != want:
             raise Fail("clean: {} != {}".format(got, want))

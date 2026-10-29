@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """CPU asm templates from clang GCC_ASM_STMT; preserve architecture exceptions."""
 import argparse
+from source_roots import SCAN_ROOTS
 import pathlib
 import re
 import clang_ast as ast
 from clang_ast.asm import templates
 K = ast.K
-SCAN_DIRS = ['kernel','kdebug','drivers','exec','fs','kapi','lib','net','gfx','include','arch','platform']
+SCAN_DIRS = SCAN_ROOTS['arch_asm']
 ALLOW_RE = re.compile(r'^arch/[^/]+/arch_[A-Za-z0-9_]+\.h$')
 ALLOW_LOOKBACK = 16
 MNEMONIC_RE = re.compile(r'(?:^|[;\s])(hlt|cli|sti)(?=$|[;\s])')

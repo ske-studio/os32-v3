@@ -314,7 +314,7 @@ def link_fixture(root, core_end=0x2bc060):
     """本物のos32.ldに最小入力を与え、ASSERTを実際に評価する。"""
     cc = 'i386-elf-gcc'
     ld = 'i386-elf-ld'
-    for rel, asm in (('kernel/kentry', f'.text\n.globl kentry\nkentry: nop\n.bss\n.space {core_end - 0x100000}\n'),):
+    for rel, asm in (('build/out/obj/kernel/kentry', f'.text\n.globl kentry\nkentry: nop\n.bss\n.space {core_end - 0x100000}\n'),):
         src = root / (rel + '.s')
         src.parent.mkdir(parents=True, exist_ok=True)
         src.write_text(asm)
@@ -322,9 +322,9 @@ def link_fixture(root, core_end=0x2bc060):
                        capture_output=True)
     sys.path.insert(0, str(ROOT / 'tools'))
     import gen_memmap
-    source = (root / 'build/os32.ld').read_text()
+    source = (root / 'build/os32.ld').read_text().replace('kernel/kentry.o', 'build/out/obj/kernel/kentry.o')
     (root / 'build/out/fixture.ld').write_text(gen_memmap.preprocess_layout(root, source))
-    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'kernel/kentry.o', '-o', 'build/out/fixture.elf'],
+    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'build/out/obj/kernel/kentry.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
 
 

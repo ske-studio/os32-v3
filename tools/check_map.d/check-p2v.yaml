@@ -1,4 +1,5 @@
 check-p2v:
+- tools/source_roots.py
 - tools/prototypes/geforce_imports.def
 - tools/prototypes/v86_imports.def
 - tools/clang_ast/**

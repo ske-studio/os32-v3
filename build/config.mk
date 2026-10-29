@@ -7,7 +7,7 @@
 BUILD_OUT ?= build/out
 LAYOUT_HEADER = $(BUILD_OUT)/memmap_layout.h
 LAYOUT_CPP = $(CC) -E -P -x c -imacros $(LAYOUT_HEADER)
-KERNEL_OBJ_PREFIX = $(if $(filter-out build/out,$(BUILD_OUT)),$(BUILD_OUT)/obj/)
+KERNEL_OBJ_PREFIX = $(BUILD_OUT)/obj/
 $(shell mkdir -p $(BUILD_OUT))
 
 # ユーザー空間ライブラリのアーカイブ (.a) 出力先。

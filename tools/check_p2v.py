@@ -3,12 +3,13 @@
 import bisect
 import collections
 import argparse
+from source_roots import SCAN_ROOTS
 import pathlib
 import re
 import clang_ast as ast
 
 ROOT = ast.ROOT
-ROOTS = ('kernel', 'kdebug', 'drivers', 'gfx', 'fs', 'exec', 'kapi', 'lib')
+ROOTS = SCAN_ROOTS['p2v']
 EXCLUDED = {'third_party', 'sqlite', 'sqlite3', 'fatfs', 'zlib', 'microtar', 'os32_lz4'}
 PHYS = re.compile(r'^(?:MEM_\w*(?:BASE|ADDR)|TVRAM_\w+|VRAM_PLANE_\w+|PEGC_\w*_BASE|BIOS_WORK_\w+|KHEAP_BASE|KAPI_ADDR|V86_(?:TEST_\w+_ADDR|IPL_ADDR|REMAP_START)|DB_SHM_PTR|\w*_phys|phys|pa|paddr|pfn)$')
 USER = re.compile(r'^(?:RING3_\w+|MEM_EXEC_LOAD_ADDR|MEM_APP_BAND_\w+|MEM_LEASE_\w+|uva|user_\w+)$')

@@ -11,7 +11,7 @@ from ver_test_utils import ROOT, arguments
 
 CONSUMER = 'kernel/ver_format.c'
 VERSION_USE = '"PC-9821 OS32 v" SYS_VERSION'
-OBJECTS = ('kernel/ver_format.o', 'kernel/module.o')
+OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module.o')
 # These directories contain all outputs/generators reachable from OBJECTS.
 # Copy tracked sources, excluding .o/.d/target caches; other inputs are read-only
 # links. Neither config edits nor make outputs touch the invoking worktree.

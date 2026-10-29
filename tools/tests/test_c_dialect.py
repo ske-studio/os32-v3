@@ -89,11 +89,11 @@ def case_lex(cd):
 # --------------------------------------------------------------------------
 
 DRY = """\
-nasm -f elf32 -o kernel/entry.o kernel/entry.asm
-i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c kernel/kernel.c -o kernel/kernel.o
-i386-elf-gcc -std=gnu89 -m32 -Os -include lib/sqlite3/os32_sqlite_config.h -Ilib/sqlite3 -c lib/sqlite3/sqlite3.c -o lib/sqlite3/sqlite3.o
+nasm -f elf32 -o build/out/obj/kernel/entry.o kernel/entry.asm
+i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c kernel/kernel.c -o build/out/obj/kernel/kernel.o
+i386-elf-gcc -std=gnu89 -m32 -Os -include lib/sqlite3/os32_sqlite_config.h -Ilib/sqlite3 -c lib/sqlite3/sqlite3.c -o build/out/sqlite-proto/sqlite3.o
 i386-elf-gcc -std=gnu11 -m32 -Iboot -c -o boot/boot_main.o boot/boot_main.c
-i386-elf-ld -m elf_i386 -o build/kernel.elf kernel/kernel.o
+i386-elf-ld -m elf_i386 -o build/kernel.elf build/out/obj/kernel/kernel.o
 """
 
 
@@ -123,7 +123,7 @@ def case_parse(cd):
     check(cd.expected_std("userland/lib/gfx/gfx.c") == "gnu11", "userland は gnu11")
     a = units[0]["argv"]
     check("-Iinclude" in a and "kernel/kernel.c" in a and "-c" not in a and "-MMD" not in a
-          and "-o" not in a and "kernel/kernel.o" not in a,
+          and "-o" not in a and "build/out/obj/kernel/kernel.o" not in a,
           "前処理用の引数は -I とソースを残し、依存生成・-c・-o を外す")
 
 
@@ -481,7 +481,7 @@ def run_checker(root):
 def case_build_coverage(cd):
     # Exercise the same flag pass used by the full checker, with a tiny dry run.
     from unittest import mock
-    lines = "i386-elf-gcc -std=gnu11 -c kernel/kernel.c -o kernel/kernel.o\n"
+    lines = "i386-elf-gcc -std=gnu11 -c kernel/kernel.c -o build/out/obj/kernel/kernel.o\n"
     for sqlite, want_ok in [(False, False), (True, True)]:
         out = lines + ("i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o\n" if sqlite else "")
         with mock.patch.object(cd, 'dry_run', return_value=(0, out, '')), \
