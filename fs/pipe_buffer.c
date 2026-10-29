@@ -81,14 +81,6 @@ u8 *pipe_get_buf(int id)
     return (u8 *)0;
 }
 
-u32 pipe_get_capacity(int id)
-{
-    if (id >= 0 && id < PIPE_BUF_COUNT && pipe_ptr[id]) {
-        return PIPE_BUF_SIZE;
-    }
-    return 0;
-}
-
 u32 pipe_get_len(int id)
 {
     if (id >= 0 && id < PIPE_BUF_COUNT &&

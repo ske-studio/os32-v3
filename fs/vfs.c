@@ -747,19 +747,6 @@ int vfs_sync(void)
     return rc;
 }
 
-u32 vfs_total_blocks(void) {
-    MountPoint *mnt = vfs_find_mount("/", (const char **)0);
-    return (mnt && mnt->ops->total_blocks) ? mnt->ops->total_blocks(mnt->fs_ctx) : 0;
-}
-u32 vfs_free_blocks(void) {
-    MountPoint *mnt = vfs_find_mount("/", (const char **)0);
-    return (mnt && mnt->ops->free_blocks) ? mnt->ops->free_blocks(mnt->fs_ctx) : 0;
-}
-u32 vfs_block_size(void) {
-    MountPoint *mnt = vfs_find_mount("/", (const char **)0);
-    return (mnt && mnt->ops->block_size) ? mnt->ops->block_size(mnt->fs_ctx) : 0;
-}
-
 /* stat の st_dev をマウント単位で決める。FS ドライバは st_dev を埋めない
  * (ext2/iso9660 は 0 固定、hostdrv/fatfs は kmemset のまま) ので、VFS が
  * 正典として上書きする。値は VFS_MOUNT_DEV_ENCODE() + 1 — +1 は「不明」を
