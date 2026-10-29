@@ -1,6 +1,6 @@
 """Expected private hwdev fingerprints after GF_DRIVER P4/P5."""
 
-HWDEV_CONTRACT_CRC = 0xf22b1add
+HWDEV_CONTRACT_CRC = 0x770af7ec
 HWDEV_LAYOUT_CRC = 0x1eae31dc
 
 

@@ -49,7 +49,7 @@ struct hwdev_core_api {
     int (*recover_hal_wait_frame)(void *opaque, u32 frame_us);
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
 };
-#define HWDEV_CONTRACT_CRC 0xf22b1addU
+#define HWDEV_CONTRACT_CRC 0x770af7ecU
 #define HWDEV_LAYOUT_CRC 0x1eae31dcU
 #define HWDEV_IMPORT_COUNT 36U
 #define HWDEV_CORE_SLOTS 25U
