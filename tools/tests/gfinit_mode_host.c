@@ -4,6 +4,7 @@
 #undef _start
 #include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_mode.c"
+#include "gf_display_calc_host.inc"
 #include "../../hwdev/gf_load_state.c"
 static void number(u32 x)
 {

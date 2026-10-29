@@ -16,7 +16,6 @@ check-hwdev-image-host:
 - kdebug/gfinit_decode/*.inc
 - kdebug/gfinit_op/*.inc
 - kdebug/gfinit/*.inc
-- kdebug/gfinit_mode/*.inc
 - kdebug/gfinit_plan_c/*.inc
 - kdebug/gfinit_pll/*.inc
 - kdebug/gfinit_resources/*.inc
@@ -92,4 +91,6 @@ check-hwdev-image-host:
 - drivers/serial.h
 - hwdev/gf_load_state.c
 - hwdev/gf_load_state.h
+- hwdev/gf/quiesce_rows.h
+- tools/tests/gf_display_calc_host.inc
 artifact_reader: true

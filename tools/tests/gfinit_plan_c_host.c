@@ -5,6 +5,7 @@
 #undef GF_S5_ENTRY
 #include "../../kdebug/gfinit_plan.c"
 #include "../../kdebug/gfinit_mode.c"
+#include "gf_display_calc_host.inc"
 #include "../../hwdev/gf_load_state.c"
 #include "../../kdebug/gfinit_plan_c.c"
 #include "../../kdebug/gfinit_verify.inc"

@@ -1,6 +1,8 @@
 # GF body lives only in HWDEV; S0 recovery stays in kdebug.
 HWDEV_OUT := $(BUILD_OUT)/hwdev
-HWDEV_GF := gf_load_state gf_stage_state gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf
+GF_CALC_NAMES := calc timing format pitch start dac_format output cursor fifo extended pll_program
+GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(GF_CALC_NAMES)))
+HWDEV_GF := gf_load_state gf_stage_state gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf calc timing format pitch start dac_format output cursor fifo extended pll_program
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
 # Normal and R1 share this decoder object; keep all other units at -O2.
@@ -104,3 +106,15 @@ $(HWDEV_OUT)/gf/%.o: hwdev/gf/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev
 # Compile now without adding unused components to the diagnostic module.
 $(HWDEV_OUT)/hwdev.elf: $(GF_INIT_OBJS)
 -include $(GF_INIT_OBJS:.o=.d)
+
+# P3 calculation is linked once; diagnostic C and production use its functions.
+$(GF_CALC_OBJS): $(HWDEV_OUT)/%.o: hwdev/gf/display/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -Werror -c $< -o $@
+GF_DISPLAY_SOURCES := hwdev/gf/service.c $(filter-out $(addprefix hwdev/gf/display/,$(addsuffix .c,$(GF_CALC_NAMES))),$(wildcard hwdev/gf/display/*.c))
+GF_DISPLAY_OBJS := $(patsubst hwdev/%.c,$(HWDEV_OUT)/%.o,$(GF_DISPLAY_SOURCES))
+$(HWDEV_OUT)/hwdev.elf: $(GF_DISPLAY_OBJS)
+-include $(GF_CALC_OBJS:.o=.d) $(GF_DISPLAY_OBJS:.o=.d)
+$(addprefix $(VPLL_OUT)/hw/,$(addsuffix .o,$(GF_CALC_NAMES))): $(VPLL_OUT)/hw/%.o: hwdev/gf/display/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -Werror -c $< -o $@

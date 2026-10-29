@@ -178,8 +178,28 @@ int gf_op_condition_run(struct gf_init_context *, const struct gfinit_instructio
 int gf_op_index_io_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_zm_reg_run(struct gf_init_context *, const struct gfinit_instruction *);
 
+enum gf_display_stage { GF_DISPLAY_INIT=GF_LOAD_COMMIT+1, GF_DISPLAY_BASELINE,
+    GF_DISPLAY_CALC, GF_DISPLAY_CHECK, GF_DISPLAY_PALETTE, GF_DISPLAY_BLANK,
+    GF_DISPLAY_STOP };
+struct gf_display_context;
+/* P4 owner: acquire performs resource/Command/ROM/A2 preparation and supplies
+ * init/program + parsed limits. release drops borrowed ROM/scratch after
+ * baseline (also on failure). validate rechecks identity/BAR/Command/legacy/
+ * PMC without repeating devinit, and refuses unsafe MMIO after identity change.
+ * io.restore owns local index/lock/window cleanup, even for an empty table.
+ * A fresh context has reusable=true. Owner/table and bus outlive the device. */
+struct gf_display_owner {
+    int (*acquire)(struct gf_display_context *);
+    void (*release)(struct gf_display_context *);
+    int (*validate)(struct gf_display_context *);
+};
 struct gf_display_context {
     struct gf_io io;
+    const struct gf_display_owner *owner;
+    /* Borrowed from acquire through release only; load_context is stack-owned
+     * by modeset and used for the operation-local PLL transaction/waits. */
+    struct gf_init_context *init, *load_context;
+    struct gf_init_program *program;
     struct recover_identity identity; /* metadata only, no recover executor */
     struct recover_bar_extent bars[RECOVER_BAR_COUNT]; /* raw/base/length */
     void *bar0_map, *bar1_map;
@@ -187,13 +207,13 @@ struct gf_display_context {
     struct gfinit_pll_limits limits;
     struct gfinit_mode_saved baseline;
     u32 baseline_c040, baseline_pmc;
-    bool initialized, baseline_valid, active, blank, stop_ok, reusable;
+    bool initialized, baseline_valid, active, blank, stop_ok, reusable, engaged;
     struct gfinit_mode mode;
     u8 palette[VIDEO_PALETTE_BYTES];
     /* Runtime row state: first C040 is kept, FP/LIVE predicates are not
      * precomputed. baseline_valid only after every main4 capture succeeds;
      * CR52 always derives from baseline, never from the last modeset. */
-    u32 section, ordinal, pll_gate;
+    u32 section, ordinal, target, pll_gate;
     bool pll_gate_valid, fp_on;
     int last_rc;
 };
@@ -202,4 +222,16 @@ struct gf_display_context {
  * alone owns ordering/DPMS/waits; don't duplicate generated gf_mode_rows.
  * AR uses FF-reset/index/data; DAC is write-only auto-increment. */
 int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, u32 ordinal);
+/* GF implementations of the eight video operations. */
+int gf_display_query(void *, struct video_info *);
+int gf_display_mode_info(void *, u32, struct video_mode *);
+int gf_display_framebuffer(void *, struct video_fb *);
+int gf_display_start(void *, u32);
+int gf_display_palette(struct gf_display_context *, u32, u32, const u8 *);
+int gf_display_blank(struct gf_display_context *, int);
+int gf_display_modeset(struct gf_display_context *);
+int gf_display_baseline(struct gf_display_context *);
+int gf_display_checks(struct gf_display_context *);
+int gf_display_stop(void *);
+extern const struct video_ops gf_video_ops;
 #endif
