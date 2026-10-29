@@ -26,10 +26,6 @@
 
 #include "rtc.h"
 #include "io.h"
-#include "memmap.h"
-
-/* 外部: tick_count (idt.c) */
-extern volatile u32 tick_count;
 
 /* ======== I/Oウェイト ======== */
 /* io_wait()×2回で約1.2µsの遅延 (µPD4990A最小CLKパルス幅: 0.9µs) */
@@ -152,11 +148,6 @@ void rtc_read(RTC_Time *t)
     if (t->hour > 23) t->hour = 0;
     if (t->day < 1 || t->day > 31) t->day = 1;
     if (t->month < 1 || t->month > 12) t->month = 1;
-}
-
-u32 rtc_uptime_sec(void)
-{
-    return tick_count / PIT_HZ;  /* PIT_HZ Hz → 秒変換 */
 }
 
 /* PC-9821 calendar adapter: one hardware read, one two-digit year pivot. */

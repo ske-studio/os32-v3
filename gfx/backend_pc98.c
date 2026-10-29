@@ -91,40 +91,12 @@ static void pc98_shutdown(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  present で書き込む VRAM バイト数を数える (契約 G7 / DESIGN §8)。          */
-/*  gfx_add_dirty_rect と同じ 32px アライン + 画面クリップで、要求された矩形の */
-/*  論理 present サイズ ((aligned_w/8) × h × 4 プレーン) を加算する。         */
-/*  gfx_present() 1 回 = 640/8×400×4 = 128000、present_rect(0,0,32,16) =      */
-/*  4×16×4 = 256 (完了条件)。フリップのステイルページ再転送は含めない         */
-/*  (論理 present 量を数えるため)。                                          */
-/* ------------------------------------------------------------------------ */
-static void pc98_count_present(int x, int y, int w, int h)
-{
-    const GfxMode *mode = gfx_backend_mode(&gfx_backend_pc98);
-    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, gfx_current_height)) return;
-    int right = x + w;
-    int ax = x & ~(BITS_PER_U32 - 1);
-    int aw = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - ax;
-
-    if (ax < 0) { aw += ax; ax = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (ax + aw > mode->width) aw = mode->width - ax;
-    if (y + h > gfx_current_height) h = gfx_current_height - y;
-    if (aw <= 0 || h <= 0) return;
-
-    /* aw は 32 の倍数なので aw/8 は偶数 → 実転送ワード×2 と一致する */
-    /* present_bytes は実 VRAM 転送点 (_flush_dirty_queue) で数える (レビュー ⑦)。
-     * ここで論理 damage を数えると、ステイルページ再転送分が漏れる。 */
-}
-
-/* ------------------------------------------------------------------------ */
 /*  present_rect: バックバッファの矩形を VRAM へ転送する。                    */
 /*  commit カウンタと io_accesses (ページ切替 OUT) は gfx_present_dirty /     */
 /*  _flip_page 側で加算する。                                                */
 /* ------------------------------------------------------------------------ */
 static void pc98_present_rect(int x, int y, int w, int h)
 {
-    pc98_count_present(x, y, w, h);
     gfx_add_dirty_rect(x, y, w, h);
     gfx_present_dirty();
 }

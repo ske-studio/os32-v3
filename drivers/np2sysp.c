@@ -58,18 +58,6 @@ void np2_send_val(u32 val)
     outp(NP2PORT_VAL, (u8)((val >> 24) & 0xFF));
 }
 
-/* 32bit値をポート0x7EDから受信 */
-u32 np2_recv_val(void)
-{
-    u32 val = 0;
-    /* np2sysp_i7ed: ret = inpval & 0xff; inpval = (ret<<24) | (inpval>>8) */
-    val |= (u32)inp(NP2PORT_VAL);
-    val |= (u32)inp(NP2PORT_VAL) << 8;
-    val |= (u32)inp(NP2PORT_VAL) << 16;
-    val |= (u32)inp(NP2PORT_VAL) << 24;
-    return val;
-}
-
 /* ======================================================================== */
 /*  NP21/W検出                                                              */
 /*                                                                          */

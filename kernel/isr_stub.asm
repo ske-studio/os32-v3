@@ -146,16 +146,6 @@ section .text
 ;; CPU例外スタブ: 例外番号をpushしてからCハンドラへ
 ;; ============================================================
 
-;; マクロ: エラーコードなし例外
-%macro ISR_NOERR 1
-global isr_stub_%1
-isr_stub_%1:
-        cli
-        push    0               ;; ダミーエラーコード
-        push    %1              ;; 例外番号
-        jmp     isr_common
-%endmacro
-
 ;; マクロ: エラーコードあり例外
 %macro ISR_ERR 1
 global isr_stub_%1

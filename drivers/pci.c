@@ -295,19 +295,9 @@ int pci_init(void)
     return g_pci_count;
 }
 
-int pci_present(void)
-{
-    return g_pci_present;
-}
-
 int pci_count(void)
 {
     return g_pci_count;
-}
-
-int pci_seen(void)
-{
-    return g_pci_seen;
 }
 
 int pci_get(u32 idx, void *out)

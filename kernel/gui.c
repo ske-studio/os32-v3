@@ -192,7 +192,7 @@ void *gui_get_pump(void)
 /*  sys_switch_shell — 次シェルのパスを記録する (契約 T9、K4 の入口)         */
 /*                                                                          */
 /*  shell 帯 (owner 1) からのみ。実際の入れ替えはカーネルのシェル起動ループ  */
-/*  (K4) が gui_next_shell() を読んで行う。呼んだシェルは自分で後始末して     */
+/*  (K4) が gui_take_next_shell() で行う。呼んだシェルは自分で後始末して    */
 /*  exit する。                                                              */
 /* ======================================================================== */
 i32 sys_switch_shell(const char *path)
@@ -216,17 +216,6 @@ i32 sys_switch_shell(const char *path)
 }
 
 /* ======================================================================== */
-/*  gui_next_shell — K4 用: 記録された次シェルのパス (無ければ NULL)         */
-/* ======================================================================== */
-const char *gui_next_shell(void)
-{
-    if (g_next_shell[0] == '\0') {
-        return (const char *)0;
-    }
-    return g_next_shell;
-}
-
-/* ======================================================================== */
 /*  gui_take_next_shell — K4 用: 要求を取り出して消す (consume 方式)         */
 /*                                                                          */
 /*  起動ループはこちらを使う。パス比較で「前回と違うときだけ新要求」と        */
@@ -243,30 +232,6 @@ int gui_take_next_shell(char *out, int cap)
     out[cap - 1] = '\0';
     g_next_shell[0] = '\0';
     return 1;
-}
-
-/* ======================================================================== */
-/*  gfx_stats / gfx_lease_palette — H1 の依頼分の weak 既定                  */
-/*                                                                          */
-/*  本実装は H レーンが gfx/ (gfx_core.c) に置く (票 §3「H1 からの依頼」)。  */
-/*  K1 は KAPI スロットを切るだけだが、H1 未着手でもカーネルがリンクできる   */
-/*  よう weak な既定を置く。H1 の強シンボルがリンク時に上書きする。          */
-/*  TODO(H1): gfx/ で本実装に置き換える。                                    */
-/* ======================================================================== */
-__attribute__((weak)) int gfx_stats(void *out)
-{
-    if (out != 0) {
-        kmemset(out, 0, sizeof(GFX_Stats));
-    }
-    return OS32_ERR_NOSYS;
-}
-
-__attribute__((weak)) int gfx_lease_palette(int first, int count, const u8 *rgb)
-{
-    (void)first;
-    (void)count;
-    (void)rgb;
-    return OS32_ERR_NOSYS;
 }
 
 void gui_display_failed(void)
