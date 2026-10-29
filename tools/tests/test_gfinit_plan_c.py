@@ -19,6 +19,10 @@ def command(exe):
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
+    # f5953909 rebuilt independently, then debd2ad5 (CR1A mask D7) merged — PM.
+    assert 'default_hash=81564298\n' in text
+    assert 'default_crc=2834802941\n' in text
+    assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
     assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
@@ -29,7 +33,7 @@ def check_output(text, verbose=True):
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
         for line in text.splitlines():
-            if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'ROUTE ', 'CELL ', 'REC sid=')):
+            if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'ROUTE ', 'CELL ', 'VERIFY ', 'default_', 'REC sid=')):
                 print(line)
     groups = text.split('CHECK entry case=')[0].split('variant=')[1:]
     assert len(groups) == 3

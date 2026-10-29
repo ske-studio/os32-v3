@@ -1,5 +1,6 @@
 """4c2c3 REC/cleanup accounting and real failure paths (ILP32/qemu)."""
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,9 +45,17 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gf-budget-') as td:
         exe = pathlib.Path(td) / 'host'
         subprocess.run(command(exe), check=True, cwd=ROOT)
-        result = host32.run([str(exe)], cwd=ROOT, timeout=120)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=120, capture_output=True)
+        output = result.stdout.decode()
+        print(output, end='')
+        if result.stderr:
+            print(result.stderr.decode(), file=sys.stderr)
         if result.returncode:
             return result.returncode
+        rows = int(re.search(r'BUDGET case=15 c_rows=(\d+)', output)[1])
+        monitor = (ROOT / 'tools/rshell_recover.py').read_text()
+        limit = int(re.search(r'MODE_C_BYTES = (\d+)', monitor)[1])
+        assert (rows + 40) * 385 <= limit, (rows, limit)
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
                         ('kdebug/gfinit_budget.inc', 'control', '', ''))))

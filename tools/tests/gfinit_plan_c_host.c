@@ -6,6 +6,7 @@
 #include "../../kdebug/gfinit_plan.c"
 #include "../../kdebug/gfinit_mode.c"
 #include "../../kdebug/gfinit_plan_c.c"
+#include "../../kdebug/gfinit_verify.inc"
 #include "../../kdebug/recover_profile.c"
 static struct gfinit_plan composed;
 static u8 frame[GF_MODE_VRAM_BYTES];
@@ -694,7 +695,7 @@ static void check_contracts(void)
         const struct recover_target *t=&profile.targets[a[REC_CHECK_KEY].value];
         u32 mask=a[REC_CHECK_MASK].value,expected=a[REC_CHECK_EXPECTED].value;
         if(t->space==REC_BAR_MMIO) switch(t->offset) {
-        case 0x68050c:CHECK(mask==~0U && expected==0x10000204);seen|=1;break;
+        case 0x68050c:CHECK(mask==0xefffffffU && expected==0x10000204);seen|=1;break;
         case 0x680510:CHECK(mask==0);seen|=2;break;
         case 0x680508:CHECK(mask==0x0007ffff);seen|=4;break;
         case 0x680578:CHECK(mask==0x8000ffff);seen|=8;break;
@@ -707,7 +708,7 @@ static void check_contracts(void)
         case 0x680608:CHECK(mask==0x100000 && expected==0x100000);seen|=1024;break;
         }
         if(t->space==REC_VGA_INDEXED) {
-            CHECK(mask==255);
+            CHECK(mask==(t->port==0x3d4 && t->index==0x1a ? 0xd7U : 255U));
             if(t->port==0x3d4 && t->index==0x11)CHECK(expected==0xab);
             if(t->port==0x3d4 && t->index==0x17)CHECK(expected==0xc3);
             if(t->port==0x3c4 && t->index==1)CHECK(expected==1);
@@ -894,12 +895,99 @@ static void route_cell_cases(void)
     output("ROUTE fixed 01 mask03 match/mismatch/bus failures, exclusive operation and slots94/95 PASS\n");
     output("CELL RUN match/mismatch/test-write failure restore once, no HAL restore/redraw PASS\n");
 }
+static u32 policy_bad_key, policy_reads, policy_used, policy_bus_fault;
+static char policy_line[RECOVER_ROW_MAX], policy_end[RECOVER_ROW_MAX];
+static int policy_put(void *v,u32 ch)
+{
+    (void)v;CHECK(policy_used+1<sizeof(policy_line));
+    policy_line[policy_used++]=(char)ch;policy_line[policy_used]=0;
+    if(ch=='\n') {
+        if(frame_contains(policy_line,"phase=gf_bus event=END"))
+            for(u32 i=0;i<=policy_used;i++)policy_end[i]=policy_line[i];
+        policy_used=0;
+    }
+    return 0;
+}
+static const struct recover_transport policy_transport={
+    .uart={exec_log_ready,policy_put,exec_log_wait},.frame_us=1,.max_polls=1048576};
+static int policy_read(void *v,const struct recover_bus_access *a,u32 *value)
+{
+    int rc=bus_read_test(v,a,value);
+    if(a->key==policy_bad_key && ++policy_reads>1){if(policy_bus_fault)return -1;*value^=1;}
+    return rc;
+}
+static int policy_step(struct recover *r,void *v)
+{ u32 value=0;(void)v;return recover_plan_access(r,&value); }
+static void verify_policy_cases(void)
+{
+    c_build();u32 hash=core.bound_hash,crc=profile.crc;
+    field("default_hash",hash);field("default_crc",crc);
+    CHECK(!gfinit_verify_policy(&composed,&profile,0,0,0));
+    core.plan=0;CHECK(!contract_bind() && hash==core.bound_hash && crc==profile.crc);
+    CHECK(!gfinit_verify_policy(&composed,&profile,GF_VERIFY_REQUIRED,0,0));
+    core.plan=0;CHECK(!contract_bind() && hash!=core.bound_hash);
+    u32 recorded=0,required=0;
+    for(u32 i=0;i<profile.rule_count;i++) {
+        const struct recover_rule *w=&profile.rules[i];
+        if(w->phase!=REC_MODE_C) {CHECK(!(w->flags&REC_VERIFY_RECORD));continue;}
+        const struct recover_target *t=&profile.targets[w->key];
+        if(w->substep==GF_C_SELECT)CHECK(!(w->flags&REC_VERIFY_RECORD));
+        else if(t->space==REC_BAR_MMIO && (t->offset==0x68050c || t->offset==0x680524 ||
+                t->offset==0x680580 || t->offset==0xc040 || t->offset==0x600800 ||
+                t->offset==0x600804 || t->offset==0x68052c || t->offset==0x680608)) {
+            CHECK(!(w->flags&REC_VERIFY_RECORD));required++;
+        }
+        if(w->flags&REC_VERIFY_RECORD)recorded++;
+    }
+    CHECK(recorded>0 && required>=8);
+    const struct gfinit_no_verify indexed[]={{GF_VERIFY_CR,0x1c},{GF_VERIFY_SR,1}};
+    CHECK(!gfinit_verify_policy(&composed,&profile,0,indexed,2));
+    for(u32 i=0;i<profile.rule_count;i++) {
+        const struct recover_rule *w=&profile.rules[i];
+        const struct recover_target *t=&profile.targets[w->key];
+        if(w->phase==REC_MODE_C && w->substep!=GF_C_SELECT && t->space==REC_VGA_INDEXED &&
+           ((t->port==RECOVER_CRTC && t->index==0x1c) || (t->port==RECOVER_SEQ && t->index==1)))
+            CHECK(w->flags&REC_VERIFY_RECORD);
+    }
+    const struct gfinit_no_verify missing={GF_VERIFY_MMIO,0x123456};
+    CHECK(gfinit_verify_policy(&composed,&profile,0,&missing,1)<0);
+    /* Required write mismatch still fails; optional/explicit mismatch closes
+     * with rc=0. Use the real binder/access path, corrupt only the readback. */
+    for(u32 mode=0;mode<4;mode++) {
+        c_build();
+        struct gfinit_no_verify reg={GF_VERIFY_MMIO,(mode==0 || mode==3)?0x680a24:0x68050c};
+        CHECK(!gfinit_verify_policy(&composed,&profile,mode!=2?GF_VERIFY_REQUIRED:0,
+                                    mode==2?&reg:0,mode==2?1:0));
+        core.plan=0;CHECK(!contract_bind());c_arm();
+        u32 id=composed.c_node;
+        while(id<composed.plan.node_count) {
+            const struct recover_rule *w=core.node_write[id];
+            if(w && w->substep!=GF_C_SELECT && profile.targets[w->key].offset==reg.reg)break;
+            id++;
+        }
+        CHECK(id<composed.plan.node_count);policy_bad_key=core.node_write[id]->key;policy_reads=0;policy_bus_fault=mode==3;
+        executor_bus.read=policy_read;core.expected_node=id;
+        core.transport=&policy_transport;policy_used=0;policy_end[0]=0;exec_log_busy=false;
+        CHECK(!recover_plan_enter(&core,id));
+        int rc=policy_step(&core,0);
+        output("VERIFY execution mode/rc/reads/state/reason ");val(mode);val((u32)rc);val(policy_reads);val(core.state);val(core.reason);output("\n");
+        CHECK((rc!=0)==(mode==1 || mode==3));
+        if(mode==3)CHECK(core.reason==REC_BUS);
+        else if(mode==1)CHECK(core.reason==REC_VERIFY);
+        else {
+            CHECK(core.state==REC_RUNNING && !core.failed && policy_reads>=2);
+            CHECK(frame_contains(policy_end," mismatch=1 space=1 port=0 index=4294967295 rc=0"));
+            output(policy_end);
+        }
+    }
+    output("VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS\n");
+}
 #ifndef GF_C_ENTRY
 #define GF_C_ENTRY _start
 #endif
 void GF_C_ENTRY(void)
 {
-    gf_fixture_init();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();
+    gf_fixture_init();verify_policy_cases();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

@@ -206,7 +206,8 @@ enum recover_value_mode { REC_LITERAL, REC_SET, REC_RANGE, REC_EXPR, REC_SAVED }
 enum recover_arg_kind { REC_IMM, REC_ARG_READ, REC_ARG_SAVED };
 enum recover_guard_when { REC_BEFORE = 1, REC_AFTER = 2 };
 enum recover_rule_flag { REC_N1 = 1, REC_LOCAL = 2, REC_FORCE = 4,
-    REC_RUN_NO_PREREAD = 8 /* preserve the original RUN target read_safe */ };
+    REC_RUN_NO_PREREAD = 8, /* preserve the original RUN target read_safe */
+    REC_VERIFY_RECORD = 16 /* C write: read and report mismatch, continue */ };
 struct recover_target {
     u32 space, bar, offset, head, port, index, width, access, read_safe;
 };

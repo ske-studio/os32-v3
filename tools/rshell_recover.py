@@ -41,12 +41,12 @@ DEFAULT_TIMEOUT = 240
 METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
 PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route', 'wait', 'cell')
 PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
-MODE_C_BYTES = 900130
+MODE_C_BYTES = 952490  # (2434 maximal C rows + 40 state/margin rows) * 385
 UART_FRAME_BITS = 10
 MODE_C_WORK_SECONDS = 60
 MODE_C_CHECK_COUNT = 66
 MODE_C_VRAM_BYTES = 307200
-MODE_C_REGISTERS = {0x68050c: (0xffffffff, 0x10000204),
+MODE_C_REGISTERS = {0x68050c: (0xefffffff, 0x10000204),  # bit28 reads 0 on NV44A
                     0x680508: (0x0007ffff, None), 0x680578: (0x8000ffff, None)}
 BUS_ID = ('pc', 'bar', 'off', 'width')
 VPLL_VERSION_1 = 0x56504c03
@@ -61,7 +61,7 @@ READBACK_NONE = 0xffffffff
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
 BOOL_FIELDS = ('exec', 'minimal', 'capacity_known', 'full_capacity', 'verified',
-               'unknown', 'override', 'txd', 'sent')
+               'unknown', 'override', 'txd', 'sent', 'mismatch')
 
 
 class Records:
@@ -150,6 +150,10 @@ class Records:
                     required += ('rc',) if 'row' in fields else ('bad_off', 'expected', 'actual', 'rc')
             else:
                 required = BUS_ID + (('old', 'new') if event == 'BEGIN' else ('readback', 'rc'))
+                if event == 'END' and 'mismatch' in fields:
+                    required += ('mismatch', 'space', 'port', 'index')
+                    if fields['mismatch'] != '1' or fields.get('rc') != '0':
+                        raise malformed('mismatch')
         elif phase == 'check' and event == 'END' or phase == 'route' and event == 'END' and 'source' in fields:
             required = ('source', 'key', 'mask', 'expected', 'actual', 'rc')
         elif phase == 'gf_verify' and event == 'END':
@@ -279,6 +283,15 @@ class Records:
             begin = self.data['stack'][-1]
             evidence['last_access'] = [int(begin['step']), int(begin['addr'])]
         if phase == 'gf_bus' and event == 'END':
+            if fields.get('mismatch') == '1':
+                begin = self.data['stack'][-1]
+                space, port = int(fields['space']), int(fields['port'])
+                kind = {0x3d4: 'CR', 0x3c4: 'SR', 0x3ce: 'GR'}.get(port) if space == 5 else 'MMIO' if space == 1 else None
+                if kind is None:
+                    raise RecoverError('MODE_C mismatch register kind')
+                reg = int(fields['index']) if space == 5 else int(fields['off'])
+                evidence.setdefault('mismatches', []).append(
+                    [kind, reg, int(begin['new']), int(fields['readback'])])
             if int(fields['rc']):
                 raise RecoverError('MODE_C gf_bus failed')
             if 'len' in fields and 'row' not in fields:
@@ -304,7 +317,7 @@ class Records:
                 off = evidence['last_access'][1]
                 if off in MODE_C_REGISTERS:
                     required_mask, required_value = MODE_C_REGISTERS[off]
-                    if mask != required_mask or (required_value is not None and actual != required_value):
+                    if mask != required_mask or (required_value is not None and (actual ^ required_value) & mask):
                         raise RecoverError('MODE_C register mismatch')
                     evidence['registers'][str(off)] = [mask, expected, actual]
             if phase == 'check':
@@ -313,6 +326,13 @@ class Records:
             if int(fields['rc']):
                 raise RecoverError('MODE_C cell access failed')
             evidence['cell_steps'].append(int(self.data['stack'][-1]['step']))
+
+    def mode_c_mismatches(self):
+        rows = self.data.get('mode_c_evidence', {}).get('mismatches', [])
+        print('MODE_C record-only mismatches=%d' % len(rows))
+        for kind, reg, written, actual in rows:
+            print('MODE_C record-only %s %06X written=%08X readback=%08X' %
+                  (kind, reg, written, actual))
 
     def mode_c_success(self):
         e = self.data['mode_c_evidence']
@@ -385,6 +405,8 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                     continue  # Initial rshell EOT is not this command's reply.
                 if line or dropping:
                     record_failure('truncated line before EOT/deadline')
+                if records is not None and records.data.get('mode_c_active'):
+                    records.mode_c_mismatches()
                 if failure:
                     raise RecoverError(failure)
                 if records is None:

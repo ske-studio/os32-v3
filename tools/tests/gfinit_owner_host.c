@@ -266,6 +266,19 @@ static void mode_c_test(void)
 #endif
     output("MODE_C modeset gates / PAUSED / failure / cache PASS\n");
 }
+static void owner_verify_test(void)
+{
+    setup();CHECK(!call(GF_OP_INSPECT,0,0));CHECK(!call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0));
+    CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE|GF_VERIFY_REQUIRED,0)<0);
+    CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE|GF_VERIFY_REQUIRED,0)<0);
+    struct gfinit_prepare_request payload={.request=request(GF_ALLOW_WRITE|GF_MODE_C|GF_NO_VERIFY_FILE,0),
+        .count=1,.regs={{GF_VERIFY_MMIO,0x123456}}};
+    payload.request.size=sizeof(payload);
+    u32 before=begins;
+    CHECK(gfinit_call(GF_OP_PREPARE,&payload,sizeof(payload),&base,&transport,&s0)<0 && begins==before);
+    CHECK(core.state==REC_VERIFIED);
+    output("A2 unmatched file selector and C-only option gates PASS\n");
+}
 static void lifecycle(void)
 {
     setup();CHECK(call(GF_OP_INSPECT,0,0)==0 && writes==0 && reads>0 && owner->inspected);
@@ -413,7 +426,7 @@ static void expansion_lifetime_test(void)
     CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
     /* B4: retain a previous RUN plan and enter SIZE_BARS without end release. */
     core.state=REC_VERIFIED;
-    CHECK(gf_begin(&core,owner,&transport,true,GF_ALLOW_WRITE)==0 && expand_calls==4);
+    CHECK(gf_begin(&core,owner,&transport,true,GF_ALLOW_WRITE,0,0)==0 && expand_calls==4);
     core.plan=&owner->size_plan;
     CHECK(gf_read(&owner->bus,&access,&value)==0 && plan_reads==1);
     CHECK(owner->compiled==backing && owner->profile.rule_count==1);
@@ -476,21 +489,62 @@ static void inspection_test(void)
 struct kdebug kdebug;
 static u32 cli_calls, cli_op;
 static struct gfinit_request cli_request;
+static struct gfinit_prepare_request cli_payload;
 static int cli_result, cli_live;
 static i32 cli_dispatch(u32 op, void *buf, u32 size)
 {
-    CHECK(size==40);
+    CHECK(size==40 || size==sizeof(struct gfinit_prepare_request));
+    if(size==sizeof(cli_payload))cli_payload=*(struct gfinit_prepare_request *)buf;
     cli_calls++;cli_op=op;cli_request=*(struct gfinit_request *)buf;
     if (cli_live) return gfinit_call(op,buf,size,&base,&transport,&s0);
     ((struct gfinit_request *)buf)->status=99; /* rc, never status, is authoritative */
     return cli_result;
 }
+static const char *cli_file;
+static u32 cli_file_pos, cli_file_closes;
+static int cli_file_fail;
+static int cli_open(const char *path, int flags)
+{ CHECK(equal(path,"/verify.txt") && flags==0);cli_file_pos=0;return cli_file?3:-1; }
+static int cli_read(int fd, void *out, u32 size)
+{ CHECK(fd==3 && size==1);if(cli_file_fail)return -1;if(!cli_file[cli_file_pos])return 0;*(char *)out=cli_file[cli_file_pos++];return 1; }
+static int cli_close(int fd) { CHECK(fd==3);cli_file_closes++;return 0; }
 static struct {
     u32 version;
     void (*kprintf)(u8,const char *,...);
     i32 (*kdebug_call)(u32,void *,u32);
-} api={78,kprintf,kdebug_call}, *g_api=&api;
+    int (*sys_open)(const char *,int);
+    int (*sys_read)(int,void *,u32);
+    int (*sys_close)(int);
+} api={78,kprintf,kdebug_call,cli_open,cli_read,cli_close}, *g_api=&api;
 #include "../../userland/shell/cmd_gfinit.c"
+static void cli_verify_test(void)
+{
+    char *args[]={"gfinit","prepare","5","--mode-c","--allow-write","--verify","required","--no-verify-file","/verify.txt"};
+    setup();kdebug.ops.dbg_call=cli_dispatch;cli_live=0;cli_result=0;api.version=78;api.kdebug_call=kdebug_call;
+    cli_file=" # comment\nMMIO 680a24 # write-only\r\nCR 1c\nSR 01";cli_file_fail=0;cli_file_closes=0;
+    CHECK(!shell_cmd_gfinit(9,args));
+    CHECK(cli_request.flags==(GF_ALLOW_WRITE|GF_MODE_C|GF_VERIFY_REQUIRED|GF_NO_VERIFY_FILE));
+    CHECK(cli_payload.count==3 && cli_file_closes==1);
+    CHECK(cli_payload.regs[0].kind==GF_VERIFY_MMIO && cli_payload.regs[0].reg==0x680a24);
+    CHECK(cli_payload.regs[1].kind==GF_VERIFY_CR && cli_payload.regs[1].reg==0x1c);
+    CHECK(cli_payload.regs[2].kind==GF_VERIFY_SR && cli_payload.regs[2].reg==1);
+    CHECK(!shell_cmd_gfinit(7,args) && cli_request.size==40 && !(cli_request.flags&GF_NO_VERIFY_FILE));
+    const char *bad[]={"CR 100", "MMIO fffffffff", "AR 1", "MMIO nope", "CR 1c extra", "SR"};
+    const char *rejected="gfinit: rejected rc=-1 invalid no-verify file (MMIO/CR/SR hex, max 64 entries)\n";
+    for(u32 i=0;i<sizeof(bad)/sizeof(bad[0]);i++) {
+        cli_file=bad[i];u32 before=cli_calls;clear_output();
+        CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before);
+        CHECK(equal(serial_output,rejected));
+    }
+    u32 before=cli_calls, closed=cli_file_closes;
+    cli_file_fail=1;clear_output();
+    CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before && cli_file_closes==closed+1);
+    CHECK(equal(serial_output,rejected));cli_file_fail=0;
+    cli_file=0;clear_output();
+    CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before && cli_file_closes==closed+1);
+    CHECK(equal(serial_output,rejected));
+    output("CLI verify required/file parsing, comments, hex and errors PASS\n");
+}
 static void cli_test(void)
 {
     char *inspect[]={"gfinit","inspect","5","--allow-write","extra"};
@@ -537,10 +591,10 @@ static void cli_test(void)
     clear_output();CHECK(shell_cmd_gfinit(4,abort)==1 && cli_calls==before);
     CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
     api.version=77;clear_output();CHECK(shell_cmd_gfinit(3,inspect)==1);
-    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
+    CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));
     api.version=78;api.kdebug_call=0;clear_output();
     CHECK(shell_cmd_gfinit(3,inspect)==1 && cli_calls==before);
-    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));api.kdebug_call=kdebug_call;
+    CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));api.kdebug_call=kdebug_call;
     output("S7a CLI / KDEBUG=0 NOSYS / inspect two lines via console serial PASS checks complete\n");
 }
 static void cli_write_test(void)
@@ -590,9 +644,10 @@ static void cli_write_test(void)
         CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
         CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
         api.version=77;clear_output();CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
-        CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
-        api.version=78;api.kdebug_call=0;
-        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);api.kdebug_call=kdebug_call;
+        CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));
+        api.version=78;api.kdebug_call=0;clear_output();
+        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
+        CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));api.kdebug_call=kdebug_call;
     }
     char *mode[]={"gfinit","prepare","5","--mode-c","--allow-write","extra"};
     cli_result=0;kdebug.ops.dbg_call=cli_dispatch;
@@ -622,4 +677,4 @@ static void vpll_budget_test(void)
     output("VPLL budget rows and overflow PASS\n");
 }
 void _start(void)
-{ vpll_budget_test();mode_c_test();cli_test();cli_write_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

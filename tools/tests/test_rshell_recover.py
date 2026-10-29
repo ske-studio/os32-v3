@@ -183,6 +183,34 @@ def gfinit_cases(m):
             assert port.writes == [(command+'\n').encode()]
             if ending.startswith(meta):
                 assert saves[-1]['sid'] == 6 and saves[-1]['crc']['snapshot_crc'] == 13
+    # A failed file-based A2 retry must not reuse a saved PAUSED as success.
+    # The rshell response contains the CLI diagnostic and EOT, with no new REC.
+    command = 'gfinit prepare 7 --mode-c --allow-write --no-verify-file /missing.txt'
+    errors = [
+        'gfinit: rejected rc=-1 invalid no-verify file (MMIO/CR/SR hex, max 64 entries)',
+        'gfinit: rejected rc=-10 kdebug unavailable',
+    ]
+    with tempfile.TemporaryDirectory(prefix='gfinit_retry_') as tmp:
+        state = Path(tmp) / 'state.json'
+        log = Path(tmp) / 'raw.log'
+        for split in (1, 7, 256):
+            for error in errors:
+                records = m.Records(7)
+                records.line(META)
+                records.data['image_crc'] = '1234abcd'
+                state.write_text(json.dumps(records.data))
+                data = ('> ' + command + '\n' + error + '\n\x04').encode()
+                port = Port(data, split=split)
+                closed = []
+                port.close = lambda: closed.append(True)
+                argv = ['rshell_recover', '--session', '7', '--image-crc', '1234abcd',
+                        '--state', str(state), '--log', str(log), '--command', command]
+                with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), redirect_stdout(io.StringIO()) as out:
+                    assert m.main() == 1
+                assert out.getvalue().strip() == 'recover: guest rejected recovery'
+                assert json.loads(state.read_text())['invalid'] == 'guest rejected recovery'
+                assert port.writes == [(command + '\n').encode()] and closed == [True]
+                assert log.read_bytes().endswith(data)
     # A2 PAUSED saves the newly assigned sid; continuation never probes ver.
     records = m.Records(0);records.line(meta)
     resumed = m.Records(6, records.data)
@@ -373,8 +401,8 @@ def vpll_cases(m):
         assert rec.data['vpll_comparison_valid'] == (old == 4)
 
 def mode_c_cases(m):
-    assert m.mode_c_timeout(9600, 23) == 1026
-    assert m.mode_c_timeout(19200, 23) == 557
+    assert m.mode_c_timeout(9600, 23) == 1081
+    assert m.mode_c_timeout(19200, 23) == 585
     def run(fault=None):
         rec = m.Records(7)
         rec.data['mode_c_active'] = True
@@ -385,6 +413,9 @@ def mode_c_cases(m):
         def pair(phase, fields, end):
             add(phase, 'BEGIN', fields)
             add(phase, 'END', end)
+        for space, port, index, off in ((1, 0, 4294967295, 0x680a24), (5, 0x3d4, 0x1c, 0x6013d5), (5, 0x3c4, 1, 0x0c03c5)):
+            pair('gf_bus', 'pc=4294967295 bar=0 off=%d width=4 old=0 new=1048575' % off,
+                 'pc=4294967295 bar=0 off=%d width=4 readback=0 mismatch=1 space=%d port=%d index=%d rc=0' % (off, space, port, index))
         for direction in (1, 0):
             f = 'pc=4294967295 bar=1 off=0 len=307200 dir=%d' % direction
             pair('gf_bus', f, f + ' bad_off=4294967295 expected=4294967295 actual=4294967295 rc=0')
@@ -394,7 +425,7 @@ def mode_c_cases(m):
         for step in (2, 7):
             pair('cell', 'step=%d addr=0' % step, 'rc=0 elapsed=1')
         pair('route', 'step=9 addr=4012', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
-        for key, off, mask, value in ((10, 0x68050c, 0xffffffff, 0x10000204),
+        for key, off, mask, value in ((10, 0x68050c, 0xefffffff, 0x10000204),
                                       (11, 0x680508, 0x7ffff, 123),
                                       (12, 0x680578, 0x8000ffff, 456)):
             pair('access', 'step=%d addr=%d' % (key, off), 'rc=0 elapsed=1')
@@ -413,6 +444,7 @@ def mode_c_cases(m):
             for seq, row in enumerate(rows, 1):
                 rec.line('REC sid=7 seq=%d %s' % (seq, row))
             assert rec.mode_c_success()
+            assert len(rec.data['mode_c_evidence']['mismatches']) == 3
         except (m.RecoverError, AssertionError):
             assert fault is not None
         else:
@@ -427,6 +459,9 @@ def mode_c_cases(m):
             with redirect_stdout(io.StringIO()) as output:
                 assert m.exchange(port, 'gfinit modeset 7 --allow-write', fresh, 100, 23, io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
             assert '機械項目合格・映像保留' in output.getvalue()
+            assert 'record-only mismatches=3' in output.getvalue()
+            assert 'MMIO 680A24 written=000FFFFF readback=00000000' in output.getvalue()
+            assert 'CR 00001C' in output.getvalue() and 'SR 000001' in output.getvalue()
             assert not fresh.data['mode_c_active'] and fresh.data['mode_c_trial']
             cleanup_cases(m, fresh.data)
 

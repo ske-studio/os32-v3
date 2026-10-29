@@ -792,6 +792,10 @@
       "target",
       "value"
     ],
+    "struct gfinit_no_verify": [
+      "kind",
+      "reg"
+    ],
     "struct gfinit_pci_ops": [
       "read16",
       "read32",
@@ -857,6 +861,11 @@
       "reg",
       "source",
       "value"
+    ],
+    "struct gfinit_prepare_request": [
+      "count",
+      "regs",
+      "request"
     ],
     "struct gfinit_request": [
       "fail_pc",
@@ -1455,6 +1464,9 @@
     "GF_C_VRAM_COMPARE",
     "GF_C_VRAM_WRITE",
     "GF_C_WAIT",
+    "GF_VERIFY_CR",
+    "GF_VERIFY_MMIO",
+    "GF_VERIFY_SR",
     "REC_ABORT",
     "REC_AFTER",
     "REC_ARG_READ",
@@ -1533,6 +1545,7 @@
     "REC_VERIFIED",
     "REC_VERIFY",
     "REC_VERIFY_PHASE",
+    "REC_VERIFY_RECORD",
     "REC_VGA_DIRECT",
     "REC_VGA_INDEXED",
     "REC_VRAM_TEST",

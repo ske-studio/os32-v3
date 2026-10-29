@@ -5,6 +5,7 @@
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
 #include "gfinit_plan_c.h"
+#include "gfinit_verify.inc"
 #include "gfinit_budget.inc"
 #include "gfinit_resources.h"
 #include "recover_gf_expand.h"
@@ -58,6 +59,8 @@ struct gfinit_owner {
     u8 *rom;
     bool inspected;
     u32 generation, prepare_flags;
+    u32 last_count;
+    struct gfinit_no_verify last_regs[GF_NO_VERIFY_MAX];
 };
 static struct gfinit_owner control; /* small, stable callbacks survive terminal status */
 static struct gfinit_owner *owner;
@@ -352,7 +355,8 @@ static int gf_modeset(struct recover *r, void *arg)
     return 0;
 }
 static int gf_begin(struct recover *r, struct gfinit_owner *g,
-                    struct recover_transport *transport, bool size, u32 flags)
+                    struct recover_transport *transport, bool size, u32 flags,
+                    const struct gfinit_no_verify *regs, u32 count)
 {
     if (!g || !g->inspected || !gf_owned(r) || r->cold_latched ||
         (r->state != REC_IDLE && r->state != REC_VERIFIED)) return -1;
@@ -370,7 +374,8 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
         g->prepare_flags = flags;
         if (flags & GF_MODE_C) {
             if (gfinit_plan_build_c(g->compiled, g->decoded, &g->profile,
-                    r->cache.bar[1].length, g->rom, g->rom_size)) return -1;
+                    r->cache.bar[1].length, g->rom, g->rom_size) ||
+                gfinit_verify_policy(g->compiled, &g->profile, flags, regs, count)) return -1;
         } else if (gfinit_plan_build(g->compiled, g->decoded, &g->profile,
                                      r->cache.bar[1].length)) return -1;
         plan = &g->compiled->plan;
@@ -400,11 +405,20 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
-    if (!buf || size != sizeof(struct gfinit_request)) return -1;
+    if (!buf || size < sizeof(struct gfinit_request)) return -1;
     struct gfinit_request q = *(const struct gfinit_request *)buf;
+    const struct gfinit_prepare_request *extra = buf;
+    const struct gfinit_no_verify *regs = 0;
+    u32 count = 0;
+    if (q.flags & GF_NO_VERIFY_FILE) {
+        if (op != GF_OP_PREPARE || size != sizeof(*extra) ||
+            extra->count > GF_NO_VERIFY_MAX) return -1;
+        count = extra->count; regs = extra->regs;
+    } else if (size != sizeof(q)) return -1;
     struct recover *r = recover_owner();
-    if (q.version != GF_INIT_VERSION || q.size != sizeof(q) ||
-        (q.flags & ~(GF_ALLOW_WRITE | (op == GF_OP_PREPARE ? GF_MODE_C : 0U))) || q.max_steps != GF_INIT_SCHEDULE ||
+    if (q.version != GF_INIT_VERSION || q.size != size ||
+        (q.flags & ~(GF_ALLOW_WRITE | (op == GF_OP_PREPARE ? (GF_MODE_C | GF_VERIFY_REQUIRED | GF_NO_VERIFY_FILE) : 0U))) || q.max_steps != GF_INIT_SCHEDULE ||
+        ((q.flags & (GF_VERIFY_REQUIRED | GF_NO_VERIFY_FILE)) && !(q.flags & GF_MODE_C)) ||
         q.status || q.fail_pc || q.fail_reg || q.steps ||
         (op != GF_OP_RUN_ONE && q.script_id) ||
         (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
@@ -412,7 +426,11 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);
         return -1;
     }
-    if (owner && q.session && q.session == r->token.session && owner->last_op == op &&
+    bool same_regs = owner && owner->last_count == count;
+    for (u32 i = 0; same_regs && i < count; i++)
+        if (owner->last_regs[i].kind != regs[i].kind || owner->last_regs[i].reg != regs[i].reg)
+            same_regs = false;
+    if (same_regs && owner && q.session && q.session == r->token.session && owner->last_op == op &&
         owner->last_main == q.script_id && owner->last.flags == q.flags) {
         *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0;
     }
@@ -420,7 +438,7 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     int rc = -1;
     if (op == GF_OP_INSPECT) rc = gf_inspect(r, base, transport, s0);
     else if (op == GF_OP_SIZE_BARS || op == GF_OP_PREPARE)
-        rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS, q.flags);
+        rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS, q.flags, regs, count);
     else if (owner && owner->inspected && op == GF_OP_RUN_ONE &&
              q.script_id == owner->next_main && q.script_id < GF_INIT_MAINS) {
         struct gfinit_exec e = {.rom = owner->rom, .rom_size = owner->rom_size,
@@ -444,6 +462,8 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     q.fail_reg = r->first_key;
     if (owner) {
         owner->last_op = op; owner->last_main = q.script_id; owner->last = q;
+        owner->last_count = count;
+        for (u32 i = 0; i < count; i++) owner->last_regs[i] = regs[i];
         if ((rc && (r->state == REC_IDLE || r->state == REC_VERIFIED)) ||
             ((r->state == REC_VERIFIED || r->state == REC_FAILED) &&
             op != GF_OP_INSPECT && (op != GF_OP_SIZE_BARS || r->state == REC_FAILED)))
