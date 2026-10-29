@@ -24,11 +24,6 @@ endif
 
 ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o)
 
-exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
-	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
-
-exec/ring3_ls.o exec/exec.o: exec/ring3_ls.h
-
 # === カーネル C ソース ===
 C_KERNEL = \
     kernel/boot_platform.c kernel/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/font_guard.c kernel/kernel.c kernel/kstack_hw.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_snapshot.c kernel/v86_module.c kernel/v86_gcap.c kernel/kdebug_call.c kernel/boot_splash.c platform/pc98/splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c platform/pc98/clock.c kernel/pit.c platform/pc98/timer.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
@@ -65,83 +60,13 @@ $(BUILD_ID_SRC): .FORCE
 $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
 
-# === モジュール別コンパイルルール ===
-
-# kernel/ モジュール
-kernel/%.o: kernel/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-# Fixed PC-9821 service tables use the same internal dialect and includes.
-platform/pc98/%.o: platform/pc98/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
 # Test-only real guard injection: 0=off, 1=kernel, 2=SQLite engine.
 DF_GUARD_TEST ?= 0
-kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
-kernel/double_fault.o: .FORCE
+$(KERNEL_OBJ_PREFIX)kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
+$(KERNEL_OBJ_PREFIX)kernel/double_fault.o: .FORCE
 
-# Resident debug loader and validator: keep their boot-only code compact.
-kernel/module.o kernel/module_image.o kernel/module_runtime.o: private KERNEL_CFLAGS += -Os
-kernel/module.o kernel/module_image.o kernel/module_runtime.o: build/kernel.mk
-
-# drivers/ モジュール
-# mouse.c は idt.h (IRQ制御) を参照するため INC_KERNEL でビルド
-drivers/mouse.o: drivers/mouse.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-# loop_dev.c は vfs.h / kprintf.h (fs/, lib/) を参照するため INC_KERNEL でビルド
-drivers/loop_dev.o: drivers/loop_dev.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-# LAN: ne2000.c は idt.h (tick_count) / cpu_calibrate.h、lgy98.c は idt.h (PIC) を
-# 参照するため INC_KERNEL。lgy98.o は CONFIG_LGY98_* (make kernel LGY98=1) を
-# 唯一読む場所なので、フラグ変更が拾えるよう毎回コンパイルする。
-drivers/ne2000.o: drivers/ne2000.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-drivers/lgy98.o: drivers/lgy98.c .FORCE
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-# f5a: keep internal appmem wiring within the f image budget.
-exec/exec_heap.o exec/appmem.o exec/appmem_map.o exec/appmem_unmap.o: exec/%.o: exec/%.c
-	$(CC) $(CFLAGS_BASE) -Os $(INC_EXEC) -c $< -o $@
-
-kernel/paging_app.o: kernel/paging_app.c
-	$(CC) $(CFLAGS_BASE) -Os $(INC_KERNEL) -c $< -o $@
-
-# FDC は IRQ11 の登録口 (kernel/irq.h) を使う。
-drivers/fdc.o: drivers/fdc.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-# net/ (リンク層。ne2000.h / idt.h / kstring.h を参照するため INC_KERNEL)
-net/%.o: net/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-drivers/%.o: drivers/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_DRIVERS) -c $< -o $@
-
-# gfx/ モジュール
-gfx/%.o: gfx/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_GFX) -c $< -o $@
-
-# fs/ モジュール
-# セッションは常駐シェルの判定 (exec/appslot.h の APP_ID_SHELL) を見るので -Iexec も要る
-fs/serialfs_session.o: fs/serialfs_session.c
-	$(CC) $(CFLAGS_BASE) $(INC_KERNEL) -c $< -o $@
-
-fs/%.o: fs/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_FS) -c $< -o $@
-
-# fs/fatfs/ モジュール (FatFs公式ソース — string.hスタブ付き)
-fs/fatfs/ff.o: fs/fatfs/ff.c fs/fatfs/ffconf.h fs/fatfs/string.h
-	$(CC) $(CFLAGS_BASE) $(INC_FATFS) -c $< -o $@
-
-fs/fatfs/diskio.o: fs/fatfs/diskio.c fs/fatfs/ff.h fs/fatfs/diskio.h
-	$(CC) $(CFLAGS_BASE) $(INC_FATFS) -c $< -o $@
-
-# exec/ モジュール
-exec/%.o: exec/%.c kapi/kapi_generated.c
-	$(CC) $(CFLAGS_BASE) $(INC_EXEC) -c $< -o $@
+# Resident debug loader and validator: preserve the source-adjacent flags.
+$(addprefix $(KERNEL_OBJ_PREFIX),kernel/module.o kernel/module_image.o kernel/module_runtime.o): private KERNEL_CFLAGS += -Os
 
 # 常駐 shell の内部入口 (T7b-b2、exec/shell_service.c)。wrapper は
 # __builtin_return_address(0) で呼び手を確かめるので、このファイルだけ
@@ -161,18 +86,9 @@ KAPI_GENERATED := kapi/kapi_generated.c exec/exec_kapi_init.inc \
 $(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py
 	python3 sdk/gen_kapi.py
 
-# kapi_sys.o は __DATE__/__TIME__ を含むため毎回再コンパイル
-kapi/kapi_sys.o: kapi/kapi_sys.c .FORCE
-	$(CC) $(CFLAGS_BASE) $(INC_KAPI) -c $< -o $@
-
-kapi/%.o: kapi/%.c kapi/kapi_generated.c
-	$(CC) $(CFLAGS_BASE) $(INC_KAPI) -c $< -o $@
-
+# GCC honors SOURCE_DATE_EPOCH for __DATE__/__TIME__ in kapi_sys.c.
+# Without that environment variable the normal wall-clock build date remains.
 .FORCE:
-
-# lib/ モジュール (汎用ライブラリ: カーネル依存なし)
-lib/%.o: lib/%.c
-	$(CC) $(CFLAGS_BASE) $(INC_LIB) -c $< -o $@
 
 $(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
 	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) -lgcc
@@ -203,7 +119,7 @@ kernel: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/layout-ma
 
 # === カーネルクリーン ===
 clean-kernel:
-	rm -f $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_SRC) $(BUILD_ID_OBJ) $(BUILD_OUT)/kernel.elf $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kernel.map
+	rm -f $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(ASM_KERNEL:.asm=.o) $(C_KERNEL:.c=.o) exec/ring3_ls_shim.o $(BUILD_ID_SRC) $(BUILD_ID_OBJ) $(BUILD_OUT)/kernel.elf $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/vmkernel.lz4 $(BUILD_OUT)/kernel.map
 
 .PHONY: kernel clean-kernel
 
@@ -328,29 +244,38 @@ $(LAYOUT_HEADER): include/memmap.h tools/gen_memmap.py .FORCE
 $(BUILD_OUT)/os32.raw.ld: build/os32.ld $(LAYOUT_HEADER)
 	$(LAYOUT_CPP) $< -o $@
 
-$(BUILD_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
+$(BUILD_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld build/config.mk build/kernel.mk
 	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(KERNEL_OBJ_PREFIX)\1@g' $< > $@
 
 $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS): $(LAYOUT_HEADER) build/kernel.mk build/config.mk
 
-# Keep the original source-adjacent legacy objects. All alternate output trees
-# use separate objects/dependencies, including SQLite and assembler inputs.
-ifneq ($(KERNEL_OBJ_PREFIX),)
-LAYOUT_SMALL = $(R1_SMALL) kernel/module.c kernel/hwdev_module.c kernel/module_image.c kernel/module_runtime.c
+# Core objects always live under BUILD_OUT. Preserve each original -I order;
+# the R1 fixture above deliberately keeps its existing INC_KERNEL profile.
+LAYOUT_SMALL = $(R1_SMALL)
+$(KERNEL_OBJ_PREFIX)%.o: private KERNEL_INCLUDES = $(INC_KERNEL)
+$(KERNEL_OBJ_PREFIX)drivers/%.o: private KERNEL_INCLUDES = $(INC_DRIVERS)
+$(KERNEL_OBJ_PREFIX)gfx/%.o: private KERNEL_INCLUDES = $(INC_GFX)
+$(KERNEL_OBJ_PREFIX)fs/%.o: private KERNEL_INCLUDES = $(INC_FS)
+$(KERNEL_OBJ_PREFIX)fs/fatfs/%.o: private KERNEL_INCLUDES = $(INC_FATFS)
+$(KERNEL_OBJ_PREFIX)exec/%.o: private KERNEL_INCLUDES = $(INC_EXEC)
+$(KERNEL_OBJ_PREFIX)kapi/%.o: private KERNEL_INCLUDES = $(INC_KAPI)
+$(KERNEL_OBJ_PREFIX)lib/%.o: private KERNEL_INCLUDES = $(INC_LIB)
+CORE_KERNEL_INCLUDES = drivers/mouse.o drivers/loop_dev.o drivers/ne2000.o drivers/lgy98.o drivers/fdc.o fs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
+$(addprefix $(KERNEL_OBJ_PREFIX),$(CORE_KERNEL_INCLUDES)): private KERNEL_INCLUDES = $(INC_KERNEL)
+
 $(KERNEL_OBJ_PREFIX)%.o: %.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(if $(filter kernel/module.c,$<),-Ikdebug/generated) $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
+	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(KERNEL_INCLUDES) -c $< -o $@
 
 $(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
 	@mkdir -p $(@D)
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
-$(KERNEL_OBJ_PREFIX)kernel/module.o: kdebug/generated/kdebug_imports.h
-
-$(KERNEL_OBJ_PREFIX)exec/exec.o $(KERNEL_OBJ_PREFIX)kapi/kapi_generated.o: kapi/kapi_generated.c
+$(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
+$(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c
 $(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
--include $(C_KERNEL_OBJ:.o=.d)
-endif
+$(KERNEL_OBJ_PREFIX)fs/fatfs/ff.o: fs/fatfs/ffconf.h fs/fatfs/string.h
+$(KERNEL_OBJ_PREFIX)fs/fatfs/diskio.o: fs/fatfs/ff.h fs/fatfs/diskio.h
 
 $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc kernel/entry_layout.inc
 	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)

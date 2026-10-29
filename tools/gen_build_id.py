@@ -43,6 +43,13 @@ def git(args, cwd):
 
 
 def commit_id(cwd=ROOT):
+    # Comparison builds can pin the displayed commit independently of git.
+    fixed = os.environ.get('OS32_BUILD_COMMIT')
+    if fixed is not None:
+        if not fixed or len(fixed) >= COMMIT_MAX or any(
+                c not in '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._' for c in fixed):
+            raise ValueError('OS32_BUILD_COMMIT must be 1..23 ASCII ID characters')
+        return fixed
     try:
         h = git(['rev-parse', '--short=7', 'HEAD'], cwd).strip()
         if not h or any(c not in '0123456789abcdef' for c in h):
@@ -68,7 +75,11 @@ def main():
     ap.add_argument('--repo', default=ROOT, help='git を見るディレクトリ (試験用)')
     args = ap.parse_args()
 
-    cid = commit_id(args.repo)
+    try:
+        cid = commit_id(args.repo)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 1
     if len(cid) >= COMMIT_MAX:
         print('Error: commit id too long: {!r}'.format(cid), file=sys.stderr)
         return 1

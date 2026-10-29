@@ -92,8 +92,12 @@ $(C_KERNEL_OBJ) $(R1_OBJECTS) $(KDEBUG_OBJS) $(FEP_OBJS) $(CD_OBJS) \
 # 各 .c のコンパイル時に -MMD -MP (build/config.mk の DEPFLAGS) が生成する .d を読み込む。
 # これにより構造体定義などヘッダを変更したとき、依存する .o が必ず再ビルドされる。
 # Rust の target/ 以下にも .d があるため除外する。
-DEPFILES := $(shell find boot kernel drivers gfx fs exec kapi lib programs userland sdk \
-              -name '*.d' -not -path '*/target/*' 2>/dev/null)
+# Ignore legacy core .d files beside sources, including lib/: those describe
+# the old objects. User-side lib/*_prog.d stays in scope until the 6b task.
+DEPFILES := $(C_KERNEL_OBJ:.o=.d) $(BUILD_ID_OBJ:.o=.d) \
+            $(shell find $(BUILD_OUT) boot programs userland sdk \
+              -name '*.d' -not -path '*/target/*' 2>/dev/null) \
+            $(shell find lib -name '*_prog.d' -not -path '*/target/*' 2>/dev/null)
 -include $(DEPFILES)
 
 # === 汎用パターンルール (ASM) ===
@@ -143,7 +147,7 @@ clean: clean-kernel clean-programs clean-libs clean-images clean-sdk clean-asset
 
 # 依存ファイル (.d) の一括削除 — Rust の target/ 以下は対象外
 clean-deps:
-	@find boot kernel drivers gfx fs exec kapi lib programs userland sdk \
+	@find $(BUILD_OUT) boot kernel drivers platform net gfx fs exec kapi lib programs userland sdk \
 	  -name '*.d' -not -path '*/target/*' -delete 2>/dev/null || true
 
 .PHONY: all clean clean-deps

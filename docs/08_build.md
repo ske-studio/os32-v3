@@ -45,10 +45,10 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 ```
 === カーネルビルド ===
 boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
-kernel/*.asm    →  nasm (-f elf32)           →  kernel/*.o
-*/*.c           →  gcc (-m32 -ffreestanding) →  */*.o
+kernel/*.asm    →  nasm (-f elf32)           →  build/out/obj/kernel/*.o
+カーネル側 *.c   →  gcc (-m32 -ffreestanding) →  build/out/obj/**/*.o (+ .d)
                                                ↓
-*.o + kernel/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite を含まない core)
+build/out/obj/**/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite を含まない core)
                                                (+ build/out/kernel.map)
 kernel.elf      →  objcopy (-O binary)       → build/out/kernel.bin (カーネル本体)
                                                ↓
@@ -67,6 +67,21 @@ kernel.elf のリンクに build/out/build_id.c   → tools/gen_build_id.py (コ
 
 ※ カーネル関連のビルド成果物はすべて `build/out/` に集約される (`BUILD_OUT`、gitignore対象)。
   `tools/gen_unicode` の出力 `unicode.bin` も同ディレクトリへ移動される。
+  カーネル側の `.o/.d` は既定も別 `BUILD_OUT` も `$(BUILD_OUT)/obj/`。boot・SDK・userland と
+  `lib/*_prog.o` は従来の出力先を使う。古いソース隣のカーネル `.d` は読み込まない。
+
+配置変更の比較は `tools/build_compare.sh <基点> HEAD`。`HEAD` には作業中の変更と未追跡の
+新規ソースも含み、2 つの一時ツリーで `make kernel kernel-r1` を実行する。
+`OS32_BUILD_COMMIT=layout-compare SOURCE_DATE_EPOCH=946684800` でコミット表示と日時を固定し、
+core・VK32・各 `.mod` (hwdev は現行の `hwdev.mod`)・kdebug と R1 の同じ集合をバイト比較する。
+一致しなければログの隣の `function-diff.txt` に objdump の関数差を残す。通常のビルドは両環境変数を
+指定せず、従来の git ID と実日時を使う。`OS32_BUILD_COMMIT` は最大23文字のASCII ID。
+
+移動の準備は `tools/move_files.py <対応表.json> --dry-run` (移動・差分・分割パスの警告)。
+適用時は `git mv` と入力の置換後に生成ヘッダを再生成する。`tools/include_resolve.py -o includes.json` は
+`make all` の実際の `-I` 順で非活性分岐を含む引用 include を解決する (未解決は `null`)。
+走査ルートの正典は `tools/source_roots.py`。道具の小さな木での試験は `make check-src-layout-host`。
+
 
 === HDD デプロイ ===
 boot_hdd.asm    →  nasm (-f bin)             →  boot_hdd.bin (512B IPL, LBA 0)

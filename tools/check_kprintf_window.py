@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CPL3 kprintf の C / Rust 引数窓を、非活性分岐も含めて検査する。"""
 import argparse
+from source_roots import SCAN_ROOTS
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -367,7 +368,7 @@ def c_files(root, directory):
 
 
 def rust_files(root):
-    return sorted(p for directory in ('sdk/rust', 'userland')
+    return sorted(p for directory in SCAN_ROOTS['kprintf_rust']
                   for p in (root / directory).rglob('*.rs')
                   if not {'.git', 'target'} & set(p.relative_to(root / directory).parts))
 
@@ -375,7 +376,7 @@ def rust_files(root):
 def audit(root):
     window, limit = window_limit(root)
     allow = read_allow(root)
-    files = c_files(root, 'userland') + c_files(root, 'sdk')
+    files = [p for directory in SCAN_ROOTS['kprintf_c'] for p in c_files(root, directory)]
     calls, errors, used = [], [], set()
     for path in files:
         calls.extend(calls_in(path.read_text(), path.relative_to(root).as_posix()))
@@ -446,6 +447,7 @@ def mutate(root):
             (tree / subdir).mkdir(parents=True, exist_ok=True)
         (tree / 'exec/exec.c').write_text((root / 'exec/exec.c').read_text())
         (tree / ALLOW).write_text('')
+        (tree / 'tools/source_roots.py').write_text(Path(__file__).with_name('source_roots.py').read_text())
         _, limit = window_limit(root)
         source = tree / 'userland/tests/control.c'
         source.write_text('void control(void) { odd_receiver->kprintf(0, "'

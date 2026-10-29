@@ -38,8 +38,11 @@ def fixture(work, core_bss=32, core_data=4, link_edit=None):
         f'global kentry\nsection .text\nkentry: nop\n'
         f'section .data align=4\ntimes {core_data} db 7\n'
         f'section .bss align=4\nresb {core_bss}\n')
-    command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', p.with_suffix('.o')])
+    obj = work / 'build/out/obj/kernel/kentry.o'
+    obj.parent.mkdir(parents=True)
+    command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', obj])
     script = gen.preprocess_layout(ROOT, (ROOT / 'build/os32.ld').read_text())
+    script = script.replace('kernel/kentry.o', 'build/out/obj/kernel/kentry.o')
     if link_edit:
         before, after = link_edit
         assert before in script
@@ -47,7 +50,7 @@ def fixture(work, core_bss=32, core_data=4, link_edit=None):
     (work / 'layout.ld').write_text(script)
     elf = work / 'kernel.elf'
     command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map',
-             '-o', elf, 'kernel/kentry.o'], cwd=work)
+             '-o', elf, 'build/out/obj/kernel/kentry.o'], cwd=work)
     command(['objcopy', '-O', 'binary', elf, work / 'kernel.bin'])
     return elf
 
@@ -75,7 +78,7 @@ def link_asserts(work, elf):
             assertions.append(f'ASSERT({hi} <= {a} || {lo} >= {a+n}, "BSS guard")')
     (work / 'assert.ld').write_text('\n'.join(assertions))
     return command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-T', 'assert.ld',
-                    '-o', work / 'assert.elf', 'kernel/kentry.o'], cwd=work, ok=False)
+                    '-o', work / 'assert.elf', 'build/out/obj/kernel/kentry.o'], cwd=work, ok=False)
 
 
 def edit_elf(elf, output, symbol=None, value=None, bss_end=None):

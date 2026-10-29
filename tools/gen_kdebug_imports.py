@@ -188,7 +188,7 @@ def check_nm(entries, nm=None, root=ROOT):
     cumulative = set()
     for stage, stems in groups.items():
         paths = ([root / 'build/out/kdebug/crt_diag.o'] if stage == 'S1' else
-                 [root / 'build/out/kdebug/kselftest.o', root / 'kernel/kaudit.o'] if stage == 'S2' else
+                 [root / 'build/out/kdebug/kselftest.o', root / 'build/out/obj/kernel/kaudit.o'] if stage == 'S2' else
                  [root / 'build/out/kdebug' / (name + '.o') for name in stems])
         if stage == 'S2':
             paths += moved

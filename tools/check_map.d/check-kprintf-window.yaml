@@ -1,4 +1,5 @@
 check-kprintf-window:
+- tools/source_roots.py
 - userland/**
 - sdk/**
 - sdk/rust/**/*.rs

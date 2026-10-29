@@ -51,6 +51,7 @@ LE アクセサ化) の効果を同じ物差しで見るための計測器。
 """
 
 import argparse
+from source_roots import SCAN_ROOTS
 import json
 import os
 import re
@@ -70,7 +71,7 @@ KERNEL_MK = os.path.join(PROJ_DIR, "build", "kernel.mk")
 DEFAULT_ARM_CC = "arm-none-eabi-gcc"
 
 # glob 対象のディレクトリ (DRIFT 検出用。計測の対象集合ではない)
-SCAN_DIRS = ["kernel", "drivers", "fs", "exec", "kapi", "lib", "net", "gfx"]
+SCAN_DIRS = SCAN_ROOTS['arm_compile']
 
 # C_KERNEL に無くても DRIFT として騒がないもの = 上の docstring で
 # 理由を書いた除外。接頭辞かちょうど一致で判定する。
