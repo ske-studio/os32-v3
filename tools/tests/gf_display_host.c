@@ -269,12 +269,45 @@ static void service_cases(void)
     CHECK(video_blank(0,0)==OS32_ERR_INVAL && video_stop(0)==OS32_ERR_INVAL && video_display_start(0,0)==OS32_ERR_INVAL);
     output("PASS service: runner/baseline/load/check, restart, palette/blank/stop, all bus/point/wait failures\n");
 }
+static void record_cases(void)
+{
+    /* astra P3 review counterexamples, kept as regressions. */
+    struct video_device d={&display,&gf_video_ops};
+    sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_fail=sim_calls+1;
+    CHECK(video_palette(&d,0,1,sim_rgb)==-1);
+    CHECK(display.target==GF_MODE_DAC_MASK && display.section==GF_DISPLAY_PALETTE && display.last_rc==-1);
+    sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_fail=sim_calls+1;
+    CHECK(video_blank(&d,1)==-1);
+    CHECK(display.target==RECOVER_PRMVIO+RECOVER_SEQ && display.section==GF_DISPLAY_BLANK && display.last_rc==-1);
+    sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_fail=sim_calls+1;
+    CHECK(video_stop(&d)==-1);
+    CHECK(display.target==RECOVER_PBUS1850 && display.section==GF_DISPLAY_STOP && display.last_rc==-1);
+    sim_reset();CHECK(!video_start(&d,1,sim_rgb));CHECK(!video_stop(&d));
+    u32 before=sim_calls;
+    CHECK(!video_blank(&d,0) && sim_calls==before);
+    CHECK(video_blank(&d,1)==-1 && sim_calls==before);
+    /* A parser-valid VIDEO entry (VCO1 20-60MHz, M=1) solves with too large
+     * an error; diagnostic C and production start both reject it. */
+    u32 at=GF_INIT_PLL_TABLE+4+35*2;
+    put(at+GF_PLL_ENT_VCO1_MIN,20,2);put(at+GF_PLL_ENT_VCO1_MAX,60,2);
+    put(at+GF_PLL_ENT_VCO1_M_MIN,1,1);put(at+GF_PLL_ENT_VCO1_M_MAX,1,1);
+    struct gfinit_pll_limits limits;struct gfinit_mode m;
+    const struct gfinit_mode_saved empty={0};
+    CHECK(!gfinit_pll_parse(rom,sizeof(rom),GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&limits));
+    CHECK(!gfinit_mode_calc(&limits,&empty,&m) && m.pll.error>GF_MODE_CLOCK_KHZ/GF_PLL_MARGIN_DIV);
+    CHECK(c_append(&composed,&decoded,&profile,0x10000000,&limits,0)==-1);
+    sim_reset();
+    CHECK(video_start(&d,1,sim_rgb)==-1 && !display.active && !display.reusable &&
+          display.section==GF_DISPLAY_CALC);
+    fixture();
+    output("PASS record: palette/blank/stop failure target+section kept, same blank after stop, PLL error ceiling shared\n");
+}
 void _start(void)
 {
     gf_fixture_init();c_build();
     calc_equivalence();
     row_comparison(0,true);row_comparison(1,true);row_comparison(1,false);
-    pll_failure_cases();service_cases();
+    pll_failure_cases();service_cases();record_cases();
     output(failures?"DISPLAY FAIL\n":"DISPLAY PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

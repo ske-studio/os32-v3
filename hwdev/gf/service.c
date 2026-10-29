@@ -31,7 +31,8 @@ static int gf_start(void *v, u32 mode_id, const u8 *rgb)
         c->initialized=true;
     } else if (c->owner->validate(c)) goto fail;
     c->section=GF_DISPLAY_CALC;
-    if (gfinit_mode_calc(&c->limits,&c->baseline,&c->mode) || gf_display_modeset(c)) goto fail;
+    if (gfinit_mode_calc(&c->limits,&c->baseline,&c->mode) ||
+        !gfinit_mode_pll_ok(&c->mode) || gf_display_modeset(c)) goto fail;
     c->section=GF_DISPLAY_CHECK;
     if (gf_display_checks(c)) goto fail;
     c->active=true;c->blank=false;c->last_rc=0;
@@ -54,6 +55,7 @@ static int gf_blank(void *v, int blank)
 {
     struct gf_display_context *c=v;
     if (!c || (blank!=0 && blank!=1)) return OS32_ERR_INVAL;
+    if (c->blank==(bool)blank) return 0; /* same value: no I/O, also after stop */
     if (!c->active) return -1;
     c->section=GF_DISPLAY_BLANK;
     int rc=gf_display_blank(c,blank);

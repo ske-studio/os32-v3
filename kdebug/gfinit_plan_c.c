@@ -229,8 +229,7 @@ static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
     struct gfinit_mode mode;
     const struct gfinit_mode_saved empty={0};
     if (!out || !d || !p || bar1_length < GF_MODE_PITCH*GF_MODE_HEIGHT ||
-        gfinit_mode_calc(limits,&empty,&mode) ||
-        mode.pll.error > GF_MODE_CLOCK_KHZ/GF_PLL_MARGIN_DIV) return -1;
+        gfinit_mode_calc(limits,&empty,&mode) || !gfinit_mode_pll_ok(&mode)) return -1;
     if(out->plan.node_count+C_EXTRA_NODES>RECOVER_NODE_MAX ||
        out->plan.arg_count+C_EXTRA_ARGS>GF_INIT_ARGS ||
        out->plan.capture_count+C_EXTRA_CAPTURES>RECOVER_CAPTURE_MAX ||
