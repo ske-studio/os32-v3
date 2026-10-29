@@ -331,6 +331,41 @@ static void prod_cases(void)
     CHECK(!prod_start() && !prod_return(&prod));
     output("PASS finite wait, unavailable/frozen clock, elapsed wrap and baseline deadline\n");
 }
+#ifndef GF_HAL_TEST
+/* astra P4/P5 counterexample: the real transfer with the real identity point.
+ * After a BAR change the old windows must not be touched; both windows are
+ * given as address 0 (unmapped), so any write or drain read faults the test. */
+#include "gfx_hal.h"
+GfxCounters gfx_counters;
+#include "../../gfx/gf_present.c"
+static u32 prod_points,prod_present_regs[GF_PRESENT_PFB_AMOUNT/4+1];
+static volatile u8 *volatile prod_unmapped;
+static int prod_present_point(void *v) { prod_points++;return gf_production_point(v); }
+static void prod_present_cases(void)
+{
+    static u8 src[2*GF_MODE_WIDTH],dst[2*GF_MODE_WIDTH];
+    for(u32 i=0;i<sizeof(src);i++)src[i]=(u8)(i*7U+1U);
+    for(int h=1;h<=2;h++) {
+        prod_reset();CHECK(!prod_start());
+        kmemset(dst,0,sizeof(dst));gfx_counters=(GfxCounters){0};prod_points=0;
+        CHECK(!gf_present_rect(src,GF_MODE_WIDTH,dst,GF_MODE_WIDTH,(volatile u8 *)prod_present_regs,
+                               0,0,2,h,prod_present_point,&prod));
+        CHECK(prod_points==(u32)h && !prod.revoked && gfx_counters.commits==1 &&
+              gfx_counters.present_bytes==2U*(u32)h);
+        for(int r=0;r<h;r++)CHECK(dst[r*GF_MODE_WIDTH]==src[r*GF_MODE_WIDTH] &&
+                                  dst[r*GF_MODE_WIDTH+1]==src[r*GF_MODE_WIDTH+1]);
+        prod_cfg[13][0][4]^=0x01000000; /* BAR0 changed after a good display */
+        u32 reads=prod_mmio_calls;prod_points=0;gfx_counters=(GfxCounters){0};
+        CHECK(gf_present_rect(src,GF_MODE_WIDTH,prod_unmapped,GF_MODE_WIDTH,prod_unmapped,
+                              0,0,2,h,prod_present_point,&prod)==-1);
+        CHECK(prod_points==1 && prod.revoked && prod_mmio_calls==reads);
+        CHECK(!gfx_counters.commits && !gfx_counters.present_bytes);
+        /* Existing failure exit: stop (MMIO denied) -> route00, no 98 redraw. */
+        CHECK(prod_return(&prod)==-1 && prod_mmio_calls==reads && prod_route_calls==2 && !prod_redraws);
+    }
+    output("PASS present after BAR0 change (h=1,2): identity checked before the first row, no old-window write/drain, stop->route00\n");
+}
+#endif
 #ifdef GF_HAL_TEST
 #include "gf_production_hal_host.inc"
 #endif
@@ -338,6 +373,9 @@ void _start(void)
 {
 #ifdef GF_HAL_TEST
     prod_hal_cases();
+#endif
+#ifndef GF_HAL_TEST
+    prod_present_cases();
 #endif
     prod_selection_tests();prod_cases();
     prod_reset();CHECK(!prod_start());

@@ -11,8 +11,10 @@
 #define GF_PRESENT_PFB_AMOUNT 0x10020cU
 
 /* bar0 and display are already mapped device pointers. point is the caller's
- * non-reentrant interruption check; it runs between rows. A failed check
- * returns -1 after draining and accounting for the rows already written. */
+ * non-reentrant identity/interruption check; it runs before every row, so a
+ * one-row present is checked too and the final BAR0 drain follows a passed
+ * check. A failed check returns -1 without touching either window again,
+ * still accounting for the rows already written. */
 int gf_present_rect(const u8 *client, u32 client_pitch,
                     volatile u8 *display, u32 display_pitch,
                     volatile u8 *bar0, int x, int y, int w, int h,
@@ -27,19 +29,19 @@ int gf_present_rect(const u8 *client, u32 client_pitch,
     client += (u32)y * client_pitch + (u32)x;
     display += (u32)y * display_pitch + (u32)x;
     for (int row = 0; row < h; row++) {
-        for (int col = 0; col < w; col++)
-            display[col] = client[col];
-        rows++;
-        if (row + 1 < h && point(opaque)) {
+        if (point(opaque)) {
             rc = -1;
             break;
         }
+        for (int col = 0; col < w; col++)
+            display[col] = client[col];
+        rows++;
         client += client_pitch;
         display += display_pitch;
     }
 
     /* A BAR0 read drains posted BAR1 writes; do not read the display. */
-    (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT);
+    if (!rc) (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT);
     gfx_counters.present_bytes += (u32)w * rows;
     if (!rc) gfx_counters.commits++;
     return rc;
