@@ -19,6 +19,7 @@ def component(name):
 
 def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
     fixture=(ROOT/'tools/tests/gfx_kernel_fb_host.c').read_text().replace('return id == 2 ? &slot : 0;', 'return id == 2 || id == APP_ID_SHELL ? &slot : 0;')
+    fixture=fixture.replace('void gui_display_failed(void) {}', '')
     fixture=fixture.replace('static void run(void)\n{',
         '#include "geforce_core_cases.inc"\nstatic void run(void)\n{',1)
     fixture=replace_function(fixture,'static void run(void)',r'''
@@ -33,6 +34,13 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
     CHECK(client->npages*PAGE_SIZE==307200 && display->npages*PAGE_SIZE==307200);
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_CLIENT));
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY));
+    CHECK(!geforce_range_reserved(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES));
+    CHECK(!geforce_range_reserved(GF_TEST_DISPLAY,GF_PRODUCTION_BAR1_BYTES));
+    CHECK(!geforce_range_reserved(GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES));
+    CHECK((paging_pte_raw(GF_TEST_BAR0)&(PTE_PRESENT|PTE_USER|PTE_PCD))==(PTE_PRESENT|PTE_PCD));
+    CHECK((paging_pte_raw(GF_TEST_DISPLAY)&(PTE_PRESENT|PTE_USER|PTE_PCD))==(PTE_PRESENT|PTE_PCD));
+    CHECK(!(paging_pte_raw(GF_TEST_BAR2)&PTE_PRESENT));
+    CHECK(!(paging_pte_raw(GF_TEST_DISPLAY+MEM_GFX_BB8_SIZE)&PTE_PRESENT));
     CHECK(!acquires && !starts);
     if (!MISSING) geforce_backend_bind(&device_gf,identify_gf,0,point_gf,0);
     gfx_prepare_backend(); CHECK(!acquires && !starts);
@@ -44,7 +52,7 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
         if (UNSAFE) {
             struct surface_query_source source;
             CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT,&source)==OS32_ERR_INVAL);
-            CHECK(!host_planar_inits);
+            CHECK(!host_planar_inits && !console_safe);
             gfx_init_200(); CHECK(!starts && acquires==1 && !host_planar_inits);
         } else {
             CHECK(g_backend==&gfx_backend_pc98);
@@ -56,25 +64,31 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
         CHECK(bb[0]==P2V(client->first*PAGE_SIZE) && !bb[1]);
         CHECK(gfx_backend_geforce.bb_size==307200 && gfx_selected_selfcheck());
         CHECK(cell_checks==1 && route_gf==1);
+        gfx_init_200();
+        CHECK(gfx_sf_backend()==LEDGER_SF_GEFORCE && gfx_current_height==480);
+        CHECK(acquires==1 && starts==1 && cell_checks==1 && route_gf==1);
         host_user=0; gfx_shutdown(); CHECK(stops==1 && route_98==1);
         gfx_init_200(); CHECK(acquires==1 && starts==1 && validates==1);
         CHECK(gfx_sf_backend()==LEDGER_SF_GEFORCE && gfx_current_height==480);
         CHECK(cell_checks==2 && route_gf==2);
         host_gui=1; slot.abort_req=0;
         fail_palette=1; u8 rgb[3]={1,2,3};
-        gfx_backend_geforce.set_palette(16,1,rgb); CHECK(slot.abort_req);
+        gfx_backend_geforce.set_palette(16,1,rgb); CHECK(wm_pending && !slot.abort_req);
         struct surface_query_source source;
         CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT,&source)==OS32_ERR_INVAL);
         CHECK(gfx_sf_backend()==LEDGER_SF_GEFORCE && !host_planar_inits);
-        host_user=0; gfx_shutdown(); CHECK(gfx_sf_backend()==LEDGER_SF_PC98);
+        wm_consume(); CHECK(gfx_sf_backend()==LEDGER_SF_PC98);
+        CHECK(bb[0] && bb[1] && !wm_pending);
     }
     SAY("PASS GF core lifecycle/reservation/fallback"); die(0);
 ''')
-    fixture=f'#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
+    fixture=f'#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
     def stage(tmp,sources):
+        gui=(ROOT/'kernel/gui.c').read_text()
+        (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
         source=(ROOT/'kernel/geforce_module.c').read_text()
         start=source.index('int geforce_boot_reserve(void)')
-        end=source.index('static int geforce_start(',start)
+        end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
         for rel in ('gfx/backend_geforce.c','hwdev/gf/service.c','hwdev/gf/display/modes.c'):
             sources.append(ROOT/rel)
@@ -90,6 +104,50 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
          'static void _gfx_common_init(int plane_sz)\n{\n    extern int host_planar_inits; host_planar_inits++;')])
     assert result.returncode==0,(init_fail,unsafe,missing,result.returncode,result.stdout,result.stderr)
     print(result.stdout,end='',flush=True)
+
+def unsafe_console(old=False):
+    from test_dep_dir_d_console import grid_instrument
+    body=(ROOT/'kernel/console.c').read_text()
+    if old:
+        body=subprocess.check_output(['git','show','HEAD:kernel/console.c'],cwd=ROOT,text=True)
+    harness=(ROOT/'tools/tests/dep_dir_d_console_grid_host.c').read_text()
+    harness='int safe=1; static int serial_count;\n'+harness
+    harness=harness.replace('    if (address < TVRAM_CHAR_BASE',
+                            '    if (!safe) finish(71);\n    if (address < TVRAM_CHAR_BASE')
+    harness=harness.replace('event(2, p, v);', 'if (!safe) finish(72); event(2, p, v);')
+    harness=harness.replace('event(9,(u8)c,0);', 'serial_count++; event(9,(u8)c,0);')
+    harness=replace_function(harness,'void _start(void)',r'''
+        (void)snapshot; seed(); active=gui=0; rshell_active=1;
+        console_write("A",1,0xe1); /* positive control: normal console writes */
+        safe=0; serial_count=0;
+        console_write("X",1,0xe1); shell_print("Y",0xe1);
+        shell_print_utf8("Z",0xe1); shell_putchar('!',0xe1);
+        tvram_clear(); tvram_putchar_at(0,0,'X',0xe1);
+        tvram_putkanji_at(0,0,0x2422,0xe1); tvram_scroll();
+        u16 code=0; u8 attr=0; tvram_readchar_at(0,0,&code,&attr);
+        (void)tvram_reverse_cell(0,0);
+        console_set_cursor(0,0); console_hw_cursor_enable();
+        console_text_gdc_stop(); gui=1; console_text_gdc_start();
+        if (serial_count!=3) finish(73);
+        safe=1; console_write("R",1,0xe1); /* safe return resumes output */
+        finish(0);
+    ''')
+    with tempfile.TemporaryDirectory(prefix='gf-console-') as td:
+        tmp=Path(td); exe=tmp/'host'
+        (tmp/'console_source.inc').write_text(grid_instrument(body))
+        (tmp/'platform/pc98').mkdir(parents=True)
+        (tmp/'platform/pc98/console.c').write_text(grid_instrument((ROOT/'platform/pc98/console.c').read_text()))
+        (tmp/'host.c').write_text(harness)
+        (tmp/'safe.c').write_text('extern int safe; int pc98_console_safe(void) { return safe; }')
+        subprocess.run(FLAGS+['-I'+td,*INCLUDES,'-Wno-sign-compare',str(tmp/'host.c'),str(tmp/'safe.c'),'-o',str(exe)],check=True)
+        result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
+        if old:
+            assert result.returncode==71,result
+            print('REPRO unsafe console writes TVRAM (rc=71)',flush=True)
+        else:
+            assert result.returncode==0,result
+            print('PASS unsafe console: ordinary output/clear/cursor/GUI return suppress MMIO, serial retained',flush=True)
+
 
 def product():
     import json
@@ -107,7 +165,8 @@ def product():
     rebuilt,stats=mkmod.build(body,meta,kernel,spec['version'],spec['generations']['memory_layout'],module_id=12)
     assert rebuilt==data
     symbols=mkmod.Elf(body).symbols
-    for symbol in ('gf_video_ops','gf_init_run','gf_display_modeset','geforce_backend_ops'):
+    for symbol in ('gf_video_ops','gf_init_run','gf_display_modeset','geforce_backend_ops','gf_production_prepare',
+                   'gf_production_identify','gf_production_quiesce','gf_production_decode_safe'):
         assert symbol in symbols,symbol
     for symbol in ('recover_run','gfinit_decode_rom','gfinit_plan_c','gfinit_begin'):
         assert symbol not in symbols,symbol
@@ -137,6 +196,7 @@ def module_registration():
     print('PASS GF registration: missing stub, NULL acceleration, prepare required, lifetime pin',flush=True)
 
 def main():
+    unsafe_console()
     product()
     module_registration()
     for name in ('gf_present','backend_geforce','pc98_route'): component(name)

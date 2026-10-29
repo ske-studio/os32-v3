@@ -6,6 +6,9 @@
 #define PC98_ROUTE_98 0U
 #define PC98_ROUTE_GF 1U
 int pc98_route_to_gf(void);
+int pc98_route_select_98(void);
+void pc98_console_set_safe(int safe);
+int pc98_console_safe(void) __attribute__((weak));
 int pc98_route_to_98(void);
 int pc98_route_cell_check(void);
 /* Includes route readback and the platform owner's legacy-decode check. */

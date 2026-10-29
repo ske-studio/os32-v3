@@ -1,15 +1,21 @@
 /* Included by the existing real paging/ledger/HAL fixture. */
 #include "geforce_module.h"
-#define GF_TEST_DISPLAY 0xe4000000U
+#include "gui.h"
+#define GF_TEST_DISPLAY 0xd0000000U
+#define GF_TEST_BAR0 0xe0000000U
+#define GF_TEST_BAR2 0xe1000000U
 static int starts, stops, acquires, releases, validates, transfers, cell_checks, route_gf, route_98;
-static int decode_safe=1, fail_palette;
+static int decode_safe=1, fail_palette, route;
 int host_planar_inits;
 static int identify_gf(void) { return 1; }
 static int point_gf(void *p) { (void)p; return 0; }
-int pc98_route_safe(void) { return decode_safe; }
-int pc98_route_to_gf(void) { route_gf++; return 0; }
-int pc98_route_to_98(void) { route_98++; return decode_safe ? 0 : -1; }
-int pc98_route_cell_check(void) { cell_checks++; return decode_safe ? 0 : -1; }
+static int console_safe=1, wm_pending;
+void pc98_console_set_safe(int safe) { console_safe=safe; }
+int pc98_console_safe(void) { return console_safe; }
+int pc98_route_safe(void) { return decode_safe && !route; }
+int pc98_route_to_gf(void) { route_gf++; route=1; return 0; }
+int pc98_route_to_98(void) { route_98++; route=0; console_safe=decode_safe; return decode_safe ? 0 : -1; }
+int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : -1; }
 #include "../../hwdev/gf/internal.h"
 /* Run the actual P3 start state machine. These seams replace lower hardware
  * operations, not the acquire-once/validate-on-resume decision. */
@@ -30,23 +36,32 @@ int gf_display_palette(struct gf_display_context *c,u32 first,u32 count,const u8
 int gf_display_blank(struct gf_display_context *c,int v) { c->blank=v;return 0; }
 int gf_display_stop(void *v) { struct gf_display_context *c=v;stops++;c->active=false;return 0; }
 static struct video_device device_gf={&display_gf,&gf_video_ops};
-static int reserve_gf(void)
+#include "../../hwdev/gf/production.h"
+int gf_production_selected(void) { return 1; }
+int gf_production_identify(struct gf_production_resources *r)
 {
-    struct ledger_resource r={.decode_first=GF_TEST_DISPLAY/PAGE_SIZE,
-        .decode_end=(GF_TEST_DISPLAY+MEM_GFX_BB8_SIZE)/PAGE_SIZE,
-        .map_first=GF_TEST_DISPLAY/PAGE_SIZE,.map_end=(GF_TEST_DISPLAY+MEM_GFX_BB8_SIZE)/PAGE_SIZE,
-        .bus=LEDGER_BUS_FIXED,.width_basis=LEDGER_WB_DATASHEET};
-    u32 rid;
-    CHECK(ledger_resource_add(&r,&rid));
-    struct ledger_span sp={r.decode_first,r.decode_end,LEDGER_SPAN_MMIO,rid};
-    CHECK(ledger_reserve_set(LEDGER_OWNER_GFX,&sp,1));
-    CHECK(!paging_map_phys(GF_TEST_DISPLAY,GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE/PAGE_SIZE,PAGE_RW|PTE_PCD));
-    CHECK(ledger_resource_set_map(rid,r.map_first,r.map_end));
-    return 1;
+    *r=(struct gf_production_resources){0};
+    r->identity.device=RECOVER_GF_DEVICE;
+    r->bars[0]=(struct recover_bar_extent){GF_TEST_BAR0,GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES,1};
+    r->bars[1]=(struct recover_bar_extent){GF_TEST_DISPLAY|8,GF_TEST_DISPLAY,GF_PRODUCTION_BAR1_BYTES,1};
+    r->bars[2]=(struct recover_bar_extent){GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1};
+    return 0;
 }
-static const struct geforce_platform platform_gf={.device=&device_gf,.reserve=reserve_gf,
-    .identify=identify_gf,.pc98_safe=pc98_route_safe,.point=point_gf,.display_phys=GF_TEST_DISPLAY};
-const struct geforce_platform *geforce_platform_get(void) { return &platform_gf; }
+#include "../../kernel/geforce_platform.c"
 #include "geforce_reserve.inc"
 static int geforce_gui(void) { return host_gui; }
+static i32 wm_notice(u32 op,u32 arg,int owner)
+{
+    CHECK(op==GUI_OP_SESSION_REQUEST && arg==GUI_SESSION_SWITCH_CUI && owner==1);
+    wm_pending=1; return 0;
+}
+static i32 (*g_gui_handler)(u32,u32,int)=wm_notice;
+void ring3_wm_enter(void) {}
+void ring3_wm_leave(void) {}
+#include "geforce_gui_notice.inc"
+static void wm_consume(void)
+{
+    CHECK(wm_pending); wm_pending=0;
+    host_user=0; gfx_shutdown();
+}
 /* Code from P5's actual failure hook is compiled with core, not faked. */

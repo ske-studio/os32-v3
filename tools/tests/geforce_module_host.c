@@ -3,6 +3,20 @@
 #undef _start
 #include "../../kernel/geforce_module.c"
 #include "../../kernel/geforce_body.c"
+static struct geforce_platform fixture_platform;
+struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
+void geforce_backend_stop_bind(int (*stop)(void)) { (void)stop; }
+int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *b,
+                         int (*r)(void *),void *o) { (void)p;(void)b;(void)r;(void)o;return -1; }
+int gf_production_identity(struct gf_production *p) { (void)p;return -1; }
+int gf_production_decode_safe(struct gf_production *p) { (void)p;return -1; }
+int gf_production_quiesce(struct gf_production *p) { (void)p;return -1; }
+int gf_production_point(void *p) { (void)p;return -1; }
+int pc98_route_select_98(void) { return 0; }
+int pc98_route_to_98(void) { return 0; }
+static int return_registered;
+void gf_production_set_return(int (*callback)(void *),void *opaque)
+{ (void)callback;(void)opaque;CHECK(registered);return_registered++; }
 GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 static u32 probes, enables;
@@ -22,6 +36,7 @@ void _start(void)
     read_input(input,sizeof(input)); read_input(file,sizeof(file));
     kmemcpy(&imports[0].name_hash,file+152,4);
     kmemcpy(&exports[4].name_hash,file+164,4); exports[4].version=1;
+    context.platform=&fixture_platform;
     struct module_request q=request();
     q.lifecycle=(struct module_lifecycle){.start=geforce_start,.detach=geforce_detach};
     CHECK(!gfx_backend_geforce.probe());
@@ -37,7 +52,7 @@ void _start(void)
         CHECK(rc==MODULE_INIT_FAILED && !registered && !r->registration_refs);
         CHECK(!gfx_backend_geforce.probe()); empty(); finish(0);
     }
-    CHECK(!rc && registered && r->registration_refs==1);
+    CHECK(!rc && registered && r->registration_refs==1 && return_registered==1);
     gfx_backend_geforce=candidate;
     CHECK(geforce_context->backend==&gfx_backend_geforce);
     CHECK(gfx_backend_geforce.prepare && !gfx_backend_geforce.fill_rect && !gfx_backend_geforce.blit);

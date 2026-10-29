@@ -27,6 +27,12 @@ def main():
                             '-o', str(Path(tmp) / f'{name}-cross.o')], check=True)
         subprocess.run(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
                         '-c', str(ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
+        module=(ROOT/'kernel/geforce_module.c').read_text()
+        a=module.index('static int geforce_return(')
+        (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)])
+        backend=Path(tmp)/'backend.o'
+        subprocess.run(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
+                        str(ROOT/'gfx/backend_geforce.c'),'-o',str(backend)],check=True)
         sources = ['tools/tests/gf_production_host.c', 'kernel/sys.c',
                    'hwdev/gf/devinit.c', 'hwdev/gf/bus.c', 'hwdev/gf/resources.c',
                    'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
@@ -37,7 +43,12 @@ def main():
                         *[str(ROOT / p) for p in sources], str(native), '-o', str(exe)], check=True)
         symbols = subprocess.check_output(['nm', '--defined-only', str(exe)], text=True)
         assert not any(name in symbols for name in (' recover_', ' kpeek_', ' trial_'))
-        return host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
+        rc=host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
+        if rc: return rc
+        subprocess.run(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
+                        '-Wl,--gc-sections',*[str(ROOT/p) for p in sources],str(native),str(backend),
+                        '-o',str(exe)],check=True)
+        return host32.run([str(exe)],cwd=ROOT,timeout=180).returncode
 
 
 if __name__ == '__main__':

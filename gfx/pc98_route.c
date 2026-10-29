@@ -9,6 +9,10 @@
 #include "display_private.h"
 #include "gfx_internal.h"
 
+static int console_safe = 1;
+void pc98_console_set_safe(int safe) { console_safe = safe; }
+int pc98_console_safe(void) { return console_safe; }
+
 static int route_set(u8 value)
 {
     u8 old = inp(PC98_ROUTE_PORT);
@@ -36,10 +40,13 @@ int pc98_route_to_gf(void)
 {
     return route_set(PC98_ROUTE_GF);
 }
+int pc98_route_select_98(void) { return route_set(PC98_ROUTE_98); }
 int pc98_route_to_98(void)
 {
     /* Route even when the GF identity is lost. No 98 access until safe. */
-    if (route_set(PC98_ROUTE_98) || !pc98_route_safe()) return -1;
+    int rc = pc98_route_select_98();
+    pc98_console_set_safe(!rc && pc98_route_safe());
+    if (!console_safe) return -1;
     int height = gfx_current_height, flip = gfx_flip_enabled, page = gfx_display_page;
     display_restore_98();
     /* Live GUI geometry is retained until its existing shutdown boundary. */

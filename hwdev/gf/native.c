@@ -5,6 +5,10 @@
 #include "../../kernel/pgalloc.h"
 #include "../../include/sys.h"
 #define GF_PRODUCTION_WAIT_POLLS 1000000U
+#ifdef GF_PRODUCTION_MODULE
+#include "geforce_module.h"
+#define reserved geforce_range_reserved
+#else
 static int reserved(u32 base, u32 length)
 {
     u32 first=base/PAGE_SIZE, end=first+length/PAGE_SIZE;
@@ -21,6 +25,8 @@ static int reserved(u32 base, u32 length)
     }
     return 0;
 }
+#endif
+
 int gf_production_mapped(struct gf_production *p)
 {
     for (u32 i=0;i<RECOVER_BAR_COUNT;i++) {

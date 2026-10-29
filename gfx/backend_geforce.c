@@ -40,6 +40,8 @@ static u32 bar0_phys;
 static int (*interrupt_point)(void *);
 static void *interrupt_context;
 static int failed, active, routed;
+static int (*stop_device)(void);
+void geforce_backend_stop_bind(int (*stop)(void)) { stop_device = stop; }
 static u8 initial_palette[VIDEO_PALETTE_BYTES];
 
 /* Integration supplies a long-lived device and a read-only identity/resource
@@ -89,7 +91,7 @@ static void geforce_palette_init(void)
 
 static int geforce_stop(void)
 {
-    int rc = device ? video_stop(device) : 0;
+    int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
     if (pc98_route_to_98()) rc = -1;
     active = routed = 0;
     if (rc) failed = 1;
@@ -114,12 +116,14 @@ static void geforce_init(void)
 {
     struct video_mode mode;
     if (!geforce_probe()) return;
+    if (active) return; /* One fixed mode; gfx_init -> gfx_init_200 preserves it. */
     if (video_mode_info(device, GF_MODE_INDEX, &mode) ||
         video_framebuffer(device, &framebuffer) || !gfx_backend_geforce.bb_base) {
         geforce_fail();
         return;
     }
     geforce_palette_init();
+    pc98_console_set_safe(0);
     if (video_start(device, mode.id, initial_palette) ||
         geforce_transfer(0, 0, GF_WIDTH, GF_HEIGHT) ||
         pc98_route_cell_check() || pc98_route_to_gf()) {

@@ -2,6 +2,7 @@
 #include "pgalloc.h"
 #include "memmap.h"
 #include "platform_memory.h"
+#include "gf_production.h"
 
 /* The loader samples one dword per 512KiB, including F00000/F80000.
  * Writable device memory can pass that test: it does NOT establish RAM in
@@ -10,7 +11,8 @@
  * RAM at/above MEM_HIGH_RAM_BASE comes from memory_boot_detect instead.
  * Keep the raw sys_mem_kb report unchanged; sys freezes the safe tail. */
 /* Spare workspace page kept for later device windows, on top of the identity
- * PTs that high RAM needs. Never a cap on how much RAM may be admitted. */
+ * PTs that high RAM needs. High-RAM machines also reserve the five GF map
+ * PTs. FIXED low-memory boots retain their one-page workspace. */
 #define MEMORY_BOOT_WORKSPACE_PAGES 1UL
 /* FIXED 型の置き場 (TASK_T1_LEDGER §3-3): [MEM_LEDGER_META_BASE,
  * MEM_LEDGER_META_END) = metadata 1 ページ + workspace 1 ページ。低位 RAM の
@@ -60,11 +62,12 @@ u32 memory_boot_detect(u32 mem_kb)
 }
 
 /* workspace が要るページ数 = 恒等 PT (ブート窓 PAGING_BOOT_MAP_SIZE より上の
- * PDE 1 枚につき 1 枚) + デバイス窓ぶんの予備 1 枚。検出量に比例する。 */
+ * PDE 1 枚につき 1 枚) + 通常のデバイス窓 1 枚 + 高位 RAM 時の GF 窓 5 枚。 */
 static u32 memory_boot_workspace_pages(u32 limit)
 {
     u32 pages;
     pages = MEMORY_BOOT_WORKSPACE_PAGES;
+    if (limit) pages += GF_PRODUCTION_PT_PAGES;
     if (limit > PAGING_BOOT_MAP_SIZE / PAGE_SIZE)
         pages += (limit + PTE_COUNT - 1) / PTE_COUNT - PAGING_BOOT_PT_COUNT;
     return pages;

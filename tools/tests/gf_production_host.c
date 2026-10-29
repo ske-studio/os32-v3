@@ -316,8 +316,14 @@ static void prod_cases(void)
     CHECK(!prod_start() && !prod_return(&prod));
     output("PASS finite wait, unavailable/frozen clock, elapsed wrap and baseline deadline\n");
 }
+#ifdef GF_HAL_TEST
+#include "gf_production_hal_host.inc"
+#endif
 void _start(void)
 {
+#ifdef GF_HAL_TEST
+    prod_hal_cases();
+#endif
     prod_selection_tests();prod_cases();
     prod_reset();CHECK(!prod_start());
     gf_production_set_return(prod_return,&prod);

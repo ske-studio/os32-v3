@@ -40,7 +40,7 @@ C_KERNEL = \
     drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
     drivers/lgy98.c drivers/ne2000.c drivers/ne2000_ring.c \
     kernel/pcm_module.c kernel/lan_module.c \
-    kernel/cirrus_module.c kernel/geforce_module.c gfx/pc98_route.c gfx/cirrus_identify.c \
+    kernel/cirrus_module.c kernel/geforce_module.c kernel/geforce_platform.c gfx/pc98_route.c gfx/cirrus_identify.c \
     net/link.c \
     gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c gfx/backend_pc98.c gfx/backend_pegc.c \
     fs/fatfs/ff.c fs/fatfs/diskio.c fs/fatfs_vfs.c \

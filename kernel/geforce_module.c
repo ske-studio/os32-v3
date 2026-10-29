@@ -7,6 +7,8 @@
 #include "pgalloc.h"
 #include "kstring.h"
 #include "kprintf.h"
+#include "gf_production.h"
+#include "pc98_route.h"
 
 extern const u32 geforce_kexports[];
 extern const struct module_symbol_contract geforce_import_contracts[], geforce_export_contracts[];
@@ -18,11 +20,10 @@ GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_pr
 static GeforceModuleContext context = {
     &gfx_backend_geforce, &gfx_counters, &gfx_current_height, &gfx_flip_enabled, &gfx_display_page, 0
 };
-const struct geforce_platform *__attribute__((weak)) geforce_platform_get(void) { return 0; }
 int geforce_pc98_safe(void)
 {
     const struct geforce_platform *p = geforce_platform_get();
-    return !p || (p->pc98_safe && p->pc98_safe());
+    return !p || !p->pc98_safe || p->pc98_safe();
 }
 /* The P4 hook reserves/maps all BAR decode ranges before these two records.
  * RAM CLIENT is never confused with BAR1 DISPLAY, nor allocated for PEGC. */
@@ -49,6 +50,13 @@ int geforce_boot_reserve(void)
     (void)pgalloc_free_n_owner(sf.owner, first, sf.npages);
     return 0;
 }
+static int geforce_return(void *opaque)
+{
+    struct geforce_platform *p = opaque;
+    int rc = p->stop ? p->stop() : 0;
+    if (pc98_route_to_98()) rc = -1;
+    return rc;
+}
 static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
 {
     (void)exports;
@@ -69,6 +77,7 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
     if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0))
         return MODULE_INIT_FAILED;
     registered=1;
+    if (context.platform) gf_production_set_return(geforce_return, context.platform);
     return 0;
 }
 static int geforce_detach(struct module_record *r)

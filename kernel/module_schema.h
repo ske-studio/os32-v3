@@ -271,7 +271,7 @@ enum module_field {
         .image_max = 131072U, \
         .mem_max = 131072U, \
         .reloc_max = 8192U, \
-        .import_max = 16U, \
+        .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 163840U, \
     }, \

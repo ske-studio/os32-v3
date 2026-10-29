@@ -5,6 +5,7 @@ const unsigned int __os32_abi_1_mem_4_fmt_4 = 0;
 static int events[32], n, fail_step;
 static PaletteEntry colors[16];
 static u8 client[640 * 480];
+void pc98_console_set_safe(int safe) { (void)safe; }
 static int identify(void) { return 1; }
 static const PaletteEntry *fake_palette_get_all(void) { return colors; }
 static void fake_palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }

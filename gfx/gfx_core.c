@@ -15,6 +15,7 @@
 #include "kselftest.h"
 #include "kcg_module.h"
 #include "geforce_module.h"
+#include "gui.h"
 #include "pc98_route.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
@@ -465,7 +466,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
                            LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
     rid = 0;
 
-    cand = m = gfx_identify_candidates();
+    cand = m = g_backend_pref == GFX_PREF_GEFORCE ? 0 : gfx_identify_candidates();
     pfn = 0;
     /* 2. 登録できた窓をまとめて予約。登録に失敗した候補から先は登録しない
      *    (先に登録した窓は保持する。PEGC は F00 だけ登録済みでも alt が無ければ落ちる)。 */
@@ -1202,12 +1203,8 @@ void geforce_display_failed(void)
 {
     gfx_started = 0;
     gfx_reinit_surfaces(0);
-    /* Existing deferred shell abort ends the GUI at its normal boundary. Keep its
-     * geometry and CLIENT until shutdown, so live GUI pointers stay valid. */
-    if (con_sink_is_enabled()) {
-        AppSlot *wm = appslot_get(APP_ID_SHELL);
-        if (wm) wm->abort_req = 1;
-    }
+    /* Queue the WM's existing SessionAction; CPL0 never consumes abort_req. */
+    if (con_sink_is_enabled()) gui_display_failed();
 }
 
 /* Public USER compatibility bridge; regen invalidates the held token.

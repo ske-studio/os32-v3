@@ -1,4 +1,5 @@
 #include "display_restore.h"
+#include "pc98_route.h"
 #include "platform_display.h"
 #include "display_private.h"
 #include "io.h"
@@ -21,6 +22,7 @@ static void display_out(unsigned int port, unsigned int value)
 
 void display_text_start(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     gfx_current_height = GFX_HEIGHT;
     gfx_flip_enabled = 0;
     outp(GDC_GFX_CMD, GDC_CMD_STOP);
@@ -33,6 +35,7 @@ void display_text_start(void)
 
 void display_restore_98(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     u32 i;
     /* gfx_hardware_scroll(0) が 400 ライン・スクロール無しで出す値
      * (SAD=0 / SL=400 の 1 分割)。実測した OS32 側の PRAM と一致する。 */

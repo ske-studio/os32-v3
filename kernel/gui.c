@@ -268,3 +268,12 @@ __attribute__((weak)) int gfx_lease_palette(int first, int count, const u8 *rgb)
     (void)rgb;
     return OS32_ERR_NOSYS;
 }
+
+void gui_display_failed(void)
+{
+    if (g_gui_handler) {
+        ring3_wm_enter();
+        g_gui_handler(GUI_OP_SESSION_REQUEST, GUI_SESSION_SWITCH_CUI, GUI_SHELL_OWNER);
+        ring3_wm_leave();
+    }
+}

@@ -186,7 +186,7 @@ COMPONENTS = (
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          stop_allowed=0, ops_version=1, ops_slots=1,
          image_max=131072, mem_max=131072, load_span_max=163840,
-         reloc_max=8192, import_max=16, export_max=1,
+         reloc_max=8192, import_max=32, export_max=1,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',
          ops_symbol='geforce_module_ops', ops_names=('initialize',)),
 )
