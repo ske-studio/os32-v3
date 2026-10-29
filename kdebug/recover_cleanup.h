@@ -4,6 +4,7 @@
 #include "config.h"
 #include "pc98.h"
 #include "memmap.h"
+#include "gfinit_decode.h"
 
 /* Internal to recover.c. A row's sizeof includes one compensation LF in
  * addition to its explicit LF; CR is also allowed for the budget proof.
@@ -121,17 +122,26 @@ static int cleanup_budget_compute(const struct recover *r, const struct recover_
         pairs += 1 + cleanup_access_pairs(p, d->key, REC_WRITE, REC_RESTORE);
     }
     if (maximum || r->zero_hold) pairs += cleanup_zero_count(p);
-    unsigned long long pre = pairs * pair + sizeof(state_row);
+    /* A cancelled runner can still own one pending PLL/index transaction.
+     * Reserve its reverse writes before S0; C-only and A1 keep their budgets. */
+    u32 runner_pairs = 0;
+    if (r->plan) for (u32 i=0;i<r->plan->node_count;i++)
+        if (r->plan->nodes[i].opcode==GF_INIT_RUNNER && (maximum || i==r->expected_node)) {
+            runner_pairs=2U*GF_PLL_WRITES_MAX; /* select + data per indexed save */
+            break;
+        }
+    unsigned long long pre = pairs * pair + sizeof(state_row) +
+        (unsigned long long)runner_pairs * 2U * (RECOVER_ROW_MAX+1U);
     u32 s0 = REC_CLEANUP_S0_PAIRS * pair + sizeof(final_row) + sizeof(discard_row) + sizeof(diag_row);
     if (s0 < RECOVER_BUDGET_BYTES_S0) s0 = RECOVER_BUDGET_BYTES_S0;
-    if (pre + s0 > ~0U || pairs * REC_CLEANUP_POINTS_PER_PAIR + REC_CLEANUP_FIXED_POINTS > ~0U) return -1;
+    if (pre + s0 > ~0U || (pairs + runner_pairs) * REC_CLEANUP_POINTS_PER_PAIR + REC_CLEANUP_FIXED_POINTS > ~0U) return -1;
     u32 frame = r->transport ? r->transport->frame_us :
         (RECOVER_UART_FRAME_US / SYS_SERIAL_BAUD + (RECOVER_UART_FRAME_US % SYS_SERIAL_BAUD != 0));
     if (!frame || frame > RECOVER_UART_US) return -1;
     u32 ms = (maximum || r->measuring) ? RECOVER_BUDGET_EXEC_MS_SIZE_BARS : RECOVER_BUDGET_EXEC_MS_RUN;
     u32 ticks, polls, s0_ticks, s0_polls;
     if (cleanup_stage((u32)pre, ms - RECOVER_BUDGET_EXEC_MS_S0,
-            (u32)pairs * REC_CLEANUP_POINTS_PER_PAIR + REC_CLEANUP_FIXED_POINTS, frame, &ticks, &polls) ||
+            ((u32)pairs + runner_pairs) * REC_CLEANUP_POINTS_PER_PAIR + REC_CLEANUP_FIXED_POINTS, frame, &ticks, &polls) ||
         cleanup_stage(s0, RECOVER_BUDGET_EXEC_MS_S0, RECOVER_BUDGET_S0_POINTS, frame, &s0_ticks, &s0_polls)) return -1;
     if (s0_polls < RECOVER_BUDGET_POLLS_S0) s0_polls = RECOVER_BUDGET_POLLS_S0;
     if (ticks >= RECOVER_HALF_TICKS - s0_ticks || polls >= RECOVER_HALF_TICKS - s0_polls) return -1;

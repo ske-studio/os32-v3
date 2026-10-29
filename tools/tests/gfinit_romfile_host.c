@@ -87,18 +87,12 @@ static int diagnostic(void)
         row.max_p!=l.max_p || row.bias_p!=l.bias_p || row.ref!=l.ref) return -1;
     vco_fields("limits.vco1", &l.vco1); vco_fields("limits.vco2", &l.vco2);
     field("limits.ref", l.ref); field("limits.max_p", l.max_p); field("limits.bias_p", l.bias_p);
-    u32 pc=0, khz=0, found=0, boundary=RECOVER_NONE;
-    for (u32 i=decoded.entries[2].first; i<decoded.entries[3].first; i++) {
-        const struct recover_plan_node *n=&decoded.nodes[i];
-        if (n->opcode==GF_INIT_PLL2 && n->substep==GF_PLL_SUBSTEP+2*GF_PLL_SUBSTEP_STRIDE+4) {
-            if (boundary!=RECOVER_NONE && n->pc!=pc) return -1;
-            pc=n->pc; boundary=i;
+    u32 pc=0, khz=0, found=0;
+    for (u32 i=0; i<decoded.program.count; i++) {
+        const struct gfinit_instruction *v=&decoded.program.insns[i];
+        if (v->pc>=0xe623 && v->pc<0xe728 && v->opcode==GF_INIT_PLL2 && v->target==GF_PLL_VIDEO) {
+            pc=v->pc; khz=v->value; found++;
         }
-    }
-    if (boundary==RECOVER_NONE) return -1;
-    for (u32 i=0; i<decoded.instruction_count; i++) {
-        const struct gfinit_instruction *v=&decoded.insns[i];
-        if (v->pc==pc && v->opcode==GF_INIT_PLL2 && v->target==GF_PLL_VIDEO) { khz=v->value; found++; }
     }
     if (found!=1 || !khz) return -1;
     field("video.pc", pc); field("video.request_khz", khz);
@@ -111,44 +105,17 @@ static int diagnostic(void)
     if (solve("mode", &mode.limits, GF_MODE_CLOCK_KHZ)) return -1;
     l.vco2=(struct gfinit_pll_vco){0};
     if (solve("single", &l, khz)) return -1;
-    u32 writes=0;
-    for (u32 i=boundary+1; i<decoded.plan.node_count; i++) {
-        const struct recover_plan_node *n=&decoded.nodes[i];
-        if (n->main_id<2 || n->main_id>4) continue;
-        const struct recover_opcode_layout *layout=layout_for(&gf_fixture_profile, n);
-        if (!layout) return -1;
-        if (layout->dir_substep!=REC_WRITE) continue;
-        if (!n->arg_count || decoded.args[n->arg_first].kind!=REC_IMM) return -1;
-        u32 key=decoded.args[n->arg_first].value;
-        if (key>=gf_fixture_profile.target_count) return -1;
-        const struct recover_target *t=&gf_fixture_profile.targets[key];
-        if (t->space!=REC_BAR_MMIO || t->bar || (t->offset!=GF_PLL_VIDEO && t->offset!=GF_PLL_VIDEO_COEFF &&
-            t->offset!=GF_PLL_VIDEO_STAGE && t->offset!=GF_PLL_GATE && t->offset!=GF_PLL_VIDEO+4)) continue;
-        indexed("later",writes,"main",n->main_id); indexed("later",writes,"pc",n->pc);
-        indexed("later",writes,"substep",n->substep); indexed("later",writes,"ctx",n->ctx);
-        indexed("later",writes,"head",n->head); indexed("later",writes,"skip",n->skip);
-        indexed("later",writes,"reg",t->offset); writes++;
-    }
-    field("later.count", writes); return 0;
+    return 0;
 }
 void _start(void)
 {
     gf_fixture_init();
     int rc=gfinit_decode_rom(gf_private_rom, sizeof(gf_private_rom), &gf_fixture_profile, &decoded);
     field("decode.rc", rc ? 1U : 0U); field("decode.size", sizeof(gf_private_rom));
-    field("decode.insns", decoded.instruction_count); field("decode.schedule", decoded.schedule_count);
+    field("decode.insns", decoded.program.count);
     field("decode.nodes", decoded.plan.node_count); field("decode.error_pc", decoded.error_pc); field("decode.error", decoded.error);
     if (!rc) {
         field("decode.rom_crc", decoded.plan.rom_crc);
-#ifdef GF_TEST_LATER
-        /* Synthetic plan: retarget a write inside main 3's repeat. */
-        for (u32 i=0; i<decoded.plan.node_count; i++) {
-            struct recover_plan_node *n=&decoded.nodes[i];
-            const struct recover_opcode_layout *l=layout_for(&gf_fixture_profile, n);
-            if (n->main_id==3 && n->pc==0xe7e0 && l && l->dir_substep==REC_WRITE)
-                decoded.args[n->arg_first].value=key_for(&gf_fixture_profile, GF_PLL_VIDEO, 0, 0, 0);
-        }
-#endif
         rc=diagnostic();
     }
     field("diagnostic.rc", rc ? 1U : 0U);

@@ -82,10 +82,7 @@ static void plan_case(u32 damage,u32 amount)
     executor_bus.read=plan_read;executor_bus.write=plan_write;
     for(u32 i=0;i<profile.target_count;i++)values[i]=0;
     switch_written=0;corrupt=damage;vram_reads=vram_writes=alias_reads=minimum_reads=alias_maxoffset=0;
-    for(u32 i=0;i<recover_gf_prepare_plan.node_count;i++) {
-        u32 value;
-        CHECK(!recover_plan_enter(&core,i));CHECK(!recover_plan_access(&core,&value));CHECK(!recover_plan_leave(&core,0));
-    }
+    CHECK(!gfinit_exec_prepare(&core,&execution));
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;
         int run_rc=gfinit_exec_run(&core,&execution);

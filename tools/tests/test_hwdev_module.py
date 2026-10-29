@@ -121,7 +121,7 @@ def fixtures(folder):
 
 def build(exe):
     # These addresses are installed only; no stub substitutes facade/validator code.
-    aliases = [e['symbol'] for e in gen.slots()[25:]
+    aliases = [e['symbol'] for e in [e for e in gen.slots() if e['group'] == 'kernel']
                if e['symbol'] not in ('kprintf', 'kmemset', 'pgalloc_alloc_phys', 'pgalloc_free_n_owner',
                                       'gf_production_selected')]
     return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',

@@ -39,6 +39,23 @@ int gf_init_pll(struct gf_init_context *ctx, u32 reg, u32 khz)
         }
         if (ctx->io.write(ctx->io.opaque, KPEEK_NV_BAR_MMIO, w->reg, 4, value)) return -1;
     }
+#if GF_VPLL_PROBE
+    /* Retained diagnostic probe: first coefficients, switch, repeat using
+     * the original source snapshots, then return the switch to its default. */
+    if (ctx->main_id==RECOVER_VPLL_MAIN && ctx->fail_pc==RECOVER_VPLL_PC && reg==GF_PLL_VIDEO) {
+        u32 old;
+        if (ctx->io.read(ctx->io.opaque,0,RECOVER_VPLL_SWITCH_OFF,4,&old) ||
+            gf_init_save(ctx,0,RECOVER_VPLL_SWITCH_OFF,4,old) ||
+            ctx->io.write(ctx->io.opaque,0,RECOVER_VPLL_SWITCH_OFF,4,RECOVER_VPLL_SWITCH_ON)) return -1;
+        for (u32 i=0;i<seq.count;i++) {
+            const struct gfinit_pll_write *w=&seq.writes[i];
+            u32 value=w->value;
+            for (u32 j=0;j<count;j++) if (sources[j]==w->source) value|=values[j]&w->keep;
+            if (ctx->io.write(ctx->io.opaque,0,w->reg,4,value)) return -1;
+        }
+        if (ctx->io.write(ctx->io.opaque,0,RECOVER_VPLL_SWITCH_OFF,4,RECOVER_VPLL_SWITCH_DEFAULT)) return -1;
+    }
+#endif
     gf_init_commit(ctx);
     return 0;
 }

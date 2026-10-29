@@ -46,9 +46,9 @@ hwdev_start_initialize(h); /* slot 充填後に開始し call/release_work を�
 
 装置境界は `recover.h:200–219` の recover_ops/opaque を再利用し、HWDEV 固有の口は call/release_work だけ。
 
-## 2. 核の関数の slot (25 関数、既存宣言と同型)
+## 2. 核の関数の slot (26 関数、既存宣言と同型)
 
-slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.py` が読み、GF 8 オブジェクトの未解決参照から内部参照と kernel imports を除いた集合と完全一致で照合する。型と呼出し元は宣言元・nm から JSON に生成する。
+slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.py` が読み、GF 部品オブジェクトの未解決参照から内部参照と kernel imports を除いた集合と完全一致で照合する。型と呼出し元は宣言元・nm から JSON に生成する。
 
 | slot | 関数 | 宣言元 |
 |---|---|---|
@@ -77,13 +77,17 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 22 | `recover_gf_screen_safe` | `kdebug/recover.h` |
 | 23 | `recover_hal_wait_frame` | `kdebug/recover.h` |
 | 24 | `kpeek_call` | `kdebug/kpeek.h` |
+| 36 | `recover_gf_runner_access` | `kdebug/recover.h` |
+
+P6: 既存 import index 0〜35 は維持し、診断 runner の記録付き bus を index 36 に追加する。
+核の型付き表では core 関数だけを表の順に並べる (最後のポインタは 26 番目)。
 
 - **G2**: `recover_hal_wait_frame` (recover.h:373・recover_profile.c:119) は gfinit.c:80 の static const 初期化子で関数ポインタとして使う。アドレスは stub のアドレスで、R_386_32 再配置を受ける。
 - M1 で GF オブジェクトの未解決 symbol と生成表を照合し、上表以外の既存 kernel imports (確保等) も型付きで供給する (§3)。部品間の symbol 探索は追加しない。
 
 ## 3. HWDEV の import の生成 (G3)
 
-- 核は **25** 関数で上表に不足・余剰なし。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
+- 核は **26** 関数で上表に不足・余剰なし。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
 - kernel imports は **11** (P4 の本番選択門 `gf_production_selected` を末尾追加)。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
 
 | HWDEV index | 関数 | 既存 kdebug index |
@@ -106,7 +110,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 - HWDEV は自分の .def から `hwdev_import_stubs.S` と `hwdev_import_slots` を生成し、§2 の核の関数と kernel の関数を 1 つの表に並べる。`kdebug_import_stubs.o` は HWDEV にリンクしない。
 - gfinit.c・gfinit_resources.c は `generated/kdebug_import_macros.h` を取り込むが getter マクロは使っていない — 取り込みを HWDEV の生成物に差し替える。
 - `tools/gen_hwdev_contract.py` が共通契約と同時に stub・slot・metadata・取り込み用ヘッダを生成する。`HWDEV_MODULE` の GF ビルドだけ取り込み先を切替え、両像で配置 assert をコンパイルする。
-- `build/hwdev.mk` は同じ machine/ABI flags で GF 8 オブジェクトを別にコンパイルし、`hwdev_main.o` と専用 imports を `build/out/hwdev/hwdev.elf` (map 同居) へリンク、`build/out/hwdev.mod` へ pack する。`build/hwdev.ld` は HWDEV slot 配列を data 先頭に置く。
+- `build/hwdev.mk` は同じ machine/ABI flags で GF 部品オブジェクトを別にコンパイルし、`hwdev_main.o` と専用 imports を `build/out/hwdev/hwdev.elf` (map 同居) へリンク、`build/out/hwdev.mod` へ pack する。`build/hwdev.ld` は HWDEV slot 配列を data 先頭に置く。
 - 表は facade が開始前に充填する (§1)。slot 25〜35 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
 
 ## 4. contract_crc (G4)
@@ -168,8 +172,8 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 4. inventory から `sizeof(T)`, `__alignof__(T)`, `offsetof(T, member)`, `sizeof(((T *)0)->member)`、enum 値の定数表を C で生成し、対象クロスコンパイラが出す ELF32 の専用 section から little-endian u32 を読む (ゲスト実行不要)。名前は型名/メンバ名の ASCII 辞書順、enum は列挙子名順。負の enum は u32 の2の補数。値から `STATIC_ASSERT` 全行を生成し、両像の実ビルドで include する。値の変化を片側だけ再生成して通してはいけない。
 5. 配置の正規形は UTF-8/LF、各行 `kind\tname\tdecimal-u32\n` (kind は size/align/offset/member_size/enum)。`layout_crc` はその全 byte の CRC-32/ISO-HDLC (`zlib.crc32(data) & 0xffffffff`)。これは配置表の指紋であり、テキスト CRC と別に保持する。
 6. umbrella を同じクロスコンパイラで `-E -P`。行番号とコメントは含めず、文字列/文字リテラル内部を維持して外側の空白を除く。リテラルの escape は展開・変更しない。日時・絶対パス等のビルド依存マクロを共有ヘッダで使わない。正規化 slot 宣言は `core:<index>:<symbol>:<declaration>\n` と `kernel:<index>:<symbol>:<declaration>\n` の順 (declaration は同じ空白正規化)。最後に正規化ヘッダテキストを連結した UTF-8 byte 列の同じ CRC-32 を `contract_crc` とする。署名の const・引数順・callback 型、enum・配列長の変更も対象となる。
-7. `hwdev_identity` は §1 の32Bを維持。`hwdev_core_api` の固定 prefix は `u32 abi, size, contract_crc, layout_crc` (16B) に確定し、その後に §2 の25ポインタ (計116B、abi=1)。manifest にも `layout_crc` を持たせ、M2 は version/size、両 CRC、PAIR と core image CRC の完全一致を登録前に検査する。CRC 値 0 を未指定/wildcard にしない。
-8. M2 の生成器は `tools/gen_hwdev_contract.py`、配置 inventory は `tools/hwdev_layout.json`、共通生成物は `hwdev/generated/`。KMOD の `module_abi_gen` は `contract_crc` と同値。kernel の facade も同じ CRC・配置 assert を使い、core 表全体の RO span と25関数の text 範囲を照合してから slot を充填する。module runtime は検証済みの RO 範囲と IMAGE_CRC を record に保持する。
+7. `hwdev_identity` は §1 の32Bを維持。`hwdev_core_api` の固定 prefix は `u32 abi, size, contract_crc, layout_crc` (16B) に確定し、その後に §2 の26ポインタ (計120B、abi=1)。manifest にも `layout_crc` を持たせ、M2 は version/size、両 CRC、PAIR と core image CRC の完全一致を登録前に検査する。CRC 値 0 を未指定/wildcard にしない。
+8. M2 の生成器は `tools/gen_hwdev_contract.py`、配置 inventory は `tools/hwdev_layout.json`、共通生成物は `hwdev/generated/`。KMOD の `module_abi_gen` は `contract_crc` と同値。kernel の facade も同じ CRC・配置 assert を使い、core 表全体の RO span と26関数の text 範囲を照合してから slot を充填する。module runtime は検証済みの RO 範囲と IMAGE_CRC を record に保持する。
 9. M3a の受入は生成の再実行で差分0、両像の assert 通過、関数順・署名・enum 値・同サイズのメンバ交換・callback の const を片側で変更した負例が照合失敗。生成器はどちらかの像だけを正として自動的に追認せず、一組の契約を生成する。
 
 ## 9. 部品の寿命 manifest v1 (M2/M3a の入力契約)
@@ -221,7 +225,7 @@ GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retai
 生成器の nm 検査は実際の kdebug map の LOAD 入力を読み、GF オブジェクトの混入・
 核の未知参照・上の口への核の参照・retained の欠落・kernel 側の旧実装欠落を拒否する。
 出力ディレクトリに残る古い GF オブジェクトはリンク入力として数えない。
-`hwdev_audit.py` の計測対象は HWDEV の map/ELF/header とし、GF 8 オブジェクトと
+`hwdev_audit.py` の計測対象は HWDEV の map/ELF/header とし、GF 部品オブジェクトと
 部品接続部分を分ける。§7 の M1 単一像実測は過去の基準値として維持する。
 
 ## 実装の後の変化 (2026-10-23、PM 注記)

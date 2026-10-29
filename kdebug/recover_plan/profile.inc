@@ -181,8 +181,7 @@ int recover_profile_ok(const struct recover_profile *p)
              (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
             w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
             w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
-            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_RUN_NO_PREREAD | REC_VERIFY_RECORD)) ||
-            ((w->flags & REC_RUN_NO_PREREAD) && w->phase != REC_RUN) ||
+            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_VERIFY_RECORD)) ||
             ((w->flags & REC_VERIFY_RECORD) && (w->phase != REC_MODE_C || !w->verify_mask))) return -1;
         const struct recover_target *t = &p->targets[w->key];
         const struct recover_value *v = &w->value;

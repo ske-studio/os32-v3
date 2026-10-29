@@ -187,6 +187,14 @@ static void budget_cases(void)
     prefix.nodes=nodes;
     CHECK(!gfinit_log_rows(&prefix,2,&rows) && rows==128+2*12+6*4);
     CHECK(gfinit_log_rows(&prefix,3,&rows)<0);
+    nodes[0].opcode=GF_INIT_RUNNER;
+    CHECK(!gfinit_log_rows(&prefix,2,&rows) && rows==128+2*12+6*4+5*4096*12);
+    budget_setup(0,true);
+    struct rec_cleanup_budget ordinary,pending;
+    CHECK(!cleanup_budget_compute(&core,&profile,false,&ordinary));
+    core.expected_node=composed.entries[1].first;
+    CHECK(!cleanup_budget_compute(&core,&profile,false,&pending));
+    CHECK(pending.bytes==ordinary.bytes+2*15*2*385 && pending.s0_bytes==ordinary.s0_bytes);
     for(u32 fault_kind=0;fault_kind<17;fault_kind++) {
         budget_setup(fault_kind,fault_kind!=9);
         u32 crc=profile.crc,hash=core.token.plan_hash,saved=core.local_saved_count;

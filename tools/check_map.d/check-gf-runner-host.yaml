@@ -152,3 +152,4 @@ check-gf-runner-host:
 - hwdev/gf/display/state.h
 - hwdev/gf/display/checks.inc
 - hwdev/gf/quiesce_rows.h
+- tools/tests/gf_runner_trace_fixture.h

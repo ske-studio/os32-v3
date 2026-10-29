@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 1997207532,
+  "module_abi_gen": 2361821753,
   "imports": [
     {
       "name": "trial_begin",
@@ -214,6 +214,12 @@
     {
       "name": "gf_production_selected",
       "index": 35,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "recover_gf_runner_access",
+      "index": 36,
       "kind": 1,
       "type_ver": 1
     }

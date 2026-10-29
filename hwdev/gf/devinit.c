@@ -36,7 +36,7 @@ int gf_production_prepare(struct gf_production *p,
     for (u32 i=0;i<RECOVER_BAR_COUNT;i++) p->display.bars[i]=boot->bars[i];
     p->route98=route98;p->route_opaque=opaque;
     p->display.io=(struct gf_io){p,gf_production_read,gf_production_write,
-        {gf_production_clock,gf_production_wait},gf_production_point,gf_production_restore};
+        {gf_production_clock,gf_production_wait},gf_production_point,gf_production_restore,0};
     p->display.owner=&gf_production_owner;
     p->video=(struct video_device){&p->display,&gf_video_ops};
     if (same_resources(p)) return -1;
@@ -63,24 +63,8 @@ static int read_rom(struct gf_production *p)
     return gfinit_pll_parse(rom,c->rom_size,GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&c->limits) ||
            gf_init_prepare(c->init,c->program) ? -1 : 0;
 }
-static int a2_write(struct gf_production *p, u32 off, u32 width, u32 value)
-{
-    return gf_production_point(p) || gf_production_write(p,0,off,width,value) ? -1 : 0;
-}
-static int a2(struct gf_production *p)
-{
-    u32 value,cr=RECOVER_PRMCIO+RECOVER_CRTC;
-    if (a2_write(p,RECOVER_PBUS1854,4,0) || a2_write(p,RECOVER_PBUS1850,4,0) ||
-        a2_write(p,RECOVER_GF_PMC_IRQ,4,0) ||
-        gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&value) ||
-        a2_write(p,RECOVER_PMC_ENABLE,4,value|RECOVER_PMC_ENABLE_BIT0) ||
-        gf_production_decode_safe(p) ||
-        a2_write(p,cr,1,RECOVER_CR44) || a2_write(p,cr+1,1,0) ||
-        a2_write(p,cr,1,RECOVER_CR1F) || a2_write(p,cr+1,1,RECOVER_CR1F_UNLOCK) ||
-        a2_write(p,cr,1,RECOVER_CR11) || gf_production_read(p,0,cr+1,1,&value) ||
-        a2_write(p,cr+1,1,value&~RECOVER_CR11_PROTECT)) return -1;
-    return gf_production_point(p);
-}
+static int a2_decode_safe(void *opaque)
+{ return gf_production_decode_safe(opaque); }
 static int acquire(struct gf_display_context *c)
 {
     struct gf_production *p=c->io.opaque;
@@ -101,7 +85,7 @@ static int acquire(struct gf_display_context *c)
     c->init=&p->scratch->init;c->program=&p->scratch->program;
     *c->init=(struct gf_init_context){.io=c->io,.started_us=started};
     p->acquiring=true;
-    return read_rom(p) || a2(p) ? -1 : 0;
+    return read_rom(p) || gf_init_a2(c->init,a2_decode_safe) ? -1 : 0;
 }
 static void release(struct gf_display_context *c)
 {

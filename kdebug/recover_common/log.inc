@@ -156,13 +156,11 @@ int recover_gf_result(struct recover *r, u32 saved_words, bool minimal,
     row_number(&b, " tested_bytes=", tested_bytes);
     return row_send(r, &b);
 }
-static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
+static int gf_bus_record_at(struct recover *r, const struct recover_bus_access *a, u32 pc,
                          const char *event, u32 old, u32 value, u32 actual, int rc, bool mismatch)
 {
     if (!r->transport) return 0;
     struct rec_row b;
-    u32 pc = r->entered && r->plan && r->cursor < r->plan->node_count ?
-             r->plan->nodes[r->cursor].pc : RECOVER_NONE;
     row_start(r, &b, "gf_bus", event);
     row_number(&b, " pc=", pc); row_number(&b, " bar=", a->bar);
     row_number(&b, " off=", a->offset); row_number(&b, " width=", a->width);
@@ -181,6 +179,13 @@ static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
         row_number(&b, "", rc < 0 ? 0U - (u32)rc : (u32)rc);
     }
     return row_send(r, &b);
+}
+static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
+                         const char *event, u32 old, u32 value, u32 actual, int rc, bool mismatch)
+{
+    u32 pc = r->entered && r->plan && r->cursor < r->plan->node_count ?
+             r->plan->nodes[r->cursor].pc : RECOVER_NONE;
+    return gf_bus_record_at(r,a,pc,event,old,value,actual,rc,mismatch);
 }
 static int mode_vram_record(struct recover *r, const char *event, u32 dir,
                              u32 bad_offset, u32 expected, u32 actual, int rc)

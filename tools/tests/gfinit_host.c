@@ -6,6 +6,9 @@ static unsigned lookup_steps;
 #undef _start
 #include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_decode.c"
+#define IMM(v) ((struct recover_plan_arg){REC_IMM,(v)})
+#define READ(v) ((struct recover_plan_arg){REC_ARG_READ,(v)})
+#define SAVED(v) ((struct recover_plan_arg){REC_ARG_SAVED,(v)})
 static struct gfinit_decode decoded;
 static u8 rom[65536];
 #define output print
@@ -98,51 +101,25 @@ static void parser_tests(void)
 }
 static void decode_inventory(void)
 {
-    fixture(); CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
-    CHECK(decoded.instruction_count==193 && decoded.plan.node_count==972);
-    CHECK(decoded.plan.arg_count<=8192 && decoded.plan.unresolved_count==0);
-    CHECK(recover_profile_ok(&gf_fixture_profile)==0);
-    for(u32 i=0;i<decoded.plan.node_count;i++) {
-        const struct recover_plan_node *n=&decoded.nodes[i];
-        const struct recover_opcode_layout *l=layout_for(&gf_fixture_profile,n);
-        CHECK(l && l->argc==n->arg_count);
-        if(!l || l->argc!=n->arg_count) {output("layout pc=");number(n->pc);output(" sub=");number(n->substep);output(" argc=");number(n->arg_count);output("\n");}
-        if(l) for(u32 j=0;j<n->arg_count;j++) CHECK(l->kinds[j]==decoded.args[n->arg_first+j].kind);
-        if(n->rule_id!=RECOVER_NONE) {
-            const struct recover_rule *w=rule_by_id(&gf_fixture_profile,n->rule_id);
-            CHECK(w && node_rule(n,w) && w->key==decoded.args[n->arg_first].value);
-            CHECK(node_ok(&gf_fixture_profile,&decoded.plan,i));
-        }
-        for(u32 edge=0;edge<2;edge++)CHECK(n->next[edge]==RECOVER_NONE || n->next[edge]>i);
-    }
-    for(u32 i=0;i<3;i++) {
-        const struct recover_capture *c=&decoded.captures[i];
-        CHECK(c->slot==gf_fixture_profile.count+i && c->producer_node<c->consumer_node);
-        CHECK(decoded.nodes[c->producer_node].pc==decoded.nodes[c->consumer_node].pc);
-    }
-    const u32 step_bounds[]={208,281,143,127,1};
+    fixture(); CHECK(!gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded));
+    CHECK(decoded.program.count==193 && decoded.plan.node_count==5);
+    CHECK(!decoded.plan.arg_count && !decoded.plan.capture_count);
     for(u32 m=0;m<5;m++) {
-        CHECK(decoded.main_steps[m]==step_bounds[m]);
-        output("main=");number(m);output(" nodes=");number(decoded.main_nodes[m]);
-        output(" steps=");number(decoded.main_steps[m]);output(" wait_us=");number(decoded.main_wait[m]);output("\n");
+        CHECK(decoded.entries[m].first==m && decoded.nodes[m].main_id==m);
+        CHECK(decoded.nodes[m].opcode==GF_INIT_RUNNER);
+        CHECK(decoded.program.main_pc[m]==decoded.nodes[m].pc);
     }
-    output("layouts=");number(gf_fixture_profile.layout_count);output(" rules=");number(gf_fixture_profile.rule_count);
-    output(" nodes=");number(decoded.plan.node_count);output(" args=");number(decoded.plan.arg_count);
-    output(" ctx=");number(decoded.plan.ctx_count);output(" deps=");number(decoded.plan.dep_count);
-    output(" entries=");number(decoded.plan.entry_count);output(" call_depth=");number(decoded.max_call);
-    output(" repeat_depth=");number(decoded.max_repeat);output("\n");
-    /* Complete reference/action inventory: node indices identify every edge;
-     * args retain kind (IMM=0, READ=1, SAVED=2), no inferred read values. */
-    for(u32 i=0;failures && i<decoded.plan.node_count;i++) {
-        const struct recover_plan_node *n=&decoded.nodes[i];
-        const struct recover_opcode_layout *l=layout_for(&gf_fixture_profile,n);
-        output("node ");number(i);output(" pc ");number(n->pc);output(" op ");number(n->opcode);
-        output(" sub ");number(n->substep);output(" dir ");number(l?l->dir_substep:RECOVER_NONE);
-        output(" ctx ");number(n->ctx);output(" head/skip ");number(n->head);output("/");number(n->skip);
-        output(" args");
-        for(u32 j=0;j<n->arg_count;j++) {output(" ");number(decoded.args[n->arg_first+j].kind);output(":");number(decoded.args[n->arg_first+j].value);}
-        output(" next ");number(n->next[0]);output("/");number(n->next[1]);output("\n");
+    output("S1 decoder: 193 instructions, five main approval markers, no expanded nodes\n");
+}
+static inline u32 key_for(const struct recover_profile *p,u32 reg,u32 port,u32 index,u32 head)
+{
+    for(u32 k=0;k<p->target_count;k++) {
+        const struct recover_target *t=&p->targets[k];
+        if(port ? t->space==REC_VGA_INDEXED && t->port==port && t->index==index &&
+            t->head==(port==RECOVER_CRTC && index==RECOVER_CR44 ? 0 : head) :
+            t->space==REC_BAR_MMIO && t->bar==0 && t->offset==reg) return k;
     }
+    return RECOVER_NONE;
 }
 struct host_time {u32 sec,nsec;};
 static u32 micros(void)
@@ -286,20 +263,7 @@ static void rejection_tests(void)
         if(bad==8)decoded.plan.unresolved_count=1;
         CHECK(contract_bind()<0 && writes==0);
     }
-    fixture();CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
-    u32 active[GF_INIT_INSNS]={0};
-    u32 call=instruction_at(&decoded,0xe780);
-    for(u32 i=0;i<decoded.instruction_count;i++) if(decoded.insns[i].opcode==0x5b)call=i;
-    u32 pc=decoded.insns[call].pc,saved=decoded.insns[call].ref;
-    for(u32 bad=0;bad<4;bad++) {
-        decoded.schedule_count=0;
-        decoded.insns[call].ref=bad==0?pc:bad==1?saved+1:bad==2?0x5daa:0xffffffffU;
-        CHECK(schedule_block(&decoded,pc,pc+3,0,3,0,0,active)<0);
-        for(u32 i=0;i<GF_INIT_INSNS;i++)active[i]=0;
-    }
-    decoded.insns[call].ref=saved;decoded.schedule_count=0;
-    CHECK(schedule_block(&decoded,0xe832,0xe832,0,4,GF_INIT_CALL_DEPTH+1,0,active)<0);
-    CHECK(schedule_block(&decoded,0xe832,0xe832,0,4,0,GF_INIT_REPEAT_DEPTH+1,active)<0);
+
 }
 static u32 callback_us;
 static int timed_read(void *v,const struct recover_bus_access *a,u32 *value)
@@ -399,13 +363,6 @@ static void logical_head_tests(void)
         CHECK(recover_plan_enter(&core,0)==0 && recover_plan_leave(&core,0)==0);
         CHECK(core.head==1 && recover_plan_enter(&core,1)==0 && recover_plan_leave(&core,0)==0);
         CHECK(writes==0);
-    }
-    const u32 unsupported[]={0x52,0x62,0x78,0x37,0x51};
-    for(u32 i=0;i<GF_ARRAY(unsupported);i++) {
-        decoded.plan.node_count=decoded.plan.arg_count=decoded.error=0;
-        decoded.insns[0]=(struct gfinit_instruction){.opcode=unsupported[i],.port=RECOVER_CRTC,.index=RECOVER_CR44};
-        decoded.schedule[0]=(struct gfinit_scheduled){0};
-        CHECK(expand_step(&decoded,rom,&gf_fixture_profile,0,1)<0);
     }
     contract_setup(1);profile.rule_count=1;
     contract_targets[0]=(struct recover_target){.space=REC_VGA_INDEXED,.port=RECOVER_SEQ,
