@@ -981,11 +981,6 @@ static VfsOps g_hostdrvfs_ops = {
     0 /* SQLite capability is not implied by filesystem permissions. */
 };
 
-VfsOps *hostdrvfs_get_ops(void)
-{
-    return &g_hostdrvfs_ops;
-}
-
 int hostdrvfs_init(void)
 {
     return vfs_register_fs(&g_hostdrvfs_ops);

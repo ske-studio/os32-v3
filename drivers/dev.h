@@ -88,9 +88,6 @@ int dev_unregister(Device *dev);
 /* HDDデバイスの登録 (ユーティリティ) */
 void dev_register_hdd(int drive);
 
-/* SCSIデバイスの登録 (将来用スタブ — WD33C93ドライバ完成後に実装) */
-void dev_register_scsi(int scsi_id);
-
 /* デバイス検索 (名前で) */
 Device *dev_find(const char *name);
 

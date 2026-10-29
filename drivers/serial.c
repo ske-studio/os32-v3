@@ -907,21 +907,6 @@ void pc98_serial_puts_polled(const char *str)
     }
 }
 
-void serial_put_hex32_polled(u32 val)
-{
-    static const char hex[] = "0123456789ABCDEF";
-    char buf[HEX32_DIGITS + sizeof("0x")];
-    int i;
-    buf[0] = '0';
-    buf[1] = 'x';
-    for (i = HEX32_DIGITS - 1; i >= 0; i--) {
-        buf[i + sizeof("0x") - 1] = hex[val & ((1U << HEX_NIBBLE_BITS) - 1)];
-        val >>= HEX_NIBBLE_BITS;
-    }
-    buf[HEX32_DIGITS + sizeof("0x") - 1] = '\0';
-    pc98_serial_puts_polled(buf);
-}
-
 /* Public KAPI waits only. Internal logs and SerialFS never unwind here.
  * ser_tx_byte has a bounded retry budget; abort only between whole bytes. */
 int serial_getchar(void) { return serial_getchar_wait(0); }

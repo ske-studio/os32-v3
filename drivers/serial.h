@@ -277,7 +277,6 @@ int serial_get_status(u32 *mode, u32 *baud, u32 *fifo);
 int serial_putchar(char c);
 void serial_puts(const char *str);
 void pc98_serial_puts_polled(const char *str);
-void serial_put_hex32_polled(u32 val);
 int  serial_getchar(void);     /* ブロッキング */
 int  serial_trygetchar(void);  /* ノンブロッキング: -1=なし */
 int  serial_peekchar(void);    /* 覗くだけ (取り出さない): -1=なし */

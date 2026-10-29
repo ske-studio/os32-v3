@@ -18,14 +18,6 @@ static char cur_drive[PATH_DRIVE_LEN] = "fdd0";
 static char cur_cwd[PATH_MAX_LEN]     = "/";
 
 /* ======== ユーティリティ ======== */
-/* ローカル再実装だった path_slen/path_scpy は kstring に統一 (SR5)。
- * path_scpy は kstrlcpy (n=バッファ全体サイズ, NUL 終端保証) の
- * ガード付きラッパー。 */
-static int path_slen(const char *s)
-{
-    return (int)kstrlen(s);
-}
-
 static void path_scpy(char *dst, const char *src, int max)
 {
     /* max<=0 の u32 キャストは巨大長に化けるので先に弾く */
@@ -100,15 +92,4 @@ int path_parse(const char *input, ParsedPath *out)
     }
 
     return 0;
-}
-
-const char *path_basename(const char *path)
-{
-    const char *last = path;
-    while (*path) {
-        if (*path == '/' && *(path + 1))
-            last = path + 1;
-        path++;
-    }
-    return last;
 }

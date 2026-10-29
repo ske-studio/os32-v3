@@ -355,11 +355,6 @@ int  vfs_set_mtime(const char *path, os_time_t mtime);
 /* メタデータ */
 int  vfs_sync(void);
 
-/* ファイルシステム情報 */
-u32 vfs_total_blocks(void);
-u32 vfs_free_blocks(void);
-u32 vfs_block_size(void);
-
 /* カレントディレクトリ */
 const char *vfs_cwd(void);
 int vfs_chdir(const char *path);   /* 存在するディレクトリ以外は VFS_ERR_NOTFOUND / VFS_ERR_NOTDIR */

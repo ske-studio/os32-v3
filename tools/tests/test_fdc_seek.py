@@ -20,12 +20,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/fdc_seek_host.c"
 SRC = ROOT / "drivers/fdc_decide.c"
 # カーネルと同じ i386-elf で通す実ソース。
-# fdc.c だけ -Wno-unused-function を足す: fdc_motor_off() が **元から**
-# 未使用の static で (票の指示どおり触っていない)、カーネル本体のビルドは
-# -Werror ではないので今まで表に出ていなかった。他の警告は落とす。
 TARGET_SRCS = [
-    ("drivers/fdc_decide.c", []),
-    ("drivers/fdc.c", ["-Wno-unused-function"]),
+    "drivers/fdc_decide.c",
+    "drivers/fdc.c",
 ]
 
 CASES = ["sis_len", "seek_ok", "seek_ec", "seek_pending", "seek_fail",
@@ -87,7 +84,7 @@ def run_cases(exe, cases):
 
 def build_target(tmp):
     """カーネルと同じ i386-elf で drivers/fdc.c ごと通す。"""
-    for rel, extra in TARGET_SRCS:
+    for rel in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
@@ -97,7 +94,7 @@ def build_target(tmp):
                "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
                "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "drivers"),
                "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "kernel"),
-               *extra, "-c", str(ROOT / rel),
+               "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
