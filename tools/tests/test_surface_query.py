@@ -40,7 +40,7 @@ MUTANTS = [
     ('&& sf->npages', '&& 1', 'alien ref pages'),
     ('refs[j].sid == refs[i].sid', '0', 'duplicate input'),
     ('s->backend < LEDGER_SF_PC98', '0', 'backend lower bound'),
-    ('s->backend > LEDGER_SF_CIRRUS', '0', 'backend upper bound'),
+    ('s->backend > LEDGER_SF_GEFORCE', '0', 'backend upper bound'),
     ('else if (s->backend)', 'else if (0)', 'system backend'),
     ('s->backend == LEDGER_SF_PC98 ? SURFACE_QUERY_MAX : 1', 's->backend != 0 ? SURFACE_QUERY_MAX : 1', 'PEGC DISPLAY count'),
     ('refs[i].generation != snap.desc[i].ref.generation', '0', 'old refs'),

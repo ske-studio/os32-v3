@@ -147,6 +147,8 @@ void pegc_restore_text_sync(int hsync31) __attribute__((weak));
  * 境界。bb_base は FE000000h のリニア窓内の CLIENT 面 (表示面は含まない)。
  * weak は backend を持たない host fixture のため維持する。 */
 extern GfxBackend gfx_backend_cirrus __attribute__((weak));
+extern GfxBackend gfx_backend_geforce __attribute__((weak));
+
 
 /* ------------------------------------------------------------------------ */
 /*  バックエンドの強制指定 (票 H2b)。                                        */
@@ -159,7 +161,12 @@ extern GfxBackend gfx_backend_cirrus __attribute__((weak));
 #define GFX_PREF_AUTO   0   /* 既定: probe 順 (Cirrus → PEGC → 9801) */
 #define GFX_PREF_PC98   1   /* 9801 プレーン強制 (probe を行わない) */
 #define GFX_PREF_PEGC   2   /* PEGC 強制。probe が通らなければ 9801 へ落とす */
+#define GFX_PREF_GEFORCE 4
 #define GFX_PREF_CIRRUS 3   /* Cirrus 強制。probe が通らなければ 9801 へ落とす */
+
+/* The config reader supplies GUI's existing default (0). */
+static inline int gfx_geforce_pref(int gui)
+{ return gui == 1 ? GFX_PREF_PC98 : GFX_PREF_GEFORCE; }
 
 /* 起動設定から読んだ希望バックエンドを覚える。gfx_init() より前に呼ぶこと
  * (probe の直前に参照される)。範囲外の値は GFX_PREF_AUTO 扱い。 */
@@ -175,6 +182,7 @@ int gfx_cirrus_probed(void);
 #define GFX_VER_UNKNOWN 0
 #define GFX_VER_PC98    1
 #define GFX_VER_PEGC    2
+#define GFX_VER_GEFORCE 4
 #define GFX_VER_CIRRUS  3
 /* Saved query only: active height while started, selected GUI target otherwise.
  * No probe, mode switch or allocation. All outputs required (INVAL if NULL);

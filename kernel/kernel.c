@@ -58,6 +58,7 @@
 #include "pcm_module.h"
 #include "lan_module.h"
 #include "cirrus_module.h"
+#include "geforce_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "sqlite_engine.h"
@@ -360,6 +361,8 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
                 gfx_set_backend_pref(GFX_PREF_PC98);
             } else if (kstrcmp(gfxmode, "pegc") == 0) {
                 gfx_set_backend_pref(GFX_PREF_PEGC);
+            } else if (kstrcmp(gfxmode, "geforce") == 0) {
+                gfx_set_backend_pref(gfx_geforce_pref(sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0)));
             } else if (kstrcmp(gfxmode, "cirrus") == 0) {
                 gfx_set_backend_pref(GFX_PREF_CIRRUS);
             } else {
@@ -423,6 +426,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     gfx_prepare_backend();
     /* Register after boot preparation: GUI=0 must never probe/enable Cirrus. */
     cirrus_module_load();
+    if (gfx_get_backend_pref() == GFX_PREF_GEFORCE) geforce_module_load();
     kaudit_post_probe();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_probe();
 

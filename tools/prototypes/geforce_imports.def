@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/geforce_module.h",
+    "include/gfx_hal.h",
+    "include/video_service.h"
+  ],
+  "imports": [
+    {
+      "symbol": "pc98_route_to_gf",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_route_to_98",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_route_cell_check",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "geforce_display_failed",
+      "source": "kernel/geforce_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_get_all",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_shadow_set",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

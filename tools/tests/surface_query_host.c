@@ -74,7 +74,7 @@ static void caller_copy_tests(void)
     ledger_surfaces[sid[0]].role = LEDGER_ROLE_CLIENT;
     ledger_surfaces[sid[0]].backend = LEDGER_SF_PC98;
     ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RW;
-    for (u32 backend = LEDGER_SF_PC98; backend <= LEDGER_SF_CIRRUS; backend++) {
+    for (u32 backend = LEDGER_SF_PC98; backend <= LEDGER_SF_GEFORCE; backend++) {
         source.backend = backend; ledger_surfaces[sid[0]].backend = backend;
         query_expect(0);
     }
@@ -85,7 +85,7 @@ static void caller_copy_tests(void)
         source.backend = role <= LEDGER_ROLE_DISPLAY ? 0 : LEDGER_SF_PC98;
         CHECK(surface_query_authorize(&source, &auth) == OS32_ERR_INVAL);
         if (role <= LEDGER_ROLE_DISPLAY) {
-            source.backend = LEDGER_SF_CIRRUS + 1;
+            source.backend = LEDGER_SF_GEFORCE + 1;
             CHECK(surface_query_authorize(&source, &auth) == OS32_ERR_INVAL);
         }
     }

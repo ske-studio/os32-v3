@@ -30,8 +30,8 @@ CONSTANTS = dict(
 )
 # Consecutive section/table descriptors are (offset, size/count) word pairs.
 PAIR_STRIDE = HEADER_FIELDS.index('RO_OFF') - HEADER_FIELDS.index('TEXT_OFF')
-# PM HWDEV decision: preserve the first ten policies, append HWDEV.
-MODULE_RECORD_CAP = 11
+# Preserve existing IDs; GF_DRIVER P5 appends GEFORCE.
+MODULE_RECORD_CAP = 12
 KDEBUG_OPS_NAMES = (
     'selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
     'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
@@ -181,6 +181,14 @@ COMPONENTS = (
          reloc_max=16384, import_max=128, export_max=1,
          init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
          ops_symbol='hwdev_ops', ops_names=('initialize',)),
+    dict(name='GEFORCE', path='/boot/geforce.mod', dependencies=(), required=False,
+         module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
+         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+         stop_allowed=0, ops_version=1, ops_slots=1,
+         image_max=131072, mem_max=131072, load_span_max=163840,
+         reloc_max=8192, import_max=16, export_max=1,
+         init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',
+         ops_symbol='geforce_module_ops', ops_names=('initialize',)),
 )
 
 

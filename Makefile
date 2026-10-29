@@ -54,6 +54,7 @@ include build/pcm-module.mk
 include build/v86-module.mk
 include build/lan-module.mk
 include build/cirrus-module.mk
+include build/geforce-module.mk
 include build/libs.mk
 include build/programs.mk
 include build/deploy.mk
@@ -66,10 +67,10 @@ MODULE_PROVIDER_OBJS := $(SQLITE_PROTO_OUT)/sqlite_provider_types.o \
     $(FEP_OUT)/fep_provider_types.o $(CD_OUT)/cd_provider_types.o \
     $(KCG_OUT)/kcg_provider_types.o $(FM_OUT)/fm_provider_types.o \
     $(PCM_OUT)/pcm_provider_types.o $(V86_OUT)/v86_provider_types.o \
-    $(LAN_OUT)/lan_provider_types.o $(CIRRUS_OUT)/cirrus_provider_types.o
+    $(LAN_OUT)/lan_provider_types.o $(CIRRUS_OUT)/cirrus_provider_types.o $(GEFORCE_OUT)/geforce_provider_types.o
 $(C_KERNEL_OBJ) $(ASM_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS) \
     $(KDEBUG_OBJS) $(SQLITE_PROTO_OBJS) $(FEP_OBJS) $(CD_OBJS) $(KCG_OBJS) \
-    $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) \
+    $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) $(GEFORCE_OBJS) \
     $(ALL_LIB_OBJ) $(CRT0_USER_OBJ) $(CRT0_RESIDENT_OBJ) $(DBG_OBJ) \
     $(SHELL_OBJ) $(SH_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) \
     $(SH_PCI_DECODE_OBJ) $(SH_PC98PT_OBJ) $(INST_OBJ) $(BENCH_OBJ) \
@@ -84,7 +85,7 @@ $(GSHELL_LIB) sdk: | $(RUST_KAPI_RS)
 
 # module_image.h is also included transitively by core and component units.
 $(C_KERNEL_OBJ) $(R1_OBJECTS) $(KDEBUG_OBJS) $(FEP_OBJS) $(CD_OBJS) \
-    $(KCG_OBJS) $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) \
+    $(KCG_OBJS) $(FM_OBJS) $(PCM_OBJS) $(V86_OBJS) $(LAN_OBJS) $(CIRRUS_OBJS) $(GEFORCE_OBJS) \
     $(MODULE_PROVIDER_OBJS): | $(MODULE_SCHEMA)
 
 # === ヘッダ依存の取り込み ===

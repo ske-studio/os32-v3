@@ -179,6 +179,8 @@ void _start(void)
     line(7, "GFX: 98 640x400x4 bpp; GUI target");
     s.gfx_kind = 3; formatted(16);
     line(7, "GFX: Cirrus 640x400x4 bpp; GUI target");
+    s.gfx_kind = 4; formatted(16);
+    line(7, "GFX: GeForce 640x400x4 bpp; GUI target");
     for (u32 part = 0; part < 3; part++) {
         baseline();
         if (part == 0) s.gfx.width = 0;

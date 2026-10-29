@@ -39,8 +39,8 @@ def fixtures(validator=schema.validate_components):
             bad[2]['dependencies'] = (2, 2)
         assert rejected(bad, validator), change
     extra = copy.deepcopy(rows[0])
-    extra.update(module_id=12, name='EXTRA', path='/boot/extra.mod', dependencies=())
-    assert rejected((*rows, extra), validator), 'twelfth ID accepted'
+    extra.update(module_id=13, name='EXTRA', path='/boot/extra.mod', dependencies=())
+    assert rejected((*rows, extra), validator), 'thirteenth ID accepted'
 
 
 def conformance():
@@ -101,8 +101,8 @@ def main():
         try:
             fixtures(namespace['validate_components'])
         except AssertionError as exc:
-            assert str(exc) == 'twelfth ID accepted', exc
-            print('MUTATE capacity-check-removed RED (compiled Python, runtime twelfth ID)')
+            assert str(exc) == 'thirteenth ID accepted', exc
+            print('MUTATE capacity-check-removed RED (compiled Python, runtime thirteenth ID)')
         else:
             raise AssertionError('capacity mutant survived')
 

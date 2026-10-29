@@ -11,6 +11,7 @@ check-recover-host:
 - build/checks.d/check-recover-host.mk
 - tools/tests/recover_descriptor_host.inc
 - kdebug/recover_profile.c
+- lib/pc98_cell.h
 - tools/tests/recover_t2_host.inc
 - include/memmap.h
 - tools/tests/recover_hostshim/io.h

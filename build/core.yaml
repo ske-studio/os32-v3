@@ -84,6 +84,10 @@ filesystem:
     - host: build/out/hwdev.mod
       guest: /boot/hwdev.mod
       tags: [core]
+    # --- GF_DRIVER production HAL (independent of KDEBUG) ---
+    - host: build/out/geforce.mod
+      guest: /boot/geforce.mod
+      tags: [core]
     # --- カーネルデータ ---
     - host: build/out/unicode.bin
       guest: /sys/unicode.bin

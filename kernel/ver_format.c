@@ -11,6 +11,7 @@
 #define VER_GFX_PC98 1u
 #define VER_GFX_PEGC 2u
 #define VER_GFX_CIRRUS 3u
+#define VER_GFX_GEFORCE 4u
 #define VER_VERSION_MAX 20u
 #define VER_DEVICE (OS32_VER_DEVICE | OS32_VER_INDENT)
 #define VER_IDENTITY (OS32_VER_IDENTITY | OS32_VER_INDENT)
@@ -85,7 +86,8 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     VerLineBuilder b;
     const char *backend = s->gfx_kind == VER_GFX_PC98 ? "98" :
                           s->gfx_kind == VER_GFX_PEGC ? "PEGC" :
-                          s->gfx_kind == VER_GFX_CIRRUS ? "Cirrus" : NULL;
+                          s->gfx_kind == VER_GFX_CIRRUS ? "Cirrus" :
+                          s->gfx_kind == VER_GFX_GEFORCE ? "GeForce" : NULL;
     kmemset(out, 0, sizeof(*out));
     b = ver_line(out, OS32_VER_HEAD, "OS32");
     b.used = 0;

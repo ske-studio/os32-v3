@@ -24,6 +24,7 @@
 #define SYS_SQLITE_MOD        "/boot/sqlite.mod"
 #define SYS_V86_MOD           "/boot/v86.mod"
 #define SYS_FM_MOD            "/boot/fm.mod"
+#define SYS_GEFORCE_MOD       "/boot/geforce.mod"
 #define SYS_CIRRUS_MOD        "/boot/cirrus.mod"
 #define SYS_PCM_MOD           "/boot/pcm.mod"
 #define SYS_LAN_MOD           "/boot/lan.mod"

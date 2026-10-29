@@ -323,7 +323,7 @@ static void registry_limits(void)
 }
 void _start(void)
 {
-    CHECK(MODULE_RECORD_CAP == 11);
+    CHECK(MODULE_RECORD_CAP == 12);
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     if (input[0] == 12) { registry_limits(); finish(0); }
     /* Decode contract hashes independently from the file's known records. */
