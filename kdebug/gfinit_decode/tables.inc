@@ -1,4 +1,4 @@
-struct gf_script_span { u32 id, pc, length, crc; };
+#include "../../hwdev/gf/scripts.h"
 static const struct gf_script_span scripts[] = {
     {0x0U, 0xdeb0U, 0x2e5U, 0xf8ece062U},
     {0x1U, 0xe195U, 0x48eU, 0x3cfd0867U},
