@@ -1,4 +1,5 @@
 check-dep-dir-a-l06-host:
+- tools/tests/hwdev_contract_fixture.py
 - fs/ext2.h
 - fs/serialfs.h
 - fs/sfs_client.h

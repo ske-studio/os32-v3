@@ -1,4 +1,5 @@
 check-boot-splash-host:
+- gfx/pc98_route.h
 - gfx/gfx_vram.c
 - gfx/backend_pc98.c
 - gfx/gfx_core.c

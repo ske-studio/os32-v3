@@ -1,4 +1,5 @@
 check-gfinit-host:
+- lib/pc98_cell.h
 - kdebug/gfinit_decode.c
 - kdebug/gfinit_decode.h
 - kdebug/gfinit_decode/*.inc

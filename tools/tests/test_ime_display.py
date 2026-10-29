@@ -29,7 +29,7 @@ def main():
         for modified in (False, True) if args.mutate else (False,):
             (tmp / 'console.c').write_text(original.replace(OLD, NEW) if modified else original)
             exe = tmp / ('mutant' if modified else 'normal')
-            includes = ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib',
+            includes = ('include', 'arch/x86', 'platform/pc98', 'kernel', 'gfx', 'lib',
                         'drivers', 'sdk/include/os32', 'exec', 'fs')
             host32.build(['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',

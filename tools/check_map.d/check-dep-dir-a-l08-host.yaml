@@ -1,4 +1,5 @@
 check-dep-dir-a-l08-host:
+- tools/tests/hwdev_contract_fixture.py
 - include/memmap.h
 - include/platform_device.h
 - include/time_units.h

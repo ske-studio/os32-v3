@@ -1,4 +1,5 @@
 check-ci-stab-host:
+- tools/tests/hwdev_contract_fixture.py
 - tools/tests/dep_dir_a_l05b_host.c
 - fs/fatfs/diskio.c
 - fs/ext2_super.c

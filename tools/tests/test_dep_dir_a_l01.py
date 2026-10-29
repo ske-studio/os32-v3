@@ -4,6 +4,7 @@ The fixture was captured from 466010d7, not from the code under test.
 --prepare only compiles copied mutation units; it never executes a mutant.
 """
 import argparse
+from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
 import json
 import os
@@ -65,10 +66,7 @@ def abi(folder, fixture):
                                      f'build/out/{name}/{name}_imports.h'], cwd=ROOT,
                                     capture_output=True, text=True, check=True)
             assert f'gen_sqlite_imports.py --module {name} ' in result.stdout, result.stdout
-    # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
-    hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x50a115a8U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x1eae31dcU' in hwdev
+    assert_hwdev_contract(ROOT)
     print('PASS fixed KAPI spec, ILP32 sizes/offsets/slots, OPS_VERSION, hwdev CRC, make dependencies')
 
 

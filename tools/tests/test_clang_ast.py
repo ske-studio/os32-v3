@@ -62,6 +62,12 @@ class ClangTest(unittest.TestCase):
                 if arg == '-include':
                     self.assertTrue(pathlib.Path(unit['argv'][i + 1]).is_file())
         sources = {u['src'] for u in units}
+        # Paired module inputs must exist before any real build, including P5.
+        for unit in units:
+            if '/geforce/' in unit['src']:
+                source = pathlib.Path(unit['src'])
+                self.assertTrue(source.is_file(), source)
+                self.assertTrue((source.parent / 'geforce_imports.h').is_file())
         self.assertTrue({'kernel/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
                          'sdk/allocator/nano_adapter.c'} <= sources)

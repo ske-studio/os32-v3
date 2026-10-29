@@ -28,6 +28,7 @@ static int v86_gcap_active(void) { return active; }
 struct kdebug kdebug = { .ops = { .gcap_active = v86_gcap_active } };
 static void snd_state_for_os32(void) { sound++; }
 static void tv_restore(const u16 *tv) { CHECK(*tv == 123, "saved TVRAM"); restored++; }
+#include "pc98_route.h"
 #include "display_restore.h"
 #include "display_private.h"
 static u16 reserved_cell;

@@ -1,4 +1,5 @@
 check-dep-dir-a-l01-host:
+- tools/tests/hwdev_contract_fixture.py
 - tools/tests/test_dep_dir_a_l01.py
 - tools/tests/dep_dir_a_l01_host.c
 - tools/tests/fixtures/dep_dir_a/l01.json

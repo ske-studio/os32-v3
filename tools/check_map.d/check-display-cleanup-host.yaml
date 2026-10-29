@@ -1,4 +1,5 @@
 check-display-cleanup-host:
+- gfx/pc98_route.h
 - kernel/v86.c
 - gfx/backend_pc98.c
 - gfx/gfx_core.c

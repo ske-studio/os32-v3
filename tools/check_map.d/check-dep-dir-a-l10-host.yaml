@@ -1,4 +1,5 @@
 check-dep-dir-a-l10-host:
+- tools/tests/hwdev_contract_fixture.py
 - include/types.h
 - include/platform_device.h
 - include/kcg_contract.h

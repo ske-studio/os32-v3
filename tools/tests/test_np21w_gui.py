@@ -217,7 +217,7 @@ class Http:
 
 # i386 module_record: 15 prefix words, version + 20 exports,
 # 8 two-word dependencies, dependency_count, 6 ref counters, 4 hooks.
-MODULE_RECORD_COUNT = 11
+MODULE_RECORD_COUNT = 12
 MODULE_RECORD_STRIDE = (15 + 21 + 8 * 2 + 1 + 6 + 4) * 4
 
 # A real nm -S shape, including local symbols and sizeof(g_slot)=6*64.

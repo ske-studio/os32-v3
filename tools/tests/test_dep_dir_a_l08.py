@@ -1,5 +1,6 @@
 """L08 PCI diagnostic KAPI boundary; --prepare builds but never runs a mutation."""
 import argparse
+from hwdev_contract_fixture import assert_hwdev_contract
 import json
 from pathlib import Path
 import shutil
@@ -50,10 +51,7 @@ def contracts():
     wrappers = diagnostic + '\n' + wrappers
     assert 'pci.h' not in spec['includes'] and 'pci_dev_contract.h' in spec['includes']
     assert '#include "pci_bind.h"' not in (ROOT / 'kapi/kapi_sys.c').read_text()
-    # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
-    hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x50a115a8U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x1eae31dcU' in hwdev
+    assert_hwdev_contract(ROOT)
     print('PASS fixed baseline public ABI/generated files, wrapper guards/snapshot, A4/B5 and hwdev CRC')
     return wrappers
 
