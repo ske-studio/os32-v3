@@ -15,8 +15,6 @@ enum gf_c_section { GF_C_CHECK_IN, GF_C_Q, GF_C_P, GF_C_VRAM, GF_C_SD,
     GF_C_SECTION_COUNT };
 enum gf_c_pending { GF_C_PENDING_CHECK = 1, GF_C_PENDING_VRAM,
     GF_C_PENDING_ROW, GF_C_PENDING_CELL, GF_C_PENDING_EXIT };
-#define GF_C_FP_WAIT_MS 50U
-#define GF_C_DPMS_WAIT_MS 10U
 #define GF_C_EXIT_ROUTE_SLOT (GF_C_CHECK_MAX - 2U)
 #define GF_C_EXIT_CELL_SLOT (GF_C_CHECK_MAX - 1U)
 /* No op13 or cleanup extension. */

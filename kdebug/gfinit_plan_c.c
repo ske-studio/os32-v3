@@ -12,8 +12,9 @@
 #define C_EXTRA_ARGS 2100U
 #define C_EXTRA_LAYOUTS 194U
 #define C_EXTRA_RULES 260U
+/* Preserve the old target reservation after dropping its duplicate table. */
+#define C_EXTRA_TARGETS 107U
 #define C_EXTRA_CAPTURES 13U
-#define C_FP_ON_MASK 0x10000011U
 #define C_PLL_RESTORE 4U
 #define C_GPIO_EXT 0x60081cU
 #define C_CRTC850 0x600850U
@@ -33,10 +34,7 @@
 #define C_PLL_STAGE_WRITE 1U
 #define C_PLL_COEFF_WRITE 2U
 #define C_PLL_PRIMARY_WRITE 3U
-/* Boundaries in the fixed stage-1 row contract (not ROM offsets). */
-enum c_row_boundary { C_ROW_P=2, C_ROW_SD=15, C_ROW_L1=26,
-    C_ROW_L2=46, C_ROW_L3=120, C_ROW_COMMIT=190,
-    C_ROW_DPMS_OFF_WAIT=5, C_ROW_DPMS_ON_WAIT=200 };
+static const u32 base_kinds[]={REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
 static const u32 c_imm[] = {REC_IMM, REC_IMM};
 static const u32 c_live[] = {REC_IMM, REC_ARG_READ, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
 static const u32 c_saved[] = {REC_IMM, REC_ARG_SAVED, REC_IMM, REC_IMM, REC_IMM, REC_IMM};
@@ -54,7 +52,7 @@ static int c_value(const u32 *a, u32 n, u32 *v)
 static int c_fp_on(const u32 *a, u32 n, u32 *v)
 {
     if (n != 1) return -1;
-    *v = (a[0] & C_FP_ON_MASK) != 0;
+    *v = (a[0] & GF_LOAD_FP_ON_MASK) != 0;
     return 0;
 }
 struct c_builder {
@@ -62,6 +60,7 @@ struct c_builder {
     struct gfinit_decode *d;
     struct recover_profile *p;
     u32 ctx, select_base;
+    u32 branch, pll_first, producers[GF_STAGE_FIELDS], keys[GF_STAGE_FIELDS];
     const struct gf_stage_state *baseline;
 };
 static u32 c_emit(struct c_builder *b, u32 sub, u32 rule, u32 expr,
@@ -274,6 +273,82 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
     c_check_exit(b,REC_CHECK_ROUTE,RECOVER_ROUTE_MASK,RECOVER_ROUTE_RGB_IN,GF_C_EXIT_ROUTE_SLOT);
     c_check_exit(b,REC_CHECK_CELL,~0U,1,GF_C_EXIT_CELL_SLOT);
 }
+static int c_load_section(void *saved, u32 section)
+{
+    struct c_builder *b=saved;
+    static const u32 sections[]={GF_C_Q,GF_C_P,GF_C_SD,GF_C_L1,GF_C_L2,GF_C_L3,GF_C_COMMIT};
+    if (section==GF_LOAD_SD) {c_marker(b,GF_C_VRAM);c_vram(b);}
+    c_marker(b,sections[section]);
+    return 0;
+}
+static int c_load_wait(void *saved, u32 ms, bool fp_only)
+{
+    struct c_builder *b=saved;
+    c_wait(b,ms);
+    if (fp_only) b->d->nodes[b->branch].next[0]=b->out->plan.node_count;
+    return 0;
+}
+static int c_load_row(void *saved, const struct gfinit_mode *mode, u32 i)
+{
+    struct c_builder *b=saved;
+    const struct gf_mode_row *row=&gf_mode_rows[i];
+    if (row->kind==GF_C_AR || row->kind==GF_C_AR_GATE || row->kind==GF_C_DAC_MASK) {
+        u32 value=row->expr==GF_C_STATE ? ((const u8 *)mode)[row->source] : row->bits;
+        struct recover_plan_arg a[]={{REC_IMM,i},{REC_IMM,value}};
+        c_emit(b,GF_C_COLOR,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+        return 0;
+    }
+    if (row->kind==GF_C_DAC_INDEX || row->kind==GF_C_DAC_DATA) return 0;
+    u32 key=c_key(b,row->kind,row->reg,row->index,row->width);
+    b->branch=RECOVER_NONE;
+    if(row->flags & REC_GF_C_FP_ON) {
+        struct recover_plan_arg a={REC_ARG_READ,key};
+        b->branch=c_emit(b,GF_C_BRANCH,RECOVER_NONE,GF_C_EXPR_FP_ON,&a,1);
+    }
+    c_select(b,key);
+    u32 expr=RECOVER_NONE,keep=row->keep,bits=row->bits,add=0;
+    u32 source=key,producer=RECOVER_NONE,mask=row->width==1 ? GF_MODE_BYTE_MASK : ~0U;
+    if(row->expr==GF_C_STATE) {
+        bits=0;
+        for(u32 j=0;j<row->width;j++)bits|=(u32)((const u8 *)mode)[row->source+j]<<(8*j);
+        for(u32 j=0;j<C_COUNT(c_fields);j++)if(c_fields[j].offset==row->source) {
+            expr=GF_C_EXPR_SAVED;source=b->keys[j];producer=b->producers[j];
+            keep=c_fields[j].keep;add=c_fields[j].add;bits=c_fields[j].bits;
+        }
+    } else if(row->expr==GF_C_LIVE) expr=GF_C_EXPR_LIVE;
+    else if(row->expr==GF_C_PLL) {
+        const struct gfinit_pll_write *w=&mode->sequence.writes[row->source];
+        if(w->reg!=row->reg || w->source!=row->reg) return -1;
+        keep=w->keep;bits=w->value;expr=GF_C_EXPR_LIVE;
+        if(row->source==C_PLL_RESTORE) {expr=GF_C_EXPR_SAVED;producer=b->pll_first;}
+    }
+    struct gfinit_plan *out=b->out;
+    struct gfinit_decode *d=b->d;
+    struct recover_profile *p=b->p;
+    u32 rule=REC_GF_C_RULE_FIRST+i;
+    u32 id=out->plan.node_count;
+    struct recover_plan_arg a[]={{REC_IMM,key},{REC_IMM,bits},
+        {REC_IMM,keep},{REC_IMM,add},{REC_IMM,bits},{REC_IMM,mask}};
+    if(expr!=RECOVER_NONE) {
+        a[1]=(struct recover_plan_arg){REC_ARG_READ,source};
+        if(expr==GF_C_EXPR_SAVED && b->baseline) {
+            expr=GF_C_EXPR_BASE;
+            a[1]=(struct recover_plan_arg){REC_IMM,c_baseline(b,source)};
+        } else if(expr==GF_C_EXPR_SAVED) {
+            u32 slot=out->plan.capture_count++;
+            a[1]=(struct recover_plan_arg){REC_ARG_SAVED,p->count+slot};
+            d->captures[slot]=(struct recover_capture){p->count+slot,producer,id,source,0};
+        }
+    }
+    c_rule(b,rule,key,rule,bits,expr,row->verify);
+    c_layout(b,rule,expr==RECOVER_NONE?2:6,
+        expr==RECOVER_NONE?c_imm:expr==GF_C_EXPR_LIVE?c_live:expr==GF_C_EXPR_BASE?base_kinds:c_saved,
+        p->targets[key].space==REC_VGA_INDEXED?REC_DATA:REC_WRITE,0);
+    c_emit(b,rule,rule,expr,a,expr==RECOVER_NONE?2:6);
+    if(row->expr==GF_C_PLL && row->source==0)b->pll_first=id;
+    return 0;
+}
+static const struct gf_load_io c_load_io={c_load_section,c_load_row,c_load_wait};
 #endif
 static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
                         struct recover_profile *p, u32 bar1_length,
@@ -293,10 +368,11 @@ static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
        out->plan.arg_count+C_EXTRA_ARGS>GF_INIT_ARGS ||
        out->plan.capture_count+C_EXTRA_CAPTURES>RECOVER_CAPTURE_MAX ||
        out->plan.entry_count==RECOVER_ENTRY_MAX || out->plan.ctx_count==RECOVER_CTX_MAX ||
-       p->target_count+recover_gf_c_target_count>GF_PLAN_TARGETS ||
+       p->target_count+C_EXTRA_TARGETS>GF_PLAN_TARGETS ||
        p->rule_count+C_EXTRA_RULES>GF_PLAN_RULES ||
        p->layout_count+C_EXTRA_LAYOUTS>GF_PLAN_LAYOUTS || p->expr_count+4>GF_PLAN_EXPRS) return -1;
-    struct c_builder b={out,d,p,out->plan.ctx_count++,REC_GF_C_RULE_FIRST+recover_gf_c_row_count,baseline};
+    struct c_builder b={.out=out,.d=d,.p=p,.ctx=out->plan.ctx_count++,
+        .select_base=REC_GF_C_RULE_FIRST+gf_mode_row_count,.baseline=baseline,.pll_first=RECOVER_NONE};
     out->mode_flags=GF_MODE_C;out->c_node=out->plan.node_count;out->c_unbound=0;
     out->c_check_count=0;
     for(u32 i=0;i<GF_C_CHECK_MAX;i++)out->c_checks[i]=(struct gfinit_c_check_result){0};
@@ -307,7 +383,6 @@ static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_LIVE,5,c_live+1,c_value};
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_SAVED,5,c_saved+1,c_value};
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_FP_ON,1,c_branch,c_fp_on};
-    static const u32 base_kinds[]={REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_BASE,5,base_kinds+1,c_value};
     c_layout(&b,GF_C_SELECT,2,c_imm,REC_SELECT,0);
     c_layout(&b,GF_C_READ,1,c_imm,REC_READ,0);
@@ -318,91 +393,23 @@ static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
     c_layout(&b,GF_C_CHECK_SAVED,REC_CHECK_ARGS,c_check_saved_kinds,RECOVER_NONE,REC_LAYOUT_MODE_CHECK);
     c_layout(&b,GF_C_BRANCH,1,c_branch,RECOVER_NONE,REC_LAYOUT_CHECK_EXPR);
     c_layout(&b,GF_C_COLOR,2,c_imm,RECOVER_NONE,REC_LAYOUT_MODE_COLOR);
-    for(u32 i=0;i<recover_gf_c_target_count;i++) {
-        const struct recover_gf_c_target *t=&recover_gf_c_targets[i];
+    for(u32 i=0;i<gf_mode_row_count;i++) {
+        const struct gf_mode_row *t=&gf_mode_rows[i];
         if(t->kind<=GF_C_GR || t->kind==GF_C_MISC)
             (void)c_key(&b,t->kind,t->reg,t->index,t->width);
     }
     c_marker(&b,GF_C_CHECK_IN);
     c_check_in(&b);
-    u32 producers[C_COUNT(c_fields)], keys[C_COUNT(c_fields)], pll_first=RECOVER_NONE;
     for(u32 i=0;i<C_COUNT(c_fields);i++) {
         const struct c_saved_field *f=&c_fields[i];
-        keys[i]=c_key(&b,f->kind,f->reg,f->index,f->width);
-        producers[i]=c_read(&b,keys[i]);
+        b.keys[i]=c_key(&b,f->kind,f->reg,f->index,f->width);
+        b.producers[i]=c_read(&b,b.keys[i]);
     }
-    c_marker(&b,GF_C_Q);
-    for(u32 i=0;i<recover_gf_c_row_count;i++) {
-        const struct recover_gf_c_row *row=&recover_gf_c_rows[i];
-        /* Stage-1 row boundaries: Q, P, S/D, L1, L2, L3, commit, R. */
-        if(i==C_ROW_P)c_marker(&b,GF_C_P);
-        if(i==C_ROW_SD) {c_marker(&b,GF_C_VRAM);c_vram(&b);c_marker(&b,GF_C_SD);}
-        if(i==C_ROW_L1)c_marker(&b,GF_C_L1);
-        if(i==C_ROW_L2)c_marker(&b,GF_C_L2);
-        if(i==C_ROW_L3)c_marker(&b,GF_C_L3);
-        if(i==C_ROW_COMMIT)c_marker(&b,GF_C_COMMIT);
-        if(row->kind==GF_C_ROUTE)c_marker(&b,GF_C_R);
-        if (row->kind==GF_C_AR || row->kind==GF_C_AR_GATE || row->kind==GF_C_DAC_MASK) {
-            u32 value = row->expr==GF_C_STATE ? ((const u8 *)&mode)[row->source] : row->bits;
-            struct recover_plan_arg a[]={{REC_IMM,i},{REC_IMM,value}};
-            c_emit(&b,GF_C_COLOR,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
-            continue;
-        }
-        if (row->kind==GF_C_DAC_INDEX || row->kind==GF_C_DAC_DATA) continue;
-        if(row->kind==GF_C_ROUTE) {
-            struct recover_plan_arg a[]={{REC_IMM,RECOVER_ROUTE_RGB_IN},{REC_IMM,RECOVER_ROUTE_MASK}};
-            c_emit(&b,GF_C_ROUTE_SET,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));continue;
-        }
-        u32 key=c_key(&b,row->kind,row->reg,row->index,row->width);
-        u32 branch=RECOVER_NONE;
-        if(row->flags & REC_GF_C_FP_ON) {
-            struct recover_plan_arg a={REC_ARG_READ,key};
-            branch=c_emit(&b,GF_C_BRANCH,RECOVER_NONE,GF_C_EXPR_FP_ON,&a,1);
-        }
-        c_select(&b,key);
-        u32 expr=RECOVER_NONE,keep=row->keep,bits=row->bits,add=0;
-        u32 source=key,producer=RECOVER_NONE,mask=row->width==1 ? GF_MODE_BYTE_MASK : ~0U;
-        if(row->expr==GF_C_STATE) {
-            bits=0;
-            for(u32 j=0;j<row->width;j++)bits|=(u32)((const u8 *)&mode)[row->source+j]<<(8*j);
-            for(u32 j=0;j<C_COUNT(c_fields);j++)if(c_fields[j].offset==row->source) {
-                expr=GF_C_EXPR_SAVED;source=keys[j];producer=producers[j];
-                keep=c_fields[j].keep;add=c_fields[j].add;bits=c_fields[j].bits;
-            }
-        } else if(row->expr==GF_C_LIVE) expr=GF_C_EXPR_LIVE;
-        else if(row->expr==GF_C_PLL) {
-            const struct gfinit_pll_write *w=&mode.sequence.writes[row->source];
-            if(w->reg!=row->reg || w->source!=row->reg) return -1;
-            keep=w->keep;bits=w->value;expr=GF_C_EXPR_LIVE;
-            if(row->source==C_PLL_RESTORE) {expr=GF_C_EXPR_SAVED;producer=pll_first;}
-        }
-        u32 id=out->plan.node_count;
-        struct recover_plan_arg a[]={{REC_IMM,key},{REC_IMM,bits},
-            {REC_IMM,keep},{REC_IMM,add},{REC_IMM,bits},{REC_IMM,mask}};
-        if(expr!=RECOVER_NONE) {
-            a[1]=(struct recover_plan_arg){REC_ARG_READ,source};
-            if(expr==GF_C_EXPR_SAVED && baseline) {
-                expr=GF_C_EXPR_BASE;
-                a[1]=(struct recover_plan_arg){REC_IMM,c_baseline(&b,source)};
-            } else if(expr==GF_C_EXPR_SAVED) {
-                u32 slot=out->plan.capture_count++;
-                a[1]=(struct recover_plan_arg){REC_ARG_SAVED,p->count+slot};
-                d->captures[slot]=(struct recover_capture){p->count+slot,producer,id,source,0};
-            }
-        }
-        c_rule(&b,row->id,key,row->id,bits,expr,row->verify);
-        c_layout(&b,row->id,expr==RECOVER_NONE?2:6,
-            expr==RECOVER_NONE?c_imm:expr==GF_C_EXPR_LIVE?c_live:expr==GF_C_EXPR_BASE?base_kinds:c_saved,
-            p->targets[key].space==REC_VGA_INDEXED?REC_DATA:REC_WRITE,0);
-        c_emit(&b,row->id,row->id,expr,a,expr==RECOVER_NONE?2:6);
-        if(row->expr==GF_C_PLL && row->source==0)pll_first=id;
-        if(branch!=RECOVER_NONE) {
-            c_wait(&b,GF_C_FP_WAIT_MS);
-            d->nodes[branch].next[0]=out->plan.node_count;
-        }
-        if(i==C_ROW_DPMS_OFF_WAIT || i==C_ROW_DPMS_ON_WAIT)c_wait(&b,GF_C_DPMS_WAIT_MS);
-    }
-    c_marker(&b,GF_C_CHECK_OUT);c_check_out(&b,&mode,producers,keys,pll_first);
+    if (gf_load_state(&mode,&b,&c_load_io)) return -1;
+    c_marker(&b,GF_C_R);
+    struct recover_plan_arg route[]={{REC_IMM,RECOVER_ROUTE_RGB_IN},{REC_IMM,RECOVER_ROUTE_MASK}};
+    c_emit(&b,GF_C_ROUTE_SET,RECOVER_NONE,RECOVER_NONE,route,C_COUNT(route));
+    c_marker(&b,GF_C_CHECK_OUT);c_check_out(&b,&mode,b.producers,b.keys,b.pll_first);
     if(out->c_check_count>GF_C_EXIT_ROUTE_SLOT)return -1;
     u32 last=out->plan.node_count-1;
     d->nodes[last].next[0]=d->nodes[last].next[1]=RECOVER_NONE;
@@ -510,11 +517,11 @@ int gfinit_plan_c_vram(void *bus, struct recover *r, bool write,
 /* Only the fixed stage-1 AR and palette rows are reachable through this path. */
 int gfinit_plan_c_color(void *bus, struct recover *r, u32 ordinal, u32 value)
 {
-    const struct recover_gf_c_row *row = &recover_gf_c_rows[ordinal];
+    const struct gf_mode_row *row = &gf_mode_rows[ordinal];
     if (ordinal == GF_MODE_ROW_DAC) {
         if (row->kind != GF_C_DAC_MASK || row->bits != value ||
-            recover_gf_c_rows[ordinal+1].kind != GF_C_DAC_INDEX ||
-            recover_gf_c_rows[ordinal+2].kind != GF_C_DAC_DATA) return -1;
+            gf_mode_rows[ordinal+1].kind != GF_C_DAC_INDEX ||
+            gf_mode_rows[ordinal+2].kind != GF_C_DAC_DATA) return -1;
         return gfinit_bus_mode_dac(bus,r);
     }
     if (row->kind != GF_C_AR && row->kind != GF_C_AR_GATE) return -1;

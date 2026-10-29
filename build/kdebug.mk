@@ -75,7 +75,7 @@ kernel/module_image.o kernel/module_runtime.o $(R1_OBJ)/kernel/module.o \
 
 # One shared contract, compiled with the kernel machine/ABI flags.
 HWDEV_GEN := hwdev/generated
-HWDEV_HEADERS := $(wildcard include/*.h kernel/*.h drivers/*.h lib/*.h fs/*.h exec/*.h gfx/*.h arch/x86/*.h platform/pc98/*.h sdk/include/os32/*.h kdebug/*.h)
+HWDEV_HEADERS := $(wildcard include/*.h kernel/*.h drivers/*.h lib/*.h fs/*.h exec/*.h gfx/*.h arch/x86/*.h platform/pc98/*.h sdk/include/os32/*.h kdebug/*.h hwdev/*.h)
 HWDEV_GENERATED := $(addprefix $(HWDEV_GEN)/,hwdev_contract.h hwdev_core.c hwdev_imports.h hwdev_layout.txt hwdev_import_macros.h hwdev_import_slots.c hwdev_import_stubs.S hwdev_imports.json)
 $(HWDEV_GENERATED) &: hwdev/hwdev_imports.def kernel/kdebug_imports.def tools/gen_kdebug_imports.py build/config.mk build/kdebug.mk tools/gen_hwdev_contract.py tools/hwdev_layout.json docs/decisions/realhw/HWDEV_CORE_API.md $(HWDEV_HEADERS)
 	python3 tools/gen_hwdev_contract.py --cc $(CROSS_DIR)/bin/i386-elf-gcc --flags '$(filter-out -MMD -MP,$(KERNEL_CFLAGS))' --includes '$(INC_KERNEL)'

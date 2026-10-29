@@ -296,7 +296,7 @@ static int gf_budget(struct gfinit_owner *g, struct recover *r,
     u32 rows, first = RECOVER_NONE;
     if (kind == REC_BUDGET_GF && (g->compiled->mode_flags & GF_MODE_C))
         first = g->compiled->c_node;
-    if (gfinit_log_rows(&g->profile, plan, first, &rows)) return -1;
+    if (gfinit_log_rows(plan, first, &rows)) return -1;
 #if GF_VPLL_PROBE
     if (kind == REC_BUDGET_GF) {
         if (rows > ~0U - RECOVER_VPLL_ROWS) return -1;

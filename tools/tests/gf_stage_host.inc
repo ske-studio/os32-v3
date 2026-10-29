@@ -50,8 +50,39 @@ static void stage_rebuild(void)
     CHECK(composed.plan.nodes[0].phase==REC_MODE_C && profile.cold_required);
     core.c_only=true;core.gf_stage=&stage_fixture;stage_fixture.entry_ok=true;
 }
+static void stage_shared_sequence(void)
+{
+    struct stage_row {u32 sub,space,offset,port,index,width,verify;};
+    static struct stage_row rows[C_EXTRA_NODES];
+    stage_baseline();
+    u32 count=composed.plan.node_count-composed.c_node;
+    CHECK(count<C_EXTRA_NODES);
+    for(u32 i=0;i<count;i++) {
+        const struct recover_plan_node *n=&composed.plan.nodes[composed.c_node+i];
+        u32 sub=n->substep==GF_C_CHECK_SAVED?GF_C_CHECK:n->substep;
+        rows[i]=(struct stage_row){.sub=sub};
+        if(n->rule_id==RECOVER_NONE)continue;
+        const struct recover_target *t=&profile.targets[composed.plan.args[n->arg_first].value];
+        const struct recover_rule *w=rule_by_id(&profile,n->rule_id);
+        rows[i]=(struct stage_row){sub,t->space,t->offset,t->port,t->index,t->width,w->verify_mask};
+    }
+    stage_rebuild();
+    CHECK(composed.plan.node_count==count);
+    for(u32 i=0;i<count;i++) {
+        const struct recover_plan_node *n=&composed.plan.nodes[i];
+        u32 sub=n->substep==GF_C_CHECK_SAVED?GF_C_CHECK:n->substep;
+        CHECK(sub==rows[i].sub);
+        if(n->rule_id==RECOVER_NONE)continue;
+        const struct recover_target *t=&profile.targets[composed.plan.args[n->arg_first].value];
+        const struct recover_rule *w=rule_by_id(&profile,n->rule_id);
+        CHECK(t->space==rows[i].space && t->offset==rows[i].offset && t->port==rows[i].port);
+        CHECK(t->index==rows[i].index && t->width==rows[i].width && w->verify_mask==rows[i].verify);
+    }
+    output("T2 same-session and C-only share ordered writes, waits, sections and verification masks PASS\n");
+}
 static void stage_gates(void)
 {
+    stage_shared_sequence();
     stage_baseline();stage_rebuild();
     struct recover original_owner=*recover_owner();
     core.state=REC_FAILED;core.failed=core.cold_latched=true;

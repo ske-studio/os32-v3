@@ -1,4 +1,4 @@
-/* Count production C records and follow real failure cleanup through S0.
+/* Follow production C deadlines and real failure cleanup through S0.
  * The inherited fixture replaces PCI/PTE/memory only; plans and recovery run. */
 #define GF_C_ENTRY budget_old_entry
 #include "gfinit_plan_c_host.c"
@@ -7,13 +7,14 @@
 
 static u32 run_rows,run_bytes,pre_rows,pre_bytes,s0_rows,s0_bytes,line_used;
 static u32 budget_fault,budget_tick,quiesce_seen,local_count,cleanup_p,cleanup_q;
-static u32 c_bound,whole_bound,sequence_peak;
+static u32 sequence_peak;
 static char budget_line[RECOVER_ROW_MAX];
 static bool restoring_seen,final_seen;
 static u32 vram_rec,dac_rec,ar_rec,wait_rec,check_rec,cell_rec,route_rec;
 static int budget_put(void *v,u32 ch)
 {
     (void)v;
+    if (budget_fault==16 && core.state==REC_RUNNING) budget_tick++;
     CHECK(line_used+1<sizeof(budget_line));
     budget_line[line_used++]=(char)ch;budget_line[line_used]=0;
     if(core.state==REC_RESTORING) {
@@ -110,6 +111,7 @@ static int budget_step(struct recover *r,void *v)
         if(budget_fault==10 && (l->flags & REC_LAYOUT_MODE_CHECK) &&
            composed.plan.args[n->arg_first+REC_CHECK_SLOT].value==95)core.tx_ticks=core.log_limit;
         if(budget_fault==11 && n->substep==GF_C_WAIT && frame_reads==sizeof(frame))wait_fail=1;
+        if(budget_fault==16)budget_tick++;
         if(recover_safe_point(r) || recover_plan_enter(r,id))return -1;
         int rc=0;
         if(l->flags & (REC_LAYOUT_MODE_CHECK|REC_LAYOUT_MODE_WAIT|REC_LAYOUT_MODE_ROUTE))
@@ -160,9 +162,12 @@ static void budget_setup(u32 fault_kind,bool fp_on)
     if(fault_kind==7)cell_fault=1; /* test mismatch after the whole mode */
     if(fault_kind==8)check_damage_slot=1;
     if(fault_kind==8)budget_fault=1;
-    CHECK(!gfinit_c_rows(&profile,&composed.plan,composed.c_node,&c_bound));
-    CHECK(!gfinit_log_rows(&profile,&composed.plan,composed.c_node,&whole_bound));
-    core.log_limit=(2*((whole_bound*(RECOVER_ROW_MAX+1U)*10U+9599U)/9600U)+3U)*PIT_HZ;
+    core.log_limit=GF_C_TX_SECONDS*PIT_HZ;
+    if(fault_kind==16) {
+        profile.max_polls=profile.opcode_limit=1;
+        core.budget=core.spent=1;core.log_limit=core.tx_ticks=1;
+        core.uart_polls=GF_C_TX_POLLS;
+    }
     core.token.profile_crc=profile.crc=recover_profile_crc(&profile);
     core.token.snapshot_crc=snapshot_crc(&core);
 }
@@ -172,17 +177,30 @@ static void budget_cases(void)
     const u32 counts[]={0,1,100,2048};
     for(u32 i=0;i<4;i++) {
         struct recover_plan p={.node_count=counts[i],.arg_count=counts[i]*3};u32 rows=0;
-        CHECK(!gfinit_log_rows(&profile,&p,RECOVER_NONE,&rows));
+        CHECK(!gfinit_log_rows(&p,RECOVER_NONE,&rows));
         CHECK(rows==128+counts[i]*12+counts[i]*3*4);
     }
     struct recover_plan overflow={.node_count=~0U};u32 rows=0;
-    CHECK(gfinit_log_rows(&profile,&overflow,RECOVER_NONE,&rows)<0);
-    for(u32 fault_kind=0;fault_kind<16;fault_kind++) {
+    CHECK(gfinit_log_rows(&overflow,RECOVER_NONE,&rows)<0);
+    struct recover_plan prefix={.node_count=3,.arg_count=100};
+    struct recover_plan_node nodes[3]={{0},{0},{.arg_first=6}};
+    prefix.nodes=nodes;
+    CHECK(!gfinit_log_rows(&prefix,2,&rows) && rows==128+2*12+6*4);
+    CHECK(gfinit_log_rows(&prefix,3,&rows)<0);
+    for(u32 fault_kind=0;fault_kind<17;fault_kind++) {
         budget_setup(fault_kind,fault_kind!=9);
         u32 crc=profile.crc,hash=core.token.plan_hash,saved=core.local_saved_count;
+        u32 restore=profile.restore_limit,s0=profile.s0_reserve_ticks;
         int rc=trial_step(&core,&core.token,true,budget_step,0);
-        bool bad=fault_kind!=0 && fault_kind!=9 && fault_kind!=15;
+        bool bad=fault_kind!=0 && fault_kind!=9 && fault_kind!=15 && fault_kind!=16;
         CHECK((rc!=0)==bad);
+        if(fault_kind==16) {
+            CHECK(!rc && !core.c_only && core.budget==60*PIT_HZ);
+            CHECK(core.log_limit==1800*PIT_HZ && core.tx_ticks>1600*PIT_HZ);
+            CHECK(core.spent>1 && core.spent<core.budget && core.polls>profile.max_polls);
+            CHECK(profile.restore_limit==restore && profile.s0_reserve_ticks==s0);
+            output("T2 long same-session C resets execution/TX/polls, immutable S0 reservation PASS\n");
+        }
         if(!bad) {
             CHECK(core.state==REC_PAUSED && !core.failed && route_value==1);
             /* PAUSED wall time is not charged to the trial. */
@@ -197,9 +215,9 @@ static void budget_cases(void)
         CHECK(cleanup_calls==1 && quiesce_seen==((fault_kind==5 || fault_kind==13)?0U:3U) && !core.plan);
         CHECK(core.state==(bad?REC_FAILED:REC_VERIFIED));
         static const enum recover_reason reasons[]={REC_ABORT,REC_VERIFY,REC_BUS,REC_VERIFY,
-            REC_VERIFY,REC_BUS,REC_TIMEOUT,REC_BUS,REC_VERIFY,REC_ABORT,REC_LOG,REC_BUS,REC_BUS,REC_BUS,REC_BUS,REC_ABORT};
+            REC_VERIFY,REC_BUS,REC_TIMEOUT,REC_BUS,REC_VERIFY,REC_ABORT,REC_LOG,REC_BUS,REC_BUS,REC_BUS,REC_BUS,REC_ABORT,REC_ABORT};
         CHECK(core.reason==reasons[fault_kind]);
-        CHECK(!core.lost_lines && run_rows<=c_bound && run_bytes<=c_bound*(RECOVER_ROW_MAX+1U));
+        CHECK(!core.lost_lines);
         /* P: 24 local + 6 quiesce + 4 zero-guard pairs; 188 B/pair,
          * RESTORING 178 B. Q: 14 pairs + final/discard/diag=3122 B. */
         CHECK(local_count==7 && saved==7 && cleanup_p==34*188+178);
@@ -213,20 +231,12 @@ static void budget_cases(void)
         if(!fault_kind) {
             CHECK(vram_rec==4 && dac_rec==2 && ar_rec==48 && wait_rec==6);
             CHECK(check_rec==66 && cell_rec==4 && route_rec==2);
-            CHECK(run_rows==2298 && c_bound==2298);
-            CHECK(128+composed.plan.node_count*12+composed.plan.arg_count*4==32960);
             output("BUDGET VRAM=4 DAC=2 AR=48 WAIT=6 CHECK=66 CELL=4 ROUTE=2 PASS\n");
-        }
-        if(fault_kind==15) {
-            CHECK(run_rows==c_bound && c_bound>2298);
-            CHECK(run_bytes<=c_bound*(RECOVER_ROW_MAX+1U));
-            CHECK(core.log_limit/PIT_HZ<RECOVER_HALF_TICKS/PIT_HZ);
-            output("BUDGET record-only additional readbacks within row/time bounds PASS\n");
         }
         CHECK(pre_bytes<=cleanup_p && s0_bytes<=cleanup_q && cleanup_q==4096);
         CHECK(profile.crc==crc && core.token.profile_crc==crc && core.token.plan_hash==hash);
-        output("BUDGET case=");val(fault_kind);output("c_rows=");val(c_bound);output("actual=");val(run_rows);
-        output("bytes=");val(run_bytes);output("whole_rows=");val(whole_bound);
+        output("BUDGET case=");val(fault_kind);output("actual=");val(run_rows);
+        output("bytes=");val(run_bytes);
         output("local_before=");val(saved);output("local_cleanup=");val(local_count);
         output("P=");val(cleanup_p);output("S=");val(cleanup_q);output("seconds=");val(cb.seconds);
         output("pre_rows=");val(pre_rows);output("pre_bytes=");val(pre_bytes);

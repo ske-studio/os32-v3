@@ -243,7 +243,6 @@ STATIC_ASSERT(__alignof__(struct recover_layout_range) == 4, gf_layout_storage_a
 #endif
 #include "generated/recover_gf_tables.inc"
 /* Unbound C-only contracts; default expansion below is intentionally unchanged. */
-#include "generated/recover_gf_c_tables.inc"
 
 /* Subtraction bounds the inclusive length without overflowing at UINT32_MAX. */
 static int gf_layout_ranges_valid(const struct recover_layout_range *ranges,

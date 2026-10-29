@@ -131,14 +131,18 @@ def check_output(text, verbose=True):
     assert len(groups) == 2
     for variant, section in enumerate(groups):
         lines = section.splitlines()[1:]
-        fields, rows, writes, palette = {}, [], [], []
+        fields, rows, writes, palette, sections, waits = {}, [], [], [], [], []
         for line in lines:
             name, values = line.split('=',1)
             v = list(map(int,values.split()))
-            if name == 'row': rows.append(v)
+            if name == 'section': sections.append(v)
+            elif name == 'wait': waits.append(v)
+            elif name == 'row': rows.append(v)
             elif name == 'pllwrite': writes.append(v)
             elif name == 'rgb': palette.append(v)
             elif name != 'target': fields[name] = v
+        assert sections == [[i] for i in range(7)]
+        assert waits == [[50, 1, 2], [10, 0, 6], [10, 0, 201]]
         timing, _ = timings()
         assert fields['timing'] == timing
         state = expected_state(variant)
@@ -162,11 +166,10 @@ def check_output(text, verbose=True):
                           [0xc040,0xc040,FULL,0]]
         colors = [[0,0,0],[255,0,0],[0,255,0],[0,0,255],[255,255,255],[0,255,255],[255,0,255],[255,255,0]]
         assert palette == [[i]+(colors[i] if i<8 else [0,0,0]) for i in range(256)]
-        expected = expected_trace(state,pll)
-        assert len(rows) == len(expected) == 206
+        expected = expected_trace(state,pll)[:-1]
+        assert len(rows) == len(expected) == 205
         for ordinal, (row, want) in enumerate(zip(rows,expected)):
-            rid,key,phase,kind,reg,index,width,expr,source,keep,bits,verify,count,flags,value = row
-            assert rid == 578+ordinal and phase == 9
+            kind,reg,index,width,expr,source,keep,bits,verify,count,flags,value = row
             got = kind,reg,index,width,value,count
             assert got == want, (ordinal,got,want)
             assert verify <= (FULL if width == 4 else 255)
@@ -179,17 +182,9 @@ def check_output(text, verbose=True):
             if reg == 0x680578: assert verify == 0
             if reg == 0x680508: assert verify == 0
             assert reg != 0x680510
-            # Existing target keys must be reused (gate/stage/SR01/CR11).
-            keys = {(0,0xc040,FULL):25,(0,0x680580,FULL):28,
-                    (2,0xc03c4,1):17,(1,0x6013d4,0x11):12}
-            if (kind,reg,index) in keys: assert key == keys[(kind,reg,index)]
-        targets = [list(map(int,line.split('=',1)[1].split())) for line in lines if line.startswith('target=')]
-        if variant:
-            assert [30,0,0x680510,FULL,4,1,1] in targets
-            assert all(t[5] == 1 for t in targets)
         if verbose:
             print(f'PASS variant={variant}: H/V equations + handwritten CR00..18/25/2D/41, CR05=9f; '
-                  f'206 ordered typed C rows; N/M/N/M/P={n}/{m}/{n2}/{m2}/{p} actual/error={actual}/{error} kHz')
+                  f'205 ordered typed hardware rows; N/M/N/M/P={n}/{m}/{n2}/{m2}/{p} actual/error={actual}/{error} kHz')
             print('timing='+' '.join(f'{v:X}' for v in timing))
             print('CR00..18='+' '.join(f'{v:02X}' for v in state['cr'][:25]))
     return 0
@@ -207,7 +202,7 @@ MUTATIONS = [
 
 def mutation(item):
     name, old, new = item
-    file = 'kdebug/generated/recover_gf_c_tables.inc' if name == 'immediate_verify' else 'kdebug/gfinit_mode.c'
+    file = 'hwdev/generated/gf_mode_rows.inc' if name == 'immediate_verify' else 'kdebug/gfinit_mode.c'
     source = (ROOT/file).read_text()
     if name == 'immediate_verify':
         old = next(line for line in source.splitlines() if '0x680508U' in line and line.endswith(old))
@@ -219,7 +214,7 @@ def mutation(item):
                                    [command(exe)],capture_output=True)
         # gcc -MM drives copies, including all new headers; assert they resolve
         # inside the mutant tree so a header-copy failure cannot look like RED.
-        for path in ('hwdev/gfinit_mode.h','kdebug/recover_gf_c.h','kdebug/generated/recover_gf_c_tables.inc'):
+        for path in ('hwdev/gfinit_mode.h','hwdev/gf_load_state.c','hwdev/gf_load_state.h','hwdev/generated/gf_mode_rows.inc'):
             assert (tree/path).is_file() and not (tree/path).is_symlink(), path
         run = host32.run([str(exe)],cwd=tree,timeout=60,capture_output=True)
         rc = run.returncode

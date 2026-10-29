@@ -5,6 +5,7 @@
 #undef GF_S5_ENTRY
 #include "../../kdebug/gfinit_plan.c"
 #include "../../kdebug/gfinit_mode.c"
+#include "../../hwdev/gf_load_state.c"
 #include "../../kdebug/gfinit_plan_c.c"
 #include "../../kdebug/gfinit_verify.inc"
 #include "../../kdebug/recover_profile.c"
@@ -240,7 +241,8 @@ static u32 saved_value(const struct recover_target *t,u32 variant)
 }
 static void dump_row(u32 ordinal,u32 value,u32 bound,u32 key)
 {
-    const struct recover_gf_c_row *row=&recover_gf_c_rows[ordinal];
+    const struct gf_mode_row route={.kind=10,.reg=0xfac,.index=~0U,.width=1,.count=1};
+    const struct gf_mode_row *row=ordinal==gf_mode_row_count ? &route : &gf_mode_rows[ordinal];
     u32 kind=row->kind,reg=row->reg,index=row->index,width=row->width;
     if(bound && key!=RECOVER_NONE) {
         const struct recover_target *t=&profile.targets[key];
@@ -336,15 +338,15 @@ static void c_walk(u32 variant,bool fp_on)
             CHECK(a[0].value==rows);
             CHECK(!recover_plan_access(&core,&value));
             for (u32 j=0;j<count;j++) {
-                const struct recover_gf_c_row *row=&recover_gf_c_rows[rows];
+                const struct gf_mode_row *row=&gf_mode_rows[rows];
                 u32 v=row->expr==GF_C_STATE ? ((const u8 *)&mode)[row->source] : row->bits;
                 dump_row(rows++,v,1,RECOVER_NONE);
             }
         } else if(l->dir_substep!=RECOVER_NONE) {
             CHECK(!recover_plan_access(&core,&value));
             if(n->substep>=REC_GF_C_RULE_FIRST) {
-                CHECK(rows<recover_gf_c_row_count && n->rule_id==recover_gf_c_rows[rows].id);
-                CHECK(core.node_write[id]->verify_mask==recover_gf_c_rows[rows].verify);
+                CHECK(rows<gf_mode_row_count && n->rule_id==REC_GF_C_RULE_FIRST+rows);
+                CHECK(core.node_write[id]->verify_mask==gf_mode_rows[rows].verify);
                 dump_row(rows++,value,1,a[0].value);data_writes++;
             }
         }
