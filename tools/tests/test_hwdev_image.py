@@ -3,12 +3,15 @@ import json
 import os
 import re
 from pathlib import Path
+import shlex
 import struct
 import subprocess
 import sys
 import tempfile
 import zlib
+from unittest.mock import patch
 
+from hwdev_contract_fixture import assert_hwdev_contract
 import test_hwdev_module as module
 import test_hwdev_trace as trace
 import test_hwdev_dispatch as dispatch
@@ -37,7 +40,79 @@ def verify_stubs(elf_data, entries):
     print(f'PASS {len(entries)} tail-jump destinations, address-only callback stub, no kdebug slots')
 
 
+def contract_mutations(folder, cross):
+    """Regenerate both sides in copies: mode edits GREEN, ABI edits RED."""
+    gen = module.gen
+    doc = 'docs/decisions/realhw/HWDEV_CORE_API.md'
+    state = 'kdebug/gf_stage_state.h'
+    mode = 'hwdev/gfinit_mode.h'
+    header = 'kdebug/recover.h'
+    definition = 'hwdev/hwdev_imports.def'
+
+    def edit(rel, old, new):
+        text = (ROOT / rel).read_text()
+        assert text.count(old) == 1, (rel, old)
+        return {rel: text.replace(old, new)}
+
+    entries = json.loads((ROOT / definition).read_text())
+    entries['imports'][0], entries['imports'][1] = entries['imports'][1], entries['imports'][0]
+    for i in (0, 1):
+        entries['imports'][i]['index'] = i
+    swapped = edit(doc, '| 0 | `trial_begin`', '| 1 | `trial_begin`')
+    swapped[doc] = swapped[doc].replace('| 1 | `trial_step`', '| 0 | `trial_step`')
+    swapped[definition] = json.dumps(entries)
+    cases = [
+        ('control', {}, None),
+        ('mode-value', edit(mode, '#define GF_MODE_CLOCK_KHZ 25175U',
+                           '#define GF_MODE_CLOCK_KHZ 25176U'), None),
+        ('mode-check', edit(mode, 'm->pll.error <= GF_MODE_CLOCK_KHZ',
+                           'm->pll.error < GF_MODE_CLOCK_KHZ'), None),
+        ('member-order', edit(state, 'u32 rom_crc, rom_size;', 'u32 rom_size, rom_crc;'),
+         'private HWDEV layout changed'),
+        ('import-order', swapped, 'private HWDEV import indices/names/types changed'),
+        ('import-type', edit(header, 'int trial_step(', 'u32 trial_step('),
+         'private HWDEV import indices/names/types changed'),
+    ]
+    # Read the product flags, including the forced SDK unit stamp. The host
+    # fixture flags omit that stamp and produce a different full contract CRC.
+    rule = ('.PHONY: hwdev-fixture-flags\nhwdev-fixture-flags:\n'
+            '\t@printf "%s\\n" \'$(filter-out -MMD -MP,$(KERNEL_CFLAGS))\' \'$(INC_KERNEL)\'\n')
+    lines = subprocess.check_output(['make', '-s', '--no-print-directory', '-f', 'Makefile',
+                                     '-f', '-', 'hwdev-fixture-flags'], input=rule,
+                                    cwd=ROOT, text=True).splitlines()
+    flags = shlex.split(lines[0])
+    for i in range(1, len(flags)):
+        if flags[i - 1] == '-include':
+            flags[i] = str(ROOT / flags[i])
+    includes = ['-I' + str(ROOT / arg[2:]) for arg in shlex.split(lines[1])]
+    cc = str(cross / 'i386-elf-gcc')
+    deps = module.mutpar.gcc_deps([cc, *flags, *includes,
+                                 '-x', 'c', str(ROOT / 'hwdev/generated/hwdev_contract.h')], ROOT)
+    current = json.loads((ROOT / 'hwdev/generated/hwdev_imports.json').read_text())['module_abi_gen']
+    for label, edits, expected in cases:
+        tree = module.mutpar.mutant_tree(ROOT, folder / label, edits,
+                                        real=deps | {'hwdev/generated'})
+        with patch.multiple(gen, ROOT=tree, DOC=tree / doc):
+            gen.generate(cc, module.mutpar.rebase(flags, ROOT, tree),
+                         module.mutpar.rebase(includes, ROOT, tree),
+                         out=tree / 'hwdev/generated')
+        generated = tree / 'hwdev/generated'
+        contract = json.loads((generated / 'hwdev_imports.json').read_text())['module_abi_gen']
+        assert (contract == current) == (label == 'control'), (label, contract, current)
+        layout = zlib.crc32((generated / 'hwdev_layout.txt').read_bytes())
+        print(f'PAIR regenerated-{label}: contract={contract:08x} layout={layout:08x}')
+        try:
+            assert_hwdev_contract(tree)
+        except AssertionError as exc:
+            assert expected is not None and str(exc) == expected, (label, exc)
+            print(f'MUTATE regenerated-{label} RED: {exc}')
+        else:
+            assert expected is None, f'survived regenerated-{label}'
+            print(f'PASS regenerated-{label} GREEN')
+
+
 def main():
+    assert_hwdev_contract(ROOT)
     image = (OUT/'hwdev.mod').read_bytes()
     elf_data = (OUT/'hwdev/hwdev.elf').read_bytes()
     meta = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())
@@ -110,6 +185,7 @@ def main():
         trace.run(folder, mode_c=True)
         dispatch.main()
         if '--mutate' in sys.argv:
+            contract_mutations(folder / 'contracts', cross)
             # Break only the loaded body. Host white-box copies remain intact:
             # losing the trace macro substitution would let this mutant survive.
             b = bytearray(image)

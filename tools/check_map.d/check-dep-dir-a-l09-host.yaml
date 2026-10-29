@@ -1,4 +1,18 @@
 check-dep-dir-a-l09-host:
+- drivers/pci.h
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/bootinfo.h
+- include/gf_production.h
+- include/kprintf.h
+- kdebug/kpeek.h
+- kdebug/recover.h
+- kernel/kdebug_imports.def
+- kernel/pgalloc.h
+- lib/kstring.h
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/module_schema.py
 - tools/tests/hwdev_contract_fixture.py
 - include/memmap.h
 - include/platform_device.h

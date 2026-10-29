@@ -1,4 +1,5 @@
 check-hwdev-image-host:
+- tools/tests/hwdev_contract_fixture.py
 - kdebug/gfinit_verify.inc
 - hwdev/**
 - tools/gen_hwdev_contract.py
@@ -33,6 +34,7 @@ check-hwdev-image-host:
 - build/out/*
 - sdk/link/generations.ld
 - sdk/kapi.json
+- sdk/include/os32/os32_unit_stamp.h
 - tools/tests/test_hwdev_image.py
 - tools/tests/test_hwdev_module.py
 - tools/tests/hwdev_module_host.c

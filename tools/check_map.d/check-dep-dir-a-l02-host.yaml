@@ -1,4 +1,9 @@
 check-dep-dir-a-l02-host:
+- drivers/serial.h
+- hwdev/hwdev_imports.def
+- include/gf_production.h
+- kdebug/kpeek.h
+- kdebug/recover.h
 - tools/tests/hwdev_contract_fixture.py
 - kernel/tick.c
 - kernel/tick.h
