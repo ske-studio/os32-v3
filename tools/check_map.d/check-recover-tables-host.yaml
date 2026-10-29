@@ -12,6 +12,9 @@ check-recover-tables-host:
 - kdebug/gfinit_wire.h
 - kdebug/gfinit_pll.h
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover_wire.h
 - lib/crc32_core.inc
 - tools/tests/recover_tables_oracle.c

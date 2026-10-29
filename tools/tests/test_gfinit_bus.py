@@ -29,11 +29,11 @@ MUTATIONS = [
     ('bus_command_width', 'if (a->width == 2)', 'if (a->width == 1)'),
 ]
 SHARED_MUTATIONS = [
-    ('resource_overlap_left', '(unsigned long long)base < (unsigned long long)exclude[i].base + exclude[i].len', 'false'),
-    ('resource_overlap_right', '(unsigned long long)exclude[i].base < (unsigned long long)base + length', 'false'),
-    ('cr1f_verify', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCKED : 0', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCK : 0'),
-    ('cr1f_saved', 'RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK) : value;', 'RECOVER_CR1F_UNLOCK : 0) : value;'),
-    ('local_select', 'v->key == target && *value == t->index && t->access == REC_RW) found = true;',
+    ('kdebug/recover.c', 'resource_overlap_left', '(unsigned long long)base < (unsigned long long)exclude[i].base + exclude[i].len', 'false'),
+    ('kdebug/recover.c', 'resource_overlap_right', '(unsigned long long)exclude[i].base < (unsigned long long)base + length', 'false'),
+    ('kdebug/recover_plan/access.inc', 'cr1f_verify', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCKED : 0', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCK : 0'),
+    ('kdebug/recover_plan/access.inc', 'cr1f_saved', 'RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK) : value;', 'RECOVER_CR1F_UNLOCK : 0) : value;'),
+    ('kdebug/recover_plan/access.inc', 'local_select', 'v->key == target && *value == t->index && t->access == REC_RW) found = true;',
      'v->key == target && *value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
@@ -92,7 +92,7 @@ def main():
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
             [('kdebug/gfinit_bus.c', *item) for item in MUTATIONS] +
-            [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS] +
+            list(SHARED_MUTATIONS) +
             [('kdebug/kdebug_window.c', *item) for item in WINDOW_MUTATIONS] +
             RESOURCE_MUTATIONS,
             ('kdebug/gfinit_bus.c', 'control', '', ''))))

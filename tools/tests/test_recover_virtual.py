@@ -58,10 +58,10 @@ def build_cmd(temp, dispatch=None, expire=0):
 def one(item):
     name, before, after = item
     path = {'paused_gate_removed': 'kdebug/kdebug_main.c',
-            'step_failure_ignored': 'kdebug/recover.c',
-            'trial_deadline_removed': 'kdebug/recover.c',
-            'step_poll_limit_removed': 'kdebug/recover.c',
-            'uart_poll_limit_removed': 'kdebug/recover.c'}.get(name, SOURCE)
+            'step_failure_ignored': 'kdebug/recover_common/session.inc',
+            'trial_deadline_removed': 'kdebug/recover_common/session.inc',
+            'step_poll_limit_removed': 'kdebug/recover_common/session.inc',
+            'uart_poll_limit_removed': 'kdebug/recover_common/clock.inc'}.get(name, SOURCE)
     source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:

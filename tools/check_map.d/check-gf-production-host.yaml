@@ -47,6 +47,9 @@ check-gf-production-host:
 - kdebug/gfinit_resources/scan.inc
 - kdebug/gfinit_resources/windows.inc
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover_gf.c
 - kernel/sys.c
 - kernel/sysconfig.c

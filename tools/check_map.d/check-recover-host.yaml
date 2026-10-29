@@ -1,5 +1,8 @@
 check-recover-host:
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover.h
 - include/types.h
 - lib/crc32_core.inc

@@ -41,11 +41,11 @@ PRECHECK = """        if (!w || t->access == REC_UNCLASSIFIED || (n && !node_rul
             return access_error(r, target);
 """
 SHARED_MUTATIONS = [
-    ('vpll_read', '|| (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&', '|| (false && r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&'),
-    ('timeout_reason', 'r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION', 'REC_OPERATION'),
-    ('pre_read_order', PRECHECK + "        if (w->write_mask", "        if (!w) return access_error(r, target);\n        if (w->write_mask"),
-    ('fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
-    ('planned_value', 'if (planned) *value = expected;', 'if (planned) *value = 0;'),
+    ('kdebug/recover_plan/access.inc', 'vpll_read', '|| (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&', '|| (false && r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&'),
+    ('kdebug/recover_common/session.inc', 'timeout_reason', 'r->reason == REC_TIMEOUT ? REC_TIMEOUT : REC_OPERATION', 'REC_OPERATION'),
+    ('kdebug/recover_plan/access.inc', 'pre_read_order', PRECHECK + "        if (w->write_mask", "        if (!w) return access_error(r, target);\n        if (w->write_mask"),
+    ('kdebug/recover_plan/bind.inc', 'fixed_head', 'if (w->value.mask != width_mask(t->width)) return -1;', 'if (false && w->value.mask != width_mask(t->width)) return -1;'),
+    ('kdebug/recover_plan/access.inc', 'planned_value', 'if (planned) *value = expected;', 'if (planned) *value = 0;'),
 ]
 
 
@@ -82,7 +82,7 @@ def main():
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
             [('kdebug/gfinit_exec.c', *item) for item in MUTATIONS] +
-            [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS] +
+            list(SHARED_MUTATIONS) +
             [('kdebug/gfinit_op/pll_expand.inc', 'vpll_repeat_drop', 'i < q.count; i++) {\n            const struct gfinit_pll_write *w = &q.writes[i];', 'i < q.count - 1; i++) {\n            const struct gfinit_pll_write *w = &q.writes[i];'),
              ('kdebug/recover_gf.c', 'vpll_verify_zero', '.write_mask = ~0U, .verify_mask = ~0U,', '.write_mask = ~0U, .verify_mask = 0,')],
             ('kdebug/gfinit_exec.c', 'control', '', ''))))

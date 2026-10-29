@@ -35,12 +35,12 @@ MUTATIONS = [
 ]
 
 SHARED_MUTATIONS = [
-    ('skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
-    ('capture_ordinal', 'c->read_ordinal)', '0)'),
-    ('capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
-    ('capture_consumed', 'consumer_node == node) r->capture_valid &= ~(1ULL << i);',
+    ('kdebug/recover_plan/bind.inc', 'skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
+    ('kdebug/recover_plan/bind.inc', 'capture_ordinal', 'c->read_ordinal)', '0)'),
+    ('kdebug/recover_plan/bind.inc', 'capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
+    ('kdebug/recover_plan/access.inc', 'capture_consumed', 'consumer_node == node) r->capture_valid &= ~(1ULL << i);',
      'consumer_node == node) r->capture_valid |= 1ULL << i;'),
-    ('unresolved_bind', '!plan->entries || plan->unresolved_count ||', '!plan->entries ||'),
+    ('kdebug/recover_plan/bind.inc', 'unresolved_bind', '!plan->entries || plan->unresolved_count ||', '!plan->entries ||'),
 ]
 
 
@@ -191,7 +191,7 @@ def main():
             ('diag_control', '', ''))
         return int(bool(diagnostic_bad | mutpar.run_with_control(mutation,
             MUTATIONS +
-            [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS],
+            list(SHARED_MUTATIONS),
             ('kdebug/gfinit_decode.c', 'control', '', ''))))
     return 0
 
