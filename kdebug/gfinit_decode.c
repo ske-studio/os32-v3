@@ -9,6 +9,11 @@ STATIC_ASSERT(GF_INIT_WORK_STEPS >= RECOVER_NODE_MAX, gf_schedule_scratch);
 STATIC_ASSERT(GF_INIT_FIXED_CAPTURES <= RECOVER_CAPTURE_MAX, gf_fixed_captures);
 #include "gfinit_decode/tables.inc"
 #include "gfinit_decode/bytes.inc"
+const struct gf_script_span *gfinit_script_spans(u32 *count)
+{
+    *count = GF_ARRAY(scripts);
+    return scripts;
+}
 int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
                              struct gfinit_instruction *o)
 {

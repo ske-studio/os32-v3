@@ -1,9 +1,10 @@
-/* GF component contracts, GF_DRIVER_DESIGN §§2-3. No hardware implementation. */
+/* GF component contracts, GF_DRIVER_DESIGN §§2-3. */
 #ifndef HWDEV_GF_INTERNAL_H
 #define HWDEV_GF_INTERNAL_H
 #include "../../include/video_service.h"
 #include "../../kdebug/gfinit_exec.h" /* decoder types, limits, clock/wait types */
 #include "../gf_load_state.h"
+#include "scripts.h"
 
 struct gf_init_context;
 /* One instruction/PLL transaction, at most one save per PLL destination. */
@@ -94,6 +95,19 @@ int gf_init_save(struct gf_init_context *ctx, u32 bar, u32 off, u32 width, u32 o
 int gf_init_save_indexed(struct gf_init_context *ctx, u32 bar, u32 select_off,
                          u32 data_off, u32 index, u32 old);
 void gf_init_commit(struct gf_init_context *ctx);
+/* Table restoration only; adapter restore calls this and always attempts its
+ * own index/lock/window cleanup afterwards, even if this returns -1. */
+int gf_init_restore(struct gf_init_context *ctx);
+/* Caller-owned finite scratch, released after devinit. No expanded plan. */
+struct gf_init_program {
+    u32 count, main_pc[GF_INIT_MAINS];
+    struct gfinit_instruction insns[GF_INIT_INSNS];
+};
+/* Decode/CRC-check known S1 spans, pair repeats before any I/O, then run
+ * main0..4. started_us is supplied by the ROM acquisition owner. On error
+ * call io.restore once before returning; owner then quiesces. ctx/work/ROM
+ * and all io callbacks are supplied by the owner. */
+int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
 /* The design's "gf_instruction" is the existing gfinit_instruction tag:
  * share gfinit_decode_instruction and its .inc decoder, no second IR/type.
  * Run entry: pc/opcode/length and opcode-specific ref/count/port/index/mask/
@@ -112,11 +126,29 @@ void gf_init_commit(struct gf_init_context *ctx);
  * jumps to top.pc while count!=0, otherwise pops and keeps successor pc.
  * Each run returns 0/-1; never encode control flow in a new return-code class.
  * Preserve skip exceptions, CR44 head changes in skip, RESET forced execution
- * and 184C restoration. Reads for LIVE RMW happen at execution time. */
+ * and 184C restoration. Reads for LIVE RMW happen at execution time.
+ * head is 0/1. Indexed aliases are (port==CRTC ? PRMCIO : PRMVIO) +
+ * head*HEAD_STRIDE + port, with data at alias+1 (SEQ/GFX use PRMVIO).
+ * CRTC index CR44 itself ALWAYS uses head=0, including a latch's data
+ * destination. CR/INDEX_IO/ZM_INDEX_IO set logical head AFTER successful
+ * data write to (insn->value==CR44_HEAD1); the literal decoder value is used,
+ * not the RMW result. COPY does not change logical head. ZM_CR and each
+ * ZM_CR_GROUP element update head even in skip, without I/O then; GROUP's
+ * next element uses the updated head. In skip every other opcode with
+ * port==CRTC rejects index==CR44 (latched also rejects value==CR44), matching
+ * the old expansion. Indexed readers do not update head. */
 typedef int (*gf_op_run_fn)(struct gf_init_context *, const struct gfinit_instruction *);
 struct gf_op_dispatch { u32 opcode; gf_op_run_fn run; };
 extern const struct gf_op_dispatch gf_op_dispatch[];
 extern const u32 gf_op_dispatch_count;
+/* Shared indexed alias and PLL transaction, without alternate decoding. */
+static inline u32 gf_init_index_alias(const struct gf_init_context *ctx, u32 port, u32 index)
+{
+    u32 head = port == RECOVER_CRTC && index == RECOVER_CR44 ? 0 : ctx->head;
+    return (port == RECOVER_CRTC ? RECOVER_PRMCIO : RECOVER_PRMVIO) +
+           head * RECOVER_HEAD_STRIDE + port;
+}
+int gf_init_pll(struct gf_init_context *, u32 reg, u32 khz);
 
 int gf_op_io_restrict_prog_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_repeat_run(struct gf_init_context *, const struct gfinit_instruction *);

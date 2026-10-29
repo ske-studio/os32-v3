@@ -15,3 +15,5 @@ check-video-service-host:
 - lib/crc32_core.inc
 - build/checks.d/check-video-service-host.mk
 - tools/check_map.d/check-video-service-host.yaml
+- kdebug/gfinit_pll/*.inc
+- hwdev/gf/scripts.h

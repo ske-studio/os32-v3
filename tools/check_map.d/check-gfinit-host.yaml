@@ -123,3 +123,4 @@ check-gfinit-host:
 - tools/tests/gfinit_sequence_host.inc
 - hwdev/gf_load_state.c
 - hwdev/gf_load_state.h
+- hwdev/gf/scripts.h
