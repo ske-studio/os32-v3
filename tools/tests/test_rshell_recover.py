@@ -434,6 +434,33 @@ def mode_c_cli_cases(m):
 
 
 def restore_cases(m):
+    # rshell emits no new EOT while idle: reply only after a command is written.
+    class Shell(Port):
+        def write(self, data):
+            count = super().write(data)
+            if data == b'recover restore\n':
+                self.restore_at = self.t
+                self.data += b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+            return count
+
+    command = 'gfinit c-only --allow-write --verify required'
+    for terminal in ('PAUSED', 'S0'):
+        rows = META + (FINAL if terminal == 'S0' else '')
+        reply = '> ' + command + '\n' + rows + 'GF C verify=required result=OK\n\x04'
+        port = Shell(reply.encode())
+        with redirect_stdout(io.StringIO()):
+            assert m.exchange(port, command, m.Records(0), 20, 1,
+                              io.BytesIO(), lambda _: None, port.clock) == (
+                                  'PAUSED' if terminal == 'PAUSED' else 'OK')
+        assert not port.data
+        port.writes.clear()
+        idle_at = port.t
+        raw = io.BytesIO()
+        assert m.restore_exchange(port, 20, 1, raw, port.clock) == 'OK'
+        assert port.writes == [b'recover restore\n']
+        assert port.restore_at - idle_at >= 10  # Full quiet interval, not one empty read.
+        assert raw.getvalue() == b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+
     with tempfile.TemporaryDirectory(prefix='restore_cli_') as tmp:
         state, log=Path(tmp)/'state',Path(tmp)/'log'
         for bad in ('{broken',json.dumps(dict(invalid='old failure',image_crc='wrong')), '[]'):
@@ -457,6 +484,36 @@ def restore_cases(m):
 
     # A current RUN stream uses the existing abort frame, with no shell command.
     running=META.replace('event=PAUSED','event=RUNNING')
+    # Late bytes restart the quiet interval, including an unfinished row.
+    class LateShell(Shell):
+        def __init__(self, pending):
+            super().__init__(b'')
+            self.pending = list(pending)
+            self.last_rx = 0
+        def read(self, count):
+            self.t += .25
+            if self.pending and self.t >= self.pending[0][0]:
+                self.data += self.pending.pop(0)[1]
+            chunk = super().read(count)
+            if chunk:
+                self.last_rx = self.t
+            return chunk
+
+    partial = b'7 seq=20 phase=access'
+    tail = b' event=END rc=0 elapsed=1\n' + (running + FINAL + '\x04').encode()
+    port = LateShell([(8, partial), (17, tail)])
+    raw = io.BytesIO()
+    assert m.restore_exchange(port, 30, 1, raw, port.clock) == 'OK'
+    assert port.writes == [m.abort_frame(7)]
+    assert raw.getvalue() == partial + tail
+    for prefix in (b'noise\n', partial, b'x' * (m.MAX_LINE + 1)):
+        port = LateShell([(8, prefix)])
+        raw = io.BytesIO()
+        assert m.restore_exchange(port, 30, 1, raw, port.clock) == 'OK'
+        assert port.writes == [b'recover restore\n']
+        assert port.restore_at >= 18
+        assert raw.getvalue() == prefix + b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+
     port=Port((running+FINAL+'\x04').encode(),split=len(running))
     with redirect_stdout(io.StringIO()):
         assert m.restore_exchange(port,10,1,io.BytesIO(),port.clock)=='OK'

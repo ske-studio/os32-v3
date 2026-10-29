@@ -44,6 +44,9 @@ PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
 MAIN_TIMEOUT = 900
 C_TIMEOUT = 1800
 RESTORE_TIMEOUT = 180
+# At 9600 baud, allow the guest's <=5s wait and a MAX_LINE-sized REC row.
+# An idle rshell does not repeat an EOT already consumed by a previous call.
+RESTORE_IDLE_SECONDS = 10
 BUS_ID = ('pc', 'bar', 'off', 'width')
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
@@ -356,11 +359,22 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
 
 def restore_exchange(port, timeout, cleanup_timeout, raw, clock=time.monotonic):
     # A live stream supplies its sid. Never reenter the shell during RUN.
-    deadline = clock() + timeout
+    last_rx = clock()
+    deadline = last_rx + timeout
     line = bytearray()
     dropping = False
     while clock() < deadline:
         chunk = port.read(256)
+        now = clock()
+        if chunk:
+            last_rx = now
+        elif now - last_rx >= RESTORE_IDLE_SECONDS and now < deadline:
+            # Empty reads and partial rows alone are not shell readiness.
+            # Require a full quiet interval since attachment/the last byte.
+            raw.write(line)
+            raw.flush()
+            return exchange(port, 'recover restore', Records(0, resync=True),
+                            timeout, cleanup_timeout, raw, lambda _: None, clock)
         for pos, byte in enumerate(chunk):
             if byte == 4:
                 # EOT closes the current command: the shell can accept restore.
