@@ -120,6 +120,12 @@ def run_variants(tmp, shim, prefix):
 #  変異 (否定側)。(ファイル, 置換前, 置換後) — 置換前は 1 か所だけに出ること。
 # ---------------------------------------------------------------------------
 MUTATIONS = [
+    ("gfxmode_geforce", "userland/shell/cmd_sys.c",
+     '!str_eq(argv[1], "cirrus") && !str_eq(argv[1], "geforce") &&',
+     '!str_eq(argv[1], "cirrus") &&'),
+    ("gfxmode_geforce_warning", "userland/shell/cmd_sys.c",
+     '"GUI=1 selects pc98 at next boot\\n"',
+     '"Graphics backend selected\\n"'),
     ("gserial_sfs_guard", "userland/shell/cmd_sys.c",
      "    if (sh_in_sfs) {", "    if (0) {"),
     ("gserial_sfs_flag", "userland/shell/rshell.c",
