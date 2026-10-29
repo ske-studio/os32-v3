@@ -19,9 +19,9 @@ def command(exe):
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
-    # Independently rebuilt f5953909 with this synthetic ROM/profile fixture.
-    assert 'default_hash=136312656\n' in text
-    assert 'default_crc=4168826899\n' in text
+    # f5953909 rebuilt independently, then debd2ad5 (CR1A mask D7) merged — PM.
+    assert 'default_hash=81564298\n' in text
+    assert 'default_crc=2834802941\n' in text
     assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
