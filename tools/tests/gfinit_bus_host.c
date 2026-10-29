@@ -458,7 +458,8 @@ static int resource_size_operation(struct recover *r,void *arg)
         if(recover_plan_enter(r,i))return -1;
         if(node->rule_id!=RECOVER_NONE){
             const struct recover_rule *w=rule_by_id(&profile,node->rule_id);
-            if(!evaluate(r,node,w,0,&value))return -1;
+            u32 old=0;
+            if(!evaluate(r,node,w,&old,&value))return -1;
         }
         if(recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value))return -1;
         if(l->dir_substep==REC_READ && recover_bar_probe(r,key-7,r->bars[key-7].raw,

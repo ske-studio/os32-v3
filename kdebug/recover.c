@@ -1947,7 +1947,7 @@ static void capture_read(struct recover *r, u32 target, u32 ordinal, u32 value)
     }
 }
 static bool evaluate(struct recover *r, const struct recover_plan_node *n,
-                     const struct recover_rule *w, u32 old, u32 *result)
+                     const struct recover_rule *w, u32 *old, u32 *result)
 {
     const struct recover_plan_arg *args = &r->plan->args[n->arg_first];
     if (w->value.mode == REC_EXPR) {
@@ -1961,6 +1961,10 @@ static bool evaluate(struct recover *r, const struct recover_plan_node *n,
                 if ((r->profile->targets[a->value].space == REC_VGA_INDEXED &&
                      r->port_selected[r->index_port[a->value]] != a->value) || bus_read(r, a->value, &values[i])) return false;
                 capture_read(r, a->value, ordinal++, values[i]);
+                /* Validate preserved bits against the destination sample used
+                 * by the expression. Status bits can change while serial logs
+                 * separate this READ from the earlier pre-read. */
+                if (a->value == w->key) *old = values[i];
             } else {
                 if (!r->valid) return false;
                 if (a->value < r->profile->count) {
@@ -1978,7 +1982,7 @@ static bool evaluate(struct recover *r, const struct recover_plan_node *n,
     }
     if (w->value.mode == REC_SAVED) {
         if (!r->valid || args[1].value >= r->saved_count) return false;
-        *result = (old & ~w->write_mask) | (r->saved[args[1].value] & w->write_mask);
+        *result = (*old & ~w->write_mask) | (r->saved[args[1].value] & w->write_mask);
     } else *result = args[1].value;
     return true;
 }
@@ -2091,7 +2095,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             return access_error(r, target);
         if (r->transport && r->state == REC_RUNNING && w->write_mask == width_mask(width) &&
             t->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)) return access_error(r, target);
-        if (n && !evaluate(r, n, w, old, &expected)) return access_error(r, target);
+        if (n && !evaluate(r, n, w, &old, &expected)) return access_error(r, target);
         if (planned) *value = expected;
         if (!value_ok(&w->value, width, *value)) return access_error(r, target);
         if (dir == REC_SELECT && !(w->flags & REC_LOCAL) && *value != t->index) return access_error(r, target);

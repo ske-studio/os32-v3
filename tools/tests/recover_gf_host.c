@@ -287,7 +287,8 @@ static int size_operation(struct recover *r,void *arg)
         if(recover_plan_enter(r,i)) return -1;
         if(n->rule_id!=RECOVER_NONE) {
             const struct recover_rule *w=rule_by_id(&profile,n->rule_id);
-            if(!evaluate(r,n,w,0,&value)) return -1;
+            u32 old=0;
+            if(!evaluate(r,n,w,&old,&value)) return -1;
         }
         if(recover_access(r,i,l->dir_substep,key,gf_fixture_profile.targets[key].width,&value)) return -1;
         if(l->dir_substep==REC_READ) {

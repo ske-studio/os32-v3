@@ -70,9 +70,11 @@ def main():
     verify_stubs(elf_data, meta['imports'])
     cases = [('actual-GF', 0, 0, image), ('actual-GF-core-contract', 5, 6, image),
              ('actual-GF-core-layout', 6, 6, image), ('actual-GF-kernel-pair', 9, 4, image)]
+    # The decoder's local control() has the same name as the owner's BSS.
     symbols = {line.split()[-1]: int(line.split()[0], 16) for line in
                subprocess.check_output([str(cross/'i386-elf-nm'), '--defined-only',
-                                        str(OUT/'hwdev/hwdev.elf')], text=True).splitlines()}
+                                        str(OUT/'hwdev/hwdev.elf')], text=True).splitlines()
+               if line.split()[-1] != 'control' or line.split()[-2] == 'b'}
     h = struct.unpack_from('<36I', image)
     for label, relative in [('core-image', 24), ('contract', 28), ('layout', 40)]:
         b = bytearray(image)
@@ -105,6 +107,7 @@ def main():
         module.run(exe, cases)
         print("PASS actual ops->call op5-10 and release_work -> relocated core stubs")
         trace.run(folder)
+        trace.run(folder, mode_c=True)
         dispatch.main()
         if '--mutate' in sys.argv:
             # Break only the loaded body. Host white-box copies remain intact:

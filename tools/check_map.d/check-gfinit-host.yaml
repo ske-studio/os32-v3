@@ -113,3 +113,4 @@ check-gfinit-host:
 - kdebug/gf_stage_state.c
 - kdebug/gf_stage_state.h
 - tools/tests/gf_stage_host.inc
+- tools/tests/gfinit_sequence_host.inc
