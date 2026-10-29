@@ -26,5 +26,6 @@ static const struct hwdev_core_api core = {
     recover_gf_screen_safe,
     recover_hal_wait_frame,
     kpeek_call,
+    recover_gf_runner_access,
 };
 const struct hwdev_core_api *hwdev_core_get(void) { return &core; }

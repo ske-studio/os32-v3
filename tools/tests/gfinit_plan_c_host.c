@@ -146,10 +146,7 @@ static void prefix_run(bool mode_c)
     executor_bus.read=prefix_read;executor_bus.write=bus_write_test;
     core.transport=&prefix_transport;exec_log_busy=false;
     for(u32 i=0;i<profile.target_count;i++)values[i]=0;
-    for(u32 i=0;i<recover_gf_prepare_plan.node_count;i++) {
-        u32 value;
-        CHECK(!recover_plan_enter(&core,i));CHECK(!recover_plan_access(&core,&value));CHECK(!recover_plan_leave(&core,0));
-    }
+    CHECK(!gfinit_exec_prepare(&core,&execution));
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;CHECK(!gfinit_exec_run(&core,&execution));
     }
@@ -204,10 +201,7 @@ static void c_arm(void)
     core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
     executor_bus.read=bus_read_test;executor_bus.write=bus_write_test;
     for(u32 i=0;i<profile.target_count;i++)values[i]=0;
-    for(u32 i=0;i<recover_gf_prepare_plan.node_count;i++) {
-        u32 value;
-        CHECK(!recover_plan_enter(&core,i));CHECK(!recover_plan_access(&core,&value));CHECK(!recover_plan_leave(&core,0));
-    }
+    CHECK(!gfinit_exec_prepare(&core,&execution));
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;CHECK(gfinit_exec_run(&core,&execution)==0);
     }
@@ -389,6 +383,31 @@ static void c_walk(u32 variant,bool fp_on)
     field("prefix_nodes",composed.c_node);
     field("plan_bytes",sizeof(composed));field("decode_bytes",sizeof(decoded));
 }
+static u32 changing_key,changing_bit,changing_reads;
+static int changing_c_read(void *v,const struct recover_bus_access *a,u32 *value)
+{
+    if(a->key==changing_key && ++changing_reads==2)values[a->key]^=changing_bit;
+    return bus_read_test(v,a,value);
+}
+static void c_live_sample(void)
+{
+    /* C rows grant full-width writes, while generic plans also validate
+     * preserved bits. Keep that primitive's runtime-sample regression here. */
+    bus_setup();contract_setup(1);
+    contract_rules[0].write_mask=1;
+    contract_rules[0].value=(struct recover_value){.mode=REC_EXPR,.mask=1,.bits=1,
+        .max=~0U,.expr_id=REC_GF_RMW};
+    contract_layouts[0]=(struct recover_opcode_layout){1,0,4,four,REC_WRITE,0};
+    decoded.nodes[0].expr_id=REC_GF_RMW;decoded.nodes[0].arg_count=4;
+    decoded.args[0]=IMM(0);decoded.args[1]=READ(0);decoded.args[2]=IMM(~1U);decoded.args[3]=IMM(1);
+    CHECK(!contract_bind());contract_arm();
+    changing_key=0;changing_bit=0x80000000;changing_reads=0;values[0]=0;
+    executor_bus=ops;executor_bus.read=changing_c_read;executor_bus.write=bus_write_test;
+    core.ops=&executor_bus;u32 value=0;
+    CHECK(!recover_plan_enter(&core,0));CHECK(!recover_plan_access(&core,&value));
+    CHECK(changing_reads==2 && values[0]==0x80000001);
+    CHECK(!recover_plan_leave(&core,0));
+}
 static void contracts(void)
 {
     const u32 fp_values[]={0,0x20000022,1,16,0x10000000};
@@ -408,9 +427,9 @@ static void contracts(void)
     decoded.nodes[id-1].substep=GF_C_SECTION;
     decoded.nodes[id-1].rule_id=RECOVER_NONE;
     CHECK(contract_bind()<0);
-    c_build();core.plan=0;decoded.captures[35].producer_node=decoded.captures[35].consumer_node;
+    c_build();core.plan=0;decoded.captures[0].producer_node=decoded.captures[0].consumer_node;
     CHECK(contract_bind()<0);
-    c_build();core.plan=0;decoded.captures[35].read_ordinal++;
+    c_build();core.plan=0;decoded.captures[0].read_ordinal++;
     CHECK(contract_bind()<0);
     bus_setup();fixture();CHECK(!recover_gf_profile_expand(&profile,&composed));
     CHECK(!gfinit_decode_rom(rom,sizeof(rom),&profile,&decoded));
@@ -997,7 +1016,7 @@ void GF_C_ENTRY(void)
 #ifdef HWDEV_SEQUENCE_IMAGE
     sequence_owner_cases();
 #endif
-    sequence_cases();verify_policy_cases();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();stage_record();stage_gates();stage_s0_failures();stage_local_locks();
+    sequence_cases(); c_live_sample();verify_policy_cases();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();stage_record();stage_gates();stage_s0_failures();stage_local_locks();
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

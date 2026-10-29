@@ -1,5 +1,5 @@
 /* S1 bytes (193 instructions/27 kinds), synthetic supporting tables. The
- * oracle is the retained OLD expansion + actual recover executor. */
+ * oracle is the frozen pre-P6 expansion/executor trace. */
 #define GF_S3_ENTRY old_s3_entry
 #include "gfinit_exec_host.c"
 #include "../../hwdev/gf/runner.c"
@@ -7,13 +7,16 @@
 #include "../../hwdev/gf/pll.c"
 
 struct raw_event { u32 write, off, width, value, pc, op; };
-static struct raw_event old_trace[TRACE_MAX], new_trace[TRACE_MAX];
-static u32 raw_count, recording_old, raw_index[6], fail_at, point_count, point_fail;
+#include "gf_runner_trace_fixture.h"
+static struct raw_event new_trace[TRACE_MAX];
+static const struct raw_event *old_trace;
+static u32 raw_count, raw_index[6], fail_at, point_count, point_fail;
 static u32 restore_calls, adapter_cleanup, restore_fail_at, raw_calls;
 static struct gf_init_context init;
 static struct gf_init_program program;
 static u32 observed[256], raw_vga[6][256], restored_entries, seed_mode;
 static u32 instruction_seen[256];
+static bool diagnostic_mode,a2_bad_decode;
 static u32 initial_value(u32 off,u32 width)
 {
     return seed_mode ? ((off * 0x10203U) ^ 0xa5a50f55U) & width_mask(width) : 0;
@@ -55,39 +58,13 @@ static int raw_access(u32 write, u32 off, u32 width, u32 *value)
         else if (data >= 0) raw_vga[data][raw_index[data]] = *value & 255;
         else if (k != RECOVER_NONE) values[k] = *value & width_mask(width);
     }
-    struct raw_event *trace = recording_old ? old_trace : new_trace;
+    struct raw_event *trace = new_trace;
     CHECK(raw_count < TRACE_MAX);
-    u32 pc = recording_old ? core.plan->nodes[core.cursor].pc : init.fail_pc;
-    u32 op = recording_old ? core.plan->nodes[core.cursor].opcode : rom[pc];
+    u32 pc = diagnostic_mode ? execution.init.fail_pc : init.fail_pc;
+    u32 op = pc<sizeof(rom)?rom[pc]:0;
     if (raw_count < TRACE_MAX) trace[raw_count++] = (struct raw_event){write,off,width,*value,pc,op};
-    if (!recording_old) observed[op]++;
+    observed[op]++;
     return 0;
-}
-static int old_read(void *v, const struct recover_bus_access *a, u32 *value)
-{
-    int rc = exec_bus_read(v,a,value);
-    if(core.cursor==RECOVER_NONE || core.state!=REC_RUNNING)return rc;
-    int data=raw_port(a->offset-1);
-    if(data>=0)*value=raw_vga[data][raw_index[data]];
-    const struct recover_plan_node *n = &core.plan->nodes[core.cursor];
-    const struct recover_opcode_layout *l = core.node_layout[core.cursor];
-    bool operand = l->dir_substep == REC_READ && decoded.args[n->arg_first].value == a->key;
-    for (u32 j=0;j<n->arg_count;j++)
-        if (decoded.args[n->arg_first+j].kind == REC_ARG_READ &&
-            decoded.args[n->arg_first+j].value == a->key) operand = true;
-    if (operand) old_trace[raw_count++] = (struct raw_event){0,a->offset,a->width,*value,n->pc,n->opcode};
-    return rc;
-}
-static int old_write(void *v, const struct recover_bus_access *a, u32 value)
-{
-    if(core.cursor==RECOVER_NONE || core.state!=REC_RUNNING)return exec_bus_write(v,a,value);
-    int p=raw_port(a->offset);
-    if(p>=0)raw_index[p]=value;
-    int data=raw_port(a->offset-1);
-    if(data>=0)raw_vga[data][raw_index[data]]=value & 255;
-    const struct recover_plan_node *n=&core.plan->nodes[core.cursor];
-    old_trace[raw_count++]=(struct raw_event){1,a->offset,a->width,value,n->pc,n->opcode};
-    return exec_bus_write(v,a,value);
 }
 static int new_read(void *v, u32 bar, u32 off, u32 width, u32 *value)
 {
@@ -109,14 +86,13 @@ static int raw_delay(void *v,u32 us)
 {
     int rc=exec_delay(v,us);
     if(rc)return rc;
-    u32 pc=recording_old?core.plan->nodes[core.cursor].pc:init.fail_pc;
-    u32 op=recording_old?core.plan->nodes[core.cursor].opcode:pc<sizeof(rom)?rom[pc]:0;
-    struct raw_event *trace=recording_old?old_trace:new_trace;
+    u32 pc=diagnostic_mode ? execution.init.fail_pc : init.fail_pc;
+    u32 op=pc<sizeof(rom)?rom[pc]:0;
+    struct raw_event *trace=new_trace;
     CHECK(raw_count<TRACE_MAX);
     if(raw_count<TRACE_MAX)trace[raw_count++]=(struct raw_event){2,0,0,us,pc,op};
     return 0;
 }
-static const struct gfinit_exec_ops raw_timing={exec_clock,raw_delay};
 static int new_restore(void *v, struct gf_init_context *ctx)
 {
     (void)v;
@@ -150,7 +126,7 @@ static void reset_raw(void)
 }
 static void new_context(void)
 {
-    reset_raw(); recording_old = 0;
+    reset_raw();
     for(u32 i=0;i<256;i++)instruction_seen[i]=0;
     init = (struct gf_init_context){.rom=rom,.rom_size=sizeof(rom),
         .io={.read=new_read,.write=new_write,.point=new_point,.restore=new_restore,
@@ -161,24 +137,95 @@ static bool equal_event(const struct raw_event *a, const struct raw_event *b)
     return a->write == b->write && a->off == b->off && a->width == b->width &&
            a->value == b->value && a->pc == b->pc;
 }
-static void differential(void)
+static int diagnostic_read(void *v,const struct recover_bus_access *a,u32 *value)
+{
+    (void)v;
+    /* Recover's decode-zero guards are bookkeeping, outside the old operand
+     * stream too. S1 never reads these two zero-only registers as operands. */
+    if(a->space==REC_PCI_CFG || a->offset==0x1850 || a->offset==0x1854) {
+        *value=a2_bad_decode && a->space==REC_PCI_CFG && a->offset==RECOVER_CFG50;return 0;
+    }
+    return raw_access(0,a->offset,a->width,value);
+}
+static int diagnostic_write(void *v,const struct recover_bus_access *a,u32 value)
+{ (void)v;return raw_access(1,a->offset,a->width,&value); }
+static void diagnostic_run(void)
+{
+    adapter_begin();reset_raw();diagnostic_mode=true;
+    executor_bus.read=diagnostic_read;executor_bus.write=diagnostic_write;
+    static const struct gfinit_exec_ops timing={exec_clock,raw_delay};
+    execution.ops=&timing;
+    for(u32 m=0;m<5;m++) {
+        execution.main_id=m;
+        u32 before=raw_count;
+        CHECK(trial_step(&core,&core.token,false,gfinit_exec_run,&execution)<0 && raw_count==before);
+        CHECK(!trial_step(&core,&core.token,true,gfinit_exec_run,&execution));
+        CHECK(core.state==REC_PAUSED);
+    }
+}
+static int diagnostic_cleanup(void *v)
+{
+    (void)v;cleanup_calls++;
+    CHECK(execution.init.saved_count==1); /* interrupted RESET */
+    int rc=gfinit_exec_restore(&execution);
+    CHECK(!execution.init.saved_count);
+    return rc;
+}
+static int diagnostic_abort(void *v,u32 session)
+{ (void)v;(void)session;return execution.init.saved_count!=0; }
+static void diagnostic_cancel(void)
+{
+    adapter_begin();reset_raw();diagnostic_mode=true;
+    executor_bus.read=diagnostic_read;executor_bus.write=diagnostic_write;
+    executor_bus.local_cleanup=diagnostic_cleanup;executor_bus.abort_requested=diagnostic_abort;
+    values[raw_key(0x184c,4)]=0xa5a50f55;
+    CHECK(trial_step(&core,&core.token,true,gfinit_exec_run,&execution)<0);
+    CHECK(core.reason==REC_ABORT && cleanup_calls==1 && !core.plan);
+    CHECK(values[raw_key(0x184c,4)]==0xa5a50f55);
+    diagnostic_mode=false;
+    output("diagnostic RESET cancellation restores pending transaction before S0 PASS\n");
+}
+static void diagnostic_a2(void)
+{
+    for(u32 bad=0;bad<2;bad++) {
+        adapter_begin();release_plan(&core);core.state=REC_IDLE;
+        decoded.nodes[0]=(struct recover_plan_node){.phase=REC_PREPARE,.main_id=RECOVER_NONE,
+            .pc=RECOVER_NONE,.opcode=GF_INIT_A2,.rule_id=RECOVER_NONE,.expr_id=RECOVER_NONE,
+            .next={RECOVER_NONE,RECOVER_NONE}};
+        decoded.entries[0]=(struct recover_plan_entry){REC_PREPARE,RECOVER_NONE,0};
+        decoded.plan.node_count=decoded.plan.entry_count=1;
+        exec_layouts[profile.layout_count++]=(struct recover_opcode_layout){
+            .opcode=GF_INIT_A2,.dir_substep=RECOVER_NONE};
+        CHECK(!contract_bind());exec_arm();
+        core.token.profile_crc=profile.crc;core.token.profile_version=profile.version;
+        core.token.plan_hash=core.bound_hash;core.token.snapshot_crc=snapshot_crc(&core);
+        core.state=REC_PAUSED;core.in_call=core.in_opcode=false;
+        reset_raw();diagnostic_mode=true;a2_bad_decode=bad;
+        executor_bus.read=diagnostic_read;executor_bus.write=diagnostic_write;
+        int rc=trial_step(&core,&core.token,true,gfinit_exec_prepare,&execution);
+        if(bad)CHECK(rc && core.reason==REC_CONTRACT && cleanup_calls==1 && raw_count==5);
+        else {
+            CHECK(!rc && raw_count==GF_ARRAY(a2_trace_fixture));
+            for(u32 i=0;i<raw_count && i<GF_ARRAY(a2_trace_fixture);i++)
+                CHECK(equal_event(&new_trace[i],&a2_trace_fixture[i]));
+        }
+    }
+    a2_bad_decode=false;diagnostic_mode=false;
+    output("diagnostic A2 literal trace and decode guard before VGA PASS\n");
+}
+static void differential(bool diagnostic)
 {
     setup(); fixture();
-    CHECK(gfinit_decode_rom(rom,sizeof(rom),&gf_fixture_profile,&decoded)==0);
     synthetic_profile();
-    for(u32 i=0;i<profile.target_count;i++)exec_targets[i].access=REC_COLD;
-    CHECK(contract_bind()==0); exec_arm();
-    reset_raw(); recording_old = 1;
-    executor_bus.read=old_read; executor_bus.write=old_write;
-    execution.ops=&raw_timing;
-    for (u32 m=0;m<5;m++) {
-        execution.main_id=m;
-        CHECK(gfinit_exec_run(&core,&execution)==0);
-    }
-    u32 old_count=raw_count;
+    old_trace=seed_mode ? old_trace_seed1 : old_trace_seed0;
+    u32 old_count=GF_ARRAY(old_trace_seed0);
     new_context();
-    CHECK(gf_init_run(&init,&program)==0);
-    CHECK(program.count==193 && gf_op_dispatch_count==27 && !restore_calls);
+    if(diagnostic) diagnostic_run();
+    else {
+        diagnostic_mode=false;
+        CHECK(gf_init_run(&init,&program)==0);
+        CHECK(program.count==193 && gf_op_dispatch_count==27 && !restore_calls);
+    }
     output("S1 command/wait events old/new (with saves) "); number(old_count); output("/"); number(raw_count); output("\n");
     /* P0 adds four literal PLL snapshots and two latch index pairs to the
      * old command stream. This independent overlay is specified by internal.h;
@@ -209,7 +256,7 @@ static void differential(void)
     CHECK(oi==old_count && ni==raw_count && extra==8);
     u32 kinds=0;
     for(u32 i=0;i<256;i++)if(instruction_seen[i])kinds++;
-    CHECK(kinds==27);
+    CHECK(diagnostic || kinds==27);
     output("S1: 193 decoded/27 executed kinds; old operand I/O exact, 8 contract saves exact\n");
 
 }
@@ -238,7 +285,7 @@ static void control_cases(void)
     struct gf_script_span sub={.pc=0x300,.length=3};
     CHECK(init_prepare_span(&init,&program,&sub)==0);
     CHECK(program.insns[0].end_repeat==0x107 && program.insns[1].end_repeat==0x106);
-    CHECK(init_run_main(&init,&program)==0 && raw_count==8 && !init.calls && !init.repeats);
+    CHECK(gf_init_run_one(&init,&program)==0 && raw_count==8 && !init.calls && !init.repeats);
     CHECK(init.wait_us==0 && init.steps==29);
     for(u32 i=0;i<raw_count;i++)CHECK(new_trace[i].write==1 && new_trace[i].width==4);
     /* Conditions fail once, stay skipped, NOT toggles, RESUME clears. */
@@ -250,21 +297,21 @@ static void control_cases(void)
         u32 pc=program.insns[i].pc;
         CHECK(gfinit_decode_instruction(rom,sizeof(rom),pc,&program.insns[i])==0);
     }
-    CHECK(init_run_main(&init,&program)==0 && init.skip && raw_count==4);
+    CHECK(gf_init_run_one(&init,&program)==0 && init.skip && raw_count==4);
     CHECK(new_trace[0].write==0 && new_trace[1].write==1 &&
           new_trace[2].write==1 && new_trace[3].write==0);
     /* REPEATs are structural in skip too; no writes until NOT. */
     const u8 skip_repeat[]={0x38,0x33,2,0x6f,0,0x36,0x38,0x6f,0,0x71};
     CHECK(synthetic(skip_repeat,sizeof(skip_repeat))==0);
-    CHECK(init_run_main(&init,&program)==0 && raw_count==1 && !init.repeats);
+    CHECK(gf_init_run_one(&init,&program)==0 && raw_count==1 && !init.repeats);
     /* A recursive subroutine hits exactly the existing call ceiling. */
     const u8 recurse[]={0x5b,0,1,0x71};
     CHECK(synthetic(recurse,sizeof(recurse))==0);
-    CHECK(init_run_main(&init,&program)<0 && init.calls==16 && raw_count==0);
+    CHECK(gf_init_run_one(&init,&program)<0 && init.calls==16 && raw_count==0);
     /* Nested valid loops exceed the instruction budget without waiting. */
     const u8 budget[]={0x33,254,0x33,254,0x63,0x36,0x36,0x71};
     CHECK(synthetic(budget,sizeof(budget))==0);
-    CHECK(init_run_main(&init,&program)<0 && init.steps==4096);
+    CHECK(gf_init_run_one(&init,&program)<0 && init.steps==4096);
     const u8 unmatched[]={0x33,2,0x71}, extra_end[]={0x36,0x71};
     CHECK(synthetic(unmatched,sizeof(unmatched))<0 && raw_count==0);
     CHECK(synthetic(extra_end,sizeof(extra_end))<0 && raw_count==0);
@@ -273,7 +320,7 @@ static void control_cases(void)
         for(u32 i=0;i<depth;i++){deep[2*i]=0x33;deep[2*i+1]=1;deep[2*depth+i]=0x36;}
         deep[3*depth]=0x71;
         int rc=synthetic(deep,3*depth+1);
-        if(depth==8)CHECK(rc==0 && init_run_main(&init,&program)==0 && !init.repeats);
+        if(depth==8)CHECK(rc==0 && gf_init_run_one(&init,&program)==0 && !init.repeats);
         else CHECK(rc<0 && raw_count==0);
     }
     /* DONE cannot return across an active repeat owned by its callee. */
@@ -286,15 +333,15 @@ static void head_cases(void)
 {
     const u8 heads[]={0x53,0x44,3,0x53,0x44,0,0x53,0x11,7,0x71};
     CHECK(synthetic(heads,sizeof(heads))==0);
-    CHECK(init_run_main(&init,&program)==0 && raw_count==6 && init.head==0);
+    CHECK(gf_init_run_one(&init,&program)==0 && raw_count==6 && init.head==0);
     for(u32 i=0;i<raw_count;i++)CHECK(new_trace[i].off==0x6013d4U+(i%2));
     const u8 group[]={0x54,4,0x44,3,0x11,7,0x44,0,0x11,9,0x71};
     CHECK(synthetic(group,sizeof(group))==0);
-    CHECK(init_run_main(&init,&program)==0 && raw_count==8);
+    CHECK(gf_init_run_one(&init,&program)==0 && raw_count==8);
     CHECK(new_trace[2].off==0x6033d4 && new_trace[6].off==0x6013d4);
     const u8 skipped[]={0x38,0x53,0x44,3,0x54,2,0x44,0,0x44,3,0x72,0x53,0x11,7,0x71};
     CHECK(synthetic(skipped,sizeof(skipped))==0);
-    CHECK(init_run_main(&init,&program)==0 && init.head==1 && raw_count==2);
+    CHECK(gf_init_run_one(&init,&program)==0 && init.head==1 && raw_count==2);
     CHECK(new_trace[0].off==0x6033d4);
     /* Both latch aliases independently honor CR44; skip rejects either. */
     struct gfinit_instruction latch={.index=0x20,.value=0x44,.count=1,.ref=0x200};
@@ -415,7 +462,7 @@ static void save_cases(void)
         CHECK(synthetic(reset,sizeof(reset))==0);
         values[raw_key(0x184c,4)]=0xa5a50f55;
         wait_fail=failure;
-        int rc=init_run_main(&init,&program);
+        int rc=gf_init_run_one(&init,&program);
         if(failure) {
             CHECK(rc<0 && init.saved_count==1);
             CHECK(new_restore(0,&init)==0 && restored_entries==1);
@@ -452,7 +499,13 @@ static void save_cases(void)
 }
 void _start(void)
 {
-    gf_fixture_init(); differential(); seed_mode=1; differential(); seed_mode=0; control_cases(); head_cases(); wait_cases(); pll_case(); save_cases();
+    gf_fixture_init(); differential(false); differential(true);
+    seed_mode=1; differential(false); differential(true); seed_mode=0;
+    diagnostic_mode=false; diagnostic_cancel(); diagnostic_a2();
+#ifdef GF_RUNNER_TRACE_ONLY
+    if (0)
+#endif
+    { control_cases(); head_cases(); wait_cases(); pll_case(); save_cases(); }
     output(failures?"GF runner FAIL\n":"GF runner PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1),"b"(failures?1:0));
     __builtin_unreachable();

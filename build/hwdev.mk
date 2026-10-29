@@ -97,14 +97,22 @@ $(VPLL_OUT)/hw/gf_load_state.o: hwdev/gf_load_state.c hwdev/gf_load_state.h hwde
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -c $< -o $@
 
-# P2 components compile in HWDEV configuration; module wiring follows in P4/P5.
+# Shared init components are linked into the diagnostic HWDEV module.
 GF_INIT_SOURCES := hwdev/gf/runner.c hwdev/gf/save.c hwdev/gf/pll.c $(wildcard hwdev/gf/op/*.c)
 GF_INIT_OBJS := $(patsubst hwdev/%.c,$(HWDEV_OUT)/%.o,$(GF_INIT_SOURCES))
 $(HWDEV_OUT)/gf/%.o: hwdev/gf/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -Werror -c $< -o $@
-# Compile now without adding unused components to the diagnostic module.
-$(HWDEV_OUT)/hwdev.elf: $(GF_INIT_OBJS)
+# Diagnostics now execute the same A/main runner as production.
+HWDEV_OBJS += $(GF_INIT_OBJS)
+R1_HWDEV_OBJS += $(GF_INIT_OBJS)
+VPLL_GF_INIT_OBJS := $(patsubst $(HWDEV_OUT)/%,$(VPLL_OUT)/hw/%,$(GF_INIT_OBJS))
+VPLL_HW_OBJS += $(VPLL_GF_INIT_OBJS)
+$(VPLL_OUT)/hw/gf/%.o: hwdev/gf/%.c $(HWDEV_GENERATED) build/config.mk build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -Werror -c $< -o $@
+$(HWDEV_OUT)/hwdev.elf $(R1_HWDEV_OUT)/hwdev.elf: $(GF_INIT_OBJS)
+$(VPLL_OUT)/hw/hwdev.elf: $(VPLL_GF_INIT_OBJS)
 -include $(GF_INIT_OBJS:.o=.d)
 
 # P3 calculation is linked once; diagnostic C and production use its functions.

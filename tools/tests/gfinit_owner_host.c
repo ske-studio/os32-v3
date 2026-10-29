@@ -177,6 +177,9 @@ int trial_step(struct recover *r,const struct recover_token *token,bool approved
 }
 int trial_end(struct recover *r,const struct recover_token *token,enum recover_reason reason)
 { CHECK(token==&r->token);if(r->state!=REC_PAUSED)return -1;ends++;event('E');r->reason=reason;r->ops->local_cleanup(r->opaque);r->state=REC_VERIFIED;r->s0_verified=true;if(stage.initialized)stage.s0_ok=true;r->plan=0;r->cache.bar[1].valid=true;r->cache.bar[1].length=0x100000;return 0; }
+int gfinit_exec_prepare(struct recover *r,void *arg)
+{ struct gfinit_exec *e=arg;CHECK(r==&core && e->rom==owner->rom);return 0; }
+int gfinit_exec_restore(struct gfinit_exec *e) { (void)e;return 0; }
 int gfinit_exec_run(struct recover *r,void *arg)
 { struct gfinit_exec *e=arg;CHECK(r==&core && e->rom==owner->rom && e->rom_size==512);CHECK(e->main_id<5);run_mask|=1U<<e->main_id;e->steps=9;e->fail_pc=0;if(run_fail==e->main_id+1)return -1;writes++;return 0; }
 int gfinit_plan_c_control(struct gfinit_plan *p,struct recover *r)
@@ -415,7 +418,9 @@ static void allocation_test(void)
         CHECK(alloc_calls==fail);
     }
     setup();plan_nodes=RECOVER_NODE_MAX;prepared();
-    CHECK(peak_pages==TEST_PAGE_BUDGET && writes==0);
+    CHECK(peak_pages==(PAGE_ALIGN_UP(sizeof(struct gfinit_decode))+
+        PAGE_ALIGN_UP(sizeof(struct gfinit_plan))+GF_ROM_MAX+GF_FLOW_MAX_BYTES)/PAGE_SIZE && writes==0);
+    CHECK(peak_pages<=TEST_PAGE_BUDGET);
     output("bytes control/decode/plan/ROM/flow pages_peak: ");
     number(sizeof(control));output("/");number(sizeof(struct gfinit_decode));output("/");
     number(sizeof(struct gfinit_plan));output("/");number(GF_ROM_MAX);output("/");

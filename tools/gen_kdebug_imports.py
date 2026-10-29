@@ -53,6 +53,9 @@ def hwdev_gf_objects(root=ROOT):
     if not match:
         raise ValueError('missing HWDEV_GF literal inventory')
     names = tuple(match[1].split())
+    # P6 links the common runner and opcode implementations into HWDEV.
+    names += ('gf/runner', 'gf/save', 'gf/pll') + tuple(
+        'gf/op/' + p.stem for p in sorted((Path(root)/'hwdev/gf/op').glob('*.c')))
     if not names or len(names) != len(set(names)):
         raise ValueError('empty/duplicate HWDEV_GF inventory')
     return names
@@ -228,7 +231,7 @@ def check_nm(entries, nm=None, root=ROOT):
     # M3c: read actual linked inputs, never stale GF .o files left in the
     # output directory. Their old kernel slots remain callable ABI entries.
     paths = linked
-    if any(p.stem in hwdev_gf_objects(root) for p in paths):
+    if any(p.stem in {Path(name).name for name in hwdev_gf_objects(root)} for p in paths):
         raise ValueError('GF object still linked into kdebug')
     callers = [p for p in paths if p.stem not in ('kdebug_import_slots', 'kdebug_import_stubs')]
     refs = symbols(nm, callers, True) - symbols(nm, callers, False) - {ABI_SYMBOL}

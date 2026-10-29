@@ -1,7 +1,7 @@
-"""Expected private hwdev fingerprints after GF_DRIVER P4/P5."""
+"""Expected private hwdev fingerprints after GF_DRIVER P6 cleanup."""
 
-HWDEV_CONTRACT_CRC = 0xf22b1add
-HWDEV_LAYOUT_CRC = 0x1eae31dc
+HWDEV_CONTRACT_CRC = 0x466ad163
+HWDEV_LAYOUT_CRC = 0x64142dfa
 
 
 def assert_hwdev_contract(root):

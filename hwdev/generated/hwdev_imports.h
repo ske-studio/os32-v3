@@ -1,5 +1,6 @@
 #include "hwdev_contract.h"
 #include "kernel/module_image.h"
+static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1};
 static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0x92f2e639U, 1, 1},
     {0xa2272b76U, 1, 1},
@@ -37,6 +38,7 @@ static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0xbba6498fU, 1, 1},
     {0x47aba321U, 1, 1},
     {0x5d4718c6U, 1, 1},
+    {0x6a04f24bU, 1, 1},
 };
 static const struct module_symbol_contract hwdev_export_contracts[] = {
     {0xce92964bU, 1, 0},
@@ -78,4 +80,5 @@ static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {
     slots[33] = (u32)(uptr)pci_cfg_write32;
     slots[34] = (u32)(uptr)pci_cfg_write16;
     slots[35] = (u32)(uptr)gf_production_selected;
+    slots[36] = (u32)(uptr)core->recover_gf_runner_access;
 }

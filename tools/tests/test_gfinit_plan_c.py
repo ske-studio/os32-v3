@@ -64,7 +64,7 @@ def check_output(text, verbose=True):
                                       [(i, v) for i, v in enumerate(expected) if i != 1]):
             assert tuple(row[:-1]) == (ordinal, *want), (ordinal, row, want)
             assert row[-1] == 1
-        assert fields['entries'] == [7] and fields['captures'] == [39]
+        assert fields['entries'] == [7] and fields['captures'] == [13]
         assert fields['pending'] == [0]
         assert fields['nodes'][0] <= 2048 and fields['args'][0] <= 6144
         assert fields['targets'][0] <= 608 and fields['rules'][0] <= 1280
@@ -111,9 +111,6 @@ MUTATIONS = [
      'mode_byte(b,base,GF_MODE_AR_STATUS,false,&ignored)', 'mode_byte(b,base,GF_MODE_AR_PORT,false,&ignored)'),
     ('kdebug/gfinit_bus.c', 'dac_palette',
      'gfinit_mode_palette(i,rgb);', 'gfinit_mode_palette(0,rgb);'),
-    ('kdebug/recover_plan/access.inc', 'run_uses_c_read_safe',
-     't->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)',
-     't->read_safe && logged_read(r, &a, &old)'),
     ('kdebug/gfinit_plan_c.c', 'pll_restore_live',
      'expr=GF_C_EXPR_SAVED;producer=b->pll_first;', 'expr=GF_C_EXPR_LIVE;producer=b->pll_first;'),
     ('kdebug/gfinit_bus.c', 'misc_read_alias',

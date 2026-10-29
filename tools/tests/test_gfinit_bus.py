@@ -13,7 +13,7 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
 
 def command(exe):
     return ['gcc', *FLAGS, '-O2', '-ffunction-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-            '-I'+str(ROOT/'tools/tests/recover_hostshim'), '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_bus_host.c'), '-o', str(exe)]
+            '-I'+str(ROOT/'tools/tests/recover_hostshim'), '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_bus_host.c'), *[str(ROOT / p) for p in ('hwdev/gf/runner.c','hwdev/gf/save.c','hwdev/gf/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
 
 
 MUTATIONS = [

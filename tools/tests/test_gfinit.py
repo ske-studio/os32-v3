@@ -20,16 +20,12 @@ def command(exe):
 # The decoder is split into .inc files included in place (kdebug/gfinit_op, kdebug/gfinit_decode);
 # each anchor names the file that holds it.
 MUTATIONS = [
-    ('kdebug/gfinit_decode.c', 'static_read_cost', 'if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;', 'if (false && d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;'),
-    ('kdebug/gfinit_decode.c', 'skip_cr44_decode', 'if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port', 'if (false && op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port'),
     ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
     ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
     ('kdebug/gfinit_decode.c', 'unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
     ('kdebug/gfinit_decode.c', 'rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
     ('kdebug/gfinit_op/copy_decode.inc', 'copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
     ('kdebug/gfinit_op/condition_decode.inc', 'table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
-    ('kdebug/gfinit_decode/schedule.inc', 'call_depth', 'calls > GF_INIT_CALL_DEPTH', 'false'),
-    ('kdebug/gfinit_decode/schedule.inc', 'repeat_depth', 'repeats > GF_INIT_REPEAT_DEPTH', 'false'),
     ('kdebug/gfinit_op/io_restrict_decode.inc', 'selection_coverage', '|| (o->mask >> o->shift) >= o->count', ''),
     ('kdebug/gfinit_op/zm_reg_sequence_decode.inc', 'sequence_overflow', 'o->count - 1 > (0xffffffffU - o->target) / 4', 'false'),
 ]
@@ -152,19 +148,6 @@ def main():
             assert int(fields['limits.vco1.min_' + coeff[0]]) <= int(fields['mode.' + coeff]) <= int(fields['limits.vco1.max_' + coeff[0]])
         assert int(fields['mode.error']) * 200 <= 25175
         assert int(fields['decode.rom_crc']) == zlib.crc32(result_rom)
-        assert fields['later.count'] == '0'
-        subprocess.run(cmd[:1] + ['-DGF_TEST_LATER'] + cmd[1:], cwd=ROOT, check=True)
-        later_result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
-        assert later_result.returncode == 0
-        later_fields = dict(line.split('=', 1) for line in later_result.stdout.decode().splitlines())
-        assert later_fields['later.count'] == '10'
-        for i in range(10):
-            assert later_fields[f'later{i}.main'] == '3'
-            assert later_fields[f'later{i}.pc'] == str(0xe7e0)
-            assert later_fields[f'later{i}.substep'] == '489'
-            assert later_fields[f'later{i}.ctx'] == str(7 + i)
-            assert later_fields[f'later{i}.reg'] == str(0x680508)
-        print('synthetic later: 10 writes in repeat')
         for mode in ('two', 'single'):
             for name in ('n1', 'm1', 'n2', 'm2', 'p', 'actual', 'error'):
                 assert fields[mode + '.' + name] == oracle[mode + '.' + name]
@@ -186,8 +169,7 @@ def main():
     if '--mutate' in sys.argv:
         diagnostic_bad = mutpar.run_with_control(diagnostic_mutation,
             [('diag_single', 'l.vco2=(struct gfinit_pll_vco){0};', '(void)l;'),
-             ('diag_request', 'khz=v->value; found++;', 'khz=v->value+1; found++;'),
-             ('diag_later_empty', 'i=boundary+1; i<decoded.plan.node_count; i++', 'i=boundary+1; i<boundary+1; i++')],
+             ('diag_request', 'pc=v->pc; khz=v->value; found++;', 'pc=v->pc; khz=v->value+1; found++;')],
             ('diag_control', '', ''))
         return int(bool(diagnostic_bad | mutpar.run_with_control(mutation,
             MUTATIONS +

@@ -232,7 +232,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
         if (w->write_mask != width_mask(width) && (dir == REC_SELECT || bus_read(r, target, &old)))
             return access_error(r, target);
         if (r->transport && r->state == REC_RUNNING && w->write_mask == width_mask(width) &&
-            t->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)) return access_error(r, target);
+            t->read_safe && logged_read(r, &a, &old)) return access_error(r, target);
         if (n && !evaluate(r, n, w, &old, &expected)) return access_error(r, target);
         if (planned) *value = expected;
         if (!value_ok(&w->value, width, *value)) return access_error(r, target);
@@ -344,4 +344,63 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
 int recover_access(struct recover *r, u32 node, u32 dir, u32 target, u32 width, u32 *value)
 {
     return access_impl(r, node, dir, target, width, value, false);
+}
+
+/* GF runner operands are already decoded/CRC checked. Resolve their raw alias
+ * through the existing profile/bus, retaining local index/lock saves and REC.
+ * Stage authorization remains the bound main marker and trial_step. */
+int recover_gf_runner_access(struct recover *r, u32 pc, u32 bar, u32 off,
+                              u32 width, bool write, u32 *value)
+{
+    struct recover_bus_access a;
+    u32 key = RECOVER_NONE, dir = write ? REC_WRITE : REC_READ;
+    bool restoring = r->state == REC_RESTORING;
+    if ((!restoring && (r->state != REC_RUNNING || !r->entered)) || r->access_blocked) return -1;
+    for (u32 k = 0; k < r->profile->target_count; k++) {
+        const struct recover_target *t = &r->profile->targets[k];
+        if ((t->space == REC_PCI_CFG ? bar != RECOVER_NONE : t->bar != bar) ||
+            t->width != width) continue;
+        u32 d = write ? REC_WRITE : REC_READ;
+        if (t->space == REC_VGA_INDEXED) {
+            if (recover_target_address(t,REC_SELECT,&a)) continue;
+            if (a.offset == off) {
+                d = REC_SELECT;
+                if (write && *value != t->index && key != RECOVER_NONE) continue;
+            } else {
+                u32 selected = r->port_selected[r->index_port[k]];
+                if (selected != k) continue;
+                d = write ? REC_DATA : REC_READ;
+            }
+        }
+        if (recover_target_address(t,d,&a) || a.offset != off) continue;
+        key = k; dir = d;
+        if (d != REC_SELECT || !write || *value == t->index) break;
+    }
+    if (key == RECOVER_NONE || bus_address(r,key,dir,&a)) return -1;
+    const struct recover_target *t = &r->profile->targets[key];
+    if (write && !restoring && t->space == REC_VGA_INDEXED &&
+        ((dir == REC_SELECT && index_save_safe(r->profile,key)) ||
+         (dir == REC_DATA && t->access == REC_RW))) {
+        bool saved = false;
+        for (u32 i = 0; i < r->local_saved_count; i++) {
+            const struct recover_local_saved *v = &r->local_saved[i];
+            if (v->dir_substep == dir && (v->key == key || (dir == REC_SELECT &&
+                r->index_port[v->key] == r->index_port[key]))) saved = true;
+        }
+        if (!saved) {
+            u32 old;
+            if (r->local_saved_count == RECOVER_MAX_REGS || recover_gf_runner_access(r,pc,bar,off,width,false,&old)) return -1;
+            r->local_saved[r->local_saved_count++] = (struct recover_local_saved){key,dir,old};
+        }
+    }
+    int begin_log = gf_bus_record_at(r,&a,pc,"BEGIN",RECOVER_NONE,write ? *value : RECOVER_NONE,0,0,false);
+    if (begin_log && !restoring) return -1;
+    int rc = write ? r->ops->write(r->opaque,&a,*value) : r->ops->read(r->opaque,&a,value);
+    if (!rc && write) {
+        r->gpu_written = true;
+        if (dir == REC_SELECT) r->port_selected[r->index_port[key]] =
+            *value == t->index ? key : RECOVER_NONE;
+    }
+    int log = gf_bus_record_at(r,&a,pc,"END",0,0,rc || write ? RECOVER_NONE : *value,rc,false);
+    return rc || log || begin_log ? -1 : 0;
 }

@@ -1,36 +1,26 @@
 /* A2 -> main0..4 with the real begin/step boundaries, not exec_arm().
  * Init instruction bytes match S1; support tables and hardware are synthetic. */
-static int sequence_prepare(struct recover *r,void *arg)
-{
-    (void)arg;
-    while(r->expected_node<recover_gf_prepare_plan.node_count) {
-        u32 id=r->expected_node,value;
-        if(recover_plan_enter(r,id) || recover_plan_access(r,&value) ||
-           recover_plan_leave(r,0))return -1;
-    }
-    return 0;
-}
-static bool sequence_gpio_change;
+static bool sequence_gpio_change,sequence_bus_failure;
 static u32 sequence_gpio_reads,sequence_gpio_value;
-static void sequence_gpio_sample(const struct recover_bus_access *a)
+static void sequence_gpio_sample(const struct recover_bus_access *a,u32 pc)
 {
     /* A deterministic status change outside the instruction's write mask.
      * The real failing REC log omits read values, so this models a possible
      * hardware difference; it does not claim those real samples were measured. */
-    if(core.entered && core.plan->nodes[core.cursor].pc==0xdebd && a->offset==0x60081c) {
+    if(core.entered && pc==0xdebd && a->offset==0x60081c) {
         if(sequence_gpio_change && !sequence_gpio_reads)values[a->key]^=0x80000000U;
         sequence_gpio_reads++;
     }
 }
 static int sequence_bus_read(void *v,const struct recover_bus_access *a,u32 *value)
 {
-    int rc=prefix_read(v,a,value);
-    if(!rc)sequence_gpio_sample(a);
-    return rc;
+    sequence_gpio_sample(a,execution.init.fail_pc);
+    if(sequence_bus_failure && execution.init.fail_pc==0xdebd)return -1;
+    return prefix_read(v,a,value);
 }
 static int sequence_bus_write(void *v,const struct recover_bus_access *a,u32 value)
 {
-    if(core.state==REC_RUNNING && core.entered && core.plan->nodes[core.cursor].pc==0xdebd)
+    if(core.state==REC_RUNNING && core.entered && execution.init.fail_pc==0xdebd && a->offset==0x60081c)
         sequence_gpio_value=value;
     return bus_write_test(v,a,value);
 }
@@ -43,10 +33,6 @@ static void sequence_run(bool mode_c,bool record,bool changing,bool bad_keep)
     CHECK(!(mode_c ? gfinit_plan_build_c(&composed,&decoded,&profile,0x1000000,rom,sizeof(rom)) :
                     gfinit_plan_build(&composed,&decoded,&profile,0x1000000)));
     if(mode_c)CHECK(!gfinit_verify_policy(&composed,&profile,record?GF_VERIFY_RECORD:GF_VERIFY_REQUIRED,0,0));
-    if(bad_keep) for(u32 i=0;i<composed.c_node;i++) {
-        const struct recover_plan_node *n=&decoded.nodes[i];
-        if(n->pc==0xdebd)decoded.args[n->arg_first+2].value&=~0x80000000U;
-    }
     stage_fixture=(struct gf_stage_state){0};
     CHECK(!gfinit_plan_baseline(&composed,&profile,&stage_fixture,rom,sizeof(rom)));
     profile.trial_limit=profile.opcode_limit=profile.restore_limit=1000;
@@ -56,20 +42,20 @@ static void sequence_run(bool mode_c,bool record,bool changing,bool bad_keep)
     executor_bus=ops;executor_bus.read=sequence_bus_read;executor_bus.write=sequence_bus_write;
     core.ops=&executor_bus;core.transport=&prefix_transport;
     core.cache.identity=ident;core.gf_stage=&stage_fixture;core.route_write_approved=true;core.verify_record=record;
-    sequence_gpio_change=changing;sequence_gpio_reads=0;
+    sequence_gpio_change=changing;sequence_bus_failure=bad_keep;sequence_gpio_reads=0;
     clock_value=clock_jump=wait_total=clock_fail=wait_fail=bus_fail=actual_count=expected_count=0;
-    execution=(struct gfinit_exec){.rom=rom,.rom_size=sizeof(rom),.ops=&executor_ops};
+    execution=(struct gfinit_exec){.rom=rom,.rom_size=sizeof(rom),.ops=&executor_ops,.program=&decoded.program};
     values[key_for(&profile,0x60081c,0,0,0)]=0xa5a50f55;
     CHECK(!recover_bind_plan(&core,&profile,&composed.plan,&buffers,&hash));
     int rc=trial_begin(&core,&profile,hash,profile.trial_limit);
     CHECK(!rc);if(rc)return;
-    CHECK(!trial_step(&core,&core.token,true,sequence_prepare,0));
+    CHECK(!trial_step(&core,&core.token,true,gfinit_exec_prepare,&execution));
     CHECK(core.state==REC_PAUSED && core.expected_node==composed.entries[1].first);
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;
         rc=trial_step(&core,&core.token,true,gfinit_exec_run,&execution);
         if(bad_keep && !main) {
-            CHECK(rc && execution.fail_pc==0xdebd && core.reason==REC_CONTRACT);
+            CHECK(rc && execution.fail_pc==0xdebd && core.reason==REC_OPERATION);
             return;
         }
         if(rc) {output("sequence failure pc/reason ");number(execution.fail_pc);output("/");number(core.reason);output("\n");}
@@ -78,7 +64,7 @@ static void sequence_run(bool mode_c,bool record,bool changing,bool bad_keep)
     }
     CHECK(!trial_step(&core,&core.token,true,gf_stage_capture,&stage_fixture));
     CHECK(stage_fixture.initialized && core.expected_node==(mode_c?composed.c_node:composed.vram_node));
-    CHECK(sequence_gpio_reads==2);
+    CHECK(sequence_gpio_reads==1);
     CHECK(sequence_gpio_value==(((0xa5a50f55U ^ (changing?0x80000000U:0)) & 0xfffeefefU) | 0x11000U));
 }
 static void sequence_cases(void)
@@ -89,7 +75,7 @@ static void sequence_cases(void)
         sequence_run(true,true,changing,false);
         sequence_run(false,false,changing,false);
     }
-    sequence_run(true,false,false,true); /* Incorrect preservation is still rejected. */
+    sequence_run(true,false,false,true); /* Bus failure still stops this main and enters S0. */
     if(failures==before)output("A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS\n");
 }
 #ifdef HWDEV_SEQUENCE_IMAGE
@@ -117,14 +103,13 @@ static const struct serial_setup *sequence_serial_get_setup(void)
 static int sequence_read(void *v,const struct recover_bus_access *a,u32 *value)
 {
     active=a;profile=sequence_bundle->profile;
-    int rc=((__typeof__(&gfinit_bus_read))(uptr)hwdev_image_symbol(SEQUENCE_GF_READ))(v,a,value);
-    if(!rc)sequence_gpio_sample(a);
-    return rc;
+    sequence_gpio_sample(a,sequence_bundle->execution ? sequence_bundle->execution->init.fail_pc : RECOVER_NONE);
+    return ((__typeof__(&gfinit_bus_read))(uptr)hwdev_image_symbol(SEQUENCE_GF_READ))(v,a,value);
 }
 static int sequence_write(void *v,const struct recover_bus_access *a,u32 value)
 {
     active=a;profile=sequence_bundle->profile;
-    if(core.state==REC_RUNNING && core.entered && core.plan->nodes[core.cursor].pc==0xdebd)
+    if(core.state==REC_RUNNING && core.entered && sequence_bundle->execution && sequence_bundle->execution->init.fail_pc==0xdebd && a->offset==0x60081c)
         sequence_gpio_value=value;
     return ((__typeof__(&gfinit_bus_write))(uptr)hwdev_image_symbol(SEQUENCE_GF_WRITE))(v,a,value);
 }
@@ -163,7 +148,7 @@ static void sequence_owner_run(bool mode_c,bool record,bool changing)
         CHECK(!rc);if(rc)return;
     }
     CHECK(g->next_main==GF_INIT_MAINS && core.gf_stage && core.gf_stage->initialized);
-    CHECK(sequence_gpio_reads==2);
+    CHECK(sequence_gpio_reads==1);
     CHECK(sequence_gpio_value==(((0xa5a50f55U ^ (changing?0x80000000U:0)) & 0xfffeefefU) | 0x11000U));
 }
 static void sequence_owner_cases(void)

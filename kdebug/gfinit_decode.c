@@ -5,8 +5,6 @@
 #include "gfinit_pll.h"
 #include "../lib/crc32_core.inc"
 #define GF_ARRAY(a) (sizeof(a) / sizeof((a)[0]))
-STATIC_ASSERT(GF_INIT_WORK_STEPS >= RECOVER_NODE_MAX, gf_schedule_scratch);
-STATIC_ASSERT(GF_INIT_FIXED_CAPTURES <= RECOVER_CAPTURE_MAX, gf_fixed_captures);
 #include "gfinit_decode/tables.inc"
 #include "gfinit_decode/bytes.inc"
 const struct gf_script_span *gfinit_script_spans(u32 *count)
@@ -67,66 +65,14 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     return 0;
 }
 #ifndef GF_PRODUCTION_DECODE
-#include "gfinit_decode/schedule.inc"
-#include "gfinit_decode/emit.inc"
-#include "gfinit_op/pll_expand.inc"
-static int expand_step(struct gfinit_decode *d, const u8 *r, const struct recover_profile *p,
-                       u32 step, u32 state)
-{
-    const struct gfinit_scheduled *s = &d->schedule[step];
-    const struct gfinit_instruction *v = &d->insns[s->instruction];
-    u32 op = v->opcode, pc = v->pc, e = v->effect_first, head = GF_STATE_HEAD(state);
-    u32 next_state = state, next_step = step + 1, first = d->plan.node_count;
-    u32 t = key_for(p, v->target, v->port, v->index, head);
-    if (s->kind) {
-        if (s->kind == 1) control(d, p, s, state, GF_INIT_C+1, pc+v->length, 0, 0, 1);
-        if (s->kind == 2) control(d, p, s, state, GF_INIT_C+1+s->k, s->k, 0, 0, 1);
-        if (s->kind == 3) control(d, p, s, state, GF_INIT_C+1+s->count, s->count, 0, 0, 1);
-    } else if ((state & GF_STATE_SKIP) && op != GF_INIT_REPEAT && op != GF_INIT_END_REPEAT && op != GF_INIT_NOT &&
-               op != GF_INIT_DONE && op != GF_INIT_RESUME && op != GF_INIT_RESET && op != GF_INIT_COMPUTE_MEM) {
-        if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port == RECOVER_CRTC &&
-            (v->index == RECOVER_CR44 || (op == GF_INIT_CR_INDEX_ADDRESS_LATCHED && v->value == RECOVER_CR44))) return -1;
-        control(d, p, s, state, GF_INIT_K+pc, v->length, 0, 0, 1);
-        if (op == GF_INIT_SUB_DIRECT || op == GF_INIT_SUB) next_step = s->jump;
-        if (op == GF_INIT_ZM_CR && v->index == RECOVER_CR44) next_state = (v->value == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0) | GF_STATE_SKIP;
-        if (op == GF_INIT_ZM_CR_GROUP) for (u32 j = 0; j < v->count; j++)
-            if (r[pc+2+2*j] == RECOVER_CR44) next_state = (r[pc+3+2*j] == RECOVER_CR44_HEAD1 ? GF_STATE_HEAD1 : 0) | GF_STATE_SKIP;
-    } else switch (op) {
-    case GF_INIT_REPEAT: control(d, p, s, state, GF_INIT_C, v->count, v->end_repeat, 0, 2); break;
-    case GF_INIT_END_REPEAT: control(d, p, s, state, GF_INIT_C, s->jump, s->k, s->count, 3); break;
-    case GF_INIT_NOT: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state ^= GF_STATE_SKIP; break;
-    case GF_INIT_RESUME: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); next_state &= ~GF_STATE_SKIP; break;
-    case GF_INIT_COMPUTE_MEM: case GF_INIT_DONE: control(d, p, s, state, GF_INIT_C, 0, 0, 0, 0); break;
-    case GF_INIT_TIME: control(d, p, s, state, GF_INIT_C, v->value, 0, 0, 1); break;
-    case GF_INIT_SUB_DIRECT: control(d, p, s, state, GF_INIT_C, v->ref, pc+v->length, 0, 2); break;
-    case GF_INIT_SUB: control(d, p, s, state, GF_INIT_C, v->index, v->ref, pc+v->length, 3); break;
-    #include "gfinit_op/condition_expand.inc"
-    #include "gfinit_op/io_restrict_expand.inc"
-    case GF_INIT_PLL2: if (expand_pll(d, r, p, s, state, v->value)) return -1; break;
-    case GF_INIT_NV_REG: write_node(d, p, s, state, e, REC_WRITE, t, v->mask, v->value, true); break;
-    case GF_INIT_ZM_REG: case GF_INIT_MACRO: write_node(d, p, s, state, e, REC_WRITE, t, 0, v->value, false); break;
-    #include "gfinit_op/cr_index_io_expand.inc"
-    #include "gfinit_op/zm_cr_group_expand.inc"
-    #include "gfinit_op/zm_reg_sequence_expand.inc"
-    #include "gfinit_op/copy_expand.inc"
-    #include "gfinit_op/reset_expand.inc"
-    #include "gfinit_op/cr_index_address_latched_expand.inc"
-    default: return -1;
-    }
-    if (d->error || first == d->plan.node_count || next_step > d->schedule_count) return -1;
-    d->nodes[d->plan.node_count-1].next[0] = d->nodes[d->plan.node_count-1].next[1] = destination(next_step, next_state);
-    if (next_step < d->schedule_count) d->reachable[next_step] |= 1U << next_state;
-    return 0;
-}
 int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
                       struct gfinit_decode *d)
 {
     if (!r || !p || !d) return -1;
     d->plan = (struct recover_plan){.version = 1, .profile_crc = p->crc, .rom_size = size,
         .nodes = d->nodes, .args = d->args, .entries = d->entries, .entry_count = GF_INIT_MAINS,
-        .captures = d->captures, .capture_count = GF_INIT_FIXED_CAPTURES};
-    d->instruction_count = d->schedule_count = d->error = d->max_call = d->max_repeat = 0;
-    u32 active[GF_INIT_INSNS] = {0}, main_start[GF_INIT_MAINS];
+        .captures = d->captures, .ctx_count = 1};
+    d->program.count = d->error = 0;
     for (u32 i = 0; i < GF_ARRAY(scripts); i++) {
         const struct gf_script_span *s = &scripts[i];
         if (span(size, s->pc, s->length)) return -1;
@@ -136,91 +82,37 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
         u32 pc = s->pc, stack[GF_INIT_REPEAT_DEPTH], depth = 0;
         while (pc < s->pc + s->length) {
             d->error_pc = pc;
-            if (d->instruction_count == GF_INIT_INSNS) return -1;
-            u32 id = d->instruction_count++;
-            struct gfinit_instruction *v = &d->insns[id];
+            if (d->program.count == GF_INIT_INSNS) return -1;
+            u32 id = d->program.count++;
+            struct gfinit_instruction *v = &d->program.insns[id];
             if (gfinit_decode_instruction(r, size, pc, v) || v->length > s->pc + s->length - pc) return -1;
-            for (u32 j = 0; j < GF_ARRAY(effect_spans); j++) if (effect_spans[j].pc == pc) {
-                v->effect_first = effect_spans[j].first; v->effect_count = effect_spans[j].count;
-            }
             if (v->opcode == GF_INIT_REPEAT) {
                 if (depth == GF_INIT_REPEAT_DEPTH) return -1;
                 stack[depth++] = id;
             }
             if (v->opcode == GF_INIT_END_REPEAT) {
                 if (!depth) return -1;
-                d->insns[stack[--depth]].end_repeat = pc;
+                d->program.insns[stack[--depth]].end_repeat = pc;
             }
             if (v->opcode == GF_INIT_DONE && pc + 1 != s->pc + s->length) return -1;
             pc += v->length;
         }
         if (depth || r[pc - 1] != GF_INIT_DONE) return -1;
     }
-    if (d->instruction_count != GF_INIT_INSNS) return -1;
+    if (d->program.count != GF_INIT_INSNS) return -1;
     u32 crc = CRC32_INIT;
     crc = crc32_core_update(crc, r, size);
     d->plan.rom_crc = crc32_core_final(crc);
-    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
-        main_start[main] = d->schedule_count;
-        for (u32 i = 0; i < GF_ARRAY(scripts); i++) if (scripts[i].id == main)
-            if (schedule_block(d, scripts[i].pc, scripts[i].pc + scripts[i].length - 1,
-                               d->plan.ctx_count++, main, 0, 0, active)) return -1;
+    for (u32 i = 0; i < GF_ARRAY(scripts); i++) if (scripts[i].id < GF_INIT_MAINS) {
+        u32 main = scripts[i].id, next = main + 1;
+        d->program.main_pc[main] = scripts[i].pc;
+        d->entries[main] = (struct recover_plan_entry){REC_RUN, main, main};
+        if (next == GF_INIT_MAINS) next = RECOVER_NONE;
+        d->nodes[main] = (struct recover_plan_node){.phase=REC_RUN, .main_id=main,
+            .pc=scripts[i].pc, .opcode=GF_INIT_RUNNER, .rule_id=RECOVER_NONE,
+            .expr_id=RECOVER_NONE, .next={next,next}};
     }
-    for (u32 i = 0; i < d->schedule_count; i++) {
-        d->reachable[i] = 0;
-        for (u32 j = 0; j < GF_STATE_COUNT; j++) d->heads[i][j] = RECOVER_NONE;
-    }
-    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
-        u32 end = main == GF_INIT_MAINS - 1 ? d->schedule_count : main_start[main + 1];
-        d->reachable[main_start[main]] = 1;
-        d->entries[main] = (struct recover_plan_entry){REC_RUN, main, d->plan.node_count};
-        for (u32 step = main_start[main]; step < end; step++) {
-            for (u32 state = 0; state < GF_STATE_COUNT; state++) if (d->reachable[step] & (1U << state)) {
-                d->heads[step][state] = d->plan.node_count;
-                d->error_pc = d->insns[d->schedule[step].instruction].pc;
-                if (expand_step(d, r, p, step, state)) return -1;
-            }
-        }
-        d->main_nodes[main] = d->plan.node_count - d->entries[main].first;
-    }
-    for (u32 i = 0; i < d->plan.node_count; i++) for (u32 edge = 0; edge < 2; edge++) {
-        u32 dest = d->nodes[i].next[edge];
-        if (dest & GF_PENDING) {
-            u32 step = (dest & ~GF_PENDING) / GF_STATE_COUNT, state = dest & (GF_STATE_COUNT - 1);
-            if (step == d->schedule_count) dest = RECOVER_NONE;
-            else if (step > d->schedule_count) return -1;
-            else {
-                if (d->schedule[step].main_id != d->nodes[i].main_id) state = 0;
-                dest = d->heads[step][state];
-            }
-            d->nodes[i].next[edge] = dest;
-        }
-        if (dest != RECOVER_NONE && (dest <= i || dest >= d->plan.node_count)) return -1;
-    }
-    /* Longest path, not sum of mutually exclusive branches. Schedule scratch
-     * is no longer live; reuse it for step/wait costs to avoid another arena. */
-    for (u32 i = d->plan.node_count; i-- > 0;) {
-        const struct recover_plan_node *n = &d->nodes[i];
-        u32 max_steps = 0, max_wait = 0;
-        for (u32 edge = 0; edge < 2; edge++) {
-            u32 next = n->next[edge];
-            if (next == RECOVER_NONE || d->nodes[next].main_id != n->main_id) continue;
-            if (d->schedule[next].k > max_steps) max_steps = d->schedule[next].k;
-            if (d->schedule[next].count > max_wait) max_wait = d->schedule[next].count;
-        }
-        u32 delay = (n->opcode == GF_INIT_TIME || n->opcode == GF_INIT_RESET) && n->substep == GF_INIT_C ?
-            d->args[n->arg_first].value : 0;
-        u32 cost = 1;
-        for (u32 j = 0; j < n->arg_count; j++)
-            if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;
-        if (cost > GF_INIT_SCHEDULE - max_steps || delay > GF_INIT_WAIT_MAX - max_wait) return -1;
-        d->schedule[i].k = max_steps + cost; d->schedule[i].count = max_wait + delay;
-    }
-    for (u32 main = 0; main < GF_INIT_MAINS; main++) {
-        d->main_steps[main] = d->schedule[d->entries[main].first].k;
-        d->main_wait[main] = d->schedule[d->entries[main].first].count;
-    }
+    d->plan.node_count = GF_INIT_MAINS;
     return 0;
 }
-
-#endif /* diagnostic plan expansion */
+#endif /* diagnostic stage boundaries */

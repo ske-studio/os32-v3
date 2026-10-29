@@ -1,9 +1,6 @@
 /* Real C plan is the write oracle. Bus/owner are fake; no physical I/O. */
 #define GF_C_ENTRY previous_c_tests
 #include "gfinit_plan_c_host.c"
-#include "../../hwdev/gf/runner.c"
-#include "../../hwdev/gf/save.c"
-#include "../../hwdev/gf/pll.c"
 #include "gf_previous_calc.inc" /* generated from the immutable P3 base */
 
 struct sim_reg {u32 off,value;};

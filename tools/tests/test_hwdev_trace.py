@@ -17,7 +17,7 @@ ROOT = module.ROOT
 FUNCTIONS = {
     'recover_gf': ['recover_gf_profile_expand'],
     'gfinit_decode': ['gfinit_decode_rom', 'gfinit_decode_instruction'],
-    'gfinit_exec': ['gfinit_exec_run'],
+    'gfinit_exec': ['gfinit_exec_run', 'gfinit_exec_prepare'],
     'gfinit_pll': ['gfinit_pll_parse', 'gfinit_pll_solve'],
     'gfinit_bus': ['gfinit_bus_init', 'gfinit_bus_probe', 'gfinit_bus_read',
                    'gfinit_bus_write', 'gfinit_bus_local_cleanup'],
@@ -78,12 +78,11 @@ def run(folder, image=None, mode_c=False):
         suffix = suffix.replace('    gf_fixture_init();\n', '', 1)
         source = prefix + pll + ('\nvoid trace_entry(void)\n{\n'
             '    gf_fixture_init();\n'
-            '    all_trace(); log_tests(); depth_tests(); budget_tests(); condition_tests();\n'
-            '    selection_tests(); force_reset_test(); failure_tests(); frame_mismatch_tests(); pre_read_tests();\n'
-            '    pll_parser_tests(); pll_solver_tests(); pll_execution_tests();\n'
+            '    adapter_cases();\n'
+            '    pll_parser_tests(); pll_solver_tests(); pll_sequence_tests();\n'
             '    resource_tests(); accessor_tests(); production_plan(0); production_plan(RECOVER_CR1F_UNLOCKED);') + suffix
     names = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())['imports']
-    core = {e['name'] for e in names[:25]} - {'kpeek_call', 'recover_hal_wait_frame'}
+    core = {e['symbol'] for e in module.gen.slots() if e['group']=='core'} - {'kpeek_call', 'recover_hal_wait_frame'}
     source += '\nstatic void unused_import(void) { CHECK(0); }\n'
     source += 'static int trace_production_selected(void) { return 0; }\n'
     source += 'extern void hwdev_trace_load(const unsigned *);\nvoid _start(void) {\n'
