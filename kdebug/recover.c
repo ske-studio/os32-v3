@@ -387,7 +387,7 @@ int recover_gf_result(struct recover *r, u32 saved_words, bool minimal,
     return row_send(r, &b);
 }
 static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
-                         const char *event, u32 old, u32 value, u32 actual, int rc)
+                         const char *event, u32 old, u32 value, u32 actual, int rc, bool mismatch)
 {
     if (!r->transport) return 0;
     struct rec_row b;
@@ -400,6 +400,13 @@ static int gf_bus_record(struct recover *r, const struct recover_bus_access *a,
         row_number(&b, " old=", old); row_number(&b, " new=", value);
     } else {
         row_number(&b, " readback=", actual);
+        if (mismatch) {
+            const struct recover_target *t = &r->profile->targets[a->key];
+            row_number(&b, " mismatch=", 1);
+            row_number(&b, " space=", t->space);
+            row_number(&b, " port=", t->port);
+            row_number(&b, " index=", t->index);
+        }
         row_text(&b, " rc="); if (rc < 0) row_text(&b, "-");
         row_number(&b, "", rc < 0 ? 0U - (u32)rc : (u32)rc);
     }
@@ -728,8 +735,9 @@ int recover_profile_ok(const struct recover_profile *p)
              (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
             w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
             w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
-            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_RUN_NO_PREREAD)) ||
-            ((w->flags & REC_RUN_NO_PREREAD) && w->phase != REC_RUN)) return -1;
+            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_RUN_NO_PREREAD | REC_VERIFY_RECORD)) ||
+            ((w->flags & REC_RUN_NO_PREREAD) && w->phase != REC_RUN) ||
+            ((w->flags & REC_VERIFY_RECORD) && (w->phase != REC_MODE_C || !w->verify_mask))) return -1;
         const struct recover_target *t = &p->targets[w->key];
         const struct recover_value *v = &w->value;
         u32 mask = width_mask(t->width);
@@ -988,14 +996,14 @@ static int logged_write(struct recover *r, const struct recover_bus_access *a, u
     if (!r->transport) return r->ops->write(r->opaque, a, value);
     u32 tick = r->ops->ticks(r->opaque);
     bool gf = r->state == REC_RUNNING;
-    int log = gf ? gf_bus_record(r, a, "BEGIN", old, value, 0, 0) :
+    int log = gf ? gf_bus_record(r, a, "BEGIN", old, value, 0, 0, false) :
                    recover_record(r, log_phase(r), "BEGIN", a->key, a->offset, 0, 0);
     if (log && r->state != REC_RESTORING) return -1;
     if (r->state == REC_RESTORING && recover_restore_point(r)) return -1;
     if (r->state != REC_RESTORING && call_point(r, false)) return -1;
     int rc = r->ops->write(r->opaque, a, value);
     if (gf) {
-        if (rc) (void)gf_bus_record(r, a, "END", old, value, RECOVER_NONE, rc);
+        if (rc) (void)gf_bus_record(r, a, "END", old, value, RECOVER_NONE, rc, false);
         return rc;
     }
     log = recover_record(r, log_phase(r), "END", a->key, a->offset, rc,
@@ -2098,6 +2106,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
         if (dir == REC_SELECT) r->port_selected[r->index_port[target]] =
             *value == t->index ? target : RECOVER_NONE;
         u32 actual = RECOVER_NONE;
+        bool mismatch = false;
         if (w->verify_mask
 #if GF_VPLL_PROBE
             || (r->profile->version == RECOVER_PROFILE_VPLL_VERSION && n &&
@@ -2114,13 +2123,14 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
                 fail(r, REC_BUS, access_phase(r), target);
                 return access_error(r, target);
             }
-            if (((actual ^ readback_value(t, dir, *value)) & w->verify_mask)) {
-                if (r->state == REC_RUNNING) (void)gf_bus_record(r, &a, "END", old, *value, actual, -1);
+            mismatch = ((actual ^ readback_value(t, dir, *value)) & w->verify_mask) != 0;
+            if (mismatch && !(w->flags & REC_VERIFY_RECORD)) {
+                if (r->state == REC_RUNNING) (void)gf_bus_record(r, &a, "END", old, *value, actual, -1, false);
                 fail(r, REC_VERIFY, access_phase(r), target);
                 return access_error(r, target);
             }
         }
-        if (r->state == REC_RUNNING && gf_bus_record(r, &a, "END", old, *value, actual, 0))
+        if (r->state == REC_RUNNING && gf_bus_record(r, &a, "END", old, *value, actual, 0, mismatch))
             return access_error(r, target);
         if (!guards(r, w, REC_AFTER)) return access_error(r, target);
         if (t->space == REC_VGA_INDEXED && t->port == RECOVER_CRTC &&

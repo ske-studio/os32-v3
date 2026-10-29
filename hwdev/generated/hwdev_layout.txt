@@ -1472,6 +1472,12 @@ offset	struct gfinit_instruction.target	48
 member_size	struct gfinit_instruction.target	4
 offset	struct gfinit_instruction.value	52
 member_size	struct gfinit_instruction.value	4
+size	struct gfinit_no_verify	8
+align	struct gfinit_no_verify	4
+offset	struct gfinit_no_verify.kind	0
+member_size	struct gfinit_no_verify.kind	4
+offset	struct gfinit_no_verify.reg	4
+member_size	struct gfinit_no_verify.reg	4
 size	struct gfinit_pci_ops	16
 align	struct gfinit_pci_ops	4
 offset	struct gfinit_pci_ops.read16	4
@@ -1590,6 +1596,14 @@ offset	struct gfinit_pll_write.source	4
 member_size	struct gfinit_pll_write.source	4
 offset	struct gfinit_pll_write.value	12
 member_size	struct gfinit_pll_write.value	4
+size	struct gfinit_prepare_request	556
+align	struct gfinit_prepare_request	4
+offset	struct gfinit_prepare_request.count	40
+member_size	struct gfinit_prepare_request.count	4
+offset	struct gfinit_prepare_request.regs	44
+member_size	struct gfinit_prepare_request.regs	512
+offset	struct gfinit_prepare_request.request	0
+member_size	struct gfinit_prepare_request.request	40
 size	struct gfinit_request	40
 align	struct gfinit_request	4
 offset	struct gfinit_request.fail_pc	28
@@ -2642,6 +2656,9 @@ enum	GF_C_VRAM	3
 enum	GF_C_VRAM_COMPARE	7
 enum	GF_C_VRAM_WRITE	6
 enum	GF_C_WAIT	4
+enum	GF_VERIFY_CR	1
+enum	GF_VERIFY_MMIO	0
+enum	GF_VERIFY_SR	2
 enum	REC_ABORT	1
 enum	REC_AFTER	2
 enum	REC_ARG_READ	1
@@ -2720,6 +2737,7 @@ enum	REC_UNCLASSIFIED	3
 enum	REC_VERIFIED	6
 enum	REC_VERIFY	8
 enum	REC_VERIFY_PHASE	8
+enum	REC_VERIFY_RECORD	16
 enum	REC_VGA_DIRECT	4
 enum	REC_VGA_INDEXED	5
 enum	REC_VRAM_TEST	3

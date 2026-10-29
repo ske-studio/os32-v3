@@ -373,8 +373,8 @@ def vpll_cases(m):
         assert rec.data['vpll_comparison_valid'] == (old == 4)
 
 def mode_c_cases(m):
-    assert m.mode_c_timeout(9600, 23) == 1026
-    assert m.mode_c_timeout(19200, 23) == 557
+    assert m.mode_c_timeout(9600, 23) == 1081
+    assert m.mode_c_timeout(19200, 23) == 585
     def run(fault=None):
         rec = m.Records(7)
         rec.data['mode_c_active'] = True
@@ -385,6 +385,9 @@ def mode_c_cases(m):
         def pair(phase, fields, end):
             add(phase, 'BEGIN', fields)
             add(phase, 'END', end)
+        for space, port, index, off in ((1, 0, 4294967295, 0x680a24), (5, 0x3d4, 0x1c, 0x6013d5), (5, 0x3c4, 1, 0x0c03c5)):
+            pair('gf_bus', 'pc=4294967295 bar=0 off=%d width=4 old=0 new=1048575' % off,
+                 'pc=4294967295 bar=0 off=%d width=4 readback=0 mismatch=1 space=%d port=%d index=%d rc=0' % (off, space, port, index))
         for direction in (1, 0):
             f = 'pc=4294967295 bar=1 off=0 len=307200 dir=%d' % direction
             pair('gf_bus', f, f + ' bad_off=4294967295 expected=4294967295 actual=4294967295 rc=0')
@@ -413,6 +416,7 @@ def mode_c_cases(m):
             for seq, row in enumerate(rows, 1):
                 rec.line('REC sid=7 seq=%d %s' % (seq, row))
             assert rec.mode_c_success()
+            assert len(rec.data['mode_c_evidence']['mismatches']) == 3
         except (m.RecoverError, AssertionError):
             assert fault is not None
         else:
@@ -427,6 +431,9 @@ def mode_c_cases(m):
             with redirect_stdout(io.StringIO()) as output:
                 assert m.exchange(port, 'gfinit modeset 7 --allow-write', fresh, 100, 23, io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
             assert '機械項目合格・映像保留' in output.getvalue()
+            assert 'record-only mismatches=3' in output.getvalue()
+            assert 'MMIO 680A24 written=000FFFFF readback=00000000' in output.getvalue()
+            assert 'CR 00001C' in output.getvalue() and 'SR 000001' in output.getvalue()
             assert not fresh.data['mode_c_active'] and fresh.data['mode_c_trial']
             cleanup_cases(m, fresh.data)
 

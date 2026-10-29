@@ -124,7 +124,25 @@ static int budget_step(struct recover *r,void *v)
 static int budget_noop(struct recover *r,void *v){(void)r;(void)v;return 0;}
 static void budget_setup(u32 fault_kind,bool fp_on)
 {
-    c_build();c_arm();profile.expected_device=RECOVER_GF_DEVICE;budget_fault=fault_kind;budget_tick=0;
+    c_build();
+    if(fault_kind==15) {
+        struct gfinit_no_verify regs[GF_NO_VERIFY_MAX];u32 count=0;
+        /* All previously unread writes, including required coefficients/CR33:
+         * this bounds every file policy as well as --verify required. */
+        for(u32 i=0;i<profile.rule_count;i++) {
+            const struct recover_rule *w=&profile.rules[i];
+            if(w->phase!=REC_MODE_C || w->substep==GF_C_SELECT || w->verify_mask)continue;
+            const struct recover_target *t=&profile.targets[w->key];
+            u32 kind=t->space==REC_BAR_MMIO?GF_VERIFY_MMIO:t->port==RECOVER_CRTC?GF_VERIFY_CR:GF_VERIFY_SR;
+            u32 reg=t->space==REC_BAR_MMIO?t->offset:t->index;
+            bool found=false;
+            for(u32 j=0;j<count;j++)if(regs[j].kind==kind && regs[j].reg==reg)found=true;
+            if(!found){CHECK(count<GF_NO_VERIFY_MAX);regs[count++]=(struct gfinit_no_verify){kind,reg};}
+        }
+        CHECK(!gfinit_verify_policy(&composed,&profile,GF_VERIFY_REQUIRED,regs,count));
+        core.plan=0;CHECK(!contract_bind());
+    }
+    c_arm();profile.expected_device=RECOVER_GF_DEVICE;budget_fault=fault_kind;budget_tick=0;
     values[key_for(&profile,0x680848,0,0,0)]=fp_on?0x10000000:0x20000022;
     executor_bus.ticks=budget_clock;executor_bus.read=budget_read;executor_bus.write=budget_write;
     executor_bus.local_cleanup=budget_local;executor_bus.route_read=budget_route_read;
@@ -159,11 +177,11 @@ static void budget_cases(void)
     }
     struct recover_plan overflow={.node_count=~0U};u32 rows=0;
     CHECK(gfinit_log_rows(&profile,&overflow,RECOVER_NONE,&rows)<0);
-    for(u32 fault_kind=0;fault_kind<15;fault_kind++) {
+    for(u32 fault_kind=0;fault_kind<16;fault_kind++) {
         budget_setup(fault_kind,fault_kind!=9);
         u32 crc=profile.crc,hash=core.token.plan_hash,saved=core.local_saved_count;
         int rc=trial_step(&core,&core.token,true,budget_step,0);
-        bool bad=fault_kind!=0 && fault_kind!=9;
+        bool bad=fault_kind!=0 && fault_kind!=9 && fault_kind!=15;
         CHECK((rc!=0)==bad);
         if(!bad) {
             CHECK(core.state==REC_PAUSED && !core.failed && route_value==1);
@@ -179,7 +197,7 @@ static void budget_cases(void)
         CHECK(cleanup_calls==1 && quiesce_seen==((fault_kind==5 || fault_kind==13)?0U:3U) && !core.plan);
         CHECK(core.state==(bad?REC_FAILED:REC_VERIFIED));
         static const enum recover_reason reasons[]={REC_ABORT,REC_VERIFY,REC_BUS,REC_VERIFY,
-            REC_VERIFY,REC_BUS,REC_TIMEOUT,REC_BUS,REC_VERIFY,REC_ABORT,REC_LOG,REC_BUS,REC_BUS,REC_BUS,REC_BUS};
+            REC_VERIFY,REC_BUS,REC_TIMEOUT,REC_BUS,REC_VERIFY,REC_ABORT,REC_LOG,REC_BUS,REC_BUS,REC_BUS,REC_BUS,REC_ABORT};
         CHECK(core.reason==reasons[fault_kind]);
         CHECK(!core.lost_lines && run_rows<=c_bound && run_bytes<=c_bound*(RECOVER_ROW_MAX+1U));
         /* P: 24 local + 6 quiesce + 4 zero-guard pairs; 188 B/pair,
@@ -198,6 +216,12 @@ static void budget_cases(void)
             CHECK(run_rows==2298 && c_bound==2298);
             CHECK(128+composed.plan.node_count*12+composed.plan.arg_count*4==32960);
             output("BUDGET VRAM=4 DAC=2 AR=48 WAIT=6 CHECK=66 CELL=4 ROUTE=2 PASS\n");
+        }
+        if(fault_kind==15) {
+            CHECK(run_rows==c_bound && c_bound>2298);
+            CHECK(run_bytes<=c_bound*(RECOVER_ROW_MAX+1U));
+            CHECK(core.log_limit/PIT_HZ<RECOVER_HALF_TICKS/PIT_HZ);
+            output("BUDGET record-only additional readbacks within row/time bounds PASS\n");
         }
         CHECK(pre_bytes<=cleanup_p && s0_bytes<=cleanup_q && cleanup_q==4096);
         CHECK(profile.crc==crc && core.token.profile_crc==crc && core.token.plan_hash==hash);

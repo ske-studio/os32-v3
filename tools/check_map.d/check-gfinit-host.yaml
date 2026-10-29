@@ -103,3 +103,10 @@ check-gfinit-host:
 - kdebug/gfinit_budget.inc
 - tools/tests/test_gfinit_budget.py
 - tools/tests/gfinit_budget_host.c
+- kdebug/gfinit_verify.inc
+- tools/rshell_recover.py
+- tools/lan_bridge.py
+- tools/lanfs_host.py
+- tools/rshell_peek.py
+- tools/rshell_serial.py
+- tools/serialfs_host.py

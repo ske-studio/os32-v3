@@ -180,3 +180,23 @@ OR0/OR1と実コネクタ/RGB-INの対応、DCBのhead mask、Ra266の0FACh=01�
 - 段 1〜3b は main (b8483170)。段 4 の台本と承認の資料は `tools/accept/gf_c.md` (astra 起草・Opus レビュー確定可・PM が「当日ユーザーがすること」を冒頭に)。立会いの回はユーザーの承認と目視が要る。
 - 実 ROM での 25.175MHz の係数 (2026-10-29、ノートで tools/gfinit_rom_decode.py、24b00c7a、ROM 63488B sha256 db7457d8…、rom_crc=3919973859、証拠はノートの ~/os32-tmp/evidence/2026-10-29/gf-4c-rom/DECODE.txt): VIDEO の行は先頭の行への fallback (前と同じ limits)。**単段 N1/M1=26/7・N2=M2=1・P=2、actual 25,071kHz (誤差 104kHz・0.41%、±0.5% の内)**、vco1 100,285kHz (下限 100,000 のすぐ上)。5 本: C040h←(keep FFFCFFFF)、680580h bit8=1、680578h=8000011Fh、680508h=00021A07h、C040h 復元。同期の見込み 水平 約 31.34kHz・垂直 約 59.7Hz (VGA 640x480 の 31.47kHz・59.94Hz より 0.4% 低い、モニタは同期できる見込み — 推測)。
 - 送り項目 (2026-10-29、実機の回の A2 で): prepare の REC の metadata (kdebug/recover.c:466〜 の state の行) に flags (MODE_C) の欄が無く、実機で MODE_C が入ったかを modeset の入口 (gfinit.c:431) より前に確かめられない。次に gfinit に触る段で、prepare の metadata に flags を 1 欄足す (rshell_recover.py の解釈も)。
+
+
+## C 書込み照合の実行時指定 (2026-10-29)
+
+`gfinit prepare <sid> --mode-c --allow-write [--verify required] [--no-verify-file <path>]`
+で A2 の計画を固定する。指定なしの計画・hash・REC 行数は f5953909 と同じ。
+`--verify required` は出口 CHECK に非零 mask のある対象を必須として維持し、
+それ以外の C 書込みを記録だけにする。SELECT、入口/出口 CHECK、旧 main 列は変更しない。
+`--no-verify-file` は OS32 上のファイルを読み、指定した C 書込みを記録だけにする。
+両方を指定した場合、ファイル指定を優先するが、出口 CHECK は維持する。
+ファイルは 1 行 1 本の `MMIO 680a24` / `CR 1c` / `SR 01` (数値は十六進、0x も可)、
+空行と `#` 以降の注釈を許可する。最大 64 指定、注釈を除く各行は 63 byte まで。
+形式不正・読込み失敗・C の書込みに一致しない指定は A2 を拒否する。
+既存の 40 B 私有要求は維持し、ファイル指定だけレジスタ列を含む私有 payload を使う。
+記録属性と比較 mask は profile CRC / plan hash に入り、C 実行中は変更できない。
+記録だけでも読取りを行い、不一致なら `gf_bus END` の `readback` に続けて
+`mismatch=1 space=<recover_space> port=<port> index=<index>` を付け、`rc=0` で進む。
+書いた値は対応する BEGIN の `new`。一致時と既定の行形式は変わらず、バスエラーは失敗する。
+monitor は C の終わりに不一致の件数・種別・番地/index・書いた値・読んだ値を表示し、
+記録だけの不一致は機械項目の不合格にしない。追加読取りも既存の行数・UART/時間予算へ算入する。

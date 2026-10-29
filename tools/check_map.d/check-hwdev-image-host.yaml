@@ -1,4 +1,5 @@
 check-hwdev-image-host:
+- kdebug/gfinit_verify.inc
 - hwdev/**
 - tools/gen_hwdev_contract.py
 - tools/gen_hwdev_pair.py
