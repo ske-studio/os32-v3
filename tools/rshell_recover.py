@@ -46,7 +46,7 @@ UART_FRAME_BITS = 10
 MODE_C_WORK_SECONDS = 60
 MODE_C_CHECK_COUNT = 66
 MODE_C_VRAM_BYTES = 307200
-MODE_C_REGISTERS = {0x68050c: (0xffffffff, 0x10000204),
+MODE_C_REGISTERS = {0x68050c: (0xefffffff, 0x10000204),  # bit28 reads 0 on NV44A
                     0x680508: (0x0007ffff, None), 0x680578: (0x8000ffff, None)}
 BUS_ID = ('pc', 'bar', 'off', 'width')
 VPLL_VERSION_1 = 0x56504c03

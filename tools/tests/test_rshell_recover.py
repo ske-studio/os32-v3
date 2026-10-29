@@ -394,7 +394,7 @@ def mode_c_cases(m):
         for step in (2, 7):
             pair('cell', 'step=%d addr=0' % step, 'rc=0 elapsed=1')
         pair('route', 'step=9 addr=4012', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
-        for key, off, mask, value in ((10, 0x68050c, 0xffffffff, 0x10000204),
+        for key, off, mask, value in ((10, 0x68050c, 0xefffffff, 0x10000204),
                                       (11, 0x680508, 0x7ffff, 123),
                                       (12, 0x680578, 0x8000ffff, 456)):
             pair('access', 'step=%d addr=%d' % (key, off), 'rc=0 elapsed=1')

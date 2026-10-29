@@ -95,7 +95,9 @@ def initializers():
                        ('0x680848', 'fp_control'), ('0x6808c0', 'ramdac8c0'),
                        ('0x680a20', 'ramdaca20'), ('0x680a24', 'ramdaca24'),
                        ('0x680a34', 'ramdaca34')]:
-        mm(reg, field)
+        # 50C bit28 (VCLK_RATIO_DB2) reads back 0 on NV44A (Ra266 2026-10-29,
+        # wrote 10000204, read 00000204); nouveau writes it and never reads it.
+        mm(reg, field, verify='~0x10000000U' if field == 'pllsel' else FULL)
     # Analog-only omissions: no TV/FP timing or CTV, DESIGN §3 stopping values.
     # L2: hw.c:665-772; no NV11/20 retrace waits on NV44A.
     mm('0x600860', 'engine_ctrl')

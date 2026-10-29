@@ -694,7 +694,7 @@ static void check_contracts(void)
         const struct recover_target *t=&profile.targets[a[REC_CHECK_KEY].value];
         u32 mask=a[REC_CHECK_MASK].value,expected=a[REC_CHECK_EXPECTED].value;
         if(t->space==REC_BAR_MMIO) switch(t->offset) {
-        case 0x68050c:CHECK(mask==~0U && expected==0x10000204);seen|=1;break;
+        case 0x68050c:CHECK(mask==0xefffffffU && expected==0x10000204);seen|=1;break;
         case 0x680510:CHECK(mask==0);seen|=2;break;
         case 0x680508:CHECK(mask==0x0007ffff);seen|=4;break;
         case 0x680578:CHECK(mask==0x8000ffff);seen|=8;break;

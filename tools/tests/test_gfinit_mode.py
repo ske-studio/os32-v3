@@ -172,7 +172,7 @@ def check_output(text, verbose=True):
             assert verify <= (FULL if width == 4 else 255)
             assert flags == (1 if ordinal == 1 else 0)
             if kind in (4,6,7,8,9): assert verify == 0
-            if reg == 0x68050c: assert verify == FULL and value == 0x10000204
+            if reg == 0x68050c: assert verify == 0xefffffff and value == 0x10000204
             if reg == 0x680608: assert verify == 0x100000
             if reg == 0x600804: assert verify == 3
             if reg == 0x68052c: assert verify == 0x101

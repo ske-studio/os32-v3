@@ -217,7 +217,7 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
 {
     /* DESIGN §§3-4: coefficients are checked only after 50C selection.
      * 510 is evidence only; TEST excludes sense and compares bit20 only. */
-    c_check_mmio(b,C_PLL_SELECT,~0U,m->pllsel);
+    c_check_mmio(b,C_PLL_SELECT,~GF_MODE_PLLSEL_VPLL_A,m->pllsel); /* bit28 reads 0 on NV44A */
     c_check_mmio(b,C_PLL_STATUS,0,0);
     const struct gfinit_pll_write *q=m->sequence.writes;
     c_check_mmio(b,GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);
