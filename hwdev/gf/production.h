@@ -12,10 +12,16 @@
 #define GF_PRODUCTION_PFB_AMOUNT 0x10020cU
 #define GF_PRODUCTION_PFB_MASK 0xff000000U
 #define GF_PRODUCTION_PFB_MIN 0x01000000U
+/* Why the bus-0 resource scan rejected (reason=0: nothing recorded). The
+ * production copy records this instead of printing (decode not yet safe). */
+struct gfinit_resource_reject { const char *reason; u32 dev, fn, reg, raw; };
 struct gf_production_resources {
     struct recover_identity identity;
     struct recover_bar_extent bars[RECOVER_BAR_COUNT];
+    struct gfinit_resource_reject reject; /* set when the bus-0 scan rejects */
 };
+/* Failure record target for a resource reject: BDF (dev<<3|fn) << 8 | reg. */
+#define GF_PRODUCTION_REJECT_TARGET(r) ((((r)->dev << 3 | (r)->fn) << 8) | (r)->reg)
 struct gf_production_local { u32 alias, index, value; bool valid; };
 struct gf_production_scratch {
     struct gf_init_context init;
@@ -30,6 +36,8 @@ struct gf_production {
     int (*route98)(void *);
     void *route_opaque;
     bool prepared, attempted, revoked, acquiring;
+    /* Last resource-gate reject (no console output on this path). */
+    struct gfinit_resource_reject reject;
     struct gf_production_local indexes[GF_PRODUCTION_INDEXES];
     struct gf_production_local locks[GF_PRODUCTION_LOCKS];
 };

@@ -10,7 +10,16 @@
 static int same_resources(struct gf_production *p)
 {
     struct gf_production_resources current;
-    if (gf_production_identity(p) || gf_production_identify(&current)) return -1;
+    if (gf_production_identity(p)) return -1;
+    if (gf_production_identify(&current)) {
+        /* Recorded only: the 98 decode is not proven safe here (§4-3). */
+        if (current.reject.reason) {
+            p->reject=current.reject;
+            p->display.target=GF_PRODUCTION_REJECT_TARGET(&current.reject);
+            p->display.last_rc=-1;
+        }
+        return -1;
+    }
     for (u32 i=0;i<RECOVER_BAR_COUNT;i++) {
         const struct recover_bar_extent *b=&p->display.bars[i];
         if (current.bars[i].raw!=b->raw || current.bars[i].base!=b->base ||

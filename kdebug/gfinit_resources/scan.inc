@@ -1,5 +1,8 @@
 int gfinit_resources(struct recover_range *exclude, u32 *count)
 {
+#ifdef GF_PRODUCTION
+    resource_rejected = (struct gfinit_resource_reject){0};
+#endif
     if (!count) return -1;
     *count = 0;
     if (!exclude) return -1;

@@ -263,11 +263,13 @@ static int resource_run(struct recover_range *ranges,u32 *n)
 {int rc=gfinit_resources(ranges,n);CHECK(resource_writes==0);return rc;}
 
 static const char *resource_reason;
+static u32 resource_logs;
 static u32 resource_dev, resource_fn, resource_reg, resource_raw;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
     __builtin_va_list ap;
     (void)attr; (void)fmt;
+    resource_logs++;
     __builtin_va_start(ap, fmt);
     resource_reason=__builtin_va_arg(ap,const char *);
     resource_dev=__builtin_va_arg(ap,u32);resource_fn=__builtin_va_arg(ap,u32);
@@ -353,6 +355,12 @@ static void resource_barlen_tests(void)
         {0x20410000,0x1000},{0x20500000,0x100000}};
     resource_snapshot();CHECK(resource_run(ranges,&n)==0 && n==ARRAY_SIZE(expected));
     for(u32 i=0;i<n;i++)CHECK(ranges[i].base==expected[i].base && ranges[i].len==expected[i].len);
+    /* astra P4 counterexample, diagnostic copy: an enabled expansion ROM on
+     * another device still prints one console line (production is silent). */
+    resource_logs=0;resource_cfg[11][0][12]|=1U;
+    resource_expect("rom_length",11,0,PCI_CFG_ROM_ENDPOINT,resource_cfg[11][0][12]);
+    CHECK(resource_logs==1);
+    resource_snapshot();
     /* Ra266 single-function Trident aliases fn0 at every higher function.
      * Both passes must skip those reads and preserve all BARLEN ranges. */
     for(u32 f=1;f<PCI_FN_COUNT;f++)for(u32 r=0;r<16;r++)

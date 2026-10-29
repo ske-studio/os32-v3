@@ -26,8 +26,9 @@ static u32 prod_deadline_section;
 static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pfb;
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
+static u32 prod_logs;
 void kprintf(u8 attr,const char *format,...)
-{ (void)attr;(void)format; }
+{ (void)attr;(void)format;prod_logs++; }
 #define PROD_ROUTE 0xfacU
 #define PROD_REDRAW 0xa8000U
 static void prod_event(u32 e)
@@ -305,6 +306,20 @@ static void prod_cases(void)
     prod_reset();prod_ram_fail=1;CHECK(gf_production_identify(&prod_boot)==-1);
     prod_reset();prod_cfg[13][0][5]=prod_cfg[13][0][4]|8;CHECK(gf_production_identify(&prod_boot)==-1);
     prod_reset();prod_cfg[13][0][4]=0x20000000;CHECK(gf_production_identify(&prod_boot)==-1);
+    /* astra P4 counterexample: another device's enabled expansion ROM makes
+     * the resource gate reject. Production prints nothing (no 98 text VRAM
+     * before decode is proven safe); the reject is kept in the failure record. */
+    prod_reset();prod_logs=0;prod_cfg[11][0][12]|=1U;
+    CHECK(gf_production_identify(&prod_boot)==-1 && !prod_logs);
+    CHECK(prod_boot.reject.reason && !kstrcmp(prod_boot.reject.reason,"rom_length") &&
+          prod_boot.reject.dev==11 && !prod_boot.reject.fn &&
+          prod_boot.reject.reg==PCI_CFG_ROM_ENDPOINT && prod_boot.reject.raw==prod_cfg[11][0][12]);
+    CHECK(prod_start()==-1 && !prod_logs && !prod_cmd_writes && !prod_mmio_calls && prod_route_calls==1);
+    CHECK(prod.reject.reason && !kstrcmp(prod.reject.reason,"rom_length") && prod.reject.dev==11);
+    CHECK(prod.display.section==GF_DISPLAY_INIT && prod.display.last_rc==-1 &&
+          prod.display.target==((11U<<3)<<8 | PCI_CFG_ROM_ENDPOINT) && !prod.display.reusable);
+    prod_cfg[11][0][12]&=~1U;CHECK(!gf_production_identify(&prod_boot) && !prod_boot.reject.reason);
+    output("PASS resource reject (other device ROM enabled): no console output, reason/BDF/reg kept in failure record\n");
     prod_reset();prod_map_fail=1;CHECK(gf_production_mapped(&prod)==-1);
     prod_reset();ledger_region_count=0;CHECK(gf_production_mapped(&prod)==-1);
     output("PASS resource/overlap/RAM/reservation/mapping/width/range gates\n");

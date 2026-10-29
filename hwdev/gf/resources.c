@@ -19,7 +19,8 @@ int gf_production_identify(struct gf_production_resources *out)
         .subsys=pci_cfg_read32(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_SUBSYS_VENDOR),
         .revision=pci_cfg_read32(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_REVISION_ID)&PCI_REVISION_MASK};
     if (next.identity.device!=RECOVER_GF_DEVICE ||
-        next.identity.subsys!=GF_PRODUCTION_SUBSYS || gfinit_resources(exclude,&count)) return -1;
+        next.identity.subsys!=GF_PRODUCTION_SUBSYS) return -1;
+    if (gfinit_resources(exclude,&count)) {gfinit_resources_rejected(&out->reject);return -1;}
     for (u32 i=0;i<RECOVER_BAR_COUNT;i++) {
         u32 raw=pci_cfg_read32(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_BAR0+i*PCI_CFG_BAR_STRIDE);
         u32 base=raw&PCI_BAR_MEM_ADDR_MASK, len=lengths[i];
