@@ -3,6 +3,7 @@
  * This checks expressibility/signatures, not production driver behavior. */
 #include "video_service.h"
 #include "hwdev/gf/internal.h"
+void gf_init_contract_test(void);
 
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
@@ -255,6 +256,7 @@ static void exercise(struct fake_video *f)
 
 void _start(void)
 {
+    gf_init_contract_test();
     struct fake_video gf = {
         .mode = {FAKE_GF_MODE_ID, GF_MODE_WIDTH, GF_MODE_HEIGHT, GF_MODE_PITCH,
                  GFX_FMT_PACKED8, VIDEO_RGB_BITS, GF_MODE_CLOCK_KHZ},

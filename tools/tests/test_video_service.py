@@ -1,4 +1,4 @@
-"""P0: compile real internal headers and exercise two test-only devices."""
+"""P0: fake devices + init contracts with the real instruction decoder."""
 import os
 from pathlib import Path
 import subprocess
@@ -16,14 +16,19 @@ def main():
             'gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
             '-Werror', '-Werror=vla', '-ffreestanding', '-fno-pie',
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+            '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
             *['-I' + str(ROOT / d) for d in
               ('.', 'include', 'sdk/include/os32', 'arch/x86', 'platform/pc98')],
-            str(ROOT / 'tools/tests/video_service_host.c'), '-o', str(exe)
+            *[str(ROOT / f) for f in (
+                'tools/tests/video_service_host.c',
+                'tools/tests/gf_init_contract_host.c',
+                'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c')],
+            '-o', str(exe)
         ], cwd=ROOT, check=True)
         for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
             result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
             assert result.returncode == 0 and result.stdout == '', result
-            print('PASS video service: GF/Trident fake contracts, headers (' + runner + ')')
+            print('PASS video service: GF/Trident, REPEAT, wait/cancel, RESET restore, PLL commit (' + runner + ')')
 
 
 if __name__ == '__main__':
