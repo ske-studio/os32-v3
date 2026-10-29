@@ -56,4 +56,6 @@ check-dep-dir-a-l01-host:
 - kernel/kernel.c
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

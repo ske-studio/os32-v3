@@ -48,4 +48,6 @@ check-dep-dir-a-l08-host:
 - tools/check_map.d/check-dep-dir-a-l08-host.yaml
 - platform/pc98/device_ide.c
 - tools/tests/dep_dir_a_l05a_host.c
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

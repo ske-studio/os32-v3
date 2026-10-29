@@ -47,4 +47,6 @@ check-dep-dir-a-l09-host:
 - tools/tests/fixtures/dep_dir_a/l09.json
 - build/checks.d/check-dep-dir-a-l09-host.mk
 - tools/check_map.d/check-dep-dir-a-l09-host.yaml
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

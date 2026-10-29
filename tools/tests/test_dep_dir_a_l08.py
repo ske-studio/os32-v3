@@ -51,8 +51,9 @@ def contracts():
     wrappers = diagnostic + '\n' + wrappers
     assert 'pci.h' not in spec['includes'] and 'pci_dev_contract.h' in spec['includes']
     assert '#include "pci_bind.h"' not in (ROOT / 'kapi/kapi_sys.c').read_text()
+    # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
-    print('PASS fixed baseline public ABI/generated files, wrapper guards/snapshot, A4/B5 and hwdev CRC')
+    print('PASS fixed baseline public ABI/generated files, wrapper guards/snapshot, A4/B5 and current hwdev pair')
     return wrappers
 
 

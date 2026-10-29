@@ -66,7 +66,7 @@ def run(folder, image=None, mode_c=False):
                 continue
             lines.append(line)
         return ''.join(lines)
-    entry = 'gfinit_plan_c_host.c' if mode_c else 'gfinit_plan_host.c'
+    entry = 'gfinit_stages_host.c' if mode_c else 'gfinit_plan_host.c'
     source = 'extern unsigned hwdev_image_symbol(unsigned);\n' + expand(ROOT/'tools/tests'/entry)
     if mode_c:
         source = source.replace('void GF_C_ENTRY(void)', 'void trace_entry(void)')

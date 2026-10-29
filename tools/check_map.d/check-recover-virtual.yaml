@@ -26,3 +26,5 @@ check-recover-virtual:
 - kdebug/gf_stage_state.h
 - kdebug/gfinit_pll.h
 - kdebug/gfinit_wire.h
+- tools/tests/recover_virtual_cases_host.inc
+- tools/tests/recover_virtual_fixture_host.inc

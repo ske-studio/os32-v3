@@ -50,8 +50,9 @@ def contracts():
         wrappers += body + '\n'
     for path, expected in fixture['generated'].items():
         assert digest((ROOT / path).read_bytes()) == expected, path
+    # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
-    print('PASS fixed b400acb6 public API/version/slots/signatures/out/in/generated ABI; hwdev CRC')
+    print('PASS fixed b400acb6 public API/version/slots/signatures/out/in/generated ABI; current hwdev pair')
     return fixture, wrappers
 
 

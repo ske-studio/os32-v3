@@ -47,8 +47,9 @@ def contracts():
     assert '#include "kcg_contract.h"' in module and '#include "kcg.h"' not in module
     assert 'void kcg_rom_read_ank(u8 ch, u8 *buf) { public_api()->read_ank(ch, buf); }' in module
     assert 'void kcg_rom_read_kanji(u16 jis, u8 *buf) { public_api()->read_kanji(jis, buf); }' in module
+    # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
-    print('PASS baseline public ABI/generated files, KCG controls and ROM boundary, hwdev CRC')
+    print('PASS baseline public ABI/generated files, KCG controls and ROM boundary, current hwdev pair')
     return wrappers
 
 

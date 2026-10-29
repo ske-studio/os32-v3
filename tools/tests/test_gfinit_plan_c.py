@@ -12,21 +12,18 @@ import test_gfinit_plan
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
-def command(exe):
-    return [s.replace('gfinit_plan_host.c', 'gfinit_plan_c_host.c')
+def command(exe, stage="c"):
+    source = {"c": "gfinit_plan_c_host.c", "init": "gfinit_init_host.c",
+              "c_only": "gfinit_c_only_host.c", "s0": "gfinit_s0_host.c"}[stage]
+    return [s.replace('gfinit_plan_host.c', source)
             for s in test_gfinit_plan.command(exe)]
 
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
-    assert 'A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS' in text
     assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
-    assert 'T2 same-session and C-only share ordered writes, waits, sections and verification masks PASS' in text
-    assert 'T1 baseline once, three E gates, cold latch, CR52/C040, restore and S0 failure PASS' in text
     assert 'T1 record entry/route/cell required, exit TARGET/VRAM evidence, later bus failure PASS' in text
-    assert 'T1 CHECK then S0 local/quiesce/first-send/final-send failure revokes init PASS' in text
-    assert 'T1 C-only each lock write/abort restores per-call CR1F/CR11/CR44 originals PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
     assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
     assert 'WAIT lengths positions, conditional FP, REC, callback failure and abort PASS' in text
@@ -35,7 +32,6 @@ def check_output(text, verbose=True):
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
-        print('PASS A2/main0..4/baseline: required/record/A4, stable/changing GPIO')
         for line in text.splitlines():
             if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'ROUTE ', 'CELL ', 'VERIFY ', 'default_', 'REC sid=')):
                 print(line)
@@ -78,17 +74,8 @@ def check_output(text, verbose=True):
 MUTATIONS = [
     ('kdebug/recover_plan/access.inc', 'rmw_destination_sample',
      'if (a->value == w->key) *old = values[i];', '(void)old;'),
-    ('kdebug/gf_stage_state.c', 'baseline_once',
-     'if (s->initialized) return 0;', 'if (false) return 0;'),
-    ('kdebug/gf_stage_state.c', 'entry_pmc',
-     'value != s->values[GF_STAGE_PMC]', 'false'),
-    ('kdebug/gf_stage_state.h', 'entry_last_s0',
-     'r->gf_stage->s0_ok && r->s0_verified', 'r->gf_stage->s0_ok'),
     ('kdebug/recover_gf_stage/c.inc', 'record_cell_required',
      'source != REC_CHECK_TARGET;', 'false;'),
-    ('kdebug/recover_common/session.inc', 'cold_retained',
-     'r->cold_latched = r->cold_latched || p->cold_required;', 'r->cold_latched = false;'),
-
     ('kdebug/recover_gf_stage/c.inc', 'route_readback_mask',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & RECOVER_ROUTE_MASK)',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & 0U)'),
@@ -122,9 +109,21 @@ MUTATIONS = [
      '!write && value != wanted && *bad_offset != RECOVER_NONE'),
 ]
 
+STAGE_MUTATIONS = [
+    ('kdebug/gf_stage_state.c', 'baseline_once',
+     'if (s->initialized) return 0;', 'if (false) return 0;', 'c_only'),
+    ('kdebug/gf_stage_state.c', 'entry_pmc',
+     'value != s->values[GF_STAGE_PMC]', 'false', 's0'),
+    ('kdebug/gf_stage_state.h', 'entry_last_s0',
+     'r->gf_stage->s0_ok && r->s0_verified', 'r->gf_stage->s0_ok', 'c_only'),
+    ('kdebug/recover_common/session.inc', 'cold_retained',
+     'r->cold_latched = r->cold_latched || p->cold_required;', 'r->cold_latched = false;', 'c_only'),
+]
+
 
 def mutation(item):
-    file, name, old, new = item
+    file, name, old, new = item[:4]
+    stage = item[4] if len(item) == 5 else "c"
     source = (ROOT / file).read_text()
     if old and source.count(old) != 1:
         return name + ': ambiguous anchor', 1
@@ -132,7 +131,7 @@ def mutation(item):
         exe = pathlib.Path(td) / 'host'
         try:
             tree = mutpar.build_in_tree(ROOT, td, {file: source.replace(old, new, 1) if old else source},
-                                       [command(exe)], capture_output=True)
+                                       [command(exe, stage)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': compile failed ' + str(exc.stderr), 1
         # gcc dependency closure must copy the new units, not follow source-tree symlinks.
@@ -143,7 +142,11 @@ def mutation(item):
         failed = result.returncode != 0
         if not failed:
             try:
-                check_output(result.stdout.decode(), verbose=False)
+                if stage == "c":
+                    check_output(result.stdout.decode(), verbose=False)
+                else:
+                    from test_gfinit_stages import check_output as check_stage
+                    check_stage(stage, result.stdout.decode())
             except AssertionError:
                 failed = True
         return name + (': RED' if failed else ': GREEN'), int(not failed)

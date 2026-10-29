@@ -34,4 +34,6 @@ check-dep-dir-a-l05a-host:
 - kernel/v86_mem.c
 - kernel/v86_snapshot.c
 - tools/tests/shm_user_host.c
+- hwdev/generated/hwdev_imports.json
+- hwdev/generated/hwdev_layout.txt
 artifact_reader: true

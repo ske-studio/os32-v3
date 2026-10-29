@@ -66,3 +66,5 @@ check-gf-production-host:
 - gfx/gf_present.c
 - gfx/palette.h
 - gfx/pc98_route.h
+- tools/tests/recover_gf_cases_host.inc
+- tools/tests/recover_gf_fixture_host.inc

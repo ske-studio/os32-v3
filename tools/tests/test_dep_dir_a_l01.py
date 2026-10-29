@@ -66,8 +66,9 @@ def abi(folder, fixture):
                                      f'build/out/{name}/{name}_imports.h'], cwd=ROOT,
                                     capture_output=True, text=True, check=True)
             assert f'gen_sqlite_imports.py --module {name} ' in result.stdout, result.stdout
+    # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
-    print('PASS fixed KAPI spec, ILP32 sizes/offsets/slots, OPS_VERSION, hwdev CRC, make dependencies')
+    print('PASS fixed KAPI spec, ILP32 sizes/offsets/slots, OPS_VERSION, current hwdev pair, make dependencies')
 
 
 
