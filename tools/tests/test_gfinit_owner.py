@@ -31,7 +31,7 @@ MUTATIONS = [
     ('cli_main_range', 'q.script_id >= GF_INIT_MAINS', '0', 'userland/shell/cmd_gfinit.c'),
     ('cli_op_swap', 'op = GF_OP_ABORT;', 'op = GF_OP_INSPECT;', 'userland/shell/cmd_gfinit.c'),
     ('cli_nosys_success', 'return rc ? 1 : 0;', 'return rc && rc != -10 ? 1 : 0;', 'userland/shell/cmd_gfinit.c'),
-    ('chip_fixed', 'return rom[data + GF_BIT_CHIP_OFFSET];', 'return GF_VERSION_CHIP;', 'kdebug/gfinit/rom.inc'),
+    ('chip_fixed', 'return rom[data + GF_BIT_CHIP_OFFSET];', 'return GF_VERSION_CHIP;', 'hwdev/gf/rom.inc'),
     ('lease_generation', 'owner->generation, r->token.session', 'gf_lease.generation, r->token.session'),
     ('lease_entry', 'if (owner && owner->inspected && !gf_owned(r)) {', 'if (false) {'),
     ('idle_unowned_release', 'if (r->state == REC_IDLE || r->state == REC_VERIFIED) gf_release_rom(owner);', ''),

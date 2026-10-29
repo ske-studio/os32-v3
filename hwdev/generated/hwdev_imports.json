@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 1352734120,
+  "module_abi_gen": 4062911197,
   "imports": [
     {
       "name": "trial_begin",
@@ -208,6 +208,12 @@
     {
       "name": "pci_cfg_write16",
       "index": 34,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "gf_production_selected",
+      "index": 35,
       "kind": 1,
       "type_ver": 1
     }

@@ -176,4 +176,9 @@ pci_cfg_write32:
 pci_cfg_write16:
     jmp *hwdev_import_slots+136
 .size pci_cfg_write16, .-pci_cfg_write16
+.globl gf_production_selected
+.type gf_production_selected, @function
+gf_production_selected:
+    jmp *hwdev_import_slots+140
+.size gf_production_selected, .-gf_production_selected
 .section .note.GNU-stack,"",@progbits

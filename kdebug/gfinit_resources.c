@@ -1,7 +1,7 @@
 #include "gfinit_resources.h"
 #include "kprintf.h"
 #include "../drivers/pci.h"
-#ifndef GFINIT_RESOURCES_HOST
+#if !defined(GFINIT_RESOURCES_HOST) && !defined(GF_PRODUCTION)
 #ifdef HWDEV_MODULE
 #include "hwdev/generated/hwdev_import_macros.h"
 #else

@@ -34,7 +34,7 @@ def verify_stubs(elf_data, entries):
         assert payload[offset:offset+6] == b'\xff\x25' + struct.pack('<I', base + 4*e['index']), e
     assert 'kdebug_import_slots' not in elf.symbols
     assert 'recover_hal_wait_frame' in elf.symbols
-    print('PASS 35 tail-jump destinations, address-only callback stub, no kdebug slots')
+    print(f'PASS {len(entries)} tail-jump destinations, address-only callback stub, no kdebug slots')
 
 
 def main():

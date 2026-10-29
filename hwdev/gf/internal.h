@@ -108,6 +108,8 @@ struct gf_init_program {
  * call io.restore once before returning; owner then quiesces. ctx/work/ROM
  * and all io callbacks are supplied by the owner. */
 int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
+/* Read-only ROM/known-span validation, also used by P4 before A2 writes. */
+int gf_init_prepare(struct gf_init_context *ctx, struct gf_init_program *work);
 /* The design's "gf_instruction" is the existing gfinit_instruction tag:
  * share gfinit_decode_instruction and its .inc decoder, no second IR/type.
  * Run entry: pc/opcode/length and opcode-specific ref/count/port/index/mask/

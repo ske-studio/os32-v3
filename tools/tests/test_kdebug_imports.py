@@ -97,7 +97,7 @@ class ImportsTests(unittest.TestCase):
                         gen.check_nm(self.entries)
 
     def test_exact_order_kinds_context_and_hash(self):
-        self.assertEqual(len(self.entries), 308)
+        self.assertEqual(len(self.entries), 309)
         self.assertEqual([e['name'] for e in self.entries[221:234]], [
             'vfs_fstype', 'vfs_stat', 'vfs_open', 'vfs_close', 'vfs_read_fd',
             'vfs_write_fd', 'vfs_get_size', 'vfs_rm', 'dma_range_ok',
@@ -105,8 +105,8 @@ class ImportsTests(unittest.TestCase):
         # S5 (TASK_KPEEK §2-6・§2-8): peek's six imports plus T5's four LAN ones.
         self.assertEqual(gen.STAGES['S4'], 234)
         self.assertEqual(gen.STAGES['S5'], 264)
-        self.assertEqual(gen.STAGES['S6'], 308)
-        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3)
+        self.assertEqual(gen.STAGES['S6'], 309)
+        self.assertEqual(gen.STAGE_KINDS['S6'], ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',))
         self.assertEqual([(e['stage'], e['name']) for e in self.entries[234:264]], [
             ('S5', 'paging_is_present'), ('S5', 'paging_map_phys'), ('S5', 'paging_pte_raw'),
             ('S5', 'paging_pte_restore'), ('S5', 'pci_find'), ('S5', 'pci_get'),
@@ -258,7 +258,7 @@ class ImportsTests(unittest.TestCase):
             'kdi_get_kbd_inject_drop_count',
             'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count',
             'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
-            'kdi_ptr___kernel_resident_end'])
+            'kdi_ptr___kernel_resident_end', 'gf_production_selected'])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
         moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'

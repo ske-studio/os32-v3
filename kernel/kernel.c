@@ -17,6 +17,7 @@
 #include "kmalloc.h"
 #include "palette.h"
 #include "gfx.h"
+#include "gf_production.h"
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
 #include "kcg_module.h"
 #include "boot_splash.h"
@@ -352,6 +353,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
     {
         char gfxmode[16];
+        char gfmode[16] = {0};
+        (void)sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfmode, sizeof(gfmode));
+        gf_production_configure(gfmode, sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0));
         if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0) {
             gfx_diag_stripes = kstrcmp(gfxmode, "stripes") == 0;
             gfx_diag_altwin = kstrcmp(gfxmode, "altwin") == 0;

@@ -85,12 +85,14 @@ def run(folder, image=None, mode_c=False):
     names = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())['imports']
     core = {e['name'] for e in names[:25]} - {'kpeek_call', 'recover_hal_wait_frame'}
     source += '\nstatic void unused_import(void) { CHECK(0); }\n'
+    source += 'static int trace_production_selected(void) { return 0; }\n'
     source += 'extern void hwdev_trace_load(const unsigned *);\nvoid _start(void) {\n'
     replacements = {name: 'sequence_' + name for name in
                     ('recover_owner', 'recover_owner_configure', 'kmemset',
                      'pgalloc_alloc_phys', 'pgalloc_free_n_owner', 'serial_get_setup')} if mode_c else {}
     if mode_c:
         replacements['recover_hal_wait_frame'] = 'exec_delay'
+    replacements['gf_production_selected'] = 'trace_production_selected'
     source += '    const unsigned imports[] = {\n' + ''.join(
         '        (unsigned)' + replacements.get(e['name'],
             e['name'] if e['name'] in core or e['name'] == 'kprintf' else 'unused_import') + ',\n'

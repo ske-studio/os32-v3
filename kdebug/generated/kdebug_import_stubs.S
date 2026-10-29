@@ -1541,4 +1541,9 @@ kdi_ptr_ring3_ls_end:
 kdi_ptr___kernel_resident_end:
     jmp *kdebug_import_slots+1228
 .size kdi_ptr___kernel_resident_end, .-kdi_ptr___kernel_resident_end
+.globl gf_production_selected
+.type gf_production_selected, @function
+gf_production_selected:
+    jmp *kdebug_import_slots+1232
+.size gf_production_selected, .-gf_production_selected
 .section .note.GNU-stack,"",@progbits
