@@ -25,21 +25,11 @@ void mouse_init(void);
 /* 状態取得 (ポーリング) — 差分はpoll間でリセットされる */
 void mouse_poll(MouseState *state);
 
-/* ボタン状態のみ取得 */
-u8   mouse_buttons(void);
-
 /* カーソル移動範囲設定 */
 void mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max);
 
-/* 割り込み周期設定 (バスマウスモードのみ) */
-/* rate: 0=120Hz, 1=60Hz, 2=30Hz, 3=15Hz */
-void mouse_set_rate(u8 rate);
-
 /* マウスが使用可能か */
 int  mouse_available(void);
-
-/* 現在のモード取得 */
-u8   mouse_get_mode(void);
 
 /* カーソル表示レイヤー */
 void mouse_cursor_set_mode(int mode);  /* MOUSE_CURSOR_xxx */

@@ -24,9 +24,6 @@ int np2_recv_str(char *buf, int maxlen);
 /* 32bit値送信 (ポート0x7EDに4バイト出力) */
 void np2_send_val(u32 val);
 
-/* 32bit値受信 (ポート0x7EDから4バイト入力) */
-u32 np2_recv_val(void);
-
 /* 情報取得ヘルパー */
 int np2_get_version(char *buf, int maxlen);    /* バージョン文字列 */
 int np2_get_cpu(char *buf, int maxlen);        /* CPU種類 */
