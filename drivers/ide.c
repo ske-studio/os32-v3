@@ -84,17 +84,6 @@ static int ide_wait_drq(void)
     return IDE_ERR_TIMEOUT;
 }
 
-/* DRDY待ち */
-static int ide_wait_ready(void)
-{
-    int timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
-        u8 st = (u8)inp(IDE_ALT_STATUS);
-        if (!(st & IDE_ST_BSY) && (st & IDE_ST_DRDY)) return IDE_OK;
-    }
-    return IDE_ERR_TIMEOUT;
-}
-
 /* ドライブ選択 (Master/Slave)
  * PC-98では IDE_DRV_HEAD の bit4 で Master(0)/Slave(1) を選択する。
  * またI/Oバンク (0 or 1) も同時に切り替える。 */
