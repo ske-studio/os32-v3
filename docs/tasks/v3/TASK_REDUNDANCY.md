@@ -1,6 +1,6 @@
 # TASK_REDUNDANCY — ユーザーランド外の冗長コードの整理
 
-> 状態: **計画 (2026-10-29)** — 調査・裏取りを段へ分解した票。実装・受入は未着手。
+> 状態: **実装中 (2026-10-30)** — **A01・A06 は main** (sol と terra に同じ依頼を並行で出して比べた: 差分は 2 段とも同一、所要は A01 sol 5:01 / terra 3:42、A06 sol 5:36 / terra 3:54、完了条件は両方とも満たした — terra の版を取り込み、astra レビュー Approve。記録 ~/os32-tmp/run/terra-eval.md)。それまで: **計画 (2026-10-29)** — 調査・裏取りを段へ分解した票。実装・受入は未着手。
 > 上位: [ROADMAP](../../ROADMAP.md)・開発規約 [POLICY_DEV](../../POLICY_DEV.md) §2「ソースファイルの大きさ」。先行: [TASK_GEFORCE6200](../realhw/TASK_GEFORCE6200.md)・[TASK_HWDEV](../realhw/TASK_HWDEV.md)。調査の原文 (`REPORT.md`・`VERIFY.md`・`REPORT2.md`・`VERIFY2.md` の引用先) は `~/os32-tmp/run/redundancy/`。
 >
 > 作成: sol (gpt-6.1-sol) が起草、Opus のレビュー 1 回を反映した r2 を元に、票に載っていないファイルの再調査 (REPORT2・REPORT3、ユーザー指示 2026-10-29) と Opus の裏取り (VERIFY2) の訂正を取り込んだ **r3**。実装は GeForce の後、§2 の 2 段 (A01・A06) を sol と terra に並行で出して比べる (ユーザー 2026-10-29)。
