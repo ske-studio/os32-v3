@@ -168,10 +168,6 @@ def build_target(tmp):
                "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
-        # ide.c には既存の未使用関数 (ide_wait_ready) の警告があるので
-        # それだけ黙らせる (この票で増やした警告ではない)。
-        if rel == "drivers/ide.c":
-            cmd.insert(cmd.index("-Werror") + 1, "-Wno-unused-function")
         subprocess.run(cmd, cwd=ROOT, check=True)
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 
