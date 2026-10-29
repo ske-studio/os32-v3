@@ -22,6 +22,7 @@ def check_output(text, verbose=True):
     assert 'A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS' in text
     assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
+    assert 'T2 same-session and C-only share ordered writes, waits, sections and verification masks PASS' in text
     assert 'T1 baseline once, three E gates, cold latch, CR52/C040, restore and S0 failure PASS' in text
     assert 'T1 record entry/route/cell required, exit TARGET/VRAM evidence, later bus failure PASS' in text
     assert 'T1 CHECK then S0 local/quiesce/first-send/final-send failure revokes init PASS' in text
@@ -114,7 +115,7 @@ MUTATIONS = [
      't->read_safe && !(w->flags & REC_RUN_NO_PREREAD) && logged_read(r, &a, &old)',
      't->read_safe && logged_read(r, &a, &old)'),
     ('kdebug/gfinit_plan_c.c', 'pll_restore_live',
-     'expr=GF_C_EXPR_SAVED;producer=pll_first;', 'expr=GF_C_EXPR_LIVE;producer=pll_first;'),
+     'expr=GF_C_EXPR_SAVED;producer=b->pll_first;', 'expr=GF_C_EXPR_LIVE;producer=b->pll_first;'),
     ('kdebug/gfinit_bus.c', 'misc_read_alias',
      'offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;', 'offset += 0;'),
     ('kdebug/gfinit_plan_c.c', 'vram_last_row',
@@ -139,7 +140,7 @@ def mutation(item):
             return name + ': compile failed ' + str(exc.stderr), 1
         # gcc dependency closure must copy the new units, not follow source-tree symlinks.
         for dependency in ('kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h',
-                           'hwdev/gfinit_mode.h', 'kdebug/generated/recover_gf_c_tables.inc'):
+                           'hwdev/gfinit_mode.h', 'hwdev/generated/gf_mode_rows.inc'):
             assert (tree / dependency).is_file() and not (tree / dependency).is_symlink()
         result = host32.run([str(exe)], cwd=tree, timeout=60, capture_output=True)
         failed = result.returncode != 0

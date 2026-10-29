@@ -97,8 +97,8 @@ def main():
     data = json.loads(args.input.read_text()) if args.input else extract_oracle()
     result = generate(data)
     from gfinit_mode_tables import generate as generate_mode
-    mode_output = ROOT / "kdebug/generated/recover_gf_c_tables.inc"
-    mode_result = generate_mode(data)
+    mode_output = ROOT / "hwdev/generated/gf_mode_rows.inc"
+    mode_result = generate_mode()
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != result:
             raise SystemExit('recover GF generated tables are stale')
@@ -107,6 +107,7 @@ def main():
         print('PASS recover GF default/C generated tables reproducible')
     else:
         OUTPUT.write_text(result)
+        mode_output.parent.mkdir(parents=True, exist_ok=True)
         mode_output.write_text(mode_result)
 
 

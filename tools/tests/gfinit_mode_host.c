@@ -4,6 +4,7 @@
 #undef _start
 #include "../../kdebug/gfinit_pll.c"
 #include "../../kdebug/gfinit_mode.c"
+#include "../../hwdev/gf_load_state.c"
 static void number(u32 x)
 {
     char b[16]; u32 n = 0;
@@ -13,6 +14,47 @@ static void number(u32 x)
 static void value(u32 v) { number(v); print(" "); }
 static void field(const char *name, u32 v) { print(name); print("="); number(v); print("\n"); }
 static struct gfinit_mode mode;
+static u32 load_seen,load_stop=~0U,load_sections,load_waits,load_fault;
+static bool load_silent;
+static int load_section(void *saved,u32 section)
+{
+    (void)saved;load_sections++;
+    if (!load_silent) field("section",section);
+    return load_fault==1 && section==load_stop ? -1 : 0;
+}
+static int load_wait(void *saved,u32 ms,bool fp_only)
+{
+    (void)saved;load_waits++;
+    if (!load_silent) {
+        print("wait=");value(ms);value(fp_only);value(load_seen);print("\n");
+    }
+    return load_fault==2 && load_waits==load_stop ? -1 : 0;
+}
+static int load_row(void *saved,const struct gfinit_mode *state,u32 i)
+{
+    (void)saved;
+    CHECK(i==load_seen++);
+    if (!load_fault && i==load_stop) return -1;
+    if (load_silent) return 0;
+    const struct gf_mode_row *r=&gf_mode_rows[i];
+    u32 v=r->bits, keep=r->keep, bits=r->bits;
+    const u32 live=0xa5a55a5aU & (r->width==1 ? 255U : ~0U);
+    if (r->expr==GF_C_STATE) {
+        CHECK(r->source <= sizeof(*state)-r->width);
+        v=0; for (u32 b=0;b<r->width;b++) v|=(u32)((const u8 *)state)[r->source+b]<<(8*b);
+    } else if (r->expr==GF_C_LIVE) v=(live & r->keep)|r->bits;
+    else if (r->expr==GF_C_PLL) {
+        CHECK(r->source < state->sequence.count);
+        const struct gfinit_pll_write *w=&state->sequence.writes[r->source];
+        CHECK(r->reg==w->reg); keep=w->keep; bits=w->value; v=(live & keep)|bits;
+    } else CHECK(r->expr==GF_C_LITERAL || r->expr==GF_C_PALETTE);
+    print("row=");
+    value(r->kind); value(r->reg);
+    value(r->index); value(r->width); value(r->expr); value(r->source);
+    value(keep); value(bits); value(r->verify); value(r->count); value(r->flags); value(v); print("\n");
+    return 0;
+}
+static const struct gf_load_io load_io={load_section,load_row,load_wait};
 static void dump(u32 variant)
 {
     struct gfinit_pll_limits limits = {
@@ -50,24 +92,9 @@ static void dump(u32 variant)
         u8 rgb[GF_MODE_RGB]; gfinit_mode_palette(i,rgb);
         print("rgb="); value(i); for (u32 c=0;c<GF_MODE_RGB;c++) value(rgb[c]); print("\n");
     }
-    for (u32 i=0;i<recover_gf_c_row_count;i++) {
-        const struct recover_gf_c_row *r=&recover_gf_c_rows[i];
-        u32 v=r->bits, keep=r->keep, bits=r->bits;
-        const u32 live=0xa5a55a5aU & (r->width==1 ? 255U : ~0U);
-        if (r->expr==GF_C_STATE) {
-            CHECK(r->source <= sizeof(mode)-r->width);
-            v=0; for (u32 b=0;b<r->width;b++) v|=(u32)((const u8 *)&mode)[r->source+b]<<(8*b);
-        } else if (r->expr==GF_C_LIVE) v=(live & r->keep)|r->bits;
-        else if (r->expr==GF_C_PLL) {
-            CHECK(r->source < mode.sequence.count);
-            const struct gfinit_pll_write *w=&mode.sequence.writes[r->source];
-            CHECK(r->reg==w->reg); keep=w->keep; bits=w->value; v=(live & keep)|bits;
-        } else CHECK(r->expr==GF_C_LITERAL || r->expr==GF_C_PALETTE);
-        print("row=");
-        value(r->id); value(r->key); value(r->phase); value(r->kind); value(r->reg);
-        value(r->index); value(r->width); value(r->expr); value(r->source);
-        value(keep); value(bits); value(r->verify); value(r->count); value(r->flags); value(v); print("\n");
-    }
+    load_seen=load_sections=load_waits=0;
+    CHECK(!gf_load_state(&mode,0,&load_io));
+    CHECK(load_seen==205 && load_sections==7 && load_waits==3);
 }
 void _start(void)
 {
@@ -92,6 +119,22 @@ void _start(void)
     CHECK(REC_GF_C_CHECK_508_MASK == 0x0007ffffU);
     CHECK(REC_GF_C_CHECK_578_MASK == 0x8000ffffU);
     dump(0); dump(1);
+    /* A consumer failure at any row, section or wait stops the shared walk. */
+    load_silent=true;
+    for (load_stop=0;load_stop<205;load_stop++) {
+        load_seen=load_sections=load_waits=0;
+        CHECK(gf_load_state(&mode,0,&load_io)<0 && load_seen==load_stop+1);
+    }
+    load_fault=1;
+    for (load_stop=0;load_stop<7;load_stop++) {
+        load_seen=load_sections=load_waits=0;
+        CHECK(gf_load_state(&mode,0,&load_io)<0 && load_sections==load_stop+1);
+    }
+    load_fault=2;
+    for (load_stop=1;load_stop<=3;load_stop++) {
+        load_seen=load_sections=load_waits=0;
+        CHECK(gf_load_state(&mode,0,&load_io)<0 && load_waits==load_stop);
+    }
     /* Single-stage threshold equality and a forced two-stage test. */
     struct gfinit_pll_limits l={{10000,50350,1000,27000,1,255,1,27},
         {200000,400000,1000,200000,4,255,1,4},6,0,27000};
@@ -101,13 +144,6 @@ void _start(void)
     CHECK(gfinit_mode_calc(&l,&s,&mode)==0 && !mode.single && mode.pll.n2!=mode.pll.m2);
     l.ref=0;
     CHECK(gfinit_mode_calc(&l,&s,&mode)<0);
-    for (u32 i=0;i<recover_gf_c_target_count;i++) {
-        const struct recover_gf_c_target *t=&recover_gf_c_targets[i];
-        CHECK(t->access==REC_COLD);
-        if (t->kind==GF_C_AR || t->kind>=GF_C_AR_GATE) CHECK(!t->read_safe);
-        print("target="); value(t->key); value(t->kind); value(t->reg); value(t->index);
-        value(t->width); value(t->access); value(t->read_safe); print("\n");
-    }
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failures ? 1 : 0));
     __builtin_unreachable();
 }

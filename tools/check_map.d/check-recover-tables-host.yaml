@@ -30,6 +30,8 @@ check-recover-tables-host:
 - tools/gfinit_mode_tables.py
 - hwdev/gfinit_mode.h
 - kdebug/recover_gf_c.h
-- kdebug/generated/recover_gf_c_tables.inc
+- hwdev/generated/gf_mode_rows.inc
 - kdebug/gf_stage_state.h
 - kdebug/gfinit_pll.h
+- hwdev/gf_load_state.c
+- hwdev/gf_load_state.h

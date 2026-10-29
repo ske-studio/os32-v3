@@ -20,6 +20,15 @@ static void select_record(const struct recover *r, u32 node, u32 *bits);
 static bool extent_ok(const struct recover_profile *p, const struct recover_target *t,
                       const struct recover_bar_extent bars[RECOVER_BAR_COUNT]);
 
+/* auth_phase persists through pause/final records; expected_node identifies the
+ * transition before trial_step emits RUNNING or charges its first safe point. */
+static bool gf_stage_c_running(const struct recover *r)
+{
+    return r->state!=REC_RESTORING && r->profile && r->profile->expected_device==RECOVER_GF_DEVICE && r->plan &&
+        (r->auth_phase==REC_MODE_C ||
+         (r->expected_node<r->plan->node_count && r->plan->nodes[r->expected_node].phase==REC_MODE_C));
+}
+
 static struct rec_tx_diag txd;
 static u32 tx_pos, tx_sent, tx_where;
 const struct rec_tx_diag *recover_diag_get(void) { return &txd; }
@@ -312,6 +321,7 @@ static int row_send(struct recover *r, struct rec_row *b)
 {
     const struct recover_transport *t = r->transport;
     if (!t) return 0;
+    u32 max_polls = gf_stage_c_running(r) ? GF_C_TX_POLLS : t->max_polls;
     txd.active = 1; tx_pos = tx_sent = 0; tx_where = REC_TX_BUILD;
     row_text(b, "\n");
     if (b->overflow) {
@@ -330,12 +340,12 @@ static int row_send(struct recover *r, struct rec_row *b)
      * separator to the same checked UART allocation as that next record. */
     if (!rc && r->log_partial) {
         tx_pos = tx_sent = 0; tx_where = REC_TX_SEPARATOR;
-        rc = recover_uart_byte(r, &t->uart, t->opaque, '\n', t->frame_us, t->max_polls);
+        rc = recover_uart_byte(r, &t->uart, t->opaque, '\n', t->frame_us, max_polls);
         if (!rc) r->log_partial = false;
     }
     for (u32 i = 0; !rc && i < b->n; i++) {
         tx_pos = i + 1; tx_sent = 0; tx_where = REC_TX_BYTE;
-        if (recover_uart_byte(r, &t->uart, t->opaque, (u8)b->data[i], t->frame_us, t->max_polls)) {
+        if (recover_uart_byte(r, &t->uart, t->opaque, (u8)b->data[i], t->frame_us, max_polls)) {
             rc = -1; break;
         }
     }
@@ -1248,7 +1258,7 @@ static int check_deadline(struct recover *r)
     if (r->spent >= r->budget ||
         (r->in_opcode && (r->log_limit ? r->spent - r->opcode_spent :
          (u32)(r->call_tick - r->opcode_tick)) >=
-         r->profile->opcode_limit)) {
+         (gf_stage_c_running(r) ? GF_C_EXEC_SECONDS * PIT_HZ : r->profile->opcode_limit))) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0);
         if (!r->emitting) cleanup(r);
         return -1;
@@ -1397,7 +1407,7 @@ static int call_point(struct recover *r, bool count_poll)
     if (!r->in_call || (r->state != REC_SNAPSHOTTING && r->state != REC_ARMED &&
         r->state != REC_RUNNING && r->state != REC_PAUSED)) return -1;
     if (check_deadline(r)) return -1;
-    if (count_poll && r->in_opcode && ++r->polls > r->profile->max_polls) {
+    if (count_poll && r->in_opcode && ++r->polls > (gf_stage_c_running(r) ? GF_C_EXEC_POLLS : r->profile->max_polls)) {
         fail(r, REC_TIMEOUT, REC_PHASE_NONE, 0); return cleanup(r), -1;
     }
     if (r->emitting) return 0;
@@ -1426,6 +1436,14 @@ int trial_step(struct recover *r, const struct recover_token *t, bool approved,
     if (!live_matches(r)) {
         r->access_blocked = true;
         fail(r, REC_CONTRACT, REC_PHASE_NONE, 0); return cleanup(r);
+    }
+    /* N2: start C with its own finite limits, before RUNNING can emit UART.
+     * The bound profile and its local/S0 reservation remain unchanged. */
+    if (gf_stage_c_running(r) && r->expected_node<r->plan->node_count &&
+        r->plan->nodes[r->expected_node].phase==REC_MODE_C) {
+        r->budget=GF_C_EXEC_SECONDS * PIT_HZ; r->spent=0;
+        r->log_limit=GF_C_TX_SECONDS * PIT_HZ; r->tx_ticks=0;
+        r->uart_polls=0;
     }
     r->opcode_tick = r->ops->ticks(r->opaque);
     r->opcode_spent = r->spent;

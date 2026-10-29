@@ -4,7 +4,7 @@ check-gfinit-mode-host:
 - kdebug/gfinit_mode.c
 - hwdev/gfinit_mode.h
 - kdebug/recover_gf_c.h
-- kdebug/generated/recover_gf_c_tables.inc
+- hwdev/generated/gf_mode_rows.inc
 - tools/gfinit_mode_tables.py
 - tools/gen_recover_tables.py
 - tools/tests/host32.py
@@ -18,3 +18,5 @@ check-gfinit-mode-host:
 - lib/crc32_core.inc
 - tools/tests/recover_gf_host.c
 - tools/tests/recover_cleanup_host.inc
+- hwdev/gf_load_state.c
+- hwdev/gf_load_state.h

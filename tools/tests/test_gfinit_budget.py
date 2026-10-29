@@ -1,4 +1,4 @@
-"""4c2c3 REC/cleanup accounting and real failure paths (ILP32/qemu)."""
+"""Prefix accounting, fixed C deadlines and real failure paths (ILP32/qemu)."""
 import pathlib
 import re
 import subprocess
@@ -11,9 +11,13 @@ import test_gfinit_plan_c
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ('kdebug/gfinit_budget.inc', 'omit_check_records',
-     'total++; /* CHECK result, also on mismatch or bus failure */',
-     'total += 0; /* missing CHECK result */'),
+    ('kdebug/recover.c', 'c_deadline_switch',
+     'r->budget=GF_C_EXEC_SECONDS * PIT_HZ; r->spent=0;', 'r->budget=1; r->spent=0;'),
+    ('kdebug/recover.c', 'c_tx_reset',
+     'r->log_limit=GF_C_TX_SECONDS * PIT_HZ; r->tx_ticks=0;', 'r->tx_ticks=0;'),
+    ('kdebug/recover.c', 'c_poll_limit',
+     'gf_stage_c_running(r) ? GF_C_EXEC_POLLS : r->profile->max_polls', 'r->profile->max_polls'),
+
     ('kdebug/recover_cleanup.h', 'omit_local_targets',
      'pairs += t->index == RECOVER_CR1F ? 2 * n : n;',
      'pairs += t->index == RECOVER_CR1F ? 0 * n : 0 * n;'),

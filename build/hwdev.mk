@@ -1,6 +1,6 @@
 # GF body lives only in HWDEV; S0 recovery stays in kdebug.
 HWDEV_OUT := $(BUILD_OUT)/hwdev
-HWDEV_GF := gf_stage_state gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf
+HWDEV_GF := gf_load_state gf_stage_state gfinit_bus gfinit gfinit_plan gfinit_plan_c gfinit_resources gfinit_decode gfinit_exec gfinit_pll gfinit_mode recover_gf
 HWDEV_OBJS := $(addprefix $(HWDEV_OUT)/,$(addsuffix .o,$(HWDEV_GF))) \
     $(HWDEV_OUT)/hwdev_main.o $(HWDEV_OUT)/hwdev_import_slots.o $(HWDEV_OUT)/hwdev_import_stubs.o
 # Normal and R1 share this decoder object; keep all other units at -O2.
@@ -87,3 +87,10 @@ else
 gf-vpll-probe:
 	@echo 'Use make GF_VPLL_PROBE=1 gf-vpll-probe' >&2; exit 1
 endif
+
+$(HWDEV_OUT)/gf_load_state.o: hwdev/gf_load_state.c hwdev/gf_load_state.h hwdev/generated/gf_mode_rows.inc build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -c $< -o $@
+$(VPLL_OUT)/hw/gf_load_state.o: hwdev/gf_load_state.c hwdev/gf_load_state.h hwdev/generated/gf_mode_rows.inc build/hwdev.mk
+	mkdir -p $(@D)
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -DHWDEV_MODULE -DGF_VPLL_PROBE=1 -c $< -o $@
