@@ -282,3 +282,35 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
    本案ではしない (外部プログラムの `PROGRAM_FLAGS` は `-Iplatform` を足さない約束、build/config.mk:192)。
 6. 改名 (例: `kernel.c` → `init/main.c`、`backend_pc98.c` → `drivers/video/pc98/backend.c`) をするか。するなら移動と別の段。
 7. 実施の時期: GF_STAGES など進行中の票と kdebug/ hwdev/ drivers/ の衝突。移動の段は他の段を止めて (取り込みの合間に) 入れるのがよい。
+
+## 9. 実施の手順 (2026-10-30、ユーザー「手順をドキュメント化し終えたら実行してください」)
+
+決まっていない要判断は PM の推奨で進める (ROLES §0「決裁」): 1 は `init/`・`mm/` を最上位・`drivers/char/` の名のまま、2 は窓口・本体を装置の隣、5 は PC-98 固有ヘッダを動かさない、6 は改名しない。3・4 は仮 (上の決定)。分離計画が後で置き場を変えるときは、同じ道具で移し直す (対応表を書き換えるだけ)。
+
+### 9-1. 段と実装者
+
+| 段 | 実装者 | 中身 | 基点 |
+|---|---|---|---|
+| L0 | **sol** (ビルドの仕組みを変える — 機械的でない) | (a) 比較の口: `tools/gen_build_id.py` に固定の commit 文字列を渡す環境変数、`kapi/kapi_sys.c:157` の `__DATE__ __TIME__` を固定できる口 (例: `SOURCE_DATE_EPOCH` 相当の `-D`)、(b) §6a (カーネル側の .o/.d を `build/out/obj/` へ、ソース隣の規則を消す)、(c) 走査の根の一覧を 1 か所に (check_p2v・check_arm_compile・check_arch_asm・check_kprintf_window が読む)、(d) 道具 `tools/move_files.py` (下 9-2) と `tools/include_resolve.py` (全 `#include "x"` の解決先を JSON に出す)、`tools/build_compare.sh` (固定の build_id で 2 つの木を組み、成果物をバイト比較・ずれたら objdump の関数ごとの差) | main |
+| L1 | **terra** | `kernel/` → `init/` `mm/` `kernel/{irq,time,module,console,ime,v86}/` `arch/x86/kernel/` `include/` (§3 の表、窓口・本体を除く 128 本) | L0 の取り込み後 |
+| L2 | **terra** | `drivers/` → `drivers/<種類>/`、窓口・本体 24 本と gfx のバックエンド 8 本を装置の隣へ (108 本) | L1 の取り込み後 |
+| L3 | **terra** | `fs/` → `fs/<各FS>/` (35 本) | L2 の取り込み後 (C_KERNEL と check_map.yaml が同じファイルなので順に) |
+| L4 | PM の Opus サブエージェント | 文書: 08_build §8-3 の木、DEVELOPMENT §2、ほかの参照 (check_docs_links が拾うもの) | L3 の後 |
+
+L0 の後は、L1〜L3 のあいだ、`kernel/` `drivers/` `fs/` `gfx/` を触るほかの段 (TASK_REDUNDANCY の C 群など) を出さない。
+
+### 9-2. 道具 move_files.py の約束
+
+- 入力は対応表 JSON (`[{"from": "kernel/paging.c", "to": "mm/paging.c"}, …]`)。各段の実装者が書くのはこの JSON だけ (§3 の表から作る)。
+- `git mv` で移し、追跡ファイル全体 (docs/archive・docs/hw・第三者のコードの中身は除く) で旧パスを置き換える: 完全一致・語境界つき、`../` 付きの相対パスは新しい位置から計算し直す。`ROOT / 'kernel' / 'x.c'` のような分割したパスは一覧に出して手で直す (未確認 4)。
+- 生成物は入力 (`kernel/kdebug_imports.def`・`hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) を置き換えてから作り直す。
+- `build/config.mk` の -I に新しいディレクトリを足す (要判断 4 の仮: -I を足す)。パスで選ぶ規則 (`-Os`・DF_GUARD_TEST・`.FORCE`・fatfs の INC) は置換の対象に含め、取りこぼしはバイト比較で出る。
+
+### 9-3. 段の完了条件 (実装者)
+
+`make all` rc=0、`tools/build_compare.sh <段の基点> HEAD` で kernel・各 .mod・kdebug・hwdev・kernel-r1 がバイト一致、`tools/include_resolve.py` の解決先が前後で一致 (ファイルのパスの付け替えを除いて)、走査型の検査の走査ファイル数が前後で一致、`python3 tools/check_select.py --lint` rc=0。**試験は回さない** (L0 だけは道具の試験と、kernel.map のパスが変わるので PM が NP21/W で 1 回起動)。
+
+### 9-4. PM の取り込み
+
+レビュー: L0 は astra (ビルドの仕組みの変更)。L1〜L3 は対応表 JSON・build/*.mk・config.mk の差分と比較の結果を PM が読む (機械置換の本体は道具の出力で、比較が一致していればレビューに出さない — 道具そのものは L0 でレビュー済み)。
+取り込みの検査は `check_wt.sh` (移動の量なので全体の検査になる)。落ちた試験・検査のパスは PM の Opus サブエージェントか同じ実装者が直し、落ちた対象だけ回し直す。rc=0 で push、CI の build を待って次の段へ。
