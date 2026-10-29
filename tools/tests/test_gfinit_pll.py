@@ -17,19 +17,19 @@ def command(exe):
 
 
 MUTATIONS = [
-    ('pll_write_limit', 'if (q->count < GF_PLL_WRITES_MAX)', 'if (q->count <= GF_PLL_WRITES_MAX)'),
-    ('pll_low_clock', 'min = clk * GF_PLL_P_MAX', 'min = clk << GF_PLL_P_MAX'),
-    ('pll_input_exit', 'if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;', 'if (GF_PLL_REF / m < a->min_input) break;'),
-    ('pll_version', 'r[table + GF_PLL_HDR_VERSION] != GF_PLL_TBL_VERSION', 'false'),
-    ('pll_ref', 'l->ref == GF_PLL_REF', 'true'),
-    ('pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),
-    ('pll_output_round', '((n * GF_PLL_REF + div / 2) / div + m / 2) / m', '(n * GF_PLL_REF / div) / m'),
-    ('pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
-    ('pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
-    ('pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
-    ('pll_fallback_not_first', 'u32 at = table + header, found = 0;', 'u32 at = table + header + len, found = 0;'),
-    ('pll_match_ignored', '        at = table + header + i * len;\n', '        (void)i;\n'),
-    ('pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
+    ('kdebug/gfinit_pll/sequence.inc', 'pll_write_limit', 'if (q->count < GF_PLL_WRITES_MAX)', 'if (q->count <= GF_PLL_WRITES_MAX)'),
+    ('kdebug/gfinit_pll/solve.inc', 'pll_low_clock', 'min = clk * GF_PLL_P_MAX', 'min = clk << GF_PLL_P_MAX'),
+    ('kdebug/gfinit_pll/solve.inc', 'pll_input_exit', 'if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;', 'if (GF_PLL_REF / m < a->min_input) break;'),
+    ('kdebug/gfinit_pll/parse.inc', 'pll_version', 'r[table + GF_PLL_HDR_VERSION] != GF_PLL_TBL_VERSION', 'false'),
+    ('kdebug/gfinit_pll/limits.inc', 'pll_ref', 'l->ref == GF_PLL_REF', 'true'),
+    ('kdebug/gfinit_pll/solve.inc', 'pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),
+    ('kdebug/gfinit_pll/solve.inc', 'pll_output_round', '((n * GF_PLL_REF + div / 2) / div + m / 2) / m', '(n * GF_PLL_REF / div) / m'),
+    ('kdebug/gfinit_pll/solve.inc', 'pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
+    ('kdebug/gfinit_pll/sequence.inc', 'pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
+    ('kdebug/gfinit_pll/sequence.inc', 'pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
+    ('kdebug/gfinit_pll/parse.inc', 'pll_fallback_not_first', 'u32 at = table + header, found = 0;', 'u32 at = table + header + len, found = 0;'),
+    ('kdebug/gfinit_pll/parse.inc', 'pll_match_ignored', '        at = table + header + i * len;\n', '        (void)i;\n'),
+    ('kdebug/gfinit_pll/sequence.inc', 'pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
 ]
 SHARED_MUTATIONS = []
 
@@ -66,7 +66,7 @@ def main():
             return result.returncode
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
-            [('kdebug/gfinit_pll.c', *item) for item in MUTATIONS] +
+            MUTATIONS +
             [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS],
             ('kdebug/gfinit_pll.c', 'control', '', ''))))
     return 0
