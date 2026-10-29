@@ -26,11 +26,6 @@ void pci_bind_reason_reset(void)
     s_reason = PCI_BIND_OK;
 }
 
-u8 pci_bind_reason_get(void)
-{
-    return s_reason;
-}
-
 /* ------------------------------------------------------------------------ */
 /*  線の様子は**読む時点で合成する** (往復 9 R1)                            */
 /*                                                                          */
