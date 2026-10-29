@@ -2,7 +2,7 @@
 #ifndef HWDEV_GF_INTERNAL_H
 #define HWDEV_GF_INTERNAL_H
 #include "../../include/video_service.h"
-#include "../../kdebug/gfinit_exec.h" /* decoder types, limits, clock/wait types */
+#include "../../kdebug/gfinit_decode.h"
 #include "../gf_load_state.h"
 #include "scripts.h"
 
@@ -39,6 +39,8 @@ struct gf_io {
     struct gfinit_exec_ops timing;
     int (*point)(void *opaque);
     int (*restore)(void *opaque, struct gf_init_context *ctx);
+    /* Optional diagnostic instruction BEGIN/END, including skipped controls. */
+    int (*trace)(void *opaque, struct gf_init_context *ctx, bool begin, int rc);
 };
 struct gf_init_context {
     struct gf_io io;
@@ -99,22 +101,22 @@ void gf_init_commit(struct gf_init_context *ctx);
  * own index/lock/window cleanup afterwards, even if this returns -1. */
 int gf_init_restore(struct gf_init_context *ctx);
 /* Caller-owned finite scratch, released after devinit. No expanded plan. */
-struct gf_init_program {
-    u32 count, main_pc[GF_INIT_MAINS];
-    struct gfinit_instruction insns[GF_INIT_INSNS];
-};
 /* Decode/CRC-check known S1 spans, pair repeats before any I/O, then run
  * main0..4. started_us is supplied by the ROM acquisition owner. On error
  * call io.restore once before returning; owner then quiesces. ctx/work/ROM
  * and all io callbacks are supplied by the owner. */
 int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
+/* Already prepared immutable program; diagnostic owner approves one main. */
+int gf_init_run_one(struct gf_init_context *ctx, const struct gf_init_program *work);
+/* A2 shares the same ordered writes; owner checks legacy decode before VGA. */
+int gf_init_a2(struct gf_init_context *ctx, int (*decode_safe)(void *));
 /* Read-only ROM/known-span validation, also used by P4 before A2 writes. */
 int gf_init_prepare(struct gf_init_context *ctx, struct gf_init_program *work);
 /* The design's "gf_instruction" is the existing gfinit_instruction tag:
  * share gfinit_decode_instruction and its .inc decoder, no second IR/type.
  * Run entry: pc/opcode/length and opcode-specific ref/count/port/index/mask/
  * shift/target/value are the successful decoder output; unused fields stay
- * zero. effect_first/effect_count are old plan metadata, NOT valid for runs.
+ * zero.
  * Runner supplements REPEAT.end_repeat with its matching END_REPEAT PC
  * BEFORE dispatch (decoder alone returns RECOVER_NONE). Match nested pairs
  * by decoding sequentially within each script span, as gfinit_decode_rom

@@ -1,4 +1,4 @@
-/* GF4a owner. All trial writes go through recover's immutable plan. */
+/* Diagnostic owner: bound stage approvals and the recorded common runner. */
 #include "gfinit.h"
 #include "gf_production.h"
 #include "hwdev/owner.h"
@@ -58,6 +58,7 @@ struct gfinit_owner {
     struct recover_range exclude[RECOVER_RANGE_MAX];
     u32 exclude_count, rom_size, next_main, last_op, last_main;
     struct gfinit_request last;
+    struct gfinit_exec *execution;
     u8 *rom;
     bool inspected;
     u32 generation, prepare_flags;
@@ -66,8 +67,8 @@ struct gfinit_owner {
 };
 static struct gfinit_owner control; /* small, stable callbacks survive terminal status */
 static struct gfinit_owner *owner;
-/* There is no production GF driver in v1. Only this fixed, stopped device is
- * classified; IDE, LAN/SerialFS, display and unknown inputs never claim. */
+/* Diagnostics claim only this fixed, stopped device. Production selection
+ * rejects this owner; IDE, LAN/SerialFS and unknown inputs never claim. */
 static struct hwdev_device_owner gf_device = {
     .bdf = RECOVER_GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
 };
@@ -111,7 +112,11 @@ static int gf_write(void *opaque, const struct recover_bus_access *a, u32 value)
     return gfinit_bus_write(opaque, a, value);
 }
 static int gf_local(void *opaque)
-{ return gfinit_bus_local_cleanup(opaque, recover_owner()); }
+{
+    int rc = owner ? gfinit_exec_restore(owner->execution) : 0;
+    int local = gfinit_bus_local_cleanup(opaque,recover_owner());
+    return rc || local ? -1 : 0;
+}
 static int gf_mode_vram(void *opaque, struct recover *r, bool write,
                          u32 *bad_offset, u32 *expected, u32 *actual)
 {
@@ -330,7 +335,11 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     gf_lease.session = r->next_session + 1U;
     if (trial_begin(r, &g->profile, hash, g->profile.trial_limit)) return -1;
     gf_lease.session = r->token.session;
-    if (trial_step(r, &r->token, true, gf_fixed, g)) return -1;
+    struct gfinit_exec e={.rom=g->rom,.rom_size=g->rom_size,.ops=&gf_clock_ops,.opaque=r};
+    g->execution=size?0:&e;
+    int rc=trial_step(r,&r->token,true,size?gf_fixed:gfinit_exec_prepare,size?(void *)g:(void *)&e);
+    g->execution=0;
+    if(rc)return -1;
     if (size) return trial_end(r, &r->token, REC_NORMAL);
     return 0;
 }
@@ -427,8 +436,11 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     else if (owner && owner->inspected && op == GF_OP_RUN_ONE &&
              q.script_id == owner->next_main && q.script_id < GF_INIT_MAINS) {
         struct gfinit_exec e = {.rom = owner->rom, .rom_size = owner->rom_size,
-            .main_id = q.script_id, .ops = &gf_clock_ops, .opaque = r};
+            .main_id = q.script_id, .ops = &gf_clock_ops, .opaque = r,
+            .program = &owner->decoded->program};
+        owner->execution = &e;
         rc = trial_step(r, &r->token, true, gfinit_exec_run, &e);
+        owner->execution = 0;
         q.steps = e.steps; q.fail_pc = e.fail_pc;
         if (!rc) owner->next_main++;
 #if !GF_VPLL_PROBE

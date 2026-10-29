@@ -98,11 +98,6 @@ static u32 c_key(struct c_builder *b, u32 kind, u32 reg, u32 index, u32 width)
         const struct recover_target *q=&b->p->targets[i];
         if(q->space==t.space && q->bar==t.bar && q->offset==t.offset &&
            q->head==t.head && q->port==t.port && q->index==t.index && q->width==t.width) {
-            /* C may read this shared key, but RUN keeps the 4a pre-read policy. */
-            if (!q->read_safe) for (u32 j=0;j<b->p->rule_count;j++) {
-                struct recover_rule *w=&b->out->rules[j];
-                if (w->key==i && w->phase==REC_RUN) w->flags|=REC_RUN_NO_PREREAD;
-            }
             b->out->targets[i].read_safe=1;
             return i;
         }

@@ -11,6 +11,8 @@ import test_gfinit_plan_c
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('kdebug/gfinit_budget.inc', 'runner_bus_rows',
+     'total += (unsigned long long)GF_INIT_MAINS * GF_INIT_SCHEDULE * GF_REC_NODE_ROWS;', 'total += 0;'),
     ('kdebug/recover_common/session.inc', 'c_deadline_switch',
      'r->budget=GF_C_EXEC_SECONDS * PIT_HZ; r->spent=0;', 'r->budget=1; r->spent=0;'),
     ('kdebug/recover_common/session.inc', 'c_tx_reset',

@@ -12,7 +12,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='hwdev-audit-') as td:
         document = Path(td)/'contract.md'
         source = DOC.read_text()
-        # A matching-looking row elsewhere must not change the 25-slot contract.
+        # A matching-looking row elsewhere must not change the 26-function contract.
         document.write_text(source+'\n| 25 | `not_a_core_slot` | `not_a_header.h` |\n')
         command = [sys.executable, '-O', '-c',
                    'import sys; from pathlib import Path; sys.path.insert(0,"tools"); '

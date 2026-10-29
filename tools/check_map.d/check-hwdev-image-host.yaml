@@ -98,4 +98,10 @@ check-hwdev-image-host:
 - tools/tests/gf_display_calc_host.inc
 - hwdev/gf/rom.inc
 - include/gf_production.h
+- hwdev/gf/internal.h
+- hwdev/gf/runner.c
+- hwdev/gf/save.c
+- hwdev/gf/pll.c
+- hwdev/gf/op/*.c
+- hwdev/gf/scripts.h
 artifact_reader: true

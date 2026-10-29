@@ -1,5 +1,5 @@
 /* Bounded direct runner; control model: MIT nouveau bios/init.c (c03c1a1),
- * OS32 gfinit_decode/schedule.inc. S1 spans/decoder remain shared. */
+ * S1 spans/decoder remain shared with diagnostics. */
 #include "internal.h"
 #include "../../lib/crc32_core.inc"
 
@@ -39,6 +39,24 @@ int gf_init_wait(struct gf_init_context *ctx, u32 us)
     }
     return 0;
 }
+static int a2_write(struct gf_init_context *ctx,u32 off,u32 width,u32 value)
+{
+    return init_point(ctx) || ctx->io.write(ctx->io.opaque,0,off,width,value) ? -1 : 0;
+}
+int gf_init_a2(struct gf_init_context *ctx,int (*decode_safe)(void *))
+{
+    u32 value,cr=RECOVER_PRMCIO+RECOVER_CRTC;
+    if (a2_write(ctx,RECOVER_PBUS1854,4,0) || a2_write(ctx,RECOVER_PBUS1850,4,0) ||
+        a2_write(ctx,RECOVER_GF_PMC_IRQ,4,0) ||
+        ctx->io.read(ctx->io.opaque,0,RECOVER_PMC_ENABLE,4,&value) ||
+        a2_write(ctx,RECOVER_PMC_ENABLE,4,value|RECOVER_PMC_ENABLE_BIT0) ||
+        decode_safe(ctx->io.opaque) ||
+        a2_write(ctx,cr,1,RECOVER_CR44) || a2_write(ctx,cr+1,1,0) ||
+        a2_write(ctx,cr,1,RECOVER_CR1F) || a2_write(ctx,cr+1,1,RECOVER_CR1F_UNLOCK) ||
+        a2_write(ctx,cr,1,RECOVER_CR11) || ctx->io.read(ctx->io.opaque,0,cr+1,1,&value) ||
+        a2_write(ctx,cr+1,1,value&~RECOVER_CR11_PROTECT)) return -1;
+    return init_point(ctx);
+}
 /* One sequential span, never follow calls while matching REPEAT pairs. */
 static int init_prepare_span(struct gf_init_context *ctx, struct gf_init_program *work,
                               const struct gf_script_span *s)
@@ -65,7 +83,7 @@ static int init_prepare_span(struct gf_init_context *ctx, struct gf_init_program
     }
     return depth || ctx->rom[end - 1] != GF_INIT_DONE ? -1 : 0;
 }
-static int init_run_main(struct gf_init_context *ctx, const struct gf_init_program *work)
+int gf_init_run_one(struct gf_init_context *ctx, const struct gf_init_program *work)
 {
     ctx->pc = work->main_pc[ctx->main_id];
     ctx->head = ctx->calls = ctx->repeats = 0;
@@ -82,7 +100,10 @@ static int init_run_main(struct gf_init_context *ctx, const struct gf_init_progr
         gf_op_run_fn run = 0;
         for (u32 i = 0; i < gf_op_dispatch_count; i++)
             if (gf_op_dispatch[i].opcode == v->opcode) { run = gf_op_dispatch[i].run; break; }
-        if (!run || run(ctx, v) || init_point(ctx)) return -1;
+        if (!run || (ctx->io.trace && ctx->io.trace(ctx->io.opaque,ctx,true,0))) return -1;
+        int rc = run(ctx,v);
+        if (ctx->io.trace && ctx->io.trace(ctx->io.opaque,ctx,false,rc)) return -1;
+        if (rc || init_point(ctx)) return -1;
     }
     return ctx->calls || ctx->repeats ? -1 : 0;
 }
@@ -107,7 +128,7 @@ int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work)
     ctx->last_rc = -1;
     if (ctx->saved_count || gf_init_prepare(ctx, work)) goto fail;
     for (ctx->main_id = 0; ctx->main_id < GF_INIT_MAINS; ctx->main_id++)
-        if (init_run_main(ctx, work)) goto fail;
+        if (gf_init_run_one(ctx, work)) goto fail;
     ctx->main_id = GF_INIT_MAINS - 1;
     ctx->last_rc = 0;
     return 0;

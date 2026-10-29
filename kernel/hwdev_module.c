@@ -103,7 +103,7 @@ int hwdev_module_load(struct module_handle core_handle)
     hwdev_fill_imports(imports, core_api);
     for (u32 i = 0; i < HWDEV_IMPORT_COUNT; i++) {
         if (!imports[i]) return MODULE_IMPORT_INVALID;
-        if (i < HWDEV_CORE_SLOTS && !contains(core->text, core->text_size, imports[i], 1))
+        if (hwdev_core_import[i] && !contains(core->text, core->text_size, imports[i], 1))
             return MODULE_IMPORT_INVALID;
     }
     const struct bootinfo *bi = bootinfo_get();

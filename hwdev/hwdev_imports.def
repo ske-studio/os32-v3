@@ -251,6 +251,13 @@
       "source": "include/gf_production.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "index": 36,
+      "symbol": "recover_gf_runner_access",
+      "source": "kdebug/recover.h",
+      "kind": "FUNC",
+      "group": "core"
     }
   ]
 }

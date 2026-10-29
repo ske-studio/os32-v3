@@ -83,8 +83,7 @@ def main():
                for s in test_gfinit_plan_c.command(exe)]
         sources = [ROOT / 'hwdev/gf/service.c',
                    *[p for p in sorted((ROOT / 'hwdev/gf/display').glob('*.c'))
-                     if p.stem in ('baseline', 'checks', 'load_row', 'modeset', 'quiesce', 'palette', 'blank', 'modes')],
-                   *sorted((ROOT / 'hwdev/gf/op').glob('*.c'))]
+                     if p.stem in ('baseline', 'checks', 'load_row', 'modeset', 'quiesce', 'palette', 'blank', 'modes')]]
         cmd += ['-I'+str(ROOT), '-I'+str(tmp), *map(str, sources)]
         subprocess.run(cmd, cwd=ROOT, check=True)
         result = host32.run([str(exe)], cwd=ROOT, timeout=180, capture_output=True, text=True)

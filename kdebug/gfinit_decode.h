@@ -30,11 +30,6 @@
 #define GF_INIT_CONDITION 0x75
 #define GF_INIT_INDEX_IO 0x78
 #define GF_INIT_ZM_REG 0x7a
-/* State = head * GF_STATE_HEAD1 + skip. */
-#define GF_STATE_SKIP 1U
-#define GF_STATE_HEAD1 2U
-#define GF_STATE_COUNT 4 /* literal also preserves the shared contract array bound */
-#define GF_STATE_HEAD(s) ((s) / GF_STATE_HEAD1)
 /* Encoded shifts below GF_SHIFT_LEFT shift right; the rest shift left. */
 #define GF_SHIFT_LEFT 0x80U
 #define GF_SHIFT_WRAP 0x100U
@@ -46,7 +41,6 @@
 #define GF_INIT_RESET_US 10U
 #define GF_INIT_SCRIPTS 9U
 #define GF_INIT_INSNS 193U
-#define GF_INIT_WORK_STEPS 2048U /* bounded expansion scratch, not execution budget */
 #define GF_INIT_ARGS 6144U /* includes S6 PREPARE and maximum BAR1 verification */
 #define GF_INIT_CALL_DEPTH 16U
 #define GF_INIT_REPEAT_DEPTH 8U
@@ -74,16 +68,28 @@
 #define GF_INIT_CONDITION_VALUE 8U
 #define GF_INIT_MACRO_VALUE 4U
 #define GF_INIT_PLL_TABLE 0x5bc8U
-#define GF_INIT_FIXED_CAPTURES 3U /* 0x65 saved slot + one 0x51 slot per head */
+#define GF_INIT_A2 0x203U
+#define GF_INIT_RUNNER 0x202U /* one approval boundary per main */
+#define GF_INIT_EXEC_US 60000000U
+#define GF_INIT_WAIT_CHUNK_US 1000U
+struct gfinit_exec_ops {
+    /* Checked monotonic microseconds of execution, excluding measured UART
+     * time. Error (including an unavailable calibrated clock) stops RUN. */
+    int (*clock_us)(void *opaque, u32 *value);
+    /* Wait at least us, with a finite hardware polling limit. */
+    int (*wait_us)(void *opaque, u32 us);
+};
+struct gfinit_exec_frame { u32 pc, ctx, count; };
 /* Owned by caller, no allocation or bus access. ROM remains borrowed only
  * during decode. A successful decode is an inventory, not permission to RUN:
- * S5 supplies COPY/capture rules; S6 composes PREPARE dependencies and arm. */
+ * PREPARE and the five main markers are bound/armed before runner entry. */
 struct gfinit_instruction {
-    u32 pc, opcode, length, end_repeat, effect_first, effect_count;
+    u32 pc, opcode, length, end_repeat;
     u32 ref, count, port, index, mask, shift, target, value;
 };
-struct gfinit_scheduled {
-    u32 instruction, ctx, main_id, kind, k, count, jump;
+struct gf_init_program {
+    u32 count, main_pc[GF_INIT_MAINS];
+    struct gfinit_instruction insns[GF_INIT_INSNS];
 };
 struct gfinit_decode {
     struct recover_plan plan;
@@ -91,11 +97,8 @@ struct gfinit_decode {
     struct recover_plan_arg args[GF_INIT_ARGS];
     struct recover_plan_entry entries[GF_INIT_MAINS];
     struct recover_capture captures[RECOVER_CAPTURE_MAX];
-    struct gfinit_instruction insns[GF_INIT_INSNS];
-    struct gfinit_scheduled schedule[GF_INIT_WORK_STEPS];
-    u32 heads[GF_INIT_WORK_STEPS][GF_STATE_COUNT], reachable[GF_INIT_WORK_STEPS];
-    u32 instruction_count, schedule_count, error_pc, error;
-    u32 main_nodes[GF_INIT_MAINS], main_steps[GF_INIT_MAINS], main_wait[GF_INIT_MAINS], max_call, max_repeat;
+    struct gf_init_program program;
+    u32 error_pc, error;
 };
 /* checked instruction parser, also used by synthetic host fixtures. No CRC
  * bypass in gfinit_decode_rom: every production script must match S1. */

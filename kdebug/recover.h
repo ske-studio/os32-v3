@@ -206,7 +206,6 @@ enum recover_value_mode { REC_LITERAL, REC_SET, REC_RANGE, REC_EXPR, REC_SAVED }
 enum recover_arg_kind { REC_IMM, REC_ARG_READ, REC_ARG_SAVED };
 enum recover_guard_when { REC_BEFORE = 1, REC_AFTER = 2 };
 enum recover_rule_flag { REC_N1 = 1, REC_LOCAL = 2, REC_FORCE = 4,
-    REC_RUN_NO_PREREAD = 8, /* preserve the original RUN target read_safe */
     REC_VERIFY_RECORD = 16 /* C write: read and report mismatch, continue */ };
 struct recover_target {
     u32 space, bar, offset, head, port, index, width, access, read_safe;
@@ -405,6 +404,9 @@ int recover_plan_leave(struct recover *r, u32 edge);
 /* Evaluate checked operands once and perform the current node access. */
 int recover_plan_access(struct recover *r, u32 *value);
 int recover_plan_check(struct recover *r, u32 *value);
+/* BAR-relative runner access; bar=RECOVER_NONE selects A2 PCI decode reads. */
+int recover_gf_runner_access(struct recover *r, u32 pc, u32 bar, u32 off,
+                              u32 width, bool write, u32 *value);
 int recover_access(struct recover *r, u32 node, u32 dir_substep,
                    u32 target, u32 width, u32 *value);
 int recover_bar_probe(struct recover *r, u32 bar, u32 raw, u32 mask,
