@@ -207,7 +207,9 @@ def gfinit_cases(m):
                         '--state', str(state), '--log', str(log), '--command', command]
                 with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), redirect_stdout(io.StringIO()) as out:
                     assert m.main() == 1
-                assert out.getvalue().strip() == 'recover: guest rejected recovery'
+                assert out.getvalue().splitlines() == [
+                    'REC RUN max interval: n/a s after phase=n/a',
+                    'recover: guest rejected recovery']
                 assert json.loads(state.read_text())['invalid'] == 'guest rejected recovery'
                 assert port.writes == [(command + '\n').encode()] and closed == [True]
                 assert log.read_bytes().endswith(data)
@@ -434,6 +436,7 @@ def mode_c_cli_cases(m):
 
 
 def restore_cases(m):
+    assert m.RESTORE_IDLE_SECONDS == 30
     # rshell emits no new EOT while idle: reply only after a command is written.
     class Shell(Port):
         def write(self, data):
@@ -456,9 +459,9 @@ def restore_cases(m):
         port.writes.clear()
         idle_at = port.t
         raw = io.BytesIO()
-        assert m.restore_exchange(port, 20, 1, raw, port.clock) == 'OK'
+        assert m.restore_exchange(port, 60, 1, raw, port.clock) == 'OK'
         assert port.writes == [b'recover restore\n']
-        assert port.restore_at - idle_at >= 10  # Full quiet interval, not one empty read.
+        assert 30 <= port.restore_at - idle_at < 30.1
         assert raw.getvalue() == b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
 
     with tempfile.TemporaryDirectory(prefix='restore_cli_') as tmp:
@@ -498,6 +501,9 @@ def restore_cases(m):
             if chunk:
                 self.last_rx = self.t
             return chunk
+        def write(self, data):
+            self.quiet_since = self.last_rx
+            return super().write(data)
 
     partial = b'7 seq=20 phase=access'
     tail = b' event=END rc=0 elapsed=1\n' + (running + FINAL + '\x04').encode()
@@ -509,10 +515,41 @@ def restore_cases(m):
     for prefix in (b'noise\n', partial, b'x' * (m.MAX_LINE + 1)):
         port = LateShell([(8, prefix)])
         raw = io.BytesIO()
-        assert m.restore_exchange(port, 30, 1, raw, port.clock) == 'OK'
+        assert m.restore_exchange(port, 60, 1, raw, port.clock) == 'OK'
         assert port.writes == [b'recover restore\n']
-        assert port.restore_at >= 18
+        assert 30 <= port.restore_at - port.quiet_since < 30.3
         assert raw.getvalue() == prefix + b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+
+    # r3's real-core fixture: attach after VRAM BEGIN, then 14.4 s without REC.
+    # The unseen BEGIN still makes parsing fail, but abort must use the live sid.
+    end = ('REC sid=1 seq=2 phase=gf_bus event=END pc=4294967295 bar=1 off=0 '
+           'len=307200 dir=1 bad_off=4294967295 expected=4294967295 '
+           'actual=4294967295 rc=0\n')
+    paused = META.replace('sid=7 seq=1', 'sid=1 seq=3')
+    class QuietRun(Port):
+        def __init__(self):
+            super().__init__(b'')
+            self.released = False
+            self.write_times = []
+        def read(self, count):
+            if self.t >= 14.4 and not self.released:
+                self.data += (end + paused + '\x04').encode()
+                self.released = True
+            return super().read(count)
+        def write(self, data):
+            self.write_times.append(self.t)
+            return super().write(data)  # RUN discards shell text; no echo/reply.
+
+    port = QuietRun()
+    with redirect_stdout(io.StringIO()):
+        try:
+            m.restore_exchange(port, 20, 1, io.BytesIO(), port.clock)
+        except m.RecoverError as exc:
+            assert 'unmatched BEGIN/END' in str(exc)
+        else:
+            raise AssertionError('unseen VRAM BEGIN accepted')
+    assert port.writes == [m.abort_frame(1)]
+    assert 14.4 <= port.write_times[0] < 14.5
 
     port=Port((running+FINAL+'\x04').encode(),split=len(running))
     with redirect_stdout(io.StringIO()):
@@ -540,6 +577,57 @@ def restore_cases(m):
         assert raw.getvalue()==data
 
 
+def interval_cases(m):
+    class TimedPort(Port):
+        def __init__(self, pending):
+            super().__init__(b'')
+            self.pending = list(pending)
+        def clock(self):
+            return self.t
+        def read(self, count):
+            if not self.data:
+                if not self.pending:
+                    self.t += 1
+                    return b''
+                self.t, data = self.pending.pop(0)
+                self.data += data
+            chunk = bytes(self.data[:count])
+            del self.data[:len(chunk)]
+            return chunk
+
+    # Ignore time before RUN and non-REC progress; report even on missing EOT.
+    for gap in (14.4, 35):
+        for eot in ('\x04', ''):
+            pending = [(0, ECHO + META),
+                       (100, META.replace('seq=1', 'seq=2').replace('PAUSED', 'RUNNING')),
+                       (102, 'REC sid=7 seq=3 phase=gf_bus event=BEGIN pc=1 bar=1 off=0 len=307200 dir=1\n'),
+                       (109, 'VRAM transfer in progress\n'),
+                       (102 + gap, 'REC sid=7 seq=4 phase=gf_bus event=END pc=1 bar=1 off=0 len=307200 dir=1 bad_off=0 expected=0 actual=0 rc=0\n'),
+                       (103 + gap, META.replace('seq=1', 'seq=5') + eot)]
+            port = TimedPort([(at, row.encode()) for at, row in pending])
+            with redirect_stdout(io.StringIO()) as output:
+                try:
+                    result = m.exchange(port, 'recover now 7', m.Records(7), 180, 1,
+                                        io.BytesIO(), lambda _: None, port.clock)
+                except m.RecoverError as exc:
+                    assert not eot and 'host timeout' in str(exc)
+                else:
+                    assert eot and result == 'PAUSED'
+            assert output.getvalue().splitlines() == [
+                'REC RUN max interval: %.3f s after phase=gf_bus' % gap]
+            assert port.writes == [b'recover now 7\n'] + ([m.abort_frame(7)] if not eot else [])
+
+    # Two rows received in the same chunk have a measured zero interval.
+    rows = META.replace('PAUSED', 'RUNNING') + META.replace('seq=1', 'seq=2')
+    for rows, expected in ((rows, '0.000 s after phase=state'),
+                           (META, 'n/a s after phase=n/a')):
+        port = TimedPort([(0, (ECHO + rows + '\x04').encode())])
+        with redirect_stdout(io.StringIO()) as output:
+            assert m.exchange(port, 'recover now 7', m.Records(7), 10, 1,
+                              io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
+        assert output.getvalue().strip() == 'REC RUN max interval: ' + expected
+
+
 MUTATIONS = [
     ('guest_c', "if c_result is None or c_result[2] != 'OK':", 'if False:'),
     ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
@@ -547,7 +635,7 @@ MUTATIONS = [
     ('required', "if name not in fields:  # Mandatory fields must precede state updates.", "if False:  # Mandatory fields must precede state updates."),
     ('pop', '                stack.pop()', '                pass'),
     ('identity', "or any(stack[-1][key] != fields[key] for key in ids)", 'or False'),
-    ('fragment', "if line or dropping:\n                    record_failure('truncated line before EOT/deadline')", "if False:\n                    record_failure('truncated line before EOT/deadline')"),
+    ('fragment', "if line or dropping:\n                        record_failure('truncated line before EOT/deadline')", "if False:\n                        record_failure('truncated line before EOT/deadline')"),
     ('loss', "f.get('lost_lines') == '0'", 'True'),
     ('verify', "f.get('verified') == '1'", 'True'),
     ('echo', 'if not echo:', 'if False:'),
@@ -575,6 +663,7 @@ def mutation(item):
             mode_c_cases(mutant)
             mode_c_cli_cases(mutant)
             restore_cases(mutant)
+            interval_cases(mutant)
         except (AssertionError, mutant.RecoverError):
             return name + ': RED', 0
         return name + ': GREEN', 1
@@ -591,6 +680,7 @@ def main():
     mode_c_cases(load(SRC))
     mode_c_cli_cases(load(SRC))
     restore_cases(load(SRC))
+    interval_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.

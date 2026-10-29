@@ -44,9 +44,11 @@ PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
 MAIN_TIMEOUT = 900
 C_TIMEOUT = 1800
 RESTORE_TIMEOUT = 180
-# At 9600 baud, allow the guest's <=5s wait and a MAX_LINE-sized REC row.
 # An idle rshell does not repeat an EOT already consumed by a previous call.
-RESTORE_IDLE_SECONDS = 10
+# Allow long silent VRAM transfers during RUN; tune from real-hardware intervals.
+# Silence is only an operational heuristic: RUN discards a mistaken shell command,
+# so restore can still time out if a transfer exceeds this quiet interval.
+RESTORE_IDLE_SECONDS = 30
 BUS_ID = ('pc', 'bar', 'off', 'width')
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
@@ -239,6 +241,7 @@ class Records:
             if phase == 'final':
                 self.final = fields
                 self.data['final'] = fields
+            return fields
         except RecoverError as exc:
             raise RecoverError(self.invalidate(str(exc))) from exc
 
@@ -285,80 +288,99 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
         if records is not None:
             records.invalidate(failure)
             save(records.data)
-    while True:
-        if clock() >= deadline:
-            if line or dropping:
-                record_failure('truncated line before EOT/deadline')
-            if records is None or aborted:
-                raise RecoverError(failure or 'terminal/EOT missing after deadline')
-            aborted = True
-            record_failure('host timeout')
-            deadline = clock() + cleanup_timeout
-            try:
-                write_bounded(port, abort_frame(records.data['sid']), deadline, clock)
-            except RecoverError as exc:
-                record_failure(str(exc))
-        chunk = initial or port.read(256)
-        initial = b''
-        if chunk:
-            raw.write(chunk)
-            raw.flush()
-        for byte in chunk:
-            if byte == 4:
-                if not echo:
-                    continue  # Initial rshell EOT is not this command's reply.
+    last_rec_at = None
+    last_phase = None
+    max_interval = 0.0
+    after_phase = None
+    try:
+        while True:
+            if clock() >= deadline:
                 if line or dropping:
                     record_failure('truncated line before EOT/deadline')
-                if failure:
-                    raise RecoverError(failure)
-                if records is None:
-                    return
-                if c_command and c_result is None:
-                    raise RecoverError('missing/failed guest C result')
-                if records.success():
-                    return records.final['result']
-                if records.paused and records.final is None and not records.data['stack']:
-                    if len(records.data['crc']) == 4:
-                        if c_command:
-                            if c_result is None or c_result[2] != 'OK':
-                                raise RecoverError('missing/failed guest C result')
-                            print('MODE_C: ' + ('観測完了' if c_result[1] == 'record' else '機械項目合格・映像保留'))
-                        return 'PAUSED'
-                raise RecoverError('missing/failed verification or lost logs')
-            if byte == 10:
-                text = line.decode('ascii', errors='replace')
-                line.clear()
-                if dropping:
-                    dropping = False
-                    continue
-                if command is not None and text in ('> ' + command, '> ' + command + '\r'):
-                    echo = True
-                if echo:
-                    match = re.fullmatch(r'GF C verify=(record|required) result=(OK|NG)\r?', text)
-                    if match:
-                        c_result = match.group(0), match.group(1), match.group(2)
-                        print(text.rstrip('\r'))
-                        if match.group(2) == 'NG':
-                            record_failure('guest C failed')
-                    if text.startswith(('recover: rejected', 'gfinit: rejected rc=')):
-                        record_failure('guest rejected recovery')
-                    try:
-                        if records is not None:
-                            records.line(text)
-                            save(records.data)
-                    except RecoverError as exc:
-                        record_failure(str(exc))
-                continue
-            if not dropping:
-                line.append(byte)
-                if len(line) > MAX_LINE:
-                    record_failure('overlong serial line')
+                if records is None or aborted:
+                    raise RecoverError(failure or 'terminal/EOT missing after deadline')
+                aborted = True
+                record_failure('host timeout')
+                deadline = clock() + cleanup_timeout
+                try:
+                    write_bounded(port, abort_frame(records.data['sid']), deadline, clock)
+                except RecoverError as exc:
+                    record_failure(str(exc))
+            chunk = initial or port.read(256)
+            received_at = clock()
+            initial = b''
+            if chunk:
+                raw.write(chunk)
+                raw.flush()
+            for byte in chunk:
+                if byte == 4:
+                    if not echo:
+                        continue  # Initial rshell EOT is not this command's reply.
+                    if line or dropping:
+                        record_failure('truncated line before EOT/deadline')
+                    if failure:
+                        raise RecoverError(failure)
+                    if records is None:
+                        return
+                    if c_command and c_result is None:
+                        raise RecoverError('missing/failed guest C result')
+                    if records.success():
+                        return records.final['result']
+                    if records.paused and records.final is None and not records.data['stack']:
+                        if len(records.data['crc']) == 4:
+                            if c_command:
+                                if c_result is None or c_result[2] != 'OK':
+                                    raise RecoverError('missing/failed guest C result')
+                                print('MODE_C: ' + ('観測完了' if c_result[1] == 'record' else '機械項目合格・映像保留'))
+                            return 'PAUSED'
+                    raise RecoverError('missing/failed verification or lost logs')
+                if byte == 10:
+                    text = line.decode('ascii', errors='replace')
                     line.clear()
-                    dropping = True
+                    if dropping:
+                        dropping = False
+                        continue
+                    if command is not None and text in ('> ' + command, '> ' + command + '\r'):
+                        echo = True
+                    if echo:
+                        match = re.fullmatch(r'GF C verify=(record|required) result=(OK|NG)\r?', text)
+                        if match:
+                            c_result = match.group(0), match.group(1), match.group(2)
+                            print(text.rstrip('\r'))
+                            if match.group(2) == 'NG':
+                                record_failure('guest C failed')
+                        if text.startswith(('recover: rejected', 'gfinit: rejected rc=')):
+                            record_failure('guest rejected recovery')
+                        try:
+                            if records is not None:
+                                fields = records.line(text)
+                                if fields is not None:
+                                    if last_rec_at is not None:
+                                        interval = received_at - last_rec_at
+                                        if after_phase is None or interval > max_interval:
+                                            max_interval, after_phase = interval, last_phase
+                                    # Do not include time spent waiting at PAUSED/IDLE.
+                                    last_rec_at = (None if records.paused or records.final is not None
+                                                   or fields['event'] == 'IDLE' else received_at)
+                                    last_phase = fields['phase']
+                                save(records.data)
+                        except RecoverError as exc:
+                            record_failure(str(exc))
+                    continue
+                if not dropping:
+                    line.append(byte)
+                    if len(line) > MAX_LINE:
+                        record_failure('overlong serial line')
+                        line.clear()
+                        dropping = True
+    finally:
+        if records is not None:
+            interval = '%.3f' % max_interval if after_phase is not None else 'n/a'
+            print('REC RUN max interval: %s s after phase=%s' % (interval, after_phase or 'n/a'))
 
 
 def restore_exchange(port, timeout, cleanup_timeout, raw, clock=time.monotonic):
-    # A live stream supplies its sid. Never reenter the shell during RUN.
+    # A live REC stream supplies its sid for abort; silence uses the idle heuristic.
     last_rx = clock()
     deadline = last_rx + timeout
     line = bytearray()
