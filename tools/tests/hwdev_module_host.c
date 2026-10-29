@@ -109,6 +109,7 @@ int ledger_reclaim_owner(u32 owner, u32 *count) { CHECK(owner == 100); *count = 
 int ledger_owner_retire(u32 owner) { CHECK(owner == 100); live = 0; return 1; }
 /* Kernel imports are only installed, never called by initialize. */
 void fixture_kernel(void) { finish(90); }
+int gf_production_selected(void) { return 0; }
 static void core_function(void) { }
 static const struct hwdev_core_api *get_core(void) { return &fixture_core; }
 static void read_input(void *p, u32 size)

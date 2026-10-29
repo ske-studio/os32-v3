@@ -14,6 +14,9 @@
 #include "kprintf.h"
 #include "kselftest.h"
 #include "kcg_module.h"
+#include "geforce_module.h"
+#include "gui.h"
+#include "pc98_route.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 #include "../exec/exec.h"
@@ -80,6 +83,7 @@ void __attribute__((cold)) gfx_diag_first_present(u32 before)
  * 1 を返したものを使う (Cirrus → PEGC → 9801)。
  * 9801 の probe は常に 1 なので、末尾が必ず受け皿になる。 */
 static GfxBackend *const g_backend_list[] = {
+    &gfx_backend_geforce, /* Explicit selection only. */
     &gfx_backend_cirrus, /* Cirrus GD54xx アクセラレータ (H3)。ID 5Bh のみ */
     &gfx_backend_pegc,   /* 9821 PEGC 256 色 (H2)。9801 では probe が 0 */
     &gfx_backend_pc98    /* 9801 標準グラフィック (H1)。最後の受け皿 */
@@ -99,7 +103,7 @@ static void gfx_bind_client(void);
 void gfx_set_backend_pref(int pref)
 {
     if (pref != GFX_PREF_PC98 && pref != GFX_PREF_PEGC &&
-        pref != GFX_PREF_CIRRUS)
+        pref != GFX_PREF_CIRRUS && pref != GFX_PREF_GEFORCE)
         pref = GFX_PREF_AUTO;
     g_backend_pref = pref;
 }
@@ -130,7 +134,9 @@ static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
 {
     u32 plane, total, displays = 0;
     u32 backend = be == &gfx_backend_pc98 ? LEDGER_SF_PC98 :
-                  be == &gfx_backend_pegc ? LEDGER_SF_PEGC : LEDGER_SF_CIRRUS;
+                  be == &gfx_backend_pegc ? LEDGER_SF_PEGC :
+                  be == &gfx_backend_cirrus ? LEDGER_SF_CIRRUS :
+                  be == &gfx_backend_geforce ? LEDGER_SF_GEFORCE : 0;
     const struct ledger_surface *client = ledger_surface_find(backend, LEDGER_ROLE_CLIENT);
     GfxFormatDesc format;
     if (!gfx_mode_layout(mode, &plane, &total) ||
@@ -186,8 +192,8 @@ static void gfx_select_backend(int legacy200)
         return;
     }
     if (g_backend_pref == GFX_PREF_PEGC ||
-        g_backend_pref == GFX_PREF_CIRRUS) {
-        const GfxBackend *want = (g_backend_pref == GFX_PREF_CIRRUS)
+        g_backend_pref == GFX_PREF_CIRRUS || g_backend_pref == GFX_PREF_GEFORCE) {
+        const GfxBackend *want = g_backend_pref == GFX_PREF_GEFORCE ? &gfx_backend_geforce : (g_backend_pref == GFX_PREF_CIRRUS)
                                      ? &gfx_backend_cirrus
                                      : &gfx_backend_pegc;
         for (i = 0; i < n; i++) {
@@ -209,7 +215,7 @@ static void gfx_select_backend(int legacy200)
     for (i = 0; i < n; i++) {
         /* weak 宣言のバックエンド (未リンクなら 0) を飛ばす。
          * → include/gfx_hal.h の gfx_backend_pegc の注記 */
-        if (!g_backend_list[i]) continue;
+        if (!g_backend_list[i] || g_backend_list[i] == &gfx_backend_geforce) continue;
         if (gfx_probe_backend(g_backend_list[i])) {
             if (!gfx_select_mode(g_backend_list[i], legacy200)) break;
             g_backend = g_backend_list[i];
@@ -285,7 +291,8 @@ void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb)
 static void gfx_bind_client(void)
 {
     const struct ledger_surface *sf = ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);
-    GfxBackend *backend = gfx_sf_backend() == LEDGER_SF_PEGC ? &gfx_backend_pegc :
+    GfxBackend *backend = gfx_sf_backend() == LEDGER_SF_GEFORCE ? &gfx_backend_geforce :
+                          gfx_sf_backend() == LEDGER_SF_PEGC ? &gfx_backend_pegc :
                           gfx_sf_backend() == LEDGER_SF_CIRRUS ? &gfx_backend_cirrus : &gfx_backend_pc98;
     u8 *base = 0;
     u32 i;
@@ -438,7 +445,7 @@ static u32 gfx_cand_of(u32 i)
 static u32 gfx_identify_candidates(void)
 {
     u32 m = 0;
-    if (g_backend_pref == GFX_PREF_PC98 ||
+    if (g_backend_pref == GFX_PREF_PC98 || g_backend_pref == GFX_PREF_GEFORCE ||
         !(v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG] & PEGC_BIOS_ARCH_EXTGFX)) return 0;
     if (g_backend_pref != GFX_PREF_CIRRUS && pegc_identify && pegc_identify())
         m |= GFX_CAND_PEGC;
@@ -459,7 +466,7 @@ void __attribute__((cold)) gfx_boot_reserve(void)
                            LEDGER_MAX_RESOURCES, LEDGER_MAX_RESOURCES};
     rid = 0;
 
-    cand = m = gfx_identify_candidates();
+    cand = m = g_backend_pref == GFX_PREF_GEFORCE ? 0 : gfx_identify_candidates();
     pfn = 0;
     /* 2. 登録できた窓をまとめて予約。登録に失敗した候補から先は登録しない
      *    (先に登録した窓は保持する。PEGC は F00 だけ登録済みでも alt が無ければ落ちる)。 */
@@ -523,6 +530,9 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         if (!ledger_surface_create(&sf, 0)) display_fail++;
     }
     (void)ledger_surface_create(&system_tvram, 0);
+    /* GF and PEGC are mutually exclusive boot candidates. */
+    if (g_backend_pref == GFX_PREF_GEFORCE && geforce_boot_reserve)
+        (void)geforce_boot_reserve();
     /* 6. */
     ledger_arena_freeze();
     kprintf(KLOG_ATTR, "[gfx] ledger cand=%u ok=%u display_fail=%u bb=%x top=%x\n", cand, m, display_fail,
@@ -535,6 +545,7 @@ u32 gfx_sf_backend(void)
 {
     if (g_backend == &gfx_backend_pegc) return LEDGER_SF_PEGC;
     if (g_backend == &gfx_backend_cirrus) return LEDGER_SF_CIRRUS;
+    if (g_backend == &gfx_backend_geforce) return LEDGER_SF_GEFORCE;
     return LEDGER_SF_PC98;
 }
 
@@ -771,6 +782,7 @@ int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active)
     if (g_backend == &gfx_backend_pc98) *kind = GFX_VER_PC98;
     else if (g_backend == &gfx_backend_pegc) *kind = GFX_VER_PEGC;
     else if (g_backend == &gfx_backend_cirrus) *kind = GFX_VER_CIRRUS;
+    else if (g_backend == &gfx_backend_geforce) *kind = GFX_VER_GEFORCE;
     *active = gfx_started != 0;
     *out = info;
     return 0;
@@ -929,11 +941,13 @@ static int gfx_select_and_init_backend(int legacy200)
     gfx_reinit_surfaces(0);
     gfx_select_backend(legacy200);
     gfx_reinit_surfaces(0);
+    if (g_backend == &gfx_backend_geforce) gfx_bind_client();
     if (g_backend && g_backend->init) {
         g_backend->init();
         /* init が失敗して probe が取り下げられた場合は 9801 へ落とす
          * (バックバッファが取れない等)。 */
         if (g_backend->probe && !g_backend->probe()) {
+            if (g_backend == &gfx_backend_geforce && !pc98_route_safe()) return -1;
             gfx_select_mode(&gfx_backend_pc98, legacy200);
             g_backend = &gfx_backend_pc98;
             gfx_reinit_surfaces(0);
@@ -942,7 +956,7 @@ static int gfx_select_and_init_backend(int legacy200)
         }
         return 1;
     }
-    return 0;
+    return g_backend_pref != GFX_PREF_GEFORCE || !pc98_route_safe || pc98_route_safe() ? 0 : -1;
 }
 
 /* ======================================================================== */
@@ -1015,7 +1029,9 @@ void gfx_init(void)
 {
     gfx_init_gen++;
     /* ⑤: GDC 初期化より前にバックエンドを決める */
-    if (gfx_select_and_init_backend(0)) {
+    int initialized = gfx_select_and_init_backend(0);
+    if (initialized < 0) return;
+    if (initialized) {
         gfx_bind_client(); /* bind packed init */
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
@@ -1063,7 +1079,9 @@ void gfx_init_200(void)
      * 200 ラインは 9801 プレーン専用のモードなので、パックド系が選ばれた
      * ときはそのバックエンドのネイティブ解像度で立ち上げる (200 ラインの
      * 縦 2 倍表示は 16 色プレーンの機能で、PEGC には対応物が無い)。 */
-    if (gfx_select_and_init_backend(1)) {
+    int initialized = gfx_select_and_init_backend(1);
+    if (initialized < 0) return;
+    if (initialized) {
         gfx_bind_client();
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
@@ -1169,7 +1187,24 @@ void gfx_shutdown(void)
      * (旧 gfx_shutdown の本体は backend_pc98.c の pc98_shutdown に移設)。 */
     if (g_backend && g_backend->leave) g_backend->leave();
     if (g_backend && g_backend->shutdown) g_backend->shutdown();
+    if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {
+        gfx_current_height = GFX_HEIGHT;
+        gfx_flip_enabled = gfx_display_page = 0;
+    }
+    if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {
+        gfx_select_mode(&gfx_backend_pc98, 0);
+        g_backend = &gfx_backend_pc98;
+        gfx_bind_client();
+    }
     gfx_reinit_surfaces(1);
+}
+
+void geforce_display_failed(void)
+{
+    gfx_started = 0;
+    gfx_reinit_surfaces(0);
+    /* Queue the WM's existing SessionAction; CPL0 never consumes abort_req. */
+    if (con_sink_is_enabled()) gui_display_failed();
 }
 
 /* Public USER compatibility bridge; regen invalidates the held token.

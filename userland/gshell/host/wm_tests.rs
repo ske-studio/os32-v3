@@ -4474,3 +4474,25 @@ fn b5_owner_exit_focuses_the_next_front_once() {
     assert_eq!(b5_focus_ins(wm::g(), 4), vec![filer], "既存の前景切替と二重に出した");
     wm::g().inited = false;
 }
+
+/// A display fault reaches CPL0's standalone boundary, without ring3_abort_check
+/// or a config write. The production cleanup itself invokes gfx_shutdown.
+#[test]
+fn geforce_fault_finishes_standalone_and_shutdown() {
+    use crate::{handler, mocks, session, wm};
+    use os32api::gui::proto::{GUI_OP_SESSION_REQUEST, GUI_SESSION_SWITCH_CUI};
+    use std::sync::atomic::Ordering;
+    mocks::init();
+    session::clear();
+    *wm::g() = wm::GuiState::NEW;
+    wm::g().inited = true;
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_SESSION_REQUEST,
+        GUI_SESSION_SWITCH_CUI as u32, 1), 0);
+    assert!(wm::g().quit);
+    assert_eq!(mocks::GFX_SHUTDOWNS.load(Ordering::SeqCst), 0);
+    assert_eq!(crate::run_standalone(wm::g()), 0);
+    assert_eq!(mocks::GFX_SHUTDOWNS.load(Ordering::SeqCst), 1);
+    assert_eq!(*mocks::SWITCHES.lock().unwrap(), vec![b"/sys/shell.bin".to_vec()]);
+    assert!(!wm::g().inited);
+    session::clear();
+}

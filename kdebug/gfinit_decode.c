@@ -66,6 +66,7 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     }
     return 0;
 }
+#ifndef GF_PRODUCTION_DECODE
 #include "gfinit_decode/schedule.inc"
 #include "gfinit_decode/emit.inc"
 #include "gfinit_op/pll_expand.inc"
@@ -221,3 +222,5 @@ int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,
     }
     return 0;
 }
+
+#endif /* diagnostic plan expansion */

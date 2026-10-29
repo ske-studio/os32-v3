@@ -214,13 +214,16 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
+    run_standalone(st)
+}
+
+fn run_standalone(st: &mut wm::GuiState) -> i32 {
     if !standalone_loop(st) {
         return 0;
     }
 
-    /* ---- 「CUI へ」(デバッグ用の ESC = DEBUG_SHORTCUTS。契約 T9)。
-     *      製品では `st.quit` が立たないのでここは通らない — 出荷形の CUI 復帰は
-     *      下の `switch_cui` (SessionAction) 側だけ。 ---- */
+    /* Display faults and the debug ESC finish at this existing CUI boundary.
+     * A display fault closes children via SessionAction before reaching here. */
     cursor::hide(st);
     st.inited = false;
     font::close_all();
@@ -246,7 +249,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
 /// 単独ループ (契約 T8)。CUI への handoff が成立して gshell を抜けるときだけ
 /// false を返す。
 fn standalone_loop(st: &mut wm::GuiState) -> bool {
-    while !st.quit {
+    while !st.quit || session::owner_active(st) {
         wm::wm_cycle(st, input::Ctx::Standalone);
         /* top-level (owner 1) で受けた CTRL+STOP (票 T8 D4d / T9 受入 S6)。 */
         top_level_abort(st);
@@ -267,6 +270,9 @@ fn standalone_loop(st: &mut wm::GuiState) -> bool {
          * K5b-W: `LAUNCH` は「1 本増やす」なので他のアプリが生きていても
          * 実行してよい。`SWITCH_CUI` / `SHUTDOWN` だけが全回収を待つ
          * (判定は `session::ready_to_run`、契約 S2 の読み替え)。 */
+        if st.quit && session::ready_to_run(st) {
+            return true; // Fault: existing cleanup, without a config write/retry.
+        }
         if session::ready_to_run(st) && !session_handoff(st) {
             /* SWITCH_CUI が成立した (shell 切替済み)。ここで gshell を抜ける。 */
             return false;

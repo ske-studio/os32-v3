@@ -30,6 +30,7 @@ static u32 checks;
 #include "wab_glue.h"
 #include "surface_query.h"
 #include "appslot.h"
+#include "gf_production.h"
 #define CFG_KB 17408
 #ifndef HOST_ALT_WINDOW
 #define HOST_ALT_WINDOW 0
@@ -43,6 +44,9 @@ static u32 arena_top_pfn;   /* 凍結した exec 上端 (PFN) */
 static u32 ws_pages(u32 limit)
 {
     u32 pages = 1;
+#ifdef GF_RESERVATION_TEST
+    pages += GF_PRODUCTION_PT_PAGES;
+#endif
     if (limit > PAGING_BOOT_MAP_SIZE / PAGE_SIZE)
         pages += (limit + PTE_COUNT - 1) / PTE_COUNT - PAGING_BOOT_PT_COUNT;
     return pages;
@@ -180,6 +184,7 @@ static int host_exit_count, host_exit_status;
 void __cdecl kapi_sys_exit(int status) { host_exit_count++; host_exit_status = status; }
 int appslot_abort_request(void) { slot.abort_req = 1; return 1; }
 int con_sink_is_enabled(void) { return host_gui; }
+void gui_display_failed(void) {}
 /* These graphics lifecycle cases model NP21/W; gate rejection is covered
  * with the real detector in pegc_mode_host.c. */
 int np2_detect(void) { return 1; }

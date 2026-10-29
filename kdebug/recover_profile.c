@@ -4,6 +4,7 @@
  * only one latch/read. Never use tick/PIC-derived time for UART frame waits.
  */
 #include "recover.h"
+#include "../lib/pc98_cell.h"
 #include "recover_diag.h"
 #include "config.h"
 #include "memmap.h"
@@ -16,7 +17,6 @@
 #endif
 
 #define RECOVER_WAIT_SAMPLES 1048576U
-#define RECOVER_CELL_MASK 0xffffU
 
 /* The cell round trip is shared by S0 and the output-time CHECK. S0 keeps
  * its step numbers/clock; RUN defers safe points until the cell is restored. */
@@ -39,20 +39,22 @@ static int cell_access(struct recover *r, const struct recover_screen_ops *ops,
     (void)recover_record(r,phase,"END",step,0,rc,r->ops->ticks(r->opaque)-tick);
     return rc;
 }
+struct cell_adapter {
+    struct recover *r;
+    const struct recover_screen_ops *ops;
+    void *opaque;
+    bool run;
+};
+static int shared_cell_access(void *opaque, u32 step, bool write, u32 *value)
+{
+    struct cell_adapter *a = opaque;
+    return cell_access(a->r, a->ops, a->opaque, a->run, step, write, value);
+}
 int recover_cell_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {
-    u32 saved,actual;
-    bool run=r->state==REC_RUNNING;
-    if (!ops || !ops->read_cell || !ops->write_cell ||
-        cell_access(r,ops,opaque,run,2,false,&saved)) return -1;
-    u32 test=(saved ^ RECOVER_CELL_MASK) & RECOVER_CELL_MASK;
-    int rc=cell_access(r,ops,opaque,run,3,true,&test);
-    /* A failed test write can still change VRAM. Restore once, preserving
-     * the first failure, exactly as in the original S0 sequence. */
-    if (!rc && (cell_access(r,ops,opaque,run,4,false,&actual) || actual!=test)) rc=-1;
-    if (cell_access(r,ops,opaque,run,5,true,&saved)) return -1;
-    if (cell_access(r,ops,opaque,run,7,false,&actual) || actual!=saved) return -1;
-    return rc;
+    if (!ops || !ops->read_cell || !ops->write_cell) return -1;
+    struct cell_adapter a = {r, ops, opaque, r->state == REC_RUNNING};
+    return pc98_cell_check(shared_cell_access, &a);
 }
 int recover_screen_98(struct recover *r, const struct recover_screen_ops *ops, void *opaque)
 {

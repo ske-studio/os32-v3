@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "contracts": [
+    "kernel/geforce_module.h",
+    "include/gfx_hal.h",
+    "include/video_service.h",
+    "hwdev/gf/production.h"
+  ],
+  "imports": [
+    {
+      "symbol": "pc98_route_to_gf",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_route_to_98",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_route_cell_check",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "geforce_display_failed",
+      "source": "kernel/geforce_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_get_all",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "palette_shadow_set",
+      "source": "gfx/palette.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_route_select_98",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pc98_console_set_safe",
+      "source": "gfx/pc98_route.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "geforce_range_reserved",
+      "source": "kernel/geforce_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_cfg_read32",
+      "source": "drivers/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_cfg_read16",
+      "source": "drivers/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_cfg_write16",
+      "source": "drivers/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pgalloc_alloc_phys",
+      "source": "kernel/pgalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pgalloc_free_n_owner",
+      "source": "kernel/pgalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pgalloc_range_has_ram",
+      "source": "kernel/pgalloc.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "paging_pte_raw",
+      "source": "kernel/paging.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "sys_time_now",
+      "source": "include/sys.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemset",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kmemcpy",
+      "source": "lib/kstring.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    }
+  ]
+}

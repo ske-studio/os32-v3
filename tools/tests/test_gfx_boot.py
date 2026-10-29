@@ -103,7 +103,7 @@ def slice_gfx(core):
     body = SLICE_BEGIN + body
     for old, new in HOOKS:
         body = body.replace(old, new)
-    return '/* 生成物。gfx/gfx_core.c から test_gfx_boot.py が切り出した。 */\n' + body
+    return '#include \"geforce_module.h\"\n/* 生成物。gfx/gfx_core.c から test_gfx_boot.py が切り出した。 */\n' + body
 
 
 def build(texts, tmp):

@@ -2469,6 +2469,15 @@
       "source": "include/memmap.h",
       "context_safe": false,
       "index": 307
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "gf_production_selected",
+      "source": "include/gf_production.h",
+      "context_safe": false,
+      "index": 308,
+      "retained": true
     }
   ]
 }

@@ -40,8 +40,9 @@
 #define MODULE_ID_LAN 9U
 #define MODULE_ID_CIRRUS 10U
 #define MODULE_ID_HWDEV 11U
+#define MODULE_ID_GEFORCE 12U
 #define MODULE_RUNTIME_SLOTS 20U
-#define MODULE_RECORD_CAP 11U
+#define MODULE_RECORD_CAP 12U
 #define MODULE_REQUIRED_PATHS { "/boot/sqlite.mod", "/boot/fep.mod" }
 
 /* Compatibility names for the existing KDEBUG contracts. */
@@ -258,6 +259,21 @@ enum module_field {
         .import_max = 128U, \
         .export_max = 1U, \
         .load_span_max = 262144U, \
+    }, \
+    { \
+        .module_id = 12U, \
+        .phase = 2U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
+        .stop_allowed = 0U, \
+        .ops_version = 1U, \
+        .ops_slots = 1U, \
+        .image_max = 131072U, \
+        .mem_max = 131072U, \
+        .reloc_max = 8192U, \
+        .import_max = 32U, \
+        .export_max = 1U, \
+        .load_span_max = 163840U, \
     }, \
 }
 

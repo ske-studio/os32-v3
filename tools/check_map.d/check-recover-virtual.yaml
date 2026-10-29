@@ -2,6 +2,7 @@ check-recover-virtual:
 - kdebug/recover.c
 - kdebug/recover.h
 - kdebug/recover_profile.c
+- lib/pc98_cell.h
 - kdebug/recover_virtual.c
 - kdebug/recover_virtual.h
 - kdebug/recover_wire.h

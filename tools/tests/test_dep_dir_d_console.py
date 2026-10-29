@@ -121,7 +121,7 @@ def main():
         mutations(source, expected)
 
 
-GRID_FILES = ('arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_attr.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/kprintf.h', 'include/memmap.h', 'include/pc98.h', 'include/tvram.h', 'include/types.h', 'kernel/console.c', 'kernel/console_backend.h', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/console.c', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
+GRID_FILES = ('gfx/pc98_route.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_attr.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/kprintf.h', 'include/memmap.h', 'include/pc98.h', 'include/tvram.h', 'include/types.h', 'kernel/console.c', 'kernel/console_backend.h', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/console.c', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
 
 GRID = 'platform/pc98/console.c'
 GRID_KERNEL = 'kernel/console.c'
@@ -140,7 +140,7 @@ def grid_command(work, exe, baseline=False):
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
             '-static', '-no-pie', '-D__KERNEL_BUILD__',
             *['-I' + str(work / p) for p in ('.', 'include', 'arch/x86',
-                 'platform/pc98', 'kernel', 'lib', 'sdk/include/os32')],
+                 'platform/pc98', 'kernel', 'lib', 'gfx', 'sdk/include/os32')],
             str(work / GRID_HARNESS), '-o', str(exe)]
 
 

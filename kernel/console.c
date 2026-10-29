@@ -17,6 +17,7 @@
 #include "console.h"
 #include "console_backend.h"
 #include "kbd_inject.h"
+#include "pc98_route.h"
 
 /* V86 セッション中の画面描画抑止 (kernel/v86.c)。
  * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わる。
@@ -37,7 +38,8 @@ int rshell_active = 0;
 static int cursor_x = 0;
 static int cursor_y = 0;
 
-/* テキスト面へ描いてよいか。描かないのは 2 つの場合:
+/* テキスト面へ描いてよいか。GF の decode 未確認時も同じ描画抑止を使う。
+ * 描かないのは次の場合:
  *   - V86 セッション中 (上の extern のとおり、画面はゲストのもの)。
  *   - GUI モード中 = con_sink 有効 (console_text_gdc_stop 以降)。gshell が
  *     全画面 GFX を握っている間、テキスト面は gfx_init が一度消したまま
@@ -49,7 +51,8 @@ static int cursor_y = 0;
  * 論理位置だけ進むと、CUI 復帰時に食い違う。 */
 static int console_render_allowed(void)
 {
-    return !v86_is_active() && !con_sink_is_enabled();
+    return (!pc98_console_safe || pc98_console_safe()) &&
+           !v86_is_active() && !con_sink_is_enabled();
 }
 
 /* GDC (テキスト) のハードウェアカーソルを論理カーソルへ追従させる。
@@ -60,6 +63,7 @@ static int console_render_allowed(void)
  * 握っているので触らない。 */
 static void console_hw_cursor_sync(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     if (v86_is_active()) return;
     con_backend_cursor_at(cursor_x, cursor_y);
 }
@@ -94,6 +98,7 @@ void tvram_set_scroll_reserve(int rows)
 
 void tvram_clear(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     con_sink_push_clear();      /* 票 K6C: 画面クリアの経路 (CLEAR レコード) */
     /* 票 K6C-2: GUI 中はテキスト面を消さない (消す相手が見えていない上に、
      * 論理カーソルだけ 0,0 に戻ると凍っている画面と食い違う)。 */
@@ -108,12 +113,14 @@ void tvram_clear(void)
  * Reject before unsigned address arithmetic; a kanji must fit both cells. */
 void tvram_putchar_at(int x, int y, char ch, u8 color)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     con_backend_putchar(x, y, ch, color);
 }
 
 /* TVRAM 1セル読み取り (文字コード + 属性) */
 void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     con_backend_readchar(x, y, code, attr);
 }
 
@@ -123,11 +130,13 @@ void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
  * 戻り値: 反転したセル数 (1=ANK, 2=漢字) */
 int tvram_reverse_cell(int x, int y)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return 0;
     return con_backend_reverse(x, y);
 }
 
 void tvram_scroll(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     con_backend_scroll(TVRAM_ROWS - g_scroll_reserve);
 }
 
@@ -135,6 +144,7 @@ void tvram_scroll(void)
  * PC9800Bible §2-6-2 */
 void tvram_putkanji_at(int x, int y, u16 jis, u8 color)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     con_backend_putkanji(x, y, jis, color);
 }
 
@@ -417,6 +427,7 @@ void console_set_cursor(int x, int y)
  * 起動時と V86 セッション終了時にも呼ぶ。 */
 void console_hw_cursor_enable(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     if (v86_is_active()) return;
     con_backend_cursor_shape(1);
     console_hw_cursor_sync();
@@ -430,6 +441,7 @@ void console_hw_cursor_enable(void)
  * V86 セッション中は GDC をゲストが握っているので触らない。 */
 void console_text_gdc_stop(void)
 {
+    if (pc98_console_safe && !pc98_console_safe()) return;
     /* 票 K6C §2-3: GUI へ入るときにシンクを空で始める。v86 のガードより
      * **前**に置く — GDC を触らない場合でも「テキスト面が見えない」ことは
      * 変わらないので、溜め始める側は抑止しない。 */

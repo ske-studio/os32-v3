@@ -23,6 +23,7 @@
 #include "include/con_sink.h"
 #include "include/console.h"
 #include "include/dma_contract.h"
+#include "include/gf_production.h"
 #include "include/gfx_hal.h"
 #include "include/kbd_inject.h"
 #include "include/kprintf.h"
@@ -138,8 +139,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 308
-#define KDEBUG_ABI_GEN 0x6d0373deu
+#define KDEBUG_IMPORT_COUNT 309
+#define KDEBUG_ABI_GEN 0x83c11cf5u
 #include "kernel/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

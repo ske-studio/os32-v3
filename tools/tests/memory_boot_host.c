@@ -372,10 +372,10 @@ void _start(void)
         /* 32MiB / 128MiB は丸ごと通る (切り詰め無し)。 */
         CHECK(memory_boot_high_fit(0x2000, top) == 0x2000);
         CHECK(memory_boot_table_pages(0x2000) <= room);
-        CHECK(memory_boot_workspace_pages(0x2000) == MEMORY_BOOT_WORKSPACE_PAGES);
+        CHECK(memory_boot_workspace_pages(0x2000) == MEMORY_BOOT_WORKSPACE_PAGES + GF_PRODUCTION_PT_PAGES);
         CHECK(memory_boot_high_fit(0x8000, top) == 0x8000);
         CHECK(memory_boot_table_pages(0x8000) <= room);
-        CHECK(memory_boot_workspace_pages(0x8000) == MEMORY_BOOT_WORKSPACE_PAGES +
+        CHECK(memory_boot_workspace_pages(0x8000) == MEMORY_BOOT_WORKSPACE_PAGES + GF_PRODUCTION_PT_PAGES +
               0x8000 / PTE_COUNT - PAGING_BOOT_PT_COUNT);
         /* 4GiB 相当 (上端は最上位の ROM/MMIO 帯)。 */
         huge = MEM_PHYS_MMIO_TOP / PAGE_SIZE;

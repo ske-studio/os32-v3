@@ -49,6 +49,15 @@ pub extern "C" fn gshell_gui_handler(op: u32, arg: u32, owner: i32) -> i32 {
     }
     st.now = unsafe { (os32api::api().get_tick)() };
 
+    // Kernel display fault uses the existing CUI handoff. Queue only, no drawing.
+    if op == os32api::gui::proto::GUI_OP_SESSION_REQUEST
+        && owner == multiapp::APP_ID_SHELL && arg == os32api::gui::proto::GUI_SESSION_SWITCH_CUI as u32
+    {
+        st.quit = true;
+        session::clear();
+        return session::set_wm(st, os32api::gui::proto::GUI_SESSION_SWITCH_CUI, b"");
+    }
+
     /* スロットを要らない (あるいは持てない) op を先に片づける。 */
     if op == GUI_OP_OWNER_EXIT {
         if arg == OWNER_EXIT_ABORTED {

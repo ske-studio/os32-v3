@@ -84,7 +84,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 ## 3. HWDEV の import の生成 (G3)
 
 - 核は **25** 関数で上表に不足・余剰なし。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
-- kernel imports は実測 **10**。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
+- kernel imports は **11** (P4 の本番選択門 `gf_production_selected` を末尾追加)。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
 
 | HWDEV index | 関数 | 既存 kdebug index |
 |---|---|---|
@@ -98,6 +98,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 32 | pci_cfg_read16 | 260 |
 | 33 | pci_cfg_write32 | 261 |
 | 34 | pci_cfg_write16 | 262 |
+| 35 | gf_production_selected | 308 |
 
 `boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 
@@ -106,7 +107,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 - gfinit.c・gfinit_resources.c は `generated/kdebug_import_macros.h` を取り込むが getter マクロは使っていない — 取り込みを HWDEV の生成物に差し替える。
 - `tools/gen_hwdev_contract.py` が共通契約と同時に stub・slot・metadata・取り込み用ヘッダを生成する。`HWDEV_MODULE` の GF ビルドだけ取り込み先を切替え、両像で配置 assert をコンパイルする。
 - `build/hwdev.mk` は同じ machine/ABI flags で GF 8 オブジェクトを別にコンパイルし、`hwdev_main.o` と専用 imports を `build/out/hwdev/hwdev.elf` (map 同居) へリンク、`build/out/hwdev.mod` へ pack する。`build/hwdev.ld` は HWDEV slot 配列を data 先頭に置く。
-- 表は facade が開始前に充填する (§1)。slot 25〜34 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
+- 表は facade が開始前に充填する (§1)。slot 25〜35 は kernel の関数のアドレスで埋め、既存 kdebug index は宣言の取得元だけに使う。依存 handle だけで symbol を解決したとは扱わない。
 
 ## 4. contract_crc (G4)
 
@@ -213,6 +214,7 @@ KDEBUG の ops 版 4・20 口と HWDEV ABI は変更しない。GF 本体は M3c
 | 265 | pci_cfg_read16 | retained |
 | 266 | pci_cfg_write32 | retained |
 | 267 | pci_cfg_write16 | retained |
+| 308 | gf_production_selected | retained (P4、HWDEV の診断入口だけが呼ぶ) |
 
 GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retained` で保持する。
 269 slot の順序・型・実装を維持し、private 生成契約のみ再生成する (KAPI と ops の版は不変)。

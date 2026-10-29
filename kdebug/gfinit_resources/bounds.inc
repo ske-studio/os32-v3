@@ -1,7 +1,18 @@
+#ifdef GF_PRODUCTION
+static struct gfinit_resource_reject resource_rejected;
+void gfinit_resources_rejected(struct gfinit_resource_reject *out)
+{
+    *out = resource_rejected;
+}
+#endif
 static int resource_reject(const char *reason, u32 dev, u32 fn, u32 reg, u32 raw)
 {
+#ifdef GF_PRODUCTION
+    resource_rejected = (struct gfinit_resource_reject){reason, dev, fn, reg, raw};
+#else
     kprintf(KLOG_ATTR, "GF A1 reject=%s bdf=0:%u.%u reg=%x raw=%x\n",
             reason, dev, fn, reg, raw);
+#endif
     return -1;
 }
 

@@ -56,4 +56,7 @@ i32 sys_switch_shell(const char *path);
 const char *gui_next_shell(void);
 int gui_take_next_shell(char *out, int cap);   /* 取り出して消す (K4 の起動ループ用) */
 
+/* Internal display fault: queue the existing WM CUI SessionAction. */
+void gui_display_failed(void);
+
 #endif /* __GUI_H */

@@ -27,7 +27,7 @@ STAGE_KINDS = {
     'S4': ('FUNC',) * 25,
     'S5': ('FUNC',) * 30,
     # S3e: all five moved selftests.
-    'S6': ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3,
+    'S6': ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',),
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
@@ -36,7 +36,7 @@ LAST_STAGE = list(STAGE_KINDS)[-1]
 GENERATIONS = json.loads((ROOT / 'sdk/kapi.json').read_text())['generations']
 # Identify contracts by symbol: S3b..S3e compact the old selftest slots.
 GF_ONLY_SYMBOLS = frozenset(('pci_cfg_read32', 'pci_cfg_read16',
-                             'pci_cfg_write32', 'pci_cfg_write16'))
+                             'pci_cfg_write32', 'pci_cfg_write16', 'gf_production_selected'))
 # Raw function addresses do not create an nm -u reference to the function.
 # This manifest also fixes which moved object may consume each address.
 ADDRESS_IMPORTS = {'kapi_reserved_nosys': 'selftest_exec',

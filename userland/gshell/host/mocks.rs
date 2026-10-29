@@ -174,6 +174,8 @@ unsafe extern "C" fn no_key() -> i32 {
     -1
 }
 unsafe extern "C" fn nothing() {}
+pub static GFX_SHUTDOWNS: AtomicUsize = AtomicUsize::new(0);
+unsafe extern "C" fn gfx_shutdown() { GFX_SHUTDOWNS.fetch_add(1, Ordering::SeqCst); }
 unsafe extern "C" fn dirty(_: i32, _: i32, _: i32, _: i32) {
     DIRTY_RECTS.fetch_add(1, Ordering::SeqCst);
 }
@@ -948,7 +950,8 @@ pub fn init() {
     a.mouse_poll = mouse;
     a.gfx_init = gfx_init;
     a.gfx_screen_info = screen_info;
-    a.gfx_shutdown = nothing;
+    a.gfx_shutdown = gfx_shutdown;
+    GFX_SHUTDOWNS.store(0, Ordering::SeqCst);
     a.tvram_clear = nothing;
     a.gfx_set_palette = palette;
     a.gfx_get_palette = get_palette;

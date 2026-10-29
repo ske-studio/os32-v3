@@ -149,7 +149,7 @@ mem_alloc)・CUI shell 1,032 B (NP21/W、filer・edit_gui と FEP 変換・設�
 静的 PT (bootstrap) の守備範囲は 32MB (PAGING_BOOT_MAP_SIZE = PAGING_MAP_SIZE、固定 PT 8 枚、画像外)。
 **実 RAM の人為的な上限は無い** (K6-RAM で PAGING_RAM_LIMIT を撤廃)。paging_init が恒等で張るのは
 min(検出量, 32MB) — その上端が paging_boot_identity_end() — で、それより上の RAM は
-pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。
+pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。高位 RAM のある構成では、GeForce の BAR0 16MiB と DISPLAY 300KiB の写像用に PT 5 頁を追加予約する。FIXED 型の低メモリ構成は従来の workspace 1 頁を保ち、GF の写像に不足すれば 98 へフォールバックする。
 15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。ただしセットアップで「16MB システム空間: 切り離す」(I/O 043Bh bit2=1) の機械では、そこは通常 RAM で PEGC の VRAM は F00000h に出ない (FFF00000h の別名でだけ見える — undocumented io_mem.md)。実機 Ra266 はこの構成 (R7-1、2026-10-14)。v3 ではこの構成でも RAM にしない (損失 1MB、v4 の物理地図で見直す)。
 PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD で恒等に張り、043Bh bit2=1 または `GFXDIAG=altwin` なら別名から双方向の別名試験を行う。最初に成立した窓を DISPLAY に使い、両方不成立または DISPLAY 付け替え失敗なら pc98 へ落ちる。Ra266 の別名は実機未確認。
 16MB 超で RAM が載っていない範囲は既定 Not-Present で、必要な範囲だけ paging_map_phys() で張る。

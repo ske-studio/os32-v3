@@ -1,5 +1,6 @@
 /* GF4a owner. All trial writes go through recover's immutable plan. */
 #include "gfinit.h"
+#include "gf_production.h"
 #include "hwdev/owner.h"
 #include "gfinit_bus.h"
 #include "gfinit_exec.h"
@@ -132,14 +133,7 @@ static int gf_clock(void *opaque, u32 *value)
     return 0;
 }
 static const struct gfinit_exec_ops gf_clock_ops = {gf_clock, recover_hal_wait_frame};
-/* BIT i version byte order: envytools nvbios/info.c (MIT), +2 is chip.
- * Expected NV44/NV44A version.chip: REALHW_RECOVER_ADDENDUM, S4. */
-#define GF_VERSION_CHIP 0x44U
-#define GF_CHIP_UNKNOWN 0x100U
-#define GF_BIT_HEADER 12U
-#define GF_BIT_ENTRY 6U
-#define GF_BIT_CHIP_OFFSET 2U
-#define GF_BIT_I_VERSION 2U /* envytools nvbios/bit.c:50 ({ 'i', 2, ... }) */
+#include "../hwdev/gf/rom.inc"
 #include "gfinit/rom.inc"
 static int gf_release_rom(struct gfinit_owner *g)
 {
@@ -392,6 +386,7 @@ invalid:
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
+    if (gf_production_selected()) return -1;
     if (!buf || size < sizeof(struct gfinit_request)) return -1;
     struct gfinit_request q = *(const struct gfinit_request *)buf;
     const struct gfinit_prepare_request *extra = buf;

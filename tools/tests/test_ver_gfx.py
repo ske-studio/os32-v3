@@ -44,6 +44,7 @@ GfxBackend gfx_backend_pc98 = BACKEND;
 #ifndef NO_OPTIONAL
 GfxBackend gfx_backend_pegc = BACKEND;
 GfxBackend gfx_backend_cirrus = BACKEND;
+GfxBackend gfx_backend_geforce = BACKEND;
 #endif
 static GfxBackend other = BACKEND;
 const GfxBackend *g_backend;
@@ -63,12 +64,12 @@ void _start(void) {
     u32 kind, active;
     GfxBackend *backends[] = {&gfx_backend_pc98,
 #ifndef NO_OPTIONAL
-        &gfx_backend_pegc, &gfx_backend_cirrus,
+        &gfx_backend_pegc, &gfx_backend_cirrus, &gfx_backend_geforce,
 #endif
         &other};
     u32 ids[] = {GFX_VER_PC98,
 #ifndef NO_OPTIONAL
-        GFX_VER_PEGC, GFX_VER_CIRRUS,
+        GFX_VER_PEGC, GFX_VER_CIRRUS, GFX_VER_GEFORCE,
 #endif
         GFX_VER_UNKNOWN};
     for (u32 i=0; i<sizeof(ids)/sizeof(ids[0]); ++i) {

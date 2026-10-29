@@ -3,6 +3,7 @@ check-recover-t3:
 - kdebug/recover.h
 - kdebug/recover_wire.h
 - kdebug/recover_profile.c
+- lib/pc98_cell.h
 - tools/tests/recover_host.c
 - tools/tests/recover_t3_host.inc
 - tools/tests/test_recover.py
