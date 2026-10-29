@@ -19,6 +19,7 @@ def command(exe):
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
+    assert 'A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS' in text
     assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     assert 'T1 baseline once, three E gates, cold latch, CR52/C040, restore and S0 failure PASS' in text
@@ -33,6 +34,7 @@ def check_output(text, verbose=True):
     prefix = next(line for line in text.splitlines() if line.startswith('prefix transport trace events '))
     if verbose:
         print('PASS MODE_C == legacy ' + prefix)
+        print('PASS A2/main0..4/baseline: required/record/A4, stable/changing GPIO')
         for line in text.splitlines():
             if line.startswith(('VRAM ', 'COLOR ', 'CHECK ', 'WAIT ', 'ROUTE ', 'CELL ', 'VERIFY ', 'default_', 'REC sid=')):
                 print(line)
@@ -73,6 +75,8 @@ def check_output(text, verbose=True):
 
 
 MUTATIONS = [
+    ('kdebug/recover.c', 'rmw_destination_sample',
+     'if (a->value == w->key) *old = values[i];', '(void)old;'),
     ('kdebug/gf_stage_state.c', 'baseline_once',
      'if (s->initialized) return 0;', 'if (false) return 0;'),
     ('kdebug/gf_stage_state.c', 'entry_pmc',

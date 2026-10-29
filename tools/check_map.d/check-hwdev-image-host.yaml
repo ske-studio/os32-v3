@@ -78,4 +78,9 @@ check-hwdev-image-host:
 - kdebug/generated/recover_gf_c_tables.inc
 - kdebug/gf_stage_state.c
 - kdebug/gf_stage_state.h
+- tools/tests/gfinit_sequence_host.inc
+- tools/tests/gfinit_plan_c_host.c
+- tools/tests/gf_stage_host.inc
+- kdebug/gfinit_plan_c.h
+- drivers/serial.h
 artifact_reader: true
