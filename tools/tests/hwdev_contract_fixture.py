@@ -1,6 +1,6 @@
 """Expected private hwdev fingerprints after GF_DRIVER P6 cleanup."""
 
-HWDEV_CONTRACT_CRC = 0x8cc68a39
+HWDEV_CONTRACT_CRC = 0xfdda34ae
 HWDEV_LAYOUT_CRC = 0x64142dfa
 
 
