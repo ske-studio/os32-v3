@@ -123,6 +123,8 @@ FB の bytes は表示用予約 307,200 B で BAR1 全長とは別。palette の
 Trident は自身の mode/FB/DAC 情報を返し、未対応 start-offset/blank は NOSYS。GF=01 と Trident の 0FACh 選択値はボード側へ分ける（`T/TASK_TRIDENT_DRIVER.md:426–444`）。独立 DPMS と VBE 状態 blob の完全復元は初版に含めない。
 下層 A の契約は `int gf_op_<name>_run(struct gf_init_context *, const struct gf_instruction *)`。解読は現行 `decode_instruction` と `.inc` の一つの実体を共有し、命令別 decode API は増やさない。
 context は head/skip、有限の呼出し/反復 stack、ROM 借用参照、既存上限・時計・`gf_io`。bus は read/write（BAR/offset/width/値）、wait_us、point、局所復元。診断の記録・承認は adapter が担当する。
+P0 の部品間契約の詳細は `hwdev/gf/internal.h`。runner が解読後・dispatch 前に REPEAT の `end_repeat` を対応する END_REPEAT PC で補完し、run は body-PC/end-PC/残り回数を frame に置く。命令内の待ちはすべて `gf_init_wait` に通し、累積待ちの一括計上・1000us 以下の分割・各刻みの前後の中断点/期限検査は runner が実装する。
+局所退避は context の有限表に書換え前に `gf_init_save` / `gf_init_save_indexed` で登録し、失敗時は adapter の `restore(opaque, ctx)` が逆順に戻す（indexed は選択情報も保持）。RESET は184Cを、CR_INDEX_ADDRESS_LATCHED はラッチと元のindexを明示的に復元し、命令完了時に `gf_init_commit` で解除する。PLL2/IO_RESTRICT_PLL2 と P3 PLL は列全体の成功時だけ解除し、正常 stop で完了済みPLLを戻さない。runner/dispatcher/待ち/退避ヘルパーの実体は P2 の sol、27本の run はすべて terra が並列実装する。
 B は `int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, u32 ordinal)` を `gf_load_io.row` へ接続し、section/wait も既存型を使う（`O/hwdev/gf_load_state.h:36–41`）。
 read/write の別名、AR の FF reset→index→data、DAC の write-only auto-increment、LIVE RMW の実行時読取り、既存の幅/範囲/有限待ちを保持する。新しい汎用 IR・計画 VM は作らない。
 
