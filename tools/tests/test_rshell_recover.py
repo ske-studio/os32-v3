@@ -183,6 +183,34 @@ def gfinit_cases(m):
             assert port.writes == [(command+'\n').encode()]
             if ending.startswith(meta):
                 assert saves[-1]['sid'] == 6 and saves[-1]['crc']['snapshot_crc'] == 13
+    # A failed file-based A2 retry must not reuse a saved PAUSED as success.
+    # The rshell response contains the CLI diagnostic and EOT, with no new REC.
+    command = 'gfinit prepare 7 --mode-c --allow-write --no-verify-file /missing.txt'
+    errors = [
+        'gfinit: rejected rc=-1 invalid no-verify file (MMIO/CR/SR hex, max 64 entries)',
+        'gfinit: rejected rc=-10 kdebug unavailable',
+    ]
+    with tempfile.TemporaryDirectory(prefix='gfinit_retry_') as tmp:
+        state = Path(tmp) / 'state.json'
+        log = Path(tmp) / 'raw.log'
+        for split in (1, 7, 256):
+            for error in errors:
+                records = m.Records(7)
+                records.line(META)
+                records.data['image_crc'] = '1234abcd'
+                state.write_text(json.dumps(records.data))
+                data = ('> ' + command + '\n' + error + '\n\x04').encode()
+                port = Port(data, split=split)
+                closed = []
+                port.close = lambda: closed.append(True)
+                argv = ['rshell_recover', '--session', '7', '--image-crc', '1234abcd',
+                        '--state', str(state), '--log', str(log), '--command', command]
+                with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), redirect_stdout(io.StringIO()) as out:
+                    assert m.main() == 1
+                assert out.getvalue().strip() == 'recover: guest rejected recovery'
+                assert json.loads(state.read_text())['invalid'] == 'guest rejected recovery'
+                assert port.writes == [(command + '\n').encode()] and closed == [True]
+                assert log.read_bytes().endswith(data)
     # A2 PAUSED saves the newly assigned sid; continuation never probes ver.
     records = m.Records(0);records.line(meta)
     resumed = m.Records(6, records.data)

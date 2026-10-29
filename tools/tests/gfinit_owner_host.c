@@ -530,12 +530,19 @@ static void cli_verify_test(void)
     CHECK(cli_payload.regs[2].kind==GF_VERIFY_SR && cli_payload.regs[2].reg==1);
     CHECK(!shell_cmd_gfinit(7,args) && cli_request.size==40 && !(cli_request.flags&GF_NO_VERIFY_FILE));
     const char *bad[]={"CR 100", "MMIO fffffffff", "AR 1", "MMIO nope", "CR 1c extra", "SR"};
+    const char *rejected="gfinit: rejected rc=-1 invalid no-verify file (MMIO/CR/SR hex, max 64 entries)\n";
     for(u32 i=0;i<sizeof(bad)/sizeof(bad[0]);i++) {
-        cli_file=bad[i];u32 before=cli_calls;
+        cli_file=bad[i];u32 before=cli_calls;clear_output();
         CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before);
+        CHECK(equal(serial_output,rejected));
     }
-    cli_file_fail=1;CHECK(shell_cmd_gfinit(9,args)==2);cli_file_fail=0;
-    cli_file=0;CHECK(shell_cmd_gfinit(9,args)==2);
+    u32 before=cli_calls, closed=cli_file_closes;
+    cli_file_fail=1;clear_output();
+    CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before && cli_file_closes==closed+1);
+    CHECK(equal(serial_output,rejected));cli_file_fail=0;
+    cli_file=0;clear_output();
+    CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before && cli_file_closes==closed+1);
+    CHECK(equal(serial_output,rejected));
     output("CLI verify required/file parsing, comments, hex and errors PASS\n");
 }
 static void cli_test(void)
@@ -584,10 +591,10 @@ static void cli_test(void)
     clear_output();CHECK(shell_cmd_gfinit(4,abort)==1 && cli_calls==before);
     CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
     api.version=77;clear_output();CHECK(shell_cmd_gfinit(3,inspect)==1);
-    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
+    CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));
     api.version=78;api.kdebug_call=0;clear_output();
     CHECK(shell_cmd_gfinit(3,inspect)==1 && cli_calls==before);
-    CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));api.kdebug_call=kdebug_call;
+    CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));api.kdebug_call=kdebug_call;
     output("S7a CLI / KDEBUG=0 NOSYS / inspect two lines via console serial PASS checks complete\n");
 }
 static void cli_write_test(void)
@@ -637,9 +644,10 @@ static void cli_write_test(void)
         CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
         CHECK(equal(serial_output,"gfinit: rejected rc=-10\n"));
         api.version=77;clear_output();CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
-        CHECK(equal(serial_output,"gfinit: kdebug unavailable\n"));
-        api.version=78;api.kdebug_call=0;
-        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);api.kdebug_call=kdebug_call;
+        CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));
+        api.version=78;api.kdebug_call=0;clear_output();
+        CHECK(shell_cmd_gfinit(argc,args)==1 && cli_calls==before);
+        CHECK(equal(serial_output,"gfinit: rejected rc=-10 kdebug unavailable\n"));api.kdebug_call=kdebug_call;
     }
     char *mode[]={"gfinit","prepare","5","--mode-c","--allow-write","extra"};
     cli_result=0;kdebug.ops.dbg_call=cli_dispatch;

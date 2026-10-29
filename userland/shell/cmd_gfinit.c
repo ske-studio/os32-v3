@@ -118,7 +118,7 @@ int shell_cmd_gfinit(int argc, char **argv)
     }
     if (gfinit_session(argv[2], &q.session)) goto usage;
     if (g_api->version < GFINIT_KAPI_MIN || !g_api->kdebug_call) {
-        g_api->kprintf(ATTR_RED, "gfinit: kdebug unavailable\n");
+        g_api->kprintf(ATTR_RED, "gfinit: rejected rc=%d kdebug unavailable\n", OS32_ERR_NOSYS);
         return 1;
     }
     q.version = GF_INIT_VERSION;
@@ -127,7 +127,7 @@ int shell_cmd_gfinit(int argc, char **argv)
     int rc;
     if (verify_file) {
         if (gfinit_verify_file(verify_file, &payload)) {
-            g_api->kprintf(ATTR_RED, "gfinit: invalid no-verify file (MMIO/CR/SR hex, max %u entries)\n", GF_NO_VERIFY_MAX);
+            g_api->kprintf(ATTR_RED, "gfinit: rejected rc=-1 invalid no-verify file (MMIO/CR/SR hex, max %u entries)\n", GF_NO_VERIFY_MAX);
             return 2;
         }
         q.size = sizeof(payload); payload.request = q;
