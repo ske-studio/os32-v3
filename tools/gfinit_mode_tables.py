@@ -15,6 +15,13 @@ import host32
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FULL = '0xffffffffU'
 NONE = 'REC_GF_C_NO_INDEX'
+# Registers nouveau only writes (no readback) and DESIGN §4 does not list as
+# required CHECKs: record the write, do not compare the readback. Ra266
+# 2026-10-29: 680A24 wrote 000FFFFF and read 0 on NV44A.
+NOUVEAU_WRITE_ONLY = ('0x680404', '0x680630', '0x680634', '0x680700', '0x680848',
+                      '0x6808c0', '0x680a20', '0x680a24', '0x680a34', '0x600860',
+                      '0x8704', '0x8140', '0x1588', '0x600810', '0x600830',
+                      '0x600834', '0x680900')
 
 
 def initializers():
@@ -23,6 +30,8 @@ def initializers():
     def add(kind, reg, index=NONE, expr='GF_C_LITERAL', source='0', keep='0',
             bits='0', verify=FULL, count='1', flags='0'):
         width = 4 if kind == 'MMIO' else 1
+        if kind == 'MMIO' and reg in NOUVEAU_WRITE_ONLY:
+            verify = '0'
         if width == 1:
             verify = f'({verify}) & GF_MODE_BYTE_MASK'
         rows.append([f'GF_C_{kind}', str(reg), str(index), str(width), expr,

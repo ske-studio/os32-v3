@@ -195,7 +195,7 @@ static void budget_cases(void)
         if(!fault_kind) {
             CHECK(vram_rec==4 && dac_rec==2 && ar_rec==48 && wait_rec==6);
             CHECK(check_rec==66 && cell_rec==4 && route_rec==2);
-            CHECK(run_rows==2338 && c_bound==2338);
+            CHECK(run_rows==2298 && c_bound==2298);
             CHECK(128+composed.plan.node_count*12+composed.plan.arg_count*4==32960);
             output("BUDGET VRAM=4 DAC=2 AR=48 WAIT=6 CHECK=66 CELL=4 ROUTE=2 PASS\n");
         }
