@@ -513,6 +513,7 @@ static int cmd_os32gui(int argc, char **argv)
 /*    pegc   PEGC 256 色を強制 (probe が通らなければ 9801 へ落ちる)          */
 /*    cirrus Cirrus GD54xx アクセラレータを強制 (票 H3。NP21/W では ini の    */
 /*           USEGD5430 / GD5430TYPE で有効化していないと probe が落ちる)     */
+/*    geforce GeForce を明示指定 (GUI=1 では次回起動時に pc98 を選ぶ)       */
 /*    auto   既定。probe 順 (Cirrus → PEGC → 9801)                           */
 /* ------------------------------------------------------------------------ */
 static int cmd_gfxmode(int argc, char **argv)
@@ -535,7 +536,8 @@ static int cmd_gfxmode(int argc, char **argv)
         return 0;
     }
     if (!str_eq(argv[1], "pc98") && !str_eq(argv[1], "pegc") &&
-        !str_eq(argv[1], "cirrus") && !str_eq(argv[1], "auto")) {
+        !str_eq(argv[1], "cirrus") && !str_eq(argv[1], "geforce") &&
+        !str_eq(argv[1], "auto")) {
         shell_print_help(argv[0]);
         return SH_STATUS_USAGE;
     }
@@ -547,6 +549,8 @@ static int cmd_gfxmode(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "%s", "gfxmode: failed to write /etc/system.cfg\n");
         return SH_STATUS_ERROR;
     }
+    if (str_eq(argv[1], "geforce"))
+        g_api->kprintf(ATTR_YELLOW, "%s", "GUI=1 selects pc98 at next boot\n");
     return 0;
 }
 
@@ -675,7 +679,7 @@ static const ShellCmd sys_cmds[] = {
     { "format", cmd_format, "[0-3] [sects]", "Format a drive to ext2" },
     { "play",   cmd_play,   "MML",           "Play MML via FM synth" },
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
-    { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
+    { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|geforce|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
     { "gfinit", shell_cmd_gfinit, "inspect <sid> | abort <sid> --allow-write", "Inspect GF ROM or release the session" },
     { "recover", shell_cmd_recover, "status | now <session> | virtual begin <case> | virtual step|end <session>", "Show recovery state or recover the current session" },

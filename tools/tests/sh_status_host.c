@@ -2134,6 +2134,22 @@ static void case_gfxmode_diag(void)
           "diag reports cfg write failure");
 }
 
+static void case_gfxmode_geforce(void)
+{
+    char *geforce[] = { "gfxmode", "geforce" };
+    fresh();
+    file_add(SYS_SYSTEM_CFG, "GFX=pegc\nGUI=1\nOTHER=keep\n");
+    check(cmd_gfxmode(2, geforce) == 0 &&
+          strcmp(g_cfg_written, "GUI=1\nOTHER=keep\nGFX=geforce\n") == 0 &&
+          out_has("GUI=1 selects pc98 at next boot\n"),
+          "geforce writes GFX and warns about GUI=1");
+    fresh();
+    g_cfg_write_fail = 1;
+    check(cmd_gfxmode(2, geforce) == SH_STATUS_ERROR &&
+          !out_has("GUI=1 selects pc98 at next boot\n"),
+          "geforce reports write failure without success warning");
+}
+
 static void case_gserial_gui(void)
 {
     char *plain[] = { "os32gui" };
@@ -2358,6 +2374,7 @@ void _start(void)
     case_gserial_gui();
     case_sfs_lan_cfg();
     case_gfxmode_diag();
+    case_gfxmode_geforce();
 
     if (failures) {
         report("SOME FAIL\n");
