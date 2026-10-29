@@ -27,8 +27,6 @@ static inline unsigned int inpw(unsigned int port) { return hdrv_shim_inp(port);
 static inline void outpw(unsigned int port, unsigned int value)
 { hdrv_shim_outp(port, value); }
 
-static inline void insw_rep(unsigned int port, void *buf, unsigned int count)
-{ (void)port; (void)buf; (void)count; }
 static inline void outsw_rep(unsigned int port, const void *buf, unsigned int count)
 { (void)port; (void)buf; (void)count; }
 

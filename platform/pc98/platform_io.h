@@ -54,14 +54,6 @@ static inline void outpd(unsigned int port, unsigned long value) {
     __asm__ volatile("outl %0, %w1" : : "a"((unsigned int)value), "Nd"(port));
 }
 
-/* ---- I/Oポート操作 (REP INSW: バッファ読み込み) ---- */
-static inline void insw_rep(unsigned int port, void *buf, unsigned int count) {
-    __asm__ volatile("rep insw"
-                     : "+D"(buf), "+c"(count)
-                     : "d"(port)
-                     : "memory");
-}
-
 /* ---- PC-98 I/Oウェイト (ポート0x5Fダミーアクセス, 約0.6µs) ---- */
 /* PC9800Bible §4-4 準拠。                                          */
 static inline void io_wait(void) {

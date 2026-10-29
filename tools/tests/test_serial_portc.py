@@ -76,8 +76,6 @@ static inline void outpw(unsigned int port, unsigned int value)
 static inline unsigned long inpd(unsigned int port) { return fake_inp(port); }
 static inline void outpd(unsigned int port, unsigned long value)
 { fake_outp(port, (unsigned)value); }
-static inline void insw_rep(unsigned int port, void *buf, unsigned int count)
-{ (void)port; (void)buf; (void)count; }
 static inline void io_wait(void) { outp(0x5F, 0); }
 static inline void io_wait_n(int n) { while (n-- > 0) io_wait(); }
 #endif
