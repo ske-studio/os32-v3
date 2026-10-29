@@ -23,6 +23,8 @@ def check_output(text, verbose=True):
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
     assert 'T1 baseline once, three E gates, cold latch, CR52/C040, restore and S0 failure PASS' in text
     assert 'T1 record entry/route/cell required, exit TARGET/VRAM evidence, later bus failure PASS' in text
+    assert 'T1 CHECK then S0 local/quiesce/first-send/final-send failure revokes init PASS' in text
+    assert 'T1 C-only each lock write/abort restores per-call CR1F/CR11/CR44 originals PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
     assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
     assert 'WAIT lengths positions, conditional FP, REC, callback failure and abort PASS' in text

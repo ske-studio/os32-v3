@@ -559,6 +559,16 @@ static struct {
 #include "../../userland/shell/cmd_gfinit.c"
 static void cli_verify_test(void)
 {
+    /* No GeForce/init: rejection must echo this request, not the prior policy. */
+    for(u32 mode=0;mode<3;mode++) {
+        setup();core.verify_record=mode!=0;
+        struct gfinit_request q=request(GF_ALLOW_WRITE|GF_MODE_C|
+            (mode==0?GF_VERIFY_RECORD:mode==1?GF_VERIFY_REQUIRED:0),0);
+        CHECK(gfinit_call(GF_OP_C_ONLY,&q,sizeof(q),&base,&transport,&s0)<0);
+        CHECK(equal(serial_output,mode==0?"GF C verify=record result=NG\n":
+                    "GF C verify=required result=NG\n"));
+        CHECK(!reads && !writes && !begins);
+    }
     char *args[]={"gfinit","prepare","5","--mode-c","--allow-write","--verify","required","--no-verify-file","/verify.txt"};
     setup();kdebug.ops.dbg_call=cli_dispatch;cli_live=0;cli_result=0;api.version=78;api.kdebug_call=kdebug_call;
     cli_file=" # comment\nMMIO 680a24 # write-only\r\nCR 1c\nSR 01";cli_file_fail=0;cli_file_closes=0;

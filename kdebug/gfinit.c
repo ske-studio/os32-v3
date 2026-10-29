@@ -523,7 +523,8 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     }
     if (op == GF_OP_C_ONLY || op == GF_OP_MODESET)
         kprintf(ATTR_WHITE,"GF C verify=%s result=%s\n",
-            r->verify_record ? "record" : "required", rc ? "NG" : "OK");
+            (op == GF_OP_C_ONLY ? (q.flags & GF_VERIFY_RECORD) != 0 : r->verify_record)
+                ? "record" : "required", rc ? "NG" : "OK");
     q.session = r->token.session; q.status = rc ? r->reason + 1U : 0;
     q.fail_reg = r->first_key;
     if (owner) {

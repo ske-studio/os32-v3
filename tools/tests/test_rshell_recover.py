@@ -396,6 +396,23 @@ def mode_c_cases(m):
                     assert result == 'OK' and value == 'PAUSED'
                     assert guest.strip() in output.getvalue()
                     assert ('観測完了' if mode == 'record' else '機械項目合格・映像保留') in output.getvalue()
+    # C's result remains mandatory after abort/S0, independently of S0's result.
+    for verb in ('modeset 7', 'c-only'):
+        command = 'gfinit '+verb+' --allow-write --verify record'
+        for terminal in ('OK', 'PARTIAL'):
+            rows = META.replace('event=PAUSED', 'event=RESTORING').rstrip('\n')+' cleanup_seconds=17\n'
+            rows += FINAL.replace('result=OK', 'result='+terminal).replace('trial=0', 'trial=1')
+            for result in (None, 'NG', 'OK'):
+                guest = '' if result is None else 'GF C verify=record result='+result+'\n'
+                port = Port(('> '+command+'\n'+rows+guest+'\x04').encode())
+                with redirect_stdout(io.StringIO()):
+                    try:
+                        value = m.exchange(port,command,m.Records(0),10,1,io.BytesIO(),lambda _:None,port.clock)
+                    except m.RecoverError as exc:
+                        assert result != 'OK', str(exc)
+                        assert 'guest C' in str(exc)
+                    else:
+                        assert result == 'OK' and value == terminal
     assert not hasattr(m,'MODE_C_CHECK_COUNT') and not hasattr(m.Records,'mode_c_success')
 
 
@@ -424,15 +441,15 @@ def restore_cases(m):
                 state.write_text(bad)
                 command='recover restore'
                 rows=META.replace('seq=1','seq=41')+DIAG.replace('seq=2','seq=42')+FINAL.split('\n',1)[1].replace('seq=3','seq=43').replace('result=OK','result=PARTIAL')
-                port=Port(('> '+command+'\n'+rows+'\x04').encode());port.close=lambda:None
+                port=Port(('\x04> '+command+'\n'+rows+'\x04').encode());port.close=lambda:None
                 argv=['monitor','--restore','--state',str(state),'--image-crc','invalid','--log',str(log/'missing' if broken_log else log)]
                 with patch.object(sys,'argv',argv),patch.object(m,'open_port',return_value=port),redirect_stdout(io.StringIO()):
                     assert m.main()==0
                 assert port.writes==[b'recover restore\n']
                 assert state.read_text()==bad
         # Without EOT it still sends restore and the existing sid abort on timeout.
-        port=Port(b'> recover restore\n'+META.encode());port.close=lambda:None
-        argv=['monitor','--restore','--log',str(log),'--timeout','.01','--cleanup-timeout','.01']
+        port=Port(b'\x04> recover restore\n'+META.encode());port.close=lambda:None
+        argv=['monitor','--restore','--log',str(log),'--timeout','.1','--cleanup-timeout','.1']
         restore=m.restore_exchange
         with patch.object(sys,'argv',argv),patch.object(m,'open_port',return_value=port),patch.object(m,'restore_exchange',wraps=lambda *a: restore(*a,clock=port.clock)),redirect_stdout(io.StringIO()):
             assert m.main()==1
@@ -444,6 +461,26 @@ def restore_cases(m):
     with redirect_stdout(io.StringIO()):
         assert m.restore_exchange(port,10,1,io.BytesIO(),port.clock)=='OK'
     assert port.writes==[m.abort_frame(7)]
+    # Empty reads and attachment mid-row do not establish shell readiness.
+    fragment = b'7 seq=20 phase=access event=END rc=0 elapsed=1\n'
+    for prefix in (b'', fragment, b'x sid=8 seq=1 phase=state event=RUNNING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n'):
+        for split in (1, 7, 256):
+            data = prefix+(running+FINAL+'\x04').encode()
+            port=Port(data,split=split,idle_reads=2);raw=io.BytesIO()
+            assert m.restore_exchange(port,10,1,raw,port.clock)=='OK'
+            assert port.writes==[m.abort_frame(7)]
+            assert raw.getvalue()==data
+    for data in (b'', b'REC sid=7 seq=', fragment, META.encode(), FINAL.encode()):
+        port=Port(data,split=7);raw=io.BytesIO()
+        try:
+            m.restore_exchange(port,.5,.5,raw,port.clock)
+        except m.RecoverError as exc:
+            assert 'physical recovery' in str(exc) or 'missing' in str(exc)
+        else:
+            raise AssertionError('unknown state accepted')
+        # A diagnostic before final is an active stream and may request abort.
+        assert port.writes==([m.abort_frame(7)] if data==FINAL.encode() else [])
+        assert raw.getvalue()==data
 
 
 MUTATIONS = [

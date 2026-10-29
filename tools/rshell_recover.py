@@ -310,6 +310,8 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                     raise RecoverError(failure)
                 if records is None:
                     return
+                if c_command and c_result is None:
+                    raise RecoverError('missing/failed guest C result')
                 if records.success():
                     return records.final['result']
                 if records.paused and records.final is None and not records.data['stack']:
@@ -354,19 +356,57 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
 
 def restore_exchange(port, timeout, cleanup_timeout, raw, clock=time.monotonic):
     # A live stream supplies its sid. Never reenter the shell during RUN.
-    initial = port.read(MAX_LINE)
-    while initial and b'\n' not in initial and b'\x04' not in initial and len(initial) < MAX_LINE:
-        more = port.read(MAX_LINE-len(initial))
-        if not more:
-            break
-        initial += more
-    sid = re.search(rb'REC sid=([0-9]+) ', initial)
-    running = sid is not None and b'event=PAUSED' not in initial and b'phase=final' not in initial
-    records = Records(int(sid[1]) if running else 0, resync=True)
-    if running:
-        write_bounded(port, abort_frame(records.data['sid']), clock()+timeout, clock)
-    return exchange(port, None if running else 'recover restore', records,
-                    timeout, cleanup_timeout, raw, lambda _: None, clock, initial)
+    deadline = clock() + timeout
+    line = bytearray()
+    dropping = False
+    while clock() < deadline:
+        chunk = port.read(256)
+        for pos, byte in enumerate(chunk):
+            if byte == 4:
+                # EOT closes the current command: the shell can accept restore.
+                raw.write(line + b'\x04')
+                raw.flush()
+                return exchange(port, 'recover restore', Records(0, resync=True),
+                                timeout, cleanup_timeout, raw, lambda _: None,
+                                clock, chunk[pos+1:])
+            if byte == 10:
+                row = bytes(line) + b'\n'
+                line.clear()
+                if dropping:
+                    dropping = False
+                    raw.write(b'\n')
+                    continue
+                text = row.decode('ascii', errors='replace')
+                fields = None
+                try:
+                    if text.startswith('REC '):
+                        fields = Records(0)._fields(text)
+                except RecoverError:
+                    pass  # Attachment may start in the middle of a row.
+                if (fields is None or not int(fields['sid']) or
+                    fields['phase'] == 'final' or
+                    fields['event'] in ('IDLE', 'PAUSED')):
+                    raw.write(row)
+                    raw.flush()
+                    continue
+                sid = int(fields['sid'])
+                # PAUSED/final rows still precede the shell's EOT. All other
+                # complete REC rows identify an active recovery session.
+                write_bounded(port, abort_frame(sid), deadline, clock)
+                return exchange(port, None, Records(sid, resync=True),
+                                timeout, cleanup_timeout, raw, lambda _: None,
+                                clock, row + chunk[pos+1:])
+            elif dropping:
+                raw.write(bytes((byte,)))
+            else:
+                line.append(byte)
+                if len(line) > MAX_LINE:
+                    raw.write(line)
+                    line.clear()
+                    dropping = True
+    raw.write(line)
+    raw.flush()
+    raise RecoverError('restore state unknown after deadline; physical recovery required')
 
 
 def verify_boot(port, expected_crc, timeout, raw, clock=time.monotonic):

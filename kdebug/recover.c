@@ -193,6 +193,11 @@ static bool token_matches(const struct recover *r, const struct recover_token *t
 static void fail(struct recover *r, enum recover_reason reason,
                  enum recover_phase phase, u32 key)
 {
+    /* Keep the first diagnostic, but a later S0 failure must revoke re-C. */
+    if (r->state == REC_RESTORING && r->gf_stage) {
+        r->gf_stage->initialized = false;
+        r->gf_stage->s0_ok = false;
+    }
     if (reason == REC_NORMAL && (r->entered || r->expected_node != RECOVER_NONE))
         fail(r, REC_CONTRACT, REC_PHASE_NONE, r->expected_node);
     if (!r->failed) {
@@ -1146,11 +1151,11 @@ static int cleanup(struct recover *r)
      * Only the first entry owns restoration and its deadline/poll budget. */
     if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
         r->state == REC_FAILED) return -1;
-    if (cleanup_budget_prepare(r)) fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0);
     r->in_call = false; r->in_opcode = false;
     r->cursor = RECOVER_NONE; r->entered = false;
     r->auth_phase = REC_RESTORE;
     r->state = REC_RESTORING;
+    if (cleanup_budget_prepare(r)) fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0);
     r->restore_tick = r->ops->ticks(r->opaque);
     for (u32 i = 0; i < RECOVER_RULE_MAX / BITS_PER_U32; i++) r->restored_rules[i] = 0;
     r->restore_polls = 0; r->uart_polls = 0; r->uart_bytes = 0; r->in_s0 = false;
@@ -2123,7 +2128,10 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             if (!found) return access_error(r, target);
         }
         if (t->space == REC_VGA_INDEXED && r->state == REC_RUNNING &&
-            ((t->access == REC_RW && r->auth_phase != REC_MODE_C) ||
+            ((t->access == REC_RW && (r->auth_phase != REC_MODE_C ||
+              (r->c_only && dir == REC_DATA && t->port == RECOVER_CRTC &&
+               (t->index == RECOVER_CR1F || t->index == RECOVER_CR11 ||
+                t->index == RECOVER_CR44)))) ||
              (dir == REC_SELECT && index_save_safe(r->profile, target)))) {
             bool saved = false;
             for (u32 i = 0; i < r->local_saved_count; i++)
