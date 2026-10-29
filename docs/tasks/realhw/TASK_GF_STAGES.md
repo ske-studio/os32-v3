@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **設計中 (2026-10-29)** — **設計は確定** ([GF_STAGES_DESIGN](../../decisions/realhw/GF_STAGES_DESIGN.md)、astra 起草・Opus 3 往復で確定可・PM の追記)。r1 は新しく書く量が多すぎ (製品 2,300〜3,950 行) → ユーザー「一から書き直すのか？ もうちょっとシンプルな写し方はないのか？」で「書き直さず移す」に、分割は道具で (POLICY_DEV §2「分割の手段」)。段は T1 (C だけの再実行の口と record、最初に実機で main4→C→abort→C だけ を確かめる、不成立なら同一セッションの C に戻る) → T2 (C の列を本番ドライバと共有、旧 C の計数・重複を受入の直後に消す) → T3 (recover.c を道具で .inc に分割、objdump で一致) → T4 (試験を段ごとに、全体固定を外す)。見積もりの純増 −430〜+200 行。迷う所はユーザーが決める。
+> 状態: **実装中 (2026-10-29)** — **T1 は実機 Ra266 で受入に合格** (2026-10-29、版 7d571eff): inspect→A1→A2 (`--mode-c --verify record`)→main0〜4→C (record、OK・観測完了、出口 CHECK の不一致 0、書込み直後の食い違い 7 本 = 8704・600810・680900・680A24・680A34 と 508/578 の選択前)→abort (PARTIAL・verified=1)→`recover restore` (引数なし、OK)→**`gfinit c-only --verify required` が初期化をやり直さずに完走** (必須 CHECK 66 件一致、映像を目視 — 写真 `~/os32-tmp/run/gf-t1-fix/visual_c_only.jpg`)→restore→98 の入力更新をユーザーが確認→reboot で既定値。RUN 中の REC の間隔の最大は 0.603 秒 (restore の 30 秒の待ちに余裕)。証拠はノートの ~/os32-tmp/evidence/2026-10-29/gf-t1-realhw2/。途中で T1 の前からある欠陥 (recover.c で先読みと式内の READ を混ぜて保存対象外のビットを比べ REC_CONTRACT、main0 の 2 つ目で停止) が実機で出て直した (7d571eff、astra Approve)。**次は T2 (受入の直後に必ず続ける — 列を本番ドライバと共有し、旧 C の計数・重複を消す)**。設計は確定 ([GF_STAGES_DESIGN](../../decisions/realhw/GF_STAGES_DESIGN.md))。
 
 ## 0. ユーザーの提案と決定 (2026-10-29 の反省会)
 
