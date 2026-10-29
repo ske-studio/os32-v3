@@ -3,6 +3,7 @@
 /* ======================================================================== */
 
 #include "sys.h"
+#include "gf_production.h"
 #include "pgalloc.h"
 #include "memmap.h"
 #include "io.h"
@@ -13,8 +14,21 @@
 /* 管理する物理 RAM の末尾 (バイト)。legacy アリーナの上端そのもの。 */
 static u32 sys_phys_end(void);
 
+static int (*gf_return_callback)(void *);
+static void *gf_return_opaque;
+void gf_production_set_return(int (*callback)(void *), void *opaque)
+{
+    gf_return_callback = callback;
+    gf_return_opaque = opaque;
+}
+int gf_production_return(void)
+{
+    return gf_return_callback ? gf_return_callback(gf_return_opaque) : 0;
+}
+
 void sys_reboot(void)
 {
+    (void)gf_production_return();
     platform_reset();
     /* ここには来ない */
     for (;;) { _halt(); }

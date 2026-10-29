@@ -159,3 +159,5 @@ check-gf-display-host:
 - tools/tests/gf_display_modes_host.c
 - build/checks.d/check-gf-display-host.mk
 - tools/check_map.d/check-gf-display-host.yaml
+- hwdev/gf/rom.inc
+- include/gf_production.h

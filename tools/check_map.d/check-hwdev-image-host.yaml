@@ -93,4 +93,6 @@ check-hwdev-image-host:
 - hwdev/gf_load_state.h
 - hwdev/gf/quiesce_rows.h
 - tools/tests/gf_display_calc_host.inc
+- hwdev/gf/rom.inc
+- include/gf_production.h
 artifact_reader: true

@@ -139,3 +139,5 @@ check-gfinit-host:
 - hwdev/gf/display/state.h
 - hwdev/gf/display/checks.inc
 - hwdev/gf/quiesce_rows.h
+- hwdev/gf/rom.inc
+- include/gf_production.h

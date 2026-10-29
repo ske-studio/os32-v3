@@ -373,6 +373,7 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))kdi_ptr_ring3_ls_start,
     (void (*)(void))kdi_ptr_ring3_ls_end,
     (void (*)(void))kdi_ptr___kernel_resident_end,
+    (void (*)(void))gf_production_selected,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -685,6 +686,7 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0xb08892ebu, 1, 4},
     {0x2d938daeu, 1, 4},
     {0xc5098221u, 1, 4},
+    {0x5d4718c6u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1828942814,
+  "module_abi_gen": 2210471157,
   "stage": "S6",
-  "count": 308,
+  "count": 309,
   "imports": [
     {
       "stage": "S1",
@@ -4626,6 +4626,22 @@
       "signature": "u32 *kdi_ptr___kernel_resident_end(void);",
       "source_declaration": "u32 __kernel_resident_end;",
       "dtype": "u32",
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "gf_production_selected",
+      "source": "include/gf_production.h",
+      "context_safe": false,
+      "index": 308,
+      "retained": true,
+      "name": "gf_production_selected",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int gf_production_selected(void);",
+      "source_declaration": "int gf_production_selected(void);",
+      "dtype": null,
       "array": false
     }
   ]

@@ -22,6 +22,8 @@ static u32 failures, allocations, frees, reads, writes, begins, steps, ends, cle
 static u32 expand_fail, expand_calls, detach_fail, plan_reads, boot_fail;
 static u32 run_mask, run_fail, step_fail, decode_fail, probe_fail, peek_fail, verify_calls;
 static u32 mode_calls, mode_fail;
+static int production_selected;
+int gf_production_selected(void) { return production_selected; }
 static char events[64]; static u32 event_count;
 static void output(const char *s)
 { u32 n=0,result;while(s[n])n++;__asm__ volatile("int $0x80":"=a"(result):"0"(4),"b"(1),"c"(s),"d"(n):"memory");(void)result; }
@@ -733,5 +735,16 @@ static void vpll_budget_test(void)
     p.node_count=~0U; CHECK(gf_budget(&g,&r,&t,REC_BUDGET_GF,&p)!=0);
     output("VPLL budget rows and overflow PASS\n");
 }
+static void production_gate_test(void)
+{
+    production_selected=1;
+    u32 before=reads+writes+alloc_calls+begins;
+    struct gfinit_request q={0};
+    for (u32 op=GF_OP_INSPECT;op<=GF_OP_C_ONLY;op++)
+        CHECK(gfinit_call(op,&q,sizeof(q),&base,&transport,&s0)==-1);
+    CHECK(reads+writes+alloc_calls+begins==before);
+    production_selected=0;
+    output("Production selection refuses gfinit before diagnostics I/O PASS\n");
+}
 void _start(void)
-{ vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+{ production_gate_test();vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

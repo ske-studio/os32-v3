@@ -86,22 +86,26 @@ static int init_run_main(struct gf_init_context *ctx, const struct gf_init_progr
     }
     return ctx->calls || ctx->repeats ? -1 : 0;
 }
-int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work)
+int gf_init_prepare(struct gf_init_context *ctx, struct gf_init_program *work)
 {
     u32 count;
     const struct gf_script_span *spans = gfinit_script_spans(&count);
     work->count = 0;
+    for (u32 i = 0; i < count; i++) {
+        const struct gf_script_span *s = &spans[i];
+        if (init_point(ctx) || init_prepare_span(ctx, work, s)) return -1;
+        u32 crc = crc32_core_update(CRC32_INIT, ctx->rom + s->pc, s->length);
+        if (crc32_core_final(crc) != s->crc) return -1;
+        if (s->id < GF_INIT_MAINS) work->main_pc[s->id] = s->pc;
+    }
+    return init_point(ctx);
+}
+int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work)
+{
     ctx->steps = ctx->wait_us = ctx->elapsed_us = 0;
     ctx->fail_pc = RECOVER_NONE;
     ctx->last_rc = -1;
-    if (ctx->saved_count) goto fail;
-    for (u32 i = 0; i < count; i++) {
-        const struct gf_script_span *s = &spans[i];
-        if (init_prepare_span(ctx, work, s)) goto fail;
-        u32 crc = crc32_core_update(CRC32_INIT, ctx->rom + s->pc, s->length);
-        if (crc32_core_final(crc) != s->crc) goto fail;
-        if (s->id < GF_INIT_MAINS) work->main_pc[s->id] = s->pc;
-    }
+    if (ctx->saved_count || gf_init_prepare(ctx, work)) goto fail;
     for (ctx->main_id = 0; ctx->main_id < GF_INIT_MAINS; ctx->main_id++)
         if (init_run_main(ctx, work)) goto fail;
     ctx->main_id = GF_INIT_MAINS - 1;

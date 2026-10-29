@@ -244,6 +244,13 @@
       "source": "drivers/pci.h",
       "index": 34,
       "group": "kernel"
+    },
+    {
+      "index": 35,
+      "symbol": "gf_production_selected",
+      "source": "include/gf_production.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

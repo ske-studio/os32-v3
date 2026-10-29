@@ -36,6 +36,7 @@ static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0xbaa70544U, 1, 1},
     {0xbba6498fU, 1, 1},
     {0x47aba321U, 1, 1},
+    {0x5d4718c6U, 1, 1},
 };
 static const struct module_symbol_contract hwdev_export_contracts[] = {
     {0xce92964bU, 1, 0},
@@ -76,4 +77,5 @@ static void hwdev_fill_imports(u32 *slots, const struct hwdev_core_api *core) {
     slots[32] = (u32)(uptr)pci_cfg_read16;
     slots[33] = (u32)(uptr)pci_cfg_write32;
     slots[34] = (u32)(uptr)pci_cfg_write16;
+    slots[35] = (u32)(uptr)gf_production_selected;
 }
