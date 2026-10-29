@@ -242,12 +242,11 @@ def prepare_font(tmp):
             "FDC_TRACK_PATH": "0:/" + "/".join(FONT_GUEST).lower(),
             "FDC_TRACK_SEEK_MAX": str(seek_max), "FDC_TRACK_MULTI_MAX": str(multi_max)}
 
-# fdc.c の fdc_motor_off() は元から未使用の static (test_fdc_seek.py と同じ)。
 # tick_count の差し替えは「volatile u32 * を返す関数」の宣言になるので
 # -Wignored-qualifiers は出ないが、念のため戻り値の修飾は許す。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=",
-         "-Wno-unused-function", "-Wno-unused-parameter",
+         "-Wno-unused-parameter",
          "-Dtick_count=(*fdc_fake_tick_ptr())"]
 
 
@@ -485,7 +484,10 @@ def host_build(tmp, mutated=None):
         (tree / rel).write_text(text, encoding="utf-8")
         harness = tree / "tools/tests/fdc_track_host.c"
         harness.write_text(HARNESS.read_text(encoding="utf-8"), encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(tmpd), *includes(tree / "drivers"), str(harness),
+        # 変異で fdc_track_is_bad() の唯一の呼出しを消すため、
+        # 未使用関数の警告抑止は変異させた写しにだけ適用する。
+        cmd = ["gcc", *FLAGS, "-Wno-unused-function",
+               "-I" + str(tmpd), *includes(tree / "drivers"), str(harness),
                "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
@@ -510,7 +512,6 @@ def run_cases(exe, cases, quiet=False):
 def build_target(tmp):
     """カーネルと同じ i386-elf で通す。"""
     for rel in SOURCES:
-        extra = ["-Wno-unused-function"] if rel == "drivers/fdc.c" else []
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
@@ -521,7 +522,7 @@ def build_target(tmp):
                "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "drivers"),
                "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "fs/fatfs"),
                "-I" + str(ROOT / "kernel"),
-               *extra, "-c", str(ROOT / rel),
+               "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
