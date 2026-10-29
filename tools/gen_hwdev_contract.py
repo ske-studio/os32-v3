@@ -94,7 +94,7 @@ def dwarf_inventory(raw):
 
 def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     entries = slots()
-    headers = ['kdebug/recover.h', 'kdebug/recover_gf.h']
+    headers = ['kdebug/recover.h', 'kdebug/recover_gf.h', 'kdebug/gf_stage_state.h']
     # gfinit.h already includes the private wire; keep the umbrella stable.
     headers += [str(p.relative_to(ROOT)) for p in sorted((ROOT/'kdebug').glob('gfinit*.h'))
                 if p.name != 'gfinit_wire.h']

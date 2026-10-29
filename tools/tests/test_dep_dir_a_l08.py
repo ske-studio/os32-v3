@@ -52,8 +52,8 @@ def contracts():
     assert '#include "pci_bind.h"' not in (ROOT / 'kapi/kapi_sys.c').read_text()
     # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x86e444e2U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x07ce909fU' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x50a115a8U' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x1eae31dcU' in hwdev
     print('PASS fixed baseline public ABI/generated files, wrapper guards/snapshot, A4/B5 and hwdev CRC')
     return wrappers
 

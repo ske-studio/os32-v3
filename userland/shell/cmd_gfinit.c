@@ -82,19 +82,22 @@ int shell_cmd_gfinit(int argc, char **argv)
     struct gfinit_request q = {0};
     const char *verify_file = 0;
     u32 op;
+    int c_only = argc >= 3 && str_eq(argv[1], "c-only");
+    int verify_seen = 0;
     if (argc == 3 && str_eq(argv[1], "inspect")) op = GF_OP_INSPECT;
     else {
         int run_one = argc >= 2 && str_eq(argv[1], "run-one");
-        int mode_c = argc >= 5 && str_eq(argv[1], "prepare") && str_eq(argv[3], "--mode-c");
+        int mode_c = c_only || (argc >= 5 && str_eq(argv[1], "prepare") && str_eq(argv[3], "--mode-c"));
         int expected = run_one || mode_c ? 5 : 4;
         if (mode_c) {
-            for (int i = 4; i < argc; i++) {
+            for (int i = c_only ? 2 : 4; i < argc; i++) {
                 if (str_eq(argv[i], "--allow-write")) {
                     if (q.flags & GF_ALLOW_WRITE) goto usage;
                     q.flags |= GF_ALLOW_WRITE;
                 } else if (str_eq(argv[i], "--verify") && i + 1 < argc &&
-                           str_eq(argv[i + 1], "required") && !(q.flags & GF_VERIFY_REQUIRED)) {
-                    q.flags |= GF_VERIFY_REQUIRED; i++;
+                           (str_eq(argv[i + 1], "required") || str_eq(argv[i + 1], "record")) && !verify_seen) {
+                    verify_seen = 1;
+                    q.flags |= str_eq(argv[++i], "record") ? GF_VERIFY_RECORD : GF_VERIFY_REQUIRED;
                 } else if (str_eq(argv[i], "--no-verify-file") && i + 1 < argc && !verify_file) {
                     verify_file = argv[++i]; q.flags |= GF_NO_VERIFY_FILE;
                 } else goto usage;
@@ -103,7 +106,8 @@ int shell_cmd_gfinit(int argc, char **argv)
             expected = argc;
         }
         if (!mode_c && (argc != expected || !str_eq(argv[argc - 1], "--allow-write"))) goto usage;
-        if (str_eq(argv[1], "size-bars")) op = GF_OP_SIZE_BARS;
+        if (c_only) op = GF_OP_C_ONLY;
+        else if (str_eq(argv[1], "size-bars")) op = GF_OP_SIZE_BARS;
         else if (str_eq(argv[1], "prepare")) op = GF_OP_PREPARE;
         else if (run_one) {
             op = GF_OP_RUN_ONE;
@@ -116,7 +120,7 @@ int shell_cmd_gfinit(int argc, char **argv)
         q.flags |= GF_ALLOW_WRITE;
         if (mode_c) q.flags |= GF_MODE_C;
     }
-    if (gfinit_session(argv[2], &q.session)) goto usage;
+    if (!c_only && gfinit_session(argv[2], &q.session)) goto usage;
     if (g_api->version < GFINIT_KAPI_MIN || !g_api->kdebug_call) {
         g_api->kprintf(ATTR_RED, "gfinit: rejected rc=%d kdebug unavailable\n", OS32_ERR_NOSYS);
         return 1;
@@ -140,7 +144,7 @@ int shell_cmd_gfinit(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "gfinit: rejected rc=%d\n", rc);
     return rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gfinit inspect <sid> | gfinit {size-bars|prepare|modeset|verify|abort} <sid> --allow-write | gfinit prepare <sid> --mode-c --allow-write [--verify required] [--no-verify-file <path>] | gfinit run-one <sid> <main:0-%u> --allow-write\n",
+    g_api->kprintf(ATTR_WHITE, "Usage: gfinit c-only --allow-write [--verify record|required] [--no-verify-file <path>] | gfinit inspect <sid> | gfinit {size-bars|prepare|modeset|verify|abort} <sid> --allow-write | gfinit prepare <sid> --mode-c --allow-write [--verify record|required] [--no-verify-file <path>] | gfinit run-one <sid> <main:0-%u> --allow-write\n",
                    GF_INIT_MAINS - 1U);
     return 2;
 }

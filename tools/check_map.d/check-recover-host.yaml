@@ -32,3 +32,5 @@ check-recover-host:
 - tools/tests/recover_diag_host.inc
 - kdebug/recover_cleanup.h
 - include/pci_dev_contract.h
+- kdebug/gf_stage_state.h
+- kdebug/gfinit_pll.h

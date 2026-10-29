@@ -4,6 +4,7 @@
 #include "gfinit_plan_c.h"
 #include "gfinit_bus.h"
 #include "recover_gf_c.h"
+#include "gf_stage_state.h"
 #if !GF_VPLL_PROBE
 #define C_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define C_OFF(f) __builtin_offsetof(struct gfinit_mode, f)
@@ -61,6 +62,7 @@ struct c_builder {
     struct gfinit_decode *d;
     struct recover_profile *p;
     u32 ctx, select_base;
+    const struct gf_stage_state *baseline;
 };
 static u32 c_emit(struct c_builder *b, u32 sub, u32 rule, u32 expr,
                    const struct recover_plan_arg *args, u32 argc)
@@ -154,6 +156,32 @@ static u32 c_read(struct c_builder *b,u32 key)
     struct recover_plan_arg a={REC_IMM,key};
     return c_emit(b,GF_C_READ,RECOVER_NONE,RECOVER_NONE,&a,1);
 }
+struct c_saved_field { u32 offset, kind, reg, index, width, keep, add, bits; };
+static const struct c_saved_field c_fields[] = {
+    {C_OFF(cr)+GF_MODE_CR_ENH,GF_C_CR,0,GF_MODE_CR_ENH,1,~GF_MODE_ENH_CLEAR,0,0},
+    {C_OFF(cr)+GF_MODE_CR_LCD,GF_C_CR,0,GF_MODE_CR_LCD,1,~GF_MODE_LCD_CLEAR,0,0},
+    {C_OFF(cr)+GF_MODE_CR_SCRATCH4,GF_C_CR,0,GF_MODE_CR_SCRATCH4,1,~0U,0,0},
+    {C_OFF(cr)+GF_MODE_CR_SCRATCH4B,GF_C_CR,0,GF_MODE_CR_SCRATCH4B,1,~0U,0,GF_MODE_HEAD_A_SCRATCH},
+    {C_OFF(cr)+GF_MODE_CR_LATENCY,GF_C_CR,0,GF_MODE_CR_LATENCY,1,~0U,GF_MODE_LATENCY_ADD,0},
+    {C_OFF(gpio_ext),GF_C_MMIO,C_GPIO_EXT,0,4,~0U,0,0},
+    {C_OFF(crtc850),GF_C_MMIO,C_CRTC850,0,4,~0U,0,0},
+    {C_OFF(sel_clk),GF_C_MMIO,C_SEL_CLK,0,4,~GF_MODE_SEL_CLK_CLEAR,0,0}
+};
+STATIC_ASSERT(C_COUNT(c_fields) == GF_STAGE_FIELDS, gf_stage_field_count);
+static u32 c_baseline(const struct c_builder *b, u32 key)
+{
+    const struct recover_target *t = &b->p->targets[key];
+    if (t->space == REC_BAR_MMIO && t->offset == GF_PLL_GATE)
+        return b->baseline->values[GF_STAGE_GATE];
+    for (u32 i = 0; i < C_COUNT(c_fields); i++) {
+        const struct c_saved_field *f = &c_fields[i];
+        if ((f->kind == GF_C_CR && t->space == REC_VGA_INDEXED &&
+             t->port == RECOVER_CRTC && t->index == f->index) ||
+            (f->kind == GF_C_MMIO && t->space == REC_BAR_MMIO && t->offset == f->reg))
+            return b->baseline->values[i];
+    }
+    return 0;
+}
 /* CHECK metadata is immutable plan input. Each item reads exactly once;
  * recover owns comparison/logging/failure, and the caller retains the value.
  * Saved operands reuse the existing single-use capture contract. */
@@ -162,6 +190,7 @@ static void c_check(struct c_builder *b,u32 source,u32 key,u32 mask,
 {
     if (source==REC_CHECK_TARGET)c_select(b,key);
     bool saved=producer!=RECOVER_NONE;
+    if (saved && b->baseline) { expected=c_baseline(b,saved_key); saved=false; }
     struct recover_plan_arg a[]={{REC_IMM,source},{REC_IMM,key},{REC_IMM,mask},
         {REC_IMM,expected},{REC_IMM,keep},{REC_IMM,b->out->c_check_count++}};
     u32 id=b->out->plan.node_count;
@@ -185,6 +214,7 @@ static void c_check_mmio(struct c_builder *b,u32 reg,u32 mask,u32 expected)
 { c_check_literal(b,c_key(b,GF_C_MMIO,reg,0,4),mask,expected); }
 static void c_check_in(struct c_builder *b)
 {
+    u32 first=b->out->plan.node_count;
     /* Recheck identity and decode before the pre-Q saved reads. */
     c_check(b,REC_CHECK_IDENTITY,RECOVER_NONE,~0U,1,~0U,RECOVER_NONE,0);
     /* The three BAR snapshot entries are the existing recover_gf regs. */
@@ -194,25 +224,17 @@ static void c_check_in(struct c_builder *b)
         c_select(b,key);
         struct recover_plan_arg a[]={{REC_IMM,REC_CHECK_TARGET},{REC_IMM,key},
             {REC_IMM,~0U},{REC_ARG_SAVED,i},{REC_IMM,~0U},{REC_IMM,b->out->c_check_count++}};
-        c_emit(b,GF_C_CHECK_SAVED,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
+        if (b->baseline) a[REC_CHECK_EXPECTED]=(struct recover_plan_arg){REC_IMM,
+            b->baseline->bars[key-REC_GF_T_BAR0].raw};
+        c_emit(b,b->baseline?GF_C_CHECK:GF_C_CHECK_SAVED,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
     }
     c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
     for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
     c_check(b,REC_CHECK_ROUTE,RECOVER_NONE,RECOVER_ROUTE_MASK,0,~0U,RECOVER_NONE,0);
+    for(u32 i=first;i<b->out->plan.node_count;i++)
+        if(b->d->nodes[i].substep==GF_C_CHECK || b->d->nodes[i].substep==GF_C_CHECK_SAVED)
+            b->d->nodes[i].flags=REC_NODE_CHECK_ENTRY;
 }
-/* s(x): one read before Q, independent single-use captures for each consumer.
- * The value transformations are the saved fields in gfinit_mode_calc. */
-struct c_saved_field { u32 offset, kind, reg, index, width, keep, add, bits; };
-static const struct c_saved_field c_fields[] = {
-    {C_OFF(cr)+GF_MODE_CR_ENH,GF_C_CR,0,GF_MODE_CR_ENH,1,~GF_MODE_ENH_CLEAR,0,0},
-    {C_OFF(cr)+GF_MODE_CR_LCD,GF_C_CR,0,GF_MODE_CR_LCD,1,~GF_MODE_LCD_CLEAR,0,0},
-    {C_OFF(cr)+GF_MODE_CR_SCRATCH4,GF_C_CR,0,GF_MODE_CR_SCRATCH4,1,~0U,0,0},
-    {C_OFF(cr)+GF_MODE_CR_SCRATCH4B,GF_C_CR,0,GF_MODE_CR_SCRATCH4B,1,~0U,0,GF_MODE_HEAD_A_SCRATCH},
-    {C_OFF(cr)+GF_MODE_CR_LATENCY,GF_C_CR,0,GF_MODE_CR_LATENCY,1,~0U,GF_MODE_LATENCY_ADD,0},
-    {C_OFF(gpio_ext),GF_C_MMIO,C_GPIO_EXT,0,4,~0U,0,0},
-    {C_OFF(crtc850),GF_C_MMIO,C_CRTC850,0,4,~0U,0,0},
-    {C_OFF(sel_clk),GF_C_MMIO,C_SEL_CLK,0,4,~GF_MODE_SEL_CLK_CLEAR,0,0}
-};
 static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
                          const u32 *producers,const u32 *keys,u32 pll_first)
 {
@@ -253,31 +275,28 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
     c_check_exit(b,REC_CHECK_CELL,~0U,1,GF_C_EXIT_CELL_SLOT);
 }
 #endif
-int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
+static int c_append(struct gfinit_plan *out, struct gfinit_decode *d,
                         struct recover_profile *p, u32 bar1_length,
-                        const u8 *rom, u32 rom_size)
+                        const struct gfinit_pll_limits *limits, const struct gf_stage_state *baseline)
 {
 #if GF_VPLL_PROBE
     /* Separate diagnostic rules reuse the C ID namespace. Never mix profiles. */
-    (void)out;(void)d;(void)p;(void)bar1_length;(void)rom;(void)rom_size;
+    (void)out;(void)d;(void)p;(void)bar1_length;(void)limits;(void)baseline;
     return -1;
 #else
-    struct gfinit_pll_limits limits;
     struct gfinit_mode mode;
     const struct gfinit_mode_saved empty={0};
     if (!out || !d || !p || bar1_length < GF_MODE_PITCH*GF_MODE_HEIGHT ||
-        gfinit_pll_parse(rom,rom_size,GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&limits) ||
-        gfinit_mode_calc(&limits,&empty,&mode) ||
-        mode.pll.error > GF_MODE_CLOCK_KHZ/GF_PLL_MARGIN_DIV ||
-        gfinit_plan_prefix(out,d,p)) return -1;
+        gfinit_mode_calc(limits,&empty,&mode) ||
+        mode.pll.error > GF_MODE_CLOCK_KHZ/GF_PLL_MARGIN_DIV) return -1;
     if(out->plan.node_count+C_EXTRA_NODES>RECOVER_NODE_MAX ||
        out->plan.arg_count+C_EXTRA_ARGS>GF_INIT_ARGS ||
        out->plan.capture_count+C_EXTRA_CAPTURES>RECOVER_CAPTURE_MAX ||
        out->plan.entry_count==RECOVER_ENTRY_MAX || out->plan.ctx_count==RECOVER_CTX_MAX ||
        p->target_count+recover_gf_c_target_count>GF_PLAN_TARGETS ||
        p->rule_count+C_EXTRA_RULES>GF_PLAN_RULES ||
-       p->layout_count+C_EXTRA_LAYOUTS>GF_PLAN_LAYOUTS || p->expr_count+3>GF_PLAN_EXPRS) return -1;
-    struct c_builder b={out,d,p,out->plan.ctx_count++,REC_GF_C_RULE_FIRST+recover_gf_c_row_count};
+       p->layout_count+C_EXTRA_LAYOUTS>GF_PLAN_LAYOUTS || p->expr_count+4>GF_PLAN_EXPRS) return -1;
+    struct c_builder b={out,d,p,out->plan.ctx_count++,REC_GF_C_RULE_FIRST+recover_gf_c_row_count,baseline};
     out->mode_flags=GF_MODE_C;out->c_node=out->plan.node_count;out->c_unbound=0;
     out->c_check_count=0;
     for(u32 i=0;i<GF_C_CHECK_MAX;i++)out->c_checks[i]=(struct gfinit_c_check_result){0};
@@ -288,6 +307,8 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_LIVE,5,c_live+1,c_value};
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_SAVED,5,c_saved+1,c_value};
     out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_FP_ON,1,c_branch,c_fp_on};
+    static const u32 base_kinds[]={REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM,REC_IMM};
+    out->exprs[p->expr_count++]=(struct recover_expr){GF_C_EXPR_BASE,5,base_kinds+1,c_value};
     c_layout(&b,GF_C_SELECT,2,c_imm,REC_SELECT,0);
     c_layout(&b,GF_C_READ,1,c_imm,REC_READ,0);
     c_layout(&b,GF_C_SECTION,2,c_imm,RECOVER_NONE,0);
@@ -360,7 +381,10 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
             {REC_IMM,keep},{REC_IMM,add},{REC_IMM,bits},{REC_IMM,mask}};
         if(expr!=RECOVER_NONE) {
             a[1]=(struct recover_plan_arg){REC_ARG_READ,source};
-            if(expr==GF_C_EXPR_SAVED) {
+            if(expr==GF_C_EXPR_SAVED && baseline) {
+                expr=GF_C_EXPR_BASE;
+                a[1]=(struct recover_plan_arg){REC_IMM,c_baseline(&b,source)};
+            } else if(expr==GF_C_EXPR_SAVED) {
                 u32 slot=out->plan.capture_count++;
                 a[1]=(struct recover_plan_arg){REC_ARG_SAVED,p->count+slot};
                 d->captures[slot]=(struct recover_capture){p->count+slot,producer,id,source,0};
@@ -368,7 +392,7 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
         }
         c_rule(&b,row->id,key,row->id,bits,expr,row->verify);
         c_layout(&b,row->id,expr==RECOVER_NONE?2:6,
-            expr==RECOVER_NONE?c_imm:expr==GF_C_EXPR_LIVE?c_live:c_saved,
+            expr==RECOVER_NONE?c_imm:expr==GF_C_EXPR_LIVE?c_live:expr==GF_C_EXPR_BASE?base_kinds:c_saved,
             p->targets[key].space==REC_VGA_INDEXED?REC_DATA:REC_WRITE,0);
         c_emit(&b,row->id,row->id,expr,a,expr==RECOVER_NONE?2:6);
         if(row->expr==GF_C_PLL && row->source==0)pll_first=id;
@@ -385,6 +409,50 @@ int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
     p->vram_reserved=(struct recover_range){0,GF_MODE_PITCH*GF_MODE_HEIGHT};
     p->cold_required=true;
     p->crc=recover_profile_crc(p);out->plan.profile_crc=p->crc;
+    return 0;
+#endif
+}
+
+int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
+                        struct recover_profile *p, u32 length,
+                        const u8 *rom, u32 size)
+{
+    struct gfinit_pll_limits limits;
+    if (gfinit_pll_parse(rom,size,GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&limits) ||
+        gfinit_plan_prefix(out,d,p)) return -1;
+    return c_append(out,d,p,length,&limits,0);
+}
+int gfinit_plan_rebuild_c(struct gfinit_plan *out, struct gfinit_decode *d,
+                          struct recover_profile *p, const struct gf_stage_state *s)
+{
+    /* Fresh arrays, retained capacity and initial ROM/PLL identity. No decode. */
+    out->plan=(struct recover_plan){.version=1,.rom_crc=s->rom_crc,.rom_size=s->rom_size,
+        .nodes=d->nodes,.args=d->args,.captures=d->captures,
+        .entries=out->entries,.deps=out->deps};
+    for(u32 i=0;i<p->target_count;i++)out->targets[i]=p->targets[i];
+    for(u32 i=0;i<p->rule_count;i++)out->rules[i]=p->rules[i];
+    for(u32 i=0;i<p->layout_count;i++)out->layouts[i]=p->layouts[i];
+    for(u32 i=0;i<p->expr_count;i++)out->exprs[i]=p->exprs[i];
+    p->targets=out->targets;p->rules=out->rules;p->layouts=out->layouts;p->exprs=out->exprs;
+    return c_append(out,d,p,s->bars[GF_MODE_VRAM_BAR].length,&s->limits,s);
+}
+int gfinit_plan_baseline(struct gfinit_plan *out, struct recover_profile *p,
+                         struct gf_stage_state *s, const u8 *rom, u32 size)
+{
+#if GF_VPLL_PROBE
+    (void)out;(void)p;(void)s;(void)rom;(void)size;
+    return 0;
+#else
+    struct c_builder b={.out=out,.p=p};
+    if (gfinit_pll_parse(rom,size,GF_INIT_PLL_TABLE,GF_PLL_VIDEO,&s->limits) ||
+        p->target_count+GF_STAGE_VALUES>GF_PLAN_TARGETS) return -1;
+    for(u32 i=0;i<C_COUNT(c_fields);i++) {
+        const struct c_saved_field *f=&c_fields[i];
+        s->keys[i]=c_key(&b,f->kind,f->reg,f->index,f->width);
+    }
+    s->keys[GF_STAGE_GATE]=c_key(&b,GF_C_MMIO,GF_PLL_GATE,0,4);
+    s->keys[GF_STAGE_PMC]=REC_GF_T_PMC_ENABLE;
+    s->rom_crc=out->plan.rom_crc;s->rom_size=size;
     return 0;
 #endif
 }
@@ -435,7 +503,8 @@ int gfinit_plan_c_vram(void *bus, struct recover *r, bool write,
         }
         if (!drained) return -1;
     }
-    return *bad_offset == RECOVER_NONE ? 0 : -1;
+    /* Completion and mismatch are separate; a later bus error still returns -1. */
+    return 0;
 }
 
 /* Only the fixed stage-1 AR and palette rows are reachable through this path. */

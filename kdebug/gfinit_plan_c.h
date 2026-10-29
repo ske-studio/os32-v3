@@ -5,6 +5,7 @@
 #define GF_C_EXPR_LIVE 0x210U
 #define GF_C_EXPR_SAVED 0x211U
 #define GF_C_EXPR_FP_ON 0x212U
+#define GF_C_EXPR_BASE 0x213U
 /* Substeps below the stage-1 row IDs belong to composition, not data rows. */
 enum gf_c_substep { GF_C_SELECT, GF_C_READ, GF_C_SECTION, GF_C_UNBOUND,
     GF_C_WAIT, GF_C_BRANCH, GF_C_VRAM_WRITE, GF_C_VRAM_COMPARE, GF_C_COLOR,
@@ -22,6 +23,11 @@ enum gf_c_pending { GF_C_PENDING_CHECK = 1, GF_C_PENDING_VRAM,
 int gfinit_plan_build_c(struct gfinit_plan *out, struct gfinit_decode *d,
                         struct recover_profile *p, u32 bar1_length,
                         const u8 *rom, u32 rom_size);
+struct gf_stage_state;
+int gfinit_plan_rebuild_c(struct gfinit_plan *, struct gfinit_decode *,
+                          struct recover_profile *, const struct gf_stage_state *);
+int gfinit_plan_baseline(struct gfinit_plan *, struct recover_profile *,
+                         struct gf_stage_state *, const u8 *, u32);
 int gfinit_plan_c_vram(void *bus, struct recover *r, bool write,
                        u32 *bad_offset, u32 *expected, u32 *actual);
 int gfinit_plan_c_color(void *bus, struct recover *r, u32 row, u32 value);

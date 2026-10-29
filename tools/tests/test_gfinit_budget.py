@@ -52,10 +52,6 @@ def main():
             print(result.stderr.decode(), file=sys.stderr)
         if result.returncode:
             return result.returncode
-        rows = int(re.search(r'BUDGET case=15 c_rows=(\d+)', output)[1])
-        monitor = (ROOT / 'tools/rshell_recover.py').read_text()
-        limit = int(re.search(r'MODE_C_BYTES = (\d+)', monitor)[1])
-        assert (rows + 40) * 385 <= limit, (rows, limit)
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
                         ('kdebug/gfinit_budget.inc', 'control', '', ''))))

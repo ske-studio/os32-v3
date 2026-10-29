@@ -104,6 +104,11 @@ int main(void)
     assert(strstr(output,"verified=1"));
     result=-10;
     assert(shell_cmd_recover(4,route)==1 && strstr(output,"rejected rc=-10"));
+    char *restore[]={"recover","restore","unexpected"};
+    result=0;before=called;
+    assert(!shell_cmd_recover(2,restore) && called==before+1);
+    assert(observed_op==KDEBUG_OP_RECOVER_RESTORE && observed_session==0);
+    assert(shell_cmd_recover(3,restore)==2 && called==before+1);
     puts("recover virtual CLI: cases/actions/session/arity/rejection PASS");
     puts("recover CLI: status/now/session bounds/rejection PASS");
     return 0;

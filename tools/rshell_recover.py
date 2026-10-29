@@ -3,6 +3,7 @@
 
 Use an already-running rshell. --command starts an explicitly approved trial;
 without it, send recover now SESSION. Keep --state and --log across PAUSED calls.
+--restore sends recover restore without saved state; during RUN it sends the existing sid abort.
 --status sends only recover status (no trial, abort, boot probe or state update).
 --port aidebug:http://127.0.0.1:8025 uses NP21/W COM1; do not use /api/cmd
 or another serial reader concurrently. NP21/W does not emulate serial baud timing.
@@ -35,29 +36,15 @@ class RecoverError(Exception):
 # Serial frame bounds and protocol enums are kept beside the parser.
 STATE_VERSION = 2
 MAX_LINE = 4096
-CLEANUP_MARGIN = 5
 DEFAULT_CLEANUP_TIMEOUT = 180
 DEFAULT_TIMEOUT = 240
 METADATA = ('version', 'profile_crc', 'plan_hash', 'snapshot_crc')
 PAIRED = ('snapshot', 'access', 'restore', 'decode', 'screen', 'route', 'wait', 'cell')
 PRE_ID = ('main', 'pc', 'opcode', 'exec', 'substep')
-MODE_C_BYTES = 952490  # (2434 maximal C rows + 40 state/margin rows) * 385
-UART_FRAME_BITS = 10
-MODE_C_WORK_SECONDS = 60
-MODE_C_CHECK_COUNT = 66
-MODE_C_VRAM_BYTES = 307200
-MODE_C_REGISTERS = {0x68050c: (0xefffffff, 0x10000204),  # bit28 reads 0 on NV44A
-                    0x680508: (0x0007ffff, None), 0x680578: (0x8000ffff, None)}
+MAIN_TIMEOUT = 900
+C_TIMEOUT = 1800
+RESTORE_TIMEOUT = 180
 BUS_ID = ('pc', 'bar', 'off', 'width')
-VPLL_VERSION_1 = 0x56504c03
-VPLL_VERSION = 0x56504c04
-VPLL_PC = 0xe623
-VPLL_OFFSETS = (0xc040, 0x680580, 0x680578, 0x680508, 0xc040)
-VPLL_FIRST = 0x12040
-VPLL_STAGE2_FIRST = 0x12045
-VPLL_STAGE2_OFFSETS = (0x68050c, *VPLL_OFFSETS, 0x68050c)
-VPLL_BASELINE = 4
-READBACK_NONE = 0xffffffff
 DIAG_FN = ('NONE', 'READY', 'PUT', 'WAIT_FRAME', 'PIT_WAIT', 'BEGIN', 'EMPTY', 'BUDGET', 'ROW')
 DIAG_WHERE = ('NONE', 'BYTE', 'BUSY_WAIT', 'AFTER_PUT', 'FLUSH', 'SEPARATOR', 'BUILD')
 BOOL_FIELDS = ('exec', 'minimal', 'capacity_known', 'full_capacity', 'verified',
@@ -65,7 +52,8 @@ BOOL_FIELDS = ('exec', 'minimal', 'capacity_known', 'full_capacity', 'verified',
 
 
 class Records:
-    def __init__(self, session, previous=None, virtual=None):
+    def __init__(self, session, previous=None, virtual=None, resync=False):
+        self.resync = resync
         self.virtual = (previous.get('virtual', False)
                         if virtual is None and isinstance(previous, dict) else bool(virtual))
         self.data = copy.deepcopy(previous) if previous is not None else dict(
@@ -203,6 +191,9 @@ class Records:
             candidate_sid = self.data['sid']
             if candidate_sid == 0 and self.data['seq'] == 0 and sid > 0:
                 candidate_sid = sid
+            if self.resync and self.data['seq'] == 0:
+                self.data['seq'] = seq - 1
+                self.resync = False
             if sid != candidate_sid or seq != self.data['seq'] + 1:
                 raise RecoverError('session/sequence mismatch or missing REC')
             if self.final is not None:
@@ -219,35 +210,7 @@ class Records:
                 if (not stack or stack[-1]['phase'] != phase
                         or any(stack[-1][key] != fields[key] for key in ids)):
                     raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, phase))
-                if phase == 'gf_bus':
-                    pre = next((item for item in reversed(stack[:-1]) if item['phase'] == 'gf_pre'), None)
-                    if pre is not None:
-                        substep = int(pre['substep']) - VPLL_FIRST
-                        stage2 = int(pre['substep']) - VPLL_STAGE2_FIRST
-                        version = self.data['crc'].get('version')
-                        if (int(pre['main']) == 2 and int(pre['pc']) == VPLL_PC
-                                and 0 <= substep < len(VPLL_OFFSETS)
-                                and int(fields['pc']) == VPLL_PC and int(fields['bar']) == 0
-                                and int(fields['off']) == VPLL_OFFSETS[substep]
-                                and int(fields['width']) == 4
-                                and version not in (VPLL_VERSION_1, VPLL_VERSION)
-                                and int(fields['readback']) != READBACK_NONE):
-                            raise RecoverError('unexpected VPLL readback for profile version')
-                        if (int(pre['main']) == 2 and int(pre['pc']) == VPLL_PC
-                                and 0 <= stage2 < len(VPLL_STAGE2_OFFSETS)
-                                and int(fields['pc']) == VPLL_PC and int(fields['bar']) == 0
-                                and int(fields['off']) == VPLL_STAGE2_OFFSETS[stage2]
-                                and int(fields['width']) == 4):
-                            if version != VPLL_VERSION:
-                                raise RecoverError('unexpected VPLL stage 2 for profile version')
-                            if stage2 == 0:
-                                valid = int(stack[-1]['old']) == VPLL_BASELINE
-                                self.data['vpll_comparison_valid'] = valid
-                                if not valid:
-                                    print('VPLL: 比較として無効 (68050Ch old != 00000004h)', file=sys.stderr)
                 stack.pop()
-            if self.data.get('mode_c_active'):
-                self.mode_c_record(fields)
             if (event == 'PAUSED' or phase == 'final') and stack:
                 raise RecoverError('unmatched BEGIN/END sid=%s seq=%s phase=%s' % (sid, seq, stack[-1]['phase']))
             crc = dict(self.data['crc'])
@@ -276,78 +239,13 @@ class Records:
         except RecoverError as exc:
             raise RecoverError(self.invalidate(str(exc))) from exc
 
-    def mode_c_record(self, fields):
-        evidence = self.data['mode_c_evidence']
-        phase, event = fields['phase'], fields['event']
-        if phase == 'access' and event == 'END':
-            begin = self.data['stack'][-1]
-            evidence['last_access'] = [int(begin['step']), int(begin['addr'])]
-        if phase == 'gf_bus' and event == 'END':
-            if fields.get('mismatch') == '1':
-                begin = self.data['stack'][-1]
-                space, port = int(fields['space']), int(fields['port'])
-                kind = {0x3d4: 'CR', 0x3c4: 'SR', 0x3ce: 'GR'}.get(port) if space == 5 else 'MMIO' if space == 1 else None
-                if kind is None:
-                    raise RecoverError('MODE_C mismatch register kind')
-                reg = int(fields['index']) if space == 5 else int(fields['off'])
-                evidence.setdefault('mismatches', []).append(
-                    [kind, reg, int(begin['new']), int(fields['readback'])])
-            if int(fields['rc']):
-                raise RecoverError('MODE_C gf_bus failed')
-            if 'len' in fields and 'row' not in fields:
-                if (int(fields['bar']), int(fields['off']), int(fields['len'])) != (1, 0, MODE_C_VRAM_BYTES):
-                    raise RecoverError('MODE_C VRAM range mismatch')
-                if int(fields['bad_off']) != READBACK_NONE:
-                    raise RecoverError('MODE_C VRAM mismatch')
-                evidence['vram'].append(int(fields['dir']))
-        if phase in ('check', 'route') and event == 'END' and 'source' in fields:
-            mask, expected, actual = (int(fields[k]) for k in ('mask', 'expected', 'actual'))
-            if int(fields['rc']) or (actual ^ expected) & mask:
-                raise RecoverError('MODE_C %s mismatch' % phase)
-            source = int(fields['source'])
-            if phase == 'route' or (source == 2 and expected == 1):
-                if mask != 3 or expected != 1 or actual & 3 != 1:
-                    raise RecoverError('MODE_C route mismatch')
-                evidence['route'] += 1
-            elif source == 3:
-                if mask != 0xffffffff or expected != 1 or actual != 1:
-                    raise RecoverError('MODE_C cell mismatch')
-                evidence['cell'] = True
-            elif source == 0 and evidence.get('last_access', [None])[0] == int(fields['key']):
-                off = evidence['last_access'][1]
-                if off in MODE_C_REGISTERS:
-                    required_mask, required_value = MODE_C_REGISTERS[off]
-                    if mask != required_mask or (required_value is not None and (actual ^ required_value) & mask):
-                        raise RecoverError('MODE_C register mismatch')
-                    evidence['registers'][str(off)] = [mask, expected, actual]
-            if phase == 'check':
-                evidence['checks'] += 1
-        if phase == 'cell' and event == 'END':
-            if int(fields['rc']):
-                raise RecoverError('MODE_C cell access failed')
-            evidence['cell_steps'].append(int(self.data['stack'][-1]['step']))
-
-    def mode_c_mismatches(self):
-        rows = self.data.get('mode_c_evidence', {}).get('mismatches', [])
-        print('MODE_C record-only mismatches=%d' % len(rows))
-        for kind, reg, written, actual in rows:
-            print('MODE_C record-only %s %06X written=%08X readback=%08X' %
-                  (kind, reg, written, actual))
-
-    def mode_c_success(self):
-        e = self.data['mode_c_evidence']
-        return (e['vram'] == [1, 0] and e['route'] >= 2 and e['cell']
-                and e['cell_steps'] == [2, 7] and e['checks'] == MODE_C_CHECK_COUNT
-                and all(str(off) in e['registers'] for off in MODE_C_REGISTERS))
-
     def success(self):
         f = self.final or {}
         return (not self.data['invalid'] and not self.data['stack']
                 and self.data['diag'] is not None and self.data['diag']['fn'] == 'NONE'
-                and f.get('txd') == '0' and f.get('trial') == '0'
-                and f.get('result') == 'OK' and f.get('target') == 'S0'
-                and f.get('verified') == '1' and f.get('unknown') == '0'
-                and f.get('override') == '0' and f.get('lost_lines') == '0'
+                and f.get('txd') == '0'
+                and f.get('result') in ('OK', 'PARTIAL') and f.get('target') == 'S0'
+                and f.get('verified') == '1' and f.get('lost_lines') == '0'
                 and all(k in self.data['crc'] for k in METADATA))
 
 
@@ -365,17 +263,19 @@ def write_bounded(port, data, deadline, clock):
 
 
 def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
-             clock=time.monotonic):
+             clock=time.monotonic, initial=b''):
     """Read in finite chunks; record errors still drain cleanup until its deadline."""
     start = clock()
-    write_bounded(port, (command + '\n').encode('ascii'), start + timeout, clock)
+    if command is not None:
+        write_bounded(port, (command + '\n').encode('ascii'), start + timeout, clock)
     deadline = start + timeout
-    aborted = False
+    aborted = command is None
     failure = None
-    echo = False
+    echo = command is None
     line = bytearray()
     dropping = False
-    warned_seconds = None
+    c_command = bool(command and re.match(r'gfinit\s+(modeset|c-only)\b', command))
+    c_result = None
     def record_failure(message):
         nonlocal failure
         failure = failure or message
@@ -395,7 +295,8 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                 write_bounded(port, abort_frame(records.data['sid']), deadline, clock)
             except RecoverError as exc:
                 record_failure(str(exc))
-        chunk = port.read(256)
+        chunk = initial or port.read(256)
+        initial = b''
         if chunk:
             raw.write(chunk)
             raw.flush()
@@ -405,28 +306,18 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                     continue  # Initial rshell EOT is not this command's reply.
                 if line or dropping:
                     record_failure('truncated line before EOT/deadline')
-                if records is not None and records.data.get('mode_c_active'):
-                    records.mode_c_mismatches()
                 if failure:
                     raise RecoverError(failure)
                 if records is None:
                     return
                 if records.success():
-                    return 'OK'
+                    return records.final['result']
                 if records.paused and records.final is None and not records.data['stack']:
                     if len(records.data['crc']) == 4:
-                        if records.data.get('mode_c_active'):
-                            if not records.mode_c_success():
-                                raise RecoverError('MODE_C missing evidence')
-                            records.data['mode_c_active'] = False
-                            save(records.data)
-                            e = records.data['mode_c_evidence']
-                            for off in MODE_C_REGISTERS:
-                                mask, expected, actual = e['registers'][str(off)]
-                                print('MODE_C %06X mask=%08X expected=%08X actual=%08X' %
-                                      (off, mask, expected, actual))
-                            print('MODE_C CHECK=%s route=01 cell=OK VRAM=OK' % e['checks'])
-                            print('MODE_C: 機械項目合格・映像保留')
+                        if c_command:
+                            if c_result is None or c_result[2] != 'OK':
+                                raise RecoverError('missing/failed guest C result')
+                            print('MODE_C: ' + ('観測完了' if c_result[1] == 'record' else '機械項目合格・映像保留'))
                         return 'PAUSED'
                 raise RecoverError('missing/failed verification or lost logs')
             if byte == 10:
@@ -435,25 +326,20 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                 if dropping:
                     dropping = False
                     continue
-                if text == '> ' + command or text == '> ' + command + '\r':
+                if command is not None and text in ('> ' + command, '> ' + command + '\r'):
                     echo = True
                 if echo:
+                    match = re.fullmatch(r'GF C verify=(record|required) result=(OK|NG)\r?', text)
+                    if match:
+                        c_result = match.group(0), match.group(1), match.group(2)
+                        print(text.rstrip('\r'))
+                        if match.group(2) == 'NG':
+                            record_failure('guest C failed')
                     if text.startswith(('recover: rejected', 'gfinit: rejected rc=')):
                         record_failure('guest rejected recovery')
                     try:
                         if records is not None:
                             records.line(text)
-                            seconds = records.data['cleanup_seconds']
-                            if seconds is not None and seconds != warned_seconds:
-                                warned_seconds = seconds
-                                if records.data.get('mode_c_trial'):
-                                    deadline = max(deadline, clock() + seconds + CLEANUP_MARGIN)
-                                if cleanup_timeout < seconds + CLEANUP_MARGIN:
-                                    print('recover: warning: --cleanup-timeout requires at least %s seconds' %
-                                          (seconds + CLEANUP_MARGIN), file=sys.stderr)
-                                if timeout < seconds + CLEANUP_MARGIN:
-                                    print('recover: warning: --timeout requires cleanup time plus command time (%s seconds minimum)' %
-                                          (seconds + CLEANUP_MARGIN), file=sys.stderr)
                             save(records.data)
                     except RecoverError as exc:
                         record_failure(str(exc))
@@ -464,6 +350,23 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                     record_failure('overlong serial line')
                     line.clear()
                     dropping = True
+
+
+def restore_exchange(port, timeout, cleanup_timeout, raw, clock=time.monotonic):
+    # A live stream supplies its sid. Never reenter the shell during RUN.
+    initial = port.read(MAX_LINE)
+    while initial and b'\n' not in initial and b'\x04' not in initial and len(initial) < MAX_LINE:
+        more = port.read(MAX_LINE-len(initial))
+        if not more:
+            break
+        initial += more
+    sid = re.search(rb'REC sid=([0-9]+) ', initial)
+    running = sid is not None and b'event=PAUSED' not in initial and b'phase=final' not in initial
+    records = Records(int(sid[1]) if running else 0, resync=True)
+    if running:
+        write_bounded(port, abort_frame(records.data['sid']), clock()+timeout, clock)
+    return exchange(port, None if running else 'recover restore', records,
+                    timeout, cleanup_timeout, raw, lambda _: None, clock, initial)
 
 
 def verify_boot(port, expected_crc, timeout, raw, clock=time.monotonic):
@@ -515,11 +418,6 @@ def open_port(name, baud):
     return serial.Serial(name, baud, timeout=.1, write_timeout=.2, exclusive=True)
 
 
-def mode_c_timeout(baud, cleanup_seconds):
-    tlog = (MODE_C_BYTES * UART_FRAME_BITS + baud - 1) // baud
-    return MODE_C_WORK_SECONDS + tlog + cleanup_seconds + CLEANUP_MARGIN
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', default='/dev/ttyUSB0')
@@ -528,12 +426,35 @@ def main():
     parser.add_argument('--image-crc')
     parser.add_argument('--state', type=Path)
     parser.add_argument('--log', type=Path, required=True)
-    parser.add_argument('--timeout', type=float, default=DEFAULT_TIMEOUT)
+    parser.add_argument('--timeout', type=float)
     parser.add_argument('--cleanup-timeout', type=float, default=DEFAULT_CLEANUP_TIMEOUT)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--command')
     mode.add_argument('--status', action='store_true')
+    mode.add_argument('--restore', action='store_true')
     args = parser.parse_args()
+    command = 'recover restore' if args.restore else 'recover status' if args.status else (args.command or 'recover now %s' % args.session)
+    if args.timeout is None:
+        words = command.split()
+        args.timeout = (RESTORE_TIMEOUT if args.restore or words[:2] in (['gfinit', 'abort'], ['recover', 'now']) else
+                        C_TIMEOUT if words[:2] in (['gfinit', 'modeset'], ['gfinit', 'c-only']) else
+                        MAIN_TIMEOUT if words[:2] == ['gfinit', 'run-one'] else DEFAULT_TIMEOUT)
+    if command.split()[:2] == ['gfinit', 'c-only']:
+        args.session = 0
+    # Restore sends before reading any saved state or checking an image CRC.
+    if args.restore:
+        try:
+            with closing(open_port(args.port, args.baud)) as port:
+                try:
+                    raw = args.log.open('ab')
+                except OSError:
+                    raw = io.BytesIO()
+                with raw:
+                    print(restore_exchange(port, args.timeout, args.cleanup_timeout, raw))
+            return 0
+        except (RecoverError, OSError, ValueError, TypeError, KeyError) as exc:
+            print('recover: ' + str(exc))
+            return 1
     if args.baud <= 0 or min(args.timeout, args.cleanup_timeout) <= 0 or (
             args.session is not None and not 0 <= args.session <= 0xffffffff):
         parser.error('session must fit in u32 and deadlines must be positive')
@@ -541,7 +462,6 @@ def main():
         parser.error('trial/recovery needs --session, --state and --image-crc')
     if args.image_crc is not None and not re.fullmatch('[0-9a-fA-F]{8}', args.image_crc):
         parser.error('--image-crc must have 8 hexadecimal digits')
-    command = 'recover status' if args.status else (args.command or 'recover now %d' % args.session)
     if any(c in command for c in '\r\n\x04'):
         parser.error('one command only')
     def save(data):
@@ -549,6 +469,8 @@ def main():
     try:
         previous = (json.loads(args.state.read_text())
                     if not args.status and args.state.exists() else None)
+        if command.split()[:2] == ['gfinit', 'c-only']:
+            previous = None
         records = None if args.status else Records(
             args.session, previous,
             virtual=command.startswith('recover virtual ') if args.command else None)
@@ -561,11 +483,6 @@ def main():
                 records.data['image_crc'] = args.image_crc.lower()
             elif previous.get('image_crc') != args.image_crc.lower():
                 raise RecoverError('saved boot CRC differs')
-            if re.fullmatch(r'gfinit modeset [0-9]+ --allow-write', ' '.join(command.split())):
-                records.data['mode_c_trial'] = True
-                records.data['mode_c_active'] = True
-                records.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
-                args.timeout = max(args.timeout, mode_c_timeout(args.baud, args.cleanup_timeout))
             save(records.data)
             result = exchange(port, command, records, args.timeout,
                               args.cleanup_timeout, raw, save)

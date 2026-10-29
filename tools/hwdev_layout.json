@@ -716,6 +716,18 @@
       "rsvd",
       "valid"
     ],
+    "struct gf_stage_state": [
+      "bars",
+      "entry_ok",
+      "identity",
+      "initialized",
+      "keys",
+      "limits",
+      "rom_crc",
+      "rom_size",
+      "s0_ok",
+      "values"
+    ],
     "struct gfinit_bus": [
       "bars",
       "identity",
@@ -1061,6 +1073,7 @@
       "bound_profile",
       "budget",
       "buffers",
+      "c_only",
       "cache",
       "call_tick",
       "capture_valid",
@@ -1078,6 +1091,7 @@
       "failed",
       "first_key",
       "first_phase",
+      "gf_stage",
       "gpu_written",
       "head",
       "in_call",
@@ -1125,6 +1139,7 @@
       "uart_bytes",
       "uart_polls",
       "valid",
+      "verify_record",
       "zero_hold"
     ],
     "struct recover_bar_extent": [
@@ -1255,6 +1270,7 @@
       "arg_first",
       "ctx",
       "expr_id",
+      "flags",
       "head",
       "main_id",
       "next",

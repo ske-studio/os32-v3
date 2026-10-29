@@ -66,6 +66,9 @@ int recover_now_session(struct recover *r, u32 session)
 #ifdef RECOVER_ROUTE_WIRE
 static u32 route_wire_calls;
 #endif
+int recover_restore_session(struct recover *r)
+{ return recover_now_session(r,r->token.session); }
+
 int recover_route_test_session(struct recover *r, u32 session)
 {
 #ifdef RECOVER_ROUTE_WIRE
@@ -199,7 +202,8 @@ static int dispatch_tests(const struct kdebug_ops *ops)
         if (ops->dbg_call(op, buf, sizeof(buf)) != (int)op || buf[0] != op) return 1;
     }
     if (ops->dbg_call(GF_OP_MODESET, buf, sizeof(buf)) != (int)GF_OP_MODESET || buf[0] != GF_OP_MODESET) return 1;
-    if (module_calls != 7) return 1;
+    if (ops->dbg_call(GF_OP_C_ONLY, buf, sizeof(buf)) != (int)GF_OP_C_ONLY || buf[0] != GF_OP_C_ONLY) return 1;
+    if (module_calls != 8) return 1;
     owner.state = REC_PAUSED;
     if (ops->dbg_call(KDEBUG_OP_RECOVER_STATUS, buf, sizeof(buf)) != -1) return 1;
     recover_done = 0;

@@ -5,7 +5,7 @@
 #define HWDEV_ABI 1U
 #define HWDEV_KIND_GF6200 1U
 #define HWDEV_LIFETIME_FLAGS 7U
-#define HWDEV_WORK_MAX_PAGES 267U
+#define HWDEV_WORK_MAX_PAGES 269U
 struct hwdev_identity {
     u32 abi, size, kind, build_id, profile_version;
     u32 kernel_pair_crc, core_image_crc, contract_crc;

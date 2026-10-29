@@ -19,3 +19,6 @@ check-recover-virtual:
 - kdebug/recover_cleanup.h
 - kdebug/recover_diag.h
 - kernel/display_restore.h
+- kdebug/gf_stage_state.h
+- kdebug/gfinit_pll.h
+- kdebug/gfinit_wire.h
