@@ -13,6 +13,8 @@ check-hwdev-image-host:
 - kernel/module_image.c
 - include/hwdev_private.h
 - kdebug/gfinit*.c
+- kdebug/gfinit_decode/*.inc
+- kdebug/gfinit_op/*.inc
 - kdebug/gfinit*.h
 - kdebug/gfinit_budget.inc
 - kdebug/recover*.h
