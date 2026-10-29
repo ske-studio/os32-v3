@@ -94,20 +94,6 @@ void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
     aligned_x = x & ~(BITS_PER_U32 - 1);
     aligned_w = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - aligned_x;
 
-    /* 画面クリッピング */
-    if (aligned_x < 0) {
-        aligned_w += aligned_x;
-        aligned_x = 0;
-    }
-    if (y < 0) {
-        h += y;
-        y = 0;
-    }
-    if (aligned_x + aligned_w > GFX_WIDTH) aligned_w = GFX_WIDTH - aligned_x;
-    if (y + h > gfx_current_height) h = gfx_current_height - y;
-
-    if (aligned_w <= 0 || h <= 0) return;
-
     /* --- マージ判定 --- */
     new_x = aligned_x;
     new_y = y;
