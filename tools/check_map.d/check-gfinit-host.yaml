@@ -9,6 +9,9 @@ check-gfinit-host:
 - kdebug/gfinit_pll/*.inc
 - kdebug/gfinit_resources/*.inc
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover.h
 - kdebug/recover_gf.c
 - kdebug/generated/recover_gf_tables.inc

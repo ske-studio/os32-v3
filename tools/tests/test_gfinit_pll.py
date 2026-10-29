@@ -67,7 +67,7 @@ def main():
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
             MUTATIONS +
-            [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS],
+            list(SHARED_MUTATIONS),
             ('kdebug/gfinit_pll.c', 'control', '', ''))))
     return 0
 

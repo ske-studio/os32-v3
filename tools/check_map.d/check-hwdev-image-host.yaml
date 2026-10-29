@@ -52,6 +52,9 @@ check-hwdev-image-host:
 - kdebug/kdebug_main.c
 - kernel/hwdev_module.h
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover_profile.c
 - tools/tests/gfinit_host.c
 - tools/tests/gfinit_romfile_host.c

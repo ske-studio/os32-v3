@@ -21,8 +21,8 @@ MUTATIONS = [
 ]
 
 SHARED_MUTATIONS = [
-    ('check_required', '(l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR))', '(l->dir_substep != RECOVER_NONE)'),
-    ('check_reads', 'else if (bus_read(r, a->value, &values[i])) return access_error(r, a->value);', 'else values[i]=0;'),
+    ('kdebug/recover_plan/step.inc', 'check_required', '(l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR))', '(l->dir_substep != RECOVER_NONE)'),
+    ('kdebug/recover_plan/step.inc', 'check_reads', 'else if (bus_read(r, a->value, &values[i])) return access_error(r, a->value);', 'else values[i]=0;'),
 ]
 
 def mutation(item):
@@ -48,6 +48,6 @@ def main():
         result=host32.run([str(exe)],cwd=ROOT,timeout=60)
         if result.returncode:return result.returncode
     if '--mutate' in sys.argv:
-        return int(bool(mutpar.run_with_control(mutation,[('kdebug/gfinit_plan.c',*item) for item in MUTATIONS]+[('kdebug/recover.c',*item) for item in SHARED_MUTATIONS],('kdebug/gfinit_plan.c','control','',''))))
+        return int(bool(mutpar.run_with_control(mutation,[('kdebug/gfinit_plan.c',*item) for item in MUTATIONS]+list(SHARED_MUTATIONS),('kdebug/gfinit_plan.c','control','',''))))
     return 0
 if __name__=='__main__':sys.exit(main())

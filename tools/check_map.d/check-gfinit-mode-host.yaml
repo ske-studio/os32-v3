@@ -13,6 +13,9 @@ check-gfinit-mode-host:
 - tools/check_map.d/check-gfinit-mode-host.yaml
 - kdebug/generated/recover_gf_tables.inc
 - kdebug/recover.c
+- kdebug/recover_common/*.inc
+- kdebug/recover_plan/*.inc
+- kdebug/recover_gf_stage/*.inc
 - kdebug/recover_gf.c
 - kdebug/gfinit_pll.c
 - kdebug/gfinit_pll/*.inc
