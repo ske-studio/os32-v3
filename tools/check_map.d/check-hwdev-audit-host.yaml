@@ -12,6 +12,8 @@ check-hwdev-audit-host:
 - build/checks.d/check-hwdev-audit-host.mk
 - tools/check_map.d/check-hwdev-audit-host.yaml
 - kdebug/gfinit*.c
+- kdebug/gfinit_decode/*.inc
+- kdebug/gfinit_op/*.inc
 - kdebug/gfinit*.h
 - kdebug/recover*.h
 - kdebug/recover_gf.c

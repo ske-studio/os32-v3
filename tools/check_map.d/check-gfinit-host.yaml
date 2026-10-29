@@ -1,6 +1,8 @@
 check-gfinit-host:
 - kdebug/gfinit_decode.c
 - kdebug/gfinit_decode.h
+- kdebug/gfinit_decode/*.inc
+- kdebug/gfinit_op/*.inc
 - kdebug/recover.c
 - kdebug/recover.h
 - kdebug/recover_gf.c

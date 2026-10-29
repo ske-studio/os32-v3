@@ -17,19 +17,21 @@ def command(exe):
             '-I'+str(ROOT/'include'), str(ROOT/'tools/tests/gfinit_host.c'), '-o', str(exe)]
 
 
+# The decoder is split into .inc files included in place (kdebug/gfinit_op, kdebug/gfinit_decode);
+# each anchor names the file that holds it.
 MUTATIONS = [
-    ('static_read_cost', 'if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;', 'if (false && d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;'),
-    ('skip_cr44_decode', 'if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port', 'if (false && op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port'),
-    ('repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
-    ('repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
-    ('unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
-    ('rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
-    ('copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
-    ('table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
-    ('call_depth', 'calls > GF_INIT_CALL_DEPTH', 'false'),
-    ('repeat_depth', 'repeats > GF_INIT_REPEAT_DEPTH', 'false'),
-    ('selection_coverage', '|| (o->mask >> o->shift) >= o->count', ''),
-    ('sequence_overflow', 'o->count - 1 > (0xffffffffU - o->target) / 4', 'false'),
+    ('kdebug/gfinit_decode.c', 'static_read_cost', 'if (d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;', 'if (false && d->args[n->arg_first+j].kind == REC_ARG_READ) cost++;'),
+    ('kdebug/gfinit_decode.c', 'skip_cr44_decode', 'if (op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port', 'if (false && op != GF_INIT_ZM_CR && op != GF_INIT_ZM_CR_GROUP && v->port'),
+    ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
+    ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
+    ('kdebug/gfinit_decode.c', 'unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
+    ('kdebug/gfinit_decode.c', 'rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
+    ('kdebug/gfinit_op/copy_decode.inc', 'copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
+    ('kdebug/gfinit_op/condition_decode.inc', 'table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
+    ('kdebug/gfinit_decode/schedule.inc', 'call_depth', 'calls > GF_INIT_CALL_DEPTH', 'false'),
+    ('kdebug/gfinit_decode/schedule.inc', 'repeat_depth', 'repeats > GF_INIT_REPEAT_DEPTH', 'false'),
+    ('kdebug/gfinit_op/io_restrict_decode.inc', 'selection_coverage', '|| (o->mask >> o->shift) >= o->count', ''),
+    ('kdebug/gfinit_op/zm_reg_sequence_decode.inc', 'sequence_overflow', 'o->count - 1 > (0xffffffffU - o->target) / 4', 'false'),
 ]
 
 SHARED_MUTATIONS = [
@@ -188,7 +190,7 @@ def main():
              ('diag_later_empty', 'i=boundary+1; i<decoded.plan.node_count; i++', 'i=boundary+1; i<boundary+1; i++')],
             ('diag_control', '', ''))
         return int(bool(diagnostic_bad | mutpar.run_with_control(mutation,
-            [('kdebug/gfinit_decode.c', *item) for item in MUTATIONS] +
+            MUTATIONS +
             [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS],
             ('kdebug/gfinit_decode.c', 'control', '', ''))))
     return 0
