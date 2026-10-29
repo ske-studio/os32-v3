@@ -116,6 +116,63 @@ class LayoutTools(unittest.TestCase):
         self.assertEqual({(r['unit'], r['target']) for r in rows if r['file'] == 'common/shared.h'},
                          {('core.o', 'include/local.h'), ('r1.o', 'other/local.h')})
 
+    def test_move_output_prefixed_objects_and_report_unresolved_paths(self):
+        self.write('kernel/module.c', '/* module */\n')
+        # The OBJECTS line reproduces tools/tests/test_ver_version.py:14.
+        source = "OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module.o')\n"
+        prefixes = ('build/out/obj/', 'build/out/r1/obj/', 'build/out/kernel-r1/obj/', 'custom/output/obj/',
+                    'obj/', '../build/out/obj/', '/tmp/layout-output/obj/',
+                    '$(BUILD_OUT)/obj/', '${BUILD_OUT}/obj/', '$BUILD_OUT/obj/')
+        source += ''.join(f"'{prefix}kernel/module{suffix}'\n"
+                          for prefix in prefixes for suffix in ('.o', '.d'))
+        source += "'build/out/obj/kernel/module.obj' 'build/out/obj/kernel/module.o.extra'\n"
+        source += "'build/out/obj/mykernel/module.o'\n"
+        expected = source.replace("obj/kernel/module.o'", "obj/kernel/module/module.o'")
+        expected = expected.replace("obj/kernel/module.d'", "obj/kernel/module/module.d'")
+        unresolved = ("p = ROOT / 'build/out/obj' / 'kernel' / 'module.o'",
+                      "p = ROOT / 'kernel' / 'module.d'",
+                      "p = 'unrecognized/kernel/module.o'",
+                      "p = '$(call output)/obj/kernel/module.d'")
+        source += '\n'.join(unresolved) + '\n'
+        expected += '\n'.join(unresolved) + '\n'
+        self.write('tools/tests/test_ver_version.py', source)
+        command('git', 'add', '.', cwd=self.root)
+        mapping = self.write('moves.json', json.dumps([
+            {'from': 'kernel/module.c', 'to': 'kernel/module/module.c'}]))
+        dry = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, '--dry-run', mapping)
+        report = json.loads(dry.stdout)
+        self.assertTrue(report['replacements'], 'output-prefixed object references were not replaced')
+        edit = next(e for e in report['replacements'] if e['file'] == 'tools/tests/test_ver_version.py')
+        self.assertIn("+OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module/module.o')",
+                      edit['diff'])
+        self.assertEqual((self.root / 'tools/tests/test_ver_version.py').read_text(), source)
+        applied = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, mapping)
+        self.assertEqual(json.loads(applied.stdout), report)
+        self.assertEqual((self.root / 'tools/tests/test_ver_version.py').read_text(), expected)
+        self.assertFalse((self.root / 'kernel/module.c').exists())
+        self.assertTrue((self.root / 'kernel/module/module.c').is_file())
+        warnings = report['split_paths'] + report['unresolved_paths']
+        self.assertEqual({r['text'] for r in warnings}, set(unresolved))
+        for row in warnings:
+            self.assertEqual(row['file'], 'tools/tests/test_ver_version.py')
+            self.assertEqual(source.splitlines()[row['line'] - 1], row['text'])
+        self.assertEqual({r['path'] for r in warnings}, {'kernel/module.o', 'kernel/module.d'})
+
+    def test_move_assembly_outputs_with_old_path_in_destination(self):
+        moves = {'kernel/entry.asm': 'arch/x86/kernel/entry.asm',
+                 'kernel/stub.S': 'arch/x86/kernel/stub.S'}
+        source = 'build/out/obj/kernel/entry.o $(BUILD_OUT)/obj/kernel/stub.d\n'
+        expected = 'build/out/obj/arch/x86/kernel/entry.o $(BUILD_OUT)/obj/arch/x86/kernel/stub.d\n'
+        for old in moves:
+            self.write(old, '/* assembly */\n')
+        self.write('objects.mk', source)
+        command('git', 'add', '.', cwd=self.root)
+        module = load('move_files')
+        edits, split_paths, unresolved_paths, _ = module.plan(self.root, moves)
+        self.assertEqual(next(e['after'] for e in edits if e['file'] == 'objects.mk'), expected)
+        self.assertEqual(split_paths, [])
+        self.assertEqual(unresolved_paths, [])
+
     def test_rebase_include_of_unmoved_header(self):
         module = load('move_files')
         actual = module.rewrite('#include "../include/api.h"\n', 'kernel/main.c',
@@ -198,6 +255,8 @@ def mutations():
     cases = [
         ('move_files.py', "BOUNDARY = r'A-Za-z0-9_./+\\-'", "BOUNDARY = r'_'"),
         ('move_files.py', 'destination = moves.get(filename, filename)', 'destination = filename'),
+        ('move_files.py', 'for match in pattern.finditer(text):', 'for match in []:'),
+        ('move_files.py', 'for match in remaining_pattern.finditer(content):', 'for match in []:'),
         ('include_resolve.py', '(file.parent, *directories)', '(*directories, file.parent)'),
         ('build_compare.py', 'a.read_bytes() == b.read_bytes()', 'True'),
         ('gen_build_id.py', '        return fixed', "        return 'unknown'"),
