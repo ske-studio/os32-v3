@@ -64,8 +64,6 @@ u32  tss_get_esp0(void);
  * 既定は全ポート拒否 (tss_init 直後の状態)。 */
 void tss_iomap_allow(u16 port);
 void tss_iomap_deny(u16 port);
-void tss_iomap_allow_range(u16 start, u16 end);
-void tss_iomap_deny_range(u16 start, u16 end);
 void tss_iomap_deny_all(void);
 
 /* 指定ポートが素通し設定かどうか (デバッグ・検証用) */

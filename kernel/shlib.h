@@ -28,11 +28,6 @@ int shlib_loaded(void);
 int shlib_reject_reason(void);
 u32 shlib_reject_min_api(void);
 
-/* 常駐しているライブラリの版 (OS32ShlibHeader.version)。未ロードなら 0。 */
-u32 shlib_version(void);
-
-/* .text/.rodata の終端 (exclusive)。未ロードなら MEM_SHLIB_BASE。 */
-u32 shlib_text_end(void);
 /* B1: exact registered RO backing, not merely the shlib owner. */
 int shlib_read_page(u32 va, u32 frame);
 

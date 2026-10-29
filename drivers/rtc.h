@@ -73,7 +73,4 @@ void rtc_init(void);
 /* 現在日時を読み出す */
 void rtc_read(RTC_Time *t);
 
-/* uptimeをtick_countから計算し秒で返す */
-u32  rtc_uptime_sec(void);
-
 #endif /* __RTC_H */

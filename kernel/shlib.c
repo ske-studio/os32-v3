@@ -11,7 +11,7 @@
 #include "os32x_hdr.h"
 
 static u32 g_pages[MEM_SHLIB_SIZE / PAGE_SIZE];
-static u32 g_loaded, g_version, g_text_pages, g_data_vaddr, g_data_pages;
+static u32 g_loaded, g_text_pages, g_data_vaddr, g_data_pages;
 static int g_reject;
 static u32 g_reject_min_api;
 
@@ -62,7 +62,6 @@ int shlib_init(void)
         if (entry < MEM_SHLIB_BASE + PAGE_SIZE ||
             entry >= MEM_SHLIB_BASE + sh->text_pages * PAGE_SIZE) goto fail;
     }
-    g_version = sh->version;
     g_text_pages = sh->text_pages;
     g_data_pages = sh->data_pages;
     g_data_vaddr = sh->data_vaddr;
@@ -81,8 +80,6 @@ fail:
 int shlib_loaded(void) { return g_loaded; }
 int shlib_reject_reason(void) { return g_reject; }
 u32 shlib_reject_min_api(void) { return g_reject_min_api; }
-u32 shlib_version(void) { return g_loaded ? g_version : 0; }
-u32 shlib_text_end(void) { return MEM_SHLIB_BASE + g_text_pages * PAGE_SIZE; }
 u32 shlib_data_pages(void) { return g_loaded ? g_data_pages : 0; }
 
 int shlib_read_page(u32 va, u32 frame)

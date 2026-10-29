@@ -76,22 +76,6 @@ void tss_iomap_deny(u16 port)
     kernel_tss.iomap[port / BITS_PER_BYTE] |= (u8)(1 << (port % BITS_PER_BYTE));
 }
 
-void tss_iomap_allow_range(u16 start, u16 end)
-{
-    u32 p;
-    for (p = start; p <= (u32)end; p++) {
-        tss_iomap_allow((u16)p);
-    }
-}
-
-void tss_iomap_deny_range(u16 start, u16 end)
-{
-    u32 p;
-    for (p = start; p <= (u32)end; p++) {
-        tss_iomap_deny((u16)p);
-    }
-}
-
 void tss_iomap_deny_all(void)
 {
     kmemset(kernel_tss.iomap, 0xFF, TSS_IOMAP_SIZE);
