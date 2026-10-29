@@ -328,9 +328,7 @@ def exchange(port, command, records, timeout, cleanup_timeout, raw, save,
                         return records.final['result']
                     if records.paused and records.final is None and not records.data['stack']:
                         if len(records.data['crc']) == 4:
-                            if c_command:
-                                if c_result is None or c_result[2] != 'OK':
-                                    raise RecoverError('missing/failed guest C result')
+                            if c_command:  # Missing (:325) and NG (record_failure below) already fail.
                                 print('MODE_C: ' + ('観測完了' if c_result[1] == 'record' else '機械項目合格・映像保留'))
                             return 'PAUSED'
                     raise RecoverError('missing/failed verification or lost logs')

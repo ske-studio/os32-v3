@@ -1,6 +1,6 @@
 # GF_STAGES_DESIGN — GeForce の段分け (書き直さず、既存コードと試験を移す) — 確定設計
 
-> 状態: **現行 (2026-10-29 確定)** — astra 起草 (r1〜r3)、Opus のレビュー 3 往復 (r1 要修正・r2 要修正・r3 確定可)、PM の追記 §10。往復の記録は `~/os32-tmp/run/gf-stages/`。票は [TASK_GF_STAGES](../../tasks/realhw/TASK_GF_STAGES.md)。
+> 状態: **現行 (2026-10-29 確定)** — astra 起草 (r1〜r3)、Opus のレビュー 3 往復 (r1 要修正・r2 要修正・r3 確定可)、PM の追記 §10。往復の記録は `~/os32-tmp/run/gf-stages/`。票は TASK_GF_STAGES (docs/tasks/realhw/)。
 > 実行主体: Codex。正確なモデル ID は環境から確認できないため未確認（依頼の指定は `gpt-6-astra`）。
 
 根拠の相対パスは `/home/hight/os32-v3/`、設計基点は `6dc8a284`。読取り時HEADは `f4cf3dfb`、確認対象のkdebug/hwdev・monitor・C/CLI試験は基点との差分なし。

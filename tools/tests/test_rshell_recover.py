@@ -629,7 +629,7 @@ def interval_cases(m):
 
 
 MUTATIONS = [
-    ('guest_c', "if c_result is None or c_result[2] != 'OK':", 'if False:'),
+    ('guest_c', "record_failure('guest C failed')", 'pass'),
     ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
     ('sequence', "sid != candidate_sid or seq != self.data['seq'] + 1", "sid != candidate_sid"),
     ('required', "if name not in fields:  # Mandatory fields must precede state updates.", "if False:  # Mandatory fields must precede state updates."),
