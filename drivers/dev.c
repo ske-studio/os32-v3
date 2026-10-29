@@ -167,12 +167,6 @@ void dev_register_hdd(int drive)
     }
 }
 
-/* SCSIデバイスの登録 (将来用スタブ — WD33C93ドライバ完成後に実装予定) */
-void dev_register_scsi(int scsi_id)
-{
-    (void)scsi_id;
-}
-
 /* ======================================================================== */
 /*  汎用 LBA ラッパー                                                       */
 /*                                                                          */

@@ -76,18 +76,4 @@ static inline void _memcpy_d(void *dst, const void *src, unsigned int dwords) {
                      : : "memory");
 }
 
-static inline void _memset_w(void *dst, unsigned int val16, unsigned int words) {
-    __asm__ volatile("rep stosw"
-                     : "+D"(dst), "+c"(words)
-                     : "a"((unsigned short)val16)
-                     : "memory");
-}
-
-static inline void _memset_d(void *dst, unsigned int val32, unsigned int dwords) {
-    __asm__ volatile("rep stosl"
-                     : "+D"(dst), "+c"(dwords)
-                     : "a"(val32)
-                     : "memory");
-}
-
 #endif /* __GFX_INTERNAL_H */

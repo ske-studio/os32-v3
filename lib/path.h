@@ -48,11 +48,6 @@ void path_set_device_validator(PathDeviceValidator fn);
  * 戻り値: 0=OK, -1=エラー */
 int path_parse(const char *input, ParsedPath *out);
 
-/* ======== ユーティリティ ======== */
-
-/* ファイル名部分を取得 ("fdd0:/sub/file.txt" → "file.txt") */
-const char *path_basename(const char *path);
-
 /* ======== 初期化 ======== */
 void path_init(void);
 

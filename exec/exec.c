@@ -253,7 +253,6 @@ static u32 *g_cur_frame = 0;
 
 /* T2c virtual stack. The caller slot carries its actual size. */
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
-#define RING3_USTACK_SIZE MEM_EXEC_STACK_SIZE
 #define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)
 #define RING3_STACK_BOTTOM (g_cur_app ? g_cur_app->stack_base : MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE)
 static u32 g_ring3_band_top = MEM_APP_STACK_TOP;

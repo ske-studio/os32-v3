@@ -39,9 +39,6 @@ void pipe_free_owned(int owner);
 /* バッファのポインタを取得 */
 u8 *pipe_get_buf(int id);
 
-/* バッファの容量を取得 */
-u32 pipe_get_capacity(int id);
-
 /* バッファの書き込み済みデータ長を取得/設定 */
 u32 pipe_get_len(int id);
 void pipe_set_len(int id, u32 len);
