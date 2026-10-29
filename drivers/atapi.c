@@ -675,11 +675,6 @@ int atapi_drive_index(void)
     return (s_drvsel == ATAPI_DRV_SLAVE) ? 1 : 0;
 }
 
-int atapi_present(void)
-{
-    return cdrom_present;
-}
-
 int atapi_test_unit_ready(void)
 {
     u8 cdb[ATAPI_CDB_BYTES];

@@ -159,9 +159,6 @@ typedef struct {
  * 解くのはこれだけ */
 int atapi_init(void);
 
-/* CD-ROM 存在チェック */
-int atapi_present(void);
-
 /* 使っている装置: 0 = セカンダリのマスター、1 = スレーブ。atapi_init は
  * 両方のシグネチャを見て、2 台あれば媒体の入っている方 (マスター優先) を選ぶ */
 int atapi_drive_index(void);
