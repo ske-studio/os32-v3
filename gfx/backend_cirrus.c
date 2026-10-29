@@ -78,7 +78,6 @@
 #define CIRRUS_CLIENT_OFF   CIRRUS_SURFACE_SIZE
 #define CIRRUS_PATTERN_OFF  (CIRRUS_SURFACE_SIZE * 2UL)
 #define CIRRUS_PATTERN_LEN  8
-#define CIRRUS_VRAM_MIN     (CIRRUS_PATTERN_OFF + CIRRUS_PATTERN_LEN)
 
 /* 面の割り付けの整合 (票 H3b)。クライアント面の先頭と大きさはページ境界で
  * なければならない — exec は gfx_bb_phys_range() の範囲を 4KB 単位で
