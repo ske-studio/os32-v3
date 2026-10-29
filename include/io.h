@@ -59,12 +59,6 @@ static inline void outpw(unsigned int port, unsigned int value);
 static inline unsigned long inpd(unsigned int port);
 static inline void outpd(unsigned int port, unsigned long value);
 
-/* 16-bit ポートから `count` ワードを `buf` へ連続で読む。
- * 契約: `buf` は `count * 2` バイト以上。読んだ順にそのまま並べる
- *       (inpw を count 回呼ぶのと同じ結果)。メモリを書き換えるので
- *       "memory" clobber 相当の保証が要る。 */
-static inline void insw_rep(unsigned int port, void *buf, unsigned int count);
-
 /* 機器が次の I/O を受け付けるまでの短い待ち (PC-98 で約 0.6µs)。
  * 契約: 「直前の I/O が落ち着くまで待つ」。時間の長さそのものではなく、
  *       **連続アクセスのあいだに置く** ことに意味がある。各ドライバは

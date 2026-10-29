@@ -99,7 +99,6 @@ static inline unsigned int inpw(unsigned int p) {return inp(p);}
 static inline void outpw(unsigned int p,unsigned int v) {outp(p,v);}
 static inline unsigned long inpd(unsigned int p) {return inp(p);}
 static inline void outpd(unsigned int p,unsigned long v) {outp(p,v);}
-static inline void insw_rep(unsigned int p,void *b,unsigned int n) {(void)p;(void)b;(void)n;}
 static inline void io_wait(void) {}
 static inline void io_wait_n(int n) {(void)n;}
 #endif
