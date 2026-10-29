@@ -317,7 +317,7 @@ class Records:
                 off = evidence['last_access'][1]
                 if off in MODE_C_REGISTERS:
                     required_mask, required_value = MODE_C_REGISTERS[off]
-                    if mask != required_mask or (required_value is not None and actual != required_value):
+                    if mask != required_mask or (required_value is not None and (actual ^ required_value) & mask):
                         raise RecoverError('MODE_C register mismatch')
                     evidence['registers'][str(off)] = [mask, expected, actual]
             if phase == 'check':
