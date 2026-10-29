@@ -14,6 +14,11 @@ check-hwdev-audit-host:
 - kdebug/gfinit*.c
 - kdebug/gfinit_decode/*.inc
 - kdebug/gfinit_op/*.inc
+- kdebug/gfinit/*.inc
+- kdebug/gfinit_mode/*.inc
+- kdebug/gfinit_plan_c/*.inc
+- kdebug/gfinit_pll/*.inc
+- kdebug/gfinit_resources/*.inc
 - kdebug/gfinit*.h
 - kdebug/recover*.h
 - kdebug/recover_gf.c

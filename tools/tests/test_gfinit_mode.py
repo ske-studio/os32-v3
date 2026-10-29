@@ -195,14 +195,15 @@ MUTATIONS = [
     ('frame_bottom', 'y >= GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)', 'y > GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)'),
     ('immediate_verify', '0x0U, 0x1U, 0x0U},', '0x7ffffU, 0x1U, 0x0U},'),
     ('cr05', 'mode_bit(t->hbe, 5, 7)', 'mode_bit(t->hbe, 5, 6)'),
-    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;'),
-    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;'),
+    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;', 'kdebug/gfinit_mode/pll_program.inc'),
+    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;', 'kdebug/gfinit_mode/pll_program.inc'),
 ]
 
 
 def mutation(item):
-    name, old, new = item
-    file = 'hwdev/generated/gf_mode_rows.inc' if name == 'immediate_verify' else 'kdebug/gfinit_mode.c'
+    name, old, new = item[:3]
+    # The calc tail is split into .inc files included in place (kdebug/gfinit_mode/); the 4th item names it.
+    file = 'hwdev/generated/gf_mode_rows.inc' if name == 'immediate_verify' else (item[3] if len(item) == 4 else 'kdebug/gfinit_mode.c')
     source = (ROOT/file).read_text()
     if name == 'immediate_verify':
         old = next(line for line in source.splitlines() if '0x680508U' in line and line.endswith(old))

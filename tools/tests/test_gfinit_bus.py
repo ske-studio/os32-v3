@@ -37,28 +37,28 @@ SHARED_MUTATIONS = [
      'v->key == target && *value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
-    ('resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;',
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;',
      '(void)hdr0; return PCI_FN_COUNT;'),
-    ('resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
-    ('resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
-    ('resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
-    ('resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
-    ('resource_window_len', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
+    ('kdebug/gfinit_resources/scan.inc', 'resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
+    ('kdebug/gfinit_resources/scan.inc', 'resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
+    ('kdebug/gfinit_resources/windows.inc', 'resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
+    ('kdebug/gfinit_resources/windows.inc', 'resource_window_len', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
     # Reject the last valid slot instead of writing beyond a full array.
-    ('resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
-    ('resource_cap_align_only', 'cap = b->base[i] - base;', 'cap = cap;'),
-    ('resource_next_first', 'if (b->base[i] > base && b->base[i] - base < cap)\n            cap = b->base[i] - base;',
+    ('kdebug/gfinit_resources/windows.inc', 'resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_cap_align_only', 'cap = b->base[i] - base;', 'cap = cap;'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_next_first', 'if (b->base[i] > base && b->base[i] - base < cap)\n            cap = b->base[i] - base;',
      'if (b->base[i] > base) { cap = b->base[i] - base; break; }'),
-    ('resource_csr_length', '#define GF_RES_FXP_CSR_LEN 0x1000U', '#define GF_RES_FXP_CSR_LEN 0x2000U'),
-    ('resource_flash_bar', '{((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), GF_RES_BAR2, GF_RES_FXP_FLASH_LEN', '{((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), 3U, GF_RES_FXP_FLASH_LEN'),
-    ('resource_upper_append', 'u32 cap = resource_cap(b, raw & PCI_BAR_MEM_ADDR_MASK);',
+    ('kdebug/gfinit_resources.c', 'resource_csr_length', '#define GF_RES_FXP_CSR_LEN 0x1000U', '#define GF_RES_FXP_CSR_LEN 0x2000U'),
+    ('kdebug/gfinit_resources.c', 'resource_flash_bar', '{((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), GF_RES_BAR2, GF_RES_FXP_FLASH_LEN', '{((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL), 3U, GF_RES_FXP_FLASH_LEN'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_upper_append', 'u32 cap = resource_cap(b, raw & PCI_BAR_MEM_ADDR_MASK);',
      'if (!spec) return 0;\n    u32 cap = resource_cap(b, raw & PCI_BAR_MEM_ADDR_MASK);'),
-    ('resource_spec_bound', 'if (exact && len > cap)', 'if (false && len > cap)'),
-    ('resource_alignment', '(base & (len - 1U))', 'false'),
-    ('resource_write', 'b->count = 0;', 'b->count = 0; pci_cfg_write32(0, 8, 0, PCI_CFG_BAR0, 0);'),
-    ('resource_alias', 'if (b->base[i] == base)', 'if (false)'),
-    ('resource_bounds_count', 'if (b->count >= RECOVER_RANGE_MAX)', 'if (false)'),
-    ('resource_exclude_count', 'if (*used >= RECOVER_RANGE_MAX)', 'if (false)'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_spec_bound', 'if (exact && len > cap)', 'if (false && len > cap)'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_alignment', '(base & (len - 1U))', 'false'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_write', 'b->count = 0;', 'b->count = 0; pci_cfg_write32(0, 8, 0, PCI_CFG_BAR0, 0);'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_alias', 'if (b->base[i] == base)', 'if (false)'),
+    ('kdebug/gfinit_resources/bounds.inc', 'resource_bounds_count', 'if (b->count >= RECOVER_RANGE_MAX)', 'if (false)'),
+    ('kdebug/gfinit_resources/bars.inc', 'resource_exclude_count', 'if (*used >= RECOVER_RANGE_MAX)', 'if (false)'),
 ]
 WINDOW_MUTATIONS = [
     ('window_busy', 'if (window_busy)', 'if (false)'),
@@ -94,7 +94,7 @@ def main():
             [('kdebug/gfinit_bus.c', *item) for item in MUTATIONS] +
             [('kdebug/recover.c', *item) for item in SHARED_MUTATIONS] +
             [('kdebug/kdebug_window.c', *item) for item in WINDOW_MUTATIONS] +
-            [('kdebug/gfinit_resources.c', *item) for item in RESOURCE_MUTATIONS],
+            RESOURCE_MUTATIONS,
             ('kdebug/gfinit_bus.c', 'control', '', ''))))
     return 0
 
