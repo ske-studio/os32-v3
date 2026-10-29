@@ -5,6 +5,7 @@
 #include "gfinit_exec.h"
 #include "gfinit_plan.h"
 #include "gfinit_plan_c.h"
+#include "gf_stage_state.h"
 #include "gfinit_verify.inc"
 #include "gfinit_budget.inc"
 #include "gfinit_resources.h"
@@ -70,6 +71,7 @@ static struct hwdev_device_owner gf_device = {
     .bdf = RECOVER_GF_BDF, .generation = 1, .state = HWDEV_STOPPED_UNOWNED
 };
 static struct hwdev_lease gf_lease;
+static struct gf_stage_state stage;
 static bool gf_owned(struct recover *r)
 {
     return owner && hwdev_lease_matches(&gf_lease, &gf_device,
@@ -216,6 +218,8 @@ static int gf_release_rom(struct gfinit_owner *g)
     if ((r->ops == &g->ops || r->profile == &g->profile ||
          r->bound_profile == &g->profile) &&
         recover_owner_configure(0, 0, 0, false)) return -1;
+    stage = (struct gf_stage_state){0};
+    r->gf_stage = 0; r->c_only = false; r->verify_record = false;
     gf_free(g->rom, GF_ROM_MAX);
     gf_free(g->decoded, sizeof(*g->decoded));
     gf_free(g->compiled, sizeof(*g->compiled));
@@ -232,7 +236,7 @@ static int gf_release_rom(struct gfinit_owner *g)
 void gfinit_recover_end(void)
 {
     struct recover *r = recover_owner();
-    if (owner && (r->state == REC_VERIFIED || r->state == REC_FAILED))
+    if (owner && !stage.initialized && (r->state == REC_VERIFIED || r->state == REC_FAILED))
         gf_release_rom(owner);
 }
 static int gf_inspect(struct recover *r, const struct recover_ops *base,
@@ -380,6 +384,9 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
                                      r->cache.bar[1].length)) return -1;
         plan = &g->compiled->plan;
     }
+    if (!size && gfinit_plan_baseline(g->compiled,&g->profile,&stage,g->rom,g->rom_size)) return -1;
+    if (!size) r->gf_stage = &stage;
+    r->c_only = false; r->verify_record = (flags & GF_VERIFY_RECORD) != 0;
     if (!plan->node_count || plan->node_count > RECOVER_NODE_MAX) return -1;
     if (gf_budget(g, r, transport, size ? REC_BUDGET_SIZE_BARS : REC_BUDGET_GF, plan)) return -1;
     if (size) g->size_plan.profile_crc = g->profile.crc;
@@ -402,6 +409,55 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     if (size) return trial_end(r, &r->token, REC_NORMAL);
     return 0;
 }
+static int gf_c_only(struct recover *r, struct recover_transport *transport,
+                      u32 flags, const struct gfinit_no_verify *regs, u32 count)
+{
+    struct gfinit_owner *g=owner;
+    if (!g || !gf_owned(r) || !stage.initialized ||
+        (r->state != REC_VERIFIED && r->state != REC_FAILED)) return -1;
+    if (gf_stage_entry(r)) { stage.initialized=false; return -1; }
+    stage.entry_ok=true;
+    r->c_only=true;
+    if (!gf_stage_reentry(r) ||
+        recover_gf_profile_expand(&g->profile,g->compiled)) goto invalid;
+    g->profile.expected_bdf=RECOVER_GF_BDF;
+    g->profile.expected_device=RECOVER_GF_DEVICE;
+    if (gfinit_plan_rebuild_c(g->compiled,g->decoded,&g->profile,&stage) ||
+        gfinit_verify_policy(g->compiled,&g->profile,flags,regs,count)) goto invalid;
+    if (g->compiled->plan.node_count * RECOVER_BITS_WORDS * sizeof(u32) > g->flow_bytes) goto invalid;
+    g->profile.trial_limit=GF_C_EXEC_SECONDS * PIT_HZ;
+    g->profile.opcode_limit=g->profile.trial_limit;
+    g->profile.max_steps=GF_INIT_SCHEDULE;
+    g->profile.max_polls=GF_C_EXEC_POLLS;
+    g->profile.restore_limit=GF_C_RESTORE_SECONDS * PIT_HZ;
+    g->profile.restore_max_polls=GF_C_RESTORE_POLLS;
+    g->profile.restore_log_bytes=GF_C_RESTORE_BYTES;
+    g->profile.s0_reserve_ticks=GF_C_S0_SECONDS * PIT_HZ;
+    g->profile.s0_reserve_polls=GF_C_S0_POLLS;
+    g->profile.s0_reserve_bytes=GF_C_S0_BYTES;
+    r->log_limit=GF_C_TX_SECONDS * PIT_HZ;
+    transport->max_polls=GF_C_TX_POLLS;
+    g->profile.crc=recover_profile_crc(&g->profile);
+    g->compiled->plan.profile_crc=g->profile.crc;
+    r->verify_record=(flags & GF_VERIFY_RECORD) != 0;
+    u32 hash;
+    if (recover_owner_configure(&g->ops,&g->bus,g->s0,false) ||
+        recover_bind_plan(r,&g->profile,&g->compiled->plan,&g->buffers,&hash)) goto invalid;
+    r->route_write_approved=true;
+    gf_lease.session=r->next_session+1U;
+    if (trial_begin(r,&g->profile,hash,g->profile.trial_limit)) {
+        gf_lease.session=r->token.session;
+        goto invalid;
+    }
+    gf_lease.session=r->token.session;
+    stage.entry_ok=false;
+    g->prepare_flags=flags;
+    return trial_step(r,&r->token,true,gf_modeset,g->compiled);
+invalid:
+    stage.initialized=false;
+    return -1;
+}
+
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
@@ -411,14 +467,15 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
     const struct gfinit_no_verify *regs = 0;
     u32 count = 0;
     if (q.flags & GF_NO_VERIFY_FILE) {
-        if (op != GF_OP_PREPARE || size != sizeof(*extra) ||
+        if ((op != GF_OP_PREPARE && op != GF_OP_C_ONLY) || size != sizeof(*extra) ||
             extra->count > GF_NO_VERIFY_MAX) return -1;
         count = extra->count; regs = extra->regs;
     } else if (size != sizeof(q)) return -1;
     struct recover *r = recover_owner();
     if (q.version != GF_INIT_VERSION || q.size != size ||
-        (q.flags & ~(GF_ALLOW_WRITE | (op == GF_OP_PREPARE ? (GF_MODE_C | GF_VERIFY_REQUIRED | GF_NO_VERIFY_FILE) : 0U))) || q.max_steps != GF_INIT_SCHEDULE ||
-        ((q.flags & (GF_VERIFY_REQUIRED | GF_NO_VERIFY_FILE)) && !(q.flags & GF_MODE_C)) ||
+        (q.flags & ~(GF_ALLOW_WRITE | ((op == GF_OP_PREPARE || op == GF_OP_C_ONLY) ? (GF_MODE_C | GF_VERIFY_REQUIRED | GF_VERIFY_RECORD | GF_NO_VERIFY_FILE) : 0U))) || q.max_steps != GF_INIT_SCHEDULE ||
+        ((q.flags & (GF_VERIFY_REQUIRED | GF_VERIFY_RECORD | GF_NO_VERIFY_FILE)) && !(q.flags & GF_MODE_C)) ||
+        ((q.flags & GF_VERIFY_REQUIRED) && (q.flags & GF_VERIFY_RECORD)) ||
         q.status || q.fail_pc || q.fail_reg || q.steps ||
         (op != GF_OP_RUN_ONE && q.script_id) ||
         (op != GF_OP_INSPECT && !(q.flags & GF_ALLOW_WRITE))) return -1;
@@ -434,9 +491,11 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         owner->last_main == q.script_id && owner->last.flags == q.flags) {
         *(struct gfinit_request *)buf = owner->last; return owner->last.status ? -1 : 0;
     }
-    if (q.session != r->token.session) return -1;
+    if (op != GF_OP_C_ONLY && q.session != r->token.session) return -1;
+    if (op == GF_OP_C_ONLY && (q.session || !(q.flags & GF_MODE_C))) return -1;
     int rc = -1;
-    if (op == GF_OP_INSPECT) rc = gf_inspect(r, base, transport, s0);
+    if (op == GF_OP_C_ONLY) rc = gf_c_only(r,transport,q.flags,regs,count);
+    else if (op == GF_OP_INSPECT) rc = gf_inspect(r, base, transport, s0);
     else if (op == GF_OP_SIZE_BARS || op == GF_OP_PREPARE)
         rc = gf_begin(r, owner, transport, op == GF_OP_SIZE_BARS, q.flags, regs, count);
     else if (owner && owner->inspected && op == GF_OP_RUN_ONE &&
@@ -446,6 +505,10 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         rc = trial_step(r, &r->token, true, gfinit_exec_run, &e);
         q.steps = e.steps; q.fail_pc = e.fail_pc;
         if (!rc) owner->next_main++;
+#if !GF_VPLL_PROBE
+        if (!rc && owner->next_main == GF_INIT_MAINS)
+            rc = trial_step(r,&r->token,true,gf_stage_capture,&stage);
+#endif
     } else if (owner && op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C) &&
                owner->next_main == GF_INIT_MAINS && r->state == REC_PAUSED) {
         rc = trial_step(r, &r->token, true, gf_modeset, owner->compiled);
@@ -458,15 +521,19 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
             gf_release_rom(owner); rc = 0;
         } else rc = trial_end(r, &r->token, REC_ABORT);
     }
+    if (op == GF_OP_C_ONLY || op == GF_OP_MODESET)
+        kprintf(ATTR_WHITE,"GF C verify=%s result=%s\n",
+            (op == GF_OP_C_ONLY ? (q.flags & GF_VERIFY_RECORD) != 0 : r->verify_record)
+                ? "record" : "required", rc ? "NG" : "OK");
     q.session = r->token.session; q.status = rc ? r->reason + 1U : 0;
     q.fail_reg = r->first_key;
     if (owner) {
         owner->last_op = op; owner->last_main = q.script_id; owner->last = q;
         owner->last_count = count;
         for (u32 i = 0; i < count; i++) owner->last_regs[i] = regs[i];
-        if ((rc && (r->state == REC_IDLE || r->state == REC_VERIFIED)) ||
+        if (!stage.initialized && ((rc && (r->state == REC_IDLE || r->state == REC_VERIFIED)) ||
             ((r->state == REC_VERIFIED || r->state == REC_FAILED) &&
-            op != GF_OP_INSPECT && (op != GF_OP_SIZE_BARS || r->state == REC_FAILED)))
+            op != GF_OP_INSPECT && (op != GF_OP_SIZE_BARS || r->state == REC_FAILED))))
             gf_release_rom(owner);
     }
     *(struct gfinit_request *)buf = q;

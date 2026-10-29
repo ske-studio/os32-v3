@@ -162,7 +162,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 ## 8. M1 固定の G4 生成・照合手順 (M2/M3a の入力契約)
 
 1. 生成入力は `hwdev/hwdev_imports.def` (§2 の順序・§3 の kernel import 順と完全一致を検査)、共有ヘッダの umbrella、配置 inventory。既存宣言を取得する方式は `gen_kdebug_imports.py` を再利用し、型の独自 parser は追加しない。
-2. umbrella は `recover.h`, `recover_gf.h`, 辞書順の `gfinit*.h`, `kpeek.h`, 新設する `hwdev_private.h` と kernel import の宣言元を各一度 include。両像とも同じ生成物と i386 の machine/ABI flags、`__KERNEL_BUILD__` でコンパイルする。`RECOVER_MODULE` 等の像固有定義は契約生成に渡さない。
+2. umbrella は `recover.h`, `recover_gf.h`, `gf_stage_state.h`, 辞書順の `gfinit*.h`, `kpeek.h`, 新設する `hwdev_private.h` と kernel import の宣言元を各一度 include。両像とも同じ生成物と i386 の machine/ABI flags、`__KERNEL_BUILD__` でコンパイルする。`RECOVER_MODULE` 等の像固有定義は契約生成に渡さない。
 3. 配置 inventory は umbrella が宣言する共有の全 struct/union と全メンバ (配列自体、関数ポインタも含む)、全 enum の列挙子。`recover` から到達する型だけを推測で間引かない。新 private 型も対象。名前の inventory をヘッダ変更と同時に更新し、コンパイラの DWARF (`-g -fno-eliminate-unused-debug-types`) と突き合わせて欠落・余剰を失敗にする。DWARF は列挙の照合用で、型の再実装には使わない。
 4. inventory から `sizeof(T)`, `__alignof__(T)`, `offsetof(T, member)`, `sizeof(((T *)0)->member)`、enum 値の定数表を C で生成し、対象クロスコンパイラが出す ELF32 の専用 section から little-endian u32 を読む (ゲスト実行不要)。名前は型名/メンバ名の ASCII 辞書順、enum は列挙子名順。負の enum は u32 の2の補数。値から `STATIC_ASSERT` 全行を生成し、両像の実ビルドで include する。値の変化を片側だけ再生成して通してはいけない。
 5. 配置の正規形は UTF-8/LF、各行 `kind\tname\tdecimal-u32\n` (kind は size/align/offset/member_size/enum)。`layout_crc` はその全 byte の CRC-32/ISO-HDLC (`zlib.crc32(data) & 0xffffffff`)。これは配置表の指紋であり、テキスト CRC と別に保持する。
@@ -181,7 +181,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 | 32 | `u32 version, size` | 1、68 |
 | 40 | `u32 layout_crc` | §8 の配置表 CRC |
 | 44 | `u32 lifetime_flags` | 7 = BOOT_BODY(1) / SYNC_CALLBACKS(2) / NO_DMA(4)、完全一致 |
-| 48 | `u32 work_max_pages, dma_max_pages` | 267、0 (下記の試行 RAM 上限、DMA なし) |
+| 48 | `u32 work_max_pages, dma_max_pages` | 269、0 (下記の試行 RAM 上限、DMA なし) |
 | 56 | `u32 ops_abi, ops_size` | 1、16 (`hwdev_ops`: prefix 8B + call/release_work 各4B) |
 | 64 | `u32 reserved` | 0 |
 
@@ -189,9 +189,9 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 - KMOD export の `initialize` は `int (__cdecl *)(const struct hwdev_manifest **manifest, const struct hwdev_ops **ops)`。slot 充填後に一度呼び、静的な RO の2ポインタを返すだけ。登録・確保・I/O・core 呼出しをしない。失敗時は公開しない。manifest/ops の全 span が当該 body の RO 内、call/release_work が text 内であることを facade が checked 範囲検査する。
 - `hwdev_ops.call` の第5引数は実宣言どおり **`struct recover_transport *`** (const なし)。GF が max_polls を更新する。第4・6引数の const は維持。M3a は既存 `gfinit_call` への型照合を生成する。
 - 登録した body・ops・expr callback・静的許可表は boot 寿命、依存 KDEBUG handle を保持、stop=0、再初期化/差替え/hot unload なし。登録失敗は module rollback/隔離へ返し、公開前の参照だけを取り消す。
-- owner の試行 RAM 上限は **267頁 = 1,093,632B (1068KiB)**。2048 node で decode 67 + plan 40 + ROM 32 + flow 128頁を個別に丸める。旧251頁は1790 node時の値で、32MB機の試行中だけ約3%を所有する (PM 決定 2026-10-22)。**この上限と、計画の表の大きさ (GF_PLAN_TARGETS・GF_PLAN_RULES・GF_PLAN_LAYOUTS・GF_INIT_ARGS・RECOVER_CAPTURE_MAX など) は、物理的な制約 (起動 FD に入らない・部品の像の上限・番地の配置) に当たらなければ広げてよい** (ユーザー決定 2026-10-28「特に物理的な（フロッピーディスクに入らない）などがなければ拡張していいですよ」) — 枠に収めるために既存の利用を削らない。小さい静的 control は常駐 BSS に計上し、旧 SIZE_BARS flow は最大 flow の確保前に返す。
+- owner の試行 RAM 上限は **269頁 = 1,101,824B (1076KiB)**。2048 node で decode 69 + plan 40 + ROM 32 + flow 128頁を個別に丸める。旧251頁は1790 node時の値で、32MB機の試行中だけ約3%を所有する (PM 決定 2026-10-22)。**この上限と、計画の表の大きさ (GF_PLAN_TARGETS・GF_PLAN_RULES・GF_PLAN_LAYOUTS・GF_INIT_ARGS・RECOVER_CAPTURE_MAX など) は、物理的な制約 (起動 FD に入らない・部品の像の上限・番地の配置) に当たらなければ広げてよい** (ユーザー決定 2026-10-28「特に物理的な（フロッピーディスクに入らない）などがなければ拡張していいですよ」) — 枠に収めるために既存の利用を削らない。小さい静的 control は常駐 BSS に計上し、旧 SIZE_BARS flow は最大 flow の確保前に返す。
 - ROM/decode/plan/flow は専有 trial RAM。plan は decode の node/arg を借用し、profile は compiled の表を借用。PAUSED は bundle・lease・両 handle を保持。SIZE_BARS 成功から PREPARE までの保持も参照中として数える。同期 callback が帰る前に解放しない。
-- 終端順は局所 cleanup → 共通終端 → 核に結果保持 → plan/profile/expr/opaque の作業 RAM 参照解除 → release_work (I/Oなし・二重呼出し安全) → lease 解放。SIZE_BARS 成功の保持例外だけは解除/free を次の開始・中止まで送る。外部 recover、開始途中失敗、二重終端も同じ所有規則を使う。
+- 終端順は局所 cleanup → 共通終端 → 核に結果保持 → plan/profile/expr/opaque の作業 RAM 参照解除 → release_work (I/Oなし・二重呼出し安全) → lease 解放。SIZE_BARS 成功の保持例外は解除/free を次の開始・中止まで送る。GF_STAGES T1 の初期化完了後は [GF_STAGES_DESIGN §3・§10](GF_STAGES_DESIGN.md) に従い、S0 後も init・作業域・owner/lease を保持する。外部 recover、開始途中失敗、二重終端も同じ所有規則を使う。
 - FAILED/cold・PTE破損ラッチ・最後の結果・session 世代は核の boot 寿命で、部品の解放/再登録で初期化しない。核の S0 ops/profile に戻すまで部品作業 RAM を返さない。これらの実装は M4、M1 は契約の固定だけ。
 - M3a の body は `gfinit_call` と `gfinit_recover_end` を call/release_work に型照合して結ぶ。後者は既存の終端状態でだけ作業 RAM を返す実装を維持し、owner/lease の接続と全出口の整理は M4 の契約に従う。
 

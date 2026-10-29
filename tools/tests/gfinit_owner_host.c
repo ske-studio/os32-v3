@@ -119,6 +119,24 @@ int gfinit_plan_build_c(struct gfinit_plan *p,struct gfinit_decode *d,struct rec
     return rc;
 #endif
 }
+int gfinit_plan_baseline(struct gfinit_plan *p,struct recover_profile *profile,
+                         struct gf_stage_state *s,const u8 *rom,u32 size)
+{ (void)p;(void)profile;(void)s;(void)rom;(void)size;return 0; }
+int gf_stage_capture(struct recover *r,void *arg)
+{ CHECK(r==&core && owner->next_main==5);struct gf_stage_state *s=arg;
+#if !GF_VPLL_PROBE
+  s->initialized=true;
+#else
+  (void)s;
+#endif
+  return 0; }
+static u32 reentry_fault;
+int gf_stage_entry(struct recover *r) { CHECK(r==&core);return reentry_fault?-1:0; }
+int gfinit_plan_rebuild_c(struct gfinit_plan *p,struct gfinit_decode *d,
+                          struct recover_profile *profile,const struct gf_stage_state *s)
+{ (void)s;int rc=gfinit_plan_build_c(p,d,profile,0x100000,owner->rom,owner->rom_size);
+  p->c_node=0;d->nodes[0]=(struct recover_plan_node){.opcode=GF_C_OPCODE,.substep=GF_C_CHECK};
+  p->layouts[0].substep=GF_C_CHECK;p->layouts[0].flags=REC_LAYOUT_MODE_CHECK;return rc; }
 void gfinit_plan_read(struct gfinit_plan *p,const struct recover *r,const struct recover_bus_access *a,u32 value)
 { CHECK(p==owner->compiled && r==&core && a);plan_reads++;(void)value; }
 int gfinit_plan_verify(struct recover *r,void *v) { CHECK(r==&core && v==owner->compiled);verify_calls++;return 0; }
@@ -144,19 +162,19 @@ int recover_bind_plan(struct recover *r,const struct recover_profile *p,const st
 { CHECK(r==&core && b->valid_bits && b->flow_bits);
   CHECK(p->rules==owner->compiled->rules && p->targets==owner->compiled->targets && p->layouts==owner->compiled->layouts);
   CHECK(p->rule_count==(plan==&owner->size_plan?1U:2U));
-  CHECK(block_start[((u8 *)b->flow_bits-arena)/PAGE_SIZE]==PAGE_ALIGN_UP(plan->node_count*RECOVER_BITS_WORDS*4)/PAGE_SIZE);r->profile=p;r->plan=plan;*hash=123;return 0; }
+  CHECK(block_start[((u8 *)b->flow_bits-arena)/PAGE_SIZE]==PAGE_ALIGN_UP(plan->node_count*RECOVER_BITS_WORDS*4)/PAGE_SIZE);if(r->c_only)r->node_layout[0]=&owner->compiled->layouts[0];r->profile=p;r->plan=plan;*hash=123;return 0; }
 int trial_begin(struct recover *r,const struct recover_profile *p,u32 hash,u32 budget)
-{ CHECK((r->state==REC_IDLE || r->state==REC_VERIFIED) && p==r->profile && hash==123 && budget==p->trial_limit);begins++;event('B');r->token.session=++r->next_session;r->state=REC_PAUSED;r->expected_node=RECOVER_NONE;return 0; }
+{ CHECK((r->state==REC_IDLE || r->state==REC_VERIFIED || gf_stage_reentry(r)) && p==r->profile && hash==123 && budget==p->trial_limit);begins++;event('B');r->failed=false;r->cold_latched=p->cold_required;r->s0_verified=false;r->token.session=++r->next_session;r->state=REC_PAUSED;r->expected_node=r->c_only?0:RECOVER_NONE;return 0; }
 int trial_step(struct recover *r,const struct recover_token *token,bool approved,int (*operation)(struct recover *,void *),void *arg)
 {
     CHECK(token==&r->token && approved);if(r->state!=REC_PAUSED)return -1;
     steps++;event('S');r->state=REC_RUNNING;int rc=step_fail?-1:operation(r,arg);
-    if(rc){r->reason=REC_OPERATION;r->state=REC_FAILED;r->ops->local_cleanup(r->opaque);}
+    if(rc){stage.initialized=false;r->reason=REC_OPERATION;r->state=REC_FAILED;r->ops->local_cleanup(r->opaque);}
     else r->state=REC_PAUSED;
     return rc;
 }
 int trial_end(struct recover *r,const struct recover_token *token,enum recover_reason reason)
-{ CHECK(token==&r->token);if(r->state!=REC_PAUSED)return -1;ends++;event('E');r->reason=reason;r->ops->local_cleanup(r->opaque);r->state=REC_VERIFIED;r->plan=0;r->cache.bar[1].valid=true;r->cache.bar[1].length=0x100000;return 0; }
+{ CHECK(token==&r->token);if(r->state!=REC_PAUSED)return -1;ends++;event('E');r->reason=reason;r->ops->local_cleanup(r->opaque);r->state=REC_VERIFIED;r->s0_verified=true;if(stage.initialized)stage.s0_ok=true;r->plan=0;r->cache.bar[1].valid=true;r->cache.bar[1].length=0x100000;return 0; }
 int gfinit_exec_run(struct recover *r,void *arg)
 { struct gfinit_exec *e=arg;CHECK(r==&core && e->rom==owner->rom && e->rom_size==512);CHECK(e->main_id<5);run_mask|=1U<<e->main_id;e->steps=9;e->fail_pc=0;if(run_fail==e->main_id+1)return -1;writes++;return 0; }
 int gfinit_plan_c_control(struct gfinit_plan *p,struct recover *r)
@@ -187,7 +205,7 @@ static void setup(void)
     expand_fail=expand_calls=detach_fail=plan_reads=boot_fail=0;
     zero(&control,sizeof(control));owner=0;zero(&gf_lease,sizeof(gf_lease));gf_device.generation=1;gf_device.state=HWDEV_STOPPED_UNOWNED;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
-    mode_calls=mode_fail=0;
+    mode_calls=mode_fail=reentry_fault=0;stage=(struct gf_stage_state){0};
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
     image[0x40]=0xff;image[0x41]=0xb8;image[0x42]='B';image[0x43]='I';image[0x44]='T';
@@ -253,7 +271,25 @@ static void mode_c_test(void)
     core.node_layout[core.expected_node]=&owner->compiled->layouts[0];
     CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)==0 && mode_calls==1 && writes==old_writes+1 && core.state==REC_PAUSED);
     CHECK(call(GF_OP_MODESET,GF_ALLOW_WRITE,0)==0 && mode_calls==1); /* retransmit */
-    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && !live_pages && !owner->prepare_flags);
+    CHECK(call(GF_OP_ABORT,GF_ALLOW_WRITE,0)==0 && live_pages && stage.initialized && gf_lease.active);
+    /* main4 -> C -> abort -> restore's release callback -> c-only.
+     * The real core restore/sid behavior is covered by gf_stage_host.inc. */
+    u32 held=live_pages, sid=core.token.session, init_runs=run_mask;
+    void *backing=owner->flow;
+    gfinit_recover_end();
+    CHECK(stage.initialized && stage.s0_ok && gf_owned(&core) && gf_lease.session==sid);
+    struct gfinit_request retry=request(GF_ALLOW_WRITE|GF_MODE_C|GF_VERIFY_RECORD,0);
+    retry.session=0;
+    CHECK(!gfinit_call(GF_OP_C_ONLY,&retry,sizeof(retry),&base,&transport,&s0));
+    CHECK(core.token.session==sid+1 && gf_owned(&core) && stage.initialized);
+    CHECK(live_pages==held && owner->flow==backing && run_mask==init_runs);
+    CHECK(core.log_limit==1800*PIT_HZ && owner->profile.trial_limit==60*PIT_HZ);
+    CHECK(!call(GF_OP_ABORT,GF_ALLOW_WRITE,0));
+    reentry_fault=1;retry=request(GF_ALLOW_WRITE|GF_MODE_C,0);retry.session=0;
+    CHECK(gfinit_call(GF_OP_C_ONLY,&retry,sizeof(retry),&base,&transport,&s0)<0);
+    CHECK(!stage.initialized && !gf_lease.active && !live_pages);
+    output("T1 owner main4/C/abort/restore callback/c-only lease and backing retained PASS\n");
+
 #endif
 #if !GF_VPLL_PROBE
     setup();CHECK(call(GF_OP_INSPECT,0,0)==0);CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);
@@ -297,7 +333,11 @@ static void lifecycle(void)
         u32 before=steps;CHECK(call(GF_OP_RUN_ONE,GF_ALLOW_WRITE,main)==0 && steps==before);
     }
     CHECK(run_mask==31 && call(GF_OP_VERIFY,GF_ALLOW_WRITE,0)==0);
+    #if GF_VPLL_PROBE
     CHECK(verify_calls==1 && core.state==REC_VERIFIED && frees==1 && !owner->rom && !owner->inspected);
+#else
+    CHECK(verify_calls==1 && core.state==REC_VERIFIED && !frees && owner->rom && owner->inspected && stage.initialized);
+#endif
 }
 static void failures_test(void)
 {
@@ -519,6 +559,16 @@ static struct {
 #include "../../userland/shell/cmd_gfinit.c"
 static void cli_verify_test(void)
 {
+    /* No GeForce/init: rejection must echo this request, not the prior policy. */
+    for(u32 mode=0;mode<3;mode++) {
+        setup();core.verify_record=mode!=0;
+        struct gfinit_request q=request(GF_ALLOW_WRITE|GF_MODE_C|
+            (mode==0?GF_VERIFY_RECORD:mode==1?GF_VERIFY_REQUIRED:0),0);
+        CHECK(gfinit_call(GF_OP_C_ONLY,&q,sizeof(q),&base,&transport,&s0)<0);
+        CHECK(equal(serial_output,mode==0?"GF C verify=record result=NG\n":
+                    "GF C verify=required result=NG\n"));
+        CHECK(!reads && !writes && !begins);
+    }
     char *args[]={"gfinit","prepare","5","--mode-c","--allow-write","--verify","required","--no-verify-file","/verify.txt"};
     setup();kdebug.ops.dbg_call=cli_dispatch;cli_live=0;cli_result=0;api.version=78;api.kdebug_call=kdebug_call;
     cli_file=" # comment\nMMIO 680a24 # write-only\r\nCR 1c\nSR 01";cli_file_fail=0;cli_file_closes=0;
@@ -543,6 +593,13 @@ static void cli_verify_test(void)
     cli_file=0;clear_output();
     CHECK(shell_cmd_gfinit(9,args)==2 && cli_calls==before && cli_file_closes==closed+1);
     CHECK(equal(serial_output,rejected));
+    char *again[]={"gfinit","c-only","--allow-write","--verify","record"};
+    CHECK(!shell_cmd_gfinit(5,again) && cli_op==GF_OP_C_ONLY && !cli_request.session);
+    CHECK(cli_request.flags==(GF_ALLOW_WRITE|GF_MODE_C|GF_VERIFY_RECORD));
+    again[4]="required";
+    CHECK(!shell_cmd_gfinit(5,again) && cli_request.flags==(GF_ALLOW_WRITE|GF_MODE_C|GF_VERIFY_REQUIRED));
+    CHECK(!shell_cmd_gfinit(3,again) && cli_request.flags==(GF_ALLOW_WRITE|GF_MODE_C));
+    again[2]="--unknown";CHECK(shell_cmd_gfinit(5,again)==2);
     output("CLI verify required/file parsing, comments, hex and errors PASS\n");
 }
 static void cli_test(void)

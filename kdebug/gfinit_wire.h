@@ -8,6 +8,7 @@
 #define GF_MODE_C 2U
 #define GF_VERIFY_REQUIRED 8U
 #define GF_NO_VERIFY_FILE 16U
+#define GF_VERIFY_RECORD 32U
 #define GF_NO_VERIFY_MAX 64U
 enum gfinit_verify_kind { GF_VERIFY_MMIO, GF_VERIFY_CR, GF_VERIFY_SR };
 struct gfinit_no_verify { u32 kind, reg; };
@@ -18,6 +19,7 @@ struct gfinit_no_verify { u32 kind, reg; };
 #define GF_OP_VERIFY 9U
 #define GF_OP_ABORT 10U
 #define GF_OP_MODESET 13U
+#define GF_OP_C_ONLY 14U
 struct gfinit_request {
     u32 version, size, flags, session, script_id, max_steps;
     u32 status, fail_pc, fail_reg, steps;

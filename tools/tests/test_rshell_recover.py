@@ -79,10 +79,10 @@ def cases(m):
     run(ECHO+META+'\x04', good=True)
     for old, new in [('sid=7','sid=6'), ('seq=3','seq=4'), ('lost_lines=0','lost_lines=1'),
                      ('verified=1','verified=0'), ('result=OK','result=FAIL'),
-                     ('unknown=0','unknown=1'), ('override=0','override=1'),
-                     ('txd=0','txd=1'), ('trial=0','trial=1'),
-                     ('result=OK','result=PARTIAL'), ('fn=NONE','fn=PUT')]:
+                     ('txd=0','txd=1'),
+                     ('fn=NONE','fn=PUT')]:
         run(ECHO+META+FINAL.replace(old,new)+'\x04')
+    run(ECHO+META+FINAL.replace('result=OK','result=PARTIAL').replace('unknown=0','unknown=1').replace('override=0','override=1').replace('trial=0','trial=1')+'\x04', good=True)
     run(ECHO+META+FINAL+'recover: rejected rc=-1\n\x04')
     run(ECHO+FINAL+'\x04')
     run(ECHO+'\x04')
@@ -167,8 +167,8 @@ def gfinit_cases(m):
                 ('gfinit: rejected rc=-1\n', False),
                 (meta+'gfinit: rejected rc=-1\n', False),
                 (meta+final+'gfinit: rejected rc=-1\n', False),
-                (meta+final.replace('result=OK', 'result=PARTIAL'), False),
-                (meta+final.replace('override=0', 'override=1'), False)]:
+                (meta+final.replace('result=OK', 'result=PARTIAL'), True),
+                (meta+final.replace('override=0', 'override=1'), True)]:
             data = ('> '+command+'\n'+ending+'\x04').encode()
             port = Port(data, split=split)
             raw = io.BytesIO(); saves = []; records = m.Records(0)
@@ -207,7 +207,9 @@ def gfinit_cases(m):
                         '--state', str(state), '--log', str(log), '--command', command]
                 with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), redirect_stdout(io.StringIO()) as out:
                     assert m.main() == 1
-                assert out.getvalue().strip() == 'recover: guest rejected recovery'
+                assert out.getvalue().splitlines() == [
+                    'REC RUN max interval: n/a s after phase=n/a',
+                    'recover: guest rejected recovery']
                 assert json.loads(state.read_text())['invalid'] == 'guest rejected recovery'
                 assert port.writes == [(command + '\n').encode()] and closed == [True]
                 assert log.read_bytes().endswith(data)
@@ -357,7 +359,7 @@ def protocol_cases(m):
     body = row(1, 'state', 'RESTORING', meta+' cleanup_seconds=17')+row(2, 'diag', 'TX', diag)+row(3, 'final', 'END', final)
     for split in (1, 256):
         saved, warning = exchange((ECHO+body+'\x04').encode(), good=True, split=split)
-        assert '--cleanup-timeout' in warning and '22' in warning
+        assert not warning
         assert saved[-1]['cleanup_seconds'] == 17
         exchange((ECHO+body.replace('\n', '\r\n')+'\x04').encode(), good=True, split=split)
         # Missing diagnostic, missing prefix/LF, partial token, empty row deletion.
@@ -377,161 +379,263 @@ def protocol_cases(m):
             opened.assert_not_called()
 
 
-def vpll_cases(m):
-    for version in (4, m.VPLL_VERSION_1, m.VPLL_VERSION):
-        for i, offset in enumerate(m.VPLL_OFFSETS):
-            for value in (0xffffffff, 0x80000e02):
-                rec = m.Records(7)
-                rec.line(META.replace('version=1', 'version=%d' % version))
-                rec.line('REC sid=7 seq=2 phase=gf_pre event=BEGIN main=2 pc=58915 opcode=75 exec=1 substep=%d' % (m.VPLL_FIRST+i))
-                rec.line('REC sid=7 seq=3 phase=gf_bus event=BEGIN pc=58915 bar=0 off=%d width=4 old=1 new=2' % offset)
-                try:
-                    rec.line('REC sid=7 seq=4 phase=gf_bus event=END pc=58915 bar=0 off=%d width=4 readback=%d rc=0' % (offset, value))
-                except m.RecoverError:
-                    assert version not in (m.VPLL_VERSION_1, m.VPLL_VERSION) and value != 0xffffffff
-                else:
-                    assert version in (m.VPLL_VERSION_1, m.VPLL_VERSION) or value == 0xffffffff
-
-    for old in (4, 5):
-        rec = m.Records(7)
-        rec.line(META.replace('version=1', 'version=%d' % m.VPLL_VERSION))
-        rec.line('REC sid=7 seq=2 phase=gf_pre event=BEGIN main=2 pc=58915 opcode=75 exec=1 substep=%d' % m.VPLL_STAGE2_FIRST)
-        rec.line('REC sid=7 seq=3 phase=gf_bus event=BEGIN pc=58915 bar=0 off=6817036 width=4 old=%d new=516' % old)
-        rec.line('REC sid=7 seq=4 phase=gf_bus event=END pc=58915 bar=0 off=6817036 width=4 readback=516 rc=0')
-        assert rec.data['vpll_comparison_valid'] == (old == 4)
-
 def mode_c_cases(m):
-    assert m.mode_c_timeout(9600, 23) == 1081
-    assert m.mode_c_timeout(19200, 23) == 585
-    def run(fault=None):
-        rec = m.Records(7)
-        rec.data['mode_c_active'] = True
-        rec.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
-        rows = []
-        def add(phase, event, fields):
-            rows.append('phase=%s event=%s %s' % (phase, event, fields))
-        def pair(phase, fields, end):
-            add(phase, 'BEGIN', fields)
-            add(phase, 'END', end)
-        for space, port, index, off in ((1, 0, 4294967295, 0x680a24), (5, 0x3d4, 0x1c, 0x6013d5), (5, 0x3c4, 1, 0x0c03c5)):
-            pair('gf_bus', 'pc=4294967295 bar=0 off=%d width=4 old=0 new=1048575' % off,
-                 'pc=4294967295 bar=0 off=%d width=4 readback=0 mismatch=1 space=%d port=%d index=%d rc=0' % (off, space, port, index))
-        for direction in (1, 0):
-            f = 'pc=4294967295 bar=1 off=0 len=307200 dir=%d' % direction
-            pair('gf_bus', f, f + ' bad_off=4294967295 expected=4294967295 actual=4294967295 rc=0')
-        pair('gf_bus', 'pc=4294967295 bar=0 row=1 off=6296512 len=1 dir=1',
-             'pc=4294967295 bar=0 row=1 off=6296512 len=1 dir=1 rc=0')
-        pair('wait', 'step=1 addr=10', 'rc=0 elapsed=1')
-        for step in (2, 7):
-            pair('cell', 'step=%d addr=0' % step, 'rc=0 elapsed=1')
-        pair('route', 'step=9 addr=4012', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
-        for key, off, mask, value in ((10, 0x68050c, 0xefffffff, 0x10000204),
-                                      (11, 0x680508, 0x7ffff, 123),
-                                      (12, 0x680578, 0x8000ffff, 456)):
-            pair('access', 'step=%d addr=%d' % (key, off), 'rc=0 elapsed=1')
-            add('check', 'END', 'source=0 key=%d mask=%d expected=%d actual=%d rc=0' % (key, mask, value, value))
-        for i in range(61):
-            add('check', 'END', 'source=1 key=4294967295 mask=4294967295 expected=1 actual=1 rc=0')
-        add('check', 'END', 'source=2 key=4294967295 mask=3 expected=1 actual=1 rc=0')
-        add('check', 'END', 'source=3 key=4294967295 mask=4294967295 expected=1 actual=1 rc=0')
-        if fault == 'check':
-            i = next(i for i, x in enumerate(rows) if 'source=1 ' in x)
-            rows[i] = rows[i].replace('actual=1', 'actual=0')
-        if fault == 'route': rows = [x.replace('mask=3 expected=1 actual=1', 'mask=3 expected=1 actual=0') for x in rows]
-        if fault == 'cell': rows[-1] = rows[-1].replace('actual=1', 'actual=0')
-        if fault == 'missing': rows.pop(1)
-        try:
-            for seq, row in enumerate(rows, 1):
-                rec.line('REC sid=7 seq=%d %s' % (seq, row))
-            assert rec.mode_c_success()
-            assert len(rec.data['mode_c_evidence']['mismatches']) == 3
-        except (m.RecoverError, AssertionError):
-            assert fault is not None
-        else:
-            assert fault is None
-            lines = ['REC sid=7 seq=%d %s\n' % (i, row) for i, row in enumerate(rows, 1)]
-            lines.append('REC sid=7 seq=%d phase=state event=PAUSED version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n' % (len(rows) + 1))
-            port = Port(('> gfinit modeset 7 --allow-write\n' + ''.join(lines) + '\x04').encode())
-            fresh = m.Records(7)
-            fresh.data['mode_c_active'] = True
-            fresh.data['mode_c_trial'] = True
-            fresh.data['mode_c_evidence'] = dict(vram=[], route=0, cell=False, cell_steps=[], checks=0, registers={})
+    # The monitor copies arbitrary guest observations, without a register oracle.
+    for mode in ('record', 'required'):
+        for result in ('OK', 'NG', None):
+            command = 'gfinit modeset 7 --allow-write'
+            rows = ('REC sid=7 seq=1 phase=check event=END source=0 key=9 mask=255 expected=1 actual=99 rc=1\n'
+                    'REC sid=7 seq=2 phase=state event=PAUSED version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n')
+            guest = '' if result is None else 'GF C verify=%s result=%s\n' % (mode, result)
+            port = Port(('> '+command+'\n'+rows+guest+'\x04').encode())
+            rec = m.Records(7)
             with redirect_stdout(io.StringIO()) as output:
-                assert m.exchange(port, 'gfinit modeset 7 --allow-write', fresh, 100, 23, io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
-            assert '機械項目合格・映像保留' in output.getvalue()
-            assert 'record-only mismatches=3' in output.getvalue()
-            assert 'MMIO 680A24 written=000FFFFF readback=00000000' in output.getvalue()
-            assert 'CR 00001C' in output.getvalue() and 'SR 000001' in output.getvalue()
-            assert not fresh.data['mode_c_active'] and fresh.data['mode_c_trial']
-            cleanup_cases(m, fresh.data)
-
-    for fault in (None, 'check', 'route', 'cell', 'missing'):
-        run(fault)
-
-
-def cleanup_cases(m, saved):
-    class DelayedPort(Port):
-        def __init__(self, command, seq):
-            super().__init__(('> '+command+'\n').encode())
-            self.seq, self.stage = seq, 0
-            self.last = 0
-        def read(self, count):
-            if not self.data and self.stage == 0:
-                self.data.extend(('REC sid=7 seq=%d phase=state event=RESTORING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13 cleanup_seconds=3\n' % self.seq).encode())
-                self.stage = 1
-                self.last = self.t
-            elif not self.data and self.stage == 1 and self.t > self.last + 2:
-                self.data.extend((DIAG.replace('seq=2', 'seq=%d' % (self.seq+1)) + FINAL.split('\n', 1)[1].replace('seq=3', 'seq=%d' % (self.seq+2)) + '\x04').encode())
-                self.stage = 2
-            return super().read(count)
-    for is_c in (True, False):
-        for abort in (True, False):
-            state = dict(saved)
-            state['mode_c_trial'] = is_c
-            records = m.Records(7, state)
-            command = 'gfinit abort 7 --allow-write' if abort else 'recover now 7'
-            port = DelayedPort(command, state['seq'] + 1)
-            raw = io.BytesIO()
-            try:
-                with redirect_stderr(io.StringIO()):
-                    result = m.exchange(port, command, records, 1, 1, raw, lambda _: None, port.clock)
-            except m.RecoverError:
-                assert not is_c
-            else:
-                assert is_c and result == 'OK'
-            assert (b'phase=final' in raw.getvalue()) == is_c, (is_c, abort, port.t, raw.getvalue(), records.data['invalid'])
-            assert (m.abort_frame(7) in port.writes) == (not is_c)
+                try:
+                    value = m.exchange(port,command,rec,10,1,io.BytesIO(),lambda _:None,port.clock)
+                except m.RecoverError:
+                    assert result != 'OK'
+                else:
+                    assert result == 'OK' and value == 'PAUSED'
+                    assert guest.strip() in output.getvalue()
+                    assert ('観測完了' if mode == 'record' else '機械項目合格・映像保留') in output.getvalue()
+    # C's result remains mandatory after abort/S0, independently of S0's result.
+    for verb in ('modeset 7', 'c-only'):
+        command = 'gfinit '+verb+' --allow-write --verify record'
+        for terminal in ('OK', 'PARTIAL'):
+            rows = META.replace('event=PAUSED', 'event=RESTORING').rstrip('\n')+' cleanup_seconds=17\n'
+            rows += FINAL.replace('result=OK', 'result='+terminal).replace('trial=0', 'trial=1')
+            for result in (None, 'NG', 'OK'):
+                guest = '' if result is None else 'GF C verify=record result='+result+'\n'
+                port = Port(('> '+command+'\n'+rows+guest+'\x04').encode())
+                with redirect_stdout(io.StringIO()):
+                    try:
+                        value = m.exchange(port,command,m.Records(0),10,1,io.BytesIO(),lambda _:None,port.clock)
+                    except m.RecoverError as exc:
+                        assert result != 'OK', str(exc)
+                        assert 'guest C' in str(exc)
+                    else:
+                        assert result == 'OK' and value == terminal
+    assert not hasattr(m,'MODE_C_CHECK_COUNT') and not hasattr(m.Records,'mode_c_success')
 
 
 def mode_c_cli_cases(m):
     with tempfile.TemporaryDirectory(prefix='recover_cli_') as tmp:
-        state = Path(tmp)/'state'
-        log = Path(tmp)/'log'
-        for whitespace in ('  ', '\t'):
-            command = 'gfinit' + whitespace + 'modeset 7 --allow-write'
+        state, log = Path(tmp)/'state', Path(tmp)/'log'
+        for command, expected in [('gfinit  modeset 7 --allow-write',1800),
+                                  ('gfinit\trun-one 7 4 --allow-write',900),
+                                  ('gfinit size-bars 7 --allow-write',240),
+                                  ('gfinit abort 7 --allow-write',180)]:
             previous = m.Records(7).data
-            previous['image_crc'] = '1234abcd'
+            previous['image_crc']='1234abcd'
             state.write_text(json.dumps(previous))
-            port = Port(('> '+command+'\n'+META+'\x04').encode())
-            port.close = lambda: None
-            argv = ['rshell_recover', '--session', '7', '--image-crc', '1234abcd', '--state', str(state), '--log', str(log), '--command', command, '--timeout', '1', '--cleanup-timeout', '23']
-            with patch.object(sys, 'argv', argv), patch.object(m, 'open_port', return_value=port), patch.object(m, 'exchange', wraps=m.exchange) as exchange, redirect_stdout(io.StringIO()):
-                assert m.main() == 1  # PAUSED without C evidence is rejected.
-            assert exchange.call_args.args[3] == m.mode_c_timeout(9600, 23)
-            assert json.loads(state.read_text())['mode_c_trial']
+            port=Port(b'');port.close=lambda:None
+            argv=['monitor','--session','7','--image-crc','1234abcd','--state',str(state),'--log',str(log),'--command',command]
+            with patch.object(sys,'argv',argv),patch.object(m,'open_port',return_value=port),patch.object(m,'exchange',return_value='PAUSED') as exchange,redirect_stdout(io.StringIO()):
+                assert m.main()==0
+            assert exchange.call_args.args[3]==expected
+
+
+def restore_cases(m):
+    assert m.RESTORE_IDLE_SECONDS == 30
+    # rshell emits no new EOT while idle: reply only after a command is written.
+    class Shell(Port):
+        def write(self, data):
+            count = super().write(data)
+            if data == b'recover restore\n':
+                self.restore_at = self.t
+                self.data += b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+            return count
+
+    command = 'gfinit c-only --allow-write --verify required'
+    for terminal in ('PAUSED', 'S0'):
+        rows = META + (FINAL if terminal == 'S0' else '')
+        reply = '> ' + command + '\n' + rows + 'GF C verify=required result=OK\n\x04'
+        port = Shell(reply.encode())
+        with redirect_stdout(io.StringIO()):
+            assert m.exchange(port, command, m.Records(0), 20, 1,
+                              io.BytesIO(), lambda _: None, port.clock) == (
+                                  'PAUSED' if terminal == 'PAUSED' else 'OK')
+        assert not port.data
+        port.writes.clear()
+        idle_at = port.t
+        raw = io.BytesIO()
+        assert m.restore_exchange(port, 60, 1, raw, port.clock) == 'OK'
+        assert port.writes == [b'recover restore\n']
+        assert 30 <= port.restore_at - idle_at < 30.1
+        assert raw.getvalue() == b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+
+    with tempfile.TemporaryDirectory(prefix='restore_cli_') as tmp:
+        state, log=Path(tmp)/'state',Path(tmp)/'log'
+        for bad in ('{broken',json.dumps(dict(invalid='old failure',image_crc='wrong')), '[]'):
+            for broken_log in (False,True):
+                state.write_text(bad)
+                command='recover restore'
+                rows=META.replace('seq=1','seq=41')+DIAG.replace('seq=2','seq=42')+FINAL.split('\n',1)[1].replace('seq=3','seq=43').replace('result=OK','result=PARTIAL')
+                port=Port(('\x04> '+command+'\n'+rows+'\x04').encode());port.close=lambda:None
+                argv=['monitor','--restore','--state',str(state),'--image-crc','invalid','--log',str(log/'missing' if broken_log else log)]
+                with patch.object(sys,'argv',argv),patch.object(m,'open_port',return_value=port),redirect_stdout(io.StringIO()):
+                    assert m.main()==0
+                assert port.writes==[b'recover restore\n']
+                assert state.read_text()==bad
+        # Without EOT it still sends restore and the existing sid abort on timeout.
+        port=Port(b'\x04> recover restore\n'+META.encode());port.close=lambda:None
+        argv=['monitor','--restore','--log',str(log),'--timeout','.1','--cleanup-timeout','.1']
+        restore=m.restore_exchange
+        with patch.object(sys,'argv',argv),patch.object(m,'open_port',return_value=port),patch.object(m,'restore_exchange',wraps=lambda *a: restore(*a,clock=port.clock)),redirect_stdout(io.StringIO()):
+            assert m.main()==1
+        assert port.writes[0]==b'recover restore\n'
+
+    # A current RUN stream uses the existing abort frame, with no shell command.
+    running=META.replace('event=PAUSED','event=RUNNING')
+    # Late bytes restart the quiet interval, including an unfinished row.
+    class LateShell(Shell):
+        def __init__(self, pending):
+            super().__init__(b'')
+            self.pending = list(pending)
+            self.last_rx = 0
+        def read(self, count):
+            self.t += .25
+            if self.pending and self.t >= self.pending[0][0]:
+                self.data += self.pending.pop(0)[1]
+            chunk = super().read(count)
+            if chunk:
+                self.last_rx = self.t
+            return chunk
+        def write(self, data):
+            self.quiet_since = self.last_rx
+            return super().write(data)
+
+    partial = b'7 seq=20 phase=access'
+    tail = b' event=END rc=0 elapsed=1\n' + (running + FINAL + '\x04').encode()
+    port = LateShell([(8, partial), (17, tail)])
+    raw = io.BytesIO()
+    assert m.restore_exchange(port, 30, 1, raw, port.clock) == 'OK'
+    assert port.writes == [m.abort_frame(7)]
+    assert raw.getvalue() == partial + tail
+    for prefix in (b'noise\n', partial, b'x' * (m.MAX_LINE + 1)):
+        port = LateShell([(8, prefix)])
+        raw = io.BytesIO()
+        assert m.restore_exchange(port, 60, 1, raw, port.clock) == 'OK'
+        assert port.writes == [b'recover restore\n']
+        assert 30 <= port.restore_at - port.quiet_since < 30.3
+        assert raw.getvalue() == prefix + b'> recover restore\n' + (META + FINAL).encode() + b'\x04'
+
+    # r3's real-core fixture: attach after VRAM BEGIN, then 14.4 s without REC.
+    # The unseen BEGIN still makes parsing fail, but abort must use the live sid.
+    end = ('REC sid=1 seq=2 phase=gf_bus event=END pc=4294967295 bar=1 off=0 '
+           'len=307200 dir=1 bad_off=4294967295 expected=4294967295 '
+           'actual=4294967295 rc=0\n')
+    paused = META.replace('sid=7 seq=1', 'sid=1 seq=3')
+    class QuietRun(Port):
+        def __init__(self):
+            super().__init__(b'')
+            self.released = False
+            self.write_times = []
+        def read(self, count):
+            if self.t >= 14.4 and not self.released:
+                self.data += (end + paused + '\x04').encode()
+                self.released = True
+            return super().read(count)
+        def write(self, data):
+            self.write_times.append(self.t)
+            return super().write(data)  # RUN discards shell text; no echo/reply.
+
+    port = QuietRun()
+    with redirect_stdout(io.StringIO()):
+        try:
+            m.restore_exchange(port, 20, 1, io.BytesIO(), port.clock)
+        except m.RecoverError as exc:
+            assert 'unmatched BEGIN/END' in str(exc)
+        else:
+            raise AssertionError('unseen VRAM BEGIN accepted')
+    assert port.writes == [m.abort_frame(1)]
+    assert 14.4 <= port.write_times[0] < 14.5
+
+    port=Port((running+FINAL+'\x04').encode(),split=len(running))
+    with redirect_stdout(io.StringIO()):
+        assert m.restore_exchange(port,10,1,io.BytesIO(),port.clock)=='OK'
+    assert port.writes==[m.abort_frame(7)]
+    # Empty reads and attachment mid-row do not establish shell readiness.
+    fragment = b'7 seq=20 phase=access event=END rc=0 elapsed=1\n'
+    for prefix in (b'', fragment, b'x sid=8 seq=1 phase=state event=RUNNING version=1 profile_crc=11 plan_hash=12 snapshot_crc=13\n'):
+        for split in (1, 7, 256):
+            data = prefix+(running+FINAL+'\x04').encode()
+            port=Port(data,split=split,idle_reads=2);raw=io.BytesIO()
+            assert m.restore_exchange(port,10,1,raw,port.clock)=='OK'
+            assert port.writes==[m.abort_frame(7)]
+            assert raw.getvalue()==data
+    for data in (b'', b'REC sid=7 seq=', fragment, META.encode(), FINAL.encode()):
+        port=Port(data,split=7);raw=io.BytesIO()
+        try:
+            m.restore_exchange(port,.5,.5,raw,port.clock)
+        except m.RecoverError as exc:
+            assert 'physical recovery' in str(exc) or 'missing' in str(exc)
+        else:
+            raise AssertionError('unknown state accepted')
+        # A diagnostic before final is an active stream and may request abort.
+        assert port.writes==([m.abort_frame(7)] if data==FINAL.encode() else [])
+        assert raw.getvalue()==data
+
+
+def interval_cases(m):
+    class TimedPort(Port):
+        def __init__(self, pending):
+            super().__init__(b'')
+            self.pending = list(pending)
+        def clock(self):
+            return self.t
+        def read(self, count):
+            if not self.data:
+                if not self.pending:
+                    self.t += 1
+                    return b''
+                self.t, data = self.pending.pop(0)
+                self.data += data
+            chunk = bytes(self.data[:count])
+            del self.data[:len(chunk)]
+            return chunk
+
+    # Ignore time before RUN and non-REC progress; report even on missing EOT.
+    for gap in (14.4, 35):
+        for eot in ('\x04', ''):
+            pending = [(0, ECHO + META),
+                       (100, META.replace('seq=1', 'seq=2').replace('PAUSED', 'RUNNING')),
+                       (102, 'REC sid=7 seq=3 phase=gf_bus event=BEGIN pc=1 bar=1 off=0 len=307200 dir=1\n'),
+                       (109, 'VRAM transfer in progress\n'),
+                       (102 + gap, 'REC sid=7 seq=4 phase=gf_bus event=END pc=1 bar=1 off=0 len=307200 dir=1 bad_off=0 expected=0 actual=0 rc=0\n'),
+                       (103 + gap, META.replace('seq=1', 'seq=5') + eot)]
+            port = TimedPort([(at, row.encode()) for at, row in pending])
+            with redirect_stdout(io.StringIO()) as output:
+                try:
+                    result = m.exchange(port, 'recover now 7', m.Records(7), 180, 1,
+                                        io.BytesIO(), lambda _: None, port.clock)
+                except m.RecoverError as exc:
+                    assert not eot and 'host timeout' in str(exc)
+                else:
+                    assert eot and result == 'PAUSED'
+            assert output.getvalue().splitlines() == [
+                'REC RUN max interval: %.3f s after phase=gf_bus' % gap]
+            assert port.writes == [b'recover now 7\n'] + ([m.abort_frame(7)] if not eot else [])
+
+    # Two rows received in the same chunk have a measured zero interval.
+    rows = META.replace('PAUSED', 'RUNNING') + META.replace('seq=1', 'seq=2')
+    for rows, expected in ((rows, '0.000 s after phase=state'),
+                           (META, 'n/a s after phase=n/a')):
+        port = TimedPort([(0, (ECHO + rows + '\x04').encode())])
+        with redirect_stdout(io.StringIO()) as output:
+            assert m.exchange(port, 'recover now 7', m.Records(7), 10, 1,
+                              io.BytesIO(), lambda _: None, port.clock) == 'PAUSED'
+        assert output.getvalue().strip() == 'REC RUN max interval: ' + expected
 
 
 MUTATIONS = [
-    ('mode_c_split', "' '.join(command.split())", 'command'),
-    ('mode_c_cleanup', "if records.data.get('mode_c_trial'):", "if records.data.get('mode_c_active'):"),
-    ('mode_c_check', '(actual ^ expected) & mask', '0'),
-    ('vpll_version', 'version not in (VPLL_VERSION_1, VPLL_VERSION)', 'False'),
+    ('guest_c', "if c_result is None or c_result[2] != 'OK':", 'if False:'),
     ('session', "sid != candidate_sid or seq != self.data['seq'] + 1", "seq != self.data['seq'] + 1"),
     ('sequence', "sid != candidate_sid or seq != self.data['seq'] + 1", "sid != candidate_sid"),
     ('required', "if name not in fields:  # Mandatory fields must precede state updates.", "if False:  # Mandatory fields must precede state updates."),
     ('pop', '                stack.pop()', '                pass'),
     ('identity', "or any(stack[-1][key] != fields[key] for key in ids)", 'or False'),
-    ('fragment', "if line or dropping:\n                    record_failure('truncated line before EOT/deadline')", "if False:\n                    record_failure('truncated line before EOT/deadline')"),
+    ('fragment', "if line or dropping:\n                        record_failure('truncated line before EOT/deadline')", "if False:\n                        record_failure('truncated line before EOT/deadline')"),
     ('loss', "f.get('lost_lines') == '0'", 'True'),
     ('verify', "f.get('verified') == '1'", 'True'),
     ('echo', 'if not echo:', 'if False:'),
@@ -556,9 +660,10 @@ def mutation(item):
             status_cases(mutant)
             gfinit_cases(mutant)
             protocol_cases(mutant)
-            vpll_cases(mutant)
             mode_c_cases(mutant)
             mode_c_cli_cases(mutant)
+            restore_cases(mutant)
+            interval_cases(mutant)
         except (AssertionError, mutant.RecoverError):
             return name + ': RED', 0
         return name + ': GREEN', 1
@@ -572,9 +677,10 @@ def main():
     status_cases(load(SRC))
     gfinit_cases(load(SRC))
     protocol_cases(load(SRC))
-    vpll_cases(load(SRC))
     mode_c_cases(load(SRC))
     mode_c_cli_cases(load(SRC))
+    restore_cases(load(SRC))
+    interval_cases(load(SRC))
     print('recover host: PASS')
     if args.mutate:
         # Serial: status_cases patches sys.modules/argv/stdout, which threads would share.

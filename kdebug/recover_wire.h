@@ -5,8 +5,11 @@
 #define KDEBUG_OP_RECOVER_STATUS 3U
 #define KDEBUG_OP_RECOVER_NOW 4U
 #define KDEBUG_OP_RECOVER_ROUTE_TEST 12U
+#define KDEBUG_OP_RECOVER_RESTORE 15U
+
 /* Private module entry, deliberately outside the hwdev shared contract. */
 struct recover;
+int recover_restore_session(struct recover *r);
 int recover_route_test_session(struct recover *r, u32 session);
 typedef struct KdebugRecover {
     u32 session, state, reason, verified;

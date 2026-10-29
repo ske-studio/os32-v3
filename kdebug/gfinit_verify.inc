@@ -8,7 +8,6 @@
 static int gfinit_verify_policy(struct gfinit_plan *out, struct recover_profile *p,
                                u32 flags, const struct gfinit_no_verify *regs, u32 count)
 {
-    if (!((flags & GF_VERIFY_REQUIRED) || count)) return 0;
     u32 matched[GF_NO_VERIFY_MAX] = {0};
     if (!(out->mode_flags & GF_MODE_C) || count > GF_NO_VERIFY_MAX) return -1;
     for (u32 i = 0; i < p->rule_count; i++) {
@@ -32,7 +31,7 @@ static int gfinit_verify_policy(struct gfinit_plan *out, struct recover_profile 
                   (regs[j].kind == GF_VERIFY_SR && t->port == RECOVER_SEQ)));
             if (hit) { matched[j] = 1; selected = true; }
         }
-        if (selected || ((flags & GF_VERIFY_REQUIRED) && !required)) {
+        if (selected || !required || (flags & GF_VERIFY_RECORD)) {
             w->flags |= REC_VERIFY_RECORD;
             /* Even table entries with no readback become evidence-only reads. */
             if (!w->verify_mask) w->verify_mask = t->width == 1 ? GF_MODE_BYTE_MASK : ~0U;

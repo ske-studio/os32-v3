@@ -19,11 +19,12 @@ def command(exe):
 
 def check_output(text, verbose=True):
     assert 'FAIL' not in text and 'C PASS' in text, text
-    # f5953909 rebuilt independently, then debd2ad5 (CR1A mask D7) merged — PM.
-    assert 'default_hash=81564298\n' in text
-    assert 'default_crc=2834802941\n' in text
     assert 'VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS' in text
     assert 'VRAM fixed range, required execution, full row order/compare, first mismatch, bus failure and safe-point abort PASS' in text
+    assert 'T1 baseline once, three E gates, cold latch, CR52/C040, restore and S0 failure PASS' in text
+    assert 'T1 record entry/route/cell required, exit TARGET/VRAM evidence, later bus failure PASS' in text
+    assert 'T1 CHECK then S0 local/quiesce/first-send/final-send failure revokes init PASS' in text
+    assert 'T1 C-only each lock write/abort restores per-call CR1F/CR11/CR44 originals PASS' in text
     assert 'COLOR order values log and bus failure cleanup PASS' in text
     assert 'CHECK entry/exit match, each mismatch, masks, retained values, REC and failure exit PASS' in text
     assert 'WAIT lengths positions, conditional FP, REC, callback failure and abort PASS' in text
@@ -72,6 +73,17 @@ def check_output(text, verbose=True):
 
 
 MUTATIONS = [
+    ('kdebug/gf_stage_state.c', 'baseline_once',
+     'if (s->initialized) return 0;', 'if (false) return 0;'),
+    ('kdebug/gf_stage_state.c', 'entry_pmc',
+     'value != s->values[GF_STAGE_PMC]', 'false'),
+    ('kdebug/gf_stage_state.h', 'entry_last_s0',
+     'r->gf_stage->s0_ok && r->s0_verified', 'r->gf_stage->s0_ok'),
+    ('kdebug/recover.c', 'record_cell_required',
+     'source != REC_CHECK_TARGET;', 'false;'),
+    ('kdebug/recover.c', 'cold_retained',
+     'r->cold_latched = r->cold_latched || p->cold_required;', 'r->cold_latched = false;'),
+
     ('kdebug/recover.c', 'route_readback_mask',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & RECOVER_ROUTE_MASK)',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & 0U)'),

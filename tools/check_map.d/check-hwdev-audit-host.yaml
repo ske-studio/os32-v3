@@ -18,4 +18,6 @@ check-hwdev-audit-host:
 - kdebug/generated/recover_gf_tables.inc
 - sdk/kapi.json
 - tools/tests/test_hwdev_audit.py
+- kdebug/gf_stage_state.c
+- kdebug/gf_stage_state.h
 artifact_reader: true

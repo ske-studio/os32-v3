@@ -1,4 +1,5 @@
 #include "recover.h"
+#include "gf_stage_state.h"
 #include "recover_wire.h"
 #include "recover_diag.h"
 #include "../hwdev/gfinit_mode.h"
@@ -192,6 +193,11 @@ static bool token_matches(const struct recover *r, const struct recover_token *t
 static void fail(struct recover *r, enum recover_reason reason,
                  enum recover_phase phase, u32 key)
 {
+    /* Keep the first diagnostic, but a later S0 failure must revoke re-C. */
+    if (r->state == REC_RESTORING && r->gf_stage) {
+        r->gf_stage->initialized = false;
+        r->gf_stage->s0_ok = false;
+    }
     if (reason == REC_NORMAL && (r->entered || r->expected_node != RECOVER_NONE))
         fail(r, REC_CONTRACT, REC_PHASE_NONE, r->expected_node);
     if (!r->failed) {
@@ -218,8 +224,11 @@ int recover_owner_configure(const struct recover_ops *ops, void *opaque,
         owner.s0_profile = owner_s0_profile;
         return 0;
     }
-    if ((owner.state != REC_IDLE && owner.state != REC_VERIFIED) ||
-        owner.failed || owner.cold_latched || !ops || !s0_profile) return -1;
+    bool reentry = gf_stage_reentry(&owner);
+    if (owner.c_only && !reentry) return -1;
+    if ((owner.state != REC_IDLE && owner.state != REC_VERIFIED &&
+         !(owner.state == REC_FAILED && reentry)) ||
+        ((owner.failed || owner.cold_latched) && !reentry) || !s0_profile) return -1;
     if (!owner.ops) {
         owner_s0_ops = ops; owner_s0_opaque = opaque; owner_s0_profile = s0_profile;
     }
@@ -515,6 +524,25 @@ int recover_now_session(struct recover *r, u32 session)
         .profile_version = r->profile->version, .profile_crc = r->profile->crc };
     r->s0_only = true; r->reason = REC_ABORT;
     receive_boundary(r);
+    return cleanup(r);
+}
+
+int recover_restore_session(struct recover *r)
+{
+    if (!r->enabled || !r->ops || !r->ops->start_ready ||
+        r->ops->start_ready(r->opaque)) return -1;
+    if (r->state == REC_IDLE) return recover_now_session(r, r->token.session);
+    if (r->state == REC_PAUSED) return trial_end(r, &r->token, REC_ABORT);
+    if (r->state != REC_VERIFIED && r->state != REC_FAILED) return -1;
+    r->state = REC_PAUSED;
+    txd = (struct rec_tx_diag){0};
+    r->seq = 0; r->lost_lines = 0;
+    r->s0_verified = false;
+    if (!r->gf_stage || !r->gf_stage->initialized) {
+        r->profile = r->s0_profile;
+        r->s0_only = true;
+        r->saved_count = 0;
+    }
     return cleanup(r);
 }
 
@@ -1123,11 +1151,11 @@ static int cleanup(struct recover *r)
      * Only the first entry owns restoration and its deadline/poll budget. */
     if (r->state == REC_RESTORING || r->state == REC_VERIFIED ||
         r->state == REC_FAILED) return -1;
-    if (cleanup_budget_prepare(r)) fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0);
     r->in_call = false; r->in_opcode = false;
     r->cursor = RECOVER_NONE; r->entered = false;
     r->auth_phase = REC_RESTORE;
     r->state = REC_RESTORING;
+    if (cleanup_budget_prepare(r)) fail(r, REC_CONTRACT, REC_PHASE_RESTORE, 0);
     r->restore_tick = r->ops->ticks(r->opaque);
     for (u32 i = 0; i < RECOVER_RULE_MAX / BITS_PER_U32; i++) r->restored_rules[i] = 0;
     r->restore_polls = 0; r->uart_polls = 0; r->uart_bytes = 0; r->in_s0 = false;
@@ -1188,6 +1216,13 @@ static int cleanup(struct recover *r)
     }
     r->measurement = (struct recover_bar_measurement){0}; r->measuring = false;
     r->local_saved_count = 0;
+    if (r->gf_stage && r->gf_stage->initialized) {
+        r->gf_stage->s0_ok = r->s0_verified && !r->access_blocked &&
+            (r->reason == REC_NORMAL || r->reason == REC_ABORT ||
+             (r->reason == REC_VERIFY && !r->c_only));
+        if (!r->gf_stage->s0_ok) r->gf_stage->initialized = false;
+        r->gf_stage->entry_ok = false;
+    }
     release_plan(r);
     return r->failed ? -1 : 0;
 }
@@ -1234,13 +1269,17 @@ static int pause_call(struct recover *r)
 int trial_begin(struct recover *r, const struct recover_profile *p,
                 u32 plan_hash, u32 budget)
 {
-    if (r->state != REC_IDLE && r->state != REC_VERIFIED) return -1;
-    if (!r->enabled || r->failed || r->cold_latched || !profile_ok(p, budget) ||
+    bool reentry = gf_stage_reentry(r);
+    if (r->c_only && (!reentry || !p || !p->cold_required ||
+        p->expected_device != RECOVER_GF_DEVICE)) return -1;
+    if (r->state != REC_IDLE && r->state != REC_VERIFIED &&
+        !(r->state == REC_FAILED && reentry)) return -1;
+    if (!r->enabled || ((r->failed || r->cold_latched) && !reentry) || !profile_ok(p, budget) ||
         !r->plan || r->bound_profile != p || plan_hash != r->bound_hash ||
         !r->ops->local_cleanup || r->ops->start_ready(r->opaque)) {
         release_plan(r); return -1;
     }
-    if (p->expected_device == RECOVER_GF_DEVICE) {
+    if (p->expected_device == RECOVER_GF_DEVICE && !r->c_only) {
         struct rec_cleanup_budget maximum;
         if (cleanup_budget_compute(r, p, true, &maximum) ||
             (r->transport && maximum.polls > r->transport->max_polls)) {
@@ -1324,7 +1363,7 @@ int trial_begin(struct recover *r, const struct recover_profile *p,
     r->command_override = false; r->command_saved = 0; r->command_actual = 0;
     r->uart_polls = 0; r->uart_bytes = 0;
     r->in_call = true; r->call_tick = r->ops->ticks(r->opaque);
-    r->cold_latched = p->cold_required;
+    r->cold_latched = r->cold_latched || p->cold_required;
     receive_boundary(r);
     if (r->failed) return cleanup(r), -1;
     if (state(r, REC_SNAPSHOTTING)) return cleanup(r);
@@ -1529,7 +1568,8 @@ static bool node_ok(const struct recover_profile *p, const struct recover_plan *
 {
     const struct recover_plan_node *n = &plan->nodes[id];
     const struct recover_opcode_layout *l = layout_for(p, n);
-    if (!l || n->phase > REC_MODE_C || n->ctx >= plan->ctx_count ||
+    if (!l || (n->flags & ~REC_NODE_CHECK_ENTRY) ||
+        (n->flags && !(l->flags & REC_LAYOUT_MODE_CHECK)) || n->phase > REC_MODE_C || n->ctx >= plan->ctx_count ||
         n->head >= RECOVER_HEAD_COUNT || n->skip > 1 || n->arg_first > plan->arg_count ||
         n->arg_count > plan->arg_count - n->arg_first || n->arg_count != l->argc ||
         (n->phase == REC_RUN ? n->main_id > RECOVER_MAIN_MAX || n->pc == RECOVER_NONE :
@@ -1637,6 +1677,7 @@ static u32 plan_crc(const struct recover_plan *p)
         c = crc_word(c, n->head); c = crc_word(c, n->skip); c = crc_word(c, n->rule_id);
         c = crc_word(c, n->expr_id); c = crc_word(c, n->arg_first); c = crc_word(c, n->arg_count);
         c = crc_word(c, n->next[0]); c = crc_word(c, n->next[1]);
+        c = crc_word(c, n->flags);
     }
     for (u32 i = 0; i < p->arg_count; i++) {
         c = crc_word(c, p->args[i].kind); c = crc_word(c, p->args[i].value);
@@ -1662,8 +1703,13 @@ static u32 plan_crc(const struct recover_plan *p)
 int recover_bind_plan(struct recover *r, const struct recover_profile *p,
     const struct recover_plan *plan, struct recover_plan_buffers *buf, u32 *hash)
 {
-    if (!r->enabled || r->plan || (r->state != REC_IDLE && r->state != REC_VERIFIED) ||
-        r->failed || r->cold_latched || recover_profile_ok(p) || p->crc != recover_profile_crc(p) ||
+    bool reentry = gf_stage_reentry(r);
+    if (r->c_only && (!reentry || !p || !p->cold_required ||
+        p->expected_device != RECOVER_GF_DEVICE)) return -1;
+    if (!r->enabled || r->plan ||
+        ((r->state != REC_IDLE && r->state != REC_VERIFIED &&
+          !(r->state == REC_FAILED && reentry)) ||
+         ((r->failed || r->cold_latched) && !reentry)) || recover_profile_ok(p) || p->crc != recover_profile_crc(p) ||
         !plan || !buf || !buf->flow_bits || !buf->valid_bits || !hash || !plan->version ||
         plan->profile_crc != p->crc || !plan->node_count || plan->node_count > RECOVER_NODE_MAX ||
         !plan->nodes || plan->arg_count > RECOVER_ARG_MAX || (plan->arg_count && !plan->args) ||
@@ -1672,6 +1718,7 @@ int recover_bind_plan(struct recover *r, const struct recover_profile *p,
         !plan->entries || plan->unresolved_count || plan->capture_count > RECOVER_CAPTURE_MAX ||
         (plan->capture_count && !plan->captures)) return -1;
     for (u32 i = 0; i < plan->node_count; i++) {
+        if (r->c_only && plan->nodes[i].phase != REC_MODE_C) return -1;
         r->node_layout[i] = layout_for(p, &plan->nodes[i]);
         r->node_write[i] = rule_by_id(p, plan->nodes[i].rule_id);
     }
@@ -2081,7 +2128,10 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             if (!found) return access_error(r, target);
         }
         if (t->space == REC_VGA_INDEXED && r->state == REC_RUNNING &&
-            ((t->access == REC_RW && r->auth_phase != REC_MODE_C) ||
+            ((t->access == REC_RW && (r->auth_phase != REC_MODE_C ||
+              (r->c_only && dir == REC_DATA && t->port == RECOVER_CRTC &&
+               (t->index == RECOVER_CR1F || t->index == RECOVER_CR11 ||
+                t->index == RECOVER_CR44)))) ||
              (dir == REC_SELECT && index_save_safe(r->profile, target)))) {
             bool saved = false;
             for (u32 i = 0; i < r->local_saved_count; i++)
@@ -2168,9 +2218,10 @@ static int mode_vram_access(struct recover *r)
     if (dir == REC_WRITE) r->gpu_written = true;
     int rc = r->ops->mode_vram(r->opaque,r,dir == REC_WRITE,&bad_offset,&expected,&actual);
     if (r->state != REC_RUNNING) return -1; /* safe point already cleaned up */
-    int log = mode_vram_record(r,"END",dir,bad_offset,expected,actual,rc);
-    if (rc || log) {
-        fail(r,log ? REC_LOG : bad_offset == RECOVER_NONE ? REC_BUS : REC_VERIFY,
+    bool mismatch = !rc && bad_offset != RECOVER_NONE;
+    int log = mode_vram_record(r,"END",dir,bad_offset,expected,actual,rc ? rc : mismatch ? -1 : 0);
+    if (rc || (mismatch && !r->verify_record) || log) {
+        fail(r,log ? REC_LOG : rc ? REC_BUS : REC_VERIFY,
              REC_PHASE_VERIFY,bad_offset);
         return access_error(r,bad_offset);
     }
@@ -2296,7 +2347,9 @@ static int mode_check_access(struct recover *r, u32 *actual)
     if (r->state != REC_RUNNING) return -1;
     bool mismatch=!rc && ((*actual ^ expected) & mask);
     int log=mode_check_record(r,"check",source,key,mask,expected,*actual,rc || mismatch);
-    if (rc || mismatch || log) {
+    bool required = !r->verify_record || (n->flags & REC_NODE_CHECK_ENTRY) ||
+        source != REC_CHECK_TARGET;
+    if (rc || (mismatch && required) || log) {
         fail(r,log ? REC_LOG : rc ? REC_BUS : REC_VERIFY,REC_PHASE_VERIFY,key);
         return access_error(r,key);
     }

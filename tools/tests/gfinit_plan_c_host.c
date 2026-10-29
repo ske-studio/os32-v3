@@ -456,7 +456,7 @@ static int frame_step(struct recover *r,void *v)
             if(frame_damage==2)frame[640*23+65]^=1;
             if(frame_damage==3)frame[sizeof(frame)-1]^=1;
             if(frame_damage==4) {frame[17]^=1;frame[sizeof(frame)-1]^=2;}
-            if(frame_damage==6)frame_fail_at=1280;
+            if(frame_damage==6) {frame[0]^=1;frame_fail_at=1280;}
             if(frame_damage==8)frame_abort_at=1280;
         }
     }
@@ -923,9 +923,10 @@ static void verify_policy_cases(void)
     c_build();u32 hash=core.bound_hash,crc=profile.crc;
     field("default_hash",hash);field("default_crc",crc);
     CHECK(!gfinit_verify_policy(&composed,&profile,0,0,0));
-    core.plan=0;CHECK(!contract_bind() && hash==core.bound_hash && crc==profile.crc);
+    core.plan=0;CHECK(!contract_bind() && hash!=core.bound_hash && crc!=profile.crc);
+    hash=core.bound_hash;crc=profile.crc;
     CHECK(!gfinit_verify_policy(&composed,&profile,GF_VERIFY_REQUIRED,0,0));
-    core.plan=0;CHECK(!contract_bind() && hash!=core.bound_hash);
+    core.plan=0;CHECK(!contract_bind() && hash==core.bound_hash && crc==profile.crc);
     u32 recorded=0,required=0;
     for(u32 i=0;i<profile.rule_count;i++) {
         const struct recover_rule *w=&profile.rules[i];
@@ -982,12 +983,13 @@ static void verify_policy_cases(void)
     }
     output("VERIFY default hash/CRC, required targets, explicit override, unmatched selector and mismatch execution PASS\n");
 }
+#include "gf_stage_host.inc"
 #ifndef GF_C_ENTRY
 #define GF_C_ENTRY _start
 #endif
 void GF_C_ENTRY(void)
 {
-    gf_fixture_init();verify_policy_cases();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();
+    gf_fixture_init();verify_policy_cases();prefix_equivalence();contracts();frame_cases();color_cases();c_walk(0,true);c_walk(1,true);c_walk(1,false);check_cases();wait_cases();route_cell_cases();stage_record();stage_gates();stage_s0_failures();stage_local_locks();
     output(failures?"C FAIL\n":"C PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

@@ -30,7 +30,9 @@ int shell_cmd_recover(int argc, char **argv)
     void *buf = &req;
     u32 size = sizeof(req);
     u32 op = KDEBUG_OP_RECOVER_STATUS;
-    if (argc == 3 && str_eq(argv[1], "now")) {
+    if (argc == 2 && str_eq(argv[1], "restore")) {
+        op = KDEBUG_OP_RECOVER_RESTORE;
+    } else if (argc == 3 && str_eq(argv[1], "now")) {
         if (recover_session(argv[2], &req.session)) goto usage;
         op = KDEBUG_OP_RECOVER_NOW;
     } else if (argc == 4 && str_eq(argv[1], "route-test")) {
@@ -68,6 +70,6 @@ int shell_cmd_recover(int argc, char **argv)
         req.plan_hash, req.snapshot_crc, req.seq, req.lost_lines, req.discarded_bytes);
     return 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: recover route-test 0 --approve | recover status | recover now <decimal-session> | recover virtual begin <normal|fault|trial-expire|poll-stop|txbusy-stop> | recover virtual step|end <session>\n");
+    g_api->kprintf(ATTR_WHITE, "Usage: recover route-test 0 --approve | recover status | recover restore | recover now <decimal-session> | recover virtual begin <normal|fault|trial-expire|poll-stop|txbusy-stop> | recover virtual step|end <session>\n");
     return 2;
 }

@@ -110,3 +110,6 @@ check-gfinit-host:
 - tools/rshell_peek.py
 - tools/rshell_serial.py
 - tools/serialfs_host.py
+- kdebug/gf_stage_state.c
+- kdebug/gf_stage_state.h
+- tools/tests/gf_stage_host.inc

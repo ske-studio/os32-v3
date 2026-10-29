@@ -247,9 +247,11 @@ struct recover_opcode_layout {
     u32 opcode, substep, argc; const u32 *kinds; u32 dir_substep; u32 flags;
 };
 struct recover_plan_arg { u32 kind, value; };
+#define REC_NODE_CHECK_ENTRY 1U
 struct recover_plan_node {
     u32 phase, main_id, pc, opcode, substep, ctx, head, skip;
     u32 rule_id, expr_id, arg_first, arg_count, next[2];
+    u32 flags;
 };
 struct recover_plan_dep { u32 consumer, required_rule, producer; };
 struct recover_plan_entry { u32 phase, main_id, first; };
@@ -319,6 +321,7 @@ struct recover_local_saved { u32 key, dir_substep, value; };
 #define RECOVER_RX_LIMIT 64U
 #define RECOVER_RX_DRAIN 4096U
 #define RECOVER_ROW_MAX 384U
+struct gf_stage_state;
 struct recover_transport;
 struct recover;
 struct recover_ops {
@@ -387,6 +390,8 @@ struct recover {
     struct recover_bar_extent bars[RECOVER_BAR_COUNT];
     bool enabled, route_write_approved, valid, in_call, in_opcode;
     bool failed, access_blocked, cold_latched, s0_verified, s1_verified;
+    bool c_only, verify_record;
+    struct gf_stage_state *gf_stage;
 };
 
 /* profile_ok: format only; bind validates every path; begin checks extents. */

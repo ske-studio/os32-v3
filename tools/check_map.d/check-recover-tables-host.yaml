@@ -31,3 +31,5 @@ check-recover-tables-host:
 - hwdev/gfinit_mode.h
 - kdebug/recover_gf_c.h
 - kdebug/generated/recover_gf_c_tables.inc
+- kdebug/gf_stage_state.h
+- kdebug/gfinit_pll.h

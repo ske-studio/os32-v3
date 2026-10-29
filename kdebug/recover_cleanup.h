@@ -147,7 +147,7 @@ static int cleanup_budget_prepare(struct recover *r)
     cb = (struct rec_cleanup_budget){p->restore_limit, p->restore_max_polls,
         p->restore_log_bytes, p->s0_reserve_ticks, p->s0_reserve_polls,
         p->s0_reserve_bytes, p->restore_limit / PIT_HZ + (p->restore_limit % PIT_HZ != 0)};
-    if (p->expected_device != RECOVER_GF_DEVICE || r->s0_only) return 0;
+    if (p->expected_device != RECOVER_GF_DEVICE || r->s0_only || r->c_only) return 0;
     struct rec_cleanup_budget next;
     if (cleanup_budget_compute(r, p, false, &next) ||
         (r->transport && next.polls > r->transport->max_polls)) return -1;

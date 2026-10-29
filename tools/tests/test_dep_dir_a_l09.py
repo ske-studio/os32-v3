@@ -62,8 +62,8 @@ def contracts():
     assert reclaim.index('launch_owner_exit(id);') < reclaim.index('host_owner_exit(id);') < reclaim.index('con_sink_owner_exit(id);')
     # GF4c adds the private cell callback, route step and verify-record flag; public ABI stays fixed.
     hwdev = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
-    assert '#define HWDEV_CONTRACT_CRC 0x86e444e2U' in hwdev
-    assert '#define HWDEV_LAYOUT_CRC 0x07ce909fU' in hwdev
+    assert '#define HWDEV_CONTRACT_CRC 0x50a115a8U' in hwdev
+    assert '#define HWDEV_LAYOUT_CRC 0x1eae31dcU' in hwdev
     print('PASS baseline public ABI/generated files, NP2 guards, host validation/copy order, owner cleanup position, hwdev CRC')
     return wrappers
 
