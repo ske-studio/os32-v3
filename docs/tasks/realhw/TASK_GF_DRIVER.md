@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **計画 (2026-10-29)** — ユーザーの提案と決定を書き留めた。先に既存の実装を機械的に分割し、そのあと設計票 (astra 起草・Opus レビュー)。
+> 状態: **設計中 (2026-10-29)** — **設計は確定** ([GF_DRIVER_DESIGN](../../decisions/realhw/GF_DRIVER_DESIGN.md)、astra 起草・Opus 3 往復で確定可)。初期化の命令の解読の機械的な分割は main (gfinit_decode.c → kdebug/gfinit_decode/・gfinit_op/、objdump で全数一致)。**次は PM がユーザーに詳細な実装計画を説明し、了承を得る** (§3 の 2a)。
 
 ## 0. ユーザーの提案と決定 (2026-10-29)
 
