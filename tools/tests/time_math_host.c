@@ -35,8 +35,6 @@ static void decide_table(void)
 {
     struct time_snapshot s;
 
-    time_branch_reset();
-
     /* 境界を踏んでいない: t と count をそのまま */
     memset(&s, 0xAA, sizeof(s));
     CHECK(time_decide(0, 0, 100, 5000, &s) == TIME_DECIDE_OK);
@@ -54,17 +52,14 @@ static void decide_table(void)
     /* p1 = 1 なら p2 は見ない (どちらでも t + 1) */
     CHECK(time_decide(1, 1, 7, 42, &s) == TIME_DECIDE_OK);
     CHECK(s.tick == 8);
+    CHECK(s.count == 42);
 
     /* **前後どちらか不明**: 採用しない。どちらへ寄せても最大 1 周期ずれる。 */
     memset(&s, 0x5A, sizeof(s));
     CHECK(time_decide(0, 1, 100, 19900, &s) == TIME_DECIDE_RETRY);
     /* やり直しのときは out を触らない (呼び手が古い値を本物と読まない) */
     CHECK(s.tick == 0x5A5A5A5AU);
-
-    /* 3 分岐を全部踏んだことを数で確かめる (W4 の網羅はこの数で見る) */
-    CHECK(time_branch_hits[TIME_BR_T0] == 1);
-    CHECK(time_branch_hits[TIME_BR_T1] == 2);
-    CHECK(time_branch_hits[TIME_BR_RETRY] == 1);
+    CHECK(s.count == 0x5A5A5A5AU);
 
     CHECK(time_decide(0, 0, 1, 1, 0) == TIME_DECIDE_RETRY);   /* NULL は採らない */
 }

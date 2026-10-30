@@ -1,7 +1,8 @@
 """T9-K: 起動要求表を実物の exec/launch.c で確かめる。
 
-票:   docs/archive/gui_v13/TASK_T9_sh.md §1 D3 / §1a (K 側 = カーネル + KAPI v49)
+契約: include/launch.h (起動要求表)
 記録: tools/tests/t9_tdd.md
+--mutate は子の回収・DONE の受渡し・孤児回収の故障を実ソースへ注入する。
 
 test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、同じソースが
 カーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に見る
@@ -29,9 +30,12 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-launch-") as tmp:
         tmp = pathlib.Path(tmp)
         exe = tmp / "launch"
-        subprocess.run(["gcc", *FLAGS, "-O0", "-D__KERNEL_BUILD__", *INCLUDES,
-                        "-nostdlib", "-static", "-no-pie",
-                        str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+        def build(source):
+            subprocess.run(["gcc", *FLAGS, "-O0", "-D__KERNEL_BUILD__", *INCLUDES,
+                            "-nostdlib", "-static", "-no-pie",
+                            f'-DLAUNCH_SOURCE="{source}"',
+                            str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+        build(KERNEL_SRC)
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
@@ -39,4 +43,33 @@ if __name__ == "__main__":
                         "-o", str(tmp / "launch.o")], cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         print("EXIT launch_host=%d" % rc, flush=True)
+        if rc:
+            sys.exit(rc)
+        if "--mutate" in sys.argv:
+            original = KERNEL_SRC.read_text()
+            mutants = [
+                ("child retained", "r->child = 0;                   /* 再利用",
+                 "(void)r;                       /* 再利用", "2s "),
+                ("DONE repeated",
+                 "if (r->phase == LAUNCH_PHASE_DONE || r->phase == LAUNCH_PHASE_FAILED)",
+                 "if (r->phase == LAUNCH_PHASE_FAILED)", "2u "),
+                ("orphan not released", "if (r->requester == LAUNCH_REQ_ORPHAN) {",
+                 "if (0) {", "8f "),
+                ("orphan KILL lost",
+                 "r->kind = LAUNCH_KIND_KILL;\n            r->arg = r->child;",
+                 "r->kind = LAUNCH_KIND_NONE;\n            r->arg = r->child;", "5e "),
+                ("DONE stolen", "if (r->requester != res_owner_get()) return OS32_ERR_INVAL;",
+                 "if (r->requester != res_owner_get() && r->phase != LAUNCH_PHASE_DONE) "
+                 "return OS32_ERR_INVAL;", "2s2 "),
+            ]
+            for label, old, new, expected in mutants:
+                assert original.count(old) == 1, label
+                source = tmp / "launch_mutant.c"
+                source.write_text(original.replace(old, new, 1))
+                build(source)
+                result = host32.run([str(exe)], cwd=ROOT, timeout=30,
+                                    capture_output=True, text=True)
+                assert result.returncode == 1 and "  FAIL " + expected in result.stdout, (
+                    label, result.returncode, result.stdout, result.stderr)
+                print("MUTATE RED " + label + " (" + expected.strip() + ")", flush=True)
         sys.exit(rc)

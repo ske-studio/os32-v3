@@ -2,8 +2,6 @@ check-con-sink-host:
 - drivers/video/pc98/pc98_route.h
 - tools/tests/host32.py
 - kernel/console/con_sink.c
-- kdebug/selftest_con_sink.c
-- kdebug/selftest_internal.h
 - kernel/console/console.c
 - tools/tests/con_sink_host.c
 - tools/tests/test_con_sink.py

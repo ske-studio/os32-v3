@@ -81,3 +81,18 @@ MUTATION 8 RED (1 件): 範囲外 (>= 16 / PCI の未割り当て 0xFF) を「�
 - LGY-98 をアダプタに移した後の実通信
 - `int 0x23` を使う kselftest 側 (`test_irq_dynamic`) は「配線が通っているか」
   = 表・PIC のマスク・共通スタブ・`irq_finish` までを起動ごとに踏む
+
+## E08: 起動試験から実 irq.c のホスト試験へ (2026-10-30)
+
+`core_integration` は実 irq.c/irq_math.c を組み、IF と PIC 操作だけを置換する。
+登録拒否、4登録の順序と2巡、ISR登録/解除拒否と計数、DEFERRED、解除後の沈黙、
+200/201回のstormと再登録解除、隔離のsticky性、試験reset、EOIを確認する。
+起動試験を外す前の版で5/5 PASSを確認。製品IRQ実装・私有ABIは変更しない。
+
+ゲスト受入は IRQ3 pristine・IRR空の起動で `irq:reg1 unmasks`、
+`irq:int23 dispatch`、`irq:masked at end` の3判定 (旧35、総passは基点比-32)。
+IRR pendingなら `irq: IRQ3 pending in IRR -> wiring skipped` を記録し、
+当該3判定を成功と数えない (旧pending経路は6判定、新経路は0、総数は基点比-6)。
+使用中の線は従来の `irq:line pristine b4 test` 失敗で触らない。
+実IRQのmaster 3/slave 9、PIC IRR/ISRとEOIはNP21/W・実機で別途確認する。
+過去のguest_acceptance.yamlの観測値は歴史値として維持する。

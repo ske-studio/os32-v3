@@ -212,6 +212,12 @@ static void caller_copy_tests(void)
     EXPECT("RO output", 1, wrap_sys_read(1, (void *)va, 1));
     pt[index] = saved;
     ring3_in_syscall = 0;
+    u32 clock_lo = 0, clock_hi = 0;
+    named(ring3_user_range_writable((u32)&clock_lo, sizeof(clock_lo)) == 1,
+          "trusted clock output");
+    named(ring3_user_ranges_writable((u32)&clock_lo, sizeof(clock_lo),
+                                     (u32)&clock_hi, sizeof(clock_hi)) == 1,
+          "trusted clock two outputs");
     EXPECT("trusted output", 0, wrap_sys_read(1, 0, 16));
     EXPECT("trusted input", 0, wrap_sys_write(1, 0, 16));
     ring3_in_syscall = 1; ring3_wm_depth = 1;

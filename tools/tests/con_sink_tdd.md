@@ -1,6 +1,6 @@
 # con_sink (K6C) — ホスト TDD の記録
 
-票: `docs/archive/gui_v13/TASK_K6C_console.md` §2
+契約: `docs/KAPI_SPEC.md` (console シンク)
 実装: `kernel/console/con_sink.c` / `include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
 試験: `tools/tests/con_sink_host.c` + `tools/tests/test_con_sink.py` (`make check-con-sink-host`)
 
@@ -20,7 +20,7 @@
 
 `make`・エミュレータ・配備は使わない。
 
-## 試験の区分 (64 チェック)
+## 試験の区分
 
 | 区分 | 何を固定したか |
 |---|---|
@@ -31,10 +31,9 @@
 | 5 overflow | 容量内では捨てない。あふれたら**古い方をレコード単位で**捨て、`dropped` が進む。環の折り返しを跨いだレコードもそのまま出る。長さの違うレコードが混ざっても端数は残らない |
 | 6 discard on CUI | `con_sink_disable()` で捨てる / 無効中は積まない / 再入場は空から |
 | 7 single reader | 最初に読んだ所有者が持つ。2 本目は `OS32_ERR_EXIST` で、そのときリングは動かない。`con_sink_owner_exit(持ち主)` の後だけ次の 1 本が読み手になれる (受入 C4)。CUI 往復では所有は動かない。`stat` は所有が要らない |
-| 8 selftest | `con_sink_selftest()` (実機の kselftest がブート時に呼ぶもの) がホストでもビットマスク 0 |
 | 10 EXIT record | **票 T7 E1 (2026-09-12 追記)**。`EXIT` = `[4][id]`。無効中は積まない / 前後のレコードと混ざっても端数が出ない / あふれは `EXIT` も**レコード単位**で捨てる / 積むのは「非シェル・シンク有効・読み手以外」の退場だけ |
 
-## RED → GREEN
+## 過去の RED → GREEN (自己診断の撤去前)
 
 実装を 1 か所ずつ「ありそうな間違い」に差し替えて、試験が**その間違いだけ**を捕まえることを見た。
 差し替えは全部戻してある (`kernel/console/con_sink.c` は GREEN の形)。
@@ -138,7 +137,7 @@ FAILURES
 EXIT con_sink_host=1
 ```
 
-### GREEN (最終)
+### GREEN (当時)
 
 ```
 8 con_sink_selftest (what kselftest runs on the guest)
@@ -167,9 +166,8 @@ EXIT con_sink_host=0
 
 - **実機のことは何も言わない。** 割込み文脈からの実際の同時書き込み (IRQ0/IRQ1 が
   `kprintf` する形) はホストでは再現していない。錠は空に差し替えてあり、見ているのは
-  「錠の中でしか状態を動かさない」というソースの形だけ。ブート時の
-  `con_sink_selftest()` (kselftest 7 ケース — T7 E1 で `EXIT` のビット 6 を足した) も
-  同じ単一文脈での確認にとどまる。
+  「錠の中でしか状態を動かさない」というソースの形だけ。撤去した
+  `con_sink_selftest()` も同じ単一文脈の確認で、実 IRQ の試験ではなかった。
 - KAPI 経由 (CPL=3 の `int 0x80`、ディスパッチャのポインタ検証) は通っていない — 受入 C3。
 - **`EXIT` を積む側の実物 (`exec/exec.c` の `exec_reclaim_owned`) は通っていない。**
   `exec.c` はカーネル一式を引くのでホストへ持ち込めず、`con_sink_host.c` の
@@ -180,3 +178,32 @@ EXIT con_sink_host=0
   `Stop::Unknown` して解析を止める**ので、E4 が入るまで `EXIT` は端末を固める。
 - `kernel/console/console.c` の 6 入口からの差し込みが漏れていないかは、ここでは見ていない
   (差し込み先はホストに持ち込めない TVRAM / GDC と混ざっている)。受入 C1 / C2 の担当。
+
+## E08: 純リング試験のホスト専用化 (2026-10-30)
+
+`test_con_sink` の7判定と `kst_con_sink` の本体・作業バッファを撤去した。
+旧本体を呼ぶだけの `case_selftest_agrees` とその後始末6判定も不要になった。
+製品のリング処理は変更せず、実ソースを組む次の独立ケースを残す。
+
+| 撤去した起動判定 | ホストの担当 |
+|---|---|
+| push/read、CLEAR/CURSOR | `case_record_shape` (2m に連続 CLEAR/CURSOR 読出しを補完) |
+| record boundary | `case_read_cuts_on_record` |
+| overflow oldest | `case_overflow_drops_oldest` |
+| CUI discard | `case_discard_on_cui` |
+| single reader | `case_single_reader` |
+| EXIT | `case_exit_record` |
+
+不足の補完は本体撤去前に GREEN (`k-consink-before.log`) を確認済み。
+`test_con_sink.py --mutate` は通常ケースの後で上の契約を壊す7変異を実行する。
+以前のログの `8 con_sink_selftest` / `8a`〜`8f` は現行ログに出ない。
+私有 import 264〜270 と303は番号・型・実体を維持して retained にした [ABI2]。
+私有 ABI 印は変わるため kernel/kdebug は同じビルドの対で配備する。公開 KAPI は不変。
+
+ゲスト受入は PM が NP21/W・実機で実施する (この段では未実施)。
+新 kernel.map と配備バイナリの hash、kdebug_state=1、pair CRC の一致を確認し、
+`console: GUI mode does not draw to text VRAM` と
+`console: GUI mode does not advance the logical cursor` の2判定成功、fail=0を記録する。
+同一構成で本変更だけなら起動成功数は c34dbed8 から7減 (con_sink 対象9→2)。
+並列の他試験の再設計を統合した場合はその差分を別に足し、実測の総数を記録する。
+過去の固定総数を現行の期待値として使わない。純リング7件のログは不要。

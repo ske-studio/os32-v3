@@ -9,3 +9,6 @@ check-irq-math-host:
 - include/platform_irq.h
 - platform/pc98/pic.c
 - tools/tests/kernel_includes.py
+- kdebug/kselftest/irq_dynamic.inc
+- kernel/irq/irq.h
+- kernel/irq/irq_math.h

@@ -17,8 +17,8 @@
 #define TIME_DECIDE_OK     0   /* out を採用してよい */
 #define TIME_DECIDE_RETRY  1   /* 境界のどちら側か不明 → 読み直す */
 
-/* 踏んだ分岐 (kselftest / ホスト試験が「全部踏めたか」を見る観測点)。
- * W4 は位相待ちでは網羅できないので、注入した入力列で 3 分岐を数える。 */
+/* 旧分岐計数の私有 import 互換口。E08 段1で試験は返り値・tick/count の
+ * 検査へ移した。増分処理は段2まで残し、番号・型・保存領域は保持する。 */
 #define TIME_BR_T0      0   /* p1 = 0, p2 = 0 → t をそのまま */
 #define TIME_BR_T1      1   /* p1 = 1        → t + 1 (再ロードがラッチより前) */
 #define TIME_BR_RETRY   2   /* p1 = 0, p2 = 1 → どちらか不明 → やり直し */

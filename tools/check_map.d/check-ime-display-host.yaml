@@ -4,7 +4,6 @@ check-ime-display-host:
 - tools/tests/ime_display_host.c
 - tools/tests/con_sink_host.c
 - tools/tests/host32.py
-- kdebug/selftest_con_sink.c
 - kernel/console/con_sink.c
 - kernel/port_service.c
 - kernel/ime/ime.c

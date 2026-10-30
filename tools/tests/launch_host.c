@@ -1,7 +1,7 @@
 /* ========================================================================
  *  launch_host.c — 起動要求表を **実物のソースで** 確かめる
  *
- *  対象票: docs/archive/gui_v13/TASK_T9_sh.md §1 D3 / §1a (K 側)
+ *  契約:   include/launch.h (起動要求表)
  *  実行:   python3 -B tools/tests/test_launch.py
  *  記録:   tools/tests/t9_tdd.md
  *
@@ -13,7 +13,7 @@
  *  スロットは実物の AppSlot を直に組み立てる (exec/exec.c の起動経路は
  *  CR3 / pgalloc を引くのでホストへは持ち込めない)。
  *
- *  tools/tests/con_sink_host.c と同じ様式 — ホスト ILP32 GNU89 で走らせ、
+ *  tools/tests/con_sink_host.c と同じ様式 — ホスト ILP32 GNU11 で走らせ、
  *  同じソースが i386-elf-gcc -Werror でも通ることを別に見る ([C1])。
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。
  * ======================================================================== */
@@ -47,7 +47,10 @@ void fd_redirect_clear_state(FdRedirectState *st)   { (void)st; }
 
 /* 実物。appslot.c が先 (launch.c が AppSlot を引く)。 */
 #include "appslot.c"
-#include "launch.c"
+#ifndef LAUNCH_SOURCE
+#define LAUNCH_SOURCE "launch.c"
+#endif
+#include LAUNCH_SOURCE
 
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
 
@@ -258,6 +261,8 @@ static void case_launch_running(void)
     kill_app(APP_ID_MIN + 2);
     launch_owner_exit(APP_ID_MIN + 2);
     check(launch_child((i32)APP_ID_MIN) == 0, "2s 回収通知で child = 0");
+    check(poll_from(APP_ID_MIN + 1, token, &st) == OS32_ERR_INVAL,
+          "2s2 DONE も別の要求者には渡さず、表を残す");
     check(poll_from(APP_ID_MIN, token, &st) == 0 && st == (i32)LAUNCH_ST_DONE,
           "2t 回収通知で DONE");
     check(poll_from(APP_ID_MIN, token, &st) == OS32_ERR_STALE,
@@ -493,18 +498,31 @@ static void case_chain(void)
 }
 
 /* ========================================================================
- *  8. launch_selftest (ブート時に踏む形) が通ること
+ *  8. WM が孤児回収を take する前に子が終了したとき
  * ======================================================================== */
-static void case_selftest(void)
+static void case_orphan_exit_before_take(void)
 {
-    u32 bad;
+    i32 token, st;
     reset_all();
-    report("8 launch_selftest (kselftest と同じ 3 項)\n");
-    bad = launch_selftest();
-    check((bad & (1u << 0)) == 0, "8a 起動 -> 子 -> 回収で DONE + child = 0");
-    check((bad & (1u << 1)) == 0, "8b 完了は 1 度だけ渡り表は IDLE へ");
-    check((bad & (1u << 2)) == 0, "8c 要求者の退場は孤児回収、完了で IDLE");
-    check(launch_pending() == 0, "8d 自己診断は表を空にして戻る");
+    report("8 孤児回収: take より先に子が終了\n");
+    token = req_from(APP_ID_MIN, "sh");
+    check(token > 0 && launch_take(0, 0, 0, 0, 0) == token,
+          "8a 起動要求を WM が受け取る");
+    make_app(APP_ID_MIN + 2, 1, 0);
+    check(launch_report(token, APP_ID_MIN + 2) == 0, "8b 子を所有する");
+    kill_app(APP_ID_MIN);
+    launch_owner_exit(APP_ID_MIN);
+    check(launch_pending() == 1 && launch_child(APP_ID_MIN) == APP_ID_MIN + 2,
+          "8c 孤児の子を保持して回収待ち");
+    kill_app(APP_ID_MIN + 2);
+    launch_owner_exit(APP_ID_MIN + 2);
+    check(launch_pending() == 0 && launch_child(APP_ID_MIN) == 0,
+          "8d 未取得の孤児も子の終了で解放");
+    check(launch_take(0, 0, 0, 0, 0) == 0, "8e 終了済みの子を KILL しない");
+    check(poll_from(APP_ID_MIN, token, &st) == OS32_ERR_STALE,
+          "8f poll を待たずに IDLE へ戻る");
+    make_app(APP_ID_MIN, 1, (u32)OS32X_FLAG_LAUNCHER);
+    check(req_from(APP_ID_MIN, "ls") > 0, "8g 要求者 ID を再利用できる");
 }
 
 /* ========================================================================
@@ -587,7 +605,7 @@ int main(void)
     case_orphan();
     case_token();
     case_chain();
-    case_selftest();
+    case_orphan_exit_before_take();
     case_kill_report_before_reclaim();
     if (failures) {
         report("FAILURES\n");

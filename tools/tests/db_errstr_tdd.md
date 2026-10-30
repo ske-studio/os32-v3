@@ -146,3 +146,12 @@ SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所
 
 v50 の残りは `API_CASES` に全登録し、回収順の本文検査も移管した。
 db-caller (2026-10-24 から群 `check-access-host` の中の test_db_caller.py) と `check-kapi-ranges-host` の内容・ケース・変異は変更しない。
+
+## E08: db_v50 の起動時判定をホストへ移管 (2026-10-30)
+
+`kdebug/kselftest/db_v50.inc` は 7→0 判定。同一構成の `kselftest_pass` 期待値は移管前から 7 減らし、`kselftest_fail=0` を維持する。過去の実測値は変更しない。
+起動ログから外れる名前は `KAPI v50: 7 new db slots appended at 201..207`、`db row: 16KB block bound counts descriptors`、`db ptr: NULL and length overflow refused`、`db path: journal name fits the VFS capacity`、`db diag: one open-failure slot per owner ID`、`db diag: error string area is outside the result area`、`db diag: DB_OWNER_SLOTS covers the whole app ID pool`。
+先頭 6 判定は実 `kapi_db.c` を組む既存の `v50_selftest` が担い、末尾の容量比較を同ケースへ追加した。`slot_layout_append` / `shm_bound` / `user_range` / `path_len` / `diag_layout` / `errstr_truncate` も継続する。
+ホストのシナリオ数は 39→39。変異は 18→19: 実 `appslot.h` の `APP_MAX_APPS` だけを 4→5 にし、旧固定値検査が通っても追加した容量比較が失敗することを見る。
+起動側の削除前に追加済みホスト試験で GREEN を確認。ログは `/home/hight/os32-tmp/run/e-group/k-dbv50-before2.log`、最終結果は同ディレクトリの `k-dbv50.md`。
+ゲスト受入は新しい kernel/kdebug の対を照合し、同一構成で自己試験数が 7 減り失敗 0、上記ログ 7 本が消えること、および `db_test` 9/9・`db_v50_test` 42/42 を確認する。今回の実装者はゲストを操作しない。

@@ -25,12 +25,6 @@ void res_owner_set(int owner) { g_owner = owner; }
 /* 実物。CON_SINK_NO_IRQ_LOCK は test_con_sink.py が -D で渡す。 */
 #include "con_sink.c"
 
-void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
-#define KDEBUG_SELFTEST_HOST
-#include "../../kdebug/selftest_con_sink.c"
-/* 旧名の入口は fixture の中だけ (本番は kst_con_sink を直に呼ぶ)。 */
-static u32 con_sink_selftest(void) { return kst_con_sink(); }
-
 /* ======================================================================== */
 /*  kernel/console/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
@@ -284,6 +278,15 @@ static void case_record_shape(void)
     check(n == (i32)CON_SINK_HDR_CURSOR &&
           out[0] == (u8)CON_SINK_REC_CURSOR && out[1] == 12 && out[2] == 34,
           "2k CURSOR は type+x+y");
+
+    /* 起動時の純リング試験が持っていた CLEAR / CURSOR の連続読み。 */
+    con_sink_push_clear();
+    con_sink_push_cursor(12, 34);
+    n = con_sink_read(out, (u32)CON_SINK_REC_MAX);
+    check(n == (i32)(CON_SINK_HDR_CLEAR + CON_SINK_HDR_CURSOR) &&
+          out[0] == (u8)CON_SINK_REC_CLEAR &&
+          out[1] == (u8)CON_SINK_REC_CURSOR && out[2] == 12 && out[3] == 34,
+          "2m CLEAR / CURSOR round-trip");
 
     /* 空の PRINT / NULL は積まない (入口の色々な呼び方で来る) */
     con_sink_push_print("x", 0, 7);
@@ -542,22 +545,6 @@ static void case_single_reader(void)
     res_owner_set(9);
     check(con_sink_stat((u32 *)0, (u32 *)0) == 0, "7i stat は NULL でも 0");
     check(pending_now() == 0, "7j stat は所有を要求しない");
-}
-
-/* ======================================================================== */
-/*  8. kselftest が実機で呼ぶ自己診断そのもの (ビットマスク 0)               */
-/* ======================================================================== */
-static void case_selftest_agrees(void)
-{
-    reset_all();
-    report("8 con_sink_selftest (what kselftest runs on the guest)\n");
-    check(con_sink_selftest() == 0, "8a 自己診断のビットマスクは 0");
-    check(con_sink_reader_get() == CON_SINK_NO_READER,
-          "8e 自己診断後は読み手の所有を返す");
-    check(con_sink_drop_count == 0, "8f 自己診断後は drop 0");
-    check(con_sink_is_enabled() == 0, "8b 終わった後は無効 (CUI に戻る)");
-    check(pending_now() == 0, "8c 終わった後は空");
-    check(res_owner_get() == 0, "8d 所有者タグを元に戻す");
 }
 
 /* ======================================================================== */
@@ -893,7 +880,6 @@ int main(void)
     case_overflow_drops_oldest();
     case_discard_on_cui();
     case_single_reader();
-    case_selftest_agrees();
     case_console_render_gate();
     case_exit_record();
     case_inject_discard_scope();

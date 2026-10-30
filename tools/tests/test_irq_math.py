@@ -3,8 +3,8 @@
 記録: tools/tests/irq_math_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-1 (割り込みの動的登録)
 
-実物の kernel/irq/irq_math.c を 1 行も写さずに #include して回す。PIC も IDT も
-tick_count も触らないので、模型は「筋書きどおりの値を返す偽装置」だけ。
+実物の kernel/irq/irq_math.c と irq.c を #include して回す。
+IF/PIC のハードウェア効果だけを差し替える。
 
 **ここで見る分岐は NP21/W でも実機でも狙って作れない** — 「A と B が同時に
 要因を持つ」「1 巡目で受けて 2 巡目が空」は時間の重なりで、エミュレータでも
@@ -33,10 +33,11 @@ TARGET_SRCS = [
     ("kernel/irq/irq.c", []),
 ]
 
-CASES = ["dispatch_two_pass", "register_rules", "storm", "eoi_plan"]
+CASES = ["core_integration", "dispatch_two_pass", "register_rules", "storm", "eoi_plan"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
-         "-D__cdecl="]
+         "-D__cdecl=",
+         '-DIRQ_CORE_SOURCE="' + str(ROOT / "kernel/irq/irq.c") + '"']
 INCLUDES = include_flags(ROOT)
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
@@ -78,7 +79,7 @@ MUTATIONS = [
 ]
 
 
-def host_build(tmp, source_text=None):
+def host_build(tmp, source_text=None, core_text=None):
     """ハーネスをコンパイルして実行ファイルのパスを返す。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "irq-math-host"
@@ -97,6 +98,14 @@ def host_build(tmp, source_text=None):
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
+    if core_text is not None:
+        core = src_dir / "irq.c"
+        core.write_text(core_text.replace('"../../arch/x86/kernel/idt.h"',
+                        '"' + str(ROOT / 'arch/x86/kernel/idt.h') + '"').replace(
+                        '"../../include/platform_irq.h"',
+                        '"' + str(ROOT / 'include/platform_irq.h') + '"'))
+        cmd = [arg for arg in cmd if not arg.startswith('-DIRQ_CORE_SOURCE=')]
+        cmd.insert(1, '-DIRQ_CORE_SOURCE="' + str(core) + '"')
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -147,6 +156,23 @@ def mutate(tmp):
         status = "RED" if hits else "**GREEN (見逃し)**"
         print(f"MUTATION {i} {status} ({hits} 件): {why}", flush=True)
         bad += not hits
+    original = (ROOT / "kernel/irq/irq.c").read_text()
+    for old, new in [
+        ('irq_enable(irq);', 'irq_disable(irq);'),
+        ('irq_slot_remove(ln, slot);', '(void)slot;'),
+        ('if (ln->count > 0 && !ln->quarantined)', 'if (ln->count > 0)'),
+        ('irq_disable(irq);\n            if (!(irq_storm_masked',
+         '(void)irq;\n            if (!(irq_storm_masked'),
+        ('irq_line_quarantined |= (u32)(1u << irq);', '(void)irq;'),
+        ('irq_restore(saved);', 'irq_restore(0);'),
+        ('platform_irq_eoi_master();', 'pic_eoi(irq);'),
+    ]:
+        assert old in original, old
+        exe = host_build(tmp, core_text=original.replace(old, new, 1))
+        result = subprocess.run([str(exe), "core_integration"], cwd=ROOT,
+                                stderr=subprocess.DEVNULL)
+        print(f"CORE MUTATION {'RED' if result.returncode else 'GREEN (miss)'}: {old}", flush=True)
+        bad += result.returncode == 0
     return bad
 
 

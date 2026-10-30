@@ -41,7 +41,7 @@ GF_ONLY_SYMBOLS = frozenset(('pci_cfg_read32', 'pci_cfg_read16',
 # This manifest also fixes which moved object may consume each address.
 ADDRESS_IMPORTS = {'kapi_reserved_nosys': 'selftest_exec',
                    'shlib_read_page': 'selftest_lease'}
-SELFTEST_OBJECTS = ('selftest_con_sink', 'selftest_kbd_inject',
+SELFTEST_OBJECTS = ('selftest_kbd_inject',
                     'selftest_lease', 'selftest_exec')
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)
 
