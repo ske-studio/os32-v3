@@ -552,7 +552,7 @@ def discover(root: Path) -> dict[str, Check]:
         if set(data) - allowed or not {"name", "covers", "budget"} <= data.keys():
             reject("invalid CHECK fields")
         name = data["name"]
-        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name) or name.startswith("check-"):
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
             reject("invalid name")
         for field, default in (("covers", None), ("needs", [])):
             value = data.get(field, default)

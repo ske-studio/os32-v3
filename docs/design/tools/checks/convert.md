@@ -5,7 +5,7 @@
 ## 役割と境目
 
 mk の recipe、yaml の入力、旧選択器の共通方針を CHECK と run へ移す一時道具。
-共通の [Check・Plan](README.md) を境界にし、検査の期待値・正常対照・変異・合否は変えない。
+共通の Check・Plan (同じディレクトリの README) を境界にし、検査の期待値・正常対照・変異・合否は変えない。
 
 ```python
 from collections.abc import Callable, Mapping
