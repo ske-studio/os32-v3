@@ -10,6 +10,7 @@
 - [hwdev/gf/](hwdev/gf/README.md)
 - [hwdev/gf/display/](hwdev/gf/display/README.md)
 - [hwdev/gf/op/](hwdev/gf/op/README.md)
+- [tools/checks/](tools/checks/README.md)
 
 同じディレクトリに README がない設計書も、上記の関連する入口またはこのページから辿る。
 
