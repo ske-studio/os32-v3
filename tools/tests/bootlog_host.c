@@ -526,7 +526,7 @@ static int fk_rename(const char *a, const char *b)
         strcpy(n->path, b);
         return 0;
     }
-    /* ext2_rename (fs/ext2_dir.c): 元と宛先が同じ inode (ファイルの
+    /* ext2_rename (fs/ext2/ext2_dir.c): 元と宛先が同じ inode (ファイルの
      * ハードリンク同士) なら何もせず成功し、両名が残る (POSIX どおり)。
      * 別の inode の宛先があれば置き換え (旧 inode はリンク数が減るだけ)、
      * 無ければ新名を載せてから旧名を消す。fk_rename_after_link の回は新名を
@@ -731,7 +731,7 @@ static void case_save(void)
 /* ------------------------------------------------------------------------ */
 static void case_write_rc(void)
 {
-    CHECK(bootlog_write_ok(BOOTLOG_FS_EXT2, 0, 100), "9a ext2 は 0 が成功 (fs/ext2_vfs.c)");
+    CHECK(bootlog_write_ok(BOOTLOG_FS_EXT2, 0, 100), "9a ext2 は 0 が成功 (fs/ext2/ext2_vfs.c)");
     CHECK(!bootlog_write_ok(BOOTLOG_FS_EXT2, -7, 100), "9b ext2 の負は失敗");
     CHECK(bootlog_write_ok(BOOTLOG_FS_FAT, 100, 100), "9c FAT は書いたバイト数 = len が成功");
     CHECK(!bootlog_write_ok(BOOTLOG_FS_FAT, 99, 100), "9d FAT の不足は失敗 (満杯)");
@@ -805,7 +805,7 @@ static void case_hardlink(void)
     int st, rc;
 
     /* 起動 A: 公開 (boot.new → boot.log、この手順で 2 回目の rename) が旧名の
-     * 削除で落ちる。fs/ext2_dir.c の順序 (links +1 → 新名を載せる → 旧名を
+     * 削除で落ちる。fs/ext2/ext2_dir.c の順序 (links +1 → 新名を載せる → 旧名を
      * 消す) では boot.log と boot.new が同じ inode を指したまま残る */
     fk_setup(0, "PREV", 0, 0);
     fk_rename_after_link = 2;
@@ -828,7 +828,7 @@ static void case_hardlink(void)
 
     /* 起動 A': boot.log → .1 (1 回目の rename) が旧名の削除で落ちる →
      * boot.log と .1 が同じ inode。次の起動: boot.log → .1 は同じ inode
-     * 同士なので何もせず成功 (両名が残る、fs/ext2_dir.c)。続く公開
+     * 同士なので何もせず成功 (両名が残る、fs/ext2/ext2_dir.c)。続く公開
      * (boot.new → boot.log) が既存の boot.log を置き換える — 旧 inode は
      * リンク数が 1 減るだけで、.1 の名前で PREV が残る */
     fk_setup(0, "PREV", "OLDER", 0);

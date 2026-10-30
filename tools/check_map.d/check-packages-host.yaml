@@ -9,8 +9,8 @@ check-packages-host:
 - build/image.mk
 - build/packages.yaml
 - drivers/block/pc98pt.c
-- fs/ext2_layout.c
-- fs/fatfs_vfs.c
+- fs/ext2/ext2_layout.c
+- fs/fat/fatfs_vfs.c
 - init/kernel.c
 - tools/deploy_manifests.py
 - tools/mkpkg.py

@@ -10,13 +10,13 @@ tools/tests/hsync_h3_host.c が userland/system/hsync.c を 1 行も写さず
 sys_set_mtime の成功 / NOSYS / I/O 失敗を注入できる。sys_read の呼び出し
 回数も数えるので「サイズも日時も同じなら 1 バイトも読まない」を直に見られる。
 
-fs/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
+fs/hostdrv/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
 hdrv_stat_mtime) も同じ翻訳単位で直接叩く (A16)。
 
   python3 -B tools/tests/test_hsync_h3.py [--target] [--mutate]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-hsync.c / fs/hostdrvfs.c / fs/ext2_vfs.c / kapi/kapi_sys.c が -Werror で
+hsync.c / fs/hostdrv/hostdrvfs.c / fs/ext2/ext2_vfs.c / kapi/kapi_sys.c が -Werror で
 通ることを確かめる ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は
@@ -216,10 +216,10 @@ def build_vfs(tmp, name, extra=()):
 def target_compile(tmp):
     jobs = [
         (TARGET_USER, "userland/system/hsync.c", []),
-        (TARGET_KERNEL, "fs/hostdrvfs.c", ["-Wno-address-of-packed-member"]),
-        (TARGET_KERNEL, "fs/ext2_vfs.c", []),
-        (TARGET_KERNEL, "fs/fatfs_vfs.c", []),
-        (TARGET_KERNEL, "fs/iso9660.c", []),
+        (TARGET_KERNEL, "fs/hostdrv/hostdrvfs.c", ["-Wno-address-of-packed-member"]),
+        (TARGET_KERNEL, "fs/ext2/ext2_vfs.c", []),
+        (TARGET_KERNEL, "fs/fat/fatfs_vfs.c", []),
+        (TARGET_KERNEL, "fs/isofs/iso9660.c", []),
         (TARGET_KERNEL, "fs/vfs.c", ["-Wno-sign-compare",
                                      "-Wno-unused-parameter"]),
         (TARGET_KERNEL, "kapi/kapi_sys.c", []),
@@ -274,8 +274,8 @@ MUT_TARGETS = {
     "mtime_unknown_is_same": "userland/system/hsync.c",
     "copy_on_mtime_diff": "userland/system/hsync.c",
     "no_set_mtime": "userland/system/hsync.c",
-    "filetime_no_epoch_shift": "fs/hostdrv_stat_rules.inc",
-    "filetime_wrap": "fs/hostdrv_stat_rules.inc",
+    "filetime_no_epoch_shift": "fs/hostdrv/hostdrv_stat_rules.inc",
+    "filetime_wrap": "fs/hostdrv/hostdrv_stat_rules.inc",
     "verify_ignored": "userland/system/hsync.c",
     "swallow_set_failure": "userland/system/hsync.c",
 }

@@ -107,12 +107,12 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
     info->phys_sector_size = 512; info->total_sectors = DISK_SECTORS;
     return IDE_OK;
 }
-#include "../../fs/ext2_super.c"
-#include "../../fs/ext2_inode.c"
-#include "../../fs/ext2_dir.c"
-#include "../../fs/ext2_file.c"
-#include "../../fs/ext2_fmt.c"
-#include "../../fs/ext2_vfs.c"
+#include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_inode.c"
+#include "../../fs/ext2/ext2_dir.c"
+#include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_fmt.c"
+#include "../../fs/ext2/ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
 #include "../../fs/vfs.c"
 #include "../../fs/vfs_fd.c"

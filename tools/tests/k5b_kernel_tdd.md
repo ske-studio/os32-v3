@@ -303,12 +303,12 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
-| 5 | `ext2_read_file()` が `max_size` を越えて書く | 実装前の `fs/ext2_file.c` に戻すと 4 検査中 3 検査が FAIL (`resolved[]` が読んだファイルの中身で潰れる) | `tools/tests/test_ext2_read_bound.py` 4 検査 ALL PASS |
+| 5 | `ext2_read_file()` が `max_size` を越えて書く | 実装前の `fs/ext2/ext2_file.c` に戻すと 4 検査中 3 検査が FAIL (`resolved[]` が読んだファイルの中身で潰れる) | `tools/tests/test_ext2_read_bound.py` 4 検査 ALL PASS |
 | 5' | シェル帯 (ID 1) が per-app 経路に入らない | — (境界を固定する追加検査。K5b-K でも GREEN) | `tools/tests/test_multiapp_impl.py` ケース 18 (13 検査) ALL PASS |
 
 ## 原因 (推測ではなく実ソースと `kernel.map` で確定)
 
-`fs/ext2_file.c:34` (K5b-K 前からある行) —
+`fs/ext2/ext2_file.c:34` (K5b-K 前からある行) —
 
 ```c
 ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックでも 1KB 書く */
@@ -358,7 +358,7 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 
 ## 直したもの
 
-1. `fs/ext2_file.c` — 端数ブロックは `ext2_g_blk` を中継して `to_copy` だけ写す
+1. `fs/ext2/ext2_file.c` — 端数ブロックは `ext2_g_blk` を中継して `to_copy` だけ写す
    (`ext2_read_stream` が前からやっている約束と同じ。`ext2_g_aux` は `ext2_bmap`
    が使うので不可 — gotcha §4-24)。ブロック境界ちょうどの読みは経路が変わらない。
 2. `exec/exec.c` — 読み込み失敗時の `exec_cpl0_release()` を `!is_shell` で囲った。
@@ -376,7 +376,7 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 ## RED の作り方 (実際に走らせた)
 
 ```bash
-git show HEAD:fs/ext2_file.c > fs/ext2_file.c     # K5b-K 時点へ戻す
+git show HEAD:fs/ext2/ext2_file.c > fs/ext2/ext2_file.c     # K5b-K 時点へ戻す
 python3 -B tools/tests/test_ext2_read_bound.py
 ```
 

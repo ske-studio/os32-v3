@@ -6,7 +6,7 @@
   NP21/W は CD のシークも回転も模擬しないので、エミュレータでは再現しない
 - 見立て (机上、**実機では測っていない**):
   1. `drivers/ata/atapi.c` の `atapi_read_sectors` は count がいくつでも READ(10) を 1 セクタずつ出していた
-  2. `fs/iso9660.c` の `read_stream` は呼ばれるたびに `iso_resolve_path` で根からたどり直し
+  2. `fs/isofs/iso9660.c` の `read_stream` は呼ばれるたびに `iso_resolve_path` で根からたどり直し
      (根のディレクトリ = LBA 23 を 1 回読む)、それから 1 セクタずつ `iso_read_sector` を呼んでいた
   3. `userland/lib/rt/pkg.c` の無圧縮の展開は 4KB ずつ `sys_read` し、データ部の先頭 (表の後ろ) が
      セクタに揃っていないので 4KB の読みは 3 セクタに掛かる
@@ -15,7 +15,7 @@
   `pkg_parse` (事前検査と展開で 2 回) は 1B・パス長・5B の小さな `sys_read` を項目ごとに 3 回出すので、
   1 本の PKG で数百回ぶん「根を読む + データを 1 セクタ読む」を繰り返していた
 - 対象: [`drivers/ata/atapi.c`](../../drivers/ata/atapi.c) / [`atapi.h`](../../drivers/ata/atapi.h)、
-  [`fs/iso9660.c`](../../fs/iso9660.c) / [`iso9660.h`](../../fs/iso9660.h)、
+  [`fs/isofs/iso9660.c`](../../fs/isofs/iso9660.c) / [`iso9660.h`](../../fs/isofs/iso9660.h)、
   [`userland/lib/rt/pkg.c`](../../userland/lib/rt/pkg.c)。KAPI は動かしていない
 - 実行: `python3 -B tools/tests/test_cd_read.py [--target] [--mutate] [case ...]`
   (`make check-cd-read-host` が `--target --mutate` 付きで回す)

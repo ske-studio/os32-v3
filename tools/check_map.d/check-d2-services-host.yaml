@@ -42,7 +42,7 @@ check-d2-services-host:
 - drivers/char/rtc.h
 - drivers/char/rtc.c
 - kernel/sys.c
-- fs/fatfs/diskio.c
+- fs/fat/fatfs/diskio.c
 - tools/tests/clock_fixture_host.h
 - lib/os_time.c
 - include/os_time.h

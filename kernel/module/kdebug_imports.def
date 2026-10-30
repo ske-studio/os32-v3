@@ -1950,7 +1950,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "sfs_lan_peer_mac",
-      "source": "fs/serialfs.h",
+      "source": "fs/serialfs/serialfs.h",
       "context_safe": false,
       "index": 243
     },

@@ -155,7 +155,7 @@ static int vfs_open_probe(VfsOps *ops, void *fs_ctx, const char *resolved,
     if ((mode & O_TRUNC) && (mode & (O_WRONLY | O_RDWR))) {
         /* 切り詰め：空ファイルで上書き。
          * **戻り値を見る** — 以前は捨てていたので、ext2 の一括書き込みが
-         * 持つディレクトリ拒否 (fs/ext2_file.c) のような失敗も消え、
+         * 持つディレクトリ拒否 (fs/ext2/ext2_file.c) のような失敗も消え、
          * 「切り詰まった」ことになっているサイズ 0 の FD が出ていた。 */
         if (!ops->write_file) return VFS_ERR_INVAL;
         rc = ops->write_file(fs_ctx, rel_path, "", 0);

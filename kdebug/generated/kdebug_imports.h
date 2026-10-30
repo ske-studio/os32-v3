@@ -17,7 +17,7 @@
 #include "exec/os32x_hdr.h"
 #include "exec/ring3_ls.h"
 #include "fs/fd_redirect.h"
-#include "fs/serialfs.h"
+#include "fs/serialfs/serialfs.h"
 #include "fs/vfs.h"
 #include "gfx/gfx.h"
 #include "include/bootinfo.h"

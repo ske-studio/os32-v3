@@ -74,7 +74,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
         st->st_nlink = 1;
         st->st_dev = 1;
         /* fixture の並び順を inode 代わりにする (同一性の判定に使う)。
-         * `inj_no_ino` は FAT (`fs/fatfs_vfs.c` は st_ino を 0 のまま返す)
+         * `inj_no_ino` は FAT (`fs/fat/fatfs_vfs.c` は st_ino を 0 のまま返す)
          * の模型 — inode を供給しない FS。 */
         if (!inj_no_ino) st->st_ino = (u32)(f - fixture_files) + 1u;
     }

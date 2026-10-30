@@ -24,7 +24,7 @@
    (`rt/dbgserial.h` の可変引数マクロは C99 の機能だが gnu89 の GNU 拡張で通るので、ここは「取り込める」までを見る)。
    `sdk/example/hello` は Makefile の `-std` が gnu89 のままで、in-tree の SDK ヘッダで gnu89 のままコンパイルできること
    (apps/game は組まない — ユーザー決定。A5 の代わりの確認)。
-4. 内部実装: 1 の翻訳単位のうち vendor (`lib/sqlite3 lib/zlib lib/microtar lib/fatfs lib/os32_lz4 fs/fatfs userland/rust`) の元ソースと
+4. 内部実装: 1 の翻訳単位のうち vendor (`lib/sqlite3 lib/zlib lib/microtar lib/fatfs lib/os32_lz4 fs/fat/fatfs userland/rust`) の元ソースと
    生成物 (`BUILD_OUT` の `build_id.c` など、木に無いソース) を除いたもの (329 単位) を、**その単位の実際の引数で `-E -w`** に通す。
    行継続 (バックスラッシュと改行の間の空白・タブを含む)・コメント・VT/FF・`#if`・マクロ・`#include` の解釈は本物の前処理器に任せ、
    自前は前処理後の各行から文字列・文字定数を除いて識別子を数えるだけ。ファイルと行は行標識 (`# N "file" flags`) から取り、

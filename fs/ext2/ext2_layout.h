@@ -13,7 +13,7 @@
 /*  必要量 (最終グループ g):                                                 */
 /*    sparse (0, 1, 3^n, 5^n, 7^n) なら SB 1 + GDT                           */
 /*    + block bitmap 1 + inode bitmap 1 + inode 表                           */
-/*    + g = 0 ならルートディレクトリのデータ 1 (fs/ext2_fmt.c が作るのは       */
+/*    + g = 0 ならルートディレクトリのデータ 1 (fs/ext2/ext2_fmt.c が作るのは       */
 /*      ルートだけ。lost+found は作らない — e2fsck -n は「無い」を報告する)   */
 /*  上限は EXT2_MAX_GROUPS (32 グループ = 256MiB)。                          */
 /*                                                                          */

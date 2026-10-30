@@ -156,7 +156,7 @@
 `drivers/ata/atapi.c` `drivers/block/fdc.c` `drivers/sound/fm/fm.c` `drivers/ata/ide.c` `drivers/input/kbd.c`
 `drivers/video/kcg/kcg.c` `drivers/net/ne2000/lgy98.c` `drivers/input/mouse.c` `drivers/input/mouse_bus.c`
 `drivers/input/mouse_seamless.c` `drivers/net/ne2000/ne2000.c` `drivers/char/np2sysp.c` `drivers/char/rtc.c`
-`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `fs/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
+`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `fs/hostdrv/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
 `drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
 `kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
 `kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
@@ -213,7 +213,7 @@ ARM で落ちた 38 本は本当に ARM 固有の理由で落ちている。
 
 | フラグ | 何から守るか |
 |---|---|
-| `-fsigned-char` | ARM EABI は `char` が **unsigned** が既定。**今のコードに符号依存は見つかっていない** (`lib/utf8.c` は `& 0x80`、`fs/iso9660.c` は `(unsigned char)` に明示キャスト) が、`kstrcmp` はまだ `lib/kstring_asm.asm` の x86 アセンブリで、これを C 版に起こす (順序 4) と `*a - *b` の符号で 0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。移植の最中に既定が裏返らないよう先に固定する |
+| `-fsigned-char` | ARM EABI は `char` が **unsigned** が既定。**今のコードに符号依存は見つかっていない** (`lib/utf8.c` は `& 0x80`、`fs/isofs/iso9660.c` は `(unsigned char)` に明示キャスト) が、`kstrcmp` はまだ `lib/kstring_asm.asm` の x86 アセンブリで、これを C 版に起こす (順序 4) と `*a - *b` の符号で 0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。移植の最中に既定が裏返らないよう先に固定する |
 | `-fno-short-enums` | ARM EABI は `-fshort-enums` が既定 (enum を収まる最小サイズに縮める)。`sdk/include/os32/os32_kapi_shared.h` の `exec_status_t` は `0 … -5` なので **1 バイトに縮む**。カーネルと外部プログラムで共有する ABI ヘッダなので、幅が食い違うと構造体のレイアウトごとずれる ([ABI1]) |
 
 `CFLAGS_COMMON` はカーネル (`KERNEL_CFLAGS`) と
@@ -345,7 +345,7 @@ ABI の両側に同じ前提がかかる。
   `*(u32 *)&buf[off]` は ARM でも**普通にコンパイルできる** — 壊れるのは
   実行時 (`SCTLR.A=1` なら非アラインで abort、BE なら値が入れ替わる) なので、
   コンパイル計測には最初から現れない。
-* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2_*.c` 5 本、`fs/iso9660.c`、
+* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2_*.c` 5 本、`fs/isofs/iso9660.c`、
   `lib/utf8.c`) は**順序 1 の時点から ARM を通っていた** (`fs/` 14/15、
   `lib/` 8/8)。`drivers/video/kcg/kcg.c` だけは今も落ちるが、原因は
   `platform/pc98/platform_io.h:25` のポート I/O で、エンディアンとは関係が無い。
@@ -356,13 +356,13 @@ ABI の両側に同じ前提がかかる。
 
 | 対象 | 順序 4-a の前 | 順序 4-a の後 |
 |---|---|---|
-| `fs/ext2_dir.c` | 29 | 0 |
-| `fs/ext2_fmt.c` | 54 | 0 |
-| `fs/ext2_inode.c` | 46 | 0 |
-| `fs/ext2_super.c` | 28 | 0 |
+| `fs/ext2/ext2_dir.c` | 29 | 0 |
+| `fs/ext2/ext2_fmt.c` | 54 | 0 |
+| `fs/ext2/ext2_inode.c` | 46 | 0 |
+| `fs/ext2/ext2_super.c` | 28 | 0 |
 | `drivers/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
-| `fs/ext2_file.c` / `ext2_vfs.c` / `iso9660.c` | 0 | 0 |
+| `fs/ext2/ext2_file.c` / `ext2_vfs.c` / `iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |
 
 `-Wcast-align` は既定では「非アラインを許す CPU」で黙るので、x86 のホストで

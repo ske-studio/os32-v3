@@ -60,9 +60,9 @@ check-lan-module-host:
 - include/sys.h
 - include/kprintf.h
 - kernel/module/kdebug_imports.def
-- fs/sfs_lan.h
-- fs/sfs_client.h
-- fs/sfs_proto.h
+- fs/serialfs/sfs_lan.h
+- fs/serialfs/sfs_client.h
+- fs/serialfs/sfs_proto.h
 - tools/mkmod.py
 - tools/gen_kdebug_imports.py
 - tools/mkpkg.py

@@ -8,7 +8,7 @@
 #ifndef HOSTDRVFS_H
 #define HOSTDRVFS_H
 
-#include "vfs.h"
+#include "../vfs.h"
 
 /* HostDrvFS初期化: VfsOps登録を行う */
 int hostdrvfs_init(void);

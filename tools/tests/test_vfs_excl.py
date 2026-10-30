@@ -18,7 +18,7 @@ create_excl / get_file_size / write_file の戻り値と呼び出し回数を指
   python3 -B tools/tests/test_vfs_excl.py [--target] [--mutate]
 
 --target は実機と同じ i386-elf クロスコンパイラでも fs/vfs.c / fs/vfs_fd.c /
-fs/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
+fs/ext2/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は「読めなかったを無いと読まない」と
 「非対応を先に断る」なので、それを崩した版で試験が確かに落ちることを見る。
@@ -199,8 +199,8 @@ if __name__ == "__main__":
         failed += rc != 0
 
         if "--target" in sys.argv:
-            for src in ("fs/vfs.c", "fs/vfs_fd.c", "fs/ext2_vfs.c",
-                        "fs/ext2_dir.c", "fs/ext2_file.c", "fs/ext2_super.c"):
+            for src in ("fs/vfs.c", "fs/vfs_fd.c", "fs/ext2/ext2_vfs.c",
+                        "fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c", "fs/ext2/ext2_super.c"):
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)

@@ -163,7 +163,7 @@ import表と既存利用者:
 | kernel_main (`init/kernel.c:184`) | `static void kernel_shell_loop(void)`へ`:695`以降のシェル実行ループ全体（失敗時末尾フォールバックの前まで）を抽出。ループ固有ローカルも移す。boot globalsは元位置、mem_kb/boot_drive依存の初期化はmainに残す |
 | kernel_main 第2分割 | `static void kernel_mount_children(void)`へ`:517`の列挙〜`:565`付近のブロックをそのまま抽出。ルートマウント・services起動順は変更しない。捕捉が必要なローカルは入力引数にし、共有context構造体を新設しない |
 | exec_launch (`exec/exec.c:1711`) | **今回は分けない**。`:2022`setjmp、`:2027`longjmp復帰、`:2096`ESP保存、`:2202`iretがあり、見出しだけでフレーム寿命を分割できない。既存のvolatile caller情報・static状態は不変 |
-| ext2_format_range (`fs/ext2_fmt.c:49`) | `static int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)`へ`:100`〜`:142`のSB作成と書込。必要なlayout計算値はlayから現行式のまま参照、値の導出時点は移さない |
+| ext2_format_range (`fs/ext2/ext2_fmt.c:49`) | `static int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)`へ`:100`〜`:142`のSB作成と書込。必要なlayout計算値はlayから現行式のまま参照、値の導出時点は移さない |
 | ext2_format_range 第2分割 | `static int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)`へ`:308`以降のinode2とディレクトリ作成。fmt_ctxは元関数のstaticのままポインタ渡し。ext2_g_blkも元の共用バッファ、スタックへ複製しない |
 | ime_process_key (`kernel/ime/ime.c:332`) | `static int ime_candidate_key(u8 ascii, u8 scancode)`へ`:341`〜`:489`。`if (g_ime.state != IME_ST_INPUT) return ime_candidate_key(ascii, scancode);` と直返し、残りは `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す |
 | serial_init_ex (`drivers/char/serial.c:215`) | **分けない**。211行には長い理由コメントが含まれる。既にserial_plan_outがあり、`:225`〜`:410`のIRQ/PIC/モード変更と復元、`:413`の区間外報告を一体で読める価値を優先 |
@@ -204,7 +204,7 @@ import表と既存利用者:
 | 変更 kernel/console/con_sink.c、kernel/kbd_inject.c、exec/lease.c、exec/exec.c | 元試験削除、con以外へ新3口を各5〜15行。元ヘッダの試験宣言削除、conは冗長reader代入の削除だけ |
 | 変更 kdebug/kselftest.c、kernel/module/kdebug_imports.def、tools/gen_kdebug_imports.py | 呼先5種置換、旧5枠削除・圧縮、S6追加・生成表/check_nm追従（計約100〜180行） |
 | 変更 build/kdebug.mkとkernelの対象リスト | 新.o追加とKDEBUG_STAGE=S6（約10行）。生成JSON等は同時再生成 |
-| 変更 init/kernel.c、fs/ext2_fmt.c、kernel/ime/ime.c | 純粋抽出、各約180 / 100 / 250行の移動、増分各10〜30行 |
+| 変更 init/kernel.c、fs/ext2/ext2_fmt.c、kernel/ime/ime.c | 純粋抽出、各約180 / 100 / 250行の移動、増分各10〜30行 |
 | 変更 tools/tests/test_{con_sink,kbd_inject,lease,kdebug_imports,kdebug_init}.py と関連fixture | 移植.o・host用接続、旧名互換、生成契約、各10〜60行 |
 | 新規 tools/tests/test_slim_selftest.py | 状態復元・実import経由のデータ/関数番地照合、100〜200行。S4用hostログ基盤は作らない |
 | 変更 tools/check_p2v_allow.txt、tools/tests/memmap_audit_host.c、lease_host.c、test_kapi_layout.py、r1関連fixture | exec試験2本の許可を移植先へ、lease呼先/リンク入力・ソース検査を追従（各5〜30行） |

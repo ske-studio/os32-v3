@@ -166,10 +166,10 @@ pinned の保護は**保証しない**:
 従来の unlink + add 経路のままで、上の保証は付かない。
 
 **例外**: 上の経路に入る条件は dirent の `file_type` が**両側とも
-`EXT2_FT_REG_FILE`** であること (`fs/ext2_dir.c`)。**FILETYPE 機能
+`EXT2_FT_REG_FILE`** であること (`fs/ext2/ext2_dir.c`)。**FILETYPE 機能
 (`s_feature_incompat` の 0x0002) を持たない ext2 では `file_type` が常に 0** な
 ので条件が成立せず、**従来の経路 (宛先の名前を先に消す) に落ちる** — 途中で
-落ちると宛先の名前が消えた瞬間が存在する。OS32 の `fs/ext2_fmt.c` は
+落ちると宛先の名前が消えた瞬間が存在する。OS32 の `fs/ext2/ext2_fmt.c` は
 FILETYPE を立てて作るので手元の NHD では起きないが、他所で作った媒体を
 マウントするときは付かない保証だと思うこと。
 
@@ -200,7 +200,7 @@ IDE HDD上のLinux ext2ファイルシステムを読み書きする。パーテ
 | ルートinode | 2 (`EXT2_ROOT_INO`) |
 | ブロックグループ | マルチグループ対応。1 グループ最大 8192 ブロック (`EXT2_BLOCKS_PER_GROUP_MAX`)、グループ数上限 32 (`EXT2_MAX_GROUPS`) |
 
-**API** (引数名の要約): `ctx` はマウントごとの `Ext2Ctx *`。正確な宣言は [fs/ext2.h](../fs/ext2.h) と [fs/ext2_priv.h](../fs/ext2_priv.h) を参照。`ext2_format` は内部で一時コンテキストを使う。
+**API** (引数名の要約): `ctx` はマウントごとの `Ext2Ctx *`。正確な宣言は [fs/ext2/ext2.h](../fs/ext2/ext2.h) と [fs/ext2/ext2_priv.h](../fs/ext2/ext2_priv.h) を参照。`ext2_format` は内部で一時コンテキストを使う。
 
 | 関数 | 説明 |
 |------|------|
@@ -334,7 +334,7 @@ NP21/WエミュレータのHostDrv機能を利用し、ホストPC (Windows) の
 | 関数 | 説明 |
 |------|------|
 公開エントリは `hostdrvfs_init` / `hostdrvfs_detect` の 2 つだけで、VfsOps に
-登録される実体は `hdrv_*` 接頭辞を持つ (`fs/hostdrvfs.c`)。
+登録される実体は `hdrv_*` 接頭辞を持つ (`fs/hostdrv/hostdrvfs.c`)。
 
 | 関数 | 説明 |
 |------|------|

@@ -2,8 +2,8 @@
 /*  PC98PT.H — PC-98 区画表 (LBA 1) の読み書きの共有部                      */
 /*                                                                          */
 /*  票 TASK_HDD_INSTALL 段 1-4 (F10)。区画表を触る全員がここを通す:         */
-/*    カーネル   fs/ext2_super.c の ext2_find_partition                      */
-/*    カーネル   fs/fatfs_vfs.c の FAT 区画探索 (PC98PartEntry を共有)       */
+/*    カーネル   fs/ext2/ext2_super.c の ext2_find_partition                      */
+/*    カーネル   fs/fat/fatfs_vfs.c の FAT 区画探索 (PC98PartEntry を共有)       */
 /*    ローダ     boot/boot_main.c の find_partition (loader_hdd.bin)         */
 /*    シェル     userland/shell/cmd_hdprep.c (hdprep)                        */
 /*    インストーラ userland/system/inst_disk.c (cdinst / install、段 2)      */
@@ -66,7 +66,7 @@
 /* 1 シリンダの上限 (ヘッド・セクタは 1 バイト、シリンダは 2 バイト) */
 #define PC98PT_MAX_CYL        0xFFFFUL
 
-/* ---- 生の 32 バイト (fs/fatfs_vfs.c と共有する並び) ----------------------
+/* ---- 生の 32 バイト (fs/fat/fatfs_vfs.c と共有する並び) ----------------------
  * 全フィールドが自然な境界にあるので詰め物は入らない (32 B)。**媒体を読む
  * コードはこの構造体を重ねず**、下の pc98pt_get / pc98pt_put でバイト列から
  * 取り出す (エンディアンと境界に寄りかからない)。構造体はオフセットの正典を

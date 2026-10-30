@@ -2,7 +2,7 @@
 S3I2-K の列挙エラー伝播と、起動ログ (2026-09-25) の「f_close の失敗を
 fatfs_vfs_write が返す」も同じ贋物の FatFs で見る。
 
-実物の fs/fatfs_vfs.c をそのまま取り込み、FatFs の f_* / Device / IDE /
+実物の fs/fat/fatfs_vfs.c をそのまま取り込み、FatFs の f_* / Device / IDE /
 kmalloc だけを差し替える。実デバイス・実イメージ・実 FatFs には触らない。
 
 追う事象: FDD ブート (root = FAT、ffconf.h の FF_USE_LFN 0) で

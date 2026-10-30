@@ -43,7 +43,7 @@ check-surface-lease-host:
 - docs/INDEX.md
 - exec/exec_kapi_init.inc
 - exec/ring3_ls.S
-- fs/ext2_vfs.c
+- fs/ext2/ext2_vfs.c
 - fs/vfs.c
 - sdk/os32x_hdr.py
 - sdk/rust/os32api/src/kapi_generated.rs

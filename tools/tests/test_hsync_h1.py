@@ -5,14 +5,14 @@
 
 tools/tests/hsync_h1_host.c が userland/system/hsync.c を 1 行も写さず
 そのまま #include し、KernelAPI だけをオンメモリの贋ファイルシステムへ
-差し替えて回す (模型ではない)。fs/hostdrv_stat_rules.inc (HostDrv の
+差し替えて回す (模型ではない)。fs/hostdrv/hostdrv_stat_rules.inc (HostDrv の
 stat 失敗の是正) も同じ翻訳単位で直接叩き、CRC は lib/crc32.c の既存
 一括版と同じ実行ファイルにリンクして値の一致を見る。
 
   python3 -B tools/tests/test_hsync_h1.py [--target]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-hsync.c / lib/crc32.c / fs/hostdrvfs.c が -Werror で通ることを確かめる
+hsync.c / lib/crc32.c / fs/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる
 ([C1] GNU11)。make・エミュレータ・実配備には一切触れない。
 
 ビルドは 2 本:
@@ -112,9 +112,9 @@ def target_compile(tmp):
     print("TARGET i386-elf -Werror COMPILE PASS (lib/crc32.c)", flush=True)
     subprocess.run(["i386-elf-gcc", *TARGET_KERNEL,
                     "-Wno-address-of-packed-member", "-c",
-                    "fs/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
+                    "fs/hostdrv/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
                    cwd=ROOT, check=True)
-    print("TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)", flush=True)
+    print("TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)", flush=True)
 
 
 if __name__ == "__main__":

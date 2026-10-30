@@ -219,15 +219,15 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 
 # hd0 の規則は install と共有 (userland/system/inst_hdd.c / inst_disk.c)。区画表
 # (drivers/block/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
-# (fs/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
+# (fs/ext2/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
 # (票 TASK_HDD_INSTALL 段 2-9)。
 INST_HDRS = userland/system/inst_hdd.h userland/system/inst_disk.h \
-            userland/shell/hdprep_plan.h drivers/block/pc98pt.h fs/ext2_layout.h $(SDK_KAPI_HDR)
+            userland/shell/hdprep_plan.h drivers/block/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
 userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/ext2_layout_user.o: fs/ext2_layout.c fs/ext2_layout.h
+userland/system/ext2_layout_user.o: fs/ext2/ext2_layout.c fs/ext2/ext2_layout.h
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/block/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@

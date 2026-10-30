@@ -167,7 +167,7 @@ static void pc98_read_date(ClockDate *d) {
 ```
 - RTCのBCD・ビット送受信・2桁年補正はdriver内。epoch演算は既存整数datetime_to_epochをsys側で使う。read_legacy=rtc_readで7Bの旧ABIを厳密維持。
 - `const ClockOps pc98_clock = { pc98_read_date, rtc_read };` はdrivers/char/rtc.cに置き、platformはexternの表を登録する（static adapterをファイル外から参照しない）。
-- `fs/fatfs/diskio.c:386–397` のget_fattimeはclock_service.hを読み、ClockDateへ `clock_read_date(&t)`、年は `t.year` を使う。自前pivot補正を除き、DOS_YEAR_BASE=1980の減算・ビット詰め・秒/2・読出し1回を維持する。
+- `fs/fat/fatfs/diskio.c:386–397` のget_fattimeはclock_service.hを読み、ClockDateへ `clock_read_date(&t)`、年は `t.year` を使う。自前pivot補正を除き、DOS_YEAR_BASE=1980の減算・ビット詰め・秒/2・読出し1回を維持する。
 - ClockOpsは協調文脈のみ。時刻キャッシュや周期IRQを追加しない。異常値の丸め・再試行も足さず、現在の読出し結果を保存する。
 - sdk/kapi.jsonのincludesを共通入力/ポインタ/時計/ポートヘッダへ置換。全kbd entry（diag/log/local/rawを含む）はtarget=input_*、全mouse entryはtarget=pointer_*。
 - serialの8操作はtarget=port_*。serial_diagのbodyはkapi_serial_diagのまま。kbd_inject/pending、rshell_set_activeはそのまま。
@@ -207,7 +207,7 @@ static void pc98_read_date(ClockDate *d) {
 |B|変更 sdk/kapi.json→生成物、build/kernel.mk|計20、serial targetとソース登録|
 |C|新 include/clock_service.h、kernel/time/clock_service.c；変更 drivers/char/rtc.h・rtc.c|計80、共通型・転送・adapter|
 |C|変更 kernel/sys.c、platform/pc98/d2_bind.c、sdk/kapi.json→生成物、build/kernel.mk|計35、時計接続、sys.cの"rtc.h"をclock_service.hへ|
-|C|変更 fs/fatfs/diskio.c|約10、clock_read_date経由・重複年補正除去|
+|C|変更 fs/fat/fatfs/diskio.c|約10、clock_read_date経由・重複年補正除去|
 |A1/A2/B/C|新 tools/tests/d2_services_host.c・test_d2_services.py；変更関連host fixture・check_map.d/*.yaml・build/checks.d/*.mk|新250〜350、既存100〜200、段別assertと変異・依存地図|
 
 ## 8. 受入→試験・変異、既存利用者、実装段

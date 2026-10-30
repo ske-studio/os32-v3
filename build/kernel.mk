@@ -38,8 +38,8 @@ C_KERNEL = \
     drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
     gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
-    fs/fatfs/ff.c fs/fatfs/diskio.c fs/fatfs_vfs.c \
-    fs/ext2_super.c fs/ext2_inode.c fs/ext2_dir.c fs/ext2_file.c fs/ext2_fmt.c fs/ext2_layout.c fs/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrvfs.c fs/sfs_proto.c fs/sfs_client.c fs/serialfs.c fs/serialfs_session.c \
+    fs/fat/fatfs/ff.c fs/fat/fatfs/diskio.c fs/fat/fatfs_vfs.c \
+    fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c \
     exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
@@ -194,7 +194,7 @@ R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c
 
 $(R1_OBJ)/%.o: %.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
+	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fat/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc
 	@mkdir -p $(@D)
@@ -256,12 +256,12 @@ $(KERNEL_OBJ_PREFIX)%.o: private KERNEL_INCLUDES = $(INC_KERNEL)
 $(KERNEL_OBJ_PREFIX)drivers/%.o: private KERNEL_INCLUDES = $(INC_DRIVERS)
 $(KERNEL_OBJ_PREFIX)gfx/%.o: private KERNEL_INCLUDES = $(INC_GFX)
 $(KERNEL_OBJ_PREFIX)fs/%.o: private KERNEL_INCLUDES = $(INC_FS)
-$(KERNEL_OBJ_PREFIX)fs/fatfs/%.o: private KERNEL_INCLUDES = $(INC_FATFS)
+$(KERNEL_OBJ_PREFIX)fs/fat/fatfs/%.o: private KERNEL_INCLUDES = $(INC_FATFS)
 $(KERNEL_OBJ_PREFIX)exec/%.o: private KERNEL_INCLUDES = $(INC_EXEC)
 $(KERNEL_OBJ_PREFIX)kapi/%.o: private KERNEL_INCLUDES = $(INC_KAPI)
 $(KERNEL_OBJ_PREFIX)lib/%.o: private KERNEL_INCLUDES = $(INC_LIB)
 $(addprefix $(KERNEL_OBJ_PREFIX),drivers/video/cirrus/backend_cirrus.o drivers/video/cirrus/cirrus_identify.o drivers/video/geforce/backend_geforce.o drivers/video/geforce/gf_present.o drivers/video/pc98/backend_pc98.o drivers/video/pc98/backend_pegc.o drivers/video/pc98/pc98_route.o): private KERNEL_INCLUDES = $(INC_GFX)
-CORE_KERNEL_INCLUDES = drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
+CORE_KERNEL_INCLUDES = drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
 $(addprefix $(KERNEL_OBJ_PREFIX),$(CORE_KERNEL_INCLUDES)): private KERNEL_INCLUDES = $(INC_KERNEL)
 
 $(KERNEL_OBJ_PREFIX)%.o: %.c
@@ -275,8 +275,8 @@ $(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/in
 $(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
 $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c
 $(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
-$(KERNEL_OBJ_PREFIX)fs/fatfs/ff.o: fs/fatfs/ffconf.h fs/fatfs/string.h
-$(KERNEL_OBJ_PREFIX)fs/fatfs/diskio.o: fs/fatfs/ff.h fs/fatfs/diskio.h
+$(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string.h
+$(KERNEL_OBJ_PREFIX)fs/fat/fatfs/diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 
 $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc
 	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)

@@ -9,7 +9,7 @@
 
 #include "fatfs/ff.h"
 #include "fatfs/diskio.h"
-#include "vfs.h"
+#include "../vfs.h"
 #include "kmalloc.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -110,7 +110,7 @@ static int ff_stat_to_vfs(FRESULT fr)
  * 規則と Win32 (HostDrv) との差は fs/vfs_name_rules.inc。
  * FAT は**途中の空白も**断る — FatFs はそこで名前を打ち切るので、
  * "DISK.IMG ignored" も "DISK.IMG" になる (Win32 では途中の空白は正当)。 */
-#include "vfs_name_rules.inc"
+#include "../vfs_name_rules.inc"
 
 
 /* ======== パスにボリューム接頭辞を付加 ========

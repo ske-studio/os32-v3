@@ -3653,7 +3653,7 @@
       "stage": "S5",
       "kind": 1,
       "symbol": "sfs_lan_peer_mac",
-      "source": "fs/serialfs.h",
+      "source": "fs/serialfs/serialfs.h",
       "context_safe": false,
       "index": 243,
       "name": "sfs_lan_peer_mac",

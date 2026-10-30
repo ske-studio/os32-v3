@@ -11,7 +11,7 @@ from test_dep_dir_a_l05a import digest, public_spec
 
 ROOT = Path(__file__).resolve().parents[2]
 COPIES = (
-    'fs/ext2.h', 'fs/serialfs.h', 'fs/sfs_client.h', 'fs/sfs_proto.h', 'fs/vfs.h',
+    'fs/ext2/ext2.h', 'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h',
     'include/memmap.h', 'include/platform_device.h', 'include/time_units.h',
     'include/types.h', 'platform/pc98/device_fs.c',
     'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h',
@@ -44,7 +44,7 @@ def contracts():
                 else 'return ' + target + '(' in entry['body'])
         wrappers += body + '\n'
     assert '#include "kbd.h"' not in (ROOT / 'fs/vfs.c').read_text()
-    session = (ROOT / 'fs/serialfs_session.c').read_text()
+    session = (ROOT / 'fs/serialfs/serialfs_session.c').read_text()
     assert '#include "lan_contract.h"' in session and '"e82557.h"' not in session
     print('PASS fixed baseline public API/generated ABI and exact wrapper guards; A3 includes')
     return wrappers

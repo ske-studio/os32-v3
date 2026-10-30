@@ -9,7 +9,7 @@
 /*    ext2ブロックN → IDEセクタ (N*2)                                      */
 /* ======================================================================== */
 
-#include "ide_limits.h"
+#include "../ide_limits.h"
 #include "ext2_priv.h"
 #include "ide_contract.h"
 #include "platform_device.h"

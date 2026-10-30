@@ -3,7 +3,7 @@
 票:   docs/archive/shell/TASK_FS_TYPE.md §2
 記録: tools/tests/b8_tdd.md §5
 
-tools/tests/b8_hostdrv_host.c が **実物の fs/hostdrvfs.c** をそのまま
+tools/tests/b8_hostdrv_host.c が **実物の fs/hostdrv/hostdrvfs.c** をそのまま
 #include し、include/io.h だけを tools/tests/hostdrv_hostshim/io.h で
 差し替える (特権命令のインライン asm はホストで走らないため)。
 ハイパーコールのコマンド列が完成した時点で**贋の NP21/W** が応答を書くので、
@@ -16,7 +16,7 @@ IRP_MJ_CREATE が返す NTSTATUS を 1 つずつ指定して
 
   python3 -B tools/tests/test_b8_hostdrv.py [--target]
 
---target を付けると fs/hostdrvfs.c が実ビルドの素性でも通ることを見る。
+--target を付けると fs/hostdrv/hostdrvfs.c が実ビルドの素性でも通ることを見る。
 make・エミュレータ・実配備には一切触れない。
 """
 from kernel_includes import include_flags
@@ -55,14 +55,14 @@ if __name__ == "__main__":
         exe = tmp / "b8-hostdrv"
         subprocess.run(["gcc", *HOST_FLAGS, *INCLUDES, str(SRC), "-o", str(exe)],
                        cwd=ROOT, check=True)
-        print("HOST GNU11 -Werror COMPILE PASS (real fs/hostdrvfs.c)", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS (real fs/hostdrv/hostdrvfs.c)", flush=True)
 
         rc = host32.run([str(exe)], cwd=ROOT, timeout=120).returncode
         print("EXIT b8_hostdrv_host=%d" % rc, flush=True)
 
         if "--target" in sys.argv:
-            subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", "fs/hostdrvfs.c",
+            subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", "fs/hostdrv/hostdrvfs.c",
                             "-o", str(tmp / "hostdrvfs.o")], cwd=ROOT, check=True)
-            print("TARGET i386-elf COMPILE PASS (fs/hostdrvfs.c)", flush=True)
+            print("TARGET i386-elf COMPILE PASS (fs/hostdrv/hostdrvfs.c)", flush=True)
 
         sys.exit(rc)

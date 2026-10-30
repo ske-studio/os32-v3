@@ -285,7 +285,7 @@ int  serial_is_initialized(void);
 
 /* ======================================================================== */
 /*  SerialFS セッションのゲート (票 TASK_SERIAL_HOSTFS §1-v3、serial.c の注記) */
-/*  使うのは fs/serialfs_session.c だけ。                                   */
+/*  使うのは fs/serialfs/serialfs_session.c だけ。                                   */
 /* ======================================================================== */
 /* セッション中の出力を溜める保留リング (溢れたら古い方を捨てて数える) */
 #define SER_HOLD_SIZE   8192

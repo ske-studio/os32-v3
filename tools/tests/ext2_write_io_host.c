@@ -5,7 +5,7 @@
  *  実行:   python3 -B tools/tests/test_ext2_write_io.py
  *  記録:   tools/tests/s6p_tdd.md
  *
- *  実物の fs/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
+ *  実物の fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
  *  ext2_fmt.c / ext2_vfs.c をそのまま取り込み、境界は
  *    - Device API (dev_find / dev_blk_read_lba / dev_blk_write_lba)
  *    - ide_drive_present / ide_get_info
@@ -16,7 +16,7 @@
  *
  *  数えるのは **512B セクタ単位の I/O 回数** (= ide_read_sector_chs /
  *  ide_write_sector_chs の呼び出し回数)。ext2 の 1KB ブロック 1 本は必ず
- *  セクタ 2 本になる (fs/ext2_super.c の ext2_read_block / ext2_write_block)。
+ *  セクタ 2 本になる (fs/ext2/ext2_super.c の ext2_read_block / ext2_write_block)。
  *
  *  tools/tests/con_sink_host.c と同じ様式 — ホスト ILP32 GNU89 で走らせ、
  *  同じソースが i386-elf-gcc -Werror でも通ることを別に見る ([C1])。
@@ -265,12 +265,12 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 /* ======================================================================== */
 /*  実物のソース                                                            */
 /* ======================================================================== */
-#include "../../fs/ext2_super.c"
-#include "../../fs/ext2_inode.c"
-#include "../../fs/ext2_dir.c"
-#include "../../fs/ext2_file.c"
-#include "../../fs/ext2_fmt.c"
-#include "../../fs/ext2_vfs.c"
+#include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_inode.c"
+#include "../../fs/ext2/ext2_dir.c"
+#include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_fmt.c"
+#include "../../fs/ext2/ext2_vfs.c"
 
 /* 書庫を作る側も実物 (票 S6-P 段 A)。MTAR_NO_STDIO は試験側が -D で渡す。 */
 #include "../../lib/microtar/microtar.c"

@@ -5,15 +5,15 @@
 /*  (KAPI sfs_begin / sfs_end)。`mount /host COM1 serialfs` の単独実行は     */
 /*  mount の口が断る (セッションの中の vfs_mount だけが通る)。              */
 /*                                                                          */
-/*  fs/serialfs.c        … VfsOps (ホスト試験でもそのまま組む)              */
-/*  fs/serialfs_session.c … セッション (ゲート・HELLO・マウント・隔離・     */
+/*  fs/serialfs/serialfs.c        … VfsOps (ホスト試験でもそのまま組む)              */
+/*  fs/serialfs/serialfs_session.c … セッション (ゲート・HELLO・マウント・隔離・     */
 /*                          ログのフレーム)。カーネルだけ                    */
 /* ======================================================================== */
 #ifndef FS_SERIALFS_H
 #define FS_SERIALFS_H
 
 #include "types.h"
-#include "vfs.h"
+#include "../vfs.h"
 #include "sfs_client.h"
 
 #define SERIALFS_NAME     "serialfs"
@@ -30,7 +30,7 @@ void    serialfs_permit(SfsClient *c);
 void    serialfs_forbid(void);
 int     serialfs_is_mounted(void);
 
-/* ---- セッション (fs/serialfs_session.c、KAPI の実体) ----
+/* ---- セッション (fs/serialfs/serialfs_session.c、KAPI の実体) ----
  * sfs_begin: 0 = /host にマウントした /
  *   OS32_ERR_INVAL … 常駐シェル以外から / シリアル未初期化 / 待てない (IF=0)
  *   OS32_ERR_BUSY  … セッション中 / /host が使われている

@@ -36,9 +36,9 @@ check-dep-dir-a-l01-host:
 - kernel/module/module_image.h
 - kernel/module/module_schema.h
 - kernel/irq/irq.h
-- fs/sfs_lan.h
-- fs/sfs_client.h
-- fs/sfs_proto.h
+- fs/serialfs/sfs_lan.h
+- fs/serialfs/sfs_client.h
+- fs/serialfs/sfs_proto.h
 - lib/dma_contract.c
 - drivers/dma/dma8237.h
 - drivers/dma/dma8237_math.c

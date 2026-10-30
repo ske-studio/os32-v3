@@ -4,7 +4,7 @@
 /*  実物を 1 行も写さずに #include する:                                    */
 /*    drivers/block/pc98pt.c          区画表の共有部 (標準配置)                   */
 /*    drivers/ata/ide_addr.c        ATA の指定の方式 (LBA28 / 現在 / 既定) と範囲 */
-/*    fs/ext2_layout.c          format の大きさの固定点 (N7)                 */
+/*    fs/ext2/ext2_layout.c          format の大きさの固定点 (N7)                 */
 /*    userland/shell/hdprep_plan.c  hdprep の断る条件と計画                  */
 /*  記録: tools/tests/hdd_stage1_tdd.md                                     */
 /*  票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 1 / §1-v3                */
@@ -20,7 +20,7 @@
 
 #include "../../drivers/block/pc98pt.c"
 #include "../../drivers/ata/ide_addr.c"
-#include "../../fs/ext2_layout.c"
+#include "../../fs/ext2/ext2_layout.c"
 #include "../../userland/shell/hdprep_plan.c"
 
 static int failed;

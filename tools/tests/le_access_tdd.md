@@ -9,7 +9,7 @@
 
 ## 0. 正直に書く ([V4])
 
-**検査は置き換えのあとに書いた。** `fs/ext2_*.c` / `fs/iso9660.c` /
+**検査は置き換えのあとに書いた。** `fs/ext2_*.c` / `fs/isofs/iso9660.c` /
 `drivers/video/kcg/kcg.c` / `lib/utf8.c` の `*(u32 *)&buf[off]` を先にアクセサへ
 置き換え、そのあとで `tools/check_le_access.py` を書いて
 「置き換え漏れが 0 である」ことと「今後増えない」ことを固定した。
@@ -63,13 +63,13 @@ x86 のホストで見張るには **`=strict` が要る**。フラグとイン�
 
 | ファイル | 順序 4-a の前 | 後 |
 |---|---|---|
-| `fs/ext2_dir.c` | 29 | 0 |
-| `fs/ext2_fmt.c` | 54 | 0 |
-| `fs/ext2_inode.c` | 46 | 0 |
-| `fs/ext2_super.c` | 28 | 0 |
+| `fs/ext2/ext2_dir.c` | 29 | 0 |
+| `fs/ext2/ext2_fmt.c` | 54 | 0 |
+| `fs/ext2/ext2_inode.c` | 46 | 0 |
+| `fs/ext2/ext2_super.c` | 28 | 0 |
 | `drivers/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
-| `fs/ext2_file.c` / `fs/ext2_vfs.c` / `fs/iso9660.c` | 0 | 0 |
+| `fs/ext2/ext2_file.c` / `fs/ext2/ext2_vfs.c` / `fs/isofs/iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |
 
 ## 3. GREEN (現状、2026-09-15)

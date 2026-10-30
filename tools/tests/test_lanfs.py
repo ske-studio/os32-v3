@@ -20,8 +20,8 @@ from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/lanfs_host.c"
-C_SRCS = ["fs/sfs_lan.c", "fs/sfs_lan.h", "fs/sfs_client.c",
-          "fs/sfs_client.h", "fs/sfs_proto.c", "fs/sfs_proto.h", "fs/serialfs.c"]
+C_SRCS = ["fs/serialfs/sfs_lan.c", "fs/serialfs/sfs_lan.h", "fs/serialfs/sfs_client.c",
+          "fs/serialfs/sfs_client.h", "fs/serialfs/sfs_proto.c", "fs/serialfs/sfs_proto.h", "fs/serialfs/serialfs.c"]
 PY_SRC = ROOT / "tools/lanfs_host.py"
 sys.path.insert(0, str(ROOT / "tools"))
 import serialfs_host as sfs
@@ -515,9 +515,9 @@ def trial(exe, py_path, root, timeout=10):
 
 def run_mutations(tmp, root):
     mutations = [
-        ("hello_limit", "fs/sfs_client.c",
+        ("hello_limit", "fs/serialfs/sfs_client.c",
          "        c->max_payload = SFS_MAX_PAYLOAD;", "        c->max_payload = SFS_LAN_MAX_PAYLOAD;"),
-        ("seq", "fs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
+        ("seq", "fs/serialfs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
          "elif False:"),
@@ -525,10 +525,10 @@ def run_mutations(tmp, root):
          "(sfs.T_LOG, sfs.T_EXIT, sfs.T_DUMP)", "(sfs.T_LOG, sfs.T_EXIT)"),
         ("host_peer", "tools/lanfs_host.py",
          "if self.peer is not None and src != self.peer:", "if False:"),
-        ("put_deadline", "fs/sfs_lan.c",
+        ("put_deadline", "fs/serialfs/sfs_lan.c",
          "(u32)(lan_now(ctx) - start) >= sfs_ms_ticks(SFS_LAN_PUT_MS)",
          "0"),
-        ("uart_gate", "fs/sfs_lan.c", "    nic->mac(lan->mac);",
+        ("uart_gate", "fs/serialfs/sfs_lan.c", "    nic->mac(lan->mac);",
          "    extern void serial_gate_set(int on);\n"
          "    serial_gate_set(1);\n    nic->mac(lan->mac);"),
     ]

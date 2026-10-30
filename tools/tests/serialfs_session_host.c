@@ -1,8 +1,8 @@
 /* ======================================================================== */
-/*  SERIALFS_SESSION_HOST.C — fs/serialfs_session.c のホスト試験             */
+/*  SERIALFS_SESSION_HOST.C — fs/serialfs/serialfs_session.c のホスト試験             */
 /*                                                                          */
 /*  票 TASK_SERIAL_HOSTFS §1-v3 のセッション (sfs_begin / sfs_end) を、      */
-/*  実物の fs/serialfs_session.c・fs/sfs_client.c・fs/sfs_proto.c・         */
+/*  実物の fs/serialfs/serialfs_session.c・fs/serialfs/sfs_client.c・fs/serialfs/sfs_proto.c・         */
 /*  drivers/char/serial.c を #include して回す。偽物はポート I/O (8251 の送信を  */
 /*  記録、受信は「届く tick」つきの待ち行列)、tick (hlt のたびに 1 進む)、  */
 /*  VFS (mount / umount / fstype)、kprintf (実物の console と同じく          */

@@ -9,7 +9,7 @@
  *  name_fold で畳む)。ところが下の FS は、それ以外にも「違う綴りを同じ名前」
  *  と読む:
  *
- *    FatFs (FF_USE_LFN 0、fs/fatfs/ff.c の非 LFN 版 create_name)
+ *    FatFs (FF_USE_LFN 0、fs/fat/fatfs/ff.c の非 LFN 版 create_name)
  *      (a) '\' も区切り。先頭・重複した区切りは読み飛ばす ("d\img.dat" =
  *          "D/IMG.DAT"、"\disk.img" = "/DISK.IMG")
  *      (b) 0x20 以下のバイトで名前が終わる ("DISK.IMG " も

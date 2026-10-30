@@ -1,6 +1,6 @@
 # vfs mount デバイス種別 — TDD 記録 (2026-09-10)
 
-対象: `fs/vfs.h` / `fs/vfs.c` / `fs/ext2_vfs.c` / `fs/iso9660.c` / `fs/fatfs_vfs.c`
+対象: `fs/vfs.h` / `fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `fs/isofs/iso9660.c` / `fs/fat/fatfs_vfs.c`
 試験: `tools/tests/test_vfs_mount_dev.py` + `tools/tests/vfs_mount_dev_host.c`
 登録: `make check` → `check-vfs-mount-dev-host`
 
@@ -90,9 +90,9 @@ SUMMARY 4/4 PASS
 
 - `fs/vfs.h` — `VFS_DEV_*` と `VFS_MOUNT_DEV_ENCODE/TYPE/ID` を公開 (FS ドライバも見る)。
   `fs/vfs.c` の private な定義は撤去。
-- `fs/ext2_vfs.c` — `VFS_MOUNT_DEV_TYPE != VFS_DEV_HD` を ext2 本体へ届く**前**に拒否。
-- `fs/iso9660.c` — 同じく `VFS_DEV_CD` 以外を拒否。
-- `fs/fatfs_vfs.c` — 手書きのシフトを共通マクロに置換 (挙動は不変)。
+- `fs/ext2/ext2_vfs.c` — `VFS_MOUNT_DEV_TYPE != VFS_DEV_HD` を ext2 本体へ届く**前**に拒否。
+- `fs/isofs/iso9660.c` — 同じく `VFS_DEV_CD` 以外を拒否。
+- `fs/fat/fatfs_vfs.c` — 手書きのシフトを共通マクロに置換 (挙動は不変)。
 - `fs/vfs.c` — 同じ (ops, dev_type, dev_id) の二重マウントを `VFS_ERR_EXIST` で断る。
   ext2 に限らずクラスごと止める二重の網。
 
@@ -114,8 +114,8 @@ SUMMARY 4/4 PASS
 
 `userland/rust/filer/src/lib.rs` の同一ファイル判定は
 `sst.st_ino != 0 && sst.st_dev == stbuf.st_dev && sst.st_ino == stbuf.st_ino`。
-ところが `st_dev` を埋める FS ドライバが 1 つも無い — `fs/ext2_vfs.c` と
-`fs/iso9660.c` は `st_dev = 0` 固定、`fs/hostdrvfs.c` と `fs/fatfs_vfs.c` は
+ところが `st_dev` を埋める FS ドライバが 1 つも無い — `fs/ext2/ext2_vfs.c` と
+`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`fs/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
 `kmemset` のまま。よって **hd0 と hd1 で inode 番号が一致すると、別ディスクの
 別ファイルが「同じファイル」になり、正当な上書きコピーまで拒まれる**。
 ext2 の inode 番号は FS 内でしか一意でないので、12 (lost+found の次) のような
@@ -186,7 +186,7 @@ SUMMARY 6/6 PASS
 ## 既知の限界
 
 - **同じ物理ディスク上の別パーティションは区別しない。**
-  `fs/ext2_super.c:131` の `ext2_find_partition()` は PC-98 パーティション
+  `fs/ext2/ext2_super.c:131` の `ext2_find_partition()` は PC-98 パーティション
   テーブルの最初のブート可能エントリ (`bootable & 0x80`) を見つけた時点で
   `break` するので、1 台の hd につき 1 パーティションしか触れない。さらに
   `vfs_mount()` が同じ `(ops, dev_type, dev_id)` の二重マウントを断るため、

@@ -30,7 +30,7 @@
  * FAT と言える場合だけを拾う: 「/etc がルートと同じマウント (st_dev が同じ) で、
  * ルートが FD」。FD 起動のルートは kernel.c が必ず FAT でマウントする
  * (ルートのデバイス名と FS 名は tools/tests/test_packages.py が kernel.c と
- * fs/fatfs_vfs.c に突き合わせる)。/etc に別のマウント (HDD の ext2 など) が
+ * fs/fat/fatfs_vfs.c に突き合わせる)。/etc に別のマウント (HDD の ext2 など) が
  * 載っていれば st_dev が違うので読まない。FAT の HDD が /etc に載る場合も
  * 読まない (安全側。短い名前を探さないだけ) */
 #define FL_ETC_DIR           "/etc"

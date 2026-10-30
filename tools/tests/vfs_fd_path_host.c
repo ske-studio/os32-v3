@@ -18,7 +18,7 @@
  *    dot   … 最終要素の "." / ".." (rmdir / rename 両引数 / unlink / mkdir)
  *    path  … 255/256 バイト、32/33 要素、相対パス + 長い cwd、mount prefix
  *    namerule … fs/vfs_name_rules.inc の表 (FAT / Win32 が意味を変える綴り)
- *    fatname  … 実物の fs/fatfs_vfs.c + fs/fatfs/ff.c (RAM の FAT12) で、
+ *    fatname  … 実物の fs/fat/fatfs_vfs.c + fs/fat/fatfs/ff.c (RAM の FAT12) で、
  *               "disk.img " / "d\img.dat" / "db." などを INVAL で断り、
  *               BUSY / pinned の実体が消えない・動かない (ラリー 2 blocker)
  *    fatroot  … (fatname の中) FAT を "/" にマウントして 253/254/255 バイト、
@@ -1326,7 +1326,7 @@ static void case_cdinst(void)
 
 #ifndef FDP_RED
 /* ======================================================================== */
-/*  段 fatname: 実物の fs/fatfs_vfs.c + fs/fatfs/ff.c (RAM の FAT12) で、    */
+/*  段 fatname: 実物の fs/fat/fatfs_vfs.c + fs/fat/fatfs/ff.c (RAM の FAT12) で、    */
 /*  FatFs が「別の綴りを同じ名前」と読む名前を入口で断る (TASK_VFS_FD_PATH  */
 /*  実装レビュー ラリー 2 の blocker)。旧実装は vfs_rm("/fd0/disk.img ") が   */
 /*  BUSY の比較 (1 バイトの fold) をすり抜け、FatFs が DISK.IMG を消した。  */
@@ -1897,9 +1897,9 @@ static void case_fatname(void)
 }
 
 /* 合成ドライバ: ext2 の口の前に Win32 (HostDrv) の名前の入口検査を置く。
- * 実物の fs/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
+ * 実物の fs/hostdrv/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
  * 規則は同じ vfs_name_rule_check (配線は test_vfs_fd_path.py の hostwire 段が
- * fs/hostdrvfs.c の本文で確かめる)。 */
+ * fs/hostdrv/hostdrvfs.c の本文で確かめる)。 */
 static VfsOps g_win_ops;
 #define WIN_CHK(p) do { int r_ = vfs_name_rule_check((p), VFS_NAME_RULE_WIN32); \
                         if (r_ != VFS_OK) return r_; } while (0)

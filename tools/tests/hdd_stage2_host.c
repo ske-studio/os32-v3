@@ -5,7 +5,7 @@
  *  記録:   tools/tests/hdd_stage2_tdd.md
  *
  *  実物 userland/system/inst_disk.c を、drivers/block/pc98pt.c・
- *  userland/shell/hdprep_plan.c・fs/ext2_layout.c と別の翻訳単位で組む
+ *  userland/shell/hdprep_plan.c・fs/ext2/ext2_layout.c と別の翻訳単位で組む
  *  (ホスト LP64、libc あり)。見るもの:
  *    - モードの判定 (空・再作成・旧配置・未知・2 項目・開始違い・55AA・壊れ)
  *      を 8/17 と 16/63 で

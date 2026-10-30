@@ -22,7 +22,7 @@ typedef unsigned long  u32;
 #define EXT2_IND_BLOCK     12
 #define EXT2_DIND_BLOCK    13
 
-/* 1KiB 固定のローダ用 ext2 形式。fs/ext2.h と同名の定数は独立用の写し。 */
+/* 1KiB 固定のローダ用 ext2 形式。fs/ext2/ext2.h と同名の定数は独立用の写し。 */
 #define EXT2_ADDR_PER_BLOCK          (EXT2_BLOCK_SIZE / 4)
 #define EXT2_SECTORS_PER_BLOCK       (EXT2_BLOCK_SIZE / BOOTINFO_SECLEN)
 #define EXT2_GDT_BLOCK               2

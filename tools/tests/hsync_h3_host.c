@@ -13,7 +13,7 @@
  *  I/O 失敗を注入できるようにしてある。sys_read の**呼び出し回数**も数える
  *  ので、「サイズも日時も同じなら 1 バイトも読まない」を直に押さえられる。
  *
- *  fs/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
+ *  fs/hostdrv/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
  *  hdrv_stat_mtime) も同じ翻訳単位で直接叩く (A16)。純関数なので境界
  *  (1970 年より前・未提供・os_time_t 超過) をそのまま確かめられる。
  *
@@ -33,7 +33,7 @@
 #include "hsync_shell_fixture.h"
 
 /* HostDrv の stat 規則 (票 H1 の是正 + 票 H3 の時刻変換)。純関数。 */
-#include "../../fs/hostdrv_stat_rules.inc"
+#include "../../fs/hostdrv/hostdrv_stat_rules.inc"
 
 static int failures;
 static int checks;

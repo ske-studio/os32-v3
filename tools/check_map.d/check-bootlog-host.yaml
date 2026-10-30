@@ -1,7 +1,7 @@
 check-bootlog-host:
-- fs/ext2_dir.c
-- fs/ext2_vfs.c
-- fs/fatfs_vfs.c
+- fs/ext2/ext2_dir.c
+- fs/ext2/ext2_vfs.c
+- fs/fat/fatfs_vfs.c
 - init/bootlog.c
 - init/bootlog_save.c
 - kernel/console/console.c

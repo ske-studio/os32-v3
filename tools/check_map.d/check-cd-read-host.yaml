@@ -1,7 +1,7 @@
 check-cd-read-host:
 - tools/tests/mutpar.py
 - drivers/ata/atapi.c
-- fs/iso9660.c
+- fs/isofs/iso9660.c
 - tools/tests/cd_pkg_host.c
 - tools/tests/cd_read_host.c
 - tools/tests/test_cd_read.py

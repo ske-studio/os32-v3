@@ -7,7 +7,7 @@
 
 実装を先に書き、試験は後から足した。RED の根拠は**変異がすべて RED になること**
 (下の表) で、変更前のコードで試験を回した RED→GREEN の経過ではない ([V4])。
-試験を書く途中で本物の欠陥を 1 つ見つけた: `fs/serialfs.c` がホストの status を
+試験を書く途中で本物の欠陥を 1 つ見つけた: `fs/serialfs/serialfs.c` がホストの status を
 `(i32)` で読んでおり、ホスト試験の 64 ビット環境では負の値が正に化けて
 「知らない status を IO に畳む」が効かなかった (i386 では 32 ビットなので起きない)。
 `int` で読むように直した。
@@ -20,7 +20,7 @@ python3 -B tools/tests/test_serialfs.py --target --mutate   # make check-serialf
 
 | 段 | 何を | どうやって |
 |---|---|---|
-| C | フレーム・CRC32・番号・再送・長さの境界・VFS の契約・障害の注入 | `serialfs_host.c` が実物の `fs/sfs_proto.c` / `fs/sfs_client.c` / `fs/serialfs.c` を取り込み、偽の線 (仮想の tick、届く時刻つきのバイト) と C の偽ホストで回す |
+| C | フレーム・CRC32・番号・再送・長さの境界・VFS の契約・障害の注入 | `serialfs_host.c` が実物の `fs/serialfs/sfs_proto.c` / `fs/serialfs/sfs_client.c` / `fs/serialfs/serialfs.c` を取り込み、偽の線 (仮想の tick、届く時刻つきのバイト) と C の偽ホストで回す |
 | GATE | ゲート (呼び口で分ける) | `serial_gate_host.c` が実物の `drivers/char/serial.c` を偽のポートで回す |
 | PY | ホスト側の振り分け・パス・キャッシュ・期限・BYE・行の外 | 実物の `tools/serialfs_host.py` と `tools/rshell_serial.py` を偽のポートで |
 | PY | NP21/W の COM1 を HTTP で読む口 (`--port aidebug:...`) | 偽の urlopen で `/api/serial/read`・`write` の分割・空の回・読み捨て |
@@ -68,7 +68,7 @@ ERROR 0。一覧は `test_serialfs.py` の `C_MUTATIONS` / `GATE_MUTATIONS` / `P
 | Fable m4 | `--serve-host` 無しの `sfs run` は送らない | 送る |
 
 レビュー往復 1 の仕上げ (2026-09-25、コーダー交代の後): **セッション層のホスト試験
-`tools/tests/serialfs_session_host.c`** を足した (段 SESSION)。実物の `fs/serialfs_session.c`
+`tools/tests/serialfs_session_host.c`** を足した (段 SESSION)。実物の `fs/serialfs/serialfs_session.c`
 を `drivers/char/serial.c`・`fs/sfs_*.c` と組み、偽物はポート I/O (届く tick つきの受信)、
 hlt で進む tick、VFS の mount / umount / fstype、kprintf (console の複写と同じく
 serial_putchar へ)、常駐シェルの持ち主だけ。5 案件:
@@ -107,7 +107,7 @@ RED、ERROR 0 (`make check-serialfs-host`)。`--allow-write /` は根の全体�
 
 - NP21/W と実機 (T2 / T3 / T4)。**NP21/W は通信速度を模擬しない**ので、115200 の
   16 バイト FIFO の取りこぼし・ISR が汲み残す FIFO の末尾は実機でしか踏めない
-- `fs/serialfs_session.c` はホストで回す (段 SESSION) が、VFS・kprintf・tick は偽物。
+- `fs/serialfs/serialfs_session.c` はホストで回す (段 SESSION) が、VFS・kprintf・tick は偽物。
   実物の `vfs_mount` が cwd を `/` に戻す件と `sfs run` の cwd の復元は rshell の側で、
   ホストでは回していない
 - rshell の行ループ (`sfs run` を行全体で引き受ける、ESC の拒否を行末まで保つ) は

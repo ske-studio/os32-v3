@@ -633,7 +633,7 @@ static int same_file(const char *a, const char *b)
     if (rb == OS32_ERR_NOTFOUND) return 0;
     if (rb != 0) return -1;
     if (sa.st_dev != sb.st_dev) return 0;             /* 別デバイス = 別物 */
-    /* inode を供給しない FS (FAT は `fs/fatfs_vfs.c` が st_ino を 0 のまま
+    /* inode を供給しない FS (FAT は `fs/fat/fatfs_vfs.c` が st_ino を 0 のまま
      * 返す) では同一性を確かめられない。「別物」に丸めると `/ETC/SETTINGS.DB`
      * のような別名で DB 自身を O_TRUNC で潰せる (往復 3 の B1)。
      * 判定できないなら **書かない**。 */

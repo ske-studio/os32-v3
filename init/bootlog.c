@@ -235,7 +235,7 @@ const char *bootlog_stage_name(int stage)
 }
 
 /* ops->write の生の戻り値が「全部書けて閉じられた」か。vfs_write は FS ごとに
- * 約束が違う: ext2 (fs/ext2_vfs.c) は成功で VFS_OK (0)、FAT (fs/fatfs_vfs.c)
+ * 約束が違う: ext2 (fs/ext2/ext2_vfs.c) は成功で VFS_OK (0)、FAT (fs/fat/fatfs_vfs.c)
  * は書いたバイト数 (f_write の bw、f_close の失敗は負)。負はどちらも失敗。
  * 種別を知っているのはここなので、ここで揃える。 */
 int bootlog_write_ok(int kind, int rc, u32 len)
@@ -269,7 +269,7 @@ int bootlog_save_with(const BootlogFsOps *ops, int kind,
 
     /* 2. 残っている boot.new を**消す** (無ければ成功)。書き込みで既存の
      *    inode を再利用しない — ext2 の rename は新名を載せてから旧名を消す
-     *    (fs/ext2_dir.c) ので、前回の公開が旧名の削除で落ちていると boot.new
+     *    (fs/ext2/ext2_dir.c) ので、前回の公開が旧名の削除で落ちていると boot.new
      *    と boot.log が同じ inode を指している。そこへ write すると boot.log
      *    まで切り詰める。消せなければ (NOTFOUND 以外) ここで止める */
     rc = ops->rm(SYS_BOOTLOG_NEW);

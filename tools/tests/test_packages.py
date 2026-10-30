@@ -746,7 +746,7 @@ def run_install_fdset(install_src, fd_files):
         shared = [os.path.join(ROOT, f) for f in
                   ('userland/system/inst_hdd.c', 'userland/system/inst_disk.c',
                    'userland/shell/hdprep_plan.c', 'drivers/block/pc98pt.c',
-                   'fs/ext2_layout.c')]
+                   'fs/ext2/ext2_layout.c')]
         r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function',
                             '-Wno-pointer-to-int-cast', '-D__cdecl=',

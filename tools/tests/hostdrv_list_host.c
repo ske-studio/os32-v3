@@ -5,7 +5,7 @@
  *  実行: python3 -B tools/tests/test_hostdrv_list.py [--target]
  *  記録: tools/tests/h1_tdd.md
  *
- *  fs/hostdrv_list_rules.inc を 1 行も写さずそのまま #include する
+ *  fs/hostdrv/hostdrv_list_rules.inc を 1 行も写さずそのまま #include する
  *  (模型ではない)。差し替えるのは `hostdrv_query_dir` に当たる 1 件取得と、
  *  1 件ぶんの組み立てだけ。台本で
  *    (a) 途中で負値を返す (200 件のうち 50 件目で失敗)
@@ -24,7 +24,7 @@
 
 #include "os32api.h"      /* OS32_ERR_* / u8,u32 */
 
-#include "../../fs/hostdrv_list_rules.inc"
+#include "../../fs/hostdrv/hostdrv_list_rules.inc"
 
 static int failures;
 static int checks;

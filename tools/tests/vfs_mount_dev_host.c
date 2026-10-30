@@ -1,5 +1,5 @@
 /* 2026-09-10 の ext2 スーパーブロック巻き戻しの回帰試験。
- * 実物の fs/vfs.c と fs/ext2_vfs.c を取り込み、境界 (ext2 本体・kmalloc) だけを
+ * 実物の fs/vfs.c と fs/ext2/ext2_vfs.c を取り込み、境界 (ext2 本体・kmalloc) だけを
  * 差し替える。ext2_mount() が受け取ったデバイス番号を記録して、fd0 の
  * マウント要求が hd0 に化けていないことを確かめる。 */
 #include <stdio.h>
@@ -104,9 +104,9 @@ int ext2_rename(Ext2Ctx *c, u32 od, const char *on, u32 nd, const char *nn)
  * set_mtime そのものの規則は tools/tests/vfs_set_mtime_host.c が見る。 */
 int ext2_write_inode(Ext2Ctx *c, u32 i, const Ext2Inode *o)
 { (void)c; (void)i; (void)o; return EXT2_OK; }
-/* 本物 (fs/ext2_super.c) と同じく定数を返す。ゲスト側の「いま」の代わり。 */
+/* 本物 (fs/ext2/ext2_super.c) と同じく定数を返す。ゲスト側の「いま」の代わり。 */
 u32 ext2_current_time(void) { return 0x67E8E800UL; }
-/* 票 B8 往復 5: 書き込み系の入口の拒否 (エラー状態、fs/ext2_super.c)。
+/* 票 B8 往復 5: 書き込み系の入口の拒否 (エラー状態、fs/ext2/ext2_super.c)。
  * この試験は mount 経路だけを見るので、エラー状態には入らない贋物 */
 int ext2_check_writable(Ext2Ctx *c) { (void)c; return EXT2_OK; }
 
@@ -134,7 +134,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/ext2_vfs.c"
+#include "../../fs/ext2/ext2_vfs.c"
 
 static void reset(void)
 {

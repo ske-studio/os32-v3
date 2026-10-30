@@ -1,4 +1,4 @@
-#include "ide_limits.h"
+#include "../ide_limits.h"
 #include "ext2_priv.h"
 #include "ext2_layout.h"   /* 大きさの固定点 (票 TASK_HDD_INSTALL N7) */
 #include "ide_contract.h"
@@ -41,7 +41,7 @@ typedef struct {
 #define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER  0x0001
 
 /* SPARSE_SUPER規則: 0, 1, 3^n, 5^n, 7^n のグループにSBバックアップを配置
- * (規則の正典は fs/ext2_layout.c — 必要量の計算と同じ関数を使う) */
+ * (規則の正典は fs/ext2/ext2_layout.c — 必要量の計算と同じ関数を使う) */
 #define is_sparse_group(g)  ext2_layout_is_sparse(g)
 
 /* ===== Block 1: スーパーブロック =====

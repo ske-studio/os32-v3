@@ -42,7 +42,7 @@
 #define INST_IPL_OFF_SPT    9
 /* 区画の大きさ (hdprep の上限と同じ 256MiB = ext2 32 グループ) */
 #define INST_PART_MB        HDPREP_MAX_MB
-/* fs/ext2_ctx.h EXT2_MAX_GROUPS。試験が突き合わせる */
+/* fs/ext2/ext2_ctx.h EXT2_MAX_GROUPS。試験が突き合わせる */
 #define INST_EXT2_MAX_GROUPS 32UL
 /* 展開の後にも要る余白 (settings.db の更新・/tmp など、ブロック = 1KiB) */
 #define INST_SPACE_MARGIN_BLOCKS 256UL

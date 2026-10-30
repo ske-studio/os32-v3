@@ -13,7 +13,7 @@
 - 対象: [`drivers/block/fdc_track.c`](../../drivers/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
   [`drivers/block/fdc.c`](../../drivers/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
   [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
-  [`fs/fatfs/diskio.c`](../../fs/fatfs/diskio.c) (結線と、書き込み・再初期化での破棄)
+  [`fs/fat/fatfs/diskio.c`](../../fs/fat/fatfs/diskio.c) (結線と、書き込み・再初期化での破棄)
 - 実行: `python3 -B tools/tests/test_fdc_track.py [--target] [--mutate] [case ...]`
   (`make check-fdc-track-host` が `--target --mutate` 付きで回す)
 - 試験: [`fdc_track_host.c`](fdc_track_host.c) — 実物を `#include` する。
@@ -76,7 +76,7 @@ tmo=0 で IRQ の取りこぼしは消えたが、**まとめ読み 767 回・�
 ほぼ当たっていない。
 
 - **原因**: VFS が 1 回の読みごとにファイルを開き直す。`fs/vfs_fd.c` の `vfs_read_fd` →
-  `fs/fatfs_vfs.c` の `fatfs_vfs_read_stream` が毎回 `f_open` → `f_lseek` → `f_read` →
+  `fs/fat/fatfs_vfs.c` の `fatfs_vfs_read_stream` が毎回 `f_open` → `f_lseek` → `f_read` →
   `f_close` を回すので、1KB のチャンクごとにパスをたどり直す。実物のイメージでは
   ルートディレクトリ (LBA 5 = C0H0)、`/SYS` (LBA 15 = C0H1)、`/SYS/FONT` (LBA 997 = C62H0)、
   FAT (LBA 2 = C0H0)、データ (LBA 998〜1181 = C62〜C73 の 24 トラック) の

@@ -35,7 +35,7 @@
 /* test_fdc_track.py が実 pic.c から切り出す EOI と ISR 操作。 */
 #include "fdc_pic_source.c"
 #include "clock_service.c"
-#include "../../fs/fatfs/diskio.c"
+#include "../../fs/fat/fatfs/diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の
  * 厳しい警告だけ外す (カーネルのビルドでは元の警告のまま)。 */
 #pragma GCC diagnostic push
@@ -45,7 +45,7 @@
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
-#include "../../fs/fatfs/ff.c"
+#include "../../fs/fat/fatfs/ff.c"
 #pragma GCC diagnostic pop
 
 #define CHECK(x) do { if (!(x)) { \
@@ -1668,7 +1668,7 @@ static void sis_edge_limit(void)
 /*  2026-09-25 に既定フォントが MINIMAL から外れて FD に載らなくなったので、*/
 /*  同じ読み方を FD に残る大きいファイル (/vmkrnl.lz4) で回す。         */
 /*  読み方: kernel/boot_font.c → drivers/video/kcg/kcg.c の kcg_load_font と           */
-/*  fs/vfs_fd.c / fs/fatfs_vfs.c のとおり:                                  */
+/*  fs/vfs_fd.c / fs/fat/fatfs_vfs.c のとおり:                                  */
 /*    vfs_open        = stat + get_file_size (どちらも f_stat)               */
 /*    vfs_read_fd(16) = read_stream = f_open → f_lseek → f_read → f_close   */
 /*    vfs_get_size    = f_stat                                               */

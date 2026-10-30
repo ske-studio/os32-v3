@@ -10,7 +10,7 @@
  *  向け、short read の分割・read エラー・早期 EOF・0 進捗 write・短い write・
  *  書き込み時の破損・vfs_sync 失敗・stat 失敗を注入できるようにしてある。
  *
- *  fs/hostdrv_stat_rules.inc (HostDrv の stat 失敗の是正) も同じ翻訳単位で
+ *  fs/hostdrv/hostdrv_stat_rules.inc (HostDrv の stat 失敗の是正) も同じ翻訳単位で
  *  直接呼ぶ (A11)。CRC は lib/crc32.c (既存の一括版) と同じ実行ファイルに
  *  リンクし、ストリーム核の値が一致することを見る (A07)。
  *
@@ -32,7 +32,7 @@
 /* HostDrv の stat 判定 (票 H1 の是正点)。純関数なのでそのまま呼べる。
  * CRC 贋物ビルド (A08) では使わないので取り込まない。 */
 #ifndef HSYNC_CRC_STUB
-#include "../../fs/hostdrv_stat_rules.inc"
+#include "../../fs/hostdrv/hostdrv_stat_rules.inc"
 #endif
 
 static int failures;
@@ -689,7 +689,7 @@ static void case_a11_rules(void)
 {
     OS32_Stat st;
 
-    printf("== A11: hdrv_stat の成否判定 (fs/hostdrv_stat_rules.inc) ==\n");
+    printf("== A11: hdrv_stat の成否判定 (fs/hostdrv/hostdrv_stat_rules.inc) ==\n");
 
     memset(&st, 0, sizeof(st));
     check(hdrv_stat_fill(-1, 0, 0, 0, &st) == OS32_ERR_IO,
@@ -1730,7 +1730,7 @@ static void case_b3_start(void)
 }
 
 /* ---- B4 (往復 3): 途中で切れた列挙を hsync が成功にしない ----------------
- * fs/hostdrvfs.c の hdrv_list_dir は、`hostdrv_query_dir` が途中で失敗しても
+ * fs/hostdrv/hostdrvfs.c の hdrv_list_dir は、`hostdrv_query_dir` が途中で失敗しても
  * 末尾で無条件に VFS_OK を返していた。200 件のうち 50 件目で失敗すると
  * 「50 件だけの成功した列挙」になり、hsync は rc == 0 を見て 50 件を同期し
  * errors=0 / 終了コード 0 で終わる。件数上限 (1000) での打ち切りも同じ。

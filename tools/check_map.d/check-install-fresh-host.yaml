@@ -1,6 +1,6 @@
 check-install-fresh-host:
 - drivers/block/pc98pt.c
-- fs/ext2_layout.c
+- fs/ext2/ext2_layout.c
 - tools/tests/install_fresh_host.c
 - tools/tests/test_install_fresh.py
 - userland/shell/hdprep_plan.c

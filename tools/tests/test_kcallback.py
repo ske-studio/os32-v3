@@ -42,7 +42,7 @@ def run(args, mutant=None):
         'public_wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
                             'int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out)'),
         'window': (ROOT / 'fs/vfs.c').read_text().split('struct vfs_ls_window_ctx {', 1)[1].split('int vfs_ls(const char *path', 1)[0],
-        'ext2_cb': function((ROOT / 'fs/ext2_vfs.c').read_text(),
+        'ext2_cb': function((ROOT / 'fs/ext2/ext2_vfs.c').read_text(),
                             'static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)'),
         'ls': (ROOT / 'exec/ring3_ls.c').read_text(),
         'shim': (ROOT / 'exec/ring3_ls.S').read_text(),

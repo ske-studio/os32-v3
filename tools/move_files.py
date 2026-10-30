@@ -13,7 +13,7 @@ import re
 import subprocess
 
 EXCLUDED = ('docs/archive/', 'docs/hw/', 'third_party/', 'lib/sqlite3/sqlite3.',
-            'lib/zlib/', 'lib/microtar/', 'fs/fatfs/ff.', 'fs/fatfs/diskio.h',
+            'lib/zlib/', 'lib/microtar/', 'fs/fatfs/ff.', 'fs/fat/fatfs/diskio.h',
             'userland/lib/ui/microui.', 'userland/lib/font/vendor/',
             'kdebug/generated/', 'hwdev/generated/', 'lib/sqlite3/generated/',
             'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc',

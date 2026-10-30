@@ -1,12 +1,12 @@
 check-hsync-host:
-- fs/hostdrv_stat_rules.inc
-- fs/hostdrvfs.c
+- fs/hostdrv/hostdrv_stat_rules.inc
+- fs/hostdrv/hostdrvfs.c
 - lib/crc32.c
 - tools/tests/hsync_h1_host.c
 - tools/tests/test_hsync_h1.py
 - userland/system/hsync.c
 - userland/system/hsync_protect.inc
-- fs/hostdrv_list_rules.inc
+- fs/hostdrv/hostdrv_list_rules.inc
 - fs/vfs_name_rules.inc
 - lib/crc32_core.inc
 - userland/system/hsync_bootold.inc
@@ -19,9 +19,9 @@ check-hsync-host:
 - tools/tests/hsync_h2_host.c
 - tools/tests/test_hsync_h2.py
 - tools/tests/mutpar.py
-- fs/ext2_vfs.c
-- fs/fatfs_vfs.c
-- fs/iso9660.c
+- fs/ext2/ext2_vfs.c
+- fs/fat/fatfs_vfs.c
+- fs/isofs/iso9660.c
 - fs/vfs.c
 - kapi/kapi_sys.c
 - tools/tests/hsync_h3_host.c

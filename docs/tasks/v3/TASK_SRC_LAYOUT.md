@@ -129,12 +129,12 @@ exec/ kapi/ lib/ net/ kdebug/ hwdev/ platform/ boot/ userland/ sdk/   (動かさ
 | `drivers/video/kcg/` | 5 | `drivers/video/kcg/kcg.c` `drivers/video/kcg/kcg.h` `drivers/video/kcg/kcg_body.c` `drivers/video/kcg/kcg_module.c` `drivers/video/kcg/kcg_module.h` |
 | `drivers/video/pc98/` | 4 | `drivers/video/pc98/backend_pc98.c` `drivers/video/pc98/backend_pegc.c` `drivers/video/pc98/pc98_route.c` `drivers/video/pc98/pc98_route.h` |
 | `fs/` | 10 | (据え置き 10 本: fd_redirect.c fd_redirect.h ide_limits.h pipe_buffer.c pipe_buffer.h vfs.c vfs.h vfs_device.h vfs_fd.c vfs_name_rules.inc) |
-| `fs/ext2/` | 11 | `fs/ext2.h` `fs/ext2_ctx.h` `fs/ext2_dir.c` `fs/ext2_file.c` `fs/ext2_fmt.c` `fs/ext2_inode.c` `fs/ext2_layout.c` `fs/ext2_layout.h` `fs/ext2_priv.h` `fs/ext2_super.c` `fs/ext2_vfs.c` |
-| `fs/fat/` | 1 | `fs/fatfs_vfs.c` |
-| `fs/fat/fatfs/` | 7 | `fs/fatfs/diskio.c` `fs/fatfs/diskio.h` `fs/fatfs/diskio_os32.h` `fs/fatfs/ff.c` `fs/fatfs/ff.h` `fs/fatfs/ffconf.h` `fs/fatfs/string.h` |
-| `fs/hostdrv/` | 5 | `fs/hostdrv_list_rules.inc` `fs/hostdrv_stat_rules.inc` `fs/hostdrvfs.c` `fs/hostdrvfs.h` `fs/hostdrvfs_proto.h` |
-| `fs/isofs/` | 2 | `fs/iso9660.c` `fs/iso9660.h` |
-| `fs/serialfs/` | 9 | `fs/serialfs.c` `fs/serialfs.h` `fs/serialfs_session.c` `fs/sfs_client.c` `fs/sfs_client.h` `fs/sfs_lan.c` `fs/sfs_lan.h` `fs/sfs_proto.c` `fs/sfs_proto.h` |
+| `fs/ext2/` | 11 | `fs/ext2/ext2.h` `fs/ext2/ext2_ctx.h` `fs/ext2/ext2_dir.c` `fs/ext2/ext2_file.c` `fs/ext2/ext2_fmt.c` `fs/ext2/ext2_inode.c` `fs/ext2/ext2_layout.c` `fs/ext2/ext2_layout.h` `fs/ext2/ext2_priv.h` `fs/ext2/ext2_super.c` `fs/ext2/ext2_vfs.c` |
+| `fs/fat/` | 1 | `fs/fat/fatfs_vfs.c` |
+| `fs/fat/fatfs/` | 7 | `fs/fat/fatfs/diskio.c` `fs/fat/fatfs/diskio.h` `fs/fat/fatfs/diskio_os32.h` `fs/fat/fatfs/ff.c` `fs/fat/fatfs/ff.h` `fs/fat/fatfs/ffconf.h` `fs/fat/fatfs/string.h` |
+| `fs/hostdrv/` | 5 | `fs/hostdrv/hostdrv_list_rules.inc` `fs/hostdrv/hostdrv_stat_rules.inc` `fs/hostdrv/hostdrvfs.c` `fs/hostdrv/hostdrvfs.h` `fs/hostdrv/hostdrvfs_proto.h` |
+| `fs/isofs/` | 2 | `fs/isofs/iso9660.c` `fs/isofs/iso9660.h` |
+| `fs/serialfs/` | 9 | `fs/serialfs/serialfs.c` `fs/serialfs/serialfs.h` `fs/serialfs/serialfs_session.c` `fs/serialfs/sfs_client.c` `fs/serialfs/sfs_client.h` `fs/serialfs/sfs_lan.c` `fs/serialfs/sfs_lan.h` `fs/serialfs/sfs_proto.c` `fs/serialfs/sfs_proto.h` |
 | `gfx/` | 7 | (据え置き 7 本: gfx.h gfx_core.c gfx_internal.h gfx_scroll.c gfx_vram.c palette.c palette.h) |
 | `include/` | 7 | `include/platform_display.h` `include/platform_emergency.h` `include/platform_irq.h` `include/platform_memory.h` `include/platform_splash.h` `include/platform_sys.h` `include/platform_timer.h` |
 | `init/` | 15 | `init/boot_disk.h` `init/boot_display.c` `init/boot_display.h` `init/boot_platform.c` `init/boot_platform.h` `init/boot_splash.c` `init/boot_splash.h` `init/bootinfo.c` `init/bootinfo_check.c` `init/bootlog.c` `init/bootlog_save.c` `init/kaudit_boot.c` `init/kernel.c` `init/sysconfig.c` `init/sysconfig.h` |

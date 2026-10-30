@@ -1,6 +1,6 @@
 """ext2 スーパーブロック巻き戻し (2026-09-10) の回帰試験。
 
-実物の fs/vfs.c と fs/ext2_vfs.c をそのまま取り込み、ext2 本体と kmalloc だけを
+実物の fs/vfs.c と fs/ext2/ext2_vfs.c をそのまま取り込み、ext2 本体と kmalloc だけを
 差し替えて mount 経路を動かす。実デバイス・実イメージには一切触れない。
 """
 from kernel_includes import include_flags

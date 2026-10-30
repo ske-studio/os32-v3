@@ -8,7 +8,7 @@
 
 ## 0. 正直に書く ([V4])
 
-**試験は実装のあとに書いた。** `fs/ext2_inode.c` / `ext2_dir.c` / `ext2_file.c` /
+**試験は実装のあとに書いた。** `fs/ext2/ext2_inode.c` / `ext2_dir.c` / `ext2_file.c` /
 `ext2_vfs.c` / `vfs.c` / `vfs_fd.c` / `hostdrvfs.c` / `hostdrv_stat_rules.inc` を
 先に直し、そのあとで `tools/tests/b8_open_host.c` を書いた。
 だから「先に RED を見た」とは書けない。
@@ -30,9 +30,9 @@ Codex 実装レビュー 往復 4 で**実際に取り逃している**。だか
 
 | 段 | 土台 | 何を見るか |
 |---|---|---|
-| A | **実物の ext2** (`fs/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` / `ext2_file.c` / `ext2_fmt.c` / `ext2_vfs.c`) + **実物の `fs/vfs.c` / `fs/vfs_fd.c`**。贋物は Device API と IDE だけ。RAM 上の 8MB を実物の `ext2_format()` で作る | **間接ブロックを使う大きなディレクトリ**の読み出しを**一度だけ**落とし、`ext2_bmap` → `find_entry` → `lookup` → `stat` → `vfs_open` の全段で「未割当 = 検索終了」に化けないこと |
+| A | **実物の ext2** (`fs/ext2/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` / `ext2_file.c` / `ext2_fmt.c` / `ext2_vfs.c`) + **実物の `fs/vfs.c` / `fs/vfs_fd.c`**。贋物は Device API と IDE だけ。RAM 上の 8MB を実物の `ext2_format()` で作る | **間接ブロックを使う大きなディレクトリ**の読み出しを**一度だけ**落とし、`ext2_bmap` → `find_entry` → `lookup` → `stat` → `vfs_open` の全段で「未割当 = 検索終了」に化けないこと |
 | B | 合成 `VfsOps` (`tools/tests/vfs_kind_host.c` と同じ作法) | `stat` と `get_file_size` の戻り値を 1 つずつ指定し、**`write_file` の呼び出し回数**で「作成へ進んでいない」ことを 0 件で押さえる |
-| C | `fs/hostdrv_stat_rules.inc` の純関数 | HostDrv の `get_file_size` がディレクトリに答えないこと (`hdrv_size_result`)。ハイパーコールを叩く `fs/hostdrvfs.c` 本体はホストで組めないので、判定だけを純関数へ切り出した (票 H1 の `hdrv_stat_fill` と同じ作法) |
+| C | `fs/hostdrv/hostdrv_stat_rules.inc` の純関数 | HostDrv の `get_file_size` がディレクトリに答えないこと (`hdrv_size_result`)。ハイパーコールを叩く `fs/hostdrv/hostdrvfs.c` 本体はホストで組めないので、判定だけを純関数へ切り出した (票 H1 の `hdrv_stat_fill` と同じ作法) |
 
 **一度だけ**の失敗にするのが肝。恒久的な故障なら誰が見ても異常だが、B8 が起きるのは
 「一度読めなかっただけで次は読める」ときである。注入器は
@@ -182,14 +182,14 @@ CHECK(ext2_vfs_get_size(g_ec, "/tmp/d", &sz) == VFS_OK);   /* /tmp/d はディ�
 
 | 箇所 | 関数 | 今回の前 | 扱い |
 |---|---|---|---|
-| `fs/ext2_dir.c:267` | `ext2_mkdir` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-1 で修正** |
-| `fs/ext2_file.c:131` | `ext2_create` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-2 で修正** |
-| `fs/ext2_dir.c:537` | `ext2_rename` 宛先確認 | **`== EXT2_OK` だけ置き換え** | **P1-3 で修正** |
-| `fs/ext2_vfs.c:159` | `ext2_vfs_write` 既存判定 | 1 巡目で修正済 | 3 値 (OK / NOTFOUND / その他) |
-| `fs/ext2_dir.c:617` | `ext2_lookup` | 1 巡目で修正済 | `return ret` |
-| `fs/ext2_file.c:379` | `ext2_unlink` | 元から `if (ret) return ret` | 問題なし |
-| `fs/ext2_dir.c:367` | `ext2_rmdir` | 元から `if (ret) return ret` | 問題なし |
-| `fs/ext2_dir.c:520` | `ext2_rename` 移動元 | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c:267` | `ext2_mkdir` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-1 で修正** |
+| `fs/ext2/ext2_file.c:131` | `ext2_create` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-2 で修正** |
+| `fs/ext2/ext2_dir.c:537` | `ext2_rename` 宛先確認 | **`== EXT2_OK` だけ置き換え** | **P1-3 で修正** |
+| `fs/ext2/ext2_vfs.c:159` | `ext2_vfs_write` 既存判定 | 1 巡目で修正済 | 3 値 (OK / NOTFOUND / その他) |
+| `fs/ext2/ext2_dir.c:617` | `ext2_lookup` | 1 巡目で修正済 | `return ret` |
+| `fs/ext2/ext2_file.c:379` | `ext2_unlink` | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c:367` | `ext2_rmdir` | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c:520` | `ext2_rename` 移動元 | 元から `if (ret) return ret` | 問題なし |
 
 直し方は 3 つとも同じ: **`EXT2_OK` なら EXIST (rename は置き換え分岐)、
 `EXT2_ERR_NOTFOUND` のときだけ先へ進み、それ以外は何も書かずにそのまま返す。**
@@ -202,7 +202,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 が `hdrv_write_file` へ → `NP2_FILE_OVERWRITE_IF` が既存ファイルを切り詰める。
 
 **直し方**: `hostdrv_create()` が NTSTATUS を純関数
-`hdrv_create_status_to_vfs()` (`fs/hostdrv_stat_rules.inc`) で VFS エラーへ写し、
+`hdrv_create_status_to_vfs()` (`fs/hostdrv/hostdrv_stat_rules.inc`) で VFS エラーへ写し、
 **呼び手 11 か所すべてがそのまま返す**。応答が無いとき (番兵) は IO。
 
 **NP21/W 側の根拠** (`~/np21w-src/src/generic/hostdrvnt.c` の
@@ -219,7 +219,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 | `SHARING_VIOLATION` / `ACCESS_DENIED` / `MEDIA_WRITE_PROTECTED` / `TOO_MANY_OPENED_FILES` / `CANNOT_DELETE` / `INVALID_PARAMETER` | いずれも「在るが開けない」系 | **IO (既定)** |
 
 **既定を IO にしてあることが安全性の要** — 知らない状態を「無い」と言わない。
-足りなかった 6 つの状態値は `fs/hostdrvfs_proto.h` に NP21/W の
+足りなかった 6 つの状態値は `fs/hostdrv/hostdrvfs_proto.h` に NP21/W の
 `hostdrvntdef.h` と同じ値で足した。
 
 **同じ畳み込みの洗い出し**: `hdrv_list_dir` / `hdrv_read_file` /
@@ -229,7 +229,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 **11 か所すべて**を `return rc` にした。
 
 **受入の形**: 純関数だけの試験では足りない (1 巡目がそれで取り逃した) ので、
-**実物の `fs/hostdrvfs.c` をホストで動かす**試験
+**実物の `fs/hostdrv/hostdrvfs.c` をホストで動かす**試験
 `tools/tests/b8_hostdrv_host.c` を作った。`include/io.h` の `inp`/`outp` は
 特権命令のインライン asm なので `tools/tests/hostdrv_hostshim/io.h` を `-I` で
 先に置いて差し替え、コマンド列 `HDR9801` が揃った時点で**贋の NP21/W** が
@@ -316,7 +316,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 | `case_rmdir_keeps_inode` | 間接ブロックを持つ空ディレクトリを作り、空判定の読み出しは通して下見だけ落とす → 同上 |
 | `case_trailing_sync_failure` | スーパーブロックの読み出しを落として create / write / mkdir / 追記 / rename が IO を返すこと。回帰で全部通る |
 
-**`test_b8_hostdrv.py`: 新規 61 checks, 0 failures** — 実物の `fs/hostdrvfs.c`
+**`test_b8_hostdrv.py`: 新規 61 checks, 0 failures** — 実物の `fs/hostdrv/hostdrvfs.c`
 
 | 名前 | 中身 |
 |---|---|
@@ -357,8 +357,8 @@ M14 1 / M15 1 / M16 1 / M17 2 / M18 4)。件数が §4 より増えているの�
 
 ### 7-6. 触ったファイル (2 巡目)
 
-`fs/ext2_dir.c` `fs/ext2_file.c` `fs/ext2_inode.c` `fs/ext2_priv.h`
-`fs/hostdrvfs.c` `fs/hostdrvfs_proto.h` `fs/hostdrv_stat_rules.inc`、
+`fs/ext2/ext2_dir.c` `fs/ext2/ext2_file.c` `fs/ext2/ext2_inode.c` `fs/ext2/ext2_priv.h`
+`fs/hostdrv/hostdrvfs.c` `fs/hostdrv/hostdrvfs_proto.h` `fs/hostdrv/hostdrv_stat_rules.inc`、
 `build/sdk.mk`、`tools/tests/b8_open_host.c` `tools/tests/ext2_read_bound_host.c`
 (スタブの型を `int` に)、新規 `tools/tests/b8_hostdrv_host.c`
 `tools/tests/test_b8_hostdrv.py` `tools/tests/hostdrv_hostshim/io.h`。
@@ -401,7 +401,7 @@ M14 1 / M15 1 / M16 1 / M17 2 / M18 4)。件数が §4 より増えているの�
 
 | 関数 | 何をどの順に書くか |
 |---|---|
-| `ext2_truncate_blocks(ctx, ino, inode, &leaked)` (新設、`fs/ext2_inode.c`) | 1. `block[]` 15 本を写す → 2. ポインタ・`blocks`・`size` を 0 にして **inode を先に書く** (失敗したら何も返さず、メモリ上のポインタを戻して IO) → 3. **写しを辿って**返す (`ext2_release_blocks`)。3 の失敗は `*leaked = 1` |
+| `ext2_truncate_blocks(ctx, ino, inode, &leaked)` (新設、`fs/ext2/ext2_inode.c`) | 1. `block[]` 15 本を写す → 2. ポインタ・`blocks`・`size` を 0 にして **inode を先に書く** (失敗したら何も返さず、メモリ上のポインタを戻して IO) → 3. **写しを辿って**返す (`ext2_release_blocks`)。3 の失敗は `*leaked = 1` |
 | `ext2_release_blocks(ctx, blocks)` (新設) | 写しの直接 → 単一間接 (表は `g_blk`) → 二重間接 (外 `g_blk` / 内 `g_dat`) の順に返す。**読めない表は配下ごと漏らし、残りは返し続ける** (参照はもう無いので途中で止める理由が無い) |
 | `ext2_free_all_blocks` | **廃止**。「返してから呼び手が inode を書く」順序の関数名を残すと取り違えるため、名前ごと消した |
 | 下見 (`ext2_free_probe`) | **廃止**。順序で閉じたので不要 |
@@ -619,7 +619,7 @@ C89 違反でビルド失敗 → 変異を直して RED。
 
 ### 8-8. 触ったファイル (往復 3)
 
-`fs/ext2_inode.c` `fs/ext2_file.c` `fs/ext2_dir.c` `fs/ext2_priv.h`、
+`fs/ext2/ext2_inode.c` `fs/ext2/ext2_file.c` `fs/ext2/ext2_dir.c` `fs/ext2/ext2_priv.h`、
 `tools/tests/b8_open_host.c` `tools/tests/ext2_read_bound_host.c`
 `tools/tests/b8_tdd.md`。`sdk/kapi.json` 不変。
 
@@ -642,7 +642,7 @@ C89 違反でビルド失敗 → 変異を直して RED。
   dangling にならなかった。X2: 掃引で足すエントリは 1 セクタ目に収まっていた。
 - rename の原子性は往復 3 で「範囲外 (別票候補)」と書いたが、**到達可能**だった
   (sticky 故障 1 回で足りる)。
-- 旧コードの `fs/ext2_dir.c` (`bf957e4`) に往復 4 の試験を当てると
+- 旧コードの `fs/ext2/ext2_dir.c` (`bf957e4`) に往復 4 の試験を当てると
   **892 checks 中 62 failures** (X1・X2・X3・rmdir・mkdir・rename の各掃引が不整合)。
 - **X2 の「0 書き」を外す変異は媒体検査では落ちない** (§9-6)。追加の二段書きが
   独立に X2 を防ぐため。0 書きは多重の備えで、直接の検査 (スラックの inode 番号が
@@ -690,7 +690,7 @@ size を繋ぐ前に伸ばすのは、**「size より先に繋がったブロ�
      見せるフィールドが**別セクタに載るときだけ**、先に中身だけを書く
      (まだスラック / inode 0 なので見えない)。その後で見せるフィールドを書く。
    - 同じセクタに収まるときは従来どおり 1 回 (I/O を増やさない)。
-   - 判定は `ext2_same_sector()`、セクタ幅は `EXT2_SECTOR_SIZE` (`fs/ext2_priv.h`、
+   - 判定は `ext2_same_sector()`、セクタ幅は `EXT2_SECTOR_SIZE` (`fs/ext2/ext2_priv.h`、
      `ext2_write_block` の書き方と結び付けたコメント付き)。
 
 **2 を入れた理由**: 1 だけでは**既存の NHD に残っている旧コードの削除の跡**
@@ -841,8 +841,8 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 
 ### 9-8. 触ったファイル (往復 4)
 
-`fs/ext2_dir.c` (`ext2_add_entry` / `ext2_delete_entry` / `ext2_mkdir` /
-`ext2_rmdir` / `ext2_rename`)、`fs/ext2_priv.h` (`EXT2_SECTOR_SIZE`)、
+`fs/ext2/ext2_dir.c` (`ext2_add_entry` / `ext2_delete_entry` / `ext2_mkdir` /
+`ext2_rmdir` / `ext2_rename`)、`fs/ext2/ext2_priv.h` (`EXT2_SECTOR_SIZE`)、
 `tools/tests/b8_open_host.c`、`tools/tests/b8_tdd.md`。
 `docs/archive/shell/TASK_FS_TYPE.md` §2-6 は PM が直すので触っていない。
 `sdk/kapi.json` 不変。
@@ -867,7 +867,7 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
   いる)。e2fsck が直す」と**代償として書いていた**。OS32 自身の `rmdir` がその状態を dangling に
   変えることを見落としていた。
 - **§9-1 の「末尾の穴は次の追加が同じ位置を埋める」は誤り**だった。次の名前が既存ブロックの
-  スラックに収まると穴は残る (`[R5-6]` の 01 で `dir_hole=1` のまま)。`fs/ext2_dir.c` のコメントを
+  スラックに収まると穴は残る (`[R5-6]` の 01 で `dir_hole=1` のまま)。`fs/ext2/ext2_dir.c` のコメントを
   直した。§9-1 の本文は往復 4 の記録として残し、ここで訂正する。
 - 往復 5 の最初の実行で**試験全体が止まった**。e2fsck と話す `int $0x80` のインライン asm に
   `"memory"` の clobber を付けておらず、GCC が `read` の前後でバッファが変わらないと見なして
@@ -875,7 +875,7 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 
 ### 10-1. ディレクトリ rename の順序 (決裁 1)
 
-`fs/ext2_dir.c` の `ext2_rename_dir` (新設)。ファイルの rename は往復 4 の順序のまま
+`fs/ext2/ext2_dir.c` の `ext2_rename_dir` (新設)。ファイルの rename は往復 4 の順序のまま
 (links を先に上げ、新名 → 旧名、最後に下げる。ファイルのハードリンクは正当)。
 
 守る不変条件:
@@ -924,7 +924,7 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 
 | 項目 | 実装 |
 |---|---|
-| どこで立てるか | **`ext2_read_block` / `ext2_write_block` の失敗**で `ext2_fs_error(ctx)` (`fs/ext2_super.c`)。この 2 つは**メタデータ専用**にし、データブロック (ファイルの中身) は新設の `ext2_read_data_block` / `ext2_write_data_block` を使う (`ext2_read_file` / `ext2_read_stream` / `ext2_create` / `ext2_write` / `ext2_write_stream` の 8 か所)。**既定をメタデータ側**に置いたのは、メタデータの呼び手を 1 か所見落としただけでエラー状態が立たなくなる逆向きを避けるため |
+| どこで立てるか | **`ext2_read_block` / `ext2_write_block` の失敗**で `ext2_fs_error(ctx)` (`fs/ext2/ext2_super.c`)。この 2 つは**メタデータ専用**にし、データブロック (ファイルの中身) は新設の `ext2_read_data_block` / `ext2_write_data_block` を使う (`ext2_read_file` / `ext2_read_stream` / `ext2_create` / `ext2_write` / `ext2_write_stream` の 8 か所)。**既定をメタデータ側**に置いたのは、メタデータの呼び手を 1 か所見落としただけでエラー状態が立たなくなる逆向きを避けるため |
 | 媒体に何を書くか | スーパーブロックの**先頭セクタ (base+2) だけ**を読み直し、`s_state` に `EXT2_ERROR_FS` を OR して書く。**1 マウントにつき 1 度**。失敗しても何もしない (メモリ上の状態は先に立てる = 再入しない)。空き数などメモリ上の値は書かない (操作の途中でビットマップと合っている保証が無い)。**専用の 512B バッファ**を使う — 共有バッファを使うと、操作の途中 (二重間接表を `g_blk` に載せたまま内側の表の読み取りが落ちた瞬間など) に呼び手の表を潰す (§4-24 と同じ壊れ方) |
 | 何を拒否するか | 入口 `ext2_check_writable` で `EXT2_ERR_ROFS`: `ext2_create` / `ext2_write` / `ext2_write_stream` / `ext2_unlink` / `ext2_mkdir` / `ext2_rmdir` / `ext2_rename` / `ext2_vfs_set_mtime`。truncate は独立した入口を持たず、`ext2_write` / `ext2_unlink` / `ext2_rmdir` の中でだけ走るのでこれで塞がる。VFS 経由の `vfs_open(O_CREAT / O_TRUNC)` も `write_file` が断るので FD は出ない。**読み取り系は通す** |
 | 拒否しないもの | **内部の段** (`ext2_add_entry` / `ext2_delete_entry` / `ext2_alloc_*` / `ext2_free_*` / `ext2_truncate_blocks` 等)。操作の途中でエラーが出たとき、その操作の後始末 (往復 3・4 で掃引済み) は従来どおり走らせる。Linux の remount-ro も進行中の操作のバッファ書き込みは止めない |
@@ -932,8 +932,8 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 | ROFS と IO の使い分け | **ROFS は「入口で断った = 何もしていない」だけ**。操作が走った後の失敗は IO。最初は sync が ROFS を返していて、漏れを IO で返す約束 (往復 3) を sync の ROFS が上書きした (`[P1-A]` が落ちた) ので分けた |
 | マウント時 | `s_state` に `EXT2_ERROR_FS` があれば `kprintf(0x0E, "[EXT2] warning: mounting fs with errors, running e2fsck is recommended")` を出し、**読み書きでマウント**する (Linux と同じ、決裁の条件)。印は消さない (e2fsck だけが消す)。`ctx->mounted_with_errors` に残す。エラー状態 (`ctx->fs_error`) はマウントごとに 0 から |
 | エラー状態に入ったとき | `kprintf(0x0C, "[EXT2] I/O error on metadata: writes disabled until remount (run e2fsck)")` を 1 度。既存の `[E2W]` と同じ作法 |
-| `ext2_fmt.c` | `s_errors` を `CONTINUE (1)` → **`RO (2)`**。OS32 自身は値に関わらず止めるので振る舞いと食い違っていた。ホストの Linux がこの像をマウントしたときも、エラー後に書き続けなくなる。`s_state` / `s_errors` のオフセットは `fs/ext2.h` の定数にした ([C4]) |
-| エラーコード | **`OS32_ERR_ROFS = -15`** を `sdk/include/os32/os32_kapi_shared.h` の末尾に追加 (既存の番号は動かしていない)。`VFS_ERR_ROFS` (`fs/vfs.h`)、`EXT2_ERR_ROFS = -11` (`fs/ext2.h`)、`ext2_to_vfs_err` で写す。**番号の追加だけで KAPI の構造体・スロットは変えていない** (`sdk/kapi.json` 不変、`tools/check_kapi_version.py` は `KAPI バージョン一致: v52 (4 箇所)` を返す)。KAPI_SPEC §3-2 のエラー番号の予約を更新 (ネットワークの開始点を -16 へ) |
+| `ext2_fmt.c` | `s_errors` を `CONTINUE (1)` → **`RO (2)`**。OS32 自身は値に関わらず止めるので振る舞いと食い違っていた。ホストの Linux がこの像をマウントしたときも、エラー後に書き続けなくなる。`s_state` / `s_errors` のオフセットは `fs/ext2/ext2.h` の定数にした ([C4]) |
+| エラーコード | **`OS32_ERR_ROFS = -15`** を `sdk/include/os32/os32_kapi_shared.h` の末尾に追加 (既存の番号は動かしていない)。`VFS_ERR_ROFS` (`fs/vfs.h`)、`EXT2_ERR_ROFS = -11` (`fs/ext2/ext2.h`)、`ext2_to_vfs_err` で写す。**番号の追加だけで KAPI の構造体・スロットは変えていない** (`sdk/kapi.json` 不変、`tools/check_kapi_version.py` は `KAPI バージョン一致: v52 (4 箇所)` を返す)。KAPI_SPEC §3-2 のエラー番号の予約を更新 (ネットワークの開始点を -16 へ) |
 
 **データブロックの書き込み失敗をエラー状態にしない理由**: 参照 (inode のポインタ・間接表) を
 書くのはメタデータの段なので、データブロックの書き込みが落ちても**どの参照も正しいブロックを
@@ -1096,13 +1096,13 @@ R5-2 (末尾の穴からの回復) / R5-3 (X2 の配置) / R5-4 (置き換え re
 
 ### 10-10. 触ったファイル (往復 5)
 
-カーネル (FS): `fs/ext2.h` (`EXT2_ERR_ROFS` / `EXT2_ERR_MLINK` / s_state・s_errors の定数 / `EXT2_LINK_MAX`)、
-`fs/ext2_ctx.h` (`fs_error` / `mounted_with_errors`)、`fs/ext2_priv.h` (データ用 I/O・`ext2_fs_error`・
-`ext2_check_writable` の宣言)、`fs/ext2_super.c` (メタデータ / データの I/O、エラー状態、マウント時の警告、
-エラー状態の sync)、`fs/ext2_file.c` (データ I/O の置き換え 8 か所、入口の拒否 4 か所、write_stream の `io_err`)、
-`fs/ext2_dir.c` (`ext2_rename_dir` 新設、rename のやり直し経路、mkdir / rmdir / rename の入口の拒否、
-links の上限、末尾の穴のコメント)、`fs/ext2_vfs.c` (ROFS / MLINK の写像、set_mtime の入口の拒否)、
-`fs/ext2_fmt.c` (`s_errors = RO`、定数化)、`fs/vfs.h` (`VFS_ERR_ROFS` / `VFS_ERR_FULL`)
+カーネル (FS): `fs/ext2/ext2.h` (`EXT2_ERR_ROFS` / `EXT2_ERR_MLINK` / s_state・s_errors の定数 / `EXT2_LINK_MAX`)、
+`fs/ext2/ext2_ctx.h` (`fs_error` / `mounted_with_errors`)、`fs/ext2/ext2_priv.h` (データ用 I/O・`ext2_fs_error`・
+`ext2_check_writable` の宣言)、`fs/ext2/ext2_super.c` (メタデータ / データの I/O、エラー状態、マウント時の警告、
+エラー状態の sync)、`fs/ext2/ext2_file.c` (データ I/O の置き換え 8 か所、入口の拒否 4 か所、write_stream の `io_err`)、
+`fs/ext2/ext2_dir.c` (`ext2_rename_dir` 新設、rename のやり直し経路、mkdir / rmdir / rename の入口の拒否、
+links の上限、末尾の穴のコメント)、`fs/ext2/ext2_vfs.c` (ROFS / MLINK の写像、set_mtime の入口の拒否)、
+`fs/ext2/ext2_fmt.c` (`s_errors = RO`、定数化)、`fs/vfs.h` (`VFS_ERR_ROFS` / `VFS_ERR_FULL`)
 
 SDK / 文書: `sdk/include/os32/os32_kapi_shared.h` (`OS32_ERR_ROFS = -15` を末尾に追加)、
 `docs/KAPI_SPEC.md` (§3-2 のエラー番号の予約)。**`sdk/kapi.json` 不変**
@@ -1136,7 +1136,7 @@ SDK / 文書: `sdk/include/os32/os32_kapi_shared.h` (`OS32_ERR_ROFS = -15` を�
 
 ### 11-1. rmdir のガード (ユーザー決裁)
 
-`fs/ext2_dir.c` の `ext2_rmdir`: `ext2_is_dir_empty` が真で、inode を読んだ後、**何か書く前に**
+`fs/ext2/ext2_dir.c` の `ext2_rmdir`: `ext2_is_dir_empty` が真で、inode を読んだ後、**何か書く前に**
 `links_count > EXT2_EMPTY_DIR_LINKS (2)` なら inode を返さずに断る。
 
 | 項目 | 決めたこと |
@@ -1146,7 +1146,7 @@ SDK / 文書: `sdk/include/os32/os32_kapi_shared.h` (`OS32_ERR_ROFS = -15` を�
 | エラー状態 | **入れない** (決裁どおり)。I/O エラーではなく漏れ側の無害な不整合で、以後の書き込みを止めるほどではない |
 | 通知 | `kprintf(0x0E, "[EXT2] rmdir refused: empty directory inode %d still has links_count %d (orphaned subdirectory), run e2fsck\n")` を断るたびに 1 行。色 0x0E はマウント時の警告と同じ (「エラー状態」の 0x0C より弱い) |
 | 置き場 | 空の判定 (`is_dir_empty`) の**後**。前に置くと、子のある普通のディレクトリ (links > 2) で通知が出てしまう |
-| 定数 | `EXT2_EMPTY_DIR_LINKS = 2` を `fs/ext2.h` に ([C4]) |
+| 定数 | `EXT2_EMPTY_DIR_LINKS = 2` を `fs/ext2/ext2.h` に ([C4]) |
 
 **健全なディレクトリを誤って断らない証拠** (3 通り):
 
@@ -1338,10 +1338,10 @@ e2fsck の stdin を `/dev/null` にする / 子への応答の `BrokenPipeError
 
 ### 11-8. 触ったファイル (往復 6)
 
-カーネル (FS): `fs/ext2.h` (`EXT2_EMPTY_DIR_LINKS`)、`fs/ext2_dir.c` (rmdir のガード・`used_dirs`、
+カーネル (FS): `fs/ext2/ext2.h` (`EXT2_EMPTY_DIR_LINKS`)、`fs/ext2/ext2_dir.c` (rmdir のガード・`used_dirs`、
 rename_dir 段 6 とそのコメント、不変条件のコメントの訂正、割り当ての戻り値の伝播 3 か所、`kprintf.h`)、
-`fs/ext2_inode.c` (`ext2_alloc_block` / `ext2_alloc_inode` の戻り値、`bmap_set` の伝播 3 か所と約束の
-コメント)、`fs/ext2_file.c` (割り当ての戻り値の伝播 4 か所)。**`sdk/kapi.json`・エラー番号は不変**
+`fs/ext2/ext2_inode.c` (`ext2_alloc_block` / `ext2_alloc_inode` の戻り値、`bmap_set` の伝播 3 か所と約束の
+コメント)、`fs/ext2/ext2_file.c` (割り当ての戻り値の伝播 4 か所)。**`sdk/kapi.json`・エラー番号は不変**
 
 試験: `tools/tests/b8_open_host.c` (段 G・段 C2・`[R5-1]` の拡張・`sweep()` の後続操作の口・
 複数グループのディスク・ガードの突き合わせ)、`tools/tests/test_b8_open.py` (見張り)、`tools/tests/b8_tdd.md`
@@ -1461,8 +1461,8 @@ inode) と孤児・末尾の穴だけで、これは `e2fsck` 側でも「Block 
 
 ### 13-2. RED (置き換え経路と戻り値の伝播を外した版)
 
-`fs/ext2_dir.c` の分岐を `if (0)` にして**従来の unlink + add 経路**へ戻し、
-`fs/ext2_file.c` の `ext2_unlink` を「`ext2_write_inode` / `ext2_sync` の戻り値を
+`fs/ext2/ext2_dir.c` の分岐を `if (0)` にして**従来の unlink + add 経路**へ戻し、
+`fs/ext2/ext2_file.c` の `ext2_unlink` を「`ext2_write_inode` / `ext2_sync` の戻り値を
 捨てて `EXT2_OK`」に戻した状態。
 
 ```

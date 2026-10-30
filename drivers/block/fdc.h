@@ -260,7 +260,7 @@
  * 2026-09-24 夕の NP21/W の実測 (6541ef1、`[fdc] font:` の行) は
  * multi=767 / seek=751 で、先読みがほとんど当たっていなかった。原因は
  * **VFS が 1 回の読みごとにファイルを開き直す**こと —
- * fs/fatfs_vfs.c の fatfs_vfs_read_stream は f_open → f_lseek → f_read →
+ * fs/fat/fatfs_vfs.c の fatfs_vfs_read_stream は f_open → f_lseek → f_read →
  * f_close を毎回回すので、1KB のチャンクごとにルートディレクトリ
  * (シリンダ 0)、/sys と /sys/font のディレクトリ (データ域のどこか)、
  * FAT (シリンダ 0)、データの 4〜5 本のトラックを巡回する。巡回の長さが

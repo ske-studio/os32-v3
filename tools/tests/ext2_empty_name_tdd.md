@@ -54,7 +54,7 @@ case cdinst  e2fsck -fn cdinst.img: clean
 case legacy  (仕込んだ 1 件だけ検出)
 case synth
 checks 200 failures 0
-TARGET i386-elf -Werror compile PASS (fs/ext2_dir.c, fs/ext2_file.c, fs/ext2_vfs.c, fs/vfs.c)
+TARGET i386-elf -Werror compile PASS (fs/ext2/ext2_dir.c, fs/ext2/ext2_file.c, fs/ext2/ext2_vfs.c, fs/vfs.c)
 ```
 
 ## 変異 (`--mutants`、fs/ の写しを変異させるので実物は書き換えない)

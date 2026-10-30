@@ -141,25 +141,25 @@
     },
     {
       "symbol": "sfs_dec_reset",
-      "source": "fs/sfs_proto.h",
+      "source": "fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_dec_feed",
-      "source": "fs/sfs_proto.h",
+      "source": "fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_get32",
-      "source": "fs/sfs_proto.h",
+      "source": "fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_ms_ticks",
-      "source": "fs/sfs_proto.h",
+      "source": "fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },

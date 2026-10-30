@@ -41,7 +41,7 @@ HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-D__cdecl="]
 SRC = ROOT / "tools/tests/ext2_empty_name_host.c"
-TARGET_SRCS = ["fs/ext2_dir.c", "fs/ext2_file.c", "fs/ext2_vfs.c", "fs/vfs.c"]
+TARGET_SRCS = ["fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c", "fs/ext2/ext2_vfs.c", "fs/vfs.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
@@ -131,7 +131,7 @@ def make_pkgs(tmp):
 
 
 def build(tmp, fsdir, exe_name="ename"):
-    inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir)]
+    inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir), "-I" + str(fsdir / "ext2")]
     inc += (['-I' + str(ROOT / p) for p in ('userland/lib',)] + include_flags(ROOT))
     exe = tmp / exe_name
     res = subprocess.run(["gcc", *HOST_FLAGS, *inc, str(SRC), "-o", str(exe)],
@@ -198,7 +198,7 @@ def mutants(tmp, pkgs, e2fsck):
     for i, (name, fname, before, after) in enumerate(MUTANTS):
         mdir = tmp / f"mut{i}"
         shutil.copytree(ROOT / "fs", mdir)
-        path = mdir / fname
+        path = mdir / ("ext2" if fname.startswith("ext2_") else "") / fname
         text = path.read_text(encoding="utf-8")
         if text.count(before) != 1:
             print(f"MUTANT {i} ({name}): 置き換え元が {text.count(before)} 件 — 変異表が古い")

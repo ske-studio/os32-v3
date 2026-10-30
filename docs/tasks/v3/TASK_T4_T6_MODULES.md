@@ -166,7 +166,7 @@ file-backed SQLiteはext2に限定する。T4b-4cの不変CD向けRO SQLite (`vf
 
 製品の内部接続は `VfsOps.sqlite` の明示的能力で判定する。`vfs_sqlite_allow_immutable(prefix)` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。通常のRO指定だけではSQLite能力を与えない。ext2のresizeは現状0/同一サイズだけを扱い、それ以外は内容を変えずNOSYS→`SQLITE_IOERR_TRUNCATE`。未実装の縮小を成功にしない。接続のidentityはxClose後もgroup finish成功まで保持し、既定VFSの旧接続もFDのMAIN_DB印で重複対象に含める。T4b-3の既定VFS閉鎖とは独立に適用する。
 
-FDWP-1のFatFs修正は読込起動の回帰基準であり、SQLite RO契約の受入ではない。dirty時だけ書込み、flush成功後だけ窓を更新する (`fs/fatfs/ff.c:1062,1085`、`fs/fatfs_vfs.c:207`)。coreのFATで書込み禁止FDからroot/Unicode/shellを読む。F3のrc伝播は維持し、CD不変媒体条件は凍結したhost実装の契約として残す。
+FDWP-1のFatFs修正は読込起動の回帰基準であり、SQLite RO契約の受入ではない。dirty時だけ書込み、flush成功後だけ窓を更新する (`fs/fat/fatfs/ff.c:1062,1085`、`fs/fat/fatfs_vfs.c:207`)。coreのFATで書込み禁止FDからroot/Unicode/shellを読む。F3のrc伝播は維持し、CD不変媒体条件は凍結したhost実装の契約として残す。
 
 ### 3-3. FEP予算と設定の循環
 

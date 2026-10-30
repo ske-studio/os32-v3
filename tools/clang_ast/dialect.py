@@ -106,7 +106,7 @@ def findings(tu, root, words, headers, public=False):
                 c.semantic_parent.kind in (K.STRUCT_DECL,K.UNION_DECL):
             fields = tuple(x.spelling for x in c.get_children() if x.kind == K.FIELD_DECL)
             # Pre-existing HostDrv wire-layout members: preserve ABI, reject new shapes.
-            inherited = rel == 'fs/hostdrvfs_proto.h' and fields in (
+            inherited = rel == 'fs/hostdrv/hostdrvfs_proto.h' and fields in (
                 ('ReplaceIfExists','AdvanceOnly'), ('ClusterCount','DeleteHandle'))
             if not inherited:
                 features.add('anonymous record')
