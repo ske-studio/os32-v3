@@ -16,7 +16,7 @@
 
 | ソース | 確認した現行動作 / 不足 |
 |---|---|
-| `kernel/physmem.[ch]`: `physmem_exclude`, `physmem_reserve_ram` | 単一変更はコピー上で正規化後 commit。永久除外、owner/live allocation 情報なし。MMIO > RESERVED > RAM > UNKNOWN。最大64区間。 |
+| `mm/physmem.[ch]`: `physmem_exclude`, `physmem_reserve_ram` | 単一変更はコピー上で正規化後 commit。永久除外、owner/live allocation 情報なし。MMIO > RESERVED > RAM > UNKNOWN。最大64区間。 |
 | `mm/pgalloc.c`: `init_core`, `pgalloc_reserve_pfn` | model を eligibility bitmap に snapshot。単一 `[first,end)` だけ IRQ 保存区間で全 allocated bit を確認後 eligible を落とす。既に非 eligible は成功扱い、`end > limit_pfn` は拒否。owner、複数範囲 transaction、管理外 MMIO 記録はない。 |
 | `mm/pgalloc.h`, `include/sys.h` と実体 | `sys_memory_bootstrap_model(model,layout,verify)` → `sys_memory_stage_online()` が現存。BOOTSTRAP は一般 alloc 不可、workspace で高位 RAM mapping 後 ONLINE。stage は master/live AS=0 が必要、途中失敗は以前の map が残り得る fail-stop。`sys_memory_init_model` は metadata のみで ONLINE にはできない。 |
 | `init/kernel.c`: paging/pgalloc 初期化 | 製品入口は依然 `paging_init(mem_kb)` → `pgalloc_init(mem_kb)`。モデル stage/provider は未接続。broker のために boot をモデル経路へ強制変更しない。 |
@@ -85,7 +85,7 @@ GUI 初回の挿入点は `init/kernel.c` の `is_gui` 判定後、`exec_run(cur
 
 ## 7. 実装範囲と受入ゲート
 
-次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/video/cirrus/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
+次回コード範囲: `mm/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/video/cirrus/wab_glue*.{c,h}`, `drivers/video/cirrus/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
 
 | ゲート | 合格条件（全て次回実装時。今回未実行） |
 |---|---|

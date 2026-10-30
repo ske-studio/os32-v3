@@ -145,7 +145,7 @@ KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から
 (`gfx_stats`: present_bytes / hw_ops / io_accesses / commits) で「CPU が運んだ量」と
 「エンジンに任せた回数」を測る (NP21/W では時間が測れないため)。設計と経緯は
 決定 `decisions/gui/DESIGN.md` §5〜§8、Cirrus の資料は `include/wab_xe10.h` と
-`drivers/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
+`drivers/video/cirrus/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
 `kernel/v86/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):

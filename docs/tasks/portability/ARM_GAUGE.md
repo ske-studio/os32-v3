@@ -37,7 +37,7 @@
 |---|---|
 | 対象集合 | `build/kernel.mk` の `C_KERNEL` (カーネルに実際にリンクされる C ソースの正典) |
 | フラグ | `build/config.mk` の `CFLAGS_COMMON` を**読んで**使い、x86 専用の `-m32` `-march=i386` `-mno-red-zone` だけを外す。`-O2 -D__KERNEL_BUILD__` を足してカーネル本番ビルドに揃える |
-| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/check_arm_compile.py:97` の `DRIVERS_INC_KERNEL` を参照) |
+| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fat/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/check_arm_compile.py:97` の `DRIVERS_INC_KERNEL` を参照) |
 | コンパイル | `-c -o /dev/null` (コード生成まで) |
 
 フラグとインクルードを `config.mk` から**読む**のは、ここに書き写すと二重管理に
@@ -336,7 +336,7 @@ ABI の両側に同じ前提がかかる。
 
 ### 順序 4-a でも数字は動かない — この計測器が測っていないものだから
 
-順序 4-a は `fs/ext2_*.c` / `drivers/video/kcg/kcg.c` / `lib/utf8.c` の
+順序 4-a は `fs/ext2/ext2_*.c` / `drivers/video/kcg/kcg.c` / `lib/utf8.c` の
 `*(u32 *)&buf[off]` を `include/endian_le.h` の LE アクセサに置き換えた作業。
 **この計測器で数字が動かないのは正しく、しかも「効果が無い」という意味では
 ない。** 理由を分けて書いておく:
@@ -345,7 +345,7 @@ ABI の両側に同じ前提がかかる。
   `*(u32 *)&buf[off]` は ARM でも**普通にコンパイルできる** — 壊れるのは
   実行時 (`SCTLR.A=1` なら非アラインで abort、BE なら値が入れ替わる) なので、
   コンパイル計測には最初から現れない。
-* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2_*.c` 5 本、`fs/isofs/iso9660.c`、
+* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2/ext2_*.c` 5 本、`fs/isofs/iso9660.c`、
   `lib/utf8.c`) は**順序 1 の時点から ARM を通っていた** (`fs/` 14/15、
   `lib/` 8/8)。`drivers/video/kcg/kcg.c` だけは今も落ちるが、原因は
   `platform/pc98/platform_io.h:25` のポート I/O で、エンディアンとは関係が無い。

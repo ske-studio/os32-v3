@@ -217,7 +217,7 @@ path も slot の予約・SQLite open・VFS 操作前に確定する。
 | 段階 | 後日承認する小さいファイル集合 | 完了条件 |
 |---|---|---|
 | R0 | 本票の独立読取りレビューのみ | 上限、NULL、caller provenance、table walk、IF、guard 全caller一覧に重大未解決ゼロ。PM承認 |
-| B1 uaccess | `kernel/paging.c/.h`＋専用 `tools/tests/` harness。出自 helper が必要な場合だけ別小差分 `exec/exec.c/.h` | synthetic caller/master PD、safe range/overflow/IF host 検証。既存 paging helper の意味を変えない |
+| B1 uaccess | `mm/paging.c/.h`＋専用 `tools/tests/` harness。出自 helper が必要な場合だけ別小差分 `exec/exec.c/.h` | synthetic caller/master PD、safe range/overflow/IF host 検証。既存 paging helper の意味を変えない |
 | B2 FEP | `kernel/ime/ime.c`、`kernel/ime/ime_dict.c`、`kernel/ime/ime.h`＋専用 host test | staged list、全入力copy、NULL、借用binding寿命、SQL/I/O失敗。SDK layout変更は別承認 |
 | B3 DB followup | 排他移管した `kapi/kapi_db.c/.h`＋既存 F1/専用 host test | copy-before-finalize、無効 SQL/path の engine entry=0、F1/F2回帰 |
 | B4a guard基礎 | 新規 kernel内部 guard `.c/.h`、必要な build source 登録、`arch/x86/kernel/isr_handlers.c`＋専用 host test | active fault→停止／非active→従来分類。ISR frame変更なし |

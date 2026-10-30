@@ -45,7 +45,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 ```
 === カーネルビルド ===
 boot/*.asm      →  nasm (-f bin / -f elf32)  →  boot/*.bin / boot/*.o
-kernel/*.asm    →  nasm (-f elf32)           →  build/out/obj/kernel/*.o
+カーネル側 *.asm →  nasm (-f elf32)           →  build/out/obj/**/*.o
 カーネル側 *.c   →  gcc (-m32 -ffreestanding) →  build/out/obj/**/*.o (+ .d)
                                                ↓
 build/out/obj/**/*.o → ld (-T os32.ld)           → build/out/kernel.elf (0x100000〜、SQLite を含まない core)
@@ -204,18 +204,46 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 ### §8-3 ディレクトリ構造
 
 ```
-os32/
+os32-v3/
 ├── boot/           ブートローダー (16bit/32bit ASM + C)
-├── kernel/         カーネルコア・メモリ等・割り込みルーチン群 (gui.c / shlib.c / sysconfig.c / ring3_entry.asm を含む)
-├── drivers/        ハードウェアドライバ (kbd, rtc, fm, fdc, disk, ide, atapi, kcg, mouse, np2sysp, loop_dev, dev, wab_* (Cirrus / Xe10 グルー) 等)
-├── gfx/            グラフィック HAL (gfx_core + backend_pc98 / backend_pegc / backend_cirrus)
-├── fs/             ファイルシステム (vfs, ext2, fatfs, iso9660, hostdrv 等)
+├── init/           起動の順序だけ (kernel_main、起動情報・起動ログ、/etc/system.cfg、スプラッシュ)
+├── kernel/         常駐サービス・診断・ver・GUI の背骨 (gui.c)・SQLite の常駐側・試験専用の器
+│   ├── irq/        割り込みの動的登録・IRQ0 コールバック
+│   ├── time/       µs 時計・PIT の分周・システムクロックの判定・CPU の校正
+│   ├── module/     部品 (KMOD) の検証と load/start/abort、kdebug/hwdev の受け口
+│   ├── console/    TVRAM コンソール・console シンク・フォントの lease・Unicode 表
+│   ├── ime/        FEP (fep.mod の本体と窓口)
+│   └── v86/        V86 モニタと v86.mod (x86 かつ PC-98 専用)
+├── mm/             ページング・物理ページ台帳・カーネルヒープ・DMA プール・SHM・shlib
+├── arch/           CPU 依存の実装。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
+│   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
+│       └── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
+├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト ほか)。`PLATFORM ?= pc98` で選ぶ
+├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約
+├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)
+│   ├── base/       装置の共通層 (デバイス登録簿 dev)
+│   ├── ata/        IDE・ATAPI と cd.mod
+│   ├── block/      FDC・論理ディスク・ループバック・PC-98 区画表・SCSI 定数
+│   ├── char/       シリアル・RTC・NP21/W ハイパーコール
+│   ├── dma/        8237 DMA
+│   ├── input/      キーボード・マウス
+│   ├── pci/        PCI の列挙・構成空間の復号・結線表
+│   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod)
+│   ├── sound/      音源 (fm/ — OPN・サウンドエンジンと fm.mod、cs4231/ — CS4231 PCM と pcm.mod)
+│   └── video/      表示装置 (kcg/ — 漢字 ROM と kcg.mod、cirrus/ — Cirrus・Xe10 グルー・HAL バックエンドと cirrus.mod、geforce/ — GeForce の HAL バックエンドと geforce.mod、pc98/ — 内蔵表示 (GDC planar・PEGC) のバックエンド)
+├── gfx/            描画 HAL の共通層だけ (gfx_core・VRAM・スクロール・パレット。バックエンドは drivers/video/)
+├── fs/             VFS・fd・リダイレクト・パイプ (共通層)
+│   ├── ext2/       ext2 (NHD の主 FS)
+│   ├── fat/        FatFs の VFS 結線 (fatfs/ — vendor の FatFs、中身は不変)
+│   ├── hostdrv/    HostDrv (/host)
+│   ├── isofs/      ISO9660 (CD-ROM)
+│   └── serialfs/   SerialFS (シリアル・LAN 越しの /host)
+├── net/            リンク層 (link.c)
 ├── exec/           OS32X(外部プログラム) のロードと環境設定
 ├── kapi/           外部プログラム向け KernelAPI リダイレクタ
+├── kdebug/         診断の部品 (/boot/kdebug.bin) の中身 (セルフテスト・v86 -g・GeForce 初期化の段など)
+├── hwdev/          装置の核 HWDEV の部品 (hwdev.mod) の中身
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
-├── include/        システム統合用共通ヘッダ群 (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ
-├── arch/           CPU 依存の実装 (x86/arch_io.h — 割り込み制御・CPU 停止・IDT ロード、x86/arch_cpu.h — CR3/CR0・リング降下、x86/x86_desc.h — GDT/TSS ロード)。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
-├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト)。`PLATFORM ?= pc98` で選ぶ
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
 ├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + check-fast)
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
@@ -223,9 +251,8 @@ os32/
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
 ├── sdk/            配布 SDK (allocator/ (nano入力台帳・表示), include/, crt/, link/ (app.ld / app_sys.ld / shlib.ld), rust/, example/)、kapi.json と生成器
 ├── build/          モジュール化 Makefile 群 (config.mk, kernel.mk, programs.mk, libs.mk, deploy.mk, image.mk, sdk.mk 等) + リンカスクリプト
-│   └── out/        ビルド成果物 (kernel.bin, sqlite.mod, kdebug.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map)
+│   └── out/        ビルド成果物 (kernel.bin, sqlite.mod, kdebug.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map、カーネルの .o/.d は obj/)
 ├── assets/         データアセット (DB, 辞書, profile 等)
-├── tests/          テストスクリプト
 ├── tools/          ホスト上でのイメージ生成・デプロイ・検査ツール (nhd_deploy, mkshlib, check_*, emu_agent/ (ローカル AI の実機操作), np21w_mcp/, np21w_ctl (NP21/W の停止・起動))
 ├── packages/       生成された .PKG (make packages)
 ├── images/         生成されたブートイメージ (make all / iso)
@@ -233,6 +260,8 @@ os32/
 ├── .env            ローカル環境設定 (CROSS_DIR / NP21W_DIR / HOSTDRV_DIR)
 └── docs/           仕様書ドキュメント群
 ```
+
+ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。この配置にした理由と旧い配置からの対応表は票 TASK_SRC_LAYOUT §2・§3 (記録)。
 
 ### §8-4 ホスト側イメージ生成ツール
 

@@ -163,7 +163,7 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 |kernel/time/sysclk.c|未判定既定1996800Hz/is_8mhz=0/detected=0、検出済み判定、3 getter を維持。RTC の clock 登録表とは無関係|
 |kernel/time/pit.c（idt.c から論理部移動）|`s_pit`、pit_get_setup、pit_init を所有。pit_compute と既定 PIT_HZ 再計算、元の rc、両方失敗時は状態/I/O 不変|
 |platform/pc98/timer.c、起動前景 IF=0|kernel/time/pit.c が状態公開後に呼ぶ program(reload) の実体。mode→LSB→MSB だけ、s_pit を持たず再計算・待ちを追加しない|
-|kernel/pit_math.*|構造体の型・配置・mode 値・純粋整数演算をそのまま維持。100Hz: reload 19968/24576、period_us=10000|
+|kernel/time/pit_math.*|構造体の型・配置・mode 値・純粋整数演算をそのまま維持。100Hz: reload 19968/24576、period_us=10000|
 |kernel/time/ktime.c、呼出元 IF を保存|ps の valid/mode/reload 検査、retry 上限 TIME_RETRY_MAX、feed、補間、s_last_us と clamp_count を所有。sample は IRQ 内でも待たない|
 
 - sample の I/O は **W IRR/R pending → W latch/R lo/R hi → W IRR/R pending** の7操作。割込み禁止区間を短縮・分割しない。
@@ -224,7 +224,7 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 |check-dep-dir-b-host.yaml（新設）|kernel/{sys,idt,irq,pit,sysclk,ktime}.c、kernel/platform_{sys,irq,timer}.h、platform/pc98/{system,pic,clock,timer}.c、使用する既存ヘッダ・shim・runner・固定fixture・自身のYAML・mk|
 
 - `build/kernel.mk` は broad として全関連試験を選択させる。各試験の runner/host と新規入力を lint で検査する。
-- kernel/pit_math.*、boot.c、tick.c、ASM、sdk/kapi.json、生成 KAPI、kdebug_imports.def は変更不要。
+- kernel/time/pit_math.*、boot.c、tick.c、ASM、sdk/kapi.json、生成 KAPI、kdebug_imports.def は変更不要。
 
 ## 8. 受入・変異・利用者の退行・段分け
 

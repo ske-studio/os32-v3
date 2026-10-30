@@ -133,21 +133,21 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 *   **役割:** 基本型定義 (`types.h`)、I/Oポート操作マクロ (`io.h`)、定数定義。
 
 #### デバイスドライバ (drivers/)
-*   **依存先:** `include/`, `kernel/` (kprintf/kmalloc)
-*   **役割:** ハードウェア（KBD, FDC, IDE, ATAPI, RTC, Serial, KCG）の直接制御。
-*   **特記事項:** `kcg.c` は `gfx/` の描画機能を利用せず、自前でピクセル描画（またはバックバッファ操作）を行う。
+*   **依存先:** `include/`, `kernel/`, `mm/` (kmalloc), `lib/` (kprintf)
+*   **役割:** ハードウェア（KBD, FDC, IDE, ATAPI, RTC, Serial, KCG）の直接制御。`drivers/` の下は装置の種類ごと (`base/` `ata/` `block/` `char/` `input/` `video/` など、[08 §8-3](08_build.md))。
+*   **特記事項:** `drivers/video/kcg/kcg.c` は `gfx/` の描画機能を利用せず、自前でピクセル描画（またはバックバッファ操作）を行う。
 
-#### カーネルコア (kernel/)
+#### カーネルコア (init/, kernel/, mm/, arch/x86/kernel/)
 *   **依存先:** `include/`, `drivers/` (serial, console用)
-*   **役割:** `idt.c`/`isr_handlers.c` (中断処理), `paging.c` (メモリ管理), `kmalloc.c`, `console.c`
+*   **役割:** `init/kernel.c` (起動の順序), `arch/x86/kernel/idt.c`・`isr_handlers.c` (中断処理), `mm/paging.c`・`mm/kmalloc.c` (メモリ管理), `kernel/console/console.c`。`kernel/` の下は `irq/` `time/` `module/` `console/` `ime/` `v86/`
 
 #### ファイルシステム (fs/)
 *   **依存先:** `include/`, `drivers/block/disk.h`, `drivers/ata/atapi.h`, `kernel/`
-*   **役割:** VFS（仮想ファイルシステム）による抽象化と、FAT12/ext2/ISO9660/HostDrvFSの実装。
+*   **役割:** VFS（仮想ファイルシステム）による抽象化 (`fs/` 直下) と、FS ごとの下 (`ext2/` `fat/` `isofs/` `hostdrv/` `serialfs/`) の実装。
 
 #### グラフィックス (gfx/)
 *   **依存先:** `include/`, `drivers/video/kcg/kcg.h`, `kernel/`
-*   **役割:** バックバッファ管理、VRAM転送、スプライト・図形描画。高速化のためアセンブラルーチンを利用。
+*   **役割:** 描画 HAL の共通層 (バックバッファ管理、VRAM転送、スプライト・図形描画)。高速化のためアセンブラルーチンを利用。バックエンドは `drivers/video/<装置>/` の装置の隣。
 
 #### プログラムローダー (exec/)
 *   **依存先:** `fs/`, `mm/paging.h`, `kapi/`

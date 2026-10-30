@@ -105,7 +105,7 @@ pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));
 - L08と共有するPCI契約は `include/pci_contract.h`。pci_dev/pci_driver/診断型・公開定数のみ、config I/Oは含めない。型配置は維持し、LANのABI世代変更は§3のとおり受け入れる。drivers/net/e82557/lan_module.c:7 の e82557_regs.h は削除し、装置定数は機種配線側だけで読む。
 
 ## 5. L03 — PCM IRQ資源を部品側へ（2時間）
-- PCM_IRQの値を知るのはdrivers/pcm_cs4231側だけ。既存 imports の pcm_module_irq_register(irq,fn,arg,flags) を使い、表やexportスロットは追加しない。
+- PCM_IRQの値を知るのはdrivers/sound/cs4231/pcm_cs4231側だけ。既存 imports の pcm_module_irq_register(irq,fn,arg,flags) を使い、表やexportスロットは追加しない。
 - 常駐側は登録成功したIRQ番号を保存する。固定番号検査を外すが、引数・二重登録・module状態・irq_register自身の既存検査は残す。
 
 ```c
@@ -194,7 +194,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 /* read_ank/read_kanji は既存 kcg_rom_read_* → public_api() → 4枠表 */
 ```
 - drivers/video/kcg/kcg_module.c:3 の kcg.h を kcg_contract.h に置換する。JSONで3targetを向け直す。KCGの共通宣言を `include/kcg_contract.h` に分離し生成Cのkcg.hを置換。読み出しKAPIの寸法定数も同契約へ。L19のmode port/復旧は触らない。
-- 「3本すべてを部品表へ」を必須にする場合の代案: KcgModuleApi末尾にinit/set_scale/load_fontの3枠を追加、4→7枠、版1→2、kernel/kcg_bodyとfacadeを同時更新。
+- 「3本すべてを部品表へ」を必須にする場合の代案: KcgModuleApi末尾にinit/set_scale/load_fontの3枠を追加、4→7枠、版1→2、drivers/video/kcg/kcg_bodyとfacadeを同時更新。
 - 代案では旧modを書込み前に拒否、未ロードstubでもscale初期化/clamp/NOSYSを維持する必要がある。import/export契約・生成器・全fixture更新を伴うため、承認なしに代案を実装しない。
 
 ## 10. 大きさの見積もりとファイルごとの変更
