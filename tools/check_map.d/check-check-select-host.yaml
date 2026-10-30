@@ -120,4 +120,6 @@ check-check-select-host:
 - init/kernel_boot_cpu.inc
 - init/kernel_boot_memory.inc
 - init/kernel_gfx_config.inc
+- tools/checks/run.py
+- tools/checks/test_run.py
 artifact_reader: true
