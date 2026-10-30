@@ -16,6 +16,8 @@ check-check-select-host:
 - docs/08_build.md
 - tools/check_map.yaml
 - tools/check_select.py
+- tools/checks/convert.py
+- tools/checks/test_convert.py
 - tools/tests/mutpar.py
 - tools/tests/test_check_select.py
 - userland/shell/sh_pipe.inc
