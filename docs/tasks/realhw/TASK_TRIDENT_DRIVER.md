@@ -424,10 +424,10 @@ PCI のグラフィックカードのドライバを作るとき、カードの�
 ### 4-1. 層 (DESIGN §6 の二層構造をそのまま使う)
 
 ```
-gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_rect / set_palette /
+drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init / query / present_rect / set_palette /
                            enter / leave / panic_leave / fill_rect / blit / shutdown)。Cirrus と同じ「アクセラレータ系」
-  ├─ drivers/wab_tgui.c    チップドライバ: VGA の論理番号 (3C0h 系、wab_glue.h) と拡張レジスタだけを知る
-  └─ drivers/wab_glue_ra266.c (仮)  ボードグルー: PCI の BAR から窓の番地、ポートの翻訳 (§2-3 の結論)、
+  ├─ drivers/video/trident/wab_tgui.c    チップドライバ: VGA の論理番号 (3C0h 系、wab_glue.h) と拡張レジスタだけを知る
+  └─ drivers/video/trident/wab_glue_ra266.c (仮)  ボードグルー: PCI の BAR から窓の番地、ポートの翻訳 (§2-3 の結論)、
                            映像の切り替えと復帰 (§2-4・§3-5 の結論)。struct pci_driver の probe から見つける
 ```
 
@@ -455,7 +455,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 ### 4-2. メモリ・窓 (v3 の資源台帳と私有 lease)
 
 資源・面・lease の正典は [MEMMAP_V3 §0 D33](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) と
-[§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `kernel/ledger_pci.c`。
+[§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `platform/pc98/pci_resources.c`。
 旧共有 PT 昇格案と変更経緯は 設計履歴 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に保存した。
 
 **予約と準備 (Trident 固有部分は未実装)**
@@ -509,7 +509,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 | **1** | `trident -r` (CPL0 診断): **§3-4-1 の許可リストの項目だけ**を読む。全ダンプ・索引の総当たり・BAR への試し書きは**しない**。**許可リストが空なら読み取り 0 件で停止** (0FACh も例外にしない) | 段 0、資料 (許可リストの出典 + Ra266 で届く根拠) | 実機 + ホスト試験 (偽 I/O でリスト外に触らない・索引を戻す・空なら触らない) | 小 |
 | **2** | `trident -t`: 640x480x8 のモード設定 → リニア窓へテスト画 → 映像を切り替え → §3-5 R3 で 98 側へ戻す (時間切れも失敗経路も同じ処理)。液晶の OSD を写真で | **§3-5 R1 が (a) 資料か (b') 段 2-X の記録で確定**、**R2〜R4** (フックの有効化時期と接続点の実装、ホスト試験)、**§4-2 の予約・写像・有効化の順序** (BAR の用途と decode 幅が確定、broker の拡張、T8 の境界での PT 確保)、**モード手順が資料で確定**、R5 をユーザーに伝えた | 実機 (写真、シリアルログ) | 中 (+ カーネル共通の R3/R4・記述子・paging の変種) |
 | **2-X** (探索試験、**ユーザー承認済み 2026-09-29**) | **復帰未確認・リセット前提の探索試験**: R1 の根拠が資料 (a) で得られないときだけ。`trident -t` と同じ経路で Trident 側へ切り替え → R3 で 98 側へ戻す **1 往復**。成功 / 失敗 (リセットした事実) を §9-1 の形で記録し、**成功の記録があって初めて R1 (b') を満たした扱い** → 段 2 へ | **§3-5 の段 2-X 開始条件 1〜6** (R1 以外の前提 + **固定した 1 組の操作と根拠・未確認点** + 全ポートの配送・他装置の確認 (3Cxh 禁止を含む) + 観測に基づく中止条件 + 記録 + 直前の告知) | 実機 (切替後のテスト画と復帰後の CUI の**写真**、シリアルログ、経過時間、リセットの有無・方法・復旧) | 段 2 と共通 |
-| **3** | `gfx/backend_trident.c` (8bpp、CPU で present)。**`GFX=trident` 強制時だけ**。gshell の往復、CTRL+STOP、所有者の異常終了、カーネル停止時の戻し、`ring3_guard trident` | 段 2、予約・写像・例外復帰 (§3-5 R4 の (1)〜(4)、両ハンドラ) の接続、**カーネル致命的例外の誘発手段の確定** (§9 P2-d、Codex D6)、T7 | 実機 + NP21/W 回帰 (probe が落ちて **PC98** へ譲るだけ) | 中〜大 |
+| **3** | `drivers/video/trident/backend_trident.c` (8bpp、CPU で present)。**`GFX=trident` 強制時だけ**。gshell の往復、CTRL+STOP、所有者の異常終了、カーネル停止時の戻し、`ring3_guard trident` | 段 2、予約・写像・例外復帰 (§3-5 R4 の (1)〜(4)、両ハンドラ) の接続、**カーネル致命的例外の誘発手段の確定** (§9 P2-d、Codex D6)、T7 | 実機 + NP21/W 回帰 (probe が落ちて **PC98** へ譲るだけ) | 中〜大 |
 | **4** | 解像度 (800x600 / 1024x768、8bpp のまま) と GUI の G5 の確認 | 段 3、**モニタの対応 (型番・OSD)、pitch、VRAM 容量の実測、ページ単位の面隔離** (§4-3)。T6 (16bpp) は前提ではない | 実機。強制指定の失敗は **PC98** へ落ちることを期待結果にする | 中 |
 | **5** | エンジンで present (表示面 ← クライアント面) と HW_FILL / HW_BLT。**最後に置く** | 段 3、エンジンの資料、§4-5 の規則上の判断 | 実機、`gfx_stats`。受け入れに**エンジン待ちの時間切れ・CPU 描画との同期 (PCD、BLT 前の書き終わり)・失敗後の退避 (CPU present へ戻す)** を含める | 中 |
 

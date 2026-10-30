@@ -91,5 +91,5 @@ MUTATION 9 RED (1 件): dma_pool_init より前に配る (写像が張られて�
 
 ここは表の算数だけ。**写像** (0x2E8000〜0x2F7FFF が present / RW /
 supervisor で、上下が NP、USER が立っていないこと) は `mm/paging.c` が
-張り、`kernel/kselftest.c` の MM 検査が起動ごとに見る (`MM_RWU` を
+張り、`kdebug/kselftest.c` の MM 検査が起動ごとに見る (`MM_RWU` を
 `MM_RW` と分けたのはそのため)。プールを実際に DMA に渡した結果は W2 / L-B。

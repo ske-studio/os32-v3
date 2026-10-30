@@ -262,7 +262,7 @@ static void pc98_read_date(ClockDate *d) {
 
 ## A1 の実装で埋めたこと (2026-10-26、PM が F1 の規則を当てはめた)
 
-- `kernel/v86/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "../drivers/input/kbd.h" を明示して読む」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/input/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。
+- `kernel/v86/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "kbd.h" を実装位置からの相対パスで明示して読む (kernel/v86/・kernel/ime/ からは "../../drivers/input/kbd.h"、kdebug/ からは "../drivers/input/kbd.h")」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/input/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。
 
 ## D2 の取り込みで D3 へ送る項目 (2026-10-26、astra のレビュー P3 2 件)
 

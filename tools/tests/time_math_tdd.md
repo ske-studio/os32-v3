@@ -28,7 +28,7 @@ IRR bit0 (= IRQ0 が立っているか) で挟んで読む。
 
 - **三分岐を実 PIT で撃ち分けられない** (往復 8 の中継 1)。呼び出しから
   p1 読みまでに境界を越える機械があり、位相を待っても 0/0 と 0/1 を作り
-  分けられない。`kernel/kselftest.c` は**入力列 {p1, p2, count} を注入**し、
+  分けられない。`kdebug/kselftest.c` は**入力列 {p1, p2, count} を注入**し、
   `time_branch_hits[]` で踏んだ分岐を数える。実 PIT 側は「残り 1〜2 count を
   観測してから読む」を期限 100 tick で試し、**踏めた分岐を記録して、踏めな
   かったものは未検証と報告する** (失敗にしない)。
@@ -110,7 +110,7 @@ MUTATION 8 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数
 
 ## ここでは見られないもの (W4 = kselftest / NP21/W / 実機)
 
-- 実 PIT のラッチと IRR の実読み (`kernel/kselftest.c` の `test_time_now`)
+- 実 PIT のラッチと IRR の実読み (`kdebug/kselftest.c` の `test_time_now`)
 - 1 万回連続読みの逆行 0、`cpu_delay_us(1000)` を挟んだ実測、
   `ktime_clamp_count` の実数 (NP21/W と実機でどれだけすり抜けるか)
 - **CPL=3 のポインタ契約** — `ring3_in_syscall` が 0 のあいだ検証は素通しなので、

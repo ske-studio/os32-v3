@@ -132,7 +132,7 @@ MUTATION 6 RED (3 件): 素通し判定から青を落とす (0x21 が緑に化�
 
 ## 5. カーネル側 (kselftest)
 
-`kprintf` の原始命令に触ったので `kernel/kselftest.c` に `test_kprintf_attr()`
+`kprintf` の原始命令に触ったので `kdebug/kselftest.c` に `test_kprintf_attr()`
 を足した (CLAUDE.md の規則)。上の 10 個の期待値をそのまま `check()` する。
 `kprintf` は KAPI 公開関数でもあるので、ここが壊れるとカーネルもアプリも
 同時に黙る — ブート時に毎回踏む。

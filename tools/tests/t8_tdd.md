@@ -3,7 +3,7 @@
 票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §2 の D1 / D1a / D3
 実装: `exec/appslot.c` + `exec/appslot.h` (所有者の表と判定) / `exec/exec.c` (`hdr_flags` の控え・
 `--cpl0` の GUI 拒否・回収の並び) / `gfx/gfx_core.c` + `gfx/gfx.h` (KAPI の門) /
-`kernel/kselftest.c` / `sdk/kapi.json` (v48)
+`kdebug/kselftest.c` / `sdk/kapi.json` (v48)
 試験: `tools/tests/multiapp_impl_host.c` のケース 20 (`python3 -B tools/tests/test_multiapp_impl.py`)
 
 ## 様式
@@ -101,7 +101,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 ## kselftest (ブート時、実機)
 
-`kernel/kselftest.c` の `test_gfx_owner()` が `appslot_gfx_owner_selftest()` を呼び、2 項を見る:
+`kdebug/kselftest.c` の `test_gfx_owner()` が `appslot_gfx_owner_selftest()` を呼び、2 項を見る:
 
 - `gfx owner moves on claim, returns on exit` — CUI 中は動かず、GUI 中に宣言付きで呼べば移り、
   他人の回収では戻らず、本人の回収で WM へ戻る
@@ -131,7 +131,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 (`--cui-only`) / `build/programs.mk` + `build/app.conf` (4 列目 `gfx`|`cui`) /
 `tools/check_manifests.py` §2b / `exec/appslot.c` + `exec/appslot.h` (`appslot_cui_only_admit`、
 拒否で `abort_req`) / `exec/exec.c` (`exec_launch` の砦) / `gfx/gfx_core.c` (門の文言) /
-`kernel/v86/v86.c` (`v86_gui_refuse`) / `kernel/kselftest.c`
+`kernel/v86/v86.c` (`v86_gui_refuse`) / `kdebug/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 21 (`python3 -B tools/tests/test_multiapp_impl.py`)
 
 ## なぜ 2 つ足したのか
@@ -218,7 +218,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 実装: `exec/appslot.c` + `exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
 `appslot_park_poll_check/commit`、`appslot_poll_yield_reset`、カウンタ `ring3_poll_yield_count`) /
 `exec/exec.c` + `exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /
-`drivers/input/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `kernel/kselftest.c`
+`drivers/input/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `kdebug/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 22 (`python3 -B tools/tests/test_multiapp_impl.py`)
 **KAPI は 1 本も増やしていない** (v48 のまま。`kbd_trygetchar` / `kbd_trygetkey` の中身だけが変わる)。
 
@@ -321,7 +321,7 @@ $ i386-elf-gcc -std=gnu89 -m32 -march=i386 -ffreestanding ... -O2 -Wall -Wextra 
 
 ## kselftest (ブート時、実機)
 
-`appslot_resume_mark_selftest()` に 2 項追加 (`kernel/kselftest.c` の `test_resume_mark`):
+`appslot_resume_mark_selftest()` に 2 項追加 (`kdebug/kselftest.c` の `test_resume_mark`):
 
 - `resume needs the poll mark (WAIT_POLL)` — ビット 6。`WAIT_POLL` を `parked_from_wait` /
   `parked_from_kbd` の印では起こせず `OS32_ERR_STALE` + `bad_frame_count`、

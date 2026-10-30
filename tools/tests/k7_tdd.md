@@ -2,7 +2,7 @@
 
 票: `docs/archive/gui_v13/TASK_K7_input.md` §1 D1〜D7 / §5 (R1 / R2 / B / C / D)
 実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/input/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
-`exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐) / `kernel/kselftest.c` / `sdk/kapi.json` (v47)
+`exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐) / `kdebug/kselftest.c` / `sdk/kapi.json` (v47)
 試験: `tools/tests/kbd_inject_host.c` + `test_kbd_inject.py` (`make check-kbd-inject-host`) と
 `tools/tests/multiapp_impl_host.c` のケース 19 (`make check-multiapp-model-host`)
 

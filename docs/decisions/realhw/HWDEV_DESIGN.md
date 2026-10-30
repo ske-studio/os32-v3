@@ -119,7 +119,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 | 新規/変更 | 対象 | おおよその行数 (手書き差分) |
 |---|---|---:|
 | 新規 | `include/hwdev_private.h`、`kdebug/hwdev_core.c` | 100〜160、220〜320 |
-| 新規 | `kernel/module/hwdev_module.c`、`kernel/hwdev_owner.h`・拒否判定 | 130〜200、構造体と拒否のみ (registry 本体は BM 設計へ) |
+| 新規 | `kernel/module/hwdev_module.c`、`hwdev/owner.h`・拒否判定 | 130〜200、構造体と拒否のみ (registry 本体は BM 設計へ) |
 | 新規 | `hwdev/gf6200/module.c`、import 定義・linker・`build/hwdev.mk` | 100〜160、100〜150 |
 | リンク先変更 | `kdebug/recover_gf.c` と `gfinit*.c/.h` は現位置を維持 | C 計 3,926 行 + ヘッダのソース変更なし、build/hwdev.mk で GF オブジェクトを HWDEV へ振分け、核から除外 |
 | 変更 | `kdebug/kdebug_main.c`、`recover.c`、`recover_profile.c`、`build/kdebug.mk` | 計 100〜180、S0 モデルは残し main の直接 GF 参照を wrapper 接続へ変更 |

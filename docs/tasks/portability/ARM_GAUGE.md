@@ -73,7 +73,7 @@
 | `lib/zlib/` `lib/microtar/` `lib/lz4.c` | vendored だが**カーネルにはリンクされない** (ユーザーランド用。`build/libs.mk` / `build/programs.mk` が `PROGRAM_FLAGS` で別に組む)。カーネルの移植度の数字に混ぜる意味がない |
 
 対象集合が `C_KERNEL` から導かれる以上この一覧は説明でしかないが、
-`kernel/ drivers/ fs/ exec/ kapi/ lib/ net/ gfx/` を glob して**未知の** `*.c` が
+`tools/source_roots.py` の `SCAN_ROOTS['arm_compile']` (init/・mm/・arch/x86/kernel/ を含む) を glob して**未知の** `*.c` が
 出てきたときは DRIFT として警告する (カーネルに足したなら `C_KERNEL` へ、
 そうでないなら `KNOWN_NON_KERNEL` へ理由つきで)。
 

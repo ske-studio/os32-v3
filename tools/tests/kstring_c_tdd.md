@@ -45,7 +45,7 @@ libc は使わない (`-nostdlib`、Linux の `int 0x80` で write/exit する�
 
 突き合わせる入力: 空 / 1 バイト / 4・8・16 の前後 / **0x80 以上のバイトを含む列
 (日本語の UTF-8)** / `n` が長さより長い・短い・0 / **重なりコピー (前方・後方)** /
-`kstrncpy` の埋め。`kernel/kselftest.c` の `test_str` の既存ケースも両版で通す。
+`kstrncpy` の埋め。`kdebug/kselftest.c` の `test_str` の既存ケースも両版で通す。
 
 ### 重なりコピーまで一致させる理由
 
@@ -91,5 +91,5 @@ MUTATE alias_separate_body    RED (期待どおり落ちた)
 - **x86 の既定ビルドを切り替えてはいない。** `lib/kstring_c.c` が
   `C_KERNEL` に加わって ARM 計測の母数が 92 → 93 になったことは
   [`ARM_GAUGE.md`](../../docs/tasks/portability/ARM_GAUGE.md) §9 の側の記録。
-- 起動時自己試験 (`kernel/kselftest.c` の `test_str`) の代替にはならない。
+- 起動時自己試験 (`kdebug/kselftest.c` の `test_str`) の代替にはならない。
   あちらは**実機で毎起動**、出荷するアセンブリ版を踏む。

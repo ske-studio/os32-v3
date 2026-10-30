@@ -92,7 +92,7 @@ MUTATION 5 RED (2 件): 断ったのに valid を立てる (呼び出し側が�
 
 ホスト試験は算数だけを見る。**判定 (`0000:0501h` bit7 の実読み) と、それが
 `pit_init` より前に走る順序**は実機/エミュレータでしか踏めないので、
-`kernel/kselftest.c` の `test_pit_setup()` が起動ごとに見る
+`kdebug/kselftest.c` の `test_pit_setup()` が起動ごとに見る
 (`pit_get_setup()->valid` / `reload == sysclk_hz() / PIT_HZ` / `period_us == 10000`
 / `mode == PIT_MODE_TIMER0` / `sysclk_detected()`)。
 実時間そのものの照合は、実機で `tick_count` を 60 秒ぶん読んでホストの単調時計と

@@ -755,10 +755,10 @@ CD の MINIMAL とずれていた)。違いは `build/packages.yaml` の `fd:` �
 
 短い名前へ落ちるのは LFN の無い FS (FAT) の上だけ — HDD で正規名が欠けたり壊れたりしても、
 FD ルートの上に HDD の ext2 を載せても、残っている短い名前を黙って掴まない (ホスト試験:
-`test_packages.py` case 8、`test_sh_truncation.py` 25n〜25q)。既定フォントの 8.3 名
-`/sys/font/default.kcg` (`kernel/boot_font.c`、そのパスを載せているマウントが FAT のときだけ
-読む) も同じ作りで残してあるが、2026-09-25 にフォントを NORMAL へ移したので**今の FD には
-載っていない** (FD に手で置けば読む)。**install.bin (FD → HDD) は
+`test_packages.py` case 8、`test_sh_truncation.py` 25n〜25q)。旧フォントの 8.3 名
+`/sys/font/default.kcg` を読む旧フォントローダ (`kernel/boot_font.c`) は b37783b2 (T7a-1b) で撤去済み。
+今のフォントは KCG の部品 (`kcg.mod`、窓口は `drivers/video/kcg/kcg_module.c`) から取る。
+FD に旧フォントを手で置いても読まない。**install.bin (FD → HDD) は
 この表を逆に当てて正規名で写し**、ブート領域へ書く物と FD だけの物は写さない
 (`userland/system/install.c` の `fd_renames` / `fd_only`。case 9 が packages.yaml と
 突き合わせ、実物の install.c を回して HDD の集合 = MINIMAL − `fd.exclude` を見る)。

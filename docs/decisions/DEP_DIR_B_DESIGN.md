@@ -221,7 +221,7 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 |check-time-math-host.yaml|kernel/time/pit.c、include/platform_timer.h、include/platform_irq.h、platform/pc98/{clock,timer,pic}.c|
 |check-irq-math-host.yaml|include/platform_irq.h、platform/pc98/pic.c|
 |check-v86-low-host.yaml|include/platform_timer.h、platform/pc98/clock.c|
-|check-dep-dir-b-host.yaml（新設）|kernel/{sys,idt,irq,pit,sysclk,ktime}.c、kernel/platform_{sys,irq,timer}.h、platform/pc98/{system,pic,clock,timer}.c、使用する既存ヘッダ・shim・runner・固定fixture・自身のYAML・mk|
+|check-dep-dir-b-host.yaml（新設）|kernel/sys.c、arch/x86/kernel/idt.c、kernel/irq/irq.c、kernel/time/{pit,sysclk,ktime}.c、include/platform_{sys,irq,timer}.h、platform/pc98/{system,pic,clock,timer}.c、使用する既存ヘッダ・shim・runner・固定fixture・自身のYAML・mk|
 
 - `build/kernel.mk` は broad として全関連試験を選択させる。各試験の runner/host と新規入力を lint で検査する。
 - kernel/time/pit_math.*、boot.c、tick.c、ASM、sdk/kapi.json、生成 KAPI、kdebug_imports.def は変更不要。
@@ -257,7 +257,7 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 - sysclk getter を使うserial/CPU校正、pit_get_setupの診断も値・寿命不変。host runner のソース一覧、変異先パス、tools/check_map.d/*.yaml の選択規則を移動と同じ段で更新する。
 - B1/B2: serial-portc は system.c の実体を切り出し、BSR_BUZ_OFF→BSR_BUZ_ON の変異もそこへ移す。fdc-track は pic.c から pic_eoi を切り出す。旧ファイルの転送関数を切り出して合格にしない。
 - B3: v86-low は sysclk.c と clock.c を組み、test_v86_low.py の paths に clock.c を追加する。`clock boot original` CHECK は残し、原本低位メモリの bit7 を読むことを引き続き検証する。
-- B5: 新試験の通常・変異用コピー双方から kernel/platform_{sys,irq,timer}.h と必要な platform/pc98/*.c が参照・リンクできることを完了条件とする。コピー対象と include パスを更新し、依存欠落によるコンパイル/リンク失敗を変異検出に数えない。
+- B5: 新試験の通常・変異用コピー双方から include/platform_{sys,irq,timer}.h と必要な platform/pc98/*.c が参照・リンクできることを完了条件とする。コピー対象と include パスを更新し、依存欠落によるコンパイル/リンク失敗を変異検出に数えない。
 - B8: `grep -rln 'kernel/sys.c' tools/tests/` の全件に対応する試験を MUTATE=0 で実行する。test_pgalloc_model.py・test_memory_boot.py・test_device_reservation.py を含め、転送先のリンクまたは目的に即した stub を整備し既存の検査を維持する。
 
 |段（Codex実装＋関連host、各2時間以内）|完了点／並列可否|
