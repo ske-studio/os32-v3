@@ -420,8 +420,110 @@ static void bar_tests(void)
     writer(0,5,TK,REC_WRITE,0); bar_cache(); CHECK(bind_synthetic()==0);
     CHECK(trial_begin(&r,&profile,shash,100)<0 && writes()==0);
 }
+static int idle_identity(void *opaque, struct recover_identity *out)
+{
+    struct fake *bus = opaque;
+    note(bus, 'I', 0, 0);
+    return bus->ready ? identity(opaque, out) : -1;
+}
+static int idle_read_bus(void *opaque, const struct recover_bus_access *a, u32 *value)
+{
+    return read_bus(opaque, a, value) ? -23 : 0;
+}
+static int idle_log_begin(void *opaque)
+{
+    note(opaque, 'L', 0, 0);
+    return -1;
+}
+static void idle_read_tests(void)
+{
+    enum {
+        IO_OK, CFG_OK, BAR_OK, BAR_END_OK, BLOCKED, DISABLED, NO_VALUE,
+        HAS_NODE, WRITE, BAD_STATE, UNBOUND, BAD_TARGET, UNSAFE, INDEXED,
+        BAD_WIDTH, BAD_ADDRESS, NO_EXTENT, PAST_EXTENT, ID_FAIL, ID_CHANGED,
+        RAW_FAIL, MEM_OFF, BAR0_CHANGED, BAR1_CHANGED, BAR2_CHANGED, BUS_FAIL,
+        IDLE_CASES
+    };
+    static u8 before[sizeof(r)];
+    for (u32 verified = 0; verified < 2; verified++) for (u32 c = 0; c < IDLE_CASES; c++) {
+        synthetic(1); bar_cache(); CHECK(bind_synthetic() == 0);
+        struct recover_ops idle_ops = ops;
+        idle_ops.identity = idle_identity; idle_ops.read = idle_read_bus;
+        struct recover_transport transport = {.opaque = &f, .begin = idle_log_begin};
+        r.ops = &idle_ops; r.transport = &transport;
+        r.state = verified ? REC_VERIFIED : REC_IDLE;
+        /* Keep nonzero plan/snapshot sentinels: an idle read must not advance
+         * a node, capture a value, discard saves, log, or start cleanup. */
+        r.cursor = 0; r.entered = true; r.accessed = verified; r.valid = true;
+        r.capture_valid = 1; r.capture_values[0] = 0x1234;
+        r.saved_count = r.local_saved_count = 1; r.saved[0] = 0x56;
+        r.local_saved[0] = (struct recover_local_saved){TK, REC_READ, 0x78};
+        valid_bits[0] = 0x55; flow[0] = 0xaa;
+        targets[TK] = (struct recover_target){.space = REC_BAR_MMIO,
+            .offset = 0x100, .index = RECOVER_NONE, .width = 4,
+            .access = REC_RW, .read_safe = 1};
+        u32 node = RECOVER_NONE, dir = REC_READ, key = TK, width = 4;
+        u32 value = 0xfeed, *out = &value;
+        int expected_rc = -1;
+        const char *trace = "";
+        switch (c) {
+        case IO_OK:
+            targets[TK].space = REC_PC98_IO; targets[TK].width = width = 1;
+            f.ready = false; f.raw_fail = true; f.command = 0;
+            r.cache = (struct recover_bar_measurement){0};
+            expected_rc = 0; trace = "r"; break;
+        case CFG_OK:
+            targets[TK].space = REC_PCI_CFG; targets[TK].offset = 0x40;
+            targets[TK].width = width = 2;
+            expected_rc = 0; trace = "r"; break;
+        case BAR_OK: expected_rc = 0; trace = "Icr"; break;
+        case BAR_END_OK:
+            targets[TK].offset = 0xfffffc;
+            expected_rc = 0; trace = "Icr"; break;
+        case BLOCKED: r.access_blocked = true; break;
+        case DISABLED: r.enabled = false; break;
+        case NO_VALUE: out = 0; break;
+        case HAS_NODE: node = 0; break;
+        case WRITE: dir = REC_WRITE; break;
+        case BAD_STATE: r.state = REC_FAILED; break;
+        case UNBOUND: r.bound_profile = 0; break;
+        case BAD_TARGET: key = NREG; break;
+        case UNSAFE: targets[TK].read_safe = 0; break;
+        case INDEXED:
+            targets[TK] = (struct recover_target){.space = REC_VGA_INDEXED,
+                .port = RECOVER_SEQ, .index = 1, .width = 1, .access = REC_RW, .read_safe = 1};
+            width = 1; break;
+        case BAD_WIDTH: width = 2; break;
+        case BAD_ADDRESS: targets[TK].offset = 0x101; break;
+        case NO_EXTENT: r.cache.bar[0].valid = 0; break;
+        case PAST_EXTENT: targets[TK].offset = 0x1000000; break;
+        case ID_FAIL: f.ready = false; trace = "I"; break;
+        case ID_CHANGED: f.id.device++; trace = "I"; break;
+        case RAW_FAIL: f.raw_fail = true; trace = "Ic"; break;
+        case MEM_OFF: f.command = 0; trace = "Ic"; break;
+        case BAR0_CHANGED: f.bar += 0x1000; trace = "Ic"; break;
+        case BAR1_CHANGED: f.extra_bars[0] = 0x20000000; trace = "Ic"; break;
+        case BAR2_CHANGED: f.extra_bars[1] = 0x30000000; trace = "Ic"; break;
+        case BUS_FAIL: f.fail_read = TK; expected_rc = -23; trace = "Icr"; break;
+        }
+        for (u32 i = 0; i < sizeof(r); i++) before[i] = ((const u8 *)&r)[i];
+        CHECK(recover_access(&r, node, dir, key, width, out) == expected_rc);
+        CHECK(value == (expected_rc == 0 ? INITIAL : 0xfeed));
+        u32 n = 0;
+        while (trace[n]) { CHECK(n < f.n && f.trace[n].op == trace[n]); n++; }
+        CHECK(f.n == n && writes() == 0 && f.local_calls == 0);
+        if (expected_rc == 0 || c == BUS_FAIL) {
+            CHECK(count('r', TK) == 1 && f.last_dir == REC_READ);
+            CHECK(f.last_offset == targets[TK].offset);
+        }
+        bool unchanged = true;
+        for (u32 i = 0; i < sizeof(r); i++)
+            if (before[i] != ((const u8 *)&r)[i]) unchanged = false;
+        CHECK(unchanged && valid_bits[0] == 0x55 && flow[0] == 0xaa);
+    }
+}
 static void descriptor_tests(void)
 {
     address_tests(); bind_tests(); values_tests(); value_static_tests(); dependency_tests(); indexed_tests(); indexed_expr_tests(); local_saved_tests();
-    guards_tests(); crc_tests(); bar_tests(); cache_tests();
+    guards_tests(); crc_tests(); bar_tests(); cache_tests(); idle_read_tests();
 }
