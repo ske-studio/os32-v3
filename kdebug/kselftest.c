@@ -38,7 +38,7 @@
 #include "tvram.h"
 #include "console.h"
 #include "kbd_inject.h"
-#include "../drivers/input/kbd.h"          /* kbd_diag / KBD_CMD_* (POLICY_DEBUG §4-57) */
+#include "../drivers/input/kbd.h"          /* kbd_diag / KBD_CMD_* (docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) */
 #include "appslot.h"
 #include "launch.h"
 #include "exec.h"

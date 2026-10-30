@@ -9,7 +9,7 @@
  *  fs_is_dir() は stat と列挙の**両方**が失敗すると 0 を返す。cmd_file.c の
  *  呼び出し元 5 箇所 (cp の宛先 / cp の入力 / mv の FS またぎ / mv の宛先 /
  *  rm) はその 0 を「ファイル」と読み、ファイルの枝へ進んでいた。
- *  B8 の原則 (POLICY_DEBUG §4-35): 「読めなかった」を「無い / その型ではない」
+ *  B8 の原則 (docs/design/fs/ext2/ext2_super.md#落とし穴): 「読めなかった」を「無い / その型ではない」
  *  と読み替えない。判定関数の戻り値ではなく、**受け手が断るか**を見る。
  *
  *  userland/shell/cmd_fs_shared.c と cmd_file.c を 1 行も写さずそのまま

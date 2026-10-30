@@ -75,5 +75,5 @@ TARGET i386-elf -Werror COMPILE PASS (userland/shell/cmd_file.c)
 
 - **実機の `cp` の振る舞いは見ていない。** 贋 FS はオンメモリで、実物の VFS も
   ext2 も通らない。VFS 側の種別判定は [`vfs_kind_tdd.md`](vfs_kind_tdd.md) が別に見る。
-- `sys_ls` のコールバックから FS を触る危険 (POLICY_DEBUG §4-26) は対象外。
-- 日本語ファイル名の桁幅・切り詰め (POLICY_DEBUG §4-27) は対象外。
+- `sys_ls` のコールバックから FS を触る危険 ([ext2_dir「落とし穴」](../../docs/design/fs/ext2/ext2_dir.md#落とし穴)) は対象外。
+- 日本語ファイル名の桁幅・切り詰め ([utf8「落とし穴」](../../docs/design/lib/utf8.md#落とし穴)) は対象外。

@@ -423,7 +423,7 @@ P2 は「shlib ローダの流用」ではなく、**形式検査・表生成の
 | ストリーミング読み出し層 (**実装項目**) | **旧サブセット試作の見積**: 表 `cmap` `loca` `hmtx` `head` `hhea` `maxp` ≈ 100KB。原本にこの全表常駐見積を適用しない。`glyf` は字形ごとに `sys_lseek` + `read` (loca から offset/length)。ttf-parser には**字形 1 つ分のスライス**を `glyf` として渡す薄い層を書く (ttf-parser の `Face` 全体を使わず `glyf::Table` 相当を自前で組む、推測: 数百行)。作業域の上限は T7詳細 §2-2・§3 (票 TASK_T7_AND_FOLLOWUPS) のa1③で字形corpusの最大値を実測して決め、a3〜a5は実測最大以上、超過は代替字形とする |
 | ラスタライザとキャッシュの所有者 | **v3 の最初は私有**: libos32gui (shlib、text 共有) にラスタライザを置き、**キャッシュはアプリの shlib data / ヒープに私有** (私有総量の内側、16px 1bpp 2,048 字 × 40B = 80KB)。**gshell は libos32gfx を静的リンクしている** (`gshell/Cargo.toml:12`) ので、WM も同じ Rust クレートを静的に持ち、**シェル帯の内側に**私有で持つ (表100KB+キャッシュ80KBは旧サブセット見積。原本の予算は T7詳細 §2 (票 TASK_T7_AND_FOLLOWUPS) の読込方式とT3固定分割で再検証、U15)。CPL=3 の shlib から supervisor の共有キャッシュには書けないので、**共有キャッシュ (gshell 所有、RO lease、欠けた字形は GUI op で WM に頼む) は後の最適化** (U21) |
 | 予算 | 8MB: 16px 1bpp 64〜80KB/プロセス。16MB 以上: 256KB (2 サイズ or 2bpp) |
-| 判定 | 1x の見た目 (罠 POLICY_DEBUG §4-10)、ラスタ時間 (U4: P100 で 1 字 0.2〜1ms、386 は 10 倍以上 — 推測)。cold の 1 画面 1,000 字 = 0.2〜1 秒 |
+| 判定 | 1x の見た目 (罠 [gen_font16「落とし穴」](../design/tools/gen_font16.md#落とし穴))、ラスタ時間 (U4: P100 で 1 字 0.2〜1ms、386 は 10 倍以上 — 推測)。cold の 1 画面 1,000 字 = 0.2〜1 秒 |
 | `.kcgfont` | **廃止** (D14)。`gen_font16.py` / `boot_font.c` / `kcg_load_font` KAPI (スロットは残し NOSYS) は消える |
 | **KCG ROM fallback (予備、D14 で決定)** | **残す (モジュール 4KB)** — フォントファイルが読めない構成 (FD 起動・`/sys` 破損) でも GUI の文字が出る唯一の手段で、コストは 4KB と JIS 表 (どのみち残る) と読み出しキャッシュ 64KB (§4-3 に計上) |
 

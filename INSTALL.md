@@ -88,7 +88,7 @@ make deploy-kernel
 ```
 
 > ⚠️ NP21/W 実行中は NHD への書き戻しが反映されません。デプロイ前に NP21/W を
-> 終了してください (詳細: [docs/POLICY_DEBUG.md §4-8](docs/POLICY_DEBUG.md))。
+> 終了してください (詳細: [POLICY_DEBUG §4-8](docs/POLICY_DEBUG.md#4-8-nhd-の配備とロック))。
 
 HostDrv (`C:\os32`) 経由の高速デプロイ (再起動不要) は `make deploy` を使用します。
 

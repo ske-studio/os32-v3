@@ -489,7 +489,7 @@ irq_stub_1:
         ;; ゲスト用 FIFO に積まれ、OS32 のリングバッファには入らない。
         ;; 戻り値 (eax) = 反射してよいか。0041h から実データを読んだときだけ
         ;; 非 0 — 空 IRQ (RxRDY=0) やエラー (PE/FE) で反射すると、ゲストが
-        ;; 空の仮想 FIFO から偽の打鍵を読む (POLICY_DEBUG §4-57)。
+        ;; 空の仮想 FIFO から偽の打鍵を読む (docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。
         ;; ebx に移すのは EOI の `out` が al を使うから。ebx は pushad が
         ;; 退避済みで、V86_REFLECT が呼ぶ C (v86_reflect_irq) も保存する。
         call    kbd_irq_handler

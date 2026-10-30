@@ -43,20 +43,20 @@
 | `kselftest_report.c` (項目の本体は `kdebug/kselftest.c`) | ブート時セルフテスト (kstring / kmalloc / kprintf)。プリミティブを触ったら項目を足す | [POLICY_DEBUG §2](POLICY_DEBUG.md) |
 | `irq/irq.c` `irq/irq_math.c` | 割り込みの動的登録 (`irq_register`、共有 IRQ、storm の検出) — v2.1 | 票 TASK_HAL_WIRING §1-1 |
 | `time/ktime.c` `time/time_math.c` | µs 時計 (`ktime_*`、2.4576MHz 系のクランプ) — v2.1 | 票 TASK_HAL_WIRING §1-5 |
-| `time/sysclk.c` `time/pit_math.c` `time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md) |
+| `time/sysclk.c` `time/pit_math.c` `time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間) |
 | `module/module.c` / `module/module_image.c` / `module/module_runtime.c` | 部品の検証・固定 record・load/start/abort と隔離の核、および `/boot/kdebug.bin` の接続 (KDEBUG=1 のときだけ、root マウント後)。部品の中身は `kdebug/` | 票 TASK_T4_T6_MODULES §2-2、[08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1) (形式・kdebug の口) |
-| `console/console.c` | TVRAM 出力、スクロール予約 (`tvram_set_scroll_reserve`)、GDC カーソル | [05 §5-9](05_drivers.md) 周辺、[POLICY_DEBUG §4-18](POLICY_DEBUG.md) |
+| `console/console.c` | TVRAM 出力、スクロール予約 (`tvram_set_scroll_reserve`)、GDC カーソル | [05 §5-9](05_drivers.md) 周辺、[console「落とし穴」](design/kernel/console/console.md#落とし穴) |
 | `console/con_sink.c` | console シンク — GUI モード中のカーネル出力を 8KB のリングに溜め、端末アプリが `con_sink_read` (KAPI v46) で吸う | [KAPI_SPEC v46 節](KAPI_SPEC.md)、`docs/archive/gui_v13/TASK_K6C_console.md` |
 | `ime/ime.c` `ime/ime_romkana.c` `ime/ime_dict.c` `ime/ime_render*.c` | FEP。描画は関数表 (`ime_render.h`) 越し。GUI は `ime_feed_key` / `ime_set_render` (KAPI v42) で WM が FEP を持つ | 票 `tasks/fep/00_INDEX.md`、archive/gui_v11/TASK_W2 (アーカイブ: `docs/archive/gui_v11/TASK_W2_fep_lease_modal.md`) |
 | `v86/v86*.c` | V86 モニタ、仮想 PIC、キー所有権、脱出キー | archive/v21/v86v2/ (アーカイブ: `docs/archive/v21/v86v2/README.md`) |
-| `v86/v86_gcap.c`、`kdebug/` の `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md) |
+| `v86/v86_gcap.c`、`kdebug/` の `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード) |
 
 ### CPU 依存 `arch/x86/kernel/`
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
 | `idt.c` `isr_handlers.c` `isr_stub.asm` | 割り込み、`int 0x80` KAPI トランポリン着地点 | [04](04_interrupts.md)、archive/kernel_v2/M2 (アーカイブ: `docs/archive/kernel_v2/M2_KAPI_TRAMPOLINE.md`) |
-| `ring3_entry.asm` | `int 0x80` の入口 (`int80_stub`: セグメント復元後 `sti`、出口 `cli`)、`kapi_invoke` | [09](09_exec.md)、[POLICY_DEBUG §4-19](POLICY_DEBUG.md) |
+| `ring3_entry.asm` | `int 0x80` の入口 (`int80_stub`: セグメント復元後 `sti`、出口 `cli`)、`kapi_invoke` | [09](09_exec.md)、[ring3_entry「落とし穴」](design/arch/x86/kernel/ring3_entry.md#落とし穴) |
 
 ### 実行と KernelAPI `exec/` `kapi/` `sdk/`
 
@@ -80,16 +80,16 @@
 |---|---|---|
 | `base/dev.c` | デバイス登録簿 (装置の共通層) | [05 §5-2, §5-11](05_drivers.md) |
 | `block/fdc.c` `block/disk.h` `block/loop_dev.c` | FDC、論理ディスク、ループバック | [05 §5-2, §5-11](05_drivers.md) |
-| `block/fdc_track.c` `block/fdc_decide.c` | FD のトラック読みと 8 セクタの LRU / 時間上限の判定 (機構の最悪値から) — v2.1 | archive/realhw_v21/TASK_FDC_REALHW (アーカイブ: `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、[POLICY_DEBUG §4-51](POLICY_DEBUG.md) |
+| `block/fdc_track.c` `block/fdc_decide.c` | FD のトラック読みと 8 セクタの LRU / 時間上限の判定 (機構の最悪値から) — v2.1 | archive/realhw_v21/TASK_FDC_REALHW (アーカイブ: `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、[POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma) |
 | `block/pc98pt.c` `ata/ide_addr.c` | PC-98 の区画表の読み書き (HDD インストール) / ATA のセクタ指定の選択と範囲検査 — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) |
 | `ata/ide.c` `ata/atapi.c` | IDE HDD、ATAPI CD-ROM | [06 §6-3](06_filesystem.md)、[05 §5-6](05_drivers.md) |
 | `dma/dma8237.c` `dma/dma8237_math.c` | 8237 DMA の共通部 (`dma_chan_setup`、auto-init) — v2.1 | 票 TASK_HAL_WIRING §1-2 |
 | `pci/pci.c` `pci/pci_decode.c` `pci/pci_bind.c` `pci/pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | 票 TASK_LAN_82557 (L-A)、票 TASK_HAL_WIRING §1-4 |
 | `input/kbd.c` | PC-98 キーボード、修飾キー、V86 への注入。GUI 中は cooked に積まず raw リング (`kbd_trygetrawkey`、`keycode\|down<<8\|mods<<9`)、CTRL+STOP → `ring3_abort_request` | [05 §5-1](05_drivers.md) |
-| `input/kbd_status.c` `input/kbd_dlog.c` | キーボード 8251 の状態 (`kbdstat`) と make/break の記録 (`kbdstat -w`) — v2.1 | [POLICY_DEBUG §4-57](POLICY_DEBUG.md) |
+| `input/kbd_status.c` `input/kbd_dlog.c` | キーボード 8251 の状態 (`kbdstat`) と make/break の記録 (`kbdstat -w`) — v2.1 | [POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) |
 | `input/mouse*.c` | バスマウス + NP21/W シームレスマウス (座標は移動範囲へ比例配分、480 ライン可) | [05 §5-7](05_drivers.md) |
 | `char/serial.c` | RS-232C (rshell / ai-debug の経路) | [05 §5-4](05_drivers.md) |
-| `char/serial_plan.c` | シリアルの整数分周の計画 (115200 まで、クロック判定つき) — v2.1 | archive/realhw_v21/TASK_SERIAL_VFAST (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`)、[POLICY_DEBUG §4-49](POLICY_DEBUG.md) |
+| `char/serial_plan.c` | シリアルの整数分周の計画 (115200 まで、クロック判定つき) — v2.1 | archive/realhw_v21/TASK_SERIAL_VFAST (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`)、[POLICY_DEBUG §4-49](POLICY_DEBUG.md#4-49-シリアルの実効速度) |
 | `char/np2sysp.c` | NP21/W ハイパーコール | [05 §5-10](05_drivers.md) |
 | `net/ne2000/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | 票 `tasks/network/PLAN.md` |
 | `sound/fm/fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |

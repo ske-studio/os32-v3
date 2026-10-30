@@ -9,7 +9,7 @@
  *  決めていた。K6-RAM 以後、15MB + 高位 RAM の構成 (NP21/W の RAM
  *  17,408KB) では上端 17MB が 15-16MB の穴より上に出るので、穴の中の
  *  バンク窓まで「RAM が届いている」と誤判定し、probe が ID 判定の前に落ちる。
- *  PEGC で直した不具合 (docs/POLICY_DEBUG.md §4-34) と同じ形。
+ *  PEGC で直した不具合 (docs/design/mm/pgalloc.md#落とし穴) と同じ形。
  *
  *  実物の backend_cirrus.c を 1 行も写さずに #include し、周りの関数だけを
  *  贋物にする。pgalloc_range_has_ram は**贋の物理地図** (RAM の span の表)

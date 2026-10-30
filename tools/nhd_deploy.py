@@ -1307,7 +1307,7 @@ def remove_partial(dest_file):
     `cp` は書き込み前に宛先を切り詰めるので、失敗すると**壊れた中身の
     ファイルが残る**。残すとゲストは「存在するが壊れた成果物」を掴み、
     起動しない理由が見えなくなる (2026-09-10 の /boot/vmkernel.lz4 が
-    446,464 B に切り詰められた件、POLICY_DEBUG §4-29)。
+    446,464 B に切り詰められた件、docs/design/tools/nhd_deploy.md#落とし穴)。
     消しておけば NOT FOUND で失敗が見える。消せなくても報告だけして進む
     (失敗は呼び出し側が total_failed で拾う)。
 

@@ -69,7 +69,7 @@ static inline void arch_mmu_enable(void)
  * 「カーネル ESP の記録 → CR3 切替 → セグメント → フレーム積み → 特権降格」を
  * **一続きに** 行う必要があり、途中に割り込みが入ると TSS.ESP0 と実際の CR3 が
  * 食い違う。IF=1 になるのは iret が EFLAGS を積み直した瞬間だけで、カーネル側で
- * sti する窓は無い (docs/POLICY_DEBUG.md §4-19)。1 つの asm 文から出さないこと。 */
+ * sti する窓は無い (docs/design/arch/x86/kernel/ring3_entry.md#落とし穴)。1 つの asm 文から出さないこと。 */
 #define arch_enter_user(root_phys, user_sp, entry)                      \
 do {                                                                    \
     __asm__ volatile(                                                   \

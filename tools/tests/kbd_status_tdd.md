@@ -1,6 +1,6 @@
 # kbd_status — RED → GREEN の記録
 
-票: 実機の打鍵不達 (2026-09-23)、経緯は [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-57
+票: 実機の打鍵不達 (2026-09-23)、経緯は [POLICY_DEBUG §4-57](../../docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)
 対象: `drivers/input/kbd_status.c` (判定・反射の可否) / `drivers/input/kbd.c` (IRQ1 ハンドラ・`kbd_init`・`kbd_diag`) /
 `kernel/v86/v86_kbd.c` (仮想 8251 の空読み) / `arch/x86/kernel/isr_stub.asm` (`irq_stub_1` が反射の可否を見る)
 試験: `tools/tests/test_kbd_status.py` + `tools/tests/kbd_status_host.c`

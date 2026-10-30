@@ -2,7 +2,7 @@
 /*  SERIAL_PORTC_HOST.C — drivers/char/serial.c が 0035h を丸ごと書かないこと    */
 /*                                                                          */
 /*  実機 PC-9821Ra266 で rshell 中にビープが鳴り続けた件 (2026-09-24、      */
-/*  docs/POLICY_DEBUG.md §4-59)。0035h (8255 ポート C) は RS-232C の割り込み */
+/*  docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。0035h (8255 ポート C) は RS-232C の割り込み */
 /*  許可 bit0-2 と同じバイトに BUZ (bit3、0 = 鳴動)・MCHKEN・SHUT1・PSTBM・  */
 /*  SHUT0 が同居する (docs/hw/undocumented/io_syste.md)。serial.c が 0x00 →  */
 /*  0x01 を全体に書くたびに BUZ = 0 になっていた。                           */

@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------ */
 /*  KAPI ime_set_render は常駐側だけ (2026-09-26、代行レビュー P2。           */
-/*  POLICY_DEBUG §4-61)。カーネルは控えた IME_Render 表の関数を以後 CPL=0 で  */
+/*  docs/design/kernel/gui.md#落とし穴)。カーネルは控えた IME_Render 表の関数を以後 CPL=0 で  */
 /*  呼ぶので、アプリ由来 (owner != 1 か ring3_call_from_user 真) の登録は     */
 /*  kernel/gui.c の gui_ime_set_render が黙って断る。ここではディスパッチ中の */
 /*  アプリを装って NULL を渡し (門が壊れていても描画先は TVRAM 版のまま =     */

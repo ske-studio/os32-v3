@@ -51,7 +51,7 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 - **進捗 (2026-09-23、worktree `wt/pit-clock`)**: 実装済み。`kernel/sysclk.{c,h}` / `kernel/pit_math.{c,h}` を新設、
   `pit_init` は `int` を返して `pit_get_setup()` で `struct pit_setup` を公開、`serial_detect_clock()` は廃止して
   シリアルも保存値を見る。ホスト試験 `make check-pit-clock-host` (5 ケース / 変異 5 本すべて RED) と
-  kselftest の `test_pit_setup()` を追加、経緯は `docs/POLICY_DEBUG.md` §4-54。
+  kselftest の `test_pit_setup()` を追加、経緯は [POLICY_DEBUG §4-54](../../POLICY_DEBUG.md#4-54-pit-の実時間)。
   `make kernel` は警告の増加なしで通る。**W0 (実機での tick 実時間の回帰) は PM の検証待ち**。
 
 - **W0 の NP21/W 側 (PM、2026-09-23)**: 着地 (7269639、`make check` 全通過)。`kselftest_fail` = 0 (`test_pit_setup` 込み)、
@@ -503,7 +503,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 | W2 | タイムアウト → abort → 再試行の経路は未観測 (NP21/W では起きない) |
 | W3 | 実 IRQ の**共有 (2 装置)**、slave 側 (9)、V86 中は未 (`/api/pic` は読み取り専用で人工のエッジは作れない) |
 | W4 | 実 PIT の位相待ちは p1=1 の分岐だけ踏めた (0/0 と再試行は未検証)。 **`[selftest] 186/186 passed`** (NP21/W は 187。 |
-| W6 | 残件: 82557 の実 IRQ での**共有** (実機の `lspci`: 0:11.0 8086:1229 **irq 3 pin A**、bar1 io 0x6000、Command 0x0147 = IO/MEM/BM 有効 → 動的 IRQ 3 で `irq_register` できる番号。TASK_LAN_82557 §6)、W7 キャッシュ整合、NE2000 の ISR 内 reset (L-C)、既存出力 KAPI の RO 穴 (TASK_KAPI_OUTPUT_GUARD)、**io_wait() 連打で FD 読みが古くなる (POLICY_DEBUG §4-55、原因未特定)**、p1=1 で 1 周期先に出る値の扱い (クランプで単調だが 10ms 止まる。判定に count を併用する案) |
+| W6 | 残件: 82557 の実 IRQ での**共有** (実機の `lspci`: 0:11.0 8086:1229 **irq 3 pin A**、bar1 io 0x6000、Command 0x0147 = IO/MEM/BM 有効 → 動的 IRQ 3 で `irq_register` できる番号。TASK_LAN_82557 §6)、W7 キャッシュ整合、NE2000 の ISR 内 reset (L-C)、既存出力 KAPI の RO 穴 (TASK_KAPI_OUTPUT_GUARD)、**io_wait() 連打で FD 読みが古くなる ([POLICY_DEBUG §4-55](../../POLICY_DEBUG.md#4-55-io_wait-連打後の-fd-読取)、原因未特定)**、p1=1 で 1 周期先に出る値の扱い (クランプで単調だが 10ms 止まる。判定に count を併用する案) |
 | W7 | 未 (実機。FDC の書き→読み戻しは W2 で NP21/W のみ) |
 
 ## 4. しないこと

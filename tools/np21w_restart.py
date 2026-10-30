@@ -10,7 +10,7 @@ fdd1_pathが指定されればFDD1FILEを更新。
 
 **非推奨 (2026-09-25)**: 停止・起動は tools/np21w_ctl.py を使う。こちらは
 停止後にプロセスの消滅も媒体のロック解除も待たずに起動するので、起動が
-途中で止まることがある (docs/POLICY_DEBUG.md §4-60)。また FD を渡すと ini の
+途中で止まることがある (.claude/skills/run-os32/SKILL.md#配備)。また FD を渡すと ini の
 FDD1FILE を書き換える ([D2] の承認対象)。np21w_ctl.py は FD を引数で渡し、
 ini は書き換えない。
 """

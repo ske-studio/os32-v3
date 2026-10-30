@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  読むのは起動時の 1 回だけ (kernel.c、paging_init より前)。以後の利用者   */
 /*  (kernel/time/pit.c の pit_init / drivers/char/serial.c) は保存値だけを見る。       */
-/*  経緯と検証は docs/POLICY_DEBUG.md §4-54。                               */
+/*  経緯と検証は docs/POLICY_DEBUG.md#4-54-pit-の実時間。                               */
 /* ======================================================================== */
 
 #include "sysclk.h"

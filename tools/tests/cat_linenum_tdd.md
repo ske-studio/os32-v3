@@ -6,7 +6,7 @@
   (`make check-cat-linenum-host` が同じものを `--target --mutate` 付きで回す)
 - 試験: [`cat_linenum_host.c`](cat_linenum_host.c) — 実物の `cmd_fs_shared.c` と
   `cmd_file.c` を 1 行も写さずそのまま `#include` し、KernelAPI だけを贋物にする
-- 原則: [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-32 —
+- 原則: [ext2_file「落とし穴」](../../docs/design/fs/ext2/ext2_file.md#落とし穴) —
   FS の read が要求長ちょうどを返すと思い込まない (ここでは **1 回の読み取りで
   ファイル全部が来る**と思い込んでいた側の同じ間違い)
 

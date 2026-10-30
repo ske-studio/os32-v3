@@ -438,7 +438,7 @@ function CheckPath($path) {
  }
 }
 # Right after the kill / File.Replace another handle (an on-access scanner,
-# cf. POLICY_DEBUG 4-60) can briefly deny our FileShare.Read open. Retry only
+# cf. .claude/skills/run-os32/SKILL.md#配備) can briefly deny our FileShare.Read open. Retry only
 # ERROR_SHARING_VIOLATION (32) / ERROR_LOCK_VIOLATION (33), bounded per open;
 # 'replace' opens up to five files, all within one EXCHANGE_TIMEOUT. The path
 # is rechecked (reparse points, parents included) before every attempt and

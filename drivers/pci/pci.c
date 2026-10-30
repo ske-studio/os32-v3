@@ -151,7 +151,7 @@ static void pci_report(const struct pci_dev *d)
     int i;
 
     /* 実機ではこの行が画面に出る (シリアル越しにも読む)。属性は
-     * kprintf の入口で PC-98 流へ直される (POLICY_DEBUG §4-52)。 */
+     * kprintf の入口で PC-98 流へ直される (.claude/skills/run-os32/SKILL.md#症状別の道具)。 */
     kprintf(TATTR_WHITE, "[pci] %u:%u.%u %04x:%04x class %02x.%02x irq %u pin %u",
             (u32)d->bus, (u32)d->dev, (u32)d->fn,
             (u32)d->vendor, (u32)d->device,
@@ -312,7 +312,7 @@ int pci_get(u32 idx, void *out)
 
     /* 写す。**内部配列のポインタは返さない** — CPL=3 のアプリから
      * KAPI 経由で呼ばれるので、カーネル番地を渡すとそこで死ぬ
-     * (POLICY_DEBUG §4-13 の db_last_error と同じ事故)。 */
+     * (docs/design/kapi/kapi_db.md#落とし穴 の db_last_error と同じ事故)。 */
     dst = (struct pci_dev *)out;
     src = (const u8 *)&g_pci[idx];
     d = (u8 *)dst;

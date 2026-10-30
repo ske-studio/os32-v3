@@ -2,7 +2,7 @@
 
 > 上位: [ROADMAP](../../ROADMAP.md)
 
-> 状態: **実装中 (2026-10-29)** — **段 4c の映像を実機で目視 (2026-10-29)**: 640x480 8bpp の模様 (8 色の縦帯・左上の市松・白枠) が RGB-IN に出た (写真 `~/os32-tmp/evidence/2026-10-29/gf-c-run4/visual_C.jpg`、位置のずれはモニタ側の調整とユーザー判断)。4 回目で C が完走 — 読み返せないビット 3 か所 (50C bit28・680A24・CR1A bit3/5) を照合から外した版 (作業木 gf-c-50c、debd2ad5)、経緯は [POLICY_DEBUG](../../POLICY_DEBUG.md) §4-63。abort で 98 に戻り、reboot で既定値。版は取り込み前 (astra のレビュー中)。それまで: 段 0〜3 は観測済み。段 4a は S1〜S6 が main (S6 は 59ba733)、GeForce の部分は HWDEV の分離 (M3c 92153ea) で `/boot/hwdev.mod` へ移った。S7 (shell の `gfinit`、S7a・S7c、実機の S7b は合格) と BARLEN (他装置の BAR の長さ) も main。次は S8 (実機の立会い、台本 `tools/accept/gf_s8.md`)、順序は `TASK_HWDEV` §3-1。実機の書込みは段ごとにユーザー承認・立会い。
+> 状態: **実装中 (2026-10-29)** — **段 4c の映像を実機で目視 (2026-10-29)**: 640x480 8bpp の模様 (8 色の縦帯・左上の市松・白枠) が RGB-IN に出た (写真 `~/os32-tmp/evidence/2026-10-29/gf-c-run4/visual_C.jpg`、位置のずれはモニタ側の調整とユーザー判断)。4 回目で C が完走 — 読み返せないビット 3 か所 (50C bit28・680A24・CR1A bit3/5) を照合から外した版 (作業木 gf-c-50c、debd2ad5)、経緯は [POLICY_DEBUG §4-63](../../POLICY_DEBUG.md#4-63-レジスタの読戻し)。abort で 98 に戻り、reboot で既定値。版は取り込み前 (astra のレビュー中)。それまで: 段 0〜3 は観測済み。段 4a は S1〜S6 が main (S6 は 59ba733)、GeForce の部分は HWDEV の分離 (M3c 92153ea) で `/boot/hwdev.mod` へ移った。S7 (shell の `gfinit`、S7a・S7c、実機の S7b は合格) と BARLEN (他装置の BAR の長さ) も main。次は S8 (実機の立会い、台本 `tools/accept/gf_s8.md`)、順序は `TASK_HWDEV` §3-1。実機の書込みは段ごとにユーザー承認・立会い。
 
 ## 0. ユーザー決定 (2026-10-20)
 

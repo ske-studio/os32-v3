@@ -50,7 +50,7 @@ BIOS (INT 1Bh) を使用せず、I/Oポート直接制御および DMA (μPD8237
 |------|------|
 | I/Oポート | 0x90 (メインステータス `FDC_MSR`), 0x92 (データ `FDC_FIFO`), 0x94 (コントロール `FDC_CTRL`) |
 | 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`drivers/block/fdc.h`) |
-| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`drivers/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった (POLICY_DEBUG §4-51) |
+| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`drivers/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった ([POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma)) |
 | 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `drivers/block/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
 | リトライ | READ/WRITE は 3 回。失敗した試行の後に `fdc_recover()` (リセット → Specify → 排水 → recalibrate)。最終失敗だけ `[fdc] read fail ... st0/st1/st2` を 1 行出す ([V4]) |
 | DMAバッファ | 1 セクタ分 (1024B) を **1024B 境界に揃えた**静的バッファ — 64KB 境界をまたげない ([HW2])。`fdc_init()` が起動時に検査する |
@@ -167,7 +167,7 @@ NP21/W の ROM は SYNC を内部状態へ直接書くので、エミュレー�
 純粋部 (記録・判定) のホスト試験は `make check-v86-gcap-host`。記録器は KDEBUG 部品の中なので `KDEBUG=1` の起動でだけ動く (OFF は NOSYS)。
 [未] ROM の AH=30h の後は VSYNC 割り込みが止まり 0064h への書き込みで再開する ([U] io_disp.md) が、`v86 -g` は CUI を作り直すだけで 0064h を書かない。
 
-**PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる** (2026-09-29〜、経緯は POLICY_DEBUG §4-62):
+**PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる** (2026-09-29〜、経緯は [POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード)):
 `pegc_apply_timing` が 1 か所で 09A8h → 6Ah GDC クロック (83h・85h = 5MHz) → 両 GDC の SYNC → グラフィック GDC の
 PITCH (80) → SCROLL → 表示開始の順に書く (クロックは SYNC の前 — Bible 3-2 表3-2)。戻りは起動時に 09A0h
 (sel 09h の bit0 = CLOCK-1、読み値 bit1 = CLOCK-2) で読んだクロックへ戻し、PITCH (書き込み専用)・グラフィック GDC の SYNC・

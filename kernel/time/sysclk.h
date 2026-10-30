@@ -9,7 +9,7 @@
 /*  2.4576MHz 系 (実機 PC-9821Ra266) では 100Hz のつもりの tick が 123Hz     */
 /*  (8.125ms) になり、tick を使う待ち・番犬・CPU 校正が**すべて 23% 速い**   */
 /*  状態だった。NP21/W は 1.9968MHz 設定なので**エミュレータでは踏めない**。 */
-/*    経緯: docs/POLICY_DEBUG.md §4-54                                      */
+/*    経緯: docs/POLICY_DEBUG.md#4-54-pit-の実時間                                      */
 /*    票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-0                           */
 /*                                                                          */
 /*  `sysclk_detect()` は **`paging_init()` より前** (PG=0、物理番地がその     */

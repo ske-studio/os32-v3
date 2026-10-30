@@ -32,7 +32,7 @@ pub mod window;
  * ジャンプ表は通さない。**純粋な計算**なのでアプリに直接載せる。
  * 実体は共有ライブラリ側の 1 ファイルで、`#[path]` で同じソースを読む —
  * 写しを作ると「3 バイトで 2 桁」の数え方がずれ、日本語で必ず露見する
- * (`docs/POLICY_DEBUG.md` §4-27)。 */
+ * (docs/design/lib/utf8.md#落とし穴)。 */
 #[path = "../../libos32gui/src/textcore.rs"]
 pub mod textcore;
 

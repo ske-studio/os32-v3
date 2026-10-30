@@ -6,7 +6,7 @@
 試験: `tools/tests/test_ring3_guard.py` (ホスト、実物を `#include`) + `kdebug/kselftest.c` の `test_ring3_wm_guard` (ゲスト、実物の門)
 caller無効の起動時相当は `test_db_caller.py` で実ガードのWR_TABLE/計数を検証する。
 実行: `make check-ring3-guard-host` (`check-par` の列。`--target` + `--mutate` 付き)
-教訓: [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-61
+教訓: [ring3_str「落とし穴」](../../docs/design/exec/ring3_str.md#落とし穴)
 
 ## 症状 (PM、NP21/W、2026-09-26)
 

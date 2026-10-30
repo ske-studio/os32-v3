@@ -160,7 +160,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
   (SHIFT / GRPH / CTRL は引き継がない)。起動行 `[kbd] ... lock=XX` (XX = 02 CAPS / 04 カナ)。電源投入時にロック済みの
   キーを BIOS が 053Ah に載せるかは資料に無い — §3 の表の 6 で確かめる。
 - 新キーボード (0000:0481h bit 6/3) はロックをソフトから制御できる (0041h へ 9Dh で LED 設定・読み出し、`io_kb.md`)。
-  OS32 はキーボードへコマンドを送っていない (0043h に BIOS の定常値 16h を書くだけ、POLICY_DEBUG §4-57) ので使わない。NP21/W では 9Dh の設定がロック状態を
+  OS32 はキーボードへコマンドを送っていない (0043h に BIOS の定常値 16h を書くだけ、[POLICY_DEBUG §4-57](../../POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)) ので使わない。NP21/W では 9Dh の設定がロック状態を
   make / break 無しで書き換える — OS32 が送らない限り起きない。
 - **実機は CHECKLIST_2026-09-26 の手順 10 で確かめる** (解除で break が来ること)。実機が方式 A の送り方 (押すたびに make だけ)
   だった場合は、方式 B では外せなくなる (make しか来ないので ON のまま) — そのときは戻す。
@@ -169,7 +169,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
 ## 3. 実機で確かめること (次の実機の回)
 
 準備 (**実装済み 2026-09-26、wt/kbd-diaglog、KAPI v67、NP21/W の確認範囲は §3-1、実機は未確認**。
-使い方は [POLICY_DEBUG.md](../../POLICY_DEBUG.md) §4-57 の `kbdstat -w`、試験は `make check-kbd-dlog-host`
+使い方は [POLICY_DEBUG §4-57](../../POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) の `kbdstat -w`、試験は `make check-kbd-dlog-host`
 ([記録](../../../tools/tests/kbd_dlog_tdd.md))): **受信のたびに記録する診断リング**をドライバに足す (`drivers/input/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
 `seq / code / make・break / 更新後の修飾` を 32 件の循環リングへ)。読むのは KAPI `kbd_diag_log` (追記、診断専用) と
 `kbdstat -w` (リングを読んで新しい分を 1 行ずつ出す。ESC か 30 秒で終わる)。**seq が飛んだら「取りこぼし — この区間は判定不能」と出す**。

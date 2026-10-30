@@ -792,7 +792,7 @@ pub fn move_x3(st: &mut GuiState, x: i32, y: i32) {
 ///   クライアントはアプリ (契約 D4 / W3 §4.2)
 ///
 /// [`wm_button_down`] / [`wm_right_down`] と**同じ判定順**で見る
-/// (ずれると二重配送か取りこぼしになる。POLICY_DEBUG §4-22)。
+/// (ずれると二重配送か取りこぼしになる。docs/design/userland/gshell/src/input.md#落とし穴)。
 fn wm_owns_edge(st: &GuiState, mx: i32, my: i32, down_edge: bool, button: u8) -> bool {
     if startmenu::is_open() {
         return true;

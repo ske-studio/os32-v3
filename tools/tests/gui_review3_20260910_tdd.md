@@ -135,7 +135,7 @@ X4 経路の離しも `release_capture` を通す。ここだけ `forward_button
 
 その後 ESC で gui_bench を閉じ、Start → CUI mode → Yes で CUI へ戻り、rshell も復旧した。
 
-**道具側で 2 つ罠を踏んだ** (`docs/POLICY_DEBUG.md` §4-31):
+**道具側で 2 つ罠を踏んだ** ([run-os32](../../.claude/skills/run-os32/SKILL.md#前提と-gui-への入口)):
 rshell を ESC で抜けずに `/api/key` の text を打つと 4 文字ごとのコマンドになる。
 `gui_gate.py` の Start メニュー行座標が 5 行前提のままで、v1.3 の 6 行では
 1 行ずれて「CUI mode」が **Shut Down** に当たり、ゲストを 1 回 halt させた

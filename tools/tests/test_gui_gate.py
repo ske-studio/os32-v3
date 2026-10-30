@@ -1,7 +1,7 @@
 """tools/gui_gate.py の「GUI に入れたか」の判定のホスト試験。
 
 記録: tools/tests/gui_gate_tdd.md
-経緯: docs/archive/settings/TASK_S5.md §6 (R2 の予備調査、2026-09-29)、POLICY_DEBUG §4-31
+経緯: docs/archive/settings/TASK_S5.md §6 (R2 の予備調査、2026-09-29)、.claude/skills/run-os32/SKILL.md#前提と-gui-への入口
 
 台本が rshell を閉じずに `os32gui` を打つと、4 文字ずつの text が `os32` / `gui` の
 2 コマンドになって GUI に入らず、それでも `leave_gshell` の `ver` が通るので
