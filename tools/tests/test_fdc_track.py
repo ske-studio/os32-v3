@@ -197,13 +197,20 @@ def check_read_stream_shape():
     """fatfs_vfs_read_stream が今も「開いて、動いて、読んで、閉じる」か。
     font_replay はこの形を写して回すので、形が変われば試験を直す合図。"""
     src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
-    m = re.search(r"static int fatfs_vfs_read_stream\(.*?\n\}", src, re.S)
-    if not m:
+    def body(name):
+        m = re.search(r"static int " + name + r"\(.*?\n\}", src, re.S)
+        return m.group(0) if m else ""
+
+    if "return ff_read_file(ctx, path, buf, size, offset, 1);" not in body("fatfs_vfs_read_stream"):
         return False
-    body = m.group(0)
+    if "return ff_read_file(ctx, path, buf, max_size, 0, 0);" not in body("fatfs_vfs_read"):
+        return False
+    helper = body("ff_read_file")
+    if not re.search(r"if \(stream\) \{\s*fr = f_lseek\(&fil, \(FSIZE_t\)offset\);", helper):
+        return False
     # f_close は f_lseek の失敗の枝にも出るので、最後のものを見る。
-    order = [body.find("f_open("), body.find("f_lseek("), body.find("f_read("),
-             body.rfind("f_close(")]
+    order = [helper.find("f_open("), helper.find("f_lseek("), helper.find("f_read("),
+             helper.rfind("f_close(")]
     return all(x >= 0 for x in order) and order == sorted(order)
 
 
