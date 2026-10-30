@@ -3,6 +3,8 @@ check-pegc-mode-host:
 - tools/tests/host32.py
 - drivers/video/pc98/backend_pegc.c
 - drivers/char/np2sysp.c
+- drivers/input/mouse_seamless.c
+- drivers/input/mouse.h
 - kernel/console/console.c
 - tools/tests/mutpar.py
 - tools/tests/pegc_mode_host.c
