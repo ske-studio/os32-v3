@@ -4,79 +4,18 @@
 /*  ファイル読み込み — g_aux使用                                            */
 /* ======================================================================== */
 
-int ext2_read_file(Ext2Ctx *ctx, u32 ino, void *buf, u32 max_size)
+/* offset は inode.size 以下。stream の EOF 判定は入口で行う。 */
+static int ext2_read_inode_range(Ext2Ctx *ctx, const Ext2Inode *inode,
+                                void *buf, u32 size, u32 offset)
 {
-    Ext2Inode inode;
-    int ret;
-    u32 bi, remaining, to_copy, total_read, phys;
-    u8 *dst;
-
-    if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
-
-    ret = ext2_read_inode(ctx, ino, &inode);
-    if (ret != 0) return ret;
-
-    remaining = inode.size;
-    if (remaining > max_size) remaining = max_size;
-    total_read = 0;
-    dst = (u8 *)buf;
-
-    for (bi = 0; remaining > 0; bi++) {
-        /* 読めなかったのを「穴 = ファイルの終わり」にしない (票 B8)。
-         * 途中までのバイト数を返すと、呼び手には短いファイルに見える。 */
-        ret = ext2_bmap(ctx, &inode, bi, &phys);
-        if (ret != 0) return EXT2_ERR_IO;
-        if (phys == 0) break;
-
-        to_copy = remaining;
-        if (to_copy > EXT2_BLOCK_SIZE) to_copy = EXT2_BLOCK_SIZE;
-
-        if (to_copy == EXT2_BLOCK_SIZE) {
-            /* 宛先バッファに直接読み込み — ext2_g_auxを経由しない。
-             * ext2_bmapが間接ブロック参照でext2_g_auxを使うため、
-             * ここでext2_g_auxに読むとバッファ競合が発生する。 */
-            ret = ext2_read_data_block(ctx, phys, &dst[total_read]);
-            if (ret != 0) return EXT2_ERR_IO;
-        } else {
-            /* 端数ブロック。ext2_read_block は to_copy に関係なく **必ず
-             * 1KB 書く** ので、宛先へ直接読むと max_size を超えて溢れる。
-             * 呼び出し側が「ヘッダだけ」のような小さいバッファを渡すと、
-             * その先のカーネル .bss を静かに壊す (2026-09-11: exec の
-             * ヘッダ先読み 108 バイトが隣の resolved[] / トランポリンごと
-             * 潰し、shell.bin の読み込みが NOT_FOUND になった)。
-             * 中間バッファは ext2_g_blk — ext2_g_aux は上の ext2_bmap が
-             * 使うので不可 (ext2_read_stream と同じ約束、gotcha §4-24)。 */
-            ret = ext2_read_data_block(ctx, phys, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-            kmemcpy(&dst[total_read], ext2_g_blk, to_copy);
-        }
-
-        total_read += to_copy;
-        remaining -= to_copy;
-    }
-    return (int)total_read;
-}
-
-int ext2_read_stream(Ext2Ctx *ctx, u32 ino, void *buf, u32 size, u32 offset)
-{
-    Ext2Inode inode;
     int ret;
     u32 bi, remaining, to_copy, total_read, phys;
     u32 byte_in_blk;
     u8 *dst;
 
-    if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
-
-    ret = ext2_read_inode(ctx, ino, &inode);
-    if (ret != 0) return ret;
-    /* 通常ファイル以外は読まない (票 TASK_VFS_FD_PATH の最後の砦)。
-     * ディレクトリのブロックをファイルの中身として返さない。 */
-    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;
-
-    if (offset >= inode.size) return 0;
-    remaining = inode.size - offset;
+    remaining = inode->size - offset;
     if (remaining > size) remaining = size;
-    
+
     total_read = 0;
     dst = (u8 *)buf;
 
@@ -84,7 +23,8 @@ int ext2_read_stream(Ext2Ctx *ctx, u32 ino, void *buf, u32 size, u32 offset)
     byte_in_blk = offset % EXT2_BLOCK_SIZE;
 
     for (; remaining > 0; bi++) {
-        ret = ext2_bmap(ctx, &inode, bi, &phys);
+        /* 読込失敗は途中までのバイト数にせず、I/O エラーを返す (票 B8)。 */
+        ret = ext2_bmap(ctx, inode, bi, &phys);
         if (ret != 0) return EXT2_ERR_IO;
         if (phys == 0) break;
 
@@ -95,8 +35,9 @@ int ext2_read_stream(Ext2Ctx *ctx, u32 ino, void *buf, u32 size, u32 offset)
             /* ブロック全体: 直接宛先に読み込み */
             ret = ext2_read_data_block(ctx, phys, &dst[total_read]);
         } else {
-            /* 部分ブロック: ext2_g_blkを中間バッファとして使用
-             * (ext2_g_auxはext2_bmapと競合するため使えない) */
+            /* 部分ブロックは ext2_g_blk を経由して要求した範囲だけ写す。
+             * 直接読むと必ず 1KB 書かれ、exec のヘッダ先読みなどで
+             * 宛先の隣を壊す。ext2_g_aux は ext2_bmap と競合する。 */
             ret = ext2_read_data_block(ctx, phys, ext2_g_blk);
             if (ret == 0) {
                 ext2_mem_copy(&dst[total_read], &ext2_g_blk[byte_in_blk], to_copy);
@@ -109,6 +50,36 @@ int ext2_read_stream(Ext2Ctx *ctx, u32 ino, void *buf, u32 size, u32 offset)
         byte_in_blk = 0;
     }
     return (int)total_read;
+}
+
+int ext2_read_file(Ext2Ctx *ctx, u32 ino, void *buf, u32 max_size)
+{
+    Ext2Inode inode;
+    int ret;
+
+    if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
+
+    ret = ext2_read_inode(ctx, ino, &inode);
+    if (ret != 0) return ret;
+
+    return ext2_read_inode_range(ctx, &inode, buf, max_size, 0);
+}
+
+int ext2_read_stream(Ext2Ctx *ctx, u32 ino, void *buf, u32 size, u32 offset)
+{
+    Ext2Inode inode;
+    int ret;
+
+    if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
+
+    ret = ext2_read_inode(ctx, ino, &inode);
+    if (ret != 0) return ret;
+    /* 通常ファイル以外は読まない (票 TASK_VFS_FD_PATH の最後の砦)。
+     * ディレクトリのブロックをファイルの中身として返さない。 */
+    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;
+
+    if (offset >= inode.size) return 0;
+    return ext2_read_inode_range(ctx, &inode, buf, size, offset);
 }
 
 /* ======================================================================== */
