@@ -327,7 +327,7 @@ MUTATIONS = [
     ('if not parent_child and pair', 'if pair', '親子の例外を無視'),
     ('if args.update_baseline:', 'if True:', '基準値を無断で更新'),
     ('counts[k] > baseline[k]', 'False', '増加しても通す'),
-    ("if path.startswith('docs/decisions/') or re.match", 'if False and re.match', '決定層を無視'),
+    ("if path.startswith(('docs/decisions/', 'docs/design/')) or re.match", 'if False and re.match', '決定層を無視'),
     ('if dest in paths and dest != source:', 'if dest in paths:', '自己参照も数える'),
     ('    tracked = git_tracked_md(root)\n', '    tracked = None\n', 'git の管理外も数える'),
     (' and not parents_link and path.is_file()', ' and path.is_file()', '親の symlink を辿る'),

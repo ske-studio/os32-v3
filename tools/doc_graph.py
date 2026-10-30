@@ -238,7 +238,7 @@ def classify(path, lines):
         return 5
     status = next((m[1].lstrip('* ').strip() for line in lines[:HEAD_LINES]
                    if (m := STATUS.search(line))), '')
-    if path.startswith('docs/decisions/') or re.match(r'確定(?:$|[\s*(（—。、])', status):
+    if path.startswith(('docs/decisions/', 'docs/design/')) or re.match(r'確定(?:$|[\s*(（—。、])', status):
         return 3
     if path.startswith('docs/tasks/') or path in {'docs/ROADMAP.md', 'docs/V3_PLAN.md'}:
         return 4
