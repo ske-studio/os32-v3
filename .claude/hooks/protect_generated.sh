@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse (Edit/Write/MultiEdit): KAPI の生成物の手編集を拒否する ([ABI1])。
+# PreToolUse (Edit/Write/MultiEdit): KAPI の生成物の手編集を拒否する ([ABI])。
 # 対象は「ファイル全体が sdk/gen_kapi.py / kapi_rust_gen.py の出力」のものだけ。
 # 生成区間を持つ手書きのリンカスクリプト (build/os32.ld、sdk/link/app.ld・app_sys.ld・shlib.ld) は対象外
 # — 区間の中は make check-kapi-* が照合する。生成は sdk/kapi.json を直して make で。
@@ -23,7 +23,7 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 root=$(realpath -m "$root")
 rel=${path#"$root"/}
 if printf '%s\n' "$GENERATED" | grep -qxF "$rel"; then
-    echo "[ABI1] $rel は sdk/kapi.json から生成される — 手で直さず kapi.json を直して make で再生成する" >&2
+    echo "[ABI] $rel は sdk/kapi.json から生成される — 手で直さず kapi.json を直して make で再生成する" >&2
     exit 2
 fi
 exit 0

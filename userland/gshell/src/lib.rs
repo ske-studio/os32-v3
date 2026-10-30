@@ -428,7 +428,7 @@ fn run_program(st: &mut wm::GuiState, path: &[u8; 256], via: LaunchVia) -> i32 {
      * 「起動が進行中」の印を立てておく (`multiapp::begin_start` の注記)。 */
     multiapp::begin_start();
     /* KAPI v45 (K5c) で生成器が `i32` を吐くようになったので、u32 経由の
-     * 往復は要らない。生成物は手で触らない ([ABI1])。 */
+     * 往復は要らない。生成物は手で触らない ([ABI])。 */
     let rc = unsafe { (os32api::api().exec_start)(path.as_ptr()) };
     multiapp::end_start(rc);
     /* 所有者の問い合わせ (票 T8 D3/D4)。全画面に入った / 戻ったはここで決まる。

@@ -28,7 +28,7 @@
 | `tools/tests/hsync_h3_host.c` | 実物の `userland/system/hsync.c` を 1 行も写さず `#include` し、KernelAPI だけを贋物に差し替える。贋 FS は**ノードごとに mtime を持ち**、`sys_set_mtime` の成功 / `NOSYS` / I/O 失敗を注入できる。`sys_read` / `sys_write` / `sys_set_mtime` の**呼び出し回数**を数える |
 | ↑ の A16 | `fs/hostdrv/hostdrv_stat_rules.inc` の `hdrv_filetime_to_unix` / `hdrv_stat_mtime` を同じ翻訳単位で直接叩く (純関数) |
 | `tools/tests/vfs_set_mtime_host.c` | 実物の `fs/vfs.c` を `#include` し、合成 `VfsOps` で `vfs_set_mtime()` の振り分け (`NOSYS` / `INVAL` / `NOMOUNT` / エラーの素通し) を見る |
-| `tools/tests/test_hsync_h3.py` | 2 本のビルドと実行、`--target` のクロスコンパイル確認、`--mutate` の否定側、`[ABI1]`/`[ABI2]` の静的検査 (`sys_set_mtime` が **slot 213 から動いていないか** / その前の並びが変わっていないか / 版が揃うか / 生成ヘッダの `KAPI_FUNC_COUNT` が 一致するか / `build/app.conf` の要求版) |
+| `tools/tests/test_hsync_h3.py` | 2 本のビルドと実行、`--target` のクロスコンパイル確認、`--mutate` の否定側、`[ABI]`/`[ABI]` の静的検査 (`sys_set_mtime` が **slot 213 から動いていないか** / その前の並びが変わっていないか / 版が揃うか / 生成ヘッダの `KAPI_FUNC_COUNT` が 一致するか / `build/app.conf` の要求版) |
 
 贋 FS の `sys_write` は本物と同じく**書き込みのたびに mtime を現在時刻
 (555555) で上書きする**。だから「データを書き終えてから mtime を設定する」を
@@ -292,7 +292,7 @@ if (KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1) bad |= 1u << 0;
 `KAPI_SLOT_HOST_CLOSE` は 212 なので表の要素数が **213 ちょうど**であることを
 要求する。`sys_set_mtime` (slot 213) を足して 214 になったので落ちた。
 
-**これは決め打ちが古いだけでなく、設計と矛盾している。** [ABI2] は末尾への
+**これは決め打ちが古いだけでなく、設計と矛盾している。** [ABI] は末尾への
 追記を正当な操作と定めているのに、この行は「`host_close` の後ろに何も足されて
 いないこと」を要求するので、**KAPI を 1 本足すたびに必ず落ちる**。
 `kernel/kselftest.c` の `test_db_v50` の註が言う意図は
@@ -381,7 +381,7 @@ FAIL slot_layout_append:448: db_slot_layout_ok(KAPI_SLOT_COUNT + 1)
 | `tools/tests/test_vfs_excl.py` | 同上 (「H2 でスロットを足していない」を末尾で代用) | `sys_set_mtime` が slot 213 のままであること (後ろに v54 以降が何本あってもよい) |
 
 digest は「slot 213 までの名前」なので**末尾追記では動かない** — KAPI を足すたびに
-更新する必要は無い。更新が要るなら、それ自体が [ABI2] 違反の印。
+更新する必要は無い。更新が要るなら、それ自体が [ABI] 違反の印。
 
 次に同じ探索をするときは、等号だけでなく **`[-1]` / `[len-1]` / 「最後の要素」**
 の形も併せて見ること。

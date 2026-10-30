@@ -111,7 +111,7 @@ int ring3_wait_pending(void);
  * トランポリンページ内の写しを、CPL=0 の呼び手には fs/vfs.c の static cwd を
  * 返す。カーネル帯には USER ビットが無いので、写さずに返すと CPL=3 側が
  * 読んだ瞬間に #PF → fault kill になる。sdk/kapi.json の target をこれに
- * 差し替えてあるだけで、スロット・引数・戻り型は不変 ([ABI2])。 */
+ * 差し替えてあるだけで、スロット・引数・戻り型は不変 ([ABI])。 */
 const char *vfs_cwd_user(void);
 /* vfs_devname の CPL=3 向けの写し (KAPI vfs_devname の実体、TASK_HDD_INSTALL 段 2) */
 const char *vfs_devname_user(const char *prefix);

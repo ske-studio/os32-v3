@@ -56,7 +56,7 @@ void pcm_tick(void);
 /* 所有者の回収 (exec/exec.c の exec_reclaim_owned)。 */
 void pcm_reclaim(int owner);
 
-/* KAPI の実体 (kapi/ の __cdecl ラッパから呼ばれる — [C3])。 */
+/* KAPI の実体 (kapi/ の __cdecl ラッパから呼ばれる — [ABI])。 */
 int pcm_open(u32 rate);
 /* write の受付の検査だけ (owner と状態)。0 / OS32_ERR_INVAL。
  * KAPI の wrapper が**入力の検査より先に**呼ぶ — 未 open・非 owner は

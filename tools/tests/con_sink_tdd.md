@@ -197,7 +197,7 @@ EXIT con_sink_host=0
 不足の補完は本体撤去前に GREEN (`k-consink-before.log`) を確認済み。
 `test_con_sink.py --mutate` は通常ケースの後で上の契約を壊す7変異を実行する。
 以前のログの `8 con_sink_selftest` / `8a`〜`8f` は現行ログに出ない。
-私有 import 264〜270 と303は番号・型・実体を維持して retained にした [ABI2]。
+私有 import 264〜270 と303は番号・型・実体を維持して retained にした [ABI]。
 私有 ABI 印は変わるため kernel/kdebug は同じビルドの対で配備する。公開 KAPI は不変。
 
 ゲスト受入は PM が NP21/W・実機で実施する (この段では未実施)。

@@ -578,7 +578,7 @@ ID を `exec_kill` で畳むと、走っている本人の `abort_req` が立っ
 
 | 場所 | 変更 |
 |---|---|
-| `sdk/kapi.json` | 末尾にスロット 186 `exec_abort_clear` を追記 ([ABI2])、`version` 44 → 45 |
+| `sdk/kapi.json` | 末尾にスロット 186 `exec_abort_clear` を追記 ([ABI])、`version` 44 → 45 |
 | `sdk/include/os32/os32_kapi_shared.h` | `KAPI_VERSION` 45 |
 | `exec/appslot.c` / `.h` | `int appslot_abort_clear(void)` — 実体。owner 1 以外は `OS32_ERR_INVAL` |
 | `exec/exec.c` / `.h` | `i32 exec_abort_clear(void)` — KAPI の口。`appslot_abort_clear()` へ委譲 |
@@ -638,7 +638,7 @@ python3 -B tools/tests/test_multiapp_impl.py
 ## 実行コマンド
 
 ```bash
-python3 sdk/gen_kapi.py && python3 sdk/kapi_rust_gen.py   # 再生成 ([ABI1])
+python3 sdk/gen_kapi.py && python3 sdk/kapi_rust_gen.py   # 再生成 ([ABI])
 python3 tools/check_kapi_version.py               # EXIT=0 (v45、関数表も一致)
 python3 -B tools/tests/test_multiapp_impl.py      # ケース 20 を追加 (156 検査) ALL PASS
 make kernel                                       # EXIT=0、-Wall の警告 0
@@ -650,7 +650,7 @@ make kernel                                       # EXIT=0、-Wall の警告 0
   「フォーカスが別アプリのときの CTRL+STOP でフォーカス窓だけが死ぬ」は実機の受入待ち。
 - 全体ゲート (`make all` / `make external` / `make check`) は回していない (テスター担当)。
   通したのは `make kernel` と `check_kapi_version` / `test_multiapp_impl`。
-  [ABI3] の `make clean` → `make all` も**回していない** (KernelAPI 構造体が伸びたので
+  [ABI] の `make clean` → `make all` も**回していない** (KernelAPI 構造体が伸びたので
   テスターが回す必要がある)。
 - W レーン (gshell) はまだ `exec_abort_clear` を呼んでいない。`build/app.conf` の要求版を
   45 に上げただけで、`userland/gshell` のコードには 1 バイトも触っていない。

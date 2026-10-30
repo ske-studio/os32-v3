@@ -16,7 +16,7 @@
 2026-10-30: 純リング7判定は `tools/tests/con_sink_host.c` の独立ケースへ集約し、
 `kst_con_sink` は本体・宣言・ビルド登録ごと撤去した。以下は移植時の契約。
 現在は264〜270 (push群/stat/read/owner_exit) と303 (drop_count SETTER) を retained とし、
-番号・型・実体を維持する [ABI2]。enable/disable は実 TVRAM/cursor の描画試験が使う。
+番号・型・実体を維持する [ABI]。enable/disable は実 TVRAM/cursor の描画試験が使う。
 受入と判定数の変更は `tools/tests/con_sink_tdd.md` の E08 節を参照。
 
 根拠: `kernel/console/con_sink.c:314–431`。

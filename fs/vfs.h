@@ -212,7 +212,7 @@ void vfs_umount(const char *prefix);
  *   VFS_ERR_NOTFOUND … その prefix はマウントされていない
  *   VFS_ERR_INVAL    … prefix が NULL
  *   sync の負値      … 書き戻せなかった (マウントは残る)
- * 既存の vfs_umount (void、sync の失敗を捨てる) は変えない ([ABI2])。 */
+ * 既存の vfs_umount (void、sync の失敗を捨てる) は変えない ([ABI])。 */
 int  vfs_umount_checked(const char *prefix);
 /* IDE ドライブ drive (hd<drive>) を指すマウントの数 (どの prefix でも、ルートも
  * 数える)。drive が 0〜3 の外なら VFS_ERR_INVAL。KAPI dev_mount_count (v64)。 */

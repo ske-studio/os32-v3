@@ -141,7 +141,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 **検証・配備**
 - HDD 起動では hd0 がルートなので `cdinst` は拒否される。FD 起動で行う。→ `userland/system/cdinst.c`、`userland/system/inst_hdd.c`
 - 配備の成否は文言で判断しない — ゲストの `ls -l /boot/vmkernel.lz4` と手元のサイズ、kselftest (`kselftest_pass` / `_fail`) は**新しい** `kernel.map` の番地で読む。NHD の作業イメージは `build/nhd/os32.nhd`。→ §2、§4-17、§4-29
-- `deploy.yaml` に無いバイナリは NHD で古いまま残り rshell を止める ([V2])。`hsync` は HostDrv の内容で上書きするので NHD 配備の後は先に `make deploy`、`/sys` は `hsync sys` + リセット (GUI の窓が例外 0 件で出ない = shlib が古い)。→ §4-12、§4-33、§4-36、§4-42
+- `deploy.yaml` に無いバイナリは NHD で古いまま残り rshell を止める。`hsync` は HostDrv の内容で上書きするので NHD 配備の後は先に `make deploy`、`/sys` は `hsync sys` + リセット (GUI の窓が例外 0 件で出ない = shlib が古い)。→ §4-12、§4-33、§4-36、§4-42
 - 保存の試験はバイト列で突き合わせ、冪等も繰り返して見る。通知のある API は入力経由と API 経由の両方を見る。→ §4-46、§4-44
 - 変異試験は実物のソースを書き換えない (写しの木、`tools/tests/mutpar.py`)。検査の 3 段と所要時間は [`docs/08_build.md`](08_build.md) §8-4。→ §4-40、§4-41
 
@@ -254,7 +254,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 ### 4-12. deploy.yaml に無いバイナリが NHD 上で stale 化し rshell が沈黙する
 
 - **現象** (2026-08-13, sndctl): KAPI レイアウト変更後、古いバイナリの KAPI 呼び出しが別関数へ飛び、exit 後の `jmp $` で永久スピン。rshell ごと沈黙
-- **対策**: 起動対象は PKG 配布でも必ず自層の deploy.yaml に載せる ([V2])。2026-09-04 から `make deploy` / `deploy-nhd` / `deploy-kernel` は同期後に `tools/prune_stale.py` でマニフェストに無いシステム側 *.bin を消す (`NO_PRUNE=1` で一覧のみ、`make prune-stale` で手動確認)
+- **対策**: 起動対象は PKG 配布でも必ず自層の deploy.yaml に載せる。2026-09-04 から `make deploy` / `deploy-nhd` / `deploy-kernel` は同期後に `tools/prune_stale.py` でマニフェストに無いシステム側 *.bin を消す (`NO_PRUNE=1` で一覧のみ、`make prune-stale` で手動確認)
 
 ### 4-13. SQLite MEMSYS5 プールの枯渇 (`db_query` が -2)
 

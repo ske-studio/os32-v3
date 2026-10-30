@@ -767,7 +767,7 @@ ESC 以外の打鍵は条件に合わず**そのまま捨てられて**いた。
 | `drivers/input/kbd.c` | `kbd_peekkey()` — 取り出さずに次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。源の見る順番も同じ (GUI の注入リング → rshell のシリアル → cooked リング) |
 | `drivers/char/serial.c` | `serial_peekchar()` — `ser_buf[ser_head]` を読むだけ |
 | `kernel/kbd_inject.c` | `kbd_inject_peek()` — 注入リングの先頭を読むだけ。自己診断にビット 5 を追加 |
-| `sdk/kapi.json` | `kbd_peekkey` を**末尾に追加** ([ABI2])、版数 v53 → v54 ([ABI3])。slot 214 = 0x360 |
+| `sdk/kapi.json` | `kbd_peekkey` を**末尾に追加** ([ABI])、版数 v53 → v54 ([ABI])。slot 214 = 0x360 |
 | `userland/shell/cmd_script.c` | 監視を `kbd_peekkey()` に差し替え、**ESC と分かってから** `kbd_trygetkey()` を 1 回呼んで取り除く |
 | `build/app.conf` | 要求 KAPI を `userland/shell` 46 → 54、`userland/sh` (同じソースの CPL=3 版) 49 → 54 |
 
@@ -826,7 +826,7 @@ ESC 専用の検査を足すか)。今回は入れていない。逃げ道とし
 ## 5-4. 確かめていないこと ([V4])
 
 - **実機 (NP21/W) では 1 度も動かしていない。** `make clean` → `make all` → `make check`
-  → `make external` も**未実施** (コーダーの禁止範囲)。[ABI3] の clean ビルドは PM 待ち。
+  → `make external` も**未実施** (コーダーの禁止範囲)。[ABI] の clean ビルドは PM 待ち。
 - 通したのはホスト試験と、`drivers/input/kbd.c` / `drivers/char/serial.c` / `kernel/kbd_inject.c` の
   `i386-elf-gcc -Wall -Wextra -Werror` 単体コンパイルだけ。`kapi/kapi_generated.c` は
   この場の `-I` では無関係な既存の implicit declaration が出るので `-Werror` 無しで通し、
@@ -837,4 +837,4 @@ ESC 専用の検査を足すか)。今回は入れていない。逃げ道とし
   EAX に入れてしまうため、覗きと両立しない。長いスクリプトで GUI の反応が鈍らないかは
   未確認。
 - `apps/` `game/` の submodule は再ビルドしていない (この変更は KAPI の**末尾追加**だけで
-  既存スロットを動かさないが、[ABI3] の手順としては `make external` が要る)。
+  既存スロットを動かさないが、[ABI] の手順としては `make external` が要る)。

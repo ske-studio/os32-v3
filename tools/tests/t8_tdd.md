@@ -26,7 +26,7 @@
 状態を動かす `appslot_gfx_claim()` / `appslot_gfx_owner_exit()` と分けた。`gfx/gfx_core.c` に
 残るのは KAPI の門 2 本 (`gfx_kapi_init` / `gfx_kapi_init_200`) と `gfx_screen_owner` だけで、
 どれも 3 行以下。`sdk/kapi.json` の `"target"` がスロット `gfx_init` / `gfx_init_200` を門へ
-向けているので、生成物は 1 行も手で触っていない ([ABI1])。
+向けているので、生成物は 1 行も手で触っていない ([ABI])。
 
 `exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 20 が実物を叩くのは
 判定と回収の 2 つで、`exec_launch` が起動時に写す 2 語 (`ctx->cpl3` / `ctx->hdr_flags`) だけは

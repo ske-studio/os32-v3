@@ -481,7 +481,7 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
 |---|---|
 | **8bpp (PACKED8) のまま、640x480 から** (推奨) | **KAPI 変更なし**。`GFX_ScreenInfo` の width / height は u16、format は `GFX_FMT_PACKED8`、能力ビットも既存で足りる。`GFX_PREF_TRIDENT` はカーネル内部のヘッダ (`gfx_hal.h`) で KAPI ではない |
 | 800x600 / 1024x768 (8bpp) | KAPI 変更なし。ただし**条件付き**: モニタの対応 (型番・OSD)、pitch、VRAM 容量 (実測)、**ページ境界に丸めた面配置** (表示面とクライアント面を 4KB 境界で隔てないと lease が表示面を含む)。GUI / アプリが契約 G5 (決め打ちしない) を守っているかの確認 (gshell・libos32gui のレイアウト、壁紙・アイコンの配置)。exec が USER で張るクライアント面が 1024x768x8 = 768KB に増える |
-| 16bpp | `GFX_FMT_*` の追記 (末尾のみ、[ABI2]) と版上げ・`make clean` ([ABI3])、**libos32gfx・libos32gui の描画・文字・パレット貸し (G8) の全経路**に 16bpp を足す。GUI 1.x の範囲を超える → 決裁 T6 (推奨: しない)。**段 4 (解像度) の前提ではない** |
+| 16bpp | `GFX_FMT_*` の追記 (末尾のみ、[ABI]) と版上げ・`make clean` ([ABI])、**libos32gfx・libos32gui の描画・文字・パレット貸し (G8) の全経路**に 16bpp を足す。GUI 1.x の範囲を超える → 決裁 T6 (推奨: しない)。**段 4 (解像度) の前提ではない** |
 
 ### 4-4. カーネルの大きさ
 

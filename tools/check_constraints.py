@@ -6,7 +6,7 @@ check_constraints.py — プロジェクト制約の参照ずれを検査する
 `docs/CONSTRAINTS.md` が規則の正典で、エージェントが読むファイル
 (`CLAUDE.md`, `SOUL.md`) には規則行だけを置く、という構成を守らせる。
 
-文言ではなく **ID** (`[C1]`, `[HW2]`, `[ABI3]` …) で照合する。文言は場所に
+文言ではなく **ID** (`[C1]`, `[HW2]`, `[ABI]` …) で照合する。文言は場所に
 よって変えてよい (英語/日本語、詳しさの差)。ID が欠けていれば落とす。
 
 検出するずれは 3 種類:
@@ -31,9 +31,9 @@ CANON = os.path.join(PROJ_DIR, "docs", "CONSTRAINTS.md")
 REFERRERS_REQUIRED = [os.path.join(PROJ_DIR, "CLAUDE.md")]
 REFERRERS_OPTIONAL = [os.path.join(PROJ_DIR, "SOUL.md")]
 
-ID_RE = re.compile(r"\[((?:C|HW|ABI|V|D)\d+)\]")
+ID_RE = re.compile(r"\[((?:ABI|(?:C|HW|V|D)\d+))\]")
 # 正典側の見出し: "### [C1] ..." だけを規則の定義とみなす
-HEADING_RE = re.compile(r"^###\s+\[((?:C|HW|ABI|V|D)\d+)\]", re.M)
+HEADING_RE = re.compile(r"^###\s+\[((?:ABI|(?:C|HW|V|D)\d+))\]", re.M)
 
 
 def read(path):
@@ -70,7 +70,7 @@ def main():
         checked.append(rel)
         found = set(ID_RE.findall(read(path)))
 
-        missing = sorted(defined_set - found, key=lambda s: (s[:-1], int(s[-1])))
+        missing = sorted(defined_set - found)
         if missing:
             problems.append("%s に載っていない規則: %s" % (rel, ", ".join(missing)))
 

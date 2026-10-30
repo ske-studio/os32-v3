@@ -11,7 +11,7 @@
 - 試験: [`pci_decode_host.c`](pci_decode_host.c) — 実物の `drivers/pci/pci_decode.c` を
   1 行も写さずに `#include` する。復号は I/O も静的配列も構造体の padding も
   触らないので **模型が 1 つも要らない**
-- KAPI: **v56 → v57**。`pci_count` / `pci_get` / `pci_cfg_read32` の 3 本を末尾に追記 ([ABI2])
+- KAPI: **v56 → v57**。`pci_count` / `pci_get` / `pci_cfg_read32` の 3 本を末尾に追記 ([ABI])
 
 ## 1. なぜエミュレータで見つけられないか
 

@@ -138,7 +138,7 @@ filesystem:
     - host: userland/tests/dbq.bin
       guest: /usr/bin/
       tags: [test]
-    # --- stat_t / test2 (第 1 陣の試験。ビルドはされていたが [V2] の登録が
+    # --- stat_t / test2 (第 1 陣の試験。ビルドはされていたがマニフェストへの登録が
     #     漏れていて、ゲストで走らせられなかった。TASK_TEST_RESULT §4) ---
     - host: userland/tests/stat_t.bin
       guest: /usr/bin/
@@ -182,7 +182,7 @@ filesystem:
     - host: userland/tests/d0a_test.bin
       guest: /usr/bin/
       tags: [test]
-    # --- T2h h2 stack preparation, default 256KiB / explicit 512KiB [V2] ---
+    # --- T2h h2 stack preparation, default 256KiB / explicit 512KiB ---
     - host: userland/tests/h2_stack.bin
       guest: /usr/bin/
       tags: [test]
@@ -247,7 +247,7 @@ filesystem:
     - host: userland/tests/pegcchk.bin
       guest: /usr/bin/
       tags: [test]
-    # --- hello (KAPI 最小テスト、[V2] で登録 2026-10-10) ---
+    # --- hello (KAPI 最小テスト、登録 2026-10-10) ---
     - host: userland/tests/hello.bin
       guest: /usr/bin/
       tags: [test]

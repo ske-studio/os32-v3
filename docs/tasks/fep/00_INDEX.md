@@ -16,7 +16,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 
 > **コーディング規約 (本設計のコードスケッチも準拠):**
 > [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)・
-> [C3](../../CONSTRAINTS.md#c3-外部公開関数は-kapi-に-__cdecl-ラッパーを持つ) と
+> [ABI](../../CONSTRAINTS.md#abi-kernelapi) と
 > [POLICY_DEV.md §2](../../POLICY_DEV.md#2-コーディング規約) に従う。
 
 ---

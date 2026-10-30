@@ -245,7 +245,7 @@ MUTATE temp_names_synced          RED (期待どおり落ちた)
   (票 §4-2 の 3)、大きい shlib の差し替え (同 4)、空き不足 (同 5)、強制終了からの
   復旧 (同 6) はすべて未実施。
 - `make all` / `make check` / `make external` / 配備は**実行していない** (禁止範囲)。
-  `make clean` → 全体ビルドは PM が着地時に回す ([ABI3])。
+  `make clean` → 全体ビルドは PM が着地時に回す ([ABI])。
 - 贋 FS は「名前 = ノード」の模型なので、**ext2 の媒体の状態** (links_count の
   過大計上、漏れ、公開の 3 値判定) は見ていない。そこは
   `tools/tests/b8_open_host.c` の段 C / 段 H の掃引と `e2fsck -fn` が受け持つ。

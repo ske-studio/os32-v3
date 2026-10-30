@@ -28,7 +28,7 @@
 - **直すのは A と B。C は段の表に挙げたものだけ** (asm の構造体の位置など、ずれると壊れるもの)。
 - **機械語は変えない**。sqlite_engine の契約違反の直しだけが例外。各段では、変える前と変えた後の像 (vmkernel・kdebug.bin・*.mod・触ったユーザーランド) の機械語を `objdump -d` で比べる。差は 0 か、意図したものとして説明が付くものだけにする。この比べが受入の主な証拠で、名前の付け替えは試験より強くこれで確かめる。
 - 1 つの意味に名前は 1 つにする。重複している名前は正典を 1 つ決め、もう片方は正典を使って定義するか消す。番地の正典は memmap.h、PC-98 の I/O とワークエリアは pc98.h、PCI は drivers/pci/pci_decode.h、Ethernet は新しい include/net_eth.h、回復処理は kdebug/recover.h。
-- ABI と生成物には手で触らない ([ABI1])。sdk/kapi.json と生成物は対象外。module_schema.h の名前は生成器 `tools/gen_module_schema.py` から出す。
+- ABI と生成物には手で触らない ([ABI])。sdk/kapi.json と生成物は対象外。module_schema.h の名前は生成器 `tools/gen_module_schema.py` から出す。
 - 直さないもの:
   - memmap.h で同じ値が別の名前で並んでいる番地。gen_memmap.py と STATIC_ASSERT が関係を検査しているので、地図として直書きのままにする。
   - 配置を固定する STATIC_ASSERT の期待値。

@@ -214,7 +214,7 @@ ARM で落ちた 38 本は本当に ARM 固有の理由で落ちている。
 | フラグ | 何から守るか |
 |---|---|
 | `-fsigned-char` | ARM EABI は `char` が **unsigned** が既定。**今のコードに符号依存は見つかっていない** (`lib/utf8.c` は `& 0x80`、`fs/isofs/iso9660.c` は `(unsigned char)` に明示キャスト) が、`kstrcmp` はまだ `lib/kstring_asm.asm` の x86 アセンブリで、これを C 版に起こす (順序 4) と `*a - *b` の符号で 0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。移植の最中に既定が裏返らないよう先に固定する |
-| `-fno-short-enums` | ARM EABI は `-fshort-enums` が既定 (enum を収まる最小サイズに縮める)。`sdk/include/os32/os32_kapi_shared.h` の `exec_status_t` は `0 … -5` なので **1 バイトに縮む**。カーネルと外部プログラムで共有する ABI ヘッダなので、幅が食い違うと構造体のレイアウトごとずれる ([ABI1]) |
+| `-fno-short-enums` | ARM EABI は `-fshort-enums` が既定 (enum を収まる最小サイズに縮める)。`sdk/include/os32/os32_kapi_shared.h` の `exec_status_t` は `0 … -5` なので **1 バイトに縮む**。カーネルと外部プログラムで共有する ABI ヘッダなので、幅が食い違うと構造体のレイアウトごとずれる ([ABI]) |
 
 `CFLAGS_COMMON` はカーネル (`KERNEL_CFLAGS`) と
 ユーザーランド (`USER_CFLAGS` → `PROGRAM_FLAGS`) の**両方**の親なので、
@@ -246,7 +246,7 @@ ABI の両側に同じ前提がかかる。
 1. **`check_constraints.py` は ID の有無しか照合しない。**規則本文の中身も、
    フラグが実際に `config.mk` に在るかも検査しない。歯の無い ID を増やすと
    「規則はあるが守られているか誰も見ていない」状態になる。
-   [ABI1]〜[ABI3] には `check_kapi_version.py` / `check_manifests.py` という
+   [ABI] には `check_kapi_version.py` / `check_manifests.py` という
    実物の検査が付いていて、そこが違う。
 2. **守るべき場所に、より強い形で書いてある。**フラグのすぐ上に、何から守るのか
    (ARM EABI の既定、`exec_status_t`)、既定と同じである根拠 (92/92 の md5 一致)
@@ -260,12 +260,9 @@ ABI の両側に同じ前提がかかる。
 
 ### 順序 3 で採るなら (PM 判断用の下ごしらえ)
 
-採番は **[ABI4]** が空いている (`ID_RE` は `(?:C|HW|ABI|V|D)\d+`、並べ替えが
-`int(s[-1])` なので 1 桁である必要がある。`ABI4` はそのまま載る)。文言案:
+将来の規則案 (現在の規則には追加しない):
 
-> **[ABI4]** 共有 ABI ヘッダ (`sdk/include/os32/`) の型は `char` の符号・`enum` の
-> 幅の既定に依存しない。`CFLAGS_COMMON` の `-fsigned-char` / `-fno-short-enums`
-> を外さない。
+> 共有 ABI ヘッダ (`sdk/include/os32/`) の型は `char` の符号・`enum` の幅の既定に依存しない。`CFLAGS_COMMON` の `-fsigned-char` / `-fno-short-enums` を外さない。
 
 歯を付けるなら `tools/check_constraints.py` ではなく専用の検査
 (`build/config.mk` の `CFLAGS_COMMON` に 2 つのフラグが在ることを確かめる数行) を
@@ -530,7 +527,7 @@ NP21/W の既定設定 (約 16MHz) で 3 回、13 本 × 7 長 × 2 ずれ × 2 
 
 | 前提 | 効く場所 |
 |---|---|
-| `sizeof(void *) == 4`、`u32` とポインタが同じ幅 | `lib/kstring_c.c` の語単位処理、`include/types.h`、KAPI の構造体レイアウト ([ABI1]) |
+| `sizeof(void *) == 4`、`u32` とポインタが同じ幅 | `lib/kstring_c.c` の語単位処理、`include/types.h`、KAPI の構造体レイアウト ([ABI]) |
 | 語の単位は 4 バイト | `KSTR_WORD` とゼロ検出の定数 `0x01010101` / `0x80808080` |
 | `int` は 32 ビット | KAPI の戻り値、`OS32_ERR_*` |
 
