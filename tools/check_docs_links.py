@@ -97,6 +97,15 @@ ARCHIVE_SOURCE_MOVES = {
     'kernel/paging_app.h': 'mm/paging_app.h',
     'kernel/v86_io.c': 'kernel/v86/v86_io.c',
 }
+# 消した・畳んだスキル (TASK_POLICY_LIGHT P2(b))。見出しは残らないので断片を落として先のファイルへ。
+ARCHIVE_DOC_MOVES = {
+    '.claude/skills/os32-build-verify/SKILL.md': '.claude/skills/run-os32/SKILL.md',
+    '.claude/skills/os32-gui-drive/SKILL.md': '.claude/skills/run-os32/SKILL.md',
+    '.claude/skills/os32-emu-debug/SKILL.md': '.claude/skills/run-os32/SKILL.md',
+    '.claude/skills/os32-local-ai/SKILL.md': '.claude/skills/run-os32/SKILL.md',
+    '.claude/skills/os32-local-review/SKILL.md': '.claude/skills/run-os32/SKILL.md',
+    '.claude/skills/os32-emu-config/SKILL.md': '.claude/skills/os32-emu-config/SKILL.md',
+}
 
 LYCHEE_FLAGS = ["--offline", "--include-fragments", "--no-progress"]
 
@@ -130,6 +139,10 @@ def link_commands(exe, inputs):
             old_uri = (Path(PROJ_DIR) / old).as_uri()
             new_uri = (Path(PROJ_DIR) / new).as_uri()
             archived += ['--remap', '^' + re.escape(old_uri) + r'(#.*)?$ ' + new_uri + '$1']
+        for old, new in ARCHIVE_DOC_MOVES.items():
+            old_uri = (Path(PROJ_DIR) / old).as_uri()
+            new_uri = (Path(PROJ_DIR) / new).as_uri()
+            archived += ['--remap', '^' + re.escape(old_uri) + r'(#.*)?$ ' + new_uri]
         commands.append(archived + ['--', 'docs/archive/**/*.md'])
     return commands
 
