@@ -2090,24 +2090,21 @@ static void ksel_time_feed(int n, int p1a, int p2a, int p1b, int p2b)
     kdi_set_time_test_feed_n(n);
 }
 
-/* Keep read outputs across cases, including when a read leaves them unchanged. */
-struct ksel_time_values {
-    u32 lo, hi;
-    u32 t0lo, t0hi, t1lo, t1hi;
-};
-
-static void test_time_now_reads(struct ksel_time_values *v)
+static void test_time_now(void)
 {
-    u32 plo = 0, phi = 0;
+    const struct pit_setup *ps = pit_get_setup();
+    u32 lo = 0, hi = 0, plo = 0, phi = 0;
+    u32 t0lo = 0, t0hi = 0, t1lo = 0, t1hi = 0;
     u32 clamp0;
+    unsigned int hit_t0, hit_t1, hit_retry;
     int back = 0;
     int rc, i;
 
     /* --- 素の読み --- */
-    rc = sys_time_now(&v->lo, &v->hi);
+    rc = sys_time_now(&lo, &hi);
     check(rc == 0, "time:first read ok");
-    check(v->hi == 0, "time:hi=0 at boot");
-    check(v->lo > 0 || tick_count == 0, "time:us advance");
+    check(hi == 0, "time:hi=0 at boot");
+    check(lo > 0 || tick_count == 0, "time:us advance");
 
     /* --- **1 万回連続で逆行しない** ---
      * 単調性を持たせているのは p1/p2 の判定**だけではない**。8254 の再ロードと
@@ -2116,11 +2113,11 @@ static void test_time_now_reads(struct ksel_time_values *v)
      * `sys_time_now` が最後に前回値でクランプする。押さえた回数はその場で
      * 表示する — 0 なら「この機械では p1/p2 だけで足りていた」の記録になる。 */
     clamp0 = ktime_clamp_count;
-    plo = v->lo; phi = v->hi;
+    plo = lo; phi = hi;
     for (i = 0; i < KSEL_TIME_READS; i++) {
-        if (sys_time_now(&v->lo, &v->hi) != 0) { back = -1; break; }
-        if (v->hi < phi || (v->hi == phi && v->lo < plo)) { back++; break; }
-        plo = v->lo; phi = v->hi;
+        if (sys_time_now(&lo, &hi) != 0) { back = -1; break; }
+        if (hi < phi || (hi == phi && lo < plo)) { back++; break; }
+        plo = lo; phi = hi;
     }
     check(back == 0, "time:10k reads monotonic");
     clamp0 = ktime_clamp_count - clamp0;
@@ -2128,55 +2125,44 @@ static void test_time_now_reads(struct ksel_time_values *v)
             (unsigned int)clamp0, (int)KSEL_TIME_READS);
     /* 全部がクランプなら時計が止まっている (補間が効いていない)。 */
     check(clamp0 < (u32)KSEL_TIME_READS, "time:clamp count sane");
-}
 
-static void test_time_now_delay(struct ksel_time_values *v)
-{
     /* --- 既知の待ちを挟む (校正済み delay と突き合わせる) --- */
-    check(sys_time_now(&v->t0lo, &v->t0hi) == 0, "time:bracket b4");
+    check(sys_time_now(&t0lo, &t0hi) == 0, "time:bracket b4");
     cpu_delay_us(1000);
-    check(sys_time_now(&v->t1lo, &v->t1hi) == 0, "time:bracket after");
+    check(sys_time_now(&t1lo, &t1hi) == 0, "time:bracket after");
     /* 1ms の待ちが 0.2ms〜20ms に見えれば配線は正しい (校正の精度そのものは
      * cpu_calibrate の試験が持つ。ここは「時計が進むか」だけ)。 */
-    check(v->t1hi == v->t0hi && v->t1lo > v->t0lo + 200 && v->t1lo < v->t0lo + 20000,
+    check(t1hi == t0hi && t1lo > t0lo + 200 && t1lo < t0lo + 20000,
           "time:1ms delay plausible");
     /* 外れたら測った値を出す (2026-09-24 の NP21/W で 1 回だけ FAIL。
      * cpu_delay_us の校正がずれたのか、時計の補間がずれたのかを分ける)。 */
-    if (!(v->t1hi == v->t0hi && v->t1lo > v->t0lo + 200 && v->t1lo < v->t0lo + 20000)) {
+    if (!(t1hi == t0hi && t1lo > t0lo + 200 && t1lo < t0lo + 20000)) {
         kprintf(KLOG_ATTR, "[selftest] time: 1ms delay measured %u us (hi %u->%u)\n",
-                (unsigned int)(v->t1lo - v->t0lo), (unsigned int)v->t0hi,
-                (unsigned int)v->t1hi);
+                (unsigned int)(t1lo - t0lo), (unsigned int)t0hi,
+                (unsigned int)t1hi);
     }
-}
 
-static void test_time_now_branches(struct ksel_time_values *v)
-{
     /* --- 注入: p1/p2 の三分岐を全部踏む --- */
     time_branch_reset();
     ksel_time_feed(1, 0, 0, 0, 0);            /* 両方 0 → t をそのまま */
-    check(sys_time_now(&v->lo, &v->hi) == 0, "time:p1=0 p2=0 ok");
+    check(sys_time_now(&lo, &hi) == 0, "time:p1=0 p2=0 ok");
     ksel_time_feed(1, 1, 0, 1, 0);            /* p1 = 1 → t + 1 */
-    check(sys_time_now(&v->lo, &v->hi) == 0, "time:p1=1 -> t+1");
+    check(sys_time_now(&lo, &hi) == 0, "time:p1=1 -> t+1");
     ksel_time_feed(2, 0, 1, 0, 0);            /* 1 回やり直して成功 */
-    check(sys_time_now(&v->lo, &v->hi) == 0, "time:0/1 retry ok");
+    check(sys_time_now(&lo, &hi) == 0, "time:0/1 retry ok");
     /* **3 回とも 0/1 を作る** — p2 だけ強制すると境界後の p1=1 で成功し得る */
     ksel_time_feed(1, 0, 1, 0, 1);
-    check(sys_time_now(&v->lo, &v->hi) == OS32_ERR_AGAIN, "time:0/1 x3=EAGAIN");
+    check(sys_time_now(&lo, &hi) == OS32_ERR_AGAIN, "time:0/1 x3=EAGAIN");
     /* 負のときは出力を触らない。2 回目の -EAGAIN は同じ入力列の同じ経路
      * なので、返り値と「出力が不変」を 1 本で見る。 */
-    v->lo = 0xDEADBEEFUL; v->hi = 0xFEEDFACEUL;
-    check(sys_time_now(&v->lo, &v->hi) == OS32_ERR_AGAIN &&
-          v->lo == 0xDEADBEEFUL && v->hi == 0xFEEDFACEUL, "time:neg keeps out");
+    lo = 0xDEADBEEFUL; hi = 0xFEEDFACEUL;
+    check(sys_time_now(&lo, &hi) == OS32_ERR_AGAIN &&
+          lo == 0xDEADBEEFUL && hi == 0xFEEDFACEUL, "time:neg keeps out");
     time_test_feed_clear();
     check(time_branch_hits[TIME_BR_T0] >= 1 &&
           time_branch_hits[TIME_BR_T1] >= 1 &&
           time_branch_hits[TIME_BR_RETRY] >= 4,
           "time:3 branches hit");
-}
-
-static void test_time_now_fraction(struct ksel_time_values *v, const struct pit_setup *ps)
-{
-    int rc;
 
     /* --- 注入: 周期の境界の count ---
      * **2 本の読みは同じ irq_save の中で**。あいだに tick 境界が入ると
@@ -2190,21 +2176,16 @@ static void test_time_now_fraction(struct ksel_time_values *v, const struct pit_
     kdi_set_time_test_feed_n(1);
     {
         unsigned int saved = irq_save();
-        rc = sys_time_now(&v->t0lo, &v->t0hi);
+        rc = sys_time_now(&t0lo, &t0hi);
         time_test_feed[0].count = (int)ps->reload;  /* 周期のはじめ */
-        if (sys_time_now(&v->t1lo, &v->t1hi) != 0) rc = -1;
+        if (sys_time_now(&t1lo, &t1hi) != 0) rc = -1;
         irq_restore(saved);
     }
     check(rc == 0, "time:count=1/reload ok");
     /* 同じ tick なら「終わり」のほうが大きい (補間が効いている) */
-    check(v->t0lo > v->t1lo || v->t0hi > v->t1hi || tick_count == 0,
+    check(t0lo > t1lo || t0hi > t1hi || tick_count == 0,
           "time:frac moves");
     time_test_feed_clear();
-}
-
-static void test_time_now_real_pit(struct ksel_time_values *v)
-{
-    unsigned int hit_t0, hit_t1, hit_retry;
 
     /* --- 実 PIT での位相待ち (**IF=1 で待つ**。IF=0 では IRQ0 が止まり
      * tick の期限が進まない。往復 9 の中継 3) --- */
@@ -2221,7 +2202,7 @@ static void test_time_now_real_pit(struct ksel_time_values *v)
                 c = (u32)(u8)inp(PIT_CNTR0);
                 c |= (u32)((u8)inp(PIT_CNTR0)) << 8;
                 if (c <= 2) {                  /* 残り 1〜2 count */
-                    (void)sys_time_now(&v->lo, &v->hi);
+                    (void)sys_time_now(&lo, &hi);
                     done = 1;
                     break;
                 }
@@ -2245,51 +2226,29 @@ static void test_time_now_real_pit(struct ksel_time_values *v)
         kprintf(KLOG_ATTR, "[selftest] time: real-PIT phase window not caught (UNVERIFIED)\n");
     }
     time_branch_reset();
-}
 
-static void test_time_now_cpl0(struct ksel_time_values *v)
-{
     /* --- CPL=0 の直呼びは書き込み検査の対象外 (Approve 後の注意 2) ---
      * 常駐シェル / gshell はカーネル帯のローカル変数を渡す。`ring3_in_syscall`
      * が 0 のあいだは素通しでなければ、それらが全部落ちる。 */
-    check(ring3_user_range_writable((u32)&v->lo, sizeof(u32)) == 1,
+    check(ring3_user_range_writable((u32)&lo, sizeof(u32)) == 1,
           "time:CPL0 wr check off");
-    check(ring3_user_ranges_writable((u32)&v->lo, sizeof(u32),
-                                     (u32)&v->hi, sizeof(u32)) == 1,
+    check(ring3_user_ranges_writable((u32)&lo, sizeof(u32),
+                                     (u32)&hi, sizeof(u32)) == 1,
           "time:CPL0 2-range same");
-}
-
-static void test_time_now_cost(struct ksel_time_values *v)
-{
-    int i;
 
     /* --- 呼び出しコストと IF=0 の最長区間 (Approve 後の注意 3) ---
      * この時計の IF=0 区間は sys_time_now 1 回ぶんそのもの。1000 回を
      * 挟んで測り、1 回あたりの µs を報告する (合否にはしない — 機械差が
      * そのまま出る)。 */
-    if (sys_time_now(&v->t0lo, &v->t0hi) == 0) {
-        for (i = 0; i < 1000; i++) (void)sys_time_now(&v->lo, &v->hi);
-        if (sys_time_now(&v->t1lo, &v->t1hi) == 0 && v->t1hi == v->t0hi && v->t1lo > v->t0lo) {
+    if (sys_time_now(&t0lo, &t0hi) == 0) {
+        for (i = 0; i < 1000; i++) (void)sys_time_now(&lo, &hi);
+        if (sys_time_now(&t1lo, &t1hi) == 0 && t1hi == t0hi && t1lo > t0lo) {
             /* 1 回あたりの µs = この時計の IF=0 区間そのもの。 */
             kprintf(KLOG_ATTR, "[selftest] time: 1000 reads %u us (%u us/call)\n",
-                    (unsigned int)(v->t1lo - v->t0lo),
-                    (unsigned int)((v->t1lo - v->t0lo) / 1000u));
+                    (unsigned int)(t1lo - t0lo),
+                    (unsigned int)((t1lo - t0lo) / 1000u));
         }
     }
-}
-
-static void test_time_now(void)
-{
-    const struct pit_setup *ps = pit_get_setup();
-    struct ksel_time_values v = { 0 };
-
-    test_time_now_reads(&v);
-    test_time_now_delay(&v);
-    test_time_now_branches(&v);
-    test_time_now_fraction(&v, ps);
-    test_time_now_real_pit(&v);
-    test_time_now_cpl0(&v);
-    test_time_now_cost(&v);
 }
 
 /* ------------------------------------------------------------------------ */
