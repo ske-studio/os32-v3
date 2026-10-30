@@ -36,9 +36,9 @@
 - `tools/build_compare.sh <基点> HEAD` で 28 本がバイト一致。**例外**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「関数ごとの差が検算値の定数の入れ替えだけ (`movl`・`cmpl` などの即値 4 バイト。HWDEV の CRC は照合の `cmpl` にも出る、L2)」で一致とみなす。成果物ごとの差のバイト数は 8〜40 程度 (L1・L2 の実績)。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外したので、置き場だけでは値は変わらない
 - `tools/include_resolve.py` の解決先が前後で一致 (パスの付け替えを除いて)。比べ方は**単位 (コンパイル単位・ファイル) ごとの解決先の集合**で — 生成ヘッダは include をパスの順に並べるので行番号では比べない (L2)。製品の単位で変化 0 件。試験の fixture で、前は解決しなかった include が同じディレクトリに来て解決するようになるのは差に数えない
 - 走査型の検査の走査ファイル数が前後で一致
-- `tools/tests`・`build/`・`tools/check_map.d` で旧いパスを grep して 0 件 (道具の一覧の取りこぼしの確かめ)
+- `tools/tests`・`build/`・`tools/checks` で旧いパスを grep して 0 件 (道具の一覧の取りこぼしの確かめ)
 - `make check-docs-links MUTATE=0` rc=0 (見出しのパスが変わってリンクの断片が切れるのを拾う、L2)
-- `python3 tools/check_select.py --lint` rc=0
+- `python3 -B tools/checks/run.py --lint` rc=0
 
 ### PM の取り込み
 

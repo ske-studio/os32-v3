@@ -115,7 +115,7 @@ class CheckTimesTest(unittest.TestCase):
     def test_direct_make_dry_run_does_not_execute_check(self):
         result = self.make('check-a', '-n')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('--run a', result.stdout)
+        self.assertIn('--run check-a', result.stdout)
         self.assertNotIn('fake-a', result.stdout)
         self.assertFalse((self.root / 'prepared').exists())
         normal = self.make('check-a', 'MAKEFLAGS= -- RUNNER_NAME=normal')
