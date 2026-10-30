@@ -5,7 +5,7 @@
 
 - FDD読み書きバッファが64KB境界をまたいではならない (§2-2参照)
 - loader.asmでは0x10000以降をES:BP=seg:0000方式で回避
-- disk.cのDMAバッファはBSS配置で自動的に安全な配置になる
+- `drivers/block/fdc.c` の DMA バッファは BSS の静的領域から、`fdc_buf_layout` で 64KB 境界をまたがない窓を選ぶ
 
 ### §10-2 IPL (boot_hdd.asm / boot_fat.asm) の制約
 
@@ -30,7 +30,7 @@
   (`boot/loader_hdd.asm` の `pm16_trampoline` / `rm_trampoline` /
   `pm32_return_trampoline`)
 - カーネル本体は起動後 BIOS を呼び出さない
-  (ディスクI/OはPM PIO — `drivers/disk.c` 冒頭に「BIOSトランポリンは使用しない」と明記)
+  (ディスク I/O は `drivers/ata/ide.c` の ATA PIO と `drivers/block/fdc.c` の FDC/DMA を使う)
 
 ### §10-4 EGC farポインタ問題 (歴史的注記)
 

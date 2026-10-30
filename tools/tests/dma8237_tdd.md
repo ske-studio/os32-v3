@@ -113,6 +113,6 @@ MUTATION 8 RED (1 件): 64KB またぎを検査しない ([HW2] そのもの)
 
 ここは算数だけ。**I/O の順序** (フリップフロップのクリア → 下位 → 上位、
 ステータスの読みが TC を消すこと) は `drivers/dma/dma8237.c` にあり、
-`kernel/kselftest.c` の `test_dma8237()` が起動ごとに「悪い引数で
+`kdebug/kselftest.c` の `test_dma8237()` が起動ごとに「悪い引数で
 ハードウェアに触らない」ことと done / tc_event の初期化を見る。
 実転送の照合は W2 (NP21/W の 2HD 起動 + md5、実機の FD 起動)。

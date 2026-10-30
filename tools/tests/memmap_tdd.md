@@ -2,7 +2,7 @@
 
 票: `docs/archive/kernel_v21/TASK_KSTACK_USER.md` §4 の 1・2・3 と §4-bis
 
-対象: `tools/gen_memmap.py` / `mm/paging.c` / `kernel/kselftest.c` / `include/memmap.h`
+対象: `tools/gen_memmap.py` / `mm/paging.c` / `kdebug/kselftest.c` / `include/memmap.h`
 試験: `tools/tests/test_memmap_gen.py` / `tools/tests/test_memmap_boot.py` + `memmap_boot_host.c`
 登録: `make check` → `check-memmap-host` / `check-memmap` (2026-09-17 決裁 D1/D2 の後に登録)
 

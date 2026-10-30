@@ -233,5 +233,5 @@ static u32 native_cache_bits(u32 a)
 ## 確定 (2026-10-27、Opus 5.5 の第 2 回で承認)
 
 - r1 の C1〜C5 は r2 で直った (REVIEW.r1.md)。C2 は (b) 固定名ヘッダの static const (設計者が選択)。
-- N1 (依頼文に 1 行): 新しい runner の写しは `d/kernel/` と `d/platform/pc98/` の木の形で置き、`-I d/kernel` を先頭にする (平らに写すと `../platform/pc98/platform_memory_desc.h` が原本を拾い、写しに当てた変異が効かない)。
+- N1 (依頼文に 1 行): 新しい runner の写しは `d/kernel/`・`d/mm/`・`d/platform/pc98/` など元の木の形を保ち、必要なヘッダのディレクトリは `tools/tests/kernel_includes.py` の `include_dirs()` で写し、`include_flags(d)` で参照する。平らに写すと相対 include が原本を拾い、写しに当てた変異が効かない。
 - N2 (所見): static const の複製は高々 3 翻訳単位で 60B×3 未満、kdebug は読まない。大きさは実測の map で確かめる。

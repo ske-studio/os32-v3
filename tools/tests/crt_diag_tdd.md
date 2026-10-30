@@ -1,7 +1,7 @@
 # CRT diagnostic — read-only boot snapshot
 
 票: `/home/hight/os32-tmp/run/crtfreq/CRTFREQ_DESIGN.r2.md` §1・§3、依頼 `PACK_step1.md`。
-対象: `include/crt_diag.h`、`kernel/crt_diag.c`、`init/kernel.c`。
+対象: `include/crt_diag.h`、`kdebug/crt_diag.c`、`init/kernel.c`。
 実行: `make check-crt-diag-host [MUTATE=1]` (`HOST32_RUNNERS=qemu`)。
 
 - RED: 空の read/format/bootlog 実装で実行し、`out_n == 0 && ev_n == 14 && mem_n == 21` が失敗 (make rc=2)。最初の試行は未使用 fake_map の -Werror で止まり、ハーネス修正後に assertion の RED を確認。

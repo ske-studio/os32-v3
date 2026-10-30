@@ -122,7 +122,7 @@ MUTATIONS 35/35 RED (組めずに除外 0)
 
 ## ブート時 (kselftest)
 
-`kernel/kselftest.c` の `test_bootlog` (4 項目): 書き出しの前なので**溜まっている最中の本物**を見る —
+`kdebug/kselftest.c` の `test_bootlog` (4 項目): 書き出しの前なので**溜まっている最中の本物**を見る —
 まだ積んでいる / 本文が空でない / ヘッダが `# OS32 boot log ` で始まり改行で終わる /
 compose の結果がヘッダで始まり、本文より長く、改行で終わる。compose は本文を動かさないので
 自己試験から呼んでも起動ログは変わらない。

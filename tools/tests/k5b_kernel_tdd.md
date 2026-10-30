@@ -694,7 +694,7 @@ Error: shlib data attach failed (out of memory)
 
 | 場所 | 変更 |
 |---|---|
-| `kernel/shlib.{c,h}` | `shlib_data_pages()` — attach 1 回あたりの `.data/.bss` ページ数 (未ロードなら 0) |
+| `mm/shlib.{c,h}` | `shlib_data_pages()` — attach 1 回あたりの `.data/.bss` ページ数 (未ロードなら 0) |
 | `exec/exec.c` | `exec_ring3_extra_pages()` を追加し、`exec_ring3_pages()` の合計に足す |
 
 足す場所を `exec_ring3_pages()` 1 か所にしたので、`exec_sbrk_pick_tier()` の段 1 判定・段 2 の枚数・

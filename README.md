@@ -141,18 +141,24 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 
 ## ディレクトリ構成
 
+正典は [docs/08_build.md §8-3](docs/08_build.md#8-3-ディレクトリ構造)。以下はその要約。
+
 ```text
 os32-v3/
 ├── boot/       — ブートローダー (16bit/32bit ASM + C)
-├── kernel/     — カーネルコア (IDT/PIC/ページング/kmalloc/コンソール)
-├── drivers/    — デバイスドライバ (KBD/IDE/FDC/Serial/FM/RTC/KCG/Mouse/NP2SysP)
-├── gfx/        — グラフィックス (CPU直接描画)
-├── fs/         — ファイルシステム (VFS/ext2/FAT12/FatFs/ISO9660/HostDrv)
+├── init/       — 起動順序・起動情報・設定・スプラッシュ
+├── kernel/     — 常駐サービス (irq/time/module/console/ime/v86)・GUI の背骨・診断
+├── mm/         — ページング・物理ページ台帳・kmalloc・DMA プール・SHM・shlib
+├── arch/       — CPU 依存実装 (x86/kernel/ に IDT/GDT/TSS・例外入口・入口 asm)
+├── platform/   — 機種依存実装 (pc98/ に PIC・装置の配線・機種固有 I/O)
+├── drivers/    — 装置の種類ごとのドライバ (base/ata/block/char/dma/input/pci/net/sound/video)。部品の窓口・本体と表示バックエンドは装置の隣
+├── gfx/        — 描画 HAL の共通層 (装置別バックエンドは drivers/video/ の下)
+├── fs/         — VFS・fd・パイプの共通層と ext2/fat/isofs/hostdrv/serialfs (FatFs は fat/fatfs/)
 ├── exec/       — プログラムローダー (OS32X)
 ├── kapi/       — KernelAPIラッパー (自動生成)
 ├── kdebug/     — デバッグ・実機試験の部品 (KDEBUG=1 で読み込む)
 ├── hwdev/      — 装置ごとの試行の部品 (hwdev.mod、GeForce 6200)
-├── net/        — LAN (82557) とその上の通信
+├── net/        — リンク層 (link.c。82557 本体と lan.mod は drivers/net/e82557/)
 ├── lib/        — ユーティリティ (UTF-8/パス/LZ4/SQLite)
 ├── include/    — 共通ヘッダ
 ├── userland/   — ユーザー空間 (シェル/コマンド/ライブラリ/Rust)

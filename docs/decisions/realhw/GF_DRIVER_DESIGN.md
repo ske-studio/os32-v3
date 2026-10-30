@@ -157,7 +157,7 @@ prepare は識別/資源確認だけ。init で `video_start`→初回転送→9
 PROM は BAR0 から既存の二重読み/header/checksum/既知 script 検査で採取する。x86 は解析せず、全段 hash 固定も追加しない。未知 ROM/命令・処理失敗は再試行せず S0 相当へ進む。
 既存の命令/呼出し/反復/累積待ち上限を保ち、命令と wait の刻みに中断点を置く。診断の main 間承認待ちは本番に持ち込まない。
 **時間（F11）**：devinit の同期停止は 1〜5 秒程度を仮置き（未実測の推測）、本番全体のソフト上限は既存 `GF_INIT_EXEC_US` の 60 秒を採用（`O/kdebug/gfinit_exec.h:4`）。ROM 採取前から基準値採取まで計時し、P6 で実測と GUI 表示までの総時間を記録する。期限超過は既存失敗出口へ進むが、戻らない MMIO に壁時計上限は保証できない。
-配置は **`geforce.mod`＋核の薄い予約/復帰口**（U5）。下層/中層は `hwdev/gf/`、HAL は `gfx/`、診断 adapter は `kdebug/` と従来 hwdev.mod。本番は KDEBUG=0 で動く。
+配置は **`geforce.mod`＋核の薄い予約/復帰口**（U5）。下層/中層は `hwdev/gf/`、HAL のバックエンドは `drivers/video/geforce/` (共通層は `gfx/`、TASK_SRC_LAYOUT L2 で移った)、診断 adapter は `kdebug/` と従来 hwdev.mod。本番は KDEBUG=0 で動く。
 既存 loader/Cirrus 登録を使い、NULL 加速 callback と非NULL prepare を許す（`O/drivers/video/cirrus/cirrus_module.c:22–43`）。kdebug 依存の hwdev.mod を名称変更するだけでは済ませない（`O/kernel/hwdev_module.c:87–96`）。
 **診断 owner/lease は `kdebug/gfinit.c:70–74` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
 本番 context/復帰 callback は起動中保持して module を pin し、正常終了後も予約は保持する。owner の核移設、共通装置 registry、N1 lease の再設計は行わない。

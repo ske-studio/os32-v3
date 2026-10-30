@@ -128,7 +128,7 @@ T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収に�
 
 失敗手順は新規呼出しをstubへ戻す → 装置の新規転送を止める → callback/IRQ/tickを解除・進行中呼出しゼロ確認 → DMA停止確認 → RAM回収。IRQ unregisterだけで停止成功とはしない。永久DEVICE予約と必要な復帰コード/写像は回収対象から除く。停止不能なら関連コード・データ・DMAを全て隔離し、省略stubへ進んだだけで「回収済み」と記録しない。boot-only依存を逆順に畳み、RUNNINGの依存先を先に解放しない。
 
-T4a-5 の核は `kernel/module_runtime.c/.h`。POST_ROOT の `module_load` は record を先に予約し、直接読込・検証・再配置・import 解決まで行う。`module_start` は resident adapter へ非公開 candidate を渡し、成功・export 一致を確認して prefix を返してから RUNNING にする。
+T4a-5 の核は `kernel/module/module_runtime.c/.h`。POST_ROOT の `module_load` は record を先に予約し、直接読込・検証・再配置・import 解決まで行う。`module_start` は resident adapter へ非公開 candidate を渡し、成功・export 一致を確認して prefix を返してから RUNNING にする。
 record は export の解決済み値・依存 handle `{slot, generation}`・lifecycle adapter を値で保持する。`module_exports` は RUNNING の同世代だけを返し、一般 KAPI の stub/services_public は利用側で管理する。
 `module_abort_reverse` は load 順の handle 列を逆順に戻す。abort は公開を閉じて quiesce→detach/drain→stop_dma を呼び、残存参照・停止失敗・生きた依存利用側があれば QUARANTINED を保持する。回収できた owner だけ reclaim/retire し、ABSENT と隔離への二重 abort は再解放しない。
 broker 接続用の `module_ref_acquire/release` は STARTING の owner/text 所属を照合する核であり、既存 IRQ/tick/DMA broker の部品対応は後続の接続で行う。services_public transaction・kaudit_boot の勘定はT4で接続済み、EARLY owner移譲は作らない。

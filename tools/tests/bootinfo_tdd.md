@@ -86,5 +86,5 @@ INC MUTATION 3 RED: DL を DH と同じ位置に書く
 - ローダの実モードの手続き (`boot/bootinfo_rm.inc` の `bi_clear` / `bi_sense` / `bi_seal`)
   が実際に 0x7E00 へ書くこと、書く順序 (check が最後)、HDD ローダの幾何食い違いでの停止と
   読みの CF 検査。これは NP21/W と実機でしか踏めない (受入 H2 / H3)。
-- 起動時は `kernel/kselftest.c` の `test_bootinfo()` が「写したこと」「低位の magic を
+- 起動時は `kdebug/kselftest.c` の `test_bootinfo()` が「写したこと」「低位の magic を
   消したこと」「良い域を通し check の壊れた域を断ること」を見る。

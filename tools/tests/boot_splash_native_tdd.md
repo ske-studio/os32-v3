@@ -2,7 +2,7 @@
 
 ## Scope and finding
 
-Read `init/kernel.c`, `kernel/boot_splash.c/.h`, `gfx/gfx_core.c`,
+Read `init/kernel.c`, `init/boot_splash.c/.h`, `gfx/gfx_core.c`,
 `gfx/gfx_internal.h`, `include/gfx_hal.h`, PC98 backend and optional backend
 init/shutdown paths before implementation. No `system.cfg` exists in this
 checkout (`git ls-files '*system*cfg*'` and recursive `Path.glob` returned none).
