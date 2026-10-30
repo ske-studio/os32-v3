@@ -16,7 +16,7 @@ I/O も静的配列も触らないので模型は要らない。
   python3 -B tools/tests/test_pci_decode.py --target   # + i386-elf で pci.c も通す
   python3 -B tools/tests/test_pci_decode.py --mutate   # 否定側 (変異が RED になるか)
 """
-CHECK = dict(name='pci-decode-host', tier=1,
+CHECK = dict(name='pci-decode-host', tier=4,
     covers=['drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c'],
     needs=[], budget=2.542598)
 

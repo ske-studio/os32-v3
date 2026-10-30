@@ -16,7 +16,7 @@
   python3 -B tools/tests/test_cpu_calibrate.py --target   # + i386-elf で実物も通す
   python3 -B tools/tests/test_cpu_calibrate.py --mutate   # 否定側 (変異が RED か)
 """
-CHECK = dict(name='cpu-calibrate-host', tier=1,
+CHECK = dict(name='cpu-calibrate-host', tier=4,
     covers=['kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate_math.c', 'tools/tests/cpu_calibrate_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.27113)
 

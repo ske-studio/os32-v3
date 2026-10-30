@@ -4,7 +4,7 @@ The clock/nop-loop stubs supply elapsed ticks only; calibration decisions and
 arithmetic execute the actual source. The collector is compiled as a whole TU.
 No probe, printing, allocation or scheduler symbols are provided to the link.
 """
-CHECK = dict(name='ver-collect-host', tier=1,
+CHECK = dict(name='ver-collect-host', tier=4,
     covers=['kernel/ver_collect.c', 'kernel/ver_info.h', 'kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate.h', 'kernel/time/cpu_calibrate_math.c', 'kernel/time/cpu_calibrate_math.h', 'kernel/time/pit_math.h', 'arch/x86/kernel/idt.h', 'kernel/sqlite_engine.h', 'drivers/char/serial.h', 'drivers/sound/cs4231/pcm_cs4231.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_collect_host.c', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
