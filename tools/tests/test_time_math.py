@@ -16,6 +16,10 @@
   python3 -B tools/tests/test_time_math.py --target   # + i386-elf で ktime.c も通す
   python3 -B tools/tests/test_time_math.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='time-math-host', tier=1,
+    covers=['kernel/time/ktime.c', 'kernel/time/time_math.c', 'tools/tests/time_math_host.c', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'kernel/time/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.233208)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -162,3 +166,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_time_math.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

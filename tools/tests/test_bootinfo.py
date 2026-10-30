@@ -11,6 +11,10 @@
   python3 -B tools/tests/test_bootinfo.py --target   # + i386-elf で bootinfo.c / ide.c も通す
   python3 -B tools/tests/test_bootinfo.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='bootinfo-host', tier=1,
+    covers=['boot/bootinfo.inc', 'drivers/ata/ide.c', 'init/bootinfo.c', 'platform/pc98/boot_disk.c', 'platform/pc98/boot_disk.h', 'init/bootinfo_check.c', 'tools/tests/bootinfo_host.c', 'tools/tests/test_boot_named_constants.py', 'boot/boot_fat.asm', 'boot/boot_hdd.asm', 'boot/loader_hdd.asm', 'boot/loader.ld', 'boot/bootinfo_rm.inc', 'boot/memmap_defs.inc', 'boot/pc98_defs.inc', 'boot/realmode_defs.inc', 'boot/gdt_defs.inc', 'boot/hex_defs.inc', 'boot/boot_probe.inc', 'boot/fat12_defs.inc', 'include/memmap.h', 'include/pc98.h', 'include/types.h', 'arch/x86/kernel/gdt.h', 'lib/kstring.h', 'lib/le_internal.h', 'boot/vk32_defs.inc', 'boot/lz4_defs.inc', 'boot/crc32_defs.inc', 'boot/loader_fat_new.asm', 'lib/crc32_core.inc', 'boot/boot_defs.h', 'include/bootinfo.h', 'init/boot_disk.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.873366)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -224,3 +228,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_bootinfo.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

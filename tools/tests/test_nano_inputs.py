@@ -3,6 +3,10 @@
 段: T2f f1a
 Relocatable i386 probes are inspected, never executed (no ILP32 runner needed).
 """
+CHECK = dict(name='nano-inputs-host', tier=1,
+    covers=['sdk/allocator/**', '.github/workflows/build.yml', 'tools/check_nano_inputs.py', 'sdk/allocator/nano_inputs.json', 'sdk/allocator/nano.LICENSE', 'tools/ci/build_cross.sh', 'build/config.mk', 'build/programs.mk'],
+    needs=['make:all'], budget=5.981308)
+
 import copy
 import importlib.util
 import json
@@ -310,3 +314,16 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_nano_inputs.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -4,6 +4,10 @@ handlers at explicit boundaries; modeled V86 runs return HOTKEY separately.
 Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
+CHECK = dict(name='v86-gcap-abort-host', tier=1,
+    covers=['tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86_mem.*', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'kernel/v86/v86.h', 'kernel/v86/v86_gcap.*', 'kernel/v86/v86_io.*', 'kernel/module/module.h', 'exec/v86_call.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kernel/v86/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'tools/tests/v86_gp_host.inc', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.256406)
+
 from kernel_includes import include_flags
 from pathlib import Path
 import re
@@ -121,3 +125,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_v86_gcap_abort.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

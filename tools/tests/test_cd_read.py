@@ -23,6 +23,10 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 (**RED に数えない**) / SURVIVED = 全ケースが通った (見逃し)。対照 (何も変え
 ない変異) は SURVIVED でなければならない。
 """
+CHECK = dict(name='cd-read-host', tier=1,
+    covers=['tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=[], budget=12.534032)
+
 from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 import os
@@ -700,3 +704,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cd_read.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

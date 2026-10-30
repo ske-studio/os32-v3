@@ -4,6 +4,10 @@ The appmem_map/exec_heap fixture supplies only host MMU/IRQ and side effects.
 Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
+CHECK = dict(name='mem-stat-host', tier=1,
+    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sys.c', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/exec_kapi_init.inc', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'init/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=3.068874)
+
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -572,3 +576,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_mem_stat.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

@@ -3,6 +3,10 @@
 Normal control always precedes mutations; only named runtime failures are RED.
 The shared f9/f13 fixture simulates MMU/IRQ and external resource side effects.
 """
+CHECK = dict(name='trim-kernel-host', tier=1,
+    covers=['tools/tests/font_guard_inactive.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'drivers/input/kbd.h', 'exec/access_walk.c', 'exec/appmem.c', 'exec/appmem.h', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appslot.c', 'exec/appslot.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/ring3_str.c', 'exec/exec.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/lease.c', 'exec/redir_access.c', 'fs/fd_redirect.h', 'include/appmem_types.h', 'include/cpu.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/redir_access.h', 'include/sys.h', 'include/tvram.h', 'include/types.h', 'kapi/kapi_generated.c', 'kapi/kapi_sys.c', 'kernel/sqlite_engine.c', 'arch/x86/kernel/gdt.h', 'kernel/gui.c', 'kernel/gui.h', 'kernel/ime/ime.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/appmem.inc', 'mm/paging.c', 'mm/paging.h', 'mm/paging_app.c', 'mm/paging_app.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'arch/x86/kernel/tss.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_gui_shared.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/kapi.json', 'tools/tests/appmem_map_host.c', 'tools/tests/exec_heap_host.h', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/mem_stat_host.c', 'tools/tests/mutpar.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/test_appmem_map.py', 'tools/tests/test_mem_stat.py', 'tools/tests/trim_kernel_host.c', 'userland/shell/cmd_sys.c', 'userland/gshell/src/trim.rs', 'userland/rust/trim_back_rs/src/cache.rs', 'exec/owner_diag.h', 'init/kernel.c', 'kernel/kstack_hw.c', 'tools/tests/kdebug_cli_host.c', 'userland/shell/cmd_base.c', 'init/sysconfig.c', 'tools/tests/kernel_layout.py', 'init/kaudit_boot.c', 'mm/memory_boot.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc', 'kdebug/kselftest/abort_admit.inc', 'kdebug/kselftest/app_band_pde.inc', 'kdebug/kselftest/bootinfo.inc', 'kdebug/kselftest/bootlog.inc', 'kdebug/kselftest/caller_boot.inc', 'kdebug/kselftest/con_sink_render_gate.inc', 'kdebug/kselftest/cpu_calibrate.inc', 'kdebug/kselftest/dma8237.inc', 'kdebug/kselftest/dma_pool.inc', 'kdebug/kselftest/fd_redirect_access_guard.inc', 'kdebug/kselftest/gfx_ledger.inc', 'kdebug/kselftest/gfx_owner.inc', 'kdebug/kselftest/h4_backing.inc', 'kdebug/kselftest/heap.inc', 'kdebug/kselftest/ime_render_gate.inc', 'kdebug/kselftest/irq_dynamic.inc', 'kdebug/kselftest/kapi_layout.inc', 'kdebug/kselftest/kbd_cmd.inc', 'kdebug/kselftest/kbd_inject.inc', 'kdebug/kselftest/kcg_display_return.inc', 'kdebug/kselftest/kprintf.inc', 'kdebug/kselftest/kprintf_attr.inc', 'kdebug/kselftest/ledger.inc', 'kdebug/kselftest/map_user_keep.inc', 'kdebug/kselftest/mem.inc', 'kdebug/kselftest/memmap.inc', 'kdebug/kselftest/memmap_pool_user.inc', 'kdebug/kselftest/pcm.inc', 'kdebug/kselftest/pit_setup.inc', 'kdebug/kselftest/pool_model.inc', 'kdebug/kselftest/ring3_pd.inc', 'kdebug/kselftest/ring3_wm_guard.inc', 'kdebug/kselftest/slack_cycle.inc', 'kdebug/kselftest/str.inc', 'kdebug/kselftest/time_now.inc', 'kdebug/kselftest/tramp_user_str.inc', 'kdebug/kselftest/utoa.inc'],
+    needs=['make:all'], budget=3.17668)
+
 import argparse
 import pathlib
 import re
@@ -210,3 +214,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print((error.stdout or '') + (error.stderr or ''))
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_trim_kernel.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

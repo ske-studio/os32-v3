@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Lightweight preflight fixtures; no network or OS build."""
+CHECK = dict(name='preflight-host', tier=1,
+    covers=['tools/preflight.sh', 'tools/fetch_fonts.py'],
+    needs=[], budget=4.009738)
+
 import hashlib
 import os
 from pathlib import Path
@@ -141,3 +145,16 @@ class PreflightTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_preflight.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

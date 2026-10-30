@@ -10,6 +10,10 @@ FakeHttp、時計と sleep は FakeClock に差し替える。実プロセス・
 `make check-np21w-ctl-host` がケースと変異を回す。
 `make check-tools-host` の discover からは除外して二重実行を避ける。
 """
+CHECK = dict(name='np21w-ctl-host', tier=1,
+    covers=['tools/np21w_ctl.py', 'tools/nhd_profile.py'],
+    needs=[], budget=1.368864)
+
 import base64
 import importlib.util
 import io
@@ -1713,3 +1717,16 @@ if __name__ == '__main__':
     if do_mutate and rc == 0:
         rc = 1 if mutate() else 0
     sys.exit(rc)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_np21w_ctl.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

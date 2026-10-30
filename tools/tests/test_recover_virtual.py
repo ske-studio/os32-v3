@@ -1,4 +1,8 @@
 """T4b-8: real dispatcher and virtual normal/fault/trial-expire/poll-stop/txbusy-stop trials, fake HAL, ILP32."""
+CHECK = dict(name='recover-virtual', tier=1,
+    covers=['kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'kdebug/recover_virtual.c', 'kdebug/recover_virtual.h', 'kdebug/recover_wire.h', 'kdebug/kdebug_main.c', 'userland/shell/cmd_recover.c', 'tools/tests/recover_virtual_host.c', 'tools/tests/host32.py', 'tools/tests/recover_hostshim/io.h', 'lib/crc32_core.inc', 'tools/tests/mutpar.py', 'build/kdebug.mk', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'kernel/console/display_restore.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_wire.h', 'tools/tests/recover_virtual_cases_host.inc', 'tools/tests/recover_virtual_fixture_host.inc'],
+    needs=[], budget=4.739946)
+
 from pathlib import Path
 import subprocess
 import sys
@@ -103,3 +107,16 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_recover_virtual.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

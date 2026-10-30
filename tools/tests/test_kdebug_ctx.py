@@ -8,6 +8,10 @@ assignments are checked too, so a new dynamic callback cannot evade the graph.
 Other indirect call sites are rejected and require an explicit model update.
 --mutate checks direct, transitive, callback, missing-mark and missing-slot REDs.
 """
+CHECK = dict(name='kdebug-ctx-host', tier=1,
+    covers=['tools/module_schema.py', 'sdk/kapi.json', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kdebug/kdebug_main.c', 'kdebug/generated/**', 'kernel/v86/v86_gcap.c', 'kernel/v86/v86_gcap.h', 'kernel/v86/v86_gcap_math.h', 'kernel/module/module.h', 'kernel/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=1.402916)
+
 from kernel_includes import include_flags
 import copy
 import os
@@ -160,3 +164,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kdebug_ctx.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -5,6 +5,10 @@ Seed 250 reproduces the supplied lzss_fail_seed.bin exactly (SHA-256 pinned).
 The regression used to corrupt /b[0] in a match starting at A[17988], distance
 12, length 13. Also exercise overlap periods, ring wrap, F=18 and flag tails.
 """
+CHECK = dict(name='lzss-pkg-host', tier=1,
+    covers=['tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'userland/deploy.yaml', 'userland/lib/rt/pkg.c', 'tools/tests/lzss_pkg_host.c', 'tools/tests/host32.py'],
+    needs=['make:all'], budget=13.85693)
+
 import argparse
 import hashlib
 import pathlib
@@ -98,3 +102,21 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_lzss_pkg.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

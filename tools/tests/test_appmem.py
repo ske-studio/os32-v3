@@ -2,6 +2,10 @@
 記録: tools/tests/appmem_tdd.md
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
+CHECK = dict(name='appmem-host', tier=1,
+    covers=['exec/appmem.c', 'tools/tests/appmem_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.542672)
+
 from kernel_includes import include_flags
 import os
 import argparse
@@ -137,3 +141,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_appmem.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

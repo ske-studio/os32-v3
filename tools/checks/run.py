@@ -24,7 +24,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
-FULL = ("Makefile", "build/*.mk", "build/checks.d/*.mk")
+FULL = ("Makefile", "build/*.mk")
 DOCS = ("**/*.md", "docs/.orphans-allow", "docs/images/**", "docs/logs/**")
 NOTEST = (
     ("userland/tests/bench_scale2x/main.c", ()),
@@ -322,8 +322,6 @@ def compiler_headers(root, sources, inc_dirs):
 PATH_AUDIT_ALLOW = {
     "tools/tests/" + "test_check_times.py": "timing fixtures use only private build/out logs",
     "tools/tests/" + "test_preflight.py": "preflight fixtures create private build artifacts and tool stubs",
-    "tools/tests/" + "test_check_select.py": "selector fixtures describe synthetic inputs",
-    "tools/tests/" + "test_checkinfra.py": "selector fixtures use private repository roots",
     "tools/tests/" + "host32.py": "cache contains only freshly compiled host fixtures",
     # Limit helper exceptions to these offline targets: other callers may read images.
     ("check-np21w-ctl-host", "tools/" + "nhd_profile" + ".py"):
@@ -338,7 +336,6 @@ PATH_AUDIT_ALLOW = {
         "key expansion and mocked key sends only; main's output directory is unused",
     ("check-access-host", "tools/" + "h3_park_resume" + ".py"):
         "identity observer uses synthetic memory; main's ELF/map defaults are unused",
-    "tools/" + "check_select.py": "selector audits path names without reading build payloads",
 }
 ARTIFACT_DIRS = ("build/out", "build/sdk", "build/nhd", "images")
 PATH_AUDIT_ALLOW.update({
@@ -755,13 +752,14 @@ def lint(root, checks):
                 or "generations." in Path(f).name or "/generated/" in f}
     for name, check in checks.items():
         patterns = check.covers + (check.path,)
+        prepared = make_needs(checks, closure(checks, (name,)))
         for pattern in check.covers:
             if not any(matches(f, (pattern,)) for f in snapshot) and not any(
                     pattern.startswith(d + "/") for d in ARTIFACT_DIRS) and not any(
                     matches(output, (pattern,)) for output in KAPI_GENERATED):
                 errors.append(name + ": missing input " + pattern)
         if any(p.startswith(d + "/") for p in check.covers for d in ARTIFACT_DIRS) \
-                and not any(n.startswith("make:") for n in check.needs):
+                and not prepared:
             errors.append(name + ": artifact covers require make needs")
         for source in sorted(extract(root, check, snapshot)):
             if not (matches(source, patterns) or source.endswith(".h")
@@ -780,7 +778,7 @@ def lint(root, checks):
             for line, path, dynamic in refs:
                 artifact = any(path == d or path.startswith(d + "/") or
                                path == "build" and d.startswith("build/") for d in ARTIFACT_DIRS)
-                if artifact and not any(n.startswith("make:") for n in check.needs):
+                if artifact and not prepared:
                     errors.append(f"{name}: {source}:{line}: artifact {path} requires make needs")
                 if dynamic and any(path.startswith(d + "/") for d in ARTIFACT_DIRS) and not matches(path, patterns):
                     errors.append(f"{name}: uncovered dynamic artifact {path}")
@@ -869,11 +867,13 @@ def main(argv: list[str]) -> int:
             raise ValueError("unknown check: " + " ".join(sorted(names - checks.keys())))
         child = os.environ.get("CHECK_TIME_CHILD") == "1"
         stage = ordered(checks, names) if child else closure(checks, names)
-        needs = () if child else make_needs(checks, stage)
-        if needs:
-            rc = subprocess.run(["make", *needs], cwd=ROOT).returncode
-            if rc:
-                return rc
+        needs = () if child or os.environ.get("CHECK_NO_NEEDS") == "1" else make_needs(checks, stage)
+        # all を先に単独で組む (build/sdk.mk の check-prepare と同じ順)。
+        for group in ((("all",) if "all" in needs else ()), tuple(n for n in needs if n != "all")):
+            if group:
+                rc = subprocess.run(["make", *group], cwd=ROOT, close_fds=False).returncode
+                if rc:
+                    return rc
         files = None
         if args.files is not None:
             files = tuple(args.files)

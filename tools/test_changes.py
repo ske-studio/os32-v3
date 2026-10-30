@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST_PREFIXES = ('tools/tests/', 'userland/tests/', 'tools/check_map.d/', 'build/checks.d/')
+TEST_PREFIXES = ('tools/tests/', 'userland/tests/', 'tools/checks/')
 MUTATE_SKIP = re.compile(r'\b(?:if|elif|unless|ifeq|ifneq)\b.*?(?:--mutate|\bmutate\b|\bMUTATE\b)', re.I)
 RANDOM = re.compile(r'\bos\.urandom\b|\brandom\b|\brand\s*\(|\bsrand\s*\(\s*time\s*\(')
 MAIN = re.compile(r'\bint\s+main\s*\(')

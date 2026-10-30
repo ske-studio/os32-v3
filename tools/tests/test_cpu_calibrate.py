@@ -16,6 +16,10 @@
   python3 -B tools/tests/test_cpu_calibrate.py --target   # + i386-elf で実物も通す
   python3 -B tools/tests/test_cpu_calibrate.py --mutate   # 否定側 (変異が RED か)
 """
+CHECK = dict(name='cpu-calibrate-host', tier=1,
+    covers=['kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate_math.c', 'tools/tests/cpu_calibrate_host.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.27113)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -148,3 +152,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cpu_calibrate.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

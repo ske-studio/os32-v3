@@ -1,4 +1,8 @@
 """ビルド目標の対の部品と、X-7 の明示的な FD 配備を確認する。"""
+CHECK = dict(name='build-no-deploy', tier=1,
+    covers=[],
+    needs=['make:all'], budget=4.163088)
+
 from pathlib import Path
 import re
 import subprocess
@@ -44,3 +48,16 @@ class BuildNoDeploy(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_build_no_deploy.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

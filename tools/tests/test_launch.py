@@ -12,6 +12,10 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 そのまま #include する (模型ではない)。カーネル帯の代わりに要るのは所有者
 (res_owner_get/set)・GUI 判定 (con_sink_is_enabled)・kstrncpy の 3 つだけ。
 """
+CHECK = dict(name='launch-host', tier=1,
+    covers=['tools/tests/host32.py', 'exec/launch.c', 'tools/tests/launch_host.c', 'exec/appslot.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.447408)
+
 from kernel_includes import include_flags
 import host32
 import pathlib
@@ -73,3 +77,16 @@ if __name__ == "__main__":
                     label, result.returncode, result.stdout, result.stderr)
                 print("MUTATE RED " + label + " (" + expected.strip() + ")", flush=True)
         sys.exit(rc)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_launch.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

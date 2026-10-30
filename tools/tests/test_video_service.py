@@ -1,4 +1,8 @@
 """P0: fake devices + init contracts with the real instruction decoder."""
+CHECK = dict(name='video-service-host', tier=1,
+    covers=['tools/tests/video_service_host.c', 'tools/tests/gf_init_contract_host.c', 'tools/tests/host32.py', 'include/video_service.h', 'hwdev/gf/internal.h', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_exec.h', 'lib/crc32_core.inc', 'kdebug/gfinit_pll/*.inc', 'hwdev/gf/scripts.h'],
+    needs=[], budget=60.0)
+
 import os
 from pathlib import Path
 import subprocess
@@ -33,3 +37,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_video_service.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

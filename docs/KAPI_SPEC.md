@@ -72,7 +72,7 @@ make programs
 5. 本仕様書のオフセット表を更新し、新APIに依存するプログラムの
    `build/app.conf` の要求バージョンを引き上げる。
 6. [ABI3] に従い `make clean` → `make all` を実行する。変更した API の試験と
-   `python3 tools/check_select.py --lint` を行い、担当別の検査は
+   `python3 -B tools/checks/run.py --lint` を行い、担当別の検査は
    [ROLES.md](tasks/agents/ROLES.md) §0「検査」に従う。外部 apps/game の再構築は
    H-7 の再開条件 (票 T2H_EXTERNAL_GATE) に従い、再開決定後に行う。
 

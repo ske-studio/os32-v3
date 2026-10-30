@@ -1,4 +1,8 @@
 """Compile the real shell command with only its KAPI endpoints replaced."""
+CHECK = dict(name='recover-cli-host', tier=1,
+    covers=['userland/shell/cmd_recover.c', 'userland/shell/shell.h', 'kdebug/recover_wire.h', 'tools/tests/recover_cli_host.c', 'tools/tests/mutpar.py'],
+    needs=[], budget=1.3162)
+
 import os
 from pathlib import Path
 import subprocess
@@ -43,3 +47,16 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_recover_cli.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

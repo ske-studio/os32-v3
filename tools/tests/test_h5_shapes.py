@@ -1,6 +1,10 @@
 """T2h 8MB shapes: actual guest main, two pipe stops, real pre-entry budget gate.
 Compile/link failures and signals are errors, never mutation RED.
 """
+CHECK = dict(name='h5-shapes-host', tier=1,
+    covers=['userland/tests/h5_shape*.c', 'userland/tests/h5_shape.inc', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec.h', 'exec/exec_kapi_init.inc', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c'],
+    needs=[], budget=4.779452)
+
 from kernel_includes import include_flags
 import argparse
 import os
@@ -276,3 +280,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print('COMPILE/LINK ERROR (not RED):\n'+(error.stderr or ''), file=sys.stderr)
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_h5_shapes.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """LB3 real driver injection. Record: tools/tests/e82557_drv_tdd.md"""
+CHECK = dict(name='e82557-drv-host', tier=1,
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'kernel/module/module.h', 'include/config.h', 'include/bootinfo.h', 'fs/vfs.h', 'tools/tests/e82557_drv_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.c', 'mm/dma_pool.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=5.33304)
+
 from kernel_includes import include_flags
 import re
 import os
@@ -478,3 +482,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_e82557_drv.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

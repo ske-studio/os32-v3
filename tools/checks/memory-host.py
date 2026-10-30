@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+CHECK = dict(name='memory-host', tier=1,
+    covers=['kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'tools/tests/lease_selftest_host.h', 'tools/tests/font_guard_inactive.h', 'tools/tests/test_t3c2.py', 'tools/tests/layout_cycle_host.c', 'tools/tests/os32x_layout_host.c', 'exec/os32x_hdr.c', 'tools/memmap_audit_live.py', 'tools/gen_memmap.py', 'userland/lib/rt/dbgserial.c', 'userland/lib/rt/dbgserial.h', 'userland/tests/layout_cycle_test.c', 'userland/gshell/**', 'boot/bootinfo.inc', 'boot/loader_fat_new.asm', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/link/shlib.ld', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'tools/tests/host32.py', 'exec/redir_access.c', 'mm/kmalloc.c', 'tools/tests/lease_host.c', 'tools/tests/test_lease.py', 'tools/tests/kernel_layout.py', 'exec/lease.c', 'exec/appslot.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/appmem.c', 'mm/shlib.c', 'init/kernel.c', 'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'mm/paging.c', 'mm/pgalloc.c', 'platform/pc98/pci_resources.c', 'platform/pc98/pci_resources.h', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'mm/physmem.c', 'kernel/sys.c', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/tss.h', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/ring3_entry.asm', 'arch/x86/kernel/iret_user.inc', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'tools/tests/mutpar.py', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'tools/tests/app_band_pde_host.c', 'tools/tests/app_bb_overlap_host.c', 'tools/tests/device_reservation_stage_host.c', 'tools/tests/highram_stage_host.c', 'tools/tests/layout_boot_fixture.h', 'tools/tests/memory_boot_host.c', 'tools/tests/paging_rebuild_host.c', 'tools/tests/pgalloc_range_host.c', 'tools/tests/exec_budget_host.c', 'tools/tests/test_app_band_pde.py', 'tools/tests/test_app_bb_overlap.py', 'tools/tests/test_device_reservation.py', 'tools/tests/test_gfx_boot.py', 'tools/tests/gfx_boot_host.c', 'gfx/gfx_core.c', 'drivers/video/pc98/backend_pegc.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/test_highram_stage.py', 'tools/tests/test_ledger.py', 'tools/tests/test_exec_r1.py', 'tools/tests/test_kstop.py', 'userland/gshell/src/input.rs', 'userland/gshell/src/handler.rs', 'kernel/gui.c', 'drivers/input/kbd.c', 'tools/tests/test_memory_boot.py', 'tools/tests/test_paging_bounds.py', 'tools/tests/paging_bounds_host.c', 'tools/tests/test_pgalloc_model.py', 'tools/tests/test_pgalloc_range.py', 'tools/tests/test_physmem.py', 'tools/tests/test_exec_budget.py', 'userland/rust/gui_demo/src/lib.rs', 'userland/rust/gui_demo/Cargo.toml', 'build/app.conf', 'exec/exec_kapi_init.inc', 'build/kernel.mk', 'build/programs.mk', 'kernel/v86/v86_mem.h', 'sdk/allocator/**', 'sdk/allocator/nano_inputs.json', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/help.c', 'sdk/crt/syscalls.c', 'sdk/gen_kapi.py', 'sdk/include/os32/**', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link_guard.py', 'sdk/mkos32x.py', 'sdk/os32_generations.py', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/Cargo.toml', 'sdk/rust/os32api/src/cfg.rs', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/gui/mod.rs', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'sdk/rust/os32api/src/gui/types.rs', 'sdk/rust/os32api/src/host.rs', 'sdk/rust/os32api/src/kapi_generated.rs', 'sdk/rust/os32api/src/lib.rs', 'sdk/rust/os32api/src/ls.rs', 'sdk/rustc_stamp.py', 'tools/ci/build_cross.sh', 'userland/lib/rt/ls.c', 'userland/rust/.cargo/config.toml', 'userland/rust/Cargo.lock', 'userland/rust/Cargo.toml', 'userland/rust/libos32gui/Cargo.toml', 'userland/rust/libos32gui/src/textcore.rs', 'userland/rust/libos32gui_stub/Cargo.toml', 'userland/rust/libos32gui_stub/src/app.rs', 'userland/rust/libos32gui_stub/src/cfg.rs', 'userland/rust/libos32gui_stub/src/client.rs', 'userland/rust/libos32gui_stub/src/clip.rs', 'userland/rust/libos32gui_stub/src/draw.rs', 'userland/rust/libos32gui_stub/src/host.rs', 'userland/rust/libos32gui_stub/src/icon.rs', 'userland/rust/libos32gui_stub/src/layout.rs', 'userland/rust/libos32gui_stub/src/lib.rs', 'userland/rust/libos32gui_stub/src/modal.rs', 'userland/rust/libos32gui_stub/src/session.rs', 'userland/rust/libos32gui_stub/src/surface.rs', 'userland/rust/libos32gui_stub/src/timer.rs', 'userland/rust/libos32gui_stub/src/widget.rs', 'userland/rust/libos32gui_stub/src/window.rs', 'exec/owner_diag.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'gfx/gfx_internal.h', 'exec/access_walk.c', 'exec/surface_query.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'exec/exec_heap.c', 'exec/exec_heap.h', 'sdk/link/app_sys.ld', 'tools/gen_memmap.py', 'mm/memory_boot.h', 'init/kaudit_boot.c', 'kernel/module/module.h', 'userland/lib/font/**', 'arch/x86/kernel/cpu_flags.inc', 'include/input_service.h', 'include/kbd.h', 'drivers/input/kbd.h', 'kernel/input_service.c', 'include/pointer_service.h', 'drivers/pci/pci_bind.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'init/boot_platform.h', 'platform/pc98/boot.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=161.425422)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_physmem.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_paging_bounds.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_paging_bounds.py', '--rebuild', 'nonmaster']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_paging_bounds.py', '--rebuild', 'rollback']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_app_band_pde.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pgalloc_model.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pgalloc_range.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_highram_stage.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_memory_boot.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_ledger.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_lease.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_exec_r1.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_t3c2.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kstop.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_device_reservation.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_exec_budget.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_app_bb_overlap.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_gfx_boot.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

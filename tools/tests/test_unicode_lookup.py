@@ -4,6 +4,10 @@ The generator's --pairs output is read into the fake VFS input. The independent
 flat oracle still comes from the original header. Product sources contain no
 static pair table. Runtime mutants are optional (--mutate, PM only).
 """
+CHECK = dict(name='unicode-lookup-host', tier=1,
+    covers=['lib/unicode_jis_table.h', 'lib/utf8.c', 'lib/utf8.h', 'include/types.h', 'include/endian_le.h', 'tools/gen_unicode.c', 'tools/tests/host32.py', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'mm/pgalloc.h', 'fs/vfs.h', 'include/config.h', 'include/memmap.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/kernel.mk', 'tools/tests/unicode_lookup_sdk.c', 'tools/tests/unicode_lookup_host.c', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'build/programs.mk', 'build/deploy.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=4.413458)
+
 from kernel_includes import include_flags
 import argparse
 import pathlib
@@ -196,3 +200,21 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_unicode_lookup.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

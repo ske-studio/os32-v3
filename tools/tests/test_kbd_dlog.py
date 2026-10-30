@@ -15,6 +15,10 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --target   # + i386-elf で 3 本を通す
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='kbd-dlog-host', tier=1,
+    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.873258)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -217,3 +221,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kbd_dlog.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -10,6 +10,10 @@
 
 `--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] GNU11 / -Werror)。
 """
+CHECK = dict(name='install-fresh-host', tier=1,
+    covers=['drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c', 'userland/system/install_recover.inc'],
+    needs=[], budget=4.427074)
+
 import pathlib
 import subprocess
 import sys
@@ -122,3 +126,16 @@ if __name__ == "__main__":
             failed += rc != 0
         print(f"SUMMARY {len(cases)-failed}/{len(cases)} PASS", flush=True)
         sys.exit(bool(failed))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_install_fresh.py', '--target']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

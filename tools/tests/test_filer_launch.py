@@ -3,6 +3,10 @@
 The state and its initializer also come from lib.rs, so a stale launch latch is
 exercised without duplicating the policy in the fixture. No emulator or real FS.
 """
+CHECK = dict(name='filer-launch-host', tier=1,
+    covers=['tools/tests/os32api_host.py', 'userland/rust/filer/src/lib.rs', 'userland/rust/filer/src/model.rs', 'userland/rust/filer/src/fmt.rs', 'userland/rust/filer/host/launch_tests.rs', 'userland/rust/filer/host/model_tests.rs', 'sdk/rust/os32api/src/**'],
+    needs=[], budget=2.140346)
+
 import argparse
 import pathlib
 import re
@@ -84,3 +88,16 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_filer_launch.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

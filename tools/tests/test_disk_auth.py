@@ -1,4 +1,8 @@
 """Real disk KAPI authorization policy; every mutant must fail at runtime."""
+CHECK = dict(name='disk-auth-host', tier=1,
+    covers=['lib/sqlite3/generated/*', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec.h', 'exec/appslot.h', 'exec/redir_access.c', 'include/config.h', 'sdk/kapi.json', 'sdk/gen_kapi.py', 'tools/tests/disk_auth_host.c', 'tools/tests/test_kapi_ranges.py', 'tools/tests/access_walk_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'exec/access_walk.c', 'exec/exec_kapi_init.inc', 'exec/ring3_str.c', 'kapi/kapi_generated.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/host32.py', 'tools/tests/kapi_ranges_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_kapi_out.py', 'fs/vfs.c', 'fs/vfs.h', 'userland/deploy.yaml', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'CLAUDE.md', 'build/app.conf', 'build/core.yaml', 'build/packages.yaml', 'build/programs.mk', 'docs/07_shell.md', 'tools/check_artifacts.py', 'kapi/kapi_sys.c', 'sdk/include/os32/*.h', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=1.990454)
+
 import argparse
 from test_kapi_ranges import ROOT, run
 
@@ -54,3 +58,21 @@ if __name__ == '__main__':
         for m in MUTANTS:
             run(args.runner, m, fixture_name='disk_auth_host.c')
         print(f'PASS mutations {len(MUTANTS)}/{len(MUTANTS)} runtime RED')
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_disk_auth.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

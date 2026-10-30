@@ -21,6 +21,10 @@
 `textcore` を通っていること。ここが切れていると変異 3 が textbox に届かず、
 E10 を見たことにならない。
 """
+CHECK = dict(name='edit-doc-host', tier=1,
+    covers=['sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'userland/rust/edit_gui/host/doc_tests.rs', 'userland/rust/edit_gui/src/doc.rs', 'userland/rust/libos32gui/host/textcore_tests.rs', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui/src/textcore.rs', 'userland/rust/libos32gui/src/uistate.rs', 'userland/rust/libos32gui/src/widget.rs', 'tools/tests/mutpar.py', 'sdk/rust/os32api/src/**'],
+    needs=[], budget=3.092158)
+
 import argparse
 import pathlib
 import re
@@ -330,3 +334,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_edit_doc.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

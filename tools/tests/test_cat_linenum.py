@@ -30,6 +30,10 @@ FD 0 を読まない / 端末のままなら読みに行かない、の 4 つを
 閉じる / 端末でも読む) をそれぞれ壊した版を作り、この試験がちゃんと RED に
 なることを見る。make・エミュレータ・実配備には一切触れない。
 """
+CHECK = dict(name='cat-linenum-host', tier=1,
+    covers=['tools/tests/cat_linenum_host.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'tools/tests/mutpar.py'],
+    needs=[], budget=1.878034)
+
 import os
 import pathlib
 import subprocess
@@ -201,3 +205,16 @@ if __name__ == "__main__":
             failed += run_mutations(tmp)
 
         sys.exit(1 if failed else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cat_linenum.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

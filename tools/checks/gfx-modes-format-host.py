@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+CHECK = dict(name='gfx-modes-format-host', tier=1,
+    covers=['include/gfx_format.h', 'include/gfx_mode.h', 'include/gfx_hal.h', 'tools/tests/gfx_modes_format_host.c', 'tools/tests/test_gfx_modes_format.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py'],
+    needs=[], budget=60.0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_gfx_modes_format.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

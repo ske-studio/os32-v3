@@ -12,6 +12,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+# CI の静的ゲートが立てる前提の省略を、前提の試験に持ち込まない。
+os.environ.pop("CHECK_NO_NEEDS", None)
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('checks_run', Path(__file__).with_name('run.py'))
@@ -163,7 +166,7 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual((docs.tier, docs.mode), (0, 'docs'))
         self.assertEqual(set(docs.stage), R.DOCS_ALWAYS | {'a'})
         self.assertEqual(docs.mutations, docs.stage)
-        for file in ('Makefile', 'build/kernel.mk', 'build/checks.d/a.mk', 'sdk/kapi.json',
+        for file in ('Makefile', 'build/kernel.mk', 'build/sdk.mk', 'sdk/kapi.json',
                      'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
                      'tools/checks/run.py'):
             with self.subTest(file=file):
@@ -316,7 +319,8 @@ class RunnerTest(unittest.TestCase):
 
     def test_make_prepare_once_closure_and_child(self):
         self.check('prereq', needs=['make:shared'], budget=80)
-        self.check('ver-info-host', needs=['check:prereq', 'make:shared', 'make:second'])
+        self.check('ver-info-host', covers=['build/out/*.bin'], needs=['check:prereq', 'make:second'])
+        self.assertEqual(self.cli('--lint')[0], 0, self.cli('--lint')[2])
         self.write('Makefile', '.PHONY: shared second\nshared second:\n\t@echo $@ >> prepared\n')
         calls = []
         with patch.object(R, 'run_one', side_effect=lambda check, ctx: calls.append(check.name) or 0):
@@ -374,6 +378,51 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(self.cli('--run', 'a', 'stop')[0], 7)
         self.assertFalse((self.root / 'calls').exists())
         self.assertEqual(Path.cwd(), Path(__file__).resolve().parents[2])
+
+    def test_static_entry_points_preserve_none_empty_and_original_files(self):
+        actual = Path(__file__).resolve().parents[2]
+        for name, scanner in (('p2v', 'check_p2v.py'), ('c-dialect', 'check_c_dialect.py'),
+                              ('arch-asm', 'check_arch_asm.py')):
+            for files in (None, (), ('include/changed.h', 'drivers/video/gone.c')):
+                with self.subTest(name=name, files=files):
+                    ctx = R.Context(actual, False, ('qemu',), files, self.root, {})
+                    check = R.Check(name, 'tools/checks/' + name + '.py', (), 100)
+                    with patch.object(R.subprocess, 'call', return_value=0) as call:
+                        self.assertEqual(R.run_one(check, ctx), 0)
+                    argv = call.call_args_list[0].args[0]
+                    expected = [] if files is None else ['--files', *files]
+                    self.assertEqual(argv[argv.index('tools/' + scanner) + 1:], expected)
+                    # The legacy control suites retain their own full fixture contracts.
+                    for invocation in call.call_args_list[1:]:
+                        self.assertNotIn('--files', invocation.args[0])
+
+    def test_inventory_uses_registry_and_keeps_ci_and_records(self):
+        actual = Path(__file__).resolve().parents[2]
+        spec = importlib.util.spec_from_file_location('fixture_inventory', actual / 'tools/gen_tests_inventory.py')
+        inventory = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(inventory)
+        self.write('tools/checks/run.py', (actual / 'tools/checks/run.py').read_text())
+        self.check('a', covers=['drivers/video/a.c'], body=
+                   '    argv = ["python3", "tools/tests/test_probe.py"]\n    return 0\n')
+        self.write('tools/tests/test_probe.py', '"""Log: tools/tests/probe_tdd.md"""\n')
+        self.write('tools/tests/probe_tdd.md', '票 `docs/tasks/TASK_X.md`\n')
+        self.write('build/local.mk', 'check-host-agent:\n\tpython3 tools/local.py\n')
+        self.write('tools/local.py', 'pass\n')
+        self.write('.github/workflows/check.yml', 'run: make check-a\n')
+        with patch.object(inventory, 'ROOT', str(self.root)), \
+                patch.object(inventory, 'MK_FILES', ['build/local.mk']):
+            self.assertEqual([row['target'] for row in inventory.list_checks()], ['check-a'])
+            for pattern in ('test_probe.py', "'test_probe.py'", '"test_probe.py"'):
+                self.assertEqual(inventory.runners_of(
+                    'python3 -B -m unittest discover -s tools/tests -p ' + pattern),
+                    ['tools/tests/test_probe.py'])
+            text = inventory.render()
+            self.assertIn('check-host-agent', text)
+            self.assertIn('probe_tdd.md', text)
+            self.assertIn('TASK_X.md', text)
+            self.assertIn('○', text)
+            self.assertEqual(inventory.check_registration(), 0)
+        self.assertFalse((self.root / 'build/checks.d').exists())
 
     def test_dialect_gate(self):
         self.assertFalse(R.dialect_variants_needed(()))

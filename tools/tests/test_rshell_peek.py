@@ -14,6 +14,10 @@
   python3 -B tools/tests/test_rshell_peek.py            # 全ケース
   python3 -B tools/tests/test_rshell_peek.py --mutate   # 否定側
 """
+CHECK = dict(name='rshell-peek-host', tier=1,
+    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/kpeek.c', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'lib/crc32_core.inc'],
+    needs=[], budget=1.063556)
+
 import argparse
 import importlib.util
 import os
@@ -586,3 +590,16 @@ if __name__ == "__main__":
     if "--mutate" in sys.argv[1:]:
         rc = rc or bool(mutate())
     sys.exit(int(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_rshell_peek.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -2,6 +2,10 @@
 記録: tools/tests/appmem_map_tdd.md
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
+CHECK = dict(name='appmem-map-host', tier=1,
+    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=3.190182)
+
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -342,3 +346,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as e:
         print(e.stdout or '', e.stderr or '')
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_appmem_map.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

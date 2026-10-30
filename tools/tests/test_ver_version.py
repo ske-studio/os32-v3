@@ -1,4 +1,8 @@
 """V1: real build dependency loading and the kernel formatter's product version."""
+CHECK = dict(name='ver-version-host', tier=1,
+    covers=['include/config.h', 'docs/decisions/VERSIONS.md', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'kernel/module/module.c', 'tools/tests/mutpar.py', 'kernel/ver_format.c', 'kernel/ver_info.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=60.0)
+
 import os
 import pathlib
 import re
@@ -97,3 +101,21 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_ver_version.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

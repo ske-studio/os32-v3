@@ -15,6 +15,10 @@
   python3 -B tools/tests/test_build_id.py            # 全ケース
   python3 -B tools/tests/test_build_id.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
+CHECK = dict(name='build-id-host', tier=1,
+    covers=['tools/gen_build_id.py'],
+    needs=[], budget=3.9187)
+
 import os
 import pathlib
 import re
@@ -293,3 +297,16 @@ def main(args):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_build_id.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

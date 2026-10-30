@@ -7,6 +7,10 @@
 
   python3 -B tools/tests/test_install_recover.py [--target] [--sanitize] [case ...]
 """
+CHECK = dict(name='install-recover-host', tier=1,
+    covers=['fs/vfs_fd.c', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'userland/system/install_recover.inc', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    needs=[], budget=8.130882)
+
 import pathlib
 import subprocess
 import sys
@@ -155,3 +159,16 @@ if __name__ == "__main__":
         if "--mutate" in sys.argv and not failed:
             mutations(tmp, "--sanitize" in sys.argv)
         sys.exit(bool(failed))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_install_recover.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

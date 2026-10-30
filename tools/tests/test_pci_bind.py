@@ -15,6 +15,10 @@ DECLINE → 次へ / QUARANTINE → 打ち切り の遷移は全部踏める。
   python3 -B tools/tests/test_pci_bind.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_pci_bind.py --mutate   # 否定側
 """
+CHECK = dict(name='pci-bind-host', tier=1,
+    covers=['drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'tools/tests/pci_bind_host.c', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h', 'drivers/pci/pci_decode.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.533466)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -148,3 +152,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pci_bind.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

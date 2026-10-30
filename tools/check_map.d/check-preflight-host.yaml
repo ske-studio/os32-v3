@@ -1,6 +1,0 @@
-check-preflight-host:
-- tools/preflight.sh
-- tools/fetch_fonts.py
-- tools/tests/test_preflight.py
-- build/checks.d/check-preflight-host.mk
-- tools/check_map.d/check-preflight-host.yaml

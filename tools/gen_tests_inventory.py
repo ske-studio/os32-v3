@@ -13,8 +13,8 @@ docs/archive/TEST_INVENTORY_2026-09-14.md は「`make check` は 31 ターゲッ
   人が書く:   なぜその試験が弱いか、何を消すべきか、何が試験されていないか
               (docs/TESTS.md の `<!-- manual:… -->` 区間。生成器はここを保つ)
 
-情報源は build/*.mk と試験スクリプト・ハーネスそのもので、この生成器は
-どこにも一覧を持たない。Makefile に 1 行足せば表が増える。
+情報源は run.py --list --json の CHECK と試験スクリプト・ハーネスそのもの。
+この生成器はどこにも登録列を持たない。
 
 使い方:
     python3 tools/gen_tests_inventory.py            # 標準出力に出す
@@ -46,12 +46,15 @@ import glob
 import os
 import re
 import sys
-import check_select
+import json
+from pathlib import Path
+import subprocess
+import shlex
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_REL = "build/out/TESTS.md"
 HOST32_REL = "build/out/HOST32.md"
-MK_FILES = check_select.makefile_paths()
+MK_FILES = ["Makefile", *sorted(glob.glob(os.path.join(ROOT, "build/*.mk"))) ]
 CI_WORKFLOW = ".github/workflows/check.yml"
 
 # 実行スクリプトの module 直下の代入のうち、対象ソース / ハーネスを指しているもの。
@@ -135,7 +138,7 @@ def parse_makefiles():
                     # the nested $(firstword ...) remains a readable variable.
                     if cmd.startswith("$(if $(MUT),") and cmd.endswith(",@:)"):
                         cmd = cmd[len("$(if $(MUT),"):-len(",@:)")]
-                    macro = check_select.TPL_HOST32_RE.match("\t" + cmd.strip())
+                    macro = re.fullmatch(r"\$\(call host32_check,([\w.]+)\)", cmd.strip())
                     if macro:
                         cmd = "HOST32_RUNNERS ごと: python3 -B tools/tests/%s --runner <runner>; 先頭で $(MUT)" % macro.group(1)
                     cmd = cmd.replace("$(MUTS)", "--mutants").replace(
@@ -153,12 +156,33 @@ def parse_makefiles():
                 "recipe": recipe,
                 "comment": "\n".join(comment).strip(),
             }
+    # 通常列は CHECK から取得する。手書き make は列外入口の表示用だけ。
+    for check in list_checks():
+        text = read(check['path'])
+        tree = ast.parse(text)
+        run = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'run')
+        commands = []
+        for node in ast.walk(run):
+            if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == 'argv' for t in node.targets):
+                command = ' '.join(shlex.quote(e.value) if isinstance(e, ast.Constant) and isinstance(e.value, str) else ast.unparse(e) for e in node.value.elts) if isinstance(node.value, (ast.List, ast.Tuple)) else ast.unparse(node.value)
+                if '--runner' in command:
+                    command = 'HOST32_RUNNERS ごと: ' + command
+                commands.append(command)
+        if not commands:
+            commands = [ast.unparse(n) for n in ast.walk(run) if isinstance(n, ast.Call)
+                        and isinstance(n.func, ast.Attribute) and n.func.attr in ('call', 'run')]
+        rules[check['target']] = dict(file=check['path'], line=run.lineno,
+            deps=[n[6:] for n in check['needs'] if n.startswith('check:')],
+            recipe=commands, comment=text, covers=check['covers'])
     return rules
 
 
-def parse_variables():
-    """build/*.mk の `NAME := …` (行継続込み) を {NAME: [語…]} で返す。"""
-    return check_select.read_makefiles()[1]
+def list_checks():
+    """Read the runner's public registry without importing any checks."""
+    return json.loads(subprocess.check_output(
+        [sys.executable, '-B', str(Path(ROOT) / 'tools/checks/run.py'), '--list', '--json'],
+        cwd=ROOT, text=True))
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +260,7 @@ def scan_harness_c(relpath):
     return out
 
 
-DISCOVER = re.compile(r"unittest\s+discover\s+-s\s+(\S+)\s+-p\s+'([^']+)'")
+DISCOVER = re.compile(r"""unittest\s+discover\s+-s\s+(\S+)\s+-p\s+['"]?([^\s'"]+)['"]?""")
 
 
 def runners_of(cmd):
@@ -259,7 +283,8 @@ def collect(target, rules):
     if info is None:
         return [], [], []
     cmds = []
-    sources = []
+    sources = [p for p in info.get('covers', [])
+               if p.endswith(('.c', '.inc', '.rs', '.asm')) and not any(c in p for c in '*?[')]
     tdds = []
 
     for cmd in info["recipe"]:
@@ -455,7 +480,7 @@ def build_rows(rules, names, ci):
 # ---------------------------------------------------------------------------
 HEADER = """# 試験一覧 (生成物)
 
-`make tests-inventory` で build/*.mk と試験スクリプトから生成する。コミットしない。
+`make tests-inventory` で CHECK と試験スクリプトから生成する。コミットしない。
 読み方・判断・手書きの節は [docs/TESTS.md](../../docs/TESTS.md)。
 """
 
@@ -482,25 +507,19 @@ RULE_TEXT = """## 1. 名前の対応規則
 
 ## 2. `make check` の列 ({n} ターゲット)
 
-`build/checks.d/*.mk` の登録から集めた `CHECK_PAR_TARGETS` (`check-par` の依存) が
-正典。この表はその列をそのまま展開したもの。コマンド列は `make check` (変異込み) の形。
+`tools/checks/run.py --list --json` が返す CHECK の列を展開する。
+コマンド列は run(ctx) の argv 式。変異の有無は ctx.mutate が決める。
 """
 
 
 def render():
     rules = parse_makefiles()
-    # `make check` が回すのは check-par の依存 (列は変数 CHECK_PAR_TARGETS)。
-    # 2026-09-17〜26 は逐次の 2 段目 check-mut があった — 残っていれば数える。
-    variables = parse_variables()
-    names = []
-    for stage in ("check-par", "check-mut"):
-        for dep in (rules.get(stage) or {}).get("deps", []):
-            m = re.match(r"^\$\((\w+)\)$", dep)
-            names += variables.get(m.group(1), []) if m else [dep]
+    names = [c['target'] for c in list_checks()]
     # check-fast / check-changed は列を回す側 (recipe が $(MAKE)) なので数えない。
     all_check_targets = sorted(
         t for t in rules
-        if t.startswith("check-") and rules[t]["recipe"]
+        if t.startswith("check-") and t not in {"check-times-init", "check-prepare"}
+        and rules[t]["recipe"]
         and not any("$(MAKE)" in c for c in rules[t]["recipe"]))
     outside = [t for t in all_check_targets if t not in names]
 
@@ -518,34 +537,22 @@ def render():
 
 
 def check_registration():
-    """本文の鮮度によらず、登録列・recipe・対応表の漏れを検出する。"""
+    """CHECK の入口と、静的に読み取れる実行スクリプトの実在を確かめる。"""
     rules = parse_makefiles()
-    names = check_select.check_lists(parse_variables())
+    checks = list_checks()
     errors = []
-    check_map = check_select.load_map()
-    mapping = check_map["checks"]
-    local = set(check_map.get("local_checks", []))
-    for name in sorted(local & set(names)):
-        errors.append("ローカル専用の検査が登録列にある: " + name)
-    for name in sorted((set(names) | local) ^ set(mapping)):
-        errors.append("登録列と入力対応表が一致しない: " + name)
-    for name in set(names) | local:
-        if name not in rules or not rules[name]["recipe"]:
-            errors.append("登録された検査に recipe が無い: " + name)
-    for name, info in rules.items():
-        if not name.startswith("check-"):
-            continue
-        for cmd in info["recipe"]:
+    for check in checks:
+        name = check['target']
+        if not os.path.isfile(os.path.join(ROOT, check['path'])):
+            errors.append(name + ': CHECK の入口が無い: ' + check['path'])
+        for cmd in rules[name]['recipe']:
             for script in PY_IN_CMD.findall(cmd):
                 if not os.path.isfile(os.path.join(ROOT, script)):
-                    errors.append("%s: 試験スクリプトが無い: %s" % (name, script))
-                if name in mapping and not check_select.matches(
-                        script, check_select.compile_globs(mapping[name])):
-                    errors.append("%s: 試験スクリプトが入力対応表に無い: %s" % (name, script))
+                    errors.append('%s: 試験スクリプトが無い: %s' % (name, script))
     for error in errors:
         print(error, file=sys.stderr)
     if not errors:
-        print("試験の登録照合: %d ターゲット、漏れ 0 件" % len(names))
+        print('試験の登録照合: %d ターゲット、漏れ 0 件' % len(checks))
     return int(bool(errors))
 
 
@@ -557,7 +564,7 @@ def render_host32():
                 names += [os.path.basename(p)[5:-3] for p in PY_IN_CMD.findall(cmd)]
             elif "tools/run_host_group.py" in cmd:
                 names += [os.path.basename(p)[5:-3] for p in
-                          re.findall(r"--host32\s+(tools/tests/[a-z0-9_]+\.py)", cmd)]
+                          re.findall(r"--host32[\s\'\",]+(tools/tests/[a-z0-9_]+\.py)", cmd)]
     return ("# HOST32 試験一覧 (生成物)\n\n"
             "`make tests-inventory` で生成する。コミットしない。\n\n"
             "`HOST32_RUNNERS` は既定 `native qemu`。%d 試験 (%s) の正常対照を指定した全 runner、"

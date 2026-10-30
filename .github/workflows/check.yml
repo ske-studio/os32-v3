@@ -30,6 +30,8 @@ jobs:
     env:
       # Limited AST coverage: no GCC predefined-macro/branch equivalence.
       OS32_CLANG_CROSS_FREE: "1"
+      # 静的ゲートは make の前提 (CHECK の needs) を組まない — クロス無しで旧と同じ振る舞い。
+      CHECK_NO_NEEDS: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +41,7 @@ jobs:
 
       # ホスト試験の外部コマンド: gcc (build-essential)、e2fsck / mke2fs (e2fsprogs)。
       # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
-      # Python は tools/check_select.py が PyYAML を、tools/mkvmkernel.py 系が lz4 を使う。
+      # Python は tools/mkvmkernel.py 系が lz4 を使う。
       - name: Host dependencies
         run: |
           sudo apt-get update

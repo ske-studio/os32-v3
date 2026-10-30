@@ -23,9 +23,9 @@ Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run only `make all` and the tests you added or touched, with `MUTATE=0`; also run
-`python3 tools/check_select.py --lint` (seconds; register new test inputs in `tools/check_map.d/`). Do not run
+`python3 -B tools/checks/run.py --lint` (seconds; a new test declares its inputs in its own `CHECK` dict). Do not run
 mutation passes, the full `--select` candidate set or the static checks (the PM runs them once after review).
-For a request that is one step of a multi-step task (Tx, from T4): run `make kernel` (plus any userland image your step touches) instead of `make all`; after the last step, before review, run `make all`, the `check_select.py --select --files <whole Tx diff>` candidates with `MUTATE=0`, and the five static checks once (ROLES §0).
+For a request that is one step of a multi-step task (Tx, from T4): run `make kernel` (plus any userland image your step touches) instead of `make all`; after the last step, before review, run `make all`, the `python3 -B tools/checks/run.py --select --files <whole Tx diff>` candidates with `MUTATE=0`, and the five static checks once (ROLES §0).
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 

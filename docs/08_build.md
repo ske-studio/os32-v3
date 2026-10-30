@@ -395,7 +395,7 @@ python3 tools/gen_memmap.py --manifest --check
 <a id="検査の3段"></a>
 #### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
 
-依頼パックの事実は `python3 tools/check_select.py --pack --files <触るファイル…>` の出力を貼る。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。
+検査候補は `python3 -B tools/checks/run.py --select --files <触るファイル…>` で確認する。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。
 票の段の記録は `check-docs-status` が 10 行超・台帳 ID のない未実施/延期/未確認を警告する (`--strict` で失敗)。
 `make check-docs-tree` は文書の層・宣言によるリンク違反を種類ごとの基準値 (`tools/doc_tree_baseline.json`) と比べ、増加で失敗、減少で更新可能と表示する (`python3 tools/doc_graph.py --update-baseline` で明示更新)。
 
@@ -403,27 +403,27 @@ python3 tools/gen_memmap.py --manifest --check
 `build/out/HOST32.md` に生成する ([生成文書の見方](INDEX.md#生成文書の見方))。
 正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。
 
-どれも `make all` の後に回す (成果物を読む検査がある)。規則と登録は
-`build/checks.d/<検査名>.mk` に置き、`build/sdk.mk` が include する。
-`CHECK_PAR_ORDER` の番号で従来の順序を保ち、`CHECK_PAR_TARGETS` を集める。
+検査は `tools/checks/` または `tools/tests/test_*.py` の `CHECK` と `run(ctx)` に置く。
+`build/sdk.mk` が `tools/checks/run.py --list` から通常列を取得し、budget の降順で並べる。
+選択列の `make:` 前提を親 make で一度準備してから検査を回す。
 `check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
 保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
 
 同じ対象の host 試験は `check-gfx-host`、`check-font-host`、`check-access-host`、
 `check-gfinit-host` にまとめている。`tools/run_host_group.py` が元の試験を別々の make job
 として実行し、親の jobserver と正常対照・変異の runner 規則を共用する。
-入力対応表は各群の和集合で、群の一部に当たればその群を選ぶ。
+`covers` は各群の和集合で、群の一部に当たればその群を選ぶ。
 `check-gfinit-fixture-host` は引き続きローカル専用で、この群には含まない。
 
 | ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|
 | `make check-fast` | 全検査を変異なし | 作業中 | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
-| `make check-changed` | 当たった検査だけ変異込み、残りは変異なし。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
+| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 作業中の差分検査 | 選択集合に依存 |
 | `make check` | 全検査を変異込み | 取り込み前に1回 (PM は `make -k check` で最後まで回す、ROLES §0) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
 上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
-recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,test_x.py)` の1行。
+`run(ctx)` は `ctx.mutate` と `ctx.runners` に従う。`MUTATE=0` は差分実行でも変異なし。
 `check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
 言語検査器が変わった場合だけ回す。実物の lint は各本体検査に集約し、ホスト試験はfixtureを使う。
 
@@ -431,49 +431,33 @@ recipe には `$(MUT)` / `$(MUTS)` を使う。HOST32 は `$(call host32_check,t
 
 **`check-changed` は作業中の近道で、取りこぼしの保証はしない。保証は取り込み後の `make check` が担う。**
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
-基点は `tools/check_map.yaml` の `base_refs` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
+基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
 merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。
 基準枝自身 (main を含む。origin/ 接頭辞を除いた枝名) の上では HEAD~1 を使い、直前のコミットを検査する。
-`BASE=<ref>` で明示、`FILES="a b"` で選択を試せる (makeの型照合は基点が要る)。
+`BASE=<ref>` で明示、`FILES="a b"` で選択を試せる 。
 
-- 変更なし → 全部を変異なし (`fast`)。
-- `full:` または表に無い入力 → 全部を変異込み (`full`)。
-- `build/kernel.mk` / `libs.mk` / `programs.mk` → 対応表の入力検査、broad の走査器と `artifact_readers`。
-  ただし追加・削除行に `check-` / `MUT` / `HOST32` / `.ONESHELL` / `export` / `override` / `CHECK_PAR` があれば full。基点版なしも full。
-- `sdk/kapi.json` → KAPI検査、両生成器の出力15ファイル (generation・link scriptを含む) と生成器を読む検査、および `artifact_readers`。
-- 文書だけ → 当たった検査と `docs_always` (`docs`)。
-- その他 → 当たった検査は変異込み、残りは変異なし (`sel`)。
-  `notest` の md・tilemap 等も broad に当たれば、その走査器は変異込みで回す。
-  broad の `**` だけの一致は「表に載っている」の判定から除く。
+- 変更なし → 段4、全部を変異なし (`fast`)。
+- Makefile・build・KAPI・ランナー自身 → 段4、全部 (`full`)。
+- 文書だけ → 段0、当たりと文書共有の検査 (`docs`)。
+- 単一の葉は段1、同じ機能内は段2、複数機能・共有層・未登録入力は段3 (`sel`)。
+  `make check-changed` のコード変更は段2を下限とし、選んだ列の当たりだけ変異を回す。
+- 段0〜3は当たった検査 (tier4 を除く) と共有を実行し、段3は tier3 の共有も追加する。
+  未登録入力があれば tier3 以下の通常列を回す。`**` も登録入力の一致に数える。
+- `notest` だけで当たりが無ければ準備・検査とも省く。空列を全列へ戻さない。
 
-Makefile・その他のbuild規則を絞る型は `tools/check_select.py` の `TPL_*_RE` が正典。
-makeを実行して判定せず、基点から**追加だけ**であることをLF単位で調べる。
-新しい規則は末尾の塊だけ、既存recipeへの追加は規則直後の連続tab行だけ。
-空行・コメント・条件・継続行をまたいでrecipeの持ち主を変える配置は拒否する。
-許すrecipeは `python3 -B tools/tests/<file>.py` + 小文字の旗 + 末尾の `$(MUT)` / `$(MUTS)`、
-またはHOST32マクロの1行。scriptは木と当該検査の表に必要。
-`.PHONY: check-<新名>` は、その新規則のrecipeの**後ろ**だけ許す。
-既存規則とrecipeの間への挿入、`.PHONY` の後のtab行は拒否する。
-分割ファイルの追加は名前と `CHECK_PAR_ORDER += <番号>:<検査名>` の一致を確認する。
-既存の登録番号・位置の変更、規則の削除・変更、未知のmake構文はfull。
-旧形式の単一リストも、固定マーカーによる位置と名前集合の比較を保つ。
+詳しい選択・実行の契約は [run.md](design/tools/checks/run.md)。
+静的3本 (p2v・c-dialect・arch-asm) は元の変更パスを `--files` へ渡し、各検査器が翻訳単位へ展開する。
+段4・全列・変更指定なしの直接実行は全範囲を検査する。
 
 **新しい試験の足し方**:
 
-1. `build/checks.d/check-<name>.mk` を追加する。登録と規則はこの1ファイルに置く。
-   `CHECK_PAR_ORDER += 133:check-<name>`、規則、recipe、最後に `.PHONY` の順。
-2. `python3 tools/check_select.py --suggest check-<name>` を下書きに
-   `tools/check_map.d/check-<name>.yaml` を追加する。手で列挙するのはソース・試験・データ。
-   **ヘッダは手で列挙しない**。検査時の gcc -MM と静的includeの保守的な和から補う。
-   gccで処理できないターゲット専用TUや非活性の条件分岐も、既存の静的include走査を残して拾う。
+1. 検査ファイルへ `CHECK = dict(name=..., covers=[...], needs=[...], budget=...)` と `run(ctx)` を置く。
+   宣言の契約は [README](design/tools/checks/README.md)。名前は `make check-<name>` に対応する。
+2. `covers` に直接読む入力を書き、組立前提は `make:`、検査前提は `check:` で `needs` に書く。
+   自己ファイルは自動入力。依存から復元できるヘッダは自動抽出し、直接読むヘッダは残す。
 3. `make tests-inventory` で `build/out/` の試験表と runner 一覧を確認する (コミット不要)。
-4. `make check-map` と関連ホスト試験で確認する。`check-tests-inventory` は登録・入力対応を照合し、生成本文の鮮度は照合しない。
-
-全体設定 (`base_refs/ignore/full/docs_only/broad/docs_always/notest/artifact_readers`) は `tools/check_map.yaml`。
-lint は「手書きの一覧 + 自動ヘッダ依存」とrecipeからの入力を照合し、ソースの漏れ、古いglob、
-列との不一致、試験が読む入力へのnotest指定を拒否する。`--inputs` はヘッダ込み、`--suggest` はヘッダを除く。
-入力の組み立て方やコンパイル条件を完全には解釈しないため、動的な走査には広いglobを残す。
-選択で省くのは主に変異で、selでは正常試験を全て実行する。
+4. `python3 -B tools/checks/run.py --lint` と関連ホスト試験で確認する。
+   lint は宣言・入力・既存の成果物読取監査を行い、一覧生成器は CHECK の列と実行スクリプトを読む。
 
 - `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。
 - **変異試験は実物のソースを書き換えない** (2026-09-26〜)。変異は `tools/tests/mutpar.py` の

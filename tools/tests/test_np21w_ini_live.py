@@ -3,6 +3,10 @@
   python3 -B tools/tests/test_np21w_ini_live.py            # cases
   python3 -B tools/tests/test_np21w_ini_live.py --mutate   # plus mutants (make check-np21w-ini-live-host)
 """
+CHECK = dict(name='np21w-ini-live-host', tier=1,
+    covers=['tools/np21w_ini_live.py', 'tools/np21w_ini.py'],
+    needs=[], budget=2.110098)
+
 import copy
 import importlib.util
 import io
@@ -1762,3 +1766,16 @@ if __name__ == '__main__':
     if do_mutate and rc == 0:
         rc = 1 if mutate() else 0
     sys.exit(rc)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_np21w_ini_live.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

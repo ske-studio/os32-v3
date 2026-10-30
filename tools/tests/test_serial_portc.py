@@ -15,6 +15,10 @@ platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255
   python3 -B tools/tests/test_serial_portc.py            # 全ケース
   python3 -B tools/tests/test_serial_portc.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='serial-portc-host', tier=1,
+    covers=['drivers/char/serial.c', 'drivers/char/serial_plan.c', 'kernel/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.31909)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -213,3 +217,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_serial_portc.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -1,6 +1,10 @@
 """f8: execute the real Os32Alloc against mem_alloc/free mocks, without newlib.
 段: T2f f8
 """
+CHECK = dict(name='rust-alloc-host', tier=1,
+    covers=['sdk/rust/os32api/src/lib.rs', 'tools/tests/rust_alloc_host.rs', 'tools/tests/os32api_host.py'],
+    needs=[], budget=1.871332)
+
 import argparse
 from pathlib import Path
 import subprocess
@@ -54,3 +58,16 @@ def main():
             print(f'PASS {len(MUTATIONS)} runtime mutants')
     return 0
 if __name__=='__main__': raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_rust_alloc.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

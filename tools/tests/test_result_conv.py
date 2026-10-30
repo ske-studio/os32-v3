@@ -50,6 +50,10 @@
 
 make・エミュレータ・実配備には一切触れない。
 """
+CHECK = dict(name='result-conv-host', tier=1,
+    covers=['userland/tests/*.c', 'tools/tests/result_conv/run_font_load_test.c', 'tools/tests/result_conv/run_klibc_test.c', 'tools/tests/result_conv/run_restest.c', 'tools/tests/result_conv/run_stat_t.c', 'tools/tests/result_conv/run_test2.c', 'tools/tests/test_result_conv_host.c', 'userland/rust/alloc_demo/src/lib.rs', 'userland/tests/asset_test.c', 'userland/tests/font_load_test.c', 'userland/tests/klibc_test.c', 'userland/tests/restest.c', 'userland/tests/ring3_fault.c', 'userland/tests/ring3_guard.c', 'userland/tests/ring3_hello.c', 'userland/tests/stat_t.c', 'userland/tests/test2.c', 'tools/tests/mutpar.py', 'userland/tests/ring3_marker.h', 'userland/tests/nop.c', 'userland/tests/shm_reuse_test.c', 'userland/tests/shm_reuse_child.c'],
+    needs=[], budget=6.756212)
+
 import os
 import pathlib
 import re
@@ -629,3 +633,16 @@ if __name__ == "__main__":
             failed += run_mutations(tmp)
 
         sys.exit(1 if failed else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_result_conv.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

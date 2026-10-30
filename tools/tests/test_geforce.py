@@ -1,4 +1,8 @@
 """P5 HAL, real P3 start state machine, real ledger/selection and byte routing."""
+CHECK = dict(name='geforce-host', tier=1,
+    covers=['drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/pc98/pc98_route.c', 'drivers/video/pc98/pc98_route.h', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/geforce_body.c', 'lib/pc98_cell.h', 'gfx/gfx_core.c', 'include/gfx_hal.h', 'include/video_service.h', 'init/kernel.c', 'mm/pgalloc.h', 'hwdev/gf/service.c', 'hwdev/gf/display/modes.c', 'tools/tests/backend_geforce_host.c', 'tools/tests/gf_present_host.c', 'tools/tests/pc98_route_host.c', 'tools/tests/geforce_core_cases.inc', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/serial_diag_host.h', 'build/geforce-module.mk', 'build/geforce-module.ld', 'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py', 'tools/module_schema.py', 'build/core.yaml', 'build/kernel.mk', 'Makefile', 'tools/tests/geforce_module_host.c', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/mkmod.py', 'build/out/geforce.mod', 'build/out/geforce/*', 'build/out/kernel.elf', 'build/out/vmkernel.lz4', 'include/gfx_format.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/palette.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'lib/serial_diag.h', 'gfx/gfx_internal.h', 'tools/tests/gfx_reinit_host.c', 'tools/tests/test_gfx_reinit.py', 'lib/utf8.c', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'tools/run_host_group.py', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'platform/pc98/boot_names.c', 'hwdev/gf/internal.h', 'hwdev/gfinit_mode.h', 'drivers/base/dev.c', 'fs/vfs.c', 'lib/crc32_core.inc', 'sdk/kapi.json', 'drivers/video/geforce/geforce_platform.c', 'kernel/gui.c', 'kernel/gui.h', 'kernel/console/console.c', 'platform/pc98/console.c', 'platform/pc98/display.c', 'tools/tests/dep_dir_d_console_grid_host.c', 'tools/tests/test_dep_dir_d_console.py', 'hwdev/gf/production.h', 'include/gf_production.h', 'mm/memory_boot.c', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/fixtures/dep_dir_d/*', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def'],
+    needs=['make:all'], budget=60.0)
+
 from kernel_includes import include_flags
 from pathlib import Path
 from kernel_boot_source import kernel_source
@@ -205,3 +209,16 @@ def main():
     for args in ((0,0,0,0),(0,0,0,1),(1,0,0,0),(1,1,0,0),(0,0,1,0)): core(*args)
     return 0
 if __name__=='__main__': raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_geforce.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

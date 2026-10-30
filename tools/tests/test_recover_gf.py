@@ -1,4 +1,8 @@
 """GF rule evidence and real recover trace, without real opcode layouts (S2)."""
+CHECK = dict(name='recover-gf', tier=1,
+    covers=['kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/generated/recover_gf_tables.inc', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'tools/tests/gfinit_fixture.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'lib/crc32_core.inc', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'tools/tests/recover_cleanup_host.inc', 'hwdev/generated/gf_mode_rows.inc', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/quiesce_rows.h', 'tools/tests/recover_gf_cases_host.inc', 'tools/tests/recover_gf_fixture_host.inc'],
+    needs=[], budget=2.227022)
+
 import os
 import pathlib
 import subprocess
@@ -86,3 +90,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_recover_gf.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

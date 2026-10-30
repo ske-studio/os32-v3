@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Timing regressions with two fake checks; mutations never touch the live tree."""
+CHECK = dict(name='check-times-host', tier=1,
+    covers=['tools/checks/run.py', 'tools/check_time.py', 'build/sdk.mk', 'sdk/kapi.json'],
+    needs=[], budget=47.1)
+
 import contextlib
 import io
 import os
@@ -13,6 +17,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 TIMER = (ROOT / 'tools/check_time.py').read_text()
 SDK = (ROOT / 'build/sdk.mk').read_text()
+RUNNER = (ROOT / 'tools/checks/run.py').read_text()
 
 
 class CheckTimesTest(unittest.TestCase):
@@ -20,33 +25,41 @@ class CheckTimesTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for directory in ('tools', 'sdk', 'build/checks.d'):
-            (self.root / directory).mkdir(parents=True)
+        for directory in ('tools/checks', 'sdk', 'build'):
+            (self.root / directory).mkdir(parents=True, exist_ok=True)
         self.write('tools/check_time.py', TIMER)
         self.write('build/sdk.mk', SDK)
+        self.write('tools/checks/run.py', RUNNER)
+        self.write('drivers/video/a.c', 'int a;\n')
+        subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         self.write('sdk/kapi.json', '{"version": 1}')
-        self.write('Makefile', 'BUILD_OUT = build/out\ninclude build/sdk.mk\n')
-        self.write('build/checks.d/fake.mk',
-                   'CHECK_PAR_ORDER += 001:check-a 002:check-b\n'
-                   'check-a:\n\t@echo fake-a; sleep 0.03\n'
-                   'check-b:\n\t@echo fake-b >&2; exit $(FAIL)\n'
-                   '.PHONY: check-a check-b\nFAIL ?= 0\n')
-        # These generated stubs are fixture inputs, not copies of the real tools.
-        stubs = {'check_tree_unchanged': '',
-                 'check_select': 'print(' + repr('CC_STAGE1="check-a check-b"\n'
-                                                'CC_MUT1="check-b"\nCC_SUMMARY=fixture') + ')\n'}
-        for name, source in stubs.items():
-            self.write(f'tools/{name}.py', source)
+        self.write('Makefile', 'BUILD_OUT = build/out\n'
+                   'FAIL ?= 0\nPREP_FAIL ?= 0\nexport FAIL PREP_FAIL EMPTY\ninclude build/sdk.mk\n'
+                   '.PHONY: shared\nshared:\n\t@echo prepared >> prepared\n\t@exit $(PREP_FAIL)\n')
+        for name in ('a', 'b'):
+            self.write(f'tools/checks/{name}.py',
+                       f"CHECK = dict(name='{name}', covers=['drivers/video/a.c'], budget=1, needs=['make:shared'])\n"
+                       'def run(ctx):\n    import os, subprocess, time\n'
+                       + ('    time.sleep(0.03)\n    print("fake-a", flush=True)\n    return 0\n'
+                          if name == 'a' else
+                          '    print("fake-b", file=__import__("sys").stderr, flush=True)\n'
+                          '    return int(os.environ.get("FAIL", "0"))\n'))
+        self.write('tools/' + 'check_tree_unchanged.py', '')
         self.env = dict(os.environ)
         # 呼び手の CHECK_TIMES・CHECK_TIME_CHILD を引き継ぐと、偽の木の表の置き場や前提が変わる。
-        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD'):
+        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD', 'CC_FILES_JSON', 'CC_TIER',
+                    'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY',
+                    'CHECK_NEEDS', 'CHECK_PAR_TARGETS', 'CHECK_NO_NEEDS'):
             self.env.pop(key, None)
 
     def write(self, path, text):
-        (self.root / path).write_text(text)
+        dest = self.root / path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text)
 
     def make(self, target, *args):
-        return subprocess.run(['make', '--no-print-directory', '-j2', '-k', target, *args],
+        return subprocess.run(['make', '--no-print-directory', '-j2', '-k', target,
+                               'FILES=drivers/video/a.c', *args],
                               cwd=self.root, env=self.env, capture_output=True, text=True,
                               timeout=15)
 
@@ -69,6 +82,8 @@ class CheckTimesTest(unittest.TestCase):
                     self.assertEqual(result.returncode, 2 if fail else 0,
                                      result.stdout + result.stderr)
                     rows = self.rows(path)
+                    if target == 'check-changed':
+                        self.assertIn('tier 2, 2 checks', result.stderr)
                     self.assertEqual(rows['check-a'][1], 0)
                     self.assertEqual(rows['check-b'][1], 2 if fail else 0)
                     self.assertGreaterEqual(rows['check-a'][0], 0.03)
@@ -78,6 +93,42 @@ class CheckTimesTest(unittest.TestCase):
         result = self.make('check-par')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.rows(self.root / 'build/out/check_times.tsv')
+
+    def test_prepare_once_direct_empty_and_failure(self):
+        for target in ('check-par', 'check-changed', 'check-fast', 'check-a'):
+            with self.subTest(target=target):
+                prepared = self.root / 'prepared'
+                prepared.unlink(missing_ok=True)
+                result = self.make(target, 'MUTATE=0')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(prepared.read_text().splitlines(), ['prepared'])
+                prepared.unlink()
+                result = self.make(target, 'PREP_FAIL=7', 'MUTATE=0')
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn('fake-a', result.stdout)
+                self.assertNotIn('fake-b', result.stderr)
+        (self.root / 'prepared').unlink()
+        result = self.make('check-changed', 'FILES=userland/cmds/untested.c')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.root / 'prepared').exists())
+        self.assertEqual((self.root / 'build/out/check_times.tsv').read_text(), '')
+
+    def test_direct_make_dry_run_does_not_execute_check(self):
+        result = self.make('check-a', '-n')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('--run check-a', result.stdout)
+        self.assertNotIn('fake-a', result.stdout)
+        self.assertFalse((self.root / 'prepared').exists())
+        normal = self.make('check-a', 'MAKEFLAGS= -- RUNNER_NAME=normal')
+        self.assertEqual(normal.returncode, 0, normal.stdout + normal.stderr)
+        self.assertIn('fake-a', normal.stdout)
+
+    def test_listing_failure_stops_make(self):
+        self.write('tools/checks/a.py', 'CHECK = dict(name="a", covers=[], budget=False)\ndef run(ctx): return 0\n')
+        result = self.make('check-par')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('--list failed', result.stderr)
+        self.assertFalse((self.root / 'prepared').exists())
 
     def test_command_rc_and_output(self):
         path = self.root / 'direct.tsv'
@@ -126,3 +177,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_check_times.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

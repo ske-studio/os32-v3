@@ -17,6 +17,10 @@
 SKIP と出す)。恒等の対照 (何も変えない置換) は GREEN でなければならない —
 RED なら変異の仕組みそのものが壊れている。
 """
+CHECK = dict(name='bootlog-host', tier=1,
+    covers=['fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c', 'init/bootlog.c', 'init/bootlog_save.c', 'kernel/console/console.c', 'init/kernel.c', 'tools/tests/bootlog_host.c', 'fs/vfs_name_rules.inc', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=[], budget=1.63287)
+
 from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import pathlib
@@ -295,3 +299,16 @@ if __name__ == "__main__":
             rc += mutate(tmp)
         print("RESULT " + ("PASS" if rc == 0 else "FAIL"), flush=True)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_bootlog.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

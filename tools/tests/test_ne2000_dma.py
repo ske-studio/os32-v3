@@ -1,4 +1,8 @@
 """D04: execute the real NE2000 DMA paths with recorded I/O and PIO seams."""
+CHECK = dict(name='ne2000-dma-host', tier=1,
+    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=60.0)
+
 import os
 from pathlib import Path
 import subprocess
@@ -65,3 +69,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_ne2000_dma.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0
