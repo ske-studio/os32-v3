@@ -28,39 +28,8 @@
 
 /* ======== 数値→文字列変換 (kprintf.h で公開) ======== */
 
-/* 符号なし10進を文字列バッファに変換 (末尾NUL付き) */
-/* 戻り値: 桁数 */
-int kutoa_dec(u32 val, char *buf, int bufsz)
-{
-    int i = bufsz - 1;
-    int len;
-    buf[i] = '\0';
-    i--;
-    if (val == 0) {
-        buf[i] = '0';
-        i--;
-    } else {
-        while (val > 0 && i >= 0) {
-            buf[i] = '0' + (char)(val % 10);
-            val /= 10;
-            i--;
-        }
-    }
-    len = bufsz - 2 - i;
-    /* バッファ先頭に移動 */
-    {
-        int j;
-        int start = i + 1;
-        for (j = 0; j < len; j++) {
-            buf[j] = buf[start + j];
-        }
-    }
-    buf[len] = '\0';
-    return len;
-}
-
-/* 符号なし16進を文字列バッファに変換 */
-int kutoa_hex(u32 val, char *buf, int bufsz, int upper)
+/* 末尾から桁を生成し、バッファ先頭に詰める。 */
+static int kutoa_base(u32 val, char *buf, int bufsz, int hex, int upper)
 {
     const char *digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
     int i = bufsz - 1;
@@ -72,8 +41,13 @@ int kutoa_hex(u32 val, char *buf, int bufsz, int upper)
         i--;
     } else {
         while (val > 0 && i >= 0) {
-            buf[i] = digits[val & 0xF];
-            val >>= 4;
+            if (hex) {
+                buf[i] = digits[val & 0xF];
+                val >>= 4;
+            } else {
+                buf[i] = '0' + (char)(val % 10);
+                val /= 10;
+            }
             i--;
         }
     }
@@ -87,6 +61,18 @@ int kutoa_hex(u32 val, char *buf, int bufsz, int upper)
     }
     buf[len] = '\0';
     return len;
+}
+
+/* 符号なし10進を文字列バッファに変換 (末尾NUL付き)。戻り値: 桁数 */
+int kutoa_dec(u32 val, char *buf, int bufsz)
+{
+    return kutoa_base(val, buf, bufsz, 0, 0);
+}
+
+/* 符号なし16進を文字列バッファに変換 */
+int kutoa_hex(u32 val, char *buf, int bufsz, int upper)
+{
+    return kutoa_base(val, buf, bufsz, 1, upper);
 }
 
 /* ======== 内部: パディング付き出力 ======== */

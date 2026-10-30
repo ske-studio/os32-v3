@@ -88,8 +88,23 @@ static void invoke(u32 args, int accepted, const char *expected)
     for (u32 i = 0; i < KAPI_PRINT_ARG_LIMIT; i++) CHECK(!allocated[i]);
 }
 
+static void kutoa_tests(void)
+{
+    char buf[16];
+    CHECK(kutoa_dec(0, buf, 2) == 1 && equal(buf, "0"));
+    CHECK(kutoa_hex(0, buf, 2, 0) == 1 && equal(buf, "0"));
+    CHECK(kutoa_dec(12345, buf, 2) == 1 && equal(buf, "5"));
+    CHECK(kutoa_dec(12345, buf, 4) == 3 && equal(buf, "345"));
+    CHECK(kutoa_dec(~0U, buf, sizeof(buf)) == 10 && equal(buf, "4294967295"));
+    CHECK(kutoa_hex(0x123ab, buf, 2, 0) == 1 && equal(buf, "b"));
+    CHECK(kutoa_hex(0x123ab, buf, 4, 0) == 3 && equal(buf, "3ab"));
+    CHECK(kutoa_hex(0x123ab, buf, 4, 1) == 3 && equal(buf, "3AB"));
+    CHECK(kutoa_hex(0x1234abcd, buf, sizeof(buf), 0) == 8 && equal(buf, "1234abcd"));
+}
+
 static void caller_copy_tests(void)
 {
+    kutoa_tests();
     CallerAccessFrame previous;
     u32 va = MEM_EXEC_LOAD_ADDR, tail = va + PAGE_SIZE;
     u32 *pt = P2V(space.app_pt_phys[0]);
