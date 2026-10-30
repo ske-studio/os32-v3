@@ -141,6 +141,7 @@ G02a/G08/F10/G11 の補強も既存 fixture に不足する対象契約だけを
 ### 5.1 抽出（E 群、別々の依頼）
 
 > **ユーザー指示 (2026-10-30)**: 「これは対処しておかないとどんどん肥大化すると思います。このセクションだけ sol や terra ではなくすべて astra で行うように。再調査し直して事にあたってください。」— E 群は**実装も調べもすべて astra**。配置の整理の後の今のコードで再調査 (`~/os32-tmp/run/e-group/RESURVEY.md`) してから、段ごとに出す。E04 は main、E08 は外した (+41 行で追う先が増えただけ、2026-10-30)。
+> **2026-10-30 の進み (すべて astra)**: kselftest.c を 1 試験 1 ファイル (kdebug/kselftest/*.inc 42 本、2,495→313 行、機械語一致、c34dbed8)。E01a・E02a・E03a・E05b・E06a・E07a は main (e25bfb4e、切り出した関数は別ファイル `<元>_<機能>.inc`、Opus レビュー)。E03b・E05a は切らない (再調査の判定)。kselftest の再設計 6 本 (時計 = E08 段 1・launch・db_v50・resume_mark・irq_dynamic・con_sink) は b84a13c8 — 人工の状態を作る判定をホストの試験へ、私有 import 27 枠を retained、NP21/W で自己試験 1817→1748・fail 0。**残り**: E01b・E02b・E06b・E07b (前の段のゲスト受入の後)、**E08 段 2** (カーネル側の試験の口 — time_test_feed・time_branch_hits の上書き・計数、launch_selftest・db_v50_selftest・appslot の resume mark selftest・irq の試験用の口 — を製品の時計・機能から切り離す。番号は残す)。
 > **E08 は再設計** (ユーザー 2026-10-30「冗長と言うより要らなくなった機能がたくさんある」— 調べは `~/os32-tmp/run/e-group/E08_REDESIGN.md`、astra)。**実装に入る直前の main に注釈付きタグ `pre-e08-redesign` を打って push し、戻れるようにする** (ユーザー指示「E08 実装時点でタグを打って戻れるように」)。戻すときは `git revert` で E08 の取り込みを打ち消す (main の履歴は書き換えない)。
 
 抽出は元ファイルの中で関数境界を作る段。S 群のファイル移動と同じ差分に混ぜない。機械語の比較基点は E 群受入後に取り直す。新しい処理・検査を足さず、既存の順と返値を保つ。
