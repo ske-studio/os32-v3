@@ -7,7 +7,7 @@ from source_roots import SCAN_ROOTS
 import pathlib
 import re
 import clang_ast as ast
-from clang_ast.build import select_units
+from clang_ast.build import dependency_files, select_units
 
 ROOT = ast.ROOT
 ROOTS = SCAN_ROOTS['p2v']
@@ -207,6 +207,7 @@ def scan(source):
 
 
 def audit(root, changed=None):
+    changed = dependency_files(changed)
     root = pathlib.Path(root).absolute()
     allowed, errors = {}, []
     for line in (root / 'tools/check_p2v_allow.txt').read_text().splitlines():

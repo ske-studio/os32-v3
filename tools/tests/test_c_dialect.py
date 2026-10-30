@@ -492,6 +492,31 @@ def case_build_coverage(cd):
         check(summary['counts'].get('gnu11', 0) > 0, 'gnu11 TU count retained')
 
 
+def case_non_dependency_inputs(cd):
+    from unittest import mock
+    with tempfile.TemporaryDirectory() as td:
+        root = pathlib.Path(td)
+        sample = root / cd.SAMPLE_DIR
+        sample.mkdir(parents=True)
+        (root / 'build').mkdir()
+        (root / 'build/sdk.mk').write_text('SDK_LIB_HEADER_DIRS :=\n')
+        (sample / 'hello.c').write_text('int main(void) { return 0; }\n')
+        (sample / 'Makefile').write_text('CFLAGS = -std=gnu11\n')
+        full = cd.check_sdk_sample(root)
+        check(bool(full) and cd.check_sdk_sample(root, files=[cd.SAMPLE_DIR + '/Makefile']) == full,
+              'SDK Makefile edit retains the full gnu89 mode check')
+        for checker in (cd.check_sdk_headers, cd.check_sdk_lib_headers):
+            check(checker(root, files=['build/sdk.mk']) == checker(root),
+                  checker.__name__ + ': build edit retains empty-header rejection')
+    lines = 'i386-elf-gcc -std=gnu89 -c init/kernel.c -o kernel.o\n'
+    with mock.patch.object(cd, 'dry_run', return_value=(0, lines, '')), \
+            mock.patch.object(cd, 'probe_rejects', return_value=[]):
+        full = cd.check_build_flags(ROOT)
+        changed = cd.check_build_flags(ROOT, files=['build/config.mk'])
+    check(bool(full[0]) and changed == full,
+          'build/config.mk edit retains every TU, required source and language mode check')
+
+
 def case_make_variants():
     # 親の make の旗と変数指定は MAKEFLAGS のまま子の make -n に渡す (Codex P2-1、2 回目 1・2)
     base = dict(os.environ)
@@ -712,6 +737,7 @@ def main(argv):
     case_internal_cache(cd)
     case_suite_cache_owner(cd)
     case_build_coverage(cd)
+    case_non_dependency_inputs(cd)
     sys.path.insert(0, str(ROOT / "tools"))
     import check_select
     if "--mutate" in argv or check_select.dialect_variants_needed():

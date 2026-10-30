@@ -55,6 +55,15 @@ class ClangTest(unittest.TestCase):
             self.assertEqual(select(['one/config.h']), units[:1])
             self.assertEqual(select([str(root / 'one/body.inc')]), units[:1])
             self.assertEqual(select(['forced.h']), units[2:])
+            # Non-dependency inputs can change any TU; do not scan a partial graph.
+            with mock.patch.object(subprocess, 'run', side_effect=AssertionError('dependency scan')):
+                for changed in ('tools/prototypes/geforce_imports.def', 'Makefile',
+                                'sdk/example/hello/Makefile', 'build/config.mk',
+                                'build/sdk.mk', 'tools/gen_sqlite_imports.py'):
+                    with self.subTest(changed=changed):
+                        self.assertIs(select(['active.c', changed]), units)
+            for suffix in ('.asm', '.s', '.S'):
+                self.assertEqual(select(['unrelated' + suffix]), [])
             # Read dependencies again after an include changes; no stale graph.
             (root / 'one/config.h').write_text('int replaced;\n')
             self.assertEqual(select(['one/body.inc']), [])
@@ -75,6 +84,9 @@ class ClangTest(unittest.TestCase):
                 errors, _ = p2v.audit(root, ['kernel/selected.c'])
             self.assertEqual(errors, ['stale exception: kernel/empty.h:removed',
                                       'stale exception: kernel/selected.c:removed'])
+            with mock.patch.object(a, 'units', return_value=units):
+                errors, _ = p2v.audit(root, ['tools/prototypes/geforce_imports.def'])
+            self.assertIn('stale exception: kernel/elsewhere.c:missing', errors)
 
     def test_partial_build_flags_keep_selected_mode_checks(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -86,7 +86,7 @@ PROBES = (
 
 
 # Build command extraction is shared by every AST checker.
-from clang_ast.build import parse_compile_lines, strip_jobserver, dry_run, select_units
+from clang_ast.build import parse_compile_lines, strip_jobserver, dry_run, dependency_files, select_units
 import clang_ast as ast
 from clang_ast.dialect import findings as ast_findings
 
@@ -215,6 +215,7 @@ def _rel(root, p):
 # ==========================================================================
 
 def sdk_public_headers(root, files=None):
+    files = dependency_files(files)
     root = pathlib.Path(root)
     hs = sorted((root / SDK_HDR_DIR).glob("*.h"))
     hs += [root / x for x in SDK_EXTRA_HDRS if (root / x).is_file()]
@@ -243,6 +244,7 @@ def _selected_headers(root, headers, files, argv, prelude):
 
 def check_sdk_headers(root, cc=None, files=None):
     """公開 SDK ヘッダの問題の並び (空なら合格)。"""
+    files = dependency_files(files)
     root = pathlib.Path(root)
     cc = cc or CC
     probs = []
@@ -322,6 +324,7 @@ def _lib_incs(root, cc, dirs):
 
 
 def check_sdk_lib_headers(root, cc=None, files=None):
+    files = dependency_files(files)
     root = pathlib.Path(root)
     cc = cc or CC
     dirs, hs = sdk_lib_headers(root)
@@ -346,6 +349,7 @@ def check_sdk_lib_headers(root, cc=None, files=None):
 
 def check_sdk_sample(root, cc=None, files=None):
     """sdk/example/hello が gnu89 のまま、in-tree の SDK ヘッダでコンパイルできるか。"""
+    files = dependency_files(files)
     root = pathlib.Path(root)
     cc = cc or CC
     if files is not None:
@@ -517,6 +521,7 @@ def check_internal_units(units, root, jobs=None, cache=None):
 
 def check_build_flags(root, files=None):
     """(問題の並び, 要約の辞書)。"""
+    files = dependency_files(files)
     root = pathlib.Path(root)
     rc, out, err = dry_run(root)
     if rc != 0:

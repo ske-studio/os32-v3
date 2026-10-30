@@ -10,6 +10,14 @@ ARG_KEEP = {"-include", "-imacros", "-x"}
 SEPARATORS = {"&&", "||", ";", "|", "then", "do", "else"}
 
 
+def dependency_files(files):
+    """Fall back to whole-tree checks for inputs outside compiler dependencies."""
+    if files is None or any(pathlib.Path(f).suffix.lower() not in
+                            {'.c', '.h', '.inc', '.asm', '.s'} for f in files):
+        return None
+    return files
+
+
 def select_units(units, root, files):
     """Select changed sources and their includers using each build's flags.
 
@@ -17,6 +25,7 @@ def select_units(units, root, files):
     are read afresh, so header edits and include-search changes need no cache.
     Both raw make commands and units()'s source-free argv are accepted.
     """
+    files = dependency_files(files)
     if files is None:
         return units
     from . import ParseError, cross_compiler, flags
