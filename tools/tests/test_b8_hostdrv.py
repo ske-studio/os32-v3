@@ -14,7 +14,7 @@ IRP_MJ_CREATE が返す NTSTATUS を 1 つずつ指定して
 **その手前の hostdrv_create() の失敗が全部 NOTFOUND に畳まれている**ことを
 見逃した。純関数だけでは足りない。
 
-  python3 -B tools/tests/test_b8_hostdrv.py [--target]
+  python3 -B tools/tests/test_b8_hostdrv.py [--target] [--mutate]
 
 --target を付けると fs/hostdrv/hostdrvfs.c が実ビルドの素性でも通ることを見る。
 make・エミュレータ・実配備には一切触れない。
@@ -49,6 +49,64 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-D__KERNEL_BUILD__",
                     *include_flags(ROOT)]
 
+DELETE_SET_CLOSE = """    disp.DeleteFileOnClose = 1;
+    rc = hostdrv_set_info(NP2_FileDispositionInformation, &disp, sizeof(disp));
+
+    hostdrv_cleanup_close();
+
+    return (rc == 0) ? VFS_OK : VFS_ERR_IO;"""
+DELETE_OPEN = """    rc = hostdrv_create(path, NP2_FILE_OPEN,
+                        options_flags | NP2_FILE_SYNCHRONOUS_IO_NONALERT,
+                        NP2_DELETE);
+    if (rc < 0) return rc;"""
+MUTANTS = [
+    ("rmdir uses file attribute",
+     "return hdrv_delete(path, NP2_FILE_DIRECTORY_FILE);",
+     "return hdrv_delete(path, NP2_FILE_NON_DIRECTORY_FILE);"),
+    ("unlink uses directory attribute",
+     "return hdrv_delete(path, NP2_FILE_NON_DIRECTORY_FILE);",
+     "return hdrv_delete(path, NP2_FILE_DIRECTORY_FILE);"),
+    ("OPEN failure is flattened", DELETE_OPEN,
+     DELETE_OPEN.replace("return rc;", "return VFS_ERR_NOTFOUND;")),
+    ("delete flag is cleared", DELETE_SET_CLOSE,
+     DELETE_SET_CLOSE.replace("DeleteFileOnClose = 1", "DeleteFileOnClose = 0")),
+    ("close precedes delete disposition", DELETE_SET_CLOSE,
+     DELETE_SET_CLOSE.replace("    hostdrv_cleanup_close();\n", "").replace(
+         "    disp.DeleteFileOnClose = 1;",
+         "    hostdrv_cleanup_close();\n    disp.DeleteFileOnClose = 1;")),
+    ("failed disposition skips close", DELETE_SET_CLOSE,
+     DELETE_SET_CLOSE.replace("    hostdrv_cleanup_close();",
+                              "    if (rc == 0) hostdrv_cleanup_close();")),
+    ("failed disposition reports success", DELETE_SET_CLOSE,
+     DELETE_SET_CLOSE.replace("return (rc == 0) ? VFS_OK : VFS_ERR_IO;",
+                              "return VFS_OK;")),
+]
+
+
+def mutants(tmp):
+    source = (ROOT / "fs/hostdrv/hostdrvfs.c").read_text()
+    fixture = SRC.read_text().replace('"../../lib/kutf16.c"',
+                                      '"' + str(ROOT / "lib/kutf16.c") + '"')
+    for i, (name, before, after) in enumerate(MUTANTS):
+        count = source.count(before)
+        if count != 1:
+            raise RuntimeError(f"MUTANT {name}: expected one marker, found {count}")
+        copied = tmp / f"hostdrvfs_m{i}.c"
+        copied.write_text(source.replace(before, after).replace(
+            '"../vfs_name_rules.inc"', '"' + str(ROOT / "fs/vfs_name_rules.inc") + '"'))
+        host = tmp / f"host_m{i}.c"
+        host.write_text(fixture.replace('"../../fs/hostdrv/hostdrvfs.c"',
+                                       '"' + str(copied) + '"'))
+        exe = tmp / f"mutant{i}"
+        subprocess.run(["gcc", *HOST_FLAGS, *INCLUDES, str(host), "-o", str(exe)],
+                       cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=120,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if result.returncode != 1 or b"FAIL line" not in result.stdout:
+            raise RuntimeError(f"MUTANT {name}: expected assertion RED, rc={result.returncode}")
+        print(f"MUTANT {i} ({name}): marker=1, COMPILE PASS, runtime RED (rc=1)", flush=True)
+
+
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-b8hd-") as tmp:
         tmp = pathlib.Path(tmp)
@@ -65,4 +123,8 @@ if __name__ == "__main__":
                             "-o", str(tmp / "hostdrvfs.o")], cwd=ROOT, check=True)
             print("TARGET i386-elf COMPILE PASS (fs/hostdrv/hostdrvfs.c)", flush=True)
 
-        sys.exit(rc)
+        if rc != 0:
+            sys.exit(rc)
+        if "--mutate" in sys.argv:
+            mutants(tmp)
+        sys.exit(0)
