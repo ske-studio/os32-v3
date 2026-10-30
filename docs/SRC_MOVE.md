@@ -33,8 +33,8 @@
 ### 完了条件 (実装者 — 試験は回さない)
 
 - `make all` rc=0
-- `tools/build_compare.sh <基点> HEAD` で 28 本がバイト一致。**例外**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「関数ごとの差が検算値の定数 (`movl $0x…` の 4 バイト) の入れ替えだけ」で一致とみなす。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外したので、置き場だけでは値は変わらない
-- `tools/include_resolve.py` の解決先が前後で一致 (パスの付け替えを除いて)
+- `tools/build_compare.sh <基点> HEAD` で 28 本がバイト一致。**例外**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「関数ごとの差が検算値の定数の入れ替えだけ (`movl`・`cmpl` などの即値 4 バイト。HWDEV の CRC は照合の `cmpl` にも出る、L2)」で一致とみなす。成果物ごとの差のバイト数は 8〜40 程度 (L1・L2 の実績)。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外したので、置き場だけでは値は変わらない
+- `tools/include_resolve.py` の解決先が前後で一致 (パスの付け替えを除いて)。比べ方は**単位 (コンパイル単位・ファイル) ごとの解決先の集合**で — 生成ヘッダは include をパスの順に並べるので行番号では比べない (L2)。製品の単位で変化 0 件。試験の fixture で、前は解決しなかった include が同じディレクトリに来て解決するようになるのは差に数えない
 - 走査型の検査の走査ファイル数が前後で一致
 - `tools/tests`・`build/`・`tools/check_map.d` で旧いパスを grep して 0 件 (道具の一覧の取りこぼしの確かめ)
 - `python3 tools/check_select.py --lint` rc=0
@@ -52,5 +52,6 @@
 | L1 | 取り込みの検査で試験 111 本が落ちた — 試験がそれぞれ自分の -I でカーネルのソースを組み、新しいディレクトリが無かった | 試験の -I を `kernel_includes.py` の 1 か所に (a4b679a1)、完了条件に旧パスの grep 0 件 |
 | L1 | ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` がパスで部品を選んでいて、道具の一覧に出た所を手で直した | 手順 4 |
 | L1 | 新しいディレクトリを `config.mk` の INC_* 7 行に別々に書き足した (取りこぼしの元) | 手順 1 (KERNEL_SRC_DIRS) |
-| (L2 で初) | 同名のヘッダ `include/kbd.h` と `drivers/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる |
+| L2 | include の照合を行番号で比べ 870 件の差に見えた — 生成ヘッダの include の並びがパス順で入れ替わっただけ | 単位ごとの集合で比べる (§3)。製品 0 件 |
+| L2 | 同名のヘッダ `include/kbd.h` と `drivers/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |
