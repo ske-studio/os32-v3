@@ -212,82 +212,11 @@ static void serial_probe_fifo(void)
     s_fifo_probed = 1;
 }
 
-/* ======================================================================== */
-/*  serial_init_ex — 初期化の本体 (互換 / V･FAST 共通)                      */
-/*                                                                          */
-/*  want_vfast が 0 なら従来とまったく同じ経路を通る。1 のときだけ          */
-/*  0138h / 013Ah を叩く。戻り 0 = V･FAST に入った / -1 = 互換。            */
-/* ======================================================================== */
-static int serial_init_ex(unsigned long baud, int want_vfast)
+/* 適用は呼出し元の IRQ 保護区間で行う。 */
+static void serial_apply_plan(unsigned long baud, unsigned long clk,
+                              struct serial_plan_out plan)
 {
-    struct serial_plan_out plan;
-    u8  mode;
-    unsigned long clk;
-    unsigned int irqf;
-    unsigned long keep;
-    int rc;
-
-    /* ==================================================================== */
-    /*  切替のあいだは IRQ4 を止める                                        */
-    /*                                                                      */
-    /*  **割り込み許可 (0035h bit0-2) を BSR で落とすだけでは排他にならない。*/
-    /*  NP21/W の `rs232c_callback` は許可ビットを見ずに `pic_setirq(4)` を  */
-    /*  上げるし、こちらの ISR 末尾も無条件で BSR により再許可する。止めないと:*/
-    /*    - `ser_head=0; ser_tail=0;` の直後に ISR が添字 0 へ書いて tail=1、 */
-    /*      そのあと初期化側が `ser_count=0` を書く → 読み手は head=0 から   */
-    /*      **古い値を 1 バイト返す**                                        */
-    /*    - `s_port_*` / `s_mask_*` を 1 本ずつ差し替えている最中に ISR が   */
-    /*      走ると、**新しいポートを古いビット位置で読む**                   */
-    /*  PIC のマスクと IF の両方を落とす。IF は元の状態へ戻す                */
-    /*  (`irq_save`/`irq_restore`) — 起動時は IF=0 で呼ばれることがある。    */
-    /*                                                                      */
-    /*  ⚠ **この区間で `kprintf` を呼んではいけない。** rshell 中の          */
-    /*  `console.c` は kprintf をシリアルへも流し、`serial_putchar` は予算を */
-    /*  使い切ると `_halt()` する。IF=0 の `hlt` は二度と起きない。          */
-    /*  報告は区間を出てから行う。                                          */
-    /* ==================================================================== */
-    irqf = irq_save();
-    irq_disable(PC98_IRQ_SERIAL);
-
-    /* ---- FIFO 搭載判定 (1 回だけ。0136h を読むだけで何も書かない) ---- */
-    serial_probe_fifo();
-
-    /* クロックは起動時に 0000:0501h から判定した保存値 (kernel/time/sysclk.c)。
-     * 未判定なら sysclk_hz() が従来値 (TIMER_CLK_1997) を返す。 */
-    clk = sysclk_hz();
-    if (baud == 0) baud = SER_BAUD_DEFAULT;
-    serial_plan(baud, (int)s_setup.has_fifo, clk, want_vfast, &plan);
-
-    /* ==================================================================== */
-    /*  出せない速度は **適用しない** (現状維持)                             */
-    /*                                                                      */
-    /*  以前は「WARN を出して実効値を適用」だった。それだと FIFO 非搭載機で  */
-    /*  `serial 115200` を打ったとき、2.4576MHz 系では count=1 = 153600bps が */
-    /*  そのまま入る。ホストは 115200 へ移ってしまうので、**戻すための       */
-    /*  `serial 9600` すら届かなくなる** (Codex レビュー blocker 2)。        */
-    /*  ここまでハードウェアには 1 バイトも書いていないので、そのまま戻れば  */
-    /*  いまの設定が生き残る。                                              */
-    /*                                                                      */
-    /*  起動時の既定 (SYS_SERIAL_BAUD = 9600) は 1.9968MHz / 2.4576MHz の    */
-    /*  どちらでも exact なので、この分岐を通らない。                        */
-    /* ==================================================================== */
-    if (plan.mode == SER_MODE_COMPAT && !plan.exact) {
-        keep = s_setup.actual;
-        if (ser_initialized) {
-            irq_enable(PC98_IRQ_SERIAL);   /* いまの設定を生かしたままにする */
-        }
-        irq_restore(irqf);
-        if (ser_initialized) {
-            kprintf(KLOG_LEGACY_YELLOW,
-                    "[ser] refuse %ubps: 8253 では %ubps になる (現状維持 %ubps)\n",
-                    (u32)baud, (u32)plan.actual, (u32)keep);
-        } else {
-            kprintf(KLOG_LEGACY_YELLOW,
-                    "[ser] refuse %ubps: 8253 では %ubps になる (未初期化のまま)\n",
-                    (u32)baud, (u32)plan.actual);
-        }
-        return SER_INIT_REFUSED;
-    }
+    u8 mode;
 
     /* ---- ここから実際に書く ---- */
     /* 全割り込みマスク。0035h を読み、**いま 1 のビットだけ** BSR で落とす
@@ -411,11 +340,11 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     outp(SYSPORT_C_BSR, BSR_BUZ_OFF);  /* 07h = 停止 (UNDOCUMENTED) */
 
     ser_initialized = 1;
-    rc = (plan.mode == SER_MODE_VFAST) ? SER_INIT_VFAST : SER_INIT_COMPAT;
+}
 
-    /* ---- 危険区間はここまで。IF を元へ戻す ---- */
-    irq_restore(irqf);
-
+static void serial_report_plan(unsigned long baud, unsigned long clk,
+                               struct serial_plan_out plan)
+{
     /* **報告は区間の外で。** rshell 中はこの kprintf がシリアルへも流れ、
      * `serial_putchar` が予算を使い切ると `_halt()` する ([V4] の報告より
      * 先に、IF=0 の hlt で止まらないことが要る)。 */
@@ -427,6 +356,91 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
                 (u32)baud, (u32)clk, (u32)plan.count,
                 s_setup.has_fifo ? " [FIFO available]" : "");
     }
+}
+
+/* ======================================================================== */
+/*  serial_init_ex — 初期化の本体 (互換 / V･FAST 共通)                      */
+/*                                                                          */
+/*  want_vfast が 0 なら従来とまったく同じ経路を通る。1 のときだけ          */
+/*  0138h / 013Ah を叩く。戻り 0 = V･FAST に入った / -1 = 互換。            */
+/* ======================================================================== */
+static int serial_init_ex(unsigned long baud, int want_vfast)
+{
+    struct serial_plan_out plan;
+    unsigned long clk;
+    unsigned int irqf;
+    unsigned long keep;
+    int rc;
+
+    /* ==================================================================== */
+    /*  切替のあいだは IRQ4 を止める                                        */
+    /*                                                                      */
+    /*  **割り込み許可 (0035h bit0-2) を BSR で落とすだけでは排他にならない。*/
+    /*  NP21/W の `rs232c_callback` は許可ビットを見ずに `pic_setirq(4)` を  */
+    /*  上げるし、こちらの ISR 末尾も無条件で BSR により再許可する。止めないと:*/
+    /*    - `ser_head=0; ser_tail=0;` の直後に ISR が添字 0 へ書いて tail=1、 */
+    /*      そのあと初期化側が `ser_count=0` を書く → 読み手は head=0 から   */
+    /*      **古い値を 1 バイト返す**                                        */
+    /*    - `s_port_*` / `s_mask_*` を 1 本ずつ差し替えている最中に ISR が   */
+    /*      走ると、**新しいポートを古いビット位置で読む**                   */
+    /*  PIC のマスクと IF の両方を落とす。IF は元の状態へ戻す                */
+    /*  (`irq_save`/`irq_restore`) — 起動時は IF=0 で呼ばれることがある。    */
+    /*                                                                      */
+    /*  ⚠ **この区間で `kprintf` を呼んではいけない。** rshell 中の          */
+    /*  `console.c` は kprintf をシリアルへも流し、`serial_putchar` は予算を */
+    /*  使い切ると `_halt()` する。IF=0 の `hlt` は二度と起きない。          */
+    /*  報告は区間を出てから行う。                                          */
+    /* ==================================================================== */
+    irqf = irq_save();
+    irq_disable(PC98_IRQ_SERIAL);
+
+    /* ---- FIFO 搭載判定 (1 回だけ。0136h を読むだけで何も書かない) ---- */
+    serial_probe_fifo();
+
+    /* クロックは起動時に 0000:0501h から判定した保存値 (kernel/time/sysclk.c)。
+     * 未判定なら sysclk_hz() が従来値 (TIMER_CLK_1997) を返す。 */
+    clk = sysclk_hz();
+    if (baud == 0) baud = SER_BAUD_DEFAULT;
+    serial_plan(baud, (int)s_setup.has_fifo, clk, want_vfast, &plan);
+
+    /* ==================================================================== */
+    /*  出せない速度は **適用しない** (現状維持)                             */
+    /*                                                                      */
+    /*  以前は「WARN を出して実効値を適用」だった。それだと FIFO 非搭載機で  */
+    /*  `serial 115200` を打ったとき、2.4576MHz 系では count=1 = 153600bps が */
+    /*  そのまま入る。ホストは 115200 へ移ってしまうので、**戻すための       */
+    /*  `serial 9600` すら届かなくなる** (Codex レビュー blocker 2)。        */
+    /*  ここまでハードウェアには 1 バイトも書いていないので、そのまま戻れば  */
+    /*  いまの設定が生き残る。                                              */
+    /*                                                                      */
+    /*  起動時の既定 (SYS_SERIAL_BAUD = 9600) は 1.9968MHz / 2.4576MHz の    */
+    /*  どちらでも exact なので、この分岐を通らない。                        */
+    /* ==================================================================== */
+    if (plan.mode == SER_MODE_COMPAT && !plan.exact) {
+        keep = s_setup.actual;
+        if (ser_initialized) {
+            irq_enable(PC98_IRQ_SERIAL);   /* いまの設定を生かしたままにする */
+        }
+        irq_restore(irqf);
+        if (ser_initialized) {
+            kprintf(KLOG_LEGACY_YELLOW,
+                    "[ser] refuse %ubps: 8253 では %ubps になる (現状維持 %ubps)\n",
+                    (u32)baud, (u32)plan.actual, (u32)keep);
+        } else {
+            kprintf(KLOG_LEGACY_YELLOW,
+                    "[ser] refuse %ubps: 8253 では %ubps になる (未初期化のまま)\n",
+                    (u32)baud, (u32)plan.actual);
+        }
+        return SER_INIT_REFUSED;
+    }
+
+    serial_apply_plan(baud, clk, plan);
+    rc = (plan.mode == SER_MODE_VFAST) ? SER_INIT_VFAST : SER_INIT_COMPAT;
+
+    /* ---- 危険区間はここまで。IF を元へ戻す ---- */
+    irq_restore(irqf);
+
+    serial_report_plan(baud, clk, plan);
     return rc;
 }
 
