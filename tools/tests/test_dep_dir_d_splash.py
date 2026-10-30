@@ -1,5 +1,5 @@
 """L20: pre-move planar bytes, boot lifecycle and isolated mutation preparation."""
-CHECK = dict(name='dep-dir-d-splash-host', tier=1,
+CHECK = dict(name='dep-dir-d-splash-host', tier=4,
     covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
