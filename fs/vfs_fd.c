@@ -10,26 +10,11 @@
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "console.h"
 #include "input_service.h"
+#include "kstring.h"
 
 #ifndef ATTR_WHITE
 #define ATTR_WHITE   TATTR_WHITE
 #endif
-
-/* ======== 内部ユーティリティ ======== */
-
-static int str_len(const char *s)
-{
-    int n = 0;
-    while (s[n]) n++;
-    return n;
-}
-
-static void str_cpy(char *dst, const char *src, int max)
-{
-    int i;
-    for (i = 0; i < max - 1 && src[i]; i++) dst[i] = src[i];
-    dst[i] = '\0';
-}
 
 /* ======================================================================== */
 /*  ストリーム操作 (ファイルディスクリプタ)                                  */
@@ -249,7 +234,7 @@ static int vfs_open_internal(const char *path, int mode, int owner,
     }
 
     open_files[fd].generation++;
-    str_cpy(open_files[fd].path, rel_path, VFS_MAX_PATH);
+    kstrlcpy(open_files[fd].path, rel_path, VFS_MAX_PATH);
     open_files[fd].offset = 0;
     open_files[fd].size = file_size;
     open_files[fd].mode = mode;
@@ -785,7 +770,7 @@ void vfs_sys_compat_shell_print(const char *s, u8 attr)
 {
     /* 互換機能として常に FD=1(標準出力) へ流し込む。色指定は無視される */
     if (!s) return;
-    vfs_write_fd(1, s, str_len(s));
+    vfs_write_fd(1, s, kstrlen(s));
 }
 
 /* SQLite uses these only in the existing non-reentrant normal context. */
