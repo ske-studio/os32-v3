@@ -1,4 +1,5 @@
 check-net-link-host:
+- lib/le_internal.h
 - kernel/irq/tick.c
 - kernel/irq/tick.h
 - platform/pc98/tick_order.h

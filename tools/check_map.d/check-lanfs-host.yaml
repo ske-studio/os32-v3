@@ -1,4 +1,5 @@
 check-lanfs-host:
+- lib/le_internal.h
 - fs/serialfs/serialfs.c
 - fs/serialfs/sfs_lan.c
 - fs/serialfs/sfs_lan.h

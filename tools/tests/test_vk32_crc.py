@@ -734,7 +734,7 @@ MUTATIONS = [
     ("script", "addr = spans[purpose][0]", "addr = spans[purpose][0] + 4096",
      0, "T3a1: SQLite の宛先を旧 0x200000 に強制"),
     ("script", "and not r['noload']", "", 0, "T3a1: NOLOAD をファイル長として扱う"),
-    ("vk32", "    if (rd32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;\n",
+    ("vk32", "    if (le_read32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;\n",
      "", 0, "C: 完全長を見ない"),
     ("vk32", "        return VK32_ERR_FILE_CRC;", "        ;", 0, "C: ファイル全体の CRC を見ない"),
     ("vk32", "            return VK32_ERR_ENTRY_CRC;", "            ;", 0, "C: 展開後の CRC を見ない"),
