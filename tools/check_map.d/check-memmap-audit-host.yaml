@@ -34,6 +34,7 @@ check-memmap-audit-host:
 - mm/pgalloc.c
 - mm/physmem.c
 - arch/x86/kernel/ring3_entry.asm
+- arch/x86/kernel/iret_user.inc
 - mm/shlib.c
 - mm/shlib.h
 - kernel/sys.c

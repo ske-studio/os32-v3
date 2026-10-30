@@ -21,6 +21,7 @@
 %include "arch/x86/kernel/cpu_flags.inc"
 ;; セレクタの正典は arch/x86/kernel/gdt.h (値の一致は host 試験で固定)。
 %include "arch/x86/kernel/entry_layout.inc"
+%include "arch/x86/kernel/iret_user.inc"
 
 cpu 386
 
@@ -72,21 +73,8 @@ global ring3_iret_to_user
 ring3_iret_to_user:
         popad                           ;; eax = 戻り値 (dispatcher が frame[7] に格納)
 
-        ;; --- IRETD_USER: CPL=3 へ戻るならユーザセグメントを復元 ---
         ;; popad 後 esp -> [EIP][CS][EFLAGS][userESP][userSS]
-        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM? (トランポリンは常に非V86)
-        jnz     .do_iret
-        test    dword [esp + IRET_CS_OFF], X86_SEL_RPL_MASK  ;; CS.RPL == 3 (CPL=3 へ戻る)?
-        jz      .do_iret
-        push    eax
-        mov     ax, USER_DS
-        mov     ds, ax
-        mov     es, ax
-        mov     fs, ax
-        mov     gs, ax
-        pop     eax
-.do_iret:
-        iretd
+        IRETD_USER
 
 ;; ============================================================
 ;; void __cdecl ring3_resume(const u32 *frame, u32 pd_phys, void *tss)
