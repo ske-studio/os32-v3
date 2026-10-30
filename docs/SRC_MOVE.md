@@ -57,4 +57,7 @@
 | L2 | 同名のヘッダ `include/kbd.h` と `drivers/input/kbd.h` (旧 `drivers/kbd.h`)、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
 | L2 | 道具が文書の見出しの中のパスも置換し、別の文書からその見出しへのリンクの断片 (`#2-1-カーネル-driverspcm_cs4231c…`) が切れた | 完了条件に `make check-docs-links` を足す (数秒) |
 | L2 | 取り込みの検査で 18 本が落ちた (L1 の 111 本から減った) — 残っていた自前の -I・分割パス・生成入力が部品のソースの隣にある前提・変異のコピーの親階層と -I の優先順 | 試験の -I を `kernel_includes.py` に寄せ切った。移動の後は変異のコピーの階層と -I の順・分割パス・生成物の隣接の前提も見る (sol の提案) |
+| L3 | `fs/fatfs` のようにディレクトリを文字列で書いた除外 (check_c_dialect・check_arm_compile・move_files) を道具が置換せず、第三者のコードの VLA を自前のコードと誤認した | 移動の後に、文字列で書いた旧いディレクトリ名を tools/ と build/ で grep する |
+| L3 | check_arm_compile が config.mk を自前で読み、L2 で入れた `$(addprefix -I,$(KERNEL_SRC_DIRS))` を展開できず L2 から壊れていた (取り込みの検査で選ばれず見えなかった) | make に展開させる形にした。config.mk を自前で読む道具は make 展開に寄せる |
+| L3 | 文書の追従 (L4 の残り) は sol が調べ (280 文書・97 か所)、PM が計画書 (直す 51・残す 46 の判断)、terra が当てた | 文書の追従の型 (調べ → PM の計画書 → 機械的な置換) |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |
