@@ -131,7 +131,7 @@ def run(runner, mutation=None):
     assert clock_wrapper
     sys_time = re.search(r'^os_time_t sys_time\(void\)\n\{.*?^\}',
                          (ROOT / 'kernel/sys.c').read_text(), re.M | re.S)
-    diskio = (ROOT / 'fs/fatfs/diskio.c').read_text()
+    diskio = (ROOT / 'fs/fat/fatfs/diskio.c').read_text()
     fattime = re.search(r'^DWORD get_fattime\(void\)\n\{.*?^\}', diskio, re.M | re.S)
     assert sys_time and fattime
     constants = '\n'.join(re.findall(r'^#define DOS_.*$', diskio, re.M))
@@ -226,7 +226,7 @@ def contracts():
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
     assert 'clock_register(&pc98_clock);' in bind
-    for name in ('kernel/sys.c', 'fs/fatfs/diskio.c'):
+    for name in ('kernel/sys.c', 'fs/fat/fatfs/diskio.c'):
         source = (ROOT / name).read_text()
         assert '#include "clock_service.h"' in source
         assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source

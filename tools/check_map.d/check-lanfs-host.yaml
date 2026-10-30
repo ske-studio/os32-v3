@@ -1,9 +1,9 @@
 check-lanfs-host:
-- fs/serialfs.c
-- fs/sfs_lan.c
-- fs/sfs_lan.h
-- fs/sfs_client.c
-- fs/sfs_proto.c
+- fs/serialfs/serialfs.c
+- fs/serialfs/sfs_lan.c
+- fs/serialfs/sfs_lan.h
+- fs/serialfs/sfs_client.c
+- fs/serialfs/sfs_proto.c
 - lib/crc32.c
 - lib/crc32_core.inc
 - tools/lanfs_host.py

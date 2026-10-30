@@ -274,7 +274,7 @@ int ext2_free_inode(Ext2Ctx *ctx, u32 ino)
 /* ======================================================================== */
 
 /* 「未割当 (0)」と「読めなかった (EXT2_ERR_IO)」を分けて返す。
- * 宣言の上のコメント (fs/ext2_priv.h) が決め方の理由を持つ (票 B8)。 */
+ * 宣言の上のコメント (fs/ext2/ext2_priv.h) が決め方の理由を持つ (票 B8)。 */
 int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
               u32 *out_phys)
 {

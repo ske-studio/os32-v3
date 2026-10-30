@@ -34,9 +34,9 @@
 #include "kpeek.h"
 #include "kdebug_window.h"
 #include "drivers/net/e82557/e82557.h"
-#include "fs/sfs_proto.h"
-#include "fs/sfs_lan.h"
-#include "fs/serialfs.h"
+#include "fs/serialfs/sfs_proto.h"
+#include "fs/serialfs/sfs_lan.h"
+#include "fs/serialfs/serialfs.h"
 #ifndef KPEEK_HOST
 #include "io.h"
 #include "generated/kdebug_import_macros.h"
@@ -162,7 +162,7 @@ static u32 kpeek_lan_send(const KdebugPeek *req)
     kpeek_put32(sfs + SFS_HDR_LEN, req->addr);
     for (i = 0; i < req->len; i++)
         sfs[SFS_HDR_LEN + KPEEK_LAN_ADDR_LEN + i] = req->data[i];
-    /* CRC32 は種別からペイロードの末尾まで (fs/sfs_proto.h) */
+    /* CRC32 は種別からペイロードの末尾まで (fs/serialfs/sfs_proto.h) */
     crc = crc32_core_final(crc32_core_update(CRC32_INIT, sfs + 3,
                                              SFS_HDR_LEN - 3U + plen));
     kpeek_put32(sfs + SFS_HDR_LEN + plen, crc);

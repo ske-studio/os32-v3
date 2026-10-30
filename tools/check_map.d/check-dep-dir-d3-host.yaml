@@ -1,7 +1,7 @@
 check-dep-dir-d3-host:
 - fs/vfs.h
 - fs/vfs.c
-- fs/ext2_vfs.c
+- fs/ext2/ext2_vfs.c
 - init/kernel.c
 - include/input_service.h
 - kernel/input_service.c

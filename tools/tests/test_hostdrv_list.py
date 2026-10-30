@@ -4,7 +4,7 @@
       (完了条件「I/O 失敗を成功にしない」/ 対象「HostDrv のエラー処理」)
 記録: tools/tests/h1_tdd.md
 
-tools/tests/hostdrv_list_host.c が fs/hostdrv_list_rules.inc を 1 行も写さず
+tools/tests/hostdrv_list_host.c が fs/hostdrv/hostdrv_list_rules.inc を 1 行も写さず
 そのまま #include し、`hostdrv_query_dir` に当たる 1 件取得だけを台本式の
 贋物に差し替えて回す (模型ではない)。注入するのは
 
@@ -16,7 +16,7 @@ tools/tests/hostdrv_list_host.c が fs/hostdrv_list_rules.inc を 1 行も写さ
   python3 -B tools/tests/test_hostdrv_list.py [--target]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-fs/hostdrvfs.c が -Werror で通ることを確かめる ([C1] GNU11)。
+fs/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる ([C1] GNU11)。
 make・エミュレータ・実配備には一切触れない。
 """
 from kernel_includes import include_flags
@@ -53,15 +53,15 @@ TARGET_KERNEL = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 
 
 def check_cap_constant():
-    """上限値が 1 か所 (fs/hostdrvfs.c) にしか無いことを確かめる ([C4])。
+    """上限値が 1 か所 (fs/hostdrv/hostdrvfs.c) にしか無いことを確かめる ([C4])。
 
     試験は上限を引数で受け取るので、本体の定数とずれても気づけない。
     ここで定義の存在と値を報告し、写しが増えていないかを見る。
     """
-    text = (ROOT / "fs/hostdrvfs.c").read_text()
+    text = (ROOT / "fs/hostdrv/hostdrvfs.c").read_text()
     m = re.search(r"^#define\s+HOSTDRV_MAX_DIR_ENTRIES\s+(\d+)", text, re.M)
     if not m:
-        raise SystemExit("fs/hostdrvfs.c に HOSTDRV_MAX_DIR_ENTRIES が無い")
+        raise SystemExit("fs/hostdrv/hostdrvfs.c に HOSTDRV_MAX_DIR_ENTRIES が無い")
     hits = len(re.findall(r"HOSTDRV_MAX_DIR_ENTRIES", text))
     if hits != 2:          # 定義 1 + 使用 1
         raise SystemExit(
@@ -88,9 +88,9 @@ if __name__ == "__main__":
 
         if "--target" in sys.argv:
             subprocess.run(["i386-elf-gcc", *TARGET_KERNEL, "-c",
-                            "fs/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
+                            "fs/hostdrv/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
                            cwd=ROOT, check=True)
-            print("TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)",
+            print("TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)",
                   flush=True)
 
         sys.exit(rc)

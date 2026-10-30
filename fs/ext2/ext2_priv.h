@@ -4,7 +4,7 @@
 #include "ext2.h"
 #include "ext2_ctx.h"
 #include "dev.h"
-#include "vfs.h"
+#include "../vfs.h"
 #include "kstring.h"
 /* 媒体の上の欄 (superblock / group descriptor / inode / dirent / 間接表) は
  * すべて LE のバイト列。`*(u32 *)&buf[off]` は x86 の非アラインアクセスと
@@ -103,9 +103,9 @@ int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
 int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block);
 
 /* ext2_write_block は 1KB ブロックを**セクタ 0 -> セクタ 1 の順**に 2 回に分けて
- * 書く (fs/ext2_super.c)。1 回の書き込みが途中で落ちると「前半だけ届いた」
+ * 書く (fs/ext2/ext2_super.c)。1 回の書き込みが途中で落ちると「前半だけ届いた」
  * 状態が媒体に残る。ディレクトリの更新はこの境界を意識して順序を決める
- * (票 B8 往復 4、fs/ext2_dir.c の ext2_add_entry)。 */
+ * (票 B8 往復 4、fs/ext2/ext2_dir.c の ext2_add_entry)。 */
 
 /* ---- ブロックの解放 (票 B8 往復 3) ----
  * 不変条件: **媒体上のどの参照も解放済みのブロックを指さない。**

@@ -62,7 +62,7 @@ ROOM_SIZES = [16652, 20160, 36000, 62496]
 CASE_TIMEOUT = 120
 
 SHARED = ["userland/system/inst_disk.c", "drivers/block/pc98pt.c",
-          "userland/shell/hdprep_plan.c", "fs/ext2_layout.c"]
+          "userland/shell/hdprep_plan.c", "fs/ext2/ext2_layout.c"]
 INS_SHARED = ["userland/system/inst_hdd.c"] + SHARED
 
 HOST = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
@@ -77,7 +77,7 @@ MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
           "userland/system/cdinst.c", "userland/system/install.c",
           "userland/system/install_recover.inc",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
-          "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "fs/ext2_layout.c", "fs/ext2_layout.h", "fs/ext2.h",
+          "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h", "fs/ext2/ext2.h",
           "boot/ext2_mini.c", "boot/boot_defs.h",
           "include/bootinfo.h", "include/types.h",
           "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h", "userland/lib/rt/dbgserial.h"]
@@ -256,7 +256,7 @@ def consts_cross_check(pure_exe):
         input="MAX_IMAGE_SIZE\n", text=True).strip()
     expr = re.sub(r"(?<=[0-9a-fA-F])[uUlL]+", "", expr)
     bad += eval(expr, {"__builtins__": {}}, {}) != kmax
-    ctx = (ROOT / "fs/ext2_ctx.h").read_text(encoding="utf-8")
+    ctx = (ROOT / "fs/ext2/ext2_ctx.h").read_text(encoding="utf-8")
     m = re.search(r"#define\s+EXT2_MAX_GROUPS\s+(\d+)", ctx)
     bad += not (m and int(m.group(1)) == groups)
     nhd = (ROOT / "tools/nhd_deploy.py").read_text(encoding="utf-8")

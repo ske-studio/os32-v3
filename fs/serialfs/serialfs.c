@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  SERIALFS.C — シリアル越しの /host の VfsOps (票 TASK_SERIAL_HOSTFS B)    */
 /*                                                                          */
-/*  旧 SerialFS (8896d38 で削除) の起こし直し。形式は fs/sfs_proto.h。      */
+/*  旧 SerialFS (8896d38 で削除) の起こし直し。形式は fs/serialfs/sfs_proto.h。      */
 /*  VFS の契約 (§1-v2 B-3'):                                                */
 /*   - stat は種別・サイズ・mtime (UNIX 秒 UTC) を返す                      */
 /*   - get_file_size はディレクトリに ISDIR                                 */

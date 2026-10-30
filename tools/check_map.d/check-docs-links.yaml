@@ -1,4 +1,5 @@
 check-docs-links:
+- fs/**
 - docs/**/*.md
 - CLAUDE.md
 - README.md

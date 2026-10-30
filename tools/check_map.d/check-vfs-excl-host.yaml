@@ -1,8 +1,8 @@
 check-vfs-excl-host:
-- fs/ext2_dir.c
-- fs/ext2_file.c
-- fs/ext2_super.c
-- fs/ext2_vfs.c
+- fs/ext2/ext2_dir.c
+- fs/ext2/ext2_file.c
+- fs/ext2/ext2_super.c
+- fs/ext2/ext2_vfs.c
 - fs/vfs.c
 - fs/vfs_fd.c
 - tools/tests/test_vfs_excl.py

@@ -2,8 +2,8 @@
 
 票: S6-P / 観測は `docs/archive/settings/TASK_S6.md` 「PM 受入記録」
 診断: `docs/archive/settings/TASK_S6P.md`
-実装 (段 B, ext2): `fs/ext2_ctx.h` / `fs/ext2_super.c` / `fs/ext2_inode.c` / `fs/ext2_dir.c` /
-      `fs/ext2_vfs.c` / `fs/ext2_priv.h` / `fs/ext2_fmt.c`
+実装 (段 B, ext2): `fs/ext2/ext2_ctx.h` / `fs/ext2/ext2_super.c` / `fs/ext2/ext2_inode.c` / `fs/ext2/ext2_dir.c` /
+      `fs/ext2/ext2_vfs.c` / `fs/ext2/ext2_priv.h` / `fs/ext2/ext2_fmt.c`
 実装 (段 A, 呼び出し側): `lib/microtar/microtar.c` の `write_null_bytes()`
       (`lib/microtar/README.OS32` 改変点 4) / `userland/cmds/tar.c` ([C1] 修正)
 試験: `tools/tests/ext2_write_io_host.c` + `test_ext2_write_io.py`
@@ -14,7 +14,7 @@
 
 `con_sink_tdd.md` / `ext2_read_bound_host.c` と同じで、**模型ではなく実物**を見る:
 
-1. `ext2_write_io_host.c` が `fs/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` /
+1. `ext2_write_io_host.c` が `fs/ext2/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` /
    `ext2_file.c` / `ext2_fmt.c` / `ext2_vfs.c` を 1 行も写さずに `#include` する。
 2. 差し替えるのは境界だけ — Device API (`dev_find` / `dev_blk_read_lba` /
    `dev_blk_write_lba`)、`ide_drive_present` / `ide_get_info`、kstring / kmalloc /
@@ -184,7 +184,7 @@ rmdir) は必ずそのどちらかを通る。
 ### (c) 付随: `ext2_format()` の一時コンテキストを static に
 
 `sizeof(Ext2Ctx)` は 732 → **1788 バイト** (記憶が 1056 バイト)。
-`fs/ext2_fmt.c` はこれをスタックに積んでいたので、そのままだと
+`fs/ext2/ext2_fmt.c` はこれをスタックに積んでいたので、そのままだと
 `ext2_format()` のフレームが 824 → 1880 バイトに膨らむ (カーネルスタックは
 16KB)。`static` にして **88 バイト**にした — 変更前より小さい。
 シングルタスクなのでフォーマットが同時に 2 本走ることはない。

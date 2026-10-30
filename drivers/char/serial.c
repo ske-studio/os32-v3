@@ -76,7 +76,7 @@ static volatile int ser_count = 0;
 /*     `serial_has_data` (KAPI と kbd.c の 4 か所) は「無い」。読めるのは    */
 /*     `serial_gate_get` (SerialFS の受信器) だけ                            */
 /*   - `serial_init` / `serial_init_vfast` (速度変更) は断る                 */
-/*  持ち主は fs/serialfs_session.c だけ (exec_exit / ring3_fault_kill は     */
+/*  持ち主は fs/serialfs/serialfs_session.c だけ (exec_exit / ring3_fault_kill は     */
 /*  触らない)。                                                             */
 /* ======================================================================== */
 static volatile int s_gate = 0;
@@ -741,7 +741,7 @@ void serial_checked_end(void)
 }
 
 /* ======================================================================== */
-/*  ゲートの口 (fs/serialfs_session.c だけが使う)                          */
+/*  ゲートの口 (fs/serialfs/serialfs_session.c だけが使う)                          */
 /* ======================================================================== */
 void serial_gate_set(int on)
 {

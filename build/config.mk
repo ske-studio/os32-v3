@@ -56,7 +56,7 @@ SDK_KAPI_HDR = sdk/include/os32/os32_kapi_shared.h
 # "arch_io.h" / "platform_io.h" をここで解決する。
 INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
 
-KERNEL_SRC_DIRS = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98
+KERNEL_SRC_DIRS = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
 KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
 
 # カーネルコア: 自身 + ドライバ + fs + exec + shell + gfx + lib + kapi
@@ -70,11 +70,11 @@ INC_DRIVERS = $(INC_COMMON) -Idrivers -Igfx -Ilib $(KERNEL_SRC_INCLUDES)
 INC_GFX = $(INC_COMMON) -Igfx -Idrivers -Ifs -Ilib $(KERNEL_SRC_INCLUDES)
 
 # FS: 共通 + 自身 + ドライバ (disk/ide依存)
-INC_FS = $(INC_COMMON) -Ifs -Ifs/fatfs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
+INC_FS = $(INC_COMMON) -Ifs -Ifs/fat/fatfs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
 
-# FatFS: fs/fatfs/ ディレクトリ内のソースを独自の string.h スタブで解決
-# -Ifs/fatfs を先頭に指定して <string.h> → fs/fatfs/string.h へ誘導
-INC_FATFS = -Ifs/fatfs $(INC_COMMON) -Ifs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
+# FatFS: fs/fat/fatfs/ ディレクトリ内のソースを独自の string.h スタブで解決
+# -Ifs/fat/fatfs を先頭に指定して <string.h> → fs/fat/fatfs/string.h へ誘導
+INC_FATFS = -Ifs/fat/fatfs $(INC_COMMON) -Ifs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
 
 # exec: 共通 + exec + kapi + fs + gfx + ドライバ (kbd依存)
 INC_EXEC = $(INC_COMMON) -Iexec -Ikapi -Ifs -Igfx -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)

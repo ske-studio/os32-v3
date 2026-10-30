@@ -2,7 +2,7 @@
 
 依頼: `/home/hight/os32-tmp/run/lanfs/PACK_lf1.md`、設計: 同所 `LANFS_DESIGN.r1.md` §3/§6 (PM の決定優先)。
 
-`make check-lanfs-host` builds the real `fs/sfs_client.c`, `sfs_proto.c`,
+`make check-lanfs-host` builds the real `fs/serialfs/sfs_client.c`, `sfs_proto.c`,
 `sfs_lan.c` and CRC into a host shared library. A ctypes NIC passes complete
 Ethernet frames to the real `serialfs_host.Server` / read-only `HostFS`, through
 `lanfs_host.LanServer`. Only NIC delivery and the 10 ms clock are simulated.

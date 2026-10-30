@@ -45,7 +45,7 @@ INC = ["-I" + str(ROOT / p) for p in
 # 段 2: install.c が繋ぐ共有部 (build/programs.mk の INST_OBJ と同じ顔ぶれ)。
 # 写さずに実物を別の翻訳単位として組む。
 SHARED = ["userland/system/inst_hdd.c", "userland/system/inst_disk.c",
-          "userland/shell/hdprep_plan.c", "drivers/block/pc98pt.c", "fs/ext2_layout.c"]
+          "userland/shell/hdprep_plan.c", "drivers/block/pc98pt.c", "fs/ext2/ext2_layout.c"]
 
 
 def build(tmp, sanitize, extra=(), root=ROOT):

@@ -33,7 +33,7 @@ static void ext2_split_path(const char *path, char *dir_path, const char **filen
  * ext2_lookup がディレクトリを先頭から辿り直す。/tmp/e8.tar への 1 バイト
  * 追記 26 セクタのうち 8 セクタがこの辿り直しだった (票 S6-P)。
  * 名前空間が動けば ns_gen が進んで記憶は全部捨てられるので、当たった記憶は
- * 必ず現物と一致する (ext2_path_memo_get / fs/ext2_ctx.h)。 */
+ * 必ず現物と一致する (ext2_path_memo_get / fs/ext2/ext2_ctx.h)。 */
 /* 下で定義する変換。resolve_path が **VFS 番号体系で**返すために前方宣言する */
 static int ext2_to_vfs_err(int rc);
 
@@ -345,7 +345,7 @@ static int ext2_vfs_stat(void *ctx, const char *path, OS32_Stat *buf)
 /* ---- 更新日時の設定 (票 H3 / 設計書 §5.2) ----
  *
  * ext2 は inode に mtime を持ち、書き込みのたびに現在時刻で更新している
- * (fs/ext2_file.c)。値は元から持っていて、外から与える口が無かっただけ。
+ * (fs/ext2/ext2_file.c)。値は元から持っていて、外から与える口が無かっただけ。
  *
  * **ctime はゲスト側の現在時刻にする** — ctime は「作成時刻」ではなく
  * inode の状態変更時刻で、いま状態を変えたのはこのゲストだから。

@@ -5,8 +5,8 @@
 
 実物を 1 行も写さずに回す:
   tools/tests/hdd_stage1_host.c  drivers/block/pc98pt.c・drivers/ata/ide_addr.c・
-                                 fs/ext2_layout.c・userland/shell/hdprep_plan.c
-  tools/tests/ext2_part_host.c   fs/ext2_super.c・ext2_fmt.c (区画探索と format_at)
+                                 fs/ext2/ext2_layout.c・userland/shell/hdprep_plan.c
+  tools/tests/ext2_part_host.c   fs/ext2/ext2_super.c・ext2_fmt.c (区画探索と format_at)
   tools/pc98pt.py / tools/nhd_deploy.py (migrate-pt) — Python 側
 見るもの:
   - 区画表の標準配置 (8/17・16/63)、fatfs の PC98PartEntry との一致、C と Python の
@@ -44,10 +44,10 @@ HARNESS = ROOT / "tools/tests/hdd_stage1_host.c"
 PART_HARNESS = ROOT / "tools/tests/ext2_part_host.c"
 PT_SRC = ROOT / "drivers/block/pc98pt.c"
 ADDR_SRC = ROOT / "drivers/ata/ide_addr.c"
-LAYOUT_SRC = ROOT / "fs/ext2_layout.c"
+LAYOUT_SRC = ROOT / "fs/ext2/ext2_layout.c"
 HDPREP_SRC = ROOT / "userland/shell/hdprep_plan.c"
-SUPER_SRC = ROOT / "fs/ext2_super.c"
-FMT_SRC = ROOT / "fs/ext2_fmt.c"
+SUPER_SRC = ROOT / "fs/ext2/ext2_super.c"
+FMT_SRC = ROOT / "fs/ext2/ext2_fmt.c"
 PY_PT = ROOT / "tools/pc98pt.py"
 PY_NHD = ROOT / "tools/nhd_deploy.py"
 
@@ -92,15 +92,15 @@ C_MUTATIONS = [
      "LBA28 の上限を見ない (lba=268435456 が LBA 0 に化ける)"),
     ("drivers/ata/ide_addr.c", "    } else if ((g->w53 & 0x0001) &&", "    } else if (0 && (g->w53 & 0x0001) &&",
      "現在の幾何 (word 53-56) を無視して既定で CHS にする (F13)"),
-    ("fs/ext2_layout.c", "        if (l.num_groups <= 1) return EXT2L_ERR_SMALL;\n        tb = EXT2L_FIRST_DATA_BLOCK",
+    ("fs/ext2/ext2_layout.c", "        if (l.num_groups <= 1) return EXT2L_ERR_SMALL;\n        tb = EXT2L_FIRST_DATA_BLOCK",
      "        *out = l;\n        return EXT2L_OK;\n        tb = EXT2L_FIRST_DATA_BLOCK",
      "最終グループが足りなくても落とさない (F12)"),
-    ("fs/ext2_layout.c", "    if (last == 0) l->last_group_need += EXT2L_ROOT_DATA_BLOCKS;\n", "",
+    ("fs/ext2/ext2_layout.c", "    if (last == 0) l->last_group_need += EXT2L_ROOT_DATA_BLOCKS;\n", "",
      "グループ 0 のルートのデータを数えない"),
-    ("fs/ext2_layout.c", "    if (ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
+    ("fs/ext2/ext2_layout.c", "    if (ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
      "    if (0 && ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
      "スパースグループの SB / GDT を数えない"),
-    ("fs/ext2_layout.c", "    if (l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
+    ("fs/ext2/ext2_layout.c", "    if (l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
      "    if (0 && l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
      "32 グループの上限を見ない"),
     ("userland/shell/hdprep_plan.c", "    if (g->addr_mode != HDPREP_AMODE_LBA28 &&",
@@ -122,26 +122,26 @@ C_MUTATIONS = [
      "IDENTIFY の総数を見ない"),
     ("userland/shell/hdprep_plan.c", "    if (pc98pt_count_used(lba1) != 0) return HDPREP_E_PT_USED;\n", "",
      "既存の区画項目を上書きする"),
-    ("fs/ext2_super.c",
+    ("fs/ext2/ext2_super.c",
      "        return EXT2_ERR_NOPART;\n    }\n\n    *out_start",
      "        start = 1088; len = 16384;\n    }\n\n    *out_start",
      "見つからないとき LBA 1088 にフォールバックする (旧動作)"),
-    ("fs/ext2_super.c", "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n",
+    ("fs/ext2/ext2_super.c", "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n",
      "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n"
      "    heads = info.heads; spt = info.sectors;\n",
      "区画表の CHS を IDENTIFY の幾何で LBA にする (F4)"),
-    ("fs/ext2_super.c", "    return (block_num < ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) ? 1 : 0;", "    return 1;",
+    ("fs/ext2/ext2_super.c", "    return (block_num < ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) ? 1 : 0;", "    return 1;",
      "ブロック I/O が区画の外を書ける"),
-    ("fs/ext2_super.c", "    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {",
+    ("fs/ext2/ext2_super.c", "    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {",
      "    if (0) {", "FS が区画より大きくてもマウントする"),
-    ("fs/ext2_super.c", "    if (dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect) != 0) return EXT2_ERR_IO;\n",
+    ("fs/ext2/ext2_super.c", "    if (dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect) != 0) return EXT2_ERR_IO;\n",
      "    (void)dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect);\n",
      "区画表が読めなくても続ける"),
-    ("fs/ext2_fmt.c", "    if (length > info.total_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (length > info.total_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
      "format_at がディスクの外まで書く"),
-    ("fs/ext2_fmt.c", "    if (start_lba < (u32)EXT2_FMT_MIN_LBA) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (start_lba < (u32)EXT2_FMT_MIN_LBA) return EXT2_ERR_INVAL;\n", "",
      "format_at が IPL / 区画表 / ローダを潰す"),
-    ("fs/ext2_fmt.c", "    if (sectors > part_len) sectors = part_len;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (sectors > part_len) sectors = part_len;\n", "",
      "ext2_format が区画の長さで頭打ちにしない"),
     ("userland/shell/hdprep_plan.c", "    if (g->ata_total == 0) return HDPREP_E_NO_TOTAL;", "",
      "総数の申告が無いドライブに探りを書く (C3)"),
@@ -149,16 +149,16 @@ C_MUTATIONS = [
      "現在の CHS の容量を計画の上限にしない (C4)"),
     ("userland/shell/hdprep_plan.c", "        if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;",
      "        (void)0;", "LBA28 の上限を計画の上限にしない (C4)"),
-    ("fs/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
      "format_at が ATA の方式の上限を見ない (C4)"),
-    ("fs/ext2_fmt.c", "        if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
+    ("fs/ext2/ext2_fmt.c", "        if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
      "ext2_format が IDENTIFY の幾何で見つけた区画に書く (m3)"),
-    ("fs/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
+    ("fs/ext2/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
      "ext2_format が 32 グループを超える区画で頭打ちにせず断る (m2)"),
     ("drivers/block/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "        return 0;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "旧配置を検出しない (カーネルが移行の案内を出せない、M2)"),
-    ("fs/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("drivers/block/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
@@ -828,7 +828,7 @@ def build_target(tmp):
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
             "-fcommon", "-O2", "-Wall", "-Werror",
             "-D__KERNEL_BUILD__", *include_flags(ROOT)]
-    for rel in ("drivers/block/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2_layout.c",
+    for rel in ("drivers/block/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2/ext2_layout.c",
                 "userland/shell/hdprep_plan.c"):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
         run([*base, "-c", str(ROOT / rel), "-o", str(out)], check=True)
@@ -850,10 +850,10 @@ def build_target(tmp):
 # ======================================================================== #
 
 MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "drivers/ata/ide_addr.c",
-          "drivers/ata/ide_addr.h", "fs/ext2_layout.c", "fs/ext2_layout.h",
+          "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
-          "fs/ext2_super.c", "fs/ext2_fmt.c", "fs/ext2_inode.c", "fs/ext2_dir.c",
-          "fs/ext2_file.c"]
+          "fs/ext2/ext2_super.c", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
+          "fs/ext2/ext2_file.c"]
 PY_MIRROR = ["tools/pc98pt.py", "tools/nhd_deploy.py", "tools/deploy_protect.py",
              "tools/deploy_manifests.py", "tools/nhd_profile.py"]
 
@@ -885,10 +885,10 @@ def _controls(mutations):
 REBUILD = {
     "drivers/block/pc98pt.c": ("pure", "part"),
     "drivers/ata/ide_addr.c": ("pure",),
-    "fs/ext2_layout.c": ("pure", "part"),
+    "fs/ext2/ext2_layout.c": ("pure", "part"),
     "userland/shell/hdprep_plan.c": ("pure",),
-    "fs/ext2_super.c": ("part",),
-    "fs/ext2_fmt.c": ("part",),
+    "fs/ext2/ext2_super.c": ("part",),
+    "fs/ext2/ext2_fmt.c": ("part",),
 }
 C_HARNESS = {"pure": (_pure_cmd, PURE_CASES), "part": (_part_cmd, PART_CASES)}
 

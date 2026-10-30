@@ -4,7 +4,7 @@
  *  実行:   python3 -B tools/tests/test_hdd_stage1.py
  *  記録:   tools/tests/hdd_stage1_tdd.md
  *
- *  実物の fs/ext2_super.c / ext2_fmt.c / ext2_layout.c と drivers/block/pc98pt.c を
+ *  実物の fs/ext2/ext2_super.c / ext2_fmt.c / ext2_layout.c と drivers/block/pc98pt.c を
  *  そのまま取り込み、Device API・IDE・区画表の幾何 (bootinfo_part_geom) だけを
  *  贋物にする。見るのは:
  *    - ext2_find_partition が (開始, 長さ) を返し、見つからない / 読めない /
@@ -238,11 +238,11 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 /* ======================================================================== */
 /*  実物のソース                                                            */
 /* ======================================================================== */
-#include "../../fs/ext2_super.c"
-#include "../../fs/ext2_inode.c"
-#include "../../fs/ext2_dir.c"
-#include "../../fs/ext2_file.c"
-#include "../../fs/ext2_fmt.c"
+#include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_inode.c"
+#include "../../fs/ext2/ext2_dir.c"
+#include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_fmt.c"
 
 /* ======================================================================== */
 /*  足場                                                                    */

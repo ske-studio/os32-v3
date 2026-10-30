@@ -83,11 +83,11 @@ def check_manifest():
     if '#define HS_TEMP_PREFIX     ".hs~"' not in src:
         raise SystemExit("hsync.c の予約接頭辞が \".hs~\" でない")
 
-    # --root の ext2 判定は fs/ext2.h の EXT2_ROOT_INO の写し ([C4])
+    # --root の ext2 判定は fs/ext2/ext2.h の EXT2_ROOT_INO の写し ([C4])
     m = re.search(r"^#define EXT2_ROOT_INO\s+(\d+)",
-                  (ROOT / "fs/ext2.h").read_text(encoding="utf-8"), re.M)
+                  (ROOT / "fs/ext2/ext2.h").read_text(encoding="utf-8"), re.M)
     if not m or ("#define HS_EXT2_ROOT_INO %sUL" % m.group(1)) not in src:
-        raise SystemExit("hsync.c の HS_EXT2_ROOT_INO が fs/ext2.h の "
+        raise SystemExit("hsync.c の HS_EXT2_ROOT_INO が fs/ext2/ext2.h の "
                          "EXT2_ROOT_INO と合わない")
 
     man = (ROOT / "docs/manpages/hsync.1").read_text(encoding="utf-8")

@@ -36,10 +36,10 @@
  * 区切りと読み、名前の**末尾の**空白と '.' を落とす ("disk.img " も
  * "disk.img." も "disk.img")。VFS の BUSY / pinned は 1 バイトの fold で名前を
  * 比べるので、この綴りは使用中の実体を別の綴りで消せる。INVAL で断る。
- * **途中の空白は Windows の名前として正当なので通す** — FAT (fs/fatfs_vfs.c)
+ * **途中の空白は Windows の名前として正当なので通す** — FAT (fs/fat/fatfs_vfs.c)
  * は FatFs が途中の空白で名前を打ち切るので途中も断る。この差が規則の
  * 引数 (VFS_NAME_RULE_WIN32 / _FAT)。規則は fs/vfs_name_rules.inc。 */
-#include "vfs_name_rules.inc"
+#include "../vfs_name_rules.inc"
 
 /* ===================================================================== */
 /*  内部定数                                                              */
@@ -344,7 +344,7 @@ static void setup_close(void)
  * hdrv_write_file の NP2_FILE_OVERWRITE_IF が**既存ファイルを切り詰めて**
  * いた。**「無い」と言ってよいのは NT が「無い」と言ったときだけ。**
  * 対応表と根拠 (NP21/W のどの状態がいつ返るか) は
- * fs/hostdrv_stat_rules.inc の hdrv_create_status_to_vfs にある。 */
+ * fs/hostdrv/hostdrv_stat_rules.inc の hdrv_create_status_to_vfs にある。 */
 static int hostdrv_create(const char *path, u32 disposition,
                           u32 options_flags, u32 desired_access)
 {
@@ -653,7 +653,7 @@ static int hdrv_read_file(void *ctx, const char *path,
  * **問い合わせを増やさない**ため — get_file_size は open のたびに走り、
  * hsync は何千回も呼ぶ。NP21/W 側はどちらも同じ GetFileAttributesEx から
  * 埋めている (np21w-src/src/generic/hostdrvnt.c)。
- * 判定そのものは fs/hostdrv_stat_rules.inc の純関数 hdrv_size_result。 */
+ * 判定そのものは fs/hostdrv/hostdrv_stat_rules.inc の純関数 hdrv_size_result。 */
 static int hdrv_get_file_size(void *ctx, const char *path, u32 *size)
 {
     int rc;
@@ -680,7 +680,7 @@ static int hdrv_get_file_size(void *ctx, const char *path, u32 *size)
 
     hostdrv_cleanup_close();
 
-    /* 判定は純関数へ (fs/hostdrv_stat_rules.inc)。ホストで直接叩ける
+    /* 判定は純関数へ (fs/hostdrv/hostdrv_stat_rules.inc)。ホストで直接叩ける
      * = 変異で落ちる試験が書ける (tools/tests/b8_open_host.c の 段 C)。
      * **問い合わせは 1 回のまま** — 種別は同じ応答の Directory で分かる。 */
     return hdrv_size_result(rc, is_dir);

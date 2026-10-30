@@ -14,10 +14,10 @@ check-dep-dir-a-l06-host:
 - tools/mkmod.py
 - tools/module_schema.py
 - tools/tests/hwdev_contract_fixture.py
-- fs/ext2.h
-- fs/serialfs.h
-- fs/sfs_client.h
-- fs/sfs_proto.h
+- fs/ext2/ext2.h
+- fs/serialfs/serialfs.h
+- fs/serialfs/sfs_client.h
+- fs/serialfs/sfs_proto.h
 - fs/vfs.h
 - include/memmap.h
 - include/platform_device.h
@@ -34,7 +34,7 @@ check-dep-dir-a-l06-host:
 - sdk/kapi.json
 - kapi/kapi_generated.c
 - fs/vfs.c
-- fs/serialfs_session.c
+- fs/serialfs/serialfs_session.c
 - tools/tests/test_dep_dir_a_l06.py
 - tools/tests/test_dep_dir_a_l05a.py
 - tools/tests/fixtures/dep_dir_a/l06.json

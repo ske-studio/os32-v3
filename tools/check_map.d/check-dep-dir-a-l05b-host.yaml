@@ -8,11 +8,11 @@ check-dep-dir-a-l05b-host:
 - platform/pc98/device_ide.c
 - tools/tests/dep_dir_a_l05b_host.c
 - tools/tests/test_dep_dir_a_l05b.py
-- fs/ext2_super.c
-- fs/ext2_fmt.c
-- fs/fatfs_vfs.c
-- fs/fatfs/diskio.c
-- fs/fatfs/diskio_os32.h
+- fs/ext2/ext2_super.c
+- fs/ext2/ext2_fmt.c
+- fs/fat/fatfs_vfs.c
+- fs/fat/fatfs/diskio.c
+- fs/fat/fatfs/diskio_os32.h
 - fs/ide_limits.h
 - build/checks.d/check-dep-dir-a-l05b-host.mk
 - tools/check_map.d/check-dep-dir-a-l05b-host.yaml

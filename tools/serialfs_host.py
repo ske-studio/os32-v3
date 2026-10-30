@@ -13,7 +13,7 @@ SerialFS のセッションを開く。ホストは `tools/rshell_serial.py --se
   3. 要求フレームには `<dir>` を根にした応答を返す。LOG フレームは溜めた
      出力として表示し、EXIT フレームで終了コードを受け取る
 
-形式の正典は fs/sfs_proto.h (C)。ここはその写しで、tools/tests/test_serialfs.py が
+形式の正典は fs/serialfs/sfs_proto.h (C)。ここはその写しで、tools/tests/test_serialfs.py が
 C の組み立てた列をここで読み、その逆も確かめる。
 
 規則 (票 §1-v2 B-7' / §1-v3):
@@ -41,7 +41,7 @@ import struct
 import time
 import zlib
 
-# ---- fs/sfs_proto.h の写し --------------------------------------------------
+# ---- fs/serialfs/sfs_proto.h の写し --------------------------------------------------
 ENQ = 0x05
 EOT = 0x04
 MAGIC = b"SF"

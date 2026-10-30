@@ -51,7 +51,7 @@ LAN 版は `--sfs-lan --timeout 600 cmd sfs run hsync boot`。
 ゲストの `sfs lan on` を先に設定し、ノートでは lanfs_host.py を別途起動する。
 `--sfs-lan` は `--serve-host` と排他。開始行・exit 行・echo・EOT を照合する。
 このどちらの指定も無い `sfs run` は送らずに断る。
-プロトコルは tools/serialfs_host.py と fs/sfs_proto.h。
+プロトコルは tools/serialfs_host.py と fs/serialfs/sfs_proto.h。
 NP21/W (ai-debug) では `--port aidebug:http://127.0.0.1:8025` で COM1 を HTTP の
 /api/serial/read・write 越しに使える (ini は変えない。/api/cmd と同時に使わない)。
 ⚠ 本文に EOT (0x04) を含む出力はセッション外では途中で切れる (既知の制約)。

@@ -10,7 +10,7 @@ Codex・Antigravity・Fable サブエージェントが枯渇したときの補�
 
 使い方:
     python3 tools/review_local.py <依頼文ファイル> <対象ファイル>...
-    python3 tools/review_local.py prompt.txt fs/ext2_dir.c fs/ext2_file.c > out.md
+    python3 tools/review_local.py prompt.txt fs/ext2/ext2_dir.c fs/ext2/ext2_file.c > out.md
 
 環境変数:
     OS32_REVIEW_LLM_URL  Ollama の口 (既定 http://127.0.0.1:11434)。環境変数に無ければ

@@ -5,7 +5,7 @@
 
 tools/tests/b8_open_host.c が
 
-  * 実物の fs/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
+  * 実物の fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
     ext2_fmt.c / ext2_vfs.c / vfs.c / vfs_fd.c をそのまま #include し、
   * 贋物は Device API と IDE だけ、
   * RAM 上の 8MB ディスクを実物の ext2_format() で作って、
@@ -60,8 +60,8 @@ INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/b8_open_host.c"
 
 # 票 B8 で触ったカーネル側。実ビルドと同じ素性で -Werror を通す ([C1])。
-TARGET_SRCS = ["fs/ext2_inode.c", "fs/ext2_dir.c", "fs/ext2_file.c",
-               "fs/ext2_vfs.c", "fs/ext2_super.c", "fs/vfs.c", "fs/vfs_fd.c"]
+TARGET_SRCS = ["fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c",
+               "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_super.c", "fs/vfs.c", "fs/vfs_fd.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",

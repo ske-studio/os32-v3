@@ -67,7 +67,7 @@ static int hsp_ieq(const char *a, const char *b)
 /* パスに '\' が混じっているか (1 = 混じっている)。
  *
  * OS32 の区切りは '/' だけなので、ここでは '\' は**普通の 1 文字**として
- * 要素名に収まる。ところが HostDrv の `session_set_path` (fs/hostdrvfs.c) は
+ * 要素名に収まる。ところが HostDrv の `session_set_path` (fs/hostdrv/hostdrvfs.c) は
  * '/' を '\' へ直したうえで他の文字をそのまま通すので、`/host/..\other` は
  * ホスト側で `C:\os32\..\other` になる。NP21/W の `hostdrvNT_getHostPath` は
  * `PathCanonicalizeW` で '..' を畳んだあと**境界を見ない前方一致**でルート検査を

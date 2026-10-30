@@ -2,14 +2,14 @@
 /*  INST_DISK.C — インストーラの判定 (純粋関数)                              */
 /*                                                                          */
 /*  規則は inst_disk.h。区画表は drivers/block/pc98pt.c、幾何と計画は            */
-/*  userland/shell/hdprep_plan.c、ext2 の配置は fs/ext2_layout.c (どれも    */
+/*  userland/shell/hdprep_plan.c、ext2 の配置は fs/ext2/ext2_layout.c (どれも    */
 /*  カーネル・hdprep と同じソースを組む — 写さない)。                       */
 /*  32 ビットの桁あふれに頼る計算はしない (ホスト試験は 64 ビットで回る)。   */
 /* ======================================================================== */
 
 #include "inst_disk.h"
 #include "drivers/block/pc98pt.h"
-#include "fs/ext2_layout.h"
+#include "fs/ext2/ext2_layout.h"
 
 static unsigned long inst_rd16(const unsigned char *p)
 {

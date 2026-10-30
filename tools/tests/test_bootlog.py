@@ -211,10 +211,10 @@ def fn_body(src, name):
 
 def check_write_contract():
     """bootlog_write_ok が前提にする vfs_write の FS ごとの戻り値が、実物の
-    fs/ext2_vfs.c / fs/fatfs_vfs.c に今もあるか (偽の VFS はこれを写す)。"""
+    fs/ext2/ext2_vfs.c / fs/fat/fatfs_vfs.c に今もあるか (偽の VFS はこれを写す)。"""
     bad = 0
-    ext2 = fn_body((ROOT / "fs/ext2_vfs.c").read_text(encoding="utf-8"), "ext2_vfs_write")
-    fat = fn_body((ROOT / "fs/fatfs_vfs.c").read_text(encoding="utf-8"), "fatfs_vfs_write")
+    ext2 = fn_body((ROOT / "fs/ext2/ext2_vfs.c").read_text(encoding="utf-8"), "ext2_vfs_write")
+    fat = fn_body((ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8"), "fatfs_vfs_write")
     print("CONTRACT ext2_vfs_write / fatfs_vfs_write / ext2_rename の同一 inode", flush=True)
     if "return ext2_to_vfs_err(ext2_write(" not in ext2 or \
        "return ext2_to_vfs_err(ext2_create(" not in ext2 or re.search(r"return \(int\)", ext2):
@@ -223,7 +223,7 @@ def check_write_contract():
     if "return (int)bw;" not in fat:
         print("  FAIL FAT の write_file は書いたバイト数を返す形", flush=True)
         bad += 1
-    d = (ROOT / "fs/ext2_dir.c").read_text(encoding="utf-8")
+    d = (ROOT / "fs/ext2/ext2_dir.c").read_text(encoding="utf-8")
     if not re.search(r"if \(dst_ino == ino\) \{.*?return EXT2_OK;\s*/\*[^*]*ハードリンク同士", d, re.S):
         print("  FAIL ext2 の rename は元と宛先が同じ inode なら何もせず成功 (偽 FS はこれを写す)",
               flush=True)

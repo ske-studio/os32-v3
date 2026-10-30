@@ -2,7 +2,7 @@
 /*  SFS_CLIENT.H — SerialFS の要求 / 応答 (再送・期限・線の死)              */
 /*                                                                          */
 /*  1 要求 = 1 応答。線への出入りは SfsIo 経由なので、カーネルでは          */
-/*  drivers/char/serial.c のゲートの口 (fs/serialfs_session.c)、ホスト試験では   */
+/*  drivers/char/serial.c のゲートの口 (fs/serialfs/serialfs_session.c)、ホスト試験では   */
 /*  偽の線と偽のホスト (tools/tests/serialfs_host.c) につながる。            */
 /*                                                                          */
 /*  規則 (票 TASK_SERIAL_HOSTFS §1-v2 B-5' / §1-v3):                        */

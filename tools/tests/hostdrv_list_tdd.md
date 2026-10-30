@@ -5,7 +5,7 @@
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_hostdrv_list.py [--target]`
   (`make check-hostdrv-list-host` が同じものを `--target` 付きで回す)
-- 対象: `fs/hostdrv_list_rules.inc` (実物を `#include`) / `fs/hostdrvfs.c` (クロス確認)
+- 対象: `fs/hostdrv/hostdrv_list_rules.inc` (実物を `#include`) / `fs/hostdrv/hostdrvfs.c` (クロス確認)
 
 ## 0. 正直に書く ([V4])
 
@@ -17,9 +17,9 @@
 ## 1. 何を確かめる試験か
 
 HostDrv の一覧取得は「1 件ずつ問い合わせて、終わりが来るまで繰り返す」形。
-ハイパーコールを叩く `fs/hostdrvfs.c` 本体はホストで組めないので、**ループの
-規則だけを `fs/hostdrv_list_rules.inc` に純関数として切り出してある**
-(票 H1 の `hdrv_stat_fill` と同じ作法)。`fs/hostdrvfs.c` はこの `.inc` を
+ハイパーコールを叩く `fs/hostdrv/hostdrvfs.c` 本体はホストで組めないので、**ループの
+規則だけを `fs/hostdrv/hostdrv_list_rules.inc` に純関数として切り出してある**
+(票 H1 の `hdrv_stat_fill` と同じ作法)。`fs/hostdrv/hostdrvfs.c` はこの `.inc` を
 `#include` して呼ぶだけで、判定の写しをどこにも作っていない。
 
 `tools/tests/hostdrv_list_host.c` はその `.inc` を 1 行も写さずそのまま
@@ -37,10 +37,10 @@ HostDrv の一覧取得は「1 件ずつ問い合わせて、終わりが来る�
 ## 2. GREEN (現状)
 
 ```
-HOST GNU89 -Werror COMPILE PASS (real fs/hostdrv_list_rules.inc)
+HOST GNU89 -Werror COMPILE PASS (real fs/hostdrv/hostdrv_list_rules.inc)
 23 checks, 0 failures
 EXIT hostdrv_list_host=0
-TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)
 ```
 
 | 節 | 見ているもの |
@@ -55,7 +55,7 @@ TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)
 | 引数の防御 | `step` / `emit` が `NULL`、上限 0 は失敗 (**無限ループにしない**) |
 | 2 つのエラーは別物 | `ERR_IO != ERR_CAPPED`、どちらも 0 ではない |
 
-`--target` は `fs/hostdrvfs.c` が `i386-elf-gcc -Werror` でも通ること ([C1]) を見る。
+`--target` は `fs/hostdrv/hostdrvfs.c` が `i386-elf-gcc -Werror` でも通ること ([C1]) を見る。
 
 ## 3. 壊すとどれが落ちるか
 

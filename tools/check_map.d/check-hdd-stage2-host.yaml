@@ -1,4 +1,5 @@
 check-hdd-stage2-host:
+- fs/**
 - tools/gen_memmap.py
 - include/memmap.h
 - tools/tests/host32.py
@@ -11,12 +12,12 @@ check-hdd-stage2-host:
 - drivers/ata/ide_addr.c
 - drivers/block/pc98pt.c
 - exec/exec.c
-- fs/ext2_dir.c
-- fs/ext2_file.c
-- fs/ext2_fmt.c
-- fs/ext2_inode.c
-- fs/ext2_layout.c
-- fs/ext2_super.c
+- fs/ext2/ext2_dir.c
+- fs/ext2/ext2_file.c
+- fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_inode.c
+- fs/ext2/ext2_layout.c
+- fs/ext2/ext2_super.c
 - kapi/kapi_generated.c
 - tools/deploy_manifests.py
 - tools/deploy_protect.py

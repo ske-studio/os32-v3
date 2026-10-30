@@ -22,7 +22,7 @@
 |---|---|
 |差分1 #26|`drivers/net/e82557/lan_module.c:163` → `:167` の e82557_driver。表は依然常駐。SURVEY の部品登録案は F9 により機種配線へ変更|
 |差分2 #27|`drivers/sound/cs4231/pcm_module.c:74,88,154` → `:77,91,157` が PCM_IRQ 固定。汎用 lifecycle 案は採らず既存 IRQ 口を使う|
-|差分3 #36/37|生成 C の954/1024等 → `kapi/kapi_generated.c:957,1027,2236`。FS→IDE は SURVEY 対象外、`fs/ext2_fmt.c:412,413,425` の format_at にも存在|
+|差分3 #36/37|生成 C の954/1024等 → `kapi/kapi_generated.c:957,1027,2236`。FS→IDE は SURVEY 対象外、`fs/ext2/ext2_fmt.c:412,413,425` の format_at にも存在|
 |差分4 #39/40|生成 C の904/1680 → `kapi/kapi_generated.c:907,1683`。操作表案は F5(a) の固定転送へ|
 |差分5 #41/42|生成 C の2144/2273 → `kapi/kapi_generated.c:2147,2276`。PCI/serialfs も固定転送へ|
 |差分6 #43|生成 C の1030/1036/1652 → `:1033,1039,1655`。`drivers/video/kcg/kcg.c:33,38,56` は scale初期化・clamp・常時NOSYS。font読込み処理ではない|
@@ -79,7 +79,7 @@ int dma_range_ok(u32 pa, u32 size, u32 limit) {
 - PcmModuleApi/FmModuleApi/LanModuleApi 自体は kernel の既存ヘッダに残す。スロット数/順序/sizeof/offsetof と OPS_VERSION は固定。LAN の pci_dev は前方宣言、必要なPCI型は独立契約へ。
 - pcm_present/reclaim/open等、FMの常駐facade宣言を共通契約から供給。exec/ver_collectとJSON includesも置換する。E82557状態値・診断型は名前と値を維持してlan契約へ。
 - DMA pool状態/割当/leaseはkernel、8237実行状態とPCM ringはdrivers、module_handle/candidateは常駐facade。新登録はない。
-- L01のinclude追従: mm/dma_pool_math.c:14 は dma_contract.h、drivers/sound/fm/snd_engine.c:11 は fm_contract.h、fs/serialfs_session.c:36 は lan_contract.h へ置換する。
+- L01のinclude追従: mm/dma_pool_math.c:14 は dma_contract.h、drivers/sound/fm/snd_engine.c:11 は fm_contract.h、fs/serialfs/serialfs_session.c:36 は lan_contract.h へ置換する。
 - tools/prototypes/pcm_imports.def の contracts に include/pcm_contract.h・include/dma_contract.h、fm_imports.def に include/fm_contract.h、lan_imports.def に include/lan_contract.h を追加し、L02ではLANに include/pci_contract.h も追加。既存列の順序は保つ。生テキストhashなので型配置不変でも PCM_MODULE_ABI_GEN・FM_MODULE_ABI_GEN・LAN_MODULE_ABI_GEN は変わる。
 - kernel/module/kdebug_imports.def の source を dma_crosses_64k/dma_range_ok→include/dma_contract.h、pcm_open/pcm_state→include/pcm_contract.h、e82557_send/get_mac/state→include/lan_contract.h に変更。旧ヘッダに再宣言は残さず、生成器が新所在の本文から宣言を得る。
 - PM決定: KDEBUG_ABI_GEN も変わり、hwdev契約CRCも変わり得る。配置世代・KAPI版・部品のスロット配置/OPS_VERSIONは不変。旧部品はloadのpolicyで断られる。カーネルと対応する部品を再生成・再ビルドし、hsync bootで常に組で配る（実機の入れ方は不変、Cirrus/FMと同扱い）。
@@ -151,7 +151,7 @@ int platform_disk_geometry_get(int drv, struct platform_disk_geometry *out);
 /* IdeInfo i; int rc=ide_get_info(drv,&i); if(rc) return rc; ...; return rc; */
 ```
 
-- L05b: ext2_super/fmt、fatfs_vfs、fatfs/diskioの全照会を置換。fs/fatfs/diskio_os32.h:14 の ide.h も ide_contract.h/platform_device.h へ置換。`fs/ide_limits.h` は共通契約から上限を得て mask を維持（hd名/bootinfo幾何/MBR選択は変えない）。
+- L05b: ext2_super/fmt、fatfs_vfs、fatfs/diskioの全照会を置換。fs/fat/fatfs/diskio_os32.h:14 の ide.h も ide_contract.h/platform_device.h へ置換。`fs/ide_limits.h` は共通契約から上限を得て mask を維持（hd名/bootinfo幾何/MBR選択は変えない）。
 - FSの媒体I/Oは既存Device/VFS経由を維持。256/512B変換、part_offset控除、範囲演算、丸め、失敗時の初期値はFS側で維持。新ヘルパ内で再計算しない。
 - L05aのIDE KAPIはinit/present/identify/read_sector/write_sector/write_sectors/get_infoの7本。infoコピーは96B、既存ABIのvoid*を保ち内側でcast。out検査はKAPI側のまま。
 - L06は `device_fs.c` に ext2_format/format_at、serialfs_session_begin/end の4転送。VFSの既存登録表とsession状態はFS所有、二重登録なし。vfs.cの未使用kbd.hを削除。
@@ -220,7 +220,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 |段|新規ファイル（概算行数）|変更ファイル（各概算行数、生成物は再生成）|
 |---|---|---|
-|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、mm/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/module/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
+|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、mm/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/module/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
 |L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|drivers/net/e82557/lan_module.c 15・lan_module.h 5、drivers/net/e82557/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
 |L03|なし|drivers/sound/cs4231/pcm_module.c 15、drivers/sound/cs4231/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
 |L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|

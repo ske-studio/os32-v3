@@ -6,7 +6,7 @@
  *
  *  取り込む実物: userland/system/cdinst.c (main ごと)・inst_hdd.c・inst_disk.c・
  *  userland/lib/rt/pkg.c・userland/shell/hdprep_plan.c・drivers/block/pc98pt.c・
- *  fs/ext2_layout.c。贋物は KAPI だけ:
+ *  fs/ext2/ext2_layout.c。贋物は KAPI だけ:
  *    - /cd0 の .PKG は試験がバイト列で組む (無圧縮、PKG1 形式)
  *    - hd0 は LBA 0〜31 のセクタの模型 (区画表・IPL・ローダの帯)。ext2 の
  *      中身は ext2_format_at の呼び出しを記録するだけ (実物の format_at と
@@ -460,7 +460,7 @@ static int __cdecl f_serial_trygetchar(void) { return keys_serial ? keys_next() 
 #include "../../userland/lib/rt/pkg.c"
 #include "../../userland/shell/hdprep_plan.c"
 #include "../../drivers/block/pc98pt.c"
-#include "../../fs/ext2_layout.c"
+#include "../../fs/ext2/ext2_layout.c"
 
 static KernelAPI g_api;
 

@@ -51,8 +51,8 @@
  * 差す (init/bootlog_save.c)。戻り値の約束は vfs_* と同じ:
  *   - mkdir / rm / rename / sync: 0 = 成功、負 = OS32_ERR_* (EXIST / NOTFOUND
  *     は手順の側で成功と読む)
- *   - write: **FS ごとに違う** — ext2 は成功で 0 (fs/ext2_vfs.c の
- *     ext2_to_vfs_err)、FAT は書いたバイト数 (fs/fatfs_vfs.c の f_write の bw、
+ *   - write: **FS ごとに違う** — ext2 は成功で 0 (fs/ext2/ext2_vfs.c の
+ *     ext2_to_vfs_err)、FAT は書いたバイト数 (fs/fat/fatfs_vfs.c の f_write の bw、
  *     f_close の失敗は負)。判定は bootlog_write_ok が種別で揃える。
  *     偽の VFS (tools/tests/bootlog_host.c) も種別ごとにこの生の値を返す。 */
 typedef struct {

@@ -99,8 +99,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v49 | **実装済み (2026-09-12、T9-K)** | GUI v1.3 T9 shell script: 起動要求表 8 本 — `launch_req` / `launch_pending` / `launch_take` / `launch_report` / `launch_poll` / `launch_cancel` / `launch_child` と `sys_yield`。GUI 中の CPL=3 は入れ子 `exec_run` を使えないので、外部プログラムの起動と kill をカーネルの表に載せ owner 1 (WM) が仲介する。同じ追記で `exec_kill` を「id と子孫を末尾から回収」に固定した (D8) | `docs/archive/gui_v13/TASK_T9_sh.md` |
 | v50 | **実装済み (2026-09-13、S0-K)** | 設定レジストリ: `db_open_existing` (RO / RW、CREATE 無し) / `db_prepare_only` / `db_bind_int` / `db_bind_text` / `db_bind_blob` / `db_bind_null` / `db_error_code` の 7 本 (slot 201〜207、data_fields は 0x348 / 0x34C へ)。既存 `db_*` 10 本は不変 | archive/settings/TASK_S0.md §1a (アーカイブ: `docs/archive/settings/TASK_S0.md`) |
 | v51 | **実装済み (2026-09-14、N1)** | ネットワーク Host Services `host_open` / `host_status` / `host_read` / `host_write` / `host_close` の 5 本 (slot 208〜212 = 0x348〜0x358、data_fields は 0x35C / 0x360 へ)。非ブロッキング (プロトコルを進めるのは 100Hz の `link_tick` だけ)、同時 2 ハンドル、ストリーム 1 本。実体は `kapi/kapi_host.c` + `net/link.c` | `docs/archive/network/TASK_N0.md` §1a |
-| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
-| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI3])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
+| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
+| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI3])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
 | v54 | **実装済み (2026-09-16、継承バグ)** | 覗くだけのキー取得 `kbd_peekkey` 1 本 (slot 214 = 0x360、data_fields は 0x364 / 0x368 へ)。キューを**1 バイトも動かさず**に 次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。`script_exec` の毎行の ESC 監視が `kbd_trygetkey` で打鍵を**取り出して捨てて**いたのを直す。実体は `drivers/input/kbd.c` (+ `drivers/char/serial.c` の `serial_peekchar` と `kernel/kbd_inject.c` の `kbd_inject_peek`) | 票 INHERITED_BUGS |
 | v55 | **実装済み (2026-09-16、$?)** | 終了コードの配線 `exec_last_result` 1 本 (slot 215 = 0x364、data_fields は 0x368 / 0x36C へ)。直前の `exec_run` の結果を**種別 + 値**で返す。種別 (`EXEC_KIND_*`) は畳んだ側が渡すので `exit(-2)` / fault / CTRL+STOP を値ではなく種別で見分けられる。`exec_run` は**すべての return 点で**記録を書くので、起動しなかった場合に前回の記録が残らない。GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない。実体は `exec/exec.c` | `docs/archive/shell/TASK_EXIT_STATUS.md` |
 | v56 | **実装済み (2026-09-22、実機シリアル)** | V･FAST モード `serial_init_vfast` / `serial_get_status` の 2 本 (slot 216 = 0x368、217 = 0x36C、data_fields は 0x370 / 0x374 へ)。FIFO 搭載機 (`0136h` bit6 の反転で判定) で `013Ah` bit7 を立てて **8253 と無関係に** 115200bps まで出す。**起動時の既定 9600 は互換モードのまま** — V･FAST は `serial N` で明示的に入る。併せて `serial_putchar` の TxRDY 待ちを「10ms tick まで寝る」から「1 文字時間 × 2 の予算で `cpu_delay_us` を挟んで見る」へ。実体は `drivers/char/serial.c` / `drivers/char/serial_plan.c` | `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` |
@@ -1247,7 +1247,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   開始 + 長さがディスクの外 (足し算の桁あふれも)・ATA の指定の方式で指せない範囲
   (LBA28 の上限 2^28・現在の CHS の容量、`ide_range_ok`) は **1 バイトも書かずに**
   `EXT2_ERR_INVAL` (-10)。ドライブが無ければ `EXT2_ERR_IO`。大きさは
-  `fs/ext2_layout.c` の固定点で決まる (最終グループに SB・GDT・bitmap 2・inode 表・
+  `fs/ext2/ext2_layout.c` の固定点で決まる (最終グループに SB・GDT・bitmap 2・inode 表・
   グループ 0 のルートが収まる長さへ切り下げ、上限 32 グループ = 256MiB、超えれば
   `EXT2_ERR_NOSPC`)。既存の `ext2_format` は区画表の OS32 区画を探し (無ければ
   `EXT2_ERR_NOPART` = -13)、区画の長さと 32 グループ (524,290 セクタ) で頭打ちにする
@@ -1330,7 +1330,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 票 TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 B (§1-v3)。呼ぶのは
 常駐シェルの `sfs run <コマンド行>` だけ (owner 1 以外は `OS32_ERR_INVAL`)。
 ホストは `tools/rshell_serial.py --serve-host <dir> cmd "sfs run ..."`、形式の正典は
-`fs/sfs_proto.h` (ホスト側の写しは `tools/serialfs_host.py`)。
+`fs/serialfs/sfs_proto.h` (ホスト側の写しは `tools/serialfs_host.py`)。
 
 - **`sfs_begin`** — `/host` が空いていることを確かめ、送受信のゲート
   (`drivers/char/serial.c`) を上げ、HELLO でセッション ID を得て、`/host` に SerialFS を

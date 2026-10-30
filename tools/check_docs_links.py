@@ -89,6 +89,10 @@ EXCLUDE_PATHS = ["docs/hw"]
 # Preserve historical source links without editing archived records. These
 # aliases apply only to the archive pass, and the destination must still exist.
 ARCHIVE_SOURCE_MOVES = {
+    'fs/ext2_dir.c': 'fs/ext2/ext2_dir.c',
+    'fs/ext2_vfs.c': 'fs/ext2/ext2_vfs.c',
+    'fs/hostdrvfs.c': 'fs/hostdrv/hostdrvfs.c',
+    'fs/hostdrvfs_proto.h': 'fs/hostdrv/hostdrvfs_proto.h',
     'kernel/paging_app.c': 'mm/paging_app.c',
     'kernel/paging_app.h': 'mm/paging_app.h',
     'kernel/v86_io.c': 'kernel/v86/v86_io.c',

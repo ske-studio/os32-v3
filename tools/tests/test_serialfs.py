@@ -5,7 +5,7 @@
 
 5 つの段:
 
-  C   ゲスト側の実物 (fs/sfs_proto.c・fs/sfs_client.c・fs/serialfs.c・
+  C   ゲスト側の実物 (fs/serialfs/sfs_proto.c・fs/serialfs/sfs_client.c・fs/serialfs/serialfs.c・
       userland/shell/serial_watchdog.c・userland/system/hsync_bootold.inc) を
       tools/tests/serialfs_host.c に取り込み、偽の線・仮想の時計・偽のホストで
       回す。フレーム・CRC32・番号・再送・フレーム長の境界・VFS の契約・
@@ -13,7 +13,7 @@
       ホストの停止 / ごみの連続 / ERR / 契約違反の応答)
   GATE drivers/char/serial.c のゲート (tools/tests/serial_gate_host.c)。セッション中に
       rshell へフレームが漏れない・出力は保留リングへ・下ろすと受信を捨てる
-  SESSION fs/serialfs_session.c (tools/tests/serialfs_session_host.c)。実物の
+  SESSION fs/serialfs/serialfs_session.c (tools/tests/serialfs_session_host.c)。実物の
       drivers/char/serial.c・fs/sfs_*.c と組み、HELLO → mount → BYE / LOG / EXIT の
       流れ、HELLO が通らなかった回も隔離してから下ろす (決定 11)、EXIT の後に
       保留へ入った文字も流す (Fable m6)、隔離の上限と NOT_QUIET
@@ -59,11 +59,11 @@ GATE_HARNESS = ROOT / "tools/tests/serial_gate_host.c"
 SESSION_HARNESS = ROOT / "tools/tests/serialfs_session_host.c"
 
 C_SRCS = {
-    "fs/sfs_proto.c": "sfs_proto.c",
-    "fs/sfs_proto.h": "sfs_proto.h",
-    "fs/sfs_client.c": "sfs_client.c",
-    "fs/sfs_client.h": "sfs_client.h",
-    "fs/serialfs.c": "serialfs.c",
+    "fs/serialfs/sfs_proto.c": "sfs_proto.c",
+    "fs/serialfs/sfs_proto.h": "sfs_proto.h",
+    "fs/serialfs/sfs_client.c": "sfs_client.c",
+    "fs/serialfs/sfs_client.h": "sfs_client.h",
+    "fs/serialfs/serialfs.c": "serialfs.c",
     "userland/shell/serial_watchdog.c": "serial_watchdog.c",
     "userland/system/hsync_bootold.inc": "hsync_bootold.inc",
 }
@@ -145,12 +145,12 @@ FAKE_ARCH_IO_SESSION = FAKE_ARCH_IO.replace(
     "void fake_halt(void);\nstatic inline void _halt(void) { fake_halt(); }").replace(
     "static inline void _idle(void) {}",
     "static inline void _idle(void) { fake_halt(); }")
-SESSION_SRCS = ("drivers/char/serial.c", "fs/sfs_proto.c", "fs/sfs_client.c",
-                "fs/serialfs_session.c", "fs/sfs_lan.c", "lib/crc32.c")
+SESSION_SRCS = ("drivers/char/serial.c", "fs/serialfs/sfs_proto.c", "fs/serialfs/sfs_client.c",
+                "fs/serialfs/serialfs_session.c", "fs/serialfs/sfs_lan.c", "lib/crc32.c")
 
 
 def session_build(tmp, mutated=None, name="session"):
-    """fs/serialfs_session.c を実物の drivers/char/serial.c・fs/sfs_*.c と組む。
+    """fs/serialfs/serialfs_session.c を実物の drivers/char/serial.c・fs/sfs_*.c と組む。
     kstring.h (glibc の string.h と衝突) と appslot.h (カーネルの構造体) は
     写しのディレクトリの小さな偽物で影にする。"""
     work = pathlib.Path(tmp) / name
@@ -216,8 +216,8 @@ def build_target(tmp):
             "-D__KERNEL_BUILD__"]
     inc = [
               *include_flags(ROOT)]
-    for rel in ("fs/sfs_proto.c", "fs/sfs_client.c", "fs/serialfs.c",
-                "fs/serialfs_session.c", "drivers/char/serial.c",
+    for rel in ("fs/serialfs/sfs_proto.c", "fs/serialfs/sfs_client.c", "fs/serialfs/serialfs.c",
+                "fs/serialfs/serialfs_session.c", "drivers/char/serial.c",
                 "drivers/char/serial_plan.c"):
         out = pathlib.Path(tmp) / (rel.replace("/", "_") + ".o")
         subprocess.run(base + inc + ["-c", rel, "-o", str(out)], cwd=ROOT,
@@ -1239,7 +1239,7 @@ def header_consts(text, names):
 
 def const_check(h):
     bad = 0
-    proto = (ROOT / "fs/sfs_proto.h").read_text(encoding="utf-8")
+    proto = (ROOT / "fs/serialfs/sfs_proto.h").read_text(encoding="utf-8")
     pairs = {"SFS_ENQ": h.ENQ, "SFS_VERSION": h.VERSION, "SFS_HDR_LEN": h.HDR_LEN,
              "SFS_CRC_LEN": h.CRC_LEN, "SFS_MAX_PAYLOAD": h.MAX_PAYLOAD,
              "SFS_T_HELLO": h.T_HELLO, "SFS_T_BYE": h.T_BYE,
@@ -1389,69 +1389,69 @@ def integration(exe, h):
 # ============================================================================
 IDENTITY = "IDENTITY"
 C_MUTATIONS = [
-    ("fs/sfs_client.c", r"    c->max_payload = SFS_MAX_PAYLOAD;\n    sfs_dec_reset",
+    ("fs/serialfs/sfs_client.c", r"    c->max_payload = SFS_MAX_PAYLOAD;\n    sfs_dec_reset",
      "    c->max_payload = SFS_LAN_MAX_PAYLOAD;\n    sfs_dec_reset", "LAN limit applied to serial"),
-    ("fs/sfs_proto.c", r"(    /\* CRC は種別 \(off 3\) からペイロードの末尾まで)",
+    ("fs/serialfs/sfs_proto.c", r"(    /\* CRC は種別 \(off 3\) からペイロードの末尾まで)",
      r"\1", IDENTITY),
-    ("fs/sfs_proto.c", r"crc = sfs_crc32\(out \+ SFS_OFF_TYPE, \(u32\)\(SFS_HDR_LEN - SFS_OFF_TYPE \+ len\)\);",
+    ("fs/serialfs/sfs_proto.c", r"crc = sfs_crc32\(out \+ SFS_OFF_TYPE, \(u32\)\(SFS_HDR_LEN - SFS_OFF_TYPE \+ len\)\);",
      "crc = sfs_crc32(out + 4, (u32)(SFS_HDR_LEN - 4 + len));",
      "CRC の範囲から種別を外す (Python と食い違う)"),
-    ("fs/sfs_proto.c", r"        if \(len > d->max_payload \|\| len > SFS_LAN_MAX_PAYLOAD\) \{\n            d->bad_len\+\+;",
+    ("fs/serialfs/sfs_proto.c", r"        if \(len > d->max_payload \|\| len > SFS_LAN_MAX_PAYLOAD\) \{\n            d->bad_len\+\+;",
      "        if (len > 0xFFFF) {\n            d->bad_len++;",
      "受信器が長さ欄を上限と照合しない"),
-    ("fs/sfs_proto.c", r"    if \(limit > SFS_LAN_MAX_PAYLOAD \|\| len > limit\) return 0;\n    out\[0\]",
+    ("fs/serialfs/sfs_proto.c", r"    if \(limit > SFS_LAN_MAX_PAYLOAD \|\| len > limit\) return 0;\n    out\[0\]",
      "    out[0]", "組み立てが上限を越えるペイロードを断らない"),
-    ("fs/sfs_proto.c", r"if \(\*seq >= SFS_SEQ_LAST\) return -1;",
+    ("fs/serialfs/sfs_proto.c", r"if \(\*seq >= SFS_SEQ_LAST\) return -1;",
      "if (*seq >= 0xFFFFu) *seq = 0;", "番号を周回させる"),
-    ("fs/sfs_proto.c", r"\(u32\)SFS_FIRST_BYTE_MS \+ frame_ms \+ \(u32\)SFS_SLACK_MS",
+    ("fs/serialfs/sfs_proto.c", r"\(u32\)SFS_FIRST_BYTE_MS \+ frame_ms \+ \(u32\)SFS_SLACK_MS",
      "(u32)SFS_SLACK_MS", "最初のバイトまでの 2 秒を期限に入れない"),
-    ("fs/sfs_client.c", r"            if \(sfs_match\(c, &f, type, seq, hello, nonce\)\) \{\n"
+    ("fs/serialfs/sfs_client.c", r"            if \(sfs_match\(c, &f, type, seq, hello, nonce\)\) \{\n"
                         r"                \*got = f;\n                return 0;\n            \}\n"
                         r"            c->stray\+\+;",
      "            if (sfs_match(c, &f, type, seq, hello, nonce)) {\n"
      "                *got = f;\n                return 0;\n            }\n"
      "            c->stray++;\n            start = t;",
      "受け取らなかったフレームで期限を延ばす"),
-    ("fs/sfs_client.c", r"    if \(f->sid != c->sid \|\| f->seq != seq\) return 0;",
+    ("fs/serialfs/sfs_client.c", r"    if \(f->sid != c->sid \|\| f->seq != seq\) return 0;",
      "    if (f->sid != c->sid) return 0;", "番号違いの応答を取る"),
-    ("fs/sfs_client.c", r"    if \(f->sid != c->sid \|\| f->seq != seq\) return 0;",
+    ("fs/serialfs/sfs_client.c", r"    if \(f->sid != c->sid \|\| f->seq != seq\) return 0;",
      "    if (f->seq != seq) return 0;", "セッション違いの応答を取る"),
-    ("fs/sfs_client.c", r"        if \(sfs_get32\(f->payload \+ SFS_HELLO_RSP_NONCE\) != nonce\) return 0;\n",
+    ("fs/serialfs/sfs_client.c", r"        if \(sfs_get32\(f->payload \+ SFS_HELLO_RSP_NONCE\) != nonce\) return 0;\n",
      "", "HELLO の nonce を見ない (前のセッションの遅れた HELLO を取る)"),
-    ("fs/sfs_client.c", r"    if \(c->fails >= SFS_DEAD_AFTER && c->dead == SFS_DEAD_NONE\)",
+    ("fs/serialfs/sfs_client.c", r"    if \(c->fails >= SFS_DEAD_AFTER && c->dead == SFS_DEAD_NONE\)",
      "    if (0)", "連続失敗で線を死んだと見なさない"),
-    ("fs/sfs_client.c", r"        c->dead = SFS_DEAD_STALE;\n", "",
+    ("fs/serialfs/sfs_client.c", r"        c->dead = SFS_DEAD_STALE;\n", "",
      "ERR (未知のセッション) で止まらない"),
-    ("fs/sfs_client.c", r"    for \(attempt = 0; attempt <= SFS_RETRIES; attempt\+\+\) \{",
+    ("fs/serialfs/sfs_client.c", r"    for \(attempt = 0; attempt <= SFS_RETRIES; attempt\+\+\) \{",
      "    for (attempt = 0; attempt < 1; attempt++) {", "再送しない"),
-    ("fs/sfs_client.c", r"        if \(c->io->put\(c->ctx, c->tx, flen\) != 0\) \{\n            c->timeouts\+\+;",
+    ("fs/serialfs/sfs_client.c", r"        if \(c->io->put\(c->ctx, c->tx, flen\) != 0\) \{\n            c->timeouts\+\+;",
      "        if (attempt > 0) sfs_encode(c->tx, type, c->sid, (u16)(seq + attempt), c->tx + SFS_HDR_LEN, (u16)(flen - SFS_HDR_LEN - SFS_CRC_LEN));\n"
      "        if (c->io->put(c->ctx, c->tx, flen) != 0) {\n            c->timeouts++;",
      "再送で番号を変える (ホストのキャッシュが効かず副作用が二重になる)"),
-    ("fs/sfs_client.c", r"    if \(!c->io->can_wait\(c->ctx\)\) return OS32_ERR_IO;\n    /\* 番号は",
+    ("fs/serialfs/sfs_client.c", r"    if \(!c->io->can_wait\(c->ctx\)\) return OS32_ERR_IO;\n    /\* 番号は",
      "    /* 番号は", "IF=0 でも待つ"),
-    ("fs/sfs_client.c", r"        if \(\(u32\)\(t - start\) >= limit\) return 0;",
+    ("fs/serialfs/sfs_client.c", r"        if \(\(u32\)\(t - start\) >= limit\) return 0;",
      "", "静まるのを待つ口に上限が無い"),
-    ("fs/serialfs.c", r"    if \(!g_permit_cli \|\| g_mounted\) return \(void \*\)0;",
+    ("fs/serialfs/serialfs.c", r"    if \(!g_permit_cli \|\| g_mounted\) return \(void \*\)0;",
      "    if (g_mounted) return (void *)0;", "セッションの外からマウントできる"),
-    ("fs/serialfs.c", r"    if \(VFS_MOUNT_DEV_TYPE\(dev\) != VFS_DEV_SERIAL\) return \(void \*\)0;",
+    ("fs/serialfs/serialfs.c", r"    if \(VFS_MOUNT_DEV_TYPE\(dev\) != VFS_DEV_SERIAL\) return \(void \*\)0;",
      "", "デバイス種別を見ない"),
-    ("fs/serialfs.c", r"if \(\(u32\)rc > want \|\| \(u32\)rc != blen\) return OS32_ERR_IO;",
+    ("fs/serialfs/serialfs.c", r"if \(\(u32\)rc > want \|\| \(u32\)rc != blen\) return OS32_ERR_IO;",
      "if ((u32)rc != blen) return OS32_ERR_IO;", "要求より多く返す応答を通す"),
-    ("fs/serialfs.c", r"        if \(\(u16\)rc < want\) break;          /\* 短い = EOF \*/",
+    ("fs/serialfs/serialfs.c", r"        if \(\(u16\)rc < want\) break;          /\* 短い = EOF \*/",
      "", "短い応答を EOF と見ない"),
-    ("fs/serialfs.c", r"                if \(ch == 0 \|\| ch == '/'\) return OS32_ERR_IO;",
+    ("fs/serialfs/serialfs.c", r"                if \(ch == 0 \|\| ch == '/'\) return OS32_ERR_IO;",
      "", "名前の '/' を通す"),
-    ("fs/serialfs.c", r"        if \(next <= cookie\) return OS32_ERR_IO;",
+    ("fs/serialfs/serialfs.c", r"        if \(next <= cookie\) return OS32_ERR_IO;",
      "", "cookie が進まない相手で回り続ける"),
-    ("fs/serialfs.c", r"    if \(kind == SFS_KIND_DIR\) return OS32_ERR_ISDIR;",
+    ("fs/serialfs/serialfs.c", r"    if \(kind == SFS_KIND_DIR\) return OS32_ERR_ISDIR;",
      "", "get_file_size がディレクトリにサイズを返す"),
-    ("fs/serialfs.c", r"        pl\[SFS_WRITE_FLAGS_OFF\] = \(u8\)\(\(first && first_trunc\) \? SFS_WF_TRUNC : 0\);",
+    ("fs/serialfs/serialfs.c", r"        pl\[SFS_WRITE_FLAGS_OFF\] = \(u8\)\(\(first && first_trunc\) \? SFS_WF_TRUNC : 0\);",
      "        pl[SFS_WRITE_FLAGS_OFF] = (u8)(first_trunc ? SFS_WF_TRUNC : 0);",
      "write_file の 2 回目以降も TRUNC (前の塊を消す)"),
-    ("fs/serialfs.c", r"    if \(size == 0 && !first_trunc\) return 0;\n", "",
+    ("fs/serialfs/serialfs.c", r"    if \(size == 0 && !first_trunc\) return 0;\n", "",
      "0 バイトの write_stream が要求を出す"),
-    ("fs/serialfs.c", r"    default:\n        return OS32_ERR_IO;\n    \}\n\}",
+    ("fs/serialfs/serialfs.c", r"    default:\n        return OS32_ERR_IO;\n    \}\n\}",
      "    default:\n        return st;\n    }\n}", "知らない status を畳まない"),
     ("userland/shell/serial_watchdog.c",
      r"    if \(at_line_start && !followed\) return RSH_ESC_EXIT;",
@@ -1538,35 +1538,35 @@ GATE_MUTATIONS = CHECKED_MUTATIONS + [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
-    ("fs/serialfs_session.c",
+    ("fs/serialfs/serialfs_session.c",
      r'            kprintf\(KLOG_LEGACY_LIGHT_RED, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
      "", "lan.mod 不在の診断を消す"),
-    ("fs/serialfs_session.c", r"            sfs_lan_reset\(&g_lan\);",
+    ("fs/serialfs/serialfs_session.c", r"            sfs_lan_reset\(&g_lan\);",
      "            ;", "LAN start の読み捨てを外す"),
-    ("fs/serialfs_session.c", r"        while \(!e82557_rx_ready\(\)\) \{",
+    ("fs/serialfs/serialfs_session.c", r"        while \(!e82557_rx_ready\(\)\) \{",
      "        while (0) {", "LAN start の RU ready 待ちを外す"),
-    ("fs/serialfs_session.c",
+    ("fs/serialfs/serialfs_session.c",
      r'    g_use_lan = sysconfig_get_int\(SYS_SYSTEM_CFG, "SFS_LAN", 0\) == 1;',
      '    g_use_lan = 0;', "SFS_LAN を読まない"),
-    ("fs/serialfs_session.c", r"        sfs_lan_reset\(&g_lan\);",
+    ("fs/serialfs/serialfs_session.c", r"        sfs_lan_reset\(&g_lan\);",
      "        ;", "LAN end で受信状態を捨てない"),
-    ("fs/serialfs_session.c", r"(static SfsClient g_cli;)", r"\1", IDENTITY),
-    ("fs/serialfs_session.c",
+    ("fs/serialfs/serialfs_session.c", r"(static SfsClient g_cli;)", r"\1", IDENTITY),
+    ("fs/serialfs/serialfs_session.c",
      r"    quiet = sfs_client_quiesce\(&g_cli, SFS_QUIET_MS, SFS_QUIET_MAX_MS\);",
      "    quiet = g_cli.sid ? sfs_client_quiesce(&g_cli, SFS_QUIET_MS, SFS_QUIET_MAX_MS) : 1;",
      "HELLO が通らなかった回は隔離せずに下ろす (遅れて届く相手の応答が rshell に入る)"),
-    ("fs/serialfs_session.c", r"    sfs_flush_hold_raw\(\);\n    g_cli.sid = 0;",
+    ("fs/serialfs/serialfs_session.c", r"    sfs_flush_hold_raw\(\);\n    g_cli.sid = 0;",
      "    if (g_cli.sid == 0) sfs_flush_hold_raw();\n    g_cli.sid = 0;",
      "EXIT からゲートを下ろすまでに保留へ入った文字を捨てる"),
-    ("fs/serialfs_session.c",
+    ("fs/serialfs/serialfs_session.c",
      r"    if \(g_cli.sid != 0\) \(void\)sfs_client_oneway\(&g_cli, SFS_T_BYE, 0, 0\);\n",
      "", "BYE を送らない"),
-    ("fs/serialfs_session.c", r"        flags \|= SFS_XF_NOT_QUIET;\n", "",
+    ("fs/serialfs/serialfs_session.c", r"        flags \|= SFS_XF_NOT_QUIET;\n", "",
      "隔離の上限に達しても EXIT の flags に出さない"),
-    ("fs/serialfs_session.c",
+    ("fs/serialfs/serialfs_session.c",
      r"    if \(vfs_fstype\(SERIALFS_PREFIX\)\[0\] != '\\0'\) return OS32_ERR_BUSY;\n", "",
      "/host が使われていても (HostDrv) 始める"),
-    ("fs/serialfs_session.c", r"    if \(!_irq_enabled\(\)\) return OS32_ERR_INVAL;\n", "",
+    ("fs/serialfs/serialfs_session.c", r"    if \(!_irq_enabled\(\)\) return OS32_ERR_INVAL;\n", "",
      "IF=0 のまま始める (tick が進まず期限が来ない)"),
 ]
 PY_MUTATIONS = [
@@ -1657,7 +1657,7 @@ def _mutate_c_one(item):
     # 含んでも変異の的ではない — 従来どおりの対応)
     if rel == "drivers/char/serial.c":
         build, cases = gate_build, GATE_CASES
-    elif rel == "fs/serialfs_session.c":
+    elif rel == "fs/serialfs/serialfs_session.c":
         build, cases = session_build, SESSION_CASES
     else:
         build, cases = c_build, C_CASES
@@ -1744,8 +1744,8 @@ def main():
         exe = c_build(tmp)
         gexe = gate_build(tmp)
         sexe = session_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real fs/sfs_*.c, fs/serialfs.c, "
-              "fs/serialfs_session.c, drivers/char/serial.c)", flush=True)
+        print("HOST GNU11 -Werror compile PASS (real fs/sfs_*.c, fs/serialfs/serialfs.c, "
+              "fs/serialfs/serialfs_session.c, drivers/char/serial.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc += run_exe_cases(exe, [c for c in C_CASES if not only or c in only])

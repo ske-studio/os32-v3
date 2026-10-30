@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  SERIALFS_HOST.C — SerialFS のゲスト側のホスト試験 (票 TASK_SERIAL_HOSTFS) */
 /*                                                                          */
-/*  実物の fs/sfs_proto.c・fs/sfs_client.c・fs/serialfs.c・lib/crc32.c と    */
+/*  実物の fs/serialfs/sfs_proto.c・fs/serialfs/sfs_client.c・fs/serialfs/serialfs.c・lib/crc32.c と    */
 /*  userland/shell/serial_watchdog.c・userland/system/hsync_bootold.inc を   */
 /*  #include し、線と時計と相手 (ホスト) だけを偽物にする。                 */
 /*                                                                          */

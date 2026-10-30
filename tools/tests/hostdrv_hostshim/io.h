@@ -6,7 +6,7 @@
  *  ポート操作を試験側の関数へ回す
  *  (tools/tests/mtar_freestanding と同じ作法)。
  *
- *  票: B8 / Codex 実装レビュー P1-4。fs/hostdrvfs.c の **実物**をホストで
+ *  票: B8 / Codex 実装レビュー P1-4。fs/hostdrv/hostdrvfs.c の **実物**をホストで
  *  動かし、hdrv_get_file_size() などを直接通すために要る。
  *
  *  [C1] C89 / GNU89。

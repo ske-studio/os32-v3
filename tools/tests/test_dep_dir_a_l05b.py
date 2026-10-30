@@ -15,7 +15,7 @@ COPIES = ('include/types.h', 'include/config.h', 'include/ide_contract.h',
           'tools/tests/dep_dir_a_l05b_host.c')
 OLD = 'out->phys_sector_size = info.phys_sector_size;'
 NEW = 'out->phys_sector_size = info.phys_sector_size ^ 1u;'
-FS = ('fs/ext2_super.c', 'fs/ext2_fmt.c', 'fs/fatfs_vfs.c', 'fs/fatfs/diskio.c')
+FS = ('fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/fat/fatfs_vfs.c', 'fs/fat/fatfs/diskio.c')
 
 
 def contracts():
@@ -26,7 +26,7 @@ def contracts():
         assert not re.search(r'\b(?:IdeInfo|ide_get_info|ide_drive_present|ide_range_ok)\b',
                              re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)), rel
         assert '"ide.h"' not in source, rel
-    for rel in ('fs/ide_limits.h', 'fs/fatfs/diskio_os32.h'):
+    for rel in ('fs/ide_limits.h', 'fs/fat/fatfs/diskio_os32.h'):
         source = (ROOT / rel).read_text()
         assert '"ide_contract.h"' in source and '"ide.h"' not in source
     print('PASS FS uses platform value queries and shared IDE constants')

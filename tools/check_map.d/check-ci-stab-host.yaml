@@ -14,9 +14,9 @@ check-ci-stab-host:
 - tools/module_schema.py
 - tools/tests/hwdev_contract_fixture.py
 - tools/tests/dep_dir_a_l05b_host.c
-- fs/fatfs/diskio.c
-- fs/ext2_super.c
-- fs/ext2_fmt.c
+- fs/fat/fatfs/diskio.c
+- fs/ext2/ext2_super.c
+- fs/ext2/ext2_fmt.c
 - tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
@@ -46,8 +46,8 @@ check-ci-stab-host:
 - exec/appmem_unmap.c
 - exec/exec.c
 - exec/exec_kapi_init.inc
-- fs/ext2_layout.c
-- fs/fatfs_vfs.c
+- fs/ext2/ext2_layout.c
+- fs/fat/fatfs_vfs.c
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
 - fs/vfs_name_rules.inc
@@ -154,10 +154,10 @@ check-ci-stab-host:
 - platform/pc98/device_ide.c
 - tools/tests/dep_dir_a_l06_host.c
 - platform/pc98/device_fs.c
-- fs/ext2.h
-- fs/serialfs.h
-- fs/sfs_client.h
-- fs/sfs_proto.h
+- fs/ext2/ext2.h
+- fs/serialfs/serialfs.h
+- fs/serialfs/sfs_client.h
+- fs/serialfs/sfs_proto.h
 - fs/vfs.h
 - include/memmap.h
 - include/platform_device.h
@@ -170,7 +170,7 @@ check-ci-stab-host:
 - sdk/include/os32/os32_surface.h
 - sdk/include/os32/os32_ver_info.h
 - fs/vfs.c
-- fs/serialfs_session.c
+- fs/serialfs/serialfs_session.c
 - tools/tests/test_dep_dir_a_l06.py
 - tools/tests/test_dep_dir_a_l05a.py
 - tools/tests/fixtures/dep_dir_a/l06.json

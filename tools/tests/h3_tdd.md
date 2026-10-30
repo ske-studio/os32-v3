@@ -9,8 +9,8 @@
 
 ## 0. 正直に書く ([V4])
 
-**試験は実装のあとに書いた。** `hsync.c` / `fs/hostdrv_stat_rules.inc` /
-`fs/vfs.c` / `fs/ext2_vfs.c` / `kapi/kapi_sys.c` を先に直し、そのあとで
+**試験は実装のあとに書いた。** `hsync.c` / `fs/hostdrv/hostdrv_stat_rules.inc` /
+`fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `kapi/kapi_sys.c` を先に直し、そのあとで
 `tools/tests/hsync_h3_host.c` と `tools/tests/vfs_set_mtime_host.c` を書いた。
 だから「先に RED を見た」とは書けない。
 
@@ -26,7 +26,7 @@
 | ファイル | 中身 |
 |---|---|
 | `tools/tests/hsync_h3_host.c` | 実物の `userland/system/hsync.c` を 1 行も写さず `#include` し、KernelAPI だけを贋物に差し替える。贋 FS は**ノードごとに mtime を持ち**、`sys_set_mtime` の成功 / `NOSYS` / I/O 失敗を注入できる。`sys_read` / `sys_write` / `sys_set_mtime` の**呼び出し回数**を数える |
-| ↑ の A16 | `fs/hostdrv_stat_rules.inc` の `hdrv_filetime_to_unix` / `hdrv_stat_mtime` を同じ翻訳単位で直接叩く (純関数) |
+| ↑ の A16 | `fs/hostdrv/hostdrv_stat_rules.inc` の `hdrv_filetime_to_unix` / `hdrv_stat_mtime` を同じ翻訳単位で直接叩く (純関数) |
 | `tools/tests/vfs_set_mtime_host.c` | 実物の `fs/vfs.c` を `#include` し、合成 `VfsOps` で `vfs_set_mtime()` の振り分け (`NOSYS` / `INVAL` / `NOMOUNT` / エラーの素通し) を見る |
 | `tools/tests/test_hsync_h3.py` | 2 本のビルドと実行、`--target` のクロスコンパイル確認、`--mutate` の否定側、`[ABI1]`/`[ABI2]` の静的検査 (`sys_set_mtime` が **slot 213 から動いていないか** / その前の並びが変わっていないか / 版が揃うか / 生成ヘッダの `KAPI_FUNC_COUNT` が 一致するか / `build/app.conf` の要求版) |
 
@@ -45,10 +45,10 @@ HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c)
 17 checks, 0 failures
 EXIT vfs_set_mtime_host=0
 TARGET i386-elf -Werror COMPILE PASS (userland/system/hsync.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/fatfs_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/iso9660.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/fat/fatfs_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/isofs/iso9660.c)
 TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
 TARGET i386-elf -Werror COMPILE PASS (kapi/kapi_sys.c)
 ```
@@ -98,7 +98,7 @@ H1 のホスト試験 (`hsync_h1_host.c`) は同じ `.inc` を取り込むが時
 呼ばないので、`-Wunused-function` で**ビルドが落ちた**。
 
 ```
-fs/hostdrv_stat_rules.inc:123:12: error: 'hdrv_stat_mtime' defined but not used
+fs/hostdrv/hostdrv_stat_rules.inc:123:12: error: 'hdrv_stat_mtime' defined but not used
 ```
 
 直し方: `.inc` は「純規則の置き場」で取り込む側が全部を使うとは限らないので、
@@ -124,12 +124,12 @@ fs/hostdrv_stat_rules.inc:123:12: error: 'hdrv_stat_mtime' defined but not used
 ### R3. `VfsOps` にフィールドを足したら既存ドライバが `-Werror` で落ちた
 
 ```
-fs/hostdrvfs.c:890:1: error: missing initializer for field 'set_mtime' of 'VfsOps'
+fs/hostdrv/hostdrvfs.c:890:1: error: missing initializer for field 'set_mtime' of 'VfsOps'
 ```
 
 `-Wextra` の `-Wmissing-field-initializers`。C89 の規則では書かなかった
 メンバはゼロになるので**動作は正しい**が、「書き忘れ」と区別が付かない。
-`fs/hostdrvfs.c` / `fs/fatfs_vfs.c` / `fs/iso9660.c` に**明示的な `0`** と
+`fs/hostdrv/hostdrvfs.c` / `fs/fat/fatfs_vfs.c` / `fs/isofs/iso9660.c` に**明示的な `0`** と
 理由のコメントを置いた。ゼロになること自体は
 `tools/tests/vfs_set_mtime_host.c` が位置指定の初期化子で固定している。
 
@@ -231,11 +231,11 @@ H1 側からも押さえる形になった。時刻を使う試験は H3 側が�
 
 実装:
 
-- `fs/hostdrv_stat_rules.inc` — FILETIME → Unix 秒の純関数 (`hdrv_filetime_to_unix` / `hdrv_stat_mtime`)
-- `fs/hostdrvfs.c` — `hdrv_stat()` が `LastWriteTime` を値として退避し `st_mtime` に返す
+- `fs/hostdrv/hostdrv_stat_rules.inc` — FILETIME → Unix 秒の純関数 (`hdrv_filetime_to_unix` / `hdrv_stat_mtime`)
+- `fs/hostdrv/hostdrvfs.c` — `hdrv_stat()` が `LastWriteTime` を値として退避し `st_mtime` に返す
 - `fs/vfs.h` / `fs/vfs.c` — `VfsOps.set_mtime` (任意実装) と `vfs_set_mtime()`、`VFS_ERR_NOSYS`
-- `fs/ext2_vfs.c` — `ext2_vfs_set_mtime()` (ext2 のみ実装)
-- `fs/fatfs_vfs.c` / `fs/iso9660.c` / `fs/hostdrvfs.c` — `VfsOps` に明示的な `0`
+- `fs/ext2/ext2_vfs.c` — `ext2_vfs_set_mtime()` (ext2 のみ実装)
+- `fs/fat/fatfs_vfs.c` / `fs/isofs/iso9660.c` / `fs/hostdrv/hostdrvfs.c` — `VfsOps` に明示的な `0`
 - `kapi/kapi_sys.c` — `kapi_sys_set_mtime()` (CPL=3 のポインタ検証と写し)
 - `sdk/kapi.json` (v51 → v52、`api` 末尾に `sys_set_mtime`) と生成物
 - `sdk/include/os32/os32_kapi_shared.h` — `KAPI_VERSION` 52
@@ -269,7 +269,7 @@ vfs_mount_dev_host.c:(.text+0x31e7): undefined reference to `ext2_current_time'
 vfs_mount_dev_host.c:(.text+0x320e): undefined reference to `ext2_write_inode'
 ```
 
-`tools/tests/vfs_mount_dev_host.c` は実物の `fs/ext2_vfs.c` を取り込んで
+`tools/tests/vfs_mount_dev_host.c` は実物の `fs/ext2/ext2_vfs.c` を取り込んで
 ext2 本体を贋物で埋めているが、H3 で足した `ext2_vfs_set_mtime()` が
 `ext2_read_inode` → **`ext2_write_inode`** → `ext2_sync` と進み、時刻を
 **`ext2_current_time()`** から取るので、埋まっていない 2 本が未定義になった。

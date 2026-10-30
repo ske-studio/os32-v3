@@ -311,7 +311,7 @@ FD の新しいカーネルで起動し、SerialFS 越しの /host から /hd0 (
 `root_source_accepted` `root_protect_by_full_path` `root_protect_scan_slash_etc`
 `root_manifest_full_path` `root_old_on_slash` `root_kernel_by_full_path`
 `root_note_by_full_path` `root_subdir_not_prefixed`) がすべて RED。既存 20 本も RED のまま。
-`check_manifest` に「HS_EXT2_ROOT_INO が fs/ext2.h の EXT2_ROOT_INO と同じ」と man ページの
+`check_manifest` に「HS_EXT2_ROOT_INO が fs/ext2/ext2.h の EXT2_ROOT_INO と同じ」と man ページの
 `--root` / `root_*` の記載を足した。
 
 着地後の P3 (2026-09-26、代行レビュー): 根の stat が落ちたら `root_stat_failed err=` (I/O 失敗を

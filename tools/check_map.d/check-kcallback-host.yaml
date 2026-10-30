@@ -3,7 +3,7 @@ check-kcallback-host:
 - sdk/include/os32/ls.h
 - fs/vfs.c
 - fs/vfs.h
-- fs/ext2_vfs.c
+- fs/ext2/ext2_vfs.c
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - exec/ring3_ls.c

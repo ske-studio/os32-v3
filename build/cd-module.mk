@@ -11,7 +11,7 @@ $(CD_OUT)/cd_body.o: drivers/ata/cd_body.c $(CD_GEN) build/config.mk build/cd-mo
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
 $(CD_OUT)/atapi.o: drivers/ata/atapi.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os $(CD_INC) -c $< -o $@
-$(CD_OUT)/iso9660.o: fs/iso9660.c $(CD_GEN) build/config.mk build/cd-module.mk
+$(CD_OUT)/iso9660.o: fs/isofs/iso9660.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
 $(CD_OUT)/cd_import_slots.o $(CD_OUT)/cd_provider_types.o $(CD_OUT)/cd_kexports.o: $(CD_OUT)/%.o: $(CD_OUT)/%.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(CD_INC) -c $< -o $@

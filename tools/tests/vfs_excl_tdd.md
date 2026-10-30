@@ -86,10 +86,10 @@ HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)
 EXIT vfs_excl_host=0
 TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
 TARGET i386-elf -Werror COMPILE PASS (fs/vfs_fd.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2_dir.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2_file.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2_super.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_dir.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_file.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_super.c)
 ```
 
 ## 変異試験 (`--mutate`、否定側)

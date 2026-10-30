@@ -13,7 +13,7 @@ check-sqlite-vfs-identity-host:
 - fs/vfs_fd.c
 - fs/vfs.c
 - fs/vfs.h
-- fs/ext2_vfs.c
+- fs/ext2/ext2_vfs.c
 - tools/tests/input_fixture_host.h
 - kernel/input_service.c
 - include/pointer_service.h

@@ -178,7 +178,7 @@
 #define HR_ROOT_IS_SOURCE "root_is_source"  /* --root が同期元 (/host) 自身かその下 */
 #define HR_ROOT_STAT_FAIL "root_stat_failed" /* --root の根を stat できない (I/O 失敗・NOMOUNT) */
 
-/* ext2 のルート inode 番号。**fs/ext2.h の EXT2_ROOT_INO が正典**で、外部
+/* ext2 のルート inode 番号。**fs/ext2/ext2.h の EXT2_ROOT_INO が正典**で、外部
  * プログラムからは引けないので写しを置く (ずれは tools/tests/test_hsync_h2.py
  * が両方を読んで突き合わせる、[C4])。
  *
@@ -2153,7 +2153,7 @@ static void clean_temps(const char *dst_dir)
  *   0 = ディレクトリ、または不存在 (進んでよい)
  *  -1 = 通常ファイル等の型衝突 / stat 不能 (errors に数え済み)
  *
- * fs/ext2_dir.c の ext2_find_entry は**種別を問わず**名前があれば EXIST を
+ * fs/ext2/ext2_dir.c の ext2_find_entry は**種別を問わず**名前があれば EXIST を
  * 返すので、sys_mkdir の OS32_ERR_EXIST だけでは「同じ名前の通常ファイル」を
  * 見分けられない。無条件に受理して再帰すると、`/host/usr/empty` が
  * ディレクトリ・`/usr/empty` が通常ファイルのまま errors=0 / 終了コード 0 で

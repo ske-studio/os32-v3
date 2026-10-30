@@ -1,10 +1,10 @@
 /* ========================================================================
- *  cd_read_host.c — CD の読み (drivers/ata/atapi.c + fs/iso9660.c) のホスト試験
+ *  cd_read_host.c — CD の読み (drivers/ata/atapi.c + fs/isofs/iso9660.c) のホスト試験
  *
  *  実行:  python3 -B tools/tests/test_cd_read.py [--target] [--mutate] [case ...]
  *  記録:  tools/tests/cd_read_tdd.md
  *
- *  実物の drivers/ata/atapi.c と fs/iso9660.c を 1 行も写さずに #include する。
+ *  実物の drivers/ata/atapi.c と fs/isofs/iso9660.c を 1 行も写さずに #include する。
  *  atapi.c のポートは tools/tests/atapi_hostshim/io.h がここの ATAPI デバイスの
  *  模型へ回す。模型は PACKET (0xA0) → 12 バイトの CDB → DRQ ごとのデータ、を
  *  レジスタの粒度で写し、READ(10) の回数・セクタ数・(LBA, 数) の列を数える。
@@ -74,7 +74,7 @@ void kprintf(u8 attr, const char *fmt, ...)
 
 /* ---- 実物 ---- */
 #include "../../drivers/ata/atapi.c"
-#include "../../fs/iso9660.c"
+#include "../../fs/isofs/iso9660.c"
 #include "../../drivers/ata/cd_body.c"
 
 #define CHECK(x) do { if (!(x)) { \

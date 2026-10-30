@@ -15,8 +15,8 @@ make check-hsync-host        # 同じもの (--target 付き)
   0 進捗 write / 書き込み時のビット反転 (破損) / stat のエラー・種別ゼロ・サイズ偽装**
   を注入できる。`vfs_sync` の失敗は大域スイッチ。`kprintf` は全文をログへ溜め、
   検査は**固定文字列の理由コード**で行う (文言の雰囲気で判定しない)。
-- `fs/hostdrv_stat_rules.inc` (HostDrv の stat 失敗の是正) は純関数なので同じ翻訳単位で
-  直接叩く。`fs/hostdrvfs.c` の `hdrv_stat()` はこの `.inc` を `#include` して呼ぶだけで、
+- `fs/hostdrv/hostdrv_stat_rules.inc` (HostDrv の stat 失敗の是正) は純関数なので同じ翻訳単位で
+  直接叩く。`fs/hostdrv/hostdrvfs.c` の `hdrv_stat()` はこの `.inc` を `#include` して呼ぶだけで、
   判定の写しをどこにも作っていない。
 - CRC は `lib/crc32.c` (既存の一括版 `crc32_calc`) を同じ実行ファイルへリンクし、
   ストリーム核 (`lib/crc32_core.inc`) との一致を既知ベクトルと実データで見る。
@@ -61,7 +61,7 @@ HOST GNU89 -Werror COMPILE PASS [CRC stub] (real hsync.c)
 EXIT hsync_h1_host_crcstub=0
 TARGET i386-elf -Werror COMPILE PASS (hsync.c)
 TARGET i386-elf -Werror COMPILE PASS (lib/crc32.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/hostdrvfs.c)
+TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)
 ```
 
 RED は**実装を 1 か所ずつ「直す前」へ戻した変異**で取った ([V4]: 時系列で先に
@@ -110,7 +110,7 @@ M1 の RED (抜粋):
 |---|---|---|
 | B1 | `\` を含むパスを断つ。OS32 の区切りは `/` だけなので `..\other` は**普通の 1 要素**として `..` 脱出検査を素通りするが、HostDrv の `session_set_path` が `/`→`\` に直したうえで他の文字をそのまま通すため、ホスト側では `C:\os32\..\other` になる。NP21/W の `hostdrvNT_getHostPath` は `PathCanonicalizeW` のあと**境界を見ない前方一致**でルート検査をするので `C:\os32-other` が通る。`argv` の dir と**列挙で得た名前の両方**を拒否 (`reason=bad_name`) | `hsp_has_backslash` / `hsp_normalize` / `ls_cb` / `main` |
 | B2 | `/host` を前置した**あと**の要素数で上限を見る。`hsp_normalize` の `HSP_MAX_DEPTH` は入力側にしか掛からないので、32 要素の dir は通り、同期元は 33 要素になる。`fs/vfs.c` は上限超過の要素を**黙って捨てる**ので「指定した親ディレクトリ」を列挙してしまい、宛先側も化けて、何も同期していないのに `errors=0` / 終了コード 0 だった。越えたら `reason=path_too_deep` で `errors` に数える。あわせて **`PROTECTED` を「保護に当たったとき」だけの語**にし、正規化失敗は `reason=path_rejected` のエラーにした (`hsp_path_protected` の真偽 1 本を 3 値の `hsp_path_classify` に置き換え) | `hsp_depth` / `hsp_path_classify` / `HS_MAX_PATH_DEPTH` / `sync_directory` / `main` |
-| B3 | `sys_mkdir` が `OS32_ERR_EXIST` を返したら宛先を `stat` して**ディレクトリであることを確かめる**。`fs/ext2_dir.c` の `ext2_find_entry` は**種別を問わず** EXIST を返すので、コピー元がディレクトリ・宛先が通常ファイルのまま `errors=0` / 終了コード 0 で終わっていた。`-n` は `mkdir` を呼ばないので、**dry-run でも型検査だけは行う** (書き込みはしない) | `dst_dir_type_ok` / `sync_directory` |
+| B3 | `sys_mkdir` が `OS32_ERR_EXIST` を返したら宛先を `stat` して**ディレクトリであることを確かめる**。`fs/ext2/ext2_dir.c` の `ext2_find_entry` は**種別を問わず** EXIST を返すので、コピー元がディレクトリ・宛先が通常ファイルのまま `errors=0` / 終了コード 0 で終わっていた。`-n` は `mkdir` を呼ばないので、**dry-run でも型検査だけは行う** (書き込みはしない) | `dst_dir_type_ok` / `sync_directory` |
 
 追加した検査は **`case_b1` 10 件 / `case_b2` 18 件 / `case_b3` 11 件 = 39 件**
 (`hsync_h1_host.c`、149 → **188 checks / 0 failures**、CRC 贋物ビルドは 3 / 0 のまま)。
@@ -186,7 +186,7 @@ dry-run も force も同じ検査を通る (書き込みは一切しない)。
 コピー元の型検査も足した。
 
 - 直す前の実際の動き: `sync_directory` が `sys_ls(src_dir)` を呼び、
-  `fs/hostdrvfs.c` の `hdrv_list_dir` は `NP2_FILE_DIRECTORY_FILE` で開くので
+  `fs/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は `NP2_FILE_DIRECTORY_FILE` で開くので
   通常ファイルなら `hostdrv_create` が失敗し **`VFS_ERR_NOTFOUND`** を返す。
   結果 `FAIL: ls /host/usr/file.txt (err=-2)` となり `errors=1` / 非ゼロ終了。
   **落ちること自体は落ちていた。**
@@ -199,7 +199,7 @@ dry-run も force も同じ検査を通る (書き込みは一切しない)。
   stat 自体が失敗すれば `reason=io_error` で落とすようにした。
 
 **別件として PM へ**: `hdrv_list_dir` は列挙の途中で `hostdrv_query_dir` が
-負値を返しても `break` して **`VFS_OK` を返す** (`fs/hostdrvfs.c:525`)。
+負値を返しても `break` して **`VFS_OK` を返す** (`fs/hostdrv/hostdrvfs.c:525`)。
 途中で切れた列挙が「全部読めた」ことになるので、B3 と同じ形の穴が
 カーネル FS 側に残っている。この票の範囲外なので触っていない。
 
@@ -230,7 +230,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 到達可能**と判定。H1 の完了条件「I/O 失敗を成功にしない」と対象「HostDrv の
 エラー処理」に入るのでこの票で直した。
 
-`fs/hostdrvfs.c` の `hdrv_list_dir` は列挙ループを 2 通りで抜け、どちらも
+`fs/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は列挙ループを 2 通りで抜け、どちらも
 末尾で無条件に `return VFS_OK` していた。
 
 - `if (rc < 0) break;` — `hostdrv_query_dir` の失敗。200 件のうち 50 件目で
@@ -241,9 +241,9 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 ### 直した内容
 
-列挙ループを `fs/hostdrv_list_rules.inc` の純関数 `hdrv_list_run()` に切り出し、
+列挙ループを `fs/hostdrv/hostdrv_list_rules.inc` の純関数 `hdrv_list_run()` に切り出し、
 1 件取得 (`hostdrv_query_dir`) と 1 件の組み立てを関数ポインタで受ける形にした
-(`fs/hostdrv_stat_rules.inc` と同じ作法)。`hdrv_list_dir` は step / emit を渡して
+(`fs/hostdrv/hostdrv_stat_rules.inc` と同じ作法)。`hdrv_list_dir` は step / emit を渡して
 呼ぶだけになり、判定の写しはどこにも無い。`hostdrv_cleanup_close()` は
 **戻り値にかかわらず必ず通す**。
 
@@ -259,7 +259,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 ### 修正 2 は挙動の変更 — 切り離せる形
 
-`fs/hostdrv_list_rules.inc` の `hdrv_list_run()` にある
+`fs/hostdrv/hostdrv_list_rules.inc` の `hdrv_list_run()` にある
 
 ```c
         if (count++ >= max_entries) {
@@ -318,7 +318,7 @@ ext2 と iso9660 は自前の `list_dir` を持つので影響を受けない
 - `tools/tests/hostdrv_list_host.c` + `tools/tests/test_hostdrv_list.py` (新設、
   `build/sdk.mk` に `check-hostdrv-list-host` を登録し `check:` の列に追加)。
   **23 件 / 0 failures**。正常系 7 / (a) 途中で負値 5 / (b) 件数上限 5 /
-  引数の防御 3 / 2 つのエラーが別物 2。`--target` で `fs/hostdrvfs.c` の
+  引数の防御 3 / 2 つのエラーが別物 2。`--target` で `fs/hostdrv/hostdrvfs.c` の
   クロスコンパイルも見る。上限定数が 1 か所にしか無いことの検査つき ([C4])。
 - `hsync_h1_host.c` に `case_b4` **8 件** (211 → **219 checks / 0 failures**)。
   贋 `sys_ls` に「N 件流してから I/O エラー」を注入し、**呼び手側の意味** —
@@ -507,8 +507,8 @@ Basic 問い合わせだけが IO、Standard と列挙は成功する状況。ex
   今回の 1 か所の修正で**カーネル・KAPI・SQLite VFS の全経路**が塞がる。
 - `vfs_rm` / `vfs_rename` / `vfs_rmdir` / `vfs_read` / `vfs_write` は
   `vfs_path_kind` を**呼んでいない**。ドライバの `unlink` / `rename` に委ね、
-  そちら側に独自の型検査がある (`fs/ext2_file.c:177` の `EXT2_ERR_ISDIR`、
-  `fs/ext2_dir.c:22` の `EXT2_ERR_NOTDIR`)。B6 / B7 の影響を受けない。
+  そちら側に独自の型検査がある (`fs/ext2/ext2_file.c:177` の `EXT2_ERR_ISDIR`、
+  `fs/ext2/ext2_dir.c:22` の `EXT2_ERR_NOTDIR`)。B6 / B7 の影響を受けない。
 - KAPI ラッパ (`kapi/kapi_generated.c`) は種別を自分で判定せず、
   `vfs_ls` / `vfs_stat` / `vfs_open` をそのまま呼ぶだけ。
 - `kapi/kapi_db.c:916,935` は `vfs_stat` を直接使う (種別ではなくサイズの確認)。

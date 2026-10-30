@@ -1,13 +1,13 @@
 check-vfs-mount-dev-host:
 - tools/tests/host32.py
 - drivers/block/pc98pt.c
-- fs/ext2_dir.c
-- fs/ext2_file.c
-- fs/ext2_fmt.c
-- fs/ext2_inode.c
-- fs/ext2_super.c
-- fs/ext2_vfs.c
-- fs/fatfs_vfs.c
+- fs/ext2/ext2_dir.c
+- fs/ext2/ext2_file.c
+- fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_inode.c
+- fs/ext2/ext2_super.c
+- fs/ext2/ext2_vfs.c
+- fs/fat/fatfs_vfs.c
 - fs/vfs.c
 - init/bootlog.c
 - lib/microtar/microtar.c
@@ -20,7 +20,7 @@ check-vfs-mount-dev-host:
 - tools/tests/test_vfs_mount_dev.py
 - tools/tests/vfs_mount_dev_host.c
 - fs/vfs_name_rules.inc
-- fs/ext2_layout.c
+- fs/ext2/ext2_layout.c
 - tools/check_map.d/check-vfs-mount-dev-host.yaml
 - build/checks.d/check-vfs-mount-dev-host.mk
 - fs/vfs_device.h

@@ -12,7 +12,7 @@
 #ifndef ISO9660_H
 #define ISO9660_H
 
-#include "vfs.h"
+#include "../vfs.h"
 #include "memmap.h"   /* PIT_HZ */
 #include "atapi.h"    /* ATAPI_READ_MAX_SECTORS */
 

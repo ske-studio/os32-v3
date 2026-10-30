@@ -6,7 +6,7 @@ K5b-K の実機初回起動 (2026-09-11) で「FATAL: shell.bin load failed」�
 カーネル .bss バッファへ変えたことで、隣の resolved[] (解決済みパス) が潰れ、
 続く本体読み込みが NOT_FOUND を返していた。
 
-実物の fs/ext2_file.c をそのまま取り込み、ブロック I/O・inode・bmap だけを
+実物の fs/ext2/ext2_file.c をそのまま取り込み、ブロック I/O・inode・bmap だけを
 差し替える。実デバイス・実イメージ・エミュレータには一切触れない。
 記録: tools/tests/k5b_kernel_tdd.md 節 R
 """
@@ -42,7 +42,7 @@ if __name__ == "__main__":
                         "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                         "-Wall", "-Wextra", "-Werror",
                         "-Wno-unused-parameter", "-Wno-sign-compare",
-                        *INCLUDES, "-O2", "-c", str(ROOT / "fs/ext2_file.c"),
+                        *INCLUDES, "-O2", "-c", str(ROOT / "fs/ext2/ext2_file.c"),
                         "-o", str(tmp / "ext2_file.o")],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)

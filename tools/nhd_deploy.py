@@ -839,7 +839,7 @@ class MigrateError(Exception):
 def _ext2_blocks_at(img, hs, start):
     """区画の先頭に ext2 のスーパーブロックがあれば 512B セクタ換算の大きさ、無ければ None。
 
-    OS32 の ext2 は 1KiB ブロック専用 (fs/ext2_fmt.c・ローダの ext2_mini)。
+    OS32 の ext2 は 1KiB ブロック専用 (fs/ext2/ext2_fmt.c・ローダの ext2_mini)。
     s_log_block_size が 0 でない FS は容量を正しく数えられない上に OS32 が
     読めないので、ここで MigrateError にする (Codex C2)。
     """

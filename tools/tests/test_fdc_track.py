@@ -29,7 +29,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/fdc_track_host.c"
 SHIM = ROOT / "tools/tests/fdc_hostshim"
 SOURCES = ["drivers/block/fdc_track.c", "drivers/block/fdc.c", "drivers/block/fdc_decide.c",
-           "fs/fatfs/diskio.c"]
+           "fs/fat/fatfs/diskio.c"]
 
 CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "fallback_single", "single_fail", "cache_rules", "oversize_geom",
@@ -196,7 +196,7 @@ def font_bounds(img, spt=8, heads=2):
 def check_read_stream_shape():
     """fatfs_vfs_read_stream が今も「開いて、動いて、読んで、閉じる」か。
     font_replay はこの形を写して回すので、形が変われば試験を直す合図。"""
-    src = (ROOT / "fs/fatfs_vfs.c").read_text(encoding="utf-8")
+    src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
     m = re.search(r"static int fatfs_vfs_read_stream\(.*?\n\}", src, re.S)
     if not m:
         return False
@@ -252,7 +252,7 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
 
 
 def includes(first=None):
-    dirs = [SHIM, ROOT / 'fs/fatfs']
+    dirs = [SHIM, ROOT / 'fs/fat/fatfs']
     copied = include_flags(first) if first else []
     return ['-I' + str(d) for d in dirs] + copied + include_flags(ROOT)
 
@@ -429,7 +429,7 @@ MUTATIONS = [
      "(u32)(now - c->last_tick) >= (u32)FDC_TRACK_IDLE_TICKS",
      "2 秒規則の境目を 1 tick 早める"),
     # --- diskio.c の結線
-    ("fs/fatfs/diskio.c",
+    ("fs/fat/fatfs/diskio.c",
      r"        fdc_track_invalidate\(&fdd_track\);\n        fdd_status = 0;",
      "        fdd_status = 0;",
      "disk_initialize で先読みを捨てない (Ready 変化の無い入れ替え)"),
@@ -472,13 +472,13 @@ def host_build(tmp, mutated=None):
     else:
         rel, text = mutated
         tree = tmpd / "tree"
-        for sub in ("drivers", "tools/tests", "fs/fatfs", "lib"):
+        for sub in ("drivers", "tools/tests", "fs/fat/fatfs", "lib"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
         for rel_ in ("drivers/block/fdc_track.c", "drivers/block/fdc_track.h",
                      "drivers/block/fdc.c", "drivers/block/fdc.h",
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
-                     "fs/fatfs/diskio.c"):
+                     "fs/fat/fatfs/diskio.c"):
             (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")
@@ -518,7 +518,7 @@ def build_target(tmp):
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
                "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-                "-I" + str(ROOT / "fs/fatfs"),
+                "-I" + str(ROOT / "fs/fat/fatfs"),
                *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
@@ -580,7 +580,7 @@ if __name__ == "__main__":
             build_target(tmp)
         rc = 0
         if not check_read_stream_shape():
-            print("FAIL fs/fatfs_vfs.c の read_stream の形が変わった "
+            print("FAIL fs/fat/fatfs_vfs.c の read_stream の形が変わった "
                   "(font_replay の写しを直す)", flush=True)
             rc += 1
         env = prepare_font(tmp)
