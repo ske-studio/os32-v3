@@ -62,6 +62,7 @@ check-memmap-audit-host:
 - exec/exec_kapi_init.inc
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_bios.c
 - tools/tests/shm_user_host.c
 - tools/tests/serial_diag_host.h

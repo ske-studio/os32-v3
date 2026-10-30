@@ -33,5 +33,6 @@ check-dep-dir-d-display-host:
 - tools/check_map.d/check-dep-dir-d-display-host.yaml
 - tools/check_map.yaml
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - drivers/video/pc98/pc98_route.h
 - tools/tests/kernel_includes.py

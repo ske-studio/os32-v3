@@ -4,6 +4,7 @@ check-dep-dir-a-l04-host:
 - drivers/block/loop_dev.h
 - platform/pc98/device_loop.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_bios.c
 - sdk/kapi.json
 - kapi/kapi_generated.c

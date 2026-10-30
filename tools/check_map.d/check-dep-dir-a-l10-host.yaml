@@ -53,6 +53,7 @@ check-dep-dir-a-l10-host:
 - mm/physmem.c
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_mem.c
 - kernel/v86/v86_snapshot.c
 - platform/pc98/device_ide.c

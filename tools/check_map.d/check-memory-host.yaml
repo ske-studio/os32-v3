@@ -59,6 +59,7 @@ check-memory-host:
 - kernel/irq/irq.c
 - kernel/irq/irq_math.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - tools/tests/mutpar.py
 - kdebug/kselftest.c
 - tools/tests/app_band_pde_host.c
