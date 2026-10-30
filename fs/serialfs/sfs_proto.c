@@ -8,30 +8,26 @@
 #include "sfs_proto.h"
 #include "config.h"
 #include "crc32.h"
+#include "le_internal.h"
 
 void sfs_put16(u8 *p, u16 v)
 {
-    p[0] = (u8)(v & 0xFF);
-    p[1] = (u8)((v >> 8) & 0xFF);
+    le_write16(p, v);
 }
 
 void sfs_put32(u8 *p, u32 v)
 {
-    p[0] = (u8)(v & 0xFF);
-    p[1] = (u8)((v >> 8) & 0xFF);
-    p[2] = (u8)((v >> 16) & 0xFF);
-    p[3] = (u8)((v >> 24) & 0xFF);
+    le_write32(p, v);
 }
 
 u16 sfs_get16(const u8 *p)
 {
-    return (u16)(p[0] | ((u16)p[1] << 8));
+    return le_read16(p);
 }
 
 u32 sfs_get32(const u8 *p)
 {
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
-           ((u32)p[3] << 24);
+    return le_read32(p);
 }
 
 u32 sfs_crc32(const u8 *p, u32 n)

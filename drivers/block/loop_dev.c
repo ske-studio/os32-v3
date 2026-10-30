@@ -18,6 +18,7 @@
 #include "../base/dev.h"
 #include "vfs.h"
 #include "kprintf.h"
+#include "le_internal.h"
 
 #define LOOP_FDD_SPT_MAX 64
 #define LOOP_HEADER_BYTES_MAX 65536
@@ -101,18 +102,6 @@ static LoopSlot loop_slots[LOOP_MAX_SLOTS];
 static const char *slot_names[LOOP_MAX_SLOTS] = {
     "lo0", "lo1", "lo2", "lo3"
 };
-
-/* ======== LE ヘルパ ======== */
-static u16 le16(const u8 *p)
-{
-    return (u16)p[0] | ((u16)p[1] << 8);
-}
-
-static u32 le32(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8)
-         | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
 
 /* ======== ゼロ埋めヘルパ ======== */
 static void zero_fill(u8 *dst, u32 len)
@@ -257,7 +246,7 @@ static int d88_blk_read(Device *self, int lba, int count, void *buf)
         vfs_seek(s->fd, (int)trk_off, 0);
         rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
         if (rd < D88_SECT_HDR_SIZE) return -1;
-        track_spt = le16(shdr + D88_SH_SPT_OFF);
+        track_spt = le_read16(shdr + D88_SH_SPT_OFF);
 
         if (track_spt == 0 || track_spt > LOOP_FDD_SPT_MAX) return -1;
 
@@ -269,7 +258,7 @@ static int d88_blk_read(Device *self, int lba, int count, void *buf)
             rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
             if (rd < D88_SECT_HDR_SIZE) return -1;
 
-            data_len = le16(shdr + D88_SH_DATA_LEN_OFF);
+            data_len = le_read16(shdr + D88_SH_DATA_LEN_OFF);
 
             if (data_len == 0) {
                 pos += D88_SECT_HDR_SIZE;
@@ -324,7 +313,7 @@ static int attach_d88(LoopSlot *s, int fd, u32 fsize)
     if (rd < D88_FIXED_HDR_BYTES) return LOOP_ERR_IO;
 
     s->media     = hdr_small[D88_OFF_MEDIA];
-    s->file_size = le32(hdr_small + D88_OFF_SIZE);
+    s->file_size = le_read32(hdr_small + D88_OFF_SIZE);
     if (s->file_size > fsize)
         s->file_size = fsize;
 
@@ -333,7 +322,7 @@ static int attach_d88(LoopSlot *s, int fd, u32 fsize)
     rd = vfs_read_fd(fd, tbl_buf, D88_MAX_TRACKS * D88_TRACK_ENTRY_BYTES);
     if (rd < (int)(D88_MAX_TRACKS * D88_TRACK_ENTRY_BYTES)) return LOOP_ERR_IO;
     for (i = 0; i < D88_MAX_TRACKS; i++)
-        s->track_offset[i] = le32(tbl_buf + i * D88_TRACK_ENTRY_BYTES);
+        s->track_offset[i] = le_read32(tbl_buf + i * D88_TRACK_ENTRY_BYTES);
 
     /* media → cyls/heads */
     switch (s->media) {
@@ -354,7 +343,7 @@ static int attach_d88(LoopSlot *s, int fd, u32 fsize)
 
     {
         u8  n_val   = sec0[D88_SH_N_OFF];
-        u16 hdr_spt = le16(sec0 + D88_SH_SPT_OFF);
+        u16 hdr_spt = le_read16(sec0 + D88_SH_SPT_OFF);
         if (hdr_spt == 0 || hdr_spt > LOOP_FDD_SPT_MAX || n_val > D88_SECTOR_N_MAX)
             return LOOP_ERR_FORMAT;
         s->spt          = (u8)hdr_spt;
@@ -383,12 +372,12 @@ static int attach_fdi(LoopSlot *s, int fd, u32 fsize)
     if (rd < FDI_HDR_FIELDS) return LOOP_ERR_IO;
 
     /* FDI ヘッダ解析 (全フィールド LE32) */
-    hdr_size  = le32(hdr + FDI_OFF_HDRSIZE);
-    fdd_size  = le32(hdr + FDI_OFF_DATASIZE);
-    sect_size = le32(hdr + FDI_OFF_BPS);
-    spt       = le32(hdr + FDI_OFF_SPT);
-    surfaces  = le32(hdr + FDI_OFF_HEADS);
-    cyls      = le32(hdr + FDI_OFF_CYLS);
+    hdr_size  = le_read32(hdr + FDI_OFF_HDRSIZE);
+    fdd_size  = le_read32(hdr + FDI_OFF_DATASIZE);
+    sect_size = le_read32(hdr + FDI_OFF_BPS);
+    spt       = le_read32(hdr + FDI_OFF_SPT);
+    surfaces  = le_read32(hdr + FDI_OFF_HEADS);
+    cyls      = le_read32(hdr + FDI_OFF_CYLS);
 
     /* バリデーション */
     if (hdr_size < FDI_HDR_FIELDS || hdr_size > LOOP_HEADER_BYTES_MAX) return LOOP_ERR_FORMAT;
@@ -429,12 +418,12 @@ static int attach_hdi(LoopSlot *s, int fd, u32 fsize)
     if (rd < FDI_HDR_FIELDS) return LOOP_ERR_IO;
 
     /* HDI ヘッダ解析 (FDI と同一レイアウト、全フィールド LE32) */
-    hdr_size  = le32(hdr + FDI_OFF_HDRSIZE);
-    data_size = le32(hdr + FDI_OFF_DATASIZE);
-    sect_size = le32(hdr + FDI_OFF_BPS);
-    spt       = le32(hdr + FDI_OFF_SPT);
-    surfaces  = le32(hdr + FDI_OFF_HEADS);
-    cyls      = le32(hdr + FDI_OFF_CYLS);
+    hdr_size  = le_read32(hdr + FDI_OFF_HDRSIZE);
+    data_size = le_read32(hdr + FDI_OFF_DATASIZE);
+    sect_size = le_read32(hdr + FDI_OFF_BPS);
+    spt       = le_read32(hdr + FDI_OFF_SPT);
+    surfaces  = le_read32(hdr + FDI_OFF_HEADS);
+    cyls      = le_read32(hdr + FDI_OFF_CYLS);
 
     /* バリデーション */
     if (hdr_size < FDI_HDR_FIELDS || hdr_size > LOOP_HEADER_BYTES_MAX) return LOOP_ERR_FORMAT;
@@ -479,11 +468,11 @@ static int attach_nhd(LoopSlot *s, int fd, u32 fsize)
         if (hdr[i] != (u8)sig[i]) return LOOP_ERR_FORMAT;
     }
 
-    hdr_size = le32(hdr + NHD_OFF_HDRSIZE);
-    cyls     = le32(hdr + NHD_OFF_CYLS);
-    heads    = le16(hdr + NHD_OFF_HEADS);
-    spt      = le16(hdr + NHD_OFF_SPT);
-    bps      = le16(hdr + NHD_OFF_BPS);
+    hdr_size = le_read32(hdr + NHD_OFF_HDRSIZE);
+    cyls     = le_read32(hdr + NHD_OFF_CYLS);
+    heads    = le_read16(hdr + NHD_OFF_HEADS);
+    spt      = le_read16(hdr + NHD_OFF_SPT);
+    bps      = le_read16(hdr + NHD_OFF_BPS);
 
     /* バリデーション (LoopSlot.cyls は u16 なので上限 65535)。
      * C*H*S*BPS は u32 を溢れ得るので段階的に上限を確かめる。
@@ -595,7 +584,7 @@ u32 loop_dev_seek_d88(int slot,
     vfs_seek(s->fd, (int)trk_off, 0);
     rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
     if (rd < D88_SECT_HDR_SIZE) return 0;
-    track_spt = le16(shdr + D88_SH_SPT_OFF);
+    track_spt = le_read16(shdr + D88_SH_SPT_OFF);
 
     if (track_spt == 0 || track_spt > LOOP_FDD_SPT_MAX) return 0;
     if (out_spt) *out_spt = track_spt;
@@ -607,7 +596,7 @@ u32 loop_dev_seek_d88(int slot,
         rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
         if (rd < D88_SECT_HDR_SIZE) return 0;
 
-        data_len = le16(shdr + D88_SH_DATA_LEN_OFF);
+        data_len = le_read16(shdr + D88_SH_DATA_LEN_OFF);
         if (data_len == 0) {
             pos += D88_SECT_HDR_SIZE;
             continue;
@@ -657,7 +646,7 @@ int loop_dev_track_id_d88(int slot, u8 trk_cyl, u8 trk_head, u16 index,
     vfs_seek(s->fd, (int)trk_off, 0);
     rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
     if (rd < D88_SECT_HDR_SIZE) return -1;
-    track_spt = le16(shdr + D88_SH_SPT_OFF);
+    track_spt = le_read16(shdr + D88_SH_SPT_OFF);
     if (track_spt == 0 || track_spt > LOOP_FDD_SPT_MAX) return -1;
     if (out_spt) *out_spt = track_spt;
     if (index >= track_spt) return -1;
@@ -667,7 +656,7 @@ int loop_dev_track_id_d88(int slot, u8 trk_cyl, u8 trk_head, u16 index,
         vfs_seek(s->fd, (int)pos, 0);
         rd = vfs_read_fd(s->fd, shdr, D88_SECT_HDR_SIZE);
         if (rd < D88_SECT_HDR_SIZE) return -1;
-        data_len = le16(shdr + D88_SH_DATA_LEN_OFF);
+        data_len = le_read16(shdr + D88_SH_DATA_LEN_OFF);
 
         if (si == (int)index) {
             if (out_c) *out_c = shdr[0];

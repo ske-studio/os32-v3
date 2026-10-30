@@ -350,11 +350,11 @@ static void inject(u8 op, u8 flags, u16 epoch, u32 seq, u32 ack, u32 rid, u16 se
 /* TX 記録の読み取り */
 static u8  tx_op(int i)    { return txlog[i][14 + LINK_OFF_OP]; }
 static u8  tx_flags(int i) { return txlog[i][14 + LINK_OFF_FLAGS]; }
-static u16 tx_epoch(int i) { return rd16(txlog[i] + 14 + LINK_OFF_EPOCH); }
-static u32 tx_seq(int i)   { return rd32(txlog[i] + 14 + LINK_OFF_SEQ); }
-static u32 tx_ack(int i)   { return rd32(txlog[i] + 14 + LINK_OFF_ACK); }
-static u32 tx_rid(int i)   { return rd32(txlog[i] + 14 + LINK_OFF_RID); }
-static u16 tx_sess(int i)  { return rd16(txlog[i] + 14 + LINK_OFF_SESS); }
+static u16 tx_epoch(int i) { return le_read16(txlog[i] + 14 + LINK_OFF_EPOCH); }
+static u32 tx_seq(int i)   { return le_read32(txlog[i] + 14 + LINK_OFF_SEQ); }
+static u32 tx_ack(int i)   { return le_read32(txlog[i] + 14 + LINK_OFF_ACK); }
+static u32 tx_rid(int i)   { return le_read32(txlog[i] + 14 + LINK_OFF_RID); }
+static u16 tx_sess(int i)  { return le_read16(txlog[i] + 14 + LINK_OFF_SESS); }
 
 static int tx_next(int from, u8 op)
 {
@@ -394,9 +394,9 @@ static void script_handshake(u16 sess, u16 want_epoch)
     if (syn < 0) return;
     nonce = tx_seq(syn);
     script_epoch = want_epoch ? want_epoch : tx_epoch(syn);
-    wr16(pl, SCRIPT_AGENT);
-    wr16(pl + 2, tx_sess(syn));          /* req_sess の写し */
-    wr16(pl + 4, tx_epoch(syn));         /* req_epoch の写し */
+    le_write16(pl, SCRIPT_AGENT);
+    le_write16(pl + 2, tx_sess(syn));          /* req_sess の写し */
+    le_write16(pl + 4, tx_epoch(syn));         /* req_epoch の写し */
     inject(LINK_OP_HELLO, LINK_HS_SYNACK, script_epoch, nonce, SCRIPT_NONCE,
            0, sess, pl, 6);
     host_tick();
@@ -404,7 +404,7 @@ static void script_handshake(u16 sess, u16 want_epoch)
     check(i >= 0 && tx_flags(i) == LINK_HS_CONFIRM, "CONFIRM が出ない");
     if (i < 0) return;
     check(tx_ack(i) == SCRIPT_NONCE, "CONFIRM に Agent nonce の写しが無い");
-    wr16(pl, SCRIPT_AGENT);
+    le_write16(pl, SCRIPT_AGENT);
     inject(LINK_OP_HELLO, LINK_HS_ESTAB, script_epoch, SCRIPT_NONCE, nonce,
            0, sess, pl, 2);
     host_tick();
@@ -439,8 +439,8 @@ static void reset_all(const char *name)
 /* 業務 RESPONSE / 制御 RESPONSE の payload を組む */
 static void resp_pl(u8 *pl, u16 status, u32 len)
 {
-    wr16(pl, status);
-    wr32(pl + 2, len);
+    le_write16(pl, status);
+    le_write32(pl + 2, len);
 }
 
 /* ======================================================================== */
@@ -1014,9 +1014,9 @@ static void r4_hello_stage_losses(void)
 
     /* 新しい nonce に SYN-ACK を返す → CONFIRM */
     nonce = tx_seq(i);
-    wr16(pl, SCRIPT_AGENT);
-    wr16(pl + 2, tx_sess(i));
-    wr16(pl + 4, tx_epoch(i));
+    le_write16(pl, SCRIPT_AGENT);
+    le_write16(pl + 2, tx_sess(i));
+    le_write16(pl + 4, tx_epoch(i));
     inject(LINK_OP_HELLO, LINK_HS_SYNACK, tx_epoch(i), nonce, SCRIPT_NONCE, 0,
            SCRIPT_SESS, pl, 6);
     host_tick();
@@ -1031,15 +1031,15 @@ static void r4_hello_stage_losses(void)
     check(tx_flags(tx_next(0, LINK_OP_HELLO)) == LINK_HS_CONFIRM, "再送が CONFIRM でない");
 
     /* 遅延した SYN-ACK (古い nonce) は採用しない */
-    wr16(pl, SCRIPT_AGENT);
-    wr16(pl + 2, 0);
-    wr16(pl + 4, 1);
+    le_write16(pl, SCRIPT_AGENT);
+    le_write16(pl + 2, 0);
+    le_write16(pl + 4, 1);
     inject(LINK_OP_HELLO, LINK_HS_SYNACK, 9, nonce - 1, 0xBBBBBBBBu, 0, 999, pl, 6);
     host_tick();
     check(link_sess == SCRIPT_SESS, "古い SYN-ACK で sess が動いた");
 
     /* 正しい ESTABLISHED で確立 */
-    wr16(pl, SCRIPT_AGENT);
+    le_write16(pl, SCRIPT_AGENT);
     inject(LINK_OP_HELLO, LINK_HS_ESTAB, link_epoch, SCRIPT_NONCE, nonce, 0,
            SCRIPT_SESS, pl, 2);
     host_tick();

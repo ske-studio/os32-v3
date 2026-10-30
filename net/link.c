@@ -22,6 +22,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "ne2000.h"
 #include "kstring.h"
 #include "kprintf.h"
+#include "le_internal.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* ([C4] 共有定数の正典) */
 
 #define LINK_RX_BUFFER_SIZE 1520
@@ -58,20 +59,6 @@ void link_test_idle(void);
  * 理由は io.h の _idle() の註。順序 3 ではここが HAL の待ち 1 関数になる。 */
 #define LINK_IDLE()          _idle()
 #endif
-
-/* ======================================================================== */
-/*  LE アクセサ — ワイヤ上の値はすべてここを通す                             */
-/* ======================================================================== */
-static u16 rd16(const u8 *p) { return (u16)(p[0] | ((u16)p[1] << 8)); }
-static u32 rd32(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
-static void wr16(u8 *p, u16 v) { p[0] = (u8)v; p[1] = (u8)(v >> 8); }
-static void wr32(u8 *p, u32 v)
-{
-    p[0] = (u8)v; p[1] = (u8)(v >> 8); p[2] = (u8)(v >> 16); p[3] = (u8)(v >> 24);
-}
 
 static const u8 link_bcast[ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
@@ -246,12 +233,12 @@ static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
     h = p + LINK_ETH_HDR_LEN;
     h[LINK_OFF_OP] = op;
     h[LINK_OFF_FLAGS] = flags;
-    wr16(h + LINK_OFF_EPOCH, epoch);
-    wr32(h + LINK_OFF_SEQ, seq);
-    wr32(h + LINK_OFF_ACK, ack);
-    wr16(h + LINK_OFF_LENGTH, (u16)len);
-    wr32(h + LINK_OFF_RID, rid);
-    wr16(h + LINK_OFF_SESS, sess);
+    le_write16(h + LINK_OFF_EPOCH, epoch);
+    le_write32(h + LINK_OFF_SEQ, seq);
+    le_write32(h + LINK_OFF_ACK, ack);
+    le_write16(h + LINK_OFF_LENGTH, (u16)len);
+    le_write32(h + LINK_OFF_RID, rid);
+    le_write16(h + LINK_OFF_SESS, sess);
     if (len) kmemcpy(h + LINK_HDR_LEN, payload, len);
     return (ne2k_send(p, LINK_ETH_HDR_LEN + LINK_HDR_LEN + len) == NE2K_OK) ? 1 : 0;
 }
@@ -352,9 +339,9 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
     if (flags == LINK_HS_SYNACK) {
         if (link_state != LINK_S_SYN) return;
         if (seq != link_nonce) return;                  /* 自分の SYN の応答か */
-        if (rd16(pl + LINK_HELLO_REQ_SESS_OFF) != link_syn_sess) return;      /* req_sess の写し */
-        if (rd16(pl + LINK_HELLO_REQ_EPOCH_OFF) != link_syn_epoch) return;     /* req_epoch の写し */
-        link_agent_gen = rd16(pl);
+        if (le_read16(pl + LINK_HELLO_REQ_SESS_OFF) != link_syn_sess) return;      /* req_sess の写し */
+        if (le_read16(pl + LINK_HELLO_REQ_EPOCH_OFF) != link_syn_epoch) return;     /* req_epoch の写し */
+        link_agent_gen = le_read16(pl);
         link_agent_nonce = ack;
         kmemcpy(link_peer_mac, src, ETH_ALEN);
         if (sess != link_sess) link_next_rid = 1;       /* 新セッション */
@@ -370,7 +357,7 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
         if (sess != link_sess || epoch != link_epoch) return;
         if (ack != link_nonce) return;
         if (!mac_eq(src, link_peer_mac)) return;
-        link_agent_gen = rd16(pl);
+        link_agent_gen = le_read16(pl);
         link_state = LINK_S_UP;
         link_hs_due = 0;
         link_hello_ok = 1;
@@ -381,8 +368,8 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
 
 static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
 {
-    u16 st = rd16(pl);
-    u32 ln = rd32(pl + LINK_RESPONSE_LENGTH_OFF);
+    u16 st = le_read16(pl);
+    u32 ln = le_read32(pl + LINK_RESPONSE_LENGTH_OFF);
 
     e->last_rx_tick = tick_count;
     e->probes = 0;
@@ -442,12 +429,12 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     h = f + LINK_ETH_HDR_LEN;
     op = h[LINK_OFF_OP];
     flags = h[LINK_OFF_FLAGS];
-    epoch = rd16(h + LINK_OFF_EPOCH);
-    seq = rd32(h + LINK_OFF_SEQ);
-    ack = rd32(h + LINK_OFF_ACK);
-    plen = rd16(h + LINK_OFF_LENGTH);
-    rid = rd32(h + LINK_OFF_RID);
-    sess = rd16(h + LINK_OFF_SESS);
+    epoch = le_read16(h + LINK_OFF_EPOCH);
+    seq = le_read32(h + LINK_OFF_SEQ);
+    ack = le_read32(h + LINK_OFF_ACK);
+    plen = le_read16(h + LINK_OFF_LENGTH);
+    rid = le_read32(h + LINK_OFF_RID);
+    sess = le_read16(h + LINK_OFF_SESS);
     if ((unsigned int)(LINK_ETH_HDR_LEN + LINK_HDR_LEN + plen) > flen) {
         link_rx_dropped++; return;
     }
@@ -675,7 +662,7 @@ static int link_tx_control(void)
             } else if (kind == LINK_CTRL_WINDOW && e->want_window) {
                 u8 pl[LINK_WINDOW_LEN];
                 u16 credit = link_credit_pages();
-                wr16(pl, credit);
+                le_write16(pl, credit);
                 if (!link_send(LINK_OP_WINDOW, 0, 0, e->ack_seq, e->rid,
                                pl, LINK_WINDOW_LEN)) return -1;
                 e->want_window = 0;
