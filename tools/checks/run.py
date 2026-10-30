@@ -209,6 +209,15 @@ class Extractor:
             return
         d = os.path.dirname(rel)
         if rel.endswith(".py"):
+            # CHECK paths are declarations, not recipe inputs. Seed their
+            # explicit .c/.py entries in extract(), as the old selector did.
+            lines = text.splitlines(keepends=True)
+            for node in ast.parse(text).body:
+                if isinstance(node, (ast.Assign, ast.AnnAssign)) and any(
+                        isinstance(t, ast.Name) and t.id == "CHECK" for t in
+                        (node.targets if isinstance(node, ast.Assign) else [node.target])):
+                    lines[node.lineno - 1:node.end_lineno] = ["\n"] * (node.end_lineno - node.lineno + 1)
+            text = "".join(lines)
             self.scan_py(text, d)
         elif rel.endswith(C_EXTS):
             # "..." はまず取り込む側の場所から探し (C の規則)、無ければ ROOT と
@@ -577,17 +586,9 @@ def discover(root: Path) -> dict[str, Check]:
 def extract(root, check, snapshot=None, *, compiler=False):
     ex = Extractor(root, snapshot)
     ex.add(check.path)
-    for pattern in check.covers:
-        prefix = re.split(r"[*?[]", pattern, maxsplit=1)[0]
-        if prefix == pattern:
-            ex.add(pattern)
-            continue
-        i = bisect_left(ex._tracked, prefix)
-        while i < len(ex._tracked) and ex._tracked[i].startswith(prefix):
-            source = ex._tracked[i]
-            if matches(source, (pattern,)):
-                ex.add(source)
-            i += 1
+    for source in check.covers:
+        if source.endswith((".c", ".py")) and not any(c in source for c in "*?["):
+            ex.add(source)
     ex.drain()
     if compiler:
         ex.found.update(compiler_headers(str(root), tuple(sorted(f for f in ex.found if f.endswith(".c"))),
@@ -644,7 +645,9 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     patterns = {n: c.covers + (c.path,) + (tuple(f for f in extract(root, c, snapshot, compiler=True)
                          if f.endswith(".h")) if header_scan else ()) for n, c in checks.items()}
     hit, unmatched, full_hits = set(), set(), set()
-    artifact_targets = {n for n, c in checks.items() if any(
+    # Conversion retains the old artifact_readers as make:all consumers,
+    # including readers whose covers contain no build output paths.
+    artifact_targets = {n for n, c in checks.items() if "make:all" in c.needs or any(
         p.startswith(("build/out/", "build/sdk/")) for p in c.covers)}
     generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_rust_gen.py")
     for f in changed:
@@ -669,7 +672,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     docs_only = bool(changed) and all(matches(f, DOCS) for f in changed)
     notest_only = bool(changed) and all(any(matches(f, (p,)) and not matches(f, ex)
                                           for p, ex in NOTEST) for f in changed)
-    forced = bool(full_hits) or any(f in KAPI_GENERATED or f in
+    forced = bool(full_hits) or any(matches(f, FULL + BUILD_CONFIG_GLOBS) or f in KAPI_GENERATED or f in
         ("sdk/kapi.json", "sdk/gen_kapi.py", "sdk/kapi_rust_gen.py", "tools/checks/run.py") for f in changed)
     if not changed:
         tier, mode, selected = 4, "fast", set(checks)

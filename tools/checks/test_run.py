@@ -221,6 +221,46 @@ class RunnerTest(unittest.TestCase):
             with self.assertRaises(OSError):
                 R.compiler_headers(str(self.root), ('drivers/video/a.c',), ())
 
+    def test_dependency_seeds_exclude_globs_and_direct_headers(self):
+        self.write('drivers/video/a.c', '#include "glob_only.h"\n')
+        self.write('drivers/video/glob_only.h', '/* glob dependency */\n')
+        self.write('include/direct.h', '#include "transitive.h"\n')
+        self.write('include/transitive.h', '/* header dependency */\n')
+        self.write('tools/tests/recipe.c', '#include "recipe.h"\n')
+        self.write('tools/tests/recipe.h', '/* recipe dependency */\n')
+        self.check(covers=['drivers/video/*.c', 'include/direct.h'],
+                   body='    source = "tools/tests/recipe.c"\n    return 0\n')
+        sources = []
+        with patch.object(R, 'compiler_headers', side_effect=lambda root, src, inc: sources.extend(src) or frozenset()):
+            self.assertNotIn('a', self.plan('drivers/video/glob_only.h').hit)
+            self.assertNotIn('a', self.plan('include/transitive.h').hit)
+            self.assertIn('a', self.plan('tools/tests/recipe.h').hit)
+        self.assertEqual(set(sources), {'tools/tests/recipe.c'})
+        self.assertIn('a', self.plan('drivers/video/new.c').hit)
+        self.assertIn('a', self.plan('include/direct.h').hit)
+
+    def test_kapi_artifact_reader_without_output_covers(self):
+        self.check('build-no-deploy', covers=['tools/tests/test_build_no_deploy.py'], needs=['make:all'])
+        self.write('tools/tests/test_build_no_deploy.py', '# build definition reader\n')
+        self.check('other', covers=['drivers/video/a.c'], needs=['make:kernel'])
+        result = self.plan('sdk/kapi.json')
+        self.assertEqual((result.hit, result.unmatched, result.full_hits),
+                         ({'build-no-deploy'}, set(), set()))
+
+    def test_routed_build_whitespace_forces_tier_after_three_sets(self):
+        self.write('build/kernel.mk', 'kernel: source.c\n')
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write('build/kernel.mk', 'kernel: source.c\n\n')
+        self.check('scanner', covers=['drivers/**'])
+        self.check('reader', covers=['tools/tests/reader.py'], needs=['make:all'])
+        self.check('stable', covers=['unrelated'], tier=4)
+        result = R.plan(self.root, self.registry(), ('build/kernel.mk',), base=base)
+        self.assertEqual((result.hit, result.unmatched, result.full_hits),
+                         ({'scanner', 'reader'}, set(), set()))
+        self.assertEqual((result.tier, result.mode), (4, 'full'))
+        self.assertIn('stable', result.stage)
+
     def test_lint_inputs_artifacts_and_dynamic_generated_audit(self):
         self.check(covers=['absent.c'])
         self.assertIn('missing input', self.cli('--lint')[2])
