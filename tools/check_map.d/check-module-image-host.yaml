@@ -7,6 +7,7 @@ check-module-image-host:
 - kernel/module/module_image.c
 - kernel/module/module_image.h
 - lib/crc32_core.inc
+- lib/le_internal.h
 - tools/check_map.d/check-module-image-host.yaml
 - tools/tests/host32.py
 - tools/tests/module_image_host.c

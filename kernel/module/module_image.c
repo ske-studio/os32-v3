@@ -1,3 +1,4 @@
+#include "le_internal.h"
 /* KMOD v1: bounded, read-only validation of the container and body offsets. */
 #include "module_image.h"
 #include "../../lib/crc32_core.inc"
@@ -14,10 +15,6 @@ static const struct module_component_policy *component_policy(u32 id)
     return 0;
 }
 
-static u32 get32(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
 
 static u16 get16(const u8 *p)
 {
@@ -58,7 +55,7 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
     const u32 count_max[MODULE_RECORD_TABLES] = {
         component->reloc_max, component->import_max, component->export_max
     };
-    for (u32 i = 0; i < MI_WORDS; i++) h[i] = get32(header + MODULE_WORD_BYTES * i);
+    for (u32 i = 0; i < MI_WORDS; i++) h[i] = le_read32(header + MODULE_WORD_BYTES * i);
     if (h[MI_MAGIC] != MODULE_MAGIC || h[MI_FORMAT] != MODULE_FORMAT_VERSION ||
         h[MI_HEADER_SIZE] != MODULE_HEADER_SIZE || h[MI_IMAGE_SIZE] != file_size ||
         file_size > component->image_max || h[MI_ID] != component->module_id ||
@@ -168,8 +165,8 @@ int module_image_validate(const u8 *image, u32 size,
     for (u32 i = 0; i < h[MI_IMPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE;
         const struct module_symbol_contract *want = &policy->imports[i];
-        u32 slot = get32(rec + MODULE_IMPORT_SLOT_OFF);
-        u32 hash = get32(rec + MODULE_IMPORT_HASH_OFF);
+        u32 slot = le_read32(rec + MODULE_IMPORT_SLOT_OFF);
+        u32 hash = le_read32(rec + MODULE_IMPORT_HASH_OFF);
         if (get16(rec + MODULE_IMPORT_KIND_OFF) < MODULE_SYM_KIND_MIN ||
             get16(rec + MODULE_IMPORT_KIND_OFF) > MODULE_SYM_KIND_MAX ||
             get16(rec + MODULE_IMPORT_KIND_OFF) != want->kind ||
@@ -181,23 +178,23 @@ int module_image_validate(const u8 *image, u32 size,
             return MODULE_IMPORT_INVALID;
         for (u32 j = 0; j < i; j++) {
             const u8 *prev = image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE;
-            if (slot == get32(prev + MODULE_IMPORT_SLOT_OFF) ||
-                hash == get32(prev + MODULE_IMPORT_HASH_OFF)) return MODULE_IMPORT_INVALID;
+            if (slot == le_read32(prev + MODULE_IMPORT_SLOT_OFF) ||
+                hash == le_read32(prev + MODULE_IMPORT_HASH_OFF)) return MODULE_IMPORT_INVALID;
         }
     }
     u32 seen = 0;
     for (u32 i = 0; i < h[MI_EXPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_EXPORT_OFF] + i * MODULE_RECORD_SIZE;
         u32 slot = get16(rec + MODULE_EXPORT_SLOT_OFF);
-        u32 hash = get32(rec + MODULE_EXPORT_HASH_OFF);
+        u32 hash = le_read32(rec + MODULE_EXPORT_HASH_OFF);
         if (slot < 1 || slot > component->ops_slots || (seen & (1U << slot)) ||
-            !in_text(get32(rec + MODULE_EXPORT_ADDR_OFF), h) || !policy->exports)
+            !in_text(le_read32(rec + MODULE_EXPORT_ADDR_OFF), h) || !policy->exports)
             return MODULE_BAD_HEADER;
         const struct module_symbol_contract *want = &policy->exports[slot - 1];
         if (!want->version || get16(rec + MODULE_EXPORT_VERSION_OFF) != want->version || hash != want->name_hash ||
             !check_name(names, h[MI_NAMES_SIZE], &name_pos, hash)) return MODULE_BAD_HEADER;
         for (u32 j = 0; j < i; j++)
-            if (hash == get32(image + h[MI_EXPORT_OFF] + j * MODULE_RECORD_SIZE + MODULE_EXPORT_HASH_OFF))
+            if (hash == le_read32(image + h[MI_EXPORT_OFF] + j * MODULE_RECORD_SIZE + MODULE_EXPORT_HASH_OFF))
                 return MODULE_BAD_HEADER;
         seen |= 1U << slot;
     }
@@ -207,18 +204,18 @@ int module_image_validate(const u8 *image, u32 size,
      * and bounded stack use. Counts are capped in header validation. */
     u32 reloc_end = 0;
     for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
-        u32 off = get32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * i);
+        u32 off = le_read32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * i);
         if (!within(off, MODULE_WORD_BYTES, h[MI_PAYLOAD_SIZE]) ||
-            get32(image + h[MI_PAYLOAD_OFF] + off) > h[MI_MEM_SIZE])
+            le_read32(image + h[MI_PAYLOAD_OFF] + off) > h[MI_MEM_SIZE])
             return MODULE_RELOC_INVALID;
         if (off < reloc_end)
             for (u32 j = 0; j < i; j++) {
-                u32 prev = get32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * j);
+                u32 prev = le_read32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * j);
                 if (overlap(off, MODULE_WORD_BYTES, prev, MODULE_WORD_BYTES)) return MODULE_RELOC_INVALID;
             }
         if (off + MODULE_WORD_BYTES > reloc_end) reloc_end = off + MODULE_WORD_BYTES;
         for (u32 j = 0; j < h[MI_IMPORT_COUNT]; j++) {
-            u32 slot = get32(image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
+            u32 slot = le_read32(image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
             if (overlap(off, MODULE_WORD_BYTES, slot, MODULE_WORD_BYTES)) return MODULE_RELOC_INVALID;
         }
     }
@@ -240,8 +237,8 @@ int module_image_relocate(u8 *image, u32 size,
     u8 *body = image + h[MI_PAYLOAD_OFF];
     for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
     for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
-        u32 off = get32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * i);
-        u32 value = base + get32(body + off);
+        u32 off = le_read32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * i);
+        u32 value = base + le_read32(body + off);
         for (u32 j = 0; j < MODULE_WORD_BYTES; j++) body[off + j] = (u8)(value >> (8 * j));
     }
     if (out) *out = plan;

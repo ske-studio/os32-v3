@@ -247,7 +247,7 @@ MUTATIONS = [
     ("reloc-overlap", "if (overlap(off, MODULE_WORD_BYTES, prev, MODULE_WORD_BYTES))", "if (off == prev)"),
     ("reloc-range", "!within(off, MODULE_WORD_BYTES, h[MI_PAYLOAD_SIZE])", "!within(off, 1, h[MI_PAYLOAD_SIZE])"),
     ("import-slot", "slot % MODULE_WORD_BYTES || slot <", "slot <"),
-    ("export-slot", "!in_text(get32(rec + MODULE_EXPORT_ADDR_OFF), h)", "0"),
+    ("export-slot", "!in_text(le_read32(rec + MODULE_EXPORT_ADDR_OFF), h)", "0"),
     ("name-hash", "hash == expected", "(hash == expected || 1)"),
     ("crc", "crc32_core_final(crc) != h[MI_IMAGE_CRC]", "crc32_core_final(crc) != h[MI_IMAGE_CRC] && 0"),
     ("pair", "h[MI_PAIR_CRC] != policy->pair_image_crc", "0"),
@@ -269,7 +269,7 @@ def main():
             if not ok:
                 raise AssertionError((name, run.returncode, run.stdout, run.stderr))
         cross = Path(os.environ.get("CROSS_DIR", "/home/hight/opt/cross")) / "bin/i386-elf-gcc"
-        subprocess.run([str(cross), *FLAGS, "-I" + str(ROOT / "include"), "-c",
+        subprocess.run([str(cross), *FLAGS, *include_flags(ROOT), "-c",
                         str(TARGET_SRC), "-o", str(Path(td) / "module_image.o")], check=True)
         print("TARGET GNU11 -Werror GREEN")
         if "--mutate" in sys.argv:

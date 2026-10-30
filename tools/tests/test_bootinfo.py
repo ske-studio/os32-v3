@@ -35,7 +35,7 @@ INCLUDES = include_flags(ROOT)
 
 # 否定側。(パターン, 置換, 説明)
 MUTATIONS = [
-    (r"    if \(rd32\(raw \+ BI_OFF_CHECK\) != \(u32\)BOOTINFO_CHECK\) \{\n"
+    (r"    if \(le_read32\(raw \+ BI_OFF_CHECK\) != \(u32\)BOOTINFO_CHECK\) \{\n"
      r"        out->status = BOOTINFO_ERR_CHECK;\n        return out->status;\n    \}\n",
      "", "反転チェック語を見ない (書きかけの域を受け入れる)"),
     (r"    if \(d->seclen != \(u16\)BOOTINFO_SECLEN\) return 0;\n", "",
@@ -55,7 +55,7 @@ MUTATIONS = [
      "d->valid = (u8)bootinfo_drive_usable(d);", "ローダが 0 と書いたものを拾い直す"),
     (r"    if \(!d->queried\) return 0;\n", "", "問い合わせていないドライブを使う"),
     # イメージ欄 (v2、票 TASK_SERIAL_HOSTFS A-4)
-    (r"rd32\(raw \+ BI_OFF_IMG_CHECK\) == BOOTINFO_IMG_CHECK_OF\(crc, size\)",
+    (r"le_read32\(raw \+ BI_OFF_IMG_CHECK\) == BOOTINFO_IMG_CHECK_OF\(crc, size\)",
      "1", "イメージ欄のチェック語を見ない (書きかけ・化けた CRC を記録ありにする)"),
     (r"        if \(size != 0 &&\n", "        if (",
      "大きさ 0 を記録ありにする"),
@@ -175,7 +175,7 @@ def mutate(tmp):
     bad = 0
     host_cases = [c for c in CASES if c != "inc_mirror"]
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
-        mutated, n = re.subn(pattern, repl, original, count=1)
+        mutated, n = re.subn(pattern, repl, original)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
@@ -196,7 +196,7 @@ def mutate(tmp):
     exe = host_build(tmp)
     inc = INC.read_text(encoding="utf-8")
     for j, (old, new, why) in enumerate(INC_MUTATIONS, 1):
-        if old not in inc:
+        if inc.count(old) != 1:
             print(f"INC MUTATION {j} NOT APPLICABLE: {why}", flush=True)
             bad += 1
             continue
