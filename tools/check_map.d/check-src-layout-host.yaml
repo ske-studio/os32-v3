@@ -1,6 +1,18 @@
 check-src-layout-host:
 - kernel/module/kdebug_imports.def
 - tools/source_roots.py
+- tools/check_arm_compile.py
+- init/kernel.c
+- mm/paging.c
+- arch/x86/kernel/idt.c
+- drivers/ata/ide.c
+- drivers/ata/cd_module.c
+- drivers/video/geforce/geforce_platform.c
+- drivers/video/pc98/backend_pc98.c
+- drivers/video/cirrus/cirrus_identify.c
+- fs/ext2/ext2_super.c
+- fs/fat/fatfs/ff.c
+- fs/serialfs/serialfs_session.c
 - tools/move_files.py
 - tools/include_resolve.py
 - tools/build_compare.sh

@@ -20,6 +20,7 @@ from kernel_includes import include_dirs, include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = Path(os.environ.get('OS32_LAYOUT_TEST_TOOLS', ROOT / 'tools'))
+sys.path.insert(0, str(TOOLS))
 
 
 def load(name):
@@ -68,6 +69,50 @@ class LayoutTools(unittest.TestCase):
         self.assertEqual(flags, ['-I' + str(self.root / 'copy' / d) for d in directories])
         self.assertIn('-I' + str(self.root / 'copy/future/layer'), flags)
 
+    def test_arm_flags_use_make_functions_defaults_and_appends(self):
+        self.write('build/config.mk',
+                   'ARCH ?= x86\nDIRS = init mm arch/$(ARCH)/kernel fs/ext2\n'
+                   'DIRS += fs/serialfs\n'
+                   'INC_COMMON = -Iinclude $(addprefix -I,$(DIRS))\n'
+                   'CFLAGS_COMMON = -std=gnu11 -m32 -march=i386 -MMD -MP\n'
+                   'CFLAGS_COMMON += -ffreestanding -fsigned-char\n'
+                   + ''.join(f'{name} = $(INC_COMMON) -I{name}\n'
+                             for name in ('INC_KERNEL', 'INC_DRIVERS', 'INC_GFX',
+                                          'INC_FS', 'INC_FATFS', 'INC_EXEC',
+                                          'INC_KAPI', 'INC_LIB')))
+        module = load('check_arm_compile')
+        with patch.dict(os.environ, {'MAKEFLAGS': '-n --invalid-arm-query-option',
+                                     'GNUMAKEFLAGS': '--invalid-arm-query-option'}):
+            values = module.make_config_vars(self.root)
+        for name in ('INC_KERNEL', 'INC_DRIVERS', 'INC_GFX', 'INC_FS', 'INC_FATFS',
+                     'INC_EXEC', 'INC_KAPI', 'INC_LIB'):
+            self.assertEqual(values[name], '-Iinclude -Iinit -Imm -Iarch/x86/kernel '
+                             '-Ifs/ext2 -Ifs/serialfs -I' + name)
+        flags, dropped = module.build_flags(values)
+        self.assertEqual(flags, ['-std=gnu11', '-ffreestanding', '-fsigned-char',
+                                 '-O2', '-D__KERNEL_BUILD__'])
+        self.assertEqual(dropped, ['-m32', '-march=i386'])
+
+    def test_arm_sources_and_include_profiles_follow_relocations(self):
+        module = load('check_arm_compile')
+        with patch.object(module, 'PROJ_DIR', str(ROOT)):
+            files = module.scan_glob()
+        self.assertEqual(len(files), 209)
+        self.assertTrue(all((ROOT / name).is_file() for name in files))
+        for path, expected in (
+                ('init/kernel.c', 'INC_KERNEL'), ('mm/paging.c', 'INC_KERNEL'),
+                ('arch/x86/kernel/idt.c', 'INC_KERNEL'),
+                ('drivers/ata/ide.c', 'INC_DRIVERS'),
+                ('drivers/ata/cd_module.c', 'INC_KERNEL'),
+                ('drivers/video/geforce/geforce_platform.c', 'INC_KERNEL'),
+                ('drivers/video/pc98/backend_pc98.c', 'INC_GFX'),
+                ('drivers/video/cirrus/cirrus_identify.c', 'INC_GFX'),
+                ('fs/ext2/ext2_super.c', 'INC_FS'),
+                ('fs/fat/fatfs/ff.c', 'INC_FATFS'),
+                ('fs/serialfs/serialfs_session.c', 'INC_KERNEL')):
+            self.assertIn(path, files)
+            self.assertEqual(module.inc_var_for(path), expected, path)
+
     def test_symlinked_include_helper_keeps_the_callers_copied_headers(self):
         self.write('include/layout_host_marker.h', '#define COPIED_MARKER 43\n')
         self.write('probe.c', '#include "layout_host_marker.h"\n'
@@ -90,6 +135,7 @@ class LayoutTools(unittest.TestCase):
         self.write('tools/test.py', "p = ROOT / 'kernel' / 'main.c'\n")
         self.write('docs/archive/old.txt', 'kernel/main.c\n')
         self.write('third_party/vendor.c', '/* kernel/main.c */\n')
+        self.write('fs/fat/fatfs/ff.c', '/* kernel/main.c */\n')
         self.write('kernel/module/kdebug_imports.def', '#include "kernel/local.h"\n')
         self.write('kdebug/generated/kdebug_imports.h', '#include "../../kernel/local.h"\n')
         self.write('Makefile', 'kdebug/generated/kdebug_imports.h: kernel/module/kdebug_imports.def\n'
@@ -123,6 +169,7 @@ class LayoutTools(unittest.TestCase):
         self.assertIn('R  kernel/main.c -> mm/main.c', command('git', 'status', '--short', cwd=self.root).stdout)
         self.assertEqual((self.root / 'docs/archive/old.txt').read_text(), 'kernel/main.c\n')
         self.assertEqual((self.root / 'third_party/vendor.c').read_text(), '/* kernel/main.c */\n')
+        self.assertEqual((self.root / 'fs/fat/fatfs/ff.c').read_text(), '/* kernel/main.c */\n')
         self.assertIn('-Ikernel -Imm', (self.root / 'build/config.mk').read_text())
         after = self.include_rows()
         mapping = {m['from']: m['to'] for m in moves}
@@ -291,6 +338,10 @@ def mutations():
         ('move_files.py', 'destination = moves.get(filename, filename)', 'destination = filename'),
         ('move_files.py', 'for match in pattern.finditer(text):', 'for match in []:'),
         ('move_files.py', 'for match in remaining_pattern.finditer(content):', 'for match in []:'),
+        ('move_files.py', "'fs/fat/fatfs/ff.'", "'fs/fatfs/ff.'"),
+        ('check_arm_compile.py', 'input=query, cwd=config_root, env=env, text=True,',
+         'input=query.replace("$(INC_KERNEL)", "-Ibroken"), cwd=config_root, env=env, text=True,'),
+        ('check_arm_compile.py', 'if path in DRIVERS_INC_GFX:', 'if False:'),
         ('include_resolve.py', '(file.parent, *directories)', '(*directories, file.parent)'),
         ('build_compare.py', 'a.read_bytes() == b.read_bytes()', 'True'),
         ('gen_build_id.py', '        return fixed', "        return 'unknown'"),
@@ -298,7 +349,8 @@ def mutations():
     for filename, old, new in cases:
         with tempfile.TemporaryDirectory(prefix='layout-mutant-') as directory:
             tools = Path(directory)
-            for name in ('move_files.py', 'include_resolve.py', 'build_compare.py', 'gen_build_id.py'):
+            for name in ('move_files.py', 'include_resolve.py', 'build_compare.py', 'gen_build_id.py',
+                         'check_arm_compile.py', 'source_roots.py'):
                 shutil.copy2(TOOLS / name, tools / name)
             text = (tools / filename).read_text()
             assert text.count(old) == 1, (filename, old)
