@@ -18,6 +18,7 @@ import clang_ast as a
 from clang_ast.dialect import findings as dialect
 import check_arch_asm as arch
 import check_p2v as p2v
+import check_c_dialect as cd
 import check_le_access as le
 from clang_ast.asm import templates
 from mutpar import mutant_tree, run_ordered
@@ -31,6 +32,93 @@ def limited_mode():
 
 
 class ClangTest(unittest.TestCase):
+    def test_changed_unit_dependencies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'one').mkdir()
+            (root / 'two').mkdir()
+            (root / 'one/config.h').write_text('#include "body.inc"\n')
+            (root / 'one/body.inc').write_text('int included;\n')
+            (root / 'two/config.h').write_text('int other;\n')
+            (root / 'forced.h').write_text('int forced;\n')
+            (root / 'active.c').write_text('#include HEADER\n')
+            (root / 'idle.c').write_text('int idle;\n')
+            units = a.build.parse_compile_lines('\n'.join([
+                'i386-elf-gcc -std=gnu11 -Ione -DHEADER=\\"config.h\\" -c active.c -o a.o',
+                'i386-elf-gcc -std=gnu11 -Itwo -DHEADER=\\"config.h\\" -c active.c -o b.o',
+                'i386-elf-gcc -std=gnu11 -include forced.h -c idle.c -o c.o',
+            ]))
+            select = lambda files: a.build.select_units(units, root, files)
+            self.assertIs(select(None), units)
+            self.assertEqual(select([]), [])
+            self.assertEqual(select(['active.c']), units[:2])
+            self.assertEqual(select(['one/config.h']), units[:1])
+            self.assertEqual(select([str(root / 'one/body.inc')]), units[:1])
+            self.assertEqual(select(['forced.h']), units[2:])
+            # Non-dependency inputs can change any TU; do not scan a partial graph.
+            with mock.patch.object(subprocess, 'run', side_effect=AssertionError('dependency scan')):
+                for changed in ('tools/prototypes/geforce_imports.def', 'Makefile',
+                                'sdk/example/hello/Makefile', 'build/config.mk',
+                                'build/sdk.mk', 'tools/gen_sqlite_imports.py'):
+                    with self.subTest(changed=changed):
+                        self.assertIs(select(['active.c', changed]), units)
+            for suffix in ('.asm', '.s', '.S'):
+                self.assertEqual(select(['unrelated' + suffix]), [])
+            # Read dependencies again after an include changes; no stale graph.
+            (root / 'one/config.h').write_text('int replaced;\n')
+            self.assertEqual(select(['one/body.inc']), [])
+
+    def test_partial_p2v_exception_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'kernel').mkdir()
+            (root / 'tools').mkdir()
+            (root / 'kernel/empty.h').write_text('/* function removed */\n')
+            (root / 'kernel/selected.c').write_text('#include "empty.h"\nint selected;\n')
+            (root / 'tools/check_p2v_allow.txt').write_text(
+                'kernel/elsewhere.c:missing:outside selected units\n'
+                'kernel/selected.c:removed:must still report stale\n'
+                'kernel/empty.h:removed:included empty header\n')
+            units = [dict(src='kernel/selected.c', argv=['-std=gnu11'])]
+            with mock.patch.object(a, 'units', return_value=units):
+                errors, _ = p2v.audit(root, ['kernel/selected.c'])
+            self.assertEqual(errors, ['stale exception: kernel/empty.h:removed',
+                                      'stale exception: kernel/selected.c:removed'])
+            with mock.patch.object(a, 'units', return_value=units):
+                errors, _ = p2v.audit(root, ['tools/prototypes/geforce_imports.def'])
+            self.assertIn('stale exception: kernel/elsewhere.c:missing', errors)
+
+    def test_partial_build_flags_keep_selected_mode_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / 'selected.c').write_text('int selected;\n')
+            (root / 'other.c').write_text('int other;\n')
+            for mode, want_error in [('gnu11', False), ('gnu89', True)]:
+                lines = ('i386-elf-gcc -std=' + mode + ' -c selected.c -o s.o\n'
+                         'i386-elf-gcc -std=gnu11 -c other.c -o o.o\n')
+                with mock.patch.object(cd, 'dry_run', return_value=(0, lines, '')), \
+                        mock.patch.object(cd, 'probe_rejects', return_value=[]):
+                    errors, summary = cd.check_build_flags(root, ['selected.c'])
+                self.assertEqual(bool(errors), want_error, errors)
+                self.assertEqual(summary['units'], 1)
+                self.assertEqual(summary['counts'], {mode: 1})
+
+    def test_partial_sdk_header_probes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            headers = root / cd.SDK_HDR_DIR
+            headers.mkdir(parents=True)
+            (headers / 'good.h').write_text('extern int good;\n')
+            (headers / 'bad.h').write_text('extern _Bool bad;\n')
+            self.assertEqual(cd.check_sdk_headers(root, files=[cd.SDK_HDR_DIR + '/good.h']), [])
+            self.assertTrue(cd.check_sdk_headers(root, files=[cd.SDK_HDR_DIR + '/bad.h']))
+            # A shared include edit also selects its public header wrapper.
+            (headers / 'good.h').write_text('#include "nested.inc"\n')
+            (headers / 'nested.inc').write_text('extern _Bool nested;\n')
+            problems = cd.check_sdk_headers(root, files=[cd.SDK_HDR_DIR + '/nested.inc'])
+            self.assertTrue(any('nested.inc' in p for p in problems), problems)
+            self.assertFalse(any('/bad.h:' in p for p in problems), problems)
+
     def tu(self, body, flags=()):
         return a.parse('kernel/clang_probe.c', ['-std=gnu11','-ffreestanding']+list(flags),
                        ROOT,text=body)

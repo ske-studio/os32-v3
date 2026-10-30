@@ -7,6 +7,7 @@ from source_roots import SCAN_ROOTS
 import pathlib
 import re
 import clang_ast as ast
+from clang_ast.build import dependency_files, select_units
 
 ROOT = ast.ROOT
 ROOTS = SCAN_ROOTS['p2v']
@@ -205,7 +206,8 @@ def scan(source):
     return [(ln,f,rule) for _,ln,f,rule in findings(tu)[0]]
 
 
-def audit(root):
+def audit(root, changed=None):
+    changed = dependency_files(changed)
     root = pathlib.Path(root).absolute()
     allowed, errors = {}, []
     for line in (root / 'tools/check_p2v_allow.txt').read_text().splitlines():
@@ -221,10 +223,19 @@ def audit(root):
         allowed[rel,func] = reason
     functions, files = set(), set()
     try:
-        for u in ast.units(root):
-            if not any(u['src'].startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(u['src']).parts):
-                continue
+        units = [u for u in ast.units(root)
+                 if any(u['src'].startswith(d + '/') for d in ROOTS)
+                 and not EXCLUDED.intersection(pathlib.Path(u['src']).parts)]
+        for u in select_units(units, root, changed):
+            if changed is not None:
+                files.add(u['src'])
             tu = ast.parse(u['src'],u['argv'],root)
+            if changed is not None:
+                for include in tu.get_includes():
+                    try:
+                        files.add(pathlib.Path(include.include.name).relative_to(root).as_posix())
+                    except ValueError:
+                        pass
             # Collect exception-file coverage during the findings walk too.
             hits, funcs = findings(tu,root,files)
             functions.update(funcs)
@@ -237,6 +248,8 @@ def audit(root):
     except (ast.ParseError, RuntimeError) as e:
         errors.append('clang parse failure: ' + str(e))
     for rel,func in allowed:
+        if changed is not None and rel not in files:
+            continue
         if rel not in files or (func != '<file>' and (rel,func) not in functions):
             errors.append(f'stale exception: {rel}:{func}')
     return sorted(set(errors)), len(allowed)
@@ -245,7 +258,9 @@ def audit(root):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',type=pathlib.Path,default=ROOT)
-    errors,count = audit(p.parse_args().root)
+    p.add_argument('--files', nargs='*', help='changed files; check their translation units and includers')
+    args = p.parse_args()
+    errors,count = audit(args.root, args.files)
     for e in errors:
         print(e)
     print(f'P2V: {len(errors)} violations; {count} exceptions')

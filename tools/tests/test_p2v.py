@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -188,6 +189,37 @@ void probe(void) {
             'void probe(void) { unsigned int planes[2]; '
             'void *p = (void *)planes[1]; void *sentinel = (void *)1; '
             'void *null = (void *)0x0; }'), [])
+
+    def test_files_cli_nested_inc(self):
+        # One valid C policy violation per checker in an isolated real build.
+        # Include a violation in an unrelated TU to verify the scope too.
+        body = ('\nvoid p1b_probe(void) {\n'
+                '    int *restrict p = (int *)0x123400;\n'
+                '    __asm__ volatile("cli"); (void)p;\n}\n')
+        other = 'kernel/time/sysclk.c'
+        target = 'drivers/block/fdc.c'
+        with tempfile.TemporaryDirectory() as tmp:
+            changed = 'drivers/block/p1b_probe.inc'
+            edits = {other: (ROOT / other).read_text() + body,
+                     changed: body,
+                     'drivers/block/p1b_probe.h': '#include "p1b_probe.inc"\n',
+                     target: (ROOT / target).read_text() + '\n#include "p1b_probe.h"\n'}
+            tree = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree', edits)
+            started = time.monotonic()
+            for checker, finding in [('p2v', 'physical-cast'),
+                                     ('c_dialect', 'restrict'),
+                                     ('arch_asm', 'inline asm `cli`')]:
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / ('tools/check_' + checker + '.py')),
+                     '--root', str(tree), '--files', changed],
+                    capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(finding, result.stdout)
+                self.assertNotIn('clang parse failure', result.stdout)
+                self.assertNotIn('stale exception', result.stdout)
+                self.assertNotIn(other + ':', result.stdout)
+            print('files .h -> .inc: 3 checkers detected violations in %.3fs' %
+                  (time.monotonic() - started), flush=True)
 
     def test_real_tree(self):
         self.assertEqual(checker.audit(ROOT)[0], [])
