@@ -10,10 +10,10 @@ extern void os32_resident_sbrk_stats(u32 out[3]); /* private resident CRT */
 /*  システム操作モジュール (cmd_sys.c)                                      */
 /* ======================================================================== */
 
-/* I-1: drivers/ide.h の IdeInfo と**同じ並び**でなければならない。
+/* I-1: drivers/ata/ide.h の IdeInfo と**同じ並び**でなければならない。
  * ide_identify はカーネル側の定義 (96B) で書くので、ここが 92B のままだと
  * phys_sector_size の 2 バイトが呼び手のスタックを踏む (`ide 0` で発現)。
- * drivers/ide.h はカーネル内部ヘッダで外部プログラムからは引けないため、
+ * drivers/ata/ide.h はカーネル内部ヘッダで外部プログラムからは引けないため、
  * 写しをここに置く — ide.h を変えたら必ず一緒に直すこと。 */
 typedef struct {
     u32 total_sectors;

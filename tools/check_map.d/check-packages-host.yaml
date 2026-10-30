@@ -8,7 +8,7 @@ check-packages-host:
 - build/deploy.mk
 - build/image.mk
 - build/packages.yaml
-- drivers/pc98pt.c
+- drivers/block/pc98pt.c
 - fs/ext2_layout.c
 - fs/fatfs_vfs.c
 - init/kernel.c

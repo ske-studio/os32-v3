@@ -423,8 +423,8 @@ generation:16**)。古いイベントは generation が合わないのでクラ�
 
 ### U2a. キー入力と文字入力の分離 — 確定 2026-09-04 (Key.code の体系)
 
-事実: カーネルのキー待ち行列は `(scancode << 8) | ascii` の 16bit (drivers/kbd.c)。scancode は
-PC-98 の 7bit コード (`drivers/kbd.h` の `KEY_*`: F1〜F10 = 62h〜6Bh、VF1〜5、ROLL UP/DOWN、
+事実: カーネルのキー待ち行列は `(scancode << 8) | ascii` の 16bit (drivers/input/kbd.c)。scancode は
+PC-98 の 7bit コード (`drivers/input/kbd.h` の `KEY_*`: F1〜F10 = 62h〜6Bh、VF1〜5、ROLL UP/DOWN、
 INS/DEL、HELP、XFER/NFER、COPY、STOP、テンキー) で、ascii は変換後の文字 (無ければ 0)。
 修飾は `kbd_get_modifiers` の 5bit (SHIFT 01h / CAPS 02h / KANA 04h / GRPH 08h / CTRL 10h)。
 FEP は `ime_trygetkey` が確定済み UTF-8 を 1 バイトずつ (scancode=0) 返す。既存 libos32gui の

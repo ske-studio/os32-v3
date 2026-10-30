@@ -120,7 +120,7 @@ def run(runner, mutation=None):
     elif mutation == 'target':
         assert 'input_getchar_kapi()' in selected[1]
         selected[1] = selected[1].replace('input_getchar_kapi()', 'kbd_getchar_kapi()')
-    rtc = (ROOT / 'drivers/rtc.c').read_text()
+    rtc = (ROOT / 'drivers/char/rtc.c').read_text()
     adapter = rtc[rtc.index('static void pc98_read_date('):]
     if mutation == 'clock_pivot':
         assert 'time.year < RTC_YEAR_PIVOT' in adapter
@@ -140,13 +140,13 @@ def run(runner, mutation=None):
         fixture = (ROOT / 'tools/tests/d2_services_host.c').read_text()
         fixture = fixture.replace('#include "../../kernel/input_service.c"', service)
         fixture = fixture.replace('#include "../../platform/pc98/d2_bind.c"', bind)
-        fixture = fixture.replace('#include "../../drivers/kbd.h"', '#include "' + str(ROOT / 'drivers/kbd.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/mouse.h"', '#include "' + str(ROOT / 'drivers/mouse.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/input/kbd.h"', '#include "' + str(ROOT / 'drivers/input/kbd.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/input/mouse.h"', '#include "' + str(ROOT / 'drivers/input/mouse.h') + '"')
         fixture = fixture.replace('#include \"pointer_fixture_host.h\"', '#include \"' + str(ROOT / 'tools/tests/pointer_fixture_host.h') + '\"')
         fixture = fixture.replace('#include "port_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/port_fixture_host.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/serial.h"', '#include "' + str(ROOT / 'drivers/serial.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/char/serial.h"', '#include "' + str(ROOT / 'drivers/char/serial.h') + '"')
         fixture = fixture.replace('#include "clock_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/clock_fixture_host.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/rtc.h"', '#include "' + str(ROOT / 'drivers/rtc.h') + '"')
+        fixture = fixture.replace('#include "../../drivers/char/rtc.h"', '#include "' + str(ROOT / 'drivers/char/rtc.h') + '"')
         (work / 'clock_adapter.inc').write_text(adapter)
         (work / 'clock_consumers.inc').write_text('typedef u32 DWORD;\n' + constants + '\n' + sys_time[0] + '\n' + fattime[0])
         (work / 'clock_wrapper.inc').write_text(f'#define CLOCK_SLOT {clock_slot}\n' + clock_wrapper[0])
@@ -186,16 +186,16 @@ def contracts():
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name, header in (('kernel/ime/ime.c', '../../drivers/kbd.h'),
-                         ('kdebug/kselftest.c', '../drivers/kbd.h')):
+    for name, header in (('kernel/ime/ime.c', '../../drivers/input/kbd.h'),
+                         ('kdebug/kselftest.c', '../drivers/input/kbd.h')):
         assert '#include "' + header + '"' in (ROOT / name).read_text()
-    assert '#include "../../drivers/mouse.h"' in platform
-    assert 'drivers/mouse.h' not in boot and 'drivers/kbd.h' not in boot
-    assert '#include "../include/pointer_service.h"' in (ROOT / 'drivers/mouse.h').read_text()
+    assert '#include "../../drivers/input/mouse.h"' in platform
+    assert 'drivers/input/mouse.h' not in boot and 'drivers/input/kbd.h' not in boot
+    assert '#include "../include/pointer_service.h"' in (ROOT / 'drivers/input/mouse.h').read_text()
     assert 'drivers/' not in (ROOT / 'include/pointer_service.h').read_text()
     common = (ROOT / 'include/kbd.h').read_text()
     assert 'drivers/' not in common and 'kbd_init' not in common and 'KBD_DATA' not in common
-    assert '#include "../include/kbd.h"' in (ROOT / 'drivers/kbd.h').read_text()
+    assert '#include "../include/kbd.h"' in (ROOT / 'drivers/input/kbd.h').read_text()
     # The common header must resolve without the drivers include search path.
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Werror', '-fsyntax-only', '-x', 'c',
                     '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-'],

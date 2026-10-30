@@ -9,14 +9,14 @@ check-module-runtime-host:
 - include/memmap.h
 - fs/vfs.c
 - fs/vfs.h
-- drivers/dev.c
-- drivers/dev.h
-- drivers/disk.h
-- drivers/atapi.h
-- drivers/fdc.h
+- drivers/base/dev.c
+- drivers/base/dev.h
+- drivers/block/disk.h
+- drivers/ata/atapi.h
+- drivers/block/fdc.h
 - include/console.h
 - include/kbd.h
-- drivers/kbd.h
+- drivers/input/kbd.h
 - tools/module_schema.py
 - tools/gen_module_schema.py
 - lib/kstring.h
@@ -32,5 +32,5 @@ check-module-runtime-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - tools/tests/kernel_includes.py

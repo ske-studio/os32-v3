@@ -52,5 +52,5 @@
 | L1 | 取り込みの検査で試験 111 本が落ちた — 試験がそれぞれ自分の -I でカーネルのソースを組み、新しいディレクトリが無かった | 試験の -I を `kernel_includes.py` の 1 か所に (a4b679a1)、完了条件に旧パスの grep 0 件 |
 | L1 | ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` がパスで部品を選んでいて、道具の一覧に出た所を手で直した | 手順 4 |
 | L1 | 新しいディレクトリを `config.mk` の INC_* 7 行に別々に書き足した (取りこぼしの元) | 手順 1 (KERNEL_SRC_DIRS) |
-| (L2 で初) | 同名のヘッダ `include/kbd.h` と `drivers/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる |
+| (L2 で初) | 同名のヘッダ `include/kbd.h` と `drivers/input/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |

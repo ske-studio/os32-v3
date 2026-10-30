@@ -98,7 +98,7 @@ v3 の答え: **システム側は恒等のまま (D1・D20)、物理地図と�
 | 0xFE000000–0xFEFFFFFF | 1016–1019 | 固定 sup+PCD | 16MB | デバイス窓の帯 (v2.1 のまま) |
 | 0xFF000000– | 1020–1023 | 固定 | 16MB | ROM ミラー / MMIO |
 
-**案5 (ユーザー承認 2026-10-16)**: DMA を低位の池へ移し、両ガードと16KiBスタックを維持する。番地は固定 `0x7F0000` を採る (8MB末尾の64KiBでRAM)。末尾に置いて低位の池を連続して使う (集積拡張は凍結、旧同梱域の予約は2026-10-18に取消)。検出RAMが終端0x800000に届かない場合はDMAを使う装置 (PCM・82557) だけを無効にし、診断を1行出して起動を続ける。一般割当前に `LEDGER_R_DMA / LEDGER_OWNER_KERNEL / WB` で16ページを恒久予約し、物理=仮想・supervisor/RWを保つ。8237A＋バンクは24bit (`docs/hw/undocumented/io_dma.md:383-386`)、[HW2] により64KiB整列・境界非跨越、1MB以上禁止は解除済み (`drivers/dma8237.c:89-91`)。15〜16MBは全機種・全設定で除外する (`docs/hw/undocumented/io_mem.md:157-191`、`docs/hw/undocumented/pci_cbus.md:79-100` のシステム空間、386以上の機種が前提)。具体配置・利用側・初期化順は T3 §2-2 (票 TASK_T3_LAYOUT)。
+**案5 (ユーザー承認 2026-10-16)**: DMA を低位の池へ移し、両ガードと16KiBスタックを維持する。番地は固定 `0x7F0000` を採る (8MB末尾の64KiBでRAM)。末尾に置いて低位の池を連続して使う (集積拡張は凍結、旧同梱域の予約は2026-10-18に取消)。検出RAMが終端0x800000に届かない場合はDMAを使う装置 (PCM・82557) だけを無効にし、診断を1行出して起動を続ける。一般割当前に `LEDGER_R_DMA / LEDGER_OWNER_KERNEL / WB` で16ページを恒久予約し、物理=仮想・supervisor/RWを保つ。8237A＋バンクは24bit (`docs/hw/undocumented/io_dma.md:383-386`)、[HW2] により64KiB整列・境界非跨越、1MB以上禁止は解除済み (`drivers/dma/dma8237.c:89-91`)。15〜16MBは全機種・全設定で除外する (`docs/hw/undocumented/io_mem.md:157-191`、`docs/hw/undocumented/pci_cbus.md:79-100` のシステム空間、386以上の機種が前提)。具体配置・利用側・初期化順は T3 §2-2 (票 TASK_T3_LAYOUT)。
 
 ### 2-2. lease の契約
 
@@ -154,7 +154,7 @@ RAM の存在 (物理地図)・割当可否・owner・写像を**別の情報**�
 ### 3-4. P2V / V2P への集約 (D20 — 高位カーネルは v4 以降)
 
 - **規則**: カーネルが物理番地をポインタとして触る箇所は `P2V(phys)` を通し、ポインタを装置 (DMA・ページ表・窓) に渡す箇所は `V2P(ptr)` を通す。恒等の v3 では両方とも**何もしない関数 (`static inline`) / マクロ** (`include/memmap.h` に 1 か所)。台帳の API は**物理 PFN / 物理番地を返す**ことにし、呼び手が P2V で触る形に揃える。
-- **監査の対象 (Codex 往復 2 の一覧 + 追加)**: `mm/paging.c` の PD/PT (`:717,737,794,836,889` の `(u32 *)phys`)、`mm/shlib.c:208,285` の複製、`kernel/v86/v86_mem.c:44` のバッキング、`gfx/backend_pegc.c:704-705` の BB、`drivers/fdc.c:787,816` / ATAPI / PCM の DMA バッファ (`dma_pool_alloc` の戻り値、V2P 側)、BIOS データ領域 (`backend_pegc.c:117-125` の 0000:0400h、`kbd_init` の BIOS ワーク)、VRAM 窓 (`PEGC_LINEAR_BASE`、`0xA8000` 系、Cirrus の `s_lin`)。`kmalloc` は対象外 (仮想のヒープ)。
+- **監査の対象 (Codex 往復 2 の一覧 + 追加)**: `mm/paging.c` の PD/PT (`:717,737,794,836,889` の `(u32 *)phys`)、`mm/shlib.c:208,285` の複製、`kernel/v86/v86_mem.c:44` のバッキング、`drivers/video/pc98/backend_pegc.c:704-705` の BB、`drivers/block/fdc.c:787,816` / ATAPI / PCM の DMA バッファ (`dma_pool_alloc` の戻り値、V2P 側)、BIOS データ領域 (`backend_pegc.c:117-125` の 0000:0400h、`kbd_init` の BIOS ワーク)、VRAM 窓 (`PEGC_LINEAR_BASE`、`0xA8000` 系、Cirrus の `s_lin`)。`kmalloc` は対象外 (仮想のヒープ)。
 - **票**: **T1 (台帳) の中**に置く — 台帳の API を作り替えるときに呼び手を全部触るので、同じ差分で P2V/V2P に揃えるのが最も安い。恒等なので動作は変わらず、危険は無い。**`tools/check_constraints.py` に検査を足す**: `kernel/ drivers/ gfx/ fs/ exec/` で `(u8 *)` / `(u32 *)` / `(void *)` を物理番地の変数・定数 (`*_phys`、`MEM_*_BASE`、`PEGC_LINEAR_BASE` など) に当てるキャストは P2V を通っていなければ違反 (ID は新設、例外は一覧で許可)。
 - **適用範囲 (Codex X7-3、2026-09-30、ユーザー承認)**: `P2V` / `V2P` が使えるのは**恒等の supervisor 領域だけ** (カーネル帯・シェル帯・池・MMIO の恒等窓)。**アプリ帯と lease 窓は v3 でも非恒等**なので、そのポインタを恒等の `V2P` に渡すと装置へ仮想番地を渡してしまう — **AS のページと lease は台帳 (PTE / SURFACE) から物理へ変換する別の関数**にし、`V2P` には渡せないことを検査 (`check_constraints.py` の同じ検査で、アプリ帯・lease 窓の番地を持つ変数に `V2P` を当てたら違反) で分ける。**DMA には物理の記述子 (PFN 区間) を渡す** — 仮想ポインタを受け取る DMA API を作らない (`dma_alloc` の戻りは物理と仮想の組)。
 - **v4 で高位化するとき**に変わるのはこの 1 か所と、lease 窓の別名 (既に非恒等) だけ、という状態を v3 の終わりに作る。Codex 往復 2 の W1〜W3 (live-AS 規則・exec の CR3 切替・監査対象の広さ) は v4 の設計で改めて解く。

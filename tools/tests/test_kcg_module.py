@@ -194,14 +194,14 @@ def main():
         shutil.copyfile(ROOT / 'include/platform_display.h', folder / 'platform_display.h')
         product(folder)
         display_diagnostic(folder)
-        adapter = (ROOT / 'kernel/kcg_module.c').read_text()
+        adapter = (ROOT / 'drivers/video/kcg/kcg_module.c').read_text()
         display = (ROOT / 'platform/pc98/display.c').read_text()
         signature = 'void platform_display_kcg_code(void)\n{'
         assert display.count(signature) == 1
         start = display.index(signature)
         end = display.index('\n}', start) + 2
         (folder / 'kcg_display_code.inc').write_text(display[start:end] + '\n')
-        body = (ROOT / 'kernel/kcg_body.c').read_text()
+        body = (ROOT / 'drivers/video/kcg/kcg_body.c').read_text()
 
         def run(source, kind, modes, expected=0):
             path = folder / ('kcg_body_source.inc' if kind == 'body' else 'adapter.c')
@@ -210,7 +210,7 @@ def main():
                 (folder / 'adapter.c').write_text(adapter)
             exe = folder / kind
             extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module/module_runtime.c',
-                      ROOT / 'kernel/module/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c']
+                      ROOT / 'kernel/module/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c']
                      if kind == 'module' else [f'-DKCG_ADAPTER="{folder / "adapter.c"}"'])
             result = subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
                                      '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),

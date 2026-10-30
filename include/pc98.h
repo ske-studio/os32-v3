@@ -47,7 +47,7 @@
 #define PC98_IRQ_MOUSE       13
 #define PC98_IO_OPEN_BUS8    0xFF
 
-/* RTC 書込みポート (drivers/rtc.h の同名の写しの除去は N8)。 */
+/* RTC 書込みポート (drivers/char/rtc.h の同名の写しの除去は N8)。 */
 #define RTC_SET    0x20
 
 
@@ -162,8 +162,8 @@
 
 /* どちらのクロックかは BIOS ワークエリア 0000:0501h の bit7 で分かる。
  * **定義はここ 1 か所** ([C4]) — 読むのは kernel/time/sysclk.c だけで、
- * drivers/serial.h は別名 (TIMER_CLK_*) を張るだけにしてある。
- * 根拠の資料と食い違いの決着は drivers/serial.h の注記を参照。 */
+ * drivers/char/serial.h は別名 (TIMER_CLK_*) を張るだけにしてある。
+ * 根拠の資料と食い違いの決着は drivers/char/serial.h の注記を参照。 */
 #define BIOS_WORK_SYSCLK    0x00000501UL  /* BYTE: bit7=1 なら 8MHz系 */
 #define BIOS_SYSCLK_8MHZ    0x80
 
@@ -434,7 +434,7 @@
  *   053Ah  BYTE  KB_SHFT_STS シフトキー押下状態フラグ。INT 09h ハンドラが make で
  *                セット、break でリセットする (「1= 押されている」)。INT 18h AH=02h の値。
  *                bit4 CTRL / bit3 GRPH / bit2 カナ / bit1 CAPS / bit0 SHIFT。
- *                読むのは drivers/kbd.c の kbd_init (paging_init より前) だけで、
+ *                読むのは drivers/input/kbd.c の kbd_init (paging_init より前) だけで、
  *                カナ・CAPS のロックの初期値にする (TASK_KBD_NAV §2)。 */
 #define BIOS_WORK_KB_SHIFT   0x0000053AUL  /* BYTE: シフトキー押下状態 */
 #define BIOS_KB_SHIFT_CAPS   0x02

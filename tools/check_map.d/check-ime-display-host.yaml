@@ -1,5 +1,5 @@
 check-ime-display-host:
-- gfx/pc98_route.h
+- drivers/video/pc98/pc98_route.h
 - tools/tests/test_ime_display.py
 - tools/tests/ime_display_host.c
 - tools/tests/con_sink_host.c

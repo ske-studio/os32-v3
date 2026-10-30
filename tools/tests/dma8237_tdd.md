@@ -1,13 +1,13 @@
 # dma8237 — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-2
-対象: `drivers/dma8237_math.c` (算数とポート表) / `drivers/dma8237.c` (I/O を出す側)
+対象: `drivers/dma/dma8237_math.c` (算数とポート表) / `drivers/dma/dma8237.c` (I/O を出す側)
 試験: `tools/tests/test_dma8237.py` + `tools/tests/dma8237_host.c`
 実行: `make check-dma8237-host` (`check-par` の列)
 
 ## 何が起きていたか
 
-DMA の設定は `drivers/fdc.c` の中に **ch2 決め打ち**で書かれていた。
+DMA の設定は `drivers/block/fdc.c` の中に **ch2 決め打ち**で書かれていた。
 
 ```c
 outp(DMA_MASK_REG, DMA_MASK_CH2);       /* 0x15 <- 0x06 */
@@ -45,11 +45,11 @@ Vol.2「DMAコントローラ」(io_dma.md 152〜155 行) は
 
 ### RED 1 — 実装が無い
 
-`drivers/dma8237_math.c` を置く前にハーネスを回すと `#include` が解決できない。
+`drivers/dma/dma8237_math.c` を置く前にハーネスを回すと `#include` が解決できない。
 
 ```
 $ python3 -B tools/tests/test_dma8237.py
-tools/tests/dma8237_host.c:16:10: fatal error: ../../drivers/dma8237_math.c: No such file or directory
+tools/tests/dma8237_host.c:16:10: fatal error: ../../drivers/dma/dma8237_math.c: No such file or directory
 ```
 
 ### RED 2 — ポート表を式で出した姿 (変異 5)
@@ -68,7 +68,7 @@ tools/tests/dma8237_host.c:16:10: fatal error: ../../drivers/dma8237_math.c: No 
 
 ```
 $ python3 -B tools/tests/test_dma8237.py --target --mutate
-HOST GNU89 -Werror compile PASS (real drivers/dma8237_math.c)
+HOST GNU89 -Werror compile PASS (real drivers/dma/dma8237_math.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT port_table=0
 EXIT split_addr=0
@@ -112,7 +112,7 @@ MUTATION 8 RED (1 件): 64KB またぎを検査しない ([HW2] そのもの)
 ## エミュレータでも実機でも見るしかない残り
 
 ここは算数だけ。**I/O の順序** (フリップフロップのクリア → 下位 → 上位、
-ステータスの読みが TC を消すこと) は `drivers/dma8237.c` にあり、
+ステータスの読みが TC を消すこと) は `drivers/dma/dma8237.c` にあり、
 `kernel/kselftest.c` の `test_dma8237()` が起動ごとに「悪い引数で
 ハードウェアに触らない」ことと done / tc_event の初期化を見る。
 実転送の照合は W2 (NP21/W の 2HD 起動 + md5、実機の FD 起動)。

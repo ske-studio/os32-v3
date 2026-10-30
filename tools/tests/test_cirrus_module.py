@@ -12,7 +12,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/cirrus_body.c'
+SOURCE = ROOT / 'drivers/video/cirrus/cirrus_body.c'
 CASES = ['register-detach', 'failure-after-registration', 'selected-isolation', 'prefix-failure']
 
 def product_image(folder):
@@ -70,7 +70,7 @@ def hal_context(unguarded=False, cui_first=False):
     """
     from test_gfx_kernel_fb import run_case
     fixture = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
-    glue = '#include "' + str(ROOT / 'kernel/cirrus_body.c') + '"\n' + """
+    glue = '#include "' + str(ROOT / 'drivers/video/cirrus/cirrus_body.c') + '"\n' + """
 GfxBackend gfx_backend_cirrus;
 static void (*boundary_real_init)(void);
 static int boundary_init_calls;
@@ -116,7 +116,7 @@ static const CirrusModuleContext fixture_context = {
     CHECK(boundary_init_calls == 1);
     gfx_backend_cirrus.init = boundary_real_init;
 """ + marker)
-    change = ('gfx/backend_cirrus.c', '#include "cirrus_module.h"',
+    change = ('drivers/video/cirrus/backend_cirrus.c', '#include "cirrus_module.h"',
               '#define OS32_CIRRUS_MODULE 1\n#include "cirrus_module.h"')
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = run_case(None, runner, extra_changes=[change],
@@ -132,13 +132,13 @@ static const CirrusModuleContext fixture_context = {
 def identify_enable_mutant(folder):
     from test_cirrus_win import host_cmd
     from mutpar import build_in_tree
-    source = (ROOT / 'gfx/cirrus_identify.c').read_text()
+    source = (ROOT / 'drivers/video/cirrus/cirrus_identify.c').read_text()
     old = 'int cirrus_identify(void)\n{'
     assert source.count(old) == 1
     source = source.replace(old, old + '\n    gfx_backend_cirrus.init();')
     exe = folder / 'identify-enable'
     tree = build_in_tree(ROOT, folder / 'identify-tree',
-                         {'gfx/cirrus_identify.c': source}, [host_cmd(exe)],
+                         {'drivers/video/cirrus/cirrus_identify.c': source}, [host_cmd(exe)],
                          capture_output=True)  # A compile failure is a failure, never RED.
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = host32.run([str(exe)], cwd=str(tree), runner=runner, capture_output=True)
@@ -166,7 +166,7 @@ def main():
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cirrus_module_host.c',
                             ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
+                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()

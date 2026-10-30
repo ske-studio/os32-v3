@@ -1,5 +1,5 @@
 check-sqlite-module-proto-host:
-- drivers/dev.c
+- drivers/base/dev.c
 - fs/vfs.c
 - Makefile
 - build/config.mk
@@ -87,8 +87,8 @@ check-sqlite-module-proto-host:
 - fs/fd_redirect.h
 - lib/utf8.h
 - include/tvram.h
-- drivers/kbd.h
-- drivers/serial.h
+- drivers/input/kbd.h
+- drivers/char/serial.h
 - exec/exec.h
 - include/con_sink.h
 - include/redir_access.h
@@ -102,6 +102,6 @@ check-sqlite-module-proto-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - tools/tests/kernel_includes.py
 artifact_reader: true

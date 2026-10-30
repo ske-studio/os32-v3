@@ -2,7 +2,7 @@
  * bridge-window exclusions (gfinit_resources, PCI2050B / FreeBSD references).
  * Fixed lengths: GF_DRIVER_DESIGN §4-1, measured gf_a4 acceptance. */
 #include "production.h"
-#include "../../drivers/pci.h"
+#include "../../drivers/pci/pci.h"
 #include "../../mm/pgalloc.h"
 #include "../../kdebug/gfinit_resources.h"
 int gf_production_identify(struct gf_production_resources *out)

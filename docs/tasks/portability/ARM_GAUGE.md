@@ -62,7 +62,7 @@
 そこで `-g -S` で `.s` を出し直してアセンブルし、`.loc` / `.file` の表で元の
 ソース行に戻している。この処理のおかげで **7 本が「その他」から `io.h` 由来へ
 正しく移った** (`kernel/console/con_sink.c` `kernel/kbd_inject.c` `init/kernel.c`
-`mm/pgalloc.c` `kernel/snd_engine.c` `kernel/v86/v86.c` `net/link.c`)。
+`mm/pgalloc.c` `drivers/sound/fm/snd_engine.c` `kernel/v86/v86.c` `net/link.c`)。
 `-g` はコード生成を変えないので、測っている対象は同じ。
 
 ### 対象から外しているもの (理由つき)
@@ -153,13 +153,13 @@
 
 ファイル:
 
-`drivers/atapi.c` `drivers/fdc.c` `drivers/fm.c` `drivers/ide.c` `drivers/kbd.c`
-`drivers/kcg.c` `drivers/lgy98.c` `drivers/mouse.c` `drivers/mouse_bus.c`
-`drivers/mouse_seamless.c` `drivers/ne2000.c` `drivers/np2sysp.c` `drivers/rtc.c`
-`drivers/serial.c` `drivers/wab_glue_xe10.c` `fs/hostdrvfs.c` `gfx/backend_pc98.c`
-`gfx/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
+`drivers/ata/atapi.c` `drivers/block/fdc.c` `drivers/sound/fm/fm.c` `drivers/ata/ide.c` `drivers/input/kbd.c`
+`drivers/video/kcg/kcg.c` `drivers/net/ne2000/lgy98.c` `drivers/input/mouse.c` `drivers/input/mouse_bus.c`
+`drivers/input/mouse_seamless.c` `drivers/net/ne2000/ne2000.c` `drivers/char/np2sysp.c` `drivers/char/rtc.c`
+`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `fs/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
+`drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
 `kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
-`kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `kernel/snd_engine.c`
+`kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
 `kernel/sys.c` `kernel/v86/v86.c` `kernel/v86/v86_io.c` `net/link.c`
 
 ---
@@ -336,7 +336,7 @@ ABI の両側に同じ前提がかかる。
 
 ### 順序 4-a でも数字は動かない — この計測器が測っていないものだから
 
-順序 4-a は `fs/ext2_*.c` / `drivers/kcg.c` / `lib/utf8.c` の
+順序 4-a は `fs/ext2_*.c` / `drivers/video/kcg/kcg.c` / `lib/utf8.c` の
 `*(u32 *)&buf[off]` を `include/endian_le.h` の LE アクセサに置き換えた作業。
 **この計測器で数字が動かないのは正しく、しかも「効果が無い」という意味では
 ない。** 理由を分けて書いておく:
@@ -347,7 +347,7 @@ ABI の両側に同じ前提がかかる。
   コンパイル計測には最初から現れない。
 * 実際、置き換えた 8 本のうち 7 本 (`fs/ext2_*.c` 5 本、`fs/iso9660.c`、
   `lib/utf8.c`) は**順序 1 の時点から ARM を通っていた** (`fs/` 14/15、
-  `lib/` 8/8)。`drivers/kcg.c` だけは今も落ちるが、原因は
+  `lib/` 8/8)。`drivers/video/kcg/kcg.c` だけは今も落ちるが、原因は
   `platform/pc98/platform_io.h:25` のポート I/O で、エンディアンとは関係が無い。
   基点 `ff4160c` の 55/93 は前後で 1 本も動かない (分類も 5 / 33 / 0 / 0 のまま)。
 
@@ -360,7 +360,7 @@ ABI の両側に同じ前提がかかる。
 | `fs/ext2_fmt.c` | 54 | 0 |
 | `fs/ext2_inode.c` | 46 | 0 |
 | `fs/ext2_super.c` | 28 | 0 |
-| `drivers/kcg.c` | 3 | 0 |
+| `drivers/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
 | `fs/ext2_file.c` / `ext2_vfs.c` / `iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |

@@ -1,9 +1,9 @@
-"""PCI の結線表 (drivers/pci_bind_match.c) のホスト試験。
+"""PCI の結線表 (drivers/pci/pci_bind_match.c) のホスト試験。
 
 記録: tools/tests/pci_bind_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-4 (PCI デバイスの結線表)
 
-実物の drivers/pci_bind_match.c を 1 行も写さずに #include して回す。
+実物の drivers/pci/pci_bind_match.c を 1 行も写さずに #include して回す。
 probe は呼び手が渡す関数ポインタなので、偽 driver を並べれば
 DECLINE → 次へ / QUARANTINE → 打ち切り の遷移は全部踏める。
 
@@ -24,8 +24,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pci_bind_host.c"
-SRC = ROOT / "drivers/pci_bind_match.c"
-TARGET_SRCS = ["drivers/pci_bind_match.c", "drivers/pci_bind.c"]
+SRC = ROOT / "drivers/pci/pci_bind_match.c"
+TARGET_SRCS = ["drivers/pci/pci_bind_match.c", "drivers/pci/pci_bind.c"]
 
 CASES = ["match_rules", "next_order", "decline_chain", "quarantine_stops",
          "reason_reset", "line_state", "multi_dev", "info_get"]
@@ -78,10 +78,10 @@ def host_build(tmp, source_text=None):
         # **実物のまま**絶対パスで引く — 相対のままだと tmp から辿れない。
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../drivers/pci_bind.c"',
-                     '"%s/drivers/pci_bind.c"' % ROOT)
-            .replace('"../../drivers/pci_bind_match.c"',
-                     '"drivers/pci_bind_match.c"'),
+            .replace('"../../drivers/pci/pci_bind.c"',
+                     '"%s/drivers/pci/pci_bind.c"' % ROOT)
+            .replace('"../../drivers/pci/pci_bind_match.c"',
+                     '"drivers/pci/pci_bind_match.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, *INCLUDES, "-I" + str(src_dir), str(shim),
                "-o", str(exe)]
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pci-bind-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/pci_bind_match.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/pci/pci_bind_match.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

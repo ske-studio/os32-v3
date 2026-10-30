@@ -3,7 +3,7 @@
 /* ======================================================================== */
 #include "kpeek_allow.h"
 #include "os32_kapi_shared.h"
-#include "drivers/pci.h"
+#include "drivers/pci/pci.h"
 
 #define NV_ROW(off, len, w) \
     { KPEEK_NV_VENDOR, KPEEK_NV44A_DEVICE, KPEEK_NV_BAR_MMIO, (w), 0, (off), (len) }

@@ -29,7 +29,7 @@ use os32api::gui::proto::{
 use os32api::gui::stub::AppVTable;
 use os32api::gui::types::{Rect, Style};
 
-/* drivers/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` に載る値 (契約 D4)。 */
+/* drivers/input/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` に載る値 (契約 D4)。 */
 const MOUSE_BTN_LEFT: u8 = 0x01;
 
 /* アプリ発フォーカス通知を 1 か所で配る回数の上限 ([C4]: 数値を散らさない)。

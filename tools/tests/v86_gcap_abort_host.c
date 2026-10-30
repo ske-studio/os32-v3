@@ -168,7 +168,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 ticks) {
         ((volatile u16 *)P2V_IO(TVRAM_ATTR_BASE))[i] = 0xbeef;
     }
     /* IRQ/IRET and ROM are modeled: the real V86 keyboard branch returns
-     * HOTKEY here without ring3_abort_request/check (drivers/kbd.c). */
+     * HOTKEY here without ring3_abort_request/check (drivers/input/kbd.c). */
     if (calls == hotkey_call) {
         CHECK(v86_gcap_active(), "HOTKEY observed active");
         gd_set(GD_DONE, 0);

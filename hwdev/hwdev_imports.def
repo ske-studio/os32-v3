@@ -213,35 +213,35 @@
     {
       "kind": "FUNC",
       "symbol": "serial_get_setup",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "index": 30,
       "group": "kernel"
     },
     {
       "kind": "FUNC",
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "index": 31,
       "group": "kernel"
     },
     {
       "kind": "FUNC",
       "symbol": "pci_cfg_read16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "index": 32,
       "group": "kernel"
     },
     {
       "kind": "FUNC",
       "symbol": "pci_cfg_write32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "index": 33,
       "group": "kernel"
     },
     {
       "kind": "FUNC",
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "index": 34,
       "group": "kernel"
     },

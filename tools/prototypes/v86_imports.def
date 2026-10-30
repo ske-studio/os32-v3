@@ -19,7 +19,7 @@
     },
     {
       "symbol": "snd_set_master",
-      "source": "kernel/snd_engine.h",
+      "source": "drivers/sound/fm/snd_engine.h",
       "context": "normal,exception",
       "irq": true
     },
@@ -79,85 +79,85 @@
     },
     {
       "symbol": "loop_dev_attach",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "loop_dev_detach",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "loop_dev_get_fd",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_format",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_geometry",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_sec_n",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_is_hdd",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_is_writable",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_read_chs",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_read_lba",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_seek_d88",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_track_id_d88",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_write_chs",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_write_lba",
-      "source": "drivers/loop_dev.h",
+      "source": "drivers/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },

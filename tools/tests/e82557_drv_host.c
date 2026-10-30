@@ -88,12 +88,12 @@ static void fprintf(int fd, const char *fmt, ...)
 __asm__(".global _start\n_start:\n"
         "mov (%esp), %eax\nlea 4(%esp), %edx\npush %edx\npush %eax\ncall main\n"
         "mov %eax, %ebx\nmov $1, %eax\nint $0x80\n");
-#include "../../drivers/pci_decode.c"
+#include "../../drivers/pci/pci_decode.c"
 #define e82557_ee_read_word real_ee_read_word
-#include "../../drivers/e82557_eeprom.c"
+#include "../../drivers/net/e82557/e82557_eeprom.c"
 #undef e82557_ee_read_word
 #include "../../fs/vfs.h"
-#include "../../drivers/e82557.h"
+#include "../../drivers/net/e82557/e82557.h"
 #include "../../kernel/module/module.h"
 #include "../../include/bootinfo.h"
 _Static_assert(sizeof(u32) == 4, "ILP32 required");
@@ -220,7 +220,7 @@ int vfs_rm(const char *path)
 { CHECK(!irq_depth); fs_calls++; rm_calls++; CHECK(!strcmp(path,"/var/log/lan.try")); if(remove_fail) return VFS_ERR_IO; files[0].present=0; return 0; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { va_list ap; size_t n=strlen(output); (void)attr; va_start(ap,fmt); vsnprintf(output+n,sizeof(output)-n,fmt,ap); va_end(ap); }
-#include "../../drivers/pci_bind_match.c"
+#include "../../drivers/pci/pci_bind_match.c"
 static u32 irq_save(void) { u32 f=irq_depth?0:0x200; irq_depth++; return f; }
 static void irq_restore(u32 flags) { CHECK(irq_depth>0); irq_depth--; CHECK(!!(flags&0x200)==!irq_depth); }
 static void trace(u32 stage)
@@ -371,7 +371,7 @@ static void barrier_event(void) { last_barrier=++event_seq; }
 #define E82557_BARRIER() barrier_event()
 #define E82557_DESC_ACCESS(p,n,w) desc_event(p,n,w)
 #define E82557_HOST_YIELD() yield_event()
-#include "../../drivers/e82557_desc.c"
+#include "../../drivers/net/e82557/e82557_desc.c"
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
 { CHECK(!bus && dev==11 && !fn && reg==4); return pci_command; }
 int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
@@ -405,7 +405,7 @@ int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
 int kutoa_dec(u32 value,char *buf,int cap) { return snprintf(buf,cap,"%u",value); }
 #define tick_count fake_ticks()
 #define E82557_HOST_TEST
-#include "../../drivers/e82557.c"
+#include "../../drivers/net/e82557/e82557.c"
 #include "pci_table.h"
 static void check_pending(void)
 {

@@ -1,8 +1,8 @@
 /* P5 module adapter + real P4 owner/transport/runner, with fake ports/copy. */
-#include "kernel/geforce_module.h"
+#include "drivers/video/geforce/geforce_module.h"
 #include "gfx/palette.h"
 #define production prod
-#include "kernel/geforce_body.c"
+#include "drivers/video/geforce/geforce_body.c"
 #undef production
 static GfxBackend hal_backend;
 static GfxCounters hal_counters;

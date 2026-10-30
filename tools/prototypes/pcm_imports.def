@@ -3,33 +3,33 @@
   "contracts": [
     "include/pcm_contract.h",
     "include/dma_contract.h",
-    "kernel/pcm_module.h",
-    "drivers/pcm_cs4231.h",
+    "drivers/sound/cs4231/pcm_module.h",
+    "drivers/sound/cs4231/pcm_cs4231.h",
     "kernel/irq/irq.h",
     "mm/dma_pool.h"
   ],
   "imports": [
     {
       "symbol": "pcm_module_irq_register",
-      "source": "kernel/pcm_module.h",
+      "source": "drivers/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_irq_unregister",
-      "source": "kernel/pcm_module.h",
+      "source": "drivers/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_dma_alloc",
-      "source": "kernel/pcm_module.h",
+      "source": "drivers/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_dma_free",
-      "source": "kernel/pcm_module.h",
+      "source": "drivers/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
@@ -41,31 +41,31 @@
     },
     {
       "symbol": "dma_chan_mask",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_unmask",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_setup",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_remaining",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_ack_tc",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },

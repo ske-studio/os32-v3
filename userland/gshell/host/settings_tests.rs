@@ -27,7 +27,7 @@ const K_CLOCK: &[u8] = b"taskbar/clock_24h";
 const K_FONT_SET: &[u8] = b"font_set";
 const K_FONT_GEN: &[u8] = b"font/gen";
 
-/* スキャンコード (drivers/kbd.h)。 */
+/* スキャンコード (drivers/input/kbd.h)。 */
 const SC_ESC: u8 = 0x00;
 const SC_TAB: u8 = 0x0F;
 const SC_RETURN: u8 = 0x1C;

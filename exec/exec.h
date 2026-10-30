@@ -73,13 +73,13 @@ i32 exec_resume(i32 app_id, i32 wait_ret);
 i32 exec_park(void);
 
 /* 第 2 の park 点 (票 K7 D1): GUI 中に kbd が空のとき、走っている CPL=3 の
- * アプリを WAIT_KEY で止めて WM へ戻す。drivers/kbd.c から呼ぶ。
+ * アプリを WAIT_KEY で止めて WM へ戻す。drivers/input/kbd.c から呼ぶ。
  * 成立すれば **戻らない**。0 = 止められなかった (呼び手は hlt 待ちへ)。 */
 int exec_park_kbd(void);
 
 /* 第 3 の park 点 (票 T8 §7 D8): GUI 中に注入リングが空で、前回の譲りから
  * PIT tick が進んでいるとき、走っている CPL=3 アプリを WAIT_POLL で止めて
- * **1 周だけ** WM へ譲る。drivers/kbd.c の kbd_trygetchar / kbd_trygetkey
+ * **1 周だけ** WM へ譲る。drivers/input/kbd.c の kbd_trygetchar / kbd_trygetkey
  * から、now_tick に tick_count を渡して呼ぶ。成立すれば **戻らない**。
  * 0 = 譲れなかった (呼び手はそのまま -1 を返す)。 */
 int exec_park_poll(u32 now_tick);

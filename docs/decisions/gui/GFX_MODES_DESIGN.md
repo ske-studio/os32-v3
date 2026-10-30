@@ -26,7 +26,7 @@
 ## 1. 実物の確認
 | # | 票から想定しやすい形と実物の差 | 根拠と設計への反映 |
 |---|---|---|
-| D1 | PEGC の 400/480 を選べるように読めるが、現実の描画 init は 480 のみ | gfx/backend_pegc.c:907,943,959。400 は include/pegc.h:186 の定数と復帰タイミングであり、256 色の選択経路ではない |
+| D1 | PEGC の 400/480 を選べるように読めるが、現実の描画 init は 480 のみ | drivers/video/pc98/backend_pegc.c:907,943,959。400 は include/pegc.h:186 の定数と復帰タイミングであり、256 色の選択経路ではない |
 | D2 | 範囲の 400/480 以外に既存 200 ライン API がある | gfx/gfx_core.c:975,982,991,993。packed は 200 要求でも 480、planar は 200、面間隔は 400 のまま。退行させない |
 | D3 | 面・リースを毎回表示サイズで確保するわけではない | gfx/gfx_core.c:254,320,442 が probe 前に候補を予約。exec/lease.c:88,109 は台帳の npages を貸す。選択寸法と予約容量を分ける |
 - 食い違いは上記 **3 件**。D2/D3 は票の省略を補う点であり、既存コードの不具合認定ではない。
@@ -34,25 +34,25 @@
 - 直書きの集計単位は「指定ファイル内の幅・高さ・bpp・パレット項目数の数値マクロ定義」。コメント・タイミング列・DAC 最大値を除く。
 | ファイル:行 | 定義（数値直書き） | 件数 |
 |---|---|---:|
-| gfx/backend_cirrus.c:72,73,74,101 | WIDTH=640 / HEIGHT=480 / BPP=8 / PAL_COUNT=256 | 4 |
+| drivers/video/cirrus/backend_cirrus.c:72,73,74,101 | WIDTH=640 / HEIGHT=480 / BPP=8 / PAL_COUNT=256 | 4 |
 | include/pegc.h:184,185,186,187,211 | WIDTH=640 / HEIGHT_480=480 / HEIGHT_400=400 / BPP=8 / PALETTE_COUNT=256 | 5 |
 | include/memmap.h:147,148 | BB8_WIDTH=640 / BB8_HEIGHT=480 | 2 |
 | gfx/gfx.h:16,17,23 | WIDTH=640 / HEIGHT=400 / HEIGHT_200=200 | 3 |
 | 合計 | G0 が上記パレット 2 定義を形式名へ寄せた後は 12 件 | 14 |
-- 別途 bpp の別名 1 件: gfx/backend_pc98.c:43 の PC98_BPP=GVRAM_PLANES。
+- 別途 bpp の別名 1 件: drivers/video/pc98/backend_pc98.c:43 の PC98_BPP=GVRAM_PLANES。
 - gfx/gfx.h:18–24 の BPL=80/WPL=40/PLANE_SZ=32000/PLANE_SZ_200=16000 は収納・転送定数として残す。上の寸法定義14件とは別に4件。以下もリポジトリ全体の件数ではない。
 | 固定寸法を使用する部位 | file:line（同種の連続処理は一まとまり） |
 |---|---|
-| 標準 16 色 query / shutdown / clip / pitch | gfx/backend_pc98.c:52,79,93,100,161 |
-| PEGC 診断縞 / clear / 高さ / query / present / 復帰 / pitch | gfx/backend_pegc.c:873,921,943,958,1001,1138,1172,1194 |
-| Cirrus サイズ・offset / setup / clear / 高さ / query | gfx/backend_cirrus.c:75,79,80,311,336,360,376 |
-| Cirrus clip / present / fill / blit / 復帰 / pitch | gfx/backend_cirrus.c:398,418,460,485,560,585 |
+| 標準 16 色 query / shutdown / clip / pitch | drivers/video/pc98/backend_pc98.c:52,79,93,100,161 |
+| PEGC 診断縞 / clear / 高さ / query / present / 復帰 / pitch | drivers/video/pc98/backend_pegc.c:873,921,943,958,1001,1138,1172,1194 |
+| Cirrus サイズ・offset / setup / clear / 高さ / query | drivers/video/cirrus/backend_cirrus.c:75,79,80,311,336,360,376 |
+| Cirrus clip / present / fill / blit / 復帰 / pitch | drivers/video/cirrus/backend_cirrus.c:398,418,460,485,560,585 |
 | core 初期値 / 未初期化 FB / CLIENT 型板 / DISPLAY 型板 | gfx/gfx_core.c:33,187,313,320,326,333,350,358 |
 | core 予約・clear / 400 init / 200 init | gfx/gfx_core.c:442,445,943,949,958,991,995,1004 |
 | VRAM dirty clip / merge / 全画面 present | gfx/gfx_vram.c:88,106,149,311：全モード640幅なので今回は残す。高解像度を実装する段で変更 |
 | planar ハードスクロール倍率 | gfx/gfx_scroll.c:35：400/gfx_current_height は200倍表示のHW規則として残す |
 | 起動面の自己試験 | kdebug/kselftest.c:912：MEM_GFX_BB8_* の予約形状照合なので残す |
-| Cirrus 識別時の窓容量判定 | gfx/cirrus_identify.c:44：モジュール前の予約上限判定として残す |
+| Cirrus 識別時の窓容量判定 | drivers/video/cirrus/cirrus_identify.c:44：モジュール前の予約上限判定として残す |
 - 使用箇所の一覧は10部位群・49起点。追加7起点は今回変更しない。gfx.h の宣言コメントは G6b で現在の400/480/200を説明する。
 - 関連根拠: docs/05_drivers.md:131–133 も PEGC/Cirrus は 480 のみと記載。
 - exec/surface_query.h:11 は format/width/height/pitch/planes を持つが bpp は持たない。lease.c 自身に幅・高さ・bpp の決め打ちは無い。
@@ -145,7 +145,7 @@ static const GfxMode pegc_modes[] = {
 | init 後 probe 失敗 | 既存の cleanup を経て pc98。要求が legacy200 なら 200、それ以外 400 |
 | prepare | 選択だけ先行、PEGC は同期を変えない。Cirrus の既存 init→shutdown の時機も維持 |
 - モード選択は実体の probe 成功後・init/prepare の前。boot reserve は候補表を参照せず、今の容量定数と型板を使う。
-- init/kernel.c:590 の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（kernel/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
+- init/kernel.c:590 の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（drivers/video/cirrus/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
 - 登録後の graphics 境界だけで Cirrus の表を読む。G6b はその選択点で既存予約容量を照合し、未登録表への参照を一切行わない。
 - gfx_mode_pick は通常 default、legacy200 は planar の既存 200 行だけ選ぶ。面積最大・色数最大の探索はしない。
 - 未知形式/空表/容量不足はハード設定前に不成立とし、pc98 へ戻す。pc98 自体の資源不足は描画未開始の既存経路へ。
@@ -196,9 +196,9 @@ static const GfxMode pegc_modes[] = {
 | 段 | 本体ファイル（変更、明記したものだけ新規） | 本体差分目安 |
 |---|---|---:|
 | G2 | include/gfx_format.h、include/gfx_hal.h、新規 include/gfx_mode.h、tools/prototypes/cirrus_imports.def | 45–65 |
-| G3 | gfx/backend_pc98.c | 35–50 |
-| G4 | gfx/backend_pegc.c | 55–75 |
-| G5 | gfx/backend_cirrus.c | 65–85 |
+| G3 | drivers/video/pc98/backend_pc98.c | 35–50 |
+| G4 | drivers/video/pc98/backend_pegc.c | 55–75 |
+| G5 | drivers/video/cirrus/backend_cirrus.c | 65–85 |
 | G6a | gfx/gfx_core.c（選択・init/init_200/prepare への結線だけ） | 60–80 |
 | G6b | gfx/gfx_core.c（FB/query・容量照合）、gfx/gfx.h、gfx/gfx_internal.h、docs/05_drivers.md | 65–85 |
 - G6b の include/memmap.h は別名が必要な場合のみ0–5行。型板・予約関数はどの段も変更しない。
@@ -215,21 +215,21 @@ static const GfxMode pegc_modes[] = {
 |---|---|
 | F | include/gfx_format.h、include/gfx_mode.h、tools/prototypes/cirrus_imports.def → 該当なし |
 | H | include/gfx_hal.h、gfx/gfx_internal.h → boot_splash_native_tdd.md |
-| P | gfx/backend_pc98.c → boot_splash_native_host.c、test_unicode_surface.py、test_gfx_attach.py、test_gfx_kernel_fb.py |
-| E | gfx/backend_pegc.c → pegc_hostshim/io.h、pegc_mode_tdd.md、test_unicode_surface.py、test_gfx_attach.py、test_shm_user.py、test_gfx_kernel_fb.py、test_gfx_bounds.py、k6_ram_tdd.md、pegc_mode_host.c、test_pegc_mode.py、test_gfx_boot.py |
-| C | gfx/backend_cirrus.c → test_cirrus_module.py、test_unicode_surface.py、cirrus_win_tdd.md、cirrus_win_host.c、test_gfx_attach.py、test_gfx_kernel_fb.py、test_cirrus_win.py、k6_ram_tdd.md、test_gfx_bounds.py、test_gfx_boot.py |
+| P | drivers/video/pc98/backend_pc98.c → boot_splash_native_host.c、test_unicode_surface.py、test_gfx_attach.py、test_gfx_kernel_fb.py |
+| E | drivers/video/pc98/backend_pegc.c → pegc_hostshim/io.h、pegc_mode_tdd.md、test_unicode_surface.py、test_gfx_attach.py、test_shm_user.py、test_gfx_kernel_fb.py、test_gfx_bounds.py、k6_ram_tdd.md、pegc_mode_host.c、test_pegc_mode.py、test_gfx_boot.py |
+| C | drivers/video/cirrus/backend_cirrus.c → test_cirrus_module.py、test_unicode_surface.py、cirrus_win_tdd.md、cirrus_win_host.c、test_gfx_attach.py、test_gfx_kernel_fb.py、test_cirrus_win.py、k6_ram_tdd.md、test_gfx_bounds.py、test_gfx_boot.py |
 | K | gfx/gfx_core.c → test_shutdown_probe.py、k5b_gshell_tdd.md、boot_splash_native_host.c、gfx_boot_host.c、test_unicode_surface.py、test_shm_user.py、test_gfx_attach.py、test_kapi_bounds.py、test_gfx_kernel_fb.py、test_memmap_audit.py、test_display_cleanup.py、t8_tdd.md、boot_splash_native_tdd.md、test_gfx_reattach.py、test_gfx_reinit.py、test_gfx_boot.py、test_kcg_module.py |
 | G | gfx/gfx.h → t8_tdd.md、r1_recovery.py、kcg_display_host.c |
 | M | include/memmap.h → multiapp_impl_host.c、guest_acceptance.yaml、test_appmem_map.py、test_appmem.py、cirrus_win_tdd.md、test_fep_boundary.py、test_memmap_gen.py、test_owner_reclaim.py、test_memory_boot.py、test_c_dialect.py、test_np21w_gui.py、test_hdd_stage2.py、test_stack_entry.py、multiapp_model_host.c、test_vmkernel_lz4.py、test_t3c2.py、memmap_tdd.md、k6_ram_tdd.md、test_vmkernel_layout.py、test_vk32_crc.py、test_layout_defs.py、test_boot_named_constants.py |
-| B | kernel/cirrus_module.c → cirrus_module_host.c；kernel/cirrus_body.c → test_cirrus_module.py、cirrus_module_host.c（本体ソースは変更せず再ビルド） |
+| B | drivers/video/cirrus/cirrus_module.c → cirrus_module_host.c；drivers/video/cirrus/cirrus_body.c → test_cirrus_module.py、cirrus_module_host.c（本体ソースは変更せず再ビルド） |
 - 集合は「全件編集」の意味ではない。変異のold文字列やstubが壊れる行だけ修正し、count(old)==1を維持する。markdownは記載照合、host.cは対応runner、手動項目はゲスト受入へ回す。
 - 下表の test_*.py/*_host.c は tools/tests/ 相対、guest_acceptance.yaml も同所、DEFERRED_TESTS は docs/tasks/。行数/時間は本体・試験差分と照合集合の候補検査を含む見積もり。新しい不具合が出て枠を超す場合は未合格候補としてPMへ返し、無断で巨大段にしない。
 | 段 | 触るファイル（§6の本体＋試験・登録）と照合先 | 行数 / 時間・依存 |
 |---|---|---|
 | G2 | include/gfx_format.h、include/gfx_hal.h、新規 include/gfx_mode.h、tools/prototypes/cirrus_imports.def；新規 tools/tests/gfx_modes_format_host.c、test_gfx_modes_format.py、build/checks.d/gfx-modes-format.mk、tools/check_map.d/gfx-modes-format.yaml；既存 test_cirrus_module.py/cirrus_module_host.c は必要なstubだけ更新。照合 F/H/B | 90–120行 / 45–65分。G0後、並列なし |
-| G3 | gfx/backend_pc98.c；test_gfx_kernel_fb.py、gfx_kernel_fb_host.c；照合 P/H（高さ・shutdownの期待値と必要なstubだけ） | 100–130行 / 55–75分。G2後、並列なし |
-| G4 | gfx/backend_pegc.c；test_gfx_bounds.py、test_pegc_mode.py、pegc_mode_host.c、test_gfx_kernel_fb.py；照合 E/P。guest_acceptance.yaml に§7末尾の4IDを登録、DEFERRED_TESTS文案も記録 | 125–155行 / 65–85分。G3後、G5と直列 |
-| G5 | gfx/backend_cirrus.c；test_gfx_bounds.py、test_cirrus_win.py、cirrus_win_host.c、test_gfx_kernel_fb.py；照合 C/E/B | 145–175行 / 75–95分。G4後、並列なし |
+| G3 | drivers/video/pc98/backend_pc98.c；test_gfx_kernel_fb.py、gfx_kernel_fb_host.c；照合 P/H（高さ・shutdownの期待値と必要なstubだけ） | 100–130行 / 55–75分。G2後、並列なし |
+| G4 | drivers/video/pc98/backend_pegc.c；test_gfx_bounds.py、test_pegc_mode.py、pegc_mode_host.c、test_gfx_kernel_fb.py；照合 E/P。guest_acceptance.yaml に§7末尾の4IDを登録、DEFERRED_TESTS文案も記録 | 125–155行 / 65–85分。G3後、G5と直列 |
+| G5 | drivers/video/cirrus/backend_cirrus.c；test_gfx_bounds.py、test_cirrus_win.py、cirrus_win_host.c、test_gfx_kernel_fb.py；照合 C/E/B | 145–175行 / 75–95分。G4後、並列なし |
 | G6a | gfx/gfx_core.c；test_gfx_kernel_fb.py、gfx_kernel_fb_host.c、test_gfx_attach.py、gfx_attach_host.c、test_gfx_reattach.py、gfx_reattach_host.c；照合 K/P/E/C | 160–190行 / 85–110分。G5後、並列なし |
 | G6b | gfx/gfx_core.c、gfx/gfx.h、gfx/gfx_internal.h、docs/05_drivers.md（必要時include/memmap.h）；test_gfx_kernel_fb.py、gfx_kernel_fb_host.c、test_gfx_boot.py、gfx_boot_host.c；照合 K/G/H、memmap別名を足す場合だけ M。docs/05_drivers.md の更新も含む | 175–205行 / 95–120分。G6a後、並列なし |
 - G2以降のcontracts変更ごとに生成ヘッダ・manifest・cirrus.modを生成し直す（手編集しない）。表の追加前は末尾ゼロ、G3～G5は未設定selected_modeをdefaultとして動くので単独ビルド可能。
@@ -241,7 +241,7 @@ static const GfxMode pegc_modes[] = {
 | G5 | 変わる。setup引数、BLT端、CPU代替、失敗時リレー復帰。boundsのCirrus変異文字列を更新しcount==1 | N16/P480/P400でfallback回帰、C480は節目 / 表のpitchを641にし引数・容量のhost照合で失敗 |
 | G6a | 変わる。auto/強制/不正pref、probe/init/prepare失敗、未登録Cirrus、legacy200、再init。実coreを呼び順序・回数・attach/reattachを確認 | N16/P480/P400 / 強制Cirrus失敗をPEGCへ落とし選択試験失敗 |
 | G6b | 変わる。FB/query/現在高さ、容量超過でHW設定前にfallback、200固定面間隔、lease世代、起動型板の不変を確認。gen_memmap.py --check、像/FD増分も実測 | N16/P480/P400 / 容量超過の判定を無効化し不成立モードのhost試験失敗 |
-- G2の差分位置の根拠: kernel/cirrus_module.c:53,79 と kernel/cirrus_body.c:6。load内はABI即値とcandidateのコピー長を同じ関数の許容差として記録する。
+- G2の差分位置の根拠: drivers/video/cirrus/cirrus_module.c:53,79 と drivers/video/cirrus/cirrus_body.c:6。load内はABI即値とcandidateのコピー長を同じ関数の許容差として記録する。
 - 予約行列はPC98常時32頁、PEGC候補時75頁、Cirrus CLIENT/DISPLAY各75頁。旧型板・起動順・MEM_GFX_BB8_SIZEのclearは不変なのでtest_gfx_boot.py:270の変異文字列も原則維持する。
 - G6aは選択と現在高さ/selected_mode更新だけ。G6bでFB/queryの一貫性・容量照合を仕上げる。G6aの試験文字列をG6bで再変更する場合も同じ試験を再実行する。
 - 初期化失敗で既存cleanupが表示を戻すこと、reinit_pendingが残らず古い参照が復活しないことを確認。権限分離の仕様は追加しない。
@@ -276,6 +276,6 @@ static const GfxMode pegc_modes[] = {
 ## G2 の実装で PM が決めたこと (2026-10-26)
 
 - `build/cirrus-module.mk` の Cirrus の ABI の値の生成の依存一覧に `include/gfx_mode.h` を足す (G2 の触ってよいファイルに加える)。生成器は contracts の本文から値を出すので、この依存が無いと gfx_mode.h だけを変えたときに値が作り直されない (G2 の実装者の「設計の欠け」の報告)。
-- G2 で `gfx/backend_pc98.c`・`backend_pegc.c`・`backend_cirrus.c` の既存の初期化子に、新しい末尾の欄を明示の 0 (NULL) で書き足す (G2 の触ってよいファイルに加える、この 3 ファイルでは初期化子の追記だけ)。host の `-Wextra -Werror` が省いた欄を落とすため。製品の像はゼロ初期化で同じ。表の中身は G3〜G5 が入れる (段は直列なので衝突しない)。
+- G2 で `drivers/video/pc98/backend_pc98.c`・`backend_pegc.c`・`backend_cirrus.c` の既存の初期化子に、新しい末尾の欄を明示の 0 (NULL) で書き足す (G2 の触ってよいファイルに加える、この 3 ファイルでは初期化子の追記だけ)。host の `-Wextra -Werror` が省いた欄を落とすため。製品の像はゼロ初期化で同じ。表の中身は G3〜G5 が入れる (段は直列なので衝突しない)。
 - **G3 の実装で PM が決めたこと (2026-10-26)**: 確定の B1 の高さの式 (`gfx_started ? gfx_current_height : gfx_backend_mode(be)->height`) は gfx_core.c の static な `gfx_started` を使うので、**入れるのは G6b (gfx_core.c の問い合わせ)**。G3〜G5 のバックエンドは表を申告し、init で選んだ行の height を `gfx_current_height` に書くところまでで、各バックエンドの問い合わせの高さは今の形 (`gfx_current_height` などを読む既存の式) のまま変えない。G3 の host 試験の「init→shutdown→query=400」は、今の振る舞いのまま成り立つことを確かめる形にする。
 - **G3 の取り込みで PM が決めたこと (2026-10-26)**: 98 の 16 色のバックエンドは init の関数を持たない (gfx_core.c が init=NULL を見て GDC を初期化する)。そのため「init で選んだ行の height を `gfx_current_height` に書く」のは、98 の分は **G6a (gfx_core.c のモードの選択と init への反映)** で入れる。G4・G5 は各バックエンドの init で書く。

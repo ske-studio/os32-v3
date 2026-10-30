@@ -4,7 +4,7 @@
       §2 (方式 B: カナ / CAPS は make で ON、break で OFF。起動時は 053Ah から)
 記録: tools/tests/kbd_dlog_tdd.md
 
-実物の drivers/kbd_dlog.c・drivers/kbd.c (IRQ1 ハンドラと kbd_diag_log)・
+実物の drivers/input/kbd_dlog.c・drivers/input/kbd.c (IRQ1 ハンドラと kbd_diag_log)・
 userland/shell/kbd_watch.c を 1 行も写さずに #include して回す。0043h / 0041h は
 tools/tests/kbd_hostshim/io.h で模型へ回す。
 
@@ -28,10 +28,10 @@ HARNESS = ROOT / "tools/tests/kbd_dlog_host.c"
 SHIM = ROOT / "tools/tests/kbd_hostshim"
 # 変異の対象。キーは MUTATIONS の 1 列目。
 SOURCES = {
-    "d": "drivers/kbd_dlog.c",
-    "k": "drivers/kbd.c",
+    "d": "drivers/input/kbd_dlog.c",
+    "k": "drivers/input/kbd.c",
     "w": "userland/shell/kbd_watch.c",
-    "m": "drivers/mouse.c",
+    "m": "drivers/input/mouse.c",
 }
 
 CASES = ["stop_timeout", "stop_mouse", "stop_burst", "ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
@@ -130,8 +130,8 @@ def host_build(tmp, mutated=None):
     先頭に置いてハーネスの #include をそちらへ向ける。io.h は shim が先。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-dlog-host"
-    # Keep driver-local and explicit ../drivers/kbd.h includes in the fixture.
-    for rel in ("kernel/v86/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
+    # Keep driver-local and explicit ../drivers/input/kbd.h includes in the fixture.
+    for rel in ("kernel/v86/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
@@ -162,7 +162,7 @@ def run_cases(exe, cases):
 def build_target(tmp):
     """カーネルと同じ i386-elf で通す (ホストで外した STATIC_ASSERT もここで効く)。
     kbd_watch.c は常駐シェルの側だが、同じ GNU11 -Werror で通るかだけを見る。"""
-    for rel in ["drivers/kbd_dlog.c", "drivers/kbd.c", "userland/shell/kbd_watch.c"]:
+    for rel in ["drivers/input/kbd_dlog.c", "drivers/input/kbd.c", "userland/shell/kbd_watch.c"]:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kbd-dlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/kbd_dlog.c + drivers/kbd.c"
+        print("HOST GNU11 -Werror compile PASS (real drivers/input/kbd_dlog.c + drivers/input/kbd.c"
               " + userland/shell/kbd_watch.c)", flush=True)
         if "--target" in args:
             build_target(tmp)

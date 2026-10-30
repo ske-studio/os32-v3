@@ -4,7 +4,7 @@
  *  実行:   python3 -B tools/tests/test_hdd_stage2.py
  *  記録:   tools/tests/hdd_stage2_tdd.md
  *
- *  実物 userland/system/inst_disk.c を、drivers/pc98pt.c・
+ *  実物 userland/system/inst_disk.c を、drivers/block/pc98pt.c・
  *  userland/shell/hdprep_plan.c・fs/ext2_layout.c と別の翻訳単位で組む
  *  (ホスト LP64、libc あり)。見るもの:
  *    - モードの判定 (空・再作成・旧配置・未知・2 項目・開始違い・55AA・壊れ)
@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "drivers/pc98pt.h"
+#include "drivers/block/pc98pt.h"
 #include "userland/system/inst_disk.h"
 
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL %s:%d: %s\n", \

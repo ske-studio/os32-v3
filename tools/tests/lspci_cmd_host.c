@@ -85,7 +85,7 @@ void shell_register_cmds(const ShellCmd *cmds) { (void)cmds; }
 
 /* ---- 実物 (PciDev の定義もここから) --------------------------------------------------------------- */
 #include "../../userland/shell/cmd_pci.c"
-#include "../../drivers/pci_decode.c"
+#include "../../drivers/pci/pci_decode.c"
 #include "../../userland/shell/pci_verbose.c"
 
 /* ---- 偽の PCI ---------------------------------------------------------- */

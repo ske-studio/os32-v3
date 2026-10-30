@@ -27,7 +27,7 @@
 /* 1 デバイス (= 1 ファンクション) の記録。
  * **並びを変えたら KAPI の写し (userland/shell/cmd_pci.c) も直すこと。**
  * i386 の既定アラインでちょうど 40 バイト — `pci.c` の STATIC_ASSERT が
- * 見張る (drivers/ide.h の IdeInfo と同じ作法)。 */
+ * 見張る (drivers/ata/ide.h の IdeInfo と同じ作法)。 */
 struct pci_dev {
     u8  bus;            /*  0 */
     u8  dev;            /*  1 */

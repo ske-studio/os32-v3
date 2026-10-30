@@ -36,7 +36,7 @@
 #define KOUT_PATH     "/etc/profile"
 #define KOUT_READ_LEN 64
 #define KOUT_SECTOR   512
-#define KOUT_PCI_LEN  40     /* struct pci_dev の写し (drivers/pci.h) */
+#define KOUT_PCI_LEN  40     /* struct pci_dev の写し (drivers/pci/pci.h) */
 #define KOUT_VER_LEN  32
 
 int main(int argc, char **argv, KernelAPI *api)

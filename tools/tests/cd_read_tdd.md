@@ -5,7 +5,7 @@
   **全部 `lzss: false`** = `pkg_extract` の無圧縮の経路) なので、実効は 20KB/s を切っている。
   NP21/W は CD のシークも回転も模擬しないので、エミュレータでは再現しない
 - 見立て (机上、**実機では測っていない**):
-  1. `drivers/atapi.c` の `atapi_read_sectors` は count がいくつでも READ(10) を 1 セクタずつ出していた
+  1. `drivers/ata/atapi.c` の `atapi_read_sectors` は count がいくつでも READ(10) を 1 セクタずつ出していた
   2. `fs/iso9660.c` の `read_stream` は呼ばれるたびに `iso_resolve_path` で根からたどり直し
      (根のディレクトリ = LBA 23 を 1 回読む)、それから 1 セクタずつ `iso_read_sector` を呼んでいた
   3. `userland/lib/rt/pkg.c` の無圧縮の展開は 4KB ずつ `sys_read` し、データ部の先頭 (表の後ろ) が
@@ -14,7 +14,7 @@
   離れた位置へのシーク**。12MB で約 3000 区切り × 4 = 約 12000 コマンド、シーク約 6000 回。
   `pkg_parse` (事前検査と展開で 2 回) は 1B・パス長・5B の小さな `sys_read` を項目ごとに 3 回出すので、
   1 本の PKG で数百回ぶん「根を読む + データを 1 セクタ読む」を繰り返していた
-- 対象: [`drivers/atapi.c`](../../drivers/atapi.c) / [`atapi.h`](../../drivers/atapi.h)、
+- 対象: [`drivers/ata/atapi.c`](../../drivers/ata/atapi.c) / [`atapi.h`](../../drivers/ata/atapi.h)、
   [`fs/iso9660.c`](../../fs/iso9660.c) / [`iso9660.h`](../../fs/iso9660.h)、
   [`userland/lib/rt/pkg.c`](../../userland/lib/rt/pkg.c)。KAPI は動かしていない
 - 実行: `python3 -B tools/tests/test_cd_read.py [--target] [--mutate] [case ...]`

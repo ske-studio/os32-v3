@@ -1,5 +1,5 @@
 /* Recording mouse provider for fixtures that include the real PC98 binding. */
-#include "../../drivers/mouse.h"
+#include "../../drivers/input/mouse.h"
 static int pointer_seen, pointer_mode;
 static i16 pointer_bounds[4];
 static MouseState *pointer_output;

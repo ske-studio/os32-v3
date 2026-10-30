@@ -41,11 +41,11 @@ def build(tmp, mutation=None):
     source = ROOT / 'tools/tests/e82557_desc_host.c'
     if mutation:
         tree = pathlib.Path(tmp) / 'tree'
-        for rel in ('tools/tests/e82557_desc_host.c', 'drivers/e82557_desc.c', 'drivers/e82557_desc.h', 'drivers/e82557_regs.h'):
+        for rel in ('tools/tests/e82557_desc_host.c', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h'):
             target = tree / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             text = (ROOT / rel).read_text()
-            if rel == 'drivers/e82557_desc.c':
+            if rel == 'drivers/net/e82557/e82557_desc.c':
                 old, new, label = mutation
                 # Mask expression also occurs in decode; mutate stop predicate only.
                 if label == 'RU active accepted':

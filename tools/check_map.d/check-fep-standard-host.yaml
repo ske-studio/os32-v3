@@ -11,9 +11,9 @@ check-fep-standard-host:
 - fs/vfs.h
 - fs/ext2*.c
 - fs/ext2*.h
-- drivers/pc98pt.c
-- drivers/pc98pt.h
-- drivers/dev.h
+- drivers/block/pc98pt.c
+- drivers/block/pc98pt.h
+- drivers/base/dev.h
 - lib/sqlite3/**
 - build/checks.d/check-fep-standard-host.mk
 - tools/check_map.d/check-fep-standard-host.yaml
@@ -25,7 +25,7 @@ check-fep-standard-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - include/platform_device.h
 - include/ide_contract.h
 - tools/tests/kernel_includes.py

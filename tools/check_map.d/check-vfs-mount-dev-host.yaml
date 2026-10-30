@@ -1,6 +1,6 @@
 check-vfs-mount-dev-host:
 - tools/tests/host32.py
-- drivers/pc98pt.c
+- drivers/block/pc98pt.c
 - fs/ext2_dir.c
 - fs/ext2_file.c
 - fs/ext2_fmt.c
@@ -26,7 +26,7 @@ check-vfs-mount-dev-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - include/platform_device.h
 - include/ide_contract.h
 - tools/tests/kernel_includes.py

@@ -97,7 +97,7 @@ static inline void irq_restore(unsigned int flags);
  *       (irq_save() は cli する副作用があるので、ただ知りたいだけの
  *       場所で使ってはいけない — しかも戻り値は不透明という契約)。
  * これが要るのは「IF=0 なら _halt() してはいけない」を自分で判断する
- * コード (drivers/serial.c の送信ループ)。IF=0 の hlt は二度と起きない。 */
+ * コード (drivers/char/serial.c の送信ループ)。IF=0 の hlt は二度と起きない。 */
 static inline int _irq_enabled(void);
 
 /* 割り込み記述子表をロードする。
@@ -107,7 +107,7 @@ static inline void _lidt(void *ptr);
 
 /* 次の割り込みまで CPU を止める。
  * 契約: 割り込みが **すでに許可されている** ことを呼び手が保証する。IF=0 の
- *       文脈で呼ぶと永久に起きない (drivers/serial.c の panic 経路が
+ *       文脈で呼ぶと永久に起きない (drivers/char/serial.c の panic 経路が
  *       スピン待ちにしてあるのはこの理由)。
  *       割り込みを 1 つ処理して戻る、が期待する使い方。ただし NMI や
  *       他の外部事象でも戻り得るので、待ち条件は必ずループで再検査する。 */

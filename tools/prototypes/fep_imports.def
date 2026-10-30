@@ -64,19 +64,19 @@
       "symbol": "kbd_getkey_wait",
       "context": "normal",
       "irq": false,
-      "source": "drivers/kbd.h"
+      "source": "drivers/input/kbd.h"
     },
     {
       "symbol": "kbd_trygetchar",
       "context": "normal",
       "irq": false,
-      "source": "drivers/kbd.h"
+      "source": "drivers/input/kbd.h"
     },
     {
       "symbol": "kbd_trygetkey",
       "context": "normal",
       "irq": false,
-      "source": "drivers/kbd.h"
+      "source": "drivers/input/kbd.h"
     },
     {
       "symbol": "kfree",
@@ -304,7 +304,7 @@
       "symbol": "serial_puts",
       "context": "normal",
       "irq": false,
-      "source": "drivers/serial.h"
+      "source": "drivers/char/serial.h"
     },
     {
       "symbol": "sqlite_engine_available",

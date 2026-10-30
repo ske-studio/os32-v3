@@ -6,14 +6,14 @@ from pathlib import Path
 import test_gfx_kernel_fb as base
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
- ('pegc', 'gfx/backend_pegc.c',
+ ('pegc', 'drivers/video/pc98/backend_pegc.c',
   '    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, mode->height)) return;',
   '''    if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
     if (x + w > mode->width) w = mode->width - x;
     if (y + h > mode->height) h = mode->height - y;
     if (w <= 0 || h <= 0) return;'''),
- ('cirrus', 'gfx/backend_cirrus.c',
+ ('cirrus', 'drivers/video/cirrus/backend_cirrus.c',
   '    return gfx_clip_screen(x, y, w, h, mode->width, mode->height);',
   '''    if (*x < 0) { *w += *x; *x = 0; }
     if (*y < 0) { *h += *y; *y = 0; }

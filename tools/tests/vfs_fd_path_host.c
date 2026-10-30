@@ -1383,7 +1383,7 @@ static void fat_clock_date(ClockDate *t)
 static void fat_clock_legacy(RTC_Time *t)
 { kmemset(t, 0, sizeof(*t)); t->year = 26; t->month = 10; t->day = 17; }
 static const ClockOps fat_clock = { fat_clock_date, fat_clock_legacy };
-#include "drivers/fdc_track.c"
+#include "drivers/block/fdc_track.c"
 #define disk_write fatwp_disk_write_impl
 #include "fatfs/diskio.c"
 #undef disk_write

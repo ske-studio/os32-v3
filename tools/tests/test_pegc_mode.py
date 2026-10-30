@@ -1,4 +1,4 @@
-"""PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO・VSYNC 待ち (gfx/backend_pegc.c)。
+"""PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO・VSYNC 待ち (drivers/video/pc98/backend_pegc.c)。
 
 受け入れ (A): 実機 PC-9821Ra266 の ROM の OUT 列 (v86 -g の記録) との突き合わせ
 (pegc_mode_host.c の ROM_S480 / ROM_BACK、票 TASK_PEGC480_REALHW §3-3・§5)。
@@ -6,7 +6,7 @@
 記録: tools/tests/pegc_mode_tdd.md
 票:   docs/tasks/realhw/TASK_PEGC480_REALHW.md (§2 H2・H3・H5、§4)
 
-tools/tests/pegc_mode_host.c が実物の gfx/backend_pegc.c を 1 行も写さずに
+tools/tests/pegc_mode_host.c が実物の drivers/video/pc98/backend_pegc.c を 1 行も写さずに
 #include し、ポート I/O だけを偽物 (tools/tests/pegc_hostshim/io.h) にして
 ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比べ、GDC への書き込みの
 直前に FIFO のステータスを見ていること・待ちに上限があることを確かめる。
@@ -35,7 +35,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 TARGET_INCLUDES = include_flags(ROOT)
 SHIM = "-I" + str(ROOT / "tools/tests/pegc_hostshim")
 SRC = ROOT / "tools/tests/pegc_mode_host.c"
-MUT_TARGET = "gfx/backend_pegc.c"
+MUT_TARGET = "drivers/video/pc98/backend_pegc.c"
 HDR = "include/pegc.h"
 
 
@@ -337,7 +337,7 @@ if __name__ == "__main__":
         tmp = pathlib.Path(tmp)
         exe = tmp / "pegc-mode"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS (real gfx/backend_pegc.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real drivers/video/pc98/backend_pegc.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT pegc_mode_host=%d" % rc, flush=True)

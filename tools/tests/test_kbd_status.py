@@ -1,11 +1,11 @@
-"""キーボード 8251 のステータス判定 (drivers/kbd_status.c) と仮想 8251
+"""キーボード 8251 のステータス判定 (drivers/input/kbd_status.c) と仮想 8251
 (kernel/v86/v86_kbd.c) のホスト試験。
 
 記録: tools/tests/kbd_status_tdd.md
 経緯: docs/POLICY_DEBUG.md §4-57 (実機 PC-9821Ra266 で打鍵が届かない、
       その実装レビューで出た V86 への偽 ESC と OE の扱い)
 
-実物の drivers/kbd_status.c と kernel/v86/v86_kbd.c を 1 行も写さずに #include
+実物の drivers/input/kbd_status.c と kernel/v86/v86_kbd.c を 1 行も写さずに #include
 して回す。I/O を持たないので模型は要らない。
 
 **ここで見る分岐のうち EMPTY / ERROR / OVERRUN は NP21/W では (ほぼ) 踏めない**
@@ -27,8 +27,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/kbd_status_host.c"
 # 変異の対象。キーは MUTATIONS の 1 列目。
 SOURCES = {
-    "c": "drivers/kbd_status.c",
-    "h": "drivers/kbd_status.h",
+    "c": "drivers/input/kbd_status.c",
+    "h": "drivers/input/kbd_status.h",
     "v": "kernel/v86/v86_kbd.c",
 }
 
@@ -36,8 +36,8 @@ SOURCES = {
 # IRQ1 ハンドラが判定を**実際に**呼ぶ形と KbdDiag の大きさ (STATIC_ASSERT)
 # を固定するため。
 TARGET_SRCS = [
-    "drivers/kbd_status.c",
-    "drivers/kbd.c",
+    "drivers/input/kbd_status.c",
+    "drivers/input/kbd.c",
     "kernel/v86/v86_kbd.c",
 ]
 
@@ -104,8 +104,8 @@ def host_build(tmp, mutated=None):
     -I tmp を先頭に置いてハーネスの #include をそちらへ向ける。"""
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-status-host"
-    # Preserve the component's explicit ../drivers/kbd.h dependency.
-    for rel in ("kernel/v86/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
+    # Preserve the component's explicit ../drivers/input/kbd.h dependency.
+    for rel in ("kernel/v86/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
@@ -134,7 +134,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で drivers/kbd.c ごと通す。"""
+    """カーネルと同じ i386-elf で drivers/input/kbd.c ごと通す。"""
     for rel in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kbd-status-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/kbd_status.c + kernel/v86/v86_kbd.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/input/kbd_status.c + kernel/v86/v86_kbd.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

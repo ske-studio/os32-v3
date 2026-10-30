@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 054:check-pci-bind-host
-# PCI の結線表 (drivers/pci_bind_match.c)。票 TASK_HAL_WIRING §1-4。
+# PCI の結線表 (drivers/pci/pci_bind_match.c)。票 TASK_HAL_WIRING §1-4。
 # **NP21/W には PCI が無い**ので、この層はエミュレータでは 1 行も走らない。
 # 一致規則 (4 欄の AND と「任意」)、DECLINE → 次の候補へ、QUARANTINE →
 # **その BDF の探索を打ち切る**、理由が候補ごとに初期化されること、

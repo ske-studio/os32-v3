@@ -6,7 +6,7 @@
 #include "kdebug/kpeek.h"
 #include "kdebug/recover.h"
 #include "kdebug/recover_diag.h"
-#include "drivers/serial.h"
+#include "drivers/char/serial.h"
 #include "hwdev_private.h"
 #include "kdebug/gfinit.h"
 #include "kdebug/recover_wire.h"

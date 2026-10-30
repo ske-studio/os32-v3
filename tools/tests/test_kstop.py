@@ -21,7 +21,7 @@ static u32 host_cr3;
 #include "ring3_ls.h"
 int ring3_ls_dispatch(u32 user_esp) { (void)user_esp; __builtin_trap(); }
 #include "fd_redirect.h"
-#include "../drivers/kbd.h"
+#include "../drivers/input/kbd.h"
 #include "input_service.h"
 #include "gui.h"
 #include "v86.h"
@@ -272,7 +272,7 @@ def run(overrides=None):
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
     code = PRE + constants + read('exec/appslot.c') + '\n' + '\n'.join(function(ex,n) for n in (
         'ring3_abort_request','ring3_abort_check','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
-    kbd = read('drivers/kbd.c')
+    kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
@@ -303,7 +303,7 @@ MUTATIONS = [
  ('wrong-owner','exec/appslot.c','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot.c','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot.c','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
- ('raw-stop-retained','drivers/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
+ ('raw-stop-retained','drivers/input/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
@@ -324,7 +324,7 @@ src=src[a:b]
 MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
 src=function((ROOT/'exec/appslot.c').read_text(),'appslot_stop_request')
 MUTATIONS.append(('request-non-gui','exec/appslot.c',src,src.replace('a->gui && ','')))
-MUTATIONS.append(('raw-full-loses-stop','drivers/kbd.c',
+MUTATIONS.append(('raw-full-loses-stop','drivers/input/kbd.c',
     'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {',
     'if (0) {'))
 
@@ -332,7 +332,7 @@ for name, guard in (('raw-full-replaces-break', '!is_break && '),
                     ('raw-full-replaces-without-ctrl', ' && (kbd_shift_state & SHIFT_CTRL)')):
     old = 'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {'
     assert old.count(guard) == 1
-    MUTATIONS.append((name, 'drivers/kbd.c', old, old.replace(guard, '')))
+    MUTATIONS.append((name, 'drivers/input/kbd.c', old, old.replace(guard, '')))
 
 if __name__ == '__main__':
     status,log=run(); print('kstop control:',status,log,flush=True)

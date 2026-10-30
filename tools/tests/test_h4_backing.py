@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kdebug/kselftest.c', 'mm/paging.c', 'mm/pgalloc.c',
               'exec/access_walk.c', 'mm/physmem.c', 'mm/dma_pool.c',
               'mm/dma_pool_math.c', 'lib/dma_contract.c',
-              'drivers/fdc.c', 'drivers/fdc_decide.c']
+              'drivers/block/fdc.c', 'drivers/block/fdc_decide.c']
 MUTANTS = [
     ('VA-only high classification', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
      'va > H4_PHYS_BOUNDARY'),
@@ -61,7 +61,7 @@ def run(body, runner):
                            ('dma_pool', 'mm/dma_pool.c'),
                            ('access_walk', 'exec/access_walk.c')):
             (tmp / (name + '_host_source.c')).write_text((ROOT / path).read_text())
-        fdc = (ROOT / 'drivers/fdc.c').read_text()
+        fdc = (ROOT / 'drivers/block/fdc.c').read_text()
         fdc = fdc[fdc.index('static u8 s_fdbuf['):fdc.index('static u8 *fdc_dma_buf(void)')]
         fdc = fdc.replace('static u8 s_fdbuf[FDC_BUF_BYTES];',
                           '#define s_fdbuf ((u8 *)P2V(host_fdc_base))')
@@ -85,7 +85,7 @@ def run(body, runner):
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
                    *[str(ROOT / path) for path in ('mm/physmem.c',
                        'mm/dma_pool_math.c',
-                       'lib/dma_contract.c', 'drivers/fdc_decide.c')],
+                       'lib/dma_contract.c', 'drivers/block/fdc_decide.c')],
                    '-o', str(exe)]
         host32.build(command, check=True, capture_output=True, text=True)
         return host32.run([str(exe)], runner=runner, capture_output=True,

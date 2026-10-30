@@ -15,7 +15,7 @@ N=`/home/hight/np21w-src`、O=`/home/hight/os32-v3`、D=`/mnt/c/WATCOM/docs`。�
 |---|---|
 | O/docs/tasks/realhw/TASK_REALHW_RECOVER.md:38、docs/tasks/DEFERRED_TESTS.md:54 | T4b未受入。31kHzとHWDEV M5配備が前提。本件だけでT4b完了にしない。 |
 | O/kernel/v86.c:1038–1043 | S0は09A8h D0=1、sink無効、高さ400、flip無効が必要。 |
-| O/gfx/backend_pegc.c:465–505、1086–1103 | 起動時ポートとBIOS記録を比較。400への戻しは自前pegc_text_sync_400で、INT18h修正は不要。 |
+| O/drivers/video/pc98/backend_pegc.c:465–505、1086–1103 | 起動時ポートとBIOS記録を比較。400への戻しは自前pegc_text_sync_400で、INT18h修正は不要。 |
 | N/src/io/gdc.c:47–53、1072–1173 | 31k SYNC定数は#if 0。gdc_resetだけでなくgdc_biosresetにも適用が必要。 |
 | N/src/io/gdc.c:403、1029–1043、1177–1185 | GDCDISP_31がクロック選択と09A8h読値を決める。gdc_bindでクロック再計算。 |
 | N/src/bios/bios.c:158、208–236、692–700、989–1001 | BIOS再初期化でもGDC設定とBIOSメモリ再構築を通る。PRXDUPDのb2/b7は元から0。 |

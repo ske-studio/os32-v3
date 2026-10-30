@@ -35,7 +35,7 @@
 
 ## 2. 設計
 
-### 2-1. カーネル `drivers/pcm_cs4231.c` (+ `pcm_cs4231_math.c` 純粋部)
+### 2-1. カーネル `drivers/sound/cs4231/pcm_cs4231.c` (+ `pcm_cs4231_math.c` 純粋部)
 
 **方式の変更 (往復 3 B2/B3)**: アプリのデータを foreground から DMA リングへ直接コピーする方式は、装置の半分の切り替えや
 RESYNC との競合を `gen` の検査では消せない (既に鳴ったデータは取り消せない) ので**やめる**。**foreground が書くのは
@@ -47,7 +47,7 @@ RESYNC との競合を `gen` の検査では消せない (既に鳴ったデー�
 (「386 で 1ms」は見込みであって根拠ではない)。
 
 **メモリ**: **リング 16KB (DMA、4096 frame = 半バッファ 2048 × 2)** は 1-3 の `dma_pool_alloc` から (プール 64KB のうち。82557 の 16KB と共存できる)、
-**ステージング 16KB (4096 frame、DMA しない)** は `kmalloc` (KHEAP) から (PM 指示 2026-09-23、`drivers/pcm_cs4231.c`。初稿は「カーネル予算が
+**ステージング 16KB (4096 frame、DMA しない)** は `kmalloc` (KHEAP) から (PM 指示 2026-09-23、`drivers/sound/cs4231/pcm_cs4231.c`。初稿は「カーネル予算が
 6KB しか無いので暫定でプールを使う」だったが解消 — §2-1 末尾「票からの逸脱」1。カーネル予算の現在値は [`02_memory.md`](../../02_memory.md) §2-1 から案内する `build/out/MEMMAP.md`)。open 時に両方を 0 で埋める。
 
 **レジスタアクセス**: `cs_read(idx)` / `cs_write(idx, val)` / `cs_write_mce(idx, val)` (R0 に `0x40 | idx` を書いて MCE を保つ) は

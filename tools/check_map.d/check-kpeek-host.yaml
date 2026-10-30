@@ -4,8 +4,8 @@ check-kpeek-host:
 - kdebug/kpeek_allow.c
 - kdebug/kpeek_allow.h
 - mm/paging.h
-- drivers/pci.h
-- drivers/pci_decode.h
+- drivers/pci/pci.h
+- drivers/pci/pci_decode.h
 - include/memmap.h
 - include/pc98.h
 - include/io.h

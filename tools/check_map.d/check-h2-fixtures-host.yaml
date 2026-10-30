@@ -19,8 +19,8 @@ check-h2-fixtures-host:
 
 # Runtime artifacts reduced from *.inputs.json selected (f13b audit).
 - build/app.conf
-- drivers/pc98pt.c
-- drivers/pci_decode.c
+- drivers/block/pc98pt.c
+- drivers/pci/pci_decode.c
 - lib/utf8.c
 - sdk/allocator/**
 - sdk/allocator/nano_adapter.c

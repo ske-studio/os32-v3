@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 052:check-dma8237-host
-# 8237 DMA 共通部の算数 (drivers/dma8237_math.c)。票 TASK_HAL_WIRING §1-2。
+# 8237 DMA 共通部の算数 (drivers/dma/dma8237_math.c)。票 TASK_HAL_WIRING §1-2。
 # 見るのは 4 つ: 64KB バンクまたぎの判定、16MB の壁、TC 後の FFFFh を弾く
 # 安定読みの採用規則、**バンクレジスタが等差数列でないこと** (ch0 だけ
 # 0027h。式で出すと ch1 のバンクを壊す)。

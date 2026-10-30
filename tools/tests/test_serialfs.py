@@ -11,10 +11,10 @@
       回す。フレーム・CRC32・番号・再送・フレーム長の境界・VFS の契約・
       障害の注入 (喪失 / 遅延 / CRC 破損 / 番号違い / セッション違い /
       ホストの停止 / ごみの連続 / ERR / 契約違反の応答)
-  GATE drivers/serial.c のゲート (tools/tests/serial_gate_host.c)。セッション中に
+  GATE drivers/char/serial.c のゲート (tools/tests/serial_gate_host.c)。セッション中に
       rshell へフレームが漏れない・出力は保留リングへ・下ろすと受信を捨てる
   SESSION fs/serialfs_session.c (tools/tests/serialfs_session_host.c)。実物の
-      drivers/serial.c・fs/sfs_*.c と組み、HELLO → mount → BYE / LOG / EXIT の
+      drivers/char/serial.c・fs/sfs_*.c と組み、HELLO → mount → BYE / LOG / EXIT の
       流れ、HELLO が通らなかった回も隔離してから下ろす (決定 11)、EXIT の後に
       保留へ入った文字も流す (Fable m6)、隔離の上限と NOT_QUIET
   PY  ホスト側の実物 (tools/serialfs_host.py・tools/rshell_serial.py): 振り分け
@@ -127,8 +127,8 @@ def gate_build(tmp, mutated=None, name="gate"):
     work.mkdir(parents=True)
     (work / "arch_io.h").write_text(FAKE_ARCH_IO, encoding="utf-8")
     (work / "platform_io.h").write_text(FAKE_PLATFORM_IO, encoding="utf-8")
-    text = (mutated or {}).get("drivers/serial.c",
-                               (ROOT / "drivers/serial.c").read_text(encoding="utf-8"))
+    text = (mutated or {}).get("drivers/char/serial.c",
+                               (ROOT / "drivers/char/serial.c").read_text(encoding="utf-8"))
     (work / "serial.c").write_text(text, encoding="utf-8")
     exe = work / "serial-gate-host"
     cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "include"),
@@ -149,12 +149,12 @@ FAKE_ARCH_IO_SESSION = FAKE_ARCH_IO.replace(
     "void fake_halt(void);\nstatic inline void _halt(void) { fake_halt(); }").replace(
     "static inline void _idle(void) {}",
     "static inline void _idle(void) { fake_halt(); }")
-SESSION_SRCS = ("drivers/serial.c", "fs/sfs_proto.c", "fs/sfs_client.c",
+SESSION_SRCS = ("drivers/char/serial.c", "fs/sfs_proto.c", "fs/sfs_client.c",
                 "fs/serialfs_session.c", "fs/sfs_lan.c", "lib/crc32.c")
 
 
 def session_build(tmp, mutated=None, name="session"):
-    """fs/serialfs_session.c を実物の drivers/serial.c・fs/sfs_*.c と組む。
+    """fs/serialfs_session.c を実物の drivers/char/serial.c・fs/sfs_*.c と組む。
     kstring.h (glibc の string.h と衝突) と appslot.h (カーネルの構造体) は
     写しのディレクトリの小さな偽物で影にする。"""
     work = pathlib.Path(tmp) / name
@@ -221,8 +221,8 @@ def build_target(tmp):
     inc = [
               *include_flags(ROOT)]
     for rel in ("fs/sfs_proto.c", "fs/sfs_client.c", "fs/serialfs.c",
-                "fs/serialfs_session.c", "drivers/serial.c",
-                "drivers/serial_plan.c"):
+                "fs/serialfs_session.c", "drivers/char/serial.c",
+                "drivers/char/serial_plan.c"):
         out = pathlib.Path(tmp) / (rel.replace("/", "_") + ".o")
         subprocess.run(base + inc + ["-c", rel, "-o", str(out)], cwd=ROOT,
                        check=True)
@@ -1514,31 +1514,31 @@ C_MUTATIONS = [
      "image_crc 欄を 0 にせずに CRC を取る"),
 ]
 CHECKED_MUTATIONS = [
-    ("drivers/serial.c", r"!ser_initialized \|\| s_gate \|\| s_checked", "0", "checked ownership excluded"),
-    ("drivers/serial.c", r"if \(ready != 1\) \{ irq_restore\(f\); return ready < 0", "if (0) { irq_restore(f); return ready < 0", "checked put ignores TxRDY"),
-    ("drivers/serial.c", r"SER_FSTS_TXEMP : STS_TXE", "SER_FSTS_TXRDY : STS_TXRDY", "checked wire completion uses TxRDY"),
-    ("drivers/serial.c", r"if \(s_checked\) \{\n        ser_hold_push", "if (0) {\n        ser_hold_push", "checked ordinary output interleaves"),
-    ("drivers/serial.c", r"if \(s_checked\) return SER_TX_DROPPED;", "if (0) return SER_TX_DROPPED;", "checked gate output interleaves"),
-    ("drivers/serial.c", r"if \(s_checked\) \{ irq_restore\(f\); return; \}", "if (0) { irq_restore(f); return; }", "checked gate switch allowed"),
-    ("drivers/serial.c", r"if \(s_checked\) return;", "if (0) return;", "checked baud change allowed"),
+    ("drivers/char/serial.c", r"!ser_initialized \|\| s_gate \|\| s_checked", "0", "checked ownership excluded"),
+    ("drivers/char/serial.c", r"if \(ready != 1\) \{ irq_restore\(f\); return ready < 0", "if (0) { irq_restore(f); return ready < 0", "checked put ignores TxRDY"),
+    ("drivers/char/serial.c", r"SER_FSTS_TXEMP : STS_TXE", "SER_FSTS_TXRDY : STS_TXRDY", "checked wire completion uses TxRDY"),
+    ("drivers/char/serial.c", r"if \(s_checked\) \{\n        ser_hold_push", "if (0) {\n        ser_hold_push", "checked ordinary output interleaves"),
+    ("drivers/char/serial.c", r"if \(s_checked\) return SER_TX_DROPPED;", "if (0) return SER_TX_DROPPED;", "checked gate output interleaves"),
+    ("drivers/char/serial.c", r"if \(s_checked\) \{ irq_restore\(f\); return; \}", "if (0) { irq_restore(f); return; }", "checked gate switch allowed"),
+    ("drivers/char/serial.c", r"if \(s_checked\) return;", "if (0) return;", "checked baud change allowed"),
 ]
 GATE_MUTATIONS = CHECKED_MUTATIONS + [
-    ("drivers/serial.c", r"    if \(s_gate\) \{\n        ser_hold_push\(\(u8\)c\);",
+    ("drivers/char/serial.c", r"    if \(s_gate\) \{\n        ser_hold_push\(\(u8\)c\);",
      "    if (0) {\n        ser_hold_push((u8)c);",
      "ゲート中の serial_putchar が線へ出る (console の複写がフレームに混ざる)"),
-    ("drivers/serial.c", r"    if \(s_gate\) return -1;         /\* rshell / kbd.c / KAPI にフレームを渡さない \*/\n",
+    ("drivers/char/serial.c", r"    if \(s_gate\) return -1;         /\* rshell / kbd.c / KAPI にフレームを渡さない \*/\n",
      "", "ゲート中の serial_trygetchar が受信を渡す (rshell にフレームが漏れる)"),
-    ("drivers/serial.c", r"    ser_head = 0;\n    ser_tail = 0;\n    ser_count = 0;\n    s_gate = on",
+    ("drivers/char/serial.c", r"    ser_head = 0;\n    ser_tail = 0;\n    ser_count = 0;\n    s_gate = on",
      "    if (on) { ser_head = 0; ser_tail = 0; ser_count = 0; }\n    s_gate = on",
      "下ろすときに受信リングを空にしない (遅れた応答が rshell に入る)"),
-    ("drivers/serial.c", r"        s_hold_head = \(s_hold_head \+ 1\) % \(u32\)SER_HOLD_SIZE;\n        s_hold_count--;\n        s_hold_dropped\+\+;\n    \}\n    s_hold\[",
+    ("drivers/char/serial.c", r"        s_hold_head = \(s_hold_head \+ 1\) % \(u32\)SER_HOLD_SIZE;\n        s_hold_count--;\n        s_hold_dropped\+\+;\n    \}\n    s_hold\[",
      "        s_hold_dropped++;\n        irq_restore(f);\n        return;\n    }\n    s_hold[",
      "保留リングが溢れたら新しい方を捨てる (結果行と exit が消える)"),
-    ("drivers/serial.c", r"    if \(s_gate\) \{\n        kprintf\(KLOG_LEGACY_YELLOW, \"\[ser\] refuse serial_init during SerialFS session\\n\"\);\n        return;\n    \}",
+    ("drivers/char/serial.c", r"    if \(s_gate\) \{\n        kprintf\(KLOG_LEGACY_YELLOW, \"\[ser\] refuse serial_init during SerialFS session\\n\"\);\n        return;\n    \}",
      "", "セッション中に速度を変えられる"),
-    ("drivers/serial.c", r"(void serial_irq_handler\(void\)[\s\S]*?)            if \(sts & serial_oe_mask\(s_setup.mode\)\) ser_err_oe\+\+;\n            if \(sts & serial_fe_mask",
+    ("drivers/char/serial.c", r"(void serial_irq_handler\(void\)[\s\S]*?)            if \(sts & serial_oe_mask\(s_setup.mode\)\) ser_err_oe\+\+;\n            if \(sts & serial_fe_mask",
      r"\1            if (sts & serial_fe_mask", "ISR が OE を数えない"),
-    ("drivers/serial.c", r"            if \(!\(sts & s_mask_rxrdy\)\) break;\n            \(void\)inp\(s_port_data\);",
+    ("drivers/char/serial.c", r"            if \(!\(sts & s_mask_rxrdy\)\) break;\n            \(void\)inp\(s_port_data\);",
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
@@ -1659,7 +1659,7 @@ def _mutate_c_one(item):
         return 0, 1, f"MUTATION C{i} ERROR (not applicable): {why}"
     # 変異を当てたファイル → 組むハーネス (ほかのハーネスはこのファイルを含まないか、
     # 含んでも変異の的ではない — 従来どおりの対応)
-    if rel == "drivers/serial.c":
+    if rel == "drivers/char/serial.c":
         build, cases = gate_build, GATE_CASES
     elif rel == "fs/serialfs_session.c":
         build, cases = session_build, SESSION_CASES
@@ -1749,7 +1749,7 @@ def main():
         gexe = gate_build(tmp)
         sexe = session_build(tmp)
         print("HOST GNU11 -Werror compile PASS (real fs/sfs_*.c, fs/serialfs.c, "
-              "fs/serialfs_session.c, drivers/serial.c)", flush=True)
+              "fs/serialfs_session.c, drivers/char/serial.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc += run_exe_cases(exe, [c for c in C_CASES if not only or c in only])

@@ -15,7 +15,7 @@ int gfx_current_height=480, gfx_flip_enabled, gfx_display_page;
 int geforce_pc98_safe(void) { return safe; }
 void display_restore_98(void) { restored++; gfx_current_height=400; }
 void console_hw_cursor_enable(void) { redrawn++; }
-#include "../../gfx/pc98_route.c"
+#include "../../drivers/video/pc98/pc98_route.c"
 static int steps[8], n, fail_at;
 static u32 test_cell;
 static int access(void *opaque, u32 step, bool write, u32 *value)

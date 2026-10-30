@@ -88,7 +88,7 @@ HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更と
 
 PM 実測: 15MB (`ExMemory 16`) + `gfxmode pegc` + リセットで `hal_test` が
 `backend pc98 (planar 4bpp)`、`sys_top_reserved` = 0。BIOS の PEGC ビットは立っている。
-原因は `gfx/backend_pegc.c` の probe 段 2 `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` —
+原因は `drivers/video/pc98/backend_pegc.c` の probe 段 2 `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` —
 K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも 17408 を返すようになったため。
 
 ### RED → GREEN
@@ -107,7 +107,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 - `tools/tests/pgalloc_range_host.c` に `device_window_ram()`:
   8MiB → 窓に RAM 無し (真)、16MiB 丸ごと RAM の legacy モデル → 窓が RAM (偽)、
   部分一致 1 ページ (`[hi-1, hi)`) でも真、窓の外は無し、逆順範囲と未初期化は保守的に真。
-- `gfx/backend_pegc.c` は probe 段 2 を
+- `drivers/video/pc98/backend_pegc.c` は probe 段 2 を
   `pgalloc_range_has_ram(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE, MEM_HIGH_RAM_BASE / PAGE_SIZE)` に置換。
   `backend_pegc.c` はホストへ持ち込めない (probe が `_out` / `_in` で実ポートを叩き、
   `boot_splash_native_host.c` が直リンクしているのは `gfx_core.c` だけ) ので、
@@ -126,7 +126,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 | `tools/tests/test_paging_bounds.py` / `test_app_band_pde.py` | PASS |
 | `tools/tests/test_boot_splash_native.py` | PASS (2) |
 | `python3 tools/check_constraints.py` | EXIT=0 |
-| i386-elf-gcc `-Wall -Wextra` (`gfx/backend_pegc.c` / `mm/pgalloc.c`) | 警告ゼロ |
+| i386-elf-gcc `-Wall -Wextra` (`drivers/video/pc98/backend_pegc.c` / `mm/pgalloc.c`) | 警告ゼロ |
 
 ### ホスト試験で**証明していない**こと
 
@@ -134,6 +134,6 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
   `sys_top_reserved` が 300KB になるかは PM / テスターの受入でしか確かめられない。
 - `make` は一度も回していない (コーダーの禁止事項)。目標コンパイルは変更した 2 ファイルの
   単体 `i386-elf-gcc -c` のみ。
-- `gfx/backend_cirrus.c` の `cirrus_win_usable()` は**この票では直していない**。同じ型の
+- `drivers/video/cirrus/backend_cirrus.c` の `cirrus_win_usable()` は**この票では直していない**。同じ型の
   誤判定なので、**高位 RAM がある構成ではリニア窓 0x1000000 が常に不可になる**
   (K6-RAM 決裁 (4)、Cirrus レーン再開時)。

@@ -1,13 +1,13 @@
 check-pci-bind-host:
-- drivers/pci_bind.c
-- drivers/pci_bind_match.c
+- drivers/pci/pci_bind.c
+- drivers/pci/pci_bind_match.c
 - tools/tests/pci_bind_host.c
 - tools/tests/test_pci_bind.py
 - tools/check_map.d/check-pci-bind-host.yaml
 - build/checks.d/check-pci-bind-host.mk
-- drivers/pci.h
-- drivers/pci_bind.h
-- drivers/pci_decode.h
+- drivers/pci/pci.h
+- drivers/pci/pci_bind.h
+- drivers/pci/pci_decode.h
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
 - include/types.h

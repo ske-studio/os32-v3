@@ -79,7 +79,7 @@ static void sequence_cases(void)
     if(failures==before)output("A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS\n");
 }
 #ifdef HWDEV_SEQUENCE_IMAGE
-#include "../../drivers/serial.h"
+#include "../../drivers/char/serial.h"
 #include "../../hwdev/owner.h"
 #include "hwdev_trace_symbols.h"
 static struct gfinit_owner *sequence_bundle;

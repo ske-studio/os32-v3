@@ -7,12 +7,12 @@
 //! ## 何を注ぐか
 //!
 //! 注ぐバイトは「GUI モードでなければ IRQ1 が cooked リングへ積んだはずの
-//! バイト」と同じにする。正典は `drivers/kbd.c` の `scancode_to_ascii[]`
+//! バイト」と同じにする。正典は `drivers/input/kbd.c` の `scancode_to_ascii[]`
 //! (gshell の `input.rs::SC2A` はその写し):
 //!
 //! | キー | scan | 注入 | 根拠 |
 //! |---|---|---|---|
-//! | Enter | 0x1C | **0x0D** (`\r`) | `drivers/kbd.c:108` が 0x0D |
+//! | Enter | 0x1C | **0x0D** (`\r`) | `drivers/input/kbd.c:108` が 0x0D |
 //! | BS    | 0x0E | 0x08 | 同 `:84` (gshell SC2A) |
 //! | TAB   | 0x0F | 0x09 | 同上 |
 //! | ESC   | 0x00 | 注入しない | 端末アプリ自身の終了に使う (票 §6) |
@@ -33,7 +33,7 @@
 /// `GuiEvtText.utf8` の長さ。1 回の注入はこれを超えない。
 pub const MAX: usize = 8;
 
-/* --- 制御キーが積むバイト (drivers/kbd.c の keymap と同じ値) --- */
+/* --- 制御キーが積むバイト (drivers/input/kbd.c の keymap と同じ値) --- */
 pub const BYTE_ENTER: u8 = 0x0D;
 pub const BYTE_BS: u8 = 0x08;
 pub const BYTE_TAB: u8 = 0x09;

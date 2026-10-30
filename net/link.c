@@ -5,7 +5,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /*  LINK.C — OS32 リンクプロトコル v2 (非ブロッキング)                        */
 /*                                                                          */
 /*  契約の正典: docs/archive/network/TASK_N0.md §1b (ワイヤ) / §1a (KAPI の   */
-/*  ABI) / §2 (駆動・排他・状態機械)。ドライバ API (drivers/ne2000.c) だけに  */
+/*  ABI) / §2 (駆動・排他・状態機械)。ドライバ API (drivers/net/ne2000/ne2000.c) だけに  */
 /*  依存し、NIC の詳細は持たない。                                            */
 /*                                                                          */
 /*  設計の 3 本柱:                                                           */

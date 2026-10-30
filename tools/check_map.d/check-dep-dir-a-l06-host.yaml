@@ -1,6 +1,6 @@
 check-dep-dir-a-l06-host:
-- drivers/pci.h
-- drivers/serial.h
+- drivers/pci/pci.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -47,7 +47,7 @@ check-dep-dir-a-l06-host:
 - build/checks.d/check-dep-dir-a-l06-host.mk
 - include/config.h
 - include/ide_contract.h
-- drivers/ide.h
+- drivers/ata/ide.h
 - platform/pc98/device_ide.c
 - sdk/include/os32/os32_kapi_slots.h
 - exec/exec_kapi_init.inc
@@ -57,7 +57,7 @@ check-dep-dir-a-l06-host:
 - tools/check_map.d/check-dep-dir-a-l05a-host.yaml
 - build/checks.d/check-dep-dir-a-l05a-host.mk
 - exec/exec.c
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c

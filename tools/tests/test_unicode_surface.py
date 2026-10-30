@@ -19,10 +19,10 @@ SYSTEM = 'exec/system_surface.c'
 UTF8 = 'lib/utf8.c'
 TARGET_SRCS = [
     'gfx/gfx_core.c',
-    'gfx/backend_pc98.c',
-    'gfx/backend_pegc.c',
-    'gfx/backend_cirrus.c',
-    'gfx/cirrus_identify.c',
+    'drivers/video/pc98/backend_pc98.c',
+    'drivers/video/pc98/backend_pegc.c',
+    'drivers/video/cirrus/backend_cirrus.c',
+    'drivers/video/cirrus/cirrus_identify.c',
     'gfx/gfx_vram.c',
     'gfx/gfx_scroll.c',
     'exec/surface_query.c',

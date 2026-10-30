@@ -745,7 +745,7 @@ def run_install_fdset(install_src, fd_files):
         # build/programs.mk の INST_OBJ と同じ顔ぶれ)
         shared = [os.path.join(ROOT, f) for f in
                   ('userland/system/inst_hdd.c', 'userland/system/inst_disk.c',
-                   'userland/shell/hdprep_plan.c', 'drivers/pc98pt.c',
+                   'userland/shell/hdprep_plan.c', 'drivers/block/pc98pt.c',
                    'fs/ext2_layout.c')]
         r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function',

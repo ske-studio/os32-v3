@@ -13,7 +13,7 @@ import tempfile
 from test_shm_user import function
 
 ROOT = Path(__file__).resolve().parents[2]
-COPIES = ('include/types.h', 'include/platform_device.h', 'drivers/loop_dev.h',
+COPIES = ('include/types.h', 'include/platform_device.h', 'drivers/block/loop_dev.h',
           'platform/pc98/device_loop.c', 'tools/tests/dep_dir_a_l04_host.c')
 OLD = 'return loop_dev_read_lba(slot, lba, count, buf);'
 NEW = 'return loop_dev_read_lba(slot ^ 1, lba, count, buf);'

@@ -13,7 +13,7 @@
 | `arch/x86/kernel/isr_stub.asm:639–658`、`arch/x86/kernel/idt.c:144` | IRQ11 専用入口。EOI は slave → master、V86 反射なし |
 | `kernel/irq/irq.h:7–20`、`kernel/irq/irq_math.h:29`、`kernel/irq/irq_math.c:18` | IRQ11 は登録対象外。対象表・IDT も変更必須。全登録者に tick 回収を要求する現契約は FDC にそのまま適用できない |
 | `kernel/irq/irq_math.c:103–131` | 登録ハンドラは最大2巡。FDC の同じフラグへの再代入は冪等 |
-| `drivers/fdc.c:27,264–273,1133–1189`、`init/kernel.c:313–316` | フラグはドライバ所有、待ちは期限付き。現在は kernel が IRQ11 を開けてから割込み許可・初期化 |
+| `drivers/block/fdc.c:27,264–273,1133–1189`、`init/kernel.c:313–316` | フラグはドライバ所有、待ちは期限付き。現在は kernel が IRQ11 を開けてから割込み許可・初期化 |
 | `kernel/{fm,pcm,lan}_module.c:23,20,44` | 3 façade は常駐。tick_target とモジュール参照の取得・解除を既に所有 |
 | `kernel/v86/v86_bios.c:178,649,811` | V86 の FD は loop イメージ経由。物理 FDC IRQ をゲストへ反射する経路ではない |
 
@@ -41,19 +41,19 @@ enum { PC98_TICK_SND, PC98_TICK_PCM, PC98_TICK_NE2K,
 - callback は現状同様 IRQ0 内。待ち・メモリ確保・協調切替を足さない。tick_count 更新、EOI、V86 timeout/反射、IRQ 深さは ASM の現状を保持。
 | 登録する所有者 | 登録箇所・有効になる条件 |
 |---|---|
-| `kernel/fm_module.c` | `fm_module_load()` の先頭で `tick_register(PC98_TICK_SND, snd_tick)`。失敗なら既存の負値経路で load を中止 |
-| `kernel/pcm_module.c` | `pcm_module_load()` の先頭、同様に pcm façade を登録 |
-| `kernel/lan_module.c` | `lan_module_load()` の先頭、同様に e82557 façade を登録 |
-| `drivers/ne2000.c` | `ne2k_init()` の引数検査後・bring_up 前。失敗なら既存エラーで返し、装置を起動しない |
+| `drivers/sound/fm/fm_module.c` | `fm_module_load()` の先頭で `tick_register(PC98_TICK_SND, snd_tick)`。失敗なら既存の負値経路で load を中止 |
+| `drivers/sound/cs4231/pcm_module.c` | `pcm_module_load()` の先頭、同様に pcm façade を登録 |
+| `drivers/net/e82557/lan_module.c` | `lan_module_load()` の先頭、同様に e82557 façade を登録 |
+| `drivers/net/ne2000/ne2000.c` | `ne2k_init()` の引数検査後・bring_up 前。失敗なら既存エラーで返し、装置を起動しない |
 | `net/link.c` | `link_init()` で状態を有効化する前。失敗なら診断して return（初回は link_ready=0、既存状態を変更しない） |
-| `drivers/lgy98.c` | 公開 `lgy98_attach()` の検査後・装置操作前。init 経由以外の attach も覆う |
+| `drivers/net/ne2000/lgy98.c` | 公開 `lgy98_attach()` の検査後・装置操作前。init 経由以外の attach も覆う |
 - 初期化前の未登録 callback は、現在の未初期化時 no-op と同じ。ne2k の RUNNING/OVW_WAIT、link_ready、反射フラグの公開より必ず先に登録する。
 - façade は登録を残し、既存の tick_target=0 と参照解放で停止する。再ロードは同一登録として成功。表に `.mod` 内のアドレスを置かず、既存 ABI・import 表・参照寿命を変えない。
 - snd/pcm/e82557 のモジュール内部実装には登録コードを入れない。単体 host 試験も引き続きその実装を呼べる。
 
 ## 3. FDC IRQ の境界・起動・V86
 ```c
-/* drivers/fdc.c: 状態と入口をドライバ内へ閉じる。 */
+/* drivers/block/fdc.c: 状態と入口をドライバ内へ閉じる。 */
 static volatile u32 fdc_irq_fired;
 static int fdc_irq(unsigned int irq, void *arg) {
     (void)irq; (void)arg;
@@ -93,9 +93,9 @@ fdc_irq_fired = 0;                       /* 既存の初期化位置を維持 */
 | 新規 | `kernel/irq/tick.h` / `kernel/irq/tick.c` / `platform/pc98/tick_order.h` | 25 / 50 / 15 |
 | 変更 | `arch/x86/kernel/isr_handlers.c` / `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | −30 / −25,+2 / 5 |
 | 変更 | `kernel/irq/irq_math.h` / `kernel/irq/irq_math.c` / `kernel/irq/irq.h` | 5 / 4 / 12（irq.c は変更不要） |
-| 変更 | `drivers/fdc.c` / `init/kernel.c` | 20 / −1 |
-| 変更 | `kernel/fm_module.c` / `kernel/pcm_module.c` / `kernel/lan_module.c` | 各6 |
-| 変更 | `drivers/ne2000.c` / `drivers/lgy98.c` / `net/link.c` | 各8～12 |
+| 変更 | `drivers/block/fdc.c` / `init/kernel.c` | 20 / −1 |
+| 変更 | `drivers/sound/fm/fm_module.c` / `drivers/sound/cs4231/pcm_module.c` / `drivers/net/e82557/lan_module.c` | 各6 |
+| 変更 | `drivers/net/ne2000/ne2000.c` / `drivers/net/ne2000/lgy98.c` / `net/link.c` | 各8～12 |
 | 変更 | `build/kernel.mk` / `kdebug/kselftest.c` | 2 / 2 |
 | 新規 | `tools/tests/tick_host.c` / `test_tick.py` / `fdc_irq_host.c` / `test_fdc_irq.py` | 100 / 70 / 90 / 60 |
 | 新規 | `build/checks.d/check-{tick,fdc-irq}-host.mk`、`tools/check_map.d/check-{tick,fdc-irq}-host.yaml` | 各15～25 |
@@ -133,7 +133,7 @@ fdc_irq_fired = 0;                       /* 既存の初期化位置を維持 */
 
 ## 確定 (2026-10-26、Opus 5.5 の第 1 回 (P1 なし) を PM が反映 — 本文の該当の行より優先する)
 
-- **F1**: §5 に `drivers/fdc.h` を足す (465 行の `extern volatile u32 fdc_irq_fired;` と isr_handlers の注記を削る。fdc.c で static にすると、そのままでは「static declaration follows non-static」で止まる)。
+- **F1**: §5 に `drivers/block/fdc.h` を足す (465 行の `extern volatile u32 fdc_irq_fired;` と isr_handlers の注記を削る。fdc.c で static にすると、そのままでは「static declaration follows non-static」で止まる)。
 - **F2**: `tools/tests/test_net_link.py:92-99` の check_timer_calls_link_tick (timer_handler の本文に ne2k_timer_tick → link_tick の順の文字) は D1b で必ず落ちる。「PC98_TICK_NE2K < PC98_TICK_LINK、かつ link_tick を登録するのは net/link.c だけ」の検査に置き換える (D1b に含める)。
 - **F3 (PM 決定)**: IRQ11 の入口の変更は実機の FD 起動で確かめる。DEFERRED_TESTS の T4T7-RH の回に「D1 の Ra266 FD 起動 (IRQ11 の共通入口)」を足す。NP21/W の FD 起動 (1232/1440) は D1c のゲストで PM が回す。
 - **F4**: 完了条件は ROLES §0 の Tx の形: D1a・D1b は各 `make kernel` + その段の直接の試験 `MUTATE=0` + `check_select.py --lint`、D1b の後に 1 回だけ `make all` + `check_select.py --select --files <D1 全体の差分>` の候補を `MUTATE=0` + 静的 5 本。表の「FD/V86 受入」「対象変異」「結合ゲスト・容量」は **PM の行** (D1c = PM がレビューの後に回す)。

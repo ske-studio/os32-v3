@@ -1214,16 +1214,16 @@ KAPI ではない**カーネルの大域変数** (カウンタ・印)。番地�
 **決着しなかったもの**: `I/O 0434h` bit6 (入力クロック 4 分周) の**極性は機種依存で、
 しかも 1999 年の読者指摘として逆の可能性が併記されている**。自己整合で決められない。
 だから**自動では触らない** — `serial_set_div4()` を用意して、実機で確かめてから
-明示的に呼ぶ形にした (`drivers/serial.h` の注記)。bit0 は「ポート切り離し」なので
+明示的に呼ぶ形にした (`drivers/char/serial.h` の注記)。bit0 は「ポート切り離し」なので
 read-modify-write で保つ。
 
 ### 4-51. FDC の IRQ 待ち 200ms は**エミュレータに合わせた値**で、実機のシークに足りなかった (2026-09-22)
 
 - **症状**: 実機 PC-9821Ra266 で FD (1.2MB / 1.44MB とも) から起動すると `MOUNT...` で **`root panic`**。
   HDD は未フォーマットだったので「ext2 が無いから」と見えたが、**FD 起動の経路に ext2 の依存は無い**。
-  `root panic` は fd0 の FAT マウント失敗で、その下はカーネル自前の FDC ドライバ (`drivers/fdc.c`)。
+  `root panic` は fd0 の FAT マウント失敗で、その下はカーネル自前の FDC ドライバ (`drivers/block/fdc.c`)。
   IPL とローダは BIOS で読むので、**FDC ドライバが実機で走ったのはこれが最初**だった。
-- **原因**: `drivers/fdc.h` の `FDC_IRQ_TIMEOUT_TICKS = 20` (200ms)。コメントに「NP21/W で IRQ 未到達時の
+- **原因**: `drivers/block/fdc.h` の `FDC_IRQ_TIMEOUT_TICKS = 20` (200ms)。コメントに「NP21/W で IRQ 未到達時の
   遅延を抑制」とあるとおりエミュレータ基準。実機は SPECIFY の SRT=8ms で **RECALIBRATE / SEEK が最大
   77〜80 トラック × 8ms ≒ 620〜640ms**、READ DATA も 1 回転 (167〜200ms) + ヘッドロードで 200ms 前後。
   ローダがカーネルを読んだ直後のヘッドはシリンダ 20〜40 付近なので `fdc_init()` の recalibrate が落ちる。
@@ -1244,7 +1244,7 @@ read-modify-write で保つ。
   「NP21/W で〜を抑制」という理由の定数は、実機の前に必ず疑う (`grep -rn NP21 drivers/*.h`)。
 - **続き (2026-09-24、速度)**: 通るようになった後、1 セクタごとに SEEK + 20ms + READ DATA で**ほぼ 1 回転ずつ**待ち、
   フォント (188KB) で 1 分以上止まった (これも回転待ちを模擬しない NP21/W では出ない)。同じシリンダのシークを省き、
-  要求セクタから EOT までを 1 回で読んで持つ形にした (`drivers/fdc_track.c`、FatFs の窓は count=1 で来るので束ねるだけでは効かない)。
+  要求セクタから EOT までを 1 回で読んで持つ形にした (`drivers/block/fdc_track.c`、FatFs の窓は count=1 で来るので束ねるだけでは効かない)。
   まとめ読みの時間上限も同じく最悪値 `2 × (2 回転 + ceil(count/spt) 回転 + HLT)` から導く。票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md` の v3 の節。
   **ただし 1 本の先読みは効かなかった** — FatFs (`FF_FS_TINY=1`) は FAT とデータで窓を取り合い、クラスタを越えるたびに
   シリンダ 0 の FAT を読み直すので、FAT とデータのトラックが追い出し合う (1KB ごとにシーク 2 回)。2 本にした。
@@ -1292,7 +1292,7 @@ read-modify-write で保つ。
 - **なぜ気づかなかったか**: **NP21/W は 1.9968MHz 設定**なので、エミュレータでは
   決め打ちの値がたまたま正解で、100Hz ちょうどが出ていた。§4-49 (シリアルの分周)・
   §4-51 (FDC のシーク時間)・§4-53 (FRY) と同じ型 — **エミュレータが模擬しない機種差**。
-  クロックの判定自体は `drivers/serial.c` の `serial_detect_clock()` に既にあったが、
+  クロックの判定自体は `drivers/char/serial.c` の `serial_detect_clock()` に既にあったが、
   呼ばれるのは `kernel.c:228` = `pit_init` (194 行) の **34 行あと**で、しかも
   CR3 が master と一致しないと何もしない作りだった (シリアルしか見ていなかった)。
 - **対策**: 判定を `kernel/time/sysclk.c` (`sysclk_detect()` / `sysclk_hz()` /
@@ -1425,7 +1425,7 @@ read-modify-write で保つ。
 
 - **症状**: 実機 PC-9821Ra266 で rshell (シリアル) で会話している間、ビープが鳴り続ける。NP21/W では鳴らない。
 - **原因 (2 経路、どちらも BUZ = 0 を書く)**:
-  1. `drivers/serial.c` が RS-232C の割り込み許可を **0035h へ全体で**書いていた — 初期化で `0x00` → `0x01`、
+  1. `drivers/char/serial.c` が RS-232C の割り込み許可を **0035h へ全体で**書いていた — 初期化で `0x00` → `0x01`、
      ISR では**受信のたびに** `0x00` → `0x01` (IRQ4 のエッジを作り直すため)。0035h はポート C で、bit0-2 の
      RXRE / TXEE / TXRE と同じバイトに **bit3 = BUZ (0 = 鳴動)**、bit4 = MCHKEN、bit5 = SHUT1、bit6 = PSTBM、
      bit7 = SHUT0 がいる (`docs/hw/undocumented/io_syste.md` の I/O 0035h)。1 バイト受けるごとに BUZ・SHUT0・
@@ -1555,7 +1555,7 @@ read-modify-write で保つ。
 - **症状**: 15MB 構成 (NP21/W `ExMemory 16`) + `gfxmode pegc` + リセットで、`hal_test` が
   `backend pc98 (planar 4bpp)` のまま。`sys_top_reserved` = 0。BIOS の PEGC ビット
   (0x045C bit6 = 0x40、0x0597 bit2 = 0x84) は立っているので、機種判別 (probe 段 1) は通っている。
-- **原因**: `gfx/backend_pegc.c` の probe 段 2 が `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` で
+- **原因**: `drivers/video/pc98/backend_pegc.c` の probe 段 2 が `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` で
   「自分の RAM が窓に届いているか」を見ていた。K6-RAM (`f6ec520`, 2026-09-11) で `sys_mem_kb` の
   定義が「**RAM の上端アドレス / 1024**」に変わり、15MB 機でも高位 RAM (16-17MB) のぶん 17408 を
   返す。窓 `[0xF00000, 0x1000000)` は K6 の検出器が **RAM にしない穴** (`MEMORY_BOOT_LEGACY_END`
@@ -1568,7 +1568,7 @@ read-modify-write で保つ。
   8MB (legacy 経路) は窓まで RAM が届かないので従来どおり真。
 - **教訓**: (1) **「上端 > 窓」は「窓が RAM」ではない** — 穴のある物理地図では上端は窓の可否を
   答えない。デバイス窓の可否は必ず**その範囲**を物理地図に問い合わせる。
-  (2) 同じ型の誤判定が `gfx/backend_cirrus.c` の `cirrus_win_usable()` にもあった
+  (2) 同じ型の誤判定が `drivers/video/cirrus/backend_cirrus.c` の `cirrus_win_usable()` にもあった
   (`sys_get_mem_kb() > base / 1024`)。RAM 17,408KB の NP21/W で**穴の中のバンク窓 0xF60000 まで**
   拒み、Cirrus の probe が ID 判定の前に落ちた (2026-09-29、TASK_S5 §6 R2)。同じ口
   (`pgalloc_range_has_ram`、窓の全ページ) に直した (`tools/tests/test_cirrus_win.py`)。

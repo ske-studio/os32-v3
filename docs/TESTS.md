@@ -67,7 +67,7 @@ a5 の `check-host-agent` / `check-host-lib-host` / `check-net-link-host` /
 | 名前 | 種類 | 何を守っているか | いつ走る |
 |---|---|---|---|
 | [`kdebug/kselftest.c`](../kdebug/kselftest.c) | 起動時自己試験 (KDEBUG=1 のときだけ。OFF は 0/0) | カーネルが**実際に使う**プリミティブ (`kstring_asm.asm` / `kmalloc.c` / `kprintf`) の境界ケース。外部プログラムの `klibc_test` は newlib を測るので代替にならない。f5a の appmem owner 往復 5 件を含む標準起動の期待は 288/0 (ゲスト未確認、台帳 F-6)。結果は `kselftest_pass` / `kselftest_fail` に残り `kernel.map` 経由で読む | 毎起動 (実機) |
-| `link_selftest()` ([`drivers/lgy98.c`](../drivers/lgy98.c)) | 起動時自己試験 | LGY-98 リンク層の HELLO + PING/PONG。**`make kernel-lgy98-link` (LGY98_FLAG_LINKTEST) でビルドしたカーネルでのみ**走る。判定は `tools/net_l0_test.py` が `link_*` グローバルを `/api/mem` で読む | LINKTEST 版の毎起動 |
+| `link_selftest()` ([`drivers/net/ne2000/lgy98.c`](../drivers/net/ne2000/lgy98.c)) | 起動時自己試験 | LGY-98 リンク層の HELLO + PING/PONG。**`make kernel-lgy98-link` (LGY98_FLAG_LINKTEST) でビルドしたカーネルでのみ**走る。判定は `tools/net_l0_test.py` が `link_*` グローバルを `/api/mem` で読む | LINKTEST 版の毎起動 |
 | [`tools/gui_gate.py`](../tools/gui_gate.py) | ゲスト観測 (判定は人) | GUI のゲート操作列 (`v11` / `v12g1` / `v12g4` / `shot` / `click`)。**自動照合は `wab_relay` / `scrn_ymax` / `fault_generation` の 3 数値だけ**、他は PM が目で見る | 手動 |
 | `tools/emu_agent/tasks/regress.txt` | ゲスト観測 (ローカル AI) | 配備後の定型回帰 — kselftest カウンタ / `klibc_test` / `alloc_demo` / `ring3_fault` で落ちてもシェルが生きている / パイプライン 2 本 / screenshot。**モデルは観測を転記するだけで合否は人** | 手動 (スキル `os32-local-ai`) |
 | `tools/emu_agent/tasks/v86_dos.txt` | ゲスト観測 (ローカル AI) | V86 の DOS 起動。`dos5hd.nhd` / master は 2026-09-10 に削除済みで、再作成は FORMAT から 30 分 | 手動 |

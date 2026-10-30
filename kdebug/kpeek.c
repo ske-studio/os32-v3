@@ -33,7 +33,7 @@
 #include "kpeek_allow.h"
 #include "kpeek.h"
 #include "kdebug_window.h"
-#include "drivers/e82557.h"
+#include "drivers/net/e82557/e82557.h"
 #include "fs/sfs_proto.h"
 #include "fs/sfs_lan.h"
 #include "fs/serialfs.h"

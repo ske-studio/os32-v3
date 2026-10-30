@@ -2,7 +2,7 @@
 """OS32 リンク層 L3 (Host Services) の検証 — docs/tasks/network/LINK_PLAN.md §1 / §5。
 
 前提は L0〜L2 と同じ (host_agent.py 起動 → kernel-lgy98-link 配備)。起動時に
-drivers/lgy98.c が link_l3_service() を実行する:
+drivers/net/ne2000/lgy98.c が link_l3_service() を実行する:
   1. GET /pattern/65536  — ホストが本文を生成、OS32 はストリームで受けて内容検証
   2. GET /notfound       — status 404 の要求応答
   3. GET http://example.com/ — ホストが実 HTTP を取得 (オンラインなら 200)。付録

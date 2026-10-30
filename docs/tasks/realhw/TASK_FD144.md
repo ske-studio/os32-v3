@@ -94,9 +94,9 @@ IPL はルートディレクトリを `0x6000` へ**一括で**読む。標準�
 | `boot/loader_fat_new.asm` | 同じ形。`DA_UA` がカーネルへ渡る `boot_drive` になる |
 | `build/boot.mk` | `boot_fat144.bin` / `loader_fat144.bin` を `-DFD144` で組む |
 | `build/image.mk` | ファイル一覧を `define FDD_IMAGE_ARGS` で 1 か所に。`images/os32_boot144.img` と `make fd144`。**1,474,560 でなければエラーで止める** |
-| `drivers/fdc.h` / `fdc.c` | `fdc_geom_144`、ドライブごとの現在ジオメトリ (`fdc_get_geom` / `fdc_set_media` / `fdc_set_media_by_daua`)、`fdc_set_3mode` (04BEh) |
+| `drivers/block/fdc.h` / `fdc.c` | `fdc_geom_144`、ドライブごとの現在ジオメトリ (`fdc_get_geom` / `fdc_set_media` / `fdc_set_media_by_daua`)、`fdc_set_3mode` (04BEh) |
 | `fs/fatfs/diskio.c` | LBA→CHS と `GET_SECTOR_COUNT/SIZE` を**ジオメトリ駆動**に (マクロ直読みをやめた) |
-| `drivers/dev.c` | `dev_init()` が記述子を現在のジオメトリで書き直す |
+| `drivers/base/dev.c` | `dev_init()` が記述子を現在のジオメトリで書き直す |
 | `init/kernel.c` | `boot_drive` の DA/UA でメディアを選ぶ。**`dev_init()` より前。** 3モードの状態を画面へ (`144M` / 赤い `144?`) |
 
 ### 4-4. `read_sector` を `div` に統一した理由

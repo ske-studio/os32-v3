@@ -8,7 +8,7 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef PCM_ADAPTER
-#define PCM_ADAPTER "../../kernel/pcm_module.c"
+#define PCM_ADAPTER "../../drivers/sound/cs4231/pcm_module.c"
 #endif
 #include PCM_ADAPTER
 #include "../../kernel/irq/tick.c"

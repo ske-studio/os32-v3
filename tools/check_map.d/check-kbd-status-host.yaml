@@ -1,9 +1,9 @@
 check-kbd-status-host:
 - include/kbd.h
-- drivers/kbd.h
+- drivers/input/kbd.h
 - kernel/v86/v86_kbd.h
-- drivers/kbd.c
-- drivers/kbd_status.c
+- drivers/input/kbd.c
+- drivers/input/kbd_status.c
 - kernel/v86/v86_kbd.c
 - tools/tests/kbd_status_host.c
 - tools/tests/test_kbd_status.py

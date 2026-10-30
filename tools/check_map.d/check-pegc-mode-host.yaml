@@ -1,8 +1,8 @@
 check-pegc-mode-host:
 - include/gfx_format.h
 - tools/tests/host32.py
-- gfx/backend_pegc.c
-- drivers/np2sysp.c
+- drivers/video/pc98/backend_pegc.c
+- drivers/char/np2sysp.c
 - kernel/console/console.c
 - tools/tests/mutpar.py
 - tools/tests/pegc_mode_host.c

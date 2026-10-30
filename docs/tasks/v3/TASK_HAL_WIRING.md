@@ -16,7 +16,7 @@
 PCI の装置は **BIOS が IRQ を割り当て、複数の装置が 1 本の IRQ を共有し得る**。いまの OS32 は `arch/x86/kernel/isr_stub.asm` が
 装置ごとに固定の C ハンドラを `extern` で結んでおり (`timer_handler` / `kbd_irq_handler` / `serial_irq_handler` /
 `fdc_irq_handler` / `mouse_irq_handler` / `ne2k_irq` (`irq_stub_nic_3/5/6`)、それ以外は `IRQ_UNEXP` で EOI だけ)、
-**起動時に読んだ IRQ 番号でハンドラを結ぶ口が無い**。DMA も `dma_setup()` が `drivers/fdc.c` の中で ch2 決め打ち、
+**起動時に読んだ IRQ 番号でハンドラを結ぶ口が無い**。DMA も `dma_setup()` が `drivers/block/fdc.c` の中で ch2 決め打ち、
 DMA に使えるメモリは静的配列 + 整列で取っている。82557 (バスマスタ、IRQ は BIOS 次第) と CS4231 (8237 の #1/#3) を
 載せるには、この 4 つを装置から切り離した層にする必要がある。
 
@@ -188,7 +188,7 @@ ISR の中からの登録・解除・自己解除は禁止 (契約、debug ビ�
   LGY-98 の登録拒否時は既存 tick 回収によるポーリング稼働を維持する (PCI probe の利用不可とは区別)。
   **未実装**: debug のハンドラ1ms超診断と `irq_off_max_us` (§1-6)。
 
-### 1-2. 8237 DMA の共通部 — `drivers/dma8237.c` / `dma8237.h`
+### 1-2. 8237 DMA の共通部 — `drivers/dma/dma8237.c` / `dma8237.h`
 
 ```c
 #define DMA_DIR_TO_MEM   0   /* 装置 → メモリ (8237 の write transfer) */
@@ -302,7 +302,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   受入記録 W5 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   現行配置は `include/memmap.h`、生成地図は `build/out/MEMMAP.md` を参照。
 
-### 1-4. PCI デバイスの結線表 — `drivers/pci_bind.c`
+### 1-4. PCI デバイスの結線表 — `drivers/pci/pci_bind.c`
 
 ```c
 #define PCI_PROBE_OK          0

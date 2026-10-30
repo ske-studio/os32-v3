@@ -1,7 +1,7 @@
 check-dep-dir-a-l04-host:
 - include/types.h
 - include/platform_device.h
-- drivers/loop_dev.h
+- drivers/block/loop_dev.h
 - platform/pc98/device_loop.c
 - kernel/v86/v86.c
 - kernel/v86/v86_bios.c
@@ -21,7 +21,7 @@ check-dep-dir-a-l04-host:
 - tools/check_map.d/check-dep-dir-a-l04-host.yaml
 - build/checks.d/check-dep-dir-a-l04-host.mk
 - exec/exec.c
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c

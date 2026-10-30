@@ -83,7 +83,7 @@ def check_generated_map():
 
 def main():
     check_generated_map()
-    paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_bios.c', 'kernel/v86/v86_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'mm/memory_boot.c')
+    paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_bios.c', 'kernel/v86/v86_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/input/kbd.c', 'mm/memory_boot.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)
@@ -94,7 +94,7 @@ def main():
         def run(parts, label=None):
             for path, source in parts.items():
                 (work / Path(path).name).write_text(source)
-            (work / 'bios_consumer_slice.inc').write_text(function(parts['drivers/kbd.c'], 'kbd_bios_shift_peek'))
+            (work / 'bios_consumer_slice.inc').write_text(function(parts['drivers/input/kbd.c'], 'kbd_bios_shift_peek'))
             memory = parts['mm/memory_boot.c']
             # L15 keeps the two-row table inside memory_boot_regions. Copy
             # that initializer into the host's corresponding local scope.

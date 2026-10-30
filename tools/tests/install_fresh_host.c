@@ -4,7 +4,7 @@
 /*                                                                           */
 /*  実物は `userland/system/install.c` の **通常インストール経路** そのもの   */
 /*  (`#define main` で取り込む)。模型は KAPI の贋物だけ:                      */
-/*    - `ide_identify` は実型 (drivers/ide.h の IdeInfo と同じ 96 B) を書く   */
+/*    - `ide_identify` は実型 (drivers/ata/ide.h の IdeInfo と同じ 96 B) を書く   */
 /*    - `ide_write_sectors` は (LBA, 本数) を記録するだけ                     */
 /*    - `sys_ls` は **FAT のように大文字** の名前を返す (FF_USE_LFN 0)        */
 /*    - 媒体側 (`/hd0` 以外) の名前引きは FAT のように大小文字を無視し、      */
@@ -24,7 +24,7 @@
 #include <stddef.h>
 
 #include "os32api.h"
-#include "drivers/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
+#include "drivers/block/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
 #include "userland/system/inst_disk.h"
 
 /* ---- kprintf の捕捉 ---------------------------------------------------- */
@@ -320,7 +320,7 @@ static int rec_has_exact(char list[][96], int n, const char *path)
 #include "../../userland/system/install.c"
 #undef main
 
-/* drivers/ide.h の IdeInfo と同じ並び (i386 では 96 B)。install.c 側の型が
+/* drivers/ata/ide.h の IdeInfo と同じ並び (i386 では 96 B)。install.c 側の型が
  * これより小さいと ide_identify が呼び手の領域外へ 2 バイト書く (票 §1 の B2)。
  * ホストは LP64 で u32 = unsigned long が 8 B なので「96」という数そのものは
  * 再現できない。ここでは **実型との一致** (大きさと全 offset) を見て、96 /

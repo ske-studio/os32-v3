@@ -1,6 +1,6 @@
 check-dep-dir-a-l09-host:
-- drivers/pci.h
-- drivers/serial.h
+- drivers/pci/pci.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -37,7 +37,7 @@ check-dep-dir-a-l09-host:
 - sdk/rust/os32api/src/kapi_generated.rs
 - hwdev/generated/hwdev_contract.h
 - exec/exec.c
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c
@@ -52,7 +52,7 @@ check-dep-dir-a-l09-host:
 - tools/tests/dep_dir_a_l05a_host.c
 - include/platform_host.h
 - include/net_eth.h
-- drivers/np2sysp.h
+- drivers/char/np2sysp.h
 - net/link.h
 - platform/pc98/device_host.c
 - tools/tests/dep_dir_a_l09_host.c

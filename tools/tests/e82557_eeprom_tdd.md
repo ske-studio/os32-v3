@@ -4,7 +4,7 @@
 契約: `/home/hight/os32-tmp/run/lan/LB_MAIN_DESIGN.r3.md` §2 LB-1、§5。
 LB-1 で R5 の全語読み・和・診断整形・3方式の再試行を撤去する。
 
-実物の `drivers/e82557_eeprom.c` と `drivers/pci_decode.c` を include する。
+実物の `drivers/net/e82557/e82557_eeprom.c` と `drivers/pci/pci_decode.c` を include する。
 ホストは `-m32 -static`、`HOST32_RUNNERS=qemu` で実行し、u32=4 を静的 assert。
 模型は 93C46 (6 bit) / 93C66 (8 bit)、dummy の SK↑ / SK↓ 出力を持つ。
 `--target` は EEPROM 実装を i386-elf GNU11、`-Os -Werror` で通す。

@@ -1,6 +1,6 @@
 check-dep-dir-a-l10-host:
-- drivers/pci.h
-- drivers/serial.h
+- drivers/pci/pci.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -18,9 +18,9 @@ check-dep-dir-a-l10-host:
 - include/platform_device.h
 - include/kcg_contract.h
 - include/pc98.h
-- drivers/kcg.h
-- drivers/kcg.c
-- kernel/kcg_module.h
+- drivers/video/kcg/kcg.h
+- drivers/video/kcg/kcg.c
+- drivers/video/kcg/kcg_module.h
 - kernel/module/module_runtime.h
 - kernel/module/module_image.h
 - kernel/module/module_schema.h
@@ -34,7 +34,7 @@ check-dep-dir-a-l10-host:
 - tools/tests/dep_dir_a_l10_host.c
 - sdk/kapi.json
 - kapi/kapi_generated.c
-- kernel/kcg_module.c
+- drivers/video/kcg/kcg_module.c
 - hwdev/generated/hwdev_contract.h
 - tools/tests/test_shm_user.py
 - tools/tests/test_dep_dir_a_l05a.py
@@ -45,7 +45,7 @@ check-dep-dir-a-l10-host:
 - tools/check_map.d/check-dep-dir-a-l10-host.yaml
 - exec/exec.c
 - exec/exec_kapi_init.inc
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c

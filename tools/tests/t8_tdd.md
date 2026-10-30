@@ -218,7 +218,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 実装: `exec/appslot.c` + `exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
 `appslot_park_poll_check/commit`、`appslot_poll_yield_reset`、カウンタ `ring3_poll_yield_count`) /
 `exec/exec.c` + `exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /
-`drivers/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `kernel/kselftest.c`
+`drivers/input/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `kernel/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 22 (`python3 -B tools/tests/test_multiapp_impl.py`)
 **KAPI は 1 本も増やしていない** (v48 のまま。`kbd_trygetchar` / `kbd_trygetkey` の中身だけが変わる)。
 
@@ -246,7 +246,7 @@ CPU を独占したままになる (票 §7 の F1 後半)。
 (弾かれる文脈はそもそも譲れない)。この順番だけを見る検査が 22M / 22N。
 
 `now_tick` を**引数で受ける**のは 2 つの理由: `exec/appslot.c` はハードウェアを知らない規約と、
-ホストで tick を差し替えられるようにするため (`drivers/kbd.c` が `tick_count` を読んで渡す)。
+ホストで tick を差し替えられるようにするため (`drivers/input/kbd.c` が `tick_count` を読んで渡す)。
 
 ## `kbd_has_key` に譲りを入れなかった理由
 
@@ -315,7 +315,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 ```
 $ i386-elf-gcc -std=gnu89 -m32 -march=i386 -ffreestanding ... -O2 -Wall -Wextra -D__KERNEL_BUILD__ \
-    -c drivers/kbd.c exec/exec.c exec/appslot.c kernel/kselftest.c
+    -c drivers/input/kbd.c exec/exec.c exec/appslot.c kernel/kselftest.c
 (4 本とも警告 0)
 ```
 

@@ -379,7 +379,7 @@ static inline void _raster_delay(void)
 /*  なったので (票 TASK_SERIAL_VFAST 往復 3)、この待ちの合計は実機で         */
 /*  **12〜48ms** になる。そのあいだ割り込みを止めると:                      */
 /*    - 38400 以上の受信を取りこぼす (FIFO は 16 バイトしかない)             */
-/*    - PIT の tick を失う → drivers/serial.c の送信予算 (tick を数える)     */
+/*    - PIT の tick を失う → drivers/char/serial.c の送信予算 (tick を数える)     */
 /*      の前提が崩れる                                                      */
 /*                                                                          */
 /*  **開けるのは待ちのあいだだけ。** VSYNC 終了待ち・VRAM 転送                */

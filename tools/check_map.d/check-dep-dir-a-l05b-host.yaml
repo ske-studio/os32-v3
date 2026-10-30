@@ -4,7 +4,7 @@ check-dep-dir-a-l05b-host:
 - include/config.h
 - include/ide_contract.h
 - include/platform_device.h
-- drivers/ide.h
+- drivers/ata/ide.h
 - platform/pc98/device_ide.c
 - tools/tests/dep_dir_a_l05b_host.c
 - tools/tests/test_dep_dir_a_l05b.py

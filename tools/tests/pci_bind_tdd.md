@@ -1,7 +1,7 @@
 # pci_bind — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-4
-対象: `drivers/pci_bind_match.c` (一致規則と遷移) / `drivers/pci_bind.c` (実行と記録)
+対象: `drivers/pci/pci_bind_match.c` (一致規則と遷移) / `drivers/pci/pci_bind.c` (実行と記録)
 試験: `tools/tests/test_pci_bind.py` + `tools/tests/pci_bind_host.c`
 実行: `make check-pci-bind-host` (`check-par` の列)
 
@@ -28,7 +28,7 @@ probe が失敗したときに「装置に触っていない」のか「未知�
 
 ```
 $ python3 -B tools/tests/test_pci_bind.py
-tools/tests/pci_bind_host.c:15:10: fatal error: ../../drivers/pci_bind_match.c: No such file or directory
+tools/tests/pci_bind_host.c:15:10: fatal error: ../../drivers/pci/pci_bind_match.c: No such file or directory
 ```
 
 ### RED 2 — QUARANTINE で打ち切らない (変異 1 / 2)
@@ -52,7 +52,7 @@ tools/tests/pci_bind_host.c:15:10: fatal error: ../../drivers/pci_bind_match.c: 
 
 ```
 $ python3 -B tools/tests/test_pci_bind.py --target --mutate
-HOST GNU89 -Werror compile PASS (real drivers/pci_bind_match.c)
+HOST GNU89 -Werror compile PASS (real drivers/pci/pci_bind_match.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT match_rules=0
 EXIT next_order=0

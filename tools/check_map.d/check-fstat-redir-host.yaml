@@ -15,5 +15,5 @@ check-fstat-redir-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - tools/tests/kernel_includes.py

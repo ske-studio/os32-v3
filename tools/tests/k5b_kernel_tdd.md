@@ -560,7 +560,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 ## 何が足りていなかったか
 
-CTRL+STOP は IRQ1 (`drivers/kbd.c:235` → `ring3_abort_request` → `appslot_abort_request`)
+CTRL+STOP は IRQ1 (`drivers/input/kbd.c:235` → `ring3_abort_request` → `appslot_abort_request`)
 の時点で **走っているアプリ** の `AppSlot.abort_req` を無条件に立てる。IRQ1 の時点で
 カーネルが知っているのはそれだけだからで、宛先は選べない。ところが契約 T6 の宛先は
 **フォーカス窓のアプリ**。4 本同時実行では両者が食い違い、WM (gshell) がフォーカス窓の

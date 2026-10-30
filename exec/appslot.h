@@ -241,7 +241,7 @@ void appslot_park_commit(void);
  * ダメなら ring3_park_reject_count++ して負を返す。
  *
  * kbd_gui_mode / CPL=3 フレームの有無は **ドライバとカーネル側の条件** (R1)
- * なので、ここでは見ない (exec/exec.c と drivers/kbd.c が見る)。 */
+ * なので、ここでは見ない (exec/exec.c と drivers/input/kbd.c が見る)。 */
 int appslot_park_kbd_check(void);
 /* kbd 待ちの park を成立させる。印 parked_from_kbd を立て、WAIT_KEY にして
  * cur をシェル帯へ戻す。ring3_kbd_park_count++。 */
@@ -253,7 +253,7 @@ void appslot_park_kbd_commit(void);
  * **PIT tick の間引き** (10ms に 1 回まで) を持つこと。busy-wait のループから
  * 呼ばれるので、間引きが無いと譲りだけで CPU を食い潰す。
  *
- *   now_tick : 呼び手 (drivers/kbd.c) が渡す PIT の tick (100Hz)。
+ *   now_tick : 呼び手 (drivers/input/kbd.c) が渡す PIT の tick (100Hz)。
  *              **引数で受ける**のは (a) この表がハードウェアを知らない規約と
  *              (b) ホスト試験 (tools/tests/multiapp_impl_host.c ケース 22) で
  *              tick を差し替えられるようにするため。
@@ -267,7 +267,7 @@ void appslot_park_kbd_commit(void);
  * **この関数は控えを進めるので純関数ではない** (park_check / park_kbd_check が
  * 弾き数を進めるのと同じ扱い)。
  *
- * kbd_gui_mode / CPL=3 フレームの有無は R1 と同じく呼び手側 (drivers/kbd.c と
+ * kbd_gui_mode / CPL=3 フレームの有無は R1 と同じく呼び手側 (drivers/input/kbd.c と
  * exec/exec.c) が見る。 */
 int appslot_park_poll_check(u32 now_tick);
 /* ポーリング型の park を成立させる。印 parked_from_poll を立て、WAIT_POLL に

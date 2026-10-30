@@ -153,7 +153,7 @@ def boot_gate(tmp):
     for case in ("ready", "short", "conflict", "nodebug"):
         subprocess.run([str(exe), case], check=True)
     # FDC's early boot buffer must stay independent of the pool.
-    fdc = (ROOT / "drivers/fdc.c").read_text()
+    fdc = (ROOT / "drivers/block/fdc.c").read_text()
     assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
     assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)
     assert kernel.index('boot_platform_run(BOOT_FLOPPY, &boot)') < start

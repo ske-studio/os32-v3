@@ -1185,17 +1185,17 @@ int shell_cmd_recover(int argc, char **argv) { (void)argc; (void)argv; return 0;
 int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
- * 復号の実体 drivers/pci_decode.c は実ビルドでも同じ 1 本をリンクする
+ * 復号の実体 drivers/pci/pci_decode.c は実ビルドでも同じ 1 本をリンクする
  * (build/programs.mk の PCI_DECODE_USER_OBJ)。 */
 #include "../../userland/shell/cmd_pci.c"
-#include "../../drivers/pci_decode.c"
+#include "../../drivers/pci/pci_decode.c"
 #include "../../userland/shell/pci_verbose.c"   /* lspci -v の行づくり */
 /* cmd_hdprep.c (hdprep、票 TASK_HDD_INSTALL 段 1) も同じ理由 — main.c が
  * shell_cmd_hdprep_init() を呼ぶ。判定の純粋部と区画表の共有部も実ビルドと同じ 1 本
  * (build/programs.mk の PC98PT_USER_OBJ)。 */
 #include "../../userland/shell/cmd_hdprep.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../drivers/pc98pt.c"
+#include "../../drivers/block/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
 #include "../../userland/shell/rshell.c"
 #include "../../userland/shell/serial_watchdog.c"   /* rshell.c の番犬 (往復 2) */

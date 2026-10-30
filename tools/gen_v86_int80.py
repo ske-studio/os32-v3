@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the E10-6 IPL probe: v86 -b /host/test/int80.img.
 
-RAW PC-98 2HD 1232KB is recognized by drivers/loop_dev.c (77/2/8, 1024B sectors).
+RAW PC-98 2HD 1232KB is recognized by drivers/block/loop_dev.c (77/2/8, 1024B sectors).
 v86_boot2 loads C0/H0/S1 at 1FC0:0000. Install our own IVT[80h] ISR,
 enable IF before INT80, save the ISR's FLAGS at 1FC0:0040, then IRET/HLT.
 Expected IF is zero for v86 -b without -g. Break at v86_exit_to_kernel

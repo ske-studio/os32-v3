@@ -8,10 +8,10 @@
 
 ## 0. 事実 (2026-09-25 の調査、ファイル:行)
 
-- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/kbd.h:131-135` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
+- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/input/kbd.h:131-135` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
 - 振り分けの順: X4 の退避判定 (input.rs:317) → 修飾 → CTRL+STOP → SHIFT+SPACE (FEP) → modal (input.rs:377) → startmenu → (窓なし) standalone → FEP → 最前面の窓。
 - マウスは `capture_mouse` がキーボードを読み切った**後に 1 回**、`mouse_poll` の現在値と `prev_buttons` の差分でエッジを作る (input.rs:454-)。X4 では WM の領分のエッジを保留して `prev_buttons` を進めない (input.rs:551)。全画面 GFX 中はマウスを誰にも配らない (input.rs:466)。
-- **カナ**: `drivers/kbd.c:299` は **make でだけ状態を反転**し break を無視する (CAPS も同じ)。OS32 のどこもカナの状態を使っていない。修飾の現在値は KAPI `kbd_get_modifiers` で読める。
+- **カナ**: `drivers/input/kbd.c:299` は **make でだけ状態を反転**し break を無視する (CAPS も同じ)。OS32 のどこもカナの状態を使っていない。修飾の現在値は KAPI `kbd_get_modifiers` で読める。
 - FEP の確定文字は**確定した時点の**フォーカス窓へ配る (fep.rs:454)。WM のフォーカス変更 (`wm::set_focus`、wm.rs:1032) は FEP の未確定文字を確定も取消もしない — **マウスで窓を切り替えたときにも同じ穴がある** (既存)。
 - `libos32ui` (microUI、`mui_pump_input_ch`) のアプリは WM のイベントではなく `mouse_poll` を直接読む (`userland/lib/ui/libos32ui_core.c:192`)。今の利用者は `apps/ui_demo` だけ。
 
@@ -129,7 +129,7 @@ WM のショートカットとマウスキーは状態機械を動かすので *
 
 ### 1-5. カナの状態と、モードが切れるとき — Codex 指摘 P2-5
 
-- モードは **raw に焼き込まれた修飾の KANA ビット**で決める (`drivers/kbd.c:283` — 修飾キー自身の raw は更新後の値を載せる)。
+- モードは **raw に焼き込まれた修飾の KANA ビット**で決める (`drivers/input/kbd.c:283` — 修飾キー自身の raw は更新後の値を載せる)。
   カナの raw を修飾として捨てる前に、その raw の KANA ビットでモードを決め直す。**現在値 (`kbd_get_modifiers()`) は使わない** —
   「カナ ON → 5 → カナ OFF」が溜まっていると最初から OFF を読んでしまう (Codex 2 回目 A2)。
   現在値を読むのは gshell の起動時の初期化だけ (カナをロックしたまま GUI に入った場合)。
@@ -154,7 +154,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
   1 回目 make・2 回目 break) と資料: BIOS ワークエリア 0000:053Ah (KB_SHFT_STS) の bit2 カナ / bit1 CAPS は SHIFT・CTRL と同じ
   「1= 押されている」で「INT 09h ハンドラがセット／リセットする」(`memsys.md`、Bible §2-5 の INT 18h AH=02h も「押下中」)
   = BIOS 自身が make で立てて break で落としている。シフト系キーはキーボード側でリピートしない (`memsys.md` 052A〜0539h)。
-  NP21/W の `keystat.c` も「シフトメカニカル処理」として同じ送り方。実装は `drivers/kbd.c` の `kbd_lock_apply`:
+  NP21/W の `keystat.c` も「シフトメカニカル処理」として同じ送り方。実装は `drivers/input/kbd.c` の `kbd_lock_apply`:
   make の繰り返しでも ON のまま (冪等)、**V86 中も追う** (打鍵はゲストへ回すがロックの物理状態は OS32 側でも持つ)。
 - **起動時の初期値**: IRQ1 を開く前の make は OS32 に届かないので、`kbd_init` が 053Ah のカナ・CAPS ビットを引き継ぐ
   (SHIFT / GRPH / CTRL は引き継がない)。起動行 `[kbd] ... lock=XX` (XX = 02 CAPS / 04 カナ)。電源投入時にロック済みの
@@ -170,7 +170,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
 
 準備 (**実装済み 2026-09-26、wt/kbd-diaglog、KAPI v67、NP21/W の確認範囲は §3-1、実機は未確認**。
 使い方は [POLICY_DEBUG.md](../../POLICY_DEBUG.md) §4-57 の `kbdstat -w`、試験は `make check-kbd-dlog-host`
-([記録](../../../tools/tests/kbd_dlog_tdd.md))): **受信のたびに記録する診断リング**をドライバに足す (`drivers/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
+([記録](../../../tools/tests/kbd_dlog_tdd.md))): **受信のたびに記録する診断リング**をドライバに足す (`drivers/input/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
 `seq / code / make・break / 更新後の修飾` を 32 件の循環リングへ)。読むのは KAPI `kbd_diag_log` (追記、診断専用) と
 `kbdstat -w` (リングを読んで新しい分を 1 行ずつ出す。ESC か 30 秒で終わる)。**seq が飛んだら「取りこぼし — この区間は判定不能」と出す**。
 今の `kbdstat` では足りない: `last_code` は最後の 1 件だけ、`irq_count` は EMPTY / ERROR の判定より前に増えるので受信件数ではない、

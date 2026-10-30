@@ -1,8 +1,8 @@
 /* ======================================================================== */
-/*  SERIAL_GATE_HOST.C — drivers/serial.c の SerialFS ゲート                 */
+/*  SERIAL_GATE_HOST.C — drivers/char/serial.c の SerialFS ゲート                 */
 /*                                                                          */
 /*  票 TASK_SERIAL_HOSTFS §1-v3「送受信のゲートは呼び口で分ける」。          */
-/*  実物の drivers/serial.c を #include し、ポート I/O だけを偽物にする      */
+/*  実物の drivers/char/serial.c を #include し、ポート I/O だけを偽物にする      */
 /*  (test_serialfs.py が arch_io.h / platform_io.h を差し替える。           */
 /*  tools/tests/serial_portc_host.c と同じ作り)。偽物は 8251 の送信 (0030h   */
 /*  への書き込みを記録) と受信 (待ち行列から RxRDY) を持つ。                */
@@ -88,7 +88,7 @@ int ring3_wait_pending(void) { return 0; }
 
 #include "serial.c"
 #include "serial_emergency_host.h"
-#include "../../drivers/serial_plan.c"
+#include "../../drivers/char/serial_plan.c"
 
 void cpu_delay_us(u32 us) { (void)us; }
 volatile u32 tick_count;

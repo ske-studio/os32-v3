@@ -1,7 +1,7 @@
 check-kcg-boot-host:
-- drivers/kcg.c
-- drivers/kcg.h
-- kernel/kcg_module.h
+- drivers/video/kcg/kcg.c
+- drivers/video/kcg/kcg.h
+- drivers/video/kcg/kcg_module.h
 - init/kernel.c
 - lib/utf8.c
 - tools/tests/host32.py

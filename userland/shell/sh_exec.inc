@@ -302,13 +302,13 @@ static int sh_is_cui_only(int argc, char **argv)
     if (str_eq(name, "os32gui") || str_eq(name, "rshell") ||
         str_eq(name, "filer")) return 1;
 
-    /* R5: ループデバイスの枠 (drivers/loop_dev.c の loop_slots) は sh が
+    /* R5: ループデバイスの枠 (drivers/block/loop_dev.c の loop_slots) は sh が
      * 退場しても残り、backing FD だけが owner 回収で閉じる。その後 FD 番号が
      * 再利用されると枠が別ファイルを向く。カーネル側の本修正は別票なので、
      * sh.bin では枠を作る / 使う経路をまとめて断る。 */
     if (str_eq(name, "losetup")) return 1;
 
-    /* T2: `play` は drivers/fm.c の io_wait で**同期に**鳴らし終わるまで
+    /* T2: `play` は drivers/sound/fm/fm.c の io_wait で**同期に**鳴らし終わるまで
      * CPL=0 で待つ。GUI 中は協調型全体が止まり、CTRL+STOP でも回収できない
      * (`C` を 100 個で 22 秒)。`beep` は一瞬なので残す。 */
     if (str_eq(name, "play")) return 1;

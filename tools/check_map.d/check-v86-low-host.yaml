@@ -1,7 +1,7 @@
 check-v86-low-host:
 - tools/tests/font_guard_inactive.h
 - kernel/time/sysclk.c
-- drivers/kbd.c
+- drivers/input/kbd.c
 - tools/tests/test_shm_user.py
 - tools/tests/mutpar.py
 - mm/paging.*
@@ -21,7 +21,7 @@ check-v86-low-host:
 - arch/x86/**
 - platform/pc98/**
 - gfx/gfx.h
-- drivers/loop_dev.h
+- drivers/block/loop_dev.h
 - fs/vfs.h
 - lib/kstring.h
 - sdk/include/os32/**
@@ -34,7 +34,7 @@ check-v86-low-host:
 - build/checks.d/check-v86-low-host.mk
 - exec/exec.c
 - exec/exec_kapi_init.inc
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/pgalloc.c

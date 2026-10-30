@@ -285,7 +285,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma8237_ready",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context_safe": false,
       "index": 35
     },
@@ -293,7 +293,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma_above_1mb_state",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context_safe": false,
       "index": 36
     },
@@ -309,7 +309,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma_chan_mask",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context_safe": false,
       "index": 38
     },
@@ -317,7 +317,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma_chan_setup",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context_safe": false,
       "index": 39
     },
@@ -325,7 +325,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "dma_chan_state",
-      "source": "drivers/dma8237.h",
+      "source": "drivers/dma/dma8237.h",
       "context_safe": false,
       "index": 40
     },
@@ -509,7 +509,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "kbd_diag",
-      "source": "drivers/kbd.h",
+      "source": "drivers/input/kbd.h",
       "context_safe": false,
       "index": 63
     },
@@ -1846,7 +1846,7 @@
       "stage": "S4",
       "kind": "FUNC",
       "symbol": "kcg_rom_read_ank",
-      "source": "kernel/kcg_module.h",
+      "source": "drivers/video/kcg/kcg_module.h",
       "context_safe": false,
       "index": 230
     },
@@ -1854,7 +1854,7 @@
       "stage": "S4",
       "kind": "FUNC",
       "symbol": "kcg_cache_stats",
-      "source": "kernel/kcg_module.h",
+      "source": "drivers/video/kcg/kcg_module.h",
       "context_safe": false,
       "index": 231
     },
@@ -1910,7 +1910,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_find",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 238
     },
@@ -1918,7 +1918,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_get",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 239
     },
@@ -1966,7 +1966,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_get_setup",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 245
     },
@@ -1974,7 +1974,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_trygetchar",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 246
     },
@@ -1982,7 +1982,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_cmd_port",
-      "source": "drivers/serial_plan.h",
+      "source": "drivers/char/serial_plan.h",
       "context_safe": false,
       "index": 247
     },
@@ -1990,7 +1990,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_data_port",
-      "source": "drivers/serial_plan.h",
+      "source": "drivers/char/serial_plan.h",
       "context_safe": false,
       "index": 248
     },
@@ -1998,7 +1998,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_txrdy_mask",
-      "source": "drivers/serial_plan.h",
+      "source": "drivers/char/serial_plan.h",
       "context_safe": false,
       "index": 249
     },
@@ -2038,7 +2038,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_checked_begin",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 254
     },
@@ -2046,7 +2046,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_checked_ready",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 255
     },
@@ -2054,7 +2054,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_checked_put",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 256
     },
@@ -2062,7 +2062,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_checked_empty",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 257
     },
@@ -2070,7 +2070,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "serial_checked_end",
-      "source": "drivers/serial.h",
+      "source": "drivers/char/serial.h",
       "context_safe": false,
       "index": 258
     },
@@ -2078,7 +2078,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 259,
       "retained": true
@@ -2087,7 +2087,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_cfg_read16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 260,
       "retained": true
@@ -2096,7 +2096,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_cfg_write32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 261,
       "retained": true
@@ -2105,7 +2105,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context_safe": false,
       "index": 262,
       "retained": true

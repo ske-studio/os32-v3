@@ -49,9 +49,9 @@ static void port_write(u32 port, u32 value)
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #define OS32_FM_MODULE 1
-#include "../../drivers/fm.c"
+#include "../../drivers/sound/fm/fm.c"
 #undef tick_count
-#include "../../kernel/snd_engine.c"
+#include "../../drivers/sound/fm/snd_engine.c"
 void _start(void)
 {
     snd_init();

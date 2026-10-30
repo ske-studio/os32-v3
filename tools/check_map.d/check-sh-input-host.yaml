@@ -1,7 +1,7 @@
 check-sh-input-host:
 - tools/tests/host32.py
-- drivers/pc98pt.c
-- drivers/pci_decode.c
+- drivers/block/pc98pt.c
+- drivers/pci/pci_decode.c
 - tools/tests/sh_status_host.c
 - tools/tests/test_sh_status.py
 - userland/shell/cmd_base.c

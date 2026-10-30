@@ -161,7 +161,7 @@ static void delay_scale(void)
           == 10UL * ((bad / 100UL) * 5UL / 100UL));
 
     /* **つまり cpu_delay_us の利用者は実待ちが 10 倍に伸びる。**
-     * drivers/serial.c (TxRDY のポーリング間隔)、drivers/ne2000.c
+     * drivers/char/serial.c (TxRDY のポーリング間隔)、drivers/net/ne2000/ne2000.c
      * (RDC / RESET / OVW)、gfx/gfx_vram.c (RASTER_LINE_US) の 3 つ。
      * いままで**短すぎた**ので、伸びるのが正しい向き。 */
     CHECK(good > bad);

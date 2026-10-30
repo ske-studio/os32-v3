@@ -1,10 +1,10 @@
-"""drivers/serial.c が 0035h (8255 ポート C) を丸ごと書かないことのホスト試験。
+"""drivers/char/serial.c が 0035h (8255 ポート C) を丸ごと書かないことのホスト試験。
 
 教訓: docs/POLICY_DEBUG.md §4-59 (実機 PC-9821Ra266 で rshell 中にビープが
 鳴り続けた、2026-09-24)。資料: docs/hw/undocumented/io_syste.md の I/O 0035h /
 0037h (BUZ は bit3 = 1 で停止、BSR 06h = 鳴動 / 07h = 停止)。
 
-実物の drivers/serial.c を #include し、include/io.h の実装側 (arch_io.h /
+実物の drivers/char/serial.c を #include し、include/io.h の実装側 (arch_io.h /
 platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255 のポート C を
 模型として持ち、0037h の BSR を 1 ビットずつ適用し、0035h への書き込みを
 違反として数える。
@@ -25,7 +25,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/serial_portc_host.c"
 SRCS = {
-    "drivers/serial.c": ROOT / "drivers/serial.c",
+    "drivers/char/serial.c": ROOT / "drivers/char/serial.c",
     "include/pc98.h": ROOT / "include/pc98.h",
     "platform/pc98/system.c": ROOT / "platform/pc98/system.c",
 }
@@ -84,7 +84,7 @@ static inline void io_wait_n(int n) { while (n-- > 0) io_wait(); }
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ソース, パターン, 置換, 説明)
 MUTATIONS = [
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"        u8 cur = \(u8\)\(inp\(SER_MASK\) & \(IEN_RX \| IEN_TXEMP \| IEN_TX\)\);\n"
      r"        ser_ien_bsr\(cur, 0\);\n",
      "        ser_ien_bsr((u8)(IEN_RX | IEN_TXEMP | IEN_TX), 0);\n",
@@ -94,25 +94,25 @@ MUTATIONS = [
      r"(void platform_buzzer_off\(void\)\n\{\n    outp\(SYSPORT_C_BSR, )BSR_BUZ_OFF",
      r"\1BSR_BUZ_ON",
      "platform/pc98/system.c の platform_buzzer_off() が 06h (鳴動) を書く (rshell が応答のたびに鳴らす)"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"    ser_ien_bsr\(s_mask_ien, 0\);\n    ser_ien_bsr\(s_mask_ien, s_mask_ien\);\n",
      "    outp(SER_MASK, 0x00);\n    outp(SER_MASK, s_mask_ien);\n",
      "ISR のエッジ作りを直す前の 0035h 全体書き (0x00 → 許可) に戻す"
      " — 受信のたびに BUZ = 0 = 鳴動"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"        u8 cur = \(u8\)\(inp\(SER_MASK\) & \(IEN_RX \| IEN_TXEMP \| IEN_TX\)\);\n"
      r"        ser_ien_bsr\(cur, 0\);\n",
      "        outp(SER_MASK, 0x00);\n",
      "初期化の全マスクを 0035h 全体書きに戻す (SHUT0/SHUT1/BUZ も 0 になる)"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"    ser_ien_bsr\(s_mask_ien, 0\);\n    ser_ien_bsr\(s_mask_ien, s_mask_ien\);\n",
      "    ser_ien_bsr(s_mask_ien, s_mask_ien);\n",
      "ISR で許可を一度落とさない (Bible §2-10 のエッジ作りが消える)"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"    if \(which & IEN_TX\)\n        outp",
      "    if (1)\n        outp",
      "許可していない TXRE も毎回 BSR で書く (NP21/W では IRQ4 を自作しうる)"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"    outp\(SYSPORT_C_BSR, BSR_BUZ_OFF\);\n",
      "    outp(SYSPORT_C_BSR, BSR_BUZ_ON);\n",
      "初期化のブザー停止を 06h に戻す (Bible の向き = 実機では鳴動)"),
@@ -120,7 +120,7 @@ MUTATIONS = [
      r"#define BSR_BUZ_ON          0x06(.*)\n#define BSR_BUZ_OFF         0x07",
      r"#define BSR_BUZ_ON          0x07\1\n#define BSR_BUZ_OFF         0x06",
      "pc98.h の BUZ の名前を Bible の向きに戻す (platform_buzzer_off() が鳴らす)"),
-    ("drivers/serial.c",
+    ("drivers/char/serial.c",
      r"(ien & IEN_RX\)    \? )BSR_RXRE_ON : BSR_RXRE_OFF",
      r"\1BSR_TXEE_ON : BSR_RXRE_OFF",
      "RXRE を立てるつもりで TXEE を立てる (BSR の番号の取り違え)"),
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-serial-portc-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/serial.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/char/serial.c)",
               flush=True)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)
         if "--mutate" in args:

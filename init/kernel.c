@@ -19,7 +19,7 @@
 #include "gfx.h"
 #include "gf_production.h"
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
-#include "../kernel/kcg_module.h"
+#include "../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
 #include "../kernel/time/cpu_calibrate.h"
 #include "../kernel/time/sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
@@ -37,7 +37,7 @@
 #include "../kernel/irq/irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
 #include "../mm/dma_pool.h"   /* DMA プール (同 §1-3) */
 #include "bootinfo.h"   /* ブート情報域 0x7E00 (票 TASK_HDD_INSTALL 段 0) */
-#include "../kernel/cd_module.h"
+#include "../drivers/ata/cd_module.h"
 #include "vfs.h"
 
 
@@ -53,13 +53,13 @@
 #include "../kernel/ime/ime.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
-#include "../kernel/snd_engine.h"
-#include "../kernel/fm_module.h"
+#include "../drivers/sound/fm/snd_engine.h"
+#include "../drivers/sound/fm/fm_module.h"
 #include "../kernel/v86/v86_module.h"
-#include "../kernel/pcm_module.h"
-#include "../kernel/lan_module.h"
-#include "../kernel/cirrus_module.h"
-#include "../kernel/geforce_module.h"
+#include "../drivers/sound/cs4231/pcm_module.h"
+#include "../drivers/net/e82557/lan_module.h"
+#include "../drivers/video/cirrus/cirrus_module.h"
+#include "../drivers/video/geforce/geforce_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
 #include "../kernel/sqlite_engine.h"

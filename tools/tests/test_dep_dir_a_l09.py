@@ -14,7 +14,7 @@ from test_dep_dir_a_l05a import digest, public_spec
 ROOT = Path(__file__).resolve().parents[2]
 COPIES = (
     'include/types.h', 'include/platform_device.h', 'include/platform_host.h',
-    'include/net_eth.h', 'drivers/np2sysp.h', 'net/link.h',
+    'include/net_eth.h', 'drivers/char/np2sysp.h', 'net/link.h',
     'include/memmap.h', 'include/time_units.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',

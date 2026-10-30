@@ -360,7 +360,7 @@ void appslot_park_commit(void)
 /* park_check との違いは「いま gui_call(OP_WAIT) の中か」を要求しないこと
  * だけ。ここへ来るのは kbd_getchar / kbd_getkey の syscall の中で、WM の
  * コールバックではないため。GUI モードと CPL=3 フレームの有無 (票 §5 R1) は
- * drivers/kbd.c と exec/exec.c が見る — この表はハードウェアを知らない。 */
+ * drivers/input/kbd.c と exec/exec.c が見る — この表はハードウェアを知らない。 */
 int appslot_park_kbd_check(void)
 {
     AppSlot *a;

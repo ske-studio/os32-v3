@@ -4,7 +4,7 @@
 
 # === カーネル ASM ソース ===
 ASM_KERNEL_PRE  = arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm kernel/v86/v86_entry.asm arch/x86/kernel/ring3_entry.asm arch/x86/kernel/setjmp.asm
-ASM_KERNEL_POST = lib/sqlite3/sqlite_stack.asm drivers/ne2000_io.asm
+ASM_KERNEL_POST = lib/sqlite3/sqlite_stack.asm drivers/net/ne2000/ne2000_io.asm
 
 # kstring の 13 本 (kmemcpy / memcpy / kmemset / memset / kstrlen / strlen /
 # kstrcmp / strcmp / kstrncmp / strncmp / kstrcpy / kstrncpy / memcmp) は
@@ -29,15 +29,15 @@ C_KERNEL = \
     init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \
     mm/paging.c mm/paging_app.c mm/dma_pool.c mm/dma_pool_math.c mm/physmem.c mm/pgalloc.c platform/pc98/lan_match.c platform/pc98/device_loop.c platform/pc98/device_ide.c platform/pc98/device_fs.c platform/pc98/device_pci.c platform/pc98/device_host.c platform/pc98/device_kcg.c platform/pc98/pci_resources.c platform/pc98/boot_disk.c mm/memory_boot.c platform/pc98/memory.c mm/shlib.c mm/shm.c kernel/gui.c kernel/input_service.c kernel/time/clock_service.c kernel/port_service.c kernel/serial_diag.c platform/pc98/d2_bind.c platform/pc98/boot_names.c mm/kmalloc.c kernel/console/console.c platform/pc98/console.c platform/pc98/display.c kernel/console/con_sink.c init/bootlog.c init/bootlog_save.c kernel/kbd_inject.c kernel/sys.c platform/pc98/system.c platform/pc98/pic.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/irq/tick.c kernel/time/ktime.c kernel/time/time_math.c \
     kernel/ver_collect.c kernel/ver_format.c \
-    kernel/console/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module/module.c kernel/module/hwdev_module.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/console/unicode_file.c kernel/ime/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
-    drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
-    drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/dma8237.c drivers/dma8237_math.c lib/dma_contract.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
-    drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
-    drivers/lgy98.c drivers/ne2000.c drivers/ne2000_ring.c \
-    kernel/pcm_module.c kernel/lan_module.c \
-    kernel/cirrus_module.c kernel/geforce_module.c kernel/geforce_platform.c gfx/pc98_route.c gfx/cirrus_identify.c \
+    kernel/console/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module/module.c kernel/module/hwdev_module.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/console/unicode_file.c kernel/ime/fep_module.c drivers/ata/cd_module.c drivers/video/kcg/kcg_module.c drivers/sound/fm/fm_module.c \
+    drivers/input/kbd.c drivers/input/kbd_status.c drivers/input/kbd_dlog.c drivers/char/serial.c drivers/char/serial_plan.c \
+    drivers/block/fdc.c drivers/block/fdc_decide.c drivers/block/fdc_track.c drivers/dma/dma8237.c drivers/dma/dma8237_math.c lib/dma_contract.c drivers/pci/pci.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c drivers/ata/ide.c drivers/ata/ide_addr.c drivers/block/pc98pt.c drivers/char/rtc.c drivers/base/dev.c drivers/video/kcg/kcg.c drivers/char/np2sysp.c drivers/block/loop_dev.c \
+    drivers/input/mouse.c drivers/input/mouse_bus.c drivers/input/mouse_seamless.c \
+    drivers/net/ne2000/lgy98.c drivers/net/ne2000/ne2000.c drivers/net/ne2000/ne2000_ring.c \
+    drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \
+    drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
-    gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c gfx/backend_pc98.c gfx/backend_pegc.c \
+    gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
     fs/fatfs/ff.c fs/fatfs/diskio.c fs/fatfs_vfs.c \
     fs/ext2_super.c fs/ext2_inode.c fs/ext2_dir.c fs/ext2_file.c fs/ext2_fmt.c fs/ext2_layout.c fs/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrvfs.c fs/sfs_proto.c fs/sfs_client.c fs/serialfs.c fs/serialfs_session.c \
     exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
@@ -214,7 +214,7 @@ $(R1_OBJ)/build_id.o: $(R1_OUT)/build_id.c
 	$(CC) $(CFLAGS_BASE) -DOS32_R1_FIXTURE -Iinclude -c $< -o $@
 
 $(R1_OBJ)/exec/exec.o $(R1_OBJ)/kapi/kapi_generated.o: kapi/kapi_generated.c
-$(R1_OBJ)/drivers/lgy98.o $(R1_OBJ)/kapi/kapi_sys.o: .FORCE
+$(R1_OBJ)/drivers/net/ne2000/lgy98.o $(R1_OBJ)/kapi/kapi_sys.o: .FORCE
 
 $(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	@mkdir -p $(@D)
@@ -260,7 +260,8 @@ $(KERNEL_OBJ_PREFIX)fs/fatfs/%.o: private KERNEL_INCLUDES = $(INC_FATFS)
 $(KERNEL_OBJ_PREFIX)exec/%.o: private KERNEL_INCLUDES = $(INC_EXEC)
 $(KERNEL_OBJ_PREFIX)kapi/%.o: private KERNEL_INCLUDES = $(INC_KAPI)
 $(KERNEL_OBJ_PREFIX)lib/%.o: private KERNEL_INCLUDES = $(INC_LIB)
-CORE_KERNEL_INCLUDES = drivers/mouse.o drivers/loop_dev.o drivers/ne2000.o drivers/lgy98.o drivers/fdc.o fs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
+$(addprefix $(KERNEL_OBJ_PREFIX),drivers/video/cirrus/backend_cirrus.o drivers/video/cirrus/cirrus_identify.o drivers/video/geforce/backend_geforce.o drivers/video/geforce/gf_present.o drivers/video/pc98/backend_pc98.o drivers/video/pc98/backend_pegc.o drivers/video/pc98/pc98_route.o): private KERNEL_INCLUDES = $(INC_GFX)
+CORE_KERNEL_INCLUDES = drivers/ata/cd_body.o drivers/ata/cd_module.o drivers/net/e82557/lan_body.o drivers/net/e82557/lan_module.o drivers/sound/cs4231/pcm_body.o drivers/sound/cs4231/pcm_module.o drivers/sound/fm/fm_body.o drivers/sound/fm/fm_module.o drivers/sound/fm/snd_engine.o drivers/video/cirrus/cirrus_body.o drivers/video/cirrus/cirrus_module.o drivers/video/geforce/geforce_body.o drivers/video/geforce/geforce_module.o drivers/video/geforce/geforce_platform.o drivers/video/kcg/kcg_body.o drivers/video/kcg/kcg_module.o drivers/input/mouse.o drivers/block/loop_dev.o drivers/net/ne2000/ne2000.o drivers/net/ne2000/lgy98.o drivers/block/fdc.o fs/serialfs_session.o lib/sqlite3/os32_sqlite_test.o
 $(addprefix $(KERNEL_OBJ_PREFIX),$(CORE_KERNEL_INCLUDES)): private KERNEL_INCLUDES = $(INC_KERNEL)
 
 $(KERNEL_OBJ_PREFIX)%.o: %.c
@@ -273,7 +274,7 @@ $(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/in
 
 $(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
 $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c
-$(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
+$(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
 $(KERNEL_OBJ_PREFIX)fs/fatfs/ff.o: fs/fatfs/ffconf.h fs/fatfs/string.h
 $(KERNEL_OBJ_PREFIX)fs/fatfs/diskio.o: fs/fatfs/ff.h fs/fatfs/diskio.h
 

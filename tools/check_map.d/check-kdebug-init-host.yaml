@@ -24,7 +24,7 @@ check-kdebug-init-host:
 - kernel/module/kdebug_imports.def
 - kdebug/nic_trace.c
 - kdebug/nic_trace.h
-- drivers/e82557.h
+- drivers/net/e82557/e82557.h
 - fs/vfs.h
 - tools/tests/nic_trace_host.c
 - kdebug/kdebug_main.c
@@ -36,8 +36,8 @@ check-kdebug-init-host:
 - kdebug/recover_profile.c
 - kdebug/recover_wire.h
 - kdebug/gfinit.h
-- drivers/serial.h
-- drivers/serial_plan.h
+- drivers/char/serial.h
+- drivers/char/serial_plan.h
 - kernel/console/display_restore.h
 - kernel/module/kdebug_call.c
 - kdebug/kselftest.c

@@ -190,7 +190,7 @@
  * カーネル内の vfs_fstype は KAPI に出ていない。 */
 #define HS_EXT2_ROOT_INO 2UL
 
-/* フロッピーのデバイス名の先頭 (drivers/dev.c の "fd0" / "fd1"、kernel.c の
+/* フロッピーのデバイス名の先頭 (drivers/base/dev.c の "fd0" / "fd1"、kernel.c の
  * FD 起動のルート root_dev = "fd0")。同期先のマウントがこれなら断る */
 #define HS_FD_DEV_PREFIX0 'f'
 #define HS_FD_DEV_PREFIX1 'd'

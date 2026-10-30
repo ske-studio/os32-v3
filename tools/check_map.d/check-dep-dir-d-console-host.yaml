@@ -36,5 +36,5 @@ check-dep-dir-d-console-host:
 - lib/utf8.h
 - platform/pc98/platform_io.h
 - tools/tests/dep_dir_d_console_grid_host.c
-- gfx/pc98_route.h
+- drivers/video/pc98/pc98_route.h
 - tools/tests/kernel_includes.py

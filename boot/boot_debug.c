@@ -176,7 +176,7 @@ int boot_main(void)
             PC98PartEntry pe;
             unsigned long st, ln;
 
-            /* 標準配置で読む (drivers/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
+            /* 標準配置で読む (drivers/block/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
             (void)pc98pt_get(buf, i, &pe);
             if (pc98pt_entry_range(&pe, param_heads, param_spt, 0,
                                    &st, &ln) == PC98PT_OK)

@@ -1,7 +1,7 @@
 # 82557 LB-3 記述子・停止証拠のホスト試験
 
 契約: [TASK_LAN_82557](../../docs/tasks/realhw/TASK_LAN_82557.md) §2 LB-3。
-実物 `drivers/e82557_desc.c` を include。I/Oなし、freestanding ILP32/qemu-i386。
+実物 `drivers/net/e82557/e82557_desc.c` を include。I/Oなし、freestanding ILP32/qemu-i386。
 48ケースの正典は `test_e82557_desc.py` CASES。
 
 | 番号 | 独立oracle |

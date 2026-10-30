@@ -1,7 +1,7 @@
 check-shm-user-host:
 - include/platform_emergency.h
 - tools/tests/font_guard_inactive.h
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - include/pegc.h
 - gfx/gfx.h

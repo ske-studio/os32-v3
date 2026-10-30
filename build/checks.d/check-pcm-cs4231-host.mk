@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 011:check-pcm-cs4231-host
-# CS4231 (MATE-X PCM) の再生ドライバ (drivers/pcm_cs4231_math.c + pcm_cs4231.c)。
+# CS4231 (MATE-X PCM) の再生ドライバ (drivers/sound/cs4231/pcm_cs4231_math.c + pcm_cs4231.c)。
 # 票 docs/tasks/v3/TASK_PCM_CS4231.md §2-3 / E1。
 # **NP21/W では踏めない分岐がここの主目的**: 1 周回った観測 (同じ半分で位置が
 # 戻る)、補充の余裕 (REFILL_MARGIN) を割った切り替え、drain の 3 段階、初期化列

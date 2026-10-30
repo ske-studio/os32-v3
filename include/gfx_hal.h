@@ -122,22 +122,22 @@ extern GfxCounters gfx_counters;
  * 静的初期化子で 9801 を指すので、gfx_init 前でも NULL にはならない。 */
 extern const GfxBackend *g_backend;
 
-/* 9801 プレーンバックエンド (gfx/backend_pc98.c)。
+/* 9801 プレーンバックエンド (drivers/video/pc98/backend_pc98.c)。
  * H3 (Cirrus) はこの表にもう 1 枚足す。 */
 extern GfxBackend gfx_backend_pc98;
 
-/* 9821 PEGC 256 色バックエンド (gfx/backend_pegc.c, H2)。
+/* 9821 PEGC 256 色バックエンド (drivers/video/pc98/backend_pegc.c, H2)。
  * **const ではない**: バックバッファは起動時の ⑥ が池から確保する (台帳の
  * SURFACE) から埋める。9801 も gfx_core の共通設定で CLIENT に結び付ける。
  *
- * **weak 宣言**: gfx/backend_pegc.c を build/kernel.mk の C_KERNEL に入れて
+ * **weak 宣言**: drivers/video/pc98/backend_pegc.c を build/kernel.mk の C_KERNEL に入れて
  * いないビルドではこのシンボルは 0 になり、バックエンド表の該当要素が NULL に
  * なって probe から外れる (= 9801 だけの従来どおりの動作)。表に強い参照を
  * 置くとファイルを足すまでリンクが通らなくなるため。 */
 extern GfxBackend gfx_backend_pegc __attribute__((weak));
 
 /* ROM (INT 18h AH=30h) で 400 ラインへ戻れなかったときの OS32 側の戻し
- * (gfx/backend_pegc.c、`v86 -g` だけが呼ぶ)。拡張モードを抜け、hsync31
+ * (drivers/video/pc98/backend_pegc.c、`v86 -g` だけが呼ぶ)。拡張モードを抜け、hsync31
  * (1 = 31kHz / 0 = 24kHz) の 400 ラインの SYNC を入れてグラフィック GDC を
  * 止める。backend_pegc.c を入れないビルドでは 0 (weak) — 呼ぶ側が確かめる。 */
 void pegc_restore_text_sync(int hsync31) __attribute__((weak));

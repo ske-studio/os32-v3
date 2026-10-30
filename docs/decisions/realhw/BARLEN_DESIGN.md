@@ -104,7 +104,7 @@ if (raw && !(raw & PCI_BAR_SPACE_IO)) {
 
 | 定数の置き場 | 内容 |
 |---|---|
-| `drivers/pci_decode.h:88`、同:148 | BAR0 offset/count、IO/type/prefetch/address mask を既存定義から利用 |
+| `drivers/pci/pci_decode.h:88`、同:148 | BAR0 offset/count、IO/type/prefetch/address mask を既存定義から利用 |
 | `kdebug/gfinit_resources.c` Local | FXP_ID=0x12298086、BAR0=0、BAR2=2、CSR_LEN=0x1000、FLASH_LEN=0x100000 |
 | 同 Local | ATTR_MASK=0xf、ATTR_MEM32=0、BAR_STRIDE=4、TRIDENT_ID=0x96601023、REV=0xd3、ROM_ADDR_MASK=0xfffff800。revision offsetは既存PCI定義を利用 |
 | `kdebug/recover.h:46` | 既存 RECOVER_RANGE_MAX を利用。終端は既存 RECOVER_ADDRESS_END を利用 |
@@ -162,7 +162,7 @@ helper の処理順:
 | 変更 | `docs/decisions/realhw/GF6200_4A_DESIGN.md` BARLEN契約への参照 | 3〜5 |
 
 
-- gfinit.c、recover.c、drivers/pci_decode.h、build/hwdev.mk は変更不要。新objectを作らず M4 との接点を小さくする。
+- gfinit.c、recover.c、drivers/pci/pci_decode.h、build/hwdev.mk は変更不要。新objectを作らず M4 との接点を小さくする。
 - fixture は E の7台の pcidump から転記し、それ以外の function は vendor=ffffh。raw attribute bit を保持する。
 - この起草では上記リポジトリファイルを変更していない。書いたのは本ディレクトリの設計票と参照用資料だけ。
 
@@ -213,4 +213,4 @@ helper の処理順:
 
 ## 取り込みの後の名前の変更 (2026-10-25、票 TASK_MAGIC_NUM の M4)
 
-- 境目の設計コード (`resource_bar_specs`) の `GF_RES_FXP_ID` は `((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL)`、`GF_RES_ATTR_MEM32` は `PCI_BAR_MEM_TYPE32` (どちらも `drivers/pci_decode.h`) に置き換えた。値と動作は同じ (機械語の差 0)。
+- 境目の設計コード (`resource_bar_specs`) の `GF_RES_FXP_ID` は `((PCI_DEVICE_82557 << 16) | PCI_VENDOR_INTEL)`、`GF_RES_ATTR_MEM32` は `PCI_BAR_MEM_TYPE32` (どちらも `drivers/pci/pci_decode.h`) に置き換えた。値と動作は同じ (機械語の差 0)。

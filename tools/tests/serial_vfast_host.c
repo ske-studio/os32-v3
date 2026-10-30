@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  SERIAL_VFAST_HOST.C — drivers/serial_plan.c をそのままホストで回す      */
+/*  SERIAL_VFAST_HOST.C — drivers/char/serial_plan.c をそのままホストで回す      */
 /*                                                                          */
 /*  実物の判定を 1 行も写さずに #include する。serial_plan.c は I/O も      */
 /*  tick_count も触らないので、模型は 1 つも要らない。                      */
@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "serial_diag_host.h"
-#include "../../drivers/serial_plan.c"
+#include "../../drivers/char/serial_plan.c"
 /* 番犬はシェル側 (userland/shell) に住む — 戻す判断をするのは
  * ゲストのシェルで、カーネルには周期フックが無いため。 */
 #include "../../userland/shell/serial_watchdog.c"
@@ -72,7 +72,7 @@ static void compat_exact(void)
     struct serial_plan_out p;
 
     /* 9600 は 1.9968MHz / 2.4576MHz のどちらでもちょうど出る唯一の
-     * 標準速度 (drivers/serial.h の表)。 */
+     * 標準速度 (drivers/char/serial.h の表)。 */
     serial_plan(9600UL, 0, CLK_1997, 0, &p);
     CHECK(p.mode == SER_MODE_COMPAT);
     CHECK(p.count == 13);          /* 1996800 / 16 / 9600 */

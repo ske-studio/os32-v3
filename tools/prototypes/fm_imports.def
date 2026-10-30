@@ -2,9 +2,9 @@
   "schema": 1,
   "contracts": [
     "include/fm_contract.h",
-    "kernel/fm_module.h",
-    "drivers/fm.h",
-    "kernel/snd_engine.h"
+    "drivers/sound/fm/fm_module.h",
+    "drivers/sound/fm/fm.h",
+    "drivers/sound/fm/snd_engine.h"
   ],
   "imports": [
     {

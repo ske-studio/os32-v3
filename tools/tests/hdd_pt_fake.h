@@ -4,7 +4,7 @@
 /*                                                                          */
 /*  票 TASK_HDD_INSTALL 段 1-5 で ext2_find_partition の LBA 1088 への       */
 /*  フォールバックを廃止した。以前の試験は「区画表が空 → 1088」に寄りかかって */
-/*  いたので、RAM ディスクの LBA 1 に**本物の共有部 (drivers/pc98pt.c) で**  */
+/*  いたので、RAM ディスクの LBA 1 に**本物の共有部 (drivers/block/pc98pt.c) で**  */
 /*  OS32 の区画 (標準配置、8/17) を書く。区画はシリンダ単位なので、ディスクは */
 /*  PT_FAKE_ROUNDUP で FS の大きさをシリンダへ切り上げた分だけ確保する。     */
 /*                                                                          */
@@ -15,8 +15,8 @@
 #ifndef HDD_PT_FAKE_H
 #define HDD_PT_FAKE_H
 
-#include "../../drivers/pc98pt.h"
-#include "../../drivers/pc98pt.c"
+#include "../../drivers/block/pc98pt.h"
+#include "../../drivers/block/pc98pt.c"
 #include "ext2_layout.c"          /* -I fs (変異では写しの fs) から */
 
 #define PT_FAKE_HEADS   8u

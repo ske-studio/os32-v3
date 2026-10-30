@@ -1,5 +1,5 @@
 /* Independent byte oracles for the LB3 descriptor and RFD ring contract. ILP32/qemu. */
-#include "../../drivers/e82557_desc.c"
+#include "../../drivers/net/e82557/e82557_desc.c"
 STATIC_ASSERT(sizeof(u32) == 4, ilp32);
 static int failed;
 #define CHECK(x) do { if (!(x)) failed++; } while (0)

@@ -3,9 +3,9 @@
 /*  FDC_TRACK_HOST.C — FD のトラック単位の読み出しをホストで回す            */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する:                                    */
-/*    drivers/fdc_track.c  … 区切り・先読み・読み直し (純粋な層)            */
-/*    drivers/fdc_decide.c … 時間上限の式                                   */
-/*    drivers/fdc.c        … シークの省略・まとめ読み・覚えたシリンダの破棄 */
+/*    drivers/block/fdc_track.c  … 区切り・先読み・読み直し (純粋な層)            */
+/*    drivers/block/fdc_decide.c … 時間上限の式                                   */
+/*    drivers/block/fdc.c        … シークの省略・まとめ読み・覚えたシリンダの破棄 */
 /*  fdc.c のポートは tools/tests/fdc_hostshim/io.h が下の µPD765A の模型へ  */
 /*  回す。tick_count は -D で「読むたびに 1 進む」時計に差し替える          */
 /*  (待ちのループが模型の上で有限に終わるように)。                          */
@@ -20,13 +20,13 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "../../drivers/fdc_decide.c"
-#include "../../drivers/fdc_track.c"
+#include "../../drivers/block/fdc_decide.c"
+#include "../../drivers/block/fdc_track.c"
 /* fdc.c の DMA の窓の検査 (dma_range_ok) は dma_alloc と同じ関数 — 実物を通す
  * (TASK_T1_LEDGER §4-3)。 */
-#include "../../drivers/dma8237_math.c"
+#include "../../drivers/dma/dma8237_math.c"
 #include "../../lib/dma_contract.c"
-#include "../../drivers/fdc.c"
+#include "../../drivers/block/fdc.c"
 /* 実表・公開順・2 巡・EOI 経路を同じ装置模型で通す。 */
 #include "irq_math.c"
 #define irq_register host_irq_register
@@ -1667,7 +1667,7 @@ static void sis_edge_limit(void)
 /*  取り出したファイル (FDC_TRACK_FONT)、その FatFs のパスは FDC_TRACK_PATH。*/
 /*  2026-09-25 に既定フォントが MINIMAL から外れて FD に載らなくなったので、*/
 /*  同じ読み方を FD に残る大きいファイル (/vmkrnl.lz4) で回す。         */
-/*  読み方: kernel/boot_font.c → drivers/kcg.c の kcg_load_font と           */
+/*  読み方: kernel/boot_font.c → drivers/video/kcg/kcg.c の kcg_load_font と           */
 /*  fs/vfs_fd.c / fs/fatfs_vfs.c のとおり:                                  */
 /*    vfs_open        = stat + get_file_size (どちらも f_stat)               */
 /*    vfs_read_fd(16) = read_stream = f_open → f_lseek → f_read → f_close   */

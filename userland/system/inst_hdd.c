@@ -6,7 +6,7 @@
 /* ======================================================================== */
 
 #include "inst_hdd.h"
-#include "drivers/pc98pt.h"
+#include "drivers/block/pc98pt.h"
 
 #define IH_SECT 512
 

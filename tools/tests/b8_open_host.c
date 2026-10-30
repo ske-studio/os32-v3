@@ -262,7 +262,7 @@ static int g_wfail_nth;       /* 0 = armed のあいだずっと */
 static int g_wfail_seen;
 static int g_wfail_fired;
 /* 票 H2 X3b (ii) / 往復 3 所見 2: **媒体へ写した後で失敗を返す**模様。
- * drivers/ide.c は状態レジスタをデータ転送の**後**に見るので、
+ * drivers/ata/ide.c は状態レジスタをデータ転送の**後**に見るので、
  * 「書き込みが失敗した = 媒体は未変更」は成り立たない。従来の注入は写す前に
  * 返していたので、この形は 1 度も作れていなかった。 */
 static int g_wfail_land;

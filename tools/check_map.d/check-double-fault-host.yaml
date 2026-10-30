@@ -21,7 +21,7 @@ check-double-fault-host:
 - include/types.h
 - include/pc98.h
 - include/tvram.h
-- drivers/serial.h
+- drivers/char/serial.h
 - mm/paging.h
 - kernel/sqlite_engine.h
 - kernel/time/pit_math.h

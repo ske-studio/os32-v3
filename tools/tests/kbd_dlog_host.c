@@ -3,8 +3,8 @@
 /*  `kbdstat -w` の行をそのままホストで回す                                 */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する (-I で解決。変異は写しの上で):       */
-/*    drivers/kbd_dlog.c      リングの純粋部                                */
-/*    drivers/kbd.c           IRQ1 ハンドラ (0043h / 0041h は模型へ回す —   */
+/*    drivers/input/kbd_dlog.c      リングの純粋部                                */
+/*    drivers/input/kbd.c           IRQ1 ハンドラ (0043h / 0041h は模型へ回す —   */
 /*                            tools/tests/kbd_hostshim/io.h) と kbd_diag_log */
 /*    userland/shell/kbd_watch.c  kbdstat -w の行の組み立て                 */
 /*  見るのは (票 docs/tasks/gui/TASK_KBD_NAV.md §3、記録 kbd_dlog_tdd.md):    */
@@ -31,11 +31,11 @@
 #define KBD_HOST_TEST 1
 u8 kbd_host_bios_shift;
 
-#include "drivers/kbd_status.c"
-#include "drivers/kbd_dlog.c"
-#include "drivers/kbd.c"
+#include "drivers/input/kbd_status.c"
+#include "drivers/input/kbd_dlog.c"
+#include "drivers/input/kbd.c"
 #include "userland/shell/kbd_watch.c"
-#include "drivers/mouse.c"
+#include "drivers/input/mouse.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

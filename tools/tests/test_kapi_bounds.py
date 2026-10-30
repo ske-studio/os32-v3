@@ -9,7 +9,7 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/console.c', 'drivers/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c')
+SOURCES = ('platform/pc98/console.c', 'drivers/sound/fm/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c')
 GUARD = '    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n'
 MUTATIONS = [
     ('putchar', 0, 'con_backend_putchar', GUARD, '', 'putchar bounds'),

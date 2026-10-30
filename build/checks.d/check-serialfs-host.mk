@@ -1,6 +1,6 @@
 CHECK_PAR_ORDER += 056:check-serialfs-host
 # シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B、受入 T1 と T5 のホスト部分)。
-# ゲスト側の実物 (fs/sfs_proto.c・fs/sfs_client.c・fs/serialfs.c、drivers/serial.c の
+# ゲスト側の実物 (fs/sfs_proto.c・fs/sfs_client.c・fs/serialfs.c、drivers/char/serial.c の
 # ゲート、rshell の ESC と `sfs run` の行、hsync の vmkernel.old の判定) を偽の線と
 # 仮想の時計で、ホスト側の実物 (tools/serialfs_host.py・tools/rshell_serial.py) を
 # 偽のポートで回し、C と Python を相互に照合したうえで実時間のパイプで結合する。

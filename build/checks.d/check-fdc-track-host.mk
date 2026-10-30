@@ -1,6 +1,6 @@
 CHECK_PAR_ORDER += 091:check-fdc-track-host
-# FD のトラック単位の読み出し (drivers/fdc_track.c) と、同じシリンダでの
-# シークの省略・まとめ読み (drivers/fdc.c)。実機 PC-9821Ra266 で既定フォント
+# FD のトラック単位の読み出し (drivers/block/fdc_track.c) と、同じシリンダでの
+# シークの省略・まとめ読み (drivers/block/fdc.c)。実機 PC-9821Ra266 で既定フォント
 # (188KB) の読み込みが 1 分以上止まった件 (1 セクタごとに SEEK + ほぼ 1 回転)。
 # 本物の fdc.c を µPD765A の模型 (tools/tests/fdc_hostshim/io.h) の上で回す。
 # 変異は一時の木の写しに当てるのでソースは書き換えない。

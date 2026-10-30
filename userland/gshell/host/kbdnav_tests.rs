@@ -12,7 +12,7 @@ use os32api::gui::proto::{
     GUI_MODAL_YES_NO, GUI_RING_CAPACITY,
 };
 
-/* ---- raw の組み立て (drivers/kbd.c: keycode | down<<8 | mods<<9) ---- */
+/* ---- raw の組み立て (drivers/input/kbd.c: keycode | down<<8 | mods<<9) ---- */
 const DOWN: i32 = 1 << 8;
 const SHIFT: i32 = 0x01 << 9;
 const KANA: i32 = 0x04 << 9;

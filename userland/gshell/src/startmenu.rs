@@ -407,7 +407,7 @@ fn scan_programs() {
 /*  キーボード (X3 だけ)                                             */
 /* ================================================================ */
 
-/* スキャンコード (drivers/kbd.h)。 */
+/* スキャンコード (drivers/input/kbd.h)。 */
 const SC_ESC: u8 = 0x00;
 const SC_RETURN: u8 = 0x1C;
 const SC_SPACE: u8 = 0x34;

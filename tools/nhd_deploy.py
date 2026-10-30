@@ -43,7 +43,7 @@ import nhd_profile
 # (票 S0-D / D0)。書く・消す・切り詰める直前に 1 か所で止める。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import deploy_protect as protect
-# 区画表の読み書き (drivers/pc98pt.c のホスト側の写し。票 TASK_HDD_INSTALL 段 1-4)
+# 区画表の読み書き (drivers/block/pc98pt.c のホスト側の写し。票 TASK_HDD_INSTALL 段 1-4)
 import pc98pt
 
 # === パス設定 ===
@@ -797,7 +797,7 @@ def update_partition_table(nhd_path):
 
     開始 = HDD_PARTITION_LBA (1632)、長さ = そこから NHD の終わりまでのシリンダ。
     幾何は NHD ヘッダの値 (NP21/W は IDE の IDENTIFY も BIOS もこの値で見せる)。
-    配置と規則の正典は drivers/pc98pt.h、Python 側は tools/pc98pt.py。
+    配置と規則の正典は drivers/block/pc98pt.h、Python 側は tools/pc98pt.py。
     2026-09-23 までの版は開始を +6/+7/+8-9 に書く独自配置だった (F10)。
     """
     with open(nhd_path, 'r+b') as f:

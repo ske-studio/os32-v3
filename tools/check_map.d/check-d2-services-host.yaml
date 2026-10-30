@@ -7,7 +7,7 @@ check-d2-services-host:
 - include/input_service.h
 - include/kbd.h
 - include/types.h
-- drivers/kbd.h
+- drivers/input/kbd.h
 - kernel/input_service.c
 - include/pointer_service.h
 - platform/pc98/d2_bind.c
@@ -23,14 +23,14 @@ check-d2-services-host:
 - kapi/kapi_generated.c
 - sdk/include/os32/os32_kapi_shared.h
 - exec/exec_kapi_init.inc
-- drivers/mouse.h
+- drivers/input/mouse.h
 - tools/tests/pointer_fixture_host.h
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
 - kernel/serial_diag.c
 - lib/serial_diag.h
-- drivers/serial.h
+- drivers/char/serial.h
 - tools/tests/port_fixture_host.h
 - kapi/kapi_sys.c
 - kernel/console/console.c
@@ -39,8 +39,8 @@ check-d2-services-host:
 - arch/x86/kernel/double_fault.c
 - include/clock_service.h
 - kernel/time/clock_service.c
-- drivers/rtc.h
-- drivers/rtc.c
+- drivers/char/rtc.h
+- drivers/char/rtc.c
 - kernel/sys.c
 - fs/fatfs/diskio.c
 - tools/tests/clock_fixture_host.h

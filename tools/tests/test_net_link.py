@@ -103,7 +103,7 @@ def check_timer_calls_link_tick():
                   flags=re.S)
     assert len(re.findall(r"\blink_tick\s*\(", link)) == 1, \
         "net/link.c の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
-    lgy = (ROOT / "drivers/lgy98.c").read_text(encoding="utf-8")
+    lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
     assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
         "反射モードで link_init を止めていない"
     print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)

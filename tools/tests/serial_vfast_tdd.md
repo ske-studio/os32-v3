@@ -1,8 +1,8 @@
 # serial_vfast — RED → GREEN の記録
 
 票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`
-対象: `drivers/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
-      (切替後の番犬) / `drivers/serial.c` `userland/shell/rshell.c` (I/O と配線)
+対象: `drivers/char/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
+      (切替後の番犬) / `drivers/char/serial.c` `userland/shell/rshell.c` (I/O と配線)
 試験: `tools/tests/test_serial_vfast.py` + `tools/tests/serial_vfast_host.c`
 実行: `make check-serial-vfast-host` (`check-par` の列)
 
@@ -14,22 +14,22 @@
 `0132h` の RxRDY を `0032h` のビット位置で見ても、NP21/W では動いてしまう。
 
 実機に出す前に押さえられるのは「決め事」だけなので、決め事を
-`drivers/serial_plan.c` に切り出してそこを試験する。I/O を伴う部分
+`drivers/char/serial_plan.c` に切り出してそこを試験する。I/O を伴う部分
 (`0138h` / `013Ah` を実際に叩く順番、IRQ ハンドラの汲み出し) は
 **実機での確認が要る** (票 §3 の S5 / S6)。ここで緑でも実機合格ではない ([V4])。
 
 ## RED
 
 1. ハーネス (`serial_vfast_host.c`) と `test_serial_vfast.py` を先に書いた。
-   `drivers/serial_plan.c` が無いのでコンパイルが通らない = RED。
+   `drivers/char/serial_plan.c` が無いのでコンパイルが通らない = RED。
 
    ```
-   serial_vfast_host.c:18:10: fatal error: ../../drivers/serial_plan.c:
+   serial_vfast_host.c:18:10: fatal error: ../../drivers/char/serial_plan.c:
    No such file or directory
    ```
 
 2. 実装後の否定側 (`--mutate`)。実物を 1 か所だけ壊して、どれも RED になることを見る。
-   **変異は写しの上で行う** (一時ディレクトリの `drivers/serial_plan.c` を先に
+   **変異は写しの上で行う** (一時ディレクトリの `drivers/char/serial_plan.c` を先に
    引かせる) ので、実物のソースは 1 バイトも動かない = `check-par` で並列に回せる。
 
    | # | 壊し方 | 結果 |
@@ -47,8 +47,8 @@
 ## GREEN
 
 ```
-HOST GNU89 -Werror compile PASS (real drivers/serial_plan.c)
-TARGET i386-elf GNU89 -Werror PASS      (drivers/serial_plan.c + drivers/serial.c)
+HOST GNU89 -Werror compile PASS (real drivers/char/serial_plan.c)
+TARGET i386-elf GNU89 -Werror PASS      (drivers/char/serial_plan.c + drivers/char/serial.c)
 SUMMARY 10/10 PASS
 MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃げていない)
 ```
@@ -59,7 +59,7 @@ MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃
 |---|---|---|
 | `vfast_table` | 速度 → `013Ah` bit3-0 の分周。表に無い速度は **0** | `io_rs.md` 352〜380 行 / NP21/W `speedtbl` |
 | `compat_exact` | 2.4576MHz なら 9600=16 / 19200=8 / **38400=count 4 ちょうど** | 実機 Ra266 (TASK_FDC_REALHW §9-1) |
-| `compat_inexact` | **1.9968MHz の 38400 は count 3 → 実効 41600 (+8.3%)**、`exact=0` | `drivers/serial.h` の表 |
+| `compat_inexact` | **1.9968MHz の 38400 は count 3 → 実効 41600 (+8.3%)**、`exact=0` | `drivers/char/serial.h` の表 |
 | `mode_choice` | V･FAST に入るのは **FIFO 搭載 × 明示指定 × 表にある速度** の 3 つ揃ったときだけ | 票 §2 の決裁 |
 | `tx_budget` | 予算 = 2 × 10 ビット ÷ baud (9600→2083µs / 115200→173µs)、**0 にしない** | 票 §2 |
 | `tx_budget_ticks` | **予算は tick で測る**。標準速度は下限の 3 tick (保証 20ms ≥ FTDI の遅延タイマ 16ms)、遅い速度は切り上げ + 境界ずれで伸びる、1 にも 0 にもならない | 往復 3 |

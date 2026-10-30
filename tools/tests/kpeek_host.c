@@ -20,7 +20,7 @@
 #include "memmap.h"
 #include "pc98.h"
 #include "paging.h"
-#include "drivers/pci.h"
+#include "drivers/pci/pci.h"
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80 — cirrus_win_host.c と同じ) ---- */
 static void output(const char *s)

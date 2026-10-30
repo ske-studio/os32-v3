@@ -24,7 +24,7 @@ SRC = ROOT / "init/bootinfo_check.c"
 INC = ROOT / "boot/bootinfo.inc"
 # i386-elf で通す実ソース。bootinfo.c は構造体の並びを STATIC_ASSERT で見る
 # (ホストでは u32 が 64bit なので見られない)。
-TARGET_SRCS = ["init/bootinfo_check.c", "init/bootinfo.c", "drivers/ide.c"]
+TARGET_SRCS = ["init/bootinfo_check.c", "init/bootinfo.c", "drivers/ata/ide.c"]
 
 CASES = ["good", "magic", "check_word", "version", "sum", "rules", "format",
          "image", "inc_mirror"]

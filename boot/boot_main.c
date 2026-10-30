@@ -10,7 +10,7 @@
 
 #include "boot_defs.h"
 #include "../include/pc98.h"
-#include "pc98pt.h"   /* 区画表の共有部 (drivers/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
+#include "pc98pt.h"   /* 区画表の共有部 (drivers/block/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
 
 #define BOOT_ERR_NOT_FOUND (-2)
 #define BOOT_ERR_TOO_BIG   (-6)

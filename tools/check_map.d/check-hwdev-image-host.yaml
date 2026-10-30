@@ -76,8 +76,8 @@ check-hwdev-image-host:
 - tools/tests/gfinit_bus_host.c
 - tools/tests/test_gfinit_bus.py
 - tools/tests/recover_hostshim/io.h
-- drivers/pci.h
-- drivers/pci_decode.h
+- drivers/pci/pci.h
+- drivers/pci/pci_decode.h
 - sdk/include/os32/os32_kapi_shared.h
 - tools/tests/gfinit_plan_host.c
 - tools/tests/test_gfinit_plan.py
@@ -93,7 +93,7 @@ check-hwdev-image-host:
 - tools/tests/gfinit_plan_c_host.c
 - tools/tests/gf_stage_host.inc
 - kdebug/gfinit_plan_c.h
-- drivers/serial.h
+- drivers/char/serial.h
 - hwdev/gf_load_state.c
 - hwdev/gf_load_state.h
 - hwdev/gf/quiesce_rows.h

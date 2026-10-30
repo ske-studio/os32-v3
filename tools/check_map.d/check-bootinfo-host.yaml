@@ -1,6 +1,6 @@
 check-bootinfo-host:
 - boot/bootinfo.inc
-- drivers/ide.c
+- drivers/ata/ide.c
 - init/bootinfo.c
 - platform/pc98/boot_disk.c
 - platform/pc98/boot_disk.h

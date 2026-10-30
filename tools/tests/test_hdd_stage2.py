@@ -61,7 +61,7 @@ ROOM_SIZES = [16652, 20160, 36000, 62496]
 # (mutate は TimeoutExpired を RED と数える)
 CASE_TIMEOUT = 120
 
-SHARED = ["userland/system/inst_disk.c", "drivers/pc98pt.c",
+SHARED = ["userland/system/inst_disk.c", "drivers/block/pc98pt.c",
           "userland/shell/hdprep_plan.c", "fs/ext2_layout.c"]
 INS_SHARED = ["userland/system/inst_hdd.c"] + SHARED
 
@@ -77,7 +77,7 @@ MIRROR = ["userland/system/inst_disk.c", "userland/system/inst_disk.h",
           "userland/system/cdinst.c", "userland/system/install.c",
           "userland/system/install_recover.inc",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
-          "drivers/pc98pt.c", "drivers/pc98pt.h", "fs/ext2_layout.c", "fs/ext2_layout.h", "fs/ext2.h",
+          "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "fs/ext2_layout.c", "fs/ext2_layout.h", "fs/ext2.h",
           "boot/ext2_mini.c", "boot/boot_defs.h",
           "include/bootinfo.h", "include/types.h",
           "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h", "userland/lib/rt/dbgserial.h"]
