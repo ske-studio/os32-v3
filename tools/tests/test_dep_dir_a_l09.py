@@ -55,7 +55,11 @@ def contracts():
         wrappers += body + '\n'
     text = (ROOT / 'kapi/kapi_host.c').read_text()
     for name, expected in fixture['host'].items():
-        body = host_function(text, name)
+        if name == 'host_range_ok':
+            body = host_function((ROOT / 'kapi/range_internal.h').read_text(), 'kapi_user_range_ok')
+            body = body.replace('kapi_user_range_ok', name)
+        else:
+            body = host_function(text, name).replace('kapi_user_range_ok', 'host_range_ok')
         assert body.replace('platform_host_', 'link_host_') == expected, name
         wrappers += body + '\n'
     assert 'np2sysp.h' not in spec['includes']

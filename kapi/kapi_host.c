@@ -18,7 +18,7 @@
 #include "link.h"               /* LINK_MAX_PAYLOAD */
 #include "platform_host.h"
 #include "kstring.h"
-#include "exec.h"               /* ring3_user_range_ok */
+#include "range_internal.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* */
 
 extern int res_owner_get(void);
@@ -27,19 +27,10 @@ extern int res_owner_get(void);
 static char host_req_buf[LINK_MAX_PAYLOAD];
 static u8   host_wr_buf[LINK_MAX_PAYLOAD];
 
-/* 長さ付きユーザポインタの検証 (kapi_db.c の db_user_range_ok と同じ作法)。 */
-static int host_range_ok(const void *p, u32 len)
-{
-    u32 a = (u32)p;
-    if (!p) return 0;
-    if (a + len < a) return 0;              /* 加算 overflow */
-    return ring3_user_range_ok(a, len);
-}
-
 i32 kapi_host_open(const char *req, u32 len)
 {
     if (req == 0 || len == 0 || len > LINK_MAX_PAYLOAD) return OS32_ERR_INVAL;
-    if (!host_range_ok(req, len)) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(req, len)) return OS32_ERR_INVAL;
     kmemcpy(host_req_buf, req, len);
     return platform_host_open(host_req_buf, len, res_owner_get());
 }
@@ -50,8 +41,8 @@ i32 kapi_host_status(i32 h, u32 *status, u32 *length)
     i32 rc;
 
     /* **書く前に全部の出力ポインタを検証する** */
-    if (status && !host_range_ok(status, sizeof(u32))) return OS32_ERR_INVAL;
-    if (length && !host_range_ok(length, sizeof(u32))) return OS32_ERR_INVAL;
+    if (status && !kapi_user_range_ok(status, sizeof(u32))) return OS32_ERR_INVAL;
+    if (length && !kapi_user_range_ok(length, sizeof(u32))) return OS32_ERR_INVAL;
     rc = platform_host_status(h, &st, &ln, res_owner_get());
     if (rc != 0) return rc;                 /* 失敗時は出力を書かない */
     if (status) *status = st;
@@ -65,7 +56,7 @@ i32 kapi_host_read(i32 h, void *buf, u32 cap)
     i32 n;
 
     if (buf == 0 || cap == 0) return OS32_ERR_INVAL;
-    if (!host_range_ok(buf, cap)) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(buf, cap)) return OS32_ERR_INVAL;
     /* 成功確定点は link 側の最初の cli 区間。戻った時点で n は確定していて、
      * この写しの途中で再同期 / close が起きても戻り値は変えない
      * (次の呼び出しが STALE / INVAL を返す。往復 4 の R4)。 */
@@ -79,7 +70,7 @@ i32 kapi_host_write(i32 h, const void *buf, u32 len)
     u32 n;
 
     if (buf == 0 || len == 0) return OS32_ERR_INVAL;
-    if (!host_range_ok(buf, len)) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(buf, len)) return OS32_ERR_INVAL;
     /* 1 フレームに載る分だけ写す。受け付ける長さ (= min(len, 1400)) と
      * 「残り宣言長を超えたら INVAL」の判定は link 側が len を見て決める。 */
     n = (len > LINK_MAX_PAYLOAD) ? LINK_MAX_PAYLOAD : len;

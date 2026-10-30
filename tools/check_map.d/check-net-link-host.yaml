@@ -6,6 +6,7 @@ check-net-link-host:
 - exec/exec.c
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
+- kapi/range_internal.h
 - arch/x86/kernel/isr_handlers.c
 - net/link.c
 - tools/tests/net_link_host.c
