@@ -7,12 +7,12 @@
 /*  が RAW を拒否する)。検証済みのレコード (SIZING / DATASHEET / GLUE_CONST) */
 /*  は driver か glue が ledger_resource_add で別に登録する。                */
 /*                                                                          */
-/*  pgalloc.c と分けたのは drivers/pci.h を引くのをこのファイルだけにする    */
+/*  pgalloc.c と分けたのは drivers/pci/pci.h を引くのをこのファイルだけにする    */
 /*  ため (pgalloc.c を取り込むホスト試験の探索パスを増やさない)。g_pci は    */
 /*  既存の読み口 pci_get (写しを返す) で読む — 列挙の順序も config も触らない。*/
 /* ======================================================================== */
 #include "../../mm/pgalloc.h"
-#include "../../drivers/pci.h"
+#include "../../drivers/pci/pci.h"
 
 /* 記録した各デバイスの**メモリ BAR** (メモリ種別で番地が 0 でないもの) を
  * 1 本ずつ RAW のレコードにする。I/O BAR・生値 0・予約種別は飛ばす。64 ビット
@@ -60,7 +60,7 @@ u32 ledger_resource_import_pci(void)
 }
 
 #include "pci_resources.h"
-#include "../../drivers/pci_bind.h"
+#include "../../drivers/pci/pci_bind.h"
 #include "../../kernel/irq/irq.h"
 #include "kprintf.h"
 #include "pc98.h"

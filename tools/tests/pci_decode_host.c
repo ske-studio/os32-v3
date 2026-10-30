@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  PCI_DECODE_HOST.C — drivers/pci_decode.c をそのままホストで回す         */
+/*  PCI_DECODE_HOST.C — drivers/pci/pci_decode.c をそのままホストで回す         */
 /*                                                                          */
 /*  実物の復号を 1 行も写さずに #include する。pci_decode.c は I/O も        */
 /*  静的配列も構造体の padding も触らないので、模型は 1 つも要らない。       */
@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../drivers/pci_decode.c"
+#include "../../drivers/pci/pci_decode.c"
 /* `lspci -v` の行づくり (userland/shell/pci_verbose.c) も実物をそのまま。 */
 #include "../../userland/shell/pci_verbose.c"
 

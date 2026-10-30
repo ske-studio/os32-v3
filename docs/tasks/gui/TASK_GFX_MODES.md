@@ -28,9 +28,9 @@
 |---|---|---|---|---|
 | G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | **main** (675bb395、astra 取り込み可、機械語の差 0) |
 | G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [GFX_MODES_DESIGN](../../decisions/gui/GFX_MODES_DESIGN.md) | sol | **main** (astra 取り込み可、.o の差は Cirrus の 3 関数、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
-| G3 | 98 の 16 色のバックエンドがモードの表を申告 (gfx/backend_pc98.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-n16 合格) |
-| G4 | PEGC のバックエンドの表 (gfx/backend_pegc.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-p480・p400 合格) |
-| G5 | Cirrus のバックエンドの表 (gfx/backend_cirrus.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト: Cirrus が無いときの PEGC への戻り。C480 は節目) |
+| G3 | 98 の 16 色のバックエンドがモードの表を申告 (drivers/video/pc98/backend_pc98.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-n16 合格) |
+| G4 | PEGC のバックエンドの表 (drivers/video/pc98/backend_pegc.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-p480・p400 合格) |
+| G5 | Cirrus のバックエンドの表 (drivers/video/cirrus/backend_cirrus.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト: Cirrus が無いときの PEGC への戻り。C480 は節目) |
 | G6a | HAL のモードの選択と init / init_200 / prepare への反映 (gfx/gfx_core.c) | 同上 | astra | **main** (Opus 取り込み可・PM が変異 1 本を直す、PM のゲスト n16・p480・p400 合格) |
 | G6b | フレームバッファと query への反映、容量の照合 (gfx/gfx_core.c・gfx.h・gfx_internal.h) | 同上 | astra | **main** (Opus 取り込み可・P3 の 2 件を astra が直す — 98 は DISPLAY の記録が足りなくても前と同じく描ける、PM のゲスト n16・p480・p400 合格) |
 

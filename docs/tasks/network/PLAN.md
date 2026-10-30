@@ -71,11 +71,11 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 
 | 予定ファイル | 責務 |
 |---|---|
-| `drivers/lgy98.c` | BASE/IRQ 検証、カード固有ポート、probe/reset、OS32 接続 |
-| `drivers/ne2000.c` | 8390 初期化、TX/RX、Remote DMA 制御、エラー復旧、統計 |
-| `drivers/ne2000_io.asm` | `rep insw` / `rep outsw` と奇数末尾の安全な転送 |
-| `drivers/ne2000.h` | カーネル内部 API、状態、結果コード |
-| `drivers/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
+| `drivers/net/ne2000/lgy98.c` | BASE/IRQ 検証、カード固有ポート、probe/reset、OS32 接続 |
+| `drivers/net/ne2000/ne2000.c` | 8390 初期化、TX/RX、Remote DMA 制御、エラー復旧、統計 |
+| `drivers/net/ne2000/ne2000_io.asm` | `rep insw` / `rep outsw` と奇数末尾の安全な転送 |
+| `drivers/net/ne2000/ne2000.h` | カーネル内部 API、状態、結果コード |
+| `drivers/net/ne2000/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
 | `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
 | `init/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
 | `build/kernel.mk` | C/ASM ソースと必要な include path・生成依存関係 |
@@ -307,7 +307,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 ### OS32 側で確認済みのこと
 
 - `include/io.h` には `insw_rep` (rep insw) だけがあり、`outsw` 系は無い。§3 の
-  `drivers/ne2000_io.asm` で両方向を持つ方針と矛盾しない。
+  `drivers/net/ne2000/ne2000_io.asm` で両方向を持つ方針と矛盾しない。
 - `arch/x86/kernel/idt.c` は IRQ 3/5/6 を `irq_stub_unexp_*` に接続している (§2 のとおり)。
   IRQ12 は `irq_stub_12` (サウンドボード)。
 - `kernel/time/cpu_calibrate.h` (`cpu_delay_us`) と `include/io.h` の `irq_save/irq_restore` は存在する。
@@ -348,7 +348,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 ### 実装上の決定 (計画からの差分)
 
 - **NASM の生成 include は不要**: `ne2000_io.asm` はポート番号を引数で受けるので、
-  レジスタ定数の正典は `drivers/ne2000_regs.h` 1 か所で済む。
+  レジスタ定数の正典は `drivers/net/ne2000/ne2000_regs.h` 1 か所で済む。
 - **リング計算を `ne2000_ring.c` に分離**: I/O 無しの純粋関数にし、`tools/tests/ne2000_ring_test.c`
   をホスト gcc で `make check` から回す (実カード形式と NP21/W 形式の両方、ページ境界、PSTOP wrap、
   異常ヘッダ)。幾何だけでは count の形式違い (FCS の有無) は検出できないので、その判定は

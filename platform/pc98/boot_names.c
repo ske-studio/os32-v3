@@ -1,7 +1,7 @@
 /* PC-9821 lexical names, independent of the live Device registry. */
 #include "boot_names.h"
 #include "../../fs/vfs_device.h"
-#include "../../drivers/ide.h"
+#include "../../drivers/ata/ide.h"
 
 #define PC98_FD_NAME_UNITS VFS_DEV_UNIT_MAX
 #define PC98_SERIAL_NAME_ID 1

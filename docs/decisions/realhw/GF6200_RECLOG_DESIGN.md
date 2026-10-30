@@ -37,7 +37,7 @@ begin/empty非0→BEGIN/EMPTY は既存所有解除・lost_lines出口へ。poll
 時間=-33/safe-point=-34→BUDGET記録後、既存TIMEOUT等の失敗とcleanup出口を維持。ROW=-35→REC_LOG。生rcは潰す前に保存。
 put直前sent=0、成功直後sent=1/where=AFTER_PUT。tx_failを直接returnして既存fail()/end/lost_linesを飛ばさない。
 ```c
-/* drivers/serial.c: checked API の署名・import は不変。失敗は outp より前 */
+/* drivers/char/serial.c: checked API の署名・import は不変。失敗は outp より前 */
 int serial_checked_put(u32 byte) {
     unsigned int f=irq_save(); int ready=serial_checked_ready();
     if (ready!=1) { irq_restore(f); return ready<0 ? -21 : -22; }

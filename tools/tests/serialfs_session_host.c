@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  票 TASK_SERIAL_HOSTFS §1-v3 のセッション (sfs_begin / sfs_end) を、      */
 /*  実物の fs/serialfs_session.c・fs/sfs_client.c・fs/sfs_proto.c・         */
-/*  drivers/serial.c を #include して回す。偽物はポート I/O (8251 の送信を  */
+/*  drivers/char/serial.c を #include して回す。偽物はポート I/O (8251 の送信を  */
 /*  記録、受信は「届く tick」つきの待ち行列)、tick (hlt のたびに 1 進む)、  */
 /*  VFS (mount / umount / fstype)、kprintf (実物の console と同じく          */
 /*  serial_putchar へ複写)、常駐シェルの持ち主。                            */
@@ -54,7 +54,7 @@ void ring3_abort_check(void) { fprintf(stderr, "internal serial abort\n"); abort
 
 #include "serial.c"
 #include "serial_emergency_host.h"
-#include "../../drivers/serial_plan.c"
+#include "../../drivers/char/serial_plan.c"
 #include "crc32.c"
 #include "sfs_proto.c"
 #include "sfs_client.c"

@@ -1,5 +1,5 @@
 check-install-fresh-host:
-- drivers/pc98pt.c
+- drivers/block/pc98pt.c
 - fs/ext2_layout.c
 - tools/tests/install_fresh_host.c
 - tools/tests/test_install_fresh.py

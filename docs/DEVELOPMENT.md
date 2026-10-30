@@ -68,7 +68,7 @@
 | `wab_glue.h` `wab_glue_xe10.c` `wab_cirrus.c` | ウィンドウアクセラレータ: ボードグルー契約 / Xe10 内蔵 (ID 5Bh、0FAAh/0FABh) / CL-GD5430 チップ (BLT は I/O 経由、8bpp、DAC)。定数は `include/wab_xe10.h` | 決定 `decisions/gui/DESIGN.md` §6〜§8、archive/gui_v11/TASK_H3 (アーカイブ: `docs/archive/gui_v11/TASK_H3_cirrus.md`) |
 | `fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |
 | `kcg.c` | 旧 `.kcgfont` の読込 / KCG facadeへの橋 | [05 §5-9](05_drivers.md) |
-| `kernel/kcg_body.c` `kernel/kcg_module.c` | KCG ROM/cache部品 / typed facade | [05 §5-9](05_drivers.md) |
+| `drivers/video/kcg/kcg_body.c` `drivers/video/kcg/kcg_module.c` | KCG ROM/cache部品 / typed facade | [05 §5-9](05_drivers.md) |
 | `np2sysp.c` | NP21/W ハイパーコール | [05 §5-10](05_drivers.md) |
 | `lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | 票 `tasks/network/PLAN.md` |
 | `pci.c` `pci_decode.c` `pci_bind.c` `pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | 票 TASK_LAN_82557 (L-A)、票 TASK_HAL_WIRING §1-4 |
@@ -96,7 +96,7 @@
 | ファイル | 役割 | 仕様 |
 |---|---|---|
 | `gfx/gfx_core.c` `gfx_vram.c` `palette.c` | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
-| `gfx/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (BB は pool から確保した 32 頁 (SURFACE))、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、決定 `decisions/gui/DESIGN.md` |
+| `drivers/video/pc98/backend_pc98.c` `backend_pegc.c` `backend_cirrus.c` `include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (BB は pool から確保した 32 頁 (SURFACE))、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、決定 `decisions/gui/DESIGN.md` |
 | `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (core BSS の直後、MEMSYS5 384KB、代替スタック) | archive/v21/sqlite/ (アーカイブ: `docs/archive/v21/sqlite/00_INDEX.md`) |
 | `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、archive/v21/boot_reform/ (アーカイブ: `docs/archive/v21/boot_reform/00_OVERVIEW.md`) |
 

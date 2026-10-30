@@ -70,13 +70,13 @@
 | PIC | `8259A x2; vectors=20h/28h (configured)`。arch/x86/kernel/idt.h:101–102 の設定定数 | 起動済みの設定説明。実チップを検出済みと主張しない |
 | PIT | `8254 tick=100Hz input=1996800Hz`。pit_get_setup() の valid/hz/clk_hz（arch/x86/kernel/idt.c:228） | valid=0 なら `PIT: unknown`。PIT_HZ の表示だけで実設定を代用しない |
 | KBD | `8251-compatible; IRQ1 (configured)`。既存 KBD IRQ 定義を使用 | ドライバ構成を表示。kbd_diag の IRQ 数ゼロを未搭載判定に使わず、I/O 読出しも不要 |
-| SER | `8251 baud=9600 mode=compat FIFO=yes/no`。serial_get_status()（drivers/serial.c:457） | 戻り負なら `SER: not initialized`。FIFO 搭載と VFAST 動作中を分ける |
-| SND | `OPN configured; PCM=CS4231-family/none`。FM 構成＋常駐 pcm_present()（kernel/pcm_module.c:61） | FM 実在は unknown。drivers/fm.c:54 の BUSY 成功はチップ同定ではない。PCM の none は未検出またはモジュール未読込 |
+| SER | `8251 baud=9600 mode=compat FIFO=yes/no`。serial_get_status()（drivers/char/serial.c:457） | 戻り負なら `SER: not initialized`。FIFO 搭載と VFAST 動作中を分ける |
+| SND | `OPN configured; PCM=CS4231-family/none`。FM 構成＋常駐 pcm_present()（drivers/sound/cs4231/pcm_module.c:61） | FM 実在は unknown。drivers/sound/fm/fm.c:54 の BUSY 成功はチップ同定ではない。PCM の none は未検出またはモジュール未読込 |
 | GFX | `98/PEGC/Cirrus WxHxB bpp; active/GUI target`。下記 getter の保存値 | 無効な寸法・不明な backend は unknown。CUI 時の target を実描画モードと呼ばない |
 
-- drivers/pcm_cs4231.c:451–466 の検出結果は、常駐 kernel/pcm_module.c:61–64 経由で取得する。module_exports 不在なら0であり、物理的未搭載とは断定しない。個別 CS4231/A 型番の getter は増やさない。
-- kernel/snd_engine.c:640 の snd_init は再生状態の初期化であり、FM 搭載検出ではない。
-- NIC は今回は行を増やさない。ne2k_state()（drivers/lgy98.c:169）と e82557_state()（drivers/e82557.h:33）は別の状態。
+- drivers/sound/cs4231/pcm_cs4231.c:451–466 の検出結果は、常駐 drivers/sound/cs4231/pcm_module.c:61–64 経由で取得する。module_exports 不在なら0であり、物理的未搭載とは断定しない。個別 CS4231/A 型番の getter は増やさない。
+- drivers/sound/fm/snd_engine.c:640 の snd_init は再生状態の初期化であり、FM 搭載検出ではない。
+- NIC は今回は行を増やさない。ne2k_state()（drivers/net/ne2000/lgy98.c:169）と e82557_state()（drivers/net/e82557/e82557.h:33）は別の状態。
 - NIC を単一の「有／無」にするには選択経路・モジュールの状態の集約が必要で、版表示修正の段を増やす価値が小さい。
 - メモリの sys_get_mem_kb / mem_stat は既存の診断へ、FEP の辞書・起動状態も別の診断へ残す。追加表示は本票外。
 

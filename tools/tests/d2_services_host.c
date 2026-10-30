@@ -1,6 +1,6 @@
 /* Real input forwarding and PC98 binding, with recording device operations. */
 #include "input_service.h"
-#include "../../drivers/kbd.h"
+#include "../../drivers/input/kbd.h"
 #include "../../kernel/input_service.c"
 static int seen, arg, discarded;
 static u32 sequence;

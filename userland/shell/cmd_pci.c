@@ -10,21 +10,21 @@
 /*  PCMC の vendor:device) を実機の 1 回でまとめて持ち帰るための道具。      */
 /*                                                                          */
 /*  票  : docs/tasks/realhw/TASK_LAN_82557.md §2 L-A / §5-2                 */
-/*  復号: drivers/pci_decode.c を**写さずに**リンクしている                  */
+/*  復号: drivers/pci/pci_decode.c を**写さずに**リンクしている                  */
 /*        (build/programs.mk の PCI_DECODE_USER_OBJ)。BAR の種別と番地・    */
 /*        クラス名・Header Type の切り出しがカーネルと食い違わないため。    */
 /* ======================================================================== */
 
 #include "shell.h"
-#include "drivers/pci_decode.h"   /* PROGRAM_FLAGS の -I. で引く */
+#include "drivers/pci/pci_decode.h"   /* PROGRAM_FLAGS の -I. で引く */
 #include "pci_verbose.h"          /* `lspci -v` の行づくり (純粋関数) */
 
-/* P-1: drivers/pci.h の struct pci_dev と**同じ並び**でなければならない。
+/* P-1: drivers/pci/pci.h の struct pci_dev と**同じ並び**でなければならない。
  * `pci_get` はカーネル側の定義 (i386 で 40 バイト) で書くので、ここが
- * 違うと呼び手のスタックを踏む (drivers/ide.h の IdeInfo が 92B/96B で
- * ずれて `ide 0` が壊れたのと同じ穴)。drivers/pci.h はカーネル内部
+ * 違うと呼び手のスタックを踏む (drivers/ata/ide.h の IdeInfo が 92B/96B で
+ * ずれて `ide 0` が壊れたのと同じ穴)。drivers/pci/pci.h はカーネル内部
  * ヘッダなので写しをここに置く — 向こうを変えたら必ず一緒に直すこと。
- * カーネル側は drivers/pci.c の STATIC_ASSERT が 40 バイトを見張る。 */
+ * カーネル側は drivers/pci/pci.c の STATIC_ASSERT が 40 バイトを見張る。 */
 typedef struct {
     u8  bus;            /*  0 */
     u8  dev;            /*  1 */
@@ -43,14 +43,14 @@ typedef struct {
 } PciDev;               /* 40 バイト */
 
 /* 写しが本物と同じ大きさであることをコンパイル時に確かめる
- * (カーネル側は drivers/pci.c の同名の検査)。ずれたらここで止まる。 */
+ * (カーネル側は drivers/pci/pci.c の同名の検査)。ずれたらここで止まる。 */
 STATIC_ASSERT(sizeof(PciDev) == 40, shell_pci_dev_is_40);
 
-/* P-2: drivers/pci_bind.h の `struct pci_bind_info` と**同じ並び** (8 バイト)。
+/* P-2: drivers/pci/pci_bind.h の `struct pci_bind_info` と**同じ並び** (8 バイト)。
  * `pci_bind_info` (KAPI v60) はカーネル側の定義で 8 バイトちょうど書くので、
  * ここが違うと呼び手のスタックを踏む (P-1 の PciDev と同じ理由)。
- * drivers/pci_bind.h はカーネル内部ヘッダなので写しをここに置く —
- * 向こうを変えたら必ず一緒に直すこと。カーネル側は drivers/pci_bind.c の
+ * drivers/pci/pci_bind.h はカーネル内部ヘッダなので写しをここに置く —
+ * 向こうを変えたら必ず一緒に直すこと。カーネル側は drivers/pci/pci_bind.c の
  * STATIC_ASSERT が 8 バイトを見張る。
  * 票: docs/tasks/v3/TASK_HAL_WIRING.md §1-4 (診断の取得口) */
 typedef struct {
@@ -75,7 +75,7 @@ STATIC_ASSERT(sizeof(PciBindInfo) == 8, shell_pci_bind_info_is_8);
 #define SH_LINE_STORM_MASKED 1
 #define SH_LINE_QUARANTINED  2
 
-/* reason の短い名前。**添字は drivers/pci_bind.h の PCI_BIND_* の値**
+/* reason の短い名前。**添字は drivers/pci/pci_bind.h の PCI_BIND_* の値**
  * (OK 0 / NO_DRIVER 1 / IRQ_UNSUPPORTED 2 / IRQ_QUARANTINED 3 /
  *  RESET_FAILED 4 / START_FAILED 5 / NOISY 6 / NOISY_UNMASKABLE 7 /
  *  DECLINED_UNSPECIFIED 8)。switch ではなく表にするのは、常駐シェルの

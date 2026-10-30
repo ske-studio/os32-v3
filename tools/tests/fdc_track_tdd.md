@@ -10,9 +10,9 @@
   1 セクタの窓 (count=1) で回す。フォントは 16B のヘッダの後に 1024B ずつ読む
   (`kernel/boot_font.c` の `kcg_read_chunked`) ので、**要求は全部 count=1**。そこで
   要求したセクタからトラックの終わり (EOT = spt) までを 1 回で読み、残りを持っておく
-- 対象: [`drivers/fdc_track.c`](../../drivers/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
-  [`drivers/fdc.c`](../../drivers/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
-  [`drivers/fdc_decide.c`](../../drivers/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
+- 対象: [`drivers/block/fdc_track.c`](../../drivers/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
+  [`drivers/block/fdc.c`](../../drivers/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
+  [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
   [`fs/fatfs/diskio.c`](../../fs/fatfs/diskio.c) (結線と、書き込み・再初期化での破棄)
 - 実行: `python3 -B tools/tests/test_fdc_track.py [--target] [--mutate] [case ...]`
   (`make check-fdc-track-host` が `--target --mutate` 付きで回す)

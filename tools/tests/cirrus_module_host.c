@@ -2,11 +2,11 @@
 #include "module_runtime_host.c"
 #undef _start
 #ifndef CIRRUS_ADAPTER
-#define CIRRUS_ADAPTER "../../kernel/cirrus_module.c"
+#define CIRRUS_ADAPTER "../../drivers/video/cirrus/cirrus_module.c"
 #endif
 #include CIRRUS_ADAPTER
 #ifndef CIRRUS_BODY
-#define CIRRUS_BODY "../../kernel/cirrus_body.c"
+#define CIRRUS_BODY "../../drivers/video/cirrus/cirrus_body.c"
 #endif
 #include CIRRUS_BODY
 GfxCounters gfx_counters;

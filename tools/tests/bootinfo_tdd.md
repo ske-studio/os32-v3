@@ -79,7 +79,7 @@ INC MUTATION 3 RED: DL を DH と同じ位置に書く
 | `inc_mirror` | `boot/bootinfo.inc` の EQU が `include/bootinfo.h` と名前ごとに一致 (番地 `MEM_BOOTINFO_BASE` は `gen_memmap.py --check`) |
 
 `--target` は i386-elf で `init/bootinfo.c` (構造体 `bootinfo_wire` の並びと
-オフセット定数の一致を `STATIC_ASSERT`) と `drivers/ide.c` を通す。
+オフセット定数の一致を `STATIC_ASSERT`) と `drivers/ata/ide.c` を通す。
 
 ## ホストで見られない残り
 

@@ -11,10 +11,10 @@ check-tick-host:
 - tools/tests/host32.py
 - build/checks.d/check-tick-host.mk
 - tools/check_map.d/check-tick-host.yaml
-- kernel/fm_module.c
-- kernel/pcm_module.c
-- kernel/lan_module.c
-- drivers/ne2000.c
-- drivers/lgy98.c
+- drivers/sound/fm/fm_module.c
+- drivers/sound/cs4231/pcm_module.c
+- drivers/net/e82557/lan_module.c
+- drivers/net/ne2000/ne2000.c
+- drivers/net/ne2000/lgy98.c
 - net/link.c
 - tools/tests/kernel_includes.py

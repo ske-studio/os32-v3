@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "contracts": ["kernel/kcg_module.h"],
+  "contracts": ["drivers/video/kcg/kcg_module.h"],
   "imports": [
     {"symbol": "kmemcpy", "context": "normal", "irq": false, "source": "lib/kstring.h"},
     {"symbol": "kprintf", "context": "normal", "irq": false, "source": "include/kprintf.h"}

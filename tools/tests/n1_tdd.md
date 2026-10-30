@@ -89,7 +89,7 @@
   `launch_owner_exit` と `con_sink_owner_exit` の**間**にある。
 - `check_timer_calls_link_tick()` — `timer_handler` が `ne2k_timer_tick()` の**直後**に
   `link_tick()` を呼び、`kapi/kapi_host.c` が `link_tick` を呼ばず、`net/link.c` の中にも
-  呼び出しが無く (定義 1 か所だけ)、`drivers/lgy98.c` が反射モードで `link_init` を止めている。
+  呼び出しが無く (定義 1 か所だけ)、`drivers/net/ne2000/lgy98.c` が反射モードで `link_init` を止めている。
 
 ---
 
@@ -164,7 +164,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 4. **`link_tick` は `ne2k_poll()` を呼ばない**。直前に走る `ne2k_timer_tick()` が
    リング回収をするので、リンク層は `ne2k_recv` でホストキューを drain するだけ
    (1 周回 `LINK_RX_BUDGET` = 16 フレーム)。
-5. **反射モードの止め方**: `drivers/lgy98.c` が `LGY98_FLAG_REFLECT` のとき `link_init` を
+5. **反射モードの止め方**: `drivers/net/ne2000/lgy98.c` が `LGY98_FLAG_REFLECT` のとき `link_init` を
    呼ばない → `link_ready == 0` → `link_tick` が即 return。`timer_handler` の並びは
    1 本のままで済む。
 6. **`host_open` の TX 満杯**: ハンドルごとに REQUEST の枠が 1 つあるので、
@@ -214,7 +214,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 `net/l*_test.py` はどれもカウンタしか読まないので参照は無い
 (`grep -rn 'link_' tools/net_l*_test.py` で確認済み)。
 
-`check-net-m2` の反射試験は、`drivers/lgy98.c` で `LGY98_FLAG_REFLECT` のとき
+`check-net-m2` の反射試験は、`drivers/net/ne2000/lgy98.c` で `LGY98_FLAG_REFLECT` のとき
 `link_init` を呼ばなくしたので **v1 と同じ動作** (RX の消費者は反射だけ)。
 
 ---
@@ -244,7 +244,7 @@ KAPI_SPEC.md の関数表: kapi.json と一致
 
 個別のカーネル側コンパイル (`i386-elf-gcc -Wall -Wextra -Werror`) も通した:
 `net/link.c` / `kapi/kapi_host.c` / `exec/exec.c` / `arch/x86/kernel/isr_handlers.c` /
-`drivers/lgy98.c` / `kapi/kapi_generated.c`、および
+`drivers/net/ne2000/lgy98.c` / `kapi/kapi_generated.c`、および
 `userland/tests/host_test.c` (ユーザランドのフラグ)。
 
 **やっていないこと** ([V4]): `make all` / `make check` / `make clean` / 配備 /

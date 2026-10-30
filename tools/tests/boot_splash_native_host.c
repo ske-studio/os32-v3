@@ -24,7 +24,7 @@ static void outp(unsigned int port, unsigned int value);
 #undef i32
 #undef u32
 #include "../../gfx/gfx_core.c"
-#include "../../gfx/backend_pc98.c"
+#include "../../drivers/video/pc98/backend_pc98.c"
 const u8 *v86_bios_real_lowmem(void)
 {
     static const u8 bios[MEM_PAGE_SIZE] = {

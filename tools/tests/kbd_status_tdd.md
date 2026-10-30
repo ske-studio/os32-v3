@@ -1,7 +1,7 @@
 # kbd_status — RED → GREEN の記録
 
 票: 実機の打鍵不達 (2026-09-23)、経緯は [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-57
-対象: `drivers/kbd_status.c` (判定・反射の可否) / `drivers/kbd.c` (IRQ1 ハンドラ・`kbd_init`・`kbd_diag`) /
+対象: `drivers/input/kbd_status.c` (判定・反射の可否) / `drivers/input/kbd.c` (IRQ1 ハンドラ・`kbd_init`・`kbd_diag`) /
 `kernel/v86/v86_kbd.c` (仮想 8251 の空読み) / `arch/x86/kernel/isr_stub.asm` (`irq_stub_1` が反射の可否を見る)
 試験: `tools/tests/test_kbd_status.py` + `tools/tests/kbd_status_host.c`
 実行: `make check-kbd-status-host` (`check-par` の列)
@@ -84,7 +84,7 @@ FAIL case_v86empty:102: v86_kbd_in(V86_KBD_DATA) == 0x1E
 
 ```
 $ python3 -B tools/tests/test_kbd_status.py --target --mutate
-HOST GNU89 -Werror compile PASS (real drivers/kbd_status.c + kernel/v86/v86_kbd.c)
+HOST GNU89 -Werror compile PASS (real drivers/input/kbd_status.c + kernel/v86/v86_kbd.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT empty=0
 EXIT error=0

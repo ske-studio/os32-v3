@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 049:check-serial-portc-host
-# 8255 ポート C (0035h) を丸ごと書かないこと (drivers/serial.c)。実機
+# 8255 ポート C (0035h) を丸ごと書かないこと (drivers/char/serial.c)。実機
 # PC-9821Ra266 で rshell 中にビープが鳴り続けた件 (2026-09-24、
 # docs/POLICY_DEBUG.md §4-59)。0035h は RS-232C の割り込み許可 bit0-2 と
 # BUZ (bit3、0 = 鳴動)・SHUT0/SHUT1 などが同じバイトにいるので、許可は

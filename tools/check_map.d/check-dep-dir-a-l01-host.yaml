@@ -1,6 +1,6 @@
 check-dep-dir-a-l01-host:
-- drivers/pci.h
-- drivers/serial.h
+- drivers/pci/pci.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -27,9 +27,9 @@ check-dep-dir-a-l01-host:
 - include/fm_contract.h
 - include/lan_contract.h
 - include/types.h
-- kernel/pcm_module.h
-- kernel/fm_module.h
-- kernel/lan_module.h
+- drivers/sound/cs4231/pcm_module.h
+- drivers/sound/fm/fm_module.h
+- drivers/net/e82557/lan_module.h
 - mm/dma_pool.h
 - mm/dma_pool_math.c
 - kernel/module/module_runtime.h
@@ -40,8 +40,8 @@ check-dep-dir-a-l01-host:
 - fs/sfs_client.h
 - fs/sfs_proto.h
 - lib/dma_contract.c
-- drivers/dma8237.h
-- drivers/dma8237_math.c
+- drivers/dma/dma8237.h
+- drivers/dma/dma8237_math.c
 - sdk/include/os32/os32_kapi_shared.h
 - sdk/kapi.json
 - tools/prototypes/pcm_imports.def
@@ -61,8 +61,8 @@ check-dep-dir-a-l01-host:
 - build/out/*.mod
 - build/out/vmkernel.lz4
 - build/out/kdebug.bin
-- drivers/dma8237.c
-- drivers/fdc.c
+- drivers/dma/dma8237.c
+- drivers/block/fdc.c
 - kdebug/kselftest.c
 - mm/dma_pool.c
 - init/kernel.c

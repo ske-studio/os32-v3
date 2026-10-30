@@ -56,34 +56,37 @@ SDK_KAPI_HDR = sdk/include/os32/os32_kapi_shared.h
 # "arch_io.h" / "platform_io.h" をここで解決する。
 INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
 
+KERNEL_SRC_DIRS = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time kernel/v86 mm drivers/ata drivers/base drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98
+KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
+
 # カーネルコア: 自身 + ドライバ + fs + exec + shell + gfx + lib + kapi
 # (kernel.c は全サブシステムの初期化を行うため全モジュールを参照)
-INC_KERNEL = $(INC_COMMON) -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ikapi -Ilib/sqlite3
+INC_KERNEL = $(INC_COMMON) $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ikapi -Ilib/sqlite3
 
 # ドライバ: 共通 + 自身 + gfx (kcg->gfx依存)
-INC_DRIVERS = $(INC_COMMON) -Idrivers -Igfx -Ilib
+INC_DRIVERS = $(INC_COMMON) -Idrivers -Igfx -Ilib $(KERNEL_SRC_INCLUDES)
 
 # GFX: 共通 + 自身 + ドライバ (palette依存) + FS (dump時のファイル出力)
-INC_GFX = $(INC_COMMON) -Igfx -Idrivers -Ifs -Ilib -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm
+INC_GFX = $(INC_COMMON) -Igfx -Idrivers -Ifs -Ilib $(KERNEL_SRC_INCLUDES)
 
 # FS: 共通 + 自身 + ドライバ (disk/ide依存)
-INC_FS = $(INC_COMMON) -Ifs -Ifs/fatfs -Idrivers -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm -Ilib
+INC_FS = $(INC_COMMON) -Ifs -Ifs/fatfs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
 
 # FatFS: fs/fatfs/ ディレクトリ内のソースを独自の string.h スタブで解決
 # -Ifs/fatfs を先頭に指定して <string.h> → fs/fatfs/string.h へ誘導
-INC_FATFS = -Ifs/fatfs $(INC_COMMON) -Ifs -Idrivers -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm -Ilib
+INC_FATFS = -Ifs/fatfs $(INC_COMMON) -Ifs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
 
 # exec: 共通 + exec + kapi + fs + gfx + ドライバ (kbd依存)
-INC_EXEC = $(INC_COMMON) -Iexec -Ikapi -Ifs -Igfx -Idrivers -Ilib -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm
+INC_EXEC = $(INC_COMMON) -Iexec -Ikapi -Ifs -Igfx -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)
 
 # KAPI: 全モジュール (全APIラッパーのため)
-INC_KAPI = $(INC_COMMON) -Ikapi -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3
+INC_KAPI = $(INC_COMMON) -Ikapi $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3
 
 # lib: 共通 + 自身 (汎用ライブラリ: カーネル依存なし)
 INC_LIB = $(INC_COMMON) -Ilib
 
 # SQLite: カーネルFS/ドライバ + SQLiteヘッダ (VFS実装用)
-INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Idrivers -Ilib -Ikernel -Iarch/x86/kernel -Iinclude -Iinit -Ikernel/console -Ikernel/ime -Ikernel/irq -Ikernel/module -Ikernel/time -Ikernel/v86 -Imm
+INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)
 
 # === コンパイルフラグ ===
 # -MMD -MP: ヘッダ依存を .d ファイルに出力する (Makefile 末尾で -include する)。
@@ -147,7 +150,7 @@ KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
 #   選択は $(LGY98_STAMP) に残るので以後の make kernel / deploy-nhd も同じ設定でビルドする。
 #   BASE / IRQ / FLAGS は LGY98_BASE / LGY98_IRQ / LGY98_FLAGS で上書きできる
 #   (既定は NP21/W の値。FLAGS = LGY98_FLAG_* の和。DIAG 1 / LOOPBACK 2 / REFLECT 4 / LINKTEST 8)。
-#   読むのは drivers/lgy98.c だけで、その .o は毎回コンパイルされる (build/kernel.mk)。
+#   読むのは drivers/net/ne2000/lgy98.c だけで、その .o は毎回コンパイルされる (build/kernel.mk)。
 LGY98_STAMP = $(BUILD_OUT)/lgy98.flags
 LGY98_BASE  ?= 0x10D0
 LGY98_IRQ   ?= 5

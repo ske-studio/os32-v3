@@ -22,7 +22,7 @@
 #define __V86_KBD_H
 
 #include "types.h"
-#include "../../drivers/kbd.h"
+#include "../../drivers/input/kbd.h"
 
 /* PC-98 のキーボードポート。0x41 がデータ、0x43 がコマンド/ステータス。 */
 #define V86_KBD_DATA    KBD_DATA

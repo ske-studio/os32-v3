@@ -109,7 +109,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'gfx/backend_pegc.c', 'gfx/gfx_core.c')
+    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
     sources = {p: (ROOT/p).read_text() for p in paths}
     if mutation:
         name, path, old, new, expected = mutation
@@ -132,8 +132,8 @@ def run(runner, mutation=None):
         (work/'platform_emergency.h').write_text(
             (ROOT/'include/platform_emergency.h').read_text())
         (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_restore_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
-        consumer = function(sources['gfx/backend_pegc.c'], 'bios_flag')
-        consumer += function(sources['gfx/backend_pegc.c'], 'pegc_identify')
+        consumer = function(sources['drivers/video/pc98/backend_pegc.c'], 'bios_flag')
+        consumer += function(sources['drivers/video/pc98/backend_pegc.c'], 'pegc_identify')
         consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')
         (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
         (work/'v86_unwind_slice.inc').write_text(function(sources['kernel/v86/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))

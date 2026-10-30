@@ -140,7 +140,7 @@ GUI の設計判断はすべてこの上限の内側で行い、下限は 386 �
 ## 5. 表示の確認状況と残件
 
 - PEGC の TVRAM 合成は NP21/W で確認済み (2026-09-06)。
-  `pegc_query` は `GFX_CAP_TEXT_OVERLAY` を返す ([`backend_pegc.c:973–979`](../../../gfx/backend_pegc.c))。
+  `pegc_query` は `GFX_CAP_TEXT_OVERLAY` を返す ([`backend_pegc.c:973–979`](../../../drivers/video/pc98/backend_pegc.c))。
 - 480 ライン表示と 24kHz 復帰は 実機票 `TASK_PEGC480_REALHW` §5 の受入
   と同票末尾の実機記録を参照する。エミュレータ待ちという旧状態は解消済み。
 - 実機のアクセラレータでの表示リレー: 資料上は 0FA3h/0FABh レジスタ 03h bit1 または
@@ -245,7 +245,7 @@ Cirrus:
   ピクセル角以下は CPU 直書きの方が速い。GD5430 の BLT レジスタは MMIO 化できるので、
   OUT ではなくメモリ書き込みで設定する。**逸脱 (2026-09-06、H3 実装)**: Xe10 内蔵モードには
   MMIO 窓が無い (NP21/W `wab/cirrus_vga.c` の Xe10 経路は 0FAAh/0FABh + VGA レジスタ写像のみ)
-  ため、現行の `drivers/wab_cirrus.c` は BLT レジスタを **I/O (GR 拡張レジスタ) 経由**で設定する。
+  ため、現行の `drivers/video/cirrus/wab_cirrus.c` は BLT レジスタを **I/O (GR 拡張レジスタ) 経由**で設定する。
   MMIO 化は MMIO 窓を持つボード (PCI 型 / C バス製) のグルーを足すときの課題。CPU 直書きの
   閾値は `backend_cirrus.c` の `CIRRUS_CPU_DIRECT_PIXELS` (256 画素)。
 - **エンジンは非同期**: 次の描画や CPU の VRAM アクセスの前にビジービットを IN で待つ。

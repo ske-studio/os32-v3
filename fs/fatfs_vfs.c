@@ -478,7 +478,7 @@ static u32 fatfs_vfs_block_size(void *ctx)
 
 /* ======== PC-98パーティション検出 ======== */
 
-/* PC-98パーティションテーブルエントリ (32バイト) は drivers/pc98pt.h の
+/* PC-98パーティションテーブルエントリ (32バイト) は drivers/block/pc98pt.h の
  * PC98PartEntry (標準配置、ext2 / ローダ / hdprep / nhd_deploy.py と共有)。
  * バイト列からは pc98pt_get で取り出す (構造体を重ねない)。 */
 

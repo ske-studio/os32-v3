@@ -310,7 +310,7 @@ def case_restore(r):
 # ---------------------------------------------------------------------------
 def case_bauds(r):
     check(r.FAST_BAUDS == (9600, 14400, 19200, 28800, 38400, 57600, 115200),
-          "bauds: matches the V-FAST table in drivers/serial_plan.c")
+          "bauds: matches the V-FAST table in drivers/char/serial_plan.c")
 
 
 def case_lan(r):

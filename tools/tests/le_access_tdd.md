@@ -10,7 +10,7 @@
 ## 0. 正直に書く ([V4])
 
 **検査は置き換えのあとに書いた。** `fs/ext2_*.c` / `fs/iso9660.c` /
-`drivers/kcg.c` / `lib/utf8.c` の `*(u32 *)&buf[off]` を先にアクセサへ
+`drivers/video/kcg/kcg.c` / `lib/utf8.c` の `*(u32 *)&buf[off]` を先にアクセサへ
 置き換え、そのあとで `tools/check_le_access.py` を書いて
 「置き換え漏れが 0 である」ことと「今後増えない」ことを固定した。
 だから「先に RED を見た」とは書けない。
@@ -67,7 +67,7 @@ x86 のホストで見張るには **`=strict` が要る**。フラグとイン�
 | `fs/ext2_fmt.c` | 54 | 0 |
 | `fs/ext2_inode.c` | 46 | 0 |
 | `fs/ext2_super.c` | 28 | 0 |
-| `drivers/kcg.c` | 3 | 0 |
+| `drivers/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
 | `fs/ext2_file.c` / `fs/ext2_vfs.c` / `fs/iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |

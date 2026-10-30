@@ -8,7 +8,7 @@
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "kprintf.h"
-#include "../kcg_module.h"
+#include "../../drivers/video/kcg/kcg_module.h"
 
 extern const u32 v86_kexports[];
 extern const struct module_symbol_contract v86_import_contracts[];

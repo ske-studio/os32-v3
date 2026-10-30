@@ -8,8 +8,8 @@ check-hdd-stage2-host:
 - boot/boot_debug.c
 - boot/ext2_mini.c
 - build/core.yaml
-- drivers/ide_addr.c
-- drivers/pc98pt.c
+- drivers/ata/ide_addr.c
+- drivers/block/pc98pt.c
 - exec/exec.c
 - fs/ext2_dir.c
 - fs/ext2_file.c

@@ -154,7 +154,7 @@ def text_problems():
     for old, _ in HOOKS:
         if old not in body:
             problems.append('gfx/gfx_core.c: 切り出しに %r が無い (記録係へ付け替えられない)' % old)
-    for rel in ('gfx/backend_pegc.c', 'gfx/backend_cirrus.c'):
+    for rel in ('drivers/video/pc98/backend_pegc.c', 'drivers/video/cirrus/backend_cirrus.c'):
         if 'paging_map_phys(' in (ROOT / rel).read_text():
             problems.append('%s が自分で写像している (予約・写像は ⑥ の 1 回だけ)' % rel)
     for d in ('kernel', 'gfx', 'include', 'exec', 'drivers', 'kapi'):

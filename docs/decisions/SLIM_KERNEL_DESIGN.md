@@ -28,7 +28,7 @@
 |---|---|
 | E1: カーネル344KB | `docs/tasks/v3/TASK_SLIM.md:14` に対し `size build/out/kernel.elf`: text=339,219、data=30,519、合計369,738 B（361.07 KiB）。BSS=210,680 Bは別勘定 |
 | E2: 自己試験42関数 | 同`:19`に対し `nm -S --size-sort build/out/kernel.elf` の `selftest` を含む t/T は27記号13,510 B。本体16本12,912 B、補助等11記号598 B。42本は再現しない |
-| E3: 呼び手はkselftestだけ | 同`:19`に対し `drivers/lgy98.c:136`→link、`gfx/backend_pegc.c:591`→PEGC。後者は検出結果を決める実動作 |
+| E3: 呼び手はkselftestだけ | 同`:19`に対し `drivers/net/ne2000/lgy98.c:136`→link、`drivers/video/pc98/backend_pegc.c:591`→PEGC。後者は検出結果を決める実動作 |
 | E4: FDへの効果の前提 | 同`:24`のFD節約は構成依存。現物 `images/os32_boot{,144}.img` の全ディレクトリにkdebug.binもhwdev.modも無い。kdebug入りFDの空きとして使ってはいけない |
 
 - 確認一致: `kdebug/kselftest.c` 2,494行、`boot/loader_fat_new.asm` 1,050行。
@@ -50,7 +50,7 @@
 | link_selftest | 440 | net/link.c:1149 | link_ready、(cstr/link_wait_up/open/status/link_counters_reset) / R |
 | paging_app_band_selftest | 369 | mm/paging.c:1252 | page_directory/pg_enabled、(selftest_as_begin/end) / R |
 | appslot_abort_admit_selftest | 363 | exec/appslot.c:1027 | g_slot/g_cur、(slot_zero) / R |
-| pegc_linear_selftest | 346 | gfx/backend_pegc.c:599 | s_sys16m_ram、(ff2_locked_write/pegc_stat/mmio_w8/w16/pegc_alias_test) / R |
+| pegc_linear_selftest | 346 | drivers/video/pc98/backend_pegc.c:599 | s_sys16m_ram、(ff2_locked_write/pegc_stat/mmio_w8/w16/pegc_alias_test) / R |
 | paging_pd_clone_selftest | 342 | mm/paging.c:1161 | pg_enabled/pd_selftest_probe、(selftest_as_begin/end) / R |
 | db_v50_selftest | 264 | kapi/kapi_db.c:1318 | sql_copy_buf/path_copy_buf、(db_shm_empty/diag/db_copy_input/shm_row_fits_n/db_journal_name) / R |
 
@@ -166,7 +166,7 @@ import表と既存利用者:
 | ext2_format_range (`fs/ext2_fmt.c:49`) | `static int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)`へ`:100`〜`:142`のSB作成と書込。必要なlayout計算値はlayから現行式のまま参照、値の導出時点は移さない |
 | ext2_format_range 第2分割 | `static int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)`へ`:308`以降のinode2とディレクトリ作成。fmt_ctxは元関数のstaticのままポインタ渡し。ext2_g_blkも元の共用バッファ、スタックへ複製しない |
 | ime_process_key (`kernel/ime/ime.c:332`) | `static int ime_candidate_key(u8 ascii, u8 scancode)`へ`:341`〜`:489`。`if (g_ime.state != IME_ST_INPUT) return ime_candidate_key(ascii, scancode);` と直返し、残りは `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す |
-| serial_init_ex (`drivers/serial.c:215`) | **分けない**。211行には長い理由コメントが含まれる。既にserial_plan_outがあり、`:225`〜`:410`のIRQ/PIC/モード変更と復元、`:413`の区間外報告を一体で読める価値を優先 |
+| serial_init_ex (`drivers/char/serial.c:215`) | **分けない**。211行には長い理由コメントが含まれる。既にserial_plan_outがあり、`:225`〜`:410`のIRQ/PIC/モード変更と復元、`:413`の区間外報告を一体で読める価値を優先 |
 | disk_read_common / disk_write (`kernel/v86/v86_bios.c:506/720`) | **両方とも分けず共通化しない**。readはtransfer=0のverifyとD88の実トラック→論理トラック再探索（`:605`）、writeは保護拒否（`:776`）と端数RMW（`:798`）。見出しの類似だけでは同型でない |
 
 - ext2の新補助が返すのは既存のI/O結果。呼元は元と同じ位置で元と同じエラーを返す。書込み回数・順序を固定する。

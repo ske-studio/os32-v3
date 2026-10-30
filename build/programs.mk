@@ -74,26 +74,26 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
-SHELL_DEPS = kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
+SHELL_DEPS = kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/block/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
-# PCI の純粋な復号 (drivers/pci_decode.c) を `lspci` / `pcidump` からも使う。
+# PCI の純粋な復号 (drivers/pci/pci_decode.c) を `lspci` / `pcidump` からも使う。
 # **写さない** — BAR の種別と番地、クラス名、Header Type の切り出しは
 # カーネルと 1 文字も違ってはいけない。ホスト試験 (check-pci-decode-host) が
 # 見張っているのはこの 1 本だけなので、CPL=3 側でも同じソースをもう一度
 # コンパイルして繋ぐ。I/O も静的配列も触らないのでそのまま通る。
 PCI_DECODE_USER_OBJ = userland/shell/pci_decode_user.o
-$(PCI_DECODE_USER_OBJ): drivers/pci_decode.c drivers/pci_decode.h
-	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pci_decode.c -o $@
+$(PCI_DECODE_USER_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h
+	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pci/pci_decode.c -o $@
 
-# 区画表の共有部 (drivers/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
+# 区画表の共有部 (drivers/block/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
 # カーネル・ローダ・nhd_deploy.py と 1 バイトも違ってはいけない
 # (票 TASK_HDD_INSTALL 段 1-4)。
 PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
-$(PC98PT_USER_OBJ): drivers/pc98pt.c drivers/pc98pt.h
-	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pc98pt.c -o $@
+$(PC98PT_USER_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h
+	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/block/pc98pt.c -o $@
 
 $(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
 	$(CC) -E -P -x c -I$(BUILD_OUT) $< -o $@
@@ -117,16 +117,16 @@ $(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
-# 常駐側と同じ drivers/pci_decode.c を、sh.bin 用の出力先へ。
+# 常駐側と同じ drivers/pci/pci_decode.c を、sh.bin 用の出力先へ。
 SH_PCI_DECODE_OBJ = $(SH_OBJDIR)/pci_decode_user.o
-$(SH_PCI_DECODE_OBJ): drivers/pci_decode.c drivers/pci_decode.h
+$(SH_PCI_DECODE_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h
 	@mkdir -p $(SH_OBJDIR)
-	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pci_decode.c -o $@
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pci/pci_decode.c -o $@
 
 SH_PC98PT_OBJ = $(SH_OBJDIR)/pc98pt_user.o
-$(SH_PC98PT_OBJ): drivers/pc98pt.c drivers/pc98pt.h
+$(SH_PC98PT_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h
 	@mkdir -p $(SH_OBJDIR)
-	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pc98pt.c -o $@
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/block/pc98pt.c -o $@
 
 # main.c だけが #include する .inc の明示依存 (レシピ無し = 上のパターン規則に
 # 前提だけを足す)。$(SHELL_DEPS) の wildcard でも拾えるが、wildcard は
@@ -218,20 +218,20 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # hd0 の規則は install と共有 (userland/system/inst_hdd.c / inst_disk.c)。区画表
-# (drivers/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
+# (drivers/block/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
 # (fs/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
 # (票 TASK_HDD_INSTALL 段 2-9)。
 INST_HDRS = userland/system/inst_hdd.h userland/system/inst_disk.h \
-            userland/shell/hdprep_plan.h drivers/pc98pt.h fs/ext2_layout.h $(SDK_KAPI_HDR)
+            userland/shell/hdprep_plan.h drivers/block/pc98pt.h fs/ext2_layout.h $(SDK_KAPI_HDR)
 userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/ext2_layout_user.o: fs/ext2_layout.c fs/ext2_layout.h
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/pc98pt.h
+userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/block/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/pc98pt_inst.o: drivers/pc98pt.c drivers/pc98pt.h
+userland/system/pc98pt_inst.o: drivers/block/pc98pt.c drivers/block/pc98pt.h
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c $< -o $@
 INST_OBJ = userland/system/inst_hdd.o userland/system/inst_disk.o \
            userland/system/hdprep_plan_inst.o userland/system/pc98pt_inst.o \

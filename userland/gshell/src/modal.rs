@@ -97,7 +97,7 @@ pub use os32api::gui::proto::{
     GUI_MODAL_YES_NO,
 };
 
-/* スキャンコード (drivers/kbd.h)。 */
+/* スキャンコード (drivers/input/kbd.h)。 */
 const SC_ESC: u8 = 0x00;
 const SC_BS: u8 = 0x0E;
 const SC_TAB: u8 = 0x0F;
@@ -114,7 +114,7 @@ const SC_HOME: u8 = 0x3E;
 /// PC-98 のキーボードに END は無い。HELP と SHIFT+HOME を END として扱う。
 const SC_HELP: u8 = 0x3F;
 
-/* 修飾ビット (drivers/kbd.h の SHIFT_*、input.rs の MOD_* と同値)。 */
+/* 修飾ビット (drivers/input/kbd.h の SHIFT_*、input.rs の MOD_* と同値)。 */
 const MOD_SHIFT: u32 = 0x01;
 
 /* 見た目 (libos32filer の版面に合わせた寸法)。 */

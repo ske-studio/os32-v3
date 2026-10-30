@@ -2,7 +2,7 @@
  *  tools/tests/atapi_hostshim/io.h — ホスト試験用の io.h 差し替え
  *
  *  include/io.h は in / out を特権命令のインライン asm で定義するので、
- *  drivers/atapi.c をホストでそのまま走らせるために -I で先に置いて差し替え、
+ *  drivers/ata/atapi.c をホストでそのまま走らせるために -I で先に置いて差し替え、
  *  ポート操作を試験側の ATAPI デバイスの模型 (tools/tests/cd_read_host.c)
  *  へ回す。fdc_hostshim/io.h と同じ作法。
  *

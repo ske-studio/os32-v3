@@ -7,7 +7,7 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef LAN_ADAPTER
-#define LAN_ADAPTER "../../kernel/lan_module.c"
+#define LAN_ADAPTER "../../drivers/net/e82557/lan_module.c"
 #endif
 #include "e82557_regs.h"
 #include "e82557.h"
@@ -115,9 +115,9 @@ int pci_get(u32 idx, void *buf)
     return 0;
 }
 #define pci_bind_all real_pci_bind_all
-#include "../../drivers/pci_bind.c"
+#include "../../drivers/pci/pci_bind.c"
 #undef pci_bind_all
-#include "../../drivers/pci_bind_match.c"
+#include "../../drivers/pci/pci_bind_match.c"
 static u32 bind_calls, bind_reports;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {

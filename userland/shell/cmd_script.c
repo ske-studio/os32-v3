@@ -39,7 +39,7 @@ int script_in_script(void) { return g_script_depth > 0; }
 /*  sh.bin (SHELL_AS_APP) は協調型 GUI の中を走る CPL=3 アプリなので、譲ら   */
 /*  ないかぎり WM は 1 度も回らない — スクリプトが長いあいだ画面も打鍵も     */
 /*  止まる。2026-09-16 まで、この譲りは **行ごとの ESC 監視の副作用** で     */
-/*  出ていた: kbd_trygetkey が空振りすると drivers/kbd.c が exec_park_poll  */
+/*  出ていた: kbd_trygetkey が空振りすると drivers/input/kbd.c が exec_park_poll  */
 /*  を呼び、PIT tick 1 回に 1 度だけ WM へ park していた。監視を覗くだけの   */
 /*  kbd_peekkey に替えたときその副作用ごと消えたので、ここで明示的に譲り     */
 /*  直す (KAPI v49 sys_yield = 票 T9 D5 の第 4 の park 点)。                 */
@@ -76,7 +76,7 @@ static void script_yield_gui(void)
 /*  sh.bin (SHELL_AS_APP) は協調型 GUI の中を走る CPL=3 アプリなので、譲ら   */
 /*  ないかぎり WM は 1 度も回らない — スクリプトが長いあいだ画面も打鍵も     */
 /*  止まる。2026-09-16 まで、この譲りは **行ごとの ESC 監視の副作用** で     */
-/*  出ていた: kbd_trygetkey が空振りすると drivers/kbd.c が exec_park_poll  */
+/*  出ていた: kbd_trygetkey が空振りすると drivers/input/kbd.c が exec_park_poll  */
 /*  を呼び、PIT tick 1 回に 1 度だけ WM へ park していた。監視を覗くだけの   */
 /*  kbd_peekkey に替えたときその副作用ごと消えたので、ここで明示的に譲り     */
 /*  直す (KAPI v49 sys_yield = 票 T9 D5 の第 4 の park 点)。                 */

@@ -1,18 +1,18 @@
 check-e82557-desc-host:
-- drivers/e82557_desc.c
-- drivers/e82557_desc.h
-- drivers/e82557_regs.h
-- drivers/e82557.c
+- drivers/net/e82557/e82557_desc.c
+- drivers/net/e82557/e82557_desc.h
+- drivers/net/e82557/e82557_regs.h
+- drivers/net/e82557/e82557.c
 - tools/tests/e82557_desc_host.c
 - tools/tests/test_e82557_desc.py
 - tools/tests/test_e82557_drv.py
 - tools/tests/host32.py
 - tools/check_map.d/check-e82557-desc-host.yaml
 - build/checks.d/check-e82557-desc-host.mk
-- drivers/e82557_eeprom.c
-- drivers/pci_bind_match.c
-- drivers/pci_decode.c
-- kernel/lan_module.c
+- drivers/net/e82557/e82557_eeprom.c
+- drivers/pci/pci_bind_match.c
+- drivers/pci/pci_decode.c
+- drivers/net/e82557/lan_module.c
 - tools/tests/e82557_drv_host.c
 - arch/x86/kernel/isr_handlers.c
 - platform/pc98/lan_match.c

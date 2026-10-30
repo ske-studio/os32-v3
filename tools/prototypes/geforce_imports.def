@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "contracts": [
-    "kernel/geforce_module.h",
+    "drivers/video/geforce/geforce_module.h",
     "include/gfx_hal.h",
     "include/video_service.h",
     "hwdev/gf/production.h"
@@ -9,25 +9,25 @@
   "imports": [
     {
       "symbol": "pc98_route_to_gf",
-      "source": "gfx/pc98_route.h",
+      "source": "drivers/video/pc98/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_route_to_98",
-      "source": "gfx/pc98_route.h",
+      "source": "drivers/video/pc98/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_route_cell_check",
-      "source": "gfx/pc98_route.h",
+      "source": "drivers/video/pc98/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_display_failed",
-      "source": "kernel/geforce_module.h",
+      "source": "drivers/video/geforce/geforce_module.h",
       "context": "normal",
       "irq": false
     },
@@ -45,37 +45,37 @@
     },
     {
       "symbol": "pc98_route_select_98",
-      "source": "gfx/pc98_route.h",
+      "source": "drivers/video/pc98/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_console_set_safe",
-      "source": "gfx/pc98_route.h",
+      "source": "drivers/video/pc98/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_range_reserved",
-      "source": "kernel/geforce_module.h",
+      "source": "drivers/video/geforce/geforce_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_read16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context": "normal",
       "irq": false
     },

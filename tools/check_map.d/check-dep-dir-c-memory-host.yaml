@@ -12,7 +12,7 @@ check-dep-dir-c-memory-host:
 - include/*.h
 - arch/x86/*.h
 - lib/*.h
-- drivers/*.h
+- drivers/**/*.h
 - exec/*.h
 - sdk/include/os32/*.h
 - tools/tests/host_arch/*.h

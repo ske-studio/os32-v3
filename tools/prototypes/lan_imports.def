@@ -4,36 +4,36 @@
     "include/lan_contract.h",
     "include/pci_dev_contract.h",
     "include/pci_bind_contract.h",
-    "kernel/lan_module.h"
+    "drivers/net/e82557/lan_module.h"
   ],
   "imports": [
     {
       "symbol": "lan_module_irq_register",
-      "source": "kernel/lan_module.h",
+      "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_irq_unregister",
-      "source": "kernel/lan_module.h",
+      "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_dma_alloc",
-      "source": "kernel/lan_module.h",
+      "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_dma_free",
-      "source": "kernel/lan_module.h",
+      "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_trace",
-      "source": "kernel/lan_module.h",
+      "source": "drivers/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
@@ -51,31 +51,31 @@
     },
     {
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci.h",
+      "source": "drivers/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bar_base",
-      "source": "drivers/pci_decode.h",
+      "source": "drivers/pci/pci_decode.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bar_kind",
-      "source": "drivers/pci_decode.h",
+      "source": "drivers/pci/pci_decode.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bind_set_reason",
-      "source": "drivers/pci_bind.h",
+      "source": "drivers/pci/pci_bind.h",
       "context": "normal",
       "irq": false
     },

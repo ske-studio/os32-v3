@@ -2,7 +2,7 @@
  * recover_gf_prepare_plan (recover_gf.c:410), without plan/approval machinery.
  * main0..4, baseline, calc, load_state and required CHECK remain in service.c. */
 #include "production.h"
-#include "../../drivers/pci.h"
+#include "../../drivers/pci/pci.h"
 #include "../../mm/pgalloc.h"
 #include "../../lib/kstring.h"
 #include "../../lib/crc32_core.inc"

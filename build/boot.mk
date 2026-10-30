@@ -26,7 +26,7 @@ CFLAGS_BOOT = $(C_STD) $(C_DIALECT_ERRORS) -m32 -march=i386 -ffreestanding -fno-
               -Iboot -I$(BUILD_OUT) -include $(LAYOUT_HEADER)
 
 BOOT_C_SRC = boot/boot_main.c boot/ext2_mini.c boot/lz4_mini.c boot/vk32_boot.c
-# 区画表の共有部 (drivers/pc98pt.c) を**写さずに**ローダにも組む
+# 区画表の共有部 (drivers/block/pc98pt.c) を**写さずに**ローダにも組む
 # (票 TASK_HDD_INSTALL 段 1-4)。カーネル・シェル・nhd_deploy.py と同じ配置で読む。
 BOOT_PT_OBJ = $(BOOT_OUT)/pc98pt_boot.o
 BOOT_C_OBJ = $(patsubst boot/%.c,$(BOOT_OUT)/%.o,$(BOOT_C_SRC)) $(BOOT_PT_OBJ)
@@ -37,13 +37,13 @@ $(BOOT_OUT)/loader_hdd.o: boot/loader_hdd.asm
 	@mkdir -p $(@D)
 	$(AS) -f elf32 -o $@ $<
 
-$(BOOT_OUT)/boot_main.o: boot/boot_main.c boot/boot_defs.h drivers/pc98pt.h
+$(BOOT_OUT)/boot_main.o: boot/boot_main.c boot/boot_defs.h drivers/block/pc98pt.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS_BOOT) -Idrivers -c -o $@ $<
+	$(CC) $(CFLAGS_BOOT) -Idrivers/block -c -o $@ $<
 
-$(BOOT_PT_OBJ): drivers/pc98pt.c drivers/pc98pt.h
+$(BOOT_PT_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS_BOOT) -Idrivers -c -o $@ $<
+	$(CC) $(CFLAGS_BOOT) -Idrivers/block -c -o $@ $<
 
 $(BOOT_OUT)/ext2_mini.o: boot/ext2_mini.c boot/boot_defs.h
 	@mkdir -p $(@D)
@@ -103,9 +103,9 @@ BOOT_DBG_C_SRC = boot/boot_debug.c
 BOOT_DBG_C_OBJ = $(patsubst boot/%.c,$(BOOT_OUT)/%.o,$(BOOT_DBG_C_SRC))
 BOOT_DBG_ALL_OBJ = $(BOOT_ASM_OBJ) $(BOOT_DBG_C_OBJ) $(BOOT_PT_OBJ)
 
-$(BOOT_OUT)/boot_debug.o: boot/boot_debug.c boot/boot_defs.h drivers/pc98pt.h
+$(BOOT_OUT)/boot_debug.o: boot/boot_debug.c boot/boot_defs.h drivers/block/pc98pt.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS_BOOT) -Idrivers -c -o $@ $<
+	$(CC) $(CFLAGS_BOOT) -Idrivers/block -c -o $@ $<
 
 $(BOOT_OUT)/loader_hdd_debug.elf: $(BOOT_DBG_ALL_OBJ) boot/loader.ld
 	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $(filter %.o,$^) \

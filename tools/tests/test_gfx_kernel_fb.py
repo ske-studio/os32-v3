@@ -13,8 +13,8 @@ import tempfile
 import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/backend_pc98.c', 'gfx/backend_pegc.c',
-               'gfx/backend_cirrus.c', 'gfx/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
+TARGET_SRCS = ['gfx/gfx_core.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
+               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c']
@@ -122,7 +122,7 @@ static inline void io_wait_n(int n) {(void)n;}
                         body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
-            if path == 'gfx/backend_pegc.c':
+            if path == 'drivers/video/pc98/backend_pegc.c':
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''
     extern int host_pegc_available;
@@ -132,9 +132,9 @@ static inline void io_wait_n(int n) {(void)n;}
         if (sf) s_bb_phys=sf->first*PAGE_SIZE;
     }
     return s_probe_ok && host_pegc_available;''')
-            if path == 'gfx/cirrus_identify.c':
+            if path == 'drivers/video/cirrus/cirrus_identify.c':
                 body = replace_function(body,'int cirrus_identify(void)','    return 1;')
-            if path == 'gfx/backend_cirrus.c':
+            if path == 'drivers/video/cirrus/backend_cirrus.c':
                 body = replace_function(body,'static int cirrus_probe(void)', '''
     extern int host_cirrus_available;
     if (!s_probed) {
@@ -198,7 +198,7 @@ def main():
             return 'RED '+m[0]
         for message in run_ordered(one,MUTANTS): print(message)
         for name,unit,old,new,expected in [
-            ('pc98-shutdown-height','gfx/backend_pc98.c',
+            ('pc98-shutdown-height','drivers/video/pc98/backend_pc98.c',
              'gfx_current_height = gfx_backend_mode(&gfx_backend_pc98)->height;',
              'gfx_current_height = GFX_HEIGHT_200;',
              'FAIL gfx_current_height == GFX_HEIGHT'),

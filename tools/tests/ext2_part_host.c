@@ -4,7 +4,7 @@
  *  実行:   python3 -B tools/tests/test_hdd_stage1.py
  *  記録:   tools/tests/hdd_stage1_tdd.md
  *
- *  実物の fs/ext2_super.c / ext2_fmt.c / ext2_layout.c と drivers/pc98pt.c を
+ *  実物の fs/ext2_super.c / ext2_fmt.c / ext2_layout.c と drivers/block/pc98pt.c を
  *  そのまま取り込み、Device API・IDE・区画表の幾何 (bootinfo_part_geom) だけを
  *  贋物にする。見るのは:
  *    - ext2_find_partition が (開始, 長さ) を返し、見つからない / 読めない /
@@ -22,8 +22,8 @@
 #include "ide_contract.h"
 #include "platform_device.h"
 #include "kmalloc.h"
-#include "../../drivers/pc98pt.h"
-#include "../../drivers/pc98pt.c"
+#include "../../drivers/block/pc98pt.h"
+#include "../../drivers/block/pc98pt.c"
 #include "ext2_layout.c"
 
 /* ======================================================================== */

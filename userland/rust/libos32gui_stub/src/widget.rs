@@ -11,7 +11,7 @@ use os32api::gui::types::Rect;
 
 pub use os32api::gui::stub::WidgetId;
 
-/* PC-98 スキャンコード (drivers/kbd.h)。契約 U2a: `Key` は scan を運ぶ。 */
+/* PC-98 スキャンコード (drivers/input/kbd.h)。契約 U2a: `Key` は scan を運ぶ。 */
 pub const SCAN_ESC: u8 = 0x00;
 pub const SCAN_BS: u8 = 0x0E;
 pub const SCAN_TAB: u8 = 0x0F;

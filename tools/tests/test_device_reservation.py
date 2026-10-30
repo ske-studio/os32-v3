@@ -6,7 +6,7 @@
 票 docs/archive/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
 核 (pgalloc_device_reserve / sys_device_reserve_core) を台帳の ledger_reserve_set
 に載せ直したので、その試験をここで流用・拡張する。mm/pgalloc.c と
-platform/pc98/pci_resources.c を丸ごと、drivers/pci.c からは読み口 pci_get だけを
+platform/pc98/pci_resources.c を丸ごと、drivers/pci/pci.c からは読み口 pci_get だけを
 切り出して取り込む (特権命令の irq_save / irq_restore だけを贋物にし、
 irq_restore の度に L1 / L2 の不変条件を全ページ検査する — test_ledger.py と同じ
 足場)。見るもの:
@@ -48,7 +48,7 @@ import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
 SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
-           'platform/pc98/pci_resources.c', 'drivers/pci.c', 'mm/paging.c', 'kernel/sys.c',
+           'platform/pc98/pci_resources.c', 'drivers/pci/pci.c', 'mm/paging.c', 'kernel/sys.c',
            'init/kernel.c')
 
 
@@ -63,7 +63,7 @@ def load(mutation=None):
 
 
 def pci_reader(pci_c):
-    """drivers/pci.c から読み口 pci_get の本体だけを切り出す (I/O を触らない)。"""
+    """drivers/pci/pci.c から読み口 pci_get の本体だけを切り出す (I/O を触らない)。"""
     head = 'int pci_get(u32 idx, void *out)'
     body = pci_c.split(head, 1)[1]
     return head + body.split('\n}\n', 1)[0] + '\n}\n'
@@ -580,7 +580,7 @@ BODIES['cardbus'] = r"""
 
 def run_c(texts, body):
     """本体を組んで実行し、(成功, 出力) を返す。"""
-    extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['drivers/pci.c']))
+    extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['drivers/pci/pci.c']))
              .replace('@LEDGER_PCI@', pci_source(texts['platform/pc98/pci_resources.c'])))
     post = L.POST.replace('static int test(void) {', extra + 'static int test(void) {', 1)
     with tempfile.TemporaryDirectory(prefix='os32-devres-') as tmp:
@@ -591,7 +591,7 @@ def run_c(texts, body):
         cmd = ['gcc', *linker_flags()] + L.FLAGS + ['-I' + str(tmp)]
         cmd += include_flags(ROOT)
         build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
-                                      str(ROOT / 'drivers/pci_decode.c'),
+                                      str(ROOT / 'drivers/pci/pci_decode.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr

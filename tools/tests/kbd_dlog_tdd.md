@@ -1,7 +1,7 @@
 # kbd_dlog — RED → GREEN の記録
 
 票: [`docs/tasks/gui/TASK_KBD_NAV.md`](../../docs/tasks/gui/TASK_KBD_NAV.md) §3 (実機で確かめることの準備)
-対象: `drivers/kbd_dlog.c` (リングの純粋部) / `drivers/kbd.c` (IRQ1 ハンドラが積む、`kbd_diag_log`) /
+対象: `drivers/input/kbd_dlog.c` (リングの純粋部) / `drivers/input/kbd.c` (IRQ1 ハンドラが積む、`kbd_diag_log`) /
 `userland/shell/kbd_watch.c` (`kbdstat -w` の行)
 試験: `tools/tests/test_kbd_dlog.py` + `tools/tests/kbd_dlog_host.c` (+ `tools/tests/kbd_hostshim/io.h`)
 実行: `make check-kbd-dlog-host` (`check-par` の列)
@@ -10,7 +10,7 @@
 
 GUI のマウスキー (票 TASK_KBD_NAV) はカナをマウスモードの切り替えに使う。実機のカナ
 (と CAPS) が「ロックで make、解除で break」(機械式ロック) か「押すたびに make だけ」かで
-`drivers/kbd.c` の扱い (方式 A / B、票 §2) が決まるが、今の `kbdstat` では判定できない:
+`drivers/input/kbd.c` の扱い (方式 A / B、票 §2) が決まるが、今の `kbdstat` では判定できない:
 `last_code` は最後の 1 件だけ、`irq_count` は EMPTY / ERROR も数える、`now` は 8251 の
 ステータスでカナの状態ではない。そこで IRQ1 が 0041h から**使うバイトを読むたびに**
 `seq / code / 処理後の修飾 / 印` を 32 件の循環リングへ積み、KAPI v67 `kbd_diag_log` で
@@ -20,14 +20,14 @@ GUI のマウスキー (票 TASK_KBD_NAV) はカナをマウスモードの切�
 
 **EMPTY / ERROR を積まないことは NP21/W では踏めない** (`keyboard_i43` は IRQ1 の前に
 必ず RxRDY を立て、エラービットは溢れの OE しか出さない)。リングの溢れ (読み手が 32 件
-以上遅れる) もエミュレータでは狙って作りにくい。`drivers/kbd.c` は IRQ1 ハンドラごと
+以上遅れる) もエミュレータでは狙って作りにくい。`drivers/input/kbd.c` は IRQ1 ハンドラごと
 実物をホストで回し、0043h / 0041h だけ模型 (`kbd_hostshim/io.h`) へ回す。
 
 ## RED
 
 ### RED 1 — IRQ1 が積まない (実装前の姿)
 
-`drivers/kbd.c` の `kbd_dlog_push(...)` の 1 行を外した写しで回した (リングの純粋部と
+`drivers/input/kbd.c` の `kbd_dlog_push(...)` の 1 行を外した写しで回した (リングの純粋部と
 行の組み立ては通るが、IRQ1 を通る 3 ケースが落ちる):
 
 ```
@@ -61,7 +61,7 @@ CAP 以下なので `kbd_dlog_copy` は頭打ち無しでも CAP 件を超えて
 
 ```
 $ python3 -B tools/tests/test_kbd_dlog.py --target --mutate
-HOST GNU89 -Werror compile PASS (real drivers/kbd_dlog.c + drivers/kbd.c + userland/shell/kbd_watch.c)
+HOST GNU89 -Werror compile PASS (real drivers/input/kbd_dlog.c + drivers/input/kbd.c + userland/shell/kbd_watch.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT ring_basic=0
 EXIT ring_wrap=0

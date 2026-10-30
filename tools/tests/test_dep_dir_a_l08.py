@@ -13,8 +13,8 @@ from test_dep_dir_a_l05a import digest, public_spec
 ROOT = Path(__file__).resolve().parents[2]
 COPIES = (
     'include/types.h', 'include/platform_device.h', 'include/pci_dev_contract.h',
-    'include/pci_bind_contract.h', 'drivers/pci.h', 'drivers/pci_decode.h',
-    'drivers/pci_bind.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'include/pci_bind_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h',
+    'drivers/pci/pci_bind.h', 'sdk/include/os32/os32_kapi_shared.h',
     'include/memmap.h', 'include/time_units.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h',

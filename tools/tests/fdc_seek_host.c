@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  FDC_SEEK_HOST.C — drivers/fdc_decide.c をそのままホストで回す           */
+/*  FDC_SEEK_HOST.C — drivers/block/fdc_decide.c をそのままホストで回す           */
 /*                                                                          */
 /*  実物の判定を 1 行も写さずに #include する。fdc_decide.c は I/O も        */
 /*  tick_count も触らないので、模型は 1 つも要らない。                      */
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../drivers/fdc_decide.c"
+#include "../../drivers/block/fdc_decide.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

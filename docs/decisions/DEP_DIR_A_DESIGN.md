@@ -20,15 +20,15 @@
 
 |区分|SURVEY → 今の実物／設計上の扱い|
 |---|---|
-|差分1 #26|`kernel/lan_module.c:163` → `:167` の e82557_driver。表は依然常駐。SURVEY の部品登録案は F9 により機種配線へ変更|
-|差分2 #27|`kernel/pcm_module.c:74,88,154` → `:77,91,157` が PCM_IRQ 固定。汎用 lifecycle 案は採らず既存 IRQ 口を使う|
+|差分1 #26|`drivers/net/e82557/lan_module.c:163` → `:167` の e82557_driver。表は依然常駐。SURVEY の部品登録案は F9 により機種配線へ変更|
+|差分2 #27|`drivers/sound/cs4231/pcm_module.c:74,88,154` → `:77,91,157` が PCM_IRQ 固定。汎用 lifecycle 案は採らず既存 IRQ 口を使う|
 |差分3 #36/37|生成 C の954/1024等 → `kapi/kapi_generated.c:957,1027,2236`。FS→IDE は SURVEY 対象外、`fs/ext2_fmt.c:412,413,425` の format_at にも存在|
 |差分4 #39/40|生成 C の904/1680 → `kapi/kapi_generated.c:907,1683`。操作表案は F5(a) の固定転送へ|
 |差分5 #41/42|生成 C の2144/2273 → `kapi/kapi_generated.c:2147,2276`。PCI/serialfs も固定転送へ|
-|差分6 #43|生成 C の1030/1036/1652 → `:1033,1039,1655`。`drivers/kcg.c:33,38,56` は scale初期化・clamp・常時NOSYS。font読込み処理ではない|
+|差分6 #43|生成 C の1030/1036/1652 → `:1033,1039,1655`。`drivers/video/kcg/kcg.c:33,38,56` は scale初期化・clamp・常時NOSYS。font読込み処理ではない|
 |差分7 #45|`kapi/kapi_sys.c:318,334` → `:337` PCI照会、`:353` ポートサービス。後者は解決済みで対象外|
 |差分8 #28補足|`exec/exec.c:40`、`kernel/ver_collect.c:6` も pcm_cs4231.h、`sdk/kapi.json:27,58` に fm/pcm の具体 include。表の3ヘッダだけ直しても残る|
-|差分9 KCG前提|`kernel/kcg_module.h:11–17` は read_ank/read_kanji/stats/invalidate の4枠だけ。専用3操作を入れる既存枠がない。L10は§12の判断が必要|
+|差分9 KCG前提|`drivers/video/kcg/kcg_module.h:11–17` は read_ank/read_kanji/stats/invalidate の4枠だけ。専用3操作を入れる既存枠がない。L10は§12の判断が必要|
 |一致 #15/28/30/44|`mm/dma_pool.h:30`・`dma_pool_math.c:99`、pcm/fm/lan_module.h:4、`kernel/v86/v86.c:799,810,907,917,923`、`kapi/kapi_host.c:43,54,71,86,91,96`|
 
 - 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`platform/pc98/boot.c:243` の bind に新フェーズを足さない。
@@ -79,7 +79,7 @@ int dma_range_ok(u32 pa, u32 size, u32 limit) {
 - PcmModuleApi/FmModuleApi/LanModuleApi 自体は kernel の既存ヘッダに残す。スロット数/順序/sizeof/offsetof と OPS_VERSION は固定。LAN の pci_dev は前方宣言、必要なPCI型は独立契約へ。
 - pcm_present/reclaim/open等、FMの常駐facade宣言を共通契約から供給。exec/ver_collectとJSON includesも置換する。E82557状態値・診断型は名前と値を維持してlan契約へ。
 - DMA pool状態/割当/leaseはkernel、8237実行状態とPCM ringはdrivers、module_handle/candidateは常駐facade。新登録はない。
-- L01のinclude追従: mm/dma_pool_math.c:14 は dma_contract.h、kernel/snd_engine.c:11 は fm_contract.h、fs/serialfs_session.c:36 は lan_contract.h へ置換する。
+- L01のinclude追従: mm/dma_pool_math.c:14 は dma_contract.h、drivers/sound/fm/snd_engine.c:11 は fm_contract.h、fs/serialfs_session.c:36 は lan_contract.h へ置換する。
 - tools/prototypes/pcm_imports.def の contracts に include/pcm_contract.h・include/dma_contract.h、fm_imports.def に include/fm_contract.h、lan_imports.def に include/lan_contract.h を追加し、L02ではLANに include/pci_contract.h も追加。既存列の順序は保つ。生テキストhashなので型配置不変でも PCM_MODULE_ABI_GEN・FM_MODULE_ABI_GEN・LAN_MODULE_ABI_GEN は変わる。
 - kernel/module/kdebug_imports.def の source を dma_crosses_64k/dma_range_ok→include/dma_contract.h、pcm_open/pcm_state→include/pcm_contract.h、e82557_send/get_mac/state→include/lan_contract.h に変更。旧ヘッダに再宣言は残さず、生成器が新所在の本文から宣言を得る。
 - PM決定: KDEBUG_ABI_GEN も変わり、hwdev契約CRCも変わり得る。配置世代・KAPI版・部品のスロット配置/OPS_VERSIONは不変。旧部品はloadのpolicyで断られる。カーネルと対応する部品を再生成・再ビルドし、hsync bootで常に組で配る（実機の入れ方は不変、Cirrus/FMと同扱い）。
@@ -102,7 +102,7 @@ pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));
 ```
 
 - lan_module_probe の状態検査→REGISTRATION参照→TICK参照→candidate.probe→DECLINE時の回収/隔離を不変にする。表からmod内アドレスを直接指さない。
-- L08と共有するPCI契約は `include/pci_contract.h`。pci_dev/pci_driver/診断型・公開定数のみ、config I/Oは含めない。型配置は維持し、LANのABI世代変更は§3のとおり受け入れる。kernel/lan_module.c:7 の e82557_regs.h は削除し、装置定数は機種配線側だけで読む。
+- L08と共有するPCI契約は `include/pci_contract.h`。pci_dev/pci_driver/診断型・公開定数のみ、config I/Oは含めない。型配置は維持し、LANのABI世代変更は§3のとおり受け入れる。drivers/net/e82557/lan_module.c:7 の e82557_regs.h は削除し、装置定数は機種配線側だけで読む。
 
 ## 5. L03 — PCM IRQ資源を部品側へ（2時間）
 - PCM_IRQの値を知るのはdrivers/pcm_cs4231側だけ。既存 imports の pcm_module_irq_register(irq,fn,arg,flags) を使い、表やexportスロットは追加しない。
@@ -193,7 +193,7 @@ void platform_kcg_set_scale(int s) { kcg_set_scale(s); } /* 1..4へclamp */
 int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS */
 /* read_ank/read_kanji は既存 kcg_rom_read_* → public_api() → 4枠表 */
 ```
-- kernel/kcg_module.c:3 の kcg.h を kcg_contract.h に置換する。JSONで3targetを向け直す。KCGの共通宣言を `include/kcg_contract.h` に分離し生成Cのkcg.hを置換。読み出しKAPIの寸法定数も同契約へ。L19のmode port/復旧は触らない。
+- drivers/video/kcg/kcg_module.c:3 の kcg.h を kcg_contract.h に置換する。JSONで3targetを向け直す。KCGの共通宣言を `include/kcg_contract.h` に分離し生成Cのkcg.hを置換。読み出しKAPIの寸法定数も同契約へ。L19のmode port/復旧は触らない。
 - 「3本すべてを部品表へ」を必須にする場合の代案: KcgModuleApi末尾にinit/set_scale/load_fontの3枠を追加、4→7枠、版1→2、kernel/kcg_bodyとfacadeを同時更新。
 - 代案では旧modを書込み前に拒否、未ロードstubでもscale初期化/clamp/NOSYSを維持する必要がある。import/export契約・生成器・全fixture更新を伴うため、承認なしに代案を実装しない。
 
@@ -220,16 +220,16 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 |段|新規ファイル（概算行数）|変更ファイル（各概算行数、生成物は再生成）|
 |---|---|---|
-|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、mm/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/module/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
-|L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
-|L03|なし|kernel/pcm_module.c 15、drivers/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
+|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、mm/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/module/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
+|L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|drivers/net/e82557/lan_module.c 15・lan_module.h 5、drivers/net/e82557/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
+|L03|なし|drivers/sound/cs4231/pcm_module.c 15、drivers/sound/cs4231/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
 |L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|
-|L05a|include/ide_contract.h 70、platform/pc98/device_ide.c 45|include/platform_device.h 15、drivers/ide.h 70、sdk/kapi.json 12、build/kernel.mk 2、disk_auth_host.c 2|
+|L05a|include/ide_contract.h 70、platform/pc98/device_ide.c 45|include/platform_device.h 15、drivers/ata/ide.h 70、sdk/kapi.json 12、build/kernel.mk 2、disk_auth_host.c 2|
 |L05b|なし|platform/pc98/device_ide.c 20、include/platform_device.h 10、fs/ide_limits.h 3・ext2_super.c 15・ext2_fmt.c 20・fatfs_vfs.c 15・fatfs/diskio.c 12・fatfs/diskio_os32.h 2、§11のIDE fixture/コピー一覧各5–40|
 |L06|platform/pc98/device_fs.c 25|include/platform_device.h 8、fs/vfs.c 1、sdk/kapi.json 6、build/kernel.mk 2|
 |L08|platform/pc98/device_pci.c 25|include/platform_device.h 8、kapi/kapi_sys.c 5、sdk/kapi.json 5、build/kernel.mk 2|
 |L09|include/platform_host.h 25、platform/pc98/device_host.c 55|kapi/kapi_host.c 8、include/platform_device.h 10、sdk/kapi.json 7、build/kernel.mk 2|
-|L10推奨|include/kcg_contract.h 55、platform/pc98/device_kcg.c 15|drivers/kcg.h 55、kernel/kcg_module.c 2、sdk/kapi.json 5、build/kernel.mk 2|
+|L10推奨|include/kcg_contract.h 55、platform/pc98/device_kcg.c 15|drivers/video/kcg/kcg.h 55、drivers/video/kcg/kcg_module.c 2、sdk/kapi.json 5、build/kernel.mk 2|
 |共通試験|tools/tests/test_dep_dir_a.py 180、dep_dir_a_host.c 250、fixtures/dep_dir_a/基点列/ABI寸法 80、tools/check_map.d/check-dep-dir-a-host.yaml 25|下記既存test_*.py/host.c各5–40、sdk生成のkapi_generated.c/公開ヘッダ/初期化includeは再生成差分確認|
 
 - sdk/kapi.json の includes 差分: L01 fm.h→fm_contract.h、pcm_cs4231.h→pcm_contract.h。L04 loop_dev.h→platform_device.h（以後共用）。L05a ide.h→ide_contract.h とし :447,1204 の sizeof(IdeInfo) を維持。L05b/L06 は追加差分なし。L08 pci.h→pci_contract.h。L09 np2sysp.h を除去し platform_device.h の宣言を使用。L10 kcg.h→kcg_contract.h。L02/L03もJSON includesの追加差分なし。
@@ -258,7 +258,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 - 変異は未使用変数を作らない式置換または引数を消費する同型stubで実装。コンパイル失敗を「変異を殺した」に数えず、通常版合格→変異版build成功→期待assert失敗を別々に記録する。
 - 基点の期待値/呼出列はb400acb6から採取してfixtureへ固定（B方式）、試験実行時のgitや変更後コードから期待値を生成しない。列移動で旧期待値を追従改変しない。
-- 既存利用者: test_dma_pool.pyのdrivers/dma8237_math.c同梱/リンクを新共通実体へ更新、test_dma8237.pyにも同実体をリンク。古い定義を残して二重シンボルにしない。L01で test_h4_backing.py:19,89 と dma_boot_host.c:22 の dma8237_math.c コピー/リンク/include も新共通実体へ追従する。
+- 既存利用者: test_dma_pool.pyのdrivers/dma/dma8237_math.c同梱/リンクを新共通実体へ更新、test_dma8237.pyにも同実体をリンク。古い定義を残して二重シンボルにしない。L01で test_h4_backing.py:19,89 と dma_boot_host.c:22 の dma8237_math.c コピー/リンク/include も新共通実体へ追従する。
 - test_lan_module.pyとlan_module_host.cはe82557_driverの常駐所在検査を維持し、platform表をリンク。test_pcm_module.py/pcm_module_host.c/playback_host.cはirq_lineと新ヘッダをfixtureへ渡す。
 - L10で kcg_boot_host.c とそのコピー/ビルド一覧に kcg_contract.h を追加。L04で v86_low_host.c:124 の detach stub を platform_loop_dev_detach に追従する。test_kcg_module.py、kcg_body_host.c/display_host.c、KAPI layout/audit/out/bounds/ranges、test_gen_kapi_cli.pyを回帰。KAPI body文字列依存の検査/差し替え定義は現呼先に更新し、検査目的を弱めない。
 - FS/IDEのstub差し替えはplatform口で行い、別の転送試験では実device_ide.c＋旧IDE stubを使う。boot/D2/D3/L12/L13/reclogの既存fixtureコピー一覧とcheck_select依存登録にも新契約を追加して回帰。
@@ -275,12 +275,12 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 ## 確定 (2026-10-28、Opus 5.5 の第 2 回 (軽微な要修正) を PM が反映 — 本文の該当の行より優先する)
 
-- **B1 (P2、PM 決定)**: pci の契約は **2 本に分ける** — `include/pci_dev_contract.h` (struct pci_dev と PCI_DEV_STRUCT_SIZE などの公開定数だけ、drivers/pci.h が読む) と `include/pci_bind_contract.h` (struct pci_driver・struct pci_bind_info などの bind と診断の型、kernel/lan_module.c・platform/pc98 の機種の配線・kapi の診断が読む)。drivers/pci.h は pci_dev_contract.h だけを読むので、hwdev の共有ヘッダ群 (hwdev/hwdev_imports.def の pci_cfg_*) の DWARF の型一覧は struct pci_dev だけのままで、tools/hwdev_layout.json と HWDEV_LAYOUT_CRC は変わらない (gen_hwdev_contract.py:118-119 で止まらない)。
+- **B1 (P2、PM 決定)**: pci の契約は **2 本に分ける** — `include/pci_dev_contract.h` (struct pci_dev と PCI_DEV_STRUCT_SIZE などの公開定数だけ、drivers/pci/pci.h が読む) と `include/pci_bind_contract.h` (struct pci_driver・struct pci_bind_info などの bind と診断の型、drivers/net/e82557/lan_module.c・platform/pc98 の機種の配線・kapi の診断が読む)。drivers/pci/pci.h は pci_dev_contract.h だけを読むので、hwdev の共有ヘッダ群 (hwdev/hwdev_imports.def の pci_cfg_*) の DWARF の型一覧は struct pci_dev だけのままで、tools/hwdev_layout.json と HWDEV_LAYOUT_CRC は変わらない (gen_hwdev_contract.py:118-119 で止まらない)。
 - **B2 (P2)**: build/pcm-module.mk・fm-module.mk・lan-module.mk の `*_DEF_SOURCES` に新しい契約ヘッダ (include/pcm_contract.h・fm_contract.h・lan_contract.h など、L01/L02 で作るもの、lan は pci_bind_contract.h も) を足す。§10 の一覧に載せる。増分ビルドで契約だけ変えても世代が作り直されること を host の試験 (または make の依存の dry-run) で確かめる。
 - **B3 (P3)**: L01 では hwdev/hwdev_imports.def に触らない (dma・pcm・e82557 の行は元から無い、gen_hwdev_contract.py:43)。§3:80 の「hwdev の def の source も更新」は取り消す。
 - **B4 (P3)**: platform_ide_drive_present は L05a で定義する。L05b は platform_ide_range_ok と geometry の照会だけを足す。
-- **B5 (P3)**: L08 で pci.h を契約に置き換えるとき、pci_get の out 検査の `PCI_DEV_STRUCT_SIZE` (今は drivers/pci.h:63) を pci_dev_contract.h に移す公開定数に入れる。
-- **B6 (P3)**: 順序に「群 D の L19 → 群 A の L10」(kernel/kcg_module.c を同時に触らない、PM)。
+- **B5 (P3)**: L08 で pci.h を契約に置き換えるとき、pci_get の out 検査の `PCI_DEV_STRUCT_SIZE` (今は drivers/pci/pci.h:63) を pci_dev_contract.h に移す公開定数に入れる。
+- **B6 (P3)**: 順序に「群 D の L19 → 群 A の L10」(drivers/video/kcg/kcg_module.c を同時に触らない、PM)。
 - 回帰の一覧に test_hdd_stage1・test_cd_read を足す (L05a/L05b の境目)。
 - 世代の扱い (PM 決定、REVIEW.r1.md): PCM・FM・LAN の部品の ABI の世代と KDEBUG_ABI_GEN は変わってよい (カーネルと対の部品で hsync boot で常に組で配る)。B1 の分け方で hwdev の契約 CRC は変えない。
 

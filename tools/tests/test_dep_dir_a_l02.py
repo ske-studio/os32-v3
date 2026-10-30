@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 OLD = 'E82557_VENDOR, E82557_DEVICE,'
 NEW = 'E82557_VENDOR, E82557_DEVICE ^ 1,'
 COPIES = ['include/pci_dev_contract.h', 'include/pci_bind_contract.h',
-          'include/types.h', 'drivers/pci_decode.h', 'drivers/pci.h',
-          'drivers/pci_bind.h', 'drivers/pci_bind_match.c', 'kernel/lan_module.h',
+          'include/types.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci.h',
+          'drivers/pci/pci_bind.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.h',
           'platform/pc98/lan_match.c', 'tools/tests/dep_dir_a_l02_host.c']
 
 
@@ -34,7 +34,7 @@ def build(folder, body):
                     *include_flags(ROOT),
                     str(folder / 'tools/tests/dep_dir_a_l02_host.c'),
                     str(folder / 'platform/pc98/lan_match.c'),
-                    str(folder / 'drivers/pci_bind_match.c'), '-o', str(exe)], check=True)
+                    str(folder / 'drivers/pci/pci_bind_match.c'), '-o', str(exe)], check=True)
     return exe
 
 

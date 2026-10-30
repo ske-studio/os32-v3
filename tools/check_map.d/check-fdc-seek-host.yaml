@@ -1,6 +1,6 @@
 check-fdc-seek-host:
-- drivers/fdc.c
-- drivers/fdc_decide.c
+- drivers/block/fdc.c
+- drivers/block/fdc_decide.c
 - tools/tests/fdc_seek_host.c
 - tools/tests/test_fdc_seek.py
 - tools/check_map.d/check-fdc-seek-host.yaml

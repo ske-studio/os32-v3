@@ -53,5 +53,5 @@
 | L1 | ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` がパスで部品を選んでいて、道具の一覧に出た所を手で直した | 手順 4 |
 | L1 | 新しいディレクトリを `config.mk` の INC_* 7 行に別々に書き足した (取りこぼしの元) | 手順 1 (KERNEL_SRC_DIRS) |
 | L2 | include の照合を行番号で比べ 870 件の差に見えた — 生成ヘッダの include の並びがパス順で入れ替わっただけ | 単位ごとの集合で比べる (§3)。製品 0 件 |
-| L2 | 同名のヘッダ `include/kbd.h` と `drivers/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
+| L2 | 同名のヘッダ `include/kbd.h` と `drivers/input/kbd.h` (旧 `drivers/kbd.h`)、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |

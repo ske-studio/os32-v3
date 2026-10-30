@@ -9,7 +9,7 @@ pub enum Action {
     Select(Fixture),
     Move(Movement),
 }
-/* drivers/kbd.c のスキャンコード (libos32gui::widget::SCAN_* と同じ値)。
+/* drivers/input/kbd.c のスキャンコード (libos32gui::widget::SCAN_* と同じ値)。
  * ここに並べるのは `inject::from_key` が**注がない**キーだけ — 注ぐキーに
  * 表示操作を重ねると、CUI プログラムへ渡した打鍵で画面が動いてしまう
  * (票 K7 §6「矢印・ファンクションは範囲外」)。 */

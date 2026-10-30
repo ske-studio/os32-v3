@@ -6,7 +6,7 @@
  *  票:   docs/tasks/realhw/TASK_PEGC480_REALHW.md (§3-3 比較表、§4、§5)
  *        docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md
  *
- *  実物の gfx/backend_pegc.c を 1 行も写さずに #include し、ポート I/O だけを
+ *  実物の drivers/video/pc98/backend_pegc.c を 1 行も写さずに #include し、ポート I/O だけを
  *  偽物 (tools/tests/pegc_hostshim/io.h → pegc_shim_inp / pegc_shim_outp) に
  *  する。偽の I/O は IN / OUT / 待ち (cpu_delay_us) を順に記録し、GDC の
  *  ステータス (60h / A0h) はケースごとに「FIFO が詰まっている回数」と VSYNC の
@@ -43,8 +43,8 @@ static volatile void *host_pegc_window(u32 pa)
 }
 #define P2V_IO(pa) host_pegc_window(pa)
 
-#include "../../gfx/backend_pegc.c"
-#include "../../drivers/np2sysp.c"
+#include "../../drivers/video/pc98/backend_pegc.c"
+#include "../../drivers/char/np2sysp.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
 /* カーネルは -Wall だけで組む (build/config.mk)。この試験の -Wextra -Werror で
  * console.c 側の既存の警告 2 種を止める (console.c そのものは写さず変えない)。 */

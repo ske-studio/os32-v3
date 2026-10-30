@@ -31,7 +31,7 @@
 #define HDPREP_AMODE_LBA28      1
 #define HDPREP_AMODE_CHS_CUR    2
 #define HDPREP_AMODE_CHS_DEF    3
-/* LBA28 で指せるセクタ数 (drivers/ide_addr.h の IDE_LBA28_LIMIT と同じ) */
+/* LBA28 で指せるセクタ数 (drivers/ata/ide_addr.h の IDE_LBA28_LIMIT と同じ) */
 #define HDPREP_LBA28_LIMIT      0x10000000UL
 
 /* 判定の結果。0 = 可、正 = 追加の手順が要る、負 = 断る */

@@ -211,7 +211,7 @@ static void ring3_trampoline_init(void)
 /*  グローバル状態                                                          */
 /* ======================================================================== */
 /* いま走っているプログラムの段。ID ではなく **深さ** で、シェル = 1。
- * 外 (drivers/kbd.c, arch/x86/kernel/isr_handlers.c) は「> 0 ならプログラムが走って
+ * 外 (drivers/input/kbd.c, arch/x86/kernel/isr_handlers.c) は「> 0 ならプログラムが走って
  * いる」としてしか見ないので意味は変わらない。 */
 volatile int exec_nest_level = 0;
 volatile int exec_exit_status = EXEC_SUCCESS;
@@ -2211,7 +2211,7 @@ i32 exec_park(void)
 /* ======================================================================== */
 /*  exec_park_kbd — GUI 中の kbd 待ちで止める (第 2 の park 点、票 K7 D1)    */
 /*                                                                          */
-/*  drivers/kbd.c の kbd_getchar / kbd_getkey が、GUI モードで注入リングが    */
+/*  drivers/input/kbd.c の kbd_getchar / kbd_getkey が、GUI モードで注入リングが    */
 /*  空のときに呼ぶ。成立すれば **戻らない** (exec_park と同じ longjmp)。      */
 /*  起こすのは WM で、そのとき exec_resume が注入リングの 1 バイトを EAX へ   */
 /*  入れるので、アプリからは kbd_getchar() が普通に値を返したように見える。   */
@@ -2261,7 +2261,7 @@ int exec_park_kbd(void)
 /* ======================================================================== */
 /*  exec_park_poll — ポーリング型の協調 yield (第 3 の park 点、票 T8 §7 D8) */
 /*                                                                          */
-/*  drivers/kbd.c の kbd_trygetchar / kbd_trygetkey が、GUI モードで注入     */
+/*  drivers/input/kbd.c の kbd_trygetchar / kbd_trygetkey が、GUI モードで注入     */
 /*  リングが空のときに呼ぶ。**1 周だけ** WM へ譲る park で、手順は           */
 /*  exec_park_kbd と 1 行も違わない (フレーム 13 語を写して master へ戻り、   */
 /*  WM の待っている復帰点へ longjmp する)。違うのは 2 つだけ:                */
@@ -2269,7 +2269,7 @@ int exec_park_kbd(void)
 /*    - 印 / 状態が parked_from_poll / WAIT_POLL であること                  */
 /*    - **PIT tick の間引き** (10ms に 1 回まで) が掛かること。描画ループの   */
 /*      busy-wait から秒間数万回来るので、間引きが無いと譲りだけで CPU を    */
-/*      食う。tick は呼び手 (drivers/kbd.c が tick_count を読む) から渡す。   */
+/*      食う。tick は呼び手 (drivers/input/kbd.c が tick_count を読む) から渡す。   */
 /*                                                                          */
 /*  起こすのは WM で、そのとき exec_resume は注入リングに文字があればそれを、 */
 /*  空なら **-1 (キーなし)** を EAX に入れる。アプリからは                    */

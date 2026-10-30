@@ -3,7 +3,7 @@
 記録: tools/tests/pcm_cs4231_tdd.md
 票  : docs/tasks/v3/TASK_PCM_CS4231.md §2-3 (純粋関数) / §3 E1
 
-実物の drivers/pcm_cs4231_math.c と drivers/pcm_cs4231.c を**1 行も写さずに**
+実物の drivers/sound/cs4231/pcm_cs4231_math.c と drivers/sound/cs4231/pcm_cs4231.c を**1 行も写さずに**
 #include して回す。include/io.h だけ tools/tests/pcm_hostshim/io.h で差し替え、
 ポート操作と割り込み禁止を試験側の模型へ回す (b8_hostdrv と同じ作法)。
 
@@ -31,8 +31,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pcm_cs4231_host.c"
-SRC = ROOT / "drivers/pcm_cs4231_math.c"
-TARGET_SRCS = ["drivers/pcm_cs4231_math.c", "drivers/pcm_cs4231.c"]
+SRC = ROOT / "drivers/sound/cs4231/pcm_cs4231_math.c"
+TARGET_SRCS = ["drivers/sound/cs4231/pcm_cs4231_math.c", "drivers/sound/cs4231/pcm_cs4231.c"]
 
 CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
          "close_dl", "vol", "stg", "pack", "pos", "obs", "seq",
@@ -165,7 +165,7 @@ MUTATIONS = [
 # 否定側 (driver)。foreground と tick の競合の修正 (Codex 実装レビュー
 # blocker 1〜5、2026-09-23) を 1 つずつ元に戻し、交互の台本のケースが RED に
 # なることを見る。1 本に複数の置き換えを持てる (修正が 2 重の守りのとき)。
-DRIVER = "drivers/pcm_cs4231.c"
+DRIVER = "drivers/sound/cs4231/pcm_cs4231.c"
 DRIVER_MUTATIONS = [
     ([(r"    if \(s_claimed \|\| s_mce_busy\) return IRQ_NONE;",
        "    if (s_mce_busy) return IRQ_NONE;"),
@@ -226,14 +226,14 @@ def host_build(tmp, source_text=None, driver_text=None):
         (mut / "pcm_cs4231_math.c").write_text(source_text, encoding="utf-8")
         (mut / "pcm_cs4231.c").write_text(driver_text, encoding="utf-8")
         (mut / "pcm_cs4231.h").write_text(
-            (ROOT / "drivers/pcm_cs4231.h").read_text(encoding="utf-8"),
+            (ROOT / "drivers/sound/cs4231/pcm_cs4231.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../drivers/pcm_cs4231_math.c"',
-                     '"drivers/pcm_cs4231_math.c"')
-            .replace('"../../drivers/pcm_cs4231.c"', '"drivers/pcm_cs4231.c"'),
+            .replace('"../../drivers/sound/cs4231/pcm_cs4231_math.c"',
+                     '"drivers/sound/cs4231/pcm_cs4231_math.c"')
+            .replace('"../../drivers/sound/cs4231/pcm_cs4231.c"', '"drivers/sound/cs4231/pcm_cs4231.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut), *inc,
                str(shim), "-o", str(exe)]

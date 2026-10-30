@@ -2,7 +2,7 @@
 #include "gfx_hal.h"
 #include "hwdev/gfinit_mode.h"
 GfxCounters gfx_counters;
-#include "../../gfx/gf_present.c"
+#include "../../drivers/video/geforce/gf_present.c"
 
 #define SOURCE_PITCH (GF_MODE_WIDTH + 7U)
 #define DISPLAY_PITCH (GF_MODE_WIDTH + 11U)

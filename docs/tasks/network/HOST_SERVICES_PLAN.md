@@ -20,7 +20,7 @@ OS32 アプリ ── KAPI host_* ── net/link.c (L0〜L3) ── LGY-98 ─�
 
 | 層 | 状態 |
 |---|---|
-| ドライバ `drivers/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定で有効** (設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
+| ドライバ `drivers/net/ne2000/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定で有効** (設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
 | リンク層 `net/link.{c,h}` | ワイヤ v2、絶対値 WINDOW、リングの順次消費と Go-Back-N。フレームは [LINK_PLAN §4](LINK_PLAN.md#4-フレーム形式-raw-ethernet-独自-ethertype)、非ブロッキング API と `link_tick` 駆動は [§3](#3-kapi-v51末尾追記abi13) |
 | Host Agent `tools/host_agent.py` | HELLO 応答、`GET /pattern/N`、`GET http(s)://…` (urllib)、`GET /file/<path>` (ホストのファイル読み)、`TIME`、L1/L2 の bulk / stream 配送 |
 | KAPI | **v51 で公開・受入済み**。5 本の非ブロッキング API は [§3](#3-kapi-v51末尾追記abi13) を参照 |

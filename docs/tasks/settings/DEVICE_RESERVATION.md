@@ -22,8 +22,8 @@
 | `init/kernel.c`: paging/pgalloc 初期化 | 製品入口は依然 `paging_init(mem_kb)` → `pgalloc_init(mem_kb)`。モデル stage/provider は未接続。broker のために boot をモデル経路へ強制変更しない。 |
 | `init/boot_splash.c`: `splash_gfx_init` | 希望値を保存→PC98 強制→`gfx_init()`→希望値復元。任意 probe をしない現行変更を維持。kernel.c の「splash が最初に任意 backend を選ぶ」と読める旧コメントを根拠にしない。 |
 | `gfx/gfx_core.c`: 選択/init | auto は Cirrus→PEGC→PC98、強制候補失敗は PC98。`probe()` を選択時と init 後に呼び、init は void。副作用なしの候補記述、予約許可、init 成功状態の内部契約が必要。 |
-| `gfx/backend_pegc.c`: `pegc_probe`, `pegc_linear_selftest`, `pegc_init` | probe 自体が FF2/モード/MMIO を変更し、窓 enable→map→VRAM 書込み試験。成功時 map を保持。init は `sys_reserve_top`、enable→map（戻り値未確認）→clear。予約を init にだけ追加しても遅い。 |
-| `gfx/backend_cirrus.c`, `drivers/wab_cirrus.c`, `drivers/wab_glue_xe10.c` | Xe10 probe も index OUT、chip probe は SR6 を書き解錠状態を残す。glue init は FF82/銀行窓/linear enable を map より前に実行。純粋な照会ではない。 |
+| `drivers/video/pc98/backend_pegc.c`: `pegc_probe`, `pegc_linear_selftest`, `pegc_init` | probe 自体が FF2/モード/MMIO を変更し、窓 enable→map→VRAM 書込み試験。成功時 map を保持。init は `sys_reserve_top`、enable→map（戻り値未確認）→clear。予約を init にだけ追加しても遅い。 |
+| `drivers/video/cirrus/backend_cirrus.c`, `drivers/video/cirrus/wab_cirrus.c`, `drivers/video/cirrus/wab_glue_xe10.c` | Xe10 probe も index OUT、chip probe は SR6 を書き解錠状態を残す。glue init は FF82/銀行窓/linear enable を map より前に実行。純粋な照会ではない。 |
 | `kernel/sys.c`: `sys_reserve_top` | boot/exec 前専用。今は pgalloc 永久予約に成功してから上端を下げる。同サイズのみ冪等、model freeze 後は拒否。GUI activation 時の BB 取得にそのまま転用できない。 |
 
 `physmem` を後から書き換えても allocator は追随しない。既存単一 reserve を複数回呼び、後半失敗時に free する案も不可（永久予約は解除不能）。
@@ -85,7 +85,7 @@ GUI 初回の挿入点は `init/kernel.c` の `is_gui` 判定後、`exec_run(cur
 
 ## 7. 実装範囲と受入ゲート
 
-次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
+次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/video/cirrus/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
 
 | ゲート | 合格条件（全て次回実装時。今回未実行） |
 |---|---|

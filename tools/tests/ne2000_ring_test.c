@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  ne2000_ring_test.c — drivers/ne2000_ring.c のホスト試験                  */
+/*  ne2000_ring_test.c — drivers/net/ne2000/ne2000_ring.c のホスト試験                  */
 /*                                                                          */
 /*  make check (check-ne2000-ring) がホスト gcc でビルドして実行する。        */
 /*  I/O の実動作試験を代替するものではない (docs/tasks/network/PLAN.md §6)。  */

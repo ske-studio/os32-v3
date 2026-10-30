@@ -85,7 +85,7 @@ FFIの根拠:
   `lib/utf8.c`の既知4組probeを使用しready強制設定を呼ばない。
 - `sdk/rust/os32api/src/kapi_generated.rs`: 既存のunsafe extern C
   kcg_read_ank(u8,*mut u8)、kcg_read_kanji(u16,*mut u8)。libos32gui::init後のみ使用。
-- `drivers/kcg.c`と`userland/lib/gfx/text/gfx_kcg.c`: ANK=16B、漢字=32B、
+- `drivers/video/kcg/kcg.c`と`userland/lib/gfx/text/gfx_kcg.c`: ANK=16B、漢字=32B、
   row*2が左、+1が右、MSB-left。上位/下位を各0x21..0x7Eと検査してから漢字読出し。
   void APIには欠落通知がなく、全ゼロを勝手に未収録と見なさない。
 - gui_demo/v12_api_test/filerとstubの実宣言・使用例から、init/run、WindowのDrop、

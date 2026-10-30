@@ -16,7 +16,7 @@
 #include "kcg_module.h"
 #include "geforce_module.h"
 #include "gui.h"
-#include "pc98_route.h"
+#include "../drivers/video/pc98/pc98_route.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 #include "../exec/exec.h"

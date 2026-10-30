@@ -87,11 +87,11 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
     def stage(tmp,sources):
         gui=(ROOT/'kernel/gui.c').read_text()
         (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
-        source=(ROOT/'kernel/geforce_module.c').read_text()
+        source=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         start=source.index('int geforce_boot_reserve(void)')
         end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
-        for rel in ('gfx/backend_geforce.c','hwdev/gf/service.c','hwdev/gf/display/modes.c'):
+        for rel in ('drivers/video/geforce/backend_geforce.c','hwdev/gf/service.c','hwdev/gf/display/modes.c'):
             sources.append(ROOT/rel)
         # Transfer is tested separately; this fixture tests the HAL's boundary.
         transfer=tmp/'transfer.c'
@@ -188,7 +188,7 @@ def module_registration():
         exe=Path(td)/'host'
         subprocess.run(['gcc',*runtime_flags,'-Wno-unused-parameter',*runtime_includes,'-Igfx','-Ibuild/out/geforce',
             str(ROOT/'tools/tests/geforce_module_host.c'),
-            *[str(ROOT/f) for f in ('kernel/module/module_runtime.c','kernel/module/module_image.c','fs/vfs.c','drivers/dev.c')],'-nostdlib','-static','-no-pie',
+            *[str(ROOT/f) for f in ('kernel/module/module_runtime.c','kernel/module/module_image.c','fs/vfs.c','drivers/base/dev.c')],'-nostdlib','-static','-no-pie',
             '-Wl,--gc-sections','-o',str(exe)],cwd=ROOT,check=True)
         for mode in range(3):
             result=host32.run([str(exe)],input=struct.pack('<II',0,mode)+image(),

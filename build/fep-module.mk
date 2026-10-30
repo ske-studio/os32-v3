@@ -1,7 +1,7 @@
 # T5a-2: reuse T4 function imports, VA0 packing and paired distribution.
 FEP_OUT := $(BUILD_OUT)/fep
 FEP_GEN := $(addprefix $(FEP_OUT)/,fep_imports.h fep_imports.json fep_import_slots.c fep_import_stubs.S fep_provider_types.c fep_kexports.c)
-FEP_DEF_SOURCES := include/redir_access.h fs/fd_redirect.h include/con_sink.h drivers/kbd.h mm/kmalloc.h lib/kstring.h include/kprintf.h lib/sqlite3/os32_sqlite_outer.h exec/exec.h drivers/serial.h kernel/sqlite_engine.h include/tvram.h lib/utf8.h fs/vfs.h kernel/ime/fep_module.h kernel/ime/ime_render.h sdk/include/os32/os32_kapi_shared.h
+FEP_DEF_SOURCES := include/redir_access.h fs/fd_redirect.h include/con_sink.h drivers/input/kbd.h mm/kmalloc.h lib/kstring.h include/kprintf.h lib/sqlite3/os32_sqlite_outer.h exec/exec.h drivers/char/serial.h kernel/sqlite_engine.h include/tvram.h lib/utf8.h fs/vfs.h kernel/ime/fep_module.h kernel/ime/ime_render.h sdk/include/os32/os32_kapi_shared.h
 $(FEP_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/fep_imports.def $(FEP_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module fep --out-dir $(FEP_OUT)
 

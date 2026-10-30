@@ -25,7 +25,7 @@ use crate::{fullscreen, input, modal, ring, startmenu, taskbar};
 use os32api::gui::proto::{GUI_EV_CLOSE, GUI_MAX_WINDOWS};
 
 /* ================================================================ */
-/*  スキャンコード (drivers/kbd.h) と修飾 (SHIFT_*)                   */
+/*  スキャンコード (drivers/input/kbd.h) と修飾 (SHIFT_*)                   */
 /* ================================================================ */
 const SC_ESC: u8 = 0x00; /* KEY_ESC */
 const SC_TAB: u8 = 0x0F; /* KEY_TAB */
@@ -39,7 +39,7 @@ const SC_F4: u8 = 0x65; /* KEY_F4 */
 const SC_F10: u8 = 0x6B; /* KEY_F10 */
 const SC_KANA: u8 = 0x72; /* KEY_KANA */
 
-/* テンキー (drivers/kbd.c の scancode_to_ascii 0x40〜0x50)。 */
+/* テンキー (drivers/input/kbd.c の scancode_to_ascii 0x40〜0x50)。 */
 const NP_MINUS: u8 = 0x40;
 const NP_SLASH: u8 = 0x41;
 const NP_7: u8 = 0x42;
@@ -61,7 +61,7 @@ const MOD_KANA: u32 = 0x04; /* SHIFT_KANA */
 const MOD_GRPH: u32 = 0x08; /* SHIFT_GRPH */
 const MOD_CTRL: u32 = 0x10; /* SHIFT_CTRL */
 
-/* drivers/mouse.h の MOUSE_BTN_*。 */
+/* drivers/input/mouse.h の MOUSE_BTN_*。 */
 const BTN_LEFT: u8 = 0x01;
 const BTN_RIGHT: u8 = 0x02;
 

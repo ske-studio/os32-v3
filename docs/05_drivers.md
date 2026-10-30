@@ -49,9 +49,9 @@ BIOS (INT 1Bh) を使用せず、I/Oポート直接制御および DMA (μPD8237
 | 項目 | 仕様 |
 |------|------|
 | I/Oポート | 0x90 (メインステータス `FDC_MSR`), 0x92 (データ `FDC_FIFO`), 0x94 (コントロール `FDC_CTRL`) |
-| 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`drivers/fdc.h`) |
-| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`drivers/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった (POLICY_DEBUG §4-51) |
-| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `drivers/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
+| 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`drivers/block/fdc.h`) |
+| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`drivers/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった (POLICY_DEBUG §4-51) |
+| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `drivers/block/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
 | リトライ | READ/WRITE は 3 回。失敗した試行の後に `fdc_recover()` (リセット → Specify → 排水 → recalibrate)。最終失敗だけ `[fdc] read fail ... st0/st1/st2` を 1 行出す ([V4]) |
 | DMAバッファ | 1 セクタ分 (1024B) を **1024B 境界に揃えた**静的バッファ — 64KB 境界をまたげない ([HW2])。`fdc_init()` が起動時に検査する |
 
@@ -240,7 +240,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
 
 | 項目 | 仕様 |
 |------|------|
-| I/Oポート | タスクファイル 0x640-0x64E、代替ステータス/デバイス制御 0x74C。バンク切替は 0x430/0x432 (`IDE_BANK0`/`IDE_BANK1`) で、ここはポートではなくプライマリ/セカンダリの選択に使う (`drivers/ide.h`) |
+| I/Oポート | タスクファイル 0x640-0x64E、代替ステータス/デバイス制御 0x74C。バンク切替は 0x430/0x432 (`IDE_BANK0`/`IDE_BANK1`) で、ここはポートではなくプライマリ/セカンダリの選択に使う (`drivers/ata/ide.h`) |
 | コマンドプロトコル | ATA PACKET (0xA0) + SCSI CDB |
 | セクタサイズ | 2048バイト |
 | アドレッシング | LBA (READ(10) CDB) |
@@ -315,7 +315,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   `got` が n×2048 未満は転送が足りない
 - READ CAPACITY は 8 バイトちょうど来なければ失敗 (受け皿の残りを容量にしない)。有効バイト数は Byte Count
   (`xfer_size`) で数え、奇数バイトの DRQ で 1 ワード多く読んでも数に入れない (7 バイトを 8 と数えない)
-- **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`drivers/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
+- **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`drivers/ata/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
 - **NP21/W は READ(10) で UNIT ATTENTION を返さない** (媒体の交換は TEST UNIT READY だけが報告する)。
   世代の経路は実機でしか踏まない。NP21/W の DRQ は 2048 バイトずつ
 - 試験: `make check-cd-read-host` (`tools/tests/test_cd_read.py`、記録 `tools/tests/cd_read_tdd.md`)
@@ -367,7 +367,7 @@ TEXTモードではTVRAM属性反転 (ビット2 XOR) によるカーソル表�
 
 ### §5-9 漢字キャラクタジェネレータ (kcg.c / kcg.h)
 
-PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`kernel/kcg_body.c:15,42-65`、facade は `kernel/kcg_module.c`)。
+PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`drivers/video/kcg/kcg_body.c:15,42-65`、facade は `drivers/video/kcg/kcg_module.c`)。
 V86 の復帰口は部品の有無によらず core で 68h を CODE に戻し、搭載中の KCG facade の `invalidate` で ROM/CG RAM キャッシュを全失効する。失効では統計を消さず、次の読出しを miss として観測する。通常の CUI 復帰は保存済み BIOS の機能ビットで EGC/GRCG を停止し、9821 のみ 6Ah の標準・400ライン構成へ戻す。CG 窓 WB・VRAM UC は既存のページ属性を維持する。固定診断と根拠は票 TASK_T7_AND_FOLLOWUPS §1 が持つ。
 旧 `.kcgfont` の起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
 

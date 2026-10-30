@@ -27,7 +27,7 @@
 
 - **直すのは A と B。C は段の表に挙げたものだけ** (asm の構造体の位置など、ずれると壊れるもの)。
 - **機械語は変えない**。sqlite_engine の契約違反の直しだけが例外。各段では、変える前と変えた後の像 (vmkernel・kdebug.bin・*.mod・触ったユーザーランド) の機械語を `objdump -d` で比べる。差は 0 か、意図したものとして説明が付くものだけにする。この比べが受入の主な証拠で、名前の付け替えは試験より強くこれで確かめる。
-- 1 つの意味に名前は 1 つにする。重複している名前は正典を 1 つ決め、もう片方は正典を使って定義するか消す。番地の正典は memmap.h、PC-98 の I/O とワークエリアは pc98.h、PCI は drivers/pci_decode.h、Ethernet は新しい include/net_eth.h、回復処理は kdebug/recover.h。
+- 1 つの意味に名前は 1 つにする。重複している名前は正典を 1 つ決め、もう片方は正典を使って定義するか消す。番地の正典は memmap.h、PC-98 の I/O とワークエリアは pc98.h、PCI は drivers/pci/pci_decode.h、Ethernet は新しい include/net_eth.h、回復処理は kdebug/recover.h。
 - ABI と生成物には手で触らない ([ABI1])。sdk/kapi.json と生成物は対象外。module_schema.h の名前は生成器 `tools/gen_module_schema.py` から出す。
 - 直さないもの:
   - memmap.h で同じ値が別の名前で並んでいる番地。gen_memmap.py と STATIC_ASSERT が関係を検査しているので、地図として直書きのままにする。
@@ -43,10 +43,10 @@
 
 | 段 | 中身 | 触る所 | 実装 | 状態 |
 |---|---|---|---|---|
-| M1 | 共有の名前と kernel・exec・kapi | include/{types,kprintf,cpu,memmap,pc98}.h、mm/paging.h・idt.h・v86.h、drivers/kcg.h、lib/utf8.h、kernel/ (module_image.c・module_runtime.c を除く)、exec/、kapi/ | sol | **main** (a23754f6、astra 取り込み可・PM の直し: asm の依存、変異の目印 6 本) — 差は sqlite_engine の 2 関数だけ |
+| M1 | 共有の名前と kernel・exec・kapi | include/{types,kprintf,cpu,memmap,pc98}.h、mm/paging.h・idt.h・v86.h、drivers/video/kcg/kcg.h、lib/utf8.h、kernel/ (module_image.c・module_runtime.c を除く)、exec/、kapi/ | sol | **main** (a23754f6、astra 取り込み可・PM の直し: asm の依存、変異の目印 6 本) — 差は sqlite_engine の 2 関数だけ |
 | M2 | drivers・fs・gfx とヘッダの重複 | drivers/ (pci_decode.h を除く)、fs/、gfx/、include/{crt_diag,pegc,net_eth}.h と pc98.h の BIOS ワークの番地 | sol | **main** (a23754f6、astra P2 の直し: 変異の目印 2 本) — 12 ELF で差 0、CD の ABI 世代の値だけ変わる (PM 判断で可) |
 | M3 | モジュール形式の数 | tools/gen_module_schema.py → kernel/module/module_schema.h、kernel/module/module_image.c・module_runtime.c、tools/mkmod.py・gen_kdebug_imports.py の FNV の定数 | sol | **main** (a23754f6、astra 取り込み可) — 12 ELF と *.mod・kdebug.bin の出力が同じ |
-| M4 | kdebug の A と重複定義 | kdebug/ (gfinit_decode.*・gfinit_pll.*・gfinit_plan.*・recover_gf.* を除く)、drivers/pci_decode.h | sol | **main** (30a92a0f、astra 取り込み可・PM の直し: 変異の目印 1 本) — 12 ELF で差 0 |
+| M4 | kdebug の A と重複定義 | kdebug/ (gfinit_decode.*・gfinit_pll.*・gfinit_plan.*・recover_gf.* を除く)、drivers/pci/pci_decode.h | sol | **main** (30a92a0f、astra 取り込み可・PM の直し: 変異の目印 1 本) — 12 ELF で差 0 |
 | M5 | kdebug の init script と PLL | kdebug/gfinit_decode.*・gfinit_exec.c・gfinit_pll.*・gfinit_plan.*・recover_gf.*: 命令コードの enum、状態の符号化、PLL の表とビット (名前は envytools の rnndb と nouveau に合わせる)、plan と REC_GF_OP の enum、shift の判定の重複を 1 つに、targets[] と rules[] を外から添字で参照している所の enum | sol (多ければ astra) | **main** (250b8beb、M5a と M5b に分けた、どちらも astra 取り込み可) — 名前は #define (HWDEV の契約が enum の列挙子を数えるので)。12 ELF の .text・.rodata・.data が一致、変異の RED 356 で同じ。意味を確かめられない PLL のビットは数字のまま |
 
 各段の完了条件は次のとおり。

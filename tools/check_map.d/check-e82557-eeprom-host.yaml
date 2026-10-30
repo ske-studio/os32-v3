@@ -1,10 +1,10 @@
 check-e82557-eeprom-host:
-- drivers/e82557_eeprom.c
-- drivers/e82557_eeprom.h
-- drivers/e82557_regs.h
-- drivers/pci_decode.c
-- drivers/pci_decode.h
-- drivers/pci.h
+- drivers/net/e82557/e82557_eeprom.c
+- drivers/net/e82557/e82557_eeprom.h
+- drivers/net/e82557/e82557_regs.h
+- drivers/pci/pci_decode.c
+- drivers/pci/pci_decode.h
+- drivers/pci/pci.h
 - tools/tests/e82557_eeprom_host.c
 - tools/tests/test_e82557_eeprom.py
 - tools/tests/host32.py

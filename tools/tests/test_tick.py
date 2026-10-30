@@ -9,12 +9,12 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNERS = {
-    'kernel/fm_module.c': ('SND', 'snd_tick', 'int fm_module_load(void)'),
-    'kernel/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
-    'drivers/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
-    'kernel/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
+    'drivers/sound/fm/fm_module.c': ('SND', 'snd_tick', 'int fm_module_load(void)'),
+    'drivers/sound/cs4231/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
+    'drivers/net/ne2000/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
+    'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
     'net/link.c': ('LINK', 'link_tick', 'void link_init('),
-    'drivers/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
+    'drivers/net/ne2000/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
 }
 
 def wiring():
@@ -28,12 +28,12 @@ def wiring():
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
         assert '_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT' in src
-    for rel, boundary in [('drivers/ne2000.c', 'kmemset(&nic'),
-                          ('drivers/lgy98.c', 'cfg.reg_base'),
+    for rel, boundary in [('drivers/net/ne2000/ne2000.c', 'kmemset(&nic'),
+                          ('drivers/net/ne2000/lgy98.c', 'cfg.reg_base'),
                           ('net/link.c', 'kmemcpy(link_my_mac'),
-                          ('kernel/fm_module.c', 'if (fm_handle.generation)'),
-                          ('kernel/pcm_module.c', 'if (pcm_handle.generation)'),
-                          ('kernel/lan_module.c', 'if (lan_handle.generation)')]:
+                          ('drivers/sound/fm/fm_module.c', 'if (fm_handle.generation)'),
+                          ('drivers/sound/cs4231/pcm_module.c', 'if (pcm_handle.generation)'),
+                          ('drivers/net/e82557/lan_module.c', 'if (lan_handle.generation)')]:
         src = (ROOT / rel).read_text()
         src = src[src.index(OWNERS[rel][2]):]
         assert src.index('tick_register(') < src.index(boundary), rel

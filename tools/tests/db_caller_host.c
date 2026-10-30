@@ -24,7 +24,7 @@ void ring3_fault_kill(void) {
 #include "kapi_db.h"
 #include "kapi_print.h"
 #include "kapi_strings.h"
-#include "../../drivers/dev.h"
+#include "../../drivers/base/dev.h"
 int con_sink_is_enabled(void) { return 0; }
 #include "disk_policy_host_source.c"
 /* The denied write must return before device lookup or IO. */

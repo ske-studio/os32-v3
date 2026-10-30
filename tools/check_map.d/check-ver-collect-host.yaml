@@ -8,8 +8,8 @@ check-ver-collect-host:
 - kernel/time/pit_math.h
 - arch/x86/kernel/idt.h
 - kernel/sqlite_engine.h
-- drivers/serial.h
-- drivers/pcm_cs4231.h
+- drivers/char/serial.h
+- drivers/sound/cs4231/pcm_cs4231.h
 - include/bootinfo.h
 - include/gfx_hal.h
 - include/types.h

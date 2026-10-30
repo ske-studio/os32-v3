@@ -29,7 +29,7 @@ static int fake_pal(struct video_device *d, u32 first, u32 count, const u8 *rgb)
 #define pc98_route_cell_check fake_cell
 #define pc98_route_to_gf fake_gf
 #define pc98_route_to_98 fake_98
-#include "../../gfx/backend_geforce.c"
+#include "../../drivers/video/geforce/backend_geforce.c"
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 static int run(void)
 {

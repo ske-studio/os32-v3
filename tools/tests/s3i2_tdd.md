@@ -43,7 +43,7 @@ LBA 6 へ生書きしていた。そのため FDD からの新規インストー
 実物は `userland/system/install.c` の通常経路そのもの (`#define main install_main`
 で取り込む)。模型は KAPI の贋物だけ:
 
-- `ide_identify` は **96 B** を書く (`drivers/ide.h` の並びの写し `IdeIdentifyWire`)。
+- `ide_identify` は **96 B** を書く (`drivers/ata/ide.h` の並びの写し `IdeIdentifyWire`)。
   書く前に `sizeof(IdeInfo) == sizeof(IdeIdentifyWire)` と全 offset の一致を見るので、
   install.c 側の型が小さければその場で落ちる。
 - `sys_ls` は **FAT のように大文字** の名前を返す。名前引きは `/hd0` 配下 (ext2) を

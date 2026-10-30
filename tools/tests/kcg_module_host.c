@@ -6,7 +6,7 @@
 #undef _start
 #undef vfs_open
 #ifndef KCG_ADAPTER
-#define KCG_ADAPTER "../../kernel/kcg_module.c"
+#define KCG_ADAPTER "../../drivers/video/kcg/kcg_module.c"
 #endif
 #define IO_H
 void platform_display_kcg_code(void) {}

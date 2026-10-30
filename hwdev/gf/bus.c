@@ -1,7 +1,7 @@
 /* BAR-relative bus, preserving local index/lock state. Register/cleanup order
  * follows kdebug/gfinit_bus.c; no diagnostic executor or real VGA port I/O. */
 #include "production.h"
-#include "../../drivers/pci.h"
+#include "../../drivers/pci/pci.h"
 int gf_production_identity(struct gf_production *p)
 {
     const struct recover_identity *id=&p->display.identity;

@@ -5,7 +5,7 @@
 #include "module_runtime_host.c"
 #undef _start
 #ifndef CD_ADAPTER
-#define CD_ADAPTER "../../kernel/cd_module.c"
+#define CD_ADAPTER "../../drivers/ata/cd_module.c"
 #endif
 #include CD_ADAPTER
 

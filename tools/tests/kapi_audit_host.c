@@ -67,15 +67,15 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #include "../../platform/pc98/console.c"
 #include "fm_source.inc"
 #include "serial_source.inc"
-#include "../../drivers/serial_plan.c"
+#include "../../drivers/char/serial_plan.c"
 unsigned long sysclk_hz(void) { return SYSCLK_2458; }
 int sysclk_is_8mhz(void) { return 0; }
 void irq_enable(unsigned int irq) { (void)irq; }
 void irq_disable(unsigned int irq) { (void)irq; }
 #include "ime_log_source.inc"
 #define KAPI_HIT(n) ((void)(n))
-#include "../../drivers/kbd.h"
-#include "../../drivers/kbd_dlog.c"
+#include "../../drivers/input/kbd.h"
+#include "../../drivers/input/kbd_dlog.c"
 static int injected_byte = -1;
 u32 kbd_inject_pending(void) { return injected_byte >= 0; }
 int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }

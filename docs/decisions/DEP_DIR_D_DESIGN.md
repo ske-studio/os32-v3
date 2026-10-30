@@ -26,7 +26,7 @@
 
 |SURVEY|現在の実物 file:line|判定・設計への反映|
 |---|---|---|
-|#29|`kernel/kcg_module.c:34–40`|一致。ポート→wait→`public_api()->invalidate()`。未ロード時のstubを残す|
+|#29|`drivers/video/kcg/kcg_module.c:34–40`|一致。ポート→wait→`public_api()->invalidate()`。未ロード時のstubを残す|
 |#46|`kernel/console/console.c:75,102,176,197,486,502`|一致。scrollの属性はu16、通常clear/文字の属性はu8。単一cell書込みに統一しない|
 |#47|`arch/x86/kernel/isr_handlers.c:88–100`、`arch/x86/kernel/double_fault.c:72–77`、`kernel/v86/v86_mem.c:171–176`|一致。障害属性はu16。isrの0x07をkprintf変換に通さない|
 |#48|`kernel/v86/v86.c:973,985,1044`|一致。復旧本体は既に常駐。v86.mod不在対応を新規機能と扱わない|
@@ -125,7 +125,7 @@ int display_recover_cell_read(u32 *value);
 int display_recover_cell_write(u32 value);
 /* 新規 include/platform_display.h: KCGのハード操作だけ */
 void platform_display_kcg_code(void);
-/* kernel/kcg_module.c: module状態とinvalidate呼出しは元の所有者 */
+/* drivers/video/kcg/kcg_module.c: module状態とinvalidate呼出しは元の所有者 */
 void kcg_v86_restore(void) {
     platform_display_kcg_code(); /* outp(MODE_FF1_PORT,MFF1_KCG_CODE); io_wait(); */
     public_api()->invalidate();
@@ -266,4 +266,4 @@ H=host、N=NP21/W。機能受入はエミュレータで足りる（ユーザー
 - **N1 (P2)**: L16a の属性の口の宣言は **include/console_attr.h** に置く (kernel/console/console_backend.h ではない)。lib の規則 (build/kernel.mk:174-175 の INC_LIB = INC_COMMON -Ilib、-Ikernel なし) と host の test_kprintf_attr.py:38・:76 の include の道から見えるようにするため。lib/kprintf_attr.c は `#include "console_attr.h"`。kernel/console/console_backend.h は L16b の grid・カーソルの口だけを持ち、属性の口は include/console_attr.h を読む。L16a の写しの manifest と -I の追従 (kprintf_attr・kapi_print・gfinit_owner) に console_attr.h と platform/pc98/console_attr.c を足す。
 - **N2 (P3)**: 新しい対応表には build/*.mk を書かず broad に任せる (ROLES §4-1)。
 - L16a の変異「visible の補完の OR 定数を 0 へ」の当て先は `attr | TATTR_VISIBLE` (1 回だけ一致)。`TATTR_VISIBLE` だけでは 2 回当たる。
-- 作業順は L18 → L16a → L16b → L19 → L20 の直列。各段の NP21/W の受入 (§9 の N) は PM が段の後に回してから次の段へ。L19 と群 A の L10 は kernel/kcg_module.c を同時に触らない (群 A は L10 を L19 の後に)。
+- 作業順は L18 → L16a → L16b → L19 → L20 の直列。各段の NP21/W の受入 (§9 の N) は PM が段の後に回してから次の段へ。L19 と群 A の L10 は drivers/video/kcg/kcg_module.c を同時に触らない (群 A は L10 を L19 の後に)。

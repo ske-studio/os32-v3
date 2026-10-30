@@ -301,7 +301,7 @@ int kapi_sys_time_now(u32 *lo, u32 *hi)
 /*  pci_bind_info — 結線の診断の取得口 (票 TASK_HAL_WIRING §1-4 / KAPI v60) */
 /*                                                                          */
 /*  生成される __cdecl ラッパ (`wrap_pci_bind_info`) がここを呼ぶ ([C3])。   */
-/*  記録そのものは `drivers/pci_bind.c` の `pci_bind_info_get()` が持つ。    */
+/*  記録そのものは `drivers/pci/pci_bind.c` の `pci_bind_info_get()` が持つ。    */
 /*  ここの仕事は CPL=3 のポインタ検証と **8 バイトちょうどの写し** だけ。    */
 /*                                                                          */
 /*  `pci_get` (v58、40 バイト) と**同じ列挙順の idx** で引く。既存の         */

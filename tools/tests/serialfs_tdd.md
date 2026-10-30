@@ -21,7 +21,7 @@ python3 -B tools/tests/test_serialfs.py --target --mutate   # make check-serialf
 | 段 | 何を | どうやって |
 |---|---|---|
 | C | フレーム・CRC32・番号・再送・長さの境界・VFS の契約・障害の注入 | `serialfs_host.c` が実物の `fs/sfs_proto.c` / `fs/sfs_client.c` / `fs/serialfs.c` を取り込み、偽の線 (仮想の tick、届く時刻つきのバイト) と C の偽ホストで回す |
-| GATE | ゲート (呼び口で分ける) | `serial_gate_host.c` が実物の `drivers/serial.c` を偽のポートで回す |
+| GATE | ゲート (呼び口で分ける) | `serial_gate_host.c` が実物の `drivers/char/serial.c` を偽のポートで回す |
 | PY | ホスト側の振り分け・パス・キャッシュ・期限・BYE・行の外 | 実物の `tools/serialfs_host.py` と `tools/rshell_serial.py` を偽のポートで |
 | PY | NP21/W の COM1 を HTTP で読む口 (`--port aidebug:...`) | 偽の urlopen で `/api/serial/read`・`write` の分割・空の回・読み捨て |
 | XC | C ⇔ Python | C の組んだ列を Python が読む / 逆、定数の照合、**実時間のパイプで結合** (RENAME の応答を 1 回落とし、READ の応答の CRC を 1 回壊す) |
@@ -69,7 +69,7 @@ ERROR 0。一覧は `test_serialfs.py` の `C_MUTATIONS` / `GATE_MUTATIONS` / `P
 
 レビュー往復 1 の仕上げ (2026-09-25、コーダー交代の後): **セッション層のホスト試験
 `tools/tests/serialfs_session_host.c`** を足した (段 SESSION)。実物の `fs/serialfs_session.c`
-を `drivers/serial.c`・`fs/sfs_*.c` と組み、偽物はポート I/O (届く tick つきの受信)、
+を `drivers/char/serial.c`・`fs/sfs_*.c` と組み、偽物はポート I/O (届く tick つきの受信)、
 hlt で進む tick、VFS の mount / umount / fstype、kprintf (console の複写と同じく
 serial_putchar へ)、常駐シェルの持ち主だけ。5 案件:
 

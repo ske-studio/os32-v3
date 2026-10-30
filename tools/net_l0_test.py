@@ -4,7 +4,7 @@
 前提:
   1. tools/host_agent.py を NP2NETSOCK のポート (既定 127.0.0.1:8026) で listen 起動。
   2. その後 kernel-lgy98-link (LGY98_FLAG_LINKTEST) を配備してゲストを起動。
-     起動時に drivers/lgy98.c が link_selftest(10) を実行し、HELLO のあと 10 回の
+     起動時に drivers/net/ne2000/lgy98.c が link_selftest(10) を実行し、HELLO のあと 10 回の
      PING/PONG 往復を行って link_* カウンタに残す。
 
 この試験はカーネル内の link_* グローバルを /api/mem で読み、L0 の合格条件

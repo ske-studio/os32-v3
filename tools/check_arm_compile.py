@@ -96,11 +96,11 @@ KERNEL_EXTRA_FLAGS = ["-O2", "-D__KERNEL_BUILD__"]
 # drivers/ の 5 本だけは kernel.mk が個別ルールで INC_KERNEL を渡している
 # (idt.h / vfs.h / cpu_calibrate.h を見るため)。
 DRIVERS_INC_KERNEL = [
-    "drivers/mouse.c",
-    "drivers/loop_dev.c",
-    "drivers/ne2000.c",
-    "drivers/atapi.c",
-    "drivers/lgy98.c",
+    "drivers/input/mouse.c",
+    "drivers/block/loop_dev.c",
+    "drivers/net/ne2000/ne2000.c",
+    "drivers/ata/atapi.c",
+    "drivers/net/ne2000/lgy98.c",
 ]
 
 # 先に一致したものを採る。fs/fatfs/ は fs/ より先でなければならない。

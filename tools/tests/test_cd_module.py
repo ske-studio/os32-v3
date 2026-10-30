@@ -17,7 +17,7 @@ from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/cd_module.c'
+SOURCE = ROOT / 'drivers/ata/cd_module.c'
 CASES = ['register-unmount-release', 'fs-full', 'device-full', 'init-failed',
          'no-drive-iso-available', 'prefix-return-failed', 'mounted-body-retained']
 
@@ -78,7 +78,7 @@ def main():
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cd_module_host.c',
                             ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
+                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
 
         def run(modes, expected=0):
             for mode in modes:

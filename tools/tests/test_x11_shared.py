@@ -18,7 +18,7 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
-    'kbd_source.inc': 'drivers/kbd.c',
+    'kbd_source.inc': 'drivers/input/kbd.c',
     'ime_source.inc': 'kernel/ime/ime.c',
     'gui_source.inc': 'kernel/gui.c',
     'sink_source.inc': 'kernel/console/con_sink.c',

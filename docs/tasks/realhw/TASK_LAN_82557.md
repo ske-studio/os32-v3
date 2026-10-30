@@ -30,7 +30,7 @@
 | PC-98 の PCI: コンフィギュレーションメカニズム #1 (`0CF8h` DWORD でアドレス、`0CFCh` でデータ)。マーキュリー (82434LX) だけ #2 が要る。PCMC = デバイス 0、PCI-C バスブリッヂ = デバイス 1 (資料の例。Ra266 の実測は 0:6.0)、スロット #0〜2 = デバイス 8〜10 | `io_pci.md` 40〜75 行 |
 | PIRQ0〜3 → 8259 の割り当ては C バスブリッヂの PCI コンフィギュレーションレジスタで、通常 PnP BIOS が起動時に設定 → **デバイスの Interrupt Line レジスタを読めば IRQ が分かる** | 同 315〜320 行 |
 | ハードは規格どおりの PCI (PC/AT 用ボードが挿さる) | 同 |
-| リンク層は NIC の上に載る。`drivers/lgy98.c` が `link_init(mac)` を呼び、IRQ スタブは `irq_stub_nic_3/5/6` | `drivers/lgy98.c` 122〜137 行 |
+| リンク層は NIC の上に載る。`drivers/net/ne2000/lgy98.c` が `link_init(mac)` を呼び、IRQ スタブは `irq_stub_nic_3/5/6` | `drivers/net/ne2000/lgy98.c` 122〜137 行 |
 | ホスト側 `tools/host_agent.py` は **TCP の FrameStream** (NP21/W の NP2NETSOCK が繋ぐ) しか話さない。実機では LAN の生フレームを FrameStream に橋渡しする道具が要る | `host_agent.py` `open_stream()` |
 | WSL2 (ミラーモード) は `eth3` (物理、f0:68:e3:fa:99:06) を見るが AF_PACKET は root 要 (sudoers に python は無い)。Windows 側には **Npcap 導入済み** (`System32\Npcap`)、scapy は未導入 (uv で入る) | 2026-09-22 実測 |
 | カーネル本体の大きさと残り予算は [`docs/02_memory.md`](../../02_memory.md) §2-1 から案内する `build/out/MEMMAP.md` が実測の地図 (策定時 2026-09-22 の写しは 442.6KB / 468KB、残り 25.4KB。2026-09-30 は 583.0KB / 596KB、残り 13.0KB — KHEAP の切り直しで予算が 596KB になった)。予算は `MEM_KERNEL_IMAGE_MAX` = 帯 − KHEAP − KAPI − ガード − SHM。増やすなら SHM を 16KB 単位で削るか KHEAP を減らす | `docs/02_memory.md` §2-1、`include/memmap.h` (`MEM_KERNEL_IMAGE_MAX`) |
@@ -40,7 +40,7 @@
 
 | 段 | やること | 大きさ (見積) | 検証 |
 |---|---|---|---|
-| **L-A** | **PCI の列挙**: `drivers/pci.c` (メカニズム #1 の config r/w、bus 0 の全デバイスを走査、vendor/device/class/BAR/Interrupt Line)、シェル `lspci`、`pci_find(vendor, device)`。判定は純粋関数に切り出してホスト試験 | 2〜3KB | **実機**: `lspci` で 8086:1229 (82557) と BAR (I/O 窓)、IRQ が出る |
+| **L-A** | **PCI の列挙**: `drivers/pci/pci.c` (メカニズム #1 の config r/w、bus 0 の全デバイスを走査、vendor/device/class/BAR/Interrupt Line)、シェル `lspci`、`pci_find(vendor, device)`。判定は純粋関数に切り出してホスト試験 | 2〜3KB | **実機**: `lspci` で 8086:1229 (82557) と BAR (I/O 窓)、IRQ が出る |
 | **L-B** | **82557 ドライバ (最小)**: PCI から I/O BAR と IRQ、SCB 経由で reset / EEPROM から MAC / Configure / IA setup / CU (TX: 1 コマンドずつ) / RU (RX: RFD 連結、簡略モード)、割り込みは RU の Frame Received + CU 完了。参照は Intel の SDM と BSD 実装 ([HW3]、§5-3) | 10〜15KB | **実機**: MAC が読める → 自己送信 (ループバック) → ホストへ HELLO |
 | **L-C** | **NIC 境界の一般化**: `lgy98.c` ↔ `net/link.c` の結びつきを関数表 (`net/nic.h`: tx / mac / irq / poll) にして 82557 を 2 つ目の NIC に。起動時は PCI に 82557 が居ればそれ、無ければ LGY-98 (設定は手動でよい、v3 §3) | 1〜2KB | NP21/W (LGY-98 の回帰 L0〜L3) + 実機 |
 | **L-D** | **ホストの橋** `tools/lan_bridge.py` (**Ubuntu 側 Python、標準ライブラリのみ** — AF_PACKET。scapy も Npcap も要らない): NIC で EtherType 0x88B5 を拾い、`host_agent.py --listen` の FrameStream へ流し、逆も返す。**実装済み** (ホスト試験 `make check-lan-bridge-host`、記録 [`tools/tests/lan_bridge_tdd.md`](../../../tools/tests/lan_bridge_tdd.md)) | ホストのみ | 実機 ↔ ホスト |
@@ -144,7 +144,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 
 ### 5-3. 手元で作っておくが実機で答え合わせするもの
 
-- Configure コマンドは Intel SDM の Configure 節と BSD 実装に基づいて設計する ([HW3] の正典は [CONSTRAINTS](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する)、現行実装は `drivers/e82557.c`・`drivers/e82557_desc.c`) — **リンクが上がるかは実機の PHY 次第** (82557 は外付け PHY、MII 経由。PHY の ID も R2 相当で読む)。
+- Configure コマンドは Intel SDM の Configure 節と BSD 実装に基づいて設計する ([HW3] の正典は [CONSTRAINTS](../../CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する)、現行実装は `drivers/net/e82557/e82557.c`・`drivers/net/e82557/e82557_desc.c`) — **リンクが上がるかは実機の PHY 次第** (82557 は外付け PHY、MII 経由。PHY の ID も R2 相当で読む)。
 - 10/100 の自動判別 — 82557 自体は PHY 任せ。スイッチとのネゴシエーションは実機。
 - 実効速度 — L-E で `link_l2_stream` 相当を実機で測る。
 
@@ -152,7 +152,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 
 | 日付 | 段 | 内容 |
 |---|---|---|
-| 2026-09-22 | L-A | `drivers/pci.c` / `pci_decode.c` (メカニズム #1、bus 0 + ブリッジ配下、32 件の静的表)、`lspci` / `pcidump` (KAPI **v58**: `pci_count` / `pci_get` / `pci_cfg_read32`)、`inpd/outpd` は `platform/pc98/platform_io.h`。判定は 2 値 (`0x80000000` と `0x80FFFFFC` の読み戻し) — 実機で `absent` なら 1 値に緩める。ホスト試験 `check-pci-decode-host` (9 ケース、変異 7 本)。**カーネル 446.9KB / 468KB (残り 21.1KB)**。NP21/W: `[pci] 0 devices`、`lspci: no PCI (mechanism #1 not present)`、kselftest 104/104 |
+| 2026-09-22 | L-A | `drivers/pci/pci.c` / `pci_decode.c` (メカニズム #1、bus 0 + ブリッジ配下、32 件の静的表)、`lspci` / `pcidump` (KAPI **v58**: `pci_count` / `pci_get` / `pci_cfg_read32`)、`inpd/outpd` は `platform/pc98/platform_io.h`。判定は 2 値 (`0x80000000` と `0x80FFFFFC` の読み戻し) — 実機で `absent` なら 1 値に緩める。ホスト試験 `check-pci-decode-host` (9 ケース、変異 7 本)。**カーネル 446.9KB / 468KB (残り 21.1KB)**。NP21/W: `[pci] 0 devices`、`lspci: no PCI (mechanism #1 not present)`、kselftest 104/104 |
 | 2026-09-22 | L-D | `tools/lan_bridge.py` (AF_PACKET ↔ FrameStream、標準ライブラリのみ、MAC は透過、`--agent-mac` 照合)。ホスト試験 `check-lan-bridge-host` (9 ケース、変異 5 本、実物の host_agent と L0 往復)。実 NIC は未確認 |
 | 2026-09-22 | 検証 | `make clean` → `make all` → `make external` → `make check` exit 0 (98a0785) |
 | 2026-09-23 | **R1〜R4 (実機)** | **取得済み**。Ra266 の C バスブリッジは 0:6.0、82557 は 0:11.0 (8086:1229)、BAR1 I/O 0x6000、IRQ 3 / pin A。BIOS による窓割当済み、PCI メカニズム #1 が動作。生ダンプ・判定の証拠 (アーカイブ: `docs/archive/realhw/LAN_PCI_EVIDENCE_2026-09-23.md`)。PIRQ 対応の解読と R5〜R7 は別途確認 |

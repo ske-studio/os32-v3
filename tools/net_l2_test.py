@@ -2,7 +2,7 @@
 """OS32 リンク層 L2 (ストリーミング) の検証 — docs/tasks/network/LINK_PLAN.md §3 / §5。
 
 前提は L0/L1 と同じ (host_agent.py を起動 → kernel-lgy98-link を配備)。
-起動時に drivers/lgy98.c が link_l2_stream(131072, 512, 100) を実行する:
+起動時に drivers/net/ne2000/lgy98.c が link_l2_stream(131072, 512, 100) を実行する:
 128KB のストリームを 8KB の小さなバッファで順次消費し (再結合バッファを持たない)、
 seq 100 をホストに 1 回落とさせて Go-Back-N の欠落回復も確認する。
 

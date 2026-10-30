@@ -5,7 +5,7 @@ check-recover-tables-host:
 - kdebug/recover_gf.h
 - kdebug/recover.h
 - include/types.h
-- drivers/pci_decode.h
+- drivers/pci/pci_decode.h
 - include/memmap.h
 - kdebug/gfinit_plan.h
 - kdebug/gfinit_decode.h

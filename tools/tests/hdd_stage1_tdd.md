@@ -9,8 +9,8 @@
 
 | 対象 | ケース | 見るもの |
 |---|---|---|
-| `drivers/pc98pt.c` | `pt_offsets` / `pt_817` / `pt_1663` / `pt_reject` | 標準配置 (+8/+9/+10-11) と `PC98PartEntry` (fatfs と共有) の一致、8/17 (NHD の 1632〜) と 16/63 (2016〜) のバイト列、境界に無い区画・16 ビット超のシリンダ (F3)・幾何 0・終わり <= 開始・ディスクの外・FAT の項目・**旧配置のバイト列を別の場所として読まない** |
-| `drivers/ide_addr.c` | `ata_lba28` / `ata_range` / `ata_chs` | word 49 bit9 → LBA28 (DRV/HEAD bit6、LBA[27:24])、総数と 2^28 の上限 (`lba=268435456` が LBA 0 に化けない)、`lba + count` の桁あふれ、word 53 bit0 の現在の幾何を既定より優先 (F13)、既定 0 → 8/17・シリンダ 16 ビット、ヘッド 17 以上は使わない |
+| `drivers/block/pc98pt.c` | `pt_offsets` / `pt_817` / `pt_1663` / `pt_reject` | 標準配置 (+8/+9/+10-11) と `PC98PartEntry` (fatfs と共有) の一致、8/17 (NHD の 1632〜) と 16/63 (2016〜) のバイト列、境界に無い区画・16 ビット超のシリンダ (F3)・幾何 0・終わり <= 開始・ディスクの外・FAT の項目・**旧配置のバイト列を別の場所として読まない** |
+| `drivers/ata/ide_addr.c` | `ata_lba28` / `ata_range` / `ata_chs` | word 49 bit9 → LBA28 (DRV/HEAD bit6、LBA[27:24])、総数と 2^28 の上限 (`lba=268435456` が LBA 0 に化けない)、`lba + count` の桁あふれ、word 53 bit0 の現在の幾何を既定より優先 (F13)、既定 0 → 8/17・シリンダ 16 ビット、ヘッド 17 以上は使わない |
 | `fs/ext2_layout.c` | `layout` | Codex の 16,652 セクタ (最終グループ 133 < 必要 135 → 1 グループ 8,193 ブロック)、32/33 グループ境界 (262,145 / 262,146 ブロック)、g=2 (非スパース) と g=3 (スパース) の境目を 1 ブロックずつ掃いて「落とした大きさは素朴な配置が本当に足りない」「落とさなかった大きさは足りる」の両方が出る、128〜524,288 セクタの全長で最終グループが収まり長さを超えない |
 | `userland/shell/hdprep_plan.c` | `hdprep_geom` / `hdprep_disk` / `hdprep_mounts` / `hdprep_plan` | 断る条件の全部 (ATA 無し・BIOS 幾何なし / 無効・BX≠512・LBA も現在の CHS も無い・LBA 1 の項目 (どの添字でも、OS32 自身でも)・LBA 0 の 55AA・ルートの hd0・大きさ 8〜256 の外)、マウント中は umount が要る、16/63 で開始 2016・256MiB をシリンダへ切り下げ、BIOS の CX と IDENTIFY の総数の小さい方で頭打ち、計画した区画が共有部の書き手と固定点をそのまま通る |
 | `fs/ext2_super.c` / `ext2_fmt.c` | `find_bios` / `find_fail` / `format_clamp` / `format_at_16652` / `format_at_refuse` / `mount_bounds` | 区画表の CHS を **BIOS 幾何**で LBA にする (IDENTIFY 8/17 なら 272 に化ける表が 2016 を指す)、空 / 読めない / 幾何なし / ディスクの外 / 旧配置 / FAT だけ → 失敗し **format は 1 セクタも書かずマウントもしない**、`ext2_format` は区画で頭打ち、`ext2_format_at` は範囲の外を書かず区画表も触らない、長さ 0・LBA 0〜17・ディスクの外・桁あふれ・総数 0 は 1 セクタも書かずに断る、FS が区画より大きいとマウントしない、ブロック I/O は区画の外 (×2 の桁あふれを含む) をデバイスに出さない |
@@ -39,11 +39,11 @@
 ### 3-1. 最初の記録の訂正 (実装レビュー往復 1、Opus M1)
 
 最初の版は `MUTATIONS 34/34 RED` と書いたが、**実態は違った**。C の変異を当てる写し
-(`MIRROR`) に `drivers/ide.h` が無く、`ide_addr.h` の `#include "ide.h"` が解決できずに
+(`MIRROR`) に `drivers/ata/ide.h` が無く、`ide_addr.h` の `#include "ide.h"` が解決できずに
 **C の変異 29 本は全部コンパイル失敗**で、それを RED に数えていた。つまり C 側は何も
 確かめていなかった。直したこと:
 
-- `MIRROR` に `drivers/ide.h` を足し、写しに無いヘッダは本物の `drivers/` / `fs/` から引く。
+- `MIRROR` に `drivers/ata/ide.h` を足し、写しに無いヘッダは本物の `drivers/` / `fs/` から引く。
 - **ビルドが通らない変異は RED ではなく ERROR** に数える。Python 側も、試験の失敗 (終了 1) だけを
   RED にし、読み込みの失敗・例外 (終了 3) は ERROR にする。合格は「全部 RED・ERROR 0・
   SURVIVED 0・NOT_APPLIED 0」。

@@ -1,13 +1,13 @@
 check-serial-vfast-host:
 - include/time_units.h
-- drivers/serial.c
-- drivers/serial_plan.c
+- drivers/char/serial.c
+- drivers/char/serial_plan.c
 - tools/tests/serial_vfast_host.c
 - tools/tests/test_serial_vfast.py
 - userland/shell/serial_watchdog.c
 - tools/check_map.d/check-serial-vfast-host.yaml
 - build/checks.d/check-serial-vfast-host.mk
-- drivers/serial.h
+- drivers/char/serial.h
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
 - tools/tests/kernel_includes.py

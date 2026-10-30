@@ -2,7 +2,7 @@
 //!
 //! ## 誰がキーを読むか (2026-09-06 の K2 反映後)
 //!
-//! `drivers/kbd.c` は打鍵を 2 本の待ち行列へ積むが、**GUI モード中 (WM が
+//! `drivers/input/kbd.c` は打鍵を 2 本の待ち行列へ積むが、**GUI モード中 (WM が
 //! `gui_register` した間) は cooked (`kbd_buf`) に積まない** (K2)。したがって
 //! `ime_trygetkey()` / `ime_trygetchar()` は GUI 中いつでも -1 を返す —
 //! カーネル FEP は自分でキーを引けない。WM だけが raw を読む唯一の読み手になる。
@@ -515,7 +515,7 @@ fn flush_text_to(st: &mut GuiState, t: Option<input::Target>) {
 /*  フォーカス移動の前の確定 (票 KBD_NAV §1-6)                       */
 /* ================================================================ */
 
-/* KEY_RETURN と ASCII CR (drivers/kbd.h)。確定は「RETURN を 1 打」と同じ。 */
+/* KEY_RETURN と ASCII CR (drivers/input/kbd.h)。確定は「RETURN を 1 打」と同じ。 */
 const SC_RETURN: u8 = 0x1C;
 const CH_CR: u8 = 0x0D;
 /// フォーカス移動の前の確定で RETURN を流す回数の上限 (未確定行は 1 行 =
@@ -560,7 +560,7 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
 /// 入力先の寿命終了。STOP と同じ取消で、確定も辞書アクセスもしない (X1 可)。
 /// 既に WM が集めた確定列・予約も次の入力先へ渡さない。
 pub fn cancel_input() {
-    const SC_STOP: i32 = 0x60; // drivers/kbd.h KEY_STOP
+    const SC_STOP: i32 = 0x60; // drivers/input/kbd.h KEY_STOP
     grid_clear_all(state());
     let _ = feed_kernel(SC_STOP << 8);
     let f = state();

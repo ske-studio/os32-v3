@@ -192,7 +192,7 @@ void bootinfo_seal_image(u8 *raw, u32 crc, u32 size);
 int bootinfo_format_bios(const struct bootinfo *bi, int slot,
                          char *buf, int size);
 
-/* IDENTIFY の値 (drivers/ide.c の ide_get_geom が埋める) の 1 行。
+/* IDENTIFY の値 (drivers/ata/ide.c の ide_get_geom が埋める) の 1 行。
  *   [hdd] ata def=16382/16/63 cur=16382/16/63(valid) lba=1 total=16514063 */
 struct bootinfo_ata {
     u16 def_cyl, def_heads, def_spt;       /* word 1 / 3 / 6 */

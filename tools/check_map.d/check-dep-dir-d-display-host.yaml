@@ -33,5 +33,5 @@ check-dep-dir-d-display-host:
 - tools/check_map.d/check-dep-dir-d-display-host.yaml
 - tools/check_map.yaml
 - kernel/v86/v86.c
-- gfx/pc98_route.h
+- drivers/video/pc98/pc98_route.h
 - tools/tests/kernel_includes.py

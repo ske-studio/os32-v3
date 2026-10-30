@@ -2,7 +2,7 @@
 """OS32 リンク層 L1 (WINDOW/Credit) の検証 — docs/tasks/network/LINK_PLAN.md §2 / §5。
 
 前提は L0 と同じ (host_agent.py を listen 起動 → kernel-lgy98-link を配備)。
-起動時に drivers/lgy98.c が link_l1_bulk(200, 512) を実行する: ホストに 200 個の
+起動時に drivers/net/ne2000/lgy98.c が link_l1_bulk(200, 512) を実行する: ホストに 200 個の
 DATA フレームを流させ、絶対値 WINDOW でフロー制御する。credit が NIC リング /
 SW キューの空きを超えないので、200 フレーム (ホスト側の素の流量ならリング容量を
 超える) を溢れさせずに全部・順序どおり受けられる。

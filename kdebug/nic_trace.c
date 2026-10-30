@@ -1,6 +1,6 @@
 /* Foreground probe diagnostics. Never called under irq_save, from IRQ or tick. */
 #include "nic_trace.h"
-#include "drivers/e82557.h"
+#include "drivers/net/e82557/e82557.h"
 #include "include/bootinfo.h"
 #include "include/kprintf.h"
 #include "fs/vfs.h"

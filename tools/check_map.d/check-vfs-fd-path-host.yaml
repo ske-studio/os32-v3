@@ -2,16 +2,16 @@ check-vfs-fd-path-host:
 - tools/tests/host32.py
 - tools/tests/mutpar.py
 - build/core.yaml
-- drivers/pc98pt.c
+- drivers/block/pc98pt.c
 - fs/ext2_file.c
 - fs/ext2_vfs.c
 - fs/fatfs/ff.c
 - fs/fatfs/diskio.c
 - fs/fatfs/diskio_os32.h
-- drivers/fdc.h
-- drivers/fdc_track.c
-- drivers/fdc_track.h
-- drivers/rtc.h
+- drivers/block/fdc.h
+- drivers/block/fdc_track.c
+- drivers/block/fdc_track.h
+- drivers/char/rtc.h
 - fs/fatfs_vfs.c
 - fs/hostdrvfs.c
 - fs/iso9660.c
@@ -61,7 +61,7 @@ check-vfs-fd-path-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - include/platform_device.h
 - include/ide_contract.h
 # Conservative artifact-path audit (including indirect helpers/fixtures).

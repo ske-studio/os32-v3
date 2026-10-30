@@ -49,7 +49,7 @@ def main():
         folder = Path(td)
         exe = folder / 'runtime'
 
-        def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/dev.c'):
+        def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/base/dev.c'):
             subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', *INCLUDES,
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/module_runtime_host.c', source,
@@ -114,7 +114,7 @@ def main():
                  'if (mounts[i].in_use && mounts[i].ops == ops) return VFS_ERR_BUSY;',
                  'if (0 && mounts[i].in_use && mounts[i].ops == ops) return VFS_ERR_BUSY;',
                  [('registry-full-unmount-reuse', 12, 0)]),
-                ('device-remove-missing', ROOT / 'drivers/dev.c',
+                ('device-remove-missing', ROOT / 'drivers/base/dev.c',
                  'while (++i < dev_num) dev_table[i - 1] = dev_table[i];',
                  'return 0;', [('registered-start-failure-0', 11, 0)]),
             ):

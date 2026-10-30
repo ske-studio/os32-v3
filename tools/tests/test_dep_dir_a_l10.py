@@ -14,8 +14,8 @@ from test_dep_dir_a_l05a import digest, public_spec
 ROOT = Path(__file__).resolve().parents[2]
 COPIES = (
     'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h',
-    'include/pc98.h', 'drivers/kcg.h', 'drivers/kcg.c',
-    'kernel/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
+    'include/pc98.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c',
+    'drivers/video/kcg/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
     'kernel/module/module_schema.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
@@ -44,7 +44,7 @@ def contracts():
         wrappers += body + '\n'
     assert 'kcg.h' not in spec['includes'] and 'kcg_contract.h' in spec['includes']
     assert '#include "kcg_contract.h"' in generated and '#include "kcg.h"' not in generated
-    module = (ROOT / 'kernel/kcg_module.c').read_text()
+    module = (ROOT / 'drivers/video/kcg/kcg_module.c').read_text()
     assert '#include "kcg_contract.h"' in module and '#include "kcg.h"' not in module
     assert 'void kcg_rom_read_ank(u8 ch, u8 *buf) { public_api()->read_ank(ch, buf); }' in module
     assert 'void kcg_rom_read_kanji(u16 jis, u8 *buf) { public_api()->read_kanji(jis, buf); }' in module
@@ -67,7 +67,7 @@ def build(folder, body, wrappers):
                     '-fno-stack-protector',
                     *include_flags(folder),
                     str(folder / 'platform/pc98/device_kcg.c'),
-                    str(folder / 'drivers/kcg.c'),
+                    str(folder / 'drivers/video/kcg/kcg.c'),
                     str(folder / 'tools/tests/dep_dir_a_l10_host.c'), '-o', str(exe)], check=True)
     return exe
 

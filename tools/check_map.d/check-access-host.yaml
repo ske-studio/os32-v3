@@ -39,7 +39,7 @@ check-access-host:
 - exec/ring3_str.c
 - kapi/kapi_db.c
 - kapi/kapi_strings.c
-- drivers/dev.h
+- drivers/base/dev.h
 - tools/tests/db_caller_host.c
 - tools/tests/test_db_caller.py
 - kapi/kapi_generated.c

@@ -1,4 +1,4 @@
-"""PCI コンフィギュレーションの純粋な復号 (drivers/pci_decode.c) のホスト試験。
+"""PCI コンフィギュレーションの純粋な復号 (drivers/pci/pci_decode.c) のホスト試験。
 
 記録: tools/tests/pci_decode_tdd.md
 票  : docs/tasks/realhw/TASK_LAN_82557.md §2 L-A (実機の内蔵 LAN 82557 を
@@ -9,7 +9,7 @@
 会話で、ビットの読み違いで潰すには高い。だからアドレス語の組み立て・BAR の
 復号・ヘッダの切り出しを純粋関数に切り出し、ここで全部潰しておく。
 
-実物の drivers/pci_decode.c を 1 行も写さずに #include して回す。復号は
+実物の drivers/pci/pci_decode.c を 1 行も写さずに #include して回す。復号は
 I/O も静的配列も触らないので模型は要らない。
 
   python3 -B tools/tests/test_pci_decode.py            # ホストで全ケース
@@ -24,13 +24,13 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pci_decode_host.c"
-SRC = ROOT / "drivers/pci_decode.c"
-# カーネルと同じ i386-elf で通す実ソース。列挙側 (drivers/pci.c) は I/O を
+SRC = ROOT / "drivers/pci/pci_decode.c"
+# カーネルと同じ i386-elf で通す実ソース。列挙側 (drivers/pci/pci.c) は I/O を
 # 触るのでホストでは回せないが、**コンパイルは通ることを見る** — 実機でしか
 # 走らせられないコードこそ、型とプロトタイプのずれを手元で捕まえておく。
 TARGET_SRCS = [
-    ("drivers/pci_decode.c", []),
-    ("drivers/pci.c", []),
+    ("drivers/pci/pci_decode.c", []),
+    ("drivers/pci/pci.c", []),
     ("userland/shell/pci_verbose.c", []),
 ]
 
@@ -52,25 +52,25 @@ INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers")] + ["-I" + str(
 # どれも「仕様を素直に読むと書いてしまう形」= RED 段で実際に書いた形。
 # (パターン, 置換, 説明)
 MUTATIONS = [
-    ("drivers/pci_decode.c", r"\(\(bus & PCI_BUS_MASK\) << PCI_CFG_ADDR_BUS_SHIFT\)",
+    ("drivers/pci/pci_decode.c", r"\(\(bus & PCI_BUS_MASK\) << PCI_CFG_ADDR_BUS_SHIFT\)",
      "(bus << PCI_CFG_ADDR_BUS_SHIFT)",
      "bus/dev/fn をマスクせずに詰める (範囲外が隣の欄へ溢れ、別のデバイスを読む)"),
-    ("drivers/pci_decode.c", r"if \(raw == 0\) return PCI_BAR_NONE;",
+    ("drivers/pci/pci_decode.c", r"if \(raw == 0\) return PCI_BAR_NONE;",
      "if (raw == 0 || raw == PCI_BAR_SPACE_IO) return PCI_BAR_NONE;",
      "番地未割り当ての I/O BAR (生値 1) を「無い」に畳む (票 R1 が消える)"),
-    ("drivers/pci_decode.c", r"return raw & PCI_BAR_IO_ADDR_MASK;",
+    ("drivers/pci/pci_decode.c", r"return raw & PCI_BAR_IO_ADDR_MASK;",
      "return raw & PCI_BAR_MEM_ADDR_MASK;",
      "I/O BAR の番地を ~0xF で切る (0xE808 が 0xE800 に化ける)"),
-    ("drivers/pci_decode.c", r"if \(\(raw & PCI_BAR_SPACE_IO\) != 0\) return 0;",
+    ("drivers/pci/pci_decode.c", r"if \(\(raw & PCI_BAR_SPACE_IO\) != 0\) return 0;",
      "",
      "I/O BAR でも bit3 を prefetchable と読む (番地の一部を属性と取り違える)"),
-    ("drivers/pci_decode.c", r"return \(int\)\(header_type & PCI_HDR_LAYOUT_MASK\);",
+    ("drivers/pci/pci_decode.c", r"return \(int\)\(header_type & PCI_HDR_LAYOUT_MASK\);",
      "return (int)header_type;",
      "Header Type の bit7 を落とさない (マルチファンクションのブリッヂを見落とす)"),
-    ("drivers/pci_decode.c", r"return \(u16\)\(dword >> \(\(reg & PCI_CFG_WORD_LANE_MASK\) \* PCI_CFG_BYTE_BITS\)\);",
+    ("drivers/pci/pci_decode.c", r"return \(u16\)\(dword >> \(\(reg & PCI_CFG_WORD_LANE_MASK\) \* PCI_CFG_BYTE_BITS\)\);",
      "return (u16)(dword >> ((reg & 3) * 8));",
      "16 ビットの切り出しをバイト境界で行う (奇数オフセットで値がずれる)"),
-    ("drivers/pci_decode.c", r'if \(sub == PCI_SUB_BRIDGE_ISA\) return "Bridge/ISA";',
+    ("drivers/pci/pci_decode.c", r'if \(sub == PCI_SUB_BRIDGE_ISA\) return "Bridge/ISA";',
      "",
      "ブリッヂのサブクラスを見ない (Host / ISA / PCI が全部同じ名前になる)"),
     # --- `lspci -v` (userland/shell/pci_verbose.c) ---
@@ -109,7 +109,7 @@ MUTATIONS = [
 # ハーネスが #include する実物。変異のときはこれを一時の木へ写し、1 本だけ
 # 差し替える (ハーネスの "../../drivers/..." がそのまま一時の木を指す)。
 MIRROR = ["tools/tests/pci_decode_host.c", "tools/tests/lspci_cmd_host.c",
-          "drivers/pci_decode.c", "drivers/pci_decode.h",
+          "drivers/pci/pci_decode.c", "drivers/pci/pci_decode.h",
           "userland/shell/pci_verbose.c", "userland/shell/pci_verbose.h",
           "userland/shell/cmd_pci.c", "userland/shell/shell.h"]
 
@@ -156,7 +156,7 @@ def run_cases(exes, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で drivers/pci.c ごと通す。"""
+    """カーネルと同じ i386-elf で drivers/pci/pci.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pci-decode-") as tmp:
         exes = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/pci_decode.c, "
+        print("HOST GNU11 -Werror compile PASS (real drivers/pci/pci_decode.c, "
               "userland/shell/pci_verbose.c, userland/shell/cmd_pci.c)",
               flush=True)
         if "--target" in args:

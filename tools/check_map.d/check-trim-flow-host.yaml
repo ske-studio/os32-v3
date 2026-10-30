@@ -5,7 +5,7 @@ check-trim-flow-host:
 - arch/x86/arch_io.h
 - build/checks.d/check-trim-flow-host.mk
 - build/checks.d/check-trim-kernel-host.mk
-- drivers/kbd.h
+- drivers/input/kbd.h
 - exec/access_walk.c
 - exec/appmem.c
 - exec/appmem.h

@@ -62,7 +62,7 @@ void ext2_ns_touch(Ext2Ctx *ctx);
 void ext2_path_memo_reset(Ext2Ctx *ctx);
 int  ext2_path_memo_get(Ext2Ctx *ctx, const char *path, u32 *out_ino);
 void ext2_path_memo_put(Ext2Ctx *ctx, const char *path, u32 ino);
-/* 区画表 (LBA 1) の OS32 区画を探す (drivers/pc98pt.c)。CHS → LBA の幾何は
+/* 区画表 (LBA 1) の OS32 区画を探す (drivers/block/pc98pt.c)。CHS → LBA の幾何は
  * bootinfo_part_geom (BIOS 幾何、無ければ IDENTIFY)。戻り値 EXT2_OK /
  * EXT2_ERR_IO (ドライブが無い・読めない) / EXT2_ERR_NOPART (項目が無い・
  * 範囲が壊れている・ディスクの外)。**失敗時にどこかの LBA を仮定しない**。 */

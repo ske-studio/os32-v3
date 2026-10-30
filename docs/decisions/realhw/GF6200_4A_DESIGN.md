@@ -50,7 +50,7 @@
 | D3 | `P/gf6200/PLAN.final.md:34` の gfobs.c ではなく、実物は `O/kdebug/kdebug_main.c:34` の dbg_call→kpeek_call | 既存 KAPI を使う専用 op を追加。新しい KAPI スロットは不要 |
 | D4 | 計画:35 の「4MB 窓 A/B」の実装は、実際には `O/kdebug/kpeek.c:112–146` で必要ページだけ保存・付け替え・復元、:49 は RW 無し | 同じ静的 PT を使い、書くページにだけ RW。4MB 全体を毎回張らない |
 | D5 | 依頼の coldstart_card_516_up の所在は nv_general.c ではなく `R/haiku/src/add-ons/accelerants/nvidia/engine/nv_info.c:313`。:401 は ROMSHADOW を有効化 | coldstart 全体の移植はしない。末尾の映像有効化を 4a へ持ち込まない |
-| D6 | 「命令前にシリアルへ1行」は既存 `O/drivers/serial.c:822–835` だけでは保証できない。送信待ち切れでも void で戻り、文字が落ちる | 成否と送信完了を返す専用出口を足し、失敗時は次の GPU 操作をしない |
+| D6 | 「命令前にシリアルへ1行」は既存 `O/drivers/char/serial.c:822–835` だけでは保証できない。送信待ち切れでも void で戻り、文字が落ちる | 成否と送信完了を返す専用出口を足し、失敗時は次の GPU 操作をしない |
 
 - 確定観測: 同票:44–56 の Command=0106h、BAR0=24000000h、BAR1=30000008h、BAR2=25000000h、cfg50=0・54=1、PMC=04A100A1、PFB 全零、27MHz、RAM 組3を起点とする。
 - 起動時の非零レジスタを「POST 済み」の証拠にしない。段0〜3の結果は変更せず、D2は参照実装との食い違いとして残す。
@@ -71,7 +71,7 @@
 - ROM由来の番地リストは許可の根拠ではない。独立に固定した W 行との積集合を検査する。PFB全域、PBUS全域、PCRTC全域の一括 W 許可は禁止。
 - MMIO/VRAM は volatile、supervisor・PCD、書きだけ RW。PAGEの保存→写像→操作→復元を irq_save/restore 内で行う。index/data と RMW は一組の間だけ割込み禁止。
 - TIME、ログ、ROM全体の検査を割込み禁止区間に入れない。窓の排他フラグを KPEEK と共有し、busy 中の別 op は BUSY。PTE復元失敗は致命エラーとして後続を止める。
-- `pci_get` は列挙時の写し（`O/drivers/pci.c:190–207`）。書きの直前には生 config を読み BDF・BAR・Command を再検証する。
+- `pci_get` は列挙時の写し（`O/drivers/pci/pci.c:190–207`）。書きの直前には生 config を読み BDF・BAR・Command を再検証する。
 
 ## 3. BAR測定と G1、実行準備
 
@@ -84,7 +84,7 @@
 | A2 前処理 | 1850h=0・PMC割込み=0を確認。PMC.ENABLE bit0 を立て、head0を選択、必要な拡張CRを解錠。対象値と許可行を実行前manifestに含める | readback不一致なら止める |
 | A3 静的確認 | 全 main 5本と SUB/CALL先を検査。193命令・27種・9本、表位置と全副作用を照合。承認対象のmanifestを確定 | 未知命令・N1のE81E以外の表示有効化・W行不足なら実機RUNを拒否 |
 
-- Command は `pci_cfg_write16`（`O/drivers/pci.h:84`）を使う。Status の W1C ビットを含む DWORD RMW はしない。BAR probe は専用 phase に閉じ込める。
+- Command は `pci_cfg_write16`（`O/drivers/pci/pci.h:84`）を使う。Status の W1C ビットを含む DWORD RMW はしない。BAR probe は専用 phase に閉じ込める。
 - G1（`P/gf6200/PLAN.final.md:88`）は「4bの前」の下限。本設計では初期化中の legacy decode も防ぐため4aの先頭で満たす。`R/envytools/docs/hw/bus/pci.rst:50–60,78` が根拠。
 - [A0000h,C0000h) を GF の試験に写像・アクセスしない。GPU の I/O decode は常時0。1854h を非零、1850h bit0 を1にする script は事前拒否し、黙って書換えない。
 - 各script終了でも cfg54/PBUS1854=0、cfg50/PBUS1850=0を確認。RESETの1850 bit0クリアは許可する。終了・ABORT時も54h=0を保持し、4bも同じ禁止条件を守るが、4a終了のGPU状態を残さず、承認されたinitを含む単一sessionを別途設計する。
@@ -162,7 +162,7 @@
 
 - ログ形式は recover r3 §5 のRECのみ。各命令前の`phase=gf_pre event=BEGIN main=... pc=... opcode=... exec=...`、各書込前の`phase=gf_bus event=BEGIN pc=... bar=... off=... width=... old=... new=...`を送信完了してから処理し、ENDにreadback/rcを残す。sid/seqはrecover一元採番。最終result・試験結果・復帰結果も同契約に従う。
 - RUN_ONE中も各opcode境界のtrial_stepでシリアルabortを取り込み、poll/delayも有界分割した安全点で確認する。要求があれば後続opcodeを実行せず局所PTE/IRQ/indexの後始末→trial_end(abort)へ進む。ABORT opがRUN中に届くことには依存しない。
-- 既定9600bps（`O/drivers/serial.c:263`）では90文字×4096でも8N1で384秒。実際のRECはBEGIN/END・内部MMIO・cleanupも含め、manifestの全分岐・反復展開と各フィールド最大桁数から最大送信バイト数Bを計算する。UARTの実設定bits/frameで`T_wire=ceil(B×bits/frame/9600)`を求め、有限の送信待ち余裕を加えたT_logをtrial_beginの予算に渡す。kdebug_call内だけを数える総時間上限=60秒+T_log（PAUSEDの承認待ちは除外）、実測送信時間だけを60秒の実行予算から除外し、T_log超過はLOG_FAIL。待ち5秒は実行予算内。事前に算定不能・桁溢れ・recoverが総予算を受理しない場合は書く前に拒否する。
+- 既定9600bps（`O/drivers/char/serial.c:263`）では90文字×4096でも8N1で384秒。実際のRECはBEGIN/END・内部MMIO・cleanupも含め、manifestの全分岐・反復展開と各フィールド最大桁数から最大送信バイト数Bを計算する。UARTの実設定bits/frameで`T_wire=ceil(B×bits/frame/9600)`を求め、有限の送信待ち余裕を加えたT_logをtrial_beginの予算に渡す。kdebug_call内だけを数える総時間上限=60秒+T_log（PAUSEDの承認待ちは除外）、実測送信時間だけを60秒の実行予算から除外し、T_log超過はLOG_FAIL。待ち5秒は実行予算内。事前に算定不能・桁溢れ・recoverが総予算を受理しない場合は書く前に拒否する。
 - serialの専用checked送信は既存経路と排他、TxRDY待ち＋最後の送信完了確認を期限付きにし、失敗はLOG_FAILで停止。LANは結果複製の出口、命令前の証拠の代わりにしない。
 - 最後のREC gf_pre/gf_bus BEGIN行で命令・内部手順を特定。バスアクセスそのものがCPUを止めた場合、ソフトの期限では救えない。自動再試行・自動リセットを行わず、ユーザーの電源断・再投入で回復する。
 - DIRTYはrecoverのFAILED/cold-requiredの派生表示で、別の復旧状態機械は持たない。正常なmain終了だけ次の番号へ進む。重複要求は既存結果を返す。再実行には電源再投入記録とCOLD再採取が必要で、新sessionだけでは解除しない。
@@ -203,7 +203,7 @@
 | S3 1日 | 新 `kdebug/gfinit_exec.c`、同host試験 | 制御・条件・macro・skip/force・実行予算、完全mockで27種の期待trace |
 | S4 1日 | 新 `kdebug/gfinit_pll.c`、同host試験 | 0x21 parser・整数solver・低位/高位書込列、MIT表示、未解決リンク依存0 |
 | S5 1日 | 新 `kdebug/gfinit_bus.c`、`kdebug/kpeek.c`、新 `kdebug/kdebug_window.c/.h` | 窓部品の共有、GF専用RW許可行・VGA別名・PCI probe、peek回帰試験 |
-| S6 1日 | `drivers/serial.c/.h`、`kernel/module/kdebug_imports.def`、`kdebug/kdebug_main.c`、新 `kdebug/gfinit.c/.h` | checkedログ、session/phase・cleanup・RUN_ONE、imports末尾追加と生成物再生成 |
+| S6 1日 | `drivers/char/serial.c/.h`、`kernel/module/kdebug_imports.def`、`kdebug/kdebug_main.c`、新 `kdebug/gfinit.c/.h` | checkedログ、session/phase・cleanup・RUN_ONE、imports末尾追加と生成物再生成 |
 | S7 0.5〜1日 | `sdk/include/os32/os32_kapi_shared.h`、新 `userland/shell/cmd_gfinit.c`、shell登録/ビルド定義、kdebugビルド定義 | op/固定要求・旗、INSPECT表示、ABI方針に従う版更新（スロット追加無し）、KDEBUG=0/1ビルド |
 | S8 0.5〜1日 | 同票、実機証拠ディレクトリ（ROMをコミットしない） | A1/A2受入。承認待ち・電源操作待ちは工数外 |
 | S9以降 各0.5〜1日 | 同票・実機ログ | mainごとの受入を分割、最後にA4。固まったら停止して証拠から次の設計変更をレビュー |

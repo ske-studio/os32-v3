@@ -3,7 +3,7 @@
 
 #include "types.h"
 #define PCI_DECODE_CONSTANTS_ONLY
-#include "../drivers/pci_decode.h"
+#include "../drivers/pci/pci_decode.h"
 #undef PCI_DECODE_CONSTANTS_ONLY
 #include <stdbool.h>
 

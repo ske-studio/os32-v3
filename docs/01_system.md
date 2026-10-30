@@ -142,11 +142,11 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 *   **役割:** `idt.c`/`isr_handlers.c` (中断処理), `paging.c` (メモリ管理), `kmalloc.c`, `console.c`
 
 #### ファイルシステム (fs/)
-*   **依存先:** `include/`, `drivers/disk.h`, `drivers/atapi.h`, `kernel/`
+*   **依存先:** `include/`, `drivers/block/disk.h`, `drivers/ata/atapi.h`, `kernel/`
 *   **役割:** VFS（仮想ファイルシステム）による抽象化と、FAT12/ext2/ISO9660/HostDrvFSの実装。
 
 #### グラフィックス (gfx/)
-*   **依存先:** `include/`, `drivers/kcg.h`, `kernel/`
+*   **依存先:** `include/`, `drivers/video/kcg/kcg.h`, `kernel/`
 *   **役割:** バックバッファ管理、VRAM転送、スプライト・図形描画。高速化のためアセンブラルーチンを利用。
 
 #### プログラムローダー (exec/)

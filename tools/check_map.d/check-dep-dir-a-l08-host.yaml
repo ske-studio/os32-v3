@@ -1,5 +1,5 @@
 check-dep-dir-a-l08-host:
-- drivers/serial.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -36,7 +36,7 @@ check-dep-dir-a-l08-host:
 - sdk/rust/os32api/src/kapi_generated.rs
 - hwdev/generated/hwdev_contract.h
 - exec/exec.c
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c
@@ -49,9 +49,9 @@ check-dep-dir-a-l08-host:
 - tools/tests/shm_user_host.c
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
-- drivers/pci.h
-- drivers/pci_decode.h
-- drivers/pci_bind.h
+- drivers/pci/pci.h
+- drivers/pci/pci_decode.h
+- drivers/pci/pci_bind.h
 - platform/pc98/device_pci.c
 - kapi/kapi_sys.c
 - tools/tests/test_dep_dir_a_l08.py

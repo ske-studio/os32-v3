@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  PCM_CS4231_HOST.C — CS4231 再生ドライバをそのままホストで回す           */
 /*                                                                          */
-/*  実物 (drivers/pcm_cs4231_math.c と drivers/pcm_cs4231.c) を 1 行も写さずに */
+/*  実物 (drivers/sound/cs4231/pcm_cs4231_math.c と drivers/sound/cs4231/pcm_cs4231.c) を 1 行も写さずに */
 /*  #include する。装置・8237・プール・割り込み・時計は模型に差し替え、      */
 /*  **ポートアクセスを 1 回ずつ数える**。                                    */
 /*                                                                          */
@@ -356,8 +356,8 @@ void pcm_shim_preempt(int site)
 /* ======================================================================== */
 /*  2. 実物をそのまま取り込む                                                */
 /* ======================================================================== */
-#include "../../drivers/pcm_cs4231_math.c"
-#include "../../drivers/pcm_cs4231.c"
+#include "../../drivers/sound/cs4231/pcm_cs4231_math.c"
+#include "../../drivers/sound/cs4231/pcm_cs4231.c"
 
 /* 装置の 1 tick: 時計を進め、再生中 (PEN=1 かつ unmask) なら位置も進める。 */
 static void dev_tick(void)

@@ -1,6 +1,6 @@
 #include "gfinit_resources.h"
 #include "kprintf.h"
-#include "../drivers/pci.h"
+#include "../drivers/pci/pci.h"
 #ifdef GF_PRODUCTION
 #include "../hwdev/gf/production.h"
 #endif

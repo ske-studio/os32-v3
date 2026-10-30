@@ -337,7 +337,7 @@ static void prod_cases(void)
  * given as address 0 (unmapped), so any write or drain read faults the test. */
 #include "gfx_hal.h"
 GfxCounters gfx_counters;
-#include "../../gfx/gf_present.c"
+#include "../../drivers/video/geforce/gf_present.c"
 static u32 prod_points,prod_present_regs[GF_PRESENT_PFB_AMOUNT/4+1];
 static volatile u8 *volatile prod_unmapped;
 static int prod_present_point(void *v) { prod_points++;return gf_production_point(v); }

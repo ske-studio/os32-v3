@@ -3,11 +3,11 @@
 - 症状: 実機 **PC-9821Ra266** で FD (1.2MB 2HD / 1.44MB とも) から起動すると
   カーネルの `MOUNT...` で **`root panic`** になる。IPL とローダは BIOS の
   INT 1Bh で読めているので、カーネル自前の FDC ドライバの側で失敗している
-- 対象: [`drivers/fdc.c`](../../drivers/fdc.c) / [`drivers/fdc.h`](../../drivers/fdc.h) と、
-  そこから切り出した純粋な判定 [`drivers/fdc_decide.c`](../../drivers/fdc_decide.c)
+- 対象: [`drivers/block/fdc.c`](../../drivers/block/fdc.c) / [`drivers/block/fdc.h`](../../drivers/block/fdc.h) と、
+  そこから切り出した純粋な判定 [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c)
 - 実行: `python3 -B tools/tests/test_fdc_seek.py [--target] [--mutate] [case ...]`
   (`make check-fdc-seek-host` が `--target --mutate` 付きで回す)
-- 試験: [`fdc_seek_host.c`](fdc_seek_host.c) — 実物の `drivers/fdc_decide.c` を
+- 試験: [`fdc_seek_host.c`](fdc_seek_host.c) — 実物の `drivers/block/fdc_decide.c` を
   1 行も写さずに `#include` する。判定は I/O も `tick_count` も触らないので
   **模型が 1 つも要らない**
 - KAPI は動かしていない。既存 API (`fdc_read_sector` / `_geom`、
@@ -39,7 +39,7 @@ SENSE INTERRUPT STATUS で読み出さないまま次の SEEK を出すと、µP
 ## 2. ホストで試験できる形に切り出した 2 つの判断
 
 副作用のある部分 (ポート I/O・tick 待ち) は実機でしか動かないが、
-**「ST0 をどう読むか」だけは純粋**なので `drivers/fdc_decide.c` に分けた。
+**「ST0 をどう読むか」だけは純粋**なので `drivers/block/fdc_decide.c` に分けた。
 そこが実機でしか踏まない分岐そのものだから。
 
 | ID | 見るもの | どう書いたか |
@@ -87,11 +87,11 @@ SENSE INTERRUPT STATUS で読み出さないまま次の SEEK を出すと、µP
 
 ## 3. RED → GREEN
 
-### RED (判定を「今の `drivers/fdc.c` の判断」のまま関数にした状態)
+### RED (判定を「今の `drivers/block/fdc.c` の判断」のまま関数にした状態)
 
 ```
 $ python3 -B tools/tests/test_fdc_seek.py
-HOST GNU89 -Werror compile PASS (real drivers/fdc_decide.c)
+HOST GNU89 -Werror compile PASS (real drivers/block/fdc_decide.c)
 FAIL sis_len:30: fdc_sis_result_bytes(0x80) == FDC_SIS_LEN_INVALID
 EXIT sis_len=1
 PASS seek_ok
@@ -127,7 +127,7 @@ SUMMARY 1/6 PASS
 
 ```
 $ python3 -B tools/tests/test_fdc_seek.py --target
-HOST GNU89 -Werror compile PASS (real drivers/fdc_decide.c)
+HOST GNU89 -Werror compile PASS (real drivers/block/fdc_decide.c)
 TARGET i386-elf GNU89 -Werror PASS
 PASS sis_len / seek_ok / seek_ec / seek_pending / seek_fail / real_hw_story
 SUMMARY 6/6 PASS
@@ -143,11 +143,11 @@ SEEK が NR で即失敗しても残り 2 試行のたびに `fdc_recover`
 積まない) ため、**毎回まるまる空待ちする**。
 
 `FDC_SEEK_NOT_READY` を足して `seek_not_ready` と `other_drive` を書いた。
-往復 1 の実装 (`drivers/fdc_decide.c` @ b95479d) に当てた RED:
+往復 1 の実装 (`drivers/block/fdc_decide.c` @ b95479d) に当てた RED:
 
 ```
 $ python3 -B tools/tests/test_fdc_seek.py
-HOST GNU89 -Werror compile PASS (real drivers/fdc_decide.c)
+HOST GNU89 -Werror compile PASS (real drivers/block/fdc_decide.c)
 PASS sis_len / seek_ok / seek_ec / seek_pending / seek_fail
 FAIL seek_not_ready:101: fdc_classify_seek_end(0x28, 40, 40) == FDC_SEEK_NOT_READY
 FAIL seek_not_ready:102: fdc_classify_seek_end(0x28, 0, -1) == FDC_SEEK_NOT_READY
@@ -185,7 +185,7 @@ GREEN は `SUMMARY 8/8 PASS`、`TARGET i386-elf GNU89 -Werror PASS`。
 
 - **タイムアウトを用途別にした** — `FDC_SEEK_TIMEOUT_TICKS` 150 (1.5s)、
   `FDC_RW_TIMEOUT_TICKS` 100 (1s)、`FDC_RESET_TIMEOUT_TICKS` 50。
-  根拠は `drivers/fdc.h` の各定数の隣に書いた ([C4])。
+  根拠は `drivers/block/fdc.h` の各定数の隣に書いた ([C4])。
   旧 `FDC_IRQ_TIMEOUT_TICKS` は名前だけ残して R/W 側の別名にしてある。
 - **SEEK / RECALIBRATE の前に SIS で排水する** (`fdc_drain_interrupts`)。
   上限は `FDC_SIS_DRAIN_MAX` = 4 (µPD765A が溜められるドライブ数)。

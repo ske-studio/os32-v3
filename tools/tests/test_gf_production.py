@@ -27,12 +27,12 @@ def main():
                             '-o', str(Path(tmp) / f'{name}-cross.o')], check=True)
         subprocess.run(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
                         '-c', str(ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
-        module=(ROOT/'kernel/geforce_module.c').read_text()
+        module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)])
         backend=Path(tmp)/'backend.o'
         subprocess.run(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
-                        str(ROOT/'gfx/backend_geforce.c'),'-o',str(backend)],check=True)
+                        str(ROOT/'drivers/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
         sources = ['tools/tests/gf_production_host.c', 'kernel/sys.c',
                    'hwdev/gf/devinit.c', 'hwdev/gf/bus.c', 'hwdev/gf/resources.c',
                    'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',

@@ -1,7 +1,7 @@
 # TDD 記録 — CS4231 (MATE-X PCM) 再生ドライバ
 
 票: [`docs/tasks/v3/TASK_PCM_CS4231.md`](../../docs/tasks/v3/TASK_PCM_CS4231.md) §2-3 / §3 E1
-対象: `drivers/pcm_cs4231_math.c` (純粋部) と `drivers/pcm_cs4231.c` (I/O と状態機械)
+対象: `drivers/sound/cs4231/pcm_cs4231_math.c` (純粋部) と `drivers/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)
 走らせ方: `make check-pcm-cs4231-host` (= `python3 -B tools/tests/test_pcm_cs4231.py --target --mutate`)
 
 ## なぜホストで回すのか
@@ -79,7 +79,7 @@ NP21/W では**踏めない分岐**がこの層の中心にある。
 
 ## 変異 (否定側)
 
-`--mutate` は `drivers/pcm_cs4231_math.c` を**写しの上で 1 か所だけ**壊し、
+`--mutate` は `drivers/sound/cs4231/pcm_cs4231_math.c` を**写しの上で 1 か所だけ**壊し、
 どれか 1 つのケースが RED になることを見る。24 本。
 
 **driver の変異 6 本 (25〜30、2026-09-23)** は上の競合の修正を 1 つずつ元に戻す

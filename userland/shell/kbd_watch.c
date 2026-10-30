@@ -80,7 +80,7 @@ static void kbdw_mods(KbdwOut *o, u32 mods)
 }
 
 /* キーコード (0041h の下位 7 ビット) の名前。修飾キーと ESC だけ。
- * 値は drivers/kbd.h の KEY_SHIFT〜KEY_CTRL (0x70〜0x74) と ESC (0x00)。 */
+ * 値は drivers/input/kbd.h の KEY_SHIFT〜KEY_CTRL (0x70〜0x74) と ESC (0x00)。 */
 static const char *kbdw_key_name(u32 key)
 {
     switch (key) {

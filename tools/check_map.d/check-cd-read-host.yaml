@@ -1,6 +1,6 @@
 check-cd-read-host:
 - tools/tests/mutpar.py
-- drivers/atapi.c
+- drivers/ata/atapi.c
 - fs/iso9660.c
 - tools/tests/cd_pkg_host.c
 - tools/tests/cd_read_host.c
@@ -8,19 +8,19 @@ check-cd-read-host:
 - userland/lib/rt/pkg.c
 - tools/check_map.d/check-cd-read-host.yaml
 - build/checks.d/check-cd-read-host.mk
-- kernel/cd_body.c
-- kernel/cd_module.h
+- drivers/ata/cd_body.c
+- drivers/ata/cd_module.h
 - kernel/module/module_runtime.h
 - kernel/module/module_image.h
 - kernel/module/module_schema.h
 - fs/vfs.h
-- drivers/dev.h
+- drivers/base/dev.h
 - init/kernel.c
 - fs/vfs.c
-- drivers/dev.c
-- drivers/disk.h
-- drivers/fdc.h
-- drivers/fdc_decide.h
+- drivers/base/dev.c
+- drivers/block/disk.h
+- drivers/block/fdc.h
+- drivers/block/fdc_decide.h
 - include/console.h
 - include/kbd.h
 - include/pc98.h
@@ -30,7 +30,7 @@ check-cd-read-host:
 - fs/vfs_device.h
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
-- drivers/ide.h
+- drivers/ata/ide.h
 - include/ide_contract.h
 - include/platform_device.h
 - tools/tests/kernel_includes.py

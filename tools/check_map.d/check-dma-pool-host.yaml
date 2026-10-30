@@ -1,5 +1,5 @@
 check-dma-pool-host:
-- drivers/dma8237_math.c
+- drivers/dma/dma8237_math.c
 - mm/dma_pool.c
 - mm/dma_pool_math.c
 - tools/tests/dma_pool_host.c
@@ -10,13 +10,13 @@ check-dma-pool-host:
 - init/kernel.c
 - mm/dma_pool.h
 - include/memmap.h
-- drivers/fdc.c
-- drivers/fdc.h
+- drivers/block/fdc.c
+- drivers/block/fdc.h
 - kdebug/kselftest.c
 - mm/pgalloc.h
 - kernel/module/module.h
 - kernel/sqlite_engine.h
-- drivers/dev.h
+- drivers/base/dev.h
 - fs/vfs.h
 - include/pc98.h
 - init/boot_platform.h

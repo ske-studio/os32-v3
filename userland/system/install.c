@@ -60,9 +60,9 @@ typedef struct {
 #define DST_BOOT_DIR    "/hd0/boot"
 #define DST_KERNEL_LZ4  "/hd0/boot/vmkernel.lz4"
 
-/* I2-1: drivers/ide.h の IdeInfo と**同じ並び** (i386 で 96 B) でなければ
+/* I2-1: drivers/ata/ide.h の IdeInfo と**同じ並び** (i386 で 96 B) でなければ
  * ならない。ide_identify はカーネル側の定義で書くので、ここが 92 B のままだと
- * 末尾 phys_sector_size の 2 バイトが呼び手の領域を踏む。drivers/ide.h は
+ * 末尾 phys_sector_size の 2 バイトが呼び手の領域を踏む。drivers/ata/ide.h は
  * カーネル内部ヘッダで外部プログラムからは引けないため写しを置く —
  * ide.h を変えたら必ず一緒に直すこと (userland/shell/cmd_sys.c も同じ写し)。 */
 typedef struct {

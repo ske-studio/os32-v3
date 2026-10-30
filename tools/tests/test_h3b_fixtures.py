@@ -92,7 +92,7 @@ def check_image_and_deploy():
     memory = (ROOT / 'kernel/v86/v86_mem.c').read_text()
     assert 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,' in memory
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
-                         (ROOT / 'drivers/loop_dev.c').read_text())
+                         (ROOT / 'drivers/block/loop_dev.c').read_text())
     assert geometry and tuple(map(int, geometry.groups())) == (77, 2, 8, 1024)
     boot = (ROOT / 'kernel/v86/v86.c').read_text().split('int v86_boot2(')[1]
     assert 'loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,' in boot

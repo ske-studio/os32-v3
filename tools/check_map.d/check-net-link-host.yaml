@@ -2,7 +2,7 @@ check-net-link-host:
 - kernel/irq/tick.c
 - kernel/irq/tick.h
 - platform/pc98/tick_order.h
-- drivers/lgy98.c
+- drivers/net/ne2000/lgy98.c
 - exec/exec.c
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
@@ -16,7 +16,7 @@ check-net-link-host:
 - include/platform_host.h
 - include/platform_device.h
 - platform/pc98/device_host.c
-- drivers/np2sysp.h
+- drivers/char/np2sysp.h
 - net/link.h
 - tools/tests/kernel_includes.py
 local_only: true

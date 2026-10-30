@@ -1,6 +1,6 @@
 check-dep-dir-a-l05a-host:
-- drivers/pci.h
-- drivers/serial.h
+- drivers/pci/pci.h
+- drivers/char/serial.h
 - hwdev/hwdev_imports.def
 - include/bootinfo.h
 - include/gf_production.h
@@ -18,7 +18,7 @@ check-dep-dir-a-l05a-host:
 - include/config.h
 - include/ide_contract.h
 - include/platform_device.h
-- drivers/ide.h
+- drivers/ata/ide.h
 - platform/pc98/device_ide.c
 - sdk/kapi.json
 - kapi/kapi_generated.c
@@ -37,7 +37,7 @@ check-dep-dir-a-l05a-host:
 - tools/check_map.d/check-dep-dir-a-l05a-host.yaml
 - build/checks.d/check-dep-dir-a-l05a-host.mk
 - exec/exec.c
-- gfx/backend_pegc.c
+- drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
 - mm/paging.c

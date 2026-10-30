@@ -2,7 +2,7 @@
 
 票: `docs/archive/realhw/TASK_PEGC480_REALHW.md` (アーカイブ。今の仕様は [05_drivers §5-5](../../docs/05_drivers.md)) §2 (H2・H3・H5)、§4 /
 `docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` §4
-実装: `gfx/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
+実装: `drivers/video/pc98/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
 値は `include/pegc.h` §10 (実機の記録で差し替える 1 か所)・§11・§12
 試験: `tools/tests/pegc_mode_host.c` + `tools/tests/test_pegc_mode.py` + `tools/tests/pegc_hostshim/io.h`
 (`make check-pegc-mode-host`)
@@ -20,7 +20,7 @@
 
 ## 様式
 
-実物の `gfx/backend_pegc.c` を 1 行も写さずに `#include` し、`io.h` だけを `-I` の先に置いた偽物へ差し替える
+実物の `drivers/video/pc98/backend_pegc.c` を 1 行も写さずに `#include` し、`io.h` だけを `-I` の先に置いた偽物へ差し替える
 (`atapi_hostshim` と同じ作法)。偽の I/O は IN / OUT を順に記録し、GDC のステータスはケースごとに
 「FULL を返す回数」「EMPTY を返さない回数」「コマンドを書いた直後から FULL にする回数」を決めて返す。
 09A0h は sel 09h のとき bit0 = CLOCK-1、常に bit1 = CLOCK-2 を返す ([U] io_disp.md I/O 09A0h)。

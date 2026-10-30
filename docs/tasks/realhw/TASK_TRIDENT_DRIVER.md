@@ -103,7 +103,7 @@ PEGC の直しは完了し、両方を残す意味がある (§7 決裁 T1)。
 
 **事実** (config の値そのもの):
 
-- **BAR は 3 本とも memory (32 ビット、prefetch なし)**。I/O BAR は無い。大きさは測っていない (`drivers/pci.c` は BAR に書かない方針)。
+- **BAR は 3 本とも memory (32 ビット、prefetch なし)**。I/O BAR は無い。大きさは測っていない (`drivers/pci/pci.c` は BAR に書かない方針)。
 - **Command = 0002: I/O Space Enable = 0、Memory Space Enable = 1、Bus Master = 0** (起動時点、OS32 は Command に書いていない)。
   0:7.0 (98 グラフィックス) は 0003 で I/O も Mem も有効。
 - Revision d3、class 03.00.00 (PCI class code の「VGA 互換コントローラ」— 一般、docs/hw に記述なし)、**subsystem 0000:0000 (9680 / 9682 の判別材料にならない)**。
@@ -260,7 +260,7 @@ PC/AT の番号 (3C0h 系) のまま出ているなら、Bible §4-3 の I/O マ
 | `trident -t` (新規) | 640x480x8 のモード設定 → リニア窓へ縦線と行番号のテスト画 (TASK_PEGC480 段 0 の絵と同じ) → 映像を切り替え → 98 側へ戻す。戻しは §3-5 の復帰処理 (専用コードを持たない) | 映像の切り替え | 2 (**前提 §5 が揃うまで禁止**) |
 | (任意) Windows 上の状態の採取 | Ra266 に Win9x が入れば、NEC のドライバが 640x480 / 800x600 を出している状態のレジスタを DOS 窓などから採る | ユーザーの環境次第 (T3) | 補助 |
 
-**BAR の大きさを測る書き込み** (全 1 を書いて読み戻し、元へ戻す) は `drivers/pci.c` の方針 (BAR に書かない) を破る。
+**BAR の大きさを測る書き込み** (全 1 を書いて読み戻し、元へ戻す) は `drivers/pci/pci.c` の方針 (BAR に書かない) を破る。
 v1 の「割り込み禁止で書いて戻す」手順は**取り下げ** — それだけでは安全手順にならない (T4)。
 
 #### 3-4-1. 段 1 の許可リストの作り方
@@ -431,7 +431,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
                            映像の切り替えと復帰 (§2-4・§3-5 の結論)。struct pci_driver の probe から見つける
 ```
 
-- **WabGlue の契約 (`drivers/wab_glue.h`) で足りる見込み**: `out/in` (翻訳)、`relay` (映像の切り替え)、`lin_base/lin_size`、
+- **WabGlue の契約 (`drivers/video/cirrus/wab_glue.h`) で足りる見込み**: `out/in` (翻訳)、`relay` (映像の切り替え)、`lin_base/lin_size`、
   `mmio` (エンジンのレジスタが MMIO なら)。違うのは**番地が定数ではなく BAR から実行時に決まる**ことだけ。
   `lin_base/lin_size = bar0` は**条件付き** — bar0 の用途・安全なアクセス範囲・容量 (§2-1 の (i)〜(iii)) が確認できてから (P2-6)。
   §2-3 で (C) MMIO 経路になった場合は `out/in` を MMIO で実装する (契約は変えない)。

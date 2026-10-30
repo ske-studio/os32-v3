@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  DMA8237_HOST.C — drivers/dma8237_math.c をそのままホストで回す          */
+/*  DMA8237_HOST.C — drivers/dma/dma8237_math.c をそのままホストで回す          */
 /*                                                                          */
 /*  実物の算数を 1 行も写さずに #include する。dma8237_math.c は I/O を      */
 /*  1 つも出さないので、模型は要らない。                                    */
@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../drivers/dma8237_math.c"
+#include "../../drivers/dma/dma8237_math.c"
 #include "../../lib/dma_contract.c"
 
 #define CHECK(x) do { if (!(x)) { \

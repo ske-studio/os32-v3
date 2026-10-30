@@ -47,8 +47,8 @@ check-memory-host:
 - mm/pgalloc.c
 - platform/pc98/pci_resources.c
 - platform/pc98/pci_resources.h
-- drivers/pci.c
-- drivers/pci_decode.c
+- drivers/pci/pci.c
+- drivers/pci/pci_decode.c
 - mm/physmem.c
 - kernel/sys.c
 - arch/x86/kernel/setjmp.asm
@@ -74,9 +74,9 @@ check-memory-host:
 - tools/tests/test_gfx_boot.py
 - tools/tests/gfx_boot_host.c
 - gfx/gfx_core.c
-- gfx/backend_pegc.c
-- gfx/backend_cirrus.c
-- gfx/cirrus_identify.c
+- drivers/video/pc98/backend_pegc.c
+- drivers/video/cirrus/backend_cirrus.c
+- drivers/video/cirrus/cirrus_identify.c
 - tools/tests/test_highram_stage.py
 - tools/tests/test_ledger.py
 - tools/tests/test_exec_r1.py
@@ -84,7 +84,7 @@ check-memory-host:
 - userland/gshell/src/input.rs
 - userland/gshell/src/handler.rs
 - kernel/gui.c
-- drivers/kbd.c
+- drivers/input/kbd.c
 - tools/tests/test_memory_boot.py
 - tools/tests/test_paging_bounds.py
 - tools/tests/paging_bounds_host.c
@@ -159,7 +159,7 @@ check-memory-host:
 - gfx/gfx_internal.h
 - exec/access_walk.c
 - exec/surface_query.c
-- gfx/backend_pc98.c
+- drivers/video/pc98/backend_pc98.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
 - tools/tests/gfx_kernel_fb_host.c
@@ -175,10 +175,10 @@ check-memory-host:
 - arch/x86/kernel/cpu_flags.inc
 - include/input_service.h
 - include/kbd.h
-- drivers/kbd.h
+- drivers/input/kbd.h
 - kernel/input_service.c
 - include/pointer_service.h
-- drivers/pci_bind.h
+- drivers/pci/pci_bind.h
 - kernel/irq/irq.h
 - kernel/irq/irq_math.h
 - init/boot_platform.h

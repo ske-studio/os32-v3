@@ -1,9 +1,9 @@
-"""8237 DMA 共通部の算数 (drivers/dma8237_math.c) のホスト試験。
+"""8237 DMA 共通部の算数 (drivers/dma/dma8237_math.c) のホスト試験。
 
 記録: tools/tests/dma8237_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-2 (8237 DMA の共通部)
 
-実物の drivers/dma8237_math.c を 1 行も写さずに #include して回す。I/O を
+実物の drivers/dma/dma8237_math.c を 1 行も写さずに #include して回す。I/O を
 出さないので模型は 1 つも要らない。
 
 **NP21/W では踏めない分岐がここの主目的**: エミュレータは 8237 の 64KB
@@ -24,9 +24,9 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/dma8237_host.c"
-SRC = ROOT / "drivers/dma8237_math.c"
+SRC = ROOT / "drivers/dma/dma8237_math.c"
 COMMON = ROOT / "lib/dma_contract.c"
-TARGET_SRCS = ["lib/dma_contract.c", "drivers/dma8237_math.c", "drivers/dma8237.c"]
+TARGET_SRCS = ["lib/dma_contract.c", "drivers/dma/dma8237_math.c", "drivers/dma/dma8237.c"]
 
 CASES = ["port_table", "split_addr", "crosses", "count_bytes",
          "accept_pair", "check_args", "mode_bytes"]
@@ -80,12 +80,12 @@ def host_build(tmp, source_text=None, contract_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "dma8237_math.c").write_text(source_text, encoding="utf-8")
         (mut / "dma8237.h").write_text(
-            (ROOT / "drivers/dma8237.h").read_text(encoding="utf-8"),
+            (ROOT / "drivers/dma/dma8237.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../drivers/dma8237_math.c"', '"drivers/dma8237_math.c"')
+                '"../../drivers/dma/dma8237_math.c"', '"drivers/dma/dma8237_math.c"')
             .replace('"../../lib/dma_contract.c"', '"' + str(common) + '"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-dma8237-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/dma8237_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real drivers/dma/dma8237_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

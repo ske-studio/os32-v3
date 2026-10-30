@@ -184,7 +184,7 @@ def pair_runtime_suite(folder, mutate=False):
         subprocess.run(['gcc', *RUNTIME_FLAGS, '-Werror=vla', '-Wno-unused-parameter',
                         *RUNTIME_INCLUDES, '-nostdlib', '-static', '-no-pie',
                         '-Wl,--gc-sections', harness_path, ROOT / 'kernel/module/module_runtime.c',
-                        ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', source_path,
+                        ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', source_path,
                         '-o', exe], check=True)
 
     def run(field, value, rc, expected=0):

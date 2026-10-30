@@ -1711,7 +1711,7 @@ impl Filer {
 /*  小道具                                                           */
 /* ================================================================ */
 
-/// PC-98 スキャンコード (`drivers/kbd.h` KEY_F5。`libos32gui::widget` にない分)。
+/// PC-98 スキャンコード (`drivers/input/kbd.h` KEY_F5。`libos32gui::widget` にない分)。
 const SCAN_F5: u8 = 0x66;
 
 fn clamp(v: i32, lo: i32, hi: i32) -> i32 {

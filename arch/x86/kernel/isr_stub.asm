@@ -709,7 +709,7 @@ irq_stub_13:
 
 ;; ============================================================
 ;; LAN (LGY-98 / NE2000) の IRQ 入口は **共通スタブに移した**
-;; (票 TASK_HAL_WIRING §1-1)。drivers/lgy98.c が
+;; (票 TASK_HAL_WIRING §1-1)。drivers/net/ne2000/lgy98.c が
 ;;   irq_register(irq, ne2k_irq_shared, NULL, IRQ_F_SHARED)
 ;; で結ぶので、専用の irq_stub_nic_3/5/6 も idt_register_irq() も要らない。
 ;; EOI は irq_finish() が 1 回だけ送る。

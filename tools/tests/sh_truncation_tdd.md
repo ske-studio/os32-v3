@@ -764,8 +764,8 @@ ESC 以外の打鍵は条件に合わず**そのまま捨てられて**いた。
 
 | 場所 | 足したもの |
 |---|---|
-| `drivers/kbd.c` | `kbd_peekkey()` — 取り出さずに次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。源の見る順番も同じ (GUI の注入リング → rshell のシリアル → cooked リング) |
-| `drivers/serial.c` | `serial_peekchar()` — `ser_buf[ser_head]` を読むだけ |
+| `drivers/input/kbd.c` | `kbd_peekkey()` — 取り出さずに次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。源の見る順番も同じ (GUI の注入リング → rshell のシリアル → cooked リング) |
+| `drivers/char/serial.c` | `serial_peekchar()` — `ser_buf[ser_head]` を読むだけ |
 | `kernel/kbd_inject.c` | `kbd_inject_peek()` — 注入リングの先頭を読むだけ。自己診断にビット 5 を追加 |
 | `sdk/kapi.json` | `kbd_peekkey` を**末尾に追加** ([ABI2])、版数 v53 → v54 ([ABI3])。slot 214 = 0x360 |
 | `userland/shell/cmd_script.c` | 監視を `kbd_peekkey()` に差し替え、**ESC と分かってから** `kbd_trygetkey()` を 1 回呼んで取り除く |
@@ -776,7 +776,7 @@ ESC 以外の打鍵は条件に合わず**そのまま捨てられて**いた。
 `kbd_inject` は使えない。理由は 4 つで、どれも単独で決定的:
 
 1. **CUI では誰も読まない。** 注入リングを見るのは `kbd_gui_mode` のときだけ
-   (`drivers/kbd.c` の `kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐)。
+   (`drivers/input/kbd.c` の `kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐)。
    `source` の普通の経路 (CUI / rshell) は cooked リングを読むので、
    押し戻したバイトは**二度と読まれない** — バグは直らない。
 2. **所有権で断られる。** `kbd_inject` は `con_sink` の読み手からしか受けない
@@ -827,7 +827,7 @@ ESC 専用の検査を足すか)。今回は入れていない。逃げ道とし
 
 - **実機 (NP21/W) では 1 度も動かしていない。** `make clean` → `make all` → `make check`
   → `make external` も**未実施** (コーダーの禁止範囲)。[ABI3] の clean ビルドは PM 待ち。
-- 通したのはホスト試験と、`drivers/kbd.c` / `drivers/serial.c` / `kernel/kbd_inject.c` の
+- 通したのはホスト試験と、`drivers/input/kbd.c` / `drivers/char/serial.c` / `kernel/kbd_inject.c` の
   `i386-elf-gcc -Wall -Wextra -Werror` 単体コンパイルだけ。`kapi/kapi_generated.c` は
   この場の `-I` では無関係な既存の implicit declaration が出るので `-Werror` 無しで通し、
   `kbd_peekkey` に関する警告が 0 であることだけ見た。

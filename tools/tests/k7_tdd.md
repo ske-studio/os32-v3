@@ -1,7 +1,7 @@
 # K7-K (入力統合、カーネル + KAPI v47) — ホスト TDD の記録
 
 票: `docs/archive/gui_v13/TASK_K7_input.md` §1 D1〜D7 / §5 (R1 / R2 / B / C / D)
-実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
+実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/input/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
 `exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐) / `kernel/kselftest.c` / `sdk/kapi.json` (v47)
 試験: `tools/tests/kbd_inject_host.c` + `test_kbd_inject.py` (`make check-kbd-inject-host`) と
 `tools/tests/multiapp_impl_host.c` のケース 19 (`make check-multiapp-model-host`)
@@ -159,7 +159,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 - `exec/exec.c` の実物 (`exec_park_kbd` の longjmp / フレーム 13 語の保存 / CR3 の載せ替え /
   `exec_resume` の `ring3_resume`) はホストに持ち込めないので通っていない。ケース 19 が
   見ているのは表 (`appslot.c`) とリング (`kbd_inject.c`) の噛み合わせだけ。
-- `drivers/kbd.c` の分岐 (GUI 中だけ注入リングを見る / `hlt` へ落ちる境界) は
+- `drivers/input/kbd.c` の分岐 (GUI 中だけ注入リングを見る / `hlt` へ落ちる境界) は
   クロスコンパイルが通ることしか見ていない。IRQ1・`hlt`・rshell のタイムアウトは
   ホストに無い。CUI 経路が本当に無変更かは回帰 (受入 I4) の担当。
 - KAPI 経由 (CPL=3 の `int 0x80`、ディスパッチャのポインタ検証) は通っていない。

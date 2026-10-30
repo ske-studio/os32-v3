@@ -1,8 +1,8 @@
 /* PC-9821 IDE geometry adapter; IDE retains ownership of its state. */
 #include "boot_disk.h"
 #include "../../init/boot_disk.h"
-#include "../../drivers/ide.h"
-#include "../../drivers/ide_addr.h"
+#include "../../drivers/ata/ide.h"
+#include "../../drivers/ata/ide_addr.h"
 
 STATIC_ASSERT(HDD_AMODE_LBA28 == IDE_AMODE_LBA28 &&
               HDD_AMODE_CHS_CUR == IDE_AMODE_CHS_CUR &&

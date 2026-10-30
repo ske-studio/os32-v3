@@ -58,7 +58,7 @@ pub fn discard_stop(st: &mut GuiState) {
     st.pending_raw_n = kept;
 }
 
-/* 修飾ビット (drivers/kbd.h の SHIFT_* と一致)。 */
+/* 修飾ビット (drivers/input/kbd.h の SHIFT_* と一致)。 */
 const MOD_SHIFT: u32 = 0x01;
 const MOD_CAPS: u32 = 0x02;
 const MOD_CTRL: u32 = 0x10;
@@ -79,7 +79,7 @@ const SC_SPACE: u8 = 0x34;
 const STOP_SUPPRESS_TICKS: u32 = 50;
 const SC_STOP: u8 = 0x60; /* STOP キー (kbd.h KEY_STOP)。CTRL+STOP = 強制脱出 (契約 T6) */
 
-/* drivers/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` にもこの値を載せる
+/* drivers/input/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` にもこの値を載せる
  * (契約 D4 の「前面窓のクライアントへ `Button{button=2}`」)。 */
 const MOUSE_BTN_LEFT: u8 = 0x01;
 const MOUSE_BTN_RIGHT: u8 = 0x02;
@@ -96,7 +96,7 @@ struct MouseInfo {
     mode: u8,
 }
 
-/* drivers/kbd.c の scancode_to_ascii[128] の写し (8 個 / 行、C 側と同じ並び)。 */
+/* drivers/input/kbd.c の scancode_to_ascii[128] の写し (8 個 / 行、C 側と同じ並び)。 */
 #[rustfmt::skip]
 static SC2A: [u8; 128] = [
     /* 0x00 */ 0x1B, b'1',  b'2',  b'3',  b'4',  b'5',  b'6',  b'7',
@@ -117,7 +117,7 @@ static SC2A: [u8; 128] = [
     /* 0x78 */ 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-/* drivers/kbd.c の scancode_to_ascii_shift[128] の写し。 */
+/* drivers/input/kbd.c の scancode_to_ascii_shift[128] の写し。 */
 #[rustfmt::skip]
 static SC2A_SHIFT: [u8; 128] = [
     /* 0x00 */ 0x1B, b'!',  b'"',  b'#',  b'$',  b'%',  b'&',  b'\'',
@@ -138,7 +138,7 @@ static SC2A_SHIFT: [u8; 128] = [
     /* 0x78 */ 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-/// スキャンコード + 修飾 → ASCII (drivers/kbd.c と同じ規則。無ければ 0)。
+/// スキャンコード + 修飾 → ASCII (drivers/input/kbd.c と同じ規則。無ければ 0)。
 pub(crate) fn translate(scan: u8, mods: u32) -> u8 {
     let i = (scan & 0x7F) as usize;
     let mut a = if (mods & MOD_SHIFT) != 0 { SC2A_SHIFT[i] } else { SC2A[i] };

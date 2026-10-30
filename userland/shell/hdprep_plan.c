@@ -1,12 +1,12 @@
 /* ======================================================================== */
 /*  HDPREP_PLAN.C — `hdprep` の判定と計画 (純粋関数)                         */
 /*                                                                          */
-/*  規則は hdprep_plan.h。区画表の中身は drivers/pc98pt.c (共有部) で読む。 */
+/*  規則は hdprep_plan.h。区画表の中身は drivers/block/pc98pt.c (共有部) で読む。 */
 /*  32 ビットの桁あふれに頼る計算はしない (ホスト試験は 64 ビットで回る)。   */
 /* ======================================================================== */
 
 #include "hdprep_plan.h"
-#include "drivers/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
+#include "drivers/block/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
 
 int hdprep_check_geom(const HdprepGeom *g)
 {
@@ -92,7 +92,7 @@ int hdprep_plan(const HdprepGeom *g, unsigned long mb, HdprepPlan *out)
      * bios_cyl ≤ 65535 なので積は 2^32 未満。 */
     limit = g->bios_cyl * cyl;
     if (g->ata_total < limit) limit = g->ata_total;
-    /* ATA の指定の方式で指せる上限 (drivers/ide_addr.c と同じ規則。Codex C4) */
+    /* ATA の指定の方式で指せる上限 (drivers/ata/ide_addr.c と同じ規則。Codex C4) */
     if (g->addr_mode == HDPREP_AMODE_LBA28) {
         if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;
     } else {

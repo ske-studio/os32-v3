@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "contracts": [
-    "kernel/cd_module.h",
-    "drivers/dev.h",
+    "drivers/ata/cd_module.h",
+    "drivers/base/dev.h",
     "fs/vfs.h"
   ],
   "imports": [
@@ -16,13 +16,13 @@
       "symbol": "dev_find",
       "context": "normal",
       "irq": false,
-      "source": "drivers/dev.h"
+      "source": "drivers/base/dev.h"
     },
     {
       "symbol": "dev_blk_read_lba",
       "context": "normal",
       "irq": false,
-      "source": "drivers/dev.h"
+      "source": "drivers/base/dev.h"
     },
     {
       "symbol": "kfree",

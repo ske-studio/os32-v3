@@ -20,6 +20,6 @@ T9 (sh.bin = 常駐シェルの CPL=3 ビルド) の実装レビュー (Codex、
 - `?` は照合では 1 バイトに一致するが glob の開始条件は `*` だけ。
 - `sys_ls` コールバック内の KAPI 再入 (CPL=0 で int 0x80) — **カーネル側**。`find.bin` が CPL=3 で `[Process crashed]`。sh.bin は写し取りで回避 (T9 B2)。
 - カーネル帯ポインタを CPL=3 に返す KAPI 5 本 (`vfs_devname` / `path_get_drive` / `path_get_cwd` / `db_column_text` / `db_last_error`) — **カーネル側**。`sys_getcwd` は T9 R1 で `ring3_user_str` の写しに。
-- `losetup` 後の退場で loop スロットが回収済み FD を保持 (`drivers/loop_dev.c:928`) — **カーネル側**。sh.bin では `losetup` / `dd loN` を cui only に。
+- `losetup` 後の退場で loop スロットが回収済み FD を保持 (`drivers/block/loop_dev.c:928`) — **カーネル側**。sh.bin では `losetup` / `dd loN` を cui only に。
 - ファイル名補完が 126B で名前を切る (`ui.c:210`)。
 - シェルの `ls` (`userland/shell/cmd_dir.c:43`) は `sys_ls` の戻り値を見ないので、列挙途中の I/O 失敗 (S3I2-K で FAT が負を返すようになった後も) を表示できない — **シェル側** (2026-09-14、TASK_S3I2 §4-7)。

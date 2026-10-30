@@ -28,7 +28,7 @@ extern u32 cpu_calib_rounds;
 extern u32 cpu_calib_ticks;
 
 /* cpu_delay_us が 1 回で待てる上限 (µs)。これより長い指定は**黙ってこの値に
- * 丸める** — 長く待ちたい呼び手はこれ以下の塊に分けて呼ぶ (drivers/atapi.c の
+ * 丸める** — 長く待ちたい呼び手はこれ以下の塊に分けて呼ぶ (drivers/ata/atapi.c の
  * atapi_delay_us はこのヘッダを直接 include して CPU_DELAY_US_MAX ずつに分ける) */
 #define CPU_DELAY_US_MAX  100000UL
 

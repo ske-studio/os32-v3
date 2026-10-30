@@ -117,8 +117,8 @@ int ime_user_export(IME_Dict *d, const char *p)
 int ime_user_clear(IME_Dict *d)
 { management++; return d == shared_dict ? storage_rc : -99; }
 
-#include "../../drivers/kbd.h"
-#include "../../drivers/kbd_dlog.c"
+#include "../../drivers/input/kbd.h"
+#include "../../drivers/input/kbd_dlog.c"
 #include "kbd_source.inc"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"

@@ -1,7 +1,7 @@
 /* NV44A accessor: recover owns ALL read/write authorization. VGA offsets
  * are resolved once by recover_target_address (envytools f102b82 nv_vga.xml,
  * nv3_prmvio.xml, nv3_pcrtc.xml); never issue VGA in/out on PC-98.
- * PCI lane semantics: drivers/pci.c and PC-98 UNDOCUMENTED io_pci.md.
+ * PCI lane semantics: drivers/pci/pci.c and PC-98 UNDOCUMENTED io_pci.md.
  */
 #include "gfinit_bus.h"
 #include "../hwdev/gfinit_mode.h"

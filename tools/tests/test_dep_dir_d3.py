@@ -17,7 +17,7 @@ def main():
     assert 'input_owner_exit' not in (ROOT / 'include/input_service.h').read_text()
     assert 'input_owner_exit' not in (ROOT / 'kernel/input_service.c').read_text()
     formatter = (ROOT / 'kernel/ver_format.c').read_text()
-    assert 'drivers/kbd.h' not in formatter and 'KBD_IRQ' not in formatter
+    assert 'drivers/input/kbd.h' not in formatter and 'KBD_IRQ' not in formatter
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-') as td:
         exe = Path(td) / 'names'
         subprocess.run(['gcc', *FLAGS, *INCLUDES,

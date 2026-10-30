@@ -19,12 +19,12 @@
 /*   データは無い。区画表を書く前の失敗ならディスクは空のまま扱える)。       */
 /*                                                                          */
 /*  判定と計画は hdprep_plan.c (純粋関数、ホスト試験の対象)。区画表の中身は */
-/*  drivers/pc98pt.c (カーネル・ローダ・nhd_deploy.py と共有) で作る。      */
+/*  drivers/block/pc98pt.c (カーネル・ローダ・nhd_deploy.py と共有) で作る。      */
 /* ======================================================================== */
 
 #include "shell.h"
 #include "hdprep_plan.h"
-#include "drivers/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
+#include "drivers/block/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
 
 #define HDPREP_SECT          512
 #define HDPREP_DUMP_BYTES    64      /* LBA 0 / 1 の先頭を何バイト見せるか */

@@ -2,14 +2,14 @@
 /*  PCI_VERBOSE.C — `lspci -v` の行づくり (純粋関数)                        */
 /*                                                                          */
 /*  設計と使い方は pci_verbose.h の冒頭。ここには副作用のある行を置かない   */
-/*  (I/O も静的な可変状態も無い)。復号は drivers/pci_decode.c を使う —     */
+/*  (I/O も静的な可変状態も無い)。復号は drivers/pci/pci_decode.c を使う —     */
 /*  BAR の種別と番地、クラス名、Header Type の切り出しをカーネルと          */
 /*  食い違わせないため。libc も使わない (常駐シェルに printf 系を持ち込ま   */
 /*  ない)。                                                                 */
 /* ======================================================================== */
 
 #include "pci_verbose.h"
-#include "drivers/pci_decode.h"
+#include "drivers/pci/pci_decode.h"
 
 /* 行の番号 (idx)。BAR は PV_BAR0 + n。 */
 #define PV_ID        0

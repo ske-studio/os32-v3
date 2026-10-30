@@ -339,7 +339,7 @@ static int ma_resume_kbd(int id)
  * exec_park_poll / exec_resume の **poll 分岐だけ** をここに写す。写した分は
  * 3 行 — 印を見て注入リングから 1 バイト取り、空なら **-1 (キーなし)** を
  * EAX に入れる (WAIT_KEY と違い、空でも起こす)。
- * now_tick は drivers/kbd.c が tick_count から渡す値の差し替え。 */
+ * now_tick は drivers/input/kbd.c が tick_count から渡す値の差し替え。 */
 static int ma_park_poll(u32 now_tick)
 {
     int rc = appslot_park_poll_check(now_tick);

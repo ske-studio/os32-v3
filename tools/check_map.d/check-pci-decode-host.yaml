@@ -1,6 +1,6 @@
 check-pci-decode-host:
-- drivers/pci.c
-- drivers/pci_decode.c
+- drivers/pci/pci.c
+- drivers/pci/pci_decode.c
 - tools/tests/lspci_cmd_host.c
 - tools/tests/pci_decode_host.c
 - tools/tests/test_pci_decode.py

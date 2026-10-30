@@ -32,7 +32,7 @@ static STORAGE: Storage = Storage::new();
 const TIMER_SINK: u8 = 1;
 const TIMER_TICKS: u16 = 10;
 
-/// コピー / 貼り付けのキー (票 N4b §2 / §5)。`drivers/kbd.h` の `KEY_F9` / `KEY_F10`。
+/// コピー / 貼り付けのキー (票 N4b §2 / §5)。`drivers/input/kbd.h` の `KEY_F9` / `KEY_F10`。
 ///
 /// F キーは `inject::from_key` が空を返す (注入しない) 上、gshell は F キーを
 /// `GUI_EV_KEY` でフォーカス窓へ配る (`gshell/src/input.rs::capture_keyboard` は

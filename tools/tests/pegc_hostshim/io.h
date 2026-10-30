@@ -2,7 +2,7 @@
  *  tools/tests/pegc_hostshim/io.h — ホスト試験用の io.h 差し替え
  *
  *  include/io.h は in / out を特権命令のインライン asm で定義するので、
- *  gfx/backend_pegc.c をホストでそのまま走らせるために -I で先に置いて
+ *  drivers/video/pc98/backend_pegc.c をホストでそのまま走らせるために -I で先に置いて
  *  差し替え、ポート操作を試験側 (tools/tests/pegc_mode_host.c) の偽の I/O へ
  *  回す。atapi_hostshim/io.h と同じ作法。
  *

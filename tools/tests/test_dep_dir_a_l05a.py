@@ -15,7 +15,7 @@ from test_shm_user import function
 
 ROOT = Path(__file__).resolve().parents[2]
 COPIES = ('include/types.h', 'include/config.h', 'include/ide_contract.h',
-          'include/platform_device.h', 'drivers/ide.h', 'platform/pc98/device_ide.c',
+          'include/platform_device.h', 'drivers/ata/ide.h', 'platform/pc98/device_ide.c',
           'tools/tests/dep_dir_a_l05a_host.c')
 OLD = 'return ide_read_sector(drv, lba, buf);'
 NEW = 'return ide_read_sector(drv, lba ^ 1u, buf);'

@@ -66,7 +66,7 @@ static Device *hdd_dev = 0;
 /*  1 セクタずつ SEEK + READ DATA を出していたころは 1 セクタごとにほぼ      */
 /*  1 回転待ち、実機でフォント (188KB) の読み込みが 1 分以上止まった。       */
 /*  要求をトラックの境目で区切り、要求したセクタからトラックの終わりまでを  */
-/*  1 回で読んで持っておく (drivers/fdc_track.h の注記)。持つのは           */
+/*  1 回で読んで持っておく (drivers/block/fdc_track.h の注記)。持つのは           */
 /*  FDC_TRACK_SLOTS 本 — FAT のトラックとデータのトラックの分。             */
 /*  受け皿は fdc.c の静的な領域から借りる (fdc_track_slot)。                */
 /*                                                                          */
@@ -128,7 +128,7 @@ static u32 fdd_ops_gen(void *ctx, int drv)
     return fdc_media_gen(drv);
 }
 
-/* 2 秒規則の時計 (drivers/fdc_track.h の FDC_TRACK_IDLE_TICKS)。 */
+/* 2 秒規則の時計 (drivers/block/fdc_track.h の FDC_TRACK_IDLE_TICKS)。 */
 extern volatile u32 tick_count;
 static u32 fdd_ops_now(void *ctx)
 {

@@ -17,7 +17,7 @@ from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/lan_module.c'
+SOURCE = ROOT / 'drivers/net/e82557/lan_module.c'
 CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
          'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info']
@@ -109,7 +109,7 @@ def runtime_checks(folder, mutations=False):
                         ROOT / 'tools/tests/lan_module_host.c',
                         ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                         ROOT / 'platform/pc98/lan_match.c',
-                        ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
+                        ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
 
     def run(modes, expected=0):
         for mode in modes:

@@ -2,7 +2,7 @@
 """rshell_serial.py — 実機の OS32 リモートシェル (rshell) にシリアルで話す。
 
 ゲスト側 (userland/shell/rshell.c) の約束:
-  - 9600bps 8N1 (drivers/serial.c の既定)。
+  - 9600bps 8N1 (drivers/char/serial.c の既定)。
   - ホストは 1 行 (コマンド + '\\n') を送り、ゲストは応答の最後に EOT (0x04) を返す。
   - rshell に入った瞬間にも EOT を 1 つ送る (同期用)。
 NP21/W の aidebug が /api/cmd でやっていること (aidebug_api.cpp、timeout 15s) と同じ。
@@ -93,7 +93,7 @@ except ImportError:  # pragma: no cover
 # `serial N` を送ってから閉じるまでの間合い [秒]。9600 で 14 文字 ≒ 15ms なので
 # 十分な余裕。短くすると行の途中でポートを閉じてゲストが切り替えを始めない。
 SPEED_SWITCH_SETTLE_S = 0.5
-# --fast が受ける速度 (drivers/serial_plan.c の表と同じ。V･FAST に入れるのは
+# --fast が受ける速度 (drivers/char/serial_plan.c の表と同じ。V･FAST に入れるのは
 # FIFO 搭載機だけで、入れなければゲストは互換モードのまま = 速度が合わなくなる)。
 FAST_BAUDS = (9600, 14400, 19200, 28800, 38400, 57600, 115200)
 # ---------------------------------------------------------------------------

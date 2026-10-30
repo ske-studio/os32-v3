@@ -4,11 +4,11 @@
   §5-1 の「手元で済むこと」の 1 行目
 - 目的: 実機 **PC-9821Ra266** の内蔵 LAN (Intel 82557 = `8086:1229`) を `lspci` で見つけ、
   BAR と Interrupt Line を報告する。ドライバ (L-B) はまだ書かない
-- 対象: [`drivers/pci.c`](../../drivers/pci.c) / [`drivers/pci.h`](../../drivers/pci.h) と、
-  そこから切り出した純粋な復号 [`drivers/pci_decode.c`](../../drivers/pci_decode.c)
+- 対象: [`drivers/pci/pci.c`](../../drivers/pci/pci.c) / [`drivers/pci/pci.h`](../../drivers/pci/pci.h) と、
+  そこから切り出した純粋な復号 [`drivers/pci/pci_decode.c`](../../drivers/pci/pci_decode.c)
 - 実行: `python3 -B tools/tests/test_pci_decode.py [--target] [--mutate] [case ...]`
   (`make check-pci-decode-host` が `--target --mutate` 付きで回す)
-- 試験: [`pci_decode_host.c`](pci_decode_host.c) — 実物の `drivers/pci_decode.c` を
+- 試験: [`pci_decode_host.c`](pci_decode_host.c) — 実物の `drivers/pci/pci_decode.c` を
   1 行も写さずに `#include` する。復号は I/O も静的配列も構造体の padding も
   触らないので **模型が 1 つも要らない**
 - KAPI: **v56 → v57**。`pci_count` / `pci_get` / `pci_cfg_read32` の 3 本を末尾に追記 ([ABI2])
@@ -29,7 +29,7 @@
 PIRQ が何番に落ちているか) がまるごと次回送りになる。
 
 そこで **判断を含むビット操作を全部 `pci_decode.c` に集め**、ここで潰す。
-`drivers/pci.c` に残したのは I/O と走査順と記録だけで、判断は 1 つも無い。
+`drivers/pci/pci.c` に残したのは I/O と走査順と記録だけで、判断は 1 つも無い。
 
 ## 2. RED → GREEN
 
@@ -37,7 +37,7 @@ PIRQ が何番に落ちているか) がまるごと次回送りになる。
 実装を置いて回した。**9 本中 6 本が RED** (2026-09-22)。
 
 ```
-HOST GNU89 -Werror compile PASS (real drivers/pci_decode.c)
+HOST GNU89 -Werror compile PASS (real drivers/pci/pci_decode.c)
 FAIL cfg_addr:53: pci_cfg_addr(0, 32, 0, 0) == 0x80000000UL
 FAIL cfg_addr:54: pci_cfg_addr(0, 0, 8, 0) == 0x80000000UL
 FAIL cfg_addr:55: pci_cfg_addr(256, 0, 0, 0) == 0x80000000UL
@@ -76,14 +76,14 @@ SDM 4.1.16 は **常に `01h` = INTA#**)。ハーネスを直した。
 直した後:
 
 ```
-HOST GNU89 -Werror compile PASS (real drivers/pci_decode.c)
+HOST GNU89 -Werror compile PASS (real drivers/pci/pci_decode.c)
 TARGET i386-elf GNU89 -Werror PASS
 PASS cfg_addr / probe_values / bar_kind / bar_base / header_type
 PASS extract / names / story_82557 / absent
 SUMMARY 9/9 PASS
 ```
 
-`--target` はカーネルと同じ `i386-elf-gcc -Werror` で `drivers/pci.c` ごと通す。
+`--target` はカーネルと同じ `i386-elf-gcc -Werror` で `drivers/pci/pci.c` ごと通す。
 列挙は I/O を触るのでホストでは**回せない**が、型とプロトタイプのずれは手元で捕まる。
 
 ## 3. 変異 (否定側) — 7 本すべて RED

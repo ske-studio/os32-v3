@@ -8,7 +8,7 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef FM_ADAPTER
-#define FM_ADAPTER "../../kernel/fm_module.c"
+#define FM_ADAPTER "../../drivers/sound/fm/fm_module.c"
 #endif
 #include FM_ADAPTER
 #include "../../kernel/irq/tick.c"

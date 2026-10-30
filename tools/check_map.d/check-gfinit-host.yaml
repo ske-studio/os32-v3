@@ -46,8 +46,8 @@ check-gfinit-host:
 - tools/tests/recover_hostshim/io.h
 - kdebug/gfinit_resources.c
 - kdebug/gfinit_resources.h
-- drivers/pci.h
-- drivers/pci_decode.h
+- drivers/pci/pci.h
+- drivers/pci/pci_decode.h
 - sdk/include/os32/os32_kapi_shared.h
 - include/kprintf.h
 - tools/tests/gfinit_resources_ra266.h
@@ -63,7 +63,7 @@ check-gfinit-host:
 - lib/kstring.h
 - arch/x86/kernel/idt.h
 - kernel/module/module.h
-- drivers/serial.h
+- drivers/char/serial.h
 - include/bootinfo.h
 - include/sys.h
 - kdebug/generated/kdebug_import_macros.h

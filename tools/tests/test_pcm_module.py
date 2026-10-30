@@ -12,7 +12,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/pcm_module.c'
+SOURCE = ROOT / 'drivers/sound/cs4231/pcm_module.c'
 CASES = ['normal-detach-reload', 'failure-after-irq', 'dma-stop-failure-isolates',
          'prefix-failure', 'irq-line-failures-detach-reload', 'irq-detach-failure-retains']
 
@@ -76,7 +76,7 @@ def driver_checks(folder, omit_evidence):
     Model I/O is not a claim of PCM transfer on NP21/W or real hardware.
     """
     from test_pcm_cs4231 import FLAGS as PCM_FLAGS, INCLUDES as PCM_INCLUDES
-    driver = (ROOT / 'drivers/pcm_cs4231.c').read_text()
+    driver = (ROOT / 'drivers/sound/cs4231/pcm_cs4231.c').read_text()
     if omit_evidence:
         old = "evid = ((inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&\n                (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0);"
         assert driver.count(old) == 1
@@ -87,8 +87,8 @@ def driver_checks(folder, omit_evidence):
     harness = harness.replace('"pcm_cs4231_host.c"', '"' + str(ROOT / 'tools/tests/pcm_cs4231_host.c') + '"')
     # Include the fixture with its actual driver replaced, without a second body.
     fixture = (ROOT / 'tools/tests/pcm_cs4231_host.c').read_text()
-    fixture = fixture.replace('"../../drivers/pcm_cs4231.c"', '"' + str(source) + '"')
-    fixture = fixture.replace('"../../drivers/pcm_cs4231_math.c"', '"' + str(ROOT / 'drivers/pcm_cs4231_math.c') + '"')
+    fixture = fixture.replace('"../../drivers/sound/cs4231/pcm_cs4231.c"', '"' + str(source) + '"')
+    fixture = fixture.replace('"../../drivers/sound/cs4231/pcm_cs4231_math.c"', '"' + str(ROOT / 'drivers/sound/cs4231/pcm_cs4231_math.c') + '"')
     local = folder / 'pcm-fixture.c'
     local.write_text(fixture)
     harness = harness.replace('"' + str(ROOT / 'tools/tests/pcm_cs4231_host.c') + '"', '"' + str(local) + '"')
@@ -120,7 +120,7 @@ def main():
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/pcm_module_host.c',
                             ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
+                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()

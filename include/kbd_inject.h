@@ -4,7 +4,7 @@
 /*  票: docs/archive/gui_v13/TASK_K7_input.md §1 D2 / §5 (K7-K = カーネル +    */
 /*      KAPI v47)                                                           */
 /*                                                                          */
-/*  GUI モード中 IRQ1 は raw リングにしか積まない (drivers/kbd.c の          */
+/*  GUI モード中 IRQ1 は raw リングにしか積まない (drivers/input/kbd.c の          */
 /*  kbd_gui_mode の説明)。打鍵を受け取るのは WM (gshell) で、そこから        */
 /*  フォーカス窓の端末アプリへ GUI_EV_KEY / GUI_EV_TEXT として配られる。     */
 /*  端末アプリはそれを **UTF-8 のバイト列のまま**ここへ注入し、GUI 中の      */
@@ -40,14 +40,14 @@ i32 kbd_inject(const u8 *utf8, u32 len);
  * 起床候補のヒントとして見せる (WMのtake/peekは不可)。 */
 u32 kbd_inject_pending(void);
 
-/* --- カーネル内から (drivers/kbd.c, exec/exec.c) ------------------------- */
+/* --- カーネル内から (drivers/input/kbd.c, exec/exec.c) ------------------------- */
 /* 現在のアプリ宛てを1バイト取り出す。取れたら1、空なら0 (*out不変)。
  * 取得できない宛先は飛ばし、宛先ごとのFIFO順序を維持する。 */
 int kbd_inject_take(u8 *out);
 /* exec_resume はまだWM文脈なので、検証済み再開先を明示する。KAPI非公開。 */
 int kbd_inject_take_for(int id, u8 *out);
 /* 1 バイト**覗く** (取り出さない)。覗けたら 1 を返して *out に書く。空なら 0。
- * kbd_peekkey (drivers/kbd.c) 用 — GUI 中の「ESC か否かだけ見て、ESC でなければ
+ * kbd_peekkey (drivers/input/kbd.c) 用 — GUI 中の「ESC か否かだけ見て、ESC でなければ
  * 次の読み手に残す」を、リングを 1 バイトも動かさずに書くために要る。 */
 int kbd_inject_peek(u8 *out);
 /* 溜まっているものを捨てる。CUI 復帰 (console_text_gdc_start) から。 */

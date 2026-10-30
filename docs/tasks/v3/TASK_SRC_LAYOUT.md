@@ -113,21 +113,21 @@ exec/ kapi/ lib/ net/ kdebug/ hwdev/ platform/ boot/ userland/ sdk/   (動かさ
 | 新しいディレクトリ | 本数 | 旧パス |
 |---|---|---|
 | `arch/x86/kernel/` | 15 | `arch/x86/kernel/cpu_flags.inc` `arch/x86/kernel/double_fault.c` `arch/x86/kernel/double_fault.h` `arch/x86/kernel/entry_layout.inc` `arch/x86/kernel/gdt.c` `arch/x86/kernel/gdt.h` `arch/x86/kernel/idt.c` `arch/x86/kernel/idt.h` `arch/x86/kernel/isr_handlers.c` `arch/x86/kernel/isr_stub.asm` `arch/x86/kernel/kentry.asm` `arch/x86/kernel/ring3_entry.asm` `arch/x86/kernel/setjmp.asm` `arch/x86/kernel/tss.c` `arch/x86/kernel/tss.h` |
-| `drivers/ata/` | 9 | `drivers/atapi.c` `drivers/atapi.h` `drivers/ide.c` `drivers/ide.h` `drivers/ide_addr.c` `drivers/ide_addr.h` `kernel/cd_body.c` `kernel/cd_module.c` `kernel/cd_module.h` |
-| `drivers/base/` | 2 | `drivers/dev.c` `drivers/dev.h` |
-| `drivers/block/` | 13 | `drivers/disk.c` `drivers/disk.h` `drivers/fdc.c` `drivers/fdc.h` `drivers/fdc_decide.c` `drivers/fdc_decide.h` `drivers/fdc_track.c` `drivers/fdc_track.h` `drivers/loop_dev.c` `drivers/loop_dev.h` `drivers/pc98pt.c` `drivers/pc98pt.h` `drivers/scsi.h` |
-| `drivers/char/` | 8 | `drivers/np2sysp.c` `drivers/np2sysp.h` `drivers/rtc.c` `drivers/rtc.h` `drivers/serial.c` `drivers/serial.h` `drivers/serial_plan.c` `drivers/serial_plan.h` |
-| `drivers/dma/` | 3 | `drivers/dma8237.c` `drivers/dma8237.h` `drivers/dma8237_math.c` |
-| `drivers/input/` | 10 | `drivers/kbd.c` `drivers/kbd.h` `drivers/kbd_dlog.c` `drivers/kbd_dlog.h` `drivers/kbd_status.c` `drivers/kbd_status.h` `drivers/mouse.c` `drivers/mouse.h` `drivers/mouse_bus.c` `drivers/mouse_seamless.c` |
-| `drivers/net/e82557/` | 10 | `drivers/e82557.c` `drivers/e82557.h` `drivers/e82557_desc.c` `drivers/e82557_desc.h` `drivers/e82557_eeprom.c` `drivers/e82557_eeprom.h` `drivers/e82557_regs.h` `kernel/lan_body.c` `kernel/lan_module.c` `kernel/lan_module.h` |
-| `drivers/net/ne2000/` | 8 | `drivers/lgy98.c` `drivers/lgy98.h` `drivers/ne2000.c` `drivers/ne2000.h` `drivers/ne2000_io.asm` `drivers/ne2000_regs.h` `drivers/ne2000_ring.c` `drivers/ne2000_ring.h` |
-| `drivers/pci/` | 7 | `drivers/pci.c` `drivers/pci.h` `drivers/pci_bind.c` `drivers/pci_bind.h` `drivers/pci_bind_match.c` `drivers/pci_decode.c` `drivers/pci_decode.h` |
-| `drivers/sound/cs4231/` | 6 | `drivers/pcm_cs4231.c` `drivers/pcm_cs4231.h` `drivers/pcm_cs4231_math.c` `kernel/pcm_body.c` `kernel/pcm_module.c` `kernel/pcm_module.h` |
-| `drivers/sound/fm/` | 7 | `drivers/fm.c` `drivers/fm.h` `kernel/fm_body.c` `kernel/fm_module.c` `kernel/fm_module.h` `kernel/snd_engine.c` `kernel/snd_engine.h` |
-| `drivers/video/cirrus/` | 10 | `drivers/wab_cirrus.c` `drivers/wab_cirrus.h` `drivers/wab_glue.h` `drivers/wab_glue_xe10.c` `drivers/wab_glue_xe10.h` `gfx/backend_cirrus.c` `gfx/cirrus_identify.c` `kernel/cirrus_body.c` `kernel/cirrus_module.c` `kernel/cirrus_module.h` |
-| `drivers/video/geforce/` | 6 | `gfx/backend_geforce.c` `gfx/gf_present.c` `kernel/geforce_body.c` `kernel/geforce_module.c` `kernel/geforce_module.h` `kernel/geforce_platform.c` |
-| `drivers/video/kcg/` | 5 | `drivers/kcg.c` `drivers/kcg.h` `kernel/kcg_body.c` `kernel/kcg_module.c` `kernel/kcg_module.h` |
-| `drivers/video/pc98/` | 4 | `gfx/backend_pc98.c` `gfx/backend_pegc.c` `gfx/pc98_route.c` `gfx/pc98_route.h` |
+| `drivers/ata/` | 9 | `drivers/ata/atapi.c` `drivers/ata/atapi.h` `drivers/ata/ide.c` `drivers/ata/ide.h` `drivers/ata/ide_addr.c` `drivers/ata/ide_addr.h` `drivers/ata/cd_body.c` `drivers/ata/cd_module.c` `drivers/ata/cd_module.h` |
+| `drivers/base/` | 2 | `drivers/base/dev.c` `drivers/base/dev.h` |
+| `drivers/block/` | 13 | `drivers/disk.c` `drivers/block/disk.h` `drivers/block/fdc.c` `drivers/block/fdc.h` `drivers/block/fdc_decide.c` `drivers/block/fdc_decide.h` `drivers/block/fdc_track.c` `drivers/block/fdc_track.h` `drivers/block/loop_dev.c` `drivers/block/loop_dev.h` `drivers/block/pc98pt.c` `drivers/block/pc98pt.h` `drivers/block/scsi.h` |
+| `drivers/char/` | 8 | `drivers/char/np2sysp.c` `drivers/char/np2sysp.h` `drivers/char/rtc.c` `drivers/char/rtc.h` `drivers/char/serial.c` `drivers/char/serial.h` `drivers/char/serial_plan.c` `drivers/char/serial_plan.h` |
+| `drivers/dma/` | 3 | `drivers/dma/dma8237.c` `drivers/dma/dma8237.h` `drivers/dma/dma8237_math.c` |
+| `drivers/input/` | 10 | `drivers/input/kbd.c` `drivers/input/kbd.h` `drivers/input/kbd_dlog.c` `drivers/input/kbd_dlog.h` `drivers/input/kbd_status.c` `drivers/input/kbd_status.h` `drivers/input/mouse.c` `drivers/input/mouse.h` `drivers/input/mouse_bus.c` `drivers/input/mouse_seamless.c` |
+| `drivers/net/e82557/` | 10 | `drivers/net/e82557/e82557.c` `drivers/net/e82557/e82557.h` `drivers/net/e82557/e82557_desc.c` `drivers/net/e82557/e82557_desc.h` `drivers/net/e82557/e82557_eeprom.c` `drivers/net/e82557/e82557_eeprom.h` `drivers/net/e82557/e82557_regs.h` `drivers/net/e82557/lan_body.c` `drivers/net/e82557/lan_module.c` `drivers/net/e82557/lan_module.h` |
+| `drivers/net/ne2000/` | 8 | `drivers/net/ne2000/lgy98.c` `drivers/net/ne2000/lgy98.h` `drivers/net/ne2000/ne2000.c` `drivers/net/ne2000/ne2000.h` `drivers/net/ne2000/ne2000_io.asm` `drivers/net/ne2000/ne2000_regs.h` `drivers/net/ne2000/ne2000_ring.c` `drivers/net/ne2000/ne2000_ring.h` |
+| `drivers/pci/` | 7 | `drivers/pci/pci.c` `drivers/pci/pci.h` `drivers/pci/pci_bind.c` `drivers/pci/pci_bind.h` `drivers/pci/pci_bind_match.c` `drivers/pci/pci_decode.c` `drivers/pci/pci_decode.h` |
+| `drivers/sound/cs4231/` | 6 | `drivers/sound/cs4231/pcm_cs4231.c` `drivers/sound/cs4231/pcm_cs4231.h` `drivers/sound/cs4231/pcm_cs4231_math.c` `drivers/sound/cs4231/pcm_body.c` `drivers/sound/cs4231/pcm_module.c` `drivers/sound/cs4231/pcm_module.h` |
+| `drivers/sound/fm/` | 7 | `drivers/sound/fm/fm.c` `drivers/sound/fm/fm.h` `drivers/sound/fm/fm_body.c` `drivers/sound/fm/fm_module.c` `drivers/sound/fm/fm_module.h` `drivers/sound/fm/snd_engine.c` `drivers/sound/fm/snd_engine.h` |
+| `drivers/video/cirrus/` | 10 | `drivers/video/cirrus/wab_cirrus.c` `drivers/video/cirrus/wab_cirrus.h` `drivers/video/cirrus/wab_glue.h` `drivers/video/cirrus/wab_glue_xe10.c` `drivers/video/cirrus/wab_glue_xe10.h` `drivers/video/cirrus/backend_cirrus.c` `drivers/video/cirrus/cirrus_identify.c` `drivers/video/cirrus/cirrus_body.c` `drivers/video/cirrus/cirrus_module.c` `drivers/video/cirrus/cirrus_module.h` |
+| `drivers/video/geforce/` | 6 | `drivers/video/geforce/backend_geforce.c` `drivers/video/geforce/gf_present.c` `drivers/video/geforce/geforce_body.c` `drivers/video/geforce/geforce_module.c` `drivers/video/geforce/geforce_module.h` `drivers/video/geforce/geforce_platform.c` |
+| `drivers/video/kcg/` | 5 | `drivers/video/kcg/kcg.c` `drivers/video/kcg/kcg.h` `drivers/video/kcg/kcg_body.c` `drivers/video/kcg/kcg_module.c` `drivers/video/kcg/kcg_module.h` |
+| `drivers/video/pc98/` | 4 | `drivers/video/pc98/backend_pc98.c` `drivers/video/pc98/backend_pegc.c` `drivers/video/pc98/pc98_route.c` `drivers/video/pc98/pc98_route.h` |
 | `fs/` | 10 | (据え置き 10 本: fd_redirect.c fd_redirect.h ide_limits.h pipe_buffer.c pipe_buffer.h vfs.c vfs.h vfs_device.h vfs_fd.c vfs_name_rules.inc) |
 | `fs/ext2/` | 11 | `fs/ext2.h` `fs/ext2_ctx.h` `fs/ext2_dir.c` `fs/ext2_file.c` `fs/ext2_fmt.c` `fs/ext2_inode.c` `fs/ext2_layout.c` `fs/ext2_layout.h` `fs/ext2_priv.h` `fs/ext2_super.c` `fs/ext2_vfs.c` |
 | `fs/fat/` | 1 | `fs/fatfs_vfs.c` |
@@ -158,12 +158,12 @@ exec/ kapi/ lib/ net/ kdebug/ hwdev/ platform/ boot/ userland/ sdk/   (動かさ
 | kernel/cpu_calibrate* | kernel/time/ | 校正は PIT tick と CPU ループの組で、x86 の命令は使っていない (io.h だけ)。時刻の層に置いた |
 | mm/memory_boot.c | mm/ | 起動の一部だが中身はメモリ判定と台帳への登録 |
 | kernel/font_source・font_guard・unicode_file | kernel/console/ | 文字・フォントの層。GUI と共有するので `kernel/` 直下でもよい |
-| kernel/snd_engine.c | drivers/sound/fm/ | fm.mod の中身で OPN 専用 (FM/SSG シーケンサ)。将来 PCM と共有するなら drivers/sound/ 直下 (core) |
+| drivers/sound/fm/snd_engine.c | drivers/sound/fm/ | fm.mod の中身で OPN 専用 (FM/SSG シーケンサ)。将来 PCM と共有するなら drivers/sound/ 直下 (core) |
 | kernel/sqlite_engine・sqlite_outer | kernel/ | lib/sqlite3/ (os32_sqlite_* の glue) に寄せる案もある。常駐のスタック切替は kernel 側の責任と見た |
-| kernel/geforce_platform.c | drivers/video/geforce/ | 起動時の BAR 予約で PC-98 の帯に依存。platform/pc98/ に置く案 |
+| drivers/video/geforce/geforce_platform.c | drivers/video/geforce/ | 起動時の BAR 予約で PC-98 の帯に依存。platform/pc98/ に置く案 |
 | gfx/backend_pc98・backend_pegc・pc98_route | drivers/video/pc98/ | PC-98 内蔵表示。`platform/pc98/` 寄せの案もある (v4 で機種ごとに切る単位) |
 | drivers/np2sysp | drivers/char/ | NP21/W 専用の通信。5 か所 (mouse・lgy98・backend_cirrus・backend_pegc・mouse_seamless) から引かれる「エミュレータ検出」なので drivers/platform/np21w/ の案 |
-| drivers/disk.h・scsi.h | drivers/block/ | 定数だけのヘッダ |
+| drivers/block/disk.h・scsi.h | drivers/block/ | 定数だけのヘッダ |
 | fs/ide_limits.h | fs/ | ide_contract.h の FS 側の写し。drivers/ata/ でもよい |
 | kernel/kselftest.h・kselftest_report.c | kernel/ | 本体は kdebug/kselftest.c。kdebug/ に寄せる案 (kernel.map に固定記号が要るので常駐は残る) |
 
@@ -189,7 +189,7 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
    登録に替える。④ `init/kernel.c` の窓口 8 本は「起動の順序」の責任なので残してよい (Linux の initcall 化はしない、規模に合わない)。
 3. PC-98 固有ヘッダを共通層が引く 27 本は v4 の機種分割の本題。v3 では一覧として票に残すだけ (V3_GOALS の原則 1「流さない」は新規分に適用)。
 4. 新旧の解決先が変わる include は **0 件** (同じ走査で、移動後の -I 一覧で解決し直して比較)。ただし同名ヘッダが 2 組ある:
-   `include/kbd.h` と `drivers/kbd.h`、`init/boot_disk.h` と `platform/pc98/boot_disk.h`。-I の順を並べ替えると黙って入れ替わるので、
+   `include/kbd.h` と `drivers/input/kbd.h`、`init/boot_disk.h` と `platform/pc98/boot_disk.h`。-I の順を並べ替えると黙って入れ替わるので、
    段の検査に「解決先の一致」を入れる (下 §7)。
 
 ## 5. 移動に伴って直す所の見積り (grep の数)
@@ -198,7 +198,7 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
 
 | 場所 | 参照 / ファイル | 中身・直し方 |
 |---|---|---|
-| ソースの `#include` (パス付き) | **94 / 30** | `"../drivers/kbd.h"`・`"mm/pgalloc.h"` の形。動かさない kdebug/ (10 本)・hwdev/gf (4)・platform/pc98 (6)・lib/utf8.c にも及ぶ。うち生成物 33 (kdebug/generated/kdebug_imports.h 28、hwdev/generated 4、lib/sqlite3/generated 1) は**生成器の入力を直して再生成**: `kernel/module/kdebug_imports.def` (146 参照)、`hwdev/hwdev_imports.def` (7)、`tools/prototypes/*_imports.def` 9 本 (102) |
+| ソースの `#include` (パス付き) | **94 / 30** | `"../drivers/input/kbd.h"`・`"mm/pgalloc.h"` の形。動かさない kdebug/ (10 本)・hwdev/gf (4)・platform/pc98 (6)・lib/utf8.c にも及ぶ。うち生成物 33 (kdebug/generated/kdebug_imports.h 28、hwdev/generated 4、lib/sqlite3/generated 1) は**生成器の入力を直して再生成**: `kernel/module/kdebug_imports.def` (146 参照)、`hwdev/hwdev_imports.def` (7)、`tools/prototypes/*_imports.def` 9 本 (102) |
 | ソースの註のパス | 約 320 / 約 140 | 機械語に響かない。段の中で一括置換してよい (しなくても壊れない) |
 | -I の設定 | `build/config.mk` の INC_* 10 本 | 新ディレクトリ 30 を足す (`include/` と既存の `gfx/` `fs/` `kernel/` を除く)。案: `KERNEL_SRC_DIRS` 1 変数にまとめて INC_KERNEL/INC_DRIVERS/INC_FS/INC_GFX/INC_EXEC/INC_KAPI/INC_SQLITE から引く。fatfs の `-Ifs/fatfs` 先頭 (string.h の差し替え) は `-Ifs/fat/fatfs` に |
 | ビルドの一覧・規則 | build/*.mk・Makefile・ld 239 / 16 (kernel.mk 141、programs.mk 26、lan-module.mk 14、kdebug.mk 8、他の *-module.mk 各 4〜7、boot.mk 5)、build/checks.d/*.mk 51 / 32 | `C_KERNEL`・`ASM_KERNEL` の順序は保つ。**パスで選ぶ規則** (`-Os` の LAYOUT_SMALL・R1_SMALL、`double_fault.o` の DF_GUARD_TEST、`lgy98.o: .FORCE`、`module*.o -Os`、fatfs の INC) を取りこぼすと機械語が変わる — 段の比較で必ず出る |

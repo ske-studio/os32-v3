@@ -9,7 +9,7 @@ import host32
 from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console/console.c', 'drivers/fm.c', 'drivers/serial.c', 'kapi/kapi_generated.c', 'drivers/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c')
+SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
     ('cursor x high', 0, 'if (x >= TVRAM_COLS) x = TVRAM_COLS - 1;', ''),

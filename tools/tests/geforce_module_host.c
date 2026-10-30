@@ -1,8 +1,8 @@
 #define _start unused_runtime_start
 #include "module_runtime_host.c"
 #undef _start
-#include "../../kernel/geforce_module.c"
-#include "../../kernel/geforce_body.c"
+#include "../../drivers/video/geforce/geforce_module.c"
+#include "../../drivers/video/geforce/geforce_body.c"
 static struct geforce_platform fixture_platform;
 struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
 void geforce_backend_stop_bind(int (*stop)(void)) { (void)stop; }

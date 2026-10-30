@@ -1,13 +1,13 @@
 /* PC-9821 resident input wiring. Registration performs no device I/O. */
 #include "input_service.h"
 #include "clock_service.h"
-#include "../../drivers/rtc.h"
+#include "../../drivers/char/rtc.h"
 #include "port_service.h"
 #include "console_output.h"
-#include "../../drivers/serial.h"
+#include "../../drivers/char/serial.h"
 #include "pointer_service.h"
-#include "../../drivers/mouse.h"
-#include "../../drivers/kbd.h"
+#include "../../drivers/input/mouse.h"
+#include "../../drivers/input/kbd.h"
 
 static u8 pc98_shift_state(void) { return kbd_shift_state; }
 static const InputOps pc98_input = {

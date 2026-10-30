@@ -47,7 +47,7 @@ static const char *const kpeek_status_names[] = {
 #define KPEEK_STATUS_COUNT \
     (sizeof(kpeek_status_names) / sizeof(kpeek_status_names[0]))
 
-/* lan.mod の状態の名前 (drivers/e82557.h の enum e82557_state の順の写し)。
+/* lan.mod の状態の名前 (drivers/net/e82557/e82557.h の enum e82557_state の順の写し)。
  * probe は fail_addr にこの値を返す。 */
 static const char *const kpeek_lan_state_names[] = {
     "OFF", "STARTING", "RUNNING", "RECOVER", "RX_WAIT", "FAILED", "STOPPING",

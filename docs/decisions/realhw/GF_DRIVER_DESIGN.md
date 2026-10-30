@@ -90,8 +90,8 @@ VBE の対応は機能の比較であり INT 10h 互換 ABI を提供する意�
 | 拡張状態 `extended` | 60081C/850・CR33/52 等、overlay 停止 | `dispnv04/hw.c:665–772` | 02 の内部 | `kdebug/gfinit_mode.c:85–100`・共有列／移動 |
 | 基準状態 `baseline` | init 後に一度採取、再 modeset の入力 | `dispnv04/hw.c:813`（採る範囲は OS32 限定） | 4F04 p.45 の一部分 | `kdebug/gf_stage_state.c:20`／I/O 非依存部分を共有化 |
 | 停止 `quiesce` | 1850→1854→PMC140 を 0、旧 timing は戻さない | 完全対応無し、PC-98 共存上の差分 | 04 の完全復元ではない | `kdebug/recover_gf.c:125`／列を共有化 |
-| 98 切替・復帰 `gfx/pc98_route.c` | 0FACh、decode 確認、98 再描画 | 無し、PC-98 固有 | 無し | `kdebug/recover_profile.c:42–71`、`T/TASK_GEFORCE6200.md:86`／低層だけ共有化 |
-| LFB 転送 `gfx/gf_present.c` | RAM から BAR1 へ dirty 矩形の CPU 転送 | 該当する OS32 の転送処理は無し | LFB は 01/02、銀行窓 4F05 p.46 は不使用 | `gfx/backend_pegc.c` の HAL 契約を手本／新規 |
+| 98 切替・復帰 `drivers/video/pc98/pc98_route.c` | 0FACh、decode 確認、98 再描画 | 無し、PC-98 固有 | 無し | `kdebug/recover_profile.c:42–71`、`T/TASK_GEFORCE6200.md:86`／低層だけ共有化 |
+| LFB 転送 `drivers/video/geforce/gf_present.c` | RAM から BAR1 へ dirty 矩形の CPU 転送 | 該当する OS32 の転送処理は無し | LFB は 01/02、銀行窓 4F05 p.46 は不使用 | `drivers/video/pc98/backend_pegc.c` の HAL 契約を手本／新規 |
 
 VBE 4F0A（保護モード入口、p.56）は実装しない。blank、FIFO、カーソル、PC-98 の出力リレーを VBE Core のサービス数に数えて水増ししない。
 B の timing/format/pitch/fifo/extended/output/cursor/dac_format 等は既存 calc の機械的分割で各ファイルにする（F9）。値計算の再実装はしない。modeset の順番・待ち・条件は `gf_load_state` だけが所有する。
@@ -158,7 +158,7 @@ PROM は BAR0 から既存の二重読み/header/checksum/既知 script 検査�
 既存の命令/呼出し/反復/累積待ち上限を保ち、命令と wait の刻みに中断点を置く。診断の main 間承認待ちは本番に持ち込まない。
 **時間（F11）**：devinit の同期停止は 1〜5 秒程度を仮置き（未実測の推測）、本番全体のソフト上限は既存 `GF_INIT_EXEC_US` の 60 秒を採用（`O/kdebug/gfinit_exec.h:4`）。ROM 採取前から基準値採取まで計時し、P6 で実測と GUI 表示までの総時間を記録する。期限超過は既存失敗出口へ進むが、戻らない MMIO に壁時計上限は保証できない。
 配置は **`geforce.mod`＋核の薄い予約/復帰口**（U5）。下層/中層は `hwdev/gf/`、HAL は `gfx/`、診断 adapter は `kdebug/` と従来 hwdev.mod。本番は KDEBUG=0 で動く。
-既存 loader/Cirrus 登録を使い、NULL 加速 callback と非NULL prepare を許す（`O/kernel/cirrus_module.c:22–43`）。kdebug 依存の hwdev.mod を名称変更するだけでは済ませない（`O/kernel/hwdev_module.c:87–96`）。
+既存 loader/Cirrus 登録を使い、NULL 加速 callback と非NULL prepare を許す（`O/drivers/video/cirrus/cirrus_module.c:22–43`）。kdebug 依存の hwdev.mod を名称変更するだけでは済ませない（`O/kernel/hwdev_module.c:87–96`）。
 **診断 owner/lease は `kdebug/gfinit.c:70–74` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
 本番 context/復帰 callback は起動中保持して module を pin し、正常終了後も予約は保持する。owner の核移設、共通装置 registry、N1 lease の再設計は行わない。
 P6 までは診断 A2/main の旧展開を比較用に残す。**runner の実機受入後、診断も同じ A2/main runner＋記録付き bus に移し、schedule.inc・emit.inc・*_expand.inc と専用の旧接続を削除する**（F4）。診断の段別承認/記録/中断/S0 は adapter に残し、C plan・A1/A4/VPLL/virtual が使う汎用機能は維持する。

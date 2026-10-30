@@ -17,8 +17,8 @@ check-ver-info-host:
 - include/input_service.h
 - kernel/input_service.c
 - platform/pc98/d2_bind.c
-- drivers/pcm_cs4231.h
-- drivers/serial.h
+- drivers/sound/cs4231/pcm_cs4231.h
+- drivers/char/serial.h
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - gfx/gfx_core.c

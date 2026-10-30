@@ -69,8 +69,8 @@ static void fprintf(int fd, const char *fmt, ...)
 __asm__(".global _start\n_start:\n"
         "mov (%esp), %eax\nlea 4(%esp), %edx\npush %edx\npush %eax\ncall main\n"
         "mov %eax, %ebx\nmov $1, %eax\nint $0x80\n");
-#include "../../drivers/pci_decode.c"
-#include "../../drivers/e82557_eeprom.c"
+#include "../../drivers/pci/pci_decode.c"
+#include "../../drivers/net/e82557/e82557_eeprom.c"
 _Static_assert(sizeof(u32) == 4, "EEPROM model requires target-width u32");
 
 static int failed, only; /* 0 all, 1 timing T, 2 sequence S */
