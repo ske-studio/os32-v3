@@ -1,0 +1,15 @@
+# kapi/kapi_db.c — SQLite の KAPI と接続管理
+
+> 状態: **現行 (2026-10-31)**
+
+SQLite 接続とステートメントをハンドルとして公開する。
+結果と診断文字列を共有領域に置き、所有者ごとに回収する。
+
+## 落とし穴
+
+- DB の失敗は戻り値だけではプール枯渇と他の失敗を区別しにくい。
+  `db_last_error` の診断を確認し、不要になった接続やステートメントを閉じる
+  (`kapi/kapi_db.c:388`, `kapi/kapi_db.c:579`)。ユーザーから読めるよう、
+  エラー文字列は共有領域へ写される (`kapi/kapi_db.c:833`)。
+  呼出し元によるハンドルの所有検査は `kapi/kapi_db.c:151` にある。
+  `tools/tests/test_db_errstr.py` と `tools/tests/test_db_caller.py` が検査する。
