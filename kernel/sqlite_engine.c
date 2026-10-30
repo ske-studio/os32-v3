@@ -101,7 +101,7 @@ static int valid_api(const struct module_record *r)
     STATIC_ASSERT(sizeof(candidate_api) == sizeof(entries), sqlite_facade_size);
     kmemcpy(entries, &candidate_api, sizeof(entries));
     for (u32 i = 0; i < SQLITE_MODULE_API_SLOTS; ++i)
-        if (entries[i] < r->text || entries[i] - r->text >= r->text_size) return 0;
+        if (!module_text_contains(r, entries[i])) return 0;
     return 1;
 }
 
