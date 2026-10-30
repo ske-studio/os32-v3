@@ -129,7 +129,7 @@ static int pcm_start_module(struct module_record *r, u32 entry, u32 *exports)
     STATIC_ASSERT(sizeof(candidate) == sizeof(entries), pcm_facade_size);
     kmemcpy(entries, &candidate, sizeof(entries));
     for (u32 i = 0; i < PCM_MODULE_API_SLOTS; i++)
-        if (entries[i] < r->text || entries[i] - r->text >= r->text_size)
+        if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
     candidate_valid = 1;
     if (rc) return rc;

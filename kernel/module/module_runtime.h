@@ -51,6 +51,13 @@ struct module_record {
     u32 registration_refs;
     struct module_lifecycle lifecycle;
 };
+
+/* The module's text interval is half-open; subtract after the lower bound. */
+static inline int module_text_contains(const struct module_record *record, u32 address)
+{
+    return address >= record->text && address - record->text < record->text_size;
+}
+
 extern struct module_record module_records[MODULE_RECORD_CAP];
 
 /* Normal boot context only. No SERVICES_READY unload/reload API.

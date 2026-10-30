@@ -217,8 +217,7 @@ int module_ref_acquire(struct module_handle h, u32 owner,
     struct module_record *r = module_record_get(h);
     if (!r || r->owner != owner ||
         (r->state != MODULE_STARTING && r->state != MODULE_RUNNING)) return 0;
-    if (kind <= MODULE_REF_CALLBACK &&
-        (handler < r->text || handler - r->text >= r->text_size)) return 0;
+    if (kind <= MODULE_REF_CALLBACK && !module_text_contains(r, handler)) return 0;
     u32 *count = ref_count(r, kind);
     if (!count) return 0;
     ++*count;
