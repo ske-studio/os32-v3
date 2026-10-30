@@ -12,6 +12,7 @@ check-db-errstr-host:
 - tools/tests/mutpar.py
 - exec/exec.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/paging.c
 - tools/tests/kapi_db_v50_host.c
 - exec/exec_kapi_init.inc

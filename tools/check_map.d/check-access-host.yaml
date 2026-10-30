@@ -24,6 +24,7 @@ check-access-host:
 - tools/tests/host32.py
 - tools/tests/test_host32.py
 - kdebug/kselftest.c
+- kdebug/kselftest/caller_boot.inc
 - exec/access_walk.c
 - mm/paging.c
 - platform/pc98/platform_memory_desc.h

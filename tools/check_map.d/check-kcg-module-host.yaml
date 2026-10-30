@@ -1,5 +1,6 @@
 check-kcg-module-host:
 - kdebug/kselftest.c
+- kdebug/kselftest/kcg_display_return.inc
 - tools/tests/kcg_display_host.c
 - mm/paging.h
 - gfx/gfx.h

@@ -15,6 +15,7 @@ check-kapi-print-host:
 - mm/physmem.c
 - mm/shlib.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - tools/tests/kapi_print_host.c
 - tools/tests/test_kapi_print.py
 - tools/tests/test_access_walk.py

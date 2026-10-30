@@ -11,6 +11,7 @@ check-kapi-strings-host:
 - mm/physmem.c
 - mm/shlib.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - sdk/kapi.json
 - userland/tests/kstr_boundary.c
 - userland/tests/kstr_v86.c

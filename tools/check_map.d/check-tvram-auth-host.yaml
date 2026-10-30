@@ -18,6 +18,7 @@ check-tvram-auth-host:
 - exec/ring3_str.c
 - fs/vfs.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/paging.c
 - mm/pgalloc.c
 - mm/physmem.c

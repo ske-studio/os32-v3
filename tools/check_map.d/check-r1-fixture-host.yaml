@@ -18,6 +18,7 @@ check-r1-fixture-host:
 - mm/physmem.c
 - mm/physmem.h
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - exec/exec.c
 - tools/r1_manifest.py
 - tools/nhd_profile.py

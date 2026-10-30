@@ -15,7 +15,7 @@ import test_mem_stat as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kernel/gui.c', 'kernel/gui.h', 'kdebug/kselftest.c', 'fs/fd_redirect.h',
+    'kernel/gui.c', 'kernel/gui.h', 'kdebug/kselftest/appmem.inc', 'fs/fd_redirect.h',
     'sdk/include/os32/os32_gui_shared.h', 'tools/tests/trim_kernel_host.c',
     'tools/tests/test_trim_kernel.py', 'tools/tests/test_mem_stat.py',
 ]
@@ -110,7 +110,7 @@ void fd_redirect_restore(const FdRedirectState *s) { (void)s; }
     (tmp / 'trim_selftest_source.c').write_text(
         ''.join('static void kdi_set_' + name + '(' + ('int' if name.endswith('_id') else 'u32') +
                 ' value) { ' + name + ' = value; }\n' for name in setters) +
-        fn(sources['kdebug/kselftest.c'], 'static void test_appmem('))
+        fn(sources['kdebug/kselftest/appmem.inc'], 'static void test_appmem('))
     (tmp / 'heap_source.c').write_text(sources['exec/exec_heap.c'])
     return cc
 
@@ -174,7 +174,7 @@ def main():
     p.add_argument('--mutate', action='store_true')
     p.add_argument('--runner', choices=('native', 'qemu'), default='native')
     args = p.parse_args()
-    paths = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
+    paths = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
              'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
              'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c']
     sources = {name: (ROOT / name).read_text() for name in paths}
