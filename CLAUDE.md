@@ -49,9 +49,9 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 | 知らないサブシステムに触る | [`docs/WORK_GUIDE.md`](docs/WORK_GUIDE.md) (作業別の入口)・[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) §2 (ファイル地図) |
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`) |
-| ビルド・配備・検証を選ぶ | スキル **`os32-build-verify`**、[`docs/08_build.md`](docs/08_build.md) §8-4 |
+| ビルド・配備・検証を選ぶ | [`docs/08_build.md`](docs/08_build.md) §8-4 |
 | KAPI の追加・変更 | スキル **`os32-kapi-add`**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
-| エミュレータ上の障害 / ini の変更 | スキル **`os32-emu-debug`** / **`os32-emu-config`** (ini は PM だけ) |
+| エミュレータ上の障害 / ini の変更 | スキル **`run-os32`** / **`os32-emu-config`** (ini は PM だけ) |
 | 実行モデル (CPL=3、資源回収) / 描画 | [`docs/09_exec.md`](docs/09_exec.md) / [`docs/05_drivers.md`](docs/05_drivers.md) §5-5 |
 
 **External programs** — The CRT calls `main` by name; see the [SDK application contract](sdk/README.md#アプリを書くときの約束).
