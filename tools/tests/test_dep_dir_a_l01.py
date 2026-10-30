@@ -31,7 +31,7 @@ def build_dma(folder, body):
     exe = folder / 'dma'
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-m32', '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
-                    '-I' + str(folder), '-I' + str(ROOT / 'sdk/include/os32'),
+                    '-I' + str(folder), *include_flags(folder),
                     str(folder / 'probe.c'), str(folder / 'dma_contract.c'),
                     '-o', str(exe)], check=True)
     return exe
@@ -43,7 +43,9 @@ def abi(folder, fixture):
     assert hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest() == fixture['kapi_sha256']
     probe = ['#include <stddef.h>']
     for name, api in fixture['apis'].items():
-        text = (ROOT / (f'kernel/module/{name}_module.h' if name == 'v86' else f'kernel/{name}_module.h')).read_text()
+        directory = {'pcm': 'drivers/sound/cs4231', 'fm': 'drivers/sound/fm',
+                     'lan': 'drivers/net/e82557', 'v86': 'kernel/v86'}[name]
+        text = (ROOT / directory / f'{name}_module.h').read_text()
         block = re.search(r'typedef struct \{(.*?)\} ' + api['type'] + ';', text, re.S).group(1)
         assert ' '.join(re.sub(r'/\*.*?\*/', '', block, flags=re.S).split()) == api['body']
         probe += [f'#include "{name}_module.h"',

@@ -244,9 +244,7 @@ def _pure_cmd(tmp, root):
         text = HARNESS.read_text(encoding="utf-8").replace('"../../', '"')
         harness = pathlib.Path(tmp) / "hdd_stage1_host.c"
         harness.write_text(text, encoding="utf-8")
-    inc = ["-I" + str(root), "-I" + str(root / "include"), "-I" + str(root / "drivers"),
-           "-I" + str(root / "fs"), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs")]
+    inc = [*include_flags(root), *include_flags(ROOT)]
     return ["gcc", *HOST_FLAGS, *inc, str(harness), "-o", str(exe)]
 
 
@@ -829,10 +827,7 @@ def build_target(tmp):
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
             "-fcommon", "-O2", "-Wall", "-Werror",
-            "-D__KERNEL_BUILD__", "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-            "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
-            "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "arch/x86"),
-            "-I" + str(ROOT / "platform/pc98")]
+            "-D__KERNEL_BUILD__", *include_flags(ROOT)]
     for rel in ("drivers/block/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2_layout.c",
                 "userland/shell/hdprep_plan.c"):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
@@ -843,7 +838,7 @@ def build_target(tmp):
         extra = ["-Iinclude", "-include", "lib/kstring.h"] if rel.endswith("boot_debug.c") else []
         run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
              "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
-             "-Wall", "-Werror", "-fcommon", "-Iboot", "-Idrivers",
+             "-Wall", "-Werror", "-fcommon", "-Iboot", *include_flags(ROOT),
              "-include", str(layout), *extra, "-c",
              str(ROOT / rel), "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
             check=True)

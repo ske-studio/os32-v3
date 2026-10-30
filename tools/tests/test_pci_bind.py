@@ -70,8 +70,8 @@ def host_build(tmp, source_text=None):
     exe = src_dir / "pci-bind-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
     if source_text is not None:
-        mut = src_dir / "drivers"
-        mut.mkdir(exist_ok=True)
+        mut = src_dir / "drivers/pci"
+        mut.mkdir(parents=True, exist_ok=True)
         (mut / "pci_bind_match.c").write_text(source_text, encoding="utf-8")
         shim = src_dir / "harness.c"
         # 変異させるのは pci_bind_match.c だけ。pci_bind.c (記録の取得口) は
@@ -83,7 +83,7 @@ def host_build(tmp, source_text=None):
             .replace('"../../drivers/pci/pci_bind_match.c"',
                      '"drivers/pci/pci_bind_match.c"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, *INCLUDES, "-I" + str(src_dir), str(shim),
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), *INCLUDES, str(shim),
                "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe

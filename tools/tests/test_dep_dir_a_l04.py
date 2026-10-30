@@ -2,6 +2,7 @@
 
 --prepare builds a substituted copy with -Werror without executing a mutant.
 """
+from kernel_includes import include_flags
 import argparse
 import hashlib
 import json
@@ -29,7 +30,7 @@ def build(folder, body):
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
-                    *['-I' + str(folder / p) for p in ('include', 'drivers')],
+                    *include_flags(folder),
                     str(folder / 'platform/pc98/device_loop.c'),
                     str(folder / 'tools/tests/dep_dir_a_l04_host.c'), '-o', str(exe)],
                    check=True)

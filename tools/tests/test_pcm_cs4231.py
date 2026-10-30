@@ -217,8 +217,8 @@ def host_build(tmp, source_text=None, driver_text=None):
     if source_text is None and driver_text is None:
         cmd = ["gcc", *FLAGS, *inc, str(HARNESS), "-o", str(exe)]
     else:
-        mut = src_dir / "drivers"
-        mut.mkdir(exist_ok=True)
+        mut = src_dir / "drivers/sound/cs4231"
+        mut.mkdir(parents=True, exist_ok=True)
         if source_text is None:
             source_text = SRC.read_text(encoding="utf-8")
         if driver_text is None:

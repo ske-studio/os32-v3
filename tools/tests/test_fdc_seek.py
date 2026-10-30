@@ -55,9 +55,9 @@ def host_build(tmp, source_text=None):
     exe = src_dir / "fdc-seek-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
     if source_text is not None:
-        # 変異させた fdc_decide.c を一時の drivers/ に置いて、そちらを先に引かせる。
-        mut = src_dir / "drivers"
-        mut.mkdir(exist_ok=True)
+        # 変異させた写しを元と同じ相対パスに置いて、そちらを先に引かせる。
+        mut = src_dir / "drivers/block"
+        mut.mkdir(parents=True, exist_ok=True)
         (mut / "fdc_decide.c").write_text(source_text, encoding="utf-8")
         (mut / "fdc_decide.h").write_text(
             (ROOT / "drivers/block/fdc_decide.h").read_text(encoding="utf-8"),
@@ -67,8 +67,8 @@ def host_build(tmp, source_text=None):
             HARNESS.read_text(encoding="utf-8").replace(
                 '"../../drivers/block/fdc_decide.c"', '"drivers/block/fdc_decide.c"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
-               "-I" + str(mut), str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
+               *INCLUDES, str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 

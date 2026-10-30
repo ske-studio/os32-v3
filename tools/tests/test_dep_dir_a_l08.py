@@ -1,4 +1,5 @@
 """L08 PCI diagnostic KAPI boundary; --prepare builds but never runs a mutation."""
+from kernel_includes import include_flags
 import argparse
 from hwdev_contract_fixture import assert_hwdev_contract
 import json
@@ -68,7 +69,7 @@ def build(folder, body, wrappers):
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
-                    *['-I' + str(folder / p) for p in ('.', 'include', 'drivers', 'sdk/include/os32')],
+                    *include_flags(folder),
                     str(folder / 'platform/pc98/device_pci.c'),
                     str(folder / 'tools/tests/dep_dir_a_l08_host.c'), '-o', str(exe)], check=True)
     return exe

@@ -109,9 +109,7 @@ def c_build(tmp, mutated=None, name="real"):
         text = (mutated or {}).get(rel, (ROOT / rel).read_text(encoding="utf-8"))
         (work / base).write_text(text, encoding="utf-8")
     exe = work / "serialfs-host"
-    cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "fs"),
-           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "sdk/include/os32"),
+    cmd = ["gcc", *flags_for(mutated), "-I" + str(work), *include_flags(ROOT),
            "-I" + str(ROOT / "userland/shell"),
            "-I" + str(ROOT / "userland/system"),
            str(HARNESS), "-o", str(exe)]
@@ -131,9 +129,7 @@ def gate_build(tmp, mutated=None, name="gate"):
                                (ROOT / "drivers/char/serial.c").read_text(encoding="utf-8"))
     (work / "serial.c").write_text(text, encoding="utf-8")
     exe = work / "serial-gate-host"
-    cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
-           "-I" + str(ROOT / "sdk/include/os32"),
+    cmd = ["gcc", *flags_for(mutated), "-I" + str(work), *include_flags(ROOT),
            str(GATE_HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,
                    stderr=subprocess.DEVNULL if mutated is not None else None)

@@ -2,6 +2,7 @@
 
 --prepare compiles a copied mutation with -Werror; it never runs that mutation.
 """
+from kernel_includes import include_flags
 import argparse
 from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
@@ -75,7 +76,7 @@ def build(folder, body, fixture, wrappers):
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
-                    *['-I' + str(folder / p) for p in ('.', 'include', 'drivers')],
+                    *include_flags(folder),
                     str(folder / 'abi.c'), str(folder / 'platform/pc98/device_ide.c'),
                     str(folder / 'tools/tests/dep_dir_a_l05a_host.c'), '-o', str(exe)],
                    check=True)

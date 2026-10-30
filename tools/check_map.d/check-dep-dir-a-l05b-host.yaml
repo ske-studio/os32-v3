@@ -16,3 +16,4 @@ check-dep-dir-a-l05b-host:
 - fs/ide_limits.h
 - build/checks.d/check-dep-dir-a-l05b-host.mk
 - tools/check_map.d/check-dep-dir-a-l05b-host.yaml
+- tools/tests/kernel_includes.py

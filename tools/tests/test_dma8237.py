@@ -76,8 +76,8 @@ def host_build(tmp, source_text=None, contract_text=None):
             contract_text = COMMON.read_text()
         common = src_dir / "dma_contract.c"
         common.write_text(contract_text)
-        mut = src_dir / "drivers"
-        mut.mkdir(exist_ok=True)
+        mut = src_dir / "drivers/dma"
+        mut.mkdir(parents=True, exist_ok=True)
         (mut / "dma8237_math.c").write_text(source_text, encoding="utf-8")
         (mut / "dma8237.h").write_text(
             (ROOT / "drivers/dma/dma8237.h").read_text(encoding="utf-8"),
@@ -88,9 +88,8 @@ def host_build(tmp, source_text=None, contract_text=None):
                 '"../../drivers/dma/dma8237_math.c"', '"drivers/dma/dma8237_math.c"')
             .replace('"../../lib/dma_contract.c"', '"' + str(common) + '"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(src_dir),
-               "-I" + str(mut), str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
+               *INCLUDES, str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
