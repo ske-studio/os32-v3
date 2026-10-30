@@ -20,6 +20,7 @@ check-module-runtime-host:
 - tools/module_schema.py
 - tools/gen_module_schema.py
 - lib/kstring.h
+- lib/le_internal.h
 - lib/crc32_core.inc
 - tools/tests/module_runtime_host.c
 - tools/tests/test_module_runtime.py

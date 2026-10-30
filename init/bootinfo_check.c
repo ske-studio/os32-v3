@@ -1,3 +1,4 @@
+#include "le_internal.h"
 /* ======================================================================== */
 /*  BOOTINFO_CHECK.C — ブート情報域の検証と表示行 (純粋関数)                */
 /*                                                                          */
@@ -18,10 +19,6 @@ static u16 rd16(const u8 *p)
     return (u16)((u16)p[0] | ((u16)p[1] << 8));
 }
 
-static u32 rd32(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
 
 static void wr16(u8 *p, u16 v)
 {
@@ -94,12 +91,12 @@ int bootinfo_parse(const u8 *raw, unsigned int len, struct bootinfo *out)
         return out->status;
     }
 
-    out->magic = rd32(raw + BI_OFF_MAGIC);
+    out->magic = le_read32(raw + BI_OFF_MAGIC);
     if (out->magic != (u32)BOOTINFO_MAGIC) {
         out->status = BOOTINFO_ERR_MAGIC;
         return out->status;
     }
-    if (rd32(raw + BI_OFF_CHECK) != (u32)BOOTINFO_CHECK) {
+    if (le_read32(raw + BI_OFF_CHECK) != (u32)BOOTINFO_CHECK) {
         out->status = BOOTINFO_ERR_CHECK;
         return out->status;
     }
@@ -139,10 +136,10 @@ int bootinfo_parse(const u8 *raw, unsigned int len, struct bootinfo *out)
     /* イメージ欄 (v2)。主部とは別のチェック語で、合わなければ「記録なし」
      * (主部の status は OK のまま — 幾何は使える)。 */
     {
-        u32 crc  = rd32(raw + BI_OFF_IMG_CRC);
-        u32 size = rd32(raw + BI_OFF_IMG_SIZE);
+        u32 crc  = le_read32(raw + BI_OFF_IMG_CRC);
+        u32 size = le_read32(raw + BI_OFF_IMG_SIZE);
         if (size != 0 &&
-            rd32(raw + BI_OFF_IMG_CHECK) == BOOTINFO_IMG_CHECK_OF(crc, size)) {
+            le_read32(raw + BI_OFF_IMG_CHECK) == BOOTINFO_IMG_CHECK_OF(crc, size)) {
             out->img_valid = 1;
             out->img_crc   = crc;
             out->img_size  = size;
