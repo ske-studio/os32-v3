@@ -37,6 +37,6 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 
 生成・版更新・ビルド・関数表更新は [KAPI_SPEC §3-1](../../../docs/KAPI_SPEC.md#3-1-kernelapi-関数の追加手順)、
 役別の検査条件は [ROLES §0「検査」](../../../docs/tasks/agents/ROLES.md#0-現行の体制) を参照する。
-配備と呼出し確認は [os32-build-verify](../os32-build-verify/SKILL.md#起動したバイナリを確認する) に従う ([V1])。
+配備と呼出し確認は [run-os32](../run-os32/SKILL.md#配備と起動の注意) に従う ([V1])。
 報告には追加したエントリとスロット、版数、担当した検査の結果、ゲストでの呼出し結果を含める。
 未実施は未実施と書く ([V4])。

@@ -2,7 +2,7 @@
 """review_local.py — ローカル / リモートの Ollama に独立レビューを依頼する。
 
 Codex・Antigravity・Fable サブエージェントが枯渇したときの補助レビュアー
-(docs/tasks/agents/ROLES.md §5、スキル os32-local-review)。
+(docs/tasks/agents/ROLES.md §5)。
 
 **opencode は介さない。** 対象ファイルを行番号つきで依頼文に埋め込み、
 1 回の要求で返させる。こうするとモデルが何を見たかが確定し、

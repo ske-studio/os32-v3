@@ -5,7 +5,7 @@ description: レビューを通った段 (作業木のブランチ) を main に
 
 # os32-land — 段の取り込み・検査・push
 
-規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の 3 段、全体検査は節目、検査中も main を編集してよい)。
+規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の段、全体検査は節目、検査中も main を編集してよい)。
 ここはその手順を 1 本にしたもの。
 
 ## 1. 取り込む前

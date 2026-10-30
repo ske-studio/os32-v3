@@ -5,9 +5,7 @@ description: 段の実装 (または後片付け・ゲスト受入) を実装者
 
 # os32-delegate — 実装の依頼とレビューの依頼
 
-役の割り当ての正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) と [HANDOVER](../../../docs/tasks/agents/HANDOVER_2026-10-25.md) §2
-(2026-10-21 に通常の体制へ戻した: 実装 = Codex (既定 sol、難所は astra)、sol の差分 → astra、astra の実装・設計票 → Opus reviewer。一時体制 (Fable/Opus) は終了)。
-Codex は ROLES §2 の `codex exec` の形で起動する。**書き手とレビュアーは別のモデル。**
+役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。
 
 ## 1. 作業木
 
@@ -36,7 +34,7 @@ cp assets/fonts/ipaex*.ttf ~/wt/os32-v3/<名>/assets/fonts/   # 同意済みの 
 - **新しく足した試験の変異の処理は実装者が 1 回 `--mutate` で回す** (2026-10-28、群 D の取り込みで 2 本): `MUTATE=0` の候補検査は変異の処理そのもの (置き換え・当て先の照合・resident の検査) を実行しないので、その中の誤りは PM の取り込みの検査で初めて落ちる。完了条件に「この段で新しく足した試験だけ `--mutate` を 1 回、rc=0」と書く (既存の試験の変異は回さない)。
 - **試験に補助ヘッダ・include を足す段** (2026-10-27、TASK_DEP_DIR の D2・D3 の取り込みで 2 回): 完了条件に「新しく include や補助ヘッダを足した試験は、変異の段の写し (一時ディレクトリに書くソース) からもそのヘッダが見えることを grep で確かめる」と書く。`MUTATE=0` の候補検査では変異の写しを組まないので見つからず、PM の取り込みの検査 (変異込み) で初めて落ちる。
 - KAPI を触る段: スキル os32-kapi-add に従い、`make clean` → `make all` を完了条件に足す。
-- ゲスト受入を含める段: 配備はスキル run-os32 (作業木の成果物)、GUI は os32-gui-drive、カーネルの入れ替えは hsync + emu_reset、
+- ゲスト受入を含める段: 配備はスキル run-os32 (作業木の成果物)、GUI は run-os32、カーネルの入れ替えは hsync + emu_reset、
   rshell 中の ESC は rshell を閉じる (閉じたら emu_key で `rshell` + RETURN)、MCP の emu_gui_launch / consink は本体の ELF を引くので
   `OS32_KERNEL_ELF` / `OS32_GSHELL_ELF` で作業木の ELF を渡す、証拠は `~/os32-tmp/evidence/<日付>/<名>/RESULT.md` (項目ごとに 合格/不合格/未確認、PNG を自分で開いて見る)。
 - **設計の欠けが報告されたら** (ユーザー指示 2026-10-21): PM が実装を決めずに、設計者 (通常は astra) に確定設計の追記として埋めさせ (os32-design-rally の差分依頼の形)、必要ならレビュアーに短く見せてから、同じ実装者に続きを頼む。

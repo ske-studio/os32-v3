@@ -607,7 +607,7 @@ U3 の予行・実機更新の準備は `make deploy-u3 HOSTDRV_DIR=<配備元�
   ホストが落ちると、配備元は新しいのに名札は古いままになる。`--expect-build` は
   そこで断る (安全側)。復旧は `make deploy` をもう一度打つだけ。
 - 環境変数: `HOSTDRV_DIR` (既定 `/mnt/c/os32`)、`NP21W_DIR` (既定 `/tmp/np21w`)。
-- 判断と検証の進め方はスキル `os32-build-verify`、反映確認の手順は
+- 判断と検証の進め方は本節、反映確認の手順は
   [POLICY_DEBUG.md §2](POLICY_DEBUG.md)。
 
 #### submodule (`apps/` `game/`) の扱い
