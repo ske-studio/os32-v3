@@ -8,8 +8,3 @@ runner が解読後・dispatch 前に REPEAT の `end_repeat` を対応する EN
 旧 plan executor の丸ごと移植や恒久的な二重実装はしない。
 実 ROM fixture（27 種/193 命令）の旧展開との I/O trace 差分試験 1 本＋制御個別 case
 skip/head、呼出し/反復上限
-## 索引
-
-- [hwdev/gf/](README.md)
-- [hwdev/gf/op/](op/README.md)
-- [hwdev/gf/internal.h](internal.md)

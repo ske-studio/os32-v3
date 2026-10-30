@@ -23,8 +23,3 @@ mode ID と配列 index は区別する。format は既存 PACKED8、RGB は各 
 FB の bytes は表示用予約 307,200 B で BAR1 全長とは別。palette の first/count と FB の offset/pitch/height を既存範囲内で検査し、不正なら I/O 前に返す。active/能力には成功済みの機能だけを載せる。
 Trident は自身の mode/FB/DAC 情報を返し、未対応 start-offset/blank は NOSYS。GF=01 と Trident の 0FACh 選択値はボード側へ分ける（`T/TASK_TRIDENT_DRIVER.md:426–444`）。独立 DPMS と VBE 状態 blob の完全復元は初版に含めない。
 Trident fake で契約成立、ABI と選択門・失敗出口を確認
-## 索引
-
-- [hwdev/gf/](../hwdev/gf/README.md)
-- [drivers/video/geforce/](../drivers/video/geforce/README.md)
-- [hwdev/gf/internal.h](../hwdev/gf/internal.md)

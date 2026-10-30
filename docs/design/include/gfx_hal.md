@@ -3,7 +3,3 @@
 ソース: `include/gfx_hal.h`
 
 GUI/グラフィックコンソール→RAM CLIENT→`gfx_present/dirty`→`backend_geforce`→video service→GF 部品。KAPI とアプリ側描画経路を変えない（[HW1]、`O/include/gfx_hal.h:37–97`）。
-
-## 索引
-
-- [./](../../../README.md)

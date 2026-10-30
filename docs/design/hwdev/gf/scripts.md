@@ -3,7 +3,3 @@
 ソース: `hwdev/gf/scripts.h`
 
 context は head/skip、有限の呼出し/反復 stack、ROM 借用参照、既存上限・時計・`gf_io`。bus は read/write（BAR/offset/width/値）、wait_us、point、局所復元。診断の記録・承認は adapter が担当する。
-
-## 索引
-
-- [hwdev/gf/](README.md)

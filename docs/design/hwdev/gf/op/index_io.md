@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 78 INDEX_IO | I:1853 `init_index_io` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

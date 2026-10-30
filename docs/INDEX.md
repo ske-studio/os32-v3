@@ -34,7 +34,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | ソースの付け替え手順 (置き場だけを変える: 対応表・道具・バイト比較・踏んだこと) | [SRC_MOVE.md](SRC_MOVE.md) | [TASK_SRC_LAYOUT](tasks/v3/TASK_SRC_LAYOUT.md) §9、[POLICY_DEV](POLICY_DEV.md) §2 |
 | CI の本体ビルド (GitHub Actions の成果物・キャッシュ・取り方) | [08_build.md §8-6](08_build.md) (`.github/workflows/build.yml`、`tools/ci/build_cross.sh`、`tools/ci_fetch.sh`) | `check.yml` の冒頭コメント |
 | ファイル → 役割 → 仕様の対応 | [DEVELOPMENT.md §2](DEVELOPMENT.md) | — |
-| 設計書 (1 機能 1 ファイル、ソースと同じディレクトリ構造) | `docs/design/<ソースと同じパス>.md` (決まりは [POLICY_DEV.md §9](POLICY_DEV.md) の 2a) | 既存の `docs/decisions/` は移すまで現行。[GF 設計](design/hwdev/gf/README.md) |
+| 設計書 (1 機能 1 ファイル、ソースと同じディレクトリ構造) | `docs/design/<ソースと同じパス>.md` (決まりは [POLICY_DEV.md §9](POLICY_DEV.md) の 2a) | 既存の `docs/decisions/` は移すまで現行。[設計書の入口](design/README.md) |
 | 第三者の部品とライセンス (版・改変の有無・原文の所在) | [../THIRD_PARTY.md](../THIRD_PARTY.md) (原文は各 vendor ディレクトリと `assets/*/README.OS32`) | README.md「ライセンス」(リンクのみ)、[../requirements.txt](../requirements.txt) (ホストの Python 依存) |
 | 作業別の参照先 | [WORK_GUIDE.md](WORK_GUIDE.md) (2026-10-23 に DEVELOPMENT §1 から切り出した) | — |
 | 実行モデル (ローダ、ネスト、リング3、資源回収、exec_run の分割壁) | [09_exec.md](09_exec.md) | [10 §10-9](10_notes.md)、`archive/kernel_v2/` (設計経緯) |

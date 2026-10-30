@@ -3,7 +3,3 @@
 ソース: `hwdev/gfinit_mode.h`
 
 表示は **640×480、PACKED8、256 色、pitch=640、表示先頭=0、25.175 MHz 要求**の 1 モードとする。
-
-## 索引
-
-- [hwdev/gf/](gf/README.md)

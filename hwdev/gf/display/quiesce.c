@@ -1,7 +1,7 @@
 #include "access.h"
 #include "../quiesce_rows.h"
 /* Keep the first failing target/rc; later successful cleanup must not
- * overwrite it (GF_DRIVER_DESIGN §3). */
+ * overwrite it (docs/design/hwdev/gf/display/quiesce.md). */
 static void gf_stop_write(struct gf_display_context *c, u32 off, int *rc,
                           u32 *target, int *first_rc)
 {

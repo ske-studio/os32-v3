@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 6E NV_REG | I:1709 `init_nv_reg` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

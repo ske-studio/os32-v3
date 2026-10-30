@@ -1,6 +1,6 @@
 # TASK_DESIGN_LAYOUT — 設計書を 1 機能 1 ファイル・ソースと同じディレクトリ構造へ移す
 
-> 状態: **実装中 (2026-10-30)** — まず GF_DRIVER_DESIGN の 1 本で試す。
+> 状態: **実装中 (2026-10-30)** — まず GF_DRIVER_DESIGN の 1 本で試す（[移設後の入口](../../design/hwdev/gf/README.md)）。
 > 上位: 文書の書き方の正典 [POLICY_DEV](../../POLICY_DEV.md) §9 の 2a・ソースの配置 [TASK_SRC_LAYOUT](TASK_SRC_LAYOUT.md)・付け替えの手順 [SRC_MOVE](../../SRC_MOVE.md)。
 
 ## ユーザーの指示と決定 (2026-10-30)
@@ -19,5 +19,5 @@
 
 | 段 | 対象 | 状態 |
 |---|---|---|
-| D0 | GF_DRIVER_DESIGN (試し、形を決める) | 調べ中 |
+| D0 | GF_DRIVER_DESIGN ([移設後の入口](../../design/hwdev/gf/README.md)、試し、形を決める) | 調べ中 |
 | D1〜 | 残りの `docs/decisions/` (D0 で決めた形で並列) | 計画 |

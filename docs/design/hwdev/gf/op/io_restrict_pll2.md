@@ -7,7 +7,3 @@
 | 4A IO_RESTRICT_PLL2 | I:950 `init_io_restrict_pll2` |
 
 PLL2/IO_RESTRICT_PLL2 は列全体の成功時だけ解除し、正常 stop で完了済みPLLを戻さない。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

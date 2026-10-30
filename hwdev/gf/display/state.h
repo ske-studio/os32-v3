@@ -1,4 +1,4 @@
-/* Shared main4 captures and C CHECK constants, GF_DRIVER_DESIGN §§3-5. */
+/* Shared main4 captures and C CHECK constants, docs/design/hwdev/gf/display/state.md. */
 #ifndef GF_DISPLAY_STATE_H
 #define GF_DISPLAY_STATE_H
 #include "../../gf_load_state.h"

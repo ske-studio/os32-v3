@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 52 CR | I:1176 `init_cr` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

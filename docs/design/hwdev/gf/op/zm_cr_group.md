@@ -7,7 +7,3 @@
 | 54 ZM_CR_GROUP | I:1213 `init_zm_cr_group` |
 
 skip 中の CR44 による head 更新も維持する（`O/kdebug/gfinit_decode.c:79–96`）。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

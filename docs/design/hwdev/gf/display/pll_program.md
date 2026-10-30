@@ -6,7 +6,3 @@
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|
 | PLL `pll_program` | solver と 5 書込み、選択 50C・524 | `nvkm/subdev/devinit/nv04.c:200`、`dispnv04/hw.c:468` | 4F0B p.59／02 の内部 |
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

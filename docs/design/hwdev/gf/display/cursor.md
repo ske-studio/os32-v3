@@ -6,7 +6,3 @@
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|
 | cursor `cursor` | offset=0・非表示だけ | `dispnv04/cursor.c:9–59` | Core に該当無し |
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

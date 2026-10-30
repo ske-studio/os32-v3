@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 38 NOT | I:767 `init_not` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

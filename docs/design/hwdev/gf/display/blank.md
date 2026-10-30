@@ -6,7 +6,3 @@
 |---|---|---|---|
 | protect/blank `blank` | VGA protect と画面 blank、同期停止とは別 | `dispnv04/hw.c:110–124`、`hw.h:243`、`crtc.c:721` | Core の独立機能無し |
 移動した各機能の既存試験、AR/DAC/LIVE/FP/PLL復元・独立期待列・CHECK
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

@@ -7,7 +7,3 @@
 | 36 END_REPEAT | I:724 `init_end_repeat` |
 
 REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

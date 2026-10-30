@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 39 IO_FLAG_CONDITION | I:779 `init_io_flag_condition` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

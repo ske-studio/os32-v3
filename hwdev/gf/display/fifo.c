@@ -23,7 +23,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 /* NV44A analog: MIT nouveau c03c1a1 dispnv04/crtc.c:245-606;
- * see GF_DRIVER_DESIGN §5 for the assignment ownership. */
+ * see docs/design/hwdev/gf/display/fifo.md for the assignment ownership. */
 #include "calc.h"
 void gf_mode_fifo(struct gfinit_mode *o)
 {

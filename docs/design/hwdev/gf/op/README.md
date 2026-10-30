@@ -9,8 +9,37 @@ F8：新規 host は実 ROM fixture の差分試験一つと REPEAT/SUB/CONDITIO
 既存試験は機能別の入口へ移し、fake bus/clock を共有する。削除後も旧 executor を試験用コピーとして残さず、製品表から期待値を作って自己一致を主張しない。
 ## 索引
 
-- [hwdev/gf/](../README.md)
 - [hwdev/gf/internal.h](../internal.md)
 - [hwdev/gf/runner.c](../runner.md)
 - [hwdev/gf/save.c](../save.md)
 - [hwdev/gf/pll.c](../pll.md)
+
+### 個別設計書
+
+- [compute_mem](compute_mem.md)
+- [condition](condition.md)
+- [copy](copy.md)
+- [copy_nv_reg](copy_nv_reg.md)
+- [cr](cr.md)
+- [cr_index_address_latched](cr_index_address_latched.md)
+- [done](done.md)
+- [end_repeat](end_repeat.md)
+- [index_io](index_io.md)
+- [io_flag_condition](io_flag_condition.md)
+- [io_restrict_pll2](io_restrict_pll2.md)
+- [io_restrict_prog](io_restrict_prog.md)
+- [macro](macro.md)
+- [not](not.md)
+- [nv_reg](nv_reg.md)
+- [pll2](pll2.md)
+- [repeat](repeat.md)
+- [reset](reset.md)
+- [resume](resume.md)
+- [sub](sub.md)
+- [sub_direct](sub_direct.md)
+- [time](time.md)
+- [zm_cr](zm_cr.md)
+- [zm_cr_group](zm_cr_group.md)
+- [zm_index_io](zm_index_io.md)
+- [zm_reg](zm_reg.md)
+- [zm_reg_sequence](zm_reg_sequence.md)

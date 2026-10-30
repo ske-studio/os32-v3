@@ -7,7 +7,3 @@
 | 6B SUB | I:1663 `init_sub` |
 
 SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

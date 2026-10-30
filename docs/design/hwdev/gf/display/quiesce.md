@@ -9,7 +9,3 @@ stop は局所後始末→quiesce、続けて上層が 98 切替を行う。
 停止済み stop・同値 blank は成功。
 終了/障害/reboot 前は **局所 index/lock/窓復元→1850=0→1854=0→PMC140=0→route00→decode 安全確認→98 復元・予約セル往復・再描画**（`D/GF_STAGES_DESIGN.md:115–117`）。
 移動した各機能の既存試験、AR/DAC/LIVE/FP/PLL復元・独立期待列・CHECK
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

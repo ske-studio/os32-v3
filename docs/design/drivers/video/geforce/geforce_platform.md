@@ -3,7 +3,3 @@
 ソース: `drivers/video/geforce/geforce_platform.c`
 
 BAR 全 decode 範囲を台帳予約し、BAR0 の必要頁と BAR1 の表示面を既存 master PD の supervisor+PCD で写像する。予約凍結後に拡張せず、実使用前は ID/base/属性の一致を読取りで確認する。
-
-## 索引
-
-- [docs/design/drivers/video/geforce/](README.md)

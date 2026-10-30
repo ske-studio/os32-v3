@@ -9,7 +9,3 @@
 | DPMS `dpms` | SR01→10ms→CR17→CR1A、modeset の OFF/ON は必須 | `dispnv04/crtc.c:175–234`、`dac.c:460` | 拡張 4F10、p.63 |
 B は `int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, u32 ordinal)` を `gf_load_io.row` へ接続し、section/wait も既存型を使う（`O/hwdev/gf_load_state.h:36–41`）。
 分割/複製無し。唯一の生成元 `tools/gfinit_mode_tables.py:29` を維持。blank/DPMS の modeset 順序もここに保持。
-
-## 索引
-
-- [hwdev/gf/](gf/README.md)

@@ -7,7 +7,3 @@
 | 32 IO_RESTRICT_PROG | I:621 `init_io_restrict_prog` |
 
 CR3C の組を確認する。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

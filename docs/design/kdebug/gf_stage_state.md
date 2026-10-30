@@ -3,7 +3,3 @@
 ソース: `kdebug/gf_stage_state.c`
 
 baseline 値採取と局所復元だけ必要範囲を共有化。診断 recover 型の adapter を残す。
-
-## 索引
-
-- [hwdev/gf/](../hwdev/gf/README.md)

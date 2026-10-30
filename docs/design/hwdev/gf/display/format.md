@@ -5,7 +5,3 @@
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|
 | 画素形式 `format` | PACKED8・GR/AR の値（GENERAL は dac_format） | `dispnv04/crtc.c:418–449,589` | 01/02 の内部 |
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

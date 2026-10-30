@@ -1,4 +1,4 @@
-/* GF component contracts, GF_DRIVER_DESIGN §§2-3. */
+/* GF component contracts, docs/design/hwdev/gf/internal.md. */
 #ifndef HWDEV_GF_INTERNAL_H
 #define HWDEV_GF_INTERNAL_H
 #include "../../include/video_service.h"

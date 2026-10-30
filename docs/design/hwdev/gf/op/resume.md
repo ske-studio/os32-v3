@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 72 RESUME | I:1751 `init_resume` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

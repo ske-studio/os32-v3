@@ -3,7 +3,3 @@
 ソース: `tools/gfinit_mode_tables.py`
 
 分割/複製無し。唯一の生成元 `tools/gfinit_mode_tables.py:29` を維持。blank/DPMS の modeset 順序もここに保持。
-
-## 索引
-
-- [hwdev/gf/](../hwdev/gf/README.md)

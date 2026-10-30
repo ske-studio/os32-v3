@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 58 ZM_REG_SEQUENCE | I:1281 `init_zm_reg_sequence` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

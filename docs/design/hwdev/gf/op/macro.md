@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 6F MACRO | I:1727 `init_macro` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

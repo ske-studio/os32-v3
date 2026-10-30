@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 71 DONE | I:610 `init_done` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

@@ -8,7 +8,3 @@ RAM CLIENT 300 KiB と BAR1+[0,4B000h) の DISPLAY を SURFACE 台帳へ別登�
 CLIENT は PEGC/GF のどちらか一つの 300 KiB。BAR1 の DISPLAY は MMIO で RAM の CLIENT と別。
 
 CLIENT は PEGC/GF 一方だけ、pc98 fallback、decode不明時98無書込み、shutdown→再init、部品欠落/KDEBUG=0。
-
-## 索引
-
-- [docs/design/drivers/video/geforce/](README.md)

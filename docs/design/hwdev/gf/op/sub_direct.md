@@ -7,7 +7,3 @@
 | 5B SUB_DIRECT | I:1344 `init_sub_direct` |
 
 SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

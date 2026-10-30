@@ -7,7 +7,3 @@
 | 7A ZM_REG | I:1892 `init_zm_reg` |
 
 PMC_ENABLE bit0 を立てる
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

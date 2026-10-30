@@ -10,7 +10,3 @@ prepare は識別/資源確認だけ。init で `video_start`→初回転送→9
 route01 とセルは上層の切替後に判定し、共有列の終了条件に route01 を混ぜない。510/TEST sense/scratch、50C bit28・CR1A bit3/5・680A24 全bit の照合は復活させず、AR/DAC の副作用読取りも増やさない（`O/docs/POLICY_DEBUG.md:1585–1590`）。
 
 GUI=1拒否・GUI≠1許可（省略時0）、GUI 起動・CUI 描画アプリ起動の各場合で、起動 1 回につき最初の gfx_init で 1 回だけ devinit、dirty/pitch/palette、CLIENT は PEGC/GF 一方だけ、pc98 fallback、decode不明時98無書込み、shutdown→再init、部品欠落/KDEBUG=0。NP21/W は GF 無し拒否と98/PEGC/Cirrus退行
-
-## 索引
-
-- [docs/design/drivers/video/geforce/](README.md)

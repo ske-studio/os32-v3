@@ -10,7 +10,3 @@ PROM は BAR0 から既存の二重読み/header/checksum/既知 script 検査�
 共有 parser は一つ。診断用出力/接続・lifetime/stages・owner/lease は元の場所に残す。
 KDEBUG=0 fake 起動、初回 Command 書込みは 1 回・BAR 書込みは 0、0x0106→0x0102 の 16bit 確認と不一致時の停止、A2/main順・期限・各失敗出口、選択中 gfinit 拒否、再 devinit 無し
 初期化中 ROM は最大既存 GF_ROM_MAX、runner の有限作業域を使い、limits/基準値を値コピーした後に ROM と作業域を解放する。本番再 modeset は ROM に依存しない。
-
-## 索引
-
-- [hwdev/gf/](README.md)

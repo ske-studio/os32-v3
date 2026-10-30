@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 75 CONDITION | I:1802 `init_condition` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

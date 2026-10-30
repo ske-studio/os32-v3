@@ -3,7 +3,3 @@
 ソース: `kdebug/gfinit_pll.c`
 
 共通 solver は一つ。
-
-## 索引
-
-- [hwdev/gf/](../hwdev/gf/README.md)

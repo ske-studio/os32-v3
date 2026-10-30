@@ -11,7 +11,3 @@ prepare は識別/資源確認だけ。init で `video_start`→初回転送→9
 表示中の転送/palette/再 enter 失敗も stop→route00→既存 GUI 終了境界→面の再結線へ進む。使用中の GUI の下で寸法の違う BB へ即時に差し替えず、KAPI の void 型は維持する。
 
 GUI=1拒否・GUI≠1許可（省略時0）、GUI 起動・CUI 描画アプリ起動の各場合で、起動 1 回につき最初の gfx_init で 1 回だけ devinit、dirty/pitch/palette、CLIENT は PEGC/GF 一方だけ、pc98 fallback、decode不明時98無書込み、shutdown→再init、部品欠落/KDEBUG=0。NP21/W は GF 無し拒否と98/PEGC/Cirrus退行
-
-## 索引
-
-- [./](../../../README.md)

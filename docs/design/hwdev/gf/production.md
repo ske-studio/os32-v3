@@ -3,7 +3,3 @@
 ソース: `hwdev/gf/production.h`
 
 **ID 10de:0221・subsys 10fc:1270、Ra266 の 0:13.0 に限り** BAR0=16 MiB、BAR1=256 MiB、BAR2=16 MiB の定数長を使う（F6、`O/tools/accept/gf_a4.md:25`）。長さは既知ボードの測定値であり任意の同系列製品へ一般化しない。
-
-## 索引
-
-- [hwdev/gf/](README.md)

@@ -9,7 +9,3 @@
 start-offset は BAR1 相対 byte、0 だけ成功、非零は NOSYS。
 mode ID と配列 index は区別する。
 情報取得は I/O・割当て・再初期化をせず、失敗時 out をゼロにする。
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

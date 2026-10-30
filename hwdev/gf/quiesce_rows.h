@@ -1,4 +1,4 @@
-/* Existing PC-98 coexistence sequence, recover_gf.c / GF_DRIVER_DESIGN §4-3. */
+/* Existing PC-98 coexistence sequence, recover_gf.c / docs/design/hwdev/gf/quiesce_rows.md. */
 #ifndef GF_QUIESCE_ROWS_H
 #define GF_QUIESCE_ROWS_H
 #define GF_PMC_IRQ 0x140U

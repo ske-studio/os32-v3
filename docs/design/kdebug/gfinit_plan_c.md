@@ -4,7 +4,3 @@
 
 record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必須 CHECK と任意観測を区別し、全レジスタ readback を追加しない。
 診断の node 生成接続、446 の呼出し、rows/build/control/vram/color は元の場所に残す（N3）。
-
-## 索引
-
-- [hwdev/gf/](../hwdev/gf/README.md)

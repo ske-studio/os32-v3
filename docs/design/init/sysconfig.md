@@ -3,7 +3,3 @@
 ソース: `init/sysconfig.c`
 
 **`GFX=geforce` は `GUI≠1` のとき許す**（F5・N4）。起動予約前に既存の設定読取りで判定し、GUI=1 なら拒否して pc98 を選ぶ。GUI 省略時は既定値 0（`O/init/kernel.c:521`）。
-
-## 索引
-
-- [./](../../../README.md)

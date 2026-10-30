@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 74 TIME | I:1781 `init_time` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

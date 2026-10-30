@@ -5,8 +5,3 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 5F COPY_NV_REG | I:1415 `init_copy_nv_reg` |
-
-
-## 索引
-
-- [hwdev/gf/op/](README.md)

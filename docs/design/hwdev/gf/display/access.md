@@ -3,7 +3,3 @@
 ソース: `hwdev/gf/display/access.h`
 
 read/write の別名、AR の FF reset→index→data、DAC の write-only auto-increment、LIVE RMW の実行時読取り、既存の幅/範囲/有限待ちを保持する。
-
-## 索引
-
-- [hwdev/gf/display/](README.md)

@@ -12,10 +12,3 @@ HAL に GF のレジスタ・ROM・recover token を出さない。
 context は head/skip、有限の呼出し/反復 stack、ROM 借用参照、既存上限・時計・`gf_io`。bus は read/write（BAR/offset/width/値）、wait_us、point、局所復元。診断の記録・承認は adapter が担当する。
 CLIENT は PEGC/GF のどちらか一つの 300 KiB。BAR1 の DISPLAY は MMIO で RAM の CLIENT と別。初期化中 ROM は最大既存 GF_ROM_MAX、runner の有限作業域を使い、limits/基準値を値コピーした後に ROM と作業域を解放する。本番再 modeset は ROM に依存しない。
 診断の常駐 ROM/plan/lease は別の起動で既存寿命を維持する。
-## 索引
-
-- [hwdev/gf/](README.md)
-- [hwdev/gf/runner.c](runner.md)
-- [hwdev/gf/save.c](save.md)
-- [hwdev/gf/pll.c](pll.md)
-- [include/video_service.h](../../include/video_service.md)

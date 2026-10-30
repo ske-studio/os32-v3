@@ -1,4 +1,4 @@
-/* Production startup: GF_DRIVER_DESIGN §4-2. A2 order is the existing
+/* Production startup: docs/design/hwdev/gf/devinit.md. A2 order is the existing
  * recover_gf_prepare_plan (recover_gf.c:410), without plan/approval machinery.
  * main0..4, baseline, calc, load_state and required CHECK remain in service.c. */
 #include "production.h"
