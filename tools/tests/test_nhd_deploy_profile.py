@@ -48,6 +48,7 @@ class ProfileTests(unittest.TestCase):
         self.patches.enter_context(patch.object(nd, 'do_mount', self.mount_image))
         self.patches.enter_context(patch.object(nd, 'do_umount', self.umount_image))
         self.patches.enter_context(patch.object(nd, 'legacy_pt_guard', lambda **kw: True))
+        self.patches.enter_context(patch.object(nd.np21w_ctl.Ctl, 'split_procs', return_value=([], [])))
         self.patches.enter_context(patch.object(nd, 'do_write_boot', lambda _p: True))
         self.patches.enter_context(patch.object(nd.subprocess, 'run', self.command))
 
