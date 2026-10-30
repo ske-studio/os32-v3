@@ -36,6 +36,7 @@ check-dep-dir-a-l08-host:
 - sdk/rust/os32api/src/kapi_generated.rs
 - hwdev/generated/hwdev_contract.h
 - exec/exec.c
+- exec/exec_image.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c

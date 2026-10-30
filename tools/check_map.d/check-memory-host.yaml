@@ -36,6 +36,7 @@ check-memory-host:
 - exec/lease.c
 - exec/appslot.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appmem.c
 - mm/shlib.c
 - init/kernel.c

@@ -12,6 +12,7 @@ check-raw-wait-host:
 - exec/appslot.h
 - exec/appslot.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec.h
 - exec/exec_heap.c
 - exec/exec_kapi_init.inc

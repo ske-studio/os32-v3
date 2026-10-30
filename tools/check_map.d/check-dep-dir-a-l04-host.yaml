@@ -21,6 +21,7 @@ check-dep-dir-a-l04-host:
 - tools/check_map.d/check-dep-dir-a-l04-host.yaml
 - build/checks.d/check-dep-dir-a-l04-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c

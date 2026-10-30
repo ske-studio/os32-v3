@@ -13,6 +13,7 @@ check-trim-kernel-host:
 - exec/appslot.c
 - exec/appslot.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/ring3_str.c
 - exec/exec.h

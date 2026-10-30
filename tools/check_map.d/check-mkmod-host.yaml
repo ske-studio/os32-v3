@@ -7,6 +7,7 @@ check-mkmod-host:
 - tools/tests/exec_selftest_host.c
 - tools/tests/test_exec_selftest.py
 - exec/exec.c
+- exec/exec_image.inc
 - exec/ring3_str.c
 - exec/os32x_hdr.c
 - exec/ring3_ls.S

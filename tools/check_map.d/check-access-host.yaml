@@ -2,6 +2,7 @@ check-access-host:
 - exec/ring3_ls.h
 - kernel/v86/v86.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/redir_access.c
 - tools/tests/caller_access_host.c

@@ -10,6 +10,7 @@ check-sqlite-engine-host:
 - lib/sqlite3/sqlite_stack.asm
 - lib/sqlite3/os32_sqlite_test.c
 - exec/exec.c
+- exec/exec_image.inc
 - arch/x86/kernel/isr_handlers.c
 - init/kernel.c
 - kapi/kapi_db.c

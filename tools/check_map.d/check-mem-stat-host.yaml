@@ -10,6 +10,7 @@ check-mem-stat-host:
 - sdk/kapi.json
 - kapi/kapi_generated.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.c
 - exec/lease.c
 - exec/appslot.h

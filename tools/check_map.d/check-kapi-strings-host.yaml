@@ -2,6 +2,7 @@ check-kapi-strings-host:
 - kapi/kapi_strings.c
 - include/kapi_strings.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/ring3_ls.c
 - exec/redir_access.c

@@ -11,6 +11,7 @@ check-font-guard-host:
 - mm/kmalloc.c
 - arch/x86/kernel/setjmp.asm
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.h
 - include/**
 - arch/x86/**

@@ -1,6 +1,7 @@
 check-disk-auth-host:
 - lib/sqlite3/generated/*
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec.h
 - exec/appslot.h
 - exec/redir_access.c

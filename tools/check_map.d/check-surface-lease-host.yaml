@@ -39,6 +39,7 @@ check-surface-lease-host:
 - tools/check_kapi_version.py
 - docs/KAPI_SPEC.md
 - exec/exec.c
+- exec/exec_image.inc
 - README.md
 - docs/INDEX.md
 - exec/exec_kapi_init.inc

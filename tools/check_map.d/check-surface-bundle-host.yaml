@@ -5,6 +5,7 @@ check-surface-bundle-host:
 - sdk/include/os32/ls.h
 - exec/access_walk.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/lease.c
 - exec/redir_access.c

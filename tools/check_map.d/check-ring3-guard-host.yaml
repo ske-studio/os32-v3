@@ -1,6 +1,7 @@
 check-ring3-guard-host:
 - tools/tests/host32.py
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/ring3_str.c
 - fs/fd_redirect.c

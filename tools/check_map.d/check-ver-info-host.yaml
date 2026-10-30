@@ -20,6 +20,7 @@ check-ver-info-host:
 - drivers/sound/cs4231/pcm_cs4231.h
 - drivers/char/serial.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - gfx/gfx_core.c
 - include/bootinfo.h
