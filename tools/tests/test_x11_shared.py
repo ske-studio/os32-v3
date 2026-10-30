@@ -5,6 +5,7 @@ Park/resume uses production exec/AppSlot functions and setjmp.asm, sharing the
 function-extraction tool with test_exec_r1. IME state is the real resident state.
 Mutations must compile and fail at their named runtime assertion.
 """
+from kernel_includes import include_flags
 import argparse
 import os
 import pathlib
@@ -58,9 +59,7 @@ def run(mutation=None):
         assert getter
         (work / 'exec_result.inc').write_text(
             'static int g_last_kind, g_last_code;\n' + getter[0])
-        includes = ['-I' + str(work)] + ['-I' + str(ROOT / p) for p in (
-            'tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
-            'kernel', 'drivers', 'lib', 'sdk/include/os32', 'exec', 'fs')]
+        includes = ['-I' + str(work)] + ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         exe = work / 'test'
         subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'arch/x86/kernel/setjmp.asm'),
                         '-o', str(work / 'setjmp.o')], check=True)

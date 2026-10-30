@@ -1,4 +1,5 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
+from kernel_includes import include_flags
 import os
 from pathlib import Path
 import subprocess
@@ -48,8 +49,7 @@ def main():
         def build(source):
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-fno-pie', '-nostdlib', '-static', '-no-pie',
-                            '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
-                            '-I' + str(ROOT / 'platform/pc98'),
+                            *include_flags(ROOT),
                             '-DTICK_SOURCE="' + str(source) + '"',
                             str(ROOT / 'tools/tests/tick_host.c'), '-o', str(exe)], check=True)
         build(ROOT / 'kernel/irq/tick.c')

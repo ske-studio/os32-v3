@@ -103,4 +103,5 @@ check-trim-back-rs-host:
 - include/pointer_service.h
 - include/input_service.h
 - include/kbd.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

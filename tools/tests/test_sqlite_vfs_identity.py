@@ -1,4 +1,5 @@
 """T4b-4: real SQLite callbacks/FD table; runtime mutation failures only."""
+from kernel_includes import include_flags
 import os
 import pathlib
 import shutil
@@ -12,8 +13,7 @@ FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/input_fixture_host.h']
-INC = ['-I' + str(ROOT / p) for p in
-       ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3')]
+INC = include_flags(ROOT)
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
 FD = 'fs/vfs_fd.c'
 MUTANTS = [
@@ -58,7 +58,7 @@ def compile_host(root, obj, exe):
                     '-Wno-unused-parameter', '-Wno-sign-compare',
                     '-Wno-pointer-to-int-cast', '-Wno-missing-field-initializers',
                     '-D__cdecl=', '-Wno-unused-function',
-                    '-I' + str(root), '-I' + str(ROOT), '-I' + str(ROOT / 'kernel'), *INC,
+                    '-I' + str(root),  *include_flags(ROOT), *INC,
                     str(root / 'tools/tests/sqlite_vfs_identity_host.c'), str(obj),
                     '-o', str(exe)], check=True)
 

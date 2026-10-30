@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
+from kernel_includes import include_flags
 import argparse
 from pathlib import Path
 import tempfile
@@ -29,15 +30,13 @@ def main():
         for modified in (False, True) if args.mutate else (False,):
             (tmp / 'console.c').write_text(original.replace(OLD, NEW) if modified else original)
             exe = tmp / ('mutant' if modified else 'normal')
-            includes = ('include', 'arch/x86', 'platform/pc98', 'kernel', 'gfx', 'lib',
-                        'drivers', 'sdk/include/os32', 'exec', 'fs')
             host32.build(['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
                           '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
                           '-Wno-type-limits', '-Wno-missing-field-initializers',
                           '-DCON_SINK_NO_IRQ_LOCK', '-D__KERNEL_BUILD__', '-D__cdecl=',
                           '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
-                          *['-I' + str(ROOT / p) for p in includes],
+                          *include_flags(ROOT),
                           '-nostdlib', '-static', '-no-pie', str(tmp / 'ime_display_host.c'),
                           '-o', str(exe)], check=True)
             result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=30)

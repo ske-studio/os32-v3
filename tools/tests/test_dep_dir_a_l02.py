@@ -2,6 +2,7 @@
 
 --prepare compiles copied substitutions only; it does not execute mutants.
 """
+from kernel_includes import include_flags
 import argparse
 from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
@@ -29,9 +30,8 @@ def build(folder, body):
     exe = folder / 'match'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
-                    *['-I' + str(folder / p) for p in ('include', 'drivers', 'kernel')],
-                    *['-I' + str(ROOT / p) for p in
-                      ('include', 'drivers', 'kernel', 'fs', 'sdk/include/os32')],
+                    *include_flags(folder),
+                    *include_flags(ROOT),
                     str(folder / 'tools/tests/dep_dir_a_l02_host.c'),
                     str(folder / 'platform/pc98/lan_match.c'),
                     str(folder / 'drivers/pci_bind_match.c'), '-o', str(exe)], check=True)

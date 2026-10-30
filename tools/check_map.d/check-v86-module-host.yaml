@@ -78,4 +78,5 @@ check-v86-module-host:
 - kernel/console/display_restore.h
 - include/platform_display.h
 - platform/pc98/display.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -75,4 +75,5 @@ check-pcm-module-host:
 - drivers/ide.h
 - include/pcm_contract.h
 - include/dma_contract.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

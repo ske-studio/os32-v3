@@ -7,6 +7,7 @@
 
 記録: tools/tests/s6p_tdd.md
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -24,10 +25,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-D__cdecl=", "-DMTAR_NO_STDIO"]
 # mtar_freestanding は必ず先頭 — 32bit の glibc ヘッダが無い環境で
 # lib/microtar/microtar.c の <stdio.h> / <stdlib.h> / <string.h> を埋める。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("tools/tests/mtar_freestanding",
-                      "include", "fs", "lib", "kernel", "drivers",
-                      "lib/microtar", "sdk/include/os32")]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('tools/tests/mtar_freestanding', 'lib/microtar')] + include_flags(ROOT))
 SRC = ROOT / "tools/tests/ext2_write_io_host.c"
 TARGET_SRCS = ["fs/ext2_super.c", "fs/ext2_inode.c", "fs/ext2_dir.c",
                "fs/ext2_file.c", "fs/ext2_vfs.c"]

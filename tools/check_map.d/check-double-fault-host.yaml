@@ -37,4 +37,5 @@ check-double-fault-host:
 - include/cpu.h
 - include/platform_emergency.h
 - platform/pc98/emergency.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

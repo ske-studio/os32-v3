@@ -3,6 +3,7 @@
 Mutations compile then fail at runtime. Only the two C sources and fixture are
 copied per variant; headers use the original read-only include paths.
 """
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import subprocess
@@ -71,7 +72,7 @@ def run(src, quiet=False):
         result = subprocess.run([
             "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
             "-Wno-int-to-pointer-cast", "-Wno-pointer-to-int-cast", "-D__cdecl=",
-            *["-I" + str(ROOT / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32", "arch/x86")],
+            *include_flags(ROOT),
             str(host), "-o", str(exe),
         ], capture_output=True, text=True)
         if result.returncode:

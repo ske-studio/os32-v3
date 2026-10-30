@@ -50,4 +50,5 @@ check-access-host:
 - tools/tests/test_surface_query.py
 - tools/tests/surface_query_host.c
 - tools/run_host_group.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

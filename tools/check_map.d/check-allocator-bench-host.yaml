@@ -20,3 +20,4 @@ check-allocator-bench-host:
 - build/checks.d/check-allocator-bench-host.mk
 - tools/check_map.d/check-allocator-bench-host.yaml
 - tools/accept/t3c3.md
+- tools/tests/kernel_includes.py

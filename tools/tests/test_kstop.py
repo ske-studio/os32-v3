@@ -1,6 +1,7 @@
 """GUI STOP A: actual AppSlot/dispatch/park/resume code, ILP32 + runtime mutants.
 R1's existing harness covers both landings, IRQ/fault cleanup and parked WM kill.
 """
+from kernel_includes import include_flags
 import pathlib
 import subprocess
 import sys
@@ -283,7 +284,7 @@ def run(overrides=None):
         d=pathlib.Path(d); (d/'t.c').write_text(code)
         (d/'s.asm').write_text((ROOT/'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
-        inc=['-I'+str(ROOT/p) for p in ('tools/tests','tools/tests/host_arch','include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
+        inc=(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         r=subprocess.run(['gcc','-m32','-std=gnu11','-O0','-Wall','-Werror','-Wno-unused-function',
           '-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-ffreestanding','-fno-pie',
           '-fno-stack-protector','-nostdlib','-static','-no-pie',*inc,str(d/'t.c'),str(d/'s.o'),'-o',str(d/'t')],capture_output=True,text=True)

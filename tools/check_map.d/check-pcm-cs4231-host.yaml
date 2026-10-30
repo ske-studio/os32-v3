@@ -9,3 +9,4 @@ check-pcm-cs4231-host:
 - tools/tests/mutpar.py
 
 - include/pcm_contract.h
+- tools/tests/kernel_includes.py

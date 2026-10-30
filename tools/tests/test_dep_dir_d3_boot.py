@@ -1,4 +1,5 @@
 """D3c B/C: real static table/dispatcher/wrappers and kernel boundary order."""
+from kernel_includes import include_flags
 from pathlib import Path
 import re
 import subprocess
@@ -69,8 +70,8 @@ def build(work, mutation=None):
         kernel[start:end] + '}\n' + child.group())
     exe = work / 'boot'
     cmd = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
-           '-I' + str(work), '-I' + str(work / 'include'), '-I' + str(work / 'kernel')]
-    cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
+           '-I' + str(work), '-I' + str(work / 'include'), *include_flags(work)]
+    cmd += include_flags(ROOT)
     subprocess.run([*cmd, str(ROOT / 'tools/tests/dep_dir_d3_boot_host.c'), '-o', str(exe)], check=True)
     return exe
 

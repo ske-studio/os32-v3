@@ -30,6 +30,7 @@ test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあ�
   python3 -B tools/tests/test_ring3_guard.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_ring3_guard.py --mutate   # 否定側 (写しの上で変異)
 """
+from kernel_includes import include_dirs, include_flags
 import host32
 import pathlib
 import shutil
@@ -40,7 +41,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INC_DIRS = ("include", "arch/x86", "kernel", "lib", "exec", "fs", "sdk/include/os32")
+INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST_SRC = ROOT / "tools/tests/ring3_guard_host.c"
 KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_redirect.c"]
 
@@ -169,7 +170,7 @@ def static_checks(root, quiet=False):
 
 
 def includes(root):
-    return ["-I" + str(root / p) for p in INC_DIRS]
+    return include_flags(root)
 
 
 def run_host(root, tmp, quiet=False):

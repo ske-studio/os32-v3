@@ -86,4 +86,5 @@ check-kdebug-init-host:
 - include/platform_display.h
 - platform/pc98/display_private.h
 - platform/pc98/display.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -2,6 +2,7 @@
 Normal controls run on every requested runner; mutants on the first runner.
 Hardware discovery and port I/O are stubbed, lifecycle and ledger are real.
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
 import hashlib
@@ -157,9 +158,7 @@ static inline void io_wait_n(int n) {(void)n;}
                '-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable',
                '-DPHYSMEM_HOST_TEST=1','-I'+str(tmp)]
         if alt_window: flags.append('-DHOST_ALT_WINDOW=1')
-        flags += ['-I'+str(ROOT/p) for p in ('tools/tests','tools/tests/host_arch','include',
-                  'arch/x86','platform/pc98','kernel','exec','gfx','drivers','lib','fs',
-                  'kapi','lib/sqlite3','sdk/include/os32')]
+        flags += (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         exe=tmp/'test'
         inputs = sources
         if object_cache is not None:

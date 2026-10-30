@@ -14,6 +14,7 @@ Make・エミュレータ・ネットワークには触らない (Agent は --of
 --target は同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
 別に見る ([C1] GNU11)。
 """
+from kernel_includes import include_flags
 import os
 import signal
 import pathlib
@@ -28,8 +29,7 @@ GENERATED = ROOT / "kapi/kapi_generated.c"
 
 # ヘッダは実物の置き場を通す。ホストに持ち込めないものは net_link_host.c が
 # **include ガードを先に define して**中身を自前のものに差し替える。
-INC = ["-I" + str(ROOT / p) for p in ("include", "net", "kapi", "lib", "kernel",
-                                      "drivers", "exec", "fs", "sdk/include/os32", "platform/pc98")]
+INC = include_flags(ROOT)
 FLAGS = ["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror",
          "-Wno-pointer-to-int-cast",
          "-Wno-unused-parameter"]
@@ -42,10 +42,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_KERNEL と
 # 同じものをここでも渡す (ホスト側は LINK_HOST_TEST で io.h を外すので不要
 # だが、--target はカーネルと同じ素性で組むので要る)。
-TARGET_INC = ["-I" + str(ROOT / p) for p in
-              (".", "include", "arch/x86", "platform/pc98",
-               "sdk/include", "sdk/include/os32", "kernel",
-               "drivers", "net", "fs", "exec", "gfx", "lib", "kapi", "lib/sqlite3")]
+TARGET_INC = include_flags(ROOT)
 
 
 def argptr_defines():

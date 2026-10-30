@@ -1,4 +1,5 @@
 """Host dispatch regression: no emulator, shared build, or device access."""
+from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
 import tempfile
@@ -16,8 +17,7 @@ class NativeBootTest(unittest.TestCase):
         command = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
                    "-Wno-unused-function", "-D__KERNEL_BUILD__",
                    "-Wl,--gc-sections"]
-        command += ["-I" + str(ROOT / p) for p in
-                    ("include", "sdk/include", "sdk/include/os32", "gfx", "lib", "kernel")]
+        command += include_flags(ROOT)
         command += [str(ROOT / "tools/tests/boot_splash_native_host.c"),
                     "-o", str(cls.binary)]
         subprocess.run(command, cwd=ROOT, check=True)

@@ -1,6 +1,7 @@
 """KMOD validation, independent wire fixtures and real GNU11 ILP32 C.
 記録: tools/tests/module_image_tdd.md
 """
+from kernel_includes import include_flags
 import os
 from pathlib import Path
 import struct
@@ -21,7 +22,7 @@ FLAGS = ["-m32", "-march=i386", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werro
 def build_validator(directory, source=None):
     exe = Path(directory) / "module-validator"
     subprocess.run(["gcc", *FLAGS, "-nostdlib", "-static", "-no-pie",
-                    "-I" + str(ROOT / "include"), "-I" + str(ROOT / "kernel"),
+                     *include_flags(ROOT),
                     str(HARNESS), str(source or TARGET_SRC), "-o", str(exe)], check=True)
     return exe
 

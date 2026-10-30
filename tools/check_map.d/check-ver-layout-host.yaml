@@ -7,3 +7,4 @@ check-ver-layout-host:
 - tools/tests/host32.py
 - build/checks.d/check-ver-layout-host.mk
 - tools/check_map.d/check-ver-layout-host.yaml
+- tools/tests/kernel_includes.py

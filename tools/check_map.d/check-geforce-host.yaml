@@ -103,4 +103,5 @@ check-geforce-host:
 - tools/check_map.d/check-dep-dir-d-console-host.yaml
 - tools/tests/dep_dir_d_console_host.c
 - tools/tests/fixtures/dep_dir_d/*
+- tools/tests/kernel_includes.py
 artifact_reader: true

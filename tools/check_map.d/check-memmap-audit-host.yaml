@@ -68,4 +68,5 @@ check-memmap-audit-host:
 - arch/x86/kernel/cpu_flags.inc
 - arch/x86/kernel/entry_layout.inc
 - kernel/console/display_restore.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

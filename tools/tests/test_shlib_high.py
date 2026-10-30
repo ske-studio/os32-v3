@@ -1,4 +1,5 @@
 """T2c actual shlib and paging/ledger, fragmented supply and rollback (ILP32)."""
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -28,9 +29,7 @@ def run(mutation=None):
         allocator = (ROOT / 'mm/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
-        includes = ['-I' + str(ROOT / p)
-                    for p in ('include', 'arch/x86', 'platform/pc98', 'kernel',
-                              'lib', 'exec', 'fs', 'sdk/include/os32')] + ['-I' + str(tmp)]
+        includes = include_flags(ROOT) + ['-I' + str(tmp)]
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',

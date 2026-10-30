@@ -2,6 +2,7 @@
 """T2f f1b real nano connection. Log: tools/tests/nano_adapter_tdd.md
 段: T2f f1b
 """
+from kernel_includes import include_flags
 import argparse
 import importlib.util
 import os
@@ -99,8 +100,7 @@ static void resident_handoff(AppSlot *ctx, u32 sbrk_end, u32 exec_heap_base,
     int is_shell = 1;
 ''' + source[start:end] + '\n}')
     (work / 'resident_exec.inc').write_text('\n'.join(parts))
-    inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'include', 'kernel',
-           'exec', 'lib', 'sdk/allocator', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
+    inc = (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'sdk/allocator')] + include_flags(ROOT))
     objects = []
     for rel in ('tools/tests/resident_heap_host.c', 'exec/exec_heap.c', 'mm/kmalloc.c'):
         obj = work / (Path(rel).stem + '.o')

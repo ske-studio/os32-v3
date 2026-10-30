@@ -12,6 +12,7 @@ test_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと�
 カーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に見る
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -21,8 +22,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "arch/x86", "kernel", "lib", "exec", "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 HOST_SRC = ROOT / "tools/tests/ring3_str_host.c"
 KERNEL_SRC = ROOT / "exec/ring3_str.c"
 

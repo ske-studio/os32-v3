@@ -11,3 +11,4 @@ check-bootlog-host:
 - fs/vfs_name_rules.inc
 - tools/check_map.d/check-bootlog-host.yaml
 - build/checks.d/check-bootlog-host.mk
+- tools/tests/kernel_includes.py

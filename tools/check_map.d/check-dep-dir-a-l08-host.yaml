@@ -63,4 +63,5 @@ check-dep-dir-a-l08-host:
 - tools/tests/dep_dir_a_l05a_host.c
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -3,6 +3,7 @@
 The small verdict harness is LP64; shutdown's real ILP32 gfx harness is run
 separately by test_shutdown_probe.py through host32 (qemu in Codex).
 """
+from kernel_includes import include_flags
 import argparse
 import importlib.util
 import json
@@ -62,7 +63,7 @@ def run_harness(mutation=None, pipe_mutation=None):
         exe = tmp / 'h3b'
         command = ['gcc', '-std=gnu11', '-D__cdecl=', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
                    '-I' + str(tmp)]
-        command += ['-I' + str(ROOT / p) for p in ('sdk/include/os32', 'include', 'fs', 'kernel', 'exec')]
+        command += include_flags(ROOT)
         subprocess.run(command + [str(ROOT / 'tools/tests/h3b_fixtures_host.c'), '-o', str(exe)],
                        check=True, cwd=ROOT)
         return subprocess.run([str(exe)], capture_output=True, text=True, check=False)

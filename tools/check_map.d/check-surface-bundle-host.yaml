@@ -48,4 +48,5 @@ check-surface-bundle-host:
 - tools/tests/test_kcallback.py
 - userland/rust/libos32gui/src/cfgro.rs
 - userland/tests/kcallback_test.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

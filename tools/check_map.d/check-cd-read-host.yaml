@@ -33,3 +33,4 @@ check-cd-read-host:
 - drivers/ide.h
 - include/ide_contract.h
 - include/platform_device.h
+- tools/tests/kernel_includes.py

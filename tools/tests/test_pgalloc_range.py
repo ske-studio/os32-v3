@@ -1,4 +1,5 @@
 """A0 real-source ILP32 harness; no Make, emulator, deployment or libc needed."""
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -16,9 +17,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "lib")]
+INCLUDES = include_flags(ROOT)
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-a0-") as tmp:

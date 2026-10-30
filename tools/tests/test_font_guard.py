@@ -5,6 +5,7 @@ gone (integer raster); the section, reentry/IRQ/exception BUSY, STOP/park and
 fault attribution stay. The compiled guard is checked to hold no x87
 instruction (counted by mnemonic in `objdump -d`, design G-4).
 """
+from kernel_includes import include_flags
 from pathlib import Path
 import re
 import subprocess
@@ -40,7 +41,7 @@ def run(parts, work, name, expected=None):
                            ('page_fault_handler', '    /* 画面上部をクリア')))
     (work / 'fault.inc').write_text('#include "idt.h"\n' + handlers.replace('    const char *name;', '    (void)error_code;\n    const char *name;'))
     exe=work/'test'
-    inc=['-I'+str(ROOT/p) for p in ('tools/tests/host_arch','include','kernel','exec','fs','lib','gfx','drivers','arch/x86','platform/pc98','sdk/include/os32')]
+    inc=['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
     cmd=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
          '-Wno-unused-variable','-Wno-unused-function','-ffreestanding','-fno-builtin',
          '-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie',

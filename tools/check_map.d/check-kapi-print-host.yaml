@@ -28,4 +28,5 @@ check-kapi-print-host:
 - userland/tests/kprint_boundary.c
 - build/checks.d/check-kapi-print-host.mk
 - tools/check_map.d/check-kapi-print-host.yaml
+- tools/tests/kernel_includes.py
 artifact_reader: true

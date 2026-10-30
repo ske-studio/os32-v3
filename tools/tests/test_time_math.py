@@ -16,6 +16,7 @@
   python3 -B tools/tests/test_time_math.py --target   # + i386-elf で ktime.c も通す
   python3 -B tools/tests/test_time_math.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import subprocess
@@ -39,7 +40,7 @@ CASES = ["decide_table", "us_math", "no_u32_overflow", "monotonic",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "kernel")]
+INCLUDES = include_flags(ROOT)
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
@@ -86,8 +87,8 @@ def host_build(tmp, source_text=None):
     exe = src_dir / "time-math-host"
     cmd = ["gcc", *FLAGS, *INCLUDES, str(HARNESS), "-o", str(exe)]
     if source_text is not None:
-        mut = src_dir / "kernel"
-        mut.mkdir(exist_ok=True)
+        mut = src_dir / SRC.relative_to(ROOT).parent
+        mut.mkdir(parents=True, exist_ok=True)
         (mut / "time_math.c").write_text(source_text, encoding="utf-8")
         (mut / "time_math.h").write_text(
             (ROOT / "kernel/time/time_math.h").read_text(encoding="utf-8"),
@@ -97,8 +98,8 @@ def host_build(tmp, source_text=None):
             HARNESS.read_text(encoding="utf-8").replace(
                 '"../../kernel/time/time_math.c"', '"kernel/time/time_math.c"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
-               "-I" + str(mut), str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
+               *include_flags(ROOT), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -118,12 +119,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", 
+               "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "kernel"),
-               "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
+                *include_flags(ROOT),
                *extra, "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

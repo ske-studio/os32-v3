@@ -38,4 +38,5 @@ check-c-dialect:
 - kernel/module/kdebug_imports.def
 - tools/mkmod.py
 - tools/module_schema.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

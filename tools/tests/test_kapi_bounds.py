@@ -1,6 +1,7 @@
 """Real console/FM bounds regression. Copies only for mutations.
 Record: tools/tests/kapi_bounds_tdd.md.
 """
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import subprocess
@@ -42,8 +43,7 @@ def run(runner, mutation=None):
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__']
         cmd += ['-I' + str(work)]
-        cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-            'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'sdk/include/os32', 'kapi', 'exec', 'fs', 'gfx', 'lib/sqlite3')]
+        cmd += ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         p = subprocess.run(cmd + [str(ROOT / 'tools/tests/kapi_bounds_host.c'), '-o', str(exe)],
                            capture_output=True, text=True)
         assert p.returncode == 0, p.stderr

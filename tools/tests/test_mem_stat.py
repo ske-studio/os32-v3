@@ -4,6 +4,7 @@ The appmem_map/exec_heap fixture supplies only host MMU/IRQ and side effects.
 Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
 import pathlib
@@ -78,7 +79,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
         'static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;')
     (tmp / 'arch_io.h').write_text(io)
     for name in ('paging', 'pgalloc'):
-        (tmp / (name + '_source.c')).write_text(read('kernel/' + name + '.c'))
+        (tmp / (name + '_source.c')).write_text(read('mm/' + name + '.c'))
     parts = [function(exe, sig) for sig in
              ('void exec_addrspace_abort(', 'void ring3_abort_check(', 'static void exec_teardown_app(')]
     resume = function(exe, 'i32 exec_resume(')
@@ -110,8 +111,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
             '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
             '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1',
             *linker_flags(), '-I' + str(tmp),
-            *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', '.', 'include',
-                'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'fs', 'sdk/include/os32', 'tools/tests')]]
+            *(['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))]
 
 
 MUTANTS = [

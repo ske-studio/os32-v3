@@ -185,4 +185,5 @@ check-memory-host:
 - platform/pc98/boot.c
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

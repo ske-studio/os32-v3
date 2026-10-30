@@ -21,3 +21,4 @@ check-kpeek-host:
 - kdebug/kdebug_window.h
 - kdebug/recover.h
 - include/pci_dev_contract.h
+- tools/tests/kernel_includes.py

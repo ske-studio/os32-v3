@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T5a-1 B2 production facade/dictionary, ordinary failures and lifetime mutants."""
+from kernel_includes import include_flags
 import argparse
 import os
 from pathlib import Path
@@ -86,9 +87,7 @@ def main():
                           '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
                           '-Wno-type-limits', '-Wno-missing-field-initializers', '-Wno-maybe-uninitialized',
                           '-I' + str(work), '-I' + str(work / 'ime_shim'),
-                          *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                            'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'lib/sqlite3',
-                            'sdk/include/os32', 'exec', 'fs', 'tools/tests')],
+                          *(['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT)),
                           str(work / 'fep_boundary_host.c'),
                           str(ROOT / 'tools/tests/fep_budget_linux.c'), str(work / 'sqlite.o'),
                           '-lm', '-o', str(exe)], check=True)

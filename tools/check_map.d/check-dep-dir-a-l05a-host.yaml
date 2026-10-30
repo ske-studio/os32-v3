@@ -50,4 +50,5 @@ check-dep-dir-a-l05a-host:
 - tools/tests/shm_user_host.c
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
+- tools/tests/kernel_includes.py
 artifact_reader: true

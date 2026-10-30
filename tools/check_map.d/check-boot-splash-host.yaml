@@ -12,3 +12,4 @@ check-boot-splash-host:
 - lib/serial_diag.h
 - include/platform_splash.h
 - platform/pc98/splash.c
+- tools/tests/kernel_includes.py

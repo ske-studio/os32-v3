@@ -1,4 +1,5 @@
 """T3ab-B direct product entry/stack fixture, invoked by VK32 tests."""
+from kernel_includes import include_flags
 import pathlib
 import re
 
@@ -108,7 +109,7 @@ static void check_fault_return(void)
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-ffreestanding', '-fno-builtin',
            '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
            '-Wall', '-Wextra', '-Werror',
-           *['-I' + str(p) for p in (work, ROOT, ROOT / 'include', ROOT / 'kernel', ROOT / 'lib')],
+           *['-I' + str(work), *include_flags(ROOT)],
            work / 'host.c', work / 'entry.o', work / 'sqlite_stack.o', work / 'setjmp.o', '-o', work / 'host']
     for name in ('__bss_start', '__bss_end', '__kernel_resident_end'):
         host_name = 'fixture_bss_start' if name == '__bss_start' else name

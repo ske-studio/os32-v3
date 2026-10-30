@@ -1,4 +1,5 @@
 """R1 recovery probes: real lifecycle slices and real SDK/lease attachment."""
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import re
 import subprocess
@@ -56,8 +57,7 @@ def recovery(tmp, function, runner, mutation=None):
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
              '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
              '-Wl,--gc-sections', '-DOS32_R1_FIXTURE', '-DPHYSMEM_HOST_TEST=1', '-I'+str(tmp)]
-    flags += ['-I'+str(ROOT/p) for p in ('tools/tests/host_arch','tools/tests','include',
-             'arch/x86','platform/pc98','kernel','exec','gfx','drivers','lib','sdk/include/os32')]
+    flags += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
     result = host32.build(flags + [str(ROOT/'tools/tests/r1_recovery_host.c'),
                          str(ROOT/'mm/physmem.c'), '-o', str(tmp/'recovery')],
                          capture_output=True, text=True)

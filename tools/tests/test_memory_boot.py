@@ -12,6 +12,7 @@ sys_frozen_exec を workspace_first に戻す) と、FIXED / ARENA_TOP の境界
 backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED になることを見る。
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -90,6 +91,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         # Keep the platform descriptor relative to the copied kernel header,
         # including in mutation stages (N1).
         (d / 'kernel').mkdir()
+        (d / 'include').mkdir()
+        (d / 'mm').mkdir()
         (d / 'platform/pc98').mkdir(parents=True)
         for rel in ('include/platform_memory.h',
                     'platform/pc98/platform_memory_desc.h'):
@@ -105,7 +108,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
                 raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
             texts[rel] = texts[rel].replace(old, new, 1)
         for unit in ('paging', 'pgalloc', 'sys'):
-            s = texts[f'kernel/{unit}.c']
+            s = texts['kernel/sys.c' if unit == 'sys' else f'mm/{unit}.c']
             s = s.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
             (d / 'kernel' / f'{unit}_host_source.c').write_text(s)
         # 写しの memmap.h を -I の先頭に置く (変異を当てたときだけ中身が違う)。
@@ -141,7 +144,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
         cmd += ['-I' + str(d / 'kernel'), '-I' + str(d / 'platform/pc98'), '-I' + str(d), '-I' + str(ROOT / 'tools/tests/host_arch')]
-        cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
+        cmd += include_flags(ROOT)
         # physmem.c も写しから組む ("memmap.h" を同じ写しで引かせるため)。
         physmem = d / 'mm/physmem.c'
         physmem.write_text((ROOT / 'mm/physmem.c').read_text())
@@ -257,7 +260,7 @@ class MemoryBoot(unittest.TestCase):
         callers = []
         # 1 本の文字列で持つ (tools/check_select.py の入力の推定が、裸の
         # ディレクトリ名を -I の探索先と取り違えないように)。
-        for top in 'kernel drivers gfx exec fs kapi lib net arch platform'.split():
+        for top in 'init mm kernel drivers gfx exec fs kapi lib net arch platform'.split():
             base = ROOT / top
             if not base.is_dir():
                 continue

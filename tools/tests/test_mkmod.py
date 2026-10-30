@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Real i386 link -> KMOD -> C validator; generator failures and mutation controls."""
+from kernel_includes import include_flags
 import argparse
 import importlib.util
 import json
@@ -87,9 +88,7 @@ scratch: .zero 8
         obj = src.with_suffix('.o')
         command([cross / 'i386-elf-gcc', '-m32', '-march=i386', '-ffreestanding',
                  '-O2', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__',
-                 *['-I' + str(ROOT / d) for d in ('.', 'include', 'kernel', 'drivers',
-                    'exec', 'lib', 'gfx', 'fs', 'kapi', 'arch/x86',
-                    'platform/pc98', 'sdk/include/os32')], '-c', src, '-o', obj])
+                 *include_flags(ROOT), '-c', src, '-o', obj])
         objs.append(obj)
     elf = directory / 'module.elf'
     command([cross / 'i386-elf-ld', '-m', 'elf_i386', '--emit-relocs',

@@ -11,6 +11,7 @@ then checks that folding ID 2 frees only ID 2's redirect / pipe / SHM.
 Same harness shape as test_db_errstr.py: tiny shim headers in a temp dir,
 one host binary, no Make / emulator / VFS.
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import subprocess
@@ -62,13 +63,10 @@ class OwnerReclaimTests(unittest.TestCase):
             exe = tmp / "owner-reclaim"
             command = [
                 "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
-                "-Wno-unused-parameter", 
+                "-Wno-unused-parameter",
                 "-D__cdecl=", "-I" + str(ROOT / "tools/tests"),
                 "-I" + str(tmp),
-                "-I" + str(ROOT / "sdk/include/os32"),
-                "-I" + str(ROOT / "include"),
-                "-I" + str(ROOT / "fs"),
-                "-I" + str(ROOT / "kernel"),
+                *include_flags(ROOT),
                 str(ROOT / "tools/tests/owner_reclaim_host.c"), "-o", str(exe),
             ]
             subprocess.run(command, check=True, cwd=ROOT)

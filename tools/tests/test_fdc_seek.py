@@ -10,6 +10,7 @@
   python3 -B tools/tests/test_fdc_seek.py --target   # + i386-elf で fdc.c も通す
   python3 -B tools/tests/test_fdc_seek.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import subprocess
@@ -30,7 +31,7 @@ CASES = ["sis_len", "seek_ok", "seek_ec", "seek_pending", "seek_fail",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers")]
+INCLUDES = include_flags(ROOT)
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (パターン, 置換, 説明)
@@ -88,12 +89,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", 
+               "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "drivers"),
-               "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "kernel"),
+                *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

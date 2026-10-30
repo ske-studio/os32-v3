@@ -1,6 +1,7 @@
 """T4a-5 actual module transaction core under ILP32.
 記録: tools/tests/module_runtime_tdd.md
 """
+from kernel_includes import include_flags
 import os
 from pathlib import Path
 import struct
@@ -16,9 +17,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'kernel/module/module_runtime.c'
-INCLUDES = ['-I' + str(ROOT / d) for d in
-            ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32', 'exec', 'drivers')]
+INCLUDES = include_flags(ROOT)
 
 
 def image():

@@ -1,4 +1,5 @@
 """Real source ILP32 tests for cursor, FM/SSG, input STOP and rshell authority."""
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import re
@@ -109,8 +110,7 @@ def run(runner, mutation=None, case=0, expected=None):
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__',
                '-DOS32_RAW_WAIT_LOG_TICKS=32', '-DAUDIT_CASE=' + str(case), '-I' + str(work)]
-        cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-            'arch/x86', 'platform/pc98', 'kernel', 'gfx', 'drivers', 'lib', 'sdk/include/os32', 'exec', 'fs')]
+        cmd += ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         p = subprocess.run(cmd + [str(ROOT / 'tools/tests/kapi_audit_host.c'), '-o', str(exe)], capture_output=True, text=True)
         assert p.returncode == 0, p.stderr
         p = host32.run([str(exe)], runner=runner, capture_output=True, text=True, timeout=30)

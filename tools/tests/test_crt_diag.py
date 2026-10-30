@@ -4,6 +4,7 @@ Real kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
 記録: tools/tests/crt_diag_tdd.md
 Run: python3 -B tools/tests/test_crt_diag.py [--mutate]
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import subprocess
@@ -18,8 +19,7 @@ SRC = ROOT / "tools/tests/crt_diag_host.c"
 TARGET_SRC = ROOT / "kdebug/crt_diag.c"
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror", "-O2"]
-INCLUDES = ["-I" + str(ROOT / p) for p in
-            (".", "include", "arch/x86", "platform/pc98", "sdk/include/os32", "lib", "kernel", "exec", "drivers", "fs", "gfx")]
+INCLUDES = include_flags(ROOT)
 
 
 def host_cmd(exe):

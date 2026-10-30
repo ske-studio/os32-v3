@@ -4,6 +4,7 @@ Reuse the real driver/wrapper ILP32 fixture, actual SQLite stack/guard and R1
 exec landings. Device IRQ/input and CPU transitions are their explicit seams;
 this check does not claim to execute the NP21/W guest acceptance matrix.
 """
+from kernel_includes import include_flags
 import argparse
 import importlib.util
 import os
@@ -62,8 +63,7 @@ def late_stop(mutate=False):
             (tmp / 'late_stop_exec.inc').write_text(body + '\n' + '\n'.join(
                 lifecycle.function(ex, n) for n in ('ring3_abort_request', 'ring3_abort_check')))
             exe = tmp / 'test'
-            inc = ['-I' + str(root / p) for p in ('tools/tests/host_arch', 'include',
-                   'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32')]
+            inc = (['-I' + str(root / p) for p in ('tools/tests/host_arch',)] + include_flags(root))
             host32.build(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Werror',
                           '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                           '-ffreestanding', '-fno-pie', '-fno-stack-protector',

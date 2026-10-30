@@ -15,6 +15,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --target   # + i386-elf で 3 本を通す
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import mutpar
@@ -142,10 +143,7 @@ def host_build(tmp, mutated=None):
             text = (ROOT / rel).read_text(encoding="utf-8")
         dst.write_text(text, encoding="utf-8")
     cmd = ["gcc", *FLAGS, "-I" + str(SHIM), "-I" + str(src_dir),
-           "-I" + str(ROOT / "include"), "-I" + str(ROOT / "sdk/include/os32"),
-           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "kernel"),
-           "-I" + str(ROOT / "lib"),
-           "-I" + str(ROOT / "userland/shell"), "-I" + str(ROOT),
+           "-I" + str(ROOT / "userland/shell"), *include_flags(ROOT),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
@@ -168,12 +166,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", 
+               "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "kernel"),
-               "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
+                *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

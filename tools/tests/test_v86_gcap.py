@@ -22,6 +22,7 @@ kdebug/v86_test16_gcap.asm を組んだものと同じかも見る (nasm が無�
   python3 -B tools/tests/test_v86_gcap.py --target   # + i386-elf で v86_gcap*.c を通す
   python3 -B tools/tests/test_v86_gcap.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import shutil
@@ -42,7 +43,7 @@ CASES = ["phase_diag", "port_list", "insn", "record_order", "overflow", "in_tabl
 
 # -Wno-attributes: __cdecl は x86-64 のホストでは無視される (警告だけ)。
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("sdk/include/os32", "kernel", "lib", "kdebug", "include")]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
@@ -173,8 +174,8 @@ def host_build(tmp, source_text=None):
             HARNESS.read_text(encoding="utf-8").replace(
                 '"../../kdebug/v86_gcap_math.c"', '"kdebug/v86_gcap_math.c"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "sdk/include/os32"),
-               "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "include"), "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
+               *INCLUDES, str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -252,12 +253,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", 
+               "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               *["-I" + str(ROOT / p) for p in (
-                   ".", "include", "arch/x86", "platform/pc98", "sdk/include",
-                   "sdk/include/os32", "kernel", "drivers", "net", "fs", "exec",
-                   "gfx", "lib", "kapi")],
+               *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

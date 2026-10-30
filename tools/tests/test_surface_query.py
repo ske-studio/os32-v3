@@ -2,6 +2,7 @@
 Fixed low fixture stack; explicit native/qemu execution, no silent fallback.
 Compile failures and signals are never mutation kills.
 """
+from kernel_includes import include_flags
 TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
 from kernel_layout import linker_flags
 import host32
@@ -85,9 +86,7 @@ def main():
               '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
               '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1',
               '-DHOST_HIGH_ENTRY_STACK=1', '-I' + str(tmp),
-              *['-I' + str(ROOT / x) for x in ('tools/tests', 'tools/tests/host_arch',
-                'include', 'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs',
-                'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')]]
+              *(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))]
         for src, obj in [(tmp / 'fixture.c', tmp / 'fixture.o'),
                          (ROOT / 'mm/physmem.c', tmp / 'physmem.o')]:
             host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,

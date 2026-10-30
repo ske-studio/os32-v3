@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Private import ABI generation, compilation and actual nm-set regression tests."""
+from kernel_includes import include_flags
 import argparse
 import copy
 import json
@@ -195,7 +196,7 @@ class ImportsTests(unittest.TestCase):
                 includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx',
                             'fs', 'kapi', 'arch/x86', 'platform/pc98', 'sdk/include/os32']
                 flags = ['-std=gnu11', '-ffreestanding', '-fno-pie', '-D__KERNEL_BUILD__']
-                flags += ['-I' + str(ROOT / d) for d in includes]
+                flags += include_flags(ROOT)
                 for name in ('kdebug_kexports.c', 'kdebug_import_slots.c', 'kdebug_import_stubs.S'):
                     subprocess.run([str(self.cross / 'i386-elf-gcc'), *flags, '-c',
                                     str(out / name), '-o', str(out / (name + '.o'))],
@@ -368,7 +369,7 @@ class ImportsTests(unittest.TestCase):
                 '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                 '-nostdlib', '-static', '-D__KERNEL_BUILD__',
                 '-Wl,--defsym=' + gen.ABI_SYMBOL + '=0',
-                *['-I' + str(ROOT / d) for d in includes], str(probe),
+                *include_flags(ROOT), str(probe),
                 str(out / 'kdebug_import_slots.c'), str(out / 'kdebug_import_stubs.S'),
                 '-o', str(exe)], check=True, capture_output=True)
             self.assertEqual(host32.run([str(exe)], capture_output=True, timeout=60).returncode, 0)
@@ -377,7 +378,7 @@ class ImportsTests(unittest.TestCase):
         includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx', 'fs', 'kapi',
                     'arch/x86', 'platform/pc98', 'sdk/include/os32']
         flags = ['-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-builtin', '-D__KERNEL_BUILD__',
-                 '-Werror=implicit-function-declaration'] + ['-I' + str(ROOT / d) for d in includes]
+                 '-Werror=implicit-function-declaration'] + include_flags(ROOT)
         with tempfile.TemporaryDirectory(prefix='kdebug-imports-') as folder:
             out = Path(folder)
             for stage, count in gen.STAGES.items():

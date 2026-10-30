@@ -2,6 +2,7 @@
 Run: python3 tools/tests/test_physmem.py
 Uses real ILP32 types.h and GNU11 core, no libc/multilib runtime required.
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -45,7 +46,7 @@ void _start(void) {
                 'gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-fno-builtin',
                 '-fno-pie', '-fno-stack-protector', '-nostdlib', '-no-pie',
-                '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
+                 *include_flags(ROOT),
                 str(src), str(ROOT / 'mm/physmem.c'), '-o', str(exe)
             ] + LAYOUT_FLAGS + list(flags), capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -135,7 +136,7 @@ void _start(void) {
 ''')
 
     def test_reserved_wins_both_orders_and_capacity_is_atomic(self):
-        self.run_c(''' 
+        self.run_c('''
     struct physmem m, reverse, before;
     u32 i, count;
     unsigned char *a, *b;

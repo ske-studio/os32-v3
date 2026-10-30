@@ -36,3 +36,4 @@ check-bootinfo-host:
 - boot/boot_defs.h
 - include/bootinfo.h
 - init/boot_disk.h
+- tools/tests/kernel_includes.py

@@ -39,3 +39,4 @@ check-serialfs-host:
 - platform/pc98/system.c
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
+- tools/tests/kernel_includes.py

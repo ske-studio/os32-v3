@@ -17,3 +17,4 @@ check-multiapp-model-host:
 - exec/exec.c
 - exec/appslot.h
 - exec/exec_kapi_init.inc
+- tools/tests/kernel_includes.py

@@ -27,6 +27,7 @@
 復元を抜く) を写しに当て、どれかの試験が RED になることを見る。実物の
 ソースは書き換えない (メモリ上の写しをハーネスへ書き出すだけ)。
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -175,7 +176,7 @@ def run_c(texts, body):
         src = texts['mm/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(PRE + src + POST + body + END)
         cmd = ['gcc', *linker_flags()] + FLAGS + ['-I' + str(tmp)]
-        cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
+        cmd += include_flags(ROOT)
         build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:

@@ -24,6 +24,7 @@ B7 の検出漏れの原因だったので、種別の判定を**消費する側
 --target を付けると i386-elf クロスコンパイラでも fs/vfs.c が -Werror で
 通ることを確かめる。make・エミュレータ・実配備には一切触れない。
 """
+from kernel_includes import include_flags
 import pathlib
 import subprocess
 import sys
@@ -34,9 +35,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-D__cdecl="]
-HOST_INC = ["-I" + str(ROOT / p)
-            for p in ("include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+HOST_INC = include_flags(ROOT)
 
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -47,10 +46,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 
 if __name__ == "__main__":

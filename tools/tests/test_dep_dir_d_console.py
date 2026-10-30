@@ -1,4 +1,5 @@
 """L16a/L16b: immutable pre-move attribute/grid/cursor traces and isolated closure."""
+from kernel_includes import include_flags
 import argparse
 import gzip
 import hashlib
@@ -139,8 +140,7 @@ def grid_command(work, exe, baseline=False):
             '-Werror', '-Wno-sign-compare', *(['-Wno-unused-variable', '-DBASELINE'] if baseline else []),
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
             '-static', '-no-pie', '-D__KERNEL_BUILD__',
-            *['-I' + str(work / p) for p in ('.', 'include', 'arch/x86',
-                 'platform/pc98', 'kernel', 'lib', 'gfx', 'sdk/include/os32')],
+            *include_flags(work),
             str(work / GRID_HARNESS), '-o', str(exe)]
 
 

@@ -7,6 +7,7 @@ list in dep_dir_b_l11_baseline.json. The same C harness/shim records both
 versions. 12b7e2fe and step base 6e880821 have identical kernel/sys.c.
 The first reboot halt returns; the second terminates the host process.
 """
+from kernel_includes import include_flags
 import json
 from pathlib import Path
 import re
@@ -57,7 +58,7 @@ def build(work, enabled, mutation=None, baseline=None):
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
            '-static', '-no-pie', f'-DTEST_IF={enabled}', '-include', 'pc98.h',
-           '-I' + str(work), '-I' + str(work / 'kernel'), '-I' + str(ROOT / 'include'),
+           '-I' + str(work), *include_flags(work), '-I' + str(ROOT / 'include'),
            str(ROOT / 'tools/tests/dep_dir_b_io_host.c')]
     if baseline is None:
         cmd.append(str(work / 'platform/pc98/system.c'))

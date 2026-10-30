@@ -39,3 +39,4 @@ check-dep-dir-b-host:
 - tools/tests/test_dep_dir_b_timer.py
 - tools/tests/dep_dir_b_timer_host.c
 - tools/tests/dep_dir_b_l13_baseline.json
+- tools/tests/kernel_includes.py

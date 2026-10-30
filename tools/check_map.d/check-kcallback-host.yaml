@@ -21,4 +21,5 @@ check-kcallback-host:
 - userland/tests/kcallback_test.c
 - tools/tests/kcallback_result_host.c
 - tools/tests/kernel_layout.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

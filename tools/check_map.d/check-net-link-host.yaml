@@ -18,4 +18,5 @@ check-net-link-host:
 - platform/pc98/device_host.c
 - drivers/np2sysp.h
 - net/link.h
+- tools/tests/kernel_includes.py
 local_only: true

@@ -35,6 +35,7 @@
 恒等の対照を C と Python に 1 本ずつ入れ、それが GREEN であること (試験の枠が
 壊れていないこと) も見る。
 """
+from kernel_includes import include_flags
 import errno
 import importlib.util
 import io
@@ -176,10 +177,8 @@ def session_build(tmp, mutated=None, name="session"):
         text = (mutated or {}).get(rel, (ROOT / rel).read_text(encoding="utf-8"))
         (work / pathlib.Path(rel).name).write_text(text, encoding="utf-8")
     exe = work / "serialfs-session-host"
-    cmd = ["gcc", *flags_for(mutated), "-I" + str(work), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
-           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "kernel"),
-           "-I" + str(ROOT / "sdk/include/os32"),
+    cmd = ["gcc", *flags_for(mutated), "-I" + str(work),
+           *include_flags(ROOT),
            str(SESSION_HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,
                    stderr=subprocess.DEVNULL if mutated is not None else None)
@@ -217,11 +216,10 @@ def build_target(tmp):
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
             "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
             "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-            "-O2", "-Wall", "-Werror", 
+            "-O2", "-Wall", "-Werror",
             "-D__KERNEL_BUILD__"]
-    inc = ["-I.", "-Iinclude", "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-           "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet", "-Ifs",
-           "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+    inc = [
+              *include_flags(ROOT)]
     for rel in ("fs/sfs_proto.c", "fs/sfs_client.c", "fs/serialfs.c",
                 "fs/serialfs_session.c", "drivers/serial.c",
                 "drivers/serial_plan.c"):

@@ -25,4 +25,5 @@ check-kapi-strings-host:
 - tools/tests/mutpar.py
 - build/checks.d/check-kapi-strings-host.mk
 - tools/check_map.d/check-kapi-strings-host.yaml
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -221,4 +221,5 @@ check-ci-stab-host:
 - drivers/kcg.c
 - kernel/kcg_module.c
 - platform/pc98/device_kcg.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

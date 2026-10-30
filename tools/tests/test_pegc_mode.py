@@ -16,6 +16,7 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 --mutate は否定側。順序・値・FIFO 待ち・上限を 1 か所ずつ壊した版を写しの木で
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -31,10 +32,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 # build/config.mk の INC_GFX と同じ探索先。io.h だけを偽物に差し替える。
-TARGET_INCLUDES = ["-I" + str(ROOT / p)
-                   for p in ("include", "arch/x86", "platform/pc98",
-                             "sdk/include/os32",
-                             "gfx", "drivers", "fs", "lib", "kernel")]
+TARGET_INCLUDES = include_flags(ROOT)
 SHIM = "-I" + str(ROOT / "tools/tests/pegc_hostshim")
 SRC = ROOT / "tools/tests/pegc_mode_host.c"
 MUT_TARGET = "gfx/backend_pegc.c"

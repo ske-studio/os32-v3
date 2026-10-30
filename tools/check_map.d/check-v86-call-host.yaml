@@ -10,3 +10,4 @@ check-v86-call-host:
 - tools/tests/host32.py
 - tools/check_map.d/check-v86-call-host.yaml
 - build/checks.d/check-v86-call-host.mk
+- tools/tests/kernel_includes.py

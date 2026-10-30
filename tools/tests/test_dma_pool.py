@@ -17,6 +17,7 @@
   python3 -B tools/tests/test_dma_pool.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -38,8 +39,7 @@ CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "kernel", "drivers", "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 
 MUTATIONS = [
     (r"        if \(!dma_range_ok\(addr, bytes, limit\)\) continue;\n",
@@ -103,8 +103,8 @@ def host_build(tmp, source_text=None, d8237_text=None):
         if d8237_text is not None:
             d8237 = src_dir / "dma_contract.c"
             d8237.write_text(d8237_text, encoding="utf-8")
-        mut = src_dir / "kernel"
-        mut.mkdir(exist_ok=True)
+        mut = src_dir / SRC.relative_to(ROOT).parent
+        mut.mkdir(parents=True, exist_ok=True)
         (mut / "dma_pool_math.c").write_text(source_text, encoding="utf-8")
         (mut / "dma_pool.h").write_text(
             (ROOT / "mm/dma_pool.h").read_text(encoding="utf-8"),
@@ -119,9 +119,8 @@ def host_build(tmp, source_text=None, d8237_text=None):
             .replace('"../../lib/dma_contract.c"',
                      '"%s"' % d8237),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "sdk/include/os32"),
-               "-I" + str(src_dir), "-I" + str(mut), str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
+               *include_flags(ROOT), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -176,12 +175,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-O2", "-Wall", "-Werror", 
+               "-O2", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "kernel"),
-               "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
+                *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

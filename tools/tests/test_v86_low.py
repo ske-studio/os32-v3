@@ -2,6 +2,7 @@
 qemu -B reserves a host offset so Linux mmap_min_addr does not hide page zero.
 Normal control always precedes compiled, runtime-RED single omissions.
 """
+from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
 import sys
@@ -108,8 +109,7 @@ def main():
                    '-DPHYSMEM_HOST_TEST=1', '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                    '-fno-delete-null-pointer-checks', '-ffunction-sections', '-fdata-sections',
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
-            cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include',
-                    'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'fs', 'drivers', 'sdk/include/os32')]
+            cmd += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
             subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_low_host.c'), str(ROOT / 'mm/physmem.c'), '-o', str(exe)], check=True)
             result = subprocess.run(['qemu-i386', '-B', '0x100000000', str(exe)],
                                     capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)

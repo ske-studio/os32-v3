@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """LB3 real driver injection. Record: tools/tests/e82557_drv_tdd.md"""
+from kernel_includes import include_flags
 import re
 import os
 import pathlib
@@ -22,7 +23,7 @@ CASES += ["recover_" + n for n in ("full", "final", "stopfail", "r3fail")] + ["r
 CASES += ["tx_send_done", "tx_send_bad", "tx_irq_cx", "tx_irq_cna", "tx_irq_bad"]
 CASES += ["module_quiet", "module_stopfail", "module_bm_present"]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
+INCLUDES = include_flags(ROOT)
 MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module/module.h", "include/bootinfo.h", "include/config.h"]
 MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "mm/dma_pool.h"]
 MIRROR += ["include/pci_dev_contract.h", "include/pci_bind_contract.h",
@@ -395,7 +396,7 @@ def host_build(tmp, mutated=None):
         "#define PCI_DRIVER_COUNT (sizeof(pci_drivers) / sizeof(pci_drivers[0]))\n")
     exe = pathlib.Path(tmp) / "drv-host"
     subprocess.run(["gcc", *FLAGS,
-                    *["-I" + str(root / p) for p in ("include", "drivers", "kernel")],
+                    *include_flags(root),
                     *INCLUDES, "-I" + str(tmp), str(root / HARNESS.relative_to(ROOT)),
                     "-o", str(exe)], check=True)
     return exe
@@ -420,7 +421,7 @@ def target_build(tmp):
         subprocess.run([str(cross), "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Wextra", "-Werror",
             "-D__KERNEL_BUILD__", *INCLUDES,
-            *["-I" + str(ROOT / p) for p in ("arch/x86", "platform/pc98", "lib", "kernel")],
+            *include_flags(ROOT),
             "-c", str(ROOT / rel), "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))], check=True)
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 

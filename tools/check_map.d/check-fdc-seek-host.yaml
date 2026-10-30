@@ -5,3 +5,4 @@ check-fdc-seek-host:
 - tools/tests/test_fdc_seek.py
 - tools/check_map.d/check-fdc-seek-host.yaml
 - build/checks.d/check-fdc-seek-host.mk
+- tools/tests/kernel_includes.py

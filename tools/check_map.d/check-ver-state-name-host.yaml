@@ -6,3 +6,4 @@ check-ver-state-name-host:
 - build/checks.d/check-ver-state-name-host.mk
 - tools/check_map.d/check-ver-state-name-host.yaml
 - include/types.h
+- tools/tests/kernel_includes.py

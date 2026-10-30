@@ -21,6 +21,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
+from kernel_includes import include_dirs, include_flags
 import re
 import host32
 import pathlib
@@ -32,8 +33,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INC_DIRS = ("include", "kernel", "lib", "exec", "fs", "sdk/include/os32",
-            "arch/x86", "platform/pc98")
+INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 SRC = "exec/shell_service.c"
 HDR = "exec/shell_service.h"
 EXEC = "exec/exec.c"
@@ -210,7 +210,7 @@ def static_checks(root, quiet=False):
 
 
 def includes(root):
-    return ["-I" + str(root / p) for p in INC_DIRS]
+    return include_flags(root)
 
 
 def run_host(root, tmp, quiet=False):

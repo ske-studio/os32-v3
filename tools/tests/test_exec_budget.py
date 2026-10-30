@@ -1,6 +1,7 @@
 """f12 startup budget: real exec launch allocation/teardown with real paging/ledger.
 Normal control always precedes runtime mutants. File I/O and entry are boundaries.
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -80,7 +81,7 @@ def run(source):
         n = (image + 4095) // 4096
         pdes = len(set(range(512, ((0x80100000 + (n + 1) * 4096 - 1) >> 22) + 1)) | {544, 575})
         need = n + 1 + 16 + 64 + 2 + pdes + 4
-        inc = ['-I'+str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')]
+        inc = (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
         exe = tmp / 'budget'
         cmd = ['gcc', *bb.linker_flags(), *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
                f'-DGUI_IMAGE_BYTES={image}', f'-DGUI_NEED_PAGES={need}', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',

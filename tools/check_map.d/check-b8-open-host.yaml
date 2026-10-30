@@ -33,3 +33,4 @@ check-b8-open-host:
 - drivers/ide.h
 - include/platform_device.h
 - include/ide_contract.h
+- tools/tests/kernel_includes.py

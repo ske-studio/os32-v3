@@ -107,3 +107,4 @@ check-ver-info-host:
 - userland/rust/libos32gui/src/layout.rs
 - userland/rust/libos32gui/src/widget.rs
 - userland/shell/cmd_base.c
+- tools/tests/kernel_includes.py

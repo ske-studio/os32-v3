@@ -19,6 +19,7 @@ tools/tests/hostdrv_list_host.c が fs/hostdrv_list_rules.inc を 1 行も写さ
 fs/hostdrvfs.c が -Werror で通ることを確かめる ([C1] GNU11)。
 make・エミュレータ・実配備には一切触れない。
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -47,10 +48,8 @@ TARGET_KERNEL = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                  "-Wno-address-of-packed-member",
                  # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
                  # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
-                 "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                 "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                 "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                 "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                 "-D__KERNEL_BUILD__",
+                     *include_flags(ROOT)]
 
 
 def check_cap_constant():

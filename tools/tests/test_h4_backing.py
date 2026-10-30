@@ -5,6 +5,7 @@ partial allocation/map failure and reclaim, I/O fault/cleanup controls, the
 actual DMA allocator and FDC setup at this kernel ELF's BSS address. --mutate is for PM verification;
 compilation errors never count as RED.
 """
+from kernel_includes import include_flags
 import argparse
 from pathlib import Path
 import subprocess
@@ -80,9 +81,7 @@ def run(body, runner):
                    '-fno-pie', '-fno-stack-protector', '-ffunction-sections',
                    '-fdata-sections', '-DPHYSMEM_HOST_TEST=1', '-nostdlib',
                    '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(tmp),
-                   *['-I' + str(ROOT / p) for p in
-                     ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
-                      'kernel', 'exec', 'fs', 'lib', 'drivers', 'sdk/include/os32')],
+                   *['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)],
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
                    *[str(ROOT / path) for path in ('mm/physmem.c',
                        'mm/dma_pool_math.c',

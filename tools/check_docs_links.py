@@ -30,6 +30,8 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
   * `docs/archive/` は**除外しない**。完了した票を archive へ移したあとも
     リンクが生きていることを見るのがこの検査の目的の 1 つで、移動で
     相対パスが 1 段ずれるのはいちばん起きやすい壊し方だから。
+    移動済みソースへの履歴リンクだけは、アーカイブ専用の検査で移動先へ
+    解決する。現行文書にはこの読み替えを適用しない。
   * `CLAUDE.md` / `README.md` — AI と人の入口。
   * `arch/README.md` / `platform/README.md` — 移植準備で入った層の説明。
   * `tools/tests/*_tdd.md` — 票が根拠として指す TDD の記録。
@@ -55,6 +57,8 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
 import argparse
 import glob
 import os
+from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -82,6 +86,14 @@ INPUTS = [
 # **docs/archive は外さない** — 上の docstring の理由。
 EXCLUDE_PATHS = ["docs/hw"]
 
+# Preserve historical source links without editing archived records. These
+# aliases apply only to the archive pass, and the destination must still exist.
+ARCHIVE_SOURCE_MOVES = {
+    'kernel/paging_app.c': 'mm/paging_app.c',
+    'kernel/paging_app.h': 'mm/paging_app.h',
+    'kernel/v86_io.c': 'kernel/v86/v86_io.c',
+}
+
 LYCHEE_FLAGS = ["--offline", "--include-fragments", "--no-progress"]
 
 
@@ -103,11 +115,26 @@ def present_inputs():
     return out
 
 
-def main():
+def link_commands(exe, inputs):
+    current = [exe, *LYCHEE_FLAGS]
+    for path in (*EXCLUDE_PATHS, 'docs/archive'):
+        current += ['--exclude-path', path]
+    commands = [current + ['--', *inputs]]
+    if glob.glob(os.path.join(PROJ_DIR, 'docs/archive/**/*.md'), recursive=True):
+        archived = [exe, *LYCHEE_FLAGS]
+        for old, new in ARCHIVE_SOURCE_MOVES.items():
+            old_uri = (Path(PROJ_DIR) / old).as_uri()
+            new_uri = (Path(PROJ_DIR) / new).as_uri()
+            archived += ['--remap', '^' + re.escape(old_uri) + r'(#.*)?$ ' + new_uri + '$1']
+        commands.append(archived + ['--', 'docs/archive/**/*.md'])
+    return commands
+
+
+def main(argv=None):
     ap = argparse.ArgumentParser(description="文書のリンク切れ検査")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="lychee の出力をそのまま全部出す")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     exe = find_lychee()
     if not exe:
@@ -121,16 +148,12 @@ def main():
               "(実行場所が %s でない可能性)" % PROJ_DIR, file=sys.stderr)
         return 1
 
-    cmd = [exe] + LYCHEE_FLAGS
-    for p in EXCLUDE_PATHS:
-        cmd += ["--exclude-path", p]
-    cmd += ["--"] + inputs
+    results = [subprocess.run(cmd, cwd=PROJ_DIR, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, universal_newlines=True)
+               for cmd in link_commands(exe, inputs)]
+    out = '\n'.join(proc.stdout.rstrip() for proc in results)
 
-    proc = subprocess.run(cmd, cwd=PROJ_DIR, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, universal_newlines=True)
-    out = proc.stdout.rstrip()
-
-    if proc.returncode == 0:
+    if all(proc.returncode == 0 for proc in results):
         # 成功時は集計の 1 行だけ (「859 Total ... 0 Errors」)。
         if args.verbose:
             print(out)

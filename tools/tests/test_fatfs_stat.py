@@ -11,6 +11,7 @@ hot journal 検査は vfs_stat("<path>-journal") の NOTFOUND 以外を IOERR �
 するが、"settings.db-journal" は 8.3 に収まらず f_stat が FR_INVALID_NAME を
 返していた。
 """
+from kernel_includes import include_flags
 import pathlib
 import subprocess
 import sys
@@ -35,9 +36,7 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
          "-D__cdecl=",
          "-DBOOTLOG_NO_IRQ_LOCK"]     # init/bootlog.c の錠をホストで空にする
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-fatfsstat-") as tmp:

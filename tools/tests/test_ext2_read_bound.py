@@ -10,6 +10,7 @@ K5b-K の実機初回起動 (2026-09-11) で「FATAL: shell.bin load failed」�
 差し替える。実デバイス・実イメージ・エミュレータには一切触れない。
 記録: tools/tests/k5b_kernel_tdd.md 節 R
 """
+from kernel_includes import include_flags
 import pathlib
 import subprocess
 import sys
@@ -20,9 +21,7 @@ CASES = ["bound_header", "bound_tail", "bound_aligned", "exec_bss_neighbour"]
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
          "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/ext2_read_bound_host.c"
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ The clock/nop-loop stubs supply elapsed ticks only; calibration decisions and
 arithmetic execute the actual source. The collector is compiled as a whole TU.
 No probe, printing, allocation or scheduler symbols are provided to the link.
 """
+from kernel_includes import include_flags
 import subprocess
 import tempfile
 from pathlib import Path
@@ -74,9 +75,7 @@ def build_run(fixture, runner, collector=None, calibration=None):
                '-Wextra', '-Werror', '-Wno-unused-function', '-ffreestanding',
                '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-nostdlib',
                '-static', '-no-pie', '-I' + str(tmp)]
-        cmd += ['-I' + str(ROOT / path) for path in
-                ('.', 'include', 'kernel', 'drivers', 'lib', 'arch/x86',
-                 'platform/pc98', 'sdk/include/os32')]
+        cmd += include_flags(ROOT)
         host32.build(cmd + sources + [str(obj), '-o', str(tmp / 'host')], check=True)
         result = host32.run([str(tmp / 'host')], runner=runner,
                             capture_output=True, text=True, timeout=30)

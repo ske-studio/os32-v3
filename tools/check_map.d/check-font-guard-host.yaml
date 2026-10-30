@@ -22,3 +22,4 @@ check-font-guard-host:
 - build/checks.d/check-font-guard-host.mk
 - tools/check_map.d/check-font-guard-host.yaml
 - arch/x86/kernel/cpu_flags.inc
+- tools/tests/kernel_includes.py

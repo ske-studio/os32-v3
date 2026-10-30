@@ -32,4 +32,5 @@ check-hwdev-module-host:
 - lib/crc32_core.inc
 - build/module.ld
 - hwdev/hwdev_imports.def
+- tools/tests/kernel_includes.py
 artifact_reader: true

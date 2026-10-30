@@ -13,3 +13,4 @@ check-kbd-inject-host:
 - kdebug/selftest_kbd_inject.c
 - include/kselftest_probe.h
 - kdebug/selftest_internal.h
+- tools/tests/kernel_includes.py

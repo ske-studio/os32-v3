@@ -10,4 +10,5 @@ check-shlib-high-host:
 - tools/check_map.d/check-shlib-high-host.yaml
 - build/checks.d/check-shlib-high-host.mk
 - tools/tests/kernel_layout.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

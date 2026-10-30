@@ -11,6 +11,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 そのまま #include する (模型ではない)。カーネル帯の代わりに要るのは所有者
 (res_owner_get/set)・GUI 判定 (con_sink_is_enabled)・kstrncpy の 3 つだけ。
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -20,8 +21,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "kernel", "lib", "exec", "fs", "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 HOST_SRC = ROOT / "tools/tests/launch_host.c"
 KERNEL_SRC = ROOT / "exec/launch.c"
 

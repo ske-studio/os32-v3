@@ -67,4 +67,5 @@ check-docs-orphans:
 - tools/module_schema.py
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
+- tools/tests/kernel_includes.py
 artifact_reader: true

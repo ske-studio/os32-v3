@@ -4,6 +4,7 @@
 Compile the real exec TU with section GC: retain snapshot, trampoline and
 string/WM paths, replacing only their environment. No emulator or mutants.
 """
+from kernel_includes import include_flags
 import os
 import re
 from pathlib import Path
@@ -114,12 +115,10 @@ class ExecSelftest(unittest.TestCase):
         entries = gen.load_def()
         by_name = {e['name']: e for e in entries}
         cross = Path(os.environ['CROSS_DIR']) / 'bin'
-        includes = ['.', 'include', 'kernel', 'drivers', 'exec', 'lib', 'gfx',
-                    'fs', 'kapi', 'arch/x86', 'platform/pc98', 'sdk/include/os32']
         flags = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding',
                  '-fno-pie', '-fno-stack-protector', '-fcommon', '-O2',
                  '-ffunction-sections', '-fdata-sections', '-D__KERNEL_BUILD__']
-        flags += ['-I' + str(ROOT / p) for p in includes]
+        flags += include_flags(ROOT)
         with tempfile.TemporaryDirectory(prefix='exec-selftest-') as folder:
             out = Path(folder)
             main = MAIN.replace('@DECLS@', '\n'.join(

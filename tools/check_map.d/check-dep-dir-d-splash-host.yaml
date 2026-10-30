@@ -32,3 +32,4 @@ check-dep-dir-d-splash-host:
 - build/checks.d/check-dep-dir-d-splash-host.mk
 - tools/check_map.d/check-dep-dir-d-splash-host.yaml
 - tools/check_map.yaml
+- tools/tests/kernel_includes.py

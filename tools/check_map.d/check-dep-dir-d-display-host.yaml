@@ -34,3 +34,4 @@ check-dep-dir-d-display-host:
 - tools/check_map.yaml
 - kernel/v86/v86.c
 - gfx/pc98_route.h
+- tools/tests/kernel_includes.py

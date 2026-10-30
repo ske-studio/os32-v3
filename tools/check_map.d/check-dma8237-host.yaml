@@ -8,3 +8,4 @@ check-dma8237-host:
 
 - include/dma_contract.h
 - lib/dma_contract.c
+- tools/tests/kernel_includes.py

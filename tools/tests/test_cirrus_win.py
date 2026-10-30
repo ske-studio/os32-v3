@@ -14,6 +14,7 @@ tools/tests/cirrus_win_host.c が実物の gfx/backend_cirrus.c を 1 行も写�
 読む / リニア窓を旧番地へ戻す / probe が ⑥ の SURFACE を確かめない) を写しの木で組み、この試験が RED になることを見る。
 make・エミュレータ・配備には触れない。
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -28,10 +29,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 # build/config.mk の INC_GFX と同じ探索先 (INC_COMMON + gfx drivers fs lib kernel)。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "arch/x86", "platform/pc98",
-                      "sdk/include/os32",
-                      "gfx", "drivers", "fs", "lib", "kernel")]
+INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/cirrus_win_host.c"
 MUT_TARGET = "gfx/backend_cirrus.c"
 IDENTIFY = "gfx/cirrus_identify.c"

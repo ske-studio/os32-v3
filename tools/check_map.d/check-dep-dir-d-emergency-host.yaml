@@ -17,3 +17,12 @@ check-dep-dir-d-emergency-host:
 - build/checks.d/check-dep-dir-d-emergency-host.mk
 - tools/check_map.d/check-dep-dir-d-emergency-host.yaml
 - tools/check_map.yaml
+- tools/tests/kernel_includes.py
+- mm/*.h
+- init/*.h
+- arch/x86/kernel/*.h
+- kernel/**/*.h
+- net/*.h
+- kapi/*.h
+- gfx/*.h
+- lib/sqlite3/*.h

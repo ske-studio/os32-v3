@@ -1,4 +1,5 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
+from kernel_includes import include_flags
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
               'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
 from kernel_layout import linker_flags
@@ -84,9 +85,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
               '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
               '-Wall', '-Wextra', '-Werror', '-DPHYSMEM_HOST_TEST=1',
               '-DHOST_HIGH_ENTRY_STACK=1', '-I' + str(tmp),
-              *['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch',
-                'include', 'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'lib',
-                'kapi', 'lib/sqlite3', 'sdk/include/os32')]]
+              *(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))]
         def compile_source(src, obj):
             host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
