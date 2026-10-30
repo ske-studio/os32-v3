@@ -19,7 +19,7 @@
 
 | 段 | 対象 | 状態 |
 |---|---|---|
-| D0 | GF_DRIVER_DESIGN (試し、形を決める) | 済み |
+| D0 | GF_DRIVER_DESIGN ([移設後の入口](../../design/hwdev/gf/README.md)、試し、形を決める) | 済み |
 | D1〜 | 残りの `docs/decisions/` (D0 で決めた形で並列) | 計画 |
 
 ## D0 で決まった形 (D1 以降もこれで)

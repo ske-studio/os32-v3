@@ -1,4 +1,4 @@
-/* GF_DRIVER_DESIGN §4-3. Byte I/O; never replay the port's upper bits. */
+/* docs/design/drivers/video/pc98/pc98_route.md. Byte I/O; never replay the port's upper bits. */
 #include "pc98_route.h"
 #include "io.h"
 #include "pc98_cell.h"

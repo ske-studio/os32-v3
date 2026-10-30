@@ -1,4 +1,4 @@
-/* GF_DRIVER_DESIGN §2-B: nouveau dispnv04/crtc.c:643 (mode setting;
+/* docs/design/hwdev/gf/display/modes.md: nouveau dispnv04/crtc.c:643 (mode setting;
  * OS32's mode enumeration and information services have no nouveau analogue). */
 #include "../internal.h"
 

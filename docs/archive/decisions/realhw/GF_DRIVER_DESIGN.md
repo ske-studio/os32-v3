@@ -1,3 +1,5 @@
+移した先: docs/design/hwdev/gf/README.md ほか (2026-10-30)
+
 # GF_DRIVER_DESIGN — GeForce 6200 の本番の画面ドライバ — 確定設計
 
 > 状態: **現行 (2026-10-29 確定)** — astra 起草 (r1〜r3)、Opus のレビュー 3 往復 (r1 要修正・r2 要修正・r3 確定可、R1 の文言は PM が直した)。往復の記録は `~/os32-tmp/run/gf-driver/`。票は TASK_GF_DRIVER (docs/tasks/realhw/)。**実装の前に PM がユーザーに詳細な実装計画を説明し、了承を得る。**

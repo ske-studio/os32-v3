@@ -1,4 +1,4 @@
-/* GF_DRIVER_DESIGN §4-1: CPU copy to the mapped BAR1 display surface. */
+/* docs/design/drivers/video/geforce/gf_present.md: CPU copy to the mapped BAR1 display surface. */
 #include "gfx_hal.h"
 #include "../../../gfx/gfx_internal.h"
 #include "hwdev/gfinit_mode.h"

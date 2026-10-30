@@ -41,6 +41,7 @@ os32-v3 の読者は §2 と §4 だけ読めば「なぜ今の形か」が分�
 | 2026-09-26 | キーボードだけの GUI 操作 (KBD_NAV)、カナ・CAPS のロックキー、`kbdstat -w`、検査の 3 段 (check-fast / check-changed / check)、変異試験を写しの木へ、`hsync --root` | CHECKLIST_2026-09-26 |
 | 2026-09-29 | 実機 ROM の OUT 列 (`v86 -g`) に合わせた PEGC 640x480、SerialFS で HDD 起動のまま更新 (21 分)、v2.1 の棚卸し (票 54 本を archive へ、状態行の語彙、ROLES §0 を 1 表に)、**v2.1 確定** | タグ `v2.1` = `6ccc4049` |
 | 2026-09-29〜30 | v3 の本案の草案 (V3_PLAN_DRAFT)、**メモリマップの 3 者討論** (ユーザー / Fable / Codex) で方針確定、Rust vs C11、T0 (C11 化)、**fork の段取り (FORK_PLAN) を承認**、公開前の監査 (手順 a)、この文書 (手順 b) | `d995e078` → `8e00edec` |
+| 2026-10-29 | GF_DRIVER_DESIGN は astra が起草し Opus が 3 往復レビュー、確定（票 TASK_GF_DRIVER） | — |
 
 ---
 

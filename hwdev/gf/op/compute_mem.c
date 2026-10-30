@@ -1,4 +1,4 @@
-/* NV44A init DATA runner. GF_DRIVER_DESIGN §2-A.
+/* NV44A init DATA runner. docs/design/hwdev/gf/op/compute_mem.md.
  * Semantics checked against MIT nouveau c03c1a1 nvkm/subdev/bios/init.c:1459;
  * NV44A devinit has no meminit callback, so this instruction is a no-op. */
 #include "../internal.h"

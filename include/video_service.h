@@ -1,4 +1,4 @@
-/* Internal video services, GF_DRIVER_DESIGN §3. Not a KAPI/INT 10h ABI. */
+/* Internal video services, docs/design/include/video_service.md. Not a KAPI/INT 10h ABI. */
 #ifndef VIDEO_SERVICE_H
 #define VIDEO_SERVICE_H
 #include "types.h"
