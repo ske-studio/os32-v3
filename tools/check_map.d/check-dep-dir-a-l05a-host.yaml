@@ -46,6 +46,7 @@ check-dep-dir-a-l05a-host:
 - mm/physmem.c
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_mem.c
 - kernel/v86/v86_snapshot.c
 - tools/tests/shm_user_host.c

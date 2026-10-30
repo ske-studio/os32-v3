@@ -42,6 +42,7 @@ check-v86-low-host:
 - mm/physmem.c
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - tools/tests/shm_user_host.c
 - mm/memory_boot.c
 - tools/tests/pgalloc_host_fixture.h

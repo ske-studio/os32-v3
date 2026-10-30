@@ -13,6 +13,7 @@ check-shm-user-host:
 - kernel/v86/v86.h
 - arch/x86/kernel/idt.h
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_bios.c
 - init/kernel.c
 - mm/pgalloc.*

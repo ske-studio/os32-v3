@@ -1,6 +1,7 @@
 check-display-cleanup-host:
 - drivers/video/pc98/pc98_route.h
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - drivers/video/pc98/backend_pc98.c
 - gfx/gfx_core.c
 - gfx/gfx_vram.c

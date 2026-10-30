@@ -200,10 +200,13 @@ static void after(void) {
         CHECK(((volatile u16 *)P2V_IO(TVRAM_ATTR_BASE))[i] == original(i+GCAP_TV_CELLS), "TVRAM 30 rows attrs");
     }
 }
+#include "v86_gp_host.inc"
+
 void _start(void) {
     u32 args[6] = {0, 16*1024*1024, 3, 0x32, ~0U, 0}, result;
     __asm__ volatile("int $0x80":"=a"(result):"a"(90),"b"(args):"memory");
     CHECK(!result, "low fixture mapping");
+    test_gp_handler();
     v86_session.real_saved = 1;
     kdebug.ops.gcap_capture = capture_body;
     kdebug.ops.gcap_active = v86_gcap_active;
@@ -231,6 +234,7 @@ void _start(void) {
                     CHECK(0, "injection reached");
                 }
                 kctx_irq_depth = kctx_exc_depth = 0; /* trusted setjmp landing */
+                CHECK(!gcap_ops, "ops detached before release");
                 exec_pending_finish();
                 CHECK(fault_kill_count == kills_before+1, "kills delta one");
                 CHECK(ring3_abort_count == aborts_before, "fault is not STOP");
