@@ -15,20 +15,11 @@
 #include "../block/disk.h"
 #include "../ata/ide.h"
 #include "../block/fdc.h"   /* fdc_read_sector, fdc_write_sector */
+#include "lib/kstring.h"
 
 /* ======== デバイステーブル ======== */
 static Device *dev_table[MAX_DEVICES];
 static int     dev_num = 0;
-
-/* ======== ユーティリティ ======== */
-static int dev_streq(const char *a, const char *b)
-{
-    while (*a && *b) {
-        if (*a != *b) return 0;
-        a++; b++;
-    }
-    return *a == *b;
-}
 
 /* ======================================================================== */
 /*  FDD ドライバ (CHS ネイティブ)                                          */
@@ -301,7 +292,7 @@ Device *dev_find(const char *name)
 {
     int i;
     for (i = 0; i < dev_num; i++) {
-        if (dev_table[i] && dev_streq(dev_table[i]->name, name)) {
+        if (dev_table[i] && kstrcmp(dev_table[i]->name, name) == 0) {
             return dev_table[i];
         }
     }
