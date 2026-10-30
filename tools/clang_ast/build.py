@@ -1,4 +1,5 @@
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 import os, pathlib, re, shlex, shutil, subprocess, tempfile
 MAKE_TARGETS = ["all"]
 # Compile commands outlive dry_run; keep their generated inputs until exit.
@@ -7,6 +8,48 @@ ARG_DROP = {"-o", "-MF", "-MT", "-MQ", "-I", "-isystem", "-iquote", "-idirafter"
 FLAG_DROP = {"-c", "-MMD", "-MD", "-MP", "-M", "-MM"}
 ARG_KEEP = {"-include", "-imacros", "-x"}
 SEPARATORS = {"&&", "||", ";", "|", "then", "do", "else"}
+
+
+def select_units(units, root, files):
+    """Select changed sources and their includers using each build's flags.
+
+    No dependency work is done for the ordinary whole-tree checks. Dependencies
+    are read afresh, so header edits and include-search changes need no cache.
+    Both raw make commands and units()'s source-free argv are accepted.
+    """
+    if files is None:
+        return units
+    from . import ParseError, cross_compiler, flags
+    root = pathlib.Path(root).absolute()
+
+    def path(name):
+        return os.path.normpath(root / name)
+
+    changed = {path(f) for f in files}
+    if not changed:
+        return []
+
+    def affected(u):
+        src = u['src']
+        if not pathlib.Path(root, src).is_file() and src.endswith('/build_id.c'):
+            src = 'build/out/build_id.c'
+        if path(src) in changed:
+            return True
+        # dry_run generates the module's adapted copy from this source.
+        if pathlib.Path(src).name == 'os32_sqlite_vfs.c' and path('lib/sqlite3/os32_sqlite_vfs.c') in changed:
+            return True
+        argv = [a for a in u['argv'] if a != u['src']]
+        cc = cross_compiler(u.get('cc'))
+        cmd = [cc, *argv] if cc else ['clang', *flags(argv, root, u.get('cc'))]
+        proc = subprocess.run([*cmd, '-MM', '-MG', '-MT', 'unit', src],
+                              cwd=root, capture_output=True, text=True)
+        if proc.returncode:
+            raise ParseError(f'{src}: dependency scan: {proc.stderr.strip()}')
+        deps = shlex.split(proc.stdout.replace('\\\n', '').partition(':')[2])
+        return any(path(dep.replace('$$', '$')) in changed for dep in deps)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        return [u for u, hit in zip(units, pool.map(affected, units)) if hit]
 
 
 def _segments(line):

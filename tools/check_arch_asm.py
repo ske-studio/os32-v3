@@ -6,6 +6,7 @@ import pathlib
 import re
 import clang_ast as ast
 from clang_ast.asm import templates
+from clang_ast.build import select_units
 K = ast.K
 SCAN_DIRS = SCAN_ROOTS['arch_asm']
 ALLOW_RE = re.compile(r'^arch/[^/]+/arch_[A-Za-z0-9_]+\.h$')
@@ -54,12 +55,15 @@ def findings(tu, root=ast.ROOT):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root',default=ast.ROOT)
-    root = p.parse_args().root
+    p.add_argument('--files', nargs='*', help='changed files; check their translation units and includers')
+    args = p.parse_args()
+    root = args.root
     hits,errors = set(),[]
     try:
-        for u in ast.units(root):
-            if u['src'].split('/')[0] not in SCAN_DIRS or u['src'].startswith('lib/sqlite3/'):
-                continue
+        units = [u for u in ast.units(root)
+                 if u['src'].split('/')[0] in SCAN_DIRS
+                 and not u['src'].startswith('lib/sqlite3/')]
+        for u in select_units(units, root, args.files):
             hits.update(findings(ast.parse(u['src'],u['argv'],root),root))
     except RuntimeError as e:
         errors.append('clang parse failure: ' + str(e))

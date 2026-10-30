@@ -4,6 +4,7 @@ check-c-dialect:
 - tools/clang_ast/**
 - tools/gen_hwdev_pair.py
 - tools/tests/test_clang_ast.py
+- tools/tests/test_p2v.py
 - '**/*.[ch]'
 - '**/*.inc'
 - sdk/example/hello/**

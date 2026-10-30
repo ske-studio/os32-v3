@@ -7,6 +7,7 @@ TLS, anonymous records and old-style definitions. Public SDK headers also use
 clang gnu89/C99/C11 diagnostics and compiler tokens for unexpanded macros and
 C99 comments. Parse failures are errors. --root selects an isolated test tree.
 """
+import argparse
 import os
 import hashlib
 import pathlib
@@ -85,7 +86,7 @@ PROBES = (
 
 
 # Build command extraction is shared by every AST checker.
-from clang_ast.build import parse_compile_lines, strip_jobserver, dry_run
+from clang_ast.build import parse_compile_lines, strip_jobserver, dry_run, select_units
 import clang_ast as ast
 from clang_ast.dialect import findings as ast_findings
 
@@ -213,20 +214,40 @@ def _rel(root, p):
 #  (c) 公開 SDK ヘッダ・配布ライブラリヘッダ・gnu89 の例
 # ==========================================================================
 
-def sdk_public_headers(root):
+def sdk_public_headers(root, files=None):
     root = pathlib.Path(root)
     hs = sorted((root / SDK_HDR_DIR).glob("*.h"))
     hs += [root / x for x in SDK_EXTRA_HDRS if (root / x).is_file()]
-    return hs
+    if files is None:
+        return hs
+    argv = SDK_BASE[1:] + ['-std=gnu11', '-I', str(root / SDK_HDR_DIR),
+                          '-I', str(root / 'sdk/include')]
+    prelude = ('#include "os32_kapi_shared.h"\n'
+               if (root / SDK_HDR_DIR / 'os32_kapi_shared.h').is_file() else '')
+    return _selected_headers(root, hs, files, argv, prelude)
 
 
-def check_sdk_headers(root, cc=None):
+def _selected_headers(root, headers, files, argv, prelude):
+    """SDK headers are standalone probe translation units, with dependencies too."""
+    if files is None:
+        return headers
+    with tempfile.TemporaryDirectory(prefix='c_dialect_header_deps_') as tmp:
+        units = []
+        for i, header in enumerate(headers):
+            src = pathlib.Path(tmp, str(i) + '.c')
+            src.write_text(prelude + '#include "%s"\n' % header.resolve())
+            units.append(dict(src=str(src), argv=argv))
+        selected = {u['src'] for u in select_units(units, root, files)}
+        return [h for h, u in zip(headers, units) if u['src'] in selected]
+
+
+def check_sdk_headers(root, cc=None, files=None):
     """公開 SDK ヘッダの問題の並び (空なら合格)。"""
     root = pathlib.Path(root)
     cc = cc or CC
     probs = []
-    hs = sdk_public_headers(root)
-    if not hs:
+    hs = sdk_public_headers(root, files)
+    if not hs and files is None:
         return ["%s: 公開 SDK ヘッダが 1 本も無い (空の検査で通さない)" % SDK_HDR_DIR]
     shared = root / SDK_HDR_DIR / "os32_kapi_shared.h"
     incs = [root / SDK_HDR_DIR, root / "sdk/include"]
@@ -300,14 +321,18 @@ def _lib_incs(root, cc, dirs):
     return incs
 
 
-def check_sdk_lib_headers(root, cc=None):
+def check_sdk_lib_headers(root, cc=None, files=None):
     root = pathlib.Path(root)
     cc = cc or CC
     dirs, hs = sdk_lib_headers(root)
-    if not hs:
+    if not hs and files is None:
         return ["build/sdk.mk: SDK が配るライブラリヘッダが 1 本も見つからない"], 0
     probs = []
     incs = _lib_incs(root, cc, dirs)
+    argv = SDK_BASE[1:] + ['-std=gnu11']
+    for d in incs:
+        argv += ['-I', str(d)]
+    hs = _selected_headers(root, hs, files, argv, '#include "os32api.h"\n')
     with tempfile.TemporaryDirectory(prefix="c_dialect_lib_") as tmp:
         for h in hs:
             body = '#include "os32api.h"\n#include "%s"\nint os32_lib_probe_tu;\n' % h.resolve()
@@ -319,10 +344,23 @@ def check_sdk_lib_headers(root, cc=None):
     return probs, len(hs)
 
 
-def check_sdk_sample(root, cc=None):
+def check_sdk_sample(root, cc=None, files=None):
     """sdk/example/hello が gnu89 のまま、in-tree の SDK ヘッダでコンパイルできるか。"""
     root = pathlib.Path(root)
     cc = cc or CC
+    if files is not None:
+        dirs, _ = sdk_lib_headers(root)
+        argv = ['-std=' + SAMPLE_STD] + SDK_BASE[1:] + ['-Wall']
+        for d in _lib_incs(root, cc, dirs):
+            argv += ['-I', str(d)]
+        units = [dict(src=str(src), argv=argv, cc=cc)
+                 for src in sorted((root / SAMPLE_DIR).glob('*.c'))]
+        selected = select_units(units, root, files)
+        if not selected:
+            return []
+        sources = [pathlib.Path(u['src']) for u in selected]
+    else:
+        sources = sorted((root / SAMPLE_DIR).glob('*.c'))
     mk = root / SAMPLE_DIR / "Makefile"
     if not mk.is_file():
         return ["%s: 無い (gnu89 の例が消えた)" % _rel(root, mk)]
@@ -331,7 +369,7 @@ def check_sdk_sample(root, cc=None):
         return ["%s: -std が %r (gnu89 の例として残す、票 §1-2)" % (_rel(root, mk), stds)]
     dirs, _ = sdk_lib_headers(root)
     probs = []
-    for src in sorted((root / SAMPLE_DIR).glob("*.c")):
+    for src in sources:
         args = compiler_args(cc, ["-std=" + SAMPLE_STD] + SDK_BASE + ["-Wall"], root)
         for d in _lib_incs(root, cc, dirs):
             args += ["-I", str(d)]
@@ -477,7 +515,7 @@ def check_internal_units(units, root, jobs=None, cache=None):
     return sorted(probs),count
 
 
-def check_build_flags(root):
+def check_build_flags(root, files=None):
     """(問題の並び, 要約の辞書)。"""
     root = pathlib.Path(root)
     rc, out, err = dry_run(root)
@@ -489,9 +527,13 @@ def check_build_flags(root):
     if not units:
         return (["make -n -B の出力に i386-elf-gcc のコンパイル行が無い"], {})
     seen = {source_identity(u["src"]) for u in units}
-    for s in REQUIRED_SRCS:
+    for s in REQUIRED_SRCS if files is None else ():
         if s not in seen:
             probs.append("%s: コンパイル行に無い (検査が空振りしている)" % s)
+    try:
+        units = select_units(units, root, files)
+    except ast.ParseError as e:
+        return ["clang parse failure — " + str(e)], {}
     eff_cache = {}
     counts = {}
     bad = {}
@@ -507,7 +549,7 @@ def check_build_flags(root):
     for (exp, eff), srcs in sorted(bad.items()):
         probs.append("%d 単位が %s でなく %s: %s%s" % (
             len(srcs), exp, eff, " ".join(srcs[:6]), " …" if len(srcs) > 6 else ""))
-    for std in (STD_MAIN, STD_SQLITE):
+    for std in (STD_MAIN, STD_SQLITE) if files is None else ():
         if not counts.get(std, 0):
             probs.append("%s の翻訳単位が 0 本 (検査が空振りしている)" % std)
     probed = 0
@@ -524,19 +566,26 @@ def check_build_flags(root):
 
 
 def main(argv):
-    root = ROOT
-    if "--root" in argv:
-        root = pathlib.Path(argv[argv.index("--root") + 1]).resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', type=pathlib.Path, default=ROOT)
+    parser.add_argument('--files', nargs='*', help='changed files; check their translation units and includers')
+    args = parser.parse_args(argv)
+    root = args.root.resolve()
     if shutil.which(CC) is None and os.environ.get("OS32_CLANG_CROSS_FREE") != "1":
         print("check_c_dialect: コンパイラ %s が無い" % CC, file=sys.stderr)
         return 2
     if shutil.which("make") is None:
         print("check_c_dialect: make が無い", file=sys.stderr)
         return 2
-    probs, summ = check_build_flags(root)
-    sdk_p = check_sdk_headers(root)
-    lib_p, nlib = check_sdk_lib_headers(root)
-    sample_p = check_sdk_sample(root)
+    probs, summ = check_build_flags(root, args.files)
+    try:
+        nsdk = len(sdk_public_headers(root, args.files))
+        sdk_p = check_sdk_headers(root, files=args.files)
+        lib_p, nlib = check_sdk_lib_headers(root, files=args.files)
+        sample_p = check_sdk_sample(root, files=args.files)
+    except ast.ParseError as e:
+        sdk_p, lib_p, sample_p, nlib = ["clang parse failure — " + str(e)], [], [], 0
+        nsdk = 0
     int_p, nint = ([], 0) if probs or sdk_p or lib_p or sample_p else check_internal_units(
         summ.get("unit_list", []), root, cache=_suite_cache())
     probs += sdk_p + lib_p + sample_p + int_p
@@ -545,7 +594,7 @@ def main(argv):
           "公開 SDK ヘッダ %d 本、配布ライブラリヘッダ %d 本、内部実装 %d 翻訳単位 (clang AST)"
           % (summ.get("units", 0), c.get(STD_MAIN, 0), c.get(STD_SQLITE, 0),
              sum(v for k, v in c.items() if k not in (STD_MAIN, STD_SQLITE)),
-             summ.get("sigs", 0), summ.get("probed", 0), len(sdk_public_headers(root)),
+             summ.get("sigs", 0), summ.get("probed", 0), nsdk,
              nlib, nint))
     if probs:
         for p in probs:

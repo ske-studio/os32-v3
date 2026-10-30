@@ -14,6 +14,8 @@ check-arch-asm:
 - tools/prototypes/lan_imports.def
 - tools/prototypes/cirrus_imports.def
 - tools/tests/test_clang_ast.py
+- tools/tests/test_p2v.py
+- tools/check_c_dialect.py
 - boot/boot_main.c
 - sdk/allocator/nano_adapter.c
 - sdk/crt/syscalls.c
@@ -39,4 +41,26 @@ check-arch-asm:
 - tools/gen_memmap.py
 # Direct root/cwd regression in test_clang_ast.py.
 - tools/clang_ast/__init__.py
+- boot/bootinfo.inc
+- boot/loader_fat_new.asm
+- build/os32.ld
+- sdk/kapi.json
+- sdk/link/app.ld
+- sdk/link/app_sys.ld
+- sdk/link/shlib.ld
+- sdk/os32x_hdr.py
+- sdk/rust/os32api/src/gui/proto.rs
+- sdk/rust/os32api/src/gui/stub.rs
+- tools/check_artifacts.py
+- tools/gen_kdebug_imports.py
+- tools/mkmod.py
+- tools/mkshlib.py
+- tools/module_schema.py
+- tools/prototypes/sqlite_imports.def
+- tools/tests/kernel_includes.py
+- tools/tests/owner_reclaim_host.c
+- tools/tests/test_owner_reclaim.py
+- userland/rust/libos32gui/src/shlib.rs
+- userland/tests/sqlite_standalone/sqlite_standalone.c
+- userland/tests/sqlite_standalone/sqlite_user_vfs.c
 artifact_reader: true
