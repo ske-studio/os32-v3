@@ -246,11 +246,11 @@ static int wait_rdc(void)
     return NE2K_ERR_TIMEOUT;
 }
 
-/* NIC RAM addr から len バイトを buf へ。page0 前提。
+/* NIC RAM addr と buf の間で len バイトを転送。page0 前提。
  * len が奇数でも RBCR は偶数丸め、PIO は末尾を安全に扱う。
  * RDC が期限内に立たない一過性のハズレは、リング全体を捨てる reinit ではなく
  * ここで 1 回だけ Remote DMA を再発行して吸収する (M4/L1 の堅牢性)。 */
-static int dma_read(u16 addr, void *buf, u16 len)
+static int dma_transfer(u16 addr, void *buf, u16 len, int write)
 {
     u16 n = (u16)((len + 1) & ~1);
     int try_i;
@@ -261,31 +261,23 @@ static int dma_read(u16 addr, void *buf, u16 len)
         wr(NE2K_P0_RBCR1, (u8)(n >> 8));
         wr(NE2K_P0_RSAR0, (u8)(addr & 0xFF));
         wr(NE2K_P0_RSAR1, (u8)(addr >> 8));
-        wr(NE2K_CR, NE2K_CR_PAGE0 | NE2K_CR_RD0 | NE2K_CR_STA); /* STA で発行 (Linux ne.c / FreeBSD if_ed と同じ) */
-        ne2k_pio_read(nic.cfg.data_port, buf, len);
+        wr(NE2K_CR, NE2K_CR_PAGE0 | (write ? NE2K_CR_RD1 : NE2K_CR_RD0) | NE2K_CR_STA); /* STA で発行 */
+        if (write) ne2k_pio_write(nic.cfg.data_port, buf, len);
+        else ne2k_pio_read(nic.cfg.data_port, buf, len);
         if (wait_rdc() == NE2K_OK) return NE2K_OK;
         nic.st.rdc_retry++;
     }
     return NE2K_ERR_TIMEOUT;
 }
 
+static int dma_read(u16 addr, void *buf, u16 len)
+{
+    return dma_transfer(addr, buf, len, 0);
+}
+
 static int dma_write(u16 addr, const void *buf, u16 len)
 {
-    u16 n = (u16)((len + 1) & ~1);
-    int try_i;
-    if (len == 0) return NE2K_OK;
-    for (try_i = 0; try_i < NE2K_RDMA_ATTEMPTS; try_i++) {
-        wr(NE2K_P0_ISR, NE2K_ISR_RDC);
-        wr(NE2K_P0_RBCR0, (u8)(n & 0xFF));
-        wr(NE2K_P0_RBCR1, (u8)(n >> 8));
-        wr(NE2K_P0_RSAR0, (u8)(addr & 0xFF));
-        wr(NE2K_P0_RSAR1, (u8)(addr >> 8));
-        wr(NE2K_CR, NE2K_CR_PAGE0 | NE2K_CR_RD1 | NE2K_CR_STA);
-        ne2k_pio_write(nic.cfg.data_port, buf, len);
-        if (wait_rdc() == NE2K_OK) return NE2K_OK;
-        nic.st.rdc_retry++;
-    }
-    return NE2K_ERR_TIMEOUT;
+    return dma_transfer(addr, (void *)buf, len, 1);
 }
 
 /* ====================================================================== */
