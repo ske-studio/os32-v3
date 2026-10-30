@@ -48,7 +48,8 @@ class CheckTimesTest(unittest.TestCase):
         self.env = dict(os.environ)
         # 呼び手の CHECK_TIMES・CHECK_TIME_CHILD を引き継ぐと、偽の木の表の置き場や前提が変わる。
         for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIMES', 'CHECK_TIME_CHILD', 'CC_FILES_JSON', 'CC_TIER',
-                    'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY'):
+                    'MUTATE', 'MUTATE_TARGETS', 'FAIL', 'PREP_FAIL', 'EMPTY',
+                    'CHECK_NEEDS', 'CHECK_PAR_TARGETS', 'CHECK_NO_NEEDS'):
             self.env.pop(key, None)
 
     def write(self, path, text):
