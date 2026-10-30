@@ -1,7 +1,7 @@
 """E01a: run the real exec_launch through image I/O, stopping at argv storage.
 
-Admission/allocation/CPU edges are stubs. The launch body is not rewritten;
-after extraction its real included helper runs in the same fixture as well.
+Compile the complete exec.c translation unit, including exec_image.inc.
+Only external allocation, VFS and CPU boundaries are supplied by the fixture.
 """
 from pathlib import Path
 import subprocess
@@ -31,28 +31,26 @@ MUTATIONS = (
 )
 
 
-def function(source, name):
-    start = source.index('static int ' + name + '(')
-    end = source.index('\n}', start) + 2
-    return source[start:end]
-
-
 def run(source=None, image=None):
     if source is None:
         source = (ROOT / 'exec/exec.c').read_text()
-    helper = ROOT / 'exec/exec_image.inc'
     if image is None:
-        image = helper.read_text() if helper.exists() else ''
-    code = image + '\n' + function(source, 'exec_launch')
+        image = (ROOT / 'exec/exec_image.inc').read_text()
     with tempfile.TemporaryDirectory(prefix='exec-image-') as directory:
         tmp = Path(directory)
-        (tmp / 'exec_image_source.inc').write_text(code)
+        # Keep the entire TU and its local helper together, including mutants.
+        (tmp / 'exec.c').write_text(source)
+        (tmp / 'exec_image.inc').write_text(image)
         exe = tmp / 'test'
         result = subprocess.run([
-            'gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
-            '-Wno-unused-function', '-ffreestanding', '-fno-pie',
+            'gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Werror',
+            # host_arch's stack-switch macro only assigns the saved ESP slot.
+            '-Wno-unused-function', '-Wno-unused-but-set-variable',
+            '-D__KERNEL_BUILD__', '-ffunction-sections', '-fdata-sections',
+            '-Wl,--gc-sections', '-ffreestanding', '-fno-pie',
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
-            '-I' + str(tmp), *include_flags(ROOT),
+            '-I' + str(tmp), '-I' + str(ROOT / 'tools/tests/host_arch'),
+            '-I' + str(ROOT / 'exec'), *include_flags(ROOT),
             str(ROOT / 'tools/tests/exec_image_host.c'), '-o', str(exe),
         ], capture_output=True, text=True)
         if result.returncode:
