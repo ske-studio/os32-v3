@@ -180,8 +180,11 @@ CHECK_NEEDS ?= $(CHECK_ALL_NEEDS)
 $(CHECK_NAMES): check-%:
 	+@$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),echo ,)python3 -B tools/checks/run.py --run $@
 
+# all を先に単独で組む (旧と同じ順): all の末尾が中間物を消すので、同じ並列 make で
+# sqlite-module-proto などを組むと、組み直し前の vmkernel を読んだ像ができる。
 check-prepare:
-	+@$(if $(strip $(CHECK_NEEDS)),$(MAKE) $(CHECK_NEEDS),:)
+	+@$(if $(filter all,$(CHECK_NEEDS)),$(MAKE) all,:)
+	+@$(if $(strip $(filter-out all,$(CHECK_NEEDS))),$(MAKE) $(filter-out all,$(CHECK_NEEDS)),:)
 
 CHECK_TIMES ?= build/out/check_times.tsv
 .PHONY: check-times-init $(addprefix check-time-,$(CHECK_NAMES))

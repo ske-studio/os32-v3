@@ -868,10 +868,12 @@ def main(argv: list[str]) -> int:
         child = os.environ.get("CHECK_TIME_CHILD") == "1"
         stage = ordered(checks, names) if child else closure(checks, names)
         needs = () if child or os.environ.get("CHECK_NO_NEEDS") == "1" else make_needs(checks, stage)
-        if needs:
-            rc = subprocess.run(["make", *needs], cwd=ROOT, close_fds=False).returncode
-            if rc:
-                return rc
+        # all を先に単独で組む (build/sdk.mk の check-prepare と同じ順)。
+        for group in ((("all",) if "all" in needs else ()), tuple(n for n in needs if n != "all")):
+            if group:
+                rc = subprocess.run(["make", *group], cwd=ROOT, close_fds=False).returncode
+                if rc:
+                    return rc
         files = None
         if args.files is not None:
             files = tuple(args.files)
