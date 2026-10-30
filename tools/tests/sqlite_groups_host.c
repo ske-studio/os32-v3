@@ -5,8 +5,9 @@
 #undef main
 /* Host size_t differs from kernel u32; retain libc memory functions. */
 #define __KSTRING_H
+u32 kstrlen(const char *s) { return (u32)strlen(s); }
 char *kstrncpy(char *dst, const char *src, u32 size)
-{ str_cpy(dst, src, (int)size); return dst; }
+{ return kstrlcpy(dst, src, size); }
 void *kmemcpy(void *dst, const void *src, u32 size) { return memcpy(dst, src, size); }
 void *kmemset(void *dst, int val, u32 size) { return memset(dst, val, size); }
 int kstrncmp(const char *a, const char *b, u32 n) { return strncmp(a, b, n); }

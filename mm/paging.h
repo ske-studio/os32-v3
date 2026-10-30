@@ -218,6 +218,8 @@ struct addrspace {
 };
 /* T2c launch path: sparse app PTs and the first lease PT. */
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner);
+/* Owned root in master/own-AS normal context; PT validation stays in paging. */
+int paging_lease_root_context(const struct addrspace *as);
 int paging_lease_map(struct addrspace *as, const struct lease_mapping *maps, u32 n);
 int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages);
 u32 paging_lease_pte(const struct addrspace *as, u32 va);

@@ -18,15 +18,9 @@ volatile u32 lease_rollback_fail_count;
 volatile u32 lease_revoke_fail_count;
 volatile u32 lease_revoke_all_fail_count;
 
-/* Keep this root/normal-context predicate in sync with
- * mm/paging.c:lease_root_context(); paging also validates managed PTs. */
 static int context(const struct addrspace *as)
 {
-    return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&
-           pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
-        (paging_current_cr3() == paging_kernel_pd_phys() ||
-         paging_current_cr3() == as->pd_phys) &&
-        !kctx_irq_depth && !kctx_exc_depth;
+    return paging_lease_root_context(as);
 }
 
 static int alias_cache(const struct ledger_surface *sf)

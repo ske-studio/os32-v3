@@ -57,6 +57,7 @@ check-dep-dir-a-l09-host:
 - platform/pc98/device_host.c
 - tools/tests/dep_dir_a_l09_host.c
 - kapi/kapi_host.c
+- kapi/range_internal.h
 - tools/tests/test_dep_dir_a_l09.py
 - tools/tests/fixtures/dep_dir_a/l09.json
 - build/checks.d/check-dep-dir-a-l09-host.mk

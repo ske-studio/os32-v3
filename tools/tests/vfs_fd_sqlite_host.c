@@ -2,6 +2,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+/* Keep host size_t declarations; kstring.h also declares libc names with u32. */
+#include "types.h"
+#define __KSTRING_H
+u32 kstrlen(const char *s);
+#ifndef OS32_SQLITE_DIRECT_TEST
+u32 kstrlen(const char *s) { return (u32)strlen(s); }
+#endif
+/* Match lib/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
+char *kstrlcpy(char *dst, const char *src, u32 size)
+{
+    u32 i;
+    if (size == 0) return dst;
+    for (i = 0; i + 1 < size && src[i]; i++) dst[i] = src[i];
+    dst[i] = '\0';
+    return dst;
+}
+/* Routing/backend fixtures previously used the FD source's private helper. */
+static void str_cpy(char *dst, const char *src, int size)
+{ kstrlcpy(dst, src, (u32)size); }
 #include "../../fs/vfs_fd.c"
 
 #define CHECK(x) do { if (!(x)) { \

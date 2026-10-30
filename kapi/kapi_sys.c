@@ -5,7 +5,8 @@
 #include "os32_kapi_shared.h"
 #include "lib/kstring.h"
 #include "vfs.h"
-#include "exec.h"             /* ring3_user_range_ok (CPL=3 ポインタ検証) */
+#include "exec.h"             /* CPL=3 ポインタ検証 */
+#include "range_internal.h"
 #include "sys.h"              /* sys_time_now (票 TASK_HAL_WIRING §1-5) */
 #include "pci_bind_contract.h"
 #include "platform_device.h"
@@ -198,13 +199,6 @@ int __cdecl kapi_sys_ver_info(void *out, u32 size)
 /* 検証後の写し先。KAPI は再入しない (CPL=3 の呼び手は 1 本ずつ)。 */
 static char set_mtime_path[OS32_MAX_PATH];
 
-static int set_mtime_user_range_ok(const void *p, u32 len)
-{
-    u32 a = (u32)p;
-    if (!p) return 0;
-    if (a + len < a) return 0;              /* 加算 overflow */
-    return ring3_user_range_ok(a, len);
-}
 
 /* 上限 cap (NUL 込み) の中で NUL を探しながら dst へ写す。
  * 1 バイトずつ検証するので、途中のページが非 present でもそこで止まる。
@@ -215,7 +209,7 @@ static int set_mtime_user_str_copy(const char *src, char *dst, u32 cap)
 
     if (!src) return 0;
     for (i = 0; i < cap; i++) {
-        if (!set_mtime_user_range_ok(src + i, 1)) return 0;
+        if (!kapi_user_range_ok(src + i, 1)) return 0;
         dst[i] = src[i];
         if (dst[i] == '\0') return 1;
     }
@@ -252,13 +246,6 @@ int kapi_sys_set_mtime(const char *path, u32 mtime)
 /*    (3) 2 本の 4 バイト範囲が**交差する** (lo == hi だけでなく差 1〜3 も。  */
 /*        重なっていると「上下が同じスナップショット」が壊れる)             */
 /* ======================================================================== */
-static int time_now_user_range_ok(const void *p, u32 len)
-{
-    u32 a = (u32)p;
-    if (!p) return 0;
-    if (a + len < a) return 0;              /* 加算 overflow */
-    return ring3_user_range_ok(a, len);
-}
 
 int kapi_sys_time_now(u32 *lo, u32 *hi)
 {
@@ -275,8 +262,8 @@ int kapi_sys_time_now(u32 *lo, u32 *hi)
 
     /* **書く前に 2 本とも検証する。** 2 本目だけ不正なときに 1 本目を
      * 書いてしまうと、呼び手は「負が返ったのに片方だけ新しい」を見る。 */
-    if (!time_now_user_range_ok(lo, (u32)sizeof(u32))) return OS32_ERR_INVAL;
-    if (!time_now_user_range_ok(hi, (u32)sizeof(u32))) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(lo, (u32)sizeof(u32))) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(hi, (u32)sizeof(u32))) return OS32_ERR_INVAL;
 
     /* **読み取り専用の USER ページ (共有ライブラリの .text) は kill** —
      * 負ではない (往復 10)。OS32 は CR0.WP = 0 なので、ここで止めないと

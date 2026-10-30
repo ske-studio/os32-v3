@@ -71,7 +71,7 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
         (u32)(uptr)candidate.enter, (u32)(uptr)candidate.leave, (u32)(uptr)candidate.prepare
     };
     for (u32 i=0; i<sizeof(entries)/sizeof(entries[0]); i++)
-        if (entries[i] < r->text || entries[i] - r->text >= r->text_size)
+        if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
     if (candidate.fill_rect || candidate.blit) return MODULE_INIT_FAILED;
     if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0))
