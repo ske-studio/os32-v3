@@ -56,4 +56,5 @@
 | L2 | include の照合を行番号で比べ 870 件の差に見えた — 生成ヘッダの include の並びがパス順で入れ替わっただけ | 単位ごとの集合で比べる (§3)。製品 0 件 |
 | L2 | 同名のヘッダ `include/kbd.h` と `drivers/input/kbd.h` (旧 `drivers/kbd.h`)、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
 | L2 | 道具が文書の見出しの中のパスも置換し、別の文書からその見出しへのリンクの断片 (`#2-1-カーネル-driverspcm_cs4231c…`) が切れた | 完了条件に `make check-docs-links` を足す (数秒) |
+| L2 | 取り込みの検査で 18 本が落ちた (L1 の 111 本から減った) — 残っていた自前の -I・分割パス・生成入力が部品のソースの隣にある前提・変異のコピーの親階層と -I の優先順 | 試験の -I を `kernel_includes.py` に寄せ切った。移動の後は変異のコピーの階層と -I の順・分割パス・生成物の隣接の前提も見る (sol の提案) |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |
