@@ -129,6 +129,48 @@ class SyncFailure(unittest.TestCase):
         self.assertFalse(self.saved['NHD_LOCAL'].startswith(real), self.saved['NHD_LOCAL'])
 
 
+class DeployProcessGuard(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='nhd-process-')
+        self.addCleanup(self.tmp.cleanup)
+        root = pathlib.Path(self.tmp.name)
+        self.local, self.remote = root / 'local.nhd', root / 'remote.nhd'
+        self.local.write_bytes(b'new image')
+        self.remote.write_bytes(b'old image')
+        self.stack = contextlib.ExitStack()
+        self.addCleanup(self.stack.close)
+        for name, value in [('NHD_LOCAL', str(self.local)), ('NHD_REMOTE', str(self.remote)),
+                            ('is_mounted', lambda: False), ('ensure_local_nhd', lambda: True),
+                            ('legacy_pt_guard', lambda **kw: True),
+                            ('verify_pull_stamp', lambda: (True, '')),
+                            ('write_pull_stamp', lambda *args: None)]:
+            self.stack.enter_context(patch.object(nd, name, value))
+
+    def check_status(self, result=None, error=None):
+        log = io.StringIO()
+        with patch.object(nd.np21w_ctl.Ctl, 'split_procs', return_value=result,
+                          side_effect=error), contextlib.redirect_stderr(log):
+            success = nd.do_deploy(force=True)
+        return success, log.getvalue()
+
+    def test_running_refuses_write(self):
+        success, log = self.check_status(([object()], []))
+        self.assertFalse(success)
+        self.assertEqual(self.remote.read_bytes(), b'old image')
+        self.assertIn('python3 tools/np21w_ctl.py stop', log)
+
+    def test_stopped_writes(self):
+        success, _ = self.check_status(([], []))
+        self.assertTrue(success)
+        self.assertEqual(self.remote.read_bytes(), b'new image')
+
+    def test_unknown_refuses_write(self):
+        success, log = self.check_status(error=nd.np21w_ctl.CtlError('unavailable'))
+        self.assertFalse(success)
+        self.assertEqual(self.remote.read_bytes(), b'old image')
+        self.assertIn('python3 tools/np21w_ctl.py stop', log)
+
+
 class MountedImage(unittest.TestCase):
     """DEPLOY-BOOT-1: real entry points, only host commands are replaced."""
     def setUp(self):
@@ -243,6 +285,21 @@ def main():
     if not result.wasSuccessful():
         return 1
     if '--mutate' in sys.argv:
+        source = inspect.getsource(nd.do_deploy)
+        original = 'if not stopped:'
+        assert source.count(original) == 1
+        original_deploy = nd.do_deploy
+        exec(source.replace(original, 'if False:'), nd.__dict__)
+        mutant_deploy = nd.do_deploy
+        nd.do_deploy = original_deploy
+        with patch.object(nd, 'do_deploy', mutant_deploy), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            result = unittest.TextTestRunner(stream=io.StringIO()).run(
+                unittest.defaultTestLoader.loadTestsFromName(
+                    'test_running_refuses_write', DeployProcessGuard))
+        if result.wasSuccessful() or result.errors:
+            raise AssertionError('process guard mutation must fail an assertion: ' + str(result.errors))
+        print('RED: NP21/W process guard ignored')
         source = inspect.getsource(nd.verify_mounted_nhd)
         original = 'if backing is not None and backing == expected:'
         assert source.count(original) == 1

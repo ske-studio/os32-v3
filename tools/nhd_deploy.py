@@ -38,6 +38,7 @@ import glob as globmod
 import yaml
 from pathlib import Path, PurePosixPath
 import nhd_profile
+import np21w_ctl
 
 # 通常配備が /etc/settings.db* を作らない・上書きしない・消さないための共通判定
 # (票 S0-D / D0)。書く・消す・切り詰める直前に 1 か所で止める。
@@ -685,6 +686,16 @@ def do_deploy(force=False):
 
     print("NHDイメージをNP21/Wにコピー中...")
     print("  {} -> {}".format(NHD_LOCAL, NHD_REMOTE))
+
+    try:
+        ctl = np21w_ctl.Ctl(np21w_ctl.Paths(NP21W_DIR, os.environ.get('WIN_NP21W_DIR')))
+        ours, others = ctl.split_procs(np21w_ctl.DEFAULT_EXE)
+        stopped = not ours and not others
+    except (np21w_ctl.CtlError, OSError):
+        stopped = False
+    if not stopped:
+        print("Error: NP21/W の停止を確認できません。python3 tools/np21w_ctl.py stop", file=sys.stderr)
+        return False
 
     try:
         shutil.copy2(NHD_LOCAL, NHD_REMOTE)
