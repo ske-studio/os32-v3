@@ -89,3 +89,13 @@ R1/R2 は `tools/tests/test_*.py` に宣言を足し、集約入口・道具ラ�
 
 未決は0件。R1 はこの Check・Plan 契約で (a) run.py と試験、(b) convert.py を並列に実装できる。
 受入は既存の R1 道具試験、R2 の200件同値、R3 の直近10件計時・段4の列照合。詳細は各文書の試験節に置く。
+
+## 既存の切り出し試験の直し方
+
+1. 変更前の正常対照・振る舞い・変異の RED 数を記録する。
+2. 関数本文の文字切り出しを消し、製品 `.c` 全体を試験 C から `#include` して組む。
+3. 外部関数の小さな stub は `tools/tests/<名前>_host.c` に置き、製品内の関数はそのまま通す。
+4. CPU 境界は `tools/tests/host_arch/` を使い、不要な節は `-ffunction-sections -fdata-sections -Wl,--gc-sections` で落とす。
+5. 変異は一時ディレクトリの `.c` / `.inc` 全文コピーに当て、include の探索順でそのコピーを確実に使う。
+6. 既存の入力・観測・正常対照を維持し、全体の前提で届かない境界値は実 helper を直接呼ぶ。
+7. `test_exec_image.py` と `exec_image_host.c` を手本に、変更後も同じ数の変異が実行時に RED になることを確認する。
