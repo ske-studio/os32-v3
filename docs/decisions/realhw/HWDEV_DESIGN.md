@@ -21,9 +21,9 @@
 | `kdebug/gfinit_decode.c:229`、`gfinit_exec.c:80`、`gfinit_pll.c:111` | ROM データ復号、検査済み plan 実行、整数 PLL 探索。exec は 125 行でも decode は 734 行、PLL は 225 行であり「汎用化 125 行」ではない |
 | `kdebug/gfinit_plan.c:79`、`gfinit_resources.c:53`、`gfinit_bus.c:70`、`recover_gf.c:884` | A4 等の plan 合成、PCI 資源収集、NV44A bus、許可表と登録式。resources は将来共通化候補だが今回 GF と共に移す |
 | `tools/module_schema.py:40`、`:53`、`:65`、`:143` | KDEBUG/SQLITE/FEP/LAN は既存 KMOD。image/mem 上限は各 256/256、512/512、64/64、64/64 KiB。FEP は SQLITE 依存の先例 |
-| `tools/mkmod.py:144`、`:212`、`kernel/module_image.c:122` | ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、CRC・PAIR・範囲検査を再利用できるが、部品間 import の自動解決はない (§4 で接続) |
-| `kernel/module_runtime.c:28`、`:144`、`:158` | 依存 handle 世代、停止・参照数検査、失敗時隔離がある。依存は関数解決そのものではない。装置所有権の仲裁は別途必要 |
-| `kernel/module.c:39`、`tools/module_schema.py:24` | KDEBUG=1 のみロード、PAIR は kernel 像 CRC。台帳は 10 枠で 10 種類が使用済み。任意の装置部品を自動発見・交換する仕組みはない |
+| `tools/mkmod.py:144`、`:212`、`kernel/module/module_image.c:122` | ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、CRC・PAIR・範囲検査を再利用できるが、部品間 import の自動解決はない (§4 で接続) |
+| `kernel/module/module_runtime.c:28`、`:144`、`:158` | 依存 handle 世代、停止・参照数検査、失敗時隔離がある。依存は関数解決そのものではない。装置所有権の仲裁は別途必要 |
+| `kernel/module/module.c:39`、`tools/module_schema.py:24` | KDEBUG=1 のみロード、PAIR は kernel 像 CRC。台帳は 10 枠で 10 種類が使用済み。任意の装置部品を自動発見・交換する仕組みはない |
 
 `size build/out/kdebug/*.o` の実測 (単位 B、text には rodata を含む。既存 .o だけ、kexports 除外):
 
@@ -119,7 +119,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 | 新規/変更 | 対象 | おおよその行数 (手書き差分) |
 |---|---|---:|
 | 新規 | `include/hwdev_private.h`、`kdebug/hwdev_core.c` | 100〜160、220〜320 |
-| 新規 | `kernel/hwdev_module.c`、`kernel/hwdev_owner.h`・拒否判定 | 130〜200、構造体と拒否のみ (registry 本体は BM 設計へ) |
+| 新規 | `kernel/module/hwdev_module.c`、`kernel/hwdev_owner.h`・拒否判定 | 130〜200、構造体と拒否のみ (registry 本体は BM 設計へ) |
 | 新規 | `hwdev/gf6200/module.c`、import 定義・linker・`build/hwdev.mk` | 100〜160、100〜150 |
 | リンク先変更 | `kdebug/recover_gf.c` と `gfinit*.c/.h` は現位置を維持 | C 計 3,926 行 + ヘッダのソース変更なし、build/hwdev.mk で GF オブジェクトを HWDEV へ振分け、核から除外 |
 | 変更 | `kdebug/kdebug_main.c`、`recover.c`、`recover_profile.c`、`build/kdebug.mk` | 計 100〜180、S0 モデルは残し main の直接 GF 参照を wrapper 接続へ変更 |
@@ -152,7 +152,7 @@ ABI の細部 (構造体・slot 表・import の生成・contract_crc・台帳�
 - G2 (P2): recover_hal_wait_tick → recover_hal_wait_frame (存在する名前)、関数ポインタとして使う箇所の再配置を 1 行。
 - G3 (P2): HWDEV は自前の .def から import の stub と slot を生成し、核と kernel の関数を 1 つの表に。kdebug_import_stubs.o はリンクしない。
 - G4 (P2): contract_crc は生成 STATIC_ASSERT の表と前処理後のヘッダの正規化テキストの CRC の 2 つを照合する方式に決めた。
-- G5 (P3、M2 の依頼文に書く): KDEBUG_OPS_VERSION は kernel/module.h:7 の手書きの定義で、GF の identity にも入る。新しい口には kdebug_export_contracts の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
+- G5 (P3、M2 の依頼文に書く): KDEBUG_OPS_VERSION は kernel/module/module.h:7 の手書きの定義で、GF の identity にも入る。新しい口には kdebug_export_contracts の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
 
 ## 実装の後の変化 (2026-10-23、PM 注記 — 上の確定本文は書き換えない)
 

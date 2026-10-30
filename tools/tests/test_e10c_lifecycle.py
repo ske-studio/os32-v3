@@ -6,7 +6,7 @@ import tempfile
 import host32
 from test_shm_user import function, ROOT
 
-PATHS = ('kdebug/v86_gcap.c','exec/exec.c','kernel/ring3_entry.asm','kernel/kernel.c','kdebug/kselftest.c')
+PATHS = ('kdebug/v86_gcap.c','exec/exec.c','arch/x86/kernel/ring3_entry.asm','init/kernel.c','kdebug/kselftest.c')
 MUTANTS = [
  ('gcap-failure-zero',PATHS[0],'    kmemcpy(out, g, (u32)sizeof(*g));',
   '    if (mode == V86G_MODE_ROM && g->status != V86G_ST_OK) { g->n_out = 0; g->n_in = 0; }\n    kmemcpy(out, g, (u32)sizeof(*g));',
@@ -58,7 +58,7 @@ def run(runner, mutant=None):
         # Execute the actual saved-EFLAGS offset/branch; replace STI's privileged
         # effect with its observable IF-set result. Segment loads are outside it.
         branch=branch.replace('        sti','        inc dword [host_if]')
-        (tmp/'vm.asm').write_text('%include "kernel/cpu_flags.inc"\n%include "kernel/entry_layout.inc"\ncpu 386\nsection .bss\nhost_if: resd 1\nsection .text\nglobal host_vm_gate\nhost_vm_gate:\n mov eax,[esp+4]\n mov dword [host_if],0\n push eax\n sub esp,40\n'+branch+' add esp,44\n mov eax,[host_if]\n ret\nsection .note.GNU-stack noalloc noexec nowrite progbits\n')
+        (tmp/'vm.asm').write_text('%include "arch/x86/kernel/cpu_flags.inc"\n%include "arch/x86/kernel/entry_layout.inc"\ncpu 386\nsection .bss\nhost_if: resd 1\nsection .text\nglobal host_vm_gate\nhost_vm_gate:\n mov eax,[esp+4]\n mov dword [host_if],0\n push eax\n sub esp,40\n'+branch+' add esp,44\n mov eax,[host_if]\n ret\nsection .note.GNU-stack noalloc noexec nowrite progbits\n')
         subprocess.run(['nasm','-f','elf32',str(tmp/'vm.asm'),'-o',str(tmp/'vm.o')],check=True)
         source=(ROOT/'tools/tests/e10c_gcap_host.c').read_text().replace('static void run(void) {','extern int host_vm_gate(u32 flags);\nstatic void run(void) {\n    CHECK(host_vm_gate(0x20000) == 0);\n    CHECK(host_vm_gate(0x202) == 1);')
         (tmp/'fixture.c').write_text(source)

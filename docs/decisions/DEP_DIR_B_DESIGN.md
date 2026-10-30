@@ -12,7 +12,7 @@
 - B4: 選択規則を check_map.d の対応表に訂正し、build/kernel.mk は broad。
 - B5: 変異用コピーから新ヘッダ・platform 実装が見えることを完了条件化。
 - B6: 基点列は一度採取して tools/tests/ に固定し、実行時 git 不要。
-- B7: s_pit の所有者を kernel/pit.c に統一し pit_init の断片を追加。
+- B7: s_pit の所有者を kernel/time/pit.c に統一し pit_init の断片を追加。
 - B8: kernel/sys.c を参照する既存試験全件を MUTATE=0 で確認。
 - B9: L12 H は irq_finish 経路に限定し、IRQ0/7 ASM は N/R で維持確認。
 - B10: 残存する直の PIC/PIT I/O を §1 の表に明記。
@@ -31,18 +31,18 @@
 |調べ|現在の実物|確認結果／設計への反映|
 |---|---|---|
 |#50 reset/beep|`kernel/sys.c:19,20,21,38,43`|記載と一致。reset は SHUT0→SHUT1→RESET、その後 `:23` の無限 halt。beep は BSR 1 書込みずつ|
-|#49 PIC 初期化・EOI|`kernel/idt.c:189,192,301`|記載と一致。初期化12書込み、通常 slave EOI は slave→master|
-|#49 IRQ 状態|`kernel/irq.c:103–116`|`:106` は slave **ISR** 読出し、`:108` は IRR モード復帰。IRQ15 のスプリアス判定に使用|
-|#49 mask|`kernel/idt.c:261,279`|mask の実装本体はこちら。`irq.c` は登録・隔離に応じて呼ぶ側。IMR の RMW を irq_save/restore で保護|
-|#49 PIT・ktime|`kernel/idt.c:226,233,249–253`、`kernel/ktime.c:84–98`|PIT 設定状態を公開してから mode→LSB→MSB。時刻は IRR→latch/lo/hi→IRR→tick|
-|#51 sysclk|`kernel/sysclk.c:16–18,27–30`|記載と一致。BIOS work bit7、1回だけ検出。未判定既定は 1996800Hz、is_8mhz=0|
-|残存する直の PIC/PIT I/O|`kernel/isr_stub.asm:507–508,607–632` の EOI/ISR、`kdebug/recover_profile.c:108–109` の PIT latch/read、`kdebug/kselftest.c:1804` の IMR 読み|今回移さず維持。#49 全域の解消ではない|
+|#49 PIC 初期化・EOI|`arch/x86/kernel/idt.c:189,192,301`|記載と一致。初期化12書込み、通常 slave EOI は slave→master|
+|#49 IRQ 状態|`kernel/irq/irq.c:103–116`|`:106` は slave **ISR** 読出し、`:108` は IRR モード復帰。IRQ15 のスプリアス判定に使用|
+|#49 mask|`arch/x86/kernel/idt.c:261,279`|mask の実装本体はこちら。`irq.c` は登録・隔離に応じて呼ぶ側。IMR の RMW を irq_save/restore で保護|
+|#49 PIT・ktime|`arch/x86/kernel/idt.c:226,233,249–253`、`kernel/time/ktime.c:84–98`|PIT 設定状態を公開してから mode→LSB→MSB。時刻は IRR→latch/lo/hi→IRR→tick|
+|#51 sysclk|`kernel/time/sysclk.c:16–18,27–30`|記載と一致。BIOS work bit7、1回だけ検出。未判定既定は 1996800Hz、is_8mhz=0|
+|残存する直の PIC/PIT I/O|`arch/x86/kernel/isr_stub.asm:507–508,607–632` の EOI/ISR、`kdebug/recover_profile.c:108–109` の PIT latch/read、`kdebug/kselftest.c:1804` の IMR 読み|今回移さず維持。#49 全域の解消ではない|
 |既設 platform|`platform/pc98/boot.c:256`、`d2_bind.c:61–65`|boot/boot_disk/boot_names/pci_resources/d2_bind と platform_io.h/tick_order.h。reset/PIC/PIT/基準 clock 実装は未移動|
 
 - `PLAN.final.md` の基点は `033ec2b8`、SURVEY は `d0f5b0e8`。古い行番号を置換指示に使わず上表の関数単位で切る。
-- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`kernel/isr_handlers.c:540` の dispatch は変更しない。
+- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`arch/x86/kernel/isr_handlers.c:540` の dispatch は変更しない。
 - D3 §3: `boot_platform_register(const struct boot_platform *)` と `step[BOOT_POINT_COUNT]` は既存のまま。
-  `kernel/kernel.c:117` の bind、`:176` PIC→`:182` sysclk→BOOT_DMA→`:187` PIT の呼出位置、IF、ログを固定する。
+  `init/kernel.c:117` の bind、`:176` PIC→`:182` sysclk→BOOT_DMA→`:187` PIT の呼出位置、IF、ログを固定する。
 - 指定範囲外の V86 用 PIC 定義や ASM の固定経路はこの段で再設計しない。#49 全域解消を過大に主張しない。
 
 ## 2. 共通境界 — リンク時固定の小さい口
@@ -57,7 +57,7 @@
 ## 3. L11 — reset / beep
 
 ```c
-/* 新規 kernel/platform_sys.h: 内部、リンク時固定、状態なし */
+/* 新規 include/platform_sys.h: 内部、リンク時固定、状態なし */
 void platform_reset(void);       /* reset I/O の3書込みだけ、戻る場合あり */
 void platform_buzzer_on(void);   /* BSR_BUZ_ON の1書込み */
 void platform_buzzer_off(void);  /* BSR_BUZ_OFF の1書込み */
@@ -88,17 +88,17 @@ void pic_init(void);
 void irq_enable(unsigned int irq);
 void irq_disable(unsigned int irq);
 void pic_eoi(unsigned int irq);
-/* 新規 kernel/platform_irq.h: kernel が必要とする状態/操作だけ */
+/* 新規 include/platform_irq.h: kernel が必要とする状態/操作だけ */
 int platform_irq_slave_last_in_service(void); /* ISR bit7、読後は IRR に戻す */
 void platform_irq_eoi_master(void);           /* master だけ EOI */
 int platform_irq_timer_pending(void);         /* master IRR bit0、L13 が使用 */
-/* kernel/irq.c: irq_finish の既存 plan と報告条件を維持 */
+/* kernel/irq/irq.c: irq_finish の既存 plan と報告条件を維持 */
 if (irq == PIC_SLAVE_LAST_IRQ)
     bit7 = platform_irq_slave_last_in_service();
 plan = irq_eoi_plan(irq, bit7);
 if (plan == IRQ_EOI_SLAVE_MASTER) pic_eoi(irq);
 else if (plan == IRQ_EOI_MASTER) platform_irq_eoi_master();
-/* IRQ 表・件数・隔離・試験状態は kernel/irq.c に残す。 */
+/* IRQ 表・件数・隔離・試験状態は kernel/irq/irq.c に残す。 */
 ```
 
 |操作|固定する I/O と文脈|
@@ -117,20 +117,20 @@ else if (plan == IRQ_EOI_MASTER) platform_irq_eoi_master();
 ## 5. L13 — sysclk → PIT → ktime のハード読み出し
 
 ```c
-/* 新規 kernel/platform_timer.h: 一時値、継続状態ではない */
+/* 新規 include/platform_timer.h: 一時値、継続状態ではない */
 struct platform_clock_value { unsigned long hz; u8 is_8mhz; };
 struct platform_timer_sample { unsigned int count; int p1, p2; };
 void platform_clock_read(struct platform_clock_value *out);
 void platform_timer_program(unsigned int reload); /* mode2→LSB→MSB */
 void platform_timer_sample(struct platform_timer_sample *out); /* 呼出側 IF=0 */
-/* kernel/sysclk.c: s_hz/s_is_8mhz/s_detected は従来の所有者に残す */
+/* kernel/time/sysclk.c: s_hz/s_is_8mhz/s_detected は従来の所有者に残す */
 void sysclk_detect(void) {
     struct platform_clock_value v;
     if (s_detected) return;
     platform_clock_read(&v);
     s_is_8mhz = v.is_8mhz; s_hz = v.hz; s_detected = 1;
 }
-/* kernel/pit.c: s_pit を所有し、状態公開後にハードへ渡す */
+/* kernel/time/pit.c: s_pit を所有し、状態公開後にハードへ渡す */
 int pit_init(unsigned int hz) {
     struct pit_setup s;
     int rc = pit_compute(sysclk_hz(), hz, &s);
@@ -150,7 +150,7 @@ void platform_timer_sample(struct platform_timer_sample *out) {
     out->count = ((unsigned int)hi << 8) | lo;
     out->p2 = platform_irq_timer_pending();
 }
-/* kernel/ktime.c: irq_save 済みの既存 retry loop 内 */
+/* kernel/time/ktime.c: irq_save 済みの既存 retry loop 内 */
 platform_timer_sample(&hw);
 p1 = hw.p1; count = hw.count; p2 = hw.p2;
 t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
@@ -160,11 +160,11 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 |所有者／文脈|移動・維持する中身|
 |---|---|
 |platform/pc98/clock.c、起動前景|`v86_bios_real_lowmem()[BIOS_WORK_SYSCLK]` を1回読む。bit7=1:1996800Hz/8MHz系、0:2457600Hz。既存低位メモリ変換経路を維持|
-|kernel/sysclk.c|未判定既定1996800Hz/is_8mhz=0/detected=0、検出済み判定、3 getter を維持。RTC の clock 登録表とは無関係|
-|kernel/pit.c（idt.c から論理部移動）|`s_pit`、pit_get_setup、pit_init を所有。pit_compute と既定 PIT_HZ 再計算、元の rc、両方失敗時は状態/I/O 不変|
-|platform/pc98/timer.c、起動前景 IF=0|kernel/pit.c が状態公開後に呼ぶ program(reload) の実体。mode→LSB→MSB だけ、s_pit を持たず再計算・待ちを追加しない|
+|kernel/time/sysclk.c|未判定既定1996800Hz/is_8mhz=0/detected=0、検出済み判定、3 getter を維持。RTC の clock 登録表とは無関係|
+|kernel/time/pit.c（idt.c から論理部移動）|`s_pit`、pit_get_setup、pit_init を所有。pit_compute と既定 PIT_HZ 再計算、元の rc、両方失敗時は状態/I/O 不変|
+|platform/pc98/timer.c、起動前景 IF=0|kernel/time/pit.c が状態公開後に呼ぶ program(reload) の実体。mode→LSB→MSB だけ、s_pit を持たず再計算・待ちを追加しない|
 |kernel/pit_math.*|構造体の型・配置・mode 値・純粋整数演算をそのまま維持。100Hz: reload 19968/24576、period_us=10000|
-|kernel/ktime.c、呼出元 IF を保存|ps の valid/mode/reload 検査、retry 上限 TIME_RETRY_MAX、feed、補間、s_last_us と clamp_count を所有。sample は IRQ 内でも待たない|
+|kernel/time/ktime.c、呼出元 IF を保存|ps の valid/mode/reload 検査、retry 上限 TIME_RETRY_MAX、feed、補間、s_last_us と clamp_count を所有。sample は IRQ 内でも待たない|
 
 - sample の I/O は **W IRR/R pending → W latch/R lo/R hi → W IRR/R pending** の7操作。割込み禁止区間を短縮・分割しない。
 - p1/p2 不一致の再試行、上限時 AGAIN、未設定時 NOSYS、失敗時出力不変、NULL 出力、feed 中 clamp 無効、成功時の単調性を維持。
@@ -194,15 +194,15 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 
 |段|ファイル（リポジトリ相対）|種別／おおよその行数・内容|
 |---|---|---|
-|L11|kernel/platform_sys.h / platform/pc98/system.c|新規 各15 / 30、内部口と3操作|
+|L11|include/platform_sys.h / platform/pc98/system.c|新規 各15 / 30、内部口と3操作|
 |L11|kernel/sys.c|変更15、I/O を転送、halt 保存|
-|L12|kernel/platform_irq.h / platform/pc98/pic.c|新規 各20 / 130、状態読出しと既存PIC操作|
-|L12|kernel/idt.c / kernel/irq.c|変更 各100 / 15、PIC 本体移動、finish の判断は維持|
-|L13|kernel/platform_timer.h|新規30、2一時構造体と3関数|
+|L12|include/platform_irq.h / platform/pc98/pic.c|新規 各20 / 130、状態読出しと既存PIC操作|
+|L12|arch/x86/kernel/idt.c / kernel/irq/irq.c|変更 各100 / 15、PIC 本体移動、finish の判断は維持|
+|L13|include/platform_timer.h|新規30、2一時構造体と3関数|
 |L13|platform/pc98/clock.c / platform/pc98/timer.c|新規 各25 / 35、BIOS選択とPIT操作|
-|L13|kernel/pit.c / kernel/idt.c|新規55 / 変更45、設定状態・fallbackを移動|
-|L13|kernel/sysclk.c / kernel/ktime.c|変更 各15 / 25、ハード操作だけ置換|
-|L13|kernel/idt.h / kernel/sysclk.h|変更 各5、実装所在地の注記。宣言・定数の互換維持|
+|L13|kernel/time/pit.c / arch/x86/kernel/idt.c|新規55 / 変更45、設定状態・fallbackを移動|
+|L13|kernel/time/sysclk.c / kernel/time/ktime.c|変更 各15 / 25、ハード操作だけ置換|
+|L13|arch/x86/kernel/idt.h / kernel/time/sysclk.h|変更 各5、実装所在地の注記。宣言・定数の互換維持|
 |各段|build/kernel.mk|変更 計10、platform 新規Cとpit.cを常駐・fixture双方へ|
 |各段|tools/tests/dep_dir_b_io_host.c / test_dep_dir_b_io.py|新規 各180 / 120、順序記録・基点比較・段別変異|
 |各段|build/checks.d/check-dep-dir-b-host.mk / tools/check_map.d/*.yaml|新規20 / 変更各数行目安、下表の選択規則を登録。check_select.py 本体は変更不要|
@@ -215,12 +215,12 @@ t = (unsigned int)tick_count;  /* 必ず sample 後、feed 注入前 */
 
 |YAML|追加する入力|
 |---|---|
-|check-serial-portc-host.yaml|kernel/platform_sys.h、platform/pc98/system.c|
-|check-fdc-track-host.yaml|kernel/platform_irq.h、platform/pc98/pic.c|
-|check-pit-clock-host.yaml|kernel/pit.c、kernel/platform_timer.h、kernel/platform_irq.h、platform/pc98/{clock,timer,pic}.c|
-|check-time-math-host.yaml|kernel/pit.c、kernel/platform_timer.h、kernel/platform_irq.h、platform/pc98/{clock,timer,pic}.c|
-|check-irq-math-host.yaml|kernel/platform_irq.h、platform/pc98/pic.c|
-|check-v86-low-host.yaml|kernel/platform_timer.h、platform/pc98/clock.c|
+|check-serial-portc-host.yaml|include/platform_sys.h、platform/pc98/system.c|
+|check-fdc-track-host.yaml|include/platform_irq.h、platform/pc98/pic.c|
+|check-pit-clock-host.yaml|kernel/time/pit.c、include/platform_timer.h、include/platform_irq.h、platform/pc98/{clock,timer,pic}.c|
+|check-time-math-host.yaml|kernel/time/pit.c、include/platform_timer.h、include/platform_irq.h、platform/pc98/{clock,timer,pic}.c|
+|check-irq-math-host.yaml|include/platform_irq.h、platform/pc98/pic.c|
+|check-v86-low-host.yaml|include/platform_timer.h、platform/pc98/clock.c|
 |check-dep-dir-b-host.yaml（新設）|kernel/{sys,idt,irq,pit,sysclk,ktime}.c、kernel/platform_{sys,irq,timer}.h、platform/pc98/{system,pic,clock,timer}.c、使用する既存ヘッダ・shim・runner・固定fixture・自身のYAML・mk|
 
 - `build/kernel.mk` は broad として全関連試験を選択させる。各試験の runner/host と新規入力を lint で検査する。

@@ -1,6 +1,6 @@
 /* Real kprintf -> real console -> serial capture, with rendering suppressed. */
 #include "../../lib/kprintf_attr.c"
-#include "../../kernel/console.c"
+#include "../../kernel/console/console.c"
 static char serial_output[4096];
 static u32 serial_length;
 #include "../../kernel/port_service.c"

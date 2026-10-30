@@ -19,7 +19,7 @@ LAYOUT_FLAGS = [
 
 class PhysmemTests(unittest.TestCase):
     def run_c(self, body, flags=('-DPHYSMEM_HOST_TEST=1',)):
-        self.assertTrue((ROOT / 'kernel/physmem.c').exists(),
+        self.assertTrue((ROOT / 'mm/physmem.c').exists(),
                         'physical range model not implemented')
         with tempfile.TemporaryDirectory(prefix='os32-physmem-') as tmp:
             src = pathlib.Path(tmp) / 'test.c'
@@ -46,7 +46,7 @@ void _start(void) {
                 '-ffreestanding', '-fno-builtin',
                 '-fno-pie', '-fno-stack-protector', '-nostdlib', '-no-pie',
                 '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
-                str(src), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)
+                str(src), str(ROOT / 'mm/physmem.c'), '-o', str(exe)
             ] + LAYOUT_FLAGS + list(flags), capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             result = host32.run([str(exe)])

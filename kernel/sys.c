@@ -4,10 +4,10 @@
 
 #include "sys.h"
 #include "gf_production.h"
-#include "pgalloc.h"
+#include "../mm/pgalloc.h"
 #include "memmap.h"
 #include "io.h"
-#include "platform_sys.h"
+#include "../include/platform_sys.h"
 #include "clock_service.h"
 #include "os_time.h"
 

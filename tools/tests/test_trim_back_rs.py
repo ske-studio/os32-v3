@@ -21,7 +21,7 @@ APP = 'userland/rust/libos32gui/src/app.rs'
 STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
 TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
          'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-         'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c',
+         'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
          CACHE, WM, APP, STUB]
 MUTANTS = [
     ('stop-leaves-bit', SLOT, '    slot_zero(a);\n    a->state = APP_STATE_FREE;',
@@ -132,10 +132,10 @@ def build(tmp, sources):
     (tmp / 'stop_source.c').write_text('\n'.join(fn(sources['exec/exec.c'], sig) for sig in
         ('static void exec_kill_one(', 'i32 exec_kill(')))
     objects = []
-    for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c')):
+    for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c')):
         src, obj = tmp / f'part{index}.c', tmp / f'part{index}.o'
         src.write_text(sources[name])
-        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'kernel/paging_app.c' else []
+        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'mm/paging_app.c' else []
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)], check=True, capture_output=True, text=True)
         objects.append(str(obj))
     return cc, objects, rust_library(tmp, sources)

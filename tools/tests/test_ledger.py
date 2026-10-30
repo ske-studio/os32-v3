@@ -3,7 +3,7 @@
   python3 -B tools/tests/test_ledger.py            # 肯定側 (unittest)
   python3 -B tools/tests/test_ledger.py --mutate   # 否定側 + 肯定側
 
-票 docs/archive/v3/TASK_T1_LEDGER.md §4-2 (T1b)。kernel/pgalloc.c を丸ごと取り込み
+票 docs/archive/v3/TASK_T1_LEDGER.md §4-2 (T1b)。mm/pgalloc.c を丸ごと取り込み
 (test_pgalloc_model.py と同じ流儀: 特権命令の irq_save / irq_restore だけを
 贋物にし、irq_restore の度に L1 / L2 の不変条件を全ページで検査する)、次を見る:
 
@@ -37,9 +37,9 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
-           'kernel/setjmp.asm', 'kernel/isr_stub.asm', 'include/ksetjmp.h',
-           'kernel/irq.c')
+SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
+           'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/isr_stub.asm', 'include/ksetjmp.h',
+           'kernel/irq/irq.c')
 
 
 def load(mutation=None):
@@ -172,11 +172,11 @@ def run_c(texts, body):
     with tempfile.TemporaryDirectory(prefix='os32-ledger-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'pgalloc_host_fixture.h').write_text(texts['tools/tests/pgalloc_host_fixture.h'])
-        src = texts['kernel/pgalloc.c'].replace('#include "io.h"', '')
+        src = texts['mm/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(PRE + src + POST + body + END)
         cmd = ['gcc', *linker_flags()] + FLAGS + ['-I' + str(tmp)]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
-        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'),
+        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
@@ -538,7 +538,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
 def setjmp_run(texts):
     with tempfile.TemporaryDirectory(prefix='os32-setjmp-') as tmp:
         tmp = pathlib.Path(tmp)
-        (tmp / 'setjmp.asm').write_text(texts['kernel/setjmp.asm'])
+        (tmp / 'setjmp.asm').write_text(texts['arch/x86/kernel/setjmp.asm'])
         (tmp / 'ksetjmp.h').write_text(texts['include/ksetjmp.h'])
         (tmp / 't.c').write_text(SETJMP_C)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 'setjmp.asm'), '-o', str(tmp / 's.o')],
@@ -584,7 +584,7 @@ def all_checks(texts):
     for name, body in BODIES.items():
         ok, log = run_c(texts, body)
         out.append((name, ok, log))
-    bad = asm_problems(texts['kernel/isr_stub.asm'])
+    bad = asm_problems(texts['arch/x86/kernel/isr_stub.asm'])
     out.append(('asm', not bad, '\n'.join(bad)))
     ok, log = setjmp_run(texts)
     out.append(('setjmp', ok, log))
@@ -622,7 +622,7 @@ class Ledger(unittest.TestCase):
         self.run_body('regions_and_selfcheck')
 
     def test_asm_depth_markers(self):
-        self.assertEqual(asm_problems(self.texts['kernel/isr_stub.asm']), [])
+        self.assertEqual(asm_problems(self.texts['arch/x86/kernel/isr_stub.asm']), [])
 
     def test_setjmp_saves_and_restores_depth(self):
         ok, log = setjmp_run(self.texts)
@@ -630,16 +630,16 @@ class Ledger(unittest.TestCase):
 
     def test_jmpbuf_length_not_hardcoded(self):
         self.assertEqual(jmpbuf_hardcoded(), [])
-        v86 = (ROOT / 'kernel/v86.c').read_text()
-        self.assertIn('jmpbuf[KSETJMP_BUF_LEN]', (ROOT / 'kernel/v86_mem.h').read_text())
+        v86 = (ROOT / 'kernel/v86/v86.c').read_text()
+        self.assertIn('jmpbuf[KSETJMP_BUF_LEN]', (ROOT / 'kernel/v86/v86_mem.h').read_text())
         self.assertIn('#define v86_jmpbuf v86_session.jmpbuf', v86)
 
     def test_broker_judgement_unchanged(self):
-        self.assertEqual(broker_problems(self.texts['kernel/irq.c']), [])
+        self.assertEqual(broker_problems(self.texts['kernel/irq/irq.c']), [])
 
     def test_old_api_is_gone(self):
         # 旧 API (owner を取らない口) は T1b の最後で消す (§3-2)。
-        header = (ROOT / 'kernel/pgalloc.h').read_text()
+        header = (ROOT / 'mm/pgalloc.h').read_text()
         for name in ('pgalloc_alloc_page', 'pgalloc_free_page', 'pgalloc_alloc_n',
                      'pgalloc_free_n', 'pgalloc_mark_used', 'pgalloc_alloc_n_range',
                      'pgalloc_alloc_n_pfn', 'pgalloc_free_n_pfn'):
@@ -648,15 +648,15 @@ class Ledger(unittest.TestCase):
 
 # 変異 (§4-2)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('r1-panic-removed', 'kernel/pgalloc.c',
+    ('r1-panic-removed', 'mm/pgalloc.c',
      '    for (;;) { _stop(); }', '    return;'),
-    ('owner-check-removed', 'kernel/pgalloc.c',
+    ('owner-check-removed', 'mm/pgalloc.c',
      '    return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;',
      '    (void)owner;\n    return bit(eligible, p) && bit(bitmap, p);'),
-    ('claim-owner-blind', 'kernel/pgalloc.c',
+    ('claim-owner-blind', 'mm/pgalloc.c',
      '        if (bit(eligible, p) && bit(bitmap, p) && owner_map[p] != owner) {',
      '        if (0) {'),
-    ('irq4-leave-missing', 'kernel/isr_stub.asm',
+    ('irq4-leave-missing', 'arch/x86/kernel/isr_stub.asm',
      '        call    serial_irq_handler\n\n'
      '        ;; マスタPICにEOI送出 (PC-98: ポート 0x00)\n'
      '        mov     al, OCW2_EOI\n        out     PIC1_CMD, al\n\n'
@@ -664,13 +664,13 @@ MUTATIONS = [
      '        call    serial_irq_handler\n\n'
      '        ;; マスタPICにEOI送出 (PC-98: ポート 0x00)\n'
      '        mov     al, OCW2_EOI\n        out     PIC1_CMD, al\n\n'),
-    ('exc-return-leave-missing', 'kernel/isr_stub.asm',
+    ('exc-return-leave-missing', 'arch/x86/kernel/isr_stub.asm',
      '        EXC_LEAVE\n        popad\n        add     esp, ISR_COMMON_SKIP_BYTES',
      '        popad\n        add     esp, ISR_COMMON_SKIP_BYTES'),
-    ('reclaim-device', 'kernel/pgalloc.c',
+    ('reclaim-device', 'mm/pgalloc.c',
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
-    ('longjmp-no-restore', 'kernel/setjmp.asm',
+    ('longjmp-no-restore', 'arch/x86/kernel/setjmp.asm',
      '        mov     ecx, [eax+JB_IRQ_DEPTH]\n        mov     [kctx_irq_depth], ecx\n'
      '        mov     ecx, [eax+JB_EXC_DEPTH]\n        mov     [kctx_exc_depth], ecx\n',
      ''),

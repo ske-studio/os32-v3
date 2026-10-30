@@ -15,7 +15,7 @@ KernelAPIポインタを引数として実行する。
 | ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v4 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
 | 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は常駐 shell (CPL=0)。受理するフラグは `exec/os32x_hdr.c:6` を参照 |
 | アドレス空間 | プログラムごとに PD。APP_BAND より下 (カーネル帯 0x100000〜・シェル帯 0x400000〜0x4FFFFF を含む) は全 PD 共有・非 USER。USER にするのは下の「Ring3 の USER 写像」の範囲だけ |
-| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`kernel/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
+| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`mm/shlib.c`)。.text はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
 | ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) |
 | ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
 | 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`exec/appslot.c:261`)。保護されたカーネル常駐 FD は回収しない |
@@ -68,10 +68,10 @@ PTE の変更の TLB への反映は CR3 の読み直しで行い、`invlpg` を
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
 V86 session の全出口 (正常・失敗・STOP・kill) で、低位の PTE の属性を戻し (VRAM/E の setup と teardown の両方で PCD を台帳と一致させる)、
-boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`kernel/v86_mem.c`)。
+boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`kernel/v86/v86_mem.c`)。
 SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し、通常の地図を検査する。V86 中は通常 AS の実行・生成・検査をしない。
 V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラフィック対応機では出口で 6Ah に標準グラフィック (20h) を書いて戻す
-(`kernel/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
+(`kernel/v86/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
 
 ### V86 セッションの入場と呼出元 (T7a、`exec/v86_call.c`)
 

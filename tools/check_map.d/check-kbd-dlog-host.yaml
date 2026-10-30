@@ -1,7 +1,7 @@
 check-kbd-dlog-host:
 - include/kbd.h
 - drivers/kbd.h
-- kernel/v86_kbd.h
+- kernel/v86/v86_kbd.h
 - drivers/kbd.c
 - drivers/kbd_dlog.c
 - drivers/kbd_status.c

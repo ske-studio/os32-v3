@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  KSETJMP.H — カーネル内 setjmp/longjmp (kernel/setjmp.asm)               */
+/*  KSETJMP.H — カーネル内 setjmp/longjmp (arch/x86/kernel/setjmp.asm)               */
 /*                                                                          */
 /*  ESP/EBP/EBX/ESI/EDI/戻り先 EIP の 6 ワードと、文脈の深さ               */
 /*  (kctx_irq_depth / kctx_exc_depth、TASK_T1_LEDGER §3-5) の 2 ワードを     */

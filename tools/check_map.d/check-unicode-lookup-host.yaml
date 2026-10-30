@@ -7,9 +7,9 @@ check-unicode-lookup-host:
 - tools/gen_unicode.c
 - tools/tests/host32.py
 - tools/tests/test_unicode_lookup.py
-- kernel/unicode_file.c
-- kernel/unicode_file.h
-- kernel/pgalloc.h
+- kernel/console/unicode_file.c
+- kernel/console/unicode_file.h
+- mm/pgalloc.h
 - fs/vfs.h
 - include/config.h
 - include/memmap.h

@@ -2,7 +2,7 @@
 /*  DISKIO_OS32.H — fs/fatfs/diskio.c の OS32 側の口                       */
 /*                                                                          */
 /*  diskio.h は FatFs (ChaN) の配布物で、ff.h の型 (BYTE / LBA_t など) を   */
-/*  前提にする。FatFs の型を持ち込まずに呼びたい側 (kernel/kernel.c、      */
+/*  前提にする。FatFs の型を持ち込まずに呼びたい側 (init/kernel.c、      */
 /*  fs/fatfs_vfs.c) のために、OS32 が足した関数だけをここで宣言する。       */
 /*  (2026-09-24 ラリー 2 の Fable: kernel.c の extern をヘッダへ)          */
 /* ======================================================================== */

@@ -1,7 +1,7 @@
 /* Shared short-lived device aperture. No permission policy lives here. */
 #include "kdebug_window.h"
 #include "memmap.h"
-#include "../kernel/paging.h"
+#include "../mm/paging.h"
 #ifndef KPEEK_HOST
 #include "io.h"
 #endif

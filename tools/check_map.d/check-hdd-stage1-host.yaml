@@ -33,8 +33,8 @@ check-hdd-stage1-host:
 - build/os32.ld
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
-- kernel/kentry.asm
-- kernel/shm.c
+- arch/x86/kernel/kentry.asm
+- mm/shm.c
 - sdk/kapi.json
 - sdk/link/app.ld
 - sdk/link/app_sys.ld

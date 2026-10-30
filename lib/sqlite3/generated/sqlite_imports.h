@@ -5,7 +5,7 @@
 #include "fs/vfs.h"
 #include "include/kprintf.h"
 #include "include/sys.h"
-#include "kernel/kmalloc.h"
+#include "mm/kmalloc.h"
 void vfs_close(int fd);
 int vfs_close_sqlite(const VfsSqliteLease *lease);
 int vfs_count_sqlite(const VfsSqliteCookie *cookie);
@@ -36,6 +36,6 @@ int vfs_sqlite_claim_main(int fd);
 int vfs_resize_fd(int fd, u32 size);
 int vfs_sync_fd(int fd);
 #define SQLITE_IMPORT_COUNT 29
-#define SQLITE_MODULE_ABI_GEN 0x3592f620u
+#define SQLITE_MODULE_ABI_GEN 0x4a069e0fu
 extern unsigned long sqlite_import_slots[SQLITE_IMPORT_COUNT];
 #endif

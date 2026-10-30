@@ -9,7 +9,7 @@ check-vfs-mount-dev-host:
 - fs/ext2_vfs.c
 - fs/fatfs_vfs.c
 - fs/vfs.c
-- kernel/bootlog.c
+- init/bootlog.c
 - lib/microtar/microtar.c
 - tools/tests/ext2_read_bound_host.c
 - tools/tests/ext2_write_io_host.c

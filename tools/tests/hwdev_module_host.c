@@ -1,5 +1,5 @@
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
-#include "../../kernel/hwdev_module.c"
+#include "../../kernel/module/hwdev_module.c"
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"

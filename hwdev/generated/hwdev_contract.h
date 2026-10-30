@@ -19,8 +19,8 @@
 #include "include/bootinfo.h"
 #include "include/gf_production.h"
 #include "include/kprintf.h"
-#include "kernel/pgalloc.h"
 #include "lib/kstring.h"
+#include "mm/pgalloc.h"
 struct hwdev_core_api {
     u32 abi, size, contract_crc, layout_crc;
     int (*trial_begin)(struct recover *r, const struct recover_profile *profile, u32 plan_hash, u32 budget);
@@ -50,7 +50,7 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0xfdda34aeU
+#define HWDEV_CONTRACT_CRC 0x949aff12U
 #define HWDEV_LAYOUT_CRC 0x64142dfaU
 #define HWDEV_IMPORT_COUNT 37U
 #define HWDEV_CORE_SLOTS 26U

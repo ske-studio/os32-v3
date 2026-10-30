@@ -34,7 +34,7 @@ CASES = ["stat_invalid_name_is_notfound",
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
          "-D__cdecl=",
-         "-DBOOTLOG_NO_IRQ_LOCK"]     # kernel/bootlog.c の錠をホストで空にする
+         "-DBOOTLOG_NO_IRQ_LOCK"]     # init/bootlog.c の錠をホストで空にする
 INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "fs", "lib", "kernel", "drivers",
                       "sdk/include/os32")]

@@ -3,7 +3,7 @@
  *  票 docs/archive/kernel_v21/TASK_KSTACK_USER.md §4 の 2・3
  *  記録: tools/tests/memmap_tdd.md
  *
- *  kernel/paging.c と kernel/shm.c を **そのまま** #include し、
+ *  mm/paging.c と mm/shm.c を **そのまま** #include し、
  *  paging_init → paging_reclaim_conventional → shm_init → (KAPI 踏み台)
  *  というカーネルの起動順を再生してから paging_memmap_selftest() を呼ぶ。
  *  ゲストを起動せずに「地図と実装が食い違う件数と区間」を確定できる。
@@ -109,13 +109,13 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 #define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
 #include "pgalloc_host_fixture.h"
 
-/* kernel/shm.c の shm_init() がページ表に対してやることの写し。
+/* mm/shm.c の shm_init() がページ表に対してやることの写し。
  *
  * **本当は shm.c をそのまま #include したい**が、ホストの gcc 15 は
  * `(u32)&__bss_end` を含む定数式を畳まなくなっており (クロスの gcc 13.2 は
  * 畳む)、shm.c の STATIC_ASSERT が "variably modified at file scope" で
  * 落ちる。そこでここだけ写しにして、**写しが本物とずれていないことを
- * tools/tests/test_memmap_boot.py が kernel/shm.c の本文と突き合わせる**。 */
+ * tools/tests/test_memmap_boot.py が mm/shm.c の本文と突き合わせる**。 */
 static void shm_init_replay(void)
 {
     paging_set_not_present(MEM_SHM_GUARD_LO,
@@ -167,7 +167,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x180000);
 
-    /* ---- カーネルの起動順そのもの (kernel/kernel.c) ---- */
+    /* ---- カーネルの起動順そのもの (init/kernel.c) ---- */
     host_map_fixed_paging();
     for (i = MEM_FIXED_PAGING_USED_END; i < MEM_FIXED_PAGING_FRAME_END; i += sizeof(u32))
         *(u32 *)i = 0xA55A1234;

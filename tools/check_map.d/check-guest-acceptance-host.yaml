@@ -10,7 +10,7 @@ check-guest-acceptance-host:
 - exec/appslot.c
 - exec/exec_kapi_init.inc
 - exec/appslot.h
-- kernel/paging.h
+- mm/paging.h
 - include/appmem_types.h
 - tools/tvdump_recv.py
 - tools/tests/test_guest_acceptance.py

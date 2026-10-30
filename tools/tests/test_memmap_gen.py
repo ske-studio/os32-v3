@@ -83,10 +83,10 @@ def _unused_mirrors(root, m):"""),
 
 
 # memmap.h の値を写している場所 (gen_memmap.py の MIRRORS / ASM_SYMBOLIC と同じ顔ぶれ)
-MIRROR_FILES = ("build/os32.ld", "kernel/kentry.asm",
+MIRROR_FILES = ("build/os32.ld", "arch/x86/kernel/kentry.asm",
                 "sdk/include/os32/os32_gui_shared.h",
                 "sdk/rust/os32api/src/gui/proto.rs",
-                # ホスト試験が kernel/shm.c を組むための偽 memmap.h を持つ。
+                # ホスト試験が mm/shm.c を組むための偽 memmap.h を持つ。
                 # 2026-09-17 に実際にずれたので写しの照合対象に入っている。
                 "tools/tests/test_owner_reclaim.py",
                 # ローダ (NASM) のブート情報域の番地 (票 TASK_HDD_INSTALL 段 0)
@@ -225,7 +225,7 @@ def cases(script):
         # ASM が数値直書きに戻ったら気づく
         with tempfile.TemporaryDirectory(prefix="os32-genmm-asm-") as directory:
             root2 = make_tree(directory, CLEAN)
-            asm = root2 / "kernel/kentry.asm"
+            asm = root2 / "arch/x86/kernel/kentry.asm"
             asm.write_text(asm.read_text(encoding="utf-8")
                            .replace("mov     esp, LAYOUT_MEM_KSTACK_TOP",
                                     "mov     esp, 002FFFFCh"), encoding="utf-8")
@@ -322,9 +322,9 @@ def link_fixture(root, core_end=0x2bc060):
                        capture_output=True)
     sys.path.insert(0, str(ROOT / 'tools'))
     import gen_memmap
-    source = (root / 'build/os32.ld').read_text().replace('kernel/kentry.o', 'build/out/obj/kernel/kentry.o')
+    source = (root / 'build/os32.ld').read_text().replace('arch/x86/kernel/kentry.o', 'build/out/obj/arch/x86/kernel/kentry.o')
     (root / 'build/out/fixture.ld').write_text(gen_memmap.preprocess_layout(root, source))
-    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'build/out/obj/kernel/kentry.o', '-o', 'build/out/fixture.elf'],
+    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'build/out/obj/arch/x86/kernel/kentry.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
 
 

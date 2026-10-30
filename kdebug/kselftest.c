@@ -73,7 +73,7 @@ extern volatile int ring3_in_syscall;
  * 残り 1.2KB まで詰まった)。-O2 はこの 6 行を呼び出し 194 か所すべてに
  * 展開していて、それだけで 6KB を食っていた。自己診断は起動時に 1 回しか
  * 走らないので速度は要らない。判定そのものは 1 バイトも変わらない。
- * (同じ理由の先例: kernel/cpu_calibrate.c の nop_loop) */
+ * (同じ理由の先例: kernel/time/cpu_calibrate.c の nop_loop) */
 static void __attribute__((noinline)) check(int cond, const char *name)
 {
     if (cond) {
@@ -2053,7 +2053,7 @@ static void test_irq_dynamic_body(int skip_unmask)
     (void)irq_unregister(KSEL_IRQ_LINE, ksel_fake_irq, &ksel_dev[3]);
     check((irq_line_quarantined & (1u << KSEL_IRQ_LINE)) != 0,
           "irq:q vs recount");
-    /* **試験専用の戻し** (kernel/irq.h の注記)。これが無いと以後の起動で
+    /* **試験専用の戻し** (kernel/irq/irq.h の注記)。これが無いと以後の起動で
      * IRQ3 が使えないままになる。 */
     irq_test_reset_line(KSEL_IRQ_LINE);
     check((irq_line_quarantined & (1u << KSEL_IRQ_LINE)) == 0,
@@ -2169,7 +2169,7 @@ static void test_time_now(void)
      * 「はじめ」の側が 1 周期ぶん大きくなり、補間の比較が偶発的に落ちる
      * (10ms に数 µs の窓。踏むまで気づけない形なので先に塞ぐ)。
      * 2 本とも同じ注入経路なので、成功の判定は 1 本にまとめる。
-     * 注入中はクランプを通らない (kernel/ktime.c) ので、
+     * 注入中はクランプを通らない (kernel/time/ktime.c) ので、
      * 「終わり」→「はじめ」の巻き戻りがそのまま観測できる。 */
     time_test_feed[0].p1 = 0; time_test_feed[0].p2 = 0;
     time_test_feed[0].count = 1;              /* 周期の終わり */
@@ -2252,7 +2252,7 @@ static void test_time_now(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  起動ログ (kernel/bootlog.c)。ここは書き出しの前なので、溜まっている     */
+/*  起動ログ (init/bootlog.c)。ここは書き出しの前なので、溜まっている     */
 /*  最中の本物を見る。compose は本文を動かさないので呼んでも害は無い。       */
 /*  組み方と手順の網羅はホスト試験 (tools/tests/test_bootlog.py)。          */
 /* ------------------------------------------------------------------------ */

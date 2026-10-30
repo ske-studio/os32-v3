@@ -158,9 +158,9 @@ def pair_runtime_suite(folder, mutate=False):
     harness = (ROOT / 'tools/tests/module_runtime_host.c').read_text()
     harness = harness.replace('MODULE_ID_KDEBUG', 'MODULE_ID_SQLITE')
     harness = harness.replace('exports[4]', 'exports[0]')
-    image_source = (ROOT / 'kernel/module_image.c').read_text().replace(
+    image_source = (ROOT / 'kernel/module/module_image.c').read_text().replace(
         '"../lib/crc32_core.inc"', '"' + str(ROOT / 'lib/crc32_core.inc') + '"')
-    schema = (ROOT / 'kernel/module_schema.h').read_text()
+    schema = (ROOT / 'kernel/module/module_schema.h').read_text()
     # The shared fixture follows KDEBUG's ops version; the caller policy and
     # image must carry the actual SQLITE row's version so that only the field
     # under test (flags / pair CRC / ops) decides the rejection.
@@ -173,7 +173,7 @@ def pair_runtime_suite(folder, mutate=False):
     harness = head + caller_policy + str(sqlite_ops) + tail[tail.index(','):]
     harness_path = folder / 'sqlite_runtime_host.c'
     harness_path.write_text(harness)
-    (folder / 'module_image.h').write_bytes((ROOT / 'kernel/module_image.h').read_bytes())
+    (folder / 'module_image.h').write_bytes((ROOT / 'kernel/module/module_image.h').read_bytes())
     source_path = folder / 'module_image.c'
     schema_path = folder / 'module_schema.h'
     exe = folder / 'sqlite-runtime'
@@ -183,7 +183,7 @@ def pair_runtime_suite(folder, mutate=False):
         schema_path.write_text(policy)
         subprocess.run(['gcc', *RUNTIME_FLAGS, '-Werror=vla', '-Wno-unused-parameter',
                         *RUNTIME_INCLUDES, '-nostdlib', '-static', '-no-pie',
-                        '-Wl,--gc-sections', harness_path, ROOT / 'kernel/module_runtime.c',
+                        '-Wl,--gc-sections', harness_path, ROOT / 'kernel/module/module_runtime.c',
                         ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', source_path,
                         '-o', exe], check=True)
 
@@ -239,11 +239,11 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     fep_elf = mkmod.Elf((fep_directory / 'fep.elf').read_bytes())
     (folder / 'fep_host_offsets.h').write_text(
         '#define HOST_FEP_STATE ' + str(next(sym['value'] for table in fep_elf.symtabs.values() for sym in table if sym['name'] == 'g_ime')) + 'u\n')
-    (folder / 'fep_module.c').write_bytes((ROOT / 'kernel/fep_module.c').read_bytes())
+    (folder / 'fep_module.c').write_bytes((ROOT / 'kernel/ime/fep_module.c').read_bytes())
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
     (folder / 'sqlite_smoke.c').write_text(smoke)
     for name in ('sqlite_engine', 'sqlite_outer'):
-        source = (ROOT / 'kernel' / (name + '.c')).read_text()
+        source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
         # Disk settings I/O belongs to the VFS fixture; use a private RAM DB here.
         source = source.replace('SYS_SETTINGS_DB, SQLITE_OPEN_READONLY', '":memory:", SQLITE_OPEN_READWRITE')
         if name == 'sqlite_engine':
@@ -263,7 +263,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         'static inline unsigned long irq_save(void) { unsigned long f=host_flags; '
         'host_flags &= ~512UL; return f ^ 512UL; }\n'
         'static inline void irq_restore(unsigned long f) { host_flags=f ^ 512UL; }\n')
-    handlers = (ROOT / 'kernel/isr_handlers.c').read_text()
+    handlers = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()
     start = handlers.index('void sqlite_engine_fault(')
     (folder / 'sqlite_fault.inc').write_text(
         '#include "io.h"\n#include "pc98.h"\n' + handlers[start:handlers.index('\n}', start) + 2])
@@ -311,8 +311,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                     ROOT / 'tools/tests/sqlite_module_host.c',
                     folder / 'sqlite_engine.c', folder / 'sqlite_outer.c',
                     folder / 'sqlite_kexports.c', folder / 'fep_kexports.c', folder / 'fep_module.c',
-                    ROOT / 'kernel/module_runtime.c',
-                    ROOT / 'kernel/module_image.c', ROOT / 'kernel/unicode_file.c',
+                    ROOT / 'kernel/module/module_runtime.c',
+                    ROOT / 'kernel/module/module_image.c', ROOT / 'kernel/console/unicode_file.c',
                     folder / 'sqlite_smoke.c', obj, '-o', exe]
     subprocess.run(command, check=True)
     pair = mkmod.pair_crc(vmkernel.read_bytes())
@@ -442,9 +442,9 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                   + result.stdout.decode().strip(), flush=True)
             target.write_text(original)
         runtime_path = folder / 'module_runtime_boot.c'
-        runtime_source = (ROOT / 'kernel/module_runtime.c').read_text()
+        runtime_source = (ROOT / 'kernel/module/module_runtime.c').read_text()
         runtime_path.write_text(runtime_source)
-        boot_command = [runtime_path if item == ROOT / 'kernel/module_runtime.c' else item for item in command]
+        boot_command = [runtime_path if item == ROOT / 'kernel/module/module_runtime.c' else item for item in command]
         mutations = [
             ('no-dictionary-loads-FEP', path, source,
              'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND',
@@ -545,7 +545,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
              '    if (!g_ime.dict.learn_stmt) return -1;\n    g_ime.dict_loaded = 1;', 32),
             ('close-fault-after-ready', 'ime_dict',
              'services_stage < SERVICES_READY &&\n        ', '', 33)):
-            source = (ROOT / 'kernel' / (name + '.c')).read_text()
+            source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict') else 'kernel') / (name + '.c')).read_text()
             scope = function(source, 'ime_dict_boot' if name == 'ime' else 'ime_dict_close')
             assert scope.count(old) == 1, label
             source_path = mutated_dir / (name + '.c')
@@ -650,7 +650,7 @@ def main():
                            stack_mutate=args.stack_mutate or args.mutate, fep_mutate=args.fep_mutate, policy_mutate=args.policy_mutate or args.mutate)
         print(json.dumps(stats, sort_keys=True))
         if args.mutate:
-            source = (ROOT / 'kernel/module_image.c').read_text()
+            source = (ROOT / 'kernel/module/module_image.c').read_text()
             for name, old, new in MUTATIONS:
                 assert source.count(old) == 1, name
                 path = folder / 'module_image.c'

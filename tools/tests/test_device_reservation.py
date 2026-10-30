@@ -5,7 +5,7 @@
 
 票 docs/archive/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
 核 (pgalloc_device_reserve / sys_device_reserve_core) を台帳の ledger_reserve_set
-に載せ直したので、その試験をここで流用・拡張する。kernel/pgalloc.c と
+に載せ直したので、その試験をここで流用・拡張する。mm/pgalloc.c と
 platform/pc98/pci_resources.c を丸ごと、drivers/pci.c からは読み口 pci_get だけを
 切り出して取り込む (特権命令の irq_save / irq_restore だけを贋物にし、
 irq_restore の度に L1 / L2 の不変条件を全ページ検査する — test_ledger.py と同じ
@@ -46,9 +46,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
-SOURCES = ('kernel/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
-           'platform/pc98/pci_resources.c', 'drivers/pci.c', 'kernel/paging.c', 'kernel/sys.c',
-           'kernel/kernel.c')
+SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
+           'platform/pc98/pci_resources.c', 'drivers/pci.c', 'mm/paging.c', 'kernel/sys.c',
+           'init/kernel.c')
 
 
 def load(mutation=None):
@@ -585,11 +585,11 @@ def run_c(texts, body):
     with tempfile.TemporaryDirectory(prefix='os32-devres-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'pgalloc_host_fixture.h').write_text(texts['tools/tests/pgalloc_host_fixture.h'])
-        src = texts['kernel/pgalloc.c'].replace('#include "io.h"', '')
+        src = texts['mm/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(L.PRE + src + post + body + L.END)
         cmd = ['gcc', *linker_flags()] + L.FLAGS + ['-I' + str(tmp)]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
-        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'kernel/physmem.c'),
+        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
                                       str(ROOT / 'drivers/pci_decode.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
@@ -603,7 +603,7 @@ def stage_run(texts):
     with tempfile.TemporaryDirectory(prefix='os32-device-stage-') as tmp:
         tmp = pathlib.Path(tmp)
         for unit in ('paging', 'pgalloc', 'sys'):
-            source = texts['kernel/%s.c' % unit]
+            source = texts[('%s/%s.c' % ('mm' if unit in ('paging', 'pgalloc') else 'kernel', unit))]
             source = source.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
             (tmp / f'{unit}_host_source.c').write_text(source)
         cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
@@ -614,7 +614,7 @@ def stage_run(texts):
         cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
         cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'drivers', 'sdk/include/os32')] + ['-I' + str(tmp)]
         build = subprocess.run(cmd + [str(ROOT / 'tools/tests/device_reservation_stage_host.c'),
-                                      str(ROOT / 'kernel/physmem.c'), '-o', str(tmp / 'test')],
+                                      str(ROOT / 'mm/physmem.c'), '-o', str(tmp / 'test')],
                                capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
@@ -689,7 +689,7 @@ class DeviceReservation(unittest.TestCase):
     def test_old_broker_is_gone(self):
         # 旧 broker (pgalloc_device_reserve / sys_device_reserve_core) は T1d で
         # ledger_reserve_set に載せ直した。生の {first, end} を予約権限にする口を残さない。
-        for rel in ('kernel/pgalloc.h', 'include/sys.h', 'kernel/pgalloc.c', 'kernel/sys.c'):
+        for rel in ('mm/pgalloc.h', 'include/sys.h', 'mm/pgalloc.c', 'kernel/sys.c'):
             text = (ROOT / rel).read_text()
             for name in ('pgalloc_device_reserve', 'sys_device_reserve_core',
                          'sys_device_span', 'device_claim'):
@@ -697,7 +697,7 @@ class DeviceReservation(unittest.TestCase):
 
     def test_import_is_before_bind(self):
         # ⑥-0 は PCI bind を行う LAN 部品の起動前 (B4)、台帳より後。
-        k = (ROOT / 'kernel/kernel.c').read_text()
+        k = (ROOT / 'init/kernel.c').read_text()
         imp = k.index('boot_platform_run(BOOT_PCI_RESOURCES, &boot)')
         self.assertLess(k.index('memory_boot_init(mem_kb)'), imp)
         self.assertLess(imp, k.index('lan_module_load()'))
@@ -705,45 +705,45 @@ class DeviceReservation(unittest.TestCase):
 
 # 変異 (§4-4)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('raw-grants-authority', 'kernel/pgalloc.c',
+    ('raw-grants-authority', 'mm/pgalloc.c',
      'rr->width_basis > LEDGER_WB_GLUE_CONST', 'rr->width_basis > LEDGER_WB_PROBE_UNVERIFIED'),
-    ('decode-end-unchecked', 'kernel/pgalloc.c',
+    ('decode-end-unchecked', 'mm/pgalloc.c',
      '            t.end > rr->decode_end ||\n', ''),
-    ('decode-first-unchecked', 'kernel/pgalloc.c',
+    ('decode-first-unchecked', 'mm/pgalloc.c',
      't.first >= t.end || t.first < rr->decode_first ||', 't.first >= t.end ||'),
-    ('res-mask-not-merged', 'kernel/pgalloc.c',
+    ('res-mask-not-merged', 'mm/pgalloc.c',
      '            s[k - 1].res |= s[i].res;\n', ''),
-    ('mixed-kind-overlap-merged', 'kernel/pgalloc.c',
+    ('mixed-kind-overlap-merged', 'mm/pgalloc.c',
      '            if (k && s[i].first < s[k - 1].end) goto done;\n', ''),
-    ('background-refused', 'kernel/pgalloc.c',
+    ('background-refused', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;\n', ''),
-    ('fixed-allowed', 'kernel/pgalloc.c',
+    ('fixed-allowed', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_FIXED) continue;'),
-    ('other-owner-device-allowed', 'kernel/pgalloc.c',
+    ('other-owner-device-allowed', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_DEVICE) continue;'),
-    ('partial-match-accepted', 'kernel/pgalloc.c',
+    ('partial-match-accepted', 'mm/pgalloc.c',
      '        ok = hit == n && mine == n;', '        ok = hit == n;'),
-    ('res-mask-not-compared', 'kernel/pgalloc.c',
+    ('res-mask-not-compared', 'mm/pgalloc.c',
      '                    g->res_mask == s[i].res && g->cache == s[i].kind) hit++;',
      '                    g->cache == s[i].kind) hit++;'),
-    ('live-or-permanent-unchecked', 'kernel/pgalloc.c',
+    ('live-or-permanent-unchecked', 'mm/pgalloc.c',
      '            if (owner_map[p] ||\n', '            if (0 ||\n'),
-    ('ram-eligibility-unchecked', 'kernel/pgalloc.c',
+    ('ram-eligibility-unchecked', 'mm/pgalloc.c',
      '(s[i].kind == LEDGER_CACHE_WB && !bit(eligible, p))) goto done;', '0) goto done;'),
-    ('eligibility-not-dropped', 'kernel/pgalloc.c',
+    ('eligibility-not-dropped', 'mm/pgalloc.c',
      '                eligible[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));\n                total_pages--;\n',
      ''),
-    ('non-device-owner', 'kernel/pgalloc.c',
+    ('non-device-owner', 'mm/pgalloc.c',
      '        ledger_owners[owner].kind != LEDGER_KIND_DEVICE || !spans || !n ||',
      '        !spans || !n ||'),
-    ('selfcheck-rejects-device-on-background', 'kernel/pgalloc.c',
+    ('selfcheck-rejects-device-on-background', 'mm/pgalloc.c',
      '                !(r->type == LEDGER_R_DEVICE && g->type == LEDGER_R_BACKGROUND))\n',
      '                1)\n'),
-    ('overflow-not-counted', 'kernel/pgalloc.c',
+    ('overflow-not-counted', 'mm/pgalloc.c',
      '        ledger_res_overflow++;\n', ''),
-    ('record-map-unchecked', 'kernel/pgalloc.c',
+    ('record-map-unchecked', 'mm/pgalloc.c',
      '        rec->map_first > rec->map_end ||\n', ''),
     ('import-width-verified', 'platform/pc98/pci_resources.c',
      '    r.width_basis = LEDGER_WB_RAW;', '    r.width_basis = LEDGER_WB_SIZING;'),

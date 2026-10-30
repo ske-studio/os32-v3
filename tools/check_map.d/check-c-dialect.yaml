@@ -23,7 +23,7 @@ check-c-dialect:
 - tools/gen_memmap.py
 - boot/loader_fat_new.asm
 - build/os32.ld
-- kernel/kentry.asm
+- arch/x86/kernel/kentry.asm
 - sdk/kapi.json
 - sdk/link/app.ld
 - sdk/link/app_sys.ld
@@ -35,7 +35,7 @@ check-c-dialect:
 - tools/mkshlib.py
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - tools/mkmod.py
 - tools/module_schema.py
 artifact_reader: true

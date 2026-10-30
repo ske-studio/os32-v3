@@ -75,7 +75,7 @@ def main():
         folder = Path(td)
         product_image(folder)
         exe = folder / 'v86-module'
-        source = (ROOT / 'kernel/v86_mem.c').read_text()
+        source = (ROOT / 'kernel/v86/v86_mem.c').read_text()
         def build(text):
             (folder / 'v86_mem.c').write_text(text)
             subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', '-I' + str(folder),
@@ -83,7 +83,7 @@ def main():
                             '-I' + str(ROOT / 'build/out/v86'),
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/v86_module_host.c',
-                            ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                             ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:

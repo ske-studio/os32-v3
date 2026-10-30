@@ -11,7 +11,7 @@
 #define PCM_ADAPTER "../../kernel/pcm_module.c"
 #endif
 #include PCM_ADAPTER
-#include "../../kernel/tick.c"
+#include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 pcm_kexports[] = {0};
 const struct module_symbol_contract pcm_import_contracts[] = {{0}};

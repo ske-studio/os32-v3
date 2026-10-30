@@ -29,7 +29,7 @@
 |差分7 #45|`kapi/kapi_sys.c:318,334` → `:337` PCI照会、`:353` ポートサービス。後者は解決済みで対象外|
 |差分8 #28補足|`exec/exec.c:40`、`kernel/ver_collect.c:6` も pcm_cs4231.h、`sdk/kapi.json:27,58` に fm/pcm の具体 include。表の3ヘッダだけ直しても残る|
 |差分9 KCG前提|`kernel/kcg_module.h:11–17` は read_ank/read_kanji/stats/invalidate の4枠だけ。専用3操作を入れる既存枠がない。L10は§12の判断が必要|
-|一致 #15/28/30/44|`kernel/dma_pool.h:30`・`dma_pool_math.c:99`、pcm/fm/lan_module.h:4、`kernel/v86.c:799,810,907,917,923`、`kapi/kapi_host.c:43,54,71,86,91,96`|
+|一致 #15/28/30/44|`mm/dma_pool.h:30`・`dma_pool_math.c:99`、pcm/fm/lan_module.h:4、`kernel/v86/v86.c:799,810,907,917,923`、`kapi/kapi_host.c:43,54,71,86,91,96`|
 
 - 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`platform/pc98/boot.c:243` の bind に新フェーズを足さない。
 - B §2 のリンク時固定口・§試験の基点列固定を踏襲。C §3 の固定名ヘッダ/static const は必要な機種記述だけに使い、状態表を増やさない。
@@ -79,9 +79,9 @@ int dma_range_ok(u32 pa, u32 size, u32 limit) {
 - PcmModuleApi/FmModuleApi/LanModuleApi 自体は kernel の既存ヘッダに残す。スロット数/順序/sizeof/offsetof と OPS_VERSION は固定。LAN の pci_dev は前方宣言、必要なPCI型は独立契約へ。
 - pcm_present/reclaim/open等、FMの常駐facade宣言を共通契約から供給。exec/ver_collectとJSON includesも置換する。E82557状態値・診断型は名前と値を維持してlan契約へ。
 - DMA pool状態/割当/leaseはkernel、8237実行状態とPCM ringはdrivers、module_handle/candidateは常駐facade。新登録はない。
-- L01のinclude追従: kernel/dma_pool_math.c:14 は dma_contract.h、kernel/snd_engine.c:11 は fm_contract.h、fs/serialfs_session.c:36 は lan_contract.h へ置換する。
+- L01のinclude追従: mm/dma_pool_math.c:14 は dma_contract.h、kernel/snd_engine.c:11 は fm_contract.h、fs/serialfs_session.c:36 は lan_contract.h へ置換する。
 - tools/prototypes/pcm_imports.def の contracts に include/pcm_contract.h・include/dma_contract.h、fm_imports.def に include/fm_contract.h、lan_imports.def に include/lan_contract.h を追加し、L02ではLANに include/pci_contract.h も追加。既存列の順序は保つ。生テキストhashなので型配置不変でも PCM_MODULE_ABI_GEN・FM_MODULE_ABI_GEN・LAN_MODULE_ABI_GEN は変わる。
-- kernel/kdebug_imports.def の source を dma_crosses_64k/dma_range_ok→include/dma_contract.h、pcm_open/pcm_state→include/pcm_contract.h、e82557_send/get_mac/state→include/lan_contract.h に変更。旧ヘッダに再宣言は残さず、生成器が新所在の本文から宣言を得る。
+- kernel/module/kdebug_imports.def の source を dma_crosses_64k/dma_range_ok→include/dma_contract.h、pcm_open/pcm_state→include/pcm_contract.h、e82557_send/get_mac/state→include/lan_contract.h に変更。旧ヘッダに再宣言は残さず、生成器が新所在の本文から宣言を得る。
 - PM決定: KDEBUG_ABI_GEN も変わり、hwdev契約CRCも変わり得る。配置世代・KAPI版・部品のスロット配置/OPS_VERSIONは不変。旧部品はloadのpolicyで断られる。カーネルと対応する部品を再生成・再ビルドし、hsync bootで常に組で配る（実機の入れ方は不変、Cirrus/FMと同扱い）。
 
 ## 4. L02 — 82557 match の機種配線（2時間）
@@ -220,10 +220,10 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 
 |段|新規ファイル（概算行数）|変更ファイル（各概算行数、生成物は再生成）|
 |---|---|---|
-|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、kernel/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
+|L01|include/dma_contract.h 45、pcm_contract.h 60、fm_contract.h 60、lan_contract.h 80、lib/dma_contract.c 25|drivers/dma8237.h 25・dma8237_math.c 20・pcm_cs4231.h 60・fm.h 60・e82557.h 80、mm/dma_pool.h 2・dma_pool_math.c 2・snd_engine.c 2・pcm_module.h/fm_module.h/lan_module.h 各3、fs/serialfs_session.c 2、exec/exec.c 2、kernel/ver_collect.c 2、sdk/kapi.json 3、build/kernel.mk 3、tools/prototypes/{pcm,fm,lan}_imports.def 各2–5、kernel/module/kdebug_imports.def 7、hwdev/hwdev_imports.def 該当source行|
 |L02|include/pci_contract.h 150、platform/pc98/lan_match.c 20|kernel/lan_module.c 15・lan_module.h 5、drivers/e82557.h 3・pci.h/pci_bind.h 各30–100、tools/prototypes/lan_imports.def 1、build/kernel.mk 2|
 |L03|なし|kernel/pcm_module.c 15、drivers/pcm_cs4231.c 0–5（既存IRQ引数を維持）|
-|L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|
+|L04|include/platform_device.h 25、platform/pc98/device_loop.c 30|kernel/v86/v86.c 12、sdk/kapi.json 5、build/kernel.mk 2|
 |L05a|include/ide_contract.h 70、platform/pc98/device_ide.c 45|include/platform_device.h 15、drivers/ide.h 70、sdk/kapi.json 12、build/kernel.mk 2、disk_auth_host.c 2|
 |L05b|なし|platform/pc98/device_ide.c 20、include/platform_device.h 10、fs/ide_limits.h 3・ext2_super.c 15・ext2_fmt.c 20・fatfs_vfs.c 15・fatfs/diskio.c 12・fatfs/diskio_os32.h 2、§11のIDE fixture/コピー一覧各5–40|
 |L06|platform/pc98/device_fs.c 25|include/platform_device.h 8、fs/vfs.c 1、sdk/kapi.json 6、build/kernel.mk 2|

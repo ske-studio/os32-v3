@@ -3,7 +3,7 @@ check-multiapp-model-host:
 - exec/appslot.c
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
-- kernel/shm.c
+- mm/shm.c
 - tools/tests/multiapp_impl_host.c
 - tools/tests/multiapp_model_host.c
 - tools/tests/owner_reclaim_host.c

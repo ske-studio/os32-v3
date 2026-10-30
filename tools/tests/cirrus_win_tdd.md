@@ -28,10 +28,10 @@ PEGC で直した §4-34 と同じ形。
 ユーザー決定: **Cirrus は NP21/W 互換のためだけ**。リニア窓を v3 のデバイス窓の帯 `[0xFE000000, 0xFF000000)`
 (`include/memmap.h` `MEM_DEVICE_APERTURE_*`) の先頭へ移す。
 
-- `include/memmap.h`: 帯と `MEM_PHYS_RAM_CEILING` を定義。`kernel/memory_boot.c` は `[MEM_PHYS_RAM_CEILING, 4GB)` を MMIO にする。
+- `include/memmap.h`: 帯と `MEM_PHYS_RAM_CEILING` を定義。`mm/memory_boot.c` は `[MEM_PHYS_RAM_CEILING, 4GB)` を MMIO にする。
 - `include/wab_xe10.h`: `WAB_XE10_LINEARWIN_SEL` = 帯の先頭 >> 24 = FEh (NP21/W は FFh を捨てる)。窓として出る 4MB を `WAB_XE10_LINEARWIN_DECODE` に。
   帯と静的 PT に収まることは `drivers/wab_glue_xe10.c` の STATIC_ASSERT。
-- `kernel/paging.c`: 帯の先頭 4MB の PT を静的に 1 枚 (+4KB BSS)。PDE は paging_init で present。
+- `mm/paging.c`: 帯の先頭 4MB の PT を静的に 1 枚 (+4KB BSS)。PDE は paging_init で present。
 - `gfx/backend_cirrus.c`: 窓の上限を旧 PAGING_MAP_SIZE (32MB) から 32bit 空間の末尾へ。
   **段 2 の門**: auto では `np2_detect()` が真のときだけボードの ID を読む。`GFX=cirrus` の明示時は読む。
   auto の probe は 1 回ごとに np2_detect の検出通信 (07EFh へ `"NP2"` の OUT 3 回 + 応答の IN 最大 7 回) を 1 組**追加で**行う。

@@ -1,8 +1,8 @@
 /* D3b: real runtime bootinfo and PC-9821 adapter, with IDE state fakes. */
 #include "bootinfo.h"
 #include "../../drivers/ide.h"
-#include "../../kernel/bootinfo.c"
-#include "../../kernel/bootinfo_check.c"
+#include "../../init/bootinfo.c"
+#include "../../init/bootinfo_check.c"
 #include "../../platform/pc98/boot_disk.c"
 
 #define STR1(x) #x

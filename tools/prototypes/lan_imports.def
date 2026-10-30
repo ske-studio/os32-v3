@@ -39,13 +39,13 @@
     },
     {
       "symbol": "dma_mark_leaked",
-      "source": "kernel/dma_pool.h",
+      "source": "mm/dma_pool.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "cpu_delay_us",
-      "source": "kernel/cpu_calibrate.h",
+      "source": "kernel/time/cpu_calibrate.h",
       "context": "normal",
       "irq": true
     },
@@ -81,7 +81,7 @@
     },
     {
       "symbol": "sysconfig_get_int",
-      "source": "kernel/sysconfig.h",
+      "source": "init/sysconfig.h",
       "context": "normal",
       "irq": false
     },

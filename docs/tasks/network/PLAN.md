@@ -55,11 +55,11 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 
 ### OS32 側
 
-- `kernel/idt.c` は IRQ3/5/6 を unexpected IRQ スタブに接続している。
+- `arch/x86/kernel/idt.c` は IRQ3/5/6 を unexpected IRQ スタブに接続している。
   専用入口を登録し、デバイス初期化後に `irq_enable()` する必要がある。
-- `kernel/isr_stub.asm` のセグメント設定と `IRETD_USER` を使い、CPL3/V86 からの割り込みを壊さない。
+- `arch/x86/kernel/isr_stub.asm` のセグメント設定と `IRETD_USER` を使い、CPL3/V86 からの割り込みを壊さない。
   NIC IRQ は OS32 が所有し、DOS ゲストへ反射しない。V86 の I/O ポリシーでも所有ポートを保護する。
-- `kernel/isr_handlers.c:timer_handler()` の現行処理は `snd_tick()`。
+- `arch/x86/kernel/isr_handlers.c:timer_handler()` の現行処理は `snd_tick()`。
   常設のネットワーク worker があるとは仮定しない。
 - カーネル帯域と 16KB スタックには余裕が限られる。フレームをスタック上に置かず、
   `.text/.data/.bss` とリンク後の帯域を計測する。
@@ -76,8 +76,8 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 | `drivers/ne2000_io.asm` | `rep insw` / `rep outsw` と奇数末尾の安全な転送 |
 | `drivers/ne2000.h` | カーネル内部 API、状態、結果コード |
 | `drivers/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
-| `kernel/isr_stub.asm` / `kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
-| `kernel/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
+| `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
+| `init/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
 | `build/kernel.mk` | C/ASM ソースと必要な include path・生成依存関係 |
 
 汎用ネットワークフレームワークや関数ポインタ式のバス抽象化は最初は作らない。
@@ -240,8 +240,8 @@ NHD/エミュレータ設定変更は実施時に該当する承認・停止手�
   §7 受信と overwrite recovery、§8 送信、§9 Remote DMA、§10 レジスタ、§11 初期化、§12 loopback。
 - ローカル NP21/W: `~/np21w-src/src/network/lgy98.c`、`lgy98.h`、`lgy98dev.h`。
   実装上の観測値を参照し、エミュレータ特有の省略を実カードの仕様にしない。
-- OS32: `include/io.h`、`kernel/idt.c`、`kernel/isr_stub.asm`、`kernel/isr_handlers.c`、
-  `kernel/cpu_calibrate.h`、`build/kernel.mk`、`build/os32.ld`。
+- OS32: `include/io.h`、`arch/x86/kernel/idt.c`、`arch/x86/kernel/isr_stub.asm`、`arch/x86/kernel/isr_handlers.c`、
+  `kernel/time/cpu_calibrate.h`、`build/kernel.mk`、`build/os32.ld`。
 - 制約: [CONSTRAINTS.md](../../CONSTRAINTS.md)、[POLICY_DEV.md](../../POLICY_DEV.md)。
 
 M0 はエミュレータ基準で凍結、M1〜M4 は実装・エミュレータ受入済み ([§9](#9-進捗と確定事項-2026-09-05-着手ブランチ-featlgy98))。
@@ -308,9 +308,9 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 
 - `include/io.h` には `insw_rep` (rep insw) だけがあり、`outsw` 系は無い。§3 の
   `drivers/ne2000_io.asm` で両方向を持つ方針と矛盾しない。
-- `kernel/idt.c` は IRQ 3/5/6 を `irq_stub_unexp_*` に接続している (§2 のとおり)。
+- `arch/x86/kernel/idt.c` は IRQ 3/5/6 を `irq_stub_unexp_*` に接続している (§2 のとおり)。
   IRQ12 は `irq_stub_12` (サウンドボード)。
-- `kernel/cpu_calibrate.h` (`cpu_delay_us`) と `include/io.h` の `irq_save/irq_restore` は存在する。
+- `kernel/time/cpu_calibrate.h` (`cpu_delay_us`) と `include/io.h` の `irq_save/irq_restore` は存在する。
 - ドキュメント運用: 本計画が設計と進捗の正典 (INDEX.md「情報単位ごとの正典」の流儀)。
   実装完了後の現行仕様は `docs/05_drivers.md` へ、落とし穴の経緯は `POLICY_DEBUG.md §4` へ。
 

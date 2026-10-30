@@ -3,7 +3,7 @@
  * child VAs backed by different owner pages. */
 #include "exec_heap.h"
 #define kfree heap_kernel_free
-#include "kernel/kmalloc.c"
+#include "mm/kmalloc.c"
 #undef kfree
 #include "exec/access_walk.c"
 int shlib_read_page(u32 va, u32 pa) { (void)va; (void)pa; return 0; }

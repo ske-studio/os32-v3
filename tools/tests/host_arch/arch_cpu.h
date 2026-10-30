@@ -6,7 +6,7 @@
 /*  これを引かせる (契約ヘッダ include/cpu.h は本物のまま)。実物のソースを    */
 /*  一字も書き換えずにホストで走らせるための差し替え口。                     */
 /*                                                                          */
-/*  順序 5 より前は各試験スクリプトが kernel/paging.c の asm 行を文字列置換   */
+/*  順序 5 より前は各試験スクリプトが mm/paging.c の asm 行を文字列置換   */
 /*  していた。asm が arch/x86/arch_cpu.h へ移ったので、置換ではなく          */
 /*  **契約の別実装**に替えてある (置換は対象が消えると黙って効かなくなる)。   */
 /*                                                                          */
@@ -61,7 +61,7 @@ static inline void arch_mmu_enable(void)
 }
 
 /* 特権境界はホストで再現できない。呼ばれたらその場で止める
- * (ホスト試験に載っているのは kernel/paging.c だけで、呼び手はいない)。 */
+ * (ホスト試験に載っているのは mm/paging.c だけで、呼び手はいない)。 */
 #define arch_enter_user(root_phys, user_sp, entry)                      \
 do {                                                                    \
     (void)(root_phys); (void)(user_sp); (void)(entry);                  \

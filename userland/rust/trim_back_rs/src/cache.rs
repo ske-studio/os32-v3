@@ -20,7 +20,7 @@ const EXEC_SIZE: usize = 27;
 const MAP_EXACT: u32 = 1;
 const INVALID: u32 = 6; // MEMSTAT_POISONED | MEMSTAT_HEAP_INVALID
 const PENDING: u32 = 8;
-// Current ILP32 heap wire format: kernel/kmalloc.h and Os32Alloc::AllocPrefix.
+// Current ILP32 heap wire format: mm/kmalloc.h and Os32Alloc::AllocPrefix.
 const HEADER: u32 = 8;
 const PREFIX: u32 = 8;
 const ALIGN: u32 = 8;

@@ -10,12 +10,12 @@ check-cd-read-host:
 - build/checks.d/check-cd-read-host.mk
 - kernel/cd_body.c
 - kernel/cd_module.h
-- kernel/module_runtime.h
-- kernel/module_image.h
-- kernel/module_schema.h
+- kernel/module/module_runtime.h
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
 - fs/vfs.h
 - drivers/dev.h
-- kernel/kernel.c
+- init/kernel.c
 - fs/vfs.c
 - drivers/dev.c
 - drivers/disk.h

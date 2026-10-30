@@ -1,10 +1,10 @@
 check-con-sink-host:
 - gfx/pc98_route.h
 - tools/tests/host32.py
-- kernel/con_sink.c
+- kernel/console/con_sink.c
 - kdebug/selftest_con_sink.c
 - kdebug/selftest_internal.h
-- kernel/console.c
+- kernel/console/console.c
 - tools/tests/con_sink_host.c
 - tools/tests/test_con_sink.py
 - tools/check_map.d/check-con-sink-host.yaml
@@ -12,6 +12,6 @@ check-con-sink-host:
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h

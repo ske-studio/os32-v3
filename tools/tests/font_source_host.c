@@ -1,4 +1,4 @@
-/* T7b-b1: font の read lease (fs/vfs_fd.c と kernel/font_source.c を実物で組む)。
+/* T7b-b1: font の read lease (fs/vfs_fd.c と kernel/console/font_source.c を実物で組む)。
  * 設計 ~/os32-tmp/run/t7bb12/DESIGN.final.md §2 / §5 の b1①〜⑦ と b2②④ の
  * lease 表側。S1 = VFS 部、S2 = lease 表・app の門 (public KAPI の実体)・
  * shell 側の段 C/D。S3b = exec.c の回収 hook (exec_reclaim_resources を
@@ -20,7 +20,7 @@
  * 試験 py が kernel/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
 #define __GUI_H
 #define GUI_SHELL_OWNER HOST_GUI_SHELL_OWNER
-#include "../../kernel/font_source.c"
+#include "../../kernel/console/font_source.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \
@@ -371,7 +371,7 @@ static void budget(void)
         open_font_ok(APP_OWNER, VFS_FONT_OPEN_PIN, &l);
 }
 
-/* ==== S2: lease 表と app の門 (kernel/font_source.c) ==================== */
+/* ==== S2: lease 表と app の門 (kernel/console/font_source.c) ==================== */
 
 /* exec / redir_access の境界の贋物。caller は試験が演じる */
 static int from_user = 1, caller_ok = 1, copy_fail, kill_calls;

@@ -9,20 +9,20 @@
 
 1 アプリに渡せるメモリが搭載 RAM に依らず約 2.5MB で頭打ちになっていた原因は、
 アプリ固有のページディレクトリエントリ (PDE) が **1 枚 (4MB) しかない**ことだった。
-これを要求量に応じて 4MB 単位で増やす変更を、実物の `kernel/paging.c` を
+これを要求量に応じて 4MB 単位で増やす変更を、実物の `mm/paging.c` を
 ホストで動かして検査する。ゲスト (NP21/W) の検証ではない。
 
 ## 作り
 
 `test_paging_bounds.py` と同じ仕掛け:
 
-- `kernel/paging.c` を読み、特権命令 (`mov %cr3` / `mov %cr0`) だけを
+- `mm/paging.c` を読み、特権命令 (`mov %cr3` / `mov %cr0`) だけを
   ホスト変数への代入に置換して `paging_host_source.c` として書き出す
-- `kernel/pgalloc.c` は `irq_save` / `irq_restore` を潰して同様に書き出す
-- `kernel/physmem.c` はそのままリンクする
+- `mm/pgalloc.c` は `irq_save` / `irq_restore` を潰して同様に書き出す
+- `mm/physmem.c` はそのままリンクする
 - `-m32 -march=i386 -std=gnu89 -Werror -Wdeclaration-after-statement` で
   ILP32 としてビルドし、`-nostdlib -static` で直接走らせる (libc に依存しない)
-- 最後に **クロスコンパイラ (`i386-elf-gcc -O2`) でも** `kernel/paging.c` を
+- 最後に **クロスコンパイラ (`i386-elf-gcc -O2`) でも** `mm/paging.c` を
   コンパイルして、ホストだけで通る C になっていないことを確かめる
 
 恒等で読み書きできる実メモリは `mmap` (int 0x80 #90) で `0x400000` から 12MB

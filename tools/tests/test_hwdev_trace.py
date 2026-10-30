@@ -103,7 +103,7 @@ def run(folder, image=None, mode_c=False):
     command[command.index(str(ROOT/'tools/tests/gfinit_plan_host.c'))] = str(harness)
     if mode_c:
         command.insert(1, '-DHWDEV_SEQUENCE_IMAGE')
-    command[-2:-2] = [str(ROOT/'tools/tests/hwdev_trace_image.c'), str(ROOT/'kernel/module_image.c'),
+    command[-2:-2] = [str(ROOT/'tools/tests/hwdev_trace_image.c'), str(ROOT/'kernel/module/module_image.c'),
                       *module.INCLUDES, '-I'+str(folder), '-I'+str(ROOT/'build/out/hwdev')]
     subprocess.run(command, check=True)
     if image is None:

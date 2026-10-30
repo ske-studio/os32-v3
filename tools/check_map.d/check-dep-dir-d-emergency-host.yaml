@@ -1,8 +1,8 @@
 check-dep-dir-d-emergency-host:
-- kernel/boot_display.c
-- kernel/isr_handlers.c
-- kernel/double_fault.c
-- kernel/v86_mem.c
+- init/boot_display.c
+- arch/x86/kernel/isr_handlers.c
+- arch/x86/kernel/double_fault.c
+- kernel/v86/v86_mem.c
 - platform/pc98/emergency.c
 - kernel/*.h
 - platform/pc98/*.h

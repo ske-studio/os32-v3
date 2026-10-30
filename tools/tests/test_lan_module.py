@@ -52,7 +52,7 @@ def product_image(folder):
                  'sfs_lan_reset', 'sfs_lan_set_peer'):
         assert name in core.symbols and name in body.symbols, name
     # h4 uses the resident VFS/PCI/DMA facades and keeps its existing contracts.
-    imports = (ROOT / 'kernel/kdebug_imports.def').read_text()
+    imports = (ROOT / 'kernel/module/kdebug_imports.def').read_text()
     for name in ('dma_alloc', 'dma_free', 'vfs_read'):
         assert name in core.symbols and '"symbol": "' + name + '"' in imports, name
     for name in ('pci_bind_all', 'pci_cfg_read32', 'irq_register', 'vfs_read'):
@@ -82,7 +82,7 @@ def product_image(folder):
 def boot_distribution():
     """FD plan and boot placement are independent of optional service modes."""
     import mkpkg
-    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
     begin = kernel.index('services_stage = SERVICES_ROOT_READY;')
     end = kernel.index('services_boot();', begin)
     boot = kernel[begin:end]
@@ -107,7 +107,7 @@ def runtime_checks(folder, mutations=False):
                         '-DLAN_ADAPTER="' + str(source) + '"',
                         '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         ROOT / 'tools/tests/lan_module_host.c',
-                        ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                        ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                         ROOT / 'platform/pc98/lan_match.c',
                         ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
 

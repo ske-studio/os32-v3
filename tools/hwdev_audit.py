@@ -43,7 +43,7 @@ def audit(out, cross):
     rows = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
                       core_table, re.M)
     require([int(r[0]) for r in rows] == list(range(25)) + [36], 'core slot order/count')
-    imports = {r['symbol']: r for r in json.loads((ROOT/'kernel/kdebug_imports.def').read_text())['imports']}
+    imports = {r['symbol']: r for r in json.loads((ROOT/'kernel/module/kdebug_imports.def').read_text())['imports']}
     core_names = {r[1] for r in rows}
     kernel_names = refs & imports.keys()
     require(refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}')

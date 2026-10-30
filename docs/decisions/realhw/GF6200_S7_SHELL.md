@@ -88,13 +88,13 @@ rc = g_api->kdebug_call(op, &q, sizeof(q));
 ## 確定 (2026-10-23、Opus r2 条件付き確定可、PM が P3 2 件を決めた)
 - C1 (inspect の再実行): 同じ sid の 2 回目の `gfinit inspect` は gfinit.c:309 の重複検査で保存済みの結果が返り `GF inspect` 行が出ない。再実行は `gfinit abort <sid> --allow-write` (IDLE では装置への書込み無し) の後に新しい sid で行う、と運用で決める。結果を出し直すコードは足さない。
 - C2 (行の受け持ち): `GF inspect` 行は hwdev が出す (取れなかった欄は unknown)。`GF inspect-end` 行は shell が kdebug_call の戻り値から必ず出す (hwdev が早く失敗して 1 行目が無くても、終わりの行で rc が分かる)。
-- 確認事項 (S7a の中): hwdev が import している kprintf が rshell_active のとき serial へ写る経路 (kernel/console.c:261) を通ることを host か NP21/W の入口で確かめる。
+- 確認事項 (S7a の中): hwdev が import している kprintf が rshell_active のとき serial へ写る経路 (kernel/console/console.c:261) を通ることを host か NP21/W の入口で確かめる。
 
 ## S7a の実装で設計者が決めたこと
 - version.chip は既存二重読取ROM内の BIT `i` (version 1) のデータ先頭+2から読む（MIT envytools f102b82381f3f11cee113d16374c87091db039d9、nvbios/bios.c:198,230・bit.c:75–78,124–128・info.c:49–52）；期待値44は REALHW_RECOVER_ADDENDUM のS4取り込み事項に揃え、欠落・範囲外・不一致はinspect失敗とする。
 - 二重読取とROM長の検査を通った時点でrom_lenと全ROMのIEEE CRC32を取得済みとし、PCIR/checksum/decode失敗でも表示する；それ以前はunknown、expectは常に44、matchはchip取得時だけ1/0とする。
 - inspectの呼出し失敗はinspect-endのrcだけで示し、abort失敗は既存recover先例の `gfinit: rejected rc=`、abort成功は追加行なしとする；API不足/NULLは呼ばずunavailableとする。
-- KDEBUGはビルド時の分岐ではなく起動設定なので同じ成果物を使い、hostは実物kernel/kdebug_call.cの未公開opsによるNOSYSと公開opsの両経路を試験する。
+- KDEBUGはビルド時の分岐ではなく起動設定なので同じ成果物を使い、hostは実物kernel/module/kdebug_call.cの未公開opsによるNOSYSと公開opsの両経路を試験する。
 - gfinit_wire.hはgfinit.h経由でDWARF収集に含まれるため、generatorのglobから直接includeだけを除き、冗長な1行追加を防いで生成物・inventoryの差0を維持する。
 
 ## S7c の実装で設計者が決めたこと

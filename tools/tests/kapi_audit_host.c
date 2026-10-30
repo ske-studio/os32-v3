@@ -87,7 +87,7 @@ void appslot_poll_yield_reset(void) {}
 #include "../../kernel/serial_diag.c"
 #include "pointer_fixture_host.h"
 /* This fixture exercises input/serial; supply a fake calendar provider. */
-#include "../../kernel/clock_service.c"
+#include "../../kernel/time/clock_service.c"
 const ClockOps pc98_clock = {
     .read_date = clock_empty_date, .read_legacy = clock_empty_legacy,
 };

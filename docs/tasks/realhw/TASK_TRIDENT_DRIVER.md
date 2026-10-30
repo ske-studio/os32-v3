@@ -297,7 +297,7 @@ v1 の「割り込み禁止で書いて戻す」手順は**取り下げ** — �
 
 現行のカーネルには「Trident の出力中に止まったら 98 側へ戻す」経路が**無い**:
 
-- 致命的例外 (`kernel/isr_handlers.c` `exception_handler`) は `_disable()` → テキスト VRAM に表示 → `exec_nest_level > 0` なら
+- 致命的例外 (`arch/x86/kernel/isr_handlers.c` `exception_handler`) は `_disable()` → テキスト VRAM に表示 → `exec_nest_level > 0` なら
   `exec_fault_recover()`、それ以外は `hlt` で停止。**`gfx_shutdown()` には接続されていない**。映像が Trident 側なら表示は見えず、
   rshell (シリアル) もこの停止からの復旧は保証しない。
 - 通常の戻しは KAPI `gfx_shutdown` → `backend->leave()` を**アプリ (gshell) が呼ぶ約束**。所有者の異常終了・CTRL+STOP で
@@ -455,7 +455,7 @@ gfx/backend_trident.c      GfxBackend (probe / prepare / init / query / present_
 ### 4-2. メモリ・窓 (v3 の資源台帳と私有 lease)
 
 資源・面・lease の正典は [MEMMAP_V3 §0 D33](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) と
-[§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `kernel/paging.c` の私有 lease 窓、`exec/lease.c` と `kernel/ledger_pci.c`。
+[§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `kernel/ledger_pci.c`。
 旧共有 PT 昇格案と変更経緯は 設計履歴 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に保存した。
 
 **予約と準備 (Trident 固有部分は未実装)**

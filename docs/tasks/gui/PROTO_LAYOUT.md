@@ -25,7 +25,7 @@ GUI は SHM 末尾の予約範囲をスロットに分割する。
 容量と範囲は [`memmap.h:167・192–194`](../../../include/memmap.h) の
 `MEM_SHM_SIZE` / `MEM_SHM_GUI_SIZE` / `MEM_SHM_GUI_OFFSET`、
 アプリからの計算は [`os32_gui_shared.h:383–385`](../../../sdk/include/os32/os32_gui_shared.h) の `GUI_SHM_OFFSET` / `GUI_SLOT_SIZE` / `GUI_SLOT_MAX` が正典。
-[`kernel/shm.c:119–122`](../../../kernel/shm.c) はこの範囲を `SHM_RESERVED` に固定し、
+[`mm/shm.c:119–122`](../../../mm/shm.c) はこの範囲を `SHM_RESERVED` に固定し、
 `shm_alloc` は配らず、`shm_free` / `shm_cleanup_all` は触らない。
 
 ## 番号・上限・色

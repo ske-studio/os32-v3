@@ -517,9 +517,9 @@ class Gui:
 
     def _module_base(self, module_name):
         kernel = self.symbol_factory(self.kernel_elf).read()
-        header = ROOT / 'kernel/module_runtime.h'
+        header = ROOT / 'kernel/module/module_runtime.h'
         constants = c_constants(header)
-        schema = c_constants(ROOT / 'kernel/module_schema.h')
+        schema = c_constants(ROOT / 'kernel/module/module_schema.h')
         offsets = c_word_offsets(header, 'module_record', 'base')
         count = schema('MODULE_RECORD_CAP')
         address, size = kernel['module_records']
@@ -538,7 +538,7 @@ class Gui:
         return self.ime_mode() != 0
 
     def _restore_ime(self, mode):
-        # SHIFT+SPACE always reopens in hiragana (kernel/ime.c:ime_toggle).
+        # SHIFT+SPACE always reopens in hiragana (kernel/ime/ime.c:ime_toggle).
         # No GUI key selects katakana; report the observed mismatch explicitly.
         result = {'before': mode, 'ok': False}
         try:

@@ -119,10 +119,10 @@ def execute(tmp, sources, runner):
     cc = build_fixture(tmp, sources)
     objects = []
     for i, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-                              'kernel/paging_app.c', 'kernel/physmem.c')):
+                              'mm/paging_app.c', 'mm/physmem.c')):
         src, obj = tmp / f'part{i}.c', tmp / f'part{i}.o'
         src.write_text(sources[name])
-        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'kernel/paging_app.c' else []
+        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'mm/paging_app.c' else []
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)],
                      check=True, capture_output=True, text=True)
         objects.append(str(obj))
@@ -176,7 +176,7 @@ def main():
     args = p.parse_args()
     paths = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
              'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-             'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c']
+             'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c']
     sources = {name: (ROOT / name).read_text() for name in paths}
     with tempfile.TemporaryDirectory(prefix='trim-kernel-') as directory:
         tmp = pathlib.Path(directory)

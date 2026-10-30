@@ -94,7 +94,7 @@ __asm__(".global _start\n_start:\n"
 #undef e82557_ee_read_word
 #include "../../fs/vfs.h"
 #include "../../drivers/e82557.h"
-#include "../../kernel/module.h"
+#include "../../kernel/module/module.h"
 #include "../../include/bootinfo.h"
 _Static_assert(sizeof(u32) == 4, "ILP32 required");
 static int failed;
@@ -129,7 +129,7 @@ static int swi_lost, irq0_first, irq_deliveries, runtime, inject_rus, inject_res
 static int yield_mode, ack_repeat, status_reads, cb_completed;
 static u32 ru_pointer, model_ticks;
 static u8 rx_frame[1600];
-#include "../../kernel/irq.h"
+#include "../../kernel/irq/irq.h"
 static irq_handler_fn handler;
 static void model_assert_ring(u32 pa);
 static void yield_event(void);
@@ -365,7 +365,7 @@ int e82557_ee_read_word(const struct e82557_ee_pins *p,int mode,int *width,u16 a
 #include "../../include/config.h"
 #define kstrncmp strncmp
 #define kstrcmp strcmp
-#include "../../kernel/dma_pool.h"
+#include "../../mm/dma_pool.h"
 static void desc_event(const volatile void *p,u32 n,int write);
 static void barrier_event(void) { last_barrier=++event_seq; }
 #define E82557_BARRIER() barrier_event()

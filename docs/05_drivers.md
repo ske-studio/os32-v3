@@ -148,7 +148,7 @@ KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から
 `drivers/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
-`kernel/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):
+`kernel/v86/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):
 `include/pegc.h` の 480 ラインの SYNC は実機 Ra266 の ROM から採った値を使う。uPD7220 の SYNC は読み戻せないため、
 採取には V86 の監視部で**実機の ROM の INT 18h** を呼ぶ — AH=31h で今のモードを読み、その値の bit の並び
 (NP21/W の bit2 / Bible 3-2 の bit3。その並びとして正しい値になるのがちょうど 1 つのときだけ決め、決まらなければ 30h を呼ばない。

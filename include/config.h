@@ -37,7 +37,7 @@
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
 #define SYS_UNICODE_BIN       "/sys/unicode.bin"   /* Unicodeテーブル */
-/* 起動ログ (kernel/bootlog.c)。最初の kprintf から常駐シェルを exec する
+/* 起動ログ (init/bootlog.c)。最初の kprintf から常駐シェルを exec する
  * 直前までの出力を溜め、ルートが ext2 / FAT のときだけ書き出す。実機で
  * 流れてしまう [selftest] などを `cat /var/log/boot.log` で読むため。
  * FAT (FatFs、LFN なし) は 8.3 しか作れないので、前回分だけ名前が違う。 */

@@ -1,4 +1,4 @@
-"""font の read lease (T7b-b1) — 実物の fs/vfs_fd.c と kernel/font_source.c をホストで。
+"""font の read lease (T7b-b1) — 実物の fs/vfs_fd.c と kernel/console/font_source.c をホストで。
 
 設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §2・§5 (b1①〜⑦、b2②④ の lease 表側)。
 S1 = VFS の内部 API (vfs_open_font / validate / read_at / close_font、公開経路の
@@ -35,7 +35,7 @@ INC_DIRS = ("include", "fs", "drivers", "sdk/include/os32", "kernel", "exec", "l
             "arch/x86", "platform/pc98")
 HOST = "tools/tests/font_source_host.c"
 SRC = "fs/vfs_fd.c"
-LEASE = "kernel/font_source.c"
+LEASE = "kernel/console/font_source.c"
 EXEC = "exec/exec.c"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
 TARGET_INC = ("include", "arch/x86", "platform/pc98", "sdk/include", "sdk/include/os32",
@@ -77,7 +77,7 @@ MUTATIONS = [
     # ---- S2 (S1 の取り込みで送られた項目) ----
     (SRC, "    open_files[fd].protect = (flags & VFS_FONT_OPEN_PROTECT) ? 1 : 0;\n",
      "    open_files[fd].protect = 0;\n", "protect=(flags&PROTECT) → 0"),
-    # ---- S2: lease 表と app の門 (kernel/font_source.c) ----
+    # ---- S2: lease 表と app の門 (kernel/console/font_source.c) ----
     (LEASE, "    if (ring3_call_from_user() == 0)\n",
      "    if (0)\n", "門 1 (CPL=3 の dispatch 中) を外す"),
     (LEASE, "    if (!caller_access_get(c) || c->origin != CALLER_USER ||\n",

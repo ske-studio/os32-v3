@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  CPU_CALIBRATE_HOST.C — kernel/cpu_calibrate_math.c をホストで回す       */
+/*  CPU_CALIBRATE_HOST.C — kernel/time/cpu_calibrate_math.c をホストで回す       */
 /*                                                                          */
 /*  実物の判定を 1 行も写さずに #include する。tick_count も I/O も触らない */
 /*  ので模型は 1 つも要らない。                                             */
@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../kernel/cpu_calibrate_math.c"
+#include "../../kernel/time/cpu_calibrate_math.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -148,7 +148,7 @@ static void give_up(void)
 /* ------------------------------------------------------------------ */
 static void delay_scale(void)
 {
-    /* cpu_delay_us の式 (kernel/cpu_calibrate.c):
+    /* cpu_delay_us の式 (kernel/time/cpu_calibrate.c):
      *   loops = (lpt / 100) * us / 100        (1 tick = 10,000µs)
      * 実機 266MHz で正しい lpt = 200 万のとき、5µs は 1000 ループ。 */
     u32 good = 2000000UL;

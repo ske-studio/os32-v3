@@ -11,7 +11,7 @@
 //! | `Face::open` の読込み、miss の raster + commit | `font_guard_run` の callback の中 | [`open_cb`] / [`raster_cb`] |
 //! | 描画 (hit の借用) | guard の外 | `text.rs` → [`glyph`] |
 //!
-//! callback の中では service の `read_at` 以外を呼ばない (kernel/font_guard.h)。
+//! callback の中では service の `read_at` 以外を呼ばない (kernel/console/font_guard.h)。
 //! guard は TASK_FONTPERF F6 から x87 を保存しない (ラスタは整数だけ) が、shell の
 //! read_at の文脈規則 (段 A/B、b12 §3-3) と fault の帰属を担う区間として残す。
 //! kernel は FPU の有無で NOSYS を返さなくなったので `Reason::NoFpu` は使わない。

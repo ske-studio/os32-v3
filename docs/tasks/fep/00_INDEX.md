@@ -12,7 +12,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
   アーキテクチャ説明 (辞書スキーマ / 入力フロー / 公開 API) で、進捗の判断には使わない
 - 元タスク一覧: [`FEP_FUTURE.md`](FEP_FUTURE.md)
 - SQLite カーネル統合: `docs/archive/v21/sqlite/00_INDEX.md`
-- 対象ソース: `kernel/ime.c` / `kernel/ime.h` / `kernel/ime_dict.c` / `kernel/ime_romkana.c`
+- 対象ソース: `kernel/ime/ime.c` / `kernel/ime/ime.h` / `kernel/ime/ime_dict.c` / `kernel/ime/ime_romkana.c`
 
 > **コーディング規約 (本設計のコードスケッチも準拠):**
 > [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)・
@@ -37,7 +37,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象化を伴う最大の変更で、
 他フェーズと切り離して最後に実施する。
 
-> **実装状況 (2026-08-07):** §1 の描画バックエンド抽象化 (`kernel/ime_render.h` +
+> **実装状況 (2026-08-07):** §1 の描画バックエンド抽象化 (`kernel/ime/ime_render.h` +
 > `ime_render_tvram.c`) と P1 / P2 / P3 は実装され、本リポジトリ `main` に
 > 移植済み (KAPI v35)。経緯は
 > `docs/archive/v21/wintree_port/PORT_PLAN.md` フェーズ6 を参照。
@@ -80,14 +80,14 @@ P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象�
 
 | ファイル | P1 | P2 | P3 | P4 | P5 | P6 | 種別 |
 |---------|----|----|----|----|----|----|------|
-| `kernel/ime.h` | ● | | ● | | ● | | 構造体/定数追加 |
-| `kernel/ime.c` | ● | ● | ● | | ● | ● | ロジック改修 |
-| `kernel/ime_dict.c` | | | ● | ● | | ● | 辞書操作追加 |
-| `kernel/ime_romkana.c` | | | | | | | 変更なし |
-| `kernel/ime_render.h` | ● | | | | ● | | 新規 (描画抽象) |
-| `kernel/ime_render_tvram.c` | ● | | | | ● | | 新規 |
+| `kernel/ime/ime.h` | ● | | ● | | ● | | 構造体/定数追加 |
+| `kernel/ime/ime.c` | ● | ● | ● | | ● | ● | ロジック改修 |
+| `kernel/ime/ime_dict.c` | | | ● | ● | | ● | 辞書操作追加 |
+| `kernel/ime/ime_romkana.c` | | | | | | | 変更なし |
+| `kernel/ime/ime_render.h` | ● | | | | ● | | 新規 (描画抽象) |
+| `kernel/ime/ime_render_tvram.c` | ● | | | | ● | | 新規 |
 | `kernel/ime_render_gfx.c` | | | | | ● | | 新規 |
-| `kernel/console.c` | | ● | | | | | スクロール改修 |
+| `kernel/console/console.c` | | ● | | | | | スクロール改修 |
 | `include/tvram.h` | | ● | | | | | API 追加 |
 | `gfx/gfx_core.c` / `gfx.h` | | | | | ● | | `gfx_is_active` 公開 |
 | `kapi/kapi_generated.c` (生成物) | | | ● | | | | 生成ラッパー |

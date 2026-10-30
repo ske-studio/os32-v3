@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  DMA_POOL_HOST.C — kernel/dma_pool_math.c をそのままホストで回す         */
+/*  DMA_POOL_HOST.C — mm/dma_pool_math.c をそのままホストで回す         */
 /*                                                                          */
 /*  表の算数だけを見る。実物を 1 行も写さずに #include する                 */
 /*  (64KB またぎの規則は lib/dma_contract.c の dma_crosses_64k が正典   */
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../lib/dma_contract.c"
-#include "../../kernel/dma_pool_math.c"
+#include "../../mm/dma_pool_math.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

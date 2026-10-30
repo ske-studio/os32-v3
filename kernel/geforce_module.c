@@ -4,7 +4,7 @@
 #include "config.h"
 #include "os32_generations.h"
 #include "gfx_internal.h"
-#include "pgalloc.h"
+#include "../mm/pgalloc.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "gf_production.h"

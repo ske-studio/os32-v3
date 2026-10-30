@@ -50,7 +50,7 @@
 /* 起動時 (pci_bind_all の後)。検出だけ。装置が無くても静かに戻る。 */
 void pcm_init(void);
 
-/* tick フック (kernel/isr_handlers.c の timer_handler)。 */
+/* tick フック (arch/x86/kernel/isr_handlers.c の timer_handler)。 */
 void pcm_tick(void);
 
 /* 所有者の回収 (exec/exec.c の exec_reclaim_owned)。 */

@@ -17,7 +17,7 @@ OWNERS = {
 }
 
 def wiring():
-    isr = (ROOT / 'kernel/isr_handlers.c').read_text()
+    isr = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()
     body = isr[isr.index('void timer_handler(void)'):]
     assert body.count('tick_dispatch();') == 1
     assert body.index('r1_fixture_timer();') < body.index('tick_dispatch();')
@@ -36,8 +36,8 @@ def wiring():
         src = (ROOT / rel).read_text()
         src = src[src.index(OWNERS[rel][2]):]
         assert src.index('tick_register(') < src.index(boundary), rel
-    assert 'tick_order.h' not in (ROOT / 'kernel/tick.c').read_text()
-    assert 'kernel/tick.c' in (ROOT / 'build/kernel.mk').read_text()
+    assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
+    assert 'kernel/irq/tick.c' in (ROOT / 'build/kernel.mk').read_text()
     print('PASS timer fixture order, six resident owners, platform boundary', flush=True)
 
 
@@ -52,13 +52,13 @@ def main():
                             '-I' + str(ROOT / 'platform/pc98'),
                             '-DTICK_SOURCE="' + str(source) + '"',
                             str(ROOT / 'tools/tests/tick_host.c'), '-o', str(exe)], check=True)
-        build(ROOT / 'kernel/tick.c')
+        build(ROOT / 'kernel/irq/tick.c')
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             result = host32.run([str(exe)], runner=runner)
             assert result.returncode == 0, (runner, result.returncode)
             print('PASS real tick registry: reverse order, holes, errors, IF, IRQ context (' + runner + ')', flush=True)
         if '--mutate' in sys.argv:
-            original = (ROOT / 'kernel/tick.c').read_text()
+            original = (ROOT / 'kernel/irq/tick.c').read_text()
             mutants = [
                 ('kctx_irq_depth != 0', 'kctx_irq_depth > 1', 'IRQ registration accepted'),
                 ('slots[slot].fn != fn', 'slots[slot].fn == fn', 'duplicate/competition reversed'),

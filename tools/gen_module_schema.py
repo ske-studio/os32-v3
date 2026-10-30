@@ -7,7 +7,7 @@ from module_schema import (CONSTANTS, HEADER_FIELDS, PAIR_STRIDE, POLICIES, POLI
                            COMPONENTS, MODULE_RECORD_CAP, validate_components)
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / 'kernel/module_schema.h'
+OUTPUT = ROOT / 'kernel/module/module_schema.h'
 
 
 def render():

@@ -15,13 +15,13 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'kernel/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c', 'exec/exec_heap.c']
-TARGET_SRCS = ['exec/exec_heap.c', 'exec/exec_heap.h', 'kernel/kmalloc.c', 'kernel/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'kernel/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-    'exec/appmem.h', 'kernel/paging_app.h', 'kernel/paging.c', 'kernel/paging.h',
-    'kernel/pgalloc.c', 'kernel/pgalloc.h', 'kernel/physmem.c', 'kernel/physmem.h',
+SOURCES = ['exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c', 'exec/exec_heap.c']
+TARGET_SRCS = ['exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
+    'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h',
+    'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
     'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h',
-    'kernel/gdt.h', 'kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
+    'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
     'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h']
@@ -281,7 +281,7 @@ def main():
                 return obj
 
             objects = []
-            for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'kernel/physmem.c')]:
+            for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'mm/physmem.c')]:
                 obj = tmp / (key + '.o')
                 host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)

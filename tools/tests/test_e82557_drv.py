@@ -23,8 +23,8 @@ CASES += ["tx_send_done", "tx_send_bad", "tx_irq_cx", "tx_irq_cna", "tx_irq_bad"
 CASES += ["module_quiet", "module_stopfail", "module_bm_present"]
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector", "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
 INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32", "fs", "kernel", "lib", "arch/x86", "platform/pc98")] + ["-I" + str(ROOT)]
-MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module.h", "include/bootinfo.h", "include/config.h"]
-MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "kernel/dma_pool.h"]
+MIRROR = ["tools/tests/e82557_drv_host.c", "drivers/e82557.c", "drivers/e82557.h", "drivers/e82557_regs.h", "drivers/e82557_eeprom.c", "drivers/e82557_eeprom.h", "drivers/pci_decode.c", "fs/vfs.h", "kernel/module/module.h", "include/bootinfo.h", "include/config.h"]
+MIRROR += ["drivers/e82557_desc.c", "drivers/e82557_desc.h", "drivers/pci_bind_match.c", "mm/dma_pool.h"]
 MIRROR += ["include/pci_dev_contract.h", "include/pci_bind_contract.h",
            "include/lan_contract.h", "drivers/pci_bind.h", "drivers/pci.h",
            "drivers/pci_decode.h", "include/types.h", "kernel/lan_module.h",

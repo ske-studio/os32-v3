@@ -1,14 +1,14 @@
 # con_sink (K6C) — ホスト TDD の記録
 
 票: `docs/archive/gui_v13/TASK_K6C_console.md` §2
-実装: `kernel/con_sink.c` / `include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
+実装: `kernel/console/con_sink.c` / `include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
 試験: `tools/tests/con_sink_host.c` + `tools/tests/test_con_sink.py` (`make check-con-sink-host`)
 
 ## 様式
 
 `test_multiapp_model.py` / `test_ext2_read_bound.py` と同じ形で、**模型ではなく実物**を見る:
 
-1. `con_sink_host.c` が `kernel/con_sink.c` を `#include` する (1 行も写さない)。
+1. `con_sink_host.c` が `kernel/console/con_sink.c` を `#include` する (1 行も写さない)。
 2. ホスト ILP32 GNU89 (`gcc -m32 -march=i386 -ffreestanding -Werror -nostdlib`) で走らせる。
    libc は使わず、Linux の `int 0x80` で `write`/`exit` するだけ。
 3. **同じソース**をカーネルと同じフラグの `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
@@ -37,7 +37,7 @@
 ## RED → GREEN
 
 実装を 1 か所ずつ「ありそうな間違い」に差し替えて、試験が**その間違いだけ**を捕まえることを見た。
-差し替えは全部戻してある (`kernel/con_sink.c` は GREEN の形)。
+差し替えは全部戻してある (`kernel/console/con_sink.c` は GREEN の形)。
 
 ### R1 — あふれをバイト単位で捨てる (レコード枠を持たない環)
 
@@ -178,5 +178,5 @@ EXIT con_sink_host=0
   `exec_reclaim_owned` を通ることも、ここではなく `exec.c` の読みで確かめた。
 - 端末側のパーサ (`t5a_display/src/sink.rs`) は別票 (E4)。**いまは未知 type で
   `Stop::Unknown` して解析を止める**ので、E4 が入るまで `EXIT` は端末を固める。
-- `kernel/console.c` の 6 入口からの差し込みが漏れていないかは、ここでは見ていない
+- `kernel/console/console.c` の 6 入口からの差し込みが漏れていないかは、ここでは見ていない
   (差し込み先はホストに持ち込めない TVRAM / GDC と混ざっている)。受入 C1 / C2 の担当。

@@ -59,14 +59,14 @@ def conformance():
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
         adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
-        source = (ROOT / 'kernel' / (adapter + '.c')).read_text()
+        source = (ROOT / ({'module': 'kernel/module', 'hwdev_module': 'kernel/module', 'fep_module': 'kernel/ime', 'v86_module': 'kernel/v86'}.get(adapter, 'kernel')) / (adapter + '.c')).read_text()
         path_macro = re.search(r'\.path = (SYS_\w+)', source)[1]
         assert re.search(r'^#define ' + path_macro + r'\s+"' + re.escape(row['path']) + '"', config, re.M), row
         assert 'MODULE_ID_' + row['name'] in source, row
         if row['name'] == 'HWDEV':
             assert row['dependencies'] == (schema.CONSTANTS['ID_KDEBUG'],)
             assert '.dependencies = &core_handle, .dependency_count = 1' in source
-            assert '(void)hwdev_module_load(handle);' in (ROOT/'kernel/module.c').read_text()
+            assert '(void)hwdev_module_load(handle);' in (ROOT/'kernel/module/module.c').read_text()
         elif row['dependencies']:
             assert row['dependencies'] == (schema.CONSTANTS['ID_SQLITE'],)
             assert '.dependencies = &sqlite, .dependency_count = 1' in source
@@ -81,7 +81,7 @@ def conformance():
     assert 'kdebug.bin / sqlite.mod' not in hsync
     # Core splash returns into unconditional boot continuation. SerialFS's FS
     # registration is earlier; actual serial/rshell service starts in shell ui.
-    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
     assert kernel.count('    boot_splash();') == 1
     assert kernel.index('    boot_splash();') < kernel.index('rc = exec_run(kcg_unavailable')
     ui = (ROOT / 'userland/shell/ui.c').read_text()

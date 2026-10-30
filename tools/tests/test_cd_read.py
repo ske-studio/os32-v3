@@ -36,7 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["include/platform_device.h", "include/ide_contract.h", "kernel/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
+TREE_FILES = ["include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "kernel/cd_body.c", "kernel/cd_module.h",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ide.h", "drivers/dev.c", "drivers/dev.h",
               "drivers/atapi.c", "drivers/atapi.h", "fs/iso9660.c", "fs/iso9660.h",
@@ -85,7 +85,7 @@ EXE_KEYS = ("read", "wide", "pkg")
 # (ヘッダなど) は 3 本とも組む。表が gcc -MM の依存より狭ければ mutate() が落ちる。
 REBUILD = {
     "kernel/cd_body.c": ("read", "wide"),
-    "kernel/kernel.c": ("read", "wide"),
+    "init/kernel.c": ("read", "wide"),
     "fs/vfs.c": ("read", "wide"),
     "platform/pc98/boot_names.c": ("read", "wide"),
     "drivers/dev.c": ("read", "wide"),
@@ -540,7 +540,7 @@ MUTATIONS = [
      "SRST の行の limit= に PACKET の上限を出す (31 秒を待ったのに 10s と出る)"),
     ("kernel/cd_body.c", r"    if \(rc\) \{", "    if (rc) { return 0;",
      "R1: 空トレイで cd0 を登録せず後挿入 sys_mount が失敗"),
-    ("kernel/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
+    ("init/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
      "            if (0) continue;", "R2: 未 attach/容量なし装置も自動 mount"),
     ("fs/vfs.c", r"(int vfs_dev_parse\(const char \*name, int \*dev_type, int \*dev_id\)\n\{)",
      r"\1" + "\n    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }",
@@ -565,7 +565,7 @@ def make_tree(tmp, rel=None, text=None):
 
 def write_boot_submount(tree, dest):
     """Share the real boot fragment with consumers of cd_read_host.c."""
-    kernel = (tree / "kernel/kernel.c").read_text()
+    kernel = (tree / "init/kernel.c").read_text()
     call = kernel.index('    kernel_mount_children(boot.root_dev);')
     assert (kernel.index('vfs_mount("/", boot.root_dev, boot.root_fs)') <
             kernel.index('    cd_module_load();') <

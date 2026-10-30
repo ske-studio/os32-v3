@@ -144,13 +144,13 @@ def main():
                    ''.join('    (void (*)(void))' + targets.get(e['name'], 'kdebug_forbidden_import') + ',\n'
                            for e in meta['imports']) + '};\n' + exports[end:])
         (folder / 'loader_exports.c').write_text(exports)
-        kernel_source = (ROOT / 'kernel/kernel.c').read_text()
+        kernel_source = (ROOT / 'init/kernel.c').read_text()
         (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
-        def build_loader(module_source, call_source=ROOT / 'kernel/kdebug_call.c'):
+        def build_loader(module_source, call_source=ROOT / 'kernel/module/kdebug_call.c'):
             command([*host, ROOT / 'tools/tests/kdebug_loader_host.c', call_source,
-                     module_source, ROOT / 'kernel/module_image.c', ROOT / 'kernel/module_runtime.c',
+                     module_source, ROOT / 'kernel/module/module_image.c', ROOT / 'kernel/module/module_runtime.c',
                      ROOT / 'kernel/kselftest_report.c', folder / 'loader_exports.c', '-o', exe])
-        build_loader(ROOT / 'kernel/module.c')
+        build_loader(ROOT / 'kernel/module/module.c')
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),
                  ('running', 1, 0, 1, image)]
         for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5), (8, 10)):
@@ -231,7 +231,7 @@ def main():
                     assert result.returncode == 0, (label, result.returncode)
                 print('PASS loader', label, f'boot pair={boot_pair:08x}', flush=True)
         if '--mutate' in sys.argv or '--mutate-running' in sys.argv:
-            module_source = (ROOT / 'kernel/module.c').read_text()
+            module_source = (ROOT / 'kernel/module/module.c').read_text()
             assignment = '    kdebug.state = KDEBUG_RUNNING;'
             assert module_source.count(assignment) == 1
             without_gate = kernel_source
@@ -252,12 +252,12 @@ def main():
                     assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)
                 print('MUTATE', label, 'RED (runtime assertion)', flush=True)
             (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
-            call_source = (ROOT / 'kernel/kdebug_call.c').read_text()
+            call_source = (ROOT / 'kernel/module/kdebug_call.c').read_text()
             gate = 'return kdebug.ops.dbg_call ?'
             assert call_source.count(gate) == 1
             mutant = folder / 'kdebug-call-always-nosys.c'
             mutant.write_text(call_source.replace(gate, 'return 0 ?'))
-            build_loader(ROOT / 'kernel/module.c', mutant)
+            build_loader(ROOT / 'kernel/module/module.c', mutant)
             payload = struct.pack('<5I', 0, 0, 0, len(image), pair) + image
             for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                 result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)

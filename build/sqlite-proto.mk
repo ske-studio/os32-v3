@@ -1,7 +1,7 @@
 # T4a measured VA0 body, now shared by the paired product and measurement tests.
 SQLITE_PROTO_OUT ?= $(BUILD_OUT)/sqlite-proto
 SQLITE_PROTO_GEN := $(addprefix $(SQLITE_PROTO_OUT)/,sqlite_imports.h sqlite_imports.json sqlite_import_slots.c sqlite_import_stubs.S sqlite_provider_types.c os32_sqlite_vfs.c sqlite_facade.h sqlite_outer_calls.inc sqlite_facade_bind.inc sqlite_kexports.c)
-SQLITE_PROTO_DEF_SOURCES := fs/vfs.h include/kprintf.h include/sys.h kernel/kmalloc.h
+SQLITE_PROTO_DEF_SOURCES := fs/vfs.h include/kprintf.h include/sys.h mm/kmalloc.h
 $(SQLITE_PROTO_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/sqlite_imports.def lib/sqlite3/os32_sqlite_vfs.c $(SQLITE_PROTO_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --out-dir $(SQLITE_PROTO_OUT)
 

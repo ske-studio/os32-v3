@@ -51,7 +51,7 @@ static volatile void *host_pegc_window(u32 pa)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wunused-variable"
-#include "../../kernel/console.c"
+#include "../../kernel/console/console.c"
 #include "../../platform/pc98/console.c"
 #pragma GCC diagnostic pop
 
@@ -385,7 +385,7 @@ static const Edit EDIT_BACK[] = {
 static const PV ADD_S480[] = { {0xA2,0x6B}, {0x62,0x6B} };
 static const PV ADD_BACK[] = { {0x62,0x6B} };
 /* CUI へ戻るとき (GUI のシンクが無効で V86 中でない) は、続けて実物の
- * console_hw_cursor_enable() (kernel/console.c) がカーソルを戻す OUT を出す:
+ * console_hw_cursor_enable() (kernel/console/console.c) がカーソルを戻す OUT を出す:
  * CSRFORM (DC=1 | L/R 0Fh、上端 14、下端 15<<3 | 3) と CSRW (論理カーソルの
  * 番地)。ROM の CSRFORM がカーソル非表示 (CS=0) なので要る — 意図的な追加。
  * 試験は論理カーソルを (5, 3) に置く = 番地 3*80+5 = 00F5h。 */

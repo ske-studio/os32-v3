@@ -46,7 +46,7 @@ def product_image(folder):
                  'dma_alloc', 'dma_free', 'irq_register', 'vfs_read'):
         assert name in core.symbols, name
     # h4's core VFS/DMA imports and S4's PCM imports retain their addresses.
-    imports = (ROOT / 'kernel/kdebug_imports.def').read_text()
+    imports = (ROOT / 'kernel/module/kdebug_imports.def').read_text()
     for name in ('pcm_open', 'pcm_state', 'dma_alloc', 'dma_free', 'vfs_read'):
         assert '"symbol": "' + name + '"' in imports
     exe = build_validator(folder)
@@ -119,7 +119,7 @@ def main():
                             '-DPCM_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/pcm_module_host.c',
-                            ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                             ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:

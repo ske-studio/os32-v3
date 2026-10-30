@@ -15,7 +15,7 @@ MUTATIONS = [
  ('no-private-copy', '        kmemcpy(P2V(phys), P2V(g_pages[g_text_pages + i]), PAGE_SIZE);', '        kmemset(P2V(phys), 0, PAGE_SIZE);'),
 ]
 def run(mutation=None):
-    source = (ROOT / 'kernel/shlib.c').read_text()
+    source = (ROOT / 'mm/shlib.c').read_text()
     if mutation:
         _, old, new = mutation
         if old not in source:
@@ -24,8 +24,8 @@ def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'shlib_host_source.c').write_text(source)
-        (tmp / 'paging_host_source.c').write_text((ROOT / 'kernel/paging.c').read_text())
-        allocator = (ROOT / 'kernel/pgalloc.c').read_text()
+        (tmp / 'paging_host_source.c').write_text((ROOT / 'mm/paging.c').read_text())
+        allocator = (ROOT / 'mm/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
         includes = ['-I' + str(ROOT / p)
@@ -34,7 +34,7 @@ def run(mutation=None):
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
-               *host_includes, str(SRC), str(ROOT / 'kernel/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), '-o', str(exe)]
+               *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:
             if mutation:

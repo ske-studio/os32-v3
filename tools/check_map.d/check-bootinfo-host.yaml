@@ -1,10 +1,10 @@
 check-bootinfo-host:
 - boot/bootinfo.inc
 - drivers/ide.c
-- kernel/bootinfo.c
+- init/bootinfo.c
 - platform/pc98/boot_disk.c
 - platform/pc98/boot_disk.h
-- kernel/bootinfo_check.c
+- init/bootinfo_check.c
 - tools/tests/bootinfo_host.c
 - tools/tests/test_bootinfo.py
 - tools/check_map.d/check-bootinfo-host.yaml
@@ -26,7 +26,7 @@ check-bootinfo-host:
 - include/memmap.h
 - include/pc98.h
 - include/types.h
-- kernel/gdt.h
+- arch/x86/kernel/gdt.h
 - lib/kstring.h
 - boot/vk32_defs.inc
 - boot/lz4_defs.inc
@@ -35,4 +35,4 @@ check-bootinfo-host:
 - lib/crc32_core.inc
 - boot/boot_defs.h
 - include/bootinfo.h
-- kernel/boot_disk.h
+- init/boot_disk.h

@@ -197,9 +197,9 @@ def mutant(case):
     name, body, rule = case
     with tempfile.TemporaryDirectory(prefix='os32-p2v-') as tmp:
         root = pathlib.Path(tmp)
-        root = mutant_tree(ROOT, root / 'tree', {}, real={'kernel/bootinfo.c','kernel/sysclk.c'})
+        root = mutant_tree(ROOT, root / 'tree', {}, real={'init/bootinfo.c','kernel/time/sysclk.c'})
         if name.startswith('bootinfo-'):
-            target = root / 'kernel/bootinfo.c'
+            target = root / 'init/bootinfo.c'
             original = 'volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);'
             source = target.read_text()
             if source.count(original) != 1:
@@ -207,7 +207,7 @@ def mutant(case):
             target.write_text(source.replace(original, body))
             expected = f'bootinfo_capture: {rule}'
         else:
-            target = root / 'kernel/sysclk.c'
+            target = root / 'kernel/time/sysclk.c'
             params = 'void *p' if name == 'grouped-cr3-pointer' else 'void'
             target.write_text(target.read_text() + '\n'
                 + '#include "memmap.h"\n#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'

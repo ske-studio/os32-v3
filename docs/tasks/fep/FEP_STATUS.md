@@ -14,7 +14,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 │         アプリケーション (shell, vz 等)         │
 │     ime_getchar() / ime_getkey() を呼び出し     │
 ├───────────────────────────────────────────┤
-│                  kernel/ime.c                   │
+│                  kernel/ime/ime.c                   │
 │  ┌──────────┬────────────┬──────────────┐  │
 │  │ ステート  │ プリエディ │  確定バッファ   │  │
 │  │ マシン    │ ット描画   │  管理           │  │
@@ -48,10 +48,10 @@ v2.1 のカーネル統合の経緯: `docs/archive/v21/sqlite/00_INDEX.md`。
 
 | ファイル | 役割 | 行数 |
 |---------|------|------|
-| `kernel/ime.h` | IME 状態構造体 + 公開 API 宣言 | ~128 |
-| `kernel/ime.c` | メインロジック (キー処理, プリエディット UI, 公開 API) | ~533 |
-| `kernel/ime_dict.c` | SQLite 辞書バックエンド (検索 + 学習 UPSERT) | ~204 |
-| `kernel/ime_romkana.c` | ローマ字→ひらがな変換テーブル + エンジン | ~300 |
+| `kernel/ime/ime.h` | IME 状態構造体 + 公開 API 宣言 | ~128 |
+| `kernel/ime/ime.c` | メインロジック (キー処理, プリエディット UI, 公開 API) | ~533 |
+| `kernel/ime/ime_dict.c` | SQLite 辞書バックエンド (検索 + 学習 UPSERT) | ~204 |
+| `kernel/ime/ime_romkana.c` | ローマ字→ひらがな変換テーブル + エンジン | ~300 |
 
 ### ツール
 
@@ -192,4 +192,4 @@ int  ime_getkey(void);        /* kbd_getkey 互換 (scancode << 8 | ascii) */
   tags: [data]
 ```
 
-辞書パスは `kernel/ime.c` 内の `#define IME_DICT_PATH "/db/fep.db"` で定義。
+辞書パスは `kernel/ime/ime.c` 内の `#define IME_DICT_PATH "/db/fep.db"` で定義。

@@ -33,7 +33,7 @@ int kbd_status_classify(unsigned char st);
 /* 分類の結果、IRQ1 を V86 ゲストへ反射 (INT 09h) してよいか。
  * **0041h から実データを読んだとき (DATA / OVERRUN) だけ** 1。
  * EMPTY / ERROR で反射すると、ゲストは空の仮想 FIFO から 1 バイト読み、
- * 以前はそれが 0x00 = ESC のメイクに化けていた (kernel/isr_stub.asm の
+ * 以前はそれが 0x00 = ESC のメイクに化けていた (arch/x86/kernel/isr_stub.asm の
  * irq_stub_1 が戻り値を見る)。 */
 int kbd_status_reflects(int kind);
 

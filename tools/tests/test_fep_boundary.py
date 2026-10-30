@@ -9,30 +9,30 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
-    ('invalid-output-returns-error', 'kernel/ime.c',
+    ('invalid-output-returns-error', 'kernel/ime/ime.c',
      '        ring3_fault_kill();\n        return -1;',
      '        return -1;',
      'invalid output must kill'),
-    ('failed-kanji-null', 'kernel/ime.c',
+    ('failed-kanji-null', 'kernel/ime/ime.c',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) return -1;\n        kanji = k;',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) kanji = NULL;\n        else kanji = k;',
      'invalid input engine0/output unchanged'),
-    ('copyout-before-finalize', 'kernel/ime.c',
+    ('copyout-before-finalize', 'kernel/ime/ime.c',
      '    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
      '    (void)copy_to_caller(&caller, out, ime_user_staging, sizeof(ime_user_staging));\n    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
      'finalize then leave then copyout'),
-    ('late-busy-leak', 'kernel/ime.c',
+    ('late-busy-leak', 'kernel/ime/ime.c',
      '(u32)n * sizeof(IME_UserEntry))) n = -1;',
      '(u32)n * sizeof(IME_UserEntry))) return -1;',
      'busy released after late refusal'),
-    ('search-borrow-leak', 'kernel/ime_dict.c',
+    ('search-borrow-leak', 'kernel/ime/ime_dict.c',
      'int clear_rc = sqlite3_bind_null(stmt, 1);', 'int clear_rc = SQLITE_OK;',
      'binding lifetime ended'),
-    ('search-reset-leak', 'kernel/ime_dict.c',
+    ('search-reset-leak', 'kernel/ime/ime_dict.c',
      'int reset_rc = sqlite3_reset(stmt);\n    int clear_rc',
      'int reset_rc = SQLITE_OK;\n    int clear_rc',
      'reset before input lifetime ends'),
-    ('learn-borrow-leak', 'kernel/ime_dict.c',
+    ('learn-borrow-leak', 'kernel/ime/ime_dict.c',
      'int k_rc = sqlite3_bind_null(stmt, 2);', 'int k_rc = SQLITE_OK;',
      'binding lifetime ended'),
 ]
@@ -61,7 +61,7 @@ def main():
                                     if line.startswith('#define ASCII_'))
         (work / 'fep_boundary_host.c').write_text(ascii_constants + '\n' +
             (ROOT / 'tools/tests/fep_boundary_host.c').read_text())
-        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime.c', 'kernel/ime_dict.c')}
+        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict.c')}
         cases = [('normal', None)]
         if args.mutate:
             cases += [(m[0], m) for m in MUTANTS]
@@ -71,10 +71,10 @@ def main():
                 _, path, old, new, marker = mutation
                 assert current[path].count(old) == 1, name
                 current[path] = current[path].replace(old, new)
-            (work / 'ime_source.inc').write_text(current['kernel/ime.c'])
-            (work / 'ime_dict.inc').write_text(current['kernel/ime_dict.c'])
+            (work / 'ime_source.inc').write_text(current['kernel/ime/ime.c'])
+            (work / 'ime_dict.inc').write_text(current['kernel/ime/ime_dict.c'])
             harness = (ROOT / 'tools/tests/ime_dict_host.c').read_text().replace(
-                '#include "../../kernel/ime_dict.c"', '#include "ime_dict.inc"')
+                '#include "../../kernel/ime/ime_dict.c"', '#include "ime_dict.inc"')
             # Keep other real source includes anchored at the repository.
             harness = harness.replace('#include "../../lib/', '#include "' + str(ROOT / 'lib') + '/')
             (work / 'ime_dict_host.c').write_text(harness)

@@ -15,7 +15,7 @@ static unsigned int irq_save(void) {
 }
 static void irq_restore(unsigned int f) { CHECK(!(host_if & 0x200U)); host_if = f; restores++; }
 #ifndef TICK_SOURCE
-#define TICK_SOURCE "../../kernel/tick.c"
+#define TICK_SOURCE "../../kernel/irq/tick.c"
 #endif
 #include TICK_SOURCE
 volatile u32 kctx_irq_depth;

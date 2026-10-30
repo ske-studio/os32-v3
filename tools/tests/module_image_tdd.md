@@ -25,7 +25,7 @@ Emulator, real hardware, loader integration and product linkage are outside S0.
 ## T4a-1 common schema / ID policy
 
 `tools/module_schema.py` is consumed by mkmod and generates
-`kernel/module_schema.h` through `tools/gen_module_schema.py`. The independent
+`kernel/module/module_schema.h` through `tools/gen_module_schema.py`. The independent
 wire fixture above keeps its explicit byte offsets. Caller-selected IDs must
 match the image and an admitted policy row; SQLite has no admitted row yet.
 KDEBUG still requires POST_ROOT, PAIR, no stop, ops v2 / 18 slots, and the existing

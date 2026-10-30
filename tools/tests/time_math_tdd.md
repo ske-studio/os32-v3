@@ -1,7 +1,7 @@
 # time_math — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-5
-対象: `kernel/time_math.c` (判定と算数) / `kernel/ktime.c` (スナップショット) /
+対象: `kernel/time/time_math.c` (判定と算数) / `kernel/time/ktime.c` (スナップショット) /
 `kapi/kapi_sys.c` (CPL=3 の検証)
 試験: `tools/tests/test_time_math.py` + `tools/tests/time_math_host.c`
 実行: `make check-time-math-host` (`check-par` の列)
@@ -50,7 +50,7 @@ IRR bit0 (= IRQ0 が立っているか) で挟んで読む。
 
 NP21/W の kselftest はこれで **「1 万回連続読みで逆行しない」が FAIL** した。
 判定表はそのままにして、最後に**前回値でクランプ**する
-(`time_clamp`、書き手は `kernel/ktime.c` の `sys_time_now` だけ、
+(`time_clamp`、書き手は `kernel/time/ktime.c` の `sys_time_now` だけ、
 スナップショットと同じ `irq_save` の中)。押さえた回数は
 `ktime_clamp_count` に数え、kselftest が表示する (実機での回数は W4 の記録項目)。
 
@@ -59,7 +59,7 @@ NP21/W の kselftest はこれで **「1 万回連続読みで逆行しない」
 ### RED 1 — 実装が無い
 
 ```
-tools/tests/time_math_host.c:19:10: fatal error: ../../kernel/time_math.c: No such file or directory
+tools/tests/time_math_host.c:19:10: fatal error: ../../kernel/time/time_math.c: No such file or directory
 ```
 
 ### RED 2 — 直す前の姿 (変異 1)
@@ -80,7 +80,7 @@ tools/tests/time_math_host.c:(.text+0x10a8): undefined reference to `time_clamp'
 
 ```
 $ python3 -B tools/tests/test_time_math.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/time_math.c)
+HOST GNU89 -Werror compile PASS (real kernel/time/time_math.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT decide_table=0
 EXIT us_math=0

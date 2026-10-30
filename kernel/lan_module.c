@@ -1,4 +1,4 @@
-#include "tick.h"
+#include "irq/tick.h"
 #include "tick_order.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* T5c-4: resident PCI/session facade using the T5c-0 reference record. */
@@ -9,7 +9,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"
-#include "module.h"
+#include "module/module.h"
 #include "kstring.h"
 #include "kprintf.h"
 #include "io.h"

@@ -14,9 +14,9 @@ import host32
 from kernel_layout import linker_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRC = ['kdebug/kselftest.c', 'kernel/paging.c', 'kernel/pgalloc.c',
-              'exec/access_walk.c', 'kernel/physmem.c', 'kernel/dma_pool.c',
-              'kernel/dma_pool_math.c', 'lib/dma_contract.c',
+TARGET_SRC = ['kdebug/kselftest.c', 'mm/paging.c', 'mm/pgalloc.c',
+              'exec/access_walk.c', 'mm/physmem.c', 'mm/dma_pool.c',
+              'mm/dma_pool_math.c', 'lib/dma_contract.c',
               'drivers/fdc.c', 'drivers/fdc_decide.c']
 MUTANTS = [
     ('VA-only high classification', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
@@ -55,9 +55,9 @@ def run(body, runner):
     with tempfile.TemporaryDirectory(prefix='h4-backing-') as directory:
         tmp = Path(directory)
         (tmp / 'h4_backing_source.c').write_text(body)
-        for name, path in (('paging', 'kernel/paging.c'),
-                           ('pgalloc', 'kernel/pgalloc.c'),
-                           ('dma_pool', 'kernel/dma_pool.c'),
+        for name, path in (('paging', 'mm/paging.c'),
+                           ('pgalloc', 'mm/pgalloc.c'),
+                           ('dma_pool', 'mm/dma_pool.c'),
                            ('access_walk', 'exec/access_walk.c')):
             (tmp / (name + '_host_source.c')).write_text((ROOT / path).read_text())
         fdc = (ROOT / 'drivers/fdc.c').read_text()
@@ -84,8 +84,8 @@ def run(body, runner):
                      ('tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
                       'kernel', 'exec', 'fs', 'lib', 'drivers', 'sdk/include/os32')],
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
-                   *[str(ROOT / path) for path in ('kernel/physmem.c',
-                       'kernel/dma_pool_math.c',
+                   *[str(ROOT / path) for path in ('mm/physmem.c',
+                       'mm/dma_pool_math.c',
                        'lib/dma_contract.c', 'drivers/fdc_decide.c')],
                    '-o', str(exe)]
         host32.build(command, check=True, capture_output=True, text=True)

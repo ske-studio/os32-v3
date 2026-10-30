@@ -22,7 +22,7 @@
 /*  PIC (8259相当) — PC9800Bible §1-4, §4-3 #1/#2                         */
 /* ====================================================================== */
 /*  マスタ: IRQ0-7, スレーブ: IRQ8-15 (カスケード IRQ7)                     */
-/* ポート値の正典。kernel/idt.h の同名の写しの除去は N2 で行う。 */
+/* ポート値の正典。arch/x86/kernel/idt.h の同名の写しの除去は N2 で行う。 */
 #define PIC1_CMD   0x00
 #define PIC1_DATA  0x02
 #define PIC2_CMD   0x08
@@ -161,7 +161,7 @@
 #define SYSCLK_2458         2457600UL   /* 2.4576MHz */
 
 /* どちらのクロックかは BIOS ワークエリア 0000:0501h の bit7 で分かる。
- * **定義はここ 1 か所** ([C4]) — 読むのは kernel/sysclk.c だけで、
+ * **定義はここ 1 か所** ([C4]) — 読むのは kernel/time/sysclk.c だけで、
  * drivers/serial.h は別名 (TIMER_CLK_*) を張るだけにしてある。
  * 根拠の資料と食い違いの決着は drivers/serial.h の注記を参照。 */
 #define BIOS_WORK_SYSCLK    0x00000501UL  /* BYTE: bit7=1 なら 8MHz系 */

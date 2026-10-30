@@ -11,7 +11,7 @@ check-packages-host:
 - drivers/pc98pt.c
 - fs/ext2_layout.c
 - fs/fatfs_vfs.c
-- kernel/kernel.c
+- init/kernel.c
 - tools/deploy_manifests.py
 - tools/mkpkg.py
 - tools/tests/install_fresh_host.c

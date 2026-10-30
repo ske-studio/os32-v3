@@ -1,14 +1,14 @@
 check-kcg-module-host:
 - kdebug/kselftest.c
 - tools/tests/kcg_display_host.c
-- kernel/paging.h
+- mm/paging.h
 - gfx/gfx.h
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
-- kernel/pgalloc.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
+- mm/pgalloc.h
 - include/types.h
 - include/memmap.h
 - fs/vfs.c
@@ -37,7 +37,7 @@ check-kcg-module-host:
 - tools/check_map.d/check-module-runtime-host.yaml
 - kernel/kcg_body.c
 - kernel/kcg_module.c
-- kernel/kernel.c
+- init/kernel.c
 - kernel/kcg_module.h
 - include/config.h
 - sdk/include/os32/os32_generations.h
@@ -59,10 +59,10 @@ check-kcg-module-host:
 - gfx/backend_pegc.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kernel/sys.c
 - tools/tests/mutpar.py
 - tools/tests/kernel_layout.py
@@ -118,7 +118,7 @@ check-kcg-module-host:
 - platform/pc98/boot_names.c
 - drivers/ide.h
 - platform/pc98/boot.c
-- kernel/platform_display.h
+- include/platform_display.h
 - platform/pc98/display.c
 - include/kcg_contract.h
 artifact_reader: true

@@ -8,8 +8,8 @@
 #include "recover_diag.h"
 #include "config.h"
 #include "memmap.h"
-#include "../kernel/idt.h"
-#include "../kernel/paging.h"
+#include "../arch/x86/kernel/idt.h"
+#include "../mm/paging.h"
 #include "pc98.h"
 #include "io.h"
 #ifdef RECOVER_MODULE
@@ -127,7 +127,7 @@ int recover_budget_apply(struct recover_profile *p, u32 kind, u32 hz,
 
 /* PIT mode 2 is already running at 100Hz. Read only the latch, never
  * reprogram it or consult PIC/tick_count. The read sequence is identical to
- * kernel/ktime.c; the short modulo difference avoids its 10ms IRR/clamp
+ * kernel/time/ktime.c; the short modulo difference avoids its 10ms IRR/clamp
  * ambiguity. At both supported input clocks one count is <1us. */
 extern const struct pit_setup *pit_get_setup(void);
 static u32 recover_pit_count(void)

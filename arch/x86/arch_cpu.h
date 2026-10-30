@@ -5,7 +5,7 @@
 /*  このファイルを直接 #include してはいけない — 常に "cpu.h" を引くこと。    */
 /*  ビルドは -Iarch/$(ARCH) で解決する (build/config.mk)。                   */
 /*                                                                          */
-/*  元の命令列は移設前 (kernel/paging.c・exec/exec.c のその場の asm) から         */
+/*  元の命令列は移設前 (mm/paging.c・exec/exec.c のその場の asm) から         */
 /*  1 文字も変えていない。移設の前後でカーネルの .o が md5 で一致することを   */
 /*  確かめてある (docs/tasks/portability/ARM_GAUGE.md §9 順序 5)。           */
 /*  T5-0b: CR3変更時にTSSの静的CR3欄も更新し、#DF診断用に控える。          */

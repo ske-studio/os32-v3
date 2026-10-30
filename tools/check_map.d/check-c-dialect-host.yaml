@@ -42,7 +42,7 @@ check-c-dialect-host:
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/gen_memmap.py
 - boot/loader_fat_new.asm
-- kernel/kentry.asm
+- arch/x86/kernel/kentry.asm
 - sdk/os32x_hdr.py
 - sdk/rust/os32api/src/gui/proto.rs
 - sdk/rust/os32api/src/gui/stub.rs
@@ -50,7 +50,7 @@ check-c-dialect-host:
 - tools/mkshlib.py
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - tools/mkmod.py
 - tools/module_schema.py
 artifact_reader: true

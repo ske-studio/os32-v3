@@ -588,7 +588,7 @@ userland/%.bin: userland/%.raw userland/%.elf
 # === ヘルパーツール ===
 unicode_bin: $(BUILD_OUT)/unicode.bin
 
-tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/unicode_file.h include/endian_le.h include/types.h
+tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h
 	gcc -std=gnu11 -O2 -I. -Iinclude $< -o $@
 
 $(BUILD_OUT)/unicode.bin: tools/gen_unicode

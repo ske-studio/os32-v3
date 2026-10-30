@@ -3,7 +3,7 @@ check-kpeek-host:
 - kdebug/kpeek.h
 - kdebug/kpeek_allow.c
 - kdebug/kpeek_allow.h
-- kernel/paging.h
+- mm/paging.h
 - drivers/pci.h
 - drivers/pci_decode.h
 - include/memmap.h

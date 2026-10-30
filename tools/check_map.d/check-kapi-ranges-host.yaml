@@ -9,10 +9,10 @@ check-kapi-ranges-host:
 - exec/ring3_str.c
 - kapi/kapi_generated.c
 - kdebug/kselftest.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - sdk/gen_kapi.py
 - sdk/kapi.json
 - tools/tests/access_walk_host.c

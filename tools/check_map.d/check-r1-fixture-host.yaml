@@ -1,22 +1,22 @@
 check-r1-fixture-host:
-- kernel/tick.c
-- kernel/tick.h
+- kernel/irq/tick.c
+- kernel/irq/tick.h
 - platform/pc98/tick_order.h
 - kdebug/selftest_lease.c
 - include/kselftest_probe.h
 - kdebug/selftest_internal.h
 - tools/tests/lease_selftest_host.h
 - tools/tests/font_guard_inactive.h
-- kernel/v86_module.h
+- kernel/v86/v86_module.h
 - kernel/r1_fixture.c
 - kernel/r1_fixture.h
-- kernel/isr_handlers.c
-- kernel/v86_mem.c
-- kernel/v86_mem.h
-- kernel/pgalloc.c
-- kernel/pgalloc.h
-- kernel/physmem.c
-- kernel/physmem.h
+- arch/x86/kernel/isr_handlers.c
+- kernel/v86/v86_mem.c
+- kernel/v86/v86_mem.h
+- mm/pgalloc.c
+- mm/pgalloc.h
+- mm/physmem.c
+- mm/physmem.h
 - kdebug/kselftest.c
 - exec/exec.c
 - tools/r1_manifest.py
@@ -48,8 +48,8 @@ check-r1-fixture-host:
 - exec/lease.c
 - exec/access_walk.c
 - exec/redir_access.c
-- kernel/shlib.c
-- kernel/paging.c
+- mm/shlib.c
+- mm/paging.c
 - kernel/sys.c
 - userland/lib/gfx/libos32gfx_core.c
 - userland/lib/gfx/draw/gfx_draw.c
@@ -84,5 +84,5 @@ check-r1-fixture-host:
 - tools/tests/mutpar.py
 - tools/gen_deploy_set.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
-- kernel/display_restore.h
+- kernel/console/display_restore.h
 artifact_reader: true

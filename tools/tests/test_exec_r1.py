@@ -458,7 +458,7 @@ void _start(void) {
 
 def run(source=None, irq=None):
     source = source or (ROOT / 'exec/exec.c').read_text()
-    irq = irq or (ROOT / 'kernel/irq.c').read_text()
+    irq = irq or (ROOT / 'kernel/irq/irq.c').read_text()
     constants = '\n'.join(l for l in source.splitlines() if
                           l.startswith(('#define EXEC_LJ_', 'static volatile int g_pending_',
                                         'static volatile int g_longjmp_')))
@@ -478,7 +478,7 @@ def run(source=None, irq=None):
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 't.c').write_text(code)
-        asm = (ROOT / 'kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
+        asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 's.asm'), '-o', str(tmp / 's.o')],
                            capture_output=True, text=True)
@@ -488,7 +488,7 @@ def run(source=None, irq=None):
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(tmp / 't')],
+                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
@@ -568,7 +568,7 @@ if __name__ == '__main__':
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
 
-        irq = (ROOT / 'kernel/irq.c').read_text()
+        irq = (ROOT / 'kernel/irq/irq.c').read_text()
         assert irq.count('flags, kctx_irq_depth)') == 1
         assert irq.count('arg, kctx_irq_depth)') == 1
         status, log = run(irq=irq.replace('flags, kctx_irq_depth)', 'flags, 0)').replace('arg, kctx_irq_depth)', 'arg, 0)'))

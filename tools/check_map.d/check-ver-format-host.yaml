@@ -1,10 +1,10 @@
 check-ver-format-host:
 - kernel/ver_format.c
 - kernel/ver_info.h
-- kernel/module.c
-- kernel/module.h
+- kernel/module/module.c
+- kernel/module/module.h
 - kernel/sqlite_engine.h
-- kernel/idt.h
+- arch/x86/kernel/idt.h
 - include/input_service.h
 - kernel/input_service.c
 - platform/pc98/d2_bind.c

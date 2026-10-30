@@ -1,7 +1,7 @@
 # CRT diagnostic — read-only boot snapshot
 
 票: `/home/hight/os32-tmp/run/crtfreq/CRTFREQ_DESIGN.r2.md` §1・§3、依頼 `PACK_step1.md`。
-対象: `include/crt_diag.h`、`kernel/crt_diag.c`、`kernel/kernel.c`。
+対象: `include/crt_diag.h`、`kernel/crt_diag.c`、`init/kernel.c`。
 実行: `make check-crt-diag-host [MUTATE=1]` (`HOST32_RUNNERS=qemu`)。
 
 - RED: 空の read/format/bootlog 実装で実行し、`out_n == 0 && ev_n == 14 && mem_n == 21` が失敗 (make rc=2)。最初の試行は未使用 fake_map の -Werror で止まり、ハーネス修正後に assertion の RED を確認。
@@ -19,7 +19,7 @@
 書式は `[crt]` (218 bytes) と `[crt2]` (129 bytes) の **2 行** (改行を除く)。
 1 行なら 341 bytes で票の 220 bytes を超えるため、パックの許容に従い分割した。
 `BOOTLOG_HDR_MAX=192` はファイル先頭ヘッダの予約領域で本文の行上限ではない。
-`kernel/console.c` は `%s` を bootlog_push に長さ付きで渡し、`kernel/bootlog.c` は
+`kernel/console/console.c` は `%s` を bootlog_push に長さ付きで渡し、`init/bootlog.c` は
 本文全体 `SYS_BOOTLOG_TEXT_MAX=16384` bytes まで積む。lib/kprintf.c の `%s` は
 固定長の中間バッファで切らず shell_print_utf8 へ渡す。各行は票の 220 bytes 以内。
 全体容量を使い切った後は既存 bootlog 方針のとおり破棄される (本試験は容量内の完全保持)。

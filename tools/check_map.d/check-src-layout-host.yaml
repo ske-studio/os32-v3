@@ -1,5 +1,5 @@
 check-src-layout-host:
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - tools/source_roots.py
 - tools/move_files.py
 - tools/include_resolve.py
@@ -7,7 +7,7 @@ check-src-layout-host:
 - tools/build_compare.py
 - tools/gen_build_id.py
 - tools/tests/test_src_layout.py
-- kernel/module.c
+- kernel/module/module.c
 - kernel/ver_format.c
 - tools/tests/host32.py
 - tools/tests/mutpar.py

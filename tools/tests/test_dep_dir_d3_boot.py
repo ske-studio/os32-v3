@@ -6,13 +6,13 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/boot.c', 'kernel/boot_platform.c', 'kernel/boot_display.c', 'platform/pc98/emergency.c')
-HEADERS = ('include/ide_contract.h', 'kernel/boot_platform.h', 'kernel/boot_display.h', 'kernel/platform_emergency.h')
+SOURCES = ('platform/pc98/boot.c', 'init/boot_platform.c', 'init/boot_display.c', 'platform/pc98/emergency.c')
+HEADERS = ('include/ide_contract.h', 'init/boot_platform.h', 'init/boot_display.h', 'include/platform_emergency.h')
 
 
 def kernel_order(kernel=None):
     if kernel is None:
-        kernel = (ROOT / 'kernel/kernel.c').read_text()
+        kernel = (ROOT / 'init/kernel.c').read_text()
     # Include the intervening operations: slot ordering alone is insufficient.
     markers = [
         'kstack_hw_init();', 'pc98_boot_bind(&boot, boot_drive);',
@@ -47,7 +47,7 @@ def kernel_order(kernel=None):
 
 def build(work, mutation=None):
     # Positive and mutation copies use the same headers and include paths.
-    for rel in (*SOURCES, *HEADERS, 'kernel/kernel.c'):
+    for rel in (*SOURCES, *HEADERS, 'init/kernel.c'):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             _, old, new = mutation
@@ -59,7 +59,7 @@ def build(work, mutation=None):
     for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
-    kernel = (work / 'kernel/kernel.c').read_text()
+    kernel = (work / 'init/kernel.c').read_text()
     start = kernel.index('    {\n        int rc;', kernel.index('"MOUNT..."'))
     end = kernel.index('    boot_platform_run(BOOT_CLOCK, &boot);', start)
     child = re.search(r'static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n', kernel, re.S)
@@ -80,7 +80,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-boot-') as td:
         subprocess.run([str(build(Path(td)))], check=True)
     if '--mutate' in sys.argv:
-        kernel = (ROOT / 'kernel/kernel.c').read_text()
+        kernel = (ROOT / 'init/kernel.c').read_text()
         a, b = 'BOOT_PCI_ENUM, &boot', 'BOOT_DISK, &boot'
         assert kernel.count(a) == kernel.count(b) == 1
         changed = kernel.replace(a, 'SWAP_BOOT_POINT').replace(b, a).replace('SWAP_BOOT_POINT', b)
@@ -95,7 +95,7 @@ def main():
             ('platform/pc98/boot.c',
              'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
              '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),
-            ('kernel/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
+            ('init/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
         ):
             with tempfile.TemporaryDirectory(prefix='dep-dir-d3-c-mut-') as td:
                 rc = subprocess.run([str(build(Path(td), mutation))]).returncode

@@ -1,9 +1,9 @@
-"""CPU 校正の止め方と丸め (kernel/cpu_calibrate_math.c) のホスト試験。
+"""CPU 校正の止め方と丸め (kernel/time/cpu_calibrate_math.c) のホスト試験。
 
 記録: tools/tests/cpu_calibrate_tdd.md
 票  : docs/archive/realhw_v21/TASK_SERIAL_VFAST.md (往復 3 — 1 バイト 2ms の固定費)
 
-実物の kernel/cpu_calibrate_math.c を 1 行も写さずに #include して回す。
+実物の kernel/time/cpu_calibrate_math.c を 1 行も写さずに #include して回す。
 判定は tick_count も I/O も触らないので模型は要らない。
 
 **ここはエミュレータでは踏めない。** NP21/W は十分に遅いので校正ループ 1 周で
@@ -24,11 +24,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/cpu_calibrate_host.c"
-SRC = ROOT / "kernel/cpu_calibrate_math.c"
+SRC = ROOT / "kernel/time/cpu_calibrate_math.c"
 # カーネルと同じ i386-elf で通す実ソース。cpu_calibrate.c は判定を使う側。
 TARGET_SRCS = [
-    ("kernel/cpu_calibrate_math.c", []),
-    ("kernel/cpu_calibrate.c", []),
+    ("kernel/time/cpu_calibrate_math.c", []),
+    ("kernel/time/cpu_calibrate.c", []),
 ]
 
 CASES = ["fast_cpu", "slow_cpu", "give_up", "delay_scale"]
@@ -72,13 +72,13 @@ def host_build(tmp, source_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "cpu_calibrate_math.c").write_text(source_text, encoding="utf-8")
         (mut / "cpu_calibrate_math.h").write_text(
-            (ROOT / "kernel/cpu_calibrate_math.h").read_text(encoding="utf-8"),
+            (ROOT / "kernel/time/cpu_calibrate_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/cpu_calibrate_math.c"',
-                '"kernel/cpu_calibrate_math.c"'),
+                '"../../kernel/time/cpu_calibrate_math.c"',
+                '"kernel/time/cpu_calibrate_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
                "-I" + str(mut), str(shim), "-o", str(exe)]
@@ -97,7 +97,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で kernel/cpu_calibrate.c ごと通す。"""
+    """カーネルと同じ i386-elf で kernel/time/cpu_calibrate.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-cpu-calibrate-") as tmp:
         exe = host_build(tmp)
         print("HOST GNU11 -Werror compile PASS "
-              "(real kernel/cpu_calibrate_math.c)", flush=True)
+              "(real kernel/time/cpu_calibrate_math.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)

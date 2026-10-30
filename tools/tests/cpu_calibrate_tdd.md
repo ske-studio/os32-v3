@@ -1,7 +1,7 @@
 # cpu_calibrate — RED → GREEN の記録
 
 票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` (往復 3)
-対象: `kernel/cpu_calibrate_math.c` (止め方と計算) / `kernel/cpu_calibrate.c` (計測)
+対象: `kernel/time/cpu_calibrate_math.c` (止め方と計算) / `kernel/time/cpu_calibrate.c` (計測)
 試験: `tools/tests/test_cpu_calibrate.py` + `tools/tests/cpu_calibrate_host.c`
 実行: `make check-cpu-calibrate-host` (`check-par` の列)
 
@@ -57,7 +57,7 @@ s_loops_per_tick = CALIBRATE_LOOPS / elapsed;
 ## RED
 
 1. ハーネス (`cpu_calibrate_host.c`) と `test_cpu_calibrate.py` を先に書いた。
-   `kernel/cpu_calibrate_math.c` が無いのでコンパイルが通らない = RED。
+   `kernel/time/cpu_calibrate_math.c` が無いのでコンパイルが通らない = RED。
 
 2. 実装後の否定側 (`--mutate`)。**5 本とも実行時 RED** (写しの上で変異するので
    実物のソースは 1 バイトも動かない = `check-par` で並列に回せる)。
@@ -73,7 +73,7 @@ s_loops_per_tick = CALIBRATE_LOOPS / elapsed;
 ## GREEN
 
 ```
-HOST GNU89 -Werror compile PASS (real kernel/cpu_calibrate_math.c)
+HOST GNU89 -Werror compile PASS (real kernel/time/cpu_calibrate_math.c)
 TARGET i386-elf GNU89 -Werror PASS   (cpu_calibrate_math.c + cpu_calibrate.c)
 SUMMARY 4/4 PASS
 MUTATION 1..5 すべて RED
@@ -90,7 +90,7 @@ MUTATION 1..5 すべて RED
 
 ## 直し方
 
-`kernel/cpu_calibrate.c`:
+`kernel/time/cpu_calibrate.c`:
 
 ```c
 start = tick_count;

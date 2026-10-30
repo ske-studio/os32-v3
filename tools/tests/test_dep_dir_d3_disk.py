@@ -6,9 +6,9 @@ import sys
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/bootinfo.c', 'kernel/bootinfo_check.c',
+SOURCES = ('init/bootinfo.c', 'init/bootinfo_check.c',
            'platform/pc98/boot_disk.c')
-HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_disk.h', 'kernel/boot_disk.h')
+HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_disk.h', 'init/boot_disk.h')
 
 
 def build(tmp, mutation=None):
@@ -37,9 +37,9 @@ def build(tmp, mutation=None):
 
 
 def main():
-    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
     assert kernel.index('pc98_boot_bind(&boot, boot_drive);') < kernel.index('bootinfo_report();')
-    for rel in ('kernel/bootinfo.c', 'kernel/kernel.c'):
+    for rel in ('init/bootinfo.c', 'init/kernel.c'):
         text = (ROOT / rel).read_text()
         assert '#include "ide.h"' not in text
         assert 'boot_devices.h' not in text

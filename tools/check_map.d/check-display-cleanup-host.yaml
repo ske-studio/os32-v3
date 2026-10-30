@@ -1,13 +1,13 @@
 check-display-cleanup-host:
 - gfx/pc98_route.h
-- kernel/v86.c
+- kernel/v86/v86.c
 - gfx/backend_pc98.c
 - gfx/gfx_core.c
 - gfx/gfx_vram.c
-- kernel/boot_splash.c
-- kernel/v86_gcap.c
+- init/boot_splash.c
+- kernel/v86/v86_gcap.c
 - kdebug/v86_gcap.c
-- kernel/v86_io.c
+- kernel/v86/v86_io.c
 - tools/tests/boot_splash_native_host.c
 - tools/tests/display_cleanup_host.c
 - tools/tests/host32.py
@@ -20,9 +20,9 @@ check-display-cleanup-host:
 - sdk/gen_kapi.py
 - include/pc98.h
 - include/pegc.h
-- kernel/v86_bios.h
-- kernel/display_restore.h
+- kernel/v86/v86_bios.h
+- kernel/console/display_restore.h
 - platform/pc98/display.c
 - platform/pc98/display_private.h
-- kernel/platform_splash.h
+- include/platform_splash.h
 - platform/pc98/splash.c

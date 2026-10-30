@@ -64,7 +64,7 @@
 
 /* ポーリングの刻み。短すぎると I/O ポートの読みで CPU を占有し、長すぎると
  * 115200 の予算 (173µs) を数回で使い切る。5µs なら 115200 でも 30 回以上見る。
- * cpu_delay_us の精度は ±10% 程度 (kernel/cpu_calibrate.h) なのでこれ以上
+ * cpu_delay_us の精度は ±10% 程度 (kernel/time/cpu_calibrate.h) なのでこれ以上
  * 細かくしても意味がない。 */
 #define SER_TX_POLL_US        5UL
 /* 予算の下限。**0 にしてはいけない** — 1 回も見ないうちに hlt へ落ちると

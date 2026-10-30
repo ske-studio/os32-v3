@@ -66,7 +66,7 @@ def reference_replacements(text, filename, moves):
     replacements = path_replacements(moves)
     old_parent = Path(filename).parent
     new_parent = Path(moves.get(filename, filename)).parent
-    # Paths relative to the old file (e.g. ../kernel/paging.h) need a new base.
+    # Paths relative to the old file (e.g. ../mm/paging.h) need a new base.
     relative = {}
     for old, new in replacements.items():
         rel = os.path.relpath(old, old_parent).replace(os.sep, '/')

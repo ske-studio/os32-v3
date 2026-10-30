@@ -7,7 +7,7 @@ import json
 from test_surface_lease import main, ROOT
 TARGET_SRC = ['sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/surface_query.c',
               'exec/lease.c', 'sdk/include/os32/os32_surface.h', 'exec/ring3_ls.c',
-              'sdk/include/os32/os32_ls.h', 'kernel/shm.c',
+              'sdk/include/os32/os32_ls.h', 'mm/shm.c',
               'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c']
 NAMES = ['surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease',
          'sys_ls_window', 'caller_identity']
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     values = [json.loads((ROOT/'sdk/kapi.json').read_text()),
               (ROOT/'sdk/include/os32/os32_kapi_shared.h').read_text(),
               (ROOT/'exec/surface_query.c').read_text(),
-              (ROOT/'exec/ring3_ls.c').read_text(), (ROOT/'kernel/shm.c').read_text()]
+              (ROOT/'exec/ring3_ls.c').read_text(), (ROOT/'mm/shm.c').read_text()]
     contract(*values)
     version = values[0]['version']
     if '--mutate' in sys.argv:

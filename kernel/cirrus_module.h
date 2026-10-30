@@ -2,7 +2,7 @@
 #ifndef CIRRUS_MODULE_H
 #define CIRRUS_MODULE_H
 #include "gfx_hal.h"
-#include "module_runtime.h"
+#include "module/module_runtime.h"
 #define CIRRUS_MODULE_OPS_VERSION 1u
 typedef struct {
     GfxBackend *backend;

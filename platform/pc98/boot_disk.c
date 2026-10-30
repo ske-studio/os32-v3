@@ -1,6 +1,6 @@
 /* PC-9821 IDE geometry adapter; IDE retains ownership of its state. */
 #include "boot_disk.h"
-#include "../../kernel/boot_disk.h"
+#include "../../init/boot_disk.h"
 #include "../../drivers/ide.h"
 #include "../../drivers/ide_addr.h"
 

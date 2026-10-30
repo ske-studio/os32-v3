@@ -1075,7 +1075,7 @@ unsafe extern "C" fn screen_info(out: *mut u8) {
 /*  lease は実ファイル (OS32_GSHELL_FONT_DIR の標準 set、integration */
 /*  .py が fetch_fonts で揃える) を名前の basename で開く。guard は   */
 /*  callback を 1 回呼ぶだけで、その中で read_at 以外が呼ばれたら     */
-/*  `violations` に数える (kernel/font_guard.h の約束)。               */
+/*  `violations` に数える (kernel/console/font_guard.h の約束)。               */
 /* ================================================================ */
 pub mod fontsvc {
     use super::lk;

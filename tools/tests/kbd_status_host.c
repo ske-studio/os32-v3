@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  KBD_STATUS_HOST.C — drivers/kbd_status.c と kernel/v86_kbd.c を         */
+/*  KBD_STATUS_HOST.C — drivers/kbd_status.c と kernel/v86/v86_kbd.c を         */
 /*  そのままホストで回す                                                    */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する (-I で解決。変異は写しの上で)。     */
@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "drivers/kbd_status.c"
-#include "kernel/v86_kbd.c"
+#include "kernel/v86/v86_kbd.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

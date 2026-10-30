@@ -1,14 +1,14 @@
 check-pcm-module-host:
-- kernel/tick.c
-- kernel/tick.h
+- kernel/irq/tick.c
+- kernel/irq/tick.h
 - platform/pc98/tick_order.h
 - include/time_units.h
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
-- kernel/pgalloc.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
+- mm/pgalloc.h
 - include/types.h
 - include/memmap.h
 - fs/vfs.c
@@ -49,11 +49,11 @@ check-pcm-module-host:
 - drivers/pcm_cs4231.c
 - drivers/pcm_cs4231_math.c
 - drivers/pcm_cs4231.h
-- kernel/irq.h
-- kernel/irq_math.h
-- kernel/dma_pool.h
+- kernel/irq/irq.h
+- kernel/irq/irq_math.h
+- mm/dma_pool.h
 - drivers/dma8237.h
-- kernel/kmalloc.h
+- mm/kmalloc.h
 - include/sys.h
 - include/kprintf.h
 - tools/tests/pcm_module_playback_host.c
@@ -61,7 +61,7 @@ check-pcm-module-host:
 - tools/tests/test_pcm_cs4231.py
 - tools/tests/pcm_hostshim/io.h
 - tools/tests/mutpar.py
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - tools/mkmod.py
 - tools/gen_kdebug_imports.py
 - sdk/kapi.json

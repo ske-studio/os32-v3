@@ -10,12 +10,12 @@ check-unicode-surface-host:
 - gfx/gfx_core.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
-- kernel/paging.c
+- mm/paging.c
 - platform/pc98/platform_memory_desc.h
-- kernel/platform_memory.h
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- include/platform_memory.h
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kernel/sys.c
 - tools/tests/gfx_kernel_fb_host.c
 - tools/tests/host32.py
@@ -33,8 +33,8 @@ check-unicode-surface-host:
 - tools/tests/unicode_surface_host.c
 - tools/check_map.d/check-unicode-surface-host.yaml
 - build/checks.d/check-unicode-surface-host.mk
-- kernel/unicode_file.c
-- kernel/unicode_file.h
+- kernel/console/unicode_file.c
+- kernel/console/unicode_file.h
 - tools/gen_unicode.c
 - lib/unicode_jis_table.h
 - tools/tests/test_unicode_lookup.py
@@ -43,7 +43,7 @@ check-unicode-surface-host:
 - kapi/kapi_generated.c
 - tools/tests/unicode_lookup_host.c
 - tools/tests/unicode_lookup_sdk.c
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h
 artifact_reader: true

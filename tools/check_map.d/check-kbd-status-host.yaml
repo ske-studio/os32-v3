@@ -1,10 +1,10 @@
 check-kbd-status-host:
 - include/kbd.h
 - drivers/kbd.h
-- kernel/v86_kbd.h
+- kernel/v86/v86_kbd.h
 - drivers/kbd.c
 - drivers/kbd_status.c
-- kernel/v86_kbd.c
+- kernel/v86/v86_kbd.c
 - tools/tests/kbd_status_host.c
 - tools/tests/test_kbd_status.py
 - tools/check_map.d/check-kbd-status-host.yaml

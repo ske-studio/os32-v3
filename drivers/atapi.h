@@ -72,7 +72,7 @@
  * 待ちの合計は 1 装置あたり最大 20 × 250ms = 5 秒 — トレイを閉じた直後の
  * becoming ready (2〜5 秒) を待ちきる長さ。atapi_init は装置ごとに待つので、
  * 装置が 2 台なら最大 10 秒。待ちは atapi_delay_us が CPU_DELAY_US_MAX
- * (kernel/cpu_calibrate.h、cpu_delay_us の上限 100ms) 以下の塊に分けて回す */
+ * (kernel/time/cpu_calibrate.h、cpu_delay_us の上限 100ms) 以下の塊に分けて回す */
 #define ATAPI_READY_RETRIES     20
 #define ATAPI_READY_WAIT_US     250000UL
 

@@ -118,4 +118,4 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 証拠は `~/os32-tmp/run/hwdev_m3c/`。M4 の所有照合・終端と M5 の配備は本段に含めない。
 
 ## 送り項目 (取り込みのレビューの P3)
-- (BARLEN か T4b で) M4: kernel/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。 **済** (0a2bf5b、失敗時に published=0)
+- (BARLEN か T4b で) M4: kernel/module/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。 **済** (0a2bf5b、失敗時に published=0)

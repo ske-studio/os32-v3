@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MIRRORS = {
     "memmap_defs.inc": "include/memmap.h",
     "pc98_defs.inc": "include/pc98.h",
-    "gdt_defs.inc": "kernel/gdt.h",
+    "gdt_defs.inc": "arch/x86/kernel/gdt.h",
     "hex_defs.inc": "lib/kstring.h",
 }
 

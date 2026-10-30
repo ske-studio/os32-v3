@@ -14,7 +14,7 @@ import host32
 from test_exec_r1 import function
 
 ROOT = Path(__file__).resolve().parents[2]
-PATHS = ('kernel/font_guard.c', 'exec/exec.c', 'kernel/isr_handlers.c')
+PATHS = ('kernel/console/font_guard.c', 'exec/exec.c', 'arch/x86/kernel/isr_handlers.c')
 MUTATIONS = [
     ('reentry', 0, 'font_guard_active || kctx_irq_depth', 'kctx_irq_depth', 'reentry'),
     ('active-kept', 0, '    font_guard_active = 0;\n', '', 'active cleared'),

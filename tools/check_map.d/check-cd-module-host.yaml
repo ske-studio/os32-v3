@@ -1,10 +1,10 @@
 check-cd-module-host:
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
-- kernel/pgalloc.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
+- mm/pgalloc.h
 - include/types.h
 - include/memmap.h
 - fs/vfs.c
@@ -35,7 +35,7 @@ check-cd-module-host:
 - include/config.h
 - sdk/include/os32/os32_generations.h
 - include/bootinfo.h
-- kernel/cpu_calibrate.h
+- kernel/time/cpu_calibrate.h
 - tools/prototypes/cd_imports.def
 - tools/gen_sqlite_imports.py
 - tools/tests/cd_module_host.c

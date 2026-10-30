@@ -93,7 +93,7 @@ static void fdd_track_setup(void)
     fdd_track_ready = 1;
 }
 
-/* 先読みとセクタキャッシュの数を 1 行で出す (起動時、kernel/kernel.c)。 */
+/* 先読みとセクタキャッシュの数を 1 行で出す (起動時、init/kernel.c)。 */
 void diskio_print_fdd_cache(const char *tag)
 {
     if (fdd_track.sec_hits + fdd_track.trk_hits + fdd_track.fills == 0) return;

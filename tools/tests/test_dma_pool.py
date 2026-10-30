@@ -1,11 +1,11 @@
-"""DMA プールの表 (kernel/dma_pool_math.c) のホスト試験。
+"""DMA プールの表 (mm/dma_pool_math.c) のホスト試験。
 
 記録: tools/tests/dma_pool_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-3 (DMA プール)、
       docs/archive/v3/TASK_T1_LEDGER.md §3-7 / §4-3 (T1c: dma_alloc の limit、
       {pa, va} の組、失敗時 *out 不変、R4 の最悪の並び)
 
-実物の kernel/dma_pool_math.c と lib/dma_contract.c を 1 行も写さずに
+実物の mm/dma_pool_math.c と lib/dma_contract.c を 1 行も写さずに
 #include して回す。表を触るだけなので I/O も割り込みも要らない。
 
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
@@ -26,11 +26,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/dma_pool_host.c"
-SRC = ROOT / "kernel/dma_pool_math.c"
+SRC = ROOT / "mm/dma_pool_math.c"
 # dma_range_ok (dma_alloc と FDC の BSS が共有する検査) は独立契約にある。
 # 変異の 4 番目の要素でこちらを指す (無ければ SRC)。
 D8237 = ROOT / "lib/dma_contract.c"
-TARGET_SRCS = ["kernel/dma_pool_math.c", "kernel/dma_pool.c",
+TARGET_SRCS = ["mm/dma_pool_math.c", "mm/dma_pool.c",
                "lib/dma_contract.c"]
 
 CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
@@ -107,7 +107,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "dma_pool_math.c").write_text(source_text, encoding="utf-8")
         (mut / "dma_pool.h").write_text(
-            (ROOT / "kernel/dma_pool.h").read_text(encoding="utf-8"),
+            (ROOT / "mm/dma_pool.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         # 変異させた写しを先に引かせる。共通実体も別に差し替えられるので、
@@ -115,7 +115,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
         # 全部の変異が「コンパイルできない」で RED に見えてしまう。
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../kernel/dma_pool_math.c"', '"kernel/dma_pool_math.c"')
+            .replace('"../../mm/dma_pool_math.c"', '"mm/dma_pool_math.c"')
             .replace('"../../lib/dma_contract.c"',
                      '"%s"' % d8237),
             encoding="utf-8")
@@ -128,7 +128,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
 
 def boot_gate(tmp):
     d = pathlib.Path(tmp)
-    kernel = (ROOT / "kernel/kernel.c").read_text()
+    kernel = (ROOT / "init/kernel.c").read_text()
     start = kernel.index('    if (!memory_boot_init(mem_kb))')
     end = kernel.index('    /* FDリダイレクト初期化', start)
     gate = '    struct boot_context boot = {0};\n' + kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
@@ -144,7 +144,7 @@ def boot_gate(tmp):
     gate = gate[:gate.index('    test_irq_dynamic();')]
     (d / "selftest_dma_gate.c").write_text(
         helper + 'static void host_selftest_dma(void) {\n' + gate + '}\n')
-    (d / "dma_pool_source.c").write_text((ROOT / "kernel/dma_pool.c").read_text())
+    (d / "dma_pool_source.c").write_text((ROOT / "mm/dma_pool.c").read_text())
     (d / "io.h").write_text(
         'static unsigned int irq_save(void) { return 0; }\n'
         'static void irq_restore(unsigned int f) { (void)f; }\n')
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-dma-pool-") as tmp:
         boot_gate(tmp)
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/dma_pool_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real mm/dma_pool_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

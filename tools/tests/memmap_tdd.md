@@ -2,7 +2,7 @@
 
 票: `docs/archive/kernel_v21/TASK_KSTACK_USER.md` §4 の 1・2・3 と §4-bis
 
-対象: `tools/gen_memmap.py` / `kernel/paging.c` / `kernel/kselftest.c` / `include/memmap.h`
+対象: `tools/gen_memmap.py` / `mm/paging.c` / `kernel/kselftest.c` / `include/memmap.h`
 試験: `tools/tests/test_memmap_gen.py` / `tools/tests/test_memmap_boot.py` + `memmap_boot_host.c`
 登録: `make check` → `check-memmap-host` / `check-memmap` (2026-09-17 決裁 D1/D2 の後に登録)
 
@@ -71,7 +71,7 @@ RED だったこと: どれも道具そのものが無かった。とくに NOMA
 
 PDE 0 の PTE 1024 本を `memmap.h` から導いた期待値と比べ、食い違った区間を
 `paging_memmap_bad[]` に積んで `kselftest_fail` に数える。
-`tools/tests/memmap_boot_host.c` が `kernel/paging.c` を**そのまま** `#include` し、
+`tools/tests/memmap_boot_host.c` が `mm/paging.c` を**そのまま** `#include` し、
 `paging_init` → `paging_reclaim_conventional` → `shm_init` 相当 → KAPI 踏み台、
 というカーネルの起動順を再生してから呼ぶ。ゲストを起動せずに件数と区間が確定する。
 
@@ -115,11 +115,11 @@ SHM 後方ガードがカーネル帯域を突き抜けて SQLite 帯の先頭�
 ### 3. `shm_init()` の写しについて
 
 ホストの gcc 15 は `(u32)&__bss_end` を含む定数式を畳まなくなっており
-(クロスの gcc 13.2 も `-Werror` では同じ)、`kernel/shm.c` の `STATIC_ASSERT` が
+(クロスの gcc 13.2 も `-Werror` では同じ)、`mm/shm.c` の `STATIC_ASSERT` が
 `variably modified at file scope` になるので `#include` できない。
 ページ表に対する 3 つの呼び出しだけをハーネスに写し、
 **写しが本物とずれていないことを `test_memmap_boot.py` が
-`kernel/shm.c` の `shm_init()` 本文と突き合わせる** (`check_shm_replay`)。
+`mm/shm.c` の `shm_init()` 本文と突き合わせる** (`check_shm_replay`)。
 
 ## 決裁 D1 / D2 (2026-09-17) で何が変わったか
 
@@ -154,14 +154,14 @@ ASSERT(__bss_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX, "...")
 
 | ファイル | 表明 | 何を見るか |
 |---|---|---|
-| `kernel/shm.c` | `shm_gui_base_aligned` | GUI 予約の先頭がブロック境界に乗る |
-| `kernel/shm.c` | `shm_gui_within_band` | GUI 予約が SHM 帯に収まる |
-| `kernel/shm.c` | `shm_gui_is_last_blocks` | 予約が帯の **末尾** にある (新規) |
-| `kernel/paging.c` | `shm_band_within_kernel_band` | 最悪配置でも SHM 帯がカーネル帯域に収まる |
-| `kernel/paging.c` | `shm_resv_not_reversed` | 最悪配置でも後方予約が逆転しない (空は許す) |
-| `kernel/paging.c` | `shm_band_below_kstack_guard` | 最悪配置でも SHM はスタックガードに届かない |
-| `kernel/paging.c` | `kstack_outside_shm_band` | スタック 16KB 全部が SHM 帯の外 |
-| `kernel/paging.c` | `kstack_outside_kernel_band` | スタックが浮動番地の帯の外に居る (D1 の要点) |
+| `mm/shm.c` | `shm_gui_base_aligned` | GUI 予約の先頭がブロック境界に乗る |
+| `mm/shm.c` | `shm_gui_within_band` | GUI 予約が SHM 帯に収まる |
+| `mm/shm.c` | `shm_gui_is_last_blocks` | 予約が帯の **末尾** にある (新規) |
+| `mm/paging.c` | `shm_band_within_kernel_band` | 最悪配置でも SHM 帯がカーネル帯域に収まる |
+| `mm/paging.c` | `shm_resv_not_reversed` | 最悪配置でも後方予約が逆転しない (空は許す) |
+| `mm/paging.c` | `shm_band_below_kstack_guard` | 最悪配置でも SHM はスタックガードに届かない |
+| `mm/paging.c` | `kstack_outside_shm_band` | スタック 16KB 全部が SHM 帯の外 |
+| `mm/paging.c` | `kstack_outside_kernel_band` | スタックが浮動番地の帯の外に居る (D1 の要点) |
 
 `shm.c` の 2 本は 2026-09-17 まで **黙って死んでいた**。条件に
 `(u32)&__bss_end` 由来の値が入っていたため、GCC が可変長配列として警告だけ
@@ -177,7 +177,7 @@ C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK 
 | 場所 | 写している値 |
 |---|---|
 | `build/os32.ld` | `KERNEL_LOAD_ADDR` / `MEM_KSTACK_TOP` / `MEM_KERNEL_IMAGE_MAX` |
-| `kernel/kentry.asm` | 値ではなく `os32.ld` の絶対シンボルを `extern` で引く (数値直書きに戻したら検出) |
+| `arch/x86/kernel/kentry.asm` | 値ではなく `os32.ld` の絶対シンボルを `extern` で引く (数値直書きに戻したら検出) |
 | `sdk/include/os32/os32_gui_shared.h` | `GUI_SHM_OFFSET` = `MEM_SHM_GUI_OFFSET` |
 | `sdk/rust/os32api/src/gui/proto.rs` | 同上 (C ⇄ Rust は `make check-gui-proto` も見る) |
 

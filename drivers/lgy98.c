@@ -28,7 +28,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #define LGY_LINKTEST_PAYLOAD  512
 #define LGY_REFLECT_BUDGET    2
 
-/* IRQ 入口は共通スタブ (kernel/isr_stub.asm の irq_stub_common_*) に移した。
+/* IRQ 入口は共通スタブ (arch/x86/kernel/isr_stub.asm の irq_stub_common_*) に移した。
  * どの線に結ぶかは irq_register() が決める (票 TASK_HAL_WIRING §1-1)。 */
 
 /* 反射モード (LGY98_FLAG_REFLECT)。static にするとホストから読めないので意図的にグローバル。 */

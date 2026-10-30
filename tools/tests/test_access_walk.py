@@ -2,7 +2,7 @@
 Only a fixed source closure is copied; compile failures never count as RED.
 """
 from kernel_layout import linker_flags
-TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/shlib.c', 'kdebug/kselftest.c']
+TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/shlib.c', 'kdebug/kselftest.c']
 
 import argparse
 import hashlib
@@ -14,8 +14,8 @@ from mutpar import run_ordered
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FILES = {
-    'paging': 'kernel/paging.c', 'pgalloc': 'kernel/pgalloc.c',
-    'shlib': 'kernel/shlib.c', 'access_walk': 'exec/access_walk.c',
+    'paging': 'mm/paging.c', 'pgalloc': 'mm/pgalloc.c',
+    'shlib': 'mm/shlib.c', 'access_walk': 'exec/access_walk.c',
     'redir_access': 'exec/redir_access.c',
     'boot': 'kdebug/kselftest.c',
 }
@@ -86,7 +86,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                *['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
                   'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs', 'drivers', 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
-               str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
+               str(ROOT / 'mm/physmem.c'), '-o', str(exe)]
         host32.build(cmd, check=True, capture_output=True, text=True)
         return run_host32(exe, runner)
 

@@ -2,8 +2,8 @@
 #include "geforce_module.h"
 #include "gf_production.h"
 #include "../hwdev/gf/production.h"
-#include "pgalloc.h"
-#include "paging.h"
+#include "../mm/pgalloc.h"
+#include "../mm/paging.h"
 STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
               GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE + 1,
               geforce_boot_pt_budget);

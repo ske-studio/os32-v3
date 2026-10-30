@@ -1,4 +1,4 @@
-"""K6C: console シンクのリングを実物の kernel/con_sink.c で確かめる。
+"""K6C: console シンクのリングを実物の kernel/console/con_sink.c で確かめる。
 
 票:   docs/archive/gui_v13/TASK_K6C_console.md §2 (設計 3 点 + レコード形式)
 記録: tools/tests/con_sink_tdd.md
@@ -27,10 +27,10 @@ INCLUDES = ["-I" + str(ROOT / p)
             for p in ("include", "arch/x86", "platform/pc98",
                       "kernel", "gfx", "lib", "drivers", "sdk/include/os32")]
 HOST_SRC = ROOT / "tools/tests/con_sink_host.c"
-KERNEL_SRC = ROOT / "kernel/con_sink.c"
-# K6C-2: 描画抑止は kernel/console.c 側なので、そちらもカーネルと同じ
+KERNEL_SRC = ROOT / "kernel/console/con_sink.c"
+# K6C-2: 描画抑止は kernel/console/console.c 側なので、そちらもカーネルと同じ
 # フラグでクロスコンパイルする (ホスト側は con_sink_host.c が取り込む)。
-CONSOLE_SRC = ROOT / "kernel/console.c"
+CONSOLE_SRC = ROOT / "kernel/console/console.c"
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-con-sink-") as tmp:

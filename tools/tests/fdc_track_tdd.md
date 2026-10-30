@@ -66,7 +66,7 @@ PM の実測: フォントの読み込みは 4a8fad4 とほぼ同じ約 3 分。
   Ready 変化は SIS のどこで見ても世代を進め、覚えたシリンダを捨てる
   (`readychange_invalidates`)
 - 起動時に `[fdc] font: seek= skip= recal= tmo= foreign= rdy= multi=ok/fail nr= single= retry= write=`
-  を 1 行出す (`kernel/kernel.c`、FD に触っていなければ出ない)
+  を 1 行出す (`init/kernel.c`、FD に触っていなければ出ない)
 
 ## 0-2. 6541ef1 の実測 (2026-09-24 夜) — まだ当たっていなかった理由と直したもの
 

@@ -192,7 +192,7 @@
     {
       "kind": "FUNC",
       "symbol": "pgalloc_alloc_phys",
-      "source": "kernel/pgalloc.h",
+      "source": "mm/pgalloc.h",
       "index": 27,
       "group": "kernel"
     },
@@ -206,7 +206,7 @@
     {
       "kind": "FUNC",
       "symbol": "pgalloc_free_n_owner",
-      "source": "kernel/pgalloc.h",
+      "source": "mm/pgalloc.h",
       "index": 29,
       "group": "kernel"
     },

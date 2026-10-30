@@ -22,11 +22,11 @@ check-np21w-gui-host:
 - include/memmap.h
 - include/con_sink.h
 - exec/appslot.h
-- kernel/module_runtime.h
-- kernel/module_schema.h
-- kernel/ime.h
-- kernel/ime.c
-- kernel/fep_module.c
+- kernel/module/module_runtime.h
+- kernel/module/module_schema.h
+- kernel/ime/ime.h
+- kernel/ime/ime.c
+- kernel/ime/fep_module.c
 - build/fep-module.ld
 - userland/gshell/src/startmenu.rs
 - .claude/skills/os32-gui-drive/SKILL.md

@@ -1,5 +1,5 @@
 /* Real KMOD relocation for the existing trace oracles. Hardware stays fake. */
-#include "kernel/module_image.h"
+#include "kernel/module/module_image.h"
 #include "hwdev/generated/hwdev_imports.h"
 #include "hwdev_pair.h"
 #include "hwdev_trace_symbols.h"

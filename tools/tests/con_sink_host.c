@@ -5,7 +5,7 @@
  *  実行:   python3 -B tools/tests/test_con_sink.py
  *  記録:   tools/tests/con_sink_tdd.md
  *
- *  kernel/con_sink.c を 1 行も写さずそのまま #include する (模型ではない)。
+ *  kernel/console/con_sink.c を 1 行も写さずそのまま #include する (模型ではない)。
  *  カーネル帯に要るものは 2 つだけ:
  *    - 割込み禁止区間: ホストは CPL=3 で cli/popfl を実行できないので
  *      CON_SINK_NO_IRQ_LOCK で空の錠に差し替える。守っている不変条件
@@ -32,7 +32,7 @@ void kdi_set_con_sink_drop_count(u32 value) { con_sink_drop_count = value; }
 static u32 con_sink_selftest(void) { return kst_con_sink(); }
 
 /* ======================================================================== */
-/*  kernel/console.c も**実物のまま**取り込む (K6C-2)                        */
+/*  kernel/console/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
 /*  「シンク有効中は描画関数が TVRAM に触らない」を見るために要るのは 2 つ:  */
 /*    - テキスト VRAM: tvram.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
@@ -80,7 +80,7 @@ static const ConOutputOps capture_output = { .putchar = capture_putchar };
 static u32 g_inject_pending;
 void kbd_inject_discard(void) { g_inject_pending = 0; }
 
-/* --- 起動ログ (kernel/bootlog.c) の代わり --------------------------------
+/* --- 起動ログ (init/bootlog.c) の代わり --------------------------------
  * console.c の入口は con_sink と同じ 4 か所で bootlog_push も呼ぶ。この
  * 試験が見るのはシンクなので、起動ログは受け流す (実物の試験は
  * tools/tests/test_bootlog.py)。 */
@@ -135,7 +135,7 @@ void console_hw_cursor_enable(void);    /* console.c の中で前方参照され
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wsign-compare"
-#include "../../kernel/console.c"
+#include "../../kernel/console/console.c"
 #include "../../platform/pc98/console.c"
 #pragma GCC diagnostic pop
 

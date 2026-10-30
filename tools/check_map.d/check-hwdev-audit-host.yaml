@@ -3,7 +3,7 @@ check-hwdev-audit-host:
 - tools/gen_kdebug_imports.py
 - tools/mkmod.py
 - tools/module_schema.py
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - docs/decisions/realhw/HWDEV_CORE_API.md
 - build/hwdev.ld
 - build/hwdev.mk

@@ -8,10 +8,10 @@ check-appmem-map-host:
 - exec/appmem.c
 - exec/appmem_map.c
 - exec/appmem_unmap.c
-- kernel/paging_app.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
+- mm/paging_app.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
 - tools/tests/appmem_map_host.c
 - tools/tests/test_appmem_map.py
 - tools/tests/host32.py
@@ -21,8 +21,8 @@ check-appmem-map-host:
 - exec/appslot.c
 - exec/exec_heap.c
 - exec/exec_heap.h
-- kernel/kmalloc.c
-- kernel/kmalloc.h
+- mm/kmalloc.c
+- mm/kmalloc.h
 - exec/redir_access.c
 - exec/access_walk.c
 - tools/tests/exec_heap_host.h

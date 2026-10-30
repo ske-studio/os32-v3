@@ -22,7 +22,7 @@
 #include "utf8.h"
 #include "endian_le.h"
 #ifdef __KERNEL_BUILD__
-#include "../kernel/unicode_file.h"
+#include "../kernel/console/unicode_file.h"
 #else
 /* The CRT and shlib each supply their initialized KAPI pointer. */
 extern KernelAPI *kapi;

@@ -13,7 +13,7 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/unicode_file.c'
+PRODUCT = 'kernel/console/unicode_file.c'
 TABLE = 'lib/unicode_jis_table.h'
 SDK = 'tools/tests/unicode_lookup_sdk.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-ffreestanding',
@@ -89,7 +89,7 @@ def product_build_rules():
         assert len(expected) == 28252, 'existing old product artifact must regenerate'
         make('-q')  # Up to date: do not recreate it on every build.
         for dependency in ('tools/gen_unicode.c', 'lib/unicode_jis_table.h',
-                           'kernel/unicode_file.h'):
+                           'kernel/console/unicode_file.h'):
             out.write_bytes(bytes(131072))
             result = make('-W', dependency)
             assert './tools/gen_unicode --pairs out/unicode.bin' in result.stdout
@@ -101,7 +101,7 @@ def product_build_rules():
 
 
 def run_case(runner, mutation=None):
-    paths = [PRODUCT, 'kernel/unicode_file.h', SDK,
+    paths = [PRODUCT, 'kernel/console/unicode_file.h', SDK,
              'lib/utf8.c', 'lib/utf8.h', 'tools/tests/unicode_lookup_host.c']
     texts = {p: (ROOT / p).read_text() for p in paths}
     pairs = entries((ROOT / TABLE).read_text())
@@ -146,7 +146,7 @@ def run_case(runner, mutation=None):
             r'\b(utf8_\w+|unicode_to_\w+)(?=\s*\()',
             lambda match: 'kernel_' + match[0], texts['lib/utf8.h']))
         kernel_utf8 = kernel_utf8.replace('#include "utf8.h"', '#include "kernel_utf8.h"')
-        kernel_utf8 = kernel_utf8.replace('#include "../kernel/unicode_file.h"',
+        kernel_utf8 = kernel_utf8.replace('#include "../kernel/console/unicode_file.h"',
                                           '#include "unicode_file.h"')
         (tmp / 'unicode_kernel.c').write_text('#define __KERNEL_BUILD__ 1\n' + kernel_utf8)
         generated = (ROOT / 'kapi/kapi_generated.c').read_text()

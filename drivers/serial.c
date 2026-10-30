@@ -28,7 +28,7 @@
 #define SER_CHECKED_NOT_OWNED (-21)
 #define SER_CHECKED_NOT_READY (-22)
 
-/* 外部: 起動時に判定したシステムクロック (kernel/sysclk.h)。drivers/ は
+/* 外部: 起動時に判定したシステムクロック (kernel/time/sysclk.h)。drivers/ は
  * カーネルヘッダを見ない作法なので extern で引く (kbd.c / ide.c と同じ)。
  * **ここで 0000:0501h を読まない** — serial_init は KAPI 経由 (CPL=3 の
  * アプリ文脈) でも呼ばれるので、低位物理は起動時に読んだ保存値だけを使う。 */
@@ -44,13 +44,13 @@ extern int ring3_wait_pending(void);
 extern void irq_enable(unsigned int irq);
 extern void irq_disable(unsigned int irq);
 
-/* 外部: 校正済みマイクロ秒ディレイ (kernel/cpu_calibrate.h)。
+/* 外部: 校正済みマイクロ秒ディレイ (kernel/time/cpu_calibrate.h)。
  * drivers/ はカーネルヘッダを見ない作法なので extern で引く
  * (sysclk_* と同じ理由。ne2000.c は kernel/ を -I しているが、ここは
  * 宣言 1 行で足りる)。 */
 extern void cpu_delay_us(u32 us);
 
-/* 外部: PIT 100Hz が進める実時間 (kernel/idt.h)。送信の予算はこれで測る
+/* 外部: PIT 100Hz が進める実時間 (arch/x86/kernel/idt.h)。送信の予算はこれで測る
  * — cpu_delay_us の校正が何倍ずれても狂わないため (往復 3)。 */
 extern volatile u32 tick_count;
 
@@ -106,7 +106,7 @@ static u32 ser_err_pe = 0;
 /*  デフォルト: 8N1 (8bit, パリティなし, ストップビット1)                     */
 /* ======================================================================== */
 /* ======================================================================== */
-/*  システムクロックは kernel/sysclk.c の保存値を見る (票 §1-0)。            */
+/*  システムクロックは kernel/time/sysclk.c の保存値を見る (票 §1-0)。            */
 /*  判定していなければ sysclk_hz() が従来の既定 1.9968MHz を返す。          */
 /* ======================================================================== */
 static struct serial_setup s_setup = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -252,7 +252,7 @@ static int serial_init_ex(unsigned long baud, int want_vfast)
     /* ---- FIFO 搭載判定 (1 回だけ。0136h を読むだけで何も書かない) ---- */
     serial_probe_fifo();
 
-    /* クロックは起動時に 0000:0501h から判定した保存値 (kernel/sysclk.c)。
+    /* クロックは起動時に 0000:0501h から判定した保存値 (kernel/time/sysclk.c)。
      * 未判定なら sysclk_hz() が従来値 (TIMER_CLK_1997) を返す。 */
     clk = sysclk_hz();
     if (baud == 0) baud = SER_BAUD_DEFAULT;

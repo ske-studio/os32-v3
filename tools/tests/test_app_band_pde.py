@@ -23,7 +23,7 @@ MUTATIONS = [
 def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-appband-') as tmp:
         tmp = pathlib.Path(tmp)
-        source = (ROOT / 'kernel/paging.c').read_text()
+        source = (ROOT / 'mm/paging.c').read_text()
         kselftest = (ROOT / 'kdebug/kselftest.c').read_text()
         ledger = kselftest[kselftest.index('static u32 ledger_persist_total(void)'):kselftest.index('/*  gfx の予約・BB・SURFACE')]
         ledger = ledger[:ledger.rfind('/* ------------------------------------------------------------------------ */')]
@@ -45,7 +45,7 @@ def run(mutation=None):
                 source = source.replace(old, new, 1)
         (tmp / 'paging_host_source.c').write_text(source)
         (tmp / 'kselftest_ledger_source.c').write_text(ledger)
-        allocator = (ROOT / 'kernel/pgalloc.c').read_text()
+        allocator = (ROOT / 'mm/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
         # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、
@@ -60,7 +60,7 @@ def run(mutation=None):
         exe = tmp / 'app_band_pde'
         build = subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
                         *host_includes, str(ROOT / 'tools/tests/app_band_pde_host.c'),
-                        str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], capture_output=bool(mutation))
+                        str(ROOT / 'mm/physmem.c'), '-o', str(exe)], capture_output=bool(mutation))
         if build.returncode:
             if mutation: return 'compile'
             raise RuntimeError('host compile failed')
@@ -72,7 +72,7 @@ def run(mutation=None):
             return 'runtime' if result.returncode else 'green'
         if result.returncode: raise RuntimeError('host execution failed')
         subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c',
-                        str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
+                        str(ROOT / 'mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
         print('HOST ILP32 + TARGET GNU11 PASS')
 
 run()

@@ -27,18 +27,18 @@
 |SURVEY|現在の実物 file:line|判定・設計への反映|
 |---|---|---|
 |#29|`kernel/kcg_module.c:34–40`|一致。ポート→wait→`public_api()->invalidate()`。未ロード時のstubを残す|
-|#46|`kernel/console.c:75,102,176,197,486,502`|一致。scrollの属性はu16、通常clear/文字の属性はu8。単一cell書込みに統一しない|
-|#47|`kernel/isr_handlers.c:88–100`、`kernel/double_fault.c:72–77`、`kernel/v86_mem.c:171–176`|一致。障害属性はu16。isrの0x07をkprintf変換に通さない|
-|#48|`kernel/v86.c:973,985,1044`|一致。復旧本体は既に常駐。v86.mod不在対応を新規機能と扱わない|
-|#53|`kernel/boot_splash.c:62,272,300–305,344–347`|一致。強制選択だけでなくplanar確認・失敗時shutdownも現存|
+|#46|`kernel/console/console.c:75,102,176,197,486,502`|一致。scrollの属性はu16、通常clear/文字の属性はu8。単一cell書込みに統一しない|
+|#47|`arch/x86/kernel/isr_handlers.c:88–100`、`arch/x86/kernel/double_fault.c:72–77`、`kernel/v86/v86_mem.c:171–176`|一致。障害属性はu16。isrの0x07をkprintf変換に通さない|
+|#48|`kernel/v86/v86.c:973,985,1044`|一致。復旧本体は既に常駐。v86.mod不在対応を新規機能と扱わない|
+|#53|`init/boot_splash.c:62,272,300–305,344–347`|一致。強制選択だけでなくplanar確認・失敗時shutdownも現存|
 |#54|`lib/kprintf_attr.c:34,65`|一致。E0h判定→visible補完／旧来前景色変換。全256入力を保存|
-|差1: 初期表示の記載なし|`kernel/boot_display.c:8–18`、`kernel/kernel.c:139,154`|L18に包含。折返し・下端打切り・属性u8を保存。kernelの呼出位置・文字列も不変|
-|差2: recoverセルの記載なし|`kernel/v86.c:1050–1061`、`kernel/display_restore.h:10`|状態判定だけでなく専用TVRAMセルread/writeと物理定数もL19で移す|
+|差1: 初期表示の記載なし|`init/boot_display.c:8–18`、`init/kernel.c:139,154`|L18に包含。折返し・下端打切り・属性u8を保存。kernelの呼出位置・文字列も不変|
+|差2: recoverセルの記載なし|`kernel/v86/v86.c:1050–1061`、`kernel/console/display_restore.h:10`|状態判定だけでなく専用TVRAMセルread/writeと物理定数もL19で移す|
 
 - F8（範囲外・持越し）: `lib/sqlite3/os32_sqlite_test.c:11–19` は常駐で0xA0000/0xA2000をP2Vなしで直書き。群Dでは触らない（PM決定）。
 
 - 現platform/pc98は boot/boot_disk/boot_names/d2_bind/pci_resources/clock/system/pic/timer/memory と関連ヘッダ。表示実装はまだ無い。
-- `platform/pc98/boot.c:243–256`でD2等をbindし、`:229–239`に既存step表。`kernel/kernel.c:117`のbindは初期表示より前。
+- `platform/pc98/boot.c:243–256`でD2等をbindし、`:229–239`に既存step表。`init/kernel.c:117`のbindは初期表示より前。
 - 確定境界だけ継承: D2 §2/4のConOutputOps・EmergencyOps、D3 §3のboot_context/step、B §2/8の固定口・基点列、C §2の固定名ヘッダstatic const。
 
 ## 2. 共通境界・所有・呼出文脈
@@ -51,7 +51,7 @@
 
 |所有者|残す状態・責務|呼ばれる文脈|
 |---|---|---|
-|kernel/console.c|cursor_x/y、scroll reserve、UTF-8処理、描画抑止、sink/bootlog/rshellの順序|起動前景・通常前景、既存診断の割込み側呼出しも待ち追加なし|
+|kernel/console/console.c|cursor_x/y、scroll reserve、UTF-8処理、描画抑止、sink/bootlog/rshellの順序|起動前景・通常前景、既存診断の割込み側呼出しも待ち追加なし|
 |PC98 console backend|TVRAM表現、漢字2セル、反転ビット、GDCカーソル列。追加可変状態なし|呼出側のIFを維持、IRQ禁止化・確保・登録待ちを追加しない|
 |PC98 emergency backend|文字/属性面へのアクセスだけ。可変大域状態なし|paging前の起動、例外、DF専用スタック、V86 teardown（IRQ/例外内を含む）|
 |kernelの障害処理|文章・16進整形・表示行・停止／復帰の判断|既存スタックとIFのまま。backendはログ/通常consoleを呼ばない|
@@ -61,7 +61,7 @@
 ## 3. L18 — 初期・障害表示を固定口へ
 
 ```c
-/* 新規 kernel/platform_emergency.h。登録関数・構造体なし。 */
+/* 新規 include/platform_emergency.h。登録関数・構造体なし。 */
 void platform_boot_puts(int x, int y, const char *s, u8 attr);
 void platform_fault_cell(u32 pos, u16 code, u8 attr);
 /* platform/pc98/emergency.c: 通常console/sink/kprintfに依存しない */
@@ -69,7 +69,7 @@ void platform_fault_cell(u32 pos, u16 code, u8 attr) {
     ((volatile u16 *)P2V_IO(TVRAM_BASE))[pos] = code;
     ((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;
 }
-/* kernel/boot_display.c: 既存名・引数・呼出側を残す */
+/* init/boot_display.c: 既存名・引数・呼出側を残す */
 void tvram_print(int x, int y, const char *s, u8 attr) {
     platform_boot_puts(x, y, s, attr);
 }
@@ -87,7 +87,7 @@ void tvram_print(int x, int y, const char *s, u8 attr) {
 - L16aは純粋属性変換とkprintf wrapperだけを移す。L16bでgridとカーソルを移し、同じconsole試験を拡張する。
 
 ```c
-/* 新規 kernel/console_backend.h。リンク時固定、全関数PC98常駐。 */
+/* 新規 kernel/console/console_backend.h。リンク時固定、全関数PC98常駐。 */
 void con_backend_clear(void);
 void con_backend_scroll(int rows); /* 対象行数をkernelが決める */
 void con_backend_putchar(int x, int y, char ch, u8 raw_attr);
@@ -97,7 +97,7 @@ int  con_backend_reverse(int x, int y);
 void con_backend_cursor_at(int x, int y);
 void con_backend_cursor_shape(int visible);
 u8 con_backend_printf_attr(u8 input); /* 純粋変換、通常raw属性とは別 */
-/* kernel/console.cの例。抑止と論理状態の所有者は変えない。 */
+/* kernel/console/console.cの例。抑止と論理状態の所有者は変えない。 */
 void tvram_scroll(void) { con_backend_scroll(TVRAM_ROWS - g_scroll_reserve); }
 /* clear: sink通知→GUIならreturn→backend_clear→cursor_x/y=0→sync */
 /* cursor_sync: v86ならreturn→con_backend_cursor_at(cursor_x,cursor_y) */
@@ -117,20 +117,20 @@ u8 kprintf_attr_to_pc98(u8 attr) { return con_backend_printf_attr(attr); }
 ## 5. L19 — 常駐復旧と状態判定
 
 ```c
-/* kernel/display_restore.h: 既存5関数の署名を保ち、機種includeを除く。 */
+/* kernel/console/display_restore.h: 既存5関数の署名を保ち、機種includeを除く。 */
 void display_text_start(void);
 void display_restore_98(void);
 int display_recover_ready(void);
 int display_recover_cell_read(u32 *value);
 int display_recover_cell_write(u32 value);
-/* 新規 kernel/platform_display.h: KCGのハード操作だけ */
+/* 新規 include/platform_display.h: KCGのハード操作だけ */
 void platform_display_kcg_code(void);
 /* kernel/kcg_module.c: module状態とinvalidate呼出しは元の所有者 */
 void kcg_v86_restore(void) {
     platform_display_kcg_code(); /* outp(MODE_FF1_PORT,MFF1_KCG_CODE); io_wait(); */
     public_api()->invalidate();
 }
-/* kernel/v86.c: この互換入口だけ残す */
+/* kernel/v86/v86.c: この互換入口だけ残す */
 void v86_cui_display_restore(void) { display_restore_98(); }
 ```
 
@@ -147,7 +147,7 @@ void v86_cui_display_restore(void) { display_restore_98(); }
 ## 6. L20 — splashのplanar部分と機種選択
 
 ```c
-/* 新規 kernel/platform_splash.h。登録/opsなし、起動前景専用。 */
+/* 新規 include/platform_splash.h。登録/opsなし、起動前景専用。 */
 int  platform_splash_begin(void); /* 0=描画可、失敗はshutdown済み */
 void platform_splash_clear(u8 color);
 void platform_splash_fill_rect(int x, int y, int w, int h, u8 color);
@@ -162,7 +162,7 @@ static struct gfx_kernel_fb splash_fb;
 - bb_clear/bb_fill_rectの本体を移動し呼出名を置換。clip、端byteのmask、4面のbit順、GFX_PLANE_SZ/BPLはPC98側へ。
 - planar確認もbeginに移す。異常時に別backendをprobeしない。prefは成功・失敗とも検証前に元に戻す。
 - `platform_splash_clear_pages`は現`gfx_clear_planar_pages(GFX_PLANE_SZ)`だけ。CPU描画→既存gfx_present_rasterの経路を保つ。
-- glyph配列、配置、整数HSV、gradient、palette設定、dirty矩形、3秒/tickループ、終了時期はkernel/boot_splash.cに残す。
+- glyph配列、配置、整数HSV、gradient、palette設定、dirty矩形、3秒/tickループ、終了時期はinit/boot_splash.cに残す。
 - splash_fbはbegin毎に既存取得経路で更新、gfx停止後には使わない。一般描画API・複数backend対応・新しいメモリ確保は追加しない。
 
 ## 7. 大きさの見積もり
@@ -188,14 +188,14 @@ i386の同じ最適化条件での常駐像増減（text+rodata+data、B）。�
 
 |段|新規/変更ファイル|概算行・内容|
 |---|---|---|
-|L18|新規 kernel/platform_emergency.h、platform/pc98/emergency.c|15 / 35、固定口と2種類の書込み幅|
-|L18|変更 kernel/boot_display.c、isr_handlers.c、double_fault.c、v86_mem.c|各15 / 12 / 10 / 8、store移動。kernel.cは呼出位置確認のみ、変更0|
-|L16a|新規 kernel/console_backend.h、platform/pc98/console_attr.c、変更 lib/kprintf_attr.c|ヘッダ属性口 / 65 / 60、純粋変換とwrapper|
-|L16b|拡張 kernel/console_backend.h、新規 platform/pc98/console.c、変更 kernel/console.c|ヘッダ計25 / 150 / 180、grid・カーソルと機種include除去|
-|L19|新規 kernel/platform_display.h、platform/pc98/display.c、display_private.h|10 / 115 / 10、常駐復旧・セル定数|
-|L19|変更 kernel/v86.c、kcg_module.c、display_restore.h|105 / 6 / 7、移動と既存署名維持|
-|L20|新規 kernel/platform_splash.h、platform/pc98/splash.c|15 / 100、fb所有とplanar操作|
-|L20|変更 kernel/boot_splash.c|110、機種選択・検証・描画を転送|
+|L18|新規 include/platform_emergency.h、platform/pc98/emergency.c|15 / 35、固定口と2種類の書込み幅|
+|L18|変更 init/boot_display.c、isr_handlers.c、double_fault.c、v86_mem.c|各15 / 12 / 10 / 8、store移動。kernel.cは呼出位置確認のみ、変更0|
+|L16a|新規 kernel/console/console_backend.h、platform/pc98/console_attr.c、変更 lib/kprintf_attr.c|ヘッダ属性口 / 65 / 60、純粋変換とwrapper|
+|L16b|拡張 kernel/console/console_backend.h、新規 platform/pc98/console.c、変更 kernel/console/console.c|ヘッダ計25 / 150 / 180、grid・カーソルと機種include除去|
+|L19|新規 include/platform_display.h、platform/pc98/display.c、display_private.h|10 / 115 / 10、常駐復旧・セル定数|
+|L19|変更 kernel/v86/v86.c、kcg_module.c、display_restore.h|105 / 6 / 7、移動と既存署名維持|
+|L20|新規 include/platform_splash.h、platform/pc98/splash.c|15 / 100、fb所有とplanar操作|
+|L20|変更 init/boot_splash.c|110、機種選択・検証・描画を転送|
 |各段|変更 build/kernel.mk|計10〜20、通常/派生ビルドともplatform常駐。v86.mod/kdebugへ入れない|
 |各段|新規 tools/tests/dep_dir_d_{emergency,console,display,splash}_host.c|各100〜180、段ごと独立harness|
 |各段|新規 tools/tests/test_dep_dir_d_{emergency,console,display,splash}.py|各80〜120、ビルド・fixture比較・変異準備|
@@ -263,7 +263,7 @@ H=host、N=NP21/W。機能受入はエミュレータで足りる（ユーザー
 
 ## 確定 (2026-10-28、Opus 5.5 の第 2 回 (条件付き承認) を PM が反映 — 本文の該当の行より優先する)
 
-- **N1 (P2)**: L16a の属性の口の宣言は **include/console_attr.h** に置く (kernel/console_backend.h ではない)。lib の規則 (build/kernel.mk:174-175 の INC_LIB = INC_COMMON -Ilib、-Ikernel なし) と host の test_kprintf_attr.py:38・:76 の include の道から見えるようにするため。lib/kprintf_attr.c は `#include "console_attr.h"`。kernel/console_backend.h は L16b の grid・カーソルの口だけを持ち、属性の口は include/console_attr.h を読む。L16a の写しの manifest と -I の追従 (kprintf_attr・kapi_print・gfinit_owner) に console_attr.h と platform/pc98/console_attr.c を足す。
+- **N1 (P2)**: L16a の属性の口の宣言は **include/console_attr.h** に置く (kernel/console/console_backend.h ではない)。lib の規則 (build/kernel.mk:174-175 の INC_LIB = INC_COMMON -Ilib、-Ikernel なし) と host の test_kprintf_attr.py:38・:76 の include の道から見えるようにするため。lib/kprintf_attr.c は `#include "console_attr.h"`。kernel/console/console_backend.h は L16b の grid・カーソルの口だけを持ち、属性の口は include/console_attr.h を読む。L16a の写しの manifest と -I の追従 (kprintf_attr・kapi_print・gfinit_owner) に console_attr.h と platform/pc98/console_attr.c を足す。
 - **N2 (P3)**: 新しい対応表には build/*.mk を書かず broad に任せる (ROLES §4-1)。
 - L16a の変異「visible の補完の OR 定数を 0 へ」の当て先は `attr | TATTR_VISIBLE` (1 回だけ一致)。`TATTR_VISIBLE` だけでは 2 回当たる。
 - 作業順は L18 → L16a → L16b → L19 → L20 の直列。各段の NP21/W の受入 (§9 の N) は PM が段の後に回してから次の段へ。L19 と群 A の L10 は kernel/kcg_module.c を同時に触らない (群 A は L10 を L19 の後に)。

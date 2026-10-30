@@ -1,7 +1,7 @@
 /* Paired ROM glyph reader. Unicode lookup and legacy NOSYS slot stay core. */
 #ifndef KCG_MODULE_H
 #define KCG_MODULE_H
-#include "module_runtime.h"
+#include "module/module_runtime.h"
 
 #define KCG_MODULE_OPS_VERSION 1u
 #define KCG_ROM_CACHE_BYTES (64u * 1024u)

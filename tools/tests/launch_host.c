@@ -8,7 +8,7 @@
  *  exec/launch.c と exec/appslot.c を 1 行も写さずそのまま #include する
  *  (模型ではない)。カーネル帯の代わりにハーネスが持つのは 3 つだけ:
  *    - 所有者 res_owner_get/set (fs/fd_redirect.c)
- *    - GUI 中かどうか con_sink_is_enabled (kernel/con_sink.c)
+ *    - GUI 中かどうか con_sink_is_enabled (kernel/console/con_sink.c)
  *    - kstrncpy (lib/kstring_asm.asm。n は**バッファ全体サイズ**)
  *  スロットは実物の AppSlot を直に組み立てる (exec/exec.c の起動経路は
  *  CR3 / pgalloc を引くのでホストへは持ち込めない)。

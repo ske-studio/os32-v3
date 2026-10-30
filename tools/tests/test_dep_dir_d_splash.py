@@ -13,9 +13,9 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/splash.c'
-HEADER = 'kernel/platform_splash.h'
+HEADER = 'include/platform_splash.h'
 HARNESS = 'tools/tests/dep_dir_d_splash_host.c'
-FILES = ('arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'kernel/boot_splash.c', 'kernel/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
+FILES = ('arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
 MUTATIONS = (('mask_first = 0xFF >> (x1 % BITS_PER_BYTE);',
               'mask_first = 0xFF << (x1 % BITS_PER_BYTE);'),)
 
@@ -42,7 +42,7 @@ def build(work, source, omit_header=False):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT/rel, dest)
     (work/'splash_source.inc').write_text(
-        source + '\n' + (work/'kernel/boot_splash.c').read_text())
+        source + '\n' + (work/'init/boot_splash.c').read_text())
     if omit_header:
         (work/HEADER).unlink()
     subprocess.run(command(work), check=True)
@@ -86,7 +86,7 @@ def main():
     make = subprocess.run(['make', '-qp'], cwd=ROOT, capture_output=True, text=True)
     assert make.returncode in (0, 1), make.stderr
     resident(make.stdout)
-    generic = (ROOT/'kernel/boot_splash.c').read_text()
+    generic = (ROOT/'init/boot_splash.c').read_text()
     for token in ('splash_fb', 'GFX_BB_PLANAR4', 'GFX_PREF_PC98', 'GFX_PLANE_SZ',
                   'GFX_BPL', 'GVRAM_PLANES', 'bb_fill_rect', 'splash_gfx_init'):
         assert token not in generic, token

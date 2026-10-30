@@ -58,7 +58,7 @@ int lgy98_init(void);
 /* 明示的に接続する (base / irq / LGY98_FLAG_*)。lgy98_init が使う。 */
 int lgy98_attach(unsigned int base, unsigned int irq, unsigned int flags);
 
-/* 100Hz タイマから呼ぶ (kernel/isr_handlers.c timer_handler)。反射モードのときだけ
+/* 100Hz タイマから呼ぶ (arch/x86/kernel/isr_handlers.c timer_handler)。反射モードのときだけ
  * NIC を poll して受信フレームを送り返す。それ以外は即座に戻る。
  * M3 で IRQ 駆動になるまでの M2 試験経路であり、完成ドライバの受信保証ではない。 */
 void lgy98_tick(void);

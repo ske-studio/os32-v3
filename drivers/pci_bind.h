@@ -32,8 +32,8 @@
 #include "pci.h"
 #include "pci_bind_contract.h"
 
-/* 線の様子 (PCI_LINE_BIT_*) を答える関数。実装 A (kernel/irq.c) の持ち物を
- * PM が差す。**ここから kernel/irq.h を include しない** — A と B は別
+/* 線の様子 (PCI_LINE_BIT_*) を答える関数。実装 A (kernel/irq/irq.c) の持ち物を
+ * PM が差す。**ここから kernel/irq/irq.h を include しない** — A と B は別
  * worktree で並行しているので、合流の順序に依存しない形にしてある。 */
 void pci_bind_set_line_state_hook(pci_bind_line_state_fn fn);
 

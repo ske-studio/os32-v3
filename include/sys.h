@@ -50,7 +50,7 @@ u32 sys_usable_mem_end(void);
 /*  引数に**同じスナップショットから**書く (KAPI は 64bit を返せない)。      */
 /*  戻り 0 = 成功 / OS32_ERR_AGAIN = 周期境界で 3 回続けて判定できなかった / */
 /*  OS32_ERR_NOSYS = PIT 未初期化か mode 2 でない。**負なら出力は不変**。    */
-/*  実体は kernel/ktime.c、判定と算数は kernel/time_math.c。                 */
+/*  実体は kernel/time/ktime.c、判定と算数は kernel/time/time_math.c。                 */
 /*  CPL=3 のポインタ検証は kapi/kapi_sys.c の kapi_sys_time_now が行う。     */
 /* ======================================================================== */
 int sys_time_now(u32 *lo, u32 *hi);

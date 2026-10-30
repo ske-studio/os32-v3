@@ -18,10 +18,10 @@ check-tvram-auth-host:
 - exec/ring3_str.c
 - fs/vfs.c
 - kdebug/kselftest.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - tools/tests/host32.py
 - tools/tests/kapi_ranges_host.c
 - tools/tests/mutpar.py
@@ -29,7 +29,7 @@ check-tvram-auth-host:
 - kapi/kapi_sys.c
 # Finite include search roots in test_kapi_ranges.resolve.
 - sdk/include/os32/*.h
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h
 artifact_reader: true

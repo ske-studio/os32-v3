@@ -8,7 +8,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
                'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
-               'kernel/paging.c', 'exec/lease.c']
+               'mm/paging.c', 'exec/lease.c']
 
 
 def recovery(tmp, function, runner, mutation=None):
@@ -23,8 +23,8 @@ def recovery(tmp, function, runner, mutation=None):
         text = text.replace('"../exec/appslot.h"', '"appslot.h"')
         text = text.replace('"../gfx/gfx.h"', '"gfx.h"')
         (tmp / name).write_text(text)
-    stage('paging_source.c', read('kernel/paging.c'))
-    stage('pgalloc_source.c', read('kernel/pgalloc.c'))
+    stage('paging_source.c', read('mm/paging.c'))
+    stage('pgalloc_source.c', read('mm/pgalloc.c'))
     exe = read('exec/exec.c')
     slot = read('exec/appslot.c')
     stage('slot_source.c', '\n'.join(function(slot, sig) for sig in (
@@ -45,9 +45,9 @@ def recovery(tmp, function, runner, mutation=None):
     stage('tails_source.c', 'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id);\n'
           + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
-    stage('v86_source.c', read('kernel/v86_mem.c').replace(
+    stage('v86_source.c', read('kernel/v86/v86_mem.c').replace(
         'P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)'))
-    entry = function(read('kernel/isr_handlers.c'), 'void exception_handler(')
+    entry = function(read('arch/x86/kernel/isr_handlers.c'), 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
     stage('entry_source.c', '#include "idt.h"\n' + entry)
@@ -59,7 +59,7 @@ def recovery(tmp, function, runner, mutation=None):
     flags += ['-I'+str(ROOT/p) for p in ('tools/tests/host_arch','tools/tests','include',
              'arch/x86','platform/pc98','kernel','exec','gfx','drivers','lib','sdk/include/os32')]
     result = host32.build(flags + [str(ROOT/'tools/tests/r1_recovery_host.c'),
-                         str(ROOT/'kernel/physmem.c'), '-o', str(tmp/'recovery')],
+                         str(ROOT/'mm/physmem.c'), '-o', str(tmp/'recovery')],
                          capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return host32.run([str(tmp/'recovery')], runner=runner, capture_output=True, text=True, timeout=30)
@@ -100,7 +100,7 @@ def lease_recovery(function, runner, mutation=None):
 
 
 RECOVERY_MUTANTS = [
-    ('K1-hook', 'kernel/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
+    ('K1-hook', 'kernel/v86/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
     ('parent-hook', 'exec/exec.c', '        r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
     ('parent-too-late', 'exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n        r1_fixture_parent(id);\n#endif\n        parent = appslot_return_target(id);',
@@ -120,7 +120,7 @@ RECOVERY_MUTANTS = [
     ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
     ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
-    ('normal-context-release', 'kernel/v86_mem.c',
+    ('normal-context-release', 'kernel/v86/v86_mem.c',
      'if (kctx_irq_depth || kctx_exc_depth) goto done;',
      '/* exception-depth guard omitted */', 'FAIL !kctx_exc_depth'),
 ]

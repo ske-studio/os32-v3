@@ -1,13 +1,13 @@
 # pit_clock — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-0
-対象: `kernel/pit_math.c` (分周の算数) / `kernel/sysclk.c` (クロック判定) / `kernel/idt.c` (積む側)
+対象: `kernel/time/pit_math.c` (分周の算数) / `kernel/time/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
 試験: `tools/tests/test_pit_clock.py` + `tools/tests/pit_clock_host.c`
 実行: `make check-pit-clock-host` (`check-par` の列)
 
 ## 何が起きていたか
 
-`kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz **決め打ち**で分周していた。
+`arch/x86/kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz **決め打ち**で分周していた。
 
 ```c
 divisor = (u16)(PIT_CLOCK / hz);   /* 1996800 / 100 = 19968 */
@@ -32,13 +32,13 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 
 ### RED 1 — 実装が無い
 
-`kernel/pit_math.c` / `.h` を置く前にハーネスを回すと、`#include` が解決できず
+`kernel/time/pit_math.c` / `.h` を置く前にハーネスを回すと、`#include` が解決できず
 コンパイルが通らない。
 
 ```
 $ python3 -B tools/tests/test_pit_clock.py
-tools/tests/pit_clock_host.c:17:10: fatal error: ../../kernel/pit_math.c: No such file or directory
-   17 | #include "../../kernel/pit_math.c"
+tools/tests/pit_clock_host.c:17:10: fatal error: ../../kernel/time/pit_math.c: No such file or directory
+   17 | #include "../../kernel/time/pit_math.c"
 compilation terminated.
 subprocess.CalledProcessError: Command '['gcc', '-std=gnu89', ... ]' returned non-zero exit status 1.
 ```
@@ -54,7 +54,7 @@ subprocess.CalledProcessError: Command '['gcc', '-std=gnu89', ... ]' returned no
 
 ```
 $ python3 -B tools/tests/test_pit_clock.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/pit_math.c)
+HOST GNU89 -Werror compile PASS (real kernel/time/pit_math.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT both_clocks=0
 EXIT reject_hz=0
@@ -86,7 +86,7 @@ MUTATION 5 RED (2 件): 断ったのに valid を立てる (呼び出し側が�
 素直に書くと**ホストでは溢れず試験が素通しになる**。そこで倍率の定数
 (`PIT_PERIOD_SCALE` / `PIT_US_PER_SEC`) を `UL` ではなく **`U` (= どの環境でも
 32bit)** で持ち、計算を `unsigned int` で行う。これで変異 4 がホストでも RED になる。
-定数そのものの上限は `kernel/pit_math.c` の `STATIC_ASSERT` が i386 ビルドで見る。
+定数そのものの上限は `kernel/time/pit_math.c` の `STATIC_ASSERT` が i386 ビルドで見る。
 
 ## 実機でしか確かめられない残り
 

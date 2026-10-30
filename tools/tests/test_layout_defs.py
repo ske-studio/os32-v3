@@ -106,7 +106,7 @@ def check_fixture(work):
 
 def check_generated(work):
     out = work / 'generated'
-    targets = [out / 'os32.ld', out / 'r1/os32.ld', out / 'obj/kernel/kentry.o',
+    targets = [out / 'os32.ld', out / 'r1/os32.ld', out / 'obj/arch/x86/kernel/kentry.o',
                out / 'boot/loader_fat_new.bin', out / 'boot/vk32_boot.o', out / 'app_sys.ld']
     run(['make', '-s', 'BUILD_OUT=' + str(out), *targets])
     normal = targets[0].read_text().replace(str(out / 'obj') + '/', '')

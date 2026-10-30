@@ -205,13 +205,13 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
 ## 3-5. 代行レビュー (Fable 5.1) 2 回目の P2 / P3 × 3
 
 - **P2** `ATAPI_READY_WAIT_US` (250ms) を `cpu_delay_us` に 1 回で渡していたが、`cpu_delay_us` は 1 回
-  100ms で丸める (`kernel/cpu_calibrate.c`)。実際の待ちは 16 × 100ms ≒ **1.6 秒** (文書は 4 秒) で、トレイを閉じた
+  100ms で丸める (`kernel/time/cpu_calibrate.c`)。実際の待ちは 16 × 100ms ≒ **1.6 秒** (文書は 4 秒) で、トレイを閉じた
   直後 (becoming ready 2〜5 秒) のスレーブを待ちきれず空のマスターに固定していた (選び直す経路は無い)。
-  → `atapi_delay_us` が `CPU_DELAY_US_MAX` (100ms。`kernel/cpu_calibrate.h` を直接 include する — 値を写さない) 以下の塊に分けて回す。
+  → `atapi_delay_us` が `CPU_DELAY_US_MAX` (100ms。`kernel/time/cpu_calibrate.h` を直接 include する — 値を写さない) 以下の塊に分けて回す。
   `ATAPI_READY_RETRIES` を 20 にして**待ちの合計は最大 20 × 250ms = 5.0 秒**。
   **tick_count で待たない理由**: tick は PIT の割り込み (IF=1) が前提で、呼ばれる文脈 (起動時の `atapi_init`、
   KAPI 経由の読み) で割り込みが開いていると決められない。`cpu_delay_us` は割り込み禁止でも待て、`atapi_init` は
-  `cpu_calibrate` の後 (`kernel/kernel.c`)
+  `cpu_calibrate` の後 (`init/kernel.c`)
 - ホスト試験の贋物 `cpu_delay_us` を実物どおり `CPU_DELAY_US_MAX` で丸める形にした (以前は `g_delay_us += us`
   で丸めず、1 回 250ms の呼び方を見抜けなかった)
 - **P3** SRST を解いた直後、BSY の解除を待たずに DRV_HEAD を書いていた。→ `atapi_srst`: 解いて 2ms

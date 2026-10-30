@@ -23,9 +23,9 @@
 
 |群|SURVEY → 現行 main の実物|判定|
 |---|---|---|
-|18|`kernel/console.c:262,301,377` の rshell 複写→serial_putchar|一致|
-|19|`lib/serial_diag.h:6–7` は extern 2本。`kernel/isr_handlers.c:66`、`kernel/double_fault.c:78`、`kernel/kaudit.c:32`、`kernel/gui.c:100`、`exec/exec.c:976`|一致。協調ログと例外出力を混同しない|
-|20–24|`include/kbd.h:6`、`exec/exec.c:1085`、`kernel/gui.c:118,146`、`kernel/fep_module.c:22,45,59`、`fs/vfs_fd.c:468`|一致|
+|18|`kernel/console/console.c:262,301,377` の rshell 複写→serial_putchar|一致|
+|19|`lib/serial_diag.h:6–7` は extern 2本。`arch/x86/kernel/isr_handlers.c:66`、`arch/x86/kernel/double_fault.c:78`、`kernel/kaudit.c:32`、`kernel/gui.c:100`、`exec/exec.c:976`|一致。協調ログと例外出力を混同しない|
+|20–24|`include/kbd.h:6`、`exec/exec.c:1085`、`kernel/gui.c:118,146`、`kernel/ime/fep_module.c:22,45,59`、`fs/vfs_fd.c:468`|一致|
 |25|`kernel/sys.c:164–171` の RTC_Time/read/年補正|一致|
 |33–34|`kapi/kapi_generated.c:651,831,2119`、`sdk/kapi.json:96,311,1584`|一致。後続のkbd診断も移す|
 |35|SURVEY `kapi/kapi_generated.c:735` → 現行 wrapper先頭730、実呼出738|食い違い1（行ずれ）|
@@ -35,12 +35,12 @@
 - `kernel/ver_collect.c:24` の状態収集もBで `port_get_status` へ置換し、includeをport_service.hへ変更する。
 - #45 の PCI はバス管理であり本段から除外。票の「シリアル診断」を満たし、PCI側の既存検査・呼出しは後段へ残す。
 - 生成器は `kapi/` にはなく **`sdk/gen_kapi.py:564–585`**。`build/kernel.mk:147–154` が生成物一式を更新する。
-- 既存の手本は `drivers/dev.h:38–65` の操作関数表、`fs/vfs.h:92` のread、`kernel/fep_module.c:65–73` の部品API。devレジストリ自体は拡張しない。
+- 既存の手本は `drivers/dev.h:38–65` の操作関数表、`fs/vfs.h:92` のread、`kernel/ime/fep_module.c:65–73` の部品API。devレジストリ自体は拡張しない。
 
 ## 2. 共通の境界・配線
 - 共通契約を include/、薄い転送を kernel/、PC-9821固有の表・変換を drivers/ または platform/pc98/ に置く。
 - 動的探索・名前解決・新しいioctl体系・所有者レジストリを作らない。各種1表、寿命は常駐全期間、解放・稼働中の差し替えなし。
-- `platform/pc98/d2_bind.c` の `pc98_d2_bind()` が各const表を登録。`kernel_main` の `kstack_hw_init()`（現行 `kernel/kernel.c:199`）の直後で呼ぶ。I/Oは実行せず、装置初期化順は従来のまま。
+- `platform/pc98/d2_bind.c` の `pc98_d2_bind()` が各const表を登録。`kernel_main` の `kstack_hw_init()`（現行 `init/kernel.c:199`）の直後で呼ぶ。I/Oは実行せず、装置初期化順は従来のまま。
 - 起動の具体配線はD3までこの1呼出しを許容。D3で同じ関数をplatform起動一覧へ移す。drivers→kernelの参照は残す。
 
 ```c
@@ -96,8 +96,8 @@ typedef struct PointerOps {
 - 状態の持ち主: cooked/rawリング・STOP集約・押下/修飾・GUIモードはkbd driver、座標/範囲/前回poll/カーソルはmouse driver、注入リングとownerは既存kernel。
 - 文脈: 転送は協調文脈/KAPI内のみ。IRQは既存driver handlerが同じ状態を更新。getkey_waitのinterruptible・park・ring3_abort_checkの位置は移さない。新たにcli/stiを足さない。
 - GUIの118/146行だけ `input_set_gui_mode(1/0)`。cooked抑止開始/解除の順序、登録失敗時・終了時の復帰位置を保つ。
-- driverヘッダの直読は装置部品（kernel/ime.c・kdebug/kselftest.c）に許容し、kbdは `"../drivers/kbd.h"` を明示する。D3c2 で起動配線の例外（kernel/kernel.c の kbd・mouse）は解消し、platform/pc98/boot.c が読む。ime.cのkbd_getkey_wait/trygetkey/trygetcharは保持し、fep.mod importを改名しない。
-- kernel/fep_module.cのshift getterとfallback/関数表をinputへ。`getkey_wait(1)`→負値→abort_check、con_sink時の生バイト、拡張キー除外を維持。fep.mod import名・世代は変更しない。
+- driverヘッダの直読は装置部品（kernel/ime/ime.c・kdebug/kselftest.c）に許容し、kbdは `"../drivers/kbd.h"` を明示する。D3c2 で起動配線の例外（init/kernel.c の kbd・mouse）は解消し、platform/pc98/boot.c が読む。ime.cのkbd_getkey_wait/trygetkey/trygetcharは保持し、fep.mod importを改名しない。
+- kernel/ime/fep_module.cのshift getterとfallback/関数表をinputへ。`getkey_wait(1)`→負値→abort_check、con_sink時の生バイト、拡張キー除外を維持。fep.mod import名・世代は変更しない。
 - execではSTOP掃除の位置だけ転送。`kbd_inject_owner_exit(id)`（1091）とdiscard（1112）の順序・対象ownerを変更しない。
 - stdinは既存canonical処理をVFSに残す。新しいTTY・Deviceインスタンスは不要。
 ```c
@@ -196,16 +196,16 @@ static void pc98_read_date(ClockDate *d) {
 |---|---|---|
 |A1/A2|新 include/input_service.h、pointer_service.h；kernel/input_service.c|各60/35/110、A1で入力、A2でpointerの契約・null表・転送|
 |A1/A2|変更 include/kbd.h、drivers/kbd.h、drivers/mouse.h|計120、A1でkbd明示パス、A2でmouse共通定義移動|
-|A1/A2|新 platform/pc98/d2_bind.c、変更 kernel/kernel.c・build/kernel.mk|100+各3〜5、入力表・配線入口、kbd/mouseのdriverヘッダ明示|
-|A1|変更 kernel/ime.c、kdebug/kselftest.c|各1、"../drivers/kbd.h"で既存宣言を保持|
-|A1|変更 fs/vfs_fd.c、exec/exec.c、kernel/gui.c、kernel/fep_module.c|各2/3/4/12、呼出先のみ|
+|A1/A2|新 platform/pc98/d2_bind.c、変更 init/kernel.c・build/kernel.mk|100+各3〜5、入力表・配線入口、kbd/mouseのdriverヘッダ明示|
+|A1|変更 kernel/ime/ime.c、kdebug/kselftest.c|各1、"../drivers/kbd.h"で既存宣言を保持|
+|A1|変更 fs/vfs_fd.c、exec/exec.c、kernel/gui.c、kernel/ime/fep_module.c|各2/3/4/12、呼出先のみ|
 |A1/A2|変更 sdk/kapi.json→生成物一式|約35、A1は入力、A2はポインタtargetとinclude|
 |B|新 include/port_service.h、console_output.h；kernel/port_service.c、serial_diag.c|計180、通常/緊急の口|
 |B|変更 platform/pc98/d2_bind.c、drivers/serial.c・serial.h、lib/serial_diag.h|計90、表・実体改名・共通宣言|
-|B|変更 kernel/console.c、kapi/kapi_sys.c、exec/exec.c、kernel/isr_handlers.c・double_fault.c|計20、転送・include整理|
+|B|変更 kernel/console/console.c、kapi/kapi_sys.c、exec/exec.c、arch/x86/kernel/isr_handlers.c・double_fault.c|計20、転送・include整理|
 |B|変更 kernel/ver_collect.c|呼出し1行とinclude、port_get_statusへ|
 |B|変更 sdk/kapi.json→生成物、build/kernel.mk|計20、serial targetとソース登録|
-|C|新 include/clock_service.h、kernel/clock_service.c；変更 drivers/rtc.h・rtc.c|計80、共通型・転送・adapter|
+|C|新 include/clock_service.h、kernel/time/clock_service.c；変更 drivers/rtc.h・rtc.c|計80、共通型・転送・adapter|
 |C|変更 kernel/sys.c、platform/pc98/d2_bind.c、sdk/kapi.json→生成物、build/kernel.mk|計35、時計接続、sys.cの"rtc.h"をclock_service.hへ|
 |C|変更 fs/fatfs/diskio.c|約10、clock_read_date経由・重複年補正除去|
 |A1/A2/B/C|新 tools/tests/d2_services_host.c・test_d2_services.py；変更関連host fixture・check_map.d/*.yaml・build/checks.d/*.mk|新250〜350、既存100〜200、段別assertと変異・依存地図|
@@ -245,7 +245,7 @@ static void pc98_read_date(ClockDate *d) {
 |A2: 100分|pointer25分、fixture追従・総点検45分、host/guest30分|A1後。入力の回帰も通し、Aを閉じる|
 |B: 120分|console/port/緊急表40分、KAPI/ver_collect/fixture45分、host/guest35分|A2後。共通ファイルの編集・生成・取り込みは直列|
 |C: 110分|時計/get_fattime35分、ABI/容量/既存利用者検査35分、全体ゲスト40分|B後。A1→A2→B→Cの順に完了|
-- F10: 取り込みはD1→D2の直列。D2の実装基点はD1取り込み後のmainとし、kernel/kernel.c・build/kernel.mk・kdebug/kselftest.cのD1変更を保持して差分を載せる。r1の行番号は照合用であり基点SHAを意味しない。
+- F10: 取り込みはD1→D2の直列。D2の実装基点はD1取り込み後のmainとし、init/kernel.c・build/kernel.mk・kdebug/kselftest.cのD1変更を保持して差分を載せる。r1の行番号は照合用であり基点SHAを意味しない。
 - 各段は単独で旧機能が動く状態まで閉じる。共通ファイルの担当はその段に一本化。ゲスト用環境が利用可能な前提の作業枠で、試験不能を成功扱いにしない。
 - ゲスト配備は既存手順。NHD/マスター上書き・ini変更はこの設計作業の承認に含まない。実装検証では停止済みの試験用コピーを用い、不可逆操作は[C1]〜[D4]に従う。
 
@@ -262,7 +262,7 @@ static void pc98_read_date(ClockDate *d) {
 
 ## A1 の実装で埋めたこと (2026-10-26、PM が F1 の規則を当てはめた)
 
-- `kernel/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "../drivers/kbd.h" を明示して読む」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。
+- `kernel/v86/v86_kbd.h:25` (v86.mod の部品、KBD_DATA・KBD_CMD を使う) は F1 の「部品は "../drivers/kbd.h" を明示して読む」に入れる (ime.c・kselftest.c と同じ扱い)。ポートの定数は PC-98 のドライバの内部定義のまま drivers/kbd.h に置き、include/kbd.h へ戻さない。host 試験 kbd-status・kbd-dlog の fixture も同じ明示のパスに追従する。
 
 ## D2 の取り込みで D3 へ送る項目 (2026-10-26、astra のレビュー P3 2 件)
 

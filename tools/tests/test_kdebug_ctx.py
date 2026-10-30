@@ -86,8 +86,8 @@ def audit(functions, addresses, entries, main):
 
 def slot239(folder):
     source = folder / 'slot239.c'
-    source.write_text('''#include "kernel/module.h"
-#include "kernel/v86_gcap.h"
+    source.write_text('''#include "kernel/module/module.h"
+#include "kernel/v86/v86_gcap.h"
 struct kdebug kdebug;
 static int calls;
 static int capture(int mode, V86Gcap *out) {
@@ -104,7 +104,7 @@ void _start(void) {
 ''')
     exe = folder / 'slot239'
     subprocess.run(['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',
-                    str(source), str(ROOT / 'kernel/v86_gcap.c'), '-o', str(exe)], check=True)
+                    str(source), str(ROOT / 'kernel/v86/v86_gcap.c'), '-o', str(exe)], check=True)
     for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
         assert host32.run([str(exe)], runner=runner).returncode == 0
     print('PASS slot 239: OFF NOSYS, ON dispatch with unchanged arguments')

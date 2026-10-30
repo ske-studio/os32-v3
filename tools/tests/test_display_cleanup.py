@@ -11,7 +11,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('kernel/v86_io.c', 'kdebug/v86_gcap.c', 'kernel/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c')
+TARGET_SRCS = ('kernel/v86/v86_io.c', 'kdebug/v86_gcap.c', 'init/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c')
 
 
 def function(text, name):
@@ -35,7 +35,7 @@ def build_run(tree, kind, cases, execute=True):
             gcap = (tree / TARGET_SRCS[1]).read_text()
             names = ['io_out']
             core = (tree / TARGET_SRCS[4]).read_text()
-            body = function((tree / 'kernel/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
+            body = function((tree / 'kernel/v86/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
             if 'static void gcap_out(' in gcap:
                 body += function(gcap, 'gcap_out')
             body += function(gcap, 'gcap_cui_rebuild')

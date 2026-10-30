@@ -10,8 +10,8 @@ check-fep-budget-host:
 - tools/fep_to_sqlite.py
 - assets/joyo_kanji.txt
 - assets/ipadic/**
-- kernel/ime_dict.c
-- kernel/ime.h
+- kernel/ime/ime_dict.c
+- kernel/ime/ime.h
 - fs/vfs_fd.c
 - fs/vfs.h
 - lib/sqlite3/**

@@ -4,7 +4,7 @@
   python3 -B tools/tests/test_gfx_boot.py --mutate   # 否定側 + 肯定側
 
 票 docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5。
-tools/tests/gfx_boot_host.c が実物の kernel/paging.c・pgalloc.c・sys.c・
+tools/tests/gfx_boot_host.c が実物の mm/paging.c・pgalloc.c・sys.c・
 physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、gfx/gfx_core.c
 から切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /
 gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものはそのファイルの
@@ -40,7 +40,7 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core.c', 'kernel/paging.c', 'kernel/pgalloc.c', 'kernel/sys.c',
+SOURCES = ('gfx/gfx_core.c', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c',
            'kdebug/kselftest.c')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
@@ -108,7 +108,7 @@ def slice_gfx(core):
 
 def build(texts, tmp):
     for unit in ('paging', 'pgalloc', 'sys'):
-        source = texts['kernel/%s.c' % unit]
+        source = texts[('%s/%s.c' % ('mm' if unit in ('paging', 'pgalloc') else 'kernel', unit))]
         source = source.replace('irq_save()', 'host_irq_save()').replace(
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
@@ -137,7 +137,7 @@ def run_case(texts, name, defs):
         tmp = pathlib.Path(tmp)
         cmd = build(texts, tmp)
         cmd += ['-D%s=%d' % kv for kv in defs.items()]
-        out = subprocess.run(cmd + [str(HOST), str(ROOT / 'kernel/physmem.c'),
+        out = subprocess.run(cmd + [str(HOST), str(ROOT / 'mm/physmem.c'),
                                     '-o', str(tmp / 'test')], capture_output=True, text=True)
         if out.returncode:
             return 'compile', out.stderr
@@ -163,7 +163,7 @@ def text_problems():
             if re.search(r'\bsys_reserve_top\s*\(|\bsys_top_reserved\b', text):
                 problems.append('%s に sys_reserve_top / sys_top_reserved が残っている'
                                 % path.relative_to(ROOT))
-    k = (ROOT / 'kernel/kernel.c').read_text()
+    k = (ROOT / 'init/kernel.c').read_text()
     try:
         gfx_cfg = k.index('sysconfig_get_str(SYS_SYSTEM_CFG, "GFX"')
         reserve = k.index('    gfx_boot_reserve();')
@@ -172,7 +172,7 @@ def text_problems():
         is_gui = k.rindex('if (is_gui) {', 0, to_gshell)
         run_shell = k.index('rc = exec_run(kcg_unavailable')
     except ValueError as e:
-        return problems + ['kernel/kernel.c: 目印が見つからない (%s)' % e]
+        return problems + ['init/kernel.c: 目印が見つからない (%s)' % e]
     if not gfx_cfg < reserve < exec_init:
         problems.append('kernel.c: GFX= の読み取り → gfx_boot_reserve → exec_init の順でない')
     if not is_gui < to_gshell < run_shell:
@@ -290,12 +290,12 @@ MUTATIONS = [
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;',
      '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;'),
     # RAM の面の移譲で L2 のページを移さない
-    ('transfer-surface-only', 'kernel/pgalloc.c',
+    ('transfer-surface-only', 'mm/pgalloc.c',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'
      '         ledger_transfer(sf->first, (int)sf->npages, from, to);',
      '    ok = 1;'),
     # 凍結が AS owner のページも「永続確保」に数える
-    ('freeze-counts-as', 'kernel/pgalloc.c',
+    ('freeze-counts-as', 'mm/pgalloc.c',
      '        if (o && ledger_owners[o].kind == LEDGER_KIND_PERSIST) arena_top = p;',
      '        if (o) arena_top = p;'),
     # sys_usable_mem_end がアリーナの上端を見ない (旧 sys_reserve_top の役が消える)

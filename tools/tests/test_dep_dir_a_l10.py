@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 COPIES = (
     'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h',
     'include/pc98.h', 'drivers/kcg.h', 'drivers/kcg.c',
-    'kernel/kcg_module.h', 'kernel/module_runtime.h', 'kernel/module_image.h',
-    'kernel/module_schema.h',
+    'kernel/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
+    'kernel/module/module_schema.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h',

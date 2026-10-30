@@ -10,7 +10,7 @@
       "symbol": "cpu_delay_us",
       "context": "normal",
       "irq": false,
-      "source": "kernel/cpu_calibrate.h"
+      "source": "kernel/time/cpu_calibrate.h"
     },
     {
       "symbol": "dev_find",
@@ -28,19 +28,19 @@
       "symbol": "kfree",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kzalloc",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kprintf",

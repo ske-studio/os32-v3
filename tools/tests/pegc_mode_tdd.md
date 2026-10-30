@@ -144,7 +144,7 @@ FIFO 9 / VSYNC 7 / 順序と ROM の列 26 / 値 11 / 戻りの組 6 / ヘッダ
   意味を変えるとの記述なし、DFh はコマンドより先のパラメータ) ので**送らないまま**、試験の `EDIT_COMMON` の 4 行を `UNRESOLVED:` と明記した
   (未解明の差分)。`defaults` が「UNRESOLVED は ROM の 8〜11 行目の 4 行だけ」を確かめる。RESET1 で打ち消されるという主張は取り下げた。
 - **P2-2 (カーソル復帰の OUT が比較から漏れていた)**: 試験は `console_hw_cursor_enable()` を OUT の無い印に置き換えていた。
-  **実物の kernel/console.c を #include** し (カーネルは -Wall だけで組むので、試験の -Wextra -Werror で出る console.c 側の 2 警告だけ
+  **実物の kernel/console/console.c を #include** し (カーネルは -Wall だけで組むので、試験の -Wextra -Werror で出る console.c 側の 2 警告だけ
   pragma で止める)、CSRFORM + CSRW の実際の OUT を期待列に `ADD_CURSOR` (意図的な追加) として足した。論理カーソルは (5, 3) に置いて
   CSRW の番地 00F5h まで見る。GUI から抜ける途中 (シンク有効) と V86 中 (FALLBACK の口) では出ないことも見る。FIFO の門は
   backend_pegc.c が出す分 (最後の 62h 6Bh まで) だけを見る (console.c は従来から FIFO を見ない — 範囲外)。

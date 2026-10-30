@@ -20,10 +20,10 @@
 
 |SURVEY #52 の記述|今の main の実物（リポジトリ相対 file:line）|判定|
 |---|---|---|
-|paging.c:332 の PC98_NATIVE_VRAM|`kernel/paging.c:332`、監査側にも `:1620`|一致。監査側も移す対象|
-|memory_boot.c:13 の15MiB上限|`kernel/memory_boot.c:13`、実際の適用は `:316`|一致|
-|memory_boot.c:97 の BIOS 情報|`kernel/memory_boot.c:97`、保存済 BDA を `:96` で取得|一致|
-|機種のメモリ領域・属性を提供へ|`kernel/paging.c:329,379,1622`、`kernel/memory_boot.c:176,298` に除外・ROM・背景登録|概要の具体化。矛盾なし|
+|paging.c:332 の PC98_NATIVE_VRAM|`mm/paging.c:332`、監査側にも `:1620`|一致。監査側も移す対象|
+|memory_boot.c:13 の15MiB上限|`mm/memory_boot.c:13`、実際の適用は `:316`|一致|
+|memory_boot.c:97 の BIOS 情報|`mm/memory_boot.c:97`、保存済 BDA を `:96` で取得|一致|
+|機種のメモリ領域・属性を提供へ|`mm/paging.c:329,379,1622`、`mm/memory_boot.c:176,298` に除外・ROM・背景登録|概要の具体化。矛盾なし|
 
 - **SURVEY との食い違いは0件**。行番号ずれを推測で作らない。以下は表に省略された境界条件。
 - `memory_boot.c:110–116`: 保存するのは低位ラップ先1語だけ。ラップ検出時だけ復元。高位の試験語は成功時も復元しない。`：122–127` の2巡目で別名を検出する。
@@ -42,7 +42,7 @@
 - L15は固定の機種記述を追加し、pagingが汎用の区間操作で使う。CPUのPTEビット生成・CR3・TLB操作はkernel所有。
 
 ```c
-/* 新規 kernel/platform_memory.h: 内部専用、全区間は半開区間 */
+/* 新規 include/platform_memory.h: 内部専用、全区間は半開区間 */
 struct platform_memory_geometry {
     u32 legacy_end, system_first, system_end, high_first, ram_ceiling;
 };
@@ -62,8 +62,8 @@ struct platform_memory_attributes {
 |---|---|---|
 |geometry / attributes|platform/pc98/platform_memory_desc.h の static const、確保なし|登録前から参照可能、IRQ操作なし|
 |probe のreported/accepted/saved等|platform関数の自動変数|paging前、IF=0、起動1回、IRQ内ではない|
-|boot_high_end / boot_ram_kb / boot_memory / meta境界|kernel/memory_boot.c、従来のstaticを維持|detect/initの既存位置|
-|PD/PT・boot_identity_end・監査状態|kernel/paging.c|initの既存irq_save/restore、監査は既存文脈|
+|boot_high_end / boot_ram_kb / boot_memory / meta境界|mm/memory_boot.c、従来のstaticを維持|detect/initの既存位置|
+|PD/PT・boot_identity_end・監査状態|mm/paging.c|initの既存irq_save/restore、監査は既存文脈|
 |BDAの保存領域|既存v86側|platformはv86_bios_real_lowmemを呼ぶだけ|
 
 ## 3. L14 — 検出・除外領域の移動
@@ -74,7 +74,7 @@ static const struct platform_memory_geometry platform_memory_geometry = {
     MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,
     MEM_HIGH_RAM_BASE, MEM_PHYS_RAM_CEILING
 };
-/* kernel/memory_boot.c: 公開名と戻り値契約を保存 */
+/* mm/memory_boot.c: 公開名と戻り値契約を保存 */
 u32 memory_boot_detect(u32 mem_kb)
 {
     u32 end = platform_memory_probe_high();
@@ -91,7 +91,7 @@ u32 memory_boot_detect(u32 mem_kb)
 - memory_boot側のlegacy clamp、高位fit/add/sum、上限clamp、物理モデルの除外、背景登録の番地はgeometry参照へ。memory_boot_page_countsのMEMORY_BOOT_LEGACY_END（:436–437）もgeometry.legacy_endへ置換し重複defineを除去。式・呼出順・失敗時returnはそのまま。
 - 穴を全RAM供給源の一律拒否規則に変えない。高位attestationなしにローダ値だけからRAMを追加しない。UNKNOWNとRESERVED/MMIOを混同しない。
 - FIXED/ARENA_TOPの分岐、metadata/workspace算式、固定予約表、DMA適格性、台帳type/owner/cacheはL14で変更しない。
-- `kernel/kernel.c:122–132` のBDA保存→detect、`:267` paging_init、`:287` memory_boot_init の位置・ログ・IFは維持。
+- `init/kernel.c:122–132` のBDA保存→detect、`:267` paging_init、`:287` memory_boot_init の位置・ログ・IFは維持。
 - **L14のRa266シリアル受入を完了してからL15に進む**。NP21/Wだけでは依存を解除しない。
 
 ## 4. L15 — 固定の機種属性
@@ -104,7 +104,7 @@ static const struct platform_memory_attributes platform_memory_attributes = {
     {MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1},
     {MEM_CONV_END, MEM_BIOS_ROM_END + 1} /* bios_rom.endと同じ */
 };
-/* kernel/paging.c: static helper、既存ループ内で使用 */
+/* mm/paging.c: static helper、既存ループ内で使用 */
 static int platform_span_has(const struct platform_memory_span *s, u32 a)
 { return a >= s->first && a < s->end; }
 static u32 native_cache_bits(u32 a)
@@ -117,7 +117,7 @@ static u32 native_cache_bits(u32 a)
 ```
 
 - 実装では3をヘッダの配列長定数に集約（新規番地定数は作らない）。PWT=0を維持し、WB/UCの再解釈をしない。
-- 固定名ヘッダはplatform_io.hと同じ寄せ方で正典ヘッダを内部includeし、kernel/platform_memory.h経由で参照する。L14からgeometryをstatic constとし、L15でattributesを追加、.cに外部実体は置かない。
+- 固定名ヘッダはplatform_io.hと同じ寄せ方で正典ヘッダを内部includeし、include/platform_memory.h経由で参照する。L14からgeometryをstatic constとし、L15でattributesを追加、.cに外部実体は置かない。
 - kernel側でMEM_BIOS_ROM_END + 1 == KERNEL_LOAD_ADDRをSTATIC_ASSERTする（Cの定数式として正典マクロを用いる）。
 - paging.c:329 と1622のシステム空間判定はgeometry参照。`:332,1620` のPC98_NATIVE_VRAMをnative_cache_bitsへ。paging.cのpc98.h依存を除去。
 - `:379` のROM RO設定は記述のfirst/end-1を渡す。`:1311–1312` の期待属性、`:683` のV86対象上端も同じROM境界を参照。NULL/tramp/guard優先順は変更しない。
@@ -126,7 +126,7 @@ static u32 native_cache_bits(u32 a)
 - paging_map_physのdevice UC、surfaceのcache指定、keep_cacheのPCD/PWT継承、DMAプールのWB、V86セッション復元は汎用処理として残す。
 - PDE/PT枠、aperture/MMIO窓、APP帯、pool、guard、ledger配置は一切動かさない。memmap.h/pc98.hの既存定数・マクロは他の利用者のため残す。
 - 同じ記述を初期化と監査に使うため、hostは必ず移動前の固定期待列と比較する。記述自身を正しさの根拠にしない。
-- kernel/v86_mem.c:41の区間表とkdebug/kselftest.c:953のPC98_NATIVE_VRAMは既存マクロ側のまま残し、§7.1でも独立に照らす側として使う。
+- kernel/v86/v86_mem.c:41の区間表とkdebug/kselftest.c:953のPC98_NATIVE_VRAMは既存マクロ側のまま残し、§7.1でも独立に照らす側として使う。
 
 ## 5. 大きさの見積もりと上限
 
@@ -148,18 +148,18 @@ static u32 native_cache_bits(u32 a)
 
 |段|ファイル（相対）|新規/変更・概算行数|
 |---|---|---|
-|L14|kernel/platform_memory.h|新規20、geometryとprobeの宣言|
+|L14|include/platform_memory.h|新規20、geometryとprobeの宣言|
 |L14|platform/pc98/memory.c / platform_memory_desc.h|新規計100、既存コメント・probeとgeometryを分離移動|
-|L14|kernel/memory_boot.c|変更130、probe削除/wrapper/geometry参照|
+|L14|mm/memory_boot.c|変更130、probe削除/wrapper/geometry参照|
 |L14|build/kernel.mk|変更2～6、常駐とfixtureのリンク集合|
-|L15|kernel/platform_memory.h / platform/pc98/platform_memory_desc.h|変更各15/15、attributes|
-|L15|kernel/paging.c / kernel/memory_boot.c|変更各45/15、機種属性参照・固定行|
+|L15|include/platform_memory.h / platform/pc98/platform_memory_desc.h|変更各15/15、attributes|
+|L15|mm/paging.c / mm/memory_boot.c|変更各45/15、機種属性参照・固定行|
 |各段|tools/tests/dep_dir_c_memory_host.c|新規240～320、probeアクセス列・モデル/PTE採取|
 |各段|tools/tests/test_dep_dir_c_memory.py|新規180～240、コピー/ビルド/比較/変異|
 |各段|tools/tests/fixtures/dep_dir_c/*|新規、manifest/入力/順序列/区間列、行数は採取件数依存（数百～数千）|
 |各段|build/checks.d/check-dep-dir-c-memory-host.mk、tools/check_map.d/check-dep-dir-c-memory-host.yaml|新規各20～40、選択検査へ登録|
 |各段|既存tools/testsの該当runner/shim、関連tools/check_map.d/*.yaml|変更各0～25、依存パス/コピー/リンク/変異先を追従|
-|必要時|kernel/kdebug_imports.def等の実装元指定|変更0～数行、移動したsourceのみ、symbol/slot固定|
+|必要時|kernel/module/kdebug_imports.def等の実装元指定|変更0～数行、移動したsourceのみ、symbol/slot固定|
 |記録|docs/tasks/v3/TASK_DEP_DIR.md|変更5～10、実施した受入・保留・証拠のみ記録|
 
 ## 7. 受入 → 試験・変異、既存利用者、段分け
@@ -182,7 +182,7 @@ static u32 native_cache_bits(u32 a)
 |新ヘッダ可視・変異成立|原本と各変異コピーを同じ-Werrorでビルドし、原本PASS/変異はassert比較でFAIL|ROM終端を1頁縮め、ビルド成功後の差分検出を要求|
 |KAPI/容量/配線維持|既存ABI・レイアウト・package・上限検査、boot一覧と検出呼出位置の前後照合|host fixtureのPTEを1bit反転して比較器自身を検証|
 
-- 新runnerはkernel/platform_memory.h、platform/pc98/platform_memory_desc.h、platform実装、既存の推移的ヘッダ/shim/fixtureを変異用段のコピーに含め、include rootとリンク対象を明示する。
+- 新runnerはinclude/platform_memory.h、platform/pc98/platform_memory_desc.h、platform実装、既存の推移的ヘッダ/shim/fixtureを変異用段のコピーに含め、include rootとリンク対象を明示する。
 - 置換でローカル変数が未使用にならない変異を選ぶ。未使用なら式を保った値/比較の変更へ直す。-Werror無効化、unused抑制、コンパイル失敗を検出成功とする扱いは禁止。
 - 全対象PTE比較は境界の抜取りだけにしない。大きい配列は全件比較し、保存fixtureは同一属性の連続区間へ圧縮可能（PFN算式・総頁数も検証）。
 

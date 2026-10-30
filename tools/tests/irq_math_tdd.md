@@ -1,13 +1,13 @@
 # irq_math — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-1
-対象: `kernel/irq_math.c` (判断) / `kernel/irq.c` (表・PIC・EOI) / `kernel/isr_stub.asm` (共通スタブ)
+対象: `kernel/irq/irq_math.c` (判断) / `kernel/irq/irq.c` (表・PIC・EOI) / `arch/x86/kernel/isr_stub.asm` (共通スタブ)
 試験: `tools/tests/test_irq_math.py` + `tools/tests/irq_math_host.c`
 実行: `make check-irq-math-host` (`check-par` の列)
 
 ## 何を直しているか
 
-`kernel/isr_stub.asm` は装置ごとに固定の C ハンドラを `extern` で結んでおり、
+`arch/x86/kernel/isr_stub.asm` は装置ごとに固定の C ハンドラを `extern` で結んでおり、
 **起動時に読んだ IRQ 番号でハンドラを結ぶ口が無かった**。PCI の装置は BIOS が
 IRQ を割り当て、複数の装置が 1 本を共有し得るので、82557 (L-B) と CS4231 を
 載せるにはこの層が要る。
@@ -33,10 +33,10 @@ W3 (NP21/W) は「配線が通っているか」を `int 0x23` と `/api/pic` �
 
 ### RED 1 — 実装が無い
 
-`kernel/irq_math.c` / `.h` を置く前にハーネスを回すと `#include` が解決できない。
+`kernel/irq/irq_math.c` / `.h` を置く前にハーネスを回すと `#include` が解決できない。
 
 ```
-tools/tests/irq_math_host.c:20:10: fatal error: ../../kernel/irq_math.c: No such file or directory
+tools/tests/irq_math_host.c:20:10: fatal error: ../../kernel/irq/irq_math.c: No such file or directory
 ```
 
 ### RED 2 — 直す前の姿 (変異 1)
@@ -48,7 +48,7 @@ tools/tests/irq_math_host.c:20:10: fatal error: ../../kernel/irq_math.c: No such
 
 ```
 $ python3 -B tools/tests/test_irq_math.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/irq_math.c)
+HOST GNU89 -Werror compile PASS (real kernel/irq/irq_math.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT dispatch_two_pass=0
 EXIT register_rules=0

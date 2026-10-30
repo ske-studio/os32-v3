@@ -3,8 +3,8 @@
  *
  *  表 g_shell_service の登録 (publish / retire) と、表に載せる入口 wrapper
  *  5 本の段 A (戻り番地) / 段 B (文脈)。段 C (shell lease の registry) と
- *  段 D (VFS) は kernel/font_source.c の shell 側実体が持つ。version 2 の
- *  font_guard_run (T7b-b3 S2) は段 A/B の後に kernel/font_guard.c へ。
+ *  段 D (VFS) は kernel/console/font_source.c の shell 側実体が持つ。version 2 の
+ *  font_guard_run (T7b-b3 S2) は段 A/B の後に kernel/console/font_guard.c へ。
  *
  *  wrapper は noinline で、このファイルは -fno-optimize-sibling-calls で
  *  組む (build/kernel.mk)。戻り値は volatile に受けてから返し、尾呼出しに
@@ -25,7 +25,7 @@
 /* exec/exec.c の実体 (int 0x80 のディスパッチ中だけ 1)。 */
 extern volatile int ring3_in_syscall;
 
-/* 段 C / 段 D の実体と署名は kernel/font_source.h (font_lease_shell_* /
+/* 段 C / 段 D の実体と署名は kernel/console/font_source.h (font_lease_shell_* /
  * font_lease_close_shell)。 */
 
 ShellService g_shell_service;
@@ -129,7 +129,7 @@ shell_svc_font_source_close(u32 id)
     return r;
 }
 
-/* version 2: guard 区間 (kernel/font_guard.c、x87 の保存は F6 で撤去) の中で
+/* version 2: guard 区間 (kernel/console/font_guard.c、x87 の保存は F6 で撤去) の中で
  * call(ctx)。段 B は read_at と同じ (callback の
  * 中で read_at を呼ぶので、read_at が通る文脈でだけ通す)。 */
 static __attribute__((noinline)) i32 __cdecl

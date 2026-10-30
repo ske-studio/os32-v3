@@ -130,7 +130,7 @@ READY と処理入口の間に STOP を送ってもこの受入の証拠には�
 `log stop` は以下の試験ビルドを使い、**ブレークせず**に注入する。通常ビルドの短いログと
 停止点でのキー注入の組合せは使わない (停止中はエミュレータの時刻が進まない)。
 
-1. `make -W kernel/ime_dict.c all KERNEL_CFLAGS_EXTRA=-DOS32_RAW_WAIT_LOG_TICKS=1000 MUTATE=0`。
+1. `make -W kernel/ime/ime_dict.c all KERNEL_CFLAGS_EXTRA=-DOS32_RAW_WAIT_LOG_TICKS=1000 MUTATE=0`。
    試験フラグは USER 呼出しからの辞書成功ログだけを1000 tick (100Hzで約10秒) 延長する。
    KAPI の引数・版・slot は変えない。フラグ切替は make の依存に含まれないため `-W` は必須。
    PM がこのカーネルと対の kdebug/モジュール・fixture を停止→配備→起動し、hash/CRC を照合する。

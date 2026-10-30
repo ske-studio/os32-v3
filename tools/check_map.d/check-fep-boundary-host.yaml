@@ -8,9 +8,9 @@ check-fep-boundary-host:
 - tools/tests/test_vfs_fd_path.py
 - tools/tests/host32.py
 - tools/tests/host_arch/**
-- kernel/ime.c
-- kernel/ime.h
-- kernel/ime_dict.c
+- kernel/ime/ime.c
+- kernel/ime/ime.h
+- kernel/ime/ime_dict.c
 - lib/kstring.h
 - include/redir_access.h
 - include/io.h

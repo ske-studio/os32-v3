@@ -1,12 +1,12 @@
 check-ver-collect-host:
 - kernel/ver_collect.c
 - kernel/ver_info.h
-- kernel/cpu_calibrate.c
-- kernel/cpu_calibrate.h
-- kernel/cpu_calibrate_math.c
-- kernel/cpu_calibrate_math.h
-- kernel/pit_math.h
-- kernel/idt.h
+- kernel/time/cpu_calibrate.c
+- kernel/time/cpu_calibrate.h
+- kernel/time/cpu_calibrate_math.c
+- kernel/time/cpu_calibrate_math.h
+- kernel/time/pit_math.h
+- arch/x86/kernel/idt.h
 - kernel/sqlite_engine.h
 - drivers/serial.h
 - drivers/pcm_cs4231.h

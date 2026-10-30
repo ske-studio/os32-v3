@@ -11,7 +11,7 @@
 #define FM_ADAPTER "../../kernel/fm_module.c"
 #endif
 #include FM_ADAPTER
-#include "../../kernel/tick.c"
+#include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 fm_kexports[] = {0};
 const struct module_symbol_contract fm_import_contracts[] = {{0}};

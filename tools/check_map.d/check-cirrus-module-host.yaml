@@ -1,10 +1,10 @@
 check-cirrus-module-host:
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
-- kernel/pgalloc.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
+- mm/pgalloc.h
 - include/types.h
 - include/memmap.h
 - fs/vfs.c
@@ -32,7 +32,7 @@ check-cirrus-module-host:
 - kernel/cirrus_module.c
 - kernel/cirrus_module.h
 - kernel/cirrus_body.c
-- kernel/kernel.c
+- init/kernel.c
 - include/config.h
 - sdk/include/os32/os32_generations.h
 - include/bootinfo.h
@@ -71,10 +71,10 @@ check-cirrus-module-host:
 - gfx/gfx_core.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kernel/sys.c
 - tools/tests/gfx_kernel_fb_host.c
 - tools/tests/mutpar.py

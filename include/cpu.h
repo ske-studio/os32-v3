@@ -20,7 +20,7 @@
 /*                                                                          */
 /*  契約に入れていないもの: GDT のロードとセグメントの再設定、タスクレジスタ  */
 /*  のロード。これは x86 にしか無い仕組みで、他の CPU に「同じ意味」が無い。  */
-/*  x86 だけの kernel/gdt.c / kernel/tss.c が arch/x86/x86_desc.h を直接引く。 */
+/*  x86 だけの arch/x86/kernel/gdt.c / arch/x86/kernel/tss.c が arch/x86/x86_desc.h を直接引く。 */
 /* ======================================================================== */
 
 #ifndef CPU_H
@@ -53,7 +53,7 @@ static inline u32 arch_mmu_current_root(void);
  * 契約: 戻った時点で、以後のメモリアクセスは `root_phys` の表で変換される。
  *       **切替前の空間の変換は TLB に残らない** — 同じ根を載せ直した場合も
  *       含む (呼び手は「同じ根の再ロード」を TLB の全消去として使っている:
- *       kernel/paging.c)。ASID を持つ CPU で TLB を残す実装にするなら、
+ *       mm/paging.c)。ASID を持つ CPU で TLB を残す実装にするなら、
  *       呼び手の側を arch_mmu_flush_tlb() に書き換えてからにすること。 */
 static inline void arch_mmu_load_root(u32 root_phys);
 

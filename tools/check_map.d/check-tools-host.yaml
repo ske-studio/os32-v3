@@ -67,7 +67,7 @@ check-tools-host:
 - sdk/gen_kapi.py
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 # About now executes the kernel formatter and bounded state lookup (V11).
-- kernel/module.c
+- kernel/module/module.c
 - kernel/ver_format.c
 - lib/kstring_asm.asm
 - tools/tests/host32.py

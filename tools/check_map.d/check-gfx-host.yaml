@@ -12,12 +12,12 @@ check-gfx-host:
 - gfx/palette.c
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
-- kernel/paging.c
+- mm/paging.c
 - platform/pc98/platform_memory_desc.h
-- kernel/platform_memory.h
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- include/platform_memory.h
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kernel/sys.c
 - tools/tests/gfx_kernel_fb_host.c
 - tools/tests/host32.py

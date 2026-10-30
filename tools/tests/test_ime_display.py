@@ -18,13 +18,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ime-display-') as directory:
         tmp = Path(directory)
         fixture = (ROOT / 'tools/tests/con_sink_host.c').read_text()
-        fixture = fixture.replace('../../kernel/console.c', str(tmp / 'console.c'))
+        fixture = fixture.replace('../../kernel/console/console.c', str(tmp / 'console.c'))
         fixture = fixture.replace('../../', str(ROOT) + '/')
         (tmp / 'con_sink_host.c').write_text(fixture)
         source = (ROOT / 'tools/tests/ime_display_host.c').read_text()
         source = source.replace('../../', str(ROOT) + '/')
         (tmp / 'ime_display_host.c').write_text(source)
-        original = (ROOT / 'kernel/console.c').read_text()
+        original = (ROOT / 'kernel/console/console.c').read_text()
         assert original.count(OLD) == 1, 'mutation target must match once'
         for modified in (False, True) if args.mutate else (False,):
             (tmp / 'console.c').write_text(original.replace(OLD, NEW) if modified else original)

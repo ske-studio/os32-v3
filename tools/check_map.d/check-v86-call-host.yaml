@@ -2,8 +2,8 @@ check-v86-call-host:
 - exec/v86_call.c
 - exec/redir_access.c
 - exec/exec.c
-- kernel/v86.c
-- kernel/v86_module.c
+- kernel/v86/v86.c
+- kernel/v86/v86_module.c
 - userland/tests/kstr_v86.c
 - tools/tests/v86_call_host.c
 - tools/tests/test_v86_call.py

@@ -1,8 +1,8 @@
 /* Native production transport. Permanent boot maps: no kpeek/recover window,
  * no temporary PTE edits. P5 owns paging_map_phys before reservation freeze. */
 #include "production.h"
-#include "../../kernel/paging.h"
-#include "../../kernel/pgalloc.h"
+#include "../../mm/paging.h"
+#include "../../mm/pgalloc.h"
 #include "../../include/sys.h"
 #define GF_PRODUCTION_WAIT_POLLS 1000000U
 #ifdef GF_PRODUCTION_MODULE

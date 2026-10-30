@@ -18,12 +18,12 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l13_baseline.json'
-SOURCES = ('kernel/sysclk.c', 'kernel/pit.c', 'kernel/ktime.c',
-           'kernel/pit_math.c', 'kernel/time_math.c',
+SOURCES = ('kernel/time/sysclk.c', 'kernel/time/pit.c', 'kernel/time/ktime.c',
+           'kernel/time/pit_math.c', 'kernel/time/time_math.c',
            'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
-HEADERS = ('kernel/platform_timer.h', 'kernel/platform_irq.h', 'kernel/idt.h',
-           'kernel/gdt.h', 'kernel/irq_math.h', 'kernel/pit_math.h', 'kernel/time_math.h',
-           'kernel/ktime.h', 'kernel/sysclk.h', 'kernel/v86_bios.h')
+HEADERS = ('include/platform_timer.h', 'include/platform_irq.h', 'arch/x86/kernel/idt.h',
+           'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'kernel/time/pit_math.h', 'kernel/time/time_math.h',
+           'kernel/time/ktime.h', 'kernel/time/sysclk.h', 'kernel/v86/v86_bios.h')
 MUTATIONS = (
     ('platform/pc98/clock.c',
      'out->is_8mhz ? (unsigned long)SYSCLK_1997 : (unsigned long)SYSCLK_2458',
@@ -34,8 +34,8 @@ MUTATIONS = (
     ('platform/pc98/timer.c',
      '    out->p1 = platform_irq_timer_pending();',
      '    out->p1 = platform_irq_timer_pending();\n    out->p2 = platform_irq_timer_pending();'),
-    ('kernel/ktime.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
-    ('kernel/ktime.c', '        platform_timer_sample(&hw);',
+    ('kernel/time/ktime.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
+    ('kernel/time/ktime.c', '        platform_timer_sample(&hw);',
      '        t = (unsigned int)tick_count;\n        platform_timer_sample(&hw);'),
 )
 # Relocations remove the old operation, rather than adding another sample.
@@ -59,16 +59,16 @@ def build(work, clock_byte, mutation=None, baseline=None):
         dest.write_text(text)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
     if baseline is None:
-        clock = (work / 'kernel/sysclk.c').read_text()
-        pit = (work / 'kernel/pit.c').read_text()
-        ktime = (work / 'kernel/ktime.c').read_text()
+        clock = (work / 'kernel/time/sysclk.c').read_text()
+        pit = (work / 'kernel/time/pit.c').read_text()
+        ktime = (work / 'kernel/time/ktime.c').read_text()
     else:
         clock, idt, ktime = baseline
         pit = re.search(r'static struct pit_setup s_pit.*?^int pit_init\(unsigned int hz\)\n\{.*?^\}', idt, re.M | re.S)[0]
     for name, text in (('clock', clock), ('pit', pit), ('ktime', ktime)):
         (work / (name + '_source.inc')).write_text(text)
     exe = work / 'timer-test'
-    linked = ['kernel/pit_math.c', 'kernel/time_math.c']
+    linked = ['kernel/time/pit_math.c', 'kernel/time/time_math.c']
     if baseline is None:
         linked += ['platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c']
     libgcc = subprocess.check_output([str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'), '-print-libgcc-file-name'], text=True).strip()

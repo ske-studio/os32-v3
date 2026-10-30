@@ -16,13 +16,13 @@
  *  dispatch 入口の印の 0 と frame[5] は字面で見る (試験 py の static_checks)。
  *
  *  version 2 (T7b-b3 S2): 表の末尾の font_guard_run の wrapper (段 A/B) を
- *  6 で見る (x87 無しの open の NOSYS は TASK_FONTPERF F6 で撤去)。kernel/font_guard.c の実物は
+ *  6 で見る (x87 無しの open の NOSYS は TASK_FONTPERF F6 で撤去)。kernel/console/font_guard.c の実物は
  *  test_font_guard.py が見るので、ここでは贋物 (呼ばれた数・戻りを差し替え
  *  可能、既定は call(ctx) をそのまま呼ぶ) を置く。
  *
- *  段 C / D の実体 (kernel/font_source.c の font_lease_shell_*、S2) は
+ *  段 C / D の実体 (kernel/console/font_source.c の font_lease_shell_*、S2) は
  *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
- *  (署名は kernel/font_source.h): lease は「使用中 + owner_gen」
+ *  (署名は kernel/console/font_source.h): lease は「使用中 + owner_gen」
  *  だけで、渡された shell_gen と違えば STALE、close_shell で全部 FREE。
  *
  *  戻り番地の範囲 (段 A) は、正当な呼び手を section "svc_in" / "svc_in2"
@@ -68,7 +68,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
     return dst;
 }
 
-/* ---- 段 C / D の贋物 (kernel/font_source.c の shell 側実体の代わり) ------ */
+/* ---- 段 C / D の贋物 (kernel/console/font_source.c の shell 側実体の代わり) ------ */
 #define FAKE_LEASES 4
 static struct { int used; u32 owner_gen; } fake[FAKE_LEASES];
 static u32 fake_last_gen;
@@ -133,7 +133,7 @@ void font_lease_close_shell(void)
     for (i = 0; i < FAKE_LEASES; i++) fake[i].used = 0;
 }
 
-/* ---- kernel/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
+/* ---- kernel/console/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
 static int fake_guard_calls;
 static i32 fake_guard_rc;          /* 0 なら call(ctx) を呼ぶ、他はそれを返す */
 int font_guard_run(int (*call)(void *), void *context)

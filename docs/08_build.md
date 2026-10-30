@@ -157,13 +157,13 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 
 #### 起動時に読む部品の形式 (KMOD v1)
 
-`/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `kernel/module_schema.h`)、検査の実体は `kernel/module_image.c`、生成は `tools/mkmod.py`。
+`/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `kernel/module/module_schema.h`)、検査の実体は `kernel/module/module_image.c`、生成は `tools/mkmod.py`。
 
 - **並び**: `header (144 B、u32 LE × 36 語) → reloc 表 → import 表 → export 表 → 名前表 → (4096 B 整列) → payload (text / rodata / data) → bss (ファイルには無い)`。C の構造体を cast して読まず、語ごとに little-endian で decode する。
 - **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜26 reloc/import/export 表の offset・**件数**、27〜28 名前表の offset・**バイト長** (NUL を含む、`tools/mkmod.py:299`)、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約。
 - **基点**: 表の offset (21・23・25・27) は容器の先頭基点。節・init・stop・reloc の書込位置・import slot・export の入口は body 基点 (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。`load_span = payload_offset + mem_size` を 1 回で確保する。
 - **表の 1 件**: reloc は `u32 off` (`R_386_32` の書込位置)。import は `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B、export は `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。名前表は import の順、続いて export の順に NUL 区切りの名前を並べたもの。
-- **ローダーが拒否する条件** (`kernel/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
+- **ローダーが拒否する条件** (`kernel/module/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
   - header (`:60`): magic・format・header_size が違う / image_size がファイルの実長と違うか部品の image 上限を超える / module_id が呼び手の期待と違う / phase が違う / 必須の flags が無いか未知の flags がある / stop を許さない部品で stop ≠ 0 / 予約欄が 0 でない。
   - 大きさ (`:69`): payload_offset が 4096 未満・4096 の倍数でない・ファイル長を超える / payload_size ≠ image_size − payload_offset / mem_size が 4096 の倍数でない・mem 上限を超える・payload_size 未満 / load_span が overflow するか上限を超える。
   - 節 (`:79`): text/ro/data/bss が mem_size からはみ出す、text/ro/data が payload_size からはみ出す、bss が payload の中に始まる、節どうしが重なる / init が text の外 / stop ≠ 0 で text の外。
@@ -179,7 +179,7 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 
 #### 起動時に読む部品の大きさの上限と由来
 
-値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
+値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
 欄: image = ファイル (容器) の長さ、mem = body (BSS 込み)、load_span = `payload_offset + mem_size` (上の「起動時に読む部品の形式」)、表 = reloc / import / export の件数。
 由来の区分: **実測** (日付・値)、**導出** (式)、**決定** (誰が・いつ・票)、**由来不明** (値だけ — 当時の推測を添える)。「式に一致」は今回 (2026-10-22) 数字を照合しただけで、当時の記載は無い。
 今の大きさは main 79ba4b0 (HWDEV M3b) と同じ木の成果物 (`~/wt/os32-v3/hwdev_m3b/build/out/`、2026-10-22 09:23) のヘッダ word 3・10・11・22・24・26 を読んだ値 (KDEBUG と HWDEV の行だけは M3c 取り込み後の値を併記)。余裕の % は 今 ÷ 上限。
@@ -647,7 +647,7 @@ python3 tools/mkpkg.py --list packages/NORMAL.PKG                # 中身の一�
 
 cdinst の展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD で
 `/etc/system.cfg` が `GUI=1` でも、gshell が無いのでカーネルは `gshell load failed -> CUI shell`
-を出して CUI で上がる (`kernel/kernel.c` のシェル起動ループ。shlib が無いのは
+を出して CUI で上がる (`init/kernel.c` のシェル起動ループ。shlib が無いのは
 `[shlib] ... not found (GUI shlib disabled)` で、拒否理由は立たない)。
 
 **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」

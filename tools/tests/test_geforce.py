@@ -107,9 +107,9 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
 
 def unsafe_console(old=False):
     from test_dep_dir_d_console import grid_instrument
-    body=(ROOT/'kernel/console.c').read_text()
+    body=(ROOT/'kernel/console/console.c').read_text()
     if old:
-        body=subprocess.check_output(['git','show','HEAD:kernel/console.c'],cwd=ROOT,text=True)
+        body=subprocess.check_output(['git','show','HEAD:kernel/console/console.c'],cwd=ROOT,text=True)
     harness=(ROOT/'tools/tests/dep_dir_d_console_grid_host.c').read_text()
     harness='int safe=1; static int serial_count;\n'+harness
     harness=harness.replace('    if (address < TVRAM_CHAR_BASE',
@@ -155,7 +155,7 @@ def product():
     sys.path.insert(0,str(ROOT/'tools'))
     import mkmod
     from test_module_image import build_validator, validate, fnv
-    boot=(ROOT/'kernel/kernel.c').read_text()
+    boot=(ROOT/'init/kernel.c').read_text()
     assert 'gfx_geforce_pref(sysconfig_get_int(SYS_SYSTEM_CFG, \"GUI\", 0))' in boot
     spec=json.loads((ROOT/'sdk/kapi.json').read_text())
     meta=json.loads((ROOT/'build/out/geforce/geforce_imports.json').read_text())
@@ -187,7 +187,7 @@ def module_registration():
         exe=Path(td)/'host'
         subprocess.run(['gcc',*runtime_flags,'-Wno-unused-parameter',*runtime_includes,'-Igfx','-Ibuild/out/geforce',
             str(ROOT/'tools/tests/geforce_module_host.c'),
-            *[str(ROOT/f) for f in ('kernel/module_runtime.c','kernel/module_image.c','fs/vfs.c','drivers/dev.c')],'-nostdlib','-static','-no-pie',
+            *[str(ROOT/f) for f in ('kernel/module/module_runtime.c','kernel/module/module_image.c','fs/vfs.c','drivers/dev.c')],'-nostdlib','-static','-no-pie',
             '-Wl,--gc-sections','-o',str(exe)],cwd=ROOT,check=True)
         for mode in range(3):
             result=host32.run([str(exe)],input=struct.pack('<II',0,mode)+image(),

@@ -1,12 +1,12 @@
 check-dep-dir-c-memory-host:
-- kernel/memory_boot.c
+- mm/memory_boot.c
 - platform/pc98/memory.c
-- kernel/platform_memory.h
+- include/platform_memory.h
 - platform/pc98/platform_memory_desc.h
-- kernel/paging.c
-- kernel/pgalloc.c
+- mm/paging.c
+- mm/pgalloc.c
 - kernel/sys.c
-- kernel/physmem.c
+- mm/physmem.c
 - kernel/*.h
 - platform/pc98/*.h
 - include/*.h

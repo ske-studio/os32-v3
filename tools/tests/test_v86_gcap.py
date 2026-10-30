@@ -166,7 +166,7 @@ def host_build(tmp, source_text=None):
         (mut / "v86_gcap_diag.h").write_text((ROOT / "kdebug/v86_gcap_diag.h").read_text())
         (src_dir / "serial_diag_host.h").write_text((ROOT / "tools/tests/serial_diag_host.h").read_text())
         (mut / "v86_gcap_math.h").write_text(
-            (ROOT / "kernel/v86_gcap_math.h").read_text(encoding="utf-8"),
+            (ROOT / "kernel/v86/v86_gcap_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(

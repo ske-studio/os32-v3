@@ -56,9 +56,9 @@ class LayoutTools(unittest.TestCase):
         self.write('tools/test.py', "p = ROOT / 'kernel' / 'main.c'\n")
         self.write('docs/archive/old.txt', 'kernel/main.c\n')
         self.write('third_party/vendor.c', '/* kernel/main.c */\n')
-        self.write('kernel/kdebug_imports.def', '#include "kernel/local.h"\n')
+        self.write('kernel/module/kdebug_imports.def', '#include "kernel/local.h"\n')
         self.write('kdebug/generated/kdebug_imports.h', '#include "../../kernel/local.h"\n')
-        self.write('Makefile', 'kdebug/generated/kdebug_imports.h: kernel/kdebug_imports.def\n'
+        self.write('Makefile', 'kdebug/generated/kdebug_imports.h: kernel/module/kdebug_imports.def\n'
                    '\tsed \'s|include "|include "../../|\' $< > $@\n')
         self.write('build/config.mk', 'INC_KERNEL = -Iinclude -Ikernel -Idrivers\n')
         command('git', 'add', '.', cwd=self.root)
@@ -117,9 +117,9 @@ class LayoutTools(unittest.TestCase):
                          {('core.o', 'include/local.h'), ('r1.o', 'other/local.h')})
 
     def test_move_output_prefixed_objects_and_report_unresolved_paths(self):
-        self.write('kernel/module.c', '/* module */\n')
+        self.write('kernel/module/module.c', '/* module */\n')
         # The OBJECTS line reproduces tools/tests/test_ver_version.py:14.
-        source = "OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module.o')\n"
+        source = "OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module/module.o')\n"
         prefixes = ('build/out/obj/', 'build/out/r1/obj/', 'build/out/kernel-r1/obj/', 'custom/output/obj/',
                     'obj/', '../build/out/obj/', '/tmp/layout-output/obj/',
                     '$(BUILD_OUT)/obj/', '${BUILD_OUT}/obj/', '$BUILD_OUT/obj/')
@@ -127,8 +127,8 @@ class LayoutTools(unittest.TestCase):
                           for prefix in prefixes for suffix in ('.o', '.d'))
         source += "'build/out/obj/kernel/module.obj' 'build/out/obj/kernel/module.o.extra'\n"
         source += "'build/out/obj/mykernel/module.o'\n"
-        expected = source.replace("obj/kernel/module.o'", "obj/kernel/module/module.o'")
-        expected = expected.replace("obj/kernel/module.d'", "obj/kernel/module/module.d'")
+        expected = source.replace("obj/kernel/module/module.o'", "obj/kernel/module/module.o'")
+        expected = expected.replace("obj/kernel/module/module.d'", "obj/kernel/module/module.d'")
         unresolved = ("p = ROOT / 'build/out/obj' / 'kernel' / 'module.o'",
                       "p = ROOT / 'kernel' / 'module.d'",
                       "p = 'unrecognized/kernel/module.o'",
@@ -138,7 +138,7 @@ class LayoutTools(unittest.TestCase):
         self.write('tools/tests/test_ver_version.py', source)
         command('git', 'add', '.', cwd=self.root)
         mapping = self.write('moves.json', json.dumps([
-            {'from': 'kernel/module.c', 'to': 'kernel/module/module.c'}]))
+            {'from': 'kernel/module/module.c', 'to': 'kernel/module/module.c'}]))
         dry = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, '--dry-run', mapping)
         report = json.loads(dry.stdout)
         self.assertTrue(report['replacements'], 'output-prefixed object references were not replaced')
@@ -149,14 +149,14 @@ class LayoutTools(unittest.TestCase):
         applied = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, mapping)
         self.assertEqual(json.loads(applied.stdout), report)
         self.assertEqual((self.root / 'tools/tests/test_ver_version.py').read_text(), expected)
-        self.assertFalse((self.root / 'kernel/module.c').exists())
+        self.assertFalse((self.root / 'kernel/module/module.c').exists())
         self.assertTrue((self.root / 'kernel/module/module.c').is_file())
         warnings = report['split_paths'] + report['unresolved_paths']
         self.assertEqual({r['text'] for r in warnings}, set(unresolved))
         for row in warnings:
             self.assertEqual(row['file'], 'tools/tests/test_ver_version.py')
             self.assertEqual(source.splitlines()[row['line'] - 1], row['text'])
-        self.assertEqual({r['path'] for r in warnings}, {'kernel/module.o', 'kernel/module.d'})
+        self.assertEqual({r['path'] for r in warnings}, {'kernel/module/module.o', 'kernel/module/module.d'})
 
     def test_move_assembly_outputs_with_old_path_in_destination(self):
         moves = {'kernel/entry.asm': 'arch/x86/kernel/entry.asm',

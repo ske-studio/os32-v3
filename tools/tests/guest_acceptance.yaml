@@ -1291,8 +1291,8 @@
   entry: cold boot with generation2 shlib copy, GUI request to CUI fallback, current gui_demo launch refusal; restored generation3 cold boot and gshell Run gui_demo
   observe:
   - '現行libos32gui.shlibの隔離コピーを作り、memory_layout_generationヘッダoffset52だけを2に変更 (accept_f12/gen2.logのapp写しと同じ形、gen_h2_fixtures.py:61-65)。parse_headerでmin_api_ver72/他3世代/kapi_data_off不変、差分がこの4B内だけ、元と写しのSHA256を保存。本物のv71_originalsは変更しない'
-  - 'shlib_initはbootで1回だけ (kernel/kernel.c:740)。PMが隔離媒体の /sys/lib/libos32gui.shlib に世代2コピーを置いて読み戻しhashを照合しcold boot。現行kernel.elfのnmでg_reject/g_loadedの番地を解決し、実メモリg_reject=SHLIB_REJECT_LAYOUT (1)、g_loaded=0を採る (kernel/shlib.c:18-35, kernel/shlib.h:26)。os32x_layout_checkの戻り値3とは別の状態。ロード済みセッションでファイルを差し替えただけの結果は数えない'
-  - 'GUI起動要求で GUI shlib: rebuild required (KAPI data layout) -> CUI shell の画面案内とCPL0 shellへの復帰を確認 (kernel/kernel.c:794-802)。同じv72のgui_demo.binはparse_headerでshlib_protocol=1を確認し、CPL0 shellから起動すると Error: required shared library is not loaded で拒否 (exec/exec.c:963-964, :1767-1773)。この起動の前後でexec_entry_calls/AS資源不変、shell/ver応答を確認。boot全体ではCUI shellが起動するため、そのentryを差に混ぜない'
+  - 'shlib_initはbootで1回だけ (init/kernel.c:740)。PMが隔離媒体の /sys/lib/libos32gui.shlib に世代2コピーを置いて読み戻しhashを照合しcold boot。現行kernel.elfのnmでg_reject/g_loadedの番地を解決し、実メモリg_reject=SHLIB_REJECT_LAYOUT (1)、g_loaded=0を採る (mm/shlib.c:18-35, mm/shlib.h:26)。os32x_layout_checkの戻り値3とは別の状態。ロード済みセッションでファイルを差し替えただけの結果は数えない'
+  - 'GUI起動要求で GUI shlib: rebuild required (KAPI data layout) -> CUI shell の画面案内とCPL0 shellへの復帰を確認 (init/kernel.c:794-802)。同じv72のgui_demo.binはparse_headerでshlib_protocol=1を確認し、CPL0 shellから起動すると Error: required shared library is not loaded で拒否 (exec/exec.c:963-964, :1767-1773)。この起動の前後でexec_entry_calls/AS資源不変、shell/ver応答を確認。boot全体ではCUI shellが起動するため、そのentryを差に混ぜない'
   - '正しい世代3をPMが復元して読み戻しhashを照合し、再びcold boot。g_reject=0/g_loaded=1とgshell起動・Runから同じgui_demoの正常起動/終了を確認。これはhost prev-memory-generation-shlibの成功とは別の実ゲスト観測、F-14を台本追加だけで閉じない'
   expect:
     generation_2_shlib_rejected: true

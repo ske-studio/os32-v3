@@ -127,7 +127,7 @@
  * 反射モードでは呼ばない (link_tick も起動しない)。 */
 void link_init(const u8 my_mac[ETH_ALEN]);
 
-/* 100Hz タイマ (kernel/isr_handlers.c の `ne2k_timer_tick()` の直後)。
+/* 100Hz タイマ (arch/x86/kernel/isr_handlers.c の `ne2k_timer_tick()` の直後)。
  * **プロトコルを進めるのはここだけ** — 受信 dispatch、再送、制御の送出、
  * HELLO / 再同期。KAPI からは呼ばない。反射モードでは呼ばれない。 */
 void link_tick(void);

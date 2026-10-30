@@ -66,7 +66,7 @@ def build_run(fixture, runner, collector=None, calibration=None):
         if calibration is not None:
             (tmp / 'calibration.inc').write_text(calibration)
             (tmp / 'calibration_math.c').write_text(
-                (ROOT / 'kernel/cpu_calibrate_math.c').read_text())
+                (ROOT / 'kernel/time/cpu_calibrate_math.c').read_text())
         obj = tmp / 'kstring.o'
         subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
                         '-o', str(obj)], check=True)
@@ -88,7 +88,7 @@ def main():
     args = arguments()
     collector = (ROOT / 'kernel/ver_collect.c').read_text()
     fixture = (ROOT / 'tools/tests/ver_collect_host.c').read_text()
-    cpu = (ROOT / 'kernel/cpu_calibrate.c').read_text()
+    cpu = (ROOT / 'kernel/time/cpu_calibrate.c').read_text()
     # Keep actual saved-state initializers and all decision/recording code.
     state = cpu[cpu.index('static u32 s_loops_per_tick'):cpu.index('/* CALIBRATE_LOOPS')]
     calibration = state + ''.join(function(cpu, sig) for sig in

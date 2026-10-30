@@ -3,7 +3,7 @@
 #include "boot_names.h"
 #include "boot_disk.h"
 #include "pci_resources.h"
-#include "../../kernel/boot_display.h"
+#include "../../init/boot_display.h"
 #include "../../drivers/kbd.h"
 #include "../../drivers/mouse.h"
 #include "../../drivers/fdc.h"

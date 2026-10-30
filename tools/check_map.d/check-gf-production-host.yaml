@@ -41,7 +41,7 @@ check-gf-production-host:
 - kdebug/recover_gf_stage/*.inc
 - kdebug/recover_gf.c
 - kernel/sys.c
-- kernel/sysconfig.c
+- init/sysconfig.c
 - lib/crc32_core.inc
 - tools/tests/gf_production_host.c
 - tools/tests/gfinit_host.c

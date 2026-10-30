@@ -32,7 +32,7 @@ struct hwdev_ops {
 /* 式は既存 recover_expr の id/argc/kinds/eval。eval は検査済み整数のみ。 */
 /* core API は §2 の既存宣言から生成。関数名・型を変えない。 */
 struct hwdev_core_api { u32 abi, size, contract_crc, layout_crc; /* §8: 生成済み型付き関数表 */ };
-/* kernel/module.h: kdebug_ops 末尾へ追加 (§5) */
+/* kernel/module/module.h: kdebug_ops 末尾へ追加 (§5) */
 const struct hwdev_core_api *(__cdecl *hwdev_core_get)(void);
 /* facade 内の接続順序 (擬似コード、各失敗は登録前に拒否) */
 if (kdebug.state != KDEBUG_RUNNING) return 0; /* ログ・load/start なし */
@@ -139,8 +139,8 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
 ## 6. KDEBUG の ops の版 3→4・slot 19→20 と波及 (G5)
 
 - KDEBUG_OPS_NAMES の末尾に `hwdev_core_get` を足し、ops_version 3→4、ops_slots 19→20。既存 19 口の順序は維持。
-- 揃えるもの: kernel/module.h の構造体、KDEBUG ops の初期化子、生成の MODULE_OPS_SLOTS / KDEBUG_OPS_VERSION。module.c:16 の STATIC_ASSERT を版 4 の 20 口 + version で成立させる。
-- **G5 (M2 の依頼文に書く)**: KDEBUG_OPS_VERSION は kernel/module.h:7 の手書きの定義で、GF の identity (gfinit.c:148 → recover.c:130 の CRC) にも入る。新しい口には `kdebug_export_contracts[MODULE_OPS_SLOTS]` (gen_kdebug_imports.py:213) の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
+- 揃えるもの: kernel/module/module.h の構造体、KDEBUG ops の初期化子、生成の MODULE_OPS_SLOTS / KDEBUG_OPS_VERSION。module.c:16 の STATIC_ASSERT を版 4 の 20 口 + version で成立させる。
+- **G5 (M2 の依頼文に書く)**: KDEBUG_OPS_VERSION は kernel/module/module.h:7 の手書きの定義で、GF の identity (gfinit.c:148 → recover.c:130 の CRC) にも入る。新しい口には `kdebug_export_contracts[MODULE_OPS_SLOTS]` (gen_kdebug_imports.py:213) の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
 - kdebug の既存 import は未使用になっても削除・並替え禁止、必要分だけ末尾追加。内部 ops 版 / 契約 CRC も更新。
 - 公開の入口 (旧 S7) は既存の kdebug_call のまま。KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新・clean → all を守る ([KAPI_SPEC.md](../../KAPI_SPEC.md) §3-1)。
 
@@ -204,7 +204,7 @@ GF は `gfinit*.o` 7 個と `recover_gf.o`、核は残るリンク入力全体 (
 
 | 境界 | 契約 |
 |---|---|
-| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`kernel/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
+| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`kernel/module/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
 | op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
 | op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
 

@@ -56,7 +56,7 @@
 extern void shell_print(const char *s, u8 attr);
 extern void shell_print_dec(u32 val, u8 color);
 extern u32 sys_mem_kb;
-/* kernel/tss.c の TSS 実体。CPL=3 遷移で TSS.ESP0 を現在のカーネル ESP に
+/* arch/x86/kernel/tss.c の TSS 実体。CPL=3 遷移で TSS.ESP0 を現在のカーネル ESP に
  * 合わせる (割り込み/int 0x80 のフレームが exec_run の frame を踏まないよう)。*/
 extern struct tss_entry kernel_tss;
 static KernelAPI *kapi;
@@ -81,7 +81,7 @@ static u8  ring3_tramp_raw[PAGE_SIZE * EXEC_TRAMP_RAW_PAGES];
 static u32 ring3_tramp_page = 0;             /* 4KB 境界に揃えた実アドレス (=物理) */
 static void ring3_trampoline_init(void);
 
-/* int 0x80 引数コピー+呼び出しの ASM ヘルパ (kernel/ring3_entry.asm)。
+/* int 0x80 引数コピー+呼び出しの ASM ヘルパ (arch/x86/kernel/ring3_entry.asm)。
  * args_src から nbytes をスタックへコピーして wrapfn を cdecl 呼び出し、
  * 戻り値 (eax) を返す。 */
 extern u32 kapi_invoke(void *wrapfn, const void *args_src, u32 nbytes);
@@ -211,7 +211,7 @@ static void ring3_trampoline_init(void)
 /*  グローバル状態                                                          */
 /* ======================================================================== */
 /* いま走っているプログラムの段。ID ではなく **深さ** で、シェル = 1。
- * 外 (drivers/kbd.c, kernel/isr_handlers.c) は「> 0 ならプログラムが走って
+ * 外 (drivers/kbd.c, arch/x86/kernel/isr_handlers.c) は「> 0 ならプログラムが走って
  * いる」としてしか見ないので意味は変わらない。 */
 volatile int exec_nest_level = 0;
 volatile int exec_exit_status = EXEC_SUCCESS;
@@ -302,7 +302,7 @@ volatile int ring3_in_syscall = 0;
  * / tramp_copy の 3 つの門は `ring3_guard_active(ring3_in_syscall,
  * ring3_wm_depth)` (exec/ring3_str.c) で「アプリ由来か」を決め、深さが 1 以上
  * なら WM 自身のポインタ (自分のスタックの MouseInfo 等) を素通しする。
- * #PF/#GP の帰属 (kernel/isr_handlers.c) は ring3_in_syscall だけを見るので
+ * #PF/#GP の帰属 (arch/x86/kernel/isr_handlers.c) は ring3_in_syscall だけを見るので
  * **変わらない**。
  * WM を longjmp で抜ける経路 (exec_park* / ring3_kill_kind / sys_exit) は
  * 出口を通らないので、そこと **ディスパッチャの入口** で 0 に戻す —
@@ -519,7 +519,7 @@ void kdi_selftest_exec_view(struct kselftest_exec_view *out)
 /*  GUI 入力ポンプと強制脱出 (K2 / 契約 T6・T8 の X4)                        */
 /* ======================================================================== */
 
-/* IRQ0 が 100Hz で加算するティック (kernel/idt.h)。ポンプの上限判定は
+/* IRQ0 が 100Hz で加算するティック (arch/x86/kernel/idt.h)。ポンプの上限判定は
  * これを **読むだけ** で行う (票 K2 の鉄則: get_tick を叩く回数を増やさない)。 */
 extern volatile u32 tick_count;
 
@@ -593,7 +593,7 @@ int ring3_wait_pending(void)
 /*  ring3_abort_check — 要求があればアプリを畳む (戻らない)                  */
 /*                                                                          */
 /*  呼び出し元:                                                             */
-/*    - kernel/isr_stub.asm の IRQ1 スタブ (EOI と V86 反射の後、割り込まれた */
+/*    - arch/x86/kernel/isr_stub.asm の IRQ1 スタブ (EOI と V86 反射の後、割り込まれた */
 /*      文脈が CPL=3 のときだけ)。KAPI を呼ばない計算ループはここで死ぬ。     */
 /*    - ring3_syscall_dispatch の入口 (wrap に入る前)。                      */
 /*    - 公開 KAPI の待ち (内部経路を除き、資源の後始末が済んだ安全点)。     */
@@ -1332,7 +1332,7 @@ void __cdecl kapi_sys_exit(int status)
 /* ======================================================================== */
 /*  ring3_syscall_dispatch — CPL=3 からの int 0x80 ディスパッチャ (v2 M2d)   */
 /*                                                                          */
-/*  kernel/ring3_entry.asm の int80_stub が pushad 後のフレーム先頭を渡す。  */
+/*  arch/x86/kernel/ring3_entry.asm の int80_stub が pushad 後のフレーム先頭を渡す。  */
 /*  フレーム (u32 配列, pushad + CPU が積んだ例外フレーム):                   */
 /*    [0..7]=pushad (EDI,ESI,EBP,ESP,EBX,EDX,ECX,EAX)  → EAX=[7]             */
 /*    [8]=EIP [9]=CS [10]=EFLAGS [11]=userESP [12]=userSS                    */
@@ -1497,7 +1497,7 @@ syscall_complete:
 /* ======================================================================== */
 /*  ring3_fault_kill — CPL=3 由来の #PF/#GP でアプリを kill (v2 M1e)        */
 /*                                                                          */
-/*  #PF/#GP ハンドラ (kernel/isr_handlers.c) がフォールトフレームの         */
+/*  #PF/#GP ハンドラ (arch/x86/kernel/isr_handlers.c) がフォールトフレームの         */
 /*  CS.RPL=3 (= CPL=3 由来) を検出したときに呼ぶ。カーネルを巻き込まず       */
 /*  **その ID だけ**を畳んでシェル (WM) に戻す (D4)。                        */
 /*  資源を触らず longjmp。両着地点の exec_pending_finish が通常文脈で回収。 */
@@ -1533,7 +1533,7 @@ void ring3_abort_kill(void)
 }
 
 /* ======================================================================== */
-/*  ring3_resume — 保存した CPL=3 フレームへ戻る (P4、kernel/ring3_entry.asm)*/
+/*  ring3_resume — 保存した CPL=3 フレームへ戻る (P4、arch/x86/kernel/ring3_entry.asm)*/
 /*  cli → TSS.ESP0 → CR3 → フレームを積んで popad; iretd を割り込み禁止で    */
 /*  一続きに行う。戻らない。                                                 */
 /* ======================================================================== */

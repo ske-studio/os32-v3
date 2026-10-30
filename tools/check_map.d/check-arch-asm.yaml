@@ -19,6 +19,8 @@ check-arch-asm:
 - sdk/crt/syscalls.c
 - userland/lib/rt/ls.c
 - kernel/**
+- init/**
+- mm/**
 - drivers/**
 - exec/**
 - fs/**

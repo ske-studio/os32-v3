@@ -2,7 +2,7 @@
 
 ## Scope and finding
 
-Read `kernel/kernel.c`, `kernel/boot_splash.c/.h`, `gfx/gfx_core.c`,
+Read `init/kernel.c`, `kernel/boot_splash.c/.h`, `gfx/gfx_core.c`,
 `gfx/gfx_internal.h`, `include/gfx_hal.h`, PC98 backend and optional backend
 init/shutdown paths before implementation. No `system.cfg` exists in this
 checkout (`git ls-files '*system*cfg*'` and recursive `Path.glob` returned none).
@@ -73,11 +73,11 @@ optional-backend exclusions into verified results.
 
 ## Target compile and isolation
 
-`i386-elf-gcc` compiled `kernel/boot_splash.c` and unchanged `gfx/gfx_core.c` to a
+`i386-elf-gcc` compiled `init/boot_splash.c` and unchanged `gfx/gfx_core.c` to a
 private TemporaryDirectory with repository kernel include paths and GNU89,
 i386 freestanding flags, plus `-Wall -Wextra -Werror
 -Wdeclaration-after-statement`. Both compiled without diagnostics.
-`git diff --check -- kernel/boot_splash.c kernel/boot_splash.h` passed.
+`git diff --check -- init/boot_splash.c init/boot_splash.h` passed.
 No shared object/build output, full build, deployment or emulator run was used.
 
 ## Outstanding lifecycle work (not implemented here)

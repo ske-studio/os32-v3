@@ -9,7 +9,7 @@
  *
  *  アプリが 4 本同時に生きると、exec_exit の回収 7 種のうち **所有者を見て
  *  いなかった 2 種** (SHM とサウンド) が他のアプリの資源を巻き上げる。
- *  ここでは実物の fs/fd_redirect.c / fs/pipe_buffer.c / kernel/shm.c を
+ *  ここでは実物の fs/fd_redirect.c / fs/pipe_buffer.c / mm/shm.c を
  *  そのままコンパイルし、ID 2 と ID 3 が資源を持った状態で ID 2 だけを
  *  畳んで「2 の分だけ」消えることを見る。
  *
@@ -98,7 +98,7 @@ void test_shm_memset(void *d, int c, unsigned long n)
 #include "../../fs/fd_redirect.c"
 #include "redir_access_stub.h"
 #include "../../fs/pipe_buffer.c"
-#include "../../kernel/shm.c"
+#include "../../mm/shm.c"
 
 static int failures;
 static int checks;

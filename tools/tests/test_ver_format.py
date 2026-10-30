@@ -4,7 +4,7 @@ from ver_test_utils import ROOT, arguments, execute, function
 
 
 def run(source, runner):
-    names = function((ROOT/'kernel/module.c').read_text(), 'const char *kdebug_state_name(')
+    names = function((ROOT/'kernel/module/module.c').read_text(), 'const char *kdebug_state_name(')
     try:
         return execute((ROOT/'tools/tests/ver_format_host.c').read_text(), runner,
                        {'ver_format_source.c': source, 'ver_state_source.c': names},

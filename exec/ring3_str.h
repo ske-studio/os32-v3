@@ -6,7 +6,7 @@
 /*  KAPI の引数として来るポインタはディスパッチャが範囲検証する              */
 /*  (`ring3_ptr_ok`) が、**戻り値のポインタ** は誰も見ていなかった。         */
 /*  `sys_getcwd` は `fs/vfs.c` の static `cwd` (カーネル帯 = PDE0 の PTE) を */
-/*  そのまま返す。`kernel/paging.c` はカーネル帯を `phys | PAGE_RW`          */
+/*  そのまま返す。`mm/paging.c` はカーネル帯を `phys | PAGE_RW`          */
 /*  (USER なし) で張るので、CPL=3 の呼び手がその番地を読むと #PF → fault     */
 /*  kill になる。RO+USER になっているのは **KAPI トランポリンページの 1 枚**  */
 /*  だけ (`exec/exec.c` の `ring3_trampoline_init`)。                        */
@@ -67,7 +67,7 @@ const char *ring3_user_str(int in_syscall, char *scratch, u32 cap,
 /* ======================================================================== */
 /*  CPL=3 へ**書き込む**前の判定 (票 TASK_HAL_WIRING、Codex 往復 10)         */
 /*                                                                          */
-/*  OS32 は **CR0.WP = 0** で走る (arch/x86/arch_cpu.h。kernel/shlib.c が     */
+/*  OS32 は **CR0.WP = 0** で走る (arch/x86/arch_cpu.h。mm/shlib.c が     */
 /*  「カーネルからは読み取り専用ページにも書ける」ことに依存している)。      */
 /*  そのため CPL=0 の KAPI ラッパは、アプリが渡した読み取り専用 USER ページ   */
 /*  — 具体的には**共有ライブラリの .text/.rodata**、全アプリで同じ物理 —     */

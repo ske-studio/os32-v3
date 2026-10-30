@@ -39,7 +39,7 @@ exec/shlib/PEGC 呼出元は変更なし。PEGC の `sys_reserve_top` が永久�
 - `python3 tools/tests/test_pgalloc_model.py -v`: RED 12件中4 failure → GREEN 12件全通過。
 - `python3 tools/tests/test_pgalloc_range.py`: RED generic baseline assertion → 全ケース GREEN。
 - 同 range runner の target GNU89 `-Werror` compile PASS。
-- `i386-elf-gcc -std=gnu89 -m32 -march=i386 -O2 -Wall -Wextra -Werror -Wdeclaration-after-statement -ffreestanding -fno-pie -fno-stack-protector -D__KERNEL_BUILD__ -Iinclude -Ikernel -Ilib -c kernel/pgalloc.c`: 一時出力先で PASS。
+- `i386-elf-gcc -std=gnu89 -m32 -march=i386 -O2 -Wall -Wextra -Werror -Wdeclaration-after-statement -ffreestanding -fno-pie -fno-stack-protector -D__KERNEL_BUILD__ -Iinclude -Ikernel -Ilib -c mm/pgalloc.c`: 一時出力先で PASS。
 - 対象製品ファイルの `git diff --check`: PASS。
 - RED の実出力は `pgalloc_legacy_red_model.log` / `pgalloc_legacy_red_range.log`（要点抜粋）に保存。
 

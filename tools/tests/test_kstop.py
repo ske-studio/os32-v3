@@ -281,7 +281,7 @@ def run(overrides=None):
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
     with tempfile.TemporaryDirectory(prefix='os32-kstop-') as d:
         d=pathlib.Path(d); (d/'t.c').write_text(code)
-        (d/'s.asm').write_text((ROOT/'kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
+        (d/'s.asm').write_text((ROOT/'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
         inc=['-I'+str(ROOT/p) for p in ('tools/tests','tools/tests/host_arch','include','kernel','exec','fs','lib','drivers','sdk/include/os32')]
         r=subprocess.run(['gcc','-m32','-std=gnu11','-O0','-Wall','-Werror','-Wno-unused-function',

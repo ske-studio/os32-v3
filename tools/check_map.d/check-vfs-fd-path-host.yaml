@@ -18,7 +18,7 @@ check-vfs-fd-path-host:
 - fs/vfs.c
 - fs/vfs_fd.c
 - fs/vfs_name_rules.inc
-- kernel/ime_dict.c
+- kernel/ime/ime_dict.c
 - lib/kutf16.c
 - lib/sqlite3/os32_sqlite_vfs.c
 - lib/sqlite3/sqlite3.c
@@ -53,7 +53,7 @@ check-vfs-fd-path-host:
 - include/input_service.h
 - include/kbd.h
 - include/clock_service.h
-- kernel/clock_service.c
+- kernel/time/clock_service.c
 - tools/tests/serial_emergency_host.h
 - kernel/serial_diag.c
 - include/console_output.h

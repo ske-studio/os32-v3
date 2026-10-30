@@ -6,7 +6,7 @@
 /*  ローダ (FD: boot/loader_fat_new.asm、HDD: boot/loader_hdd.asm) が        */
 /*  実モードで INT 1Bh AH=84h (新センス) を呼び、BIOS が見せる HDD の幾何を   */
 /*  物理 MEM_BOOTINFO_BASE (0x7E00) に書く。カーネルは kernel_main の最初で   */
-/*  写し (kernel/bootinfo.c)、以後はその写しだけを使う — 0x7E00 は           */
+/*  写し (init/bootinfo.c)、以後はその写しだけを使う — 0x7E00 は           */
 /*  フォントキャッシュ (0x1000〜) の内側で、フォント初期化で上書きされる。    */
 /*                                                                          */
 /*  **書く順序 (ローダ)**                                                   */
@@ -22,7 +22,7 @@
 /*  値を二重に持つ。一致は tools/tests/test_bootinfo.py が名前ごとに照合し、 */
 /*  番地 (MEM_BOOTINFO_BASE) は tools/gen_memmap.py --check が照合する。     */
 /*                                                                          */
-/*  i386 では下の struct bootinfo_wire が同じ並びになる (kernel/bootinfo.c   */
+/*  i386 では下の struct bootinfo_wire が同じ並びになる (init/bootinfo.c   */
 /*  の STATIC_ASSERT)。検証はホストでも回すので、バイト列を**オフセットで**  */
 /*  読む (ホストの u32 は 64bit)。                                          */
 /* ======================================================================== */
@@ -121,7 +121,7 @@ struct bootinfo_wire {
     u32 img_rsvd;
 };
 
-/* ---- カーネルが保存する写し (kernel/bootinfo.c) --------------------------- */
+/* ---- カーネルが保存する写し (init/bootinfo.c) --------------------------- */
 struct bootinfo_drive {
     u8  da;
     u8  queried;
@@ -161,7 +161,7 @@ struct bootinfo {
 struct boot_disk_ops;
 void bootinfo_disk_register(const struct boot_disk_ops *ops);
 
-/* ---- 純粋関数 (kernel/bootinfo_check.c、ホスト試験の対象) ----------------- */
+/* ---- 純粋関数 (init/bootinfo_check.c、ホスト試験の対象) ----------------- */
 
 /* イメージ欄のチェック語 (ローダと同じ計算)。 */
 #define BOOTINFO_IMG_CHECK_OF(crc, size) \
@@ -204,7 +204,7 @@ struct bootinfo_ata {
 int bootinfo_format_ata(const struct bootinfo_ata *a, int drive,
                         char *buf, int size);
 
-/* ---- カーネル側 (kernel/bootinfo.c) --------------------------------------- */
+/* ---- カーネル側 (init/bootinfo.c) --------------------------------------- */
 
 /* kernel_main の最初で 1 回だけ呼ぶ。0x7E00 を写して検証し、
  * 写した後は低位の magic を 0 に戻す (次の起動で残りを読まない)。 */

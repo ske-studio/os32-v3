@@ -1,4 +1,4 @@
-#include "tick.h"
+#include "irq/tick.h"
 #include "tick_order.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */

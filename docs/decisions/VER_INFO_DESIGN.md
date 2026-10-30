@@ -66,9 +66,9 @@
 ## 3. 装置の行の出所
 | 行 | 出す値／取り方 | 取れないとき／意味の限界 |
 |---|---|---|
-| CPU | `x86 32-bit PM+Paging; calib=measured/default`。既存の cpu_calibrate_enough(cpu_calib_ticks, cpu_calib_rounds) と cpu_loops_per_tick()（kernel/cpu_calibrate.c:104–114） | 型番・メーカー・MHz は unknown 相当として表示しない。較正は周波数測定でも CPUID 判定でもない |
-| PIC | `8259A x2; vectors=20h/28h (configured)`。kernel/idt.h:101–102 の設定定数 | 起動済みの設定説明。実チップを検出済みと主張しない |
-| PIT | `8254 tick=100Hz input=1996800Hz`。pit_get_setup() の valid/hz/clk_hz（kernel/idt.c:228） | valid=0 なら `PIT: unknown`。PIT_HZ の表示だけで実設定を代用しない |
+| CPU | `x86 32-bit PM+Paging; calib=measured/default`。既存の cpu_calibrate_enough(cpu_calib_ticks, cpu_calib_rounds) と cpu_loops_per_tick()（kernel/time/cpu_calibrate.c:104–114） | 型番・メーカー・MHz は unknown 相当として表示しない。較正は周波数測定でも CPUID 判定でもない |
+| PIC | `8259A x2; vectors=20h/28h (configured)`。arch/x86/kernel/idt.h:101–102 の設定定数 | 起動済みの設定説明。実チップを検出済みと主張しない |
+| PIT | `8254 tick=100Hz input=1996800Hz`。pit_get_setup() の valid/hz/clk_hz（arch/x86/kernel/idt.c:228） | valid=0 なら `PIT: unknown`。PIT_HZ の表示だけで実設定を代用しない |
 | KBD | `8251-compatible; IRQ1 (configured)`。既存 KBD IRQ 定義を使用 | ドライバ構成を表示。kbd_diag の IRQ 数ゼロを未搭載判定に使わず、I/O 読出しも不要 |
 | SER | `8251 baud=9600 mode=compat FIFO=yes/no`。serial_get_status()（drivers/serial.c:457） | 戻り負なら `SER: not initialized`。FIFO 搭載と VFAST 動作中を分ける |
 | SND | `OPN configured; PCM=CS4231-family/none`。FM 構成＋常駐 pcm_present()（kernel/pcm_module.c:61） | FM 実在は unknown。drivers/fm.c:54 の BUSY 成功はチップ同定ではない。PCM の none は未検出またはモジュール未読込 |
@@ -156,7 +156,7 @@ return 0;
 - 正規の行順: 見出し → CPU → PIC → PIT → KBD → SER → SND → GFX → API → Build → Commit → Image CRC → kdebug（必要時は継続1行）→ sqlite stack → services。
 - kernel/ver_format.c だけが英文と順序を持つ。見出しは `PC-9821 OS32 v3.0-dev (Ring3 Native)`（版は SYS_VERSION）。
 - kdebug は `off` / `on (pair %08x)` / `rejected %u %s` を先頭行にし、on は `kdebug pages: body=%u owner=%u`、rejected は `kdebug file pair: %08x` を続ける。取得失敗は `kdebug: unknown`。
-- 状態名は formatter から kernel/module.c:28 の kdebug_state_name() を呼ぶ。同関数に state<0 / 配列上限以上→UNKNOWN を追加。13〜16 は RECORD_FULL/BAD_DEPENDENCY/BUSY/QUARANTINED になる。
+- 状態名は formatter から kernel/module/module.c:28 の kdebug_state_name() を呼ぶ。同関数に state<0 / 配列上限以上→UNKNOWN を追加。13〜16 は RECORD_FULL/BAD_DEPENDENCY/BUSY/QUARANTINED になる。
 - cmd_ver は KAPI を一回呼び、kind の低8bitに応じて既存色を選んで `kprintf(attr, "%s", text)` で出力。
 - formatter は機器・識別・services の kind に INDENT を付ける。CUI はその bit に従って先頭2空白、各行末に改行を追加。見出し・kdebug・sqlite stack は字下げなし。構造体内に空白接頭辞・改行は含めない。
 - shell_print_kdebug の詳細コマンドは維持するが、ver からは呼ばない。ver/About の情報源は新経路だけ。
@@ -193,7 +193,7 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 | V1 | 変更 include/config.h、docs/decisions/VERSIONS.md | 1 / 8 |
 | V2 | 変更 docs/KAPI_SPEC.md、README.md、docs/INDEX.md | 40 / 2 / 2 |
 | V3 | 新規 sdk/include/os32/os32_ver_info.h、kernel/ver_info.h | 35 / 50 |
-| V4 | 変更 kernel/module.c | 3 |
+| V4 | 変更 kernel/module/module.c | 3 |
 | V5 | 変更 kernel/sqlite_engine.h、kernel/sqlite_engine.c | 7 / 15 |
 | V6 | 変更 include/gfx_hal.h、gfx/gfx_core.c | 8 / 35 |
 | V7 | 新規 kernel/ver_collect.c | 100 |
@@ -215,7 +215,7 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 | V1 / 10分 | include/config.h、docs/decisions/VERSIONS.md | test_ver_version.py:単一定義・3.0-dev・再構築 | 決裁済、V2と並列可 | 文字列 | kernel依存再構築／版を9.9-testに |
 | V2 / 15分 | docs/KAPI_SPEC.md、README.md、docs/INDEX.md | 変更なし、既存 tools/check_kapi_version.py の照合はV9と統合後 | V1、V3〜V8と並列可 | なし | 3文書の版一致／READMEの版をV-1に |
 | V3 / 25分 | sdk/include/os32/os32_ver_info.h、kernel/ver_info.h | ver_layout_host.c、test_ver_layout.py:sizeof/offset/定数 | V1、V4〜V6と並列可 | なし | 68/1092とkind bit／textを63に |
-| V4 / 30分 | kernel/module.c | test_ver_state_name.py:本物関数の抽出host実行 | 独立、V3/V5/V6と並列可 | あり | -1/0/12/13〜16/17/巨大値／上限を13に |
+| V4 / 30分 | kernel/module/module.c | test_ver_state_name.py:本物関数の抽出host実行 | 独立、V3/V5/V6と並列可 | あり | -1/0/12/13〜16/17/巨大値／上限を13に |
 | V5 / 40分 | kernel/sqlite_engine.h、kernel/sqlite_engine.c | ver_services_host.c、test_ver_services.py:保存値→snapshot | 独立、V3/V4/V6と並列可 | あり | READY/隔離/未起動、無印字／publicを常に1に |
 | V6 / 45分 | include/gfx_hal.h、gfx/gfx_core.c | test_ver_gfx.py:fake backendでgetter実行 | 独立、V3〜V5と並列可 | あり | active/target、3backend、失敗／activeを常に1に |
 | V7 / 55分 | kernel/ver_collect.c | ver_collect_host.c、test_ver_collect.py:getter stub→snapshot | V3+V5+V6、V8と並列可 | 未リンク | PIT無効/SER未初期化/PCM未読込／ser_readyを1に |
@@ -259,7 +259,7 @@ struct VerInfo { count: u32, lines: [VerLine; 16] }
 
 ## V7 の実装で PM が決めたこと (2026-10-26)
 
-- CPU の行の「実測か既定か」は値からは見分けない (正しい実測値が既定の 10000 と同じになりうる)。**`kernel/cpu_calibrate.c`・`.h` が、計測の結果を決めたときに「既定の値に落ちたか」(ticks=0 か、計算値が最小より小さくて CALIBRATE_FALLBACK_LPT を使った) を static に記録し、それを返す口 (例 `int cpu_calibrate_used_fallback(void)`) を足す**。V7 の触ってよいファイルに cpu_calibrate.c・.h を加える (この 2 つでは記録と口の追加だけ、計算の式は変えない)。表示は記録が 1 なら既定の値と分かる書き方、0 なら実測の値 (書式は formatter の V8 が決める)。
+- CPU の行の「実測か既定か」は値からは見分けない (正しい実測値が既定の 10000 と同じになりうる)。**`kernel/time/cpu_calibrate.c`・`.h` が、計測の結果を決めたときに「既定の値に落ちたか」(ticks=0 か、計算値が最小より小さくて CALIBRATE_FALLBACK_LPT を使った) を static に記録し、それを返す口 (例 `int cpu_calibrate_used_fallback(void)`) を足す**。V7 の触ってよいファイルに cpu_calibrate.c・.h を加える (この 2 つでは記録と口の追加だけ、計算の式は変えない)。表示は記録が 1 なら既定の値と分かる書き方、0 なら実測の値 (書式は formatter の V8 が決める)。
 
 ## V9 の実装で PM が決めたこと (2026-10-26)
 

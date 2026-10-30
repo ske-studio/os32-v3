@@ -57,7 +57,7 @@ STATIC_ASSERT(sizeof(V86GcapIn) == 12, v86gcap_in_is_12_bytes);
 STATIC_ASSERT(sizeof(V86Gcap) == 76 + 12 * V86G_IN_MAX + 16 * V86G_OUT_MAX,
               v86gcap_layout);
 
-/* #GP ハンドラが記録しているゲストの CS:IP (kernel/v86.c) */
+/* #GP ハンドラが記録しているゲストの CS:IP (kernel/v86/v86.c) */
 extern u32 v86_gp_cs;
 extern u32 v86_gp_ip;
 

@@ -1,12 +1,12 @@
 check-net-link-host:
-- kernel/tick.c
-- kernel/tick.h
+- kernel/irq/tick.c
+- kernel/irq/tick.h
 - platform/pc98/tick_order.h
 - drivers/lgy98.c
 - exec/exec.c
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
-- kernel/isr_handlers.c
+- arch/x86/kernel/isr_handlers.c
 - net/link.c
 - tools/tests/net_link_host.c
 - tools/tests/test_net_link.py

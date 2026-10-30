@@ -7,11 +7,11 @@ check-kdebug-ctx-host:
 - kdebug/v86_gcap_diag.h
 - kdebug/kdebug_main.c
 - kdebug/generated/**
-- kernel/v86_gcap.c
-- kernel/v86_gcap.h
-- kernel/v86_gcap_math.h
-- kernel/module.h
-- kernel/kdebug_imports.def
+- kernel/v86/v86_gcap.c
+- kernel/v86/v86_gcap.h
+- kernel/v86/v86_gcap_math.h
+- kernel/module/module.h
+- kernel/module/kdebug_imports.def
 - tools/gen_kdebug_imports.py
 - tools/mkmod.py
 - tools/tests/test_kdebug_ctx.py
