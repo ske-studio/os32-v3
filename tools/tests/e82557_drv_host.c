@@ -847,6 +847,10 @@ int main(int argc,char **argv)
             if(an_off) CHECK(strstr(output,"link=up an=no"));
         } else {
             CHECK(strstr(output,"LB3=FAIL") && !strstr(output,"LB3=PASS"));
+            if(idle_fail) CHECK(strstr(output,"FAIL(rst:idle)") && s_reason==PCI_BIND_RESET_FAILED);
+            if(pre_busy) CHECK(strstr(output,"FAIL(base:pre)"));
+            if(post_busy) CHECK(strstr(output,"FAIL(base:post)"));
+            if(alloc_fail) CHECK(strstr(output,"FAIL(dma:alloc)"));
             if(cb_ng==3) CHECK(strstr(output,"FAIL(lb:txng)"));
             if(cb_fail==3) CHECK(strstr(output,"FAIL(lb:timeout)"));
             if(cu_pre==3) CHECK(strstr(output,"FAIL(lb:pre)"));
