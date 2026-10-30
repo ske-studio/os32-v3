@@ -103,9 +103,9 @@ DRIVERS_INC_KERNEL = [
     "drivers/net/ne2000/lgy98.c",
 ]
 
-# 先に一致したものを採る。fs/fatfs/ は fs/ より先でなければならない。
+# 先に一致したものを採る。fs/fat/fatfs/ は fs/ より先でなければならない。
 INC_RULES = [
-    ("fs/fatfs/", "INC_FATFS"),
+    ("fs/fat/fatfs/", "INC_FATFS"),
     ("kernel/", "INC_KERNEL"),
     ("net/", "INC_KERNEL"),
     ("drivers/", "INC_DRIVERS"),

@@ -487,7 +487,8 @@ def build(work, changes=None, target=False):
     py_path = work / "lanfs_host.py"
     py_path.write_text(changes.get("tools/lanfs_host.py", PY_SRC.read_text()))
     inc = ["-I" + str(work), "-I" + str(ROOT / "include"),
-           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "fs"), "-I" + str(ROOT / "sdk/include/os32")]
+           "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "fs"), "-I" + str(ROOT / "fs/serialfs"),
+           "-I" + str(ROOT / "sdk/include/os32")]
     flags = ["-std=gnu11", "-Wall", "-Wextra", "-D__cdecl="]
     if not changes:
         flags.append("-Werror")

@@ -40,7 +40,7 @@ REQUIRED_SRCS = SQLITE_SRCS + (
 
 # ---- 内部実装の走査 --------------------------------------------------------
 VENDOR_DIRS = ("lib/sqlite3", "lib/zlib", "lib/microtar", "lib/fatfs", "lib/os32_lz4",
-               "fs/fatfs", "userland/rust")
+               "fs/fat/fatfs", "userland/rust")
 INTERNAL_FORBIDDEN = ("_Atomic", "_Thread_local", "__thread", "restrict",
                       "threads.h", "stdatomic.h")
 
