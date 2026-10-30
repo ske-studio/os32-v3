@@ -308,7 +308,7 @@ L0 の後は、L1〜L3 のあいだ、`kernel/` `drivers/` `fs/` `gfx/` を触�
 
 ### 9-3. 段の完了条件 (実装者)
 
-`make all` rc=0、`tools/build_compare.sh <段の基点> HEAD` で kernel・各 .mod・kdebug・hwdev・kernel-r1 がバイト一致、`tools/include_resolve.py` の解決先が前後で一致 (ファイルのパスの付け替えを除いて)、走査型の検査の走査ファイル数が前後で一致、`python3 tools/check_select.py --lint` rc=0。**試験は回さない** (L0 だけは道具の試験と、kernel.map のパスが変わるので PM が NP21/W で 1 回起動)。
+`make all` rc=0、`tools/build_compare.sh <段の基点> HEAD` で kernel・各 .mod・kdebug・hwdev・kernel-r1 がバイト一致、`tools/include_resolve.py` の解決先が前後で一致 (ファイルのパスの付け替えを除いて)、走査型の検査の走査ファイル数が前後で一致、`python3 tools/check_select.py --lint` rc=0。**バイト一致の例外 (L1 で判明、2026-10-30)**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「`build_compare` の関数ごとの差が検算値の定数の入れ替えだけ」(`movl $0x…` の 4 バイト) で一致とみなす。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外した。**試験は回さない** (L0 だけは道具の試験と、kernel.map のパスが変わるので PM が NP21/W で 1 回起動)。
 
 ### 9-4. PM の取り込み
 
