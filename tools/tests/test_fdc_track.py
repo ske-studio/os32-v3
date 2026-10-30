@@ -252,8 +252,9 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
 
 
 def includes(first=None):
-    dirs = ([first] if first else []) + [SHIM, ROOT / 'fs/fatfs']
-    return ['-I' + str(d) for d in dirs] + include_flags(ROOT)
+    dirs = [SHIM, ROOT / 'fs/fatfs']
+    copied = include_flags(first) if first else []
+    return ['-I' + str(d) for d in dirs] + copied + include_flags(ROOT)
 
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
@@ -478,6 +479,7 @@ def host_build(tmp, mutated=None):
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
                      "fs/fatfs/diskio.c"):
+            (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")
         (tree / rel).write_text(text, encoding="utf-8")
@@ -486,7 +488,7 @@ def host_build(tmp, mutated=None):
         # 変異で fdc_track_is_bad() の唯一の呼出しを消すため、
         # 未使用関数の警告抑止は変異させた写しにだけ適用する。
         cmd = ["gcc", *FLAGS, "-Wno-unused-function",
-               "-I" + str(tmpd), *includes(tree / "drivers"), str(harness),
+               "-I" + str(tmpd), *includes(tree), str(harness),
                "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe

@@ -12,3 +12,4 @@ check-serial-portc-host:
 - lib/serial_diag.h
 - include/platform_sys.h
 - platform/pc98/system.c
+- tools/tests/kernel_includes.py

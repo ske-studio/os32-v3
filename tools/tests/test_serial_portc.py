@@ -15,6 +15,7 @@ platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255
   python3 -B tools/tests/test_serial_portc.py            # 全ケース
   python3 -B tools/tests/test_serial_portc.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import shutil
@@ -150,9 +151,7 @@ def host_build(tmp, mutated=None):
         (work / pathlib.Path(rel).name).write_text(text, encoding="utf-8")
     exe = work / "serial-portc-host"
     cmd = ["gcc", *FLAGS, "-I" + str(work),
-           "-I" + str(ROOT / "include"), "-I" + str(ROOT / "drivers"),
-           "-I" + str(ROOT / "lib"),
-           "-I" + str(ROOT / "sdk/include/os32"),
+           *include_flags(ROOT),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True,
                    stderr=subprocess.DEVNULL if mutated else None)

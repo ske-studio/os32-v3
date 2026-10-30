@@ -59,7 +59,15 @@ def conformance():
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
         adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
-        source = (ROOT / ({'module': 'kernel/module', 'hwdev_module': 'kernel/module', 'fep_module': 'kernel/ime', 'v86_module': 'kernel/v86'}.get(adapter, 'kernel')) / (adapter + '.c')).read_text()
+        directory = {
+            'module': 'kernel/module', 'hwdev_module': 'kernel/module',
+            'fep_module': 'kernel/ime', 'v86_module': 'kernel/v86',
+            'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
+            'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',
+            'cirrus_module': 'drivers/video/cirrus',
+            'geforce_module': 'drivers/video/geforce', 'kcg_module': 'drivers/video/kcg',
+        }.get(adapter, 'kernel')
+        source = (ROOT / directory / (adapter + '.c')).read_text()
         path_macro = re.search(r'\.path = (SYS_\w+)', source)[1]
         assert re.search(r'^#define ' + path_macro + r'\s+"' + re.escape(row['path']) + '"', config, re.M), row
         assert 'MODULE_ID_' + row['name'] in source, row

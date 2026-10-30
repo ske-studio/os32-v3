@@ -191,11 +191,11 @@ def contracts():
         assert '#include "' + header + '"' in (ROOT / name).read_text()
     assert '#include "../../drivers/input/mouse.h"' in platform
     assert 'drivers/input/mouse.h' not in boot and 'drivers/input/kbd.h' not in boot
-    assert '#include "../include/pointer_service.h"' in (ROOT / 'drivers/input/mouse.h').read_text()
+    assert '#include "../../include/pointer_service.h"' in (ROOT / 'drivers/input/mouse.h').read_text()
     assert 'drivers/' not in (ROOT / 'include/pointer_service.h').read_text()
     common = (ROOT / 'include/kbd.h').read_text()
     assert 'drivers/' not in common and 'kbd_init' not in common and 'KBD_DATA' not in common
-    assert '#include "../include/kbd.h"' in (ROOT / 'drivers/input/kbd.h').read_text()
+    assert '#include "../../include/kbd.h"' in (ROOT / 'drivers/input/kbd.h').read_text()
     # The common header must resolve without the drivers include search path.
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Werror', '-fsyntax-only', '-x', 'c',
                     '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-'],
@@ -203,7 +203,7 @@ def contracts():
     with tempfile.TemporaryDirectory(prefix='d2-symbols-') as directory:
         obj = Path(directory) / 'input_service.o'
         subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
-                        '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'),
+                        *include_flags(ROOT),
                         '-c', str(ROOT / 'kernel/input_service.c'), '-o', str(obj)], check=True)
         symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
         assert not symbols.strip(), symbols
