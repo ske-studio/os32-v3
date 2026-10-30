@@ -47,6 +47,11 @@ void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 /* ---- 偽ファイルシステム ---------------------------------------------
  *  1 ファイルだけを持つ。ブロック番号 b の中身は (b*7 + i) の 1KB。      */
 static u32 g_file_size = 0;
+static u16 g_mode;
+static int g_inode_error, g_bmap_error, g_read_error;
+static int g_hole_block, g_error_block;
+static u32 g_reads;
+
 
 static u8 block_byte(u32 phys, u32 i) { return (u8)(phys * 7u + i); }
 
@@ -55,6 +60,8 @@ int ext2_read_block(Ext2Ctx *ctx, u32 block_num, void *buf)
     u32 i;
     u8 *d = (u8 *)buf;
     (void)ctx;
+    g_reads++;
+    if (g_read_error && block_num == (u32)(100 + g_error_block)) return -1;
     /* 実物と同じ「必ず 1KB 書く」振る舞い (512B セクタ 2 本ぶん)。 */
     for (i = 0; i < EXT2_BLOCK_SIZE; i++) d[i] = block_byte(block_num, i);
     return 0;
@@ -63,21 +70,24 @@ int ext2_read_block(Ext2Ctx *ctx, u32 block_num, void *buf)
 int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
 {
     (void)ctx; (void)ino;
+    if (g_inode_error) return g_inode_error;
     memset(inode, 0, sizeof(*inode));
     inode->size = g_file_size;
-    inode->mode = EXT2_S_IFREG;
+    inode->mode = g_mode;
     inode->links_count = 1;
     return 0;
 }
 
 /* 票 B8 で「未割当」と「読めなかった」を分ける形になった (fs/ext2/ext2_priv.h)。
- * この試験は I/O 失敗を注入しないので、常に EXT2_OK を返す。 */
+ * 試験で指定したブロックに限り hole または I/O 失敗を注入する。 */
 int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
               u32 *out_phys)
 {
     u32 blocks = (inode->size + EXT2_BLOCK_SIZE - 1) / EXT2_BLOCK_SIZE;
     (void)ctx;
-    *out_phys = (file_block >= blocks) ? 0 : (100 + file_block);
+    if (g_bmap_error && file_block == (u32)g_error_block) return -1;
+    *out_phys = (file_block >= blocks || file_block == (u32)g_hole_block)
+        ? 0 : (100 + file_block);
     return EXT2_OK;                   /* 物理ブロック 0 は「穴」 */
 }
 
@@ -135,6 +145,10 @@ static void ctx_reset(u32 size)
     memset(&g_ctx, 0, sizeof(g_ctx));
     g_ctx.mounted = 1;
     g_file_size = size;
+    g_mode = EXT2_S_IFREG;
+    g_inode_error = g_bmap_error = g_read_error = 0;
+    g_hole_block = g_error_block = -1;
+    g_reads = 0;
 }
 
 /* 番犬付きの読み込み。戻り値と「書かれた最後のバイトの次」を検査する。 */
@@ -222,6 +236,69 @@ static void case_exec_bss_neighbour(void)
     printf("  R4 exec header pre-read leaves resolved[] intact\n");
 }
 
+/* Both interfaces must stop at a hole and preserve the bytes after it. */
+static void case_hole_and_errors(void)
+{
+    u8 buf[3 * EXT2_BLOCK_SIZE];
+    int stream, kind, n;
+    u32 i;
+    for (stream = 0; stream < 2; stream++) {
+        for (kind = 0; kind < 3; kind++) {
+            ctx_reset(sizeof(buf));
+            memset(buf, GUARD_BYTE, sizeof(buf));
+            if (kind == 0) g_hole_block = 1;
+            if (kind == 1) { g_bmap_error = 1; g_error_block = 1; }
+            if (kind == 2) { g_read_error = 1; g_error_block = 1; }
+            n = stream ? ext2_read_stream(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf), 0)
+                       : ext2_read_file(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf));
+            CHECK(n == (kind == 0 ? EXT2_BLOCK_SIZE : EXT2_ERR_IO));
+            for (i = 0; i < EXT2_BLOCK_SIZE; i++)
+                CHECK(buf[i] == block_byte(100, i));
+            for (; i < sizeof(buf); i++) CHECK(buf[i] == GUARD_BYTE);
+            CHECK(g_reads == (u32)(kind == 2 ? 2 : 1));
+        }
+        ctx_reset(sizeof(buf));
+        g_inode_error = EXT2_ERR_NOTFOUND;
+        n = stream ? ext2_read_stream(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf), 0)
+                   : ext2_read_file(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf));
+        CHECK(n == EXT2_ERR_NOTFOUND);
+        CHECK(g_reads == 0);
+        g_ctx.mounted = 0;
+        n = stream ? ext2_read_stream(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf), 0)
+                   : ext2_read_file(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf));
+        CHECK(n == EXT2_ERR_NOMOUNT);
+    }
+}
+
+static void case_stream_ranges(void)
+{
+    u8 arena[3 * EXT2_BLOCK_SIZE + 2];
+    u32 offsets[] = { 0, 17, EXT2_BLOCK_SIZE, 3 * EXT2_BLOCK_SIZE - 10,
+                      3 * EXT2_BLOCK_SIZE, 3 * EXT2_BLOCK_SIZE + 1 };
+    u32 sizes[] = { 2 * EXT2_BLOCK_SIZE, 2 * EXT2_BLOCK_SIZE, EXT2_BLOCK_SIZE,
+                    100, 100, 100 };
+    u32 j, i;
+    for (j = 0; j < sizeof(offsets) / sizeof(offsets[0]); j++) {
+        u32 count = offsets[j] >= 3 * EXT2_BLOCK_SIZE ? 0 : 3 * EXT2_BLOCK_SIZE - offsets[j];
+        if (count > sizes[j]) count = sizes[j];
+        ctx_reset(3 * EXT2_BLOCK_SIZE);
+        memset(arena, GUARD_BYTE, sizeof(arena));
+        CHECK(ext2_read_stream(&g_ctx, EXT2_ROOT_INO, arena + 1, sizes[j], offsets[j]) == (int)count);
+        CHECK(arena[0] == GUARD_BYTE);
+        for (i = 0; i < count; i++)
+            CHECK(arena[i + 1] == block_byte(100 + (offsets[j] + i) / EXT2_BLOCK_SIZE,
+                                             (offsets[j] + i) % EXT2_BLOCK_SIZE));
+        for (i = count + 1; i < sizeof(arena); i++) CHECK(arena[i] == GUARD_BYTE);
+    }
+    ctx_reset(EXT2_BLOCK_SIZE);
+    g_mode = EXT2_S_IFDIR;
+    memset(arena, GUARD_BYTE, sizeof(arena));
+    CHECK(ext2_read_stream(&g_ctx, EXT2_ROOT_INO, arena + 1, 1, 0) == EXT2_ERR_ISDIR);
+    CHECK(g_reads == 0 && arena[1] == GUARD_BYTE);
+    CHECK(ext2_read_file(&g_ctx, EXT2_ROOT_INO, arena + 1, 1) == 1);
+    CHECK(arena[1] == block_byte(100, 0) && arena[2] == GUARD_BYTE);
+}
+
 int main(int argc, char **argv)
 {
     const char *sel = (argc > 1) ? argv[1] : "all";
@@ -235,6 +312,10 @@ int main(int argc, char **argv)
     if (!strcmp(sel, "all") || !strcmp(sel, "exec_bss_neighbour"))
         case_exec_bss_neighbour();
 
+    if (!strcmp(sel, "all") || !strcmp(sel, "hole_and_errors"))
+        case_hole_and_errors();
+    if (!strcmp(sel, "all") || !strcmp(sel, "stream_ranges"))
+        case_stream_ranges();
     printf("ext2_read_bound: PASS (%s)\n", sel);
     return 0;
 }
