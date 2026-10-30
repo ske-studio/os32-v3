@@ -7,6 +7,7 @@ check-v86-gcap-abort-host:
 - kernel/module/module.h
 - exec/v86_call.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/appslot.h
 - kdebug/v86_gcap.c

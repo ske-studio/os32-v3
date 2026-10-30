@@ -57,6 +57,7 @@ check-dep-dir-a-l06-host:
 - tools/check_map.d/check-dep-dir-a-l05a-host.yaml
 - build/checks.d/check-dep-dir-a-l05a-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c

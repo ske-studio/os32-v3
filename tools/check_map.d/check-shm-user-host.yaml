@@ -18,6 +18,7 @@ check-shm-user-host:
 - mm/pgalloc.*
 - mm/physmem.*
 - exec/exec.c
+- exec/exec_image.inc
 - include/**
 - arch/x86/**
 - platform/pc98/**

@@ -5,6 +5,7 @@ check-kprintf-window:
 - sdk/rust/**/*.rs
 - userland/**/*.rs
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - tools/check_kprintf_window.py
 - tools/check_kprintf_window_allow.txt

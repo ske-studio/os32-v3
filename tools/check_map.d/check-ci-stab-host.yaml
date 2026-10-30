@@ -45,6 +45,7 @@ check-ci-stab-host:
 - exec/appmem_map.c
 - exec/appmem_unmap.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - fs/ext2/ext2_layout.c
 - fs/fat/fatfs_vfs.c

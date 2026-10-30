@@ -7,6 +7,7 @@ check-kapi-print-host:
 - include/console_attr.h
 - platform/pc98/console_attr.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/redir_access.c
 - exec/access_walk.c

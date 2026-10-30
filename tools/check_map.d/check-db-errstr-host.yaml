@@ -11,6 +11,7 @@ check-db-errstr-host:
 - build/checks.d/check-db-errstr-host.mk
 - tools/tests/mutpar.py
 - exec/exec.c
+- exec/exec_image.inc
 - kdebug/kselftest.c
 - kdebug/kselftest/**
 - mm/paging.c

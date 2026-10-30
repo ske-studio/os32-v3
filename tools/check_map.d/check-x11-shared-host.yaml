@@ -13,6 +13,7 @@ check-x11-shared-host:
 - drivers/input/kbd.c
 - drivers/input/kbd.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.c
 - exec/appslot.h
 - exec/exec_heap.c

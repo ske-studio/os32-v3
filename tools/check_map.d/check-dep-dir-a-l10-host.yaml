@@ -44,6 +44,7 @@ check-dep-dir-a-l10-host:
 - build/checks.d/check-dep-dir-a-l10-host.mk
 - tools/check_map.d/check-dep-dir-a-l10-host.yaml
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c

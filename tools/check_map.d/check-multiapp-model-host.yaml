@@ -15,6 +15,7 @@ check-multiapp-model-host:
 - tools/check_map.d/check-multiapp-model-host.yaml
 - build/checks.d/check-multiapp-model-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.h
 - exec/exec_kapi_init.inc
 - tools/tests/kernel_includes.py

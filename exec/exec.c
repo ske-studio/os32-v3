@@ -1559,6 +1559,8 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
     return 0;
 }
 
+#include "exec_image.inc"
+
 /* ======================================================================== */
 /*  exec_launch — 外部プログラムのロードと実行 (exec_run / exec_start の実体) */
 /*                                                                          */
@@ -1593,7 +1595,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     u8 *load_addr;
     OS32Header *hdr;
     int sz;
-    u32 code_off, text_sz, bss_sz, heap_sz, entry_off;
+    u32 text_sz, bss_sz, heap_sz, entry_off;
     ExecEntry entry;
     AppSlot *ctx;
     int want_ring3 = 0;      /* CPL=3 で走らせるか (OS32X_FLAG_RING3, v2 M1) */
@@ -1741,7 +1743,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             return EXEC_ERR_INVALID;
         }
     }
-    code_off  = hdr->header_size;
     text_sz   = hdr->text_size;
     bss_sz    = hdr->bss_size;
     heap_sz   = hdr->heap_size;
@@ -1905,29 +1906,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     entry = (ExecEntry)(load_addr + entry_off);
 
-    /* Read directly into physical backing under the master PD. */
-    {
-        int fd = vfs_open(resolved, 0);
-        u32 pos = 0;
-        if (fd < 0) return exec_launch_abort(launcher_id, id, EXEC_ERR_NOT_FOUND);
-        if (vfs_seek(fd, (int)code_off, 0) < 0) {
-            vfs_close(fd);
-            return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
-        }
-        while (pos < text_sz) {
-            u32 pa, n = PAGE_SIZE - ((load_base + pos) & (PAGE_SIZE - 1));
-            if (n > text_sz - pos) n = text_sz - pos;
-            if (want_ring3) {
-                if (as_va_to_pa(ctx->as->pd_phys, load_base + pos, &pa)) break;
-            } else pa = load_base + pos;
-            if (vfs_read_fd(fd, P2V(pa), n) != (int)n) break;
-            pos += n;
-        }
-        vfs_close(fd);
-        if (pos != text_sz) return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
-    }
-    /* app_map_region zeroes all pages, including BSS and padding. */
-    if (!want_ring3) kmemset(load_addr + text_sz, 0, bss_sz);
+    int image_rc = exec_load_image(ctx, resolved, hdr);
+    if (image_rc) return exec_launch_abort(launcher_id, id, image_rc);
 
     /* ヒープ・ガードページ設定 */
     if (is_shell) {

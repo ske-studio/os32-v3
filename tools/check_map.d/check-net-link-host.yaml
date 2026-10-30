@@ -5,6 +5,7 @@ check-net-link-host:
 - platform/pc98/tick_order.h
 - drivers/net/ne2000/lgy98.c
 - exec/exec.c
+- exec/exec_image.inc
 - kapi/kapi_generated.c
 - kapi/kapi_host.c
 - kapi/range_internal.h

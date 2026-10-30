@@ -33,6 +33,7 @@ check-v86-low-host:
 - tools/check_map.d/check-v86-low-host.yaml
 - build/checks.d/check-v86-low-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
