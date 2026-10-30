@@ -214,7 +214,8 @@ def check_write_contract():
     fs/ext2/ext2_vfs.c / fs/fat/fatfs_vfs.c に今もあるか (偽の VFS はこれを写す)。"""
     bad = 0
     ext2 = fn_body((ROOT / "fs/ext2/ext2_vfs.c").read_text(encoding="utf-8"), "ext2_vfs_write")
-    fat = fn_body((ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8"), "fatfs_vfs_write")
+    fat_src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
+    fat = fn_body(fat_src, "ff_write_file")
     print("CONTRACT ext2_vfs_write / fatfs_vfs_write / ext2_rename の同一 inode", flush=True)
     if "return ext2_to_vfs_err(ext2_write(" not in ext2 or \
        "return ext2_to_vfs_err(ext2_create(" not in ext2 or re.search(r"return \(int\)", ext2):
@@ -222,6 +223,14 @@ def check_write_contract():
         bad += 1
     if "return (int)bw;" not in fat:
         print("  FAIL FAT の write_file は書いたバイト数を返す形", flush=True)
+        bad += 1
+    if "return ff_write_file(ctx, path, data, size, 0, 0);" not in fn_body(fat_src, "fatfs_vfs_write") or \
+       "return ff_write_file(ctx, path, data, size, offset, 1);" not in fn_body(fat_src, "fatfs_vfs_write_stream"):
+        print("  FAIL FAT の一括/stream は同じ書込処理を使い、stream だけ seek する", flush=True)
+        bad += 1
+    if "FA_WRITE | (stream ? FA_OPEN_ALWAYS : FA_CREATE_ALWAYS)" not in fat or \
+       not re.search(r"if \(stream\) \{\s*fr = f_lseek\(&fil, \(FSIZE_t\)offset\);", fat):
+        print("  FAIL FAT の一括は作り直し・seek 無し、stream は既存を残し offset へ移る", flush=True)
         bad += 1
     d = (ROOT / "fs/ext2/ext2_dir.c").read_text(encoding="utf-8")
     if not re.search(r"if \(dst_ino == ino\) \{.*?return EXT2_OK;\s*/\*[^*]*ハードリンク同士", d, re.S):

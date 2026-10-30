@@ -231,6 +231,49 @@ void shell_print_hex32(u32 val, u8 color)
     shell_print(buf, color);
 }
 
+/* 復号済み文字の描画とカーソル更新を両入口で共用する。 */
+static void console_render_codepoint(u32 cp, u8 color)
+{
+    u8 ank;
+    u16 jis;
+
+    if (cp == UCS_BOM || cp < UCS_C0_END) return;
+
+    ank = unicode_to_ank(cp);
+    if (ank) {
+        tvram_putchar_at(cursor_x, cursor_y, (char)ank, color);
+        cursor_x++;
+        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+        if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+        return;
+    }
+
+    jis = unicode_to_jis(cp);
+    if (jis) {
+        if (cursor_x >= TVRAM_COLS - 1) {
+            cursor_x = 0;
+            cursor_y++;
+            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+        }
+        tvram_putkanji_at(cursor_x, cursor_y, jis, color);
+        cursor_x += TVRAM_WIDE_COLS;
+        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+        if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+        return;
+    }
+
+    /* 変換不可: □を表示 */
+    if (cursor_x >= TVRAM_COLS - 1) {
+        cursor_x = 0;
+        cursor_y++;
+        if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+    }
+    tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
+    cursor_x += TVRAM_WIDE_COLS;
+    if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
+    if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+}
+
 /* UTF-8文字列表示 (漢字対応) */
 void shell_print_utf8(const char *utf8_str, u8 color)
 {
@@ -247,8 +290,6 @@ void shell_print_utf8(const char *utf8_str, u8 color)
     while (*p) {
         utf8_decode_t dec;
         u32 cp;
-        u8 ank;
-        u16 jis;
 
         if (*p == '\n') {
             cursor_x = 0;
@@ -267,41 +308,7 @@ void shell_print_utf8(const char *utf8_str, u8 color)
         cp = dec.codepoint;
         p += dec.bytes_used;
 
-        if (cp == UCS_BOM || cp < UCS_C0_END) continue;
-
-        ank = unicode_to_ank(cp);
-        if (ank) {
-            tvram_putchar_at(cursor_x, cursor_y, (char)ank, color);
-            cursor_x++;
-            if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            continue;
-        }
-
-        jis = unicode_to_jis(cp);
-        if (jis) {
-            if (cursor_x >= TVRAM_COLS - 1) {
-                cursor_x = 0;
-                cursor_y++;
-                if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            }
-            tvram_putkanji_at(cursor_x, cursor_y, jis, color);
-            cursor_x += TVRAM_WIDE_COLS;
-            if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            continue;
-        }
-
-        /* 変換不可: □を表示 */
-        if (cursor_x >= TVRAM_COLS - 1) {
-            cursor_x = 0;
-            cursor_y++;
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-        }
-        tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
-        cursor_x += TVRAM_WIDE_COLS;
-        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-        if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+        console_render_codepoint(cp, color);
     }
     console_hw_cursor_sync();
 }
@@ -325,8 +332,6 @@ void console_write(const char *buf, u32 size, u8 color)
     while (remaining > 0) {
         utf8_decode_t dec;
         u32 cp;
-        u8 ank;
-        u16 jis;
 
         if (*p == '\n') {
             cursor_x = 0;
@@ -360,41 +365,7 @@ void console_write(const char *buf, u32 size, u8 color)
         p += dec.bytes_used;
         remaining -= dec.bytes_used;
 
-        if (cp == UCS_BOM || cp < UCS_C0_END) continue;
-
-        ank = unicode_to_ank(cp);
-        if (ank) {
-            tvram_putchar_at(cursor_x, cursor_y, (char)ank, color);
-            cursor_x++;
-            if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            continue;
-        }
-
-        jis = unicode_to_jis(cp);
-        if (jis) {
-            if (cursor_x >= TVRAM_COLS - 1) {
-                cursor_x = 0;
-                cursor_y++;
-                if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            }
-            tvram_putkanji_at(cursor_x, cursor_y, jis, color);
-            cursor_x += TVRAM_WIDE_COLS;
-            if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-            continue;
-        }
-
-        /* 変換不可: □を表示 */
-        if (cursor_x >= TVRAM_COLS - 1) {
-            cursor_x = 0;
-            cursor_y++;
-            if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
-        }
-        tvram_putkanji_at(cursor_x, cursor_y, TVRAM_JIS_REPLACEMENT, color);  /* □ (JIS 0x2222) */
-        cursor_x += TVRAM_WIDE_COLS;
-        if (cursor_x >= TVRAM_COLS) { cursor_x = 0; cursor_y++; }
-        if (cursor_y > CONSOLE_LAST_ROW) { tvram_scroll(); cursor_y = CONSOLE_LAST_ROW; }
+        console_render_codepoint(cp, color);
     }
     console_hw_cursor_sync();
 }

@@ -22,11 +22,7 @@
 
 #include "boot_defs.h"
 #include "../lib/crc32_core.inc"
-
-static u32 rd32(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
+#include "../lib/le_internal.h"
 
 /* ファイル全体の CRC32。[crc_off, crc_off + 4) は 0 として送る。 */
 static u32 vk32_file_crc(const u8 *file, u32 size, u32 crc_off)
@@ -53,21 +49,21 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
         return VK32_ERR_SIZE;
 
     /* 2. 共通部 */
-    if (rd32(file) != VK32_MAGIC) return VK32_ERR_MAGIC;
-    if (rd32(file + VK32_OFF_VERSION) != VK32_VERSION) return VK32_ERR_VERSION;
-    n = rd32(file + VK32_OFF_ENTRY_COUNT);
+    if (le_read32(file) != VK32_MAGIC) return VK32_ERR_MAGIC;
+    if (le_read32(file + VK32_OFF_VERSION) != VK32_VERSION) return VK32_ERR_VERSION;
+    n = le_read32(file + VK32_OFF_ENTRY_COUNT);
     if (n < 1 || n > (u32)VK32_MAX_ENTRIES) return VK32_ERR_COUNT;
 
     /* 3. header_size (n <= 4 なので VK32_HEADER_SIZE は溢れない) */
-    hsz = rd32(file + VK32_OFF_HEADER_SIZE);
+    hsz = le_read32(file + VK32_OFF_HEADER_SIZE);
     if (hsz != VK32_HEADER_SIZE(n) || hsz > file_size) return VK32_ERR_HEADER;
 
     /* 4. 完全長 */
-    if (rd32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;
+    if (le_read32(file + VK32_OFF_IMAGE_SIZE(n)) != file_size) return VK32_ERR_LENGTH;
 
     /* 5. ファイル全体の CRC32 */
     crc_off = VK32_OFF_IMAGE_CRC(n);
-    if (vk32_file_crc(file, file_size, crc_off) != rd32(file + crc_off))
+    if (vk32_file_crc(file, file_size, crc_off) != le_read32(file + crc_off))
         return VK32_ERR_FILE_CRC;
 
     /* 6. 範囲 (展開の前に全エントリ) */
@@ -75,10 +71,10 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
         u32 addr, raw, off, csz;
 
         ent  = file + VK32_COMMON_SIZE + i * VK32_ENTRY_SIZE;
-        addr = rd32(ent + 0);
-        raw  = rd32(ent + VK32_ENTRY_OFF_RAW_SIZE);
-        off  = rd32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
-        csz  = rd32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
+        addr = le_read32(ent + 0);
+        raw  = le_read32(ent + VK32_ENTRY_OFF_RAW_SIZE);
+        off  = le_read32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
+        csz  = le_read32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
 
         if (off < hsz || off > file_size || csz > file_size - off)
             return VK32_ERR_SRC;
@@ -88,8 +84,8 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
         /* 読み込み域 (0x10000〜) は帯の下なので重ならない。エントリ同士だけ見る */
         for (j = 0; j < i; j++) {
             const u8 *e2 = file + VK32_COMMON_SIZE + j * VK32_ENTRY_SIZE;
-            u32 a2 = rd32(e2 + 0);
-            u32 r2 = rd32(e2 + VK32_ENTRY_OFF_RAW_SIZE);
+            u32 a2 = le_read32(e2 + 0);
+            u32 r2 = le_read32(e2 + VK32_ENTRY_OFF_RAW_SIZE);
             if (addr < a2 + r2 && a2 < addr + raw) return VK32_ERR_DST;
         }
     }
@@ -101,21 +97,21 @@ int vk32_boot(const u8 *file, u32 file_size, u8 *window, u32 *out_crc)
         int decoded;
 
         ent  = file + VK32_COMMON_SIZE + i * VK32_ENTRY_SIZE;
-        addr = rd32(ent + 0);
-        raw  = rd32(ent + VK32_ENTRY_OFF_RAW_SIZE);
-        off  = rd32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
-        csz  = rd32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
+        addr = le_read32(ent + 0);
+        raw  = le_read32(ent + VK32_ENTRY_OFF_RAW_SIZE);
+        off  = le_read32(ent + VK32_ENTRY_OFF_DATA_OFFSET);
+        csz  = le_read32(ent + VK32_ENTRY_OFF_COMPRESSED_SIZE);
         dst  = window + (addr - VK32_LOAD_MIN);
 
         decoded = boot_lz4_decode(file + off, (int)csz, dst, (int)raw);
         if (decoded < 0) return VK32_ERR_DECODE;
         if ((u32)decoded != raw) return VK32_ERR_RAW_SIZE;
         if (crc32_core_final(crc32_core_update(CRC32_INIT, dst, raw)) !=
-            rd32(file + VK32_OFF_ENTRY_CRC(n) + i * VK32_WORD_BYTES))
+            le_read32(file + VK32_OFF_ENTRY_CRC(n) + i * VK32_WORD_BYTES))
             return VK32_ERR_ENTRY_CRC;
     }
 
-    *out_crc = rd32(file + crc_off);
+    *out_crc = le_read32(file + crc_off);
     return VK32_OK;
 }
 

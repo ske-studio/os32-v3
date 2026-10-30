@@ -45,6 +45,7 @@ static volatile void *host_pegc_window(u32 pa)
 
 #include "../../drivers/video/pc98/backend_pegc.c"
 #include "../../drivers/char/np2sysp.c"
+#include "../../drivers/input/mouse_seamless.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
 /* カーネルは -Wall だけで組む (build/config.mk)。この試験の -Wextra -Werror で
  * console.c 側の既存の警告 2 種を止める (console.c そのものは写さず変えない)。 */
@@ -110,6 +111,8 @@ static u32 palette_writes;
 static int watch_stripe_init;
 static int fake_np2;
 static unsigned int fake_np2_pos;
+static const char *fake_np2_reply, *fake_mpos_reply;
+static unsigned int fake_mpos_cmd_pos;
 static int fake_unlock, fake_ext, fake_sys16m;
 
 static void ev_add(int kind, unsigned int port, unsigned int val)
@@ -167,7 +170,7 @@ unsigned int pegc_shim_inp(unsigned int port)
     } else if (port == PEGC_HSYNC_PORT) {
         v = fake_09a8_raw;
     } else if (port == NP2PORT_STR) {
-        const char *reply = fake_np2 ? "NP2" : "";
+        const char *reply = fake_np2_reply ? fake_np2_reply : (fake_np2 ? "NP2" : "");
         v = (u8)reply[fake_np2_pos];
         if (v) fake_np2_pos++;
     }
@@ -177,6 +180,14 @@ unsigned int pegc_shim_inp(unsigned int port)
 
 void pegc_shim_outp(unsigned int port, unsigned int value)
 {
+    if (port == NP2PORT_STR && fake_mpos_reply) {
+        /* getmpos の全バイトを受け取ってから新しい応答を公開する。 */
+        CHECK(value == (u8)"getmpos"[fake_mpos_cmd_pos]);
+        if (++fake_mpos_cmd_pos == 7) {
+            fake_np2_reply = fake_mpos_reply;
+            fake_np2_pos = fake_mpos_cmd_pos = 0;
+        }
+    }
     if (port == MODE_FF2_PORT) {
         if (value == PEGC_FF2_UNLOCK) fake_unlock = 1;
         if (value == PEGC_FF2_LOCK) fake_unlock = 0;
@@ -568,6 +579,7 @@ static void world_reset(void)
     kmemset(ledger_surfaces, 0, sizeof(ledger_surfaces));
     kmemset(&gfx_counters, 0, sizeof(gfx_counters));
     fake_np2 = 0; fake_np2_pos = 0;
+    fake_np2_reply = fake_mpos_reply = 0; fake_mpos_cmd_pos = 0;
     tick_count = stripe_delays = 0;
     palette_writes = 0; watch_stripe_init = 0;
     host_serial_reset(); host_serial_gate=0; printf_count=0;
@@ -1519,6 +1531,53 @@ static void case_mode_layout(void)
     output("PASS mode_layout (480 table, clear guards, transfer edge, DAC, shutdown)\n");
 }
 
+static void check_seamless_exchange(int start, const char *reply)
+{
+    /* mode=0 はちょうど4 OUT、その後に getmpos、最後に応答の IN。 */
+    for (int i = 0; i < 4; i++, start++) {
+        CHECK(start < ev_n && ev_kind[start] == EV_OUT);
+        CHECK(ev_port[start] == NP2PORT_VAL && ev_val[start] == 0);
+    }
+    for (int i = 0; i < 7; i++, start++) {
+        CHECK(start < ev_n && ev_kind[start] == EV_OUT);
+        CHECK(ev_port[start] == NP2PORT_STR && ev_val[start] == (u8)"getmpos"[i]);
+    }
+    int i = 0;
+    do {
+        CHECK(start < ev_n && ev_kind[start] == EV_IN);
+        CHECK(ev_port[start] == NP2PORT_STR && ev_val[start] == (u8)reply[i]);
+        start++;
+    } while (reply[i++]);
+    CHECK(start == ev_n);
+}
+
+static void case_seamless_exchange(void)
+{
+    static const char *const replies[] = { "65535,32768", "", "invalid" };
+    for (int i = 0; i < 2; i++) {
+        s_case = "seamless_init";
+        world_reset();
+        fake_mpos_reply = replies[i];
+        CHECK(seamless_mouse_init() == (i == 0));
+        check_seamless_exchange(0, replies[i]);
+    }
+    for (int i = 0; i < 3; i++) {
+        i16 x = -1, y = -1;
+        s_case = "seamless_poll";
+        world_reset();
+        fake_np2_reply = "old";
+        fake_mpos_reply = replies[i];
+        CHECK(seamless_mouse_poll(&x, &y) == (i == 0));
+        CHECK(x == (i == 0 ? 32767 : -1) && y == (i == 0 ? 16384 : -1));
+        for (int j = 0; j < 4; j++) {
+            CHECK(ev_kind[j] == EV_IN && ev_port[j] == NP2PORT_STR);
+            CHECK(ev_val[j] == (u8)"old"[j]);
+        }
+        check_seamless_exchange(4, replies[i]);
+    }
+    output("PASS seamless_exchange (init/poll mode=0, 4 OUT before command, drain, replies)\n");
+}
+
 void _start(void)
 {
     con_output_register(&capture_output);
@@ -1544,6 +1603,7 @@ void _start(void)
     case_fifo_busy();
     case_fifo_stuck();
     case_vsync_stuck();
-    output("PASS pegc_mode_host (20 cases)\n");
+    case_seamless_exchange();
+    output("PASS pegc_mode_host (21 cases)\n");
     finish(0);
 }

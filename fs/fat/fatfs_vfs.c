@@ -207,8 +207,9 @@ static int fatfs_vfs_list(void *ctx, const char *path, vfs_dir_cb cb, void *user
 }
 
 
-/* ======== ファイル読み込み (一括) ======== */
-static int fatfs_vfs_read(void *ctx, const char *path, void *buf, u32 max_size)
+/* 一括は seek せず、stream は offset が 0 でも seek する。 */
+static int ff_read_file(void *ctx, const char *path, void *buf, u32 size,
+                        u32 offset, int stream)
 {
     FatFsCtx *fc = (FatFsCtx *)ctx;
     int rc_path;
@@ -223,7 +224,12 @@ static int fatfs_vfs_read(void *ctx, const char *path, void *buf, u32 max_size)
     fr = f_open(&fil, fpath, FA_READ);
     if (fr != FR_OK) return ff_to_vfs(fr);
 
-    fr = f_read(&fil, buf, max_size, &br);
+    if (stream) {
+        fr = f_lseek(&fil, (FSIZE_t)offset);
+        if (fr != FR_OK) { f_close(&fil); return ff_to_vfs(fr); }
+    }
+
+    fr = f_read(&fil, buf, size, &br);
     f_close(&fil);
 
     if (fr != FR_OK) return ff_to_vfs(fr);
@@ -231,8 +237,16 @@ static int fatfs_vfs_read(void *ctx, const char *path, void *buf, u32 max_size)
 }
 
 
-/* ======== ファイル書き込み (一括) ======== */
-static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 size)
+/* ======== ファイル読み込み (一括) ======== */
+static int fatfs_vfs_read(void *ctx, const char *path, void *buf, u32 max_size)
+{
+    return ff_read_file(ctx, path, buf, max_size, 0, 0);
+}
+
+
+/* 一括は作り直し、stream は既存内容を残して offset へ移る。 */
+static int ff_write_file(void *ctx, const char *path, const void *data, u32 size,
+                         u32 offset, int stream)
 {
     FatFsCtx *fc = (FatFsCtx *)ctx;
     int rc_path;
@@ -244,8 +258,13 @@ static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 si
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
 
-    fr = f_open(&fil, fpath, FA_WRITE | FA_CREATE_ALWAYS);
+    fr = f_open(&fil, fpath, FA_WRITE | (stream ? FA_OPEN_ALWAYS : FA_CREATE_ALWAYS));
     if (fr != FR_OK) return ff_write_result(fc, fr);
+
+    if (stream) {
+        fr = f_lseek(&fil, (FSIZE_t)offset);
+        if (fr != FR_OK) { f_close(&fil); return ff_write_result(fc, fr); }
+    }
 
     fr = f_write(&fil, data, size, &bw);
     /* f_close は最後のセクタとディレクトリエントリ (サイズ・クラスタ鎖) を
@@ -259,6 +278,13 @@ static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 si
     if (fr != FR_OK) return ff_write_result(fc, fr);
     if (fr_close != FR_OK) return ff_write_result(fc, fr_close);
     return (int)bw;
+}
+
+
+/* ======== ファイル書き込み (一括) ======== */
+static int fatfs_vfs_write(void *ctx, const char *path, const void *data, u32 size)
+{
+    return ff_write_file(ctx, path, data, size, 0, 0);
 }
 
 
@@ -347,55 +373,14 @@ static int fatfs_vfs_get_size(void *ctx, const char *path, u32 *size)
 /* ======== ストリーム読み込み (オフセット指定) ======== */
 static int fatfs_vfs_read_stream(void *ctx, const char *path, void *buf, u32 size, u32 offset)
 {
-    FatFsCtx *fc = (FatFsCtx *)ctx;
-    int rc_path;
-    char fpath[VFS_MAX_PATH];
-    FIL fil;
-    FRESULT fr;
-    UINT br;
-
-    rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
-    if (rc_path != VFS_OK) return rc_path;
-
-    fr = f_open(&fil, fpath, FA_READ);
-    if (fr != FR_OK) return ff_to_vfs(fr);
-
-    fr = f_lseek(&fil, (FSIZE_t)offset);
-    if (fr != FR_OK) { f_close(&fil); return ff_to_vfs(fr); }
-
-    fr = f_read(&fil, buf, size, &br);
-    f_close(&fil);
-
-    if (fr != FR_OK) return ff_to_vfs(fr);
-    return (int)br;
+    return ff_read_file(ctx, path, buf, size, offset, 1);
 }
 
 
 /* ======== ストリーム書き込み (オフセット指定) ======== */
 static int fatfs_vfs_write_stream(void *ctx, const char *path, const void *data, u32 size, u32 offset)
 {
-    FatFsCtx *fc = (FatFsCtx *)ctx;
-    int rc_path;
-    char fpath[VFS_MAX_PATH];
-    FIL fil;
-    FRESULT fr, fr_close;
-    UINT bw;
-
-    rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
-    if (rc_path != VFS_OK) return rc_path;
-
-    fr = f_open(&fil, fpath, FA_WRITE | FA_OPEN_ALWAYS);
-    if (fr != FR_OK) return ff_write_result(fc, fr);
-
-    fr = f_lseek(&fil, (FSIZE_t)offset);
-    if (fr != FR_OK) { f_close(&fil); return ff_write_result(fc, fr); }
-
-    fr = f_write(&fil, data, size, &bw);
-    fr_close = f_close(&fil);
-
-    if (fr != FR_OK) return ff_write_result(fc, fr);
-    if (fr_close != FR_OK) return ff_write_result(fc, fr_close);
-    return (int)bw;
+    return ff_write_file(ctx, path, data, size, offset, 1);
 }
 
 

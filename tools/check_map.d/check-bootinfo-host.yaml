@@ -28,6 +28,7 @@ check-bootinfo-host:
 - include/types.h
 - arch/x86/kernel/gdt.h
 - lib/kstring.h
+- lib/le_internal.h
 - boot/vk32_defs.inc
 - boot/lz4_defs.inc
 - boot/crc32_defs.inc

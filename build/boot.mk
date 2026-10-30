@@ -55,7 +55,7 @@ $(BOOT_OUT)/lz4_mini.o: boot/lz4_mini.c boot/boot_defs.h
 
 # VK32 v2 の検査と展開 (票 TASK_SERIAL_HOSTFS A-4)。CRC32 の核は
 # lib/crc32_core.inc (カーネル・hsync と同じ) を #include する。
-$(BOOT_OUT)/vk32_boot.o: boot/vk32_boot.c boot/boot_defs.h lib/crc32_core.inc
+$(BOOT_OUT)/vk32_boot.o: boot/vk32_boot.c boot/boot_defs.h lib/crc32_core.inc lib/le_internal.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
 

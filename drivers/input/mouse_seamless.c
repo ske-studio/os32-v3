@@ -30,10 +30,7 @@ int seamless_mouse_init(void)
     int len;
 
     /* mode=0 パラメータ送信 (4バイト、全て0) */
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
+    np2_send_val(0);
 
     /* getmpos コマンド送信 */
     np2_send_cmd("getmpos");
@@ -88,10 +85,7 @@ int seamless_mouse_poll(i16 *abs_x, i16 *abs_y)
     }
 
     /* mode=0 パラメータ送信 */
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
-    outp(NP2PORT_VAL, 0x00);
+    np2_send_val(0);
 
     /* getmpos コマンド送信 */
     np2_send_cmd("getmpos");

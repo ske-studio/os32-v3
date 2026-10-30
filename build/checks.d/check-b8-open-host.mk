@@ -7,6 +7,6 @@ CHECK_PAR_ORDER += 074:check-b8-open-host
 # 贋の NP21/W で動かし、OPEN の失敗が NOTFOUND に畳まれないことを見る。
 check-b8-open-host:
 	python3 -B tools/tests/test_b8_open.py --target
-	python3 -B tools/tests/test_b8_hostdrv.py --target
+	python3 -B tools/tests/test_b8_hostdrv.py --target $(MUT)
 
 .PHONY: check-b8-open-host

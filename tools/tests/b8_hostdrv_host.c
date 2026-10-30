@@ -193,6 +193,7 @@ static u8  t_directory;         /* FileStandardInformation.Directory */
 static u32 t_attributes;        /* FileBasicInformation.FileAttributes */
 static u64 t_last_write;        /* FileBasicInformation.LastWriteTime */
 static int t_no_response;       /* 1 = 応答しない (番兵のまま) */
+static u32 t_setinfo_status;
 
 /* 観測 */
 static int t_create_calls;
@@ -203,6 +204,13 @@ static u32 t_last_disposition;  /* 直前の CREATE の disposition */
  * 既存ファイルを 0 バイトにするので、IRP_MJ_WRITE が 1 度も来なくても
  * (0 バイト書き込みは WRITE を出さない) 中身は消える。 */
 static int t_overwrite_creates;
+static u32 t_last_options;
+static u32 t_last_access;
+static u32 t_last_info_class;
+static u32 t_last_info_length;
+static u8 t_delete_on_close;
+static u8 t_commands[8];
+static u32 t_command_count;
 
 static void t_reset(void)
 {
@@ -218,6 +226,11 @@ static void t_reset(void)
     t_setinfo_calls = 0;
     t_last_disposition = 0;
     t_overwrite_creates = 0;
+    t_setinfo_status = NP2_STATUS_SUCCESS;
+    t_last_options = t_last_access = 0;
+    t_last_info_class = t_last_info_length = 0;
+    t_delete_on_close = 0;
+    t_command_count = 0;
 }
 
 unsigned int hdrv_shim_inp(unsigned int port)
@@ -232,11 +245,16 @@ static void hdrv_fake_emulator(void)
 {
     u32 major = g_stack.majorFunction;
 
+    if (t_command_count < sizeof(t_commands))
+        t_commands[t_command_count] = (u8)major;
+    t_command_count++;
     if (t_no_response) return;      /* 番兵のまま = 応答なし */
 
     if (major == NP2_IRP_MJ_CREATE) {
         t_create_calls++;
         t_last_disposition = g_stack.parameters.create.options >> 24;
+        t_last_options = g_stack.parameters.create.options & NP2_CREATE_OPTIONS_MASK;
+        t_last_access = g_secctx.DesiredAccess;
         if (t_last_disposition == NP2_FILE_OVERWRITE_IF) t_overwrite_creates++;
         g_iostatus.Status = t_create_status;
         return;
@@ -283,7 +301,10 @@ static void hdrv_fake_emulator(void)
 
     if (major == NP2_IRP_MJ_SET_INFORMATION) {
         t_setinfo_calls++;
-        g_iostatus.Status = NP2_STATUS_SUCCESS;
+        t_last_info_class = g_stack.parameters.setFile.FileInformationClass;
+        t_last_info_length = g_stack.parameters.setFile.Length;
+        t_delete_on_close = ((volatile Np2FileDispositionInfo *)g_databuf)->DeleteFileOnClose;
+        g_iostatus.Status = t_setinfo_status;
         return;
     }
 
@@ -629,6 +650,54 @@ static void case_strict_names(void)
     CHECK(t_create_calls == 1 && t_setinfo_calls == 1);
 }
 
+/* D05: VfsOps の両入口で属性・失敗・削除指定から close までの列を固定する。 */
+static void case_delete_entries(void)
+{
+    static const u32 statuses[] = {
+        NP2_STATUS_SUCCESS, NP2_STATUS_SHARING_VIOLATION,
+        NP2_STATUS_OBJECT_NAME_NOT_FOUND, NP2_STATUS_ACCESS_DENIED
+    };
+    static const int results[] = {
+        VFS_OK, VFS_ERR_IO, VFS_ERR_NOTFOUND, VFS_ERR_IO
+    };
+    u32 dir, i;
+    int fail, rc;
+
+    report("  [D05] rmdir/unlink attributes, failures and SET/CLEANUP/CLOSE order\n");
+    for (dir = 0; dir < 2; dir++) {
+        for (i = 0; i < sizeof(statuses) / sizeof(statuses[0]); i++) {
+            for (fail = 0; fail < 2; fail++) {
+                t_reset();
+                t_create_status = statuses[i];
+                if (fail) t_setinfo_status = NP2_STATUS_ACCESS_DENIED;
+                if (dir) rc = g_hostdrvfs_ops.rmdir((void *)0, "/item");
+                else rc = g_hostdrvfs_ops.unlink((void *)0, "/item");
+                CHECK(rc == ((i == 0 && fail) ? VFS_ERR_IO : results[i]));
+                CHECK(t_create_calls == 1);
+                CHECK(t_last_disposition == NP2_FILE_OPEN);
+                CHECK(t_last_options == ((dir ? NP2_FILE_DIRECTORY_FILE :
+                      NP2_FILE_NON_DIRECTORY_FILE) | NP2_FILE_SYNCHRONOUS_IO_NONALERT));
+                CHECK(t_last_access == NP2_DELETE);
+                CHECK(t_commands[0] == NP2_IRP_MJ_CREATE);
+                CHECK(g_namebuf[0] == '\\' && g_namebuf[1] == 'i');
+                if (i != 0) {
+                    CHECK(t_command_count == 1);
+                    CHECK(t_setinfo_calls == 0);
+                    continue;
+                }
+                CHECK(t_command_count == 4);
+                CHECK(t_commands[1] == NP2_IRP_MJ_SET_INFORMATION);
+                CHECK(t_commands[2] == NP2_IRP_MJ_CLEANUP);
+                CHECK(t_commands[3] == NP2_IRP_MJ_CLOSE);
+                CHECK(t_setinfo_calls == 1);
+                CHECK(t_last_info_class == NP2_FileDispositionInformation);
+                CHECK(t_last_info_length == sizeof(Np2FileDispositionInfo));
+                CHECK(t_delete_on_close == 1);
+            }
+        }
+    }
+}
+
 static void run(void)
 {
     report("=== 票 B8 / P1-4: HostDrv の実物を通す ===\n");
@@ -638,6 +707,7 @@ static void run(void)
     case_no_truncate_on_open_failure();
     case_status_table();
     case_strict_names();
+    case_delete_entries();
 
     report("\n");
     report_i(g_checks);

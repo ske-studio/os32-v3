@@ -12,6 +12,7 @@ check-fdc-track-host:
 - arch/x86/kernel/isr_handlers.c
 - init/kernel.c
 - arch/x86/kernel/isr_stub.asm
+- arch/x86/kernel/iret_user.inc
 - tools/tests/fdc_hostshim/**
 - drivers/block/fdc_decide.c
 - drivers/block/fdc_track.c

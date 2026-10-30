@@ -223,20 +223,13 @@ static void _flip_page(void)
     gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */
 }
 
-/* ======================================================================== */
-/*  KAPI: 強制でダーティ領域をVSYNC同期転送する                           */
-/*                                                                          */
-/*  フリップモード時: VSYNC待ちなしで非表示ページに転送→ページ切替。       */
-/*  従来モード時: VSYNC待ち→転送 (従来動作維持)。                    */
-/* ======================================================================== */
-void __cdecl gfx_present_dirty(void)
+static void _present_dirty(int sync)
 {
-    u32 before = gfx_counters.present_bytes;
-    if (!bb_b) goto diag;
-    if (_present_dirty_packed()) goto diag;
+    if (!bb_b) return;
+    if (_present_dirty_packed()) return;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
-        if (dirty_queue.count == 0 && prev_dirty.count == 0) goto diag;
+        if (dirty_queue.count == 0 && prev_dirty.count == 0) return;
         gfx_counters.commits++;
         /* 今フレームのオリジナルdirtyを保存 (マージ前) */
         snapshot = dirty_queue;
@@ -245,13 +238,24 @@ void __cdecl gfx_present_dirty(void)
         prev_dirty = snapshot;
         _flip_page();
     } else {
-        if (dirty_queue.count == 0) goto diag;
+        if (dirty_queue.count == 0) return;
         gfx_counters.commits++;
-        /* VSYNC期間になるまで待つ */
-        while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
+        if (sync) {
+            /* VSYNC期間になるまで待つ */
+            while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
+        }
         _flush_dirty_queue();
     }
-diag:
+}
+
+/* ======================================================================== */
+/*  KAPI: 強制でダーティ領域をVSYNC同期転送する                           */
+/*  フリップモード時はVSYNC待ちなしで転送してページ切替。                 */
+/* ======================================================================== */
+void __cdecl gfx_present_dirty(void)
+{
+    u32 before = gfx_counters.present_bytes;
+    _present_dirty(1);
     gfx_diag_first_present(before);
     gfx_diag_px();
 }
@@ -265,23 +269,7 @@ diag:
 void __cdecl gfx_present_nosync(void)
 {
     u32 before = gfx_counters.present_bytes;
-    if (!bb_b) goto diag;
-    if (_present_dirty_packed()) goto diag;
-    if (gfx_flip_enabled) {
-        DirtyRectQueue snapshot;
-        if (dirty_queue.count == 0 && prev_dirty.count == 0) goto diag;
-        gfx_counters.commits++;
-        snapshot = dirty_queue;
-        _merge_prev_dirty();
-        _flush_dirty_queue();
-        prev_dirty = snapshot;
-        _flip_page();
-    } else {
-        if (dirty_queue.count == 0) goto diag;
-        gfx_counters.commits++;
-        _flush_dirty_queue();
-    }
-diag:
+    _present_dirty(0);
     gfx_diag_first_present(before);
 }
 

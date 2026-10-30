@@ -3,11 +3,10 @@
 /*  iノード読み書き — g_blk使用                                             */
 /* ======================================================================== */
 
-int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
+/* 既存ブロックを読み、他の inode を残したまま対象の位置を渡す。 */
+static int ext2_read_inode_block(Ext2Ctx *ctx, u32 ino, u32 *block_num, u8 **data)
 {
-    u32 group, index, block_num, offset_in_block;
-    int ret, i;
-    u8 *src;
+    u32 group, index, offset_in_block;
 
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
     if (ino == 0) return EXT2_ERR_NOTFOUND;
@@ -15,13 +14,24 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
     group = (ino - 1) / ctx->sb_info.inodes_per_group;
     index = (ino - 1) % ctx->sb_info.inodes_per_group;
     if (group >= ctx->num_groups) return EXT2_ERR_NOTFOUND;
-    block_num = ctx->gd_table[group].inode_table + (index * ctx->sb_info.inode_size) / EXT2_BLOCK_SIZE;
+    *block_num = ctx->gd_table[group].inode_table + (index * ctx->sb_info.inode_size) / EXT2_BLOCK_SIZE;
     offset_in_block = (index * ctx->sb_info.inode_size) % EXT2_BLOCK_SIZE;
 
-    ret = ext2_read_block(ctx, block_num, ext2_g_blk);
-    if (ret != 0) return EXT2_ERR_IO;
+    if (ext2_read_block(ctx, *block_num, ext2_g_blk) != 0) return EXT2_ERR_IO;
 
-    src = &ext2_g_blk[offset_in_block];
+    *data = &ext2_g_blk[offset_in_block];
+    return EXT2_OK;
+}
+
+int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
+{
+    u32 block_num;
+    int ret, i;
+    u8 *src;
+
+    ret = ext2_read_inode_block(ctx, ino, &block_num, &src);
+    if (ret != 0) return ret;
+
     inode->mode  = le16_rd(&src[EXT2_INODE_MODE_OFF]);
     inode->uid   = le16_rd(&src[EXT2_INODE_UID_OFF]);
     inode->size  = le32_rd(&src[EXT2_INODE_SIZE_OFF]);
@@ -48,23 +58,13 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
 
 int ext2_write_inode(Ext2Ctx *ctx, u32 ino, const Ext2Inode *inode)
 {
-    u32 group, index, block_num, offset_in_block;
+    u32 block_num;
     int ret, i;
     u8 *dst;
 
-    if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
-    if (ino == 0) return EXT2_ERR_NOTFOUND;
+    ret = ext2_read_inode_block(ctx, ino, &block_num, &dst);
+    if (ret != 0) return ret;
 
-    group = (ino - 1) / ctx->sb_info.inodes_per_group;
-    index = (ino - 1) % ctx->sb_info.inodes_per_group;
-    if (group >= ctx->num_groups) return EXT2_ERR_NOTFOUND;
-    block_num = ctx->gd_table[group].inode_table + (index * ctx->sb_info.inode_size) / EXT2_BLOCK_SIZE;
-    offset_in_block = (index * ctx->sb_info.inode_size) % EXT2_BLOCK_SIZE;
-
-    ret = ext2_read_block(ctx, block_num, ext2_g_blk);
-    if (ret != 0) return EXT2_ERR_IO;
-
-    dst = &ext2_g_blk[offset_in_block];
     le16_wr(&dst[EXT2_INODE_MODE_OFF], inode->mode);
     le16_wr(&dst[EXT2_INODE_UID_OFF], inode->uid);
     le32_wr(&dst[EXT2_INODE_SIZE_OFF], inode->size);

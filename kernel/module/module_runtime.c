@@ -1,3 +1,4 @@
+#include "le_internal.h"
 #include "module_runtime.h"
 #include "../../mm/pgalloc.h"
 #include "memmap.h"
@@ -7,10 +8,6 @@
 STATIC_ASSERT(MODULE_PAGE_SIZE == PAGE_SIZE, module_runtime_page_size);
 struct module_record module_records[MODULE_RECORD_CAP];
 
-static u32 read_word(const u8 *p)
-{
-    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
-}
 
 struct module_record *module_record_get(struct module_handle h)
 {
@@ -66,7 +63,7 @@ int module_load(const struct module_request *q, struct module_handle *out)
     rc = MODULE_SHORT_READ;
     if (vfs_fstat(fd, &st) < 0 ||
         vfs_read_fd(fd, header, sizeof(header)) != (int)sizeof(header)) goto rejected;
-    r->pair_crc = read_word(header + MI_PAIR_CRC * MODULE_WORD_BYTES);
+    r->pair_crc = le_read32(header + MI_PAIR_CRC * MODULE_WORD_BYTES);
     rc = module_image_header(header, sizeof(header), st.st_size, &q->policy, &plan);
     if (rc) goto rejected;
     r->state = MODULE_HEADER_CHECKED;
@@ -92,14 +89,14 @@ int module_load(const struct module_request *q, struct module_handle *out)
     r->state = MODULE_VALIDATED;
     /* relocate validates export count/unique slots against generated policy. */
     for (u32 i = 0; i < h[MI_IMPORT_COUNT]; i++) {
-        u32 off = read_word(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
+        u32 off = le_read32(image + h[MI_IMPORT_OFF] + i * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
         kmemcpy(body + off, &q->imports[i], sizeof(u32));
     }
     r->exports[0] = h[MI_OPS_VERSION];
     for (u32 i = 0; i < h[MI_EXPORT_COUNT]; i++) {
         const u8 *rec = image + h[MI_EXPORT_OFF] + i * MODULE_RECORD_SIZE;
         u32 slot = (u32)rec[MODULE_EXPORT_SLOT_OFF] | ((u32)rec[MODULE_EXPORT_SLOT_OFF + 1] << 8);
-        r->exports[slot] = r->base + read_word(rec + MODULE_EXPORT_ADDR_OFF);
+        r->exports[slot] = r->base + le_read32(rec + MODULE_EXPORT_ADDR_OFF);
     }
     r->prefix_pages = h[MI_PAYLOAD_OFF] / PAGE_SIZE;
     r->text = r->base + h[MI_TEXT_OFF];
