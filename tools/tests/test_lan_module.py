@@ -3,6 +3,7 @@
 LB's real driver/PCI and SerialFS transport regressions remain separate checks.
 This suite establishes the owner lifetime across those callbacks, not NIC I/O.
 """
+from kernel_boot_source import kernel_source
 import json
 import os
 from pathlib import Path
@@ -82,7 +83,7 @@ def product_image(folder):
 def boot_distribution():
     """FD plan and boot placement are independent of optional service modes."""
     import mkpkg
-    kernel = (ROOT / 'init/kernel.c').read_text()
+    kernel = kernel_source(ROOT)
     begin = kernel.index('services_stage = SERVICES_ROOT_READY;')
     end = kernel.index('services_boot();', begin)
     boot = kernel[begin:end]

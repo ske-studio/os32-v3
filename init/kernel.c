@@ -104,15 +104,15 @@ static void __attribute__((cold)) boot_diag_exec(const char *path, int rc, int g
 extern u32 sys_mem_kb;
 
 
-/* kernel_main から抜き出した補助。本体は kernel_main の後に置く
- * (ホスト試験が kernel.c を文字の位置で切り出すため)。 */
+/* 起動段の補助は同じ翻訳単位の .inc に置く。 */
+static void kernel_boot_cpu(u32 mem_kb, struct boot_context *boot);
+static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot);
+static void kernel_gfx_config(void);
 static inline void kernel_shell_loop(void);
 static inline void kernel_mount_children(const char *root_dev);
 
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
-    char tmp[BOOT_STATUS_NUM_BUFSIZE];
-    int mb;
     struct boot_context boot;
 
     kstack_hw_init();
@@ -132,88 +132,9 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * **paging_init より前** に済ませる: ページングを張る範囲も pgalloc の
      * 表の大きさも、ここで決まった量から導かれる。 */
     mem_kb = memory_boot_detect(mem_kb);
-    mb = mem_kb / KIB;
     sys_mem_kb = mem_kb;
     
-    tvram_clear();
-    console_hw_cursor_enable();   /* GDC カーソル表示 ON (以後は出力に追従) */
-
-    tvram_print(0, 0, "PC-9801 OS32 booting...", TATTR_CYAN);
-    
-    /* メモリ量表示 (例: " (16MB)") */
-    {
-        int i, digit, scale = 1000, seen = 0;
-        tmp[0] = ' '; tmp[1] = '(';
-        /* 16MB 上限を撤廃したので 4 桁ぶん取る (先行ゼロ抑制)。 */
-        for (i = 0; i < 4; i++) {
-            digit = (mb / scale) % 10;
-            if (digit) seen = 1;
-            tmp[2 + i] = (seen || i == 3) ? (char)('0' + digit) : ' ';
-            scale /= 10;
-        }
-        tmp[6] = 'M'; tmp[7] = 'B'; tmp[8] = ')'; tmp[9] = '\0';
-    }
-    tvram_print(24, 0, tmp, TATTR_CYAN);
-
-    /* GDT 再構築 (ブートローダーのGDTから安全な場所へ移行) */
-    tvram_print(0, 1, "GDT...", TATTR_GREEN);
-    extern void gdt_init(void);
-    gdt_init();
-    tvram_print(6, 1, "OK  ", TATTR_WHITE);
-
-    /* TSS (V86 モードに必須: #GP 時の Ring0 スタックと I/O 許可ビットマップ)
-     * GDT のエントリ3を使うので gdt_init の直後に呼ぶ。
-     * ESP0 は V86 突入直前に v86_enter が実際の ESP へ差し替える。 */
-    tss_init(MEM_KSTACK_TOP);
-    double_fault_init();
-
-    /* IDT/PIC/PIT 初期化 */
-    tvram_print(12, 1, "IDT...", TATTR_GREEN);
-    idt_init();
-    tvram_print(18, 1, "OK  ", TATTR_WHITE);
-
-
-
-    tvram_print(24, 1, "PIC...", TATTR_GREEN);
-    pic_init();
-    tvram_print(30, 1, "OK  ", TATTR_WHITE);
-
-    /* PIT の分周は機械のシステムクロック次第 (1.9968MHz / 2.4576MHz)。
-     * **pit_init より前に 1 回だけ** 0000:0501h を読む。paging_init より
-     * 前なので PG=0、低位物理がそのまま見える (票 §1-0、§4-54)。 */
-    sysclk_detect();
-
-    boot_platform_run(BOOT_DMA, &boot);
-
-    tvram_print(36, 1, "PIT...", TATTR_GREEN);
-    pit_init(PIT_HZ);
-    tvram_print(42, 1, "OK  ", TATTR_WHITE);
-    /* どちらのクロックで分周したかを出す。**NP21/W では常に 1.9968M** なので、
-     * 実機で 2.4576M が出ていることがこの修正の目視確認になる。 */
-    tvram_print(11, 2, sysclk_is_8mhz() ? "PIT 1.9968M" : "PIT 2.4576M",
-                TATTR_WHITE);
-
-    /* タイマとカスケード有効化 */
-    irq_enable(0);
-    irq_enable(ICU_SLAVEID);
-
-    /* CPU速度キャリブレーション (PITベース) */
-    tvram_print(0, 2, "CPU...", TATTR_GREEN);
-    _enable();  /* タイマー割り込み許可 (キャリブレーションに必要) */
-    cpu_calibrate();
-    {
-        u32 lpt = cpu_loops_per_tick();
-        int k = (int)(lpt / 1000);
-        char cpubuf[12];
-        int pos = 0;
-        /* 簡易数値→文字列変換 (0-999K) */
-        if (k >= 100) { cpubuf[pos++] = '0' + (k / 100) % 10; }
-        if (k >= 10)  { cpubuf[pos++] = '0' + (k / 10) % 10; }
-        cpubuf[pos++] = '0' + k % 10;
-        cpubuf[pos++] = 'K';
-        cpubuf[pos] = '\0';
-        tvram_print(6, 2, cpubuf, TATTR_WHITE);
-    }
+    kernel_boot_cpu(mem_kb, &boot);
 
     boot_platform_run(BOOT_INPUT, &boot);
 
@@ -264,76 +185,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     boot_platform_run(BOOT_CLOCK, &boot);
 
-    /* ページング初期化 (メモリ保護有効化) */
-    tvram_print(37, 2, "PAGE...", TATTR_GREEN);
-    paging_init(mem_kb);
-    tvram_print(44, 2, "OK", TATTR_WHITE);
-
-    /* コンベンショナルメモリ再利用 (ブート後のローダー領域等を解放) */
-    paging_reclaim_conventional();
-
-    boot_platform_run(BOOT_FONT, &boot);
-
-    /* FPU 初期化 (paging_init の後で CR0 に対して設定)
-     * CR0.EM=0 (ネイティブFPU使用), CR0.TS=0 (タスクスイッチ不要)
-     * SQLite が double 演算を使用するため必須 */
-    {
-        u32 cr0_val;
-        __asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));
-        cr0_val &= ~((u32)(CR0_EM | CR0_TS));  /* EM(bit2) と TS(bit3) をクリア */
-        __asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");
-        __asm__ volatile("fninit");
-    }
-
-    /* 物理ページフレームアロケータ初期化 (paging_initの後) */
-    if (!memory_boot_init(mem_kb)) {
-        kprintf(KLOG_ATTR, "[MEM] bootstrap/stage failed; boot halted\n");
-        for (;;) { _stop(); }
-    }
-
-    /* 共有メモリ初期化 (ガードページ設定 + R/W設定) */
-    shm_init();
-    if (paging_boot_user_shared(exec_tramp_page_addr()) != 0) {
-        kprintf(KLOG_ATTR, "[MEM] shared USER boot failed; boot halted\n");
-        for (;;) { _stop(); }
-    }
-
-    /* D の予約・恒等写像確認の後だけ池を使う。自己診断は池を
-     * 再初期化するので、PCI/PCM が span を取るより前に済ませる。 */
-    if (memory_boot_dma_available()) {
-        dma_pool_init();
-    } else {
-        kprintf(KLOG_ATTR, "[dma] RAM short; pool/PCI/PCM skipped\n");
-    }
-    v86_module_load(); /* Core facades are ready before kdebug selftests. */
-    kdebug_load();
-    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();
-    else kselftest_skipped();
-
-    /* POST_ROOT: the loader needs root, paging and the page ledger. CD is
-     * independent of services_boot, so MINIMAL/SQLITE_ONLY can read packages. */
-    cd_module_load();
-    /* Page owners exist now; failure retains the TVRAM CUI. */
-    kcg_module_load();
-    kernel_mount_children(boot.root_dev);
-
-    services_stage = SERVICES_ROOT_READY;
-    kprintf(KLOG_ATTR, "[services] ROOT_READY tick=%u\n", tick_count);
-    unicode_file_load();
-    services_stage = SERVICES_UNICODE;
-
-    boot_platform_run(BOOT_PCI_RESOURCES, &boot);
-
-    if (memory_boot_dma_available()) {
-        lan_module_load();
-    }
-    lan_module_pci_bind_fallback();
-
-    /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
-     * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */
-    if (memory_boot_dma_available()) {
-        pcm_module_load();
-    }
+    kernel_boot_memory(mem_kb, &boot);
 
     /* FDリダイレクト初期化 (プログラムローダーより前に) */
     fd_redirect_init();
@@ -341,39 +193,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     /* パイプバッファ初期化 */
     pipe_buffer_init();
 
-    /* グラフィクスバックエンドの強制指定 (票 H2b、契約 G5)。
-     * /etc/system.cfg の GFX= を **⑥ (gfx_boot_reserve) より前** に読んで HAL
-     * へ渡す — 予約・写像・BB の候補は GFX= と識別で決まる (TASK_T1_LEDGER
-     * §3-3 ⑥、T1e で exec_init の前へ前倒し。依存は vfs_read だけで、ルートは
-     * マウント済み)。
-     *   GFX=pc98   9801 プレーン強制 (NP21/W でプレーン経路を回帰試験する)
-     *   GFX=pegc   PEGC 強制 (probe が通らなければ 9801)
-     *   GFX=cirrus Cirrus GD54xx 強制 (probe が通らなければ 9801、票 H3)
-     *   未指定     auto = probe 順 (Cirrus → PEGC → 9801)
-     * K4 の GUI= と同じ流儀: ここで読み、サブシステム側の変数へ渡す。 */
-    {
-        char gfxmode[16];
-        char gfmode[16] = {0};
-        (void)sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfmode, sizeof(gfmode));
-        gf_production_configure(gfmode, sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0));
-        if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFXDIAG", gfxmode, sizeof(gfxmode)) > 0) {
-            gfx_diag_stripes = kstrcmp(gfxmode, "stripes") == 0;
-            gfx_diag_altwin = kstrcmp(gfxmode, "altwin") == 0;
-        }
-        if (sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfxmode, (int)sizeof(gfxmode)) > 0) {
-            if (kstrcmp(gfxmode, "pc98") == 0) {
-                gfx_set_backend_pref(GFX_PREF_PC98);
-            } else if (kstrcmp(gfxmode, "pegc") == 0) {
-                gfx_set_backend_pref(GFX_PREF_PEGC);
-            } else if (kstrcmp(gfxmode, "geforce") == 0) {
-                gfx_set_backend_pref(gfx_geforce_pref(sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0)));
-            } else if (kstrcmp(gfxmode, "cirrus") == 0) {
-                gfx_set_backend_pref(GFX_PREF_CIRRUS);
-            } else {
-                gfx_set_backend_pref(GFX_PREF_AUTO);   /* auto / 未知の値 */
-            }
-        }
-    }
+    kernel_gfx_config();
 
     /* ⑥ gfx の識別 → 候補の窓の一括予約 (owner = DEVICE gfx) → 写像 → PEGC の
      * BB (池のアリーナ内の上端、owner = boot) → SURFACE → CPL=0 子のアリーナの
@@ -452,6 +272,10 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
         _halt();
     }
 }
+
+#include "kernel_boot_cpu.inc"
+#include "kernel_boot_memory.inc"
+#include "kernel_gfx_config.inc"
 
 /* ルート以外のブロックデバイスを "/<名前>" にマウントする。ルートは起動情報で選んだ名前
  * を受け取り除く。CD は iso9660 だけ、他は ext2 → iso9660 → fat の

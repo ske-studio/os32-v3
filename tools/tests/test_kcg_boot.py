@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T7a-1b: real legacy KAPI stubs, no low writes/file I/O; runtime mutants."""
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import argparse
 from pathlib import Path
@@ -59,7 +60,7 @@ def run(runner, mutation=None):
 
 
 def boot_order():
-    source = (ROOT/'init/kernel.c').read_text()
+    source = kernel_source(ROOT)
     assert 'boot_font_load' not in source and 'kcg_font_loaded' not in source
     assert 'kcg_boot_phase_close' not in source
     assert source.index('cd_module_load();') < source.index('kcg_module_load();')

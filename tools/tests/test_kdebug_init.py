@@ -1,6 +1,7 @@
 """S1a: actual init has no imports; actual loader rejects and recovers.
 記録: tools/tests/kdebug_init_tdd.md
 """
+from kernel_boot_source import kernel_source as read_kernel_source
 from kernel_includes import include_flags
 import argparse
 import json
@@ -143,7 +144,7 @@ def main():
                    ''.join('    (void (*)(void))' + targets.get(e['name'], 'kdebug_forbidden_import') + ',\n'
                            for e in meta['imports']) + '};\n' + exports[end:])
         (folder / 'loader_exports.c').write_text(exports)
-        kernel_source = (ROOT / 'init/kernel.c').read_text()
+        kernel_source = read_kernel_source(ROOT)
         (folder / 'kernel_selftest_dispatch.h').write_text(boot_dispatch(kernel_source))
         def build_loader(module_source, call_source=ROOT / 'kernel/module/kdebug_call.c'):
             command([*host, ROOT / 'tools/tests/kdebug_loader_host.c', call_source,
@@ -236,7 +237,7 @@ def main():
             without_gate = kernel_source
             for op in ('selftest_run', 'selftest_post_exec', 'selftest_post_unicode', 'selftest_post_probe'):
                 old = 'if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.' + op
-                assert old in without_gate
+                assert without_gate.count(old) == 1
                 without_gate = without_gate.replace(old, 'if (kdebug.ops.' + op + ') kdebug.ops.' + op)
             for label, module_text, kernel_text in (
                 ('loader-running-state', module_source.replace(assignment, ''), kernel_source),

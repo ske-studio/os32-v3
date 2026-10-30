@@ -1,3 +1,4 @@
+from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 #!/usr/bin/env python3
@@ -71,7 +72,7 @@ MUTATIONS = (
      'base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||', '', 'FAIL SHM foreign USER range'),
     ('shm-user-missing', 'mm/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
     ('v86-restore', 'mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
-    ('boot-order', 'init/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
+    ('boot-order', 'init/kernel_boot_memory.inc', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
      '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
     ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
@@ -93,7 +94,7 @@ def wiring(sources):
         # Both refusals precede any state change; font was added in T7b-a2.
         first = [line.strip() for line in e[start:].split('\n')[2:4]]
         assert first == ['if (font_guard_active) return OS32_ERR_BUSY;', guard], 'FAIL session exec gate'
-    k = sources['init/kernel.c']
+    k = kernel_source(ROOT, sources)
     boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kdebug.ops.selftest_run();'), 'FAIL boot before AS'
     assert k.count(boot) == 1, 'FAIL boot once'
@@ -110,11 +111,12 @@ def wiring(sources):
 
 def run(runner, mutation=None):
     paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
-    sources = {p: (ROOT/p).read_text() for p in paths}
+    sources = {p: (ROOT/p).read_text() for p in (*paths, *kernel_parts(ROOT))}
     if mutation:
         name, path, old, new, expected = mutation
         assert old in sources[path], name + ': mutation target'
         if name == 'boot-order':
+            assert sources[path].count(old) == sources[path].count('    shm_init();') == 1
             sources[path] = sources[path].replace('    shm_init();', '    shm_init();\n' + new, 1)
         elif name in ('owned-user', 'db-unreserved', 'db-shifted', 'kill-no-end'):
             sources[path] = sources[path].replace(old, new, 1)
