@@ -17,7 +17,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-CASES = ["bound_header", "bound_tail", "bound_aligned", "exec_bss_neighbour"]
+CASES = ["bound_header", "bound_tail", "bound_aligned", "exec_bss_neighbour",
+         "hole_and_errors", "stream_ranges"]
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
          "-D__cdecl="]
@@ -32,11 +33,38 @@ if __name__ == "__main__":
                        cwd=ROOT, check=True)
         print("HOST GNU11 -Werror COMPILE PASS", flush=True)
         failed = 0
-        cases = sys.argv[1:] or CASES
+        mutate = "--mutate" in sys.argv[1:]
+        cases = [arg for arg in sys.argv[1:] if arg != "--mutate"] or CASES
         for case in cases:
             rc = subprocess.run([str(exe), case], cwd=ROOT).returncode
             print(f"EXIT {case}={rc}", flush=True)
             failed += rc != 0
+        if mutate:
+            source = (ROOT / "fs/ext2/ext2_file.c").read_text()
+            mutants = [
+                ("stream-type", "if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)",
+                 "if (0) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)", "stream_ranges"),
+                ("stream-hole", "if (phys == 0) break;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;",
+                 "if (phys == 0) return EXT2_ERR_IO;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;", "hole_and_errors"),
+                ("file-error", "if (ret != 0) return EXT2_ERR_IO;\n        if (phys == 0) break;\n\n        to_copy = remaining;",
+                 "if (ret != 0) return (int)total_read;\n        if (phys == 0) break;\n\n        to_copy = remaining;", "hole_and_errors"),
+            ]
+            for name, old, new, case in mutants:
+                if source.count(old) != 1:
+                    raise RuntimeError(f"{name}: mutation marker occurs {source.count(old)} times")
+                mutated = tmp / "ext2_file_mutated.c"
+                mutated.write_text(source.replace(old, new))
+                fixture = tmp / "fixture.c"
+                fixture.write_text(SRC.read_text().replace(
+                    '#include "../../fs/ext2/ext2_file.c"',
+                    f'#include "{mutated}"'))
+                mutant_exe = tmp / "mutant"
+                subprocess.run(["gcc", *FLAGS, *INCLUDES, str(fixture), "-o", str(mutant_exe)],
+                               cwd=ROOT, check=True)
+                rc = subprocess.run([str(mutant_exe), case], cwd=ROOT).returncode
+                print(f"MUTANT {name} runtime rc={rc}", flush=True)
+                if rc == 0:
+                    failed += 1
         # 実物と同じフラグでクロスコンパイルも通ること ([C1] GNU11)
         subprocess.run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                         "-ffreestanding", "-fno-pie", "-fno-stack-protector",
