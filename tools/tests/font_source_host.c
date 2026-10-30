@@ -10,6 +10,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+/* Keep host size_t declarations; kstring.h also declares libc names with u32. */
+#include "types.h"
+#define __KSTRING_H
+u32 kstrlen(const char *s) { return (u32)strlen(s); }
+/* Match lib/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
+char *kstrlcpy(char *dst, const char *src, u32 size)
+{
+    u32 i;
+    if (size == 0) return dst;
+    for (i = 0; i + 1 < size && src[i]; i++) dst[i] = src[i];
+    dst[i] = '\0';
+    return dst;
+}
 #include "../../fs/vfs_fd.c"
 #ifdef FONT_SOURCE_HOST_APP_TOTAL
 #undef VFS_FONT_FD_MAX_APP_TOTAL
@@ -49,11 +62,11 @@ int vfs_resolve_path(const char *in, char *out, int size)
 {
     if (!in || !out || size <= 0) return VFS_ERR_INVAL;
     if ((int)strlen(in) + 1 > size) return VFS_ERR_NAMETOOLONG;
-    str_cpy(out, in, size);
+    kstrlcpy(out, in, (u32)size);
     return VFS_OK;
 }
 VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
-{ str_cpy(out, path, size); *ctx = &mock_ctx; return &mock_ops; }
+{ kstrlcpy(out, path, (u32)size); *ctx = &mock_ctx; return &mock_ops; }
 int vfs_path_kind(const char *path) { return kind_rc; }
 u32 vfs_path_dev(const char *path) { return 1; }
 u32 vfs_path_mount_generation(const char *path) { return 1; }
