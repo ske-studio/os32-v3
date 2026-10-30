@@ -73,6 +73,7 @@ check-mkmod-host:
 - kernel/module/kdebug_imports.def
 - mm/kmalloc.h
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - kernel/kaudit.c
 - kernel/kselftest.h
 - kernel/kstack_hw.h

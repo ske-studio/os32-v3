@@ -7,6 +7,7 @@ check-h4-backing-host:
 - tools/tests/kernel_layout.py
 - tools/tests/host_arch/**
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/paging.c
 - mm/pgalloc.c
 - mm/physmem.c

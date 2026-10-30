@@ -25,14 +25,12 @@ def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-appband-') as tmp:
         tmp = pathlib.Path(tmp)
         source = (ROOT / 'mm/paging.c').read_text()
-        kselftest = (ROOT / 'kdebug/kselftest.c').read_text()
-        ledger = kselftest[kselftest.index('static u32 ledger_persist_total(void)'):kselftest.index('/*  gfx の予約・BB・SURFACE')]
-        ledger = ledger[:ledger.rfind('/* ------------------------------------------------------------------------ */')]
+        ledger = (ROOT / 'kdebug/kselftest/ledger.inc').read_text()
         # This fixture tests ledger allocation/reclaim, not caller copies.
         # The real bounded boot helper is executed by test_access_walk.py.
-        boot_start = ledger.index('static void test_caller_boot(')
-        boot_end = ledger.index('static void test_ledger(void)')
-        ledger = ledger[:boot_start] + ledger[boot_end:]
+        boot_include = '#include "caller_boot.inc"\n'
+        assert ledger.count(boot_include) == 1
+        ledger = ledger.replace(boot_include, '')
         boot_call = '            if (phys) test_caller_boot(&as, phys);\n'
         assert ledger.count(boot_call) == 1
         ledger = ledger.replace(boot_call, '')

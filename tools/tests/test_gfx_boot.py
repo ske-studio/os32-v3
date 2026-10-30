@@ -42,7 +42,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = ('gfx/gfx_core.c', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c',
-           'kdebug/kselftest.c')
+           'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
 SLICE_BEGIN = 'enum { GFX_RES_PEGC'
@@ -115,7 +115,7 @@ def build(texts, tmp):
         (tmp / f'{unit}_host_source.c').write_text(source)
     (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
     # Execute the real planar boot assertion before and after owner transfer.
-    selftest = texts['kdebug/kselftest.c'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
+    selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
     end = selftest.index('"gfx:planar surface");', start) + len('"gfx:planar surface");')
     (tmp / 'gfx_planar_selftest.inc').write_text(selftest[start:end])
@@ -222,13 +222,13 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
-    ('selftest-old-planar-address', 'kdebug/kselftest.c',
+    ('selftest-old-planar-address', 'kdebug/kselftest/gfx_ledger.inc',
      'p->first >= MEM_POOL_BASE / PAGE_SIZE',
      'p->first * PAGE_SIZE == 0x6A000UL'),
-    ('selftest-fixed-planar-ram', 'kdebug/kselftest.c',
+    ('selftest-fixed-planar-ram', 'kdebug/kselftest/gfx_ledger.inc',
      'p->backing == LEDGER_SB_RAM &&',
      'p->backing == LEDGER_SB_FIXED_RAM &&'),
-    ('selftest-boot-owner-only', 'kdebug/kselftest.c',
+    ('selftest-boot-owner-only', 'kdebug/kselftest/gfx_ledger.inc',
      '(p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL)',
      '(p->owner == LEDGER_OWNER_BOOT)'),
     ('planar-pool-fails', 'gfx/gfx_core.c',

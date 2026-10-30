@@ -15,7 +15,7 @@ import host32
 from kernel_layout import linker_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRC = ['kdebug/kselftest.c', 'mm/paging.c', 'mm/pgalloc.c',
+TARGET_SRC = ['kdebug/kselftest.c', 'kdebug/kselftest/h4_backing.inc', 'mm/paging.c', 'mm/pgalloc.c',
               'exec/access_walk.c', 'mm/physmem.c', 'mm/dma_pool.c',
               'mm/dma_pool_math.c', 'lib/dma_contract.c',
               'drivers/block/fdc.c', 'drivers/block/fdc_decide.c']
@@ -48,6 +48,7 @@ def fixture_source():
     source = (ROOT / 'kdebug/kselftest.c').read_text()
     dispatch = source.split('int kselftest_run_post_exec(void)', 1)[1].split('\n}', 1)[0]
     assert dispatch.count('    test_h4_backing();') == 1
+    source = (ROOT / 'kdebug/kselftest/h4_backing.inc').read_text()
     start = source.index('/* T3b2: H-4(a) backing fixture.')
     return source[start:source.index('/* T3b2 end */', start)]
 

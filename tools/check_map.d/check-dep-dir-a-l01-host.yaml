@@ -64,6 +64,7 @@ check-dep-dir-a-l01-host:
 - drivers/dma/dma8237.c
 - drivers/block/fdc.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/dma_pool.c
 - init/kernel.c
 - include/pci_dev_contract.h

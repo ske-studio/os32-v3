@@ -41,6 +41,7 @@ check-trim-flow-host:
 - mm/kmalloc.c
 - mm/kmalloc.h
 - kdebug/kselftest.c
+- kdebug/kselftest/appmem.inc
 - mm/paging.c
 - mm/paging.h
 - mm/paging_app.c

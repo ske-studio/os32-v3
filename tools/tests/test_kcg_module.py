@@ -16,10 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def display_diagnostic(folder, blank_line=False):
-    source = (ROOT / 'kdebug/kselftest.c').read_text()
-    start = source.index('static void test_kcg_display_return(void)\n{')
-    end = source.index('\nint kselftest_run_post_unicode(void)', start)
-    source = source[start:end]
+    source = (ROOT / 'kdebug/kselftest/kcg_display_return.inc').read_text()
     if blank_line:
         assert source.count('DIAG_LINE = 4') == 1
         source = source.replace('DIAG_LINE = 4', 'DIAG_LINE = 0')

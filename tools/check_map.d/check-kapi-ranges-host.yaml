@@ -9,6 +9,7 @@ check-kapi-ranges-host:
 - exec/ring3_str.c
 - kapi/kapi_generated.c
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/paging.c
 - mm/pgalloc.c
 - mm/physmem.c

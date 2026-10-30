@@ -61,6 +61,7 @@ check-memory-host:
 - kernel/v86/v86.c
 - tools/tests/mutpar.py
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - tools/tests/app_band_pde_host.c
 - tools/tests/app_bb_overlap_host.c
 - tools/tests/device_reservation_stage_host.c

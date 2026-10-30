@@ -3,7 +3,7 @@ Only a fixed source closure is copied; compile failures never count as RED.
 """
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
-TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/shlib.c', 'kdebug/kselftest.c']
+TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/shlib.c', 'kdebug/kselftest/caller_boot.inc']
 
 import argparse
 import hashlib
@@ -18,7 +18,7 @@ FILES = {
     'paging': 'mm/paging.c', 'pgalloc': 'mm/pgalloc.c',
     'shlib': 'mm/shlib.c', 'access_walk': 'exec/access_walk.c',
     'redir_access': 'exec/redir_access.c',
-    'boot': 'kdebug/kselftest.c',
+    'boot': 'kdebug/kselftest/caller_boot.inc',
 }
 MUTANTS = [
     ('access_walk', '!sf->lease_count', '0', 'lease live reference'),
@@ -68,8 +68,6 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
     with tempfile.TemporaryDirectory(prefix='os32-d3-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
-            if key == 'boot':
-                body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             if mutant and mutant[3] == 'PS in both walk layers' and key == 'paging':
                 assert body.count(' || (pde & PTE_PS)') == 1
                 body = body.replace(' || (pde & PTE_PS)', '')

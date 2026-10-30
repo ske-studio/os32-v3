@@ -13,6 +13,7 @@ check-dma-pool-host:
 - drivers/block/fdc.c
 - drivers/block/fdc.h
 - kdebug/kselftest.c
+- kdebug/kselftest/**
 - mm/pgalloc.h
 - kernel/module/module.h
 - kernel/sqlite_engine.h
