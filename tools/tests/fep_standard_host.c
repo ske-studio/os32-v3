@@ -23,6 +23,7 @@ char *kstrncpy(char *d, const char *s, u32 n)
     d[i] = 0;
     return d;
 }
+#define kstrlcpy kstrncpy   /* lib/kstring.h と同じ別名 */
 char *kstrncat(char *d, const char *s, u32 n)
 {
     u32 used = kstrlen(d);
