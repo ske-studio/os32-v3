@@ -346,6 +346,8 @@ def load_tools(tools_dir):
     # 密閉の確認: 実物の build/nhd を NHD_LOCAL にしていない
     if nhd_deploy.NHD_LOCAL.startswith(str(ROOT / "build" / "nhd")):
         raise RuntimeError("NHD_LOCAL がリポジトリの build/nhd を指している: " + nhd_deploy.NHD_LOCAL)
+    # [D1] の停止確認は test_nhd_deploy_failure が見る。ここでは停止中として、後ろの門 (push の門) を試す。
+    nhd_deploy.np21w_ctl.Ctl.split_procs = lambda self, exe: ([], [])
     return pc98pt, nhd_deploy
 
 
