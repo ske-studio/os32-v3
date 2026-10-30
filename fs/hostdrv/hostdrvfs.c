@@ -819,15 +819,14 @@ static int hdrv_mkdir(void *ctx, const char *path)
     return VFS_OK;
 }
 
-static int hdrv_rmdir(void *ctx, const char *path)
+static int hdrv_delete(const char *path, u32 options_flags)
 {
     int rc;
     Np2FileDispositionInfo disp;
-    (void)ctx;
 
     session_begin();
     rc = hostdrv_create(path, NP2_FILE_OPEN,
-                        NP2_FILE_DIRECTORY_FILE | NP2_FILE_SYNCHRONOUS_IO_NONALERT,
+                        options_flags | NP2_FILE_SYNCHRONOUS_IO_NONALERT,
                         NP2_DELETE);
     if (rc < 0) return rc;   /* **畳まない** (票 B8 / P1-4) */
 
@@ -839,24 +838,16 @@ static int hdrv_rmdir(void *ctx, const char *path)
     return (rc == 0) ? VFS_OK : VFS_ERR_IO;
 }
 
+static int hdrv_rmdir(void *ctx, const char *path)
+{
+    (void)ctx;
+    return hdrv_delete(path, NP2_FILE_DIRECTORY_FILE);
+}
+
 static int hdrv_unlink(void *ctx, const char *path)
 {
-    int rc;
-    Np2FileDispositionInfo disp;
     (void)ctx;
-
-    session_begin();
-    rc = hostdrv_create(path, NP2_FILE_OPEN,
-                        NP2_FILE_NON_DIRECTORY_FILE | NP2_FILE_SYNCHRONOUS_IO_NONALERT,
-                        NP2_DELETE);
-    if (rc < 0) return rc;   /* **畳まない** (票 B8 / P1-4) */
-
-    disp.DeleteFileOnClose = 1;
-    rc = hostdrv_set_info(NP2_FileDispositionInformation, &disp, sizeof(disp));
-
-    hostdrv_cleanup_close();
-
-    return (rc == 0) ? VFS_OK : VFS_ERR_IO;
+    return hdrv_delete(path, NP2_FILE_NON_DIRECTORY_FILE);
 }
 
 static int hdrv_rename(void *ctx, const char *old_path, const char *new_path)

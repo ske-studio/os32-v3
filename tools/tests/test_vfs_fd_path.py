@@ -561,7 +561,8 @@ def check_hostwire(text=None):
         setup_create を呼ぶのは hostdrv_create だけ
       - hostdrv_create は setup_create の**前に** Win32 の規則で断る
       - rename の宛先 (hostdrv_create を通らない) は元を開く**前に**断る
-      - パスを受け取る VfsOps の口は全部 hostdrv_create(path, …) を通る"""
+      - パスを受け取る VfsOps の口は全部 hostdrv_create(path, …) を通る
+        (rmdir/unlink は属性付きの hdrv_delete 経由)"""
     import re
     src = text if text is not None else (ROOT / "fs/hostdrv/hostdrvfs.c").read_text(encoding="utf-8")
     bad = []
@@ -597,9 +598,17 @@ def check_hostwire(text=None):
     ops = re.findall(r"^static int (hdrv_\w+)\(void \*ctx, const char \*path", src, re.M)
     if len(ops) < 10:
         bad.append("パスを受け取る口が %d 本しか見つからない" % len(ops))
+    delete_flags = {"hdrv_rmdir": "NP2_FILE_DIRECTORY_FILE",
+                    "hdrv_unlink": "NP2_FILE_NON_DIRECTORY_FILE"}
     for name in ops:
-        if "hostdrv_create(path," not in (body(name) or ""):
+        if name in delete_flags:
+            call = "return hdrv_delete(path, %s);" % delete_flags[name]
+            if call not in (body(name) or ""):
+                bad.append(name + " が削除の属性を hdrv_delete へ渡さない")
+        elif "hostdrv_create(path," not in (body(name) or ""):
             bad.append(name + " が hostdrv_create(path, …) を通らない")
+    if "hostdrv_create(path," not in (body("hdrv_delete") or ""):
+        bad.append("hdrv_delete が hostdrv_create(path, …) を通らない")
     if "hostdrv_create(old_path," not in (body("hdrv_rename") or ""):
         bad.append("hdrv_rename が hostdrv_create(old_path, …) を通らない")
     for m in bad:
