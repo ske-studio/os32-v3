@@ -32,7 +32,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 
 | 何を入れたか | 検査 |
 |---|---|
-| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる、2026-10-28 に ROLES↔POLICY_DEV の相互リンクで落ちた)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version` (表の行の形を読む。2026-10-25 に 481a8bf6 で行に説明を足して CI の check が落ちた)。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す |
+| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる、2026-10-28 に ROLES↔POLICY_DEV の相互リンクで落ちた)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version` (表の行の形を読む。2026-10-25 に 481a8bf6 で行に説明を足して CI の check が落ちた)。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す |
 | 段・小さな取り込み | `CHECK_BASE=<最後の全体> ~/os32-tmp/bin/check_wt.sh <名札> <SHA>` (`make all` + `make -k check-changed`) |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた・tier-2 の push の 1 日後) | `~/os32-tmp/bin/check_wt.sh <名札> <SHA>` (全体) |
 
