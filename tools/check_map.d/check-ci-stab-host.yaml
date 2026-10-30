@@ -17,6 +17,7 @@ check-ci-stab-host:
 - fs/fat/fatfs/diskio.c
 - fs/ext2/ext2_super.c
 - fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_fmt_*.inc
 - tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py

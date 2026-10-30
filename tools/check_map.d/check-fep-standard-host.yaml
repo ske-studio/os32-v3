@@ -1,4 +1,5 @@
 check-fep-standard-host:
+- fs/ext2/ext2_fmt_*.inc
 - tools/tests/test_fep_standard.py
 - tools/tests/fep_standard_host.c
 - tools/tests/fep_budget_linux.c

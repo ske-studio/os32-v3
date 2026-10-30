@@ -4,6 +4,7 @@ check-b8-open-host:
 - fs/ext2/ext2_dir.c
 - fs/ext2/ext2_file.c
 - fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_fmt_*.inc
 - fs/ext2/ext2_inode.c
 - fs/ext2/ext2_super.c
 - fs/ext2/ext2_vfs.c

@@ -10,6 +10,7 @@ check-dep-dir-a-l05b-host:
 - tools/tests/test_dep_dir_a_l05b.py
 - fs/ext2/ext2_super.c
 - fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_fmt_*.inc
 - fs/fat/fatfs_vfs.c
 - fs/fat/fatfs/diskio.c
 - fs/fat/fatfs/diskio_os32.h
