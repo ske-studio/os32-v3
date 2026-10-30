@@ -55,7 +55,7 @@ PURE_CASES = ["pt_offsets", "pt_817", "pt_1663", "pt_reject", "ata_lba28",
               "ata_range", "ata_chs", "layout", "hdprep_geom", "hdprep_disk",
               "hdprep_mounts", "hdprep_plan"]
 PART_CASES = ["find_bios", "find_fail", "format_clamp", "format_at_16652",
-              "format_at_refuse", "mount_bounds", "format_geom", "legacy_hint"]
+              "format_at_refuse", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
 # e2fsck にかける format_at の大きさ (開始 2016、16/63 の RAM ディスク 64,512 セクタ)
 FSCK_SIZES = [16652, 20160, 36000, 62496]
 
@@ -162,6 +162,22 @@ C_MUTATIONS = [
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("drivers/block/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
+    # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
+    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "E03a: GDT/free count 更新より先に backup を作る"),
+    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "E03a: backup と bitmap/itable 初期化の順を逆にする"),
+    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "    (void)fmt_write_groups(&fmt_ctx, &lay);\n",
+     "E03a: fmt_write_groups の I/O 失敗後も次段へ進む"),
+    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "    (void)fmt_write_backups(&fmt_ctx, &lay);\n",
+     "E03a: fmt_write_backups の I/O 失敗後も次段へ進む"),
+    ("fs/ext2/ext2_fmt.c", "    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+     "    (void)fmt_init_groups(&fmt_ctx, &lay);\n",
+     "E03a: fmt_init_groups の I/O 失敗後も次段へ進む"),
 ]
 
 # ---- 否定側 (Python) ------------------------------------------------------------
@@ -853,7 +869,8 @@ MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/id
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2/ext2_super.c", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
-          "fs/ext2/ext2_file.c"]
+          "fs/ext2/ext2_file.c", "fs/ext2/ext2_fmt_write_groups.inc",
+          "fs/ext2/ext2_fmt_write_backups.inc", "fs/ext2/ext2_fmt_init_groups.inc"]
 PY_MIRROR = ["tools/pc98pt.py", "tools/nhd_deploy.py", "tools/deploy_protect.py",
              "tools/deploy_manifests.py", "tools/nhd_profile.py"]
 

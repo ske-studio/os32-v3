@@ -47,7 +47,7 @@ typedef struct {
 /* ===== Block 1: スーパーブロック =====
  * lay (ext2_layout_plan の結果) から SB を組んで block 1 に書く。
  * ext2_write_block の結果をそのまま返し、EXT2_ERR_IO への変換は呼び手がする。
- * s_free_blocks_count はここでは仮値 0 (ext2_format_range が後で埋める)。 */
+ * s_free_blocks_count はここでは仮値 0 (fmt_write_groups が後で埋める)。 */
 static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
 {
     ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
@@ -145,6 +145,10 @@ static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
     return EXT2_OK;
 }
 
+#include "ext2_fmt_write_groups.inc"
+#include "ext2_fmt_write_backups.inc"
+#include "ext2_fmt_init_groups.inc"
+
 /* [base_lba, base_lba + part_len) の中に sectors 分の ext2 を作る。
  * 呼び手 (ext2_format / ext2_format_at) が範囲を検証済みであること。
  * 大きさは ext2_layout_plan の固定点 — 最終グループに全メタデータが
@@ -152,12 +156,7 @@ static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
 static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
                              u32 sectors)
 {
-    u32 total_blocks, num_groups;
-    u32 inodes_per_group, inode_tbl_blocks_per_group;
-    u32 gdt_blocks;
-    u32 g, i;
     int ret;
-    GroupLayout gl;
     Ext2Layout lay;
     /* フォーマット用一時コンテキスト。
      * static — Ext2Ctx は解決済み経路の記憶 (票 S6-P) で 1.7KB 余りあり、
@@ -188,12 +187,6 @@ static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
     fmt_ctx.base_lba = base_lba;
     fmt_ctx.part_len = part_len;
 
-    total_blocks = lay.total_blocks;
-    num_groups = lay.num_groups;
-    inodes_per_group = lay.inodes_per_group;
-    inode_tbl_blocks_per_group = lay.itable_blocks;
-    gdt_blocks = lay.gdt_blocks;
-
     /* ===== Block 0: ブートブロック (ゼロクリア) ===== */
     ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
     ret = ext2_write_block(&fmt_ctx, 0, ext2_g_blk);
@@ -202,174 +195,17 @@ static int ext2_format_range(int ide_drive, u32 base_lba, u32 part_len,
     ret = fmt_write_super(&fmt_ctx, &lay);
     if (ret != 0) return EXT2_ERR_IO;
 
-    /* ===== GDT + 各グループのメタデータ初期化 ===== */
-    {
-        u32 total_free_blocks = 0;
+    ret = fmt_write_groups(&fmt_ctx, &lay);
+    if (ret != 0) return EXT2_ERR_IO;
 
-        /* まずGDTブロックをゼロクリアして書き込み準備 */
-        ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
+    ret = fmt_write_backups(&fmt_ctx, &lay);
+    if (ret != 0) return EXT2_ERR_IO;
 
-        /* 各グループのレイアウトを計算してGDTに書き込み */
-        for (g = 0; g < num_groups; g++) {
-            u32 gd_offset = (g * EXT2L_GD_SIZE) % EXT2_BLOCK_SIZE;
-            u32 overhead;
+    ret = fmt_init_groups(&fmt_ctx, &lay);
+    if (ret != 0) return EXT2_ERR_IO;
 
-            /* このグループのブロック範囲 */
-            gl.group_start = 1 + g * EXT2_BLOCKS_PER_GROUP_MAX; /* first_data_block=1 */
-            gl.blocks_in_group = EXT2_BLOCKS_PER_GROUP_MAX;
-            if (g == num_groups - 1) {
-                /* 最終グループ: 残りブロック */
-                gl.blocks_in_group = total_blocks - gl.group_start;
-            }
-            gl.inodes_in_group = inodes_per_group;
-            gl.inode_tbl_blocks = inode_tbl_blocks_per_group;
-
-            if (is_sparse_group(g)) {
-                /* スパースグループ: SB(1) + GDT(gdt_blocks) + bmap + imap + itable */
-                gl.block_bitmap = gl.group_start + 1 + gdt_blocks;
-                gl.inode_bitmap = gl.block_bitmap + 1;
-                gl.inode_table  = gl.inode_bitmap + 1;
-                gl.data_start   = gl.inode_table + gl.inode_tbl_blocks;
-                overhead = gl.data_start - gl.group_start;
-            } else {
-                /* 非スパースグループ: bmap + imap + itable のみ */
-                gl.block_bitmap = gl.group_start;
-                gl.inode_bitmap = gl.block_bitmap + 1;
-                gl.inode_table  = gl.inode_bitmap + 1;
-                gl.data_start   = gl.inode_table + gl.inode_tbl_blocks;
-                overhead = gl.data_start - gl.group_start;
-            }
-
-            /* GDTブロックの該当オフセットに書き込み */
-            if (gd_offset == 0 && g > 0) {
-                /* 新しいGDTブロックの先頭 → 前ブロックを書き込み済み → ゼロクリア */
-                ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            }
-
-            le32_wr(&ext2_g_blk[gd_offset + EXT2_GD_BLOCK_BITMAP_OFF], gl.block_bitmap);
-            le32_wr(&ext2_g_blk[gd_offset + EXT2_GD_INODE_BITMAP_OFF], gl.inode_bitmap);
-            le32_wr(&ext2_g_blk[gd_offset + EXT2_GD_INODE_TABLE_OFF], gl.inode_table);
-            /* free_blocks, free_inodes は後で設定 */
-            /* ルートディレクトリはグループ0のデータブロック1つを使用 */
-            if (g == 0) {
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_FREE_BLOCKS_OFF], (u16)(gl.blocks_in_group - overhead - 1));
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_FREE_INODES_OFF], (u16)(gl.inodes_in_group - EXT2_RESERVED_INODES));
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_USED_DIRS_OFF], 1); /* used_dirs (root) */
-                total_free_blocks += gl.blocks_in_group - overhead - 1;
-            } else {
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_FREE_BLOCKS_OFF], (u16)(gl.blocks_in_group - overhead));
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_FREE_INODES_OFF], (u16)gl.inodes_in_group);
-                le16_wr(&ext2_g_blk[gd_offset + EXT2_GD_USED_DIRS_OFF], 0);
-                total_free_blocks += gl.blocks_in_group - overhead;
-            }
-
-            /* GDTブロック末尾 or 最後のグループ → 書き込み */
-            if (gd_offset + EXT2L_GD_SIZE >= EXT2_BLOCK_SIZE || g == num_groups - 1) {
-                u32 gd_block = EXT2_GDT_FIRST_BLOCK + (g * EXT2L_GD_SIZE) / EXT2_BLOCK_SIZE;
-                ret = ext2_write_block(&fmt_ctx, gd_block, ext2_g_blk);
-                if (ret != 0) return EXT2_ERR_IO;
-            }
-        }
-
-        /* スーパーブロックのfree_blocks_countを更新 */
-        ret = ext2_read_block(&fmt_ctx, 1, ext2_g_blk);
-        if (ret != 0) return EXT2_ERR_IO;
-        le32_wr(&ext2_g_blk[EXT2_SB_FREE_BLOCKS_COUNT_OFF], total_free_blocks);
-        ret = ext2_write_block(&fmt_ctx, 1, ext2_g_blk);
-        if (ret != 0) return EXT2_ERR_IO;
-
-        /* ===== スパースグループへのSBバックアップ + GDTコピー ===== */
-        for (g = 1; g < num_groups; g++) {
-            u32 gs;
-            if (!is_sparse_group(g)) continue;
-            gs = 1 + g * EXT2_BLOCKS_PER_GROUP_MAX;
-
-            /* SBバックアップ: プライマリSBを読み、s_block_group_nrを変更 */
-            ret = ext2_read_block(&fmt_ctx, 1, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-            le16_wr(&ext2_g_blk[EXT2_SB_BLOCK_GROUP_NR_OFF], (u16)g);           /* s_block_group_nr = g */
-            ret = ext2_write_block(&fmt_ctx, gs, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-
-            /* GDTコピー: プライマリGDTを各ブロックごとにコピー */
-            for (i = 0; i < gdt_blocks; i++) {
-                ret = ext2_read_block(&fmt_ctx, EXT2_GDT_FIRST_BLOCK + i, ext2_g_blk);
-                if (ret != 0) return EXT2_ERR_IO;
-                ret = ext2_write_block(&fmt_ctx, gs + 1 + i, ext2_g_blk);
-                if (ret != 0) return EXT2_ERR_IO;
-            }
-        }
-
-        /* ===== 各グループのビットマップとinodeテーブルを初期化 ===== */
-        for (g = 0; g < num_groups; g++) {
-            u32 overhead, bmap_blk, imap_blk, itable_blk;
-
-            /* レイアウトを再計算 */
-            gl.group_start = 1 + g * EXT2_BLOCKS_PER_GROUP_MAX;
-            gl.blocks_in_group = EXT2_BLOCKS_PER_GROUP_MAX;
-            if (g == num_groups - 1) {
-                gl.blocks_in_group = total_blocks - gl.group_start;
-            }
-
-            if (is_sparse_group(g)) {
-                /* スパースグループ: SB + GDT + bmap + imap + itable */
-                bmap_blk   = gl.group_start + 1 + gdt_blocks;
-                imap_blk   = bmap_blk + 1;
-                itable_blk = imap_blk + 1;
-                overhead = (itable_blk + inode_tbl_blocks_per_group) - gl.group_start;
-            } else {
-                /* 非スパースグループ: bmap + imap + itable のみ */
-                bmap_blk  = gl.group_start;
-                imap_blk  = bmap_blk + 1;
-                itable_blk = imap_blk + 1;
-                overhead = 1 + 1 + inode_tbl_blocks_per_group;
-            }
-
-            /* ブロックビットマップ */
-            ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            /* オーバーヘッドブロックをマーク */
-            for (i = 0; i < overhead; i++) {
-                ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
-            }
-            /* グループ0: ルートディレクトリ用データブロック1つ */
-            if (g == 0) {
-                ext2_g_blk[overhead / BITS_PER_BYTE] |= (u8)(1 << (overhead % BITS_PER_BYTE));
-            }
-            /* グループ内のブロック数以降のビットを全て使用不可にマーク
-             * (ext2仕様: ビットマップのパディング部分は1) */
-            for (i = gl.blocks_in_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
-                ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
-            }
-            ret = ext2_write_block(&fmt_ctx, bmap_blk, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-
-            /* inodeビットマップ */
-            ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            if (g == 0) {
-                /* inode 1-10は予約 (ビット0-9) */
-                for (i = 0; i < EXT2_RESERVED_INODES; i++) {
-                    ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
-                }
-            }
-            /* inodes_per_group以降のビットを全て使用不可にマーク
-             * (ext2仕様: ビットマップのパディング部分は1) */
-            for (i = inodes_per_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
-                ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
-            }
-            ret = ext2_write_block(&fmt_ctx, imap_blk, ext2_g_blk);
-            if (ret != 0) return EXT2_ERR_IO;
-
-            /* inodeテーブル (ゼロクリア) */
-            ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            for (i = 0; i < inode_tbl_blocks_per_group; i++) {
-                ret = ext2_write_block(&fmt_ctx, itable_blk + i, ext2_g_blk);
-                if (ret != 0) return EXT2_ERR_IO;
-            }
-        }
-
-        ret = fmt_write_root(&fmt_ctx, gdt_blocks, inode_tbl_blocks_per_group);
-        if (ret != 0) return EXT2_ERR_IO;
-    }
+    ret = fmt_write_root(&fmt_ctx, lay.gdt_blocks, lay.itable_blocks);
+    if (ret != 0) return EXT2_ERR_IO;
 
     return EXT2_OK;
 }
