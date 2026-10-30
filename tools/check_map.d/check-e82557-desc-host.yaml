@@ -3,6 +3,7 @@ check-e82557-desc-host:
 - drivers/net/e82557/e82557_desc.h
 - drivers/net/e82557/e82557_regs.h
 - drivers/net/e82557/e82557.c
+- drivers/net/e82557/e82557_probe_reset_base.inc
 - tools/tests/e82557_desc_host.c
 - tools/tests/test_e82557_desc.py
 - tools/tests/test_e82557_drv.py
