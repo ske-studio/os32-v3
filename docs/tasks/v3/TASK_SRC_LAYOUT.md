@@ -299,18 +299,6 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
 
 L0 の後は、L1〜L3 のあいだ、`kernel/` `drivers/` `fs/` `gfx/` を触るほかの段 (TASK_REDUNDANCY の C 群など) を出さない。
 
-### 9-2. 道具 move_files.py の約束
+### 9-2. 手順・完了条件・取り込み
 
-- 入力は対応表 JSON (`[{"from": "mm/paging.c", "to": "mm/paging.c"}, …]`)。各段の実装者が書くのはこの JSON だけ (§3 の表から作る)。
-- `git mv` で移し、追跡ファイル全体 (docs/archive・docs/hw・第三者のコードの中身は除く) で旧パスを置き換える: 完全一致・語境界つき、`../` 付きの相対パスは新しい位置から計算し直す。`ROOT / 'kernel' / 'x.c'` のような分割したパスは一覧に出して手で直す (未確認 4)。
-- 生成物は入力 (`kernel/module/kdebug_imports.def`・`hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) を置き換えてから作り直す。
-- `build/config.mk` の -I に新しいディレクトリを足す (要判断 4 の仮: -I を足す)。パスで選ぶ規則 (`-Os`・DF_GUARD_TEST・`.FORCE`・fatfs の INC) は置換の対象に含め、取りこぼしはバイト比較で出る。
-
-### 9-3. 段の完了条件 (実装者)
-
-`make all` rc=0、`tools/build_compare.sh <段の基点> HEAD` で kernel・各 .mod・kdebug・hwdev・kernel-r1 がバイト一致、`tools/include_resolve.py` の解決先が前後で一致 (ファイルのパスの付け替えを除いて)、走査型の検査の走査ファイル数が前後で一致、`python3 tools/check_select.py --lint` rc=0。**バイト一致の例外 (L1 で判明、2026-10-30)**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「`build_compare` の関数ごとの差が検算値の定数の入れ替えだけ」(`movl $0x…` の 4 バイト) で一致とみなす。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外した。**試験は回さない** (L0 だけは道具の試験と、kernel.map のパスが変わるので PM が NP21/W で 1 回起動)。
-
-### 9-4. PM の取り込み
-
-レビュー: L0 は astra (ビルドの仕組みの変更)。L1〜L3 は対応表 JSON・build/*.mk・config.mk の差分と比較の結果を PM が読む (機械置換の本体は道具の出力で、比較が一致していればレビューに出さない — 道具そのものは L0 でレビュー済み)。
-取り込みの検査は `check_wt.sh` (移動の量なので全体の検査になる)。落ちた試験・検査のパスは PM の Opus サブエージェントか同じ実装者が直し、落ちた対象だけ回し直す。rc=0 で push、CI の build を待って次の段へ。
+正典は [SRC_MOVE.md](../../SRC_MOVE.md) (ソースの付け替え手順、ユーザー指示 2026-10-30「独立ドキュメント化して既存ドキュメントからは参照する形に」)。道具・1 段の手順・実装者の完了条件 (試験は回さない、バイト比較の例外)・PM の取り込み・段ごとに踏んだことはそこだけを更新する。
