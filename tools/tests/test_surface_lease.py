@@ -73,8 +73,6 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             if key == 'v86':
                 body = body.replace('P2V(V86_REMAP_START)',
                                     'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
-            if key == 'boot':
-                body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
         io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text().replace(
             'static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;')

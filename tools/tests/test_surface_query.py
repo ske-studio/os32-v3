@@ -71,8 +71,6 @@ def main():
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
             if key == 'surface_query': continue
-            if key == 'boot':
-                body = body[body.index('static void test_caller_boot('):body.index('static void test_ledger(void)')]
             (tmp / (key + '_host_source.c')).write_text(body)
         # Share the host IRQ register across TUs, so the normal source closure
         # is compiled once and each mutation compiles only surface_query.c.
