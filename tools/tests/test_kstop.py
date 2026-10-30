@@ -162,6 +162,65 @@ static void dispatch_case(int inside) {
     CHECK(a->state==APP_STATE_RUNNING && !a->parked_from_stop && !a->stop_wm_req);
     CHECK(appslot_get(3)->pages==30 && !appslot_get(3)->abort_req);
 }
+static void resume_marks(void) {
+    /* Independent cases against appslot.c, never its boot selftest. */
+    appslot_init();
+    res_owner_set(APP_ID_SHELL);
+    AppSlot *a = appslot_at(APP_ID_MAX);
+    u32 switches = ring3_switch_count, bad = ring3_resume_bad_frame_count;
+    CHECK(appslot_resume_check(APP_ID_MAX) == OS32_ERR_INVAL);
+    CHECK(appslot_state(APP_ID_MAX) == 0);
+    a->state = APP_STATE_PARKED;
+    CHECK(appslot_state(APP_ID_MAX) == 2);
+    CHECK(appslot_resume_check(APP_ID_MAX) == OS32_ERR_STALE);
+    CHECK(ring3_resume_bad_frame_count == ++bad);
+    a->parked_from_wait = 1;
+    CHECK(appslot_resume_check(APP_ID_MAX) == 0);
+    CHECK(appslot_resume_source(APP_ID_MAX) == APP_RESUME_SRC_WAIT);
+    a->state = APP_STATE_WAIT_KEY;
+    CHECK(appslot_state(APP_ID_MAX) == 3);
+    CHECK(appslot_resume_check(APP_ID_MAX) == OS32_ERR_STALE);
+    CHECK(ring3_resume_bad_frame_count == ++bad);
+    a->parked_from_kbd = 1;
+    CHECK(appslot_resume_check(APP_ID_MAX) == 0);
+    CHECK(appslot_resume_source(APP_ID_MAX) == APP_RESUME_SRC_KBD);
+    CHECK(appslot_kill_check(APP_ID_MAX) == 0);
+    a->state = APP_STATE_RUNNING;
+    CHECK(appslot_state(APP_ID_MAX) == 1);
+    CHECK(appslot_kill_check(APP_ID_MAX) == OS32_ERR_STALE);
+    a->state = APP_STATE_WAIT_POLL;
+    CHECK(appslot_state(APP_ID_MAX) == 4);
+    /* OP_WAIT and keyboard marks must not authorize polling. */
+    CHECK(appslot_resume_check(APP_ID_MAX) == OS32_ERR_STALE);
+    CHECK(ring3_resume_bad_frame_count == ++bad);
+    a->parked_from_poll = 1;
+    CHECK(appslot_resume_check(APP_ID_MAX) == 0);
+    CHECK(appslot_kill_check(APP_ID_MAX) == 0);
+    CHECK(appslot_resume_source(APP_ID_MAX) == APP_RESUME_SRC_POLL);
+    a->parked_from_poll = 0;
+    CHECK(appslot_resume_check(APP_ID_MAX) == OS32_ERR_STALE);
+    CHECK(ring3_resume_bad_frame_count == ++bad);
+    a->parked_from_yield = 1;
+    CHECK(appslot_resume_check(APP_ID_MAX) == 0);
+    CHECK(appslot_resume_source(APP_ID_MAX) == APP_RESUME_SRC_YIELD);
+    a->parked_from_yield = 0;
+    a->parked_from_stop = 1;
+    CHECK(appslot_resume_check(APP_ID_MAX) == 0);
+    CHECK(appslot_kill_check(APP_ID_MAX) == 0);
+    CHECK(appslot_resume_source(APP_ID_MAX) == APP_RESUME_SRC_KEEP);
+    CHECK(ring3_resume_bad_frame_count == bad);
+    CHECK(ring3_switch_count == switches);
+
+    u32 rejects = ring3_park_reject_count, yields = ring3_poll_yield_count;
+    g_poll_last_tick = 0x1234;
+    CHECK(appslot_park_poll_check(0x1234) == OS32_ERR_AGAIN);
+    CHECK(ring3_park_reject_count == rejects);
+    CHECK(appslot_park_poll_check(0x1235) == OS32_ERR_INVAL);
+    CHECK(ring3_park_reject_count == rejects + 1);
+    CHECK(appslot_park_poll_check(0x1235) == OS32_ERR_AGAIN);
+    CHECK(ring3_park_reject_count == rejects + 1);
+    CHECK(ring3_poll_yield_count == yields);
+}
 static int test(void) {
     static struct addrspace as;
     (void)as;
@@ -249,7 +308,7 @@ static int test(void) {
     }
     g_gui_handler=notice; gui_owner_exit(3, EXEC_KIND_ABORTED);
     CHECK(!ring3_wm_depth);
-    CHECK(appslot_resume_mark_selftest()==0);
+    resume_marks();
     return 0;
 }
 void _start(void) { int r=test(); __asm__ volatile("int $0x80"::"a"(1),"b"(r):"memory"); for(;;){} }
@@ -333,6 +392,22 @@ for name, guard in (('raw-full-replaces-break', '!is_break && '),
     old = 'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {'
     assert old.count(guard) == 1
     MUTATIONS.append((name, 'drivers/input/kbd.c', old, old.replace(guard, '')))
+
+# Resume-mark cases must catch regressions without the boot selftest.
+for name, fn, old, new in (
+    ('wait-mark', 'appslot_resume_check', '!a->parked_from_wait', '0'),
+    ('kbd-mark', 'appslot_resume_check', '!a->parked_from_kbd', '0'),
+    ('poll-mark', 'appslot_resume_check', '!a->parked_from_poll &&', '0 &&'),
+    ('bad-frame-count', 'appslot_resume_check', 'ring3_resume_bad_frame_count++;', ';'),
+    ('refusal-switch', 'appslot_resume_check', 'AppSlot *a;', 'AppSlot *a; ring3_switch_count++;'),
+    ('yield-source', 'appslot_resume_source', 'return APP_RESUME_SRC_YIELD;', 'return APP_RESUME_SRC_POLL;'),
+    ('stop-source', 'appslot_resume_source', 'return APP_RESUME_SRC_KEEP;', 'return APP_RESUME_SRC_POLL;'),
+    ('poll-throttle', 'appslot_park_poll_check', 'now_tick == g_poll_last_tick', '0'),
+    ('poll-attempt-tick', 'appslot_park_poll_check', 'g_poll_last_tick = now_tick;', ';'),
+):
+    src = function((ROOT/'exec/appslot.c').read_text(), fn)
+    assert old in src
+    MUTATIONS.append((name, 'exec/appslot.c', src, src.replace(old, new)))
 
 if __name__ == '__main__':
     status,log=run(); print('kstop control:',status,log,flush=True)

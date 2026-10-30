@@ -64,7 +64,7 @@ u32 __cdecl kapi_db_mem_used(void);
 
 /* 「直前の open 失敗」を呼び手 (owner) ごとに 1 欄だけ保持する。owner は
  * exec/appslot.h の ID の池 (0 = カーネル / 1 = シェル帯 / 2..APP_ID_MAX = 5)。
- * APP_SLOT_COUNT 以上であることは kernel/kselftest.c の v50 の項が見る。 */
+ * APP_SLOT_COUNT 以上であることは tools/tests/kapi_db_v50_host.c が見る。 */
 #define DB_OWNER_SLOTS    6
 
 /* 既存 DB を開く (CREATE / URI を付けない)。

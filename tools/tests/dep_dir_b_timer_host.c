@@ -94,6 +94,22 @@ void _start(void)
     sysclk_detect(); check(clocks == 1 && sysclk_detected());
     check(pit_init(PIT_HZ) == 0);
     check(pit_get_setup()->period_us == 10000);
+#ifdef TEST_RETRY_VALUE
+    /* Separate run keeps the captured L13 trace unchanged. Use hardware I/O
+     * samples, not the feed: reject count=1, then accept the half-period.
+     * 429497 ticks + 5000us = hi:lo 1:7704 (the next tick is 1:17704). */
+    for (state = 0; state < 2; state++) {
+        u32 lo = 0x1234, hi = 0x5678;
+        enabled = state;
+        tick_value = 429497 + state;
+        samples(0, pit_get_setup()->reload / 2, 0, 2);
+        reads[1] = 1; reads[2] = 0; reads[3] = 1;
+        check(sys_time_now(&lo, &hi) == 0);
+        check(read_at == read_n && enabled == state);
+        check(lo == (state ? 17704U : 7704U) && hi == 1);
+    }
+    finish(0);
+#endif
     check(pit_init(0) == PIT_ERR_HZ);
     prior = *pit_get_setup();
     /* The real sysclk getter never returns an unknown clock. Change its stored

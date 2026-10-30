@@ -23,7 +23,7 @@
 #include "../../include/platform_timer.h"
 #include "sys.h"
 #include "time_math.h"
-#include "ktime.h"          /* 試験専用の注入口 (kselftest だけが使う) */
+#include "ktime.h"          /* 私有 import の注入口 (E08 段2まで処理を保持) */
 #include "os32_kapi_shared.h"   /* OS32_ERR_AGAIN / OS32_ERR_NOSYS */
 
 /* 3 回失敗したら諦める。1 回の読みは数 µs なので、同じ周期の中で境界を
@@ -33,12 +33,10 @@
 /* ------------------------------------------------------------------------ */
 /*  試験専用の注入口 (往復 8 の中継 1)                                       */
 /*                                                                           */
-/*  実 PIT では「呼び出しから p1 読みまでに境界を越える」機械があり、位相を  */
-/*  待っても p1/p2 の 3 分岐を撃ち分けられない。そこで **入力列 {p1,p2,count}**
- *  を与え、time_branch_hits[] で「どの分岐を踏んだか」を数える。            */
-/*  **kselftest だけが触る**。n = 0 (既定) では 1 バイトも影響しない。       */
+/*  起動時の呼出しは E08 段1で外した。ホストの旧経路トレースを維持し、     */
+/*  注入処理そのものの撤去は段2で行う。n = 0 が既定。                       */
 /* ------------------------------------------------------------------------ */
-/* 型は kernel/time/ktime.h (kselftest が読む)。 */
+/* 型・保存領域は kernel/time/ktime.h と私有 import の互換口として残す。 */
 struct time_test_feed time_test_feed[TIME_RETRY_MAX];
 volatile int time_test_feed_n = 0;   /* > 0 でこの列を使う (最後の要素を繰り返す) */
 

@@ -9,7 +9,7 @@
 **ここで見る分岐は実機でも NP21/W でも撃ち分けられない**:
   - p1/p2 の 3 分岐 — 呼び出しから p1 読みまでに周期境界を越える機械があり、
     位相を待っても 0/0 と 0/1 を作り分けられない (往復 8 の中継 1)。
-    kselftest 側は入力列を注入する hook で同じ表を踏む。
+    kselftest 側は実 PIT の読出し・単調性・クランプ回数・1ms 待ちを観測する。
   - 71 分の桁あふれ — 起動から 71 分は NP21/W でも実機でも 1 度も回していない。
 
   python3 -B tools/tests/test_time_math.py            # ホストで全ケース
@@ -48,8 +48,7 @@ MUTATIONS = [
      "        out->tick  = t;",
      "p1 = 1 で tick を足さない (新しい周期の count を古い tick と組ませ、"
      "時刻が 1 周期ぶん戻る = 往復 2 の反例 1)"),
-    (r"        time_branch_hits\[TIME_BR_RETRY\]\+\+;\n        return TIME_DECIDE_RETRY;",
-     "        time_branch_hits[TIME_BR_RETRY]++;\n"
+    (r"        return TIME_DECIDE_RETRY;",
      "        out->tick = t;\n        out->count = count;\n"
      "        return TIME_DECIDE_OK;",
      "p1 = 0 / p2 = 1 を**やり直さずに採用する** (境界のどちら側か分からない "

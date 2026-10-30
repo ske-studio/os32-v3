@@ -41,7 +41,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["errstr_range", "coltext_range", "errstr_truncate", "result_bound",
          "diag_layout", "module_absent"]
 API_CASES = ["group_callers", "open_existing", "prepare_only", "binds", "error_code",
-         # N2 (c): ブート自己診断 db_v50_selftest() を make check で踏む (F1 回帰)
+         # 起動時から移した v50 の契約と、実 appslot.h の ID 池の容量を検査
          "v50_selftest",
          # 票 H3 の是正 (2026-09-15): slot 配置の検査が **末尾追記で落ちない**
          # こと。KAPI をもう 1 本足した場合を引数で模して踏む
@@ -218,7 +218,12 @@ def run_api_mutations(tmp, sqlite_obj, exe):
              "        !sql_copy_buf[0]) return -1;")
     assert original.count(guard) == 3
     vfs_original = (ROOT / "lib/sqlite3/os32_sqlite_vfs.c").read_text()
+    appslot = (ROOT / "exec/appslot.h").read_text()
+    pool = "#define APP_MAX_APPS     4"
+    assert appslot.count(pool) == 1
     mutations = [
+        ("DB diagnostics must cover app ID pool", "exec/appslot.h",
+         appslot.replace(pool, "#define APP_MAX_APPS     5"), "v50_selftest"),
         ("finalize before copy refusal", "kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
         ("SQL truncation", "kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
         ("late journal current owner", "lib/sqlite3/os32_sqlite_vfs.c", vfs_original.replace("vfs_open_sqlite(zName, oflags, g->owner,", "vfs_open_sqlite(zName, oflags, res_owner_get(),"), "group_callers"),

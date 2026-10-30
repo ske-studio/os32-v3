@@ -1,3 +1,5 @@
+# E08 con_sink: 同一構成・本変更だけなら起動成功数は c34dbed8 から7減、描画2判定とfail=0を確認する。
+# 過去の固定総数は当時の記録。現行の総数は他試験の変更も合算して実測 (tools/tests/con_sink_tdd.md E08節)。
 # Acceptance index; batch entry names resolve through guest_tests.txt.
 # contract は項目が確かめる性質の正典 (仕様・決定の文書、試験・道具のコード、延期は DEFERRED_TESTS) を 1 つか並びで指す。
 # docs/archive/ は指さない ([D4]、gen_guest_acceptance.py が落とす)。合否の閾値 (±10% など)・観測の段取り・fixture 固有の値は
@@ -1176,12 +1178,16 @@
   - 'CPL3 shでmem: 従来5行の順を保ち、実測システム行 (kheap_total/used/free, phys_total_pages/free_pages, resident_heap_total/used) と自分だけ。CPL0 resident sbrk上限の実測行は出ない'
   - 'P3修正後のアプリ表示は1本3行: 実測 app=<id> st=<state> fl=<flags> ext=<extents_total> [LIBC_INITIAL,EXEC_INITIAL,ANON,EXEC_ARENA,EXEC_LARGE] free=<extents_free> ar=<arenas> heap=<exec_heap_used>B; img=<MEM_EXEC_LOAD_ADDR 80100000>-<img_end> 主端=<primary_mapped_end> libc初=<sbrk_heap_limit> 窓0=<page_up(img_end)>-88000000; 端/TD=<exec_heap_cur_end>-<guard_b> stk=<stack_top-stack_size>-<stack_top>/<stack_size>B 初=<exec_heap_base>+<exec_heap_size>B。fixtureの計数値をゲストの期待にしない'
   - 'CPL3 sh終了後、CPL0常駐shellのプロンプトでmem: live appがなければ (app なし) の1行。FREE IDのNOTFOUNDは表示しない。live appを置いた場合はID2..5の該当だけ3行ずつ。system/他エラーはerror行で残す'
-  - '新kernel.mapとbinary hashでboot kselftest_pass>=295, kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認 (S1bはKDEBUGに関係なく自己試験を本体で実行)'
+  - '新kernel.mapとbinary hashでboot kselftest_pass>=217 (共通下限、IRQ3 IRR空なら>=223), kselftest_fail=0を実測しmem_stat:TRUSTED AS extentsの正例を確認。IRQ3 pending時はwiring skippedログも記録する'
   - 'fault_kill_countを前後で採りkill delta0、exec_as_leftover_pages0。db_test9/9・db_v50_test42/42、shell/ver応答を確認'
   expect:
     total: 19
     exit: 0
-    kselftest_pass: 295
+    # E08 6本統合: 295 - (time 14 + launch 3 + dbv50 7 + resume 9 + irq 32 + con_sink 7) = 223。
+    # 依頼指定のIRQ最大削減38を使う共通下限: 295 - (14 + 3 + 7 + 9 + 38 + 7) = 217。
+    # 38は保守的な受入予算。実コードのIRQ判定は通常35→3、pending時6→0で、同条件の差は32/6。
+    # pending経路の実測総数を217と断定せず、新kernel/kdebugの対・構成・ログとともに記録する。
+    kselftest_pass: 217
     kselftest_fail: 0
     kill_delta: 0
     leftover: 0
@@ -2753,3 +2759,19 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#GFX-MODES-C480
+
+- id: e08-time-now
+  gate: E08
+  contract: kdebug/kselftest/time_now.inc
+  mode: manual
+  prereq: "PM が NP21/W と Ra266 へ対応する kernel/kdebug を配備し、新 kernel.map・binary hash・kdebug_state == 1・kdebug_pair_crc == ver Image CRC を照合"
+  entry: boot kselftest; time_test
+  observe:
+  - '時計の4判定: time:first read ok / time:10k reads monotonic / time:clamp count sane / time:1ms delay plausible。FAILなし、1万回の逆行・読出し失敗0。待ちの前後とも読出し成功かつ経過200us超・20000us未満'
+  - 'time: clamped ... of 10000 reads と time: 1ms delay measured ... を両機で記録。real-PIT / UNVERIFIED と1000 readsのコスト表示は廃止'
+  - '同構成の基点c34dbed8からE08段1だけなら自己試験総数は14減。全体の実測pass/failを記録し、並行変更があればその差分も反映。過去の受入実測値・ホストfixture値を現在の合格数にしない'
+  - '両クロック (1.9968/2.4576MHz) のPIT設定・tick進行と、CPL3 time_test通常モードの読出し・単調性・負出力契約を確認。PCM / SerialFS RTT / GF待ちは利用構成で回帰確認'
+  expect:
+    time_checks: 4
+    kselftest_fail: 0
+  evidence: ~/os32-tmp/evidence/<日付>/e08-time-now/

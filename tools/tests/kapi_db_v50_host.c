@@ -11,6 +11,12 @@
 /*  実行: python3 -B tools/tests/test_db_errstr.py                         */
 /* ========================================================================= */
 
+/* appslot.h の実定義を読む。SHM だけは既存のホスト配列を使う。 */
+#include "../../include/memmap.h"
+#undef MEM_SHM_BASE
+#undef MEM_SHM_DB_OFFSET
+#undef MEM_SHM_DB_BASE
+
 #define main f2a_main
 #include "vfs_fd_sqlite_host.c"
 #undef main
@@ -122,6 +128,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 /* SHM の置き場。末尾に番兵を置いて「16KB を 1 バイトも越えない」を見る。 */
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
+#include "../../exec/appslot.h"
 
 /* 列値の実体化の境界 (往復 2 の B3)。SQLite は確保に失敗すると accessor で
  * NULL を返す。実機の MEMSYS5 (384KB) ではこれが起きうるが、ホストでは
@@ -414,13 +421,15 @@ static void error_code(void)
     resolve_owner = current_owner = 2;
 }
 
-/* ---- 4b. ブート自己診断 (N2 (c): make check で slot 番号の整合を踏む) ----
+/* ---- 4b. 起動時から移した v50 の契約 (slot / SHM / 入力 / owner) --------
  * db_v50_selftest() は KAPI_SLOT_* の位置と SHM 境界などを検査する骨。
  * F1 で slot 件数を数値直書きしていたため v51 の末尾追記で bit0 が立ち、
  * 実機の kselftest が 86/1 に落ちた。ここで 0 を確かめれば make check で
  * 同じ崩れを踏む。*/
 static void v50_selftest(void)
 {
+    /* 起動時の test_db_v50 から移設。ID の池が広がった場合も検出する。 */
+    CHECK(DB_OWNER_SLOTS >= APP_SLOT_COUNT);
     /* db_v50_selftest の (2) は 0xFFFFFF00 が帯外であることに依るので、
      * ホストでは CPL=3 の帯検査を有効にする (32bit の overflow はホストの
      * 64bit 幅では起きないため。user_range ケースと同じ帯 [BAND_LO,BAND_HI))。*/

@@ -42,7 +42,6 @@ check-kdebug-init-host:
 - kernel/module/kdebug_call.c
 - kdebug/kselftest.c
 - kdebug/kselftest/**
-- kdebug/selftest_con_sink.c
 - kdebug/selftest_internal.h
 - kernel/kselftest.h
 - kdebug/crt_diag.c

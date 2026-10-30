@@ -1,9 +1,7 @@
 /* ======================================================================== */
 /*  IRQ_MATH_HOST.C — kernel/irq/irq_math.c をそのままホストで回す              */
 /*                                                                          */
-/*  実物を 1 行も写さずに #include する。irq_math.c は PIC も IDT も         */
-/*  tick_count も触らないので、模型は 1 つも要らない — ハンドラだけが        */
-/*  「筋書きどおりの値を返す偽装置」になる。                                */
+/*  実 irq_math.c と irq.c を include。ハンドラ入力と IF/PIC を差し替える。 */
 /*                                                                          */
 /*  見るのは **NP21/W でも実機でも狙って作れない**分岐 (記録: irq_math_tdd.md):
  *    (a) A と B が**同時に**要因を持つ (走査を最初の HANDLED で打ち切らない)
@@ -321,13 +319,110 @@ static void eoi_plan(void)
     CHECK(irq_eoi_plan(0xFF, 0) == IRQ_EOI_NONE);
 }
 
+/* Execute the real registration/dispatch core; replace only hardware effects. */
+#define IO_H
+static unsigned int host_if = 1;
+static unsigned int irq_save(void) { unsigned int old = host_if; host_if = 0; return old; }
+static void irq_restore(unsigned int old) { host_if = old; }
+#include IRQ_CORE_SOURCE
+
+volatile u32 tick_count;
+volatile u32 kctx_irq_depth;
+static unsigned int host_mask = 0xffff;
+static int master_eoi, slave_eoi, slave_isr, reports;
+void irq_enable(unsigned int irq) { CHECK(!host_if); host_mask &= ~(1u << irq); }
+void irq_disable(unsigned int irq) { CHECK(!host_if); host_mask |= 1u << irq; }
+void pic_eoi(unsigned int irq) { CHECK(irq >= 8); slave_eoi++; master_eoi++; }
+void platform_irq_eoi_master(void) { master_eoi++; }
+int platform_irq_slave_last_in_service(void) { return slave_isr; }
+void isr_unexpected_report(u32 irq) { CHECK(irq == 3); reports++; }
+void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+
+static int context_handler(unsigned int irq, void *arg)
+{
+    CHECK(irq_register(5, fake_handler, arg, IRQ_F_SHARED) == IRQ_ERR_CTX);
+    CHECK(irq_unregister(irq, context_handler, arg) == IRQ_ERR_CTX);
+    return IRQ_NONE;
+}
+
+static void core_integration(void)
+{
+    struct irq_line *ln = &irq_lines[irq_dyn_index(3)];
+    reset_devs();
+    CHECK(irq_register(0, fake_handler, &g_dev[0], 0) == IRQ_ERR_NOTSUP);
+    CHECK(irq_register(12, fake_handler, &g_dev[0], 0) == IRQ_ERR_NOTSUP);
+    CHECK(irq_register(16, fake_handler, &g_dev[0], 0) == IRQ_ERR_INVAL);
+    CHECK(irq_register(3, 0, &g_dev[0], 0) == IRQ_ERR_INVAL);
+    CHECK(irq_register(3, fake_handler, &g_dev[0], 0x80) == IRQ_ERR_INVAL);
+    CHECK(host_if == 1 && host_mask == 0xffff && ln->count == 0);
+    CHECK(irq_register(3, fake_handler, &g_dev[0], IRQ_F_SHARED) == 0);
+    CHECK(host_if == 1 && !(host_mask & 8));
+    CHECK(irq_register(3, fake_handler, &g_dev[0], IRQ_F_SHARED) == IRQ_ERR_EXIST);
+    CHECK(irq_register(3, fake_handler, &g_dev[1], 0) == IRQ_ERR_SHARE);
+    for (int i = 1; i < 4; i++)
+        CHECK(irq_register(3, fake_handler, &g_dev[i], IRQ_F_SHARED) == 0);
+    CHECK(irq_register(3, fake_handler, &g_dev[4], IRQ_F_SHARED) == IRQ_ERR_FULL);
+    host_if = 0; /* ISR entry is the guest's responsibility. */
+    g_dev[0].ret[0] = IRQ_HANDLED;
+    irq_dispatch(3);
+    CHECK(g_log_n == 8 && irq_shared_dispatch(3) == 1);
+    for (int i = 0; i < 8; i++) CHECK(g_log[i] == i % 4);
+    CHECK(master_eoi == 1 && slave_eoi == 0 && irq_unexpected == 0);
+    reset_devs();
+    g_dev[1].ret[0] = g_dev[1].ret[1] = IRQ_DEFERRED;
+    irq_dispatch(3);
+    CHECK(irq_deferred_count(3) == 2 && irq_unexpected == 0);
+    CHECK(irq_unregister(3, fake_handler, &g_dev[1]) == 0);
+    CHECK(irq_unregister(3, fake_handler, &g_dev[1]) == IRQ_ERR_NOENT);
+    reset_devs();
+    irq_dispatch(3);
+    CHECK(g_dev[1].calls == 0 && g_dev[0].calls == 1 && g_dev[2].calls == 1);
+    CHECK(!(host_mask & 8) && ln->count == 3 && reports == 1);
+    CHECK(irq_register(3, context_handler, &g_dev[4], IRQ_F_SHARED) == 0);
+    kctx_irq_depth = 1;
+    irq_dispatch(3);
+    kctx_irq_depth = 0;
+    CHECK(irq_ctx_violations == 2 && !host_if);
+    CHECK(irq_unregister(3, context_handler, &g_dev[4]) == 0);
+    tick_count++; /* Fresh natural storm window; no test reset required. */
+    for (int i = 0; i < IRQ_STORM_LIMIT; i++) irq_dispatch(3);
+    CHECK(!(host_mask & 8) && !(irq_storm_masked & 8));
+    irq_dispatch(3);
+    CHECK((host_mask & 8) && (irq_storm_masked & 8) && ln->storm_masked);
+    CHECK(irq_register(3, fake_handler, &g_dev[4], IRQ_F_SHARED) == 0);
+    CHECK(!(host_mask & 8) && !(irq_storm_masked & 8) && !ln->storm_masked);
+    CHECK(irq_quarantine_line(0xff) == IRQ_ERR_INVAL);
+    CHECK(irq_quarantine_line(0) == IRQ_ERR_INVAL);
+    CHECK(irq_quarantine_line(3) == 0);
+    CHECK((host_mask & 8) && (irq_line_quarantined & 8) && ln->quarantined);
+    CHECK(irq_register(3, fake_handler, &g_dev[1], IRQ_F_SHARED) == IRQ_ERR_BUSY);
+    for (int i = 0; i < 5; i++) if (i != 1) {
+        CHECK(irq_unregister(3, fake_handler, &g_dev[i]) == 0);
+        CHECK((host_mask & 8) && ln->quarantined && (irq_line_quarantined & 8));
+    }
+    CHECK(ln->count == 0 && ln->quarantined && (irq_line_quarantined & 8) && (host_mask & 8));
+    irq_test_reset_line(3);
+    CHECK(!ln->quarantined && !ln->storm_masked && !ln->tick_hits);
+    CHECK(!(irq_line_quarantined & 8) && !(irq_storm_masked & 8) && (host_mask & 8));
+    master_eoi = slave_eoi = 0;
+    irq_finish(9, 1);
+    CHECK(master_eoi == 1 && slave_eoi == 1);
+    slave_isr = 0;
+    irq_finish(15, 1);
+    CHECK(master_eoi == 2 && slave_eoi == 1);
+    slave_isr = 1;
+    irq_finish(15, 1);
+    CHECK(master_eoi == 3 && slave_eoi == 2);
+}
+
 /* ------------------------------------------------------------------ */
 int main(int argc, char **argv)
 {
     const char *c = (argc > 1) ? argv[1] : "";
 
     failed = 0;
-    if (!strcmp(c, "dispatch_two_pass")) dispatch_two_pass();
+    if (!strcmp(c, "core_integration")) core_integration();
+    else if (!strcmp(c, "dispatch_two_pass")) dispatch_two_pass();
     else if (!strcmp(c, "register_rules")) register_rules();
     else if (!strcmp(c, "storm")) storm();
     else if (!strcmp(c, "eoi_plan")) eoi_plan();

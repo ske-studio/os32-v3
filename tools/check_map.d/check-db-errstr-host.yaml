@@ -12,6 +12,12 @@ check-db-errstr-host:
 - tools/tests/mutpar.py
 - exec/exec.c
 - exec/exec_image.inc
+- exec/appslot.h
+- include/memmap.h
+- include/appmem_types.h
+- include/ksetjmp.h
+- mm/paging.h
+- mm/physmem.h
 - kdebug/kselftest.c
 - kdebug/kselftest/**
 - mm/paging.c

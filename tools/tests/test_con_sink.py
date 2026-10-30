@@ -1,6 +1,6 @@
 """K6C: console シンクのリングを実物の kernel/console/con_sink.c で確かめる。
 
-票:   docs/archive/gui_v13/TASK_K6C_console.md §2 (設計 3 点 + レコード形式)
+契約: docs/KAPI_SPEC.md (console シンク)
 記録: tools/tests/con_sink_tdd.md
 
 test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、
@@ -12,10 +12,10 @@ test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせた
 同じ試験の中でコンパイルされる。
 """
 from kernel_includes import include_flags
+import argparse
 import host32
 import pathlib
 import subprocess
-import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -31,16 +31,30 @@ KERNEL_SRC = ROOT / "kernel/console/con_sink.c"
 # フラグでクロスコンパイルする (ホスト側は con_sink_host.c が取り込む)。
 CONSOLE_SRC = ROOT / "kernel/console/console.c"
 
+
+def run(tmp, source, runner):
+    (tmp / "con_sink.c").write_text(source)
+    exe = tmp / "con-sink"
+    subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
+                    "-D__KERNEL_BUILD__", "-I" + str(tmp), *INCLUDES,
+                    "-nostdlib", "-static", "-no-pie",
+                    str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+    return host32.run([str(exe)], cwd=ROOT, runner=runner, timeout=30,
+                      capture_output=True, text=True)
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--runner', choices=('native', 'qemu'))
+    args = parser.parse_args()
+    source = KERNEL_SRC.read_text()
     with tempfile.TemporaryDirectory(prefix="os32-con-sink-") as tmp:
         tmp = pathlib.Path(tmp)
-        exe = tmp / "con-sink"
-        subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
-                        "-D__KERNEL_BUILD__", *INCLUDES,
-                        "-nostdlib", "-static", "-no-pie",
-                        str(HOST_SRC), "-o", str(exe)], cwd=ROOT, check=True)
+        result = run(tmp, source, args.runner)
+        print(result.stdout, end='', flush=True)
+        assert result.returncode == 0, result.stderr
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        rc = host32.run([str(exe)], cwd=ROOT, timeout=30).returncode
         # 本番の割込み禁止区間 (include/io.h) を含む形でクロスコンパイル
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                         *INCLUDES, "-O2", "-c", str(KERNEL_SRC),
@@ -56,5 +70,25 @@ if __name__ == "__main__":
                        cwd=ROOT, check=True,
                        stderr=subprocess.DEVNULL)
         print("TARGET i386-elf console.c COMPILE PASS", flush=True)
-        print("EXIT con_sink_host=%d" % rc, flush=True)
-        sys.exit(rc)
+        if args.mutate:
+            for old, new, expected in [
+                ('ring_put(color);', 'ring_put(color ^ 1);', 'FAIL 2e'),
+                ('ring_put((u8)CON_SINK_REC_CLEAR);',
+                 'ring_put(0x7f);', 'FAIL 2m'),
+                ('if (written + size > cap) break;',
+                 'if (written + size > cap) size = cap - written;\n'
+                 '        if (size == 0) break;', 'FAIL 3j'),
+                ('        ring_drop_oldest();',
+                 '        ring_drop_oldest();\n'
+                 '        if (g_count) ring_drop_oldest();', 'FAIL 5e'),
+                ('ring_reset();\n    g_enabled = 0;',
+                 'g_enabled = 0;', 'FAIL 6c'),
+                ('if (g_reader == id) g_reader = CON_SINK_NO_READER;',
+                 '(void)id;', 'FAIL 7f'),
+                ('ring_put((u8)id);', 'ring_put((u8)id ^ 1);', 'FAIL 10c'),
+            ]:
+                assert source.count(old) == 1, old
+                result = run(tmp, source.replace(old, new), args.runner)
+                assert result.returncode == 1 and expected in result.stdout, result.stdout
+                print('RED runtime:', expected, flush=True)
+        print("EXIT con_sink_host=0", flush=True)

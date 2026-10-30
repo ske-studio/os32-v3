@@ -21,6 +21,10 @@ MUTANTS = (
     ('early NULL rejected', 'exec', 'if (p == 0) return 1;', 'if (p == 0) return 0;', 'sys_ls NULL ctx'),
     ('device read NULL bypass', 'generated', 'if (count > 0) {', 'if (count > 0 && buf) {', 'device NULL'),
     ('input multiplication wrap', 'generated', 'if (n > (0xFFFFFFFFUL / unit))', 'if (0)', 'input multiplication'),
+    ('CPL0 two outputs rejected', 'exec',
+     'if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return 1;',
+     'if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return lb == 0;',
+     'trusted clock two outputs'),
 )
 
 def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):

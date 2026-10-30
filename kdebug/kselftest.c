@@ -54,8 +54,8 @@
 #include "pcm_cs4231.h"
 #include "dma8237.h"      /* 8237 の共通部 (同 §1-2) */
 #include "irq.h"          /* 動的 IRQ 登録 (票 TASK_HAL_WIRING §1-1) */
-#include "time_math.h"    /* time_branch_hits (票 §1-5) */
-#include "ktime.h"        /* 試験専用の注入口 (p1/p2/count) */
+#include "time_math.h"    /* time_clamped (票 §1-5) */
+#include "ktime.h"        /* ktime_now: 実時計の単調性 */
 #include "sys.h"          /* sys_time_now */
 #include "io.h"           /* inp / irq_save */
 #include "bootinfo.h"     /* ブート情報域 (票 TASK_HDD_INSTALL 段 0) */
@@ -102,19 +102,13 @@ static void __attribute__((noinline)) check(int cond, const char *name)
 
 #include "kselftest/app_band_pde.inc"
 
-#include "kselftest/con_sink.inc"
-
 #include "kselftest/con_sink_render_gate.inc"
 
 #include "kselftest/kbd_inject.inc"
 
 #include "kselftest/kbd_cmd.inc"
 
-#include "kselftest/resume_mark.inc"
-
 #include "kselftest/gfx_owner.inc"
-
-#include "kselftest/launch.inc"
 
 #include "kselftest/tramp_user_str.inc"
 
@@ -234,8 +228,6 @@ int kselftest_run_post_exec(void)
 
 #include "kselftest/abort_admit.inc"
 
-#include "kselftest/db_v50.inc"
-
 #include "kselftest/cpu_calibrate.inc"
 
 #include "kselftest/bootinfo.inc"
@@ -272,15 +264,11 @@ int kselftest_run(void)
     test_map_user_keep();
     test_app_band_pde();
     check(kst_lease() == 0, "private lease S/T/U, master unchanged, owner zero");
-    test_con_sink();
     test_con_sink_render_gate();
     test_kbd_inject();
     test_kbd_cmd();
-    test_resume_mark();
     test_gfx_owner();
     test_abort_admit();
-    test_launch();
-    test_db_v50();
     test_cpu_calibrate();
     test_pit_setup();
     test_bootinfo();

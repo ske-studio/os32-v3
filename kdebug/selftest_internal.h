@@ -5,7 +5,6 @@
 
 /* kdebug の中だけの入口 (kselftest.c から呼ぶ)。カーネルの import 表には載せない。
  * 戻り値は移す前の自己試験と同じビットの意味。 */
-u32 kst_con_sink(void);
 u32 kst_kbd_inject(void);
 int kst_lease(void);
 

@@ -110,7 +110,6 @@ def main():
         # Build the real module independently of pre-existing product artifacts.
         objects = []
         for src in (ROOT / 'kdebug/crt_diag.c', ROOT / 'kdebug/kselftest.c',
-                    ROOT / 'kdebug/selftest_con_sink.c',
                     ROOT / 'kdebug/selftest_kbd_inject.c',
                     ROOT / 'kdebug/selftest_lease.c',
                     ROOT / 'kdebug/selftest_exec.c',

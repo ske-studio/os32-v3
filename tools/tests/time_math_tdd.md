@@ -28,10 +28,10 @@ IRR bit0 (= IRQ0 が立っているか) で挟んで読む。
 
 - **三分岐を実 PIT で撃ち分けられない** (往復 8 の中継 1)。呼び出しから
   p1 読みまでに境界を越える機械があり、位相を待っても 0/0 と 0/1 を作り
-  分けられない。`kdebug/kselftest.c` は**入力列 {p1, p2, count} を注入**し、
-  `time_branch_hits[]` で踏んだ分岐を数える。実 PIT 側は「残り 1〜2 count を
-  観測してから読む」を期限 100 tick で試し、**踏めた分岐を記録して、踏めな
-  かったものは未検証と報告する** (失敗にしない)。
+  分けられない。ホストでは `time_decide` の返り値・tick/count を直接検査する。
+  `test_dep_dir_b_timer.py` は実 `sys_time_now` を模擬 I/O で実行し、再試行後の
+  lo/hi の値・失敗時の出力不変・IF 復元を見る。起動時の人工入力・分岐計数・
+  位相探索は E08 段1で外した。カーネルの注入口そのものは段2まで残る。
 - **71 分の桁あふれ**。`tick × period_us` を u32 で組むと 429496 tick
   (= 71.58 分) で時刻が 0 に戻る。起動から 71 分は NP21/W でも実機でも
   1 度も回していない。
@@ -102,7 +102,7 @@ MUTATION 8 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数
 
 | ケース | 見るもの |
 |---|---|
-| `decide_table` | p1/p2 の 3 分岐、`p1 = 1` なら p2 を見ない、やり直しのとき `out` を触らない、`time_branch_hits[]` が 3 分岐を数える、NULL は採らない |
+| `decide_table` | p1/p2 の 3 分岐、`p1 = 1` なら p2 を見ない、やり直しのとき `out` を触らない、NULL は採らない |
 | `us_math` | 両方のクロック (reload 19968 / 24576) で周期のはじめ・真ん中・終わりが同じ µs、`count == 0` はちょうど 1 周期、`reload == 0` でも 0 除算しない、範囲外の count を巻き込まない |
 | `no_u32_overflow` | 429496 tick の直前は収まり、**1 tick 先で hi が 1 になる**、上下を組み直すと素直な値、1 日ぶんでも単調 |
 | `monotonic` | tick が進み count が減る筋書きで逆行 0、**周期をまたぐ組** (`t, 1`) → (`t+1, reload`) が逆転しない |
@@ -110,7 +110,7 @@ MUTATION 8 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数
 
 ## ここでは見られないもの (W4 = kselftest / NP21/W / 実機)
 
-- 実 PIT のラッチと IRR の実読み (`kdebug/kselftest.c` の `test_time_now`)
+- 実 PIT のラッチと IRR の実読み (`kdebug/kselftest/time_now.inc` の `test_time_now`)
 - 1 万回連続読みの逆行 0、`cpu_delay_us(1000)` を挟んだ実測、
   `ktime_clamp_count` の実数 (NP21/W と実機でどれだけすり抜けるか)
 - **CPL=3 のポインタ契約** — `ring3_in_syscall` が 0 のあいだ検証は素通しなので、
@@ -118,3 +118,15 @@ MUTATION 8 RED (1 件): 同じ µs を 2 回読んだだけでクランプに数
   NULL・範囲の交差・ヒープ / スタックの正常系を見る。
   読み取り専用 USER ページの kill は `time_test ro` (**アプリを殺す**ので明示要求)。
 - PDE / PTE のビット判定表そのものは `tools/tests/ring3_str_host.c` のケース 5
+
+## E08 段1の担当
+
+起動時は `time:first read ok`、`time:10k reads monotonic`、
+`time:clamp count sane`、`time:1ms delay plausible` の4判定。
+`time: clamped ... of 10000 reads` と `time: 1ms delay measured ...` を記録する。
+位相探索の `real-PIT` / `UNVERIFIED` と `1000 reads` のコスト表示は受入対象から外す。
+CPL0 の1範囲・2範囲の素通しは `test_kapi_ranges.py` の実範囲関数で確認する。
+ゲスト受入の項目は `tools/tests/guest_acceptance.yaml` の `e08-time-now`。
+私有 import の6枠 (127/128/174/175/181/182) は `retained` とし、番号・型・実体を保持する。
+`tick_count` の枠132も S2 の参照がなくなるため `retained` とするが、kpeek 等では現役のまま。
+この指定による私有ABI印の変更は kernel/kdebug の対ビルドで反映する。公開KAPIは不変。

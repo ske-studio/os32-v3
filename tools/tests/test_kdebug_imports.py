@@ -5,6 +5,7 @@ import argparse
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -45,6 +46,81 @@ class ImportsTests(unittest.TestCase):
         altered[196].pop('retained')
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*v86_cui_display_restore'):
             gen.check_nm(altered)
+
+    def test_time_slots_retained_after_boot_test_redesign(self):
+        signatures = {
+            127: 'void time_branch_reset(void);',
+            128: 'void time_test_feed_clear(void);',
+            # No S2 boot-test caller remains; kpeek/nic_trace still use it.
+            132: 'u32 kdi_get_tick_count(void);',
+            174: 'int kdi_get_time_test_feed_n(void);',
+            175: 'void kdi_set_time_test_feed_n(int value);',
+            181: 'unsigned int *kdi_ptr_time_branch_hits(void);',
+            182: 'struct time_test_feed *kdi_ptr_time_test_feed(void);',
+        }
+        previous = copy.deepcopy(self.entries)
+        for index, signature in signatures.items():
+            with self.subTest(index=index):
+                self.assertTrue(self.entries[index]['retained'])
+                self.assertEqual(self.entries[index]['signature'], signature)
+                previous[index].pop('retained')
+        self.assertNotEqual(gen.abi_hash(self.entries), gen.abi_hash(previous))
+        with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*time_'):
+            gen.check_nm(previous)
+        original = gen.symbols
+        for symbol in ('time_branch_reset', 'time_test_feed_clear',
+                       'tick_count', 'time_test_feed_n', 'time_branch_hits', 'time_test_feed'):
+            def without_time(nm, paths, undefined):
+                refs = original(nm, paths, undefined)
+                if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                    refs.discard(symbol)
+                return refs
+            with self.subTest(symbol=symbol), patch.object(gen, 'symbols', side_effect=without_time):
+                with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
+                    gen.check_nm(self.entries)
+
+    def test_removed_boot_tests_keep_private_abi_slots(self):
+        signatures = {
+            9: 'u32 appslot_resume_mark_selftest(void);',
+            34: 'u32 db_v50_selftest(void);',
+            55: 'u32 irq_deferred_count(unsigned int irq);',
+            57: 'int irq_quarantine_line(unsigned int irq);',
+            59: 'u32 irq_shared_dispatch(unsigned int irq);',
+            60: 'void irq_test_reset_line(unsigned int irq);',
+            80: 'u32 launch_selftest(void);',
+            148: 'u32 kdi_get_irq_ctx_violations(void);',
+            170: 'u32 kdi_get_irq_unexpected(void);',
+            171: 'void kdi_set_irq_unexpected(u32 value);',
+            172: 'int kdi_get_irq_test_quiet(void);',
+            173: 'void kdi_set_irq_test_quiet(int value);',
+        }
+        original = gen.symbols
+        callers = [ROOT / p for p in re.findall(
+            r'^LOAD (.+\.o)$', (ROOT / 'build/out/kdebug/kdebug.map').read_text(),
+            re.M) if Path(p).stem not in ('kdebug_import_stubs', 'kdebug_import_slots')]
+        refs = original(str(self.cross / 'i386-elf-nm'), callers, True)
+        for index, signature in signatures.items():
+            with self.subTest(index=index):
+                entry = self.entries[index]
+                self.assertEqual(entry['signature'], signature)
+                self.assertTrue(entry['retained'])
+                self.assertNotIn(entry['name'], refs)
+                altered = copy.deepcopy(self.entries)
+                # S2 compares source symbols; drop both accessor annotations.
+                for other in altered:
+                    if other['symbol'] == entry['symbol']:
+                        other.pop('retained')
+                self.assertNotEqual(gen.abi_hash(self.entries), gen.abi_hash(altered))
+                with self.assertRaisesRegex(ValueError, 'nm mismatch.*' + entry['symbol']):
+                    gen.check_nm(altered)
+                def without_implementation(nm, paths, undefined):
+                    symbols = original(nm, paths, undefined)
+                    if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                        symbols.discard(entry['symbol'])
+                    return symbols
+                with patch.object(gen, 'symbols', side_effect=without_implementation):
+                    with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
+                        gen.check_nm(self.entries)
 
     def test_gf_slots_retained_without_core_callers(self):
         for index in (e['index'] for e in self.entries if e['symbol'] in gen.GF_ONLY_SYMBOLS):
@@ -186,6 +262,7 @@ class ImportsTests(unittest.TestCase):
             with patch.dict(gen.STAGE_KINDS, S6=gen.STAGE_KINDS['S6'] + tuple(row[0] for row in additions)), \
                  patch.dict(gen.STAGES, S6=len(document['imports'])):
                 entries = gen.load_def(definition)
+                entries[303].pop('retained')  # Active in this synthetic contract.
                 meta = gen.generate(entries, out, 'S6')
                 self.assertEqual(meta['count'], len(self.entries) + len(additions))
                 macros = (out / 'kdebug_import_macros.h').read_text()
@@ -213,6 +290,7 @@ class ImportsTests(unittest.TestCase):
                 # Both data operations must be used: GETTER cannot mask a lost SETTER.
                 original = gen.symbols
                 new_names = {e['name'] for e in entries[len(self.entries):]}
+                new_names.add('kdi_set_con_sink_drop_count')
                 omit_setter = False
                 def with_s6(nm, paths, undefined):
                     refs = original(nm, paths, undefined)
@@ -234,10 +312,10 @@ class ImportsTests(unittest.TestCase):
             text = original_read(path, *args, **kwargs)
             if path == ROOT / 'build/out/kdebug/kdebug.map':
                 text = '\n'.join(line for line in text.splitlines()
-                    if not (line.startswith('LOAD ') and 'selftest_con_sink.o' in line))
+                    if not (line.startswith('LOAD ') and 'selftest_kbd_inject.o' in line))
             return text
         with patch.object(Path, 'read_text', without_moved):
-            with self.assertRaisesRegex(ValueError, 'nm mismatch.*kst_con_sink'):
+            with self.assertRaisesRegex(ValueError, 'nm mismatch.*kst_kbd_inject'):
                 gen.check_nm(self.entries)
 
     def test_con_kbd_move_contract_and_residency(self):
@@ -262,11 +340,10 @@ class ImportsTests(unittest.TestCase):
             'kdi_ptr___kernel_resident_end', 'gf_production_selected'])
         nm = str(self.cross / 'i386-elf-nm')
         kernel = gen.symbols(nm, [ROOT / 'build/out/kernel.elf'], False)
-        moved = ROOT / 'build/out/kdebug/selftest_con_sink.o'
-        module = gen.symbols(nm, [moved], False)
+        module = gen.symbols(nm, [ROOT / 'build/out/kdebug/kdebug.elf'], False)
         for symbol in ('con_sink_selftest', 'kst_con_sink', 'g_self_buf', 'g_self_src'):
             self.assertNotIn(symbol, kernel)
-        self.assertTrue({'kst_con_sink', 'g_self_buf', 'g_self_src'} <= module)
+            self.assertNotIn(symbol, module)
         self.assertIn('con_sink_drop_count', kernel)
         kbd = ROOT / 'build/out/kdebug/selftest_kbd_inject.o'
         self.assertIn('kst_kbd_inject', gen.symbols(nm, [kbd], False))
@@ -280,15 +357,36 @@ class ImportsTests(unittest.TestCase):
             'kbd_inject_peek', 'kbd_inject_discard', 'kdi_selftest_inj_push',
             'kdi_get_kbd_inject_drop_count', 'kdi_set_kbd_inject_drop_count'})
         self.assertNotIn('con_sink_selftest', {e['symbol'] for e in self.entries})
+
+    def test_con_sink_retained_slots(self):
+        names = ('con_sink_push_print', 'con_sink_push_clear', 'con_sink_push_cursor',
+                 'con_sink_push_exit', 'con_sink_stat', 'con_sink_read',
+                 'con_sink_owner_exit', 'kdi_set_con_sink_drop_count')
+        indices = (*range(264, 271), 303)
         original = gen.symbols
-        def without_setter(nm, paths, undefined):
-            refs = original(nm, paths, undefined)
-            if undefined:
-                refs.discard('kdi_set_con_sink_drop_count')
-            return refs
-        with patch.object(gen, 'symbols', side_effect=without_setter):
-            with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*kdi_set_con_sink_drop_count'):
-                gen.check_nm(self.entries)
+        callers = [ROOT / p for p in re.findall(
+            r'^LOAD (.+\.o)$', (ROOT / 'build/out/kdebug/kdebug.map').read_text(),
+            re.M) if Path(p).stem not in ('kdebug_import_stubs', 'kdebug_import_slots')]
+        refs = original(str(self.cross / 'i386-elf-nm'), callers, True)
+        for index, name in zip(indices, names):
+            with self.subTest(name=name):
+                entry = self.entries[index]
+                self.assertEqual(entry['name'], name)
+                self.assertTrue(entry['retained'])
+                self.assertNotIn(name, refs)
+                altered = copy.deepcopy(self.entries)
+                altered[index].pop('retained')
+                self.assertNotEqual(gen.abi_hash(self.entries), gen.abi_hash(altered))
+                with self.assertRaisesRegex(ValueError, 'S6 nm mismatch.*' + name):
+                    gen.check_nm(altered)
+                def without_implementation(nm, paths, undefined):
+                    symbols = original(nm, paths, undefined)
+                    if not undefined and ROOT / 'build/out/kernel.elf' in paths:
+                        symbols.discard(entry['symbol'])
+                    return symbols
+                with patch.object(gen, 'symbols', side_effect=without_implementation):
+                    with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
+                        gen.check_nm(self.entries)
 
     def test_lease_move_contract_and_residency(self):
         nm = str(self.cross / 'i386-elf-nm')

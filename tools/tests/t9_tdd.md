@@ -1,12 +1,29 @@
 # T9 ホスト TDD の記録 (K = 起動要求表 / W = WM 側の仲介)
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3 / D5 / D8、
-§1a の ABI 表、§10 の non-blocker 1 / 2。
+契約: `include/launch.h` の起動要求表・所有・完了通知。
 実行: `make check-launch-host` (= `python3 -B tools/tests/test_launch.py`) と
 `make check-multiapp-model-host` (その中の `test_multiapp_impl.py`)。
 
-実機・エミュレータ・`make` は**未実施** ([V4])。ここに書いてあるのは
-ホストの gcc / i386-elf-gcc だけで踏めた範囲。
+当初の T9 記録では実機・エミュレータ・`make` は**未実施** ([V4])。
+以下の過去の RED/GREEN はホストの gcc / i386-elf-gcc で踏めた範囲。
+
+## launch 起動自己試験の整理 (2026-10-30)
+
+人工の表遷移はホストへ集約し、`launch.inc` の起動時判定は 3 → 0 件。
+製品の起動経路と既存の私有 `launch_selftest` 実体・80 番枠は維持し、枠は `retained` とする。
+ホストは `launch_selftest()` を呼ばず、実 `launch.c` の操作を直接検査する。
+
+| 起動時から外す判定名 | ホストの判定 |
+|---|---|
+| `launch: child exit marks DONE and clears child` | 2s・2t (child 解放・DONE) |
+| `launch: a finished row is handed over once` | 2s2・2u・2v (別所有者を拒否・再 poll は STALE・次の要求) |
+| `launch: requester exit becomes an orphan KILL` | 5a〜5k・7a〜7l・8a〜8g (孤児の KILL・連鎖・take 前の子終了) |
+
+`make check-launch-host MUTATE=0` と `python3 -B tools/tests/test_launch.py --mutate` を実行する。
+変異は child 残存 / DONE 重複受渡し / 孤児未解放 / KILL 種別欠落 / 別所有者の DONE 消費の 5 種。
+ゲスト受入は PM が実施する (今回未実施): 新しい kernel/kdebug 対と map を照合し、同じ構成・起動段階の基点 c34dbed8 の `kselftest_pass=N` に対して `N-3`、`kselftest_fail=0` を確認する (KDEBUG OFF は 0/0 のまま)。並列の自己試験整理の減算は統合時に別途合算する。
+上表の 3 判定名は起動時の受入対象から外す。過去の観測総数は書き換えない。
+GUI 端末の sh から外部プログラムを起動して終了後にプロンプトへ戻ること、反復起動で ERR_FULL に固着しないこと、要求者終了時の子回収を実ゲストで見る。
 
 ## 1. 何を実物で回すか
 
@@ -45,7 +62,7 @@ GUI 判定 (`con_sink_is_enabled`)、`kstrncpy`。スロットは実物の `AppS
 | 5a〜5n | 要求者の退場 = 孤児回収。`requester` が -1 になり、再利用 ID からの `launch_req` は回収が終わるまで `FULL`、完了は poll を待たず `IDLE`。子を持たない要求者の退場は即 `IDLE` |
 | 6a〜6j | token: 要求者をまたいで単調増加、他人の token は `INVAL`、知らない / 0 / 負は `STALE`、ID を再利用しても古い token は当たらない |
 | 7a〜7l | `launch_child` / `launch_chain`: 端末 → sh → 子 の 3 段、途中から、不正 ID、`max 0`、末尾を畳んだ後の縮み、壊れた表の環でも止まる |
-| 8a〜8d | `launch_selftest()` (ブート時 kselftest が踏むのと同じ 3 項) が 0 を返し、表を空にして戻る |
+| 8a〜8g | WM が孤児の KILL を take する前に子が終了しても、poll を待たず IDLE に戻り、古い token は STALE・要求者 ID は再利用可能 |
 
 ## 4. 検査の並び (`multiapp_impl_host.c` ケース 23)
 

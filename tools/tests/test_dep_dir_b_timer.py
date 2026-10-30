@@ -38,13 +38,17 @@ MUTATIONS = (
     ('kernel/time/ktime.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
     ('kernel/time/ktime.c', '        platform_timer_sample(&hw);',
      '        t = (unsigned int)tick_count;\n        platform_timer_sample(&hw);'),
+    ('kernel/time/ktime.c', 'if (lo) *lo = (u32)out_lo;',
+     'if (lo) *lo = (u32)out_lo ^ (attempt == 1);'),
+    ('kernel/time/ktime.c', 'if (hi) *hi = (u32)out_hi;',
+     'if (hi) *hi = (u32)out_hi ^ (attempt == 1);'),
 )
 # Relocations remove the old operation, rather than adding another sample.
 REMOVALS = {2: '    out->p2 = platform_irq_timer_pending();',
             4: '        t = (unsigned int)tick_count;'}
 
 
-def build(work, clock_byte, mutation=None, baseline=None):
+def build(work, clock_byte, mutation=None, baseline=None, retry_value=False):
     # B5: positive and mutation copies use the SAME tree, headers and paths.
     for rel in (*SOURCES, *HEADERS):
         text = (ROOT / rel).read_text()
@@ -78,6 +82,7 @@ def build(work, clock_byte, mutation=None, baseline=None):
         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
         '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
         '-D__cdecl=', f'-DTEST_CLOCK_BYTE={clock_byte}',
+        *(['-DTEST_RETRY_VALUE'] if retry_value else []),
         '-I' + str(work), *include_flags(work),
         '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'),
         str(ROOT / 'tools/tests/dep_dir_b_timer_host.c'),
@@ -91,7 +96,10 @@ def verify(mutation=None):
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-timer-') as td:
             actual = trace(build(Path(td), byte, mutation))
         assert actual == expected['traces'][str(byte)], (byte, actual)
+        with tempfile.TemporaryDirectory(prefix='dep-dir-b-retry-') as td:
+            trace(build(Path(td), byte, mutation, retry_value=True))
     print('PASS L13 clock/default/once, PIT/fallback/state, sample7/tick/feed, retry/clamp/IF/output', flush=True)
+    print('PASS retry -> success value: both clocks, IF=0/1, lo/hi after u32 rollover', flush=True)
 
 
 if __name__ == '__main__':
