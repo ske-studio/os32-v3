@@ -15,7 +15,7 @@ OS32 は単一利用者・単一タスク・協調切替。頑丈さの対象は
 **初版の決定範囲**は Ra266 の 0:13.0、10de:0221、subsys 10fc:1270 の NV44A、既知 ROM の 27 種・193 命令、head A・ANALOG OR0・RGB-IN。
 OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `O/kdebug/gfinit_op/pll2_zm_reg_decode.inc:3`、`reset_expand.inc:10`、`D/GF6200_4A_DESIGN.md:263`。nouveau 全機種対応への拡張はしない。
 > [要確認] CR3C の組の照合は、現行実装では COPY の直後に読み返していない。
-`include/video_service.h` と `hwdev/gf/service.c` に内部サービス、`hwdev/gf/internal.h` に部品間契約を置き、P0 で固定する。HAL に GF のレジスタ・ROM・recover token を出さない。
+HAL に GF のレジスタ・ROM・recover token を出さない。
 
 これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`O/init/kernel.c:343–366,577–582`）。
 順番は **route00→ID/定数長/base/資源/写像確認→Command=0x0102 設定・生の 16bit 読戻し確認→ROM 採取・解読→A2 の legacy 無効化/解錠→main0〜4→基準値採取→mode 計算→共有列→必須 CHECK→初回転送/セル→route01**。A1 は本番の全経路から外す。
@@ -33,3 +33,12 @@ S0 は PLL/PFB/旧 timing の完全復元ではなく PARTIAL/S1 未保証を保
 - [hwdev/gf/save.c](save.md)
 - [hwdev/gf/pll.c](pll.md)
 - [include/video_service.h](../../include/video_service.md)
+- [hwdev/gf/bus](bus.md)
+- [hwdev/gf/devinit](devinit.md)
+- [hwdev/gf/native](native.md)
+- [hwdev/gf/production](production.md)
+- [hwdev/gf/quiesce_rows](quiesce_rows.md)
+- [hwdev/gf/resources](resources.md)
+- [hwdev/gf/rom](rom.md)
+- [hwdev/gf/scripts](scripts.md)
+- [hwdev/gf/service](service.md)
