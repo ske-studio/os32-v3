@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
+from kernel_includes import include_flags
 import argparse
 import importlib.util
 import os
@@ -105,8 +106,7 @@ def main():
         archive = load_builder().build(cross, tmp / 'nano')
         cc = [str(cross / 'bin/i386-elf-gcc'), '-std=gnu11', '-O2', '-ffreestanding',
               '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra',
-              '-Werror', '-Werror=vla', '-I' + str(tmp), *['-I' + str(ROOT / p) for p in
-              ('include', 'kernel', 'exec', 'lib', 'sdk/include/os32', 'sdk/allocator')]]
+              '-Werror', '-Werror=vla', '-I' + str(tmp), *(['-I' + str(ROOT / p) for p in ('sdk/allocator',)] + include_flags(ROOT))]
         objects = []
         for source in ('tools/tests/allocator_bench_host.c', 'exec/appmem.c'):
             obj = tmp / (Path(source).stem + '.o')

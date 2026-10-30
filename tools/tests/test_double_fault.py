@@ -1,4 +1,5 @@
 """T5-0b #DF descriptor/diagnostic contract; NOT hardware exception delivery."""
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import re
@@ -43,7 +44,7 @@ def run(folder, mutant=None):
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Os', '-ffreestanding',
            '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
            '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-DOS32_DF_GUARD_TEST=0']
-    cmd += ['-I'+str(p) for p in (folder, ROOT/'include', ROOT/'kernel', ROOT/'lib', ROOT/'drivers')]
+    cmd += ['-I' + str(folder), *include_flags(ROOT)]
     cmd += [str(ROOT/'tools/tests/double_fault_host.c'), str(folder/'stubs.c'), '-o', str(exe)]
     host32.build(cmd, check=True)
     for mode in range(3):
@@ -76,7 +77,7 @@ def check_asm_constants(folder):
     path = folder / 'asm_constants.c'
     path.write_text(source)
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding',
-                    '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'kernel'),
+                     *include_flags(ROOT),
                     '-c', str(path), '-o', str(folder / 'asm_constants.o')], check=True)
     print('PASS NASM/C EFLAGS/ABI, TSS.CR3 and setjmp offsets/size')
 
@@ -139,9 +140,7 @@ def check_entry_layout(folder):
     path = folder / 'entry_layout.c'
     path.write_text(source)
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding',
-                    '-I' + str(ROOT), '-I' + str(ROOT / 'include'),
-                    '-I' + str(ROOT / 'kernel'), '-I' + str(ROOT / 'lib'),
-                    '-I' + str(ROOT / 'arch/x86'),
+                    *include_flags(ROOT),
                     '-c', str(path), '-o', str(folder / 'entry_layout.o')], check=True)
     print('PASS NASM/C entry constants, ISR frames, TSS and V86Context layout')
 

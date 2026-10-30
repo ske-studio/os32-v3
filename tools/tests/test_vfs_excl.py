@@ -25,6 +25,7 @@ fs/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 make・エミュレータ・実配備には一切触れない。
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -40,19 +41,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-D__cdecl="]
-HOST_INC = ["-I" + str(ROOT / p)
-            for p in ("include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+HOST_INC = include_flags(ROOT)
 
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 
 def check_flag_constant():

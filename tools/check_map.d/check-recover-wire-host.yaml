@@ -11,3 +11,4 @@ check-recover-wire-host:
 - kdebug/recover_virtual.h
 - tools/tests/recover_hostshim/io.h
 - kdebug/recover.h
+- tools/tests/kernel_includes.py

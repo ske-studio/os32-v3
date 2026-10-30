@@ -72,4 +72,5 @@ check-tools-host:
 - lib/kstring_asm.asm
 - tools/tests/host32.py
 - tools/tests/ver_test_utils.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

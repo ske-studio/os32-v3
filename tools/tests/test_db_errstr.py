@@ -28,6 +28,7 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 「`DB_SHM_BLOCK_SIZE` を直接引き算している箇所を残さない」をそのまま
 規則にして、`kapi/kapi_db.c` がこの名前を 1 回も出さないことを見る。
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import subprocess
@@ -59,8 +60,7 @@ API_CASES = ["group_callers", "open_existing", "prepare_only", "binds", "error_c
          "resolve_depth",
          # 実機 K2 の回帰 (s0_tdd.md §K 2f)
          "cpl3_paths"]
-INC = ["-I" + str(ROOT / p) for p in
-       ("include", "fs", "drivers", "sdk/include/os32", "lib", "lib/sqlite3")]
+INC = include_flags(ROOT)
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
@@ -386,16 +386,7 @@ if __name__ == "__main__":
                             "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                             "-nostdlib", "-msoft-float", "-Os", "-Wall",
                             "-D__KERNEL_BUILD__",
-                            "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-                            "-I" + str(ROOT / "arch/x86"),
-                            "-I" + str(ROOT / "platform/pc98"),
-                            "-I" + str(ROOT / "sdk/include"),
-                            "-I" + str(ROOT / "sdk/include/os32"),
-                            "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
-                            "-I" + str(ROOT / "lib"),
-                            "-I" + str(ROOT / "lib/sqlite3"),
-                            "-I" + str(ROOT / "kapi"), "-I" + str(ROOT / "kernel"),
-                            "-I" + str(ROOT / "exec"), "-I" + str(ROOT / "gfx"),
+                             *include_flags(ROOT),
                             "-c", str(ROOT / "kapi/kapi_db.c"),
                             "-o", str(tmp / "kapi_db.o")], check=True, cwd=ROOT)
             print("TARGET i386-elf GNU11 compile PASS", flush=True)

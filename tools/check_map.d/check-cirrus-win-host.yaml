@@ -9,3 +9,4 @@ check-cirrus-win-host:
 - tools/tests/test_cirrus_win.py
 - tools/check_map.d/check-cirrus-win-host.yaml
 - build/checks.d/check-cirrus-win-host.mk
+- tools/tests/kernel_includes.py

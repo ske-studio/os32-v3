@@ -12,3 +12,4 @@ check-module-image-host:
 - tools/tests/module_image_host.c
 - tools/tests/module_image_tdd.md
 - tools/tests/test_module_image.py
+- tools/tests/kernel_includes.py

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T7a-1b: real legacy KAPI stubs, no low writes/file I/O; runtime mutants."""
+from kernel_includes import include_flags
 import argparse
 from pathlib import Path
 import subprocess
@@ -40,8 +41,7 @@ def run(runner, mutation=None):
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                '-D__KERNEL_BUILD__=1']
         cmd += ['-I'+str(work)]
-        cmd += ['-I'+str(ROOT/p) for p in ('tools/tests/host_arch', 'include',
-                'arch/x86', 'platform/pc98', 'kernel', 'drivers', 'lib', 'fs', 'sdk/include/os32')]
+        cmd += ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         exe = work / 'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/kcg_boot_host.c'),
                 '-o', str(exe)], capture_output=True, text=True)

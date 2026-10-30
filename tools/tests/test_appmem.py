@@ -2,6 +2,7 @@
 記録: tools/tests/appmem_tdd.md
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
+from kernel_includes import include_flags
 import os
 import argparse
 import hashlib
@@ -73,7 +74,7 @@ def main():
     cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
           '-Werror=implicit-function-declaration', '-Werror=implicit-int', '-Werror=vla',
-          *['-I' + str(ROOT / path) for path in ('include', 'kernel', 'exec', 'sdk/include/os32')]]
+          *include_flags(ROOT)]
     try:
         with tempfile.TemporaryDirectory(prefix='os32-f2-') as directory:
             tmp = pathlib.Path(directory)

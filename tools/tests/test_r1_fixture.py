@@ -3,6 +3,7 @@
 CPU ud2/stop are replaced; allocator and closing exception path are real source.
 Only the temporary source copy uses SOURCE_DATE_EPOCH for build comparisons.
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
 import hashlib
@@ -67,8 +68,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static',
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DOS32_R1_FIXTURE',
            '-I' + str(tmp)]
-    cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers',
-                                         'sdk/include/os32', 'tools/tests', 'exec')]
+    cmd += (['-I' + str(ROOT / p) for p in ('tools/tests',)] + include_flags(ROOT))
     cmd += [str(ROOT / 'tools/tests/r1_fixture_host.c'), str(ROOT / 'mm/physmem.c'),
             '-o', str(tmp / 'probe')]
     result = subprocess.run(cmd, capture_output=True, text=True)

@@ -19,6 +19,7 @@
 ことを見る。中心は「浮動番地の規則を固定番地の境界より優先させない」こと —
 そこを崩すと自己診断そのものが穴を隠す。
 """
+from kernel_includes import include_flags
 import host32
 import mutpar
 import os
@@ -31,10 +32,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # build/config.mk の INC_KERNEL と同じ並び。ホスト側は模型のヘッダだけ先頭に足す。
-KERNEL_INCLUDES = ['-I' + str(ROOT / p) for p in
-                   ('.', 'include', 'arch/x86', 'platform/pc98',
-                    'sdk/include', 'sdk/include/os32', 'kernel', 'drivers',
-                    'net', 'fs', 'exec', 'gfx', 'lib', 'kapi', 'lib/sqlite3')]
+KERNEL_INCLUDES = include_flags(ROOT)
 HARNESS = ROOT / "tools/tests/memmap_boot_host.c"
 TARGET_SRCS = [ROOT / "mm/paging.c"]
 SHM_SRC = ROOT / "mm/shm.c"

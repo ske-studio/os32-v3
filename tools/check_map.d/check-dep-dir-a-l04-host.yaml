@@ -31,4 +31,5 @@ check-dep-dir-a-l04-host:
 - kernel/v86/v86_mem.c
 - kernel/v86/v86_snapshot.c
 - tools/tests/shm_user_host.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

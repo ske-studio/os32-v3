@@ -1,4 +1,5 @@
 """Actual paging.c, ILP32; only privileged asm replaced for host execution."""
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -21,9 +22,7 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、
     # 実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を引く (順序 3・5)。
     # build/config.mk の INC_COMMON と同じものをここでも渡す。
-    includes = ['-I' + str(ROOT / p)
-                for p in ('include', 'arch/x86', 'platform/pc98',
-                          'kernel', 'lib')] + ['-I' + str(tmp)]
+    includes = include_flags(ROOT) + ['-I' + str(tmp)]
     # ホスト実行のときだけ arch_cpu.h を差し替える (CR0 / CR3 は CPL=3 の
     # プロセスでは触れない)。-I の順で本物より先に見つかるよう先頭に置く。
     host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes

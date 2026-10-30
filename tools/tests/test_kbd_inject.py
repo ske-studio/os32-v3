@@ -14,6 +14,7 @@ kbd_inject_host.c は kernel/console/con_sink.c も同じ翻訳単位へ入れ�
 CPL=3 では cli/popfl を実行できないため。クロス側は付けないので、
 include/io.h を使う本番の経路も同じ試験の中でコンパイルされる。
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -26,9 +27,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "exec", "lib", "kdebug", "sdk/include/os32")]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 HOST_SRC = ROOT / "tools/tests/kbd_inject_host.c"
 KERNEL_SRC = ROOT / "kernel/kbd_inject.c"
 

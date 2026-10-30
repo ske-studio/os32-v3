@@ -23,3 +23,4 @@ check-nano-adapter-host:
 - include/memmap.h
 - tools/tests/host_arch/**
 - exec/exec_kapi_init.inc
+- tools/tests/kernel_includes.py

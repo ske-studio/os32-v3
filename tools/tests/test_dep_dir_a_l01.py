@@ -3,6 +3,7 @@
 The fixture was captured from 466010d7, not from the code under test.
 --prepare only compiles copied mutation units; it never executes a mutant.
 """
+from kernel_includes import include_flags
 import argparse
 from hwdev_contract_fixture import assert_hwdev_contract
 import hashlib
@@ -42,10 +43,10 @@ def abi(folder, fixture):
     assert hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest() == fixture['kapi_sha256']
     probe = ['#include <stddef.h>']
     for name, api in fixture['apis'].items():
-        text = (ROOT / f'kernel/{name}_module.h').read_text()
+        text = (ROOT / (f'kernel/module/{name}_module.h' if name == 'v86' else f'kernel/{name}_module.h')).read_text()
         block = re.search(r'typedef struct \{(.*?)\} ' + api['type'] + ';', text, re.S).group(1)
         assert ' '.join(re.sub(r'/\*.*?\*/', '', block, flags=re.S).split()) == api['body']
-        probe += [f'#include "kernel/{name}_module.h"',
+        probe += [f'#include "{name}_module.h"',
                   f'_Static_assert(sizeof({api["type"]}) == {api["size"]}, "size");',
                   f'_Static_assert({name.upper()}_MODULE_OPS_VERSION == 1, "version");']
         for slot, member in enumerate(api['members']):
@@ -53,8 +54,7 @@ def abi(folder, fixture):
     (folder / 'abi.c').write_text('\n'.join(probe))
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-Wall', '-Wextra', '-Werror',
                     '-D__KERNEL_BUILD__', '-fsyntax-only',
-                    *['-I' + str(ROOT / p) for p in
-                      ('.', 'include', 'kernel', 'drivers', 'fs', 'sdk/include/os32')],
+                    *include_flags(ROOT),
                     str(folder / 'abi.c')], check=True)
     for name in ('pcm', 'fm', 'lan'):
         headers = [f'include/{name}_contract.h'] + (['include/dma_contract.h'] if name == 'pcm' else [])

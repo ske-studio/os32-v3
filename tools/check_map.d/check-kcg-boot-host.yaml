@@ -11,3 +11,4 @@ check-kcg-boot-host:
 - build/checks.d/check-kcg-boot-host.mk
 - tools/tests/mutpar.py
 - include/kcg_contract.h
+- tools/tests/kernel_includes.py

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T4c-3: app pressure at the product ILP32 cap and standard ext2 RW learning."""
+from kernel_includes import include_flags
 import argparse
 import os
 from pathlib import Path
@@ -56,8 +57,7 @@ def build(root, obj, exe):
                   '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
                   '-Wno-type-limits', '-Wno-missing-field-initializers', '-D__cdecl=',
                   '-I' + str(ROOT),
-                  *['-I' + str(ROOT / p) for p in
-                    ('include', 'fs', 'drivers', 'sdk/include/os32', 'lib', 'lib/sqlite3', 'kernel', 'tools/tests')],
+                  *(['-I' + str(ROOT / p) for p in ('tools/tests',)] + include_flags(ROOT)),
                   str(root / SOURCE), str(ROOT / 'tools/tests/fep_budget_linux.c'),
                   str(obj), '-lm', '-o', str(exe)], check=True)
 

@@ -2,6 +2,7 @@
 """82557 EEPROM contract, clocked model and independent T/S oracles.
 Record: tools/tests/e82557_eeprom_tdd.md
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import subprocess
@@ -19,7 +20,7 @@ CASES = ([f"window{i}" for i in range(10)] + ["frame", "auto6rise", "auto6fall",
     "read8rise", "read8fall", "erased", "empty", "stuck1fixed", "stuck0fixed", "interpret"])
 FLAGS = ["-m32", "-static", "-no-pie", "-fno-pie", "-fno-stack-protector",
          "-ffreestanding", "-nostdlib", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "drivers", "sdk/include/os32")] + ["-I" + str(ROOT)]
+INCLUDES = include_flags(ROOT) + ["-I" + str(ROOT)]
 MIRROR = ["tools/tests/e82557_eeprom_host.c", "drivers/e82557_eeprom.c",
           "drivers/e82557_eeprom.h", "drivers/e82557_regs.h", "drivers/pci_decode.c"]
 # source, exact text, replacement, label; no mutation counts compile failure as RED.
@@ -88,7 +89,7 @@ def target_build(tmp):
         subprocess.run([str(cross), "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-Os", "-Wall", "-Wextra", "-Werror",
             "-D__KERNEL_BUILD__", *INCLUDES,
-            *["-I" + str(ROOT / p) for p in ("arch/x86", "platform/pc98", "lib", "kernel")],
+            *include_flags(ROOT),
             "-c", str(ROOT / rel), "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))], check=True)
     print("TARGET i386-elf GNU11 -Werror PASS", flush=True)
 

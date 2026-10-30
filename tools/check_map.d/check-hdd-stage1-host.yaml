@@ -50,4 +50,5 @@ check-hdd-stage1-host:
 - include/ide_contract.h
 - include/platform_device.h
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/kernel_includes.py
 artifact_reader: true

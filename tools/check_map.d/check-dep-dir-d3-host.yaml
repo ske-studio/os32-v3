@@ -42,3 +42,4 @@ check-dep-dir-d3-host:
 - include/ide_contract.h
 - include/platform_emergency.h
 - platform/pc98/emergency.c
+- tools/tests/kernel_includes.py

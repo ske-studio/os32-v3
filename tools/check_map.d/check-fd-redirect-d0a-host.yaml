@@ -6,3 +6,4 @@ check-fd-redirect-d0a-host:
 - fs/fd_redirect.c
 - tools/check_map.d/check-fd-redirect-d0a-host.yaml
 - build/checks.d/check-fd-redirect-d0a-host.mk
+- tools/tests/kernel_includes.py

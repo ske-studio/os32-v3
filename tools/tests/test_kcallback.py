@@ -2,6 +2,7 @@
 
 Only int80 is replaced by a host bridge; mutants must compile and fail at runtime.
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
 import pathlib
@@ -67,8 +68,7 @@ def run(args, mutant=None):
         exe = tmp / 'test'
         subprocess.run(['gcc', *linker_flags(), '-m32', '-static', '-fno-pie', '-no-pie', '-nostdlib',
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
-                        *['-I' + str(ROOT / p) for p in
-                          ('include', 'fs', 'exec', 'kernel', 'lib', 'sdk/include/os32', 'arch/x86')],
+                        *include_flags(ROOT),
                         '-I' + str(tmp), str(ROOT / 'tools/tests/kcallback_host.c'),
                         str(tmp / 'shim.S'), '-o', str(exe)], check=True, capture_output=True)
         result = host32.run([str(exe)], runner=args.runner, timeout=30, capture_output=True, text=True)

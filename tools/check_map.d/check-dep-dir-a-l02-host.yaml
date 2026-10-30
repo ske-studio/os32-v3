@@ -106,4 +106,5 @@ check-dep-dir-a-l02-host:
 - drivers/pci_decode.c
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
+- tools/tests/kernel_includes.py
 artifact_reader: true

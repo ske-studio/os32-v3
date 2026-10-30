@@ -1,4 +1,5 @@
 """L19: fixed pre-move restore/ready/cell traces; isolated resident closure."""
+from kernel_includes import include_flags
 import argparse
 import gzip
 import hashlib
@@ -45,8 +46,7 @@ def command(work):
     return ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-Wall', '-Wextra',
             '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
             '-nostdlib', '-static', '-no-pie', '-D__KERNEL_BUILD__',
-            *['-I'+str(work/p) for p in ('.','include','arch/x86','platform/pc98',
-                                       'kernel','gfx','sdk/include/os32')],
+            *include_flags(work),
             str(work/HARNESS), '-o', str(work/'display')]
 
 

@@ -2,6 +2,7 @@
 
 Record: tools/tests/display_cleanup_tdd.md
 """
+from kernel_includes import include_dirs, include_flags
 from pathlib import Path
 import re
 import shutil
@@ -48,8 +49,7 @@ def build_run(tree, kind, cases, execute=True):
         command = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-Wno-unused-function', '-D__KERNEL_BUILD__', '-Wl,--gc-sections',
                    '-I' + str(tmp)]
-        command += ['-I' + str(tree / p) for p in
-                    ('include', 'sdk/include', 'sdk/include/os32', 'gfx', 'lib', 'kernel', 'platform/pc98')]
+        command += include_flags(tree)
         subprocess.run(command + [str(src), '-o', str(binary)], check=True)
         if not execute:
             return []
@@ -117,13 +117,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='display-mut-') as td:
         tree = Path(td)
         # Only source/header files, never build outputs or hardware documents.
-        for directory in ('include', 'sdk/include', 'gfx', 'kernel', 'kdebug', 'lib', 'platform/pc98'):
+        for directory in (*dict.fromkeys(d for d in include_dirs() if d != '.'), 'kdebug'):
             for source in (ROOT / directory).rglob('*'):
                 if source.is_file() and source.suffix in ('.h', '.c'):
                     target = tree / source.relative_to(ROOT)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
-        (tree / 'exec').mkdir(parents=True)
+        (tree / 'exec').mkdir(parents=True, exist_ok=True)
         for name in ('surface_query.h', 'surface_limits.h', 'lease.h', 'appslot.h', 'exec.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)
         (tree / 'tools/tests').mkdir(parents=True)

@@ -38,4 +38,5 @@ check-gfx-host:
 - tools/tests/test_gfx_reattach.py
 - tools/tests/gfx_reattach_host.c
 - tools/run_host_group.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

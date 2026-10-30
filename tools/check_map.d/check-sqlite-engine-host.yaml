@@ -24,3 +24,4 @@ check-sqlite-engine-host:
 - kernel/ime/ime.h
 - kernel/ime/ime_render.h
 - kernel/console/unicode_file.h
+- tools/tests/kernel_includes.py

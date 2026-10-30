@@ -6,3 +6,4 @@ check-launch-host:
 - exec/appslot.c
 - tools/check_map.d/check-launch-host.yaml
 - build/checks.d/check-launch-host.mk
+- tools/tests/kernel_includes.py

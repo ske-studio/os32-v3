@@ -103,4 +103,5 @@ check-sqlite-module-proto-host:
 - platform/pc98/boot_names.h
 - platform/pc98/boot_names.c
 - drivers/ide.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

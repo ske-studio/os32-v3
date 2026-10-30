@@ -31,6 +31,7 @@ e2fsck を当てて出力を「許容 (漏れ側)」「不整合」に分類し 
 **自前の媒体検査 (media_ok) と食い違ったら失敗**にする。e2fsck が無い環境では
 `E2FSCK SKIP` と明示して媒体検査だけで通す ([V4])。
 """
+from kernel_includes import include_flags
 import host32
 import collections
 import os
@@ -55,9 +56,7 @@ HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-Wall", "-Wextra", "-Werror",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-D__cdecl="]
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/b8_open_host.c"
 
 # 票 B8 で触ったカーネル側。実ビルドと同じ素性で -Werror を通す ([C1])。
@@ -70,10 +69,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 
 def find_e2fsck():

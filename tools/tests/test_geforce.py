@@ -1,4 +1,5 @@
 """P5 HAL, real P3 start state machine, real ledger/selection and byte routing."""
+from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
 import tempfile
@@ -7,7 +8,7 @@ from test_gfx_kernel_fb import run_case, replace_function
 ROOT=Path(__file__).resolve().parents[2]
 FLAGS=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
        '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie']
-INCLUDES=['-I'+str(ROOT/p) for p in ('.','include','sdk/include/os32','gfx','kernel','lib','arch/x86','platform/pc98')]
+INCLUDES=include_flags(ROOT)
 
 def component(name):
     with tempfile.TemporaryDirectory(prefix='gf-hal-') as td:

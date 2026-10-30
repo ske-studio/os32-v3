@@ -20,6 +20,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -42,8 +43,7 @@ CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
 # pcm_hostshim は**必ず先頭** — include/io.h を差し替えるため。
-INC_DIRS = ("tools/tests/pcm_hostshim", "include", "drivers", "kernel",
-            "lib", "sdk/include/os32")
+INCLUDES = ["-I" + str(ROOT / "tools/tests/pcm_hostshim"), *include_flags(ROOT)]
 
 # 否定側。実装 (純粋部) を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
@@ -213,7 +213,7 @@ DRIVER_MUTATIONS = [
 def host_build(tmp, source_text=None, driver_text=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "pcm-host"
-    inc = ["-I" + str(ROOT / p) for p in INC_DIRS]
+    inc = INCLUDES
     if source_text is None and driver_text is None:
         cmd = ["gcc", *FLAGS, *inc, str(HARNESS), "-o", str(exe)]
     else:
@@ -261,12 +261,9 @@ def build_target(tmp):
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
-               "-Os", "-Wall", "-Werror", 
+               "-Os", "-Wall", "-Werror",
                "-D__KERNEL_BUILD__",
-               "-I" + str(ROOT), "-I" + str(ROOT / "include"),
-               "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "platform/pc98"),
-               "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "kernel"),
-               "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "lib"),
+                *include_flags(ROOT),
                "-c", str(ROOT / rel),
                "-o", str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))]
         subprocess.run(cmd, cwd=ROOT, check=True)

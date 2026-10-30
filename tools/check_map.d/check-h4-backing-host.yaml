@@ -23,4 +23,5 @@ check-h4-backing-host:
 - fs/vfs.h
 - include/dma_contract.h
 - lib/dma_contract.c
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -30,4 +30,5 @@ check-ext2-empty-name-host:
 - include/platform_device.h
 - include/ide_contract.h
 # Conservative artifact-path audit (including indirect helpers/fixtures).
+- tools/tests/kernel_includes.py
 artifact_reader: true

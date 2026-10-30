@@ -23,3 +23,4 @@ check-v86-gcap-abort-host:
 - tools/check_map.d/check-v86-gcap-abort-host.yaml
 - build/checks.d/check-v86-gcap-abort-host.mk
 - include/platform_emergency.h
+- tools/tests/kernel_includes.py

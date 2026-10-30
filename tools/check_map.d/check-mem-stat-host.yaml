@@ -80,4 +80,5 @@ check-mem-stat-host:
 - kernel/kstack_hw.h
 - init/kernel.c
 - tools/tests/kernel_layout.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

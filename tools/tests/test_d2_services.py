@@ -1,4 +1,5 @@
 """D2 A/B/C: real service tables, public wrappers, wiring and ABI stability."""
+from kernel_includes import include_flags
 import argparse
 import json
 from pathlib import Path
@@ -162,7 +163,7 @@ def run(runner, mutation=None):
         (work / 'pointer_wrappers.inc').write_text('\n'.join(pointer_selected))
         (work / 'pointer_wrapper_checks.inc').write_text('\n'.join(pointer_checks))
         exe = work / 'test'
-        includes = ['-I' + str(ROOT / p) for p in ('include', 'lib', 'platform/pc98', 'sdk/include/os32')]
+        includes = include_flags(ROOT)
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-Wall', '-Wextra', '-Werror', '-Wno-unused-const-variable',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
@@ -185,8 +186,9 @@ def contracts():
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name in ('kernel/ime/ime.c', 'kdebug/kselftest.c'):
-        assert '#include "../drivers/kbd.h"' in (ROOT / name).read_text()
+    for name, header in (('kernel/ime/ime.c', '../../drivers/kbd.h'),
+                         ('kdebug/kselftest.c', '../drivers/kbd.h')):
+        assert '#include "' + header + '"' in (ROOT / name).read_text()
     assert '#include "../../drivers/mouse.h"' in platform
     assert 'drivers/mouse.h' not in boot and 'drivers/kbd.h' not in boot
     assert '#include "../include/pointer_service.h"' in (ROOT / 'drivers/mouse.h').read_text()
@@ -219,9 +221,8 @@ def contracts():
         for source in ('port_service', 'serial_diag', 'clock_service'):
             obj = Path(directory) / (source + '.o')
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
-                            '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'lib'),
-                            '-I' + str(ROOT / 'sdk/include/os32'), '-c',
-                            str(ROOT / ('kernel/' + source + '.c')), '-o', str(obj)], check=True)
+                            *include_flags(ROOT), '-c',
+                            str(ROOT / ('kernel/time/clock_service.c' if source == 'clock_service' else 'kernel/' + source + '.c')), '-o', str(obj)], check=True)
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
     assert 'clock_register(&pc98_clock);' in bind

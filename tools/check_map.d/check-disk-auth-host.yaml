@@ -51,4 +51,5 @@ check-disk-auth-host:
 - sdk/crt/**
 - include/ide_contract.h
 - include/platform_device.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

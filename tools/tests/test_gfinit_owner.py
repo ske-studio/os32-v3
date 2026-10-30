@@ -1,4 +1,5 @@
 """S6 owner lifecycle and S7a/S7c shell/ROM output through the real console."""
+from kernel_includes import include_flags
 import pathlib
 import subprocess
 import sys
@@ -10,9 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/gfinit.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
-INCLUDES = ['-I' + str(ROOT / d) for d in
-            ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 MUTATIONS = [
     ('cli_mode_c', 'q.flags |= GF_MODE_C;', 'q.flags |= 0;', 'userland/shell/cmd_gfinit.c'),
     ('modeset_flag', 'op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C)', 'op == GF_OP_MODESET'),

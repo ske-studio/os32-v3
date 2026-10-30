@@ -15,3 +15,4 @@ check-v86-gcap-host:
 - include/pegc.h
 - include/pc98.h
 - include/types.h
+- tools/tests/kernel_includes.py

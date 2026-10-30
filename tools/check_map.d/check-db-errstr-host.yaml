@@ -28,3 +28,4 @@ check-db-errstr-host:
 - kernel/serial_diag.c
 - include/console_output.h
 - lib/serial_diag.h
+- tools/tests/kernel_includes.py

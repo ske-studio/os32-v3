@@ -23,6 +23,7 @@
 確かに落ちることを見る (変異は一時ディレクトリの写しの木に当てる — 実物は読むだけ)。
 make・エミュレータ・実配備には触れない (i386-elf-gcc / ld / objcopy は使う)。
 """
+from kernel_includes import include_flags
 import json
 import os
 import pathlib
@@ -172,9 +173,7 @@ def case_capacity_full(tmp, kj):
           "予約 0 本なら kapi_reserved を作らず KAPI_FUNC_RESERVED は 0")
     inc = ["-I" + str(gk / "sdk/include"), "-I" + str(gk / "sdk/include/os32"),
            "-I" + str(gk / "exec")]
-    for rel in (".", "include", "arch/x86", "platform/pc98", "exec", "kapi", "fs",
-                "gfx", "drivers", "lib", "kernel"):
-        inc.append("-I" + str(ROOT / rel))
+    inc += include_flags(ROOT)
     r = run([TCC, *KERNEL_CFLAGS, *inc, "-fsyntax-only", gk / "exec/exec.c"])
     check(r.returncode == 0,
           "予約 0 本の生成物で exec/exec.c がコンパイルできる "

@@ -1,4 +1,5 @@
 """KDEBUG=0 production startup, resource gate, cleanup and reboot order."""
+from kernel_includes import include_flags
 from pathlib import Path
 import os
 import subprocess
@@ -13,8 +14,7 @@ def main():
              '-Werror', '-Werror=vla', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
              '-DKDEBUG=0', '-DGF_PRODUCTION',
-             *['-I'+str(ROOT / p) for p in ('.', 'include', 'kernel', 'lib', 'fs',
-                 'sdk/include/os32', 'exec', 'drivers', 'arch/x86', 'platform/pc98')]]
+             *include_flags(ROOT)]
     with tempfile.TemporaryDirectory(prefix='gf-production-') as tmp:
         exe = Path(tmp) / 'host'
         native = Path(tmp) / 'native.o'

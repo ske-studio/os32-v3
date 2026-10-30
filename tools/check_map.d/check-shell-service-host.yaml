@@ -18,3 +18,4 @@ check-shell-service-host:
 - tools/tests/test_shell_service.py
 - tools/check_map.d/check-shell-service-host.yaml
 - build/checks.d/check-shell-service-host.mk
+- tools/tests/kernel_includes.py

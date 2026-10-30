@@ -11,6 +11,7 @@ test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせた
 実行できないため。クロス側は付けないので、include/io.h を使う本番の経路も
 同じ試験の中でコンパイルされる。
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -23,9 +24,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("include", "arch/x86", "platform/pc98",
-                      "kernel", "gfx", "lib", "drivers", "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 HOST_SRC = ROOT / "tools/tests/con_sink_host.c"
 KERNEL_SRC = ROOT / "kernel/console/con_sink.c"
 # K6C-2: 描画抑止は kernel/console/console.c 側なので、そちらもカーネルと同じ

@@ -1,4 +1,5 @@
 """T4b-1: real op 11 dispatcher, 40-byte wire rejection, no HAL calls."""
+from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
 import sys
@@ -8,8 +9,6 @@ import mutpar
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'kdebug/kdebug_main.c'
-INCLUDES = ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-            'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')
 
 MUTATIONS = [
     ('route_dispatch_now', 'recover_route_test_session(r, out->session) :', 'recover_now_session(r, out->session) :'),
@@ -28,7 +27,7 @@ def build_cmd(exe):
             '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
             '-fno-stack-protector', '-D__KERNEL_BUILD__', '-nostdlib',
             '-static', '-no-pie', '-DRECOVER_ROUTE_WIRE',
-            '-I'+str(ROOT / 'tools/tests/recover_hostshim'), *['-I'+str(ROOT / x) for x in INCLUDES],
+            '-I'+str(ROOT / 'tools/tests/recover_hostshim'), *(['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT)),
             str(ROOT / 'tools/tests/recover_wire_host.c'),
             str(ROOT / SOURCE), '-o', str(exe)]
 

@@ -19,6 +19,7 @@ IRP_MJ_CREATE が返す NTSTATUS を 1 つずつ指定して
 --target を付けると fs/hostdrvfs.c が実ビルドの素性でも通ることを見る。
 make・エミュレータ・実配備には一切触れない。
 """
+from kernel_includes import include_flags
 import host32
 import pathlib
 import subprocess
@@ -36,10 +37,7 @@ HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-Wno-address-of-packed-member",
               "-D__cdecl="]
 # hostdrv_hostshim は**必ず先頭** — include/io.h を差し替えるため。
-INCLUDES = ["-I" + str(ROOT / p)
-            for p in ("tools/tests/hostdrv_hostshim",
-                      "include", "fs", "lib", "kernel", "drivers",
-                      "sdk/include/os32")]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('tools/tests/hostdrv_hostshim',)] + include_flags(ROOT))
 SRC = ROOT / "tools/tests/b8_hostdrv_host.c"
 
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
@@ -48,10 +46,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-Wno-address-of-packed-member",
                 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-b8hd-") as tmp:

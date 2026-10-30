@@ -11,3 +11,4 @@ check-e82557-eeprom-host:
 - tools/check_map.d/check-e82557-eeprom-host.yaml
 - build/checks.d/check-e82557-eeprom-host.mk
 - include/pci_dev_contract.h
+- tools/tests/kernel_includes.py

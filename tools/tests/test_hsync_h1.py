@@ -20,6 +20,7 @@ hsync.c / lib/crc32.c / fs/hostdrvfs.c が -Werror で通ることを確かめ�
   2. CRC 贋物  … -DHSYNC_CRC_STUB。CRC が常に同値を返しても既定の
                  バイト比較が内容差を検出することの否定側 (A08)
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -55,10 +56,8 @@ TARGET_USER = TARGET_COMMON + [
 TARGET_KERNEL = TARGET_COMMON + [
     # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
     # arch_io.h / platform_io.h を引く (順序 3)。
-    "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-    "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-    "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet", "-Ifs",
-    "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+    "-D__KERNEL_BUILD__",
+       *include_flags(ROOT)]
 
 
 def check_depth_constant():

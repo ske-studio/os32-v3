@@ -36,4 +36,5 @@ check-shm-user-host:
 - tools/check_map.d/check-shm-user-host.yaml
 - build/checks.d/check-shm-user-host.mk
 - tools/tests/mutpar.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

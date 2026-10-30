@@ -6,6 +6,7 @@ The sources are also identical at the L13 step base 5399711c. Input read
 sequences are explicitly defined by samples() in dep_dir_b_timer_host.c.
 Runtime only links the current tree and compares the checked-in fixture.
 """
+from kernel_includes import include_flags
 import json
 import os
 import re
@@ -77,7 +78,7 @@ def build(work, clock_byte, mutation=None, baseline=None):
         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
         '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
         '-D__cdecl=', f'-DTEST_CLOCK_BYTE={clock_byte}',
-        '-I' + str(work), '-I' + str(work / 'kernel'),
+        '-I' + str(work), *include_flags(work),
         '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'),
         str(ROOT / 'tools/tests/dep_dir_b_timer_host.c'),
         *(str(work / rel) for rel in linked), libgcc, '-o', str(exe)], check=True)

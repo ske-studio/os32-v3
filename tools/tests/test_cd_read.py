@@ -23,6 +23,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 (**RED に数えない**) / SURVIVED = 全ケースが通った (見逃し)。対照 (何も変え
 ない変異) は SURVIVED でなければならない。
 """
+from kernel_includes import include_flags
 import os
 import pathlib
 import re
@@ -68,9 +69,7 @@ def read_includes(tree):
     # The host shim must win over include/ (io.h) for both the copied tree and the
     # dependency scan over ROOT, so it comes first.
     return ["-I" + str(tree / SHIM), "-I" + str(tree / "include"), "-I" + str(tree / "drivers"), "-I" + str(tree / "fs"),
-            "-I" + str(tree)] + ["-I" + str(ROOT / p) for p in
-                                 ("include", "drivers", "fs", "lib", "kernel",
-                                  "sdk/include/os32")] + ["-I" + str(ROOT)]
+            "-I" + str(tree)] + include_flags(ROOT)
 
 
 def pkg_includes(tree):
@@ -652,10 +651,7 @@ def build_target(tmp):
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
             "-fsigned-char", "-fno-short-enums", "-O2", "-Wall", "-Werror"]
-    kinc = ["-D__KERNEL_BUILD__"] + ["-I" + str(ROOT / p) for p in
-                                     (".", "include", "arch/x86", "platform/pc98",
-                                      "sdk/include", "sdk/include/os32", "drivers", "fs",
-                                      "kernel", "lib")]
+    kinc = ["-D__KERNEL_BUILD__"] + include_flags(ROOT)
     for rel in ("drivers/atapi.c", "fs/iso9660.c"):
         subprocess.run([*base, *kinc, "-c", str(ROOT / rel), "-o",
                         str(pathlib.Path(tmp) / (rel.replace("/", "_") + ".o"))],

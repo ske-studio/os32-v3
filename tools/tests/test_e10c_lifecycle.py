@@ -1,4 +1,5 @@
 """e10c real gcap ownership/release, polled stop marker, and int80 VM branch."""
+from kernel_includes import include_flags
 import argparse
 from pathlib import Path
 import subprocess
@@ -63,7 +64,7 @@ def run(runner, mutant=None):
         source=(ROOT/'tools/tests/e10c_gcap_host.c').read_text().replace('static void run(void) {','extern int host_vm_gate(u32 flags);\nstatic void run(void) {\n    CHECK(host_vm_gate(0x20000) == 0);\n    CHECK(host_vm_gate(0x202) == 1);')
         (tmp/'fixture.c').write_text(source)
         cmd=['gcc','-m32','-march=i386','-std=gnu11','-O2','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-variable','-ffreestanding','-fno-builtin','-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie']
-        cmd+=['-I'+str(tmp)]+['-I'+str(ROOT/p) for p in ('include','kernel','sdk/include/os32')]
+        cmd+=['-I'+str(tmp)]+include_flags(ROOT)
         r=host32.build(cmd+[str(tmp/'fixture.c'),str(tmp/'vm.o'),'-o',str(tmp/'test')],capture_output=True,text=True)
         assert r.returncode == 0,r.stderr
         r=host32.run([str(tmp/'test')],runner=runner,capture_output=True,text=True,timeout=60)

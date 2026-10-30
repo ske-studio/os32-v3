@@ -54,3 +54,4 @@ check-x11-shared-host:
 - include/console_output.h
 - drivers/serial.h
 - lib/serial_diag.h
+- tools/tests/kernel_includes.py

@@ -21,3 +21,4 @@ check-ver-format-host:
 - tools/tests/host32.py
 - build/checks.d/check-ver-format-host.mk
 - tools/check_map.d/check-ver-format-host.yaml
+- tools/tests/kernel_includes.py

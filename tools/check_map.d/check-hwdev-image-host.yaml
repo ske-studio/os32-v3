@@ -121,4 +121,5 @@ check-hwdev-image-host:
 - tools/tests/recover_gf_cases_host.inc
 - tools/tests/recover_gf_fixture_host.inc
 - tools/tests/test_gfinit_stages.py
+- tools/tests/kernel_includes.py
 artifact_reader: true

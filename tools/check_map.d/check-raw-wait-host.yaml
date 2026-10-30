@@ -84,3 +84,4 @@ check-raw-wait-host:
 - kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h
+- tools/tests/kernel_includes.py

@@ -17,6 +17,7 @@
 SKIP と出す)。恒等の対照 (何も変えない置換) は GREEN でなければならない —
 RED なら変異の仕組みそのものが壊れている。
 """
+from kernel_includes import include_flags
 import pathlib
 import re
 import subprocess
@@ -32,16 +33,13 @@ CASES = ["collect", "overflow", "utf8_latch", "stop", "header", "compose",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=", "-DBOOTLOG_NO_IRQ_LOCK"]
-INCLUDES = ["-I" + str(ROOT / p) for p in ("include", "lib", "sdk/include/os32")]
+INCLUDES = include_flags(ROOT)
 
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
                 "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
                 "-fsigned-char", "-fno-short-enums", "-O2", "-Wall", "-Wextra",
                 "-Werror", "-D__KERNEL_BUILD__"]
-TARGET_INCLUDES = ["-I" + str(ROOT / p) for p in
-                   (".", "include", "arch/x86", "platform/pc98", "sdk/include",
-                    "sdk/include/os32", "kernel", "drivers", "fs", "exec", "lib",
-                    "kapi")]
+TARGET_INCLUDES = include_flags(ROOT)
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (パターン, 置換, 説明)。先頭は恒等の対照で、GREEN でなければならない。
@@ -139,8 +137,6 @@ def host_build(tmp, source_text=None, tag="host"):
         d.mkdir(exist_ok=True)
         (d / "bootlog.c").write_text(source_text, encoding="utf-8")
         inc = ["-I" + str(d)]
-    else:
-        inc = ["-I" + str(ROOT / "kernel")]
     subprocess.run(["gcc", *FLAGS, *inc, *INCLUDES, str(HARNESS), "-o", str(exe)],
                    cwd=ROOT, check=True,
                    stderr=None if source_text is None else subprocess.DEVNULL)

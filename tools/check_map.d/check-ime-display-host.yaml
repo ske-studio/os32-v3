@@ -13,3 +13,4 @@ check-ime-display-host:
 - platform/pc98/console.c
 - build/checks.d/check-ime-display-host.mk
 - tools/check_map.d/check-ime-display-host.yaml
+- tools/tests/kernel_includes.py

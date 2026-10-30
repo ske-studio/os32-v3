@@ -1,6 +1,7 @@
 """T7a-2a: genuine admission/staging + T2 uaccess; ILP32 CPU boundaries.
 Normal controls always run before compiled runtime-RED mutations.
 """
+from kernel_includes import include_flags
 import os
 from pathlib import Path
 import subprocess
@@ -40,8 +41,7 @@ def main():
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Os', '-Wall', '-Wextra',
                             '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                             '-ffunction-sections', '-fdata-sections', '-D__cdecl=',
-                            *['-I' + str(ROOT / d) for d in
-                              ('include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86')],
+                            *include_flags(ROOT),
                             '-I' + str(folder), '-nostdlib', '-static', '-no-pie',
                             '-Wl,--gc-sections', ROOT / 'tools/tests/v86_call_host.c',
                             '-o', exe], check=True)

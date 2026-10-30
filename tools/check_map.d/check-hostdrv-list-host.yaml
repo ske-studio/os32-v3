@@ -7,3 +7,4 @@ check-hostdrv-list-host:
 - fs/vfs_name_rules.inc
 - tools/check_map.d/check-hostdrv-list-host.yaml
 - build/checks.d/check-hostdrv-list-host.mk
+- tools/tests/kernel_includes.py

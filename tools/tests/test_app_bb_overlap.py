@@ -1,6 +1,7 @@
 """T2c high private image/heap/variable stack and supervisor BB aliases; actual paging,
 ledger and fixed KHEAP. Mutants must compile and fail during execution.
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -93,9 +94,7 @@ def run(mutation=None):
             assert heap_source.count(old) == 1
             heap_source = heap_source.replace(old, new)
         (tmp / 'kmalloc_host_source.c').write_text(heap_source)
-        includes = ['-I'  + str(ROOT / p)
-                    for p in ('include', 'arch/x86', 'platform/pc98', 'kernel',
-                              'lib', 'exec', 'sdk/include/os32')] + ['-I' + str(tmp)]
+        includes = include_flags(ROOT) + ['-I' + str(tmp)]
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',

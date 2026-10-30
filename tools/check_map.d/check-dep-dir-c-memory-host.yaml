@@ -22,3 +22,12 @@ check-dep-dir-c-memory-host:
 - tools/tests/fixtures/dep_dir_c/**
 - build/checks.d/check-dep-dir-c-memory-host.mk
 - tools/check_map.d/check-dep-dir-c-memory-host.yaml
+- tools/tests/kernel_includes.py
+- mm/*.h
+- init/*.h
+- arch/x86/kernel/*.h
+- kernel/**/*.h
+- net/*.h
+- kapi/*.h
+- gfx/*.h
+- lib/sqlite3/*.h

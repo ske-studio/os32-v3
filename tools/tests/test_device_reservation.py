@@ -34,6 +34,7 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
 RED になることを見る。実物のソースは書き換えない。コンパイルの失敗は RED に
 数えない。
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -588,7 +589,7 @@ def run_c(texts, body):
         src = texts['mm/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(L.PRE + src + post + body + L.END)
         cmd = ['gcc', *linker_flags()] + L.FLAGS + ['-I' + str(tmp)]
-        cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers', 'sdk/include/os32')]
+        cmd += include_flags(ROOT)
         build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
                                       str(ROOT / 'drivers/pci_decode.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
@@ -612,7 +613,7 @@ def stage_run(texts):
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
         cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
-        cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'drivers', 'sdk/include/os32')] + ['-I' + str(tmp)]
+        cmd += include_flags(ROOT) + ['-I' + str(tmp)]
         build = subprocess.run(cmd + [str(ROOT / 'tools/tests/device_reservation_stage_host.c'),
                                       str(ROOT / 'mm/physmem.c'), '-o', str(tmp / 'test')],
                                capture_output=True, text=True)

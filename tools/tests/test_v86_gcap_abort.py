@@ -4,6 +4,7 @@ handlers at explicit boundaries; modeled V86 runs return HOTKEY separately.
 Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
+from kernel_includes import include_flags
 from pathlib import Path
 import re
 import subprocess
@@ -70,9 +71,7 @@ def main():
                    '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                    '-fno-delete-null-pointer-checks', '-ffunction-sections', '-fdata-sections',
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
-            cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                    'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'fs',
-                    'drivers', 'sdk/include/os32', 'kdebug')]
+            cmd += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'kdebug')] + include_flags(ROOT))
             subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_gcap_abort_host.c'),
                                  str(ROOT / 'kdebug/v86_gcap_math.c'), '-o', str(exe)], check=True)
             result = subprocess.run(['qemu-i386', '-B', '0x100000000', str(exe)],

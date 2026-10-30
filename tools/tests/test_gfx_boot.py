@@ -30,6 +30,7 @@ gfx_client_to_gshell)。
 --mutate は要の行を写しで壊し、どれかの構成が実行時に RED になることを見る。
 実物のソースは書き換えない。コンパイルの失敗は RED に数えない。
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -126,8 +127,7 @@ def build(texts, tmp):
            # になりうる) は、ここでは定義があるので常に真になる。
            '-Wno-address']
     cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
-    cmd += ['-I' + str(ROOT / p) for p in ('include', 'arch/x86', 'platform/pc98', 'kernel',
-                                           'lib', 'drivers', 'gfx', 'sdk/include/os32')]
+    cmd += include_flags(ROOT)
     cmd += ['-I' + str(tmp)]
     return cmd
 

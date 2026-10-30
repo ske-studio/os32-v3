@@ -23,6 +23,7 @@
   python3 -B tools/tests/test_hdd_stage1.py --target   # + i386-elf -Werror で新しいソース
   python3 -B tools/tests/test_hdd_stage1.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import host32
 import hashlib
 import importlib.util
@@ -257,8 +258,8 @@ def _part_cmd(tmp, root):
         harness = pathlib.Path(tmp) / "ext2_part_host.c"
         harness.write_text(text, encoding="utf-8")
     inc = ["-I" + str(root)]
-    inc += ["-I" + str(root / d) for d in PART_INC_DIRS]
-    inc += ["-I" + str(ROOT / d) for d in PART_INC_DIRS]
+    inc += include_flags(root)
+    inc += include_flags(ROOT)
     return ["gcc", *PART_FLAGS, *inc, str(harness), "-o", str(exe)]
 
 
@@ -827,7 +828,7 @@ def build_target(tmp):
     gen.write_layout_header(ROOT, str(layout))
     base = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
-            "-fcommon", "-O2", "-Wall", "-Werror", 
+            "-fcommon", "-O2", "-Wall", "-Werror",
             "-D__KERNEL_BUILD__", "-I" + str(ROOT), "-I" + str(ROOT / "include"),
             "-I" + str(ROOT / "drivers"), "-I" + str(ROOT / "fs"),
             "-I" + str(ROOT / "sdk/include/os32"), "-I" + str(ROOT / "arch/x86"),

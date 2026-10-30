@@ -1,4 +1,5 @@
 """T4b-2: actual core guard, typed thunks and NASM trampoline on ILP32."""
+from kernel_includes import include_flags
 import argparse
 import json
 import pathlib
@@ -14,6 +15,11 @@ def run(runner, mutant=None):
     with tempfile.TemporaryDirectory(prefix='sqlite-engine-') as directory:
         tmp = pathlib.Path(directory)
         engine = (ROOT / TARGET_SRC[0]).read_text().split('/* Boot-only adapter:')[0]
+        # The copied guard uses host MMU/allocator seams, including after L1
+        # made the product's sibling-directory includes explicit.
+        for header in ('pgalloc.h', 'paging.h'):
+            engine = engine.replace('#include "../mm/' + header + '"',
+                                    '#include "' + header + '"')
         engine = engine.replace('#include "../lib/sqlite3/generated/', '#include "'+str(ROOT / 'lib/sqlite3/generated')+'/')
         if mutant == 'guard bypass':
             engine = engine.replace('sqlite_engine_active || kctx_irq_depth', '0 || kctx_irq_depth')
@@ -100,7 +106,7 @@ def run(runner, mutant=None):
         cmd = ['gcc','-m32','-march=i386','-std=gnu11','-Os','-ffreestanding','-fno-pie',
                '-fno-stack-protector','-ffunction-sections','-fdata-sections','-nostdlib',
                '-static','-no-pie','-Wl,--gc-sections','-I'+str(tmp), '-I'+str(ROOT)]
-        cmd += ['-I'+str(ROOT/p) for p in ['include','kernel','fs','lib','lib/sqlite3','sdk/include/os32']]
+        cmd += include_flags(ROOT)
         cmd += [str(ROOT/'tools/tests/sqlite_engine_host.c'),str(tmp/'engine.c'),
                 str(tmp/'outer.c'), *objects, '-o',str(exe)]
         host32.build(cmd, check=True, capture_output=True, text=True)

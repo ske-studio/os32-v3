@@ -5,3 +5,4 @@ check-cpu-calibrate-host:
 - tools/tests/test_cpu_calibrate.py
 - tools/check_map.d/check-cpu-calibrate-host.yaml
 - build/checks.d/check-cpu-calibrate-host.mk
+- tools/tests/kernel_includes.py

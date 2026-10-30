@@ -50,6 +50,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
           取り出し、-DFDP_RED で組んで回す。**落ちること**を確かめて記録を出す
           (失効の印・inode の口を直接見る検査と注入は RED では組まない)。
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -82,10 +83,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-Wall", "-Wextra", "-Werror",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
                 "-Wno-address-of-packed-member",
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 # 変異: (名前, 写しの中のファイル, 置き換え前, 置き換え後)。
 # 置き換え前後が同じものは正常対照 (通ること)。それ以外は落ちること。
@@ -448,9 +447,7 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
          "-Wno-unused-parameter",
          "-Wno-sign-compare", "-Wno-pointer-to-int-cast",
          "-Wno-missing-field-initializers", "-D__cdecl=", "-I" + str(shim),
-         *["-I" + str(ROOT / p) for p in ("include", "fs", "drivers",
-                                          "sdk/include/os32", "lib",
-                                          "lib/sqlite3", "kernel")],
+         *include_flags(ROOT),
          str(src), str(obj), "-o", str(exe)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if res.returncode != 0:
@@ -755,9 +752,7 @@ def build(tmp, fsdir, libdir, exe_name="fdpath", extra=(), ffo=None):
     """ffo を渡すとその ff.o を使い、FatFs を組み直さない (変異が FatFs に触らないとき)。"""
     inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir),
            "-I" + str(libdir)]
-    inc += ["-I" + str(ROOT / p) for p in
-            ("include", "lib", "kernel", "drivers", "sdk/include/os32",
-             "userland/lib")]
+    inc += (['-I' + str(ROOT / p) for p in ('userland/lib',)] + include_flags(ROOT))
     inc += ["-I" + str(ROOT)]   # cdinst の共有部 (userland/shell/hdprep_plan.c 等)
     exe = tmp / exe_name
     # 段 fatname は実物の FatFs (fs/fatfs/ff.c) と組む。ff.c は別の翻訳単位で、

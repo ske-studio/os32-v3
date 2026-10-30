@@ -1,4 +1,5 @@
 """T2b: actual paging/ledger/lease ILP32 runtime and compiled runtime mutants."""
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
 import pathlib
@@ -71,8 +72,7 @@ def run(changes=None):
                                   '((u8 *)host_surface_pointer(sf->first * PAGE_SIZE))[p]')
         for name, source in zip(('paging_host_source.c', 'pgalloc_host_source.c', 'lease_host_source.c'), texts):
             (tmp / name).write_text(source)
-        includes = ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'include',
-                    'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'sdk/include/os32')] + ['-I' + str(tmp)]
+        includes = ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)] + ['-I' + str(tmp)]
         exe = tmp / 'lease'
         subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
                         '-no-pie', '-Wl,--gc-sections', *includes, str(ROOT / 'tools/tests/lease_host.c'),

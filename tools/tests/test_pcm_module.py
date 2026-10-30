@@ -75,7 +75,7 @@ def driver_checks(folder, omit_evidence):
     """Real CS4231 shutdown with the existing port/clock/pool fixture.
     Model I/O is not a claim of PCM transfer on NP21/W or real hardware.
     """
-    from test_pcm_cs4231 import FLAGS as PCM_FLAGS, INC_DIRS
+    from test_pcm_cs4231 import FLAGS as PCM_FLAGS, INCLUDES as PCM_INCLUDES
     driver = (ROOT / 'drivers/pcm_cs4231.c').read_text()
     if omit_evidence:
         old = "evid = ((inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&\n                (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0);"
@@ -96,7 +96,7 @@ def driver_checks(folder, omit_evidence):
     probe.write_text(harness)
     exe = folder / 'pcm-playback'
     subprocess.run(['gcc', *PCM_FLAGS, '-no-pie',
-                    *['-I' + str(ROOT / p) for p in INC_DIRS],
+                    *PCM_INCLUDES,
                     str(probe), '-o', str(exe)], check=True)
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = subprocess.run((['qemu-x86_64'] if runner == 'qemu' else []) + [str(exe)],

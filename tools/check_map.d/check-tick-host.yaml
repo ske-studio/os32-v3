@@ -17,3 +17,4 @@ check-tick-host:
 - drivers/ne2000.c
 - drivers/lgy98.c
 - net/link.c
+- tools/tests/kernel_includes.py

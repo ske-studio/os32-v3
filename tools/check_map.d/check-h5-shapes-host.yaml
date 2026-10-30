@@ -21,3 +21,4 @@ check-h5-shapes-host:
 - exec/exec_kapi_init.inc
 - exec/appslot.c
 - exec/appslot.h
+- tools/tests/kernel_includes.py

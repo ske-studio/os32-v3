@@ -12,6 +12,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
+from kernel_includes import include_dirs, include_flags
 import pathlib
 import re
 import shutil
@@ -31,15 +32,12 @@ VARIANT_DEFS = ["-DFONT_SOURCE_HOST_APP_TOTAL=4"]
 VARIANT_CASES = ["lease_limit", "lease_owned"]
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare", "-D__cdecl="]
-INC_DIRS = ("include", "fs", "drivers", "sdk/include/os32", "kernel", "exec", "lib",
-            "arch/x86", "platform/pc98")
+INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST = "tools/tests/font_source_host.c"
 SRC = "fs/vfs_fd.c"
 LEASE = "kernel/console/font_source.c"
 EXEC = "exec/exec.c"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
-TARGET_INC = ("include", "arch/x86", "platform/pc98", "sdk/include", "sdk/include/os32",
-              "kernel", "drivers", "net", "fs", "exec", "gfx", "lib", "kapi")
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 # (ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, 何を崩したか)
@@ -155,7 +153,7 @@ def write_reclaim(root, out):
 
 
 def includes(root):
-    return ["-I" + str(root / p) for p in INC_DIRS]
+    return include_flags(root)
 
 
 def gui_shell_owner(root):
@@ -199,7 +197,7 @@ def target_compile(root, tmp):
                     "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                     "-mno-red-zone", "-fcommon", "-O2", "-Wall", "-Wextra", "-Werror",
                     "-Wno-unused-parameter", "-Wno-sign-compare",
-                    "-D__KERNEL_BUILD__", *["-I" + str(root / p) for p in TARGET_INC],
+                    "-D__KERNEL_BUILD__", *include_flags(root),
                     "-c", str(root / LEASE), "-o", str(tmp / "font_source.o")],
                    cwd=root, check=True)
 

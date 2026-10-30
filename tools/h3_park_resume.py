@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Also support direct execution from tools/.
 import sys
 sys.path.insert(0, str(ROOT))
+from tools.tests.kernel_includes import include_flags
 MODES = {'pf': 1, 'gp': 2, 'de': 3, 'ud': 4, 'USER-loop': 5, 'KAPI-loop': 6}
 FIELDS = 'magic owner generation phase mode arm version fixture resumes consumed window gui_slot'.split()
 MAGIC = 0x48335031
@@ -319,7 +320,7 @@ def make_layout(elf, kernel_map):
     with tempfile.TemporaryDirectory(prefix='h3-layout-') as directory:
         obj = str(Path(directory) / 'layout.o')
         subprocess.run([str(cross / 'i386-elf-gcc'), '-std=gnu11', '-ffreestanding',
-                        '-Iinclude', '-Ikernel', '-Iexec', '-Ilib', '-c',
+                        *include_flags(ROOT), '-c',
                         'tools/h3_layout.c', '-o', obj], cwd=ROOT, check=True)
         offsets = symbols(subprocess.check_output([nm, '--defined-only', obj], text=True))
     required = ('g_cur', 'tick_count', 'exec_kill', 'exec_pending_finish', 'g_slot', 'shm_state', 'shm_block_owner', 'shm_block_span',

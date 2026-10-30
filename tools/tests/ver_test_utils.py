@@ -1,4 +1,5 @@
 """Small ILP32 harness for VER_INFO's real source slices."""
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import subprocess
@@ -46,8 +47,7 @@ def execute(fixture, runner, files=None, dialect='gnu11', assembly=None):
                '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                '-nostdlib', '-static', '-no-pie', '-I'+str(tmp),
-               '-I'+str(ROOT/'include'), '-I'+str(ROOT/'kernel'),
-               '-I'+str(ROOT/'sdk/include/os32'), str(tmp/'fixture.c'), '-o', str(tmp/'host')]
+               *include_flags(ROOT), str(tmp/'fixture.c'), '-o', str(tmp/'host')]
         if assembly:
             obj = tmp/'assembly.o'
             subprocess.run(['nasm', '-f', 'elf32', str(ROOT/assembly), '-o', str(obj)], check=True)

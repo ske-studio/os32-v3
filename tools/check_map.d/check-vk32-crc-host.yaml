@@ -54,4 +54,5 @@ check-vk32-crc-host:
 - boot/crc32_defs.inc
 - boot/fat12_defs.inc
 - boot/pc98_defs.inc
+- tools/tests/kernel_includes.py
 artifact_reader: true

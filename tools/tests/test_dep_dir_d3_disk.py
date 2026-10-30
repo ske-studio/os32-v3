@@ -1,4 +1,5 @@
 """D3b geometry/ABI: compile real runtime and adapter as ILP32; IDE is fake."""
+from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
 import tempfile
@@ -30,8 +31,7 @@ def build(tmp, mutation=None):
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
            '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections',
            '-D__cdecl=', '-I' + str(tmp), '-I' + str(tmp / 'include'), '-I' + str(ROOT)]
-    cmd += ['-I' + str(ROOT / p) for p in ('include', 'kernel', 'lib', 'drivers',
-                                         'sdk/include/os32')]
+    cmd += include_flags(ROOT)
     subprocess.run([*cmd, str(src), '-o', str(exe)], check=True)
     return exe
 

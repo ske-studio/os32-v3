@@ -6,6 +6,7 @@ are the existing ktime.c IRR read expression, exposed only for the harness.
 Input reads are armed explicitly in dep_dir_b_pic_host.c; wrong/extra/missing
 reads fail. Capture once with build(work, baseline=(idt_text, irq_text)).
 """
+from kernel_includes import include_flags
 import json
 from pathlib import Path
 import re
@@ -57,7 +58,7 @@ def build(work, mutation=None, baseline=None):
         'gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
         '-static', '-no-pie', '-D__cdecl=', '-I' + str(work),
-        '-I' + str(work / 'kernel'), '-I' + str(ROOT / 'include'),
+        *include_flags(work), '-I' + str(ROOT / 'include'),
         str(ROOT / 'tools/tests/dep_dir_b_pic_host.c'),
         *(str(work / rel) for rel in SOURCES), '-o', str(exe)], check=True)
     return exe

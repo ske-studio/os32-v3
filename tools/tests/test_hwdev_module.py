@@ -1,4 +1,5 @@
 """M2 synthetic KMOD acceptance/rejection through the real facade and loader."""
+from kernel_includes import include_flags
 import json
 import os
 from pathlib import Path
@@ -19,9 +20,7 @@ import mkmod
 
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
-INCLUDES = ['-I' + str(ROOT / d) for d in
-            ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 
 
 def vk32():

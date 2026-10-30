@@ -24,6 +24,7 @@ e2fsck が無い環境では `E2FSCK SKIP` と明示して自前の検査だけ�
 --mutants fs/ の**写し**に変異を 1 つずつ当てて組み直し、どれも落ちることを見る。
           実物のソースは書き換えないので、並列の check-par に置いてよい。
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -46,10 +47,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
-                "-D__KERNEL_BUILD__", "-I.", "-Iinclude",
-                "-Iarch/x86", "-Iplatform/pc98", "-Isdk/include",
-                "-Isdk/include/os32", "-Ikernel", "-Idrivers", "-Inet",
-                "-Ifs", "-Iexec", "-Igfx", "-Ilib", "-Ikapi"]
+                "-D__KERNEL_BUILD__",
+                    *include_flags(ROOT)]
 
 # 変異: (名前, ファイル, 置き換え前, 置き換え後)。どれも**落ちなければならない**。
 MUTANTS = [
@@ -133,9 +132,7 @@ def make_pkgs(tmp):
 
 def build(tmp, fsdir, exe_name="ename"):
     inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir)]
-    inc += ["-I" + str(ROOT / p) for p in
-            ("include", "lib", "kernel", "drivers", "sdk/include/os32",
-             "userland/lib")]
+    inc += (['-I' + str(ROOT / p) for p in ('userland/lib',)] + include_flags(ROOT))
     exe = tmp / exe_name
     res = subprocess.run(["gcc", *HOST_FLAGS, *inc, str(SRC), "-o", str(exe)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

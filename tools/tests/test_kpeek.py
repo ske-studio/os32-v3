@@ -17,6 +17,7 @@ LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Eth
   python3 -B tools/tests/test_kpeek.py            # ホスト + i386-elf
   python3 -B tools/tests/test_kpeek.py --mutate   # 否定側 (変異が RED になるか)
 """
+from kernel_includes import include_flags
 import host32
 import os
 import pathlib
@@ -34,10 +35,7 @@ KPEEK = "kdebug/kpeek.c"
 ALLOW = "kdebug/kpeek_allow.c"
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
 # build/config.mk の INC_KERNEL と同じ探索先 (+ kdebug)。
-INCLUDES = ["-I" + str(ROOT / p) for p in
-            (".", "include", "arch/x86", "platform/pc98", "sdk/include",
-             "sdk/include/os32", "kernel", "drivers", "net", "fs", "exec",
-             "gfx", "lib", "kapi", "kdebug")]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 
 
 def cross_gcc():

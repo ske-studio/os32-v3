@@ -1,3 +1,4 @@
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 #!/usr/bin/env python3
 """T2e e10a real paging/SHM/V86; record: tools/tests/shm_user_tdd.md."""
@@ -153,8 +154,7 @@ def run(runner, mutation=None):
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
                '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
                '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
-        cmd += ['-I'+str(work)] + ['-I'+str(ROOT/p) for p in
-                  ('tools/tests/host_arch', 'tools/tests', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'sdk/include/os32')]
+        cmd += ['-I'+str(work)] + (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
         exe = work/'fixture'
         result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'mm/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:

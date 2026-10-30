@@ -8,3 +8,4 @@ check-irq-math-host:
 - include/pc98.h
 - include/platform_irq.h
 - platform/pc98/pic.c
+- tools/tests/kernel_includes.py

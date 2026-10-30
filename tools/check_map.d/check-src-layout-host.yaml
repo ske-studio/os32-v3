@@ -15,4 +15,5 @@ check-src-layout-host:
 - tools/tests/ver_test_utils.py
 - build/checks.d/check-src-layout-host.mk
 - tools/check_map.d/check-src-layout-host.yaml
+- tools/tests/kernel_includes.py
 artifact_reader: true

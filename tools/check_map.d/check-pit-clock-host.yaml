@@ -13,3 +13,4 @@ check-pit-clock-host:
 - platform/pc98/clock.c
 - kernel/time/pit.c
 - platform/pc98/timer.c
+- tools/tests/kernel_includes.py

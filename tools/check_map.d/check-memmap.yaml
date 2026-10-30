@@ -25,3 +25,4 @@ check-memmap:
 - tools/check_map.d/check-memmap.yaml
 - build/checks.d/check-memmap.mk
 - tools/check_artifacts.py
+- tools/tests/kernel_includes.py

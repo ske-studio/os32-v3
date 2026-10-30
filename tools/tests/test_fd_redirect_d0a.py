@@ -2,6 +2,7 @@
 MMU, live slots and IRQ primitives are instrumented host boundaries.
 Mutants must compile successfully and then fail at runtime (never compile RED).
 """
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import subprocess
@@ -46,7 +47,7 @@ def run(root, tmp, quiet=False):
     exe = tmp / "d0b"
     subprocess.run([
         "cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-D__cdecl=",
-        *["-I" + str(ROOT / d) for d in ("include", "kernel", "exec", "fs", "lib", "sdk/include/os32")],
+        *include_flags(ROOT),
         str(root / "tools/tests/fd_redirect_d0a_host.c"), "-o", str(exe),
     ], check=True, capture_output=True, text=True)
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10)

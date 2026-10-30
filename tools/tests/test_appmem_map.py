@@ -2,6 +2,7 @@
 記録: tools/tests/appmem_map_tdd.md
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
+from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
 import hashlib
@@ -183,8 +184,7 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='os32-f4-') as d:
             tmp = pathlib.Path(d)
-            includes = ['-I' + str(tmp), *['-I' + str(ROOT / p) for p in
-                ('tools/tests/host_arch', '.', 'include', 'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'fs', 'sdk/include/os32')]]
+            includes = ['-I' + str(tmp), *['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]]
             cc += includes
             # Share host IF across TUs so the real allocator's short IRQ save
             # is distinguished from an incorrectly disabled transaction.
@@ -243,7 +243,7 @@ def main():
             (tmp / 'heap_source.c').write_text(bodies[8])
             (tmp / 'heap_wrap_source.c').write_text('\n'.join(function(bodies[7], sig) for sig in ('void * __cdecl wrap_mem_alloc(', 'void __cdecl wrap_mem_free(')))
             for src in ('paging', 'pgalloc'):
-                (tmp / (src + '_source.c')).write_text((ROOT / ('kernel/' + src + '.c')).read_text())
+                (tmp / (src + '_source.c')).write_text((ROOT / ('mm/' + src + '.c')).read_text())
 
             def compile_source(source, key, index):
                 src, obj = tmp / (key + '.c'), tmp / (key + '.o')

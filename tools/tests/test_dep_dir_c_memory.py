@@ -4,6 +4,7 @@ Capture is deliberately separate from the command-line verifier. See the
 fixture manifest for revisions, inputs, shim/source hashes and procedure.
 All positive and later mutation builds use the same copied directory tree.
 """
+from kernel_includes import include_dirs, include_flags
 import gzip
 import argparse
 import hashlib
@@ -17,11 +18,10 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tools/tests/fixtures/dep_dir_c'
-SOURCES = tuple('kernel/' + name + '.c' for name in
-                ('paging', 'pgalloc', 'sys', 'memory_boot', 'physmem')) + (
+SOURCES = ('kernel/sys.c',) + tuple('mm/' + name + '.c' for name in
+                ('paging', 'pgalloc', 'memory_boot', 'physmem')) + (
                     'platform/pc98/memory.c',)
-HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib',
-               'drivers', 'exec', 'sdk/include/os32')
+HEADER_DIRS = tuple(dict.fromkeys(include_dirs()))
 HARNESS = 'tools/tests/dep_dir_c_memory_host.c'
 
 # name, source, literal target, replacement, fixed input
@@ -123,9 +123,8 @@ def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
             ('kb', 'reported', 'mode', 'fail', 'repeat')]
     if attributes:
         cmd += ['-DTEST_PLATFORM_ATTRIBUTES']
-    cmd += ['-I' + str(work / 'kernel'), '-I' + str(work / 'host_arch')]
-    cmd += ['-I' + str(work / p) for p in HEADER_DIRS if p != 'kernel']
-    cmd += [str(work / 'harness.c'), str(work / 'kernel/physmem_host_source.c'),
+    cmd += ['-I' + str(work / 'host_arch'), *include_flags(work)]
+    cmd += [str(work / 'harness.c'), str(work / 'mm/physmem_host_source.c'),
             '-o', str(exe)]
     subprocess.run(cmd, check=True)
     return exe

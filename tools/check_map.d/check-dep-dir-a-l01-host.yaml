@@ -70,4 +70,5 @@ check-dep-dir-a-l01-host:
 - include/pci_bind_contract.h
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
+- tools/tests/kernel_includes.py
 artifact_reader: true

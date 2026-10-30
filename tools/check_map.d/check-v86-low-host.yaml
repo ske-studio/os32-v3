@@ -67,4 +67,5 @@ check-v86-low-host:
 - include/platform_timer.h
 - platform/pc98/clock.c
 - include/platform_emergency.h
+- tools/tests/kernel_includes.py
 artifact_reader: true

@@ -4,6 +4,7 @@ The generator's --pairs output is read into the fake VFS input. The independent
 flat oracle still comes from the original header. Product sources contain no
 static pair table. Runtime mutants are optional (--mutate, PM only).
 """
+from kernel_includes import include_flags
 import argparse
 import pathlib
 import re
@@ -136,9 +137,7 @@ def run_case(runner, mutation=None):
         (tmp / 'unicode_lookup_oracle.h').write_text(
             byte_array('oracle_flat', flat) + byte_array('generated_pairs', data) +
             'static const u16 oracle_cp[] = {' + ','.join(str(cp) for cp, _ in pairs) + '};\n')
-        includes = ['-I' + str(p) for p in
-                    (tmp, ROOT / 'include', ROOT / 'lib', ROOT / 'kernel',
-                     ROOT / 'fs', ROOT / 'sdk/include/os32')]
+        includes = ['-I' + str(tmp), *include_flags(ROOT)]
         (tmp / 'utf8_source.inc').write_text(texts['lib/utf8.c'])
         kernel_utf8 = re.sub(r'\b(utf8_\w+|unicode_to_\w+)(?=\s*\()',
                              lambda match: 'kernel_' + match[0], texts['lib/utf8.c'])

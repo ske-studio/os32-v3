@@ -3,6 +3,7 @@
 Only individual volatile stores are instrumented; formatting/loops remain
 product code. Both positive and mutation builds use an isolated header tree.
 """
+from kernel_includes import include_dirs, include_flags
 import argparse
 import hashlib
 import json
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 SOURCES = ('init/boot_display.c', 'arch/x86/kernel/isr_handlers.c',
            'arch/x86/kernel/double_fault.c', 'kernel/v86/v86_mem.c', 'platform/pc98/emergency.c')
-HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib', 'sdk/include/os32')
+HEADER_DIRS = tuple(dict.fromkeys(include_dirs()))
 HARNESS = 'tools/tests/dep_dir_d_emergency_host.c'
 MUTATIONS = (
     ('boot-width', 'platform/pc98/emergency.c',
@@ -104,7 +105,7 @@ def build(work, parts, omit_header=False):
     exe = work / 'emergency'
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
-    cmd += ['-I' + str(work), *('-I' + str(work / d) for d in HEADER_DIRS)]
+    cmd += include_flags(work)
     subprocess.run([*cmd, str(work / 'harness.c'), '-o', str(exe)], check=True)
     return exe
 

@@ -3,6 +3,7 @@
 AppSlot/CR3/IF と資源利用終了は記録する足場。全 loader/PCM 実機の代替ではない。
 写しだけを変異し、コンパイル成功後の実行失敗だけを RED とする。
 """
+from kernel_includes import include_flags
 import os
 import host32
 import pathlib
@@ -484,7 +485,7 @@ def run(source=None, irq=None):
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
-        inc = ['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch', 'include', 'kernel', 'exec', 'fs', 'lib', 'sdk/include/os32', 'arch/x86', 'platform/pc98')]
+        inc = (['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',

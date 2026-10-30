@@ -26,3 +26,4 @@ check-ver-collect-host:
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
+- tools/tests/kernel_includes.py

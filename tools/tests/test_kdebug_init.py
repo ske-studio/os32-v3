@@ -1,6 +1,7 @@
 """S1a: actual init has no imports; actual loader rejects and recovers.
 記録: tools/tests/kdebug_init_tdd.md
 """
+from kernel_includes import include_flags
 import argparse
 import json
 import os
@@ -22,9 +23,7 @@ from test_mkmod import vk32
 
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
-INCLUDES = ['-I' + str(ROOT / d) for d in
-            ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
-             'sdk/include', 'sdk/include/os32', 'exec', 'gfx', 'drivers', 'kapi', 'kdebug')]
+INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 
 
 def command(args):

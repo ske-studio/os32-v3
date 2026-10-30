@@ -6,3 +6,4 @@ check-appmem-host:
 - tools/tests/test_appmem.py
 - tools/check_map.d/check-appmem-host.yaml
 - build/checks.d/check-appmem-host.mk
+- tools/tests/kernel_includes.py

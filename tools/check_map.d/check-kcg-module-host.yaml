@@ -121,4 +121,5 @@ check-kcg-module-host:
 - include/platform_display.h
 - platform/pc98/display.c
 - include/kcg_contract.h
+- tools/tests/kernel_includes.py
 artifact_reader: true
