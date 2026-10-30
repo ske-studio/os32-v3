@@ -10,6 +10,7 @@ check-shell-service-host:
 - kernel/console/font_source.h
 - build/kernel.mk
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - include/redir_access.h
 - arch/x86/kernel/tss.h

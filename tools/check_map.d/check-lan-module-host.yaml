@@ -85,4 +85,8 @@ check-lan-module-host:
 - include/pci_bind_contract.h
 - platform/pc98/lan_match.c
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

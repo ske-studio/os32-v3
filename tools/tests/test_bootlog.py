@@ -17,6 +17,7 @@
 SKIP と出す)。恒等の対照 (何も変えない置換) は GREEN でなければならない —
 RED なら変異の仕組みそのものが壊れている。
 """
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -177,7 +178,7 @@ def check_wiring():
         print("  FAIL console の入口 (con_sink を積む所) と同じ 4 か所で積む", flush=True)
         bad += 1
 
-    k = (ROOT / "init/kernel.c").read_text(encoding="utf-8")
+    k = kernel_source(ROOT)
     n = k.count("bootlog_save();")
     root = k.find('vfs_mount("/", boot.root_dev, boot.root_fs)')
     call = k.find("bootlog_save();")

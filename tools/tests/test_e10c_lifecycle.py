@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import host32
 from test_shm_user import function, ROOT
+from kernel_boot_source import kernel_source
 
 PATHS = ('kdebug/v86_gcap.c','exec/exec.c','arch/x86/kernel/ring3_entry.asm','init/kernel.c','kdebug/kselftest.c')
 MUTANTS = [
@@ -35,7 +36,7 @@ def run(runner, mutant=None):
             texts[path] = texts[path].replace(body, body.replace(old, new))
         else:
             texts[path]=texts[path].replace(old,new)
-    k=texts[PATHS[3]]
+    k=kernel_source(ROOT, {PATHS[3]: texts[PATHS[3]]})
     try:
         assert 'kaudit_post_probe();' in k and k.index('gfx_prepare_backend();') < k.index('kaudit_post_probe();'), 'FAIL audit after probe'
         body = function(texts[PATHS[4]],'kselftest_run_post_exec')

@@ -153,6 +153,23 @@ static void io_reset(void)
     g_wr_min = 0xFFFFFFFFu; g_wr_max = 0;
 }
 
+/* E03a: 固定した 4 group / 端数 group の I/O 列。実装や layout_plan の
+ * 出力から期待列を作らない。失敗したセクタの次を呼んだ時点でも検出する。 */
+static struct FormatSectorIO { char op; u32 lba; } g_fmt_io[2048];
+static u32 g_fmt_io_count, g_fmt_io_pos, g_fmt_fail_at;
+static int g_fmt_trace;
+
+static int format_io(char op, u32 lba, int count)
+{
+    if (!g_fmt_trace) return 0;
+    CHECK(count == 1);
+    CHECK(g_fmt_io_pos < g_fmt_io_count);
+    CHECK(g_fmt_io_pos <= g_fmt_fail_at);
+    CHECK(g_fmt_io[g_fmt_io_pos].op == op);
+    CHECK(g_fmt_io[g_fmt_io_pos].lba == lba);
+    return g_fmt_io_pos++ == g_fmt_fail_at ? -1 : 0;
+}
+
 static Device g_hd0;
 
 Device *dev_find(const char *name)
@@ -165,6 +182,7 @@ Device *dev_find(const char *name)
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 {
     int i;
+    if (format_io('R', lba, count) != 0) return -1;
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
@@ -180,6 +198,7 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
 {
     int i;
+    if (format_io('W', lba, count) != 0) return -1;
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
@@ -429,6 +448,60 @@ static void case_format_at_refuse(void)
     CHECK(g_wr_max < DISK_TOTAL);
 }
 
+/* 62,496 sectors = 31,248 blocks。4 groups、各 1,960 inodes / itable
+ * 245 blocks。g2 は非 sparse、g3 は端数 (6,671 blocks)。書く順と同じ SB の
+ * 再読込みも固定し、全セクタ (前半/後半) の失敗でそこで止まることを見る。 */
+static void case_format_io_order(void)
+{
+    static const struct FormatBlockSpan { char op; u32 block, blocks; } spans[] = {
+        {'W', 0, 3},                         /* boot, primary SB, GDT */
+        {'R', 1, 1}, {'W', 1, 1},           /* free count の更新 */
+        {'R', 1, 1}, {'W', 8193, 1},        /* g1 の backup SB/GDT */
+        {'R', 2, 1}, {'W', 8194, 1},
+        {'R', 1, 1}, {'W', 24577, 1},       /* g3 の backup SB/GDT */
+        {'R', 2, 1}, {'W', 24578, 1},
+        {'W', 3, 247},                      /* g0 bmap, imap, itable */
+        {'W', 8195, 247},                   /* g1 */
+        {'W', 16385, 247},                  /* g2 (SB/GDT なし) */
+        {'W', 24579, 247},                  /* g3 */
+        {'R', 5, 1}, {'W', 5, 1}, {'W', 250, 1} /* root inode/data */
+    };
+    u32 i, j, at;
+
+    disk_reset(16, 63);
+    g_fmt_io_count = 0;
+    for (i = 0; i < sizeof(spans) / sizeof(spans[0]); i++) {
+        for (j = 0; j < spans[i].blocks * 2; j++) {
+            CHECK(g_fmt_io_count < sizeof(g_fmt_io) / sizeof(g_fmt_io[0]));
+            g_fmt_io[g_fmt_io_count].op = spans[i].op;
+            g_fmt_io[g_fmt_io_count++].lba = 2016 + spans[i].block * 2 + j;
+        }
+    }
+    CHECK(g_fmt_io_count == 2008);
+    g_fmt_trace = 1;
+    g_fmt_io_pos = 0;
+    g_fmt_fail_at = g_fmt_io_count;           /* 正常の列を先に確かめる */
+    CHECK(ext2_format_at(0, 2016, 62496) == EXT2_OK);
+    CHECK(g_fmt_io_pos == g_fmt_io_count);
+    /* free blocks = 31,247 - (249 + 249 + 247 + 249) - root 1。
+     * backup に仮値 0 を写していないことも、媒体の内容で確かめる。 */
+    CHECK(le32_rd(g_disk + (2016 + 2) * 512u + EXT2_SB_FREE_BLOCKS_COUNT_OFF) == 30252);
+    for (i = 1; i <= 3; i += 2) {
+        u32 sb_lba = 2016 + (1 + i * 8192) * 2;
+        CHECK(le32_rd(g_disk + sb_lba * 512u + EXT2_SB_FREE_BLOCKS_COUNT_OFF) == 30252);
+        CHECK(le16_rd(g_disk + sb_lba * 512u + EXT2_SB_BLOCK_GROUP_NR_OFF) == i);
+        for (j = 0; j < 1024; j++)
+            CHECK(g_disk[(sb_lba + 2) * 512u + j] == g_disk[(2016 + 4) * 512u + j]);
+    }
+    for (at = 0; at < g_fmt_io_count; at++) {
+        g_fmt_io_pos = 0;
+        g_fmt_fail_at = at;
+        CHECK(ext2_format_at(0, 2016, 62496) == EXT2_ERR_IO);
+        CHECK(g_fmt_io_pos == at + 1);
+    }
+    g_fmt_trace = 0;
+}
+
 /* FS が区画より大きい (区画表と中身の食い違い) → マウントしない。
  * マウント後のブロック I/O は区画の外を断る (デバイスを触らない) */
 static void case_mount_bounds(void)
@@ -545,6 +618,7 @@ int os32_main(int argc, char **argv)
     else if (streq(c, "format_clamp")) case_format_clamp();
     else if (streq(c, "format_at_16652")) case_format_at_16652();
     else if (streq(c, "format_at_refuse")) case_format_at_refuse();
+    else if (streq(c, "format_io_order")) case_format_io_order();
     else if (streq(c, "mount_bounds")) case_mount_bounds();
     else if (streq(c, "format_geom")) case_format_geom();
     else if (streq(c, "legacy_hint")) case_legacy_hint();

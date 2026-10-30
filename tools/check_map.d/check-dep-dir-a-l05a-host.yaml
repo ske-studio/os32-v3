@@ -37,6 +37,7 @@ check-dep-dir-a-l05a-host:
 - tools/check_map.d/check-dep-dir-a-l05a-host.yaml
 - build/checks.d/check-dep-dir-a-l05a-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
@@ -45,10 +46,15 @@ check-dep-dir-a-l05a-host:
 - mm/physmem.c
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_mem.c
 - kernel/v86/v86_snapshot.c
 - tools/tests/shm_user_host.c
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

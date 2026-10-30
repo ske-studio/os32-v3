@@ -8,6 +8,7 @@ check-allocator-bench-host:
 - exec/appmem.c
 - exec/appmem.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/appslot.h
 - mm/paging.h

@@ -13,6 +13,7 @@ check-trim-kernel-host:
 - exec/appslot.c
 - exec/appslot.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/ring3_str.c
 - exec/exec.h
@@ -86,4 +87,7 @@ check-trim-kernel-host:
 - include/input_service.h
 - include/kbd.h
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

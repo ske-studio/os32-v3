@@ -23,6 +23,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 (**RED に数えない**) / SURVIVED = 全ケースが通った (見逃し)。対照 (何も変え
 ない変異) は SURVIVED でなければならない。
 """
+from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -552,7 +553,7 @@ CONTROL = len(MUTATIONS)
 
 def make_tree(tmp, rel=None, text=None):
     tree = pathlib.Path(tmp) / "tree"
-    for f in TREE_FILES:
+    for f in [*TREE_FILES, *kernel_parts(ROOT)]:
         dst = tree / f
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / f).read_text(encoding="utf-8"), encoding="utf-8")
@@ -564,7 +565,7 @@ def make_tree(tmp, rel=None, text=None):
 
 def write_boot_submount(tree, dest):
     """Share the real boot fragment with consumers of cd_read_host.c."""
-    kernel = (tree / "init/kernel.c").read_text()
+    kernel = kernel_source(tree)
     call = kernel.index('    kernel_mount_children(boot.root_dev);')
     assert (kernel.index('vfs_mount("/", boot.root_dev, boot.root_fs)') <
             kernel.index('    cd_module_load();') <

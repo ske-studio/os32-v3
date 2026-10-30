@@ -34,3 +34,7 @@ check-cd-read-host:
 - include/ide_contract.h
 - include/platform_device.h
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc

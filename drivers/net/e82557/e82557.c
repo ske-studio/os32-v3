@@ -651,6 +651,8 @@ static int probe_ru(void)
     irq_restore(flags);
     return rc;
 }
+#include "e82557_probe_reset_base.inc"
+
 static int e82557_probe(const struct pci_dev *dev)
 {
     const char *why, *stage = "win";
@@ -658,7 +660,7 @@ static int e82557_probe(const struct pci_dev *dev)
     u8 cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
     struct phy_observation phy = { 0 };
     int allocated = 0, registered = 0, changed_bm = 0, width = 0, dummy;
-    int reason, after = 0, issued, result = PCI_PROBE_DECLINE;
+    int reason, result = PCI_PROBE_DECLINE;
     unsigned int flags;
     nic.state = E82557_STARTING;
     why = try_begin();
@@ -672,31 +674,8 @@ static int e82557_probe(const struct pci_dev *dev)
     nic_trace(E82557_TRACE_WIN);
     if (!e82557_io_window(dev, &base, &reason)) { why = e82557_window_name(reason); goto done; }
     nic.base = base; nic.dev = *dev;
-    stage = "rst";
-    nic_trace(E82557_TRACE_RST);
-    outpd(base + E82557_PORT, E82557_PORT_SOFTWARE);
-    cpu_delay_us(E82557_RESET_US);
-    outpd(base + E82557_PORT, E82557_PORT_SELECTIVE);
-    cpu_delay_us(E82557_RESET_US);
-    scb_mask(base, 1);
-    status = inpw(base + E82557_SCB_STATUS);
-    outp(base + E82557_SCB_ACK, (u8)((status & E82557_STAT_MASK) >> E82557_STAT_SHIFT));
-    status = inpw(base + E82557_SCB_STATUS);
-    if (status & (E82557_CUS_MASK | E82557_RUS_MASK)) {
-        pci_bind_set_reason(PCI_BIND_RESET_FAILED);
-        result = PCI_PROBE_QUARANTINE; why = "idle"; goto done;
-    }
-    stage = "base";
-    nic_trace(E82557_TRACE_BASE);
-    flags = irq_save();
-    issued = scb_issue(base, E82557_CU_BASE, 0, 0, 1, &after);
-    if (issued == ISSUE_OK) issued = scb_issue(base, 0, E82557_RU_BASE, 0, 1, &after);
-    irq_restore(flags);
-    if (issued != ISSUE_OK) {
-        status = inpw(base + E82557_SCB_STATUS);
-        kprintf(E82557_LOG_ATTR, "[e82557] rst=ok base=timeout scb=%04x\n", status);
-        why = after ? "post" : "pre"; goto done;
-    }
+    int rc = probe_reset_base(base, &stage, &why);
+    if (rc != PCI_PROBE_OK) { result = rc; goto done; }
     stage = "ee";
     nic_trace(E82557_TRACE_EEPROM);
     if (!ee_mac_read(base, nic.mac, &width)) { why = "mac"; goto done; }

@@ -1,4 +1,5 @@
 """D3c B/C: real static table/dispatcher/wrappers and kernel boundary order."""
+from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 from pathlib import Path
 import re
@@ -13,12 +14,16 @@ HEADERS = ('include/ide_contract.h', 'init/boot_platform.h', 'init/boot_display.
 
 def kernel_order(kernel=None):
     if kernel is None:
-        kernel = (ROOT / 'init/kernel.c').read_text()
+        kernel = kernel_source(ROOT)
+    else:
+        kernel = kernel_source(ROOT, {'init/kernel.c': kernel})
     # Include the intervening operations: slot ordering alone is insufficient.
     markers = [
         'kstack_hw_init();', 'pc98_boot_bind(&boot, boot_drive);',
-        'bootinfo_capture();', 'sysclk_detect();',
+        'bootinfo_capture();', 'v86_bios_save_real();',
+        'mem_kb = memory_boot_detect(mem_kb);', 'sysclk_detect();',
         'boot_platform_run(BOOT_DMA, &boot);', 'pit_init(PIT_HZ);',
+        'irq_enable(0);', 'irq_enable(ICU_SLAVEID);',
         'cpu_calibrate();', 'boot_platform_run(BOOT_INPUT, &boot);',
         'boot_platform_run(BOOT_FLOPPY, &boot);',
         'boot_platform_run(BOOT_DEV_FS, &boot);', 'palette_init();',
@@ -29,11 +34,17 @@ def kernel_order(kernel=None):
         'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
         'boot_platform_run(BOOT_CLOCK, &boot);', 'paging_init(mem_kb);',
         'paging_reclaim_conventional();', 'boot_platform_run(BOOT_FONT, &boot);',
-        '"fninit"', 'memory_boot_init(mem_kb)', 'cd_module_load();',
+        '"fninit"', 'memory_boot_init(mem_kb)', 'shm_init();',
+        'paging_boot_user_shared(exec_tramp_page_addr())', 'dma_pool_init();',
+        'v86_module_load();', 'kdebug_load();', 'kdebug.ops.selftest_run();',
+        'cd_module_load();',
         'kcg_module_load();', 'kernel_mount_children(boot.root_dev);',
         'services_stage = SERVICES_ROOT_READY;', 'unicode_file_load();',
         'boot_platform_run(BOOT_PCI_RESOURCES, &boot);', 'lan_module_load();',
         'lan_module_pci_bind_fallback();', 'pcm_module_load();',
+        'fd_redirect_init();', 'pipe_buffer_init();',
+        '(void)sysconfig_get_str(SYS_SYSTEM_CFG, "GFX", gfmode, sizeof(gfmode));',
+        'gfx_boot_reserve();',
         '"[BOOT] snd module rc=%d\\n"',
         'boot_platform_run(BOOT_NIC_LEGACY, &boot);', '"IRQ_EN"', 'services_boot();',
     ]
@@ -48,7 +59,7 @@ def kernel_order(kernel=None):
 
 def build(work, mutation=None):
     # Positive and mutation copies use the same headers and include paths.
-    for rel in (*SOURCES, *HEADERS, 'init/kernel.c'):
+    for rel in (*SOURCES, *HEADERS, 'init/kernel.c', *kernel_parts(ROOT)):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             _, old, new = mutation
@@ -78,19 +89,36 @@ def build(work, mutation=None):
 
 def main():
     kernel_order()
+    kernel = (ROOT / 'init/kernel.c').read_text()
+    # Definitions can move without changing execution; follow the call sites.
+    includes = [f'#include "{Path(p).name}"' for p in kernel_parts(ROOT)]
+    assert len(includes) == 3
+    reordered = kernel
+    for i, include in enumerate(includes):
+        assert reordered.count(include) == 1
+        reordered = reordered.replace(include, f'BOOT_INCLUDE_{i}')
+    for i, include in enumerate(reversed(includes)):
+        reordered = reordered.replace(f'BOOT_INCLUDE_{i}', include)
+    kernel_order(reordered)
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-boot-') as td:
         subprocess.run([str(build(Path(td)))], check=True)
     if '--mutate' in sys.argv:
-        kernel = (ROOT / 'init/kernel.c').read_text()
-        a, b = 'BOOT_PCI_ENUM, &boot', 'BOOT_DISK, &boot'
-        assert kernel.count(a) == kernel.count(b) == 1
-        changed = kernel.replace(a, 'SWAP_BOOT_POINT').replace(b, a).replace('SWAP_BOOT_POINT', b)
-        try:
-            kernel_order(changed)
-        except AssertionError:
-            print('RED PCI_ENUM/DISK boundary swap')
-        else:
-            raise AssertionError('boot boundary swap escaped order check')
+        for label, a, b in (
+            ('PCI_ENUM/DISK', 'BOOT_PCI_ENUM, &boot', 'BOOT_DISK, &boot'),
+            ('CPU/input', 'kernel_boot_cpu(mem_kb, &boot);',
+             'boot_platform_run(BOOT_INPUT, &boot);'),
+            ('memory/root-clock', 'kernel_boot_memory(mem_kb, &boot);',
+             'boot_platform_run(BOOT_CLOCK, &boot);'),
+            ('GFX config/reservation', 'kernel_gfx_config();', 'gfx_boot_reserve();'),
+        ):
+            assert kernel.count(a) == kernel.count(b) == 1
+            changed = kernel.replace(a, 'SWAP_BOOT_POINT').replace(b, a).replace('SWAP_BOOT_POINT', b)
+            try:
+                kernel_order(changed)
+            except AssertionError:
+                print('RED', label, 'boundary swap')
+            else:
+                raise AssertionError(label + ': boot boundary swap escaped order check')
 
         for mutation in (
             ('platform/pc98/boot.c',

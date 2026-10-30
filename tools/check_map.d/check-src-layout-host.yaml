@@ -28,4 +28,7 @@ check-src-layout-host:
 - build/checks.d/check-src-layout-host.mk
 - tools/check_map.d/check-src-layout-host.yaml
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

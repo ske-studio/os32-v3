@@ -13,11 +13,13 @@ check-shm-user-host:
 - kernel/v86/v86.h
 - arch/x86/kernel/idt.h
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_bios.c
 - init/kernel.c
 - mm/pgalloc.*
 - mm/physmem.*
 - exec/exec.c
+- exec/exec_image.inc
 - include/**
 - arch/x86/**
 - platform/pc98/**
@@ -37,4 +39,8 @@ check-shm-user-host:
 - build/checks.d/check-shm-user-host.mk
 - tools/tests/mutpar.py
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

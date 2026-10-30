@@ -10,6 +10,7 @@ check-mem-stat-host:
 - sdk/kapi.json
 - kapi/kapi_generated.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.c
 - exec/lease.c
 - exec/appslot.h
@@ -81,4 +82,7 @@ check-mem-stat-host:
 - init/kernel.c
 - tools/tests/kernel_layout.py
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

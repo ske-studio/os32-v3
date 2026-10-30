@@ -12,6 +12,7 @@ sys_frozen_exec を workspace_first に戻す) と、FIXED / ARENA_TOP の境界
 backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED になることを見る。
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import host32
 import os
@@ -114,7 +115,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         # 写しの memmap.h を -I の先頭に置く (変異を当てたときだけ中身が違う)。
         (d / 'memmap.h').write_text(texts['include/memmap.h'])
         (d / 'layout_boot_fixture.h').write_text(texts['tools/tests/layout_boot_fixture.h'])
-        kernel = (ROOT / 'init/kernel.c').read_text()
+        kernel = kernel_source(ROOT)
         start = kernel.index('    if (!memory_boot_init(mem_kb))')
         end = kernel.index('    shm_init();', start) + len('    shm_init();')
         # 失敗時の行き止まりは io.h の _stop() (= cli; hlt)。ホストでは
@@ -164,7 +165,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
 
 class MemoryBoot(unittest.TestCase):
     def test_page_accounting_and_live_slack_cycle(self):
-        kernel = (ROOT / 'init/kernel.c').read_text()
+        kernel = kernel_source(ROOT)
         self.assertEqual(kernel.count('    kaudit_boot_pages();'), 1)
         self.assertLess(kernel.index('    kdebug_load();'), kernel.index('    kaudit_boot_pages();'))
         self.assertLess(kernel.index('    gfx_boot_reserve();'), kernel.index('    kaudit_boot_pages();'))
@@ -216,7 +217,7 @@ class MemoryBoot(unittest.TestCase):
                 self.run_case(case, 16384)
 
     def test_kernel_boot_order_and_failstop(self):
-        s = (ROOT / 'init/kernel.c').read_text()
+        s = kernel_source(ROOT)
         boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
         self.assertLess(s.index('shm_init();'), s.index(boot))
         self.assertLess(s.index(boot), s.index('kdebug.ops.selftest_run();'))

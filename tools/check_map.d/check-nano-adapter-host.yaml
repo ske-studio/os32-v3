@@ -15,6 +15,7 @@ check-nano-adapter-host:
 - userland/lib/rt/ls.c
 - tools/tests/resident_heap_host.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_heap.c
 - exec/exec_heap.h
 - exec/appslot.h

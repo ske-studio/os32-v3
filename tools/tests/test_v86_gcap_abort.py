@@ -14,7 +14,7 @@ import host32
 
 
 def function(text, name):
-    match = re.search(r'^(?:static )?(?:void|int) ' + name + r'\([^)]*\)\n\{', text, re.M)
+    match = re.search(r'^(?:static )?(?:void|int|u8 \*)\s*' + name + r'\([^)]*\)\n\{', text, re.M)
     assert match, name
     pos, depth = match.end(), 1
     while depth:
@@ -24,24 +24,55 @@ def function(text, name):
 
 
 ROOT = Path(__file__).resolve().parents[2]
+GP_GATE = '''    if (kdebug.ops.gcap_insn_abort && kdebug.ops.gcap_insn_abort(opsize16, pc[len])) {
+        v86_exit_reason = V86_EXIT_UNKNOWN_OP;
+        return 1;
+    }
+
+    return v86_gp_emulate(frame, pc, len);'''
 MUTATIONS = (
     ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
     ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
-    ('kdebug/v86_gcap.c', '    gcap_ops = 0;', '', 'ops'),
+    ('kdebug/v86_gcap.c', 'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;\n    gcap_ops = 0;',
+     'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;', 'ops'),
     ('kdebug/v86_gcap.c', '    g->restore = V86G_RST_FALLBACK;', '', 'interrupted-ROM-sync'),
     ('kdebug/v86_gcap.c', '    tv_restore(tv);', '    (void)tv;', 'TVRAM-tail'),
     ('kdebug/v86_gcap.c', '    if (v86_session.aborting) v86_io_reset_policy();', '', 'post-session-policy'),
+    ('kernel/v86/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+     'return v86_gp_emulate(frame, pc, 0);', 'GP-prefix-length-handoff'),
+    ('kernel/v86/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+     'return v86_gp_emulate(frame, pc + len, len);', 'GP-pc-handoff'),
+    ('kernel/v86/v86.c', GP_GATE,
+     '    int result = v86_gp_emulate(frame, pc, len);\n' +
+     GP_GATE.replace('return v86_gp_emulate(frame, pc, len);', 'return result;'),
+     'GP-capture-after-dispatch'),
+    ('kernel/v86/v86_gp_emulate.inc',
+     'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 2);',
+     'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 1);',
+     'GP-immediate-IP-increment'),
+    ('kernel/v86/v86_gp_emulate.inc', 'if (!v86_inject_int(frame, vec)) {',
+     'if (v86_inject_int(frame, vec)) {', 'GP-INT-failure'),
+    ('kernel/v86/v86_gp_emulate.inc', 'v86_exit_reason = V86_EXIT_HLT;\n        return 1;',
+     'v86_exit_reason = V86_EXIT_HLT;\n        return 0;', 'GP-HLT-return'),
 )
 
 
 def main():
     paths = ('kernel/v86/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
              'exec/v86_call.c', 'kernel/v86/v86_gcap.c', 'kernel/v86/v86_io.c',
-             'arch/x86/kernel/isr_handlers.c')
+             'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86.c',
+             'kernel/v86/v86_gp_emulate.inc')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):
+            gp = parts['kernel/v86/v86.c']
+            (work / 'gp.inc').write_text(
+                ''.join(line for line in gp.splitlines(keepends=True)
+                        if line.startswith(('#define V86_FETCH_BYTES ', '#define V86_PREFIX_MAX '))) +
+                ''.join(function(gp, n) for n in (
+                    'v86_ptr', 'v86_advance_ip', 'v86_set_al', 'v86_set_ax')) +
+                parts['kernel/v86/v86_gp_emulate.inc'] + function(gp, 'v86_gp_handler'))
             for rel in ('include/platform_emergency.h', 'platform/pc98/emergency.c'):
                 (work / Path(rel).name).write_text((ROOT / rel).read_text())
             (work / 'session.c').write_text(parts[paths[0]])
@@ -82,7 +113,7 @@ def main():
         run(sources)
         if '--mutate' in sys.argv:
             for path, old, new, label in MUTATIONS:
-                assert old in sources[path], label
+                assert sources[path].count(old) == 1, label
                 parts = dict(sources)
                 parts[path] = parts[path].replace(old, new)
                 run(parts, label)

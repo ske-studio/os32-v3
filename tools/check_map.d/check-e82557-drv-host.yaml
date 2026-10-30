@@ -3,6 +3,7 @@ check-e82557-drv-host:
 - kernel/irq/tick.h
 - platform/pc98/tick_order.h
 - drivers/net/e82557/e82557.c
+- drivers/net/e82557/e82557_probe_reset_base.inc
 - drivers/net/e82557/e82557.h
 - drivers/net/e82557/e82557_regs.h
 - drivers/net/e82557/e82557_eeprom.c

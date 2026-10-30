@@ -101,10 +101,12 @@ check-dep-dir-a-l02-host:
 - build/lan-module.mk
 - tools/tests/fixtures/dep_dir_a/l02.json
 - drivers/net/e82557/e82557.c
+- drivers/net/e82557/e82557_probe_reset_base.inc
 - drivers/net/e82557/e82557_desc.c
 - drivers/net/e82557/e82557_eeprom.c
 - drivers/pci/pci_decode.c
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
 artifact_reader: true

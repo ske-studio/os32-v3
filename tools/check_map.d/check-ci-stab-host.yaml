@@ -17,6 +17,7 @@ check-ci-stab-host:
 - fs/fat/fatfs/diskio.c
 - fs/ext2/ext2_super.c
 - fs/ext2/ext2_fmt.c
+- fs/ext2/ext2_fmt_*.inc
 - tools/tests/font_guard_inactive.h
 - sdk/link/app_sys.ld
 - tools/tests/test_ci_stab.py
@@ -45,6 +46,7 @@ check-ci-stab-host:
 - exec/appmem_map.c
 - exec/appmem_unmap.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - fs/ext2/ext2_layout.c
 - fs/fat/fatfs_vfs.c
@@ -190,6 +192,7 @@ check-ci-stab-host:
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_mem.c
 - kernel/v86/v86_snapshot.c
 - tools/tests/shm_user_host.c
@@ -222,4 +225,8 @@ check-ci-stab-host:
 - drivers/video/kcg/kcg_module.c
 - platform/pc98/device_kcg.c
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

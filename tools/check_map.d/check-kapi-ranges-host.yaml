@@ -2,6 +2,7 @@ check-kapi-ranges-host:
 - lib/sqlite3/generated/*
 - exec/access_walk.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appslot.h
 - include/config.h
 - exec/exec_kapi_init.inc

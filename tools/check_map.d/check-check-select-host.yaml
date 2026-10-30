@@ -103,6 +103,7 @@ check-check-select-host:
 - tools/prototypes/fep_imports.def
 - tools/prototypes/cd_imports.def
 - exec/exec.c
+- exec/exec_image.inc
 - kernel/ime/ime_dict.c
 - tools/tests/kapi_db_owned_host.c
 - tools/tests/kapi_db_v50_host.c
@@ -116,4 +117,7 @@ check-check-select-host:
 - include/console_output.h
 - lib/serial_diag.h
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

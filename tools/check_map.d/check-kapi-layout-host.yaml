@@ -5,6 +5,7 @@ check-kapi-layout-host:
 - sdk/rustc_stamp.py
 - sdk/link_guard.py
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - exec/os32x_hdr.c
 - kapi/kapi_generated.c

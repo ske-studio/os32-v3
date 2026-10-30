@@ -68,4 +68,7 @@ check-docs-orphans:
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

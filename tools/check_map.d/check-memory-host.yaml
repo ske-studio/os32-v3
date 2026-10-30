@@ -36,6 +36,7 @@ check-memory-host:
 - exec/lease.c
 - exec/appslot.c
 - exec/exec.c
+- exec/exec_image.inc
 - exec/appmem.c
 - mm/shlib.c
 - init/kernel.c
@@ -59,6 +60,7 @@ check-memory-host:
 - kernel/irq/irq.c
 - kernel/irq/irq_math.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - tools/tests/mutpar.py
 - kdebug/kselftest.c
 - kdebug/kselftest/**
@@ -189,4 +191,8 @@ check-memory-host:
 - include/pci_dev_contract.h
 - include/pci_bind_contract.h
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

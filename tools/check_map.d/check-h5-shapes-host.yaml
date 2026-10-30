@@ -17,6 +17,7 @@ check-h5-shapes-host:
 - include/memmap.h
 - include/types.h
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec.h
 - exec/exec_kapi_init.inc
 - exec/appslot.c

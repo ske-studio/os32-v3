@@ -33,6 +33,7 @@ check-v86-low-host:
 - tools/check_map.d/check-v86-low-host.yaml
 - build/checks.d/check-v86-low-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - exec/exec_kapi_init.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
@@ -41,6 +42,7 @@ check-v86-low-host:
 - mm/physmem.c
 - mm/shm.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - tools/tests/shm_user_host.c
 - mm/memory_boot.c
 - tools/tests/pgalloc_host_fixture.h
@@ -68,4 +70,8 @@ check-v86-low-host:
 - platform/pc98/clock.c
 - include/platform_emergency.h
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

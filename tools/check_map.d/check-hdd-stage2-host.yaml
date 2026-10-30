@@ -12,6 +12,7 @@ check-hdd-stage2-host:
 - drivers/ata/ide_addr.c
 - drivers/block/pc98pt.c
 - exec/exec.c
+- exec/exec_image.inc
 - fs/ext2/ext2_dir.c
 - fs/ext2/ext2_file.c
 - fs/ext2/ext2_fmt.c

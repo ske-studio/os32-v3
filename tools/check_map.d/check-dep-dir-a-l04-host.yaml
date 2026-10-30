@@ -4,6 +4,7 @@ check-dep-dir-a-l04-host:
 - drivers/block/loop_dev.h
 - platform/pc98/device_loop.c
 - kernel/v86/v86.c
+- kernel/v86/v86_gp_emulate.inc
 - kernel/v86/v86_bios.c
 - sdk/kapi.json
 - kapi/kapi_generated.c
@@ -21,6 +22,7 @@ check-dep-dir-a-l04-host:
 - tools/check_map.d/check-dep-dir-a-l04-host.yaml
 - build/checks.d/check-dep-dir-a-l04-host.mk
 - exec/exec.c
+- exec/exec_image.inc
 - drivers/video/pc98/backend_pegc.c
 - gfx/gfx_core.c
 - init/kernel.c
@@ -32,4 +34,8 @@ check-dep-dir-a-l04-host:
 - kernel/v86/v86_snapshot.c
 - tools/tests/shm_user_host.c
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true
