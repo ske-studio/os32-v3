@@ -1431,8 +1431,8 @@ int paging_memmap_selftest(u32 tramp_page)
 }
 
 /* T2b: page-table transactions confined to the private lease window. */
-/* Root predicate mirrors exec/lease.c:context(); lease_context adds PT checks. */
-static int lease_root_context(const struct addrspace *as)
+/* Shared root/normal-context predicate; lease_context adds PT checks. */
+int paging_lease_root_context(const struct addrspace *as)
 {
     return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&
         pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) &&
@@ -1443,7 +1443,7 @@ static int lease_root_context(const struct addrspace *as)
 static int lease_context(const struct addrspace *as)
 {
     u32 i, *pd;
-    if (!lease_root_context(as)) return 0;
+    if (!paging_lease_root_context(as)) return 0;
     /* T2c supervisor identity aliases: never install the master to walk.
      * Validate managed frames and exact PDE rights before dereferencing PTs. */
     pd = P2V(as->pd_phys);
@@ -1477,7 +1477,7 @@ int paging_addrspace_create_lease(struct addrspace *as, u32 owner)
 u32 paging_lease_pte(const struct addrspace *as, u32 va)
 {
     u32 phys, d, index;
-    if (!lease_root_context(as) || va < MEM_LEASE_BASE || va >= MEM_LEASE_END) return 0;
+    if (!paging_lease_root_context(as) || va < MEM_LEASE_BASE || va >= MEM_LEASE_END) return 0;
     index = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
     phys = as->lease_pt_phys[index];
     if (!phys || phys % PAGE_SIZE || !pgalloc_page_owned(phys / PAGE_SIZE, as->owner)) return 0;
