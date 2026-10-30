@@ -2,7 +2,7 @@
 
 read_state(read, elf_path=...) calls read(address, length), which must return
 bytes from /api/mem space=phys. The resident CPL0 shell uses identity mapping
-(exec/exec.c shell load path; kernel/paging.c shell band; app_sys.ld).
+(exec/exec.c shell load path; mm/paging.c shell band; app_sys.ld).
 The caller owns pausing/snapshot consistency; a running WM is not atomic.
 """
 from pathlib import Path

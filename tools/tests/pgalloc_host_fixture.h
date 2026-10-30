@@ -5,10 +5,10 @@
 /*  TASK_T1_LEDGER.md §4-1、D32: どの構成もモデル経路)。多くのホスト試験は   */
 /*  それを「メモリ量 kb の池を 1 回で作る」ための足場に使っていたので、同じ  */
 /*  形の足場をここに置く。**製品に reset / legacy の口は足さない** — 試験が  */
-/*  取り込んだ kernel/pgalloc.c の私有の状態を直接組む (pgalloc_range_host.c */
+/*  取り込んだ mm/pgalloc.c の私有の状態を直接組む (pgalloc_range_host.c */
 /*  が initialized を戻すのと同じ流儀)。                                    */
 /*                                                                          */
-/*  前提: kernel/pgalloc.c の本文 (と physmem.h) を先に取り込んでいること。  */
+/*  前提: mm/pgalloc.c の本文 (と physmem.h) を先に取り込んでいること。  */
 /*                                                                          */
 /*  host_pool_boot(kb)                                                      */
 /*      physmem_bootstrap_legacy(kb) の RAM を全部配る池を ONLINE にする。   */

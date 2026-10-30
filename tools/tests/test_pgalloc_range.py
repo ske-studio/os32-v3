@@ -30,7 +30,7 @@ if __name__ == "__main__":
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES,
-                        "-c", str(ROOT / "kernel/pgalloc.c"),
+                        "-c", str(ROOT / "mm/pgalloc.c"),
                         "-o", str(pathlib.Path(tmp) / "pgalloc.o")],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)

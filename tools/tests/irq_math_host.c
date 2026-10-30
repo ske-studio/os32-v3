@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  IRQ_MATH_HOST.C — kernel/irq_math.c をそのままホストで回す              */
+/*  IRQ_MATH_HOST.C — kernel/irq/irq_math.c をそのままホストで回す              */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する。irq_math.c は PIC も IDT も         */
 /*  tick_count も触らないので、模型は 1 つも要らない — ハンドラだけが        */
@@ -15,7 +15,7 @@
  * ======================================================================== */
 #include <stdio.h>
 #include <string.h>
-#include "../../kernel/irq_math.c"
+#include "../../kernel/irq/irq_math.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

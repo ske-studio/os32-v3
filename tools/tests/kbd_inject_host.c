@@ -6,7 +6,7 @@
  *  記録:   tools/tests/k7_tdd.md
  *
  *  kernel/kbd_inject.c を 1 行も写さずそのまま #include する (模型ではない)。
- *  **kernel/con_sink.c も同じ翻訳単位へ入れる** — 注入の権限は「con_sink の
+ *  **kernel/console/con_sink.c も同じ翻訳単位へ入れる** — 注入の権限は「con_sink の
  *  読み手 1 本」(票 §5 R2) で、そこを模型に置き換えると試験の意味が消える
  *  ため。読み手の確立は本物の con_sink_read() で行う。
  *

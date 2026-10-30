@@ -18,9 +18,9 @@ from test_exec_r1 import function
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
     'kbd_source.inc': 'drivers/kbd.c',
-    'ime_source.inc': 'kernel/ime.c',
+    'ime_source.inc': 'kernel/ime/ime.c',
     'gui_source.inc': 'kernel/gui.c',
-    'sink_source.inc': 'kernel/con_sink.c',
+    'sink_source.inc': 'kernel/console/con_sink.c',
     'inject_source.inc': 'kernel/kbd_inject.c',
     'exec_source.inc': 'exec/exec.c',
     'slot_source.inc': 'exec/appslot.c',
@@ -62,7 +62,7 @@ def run(mutation=None):
             'tools/tests/host_arch', 'include', 'arch/x86', 'platform/pc98',
             'kernel', 'drivers', 'lib', 'sdk/include/os32', 'exec', 'fs')]
         exe = work / 'test'
-        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'kernel/setjmp.asm'),
+        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'arch/x86/kernel/setjmp.asm'),
                         '-o', str(work / 'setjmp.o')], check=True)
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
@@ -72,7 +72,7 @@ def run(mutation=None):
                         *includes, str(ROOT / 'tools/tests/x11_shared_host.c'),
                         str(work / 'setjmp.o'),
                         *[str(ROOT / p) for p in ('lib/kstring.c', 'lib/kstring_c.c',
-                           'lib/utf8.c', 'kernel/ime_romkana.c')],
+                           'lib/utf8.c', 'kernel/ime/ime_romkana.c')],
                         '-o', str(exe)], check=True)
         result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)
         print(result.stdout, end='', flush=True)

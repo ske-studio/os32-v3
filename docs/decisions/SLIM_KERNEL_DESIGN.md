@@ -38,20 +38,20 @@
 | 本体 | B | 定義 file:line | 触るstatic / 決定 |
 |---|---:|---|---|
 | lease_selftest | 2,152 | exec/lease.c:384 | (tables_image)、永続staticデータ直接参照なし / M |
-| con_sink_selftest | 1,689 | kernel/con_sink.c:314 | g_reader、試験専用g_self_buf/g_self_src / M |
+| con_sink_selftest | 1,689 | kernel/console/con_sink.c:314 | g_reader、試験専用g_self_buf/g_self_src / M |
 | kbd_inject_selftest | 1,661 | kernel/kbd_inject.c:320 | (inj_push)、関数内utf8_a等の試験定数 / M |
 | exec_tramp_user_selftest | 1,380 | exec/exec.c:584 | ring3_tramp_page / M |
 | appslot_resume_mark_selftest | 1,182 | exec/appslot.c:882 | g_slot/g_cur/g_poll_last_tick、(slot_zero) / R |
 | launch_selftest | 788 | exec/launch.c:383 | g_req/g_next_token、(row_clear) / R |
-| paging_map_user_keep_selftest | 526 | kernel/paging.c:1210 | page_directory/page_tables/pg_enabled、(selftest_as_begin/end) / R |
+| paging_map_user_keep_selftest | 526 | mm/paging.c:1210 | page_directory/page_tables/pg_enabled、(selftest_as_begin/end) / R |
 | appslot_gfx_owner_selftest | 495 | exec/appslot.c:1081 | g_slot/g_cur、(slot_zero) / R |
 | exec_kapi_layout_selftest | 465 | exec/exec.c:522 | kapi/ring3_tramp_page / M |
-| paging_memmap_selftest | 450 | kernel/paging.c:1381 | page_directory/page_tables/pg_enabled、(fixed_paging_valid/memmap_want_at/memmap_seen_at) / R |
+| paging_memmap_selftest | 450 | mm/paging.c:1381 | page_directory/page_tables/pg_enabled、(fixed_paging_valid/memmap_want_at/memmap_seen_at) / R |
 | link_selftest | 440 | net/link.c:1149 | link_ready、(cstr/link_wait_up/open/status/link_counters_reset) / R |
-| paging_app_band_selftest | 369 | kernel/paging.c:1252 | page_directory/pg_enabled、(selftest_as_begin/end) / R |
+| paging_app_band_selftest | 369 | mm/paging.c:1252 | page_directory/pg_enabled、(selftest_as_begin/end) / R |
 | appslot_abort_admit_selftest | 363 | exec/appslot.c:1027 | g_slot/g_cur、(slot_zero) / R |
 | pegc_linear_selftest | 346 | gfx/backend_pegc.c:599 | s_sys16m_ram、(ff2_locked_write/pegc_stat/mmio_w8/w16/pegc_alias_test) / R |
-| paging_pd_clone_selftest | 342 | kernel/paging.c:1161 | pg_enabled/pd_selftest_probe、(selftest_as_begin/end) / R |
+| paging_pd_clone_selftest | 342 | mm/paging.c:1161 | pg_enabled/pd_selftest_probe、(selftest_as_begin/end) / R |
 | db_v50_selftest | 264 | kapi/kapi_db.c:1318 | sql_copy_buf/path_copy_buf、(db_shm_empty/diag/db_copy_input/shm_row_fits_n/db_journal_name) / R |
 
 - 間接的に触る状態も移植検査対象。例: inj_push→g_inj_ring/dest/head/tail/count、linkの待機→通信状態。
@@ -125,7 +125,7 @@ kdi_selftest_lease_result((u32)rc);
 ```
 
 import表と既存利用者:
-- 正典は `kernel/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py:2`）。現物269枠、stage S5。
+- 正典は `kernel/module/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py:2`）。現物269枠、stage S5。
 - 旧FUNC枠27(con)、50(exec layout)、52(exec tramp)、67(kbd)、86(lease)を削除して番号を詰める。内部importはKAPIのABI2対象外、予約枠・NULL・reserved機構を追加しない。
 - STAGE_KINDSのS2 FUNCを134→129、新S6は付表の種類列どおり（データ種類を含めてよい）。count/ABI hash/JSON/マクロ/カーネル表を同時再生成する。
 - build/kdebug.mk:6のKDEBUG_STAGEをS6へ。generate():246のS6 export slotsはS5と同じ[1..16,18,19,20]。GF_ONLY_SLOTSも番号圧縮に追従する。
@@ -135,7 +135,7 @@ import表と既存利用者:
 - ホスト試験が旧selftest名を呼ぶ場合、ホストfixtureだけの転送関数でkst_*へ渡す。本番に旧名の成功stubを残さない。
 - lease_selftest_result、kselftest_pass/fail等の観測シンボルはカーネルに残す。道具の番地は毎回現物ELFから解決する。
 - 別部品案ならmodule_load→module_start→module_exports→4起動段→module_abortが必要。
-- 根拠: `kernel/module_runtime.c:36/120/22/161`。owner・依存・参照数・quiesceを通す必要があり、単純freeではない。
+- 根拠: `kernel/module/module_runtime.c:36/120/22/161`。owner・依存・参照数・quiesceを通す必要があり、単純freeではない。
 - post_exec/post_unicode/post_probeより前に解放できず、ロード失敗をpassにもできない。採用案ではこの経路を増やさない。
 
 ## 3. 調べもの #4 の結論（この票では実装しない）
@@ -160,14 +160,14 @@ import表と既存利用者:
 
 | 対象・境界 | 補助名と引数 / staticの置場 / 残す範囲 |
 |---|---|
-| kernel_main (`kernel/kernel.c:184`) | `static void kernel_shell_loop(void)`へ`:695`以降のシェル実行ループ全体（失敗時末尾フォールバックの前まで）を抽出。ループ固有ローカルも移す。boot globalsは元位置、mem_kb/boot_drive依存の初期化はmainに残す |
+| kernel_main (`init/kernel.c:184`) | `static void kernel_shell_loop(void)`へ`:695`以降のシェル実行ループ全体（失敗時末尾フォールバックの前まで）を抽出。ループ固有ローカルも移す。boot globalsは元位置、mem_kb/boot_drive依存の初期化はmainに残す |
 | kernel_main 第2分割 | `static void kernel_mount_children(void)`へ`:517`の列挙〜`:565`付近のブロックをそのまま抽出。ルートマウント・services起動順は変更しない。捕捉が必要なローカルは入力引数にし、共有context構造体を新設しない |
 | exec_launch (`exec/exec.c:1711`) | **今回は分けない**。`:2022`setjmp、`:2027`longjmp復帰、`:2096`ESP保存、`:2202`iretがあり、見出しだけでフレーム寿命を分割できない。既存のvolatile caller情報・static状態は不変 |
 | ext2_format_range (`fs/ext2_fmt.c:49`) | `static int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)`へ`:100`〜`:142`のSB作成と書込。必要なlayout計算値はlayから現行式のまま参照、値の導出時点は移さない |
 | ext2_format_range 第2分割 | `static int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks, u32 inode_tbl_blocks_per_group)`へ`:308`以降のinode2とディレクトリ作成。fmt_ctxは元関数のstaticのままポインタ渡し。ext2_g_blkも元の共用バッファ、スタックへ複製しない |
-| ime_process_key (`kernel/ime.c:332`) | `static int ime_candidate_key(u8 ascii, u8 scancode)`へ`:341`〜`:489`。`if (g_ime.state != IME_ST_INPUT) return ime_candidate_key(ascii, scancode);` と直返し、残りは `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す |
+| ime_process_key (`kernel/ime/ime.c:332`) | `static int ime_candidate_key(u8 ascii, u8 scancode)`へ`:341`〜`:489`。`if (g_ime.state != IME_ST_INPUT) return ime_candidate_key(ascii, scancode);` と直返し、残りは `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す |
 | serial_init_ex (`drivers/serial.c:215`) | **分けない**。211行には長い理由コメントが含まれる。既にserial_plan_outがあり、`:225`〜`:410`のIRQ/PIC/モード変更と復元、`:413`の区間外報告を一体で読める価値を優先 |
-| disk_read_common / disk_write (`kernel/v86_bios.c:506/720`) | **両方とも分けず共通化しない**。readはtransfer=0のverifyとD88の実トラック→論理トラック再探索（`:605`）、writeは保護拒否（`:776`）と端数RMW（`:798`）。見出しの類似だけでは同型でない |
+| disk_read_common / disk_write (`kernel/v86/v86_bios.c:506/720`) | **両方とも分けず共通化しない**。readはtransfer=0のverifyとD88の実トラック→論理トラック再探索（`:605`）、writeは保護拒否（`:776`）と端数RMW（`:798`）。見出しの類似だけでは同型でない |
 
 - ext2の新補助が返すのは既存のI/O結果。呼元は元と同じ位置で元と同じエラーを返す。書込み回数・順序を固定する。
 - IMEの`:477`は候補確定後にreturn -1（`:488`）。呼び手`:769–771/820–822`が生キーを通す。候補処理からime_input_keyへ流さず、0/1/-1をそのまま返す。
@@ -201,10 +201,10 @@ import表と既存利用者:
 | 新規 include/kselftest_probe.h | 型と3宣言、約30行。実体は状態所有ファイル（kapi/kapi_selftest.cは作らない） |
 | 新規 kdebug/selftest_internal.h | kst_*宣言、約20行 |
 | 新規 kdebug/selftest_con.c / selftest_kbd.c / selftest_lease.c / selftest_exec.c | 順に約130 / 140 / 120 / 170行、元の試験と専用補助を移動 |
-| 変更 kernel/con_sink.c、kernel/kbd_inject.c、exec/lease.c、exec/exec.c | 元試験削除、con以外へ新3口を各5〜15行。元ヘッダの試験宣言削除、conは冗長reader代入の削除だけ |
-| 変更 kdebug/kselftest.c、kernel/kdebug_imports.def、tools/gen_kdebug_imports.py | 呼先5種置換、旧5枠削除・圧縮、S6追加・生成表/check_nm追従（計約100〜180行） |
+| 変更 kernel/console/con_sink.c、kernel/kbd_inject.c、exec/lease.c、exec/exec.c | 元試験削除、con以外へ新3口を各5〜15行。元ヘッダの試験宣言削除、conは冗長reader代入の削除だけ |
+| 変更 kdebug/kselftest.c、kernel/module/kdebug_imports.def、tools/gen_kdebug_imports.py | 呼先5種置換、旧5枠削除・圧縮、S6追加・生成表/check_nm追従（計約100〜180行） |
 | 変更 build/kdebug.mkとkernelの対象リスト | 新.o追加とKDEBUG_STAGE=S6（約10行）。生成JSON等は同時再生成 |
-| 変更 kernel/kernel.c、fs/ext2_fmt.c、kernel/ime.c | 純粋抽出、各約180 / 100 / 250行の移動、増分各10〜30行 |
+| 変更 init/kernel.c、fs/ext2_fmt.c、kernel/ime/ime.c | 純粋抽出、各約180 / 100 / 250行の移動、増分各10〜30行 |
 | 変更 tools/tests/test_{con_sink,kbd_inject,lease,kdebug_imports,kdebug_init}.py と関連fixture | 移植.o・host用接続、旧名互換、生成契約、各10〜60行 |
 | 新規 tools/tests/test_slim_selftest.py | 状態復元・実import経由のデータ/関数番地照合、100〜200行。S4用hostログ基盤は作らない |
 | 変更 tools/check_p2v_allow.txt、tools/tests/memmap_audit_host.c、lease_host.c、test_kapi_layout.py、r1関連fixture | exec試験2本の許可を移植先へ、lease呼先/リンク入力・ソース検査を追従（各5〜30行） |
@@ -267,7 +267,7 @@ import表と既存利用者:
 
 ## S4e の実装で設計者が決めたこと
 
-- 現行ビルドの `kernel/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。
+- 現行ビルドの `kernel/ime/ime.c` は `fep.mod` に入るため、指定の `kernel.elf` の .text 比較に加えて、実体の `build/out/fep/ime.o` の命令・再配置と `build/out/fep/fep.elf` の .text も変更前後で比較する。
 
 ## S3a の実装で設計者が決めたこと
 

@@ -100,7 +100,7 @@ def boot_notice(folder, remove_notice=False):
     """
     import re
     from test_sh_truncation import HOST_SRC, build_host, write_shims
-    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
     assert 'kcg_unavailable = 1;' in kernel
     assert '? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell' in kernel
     source = HOST_SRC.read_text()
@@ -191,7 +191,7 @@ def product(folder):
 def main():
     with tempfile.TemporaryDirectory(prefix='kcg-module-') as td:
         folder = Path(td)
-        shutil.copyfile(ROOT / 'kernel/platform_display.h', folder / 'platform_display.h')
+        shutil.copyfile(ROOT / 'include/platform_display.h', folder / 'platform_display.h')
         product(folder)
         display_diagnostic(folder)
         adapter = (ROOT / 'kernel/kcg_module.c').read_text()
@@ -209,8 +209,8 @@ def main():
             if kind == 'body':
                 (folder / 'adapter.c').write_text(adapter)
             exe = folder / kind
-            extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module_runtime.c',
-                      ROOT / 'kernel/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c']
+            extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module/module_runtime.c',
+                      ROOT / 'kernel/module/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c']
                      if kind == 'module' else [f'-DKCG_ADAPTER="{folder / "adapter.c"}"'])
             result = subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
                                      '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),

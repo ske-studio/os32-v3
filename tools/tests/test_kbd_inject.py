@@ -7,7 +7,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 ソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に
 見る ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 
-kbd_inject_host.c は kernel/con_sink.c も同じ翻訳単位へ入れる: 注入の権限は
+kbd_inject_host.c は kernel/console/con_sink.c も同じ翻訳単位へ入れる: 注入の権限は
 「con_sink の読み手 1 本」なので、そこを模型に置き換えると試験の意味が消える。
 
 ホスト側だけ -DCON_SINK_NO_IRQ_LOCK / -DKBD_INJECT_NO_IRQ_LOCK を付ける:

@@ -480,7 +480,7 @@ MIRRORS = (
     ("sdk/rust/os32api/src/gui/proto.rs",
      r"^pub const GUI_SHM_OFFSET:\s*u32\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_SHM_GUI_OFFSET"),
-    # ホスト試験が kernel/shm.c を組むための偽 memmap.h。実物は
+    # ホスト試験が mm/shm.c を組むための偽 memmap.h。実物は
     # (u32)&__bss_end を含んでホストで使えないので写しを持つしかないが、
     # **2026-09-17 に実際にずれた** — D1 で 16 → 14 ブロックにしたとき、
     # ここだけ 16 のままで shm.c の表明が落ちた (make check が捕まえた)。
@@ -506,7 +506,7 @@ MIRRORS = (
 )
 
 # ASM は値ではなくシンボルで引くこと。数値直書きに戻したらここで気づく。
-ASM_SYMBOLIC = (("kernel/kentry.asm", "mov     esp, LAYOUT_MEM_KSTACK_TOP",
+ASM_SYMBOLIC = (("arch/x86/kernel/kentry.asm", "mov     esp, LAYOUT_MEM_KSTACK_TOP",
                  "ESP の初期値を数値で書かず生成ヘッダの "
                  "LAYOUT_MEM_KSTACK_TOP を使うこと"),)
 

@@ -25,7 +25,7 @@ def slots():
     doc = DOC.read_text()
     core = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
                       doc.split('## 2.', 1)[1].split('## 3.', 1)[0], re.M)
-    imports = {e['symbol']: e for e in json.loads((ROOT/'kernel/kdebug_imports.def').read_text())['imports']}
+    imports = {e['symbol']: e for e in json.loads((ROOT/'kernel/module/kdebug_imports.def').read_text())['imports']}
     kernel = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
                         doc.split('## 3.', 1)[1].split('## 4.', 1)[0], re.M)
     result = []
@@ -149,7 +149,7 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     header += 'const struct hwdev_core_api *hwdev_core_get(void);\n#endif\n'
     files = {'hwdev_contract.h':header, 'hwdev_layout.txt':layout}
     files['hwdev_core.c'] = '#include "hwdev_contract.h"\nstatic const struct hwdev_core_api core = {\n    HWDEV_ABI, sizeof(core), HWDEV_CONTRACT_CRC, HWDEV_LAYOUT_CRC,\n'+''.join('    '+e['symbol']+',\n' for e in core_entries)+'};\nconst struct hwdev_core_api *hwdev_core_get(void) { return &core; }\n'
-    imports = ['#include "hwdev_contract.h"', '#include "kernel/module_image.h"',
+    imports = ['#include "hwdev_contract.h"', '#include "kernel/module/module_image.h"',
                'static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {' +
                ','.join('1' if e['group']=='core' else '0' for e in entries) + '};',
                'static const struct module_symbol_contract hwdev_import_contracts[] = {']

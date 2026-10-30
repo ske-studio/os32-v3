@@ -1,7 +1,7 @@
 /* Read saved device/diagnostic state only; no probing, output or yield. */
 #include "ver_info.h"
-#include "cpu_calibrate.h"
-#include "idt.h"
+#include "time/cpu_calibrate.h"
+#include "../arch/x86/kernel/idt.h"
 #include "port_service.h"
 #include "pcm_contract.h" /* pcm_present is the resident pcm_module.c facade. */
 #include "gfx_hal.h"

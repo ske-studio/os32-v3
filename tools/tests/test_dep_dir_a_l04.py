@@ -52,13 +52,13 @@ def fixed_contracts():
             assert target + '(' in function(generated, 'wrap_' + entry['name'])
     assert digest(json.dumps({k: v for k, v in spec.items() if k != 'includes'},
                              sort_keys=True).encode()) == fixture['api_sha256']
-    source = (ROOT / 'kernel/v86.c').read_text()
+    source = (ROOT / 'kernel/v86/v86.c').read_text()
     assert '#include "platform_device.h"' in source and '"loop_dev.h"' not in source
     for name, expected in fixture['v86_functions'].items():
         body = function(source, name)
         assert body.count('platform_loop_dev_') == (2 if name == 'v86_disk_test' else 3)
         assert digest(body.replace('platform_loop_dev_', 'loop_dev_').encode()) == expected
-    hle = (ROOT / 'kernel/v86_bios.c').read_text()
+    hle = (ROOT / 'kernel/v86/v86_bios.c').read_text()
     assert 'platform_device.h' not in hle and 'platform_loop_dev_' not in hle
     detach = function(hle, 'v86_bios_detach_disk')
     assert detach.count('loop_dev_detach(') == 1

@@ -6,9 +6,9 @@
  * TASK_FONTPERF F6: the guard no longer touches x87, so the x87 state
  * comparison and the #MF case (16) are gone. */
 #ifdef OS32_R1_FIXTURE
-#include "font_guard.h"
+#include "console/font_guard.h"
 #include "appslot.h"
-#include "idt.h"
+#include "../arch/x86/kernel/idt.h"
 #include "io.h"
 #include "memmap.h"
 #include "kprintf.h"

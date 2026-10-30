@@ -12,24 +12,24 @@ from test_shm_user import function
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('kernel/paging.c', 'page_tables[0][i] = saved;',
+    ('mm/paging.c', 'page_tables[0][i] = saved;',
      'if (i + 1 < V86_GUEST_MAP_END / PAGE_SIZE) page_tables[0][i] = saved;', 'last-PTE'),
-    ('kernel/paging.c', '    arch_mmu_flush_tlb();\n    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)',
+    ('mm/paging.c', '    arch_mmu_flush_tlb();\n    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)',
      '    for (u32 i = 0; i < V86_GUEST_MAP_END / PAGE_SIZE; i++)', 'restore-TLB'),
-    ('kernel/v86_mem.c', '    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),\n            MEM_AUTOPLAY_MAILBOX_SIZE);', '', 'mailbox-restore'),
-    ('kernel/v86_mem.c', '    kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);', '', 'fresh-zero'),
-    ('kernel/v86_mem.c', '        for (;;) _stop();', '', 'restore-fail-stop'),
-    ('kernel/v86_mem.c', 'platform_fault_cell(col, (u8)line[col], TATTR_RED);', '(void)line[col];', 'restore-diagnostic'),
-    ('kernel/paging.c', 'paging_set_not_present(0, MEM_NULL_GUARD_END);',
+    ('kernel/v86/v86_mem.c', '    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),\n            MEM_AUTOPLAY_MAILBOX_SIZE);', '', 'mailbox-restore'),
+    ('kernel/v86/v86_mem.c', '    kmemset(P2V(V86_REMAP_START), 0, V86_REMAP_END);', '', 'fresh-zero'),
+    ('kernel/v86/v86_mem.c', '        for (;;) _stop();', '', 'restore-fail-stop'),
+    ('kernel/v86/v86_mem.c', 'platform_fault_cell(col, (u8)line[col], TATTR_RED);', '(void)line[col];', 'restore-diagnostic'),
+    ('mm/paging.c', 'paging_set_not_present(0, MEM_NULL_GUARD_END);',
      'paging_set_readonly(0, MEM_NULL_GUARD_END);', 'page0-NP'),
-    ('kernel/v86_mem.c',
+    ('kernel/v86/v86_mem.c',
      'if (paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) != 0)\n        goto fail;',
      'if (paging_v86_map_range(0, PAGE_SIZE, 0, PAGE_RW | PTE_USER) != 0)\n        (void)0;', 'page0-prepare-failure'),
-    ('kernel/v86_mem.c',
+    ('kernel/v86/v86_mem.c',
      'if (paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,\n                             PAGE_RW | PTE_USER) != 0) goto fail;',
      'if (paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,\n                             PAGE_RW | PTE_USER) != 0) (void)0;', 'low-prepare-failure'),
 ) + tuple(
-    ('kernel/v86_mem.c', '                goto fail;',
+    ('kernel/v86/v86_mem.c', '                goto fail;',
      f'                if (mi != {index}) goto fail;', f'identity-prepare-{index}')
     for index in range(7)
 )
@@ -37,13 +37,13 @@ MUTATIONS = (
 LOW_ROW = """        { 0, MB_PFN(MEM_CONV_END),
           LEDGER_R_FIXED, LEDGER_OWNER_KERNEL, LEDGER_CACHE_WB, 0 },"""
 MUTATIONS += (
-    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW + """
+    ('mm/memory_boot.c', LOW_ROW, LOW_ROW + """
     { 0x6A, 0x8A, LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_BOOT, LEDGER_CACHE_WB, 0 },""", 'old-low-reservation'),
-    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW.replace('LEDGER_OWNER_KERNEL', 'LEDGER_OWNER_BOOT'), 'low-owner'),
-    ('kernel/memory_boot.c', LOW_ROW, LOW_ROW.replace('MB_PFN(MEM_CONV_END)', 'MB_PFN(MEM_CONV_END) - 1'), 'low-end-PFN'),
-    ('kernel/v86_mem.c', 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,',
+    ('mm/memory_boot.c', LOW_ROW, LOW_ROW.replace('LEDGER_OWNER_KERNEL', 'LEDGER_OWNER_BOOT'), 'low-owner'),
+    ('mm/memory_boot.c', LOW_ROW, LOW_ROW.replace('MB_PFN(MEM_CONV_END)', 'MB_PFN(MEM_CONV_END) - 1'), 'low-end-PFN'),
+    ('kernel/v86/v86_mem.c', 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,',
      'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, MEM_POOL_BASE,', 'old-backing-alias'),
-    ('kernel/v86_mem.c', '    (void)owner;',
+    ('kernel/v86/v86_mem.c', '    (void)owner;',
      '    if (!pgalloc_alloc_phys(owner, 159)) return -2;', 'old-backing-allocation'),
 )
 
@@ -82,7 +82,7 @@ def check_generated_map():
 
 def main():
     check_generated_map()
-    paths = ('kernel/platform_emergency.h', 'platform/pc98/emergency.c', 'kernel/paging.c', 'kernel/v86_mem.c', 'kernel/v86_bios.c', 'kernel/v86_snapshot.c', 'kernel/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'kernel/memory_boot.c')
+    paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_bios.c', 'kernel/v86/v86_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/kbd.c', 'mm/memory_boot.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:
         work = Path(td)
@@ -94,7 +94,7 @@ def main():
             for path, source in parts.items():
                 (work / Path(path).name).write_text(source)
             (work / 'bios_consumer_slice.inc').write_text(function(parts['drivers/kbd.c'], 'kbd_bios_shift_peek'))
-            memory = parts['kernel/memory_boot.c']
+            memory = parts['mm/memory_boot.c']
             # L15 keeps the two-row table inside memory_boot_regions. Copy
             # that initializer into the host's corresponding local scope.
             start = memory.index('    const struct {', memory.index('static int memory_boot_regions('))
@@ -110,7 +110,7 @@ def main():
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
             cmd += ['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests', 'include',
                     'arch/x86', 'platform/pc98', 'kernel', 'lib', 'exec', 'gfx', 'fs', 'drivers', 'sdk/include/os32')]
-            subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_low_host.c'), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
+            subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_low_host.c'), str(ROOT / 'mm/physmem.c'), '-o', str(exe)], check=True)
             result = subprocess.run(['qemu-i386', '-B', '0x100000000', str(exe)],
                                     capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
             assert result.returncode == (1 if label else 0), (label, result)

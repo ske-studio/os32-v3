@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = [
     'exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest.c',
     'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-    'exec/appmem_unmap.c', 'kernel/paging_app.c', 'kernel/physmem.c',
+    'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
     'sdk/allocator/nano_adapter.c',
     'tools/tests/trim_flow_host.c', 'tools/tests/multiapp_model_host.c',
 ]
@@ -158,14 +158,14 @@ def build_fixture(tmp, sources):
     (tmp / 'multiapp_model_host.c').write_text(sources['tools/tests/multiapp_model_host.c'])
     objects = []
     for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c',
-                                  'exec/appmem_unmap.c', 'kernel/paging_app.c',
-                                  'kernel/physmem.c')):
+                                  'exec/appmem_unmap.c', 'mm/paging_app.c',
+                                  'mm/physmem.c')):
         src, obj = tmp / f'part{index}.c', tmp / f'part{index}.o'
         src.write_text(sources[name])
         extra = []
         if name == 'exec/appmem_map.c':
             extra = ['-Dpaging_app_stage=flow_stage', '-Dappmem_publish=flow_publish']
-        if name == 'kernel/paging_app.c':
+        if name == 'mm/paging_app.c':
             extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free']
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)],
                      check=True, capture_output=True, text=True)

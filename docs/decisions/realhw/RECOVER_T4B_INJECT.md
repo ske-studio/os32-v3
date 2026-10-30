@@ -11,7 +11,7 @@
 | `kdebug/recover.c:174,1087,1212,1240` | boot 寿命の owner、bind 済み plan 必須の begin、承認済み step、共通 end。FAILED を再開始で消せない |
 | `kdebug/recover.c:576,1058,1191,764` | profile に target 必須。trial/opcode 期限、step poll 上限、独立 UART poll 上限がある |
 | `kdebug/recover.c:953,978,1035,357` | cleanup は①→実 S0 検証、S0 成功と試行失敗は独立。final は `target=S0`、失敗時 `result=FAIL` |
-| `kernel/kdebug_call.c:8`、`kdebug/kdebug_main.c:102,110`、`userland/shell/cmd_recover.c:9` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
+| `kernel/module/kdebug_call.c:8`、`kdebug/kdebug_main.c:102,110`、`userland/shell/cmd_recover.c:9` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
 | `tools/rshell_recover.py:2,34,93,185` | --command は一命令、PAUSED は EOT で帰還。state/log を継続し、初回だけ ver。欠落・timeout は非成功 |
 | `docs/decisions/realhw/REALHW_RECOVER_DESIGN.md:182`、`REALHW_RECOVER_ADDENDUM_R2.md:26`（同ディレクトリ） | 仮想失敗→S0 と NP21 用予算は既定だが選択・注入口が欠ける |
 | `docs/tasks/DEFERRED_TESTS.md:54`、`docs/decisions/realhw/HWDEV_DESIGN.md:144` | 仮想試行・送信詰まり・終端不着を受入、PAUSED 門除去を変異とする |

@@ -2,7 +2,7 @@
 
 Command: `python3 tools/tests/test_paging_bounds.py`
 
-The harness compiles actual `kernel/paging.c` and `kernel/pgalloc.c` as freestanding static ILP32 GNU89. CR0/CR3 instructions and allocator IRQ save/restore are replaced only in temporary host copies; Linux mmap provides the backing physical-address range. The ranged allocator wrapper injects allocation failure, but successful allocation/free and bitmap accounting use the real allocator. No Make outputs are shared. The runner also compiles unmodified target paging.c with i386-elf-gcc, `-Werror` and `-Wdeclaration-after-statement`.
+The harness compiles actual `mm/paging.c` and `mm/pgalloc.c` as freestanding static ILP32 GNU89. CR0/CR3 instructions and allocator IRQ save/restore are replaced only in temporary host copies; Linux mmap provides the backing physical-address range. The ranged allocator wrapper injects allocation failure, but successful allocation/free and bitmap accounting use the real allocator. No Make outputs are shared. The runner also compiles unmodified target paging.c with i386-elf-gcc, `-Werror` and `-Wdeclaration-after-statement`.
 
 ## Observed RED → GREEN slices
 
@@ -72,7 +72,7 @@ TDD だったとは扱わない。独立レビューは親への引継ぎ事項�
 
 ### 旧実装の削除範囲と再構築順序
 
-1. `kernel/paging.c` の **`alloc_master_pt` 関数全体を削除**し、
+1. `mm/paging.c` の **`alloc_master_pt` 関数全体を削除**し、
    **`prepare_tables` の実装全体も削除**。既存回帰テストは維持した。
    保存コピーからの復元や条件反転後の復元ではなく、残した実体は次だけ:
 

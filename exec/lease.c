@@ -19,7 +19,7 @@ volatile u32 lease_revoke_fail_count;
 volatile u32 lease_revoke_all_fail_count;
 
 /* Keep this root/normal-context predicate in sync with
- * kernel/paging.c:lease_root_context(); paging also validates managed PTs. */
+ * mm/paging.c:lease_root_context(); paging also validates managed PTs. */
 static int context(const struct addrspace *as)
 {
     return as && as->pd_phys && !(as->pd_phys % PAGE_SIZE) && as->lease_pt_phys[0] &&

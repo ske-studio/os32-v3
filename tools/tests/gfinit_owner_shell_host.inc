@@ -1,7 +1,7 @@
 /* Real shell and KDEBUG=0 gateway; only the loaded GF dispatch is injected. */
 #define SHELL_H
 #define str_eq(a,b) equal(a,b)
-#include "../../kernel/kdebug_call.c"
+#include "../../kernel/module/kdebug_call.c"
 struct kdebug kdebug;
 static u32 cli_calls, cli_op;
 static struct gfinit_request cli_request;

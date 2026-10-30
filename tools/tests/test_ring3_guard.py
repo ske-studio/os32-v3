@@ -20,7 +20,7 @@ ring3_guard_active(in_syscall, wm_depth) に寄せること。
   (5) gui_register も同じ門 (owner 1 かつ CPL=0 の直呼び)、gshell の
       top-level の登録は通る (代行レビュー P3、host §6)
   (6) WM の中で落ちた観測点 (静的): exec/exec.c の ring3_kill_kind が深さを
-      0 に戻す**前**に ring3_wm_fault_count を数え、kernel/isr_handlers.c の
+      0 に戻す**前**に ring3_wm_fault_count を数え、arch/x86/kernel/isr_handlers.c の
       2 つの kill の行が深さ 1 以上で " (in WM)" を足す (代行レビュー P3)
 
 test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、同じ
@@ -46,7 +46,7 @@ KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_r
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 MUTATIONS = [
-    ("kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
+    ("arch/x86/kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
     ("kernel/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
      "OWNER_EXIT public forgery allowed"),
     ("exec/ring3_str.c",
@@ -101,11 +101,11 @@ MUTATIONS = [
      "        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n",
      "",
      "ring3_wm_fault_count を数えない"),
-    ("kernel/isr_handlers.c",
+    ("arch/x86/kernel/isr_handlers.c",
      "        sputs(\" EIP=\"); sput_hex32(fault_eip);\n        if (ring3_wm_depth > 0) sputs(\" (in WM)\");\n",
      "        sputs(\" EIP=\"); sput_hex32(fault_eip);\n",
      "例外の kill の行に (in WM) を付けない"),
-    ("kernel/isr_handlers.c",
+    ("arch/x86/kernel/isr_handlers.c",
      "        }\n        if (ring3_wm_depth > 0) sputs(\" (in WM)\");\n        sputs(\" -> kill app\\n\");\n",
      "        }\n        sputs(\" -> kill app\\n\");\n",
      "#PF の kill の行に (in WM) を付けない"),
@@ -154,7 +154,7 @@ def static_checks(root, quiet=False):
         bad.append("ring3_kill_kind の数える条件が深さ 1 以上 / FAULT でない")
     if "volatile u32 ring3_wm_fault_count = 0;" not in exec_c:
         bad.append("ring3_wm_fault_count が大域 (カーネルシンボル) でない")
-    isr = (root / "kernel/isr_handlers.c").read_text(encoding="utf-8")
+    isr = (root / "arch/x86/kernel/isr_handlers.c").read_text(encoding="utf-8")
     for head in ("void exception_handler(", "void page_fault_handler("):
         fb = _func_body(isr, head)
         k = fb.find("ring3_fault_kill();")
@@ -174,7 +174,7 @@ def includes(root):
 
 def run_host(root, tmp, quiet=False):
     exe = tmp / "ring3-guard"
-    isr = (root / "kernel/isr_handlers.c").read_text()
+    isr = (root / "arch/x86/kernel/isr_handlers.c").read_text()
     a = isr.index('        sputs("\\n[ring3] #PF')
     b = isr.index('        ring3_fault_kill();', a)
     (tmp / "pf_diag.inc").write_text(isr[a:b])

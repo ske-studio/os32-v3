@@ -17,10 +17,10 @@
 | ソース | 確認した現行動作 / 不足 |
 |---|---|
 | `kernel/physmem.[ch]`: `physmem_exclude`, `physmem_reserve_ram` | 単一変更はコピー上で正規化後 commit。永久除外、owner/live allocation 情報なし。MMIO > RESERVED > RAM > UNKNOWN。最大64区間。 |
-| `kernel/pgalloc.c`: `init_core`, `pgalloc_reserve_pfn` | model を eligibility bitmap に snapshot。単一 `[first,end)` だけ IRQ 保存区間で全 allocated bit を確認後 eligible を落とす。既に非 eligible は成功扱い、`end > limit_pfn` は拒否。owner、複数範囲 transaction、管理外 MMIO 記録はない。 |
-| `kernel/pgalloc.h`, `include/sys.h` と実体 | `sys_memory_bootstrap_model(model,layout,verify)` → `sys_memory_stage_online()` が現存。BOOTSTRAP は一般 alloc 不可、workspace で高位 RAM mapping 後 ONLINE。stage は master/live AS=0 が必要、途中失敗は以前の map が残り得る fail-stop。`sys_memory_init_model` は metadata のみで ONLINE にはできない。 |
-| `kernel/kernel.c`: paging/pgalloc 初期化 | 製品入口は依然 `paging_init(mem_kb)` → `pgalloc_init(mem_kb)`。モデル stage/provider は未接続。broker のために boot をモデル経路へ強制変更しない。 |
-| `kernel/boot_splash.c`: `splash_gfx_init` | 希望値を保存→PC98 強制→`gfx_init()`→希望値復元。任意 probe をしない現行変更を維持。kernel.c の「splash が最初に任意 backend を選ぶ」と読める旧コメントを根拠にしない。 |
+| `mm/pgalloc.c`: `init_core`, `pgalloc_reserve_pfn` | model を eligibility bitmap に snapshot。単一 `[first,end)` だけ IRQ 保存区間で全 allocated bit を確認後 eligible を落とす。既に非 eligible は成功扱い、`end > limit_pfn` は拒否。owner、複数範囲 transaction、管理外 MMIO 記録はない。 |
+| `mm/pgalloc.h`, `include/sys.h` と実体 | `sys_memory_bootstrap_model(model,layout,verify)` → `sys_memory_stage_online()` が現存。BOOTSTRAP は一般 alloc 不可、workspace で高位 RAM mapping 後 ONLINE。stage は master/live AS=0 が必要、途中失敗は以前の map が残り得る fail-stop。`sys_memory_init_model` は metadata のみで ONLINE にはできない。 |
+| `init/kernel.c`: paging/pgalloc 初期化 | 製品入口は依然 `paging_init(mem_kb)` → `pgalloc_init(mem_kb)`。モデル stage/provider は未接続。broker のために boot をモデル経路へ強制変更しない。 |
+| `init/boot_splash.c`: `splash_gfx_init` | 希望値を保存→PC98 強制→`gfx_init()`→希望値復元。任意 probe をしない現行変更を維持。kernel.c の「splash が最初に任意 backend を選ぶ」と読める旧コメントを根拠にしない。 |
 | `gfx/gfx_core.c`: 選択/init | auto は Cirrus→PEGC→PC98、強制候補失敗は PC98。`probe()` を選択時と init 後に呼び、init は void。副作用なしの候補記述、予約許可、init 成功状態の内部契約が必要。 |
 | `gfx/backend_pegc.c`: `pegc_probe`, `pegc_linear_selftest`, `pegc_init` | probe 自体が FF2/モード/MMIO を変更し、窓 enable→map→VRAM 書込み試験。成功時 map を保持。init は `sys_reserve_top`、enable→map（戻り値未確認）→clear。予約を init にだけ追加しても遅い。 |
 | `gfx/backend_cirrus.c`, `drivers/wab_cirrus.c`, `drivers/wab_glue_xe10.c` | Xe10 probe も index OUT、chip probe は SR6 を書き解錠状態を残す。glue init は FF82/銀行窓/linear enable を map より前に実行。純粋な照会ではない。 |
@@ -69,7 +69,7 @@ live allocator の正典は frozen eligibility + broker 台帳とする。boot m
 
 PEGC BB は具体的な未解決依存である。PC98-only splash では従来の boot BB がもう作られず、現行 `sys_reserve_top()` を後発 GUI で呼ぶのは契約違反。**本票の最小実装は、既存同 owner BB を再利用、または ONLINE の確認済み・mapped RAM から arena/私有帯外の連続 BB を §4 の一括要求として永久取得する。無ければ probe 前に PEGC を拒否する。** legacy boot にはその空きがない場合があり、従来8MiB PEGC の動作維持を本票だけで達成したとはしない。idle 時の exec 縮小/BB carve-out を必要とする場合は別設計・別受入ゲート（A/B cleanup、minimum、guard、hotdeploy 不変まで）を先に承認する。CUI 用に boot BB を常時確保する迂回は禁止。
 
-GUI 初回の挿入点は `kernel/kernel.c` の `is_gui` 判定後、`exec_run(cur_shell)` より前。失敗は候補を採用せず PC98 GUI または既存 CUI 復帰へ進む。live AS/exec の不在を確かめられなければ拒否する。auto は候補ごとに transaction→準備を行い、全候補の窓をまとめて予防予約しない。
+GUI 初回の挿入点は `init/kernel.c` の `is_gui` 判定後、`exec_run(cur_shell)` より前。失敗は候補を採用せず PC98 GUI または既存 CUI 復帰へ進む。live AS/exec の不在を確かめられなければ拒否する。auto は候補ごとに transaction→準備を行い、全候補の窓をまとめて予防予約しない。
 
 単独 CPL3 アプリからの初回 `gfx_init/gfx_init_200` は既に exec 後なので、任意 backend の新規 activation を禁止して PC98 を使用する。GUI 境界で準備済みの候補の再 init のみ許可する。この制約を隠して既存単独アプリ互換を合格扱いしない。live backend の変更を希望値変更だけで即実行せず、安全な shell 境界へ送る内部調停が必要。
 
@@ -81,11 +81,11 @@ GUI 初回の挿入点は `kernel/kernel.c` の `is_gui` 判定後、`exec_run(c
 4. 成功した BB 記述子/backend 状態を公開→gshell の exec/AS 作成→`gfx_bb_phys_range()` から **client 面だけ** `paging_addrspace_map_user_keep()`。表示面は supervisor、Cirrus client の PCD/PWT を維持する。exec 側 map の戻り値も確認して失敗時は launch abort。
 5. 再 init は mapping/BB を作り直さず既存準備を使用する。Cirrus の現在の shutdown 後 mapping/BB 保持を維持し、共有 PT 上の USER を supervisor で上書きしない。予約失敗を `s_probed` の「不存在」として永久 cache しない。予約拒否と hardware probe 失敗を分ける。
 
-現行 backend の `sys_get_mem_kb()*1024` による上端判定は ownership 判定ではなく overflow もあり得る。削除するなら broker と安全な機種/decode 条件で置換する。**RAM を予約できたことは PEGC がその窓に実在する証明ではない**。未確認機種では保守的拒否を維持する。paging の現在の map は単一呼出し全件不変で失敗する（`kernel/paging.h:87-102`）。backend 内の「部分適用される」という旧コメントには従わない。
+現行 backend の `sys_get_mem_kb()*1024` による上端判定は ownership 判定ではなく overflow もあり得る。削除するなら broker と安全な機種/decode 条件で置換する。**RAM を予約できたことは PEGC がその窓に実在する証明ではない**。未確認機種では保守的拒否を維持する。paging の現在の map は単一呼出し全件不変で失敗する（`mm/paging.h:87-102`）。backend 内の「部分適用される」という旧コメントには従わない。
 
 ## 7. 実装範囲と受入ゲート
 
-次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `kernel/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
+次回コード範囲: `kernel/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/wab_glue*.{c,h}`, `drivers/wab_cirrus.c`（副作用分離）。必要時のみ `kernel/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
 
 | ゲート | 合格条件（全て次回実装時。今回未実行） |
 |---|---|

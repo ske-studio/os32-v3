@@ -208,7 +208,7 @@ def check_read_stream_shape():
 
 def check_irq_entry():
     """D1a の配線: 共通入口だけが深さ管理と配送を担い、EOI は C 側。"""
-    asm = (ROOT / "kernel/isr_stub.asm").read_text()
+    asm = (ROOT / "arch/x86/kernel/isr_stub.asm").read_text()
     common = asm.split('%macro IRQ_COMMON 1', 1)[1].split('%endmacro', 1)[0]
     code = "\n".join(line.split(';;', 1)[0].strip() for line in common.splitlines())
     order = ['IRQ_ENTER', 'cld', 'call    irq_dispatch', 'IRQ_LEAVE', 'IRETD_USER']
@@ -216,10 +216,10 @@ def check_irq_entry():
     assert not re.search(r'\b(?:out|V86_REFLECT)\b', code)
     assert len(re.findall(r'^IRQ_COMMON 11\s', asm, re.M)) == 1
     assert 'irq_stub_11' not in asm and 'fdc_irq_handler' not in asm
-    idt = (ROOT / "kernel/idt.c").read_text()
+    idt = (ROOT / "arch/x86/kernel/idt.c").read_text()
     assert re.search(r'idt_set_gate\(IRQ_TO_INT\(11\), irq_stub_common_11,', idt)
-    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "kernel/kernel.c").read_text()
-    assert 'fdc_irq' not in (ROOT / "kernel/isr_handlers.c").read_text()
+    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "init/kernel.c").read_text()
+    assert 'fdc_irq' not in (ROOT / "arch/x86/kernel/isr_handlers.c").read_text()
     assert 'fdc_irq_fired' not in (ROOT / "drivers/fdc.h").read_text()
     print('IRQ11 common entry / no V86 reflection / single EOI owner PASS', flush=True)
 

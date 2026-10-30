@@ -125,8 +125,8 @@ def build(exe):
                if e['symbol'] not in ('kprintf', 'kmemset', 'pgalloc_alloc_phys', 'pgalloc_free_n_owner',
                                       'gf_production_selected')]
     return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',
-            str(ROOT / 'tools/tests/hwdev_module_host.c'), str(ROOT / 'kernel/module_runtime.c'),
-            str(ROOT / 'kernel/module_image.c'),
+            str(ROOT / 'tools/tests/hwdev_module_host.c'), str(ROOT / 'kernel/module/module_runtime.c'),
+            str(ROOT / 'kernel/module/module_image.c'),
             *['-Wl,--defsym,' + name + '=fixture_kernel' for name in aliases], '-o', str(exe)]
 
 
@@ -147,12 +147,12 @@ def main():
         subprocess.run(build(exe), check=True)
         run(exe, cases)
         if '--mutate' in sys.argv:
-            source = (ROOT / 'kernel/hwdev_module.c').read_text()
+            source = (ROOT / 'kernel/module/hwdev_module.c').read_text()
             for name, old, new in MUTATIONS:
                 assert source.count(old) == 1, name
                 with tempfile.TemporaryDirectory(prefix='hwdev-mut-') as mt:
                     mexe = Path(mt) / 'host'
-                    mutpar.build_in_tree(ROOT, mt, {'kernel/hwdev_module.c': source.replace(old, new)},
+                    mutpar.build_in_tree(ROOT, mt, {'kernel/module/hwdev_module.c': source.replace(old, new)},
                                          [build(mexe)], capture_output=True)
                     try:
                         run(mexe, cases)

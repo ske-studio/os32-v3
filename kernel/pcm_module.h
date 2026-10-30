@@ -2,9 +2,9 @@
 #ifndef PCM_MODULE_H
 #define PCM_MODULE_H
 #include "pcm_contract.h"
-#include "module_runtime.h"
-#include "irq.h"
-#include "dma_pool.h"
+#include "module/module_runtime.h"
+#include "irq/irq.h"
+#include "../mm/dma_pool.h"
 #define PCM_MODULE_OPS_VERSION 1u
 typedef struct {
     int (*open)(u32 rate);

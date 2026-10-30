@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
-    kernel = (ROOT / 'kernel/kernel.c').read_text()
+    kernel = (ROOT / 'init/kernel.c').read_text()
     assert kernel.index('    pc98_boot_bind(&boot, boot_drive);') < kernel.index('vfs_mount("/",')
     vfs = (ROOT / 'fs/vfs.c').read_text()
     assert 'ide_limits.h' not in vfs and 'IDE_MAX_DRIVES' not in vfs

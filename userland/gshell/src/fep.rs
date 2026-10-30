@@ -18,7 +18,7 @@
 //!
 //! ### PM への申し送り 1 — `ime_feed_key` (K レーンへの依頼、G3 の前提)
 //!
-//! `kernel/ime.c` の変換本体 `ime_process_key(keydata)` は static で、公開 API
+//! `kernel/ime/ime.c` の変換本体 `ime_process_key(keydata)` は static で、公開 API
 //! (`ime_getkey` 系) はどれも `kbd_trygetkey()` から自分でキーを引く。GUI 中は
 //! cooked が空なので**この経路が丸ごと死んでいる**。次の 1 本を足してほしい:
 //!
@@ -43,7 +43,7 @@
 //!
 //! ## 未確定文字列と候補窓の描画
 //!
-//! カーネルの FEP は `IME_Render` 関数表 (`kernel/ime_render.h`) 越しに
+//! カーネルの FEP は `IME_Render` 関数表 (`kernel/ime/ime_render.h`) 越しに
 //! **80x25 のセル格子**へ描く。ここに GFX 版の関数表 [`GSHELL_IME_RENDER_GFX`] を
 //! 用意した (実体は gshell 側 = CPL=0 なのでカーネルから直接呼べる)。関数表は
 //! **画素を書かず、セル格子 (`Grid`) を更新するだけ**なので、X1 / X4 (ポンプ) から
@@ -70,7 +70,7 @@ pub const CELL_W: i32 = 8;
 pub const CELL_H: i32 = 16;
 pub const COLS: usize = 80;
 pub const ROWS: usize = 25;
-/// `kernel/ime.c` の `IME_PREEDIT_ROW`。候補リストはこの上の行に出る。
+/// `kernel/ime/ime.c` の `IME_PREEDIT_ROW`。候補リストはこの上の行に出る。
 pub const PREEDIT_ROW: usize = 24;
 
 const NCELL: usize = COLS * ROWS;
@@ -91,7 +91,7 @@ const PAD: i32 = 2;
 const COMMIT_MAX: usize = 128;
 
 /* ================================================================ */
-/*  IME_Render 関数表 (kernel/ime_render.h と同じ並び)               */
+/*  IME_Render 関数表 (kernel/ime/ime_render.h と同じ並び)               */
 /* ================================================================ */
 #[repr(C)]
 pub struct ImeRender {
@@ -541,7 +541,7 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
     let original = input::target_of(st, win_id);
     flush_text_to(st, original);
     /* RETURN 1 打では確定し切らないことがある: 候補の確定は最長一致で、
-     * 残りのかなを未確定へ戻す (kernel/ime.c の commit_candidate)。素通り
+     * 残りのかなを未確定へ戻す (kernel/ime/ime.c の commit_candidate)。素通り
      * (= 未確定が無い) になるまで上限つきで繰り返す (代行レビュー P3-1)。 */
     let mut n = 0;
     while n < COMMIT_ROUNDS_MAX {

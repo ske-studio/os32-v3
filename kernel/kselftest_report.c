@@ -1,6 +1,6 @@
 #include "kselftest.h"
 #include "kprintf.h"
-#include "module.h"
+#include "module/module.h"
 
 /* Stable kernel.map symbols, including when no debug module is loaded. */
 int kselftest_pass;

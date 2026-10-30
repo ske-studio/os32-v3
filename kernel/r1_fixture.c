@@ -1,10 +1,10 @@
 /* T2h: one-shot destructive probes, linked only into kernel-r1. */
 #ifdef OS32_R1_FIXTURE
 #include "r1_fixture.h"
-#include "pgalloc.h"
-#include "v86_mem.h"
+#include "../mm/pgalloc.h"
+#include "v86/v86_mem.h"
 #include "../exec/appslot.h"
-#include "paging.h"
+#include "../mm/paging.h"
 
 extern volatile int ring3_in_syscall;
 

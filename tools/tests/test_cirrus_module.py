@@ -87,7 +87,7 @@ static const CirrusModuleContext fixture_context = {
     fixture = fixture.replace('static void run(void)\n{', glue +
                               'static void run(void)\n{\n    cirrus_module_init(&gfx_backend_cirrus, &fixture_context);')
     # Compile the actual kernel GUI boundary statement into the real HAL fixture.
-    boot = (ROOT / 'kernel/kernel.c').read_text()
+    boot = (ROOT / 'init/kernel.c').read_text()
     start = boot.index('            if (is_gui) {\n                /* Graphics boundary')
     boundary = boot[start:boot.index('gfx_client_to_gshell();', start)]
     boundary = next(line.strip() for line in boundary.splitlines()
@@ -153,7 +153,7 @@ def main():
         hal_context()
         hal_context(cui_first=True)
         # Real boot call order: reserve/mapping before AS; no body at boot probe.
-        boot = (ROOT / 'kernel/kernel.c').read_text()
+        boot = (ROOT / 'init/kernel.c').read_text()
         assert boot.index('    gfx_boot_reserve();') < boot.index('    exec_init();')
         assert boot.index('    gfx_prepare_backend();') < boot.index('    cirrus_module_load();')
         boundary = boot.index('            if (is_gui) {\n                /* Graphics boundary')
@@ -165,7 +165,7 @@ def main():
                             '-DCIRRUS_BODY="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cirrus_module_host.c',
-                            ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                             ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:

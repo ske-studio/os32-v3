@@ -1,9 +1,9 @@
-"""µs 時計の判定と算数 (kernel/time_math.c) のホスト試験。
+"""µs 時計の判定と算数 (kernel/time/time_math.c) のホスト試験。
 
 記録: tools/tests/time_math_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-5 (µs 時計 sys_time_now)
 
-実物の kernel/time_math.c を 1 行も写さずに #include して回す。PIT も PIC も
+実物の kernel/time/time_math.c を 1 行も写さずに #include して回す。PIT も PIC も
 触らないので模型は 1 つも要らない。
 
 **ここで見る分岐は実機でも NP21/W でも撃ち分けられない**:
@@ -24,14 +24,14 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/time_math_host.c"
-SRC = ROOT / "kernel/time_math.c"
+SRC = ROOT / "kernel/time/time_math.c"
 
 # カーネルと同じ i386-elf で通す実ソース。ktime.c まで入れるのは、
 # スナップショットの採り方が time_decide / time_us_from を**実際に**呼ぶ形を
 # 固定するため (u64 が libgcc 経由で解けることもここで分かる)。
 TARGET_SRCS = [
-    ("kernel/time_math.c", []),
-    ("kernel/ktime.c", []),
+    ("kernel/time/time_math.c", []),
+    ("kernel/time/ktime.c", []),
 ]
 
 CASES = ["decide_table", "us_math", "no_u32_overflow", "monotonic",
@@ -90,12 +90,12 @@ def host_build(tmp, source_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "time_math.c").write_text(source_text, encoding="utf-8")
         (mut / "time_math.h").write_text(
-            (ROOT / "kernel/time_math.h").read_text(encoding="utf-8"),
+            (ROOT / "kernel/time/time_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/time_math.c"', '"kernel/time_math.c"'),
+                '"../../kernel/time/time_math.c"', '"kernel/time/time_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
                "-I" + str(mut), str(shim), "-o", str(exe)]
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-time-math-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/time_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/time/time_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

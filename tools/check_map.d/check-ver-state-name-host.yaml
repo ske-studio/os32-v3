@@ -1,5 +1,5 @@
 check-ver-state-name-host:
-- kernel/module.c
+- kernel/module/module.c
 - tools/tests/test_ver_state_name.py
 - tools/tests/ver_test_utils.py
 - tools/tests/host32.py

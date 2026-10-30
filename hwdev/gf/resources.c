@@ -3,7 +3,7 @@
  * Fixed lengths: GF_DRIVER_DESIGN §4-1, measured gf_a4 acceptance. */
 #include "production.h"
 #include "../../drivers/pci.h"
-#include "../../kernel/pgalloc.h"
+#include "../../mm/pgalloc.h"
 #include "../../kdebug/gfinit_resources.h"
 int gf_production_identify(struct gf_production_resources *out)
 {

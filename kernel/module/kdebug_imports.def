@@ -1,0 +1,2483 @@
+{
+  "schema": 2,
+  "imports": [
+    {
+      "stage": "S1",
+      "kind": "FUNC",
+      "symbol": "kprintf",
+      "source": "include/kprintf.h",
+      "context_safe": false,
+      "index": 0
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appmem_init",
+      "source": "exec/appmem.h",
+      "context_safe": false,
+      "index": 1
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appmem_map",
+      "source": "exec/appmem.h",
+      "context_safe": false,
+      "index": 2
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appmem_unmap",
+      "source": "exec/appmem.h",
+      "context_safe": false,
+      "index": 3
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_abort_admit_selftest",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 4
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_alloc_id",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 5
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_at",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 6
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_gfx_owner_selftest",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 7
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_reclaim",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 8
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_resume_mark_selftest",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 9
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_trim_done",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 10
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "appslot_trim_request_as",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 11
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "as_access_page",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 12
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootinfo_get",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 13
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootinfo_hdd_geom",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 14
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootinfo_parse",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 15
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootinfo_seal",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 16
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootinfo_seal_image",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 17
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootlog_compose",
+      "source": "include/bootlog.h",
+      "context_safe": false,
+      "index": 18
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootlog_format_header",
+      "source": "include/bootlog.h",
+      "context_safe": false,
+      "index": 19
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootlog_is_active",
+      "source": "include/bootlog.h",
+      "context_safe": false,
+      "index": 20
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "bootlog_len",
+      "source": "include/bootlog.h",
+      "context_safe": false,
+      "index": 21
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "caller_access_enter",
+      "source": "include/redir_access.h",
+      "context_safe": false,
+      "index": 22
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "caller_access_get",
+      "source": "include/redir_access.h",
+      "context_safe": false,
+      "index": 23
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "caller_access_leave",
+      "source": "include/redir_access.h",
+      "context_safe": false,
+      "index": 24
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "con_sink_disable",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 25
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "con_sink_enable",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 26
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "console_get_cursor_x",
+      "source": "include/console.h",
+      "context_safe": false,
+      "index": 27
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "console_get_cursor_y",
+      "source": "include/console.h",
+      "context_safe": false,
+      "index": 28
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "console_set_cursor",
+      "source": "include/console.h",
+      "context_safe": false,
+      "index": 29
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "copy_caller_cstr",
+      "source": "include/redir_access.h",
+      "context_safe": false,
+      "index": 30
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "copy_to_caller",
+      "source": "include/redir_access.h",
+      "context_safe": false,
+      "index": 31
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "cpu_delay_us",
+      "source": "kernel/time/cpu_calibrate.h",
+      "context_safe": false,
+      "index": 32
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "cpu_loops_per_tick",
+      "source": "kernel/time/cpu_calibrate.h",
+      "context_safe": false,
+      "index": 33
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "db_v50_selftest",
+      "source": "kapi/kapi_db.h",
+      "context_safe": false,
+      "index": 34
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma8237_ready",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 35
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_above_1mb_state",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 36
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_alloc",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 37
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_chan_mask",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 38
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_chan_setup",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 39
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_chan_state",
+      "source": "drivers/dma8237.h",
+      "context_safe": false,
+      "index": 40
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_crosses_64k",
+      "source": "include/dma_contract.h",
+      "context_safe": false,
+      "index": 41
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_free",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 42
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_mark_leaked",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 43
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_pool_bad_free",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 44
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_pool_free_pages",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 45
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_pool_init",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 46
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "dma_pool_leaked",
+      "source": "mm/dma_pool.h",
+      "context_safe": false,
+      "index": 47
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "exec_heap_used",
+      "source": "exec/exec_heap.h",
+      "context_safe": false,
+      "index": 48
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "exec_tramp_page_addr",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 49
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "fd_is_redirected",
+      "source": "fs/fd_redirect.h",
+      "context_safe": false,
+      "index": 50
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "fd_redirect_buf_write_ok",
+      "source": "fs/fd_redirect.h",
+      "context_safe": false,
+      "index": 51
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "fd_redirect_to_buffer",
+      "source": "fs/fd_redirect.h",
+      "context_safe": false,
+      "index": 52
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "gfx_selected_selfcheck",
+      "source": "gfx/gfx.h",
+      "context_safe": false,
+      "index": 53
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "gui_ime_set_render",
+      "source": "kernel/gui.h",
+      "context_safe": false,
+      "index": 54
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_deferred_count",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 55
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_dyn_index",
+      "source": "kernel/irq/irq_math.h",
+      "context_safe": false,
+      "index": 56
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_quarantine_line",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 57
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_register",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 58
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_shared_dispatch",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 59
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_test_reset_line",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 60
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "irq_unregister",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 61
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kapi_mem_stat",
+      "source": "kdebug/kselftest.c",
+      "context_safe": false,
+      "index": 62
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kbd_diag",
+      "source": "drivers/kbd.h",
+      "context_safe": false,
+      "index": 63
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kheap_alloc",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 64
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kheap_block_size",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 65
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kheap_free",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 66
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kheap_init",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 67
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kmemcpy",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 68
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kmemset",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 69
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kprintf_attr_to_pc98",
+      "source": "include/kprintf.h",
+      "context_safe": false,
+      "index": 70
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstack_high_water",
+      "source": "kernel/kstack_hw.h",
+      "context_safe": false,
+      "index": 71
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrcmp",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 72
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrcpy",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 73
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrlen",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 74
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrncat",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 75
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrncmp",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 76
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kstrncpy",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 77
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kutoa_dec",
+      "source": "include/kprintf.h",
+      "context_safe": false,
+      "index": 78
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "kutoa_hex",
+      "source": "include/kprintf.h",
+      "context_safe": false,
+      "index": 79
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "launch_selftest",
+      "source": "include/launch.h",
+      "context_safe": false,
+      "index": 80
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "lease_audit_all",
+      "source": "exec/lease.h",
+      "context_safe": false,
+      "index": 81
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_arena_top",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 82
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_owner_new",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 83
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_owner_pages",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 84
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_owner_retire",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 85
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_reclaim_owner",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 86
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_resource_set_map",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 87
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_selfcheck",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 88
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_surface_find",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 89
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_surface_regen",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 90
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ledger_surface_validate",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 91
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "memmove",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 92
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_addrspace_create",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 93
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_addrspace_create_lease",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 94
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_addrspace_destroy",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 95
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_addrspace_map_user",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 96
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_app_band_selftest",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 97
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_current_cr3",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 98
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_kernel_pd_phys",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 99
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_map_user_keep_selftest",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 100
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_master_audit",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 101
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_memmap_selftest",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 102
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_pd_clone_selftest",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 103
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_poke_user_bit",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 104
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_registered_pt",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 105
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "paging_v86_session_open",
+      "source": "kernel/v86/v86_mem.h",
+      "context_safe": false,
+      "index": 106
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "pcm_open",
+      "source": "include/pcm_contract.h",
+      "context_safe": false,
+      "index": 107
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "pcm_state",
+      "source": "include/pcm_contract.h",
+      "context_safe": false,
+      "index": 108
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "pgalloc_alloc_phys",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 109
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "pgalloc_model_state",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 110
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "pit_get_setup",
+      "source": "arch/x86/kernel/idt.h",
+      "context_safe": false,
+      "index": 111
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "res_owner_get",
+      "source": "fs/fd_redirect.h",
+      "context_safe": false,
+      "index": 112
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "res_owner_set",
+      "source": "fs/fd_redirect.h",
+      "context_safe": false,
+      "index": 113
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ring3_user_range_ok",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 114
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ring3_user_range_writable",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 115
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ring3_user_ranges_writable",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 116
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ring3_wm_enter",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 117
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "ring3_wm_leave",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 118
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "serial_gate_active",
+      "source": "lib/serial_diag.h",
+      "context_safe": false,
+      "index": 119
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "serial_puts_polled",
+      "source": "lib/serial_diag.h",
+      "context_safe": true,
+      "index": 120
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "shell_print",
+      "source": "include/console.h",
+      "context_safe": false,
+      "index": 121
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "strchr",
+      "source": "lib/kstring.h",
+      "context_safe": false,
+      "index": 122
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "sys_time_now",
+      "source": "include/sys.h",
+      "context_safe": false,
+      "index": 123
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "sys_usable_mem_end",
+      "source": "include/sys.h",
+      "context_safe": false,
+      "index": 124
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "sysclk_detected",
+      "source": "kernel/time/sysclk.h",
+      "context_safe": false,
+      "index": 125
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "sysclk_hz",
+      "source": "kernel/time/sysclk.h",
+      "context_safe": false,
+      "index": 126
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "time_branch_reset",
+      "source": "kernel/time/time_math.h",
+      "context_safe": false,
+      "index": 127
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "time_test_feed_clear",
+      "source": "kernel/time/ktime.h",
+      "context_safe": false,
+      "index": 128
+    },
+    {
+      "stage": "S2",
+      "kind": "FUNC",
+      "symbol": "tvram_readchar_at",
+      "source": "include/tvram.h",
+      "context_safe": false,
+      "index": 129
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "kctx_irq_depth",
+      "source": "kernel/irq/irq.h",
+      "context_safe": true,
+      "index": 130
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "kctx_exc_depth",
+      "source": "mm/pgalloc.h",
+      "context_safe": true,
+      "index": 131
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "tick_count",
+      "source": "arch/x86/kernel/idt.h",
+      "context_safe": false,
+      "index": 132
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "resident_heap_peak",
+      "source": "exec/exec_heap.h",
+      "context_safe": false,
+      "index": 133
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ledger_bad_free",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 134
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ledger_check_fail",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 135
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ledger_exc_ops",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 136
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ledger_irq_ops",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 137
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ledger_region_count",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 138
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "paging_memmap_bad_count",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 139
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "paging_range_reject_count",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 140
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_range_reject_addr",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 141
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_range_reject_count",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 142
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_range_reject_last",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 143
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_wm_depth_underflow",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 144
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "cpu_calib_rounds",
+      "source": "kernel/time/cpu_calibrate.h",
+      "context_safe": false,
+      "index": 145
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "cpu_calib_ticks",
+      "source": "kernel/time/cpu_calibrate.h",
+      "context_safe": false,
+      "index": 146
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ktime_clamp_count",
+      "source": "kernel/time/ktime.h",
+      "context_safe": false,
+      "index": 147
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "irq_ctx_violations",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 148
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "irq_storm_masked",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 149
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "irq_line_quarantined",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 150
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "gui_ime_render_rejected",
+      "source": "kernel/gui.h",
+      "context_safe": false,
+      "index": 151
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_in_syscall",
+      "source": "kdebug/kselftest.c",
+      "context_safe": false,
+      "index": 152
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "ring3_in_syscall",
+      "source": "kdebug/kselftest.c",
+      "context_safe": false,
+      "index": 153
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "ring3_wm_depth",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 154
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "ring3_wm_depth",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 155
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_trim_epoch",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 156
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_trim_epoch",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 157
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_trim_request_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 158
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_trim_request_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 159
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_trim_mark_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 160
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_trim_mark_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 161
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_trim_done_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 162
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_trim_done_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 163
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_trim_done_reject_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 164
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_trim_done_reject_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 165
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_reclaim_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 166
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_reclaim_count",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 167
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "appslot_last_reclaim_id",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 168
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "appslot_last_reclaim_id",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 169
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "irq_unexpected",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 170
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "irq_unexpected",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 171
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "irq_test_quiet",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 172
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "irq_test_quiet",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 173
+    },
+    {
+      "stage": "S2",
+      "kind": "GETTER",
+      "symbol": "time_test_feed_n",
+      "source": "kernel/time/ktime.h",
+      "context_safe": false,
+      "index": 174
+    },
+    {
+      "stage": "S2",
+      "kind": "SETTER",
+      "symbol": "time_test_feed_n",
+      "source": "kernel/time/ktime.h",
+      "context_safe": false,
+      "index": 175
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "ledger_surfaces",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 176
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "ledger_regions",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 177
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "ledger_resources",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 178
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "irq_lines",
+      "source": "kernel/irq/irq.h",
+      "context_safe": false,
+      "index": 179
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "paging_memmap_bad",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 180
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "time_branch_hits",
+      "source": "kernel/time/time_math.h",
+      "context_safe": false,
+      "index": 181
+    },
+    {
+      "stage": "S2",
+      "kind": "PTR",
+      "symbol": "time_test_feed",
+      "source": "kernel/time/ktime.h",
+      "context_safe": false,
+      "index": 182
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_kselftest_count",
+      "declaration": "void kdi_kselftest_count(int pass);",
+      "context_safe": false,
+      "index": 183
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_kselftest_reset",
+      "declaration": "void kdi_kselftest_reset(void);",
+      "context_safe": false,
+      "index": 184
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_get_kselftest_pass",
+      "declaration": "u32 kdi_get_kselftest_pass(void);",
+      "context_safe": false,
+      "index": 185
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_get_kselftest_fail",
+      "declaration": "u32 kdi_get_kselftest_fail(void);",
+      "context_safe": false,
+      "index": 186
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_kaudit_last_rc",
+      "declaration": "int kdi_kaudit_last_rc(int tag);",
+      "context_safe": false,
+      "index": 187
+    },
+    {
+      "stage": "S2",
+      "kind": "OP",
+      "symbol": "kdi_kaudit_skipped",
+      "declaration": "int kdi_kaudit_skipped(int tag);",
+      "context_safe": false,
+      "index": 188
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "console_hw_cursor_enable",
+      "source": "include/console.h",
+      "context_safe": false,
+      "index": 189
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "exec_ledger_owner",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 190
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "gfx_get_height",
+      "source": "gfx/gfx.h",
+      "context_safe": false,
+      "index": 191
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "kfree",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 192
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "kmalloc",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 193
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "kzalloc",
+      "source": "mm/kmalloc.h",
+      "context_safe": false,
+      "index": 194
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "pegc_restore_text_sync",
+      "source": "include/gfx_hal.h",
+      "context_safe": false,
+      "index": 195
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_cui_display_restore",
+      "source": "kernel/v86/v86_io.h",
+      "context_safe": false,
+      "index": 196,
+      "retained": true
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_gui_refuse",
+      "source": "kernel/v86/v86.h",
+      "context_safe": false,
+      "index": 197
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_is_active",
+      "source": "kernel/v86/v86.h",
+      "context_safe": false,
+      "index": 198
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_mem_setup",
+      "source": "kernel/v86/v86_mem.h",
+      "context_safe": false,
+      "index": 199
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_mem_teardown",
+      "source": "kernel/v86/v86_mem.h",
+      "context_safe": false,
+      "index": 200
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_pic_set_imr",
+      "source": "kernel/v86/v86_pic.h",
+      "context_safe": false,
+      "index": 201
+    },
+    {
+      "stage": "S3",
+      "kind": "FUNC",
+      "symbol": "v86_run_limit",
+      "source": "kernel/v86/v86.h",
+      "context_safe": false,
+      "index": 202
+    },
+    {
+      "stage": "S3",
+      "kind": "GETTER",
+      "symbol": "v86_gp_cs",
+      "source": "kdebug/v86_gcap.c",
+      "context_safe": true,
+      "index": 203
+    },
+    {
+      "stage": "S3",
+      "kind": "GETTER",
+      "symbol": "v86_gp_ip",
+      "source": "kdebug/v86_gcap.c",
+      "context_safe": true,
+      "index": 204
+    },
+    {
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_session",
+      "source": "kernel/v86/v86_mem.h",
+      "context_safe": true,
+      "index": 205
+    },
+    {
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_phase",
+      "source": "kernel/v86/v86_gcap.h",
+      "context_safe": true,
+      "index": 206
+    },
+    {
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_alloc_count",
+      "source": "kernel/v86/v86_gcap.h",
+      "context_safe": false,
+      "index": 207
+    },
+    {
+      "stage": "S3",
+      "kind": "PTR",
+      "symbol": "v86_gcap_free_count",
+      "source": "kernel/v86/v86_gcap.h",
+      "context_safe": false,
+      "index": 208
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_read",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 209
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_write",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 210
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_sync",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 211
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "boot_image_info",
+      "source": "include/bootinfo.h",
+      "context_safe": false,
+      "index": 212
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_alloc_n_owner",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 213
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_free_n_owner",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 214
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_free_pages",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 215
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_page_owned",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 216
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "memory_boot_slack_first",
+      "source": "mm/memory_boot.h",
+      "context_safe": false,
+      "index": 217
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "unicode_file_debug_phys",
+      "source": "kernel/console/unicode_file.h",
+      "context_safe": false,
+      "index": 218
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "unicode_file_lookup",
+      "source": "kernel/console/unicode_file.h",
+      "context_safe": false,
+      "index": 219
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "pgalloc_limit_pfn",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 220
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_fstype",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 221
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_stat",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 222
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_open",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 223
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_close",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 224
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_read_fd",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 225
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_write_fd",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 226
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_get_size",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 227
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "vfs_rm",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 228
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "dma_range_ok",
+      "source": "include/dma_contract.h",
+      "context_safe": false,
+      "index": 229
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "kcg_rom_read_ank",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 230
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "kcg_cache_stats",
+      "source": "kernel/kcg_module.h",
+      "context_safe": false,
+      "index": 231
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "v86_io_reset_policy",
+      "source": "kernel/v86/v86_io.h",
+      "context_safe": false,
+      "index": 232
+    },
+    {
+      "stage": "S4",
+      "kind": "FUNC",
+      "symbol": "paging_pte_flags",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 233
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_is_present",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 234
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_map_phys",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 235
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_pte_raw",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 236
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "paging_pte_restore",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 237
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_find",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 238
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_get",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 239
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_send",
+      "source": "include/lan_contract.h",
+      "context_safe": false,
+      "index": 240
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_get_mac",
+      "source": "include/lan_contract.h",
+      "context_safe": false,
+      "index": 241
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "e82557_state",
+      "source": "include/lan_contract.h",
+      "context_safe": false,
+      "index": 242
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "sfs_lan_peer_mac",
+      "source": "fs/serialfs.h",
+      "context_safe": false,
+      "index": 243
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_text_start",
+      "source": "kernel/console/display_restore.h",
+      "context_safe": false,
+      "index": 244
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_get_setup",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 245
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_trygetchar",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 246
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_cmd_port",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 247
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_data_port",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 248
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_txrdy_mask",
+      "source": "drivers/serial_plan.h",
+      "context_safe": false,
+      "index": 249
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_restore_98",
+      "source": "kernel/console/display_restore.h",
+      "context_safe": false,
+      "index": 250
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_ready",
+      "source": "kernel/console/display_restore.h",
+      "context_safe": false,
+      "index": 251
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_cell_read",
+      "source": "kernel/console/display_restore.h",
+      "context_safe": false,
+      "index": 252
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "display_recover_cell_write",
+      "source": "kernel/console/display_restore.h",
+      "context_safe": false,
+      "index": 253
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_begin",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 254
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_ready",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 255
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_put",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 256
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_empty",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 257
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "serial_checked_end",
+      "source": "drivers/serial.h",
+      "context_safe": false,
+      "index": 258
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read32",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 259,
+      "retained": true
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_read16",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 260,
+      "retained": true
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write32",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 261,
+      "retained": true
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "pci_cfg_write16",
+      "source": "drivers/pci.h",
+      "context_safe": false,
+      "index": 262,
+      "retained": true
+    },
+    {
+      "stage": "S5",
+      "kind": "FUNC",
+      "symbol": "hwdev_module_ops",
+      "source": "kernel/module/hwdev_module.h",
+      "context_safe": false,
+      "index": 263
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_push_print",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 264
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_push_clear",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 265
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_push_cursor",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 266
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_push_exit",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 267
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_stat",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 268
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_read",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 269
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_owner_exit",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 270
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "appslot_cur",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 271
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "appslot_gfx_owner",
+      "source": "exec/appslot.h",
+      "context_safe": false,
+      "index": 272
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "con_sink_reader_get",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 273
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kbd_inject",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 274
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kbd_inject_pending",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 275
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kbd_inject_take",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 276
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kbd_inject_peek",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 277
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kbd_inject_discard",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 278
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kdi_selftest_inj_push",
+      "source": "include/kselftest_probe.h",
+      "context_safe": false,
+      "index": 279
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "ledger_surface_create",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 280
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "ledger_surface_release",
+      "source": "mm/pgalloc.h",
+      "context_safe": false,
+      "index": 281
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "lease_acquire",
+      "source": "exec/lease.h",
+      "context_safe": false,
+      "index": 282
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "lease_check",
+      "source": "exec/lease.h",
+      "context_safe": false,
+      "index": 283
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "lease_release",
+      "source": "exec/lease.h",
+      "context_safe": false,
+      "index": 284
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "lease_revoke_all",
+      "source": "exec/lease.h",
+      "context_safe": false,
+      "index": 285
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "paging_as_audit",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 286
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "paging_lease_pte",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 287
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "paging_load_cr3",
+      "source": "mm/paging.h",
+      "context_safe": false,
+      "index": 288
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "shlib_read_page",
+      "source": "mm/shlib.h",
+      "context_safe": false,
+      "index": 289
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kdi_selftest_lease_result",
+      "source": "include/kselftest_probe.h",
+      "context_safe": false,
+      "index": 290
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kdi_selftest_exec_view",
+      "source": "include/kselftest_probe.h",
+      "context_safe": false,
+      "index": 291
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "vfs_cwd_user",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 292
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "vfs_cwd",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 293
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "vfs_devname_user",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 294
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "vfs_devname",
+      "source": "fs/vfs.h",
+      "context_safe": false,
+      "index": 295
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_get_drive_user",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 296
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_get_drive",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 297
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_get_cwd_user",
+      "source": "exec/exec.h",
+      "context_safe": false,
+      "index": 298
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_get_cwd",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 299
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "kapi_reserved_nosys",
+      "source": "exec/exec.c",
+      "context_safe": false,
+      "index": 300
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "os32x_layout_check",
+      "source": "exec/os32x_hdr.h",
+      "context_safe": false,
+      "index": 301
+    },
+    {
+      "stage": "S6",
+      "kind": "GETTER",
+      "symbol": "kbd_inject_drop_count",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 302
+    },
+    {
+      "stage": "S6",
+      "kind": "SETTER",
+      "symbol": "con_sink_drop_count",
+      "source": "include/con_sink.h",
+      "context_safe": false,
+      "index": 303
+    },
+    {
+      "stage": "S6",
+      "kind": "SETTER",
+      "symbol": "kbd_inject_drop_count",
+      "source": "include/kbd_inject.h",
+      "context_safe": false,
+      "index": 304
+    },
+    {
+      "stage": "S6",
+      "kind": "PTR",
+      "symbol": "ring3_ls_start",
+      "source": "exec/ring3_ls.h",
+      "context_safe": false,
+      "index": 305
+    },
+    {
+      "stage": "S6",
+      "kind": "PTR",
+      "symbol": "ring3_ls_end",
+      "source": "exec/ring3_ls.h",
+      "context_safe": false,
+      "index": 306
+    },
+    {
+      "stage": "S6",
+      "kind": "PTR",
+      "symbol": "__kernel_resident_end",
+      "source": "include/memmap.h",
+      "context_safe": false,
+      "index": 307
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "gf_production_selected",
+      "source": "include/gf_production.h",
+      "context_safe": false,
+      "index": 308,
+      "retained": true
+    }
+  ]
+}

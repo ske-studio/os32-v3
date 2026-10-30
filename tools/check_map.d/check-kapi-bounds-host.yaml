@@ -13,11 +13,11 @@ check-kapi-bounds-host:
 - gfx/gfx_scroll.c
 - gfx/gfx_vram.c
 - kapi/kapi_db.c
-- kernel/console.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- kernel/console/console.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kernel/sys.c
 - tools/tests/gfx_kernel_fb_host.c
 - tools/tests/host32.py
@@ -32,7 +32,7 @@ check-kapi-bounds-host:
 - build/checks.d/check-kapi-bounds-host.mk
 - lib/serial_diag.h
 - tools/tests/serial_diag_host.h
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h
 artifact_reader: true

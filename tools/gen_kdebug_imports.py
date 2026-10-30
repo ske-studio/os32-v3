@@ -17,7 +17,7 @@ import sys
 from module_schema import CONSTANTS, SYMBOL_KINDS
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DEF = ROOT / 'kernel/kdebug_imports.def'
+DEFAULT_DEF = ROOT / 'kernel/module/kdebug_imports.def'
 KINDS = SYMBOL_KINDS
 STAGE_KINDS = {
     'S1': ('FUNC',),
@@ -271,7 +271,7 @@ def generate(entries, out_dir, stage=LAST_STAGE):
     declarations = [e['signature'] for e in selected if e['kind_name'] != 'FUNC']
     header = common + declarations
     header += [f'#define KDEBUG_IMPORT_COUNT {len(selected)}', f'#define KDEBUG_ABI_GEN 0x{abi_hash(selected):08x}u']
-    header += ['#include "kernel/module_image.h"',
+    header += ['#include "kernel/module/module_image.h"',
                'extern void (*const kdebug_kexports[])(void);',
                'extern const struct module_symbol_contract kdebug_import_contracts[];',
                'extern const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS];']

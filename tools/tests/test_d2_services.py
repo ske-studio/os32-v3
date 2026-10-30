@@ -154,7 +154,7 @@ def run(runner, mutation=None):
         (work / 'input_wrappers.inc').write_text(helper + '\n'.join(selected))
         (work / 'input_wrapper_checks.inc').write_text('\n'.join(checks))
         shift = re.search(r'^u8 fep_kbd_shift_state\(void\).*$',
-                          (ROOT / 'kernel/fep_module.c').read_text(), re.M)
+                          (ROOT / 'kernel/ime/fep_module.c').read_text(), re.M)
         assert shift
         (work / 'input_shift.inc').write_text(shift[0])
         (work / 'port_wrappers.inc').write_text('\n'.join(port_selected))
@@ -174,18 +174,18 @@ def run(runner, mutation=None):
 
 
 def contracts():
-    boot = (ROOT / 'kernel/kernel.c').read_text()
+    boot = (ROOT / 'init/kernel.c').read_text()
     assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
     platform = (ROOT / 'platform/pc98/boot.c').read_text()
     assert '    pc98_d2_bind();' in platform
     assert boot.index('pc98_boot_bind(&boot, boot_drive);') < boot.index('boot_platform_run(BOOT_INPUT, &boot);')
-    for name in ('fs/vfs_fd.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/fep_module.c'):
+    for name in ('fs/vfs_fd.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/ime/fep_module.c'):
         source = (ROOT / name).read_text()
         assert '#include "input_service.h"' in source
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name in ('kernel/ime.c', 'kdebug/kselftest.c'):
+    for name in ('kernel/ime/ime.c', 'kdebug/kselftest.c'):
         assert '#include "../drivers/kbd.h"' in (ROOT / name).read_text()
     assert '#include "../../drivers/mouse.h"' in platform
     assert 'drivers/mouse.h' not in boot and 'drivers/kbd.h' not in boot
@@ -209,8 +209,8 @@ def contracts():
     for registration in ('port_register(&pc98_port);', 'con_output_register(&pc98_console_output);'):
         assert registration in bind
     assert 'const EmergencyOps emergency_output' in bind
-    for name in ('kernel/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
-                 'exec/exec.c', 'kernel/isr_handlers.c', 'kernel/double_fault.c'):
+    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
+                 'exec/exec.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c'):
         source = (ROOT / name).read_text()
         assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name
     for header in ('port_service.h', 'console_output.h'):

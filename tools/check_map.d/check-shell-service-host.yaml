@@ -7,12 +7,12 @@ check-shell-service-host:
 - exec/exec.h
 - kernel/gui.h
 - fs/fd_redirect.h
-- kernel/font_source.h
+- kernel/console/font_source.h
 - build/kernel.mk
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - include/redir_access.h
-- kernel/tss.h
+- arch/x86/kernel/tss.h
 - tools/tests/host32.py
 - tools/tests/shell_service_host.c
 - tools/tests/test_shell_service.py

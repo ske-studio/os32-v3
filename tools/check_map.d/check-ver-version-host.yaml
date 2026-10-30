@@ -6,7 +6,7 @@ check-ver-version-host:
 - tools/tests/host32.py
 - build/checks.d/check-ver-version-host.mk
 - tools/check_map.d/check-ver-version-host.yaml
-- kernel/module.c
+- kernel/module/module.c
 - tools/tests/mutpar.py
 - kernel/ver_format.c
 - kernel/ver_info.h

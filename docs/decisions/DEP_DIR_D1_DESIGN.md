@@ -6,28 +6,28 @@
 
 ## 1. 実物の確認
 - 基準: `/home/hight/os32-v3` の main `4256d6c2`。SURVEY.md は `d0f5b0e8`。実装・ビルド・ゲスト試験は未実施。
-- **実物との食い違い: 0 件**。#16 の `kernel/isr_handlers.c:547,553,554` と #17 の `:561` は行番号・内容とも一致。下表は設計に必要な補足で、食い違いには数えない。
+- **実物との食い違い: 0 件**。#16 の `arch/x86/kernel/isr_handlers.c:547,553,554` と #17 の `:561` は行番号・内容とも一致。下表は設計に必要な補足で、食い違いには数えない。
 | 確認箇所（リポジトリ相対 file:line） | 現状と設計への影響 |
 |---|---|
-| `kernel/isr_handlers.c:540–554` | fixture → snd → pcm → ne2k → e82557 → link → lgy98。6 本すべてを移す |
-| `kernel/isr_stub.asm:639–658`、`kernel/idt.c:144` | IRQ11 専用入口。EOI は slave → master、V86 反射なし |
-| `kernel/irq.h:7–20`、`kernel/irq_math.h:29`、`kernel/irq_math.c:18` | IRQ11 は登録対象外。対象表・IDT も変更必須。全登録者に tick 回収を要求する現契約は FDC にそのまま適用できない |
-| `kernel/irq_math.c:103–131` | 登録ハンドラは最大2巡。FDC の同じフラグへの再代入は冪等 |
-| `drivers/fdc.c:27,264–273,1133–1189`、`kernel/kernel.c:313–316` | フラグはドライバ所有、待ちは期限付き。現在は kernel が IRQ11 を開けてから割込み許可・初期化 |
+| `arch/x86/kernel/isr_handlers.c:540–554` | fixture → snd → pcm → ne2k → e82557 → link → lgy98。6 本すべてを移す |
+| `arch/x86/kernel/isr_stub.asm:639–658`、`arch/x86/kernel/idt.c:144` | IRQ11 専用入口。EOI は slave → master、V86 反射なし |
+| `kernel/irq/irq.h:7–20`、`kernel/irq/irq_math.h:29`、`kernel/irq/irq_math.c:18` | IRQ11 は登録対象外。対象表・IDT も変更必須。全登録者に tick 回収を要求する現契約は FDC にそのまま適用できない |
+| `kernel/irq/irq_math.c:103–131` | 登録ハンドラは最大2巡。FDC の同じフラグへの再代入は冪等 |
+| `drivers/fdc.c:27,264–273,1133–1189`、`init/kernel.c:313–316` | フラグはドライバ所有、待ちは期限付き。現在は kernel が IRQ11 を開けてから割込み許可・初期化 |
 | `kernel/{fm,pcm,lan}_module.c:23,20,44` | 3 façade は常駐。tick_target とモジュール参照の取得・解除を既に所有 |
-| `kernel/v86_bios.c:178,649,811` | V86 の FD は loop イメージ経由。物理 FDC IRQ をゲストへ反射する経路ではない |
+| `kernel/v86/v86_bios.c:178,649,811` | V86 の FD は loop イメージ経由。物理 FDC IRQ をゲストへ反射する経路ではない |
 
 ## 2. 周期表の境界・順序
 - 新しいスケジューラは作らず、IRQ 登録と同様の小さい固定表を常駐に置く。動的確保・時刻判定・KAPI 追加なし。
 - 6 枠を昇順に走査する。空枠は飛ばす。登録順によらず、従来の前後関係を保つ。
 ```c
-/* kernel/tick.h: 内部口。TICK_SLOT_COUNT=6、エラー値も名前付き定数。 */
+/* kernel/irq/tick.h: 内部口。TICK_SLOT_COUNT=6、エラー値も名前付き定数。 */
 typedef void (*tick_fn)(void);
 struct tick_slot { tick_fn fn; };
 int tick_register(unsigned int slot, tick_fn fn);
 void tick_dispatch(void);                 /* IRQ0 内、IF=0 */
-/* kernel/tick.c が static struct tick_slot slots[TICK_SLOT_COUNT] を所有。 */
-/* platform/pc98/tick_order.h: 配線の順序。kernel/tick.c は読まない。 */
+/* kernel/irq/tick.c が static struct tick_slot slots[TICK_SLOT_COUNT] を所有。 */
+/* platform/pc98/tick_order.h: 配線の順序。kernel/irq/tick.c は読まない。 */
 enum { PC98_TICK_SND, PC98_TICK_PCM, PC98_TICK_NE2K,
        PC98_TICK_E82557, PC98_TICK_LINK, PC98_TICK_LGY98 };
 /* timer_handler: fixture は現在の場所を維持。 */
@@ -70,7 +70,7 @@ fdc_irq_fired = 0;                       /* 既存の初期化位置を維持 */
 - `IRQ_ERR_EXIST` は同一 fn/arg の再初期化だけ。登録成功後の reset/recalibrate 失敗では登録を残す（従来も IRQ11 は開いたまま）。再試行・後続 I/O の寿命を変えない。
 - IRQ 内ではフラグだけ更新。SIS 読出し・状態判定・装置待ちは既存の前景処理に残す。2巡でもフラグは1、間に前景は走らない。IRQ_NONE/DEFERRED を返す方式に変えない。
 - `irq_dyn_lines` に11を10と14の間へ追加、`IRQ_DYN_COUNT=9`。`IRQ_COMMON 11` を生成し IDT を `irq_stub_common_11` へ。専用 stub と C ハンドラ、extern、FDC 用 include を不要箇所から除く。
-- `kernel/kernel.c:313` の `irq_enable(FDC_IRQ)` だけ削除。`:314` の `_enable()` と IRQ0・cascade 有効化は保持。irq_register が表公開後に IRQ11 を開けるので初回 reset 完了を受け取れる。
+- `init/kernel.c:313` の `irq_enable(FDC_IRQ)` だけ削除。`:314` の `_enable()` と IRQ0・cascade 有効化は保持。irq_register が表公開後に IRQ11 を開けるので初回 reset 完了を受け取れる。
 - IRQ11 の EOI は `irq_finish` だけから slave → master 各1回。共通入口の cld・IRQ_ENTER/LEAVE・IRETD_USER は専用入口と同じ。V86_REFLECT は追加しない。
 - irq.h の「全登録者が tick 回収」は **FDC の排他完了通知だけ例外**と明記。FDC は既存 timeout/retry で戻す。NIC 等の tick 保証は緩めず、FDC の新規 poll 処理は作らない。
 - 起動 FD は kernel の fdc_init→媒体設定→mount を維持。V86 FD は INT 1Bh→loop→VFS を維持し、背後のファイルが物理 FD 上ならこの FDC 経路で読む。V86 中の IRQ11 でもホスト通知だけ行う。
@@ -90,10 +90,10 @@ fdc_irq_fired = 0;                       /* 既存の初期化位置を維持 */
 ## 5. ファイルごとの変更一覧（概数、生成物を除く）
 | 新規/変更 | ファイル | 行数 |
 |---|---|---:|
-| 新規 | `kernel/tick.h` / `kernel/tick.c` / `platform/pc98/tick_order.h` | 25 / 50 / 15 |
-| 変更 | `kernel/isr_handlers.c` / `kernel/isr_stub.asm` / `kernel/idt.c` | −30 / −25,+2 / 5 |
-| 変更 | `kernel/irq_math.h` / `kernel/irq_math.c` / `kernel/irq.h` | 5 / 4 / 12（irq.c は変更不要） |
-| 変更 | `drivers/fdc.c` / `kernel/kernel.c` | 20 / −1 |
+| 新規 | `kernel/irq/tick.h` / `kernel/irq/tick.c` / `platform/pc98/tick_order.h` | 25 / 50 / 15 |
+| 変更 | `arch/x86/kernel/isr_handlers.c` / `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | −30 / −25,+2 / 5 |
+| 変更 | `kernel/irq/irq_math.h` / `kernel/irq/irq_math.c` / `kernel/irq/irq.h` | 5 / 4 / 12（irq.c は変更不要） |
+| 変更 | `drivers/fdc.c` / `init/kernel.c` | 20 / −1 |
 | 変更 | `kernel/fm_module.c` / `kernel/pcm_module.c` / `kernel/lan_module.c` | 各6 |
 | 変更 | `drivers/ne2000.c` / `drivers/lgy98.c` / `net/link.c` | 各8～12 |
 | 変更 | `build/kernel.mk` / `kdebug/kselftest.c` | 2 / 2 |
@@ -140,5 +140,5 @@ fdc_irq_fired = 0;                       /* 既存の初期化位置を維持 */
 - **F5**: tick_register が失敗したときの load の戻り値は各部品の既存の初期化失敗の値 (FM/PCM/LAN の MODULE_INIT_FAILED 相当、今の load の失敗の経路と同じ)、ne2k_init は既存の NE2K_ERR_* のうち初期化失敗の値を返す。link_init の登録の置き場は関数の先頭 (kmemcpy より前、登録が失敗したら状態を変えずに戻る)。
 - **F6**: platform の enum に `PC98_TICK_COUNT` を足し、両方が見える登録側で `_Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, ...)`。
 - **F7**: fdc_track_host (test_fdc_track.py:236-240) は fdc.c の `#include "irq.h"` に shim か `-Ikernel` を足し、host 側の irq_register は成功と失敗を切り替えられる形にする (「登録失敗時に motor/reset 未発行」を試す)。test_h4_backing.py:64 が fdc.c の `s_fdbuf[`〜`fdc_dma_buf(void)` を切り出すので、fdc_irq はこの区間の外に置く。
-- **F8**: §5 に文書と注記の追従を足す: docs/04_interrupts.md:42、tools/tests/irq_math_tdd.md:73、kernel/idt.c:149、kernel/irq_math.c:13-16、kernel/irq_math.h:27-28 (線の一覧 3/5/6/8/9/10/14/15 に 11 を足す)。
+- **F8**: §5 に文書と注記の追従を足す: docs/04_interrupts.md:42、tools/tests/irq_math_tdd.md:73、arch/x86/kernel/idt.c:149、kernel/irq/irq_math.c:13-16、kernel/irq/irq_math.h:27-28 (線の一覧 3/5/6/8/9/10/14/15 に 11 を足す)。
 - **PM 決定 (契約)**: irq.h の「全登録者が tick 回収」の契約に、常駐で解除しない FDC を例外として書く (TASK_HAL_WIRING §1-1 の契約の追記、irq.h の注記に 1 行)。

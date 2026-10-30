@@ -122,7 +122,7 @@ void ring3_fault_kill(void) { host_fault_kills++; for (;;) { } }
 /* K7: 注入リングは **実物** (kernel/kbd_inject.c) をそのまま取り込む。
  * 権限の照合相手だけハーネスが持つ (con_sink はここでは要らない —
  * 「読み手だけが注げる」は tools/tests/kbd_inject_host.c が本物の
- * kernel/con_sink.c と組んで見ている)。 */
+ * kernel/console/con_sink.c と組んで見ている)。 */
 static int host_reader = 2;
 int con_sink_reader_get(void) { return host_reader; }
 volatile int ring3_wm_depth;

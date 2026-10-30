@@ -144,7 +144,7 @@ void memory_boot_page_counts(u32 first, u32 pages, struct memory_page_counts *ou
     boot_page_input.kdebug_pages = pages;
     memory_boot_count_pages(&boot_page_input, out);
 }
-#include "kernel/kaudit_boot.c"
+#include "init/kaudit_boot.c"
 
 static void boot_page_status(void)
 {

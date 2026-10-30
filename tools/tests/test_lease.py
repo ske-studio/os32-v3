@@ -9,7 +9,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror']
-SOURCES = ('kernel/paging.c', 'kernel/pgalloc.c', 'exec/lease.c')
+SOURCES = ('mm/paging.c', 'mm/pgalloc.c', 'exec/lease.c')
 MUTANTS = [
     ('surface registration master guard removed', 1,
      '/* Padding uses the master identity alias until T2c. Reject before writes. */\n    if (paging_current_cr3() != paging_kernel_pd_phys() ||', '/* Padding uses the master identity alias until T2c. Reject before writes. */\n    if ('),
@@ -76,7 +76,7 @@ def run(changes=None):
         exe = tmp / 'lease'
         subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
                         '-no-pie', '-Wl,--gc-sections', *includes, str(ROOT / 'tools/tests/lease_host.c'),
-                        str(ROOT / 'kernel/physmem.c'), '-o', str(exe)], check=True)
+                        str(ROOT / 'mm/physmem.c'), '-o', str(exe)], check=True)
         return host32.run([str(exe)], capture_output=True, text=True, timeout=60)
 
 p = run()

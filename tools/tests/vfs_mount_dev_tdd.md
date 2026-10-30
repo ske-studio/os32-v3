@@ -49,7 +49,7 @@ mounts[1] prefix=/fd0  ctx=0x001562E0 dev=fd0(t1,i0) base_lba=1632 dev_ptr=0x001
 - `ext2_find_partition(0x100)` → `ide_get_info(0x100)` → `drive_info[0]` → base_lba 1632
 
 と**すべて種別が消えて hd0 に化ける**。ブート時の自動マウントループ
-(`kernel/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
+(`init/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
 `/fd0` として 2 つ目の `Ext2Ctx` が必ずできる。
 
 `vfs_sync()` は全マウントを順に回すため:

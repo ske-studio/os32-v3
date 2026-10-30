@@ -20,10 +20,10 @@ check-disk-auth-host:
 - exec/ring3_str.c
 - kapi/kapi_generated.c
 - kdebug/kselftest.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - tools/tests/host32.py
 - tools/tests/kapi_ranges_host.c
 - tools/tests/mutpar.py

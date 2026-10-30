@@ -203,7 +203,7 @@
 | S3 1日 | 新 `kdebug/gfinit_exec.c`、同host試験 | 制御・条件・macro・skip/force・実行予算、完全mockで27種の期待trace |
 | S4 1日 | 新 `kdebug/gfinit_pll.c`、同host試験 | 0x21 parser・整数solver・低位/高位書込列、MIT表示、未解決リンク依存0 |
 | S5 1日 | 新 `kdebug/gfinit_bus.c`、`kdebug/kpeek.c`、新 `kdebug/kdebug_window.c/.h` | 窓部品の共有、GF専用RW許可行・VGA別名・PCI probe、peek回帰試験 |
-| S6 1日 | `drivers/serial.c/.h`、`kernel/kdebug_imports.def`、`kdebug/kdebug_main.c`、新 `kdebug/gfinit.c/.h` | checkedログ、session/phase・cleanup・RUN_ONE、imports末尾追加と生成物再生成 |
+| S6 1日 | `drivers/serial.c/.h`、`kernel/module/kdebug_imports.def`、`kdebug/kdebug_main.c`、新 `kdebug/gfinit.c/.h` | checkedログ、session/phase・cleanup・RUN_ONE、imports末尾追加と生成物再生成 |
 | S7 0.5〜1日 | `sdk/include/os32/os32_kapi_shared.h`、新 `userland/shell/cmd_gfinit.c`、shell登録/ビルド定義、kdebugビルド定義 | op/固定要求・旗、INSPECT表示、ABI方針に従う版更新（スロット追加無し）、KDEBUG=0/1ビルド |
 | S8 0.5〜1日 | 同票、実機証拠ディレクトリ（ROMをコミットしない） | A1/A2受入。承認待ち・電源操作待ちは工数外 |
 | S9以降 各0.5〜1日 | 同票・実機ログ | mainごとの受入を分割、最後にA4。固まったら停止して証拠から次の設計変更をレビュー |

@@ -1,8 +1,8 @@
 check-font-source-host:
 - fs/vfs_fd.c
 - fs/vfs.h
-- kernel/font_source.c
-- kernel/font_source.h
+- kernel/console/font_source.c
+- kernel/console/font_source.h
 - kernel/gui.h
 - exec/exec.h
 - include/redir_access.h

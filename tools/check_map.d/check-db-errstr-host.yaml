@@ -12,11 +12,11 @@ check-db-errstr-host:
 - tools/tests/mutpar.py
 - exec/exec.c
 - kdebug/kselftest.c
-- kernel/paging.c
+- mm/paging.c
 - tools/tests/kapi_db_v50_host.c
 - exec/exec_kapi_init.inc
-- kernel/ime_dict.c
-- kernel/ime.h
+- kernel/ime/ime_dict.c
+- kernel/ime/ime.h
 - tools/tests/kapi_db_owned_host.c
 - tools/tests/db_group_shim.h
 - tools/tests/input_fixture_host.h

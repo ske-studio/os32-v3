@@ -42,7 +42,7 @@ class Port:
 def reports(runner):
     files = {
         'ver_format_source.c': (ROOT / 'kernel/ver_format.c').read_text(),
-        'ver_state_source.c': function((ROOT / 'kernel/module.c').read_text(),
+        'ver_state_source.c': function((ROOT / 'kernel/module/module.c').read_text(),
                                       'const char *kdebug_state_name('),
         'ver_shell_source.c': function((ROOT / 'userland/shell/cmd_base.c').read_text(),
                                       'static int cmd_ver('),

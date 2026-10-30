@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  TIME_MATH_HOST.C — kernel/time_math.c をそのままホストで回す            */
+/*  TIME_MATH_HOST.C — kernel/time/time_math.c をそのままホストで回す            */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する。PIT も PIC も触らないので模型は     */
 /*  1 つも要らない。                                                        */
@@ -14,7 +14,7 @@
 /* ======================================================================== */
 #include <stdio.h>
 #include <string.h>
-#include "../../kernel/time_math.c"
+#include "../../kernel/time/time_math.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

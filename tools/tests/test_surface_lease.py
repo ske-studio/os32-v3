@@ -1,6 +1,6 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
-              'exec/access_walk.c', 'kernel/paging.c', 'kernel/pgalloc.c']
+              'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
 from kernel_layout import linker_flags
 import argparse
 import host32
@@ -66,7 +66,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
         tmp = pathlib.Path(directory)
         if 'v86' in files:
             (tmp / 'platform_emergency.h').write_text(
-                (ROOT / 'kernel/platform_emergency.h').read_text())
+                (ROOT / 'include/platform_emergency.h').read_text())
         for key, body in sources.items():
             if key in ('lease', 'surface_query'): continue
             if key == 'v86':
@@ -92,7 +92,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                            capture_output=True, text=True)
         objects = {}
         for key, src in [('fixture', tmp / 'fixture.c'),
-                         ('physmem', ROOT / 'kernel/physmem.c')]:
+                         ('physmem', ROOT / 'mm/physmem.c')]:
             objects[key] = tmp / (key + '.o'); compile_source(src, objects[key])
         for key in ('lease', 'surface_query'):
             src = tmp / (key + '.c')

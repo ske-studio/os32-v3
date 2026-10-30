@@ -13,8 +13,8 @@
  *    A 戻り番地が現行 shell text の範囲内 (かつ登録中)
  *    B 呼出し文脈 (open/close は shell の通常文脈だけ、read/validate/
  *      font_guard_run は通常文脈か登録済み WM 区間)
- *  を確かめてから kernel/font_source.c の shell 側実体 (段 C registry・
- *  段 D VFS) か kernel/font_guard.c の font_guard_run へ渡す。外れたら
+ *  を確かめてから kernel/console/font_source.c の shell 側実体 (段 C registry・
+ *  段 D VFS) か kernel/console/font_guard.c の font_guard_run へ渡す。外れたら
  *  OS32_ERR_INVAL、kill はしない。
  *
  *  version 2 (T7b-b3 S2、設計 ~/os32-tmp/run/t7bb34/DESIGN.final.md §2-5):
@@ -52,7 +52,7 @@ typedef struct {
     i32 (__cdecl *font_source_read_at)(u32 id, u32 offset, void *dst, u32 len);
     i32 (__cdecl *font_source_validate)(u32 id);
     i32 (__cdecl *font_source_close)(u32 id);
-    /* version 2: guard 区間 (kernel/font_guard.h) の中で call(ctx) を 1 回呼び、
+    /* version 2: guard 区間 (kernel/console/font_guard.h) の中で call(ctx) を 1 回呼び、
      * その戻り値を返す。x87 の保存・復元と FPU 無しの NOSYS は TASK_FONTPERF F6
      * で撤去 (ラスタは整数だけ)、欄・版はそのまま。再入・IRQ/例外文脈は
      * OS32_ERR_BUSY (この呼出しだけ KCG)。 */

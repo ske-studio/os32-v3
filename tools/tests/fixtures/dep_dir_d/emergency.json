@@ -3,10 +3,10 @@
   "trace_sha256": "fd18c77f42fd084b55025a85d3dd8e59d7ea7f874fdcb8f6741e91cf8f01be6c",
   "harness_sha256": "5ccc710f0083b1eb74babd79f3cc64246f1a1bdcbf5de121d433306995e97d16",
   "sources_sha256": {
-    "kernel/boot_display.c": "f2c3b40e01848acfa3c3790d9d2c6f9186fc2dadf783366bce963b3d86c1bccc",
-    "kernel/isr_handlers.c": "3f8fbd502efb97da04edef439124c2fbf89f661a7d780d6c450f94bc16c3e0c7",
-    "kernel/double_fault.c": "e9c8e47cc4038ddf2b0fdb6e4af96a925cbe8f2c67afb454996a98d8f405eee8",
-    "kernel/v86_mem.c": "2793c2e890fb35bead5ef20bef0e23d4d3a7d476bc607cac3d6954afbec9526c"
+    "init/boot_display.c": "f2c3b40e01848acfa3c3790d9d2c6f9186fc2dadf783366bce963b3d86c1bccc",
+    "arch/x86/kernel/isr_handlers.c": "3f8fbd502efb97da04edef439124c2fbf89f661a7d780d6c450f94bc16c3e0c7",
+    "arch/x86/kernel/double_fault.c": "e9c8e47cc4038ddf2b0fdb6e4af96a925cbe8f2c67afb454996a98d8f405eee8",
+    "kernel/v86/v86_mem.c": "2793c2e890fb35bead5ef20bef0e23d4d3a7d476bc607cac3d6954afbec9526c"
   },
   "inputs": "Harness _start: boot right edge/high byte/bottom/empty; legacy exception plus hex; DF kernel/engine/unknown; V86 counts 0x123/0x12/0x34. Memory initialized to 0xa5 before each case.",
   "record": "little-endian u32 address,width,value,resulting u16 cell; width 0: serial byte or disable/stop event",

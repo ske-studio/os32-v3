@@ -3,12 +3,12 @@ check-boot-splash-host:
 - gfx/gfx_vram.c
 - gfx/backend_pc98.c
 - gfx/gfx_core.c
-- kernel/boot_splash.c
+- init/boot_splash.c
 - tools/tests/boot_splash_native_host.c
 - tools/tests/test_boot_splash_native.py
 - tools/check_map.d/check-boot-splash-host.yaml
 - build/checks.d/check-boot-splash-host.mk
 - tools/tests/serial_diag_host.h
 - lib/serial_diag.h
-- kernel/platform_splash.h
+- include/platform_splash.h
 - platform/pc98/splash.c

@@ -162,7 +162,7 @@
 /*  この窓は **NP21/W 互換のためだけ** (ユーザー決定 2026-09-29。実機の       */
 /*  Xe10 がレジスタ 02h に応えるかは資料に無く未確認。手元の実機 Ra266 の    */
 /*  アクセラレータは PCI の Trident で、Xe10 の Cirrus は無い)。              */
-/*  帯の PT は paging_init が静的に用意する (kernel/paging.c)。               */
+/*  帯の PT は paging_init が静的に用意する (mm/paging.c)。               */
 /*                                                                          */
 /*  ⚠ **窓を閉じる書き込みは NP21/W では効かない**: cirrusvga_ofab case 0x02   */
 /*  は `if(dat!=0x00 && dat!=0xff)` で 00h/FFh を捨てるので、一度開いた窓は    */

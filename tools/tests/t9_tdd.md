@@ -108,7 +108,7 @@ RED になる**ことを確認してから GREEN に戻した (下の「落ち�
 ページ属性 (PTE の USER ビット) はホストでは踏めないので、カーネル側の
 `exec_tramp_user_selftest()` (3 項) を `kselftest_run_post_exec()` から呼ぶ。
 `kselftest_run()` は `exec_init()` より**前**に走りトランポリンページがまだ
-無いため、この項だけ `kernel/kernel.c` が `exec_init()` の直後に別口で回す。
+無いため、この項だけ `init/kernel.c` が `exec_init()` の直後に別口で回す。
 **この 3 項は実機でしか踏めない (未実施)。**
 
 ## 4d. Codex 網羅レビュー 往復 8 の T1 (2026-09-13)

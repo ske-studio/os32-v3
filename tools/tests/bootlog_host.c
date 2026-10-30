@@ -1,7 +1,7 @@
 /* ======================================================================== */
-/*  bootlog_host.c — kernel/bootlog.c のホスト試験                           */
+/*  bootlog_host.c — init/bootlog.c のホスト試験                           */
 /*                                                                          */
-/*  kernel/bootlog.c を 1 行も写さずに #include する (模型ではない)。        */
+/*  init/bootlog.c を 1 行も写さずに #include する (模型ではない)。        */
 /*  ホスト側だけ -DBOOTLOG_NO_IRQ_LOCK (CPL=3 では cli/popfl を実行できない): */
 /*  錠はここが用意し、呼んだ回数・順序・返した札の復元を数える。             */
 /*  書き出しの手順は偽の VFS (呼ばれた順を記録し、段ごとに失敗を注入する。   */

@@ -1,8 +1,8 @@
 /* Real side-effect-free init, and every S1 import replaced with a counter. */
-#include "kernel/module.h"
+#include "kernel/module/module.h"
 #include "kernel/kselftest.h"
 #include "kprintf.h"
-#include "kernel/v86_gcap.h"
+#include "kernel/v86/v86_gcap.h"
 #include "kdebug/kpeek.h"
 #include "kdebug/recover.h"
 #include "kdebug/recover_diag.h"

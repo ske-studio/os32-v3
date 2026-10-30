@@ -150,7 +150,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 *   **役割:** バックバッファ管理、VRAM転送、スプライト・図形描画。高速化のためアセンブラルーチンを利用。
 
 #### プログラムローダー (exec/)
-*   **依存先:** `fs/`, `kernel/paging.h`, `kapi/`
+*   **依存先:** `fs/`, `mm/paging.h`, `kapi/`
 *   **役割:** 外部実行ファイル（.EXE/OS32X）のロード、仮想メモリ展開、実行。ヒープ管理（`exec_heap.c`）。
 
 #### KernelAPI (kapi/)

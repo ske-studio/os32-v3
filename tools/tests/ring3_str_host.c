@@ -38,7 +38,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 #include "ring3_str.c"
 
 /* 写し場がスタブの後ろで 1 ページに収まる (exec/exec.c と同じ検査)。
- * PAGE_SIZE は kernel/paging.h だが、ここでは番地の式だけを見たいので
+ * PAGE_SIZE は mm/paging.h だが、ここでは番地の式だけを見たいので
  * 値を持ち込まずに 4096 を使う (i386 の 4KB ページは動かない)。 */
 #define HOST_PAGE_SIZE 4096u
 STATIC_ASSERT(RING3_USTR_OFF >= RING3_USTR_STUB_OFF +

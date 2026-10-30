@@ -56,12 +56,12 @@ check-gf-display-host:
 - kdebug/gfinit_plan.h
 - kdebug/kpeek.h
 - kdebug/kpeek_allow.h
-- kernel/pgalloc.h
-- kernel/paging.h
-- kernel/physmem.h
+- mm/pgalloc.h
+- mm/paging.h
+- mm/physmem.h
 - lib/kstring.h
-- kernel/idt.h
-- kernel/module.h
+- arch/x86/kernel/idt.h
+- kernel/module/module.h
 - drivers/serial.h
 - include/bootinfo.h
 - include/sys.h
@@ -80,8 +80,8 @@ check-gf-display-host:
 - lib/kprintf_attr.c
 - include/console_attr.h
 - platform/pc98/console_attr.c
-- kernel/console.c
-- kernel/kdebug_call.c
+- kernel/console/console.c
+- kernel/module/kdebug_call.c
 - hwdev/hwdev_imports.def
 - kdebug/gfinit_plan.c
 - tools/tests/gfinit_plan_host.c
@@ -97,7 +97,7 @@ check-gf-display-host:
 - kdebug/recover_diag.h
 - tools/tests/recover_cleanup_host.inc
 - include/pci_dev_contract.h
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - hwdev/generated/gf_mode_rows.inc
 - kdebug/gfinit_mode.c

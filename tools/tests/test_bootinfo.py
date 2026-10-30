@@ -1,9 +1,9 @@
-"""ブート情報域 (0x7E00) の検証関数 (kernel/bootinfo_check.c) のホスト試験。
+"""ブート情報域 (0x7E00) の検証関数 (init/bootinfo_check.c) のホスト試験。
 
 記録: tools/tests/bootinfo_tdd.md
 票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0 (§1-v3 N1 / N2)
 
-実物の kernel/bootinfo_check.c を 1 行も写さずに #include して回す。
+実物の init/bootinfo_check.c を 1 行も写さずに #include して回す。
 加えて **NASM 側の写し boot/bootinfo.inc** の値が include/bootinfo.h と名前ごとに
 一致するかを見る (ローダとカーネルが別のオフセットを読むと静かにずれる)。
 
@@ -19,11 +19,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/bootinfo_host.c"
-SRC = ROOT / "kernel/bootinfo_check.c"
+SRC = ROOT / "init/bootinfo_check.c"
 INC = ROOT / "boot/bootinfo.inc"
 # i386-elf で通す実ソース。bootinfo.c は構造体の並びを STATIC_ASSERT で見る
 # (ホストでは u32 が 64bit なので見られない)。
-TARGET_SRCS = ["kernel/bootinfo_check.c", "kernel/bootinfo.c", "drivers/ide.c"]
+TARGET_SRCS = ["init/bootinfo_check.c", "init/bootinfo.c", "drivers/ide.c"]
 
 CASES = ["good", "magic", "check_word", "version", "sum", "rules", "format",
          "image", "inc_mirror"]
@@ -91,7 +91,7 @@ def host_build(tmp, source_text=None):
         harness = src_dir / "harness.c"
         harness.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/bootinfo_check.c"', '"kernel/bootinfo_check.c"'),
+                '"../../init/bootinfo_check.c"', '"init/bootinfo_check.c"'),
             encoding="utf-8")
     cmd = ["gcc", *FLAGS, *INCLUDES, "-I" + str(src_dir), str(harness),
            "-o", str(exe)]
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     check_named_constants()
     with tempfile.TemporaryDirectory(prefix="os32-bootinfo-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/bootinfo_check.c)",
+        print("HOST GNU11 -Werror compile PASS (real init/bootinfo_check.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

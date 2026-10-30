@@ -234,7 +234,7 @@ static int cmd_play(int argc, char **argv)
 /* /etc/system.cfg の読み書きバッファ幅 ([C4])。読みは実効 CFG_READ_MAX - 1。 */
 #define CFG_READ_MAX     1024
 #define CFG_OUT_MAX      1152
-/* 起動パーサ (kernel/sysconfig.c) が読める全体の長さ。ホスト試験で照合。 */
+/* 起動パーサ (init/sysconfig.c) が読める全体の長さ。ホスト試験で照合。 */
 #define CFG_WRITE_MAX    (CFG_READ_MAX - 1)
 /* 秒×100 tick の期限を符号付き差分で比較できる範囲。 */
 #define GSERIAL_TIMEOUT_MAX (0x7FFFFFFFUL / 100UL)

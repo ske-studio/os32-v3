@@ -1,7 +1,7 @@
 /* Real CRT reader/formatter and bootlog storage, ILP32 without libc.
  * 記録: tools/tests/crt_diag_tdd.md */
 #define BOOTLOG_NO_IRQ_LOCK
-#include "../../kernel/bootlog.c"
+#include "../../init/bootlog.c"
 #include "memmap.h"
 
 #define FAKE_SIZE 0x100000

@@ -130,7 +130,7 @@ def host_build(tmp, mutated=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-dlog-host"
     # Keep driver-local and explicit ../drivers/kbd.h includes in the fixture.
-    for rel in ("kernel/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
+    for rel in ("kernel/v86/v86_kbd.h", "drivers/kbd.h", "include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")

@@ -10,7 +10,7 @@
 ## 1. 変換キー (XFER) 対応
 
 XFER の候補操作は実装済み。インライン候補中はリスト展開、リスト中は次候補となる
-(`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER 対応は残件。操作の表は P1 §3 (`01_UI_CANDIDATE.md`) を参照。
+(`kernel/ime/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime/ime.c:484`) で、XFER 対応は残件。操作の表は P1 §3 (`01_UI_CANDIDATE.md`) を参照。
 `KEY_NFER` のかな直接確定への割当は将来の検討事項として残す。
 
 ---
@@ -36,8 +36,8 @@ XFER の候補操作は実装済み。インライン候補中はリスト展開
 
 | 対象 | 変更 |
 |------|------|
-| `kernel/ime.c` | `ime_process_key` に XFER/NFER 分岐 |
-| `kernel/ime_dict.c` | (調査次第) `kprintf` → `kputs` 置換 |
+| `kernel/ime/ime.c` | `ime_process_key` に XFER/NFER 分岐 |
+| `kernel/ime/ime_dict.c` | (調査次第) `kprintf` → `kputs` 置換 |
 
 **テスト:** 変換候補中の XFER でリストが開き、リスト中は次候補へ進むこと。
 入力中の XFER による変換開始は、対応を実装した後に検証する。辞書ロード失敗時のエラー出力で
@@ -64,5 +64,5 @@ MEMSYS5 プール枯渇説は 400KB 拡張テストで棄却 (200KB で動作確
 二重間接ブロック領域への永続化) を NP21/W 実機で検証済み。
 
 
-これは当時の検証記録である。現行も `kernel/ime.c` の `ime_set_mode()` に遅延オープン、
-`kernel/ime_dict.c:25` に辞書 FD の保護処理がある。
+これは当時の検証記録である。現行も `kernel/ime/ime.c` の `ime_set_mode()` に遅延オープン、
+`kernel/ime/ime_dict.c:25` に辞書 FD の保護処理がある。

@@ -145,7 +145,7 @@ static const GfxMode pegc_modes[] = {
 | init 後 probe 失敗 | 既存の cleanup を経て pc98。要求が legacy200 なら 200、それ以外 400 |
 | prepare | 選択だけ先行、PEGC は同期を変えない。Cirrus の既存 init→shutdown の時機も維持 |
 - モード選択は実体の probe 成功後・init/prepare の前。boot reserve は候補表を参照せず、今の容量定数と型板を使う。
-- kernel/kernel.c:590 の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（kernel/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
+- init/kernel.c:590 の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（kernel/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
 - 登録後の graphics 境界だけで Cirrus の表を読む。G6b はその選択点で既存予約容量を照合し、未登録表への参照を一切行わない。
 - gfx_mode_pick は通常 default、legacy200 は planar の既存 200 行だけ選ぶ。面積最大・色数最大の探索はしない。
 - 未知形式/空表/容量不足はハード設定前に不成立とし、pc98 へ戻す。pc98 自体の資源不足は描画未開始の既存経路へ。

@@ -10,7 +10,7 @@
 #include "gui.h"
 #include "kstring.h"
 #include "input_service.h"      /* input_set_gui_mode (K2-B) */
-#include "ime.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
+#include "ime/ime.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
 
 /* res_owner_get() は fs/fd_redirect.c。FD と同じ「確保した実行レベル」。
  * K5b からは値の意味が **アプリ ID** (1 = シェル帯 / 2〜5 = アプリ) になった。
@@ -155,7 +155,7 @@ void gui_owner_exit(int owner, int kind)
 /*  gui_ime_set_render — KAPI ime_set_render の入口 (常駐側だけ)             */
 /*                                                                          */
 /*  カーネルは控えた IME_Render 表の putc / putw / clear_row を**以後ずっと  */
-/*  CPL=0 で**呼ぶ (kernel/ime.c)。アプリが自分のメモリの表を渡せると、その   */
+/*  CPL=0 で**呼ぶ (kernel/ime/ime.c)。アプリが自分のメモリの表を渡せると、その   */
 /*  アプリのコードが CPL=0 で走り、別アプリの syscall や WM の top-level      */
 /*  (master CR3) でも呼ばれ、アプリが消えた後は解放済み / 他人の物理へ飛ぶ   */
 /*  (2026-09-26 代行レビュー P2)。正当な呼び手は gshell の top-level だけ    */

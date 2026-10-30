@@ -2,7 +2,7 @@
 import subprocess
 from test_surface_lease import main
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/exec.c',
-              'kernel/v86_mem.c', 'kernel/paging.c', 'kernel/pgalloc.c',
+              'kernel/v86/v86_mem.c', 'mm/paging.c', 'mm/pgalloc.c',
               'tools/tests/surface_bundle_host.c']
 MUTANTS = [
     ('lease', 'source->backend != gfx_sf_backend()', '0', 'active backend mismatch'),
@@ -40,7 +40,7 @@ MUTANTS = [
 if __name__ == '__main__':
     try:
         main(fixture_name='surface_bundle_host.c', mutants=MUTANTS,
-             extra_sources={'v86': 'kernel/v86_mem.c'},
+             extra_sources={'v86': 'kernel/v86/v86_mem.c'},
              lease_hook='#define paging_lease_unmap host_bundle_unmap\n')
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')

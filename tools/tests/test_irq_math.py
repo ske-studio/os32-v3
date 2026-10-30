@@ -1,9 +1,9 @@
-"""動的 IRQ の判断 (kernel/irq_math.c) のホスト試験。
+"""動的 IRQ の判断 (kernel/irq/irq_math.c) のホスト試験。
 
 記録: tools/tests/irq_math_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-1 (割り込みの動的登録)
 
-実物の kernel/irq_math.c を 1 行も写さずに #include して回す。PIC も IDT も
+実物の kernel/irq/irq_math.c を 1 行も写さずに #include して回す。PIC も IDT も
 tick_count も触らないので、模型は「筋書きどおりの値を返す偽装置」だけ。
 
 **ここで見る分岐は NP21/W でも実機でも狙って作れない** — 「A と B が同時に
@@ -23,13 +23,13 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/irq_math_host.c"
-SRC = ROOT / "kernel/irq_math.c"
+SRC = ROOT / "kernel/irq/irq_math.c"
 
 # カーネルと同じ i386-elf で通す実ソース。irq.c まで入れるのは、
 # 表・PIC のマスク・EOI が irq_math の決め事を**実際に**呼ぶ形を固定するため。
 TARGET_SRCS = [
-    ("kernel/irq_math.c", []),
-    ("kernel/irq.c", []),
+    ("kernel/irq/irq_math.c", []),
+    ("kernel/irq/irq.c", []),
 ]
 
 CASES = ["dispatch_two_pass", "register_rules", "storm", "eoi_plan"]
@@ -87,12 +87,12 @@ def host_build(tmp, source_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "irq_math.c").write_text(source_text, encoding="utf-8")
         (mut / "irq_math.h").write_text(
-            (ROOT / "kernel/irq_math.h").read_text(encoding="utf-8"),
+            (ROOT / "kernel/irq/irq_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/irq_math.c"', '"kernel/irq_math.c"'),
+                '"../../kernel/irq/irq_math.c"', '"kernel/irq/irq_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
                "-I" + str(mut), str(shim), "-o", str(exe)]
@@ -111,7 +111,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で kernel/irq.c ごと通す。"""
+    """カーネルと同じ i386-elf で kernel/irq/irq.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-irq-math-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/irq_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/irq/irq_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

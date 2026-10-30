@@ -276,7 +276,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 まず範囲: `HOSTDRV_MAX_DIR_ENTRIES` は **HostDrv (`/host`) だけ**の上限。
 ext2 と iso9660 は自前の `list_dir` を持つので影響を受けない
-(`kernel/kernel.c:320` で `vfs_mount("/host", "hostdrv", "hostdrv")`、
+(`init/kernel.c:320` で `vfs_mount("/host", "hostdrv", "hostdrv")`、
 マウント点は 1 つ)。
 
 カーネル側の `vfs_ls` 呼び出しは `kapi/kapi_generated.c` の `wrap_sys_ls` の

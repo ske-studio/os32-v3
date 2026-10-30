@@ -15,7 +15,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections']
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/module_runtime.c'
+SOURCE = ROOT / 'kernel/module/module_runtime.c'
 INCLUDES = ['-I' + str(ROOT / d) for d in
             ('.', 'include', 'kernel', 'lib', 'fs', 'arch/x86', 'platform/pc98',
              'sdk/include', 'sdk/include/os32', 'exec', 'drivers')]
@@ -54,7 +54,7 @@ def main():
             subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', *INCLUDES,
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/module_runtime_host.c', source,
-                            ROOT / 'kernel/module_image.c', vfs, dev, '-o', exe], check=True)
+                            ROOT / 'kernel/module/module_image.c', vfs, dev, '-o', exe], check=True)
 
         def run(cases, expected=0):
             for label, mode, arg in cases:

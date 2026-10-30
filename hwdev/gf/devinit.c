@@ -3,7 +3,7 @@
  * main0..4, baseline, calc, load_state and required CHECK remain in service.c. */
 #include "production.h"
 #include "../../drivers/pci.h"
-#include "../../kernel/pgalloc.h"
+#include "../../mm/pgalloc.h"
 #include "../../lib/kstring.h"
 #include "../../lib/crc32_core.inc"
 #include "rom.inc"

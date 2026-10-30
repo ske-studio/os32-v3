@@ -1,8 +1,8 @@
-"""起動ログ (kernel/bootlog.c) のホスト試験。
+"""起動ログ (init/bootlog.c) のホスト試験。
 
 記録: tools/tests/bootlog_tdd.md
 
-実物の kernel/bootlog.c を 1 行も写さずに tools/tests/bootlog_host.c が
+実物の init/bootlog.c を 1 行も写さずに tools/tests/bootlog_host.c が
 #include して回す。書き出しの手順は偽の VFS (呼ばれた順と段ごとの失敗注入)。
 ホスト側だけ -DBOOTLOG_NO_IRQ_LOCK (CPL=3 では cli/popfl を実行できない):
 錠は試験側が用意して、呼んだ回数・順序・札 (IF) の復元を数える。
@@ -25,7 +25,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/bootlog_host.c"
-SRC = ROOT / "kernel/bootlog.c"
+SRC = ROOT / "init/bootlog.c"
 
 CASES = ["collect", "overflow", "utf8_latch", "stop", "header", "compose",
          "plan", "lock", "save", "save_mkdir", "write_rc", "reboots", "hardlink"]
@@ -161,7 +161,7 @@ def run_cases(exe, cases, quiet=False):
 
 
 def build_target(tmp):
-    for rel in ("kernel/bootlog.c", "kernel/bootlog_save.c"):
+    for rel in ("init/bootlog.c", "init/bootlog_save.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, *TARGET_INCLUDES, "-c",
                         str(ROOT / rel),
                         "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
@@ -173,7 +173,7 @@ def build_target(tmp):
 def check_wiring():
     """結線の静的検査: console の入口 4 か所、kernel.c の呼ぶ位置、止める順。"""
     bad = 0
-    con = (ROOT / "kernel/console.c").read_text(encoding="utf-8")
+    con = (ROOT / "kernel/console/console.c").read_text(encoding="utf-8")
     sink = con.count("con_sink_push_print(")
     blog = con.count("bootlog_push(")
     print(f"WIRING console.c con_sink x{sink} bootlog x{blog}", flush=True)
@@ -181,7 +181,7 @@ def check_wiring():
         print("  FAIL console の入口 (con_sink を積む所) と同じ 4 か所で積む", flush=True)
         bad += 1
 
-    k = (ROOT / "kernel/kernel.c").read_text(encoding="utf-8")
+    k = (ROOT / "init/kernel.c").read_text(encoding="utf-8")
     n = k.count("bootlog_save();")
     root = k.find('vfs_mount("/", boot.root_dev, boot.root_fs)')
     call = k.find("bootlog_save();")
@@ -193,7 +193,7 @@ def check_wiring():
               flush=True)
         bad += 1
 
-    sv = (ROOT / "kernel/bootlog_save.c").read_text(encoding="utf-8")
+    sv = (ROOT / "init/bootlog_save.c").read_text(encoding="utf-8")
     body = sv[sv.find("void bootlog_save(void)"):]
     stop = body.find("bootlog_stop();")
     first_io = min(i for i in (body.find("vfs_fstype"), body.find("kprintf"))
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-bootlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/bootlog.c)", flush=True)
+        print("HOST GNU11 -Werror compile PASS (real init/bootlog.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)

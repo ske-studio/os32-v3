@@ -40,7 +40,7 @@
 ## 4. OS32 での作り (案、設計の往復はまだ)
 
 - 今の `drivers/serial.c` は 1st CCU (8251 互換・IRQ4) 用 — 2nd は別のドライバ (16550、受信だけ、TX の割込み不要)。
-- 割込みは `kernel/irq.c` の `irq_register()` で IRQ5 に。ISR は受信のバイトを輪に入れ、協調の側で復号。
+- 割込みは `kernel/irq/irq.c` の `irq_register()` で IRQ5 に。ISR は受信のバイトを輪に入れ、協調の側で復号。
 - 入力の口は `kernel/input_service.c` の PointerOps (今のバスマウスの `mouse_poll` と同じ形、`platform/pc98/d2_bind.c`)。KAPI は変えない。バスマウスとの同時使用は選択か合成の設計が要る (`drivers/mouse.c` は単一のモード)。
 
 ## 5. 進め方 (余暇のとき)

@@ -16,7 +16,7 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['exec/appmem.c', 'exec/appmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h',
-               'include/memmap.h', 'kernel/paging.h',
+               'include/memmap.h', 'mm/paging.h',
                'tools/tests/appmem_host.c', 'tools/tests/test_appmem.py',
                'tools/tests/host32.py', 'tools/tests/mutpar.py']
 MUTANTS = [

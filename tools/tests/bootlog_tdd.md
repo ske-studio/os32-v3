@@ -1,8 +1,8 @@
 # 起動ログ (/var/log/boot.log) — ホスト TDD の記録
 
 票: 実機 PC-9821 で起動画面の `[selftest] N/N passed` などがすぐ流れて読めない件 (ユーザー提案、2026-09-25)。
-rshell が立つ前の kprintf はシリアルにも出ない (`kernel/console.c` は `rshell_active` のときだけ写す)。
-実装: `kernel/bootlog.c` (純粋な部分) / `kernel/bootlog_save.c` (VFS と版情報への結線) / `include/bootlog.h` / `include/config.h` の `SYS_BOOTLOG_*`
+rshell が立つ前の kprintf はシリアルにも出ない (`kernel/console/console.c` は `rshell_active` のときだけ写す)。
+実装: `init/bootlog.c` (純粋な部分) / `init/bootlog_save.c` (VFS と版情報への結線) / `include/bootlog.h` / `include/config.h` の `SYS_BOOTLOG_*`
 試験: `tools/tests/bootlog_host.c` + `tools/tests/test_bootlog.py` (`make check-bootlog-host`)、
 実物の FatFs 結線は `tools/tests/fatfs_stat_host.c` (`make check-vfs-mount-dev-host` の `test_fatfs_stat.py`)
 
@@ -17,18 +17,18 @@ rshell が立つ前の kprintf はシリアルにも出ない (`kernel/console.c
 | [P2] ext2 で正常に保存しても「書き込み不足」(ext2 の `vfs_write` は成功で 0、FAT は書いたバイト数) | `BootlogFsOps.write` の約束を「`vfs_write` の生の戻り (FS ごと)」と明記し、種別を知る手順の側 (`bootlog_write_ok(kind, rc, len)`) で揃える。偽の VFS も ext2 なら 0、FAT ならバイト数を返す。`test_bootlog.py` の `CONTRACT` 検査が実物の `ext2_vfs_write` / `fatfs_vfs_write` の形 (ext2 は `ext2_to_vfs_err(...)`、FAT は `return (int)bw;` と `f_close` の伝播) を見張る |
 | [P2] FAT の最後のフラッシュ (`f_close`) の失敗を捨てて保存成功と表示 | `fs/fatfs_vfs.c` の `fatfs_vfs_write` だけ `f_close` の結果を返す (`f_write` の失敗が先)。`write_file` の他の呼び手は `fs/vfs_fd.c` の空ファイル作成と O_TRUNC の 2 か所で、どちらも `rc < 0` を見て返すだけなので、閉じる失敗が「成功した空ファイル」から「失敗」に変わる方向の影響しかない |
 | [P2] push をまたぐ UTF-8 を容量の境界で割る (残り 1 バイトに E3 が収まり、次の 81 82 が捨てられる。console.c の `kputc` は 1 バイトずつ積む) | あふれた瞬間に**蓄えた本文の末尾**を文字の境界まで戻し (`bl_trim_partial_tail`)、戻した分を dropped に足す。あふれていないときは戻さない (続きが来る) |
-| [P3 3 回目] 偽 FS の rename が元と宛先が同じ inode のときも移動元を消していた (実物の `ext2_rename` は両名を残して成功 = no-op、`fs/ext2_dir.c`)。正常時の最終内容は同じだが、公開失敗時の中間状態 (boot.log が残るか) が実物と違った | 偽 FS に「同じ inode なら何もせず成功」を入れ、11 hardlink の説明を実物どおりに (付け替えは no-op、公開が既存の boot.log を置き換え、旧 inode はリンク数が減るだけで .1 に残る)。boot.log と .1 が同じ inode の状態から、公開が**落ちる** (boot.log と .1 は同じ inode の PREV のまま、今回分は boot.new) → 次の正常な起動、と公開が**通る** の両方を足した (11h-2〜11n)。`CONTRACT` が実物の同一 inode の no-op を見張る。変異 35 (公開の前に boot.log を消す) を足した。`kernel/bootlog.c` は変えていない |
+| [P3 3 回目] 偽 FS の rename が元と宛先が同じ inode のときも移動元を消していた (実物の `ext2_rename` は両名を残して成功 = no-op、`fs/ext2_dir.c`)。正常時の最終内容は同じだが、公開失敗時の中間状態 (boot.log が残るか) が実物と違った | 偽 FS に「同じ inode なら何もせず成功」を入れ、11 hardlink の説明を実物どおりに (付け替えは no-op、公開が既存の boot.log を置き換え、旧 inode はリンク数が減るだけで .1 に残る)。boot.log と .1 が同じ inode の状態から、公開が**落ちる** (boot.log と .1 は同じ inode の PREV のまま、今回分は boot.new) → 次の正常な起動、と公開が**通る** の両方を足した (11h-2〜11n)。`CONTRACT` が実物の同一 inode の no-op を見張る。変異 35 (公開の前に boot.log を消す) を足した。`init/bootlog.c` は変えていない |
 | 試験の穴 | 切り詰めた後の失敗 (8i)、再起動をまたいで唯一の旧ログが残ること (10 reboots、8r-2〜4)、実物の FAT の close の失敗 (`fatfs_stat_host.c` 12〜14)、IF の復元 (偽の錠で回数・順序・札、3' lock)、rename が新名を載せた後で落ちる → 再起動 → 保存 (11 hardlink) |
 
 ## 様式
 
 `test_kprintf_attr.py` / `test_con_sink.py` と同じ形で、**模型ではなく実物**を見る:
 
-1. `bootlog_host.c` が `kernel/bootlog.c` を `#include` する (1 行も写さない)。
+1. `bootlog_host.c` が `init/bootlog.c` を `#include` する (1 行も写さない)。
 2. ホストの gcc `-std=gnu89 -Wall -Wextra -Werror` で走らせる。ホスト側だけ
    `-DBOOTLOG_NO_IRQ_LOCK` (CPL=3 では `cli` / `popfl` を実行できない) — 錠は試験側が用意し、
    呼んだ回数・順序 (入れ子なし)・`lock` が返した札を `unlock` がそのまま受け取ること (IF の復元) を数える。
-3. **同じソース**と結線 (`kernel/bootlog_save.c`) を、カーネルと同じフラグ + `-Wextra -Werror`
+3. **同じソース**と結線 (`init/bootlog_save.c`) を、カーネルと同じフラグ + `-Wextra -Werror`
    の i386-elf-gcc でもコンパイルする (`--target`)。本番の `irq_save` / `irq_restore` の形はここで通る。
 4. 書き出しの手順は `BootlogFsOps` 越しなので、偽の VFS (呼ばれた順を記録し、段ごと・パスごとに失敗を注入。
    FAT 版は `rename` が宛先ありで `OS32_ERR_EXIST` = FatFs の `f_rename`、ext2 版は宛先を置き換える =
@@ -131,6 +131,6 @@ compose の結果がヘッダで始まり、本文より長く、改行で終わ
 
 - 本物の ext2 / FatFs への書き出し (NP21/W と実機で PM が見る)。FatFs の `/var` `/var/log` の
   作成は、`create_name` (FF_USE_LFN 0) の規則を読んで 8.3 に収まることを確かめただけ。
-- ISR からの同時書き込みの競合 (錠は `kernel/con_sink.c` と同じ `irq_save` / `irq_restore` の形。
+- ISR からの同時書き込みの競合 (錠は `kernel/console/con_sink.c` と同じ `irq_save` / `irq_restore` の形。
   ホストで見るのは回数・順序・札の復元だけで、`cli` が本当に効いているかは見ない)。
 - 本物の `f_close` が落ちる状況 (FatFs の中は贋物)。`fatfs_vfs_write` が結果を返すところまで。

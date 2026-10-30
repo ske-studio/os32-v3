@@ -21,7 +21,7 @@ def run(source, runner):
 
 def main():
     args = arguments()
-    source = function((ROOT/'kernel/module.c').read_text(), 'const char *kdebug_state_name(')
+    source = function((ROOT/'kernel/module/module.c').read_text(), 'const char *kdebug_state_name(')
     assert run(source, args.runner).returncode == 0
     if args.mutate:
         old = 'sizeof(names) / sizeof(names[0])'

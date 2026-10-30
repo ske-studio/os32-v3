@@ -1,6 +1,6 @@
 {
   "baseline": "b400acb6",
-  "source": "kernel/console.c",
+  "source": "kernel/console/console.c",
   "source_sha256": "059e68359bf4b50c4df4bc78164c37454e53fc7428bde73faf840858c937609e",
   "harness_sha256": "9c4bdf1aedd67d227da2af4b65b61c46a6b7c4431a8ccba92acdcc7ffeee47bb",
   "trace_sha256": "ccf9625f6e4735bd32265a1d3cd2000b181840d06bb434bd50f648a69d58b195",

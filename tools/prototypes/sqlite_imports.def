@@ -117,19 +117,19 @@
     },
     {
       "symbol": "malloc",
-      "source": "kernel/kmalloc.h",
+      "source": "mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "free",
-      "source": "kernel/kmalloc.h",
+      "source": "mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "realloc",
-      "source": "kernel/kmalloc.h",
+      "source": "mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },

@@ -5,8 +5,8 @@
     "include/dma_contract.h",
     "kernel/pcm_module.h",
     "drivers/pcm_cs4231.h",
-    "kernel/irq.h",
-    "kernel/dma_pool.h"
+    "kernel/irq/irq.h",
+    "mm/dma_pool.h"
   ],
   "imports": [
     {
@@ -35,7 +35,7 @@
     },
     {
       "symbol": "dma_mark_leaked",
-      "source": "kernel/dma_pool.h",
+      "source": "mm/dma_pool.h",
       "context": "normal",
       "irq": false
     },
@@ -71,13 +71,13 @@
     },
     {
       "symbol": "kmalloc",
-      "source": "kernel/kmalloc.h",
+      "source": "mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kfree",
-      "source": "kernel/kmalloc.h",
+      "source": "mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },

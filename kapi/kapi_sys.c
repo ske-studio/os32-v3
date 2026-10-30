@@ -238,8 +238,8 @@ int kapi_sys_set_mtime(const char *path, u32 mtime)
 /*  sys_time_now — µs 時計 (票 TASK_HAL_WIRING §1-5 / KAPI v59)             */
 /*                                                                          */
 /*  生成される __cdecl ラッパ (`wrap_sys_time_now`) がここを呼ぶ ([C3])。    */
-/*  本体 (スナップショットの採り方) は kernel/ktime.c、判定と算数は          */
-/*  kernel/time_math.c。ここの仕事は CPL=3 のポインタ検証だけ。             */
+/*  本体 (スナップショットの採り方) は kernel/time/ktime.c、判定と算数は          */
+/*  kernel/time/time_math.c。ここの仕事は CPL=3 のポインタ検証だけ。             */
 /*                                                                          */
 /*  **検証の範囲は限定** (往復 9 の中継 1)。帯の外の番地はディスパッチャの   */
 /*  早期検査 (`kapi_argptr` + `ring3_ptr_ok`) が他の KAPI と同じく           */

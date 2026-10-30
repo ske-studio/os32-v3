@@ -18,12 +18,12 @@ import test_appmem_map as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module.h',
+    'kapi/kapi_sys.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module/module.h',
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
-    'kernel/sqlite_engine.c', 'kernel/sysconfig.c', 'kernel/kaudit_boot.c', 'kernel/memory_boot.c',
-    'kernel/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
-    'kernel/module_runtime.h', 'kernel/module_image.h', 'kernel/sqlite_engine.h',
-    'kernel/platform_memory.h', 'platform/pc98/platform_memory_desc.h',
+    'kernel/sqlite_engine.c', 'init/sysconfig.c', 'init/kaudit_boot.c', 'mm/memory_boot.c',
+    'mm/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
+    'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/sqlite_engine.h',
+    'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h',
 ]
 
 
@@ -155,7 +155,7 @@ def run_body(runner, mutate):
     exe = (ROOT / 'exec/exec.c').read_text()
     assert 'if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);' in exe
     assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
-    boot = (ROOT / 'kernel/kernel.c').read_text()
+    boot = (ROOT / 'init/kernel.c').read_text()
     assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('bootinfo_capture();')
     source = (ROOT / 'kapi/kapi_sys.c').read_text()
     source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('static void build_time_copy(')]
@@ -164,16 +164,16 @@ def run_body(runner, mutate):
         cc = build_fixture(tmp)
         # Preserve the descriptor's relative include in normal and mutant
         # stages; the extracted counter now uses platform geometry (L14).
-        for rel in ('kernel/platform_memory.h', 'platform/pc98/platform_memory_desc.h'):
+        for rel in ('include/platform_memory.h', 'platform/pc98/platform_memory_desc.h'):
             dest = tmp / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, dest)
-        memory = (ROOT / 'kernel/memory_boot.c').read_text()
-        (tmp / 'page_count_source.c').write_text('#include "kernel/platform_memory.h"\n' + '\n'.join(function(memory, sig) for sig in
+        memory = (ROOT / 'mm/memory_boot.c').read_text()
+        (tmp / 'page_count_source.c').write_text('#include "include/platform_memory.h"\n' + '\n'.join(function(memory, sig) for sig in
             ('static u32 memory_page_overlap(', 'void memory_boot_count_pages(')))
         objs = []
         for i, path in enumerate(['exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-                                  'kernel/paging_app.c', 'kernel/physmem.c']):
+                                  'mm/paging_app.c', 'mm/physmem.c']):
             obj = tmp / f'part{i}.o'
             host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True, capture_output=True, text=True)
             objs.append(str(obj))
@@ -503,7 +503,7 @@ def run_kdebug_cli(runner, mutate=False):
     sys_source = (ROOT / 'userland/shell/cmd_sys.c').read_text()
     cfg_defines = '\n'.join(re.findall(r'^#define CFG_.*$', sys_source, re.M))
     shell_max = int(re.search(r'^#define CFG_READ_MAX\s+(\d+)', sys_source, re.M)[1])
-    kernel_source = (ROOT / 'kernel/sysconfig.c').read_text()
+    kernel_source = (ROOT / 'init/sysconfig.c').read_text()
     kernel_max = int(re.search(r'^#define SYSCONFIG_MAX\s+(\d+)', kernel_source, re.M)[1])
     assert shell_max == kernel_max, 'shell/boot system.cfg read limits differ [C4]'
     table = base_source[base_source.index('static const char *const kdebug_state_names'):base_source.index('int shell_print_kdebug(')]

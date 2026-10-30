@@ -6,7 +6,7 @@
  *  拾い、独立した .c にすると常駐 shell.bin のリンクにも空の .o が混ざる
  *  ため (受入 S7 は常駐のバイト一致)。
  *
- *  なぜ座標を使わないか: kernel/console.c は con_sink 有効中 (= GUI 中) に
+ *  なぜ座標を使わないか: kernel/console/console.c は con_sink 有効中 (= GUI 中) に
  *  cursor_x / cursor_y を進めない (K6C-2) ので console_get_cursor_* は常駐
  *  コンソールの古い座標を返す。console_set_cursor が積む CURSOR レコードも
  *  端末側は 40 桁モデルなので x >= 40 や未到達行では**黙って捨てる**。常駐の

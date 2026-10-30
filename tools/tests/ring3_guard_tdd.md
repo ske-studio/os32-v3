@@ -31,7 +31,7 @@ gshell のスタックのポインタがアプリの PD で PTE を見られ、�
 - 「カーネルが WM のコードへ入っている深さ」`ring3_wm_depth` を `gui_call` のハンドラ / ポンプ / `gui_owner_exit` の
   前後で数え、3 つの門 (`ring3_user_ranges_writable` / `ring3_user_range_ok` / `tramp_copy`) の判定を
   `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` に寄せる (深さ 1 以上 = 常駐側の直呼び扱い)。
-- `ring3_in_syscall` の意味 (#PF/#GP の帰属、`kernel/isr_handlers.c`) は変えない。
+- `ring3_in_syscall` の意味 (#PF/#GP の帰属、`arch/x86/kernel/isr_handlers.c`) は変えない。
 - WM を longjmp で抜ける地点 (`exec_park*` ×4 / `ring3_kill_kind` / `kapi_sys_exit`) と**ディスパッチャの入口**で深さを 0 に戻す
   (不変条件: CPL=3 の syscall は必ず深さ 0 から始まる)。
 - 書き側の拒否も `ring3_range_refuse` で数える (`RING3_RANGE_WR_TRIVIAL` / `WR_TABLE` / `WR_PDE` / `WR_PTE` = 7〜10)。
@@ -101,7 +101,7 @@ MUTATIONS 11/11 RED
 
 WM の中で落ちるとアプリの kill として畳まれる (§4-61 の「例外 0 件・`fault_kill_count` だけ増える」)。
 `exec/exec.c` の `ring3_kill_kind` が深さを 0 に戻す**前**に `ring3_wm_fault_count` を +1 (FAULT のみ)、
-`kernel/isr_handlers.c` の 2 つの kill の行に深さ 1 以上で ` (in WM)` を足す。exec.c / ISR はホストで組めないので
+`arch/x86/kernel/isr_handlers.c` の 2 つの kill の行に深さ 1 以上で ` (in WM)` を足す。exec.c / ISR はホストで組めないので
 字面で見る (`static_checks`、変異は写しの上で同じ関数に通す)。
 
 ```

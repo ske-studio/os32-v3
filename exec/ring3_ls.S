@@ -1,6 +1,6 @@
 /* Position-independent cdecl shim, copied into the RO+USER trampoline page.
  * All indirect callback calls execute after int80 returns to CPL3. */
-#include "../kernel/idt.h"
+#include "../arch/x86/kernel/idt.h"
 #define LS_ARG_PATH 8
 #define LS_ARG_CB 12
 #define LS_ARG_CTX 16

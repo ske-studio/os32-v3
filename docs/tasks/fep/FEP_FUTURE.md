@@ -21,8 +21,8 @@ FEP の残存タスクと将来拡張の計画。
   - 候補ウィンドウに番号を表示
   - 対応する数字キーで即座に確定
 - [x] **候補ページング**
-  - 最大 `IME_MAX_RESULTS` (32、`kernel/ime.h:28`) 件の候補をページ分割
-  - RollDown/Right・RollUp/Left でページ切替 (`kernel/ime.c:407`)。操作は `01_UI_CANDIDATE` §3 を参照
+  - 最大 `IME_MAX_RESULTS` (32、`kernel/ime/ime.h:28`) 件の候補をページ分割
+  - RollDown/Right・RollUp/Left でページ切替 (`kernel/ime/ime.c:407`)。操作は `01_UI_CANDIDATE` §3 を参照
 
 ### GFX モード対応
 
@@ -99,7 +99,7 @@ FEP の残存タスクと将来拡張の計画。
   - `ime user export` — CSV エクスポート
 - [ ] **変換キー (XFER) 対応** (P6、候補操作のみ実装済み)
   - PC-98 専用キー `KEY_XFER` (0x35) への機能割り当て
-  - 候補リスト展開・候補送りは実装済み (`kernel/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime.c:484`) で、XFER は残件。`01_UI_CANDIDATE` §3 を参照
+  - 候補リスト展開・候補送りは実装済み (`kernel/ime/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime/ime.c:484`) で、XFER は残件。`01_UI_CANDIDATE` §3 を参照
 - [ ] **kprintf va_args 問題の調査**
   - `.sqlite_text` セクションからの `kprintf` 呼び出しで Page Fault
   - FEP 辞書のエラー出力に影響する可能性

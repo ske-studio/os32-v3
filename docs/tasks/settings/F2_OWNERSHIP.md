@@ -41,7 +41,7 @@ F1 は受入済みという依頼条件を前提とする。
 | `exec/exec.c:448–511` | heap reset 後、redirect→FD→pipe→SHM→sound→**db_cleanup_all**→GUI→nest 減算。親 DB の破壊と SQLite より先の FD 解放が残る |
 | `exec/exec.c:386–442,1016–1019,1112,1208` | nest 更新後の起動失敗は exec_launch_abort。現在は子コード未実行・owner 資源なしを前提に owner cleanup を省略 |
 | `exec/exec.c:252–258,514–533,565–636,651–663,1288` | CTRL+STOP→ring3_fault_kill→exec_fault_recover→exec_exit。通常 sys_exit と CPL0 entry return も exec_exit。STOP は SQLite/KAPI の途中ではなく静かな境界へ持ち越す |
-| `kernel/ime_dict.c:25–31,61–127,220–267,270–426` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
+| `kernel/ime/ime_dict.c:25–31,61–127,220–267,270–426` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
 
 **接続から xOpen へ所有情報を運ぶ既存経路**:
 `lib/sqlite3/sqlite3.c:189567–189584` は指定 VFS を `db->pVfs` に保存して main を開く。
@@ -232,7 +232,7 @@ F2 全体の R0/R1、実 SQLite、exec 終了、FEP、target link／guest の受
 
 ## 5. FEP direct SQLite の移行（exec 統合の前提）
 
-`kernel/ime_dict.c` と必要なら内部 `kernel/ime.h` に group 参照・隔離状態・保存診断を持たせる。
+`kernel/ime/ime_dict.c` と必要なら内部 `kernel/ime/ime.h` に group 参照・隔離状態・保存診断を持たせる。
 KAPI DbSlot へ入れず、RESIDENT group を open **前**に取得する。全 SQL 操作は既に db->pVfs を継承するので、
 検索/学習/列挙/削除/clear ごとの current owner 書換えは不要。ただし隔離中は全入口で操作を拒否する。
 
@@ -289,7 +289,7 @@ SQLite エンジン内部を fault で中断したケースに通常 close を�
 | R0 設計凍結 | 本票の独立読取りレビュー | 専用 VFS の全 xOpen 経路、lease 寿命、close 失敗／同 nest、FEP、fault 前提を照合。未解決の重大指摘ゼロ、PM 承認後のみコード開始 |
 | F2a FD lease | `fs/vfs_fd.c`, `fs/vfs.h`、専用 host 試験 | GENERIC 回帰、明示 owner、managed close 拒否、lease 再利用防止、隔離と容量上限。exec はまだ触らない |
 | F2b 接続 VFS＋F1 接続 | `lib/sqlite3/os32_sqlite_vfs.c/.h`, `kapi/kapi_db.c/.h`、専用 host 試験 | main/遅延 journal/temp 分類・失敗 open・close 順序・隔離。F1 既存試験も再実行 |
-| F2c FEP | `kernel/ime_dict.c`, 必要時 `kernel/ime.h`、専用 host 試験 | 常駐 group、全エラー分岐と reopen 拒否、export GENERIC を確認。default file open の未移行利用者ゼロ |
+| F2c FEP | `kernel/ime/ime_dict.c`, 必要時 `kernel/ime/ime.h`、専用 host 試験 | 常駐 group、全エラー分岐と reopen 拒否、export GENERIC を確認。default file open の未移行利用者ゼロ |
 | F2d 終了統合 | 排他移管された `exec/exec.c`、終了経路 host 試験 | 共通 helper と実 callsite の到達・順序。正常/fault/STOP/起動失敗、親資源を検証 |
 | R1／実機ゲート | 独立 reviewer、後日承認された専任検証者 | host 実行証拠→target compile/link→ゲスト終了理由別測定。今回の作業では実施しない |
 

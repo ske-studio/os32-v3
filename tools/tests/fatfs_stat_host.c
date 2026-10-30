@@ -199,9 +199,9 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 }
 #include "../../fs/fatfs_vfs.c"
 
-/* 起動ログの手順 (kernel/bootlog.c) を実物の fatfs_vfs_write に結ぶ。
+/* 起動ログの手順 (init/bootlog.c) を実物の fatfs_vfs_write に結ぶ。
  * 錠はホストでは空 (回数は tools/tests/bootlog_host.c が見る)。 */
-#include "../../kernel/bootlog.c"
+#include "../../init/bootlog.c"
 unsigned int bootlog_lock(void) { return 0; }
 void bootlog_unlock(unsigned int f) { (void)f; }
 

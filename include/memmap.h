@@ -68,7 +68,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_KSTACK_BASE 0x3FC000UL
 #define MEM_KSTACK_TOP 0x3FFFFCUL
 
-/* kernel/kentry.asm は ESP をここへ張り替える。ASM・ld は tools/gen_memmap.py
+/* arch/x86/kernel/kentry.asm は ESP をここへ張り替える。ASM・ld は tools/gen_memmap.py
  * が生成する $(BUILD_OUT)/memmap_layout.h の LAYOUT_MEM_KSTACK_TOP を CPP で
  * 読む。直書きに戻していないことは `gen_memmap.py --check` が見る ([C4])。 */
 
@@ -173,13 +173,13 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 
 /* DB 結果・エラー文用 SHM: 先頭 1 ブロックを固定予約する。
  * shm_alloc には配らず、末尾の GUI 予約を除いた 9 ブロックを IPC に使う。
- * SDK の DB_SHM_BLOCK_SIZE との一致は kernel/shm.c で表明する。 */
+ * SDK の DB_SHM_BLOCK_SIZE との一致は mm/shm.c で表明する。 */
 #define MEM_SHM_DB_OFFSET     0UL
 #define MEM_SHM_DB_SIZE       0x4000UL                     /* 16KB = 1 ブロック */
 #define MEM_SHM_DB_BASE       (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)
 
 /* GUI 予約 SHM (契約 T2 / docs/decisions/gui/API_CONTRACTS.md)。
- * SHM 帯の **末尾 4 ブロック** を GUI 用に固定予約する。kernel/shm.c の
+ * SHM 帯の **末尾 4 ブロック** を GUI 用に固定予約する。mm/shm.c の
  * 初期化でこの 4 ブロックを SHM_RESERVED にし、shm_alloc が配らないようにする。
  * 1 スロット (16KB) = アプリ 1 本、最大 4 アプリ (v1 はスロット 0 のみ)。
  * PTE は SHM 帯として既に RW+USER (v2 C2)。
@@ -188,7 +188,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
  * 形にした。決め打ちだと SHM を縮めた瞬間に予約が帯の外へ出る (14 ブロックに
  * するとブロック 12〜15 のうち 14・15 が存在しなくなる)。
  * MEM_SHM_GUI_OFFSET は KHEAP_BASE を含まない **純粋な定数式** — だから
- * kernel/shm.c の STATIC_ASSERT がこれを検査できる (それ以前は
+ * mm/shm.c の STATIC_ASSERT がこれを検査できる (それ以前は
  * (u32)&__bss_end を含んでいて表明が黙って死んでいた)。
  * SDK 側の写しは sdk/include/os32/os32_gui_shared.h の GUI_SHM_OFFSET と
  * Rust の os32api::gui::proto::GUI_SHM_OFFSET。make check-gui-proto が照合する。 */
@@ -224,7 +224,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /*  "variably modified at file scope" で落ちる)。                            */
 /*                                                                          */
 /*  予算を超えたら: (1) カーネルを削る、(2) MEM_SHM_SIZE を 16KB 単位で      */
-/*  減らす (kernel/shm.h の SHM_BLOCK_COUNT も同時)、(3) KHEAP_SIZE を       */
+/*  減らす (mm/shm.h の SHM_BLOCK_COUNT も同時)、(3) KHEAP_SIZE を       */
 /*  減らす。どれも票 docs/archive/kernel_v21/TASK_KSTACK_USER.md §4 の 4 の続き。  */
 /* ====================================================================== */
 #define MEM_KERNEL_IMAGE_MAX  (MEM_KERNEL_BAND_END + 1 - KERNEL_LOAD_ADDR - \
@@ -396,7 +396,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /*  共有ライブラリ帯域 (仮想 0x80000000-, MEM_SHLIB_BASE, 1MB)              */
 /*                                                                          */
 /*  固定アドレス常駐の位置依存ライブラリ (再配置なし、ロードアドレスは 1 つ)。 */
-/*  カーネル (kernel/shlib.c) が /sys/lib/libos32gui.shlib を起動時にここへ  */
+/*  カーネル (mm/shlib.c) が /sys/lib/libos32gui.shlib を起動時にここへ  */
 /*  読み、レイアウトは先頭ページの OS32ShlibHeader が決める:                 */
 /*                                                                          */
 /*  T2c: 高位 VA に位置依存で置く。原本は池から非連続の実ページを確保。 */

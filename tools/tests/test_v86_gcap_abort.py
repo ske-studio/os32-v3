@@ -24,8 +24,8 @@ def function(text, name):
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('kernel/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
-    ('kernel/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
+    ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
+    ('kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
     ('kdebug/v86_gcap.c', '    gcap_ops = 0;', '', 'ops'),
     ('kdebug/v86_gcap.c', '    g->restore = V86G_RST_FALLBACK;', '', 'interrupted-ROM-sync'),
     ('kdebug/v86_gcap.c', '    tv_restore(tv);', '    (void)tv;', 'TVRAM-tail'),
@@ -34,14 +34,14 @@ MUTATIONS = (
 
 
 def main():
-    paths = ('kernel/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
-             'exec/v86_call.c', 'kernel/v86_gcap.c', 'kernel/v86_io.c',
-             'kernel/isr_handlers.c')
+    paths = ('kernel/v86/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
+             'exec/v86_call.c', 'kernel/v86/v86_gcap.c', 'kernel/v86/v86_io.c',
+             'arch/x86/kernel/isr_handlers.c')
     sources = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):
-            for rel in ('kernel/platform_emergency.h', 'platform/pc98/emergency.c'):
+            for rel in ('include/platform_emergency.h', 'platform/pc98/emergency.c'):
                 (work / Path(rel).name).write_text((ROOT / rel).read_text())
             (work / 'session.c').write_text(parts[paths[0]])
             # The production import thunks are replaced by direct fixture edges;

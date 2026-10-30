@@ -15,7 +15,7 @@
 #include "kprintf.h"
 #include "memmap.h"
 
-/* 外部: irq_disable (kernel/idt.c で定義)。drivers/ は -Ikernel を
+/* 外部: irq_disable (arch/x86/kernel/idt.c で定義)。drivers/ は -Ikernel を
  * 持たないため、kbd.c の irq_enable と同じ扱いでここに宣言する。 */
 extern void irq_disable(unsigned int irq);
 

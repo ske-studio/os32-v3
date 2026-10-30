@@ -586,10 +586,10 @@ fault_kill_count = 0   kselftest 87/0
 **根拠のある結論** (コードで確定できた):
 
 - `paging_current_cr3()` は `mov %%cr3, %0` で**レジスタを直接読む**
-  (`kernel/paging.c`)。控えではないので疑い (1) は外れ。
+  (`mm/paging.c`)。控えではないので疑い (1) は外れ。
 - 疑い (2) が当たり。カーネルはページテーブルを「**物理番地 = 仮想番地**」で
   読む。ところが PD もアプリ PT も `pgalloc` から取られ、
-  **`PGALLOC_BASE` は 0x400000 = `MEM_APP_BAND_BASE`** (`kernel/pgalloc.h`)
+  **`PGALLOC_BASE` は 0x400000 = `MEM_APP_BAND_BASE`** (`mm/pgalloc.h`)
   — つまり **アプリ帯そのもの**。
   `exec_run` は CPL=3 アプリでは `pgalloc_mark_used` で帯を押さえない
   (`exec_cpl0_claim` は CPL=0 の子だけ) ので、PD / PT の物理はふつうに
@@ -625,7 +625,7 @@ kill する — `kprintf` の可変長 `%s` など他の KAPI と同じ既定の
 **残した番人**: `tools/tests/paging_bounds_host.c` の項を
 「`PGALLOC_BASE == MEM_APP_BAND_BASE` であること」と「exec と同じ順序で組んだ
 AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理**に解決される
-(= 歩けない)」を固定する形に置き換えた。`kernel/paging.h` にも
+(= 歩けない)」を固定する形に置き換えた。`mm/paging.h` にも
 「走っているアプリの PD を、そのアプリの syscall 中に歩いてはならない」を
 警告として書いた。計器 (`ring3_range_reject_*`) はそのまま残す
 (方針 B が効いていれば `count` は 0 のままになる)。

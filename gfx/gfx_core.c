@@ -22,7 +22,7 @@
 #include "../exec/exec.h"
 
 /* 画面の所有者の表は exec/appslot.c にある (判定材料が AppSlot にあり、
- * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/con_sink.c
+ * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/console/con_sink.c
  * が res_owner_get を引くのと同じ流儀で extern 宣言する。 */
 extern int ring3_call_from_user(void);
 extern int appslot_gfx_claim(int gui_mode);

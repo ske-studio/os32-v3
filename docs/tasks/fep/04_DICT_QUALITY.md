@@ -98,7 +98,7 @@ cost = apply_compression_heuristic(cost, yomi, surface)
 
 | 対象 | 変更 |
 |------|------|
-| `kernel/ime_dict.c` | `ime_dict_open` に PRAGMA、`ime_dict_flush` (任意) |
+| `kernel/ime/ime_dict.c` | `ime_dict_open` に PRAGMA、`ime_dict_flush` (任意) |
 | `tools/fep_to_sqlite.py` | コスト式に頻度ボーナス項 |
 | `deploy.yaml` | S/L 辞書配備 (任意) |
 

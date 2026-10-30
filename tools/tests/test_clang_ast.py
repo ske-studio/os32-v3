@@ -68,7 +68,7 @@ class ClangTest(unittest.TestCase):
                 source = pathlib.Path(unit['src'])
                 self.assertTrue(source.is_file(), source)
                 self.assertTrue((source.parent / 'geforce_imports.h').is_file())
-        self.assertTrue({'kernel/kernel.c', 'boot/boot_main.c',
+        self.assertTrue({'init/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
                          'sdk/allocator/nano_adapter.c'} <= sources)
         self.assertTrue(any(u['src'] == 'sdk/crt/syscalls.c' and
@@ -169,7 +169,7 @@ class ClangTest(unittest.TestCase):
 
     def test_review_physical_api_position(self):
         # Use the real header, including the pstart spelling from the review.
-        tu = self.tu('#include "kernel/paging.h"\n'
+        tu = self.tu('#include "mm/paging.h"\n'
             'void probe(struct addrspace *as, void *p) { '
             'paging_addrspace_map_user_range_phys(as, 0, 0, (u32)p, 0); }',
             ['-I.','-Iinclude'])

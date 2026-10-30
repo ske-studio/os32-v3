@@ -1,10 +1,10 @@
 #include "kselftest.h"
-#include "paging.h"
-#include "v86_mem.h"
+#include "../mm/paging.h"
+#include "v86/v86_mem.h"
 #include "memmap.h"
 #include "lease.h"
 #include "exec.h"
-#include "pgalloc.h"
+#include "../mm/pgalloc.h"
 #include "kstring.h"
 #include "serial_diag.h"
 

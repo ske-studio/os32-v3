@@ -1,9 +1,9 @@
 /* Real module.c + module_image.c, fake VFS/ledger and executable i386 body. */
-#include "kernel/module.h"
+#include "kernel/module/module.h"
 #include "kernel/kselftest.h"
-#include "kernel/module_image.h"
-#include "kernel/pgalloc.h"
-#include "kernel/sysconfig.h"
+#include "kernel/module/module_image.h"
+#include "mm/pgalloc.h"
+#include "init/sysconfig.h"
 #include "bootinfo.h"
 #include "config.h"
 #include "fs/vfs.h"
@@ -183,7 +183,7 @@ static void check_boot_dispatch(void)
         CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
     }
 }
-/* KAPI kdebug_call (kernel/kdebug_call.c): NOSYS without slot 19, else pass-through. */
+/* KAPI kdebug_call (kernel/module/kdebug_call.c): NOSYS without slot 19, else pass-through. */
 static u32 call_op, call_size;
 static void *call_buf;
 static i32 fake_dbg_call(u32 op, void *buf, u32 size)

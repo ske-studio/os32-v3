@@ -7,7 +7,7 @@
 #include "os32_kapi_shared.h"
 #include "kstring.h"
 #include "kprintf.h"
-#include "platform_display.h"
+#include "../include/platform_display.h"
 
 extern const u32 kcg_kexports[];
 extern const struct module_symbol_contract kcg_import_contracts[];

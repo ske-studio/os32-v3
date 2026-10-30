@@ -8,10 +8,10 @@ check-hwdev-image-host:
 - tools/gen_kdebug_imports.py
 - tools/module_schema.py
 - tools/mkmod.py
-- kernel/kdebug_imports.def
-- kernel/hwdev_module.c
-- kernel/module_runtime.c
-- kernel/module_image.c
+- kernel/module/kdebug_imports.def
+- kernel/module/hwdev_module.c
+- kernel/module/module_runtime.c
+- kernel/module/module_image.c
 - include/hwdev_private.h
 - kdebug/gfinit*.c
 - kdebug/gfinit_decode/*.inc
@@ -52,7 +52,7 @@ check-hwdev-image-host:
 - tools/tests/test_hwdev_dispatch.py
 - tools/tests/kdebug_init_host.c
 - kdebug/kdebug_main.c
-- kernel/hwdev_module.h
+- kernel/module/hwdev_module.h
 - kdebug/recover.c
 - kdebug/recover_common/*.inc
 - kdebug/recover_plan/*.inc

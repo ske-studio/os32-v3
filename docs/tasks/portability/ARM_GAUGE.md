@@ -47,7 +47,7 @@
 ### `-fsyntax-only` ではなく `-c` を使う理由
 
 `-fsyntax-only` はインライン asm の**中身を見ない**。試したところ
-`kernel/gdt.c` (`__asm__` に `eax` を書いている) すら素通りし、
+`arch/x86/kernel/gdt.c` (`__asm__` に `eax` を書いている) すら素通りし、
 「通った本数」が実態より大きく出る。コード生成まで走らせる `-c` を使う。
 
 ### アセンブル段のエラーを元のソース行へ戻している
@@ -61,8 +61,8 @@
 
 そこで `-g -S` で `.s` を出し直してアセンブルし、`.loc` / `.file` の表で元の
 ソース行に戻している。この処理のおかげで **7 本が「その他」から `io.h` 由来へ
-正しく移った** (`kernel/con_sink.c` `kernel/kbd_inject.c` `kernel/kernel.c`
-`kernel/pgalloc.c` `kernel/snd_engine.c` `kernel/v86.c` `net/link.c`)。
+正しく移った** (`kernel/console/con_sink.c` `kernel/kbd_inject.c` `init/kernel.c`
+`mm/pgalloc.c` `kernel/snd_engine.c` `kernel/v86/v86.c` `net/link.c`)。
 `-g` はコード生成を変えないので、測っている対象は同じ。
 
 ### 対象から外しているもの (理由つき)
@@ -132,9 +132,9 @@
 |---|---|
 | `exec/exec.c` | `exec/exec.c:1728:13: error: unknown register name 'eax' in 'asm'` |
 | `gfx/gfx_vram.c` | `gfx/gfx_internal.h:52:5: error: impossible constraint in 'asm'` |
-| `kernel/gdt.c` | `kernel/gdt.c:40:5: error: unknown register name 'eax' in 'asm'` |
-| `kernel/paging.c` | `kernel/paging.c:545: Error: ARM register expected -- 'mov %cr3,r3'` |
-| `kernel/tss.c` | `kernel/tss.c:53:5: error: impossible constraint in 'asm'` |
+| `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c:40:5: error: unknown register name 'eax' in 'asm'` |
+| `mm/paging.c` | `mm/paging.c:545: Error: ARM register expected -- 'mov %cr3,r3'` |
+| `arch/x86/kernel/tss.c` | `arch/x86/kernel/tss.c:53:5: error: impossible constraint in 'asm'` |
 
 この 5 本は `io.h` を経由せず**その場に x86 asm を書いている**もの。`gdt` / `tss` /
 `cr3` は x86 の仕組みそのものなので、順序 3 で `arch/x86/` へ移す対象。
@@ -158,9 +158,9 @@
 `drivers/mouse_seamless.c` `drivers/ne2000.c` `drivers/np2sysp.c` `drivers/rtc.c`
 `drivers/serial.c` `drivers/wab_glue_xe10.c` `fs/hostdrvfs.c` `gfx/backend_pc98.c`
 `gfx/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
-`kernel/con_sink.c` `kernel/console.c` `kernel/idt.c` `kernel/isr_handlers.c`
-`kernel/kbd_inject.c` `kernel/kernel.c` `kernel/pgalloc.c` `kernel/snd_engine.c`
-`kernel/sys.c` `kernel/v86.c` `kernel/v86_io.c` `net/link.c`
+`kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
+`kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `kernel/snd_engine.c`
+`kernel/sys.c` `kernel/v86/v86.c` `kernel/v86/v86_io.c` `net/link.c`
 
 ---
 
@@ -326,8 +326,8 @@ ABI の両側に同じ前提がかかる。
 | `include/io.h:58` (`_enable`) | `arch/x86/arch_io.h:17` | 1 |
 | `include/io.h:74` (`irq_save`) | `arch/x86/arch_io.h:27` | 6 |
 
-(a) の 5 本 (`exec/exec.c` `gfx/gfx_vram.c` `kernel/gdt.c` `kernel/paging.c`
-`kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
+(a) の 5 本 (`exec/exec.c` `gfx/gfx_vram.c` `arch/x86/kernel/gdt.c` `mm/paging.c`
+`arch/x86/kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
 順序 3 で `arch/x86/` へ移す対象」と書いていたが、**この 5 本の移設は行って
 いない** — 順序 3 の承認範囲は `io.h` の分割と受け皿の導入までで、`gdt.c` /
 `tss.c` / `paging.c` の中身を `arch/` へ移すのは別の判断が要る (移すのは
@@ -423,9 +423,9 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 | 順序 4 まで | 順序 5 以後 | 本数 |
 |---|---|---|
 | `exec/exec.c:1735` (リング降下) | `arch/x86/arch_cpu.h:69` | 1 |
-| `kernel/gdt.c:40` (lgdt + セグメント) | `arch/x86/x86_desc.h:25` | 1 |
-| `kernel/paging.c:545` (`mov %cr3`) | `arch/x86/arch_cpu.h:29` | 1 |
-| `kernel/tss.c:53` (`ltr`) | `arch/x86/x86_desc.h:45` | 1 |
+| `arch/x86/kernel/gdt.c:40` (lgdt + セグメント) | `arch/x86/x86_desc.h:25` | 1 |
+| `mm/paging.c:545` (`mov %cr3`) | `arch/x86/arch_cpu.h:29` | 1 |
+| `arch/x86/kernel/tss.c:53` (`ltr`) | `arch/x86/x86_desc.h:45` | 1 |
 | `gfx/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h:52` | 1 |
 
 分類 (a) の意味は「差し替え先がまだ決まっていない、その場の x86 asm」なので、
@@ -439,9 +439,9 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 ついでに 2 つ:
 
 * `CR0_PE` / `CR0_PG` を `include/pc98.h` から `arch/x86/arch_cpu.h` へ移した
-  (CPU のビットであって機種の持ち物ではない)。使っていたのは `kernel/paging.c`
+  (CPU のビットであって機種の持ち物ではない)。使っていたのは `mm/paging.c`
   だけで、そこは `arch_mmu_enable()` の内側になった。
-* その結果 `kernel/paging.c` が `pc98.h` を引く理由が無くなったので外した
+* その結果 `mm/paging.c` が `pc98.h` を引く理由が無くなったので外した
   (`.o` は md5 一致のまま)。ページングのコードが機種ヘッダに依存しなくなる。
 
 残る (a) の 1 本は `gfx/gfx_vram.c` (`gfx/gfx_internal.h` の `rep movsw` /

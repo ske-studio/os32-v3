@@ -1,7 +1,7 @@
 # bootinfo — RED → GREEN の記録
 
 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 0 (§1-v3 N1 / N2)
-対象: `kernel/bootinfo_check.c` (検証と表示行) / `boot/bootinfo.inc` (NASM 側の写し) / `kernel/bootinfo.c` (写す側)
+対象: `init/bootinfo_check.c` (検証と表示行) / `boot/bootinfo.inc` (NASM 側の写し) / `init/bootinfo.c` (写す側)
 試験: `tools/tests/test_bootinfo.py` + `tools/tests/bootinfo_host.c`
 実行: `make check-bootinfo-host` (`check-par` の列)
 
@@ -39,7 +39,7 @@ CD 2048B / NP21/W の空きスロット (BX=CX=DH=DL=0) を全部「使える幾
 
 ```
 $ python3 -B tools/tests/test_bootinfo.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/bootinfo_check.c)
+HOST GNU89 -Werror compile PASS (real init/bootinfo_check.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT good=0
 EXIT magic=0
@@ -78,7 +78,7 @@ INC MUTATION 3 RED: DL を DH と同じ位置に書く
 | `format` | 起動画面の `[hdd] bios …` / `[hdd] bios geom: none …` / `[hdd] ataN …` の書式と、小さい buf での終端 |
 | `inc_mirror` | `boot/bootinfo.inc` の EQU が `include/bootinfo.h` と名前ごとに一致 (番地 `MEM_BOOTINFO_BASE` は `gen_memmap.py --check`) |
 
-`--target` は i386-elf で `kernel/bootinfo.c` (構造体 `bootinfo_wire` の並びと
+`--target` は i386-elf で `init/bootinfo.c` (構造体 `bootinfo_wire` の並びと
 オフセット定数の一致を `STATIC_ASSERT`) と `drivers/ide.c` を通す。
 
 ## ホストで見られない残り

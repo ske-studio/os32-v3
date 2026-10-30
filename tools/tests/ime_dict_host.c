@@ -2,7 +2,7 @@
 /* ========================================================================= */
 /*  IME_DICT_HOST.C — 辞書の常駐接続の開き直し (票 TASK_VFS_FD_PATH v3 の 6)  */
 /*                                                                           */
-/*  実物だけを組む: 実 `kernel/ime_dict.c` + 実 `lib/sqlite3/sqlite3.c` +     */
+/*  実物だけを組む: 実 `kernel/ime/ime_dict.c` + 実 `lib/sqlite3/sqlite3.c` +     */
 /*  実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `fs/vfs_fd.c` + RAM バックエンド  */
 /*  (tools/tests/sqlite_groups_backend.h)。ルーティングは                     */
 /*  vfs_fd_sqlite_host.c の模型 (パスで動く FS)。                             */
@@ -84,7 +84,7 @@ static int inj_read(void *ctx, const char *path, void *buf, u32 size, u32 offset
     return fixture_read(ctx, path, buf, size, offset);
 }
 
-#include "../../kernel/ime_dict.c"
+#include "../../kernel/ime/ime_dict.c"
 
 /* Fixture setup uses a separate EXEC group; default file opens are forbidden. */
 static Os32SqliteGroup setup_group;

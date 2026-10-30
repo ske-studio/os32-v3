@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "contracts": [
-    "kernel/fep_module.h",
-    "kernel/ime_render.h",
+    "kernel/ime/fep_module.h",
+    "kernel/ime/ime_render.h",
     "sdk/include/os32/os32_kapi_shared.h"
   ],
   "imports": [
@@ -82,19 +82,19 @@
       "symbol": "kfree",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc_block_size",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "kmemcpy",
@@ -154,7 +154,7 @@
       "symbol": "kzalloc",
       "context": "normal",
       "irq": false,
-      "source": "kernel/kmalloc.h"
+      "source": "mm/kmalloc.h"
     },
     {
       "symbol": "os32_sqlite_bind_int",

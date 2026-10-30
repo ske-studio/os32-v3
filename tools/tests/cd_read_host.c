@@ -45,7 +45,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, (size_t)n); }
 void *kmalloc(u32 size) { return g_kmalloc_fail ? (void *)0 : malloc((size_t)size); }
 /* 校正済みの µs 待ちの贋物: 待った合計を数えるだけ (NOT READY の出し直しの間、
- * SRST の後)。実物 (kernel/cpu_calibrate.c) どおり 1 回 CPU_DELAY_US_MAX (100ms) で
+ * SRST の後)。実物 (kernel/time/cpu_calibrate.c) どおり 1 回 CPU_DELAY_US_MAX (100ms) で
  * 丸める — 丸めを知らずに 250ms を 1 回で頼む書き方はここで待ちが足りなくなる */
 static unsigned long g_delay_us;
 static unsigned long g_delay_calls;

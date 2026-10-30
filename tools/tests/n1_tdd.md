@@ -243,7 +243,7 @@ KAPI_SPEC.md の関数表: kapi.json と一致
 ```
 
 個別のカーネル側コンパイル (`i386-elf-gcc -Wall -Wextra -Werror`) も通した:
-`net/link.c` / `kapi/kapi_host.c` / `exec/exec.c` / `kernel/isr_handlers.c` /
+`net/link.c` / `kapi/kapi_host.c` / `exec/exec.c` / `arch/x86/kernel/isr_handlers.c` /
 `drivers/lgy98.c` / `kapi/kapi_generated.c`、および
 `userland/tests/host_test.c` (ユーザランドのフラグ)。
 

@@ -34,8 +34,8 @@ SECTIONS
     . = KERNEL_LOAD_ADDR;
 
     .text : {
-        /* kernel/kentry.o が確実に関数の先頭になるようにする */
-        kernel/kentry.o(.text)
+        /* arch/x86/kernel/kentry.o が確実に関数の先頭になるようにする */
+        arch/x86/kernel/kentry.o(.text)
         *(.text)
         *(.text.*)
     }

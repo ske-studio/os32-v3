@@ -24,7 +24,7 @@ static void host_out(unsigned p, unsigned v) { (void)p; (void)v; ports++; }
 static unsigned host_in(unsigned p) { static unsigned n; (void)p; return (++n & 1) ? 0x20 : 0; }
 #define inp(p) host_in(p)
 #define io_wait_n(n) ((void)(n))
-#include "../../kernel/console.c"
+#include "../../kernel/console/console.c"
 #include "console_source.inc"
 #include "fm_source.inc"
 #include "os32_kapi_shared.h"

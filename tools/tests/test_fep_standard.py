@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'tools/tests/fep_standard_host.c'
 # Only changed implementation sources need overlay copies; other includes
 # fall back to ROOT. All regressions run normally before any mutant.
-FILES = [SOURCE, 'lib/sqlite3/os32_sqlite_vfs.c', 'kernel/ime_dict.c']
+FILES = [SOURCE, 'lib/sqlite3/os32_sqlite_vfs.c', 'kernel/ime/ime_dict.c']
 RESERVE_FLOOR = r'''        if (reserve > 0 && reserve < OS32_SQLITE_FEP_RESERVE_MIN) {
             kprintf(KLOG_ATTR, "[SQT] FEP reserve below minimum; using %d bytes\n",
                     OS32_SQLITE_FEP_RESERVE_MIN);
@@ -30,18 +30,18 @@ MUTANTS = [
      'if (budget->context == BUDGET_APP &&',
      'if ((budget->context == BUDGET_APP || budget->context == BUDGET_FEP) &&',
      'ime_dict_search(dict, "か", result, IME_MAX_RESULTS) == 2'),
-    ('skip_learning', 'learning', 'kernel/ime_dict.c',
+    ('skip_learning', 'learning', 'kernel/ime/ime_dict.c',
      'if (rc == SQLITE_OK) rc = sqlite3_step(stmt);\n    int reset_rc',
      'if (rc == SQLITE_OK) rc = SQLITE_DONE;\n    int reset_rc',
      'ime_user_list(dict, "か", entries, 4) == 1'),
-    ('no_candidate_dedup', 'learning', 'kernel/ime_dict.c',
+    ('no_candidate_dedup', 'learning', 'kernel/ime/ime_dict.c',
      '        if (i < count) continue;\n',
      '', 'count == expected'),
-    ('truncated_spelling_compare', 'learning', 'kernel/ime_dict.c',
+    ('truncated_spelling_compare', 'learning', 'kernel/ime/ime_dict.c',
      'if (kstrcmp(seen, kanji_text) == 0) break;',
      'if (kstrncmp(seen, kanji_text, 31) == 0) break;',
      'ime_dict_search(dict, readings[k], results, IME_MAX_RESULTS) == 3'),
-    ('strict_spelling_boundary', 'learning', 'kernel/ime_dict.c',
+    ('strict_spelling_boundary', 'learning', 'kernel/ime/ime_dict.c',
      'if (copy_len >= (int)sizeof(r->kanji)) {',
      'if (copy_len > (int)sizeof(r->kanji)) {',
      'results[0].pos_id == 0 && results[1].pos_id == 12 && results[2].pos_id == 13'),

@@ -11,7 +11,7 @@
 `con_sink_tdd.md` / `k5b_kernel_tdd.md` と同じで、**模型ではなく実物**を見る:
 
 1. `kbd_inject_host.c` が `kernel/kbd_inject.c` を `#include` する (1 行も写さない)。
-   権限の照合相手も模型にしない — **`kernel/con_sink.c` を同じ翻訳単位に入れ**、
+   権限の照合相手も模型にしない — **`kernel/console/con_sink.c` を同じ翻訳単位に入れ**、
    読み手の確立は本物の `con_sink_read()` で行う (注入の権限 = con_sink の読み手 1 本、票 §5 R2)。
 2. `multiapp_impl_host.c` は実物の `exec/appslot.c` と `kernel/kbd_inject.c` の両方を取り込み、
    K5a の 84 検査に加えてケース 19 (第 2 の park 点) を回す。

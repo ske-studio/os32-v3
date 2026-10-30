@@ -66,11 +66,11 @@ def run(source):
         (tmp / 'budget_fixture.c').write_text(fixture)
         (tmp / 'exec_bb_overlap.inc').write_text(bb.extract(source))
         (tmp / 'budget_launch.inc').write_text(extract(source))
-        shlib = (ROOT / 'kernel/shlib.c').read_text()
+        shlib = (ROOT / 'mm/shlib.c').read_text()
         (tmp / 'budget_shlib.inc').write_text('\n'.join(bb.slice_out(shlib, sig) for sig in ('int shlib_addrspace_attach(', 'void shlib_addrspace_detach(')))
         (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit('))
-        (tmp / 'paging_host_source.c').write_text((ROOT / 'kernel/paging.c').read_text())
-        (tmp / 'pgalloc_host_source.c').write_text((ROOT / 'kernel/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
+        (tmp / 'paging_host_source.c').write_text((ROOT / 'mm/paging.c').read_text())
+        (tmp / 'pgalloc_host_source.c').write_text((ROOT / 'mm/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
         try:
             gui = (ROOT / 'userland/tests/gui_demo.bin').read_bytes()
         except FileNotFoundError:
@@ -84,7 +84,7 @@ def run(source):
         exe = tmp / 'budget'
         cmd = ['gcc', *bb.linker_flags(), *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
                f'-DGUI_IMAGE_BYTES={image}', f'-DGUI_NEED_PAGES={need}', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-               *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'kernel/physmem.c'), str(ROOT / 'kernel/kmalloc.c'), '-o', str(exe)]
+               *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'mm/physmem.c'), str(ROOT / 'mm/kmalloc.c'), '-o', str(exe)]
         built = subprocess.run(cmd, capture_output=True, text=True)
         if built.returncode:
             raise RuntimeError('compile is not RED:\n'+built.stderr)

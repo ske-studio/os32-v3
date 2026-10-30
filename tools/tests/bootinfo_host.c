@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  BOOTINFO_HOST.C — kernel/bootinfo_check.c をそのままホストで回す        */
+/*  BOOTINFO_HOST.C — init/bootinfo_check.c をそのままホストで回す        */
 /*                                                                          */
 /*  実物の検証関数を 1 行も写さずに #include する (I/O も低位メモリも無い)。  */
 /*  記録: tools/tests/bootinfo_tdd.md                                       */
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../kernel/bootinfo_check.c"
+#include "../../init/bootinfo_check.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

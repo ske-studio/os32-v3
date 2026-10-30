@@ -25,7 +25,7 @@
 - `paging_addrspace_free_user_range()` (P6) — 張った物理だけを PTE を辿って返す
 
 **RED の作り方**: `tools/tests/app_band_pde_host.c` の新しい節 H を、実装前の
-`kernel/paging.c` / `kernel/paging.h` のスナップショットに対してビルドする
+`mm/paging.c` / `mm/paging.h` のスナップショットに対してビルドする
 (ホストハーネスの `paging_host_source.c` の差し替え元を旧ファイルにし、
 `-I` の先頭に旧 `paging.h` を置いたディレクトリを入れる)。
 
@@ -76,7 +76,7 @@ HOST ILP32 + TARGET GNU89 PASS
 `exec_exit` の回収 7 種を全部アプリ ID で回す。これが無いと、アプリ A の終了が
 アプリ B の SHM ブロックを巻き上げる (4 本同時では実際に起きる)。
 
-**RED の作り方**: `kernel/shm.c` の `shm_free_owned` から
+**RED の作り方**: `mm/shm.c` の `shm_free_owned` から
 `if (shm_block_owner[i] != owner) continue;` の 1 行を削り (= 旧 `shm_cleanup_all`
 と同じ「所有者を見ない」挙動)、`tools/tests/owner_reclaim_host.c` をその
 `shm.c` に対してビルドする。
@@ -94,7 +94,7 @@ RED exit code: 1
 
 **GREEN**: `python3 -B tools/tests/test_owner_reclaim.py` → 27 検査 ALL PASS
 
-実物の `fs/fd_redirect.c` / `fs/pipe_buffer.c` / `kernel/shm.c` をそのまま
+実物の `fs/fd_redirect.c` / `fs/pipe_buffer.c` / `mm/shm.c` をそのまま
 コンパイルしている (回収のロジックを試験側に写していない)。見ているもの:
 
 - ID 2 と ID 3 が redirect / pipe / SHM を持った状態で **ID 2 だけ**を畳むと、
@@ -299,7 +299,7 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` (差し戻し 2026-09-11)
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
-報告、EIP = `kernel_main+0xd4c` (`kernel/kernel.c:582` の停止ループ)。
+報告、EIP = `kernel_main+0xd4c` (`init/kernel.c:582` の停止ループ)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -342,11 +342,11 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 `vfs_read(resolved, file_buf, read_max)` (`exec/exec.c:1298`) がゴミのパスを
 引くので `sz <= 0` → **`EXEC_ERR_NOT_FOUND`**。`/sys/shell.bin` も FDD
 フォールバック (`SYS_SHELL_BIN_FDD` は同じ綴り) も同じところで落ちるため、
-`kernel/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
+`init/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
 `EXEC_ERR_NOMEM` の経路 (`[DBG] NOMEM: ...`) は**通っていない** — 画面に
 その行が 1 つも出ていないことと符合する。
 
-`14000` (実機の 2 行目) は別物ではなく、`kernel/shlib.c:191` の
+`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c:191` の
 
 ```
 [shlib] /sys/lib/libos32gui.shlib v1 loaded: 101 funcs, text 20 pg, data 4 pg @414000
@@ -526,7 +526,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
   `test_sbrk_tier` / `tools/check_constraints.py`。
 - `make kernel` の警告: **`exec/exec.c` と `exec/appslot.c` からは 1 件も出ていない**。
   フルビルドのログには既存の警告 (`include/pc98.h` の `TVRAM_BPR` 再定義、
-  `kernel/v86_bios.c` の `-Warray-bounds`、`kernel/console.c` の暗黙宣言など) が
+  `kernel/v86/v86_bios.c` の `-Warray-bounds`、`kernel/console/console.c` の暗黙宣言など) が
   36 件残っているが、いずれも本変更の前からあるもので触っていない。
 - **`--cpl0` で作られている在庫バイナリは 1 つも無い** (下記)。したがって「アプリを
   閉じてから使え」の実害はいまのところゼロだが、これは実機で確かめていない。
@@ -541,7 +541,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 | `build/programs.mk` / `userland/*/Makefile` | `--cpl0` を渡している行は無い (`ring3_hello` / `ring3_fault` / `hello_r3` / `faultprobe_r3` はいずれも CPL=3 側の検証用) |
 | `apps/` (submodule) | `deploy.yaml` / `Makefile` / `app.conf` を含め `cpl0` の記述なし |
 | `game/` (submodule) | 同上、記述なし |
-| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `kernel/shlib.c:181` (CPL=0 プログラムは shlib の master をそのまま共有) |
+| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c:181` (CPL=0 プログラムは shlib の master をそのまま共有) |
 
 つまり `--cpl0` は現在「手で `sdk/mkos32x.py --cpl0` を叩いたときだけ立つエスケープ
 ハッチ」で、標準の配備物には 1 本も無い。gshell 配下でこの拒否に当たるのは、その手製
@@ -743,7 +743,7 @@ python3 -B tools/tests/test_pgalloc_model.py   # OK
 python3 -B tools/tests/test_app_band_pde.py    # PASS
 python3 -B tools/tests/test_paging_bounds.py   # PASS
 python3 -B tools/tests/test_memory_boot.py     # OK
-i386-elf-gcc <カーネルフラグ> -Wextra -c exec/exec.c kernel/shlib.c   # 警告 0
+i386-elf-gcc <カーネルフラグ> -Wextra -c exec/exec.c mm/shlib.c   # 警告 0
 ```
 
 ## この追記で**測っていないこと** ([V4])
@@ -751,6 +751,6 @@ i386-elf-gcc <カーネルフラグ> -Wextra -c exec/exec.c kernel/shlib.c   # �
 - **ゲストは未検証**。NP21/W では 1 度も動かしていない (コーダーはエミュレータ禁止)。
   8MB で `gui_demo` が実際に立つこと (受入 G6) は実機待ち。
 - `make` を 1 度も回していない (コーダー禁止)。通したのは上のホスト試験と、
-  `exec/exec.c` / `kernel/shlib.c` を単体でクロスコンパイラに通したことだけ。
+  `exec/exec.c` / `mm/shlib.c` を単体でクロスコンパイラに通したことだけ。
 - 段 2 へ倒れた分だけ 8MB のアプリの sbrk は 256KB に固定される。その狭さで
   `gui_demo` が足りるかは実機でしか分からない。

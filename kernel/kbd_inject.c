@@ -46,7 +46,7 @@ extern int res_owner_get(void);
 /*  状態                                                                     */
 /*                                                                          */
 /*  名前に inj_ を付けてあるのは、ホスト試験 (tools/tests/kbd_inject_host.c) */
-/*  が kernel/con_sink.c と**同じ翻訳単位**へ両方を #include して、権限の    */
+/*  が kernel/console/con_sink.c と**同じ翻訳単位**へ両方を #include して、権限の    */
 /*  経路 (「注げるのは con_sink の読み手だけ」) を模型で置き換えずに通す     */
 /*  ため。con_sink.c 側の g_ring / g_head / ring_reset とぶつからない。      */
 /* ------------------------------------------------------------------------ */

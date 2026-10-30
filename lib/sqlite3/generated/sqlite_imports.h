@@ -5,7 +5,7 @@
 #include "fs/vfs.h"
 #include "include/kprintf.h"
 #include "include/sys.h"
-#include "kernel/kmalloc.h"
+#include "mm/kmalloc.h"
 void vfs_close(int fd);
 int vfs_close_sqlite(const VfsSqliteLease *lease);
 int vfs_count_sqlite(const VfsSqliteCookie *cookie);

@@ -252,7 +252,7 @@
  * 最大 16KB の詰め物が出ていた (レビューの指摘)。
  *
  * DMA プール (MEM_DMA_POOL_BASE) は使わない: fdc_init() は dma_pool_init()
- * より前に走り、kselftest_run() がプールを作り直す (kernel/kernel.c の注記)。 */
+ * より前に走り、kselftest_run() がプールを作り直す (init/kernel.c の注記)。 */
 #define FDC_TRACK_MAX_BYTES  (18 * 512)  /* 1.44MB の 1 トラック = 9216B */
 #define FDC_DMA_BUF_SIZE     FDC_TRACK_MAX_BYTES
 /* 先読みのスロット数と、1 セクタの読みを覚えるセクタキャッシュの数。

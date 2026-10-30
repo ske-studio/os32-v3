@@ -1,10 +1,10 @@
 check-module-runtime-host:
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
-- kernel/pgalloc.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
+- mm/pgalloc.h
 - include/types.h
 - include/memmap.h
 - fs/vfs.c

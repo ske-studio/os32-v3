@@ -13,9 +13,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     tmp = pathlib.Path(tmp)
-    source = (ROOT / 'kernel/paging.c').read_text()
+    source = (ROOT / 'mm/paging.c').read_text()
     (tmp / 'paging_host_source.c').write_text(source)
-    allocator = (ROOT / 'kernel/pgalloc.c').read_text()
+    allocator = (ROOT / 'mm/pgalloc.c').read_text()
     allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / 'pgalloc_host_source.c').write_text(allocator)
     # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、
@@ -32,10 +32,10 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     defines = ['-DPHYSMEM_HOST_TEST=1', ]
     if args.rebuild:
         defines.append('-DTEST_' + args.rebuild.upper())
-    build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'kernel/physmem.c'), '-o', str(exe)]
+    build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'mm/physmem.c'), '-o', str(exe)]
     subprocess.run(build, check=True)
     host32.run([str(exe)], check=True, timeout=60)
-    subprocess.run(['i386-elf-gcc', *FLAGS, *defines, '-O2', *includes, '-c', str(ROOT / 'kernel/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
+    subprocess.run(['i386-elf-gcc', *FLAGS, *defines, '-O2', *includes, '-c', str(ROOT / 'mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
 
     if args.mutate:

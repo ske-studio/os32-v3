@@ -112,7 +112,7 @@ exec/ kapi/ lib/ net/ kdebug/ hwdev/ platform/ boot/ userland/ sdk/   (動かさ
 
 | 新しいディレクトリ | 本数 | 旧パス |
 |---|---|---|
-| `arch/x86/kernel/` | 15 | `kernel/cpu_flags.inc` `kernel/double_fault.c` `kernel/double_fault.h` `kernel/entry_layout.inc` `kernel/gdt.c` `kernel/gdt.h` `kernel/idt.c` `kernel/idt.h` `kernel/isr_handlers.c` `kernel/isr_stub.asm` `kernel/kentry.asm` `kernel/ring3_entry.asm` `kernel/setjmp.asm` `kernel/tss.c` `kernel/tss.h` |
+| `arch/x86/kernel/` | 15 | `arch/x86/kernel/cpu_flags.inc` `arch/x86/kernel/double_fault.c` `arch/x86/kernel/double_fault.h` `arch/x86/kernel/entry_layout.inc` `arch/x86/kernel/gdt.c` `arch/x86/kernel/gdt.h` `arch/x86/kernel/idt.c` `arch/x86/kernel/idt.h` `arch/x86/kernel/isr_handlers.c` `arch/x86/kernel/isr_stub.asm` `arch/x86/kernel/kentry.asm` `arch/x86/kernel/ring3_entry.asm` `arch/x86/kernel/setjmp.asm` `arch/x86/kernel/tss.c` `arch/x86/kernel/tss.h` |
 | `drivers/ata/` | 9 | `drivers/atapi.c` `drivers/atapi.h` `drivers/ide.c` `drivers/ide.h` `drivers/ide_addr.c` `drivers/ide_addr.h` `kernel/cd_body.c` `kernel/cd_module.c` `kernel/cd_module.h` |
 | `drivers/base/` | 2 | `drivers/dev.c` `drivers/dev.h` |
 | `drivers/block/` | 13 | `drivers/disk.c` `drivers/disk.h` `drivers/fdc.c` `drivers/fdc.h` `drivers/fdc_decide.c` `drivers/fdc_decide.h` `drivers/fdc_track.c` `drivers/fdc_track.h` `drivers/loop_dev.c` `drivers/loop_dev.h` `drivers/pc98pt.c` `drivers/pc98pt.h` `drivers/scsi.h` |
@@ -136,27 +136,27 @@ exec/ kapi/ lib/ net/ kdebug/ hwdev/ platform/ boot/ userland/ sdk/   (動かさ
 | `fs/isofs/` | 2 | `fs/iso9660.c` `fs/iso9660.h` |
 | `fs/serialfs/` | 9 | `fs/serialfs.c` `fs/serialfs.h` `fs/serialfs_session.c` `fs/sfs_client.c` `fs/sfs_client.h` `fs/sfs_lan.c` `fs/sfs_lan.h` `fs/sfs_proto.c` `fs/sfs_proto.h` |
 | `gfx/` | 7 | (据え置き 7 本: gfx.h gfx_core.c gfx_internal.h gfx_scroll.c gfx_vram.c palette.c palette.h) |
-| `include/` | 7 | `kernel/platform_display.h` `kernel/platform_emergency.h` `kernel/platform_irq.h` `kernel/platform_memory.h` `kernel/platform_splash.h` `kernel/platform_sys.h` `kernel/platform_timer.h` |
-| `init/` | 15 | `kernel/boot_disk.h` `kernel/boot_display.c` `kernel/boot_display.h` `kernel/boot_platform.c` `kernel/boot_platform.h` `kernel/boot_splash.c` `kernel/boot_splash.h` `kernel/bootinfo.c` `kernel/bootinfo_check.c` `kernel/bootlog.c` `kernel/bootlog_save.c` `kernel/kaudit_boot.c` `kernel/kernel.c` `kernel/sysconfig.c` `kernel/sysconfig.h` |
+| `include/` | 7 | `include/platform_display.h` `include/platform_emergency.h` `include/platform_irq.h` `include/platform_memory.h` `include/platform_splash.h` `include/platform_sys.h` `include/platform_timer.h` |
+| `init/` | 15 | `init/boot_disk.h` `init/boot_display.c` `init/boot_display.h` `init/boot_platform.c` `init/boot_platform.h` `init/boot_splash.c` `init/boot_splash.h` `init/bootinfo.c` `init/bootinfo_check.c` `init/bootlog.c` `init/bootlog_save.c` `init/kaudit_boot.c` `init/kernel.c` `init/sysconfig.c` `init/sysconfig.h` |
 | `kernel/` | 21 | (据え置き 21 本: font_guard_fixture.c gui.c gui.h input_service.c kaudit.c kbd_inject.c kselftest.h kselftest_report.c kstack_hw.c kstack_hw.h port_service.c r1_fixture.c r1_fixture.h serial_diag.c sqlite_engine.c sqlite_engine.h sqlite_outer.c sys.c ver_collect.c ver_format.c ver_info.h) |
-| `kernel/console/` | 10 | `kernel/con_sink.c` `kernel/console.c` `kernel/console_backend.h` `kernel/display_restore.h` `kernel/font_guard.c` `kernel/font_guard.h` `kernel/font_source.c` `kernel/font_source.h` `kernel/unicode_file.c` `kernel/unicode_file.h` |
-| `kernel/ime/` | 9 | `kernel/fep_body.c` `kernel/fep_module.c` `kernel/fep_module.h` `kernel/ime.c` `kernel/ime.h` `kernel/ime_dict.c` `kernel/ime_render.h` `kernel/ime_render_tvram.c` `kernel/ime_romkana.c` |
-| `kernel/irq/` | 6 | `kernel/irq.c` `kernel/irq.h` `kernel/irq_math.c` `kernel/irq_math.h` `kernel/tick.c` `kernel/tick.h` |
-| `kernel/module/` | 11 | `kernel/hwdev_module.c` `kernel/hwdev_module.h` `kernel/kdebug_call.c` `kernel/kdebug_imports.def` `kernel/module.c` `kernel/module.h` `kernel/module_image.c` `kernel/module_image.h` `kernel/module_runtime.c` `kernel/module_runtime.h` `kernel/module_schema.h` |
-| `kernel/time/` | 14 | `kernel/clock_service.c` `kernel/cpu_calibrate.c` `kernel/cpu_calibrate.h` `kernel/cpu_calibrate_math.c` `kernel/cpu_calibrate_math.h` `kernel/ktime.c` `kernel/ktime.h` `kernel/pit.c` `kernel/pit_math.c` `kernel/pit_math.h` `kernel/sysclk.c` `kernel/sysclk.h` `kernel/time_math.c` `kernel/time_math.h` |
-| `kernel/v86/` | 22 | `kernel/v86.c` `kernel/v86.h` `kernel/v86_bios.c` `kernel/v86_bios.h` `kernel/v86_body.c` `kernel/v86_entry.asm` `kernel/v86_gcap.c` `kernel/v86_gcap.h` `kernel/v86_gcap_math.h` `kernel/v86_io.c` `kernel/v86_io.h` `kernel/v86_kbd.c` `kernel/v86_kbd.h` `kernel/v86_mem.c` `kernel/v86_mem.h` `kernel/v86_module.c` `kernel/v86_module.h` `kernel/v86_pic.c` `kernel/v86_pic.h` `kernel/v86_snapshot.c` `kernel/v86_test16.asm` `kernel/v86_test16_disk.asm` |
-| `mm/` | 19 | `kernel/dma_pool.c` `kernel/dma_pool.h` `kernel/dma_pool_math.c` `kernel/kmalloc.c` `kernel/kmalloc.h` `kernel/memory_boot.c` `kernel/memory_boot.h` `kernel/paging.c` `kernel/paging.h` `kernel/paging_app.c` `kernel/paging_app.h` `kernel/pgalloc.c` `kernel/pgalloc.h` `kernel/physmem.c` `kernel/physmem.h` `kernel/shlib.c` `kernel/shlib.h` `kernel/shm.c` `kernel/shm.h` |
+| `kernel/console/` | 10 | `kernel/console/con_sink.c` `kernel/console/console.c` `kernel/console/console_backend.h` `kernel/console/display_restore.h` `kernel/console/font_guard.c` `kernel/console/font_guard.h` `kernel/console/font_source.c` `kernel/console/font_source.h` `kernel/console/unicode_file.c` `kernel/console/unicode_file.h` |
+| `kernel/ime/` | 9 | `kernel/ime/fep_body.c` `kernel/ime/fep_module.c` `kernel/ime/fep_module.h` `kernel/ime/ime.c` `kernel/ime/ime.h` `kernel/ime/ime_dict.c` `kernel/ime/ime_render.h` `kernel/ime/ime_render_tvram.c` `kernel/ime/ime_romkana.c` |
+| `kernel/irq/` | 6 | `kernel/irq/irq.c` `kernel/irq/irq.h` `kernel/irq/irq_math.c` `kernel/irq/irq_math.h` `kernel/irq/tick.c` `kernel/irq/tick.h` |
+| `kernel/module/` | 11 | `kernel/module/hwdev_module.c` `kernel/module/hwdev_module.h` `kernel/module/kdebug_call.c` `kernel/module/kdebug_imports.def` `kernel/module/module.c` `kernel/module/module.h` `kernel/module/module_image.c` `kernel/module/module_image.h` `kernel/module/module_runtime.c` `kernel/module/module_runtime.h` `kernel/module/module_schema.h` |
+| `kernel/time/` | 14 | `kernel/time/clock_service.c` `kernel/time/cpu_calibrate.c` `kernel/time/cpu_calibrate.h` `kernel/time/cpu_calibrate_math.c` `kernel/time/cpu_calibrate_math.h` `kernel/time/ktime.c` `kernel/time/ktime.h` `kernel/time/pit.c` `kernel/time/pit_math.c` `kernel/time/pit_math.h` `kernel/time/sysclk.c` `kernel/time/sysclk.h` `kernel/time/time_math.c` `kernel/time/time_math.h` |
+| `kernel/v86/` | 22 | `kernel/v86/v86.c` `kernel/v86/v86.h` `kernel/v86/v86_bios.c` `kernel/v86/v86_bios.h` `kernel/v86/v86_body.c` `kernel/v86/v86_entry.asm` `kernel/v86/v86_gcap.c` `kernel/v86/v86_gcap.h` `kernel/v86/v86_gcap_math.h` `kernel/v86/v86_io.c` `kernel/v86/v86_io.h` `kernel/v86/v86_kbd.c` `kernel/v86/v86_kbd.h` `kernel/v86/v86_mem.c` `kernel/v86/v86_mem.h` `kernel/v86/v86_module.c` `kernel/v86/v86_module.h` `kernel/v86/v86_pic.c` `kernel/v86/v86_pic.h` `kernel/v86/v86_snapshot.c` `kernel/v86/v86_test16.asm` `kernel/v86/v86_test16_disk.asm` |
+| `mm/` | 19 | `mm/dma_pool.c` `mm/dma_pool.h` `mm/dma_pool_math.c` `mm/kmalloc.c` `mm/kmalloc.h` `mm/memory_boot.c` `mm/memory_boot.h` `mm/paging.c` `mm/paging.h` `mm/paging_app.c` `mm/paging_app.h` `mm/pgalloc.c` `mm/pgalloc.h` `mm/physmem.c` `mm/physmem.h` `mm/shlib.c` `mm/shlib.h` `mm/shm.c` `mm/shm.h` |
 
 ### 「要判断」(上の表では仮に置いた — 2026-10-30 ユーザー「仮で良い」、本当の置き場は別の分離計画で)
 
 | ファイル | 仮の置き場 | 迷う理由 |
 |---|---|---|
 | kernel/v86* 22 本 | kernel/v86/ | x86 の仕組み (V86 モード・TSS) かつ PC-98 の BIOS・装置の模倣。arch/x86 にも platform/pc98 にも寄せ切れない。v4 で ARM に載らない部分なので「platform-only の明示」をどこでするか |
-| kernel/paging.c・paging.h | mm/ | 中身は x86 の 2 段ページング (CR3・PTE ビット) と AS 管理が混ざる。ROADMAP の「cr3 を arch/x86 へ」は関数単位の切り出しで、置き場の移動とは別の段 |
-| kernel/isr_handlers.c | arch/x86/kernel/ | 例外の C 側だが sqlite_engine・font_guard・module_runtime・r1_fixture を引く (共通層への依存が多い)。分けるなら例外の受け (arch) と方針 (kernel) に割る |
-| kernel/idt.h | arch/x86/kernel/ | IDT だけでなく PIC/PIT の定義と tick_count を持ち、共通層 12 か所が引く (§4-1)。割るまでは arch に置くと逆向きが 12 本立つ |
+| mm/paging.c・paging.h | mm/ | 中身は x86 の 2 段ページング (CR3・PTE ビット) と AS 管理が混ざる。ROADMAP の「cr3 を arch/x86 へ」は関数単位の切り出しで、置き場の移動とは別の段 |
+| arch/x86/kernel/isr_handlers.c | arch/x86/kernel/ | 例外の C 側だが sqlite_engine・font_guard・module_runtime・r1_fixture を引く (共通層への依存が多い)。分けるなら例外の受け (arch) と方針 (kernel) に割る |
+| arch/x86/kernel/idt.h | arch/x86/kernel/ | IDT だけでなく PIC/PIT の定義と tick_count を持ち、共通層 12 か所が引く (§4-1)。割るまでは arch に置くと逆向きが 12 本立つ |
 | kernel/cpu_calibrate* | kernel/time/ | 校正は PIT tick と CPU ループの組で、x86 の命令は使っていない (io.h だけ)。時刻の層に置いた |
-| kernel/memory_boot.c | mm/ | 起動の一部だが中身はメモリ判定と台帳への登録 |
+| mm/memory_boot.c | mm/ | 起動の一部だが中身はメモリ判定と台帳への登録 |
 | kernel/font_source・font_guard・unicode_file | kernel/console/ | 文字・フォントの層。GUI と共有するので `kernel/` 直下でもよい |
 | kernel/snd_engine.c | drivers/sound/fm/ | fm.mod の中身で OPN 専用 (FM/SSG シーケンサ)。将来 PCM と共有するなら drivers/sound/ 直下 (core) |
 | kernel/sqlite_engine・sqlite_outer | kernel/ | lib/sqlite3/ (os32_sqlite_* の glue) に寄せる案もある。常駐のスタック切替は kernel 側の責任と見た |
@@ -189,16 +189,16 @@ dev = `drivers/` `hwdev/`、fsimpl = `fs/<各FS>/`、それ以外を共通。
    登録に替える。④ `init/kernel.c` の窓口 8 本は「起動の順序」の責任なので残してよい (Linux の initcall 化はしない、規模に合わない)。
 3. PC-98 固有ヘッダを共通層が引く 27 本は v4 の機種分割の本題。v3 では一覧として票に残すだけ (V3_GOALS の原則 1「流さない」は新規分に適用)。
 4. 新旧の解決先が変わる include は **0 件** (同じ走査で、移動後の -I 一覧で解決し直して比較)。ただし同名ヘッダが 2 組ある:
-   `include/kbd.h` と `drivers/kbd.h`、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h`。-I の順を並べ替えると黙って入れ替わるので、
+   `include/kbd.h` と `drivers/kbd.h`、`init/boot_disk.h` と `platform/pc98/boot_disk.h`。-I の順を並べ替えると黙って入れ替わるので、
    段の検査に「解決先の一致」を入れる (下 §7)。
 
 ## 5. 移動に伴って直す所の見積り (grep の数)
 
-数え方: 動く 271 本の旧パス文字列 (`kernel/paging.c` 等、`../` 付きも) の出現数 / ファイル数。`docs/archive/` と `docs/hw/` は除く。
+数え方: 動く 271 本の旧パス文字列 (`mm/paging.c` 等、`../` 付きも) の出現数 / ファイル数。`docs/archive/` と `docs/hw/` は除く。
 
 | 場所 | 参照 / ファイル | 中身・直し方 |
 |---|---|---|
-| ソースの `#include` (パス付き) | **94 / 30** | `"../drivers/kbd.h"`・`"kernel/pgalloc.h"` の形。動かさない kdebug/ (10 本)・hwdev/gf (4)・platform/pc98 (6)・lib/utf8.c にも及ぶ。うち生成物 33 (kdebug/generated/kdebug_imports.h 28、hwdev/generated 4、lib/sqlite3/generated 1) は**生成器の入力を直して再生成**: `kernel/kdebug_imports.def` (146 参照)、`hwdev/hwdev_imports.def` (7)、`tools/prototypes/*_imports.def` 9 本 (102) |
+| ソースの `#include` (パス付き) | **94 / 30** | `"../drivers/kbd.h"`・`"mm/pgalloc.h"` の形。動かさない kdebug/ (10 本)・hwdev/gf (4)・platform/pc98 (6)・lib/utf8.c にも及ぶ。うち生成物 33 (kdebug/generated/kdebug_imports.h 28、hwdev/generated 4、lib/sqlite3/generated 1) は**生成器の入力を直して再生成**: `kernel/module/kdebug_imports.def` (146 参照)、`hwdev/hwdev_imports.def` (7)、`tools/prototypes/*_imports.def` 9 本 (102) |
 | ソースの註のパス | 約 320 / 約 140 | 機械語に響かない。段の中で一括置換してよい (しなくても壊れない) |
 | -I の設定 | `build/config.mk` の INC_* 10 本 | 新ディレクトリ 30 を足す (`include/` と既存の `gfx/` `fs/` `kernel/` を除く)。案: `KERNEL_SRC_DIRS` 1 変数にまとめて INC_KERNEL/INC_DRIVERS/INC_FS/INC_GFX/INC_EXEC/INC_KAPI/INC_SQLITE から引く。fatfs の `-Ifs/fatfs` 先頭 (string.h の差し替え) は `-Ifs/fat/fatfs` に |
 | ビルドの一覧・規則 | build/*.mk・Makefile・ld 239 / 16 (kernel.mk 141、programs.mk 26、lan-module.mk 14、kdebug.mk 8、他の *-module.mk 各 4〜7、boot.mk 5)、build/checks.d/*.mk 51 / 32 | `C_KERNEL`・`ASM_KERNEL` の順序は保つ。**パスで選ぶ規則** (`-Os` の LAYOUT_SMALL・R1_SMALL、`double_fault.o` の DF_GUARD_TEST、`lgy98.o: .FORCE`、`module*.o -Os`、fatfs の INC) を取りこぼすと機械語が変わる — 段の比較で必ず出る |
@@ -301,9 +301,9 @@ L0 の後は、L1〜L3 のあいだ、`kernel/` `drivers/` `fs/` `gfx/` を触�
 
 ### 9-2. 道具 move_files.py の約束
 
-- 入力は対応表 JSON (`[{"from": "kernel/paging.c", "to": "mm/paging.c"}, …]`)。各段の実装者が書くのはこの JSON だけ (§3 の表から作る)。
+- 入力は対応表 JSON (`[{"from": "mm/paging.c", "to": "mm/paging.c"}, …]`)。各段の実装者が書くのはこの JSON だけ (§3 の表から作る)。
 - `git mv` で移し、追跡ファイル全体 (docs/archive・docs/hw・第三者のコードの中身は除く) で旧パスを置き換える: 完全一致・語境界つき、`../` 付きの相対パスは新しい位置から計算し直す。`ROOT / 'kernel' / 'x.c'` のような分割したパスは一覧に出して手で直す (未確認 4)。
-- 生成物は入力 (`kernel/kdebug_imports.def`・`hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) を置き換えてから作り直す。
+- 生成物は入力 (`kernel/module/kdebug_imports.def`・`hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) を置き換えてから作り直す。
 - `build/config.mk` の -I に新しいディレクトリを足す (要判断 4 の仮: -I を足す)。パスで選ぶ規則 (`-Os`・DF_GUARD_TEST・`.FORCE`・fatfs の INC) は置換の対象に含め、取りこぼしはバイト比較で出る。
 
 ### 9-3. 段の完了条件 (実装者)

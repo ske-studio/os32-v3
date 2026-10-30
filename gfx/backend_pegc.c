@@ -49,7 +49,7 @@
 #include "console.h"         /* console_hw_cursor_enable (CUI へ戻った後のカーソル) */
 #include "con_sink.h"        /* con_sink_is_enabled (GUI 中はカーソルを出さない) */
 
-/* アプリ帯 (kernel/paging.c) がリニア窓を踏まないための照合 ([C4] 三層定数)。
+/* アプリ帯 (mm/paging.c) がリニア窓を踏まないための照合 ([C4] 三層定数)。
  * memmap.h 側は pegc.h を読まない (9821 の文字を core に持ち込まない) ので、
  * 両方を読むここで値の一致を検査する。ここが落ちたら
  * MEM_SYSTEM_SPACE_BASE を PEGC_LINEAR_BASE に合わせ直すこと。 */

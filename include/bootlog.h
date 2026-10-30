@@ -11,12 +11,12 @@
 /*      たら以後は全部捨てる (後から来た短い行で途中が抜けた形にしない)。   */
 /*      捨てたバイト数は末尾の行に書く。                                     */
 /*    - 割込み文脈 (ISR の kprintf) からも積めるよう IF を退避する           */
-/*      (kernel/con_sink.c と同じ書き方)。                                  */
+/*      (kernel/console/con_sink.c と同じ書き方)。                                  */
 /*    - 書き出しの手順は BootlogFsOps 越しで、偽の VFS で試験できる          */
 /*      (tools/tests/bootlog_host.c)。                                     */
 /*                                                                          */
-/*  純粋な部分は kernel/bootlog.c、VFS と版情報へ結ぶのは                  */
-/*  kernel/bootlog_save.c。記録: tools/tests/bootlog_tdd.md                 */
+/*  純粋な部分は init/bootlog.c、VFS と版情報へ結ぶのは                  */
+/*  init/bootlog_save.c。記録: tools/tests/bootlog_tdd.md                 */
 /* ======================================================================== */
 
 #ifndef __BOOTLOG_H
@@ -48,7 +48,7 @@
 #define BOOTLOG_ST_SYNC       8
 
 /* 本物は vfs_mkdir / vfs_rm / vfs_rename / vfs_write / vfs_sync をそのまま
- * 差す (kernel/bootlog_save.c)。戻り値の約束は vfs_* と同じ:
+ * 差す (init/bootlog_save.c)。戻り値の約束は vfs_* と同じ:
  *   - mkdir / rm / rename / sync: 0 = 成功、負 = OS32_ERR_* (EXIST / NOTFOUND
  *     は手順の側で成功と読む)
  *   - write: **FS ごとに違う** — ext2 は成功で 0 (fs/ext2_vfs.c の
@@ -72,7 +72,7 @@ typedef struct {
     u32  ticks;            /* tick_count (10ms) */
 } BootlogHeaderInfo;
 
-/* --- 積む側 (kernel/console.c の入口から。割込み文脈からも呼ばれる) ---- */
+/* --- 積む側 (kernel/console/console.c の入口から。割込み文脈からも呼ばれる) ---- */
 void bootlog_push(const char *buf, u32 len);
 
 /* --- 止める・読む ---------------------------------------------------- */
@@ -121,7 +121,7 @@ int bootlog_save_with(const BootlogFsOps *ops, int kind,
                       const char *data, u32 len, int *fail_rc);
 const char *bootlog_stage_name(int stage);
 
-/* --- カーネルの結線 (kernel/bootlog_save.c) --------------------------- */
+/* --- カーネルの結線 (init/bootlog_save.c) --------------------------- */
 /* 常駐シェルを exec する直前に 1 回だけ呼ぶ。失敗しても起動は続ける。 */
 void bootlog_save(void);
 

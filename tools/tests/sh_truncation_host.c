@@ -806,7 +806,7 @@ static void __cdecl h_console_set_cursor(int x, int y) { (void)x; (void)y; }
 static void __cdecl h_tvram_clear(void) {}
 
 /* ルートのデバイス名 (vfs_devname("/"))。既定は HDD。FD のルート名は
- * test_sh_truncation.py が kernel/kernel.c から読んで -DFD_ROOT_DEV で渡す
+ * test_sh_truncation.py が init/kernel.c から読んで -DFD_ROOT_DEV で渡す
  * (試験の側で "fd0" を決め打ちしない) */
 #ifndef FD_ROOT_DEV
 #error "FD_ROOT_DEV (kernel.c の FD ルートのデバイス名) を -D で渡すこと"

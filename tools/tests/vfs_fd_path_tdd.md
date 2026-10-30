@@ -3,7 +3,7 @@
 対象票: `docs/archive/kernel_v21/TASK_VFS_FD_PATH.md` (方針 v2 の 8〜12、v3、ラリー 3 とユーザー決裁 ①)
 試験: `tools/tests/vfs_fd_path_host.c` (実物の `fs/ext2_*.c` + `fs/vfs.c` + `fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)、
 `tools/tests/newlib_errno_host.c` (実物の `sdk/crt/syscalls.c` を newlib のヘッダで)、
-`tools/tests/ime_dict_host.c` (実物の `kernel/ime_dict.c` + SQLite + `lib/sqlite3/os32_sqlite_vfs.c` + `fs/vfs_fd.c`)
+`tools/tests/ime_dict_host.c` (実物の `kernel/ime/ime_dict.c` + SQLite + `lib/sqlite3/os32_sqlite_vfs.c` + `fs/vfs_fd.c`)
 実行: `python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [--red[=REV]] [case]` / `make check-vfs-fd-path-host`
 
 基点: `wt/vfs-fd` = `6de1fea`。
@@ -73,7 +73,7 @@ ime の RED は組まない (修正前の `IME_Dict` に `io_retried` が無い)
 ```
 case errno (real sdk/crt/syscalls.c + newlib headers)   checks 78 failures 0
 case mkpkg (real tools/mkpkg.py)                         7 件 ok
-case ime (real kernel/ime_dict.c + SQLite + vfs_fd.c)    SUMMARY ime_dict PASS (7 段)
+case ime (real kernel/ime/ime_dict.c + SQLite + vfs_fd.c)    SUMMARY ime_dict PASS (7 段)
 case fd     e2fsck -fn fd.img: clean
 case busy   e2fsck -fn busy.img: clean
 case dot    e2fsck -fn dot.img: clean

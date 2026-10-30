@@ -12,12 +12,12 @@ check-vk32-crc-host:
 - tools/tests/stack_entry_host.c
 - kernel/kstack_hw.c
 - kernel/kstack_hw.h
-- kernel/tss.c
-- kernel/tss.h
-- kernel/setjmp.asm
+- arch/x86/kernel/tss.c
+- arch/x86/kernel/tss.h
+- arch/x86/kernel/setjmp.asm
 - include/ksetjmp.h
-- kernel/kernel.c
-- kernel/isr_handlers.c
+- init/kernel.c
+- arch/x86/kernel/isr_handlers.c
 - lib/sqlite3/sqlite_stack.asm
 - tools/gen_memmap.py
 - build/kernel.mk
@@ -32,8 +32,8 @@ check-vk32-crc-host:
 - boot/bootinfo.inc
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
-- kernel/kentry.asm
-- kernel/shm.c
+- arch/x86/kernel/kentry.asm
+- mm/shm.c
 - sdk/kapi.json
 - sdk/link/app.ld
 - sdk/link/shlib.ld
@@ -48,7 +48,7 @@ check-vk32-crc-host:
 - build/out/*
 # T3a1: build/out の kernel.elf を丸ごと読む (成果物の読み手)。
 - kernel/sqlite_engine.c
-- kernel/cpu_flags.inc
+- arch/x86/kernel/cpu_flags.inc
 - boot/vk32_defs.inc
 - boot/lz4_defs.inc
 - boot/crc32_defs.inc

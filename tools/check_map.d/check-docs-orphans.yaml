@@ -15,8 +15,8 @@ check-docs-orphans:
 - build/programs.mk
 - exec/exec_kapi_init.inc
 - kapi/kapi_generated.c
-- kernel/kernel.c
-- kernel/sysclk.c
+- init/kernel.c
+- kernel/time/sysclk.c
 - lib/sqlite3/os32_sqlite_test.c
 - lib/sqlite3/os32_sqlite_vfs.c
 - lib/sqlite3/sqlite3.c
@@ -49,8 +49,8 @@ check-docs-orphans:
 - boot/loader_fat_new.asm
 - fs/fd_redirect.c
 - fs/pipe_buffer.c
-- kernel/kentry.asm
-- kernel/shm.c
+- arch/x86/kernel/kentry.asm
+- mm/shm.c
 - sdk/os32x_hdr.py
 - sdk/rust/os32api/src/gui/proto.rs
 - sdk/rust/os32api/src/gui/stub.rs
@@ -60,7 +60,7 @@ check-docs-orphans:
 - tools/tests/owner_reclaim_host.c
 - tools/tests/test_owner_reclaim.py
 - userland/rust/libos32gui/src/shlib.rs
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - tools/gen_kdebug_imports.py
 - tools/gen_sqlite_imports.py
 - tools/mkmod.py

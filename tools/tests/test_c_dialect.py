@@ -90,10 +90,10 @@ def case_lex(cd):
 
 DRY = """\
 nasm -f elf32 -o build/out/obj/kernel/entry.o kernel/entry.asm
-i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c kernel/kernel.c -o build/out/obj/kernel/kernel.o
+i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c init/kernel.c -o build/out/obj/init/kernel.o
 i386-elf-gcc -std=gnu89 -m32 -Os -include lib/sqlite3/os32_sqlite_config.h -Ilib/sqlite3 -c lib/sqlite3/sqlite3.c -o build/out/sqlite-proto/sqlite3.o
 i386-elf-gcc -std=gnu11 -m32 -Iboot -c -o boot/boot_main.o boot/boot_main.c
-i386-elf-ld -m elf_i386 -o build/kernel.elf build/out/obj/kernel/kernel.o
+i386-elf-ld -m elf_i386 -o build/kernel.elf build/out/obj/init/kernel.o
 """
 
 
@@ -101,7 +101,7 @@ def case_parse(cd):
     print("== 2: コンパイル行の読み取り・期待する言語モード ==", flush=True)
     units = cd.parse_compile_lines(DRY)
     srcs = [u["src"] for u in units]
-    check(srcs == ["kernel/kernel.c", "lib/sqlite3/sqlite3.c", "boot/boot_main.c"],
+    check(srcs == ["init/kernel.c", "lib/sqlite3/sqlite3.c", "boot/boot_main.c"],
           "i386-elf-gcc の -c の行だけを拾い、元のソースを読む (-o が先でも)")
     k = units[0]["sig"]
     check("-Iinclude" not in k and "-MMD" not in k and "-c" not in k and "-o" not in k,
@@ -118,12 +118,12 @@ def case_parse(cd):
           "lib/sqlite3/os32_sqlite_vfs.c", "生成した VFS を必須翻訳単位として数える")
     check(cd.expected_std("userland/tests/sqlite_standalone/sqlite_user_vfs.c") == "gnu89",
           "userland の SQLite 単体は gnu89")
-    check(cd.expected_std("kernel/kernel.c") == "gnu11", "本体は gnu11")
+    check(cd.expected_std("init/kernel.c") == "gnu11", "本体は gnu11")
     check(cd.expected_std("boot/boot_main.c") == "gnu11", "ブートは gnu11")
     check(cd.expected_std("userland/lib/gfx/gfx.c") == "gnu11", "userland は gnu11")
     a = units[0]["argv"]
-    check("-Iinclude" in a and "kernel/kernel.c" in a and "-c" not in a and "-MMD" not in a
-          and "-o" not in a and "build/out/obj/kernel/kernel.o" not in a,
+    check("-Iinclude" in a and "init/kernel.c" in a and "-c" not in a and "-MMD" not in a
+          and "-o" not in a and "build/out/obj/init/kernel.o" not in a,
           "前処理用の引数は -I とソースを残し、依存生成・-c・-o を外す")
 
 
@@ -481,7 +481,7 @@ def run_checker(root):
 def case_build_coverage(cd):
     # Exercise the same flag pass used by the full checker, with a tiny dry run.
     from unittest import mock
-    lines = "i386-elf-gcc -std=gnu11 -c kernel/kernel.c -o build/out/obj/kernel/kernel.o\n"
+    lines = "i386-elf-gcc -std=gnu11 -c init/kernel.c -o build/out/obj/init/kernel.o\n"
     for sqlite, want_ok in [(False, False), (True, True)]:
         out = lines + ("i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o\n" if sqlite else "")
         with mock.patch.object(cd, 'dry_run', return_value=(0, out, '')), \
@@ -597,41 +597,41 @@ MUTANTS = [
     ("gnu89 の例 (sdk/example/hello) を gnu11 にする", "RED",
      lambda: rep("sdk/example/hello/Makefile", "CFLAGS = -std=gnu89", "CFLAGS = -std=gnu11")),
     ("内部実装に _Atomic", "RED",
-     lambda: append("kernel/sysclk.c", "static _Atomic int t0_atomic;\n")),
+     lambda: append("kernel/time/sysclk.c", "static _Atomic int t0_atomic;\n")),
     ("内部実装に restrict", "RED",
-     lambda: append("kernel/sysclk.c", "void t0_r(char *restrict p);\n")),
+     lambda: append("kernel/time/sysclk.c", "void t0_r(char *restrict p);\n")),
     ("内部実装に #include /* C11 */ <stdatomic.h> と atomic_int (Codex P2-2 反例 a)", "RED",
-     lambda: append("kernel/sysclk.c",
+     lambda: append("kernel/time/sysclk.c",
                     "#include /* C11 */ <stdatomic.h>\natomic_int t0_atomic;\n")),
     ("内部実装に行継続で割った restrict (Codex P2-2 反例 b)", "RED",
-     lambda: append("kernel/sysclk.c", "void t0_r(char *re\\\nstrict p) { (void)p; }\n")),
+     lambda: append("kernel/time/sysclk.c", "void t0_r(char *re\\\nstrict p) { (void)p; }\n")),
     ("内部実装に \\ と改行の間に空白がある行継続で割った restrict (Codex 2 回目 反例 3)", "RED",
-     lambda: append("kernel/sysclk.c", "void t0_r2(char *re\\ \nstrict p) { (void)p; }\n")),
+     lambda: append("kernel/time/sysclk.c", "void t0_r2(char *re\\ \nstrict p) { (void)p; }\n")),
     ("内部実装に #\\vinclude <stdatomic.h> (Codex 2 回目 反例 4、VT)", "RED",
-     lambda: append("kernel/sysclk.c", "#\vinclude <stdatomic.h>\n")),
+     lambda: append("kernel/time/sysclk.c", "#\vinclude <stdatomic.h>\n")),
     ("内部実装に #\\finclude <stdatomic.h> (Codex 2 回目 反例 4、FF)", "RED",
-     lambda: append("kernel/sysclk.c", "#\finclude <stdatomic.h>\n")),
+     lambda: append("kernel/time/sysclk.c", "#\finclude <stdatomic.h>\n")),
     ("公開 SDK ヘッダに展開されないマクロ #define OS32_ASSERT(x) _Static_assert(x, \"x\") (Codex 3 回目 (1))",
      "RED",
      lambda: append("sdk/include/os32/os32api.h", "#define OS32_ASSERT(x) _Static_assert(x, \"x\")\n")),
     ("保存済み lgy98.flags=5 のときだけ組まれる #if CONFIG_LGY98_FLAGS == 5 の中の _Atomic (Codex 3 回目 (5))",
      "RED",
-     lambda: dict(append("kernel/sysclk.c",
+     lambda: dict(append("kernel/time/sysclk.c",
                          "#if defined(CONFIG_LGY98_FLAGS) && CONFIG_LGY98_FLAGS == 5\n"
                          "static _Atomic int t0_lan;\n#endif\n"),
                   **{"build/out/lgy98.flags": "5\n"})),
     ("内部実装に複数行コメントの後ろの #include <stdatomic.h> (Codex 2 回目 P3)", "RED",
-     lambda: append("kernel/sysclk.c", "/* a\n b */ #include <stdatomic.h>\n")),
+     lambda: append("kernel/time/sysclk.c", "/* a\n b */ #include <stdatomic.h>\n")),
     # --- 対照 (C11 で許す書き方。落ちたら検査器が厳しすぎる) ---
     ("対照: 内部実装に // とブロック途中の宣言", "GREEN",
-     lambda: append("kernel/sysclk.c",
+     lambda: append("kernel/time/sysclk.c",
                     "// C11 で許す行コメント\n"
                     "int t0_c11_ok(void) { int a = 0; a++; int b = a; return b; }\n")),
     ("対照: 公開 SDK ヘッダのコメントと文字列に // と restrict", "GREEN",
      lambda: append("sdk/include/os32/os32api.h",
                     "/* restrict // _Bool */\n#define OS32_T0_STR \"a//b restrict\"\n")),
     ("対照: lgy98.flags=0 なら #if CONFIG_LGY98_FLAGS == 5 の中は組まれない", "GREEN",
-     lambda: dict(append("kernel/sysclk.c",
+     lambda: dict(append("kernel/time/sysclk.c",
                          "#if defined(CONFIG_LGY98_FLAGS) && CONFIG_LGY98_FLAGS == 5\n"
                          "static _Atomic int t0_lan;\n#endif\n"),
                   **{"build/out/lgy98.flags": "0\n"})),

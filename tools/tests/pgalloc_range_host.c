@@ -12,8 +12,8 @@ static void irq_restore(unsigned int flags) NOINST;
 static void _stop(void) NOINST;
 static void _stop(void) { fail("unexpected R1 panic"); }
 #define IO_H
-#include "../../kernel/pgalloc.c"
-#include "../../kernel/physmem.c"
+#include "../../mm/pgalloc.c"
+#include "../../mm/physmem.c"
 #include "pgalloc_host_fixture.h"
 /* Each original case models a fresh boot. Production reinit is now refused;
  * reset only the private harness state, never add a product reset API.

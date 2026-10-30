@@ -25,7 +25,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
   mkpkg … 実物の tools/mkpkg.py が 123/124 バイト (UTF-8)・128/129 項目で断る
   errno … 実物の sdk/crt/syscalls.c を newlib のヘッダでホストに組み、
           OS32 の負値が -1 + errno になる (tools/tests/newlib_errno_host.c)
-  ime   … 実物の kernel/ime_dict.c + SQLite + os32_sqlite_vfs.c + vfs_fd.c で、
+  ime   … 実物の kernel/ime/ime_dict.c + SQLite + os32_sqlite_vfs.c + vfs_fd.c で、
           辞書の FD が失効したら接続ごと開き直す・1 回だけ・hot journal なら
           開かない・旧接続で SQL を流す前に失効を見る (B1)・管理 API も同じ
           (B5)・SQLite のファイルメソッドは失効で成功しない (B2)・長すぎる
@@ -309,7 +309,7 @@ ERRNO_MUTANTS = [
 ]
 
 
-# kernel/ime_dict.c の変異 (ime の段で落ちること)
+# kernel/ime/ime_dict.c の変異 (ime の段で落ちること)
 IME_MUTANTS = [
     ("io_once: evaluation error quarantines finalized statement",
      '            if (next != SQLITE_OK)\n                kprintf',
@@ -397,7 +397,7 @@ IME_SRC = ROOT / "tools/tests/ime_dict_host.c"
 
 
 def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
-    """sqlite.o は 1 回だけ作る。ime_c を渡すとその kernel/ime_dict.c を使う。
+    """sqlite.o は 1 回だけ作る。ime_c を渡すとその kernel/ime/ime_dict.c を使う。
     overrides = {"lib/sqlite3/os32_sqlite_vfs.c" / "fs/vfs_fd.c": 写しのパス}"""
     shim = tmp / "ime_shim"
     shim.mkdir(exist_ok=True)
@@ -417,11 +417,11 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
         src = tmp / f"{exe_name}_host.c"
         text = IME_SRC.read_text(encoding="utf-8")
         if ime_c is not None:
-            text = text.replace('#include "../../kernel/ime_dict.c"',
+            text = text.replace('#include "../../kernel/ime/ime_dict.c"',
                                 f'#include "{ime_c}"')
         else:
-            text = text.replace('#include "../../kernel/ime_dict.c"',
-                                f'#include "{ROOT}/kernel/ime_dict.c"')
+            text = text.replace('#include "../../kernel/ime/ime_dict.c"',
+                                f'#include "{ROOT}/kernel/ime/ime_dict.c"')
         fdhost = f"{ROOT}/tools/tests/vfs_fd_sqlite_host.c"
         if "fs/vfs_fd.c" in overrides:
             fdhost = tmp / f"{exe_name}_fdhost.c"
@@ -504,7 +504,7 @@ def ime_mutants(tmp):
     """並列に回し (mutpar)、結果は番号順に出す。sqlite.o と shim は run_ime が先に作る。"""
     surv = []
     build_ime(tmp)
-    src = (ROOT / "kernel/ime_dict.c").read_text(encoding="utf-8")
+    src = (ROOT / "kernel/ime/ime_dict.c").read_text(encoding="utf-8")
     items = [(tmp, src, i, m) for i, m in enumerate(IME_MUTANTS)]
     for s, line in mutpar.run_ordered(_ime_mutant_one, items):
         print(line, flush=True)

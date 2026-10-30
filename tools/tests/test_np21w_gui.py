@@ -569,7 +569,7 @@ class GuiTests(unittest.TestCase):
             if data == {'seq': 'SHIFT+SPACE'}:
                 if restore_error and not current:
                     raise OSError('restore key rejected')
-                # kernel/ime.c:ime_toggle: OFF -> HIRAGANA, any ON -> OFF.
+                # kernel/ime/ime.c:ime_toggle: OFF -> HIRAGANA, any ON -> OFF.
                 if not stuck:
                     self.http.put(IME_ADDRESS, struct.pack('<I', 0 if current else 1))
             if 'text' in data:

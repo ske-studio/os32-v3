@@ -5,7 +5,7 @@ check-ring3-guard-host:
 - exec/ring3_str.c
 - fs/fd_redirect.c
 - kernel/gui.c
-- kernel/isr_handlers.c
+- arch/x86/kernel/isr_handlers.c
 - sdk/kapi.json
 - tools/tests/ring3_guard_host.c
 - tools/tests/test_ring3_guard.py

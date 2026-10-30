@@ -15,8 +15,8 @@ python3 tools/tests/test_memory_boot.py      # 実測: 6 tests OK
 make check-memory-host                        # 上記を含む登録済みターゲット
 ```
 
-`kernel/paging.c` / `pgalloc.c` / `sys.c` を ILP32 (`gcc -m32 -march=i386 -std=gnu89
--Wall -Wextra -Werror -Wdeclaration-after-statement`) で実コンパイルし、`kernel/physmem.c` は
+`mm/paging.c` / `pgalloc.c` / `sys.c` を ILP32 (`gcc -m32 -march=i386 -std=gnu89
+-Wall -Wextra -Werror -Wdeclaration-after-statement`) で実コンパイルし、`mm/physmem.c` は
 無改変でリンクする。host へ置換するのは privileged な CR0/CR3 と IRQ save/restore だけ。
 
 ## 検査している振る舞い

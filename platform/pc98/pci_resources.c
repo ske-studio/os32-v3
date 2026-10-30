@@ -11,7 +11,7 @@
 /*  ため (pgalloc.c を取り込むホスト試験の探索パスを増やさない)。g_pci は    */
 /*  既存の読み口 pci_get (写しを返す) で読む — 列挙の順序も config も触らない。*/
 /* ======================================================================== */
-#include "../../kernel/pgalloc.h"
+#include "../../mm/pgalloc.h"
 #include "../../drivers/pci.h"
 
 /* 記録した各デバイスの**メモリ BAR** (メモリ種別で番地が 0 でないもの) を
@@ -61,7 +61,7 @@ u32 ledger_resource_import_pci(void)
 
 #include "pci_resources.h"
 #include "../../drivers/pci_bind.h"
-#include "../../kernel/irq.h"
+#include "../../kernel/irq/irq.h"
 #include "kprintf.h"
 #include "pc98.h"
 

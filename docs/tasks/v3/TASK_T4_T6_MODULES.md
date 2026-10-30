@@ -21,7 +21,7 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 | T2c〜h の map/allocator・trim・owner/STOP 待ち | 吸収済み (T2) | `docs/archive/v3/TASK_T2D_T2H.md:304,337,349`、`docs/tasks/agents/HANDOVER_2026-10-25.md:11`。受入済み機構を使い、台帳の未採取を完了扱いにしない |
 | T2 → T3 → T4 → T5-0 → T5a/b/c → T7 (FD容量不足時だけT6b-M) | r5で更新 | 上位§6と本票§7-1。T3配置は受入済み。本票各段で差分を再計測する。既存S4とLAN受入範囲を後続の正常対照にする (§2・§6) |
 | e11 公開版・4世代を後で照合 | 吸収済み (T2/DBGREF) | `sdk/kapi.json:2`、`:3`: format=4、KAPI ABI=1、memory=4、shlib=2、機能版76。更新時は生成値で照合する |
-| 専用module核・生成器・リンカ | T4で実装済み | `kernel/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
+| 専用module核・生成器・リンカ | T4で実装済み | `kernel/module/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
 | SQLite分離とroot順 | T4実績へ更新 | SQLiteはowner割当の部品へ移行済み。root → PG/台帳の順は維持、U19の前倒しは作らない (§5) |
 | B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/archive/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c:610`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
 | 512KiB単一MEMSYS5・FEP優先取り分 | T4実績・予約方針更新 | FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大。APP+SYSTEM上限319,488Bは既定時の値。全outerの代替stackとRESIDENT groupを維持 |
@@ -45,10 +45,10 @@ T4 で共通runtime・SQLite部品・typed facade・services transactionは実�
 
 | 実物 | T5の扱い |
 |---|---|
-| `kernel/module_runtime.c`・`tools/module_schema.py`・`tools/mkmod.py` | 既存のPOST_ROOT/PAIR検証・直接読込・prefix返却・隔離を拡張 |
+| `kernel/module/module_runtime.c`・`tools/module_schema.py`・`tools/mkmod.py` | 既存のPOST_ROOT/PAIR検証・直接読込・prefix返却・隔離を拡張 |
 | `kernel/sqlite_engine.c` | ROOT_READY → Unicode → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY。MINIMALと隔離を区別 |
-| `kernel/kernel.c`・`fs/vfs.c` | root順を維持。CD登録と自動mount/loop・hd上ISO試行だけをPOST_ROOTの後へ移す |
-| `kernel/ime.c`・`kernel/ime_dict.c` | T4の共有サービス・RESIDENTを保持し、残るB2文字列境界とFEP本体の分離を行う |
+| `init/kernel.c`・`fs/vfs.c` | root順を維持。CD登録と自動mount/loop・hd上ISO試行だけをPOST_ROOTの後へ移す |
+| `kernel/ime/ime.c`・`kernel/ime/ime_dict.c` | T4の共有サービス・RESIDENTを保持し、残るB2文字列境界とFEP本体の分離を行う |
 
 T2dのB1とT4のB3/B4を維持し、FEP追加は既存module/import生成入力を拡張する。内部ABIは公開KAPI表に混ぜない。
 
@@ -62,7 +62,7 @@ T2dのB1とT4のB3/B4を維持し、FEP追加は既存module/import生成入力�
 | E11-A2b | T4b-7でraw KAPI待ち利用者の明示ゲスト試験 | kbd/IME/serial/FMの待ち、CUI/GUI STOP、通常完了、内部ログ中は中断しない対照。B4のengine中断禁止と一緒に確認 |
 | X-1 (本票分) | T4b-1でDB文字列、T4b-8で残るNUL入力とkprintf可変引数、T5a-1でFEP文字列 | ページ0のNP化はT7。残る全公開文字列口の一覧を作りB1済み/今回/他票を対応させ、DB/FEPだけでX-1全体を閉じない |
 
-X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,43,57,60`。現在は全体の直前exec結果 (`exec/exec.c:2190`)、先着単一reader (`kernel/con_sink.c:251`)、WMへ実ownerを渡す入口 (`kernel/gui.c:66`)、共有FEP (`kernel/ime.c:603,641,715,767,850,891,912`) である。今回の方針案は、単一利用者の共有サービスという意味を保ち、正常な利用順・無効値・取消・出力寿命を明文化すること。本人別の結果保存や新しい権限表を自動追加しない。共有入力を二重消費する反例が出た場合は既存のWM/前景配送との接続で解消可能か確認し、契約選択が残るものは個別の契約判断へ送る。T5aではGUIRUNKEY-1の端末/起動連鎖への配送、IMECAND/IMEINDと終了中STOPを回帰し、証拠なしに台帳を閉じない。
+X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,43,57,60`。現在は全体の直前exec結果 (`exec/exec.c:2190`)、先着単一reader (`kernel/console/con_sink.c:251`)、WMへ実ownerを渡す入口 (`kernel/gui.c:66`)、共有FEP (`kernel/ime/ime.c:603,641,715,767,850,891,912`) である。今回の方針案は、単一利用者の共有サービスという意味を保ち、正常な利用順・無効値・取消・出力寿命を明文化すること。本人別の結果保存や新しい権限表を自動追加しない。共有入力を二重消費する反例が出た場合は既存のWM/前景配送との接続で解消可能か確認し、契約選択が残るものは個別の契約判断へ送る。T5aではGUIRUNKEY-1の端末/起動連鎖への配送、IMECAND/IMEINDと終了中STOPを回帰し、証拠なしに台帳を閉じない。
 
 ### 1-3. X-1 公開 NUL 入力・可変引数の担当表
 
@@ -74,7 +74,7 @@ X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,4
 
 部品の形式 (kdebug を含む) の現行契約は [08_build §8-2「起動時に読む部品の形式」](../../08_build.md#起動時に読む部品の形式-kmod-v1)。ops の版が合わない部品は init 前に ABI_MISMATCH で拒否する。
 
-little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module_image.h:7,23`、`docs/archive/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
+little-endianの明示的decodeを使い、C構造体のcast/sizeofでファイルを読まない。**KMOD v1・144Bヘッダの項目順は既に確定** (`kernel/module/module_image.h:7,23`、`docs/archive/v3/TASK_DBGREF.md:131`)。下表は意味の表であり再配置案ではない。C/ASM/Pythonはこの順序から生成・照合し、別スキーマを作らない。
 
 ヘッダword 0〜35は `magic,format,header_size,image_size,kapi,layout,module_abi,id,phase,flags,mem_size,payload_off,payload_size,text_off/size,ro_off/size,data_off/size,bss_off/size,reloc_off/count,import_off/count,export_off/count,names_off/size,init,stop,pair_crc,image_crc,ops_version,reserved0,reserved1`。表offsetはcontainer基点、節・入口・reloc書込先・slotはbody基点。relocは4B、importは `{u32 hash; u16 type_ver,kind; u32 slot_off}`、exportは `{u32 hash; u16 slot,ver; u32 entry_off}` の12B。名前は順序付きNUL列、63B上限、hashと実名を照合し衝突は生成失敗。CRCはimage_crc欄 (byte128〜131) を0にした容器全体 (`docs/archive/v3/TASK_DBGREF.md:132,158,164`)。
 現KDEBUG policyはID=1/POST_ROOT/PAIR必須/stop=0/ops の版 4・20 口 (T4 のときは 2・18、HWDEV M2 で 3・19 → 4・20、`tools/module_schema.py:44`)。T4a-1でID・phase・stop・ops・サイズ上限を生成policyへ移行済みで、KDEBUGの現契約とOFF/RUNNING/拒否診断を保持する。**部品ごとの大きさ・表の件数の上限 (値・由来・今の余裕) は [08_build §8-2 の表](../../08_build.md#起動時に読む部品の大きさの上限と由来)が 1 か所** (値の正は `tools/module_schema.py`)。超過を握り潰さない。旧連結SQLite 374,968BはKDEBUG用の上限に入らず、T4でSQLITE用policyを分離した。
@@ -104,9 +104,9 @@ prefixを処理後に返す場合、exportの解決済み関数表・dependency/
 
 S4の型・slot・生成ABI・pair CRC・ops2/18口を正常対照として維持する (`kdebug/generated/kdebug_imports.h:119`、`tools/gen_kdebug_imports.py:25,75,170`)。SQLite用import定義は別に作り、現235本へ一律追加しない。生成済みファイルは手編集しない。mkmodの世代引数はT4a-1で必須化済みで、旧既定値75/3へ戻さない。
 
-`make kernel` は「カーネルの像と、それと対になって起動時に読む部品の一式」を組む (部品は像の CRC を埋めるので像と一緒に組み直す。Tx の段ごとの `make kernel` で部品の誤りを拾うため、ユーザー決定 2026-10-18)。起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
+`make kernel` は「カーネルの像と、それと対になって起動時に読む部品の一式」を組む (部品は像の CRC を埋めるので像と一緒に組み直す。Tx の段ごとの `make kernel` で部品の誤りを拾うため、ユーザー決定 2026-10-18)。起動時に読むSQLite・FEP・後続部品はkdebugと同じ **`/boot`** に置き、`hsync boot` で対として運ぶ (PM決定)。機能版完全一致 (`kernel/module/module_image.c:103`) を維持し、同じ公開ABI世代でも旧部品を残さない。配布の接続は§5-4。
 
-T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収にも必要な同じ入口を使い、自己試験の移設と別の接続を省く方が小さい)。S4は235本・生成ABI印 `0xf8381b03` を維持し、PCMの私有ABIは型付き表とimport定義から生成する。T5c-3の依頼前にV86 importのcore facade維持か自己試験移設を決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
+T5c-2bはPCM importをcore facadeに残す (公開KAPI・tick・owner回収にも必要な同じ入口を使い、自己試験の移設と別の接続を省く方が小さい)。S4は235本・生成ABI印 `0xf8381b03` を維持し、PCMの私有ABIは型付き表とimport定義から生成する。T5c-3の依頼前にV86 importのcore facade維持か自己試験移設を決める。対象はpcm_open・pcm_state・v86_* 13本・paging_v86_session_open (`kernel/module/kdebug_imports.def:895,903,911,1615`)、S4の本数・ABI印も再生成する。現形式に部品間importを追加したものとは扱わない。
 
 ### 2-1a. 部品ごとの大きさの上限と由来
 
@@ -188,7 +188,7 @@ SQLITE_ONLY の FEP 予約は 0。settings の接続を閉じ、RESIDENT group �
 
 FD 復旧は T4b-4 の ext2 限定を維持する (PM 決定 2026-10-19)。install は FAT の `/etc/settings.db` を `/hd0/etc/settings.db.master.new` にコピーし、長さ・バイト一致を確認してから写しを SQLite で照合する。以後はその写しから既存の `.new` を作り、退避・最終切替の手順を保つ。既存の写しとその journal は消さず停止し、今回の写しだけを成功・取消し・失敗の出口で回収する。close 失敗時は既存の `.new` と同様に隔離 inode を保持し、再起動後の削除を案内する。RAM 試験は FD 側を SQLite 非対応、対象を ext2 対応として正常系と途中失敗を確認する。FDC と実 FD 起動の受入は NP21/W で別途確認する。
 
-`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。辞書なしは `SETTINGS_CLOSED → SQLITE_ONLY` へ分岐する。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/decisions/MEMMAP_V3.md:442`)。
+`ROOT_READY → Unicode読込 → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY`。Unicode表はkernel ownerの7頁でSLACK/poolの内数 (`kernel/console/unicode_file.c:15`)。SQLite/FEP失敗で回収しない。欠落・旧128KiB形式・I/O失敗はかなのみで継続し、FEP省略・起動停止の条件にしない。辞書なしは `SETTINGS_CLOSED → SQLITE_ONLY` へ分岐する。途中は一般のdb/ime KAPIがstubのまま、信頼するboot coordinatorとFEPだけが内部SQLite exportを使う。settingsはengine_enter経由、予約評価もこの段で行う。FEP正常起動とgroup/予約確認が揃って初めてservices_publicを一度に開く。最初のユーザーASはこの後なので、半公開をアプリが見ることはない。T4の案AではFEP固定コードはcoreに残り、回収量0の対象はその動的資源とSQLite module。T5aの案B以後はFEP bodyも同じrollback対象に加わる (上位票 `docs/decisions/MEMMAP_V3.md:442`)。
 
 SQLite失敗・fep.mod欠落・FEP画像CRC不一致・辞書ありでの辞書open/init失敗・予約不足等は利用者へ未公開の失敗として、FEPの部分stmt/groupをclose/finalize → settingsを含むRESIDENT groupゼロを確認 → sqlite3_shutdown → 内部exportをstubへ → RUNNING/STARTINGからROLLING_BACK → FEP/SQLite ownerの回収、の順。init自身で失敗した場合も同じ段階印で一度だけ処理する。正常rollback後はSQLite/FEPの占有ゼロ、全dbはNOSYSのMINIMALへ入る。close/shutdown/装置停止の証明が失敗したらcode/heap/stack/groupを依存閉包ごとQUARANTINEDに残す。一般KAPIはstubだが **MINIMAL_QUARANTINED** と別状態で診断し、隔離byte数を空きから差し引く。これを標準MINIMALや8MB標準合格に数えない。安全な入力/回復継続を証明できなければ起動停止する。
 
@@ -207,7 +207,7 @@ T4でfacade化したFEPを `/boot/fep.mod` へ移す。SQLite RUNNINGの依存�
 
 B2 facadeは `ime_user_list/delete/export` の全入力を先にbounded copy → kernel staging → bind/step → stmt finalize/resetとbinding寿命終了 → engine_leave → copyout、の順。listは上限件数/文字列長で打ち切り状態を返す。deleteの不正kanjiをNULL条件に変換しない。exportはpath検証完了前にcreate/truncateしない。上限は `FEP_BOUNDARY` §3 を引継ぎ (現行の表は [KAPI_SPEC「公開 NUL 入力・可変引数の担当表 (X-1)」](../../KAPI_SPEC.md#公開-nul-入力可変引数の担当表-x-1))、失敗時に返却バッファを部分公開しない。具体値はprefix/yomi/kanji/path各256B (NUL込み)、list max=1〜64、staging=64×68=4,352Bを専用領域に置く。NULL prefixは全件、NULL/正常な空kanjiは同一yomi全候補削除、不正kanjiは失敗。上限±1とページ末尾NUL、失敗後busy解除を試す (`docs/tasks/settings/FEP_BOUNDARY.md:45`)。
 
-T5a-2では `kernel/fep_module.h` の20口をtyped facadeとし、`fep_module_init` の1 exportで内部表を写す。全入口をFEP text内と照合し、prefix返却後もcoreの写しを使用する。ID=3・POST_ROOT・PAIR必須、SQLite RUNNINGへの依存をmodule recordへ登録する。FEP close不能時はFEP body/状態とSQLite code/pool/stack/guardを保持し、公開口はstubへ戻す。Unicodeのkernel owner 7頁はこの回収対象に含めない。
+T5a-2では `kernel/ime/fep_module.h` の20口をtyped facadeとし、`fep_module_init` の1 exportで内部表を写す。全入口をFEP text内と照合し、prefix返却後もcoreの写しを使用する。ID=3・POST_ROOT・PAIR必須、SQLite RUNNINGへの依存をmodule recordへ登録する。FEP close不能時はFEP body/状態とSQLite code/pool/stack/guardを保持し、公開口はstubへ戻す。Unicodeのkernel owner 7頁はこの回収対象に含めない。
 
 描画は既存の `IME_Render` 5 callbackとgshellの静的状態 (`fep.rs` の `state()`) を使う。独立したctx引数は無い。`gui_ime_set_render` の登録門を保ち、`gui_owner_exit` がシェル帯再利用前にNULLへ戻す。FEP側は旧表が有効な間に候補を取消し、TVRAM表へ切り替える。boot rollbackも表を戻してから辞書を閉じる。MINIMALは表を保存しない。
 
@@ -274,7 +274,7 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4a-2 (1日) | VA0 SQLite prototype・import生成・reloc量測定 | ①未解決/外部data/不支持relocを生成拒否 ②非整列正常relocは成功、末尾−2/BSS/重複/import交差は書込0 ③base加算overflow拒否 ④実画像/body/prefix/件数と上限を確定。境界緩和変異を検出。SQLite専用importを別生成し、KDEBUG S4正常像を対照にする (§2-1)。 |
 | T4a-3 (1日) | MEMSYS5 hook/タグ方式のhost prototype | ①HEAP→GETMALLOC→MALLOCの実allocatorを通る ②realloc失敗で旧block内容/勘定不変 ③別文脈freeと表満杯で漏れ0 ④heap+タグ総量≤512KiB。タグ/丸め勘定削除変異を検出 |
 | T4a-4 (1日) | 最大負荷S/M/Lの取り分測定fixture | ①app sort/prepareで上限到達後も各辞書1語変換/学習が通る ②全辞書切替で最大一時量を記録 ③予約超えは旧辞書保持＋再起動要求 ④共通予約・APP上限・最大連続要求を数値化。APP割当門削除で対照が崩れる。USER mallocとMEMSYS5を分け、既存sbrk/exec_heap採取を使う (§3-3)。 |
-| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`kernel/kernel.c:594,669,672`)。 |
+| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`init/kernel.c:594,669,672`)。 |
 | T4b-1 (0.5日) | B3のcopy核・3入口の拒否時不変契約 (§9 決定済み) | ①1023B+NUL成功、1024B+NUL/未終端/guard跨ぎ失敗 ②copy拒否でengine進入0・ファイル不変 ③出力はleave後。finalize先行/切捨て変異を検出。stmt/slot/SHMは拒否時不変に固定し、3入口の拒否→stepと資源回収を対照試験する。核だけの合格を公開接続の受入にしない |
 | T4b-2 (1日) | engine guard・sqlite_stack.asm・例外/STOP接続 | ①全outerのESPが128KiB stack内で戻りregister/IF一致 ②再入/IRQ/IF=0 I/Oは副作用前拒否 ③engine中faultはfail-stop、app-kill/cleanup0 ④STOPはleave後に1回 ⑤通常VFS callbackのactive連続。guard迂回/早期STOP変異を検出。EXECNESTのcaller/TSS.ESP0保持とCPL0のESP切替を区別 (§3-1)。 |
 | T4b-3 (1日) | F2 group/lease・KAPI/IME/boot利用者 | ①RESIDENT2slotをsettings返却→FEPで再利用 ②所属無しopen拒否 ③遅延journalは同group ④別DB親子/同ownerのT01/T02/T07/T12で子だけ回収 ⑤close失敗は隔離・再利用なし。現ownerへの誤帰属変異を検出 |
@@ -283,7 +283,7 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4b-5 (1日) | X-11全12口の契約表・共有サービス回帰 | ①12口の主体・入力・返値・状態変化・出力寿命・取消を表に明記 (IME9口は入力/モード/辞書管理に分類) ②CUI/WM通常配送で入力1回消費 ③parent/child/park-resumeで候補・辞書・出力の寿命が表と一致 ④無効mode/variantで状態不変 ⑤exec結果の「全体の直前1件」を親子切替で観測 ⑥gui_callの実owner/内部op拒否・正規WM配送を観測 ⑦con_sinkの先着/別reader EXIST/終了時返却を観測。二重配送/無効値書込/owner差替/reader早期解放変異を検出。子正常/fault/STOP→親→次KAPIのesp0/callerとUSER別勘定も確認 (§3-1/3-3)。 |
 | T4b-7 (1日) | E11-A2b raw KAPIゲストfixture ([試験・PM手順](../../../tools/tests/raw_wait_tdd.md)) | ①kbd/IME/serial無入力待ち・FM長音の各CUI/GUIでSTOP→shell/WM復帰 ②通常完了も成功 ③内部ログ/SQLite中は中断0 ④owner回収1回・Key-OFF・候補取消・池復帰。取消削除/内部ログに取消混入の変異を検出。親復帰後のesp0/caller・次KAPIとUSER別勘定を確認 (§3-1/3-3)。 |
 | T4b-8 (1日) | X-1残る文字列・kprintfの棚卸し/接続 | ①全公開NUL入力/可変引数の担当が確定 ②format/%s/引数窓の端をB1で処理 ③ページ末尾NUL成功、次ページ欠落/未終端は副作用前失敗 ④通常表示同一。生ポインタ読取へ戻す変異を検出。量が多ければAPI群別に分割 |
-| T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 SQLITE の policy (`tools/module_schema.py`) を PAIR 必須にし、mkmod に `--vmkernel` を必須で渡す (T4a の時点では PAIR を禁じていて、同じ版の古い部品を受け入れうる — T4a のレビュー R5)。 `module_start` は prefix の返却に失敗して回収まで済んだときに 0 を返す (`kernel/module_runtime.c:133-134`) — 呼び手は戻り値だけで成功と判断せず状態を見るか、0 以外を返す形に直す (T4a のレビュー Q1)。 |
+| T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 SQLITE の policy (`tools/module_schema.py`) を PAIR 必須にし、mkmod に `--vmkernel` を必須で渡す (T4a の時点では PAIR を禁じていて、同じ版の古い部品を受け入れうる — T4a のレビュー R5)。 `module_start` は prefix の返却に失敗して回収まで済んだときに 0 を返す (`kernel/module/module_runtime.c:133-134`) — 呼び手は戻り値だけで成功と判断せず状態を見るか、0 以外を返す形に直す (T4a のレビュー Q1)。 |
 | T4c-2 (1日) | services_public・settings→FEP transaction | ①公開前db/imeはstub、全成功で同時公開 ②各init確保/設定close/FEP CRC/辞書欠落/予約不足を注入 ③戻せた失敗はSQLite owner占有0・MINIMAL ④close/shutdown失敗は隔離byteとMINIMAL_QUARANTINEDを診断。早期公開/隔離free変異を検出。Unicode7頁を保持し欠落等はかなのみ継続 (§3-4)、配布世代門を回帰 (§5-4)。監査diff0 (§7-2)。起動tickを前後比較 (NP21/W参考値、現591〜595 / 544〜558、合否に使わない)。 |
 | T4c-3 (1日) | FEP の標準構成の回帰 (app 圧迫下の変換・ext2 学習) | ④アプリが MEMSYS5 の app+system 上限 319,488 B まで使っても FEP の変換が成功 ⑤ext2 標準 RW の学習を保持。FEP 予約を app と同じ上限で拒否する変異・学習を省く変異を検出 |
 | T5-0a (1日) | T4基準化・engine stack計測・最初のゲスト受入 | ①受入SHA/設定・core/module/guard/FD残量を記録 ②製品SQL設定のdb fixtureを同じ文の形のまま数分へ縮め期待結果/試験を同期 (行数はstack深さを変えない) ③128KiBのままinit/settings・db_test/db_v50_test・大きいSQL・FEP変換/学習/切替・CUI/GUIとSTOP後処理のhigh-water/残余/未測定範囲を提示 ④IMEDUP-1をゲストで確認 (学習後同一候補の重複なし、32件未満可) ⑤観測済み負荷と未測定範囲を記録。stackの決定は§3-1 |

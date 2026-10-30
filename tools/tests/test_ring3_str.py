@@ -4,7 +4,7 @@
 記録: tools/tests/t9_tdd.md
 
 sys_getcwd は fs/vfs.c の static cwd (カーネル帯) をそのまま返していた。
-カーネル帯の PTE には USER ビットが無い (kernel/paging.c が phys | PAGE_RW で
+カーネル帯の PTE には USER ビットが無い (mm/paging.c が phys | PAGE_RW で
 張る) ので、CPL=3 の sh.bin が `cd` / `pwd` で戻り値を読むと #PF → fault kill
 になる。写し先は KAPI トランポリンページ (RO+USER) の、表とスタブの後ろの空き。
 

@@ -27,7 +27,7 @@
 ### 3. ブート結線 (`test_memory_boot.py::test_high_ram_above_16m`, 32768KB / 131072KB)
 
 - RED: `FAIL limit == TEST_KB / (PAGE_SIZE / 1024)` — 池の上端が 15MB で止まる。
-- `kernel/memory_boot.c` に高位 RAM の登録 (`physmem_exclude` x2 + `physmem_add_trusted`)
+- `mm/memory_boot.c` に高位 RAM の登録 (`physmem_exclude` x2 + `physmem_add_trusted`)
   と workspace の動的サイズ決定を入れて GREEN。検査内容:
   - `pgalloc_limit_pfn()` が検出量ちょうど (人為的な切り詰めが無い)。
   - `[0xF00, 0x1000)` が RESERVED で、`pgalloc_alloc_n_pfn` がそこから 1 ページも返さない (M5)。
@@ -53,7 +53,7 @@
 ### 5. ブート順の固定 (`test_memory_boot.py::test_kernel_boot_order_and_failstop`)
 
 - `memory_boot_detect` → `paging_init` → `memory_boot_init` の順であることを
-  `kernel/kernel.c` のソース上で検査する行を追加。
+  `init/kernel.c` のソース上で検査する行を追加。
 
 ## 実行結果 (2026-09-11)
 
@@ -72,7 +72,7 @@
 | `python3 tools/check_constraints.py` | EXIT=0 |
 | i386-elf-gcc `-Wall -Wextra` (kernel.c / paging.c / pgalloc.c / physmem.c / memory_boot.c / sys.c / backend_cirrus.c) | 新規警告ゼロ |
 
-`kernel/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
+`init/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
 HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更とは無関係。
 
 ## ホスト試験で**証明していない**こと
@@ -93,7 +93,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 
 ### RED → GREEN
 
-- 新しい口: `kernel/pgalloc.c` の `pgalloc_range_has_ram(first, end)` (PFN 半開)。
+- 新しい口: `mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` (PFN 半開)。
   ブート時に凍結した物理地図 `device_boot_map` を既存の `physmem_count(... PHYSMEM_RAM ...)` で
   見るだけで、状態は変えない。未初期化・範囲異常は保守的に真 (窓を張らせない)。
   `eligible` ビットマップではなく地図を見るので、他所の永久予約で `eligible` が落ちた RAM も
@@ -126,7 +126,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 | `tools/tests/test_paging_bounds.py` / `test_app_band_pde.py` | PASS |
 | `tools/tests/test_boot_splash_native.py` | PASS (2) |
 | `python3 tools/check_constraints.py` | EXIT=0 |
-| i386-elf-gcc `-Wall -Wextra` (`gfx/backend_pegc.c` / `kernel/pgalloc.c`) | 警告ゼロ |
+| i386-elf-gcc `-Wall -Wextra` (`gfx/backend_pegc.c` / `mm/pgalloc.c`) | 警告ゼロ |
 
 ### ホスト試験で**証明していない**こと
 

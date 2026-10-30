@@ -104,7 +104,7 @@ int  ne2k_recv(void *frame, unsigned int capacity, unsigned int *length);
  * カウンタ、OVW 復旧、送信タイムアウト。M2 までは診断ループが頻繁に呼ぶ。 */
 void ne2k_poll(unsigned int budget);
 
-/* 共有 IRQ の口 (kernel/irq.c の表から呼ばれる。票 TASK_HAL_WIRING §1-1)。
+/* 共有 IRQ の口 (kernel/irq/irq.c の表から呼ばれる。票 TASK_HAL_WIRING §1-1)。
  * busy 中は NIC レジスタに触らず pending を立てて IRQ_DEFERRED。要因が無ければ
  * IRQ_NONE。それ以外は NE2K_IRQ_BUDGET フレームまで回収し、ACK 後に ISR / CURR を
  * 再確認する。予算超過は IMR をマスクしたまま IRQ_DEFERRED (回収は ne2k_timer_tick)。
@@ -115,7 +115,7 @@ int ne2k_irq_shared(unsigned int irq, void *arg);
  * (PIC のマスクは登録数が持つ)、この後で IMR を開ける。 */
 void ne2k_irq_enable(void);
 
-/* 100Hz タイマ補助 (kernel/isr_handlers.c)。予算超過の残り・OVW 復旧・送信
+/* 100Hz タイマ補助 (arch/x86/kernel/isr_handlers.c)。予算超過の残り・OVW 復旧・送信
  * タイムアウトだけを進める。busy なら延期して再入しない。プロトコル処理はしない。 */
 void ne2k_timer_tick(void);
 

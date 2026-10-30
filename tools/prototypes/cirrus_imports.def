@@ -21,7 +21,7 @@
     },
     {
       "symbol": "ledger_surface_find",
-      "source": "kernel/pgalloc.h",
+      "source": "mm/pgalloc.h",
       "context": "normal",
       "irq": false
     },

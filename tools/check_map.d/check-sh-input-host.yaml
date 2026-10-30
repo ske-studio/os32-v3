@@ -31,7 +31,7 @@ check-sh-input-host:
 - tools/tests/mutpar.py
 - tools/check_map.d/check-sh-input-host.yaml
 - build/checks.d/check-sh-input-host.mk
-- kernel/kernel.c
+- init/kernel.c
 - tools/tests/sh_truncation_host.c
 - tools/tests/test_sh_truncation.py
 - tools/run_host_group.py

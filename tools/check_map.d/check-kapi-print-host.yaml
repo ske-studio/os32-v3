@@ -10,10 +10,10 @@ check-kapi-print-host:
 - exec/exec_kapi_init.inc
 - exec/redir_access.c
 - exec/access_walk.c
-- kernel/paging.c
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- mm/paging.c
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - kdebug/kselftest.c
 - tools/tests/kapi_print_host.c
 - tools/tests/test_kapi_print.py

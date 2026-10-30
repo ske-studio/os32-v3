@@ -1,5 +1,5 @@
 #include "hwdev_contract.h"
-#include "kernel/module_image.h"
+#include "kernel/module/module_image.h"
 static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1};
 static const struct module_symbol_contract hwdev_import_contracts[] = {
     {0x92f2e639U, 1, 1},

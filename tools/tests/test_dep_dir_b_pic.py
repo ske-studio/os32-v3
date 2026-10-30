@@ -17,14 +17,14 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l12_baseline.json'
-SOURCES = ('kernel/irq.c', 'kernel/irq_math.c', 'platform/pc98/pic.c')
-HEADERS = ('kernel/platform_irq.h', 'kernel/irq.h', 'kernel/irq_math.h',
-           'kernel/idt.h', 'kernel/gdt.h', 'kernel/pit_math.h')
+SOURCES = ('kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/pic.c')
+HEADERS = ('include/platform_irq.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+           'arch/x86/kernel/idt.h', 'arch/x86/kernel/gdt.h', 'kernel/time/pit_math.h')
 MUTATIONS = (
     ('platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
     ('platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),
     ('platform/pc98/pic.c', '    outp(PIC2_CMD, OCW3_IRR);\n    return', '    /* IRR restore removed */\n    return'),
-    ('kernel/irq.c', '        platform_irq_eoi_master();', '        pic_eoi(irq);'),
+    ('kernel/irq/irq.c', '        platform_irq_eoi_master();', '        pic_eoi(irq);'),
 )
 
 
@@ -50,7 +50,7 @@ def build(work, mutation=None, baseline=None):
             '\nint platform_irq_timer_pending(void) {\n'
             'outp(PIC1_CMD, OCW3_IRR);\n'
             'return (inp(PIC1_CMD) & 0x01) ? 1 : 0;\n}\n')
-        (work / 'kernel/irq.c').write_text(irq)
+        (work / 'kernel/irq/irq.c').write_text(irq)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
     exe = work / 'pic-test'
     subprocess.run([

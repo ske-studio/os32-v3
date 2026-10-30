@@ -3,7 +3,7 @@
 #define GEFORCE_MODULE_H
 #include "gfx_hal.h"
 #include "video_service.h"
-#include "module_runtime.h"
+#include "module/module_runtime.h"
 #define GEFORCE_MODULE_OPS_VERSION 1u
 struct gf_production_resources;
 struct geforce_platform {

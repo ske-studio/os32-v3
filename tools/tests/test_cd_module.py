@@ -77,7 +77,7 @@ def main():
                             '-DCD_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cd_module_host.c',
-                            ROOT / 'kernel/module_runtime.c', ROOT / 'kernel/module_image.c',
+                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                             ROOT / 'fs/vfs.c', ROOT / 'drivers/dev.c', '-o', exe], check=True)
 
         def run(modes, expected=0):

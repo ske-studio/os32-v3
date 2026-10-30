@@ -2,7 +2,7 @@
 Fixed low fixture stack; explicit native/qemu execution, no silent fallback.
 Compile failures and signals are never mutation kills.
 """
-TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'kernel/paging.c', 'kernel/pgalloc.c']
+TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
 from kernel_layout import linker_flags
 import host32
 import argparse
@@ -89,7 +89,7 @@ def main():
                 'include', 'arch/x86', 'platform/pc98', 'kernel', 'exec', 'fs',
                 'lib', 'kapi', 'lib/sqlite3', 'sdk/include/os32')]]
         for src, obj in [(tmp / 'fixture.c', tmp / 'fixture.o'),
-                         (ROOT / 'kernel/physmem.c', tmp / 'physmem.o')]:
+                         (ROOT / 'mm/physmem.c', tmp / 'physmem.o')]:
             host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
         def run(body, key):

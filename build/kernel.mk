@@ -3,7 +3,7 @@
 # ============================================================================
 
 # === カーネル ASM ソース ===
-ASM_KERNEL_PRE  = kernel/kentry.asm kernel/isr_stub.asm kernel/v86_entry.asm kernel/ring3_entry.asm kernel/setjmp.asm
+ASM_KERNEL_PRE  = arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm kernel/v86/v86_entry.asm arch/x86/kernel/ring3_entry.asm arch/x86/kernel/setjmp.asm
 ASM_KERNEL_POST = lib/sqlite3/sqlite_stack.asm drivers/ne2000_io.asm
 
 # kstring の 13 本 (kmemcpy / memcpy / kmemset / memset / kstrlen / strlen /
@@ -26,10 +26,10 @@ ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/rin
 
 # === カーネル C ソース ===
 C_KERNEL = \
-    kernel/boot_platform.c kernel/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/font_guard.c kernel/kernel.c kernel/kstack_hw.c kernel/gdt.c kernel/double_fault.c kernel/tss.c kernel/v86.c kernel/v86_mem.c kernel/v86_snapshot.c kernel/v86_module.c kernel/v86_gcap.c kernel/kdebug_call.c kernel/boot_splash.c platform/pc98/splash.c kernel/idt.c kernel/isr_handlers.c kernel/cpu_calibrate.c kernel/cpu_calibrate_math.c kernel/sysclk.c platform/pc98/clock.c kernel/pit.c platform/pc98/timer.c kernel/pit_math.c kernel/bootinfo.c kernel/bootinfo_check.c \
-    kernel/paging.c kernel/paging_app.c kernel/dma_pool.c kernel/dma_pool_math.c kernel/physmem.c kernel/pgalloc.c platform/pc98/lan_match.c platform/pc98/device_loop.c platform/pc98/device_ide.c platform/pc98/device_fs.c platform/pc98/device_pci.c platform/pc98/device_host.c platform/pc98/device_kcg.c platform/pc98/pci_resources.c platform/pc98/boot_disk.c kernel/memory_boot.c platform/pc98/memory.c kernel/shlib.c kernel/shm.c kernel/gui.c kernel/input_service.c kernel/clock_service.c kernel/port_service.c kernel/serial_diag.c platform/pc98/d2_bind.c platform/pc98/boot_names.c kernel/kmalloc.c kernel/console.c platform/pc98/console.c platform/pc98/display.c kernel/con_sink.c kernel/bootlog.c kernel/bootlog_save.c kernel/kbd_inject.c kernel/sys.c platform/pc98/system.c platform/pc98/pic.c kernel/sysconfig.c kernel/kaudit.c kernel/kaudit_boot.c kernel/kselftest_report.c kernel/irq.c kernel/irq_math.c kernel/tick.c kernel/ktime.c kernel/time_math.c \
+    init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \
+    mm/paging.c mm/paging_app.c mm/dma_pool.c mm/dma_pool_math.c mm/physmem.c mm/pgalloc.c platform/pc98/lan_match.c platform/pc98/device_loop.c platform/pc98/device_ide.c platform/pc98/device_fs.c platform/pc98/device_pci.c platform/pc98/device_host.c platform/pc98/device_kcg.c platform/pc98/pci_resources.c platform/pc98/boot_disk.c mm/memory_boot.c platform/pc98/memory.c mm/shlib.c mm/shm.c kernel/gui.c kernel/input_service.c kernel/time/clock_service.c kernel/port_service.c kernel/serial_diag.c platform/pc98/d2_bind.c platform/pc98/boot_names.c mm/kmalloc.c kernel/console/console.c platform/pc98/console.c platform/pc98/display.c kernel/console/con_sink.c init/bootlog.c init/bootlog_save.c kernel/kbd_inject.c kernel/sys.c platform/pc98/system.c platform/pc98/pic.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/irq/tick.c kernel/time/ktime.c kernel/time/time_math.c \
     kernel/ver_collect.c kernel/ver_format.c \
-    kernel/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module.c kernel/hwdev_module.c kernel/module_image.c kernel/module_runtime.c kernel/unicode_file.c kernel/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
+    kernel/console/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module/module.c kernel/module/hwdev_module.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/console/unicode_file.c kernel/ime/fep_module.c kernel/cd_module.c kernel/kcg_module.c kernel/fm_module.c \
     drivers/kbd.c drivers/kbd_status.c drivers/kbd_dlog.c drivers/serial.c drivers/serial_plan.c \
     drivers/fdc.c drivers/fdc_decide.c drivers/fdc_track.c drivers/dma8237.c drivers/dma8237_math.c lib/dma_contract.c drivers/pci.c drivers/pci_decode.c drivers/pci_bind.c drivers/pci_bind_match.c drivers/ide.c drivers/ide_addr.c drivers/pc98pt.c drivers/rtc.c drivers/dev.c drivers/kcg.c drivers/np2sysp.c drivers/loop_dev.c \
     drivers/mouse.c drivers/mouse_bus.c drivers/mouse_seamless.c \
@@ -62,11 +62,11 @@ $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 
 # Test-only real guard injection: 0=off, 1=kernel, 2=SQLite engine.
 DF_GUARD_TEST ?= 0
-$(KERNEL_OBJ_PREFIX)kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
-$(KERNEL_OBJ_PREFIX)kernel/double_fault.o: .FORCE
+$(KERNEL_OBJ_PREFIX)arch/x86/kernel/double_fault.o: private KERNEL_CFLAGS += -Os -DOS32_DF_GUARD_TEST=$(DF_GUARD_TEST)
+$(KERNEL_OBJ_PREFIX)arch/x86/kernel/double_fault.o: .FORCE
 
 # Resident debug loader and validator: preserve the source-adjacent flags.
-$(addprefix $(KERNEL_OBJ_PREFIX),kernel/module.o kernel/module_image.o kernel/module_runtime.o): private KERNEL_CFLAGS += -Os
+$(addprefix $(KERNEL_OBJ_PREFIX),kernel/module/module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
 
 # 常駐 shell の内部入口 (T7b-b2、exec/shell_service.c)。wrapper は
 # __builtin_return_address(0) で呼び手を確かめるので、このファイルだけ
@@ -190,18 +190,18 @@ R1_OBJ := $(R1_OUT)/obj
 $(R1_OBJ)/exec/shell_service.o: private KERNEL_CFLAGS += -fno-optimize-sibling-calls
 R1_C := $(C_KERNEL) kernel/r1_fixture.c kernel/font_guard_fixture.c
 R1_OBJECTS := $(addprefix $(R1_OBJ)/,$(ASM_KERNEL:.asm=.o) exec/ring3_ls_shim.o $(R1_C:.c=.o)) $(R1_OBJ)/build_id.o
-R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c kernel/paging_app.c
+R1_SMALL := exec/exec_heap.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c mm/paging_app.c
 
 $(R1_OBJ)/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
-$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc kernel/entry_layout.inc
+$(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc
 	@mkdir -p $(@D)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $@.asm
 	$(AS) -p sdk/crt/generations.inc -f elf32 $@.asm -o $@
 
-$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
+$(R1_OBJ)/exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h arch/x86/kernel/idt.h
 	@mkdir -p $(@D)
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
@@ -267,7 +267,7 @@ $(KERNEL_OBJ_PREFIX)%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(LAYOUT_SMALL)),-Os) $(KERNEL_INCLUDES) -c $< -o $@
 
-$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h kernel/idt.h
+$(KERNEL_OBJ_PREFIX)exec/ring3_ls_shim.o: exec/ring3_ls.S exec/ring3_ls.h sdk/include/os32/os32_generations.h include/cpu.h arch/x86/kernel/idt.h
 	@mkdir -p $(@D)
 	$(CC) -m32 -Isdk/include/os32 -c $< -o $@
 
@@ -277,7 +277,7 @@ $(KERNEL_OBJ_PREFIX)drivers/lgy98.o $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: .FORCE
 $(KERNEL_OBJ_PREFIX)fs/fatfs/ff.o: fs/fatfs/ffconf.h fs/fatfs/string.h
 $(KERNEL_OBJ_PREFIX)fs/fatfs/diskio.o: fs/fatfs/ff.h fs/fatfs/diskio.h
 
-$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc kernel/cpu_flags.inc kernel/entry_layout.inc
+$(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc
 	@mkdir -p $(@D) $(dir $(BUILD_OUT)/asm/$<)
 	$(LAYOUT_CPP) -traditional-cpp $< -o $(BUILD_OUT)/asm/$<
 	$(AS) -p sdk/crt/generations.inc -f elf32 $(BUILD_OUT)/asm/$< -o $@

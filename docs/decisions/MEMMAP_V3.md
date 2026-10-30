@@ -154,7 +154,7 @@ RAM の存在 (物理地図)・割当可否・owner・写像を**別の情報**�
 ### 3-4. P2V / V2P への集約 (D20 — 高位カーネルは v4 以降)
 
 - **規則**: カーネルが物理番地をポインタとして触る箇所は `P2V(phys)` を通し、ポインタを装置 (DMA・ページ表・窓) に渡す箇所は `V2P(ptr)` を通す。恒等の v3 では両方とも**何もしない関数 (`static inline`) / マクロ** (`include/memmap.h` に 1 か所)。台帳の API は**物理 PFN / 物理番地を返す**ことにし、呼び手が P2V で触る形に揃える。
-- **監査の対象 (Codex 往復 2 の一覧 + 追加)**: `kernel/paging.c` の PD/PT (`:717,737,794,836,889` の `(u32 *)phys`)、`kernel/shlib.c:208,285` の複製、`kernel/v86_mem.c:44` のバッキング、`gfx/backend_pegc.c:704-705` の BB、`drivers/fdc.c:787,816` / ATAPI / PCM の DMA バッファ (`dma_pool_alloc` の戻り値、V2P 側)、BIOS データ領域 (`backend_pegc.c:117-125` の 0000:0400h、`kbd_init` の BIOS ワーク)、VRAM 窓 (`PEGC_LINEAR_BASE`、`0xA8000` 系、Cirrus の `s_lin`)。`kmalloc` は対象外 (仮想のヒープ)。
+- **監査の対象 (Codex 往復 2 の一覧 + 追加)**: `mm/paging.c` の PD/PT (`:717,737,794,836,889` の `(u32 *)phys`)、`mm/shlib.c:208,285` の複製、`kernel/v86/v86_mem.c:44` のバッキング、`gfx/backend_pegc.c:704-705` の BB、`drivers/fdc.c:787,816` / ATAPI / PCM の DMA バッファ (`dma_pool_alloc` の戻り値、V2P 側)、BIOS データ領域 (`backend_pegc.c:117-125` の 0000:0400h、`kbd_init` の BIOS ワーク)、VRAM 窓 (`PEGC_LINEAR_BASE`、`0xA8000` 系、Cirrus の `s_lin`)。`kmalloc` は対象外 (仮想のヒープ)。
 - **票**: **T1 (台帳) の中**に置く — 台帳の API を作り替えるときに呼び手を全部触るので、同じ差分で P2V/V2P に揃えるのが最も安い。恒等なので動作は変わらず、危険は無い。**`tools/check_constraints.py` に検査を足す**: `kernel/ drivers/ gfx/ fs/ exec/` で `(u8 *)` / `(u32 *)` / `(void *)` を物理番地の変数・定数 (`*_phys`、`MEM_*_BASE`、`PEGC_LINEAR_BASE` など) に当てるキャストは P2V を通っていなければ違反 (ID は新設、例外は一覧で許可)。
 - **適用範囲 (Codex X7-3、2026-09-30、ユーザー承認)**: `P2V` / `V2P` が使えるのは**恒等の supervisor 領域だけ** (カーネル帯・シェル帯・池・MMIO の恒等窓)。**アプリ帯と lease 窓は v3 でも非恒等**なので、そのポインタを恒等の `V2P` に渡すと装置へ仮想番地を渡してしまう — **AS のページと lease は台帳 (PTE / SURFACE) から物理へ変換する別の関数**にし、`V2P` には渡せないことを検査 (`check_constraints.py` の同じ検査で、アプリ帯・lease 窓の番地を持つ変数に `V2P` を当てたら違反) で分ける。**DMA には物理の記述子 (PFN 区間) を渡す** — 仮想ポインタを受け取る DMA API を作らない (`dma_alloc` の戻りは物理と仮想の組)。
 - **v4 で高位化するとき**に変わるのはこの 1 か所と、lease 窓の別名 (既に非恒等) だけ、という状態を v3 の終わりに作る。Codex 往復 2 の W1〜W3 (live-AS 規則・exec の CR3 切替・監査対象の広さ) は v4 の設計で改めて解く。
@@ -264,7 +264,7 @@ R1〜R4 はプリエンプティブでない前提をそのまま約束にした
 
 ### 4-1. T4 前の依存 (履歴)
 
-- リンク: `build/os32.ld:60-93` が 0x200000 に配置、`kernel.mk:190-201` が `sqlite.bin` を VK32 に同梱。カーネル側の直接シンボル参照は `kapi/kapi_db.c` (19KB) と `kernel/ime_dict.c` (`:5` に「KAPI 不使用」)。
+- リンク: `build/os32.ld:60-93` が 0x200000 に配置、`kernel.mk:190-201` が `sqlite.bin` を VK32 に同梱。カーネル側の直接シンボル参照は `kapi/kapi_db.c` (19KB) と `kernel/ime/ime_dict.c` (`:5` に「KAPI 不使用」)。
 - 大きさ: `sqlite3.o` text 367,146 + data 3,760 + bss 789、`os32_sqlite_vfs.o` bss 394,628 (MEMSYS5 384KB、`os32_sqlite_vfs.c:34-39`)、代替スタック 128KB。
 - **再配置の実態** (`readelf -r`): 内部の `R_386_PC32` が大半 (sqlite3Vdbe* 1,123 件など) のほか、**外部関数への `R_386_PC32`** (`memset` 175、`memcpy` 171、`vfs_validate_sqlite` …) と **外部データへの `R_386_32`** (`tick_count` × 3、`os32_sqlite_vfs.o`) がある。絶対参照の一覧にベースを足すだけでは足りない (Codex P2-2)。
 - `sqlite3_config(SQLITE_CONFIG_HEAP, ptr, size)` は任意ポインタ可 (`:633-635`)。
@@ -671,7 +671,7 @@ Codex は読み取りのみ (ビルド・試験・実機は未実施、反例は
 | 論点 | 決定・根拠 | 反映・確認する段 (票の節) |
 |---|---|---|
 | **ユーザー決定 2026-10-19: Cirrus/Trident はソフトウェアの確認で足りる** | Cirrus は NP21/W の構成、Trident は実機の構成というだけ。描画の HAL の確認が NP21/W で取れれば、構成の組合せ (64MB+Cirrus など) や実機での WAB の追加確認は求めない | T5c-5b、台帳 H-4 の Cirrus 構成別・T4T7-RH の WAB 候補 |
-| **PM 決定 2026-10-19: splash は core のまま (アプリにしない)** | T5c-6 の容量プローブで、アプリ化は配布 +9,448 B (FD 空き 2HD -9,216 B)・常駐の空き差 0。得るものが無いので core の `kernel/boot_splash.c` を維持し、T5c-6 は policy の一覧の統合だけ | T5c-6 (`~/os32-tmp/run/t5c6/report.md`)。起動順 splash→rshell/SerialFS→shell と表示失敗でも shell は既存の試験で維持 |
+| **PM 決定 2026-10-19: splash は core のまま (アプリにしない)** | T5c-6 の容量プローブで、アプリ化は配布 +9,448 B (FD 空き 2HD -9,216 B)・常駐の空き差 0。得るものが無いので core の `init/boot_splash.c` を維持し、T5c-6 は policy の一覧の統合だけ | T5c-6 (`~/os32-tmp/run/t5c6/report.md`)。起動順 splash→rshell/SerialFS→shell と表示失敗でも shell は既存の試験で維持 |
 | **ユーザー決定 2026-10-19: FD 起動は FEP なし (SQLite だけ)、recover-settings のため** | D21 を改訂。辞書 NOTFOUND は SQLite → settings close → SQLITE_ONLY (`db_*` 公開・IME stub・FEP予約0)。SQLite/FEP の実失敗は従来どおり MINIMAL。recover-settings の NOSYS 案内はインストール用 FD と `/boot/sqlite.mod` を確認する手順 | §3-4・本書 D21/§3-5 (必須/省略)。host は実部品起動と install の RAM backend、FD 実起動は PM が NP21/W で確認 |
 | **ユーザー承認 2026-10-18: 根拠のあいまいな基準の見直し** | FINDINGS.mdの推奨を採用。stack固定、集積拡張凍結、増減記録、policyのID数でrecord容量を決定、KCG hit率記録、FEP予約の下方上書き | §0・§3-1・§5-2/5-4・§6・§7。#7のコード変更は別依頼 |
 | **決定 (ユーザー 2026-10-16)**: 3 SQL入口の拒否時のstmt/slotとfinalize時期 (F1/F2) | 古い行が返るのは、戻り値を見ずに `db_step` を呼んだアプリ自身の文だけで、シングルタスクでは他のアプリや OS のデータに及ばない — **アプリ側の書き方の問題**として扱う (ユーザー)。第三案 (保留 stmt) は採らない。拒否時は「何も変えない」(`docs/tasks/settings/FEP_BOUNDARY.md:140,141,213`) にそろえ、`docs/KAPI_SPEC.md:1396` の prepare_only の入口 finalize は「受け付けた入力のときだけ」と書き直す。KAPI_SPEC に「拒否の戻り値を見ずに step すると前の文の続きが返る」と注記 | 票は反映済み。KAPI_SPEC の説明同期は T4b-1 の前に行う |

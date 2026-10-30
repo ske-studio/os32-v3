@@ -63,7 +63,7 @@ KAPI の追加が必要なら予約番号を KAPI_SPEC §3-2 と調停する。v
 - `docs/tasks/gui/v12/CONTRACTS.md` S1/S2: 外部アプリは1本。handler/X3/X4から直接execは禁止。
 - `fs/fd_redirect.c:166-179,197-209`: バッファ入力は空でEOF、出力は固定容量のshort write。対話ストリームではない。
 - 調査指摘: GUI中はraw入力で、既存CUIのcooked待機へ直接は届かない (`drivers/kbd.c:361-408`)。
-- 調査指摘: FD捕捉だけでは直接コンソール出力を拾えない (`kernel/console.c:214-346`)。
+- 調査指摘: FD捕捉だけでは直接コンソール出力を拾えない (`kernel/console/console.c:214-346`)。
 - 調査指摘: lconsoleは80×25・原点固定描画。窓内surface/clipへそのまま接続できない
   (`userland/lib/gfx/lconsole.h:10-27`, `userland/lib/gfx/text/lconsole.c:297-360`)。
 

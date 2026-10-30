@@ -12,7 +12,7 @@
 #include "e82557_regs.h"
 #include "e82557.h"
 #include LAN_ADAPTER
-#include "../../kernel/tick.c"
+#include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 lan_kexports[] = {0};
 const struct module_symbol_contract lan_import_contracts[] = {{0}};

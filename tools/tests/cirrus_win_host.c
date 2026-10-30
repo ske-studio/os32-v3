@@ -69,7 +69,7 @@ static void map_add(u32 base, u32 end)
     ram_spans++;
 }
 
-/* 実物 (kernel/pgalloc.c) と同じ約束: 範囲異常・未初期化は 1。 */
+/* 実物 (mm/pgalloc.c) と同じ約束: 範囲異常・未初期化は 1。 */
 int pgalloc_range_has_ram(u32 first, u32 end)
 {
     int i;

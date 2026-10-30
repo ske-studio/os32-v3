@@ -1,10 +1,10 @@
 check-irq-math-host:
-- kernel/irq.c
-- kernel/irq_math.c
+- kernel/irq/irq.c
+- kernel/irq/irq_math.c
 - tools/tests/irq_math_host.c
 - tools/tests/test_irq_math.py
 - tools/check_map.d/check-irq-math-host.yaml
 - build/checks.d/check-irq-math-host.mk
 - include/pc98.h
-- kernel/platform_irq.h
+- include/platform_irq.h
 - platform/pc98/pic.c

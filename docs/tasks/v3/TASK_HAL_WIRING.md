@@ -13,7 +13,7 @@
 
 ## 0. なぜ要るか
 
-PCI の装置は **BIOS が IRQ を割り当て、複数の装置が 1 本の IRQ を共有し得る**。いまの OS32 は `kernel/isr_stub.asm` が
+PCI の装置は **BIOS が IRQ を割り当て、複数の装置が 1 本の IRQ を共有し得る**。いまの OS32 は `arch/x86/kernel/isr_stub.asm` が
 装置ごとに固定の C ハンドラを `extern` で結んでおり (`timer_handler` / `kbd_irq_handler` / `serial_irq_handler` /
 `fdc_irq_handler` / `mouse_irq_handler` / `ne2k_irq` (`irq_stub_nic_3/5/6`)、それ以外は `IRQ_UNEXP` で EOI だけ)、
 **起動時に読んだ IRQ 番号でハンドラを結ぶ口が無い**。DMA も `dma_setup()` が `drivers/fdc.c` の中で ch2 決め打ち、
@@ -30,18 +30,18 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 
 ### 1-0. 前提の修正: PIT の分周をクロック判定に合わせる (既存バグ)
 
-`kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz 決め打ちで分周する。**2.4576MHz 系 (実機 Ra266 は
+`arch/x86/kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz 決め打ちで分周する。**2.4576MHz 系 (実機 Ra266 は
 `0000:0501h` bit7 = 0)** では 100Hz を頼んでも **tick = 8.125ms (123Hz)** になっており、`tick_count` を使う待ち・番犬・
 校正すべてが 23% 速い。
 
-- **`sysclk_detect()` (新設、`kernel/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
+- **`sysclk_detect()` (新設、`kernel/time/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
   `kernel.c` から 1 回だけ呼び、`0000:0501h` bit7 を読んで `g_sysclk_hz` (1996800 / 2457600) と `g_sysclk_8mhz` に保存する。
   以後は**保存値だけを読む**。既存の `serial_detect_clock()` は CR3 が master と一致しないと何もしない (PG=0 では
   CR3 が未設定なので現状は**検出をスキップして既定値のまま**) — これを保存値の参照に置き換え、CR3 検査を消す。
   シリアルの `serial_init` (KAPI 経由、CPL=3) も同じ保存値を見る。
 - **`pit_init(hz)`**: `reload = g_sysclk_hz / hz`。**この票では hz = 100 に限定** (両クロックで reload = 19968 / 24576、
   整数、周期はちょうど 10ms)。100 以外を頼まれたら負を返して既定 100 にする (1kHz は §5-5 の別票で、
-  そのときは実周期 = `reload × 1e6 / g_sysclk_hz` を µs で持つ汎用式に広げる)。`struct pit_setup` (実装は `kernel/pit_math.h`: `clk_hz, hz, reload, period_us, mode, valid`、i386 で 20B) を
+  そのときは実周期 = `reload × 1e6 / g_sysclk_hz` を µs で持つ汎用式に広げる)。`struct pit_setup` (実装は `kernel/time/pit_math.h`: `clk_hz, hz, reload, period_us, mode, valid`、i386 で 20B) を
   記録する (1-5 は `pit_get_setup()->valid` と `mode == 0x34` (mode 2) を検査してから使う)。
 - 順序: `sysclk_detect → pit_init → irq_enable(0) / sti → cpu_calibrate` (kernel.c 184〜204 の並びに `sysclk_detect` を
   足すだけ。校正は PIT の後という現状を保つ)。
@@ -60,7 +60,7 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
   `PIT 2.4576M` が出ること → `rshell_serial.py cmd uptime` をホストの時計で 120 秒あけて 2 回 (直す前なら
   ゲストは 148 秒進む、直っていれば 120±1 秒)。
 
-### 1-1. 割り込みの動的登録 — `kernel/irq.c` / `kernel/irq.h`
+### 1-1. 割り込みの動的登録 — `kernel/irq/irq.c` / `kernel/irq/irq.h`
 
 今の約束 (登録・共有・`irq_dispatch`・ハンドラ・ストーム・IF=0 区間・寿命) は [04_interrupts §4-4](../../04_interrupts.md#4-4-割り込みの動的登録と-irq_dispatch-の約束)。以下は設計の往復の記録。
 D1a の契約追記: IRQ11 は FDC が排他登録する。常駐で解除しない完了通知だけは tick 回収の例外とし、既存 timeout/retry で回復する。以下の固定 IRQ11 の記述は変更前の設計記録。
@@ -253,10 +253,10 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   エラーは `OS32_ERR_INVAL` / `OS32_ERR_AGAIN` / `OS32_ERR_NOSYS` の内部別名を使う。
   `dma_chan_remaining` / `dma_chan_ack_tc` は現在 PCM が使う。装置の遷移確認は PCM E6・LAN の各票で受ける。
 
-### 1-3. DMA プール — `kernel/dma_pool.c` (固定番地、SQLite 帯の予約域)
+### 1-3. DMA プール — `mm/dma_pool.c` (固定番地、SQLite 帯の予約域)
 
 **理由 (往復 1 の B8/B9、往復 2 の R4/R5)**: 割り込みは**そのときの CR3 (アプリの PD)** で走る。全 PD で共有される
-のは PDE 0 (0〜4MB) 全体 (`kernel/paging.h` 151 行)。v2 の「SHM 帯から切る」は (a) SHM の基点が `__bss_end` 由来の
+のは PDE 0 (0〜4MB) 全体 (`mm/paging.h` 151 行)。v2 の「SHM 帯から切る」は (a) SHM の基点が `__bss_end` 由来の
 4KB 整列で 64KB 整列にならない、(b) `MEM_SHM_SIZE` を減らすと `MEM_SHM_GUI_OFFSET` が動いて SDK の `GUI_SHM_OFFSET`
 (C / Rust) と GUI アプリ全部の再ビルドが要る、の 2 点で取り下げる。
 
@@ -272,7 +272,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   `MEM_KERNEL_IMAGE_MAX` (カーネル帯の予算) は**触らない** (プールはカーネル帯の外)。SHM・GUI・SDK・アプリは無変更。
 - **写像**: `paging_init` が `paging_set_not_present` の範囲からプールを外し、**present / supervisor / RW / キャッシュ
   有効**で張る。アプリ PD は master の PDE 0 を写すので同じ PT を見る。**USER ビットが立たないこと**を W5 で確かめる。
-  現行の MM 検査 (`kernel/paging.c` 1149〜、`memmap_seen_at`) は RW を見た時点で `MM_RW` を返し **USER 混入を
+  現行の MM 検査 (`mm/paging.c` 1149〜、`memmap_seen_at`) は RW を見た時点で `MM_RW` を返し **USER 混入を
   見分けない** (往復 3 B6) ので、`MM_RWU` (present + RW + USER) を足して `MM_RW` と区別し、期待値側 (`memmap_expect_at`)
   は**予約域を NP とする分岐より先に**プールを `MM_RW` と判定する (関数名は実コードでは `memmap_want_at`。この検査は
   **アプリ起動前専用**で、USER 変異は検査後に復元する)。変異試験: プールの PTE に USER を立てると W5 が落ちる。
@@ -358,7 +358,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `[quarantined noisy irq N masked]` / `[... unmaskable]` を出す。W1/W3 に「線の保持でエッジが来ない」「共有者が
   HANDLED」の両反例を足す。
 - Command の更新は**下位 16 ビットだけ**書く (`pci_cfg_write16` を足す。上位の Status は W1C)。
-- 表は静的 (`kernel/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
+- 表は静的 (`init/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
   §3 の動的読み込みが来たら `size` で版を確かめる。
 
 - **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。
@@ -392,7 +392,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   CPL=3 のポインタ検査 (往復 9 R9-2 で契約を限定、往復 10 R10-1 で出力保護を追加): **既存の kill 規則を採る** —
   生成される早期検査 (`kapi_argptr` / `ring3_ptr_ok`。`ring3_user_range_ok` は偽を返すだけの関数) が帯の外の番地で
   `ring3_fault_kill()` するのは他の KAPI と同じ。**ただし読み取り専用ページは fault しない**: OS32 は `CR0.WP = 0`
-  (`arch/x86/arch_cpu.h` の MMU 有効化、`kernel/shlib.c` がカーネルからの書き込みに依存) なので、CPL=0 の wrapper は
+  (`arch/x86/arch_cpu.h` の MMU 有効化、`mm/shlib.c` がカーネルからの書き込みに依存) なので、CPL=0 の wrapper は
   共有ライブラリの `.text` (RO、全アプリで共有) にも書けてしまう。**出力引数を持つ新設 KAPI (`sys_time_now`、
   `pci_bind_info`) は、書く前に `ring3_user_range_writable(ptr, len)` (新設、`exec/exec.c`) を通し、通らなければ
   `ring3_fault_kill()`**。**現行の検査手順 (T2)**: `ring3_user_ranges_writable_always` が
@@ -419,7 +419,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `t × 10000 + 9999` より小さい、(b) IRR が先で `p1=1` → `(t+2) × 10000` 相当まで跳び、ISR の後の
   読みで戻る、の 2 つが判定をすり抜ける (実機も数百 ns の窓で同じ形)。
   **単調性は `s_last_us` へのクランプで保証し、回数を `ktime_clamp_count` に数える**
-  (`kernel/time_math.c` の `time_clamp` が純粋な判定、書き手は `kernel/ktime.c` の
+  (`kernel/time/time_math.c` の `time_clamp` が純粋な判定、書き手は `kernel/time/ktime.c` の
   `sys_time_now` だけで、スナップショットと同じ `irq_save` の中。`us == last` は数えない。
   試験の注入中 (`time_test_feed_n > 0`) はクランプを通さない — 境界の count を撃ち分ける試験が
   わざと小さい値を作るため)。**実機での回数は W4 の記録項目**。
@@ -433,8 +433,8 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 ### 1-6. 実装の注意 (往復 5・6・12 の非 blocker、実装レビュー往復 1)
 
 - **ISR 文脈の登録・解除は全 IRQ の共通深さで拒否する**。固定 IRQ・tick を含む `IRQ_ENTER/LEAVE` が
-  `kctx_irq_depth` を更新し (`kernel/isr_stub.asm:61-66`)、`irq_register` / `irq_unregister` が判定へ渡す
-  (`kernel/irq.c:55,81`)。
+  `kctx_irq_depth` を更新し (`arch/x86/kernel/isr_stub.asm:61-66`)、`irq_register` / `irq_unregister` が判定へ渡す
+  (`kernel/irq/irq.c:55,81`)。
 - W4 の「1000 回の所要時間」は平均であって IF=0 の最長時間ではない (IF=1 の区間と割り込みを含み、KAPI の CR3 往復も測って
   いない)。最長 IF=0 (`irq_off_max_us`) とハンドラの 1ms 超診断は未実装 (別に起こす)。
 

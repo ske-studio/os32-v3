@@ -15,8 +15,8 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
-SOURCES = ('kernel/boot_display.c', 'kernel/isr_handlers.c',
-           'kernel/double_fault.c', 'kernel/v86_mem.c', 'platform/pc98/emergency.c')
+SOURCES = ('init/boot_display.c', 'arch/x86/kernel/isr_handlers.c',
+           'arch/x86/kernel/double_fault.c', 'kernel/v86/v86_mem.c', 'platform/pc98/emergency.c')
 HEADER_DIRS = ('kernel', 'platform/pc98', 'include', 'arch/x86', 'lib', 'sdk/include/os32')
 HARNESS = 'tools/tests/dep_dir_d_emergency_host.c'
 MUTATIONS = (
@@ -94,7 +94,7 @@ def build(work, parts, omit_header=False):
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, dest)
     if omit_header:
-        (work / 'kernel/platform_emergency.h').unlink()
+        (work / 'include/platform_emergency.h').unlink()
     for rel, source in parts.items():
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)

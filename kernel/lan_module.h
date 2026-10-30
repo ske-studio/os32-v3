@@ -4,9 +4,9 @@
 #include "lan_contract.h"
 #include "pci_bind_contract.h"
 #include "sfs_lan.h"
-#include "module_runtime.h"
-#include "irq.h"
-#include "dma_pool.h"
+#include "module/module_runtime.h"
+#include "irq/irq.h"
+#include "../mm/dma_pool.h"
 #define LAN_MODULE_OPS_VERSION 1u
 typedef struct {
     int (*probe)(const struct pci_dev *dev);

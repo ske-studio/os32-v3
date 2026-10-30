@@ -29,10 +29,10 @@
 | システム辞書のファイル | `assets/fep.db` 5,815,296B (M 版)。生成物で git には無い (`.gitignore:33-36` が `fep.db` / `fep_s.db` / `fep_l.db` / `fep.dic`)。`build/assets.mk:32-38` が `tools/fep_to_sqlite.py` で IPADIC の CSV から作る | `ls -l`、`.gitignore`、`build/assets.mk` |
 | 表 | **`dict` 表 1 つ** `(yomi TEXT, kanji TEXT, pos_id, cost INT)` + 索引 `idx_dict_yomi(yomi)`。**97,514 語**。メタ情報の表は無い | `sqlite_master`、`SELECT count(*)` (2026-09-30 実測) |
 | ページ / 版 | `page_size` **1024**、`PRAGMA user_version` **0** (未使用) | 同上。生成側は `PAGE_SIZE = 1024` (`tools/fep_to_sqlite.py:25,192`)、カーネル側は `SQLITE_DEFAULT_PAGE_SIZE 1024` (`lib/sqlite3/os32_sqlite_config.h:67`) |
-| 学習表 | **同じ `fep.db` の中**に、辞書を開くたび `CREATE TABLE IF NOT EXISTS dict_user (yomi, kanji, freq, last_ts, PRIMARY KEY (yomi, kanji))` + `idx_user_yomi` を作る。学習は UPSERT (`SQL_LEARN`)、列挙・削除・書き出し・全消去は `ime_user_list / delete / export / clear` | `kernel/ime_dict.c:86-95` (作成)、`:51` (`SQL_LEARN`)、`:463-599` (`ime_user_*`) |
-| 辞書を開く形 | `sqlite3_open_v2(path, SQLITE_OPEN_READWRITE)` — 学習表を書くので**読み書き**で開く。FD は `vfs_fd_set_protect` で exec の一括クローズから守る | `kernel/ime_dict.c:76,25-30,133` |
+| 学習表 | **同じ `fep.db` の中**に、辞書を開くたび `CREATE TABLE IF NOT EXISTS dict_user (yomi, kanji, freq, last_ts, PRIMARY KEY (yomi, kanji))` + `idx_user_yomi` を作る。学習は UPSERT (`SQL_LEARN`)、列挙・削除・書き出し・全消去は `ime_user_list / delete / export / clear` | `kernel/ime/ime_dict.c:86-95` (作成)、`:51` (`SQL_LEARN`)、`:463-599` (`ime_user_*`) |
+| 辞書を開く形 | `sqlite3_open_v2(path, SQLITE_OPEN_READWRITE)` — 学習表を書くので**読み書き**で開く。FD は `vfs_fd_set_protect` で exec の一括クローズから守る | `kernel/ime/ime_dict.c:76,25-30,133` |
 | S / M / L | `tools/fep_to_sqlite.py` の `SIZE_DEFS` (`:33-38`): S = cost ≤ 800 (`fep_s.db`)、M = cost ≤ 1500 (`fep.db`、既定)、L = 無制限 (`fep_l.db`)。`--all` で 3 つ、`--size` で 1 つ。dict_raw → yomi+kanji で重複排除 (同点は pos_id 最小、再現性のため) → `dict` → `VACUUM` | `tools/fep_to_sqlite.py:33-38,192-236,244-270` |
-| 切り替え | `ime_switch_dict(variant)` が `/db/fep_s.db` / `/db/fep.db` / `/db/fep_l.db` を開き直す (`ime_dict_reopen`)。**開いている辞書の置き換えは VFS が BUSY で断る**ので、`hsync` は差し替えられない | `kernel/ime.c:882-895`、`kernel/ime_dict.c:150-157` |
+| 切り替え | `ime_switch_dict(variant)` が `/db/fep_s.db` / `/db/fep.db` / `/db/fep_l.db` を開き直す (`ime_dict_reopen`)。**開いている辞書の置き換えは VFS が BUSY で断る**ので、`hsync` は差し替えられない | `kernel/ime/ime.c:882-895`、`kernel/ime/ime_dict.c:150-157` |
 | 配備 | `assets/fep.db` → ゲスト `/db/fep.db` | `userland/deploy.yaml:311-312` |
 | SQLite の取り分 (今) | FEP 辞書が常駐した状態で 38,784B (`cfg_bench` の実測)。MEMSYS5 は全接続共有の 1 ヒープ (今 384KB → v3 で 512KB) | `settings/DESIGN` §6、`lib/sqlite3/os32_sqlite_vfs.c:34-39`、MEMMAP_V3 §4-6 |
 | `PRAGMA user_version` はカーネルの SQLite で**省かれている** | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` (`lib/sqlite3/os32_sqlite_config.h:56`) は `schema_version` だけでなく **`user_version` の PRAGMA も落とす** (`lib/sqlite3/sqlite3.c:144652-144658` の `#if !defined(SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS)` の内側) | `sqlite3.c` の PRAGMA 表 |
@@ -98,8 +98,8 @@
 |---|---|
 | `tools/fep_to_sqlite.py` | `meta` 表の書き込み (§2 の全項目)、`user_version` の設定、同梱済み原文からの `license` / `attribution` 取り込み、`checksum` の計算、`cache_pages` × page_size ≤ `mem_reserve_kb` の検査 |
 | `assets/ipadic/` | `COPYING` は同梱済み ([THIRD_PARTY.md の IPADIC 行](../../../THIRD_PARTY.md))。meta への取り込み元 |
-| `kernel/ime_dict.c` | 開くとき: 形式の版の検査 (ヘッダ直読みか PRAGMA、§2)、`meta` の読み取り、辞書を RO で開く、学習 DB を別に開く (`dict_user` の作成をそちらへ)、`dict_id` / `pos_table_version` の照合。`SQL_LEARN` と `ime_user_*` の宛先を学習 DB へ |
-| `kernel/ime.c` | `ime_switch_dict`: 切り替え先の `mem_reserve_kb` が起動時の確保量を超えるときは再起動を促す (D27) |
+| `kernel/ime/ime_dict.c` | 開くとき: 形式の版の検査 (ヘッダ直読みか PRAGMA、§2)、`meta` の読み取り、辞書を RO で開く、学習 DB を別に開く (`dict_user` の作成をそちらへ)、`dict_id` / `pos_table_version` の照合。`SQL_LEARN` と `ime_user_*` の宛先を学習 DB へ |
+| `kernel/ime/ime.c` | `ime_switch_dict`: 切り替え先の `mem_reserve_kb` が起動時の確保量を超えるときは再起動を促す (D27) |
 | `lib/sqlite3/os32_sqlite_config.h` | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` を外すか、ヘッダ直読みで済ませるか (T4 で決める) |
 | KAPI (`ime_user_*`、`ime_switch_dict`) | シグネチャは変えない ([ABI2])。学習の宛先が変わるだけ。メタ情報を返す口 (`ime_dict_info` 等) を足すなら [ABI2] 追記 |
 | `userland/deploy.yaml`、`hsync` | 学習 DB は配備対象にしない (`/etc` に残す)。システム辞書の RO 差し替えの規則 |

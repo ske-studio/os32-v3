@@ -1,6 +1,6 @@
 check-access-host:
 - exec/ring3_ls.h
-- kernel/v86.h
+- kernel/v86/v86.h
 - exec/exec.c
 - exec/exec_kapi_init.inc
 - exec/redir_access.c
@@ -25,12 +25,12 @@ check-access-host:
 - tools/tests/test_host32.py
 - kdebug/kselftest.c
 - exec/access_walk.c
-- kernel/paging.c
+- mm/paging.c
 - platform/pc98/platform_memory_desc.h
-- kernel/platform_memory.h
-- kernel/pgalloc.c
-- kernel/physmem.c
-- kernel/shlib.c
+- include/platform_memory.h
+- mm/pgalloc.c
+- mm/physmem.c
+- mm/shlib.c
 - tools/tests/access_walk_host.c
 - tools/tests/test_access_walk.py
 - tools/tests/kernel_layout.py

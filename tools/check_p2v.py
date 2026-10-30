@@ -222,14 +222,14 @@ def audit(root):
     functions, files = set(), set()
     try:
         for u in ast.units(root):
-            if u['src'].split('/')[0] not in ROOTS or EXCLUDED.intersection(pathlib.Path(u['src']).parts):
+            if not any(u['src'].startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(u['src']).parts):
                 continue
             tu = ast.parse(u['src'],u['argv'],root)
             # Collect exception-file coverage during the findings walk too.
             hits, funcs = findings(tu,root,files)
             functions.update(funcs)
             for rel,ln,func,rule in hits:
-                if rel.split('/')[0] not in ROOTS or EXCLUDED.intersection(pathlib.Path(rel).parts):
+                if not any(rel.startswith(d + '/') for d in ROOTS) or EXCLUDED.intersection(pathlib.Path(rel).parts):
                     continue
                 if rule in ('physical-cast','physical-sink') and (rel,func) in allowed:
                     continue

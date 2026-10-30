@@ -1,10 +1,10 @@
 check-tick-host:
-- kernel/tick.c
-- kernel/tick.h
-- kernel/irq.h
+- kernel/irq/tick.c
+- kernel/irq/tick.h
+- kernel/irq/irq.h
 - include/types.h
 - platform/pc98/tick_order.h
-- kernel/isr_handlers.c
+- arch/x86/kernel/isr_handlers.c
 - build/kernel.mk
 - tools/tests/tick_host.c
 - tools/tests/test_tick.py

@@ -69,7 +69,7 @@ static int host_trim_calls;
 i32 exec_trim_done(u32 epoch) { host_trim_calls++; return (i32)epoch; }
 
 void kbd_set_gui_mode(int on) { (void)on; }
-/* kernel/ime.c の実物の代わり: 控えた表を覚えるだけ。初期値は「TVRAM 版」
+/* kernel/ime/ime.c の実物の代わり: 控えた表を覚えるだけ。初期値は「TVRAM 版」
  * の代わりの印 (NULL と区別する)。gui_ime_set_render の門の試験 (5) が読む。 */
 static int host_tvram_mark;
 static void *host_ime_render = &host_tvram_mark;

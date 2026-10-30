@@ -14,8 +14,8 @@ check-dep-dir-d-splash-host:
 - include/pegc.h
 - include/tvram.h
 - include/types.h
-- kernel/boot_splash.c
-- kernel/platform_splash.h
+- init/boot_splash.c
+- include/platform_splash.h
 - lib/kstring.h
 - platform/pc98/platform_io.h
 - platform/pc98/splash.c

@@ -61,7 +61,7 @@ NP21/W 上でコード変更が反映されていないように見える場合�
 `rejected (<code> …)` は OFF と同じに扱わず、理由コードを記録する (コードは [KAPI_SPEC.md](KAPI_SPEC.md) の MemStat v75 欄)。OFF の起動の到達確認は、`ver` の Image CRC と `boot.log` で行う。
 本体と部品は Image CRC の対なので、NHD へは停止 → `deploy-kernel` (vmkernel.lz4 と kdebug.bin を一緒に) → 起動 ([D1])、実機は `hsync boot` で対ごと入れる。
 拒否の経路を確かめるときは、1 つ前のビルドの `kdebug.bin` を置いて起動すると `rejected (4 PAIR_MISMATCH)` になる (確かめたら対を戻す)。
-NP21/W では `kernel.map` の記号 `kdebug` (record `struct kdebug`、`kernel/module.h`: state・pair_crc・base・base_pa・pages・owner・open_count・ops) と `ledger_owners[owner]` を `/api/mem` で読める。拒否の後に漏れが無いことは `ledger_owners[owner]` の kind と pages が 0 (retire 済み) で見る。
+NP21/W では `kernel.map` の記号 `kdebug` (record `struct kdebug`、`kernel/module/module.h`: state・pair_crc・base・base_pa・pages・owner・open_count・ops) と `ledger_owners[owner]` を `/api/mem` で読める。拒否の後に漏れが無いことは `ledger_owners[owner]` の kind と pages が 0 (retire 済み) で見る。
 
 - `kstring` / `kmalloc` / `kprintf` のプリミティブを触ったら、kselftest に項目を足す。
 - `userland/tests/klibc_test` は newlib をリンクするので、カーネル側の検証にはならない。
@@ -84,7 +84,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   `boot.new` に残る)。`boot.new` が残っていたら、その起動の保存が途中で止まった印 (次の起動で消される)。
   書けなかった後の後始末も落ちうるので、残存だけでは中身が完全とは限らない。
 - **いつの起動のログか**はヘッダの Commit / Image CRC を `ver` と突き合わせて決める。
-  実装: `kernel/bootlog.c`、記録: `tools/tests/bootlog_tdd.md`。
+  実装: `init/bootlog.c`、記録: `tools/tests/bootlog_tdd.md`。
 
 ---
 
@@ -164,7 +164,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 - VFS: エラーは `OS32_ERR_*` (FS の境界で翻訳)、`mount(dev_id)` は `(dev_type << 8) | unit`、`sys_ls` のコールバックから専用バッファ無しで FS を触らない。→ [`docs/06_filesystem.md`](06_filesystem.md) §6-1、§4-30、§4-26
 - デバイス窓は物理地図 (`pgalloc_range_has_ram`) で判定する (RAM の上端 `sys_get_mem_kb` ではない)。→ §4-34
 - CPL=3 の KAPI は IF=1 で走る (`int80_stub` の出口は IF=0)。KAPI の検査は `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` で (WM はアプリの syscall の中で走る)。→ §4-19、§4-61
-- シェルは 2 ヒープ (`kernel/paging.c` はシェル帯 0x400000–0x4FFFFF を present に保ち、shell heap は 0x4B5000–0x4F4FFF、0x4F5000 だけ NP のガード — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (アプリ ID、仕様は末尾の `09_exec.md`) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
+- シェルは 2 ヒープ (`mm/paging.c` はシェル帯 0x400000–0x4FFFFF を present に保ち、shell heap は 0x4B5000–0x4F4FFF、0x4F5000 だけ NP のガード — 番地の正典は `include/memmap.h`、生成した地図は `build/out/MEMMAP.md` (`make docs-gen`))。exit の資源回収は所有者タグ (アプリ ID、仕様は末尾の `09_exec.md`) — カーネル常駐の FD は `vfs_fd_set_protect(fd, 1)`、親へ戻るときは `exec_heap_restore_state()` (`exec_heap_init_at()` ではない)。→ §4-15、§4-16、[`09_exec.md`](09_exec.md)
 - SQLite はカーネル内 (core BSS の直後) の固定 384KB MEMSYS5 プールを全接続 (FEP 辞書を含む) で共有する — `*_init()` の末尾で接続を閉じる。枯渇は `db_query` の `-2`、`db_last_error()` を必ず出す。→ §4-13
 - 日本語は 1 文字 3 バイト・2 桁、切り詰めは UTF-8 の境界で。外部プログラムの漢字は KAPI `unicode_to_jis` で引く (T3d1〜、表の準備は要らない。`/sys/unicode.bin` が無いとかなだけになる)。フォントは `tools/gen_font16.py`。→ §4-27、§4-11、§4-10
 - 物理 0x90000 は自動プレイのメールボックス — 配置を変えたら `game/tools/autoplay/driver.py` も同じコミットで。→ [`docs/02_memory.md`](02_memory.md) §2-1
@@ -278,7 +278,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 
 - **現象**: `ls > file` の化け、`pipe: out of memory`、double-free 警告
 - **原因**: newlib の sbrk (malloc / stdio) と KAPI `mem_alloc` の exec_heap が両方 BSS 終端から始まり互いを上書き
-- **対策** (2026-09-03): exec_heap を `MEM_SHELL_HEAP_BASE` (0x380000, 512KB) へ分離。`kernel/paging.c` は 0x380000〜0x3FFFFF を present に保つ (以前は NP ギャップ。**2026-10-01 の T2a′ で heap は 0x380000〜0x3F0FFF の 452KB に縮み、0x3F1000〜0x3FAFFF は固定 PD/PT、0x3FB000〜0x3FFFFF は NP**)。番地は [02_memory.md](02_memory.md)
+- **対策** (2026-09-03): exec_heap を `MEM_SHELL_HEAP_BASE` (0x380000, 512KB) へ分離。`mm/paging.c` は 0x380000〜0x3FFFFF を present に保つ (以前は NP ギャップ。**2026-10-01 の T2a′ で heap は 0x380000〜0x3F0FFF の 452KB に縮み、0x3F1000〜0x3FAFFF は固定 PD/PT、0x3FB000〜0x3FFFFF は NP**)。番地は [02_memory.md](02_memory.md)
 
 ### 4-17. NHD 作業イメージが `/tmp` にあり、消えても deploy が exit 0 で返っていた
 
@@ -295,7 +295,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 
 - **現象** (〜2026-09-06): CPL=3 の `gdi_test` が最後の `kbd_getchar()` で固まり、`/api/cmd` も `/api/key` も効かない。`less` (`kbd_trygetchar` + `sys_halt`) も同じ。`/api/regs` で EFLAGS=0x004/0x084 (IF=0)、EIP は `hlt`、`tick_count` が止まり、`/api/pic` の IRR に IRQ0/1 が滞留
 - **原因**: `int 0x80` は割込みゲート (0xEE) なので入口で IF=0 になるが、`int80_stub` → `ring3_syscall_dispatch` → `kapi_invoke` → `wrap_*` のどこにも `sti` が無かった。KAPI 本体は CPL=0 の `call` 経路 (IF=1) と同じ前提で書かれ、`hlt` で IRQ を待つ関数 (`kbd_getchar` / `kbd_getkey` / `sys_halt`、GUI の `gui_call(OP_WAIT)`) は IF=0 だと二度と起きない。ポーリング型のアプリは syscall の合間 (ユーザコード、IF=1) に IRQ が届くので気づきにくく、rshell 経由 (シリアルはポーリング) の検証ではさらに隠れる。M3 の「`less` 常駐中の CPL3 同時試験」はこの理由で実質検証になっていなかった疑いがある
-- **対策**: `kernel/ring3_entry.asm` の `int80_stub` でカーネルセグメント復元直後に `sti`、出口 (`popad` の前) で `cli`。出口を IF=0 で通すのは、USER_DS を DS に載せてから `iretd` までに IRQ が入ると IRQ スタブが DS=KERNEL_DS にしたまま (フレームの CS が CPL=0 なので `IRETD_USER` が戻さない) CPL=3 へ帰り、最初のメモリ参照で #GP するため (gdi_test の `gfx_pixel` で実測)。`exec_run` の setjmp 復帰点にある `_enable()` は従来どおり (sys_exit の longjmp 経路)
+- **対策**: `arch/x86/kernel/ring3_entry.asm` の `int80_stub` でカーネルセグメント復元直後に `sti`、出口 (`popad` の前) で `cli`。出口を IF=0 で通すのは、USER_DS を DS に載せてから `iretd` までに IRQ が入ると IRQ スタブが DS=KERNEL_DS にしたまま (フレームの CS が CPL=0 なので `IRETD_USER` が戻さない) CPL=3 へ帰り、最初のメモリ参照で #GP するため (gdi_test の `gfx_pixel` で実測)。`exec_run` の setjmp 復帰点にある `_enable()` は従来どおり (sys_exit の longjmp 経路)
 - **検証**: `gdi_test` が rshell から約 3 秒で自動復帰してプロンプトに戻る、キーボードから `less` → `q` で終了する、`ver` が返る
 - **関連 (K2、同日)**: CTRL+STOP で CPL=3 アプリを畳む経路はそれまで存在せず (V86 脱出のみ)、K2 が `ring3_abort_request` / `ring3_abort_check` を新設した。CUI からでも暴走した CPL=3 アプリを CTRL+STOP で kill できる (`ring3_abort_count` / `fault_kill_count` が +1)。KAPI 実行中に押された場合は次の syscall 入口で畳む
 
@@ -468,7 +468,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   取れないのかは未解明**。
 - **撤回した推測**: 「A/B 穴が 0x800000 (アプリ固有 PDE の境界) をまたぐのが原因」と
   一度書いたが筋が悪い。V86 のバッキングは**物理**ページで、写像先はゲスト線形
-  0x1000-0x9FFFF = PDE 0 (`kernel/v86_mem.c` の `paging_map_range`)。バッキングの
+  0x1000-0x9FFFF = PDE 0 (`kernel/v86/v86_mem.c` の `paging_map_range`)。バッキングの
   物理位置が PDE 1 の境界をまたぐかどうかはこの写像に影響しない。
 - **窓の撤去とは無関係と考えている**が、旧カーネルでの再現はしていない。
 - **次に見るべき所**: 失敗時の `pgalloc_free_pages()` / `used_pages` と、
@@ -528,7 +528,7 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
   ext2 は下位バイトしか見ていなかったので `fd0` (=`0x100`) が
   `ide_drive_present(0x100 & 3)` → hd0、`ext2_dev_for` → `"hd0"`、
   `ext2_find_partition` → `drive_info[0]` と**すべて hd0 に化けていた**。
-  ブート時の自動マウントループ (`kernel/kernel.c`) が root 以外の全ブロック
+  ブート時の自動マウントループ (`init/kernel.c`) が root 以外の全ブロック
   デバイスに ext2 を試すので、`/fd0` として 2 つ目の `Ext2Ctx` が必ずできる。
   `vfs_sync()` は全マウントを回すため、`mounts[0]` が正しい空き数を書いた直後に
   `mounts[1]` が**マウント時点のスナップショット**を同じセクタへ書き戻す。
@@ -588,8 +588,8 @@ rshell が立つ前の kprintf はシリアルにも出ない。カーネルは�
 ### 4-32. `ext2_read_file` は端数ブロックでも 1KB 書いていた — 小さな static バッファへ読むと隣を潰す (2026-09-11、修正済み)
 
 - **現象**: K5b-K (アプリ 4 本) の新カーネルが初回起動で `FATAL: shell.bin load failed`
-  (`kernel/kernel.c:582`)。kselftest は 44/0 で通り、`[DBG] NOMEM:` も出ない。画面 2 行目の
-  `14000` は `kernel/shlib.c:191` のロード報告 `@414000` が 80 桁で折り返した尻尾で、無関係。
+  (`init/kernel.c:582`)。kselftest は 44/0 で通り、`[DBG] NOMEM:` も出ない。画面 2 行目の
+  `14000` は `mm/shlib.c:191` のロード報告 `@414000` が 80 桁で折り返した尻尾で、無関係。
 - **原因**: `fs/ext2_file.c:34` の `ext2_read_file()` が端数ブロックでも `ext2_read_block()` で
   **1024 バイト**を宛先へ書いていた (`max_size` で `remaining` は頭打ちにするが、書き込み長は
   頭打ちにしていない)。K5b-K 前は exec がファイル全体をロード番地へ読んでいたので無害。
@@ -1256,7 +1256,7 @@ read-modify-write で保つ。
 ### 4-52. `kprintf` の行は**実機でもエミュレータでも最初から見えていなかった** — 属性の流儀違い (2026-09-22)
 
 - **症状**: 実機の写真に `[fdc] …` `[ide] …` の診断行が 1 行も無い。エミュレータの `/api/tvram` には載っている。
-- **原因**: `kprintf(0x07, …)` などの属性は PC/AT (CGA) 流で、`kernel/console.c` の `tvram_putchar_at` が
+- **原因**: `kprintf(0x07, …)` などの属性は PC/AT (CGA) 流で、`kernel/console/console.c` の `tvram_putchar_at` が
   PC-98 の属性 VRAM へそのまま書く。PC-98 の属性は **bit0 = 表示** (`TATTR_VISIBLE`)、bit5/6/7 = B/R/G。
   0x0A / 0x0C / 0x0E は bit0=0 で非表示、0x07 は黒の反転。0x07 の呼び出しは 73 か所。
   黄色 (0xC1) の `[selftest]` だけが見えていたのは、そこだけ PC-98 流だったから。
@@ -1284,7 +1284,7 @@ read-modify-write で保つ。
 - **症状**: 見た目には何も起きない。実機 PC-9821Ra266 で `tick_count` を使う待ち・番犬
   (FDC のタイムアウト、シリアルの TX 予算)・CPU 校正が**一律 23% 速い**。
   100Hz を頼んだはずの tick が実際は **123Hz (8.125ms)**。
-- **原因**: `kernel/idt.c` の `pit_init()` が `PIT_CLOCK` = 1,996,800Hz **決め打ち**で
+- **原因**: `arch/x86/kernel/idt.c` の `pit_init()` が `PIT_CLOCK` = 1,996,800Hz **決め打ち**で
   `divisor = PIT_CLOCK / hz` を計算していた。PC-98 の 8253 TCU に入るクロックは機種で
   2 通り (`0000:0501h` bit7: 1 = 8MHz 系 → 1.9968MHz / 0 = 5･10MHz 系 → 2.4576MHz)。
   Ra266 は後者 (`[ser] 9600bps (clk 2457600Hz, count 16)` と出る) なので、19968 を積むと
@@ -1295,12 +1295,12 @@ read-modify-write で保つ。
   クロックの判定自体は `drivers/serial.c` の `serial_detect_clock()` に既にあったが、
   呼ばれるのは `kernel.c:228` = `pit_init` (194 行) の **34 行あと**で、しかも
   CR3 が master と一致しないと何もしない作りだった (シリアルしか見ていなかった)。
-- **対策**: 判定を `kernel/sysclk.c` (`sysclk_detect()` / `sysclk_hz()` /
+- **対策**: 判定を `kernel/time/sysclk.c` (`sysclk_detect()` / `sysclk_hz()` /
   `sysclk_is_8mhz()`) に切り出し、**`pit_init` より前**に `kernel.c` から 1 回だけ呼ぶ
   (`paging_init` より前なので PG=0、低位物理がそのまま見える → CR3 検査は不要)。
   `pit_init()` は `reload = sysclk_hz() / hz` で割り、積んだ内容を
   `struct pit_setup { clk_hz, hz, reload, period_us, mode, valid }` に残して
-  `pit_get_setup()` で読めるようにした。算数は `kernel/pit_math.c` に分けてホストで試験する。
+  `pit_get_setup()` で読めるようにした。算数は `kernel/time/pit_math.c` に分けてホストで試験する。
   `serial_detect_clock()` は廃止し、シリアルも保存値を見る。
   起動画面の 2 行目に `PIT 1.9968M` / `PIT 2.4576M` を出す (実機で目視できる)。
 - **どう確かめるか**:
@@ -1561,7 +1561,7 @@ read-modify-write で保つ。
   返す。窓 `[0xF00000, 0x1000000)` は K6 の検出器が **RAM にしない穴** (`MEMORY_BOOT_LEGACY_END`
   クランプ + `PHYSMEM_RESERVED`) なのに、上端で見たせいで「RAM が届いている」と誤判定し、
   9801 プレーナへ落ちていた。K6 以前は上端が 0xF00000 だったのでたまたま通っていた。
-- **修正**: 判定を「窓に RAM が登録されているか」に変える。`kernel/pgalloc.c` に
+- **修正**: 判定を「窓に RAM が登録されているか」に変える。`mm/pgalloc.c` に
   `pgalloc_range_has_ram(first, end)` (PFN 半開、ブート時に凍結した物理地図を `physmem_count` で
   見るだけの問い合わせ) を足し、probe 段 2 は
   `pgalloc_range_has_ram(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE, MEM_HIGH_RAM_BASE / PAGE_SIZE)` で決める。

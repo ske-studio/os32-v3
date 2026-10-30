@@ -1,5 +1,5 @@
 CHECK_PAR_ORDER += 003:check-bootinfo-host
-# ブート情報域 0x7E00 (kernel/bootinfo_check.c + boot/bootinfo.inc)。票 TASK_HDD_INSTALL 段 0。
+# ブート情報域 0x7E00 (init/bootinfo_check.c + boot/bootinfo.inc)。票 TASK_HDD_INSTALL 段 0。
 # ローダが INT 1Bh AH=84h の結果を書き、kernel_main が最初に写す。見るのは
 # magic / 反転チェック語 (書きかけ) / 版 / ドライブ記録の和 / BX=512・CX/DH/DL≠0・
 # CF=0・問い合わせ済み・ローダの valid の規則と、[hdd] 行の書式、

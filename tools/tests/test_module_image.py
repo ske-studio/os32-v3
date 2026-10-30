@@ -12,7 +12,7 @@ import zlib
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRC = ROOT / "kernel/module_image.c"
+TARGET_SRC = ROOT / "kernel/module/module_image.c"
 HARNESS = ROOT / "tools/tests/module_image_host.c"
 FLAGS = ["-m32", "-march=i386", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werror",
          "-Werror=vla", "-ffreestanding", "-fno-pie", "-fno-stack-protector"]

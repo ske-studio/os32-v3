@@ -1,9 +1,9 @@
-"""PIT の分周 (kernel/pit_math.c) のホスト試験。
+"""PIT の分周 (kernel/time/pit_math.c) のホスト試験。
 
 記録: tools/tests/pit_clock_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-0 (PIT の分周をクロック判定に合わせる)
 
-実物の kernel/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
+実物の kernel/time/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
 I/O もタイマも触らず、模型は 1 つも要らない。
 
 **NP21/W は 1.9968MHz 固定なので、2.4576MHz 系の分岐はエミュレータでは
@@ -21,15 +21,15 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pit_clock_host.c"
-SRC = ROOT / "kernel/pit_math.c"
+SRC = ROOT / "kernel/time/pit_math.c"
 # カーネルと同じ i386-elf で通す実ソース。idt.c まで入れるのは、
 # pit_init が pit_compute と sysclk_hz を**実際に**呼ぶ形を固定するため。
 # STATIC_ASSERT (中間積が 32bit に収まるか) が効くのもこちら側。
 TARGET_SRCS = [
-    ("kernel/pit_math.c", []),
-    ("kernel/sysclk.c", []),
-    ("kernel/idt.c", []),
-    ("kernel/pit.c", []),
+    ("kernel/time/pit_math.c", []),
+    ("kernel/time/sysclk.c", []),
+    ("arch/x86/kernel/idt.c", []),
+    ("kernel/time/pit.c", []),
     ("platform/pc98/clock.c", []),
     ("platform/pc98/timer.c", []),
 ]
@@ -75,12 +75,12 @@ def host_build(tmp, source_text=None):
         mut.mkdir(exist_ok=True)
         (mut / "pit_math.c").write_text(source_text, encoding="utf-8")
         (mut / "pit_math.h").write_text(
-            (ROOT / "kernel/pit_math.h").read_text(encoding="utf-8"),
+            (ROOT / "kernel/time/pit_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/pit_math.c"', '"kernel/pit_math.c"'),
+                '"../../kernel/time/pit_math.c"', '"kernel/time/pit_math.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(ROOT / "include"), "-I" + str(src_dir),
                "-I" + str(mut), str(shim), "-o", str(exe)]
@@ -99,7 +99,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で kernel/idt.c ごと通す。"""
+    """カーネルと同じ i386-elf で arch/x86/kernel/idt.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pit-clock-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/pit_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real kernel/time/pit_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

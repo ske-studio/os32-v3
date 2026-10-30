@@ -81,8 +81,8 @@ int  ime_switch_dict(int variant);   /* 0=S,1=M,2=L → reopen */
 
 | 対象 | 変更 |
 |------|------|
-| `kernel/ime_dict.c` | `ime_dict_reopen` / `ime_user_*` 実装 |
-| `kernel/ime.c` / `ime.h` | `ime_switch_dict` ファサード、`IME_UserEntry` |
+| `kernel/ime/ime_dict.c` | `ime_dict_reopen` / `ime_user_*` 実装 |
+| `kernel/ime/ime.c` / `ime.h` | `ime_switch_dict` ファサード、`IME_UserEntry` |
 | `kapi/kapi_generated.c` (生成物) | `__cdecl` ラッパー |
 | `exec/exec_kapi_init.inc` (生成物) | KAPI 登録 (手編集しない) |
 | `sdk/kapi.json` | KAPI 定義追記 |

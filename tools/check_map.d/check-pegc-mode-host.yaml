@@ -3,7 +3,7 @@ check-pegc-mode-host:
 - tools/tests/host32.py
 - gfx/backend_pegc.c
 - drivers/np2sysp.c
-- kernel/console.c
+- kernel/console/console.c
 - tools/tests/mutpar.py
 - tools/tests/pegc_mode_host.c
 - tools/tests/test_pegc_mode.py
@@ -14,6 +14,6 @@ check-pegc-mode-host:
 - include/port_service.h
 - include/console_output.h
 - kernel/port_service.c
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - include/console_attr.h

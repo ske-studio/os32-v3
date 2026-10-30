@@ -4,7 +4,7 @@
  *  実行: python3 -B tools/tests/test_gfx_boot.py [--mutate]
  *  票: docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5 (T1e)
  *
- *  実物の kernel/paging.c + kernel/pgalloc.c + kernel/sys.c + kernel/physmem.c
+ *  実物の mm/paging.c + mm/pgalloc.c + kernel/sys.c + mm/physmem.c
  *  を ILP32 でそのまま組み、段つき起動 (sys_memory_bootstrap_model →
  *  sys_memory_stage_online) で台帳を ONLINE にしてから、gfx/gfx_core.c から
  *  切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /

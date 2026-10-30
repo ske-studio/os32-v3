@@ -13,9 +13,9 @@ check-dep-dir-d-display-host:
 - include/pc98.h
 - include/pegc.h
 - include/types.h
-- kernel/display_restore.h
-- kernel/platform_display.h
-- kernel/v86_bios.h
+- kernel/console/display_restore.h
+- include/platform_display.h
+- kernel/v86/v86_bios.h
 - platform/pc98/display.c
 - platform/pc98/display_private.h
 - platform/pc98/platform_io.h
@@ -32,5 +32,5 @@ check-dep-dir-d-display-host:
 - build/checks.d/check-dep-dir-d-display-host.mk
 - tools/check_map.d/check-dep-dir-d-display-host.yaml
 - tools/check_map.yaml
-- kernel/v86.c
+- kernel/v86/v86.c
 - gfx/pc98_route.h

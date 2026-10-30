@@ -19,7 +19,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ('kernel/sys.c', 'platform/pc98/system.c')
-HEADERS = ('kernel/platform_sys.h',)
+HEADERS = ('include/platform_sys.h',)
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l11_baseline.json'
 MUTATIONS = (
     ('platform/pc98/system.c',

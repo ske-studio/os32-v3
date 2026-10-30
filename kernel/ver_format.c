@@ -1,8 +1,8 @@
 /* The single ver/About wording and order. Saved values only; no probes. */
 #include "ver_info.h"
 #include "config.h"
-#include "idt.h"
-#include "module.h"
+#include "../arch/x86/kernel/idt.h"
+#include "module/module.h"
 #include "input_service.h"
 #include "bootinfo.h"
 #include "../lib/kstring.h"

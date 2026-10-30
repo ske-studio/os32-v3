@@ -18,7 +18,7 @@ check-dep-dir-d-console-host:
 - sdk/include/os32/os32_surface.h
 - sdk/include/os32/os32_ls.h
 - sdk/include/os32/os32_kapi_generated.h
-- kernel/console_backend.h
+- kernel/console/console_backend.h
 - platform/pc98/console.c
 - arch/x86/arch_io.h
 - arch/x86/x86_flags.h
@@ -31,7 +31,7 @@ check-dep-dir-d-console-host:
 - include/kbd_inject.h
 - include/memmap.h
 - include/tvram.h
-- kernel/console.c
+- kernel/console/console.c
 - lib/kstring.h
 - lib/utf8.h
 - platform/pc98/platform_io.h

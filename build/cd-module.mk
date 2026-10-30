@@ -1,7 +1,7 @@
 # T5b-5: reuse T4 function imports, VA0 packing and paired distribution.
 CD_OUT := $(BUILD_OUT)/cd
 CD_GEN := $(addprefix $(CD_OUT)/,cd_imports.h cd_imports.json cd_import_slots.c cd_import_stubs.S cd_provider_types.c cd_kexports.c)
-CD_DEF_SOURCES := kernel/cd_module.h drivers/dev.h fs/vfs.h kernel/cpu_calibrate.h kernel/kmalloc.h lib/kstring.h include/kprintf.h
+CD_DEF_SOURCES := kernel/cd_module.h drivers/dev.h fs/vfs.h kernel/time/cpu_calibrate.h mm/kmalloc.h lib/kstring.h include/kprintf.h
 $(CD_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/cd_imports.def $(CD_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module cd --out-dir $(CD_OUT)
 

@@ -1,13 +1,13 @@
 check-hwdev-module-host:
-- kernel/hwdev_module.c
-- kernel/hwdev_module.h
-- kernel/module.c
-- kernel/module.h
-- kernel/module_runtime.c
-- kernel/module_runtime.h
-- kernel/module_image.c
-- kernel/module_image.h
-- kernel/module_schema.h
+- kernel/module/hwdev_module.c
+- kernel/module/hwdev_module.h
+- kernel/module/module.c
+- kernel/module/module.h
+- kernel/module/module_runtime.c
+- kernel/module/module_runtime.h
+- kernel/module/module_image.c
+- kernel/module/module_image.h
+- kernel/module/module_schema.h
 - tools/module_schema.py
 - tools/gen_module_schema.py
 - tools/gen_hwdev_contract.py
@@ -27,7 +27,7 @@ check-hwdev-module-host:
 - build/checks.d/check-hwdev-module-host.mk
 - tools/check_map.d/check-hwdev-module-host.yaml
 - tools/gen_kdebug_imports.py
-- kernel/kdebug_imports.def
+- kernel/module/kdebug_imports.def
 - sdk/kapi.json
 - lib/crc32_core.inc
 - build/module.ld

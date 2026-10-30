@@ -1,7 +1,7 @@
 # dma_pool — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-3
-対象: `kernel/dma_pool_math.c` (表の算数) / `kernel/dma_pool.c` (唯一の池)
+対象: `mm/dma_pool_math.c` (表の算数) / `mm/dma_pool.c` (唯一の池)
 試験: `tools/tests/test_dma_pool.py` + `tools/tests/dma_pool_host.c`
 実行: `make check-dma-pool-host` (`check-par` の列)
 
@@ -15,7 +15,7 @@
    `dma_pool_free` を呼ぶので、動的確保を挟めない。
 3. **番地が全 PD で同じ**でなければならない。割り込みは「そのときの CR3」、
    つまりアプリの PD で走る。全 PD が共有するのは PDE 0 (0〜4MB) だけ
-   (`kernel/paging.h` の契約 C2)。
+   (`mm/paging.h` の契約 C2)。
 
 だから 0〜4MB の中の**固定番地**を 4KB × 16 ページのビットマップで配る。
 置き場は SQLite 帯の予約域 (NOT PRESENT) の中に開ける穴
@@ -33,7 +33,7 @@
 
 ```
 $ python3 -B tools/tests/test_dma_pool.py
-tools/tests/dma_pool_host.c:17:10: fatal error: ../../kernel/dma_pool_math.c: No such file or directory
+tools/tests/dma_pool_host.c:17:10: fatal error: ../../mm/dma_pool_math.c: No such file or directory
 ```
 
 ### RED 2 — またぐ候補で諦める (変異 2)
@@ -54,7 +54,7 @@ tools/tests/dma_pool_host.c:17:10: fatal error: ../../kernel/dma_pool_math.c: No
 
 ```
 $ python3 -B tools/tests/test_dma_pool.py --target --mutate
-HOST GNU89 -Werror compile PASS (real kernel/dma_pool_math.c)
+HOST GNU89 -Werror compile PASS (real mm/dma_pool_math.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT layout=0
 EXIT sizes=0
@@ -90,6 +90,6 @@ MUTATION 9 RED (1 件): dma_pool_init より前に配る (写像が張られて�
 ## 実機でしか確かめられない残り
 
 ここは表の算数だけ。**写像** (0x2E8000〜0x2F7FFF が present / RW /
-supervisor で、上下が NP、USER が立っていないこと) は `kernel/paging.c` が
+supervisor で、上下が NP、USER が立っていないこと) は `mm/paging.c` が
 張り、`kernel/kselftest.c` の MM 検査が起動ごとに見る (`MM_RWU` を
 `MM_RW` と分けたのはそのため)。プールを実際に DMA に渡した結果は W2 / L-B。

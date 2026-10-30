@@ -131,7 +131,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 (`--cui-only`) / `build/programs.mk` + `build/app.conf` (4 列目 `gfx`|`cui`) /
 `tools/check_manifests.py` §2b / `exec/appslot.c` + `exec/appslot.h` (`appslot_cui_only_admit`、
 拒否で `abort_req`) / `exec/exec.c` (`exec_launch` の砦) / `gfx/gfx_core.c` (門の文言) /
-`kernel/v86.c` (`v86_gui_refuse`) / `kernel/kselftest.c`
+`kernel/v86/v86.c` (`v86_gui_refuse`) / `kernel/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 21 (`python3 -B tools/tests/test_multiapp_impl.py`)
 
 ## なぜ 2 つ足したのか

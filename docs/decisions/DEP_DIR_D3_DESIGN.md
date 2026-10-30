@@ -10,10 +10,10 @@
 
 |SURVEY|main の file:line と確認内容|
 |---|---|
-|#1–3|`kernel/kernel.c:304,308,479` kbd/mouse/kcg、`:269` DMA、`:313,316,333` FDC IRQ/init/診断。位置・内容とも一致|
+|#1–3|`init/kernel.c:304,308,479` kbd/mouse/kcg、`:269` DMA、`:313,316,333` FDC IRQ/init/診断。位置・内容とも一致|
 |#4–7|同 `:362–368` DA/UA と 3mode、`:398–405` IDE、`:373` loop、`:375–378` FS 登録。一致|
 |#8–12|同 `:435` root、`:452` HostDrv、`:466` RTC、`:393,539` PCI、`:620` LGY98。一致|
-|#13–15|`kernel/bootinfo.c:121,142,162,195` IDE、`kernel/ledger_pci.c:33` PCI、`kernel/dma_pool.h:30` と `kernel/dma_pool_math.c:99` DMA。一致|
+|#13–15|`init/bootinfo.c:121,142,162,195` IDE、`kernel/ledger_pci.c:33` PCI、`mm/dma_pool.h:30` と `mm/dma_pool_math.c:99` DMA。一致|
 |#31–32|`fs/vfs.c:327` 名前解決、`:11,495` ide_limits/IDE_MAX_DRIVES。一致|
 
 - SURVEY の短い説明を実装条件に具体化: root は FD「種別」判定でなく **BOOT_DRIVE_FDD/FDD_144 との完全一致**。`:673–674` の子マウントにも同じ判定がある。
@@ -30,7 +30,7 @@
 
 ## 3. 起動の登録一覧と呼ぶ境目
 ```c
-/* kernel/boot_platform.h: 内部専用。列挙値は下表の境目に1個ずつ。 */
+/* init/boot_platform.h: 内部専用。列挙値は下表の境目に1個ずつ。 */
 struct boot_context { u32 drive; const char *root_dev, *root_fs; };
 typedef void (*boot_step_fn)(const struct boot_context *);
 struct boot_platform { boot_step_fn step[BOOT_POINT_COUNT]; };
@@ -153,21 +153,21 @@ int vfs_device_id_valid(int type, int id);
 ## 7. ファイルごとの変更一覧
 |新規/変更/削除|対象|おおよその行数（移動を含む）|
 |---|---|---|
-|新規|kernel/boot_platform.h / .c|45 / 25|
-|新規|kernel/boot_display.h / .c|15 / 65（既存表示を移動）|
+|新規|init/boot_platform.h / .c|45 / 25|
+|新規|init/boot_display.h / .c|15 / 65（既存表示を移動）|
 |新規|platform/pc98/boot.h / boot.c|12 / 190（wrapper/表/選択/HostDrv）|
 |新規|platform/pc98/boot_disk.c|90（IDE 変換を移動）|
 |新規|platform/pc98/boot_names.c|25（5行の const 表と登録口）|
 |新規/削除|platform/pc98/pci_resources.c / kernel/ledger_pci.c|+80 / -65（line hook を含む）|
-|変更|kernel/kernel.c|-240〜-290、+20〜35（境目呼出し、子 mount 引数/種別）|
-|変更|include/bootinfo.h / kernel/bootinfo.c|+15 / ±80（既存処理を表転送へ）|
+|変更|init/kernel.c|-240〜-290、+20〜35（境目呼出し、子 mount 引数/種別）|
+|変更|include/bootinfo.h / init/bootinfo.c|+15 / ±80（既存処理を表転送へ）|
 |新規/変更|fs/vfs_device.h / fs/vfs.c|+25 / ±60（parse/番号検証/登録保持）|
 |変更|build/kernel.mk|10（新規常駐ソース、旧 ledger 行削除）|
 |新規|tools/tests/test_dep_dir_d3.py / dep_dir_d3_host.c|150 / 180（表/順序/失敗注入/幾何）|
 |変更|tools/tests/test_device_reservation.py / test_cd_read.py / test_dma_pool.py|各15〜35（抽出/順序/変異パス）|
 |変更|VFS をリンクする既存 host/fixture と起動順試験|各5〜15、合計80〜150（下記の利用者監査で確定）|
 |変更|tools/check_map.d の関連 YAML、新 D3 map、D2 設計の例外記述|合計25〜45|
-- kernel/kdebug_imports.def の source が移動対象を指す場合だけ同じ symbol/slot の source を追従し再生成。生成済み C/ASM/JSON は手で編集しない。
+- kernel/module/kdebug_imports.def の source が移動対象を指す場合だけ同じ symbol/slot の source を追従し再生成。生成済み C/ASM/JSON は手で編集しない。
 
 ## 8. 受入・既存利用者・2時間段
 |受入項目|試験（host / ゲスト NP21/W）|変異（各1行）|

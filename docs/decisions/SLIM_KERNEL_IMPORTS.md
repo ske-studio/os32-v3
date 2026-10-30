@@ -13,7 +13,7 @@
 
 ## con_sink_selftest → kst_con_sink
 
-根拠: `kernel/con_sink.c:314–431`。
+根拠: `kernel/console/con_sink.c:314–431`。
 
 | 記号 | 種類 | 呼出し名 | 表への変更 |
 |---|---|---|---|
@@ -149,7 +149,7 @@
 - カーネル内inline依存→表記した公開FUNC呼出し、関数アドレス2件→KDI_ADDR。この対応表以外の呼先/副作用の変化は不許可。
 - kapi_reserved_nosys比較、配列差分、callbackを実import tableで結ぶhost検査を加え、移植先の未解決記号とデータ左辺を検査する。
 
-## S4a/bで回す既存19試験（kernel/kernel.c参照の現物一覧）
+## S4a/bで回す既存19試験（init/kernel.c参照の現物一覧）
 
 - 全てtools/tests/の下。各候補をMUTATE=0で実行し、文字位置/呼出し順序のassertを弱めない。補助定義はkernel_mainの後、宣言のみ前に置く。
 - test_kcg_module.py、test_lan_module.py、test_memory_boot.py、test_kcg_boot.py、test_sh_truncation.py。

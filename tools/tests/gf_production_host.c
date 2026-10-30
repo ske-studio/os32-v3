@@ -4,10 +4,10 @@
 #define GF_S2_ENTRY unused_decoder_tests
 #include "gfinit_host.c"
 #include "hwdev/gf/production.h"
-#include "kernel/pgalloc.h"
-#include "kernel/paging.h"
+#include "mm/pgalloc.h"
+#include "mm/paging.h"
 #include "include/gf_production.h"
-#include "kernel/sysconfig.c"
+#include "init/sysconfig.c"
 #include "gfinit_resources_ra266.h"
 
 struct prod_reg { u32 off,value; };

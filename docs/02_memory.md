@@ -157,9 +157,9 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =
 `MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (画像外の固定域) 持つ —
 新しい PDE は live AS が 0 の間しか足せないが、gfx の init は exec の後にも走るため。
-最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003EB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ。003FB000h はスタックガード (NP)、003FC000h〜003FFFFFh の4ページはカーネルスタック (RW)。定義は [include/memmap.h](../include/memmap.h)、保護属性の適用は `kernel/paging.c:349` を参照。
+最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003EB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ。003FB000h はスタックガード (NP)、003FC000h〜003FFFFFh の4ページはカーネルスタック (RW)。定義は [include/memmap.h](../include/memmap.h)、保護属性の適用は `mm/paging.c:349` を参照。
 **固定 PD/PT 枠の並び (T3ab、半開区間)**: 見張り `[0x3E0000,0x3E1000)` (NP)、枠 `[0x3E1000,0x3FB000)` 26 頁 (`MEM_FIXED_PAGING_FRAME_PAGES`)、見張り `[0x3FB000,0x3FC000)` (NP)、カーネルスタック `[0x3FC000,0x400000)` 4 頁。枠のうち使うのは先頭の 11 頁 (PD `0x3E1000`、起動時の PT 8 枚 `0x3E2000`〜、デバイス窓の PT `0x3EA000`、最上位 4MB の PT `0x3EB000`) で、残りの予備 15 頁もカーネル所有のまま持ち、SLACK へ返さない。枠全体は恒等の supervisor/RW、NP は両側の見張りだけ。
-**DMA の池は固定 `[0x7F0000,0x800000)` の 64KiB** (`MEM_DMA_POOL_BASE`、[HW2] の 64KB 境界をまたがない)。一般の池や BB を配る前に台帳へ `LEDGER_R_DMA` / カーネル所有 / WB の恒久区間として登録し、通常 RAM として二重に配らない (`kernel/pgalloc.c`)。検出した RAM がこの区間に届かず登録できなかった機械では、池の初期化・自己診断・PCI の結び付け・PCM を行わず、`[dma] RAM short; pool/PCI/PCM skipped` を 1 行出して起動を続ける (`kernel/kernel.c`)。
+**DMA の池は固定 `[0x7F0000,0x800000)` の 64KiB** (`MEM_DMA_POOL_BASE`、[HW2] の 64KB 境界をまたがない)。一般の池や BB を配る前に台帳へ `LEDGER_R_DMA` / カーネル所有 / WB の恒久区間として登録し、通常 RAM として二重に配らない (`mm/pgalloc.c`)。検出した RAM がこの区間に届かず登録できなかった機械では、池の初期化・自己診断・PCI の結び付け・PCM を行わず、`[dma] RAM short; pool/PCI/PCM skipped` を 1 行出して起動を続ける (`init/kernel.c`)。
 **FIXED 型の台帳の置き場 (metadata 1 頁 + workspace 1 頁) はカーネルの BSS の末尾の専用区画 `.ledger_fixed`** (NOLOAD、頁整列) で、`MEM_LEDGER_META_BASE` はその先頭のリンカ記号 `__ledger_fixed_start`。起動時から恒等の supervisor/RW で present。ARENA_TOP 型の機械では動的な置き場を使い、この 2 頁は使わずにカーネル所有のまま持つ。最上位 PT は初期には全 NP、PEGC 候補の写像成功後だけ FFF00000h〜FFF7FFFFh の128ページを公開する。
 監査は候補の有無でなく台帳の公開済み map 範囲に一致させる。正常時は両窓 RW|PCD、F00 成功後の FFF 失敗時は F00 の予約・写像・公開を残して FFF は NP、候補なしなら最上位 PT の全 PTE は NP。
 帯を物理地図で MMIO に登録するのは 16MB 超の RAM を登録する経路 (`memory_boot_add_high`) だけで、高位 RAM の無い
@@ -189,7 +189,7 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 > `ring3_guard bb` は旧BB番地 (現在はV86_LOW) 0x6A000 への書込みで PF error=7、kill を期待し、
 > 正規 CLIENT lease の生存対照は `ring3_guard lease` が担う。
 
-> **CR0.WP = 0 で走る** (`arch/x86/arch_cpu.h` の MMU 有効化)。`kernel/shlib.c` が
+> **CR0.WP = 0 で走る** (`arch/x86/arch_cpu.h` の MMU 有効化)。`mm/shlib.c` が
 > 「カーネルからは RO の USER ページにも書ける」前提で共有ライブラリを張るため。
 > 裏返しとして **CPL=0 (KAPI の wrapper) は PTE の RO 保護を受けない** ので、CPL=3 が
 > 出力引数に共有ライブラリの `.text`/`.rodata` を渡しても #PF は起きない。出力ポインタは

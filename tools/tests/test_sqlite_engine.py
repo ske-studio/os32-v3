@@ -8,7 +8,7 @@ import subprocess
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'exec/exec.c',
-              'kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm']
+              'arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm']
 
 def run(runner, mutant=None):
     with tempfile.TemporaryDirectory(prefix='sqlite-engine-') as directory:
@@ -34,7 +34,7 @@ def run(runner, mutant=None):
         src = (ROOT / 'exec/exec.c').read_text()
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
-        src = (ROOT / 'kernel/isr_handlers.c').read_text()
+        src = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()
         a = src.index('void sqlite_engine_fault(')
         fault = src[a:src.index('\n}', a)+2]
         gates = [fault]

@@ -29,11 +29,11 @@ TARGET_SRCS = [
     'exec/lease.c',
     'exec/access_walk.c',
     'exec/redir_access.c',
-    'kernel/shlib.c',
-    'kernel/paging.c',
-    'kernel/pgalloc.c',
+    'mm/shlib.c',
+    'mm/paging.c',
+    'mm/pgalloc.c',
     'kernel/sys.c',
-    'kernel/physmem.c',
+    'mm/physmem.c',
     'userland/lib/gfx/libos32gfx_core.c',
     'userland/lib/gfx/draw/gfx_draw.c',
     'userland/lib/gfx/draw/gfx_blt.c',
@@ -51,8 +51,8 @@ TARGET_SRCS = [
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',
-    'kernel/unicode_file.c',
-    'kernel/unicode_file.h',
+    'kernel/console/unicode_file.c',
+    'kernel/console/unicode_file.h',
     'exec/system_surface.c',
     'exec/system_surface.h',
     'tools/tests/unicode_surface_host.c',
@@ -63,7 +63,7 @@ assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
     ('sdk-no-kapi', UTF8, 'return kapi->unicode_to_jis(cp);', '(void)cp; return 0;', 'FAIL unicode_to_jis(0x3041)==0x2421'),
     ('tvram-gui', 'exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
-    ('slot-unready', 'kernel/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
+    ('slot-unready', 'mm/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
 ]
 
 
@@ -104,7 +104,7 @@ def main():
                         dest = destdir/pathlib.Path(path).name
                         dest.write_text(body)
                         if path in SDK_SRCS: sources.append(dest)
-                for path in (SYSTEM, 'kernel/unicode_file.c'):
+                for path in (SYSTEM, 'kernel/console/unicode_file.c'):
                     dest=tmp/('kernel_'+pathlib.Path(path).name)
                     dest.write_text(texts[path]);sources.append(dest)
                 generator=tmp/'gen_unicode'
