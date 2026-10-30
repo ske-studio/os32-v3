@@ -27,4 +27,11 @@ static inline void le_write32(u8 *p, u32 v)
     p[3] = (u8)(v >> 24);
 }
 
+static inline u32 le_read_n(const u8 *p, u32 n)
+{
+    u32 v = 0;
+    for (u32 i = 0; i < n; i++) v |= (u32)p[i] << (8 * i);
+    return v;
+}
+
 #endif
