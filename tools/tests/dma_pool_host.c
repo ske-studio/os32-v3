@@ -233,6 +233,19 @@ static void leaked(void)
     }
     CHECK(A(KB(4), 0) == 0);   /* 枯渇 */
 
+    /* mark 側も範囲、整列、span 先頭を検査し、隣は維持する。 */
+    fresh();
+    a = A(KB(8), 0);
+    b = A(KB(4), 0);
+    CHECK(dma_pool_state_mark_leaked(&P, POOL_BASE - KB(4)) == DMA_POOL_ERR_ARG);
+    CHECK(dma_pool_state_mark_leaked(&P, POOL_END) == DMA_POOL_ERR_ARG);
+    CHECK(dma_pool_state_mark_leaked(&P, a + 1) == DMA_POOL_ERR_ARG);
+    CHECK(dma_pool_state_mark_leaked(&P, a + KB(4)) == DMA_POOL_ERR_ARG);
+    CHECK(P.bad_free == 4 && P.leaked == 0);
+    CHECK(dma_pool_state_mark_leaked(&P, a) == 0);
+    CHECK(dma_pool_state_free(&P, b) == 0);
+    CHECK(A(KB(4), 0) == b);
+
     /* 二重 mark も数える。 */
     fresh();
     a = A(KB(8), 0);
