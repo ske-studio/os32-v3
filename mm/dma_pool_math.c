@@ -146,38 +146,8 @@ int dma_pool_state_alloc_buf(struct dma_pool_state *s, u32 size, u32 align,
 /*  8KB の先頭を渡されたときにどちらを外すかが決まらない。先頭一致に        */
 /*  限ることで、途中ポインタも二重解放も同じ 1 本の規則で弾ける。           */
 /* ------------------------------------------------------------------------ */
-int dma_pool_state_free(struct dma_pool_state *s, u32 pa)
-{
-    u32 off, page, i;
-    int slot;
-
-    if (!s || !s->ready) return DMA_POOL_ERR_STATE;
-    if (pa < s->base) { s->bad_free++; return DMA_POOL_ERR_ARG; }
-    off = pa - s->base;
-    if (off >= s->npages * MEM_PAGE_SIZE) {
-        s->bad_free++;
-        return DMA_POOL_ERR_ARG;
-    }
-    if (off % MEM_PAGE_SIZE != 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
-
-    page = off / MEM_PAGE_SIZE;
-    slot = dma_pool_span_at(s, page);
-    if (slot < 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
-    /* LEAKED は**戻さない**。装置がまだ書いているかもしれない。 */
-    if (s->span[slot].state != DMA_SPAN_USED) {
-        s->bad_free++;
-        return DMA_POOL_ERR_ARG;
-    }
-
-    for (i = 0; i < (u32)s->span[slot].npages; i++) s->used[page + i] = 0;
-    s->span[slot].first = 0;
-    s->span[slot].npages = 0;
-    s->span[slot].state = DMA_SPAN_FREE;
-    return 0;
-}
-
-/* ------------------------------------------------------------------------ */
-int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 pa)
+/* free と mark_leaked の対象を検査して span を引く。 */
+static int dma_pool_used_span(struct dma_pool_state *s, u32 pa)
 {
     u32 off, page;
     int slot;
@@ -193,10 +163,35 @@ int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 pa)
 
     page = off / MEM_PAGE_SIZE;
     slot = dma_pool_span_at(s, page);
-    if (slot < 0 || s->span[slot].state != DMA_SPAN_USED) {
+    if (slot < 0) { s->bad_free++; return DMA_POOL_ERR_ARG; }
+    /* LEAKED は戻さない。装置がまだ書いているかもしれない。 */
+    if (s->span[slot].state != DMA_SPAN_USED) {
         s->bad_free++;
         return DMA_POOL_ERR_ARG;
     }
+    return slot;
+}
+
+int dma_pool_state_free(struct dma_pool_state *s, u32 pa)
+{
+    u32 page, i;
+    int slot = dma_pool_used_span(s, pa);
+
+    if (slot < 0) return slot;
+    page = s->span[slot].first;
+    for (i = 0; i < (u32)s->span[slot].npages; i++) s->used[page + i] = 0;
+    s->span[slot].first = 0;
+    s->span[slot].npages = 0;
+    s->span[slot].state = DMA_SPAN_FREE;
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+int dma_pool_state_mark_leaked(struct dma_pool_state *s, u32 pa)
+{
+    int slot = dma_pool_used_span(s, pa);
+
+    if (slot < 0) return slot;
     s->span[slot].state = DMA_SPAN_LEAKED;
     s->leaked++;
     return 0;
