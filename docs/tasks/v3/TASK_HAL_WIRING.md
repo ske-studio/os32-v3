@@ -294,7 +294,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   CUS = Idle かつ RUS = Idle を読む。これが証拠。reset 後も Idle にならなければもう 1 回 reset、それでも駄目なら
   **隔離** (下記)。開始命令を出す前 (probe の (5) まで) は DMA は起きていないので証拠は要らない。PCM は
   `dma_chan_mask(ch)` + CS4231 の再生許可ビットを落とした後の**装置側**の確認 (remaining の一致は証拠にしない)。
-- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[PCM §2-1](TASK_PCM_CS4231.md#2-1-カーネル-driverspcm_cs4231c--pcm_cs4231_mathc-純粋部))、余裕32KB。
+- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[PCM §2-1](TASK_PCM_CS4231.md#2-1-カーネル-driverssoundcs4231pcm_cs4231c--pcm_cs4231_mathc-純粋部))、余裕32KB。
   FDC の 1KB は**静的配列のまま** (起動最初期に要る)。
 - 純粋関数: 最初適合 + 整列 + 64KB 跨ぎの判定、span の登録 / 解放 / 不正解放をホスト試験に。
 
