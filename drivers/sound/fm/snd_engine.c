@@ -498,61 +498,39 @@ static int snd_mml_parse(const char *mml, SndNote *out, int max_notes,
 /*  SE テーブル初期化                                                       */
 /* ======================================================================== */
 
+static const SndSE_Def snd_se_defaults[SND_SE_MAX] = {
+    [SND_SE_CURSOR] = { .duration = 5, .ssg_period = 200, .ssg_vol = 12, .ssg_decay = 3 },
+    [SND_SE_SELECT] = { .use_fm = 1, .tone_num = 1, .note = NOTE(6, N_C), .duration = 15 },
+    [SND_SE_CANCEL] = { .duration = 8, .ssg_period = 800, .ssg_vol = 15, .ssg_decay = 2 },
+    [SND_SE_ERROR]  = { .duration = 15, .ssg_period = 1200, .ssg_vol = 15, .ssg_decay = 1 },
+    [SND_SE_COIN]   = { .use_fm = 1, .tone_num = 1, .note = NOTE(7, N_E), .duration = 10 },
+    [SND_SE_BEEP]   = { .duration = 10, .ssg_period = 400, .ssg_vol = 15 },
+};
+
 static void snd_init_se_table(void)
 {
-    SndSE_Def *t = g_snd.se_table;
     int i;
+    for (i = 0; i < SND_SE_MAX; i++)
+        g_snd.se_table[i] = snd_se_defaults[i];
+}
 
-    /* 全エントリをゼロクリア */
-    for (i = 0; i < SND_SE_MAX; i++) {
-        t[i].use_fm = 0;
-        t[i].tone_num = 0;
-        t[i].note = 0;
-        t[i].duration = 0;
-        t[i].ssg_period = 0;
-        t[i].ssg_vol = 0;
-        t[i].ssg_decay = 0;
+/* Save the most recent BGM state only on the first borrowing. */
+static void snd_borrow_bgm(SndBorrowState *borrow, int channel)
+{
+    if (!borrow->borrowed && g_snd.bgm.playing) {
+        int i;
+        borrow->saved_was_sounding = 0;
+        for (i = g_snd.bgm.pos; i >= 0; i--) {
+            if (g_snd.bgm.notes[i].channel == channel) {
+                borrow->saved_tone = g_snd.bgm.notes[i].tone;
+                borrow->saved_note = g_snd.bgm.notes[i].note;
+                borrow->saved_was_sounding =
+                    (g_snd.bgm.notes[i].note != SND_REST);
+                break;
+            }
+        }
     }
-
-    /* SE_CURSOR: SSG 短いピッ */
-    t[SND_SE_CURSOR].use_fm = 0;
-    t[SND_SE_CURSOR].ssg_period = 200;
-    t[SND_SE_CURSOR].ssg_vol = 12;
-    t[SND_SE_CURSOR].ssg_decay = 3;
-    t[SND_SE_CURSOR].duration = 5;    /* 50ms */
-
-    /* SE_SELECT: FM 決定音 (ベル音色, C6) */
-    t[SND_SE_SELECT].use_fm = 1;
-    t[SND_SE_SELECT].tone_num = 1;    /* ベル */
-    t[SND_SE_SELECT].note = NOTE(6, N_C);
-    t[SND_SE_SELECT].duration = 15;   /* 150ms */
-
-    /* SE_CANCEL: SSG 低音ブッ */
-    t[SND_SE_CANCEL].use_fm = 0;
-    t[SND_SE_CANCEL].ssg_period = 800;
-    t[SND_SE_CANCEL].ssg_vol = 15;
-    t[SND_SE_CANCEL].ssg_decay = 2;
-    t[SND_SE_CANCEL].duration = 8;    /* 80ms */
-
-    /* SE_ERROR: SSG ブブッ (低いノイズ的) */
-    t[SND_SE_ERROR].use_fm = 0;
-    t[SND_SE_ERROR].ssg_period = 1200;
-    t[SND_SE_ERROR].ssg_vol = 15;
-    t[SND_SE_ERROR].ssg_decay = 1;
-    t[SND_SE_ERROR].duration = 15;    /* 150ms */
-
-    /* SE_COIN: FM 高音ピコ (ベル, E7) */
-    t[SND_SE_COIN].use_fm = 1;
-    t[SND_SE_COIN].tone_num = 1;      /* ベル */
-    t[SND_SE_COIN].note = NOTE(7, N_E);
-    t[SND_SE_COIN].duration = 10;     /* 100ms */
-
-    /* SE_BEEP: SSG ビープ */
-    t[SND_SE_BEEP].use_fm = 0;
-    t[SND_SE_BEEP].ssg_period = 400;
-    t[SND_SE_BEEP].ssg_vol = 15;
-    t[SND_SE_BEEP].ssg_decay = 0;
-    t[SND_SE_BEEP].duration = 10;     /* 100ms */
+    borrow->borrowed = 1;
 }
 
 /* ======================================================================== */
@@ -568,22 +546,7 @@ static void snd_fm_se_start(int tone_num, int note, int duration)
         fm_note_off(SND_FM_SE_CH);
     }
 
-    /* BGM の FM Ch2 の現在状態を保存 */
-    if (!borrow->borrowed && g_snd.bgm.playing) {
-        int i;
-        borrow->saved_was_sounding = 0;
-        for (i = g_snd.bgm.pos; i >= 0; i--) {
-            if (g_snd.bgm.notes[i].channel == SND_FM_SE_CH) {
-                borrow->saved_tone = g_snd.bgm.notes[i].tone;
-                borrow->saved_note = g_snd.bgm.notes[i].note;
-                borrow->saved_was_sounding =
-                    (g_snd.bgm.notes[i].note != SND_REST);
-                break;
-            }
-        }
-    }
-
-    borrow->borrowed = 1;
+    snd_borrow_bgm(borrow, SND_FM_SE_CH);
 
     fm_note_off(SND_FM_SE_CH);
     fm_set_tone_num(SND_FM_SE_CH, tone_num);
@@ -606,22 +569,7 @@ static void snd_ssg_se_start(u16 period, u8 vol, u8 decay, int duration)
         ssg_volume(SND_SSG_SE_CH, 0);
     }
 
-    /* BGM の SSG ChC の現在状態を保存 */
-    if (!borrow->borrowed && g_snd.bgm.playing) {
-        int i;
-        borrow->saved_was_sounding = 0;
-        for (i = g_snd.bgm.pos; i >= 0; i--) {
-            if (g_snd.bgm.notes[i].channel == SND_SSG_SE_LOGICAL) {
-                borrow->saved_tone = g_snd.bgm.notes[i].tone;
-                borrow->saved_note = g_snd.bgm.notes[i].note;
-                borrow->saved_was_sounding =
-                    (g_snd.bgm.notes[i].note != SND_REST);
-                break;
-            }
-        }
-    }
-
-    borrow->borrowed = 1;
+    snd_borrow_bgm(borrow, SND_SSG_SE_LOGICAL);
 
     ssg_volume(SND_SSG_SE_CH, 0);
     ssg_tone(SND_SSG_SE_CH, period);
@@ -639,8 +587,6 @@ static void snd_ssg_se_start(u16 period, u8 vol, u8 decay, int duration)
 
 void snd_init(void)
 {
-    int i;
-
     g_snd.master_enable = 1;
     g_snd.bgm_persist = 0;
     g_snd.bgm.playing = 0;
@@ -651,10 +597,6 @@ void snd_init(void)
     g_snd.ssg_se.active = 0;
     g_snd.fm_borrow.borrowed = 0;
     g_snd.ssg_borrow.borrowed = 0;
-
-    for (i = 0; i < SND_SE_MAX; i++) {
-        g_snd.se_table[i].duration = 0;
-    }
 
     snd_init_se_table();
 }
