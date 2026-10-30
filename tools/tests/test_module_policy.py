@@ -1,4 +1,8 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
+CHECK = dict(name='module-policy-host', tier=1,
+    covers=['tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'build/checks.d/check-module-policy-host.mk', 'tools/check_map.d/check-module-policy-host.yaml', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'kernel/v86/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'userland/system/hsync_bootold.inc', 'userland/system/hsync_protect.inc', 'userland/shell/sh_redraw.inc', 'build/kernel.*', 'build/out/*', 'lib/crc32_core.inc', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=0.718344)
+
 import copy
 from pathlib import Path
 import re
@@ -117,3 +121,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_module_policy.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

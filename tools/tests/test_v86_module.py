@@ -2,6 +2,10 @@
 No CPU exception is simulated by a host signal stack. Hardware entry is PM's
 NP21/W check; shm-user covers exact PTE/caller/ESP0 restoration separately.
 """
+CHECK = dict(name='v86-module-host', tier=1,
+    covers=['kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/crc32_core.inc', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'build/checks.d/check-module-runtime-host.mk', 'tools/check_map.d/check-module-runtime-host.yaml', 'kernel/v86/v86_module.c', 'kernel/v86/v86_module.h', 'kernel/v86/v86_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/v86_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/v86_module_host.c', 'tools/check_map.d/check-v86-module-host.yaml', 'build/checks.d/check-v86-module-host.mk', 'build/v86-module.ld', 'kernel/v86/v86.c', 'kernel/v86/v86_entry.asm', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_mem.h', 'kernel/v86/v86_snapshot.c', 'kernel/v86/v86_bios.c', 'kernel/v86/v86_bios.h', 'kernel/v86/v86_io.c', 'kernel/v86/v86_io.h', 'kernel/v86/v86_pic.c', 'kernel/v86/v86_pic.h', 'kernel/v86/v86_kbd.c', 'kernel/v86/v86_kbd.h', 'kernel/module/module.h', 'arch/x86/kernel/double_fault.c', 'arch/x86/kernel/tss.h', 'mm/paging.h', 'kernel/kselftest.h', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'include/pc98.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/v86/*', 'build/out/v86.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'drivers/video/kcg/kcg_module.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'platform/pc98/display.c', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=3.830264)
+
 import os
 import json
 from pathlib import Path
@@ -112,3 +116,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_v86_module.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

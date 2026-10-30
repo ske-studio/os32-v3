@@ -4,6 +4,10 @@ Reuse the real driver/wrapper ILP32 fixture, actual SQLite stack/guard and R1
 exec landings. Device IRQ/input and CPU transitions are their explicit seams;
 this check does not claim to execute the NP21/W guest acceptance matrix.
 """
+CHECK = dict(name='raw-wait-host', tier=1,
+    covers=['tools/tests/font_guard_inactive.h', 'lib/sqlite3/generated/*', 'tools/prototypes/sqlite_imports.def', 'build/checks.d/check-raw-wait-host.mk', 'drivers/sound/fm/fm.c', 'drivers/sound/fm/fm.h', 'drivers/input/kbd.c', 'drivers/input/kbd.h', 'drivers/char/serial.c', 'drivers/char/serial.h', 'exec/appslot.h', 'exec/appslot.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec.h', 'exec/exec_heap.c', 'exec/exec_kapi_init.inc', 'exec/redir_access.c', 'fs/fd_redirect.h', 'include/con_sink.h', 'kapi/kapi_db.c', 'kapi/kapi_generated.c', 'kernel/console/console.c', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_romkana.c', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'mm/kmalloc.c', 'arch/x86/kernel/setjmp.asm', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_outer.c', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_test.c', 'lib/sqlite3/os32_sqlite_config.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/utf8.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/gen_kapi.py', 'sdk/kapi.json', 'tools/check_map.d/check-raw-wait-host.yaml', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_io.h', 'tools/tests/kapi_audit_host.c', 'tools/tests/sqlite_engine_host.c', 'tools/tests/sqlite_engine_regs.asm', 'tools/tests/test_exec_r1.py', 'tools/tests/test_kapi_audit.py', 'tools/tests/test_sqlite_engine.py', 'userland/tests/raw_wait_test.c', 'tools/tests/raw_wait_guest_host.c', 'tools/tests/raw_wait_late_stop_host.c', 'tools/tests/raw_wait_sql_host.c', 'tools/tests/fep_budget_linux.c', 'tools/fep_to_sqlite.py', 'assets/ipadic/**', 'assets/joyo_kanji.txt', 'arch/x86/kernel/cpu_flags.inc', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'platform/pc98/d2_bind.c', 'drivers/input/kbd_dlog.c', 'kernel/port_service.c', 'kernel/serial_diag.c', 'include/port_service.h', 'include/console_output.h', 'lib/serial_diag.h', 'drivers/char/serial_plan.c', 'drivers/char/serial_plan.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'drivers/char/rtc.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=19.981278)
+
 from kernel_includes import include_flags
 import argparse
 import importlib.util
@@ -222,3 +226,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_raw_wait.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

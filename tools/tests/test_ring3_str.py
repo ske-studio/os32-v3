@@ -12,6 +12,10 @@ test_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと�
 カーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に見る
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 """
+CHECK = dict(name='ring3-str-host', tier=1,
+    covers=['tools/tests/host32.py', 'exec/ring3_str.c', 'tools/tests/ring3_str_host.c', 'tools/check_map.d/check-ring3-str-host.yaml', 'build/checks.d/check-ring3-str-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.227204)
+
 from kernel_includes import include_flags
 import host32
 import pathlib
@@ -41,3 +45,16 @@ if __name__ == "__main__":
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
         print("EXIT ring3_str_host=%d" % rc, flush=True)
         sys.exit(rc)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_ring3_str.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

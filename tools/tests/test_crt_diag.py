@@ -4,6 +4,10 @@ Real kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
 記録: tools/tests/crt_diag_tdd.md
 Run: python3 -B tools/tests/test_crt_diag.py [--mutate]
 """
+CHECK = dict(name='crt-diag-host', tier=1,
+    covers=['kdebug/generated/**', 'kernel/v86/v86_mem.h', 'kdebug/crt_diag.c', 'init/kernel.c', 'init/bootlog.c', 'tools/tests/crt_diag_host.c', 'tools/tests/crt_diag_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-crt-diag-host.yaml', 'build/checks.d/check-crt-diag-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.059122)
+
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -78,3 +82,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_crt_diag.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

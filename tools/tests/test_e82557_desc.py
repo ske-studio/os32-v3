@@ -2,6 +2,10 @@
 """LB3 pure descriptors: byte oracles, target build, executable mutations.
 Record: tools/tests/e82557_desc_tdd.md
 """
+CHECK = dict(name='e82557-desc-host', tier=1,
+    covers=['drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'tools/tests/e82557_desc_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/host32.py', 'tools/check_map.d/check-e82557-desc-host.yaml', 'build/checks.d/check-e82557-desc-host.mk', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_decode.c', 'drivers/net/e82557/lan_module.c', 'tools/tests/e82557_drv_host.c', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.35836)
+
 import pathlib
 import subprocess
 import sys
@@ -81,3 +85,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_e82557_desc.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

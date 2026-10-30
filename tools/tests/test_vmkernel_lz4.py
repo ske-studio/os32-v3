@@ -20,6 +20,10 @@ tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM �
   python3 -B tools/tests/test_vmkernel_lz4.py --target   # デコーダを i386-elf-gcc (ローダと同じ) で組む
   python3 -B tools/tests/test_vmkernel_lz4.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
+CHECK = dict(name='vmkernel-lz4-host', tier=1,
+    covers=['boot/boot_defs.h', 'include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_map.d/check-vmkernel-lz4-host.yaml', 'build/checks.d/check-vmkernel-lz4-host.mk', 'tools/check_artifacts.py', 'boot/bootinfo.inc', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/lz4_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=3.292628)
+
 import host32
 import os
 import pathlib
@@ -474,3 +478,16 @@ def main(args):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_vmkernel_lz4.py', '--real', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

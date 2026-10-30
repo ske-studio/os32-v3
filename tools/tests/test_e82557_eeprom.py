@@ -2,6 +2,10 @@
 """82557 EEPROM contract, clocked model and independent T/S oracles.
 Record: tools/tests/e82557_eeprom_tdd.md
 """
+CHECK = dict(name='e82557-eeprom-host', tier=1,
+    covers=['drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'drivers/pci/pci.h', 'tools/tests/e82557_eeprom_host.c', 'tools/tests/host32.py', 'tools/check_map.d/check-e82557-eeprom-host.yaml', 'build/checks.d/check-e82557-eeprom-host.mk', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.640348)
+
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -146,3 +150,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_e82557_eeprom.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

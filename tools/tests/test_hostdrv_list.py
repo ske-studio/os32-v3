@@ -19,6 +19,10 @@ tools/tests/hostdrv_list_host.c が fs/hostdrv/hostdrv_list_rules.inc を 1 行�
 fs/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる ([C1] GNU11)。
 make・エミュレータ・実配備には一切触れない。
 """
+CHECK = dict(name='hostdrv-list-host', tier=1,
+    covers=['fs/hostdrv/hostdrv_list_rules.inc', 'fs/hostdrv/hostdrvfs.c', 'tools/tests/hostdrv_list_host.c', 'fs/hostdrv/hostdrv_stat_rules.inc', 'fs/vfs_name_rules.inc', 'tools/check_map.d/check-hostdrv-list-host.yaml', 'build/checks.d/check-hostdrv-list-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.49652)
+
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -94,3 +98,16 @@ if __name__ == "__main__":
                   flush=True)
 
         sys.exit(rc)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_hostdrv_list.py', '--target']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

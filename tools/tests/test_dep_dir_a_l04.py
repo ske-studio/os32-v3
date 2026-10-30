@@ -2,6 +2,10 @@
 
 --prepare builds a substituted copy with -Werror without executing a mutant.
 """
+CHECK = dict(name='dep-dir-a-l04-host', tier=1,
+    covers=['include/types.h', 'include/platform_device.h', 'drivers/block/loop_dev.h', 'platform/pc98/device_loop.c', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'kernel/v86/v86_bios.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'exec/exec_kapi_init.inc', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/dep_dir_a_l04_host.c', 'tools/tests/fixtures/dep_dir_a/l04.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-dep-dir-a-l04-host.yaml', 'build/checks.d/check-dep-dir-a-l04-host.mk', 'exec/exec.c', 'exec/exec_image.inc', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=60.0)
+
 from kernel_includes import include_flags
 import argparse
 import hashlib
@@ -94,3 +98,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dep_dir_a_l04.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

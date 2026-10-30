@@ -3,6 +3,10 @@
 python3 -B tools/tests/test_src_layout.py [--mutate]
 Mutants run the same normal cases in small independent trees.
 """
+CHECK = dict(name='src-layout-host', tier=1,
+    covers=['kernel/module/kdebug_imports.def', 'tools/source_roots.py', 'tools/check_arm_compile.py', 'init/kernel.c', 'mm/paging.c', 'arch/x86/kernel/idt.c', 'drivers/ata/ide.c', 'drivers/ata/cd_module.c', 'drivers/video/geforce/geforce_platform.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/cirrus/cirrus_identify.c', 'fs/ext2/ext2_super.c', 'fs/fat/fatfs/ff.c', 'fs/serialfs/serialfs_session.c', 'tools/move_files.py', 'tools/include_resolve.py', 'tools/build_compare.sh', 'tools/build_compare.py', 'tools/gen_build_id.py', 'kernel/module/module.c', 'kernel/ver_format.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_ver_version.py', 'tools/tests/ver_test_utils.py', 'build/checks.d/check-src-layout-host.mk', 'tools/check_map.d/check-src-layout-host.yaml', 'tools/tests/kernel_includes.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=60.0)
+
 import contextlib
 import importlib.util
 import io
@@ -369,3 +373,16 @@ if __name__ == '__main__':
         raise SystemExit(1)
     if '--mutate' in sys.argv:
         mutations()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_src_layout.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

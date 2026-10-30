@@ -14,6 +14,10 @@ tools/tests/cirrus_win_host.c が実物の drivers/video/cirrus/backend_cirrus.c
 読む / リニア窓を旧番地へ戻す / probe が ⑥ の SURFACE を確かめない) を写しの木で組み、この試験が RED になることを見る。
 make・エミュレータ・配備には触れない。
 """
+CHECK = dict(name='cirrus-win-host', tier=1,
+    covers=['include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/check_map.d/check-cirrus-win-host.yaml', 'build/checks.d/check-cirrus-win-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.55569)
+
 from kernel_includes import include_flags
 import host32
 import os
@@ -146,3 +150,16 @@ if __name__ == "__main__":
             failed += mutpar.run_with_control(one_mutation, MUTATIONS,
                                               ("control", MUT_TARGET, "", ""))
     sys.exit(1 if failed else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cirrus_win.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

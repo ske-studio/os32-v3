@@ -2,6 +2,10 @@
 """T2f f1b real nano connection. Log: tools/tests/nano_adapter_tdd.md
 段: T2f f1b
 """
+CHECK = dict(name='nano-adapter-host', tier=1,
+    covers=['sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/nano_adapter_host.c', 'tools/tests/host32.py', 'tools/check_map.d/check-nano-adapter-host.yaml', 'build/checks.d/check-nano-adapter-host.mk', 'tools/tests/mutpar.py', 'sdk/link_guard.py', 'sdk/crt/syscalls.c', 'userland/tests/malloc_arena_test.c', 'sdk/link/app.ld', 'userland/lib/rt/ls.c', 'tools/tests/resident_heap_host.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/appslot.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'include/memmap.h', 'tools/tests/host_arch/**', 'exec/exec_kapi_init.inc', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=33.136144)
+
 from kernel_includes import include_flags
 import argparse
 import importlib.util
@@ -481,3 +485,21 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_nano_adapter.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

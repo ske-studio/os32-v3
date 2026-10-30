@@ -16,6 +16,10 @@ I/O も静的配列も触らないので模型は要らない。
   python3 -B tools/tests/test_pci_decode.py --target   # + i386-elf で pci.c も通す
   python3 -B tools/tests/test_pci_decode.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='pci-decode-host', tier=1,
+    covers=['drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'tools/tests/lspci_cmd_host.c', 'tools/tests/pci_decode_host.c', 'userland/shell/cmd_pci.c', 'userland/shell/pci_verbose.c', 'tools/check_map.d/check-pci-decode-host.yaml', 'build/checks.d/check-pci-decode-host.mk'],
+    needs=[], budget=2.542598)
+
 import pathlib
 import re
 import subprocess
@@ -206,3 +210,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pci_decode.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

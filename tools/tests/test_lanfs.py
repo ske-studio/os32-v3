@@ -5,6 +5,10 @@ Record: tools/tests/lanfs_tdd.md
 No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
+CHECK = dict(name='lanfs-host', tier=1,
+    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'lib/crc32_core.inc', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md', 'build/checks.d/check-lanfs-host.mk', 'tools/check_map.d/check-lanfs-host.yaml'],
+    needs=[], budget=2.257142)
+
 import ctypes as C
 import errno
 import importlib.util
@@ -566,3 +570,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_lanfs.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

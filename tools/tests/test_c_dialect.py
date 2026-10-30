@@ -13,6 +13,10 @@
   python3 -B tools/tests/test_c_dialect.py            # 全ケース
   python3 -B tools/tests/test_c_dialect.py --mutate   # 否定側も
 """
+CHECK = dict(name='c-dialect-host', tier=1,
+    covers=['tools/prototypes/geforce_imports.def', 'tools/prototypes/v86_imports.def', 'tools/clang_ast/**', 'tools/gen_hwdev_pair.py', 'tools/tests/test_clang_ast.py', '**/*.[ch]', '**/*.inc', 'sdk/example/hello/**', 'tools/check_c_dialect.py', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def', 'tools/prototypes/fep_imports.def', 'tools/prototypes/cd_imports.def', 'tools/prototypes/pcm_imports.def', 'tools/prototypes/lan_imports.def', 'tools/prototypes/cirrus_imports.def', 'build/sqlite-proto.mk', 'tools/tests/mutpar.py', 'tools/check_map.d/check-c-dialect-host.yaml', 'build/checks.d/check-c-dialect-host.mk', 'sdk/kapi.json', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/check_map.yaml', 'tools/check_select.py', 'sdk/gen_kapi.py', 'build/kernel.mk', 'build/libs.mk', 'build/os32.ld', 'build/programs.mk', 'sdk/kapi_rust_gen.py', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs', 'tools/pack_name_tables.txt', 'tools/pack_notes.txt', 'tools/gen_memmap.py', 'boot/loader_fat_new.asm', 'arch/x86/kernel/kentry.asm', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=15.059894)
+
 import importlib.util
 import os
 import pathlib
@@ -768,3 +772,16 @@ if __name__ == "__main__":
         except OSError:
             pass  # No /proc: run every translation unit without the cache.
         sys.exit(main(sys.argv[1:]))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_c_dialect.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

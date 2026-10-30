@@ -1,4 +1,8 @@
 """Host dispatch regression: no emulator, shared build, or device access."""
+CHECK = dict(name='boot-splash-host', tier=1,
+    covers=['drivers/video/pc98/pc98_route.h', 'gfx/gfx_vram.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'init/boot_splash.c', 'tools/tests/boot_splash_native_host.c', 'tools/check_map.d/check-boot-splash-host.yaml', 'build/checks.d/check-boot-splash-host.mk', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.400906)
+
 from kernel_includes import include_flags
 from pathlib import Path
 import subprocess
@@ -43,3 +47,16 @@ class NativeBootTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_boot_splash_native.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

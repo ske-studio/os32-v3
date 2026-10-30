@@ -1,6 +1,10 @@
 """T5c-5b real body registration/runtime rollback; hardware callbacks are seams.
 The existing Cirrus windows and three-backend suites cover drawing/lease paths.
 """
+CHECK = dict(name='cirrus-module-host', tier=1,
+    covers=['kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/crc32_core.inc', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'build/checks.d/check-module-runtime-host.mk', 'tools/check_map.d/check-module-runtime-host.yaml', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/cirrus/cirrus_module.h', 'drivers/video/cirrus/cirrus_body.c', 'init/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'gfx/gfx_internal.h', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/cirrus/wab_cirrus.c', 'drivers/video/cirrus/wab_cirrus.h', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/wab_glue_xe10.h', 'drivers/video/cirrus/wab_glue.h', 'tools/prototypes/cirrus_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/cirrus_module_host.c', 'tools/check_map.d/check-cirrus-module-host.yaml', 'build/checks.d/check-cirrus-module-host.mk', 'build/cirrus-module.ld', 'build/cirrus-module.mk', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/cirrus/*', 'build/out/cirrus.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'tools/check_map.d/check-gfx-host.yaml', 'build/checks.d/check-gfx-host.mk', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/cirrus_win_host.c', 'tools/tests/test_cirrus_win.py', 'tools/check_map.d/check-cirrus-win-host.yaml', 'build/checks.d/check-cirrus-win-host.mk', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=8.134388)
+
 import os
 import json
 from pathlib import Path
@@ -193,3 +197,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cirrus_module.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -1,4 +1,8 @@
 """4c/1: independent H/V equations, fixed C values/order, synthetic PLL only."""
+CHECK = dict(name='gfinit-mode-host', tier=1,
+    covers=['tools/tests/gfinit_mode_host.c', 'kdebug/gfinit_mode.c', 'hwdev/gfinit_mode.h', 'kdebug/recover_gf_c.h', 'hwdev/generated/gf_mode_rows.inc', 'tools/gfinit_mode_tables.py', 'tools/gen_recover_tables.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/checks.d/check-gfinit-mode-host.mk', 'tools/check_map.d/check-gfinit-mode-host.yaml', 'kdebug/generated/recover_gf_tables.inc', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll/*.inc', 'lib/crc32_core.inc', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_cleanup_host.inc', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'tools/tests/gf_display_calc_host.inc', 'hwdev/gf/quiesce_rows.h', 'tools/tests/recover_gf_cases_host.inc', 'tools/tests/recover_gf_fixture_host.inc'],
+    needs=[], budget=60.0)
+
 import pathlib
 import subprocess
 import sys
@@ -243,3 +247,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_gfinit_mode.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

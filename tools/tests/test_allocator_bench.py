@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
+CHECK = dict(name='allocator-bench-host', tier=1,
+    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'build/checks.d/check-allocator-bench-host.mk', 'tools/check_map.d/check-allocator-bench-host.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.283154)
+
 from kernel_includes import include_flags
 import argparse
 import importlib.util
@@ -190,3 +194,21 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_allocator_bench.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

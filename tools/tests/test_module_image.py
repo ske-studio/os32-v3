@@ -1,6 +1,10 @@
 """KMOD validation, independent wire fixtures and real GNU11 ILP32 C.
 記録: tools/tests/module_image_tdd.md
 """
+CHECK = dict(name='module-image-host', tier=1,
+    covers=['kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'build/checks.d/check-module-image-host.mk', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/crc32_core.inc', 'lib/le_internal.h', 'tools/check_map.d/check-module-image-host.yaml', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.759112)
+
 from kernel_includes import include_flags
 import os
 from pathlib import Path
@@ -290,3 +294,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_module_image.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

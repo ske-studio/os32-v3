@@ -9,6 +9,10 @@ LAN では見出しと ok (tag) の 2 行だけ、使えなければ 1 行の後
   python3 -B tools/tests/test_kpeek_cli.py            # 全ケース
   python3 -B tools/tests/test_kpeek_cli.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='kpeek-cli-host', tier=1,
+    covers=['userland/shell/cmd_peek.c', 'userland/shell/shell.h', 'lib/crc32_core.inc', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'tools/tests/kpeek_cli_host.c', 'tools/check_map.d/check-kpeek-cli-host.yaml', 'build/checks.d/check-kpeek-cli-host.mk'],
+    needs=[], budget=1.251798)
+
 import pathlib
 import re
 import subprocess
@@ -118,3 +122,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kpeek_cli.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

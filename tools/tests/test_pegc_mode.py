@@ -16,6 +16,10 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 --mutate は否定側。順序・値・FIFO 待ち・上限を 1 か所ずつ壊した版を写しの木で
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
+CHECK = dict(name='pegc-mode-host', tier=1,
+    covers=['include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'tools/check_map.d/check-pegc-mode-host.yaml', 'build/checks.d/check-pegc-mode-host.mk', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.12602)
+
 from kernel_includes import include_flags
 import host32
 import os
@@ -350,3 +354,16 @@ if __name__ == "__main__":
             failed += mutpar.run_with_control(one_mutation, MUTATIONS,
                                               ("control", MUT_TARGET, "", ""))
     sys.exit(1 if failed else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pegc_mode.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

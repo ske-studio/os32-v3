@@ -1,4 +1,8 @@
 """L19: fixed pre-move restore/ready/cell traces; isolated resident closure."""
+CHECK = dict(name='dep-dir-d-display-host', tier=1,
+    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'kernel/v86/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'build/checks.d/check-dep-dir-d-display-host.mk', 'tools/check_map.d/check-dep-dir-d-display-host.yaml', 'tools/check_map.yaml', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=60.0)
+
 from kernel_includes import include_flags
 import argparse
 import gzip
@@ -133,3 +137,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dep_dir_d_display.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

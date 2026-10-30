@@ -1,6 +1,10 @@
 """T5c-2b real adapter/runtime rollback and PCM playback (ILP32 runtime, LP64 device fixture).
 Port I/O and relocated init are explicit host seams; no hardware claim.
 """
+CHECK = dict(name='pcm-module-host', tier=1,
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'include/time_units.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/crc32_core.inc', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'build/checks.d/check-module-runtime-host.mk', 'tools/check_map.d/check-module-runtime-host.yaml', 'drivers/sound/cs4231/pcm_module.c', 'drivers/sound/cs4231/pcm_module.h', 'drivers/sound/cs4231/pcm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/pcm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/pcm_module_host.c', 'tools/check_map.d/check-pcm-module-host.yaml', 'build/checks.d/check-pcm-module-host.mk', 'build/pcm-module.ld', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'drivers/sound/cs4231/pcm_cs4231.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'drivers/dma/dma8237.h', 'mm/kmalloc.h', 'include/sys.h', 'include/kprintf.h', 'tools/tests/pcm_module_playback_host.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/test_pcm_cs4231.py', 'tools/tests/pcm_hostshim/io.h', 'tools/tests/mutpar.py', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/pcm/*', 'build/out/pcm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/pcm_contract.h', 'include/dma_contract.h', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=4.72497)
+
 import os
 import json
 from pathlib import Path
@@ -154,3 +158,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_pcm_module.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

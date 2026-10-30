@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Timing regressions with two fake checks; mutations never touch the live tree."""
+CHECK = dict(name='check-times-host', tier=1,
+    covers=['tools/check_time.py', 'build/sdk.mk', 'sdk/kapi.json', 'build/checks.d/check-check-times-host.mk', 'tools/check_map.d/check-check-times-host.yaml'],
+    needs=[], budget=3.75216)
+
 import contextlib
 import io
 import os
@@ -126,3 +130,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_check_times.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

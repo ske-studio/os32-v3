@@ -12,6 +12,10 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
+CHECK = dict(name='font-source-host', tier=1,
+    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'tools/tests/font_source_host.c', 'tools/check_map.d/check-font-source-host.yaml', 'build/checks.d/check-font-source-host.mk', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.680518)
+
 from kernel_includes import include_dirs, include_flags
 import pathlib
 import re
@@ -257,3 +261,16 @@ if __name__ == "__main__":
         if run_all(ROOT, tmp) != 0:
             sys.exit(1)
     sys.exit(mutate() if "--mutate" in sys.argv[1:] else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_font_source.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

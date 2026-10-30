@@ -1,4 +1,8 @@
 """L16a/L16b: immutable pre-move attribute/grid/cursor traces and isolated closure."""
+CHECK = dict(name='dep-dir-d-console-host', tier=1,
+    covers=['include/console_attr.h', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'build/checks.d/check-dep-dir-d-console-host.mk', 'tools/check_map.d/check-dep-dir-d-console-host.yaml', 'tools/check_map.yaml', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/memmap.h', 'include/tvram.h', 'kernel/console/console.c', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/platform_io.h', 'tools/tests/dep_dir_d_console_grid_host.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=60.0)
+
 from kernel_includes import include_flags
 import argparse
 import gzip
@@ -225,3 +229,16 @@ def grid_verify(compile_mutations=False, mutate=False):
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dep_dir_d_console.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

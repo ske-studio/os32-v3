@@ -8,6 +8,10 @@ sudo・mount・配備・エミュレータには一切触らない (tsv fixture 
 
   python3 -B tools/tests/test_cfg.py [--target] [--sanitize] [case ...]
 """
+CHECK = dict(name='cfg-host', tier=1,
+    covers=['assets/settings/defaults.tsv', 'fs/vfs_fd.c', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/mk_settings_db.py', 'tools/tests/cfg_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/cmds/cfg.c', 'userland/lib/cfg/cfg_backend.c', 'userland/lib/cfg/cfg_enum.c', 'userland/lib/cfg/cfg_import.c', 'userland/lib/cfg/cfg_init.c', 'userland/lib/cfg/cfg_json.c', 'userland/lib/cfg/cfg_tsv.c', 'userland/lib/cfg/libos32cfg.c', 'userland/tests/cfg_bench.c', 'tools/check_map.d/check-cfg-host.yaml', 'build/checks.d/check-cfg-host.mk', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    needs=[], budget=17.669612)
+
 import pathlib
 import subprocess
 import sys
@@ -258,3 +262,16 @@ if __name__ == "__main__":
         failed += tsv_parity(exe)
         print(f"SUMMARY {len(cases)-failed}/{len(cases)} PASS", flush=True)
         sys.exit(bool(failed))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_cfg.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

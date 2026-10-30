@@ -35,6 +35,10 @@
 恒等の対照を C と Python に 1 本ずつ入れ、それが GREEN であること (試験の枠が
 壊れていないこと) も見る。
 """
+CHECK = dict(name='serialfs-host', tier=1,
+    covers=['lib/le_internal.h', 'include/time_units.h', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/tests/mutpar.py', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'drivers/net/e82557/e82557.h', 'init/sysconfig.h', 'drivers/net/e82557/lan_module.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'kernel/sys.c', 'lib/crc32.c', 'lib/kstring.h', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/serialfs_host.py', 'tools/tests/serial_gate_host.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serialfs_host.c', 'tools/tests/serialfs_session_host.c', 'tools/tests/test_serial_portc.py', 'userland/shell/serial_watchdog.c', 'userland/system/hsync_bootold.inc', 'lib/crc32_core.inc', 'tools/check_map.d/check-serialfs-host.yaml', 'build/checks.d/check-serialfs-host.mk', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=17.325232)
+
 from kernel_includes import include_flags
 import errno
 import importlib.util
@@ -1767,3 +1771,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_serialfs.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

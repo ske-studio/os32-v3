@@ -4,6 +4,10 @@ Capture is deliberately separate from the command-line verifier. See the
 fixture manifest for revisions, inputs, shim/source hashes and procedure.
 All positive and later mutation builds use the same copied directory tree.
 """
+CHECK = dict(name='dep-dir-c-memory-host', tier=1,
+    covers=['mm/memory_boot.c', 'platform/pc98/memory.c', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'drivers/**/*.h', 'exec/*.h', 'sdk/include/os32/*.h', 'tools/tests/host_arch/*.h', 'tools/tests/host32.py', 'tools/tests/dep_dir_c_memory_host.c', 'tools/tests/fixtures/dep_dir_c/**', 'build/checks.d/check-dep-dir-c-memory-host.mk', 'tools/check_map.d/check-dep-dir-c-memory-host.yaml', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
+    needs=[], budget=60.0)
+
 from kernel_includes import include_dirs, include_flags
 import gzip
 import argparse
@@ -276,3 +280,16 @@ if __name__ == '__main__':
         verify()
         if args.mutate:
             mutations()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dep_dir_c_memory.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

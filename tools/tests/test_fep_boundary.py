@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """T5a-1 B2 production facade/dictionary, ordinary failures and lifetime mutants."""
+CHECK = dict(name='fep-boundary-host', tier=1,
+    covers=['tools/tests/fep_boundary_host.c', 'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/fep_budget_linux.c', 'tools/tests/test_vfs_fd_path.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'lib/kstring.h', 'include/redir_access.h', 'include/io.h', 'fs/vfs_fd.c', 'fs/vfs.h', 'lib/sqlite3/**', 'sdk/kapi.json', 'build/checks.d/check-fep-boundary-host.mk', 'tools/check_map.d/check-fep-boundary-host.yaml', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=4.429502)
+
 from kernel_includes import include_flags
 import argparse
 import os
@@ -103,3 +107,21 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_fep_boundary.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

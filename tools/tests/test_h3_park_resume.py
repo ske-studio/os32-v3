@@ -2,6 +2,10 @@
 
 Only successful compilation followed by runtime failure counts as mutation RED.
 """
+CHECK = dict(name='h3-park-resume-host', tier=1,
+    covers=['exec/exec.c', 'exec/exec_kapi_init.inc', 'arch/x86/kernel/isr_stub.asm', 'tools/h3_layout.c', 'tools/h3_park_resume.py', 'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/h3_state_host.c', 'tools/tests/host32.py', 'userland/tests/h3/fixture.inc', 'userland/tests/h3/protocol.h', 'userland/tests/h3/state.inc', 'userland/tests/h3a.c', 'userland/tests/h3b.c', 'tools/check_map.d/check-h3-park-resume-host.yaml', 'build/checks.d/check-h3-park-resume-host.mk', 'tools/np21w_mcp/gui.py', 'tools/np21w_mcp/gui_desc.py', 'userland/gshell/src/wm.rs', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=3.404878)
+
 import argparse
 from contextlib import contextmanager
 import importlib.util
@@ -1722,3 +1726,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_h3_park_resume.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

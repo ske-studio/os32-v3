@@ -21,6 +21,10 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
+CHECK = dict(name='shell-service-host', tier=1,
+    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/check_map.d/check-shell-service-host.yaml', 'build/checks.d/check-shell-service-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.566306)
+
 from kernel_includes import include_dirs, include_flags
 import re
 import host32
@@ -284,3 +288,16 @@ if __name__ == "__main__":
         if rc:
             sys.exit(rc)
     sys.exit(mutate() if "--mutate" in sys.argv else 0)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_shell_service.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

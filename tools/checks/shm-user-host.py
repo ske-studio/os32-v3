@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+CHECK = dict(name='shm-user-host', tier=1,
+    covers=['include/platform_emergency.h', 'tools/tests/font_guard_inactive.h', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'include/pegc.h', 'gfx/gfx.h', 'kernel/v86/v86_snapshot.c', 'kernel/v86/v86_module.h', 'mm/paging.*', 'mm/shm.*', 'kernel/v86/v86_mem.*', 'kernel/v86/v86.h', 'arch/x86/kernel/idt.h', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'kernel/v86/v86_bios.c', 'init/kernel.c', 'mm/pgalloc.*', 'mm/physmem.*', 'exec/exec.c', 'exec/exec_image.inc', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/shm_user_host.c', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'exec/exec_kapi_init.inc', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'tools/check_map.d/check-shm-user-host.yaml', 'build/checks.d/check-shm-user-host.mk', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=['make:all'], budget=4.193996)
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_shm_user.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

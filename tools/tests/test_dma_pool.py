@@ -17,6 +17,10 @@
   python3 -B tools/tests/test_dma_pool.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
+CHECK = dict(name='dma-pool-host', tier=1,
+    covers=['drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/check_map.d/check-dma-pool-host.yaml', 'build/checks.d/check-dma-pool-host.mk', 'tools/tests/dma_boot_host.c', 'init/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'drivers/base/dev.h', 'fs/vfs.h', 'include/pc98.h', 'init/boot_platform.h', 'init/boot_platform.c', 'init/boot_display.h', 'init/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    needs=[], budget=2.26078)
+
 from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import os
@@ -229,3 +233,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dma_pool.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

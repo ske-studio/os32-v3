@@ -28,6 +28,10 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 「`DB_SHM_BLOCK_SIZE` を直接引き算している箇所を残さない」をそのまま
 規則にして、`kapi/kapi_db.c` がこの名前を 1 回も出さないことを見る。
 """
+CHECK = dict(name='db-errstr-host', tier=1,
+    covers=['fs/vfs_fd.c', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/check_map.d/check-db-errstr-host.yaml', 'build/checks.d/check-db-errstr-host.mk', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/exec_image.inc', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'exec/exec_kapi_init.inc', 'kernel/ime/ime_dict.c', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=10.560164)
+
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -409,3 +413,16 @@ if __name__ == "__main__":
             failed += run_mutations(tmp, sqlite_obj, san)
             run_api_mutations(tmp, sqlite_obj, api_exe)
         sys.exit(bool(failed))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_db_errstr.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

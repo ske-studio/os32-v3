@@ -3,6 +3,10 @@
 --mutate always runs the normal control first, then builds two source mutants.
 --i686-elf PATH also extracts and checks the target descriptor (no live reads).
 """
+CHECK = dict(name='gui-desc-host', tier=1,
+    covers=['userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py', 'tools/check_map.d/check-gui-desc-host.yaml', 'build/checks.d/check-gui-desc-host.mk'],
+    needs=[], budget=8.338902)
+
 from pathlib import Path
 import argparse
 import json
@@ -211,3 +215,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_gui_desc.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

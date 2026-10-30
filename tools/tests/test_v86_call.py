@@ -1,6 +1,10 @@
 """T7a-2a: genuine admission/staging + T2 uaccess; ILP32 CPU boundaries.
 Normal controls always run before compiled runtime-RED mutations.
 """
+CHECK = dict(name='v86-call-host', tier=1,
+    covers=['exec/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/check_map.d/check-v86-call-host.yaml', 'build/checks.d/check-v86-call-host.mk', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.61671)
+
 from kernel_includes import include_flags
 import os
 from pathlib import Path
@@ -65,3 +69,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_v86_call.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
+CHECK = dict(name='ime-display-host', tier=1,
+    covers=['drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'build/checks.d/check-ime-display-host.mk', 'tools/check_map.d/check-ime-display-host.yaml', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=60.0)
+
 from kernel_includes import include_flags
 import argparse
 from pathlib import Path
@@ -50,3 +54,21 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_ime_display.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

@@ -2,6 +2,10 @@
 
 --mutate covers T1 plus ADDENDUM.r2 §3 T1b mutations; hardware PTE work is T2.
 """
+CHECK = dict(name='recover-host', tier=1,
+    covers=['kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'include/types.h', 'lib/crc32_core.inc', 'tools/tests/recover_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-recover-host.yaml', 'build/checks.d/check-recover-host.mk', 'tools/tests/recover_descriptor_host.inc', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'tools/tests/recover_t2_host.inc', 'include/memmap.h', 'tools/tests/recover_hostshim/io.h', 'arch/x86/kernel/idt.h', 'kernel/time/pit_math.h', 'platform/pc98/platform_io.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/pc98.h', 'mm/paging.h', 'include/io.h', 'tools/tests/recover_t3_host.inc', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover_wire.h', 'drivers/pci/pci_decode.h', 'include/config.h', 'kdebug/recover_diag.h', 'tools/tests/recover_diag_host.inc', 'kdebug/recover_cleanup.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h'],
+    needs=[], budget=5.096848)
+
 import os
 import pathlib
 import subprocess
@@ -217,3 +221,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_recover.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

@@ -36,6 +36,10 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
 先に make all を通してから実行すること (4 と 5 は成果物を読む)。
 """
 
+CHECK = dict(name='packages-host', tier=0,
+    covers=['apps', 'game', 'userland/deploy.yaml', 'docs/manpages/**', 'assets/**', 'build/core.yaml', 'build/deploy.mk', 'build/image.mk', 'build/packages.yaml', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'init/kernel.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/install_fresh_host.c', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c', 'userland/system/install_recover.inc', 'fs/vfs_name_rules.inc', 'tools/check_map.d/check-packages-host.yaml', 'build/checks.d/check-packages-host.mk', 'tools/check_artifacts.py'],
+    needs=['make:all'], budget=5.522438)
+
 import os
 import random
 import pathlib
@@ -848,3 +852,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_packages.py']
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

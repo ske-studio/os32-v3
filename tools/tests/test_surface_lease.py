@@ -1,4 +1,8 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
+CHECK = dict(name='surface-lease-host', tier=1,
+    covers=['kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/check_map.d/check-surface-lease-host.yaml', 'build/checks.d/check-surface-lease-host.mk', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'exec/exec_image.inc', 'README.md', 'docs/INDEX.md', 'exec/exec_kapi_init.inc', 'exec/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=4.257004)
+
 from kernel_includes import include_flags
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
               'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
@@ -176,3 +180,21 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print(error.stdout or '', error.stderr or '')
         raise
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    if not ctx.runners:
+        return 1
+    for index, runner in enumerate(ctx.runners):
+        print('HOST32_RUNNERS=' + runner, flush=True)
+        argv = ['python3', '-B', 'tools/tests/test_surface_lease.py', '--runner', runner]
+        if ctx.mutate and index == 0:
+            argv.append('--mutate')
+        rc = subprocess.call(argv, cwd=ctx.root, env=base_env, close_fds=False)
+        if rc:
+            return rc
+    return 0

@@ -1,6 +1,10 @@
 """T5c-2a real adapter/runtime rollback and FM/snd playback, ILP32.
 Port I/O and relocated init are explicit host seams; no hardware claim.
 """
+CHECK = dict(name='fm-module-host', tier=1,
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'drivers/base/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/crc32_core.inc', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'build/checks.d/check-module-runtime-host.mk', 'tools/check_map.d/check-module-runtime-host.yaml', 'drivers/sound/fm/fm_module.c', 'drivers/sound/fm/fm_module.h', 'drivers/sound/fm/fm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/fm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/fm_module_host.c', 'tools/check_map.d/check-fm-module-host.yaml', 'build/checks.d/check-fm-module-host.mk', 'build/fm-module.ld', 'drivers/sound/fm/fm.c', 'drivers/sound/fm/fm.h', 'drivers/sound/fm/snd_engine.c', 'drivers/sound/fm/snd_engine.h', 'tools/tests/fm_playback_host.c', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/fm/*', 'build/out/fm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/fm_contract.h', 'tools/tests/kernel_includes.py'],
+    needs=['make:all'], budget=4.722122)
+
 import os
 import json
 from pathlib import Path
@@ -109,3 +113,16 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_fm_module.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

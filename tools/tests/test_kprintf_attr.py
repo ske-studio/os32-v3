@@ -15,6 +15,10 @@
   python3 -B tools/tests/test_kprintf_attr.py --target   # + i386-elf で通す
   python3 -B tools/tests/test_kprintf_attr.py --mutate   # 否定側 (変異が RED か)
 """
+CHECK = dict(name='kprintf-attr-host', tier=1,
+    covers=['lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'tools/check_map.d/check-kprintf-attr-host.yaml', 'build/checks.d/check-kprintf-attr-host.mk', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h'],
+    needs=[], budget=1.44383)
+
 import pathlib
 import re
 import subprocess
@@ -162,3 +166,16 @@ if __name__ == "__main__":
         if "--mutate" in args:
             rc += mutate(tmp)
         sys.exit(bool(rc))
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kprintf_attr.py', '--target', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

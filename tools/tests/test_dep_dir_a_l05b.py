@@ -2,6 +2,10 @@
 
 --prepare builds the substituted copy with -Werror, without running a mutant.
 """
+CHECK = dict(name='dep-dir-a-l05b-host', tier=1,
+    covers=['fs/vfs_name_rules.inc', 'include/types.h', 'include/config.h', 'include/ide_contract.h', 'include/platform_device.h', 'drivers/ata/ide.h', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l05b_host.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_fmt_*.inc', 'fs/fat/fatfs_vfs.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'fs/ide_limits.h', 'build/checks.d/check-dep-dir-a-l05b-host.mk', 'tools/check_map.d/check-dep-dir-a-l05b-host.yaml', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=60.0)
+
 from kernel_includes import include_flags
 import argparse
 from pathlib import Path
@@ -71,3 +75,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_dep_dir_a_l05b.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

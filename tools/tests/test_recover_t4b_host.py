@@ -1,4 +1,8 @@
 """T4b-9: one fake reader, split terminal/EOT suppression, real monitor."""
+CHECK = dict(name='recover-t4b-host', tier=1,
+    covers=['tools/accept/recover_t4b_host.py', 'tools/rshell_recover.py', 'tools/tests/test_rshell_recover.py', 'tools/tests/mutpar.py', 'build/checks.d/check-recover-t4b-host.mk', 'tools/check_map.d/check-recover-t4b-host.yaml', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py'],
+    needs=[], budget=0.913418)
+
 from contextlib import redirect_stderr
 import io
 import json
@@ -118,3 +122,16 @@ def main():
 
 if __name__ == '__main__':
     raise SystemExit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_recover_t4b_host.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0

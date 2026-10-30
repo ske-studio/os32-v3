@@ -17,6 +17,10 @@ LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Eth
   python3 -B tools/tests/test_kpeek.py            # ホスト + i386-elf
   python3 -B tools/tests/test_kpeek.py --mutate   # 否定側 (変異が RED になるか)
 """
+CHECK = dict(name='kpeek-host', tier=1,
+    covers=['kdebug/kpeek.c', 'kdebug/kpeek.h', 'kdebug/kpeek_allow.c', 'kdebug/kpeek_allow.h', 'mm/paging.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'include/pc98.h', 'include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'lib/crc32_core.inc', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-kpeek-host.yaml', 'build/checks.d/check-kpeek-host.mk', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=1.591064)
+
 from kernel_includes import include_flags
 import host32
 import os
@@ -157,3 +161,16 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def run(ctx) -> int:
+    import os
+    import shlex
+    import subprocess
+    base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
+    env = dict(base_env)
+    argv = ['python3', '-B', 'tools/tests/test_kpeek.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
+    rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
+    if rc:
+        return rc
+    return 0
