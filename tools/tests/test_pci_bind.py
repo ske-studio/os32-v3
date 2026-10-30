@@ -16,7 +16,7 @@ DECLINE → 次へ / QUARANTINE → 打ち切り の遷移は全部踏める。
   python3 -B tools/tests/test_pci_bind.py --mutate   # 否定側
 """
 CHECK = dict(name='pci-bind-host', tier=1,
-    covers=['drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'tools/tests/pci_bind_host.c', 'tools/check_map.d/check-pci-bind-host.yaml', 'build/checks.d/check-pci-bind-host.mk', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h', 'drivers/pci/pci_decode.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'tools/tests/pci_bind_host.c', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h', 'drivers/pci/pci_decode.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.533466)
 
 from kernel_includes import include_flags

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kstring-c-host', tier=1,
-    covers=['tools/tests/host32.py', 'lib/kstring_asm.asm', 'lib/kstring_c.c', 'include/types.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'tools/tests/kstring_c_host.c', 'tools/tests/test_kstring_c.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-kstring-c-host.yaml', 'build/checks.d/check-kstring-c-host.mk'],
+    covers=['tools/tests/host32.py', 'lib/kstring_asm.asm', 'lib/kstring_c.c', 'include/types.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'tools/tests/kstring_c_host.c', 'tools/tests/test_kstring_c.py', 'tools/tests/mutpar.py'],
     needs=[], budget=2.268254)
 
 

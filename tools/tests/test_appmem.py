@@ -3,7 +3,7 @@
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
 CHECK = dict(name='appmem-host', tier=1,
-    covers=['exec/appmem.c', 'tools/tests/appmem_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-appmem-host.yaml', 'build/checks.d/check-appmem-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['exec/appmem.c', 'tools/tests/appmem_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.542672)
 
 from kernel_includes import include_flags

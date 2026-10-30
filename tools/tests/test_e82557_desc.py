@@ -3,7 +3,7 @@
 Record: tools/tests/e82557_desc_tdd.md
 """
 CHECK = dict(name='e82557-desc-host', tier=1,
-    covers=['drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'tools/tests/e82557_desc_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/host32.py', 'tools/check_map.d/check-e82557-desc-host.yaml', 'build/checks.d/check-e82557-desc-host.mk', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_decode.c', 'drivers/net/e82557/lan_module.c', 'tools/tests/e82557_drv_host.c', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'tools/tests/e82557_desc_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_decode.c', 'drivers/net/e82557/lan_module.c', 'tools/tests/e82557_drv_host.c', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.35836)
 
 import pathlib

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-services-host', tier=1,
-    covers=['kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'tools/tests/ver_services_host.c', 'lib/kstring_asm.asm', 'include/types.h', 'tools/tests/test_ver_services.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'build/checks.d/check-ver-services-host.mk', 'tools/check_map.d/check-ver-services-host.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'tools/tests/ver_services_host.c', 'lib/kstring_asm.asm', 'include/types.h', 'tools/tests/test_ver_services.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 

@@ -40,7 +40,7 @@
 - **`check-privileged` は構造上落ちない**。findings があっても `--strict` を付けなければ
   `return 0`。表の ○ は「`check` の列にある」であって「門である」ではない。
 - **`tools/tests/paging_rebuild_host.c` の現行 2 モードは自動ゲートで走る**。
-  [`check-memory-host.mk`](../build/checks.d/check-memory-host.mk) は
+  [`memory-host.py`](../tools/checks/memory-host.py) は
   [`test_paging_bounds.py`](../tools/tests/test_paging_bounds.py) に `--rebuild nonmaster` /
   `--rebuild rollback` を渡す。旧 `sparse` / `attrs` / `final` は対象の legacy 分岐とともに撤去済み。
   workspace の PTE 検査は `memory_boot` の `metadata_pte` / `workspace_pte` が担う

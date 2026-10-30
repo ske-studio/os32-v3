@@ -4,7 +4,7 @@ Only individual volatile stores are instrumented; formatting/loops remain
 product code. Both positive and mutation builds use an isolated header tree.
 """
 CHECK = dict(name='dep-dir-d-emergency-host', tier=1,
-    covers=['init/boot_display.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c', 'kernel/v86/v86_mem.c', 'platform/pc98/emergency.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'sdk/include/os32/*.h', 'tools/tests/dep_dir_d_emergency_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'build/checks.d/check-dep-dir-d-emergency-host.mk', 'tools/check_map.d/check-dep-dir-d-emergency-host.yaml', 'tools/check_map.yaml', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
+    covers=['init/boot_display.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c', 'kernel/v86/v86_mem.c', 'platform/pc98/emergency.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'sdk/include/os32/*.h', 'tools/tests/dep_dir_d_emergency_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_dirs, include_flags

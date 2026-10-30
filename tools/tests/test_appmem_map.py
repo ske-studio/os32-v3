@@ -3,7 +3,7 @@
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
 CHECK = dict(name='appmem-map-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-appmem-map-host.yaml', 'build/checks.d/check-appmem-map-host.mk', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.190182)
 
 from kernel_includes import include_flags

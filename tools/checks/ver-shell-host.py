@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-shell-host', tier=1,
-    covers=['userland/shell/cmd_base.c', 'sdk/include/os32/os32_ver_info.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'tools/tests/test_ver_shell.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'build/checks.d/check-ver-shell-host.mk', 'tools/check_map.d/check-ver-shell-host.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['userland/shell/cmd_base.c', 'sdk/include/os32/os32_ver_info.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'tools/tests/test_ver_shell.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 

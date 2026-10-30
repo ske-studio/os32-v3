@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lightweight preflight fixtures; no network or OS build."""
 CHECK = dict(name='preflight-host', tier=1,
-    covers=['tools/preflight.sh', 'tools/fetch_fonts.py', 'build/checks.d/check-preflight-host.mk', 'tools/check_map.d/check-preflight-host.yaml'],
+    covers=['tools/preflight.sh', 'tools/fetch_fonts.py'],
     needs=[], budget=4.009738)
 
 import hashlib

@@ -17,7 +17,7 @@
   python3 -B tools/tests/test_time_math.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='time-math-host', tier=1,
-    covers=['kernel/time/ktime.c', 'kernel/time/time_math.c', 'tools/tests/time_math_host.c', 'tools/check_map.d/check-time-math-host.yaml', 'build/checks.d/check-time-math-host.mk', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'kernel/time/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/time/ktime.c', 'kernel/time/time_math.c', 'tools/tests/time_math_host.c', 'include/types.h', 'kernel/time/ktime.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'kernel/time/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.233208)
 
 from kernel_includes import include_flags

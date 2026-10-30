@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='rshell-serial-host', tier=1,
-    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/serialfs_host.py', 'tools/tests/test_rshell_serial.py', 'tools/check_map.d/check-rshell-serial-host.yaml', 'build/checks.d/check-rshell-serial-host.mk'],
+    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/serialfs_host.py', 'tools/tests/test_rshell_serial.py'],
     needs=[], budget=0.995684)
 
 

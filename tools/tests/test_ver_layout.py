@@ -1,6 +1,6 @@
 """V3: compile the public value ABI in C89 and execute all layout checks."""
 CHECK = dict(name='ver-layout-host', tier=1,
-    covers=['sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_layout_host.c', 'include/types.h', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'build/checks.d/check-ver-layout-host.mk', 'tools/check_map.d/check-ver-layout-host.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_layout_host.c', 'include/types.h', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from ver_test_utils import ROOT, arguments, execute

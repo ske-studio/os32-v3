@@ -16,7 +16,7 @@
   python3 -B tools/tests/test_build_id.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
 CHECK = dict(name='build-id-host', tier=1,
-    covers=['tools/gen_build_id.py', 'tools/check_map.d/check-build-id-host.yaml', 'build/checks.d/check-build-id-host.mk'],
+    covers=['tools/gen_build_id.py'],
     needs=[], budget=3.9187)
 
 import os

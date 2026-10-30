@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='term-render', tier=1,
-    covers=['userland/libos32term_render/**', 'userland/libos32term/**', 'tools/check_map.d/check-term-render.yaml', 'build/checks.d/check-term-render.mk'],
+    covers=['userland/libos32term_render/**', 'userland/libos32term/**'],
     needs=[], budget=0.961692)
 
 

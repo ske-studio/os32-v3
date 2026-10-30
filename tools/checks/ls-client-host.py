@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ls-client-host', tier=1,
-    covers=['sdk/crt/syscalls.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/include/os32/os32_ls.h', 'sdk/rust/os32api/src/ls.rs', 'sdk/rust/os32api/src/lib.rs', 'tools/tests/ls_client_host.rs', 'sdk/rust/i686-os32-none.json', 'tools/tests/ls_client_host.c', 'tools/tests/test_ls_client.py', 'tools/tests/host32.py', 'build/checks.d/check-ls-client-host.mk', 'tools/check_map.d/check-ls-client-host.yaml', 'build/sdk/crt/*'],
+    covers=['sdk/crt/syscalls.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/include/os32/os32_ls.h', 'sdk/rust/os32api/src/ls.rs', 'sdk/rust/os32api/src/lib.rs', 'tools/tests/ls_client_host.rs', 'sdk/rust/i686-os32-none.json', 'tools/tests/ls_client_host.c', 'tools/tests/test_ls_client.py', 'tools/tests/host32.py', 'build/sdk/crt/*'],
     needs=['make:all'], budget=2.781058)
 
 

@@ -15,7 +15,7 @@
   python3 -B tools/tests/test_dma8237.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='dma8237-host', tier=1,
-    covers=['drivers/dma/dma8237.c', 'drivers/dma/dma8237_math.c', 'tools/tests/dma8237_host.c', 'tools/check_map.d/check-dma8237-host.yaml', 'build/checks.d/check-dma8237-host.mk', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/dma/dma8237.c', 'drivers/dma/dma8237_math.c', 'tools/tests/dma8237_host.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.530974)
 
 from kernel_includes import include_flags

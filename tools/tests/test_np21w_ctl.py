@@ -11,7 +11,7 @@ FakeHttp、時計と sleep は FakeClock に差し替える。実プロセス・
 `make check-tools-host` の discover からは除外して二重実行を避ける。
 """
 CHECK = dict(name='np21w-ctl-host', tier=1,
-    covers=['tools/np21w_ctl.py', 'tools/check_map.d/check-np21w-ctl-host.yaml', 'build/checks.d/check-np21w-ctl-host.mk', 'tools/nhd_profile.py'],
+    covers=['tools/np21w_ctl.py', 'tools/nhd_profile.py'],
     needs=[], budget=1.368864)
 
 import base64

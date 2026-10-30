@@ -20,7 +20,7 @@ fs/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる ([C1] GNU11)�
 make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='hostdrv-list-host', tier=1,
-    covers=['fs/hostdrv/hostdrv_list_rules.inc', 'fs/hostdrv/hostdrvfs.c', 'tools/tests/hostdrv_list_host.c', 'fs/hostdrv/hostdrv_stat_rules.inc', 'fs/vfs_name_rules.inc', 'tools/check_map.d/check-hostdrv-list-host.yaml', 'build/checks.d/check-hostdrv-list-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['fs/hostdrv/hostdrv_list_rules.inc', 'fs/hostdrv/hostdrvfs.c', 'tools/tests/hostdrv_list_host.c', 'fs/hostdrv/hostdrv_stat_rules.inc', 'fs/vfs_name_rules.inc', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.49652)
 
 from kernel_includes import include_flags

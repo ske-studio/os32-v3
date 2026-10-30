@@ -1,6 +1,6 @@
 """L19: fixed pre-move restore/ready/cell traces; isolated resident closure."""
 CHECK = dict(name='dep-dir-d-display-host', tier=1,
-    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'kernel/v86/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'build/checks.d/check-dep-dir-d-display-host.mk', 'tools/check_map.d/check-dep-dir-d-display-host.yaml', 'tools/check_map.yaml', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'kernel/v86/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -20,7 +20,7 @@ FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/display.c'
 HEADER = 'platform/pc98/display_private.h'
 HARNESS = 'tools/tests/dep_dir_d_display_host.c'
-# Filled from the compiler's include closure, then fixed in source and check_map.
+# Filled from the compiler's include closure, then fixed in source and CHECK covers.
 FILES = ('drivers/video/pc98/pc98_route.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'kernel/v86/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c')
 MUTATIONS = (
     ('0x00, 0x00, 0x00, 0x19,', '0x00, 0x00, 0x00, 0x18,'),
@@ -98,9 +98,8 @@ def main():
         raise AssertionError('ambiguous anchor accepted')
     for old,new in MUTATIONS:
         once(source,old,new)
-    mapping=(ROOT/'tools/check_map.d/check-dep-dir-d-display-host.yaml').read_text()
     for rel in FILES:
-        assert '\n- '+rel+'\n' in mapping, rel
+        assert rel in CHECK['covers'], rel
     make=subprocess.run(['make','-qp'],cwd=ROOT,capture_output=True,text=True)
     assert make.returncode in (0,1), make.stderr
     resident(make.stdout)

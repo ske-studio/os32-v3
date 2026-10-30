@@ -1,6 +1,6 @@
 """Regression checks for scheduling, controls, fixture reuse and cleanup."""
 CHECK = dict(name='ci-stab-host', tier=1,
-    covers=['drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'tools/tests/dep_dir_a_l05b_host.c', 'fs/fat/fatfs/diskio.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_fmt_*.inc', 'tools/tests/font_guard_inactive.h', 'sdk/link/app_sys.ld', 'tools/run_host_group.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/check_map.d/check-ci-stab-host.yaml', 'build/checks.d/check-ci-stab-host.mk', 'CLAUDE.md', 'assets/filetypes', 'boot/bootinfo.inc', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'boot/vk32_boot.c', 'build/app.conf', 'build/core.yaml', 'build/os32.ld', 'build/packages.yaml', 'build/programs.mk', 'docs/02_memory.md', 'docs/07_shell.md', 'drivers/net/ne2000/lgy98.c', 'drivers/block/pc98pt.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'fs/vfs_name_rules.inc', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'kapi/kapi_host.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/kentry.asm', 'kernel/kstack_hw.c', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/tss.c', 'lib/sqlite3/sqlite_stack.asm', 'tools/tests/stack_entry_host.c', 'tools/tests/test_stack_entry.py', 'init/kernel.c', 'mm/paging.c', 'mm/paging_app.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'lib/crc32_core.inc', 'lib/lz4.c', 'net/link.c', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'tools/deploy_protect.py', 'tools/gen_memmap.py', 'tools/guest_tests.py', 'tools/host_agent.py', 'tools/hostdrv_deploy.py', 'tools/lan_bridge.py', 'tools/mkpkg.py', 'tools/mkshlib.py', 'tools/mkvmkernel.py', 'tools/tests/appmem_host.c', 'tools/tests/appmem_map_host.c', 'tools/tests/guest_tests.txt', 'tools/tests/install_fresh_host.c', 'tools/tests/net_link_host.c', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_appmem.py', 'tools/tests/test_appmem_map.py', 'tools/tests/test_guest_tests.py', 'tools/tests/test_lan_bridge.py', 'tools/tests/test_net_link.py', 'tools/tests/test_owner_reclaim.py', 'tools/tests/test_packages.py', 'tools/tests/test_vk32_crc.py', 'tools/tests/test_vmkernel_lz4.py', 'tools/tests/vk32_host.c', 'tools/tests/vk32_old_lz4_3e22825.asm', 'tools/tests/vmkernel_lz4_host.c', 'userland/deploy.yaml', 'userland/rust/libos32gui/src/shlib.rs', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c', 'userland/system/install_recover.inc', 'exec/exec_heap.c', 'mm/kmalloc.c', 'tools/tests/memmap_boot_host.c', 'tools/tests/test_memmap_boot.py', 'tools/tests/test_memmap_gen.py', 'tools/tests/test_hostdrv_manifest.py', 'tools/tests/test_ring3_guard.py', 'tools/tests/test_memory_boot.py', 'tools/tests/test_ledger.py', 'tools/tests/kernel_layout.py', 'tools/tests/test_gfx_boot.py', 'tools/tests/test_device_reservation.py', 'tools/tests/test_app_bb_overlap.py', 'tools/tests/test_shlib_high.py', 'tools/tests/test_*.py', 'build/checks.d/*.mk', 'exec/appslot.c', 'exec/access_walk.c', 'exec/redir_access.c', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'sdk/gen_kapi.py', 'build/kernel.mk', 'build/out/kernel.bin', 'build/out/*', 'kernel/sqlite_engine.c', 'arch/x86/kernel/cpu_flags.inc', 'boot/fat12_defs.inc', 'boot/lz4_defs.inc', 'boot/pc98_defs.inc', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'tools/tests/test_dep_dir_a_l05b.py', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l06_host.c', 'platform/pc98/device_fs.c', 'fs/ext2/ext2.h', 'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h', 'include/memmap.h', 'include/platform_device.h', 'include/time_units.h', 'include/types.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'fs/vfs.c', 'fs/serialfs/serialfs_session.c', 'tools/tests/test_dep_dir_a_l06.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l06.json', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/test_shm_user.py', 'tools/check_map.d/check-dep-dir-a-l06-host.yaml', 'build/checks.d/check-dep-dir-a-l06-host.mk', 'include/config.h', 'include/ide_contract.h', 'drivers/ata/ide.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'hwdev/generated/hwdev_contract.h', 'tools/tests/dep_dir_a_l05a_host.c', 'tools/check_map.d/check-dep-dir-a-l05a-host.yaml', 'build/checks.d/check-dep-dir-a-l05a-host.mk', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/test_dep_dir_a_l08.py', 'tools/tests/dep_dir_a_l08_host.c', 'tools/tests/fixtures/dep_dir_a/l08.json', 'platform/pc98/device_pci.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.h', 'kapi/kapi_sys.c', 'include/platform_host.h', 'include/net_eth.h', 'drivers/char/np2sysp.h', 'net/link.h', 'platform/pc98/device_host.c', 'tools/tests/dep_dir_a_l09_host.c', 'tools/tests/test_dep_dir_a_l09.py', 'tools/tests/fixtures/dep_dir_a/l09.json', 'build/checks.d/check-dep-dir-a-l09-host.mk', 'tools/check_map.d/check-dep-dir-a-l09-host.yaml', 'tools/tests/fixtures/dep_dir_a/l10.json', 'tools/tests/test_dep_dir_a_l10.py', 'build/checks.d/check-dep-dir-a-l10-host.mk', 'tools/check_map.d/check-dep-dir-a-l10-host.yaml', 'tools/tests/dep_dir_a_l10_host.c', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_module.c', 'platform/pc98/device_kcg.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    covers=['sdk/rust/os32api/src/ls.rs', 'tools/tests/ls_client_host.c', 'tools/tests/ls_client_host.rs', 'userland/lib/rt/ls.c', 'tools/checks/**/*.py', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'tools/tests/dep_dir_a_l05b_host.c', 'fs/fat/fatfs/diskio.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_fmt_*.inc', 'tools/tests/font_guard_inactive.h', 'sdk/link/app_sys.ld', 'tools/run_host_group.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'CLAUDE.md', 'assets/filetypes', 'boot/bootinfo.inc', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'boot/vk32_boot.c', 'build/app.conf', 'build/core.yaml', 'build/os32.ld', 'build/packages.yaml', 'build/programs.mk', 'docs/02_memory.md', 'docs/07_shell.md', 'drivers/net/ne2000/lgy98.c', 'drivers/block/pc98pt.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'fs/vfs_name_rules.inc', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'kapi/kapi_host.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/kentry.asm', 'kernel/kstack_hw.c', 'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/tss.c', 'lib/sqlite3/sqlite_stack.asm', 'tools/tests/stack_entry_host.c', 'tools/tests/test_stack_entry.py', 'init/kernel.c', 'mm/paging.c', 'mm/paging_app.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'lib/crc32_core.inc', 'lib/lz4.c', 'net/link.c', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'tools/deploy_protect.py', 'tools/gen_memmap.py', 'tools/guest_tests.py', 'tools/host_agent.py', 'tools/hostdrv_deploy.py', 'tools/lan_bridge.py', 'tools/mkpkg.py', 'tools/mkshlib.py', 'tools/mkvmkernel.py', 'tools/tests/appmem_host.c', 'tools/tests/appmem_map_host.c', 'tools/tests/guest_tests.txt', 'tools/tests/install_fresh_host.c', 'tools/tests/net_link_host.c', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_appmem.py', 'tools/tests/test_appmem_map.py', 'tools/tests/test_guest_tests.py', 'tools/tests/test_lan_bridge.py', 'tools/tests/test_net_link.py', 'tools/tests/test_owner_reclaim.py', 'tools/tests/test_packages.py', 'tools/tests/test_vk32_crc.py', 'tools/tests/test_vmkernel_lz4.py', 'tools/tests/vk32_host.c', 'tools/tests/vk32_old_lz4_3e22825.asm', 'tools/tests/vmkernel_lz4_host.c', 'userland/deploy.yaml', 'userland/rust/libos32gui/src/shlib.rs', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c', 'userland/system/install_recover.inc', 'exec/exec_heap.c', 'mm/kmalloc.c', 'tools/tests/memmap_boot_host.c', 'tools/tests/test_memmap_boot.py', 'tools/tests/test_memmap_gen.py', 'tools/tests/test_hostdrv_manifest.py', 'tools/tests/test_ring3_guard.py', 'tools/tests/test_memory_boot.py', 'tools/tests/test_ledger.py', 'tools/tests/kernel_layout.py', 'tools/tests/test_gfx_boot.py', 'tools/tests/test_device_reservation.py', 'tools/tests/test_app_bb_overlap.py', 'tools/tests/test_shlib_high.py', 'tools/tests/test_*.py', 'exec/appslot.c', 'exec/access_walk.c', 'exec/redir_access.c', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'sdk/gen_kapi.py', 'build/kernel.mk', 'build/out/kernel.bin', 'build/out/*', 'kernel/sqlite_engine.c', 'arch/x86/kernel/cpu_flags.inc', 'boot/fat12_defs.inc', 'boot/lz4_defs.inc', 'boot/pc98_defs.inc', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'tools/tests/test_dep_dir_a_l05b.py', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l06_host.c', 'platform/pc98/device_fs.c', 'fs/ext2/ext2.h', 'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h', 'include/memmap.h', 'include/platform_device.h', 'include/time_units.h', 'include/types.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'fs/vfs.c', 'fs/serialfs/serialfs_session.c', 'tools/tests/test_dep_dir_a_l06.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l06.json', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/test_shm_user.py', 'include/config.h', 'include/ide_contract.h', 'drivers/ata/ide.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'hwdev/generated/hwdev_contract.h', 'tools/tests/dep_dir_a_l05a_host.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/test_dep_dir_a_l08.py', 'tools/tests/dep_dir_a_l08_host.c', 'tools/tests/fixtures/dep_dir_a/l08.json', 'platform/pc98/device_pci.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.h', 'kapi/kapi_sys.c', 'include/platform_host.h', 'include/net_eth.h', 'drivers/char/np2sysp.h', 'net/link.h', 'platform/pc98/device_host.c', 'tools/tests/dep_dir_a_l09_host.c', 'tools/tests/test_dep_dir_a_l09.py', 'tools/tests/fixtures/dep_dir_a/l09.json', 'tools/tests/fixtures/dep_dir_a/l10.json', 'tools/tests/test_dep_dir_a_l10.py', 'tools/tests/dep_dir_a_l10_host.c', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_module.c', 'platform/pc98/device_kcg.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc', 'arch/x86/kernel/iret_user.inc', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/ring3_entry.asm', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'exec/os32x_hdr.c', 'exec/ring3_str.c', 'exec/surface_query.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'init/kaudit_boot.c', 'kdebug/kselftest.c', 'kdebug/kselftest/abort_admit.inc', 'kdebug/kselftest/app_band_pde.inc', 'kdebug/kselftest/appmem.inc', 'kdebug/kselftest/bootinfo.inc', 'kdebug/kselftest/bootlog.inc', 'kdebug/kselftest/caller_boot.inc', 'kdebug/kselftest/con_sink_render_gate.inc', 'kdebug/kselftest/cpu_calibrate.inc', 'kdebug/kselftest/dma8237.inc', 'kdebug/kselftest/dma_pool.inc', 'kdebug/kselftest/fd_redirect_access_guard.inc', 'kdebug/kselftest/gfx_ledger.inc', 'kdebug/kselftest/gfx_owner.inc', 'kdebug/kselftest/h4_backing.inc', 'kdebug/kselftest/heap.inc', 'kdebug/kselftest/ime_render_gate.inc', 'kdebug/kselftest/irq_dynamic.inc', 'kdebug/kselftest/kapi_layout.inc', 'kdebug/kselftest/kbd_cmd.inc', 'kdebug/kselftest/kbd_inject.inc', 'kdebug/kselftest/kcg_display_return.inc', 'kdebug/kselftest/kprintf.inc', 'kdebug/kselftest/kprintf_attr.inc', 'kdebug/kselftest/ledger.inc', 'kdebug/kselftest/map_user_keep.inc', 'kdebug/kselftest/mem.inc', 'kdebug/kselftest/memmap.inc', 'kdebug/kselftest/memmap_pool_user.inc', 'kdebug/kselftest/pcm.inc', 'kdebug/kselftest/pit_setup.inc', 'kdebug/kselftest/pool_model.inc', 'kdebug/kselftest/ring3_pd.inc', 'kdebug/kselftest/ring3_wm_guard.inc', 'kdebug/kselftest/slack_cycle.inc', 'kdebug/kselftest/str.inc', 'kdebug/kselftest/time_now.inc', 'kdebug/kselftest/tramp_user_str.inc', 'kdebug/kselftest/utoa.inc', 'kernel/gui.c', 'kernel/input_service.c', 'kernel/irq/irq.c', 'kernel/sys.c', 'mm/memory_boot.c', 'mm/shlib.c', 'platform/pc98/memory.c', 'platform/pc98/pci_resources.c', 'tools/gen_build_id.py', 'tools/tests/app_bb_overlap_host.c', 'tools/tests/device_reservation_stage_host.c', 'tools/tests/gfx_boot_host.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/memory_boot_host.c', 'tools/tests/ring3_guard_host.c', 'tools/tests/shlib_high_host.c'],
     needs=['make:all'], budget=35.614012)
 
 import os
@@ -89,15 +89,23 @@ def mutation_control_skips(source):
 
 
 def mutation_test_sources(root):
-    """All host suites plus Python scripts referenced by checks.d recipes."""
+    """All host suites, CHECK entry points and scripts named by their run bodies."""
+    import ast
     import re
     paths = set(root.glob('tools/tests/test_*.py'))
-    for recipe in root.glob('**/checks.d/*.mk'):
-        text = recipe.read_text()
-        for rel in re.findall(r'(?:(?:[\w.-]+/)+[\w.-]+\.py|test_[\w]+\.py)', text):
-            path = root / (rel if '/' in rel else 'tools/tests/' + rel)
-            if path.is_file():
-                paths.add(path)
+    entries = set(root.glob('tools/checks/**/*.py')) | paths
+    for entry in sorted(entries):
+        tree = ast.parse(entry.read_text())
+        if not any(isinstance(n, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == 'CHECK' for t in n.targets)
+                for n in tree.body):
+            continue
+        paths.add(entry)
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef) or node.name != 'run':
+                continue
+            for rel in re.findall(r'(?:[\w.-]+/)+[\w.*-]+\.py', ast.unparse(node)):
+                paths.update(p for p in root.glob(rel) if p.is_file())
     return sorted(paths)
 
 
@@ -109,6 +117,9 @@ def mutation_test_sources(root):
 # The following helpers accept mutant data, not the suite's mutation-mode flag;
 # their callers run a normal fixture before calling the helper with each mutant.
 CONTROL_SKIP_ALLOW = {
+    ('tools/checks/' + 'run.py', 'not ctx.mutate and elapsed > check.budget', 1):
+        'Reports elapsed normal-control time after run(ctx) has finished; skips no controls.',
+
     ('tools/tests/' + 'test_double_fault.py', 'mutant', 1):
         'Checks one fixture result; main runs run(folder) before descriptor mutants.',
     ('tools/tests/' + 'test_e10c_lifecycle.py', "mutant[0] == 'gcap-ops'", 1):
@@ -130,7 +141,7 @@ CONTROL_SKIP_ALLOW = {
 
     ('tools/tests/' + 'test_display_cleanup.py', "'--mutate' not in sys.argv", 1):
         'Returns after all normal runtime controls; only mutations follow.',
-    ('tools/tests/' + 'test_c_dialect.py', "'--mutate' in argv or check_select.dialect_variants_needed()", 1):
+    ('tools/tests/' + 'test_c_dialect.py', "'--mutate' in argv or checks_run.dialect_variants_needed()", 1):
         'Optional make variants; normal dialect controls always precede this branch.',
 }
 
@@ -263,31 +274,34 @@ class InfrastructureTests(unittest.TestCase):
                 self.assertFalse(host32._receipt(directory, 'qemu').exists())
 
     def test_make_runs_each_runner_once_and_mutates_first(self):
-        import re
         import json
         root = pathlib.Path(__file__).resolve().parents[2]
-        macro = re.search(r'^define host32_check\n.*?^endef',
-                          (root / 'build/sdk.mk').read_text(), re.M | re.S)[0]
         with tempfile.TemporaryDirectory() as directory:
             tmp = pathlib.Path(directory)
+            (tmp / 'tools/checks').mkdir(parents=True)
+            (tmp / 'tools/tests').mkdir()
+            for rel in ('tools/checks/run.py', 'tools/checks/ls-client-host.py'):
+                (tmp / rel).write_text((root / rel).read_text())
             calls = tmp / 'calls'
-            python = tmp / 'python3'
-            python.write_text('#!/usr/bin/python3\nimport json, sys\n'
-                              + 'with open(' + repr(str(calls)) + ', "a") as f: '
-                              + 'f.write(json.dumps(sys.argv[1:]) + "\\n")\n')
-            python.chmod(0o755)
-            (tmp / 'Makefile').write_text(macro + '\ncheck:\n\t$(call host32_check,probe.py)\n')
-            env = {k: v for k, v in os.environ.items() if k not in ('MAKEFLAGS', 'MFLAGS')}
-            env['PATH'] = str(tmp) + os.pathsep + env['PATH']
+            (tmp / 'tools/tests/test_ls_client.py').write_text(
+                'import json, sys\nwith open(' + repr(str(calls)) + ', "a") as f: '
+                + 'f.write(json.dumps(sys.argv[1:]) + "\\n")\n')
+            (tmp / 'Makefile').write_text(
+                'export HOST32_RUNNERS MUTATE\ncheck:\n'
+                '\t+python3 -B tools/checks/run.py --run ls-client-host\n'
+                '.PHONY: all\nall:\n\t@:\n')
+            env = {k: v for k, v in os.environ.items() if k not in (
+                'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL', 'MAKEOVERRIDES', 'CHECK_TIME_CHILD',
+                'CC_FILES_JSON', 'CC_TIER', 'MUTATE_TARGETS')}
             for mutate in (False, True):
                 calls.unlink(missing_ok=True)
                 subprocess.run(['make', 'check', 'HOST32_RUNNERS=qemu native',
-                                'MUT=' + ('--mutate' if mutate else '')],
+                                'MUTATE=' + str(int(mutate))],
                                cwd=tmp, env=env, capture_output=True, check=True)
                 got = [json.loads(line) for line in calls.read_text().splitlines()]
                 self.assertEqual(got, [
-                    ['-B', 'tools/tests/probe.py', '--runner', 'qemu'] + (['--mutate'] if mutate else []),
-                    ['-B', 'tools/tests/probe.py', '--runner', 'native']])
+                    ['--runner', 'qemu'] + (['--mutate'] if mutate else []),
+                    ['--runner', 'native']])
             result = subprocess.run(['make', 'check', 'HOST32_RUNNERS='],
                                     cwd=tmp, env=env, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
@@ -321,12 +335,12 @@ class InfrastructureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / 'tools/tests').mkdir(parents=True)
-            (root / 'build/checks.d').mkdir(parents=True)
+            (root / 'tools/checks').mkdir(parents=True)
             (root / 'tools/tests/test_new.py').write_text('normal()\n')
             (root / 'tools/custom.py').write_text('if not mutate:\n    normal()\n')
-            (root / 'build/checks.d/custom.mk').write_text('check:\n\tpython3 tools/custom.py $(MUT)\n')
+            (root / 'tools/checks/custom.py').write_text("CHECK = dict(name='custom', covers=[], budget=1)\ndef run(ctx):\n    return call('tools/custom.py')\n")
             sources = mutation_test_sources(root)
-            self.assertEqual(len(sources), 2)
+            self.assertEqual(len(sources), 3)
             self.assertEqual(sum(bool(mutation_control_skips(p.read_text())) for p in sources), 1)
 
     def test_allowance_is_single_occurrence(self):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-state-name-host', tier=1,
-    covers=['kernel/module/module.c', 'tools/tests/test_ver_state_name.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'build/checks.d/check-ver-state-name-host.mk', 'tools/check_map.d/check-ver-state-name-host.yaml', 'include/types.h', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/module/module.c', 'tools/tests/test_ver_state_name.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/types.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 

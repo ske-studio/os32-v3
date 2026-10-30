@@ -22,7 +22,7 @@
 E10 を見たことにならない。
 """
 CHECK = dict(name='edit-doc-host', tier=1,
-    covers=['sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'userland/rust/edit_gui/host/doc_tests.rs', 'userland/rust/edit_gui/src/doc.rs', 'userland/rust/libos32gui/host/textcore_tests.rs', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui/src/textcore.rs', 'userland/rust/libos32gui/src/uistate.rs', 'userland/rust/libos32gui/src/widget.rs', 'tools/tests/mutpar.py', 'tools/check_map.d/check-edit-doc-host.yaml', 'build/checks.d/check-edit-doc-host.mk', 'sdk/rust/os32api/src/**'],
+    covers=['sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'userland/rust/edit_gui/host/doc_tests.rs', 'userland/rust/edit_gui/src/doc.rs', 'userland/rust/libos32gui/host/textcore_tests.rs', 'userland/rust/libos32gui/src/app.rs', 'userland/rust/libos32gui/src/textcore.rs', 'userland/rust/libos32gui/src/uistate.rs', 'userland/rust/libos32gui/src/widget.rs', 'tools/tests/mutpar.py', 'sdk/rust/os32api/src/**'],
     needs=[], budget=3.092158)
 
 import argparse

@@ -4,7 +4,7 @@
   python3 -B tools/tests/test_np21w_ini_live.py --mutate   # plus mutants (make check-np21w-ini-live-host)
 """
 CHECK = dict(name='np21w-ini-live-host', tier=1,
-    covers=['tools/np21w_ini_live.py', 'tools/np21w_ini.py', 'tools/check_map.d/check-np21w-ini-live-host.yaml', 'build/checks.d/check-np21w-ini-live-host.mk'],
+    covers=['tools/np21w_ini_live.py', 'tools/np21w_ini.py'],
     needs=[], budget=2.110098)
 
 import copy

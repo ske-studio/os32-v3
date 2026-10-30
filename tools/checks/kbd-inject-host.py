@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kbd-inject-host', tier=1,
-    covers=['tools/tests/host32.py', 'kernel/kbd_inject.c', 'tools/tests/kbd_inject_host.c', 'tools/tests/test_kbd_inject.py', 'kernel/console/con_sink.c', 'tools/check_map.d/check-kbd-inject-host.yaml', 'build/checks.d/check-kbd-inject-host.mk', 'exec/appslot.h', 'include/kbd_inject.h', 'include/con_sink.h', 'include/launch.h', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/host32.py', 'kernel/kbd_inject.c', 'tools/tests/kbd_inject_host.c', 'tools/tests/test_kbd_inject.py', 'kernel/console/con_sink.c', 'exec/appslot.h', 'include/kbd_inject.h', 'include/con_sink.h', 'include/launch.h', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.386072)
 
 

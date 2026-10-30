@@ -13,7 +13,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 (res_owner_get/set)・GUI 判定 (con_sink_is_enabled)・kstrncpy の 3 つだけ。
 """
 CHECK = dict(name='launch-host', tier=1,
-    covers=['tools/tests/host32.py', 'exec/launch.c', 'tools/tests/launch_host.c', 'exec/appslot.c', 'tools/check_map.d/check-launch-host.yaml', 'build/checks.d/check-launch-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/host32.py', 'exec/launch.c', 'tools/tests/launch_host.c', 'exec/appslot.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.447408)
 
 from kernel_includes import include_flags

@@ -21,7 +21,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['include/time_units.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/check_map.d/check-pcm-cs4231-host.yaml', 'build/checks.d/check-pcm-cs4231-host.mk', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/time_units.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.028504)
 
 from kernel_includes import include_flags

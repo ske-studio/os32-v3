@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ring3-guard-host', tier=1,
-    covers=['tools/tests/host32.py', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/ring3_str.c', 'fs/fd_redirect.c', 'kernel/gui.c', 'arch/x86/kernel/isr_handlers.c', 'sdk/kapi.json', 'tools/tests/ring3_guard_host.c', 'tools/tests/test_ring3_guard.py', 'tools/check_map.d/check-ring3-guard-host.yaml', 'build/checks.d/check-ring3-guard-host.mk', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/host32.py', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/ring3_str.c', 'fs/fd_redirect.c', 'kernel/gui.c', 'arch/x86/kernel/isr_handlers.c', 'sdk/kapi.json', 'tools/tests/ring3_guard_host.c', 'tools/tests/test_ring3_guard.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.127266)
 
 

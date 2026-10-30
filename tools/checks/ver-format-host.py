@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-format-host', tier=1,
-    covers=['kernel/ver_format.c', 'kernel/ver_info.h', 'kernel/module/module.c', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'arch/x86/kernel/idt.h', 'include/input_service.h', 'kernel/input_service.c', 'platform/pc98/d2_bind.c', 'include/bootinfo.h', 'include/config.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_format_host.c', 'tools/tests/test_ver_format.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'build/checks.d/check-ver-format-host.mk', 'tools/check_map.d/check-ver-format-host.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/ver_format.c', 'kernel/ver_info.h', 'kernel/module/module.c', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'arch/x86/kernel/idt.h', 'include/input_service.h', 'kernel/input_service.c', 'platform/pc98/d2_bind.c', 'include/bootinfo.h', 'include/config.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_format_host.c', 'tools/tests/test_ver_format.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 

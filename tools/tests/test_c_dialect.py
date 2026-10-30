@@ -14,7 +14,7 @@
   python3 -B tools/tests/test_c_dialect.py --mutate   # 否定側も
 """
 CHECK = dict(name='c-dialect-host', tier=1,
-    covers=['tools/prototypes/geforce_imports.def', 'tools/prototypes/v86_imports.def', 'tools/clang_ast/**', 'tools/gen_hwdev_pair.py', 'tools/tests/test_clang_ast.py', '**/*.[ch]', '**/*.inc', 'sdk/example/hello/**', 'tools/check_c_dialect.py', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def', 'tools/prototypes/fep_imports.def', 'tools/prototypes/cd_imports.def', 'tools/prototypes/pcm_imports.def', 'tools/prototypes/lan_imports.def', 'tools/prototypes/cirrus_imports.def', 'build/sqlite-proto.mk', 'tools/tests/mutpar.py', 'tools/check_map.d/check-c-dialect-host.yaml', 'build/checks.d/check-c-dialect-host.mk', 'sdk/kapi.json', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/check_map.yaml', 'tools/check_select.py', 'sdk/gen_kapi.py', 'build/kernel.mk', 'build/libs.mk', 'build/os32.ld', 'build/programs.mk', 'sdk/kapi_rust_gen.py', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs', 'tools/pack_name_tables.txt', 'tools/pack_notes.txt', 'tools/gen_memmap.py', 'boot/loader_fat_new.asm', 'arch/x86/kernel/kentry.asm', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/kernel_includes.py'],
+    covers=['tools/prototypes/geforce_imports.def', 'tools/prototypes/v86_imports.def', 'tools/clang_ast/**', 'tools/gen_hwdev_pair.py', 'tools/tests/test_clang_ast.py', '**/*.[ch]', '**/*.inc', 'sdk/example/hello/**', 'tools/check_c_dialect.py', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/prototypes/sqlite_imports.def', 'tools/prototypes/fep_imports.def', 'tools/prototypes/cd_imports.def', 'tools/prototypes/pcm_imports.def', 'tools/prototypes/lan_imports.def', 'tools/prototypes/cirrus_imports.def', 'build/sqlite-proto.mk', 'tools/tests/mutpar.py', 'sdk/kapi.json', 'sdk/rust/os32api/src/kapi_generated.rs', 'sdk/gen_kapi.py', 'build/kernel.mk', 'build/libs.mk', 'build/os32.ld', 'build/programs.mk', 'sdk/kapi_rust_gen.py', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs', 'tools/pack_name_tables.txt', 'tools/pack_notes.txt', 'tools/gen_memmap.py', 'boot/loader_fat_new.asm', 'arch/x86/kernel/kentry.asm', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/mkshlib.py', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/kernel_includes.py', 'tools/check_arch_asm.py', 'tools/check_le_access.py', 'tools/check_p2v.py', 'tools/check_p2v_allow.txt', 'tools/source_roots.py'],
     needs=['make:all'], budget=15.059894)
 
 import importlib.util
@@ -524,8 +524,13 @@ def case_non_dependency_inputs(cd):
 def case_make_variants():
     # 親の make の旗と変数指定は MAKEFLAGS のまま子の make -n に渡す (Codex P2-1、2 回目 1・2)
     base = dict(os.environ)
-    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
+    for k in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES",
+              "CC_FILES_JSON", "CC_TIER", "CHECK_TIME_CHILD",
+              "KERNEL_CFLAGS", "INC_KERNEL", "C_STD"):
         base.pop(k, None)
+    # The full tree is already built/warmed. Exercise scanner flags without
+    # concurrently rebuilding the live artifacts under conflicting C_STD values.
+    base["CHECK_TIME_CHILD"] = "1"
     runs = [
         ("make check-c-dialect C_STD=-std=gnu89", ["check-c-dialect", "C_STD=-std=gnu89"], {}, False),
         ("C_STD=-std=gnu89 make -e check-c-dialect", ["-e", "check-c-dialect"],
@@ -742,9 +747,9 @@ def main(argv):
     case_suite_cache_owner(cd)
     case_build_coverage(cd)
     case_non_dependency_inputs(cd)
-    sys.path.insert(0, str(ROOT / "tools"))
-    import check_select
-    if "--mutate" in argv or check_select.dialect_variants_needed():
+    sys.path.insert(0, str(ROOT / "tools/checks"))
+    import run as checks_run
+    if "--mutate" in argv or checks_run.dialect_variants_needed():
         warm = run_checker(ROOT)
         check(warm.returncode == 0, 'unmodified tree warms the disposable internal cache: '
               + (warm.stdout + warm.stderr if warm.returncode else 'GREEN'))

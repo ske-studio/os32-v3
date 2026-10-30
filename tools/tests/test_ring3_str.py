@@ -13,7 +13,7 @@ test_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと�
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 """
 CHECK = dict(name='ring3-str-host', tier=1,
-    covers=['tools/tests/host32.py', 'exec/ring3_str.c', 'tools/tests/ring3_str_host.c', 'tools/check_map.d/check-ring3-str-host.yaml', 'build/checks.d/check-ring3-str-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/host32.py', 'exec/ring3_str.c', 'tools/tests/ring3_str_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.227204)
 
 from kernel_includes import include_flags

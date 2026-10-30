@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='docs-status', tier=0,
-    covers=['docs/tasks/**/*.md', 'docs/POLICY_DEV.md', 'tools/check_docs_status.py', 'tools/check_map.d/check-docs-status.yaml', 'build/checks.d/check-docs-status.mk', 'docs/tasks/DEFERRED_TESTS.md'],
+    covers=['docs/tasks/**/*.md', 'docs/POLICY_DEV.md', 'tools/check_docs_status.py', 'docs/tasks/DEFERRED_TESTS.md'],
     needs=[], budget=0.852328)
 
 

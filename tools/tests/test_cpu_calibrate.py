@@ -17,7 +17,7 @@
   python3 -B tools/tests/test_cpu_calibrate.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='cpu-calibrate-host', tier=1,
-    covers=['kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate_math.c', 'tools/tests/cpu_calibrate_host.c', 'tools/check_map.d/check-cpu-calibrate-host.yaml', 'build/checks.d/check-cpu-calibrate-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate_math.c', 'tools/tests/cpu_calibrate_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.27113)
 
 from kernel_includes import include_flags

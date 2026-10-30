@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='term-model', tier=1,
-    covers=['userland/libos32term/**', 'tools/check_map.d/check-term-model.yaml', 'build/checks.d/check-term-model.mk'],
+    covers=['userland/libos32term/**'],
     needs=[], budget=1.055124)
 
 

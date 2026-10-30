@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='sbrk-crt-host', tier=1,
-    covers=['sdk/link/app_sys.ld', 'sdk/crt/syscalls.c', 'sdk/allocator/**', 'tools/tests/test_sbrk_crt.py', 'tools/tests/sbrk_crt_host.c', 'tools/tests/host32.py', 'tools/check_map.d/check-sbrk-crt-host.yaml', 'build/checks.d/check-sbrk-crt-host.mk', 'userland/lib/rt/ls.c'],
+    covers=['sdk/link/app_sys.ld', 'sdk/crt/syscalls.c', 'sdk/allocator/**', 'tools/tests/test_sbrk_crt.py', 'tools/tests/sbrk_crt_host.c', 'tools/tests/host32.py', 'userland/lib/rt/ls.c'],
     needs=[], budget=4.809162)
 
 

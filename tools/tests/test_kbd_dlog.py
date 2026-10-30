@@ -16,7 +16,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
-    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/check_map.d/check-kbd-dlog-host.yaml', 'build/checks.d/check-kbd-dlog-host.mk', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.873258)
 
 from kernel_includes import include_flags

@@ -11,7 +11,7 @@
   python3 -B tools/tests/test_fdc_seek.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='fdc-seek-host', tier=1,
-    covers=['drivers/block/fdc.c', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/check_map.d/check-fdc-seek-host.yaml', 'build/checks.d/check-fdc-seek-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/block/fdc.c', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.113006)
 
 from kernel_includes import include_flags

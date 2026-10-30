@@ -1,6 +1,6 @@
 """ビルド目標の対の部品と、X-7 の明示的な FD 配備を確認する。"""
 CHECK = dict(name='build-no-deploy', tier=1,
-    covers=['build/checks.d/check-build-no-deploy.mk', 'tools/check_map.d/check-build-no-deploy.yaml'],
+    covers=[],
     needs=['make:all'], budget=4.163088)
 
 from pathlib import Path

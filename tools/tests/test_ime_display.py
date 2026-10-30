@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
 CHECK = dict(name='ime-display-host', tier=1,
-    covers=['drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'build/checks.d/check-ime-display-host.mk', 'tools/check_map.d/check-ime-display-host.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags

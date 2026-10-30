@@ -4,7 +4,7 @@
 --i686-elf PATH also extracts and checks the target descriptor (no live reads).
 """
 CHECK = dict(name='gui-desc-host', tier=1,
-    covers=['userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py', 'tools/check_map.d/check-gui-desc-host.yaml', 'build/checks.d/check-gui-desc-host.mk'],
+    covers=['userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py'],
     needs=[], budget=8.338902)
 
 from pathlib import Path

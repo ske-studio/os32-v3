@@ -4,7 +4,7 @@
 Relocatable i386 probes are inspected, never executed (no ILP32 runner needed).
 """
 CHECK = dict(name='nano-inputs-host', tier=1,
-    covers=['sdk/allocator/**', '.github/workflows/build.yml', 'tools/check_nano_inputs.py', 'sdk/allocator/nano_inputs.json', 'sdk/allocator/nano.LICENSE', 'tools/ci/build_cross.sh', 'build/config.mk', 'build/programs.mk', 'tools/check_map.d/check-nano-inputs-host.yaml', 'build/checks.d/check-nano-inputs-host.mk'],
+    covers=['sdk/allocator/**', '.github/workflows/build.yml', 'tools/check_nano_inputs.py', 'sdk/allocator/nano_inputs.json', 'sdk/allocator/nano.LICENSE', 'tools/ci/build_cross.sh', 'build/config.mk', 'build/programs.mk'],
     needs=['make:all'], budget=5.981308)
 
 import copy

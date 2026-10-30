@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='privileged', tier=1,
-    covers=['userland/**', 'tools/check_privileged.py', 'tools/check_privileged_allow.txt', 'tools/tests/test_check_privileged.py', 'tools/check_map.d/check-privileged.yaml', 'build/checks.d/check-privileged.mk'],
+    covers=['userland/**', 'tools/check_privileged.py', 'tools/check_privileged_allow.txt', 'tools/tests/test_check_privileged.py'],
     needs=[], budget=7.120772)
 
 

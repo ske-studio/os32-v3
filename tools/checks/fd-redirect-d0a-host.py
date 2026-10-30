@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='fd-redirect-d0a-host', tier=1,
-    covers=['tools/tests/mutpar.py', 'exec/redir_access.c', 'tools/tests/test_fd_redirect_d0a.py', 'tools/tests/fd_redirect_d0a_host.c', 'fs/fd_redirect.c', 'tools/check_map.d/check-fd-redirect-d0a-host.yaml', 'build/checks.d/check-fd-redirect-d0a-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/mutpar.py', 'exec/redir_access.c', 'tools/tests/test_fd_redirect_d0a.py', 'tools/tests/fd_redirect_d0a_host.c', 'fs/fd_redirect.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.340944)
 
 

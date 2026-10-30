@@ -15,7 +15,7 @@ I/O もタイマも触らないので模型は要らない。
   python3 -B tools/tests/test_serial_vfast.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='serial-vfast-host', tier=1,
-    covers=['include/time_units.h', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'tools/tests/serial_vfast_host.c', 'userland/shell/serial_watchdog.c', 'tools/check_map.d/check-serial-vfast-host.yaml', 'build/checks.d/check-serial-vfast-host.mk', 'drivers/char/serial.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/time_units.h', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'tools/tests/serial_vfast_host.c', 'userland/shell/serial_watchdog.c', 'drivers/char/serial.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.805172)
 
 from kernel_includes import include_flags

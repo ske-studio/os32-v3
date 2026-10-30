@@ -6,7 +6,7 @@ No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
 CHECK = dict(name='lanfs-host', tier=1,
-    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'lib/crc32_core.inc', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md', 'build/checks.d/check-lanfs-host.mk', 'tools/check_map.d/check-lanfs-host.yaml'],
+    covers=['lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'lib/crc32_core.inc', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
     needs=[], budget=2.257142)
 
 import ctypes as C

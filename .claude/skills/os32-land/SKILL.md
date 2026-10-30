@@ -32,7 +32,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 
 | 何を入れたか | 検査 |
 |---|---|
-| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる、2026-10-28 に ROLES↔POLICY_DEV の相互リンクで落ちた)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version` (表の行の形を読む。2026-10-25 に 481a8bf6 で行に説明を足して CI の check が落ちた)。どの検査が文書を読むかは `python3 tools/check_select.py --select --files <文書>` で出す |
+| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる、2026-10-28 に ROLES↔POLICY_DEV の相互リンクで落ちた)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version` (表の行の形を読む。2026-10-25 に 481a8bf6 で行に説明を足して CI の check が落ちた)。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す |
 | 段・小さな取り込み | `CHECK_BASE=<最後の全体> ~/os32-tmp/bin/check_wt.sh <名札> <SHA>` (`make all` + `make -k check-changed`) |
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた・tier-2 の push の 1 日後) | `~/os32-tmp/bin/check_wt.sh <名札> <SHA>` (全体) |
 
@@ -51,7 +51,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 今までに踏んだもの:
 - 状態行が語彙の外 (`docs/POLICY_DEV.md` §8 の表: 計画 / 設計中 / 実装中 / 受入待ち / 受入完了・実機確認待ち / 受入完了 / 撤回 / 完了記録 / 草案 / 現行。「計画中」「実装完了」は語彙の外)。
 - gshell を rustc で直に組む fixture が、build.rs の作る OUT_DIR のファイルを知らない (`test_gui_desc.py` の build_fixture に足す)。
-- 対応表 `tools/check_map.d/*.yaml` に新しいヘッダが無く、変更しても試験が選ばれない。
+- `CHECK` の `covers` と依存抽出に入力が無く、変更しても試験が選ばれない。
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
 - CI だけ落ちる (2): `.github/workflows/check.yml` は検査を**名前で直接**呼ぶ。手元の check-changed はこのファイルを見ないので、検査を消す・改名・束ねた取り込みは `grep -rn <検査名> .github` で参照が残っていないか見てから push する (2026-10-24、TT5 で消した 2 本の名前が残り CI が `No rule to make target` で落ちた)。

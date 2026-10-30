@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'build/checks.d/check-tick-host.mk', 'tools/check_map.d/check-tick-host.yaml', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags

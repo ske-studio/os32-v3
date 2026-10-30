@@ -31,7 +31,7 @@ FD 0 を読まない / 端末のままなら読みに行かない、の 4 つを
 なることを見る。make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='cat-linenum-host', tier=1,
-    covers=['tools/tests/cat_linenum_host.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'tools/tests/mutpar.py', 'tools/check_map.d/check-cat-linenum-host.yaml', 'build/checks.d/check-cat-linenum-host.mk'],
+    covers=['tools/tests/cat_linenum_host.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'tools/tests/mutpar.py'],
     needs=[], budget=1.878034)
 
 import os

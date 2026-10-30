@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ne2000-ring', tier=1,
-    covers=['drivers/net/ne2000/ne2000_ring.c', 'tools/tests/ne2000_ring_test.c', 'tools/check_map.d/check-ne2000-ring.yaml', 'build/checks.d/check-ne2000-ring.mk'],
+    covers=['drivers/net/ne2000/ne2000_ring.c', 'tools/tests/ne2000_ring_test.c'],
     needs=[], budget=1.107864)
 
 

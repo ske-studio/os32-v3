@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='shm-lockwrite-host', tier=1,
-    covers=['userland/tests/shm_reuse_child.c', 'userland/tests/ring3_marker.h', 'tools/tests/test_shm_lockwrite.py', 'tools/tests/guest_acceptance.yaml', 'tools/check_map.d/check-shm-lockwrite-host.yaml'],
+    covers=['userland/tests/shm_reuse_child.c', 'userland/tests/ring3_marker.h', 'tools/tests/test_shm_lockwrite.py', 'tools/tests/guest_acceptance.yaml'],
     needs=[], budget=1.096908)
 
 

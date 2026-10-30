@@ -1,6 +1,6 @@
 """L20: pre-move planar bytes, boot lifecycle and isolated mutation preparation."""
 CHECK = dict(name='dep-dir-d-splash-host', tier=1,
-    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'build/checks.d/check-dep-dir-d-splash-host.mk', 'tools/check_map.d/check-dep-dir-d-splash-host.yaml', 'tools/check_map.yaml', 'tools/tests/kernel_includes.py'],
+    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -84,9 +84,8 @@ def main():
         raise AssertionError('ambiguous anchor accepted')
     for old, new in MUTATIONS:
         once(source, old, new)
-    mapping = (ROOT/'tools/check_map.d/check-dep-dir-d-splash-host.yaml').read_text()
     for rel in FILES:
-        assert '\n- '+rel+'\n' in mapping, rel
+        assert rel in CHECK['covers'], rel
     make = subprocess.run(['make', '-qp'], cwd=ROOT, capture_output=True, text=True)
     assert make.returncode in (0, 1), make.stderr
     resident(make.stdout)

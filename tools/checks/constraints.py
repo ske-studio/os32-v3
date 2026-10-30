@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='constraints', tier=0,
-    covers=['CLAUDE.md', 'docs/CONSTRAINTS.md', 'tools/check_constraints.py', 'tools/check_map.d/check-constraints.yaml', 'build/checks.d/check-constraints.mk'],
+    covers=['CLAUDE.md', 'docs/CONSTRAINTS.md', 'tools/check_constraints.py'],
     needs=[], budget=0.674118)
 
 

@@ -17,7 +17,7 @@
   python3 -B tools/tests/test_kbd_status.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-status-host', tier=1,
-    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_status.c', 'kernel/v86/v86_kbd.c', 'tools/tests/kbd_status_host.c', 'tools/check_map.d/check-kbd-status-host.yaml', 'build/checks.d/check-kbd-status-host.mk', 'tools/tests/kernel_includes.py'],
+    covers=['include/kbd.h', 'drivers/input/kbd.h', 'kernel/v86/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_status.c', 'kernel/v86/v86_kbd.c', 'tools/tests/kbd_status_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.493568)
 
 from kernel_includes import include_flags
