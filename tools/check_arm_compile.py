@@ -18,7 +18,7 @@ LE アクセサ化) の効果を同じ物差しで見るための計測器。
     C ソースの正典。ディレクトリを glob すると、カーネルに入らない
     vendored ライブラリ (下記) まで数に混ざる。
   * インクルードパスとフラグは `build/config.mk` の `INC_*` /
-    `CFLAGS_COMMON` を**読んで**使う。ここに書き写すと config.mk と二重管理に
+    `CFLAGS_COMMON` を **make で展開して**使う。ここに書き写すと config.mk と二重管理に
     なり、片方だけ直ったときに黙ってずれる。
   * x86 専用のフラグ (`-m32` `-march=i386` `-mno-red-zone`) だけを外す。
     残りはカーネル本番ビルドと同じ素性で測る。
@@ -55,6 +55,7 @@ from source_roots import SCAN_ROOTS
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -64,7 +65,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 PROJ_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-CONFIG_MK = os.path.join(PROJ_DIR, "build", "config.mk")
 KERNEL_MK = os.path.join(PROJ_DIR, "build", "kernel.mk")
 
 # 既定のコンパイラ。ARM_CC で上書きできる。
@@ -93,19 +93,48 @@ DEPFLAGS_DROP = ["-MMD", "-MP"]
 KERNEL_EXTRA_FLAGS = ["-O2", "-D__KERNEL_BUILD__"]
 
 # --- ファイル -> インクルード変数の対応 (build/kernel.mk のルールを写したもの) ---
-# drivers/ の 5 本だけは kernel.mk が個別ルールで INC_KERNEL を渡している
-# (idt.h / vfs.h / cpu_calibrate.h を見るため)。
-DRIVERS_INC_KERNEL = [
+# build/kernel.mk の CORE_KERNEL_INCLUDES と描画バックエンドの個別ルール。
+CORE_INC_KERNEL = [
+    "drivers/ata/cd_body.c",
+    "drivers/ata/cd_module.c",
+    "drivers/net/e82557/lan_body.c",
+    "drivers/net/e82557/lan_module.c",
+    "drivers/sound/cs4231/pcm_body.c",
+    "drivers/sound/cs4231/pcm_module.c",
+    "drivers/sound/fm/fm_body.c",
+    "drivers/sound/fm/fm_module.c",
+    "drivers/sound/fm/snd_engine.c",
+    "drivers/video/cirrus/cirrus_body.c",
+    "drivers/video/cirrus/cirrus_module.c",
+    "drivers/video/geforce/geforce_body.c",
+    "drivers/video/geforce/geforce_module.c",
+    "drivers/video/geforce/geforce_platform.c",
+    "drivers/video/kcg/kcg_body.c",
+    "drivers/video/kcg/kcg_module.c",
     "drivers/input/mouse.c",
     "drivers/block/loop_dev.c",
     "drivers/net/ne2000/ne2000.c",
-    "drivers/ata/atapi.c",
     "drivers/net/ne2000/lgy98.c",
+    "drivers/block/fdc.c",
+    "fs/serialfs/serialfs_session.c",
+    "lib/sqlite3/os32_sqlite_test.c",
+]
+DRIVERS_INC_GFX = [
+    "drivers/video/cirrus/backend_cirrus.c",
+    "drivers/video/cirrus/cirrus_identify.c",
+    "drivers/video/geforce/backend_geforce.c",
+    "drivers/video/geforce/gf_present.c",
+    "drivers/video/pc98/backend_pc98.c",
+    "drivers/video/pc98/backend_pegc.c",
+    "drivers/video/pc98/pc98_route.c",
 ]
 
 # 先に一致したものを採る。fs/fat/fatfs/ は fs/ より先でなければならない。
 INC_RULES = [
     ("fs/fat/fatfs/", "INC_FATFS"),
+    ("init/", "INC_KERNEL"),
+    ("mm/", "INC_KERNEL"),
+    ("arch/x86/kernel/", "INC_KERNEL"),
     ("kernel/", "INC_KERNEL"),
     ("net/", "INC_KERNEL"),
     ("drivers/", "INC_DRIVERS"),
@@ -181,46 +210,20 @@ def read(path):
         return f.read()
 
 
-def parse_make_vars(text):
-    """`NAME = value` / `NAME := value` / `NAME ?= value` を拾う。
-    行末 `\\` の継続をつなぐ。
-
-    展開はしない (expand_var が必要になった時点で再帰的に行う)。`+=` は
-    無視する — 追記の意味を持つので「最初の 1 回だけ採る」この読み方と
-    合わない。
-
-    `?=` を `=` と同じに扱うのは、この計測器が config.mk を**単独で**
-    読むから。make なら「まだ定義されていなければ」の条件が付くが、ここでは
-    先に定義するものが無いので必ず既定値が採られる。順序 3 の
-    `ARCH ?= x86` / `PLATFORM ?= pc98` はこれで読める (読めないと
-    `-Iarch/$(ARCH)` が `-Iarch/` に潰れ、io.h が実装を見つけられずに
-    33 本が「ヘッダが無い」で落ちて計測が無意味になる)。
-    """
-    text = re.sub(r"\\\n", " ", text)
-    out = {}
-    for line in text.split("\n"):
-        line = line.split("#", 1)[0]
-        m = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?::|\?)?=\s*(.*)$", line)
-        if m:
-            name, value = m.group(1), m.group(2).strip()
-            if name not in out:
-                out[name] = value
-    return out
-
-
-def expand_var(varmap, name, depth=0):
-    """`$(OTHER)` を再帰的に展開する。未知の変数は空に落とす。"""
-    if depth > 16 or name not in varmap:
-        return ""
-    value = varmap[name]
-
-    def sub(m):
-        inner = m.group(1)
-        if inner.startswith("shell ") or "(" in inner:
-            return ""
-        return expand_var(varmap, inner, depth + 1)
-
-    return re.sub(r"\$\(([^()]*)\)", sub, value)
+def make_config_vars(config_root=PROJ_DIR):
+    """Ask make to expand flags, including functions, defaults and appends."""
+    names = sorted({var for _prefix, var in INC_RULES} | {"CFLAGS_COMMON"})
+    env = dict(os.environ)
+    # Independent query: do not inherit dry-run/jobserver flags or overrides.
+    for name in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "GNUMAKEFLAGS"):
+        env.pop(name, None)
+    query = "include build/config.mk\n.PHONY: __arm_config\n__arm_config:\n\t@"
+    query += "".join("$(info %s=$(%s))" % (name, name) for name in names) + ":\n"
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-rRsf", "-", "__arm_config"],
+        input=query, cwd=config_root, env=env, text=True,
+        capture_output=True, check=True)
+    return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
 
 def parse_kernel_vars(text):
@@ -289,8 +292,10 @@ def is_known_non_kernel(path):
 
 
 def inc_var_for(path):
-    if path in DRIVERS_INC_KERNEL:
+    if path in CORE_INC_KERNEL:
         return "INC_KERNEL"
+    if path in DRIVERS_INC_GFX:
+        return "INC_GFX"
     for prefix, var in INC_RULES:
         if path.startswith(prefix):
             return var
@@ -299,7 +304,7 @@ def inc_var_for(path):
 
 def build_flags(varmap):
     """CFLAGS_COMMON から x86 専用と依存生成を落とし、カーネル素性を足す。"""
-    common = expand_var(varmap, "CFLAGS_COMMON").split()
+    common = shlex.split(varmap["CFLAGS_COMMON"])
     kept = [f for f in common
             if f not in X86_ONLY_FLAGS and f not in DEPFLAGS_DROP]
     dropped = [f for f in common if f in X86_ONLY_FLAGS]
@@ -398,7 +403,7 @@ def resolve_asm_origin(cc, flags, inc, path):
 
 
 def compile_one(cc, flags, incmap, path):
-    inc = incmap[inc_var_for(path)].split()
+    inc = shlex.split(incmap[inc_var_for(path)])
     proc = _run([cc] + flags + inc + ["-c", "-o", os.devnull, path])
     if proc.returncode == 0:
         return {"file": path, "ok": True}
@@ -430,7 +435,7 @@ def main():
                   "(計測器なので失敗にはしません)" % cc)
         return 0
 
-    varmap = parse_make_vars(read(CONFIG_MK))
+    varmap = make_config_vars()
     files = parse_c_kernel(read(KERNEL_MK))
     if not files:
         print("Error: build/kernel.mk から C_KERNEL を読めません", file=sys.stderr)
@@ -439,8 +444,7 @@ def main():
     flags, dropped = build_flags(varmap)
     incmap = {}
     for _prefix, var in INC_RULES:
-        incmap[var] = expand_var(varmap, var)
-    incmap["INC_KERNEL"] = expand_var(varmap, "INC_KERNEL")
+        incmap[var] = varmap[var]
 
     missing_inc = sorted({v for v in incmap if not incmap[v].strip()})
     if missing_inc:
@@ -448,13 +452,10 @@ def main():
               % ", ".join(missing_inc), file=sys.stderr)
         return 1
 
-    # 展開できなかった変数は空文字に落ちるので、INC は空にならず
-    # `-Iarch/$(ARCH)` が `-Iarch/` のような**存在しないディレクトリ**に
-    # 潰れる。それだけでは上の検査に掛からず、計測は「ヘッダが見つからない」
-    # を測るだけになってしまう (順序 3 で実際に踏んだ)。実在を確かめる。
+    # 誤った -I で「ヘッダが見つからない」を測らないよう実在を確かめる。
     bad_dirs = set()
     for var in sorted(incmap):
-        for tok in incmap[var].split():
+        for tok in shlex.split(incmap[var]):
             if tok.startswith("-I") and not os.path.isdir(
                     os.path.join(PROJ_DIR, tok[2:])):
                 bad_dirs.add("%s: %s" % (var, tok))
