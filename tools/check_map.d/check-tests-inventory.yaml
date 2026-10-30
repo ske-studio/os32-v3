@@ -63,4 +63,7 @@ check-tests-inventory:
 - tools/prototypes/sqlite_imports.def
 - tools/prototypes/fep_imports.def
 - tools/prototypes/cd_imports.def
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

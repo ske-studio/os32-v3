@@ -1,6 +1,7 @@
 """P5 HAL, real P3 start state machine, real ledger/selection and byte routing."""
 from kernel_includes import include_flags
 from pathlib import Path
+from kernel_boot_source import kernel_source
 import subprocess
 import tempfile
 import host32
@@ -156,7 +157,7 @@ def product():
     sys.path.insert(0,str(ROOT/'tools'))
     import mkmod
     from test_module_image import build_validator, validate, fnv
-    boot=(ROOT/'init/kernel.c').read_text()
+    boot=kernel_source(ROOT)
     assert 'gfx_geforce_pref(sysconfig_get_int(SYS_SYSTEM_CFG, \"GUI\", 0))' in boot
     spec=json.loads((ROOT/'sdk/kapi.json').read_text())
     meta=json.loads((ROOT/'build/out/geforce/geforce_imports.json').read_text())

@@ -34,4 +34,7 @@ check-fdc-track-host:
 - include/ide_contract.h
 # Conservative artifact-path audit (including indirect helpers/fixtures).
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

@@ -122,4 +122,7 @@ check-kcg-module-host:
 - platform/pc98/display.c
 - include/kcg_contract.h
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

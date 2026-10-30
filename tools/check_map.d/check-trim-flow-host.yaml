@@ -109,4 +109,7 @@ check-trim-flow-host:
 - include/input_service.h
 - include/kbd.h
 - tools/tests/kernel_includes.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

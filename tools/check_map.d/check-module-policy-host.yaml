@@ -27,4 +27,7 @@ check-module-policy-host:
 - build/kernel.*
 - build/out/*
 - lib/crc32_core.inc
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

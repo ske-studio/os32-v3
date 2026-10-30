@@ -17,6 +17,7 @@
   python3 -B tools/tests/test_dma_pool.py --target   # + i386-elf で実物を通す
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -127,7 +128,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
 
 def boot_gate(tmp):
     d = pathlib.Path(tmp)
-    kernel = (ROOT / "init/kernel.c").read_text()
+    kernel = kernel_source(ROOT)
     start = kernel.index('    if (!memory_boot_init(mem_kb))')
     end = kernel.index('    /* FDリダイレクト初期化', start)
     gate = '    struct boot_context boot = {0};\n' + kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')

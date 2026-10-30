@@ -37,4 +37,8 @@ check-shm-user-host:
 - build/checks.d/check-shm-user-host.mk
 - tools/tests/mutpar.py
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

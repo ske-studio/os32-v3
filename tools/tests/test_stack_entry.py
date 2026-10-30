@@ -1,4 +1,5 @@
 """T3ab-B direct product entry/stack fixture, invoked by VK32 tests."""
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import pathlib
 import re
@@ -48,7 +49,7 @@ entry_bp: dd 0
     command(['nasm', '-f', 'elf32', work / 'entry.asm', '-o', work / 'entry.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', work / 'sqlite_stack.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'arch/x86/kernel/setjmp.asm', '-o', work / 'setjmp.o'])
-    boot = (ROOT / 'init/kernel.c').read_text()
+    boot = kernel_source(ROOT)
     tss = re.search(r'tss_init\([^;]+;', boot).group()
     calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { '
              'int result=0; sqlite_call_on_alt_stack(sqlite_body, test_stack_top, &result); return result; }\n')

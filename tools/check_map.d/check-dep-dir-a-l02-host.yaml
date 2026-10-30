@@ -107,4 +107,5 @@ check-dep-dir-a-l02-host:
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
 artifact_reader: true

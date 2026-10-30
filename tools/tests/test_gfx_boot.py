@@ -30,6 +30,7 @@ gfx_client_to_gshell)。
 --mutate は要の行を写しで壊し、どれかの構成が実行時に RED になることを見る。
 実物のソースは書き換えない。コンパイルの失敗は RED に数えない。
 """
+from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -163,7 +164,7 @@ def text_problems():
             if re.search(r'\bsys_reserve_top\s*\(|\bsys_top_reserved\b', text):
                 problems.append('%s に sys_reserve_top / sys_top_reserved が残っている'
                                 % path.relative_to(ROOT))
-    k = (ROOT / 'init/kernel.c').read_text()
+    k = kernel_source(ROOT)
     try:
         gfx_cfg = k.index('sysconfig_get_str(SYS_SYSTEM_CFG, "GFX"')
         reserve = k.index('    gfx_boot_reserve();')

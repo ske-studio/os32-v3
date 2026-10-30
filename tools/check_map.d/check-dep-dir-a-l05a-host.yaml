@@ -51,4 +51,8 @@ check-dep-dir-a-l05a-host:
 - hwdev/generated/hwdev_imports.json
 - hwdev/generated/hwdev_layout.txt
 - tools/tests/kernel_includes.py
+- tools/tests/kernel_boot_source.py
+- init/kernel_boot_cpu.inc
+- init/kernel_boot_memory.inc
+- init/kernel_gfx_config.inc
 artifact_reader: true

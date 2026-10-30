@@ -36,6 +36,7 @@ RED になることを見る。実物のソースは書き換えない。コン�
 """
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
+from kernel_boot_source import kernel_source
 import host32
 import pathlib
 import subprocess
@@ -698,7 +699,7 @@ class DeviceReservation(unittest.TestCase):
 
     def test_import_is_before_bind(self):
         # ⑥-0 は PCI bind を行う LAN 部品の起動前 (B4)、台帳より後。
-        k = (ROOT / 'init/kernel.c').read_text()
+        k = kernel_source(ROOT)
         imp = k.index('boot_platform_run(BOOT_PCI_RESOURCES, &boot)')
         self.assertLess(k.index('memory_boot_init(mem_kb)'), imp)
         self.assertLess(imp, k.index('lan_module_load()'))
