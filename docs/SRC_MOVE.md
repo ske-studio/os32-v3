@@ -37,6 +37,7 @@
 - `tools/include_resolve.py` の解決先が前後で一致 (パスの付け替えを除いて)。比べ方は**単位 (コンパイル単位・ファイル) ごとの解決先の集合**で — 生成ヘッダは include をパスの順に並べるので行番号では比べない (L2)。製品の単位で変化 0 件。試験の fixture で、前は解決しなかった include が同じディレクトリに来て解決するようになるのは差に数えない
 - 走査型の検査の走査ファイル数が前後で一致
 - `tools/tests`・`build/`・`tools/check_map.d` で旧いパスを grep して 0 件 (道具の一覧の取りこぼしの確かめ)
+- `make check-docs-links MUTATE=0` rc=0 (見出しのパスが変わってリンクの断片が切れるのを拾う、L2)
 - `python3 tools/check_select.py --lint` rc=0
 
 ### PM の取り込み
@@ -54,4 +55,5 @@
 | L1 | 新しいディレクトリを `config.mk` の INC_* 7 行に別々に書き足した (取りこぼしの元) | 手順 1 (KERNEL_SRC_DIRS) |
 | L2 | include の照合を行番号で比べ 870 件の差に見えた — 生成ヘッダの include の並びがパス順で入れ替わっただけ | 単位ごとの集合で比べる (§3)。製品 0 件 |
 | L2 | 同名のヘッダ `include/kbd.h` と `drivers/input/kbd.h` (旧 `drivers/kbd.h`)、`kernel/boot_disk.h` と `platform/pc98/boot_disk.h` — -I の順で黙って入れ替わりうる | include_resolve の一致をこの組で確かめる (L2 で `include/kbd.h` 51→51・`drivers/input/kbd.h` 47→47、入れ替わり無し) |
+| L2 | 道具が文書の見出しの中のパスも置換し、別の文書からその見出しへのリンクの断片 (`#2-1-カーネル-driverspcm_cs4231c…`) が切れた | 完了条件に `make check-docs-links` を足す (数秒) |
 | 全段 | 作業木の sandbox では Unix ソケットの試験 (ci-stab・net link) が EPERM で落ちる | 取り込みの検査 (sandbox の外) で確かめる |
