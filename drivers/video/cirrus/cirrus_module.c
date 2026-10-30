@@ -34,7 +34,7 @@ static int cirrus_start(struct module_record *r, u32 entry, u32 *exports)
         (u32)(uptr)candidate.fill_rect, (u32)(uptr)candidate.blit
     };
     for (u32 i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)
-        if (entries[i] < r->text || entries[i] - r->text >= r->text_size)
+        if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
     if (candidate.prepare) return MODULE_INIT_FAILED;
     if (!module_ref_acquire(cirrus_handle, r->owner, MODULE_REF_REGISTRATION, 0))

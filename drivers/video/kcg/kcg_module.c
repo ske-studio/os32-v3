@@ -48,7 +48,7 @@ static int kcg_start(struct module_record *r, u32 entry, u32 *exports)
     STATIC_ASSERT(sizeof(candidate) == sizeof(entries), kcg_facade_size);
     kmemcpy(entries, &candidate, sizeof(entries));
     for (u32 i = 0; i < KCG_MODULE_API_SLOTS; i++)
-        if (entries[i] < r->text || entries[i] - r->text >= r->text_size)
+        if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
     return 0;
 }
