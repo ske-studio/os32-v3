@@ -41,13 +41,14 @@ if __name__ == "__main__":
             failed += rc != 0
         if mutate:
             source = (ROOT / "fs/ext2/ext2_file.c").read_text()
+            # hole/error の目印は両入口が使う ext2_read_inode_range 内。
             mutants = [
                 ("stream-type", "if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)",
                  "if (0) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)", "stream_ranges"),
                 ("stream-hole", "if (phys == 0) break;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;",
                  "if (phys == 0) return EXT2_ERR_IO;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;", "hole_and_errors"),
-                ("file-error", "if (ret != 0) return EXT2_ERR_IO;\n        if (phys == 0) break;\n\n        to_copy = remaining;",
-                 "if (ret != 0) return (int)total_read;\n        if (phys == 0) break;\n\n        to_copy = remaining;", "hole_and_errors"),
+                ("file-error", "if (ret != 0) return EXT2_ERR_IO;\n        if (phys == 0) break;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;",
+                 "if (ret != 0) return (int)total_read;\n        if (phys == 0) break;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;", "hole_and_errors"),
             ]
             for name, old, new, case in mutants:
                 if source.count(old) != 1:
