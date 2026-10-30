@@ -101,7 +101,7 @@
 | `kernel/ime/ime_dict.c` | 開くとき: 形式の版の検査 (ヘッダ直読みか PRAGMA、§2)、`meta` の読み取り、辞書を RO で開く、学習 DB を別に開く (`dict_user` の作成をそちらへ)、`dict_id` / `pos_table_version` の照合。`SQL_LEARN` と `ime_user_*` の宛先を学習 DB へ |
 | `kernel/ime/ime.c` | `ime_switch_dict`: 切り替え先の `mem_reserve_kb` が起動時の確保量を超えるときは再起動を促す (D27) |
 | `lib/sqlite3/os32_sqlite_config.h` | `SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS` を外すか、ヘッダ直読みで済ませるか (T4 で決める) |
-| KAPI (`ime_user_*`、`ime_switch_dict`) | シグネチャは変えない ([ABI2])。学習の宛先が変わるだけ。メタ情報を返す口 (`ime_dict_info` 等) を足すなら [ABI2] 追記 |
+| KAPI (`ime_user_*`、`ime_switch_dict`) | シグネチャは変えない ([ABI])。学習の宛先が変わるだけ。メタ情報を返す口 (`ime_dict_info` 等) を足すなら [ABI] 追記 |
 | `userland/deploy.yaml`、`hsync` | 学習 DB は配備対象にしない (`/etc` に残す)。システム辞書の RO 差し替えの規則 |
 | `userland/system/hsync_protect.inc` | **`fep_user.db*` (本体・journal・回復用) を保護名に足す** (M6。今は `settings.db*` だけ) |
 | 移行の手段 (`ime` コマンドの下位コマンドか、学習 DB が無いときの初回起動の自動移行 — 設計票で決める) | 旧 `dict_user` (S/M/L の 3 ファイル) → `fep_user.db`。件数・内容の照合、重複規則、`dict_id` の対応、移行済みの印、途中失敗の復旧 (M6、§3) |

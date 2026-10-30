@@ -57,7 +57,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 
 
 def check_flag_constant():
-    """[ABI1]/[ABI3]: KAPI_O_EXCL の値と KAPI_VERSION の同期。
+    """[ABI]: KAPI_O_EXCL の値と KAPI_VERSION の同期。
 
     O_EXCL は kapi.json の関数表ではなく手書きの定数なので、版数の同期は
     check_kapi_version.py が見るが、**フラグの値そのもの**はここで見る。
@@ -82,9 +82,9 @@ def check_flag_constant():
     if not m or int(m.group(1)) != int(kapi["version"]):
         raise SystemExit("KAPI_VERSION が kapi.json の version と違う")
     if int(kapi["version"]) < 53:
-        raise SystemExit("O_EXCL を足したら KAPI は v53 以上 ([ABI3])")
+        raise SystemExit("O_EXCL を足したら KAPI は v53 以上 ([ABI])")
 
-    # スロットは 1 本も増えていない (O_EXCL はフラグだけ、[ABI2])
+    # スロットは 1 本も増えていない (O_EXCL はフラグだけ、[ABI])
     gen = (ROOT / "sdk/include/os32/os32_kapi_generated.h").read_text(
         encoding="utf-8")
     m = re.search(r"#define\s+KAPI_FUNC_COUNT\s+(\d+)", gen)
@@ -93,7 +93,7 @@ def check_flag_constant():
     # H2 (O_EXCL) は**フラグだけ**でスロットを 1 本も足していない。
     #
     # ここは以前 `api[-1]["name"] != "sys_set_mtime"` と書いていたが、それは
-    # 「sys_set_mtime が**永遠に末尾**であること」を要求してしまう。[ABI2] が
+    # 「sys_set_mtime が**永遠に末尾**であること」を要求してしまう。[ABI] が
     # 禁じるのは既存スロットを動かす / 消すことで、**末尾への追記は正当**なので、
     # その形は KAPI が 1 本増えるたびに必ず落ちる (2026-09-16、kbd_peekkey で
     # `make check` が実際に落ちた。`kapi/kapi_db.c` の `db_slot_layout_ok` が
@@ -105,11 +105,11 @@ def check_flag_constant():
     SYS_SET_MTIME_SLOT = 213        # 票 H3 (v52) で決まった位置
     names = [e["name"] for e in kapi["api"]]
     if "sys_set_mtime" not in names:
-        raise SystemExit("sys_set_mtime が kapi.json から消えている ([ABI2])")
+        raise SystemExit("sys_set_mtime が kapi.json から消えている ([ABI])")
     slot = names.index("sys_set_mtime")
     if slot != SYS_SET_MTIME_SLOT:
         raise SystemExit("H2 の前後でスロットが動いた "
-                         "(sys_set_mtime が slot %d → %d、[ABI2])"
+                         "(sys_set_mtime が slot %d → %d、[ABI])"
                          % (SYS_SET_MTIME_SLOT, slot))
 
     print("KAPI FLAG PASS (KAPI_O_EXCL=0x400, v%s, sys_set_mtime = slot %d "

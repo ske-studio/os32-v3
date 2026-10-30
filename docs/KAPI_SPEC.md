@@ -71,7 +71,7 @@ make programs
 4. カーネル側に実体を実装する。
 5. 本仕様書のオフセット表を更新し、新APIに依存するプログラムの
    `build/app.conf` の要求バージョンを引き上げる。
-6. [ABI3] に従い `make clean` → `make all` を実行する。変更した API の試験と
+6. [ABI] に従い `make clean` → `make all` を実行する。変更した API の試験と
    `python3 -B tools/checks/run.py --lint` を行い、担当別の検査は
    [ROLES.md](tasks/agents/ROLES.md) §0「検査」に従う。外部 apps/game の再構築は
    H-7 の再開条件 (票 T2H_EXTERNAL_GATE) に従い、再開決定後に行う。
@@ -100,7 +100,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v50 | **実装済み (2026-09-13、S0-K)** | 設定レジストリ: `db_open_existing` (RO / RW、CREATE 無し) / `db_prepare_only` / `db_bind_int` / `db_bind_text` / `db_bind_blob` / `db_bind_null` / `db_error_code` の 7 本 (slot 201〜207、data_fields は 0x348 / 0x34C へ)。既存 `db_*` 10 本は不変 | archive/settings/TASK_S0.md §1a (アーカイブ: `docs/archive/settings/TASK_S0.md`) |
 | v51 | **実装済み (2026-09-14、N1)** | ネットワーク Host Services `host_open` / `host_status` / `host_read` / `host_write` / `host_close` の 5 本 (slot 208〜212 = 0x348〜0x358、data_fields は 0x35C / 0x360 へ)。非ブロッキング (プロトコルを進めるのは 100Hz の `link_tick` だけ)、同時 2 ハンドル、ストリーム 1 本。実体は `kapi/kapi_host.c` + `net/link.c` | `docs/archive/network/TASK_N0.md` §1a |
 | v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
-| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI3])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
+| v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
 | v54 | **実装済み (2026-09-16、継承バグ)** | 覗くだけのキー取得 `kbd_peekkey` 1 本 (slot 214 = 0x360、data_fields は 0x364 / 0x368 へ)。キューを**1 バイトも動かさず**に 次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。`script_exec` の毎行の ESC 監視が `kbd_trygetkey` で打鍵を**取り出して捨てて**いたのを直す。実体は `drivers/input/kbd.c` (+ `drivers/char/serial.c` の `serial_peekchar` と `kernel/kbd_inject.c` の `kbd_inject_peek`) | 票 INHERITED_BUGS |
 | v55 | **実装済み (2026-09-16、$?)** | 終了コードの配線 `exec_last_result` 1 本 (slot 215 = 0x364、data_fields は 0x368 / 0x36C へ)。直前の `exec_run` の結果を**種別 + 値**で返す。種別 (`EXEC_KIND_*`) は畳んだ側が渡すので `exit(-2)` / fault / CTRL+STOP を値ではなく種別で見分けられる。`exec_run` は**すべての return 点で**記録を書くので、起動しなかった場合に前回の記録が残らない。GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない。実体は `exec/exec.c` | `docs/archive/shell/TASK_EXIT_STATUS.md` |
 | v56 | **実装済み (2026-09-22、実機シリアル)** | V･FAST モード `serial_init_vfast` / `serial_get_status` の 2 本 (slot 216 = 0x368、217 = 0x36C、data_fields は 0x370 / 0x374 へ)。FIFO 搭載機 (`0136h` bit6 の反転で判定) で `013Ah` bit7 を立てて **8253 と無関係に** 115200bps まで出す。**起動時の既定 9600 は互換モードのまま** — V･FAST は `serial N` で明示的に入る。併せて `serial_putchar` の TxRDY 待ちを「10ms tick まで寝る」から「1 文字時間 × 2 の予算で `cpu_delay_us` を挟んで見る」へ。実体は `drivers/char/serial.c` / `drivers/char/serial_plan.c` | `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` |
@@ -337,7 +337,7 @@ shlibプロトコルは完全一致、非依存アプリだけ0。min_api_verは
 4世代の現在値は [`sdk/kapi.json`](../sdk/kapi.json) の `generations`、
 KAPI の現在版は同ファイルの `version` を正典とする。shlib protocol は完全一致なので、
 protocol 1 の app と 2 の shlib、2 の app と 1 の shlib は両方向で入口前に拒否する。
-世代を変えるときも [ABI1] の生成と [ABI3] の `make clean` → `make all` を行う。
+世代を変えるときも [ABI] の生成と [ABI] の `make clean` → `make all` を行う。
 `sdk/gen_kapi.py` は C (`os32_generations.h` / `os32_unit_stamp.h`)、
 Python (`os32_generations.py`)、NASM (`crt/generations.inc`)、リンカ契約、
 Rust (`generations.rs`) を生成する。生成物を手で変更しない。
@@ -873,7 +873,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 
 ### 設定レジストリの基盤 (v50)
 
-既存 `db_*` 10 本 (0x238〜0x25C) は 1 つも動かない ([ABI2])。追加は末尾だけで、
+既存 `db_*` 10 本 (0x238〜0x25C) は 1 つも動かない ([ABI])。追加は末尾だけで、
 新しい handle にも既存の `db_step` / `db_finalize` / `db_close` をそのまま使う
 (反復は再 prepare。reset API は足さない)。票
 `docs/archive/settings/TASK_S0.md` §1a、実体は `kapi/kapi_db.c`。
@@ -1034,7 +1034,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | `0` (`KAPI_SER_TX_OK`) | UART へ書けた |
 | `-1` (`KAPI_SER_TX_DROPPED`) | TxRDY の予算を使い切って諦めた (相手が読んでいない) |
 
-- **スロット番号も引数の並びも変えていない** ([ABI2])。cdecl では戻り値は
+- **スロット番号も引数の並びも変えていない** ([ABI])。cdecl では戻り値は
   EAX で返り、呼び手が無視しても害が無いので、**古いバイナリを新しい
   カーネルで動かしても壊れない** (EAX は呼び手の scratch)。逆向き
   (新しいバイナリを古いカーネルで) は `build/app.conf` の要求版数が止める。
@@ -1434,7 +1434,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
 
 **スロットは増えていない。** `sys_open` に渡せるフラグが 1 つ増え、その意味が
 広がっただけだが、**同じバイナリが古いカーネルで別の意味になる**ので版数を上げる
-([ABI3])。定数は `sdk/include/os32/os32_kapi_shared.h` の手書き側にある
+([ABI])。定数は `sdk/include/os32/os32_kapi_shared.h` の手書き側にある
 (`sdk/kapi.json` の構造体は変わらない)。
 
 | 定数 | 値 |

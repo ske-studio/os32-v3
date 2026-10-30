@@ -164,7 +164,7 @@ void gui_owner_exit(int owner, int kind)
 /*  そこで gui_register / sys_switch_shell と同じ「owner 1 から」に加えて、  */
 /*  ring3_call_from_user() が真 (CPL=3 のアプリの syscall、WM の外) なら断る。*/
 /*  NULL (TVRAM 版へ戻す) も同じ規則 — アプリが WM の描画先を外すこともさせ */
-/*  ない。KAPI の戻りは void なので ([ABI2]、引数も戻りも変えない) 黙って    */
+/*  ない。KAPI の戻りは void なので ([ABI]、引数も戻りも変えない) 黙って    */
 /*  断り、回数だけ gui_ime_render_rejected に数える (kselftest / デバッグ)。 */
 /*  カーネル内の後始末 (gui_owner_exit(1) の NULL 戻し) はこの門を通らず      */
 /*  ime_set_render を直に呼ぶ。                                              */

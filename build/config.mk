@@ -129,7 +129,7 @@ C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int -W
 #                    サイズに縮める)。`sdk/include/os32/os32_kapi_shared.h` の
 #                    `exec_status_t` のように **カーネルと外部プログラムで
 #                    共有する ABI ヘッダ**に enum があるため、enum の幅が
-#                    両側で食い違うと構造体のレイアウトごとずれる ([ABI1])。
+#                    両側で食い違うと構造体のレイアウトごとずれる ([ABI])。
 #                    int 幅に固定する。
 CFLAGS_MACHINE = -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector \
                  -nostdlib -mno-red-zone -fcommon -fsigned-char -fno-short-enums $(DEPFLAGS)

@@ -85,7 +85,7 @@ GUI 初回の挿入点は `init/kernel.c` の `is_gui` 判定後、`exec_run(cur
 
 ## 7. 実装範囲と受入ゲート
 
-次回コード範囲: `mm/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/video/cirrus/wab_glue*.{c,h}`, `drivers/video/cirrus/wab_cirrus.c`（副作用分離）。必要時のみ `mm/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI1–3]。
+次回コード範囲: `mm/pgalloc.[ch]`, `kernel/sys.c`, `include/sys.h`（台帳/transaction/固定配置）、`exec/exec.[ch]`, `init/kernel.c`（idle 境界/公開順）、`gfx/gfx_core.c`, `include/gfx_hal.h`, 両 backend、`drivers/video/cirrus/wab_glue*.{c,h}`, `drivers/video/cirrus/wab_cirrus.c`（副作用分離）。必要時のみ `mm/paging.[ch]` の cache/mapping 準備処理、既存定数ヘッダ。共有ファイルはこの順に直列統合。C の規約は [CONSTRAINTS.md C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする)、kernel 文字列 [C2]、KAPI 変更なし [ABI]。
 
 | ゲート | 合格条件（全て次回実装時。今回未実行） |
 |---|---|

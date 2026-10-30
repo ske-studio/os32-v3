@@ -126,7 +126,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 
 **GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
 クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
-`sdk/kapi.json` からの生成物がコミット済みと一致すること ([ABI1])、`check-kapi-out`、CONSTRAINTS ⇄ CLAUDE.md、
+`sdk/kapi.json` からの生成物がコミット済みと一致すること ([ABI])、`check-kapi-out`、CONSTRAINTS ⇄ CLAUDE.md、
 `mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、`check-arch-asm` / `check-le-access`、
 対応表 (`check-map` / `check-check-select-host`)、文書 (lychee のリンク・孤児・状態行・試験一覧)、
 ne2000 リングと gcc + python3 だけで回るホスト試験 17 本。どの検査が CI に載っているかは

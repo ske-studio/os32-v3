@@ -67,12 +67,12 @@ TARGET_KERNEL = TARGET_COMMON + [
 
 
 # ---------------------------------------------------------------------------
-#  [ABI2] の主張のしかた (2026-09-16 に直した)
+#  [ABI] の主張のしかた (2026-09-16 に直した)
 #
 #  ここは以前 `api[-1]["name"] != "sys_set_mtime"` — つまり「sys_set_mtime が
-#  **永遠に kapi.json の末尾**であること」を要求していた。それは [ABI2] の本旨
-#  ではない。[ABI2] が禁じるのは **既存スロットを動かす / 消す** ことであって、
-#  末尾への追記はむしろ [ABI2] が正当と定めた唯一の増やし方なので、この主張は
+#  **永遠に kapi.json の末尾**であること」を要求していた。それは [ABI] の本旨
+#  ではない。[ABI] が禁じるのは **既存スロットを動かす / 消す** ことであって、
+#  末尾への追記はむしろ [ABI] が正当と定めた唯一の増やし方なので、この主張は
 #  **KAPI が 1 本増えるたびに必ず落ちる**。実際 2026-09-16 に kbd_peekkey (v54)
 #  の末尾追記で `make check` が落ちた。
 #
@@ -86,7 +86,7 @@ TARGET_KERNEL = TARGET_COMMON + [
 #    4. 表の長さは**下限だけ** — 後ろに何本足されていてもよい
 #
 #  3 の digest は「213 番目までの名前」なので、末尾追記では値が動かない。
-#  KAPI を足すたびに更新する必要は無い (更新が要るなら、それは [ABI2] 違反)。
+#  KAPI を足すたびに更新する必要は無い (更新が要るなら、それは [ABI] 違反)。
 # ---------------------------------------------------------------------------
 SYS_SET_MTIME_SLOT = 213        # 票 H3 (v52) で決まった位置
 
@@ -96,7 +96,7 @@ SYS_SET_MTIME_PREFIX_SHA256 = (
 
 
 def check_sys_set_mtime_slot(api):
-    """sys_set_mtime が H3 で決まった位置から動いていないこと ([ABI2])。
+    """sys_set_mtime が H3 で決まった位置から動いていないこと ([ABI])。
 
     末尾かどうかは**見ない**。見るのは位置と、その前の並び。
     """
@@ -104,24 +104,24 @@ def check_sys_set_mtime_slot(api):
 
     names = [e["name"] for e in api]
     if "sys_set_mtime" not in names:
-        raise SystemExit("sys_set_mtime が kapi.json から消えている ([ABI2])")
+        raise SystemExit("sys_set_mtime が kapi.json から消えている ([ABI])")
 
     slot = names.index("sys_set_mtime")
     if slot != SYS_SET_MTIME_SLOT:
         raise SystemExit(
-            "sys_set_mtime の slot が %d から %d へ動いた ([ABI2] — 既存スロットは"
+            "sys_set_mtime の slot が %d から %d へ動いた ([ABI] — 既存スロットは"
             " 並べ替えても消してもいけない)" % (SYS_SET_MTIME_SLOT, slot))
 
     # 長さは下限だけ (末尾追記は正当なので上限は見ない)
     if len(api) <= SYS_SET_MTIME_SLOT:
-        raise SystemExit("kapi.json の api が slot %d に届いていない ([ABI2])"
+        raise SystemExit("kapi.json の api が slot %d に届いていない ([ABI])"
                          % SYS_SET_MTIME_SLOT)
 
     digest = hashlib.sha256(
         ",".join(names[:SYS_SET_MTIME_SLOT + 1]).encode("utf-8")).hexdigest()
     if digest != SYS_SET_MTIME_PREFIX_SHA256:
         raise SystemExit(
-            "slot 0..%d の並びが変わった ([ABI2])。末尾追記なら digest は動かない"
+            "slot 0..%d の並びが変わった ([ABI])。末尾追記なら digest は動かない"
             " — 動いたということは既存スロットを並べ替えた / 消した / 改名した"
             % SYS_SET_MTIME_SLOT)
 
@@ -140,7 +140,7 @@ def check_sys_set_mtime_slot(api):
 
 
 def check_kapi_slot():
-    """[ABI1]/[ABI2]: sys_set_mtime が H3 で決まった slot に居て、版が揃う。
+    """[ABI]: sys_set_mtime が H3 で決まった slot に居て、版が揃う。
 
     **末尾かどうかは見ない** (理由は check_sys_set_mtime_slot の見出し)。
     既存スロットが動いた瞬間に配備済みバイナリは「別の関数を呼ぶ」という

@@ -290,7 +290,7 @@ int exec_layout_rejected(void)
 /* ring3 syscall (wrap) 実行中フラグ (v2 M2e フォールトガードの核)。
  * dispatcher が kapi_invoke を挟む間だけ立てる。この間に #PF/#GP が起きたら
  * (wrap 内 = CPL=0 でも) カーネル停止でなくアプリだけ kill する。可変長 %s の
- * ような静的に検証できないポインタ deref もこれで捕捉でき [ABI4] を塞ぐ。
+ * ような静的に検証できないポインタ deref もこれで捕捉できる。
  * 非 static (isr_handlers.c が extern で参照)。 */
 volatile int ring3_in_syscall = 0;
 
@@ -447,7 +447,7 @@ int exec_tvram_read_allowed(void)
 /*  vfs_cwd_user — sys_getcwd の実体 (票 T9 §12 R1、KAPI の追加はしない)     */
 /*                                                                          */
 /*  `sdk/kapi.json` の `sys_getcwd` の target を `vfs_cwd` からこれに差し    */
-/*  替えてある。スロット番号も引数も戻り型も変わらないので [ABI2] の範囲内で、*/
+/*  替えてある。スロット番号も引数も戻り型も変わらないので [ABI] の範囲内で、*/
 /*  KAPI の版も上げない (外から見える約束が 1 つも動かないため — 版を上げると */
 /*  既存バイナリの min_api_ver が一斉に足りなくなる副作用の方が大きい)。     */
 /*                                                                          */

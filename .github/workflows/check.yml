@@ -64,7 +64,7 @@ jobs:
           echo "$RUNNER_TEMP/lychee" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/lychee/lychee" --version
 
-      # [ABI1] 生成物を手で触らない: kapi.json から作り直してコミット済みと突き合わせる
+      # [ABI] 生成物を手で触らない: kapi.json から作り直してコミット済みと突き合わせる
       - name: KAPI (version, generated files, output guards)
         run: |
           make check-kapi-version

@@ -183,7 +183,7 @@ int __cdecl kapi_sys_ver_info(void *out, u32 size)
 /* ======================================================================== */
 /*  sys_set_mtime — 更新日時の設定 (票 H3 / KAPI v52)                        */
 /*                                                                          */
-/*  生成される __cdecl ラッパ (`wrap_sys_set_mtime`) がここを呼ぶ ([C3])。    */
+/*  生成される __cdecl ラッパ (`wrap_sys_set_mtime`) がここを呼ぶ ([ABI])。    */
 /*                                                                          */
 /*  ここの仕事は 2 つだけ:                                                   */
 /*    (1) CPL=3 のポインタ検証 (kapi_host.c / kapi_db.c と同じ 2 段の 2 段目。 */
@@ -231,7 +231,7 @@ int kapi_sys_set_mtime(const char *path, u32 mtime)
 /* ======================================================================== */
 /*  sys_time_now — µs 時計 (票 TASK_HAL_WIRING §1-5 / KAPI v59)             */
 /*                                                                          */
-/*  生成される __cdecl ラッパ (`wrap_sys_time_now`) がここを呼ぶ ([C3])。    */
+/*  生成される __cdecl ラッパ (`wrap_sys_time_now`) がここを呼ぶ ([ABI])。    */
 /*  本体 (スナップショットの採り方) は kernel/time/ktime.c、判定と算数は          */
 /*  kernel/time/time_math.c。ここの仕事は CPL=3 のポインタ検証だけ。             */
 /*                                                                          */
@@ -287,7 +287,7 @@ int kapi_sys_time_now(u32 *lo, u32 *hi)
 /* ======================================================================== */
 /*  pci_bind_info — 結線の診断の取得口 (票 TASK_HAL_WIRING §1-4 / KAPI v60) */
 /*                                                                          */
-/*  生成される __cdecl ラッパ (`wrap_pci_bind_info`) がここを呼ぶ ([C3])。   */
+/*  生成される __cdecl ラッパ (`wrap_pci_bind_info`) がここを呼ぶ ([ABI])。   */
 /*  記録そのものは `drivers/pci/pci_bind.c` の `pci_bind_info_get()` が持つ。    */
 /*  ここの仕事は CPL=3 のポインタ検証と **8 バイトちょうどの写し** だけ。    */
 /*                                                                          */

@@ -297,7 +297,7 @@ SQLite エンジン内部を fault で中断したケースに通常 close を�
 段階途中は host 限定、ゲストへ渡せる単位は a–d の統合済み成果物。
 新規 host 試験は `tools/tests/` に限定し、実 FD/VFS/DB 実装をコンパイルして境界だけ shim 化する。
 実装の複製で順序が合っているように見せない。exec の privileged 部分は host seam を最小化し、
-callsite の静的検査も組み合わせる。新規 guest binary の必要性・名前・deploy.yaml 登録 [V2] は後日承認する。
+callsite の静的検査も組み合わせる。新規 guest binary の必要性・名前・deploy.yaml 登録は後日承認する。
 
 ## 7.1 F2b scoped 内部基盤の進捗（F2 全体の受入ではない）
 

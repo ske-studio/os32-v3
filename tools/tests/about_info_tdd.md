@@ -41,7 +41,7 @@ Start → Programs (root メニューへの項目は足していない)。
 | `test_ok_button_inside_window` | **OK ボタンの段まで窓のクライアント面に入る**。lib.rs が root に足す部品の種類と `SizeSpec` を読み、libos32gui の実際の規則 — 部品ごとの下限 `min_h` (widget.rs のコンストラクタから読む。label = 16、row = 0、button = 22)、`Fixed(px)` は `max(px, min_h)`、`Flex` は下限だけ — で積み上げる (12 行で 278px ≤ クライアント 290px)。ボタンの下限 ≤ OK の段の高さ、上限は 640x400 に収まる |
 | `test_layout_rules_modelled` | 上の計算が写している layout.rs の規則と下限の値が変わっていない |
 | `test_constants_match_header` / `test_boot_image_info_mirror` / `test_kapi_gate_matches_header` | `BootImageInfo` の並びと source の値、v65 の判定が `os32_kapi_shared.h` と一致、`lib.rs` が判定と組み立てを `info.rs` から使う |
-| `test_deployed` | [V2] `deploy.yaml` に載っている |
+| `test_deployed` | `deploy.yaml` に載っている |
 
 ## RED → GREEN
 

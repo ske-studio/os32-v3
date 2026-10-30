@@ -37,7 +37,7 @@ Never hand-edit generated KAPI files. Follow [docs/KAPI_SPEC.md](docs/KAPI_SPEC.
 
 ## Testing Guidelines
 
-Tests use custom guest programs, commonly `userland/tests/<name>_test.c`, and boot-time checks in `kdebug/kselftest.c`. Build and deploy relevant tests, run them in NP21/W, and record results. Extend kernel selftests when changing primitives. No percentage coverage target is specified. Verify the deployed binary: HostDrv deployment alone may leave an older NHD binary running. Report skipped checks explicitly.
+Follow the verification stage table in [ROLES §0](docs/tasks/agents/ROLES.md) and report skipped checks.
 
 ## Commit & Pull Request Guidelines
 

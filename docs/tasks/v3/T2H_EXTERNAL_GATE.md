@@ -19,7 +19,7 @@ TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) §5-1 / §5-2�
 | 4 | OS32X ヘッダ v4 の 4 世代 (`os32x_format` / `kapi_abi` / `memory_layout` / `shlib_protocol`) を現行 SDK と一致させる。memory_layout 3 に追随する前の旧成果物は世代不一致で拒否される | 正典 `sdk/kapi.json` とヘッダ刻印、旧形式・世代不一致の入口前拒否 |
 | 5 | 私有 heap / map / unmap と C / Rust allocator、整列、可変 stack に追随する。SDK CRT の `libos32nano.a` は `-lc` より前にリンクする | 65535 / 65536 / 65537B と整列の対照、枯渇時失敗、解放後 owner 回収 |
 | 6 | backend / 面世代変更時に再 attach する。park / resume と trim 通知・TRIM_DONE に追随し、失敗後に古い面を描かない | 200 ライン化・backend 切替・park / resume・trim の guest 往復 |
-| 7 | 外部 Makefile を `link_guard.py` 経由のリンク・入力刻印へ移し、旧 `.o` / archive を残さず staged SDK だけで再構築する。配備物を自層 `deploy.yaml` に登録する [V2] | 新 SDK + 旧 `.o` のリンク拒否、正常再構築、build ID / hash / 世代 / リンク入力と配備集合の記録 |
+| 7 | 外部 Makefile を `link_guard.py` 経由のリンク・入力刻印へ移し、旧 `.o` / archive を残さず staged SDK だけで再構築する。配備物を自層 `deploy.yaml` に登録する | 新 SDK + 旧 `.o` のリンク拒否、正常再構築、build ID / hash / 世代 / リンク入力と配備集合の記録 |
 | 8 | 再開時の一式を配備し [D1][D2][V1]、対象構成で実 guest 受入を行う。外部未ビルドを外部 PASS に置き換えない | 起動・描画・入力・STOP / fault・終了・次起動、lease / owner 回収、反映した版・hash の確認 |
 
 L-h で **KAPI 74 / MemStat 200B** となる SDK で `make clean-external` →

@@ -142,7 +142,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
 - 揃えるもの: kernel/module/module.h の構造体、KDEBUG ops の初期化子、生成の MODULE_OPS_SLOTS / KDEBUG_OPS_VERSION。module.c:16 の STATIC_ASSERT を版 4 の 20 口 + version で成立させる。
 - **G5 (M2 の依頼文に書く)**: KDEBUG_OPS_VERSION は kernel/module/module.h:7 の手書きの定義で、GF の identity (gfinit.c:148 → recover.c:130 の CRC) にも入る。新しい口には `kdebug_export_contracts[MODULE_OPS_SLOTS]` (gen_kdebug_imports.py:213) の型契約も 1 行要る。identity の CRC が変わるのは想定どおり。
 - kdebug の既存 import は未使用になっても削除・並替え禁止、必要分だけ末尾追加。内部 ops 版 / 契約 CRC も更新。
-- 公開の入口 (旧 S7) は既存の kdebug_call のまま。KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新・clean → all を守る ([KAPI_SPEC.md](../../KAPI_SPEC.md) §3-1)。
+- 公開の入口 (旧 S7) は既存の kdebug_call のまま。KAPI は生成元だけを変え、[ABI] の版更新・clean → all を守る ([KAPI_SPEC.md](../../KAPI_SPEC.md) §3-1)。
 
 ## 7. M1 の同一像計測 (2026-10-22)
 
@@ -230,4 +230,4 @@ GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retai
 
 ## 実装の後の変化 (2026-10-23、PM 注記)
 
-- §6 の「公開の入口 (旧 S7) は … KAPI は生成元だけを変え、[ABI1]〜[ABI3] の版更新」は、`recover` の先例 (`userland/shell/cmd_recover.c` が `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃える — **2026-10-23 確定** ([GF6200_S7_SHELL.md](GF6200_S7_SHELL.md)): 公開の入口は既存の kdebug_call のまま、shell は private な `kdebug/gfinit_wire.h` を直接読む。sdk/kapi.json・KAPI の版・slot・SDK の生成物は変えない。§6 の KDEBUG の内部 ops の版 4・20 口の説明はそのまま。
+- §6 の「公開の入口 (旧 S7) は … KAPI は生成元だけを変え、[ABI] の版更新」は、`recover` の先例 (`userland/shell/cmd_recover.c` が `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃える — **2026-10-23 確定** ([GF6200_S7_SHELL.md](GF6200_S7_SHELL.md)): 公開の入口は既存の kdebug_call のまま、shell は private な `kdebug/gfinit_wire.h` を直接読む。sdk/kapi.json・KAPI の版・slot・SDK の生成物は変えない。§6 の KDEBUG の内部 ops の版 4・20 口の説明はそのまま。

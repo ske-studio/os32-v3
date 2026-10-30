@@ -1,75 +1,46 @@
 # CLAUDE.md — AI コーディングアシスタント向けガイダンス
 
-AI コーディングアシスタント共通の入口。**置くのは指示と参照だけ**で、
-番地・KAPI 表・ファイル地図・障害の経緯といった技術情報の本文は置かない。更新先は
-[`docs/INDEX.md`](docs/INDEX.md) 冒頭の「情報単位ごとの正典」表が 1 か所に決めている。
+指示と参照の入口。更新先は [docs/INDEX.md](docs/INDEX.md) を参照。
 
 ## 体制
 
-**体制の正典は [`docs/tasks/agents/ROLES.md`](docs/tasks/agents/ROLES.md) §0** (ここは要約、モデル名と起動の形はそこ)。
-3 役: **PM** (Claude Code Opus 5.5 — 分解・統合・受入・権限)、**実装者** (Codex、worktree 隔離)、**独立レビュアー** (読み取りだけ、書き手と別のモデル)。
-実装者の完了条件は **`make all` + 足した・触った試験を `MUTATE=0` + `tools/checks/run.py --lint`** の rc=0 (変異・候補の全部・静的検査は回さない)。複数の段に分けた実装 (Tx) は、段ごとは `make kernel` (カーネルと対の部品)、最後の段の後に `make all` + 候補 `MUTATE=0` + 静的検査を 1 回 (T4 から、ROLES §0)。変異込みの検査は**レビューの後に PM が 1 回**。取り込みの検査は
-**3 段** (文書だけ / 小さい取り込み / 節目の全体 — ROLES §0「検査」)、段の取り込みは `check-changed`、全体検査 (`make all` + `make -k check`) は節目に PM が 1 回 (どちらも専用の作業木、`check_wt.sh`) — 修正のやり直しの中で全体検査を回さない。触るファイルが衝突しない段は並列で出せるだけ出す。試験・検査の実行は全体で同時に 2 本まで (`check_slot.sh`)。
-票に書くのは 1 段 10 行以内 (決定・未確認・持越し・証拠の所在)。延ばした試験は [`docs/tasks/DEFERRED_TESTS.md`](docs/tasks/DEFERRED_TESTS.md) の 1 か所に書く。
-**PM の推奨は基本的に承認、[D2] と実機の物理操作は個別承認**。
-**3 ラリーで決着しない争点はユーザーへ**。
-**このリポジトリ os32-v3 が現行 (v3)** (2026-09-30 に os32 から fork)。os32 の v2.x (タグ `v2.1`、`main`) は戻り先 —
-新機能は入れず、文書の正典もここ ([`docs/decisions/VERSIONS.md`](docs/decisions/VERSIONS.md) §2)。
-**カーネル層 (カーネル本体・VFS/FS・exec/ページング・KAPI・shlib 読み込み) に分かっている不具合が
-あるあいだは、新機能より先に直す** — 理由と適用の仕方は
-[`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §1。
-**カーネルレベルの機能は整数演算が第一選択、浮動小数点演算が要るときは実装前にユーザーに確認する** ([`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §2)。
-承認済みスコープの中では止まらずに進め、止まるのは [D1]〜[D4] の承認・仕様の分岐・スコープ拡大・
-**独立レビューが要る地点** の 4 つだけ。レビューは PM が代行せず、ROLES §5 の書式で依頼する。
+正典は [ROLES §0](docs/tasks/agents/ROLES.md)。
+3 役: PM (分解・統合・受入・権限)、実装者 (worktree 隔離)、独立レビュアー (読み取りだけ、書き手と別のモデル)。
+**PM の推奨は基本的に承認、[D2] と実機の物理操作は個別承認**。**3 ラリーで決着しない争点はユーザーへ**。
+承認済みスコープの中では止まらずに進め、止まるのは [D1]〜[D4] の承認・仕様の分岐・スコープ拡大・独立レビューが要る地点。
+**このリポジトリ os32-v3 が現行** (os32 の v2.x は戻り先、[VERSIONS](docs/decisions/VERSIONS.md) §2)。
+**カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
+
+実装者の完了条件は `make all` + 足した・触った試験を `MUTATE=0` + `tools/checks/run.py --lint` の rc=0。複数段の作業は ROLES §0 に従う。
 
 ## Build Commands
 
-Full target list and compiler flags: [`docs/08_build.md`](docs/08_build.md#ビルドターゲット) §8-4 / §8-2.
-Which build and which verification a change actually needs: skill **`os32-build-verify`**.
-
-```bash
-make all / kernel / programs              # build (SDK and images come with `all`)
-make external                             # apps/ + game/ — not built in v3 (H-7 reopen gate, docs/tasks/v3/T2H_EXTERNAL_GATE.md); do not run until reopened
-make check-<name> / check-fast / check     # the checks named in your request / everything without mutants / everything with mutants (PM, once per landing batch) — docs/08_build.md §8-4
-make clean                                # required after a KAPI struct change ([ABI3])
-make deploy                               # HostDrv (C:\os32) — no reboot, not verification ([V1])
-make deploy-kernel / deploy-boot          # NHD / boot area — stop NP21/W first ([D1])
-```
-
-Which of the three deploy paths a change needs: [`docs/08_build.md`](docs/08_build.md#配備3経路) §8-4.
-
-Real hardware (Ra266) update while it stays HDD-booted: skill **`os32-realhw-update`**.
-PM workflow skills: **`os32-design-rally`** (draft → independent review, max 3 rounds → DESIGN.final), **`os32-delegate`** (worktree + implementer brief + review brief), **`os32-land`** (merge → `check_wt.sh` → push only on rc=0 → CI).
-Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; stop / start only with
-`tools/np21w_ctl.py` ([D1], [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §5).
+ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-4。
+`make all` / `make kernel` / `make programs` でビルドする。
+`make check-<name>` / `check-changed` / `check` — 指定の検査 / 変更に当たる検査 (段は各検査の `CHECK` 宣言、`tools/checks/run.py`) / 全部を変異込み (節目に PM が 1 回)。
+PM の作業のスキル: **`os32-design-rally`** (設計の往復)・**`os32-delegate`** (実装の依頼)・**`os32-land`** (取り込み・検査・push)・**`os32-realhw-update`** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
+KAPI 変更後は `make clean` → `make all` ([ABI])。
+`make deploy` は HostDrv、`make deploy-kernel` / `deploy-boot` は NP21/W 停止後 ([D1])。
 
 ## Project Constraints
 
-規則の正典は [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) — 理由と詳細はそこにある。ここは規則行だけで、
-ずれは `make check` (`tools/check_constraints.py`) が ID で検出する。
-[D1]〜[D4] の一部の操作には `.claude/settings.json` の `ask` / `deny` も設定している。
-これは包括的な保護ではない。NP21/W の停止確認や別コマンド経由の操作にも正典の規則を適用する。
+正典: [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md)。
 
-- **[C1]** C11 (GNU11) for internal code — kernel, boot, userland and SDK implementation build with `-std=gnu11`; public SDK headers stay C89/GNU89-compatible and SQLite keeps GNU89. No implicit declarations / implicit int / VLA; no new anonymous structs/unions, `restrict`, atomics, TLS or thread APIs.
-- **[C2]** In the kernel use `kstrncpy` / `kstrncat` / `kstrlen` / `kstrcmp` (`lib/kstring.h`), never libc.
-- **[C3]** Functions exposed to external programs need `__cdecl` wrappers in `kapi/`.
-- **[C4]** No hardcoded constants — follow the three-layer constant scheme.
-- **[C5]** Physical addresses become pointers through `P2V` / `P2V_IO` (`P2V_CONST` / `P2V_IO_CONST` only for constant initializers); pointers passed to device/PTE/CR3 use `V2P`. App/lease virtual addresses use AS/SURFACE translation. Exceptions are recorded in `tools/check_p2v_allow.txt`.
-- **[HW1]** Never use EGC / GRCG / GDC drawing commands. Draw through the HAL (`gfx_present` path): the CPU writes VRAM directly on 98 planar (`0xA8000`) and PEGC; the Cirrus backend may use its own accelerator inside the HAL.
-- **[HW2]** DMA buffers must not straddle a 64KB boundary.
-- **[HW3]** New hardware drivers: before designing, consult the vendor manual **and** a license-compatible existing implementation (FreeBSD/NetBSD/OpenBSD or other BSD/MIT code) and cite it in the design ticket; use that implementation as the model — for each register and step, show where and in what order/state it does it (file:line) and follow it, giving a reason for each deviation. Never copy code or structure from GPL implementations (e.g. Linux); use them only for behavior not found in BSD code or manuals, and say so. Never reverse-engineer (disassemble, decompile, analyze) anything whose license explicitly forbids it, such as vendor driver binaries.
-- **[ABI1]** `sdk/kapi.json` is the single source of truth. Never hand-edit the generated files.
-- **[ABI2]** Append KAPI entries only. Never reorder or delete an existing slot.
-- **[ABI3]** After a KAPI change, bump the version and run `make clean` → `make all`.
-- **[V1]** `make deploy` (HostDrv) alone is not verification — PATH prefers the NHD's `/usr/bin`.
-- **[V2]** Register every launchable binary in its own layer's `deploy.yaml`.
-- **[V3]** Do not shorten the curl timeout for remote execution (15s minimum, 60s+ for long runs).
-- **[V4]** Report failures and skipped steps as they happened. Never present something unverified as a pass.
-- **[D1]** Never deploy to the NHD while NP21/W is running. Stop → deploy → start.
-- **[D2]** Get approval before irreversible operations (overwriting the NHD or image masters,
-  `rm -rf`, `git reset --hard`, editing `*.ini`).
-- **[D3]** Never put the contents of `.env`, API keys or passwords in output.
-- **[D4]** Read or cite `docs/archive/` only when the user tells you to. Never use it as the basis for work, never link to it from current documents, and never point tests or acceptance lists at it.
+- **[C1]** 内部は GNU11、公開 SDK ヘッダは C89/GNU89、SQLite は GNU89。暗黙の宣言・int、VLA 等を禁止。
+- **[C2]** カーネルの文字列操作は `lib/kstring.h` を使う。
+- **[C4]** 番地・サイズ・パスは定数の 3 層管理に従う。
+- **[C5]** 物理番地とポインタの変換は `P2V` / `V2P` 等に集約する。
+- **[ABI]** `sdk/kapi.json` を正とし、末尾追加・版上げ・clean ビルドを行う。ラッパーは生成する。
+- **[HW1]** EGC / GRCG / GDC の描画コマンドを使わず HAL を通す。
+- **[HW2]** DMA バッファは 64KB 境界をまたがない。
+- **[HW3]** 新しいハードウェアはメーカー資料と BSD/MIT 実装を参照し、GPL を写さず、禁止されたリバースエンジニアリングをしない。
+- **[V1]** HostDrv の配備だけでは検証にならない。
+- **[V3]** リモート実行の curl タイムアウトは最低 15 秒、長時間は 60 秒以上。
+- **[V4]** 失敗・手順飛ばし・未確認をそのまま報告する。
+- **[D1]** NP21/W を停止してから NHD に配備する。
+- **[D2]** 不可逆な操作は事前に承認を得る。
+- **[D3]** 秘密情報の内容を出力しない。
+- **[D4]** `docs/archive/` はユーザーの指示があるときだけ参照し、作業の根拠にしない。
 
 ## 触る前に読む 1 か所
 
@@ -79,7 +50,7 @@ Guest (NP21/W): drive it through skill **`run-os32`** and `tools/np21w_mcp/`; st
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`) |
 | ビルド・配備・検証を選ぶ | スキル **`os32-build-verify`**、[`docs/08_build.md`](docs/08_build.md) §8-4 |
-| KAPI の追加・変更 | スキル **`os32-kapi-add`**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI1]〜[ABI3]) |
+| KAPI の追加・変更 | スキル **`os32-kapi-add`**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
 | エミュレータ上の障害 / ini の変更 | スキル **`os32-emu-debug`** / **`os32-emu-config`** (ini は PM だけ) |
 | 実行モデル (CPL=3、資源回収) / 描画 | [`docs/09_exec.md`](docs/09_exec.md) / [`docs/05_drivers.md`](docs/05_drivers.md) §5-5 |
 

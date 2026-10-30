@@ -443,7 +443,7 @@ static void v50_selftest(void)
  * 以前 db_v50_selftest() の (0) は
  *     KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1
  * と書いてあり、「host_close の後ろに 1 本も足されていないこと」を要求して
- * いた。[ABI2] は末尾追記を正当な操作と定めているので、これは **KAPI を
+ * いた。[ABI] は末尾追記を正当な操作と定めているので、これは **KAPI を
  * 1 本足すたびに必ず落ちる**。実際 v52 の `sys_set_mtime` (slot 213) で
  * make check が落ちた。
  *

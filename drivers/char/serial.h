@@ -273,7 +273,7 @@ int serial_get_status(u32 *mode, u32 *baud, u32 *fifo);
  *   SER_TX_DROPPED(-1) = TxRDY の予算を使い切って諦めた (相手が読んでいない)
  * 既存の呼び手は戻り値を無視してよい。KAPI の `serial_putchar` は従来どおり
  * void で受ける (`kapi/kapi_generated.c` の wrapper が捨てる) ので、
- * 外部プログラムから見た ABI は変わっていない ([ABI2])。 */
+ * 外部プログラムから見た ABI は変わっていない ([ABI])。 */
 int serial_putchar(char c);
 void serial_puts(const char *str);
 void pc98_serial_puts_polled(const char *str);

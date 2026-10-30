@@ -227,7 +227,7 @@ path も slot の予約・SQLite open・VFS 操作前に確定する。
 B2/B3 は B1 に依存。B4a/b を含む統合済み単位まで guest 配備しない。
 F2 の `ime_dict.c`/`kapi_db.c`/VFS、GUI の exec 編集者と共有ファイルは直列移管する。
 本票で exec_exit を独自改修しない。新 guest test は別途許可された `userland/tests/` と
-自層 `deploy.yaml` [V2]／build登録だけを追加範囲にする。
+自層 `deploy.yaml`／build登録だけを追加範囲にする。
 
 ## 8. 必須試験（以下は期待値、今回未実行）
 

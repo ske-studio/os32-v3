@@ -2,7 +2,7 @@
 /*  KAPI_HOST.H — Host Services KAPI (v51) の実体                            */
 /*                                                                          */
 /*  ABI の正典: docs/archive/network/TASK_N0.md §1a。生成される __cdecl ラッパ  */
-/*  (`wrap_host_*`) がここの `kapi_host_*` を呼ぶ ([C3])。                    */
+/*  (`wrap_host_*`) がここの `kapi_host_*` を呼ぶ ([ABI])。                    */
 /* ======================================================================== */
 
 #ifndef OS32_KAPI_HOST_H
