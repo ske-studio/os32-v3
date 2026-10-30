@@ -52,9 +52,74 @@ static void port_write(u32 port, u32 value)
 #include "../../drivers/sound/fm/fm.c"
 #undef tick_count
 #include "../../drivers/sound/fm/snd_engine.c"
+static void check_se_defaults(void)
+{
+    static const SndSE_Def expected[6] = {
+        { 0, 0, 0, 5, 200, 12, 3 },
+        { 1, 1, NOTE(6, N_C), 15, 0, 0, 0 },
+        { 0, 0, 0, 8, 800, 15, 2 },
+        { 0, 0, 0, 15, 1200, 15, 1 },
+        { 1, 1, NOTE(7, N_E), 10, 0, 0, 0 },
+        { 0, 0, 0, 10, 400, 15, 0 },
+    };
+    int i;
+    for (i = 0; i < SND_SE_MAX; i++) {
+        SndSE_Def *actual = &g_snd.se_table[i];
+        SndSE_Def zero = { 0 };
+        const SndSE_Def *want = i < 6 ? &expected[i] : &zero;
+        CHECK(actual->use_fm == want->use_fm && actual->tone_num == want->tone_num);
+        CHECK(actual->note == want->note && actual->duration == want->duration);
+        CHECK(actual->ssg_period == want->ssg_period && actual->ssg_vol == want->ssg_vol);
+        CHECK(actual->ssg_decay == want->ssg_decay);
+    }
+    g_snd.se_table[SND_SE_SELECT].duration = 42;
+    CHECK(g_snd.se_table[SND_SE_SELECT].duration == 42);
+    snd_init();
+    CHECK(g_snd.se_table[SND_SE_SELECT].duration == 15);
+    snd_se_play(6);
+    CHECK(!g_snd.fm_se.active && !g_snd.ssg_se.active);
+}
+
+static void check_borrow(void)
+{
+    SndBorrowState *fm = &g_snd.fm_borrow, *ssg = &g_snd.ssg_borrow;
+    snd_init();
+    g_snd.bgm.playing = 1;
+    g_snd.bgm.pos = 3;
+    g_snd.bgm.notes[0] = (SndNote){ .channel = SND_FM_SE_CH, .tone = 1, .note = NOTE(4, N_C) };
+    g_snd.bgm.notes[1] = (SndNote){ .channel = SND_SSG_SE_LOGICAL, .tone = 2, .note = NOTE(4, N_E) };
+    g_snd.bgm.notes[2] = (SndNote){ .channel = SND_FM_SE_CH, .tone = 3, .note = NOTE(5, N_G) };
+    g_snd.bgm.notes[3] = (SndNote){ .channel = 0, .tone = 0, .note = NOTE(4, N_C) };
+    snd_se_play(SND_SE_SELECT);
+    snd_se_play(SND_SE_CURSOR);
+    CHECK(fm->borrowed && fm->saved_was_sounding && fm->saved_tone == 3 && fm->saved_note == NOTE(5, N_G));
+    CHECK(ssg->borrowed && ssg->saved_was_sounding && ssg->saved_tone == 2 && ssg->saved_note == NOTE(4, N_E));
+    g_snd.bgm.notes[2].note = SND_REST;
+    g_snd.bgm.notes[1].note = SND_REST;
+    snd_se_play(SND_SE_COIN);
+    snd_se_play(SND_SE_BEEP);
+    CHECK(fm->saved_was_sounding && fm->saved_note == NOTE(5, N_G));
+    CHECK(ssg->saved_was_sounding && ssg->saved_note == NOTE(4, N_E));
+    now += 20;
+    snd_fm_se_tick(); snd_ssg_se_tick();
+    CHECK(!fm->borrowed && !ssg->borrowed);
+    CHECK((values[OPN_REG_KEY_ONOFF] & OPN_KEY_ALL_SLOTS) == OPN_KEY_ALL_SLOTS);
+    CHECK(values[SSG_REG_VOL_C] == SSG_VOLUME_MAX);
+    CHECK(values[SSG_REG_TONE_C_LO] == (ssg_period_from_note(NOTE(4, N_E)) & 0xff));
+    snd_se_play(SND_SE_SELECT); snd_se_play(SND_SE_CURSOR);
+    CHECK(!fm->saved_was_sounding && !ssg->saved_was_sounding);
+    now += 20;
+    snd_fm_se_tick(); snd_ssg_se_tick();
+    CHECK(!(values[OPN_REG_KEY_ONOFF] & OPN_KEY_ALL_SLOTS));
+    CHECK(values[SSG_REG_VOL_C] == 0);
+    snd_init();
+}
+
 void _start(void)
 {
     snd_init();
+    check_se_defaults();
+    check_borrow();
     snd_bgm_play("T120 O4 L4 CDE");
     CHECK(snd_bgm_is_playing() && (values[OPN_REG_KEY_ONOFF] & OPN_KEY_ALL_SLOTS));
     for (now = 0; now < 300; now++) snd_tick();
