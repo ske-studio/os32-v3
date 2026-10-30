@@ -35,7 +35,7 @@ NP21/W                   OK   phase=p2 protected_mode=1 eip=0x0010d130
 ```
 
 `NP21/W NG` なら `python3 tools/np21w_ctl.py status` でプロセスを確認する。
-使用中 ini は固定名と決めつけず、[os32-emu-config §2](../os32-emu-config/SKILL.md#2-構成切替の-3-経路--開始停止復帰) の管理された起動情報で確認し、
+使用中 ini は固定名と決めつけず、[os32-emu-config §2](../os32-emu-config/SKILL.md#構成切替の-3-経路--開始停止復帰) の管理された起動情報で確認し、
 その ini の `aidebug` / `aidbport` を照合する。コマンド行だけでは起動後の設定切替を証明できない。
 
 `.env` (gitignore 済み) に `CROSS_DIR` `NP21W_DIR` `HOSTDRV_DIR` の 3 つが要る。
