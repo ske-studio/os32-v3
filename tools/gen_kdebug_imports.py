@@ -144,7 +144,10 @@ def load_def(path=DEFAULT_DEF, root=ROOT):
 
 def abi_hash(entries):
     # Canonical complete resolved definition: names, actual types, order and flags.
-    return fnv1a((json.dumps(entries, sort_keys=True, separators=(',', ':')) + '\n').encode())
+    # 'source' (the file that declares it) is where it lives, not the ABI — moving a
+    # file must not change the hash (TASK_SRC_LAYOUT, 2026-10-30).
+    canon = [{k: v for k, v in e.items() if k != 'source'} for e in entries]
+    return fnv1a((json.dumps(canon, sort_keys=True, separators=(',', ':')) + '\n').encode())
 
 
 def symbols(nm, paths, undefined):
