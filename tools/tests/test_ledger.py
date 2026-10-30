@@ -40,6 +40,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
            'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/isr_stub.asm', 'include/ksetjmp.h',
+           'arch/x86/kernel/iret_user.inc', 'arch/x86/kernel/ring3_entry.asm',
            'kernel/irq/irq.c')
 
 
@@ -47,8 +48,8 @@ def load(mutation=None):
     texts = {rel: (ROOT / rel).read_text() for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
-        if old not in texts[rel]:
-            raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
+        if texts[rel].count(old) != 1:
+            raise SystemExit('変異 %s の当て先が一意でない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
     return texts
 
@@ -624,6 +625,22 @@ class Ledger(unittest.TestCase):
 
     def test_asm_depth_markers(self):
         self.assertEqual(asm_problems(self.texts['arch/x86/kernel/isr_stub.asm']), [])
+
+    def test_user_iret_shared(self):
+        include = '%include "arch/x86/kernel/iret_user.inc"'
+        isr = self.texts['arch/x86/kernel/isr_stub.asm']
+        ring = self.texts['arch/x86/kernel/ring3_entry.asm']
+        for source in (isr, ring):
+            self.assertEqual(source.count(include), 1)
+        macro = self.texts['arch/x86/kernel/iret_user.inc'].split('%macro IRETD_USER 0', 1)[1].split('%endmacro', 1)[0]
+        code = [_code(line) for line in macro.splitlines() if _code(line)]
+        self.assertEqual(code, [
+            'test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM', 'jnz     %%do_iret',
+            'test    dword [esp + IRET_CS_OFF], X86_SEL_RPL_MASK', 'jz      %%do_iret',
+            'push    eax', 'mov     ax, USER_DS', 'mov     ds, ax', 'mov     es, ax',
+            'mov     fs, ax', 'mov     gs, ax', 'pop     eax', '%%do_iret:', 'iretd'])
+        self.assertEqual(_body(ring, 'ring3_iret_to_user'), ['popad', 'IRETD_USER'])
+        self.assertEqual(_body(ring, 'int80_stub')[-1], 'cli')
 
     def test_setjmp_saves_and_restores_depth(self):
         ok, log = setjmp_run(self.texts)
