@@ -1,6 +1,6 @@
 """drivers/char/serial.c が 0035h (8255 ポート C) を丸ごと書かないことのホスト試験。
 
-教訓: docs/POLICY_DEBUG.md §4-59 (実機 PC-9821Ra266 で rshell 中にビープが
+教訓: docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用 (実機 PC-9821Ra266 で rshell 中にビープが
 鳴り続けた、2026-09-24)。資料: docs/hw/undocumented/io_syste.md の I/O 0035h /
 0037h (BUZ は bit3 = 1 で停止、BSR 06h = 鳴動 / 07h = 停止)。
 

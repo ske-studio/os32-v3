@@ -39,7 +39,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 作業別の参照先 | [WORK_GUIDE.md](WORK_GUIDE.md) (2026-10-23 に DEVELOPMENT §1 から切り出した) | — |
 | 実行モデル (ローダ、ネスト、リング3、資源回収、exec_run の分割壁) | [09_exec.md](09_exec.md) | [10 §10-9](10_notes.md)、`archive/kernel_v2/` (設計経緯) |
 | 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md は参照のみ |
-| 落とし穴の経緯・検証記録 | [POLICY_DEBUG.md §4](POLICY_DEBUG.md) | 1 行の注意は同じ §4 の冒頭「領域別の早見」(2026-10-06 に CLAUDE.md から移した)。CLAUDE.md は入口の 1 行だけ |
+| 落とし穴 | 技術詳細は [各機能の設計書](design/README.md) の「落とし穴」、検証の制限は [POLICY_DEBUG.md §4](POLICY_DEBUG.md#4-よくある落とし穴と教訓集) | 領域別の早見は POLICY_DEBUG §4 冒頭。CLAUDE.md は入口の 1 行だけ |
 | コーディング規約 (C11 (gnu11)、kstring、三層定数、asm、整数演算が第一選択) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
 | 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、archive/v21/v86v2/04 (アーカイブ: `docs/archive/v21/v86v2/04_implementation_status.md`)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
@@ -61,13 +61,13 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (実装中 — 4a の S1〜S7 は main、次は S8 (実機の立会い)) | [tasks/realhw/GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) (VBIOS について分かっていることのまとめ) |
 | 実機試験を決まった状態 (安全な 98 の CUI) へ戻す処理 (realhw_recover: 状態機械・期限・98 画面復帰・`recover now`) | [tasks/realhw/TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md) (実装中 — T1〜T3 着地、T4a・T4b 合格、T5 の書込みなしは合格、残りは S8 と同じ立会いの回) | 確定設計は [decisions/realhw/](decisions/realhw/REALHW_RECOVER_DESIGN.md) (段 4a の設計も同じ所)、[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) §5 |
 | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV、kdebug.bin の上限 92% への対処、IDE・USB・SATA など将来の装置の要件) | [tasks/realhw/TASK_HWDEV.md](tasks/realhw/TASK_HWDEV.md) (実装中 — M1〜M5・BARLEN・route-test は main、次は S8) | 構造・API・装置の要件は [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md)・[HWDEV_CORE_API.md](decisions/realhw/HWDEV_CORE_API.md)・[DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) (票の §5 から辿る)、[TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md)・[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) |
-| 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [05_drivers.md §5-5](05_drivers.md) (出入りの順序・ROM の記録との照合・`pegcchk`。票 TASK_PEGC480_REALHW は受入完了でアーカイブ: `docs/archive/realhw/TASK_PEGC480_REALHW.md`) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG.md §4-62](POLICY_DEBUG.md)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
+| 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [05_drivers.md §5-5](05_drivers.md) (出入りの順序・ROM の記録との照合・`pegcchk`。票 TASK_PEGC480_REALHW は受入完了でアーカイブ: `docs/archive/realhw/TASK_PEGC480_REALHW.md`) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
 | 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
 
 起動時に読むデバッグ部品 `/boot/kdebug.bin` (`KDEBUG=1`) の形式と口は [08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1)、到達確認と対の配備は [POLICY_DEBUG §2](POLICY_DEBUG.md) (票 TASK_DBGREF は受入完了でアーカイブ: `docs/archive/v3/TASK_DBGREF.md`)。
 標準フォントの描画を D15 に届かせる改善 (描き済みの字形の束・枠の詰め直し・先読み・領域の拡大・ラスタの整数化、KPEEK より先) は [TASK_FONTPERF](tasks/v3/TASK_FONTPERF.md)。
-実機でシリアル経由にメモリを読む道具 (kdebug の peek) の使い方は [POLICY_DEBUG §5](POLICY_DEBUG.md)「実機でメモリを読む」(票 TASK_KPEEK は受入完了でアーカイブ: `docs/archive/v3/TASK_KPEEK.md`)。
+実機でシリアル経由にメモリを読む道具 (kdebug の peek) の使い方は [rshell_peek.py](../tools/rshell_peek.py) 冒頭(票 TASK_KPEEK は受入完了でアーカイブ: `docs/archive/v3/TASK_KPEEK.md`)。
 検査の整理 (重い検査を軽く・重複を束ねる・古い試験を削る、2026-10-24 ユーザー決定) は [TASK_TEST_TIDY](tasks/v3/TASK_TEST_TIDY.md)。
 低レベルのマジックナンバーに名前を付ける段 ([C4]、v3 で足された行が中心、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM](tasks/v3/TASK_MAGIC_NUM.md)。
 fork 前からある行のマジックナンバー (OS 側、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM2](tasks/v3/TASK_MAGIC_NUM2.md)。
@@ -121,7 +121,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 |---------|------|
 | [CONSTRAINTS.md](CONSTRAINTS.md) | **プロジェクト制約の正典** — C/ABI・ハードウェア・KernelAPI・検証・破壊的操作。CLAUDE.md は ここの規則行を ID で参照する (`make check` が照合) |
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
-| [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — 仮説駆動デバッグ、バイナリ反映確認、教訓集、AI協調ルール |
+| [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v79 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 255) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
 | [WORK_GUIDE.md](WORK_GUIDE.md) | **作業別の入口** (索引) — やりたいことから読む所 / 触る所 / 検証へ。2026-10-23 に DEVELOPMENT §1 から切り出した |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **開発案内** — ファイル → 役割 → 仕様のファイル地図 (§2)。仕様本文は持たない |

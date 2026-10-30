@@ -178,7 +178,7 @@
 #define FDC_RW_TIMEOUT_TICKS      100
 
 /* まとめ読み (READ DATA で EOT まで複数セクタ) の時間上限。
- *   単発の上の見積もりと同じく機構の最悪値から引く (POLICY_DEBUG §4-51):
+ *   単発の上の見積もりと同じく機構の最悪値から引く (docs/POLICY_DEBUG.md#4-51-fdc-の時間と-dma):
  *     最初のセクタを探す      最悪 2 回転
  *     count セクタを読む      count / spt 回転 (切り上げ)
  *     ヘッドロード (HLT)       10ms

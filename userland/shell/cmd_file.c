@@ -70,7 +70,7 @@ static int do_copy_file(const char *cmd_name, const char *src, const char *dst) 
     return rc;
 }
 
-/* 種別を問う。**分からなければ断る** (TASK_FS_TYPE §3、POLICY_DEBUG §4-35)。
+/* 種別を問う。**分からなければ断る** (TASK_FS_TYPE §3、docs/design/fs/ext2/ext2_super.md#落とし穴)。
  *
  * fs_is_dir() は stat と列挙の両方が失敗すると 0 を返すので、それを「ファイル」
  * と読むと cp -r が宛先直下へ展開して既存ファイルを上書きし、rm が読めない

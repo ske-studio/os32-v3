@@ -1,6 +1,6 @@
 """Cirrus の窓の可否は RAM の上端ではなく物理地図で決める (drivers/video/cirrus/backend_cirrus.c)。
 
-記録: tools/tests/cirrus_win_tdd.md / 教訓 docs/POLICY_DEBUG.md §4-34
+記録: tools/tests/cirrus_win_tdd.md / 教訓 docs/design/mm/pgalloc.md#落とし穴
 
 tools/tests/cirrus_win_host.c が実物の drivers/video/cirrus/backend_cirrus.c を 1 行も写さずに
 #include し、pgalloc_range_has_ram (贋の物理地図) と sys_get_mem_kb (上端) と

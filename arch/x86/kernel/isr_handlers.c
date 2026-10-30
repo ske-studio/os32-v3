@@ -53,7 +53,7 @@ extern void ring3_fault_kill(void);
 extern volatile int ring3_in_syscall;
 /* カーネルが WM (gshell) のコードへ入っている深さ (exec.c、2026-09-26)。
  * kill の行に "(in WM)" を足すためだけに読む — 帰属 (kill するか) は変えない。
- * WM の中で落ちるとアプリの kill として畳まれる (POLICY_DEBUG §4-61) ので、
+ * WM の中で落ちるとアプリの kill として畳まれる (docs/design/exec/exec.md#落とし穴) ので、
  * ここと ring3_wm_fault_count (exec.c) が「WM の中だった」を残す唯一の印。 */
 extern volatile int ring3_wm_depth;
 

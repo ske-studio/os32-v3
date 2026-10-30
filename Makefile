@@ -27,7 +27,7 @@
 #  `make check` も並列で回る。変異試験は一時ディレクトリの写しの木に変異を
 #  当てる作り (tools/tests/mutpar.py) で、実物のソースは読むだけ。以前は
 #  実物を書き換えて戻す試験を 2 段目 (-j1) に分けていた (2026-09-26 に解消、
-#  docs/POLICY_DEBUG.md §4-40・票 docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5)。
+#  docs/08_build.md・票 docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5)。
 # ----------------------------------------------------------------------------
 OS32_NPROC := $(shell nproc 2>/dev/null || echo 1)
 ifeq ($(filter -j%,$(MAKEFLAGS)),)

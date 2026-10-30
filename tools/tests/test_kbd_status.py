@@ -2,7 +2,7 @@
 (kernel/v86/v86_kbd.c) のホスト試験。
 
 記録: tools/tests/kbd_status_tdd.md
-経緯: docs/POLICY_DEBUG.md §4-57 (実機 PC-9821Ra266 で打鍵が届かない、
+経緯: docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線 (実機 PC-9821Ra266 で打鍵が届かない、
       その実装レビューで出た V86 への偽 ESC と OE の扱い)
 
 実物の drivers/input/kbd_status.c と kernel/v86/v86_kbd.c を 1 行も写さずに #include

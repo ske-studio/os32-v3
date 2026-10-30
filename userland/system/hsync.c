@@ -345,7 +345,7 @@ typedef struct {
 
 /* 列挙時のサイズは**持ち回さない**。同一判定に使うサイズは比較の直前に
  * stat で取り直す (設計書 §3.1)。ここでは名前と種別だけ私有バッファへ写す
- * (コールバックの中では FS に触らない、POLICY_DEBUG §4-26)。 */
+ * (コールバックの中では FS に触らない、docs/design/fs/ext2/ext2_dir.md#落とし穴)。 */
 static void ls_cb(const DirEntry_Ext *entry, void *ctx)
 {
     FileList *fl = (FileList *)ctx;
@@ -360,7 +360,7 @@ static void ls_cb(const DirEntry_Ext *entry, void *ctx)
      * 気づく手がかりが無かった。除外として数えて -v で見せる。
      * 見せるのは**コピー元**の名前 — 直すのはそちらなので。
      * コールバックの中なので FS には触らず、パスも組み立てずに書式で繋ぐ
-     * (POLICY_DEBUG §4-26)。 */
+     * (docs/design/fs/ext2/ext2_dir.md#落とし穴)。 */
     if (hs_is_temp_name(entry->name)) {
         g_excluded++;
         if (g_verbose) {

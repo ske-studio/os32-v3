@@ -1,6 +1,6 @@
 """配備のコピー失敗が成功として報告されないことを検査する。
 
-2026-09-10 の実障害 (POLICY_DEBUG §4-29): NHD が満杯で
+2026-09-10 の実障害 (docs/design/tools/nhd_deploy.md#落とし穴): NHD が満杯で
 `cp: No space left on device` が起きたのに `make deploy-nhd` は exit 0 で
 「完了」と出し、/boot/vmkernel.lz4 は 446,464 B に切り詰められていた。
 ゲストは古いカーネルで動き続けた。実ファイルシステムもエミュレータも使わない。

@@ -63,7 +63,7 @@ int pci_init(void);
 int pci_count(void);
 
 /* idx 番目の記録を out へ写す。戻り値 0 = 成功 / -1 = 範囲外。
- * **内部配列へのポインタは返さない** (POLICY_DEBUG §4-13 の
+ * **内部配列へのポインタは返さない** (docs/design/kapi/kapi_db.md#落とし穴 の
  * `db_last_error` と同じ事故を繰り返さないため — CPL=3 から呼ばれる)。 */
 int pci_get(u32 idx, void *out);
 

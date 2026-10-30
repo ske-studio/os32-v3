@@ -195,7 +195,7 @@ static void cirrus_linear_off(void)
 /*       ⑥ が窓を予約・写像して面を SURFACE に登録していること (probe は    */
 /*       自分で予約も写像もしない、TASK_T1_LEDGER §3-8)。識別で見るのは:     */
 /*       窓を張れるか。窓に RAM が登録されていたら (物理地図で見る。RAM の   */
-/*       上端では決めない — POLICY_DEBUG §4-34) 張ってはいけないし、32bit   */
+/*       上端では決めない — docs/design/mm/pgalloc.md#落とし穴) 張ってはいけないし、32bit   */
 /*       の物理空間に収まっていること。PEGC の                              */
 /*       probe と同じ理屈 (backend_pegc.c 段 2)。バンク窓 (F60000h、グルーが */
 /*       reg 01h で既定に固定する) と、H3b で採用したリニア窓 (FE000000h、   */

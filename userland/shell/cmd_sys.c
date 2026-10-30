@@ -558,7 +558,7 @@ static int cmd_gfxmode(int argc, char **argv)
 /*  kbdstat — キーボード 8251 の診断カウンタ (KAPI v62 kbd_diag)              */
 /*                                                                          */
 /*  実機で本体キーボードの打鍵が届かないときの切り分け用。rshell (シリアル) */
-/*  から打って読む前提なので 1 行で出す。読み方は docs/POLICY_DEBUG.md §4-57:*/
+/*  から打って読む前提なので 1 行で出す。読み方は docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線:*/
 /*    irq=0 かつ now の RxRDY (bit1) = 1 → 8251 は受けている = PIC / IRQ1 側  */
 /*    irq=0 かつ RxRDY = 0              → キーボードが送っていない           */
 /*    irq>0 なのに文字が出ない          → 配送側 (リング / GUI / rshell)      */

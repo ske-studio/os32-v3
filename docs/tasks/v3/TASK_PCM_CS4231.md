@@ -258,7 +258,7 @@ close / reclaim が各状態から 1 度だけ解放すること)。
 | E6 | 部分: Ra266 の検出・初期化。後続の音切れは [持越し台帳 R7-2、H-4(b)(c)](../DEFERRED_TESTS.md) を参照 |
 
 E3 の当時の観測 (2026-09-23): 5秒再生で underruns/repeats/resyncs=0、close=0、PI累積109。生frameは右41,368 frameで欠落0、左1,000Hz、末尾無音2,732 frame。停止後PEN/IEN=0。
-この採取の独立した証拠パスは本票に残っていないため、数値を削除して追跡不能にしない。切り分けた close 状態の読みの問題は [POLICY_DEBUG §4-56](../../POLICY_DEBUG.md#4-56-isr-が書く状態を-foreground-で待つループは-volatile-で読む-pcm-の-close-が毎回-io-になった2026-09-23) を参照。
+この採取の独立した証拠パスは本票に残っていないため、数値を削除して追跡不能にしない。切り分けた close 状態の読みの問題は [pcm_cs4231「落とし穴」](../../design/drivers/sound/cs4231/pcm_cs4231.md#落とし穴) を参照。
 
 残件 (実装レビュー往復 2 の非 blocker): 生成 wrapper 経由の `pcm_write` 契約試験 (範囲・あふれ・端数の順序)、交互試験の補強 (2 段目の期限境界で STOP_DONE、release → 再 open の claim 引き継ぎ、親 owner に戻った状態の reclaim)。
 

@@ -178,7 +178,7 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 > リニア窓は 2026-09-29 まで 0x01000000 (16MB 直上) だったが、16MB 超の RAM と重なる (NP21/W 17MB、
 > 実機 64MB) ので帯へ移した。512MB 付近は PCI の BIOS が BAR を置く帯 (Ra266 の実測 0x20000000〜) なので
 > 避けた。**Cirrus は NP21/W 互換のためだけ**で、auto の probe は NP21/W の上でだけボードの ID を読む
-> (実機 Ra266 のアクセラレータは PCI の Trident)。経緯は `docs/POLICY_DEBUG.md` §4-34。
+> (実機 Ra266 のアクセラレータは PCI の Trident)。経緯は [pgalloc「落とし穴」](design/mm/pgalloc.md#落とし穴)。
 
 > **デバイス窓の貸し出し規則 (e11b2)**
 > master のデバイス窓は **supervisor + PCD**、主記憶 BB は supervisor + WB を維持する。

@@ -25,7 +25,7 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 - **再生成のあとに `git diff --stat` を見る。** 意図した追加以外の行が動いていたら、
   生成物を手で触ったか、kapi.json の既存部分を動かしている。
 - **差分ビルドは無言で壊れる** ([ABI])。構造体が変わるので `make clean` → `make all`。
-  古い `syscalls.o` が残ると `malloc` が全部 ENOMEM になる類の症状が出る (POLICY_DEBUG §4-1)。
+  古い `syscalls.o` が残ると `malloc` が全部 ENOMEM になる類の症状が出る ([CONSTRAINTS](../../../docs/CONSTRAINTS.md#abi-kernelapi))。
 - **外部 apps/game は H-7 で持越し中**。[再開条件](../../../docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし、
   再開を決定した後だけ `make external` で再構築する。
 - 関数ポインタでない値は `api` ではなく `data_fields`。ジェネレータは `= 0;` を出すだけなので、

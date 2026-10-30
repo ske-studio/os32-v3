@@ -40,7 +40,7 @@ extern i32 exec_trim_done(u32 epoch);
  * (fd_redirect のバッファ) は深さに関係なく表を歩く (exec/ring3_str.h)。
  * 深さ 1 以上 = WM を信頼境界の内側に置く、だがフォールトの帰属は
  * ring3_in_syscall のまま — WM の中で落ちるとアプリの kill として畳まれる
- * (ring3_wm_fault_count が数える、docs/POLICY_DEBUG.md §4-61 追記 3)。 */
+ * (ring3_wm_fault_count が数える、docs/design/exec/exec.md#落とし穴)。 */
 extern void ring3_wm_enter(void);
 extern void ring3_wm_leave(void);
 

@@ -199,6 +199,6 @@ FatFs (`fs/fatfs/`)、`assets/` (IPADIC・IPAex・常用漢字表) と、gitigno
 | 実機 Ra266 の票と判定 | `docs/archive/realhw_v21/` (CHECKLIST_2026-09-24/25/26、TASK_FDC_REALHW、TASK_SERIAL_VFAST、TASK_SERIAL_HOSTFS、TASK_HDD_INSTALL ほか)、`docs/tasks/realhw/` |
 | 引き継ぎ (日ごとの記録) | `docs/archive/agents/HANDOVER_2026-09-29.md`、`docs/archive/agents/HANDOVER_2026-09-{16,18,22}.md` |
 | 体制の推移 | `docs/tasks/agents/ROLES.md` (§0 現行、末尾に経緯)、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |
-| 教訓 (障害の経緯と検証) | `docs/POLICY_DEBUG.md` §4 (§4-1〜§4-62)。普遍的なものの抜粋は [CASE_STUDIES.md](CASE_STUDIES.md) |
+| 教訓 (障害の経緯と検証) | [設計書の入口](design/README.md)、[POLICY_DEBUG §4](POLICY_DEBUG.md#4-よくある落とし穴と教訓集)。普遍的なものの抜粋は [CASE_STUDIES.md](CASE_STUDIES.md) |
 | v3 の草案・決定 | `docs/tasks/v3/` (V3_PLAN_DRAFT、TASK_MEMMAP_V3、RUST_VS_C11、U6_PENDING_REVIEW、TASK_C11_MIGRATION、FORK_PLAN) |
 | VZ Editor 移植の残課題メモ | `tasks/vzeditor_status.md` (2026-04、マクロエンジンと大容量ファイルが未完のまま) は fork の準備 (FORK_PLAN §1-3) で削除した。エディタ本体は v1.0 から `edit` として同梱 |

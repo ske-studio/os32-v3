@@ -93,7 +93,7 @@ sdk-dist: sdk
 # 変異を当てる (tools/tests/mutpar.py の overlay / mutant_tree、票
 # docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5) ので、全部を並列に回せる。
 # 以前は実物のソースを書き換えて戻す試験が 14 本あり、2 段目 check-mut を
-# 逐次 (-j1) で回していた (docs/POLICY_DEBUG.md §4-40・§4-41)。
+# 逐次 (-j1) で回していた (docs/08_build.md §8-4)。
 #
 # 段の前後で tools/check_tree_unchanged.py が「試験がソースを書き換えたまま
 # 戻していないか」を見る (番人)。引っかかったら、その試験を写しの作りに直す

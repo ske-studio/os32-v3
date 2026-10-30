@@ -1396,7 +1396,7 @@ pub fn textarea_add_row(id: WidgetId, text: &[u8]) -> GuiResult<i32> {
     if k >= GUI_MAX_TEXTAREA_ROWS {
         return Err(GuiErr::FULL);
     }
-    /* 切るなら UTF-8 の境界で (`docs/POLICY_DEBUG.md` §4-27)。 */
+    /* 切るなら UTF-8 の境界で (docs/design/lib/utf8.md#落とし穴)。 */
     let n = crate::utf8core::utf8_truncate(text, GUI_TEXTAREA_ROW_CAP);
     s().rows[k] = TextRow::EMPTY;
     s().rows[k].used = true;

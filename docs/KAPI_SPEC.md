@@ -111,7 +111,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v61 | **実装済み (2026-09-23、手元ビルドのみ)** | CS4231 (MATE-X PCM) の再生 `pcm_open` / `pcm_write` / `pcm_status` / `pcm_close` / `pcm_set_volume` の 5 本 (slot 224〜228 = 0x388〜0x398、data_fields は 0x39C / 0x3A0 へ)。16 ビット・ステレオ・44.1k / 22.05kHz の**再生だけ**で、単位は frame (左右 1 組 = 4 バイト)。カーネルが DMA リング 16KB (`dma_pool`) とステージング 16KB (`kmalloc`) を持ち、**アプリのバッファを IRQ から読むことはしない** — `pcm_write` はステージングへ写すだけで、リングを書くのは `pcm_advance` (IRQ / tick、IF=0) と停止中の `pcm_start` / RS_RESTART に限る。所有者は既存の資源 owner と同じアプリ ID で、異常終了は `exec_reclaim_owned` の `pcm_reclaim` が**待たずに**止めて返す。実体は `drivers/sound/cs4231/pcm_cs4231.c` / `drivers/sound/cs4231/pcm_cs4231_math.c` | 票 TASK_PCM_CS4231 |
 | v63 | **実装済み (2026-09-24、手元ビルドのみ)** | **データ欄の固定配置** (票 TASK_KAPI_DATA_FIELDS)。関数は増えていない。関数表の容量を **R = 300** 予約し (予約スロット 230〜299)、`sbrk_heap_limit` / `shm_base` を **0x4B8 / 0x4BC に固定** — 以後の関数追加でデータ欄は動かない。OS32X ヘッダを **v3** (末尾に `kapi_data_off`) にし、exec / shlib ローダ / 常駐シェルの起動は値がカーネルと違えば断る。crt の `kapi` の実名を `os32_kapi_v63` に変えた。**旧バイナリは一度だけ全部断られる** — 移行は [08_build.md](08_build.md) §8-4 | `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md` |
 | v64 | **実装済み (2026-09-24、手元ビルドのみ)** | HDD の一時置き場 (票 TASK_HDD_INSTALL 段 1): `ext2_format_at` / `dev_mount_count` / `sys_umount_checked` / `hdd_geom_info` の 4 本 (slot 230〜233 = 0x3A0〜0x3AC。データ欄は v63 で固定済みなので動かない、crt の `kapi` の実名も `os32_kapi_v63` のまま)。`ext2_format_at` は区画表を読まずに範囲だけに作る (ディスク総数超過・LBA 0〜17・桁あふれは 1 バイトも書かずに断る)、`sys_umount_checked` は sync を先に呼んで失敗なら外さない、`hdd_geom_info` は BIOS 幾何 (INT 1Bh AH=84h) と IDENTIFY と I/O の方式を `HddGeom` (32 バイト) に写す。同じ版で ATA I/O を LBA28 (word 49 bit9) に、区画表を PC-98 標準配置に、ext2 の区画探索を「見つからなければ失敗」に変えた — **旧配置の NHD は `make nhd-migrate-pt` で移す** ([08_build.md](08_build.md) §8-4)。配備は**カーネルを先** | `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 1 |
-| v62 | **実装済み (2026-09-23、手元ビルドのみ)** | キーボード 8251 の診断 `kbd_diag` 1 本 (slot 229 = 0x39C、data_fields は 0x3A0 / 0x3A4 へ)。`KbdDiag` (24 バイト、`os32_kapi_shared.h`) を呼び手のバッファへ写す — IRQ1 回数・空 IRQ (RxRDY = 0)・エラー (PE/FE)・オーバーラン (OE だけ、バイトは使う)・起動時に読み捨てたバイト数・`kbd_init` の前後の 0043h・直近の 0043h とスキャンコード・書いたコマンド語・呼んだ時点の 0043h。戻り 0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。出力は生成ラッパの `out` 検査 (読み取り専用の USER ページなら `ring3_fault_kill`)。シェルの `kbdstat` が 1 行で出す。同じ変更でカーネルが 0043h に書くコマンド語を **0x14 → 0x16** (DTR = 1 = RTY# HIGH、BIOS の定常値) に直した — 実機 PC-9821Ra266 で打鍵が一切届かなかった件。実体は `drivers/input/kbd.c` / `drivers/input/kbd_status.c` | [POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57 |
+| v62 | **実装済み (2026-09-23、手元ビルドのみ)** | キーボード 8251 の診断 `kbd_diag` 1 本 (slot 229 = 0x39C、data_fields は 0x3A0 / 0x3A4 へ)。`KbdDiag` (24 バイト、`os32_kapi_shared.h`) を呼び手のバッファへ写す — IRQ1 回数・空 IRQ (RxRDY = 0)・エラー (PE/FE)・オーバーラン (OE だけ、バイトは使う)・起動時に読み捨てたバイト数・`kbd_init` の前後の 0043h・直近の 0043h とスキャンコード・書いたコマンド語・呼んだ時点の 0043h。戻り 0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。出力は生成ラッパの `out` 検査 (読み取り専用の USER ページなら `ring3_fault_kill`)。シェルの `kbdstat` が 1 行で出す。同じ変更でカーネルが 0043h に書くコマンド語を **0x14 → 0x16** (DTR = 1 = RTY# HIGH、BIOS の定常値) に直した — 実機 PC-9821Ra266 で打鍵が一切届かなかった件。実体は `drivers/input/kbd.c` / `drivers/input/kbd_status.c` | [POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) |
 | v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 A-4 |
 | v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 B |
 | v67 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | キーボードの受信記録 `kbd_diag_log` 1 本 (slot 238 = 0x3C0)。IRQ1 が 0041h から**使うバイトを読むたびに** `KbdDiagLogEnt` (8 バイト: seq / 生の code / 処理後の修飾 / 印) を 32 件の循環リングへ積み、`after_seq` より新しい分を古い順に写す。EMPTY / ERROR で捨てたバイトは積まない。上書きで失われた分は写した先頭の seq の飛びで分かる。シェルの `kbdstat -w` が使う — 実機のカナ / CAPS が「ロックで make、解除で break」か「押すたびに make だけ」かを見る準備。実体は `drivers/input/kbd_dlog.c` / `drivers/input/kbd.c` | 票 TASK_KBD_NAV §3 |
@@ -1003,7 +1003,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   ない)、`fifo` = `0136h` の判定を返す。CPL=0 / WM の `NULL` は飛ばすが、
   CPL=3 は生成 wrap で kill。戻り値 `0` = 初期化済み /
   `-1` = まだ `serial_init` を呼んでいない。**カーネルのポインタは返さない**
-  (POLICY_DEBUG §4-13 の `db_last_error` と同じ事故を繰り返さないため)。
+  ([kapi_db「落とし穴」](design/kapi/kapi_db.md#落とし穴) の `db_last_error` と同じ事故を繰り返さないため)。
 - 資料は `docs/hw/undocumented/io_rs.md` (`0130h`〜`013Ah`)。**NP21/W は通信速度を
   模擬しない**ので、分周が合っているかはエミュレータでは確かめられない
   (`docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`)。
@@ -1059,7 +1059,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - `pci_get` は idx 番目の記録を **呼び手のバッファへ写す**。並びは
   `drivers/pci/pci.h` の `struct pci_dev` と同じで、i386 で **40 バイト固定**
   (両側の `STATIC_ASSERT` が見張る)。**カーネルのポインタは返さない**
-  (POLICY_DEBUG §4-13 の `db_last_error` と同じ事故を繰り返さないため)。
+  ([kapi_db「落とし穴」](design/kapi/kapi_db.md#落とし穴) の `db_last_error` と同じ事故を繰り返さないため)。
 
   | Offset | 型 | 名前 |
   |---|---|---|
@@ -1207,7 +1207,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 | 0x39C | kbd_diag | `int(KbdDiag *out)` |
 
 実機で本体キーボードの打鍵が届かないときの切り分け用 (経緯と読み方は
-[POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57)。`KbdDiag` は
+[POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線))。`KbdDiag` は
 `sdk/include/os32/os32_kapi_shared.h` にあり、カーネルと外部プログラムで
 同じ定義を使う (24 バイト、`drivers/input/kbd.c` の `STATIC_ASSERT` が見張る)。
 
@@ -1374,7 +1374,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   写した先頭の seq が `after_seq + 1` でなければその間は**取りこぼし**。初回は 0 を渡す。
 - 戻り: 件数 (0 = 新しい分なし) / `OS32_ERR_INVAL` (`max <= 0`、または CPL=0 / WM で `out` が NULL。CPL=3 の NULL + `max > 0` は wrap で kill)。
   出力は生成ラッパの `out` 検査 (`max × 8` バイト。読み取り専用の USER ページなら `ring3_fault_kill`)。
-- シェルの `kbdstat -w` が毎 tick 読んで 1 行ずつ出す ([POLICY_DEBUG.md](POLICY_DEBUG.md) §4-57)。
+- シェルの `kbdstat -w` が毎 tick 読んで 1 行ずつ出す ([POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線))。
 
 `KbdDiagLogEnt` (8 バイト、`os32_kapi_shared.h`):
 
@@ -2069,4 +2069,4 @@ slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む)
 空なら `OS32_ERR_NOSYS`。`buf` は `size` バイトの入出力 (生成ラッパの出力検査)。
 op は `KDEBUG_OP_*` (`os32_kapi_shared.h`)、peek の要求は `KdebugPeek` (1064 バイト、
 LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる。
-peek の使い方は [POLICY_DEBUG.md](POLICY_DEBUG.md) §5「実機でメモリを読む」(設計の記録は `docs/archive/v3/TASK_KPEEK.md`)。
+peek のゲスト側の構文は [07_shell.md](07_shell.md)、ホスト側の採取と照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭(設計の記録は `docs/archive/v3/TASK_KPEEK.md`)。

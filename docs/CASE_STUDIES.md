@@ -20,7 +20,7 @@
 機能名 (「有効」「リトライ」) の記述は根拠にしない。別実装 (FreeBSD、エミュレータのソース) で裏を取る。それでも決まらない値 (機種依存で、しかも読者指摘で逆の可能性が併記されているもの) は
 **自動では触らず、実機で確かめてから明示的に呼ぶ口**を用意する。「Bible と UNDOCUMENTED が矛盾したら UNDOCUMENTED」という一律の規則より、この決め方のほうが強い。
 
-出典: `docs/POLICY_DEBUG.md` §4-50 (シリアルのクロック)、§4-57 (8251 のコマンド語)、§4-59 (8255 ポート C)。
+出典: [sysclk「落とし穴」](design/kernel/time/sysclk.md#落とし穴)、[POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)、[POLICY_DEBUG §4-59](POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。
 
 ## 2. エミュレータで確認済みが実機で通らない — 模擬していない量を「確認済み」と書かない
 
@@ -33,7 +33,7 @@ DMA の 1MB 制限のビットを落としていない (エミュレータは値
 時間の上限は「エミュレータで困らない値」ではなく**機構の最悪値から導いてコメントに根拠を書く**。「NP21/W で〜を抑制」という理由の定数は、実機の前に必ず疑う (`grep -rn NP21 drivers/`)。
 機種で 2 通りある値を定数で持ったら、**判定する側と使う側の順序**まで見る (判定器はあったのに、使う側より後に呼ばれていた)。実機でしか分からない値には**観測の口** (`kbdstat`、起動ログ) を同時に入れる。
 
-出典: `docs/POLICY_DEBUG.md` §4-47〜§4-57 (§4-49 シリアル、§4-51 FDC、§4-53 FRY、§4-54 PIT、§4-55 io_wait、§4-56 volatile、§4-57 8251)、`docs/archive/realhw_v21/TASK_FDC_REALHW.md`。
+出典: [boot_fat「落とし穴」](design/boot/boot_fat.md#落とし穴)、[POLICY_DEBUG §4-49](POLICY_DEBUG.md#4-49-シリアルの実効速度)、[POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma)、[POLICY_DEBUG §4-53](POLICY_DEBUG.md#4-53-fdc-の-ready)、[POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間)、[POLICY_DEBUG §4-55](POLICY_DEBUG.md#4-55-io_wait-連打後の-fd-読取)、[pcm_cs4231「落とし穴」](design/drivers/sound/cs4231/pcm_cs4231.md#落とし穴)、[POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。
 
 ## 3. 画面モードの正典は実機 ROM が流す列 — 見えない画面の受け入れ条件を作る
 
@@ -47,7 +47,7 @@ DMA の 1MB 制限のビットを落としていない (エミュレータは値
 目で見られない条件で受け入れるときは、「一致する」ことを機械で照合できる形 (記録との突き合わせ + 除外表) にし、**未解明の差分を除外表に名指しで残す** — 崩れが残ったとき最初に疑う場所が決まる。
 「v3 を遅らせないために画面を見ない条件で締める」はユーザー決定で、その代わり残件 (目視) を票に明記した。
 
-出典: `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3・§5、`docs/POLICY_DEBUG.md` §4-62、`docs/RELEASE_v2.1.md` §2-1。
+出典: `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3・§5、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード)、`docs/RELEASE_v2.1.md` §2-1。
 
 ## 4. メモリマップの 3 者討論 — 意見書 → 反論と合成 → 最終案 → レビュー往復 → 決裁
 
@@ -99,7 +99,7 @@ v3 のメモリマップは、PM が 1 人で案を書いて Codex に見せる�
 **学んだこと**: **試験が実物のソースを書き換える作りにしない**。打ち切り・並列・偶発のどれでも壊れる。変異は「その試験が見ているソースを変えたとき」にしか意味が無いので、変えた所だけ変異する段を持ち、
 コーダーの完了条件はその段の rc=0、全部の変異は着地で 1 回。並列段の時間上限は単独の実測ではなく同時実行の負荷で決める。`make check` を打ち切ったら、コミットの前に `git status` と `git diff --stat` を見る。
 
-出典: `docs/POLICY_DEBUG.md` §4-40・§4-41、`docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`、`docs/08_build.md` §8-4 (検査の 3 段)。
+出典: [08_build](08_build.md)。
 
 ## 8. 資源回収は所有者タグで — 終了段の分だけ回収し、親へ戻るときは状態を復元する
 
@@ -111,7 +111,7 @@ v3 のメモリマップは、PM が 1 人で案を書いて Codex に見せる�
 **学んだこと**: 「終了時に全部片付ける」は、ネストする実行モデル (子が親の資源を見る、常駐が資源を持つ) では必ず親の資源を壊す。**回収は所有者で選ぶ**、**常駐の資源は明示的に保護する**、
 **親へ戻るときは init ではなく restore**。ヒープが 2 系統あるなら番地の帯を分け、帯の重なり・逆転は地図の生成と検査 (`make check`) で機械的に見る。
 
-出典: `docs/POLICY_DEBUG.md` §4-15・§4-16、`docs/09_exec.md` (資源の所有者)、`docs/10_notes.md` §10-9。
+出典: [exec「落とし穴」](design/exec/exec.md#落とし穴)、[exec_heap「落とし穴」](design/exec/exec_heap.md#落とし穴)、[09_exec](09_exec.md) (資源の所有者)、[10_notes](10_notes.md) §10-9。
 
 ## 9. 配備の成否を文言で判断しない — 到達確認は実物の照合で ([V4])
 
@@ -123,7 +123,7 @@ GUI の受入台本が CUI のまま `RESULT: OK` を出していた。
 起動ログのビルド識別子 (Commit / CRC) と `ver` を突き合わせる。配備の道具にはその照合を組み込み、素通りする経路 (直接 `make deploy-nhd`) を無くす。受入の台本は「目的の状態に入れたか」を合否に入れる。
 失敗と飛ばした段は起きたとおりに報告し、未検証を合格と書かない ([V4])。デバッグの最初の一手は「バイナリが新しいか」の排除で、これはプロジェクト開始以来もっとも時間を浪費した問題だった。
 
-出典: `docs/POLICY_DEBUG.md` §2 (反映確認のチェックリスト)、§4-8・§4-17・§4-29・§4-33、`docs/CONSTRAINTS.md` [V1]・[V4]。
+出典: [POLICY_DEBUG §4-8](POLICY_DEBUG.md#4-8-nhd-の配備とロック)、[nhd_deploy「落とし穴」](design/tools/nhd_deploy.md#落とし穴)、[POLICY_DEBUG §4-33](POLICY_DEBUG.md#4-33-hsync-のコピー元)、[POLICY_DEBUG §2](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先)、[CONSTRAINTS](CONSTRAINTS.md) [V1]・[V4]。
 
 ## 10. ドラッグ枠の残像 — 損傷の申告漏れは「描いた側」ではなく「壊された側」に返す
 

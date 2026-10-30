@@ -7,7 +7,7 @@
 /*   - get_file_size はディレクトリに ISDIR                                 */
 /*   - list_dir はファイルに NOTDIR、エントリは境界を検査し、途中で切れた   */
 /*     列挙を OK にしない。**コールバックの前に頁を手元へ写す** (コール     */
-/*     バックが FS に触ると受信器の中身が書き換わる、POLICY_DEBUG §4-26)     */
+/*     バックが FS に触ると受信器の中身が書き換わる、docs/design/fs/ext2/ext2_dir.md#落とし穴)     */
 /*   - read_stream は要求より多く返さず、EOF の前に 0 を返さない            */
 /*   - 「無い」は NOTFOUND (ホストの status)、通信失敗は IO                  */
 /*   - set_mtime / create_excl は持たない (NOSYS)                           */
@@ -89,7 +89,7 @@ static int sfs_path_op(SfsClient *c, u8 type, const char *path)
 
 static void *sfs_mount(int dev)
 {
-    /* 種別を確かめる (fd0 を hd0 に化けさせない、POLICY_DEBUG §4-30)。
+    /* 種別を確かめる (fd0 を hd0 に化けさせない、docs/06_filesystem.md)。
      * **セッションの外からは付けない** — `mount /host COM1 serialfs` を
      * 単独で打っても NULL (§1-v3)。 */
     if (VFS_MOUNT_DEV_TYPE(dev) != VFS_DEV_SERIAL) return (void *)0;

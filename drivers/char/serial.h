@@ -260,7 +260,7 @@ void serial_init(unsigned long baud);
 int serial_init_vfast(unsigned long baud);
 
 /* 現在の設定を 3 つの数で返す (CPL=3 から KAPI 越しに読むための口。
- * **カーネルのポインタは渡さない** — POLICY_DEBUG §4-13 の db_last_error と
+ * **カーネルのポインタは渡さない** — docs/design/kapi/kapi_db.md#落とし穴 の db_last_error と
  * 同じ事故を繰り返さないため)。NULL は飛ばす。戻りは 0 = 初期化済み、
  * -1 = まだ serial_init を呼んでいない (値は書くが当てにならない)。
  *   mode: SER_MODE_COMPAT / SER_MODE_VFAST

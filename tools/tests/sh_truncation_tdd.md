@@ -454,7 +454,7 @@ rshell の次のコマンド) が巻き添えで捨てられる。
 
 `rshell` の断りは**必ず `rshell_end_reply()` を通す** — `buz_off` → 1 tick 待ち →
 `serial_putchar(0x04)`。返さないと `/api/cmd` が timeout まで待ち、以後のコマンドが
-全滅する (票 §2-2、`POLICY_DEBUG.md` §4-7 と同じ壊れ方)。変異 `t10_no_eot` が証人。
+全滅する (票 §2-2、[POLICY_DEBUG §4-7](../../docs/POLICY_DEBUG.md#4-7-api-timeout-とハング) と同じ壊れ方)。変異 `t10_no_eot` が証人。
 
 ### 試験の足場: `ui.c` / `rshell.c` / `cmd_filer.c` を取り込んだ
 

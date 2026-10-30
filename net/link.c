@@ -55,7 +55,7 @@ void link_test_idle(void);
 #define LINK_IRQ_RESTORE(f)  irq_restore(f)
 /* IF=1 で次の割り込みまで寝る。「許可する」と「眠る」は io.h の _idle() が
  * 1 つの不可分な原始命令として持つ (間に割り込みを入れない =
- * POLICY_DEBUG §4-19 と同じ作法)。_enable(); _halt(); に分けてはいけない
+ * docs/design/arch/x86/kernel/ring3_entry.md#落とし穴 と同じ作法)。_enable(); _halt(); に分けてはいけない
  * 理由は io.h の _idle() の註。順序 3 ではここが HAL の待ち 1 関数になる。 */
 #define LINK_IDLE()          _idle()
 #endif

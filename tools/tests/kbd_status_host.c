@@ -4,7 +4,7 @@
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する (-I で解決。変異は写しの上で)。     */
 /*  I/O を持たないので模型は要らない。見るのは                              */
-/*  (記録: kbd_status_tdd.md、経緯: docs/POLICY_DEBUG.md §4-57):            */
+/*  (記録: kbd_status_tdd.md、経緯: docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線):            */
 /*    (a) RxRDY = 0 → EMPTY (エラービットが立っていても 0041h は読まない)    */
 /*    (b) RxRDY = 1 で PE / FE のどれか 1 つでも → ERROR (OE が一緒でも)     */
 /*    (c) RxRDY = 1 で OE だけ → OVERRUN (バイトは正しい、使う)             */

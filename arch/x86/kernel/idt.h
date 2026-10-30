@@ -118,7 +118,7 @@ struct idt_ptr {
 /* システムクロックは機種で 2 通り (1.9968MHz / 2.4576MHz)。**決め打ちしない** */
 /* — 判定は kernel/time/sysclk.c、分周の算数は kernel/time/pit_math.c。               */
 /* 直す前はここに PIT_CLOCK = 1996800 があり、2.4576MHz 系では 100Hz のつもり */
-/* の tick が 123Hz (8.125ms) になっていた (docs/POLICY_DEBUG.md §4-54)。    */
+/* の tick が 123Hz (8.125ms) になっていた (docs/POLICY_DEBUG.md#4-54-pit-の実時間)。    */
 
 /* PITモードバイト: カウンタ#0, LSB/MSB, モード2(レートジェネレータ), バイナリ */
 #define PIT_MODE_TIMER0  0x34  /* 00 11 010 0 */

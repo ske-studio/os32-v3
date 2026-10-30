@@ -185,7 +185,7 @@ FILETYPE を立てて作るので手元の NHD では起きないが、他所で
 
 コールバック方式の `sys_ls` では、共有スクラッチを使う FS 操作の再入に注意する。
 ext2 は走査ブロックの私有バッファで対策済み。FatFs / HostDrv の監査状況と呼び出し側の
-注意は [POLICY_DEBUG.md §4-26](POLICY_DEBUG.md) を参照。
+注意は [ext2_dir「落とし穴」](design/fs/ext2/ext2_dir.md#落とし穴) を参照。
 
 ### §6-2 ext2 ファイルシステム (ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c / ext2_fmt.c / ext2_vfs.c)
 

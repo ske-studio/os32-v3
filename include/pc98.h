@@ -77,7 +77,7 @@
  * 同じバイトに BUZ (bit3)・MCHKEN (bit4)・SHUT1 (bit5)・PSTBM (bit6)・
  * SHUT0 (bit7) が同居していて、全体書きはこれらを巻き添えにする
  * (実機 PC-9821Ra266 で rshell 中にビープが鳴り続けた、2026-09-24。
- * docs/POLICY_DEBUG.md §4-59)。1 ビットずつ 0037h のこのコマンドで操作する。
+ * docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。1 ビットずつ 0037h のこのコマンドで操作する。
  *
  * **BUZ の極性は資料どうしで食い違う。UNDOCUMENTED を採る**
  * (docs/hw/undocumented/io_syste.md の I/O 0035h bit3 と I/O 0037h:

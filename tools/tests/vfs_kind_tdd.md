@@ -77,5 +77,5 @@ TARGET i386-elf -Werror COMPILE PASS (fs/vfs_fd.c)
   動かしていない**。ext2 側の実物経路は [`b8_tdd.md`](b8_tdd.md)、
   HostDrv の列挙は [`hostdrv_list_tdd.md`](hostdrv_list_tdd.md) が見る。
 - マウント表・FD 表の容量や世代番号は対象外。旧証跡 `vfs_fd_sqlite_tdd.md` は2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。
-- `(dev_type << 8) | unit` の mount エンコード (POLICY_DEBUG §4-30) は
+- `(dev_type << 8) | unit` の mount エンコード ([06_filesystem](../../docs/06_filesystem.md)) は
   [`vfs_mount_dev_tdd.md`](vfs_mount_dev_tdd.md) が見る。

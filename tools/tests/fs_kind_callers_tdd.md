@@ -2,7 +2,7 @@
 
 - 票: `docs/archive/shell/TASK_FS_TYPE.md` §3
   (`fs_is_dir` は「不明」を運べない)
-- 原則: [`docs/POLICY_DEBUG.md`](../../docs/POLICY_DEBUG.md) §4-35 —
+- 原則: [ext2_super「落とし穴」](../../docs/design/fs/ext2/ext2_super.md#落とし穴) —
   「読めなかった」を「無い / その型ではない」と読み替えない。判定関数ではなく**受け手**を試す
 - 実行: `python3 -B tools/tests/test_fs_kind_callers.py [--target] [--mutate]`
   (`make check-fs-kind-host MUTATE=1` がこの試験を `--target --mutate` 付きで回す)

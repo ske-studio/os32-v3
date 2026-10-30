@@ -5,9 +5,9 @@
 台本は先頭で `/api/key seq=ESC` を送って rshell を閉じ、tvram に `[Remote shell closed]` が
 新しく出たことを確かめてから `os32gui` を打つ (`close_rshell`)。確かめられなければ GUI へ
 入らずに NG で終わる。rshell が有効なまま `os32gui` を 4 文字ずつ打つと `os32` / `gui` の
-2 コマンドになり GUI に入らない (POLICY_DEBUG §4-31。2026-09-29 に R2 の予備調査で再発)。
+2 コマンドになり GUI に入らない (.claude/skills/run-os32/SKILL.md#前提と-gui-への入口。2026-09-29 に R2 の予備調査で再発)。
 マウスは `/api/mouse` の **ax/ay (シームレス絶対座標)** を使う (OS32 は NP21/W では
-np2sysp getmpos で位置を取るので dx/dy は効かない。POLICY_DEBUG §4-23)。
+np2sysp getmpos で位置を取るので dx/dy は効かない。docs/POLICY_DEBUG.md#4-23-gui-検証の実行環境)。
 
 使い方:
   python3 tools/gui_gate.py v11            # v1.1 回帰: gui_demo のドラッグ / 重なり / クリック
@@ -293,7 +293,7 @@ def enter_gshell():
 
     **rshell が有効なまま呼ばない。** rshell は `kbd_trygetchar` の生読みで、入力が
     途切れるたびに 1 コマンドとして実行するので、4 文字ずつの text が
-    `os32` / `gui` という別々のコマンドになる (POLICY_DEBUG §4-31)。台本は `begin_gui`
+    `os32` / `gui` という別々のコマンドになる (.claude/skills/run-os32/SKILL.md#前提と-gui-への入口)。台本は `begin_gui`
     から呼ぶこと — `close_rshell` で抜けたのを tvram で確かめ、入った後は
     `gui_entered` で `/api/status` を照合する。text と RETURN の間は少し待つ (打鍵の取りこぼし避け)。"""
     key(text="os32gui")

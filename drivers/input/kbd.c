@@ -13,7 +13,7 @@
 /*    - FreeBSD init_keyboard() は空 → BIOS初期化済みを前提                */
 /*      この前提を守る = **BIOS の定常値 (0x16) 以外を書かない**。以前は     */
 /*      0x14 (DTR = 0 = RTY# LOW = 再送要求) を書いて自分で壊していた       */
-/*      (実機 PC-9821Ra266 で打鍵が届かない、2026-09-23、POLICY_DEBUG §4-57)*/
+/*      (実機 PC-9821Ra266 で打鍵が届かない、2026-09-23、docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)*/
 /* ======================================================================== */
 
 #include "kbd.h"
@@ -80,7 +80,7 @@ volatile u8 kbd_shift_state = 0;
 
 /* ======== 診断カウンタ (KAPI v62 kbd_diag、シェルの `kbdstat`) ========
  * 実機で打鍵が届かないとき、どこで止まっているかを切り分けるための値
- * (読み方は docs/POLICY_DEBUG.md §4-57)。ISR だけが書く値は volatile。
+ * (読み方は docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。ISR だけが書く値は volatile。
  * init_* と cmd と flushed は kbd_init が 1 回だけ書く。 */
 static volatile u32 kbd_diag_irq;
 static volatile u32 kbd_diag_empty;
@@ -277,7 +277,7 @@ static u8 kbd_bios_shift_peek(void)
 /*  呼ばれる。戻り値は「IRQ1 を V86 ゲストへ反射してよいか」:               */
 /*  0041h から実データを読んだとき (DATA / OVERRUN) だけ 1。空 IRQ・エラー */
 /*  で反射すると、ゲストは空の仮想 FIFO を読んで偽の打鍵を得る              */
-/*  (以前は 0x00 = ESC のメイク、POLICY_DEBUG §4-57)。                      */
+/*  (以前は 0x00 = ESC のメイク、docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。                      */
 /*  スタブは V86 中でなければ戻り値に関係なく反射しない (EFLAGS.VM を見る)。*/
 /* ======================================================================== */
 static void kbd_deliver(u8 scancode);
@@ -289,7 +289,7 @@ int kbd_irq_handler(void)
     int kind;
     u8 lflags;
 
-    /* 0041h を読む前に 0043h を見る (票: 実機の打鍵不達、POLICY_DEBUG §4-57)。
+    /* 0041h を読む前に 0043h を見る (票: 実機の打鍵不達、docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)。
      *   RxRDY = 0      → 空 IRQ。0041h は読まない (読んでも打鍵ではない)。
      *   PE / FE        → 0041h を読み捨て (化けたバイトは使わない)、
      *                    コマンド語 (ER 込み) を書き直してエラーを解除する。

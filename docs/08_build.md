@@ -288,7 +288,7 @@ make deploy                                                # HostDrv 同期 → 
 > 状態ではコピーが失敗またはサイレントに無効化される。**必ず
 > `tools/np21w_ctl.py stop` → `make deploy-kernel` → `tools/np21w_ctl.py start --ini np21x64w.ini`
 > の順で実行**し、デプロイ後は `ver` の Build タイムスタンプで反映を確認すること
-> (POLICY_DEBUG.md §2 / §4-9)。
+> ([反映確認](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先) / [HostDrv の共有状態](design/fs/hostdrv/hostdrvfs.md#落とし穴))。
 
 <a id="ビルドターゲット"></a>
 Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジトリで
@@ -459,7 +459,7 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
 4. `python3 -B tools/checks/run.py --lint` と関連ホスト試験で確認する。
    lint は宣言・入力・既存の成果物読取監査を行い、一覧生成器は CHECK の列と実行スクリプトを読む。
 
-- `tools/check_tree_unchanged.py` の番人 ([POLICY_DEBUG §4-40](POLICY_DEBUG.md)) は 3 通りとも段の前後で回る。
+- `tools/check_tree_unchanged.py` の番人 は 3 通りとも段の前後で回る。
 - **変異試験は実物のソースを書き換えない** (2026-09-26〜)。変異は `tools/tests/mutpar.py` の
   `mutant_tree` / `build_in_tree` / `run_script_in_tree` で一時ディレクトリの写しの木 (変異を当てるファイルと
   gcc -MM の依存は実体、残りは symlink) に当て、変異なしの写しが GREEN であること (`CONTROL`) を
@@ -1122,7 +1122,7 @@ FORK_PLAN §3 d (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) が、素の 
 | ファイル | 中身 |
 |---|---|
 | `os32_boot.d88` / `os32_boot.img` | 2HD 1232KB の起動 FD (D88 / 生イメージ) |
-| `os32_boot144.img` | 1.44MB の起動 FD (生イメージ、[POLICY_DEBUG.md §4-47](POLICY_DEBUG.md)) |
+| `os32_boot144.img` | 1.44MB の起動 FD (生イメージ、[boot_fat「落とし穴」](design/boot/boot_fat.md#落とし穴)) |
 | `os32_install.iso` | インストール ISO |
 | `packages/*.PKG` | パッケージ |
 | `vmkernel.lz4` / `kernel.map` | カーネルとシンボル (kselftest の番地はこの map で引く) |

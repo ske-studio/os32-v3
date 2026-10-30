@@ -94,7 +94,7 @@ V86 に入るのは CPL=3 の `v86` コマンドが呼ぶ KAPI (`V86_SELFTEST` /
   その `abort_req` は同じ slot を次に使うアプリにも残さない。
 - **syscall 境界ポンプ** (`ring3_gui_pump`): アプリが KAPI を呼ぶたび (1 tick に 1 回まで) に WM の
   ポンプ (X4) を回し、計算ループ中でもカーソルとクリックを取りこぼさない (契約 T6)。WM 自身 (owner 1) は除外。
-- CPL=3 の KAPI 呼び出しは **IF=1** で走る (`int80_stub` の `sti` / 出口 `cli`。[POLICY_DEBUG §4-19](POLICY_DEBUG.md))。
+- CPL=3 の KAPI 呼び出しは **IF=1** で走る (`int80_stub` の `sti` / 出口 `cli`。[ring3_entry「落とし穴」](design/arch/x86/kernel/ring3_entry.md#落とし穴))。
 
 ### GUI アプリのスロットと譲り合い
 
@@ -174,7 +174,7 @@ shim はパスを最初に一度だけ自分のスタックへ写す。束の370
 別のサイズ取得は不要。
 列挙の間にディレクトリが変わらなければ順序・内容は同じ。変わると飛ばし・重複が起き得る
 （例: callback の中での作成・削除、ホスト側の変更）。
-[POLICY_DEBUG §4-26](POLICY_DEBUG.md#4-26-sys_ls-のコールバックから-fs-を触ると一覧が崩れる)
+[ext2_dir「落とし穴」](design/fs/ext2/ext2_dir.md#落とし穴)
 の呼び手側規則を維持する。値を返す公開列挙 API への移行は後続段。
 
 ### `exec_run` の構造と分割壁

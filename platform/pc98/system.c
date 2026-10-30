@@ -15,7 +15,7 @@ void platform_reset(void)
 }
 
 /* 0037h BSR changes only BUZ (0035h bit3).
- * UNDOCUMENTED polarity: 06h sounds, 07h stops (POLICY_DEBUG §4-59). */
+ * UNDOCUMENTED polarity: 06h sounds, 07h stops (docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用). */
 void platform_buzzer_on(void)
 {
     outp(SYSPORT_C_BSR, BSR_BUZ_ON);
