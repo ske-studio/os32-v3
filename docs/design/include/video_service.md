@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `include/video_service.h`
 
-`include/video_service.h` と `hwdev/gf/service.c` に内部サービス、`hwdev/gf/internal.h` に部品間契約を置き、P0 で固定する。HAL に GF のレジスタ・ROM・recover token を出さない。
+HAL に GF のレジスタ・ROM・recover token を出さない。
 ```c
 struct video_device; /* 私有 context と関数表、装置ごとに一つ */
 struct video_mode { u32 id, width, height, pitch, format, dac_bits, clock_khz; };
