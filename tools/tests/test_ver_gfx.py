@@ -10,7 +10,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/gfx_core.c'
+SOURCE = 'gfx/gfx_core_api.inc'
 MUTATIONS = [
     ('active-always', '*active = gfx_started != 0;', '*active = 1;', 'active == 0'),
     ('target-height', 'else if (mode) info.height = mode->height;',

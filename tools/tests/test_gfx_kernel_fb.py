@@ -14,7 +14,11 @@ import tempfile
 import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['gfx/gfx_core.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
+TARGET_SRCS = ['gfx/gfx_core.c',
+    'gfx/gfx_core_framebuffer.inc',
+    'gfx/gfx_core_surface.inc',
+    'gfx/gfx_core_api.inc',
+    'gfx/gfx_core_bridge.inc', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
                'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
@@ -105,14 +109,22 @@ static inline void io_wait(void) {}
 static inline void io_wait_n(int n) {(void)n;}
 #endif
 ''')
-        sources = []
+        texts = {}
         for path in TARGET_SRCS:
             body = source_texts[path] if source_texts is not None else paging_source(ROOT/path)
             for unit, old, new in extra_changes:
                 if unit == path:
                     assert body.count(old) == 1, (unit, old, body.count(old))
                     body = body.replace(old, new)
+            texts[path] = body
+        sources = []
+        for path in TARGET_SRCS:
+            if path.endswith('.inc'):
+                continue
+            body = texts[path]
             if path == 'gfx/gfx_core.c':
+                body = re.sub(r'^#include "(gfx_core_\w+\.inc)"$',
+                              lambda m: texts['gfx/' + m[1]], body, flags=re.M)
                 if mutation:
                     _, old, new, _ = mutation
                     assert body.count(old) == 1, (mutation[0], body.count(old))

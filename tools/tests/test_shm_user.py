@@ -41,7 +41,7 @@ MUTATIONS = (
     ('kill-no-release', 'exec/exec_finish.inc', '    v86_session_end();\n    v86_call_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'kernel/v86/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
     ('page0-forget', 'kernel/v86/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
-    ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
+    ('consumer-direct', 'gfx/gfx_core_surface.inc', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'kernel/v86/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
     ('kill-no-end', 'exec/exec_finish.inc', '    v86_session_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
     ('fixed-restore', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
@@ -112,7 +112,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
+    paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core_surface.inc')
     sources = {p: paging_source(ROOT/p) for p in (*paths, *kernel_parts(ROOT), *EXEC_PARTS)}
     if mutation:
         name, path, old, new, expected = mutation
@@ -139,7 +139,7 @@ def run(runner, mutation=None):
         (work/'v86_bios_slice.inc').write_text(re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['kernel/v86/v86_snapshot.c'], re.M)[0] + '\n' + (function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_save_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_restore_real') + function(sources['kernel/v86/v86_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
         consumer = function(sources['drivers/video/pc98/backend_pegc.c'], 'bios_flag')
         consumer += function(sources['drivers/video/pc98/backend_pegc.c'], 'pegc_identify')
-        consumer += function(sources['gfx/gfx_core.c'], 'gfx_identify_candidates')
+        consumer += function(sources['gfx/gfx_core_surface.inc'], 'gfx_identify_candidates')
         (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
         (work/'v86_unwind_slice.inc').write_text(function(sources['kernel/v86/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
         (work/'v86_int_slice.inc').write_text((function(sources['kernel/v86/v86.c'], 'v86_do_int') + function(sources['kernel/v86/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
