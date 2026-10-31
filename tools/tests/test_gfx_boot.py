@@ -43,7 +43,9 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core_surface.inc', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c',
+SOURCES = ('gfx/gfx_core_surface.inc', 'mm/paging.c', 'mm/pgalloc.c', 
+           'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
+           'kernel/sys.c',
            'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
@@ -96,6 +98,9 @@ def load(mutation=None):
         if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
+    for part in ('owner', 'resource', 'surface'):
+        texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
+            f'#include "pgalloc_{part}.inc"', texts[f'mm/pgalloc_{part}.inc'])
     return texts
 
 
@@ -299,7 +304,7 @@ MUTATIONS = [
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;',
      '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;'),
     # RAM の面の移譲で L2 のページを移さない
-    ('transfer-surface-only', 'mm/pgalloc.c',
+    ('transfer-surface-only', 'mm/pgalloc_surface.inc',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'
      '         ledger_transfer(sf->first, (int)sf->npages, from, to);',
      '    ok = 1;'),

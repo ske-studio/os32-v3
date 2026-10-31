@@ -153,7 +153,11 @@ def run(runner, mutation=None):
             if p == 'kernel/v86/v86_mem.c':
                 source = source.replace('P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
             (work/Path(p).name).write_text(source)
-        alloc = (ROOT/'mm/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
+        alloc = (ROOT/'mm/pgalloc.c').read_text()
+        for part in ('owner', 'resource', 'surface'):
+            alloc = alloc.replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
+        alloc = alloc.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (work/'pgalloc_host_source.c').write_text(alloc)
         cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',

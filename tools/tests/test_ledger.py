@@ -38,7 +38,9 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
+SOURCES = ('mm/pgalloc.c',
+           'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
+           'tools/tests/pgalloc_host_fixture.h',
            'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/isr_stub.asm', 'include/ksetjmp.h',
            'arch/x86/kernel/iret_user.inc', 'arch/x86/kernel/ring3_entry.asm',
            'kernel/irq/irq.c')
@@ -51,6 +53,9 @@ def load(mutation=None):
         if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が一意でない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
+    for part in ('owner', 'resource', 'surface'):
+        texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
+            f'#include "pgalloc_{part}.inc"', texts[f'mm/pgalloc_{part}.inc'])
     return texts
 
 
@@ -666,12 +671,12 @@ class Ledger(unittest.TestCase):
 
 # 変異 (§4-2)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('r1-panic-removed', 'mm/pgalloc.c',
+    ('r1-panic-removed', 'mm/pgalloc_owner.inc',
      '    for (;;) { _stop(); }', '    return;'),
-    ('owner-check-removed', 'mm/pgalloc.c',
+    ('owner-check-removed', 'mm/pgalloc_owner.inc',
      '    return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;',
      '    (void)owner;\n    return bit(eligible, p) && bit(bitmap, p);'),
-    ('claim-owner-blind', 'mm/pgalloc.c',
+    ('claim-owner-blind', 'mm/pgalloc_owner.inc',
      '        if (bit(eligible, p) && bit(bitmap, p) && owner_map[p] != owner) {',
      '        if (0) {'),
     ('irq4-leave-missing', 'arch/x86/kernel/isr_stub.asm',
@@ -685,7 +690,7 @@ MUTATIONS = [
     ('exc-return-leave-missing', 'arch/x86/kernel/isr_stub.asm',
      '        EXC_LEAVE\n        popad\n        add     esp, ISR_COMMON_SKIP_BYTES',
      '        popad\n        add     esp, ISR_COMMON_SKIP_BYTES'),
-    ('reclaim-device', 'mm/pgalloc.c',
+    ('reclaim-device', 'mm/pgalloc_owner.inc',
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
     ('longjmp-no-restore', 'arch/x86/kernel/setjmp.asm',

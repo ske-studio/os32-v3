@@ -28,6 +28,9 @@ def run(mutation=None):
         (tmp / 'shlib_host_source.c').write_text(source)
         (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
         allocator = (ROOT / 'mm/pgalloc.c').read_text()
+        for part in ('owner', 'resource', 'surface'):
+            allocator = allocator.replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
         includes = include_flags(ROOT) + ['-I' + str(tmp)]

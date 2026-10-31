@@ -11,7 +11,7 @@ from test_gfx_kernel_fb import run_case, TARGET_SRCS, ROOT
 HOOKS = [
  ('gfx/gfx_core.c', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */',
   '    { extern void host_reinit_event(int); host_reinit_event(1); }\n    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */'),
- ('mm/pgalloc.c', '    next.gen++;',
+ ('mm/pgalloc_surface.inc', '    next.gen++;',
   '    { extern void host_reinit_event(int); host_reinit_event(2); }\n    next.gen++;'),
 ]
 
@@ -22,7 +22,7 @@ MUTANTS = [
    ('gfx/gfx_core_surface.inc', '            (void)lease_revoke_surface(i);', ''),
    ('gfx/gfx_core_surface.inc', '            if (ledger_surface_regen(i, 0)) gfx_surface_unready &= ~bit;',
     '            (void)lease_revoke_surface(i);\n            if (ledger_surface_regen(i, 0)) gfx_surface_unready &= ~bit;')], 'FAIL !ledger_surfaces[i].lease_count'),
- ('no-gen', [('mm/pgalloc.c', '    next.gen++;', '')],
+ ('no-gen', [('mm/pgalloc_surface.inc', '    next.gen++;', '')],
   'FAIL pc->gen == client.refs[0].generation+1 && !pc->lease_count'),
  ('third-AS', [('exec/lease.c', 'failed += lease_revoke_sid(a->as, sid);',
    'failed += lease_revoke_sid(a->as, sid < LEDGER_MAX_SURFACES ? LEDGER_MAX_SURFACES : sid);')], 'FAIL pt[j] == image[n]'),
