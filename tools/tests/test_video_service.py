@@ -1,6 +1,6 @@
 """P0: fake devices + init contracts with the real instruction decoder."""
 CHECK = dict(name='video-service-host', tier=1,
-    covers=['tools/tests/video_service_host.c', 'tools/tests/gf_init_contract_host.c', 'tools/tests/host32.py', 'include/video_service.h', 'hwdev/gf/internal.h', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_exec.h', 'lib/crc32_core.inc', 'kdebug/gfinit_pll/*.inc', 'hwdev/gf/scripts.h'],
+    covers=['tools/tests/video_service_host.c', 'tools/tests/gf_init_contract_host.c', 'tools/tests/host32.py', 'include/video_service.h', 'hwdev/gf/internal.h', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_exec.h', 'kdebug/gfinit_pll/*.inc', 'hwdev/gf/scripts.h'],
     needs=[], budget=60.0)
 
 import os

@@ -11,7 +11,7 @@
 `--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] GNU11 / -Werror)。
 """
 CHECK = dict(name='install-fresh-host', tier=1,
-    covers=['drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c', 'userland/system/install_recover.inc'],
+    covers=['drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c'],
     needs=[], budget=4.427074)
 
 import pathlib

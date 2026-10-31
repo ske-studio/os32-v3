@@ -2,7 +2,7 @@
 Normal controls always run before compiled runtime-RED mutations.
 """
 CHECK = dict(name='v86-call-host', tier=1,
-    covers=['exec/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'exec/exec_kapi_init.inc', 'kernel/v86/v86_gp_emulate.inc'],
+    covers=['exec/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.61671)
 
 from kernel_includes import include_flags

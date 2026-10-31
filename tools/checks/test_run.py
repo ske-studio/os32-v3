@@ -218,7 +218,7 @@ class RunnerTest(unittest.TestCase):
             root = Path(other)
             subprocess.run(['git', 'init', '-q', other], check=True)
             (root / 'probe.c').write_text('#include <missing.h>\n')
-            self.assertEqual(R.compiler_headers(other, ('probe.c',), ()), set())
+            self.assertEqual(R.compiler_headers(other, ('probe.c',), ()), {'probe.c'})
         with patch.object(R.subprocess, 'run', side_effect=OSError('no gcc')):
             R.compiler_headers.cache_clear()
             with self.assertRaises(OSError):
@@ -250,7 +250,95 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual((result.hit, result.unmatched, result.full_hits),
                          ({'build-no-deploy'}, set(), set()))
 
-    def test_routed_build_whitespace_forces_tier_after_three_sets(self):
+    def test_build_comments_keep_hits_without_forcing_full(self):
+        for path in ('Makefile', 'build/config.mk', 'build/kernel.mk', 'build/nested/rules.mk'):
+            self.write(path, '# old heading\nVALUE = yes # old note\nall:\n\t@echo yes # shell\n')
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        for path in ('Makefile', 'build/config.mk', 'build/kernel.mk', 'build/nested/rules.mk'):
+            with self.subTest(path=path):
+                self.check('reader', covers=[path])
+                self.write(path, '\n# new heading\nVALUE = yes # new note\nall:\n\t@echo yes # shell\n')
+                result = R.plan(self.root, self.registry(), (path,), base=base)
+                self.assertEqual((result.tier, result.mode), (1 if 'nested/' in path else 3, 'sel'))
+                self.assertIn('reader', result.hit)
+                self.assertEqual(result.unmatched, set())
+                self.assertEqual(self.plan(path).tier, 4)
+                for text in ('VALUE = no\n', 'all:\n\t@echo yes # changed shell\n'):
+                    self.write(path, text)
+                    self.assertEqual(R.plan(self.root, self.registry(), (path,), base=base).tier, 4)
+
+    def test_make_ambiguous_hashes_are_changes(self):
+        pairs = [
+            ('VALUE = a\\#one\n', 'VALUE = a\\#two\n'),
+            ('VALUE = $(subst #,x,a#one)\n', 'VALUE = $(subst #,x,a#two)\n'),
+            ('VALUE := $(shell echo a#one)\n', 'VALUE := $(shell echo a#two)\n'),
+            ('VALUE = $#one\n', 'VALUE = $#two\n'),
+            ('all:; echo ok # one\n', 'all:; echo ok # two\n'),
+            ('all:\n\techo ok # one\n', 'all:\n\techo ok # two\n'),
+            ('VALUE = first \\\n# one\n', 'VALUE = first \\\n# two\n'),
+            ('define BODY\n# one\nendef\n', 'define BODY\n# two\nendef\n'),
+            ('.RECIPEPREFIX = >\nall:\n>echo ok # one\n',
+             '.RECIPEPREFIX = >\nall:\n>echo ok # two\n'),
+        ]
+        self.check('reader', covers=['build/config.mk'])
+        for before, after in pairs:
+            with self.subTest(before=before):
+                self.write('build/config.mk', before)
+                self.commit()
+                base = self.git('rev-parse', 'HEAD')
+                self.write('build/config.mk', after)
+                self.assertEqual(R.plan(self.root, self.registry(), ('build/config.mk',), base=base).tier, 4)
+        self.assertEqual(R.build_content('VALUE = a\\#b # one\n', 'Makefile'),
+                         R.build_content('VALUE = a\\#b # two\n', 'Makefile'))
+        self.assertEqual(R.build_content('VALUE = $(value) # one\n', 'Makefile'),
+                         R.build_content('VALUE = $(value) # two\n', 'Makefile'))
+        for head in ('export override define', 'override export define', 'private define'):
+            with self.subTest(head=head):
+                self.assertNotEqual(R.build_content(head + ' F\n-D="#one"\nendef\n', 'build/config.mk'),
+                                    R.build_content(head + ' F\n-D="#two"\nendef\n', 'build/config.mk'))
+
+    def test_toml_comments_preserve_quoted_hashes(self):
+        path = 'sdk/rust/demo/Cargo.toml'
+        self.write(path, 'name = "a#b" # old\n')
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.check('reader', covers=[path])
+        self.write(path, '# heading\n\nname = "a#b" # new\n')
+        self.assertLess(R.plan(self.root, self.registry(), (path,), base=base).tier, 4)
+        self.write(path, 'name = "a#c" # new\n')
+        self.assertEqual(R.plan(self.root, self.registry(), (path,), base=base).tier, 4)
+
+    def test_fragments_are_derived_without_explicit_covers(self):
+        self.check(covers=['drivers/video/a.c'],
+                   prefix='PART = "drivers/generated/" + part + ".inc"\n')
+        self.write('drivers/video/a.c', '#define PART <active.inc>\n#include PART\n'
+                   '#include "inactive.inc"\n#include <other.fragment>\n'
+                   '#include "drivers/generated/piece.inc"\n')
+        self.write('drivers/video/inactive.inc', '#if 0\n#include "nested.inc"\n#endif\n')
+        self.write('drivers/video/nested.inc', '/* inactive nested fragment */\n')
+        self.write('active.inc', '/* compiler-only fragment */\n')
+        self.write('other.fragment', '/* arbitrary C fragment extension */\n')
+        self.write('drivers/generated/piece.inc', '/* generated C fragment */\n')
+        self.write('direct.inc', '/* directly declared, not derived */\n')
+        self.check('direct', covers=['direct.inc'])
+        for path in ('active.inc', 'other.fragment', 'drivers/video/inactive.inc',
+                     'drivers/video/nested.inc', 'drivers/generated/piece.inc'):
+            with self.subTest(path=path):
+                result = self.plan(path)
+                self.assertIn('a', result.hit)
+                self.assertNotIn(path, result.unmatched)
+        self.assertIn('direct', self.plan('direct.inc').hit)
+        self.assertEqual(self.cli('--lint')[0], 0, self.cli('--lint')[2])
+        with tempfile.TemporaryDirectory(prefix='outside-dep-') as other:
+            outside = Path(other) / 'outside.inc'
+            outside.write_text('/* outside repository */\n')
+            self.write('drivers/video/a.c', '#include "' + str(outside) + '"\n')
+            R.compiler_headers.cache_clear()
+            deps = R.compiler_headers(str(self.root), ('drivers/video/a.c',), ())
+            self.assertFalse(any('outside.inc' in p for p in deps))
+
+    def test_routed_build_whitespace_preserves_three_sets(self):
         self.write('build/kernel.mk', 'kernel: source.c\n')
         self.commit()
         base = self.git('rev-parse', 'HEAD')
@@ -261,8 +349,8 @@ class RunnerTest(unittest.TestCase):
         result = R.plan(self.root, self.registry(), ('build/kernel.mk',), base=base)
         self.assertEqual((result.hit, result.unmatched, result.full_hits),
                          ({'scanner', 'reader'}, set(), set()))
-        self.assertEqual((result.tier, result.mode), (4, 'full'))
-        self.assertIn('stable', result.stage)
+        self.assertEqual((result.tier, result.mode), (3, 'sel'))
+        self.assertNotIn('stable', result.stage)
 
     def test_lint_inputs_artifacts_and_dynamic_generated_audit(self):
         self.check(covers=['absent.c'])
@@ -431,5 +519,47 @@ class RunnerTest(unittest.TestCase):
         self.assertTrue(R.dialect_variants_needed(('build/kernel.mk',)))
 
 
+def run_mutations():
+    """Run focused regression cases against broken copies of the runner."""
+    source = Path(R.__file__).read_text()
+    mutations = (
+        ('comments-force-full', 'and not routed_build_safe(root, base, f)}', '}',
+         'test_build_comments_keep_hits_without_forcing_full'),
+        ('recipe-hash-stripped', 'line.startswith("\\t") or continued', 'continued',
+         'test_make_ambiguous_hashes_are_changes'),
+        ('escaped-hash-stripped', 'and not escaped and quote is None', 'and quote is None',
+         'test_make_ambiguous_hashes_are_changes'),
+        ('reference-hash-stripped', 'if make and char == "$" and i + 1 < len(line):',
+         'if False:', 'test_make_ambiguous_hashes_are_changes'),
+        ('compiler-only-headers', 'if not os.path.isabs(rel) and not rel.startswith("../")',
+         'if rel.endswith(".h")', 'test_fragments_are_derived_without_explicit_covers'),
+        ('fragment-scan-disabled', 'dependency_scan = any(not matches(f, DOCS) for f in changed)',
+         'dependency_scan = any(f.endswith(".h") for f in changed)',
+         'test_fragments_are_derived_without_explicit_covers'),
+    )
+    original = globals()['R']
+    for name, before, after, case in mutations:
+        if source.count(before) != 1:
+            raise AssertionError('mutation anchor: ' + name)
+        mutant = type(original)('runner_mutant')
+        mutant.__file__ = original.__file__
+        sys.modules[mutant.__name__] = mutant
+        try:
+            exec(compile(source.replace(before, after), mutant.__file__, 'exec'), mutant.__dict__)
+            globals()['R'] = mutant
+            result = unittest.TextTestRunner(stream=io.StringIO()).run(RunnerTest(case))
+        finally:
+            globals()['R'] = original
+            sys.modules.pop(mutant.__name__, None)
+        if result.errors or not result.failures:
+            raise AssertionError('mutation did not fail an assertion: ' + name)
+        print('RED:', name)
+    return 0
+
+
 if __name__ == '__main__':
-    unittest.main()
+    mutate = '--mutate' in sys.argv
+    if mutate:
+        sys.argv.remove('--mutate')
+    result = unittest.main(exit=False).result
+    sys.exit(1 if not result.wasSuccessful() else run_mutations() if mutate else 0)

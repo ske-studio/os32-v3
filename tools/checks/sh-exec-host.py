@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='sh-exec-host', tier=1,
-    covers=['tools/tests/host32.py', 'tools/tests/sh_launch_host.c', 'tools/tests/test_sh_launch.py', 'userland/shell/sh_launch.inc', 'tools/tests/sh_shell_host.c', 'tools/tests/test_sh_shell.py', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/kbd_watch.c', 'userland/shell/sh_args.inc', 'userland/shell/sh_ls.inc', 'userland/shell/sh_pipe.inc', 'userland/shell/sh_redraw.inc', 'tools/run_host_group.py'],
+    covers=['tools/tests/host32.py', 'tools/tests/sh_launch_host.c', 'tools/tests/test_sh_launch.py', 'tools/tests/sh_shell_host.c', 'tools/tests/test_sh_shell.py', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/kbd_watch.c', 'tools/run_host_group.py'],
     needs=[], budget=4.258386)
 
 

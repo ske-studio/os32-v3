@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-api-host', tier=1,
-    covers=['sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/include/os32/os32_generations.h', 'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/kapi_generated.rs', 'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc', 'kapi/kapi_sys.c', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'tools/tests/test_ver_api.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    covers=['sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/include/os32/os32_generations.h', 'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/kapi_generated.rs', 'kapi/kapi_generated.c', 'kapi/kapi_sys.c', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'tools/tests/test_ver_api.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 

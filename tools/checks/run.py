@@ -315,7 +315,8 @@ def compiler_headers(root, sources, inc_dirs):
         deps = proc.stdout.replace("\\\n", " ").split(":", 1)[-1]
         for dep in shlex.split(deps):
             rel = norm(os.path.relpath(dep, root) if os.path.isabs(dep) else dep)
-            if rel.endswith(".h") and os.path.isfile(os.path.join(root, rel)):
+            if not os.path.isabs(rel) and not rel.startswith("../") \
+                    and os.path.isfile(os.path.join(root, rel)):
                 found.add(rel)
     return frozenset(found)
 
@@ -619,28 +620,87 @@ def make_needs(checks, stage):
                          if need.startswith("make:")}))
 
 
+def build_content(text, path):
+    """Drop only unambiguous build comments; retain shell/define/continued text."""
+    make = Path(path).name == "Makefile" or path.endswith(".mk")
+    toml = path.endswith((".toml", ".lock")) or Path(path).name == "config"
+    if make and ".RECIPEPREFIX" in text or toml and ("'''" in text or '\"\"\"' in text):
+        return None
+    content, continued, defines = [], False, 0
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        define = make and re.match(r"(?:(?:override|export|private|unexport)\s+)*define\b", stripped)
+        endef = make and re.match(r"endef\b", stripped)
+        protected = make and (line.startswith("\t") or continued or defines or define
+                              or ";" in line or "$(eval" in line)
+        continued = line.endswith("\\")
+        if define:
+            defines += 1
+        if endef:
+            defines = max(0, defines - 1)
+        if protected or continued:
+            content.append(line)
+            continue
+        if make or toml:
+            quote, escaped = None, False
+            i = 0
+            while i < len(line):
+                char = line[i]
+                # make keeps hashes inside variable/function references.
+                if make and char == "$" and i + 1 < len(line):
+                    opening = line[i + 1]
+                    if opening == "$":
+                        i += 2
+                        escaped = False
+                        continue
+                    if opening in "({":
+                        closing = ")" if opening == "(" else "}"
+                        depth, end = 1, i + 2
+                        while end < len(line) and depth:
+                            depth += (line[end] == opening) - (line[end] == closing)
+                            end += 1
+                        if depth:
+                            break  # malformed/ambiguous: keep the original line
+                        i, escaped = end, False
+                        continue
+                    i += 2  # single-character variable reference, including $#
+                    escaped = False
+                    continue
+                if char == "#" and not escaped and quote is None:
+                    line = line[:i]
+                    break
+                if toml and char in "\"'" and not escaped:
+                    quote = None if quote == char else char if quote is None else quote
+                escaped = char == "\\" and not escaped and (not toml or quote != "'")
+                i += 1
+            if quote is not None:
+                return None
+        if line.strip():
+            content.append(line)
+    return tuple(content)
+
+
 def routed_build_safe(root, base, path):
     if base is None:
         return False
-    import difflib
     try:
         ancestor = git(root, "merge-base", base, "HEAD")[0]
         before = "\n".join(git(root, "show", ancestor + ":" + path))
         after = (root / path).read_text()
     except (ValueError, OSError, IndexError):
         return False
-    return not any(line[2:].strip() for line in difflib.ndiff(before.splitlines(), after.splitlines())
-                   if line.startswith(("+ ", "- ")))
+    old = build_content(before, path)
+    return old is not None and old == build_content(after, path)
 
 
 def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
          *, base: str | None = None, tier_floor: int = 0) -> Plan:
     compiler_headers.cache_clear()
     changed = tuple(f for f in files if not matches(f, IGNORE))
-    header_scan = any(f.endswith(".h") or f == "sdk/kapi.json" for f in changed)
-    snapshot = tracked(root) if header_scan else None
-    patterns = {n: c.covers + (c.path,) + (tuple(f for f in extract(root, c, snapshot, compiler=True)
-                         if f.endswith(".h")) if header_scan else ()) for n, c in checks.items()}
+    dependency_scan = any(not matches(f, DOCS) for f in changed)
+    snapshot = tracked(root) if dependency_scan else None
+    patterns = {n: c.covers + (c.path,) + (tuple(extract(root, c, snapshot, compiler=True))
+                         if dependency_scan else ()) for n, c in checks.items()}
     hit, unmatched, full_hits = set(), set(), set()
     # Conversion retains the old artifact_readers as make:all consumers,
     # including readers whose covers contain no build output paths.
@@ -669,7 +729,9 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     docs_only = bool(changed) and all(matches(f, DOCS) for f in changed)
     notest_only = bool(changed) and all(any(matches(f, (p,)) and not matches(f, ex)
                                           for p, ex in NOTEST) for f in changed)
-    forced = bool(full_hits) or any(matches(f, FULL + BUILD_CONFIG_GLOBS) or f in KAPI_GENERATED or f in
+    build_changes = {f for f in changed if matches(f, FULL + BUILD_CONFIG_GLOBS)
+                     and not routed_build_safe(root, base, f)}
+    forced = bool(build_changes) or any(f in KAPI_GENERATED or f in
         ("sdk/kapi.json", "sdk/gen_kapi.py", "sdk/kapi_rust_gen.py", "tools/checks/run.py") for f in changed)
     if not changed:
         tier, mode, selected = 4, "fast", set(checks)
@@ -751,7 +813,8 @@ def lint(root, checks):
     generated = set(KAPI_GENERATED) | {f for f in snapshot if "_generated." in Path(f).name
                 or "generations." in Path(f).name or "/generated/" in f}
     for name, check in checks.items():
-        patterns = check.covers + (check.path,)
+        derived = extract(root, check, snapshot)
+        patterns = check.covers + (check.path,) + tuple(f for f in derived if f.endswith(".inc"))
         prepared = make_needs(checks, closure(checks, (name,)))
         for pattern in check.covers:
             if not any(matches(f, (pattern,)) for f in snapshot) and not any(
@@ -761,7 +824,7 @@ def lint(root, checks):
         if any(p.startswith(d + "/") for p in check.covers for d in ARTIFACT_DIRS) \
                 and not prepared:
             errors.append(name + ": artifact covers require make needs")
-        for source in sorted(extract(root, check, snapshot)):
+        for source in sorted(derived):
             if not (matches(source, patterns) or source.endswith(".h")
                     or source not in {"build/kernel.mk", "build/libs.mk", "build/programs.mk"}
                     and matches(source, FULL + BUILD_CONFIG_GLOBS) or matches(source, IGNORE)):

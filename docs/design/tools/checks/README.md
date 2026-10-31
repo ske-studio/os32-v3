@@ -62,7 +62,7 @@ class Plan:
 `scope`・`runners`・`broad`・`local_only` は宣言に持たない。`**` を含む glob の当たりも unmatched の解消に数える (PM 決定 2026-10-31、軽い方へ。旧は broad の 37 本の `**` だけを数えなかった)。
 HOST32_RUNNERS とその既定は既存 make が所有する。差分を受けるかは各 `run(ctx)` が既存 checker の引数契約に従う。
 arm-compile・gfinit-fixture-host・e10c-lifecycle・local4本は手書きの make 目標として残し、通常列の CHECK にしない。
-ヘッダは依存から同じ当たりを復元できるものだけ省く。直接読むヘッダや復元不能な入力は covers に残す。
+ヘッダと `.inc` は依存抽出で同じ当たりを復元できるものだけ省く。復元不能な入力は covers に残す。
 
 ## 置き場・状態・失敗
 

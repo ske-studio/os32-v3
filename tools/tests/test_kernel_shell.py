@@ -4,12 +4,7 @@ Only device/exec boundaries are faked; product control flow is compiled intact.
 Mutation compile failures and signals are errors, never runtime RED evidence.
 """
 CHECK = dict(name='kernel-shell-host', tier=1,
-    covers=['init/kernel.c', 'init/kernel_gui_shlib.inc',
-            'init/kernel_shell_fdd.inc', 'tools/tests/kernel_shell_host.c',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'include/config.h', 'include/pc98.h', 'include/types.h',
-            'exec/exec.h', 'mm/shlib.h', 'mm/paging.h',
-            'sdk/include/os32/os32_kapi_shared.h', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    covers=['init/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=5)
 
 from pathlib import Path
