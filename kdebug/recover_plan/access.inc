@@ -161,6 +161,7 @@ static u32 readback_value(const struct recover_target *t, u32 dir, u32 value)
         RECOVER_CR1F_UNLOCKED : 0) : value;
 }
 #include "access_idle_read.inc"
+#include "access_saved_matches.inc"
 
 static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 width, u32 *value, bool planned)
 {
@@ -234,29 +235,7 @@ static int access_impl(struct recover *r, u32 node, u32 dir, u32 target, u32 wid
             if (*value != expected) return access_error(r, target);
         } else if (w->value.mode == REC_EXPR) return access_error(r, target);
         else if (w->value.mode == REC_SAVED) {
-            bool found = false;
-            for (u32 i = 0; i < r->saved_count; i++) {
-                const struct recover_reg *d = &r->profile->regs[i];
-                if (d->key == target && d->kind == REC_RW && t->access == REC_RW &&
-                    d->restore_rule_id == w->id &&
-                    !((*value ^ r->saved[i]) & w->write_mask)) found = true;
-            }
-            if (w->flags & REC_LOCAL) for (u32 i = 0; i < r->local_saved_count; i++) {
-                const struct recover_local_saved *v = &r->local_saved[i];
-                /* A classified saved DATA needs its own SELECT before replay;
-                 * the original port index is still restored last. */
-                if (dir == REC_SELECT && v->dir_substep == REC_DATA &&
-                    v->key == target && *value == t->index && t->access == REC_RW) found = true;
-                if (v->dir_substep == dir && (v->key == target ||
-                    (dir == REC_SELECT && index_save_safe(r->profile, target) &&
-                     r->index_port[v->key] == r->index_port[target])) &&
-                    !((*value ^ saved_write_value(t, dir, v->value)) & w->write_mask)) found = true;
-                /* Cleanup first unlocks the saved lock, then restores DATA,
-                 * then replays its saved lock state before original indices. */
-                if (v->key == target && v->dir_substep == REC_DATA &&
-                    cr1f_data(t, dir) && *value == RECOVER_CR1F_UNLOCK) found = true;
-            }
-            if (!found) return access_error(r, target);
+            if (!access_saved_matches(r, w, dir, target, *value)) return access_error(r, target);
         }
         if (t->space == REC_VGA_INDEXED && r->state == REC_RUNNING &&
             ((t->access == REC_RW && (r->auth_phase != REC_MODE_C ||
