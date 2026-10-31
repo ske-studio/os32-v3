@@ -7,8 +7,8 @@
 /*    drivers/block/fdc_decide.c … 時間上限の式                                   */
 /*    drivers/block/fdc.c        … シークの省略・まとめ読み・覚えたシリンダの破棄 */
 /*  fdc.c のポートは tools/tests/fdc_hostshim/io.h が下の µPD765A の模型へ  */
-/*  回す。tick_count は -D で「読むたびに 1 進む」時計に差し替える          */
-/*  (待ちのループが模型の上で有限に終わるように)。                          */
+/*  回す。tick_count は -D で模型の時計に差し替える。既定は読むたびに      */
+/*  10ms、整定試験では 1ms 進め、tick 境界直前の待ちも再現する。           */
 /*                                                                          */
 /*  2 段で見る:                                                             */
 /*    (1) 偽の fdc (ops) で fdc_track_read の区切り・先読み・読み直しを見る */
@@ -58,6 +58,8 @@ static int failed;
 /*  カーネルの下請けの差し替え                                              */
 /* ======================================================================== */
 static u32 s_now;
+static u32 s_clock_ms;
+static u32 s_tick_step_ms = 10;
 static unsigned int s_if = 1;
 static int s_irq_error;
 static int s_irq_enabled;
@@ -108,16 +110,21 @@ static void model_deliver_irq(void)
 }
 volatile u32 *fdc_fake_tick_ptr()
 {
-    s_now++;            /* 読むたびに 1 tick 進む */
+    s_clock_ms += s_tick_step_ms;
+    s_now = s_clock_ms / 10;
     return &s_now;
 }
 
 static int s_kprintf_lines;
+static char s_last_kprintf[256];
 void kprintf(u8 attr, const char *fmt, ...)
 {
     va_list ap;
     (void)attr;
     s_kprintf_lines++;
+    va_start(ap, fmt);
+    vsnprintf(s_last_kprintf, sizeof(s_last_kprintf), fmt, ap);
+    va_end(ap);
     if (getenv("FDC_TRACK_VERBOSE")) {
         va_start(ap, fmt);
         vfprintf(stderr, fmt, ap);
@@ -261,7 +268,7 @@ static struct {
     int rw_int;
     int np21_irq;                   /* 1 = NP21/W の形 (事象ごとに IRQ) */
     int nr_on_seek;                 /* 媒体の無いドライブへの SEEK を NR で返す */
-    /* ヘッドの整定: SE 付きの SIS 結果を CPU が読んだ時刻から 2 tick 経たない
+    /* ヘッドの整定: SE 付きの SIS 結果を CPU が読んだ時刻から 15ms 経たない
      * うちに READ / WRITE が来たら数える (RECALIBRATE の後の整定漏れ)。 */
     int move_pending;
     u32 move_seen;
@@ -331,7 +338,7 @@ static void model_rw(int is_write)
     memcpy(M.last_rw, M.cmd, 9);
     if (is_write) M.writes++; else M.reads++;
     if (M.move_pending) {
-        if (s_now - M.move_seen < 2) M.unsettled++;
+        if (s_clock_ms - M.move_seen < 15) M.unsettled++;
         M.move_pending = 0;
     }
     if (M.fail_reads > 0 && !is_write) { M.fail_reads--; M.force_err = 1; }
@@ -386,7 +393,13 @@ static void model_exec(void)
             M.pend_n--;
             model_result(r, 2);
             model_line();
-            if (r[0] & 0x20) { M.move_pending = 1; M.move_seen = s_now; }
+            if (r[0] & 0x20) {
+                /* 次の tick 読取り (整定待ちの開始) を境界の 1ms 前に置く。 */
+                if (s_tick_step_ms == 1)
+                    s_clock_ms += (8 + 10 - s_clock_ms % 10) % 10;
+                M.move_pending = 1;
+                M.move_seen = s_clock_ms;
+            }
         } else {
             r[0] = 0x80;
             model_result(r, 1);
@@ -491,6 +504,7 @@ static const struct fdc_geom *model_geom(int drv) { return fdc_get_geom(drv); }
 /* 模型と fdc.c を起動直後に戻して fdc_init() を通す。 */
 static void model_boot(int drv1_present)
 {
+    s_tick_step_ms = 10;
     memset(irq_lines, 0, sizeof(irq_lines));
     s_irq_enabled = 0;
     s_irq_error = 0;
@@ -508,6 +522,7 @@ static void model_boot(int drv1_present)
     fdc_set_media(1, FDC_MEDIA_2HD_1232);
     if (fdc_init() != 0) { fprintf(stderr, "model: fdc_init failed\n"); exit(2); }
     s_kprintf_lines = 0;
+    s_last_kprintf[0] = '\0';
     memset(&s_stats, 0, sizeof(s_stats));
 }
 
@@ -1025,12 +1040,14 @@ static void fdc_seek_skip(void)
     int s0;
 
     model_boot(0);
+    s_tick_step_ms = 1;
     /* fdc_init は drv0 → drv1 の順に RECALIBRATE する。最後が drv1 なので
      * drv0 の値は「ドライブの切り替え」で捨てられている。 */
     CHECK(fdc_get_known_cyl(0) == -1);
     s0 = M.seeks;
     CHECK(fdc_read_sectors(0, 3, 0, 1, 8, &fdc_geom_2hd, buf) == 0);
     CHECK(M.seeks == s0 + 1);
+    CHECK(M.unsettled == 0);                   /* tick 境界直前でも 15ms 以上 */
     CHECK(fdc_get_known_cyl(0) == 3);
     CHECK(fdc_read_sectors(0, 3, 1, 1, 8, &fdc_geom_2hd, buf) == 0);
     CHECK(M.seeks == s0 + 1);                   /* ヘッドだけ違う: 省く */
@@ -1046,6 +1063,7 @@ static void fdc_seek_skip(void)
     CHECK(fdc_write_sector_geom(0, 9, 0, 1, &fdc_geom_2hd, buf) == 0);
     CHECK(M.seeks == s0 + 3 && fdc_get_known_cyl(0) == 9);
     CHECK(M.pcn[0] == 9);
+    CHECK(M.unsettled == 0);                   /* WRITE の前も整定している */
 }
 
 /* 覚えた値を捨てる条件 */
@@ -1124,6 +1142,9 @@ static void fdc_forget_rules(void)
         /* シークの失敗も回復 (リセット + RECALIBRATE) を通す (ラリー 2) */
         CHECK(M.resets == r0 + 1);
         CHECK(M.pcn[0] == 0 && fdc_get_known_cyl(0) == 0);
+        CHECK(strcmp(s_last_kprintf,
+                     "[fdc] read-multi fail drv=0 chs=20/0/1 phase=seek "
+                     "st0=60 st1=00 st2=00\n") == 0);
     }
     /* 次はシークし直して読める */
     CHECK(fdc_read_sectors(0, 20, 0, 1, 8, &fdc_geom_2hd, buf) == 0);
@@ -1338,6 +1359,9 @@ static void readychange_invalidates(void)
 {
     static u8 buf[1024];
     const struct fdc_geom *g = &fdc_geom_2hd;
+    int drv, i;
+    u8 st0, cyl;
+    u32 gens[FDC_MAX_DRIVES];
 
     model_boot(0);
     cache_setup2(1, FDC_SECTOR_SLOTS);
@@ -1349,6 +1373,22 @@ static void readychange_invalidates(void)
     CHECK(fdc_track_read(&s_cache, &REAL_OPS, 0, g, 80, 1, buf) == 0);  /* 別シリンダ */
     CHECK(fdc_track_read(&s_cache, &REAL_OPS, 0, g, 33, 1, buf) == 0);  /* C2 H0 R2 */
     CHECK(check_bytes(buf, 0, 2, 0, 2, 1024));  /* 新しい媒体の中身 */
+
+    /* ST0 の DS が表す全ドライブで、通知された 1 台だけを更新する。 */
+    for (drv = 0; drv < FDC_MAX_DRIVES; drv++) {
+        for (i = 0; i < FDC_MAX_DRIVES; i++) {
+            s_known_cyl[i] = 3 + i;
+            gens[i] = fdc_media_gen(i);
+        }
+        model_pend((u8)(0xC0 | drv), 2);
+        model_line();
+        CHECK(fdc_sense_interrupt(&st0, &cyl) == 0);
+        CHECK(st0 == (u8)(0xC0 | drv));
+        for (i = 0; i < FDC_MAX_DRIVES; i++) {
+            CHECK(fdc_media_gen(i) == gens[i] + (i == drv));
+            CHECK(fdc_get_known_cyl(i) == (i == drv ? FDC_CYL_UNKNOWN : 3 + i));
+        }
+    }
 }
 
 /* NR (媒体無し) はまとめ読みの失敗に数えず、行も出さない。 */
@@ -1492,6 +1532,7 @@ static void recal_settle(void)
 
     model_boot(0);
     CHECK(fdc_read_sector_geom(0, 0, 0, 1, &fdc_geom_2hd, buf) == 0);
+    s_tick_step_ms = 1;
     M.unsettled = 0;
     M.fail_reads = 1;                           /* 1 回だけ落ちる */
     CHECK(fdc_read_sector_geom(0, 0, 0, 2, &fdc_geom_2hd, buf) == 0);

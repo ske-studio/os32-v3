@@ -5,19 +5,19 @@
 /*                                                                          */
 /*  リトライごとには出さない — 画面が流れて元の失敗が見えなくなる。        */
 /*  リザルトフェーズまで届いていない (seek / cmd で落ちた) ときは           */
-/*  results[] がまだ空なので、**最後の SEEK / RECALIBRATE の ST0** を出す。 */
+/*  results[] がまだ空なので、**失敗時点の SEEK / RECALIBRATE の ST0** を出す。 */
 /*  NR (媒体もドライブも無い) なら印を付ける — いちばん多い失敗なので       */
 /*  「なぜ読めなかったか」が 1 行で分かるようにする。                      */
 /* ======================================================================== */
 static void fdc_report_fail(const char *op, int drv, int cyl, int head,
                             int sect, const char *phase, int have_results,
-                            const u8 *results)
+                            const u8 *results, u8 seek_st0)
 {
     u8 st0, st1, st2;
     const char *mark;
 
     if (!have_results) {
-        st0 = s_last_seek_st0;
+        st0 = seek_st0;
         st1 = 0;
         st2 = 0;
     } else {
@@ -131,7 +131,8 @@ int fdc_read_sector_geom(int drv, int cyl, int head, int sect,
     if (dma_armed) fdc_abort_transfer();
     fdc_forget_cyl(drv);
 
-    fdc_report_fail("read", drv, cyl, head, sect, phase, have_results, results);
+    fdc_report_fail("read", drv, cyl, head, sect, phase, have_results, results,
+                    s_last_seek_st0);
     return -1;
 }
 
@@ -234,7 +235,8 @@ int fdc_write_sector_geom(int drv, int cyl, int head, int sect,
     if (dma_armed) fdc_abort_transfer();
     fdc_forget_cyl(drv);
 
-    fdc_report_fail("write", drv, cyl, head, sect, phase, have_results, results);
+    fdc_report_fail("write", drv, cyl, head, sect, phase, have_results, results,
+                    s_last_seek_st0);
     return write_protected ? FDC_RC_WRITE_PROTECTED : -1;
 }
 
@@ -276,6 +278,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     int have_results = 0;
     int dma_armed = 0;
     int seek_failed = 0;
+    u8 failed_seek_st0;
 
     if (g == 0 || count < 1 || sect < 1) return FDC_MULTI_ERR_RANGE;
     eot = sect + count - 1;
@@ -345,6 +348,8 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     return 0;
 
 fail:
+    /* 回復の RECALIBRATE が最後の ST0 を上書きする前に、原因を残す。 */
+    failed_seek_st0 = s_last_seek_st0;
     /* 実行フェーズの途中なら DMA を閉じて FDC を畳み、**RECALIBRATE まで
      * 済ませる** (単発のリトライの間の fdc_recover と同じ形)。リセットの
      * 後の µPD765A の PCN はヘッドの実際の位置と合っている保証が無く、
@@ -367,7 +372,7 @@ fail:
     if (s_stats.multi_fail <= FDC_MULTI_FAIL_REPORT_MAX) {
         kprintf(KLOG_ATTR, "[fdc] multi-read n=%d falls back to single\n", count);
         fdc_report_fail("read-multi", drv, cyl, head, sect, phase,
-                        have_results, results);
+                        have_results, results, failed_seek_st0);
     }
     return -1;
 }
