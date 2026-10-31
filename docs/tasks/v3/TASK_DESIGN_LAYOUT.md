@@ -1,6 +1,6 @@
 # TASK_DESIGN_LAYOUT — 設計書を 1 機能 1 ファイル・ソースと同じディレクトリ構造へ移す
 
-> 状態: **受入待ち (2026-10-31)** — D0・D1 の移設は済み。D1 は設計書の新規 139 本・追記 90 本、元文書のアーカイブ 31 本、残す 4 本と現行決定だけの短い 10 本。設計の入口は [docs/design/README.md](../../design/README.md)。成果物一致は未達 (ヘッダの注記を含む既存 ABI ハッシュが変わる)。証拠: `~/os32-tmp/run/design-layout/d1/w7_compare.log`。
+> 状態: **受入完了 (2026-10-31)** — D0・D1 の移設は済み。D1 は設計書の新規 139 本・追記 90 本、元文書のアーカイブ 31 本、残す 4 本と現行決定だけの短い 10 本。設計の入口は [docs/design/README.md](../../design/README.md)。成果物は 28 本すべて一致 (契約のヘッダ 2 本の注記は部品の ABI 識別値を変えないよう旧い文書名のまま)。証拠: `~/os32-tmp/run/design-layout/d1/` (調べ・PLAN_MAP.json・IMPL_w1〜w7.md・w7_compare2.log)。
 > 上位: 文書の書き方の正典 [POLICY_DEV](../../POLICY_DEV.md) §9 の 2a・ソースの配置 [TASK_SRC_LAYOUT](TASK_SRC_LAYOUT.md)・付け替えの手順 [SRC_MOVE](../../SRC_MOVE.md)。
 
 ## ユーザーの指示と決定 (2026-10-30〜31)
