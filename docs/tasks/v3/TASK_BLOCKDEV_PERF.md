@@ -27,10 +27,11 @@
 | D5 | #8 (D5a 済み、main e2fe4686)・#9 の rep (D5b、手本・置き場が決まってから) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
 | N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 済み (D6 段 3、main 4599cfd7、sol 実装・astra 取り込み可) |
 | L3 | 調べの主因 (書き込み) | ext2 の 1KB の書き込みを count=2 の 1 要求に (`ext2_raw_write_block`) | 小 | terra | 済み (main ce72c861、D1 の試験の目印の直し 6564c069) |
-| D6 | 調べの主因 (書き込みのメタデータ) | 段 1: ビットマップ・inode・間接表の保持とまとめ更新 / 段 2: データの連続区間の範囲書き / 段 3: N1 | 設計 | astra 起草、確定版 | 段 1 実装中 (sol)、段 2 は段 1 の後、段 3 済み |
+| D6 | 調べの主因 (書き込みのメタデータ) | 段 1: ビットマップ・inode・間接表の保持とまとめ更新 / 段 2: データの連続区間の範囲書き / 段 3: N1 | 設計 | astra 起草、確定版 | 段 1 済み (main 0b0d46c6、sol 実装・Opus 取り込み可、取り込みの直し 11535a5f)、段 2 実装中 (sol)、段 3 済み |
 
 ## 軽い段の受入
 
+- 2026-11-01: D6 段 1 の main 0b0d46c6 を NP21/W で起動、guest_tests 21/21、cp・上書き・rm・diff の一致。`e2fsck -fn` は起動だけ・書き込みの後・guest_tests の後のどれも clean (`~/os32-tmp/run/d6s1-fsck/`)。**測り方の罠**: `nhd_deploy.py deploy-nhd`・`pull` の後は手元の NHD がマウントされたまま残る — その像を e2fsck すると書き出し前の集計差が出る。e2fsck は NP21/W を止めて Windows 側の NHD を別の場所に写してからかける。
 - 2026-11-01: L3・N1 の入った main 4599cfd7 を NP21/W で起動、guest_tests 21/21 PASS (`~/os32-tmp/run/n1-guest/`)。NP21/W の IDE が MULTIPLE の経路を通ったかは起動のログに出ず未確認。実機の速さは D6 の後にまとめて測る。
 
 - ホスト: 既存の試験 (cd_read・ide・ext2 の像の試験) が変わらず通る。L1 は 1KB の読み取りの要求が 1 回になること、L2 は待ちの間隔と SRST の保持が規定の値であることを試験で見る。
