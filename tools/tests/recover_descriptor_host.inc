@@ -320,6 +320,71 @@ static void local_saved_tests(void)
         CHECK(writes()==writes_before && f.releases==1);
     }
 }
+static void saved_access_tests(void)
+{
+    /* Snapshot is A5; the current upper bits B0 must survive replay. */
+    static const u32 values[] = {0xb5, 0xb6, 0xa5};
+    for (u32 c=0; c<3; c++) {
+        setup(false); begin(); f.values[DATA0]=0xb9;
+        r.state=REC_RESTORING; r.auth_phase=REC_RESTORE; r.restore_tick=f.tick;
+        CHECK(cleanup_budget_prepare(&r)==0);
+        u32 value=values[c], before=count('w',DATA0);
+        CHECK((recover_access(&r,RECOVER_NONE,REC_WRITE,DATA0,1,&value)==0)==(c==0));
+        CHECK(count('w',DATA0)==before+(c==0));
+        CHECK(f.values[DATA0]==(c==0 ? 0xb5U : 0xb9U));
+        CHECK(bit_get(r.restored_rules,0)==(c==0));
+        if (c) CHECK(r.failed && r.reason==REC_CONTRACT && r.first_phase==REC_PHASE_NONE);
+        /* Finish through the real cleanup and retain a rejected access's reason. */
+        r.state=REC_PAUSED;
+        CHECK((trial_end(&r,&r.token,REC_NORMAL)==0)==(c==0));
+        CHECK(r.state==(c==0 ? REC_VERIFIED : REC_FAILED));
+        CHECK(f.values[DATA0]==0xb5 && f.values[DATA1]==INITIAL);
+    }
+    /* Authorization and command trace: CR1F readback is tested by the GF fixture. */
+    for (u32 unlocked=0; unlocked<2; unlocked++) for (u32 bad=0; bad<3; bad++) {
+        synthetic(1);
+        targets[TK]=(struct recover_target){.space=REC_VGA_INDEXED,
+            .port=RECOVER_CRTC,.index=RECOVER_CR1F,.width=1,.access=REC_RW,.read_safe=1};
+        for (u32 i=5; i<7; i++) rules[i]=(struct recover_rule){.id=i,.key=TK,
+            .phase=REC_RESTORE,.main_id=RECOVER_NONE,.pc=RECOVER_NONE,
+            .substep=i==5 ? REC_SELECT : REC_DATA,.write_mask=0xff,
+            .verify_mask=i==5 ? 0xff : 0,
+            .value={.mode=REC_SAVED,.expr_id=RECOVER_NONE},.flags=REC_LOCAL};
+        profile.rule_count=7; bar_cache(); synthetic_begin();
+        r.local_saved[0]=(struct recover_local_saved){TK,REC_SELECT,0x12};
+        r.local_saved[1]=(struct recover_local_saved){TK,REC_DATA,unlocked ? RECOVER_CR1F_UNLOCKED : 0};
+        r.local_saved_count=2;
+        r.state=REC_RESTORING; r.auth_phase=REC_RESTORE; r.restore_tick=f.tick;
+        CHECK(cleanup_budget_prepare(&r)==0);
+        r.port_selected[r.index_port[TK]]=RECOVER_NONE;
+        u32 value=RECOVER_CR1F;
+        if (bad!=2) CHECK(recover_access(&r,RECOVER_NONE,REC_SELECT,TK,1,&value)==0);
+        value=bad==1 ? 0x98 : RECOVER_CR1F_UNLOCK;
+        CHECK((recover_access(&r,RECOVER_NONE,REC_DATA,TK,1,&value)==0)==(bad==0));
+        CHECK(count('w',TK)==(bad==0));
+        if (bad) {
+            CHECK(r.failed && r.reason==REC_CONTRACT && r.first_phase==REC_PHASE_NONE);
+            CHECK(!bit_get(r.restored_rules,6));
+            continue;
+        }
+        value=unlocked ? RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK;
+        CHECK(recover_access(&r,RECOVER_NONE,REC_DATA,TK,1,&value)==0);
+        value=0x12;
+        CHECK(recover_access(&r,RECOVER_NONE,REC_SELECT,TK,1,&value)==0);
+        static const char order[] = {'i','w','w','i'};
+        const u32 expected[] = {RECOVER_CR1F,RECOVER_CR1F_UNLOCK,
+            unlocked ? RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK,0x12};
+        u32 j=0;
+        for (u32 i=0; i<f.n; i++) if (f.trace[i].key==TK &&
+            (f.trace[i].op=='i' || f.trace[i].op=='w')) {
+            CHECK(j<4);
+            if (j<4) CHECK(f.trace[i].op==order[j] && f.trace[i].value==expected[j]);
+            j++;
+        }
+        CHECK(j==4 && f.selected_value==0x12 && r.port_selected[r.index_port[TK]]==RECOVER_NONE);
+        CHECK(f.values[TK]==(unlocked ? RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK));
+    }
+}
 static void n1_setup(void)
 {
     synthetic(8);
@@ -525,5 +590,5 @@ static void idle_read_tests(void)
 static void descriptor_tests(void)
 {
     address_tests(); bind_tests(); values_tests(); value_static_tests(); dependency_tests(); indexed_tests(); indexed_expr_tests(); local_saved_tests();
-    guards_tests(); crc_tests(); bar_tests(); cache_tests(); idle_read_tests();
+    saved_access_tests(); guards_tests(); crc_tests(); bar_tests(); cache_tests(); idle_read_tests();
 }
