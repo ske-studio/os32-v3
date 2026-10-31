@@ -24,7 +24,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['fs/isofs/iso9660_dir_record.inc', 'tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=12.534032)
 
 from kernel_boot_source import kernel_parts, kernel_source
@@ -43,6 +43,7 @@ READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
 TREE_FILES = ["tools/tests/cd_read_host_multiple_reset.inc", 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
+              "fs/isofs/iso9660_dir_record.inc",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "drivers/base/dev.h",
               "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h",
@@ -91,6 +92,7 @@ EXE_KEYS = ("read", "wide", "pkg")
 REBUILD = {
     "drivers/ata/atapi_pio.inc": ("read", "wide"),
     "fs/isofs/iso9660_dir_read.inc": ("read", "wide"),
+    "fs/isofs/iso9660_dir_record.inc": ("read", "wide"),
     "drivers/ata/cd_body.c": ("read", "wide"),
     "init/kernel.c": ("read", "wide"),
     "fs/vfs.c": ("read", "wide"),
@@ -582,8 +584,15 @@ MUTATIONS = [
      "", "D5a: 補充失敗後に上書き途中の窓を残す"),
     ("fs/isofs/iso9660_dir_read.inc", r"    if \(source\) \{",
      "    if (source && 0) {", "D5a: 窓から LRU に写さず再読"),
-    ("fs/isofs/iso9660.c", r"(        /\* レコードがセクタ境界をまたぐ場合は次のセクタで再読み込み \*/\n        )if \(rec_len > dir_size - offset\) break;",
-     r"\1if (0) break;", "D5a: 検索で末尾余白のレコードを返す"),
+    ("fs/isofs/iso9660_dir_record.inc", r"if \(rec_len > dir_size - \*offset\) return -1;",
+     "if (0) return -1;", "D5a: 検索で末尾余白のレコードを返す"),
+    # --- H01: shared record positions, exercised through search and list
+    ("fs/isofs/iso9660_dir_record.inc", r"sect_off \+ rec_len <= ISO_SECTOR_SIZE",
+     "sect_off + rec_len < ISO_SECTOR_SIZE", "H01: 境界ちょうどのレコードを飛ばす"),
+    ("fs/isofs/iso9660_dir_record.inc", r"sect_off \+ rec_len <= ISO_SECTOR_SIZE",
+     "sect_off + rec_len > 0", "H01: セクタをまたぐレコードを返す"),
+    ("fs/isofs/iso9660_dir_record.inc", r"\(\*offset / ISO_SECTOR_SIZE\) \+ 1",
+     "(*offset / ISO_SECTOR_SIZE) + 2", "H01: パディングで次のセクタまで飛ばす"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("fs/isofs/iso9660.c", r"(#include \"iso9660\.h\")", r"\1", "対照 (何も変えない)"),
 ]
@@ -623,7 +632,7 @@ def _mutate_one(item):
     (種別, 行) を返す。種別は RED / SURVIVED / ERROR / CONTROL / CTRL-RED。"""
     idx, (rel, pat, rep, desc), base = item
     src = (ROOT / rel).read_text(encoding="utf-8")
-    new, n = re.subn(pat, rep, src, count=1)
+    new, n = re.subn(pat, rep, src)
     if n != 1:
         return "ERROR", f"MUT {idx:2d} NOMATCH  {desc}"
     keys = REBUILD.get(rel, EXE_KEYS)

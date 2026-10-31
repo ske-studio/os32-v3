@@ -82,6 +82,7 @@ static void iso_check_media(Iso9660Ctx *ctx)
 }
 
 #include "iso9660_dir_read.inc"
+#include "iso9660_dir_record.inc"
 
 /* ファイルの [offset, offset + len) を dst へ読む (範囲は呼び手が確かめる)。
  *   file_secs: ファイルのセクタ数 (窓をファイルの外へ広げない)
@@ -248,7 +249,7 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
         u32 sect_idx = offset / ISO_SECTOR_SIZE;
         u32 sect_off = offset % ISO_SECTOR_SIZE;
         const u8 *rec;
-        u8 rec_len;
+        int rec_len;
         u8 name_len;
         char entry_name[ISO_MAX_NAME];
 
@@ -257,22 +258,10 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
             if (!sector) return VFS_ERR_IO;
         }
 
+        rec_len = iso_dir_record_length(sector, dir_size, &offset);
+        if (rec_len < 0) break;
+        if (rec_len == 0) continue;
         rec = sector + sect_off;
-        rec_len = rec[0];
-
-        /* レコード長0 = セクタ末尾のパディング → 次のセクタへ */
-        if (rec_len == 0) {
-            offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
-            continue;
-        }
-
-        /* レコードがセクタ境界をまたぐ場合は次のセクタで再読み込み */
-        if (rec_len > dir_size - offset) break;
-        if (sect_off + rec_len > ISO_SECTOR_SIZE) {
-            offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
-            continue;
-        }
-
         name_len = rec[ISO_DR_NAME_LEN];
 
         /* "." (0x00) と ".." (0x01) はスキップ */
@@ -498,7 +487,8 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
         u32 sect_idx = offset / ISO_SECTOR_SIZE;
         u32 sect_off = offset % ISO_SECTOR_SIZE;
         const u8 *rec;
-        u8 rec_len, name_len;
+        int rec_len;
+        u8 name_len;
 
         /* キャッシュから手元へ写す。cb がこの FS を読み直すと (§4-26)
          * キャッシュの中身が入れ替わるので、指したまま cb を呼ばない */
@@ -512,19 +502,10 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
             cur = sector;
         }
 
+        rec_len = iso_dir_record_length(cur, dir_size, &offset);
+        if (rec_len < 0) break;
+        if (rec_len == 0) continue;
         rec = cur + sect_off;
-        rec_len = rec[0];
-
-        if (rec_len == 0) {
-            offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
-            continue;
-        }
-        if (rec_len > dir_size - offset) break;
-        if (sect_off + rec_len > ISO_SECTOR_SIZE) {
-            offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
-            continue;
-        }
-
         name_len = rec[ISO_DR_NAME_LEN];
 
         /* "." / ".." はスキップ */
