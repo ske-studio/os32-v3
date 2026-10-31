@@ -270,16 +270,16 @@ MUTANTS = [
 
 # EXT2DIR-1: each removed guard must compile and fail in the real runtime.
 FILEDIR_MUTANTS = [
-    ("EXT2DIR-1: " + fn, "fs/ext2/ext2_dir.c",
+    ("EXT2DIR-1: " + fn, fname,
      "    if ((" + var + ".mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* " + fn + " */",
      "    /* removed directory guard */")
-    for fn, var in (("ext2_find_entry_loc", "inode"),
-                    ("ext2_add_entry", "dir_inode"),
-                    ("ext2_delete_entry", "dir_inode"),
-                    ("ext2_is_dir_empty", "inode"),
-                    ("ext2_parent_of", "inode"),
-                    ("ext2_set_dotdot", "inode"),
-                    ("lookup", "inode"))
+    for fn, var, fname in (("ext2_find_entry_loc", "inode", "fs/ext2/ext2_dir.c"),
+                           ("ext2_add_entry", "dir_inode", "fs/ext2/ext2_dir.c"),
+                           ("ext2_delete_entry", "dir_inode", "fs/ext2/ext2_dir.c"),
+                           ("ext2_is_dir_empty", "inode", "fs/ext2/ext2_dir_directory.inc"),
+                           ("ext2_parent_of", "inode", "fs/ext2/ext2_dir_rename.inc"),
+                           ("ext2_set_dotdot", "inode", "fs/ext2/ext2_dir_rename.inc"),
+                           ("lookup", "inode", "fs/ext2/ext2_dir.c"))
 ] + [
     ("EXT2DIR-1: list", "fs/ext2/ext2_dir.c",
      "    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR;\n",

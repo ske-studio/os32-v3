@@ -237,7 +237,7 @@ def check_write_contract():
        not re.search(r"if \(stream\) \{\s*fr = f_lseek\(&fil, \(FSIZE_t\)offset\);", fat):
         print("  FAIL FAT の一括は作り直し・seek 無し、stream は既存を残し offset へ移る", flush=True)
         bad += 1
-    d = (ROOT / "fs/ext2/ext2_dir.c").read_text(encoding="utf-8")
+    d = (ROOT / "fs/ext2/ext2_dir_rename.inc").read_text(encoding="utf-8")
     if not re.search(r"if \(dst_ino == ino\) \{.*?return EXT2_OK;\s*/\*[^*]*ハードリンク同士", d, re.S):
         print("  FAIL ext2 の rename は元と宛先が同じ inode なら何もせず成功 (偽 FS はこれを写す)",
               flush=True)
