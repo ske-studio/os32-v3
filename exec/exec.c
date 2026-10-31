@@ -1560,6 +1560,7 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 }
 
 #include "exec_image.inc"
+#include "exec_argv.inc"
 
 /* ======================================================================== */
 /*  exec_launch — 外部プログラムのロードと実行 (exec_run / exec_start の実体) */
@@ -1924,14 +1925,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
     }
 
     {
-        u32 launch_argv[OS32_MAX_ARGS];
-        u32 str_addr, argv_addr;
+        u32 argv_addr;
         u32 frame[EXEC_ENTRY_ARGS + 1];
-        int argc = 0;
-        int cmd_len = launch_cmd_len;
-        const char *s = cmdline;
-        u32 d;
-        int copy_failed = 0;
         u32 new_esp;
         u32 u_esp;   /* ring3: iret に渡すユーザ ESP (ダミー retaddr 込み) */
         /* 呼び出し元 ESP の退避先。ローカルにしないのは、子のスタックへ
@@ -1939,48 +1934,9 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * ID 別に持つ (単一 static だとネスト exec で上書きされる)。 */
         static u32 saved_esp_stack[APP_SLOT_COUNT];
 
-        stack_top -= (cmd_len + 1);
-        stack_top &= ~((u32)(ABI_WORD_ALIGN - 1));
-        str_addr = stack_top;
-
-        stack_top -= sizeof(char *) * OS32_MAX_ARGS;
-        argv_addr = stack_top;
-
-        s = cmdline;
-        d = str_addr;
-        while (launch_read_byte(launcher_pd, s, &copy_failed)) {
-            char quote;
-
-            /* 引数間の空白をスキップ */
-            while (launch_read_byte(launcher_pd, s, &copy_failed) == ' ') s++;
-            if (!launch_read_byte(launcher_pd, s, &copy_failed)) break;
-
-            /* 新しい引数を開始 */
-            if (argc < OS32_MAX_ARGS - 1) launch_argv[argc++] = d;
-
-            /* クォート対応トークナイザ */
-            while (launch_read_byte(launcher_pd, s, &copy_failed) && launch_read_byte(launcher_pd, s, &copy_failed) != ' ') {
-                if (launch_read_byte(launcher_pd, s, &copy_failed) == '"' || launch_read_byte(launcher_pd, s, &copy_failed) == '\'') {
-                    quote = launch_read_byte(launcher_pd, s++, &copy_failed);
-                    while (launch_read_byte(launcher_pd, s, &copy_failed) && launch_read_byte(launcher_pd, s, &copy_failed) != quote) {
-                        if (launch_read_byte(launcher_pd, s, &copy_failed) == '\\' && quote == '"' && launch_read_byte(launcher_pd, s + 1, &copy_failed)) {
-                            s++;
-                        }
-                        { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
-                    }
-                    if (launch_read_byte(launcher_pd, s, &copy_failed) == quote) s++;  /* 閉じクォートをスキップ */
-                } else if (launch_read_byte(launcher_pd, s, &copy_failed) == '\\' && launch_read_byte(launcher_pd, s + 1, &copy_failed)) {
-                    s++;
-                    { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
-                } else {
-                    { u8 ch = launch_read_byte(launcher_pd, s++, &copy_failed); copy_failed |= app_store(ctx, d++, &ch, 1); }
-                }
-            }
-            { u8 ch = 0; copy_failed |= app_store(ctx, d++, &ch, 1); }
-        }
-        launch_argv[argc] = 0;
-        if (copy_failed || app_store(ctx, argv_addr, launch_argv, (argc + 1) * sizeof(u32)))
-            return exec_launch_abort(launcher_id, id, EXEC_ERR_INVALID);
+        int argc = exec_build_argv(ctx, launcher_pd, cmdline, launch_cmd_len, &argv_addr);
+        if (argc < 0) return exec_launch_abort(launcher_id, id, argc);
+        stack_top = argv_addr;
 
         /* ---- 呼び出しフレームを子スタック上に自分で組む ----
          * ExecEntry は __cdecl (int argc, char **argv, KernelAPI *api) で、

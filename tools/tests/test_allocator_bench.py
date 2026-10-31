@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
 CHECK = dict(name='allocator-bench-host', tier=1,
-    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh'],
+    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'exec/exec_kapi_init.inc', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh'],
     needs=['make:all'], budget=3.283154)
 
 from kernel_includes import include_flags
