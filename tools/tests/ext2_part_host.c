@@ -142,6 +142,7 @@ static u8 g_disk[DISK_TOTAL * 512u];
 static u32 g_rd, g_wr;
 static u32 g_wr_min, g_wr_max;          /* 書いた LBA の範囲 */
 static u32 g_fail_read_lba = 0xFFFFFFFFu;
+static u32 g_fail_read_hits;
 static u32 g_ide_total = DISK_TOTAL;    /* IDENTIFY の総数 (ide_get_info) */
 /* 配列より大きいディスクの真似 (m2 の頭打ち)。DISK_TOTAL 以上の LBA は
  * 書いても捨て (範囲だけ数える)、読むと 0 が返る */
@@ -194,7 +195,7 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
         u32 cur = lba + (u32)i;
         if (format_io('R', cur, 1) != 0) return -1;
         if (cur >= g_virtual_total) return -1;
-        if (cur == g_fail_read_lba) return -1;
+        if (cur == g_fail_read_lba) { g_fail_read_hits++; return -1; }
         if (cur >= DISK_TOTAL) kmemset((u8 *)buf + i * 512, 0, 512);
         else kmemcpy((u8 *)buf + i * 512, g_disk + cur * 512u, 512);
         g_rd++;
@@ -287,6 +288,7 @@ static void disk_reset(u16 heads, u16 spt)
     g_hd0.sect_size = 512;
     g_hd0.total_sects = DISK_TOTAL;
     g_fail_read_lba = 0xFFFFFFFFu;
+    g_fail_read_hits = 0;
     g_ide_total = DISK_TOTAL;
     g_ata_limit = DISK_TOTAL;
     g_virtual_total = DISK_TOTAL;
@@ -376,6 +378,7 @@ static void case_find_fail(void)
         CHECK(ext2_mount(&g_ctx, 0) == want);
         CHECK(!g_ctx.mounted);
         CHECK(g_wr == 0);
+        if (step == 1) CHECK(g_fail_read_hits == 3);
     }
     /* 引数 */
     disk_reset(8, 17);

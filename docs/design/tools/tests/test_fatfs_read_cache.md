@@ -15,4 +15,4 @@ FF_FS_LOCK=1 の試験用設定では製品 .inc のガードによるコンパ�
 --mutate は製品 wrapper と .inc の全体コピーで、保持なし・無効化なし・LRU 順位の穴・
 seek なし・世代比較なし・read エラー無視を注入する。各変異はコンパイル成功後の実行時 RED を
 要求し、通常対照は全ケース GREEN を要求する。
-メモリ媒体の内容と検証条件は [C ハーネス](fatfs_read_cache_host.md) を参照。
+メモリ媒体の内容と検証条件は `C ハーネス`（fatfs_read_cache_host.md） を参照。

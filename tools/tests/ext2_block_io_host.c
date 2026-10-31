@@ -28,6 +28,9 @@ static void fail(unsigned line)
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
 
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+/* This fixture links super.c alone. The integrated D1 fixture checks real slots. */
+void ext2_read_cache_reset(void) { }
+
 
 #define DISK_SECTORS 256u
 static u8 disk[DISK_SECTORS * EXT2_SECTOR_SIZE];

@@ -1,3 +1,4 @@
+#define EXT2_READ_CACHE_HOST_TEST 1
 /* ========================================================================
  *  b8_open_host.c — 読み取り失敗を「不存在」として扱う経路 (票 B8) を
  *  **実物の vfs_open() / vfs_open_sqlite() を通して**確かめる
@@ -243,6 +244,7 @@ static int g_fail_fired;      /* 実際に落とした回数 */
 
 static void fail_arm(u32 lba, int nth)
 {
+    ext2_read_cache_reset();
     g_fail_lba = lba; g_fail_armed = 1; g_fail_nth = nth;
     g_fail_seen = 0; g_fail_fired = 0;
 }
@@ -708,9 +710,11 @@ static void case_size_failure(int mode, const char *label)
 
     lba = lba_of_inode(keep_ino());
     io_reset();
+    ext2_inode_cache_test_disable(1);
     fail_arm(lba, 2);
     fd = vfs_open("/big/keepme", mode);
     fail_disarm();
+    ext2_inode_cache_test_disable(0);
     fault_done();
 
     CHECK(g_fail_fired == 1);
@@ -740,9 +744,11 @@ static void case_sqlite_size_failure(void)
 
     lba = lba_of_inode(keep_ino());
     io_reset();
+    ext2_inode_cache_test_disable(1);
     fail_arm(lba, 2);
     rc = vfs_open_sqlite("/big/keepme", O_RDWR | O_CREAT, 0, &ck, 0, &lease);
     fail_disarm();
+    ext2_inode_cache_test_disable(0);
     fault_done();
 
     CHECK(g_fail_fired == 1);
@@ -2244,10 +2250,10 @@ static void case_rmdir_release_failure(void)
     CHECK(ext2_lookup(g_ec, "/", &root) == EXT2_OK);
     media_check(&before);
 
-    /* 空判定 (ext2_is_dir_empty) は bi = 12 .. nblocks の各回で間接表を読む
-     * (最後の 1 回は「未割当 = 終わり」を知るため)。その次の 1 回が解放時の
-     * 読み出し。**解放時だけ**を落とす。 */
-    nth = (int)(nblocks - EXT2_NDIR_BLOCKS) + 2;
+    /* 空判定は間接表を 1 回読み、以後は保持枠を使う。
+     * 参照を外す書込みで失効した後の 2 回目が解放時の生読み。
+     * **解放時だけ**を落とし、表と配下が漏れ側に残ることを検証する。 */
+    nth = 2;
     fail_arm(lba, nth);
     rc = ext2_rmdir(g_ec, root, "rmbig");
     fail_disarm();

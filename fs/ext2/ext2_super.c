@@ -50,6 +50,7 @@ void ext2_fs_error(Ext2Ctx *ctx)
     u32 sector;
     u16 state;
 
+    ext2_read_cache_reset();
     if (!ctx) return;
     if (ctx->fs_error) return;          /* 2 回目以降は何もしない */
     ctx->fs_error = 1;                  /* **先に**立てる (下の I/O の失敗で再入しない) */
@@ -284,6 +285,7 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
 {
     int ret, i;
 
+    ext2_read_cache_reset();
     if (ctx->mounted) ext2_unmount(ctx);
     if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
     ctx->drive_num = ide_drive;
@@ -405,6 +407,7 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
 void ext2_unmount(Ext2Ctx *ctx)
 {
     if (ctx->mounted) ext2_sync(ctx);
+    ext2_read_cache_reset();
     ctx->mounted = 0;
 }
 

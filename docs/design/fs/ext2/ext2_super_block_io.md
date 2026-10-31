@@ -1,6 +1,6 @@
 # fs/ext2/ext2_super_block_io.inc — 生の範囲 I/O
 
-> 状態: **現行 (2026-10-31)**。D1 保持枠との統合は計画。
+> 状態: **現行 (2026-10-31)**。
 
 `ext2_super.c` 内のブロック／セクタ I/O を持つ。
 `ext2_read_data_blocks(ctx, first, blocks, dst)` と
@@ -26,11 +26,11 @@ D1 の `ext2_file_read_run.inc` が同じ ctx 内の物理連続全 1KiB 区間�
 最大 32 ブロックごとに範囲読みを呼ぶ。全区間は保持枠を迂回し、登録もしない。
 EOF・穴・端数・不連続を越えないループは D1 が担当する。
 
-D2 先行の本基点には D1 保持枠・失効フックが存在しないため、偽の失効処理は置かない。
-D1 統合時に、`ext2_raw_write_block`、`ext2_write_sector`、`ext2_write_data_blocks`
-から Device 書込みを出す前と、`ext2_raw_read_blocks`・`ext2_read_sector` の生読み失敗時に
-D1 所有の失効フックを結線する。mount/unmount もその所有者と統合する。
-`ext2_fs_error` の superblock 書込みは失効対象外。
+`共通失効`（ext2_priv.md） を `ext2_raw_write_block`、`ext2_write_sector`、
+`ext2_write_data_blocks` の Device 発行前に呼ぶ。生読みの範囲検査失敗／Device 失敗と
+sector 読取失敗でも全枠を落とす。metadata の失敗だけが fs_error を立てる。
+mount/unmount と fs_error 入口の接続は `ext2_super`（ext2_super.md）。
+`ext2_fs_error` 内の superblock 書込みには追加のフックを置かない。
 範囲 I/O の関数別試験は [ext2_block_io_host](../../tools/tests/ext2_block_io_host.md)。
 
 ## 落とし穴
