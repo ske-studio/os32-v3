@@ -63,7 +63,7 @@ int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u
     Ext2Inode inode;
     int ret;
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
-    ret = ext2_name_check(name);
+    ret = ext2_name_check(name);   /* create */
     if (ret != 0) return ret;
     ret = ext2_check_writable(ctx);
     if (ret != 0) return ret;
