@@ -14,7 +14,6 @@ PMC_ENABLE bit0 を立てる
 |---|---|---|
 | 7A ZM_REG | 9B、R32直書き。宛先200hだけbit0をOR | I:1892–1906 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

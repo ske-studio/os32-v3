@@ -12,7 +12,6 @@
 |---|---|---|
 | 78 INDEX_IO | 6B、VGA←(旧&m) OR 値。indexは1Bとして復号 | I:1853–1868 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

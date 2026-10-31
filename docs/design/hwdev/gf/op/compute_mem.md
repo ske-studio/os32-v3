@@ -6,7 +6,7 @@
 |---|---|
 | 63 COMPUTE_MEM | I:1459 `init_compute_mem`、NV44A では下記の no-op |
 
-COMPUTE_MEM の no-op は省略ではなく NV44A の仕様分岐。`N/nvkm/engine/device/base.c:677`→`nvkm/subdev/devinit/nv1a.c:29` に meminit が無い（`D/GF6200_4A_DESIGN.md:49`）。
+COMPUTE_MEM の no-op は省略ではなく NV44A の仕様分岐。`N/nvkm/engine/device/base.c:677`→`nvkm/subdev/devinit/nv1a.c:29` に meminit が無い。
 
 ## 移し替えた設計
 
@@ -16,7 +16,6 @@ COMPUTE_MEM の no-op は省略ではなく NV44A の仕様分岐。`N/nvkm/engi
 
 | 63 COMPUTE_MEM | 1B、force。NV44AはNOOP_NV4A（D2）、容量を設定しない | I:1459–1469 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

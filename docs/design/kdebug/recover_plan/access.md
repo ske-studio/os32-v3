@@ -36,7 +36,7 @@ EXPRのRは同W substep内でrecoverが採取・評価する（別Qの値をRで
 
 kdebug/recover.c:2015–2032の読取りと不一致判定を分離し、read_safe確認後にlogged_read（同:943–956）を使う。RUNNINGの5本でaccess BEGIN/ENDが10行、call_pointが5回増える（ops->read直呼びはしない）。
 
-前例は同じVIDEO PLL 5規則の旧verify非零版（docs/decisions/realhw/GF6200_4A_DESIGN.md:261–262）；同じverify読戻し経路（kdebug/recover.c:2016–2020,943–956）が各到達規則で同じaccess行を出していた。
+前例は同じVIDEO PLL 5規則の旧verify非零版(記録はアーカイブ)；同じverify読戻し経路（kdebug/recover.c:2016–2020,943–956）が各到達規則で同じaccess行を出していた。
 
 SAMPLE・固定RAM・新しいREC形式は不要。既存gf_bus ENDへ全32bitを記録し、増分は上記access 10行。
 

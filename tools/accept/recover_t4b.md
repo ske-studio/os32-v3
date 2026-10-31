@@ -1,7 +1,7 @@
 # RECOVER-T4B 再開手順と 2026-10-23 の記録
 
 正典: 票 TASK_REALHW_RECOVER §5–6 と「T4b の段の細分」、台帳 DEFERRED_TESTS の RECOVER-T4B。
-設計: [RECOVER_T4B_INJECT](../../docs/decisions/realhw/RECOVER_T4B_INJECT.md)。
+設計: [recover_virtual.md](../../docs/design/kdebug/recover_virtual.md)。
 本ファイルは受入の台本。確定設計を変更しない。
 
 ## 今回の実行

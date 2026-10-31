@@ -8,7 +8,7 @@
 | --- |
 | 出力中の98セル往復→0FACh←01h（8bit、mask03hで01）→出口CHECK→PAUSED |
 
-SR/CR/GR/AR・DAC dataの副作用は型で扱い、領域一括MMIO許可にしない（`docs/decisions/realhw/REALHW_RECOVER_DESIGN.md:115–120`）。
+SR/CR/GR/AR・DAC dataの副作用は型で扱い、領域一括MMIO許可にしない（`docs/design/kdebug/recover.md`）。
 
 必須CHECKは50C全bit、524の計算値、580 bit8、C040復元値、CONFIG&3/START、標準CR/形式/pitch/blank/sync・DACCLK&101、cfg/route。TEST_CONTROLはbit20だけ比較しsenseを除外、未知・未使用scratchは記録のみ。ARはFF操作付き専用列、DACは書込み専用列としread_safeな通常MMIOへ偽装しない。
 

@@ -85,7 +85,7 @@ Win3.1 / 早期 Win95 の見た目、協調型シングルタスク、WM = gshel
 | 1.3 端末と CUI 抽象化 | 09-09〜14 | libos32term、GUI アプリ 4 本の協調 (K5)、RAM 上限 16MB 撤廃 (K6)、入力統合 (K7)、全画面 GFX 復帰 (T8)、CPL=3 のシェル `sh` (T9)、settings.db (S0〜S5)。hermes が独断で着手した T5b/T6a を監査して撤去 |
 | 1.4 ホストサービスと最小のアプリ | 09-14〜29 | Host Services N1〜N4、hsync H1〜H4、エディタ GUI 版、About、R2 計測、キーボードだけの GUI 操作 (KBD_NAV)。**GUI の版はここで閉じ、以後は v3 の線** (ユーザー決定 09-29) |
 
-設計記録は `docs/decisions/gui/DESIGN.md`、契約は `docs/decisions/gui/API_CONTRACTS.md`、票は `docs/archive/gui_v1{1,2,3,4}/`。
+設計記録は DESIGN (記録はアーカイブ)、契約は API_CONTRACTS (記録はアーカイブ)、票は `docs/archive/gui_v1{1,2,3,4}/`。
 
 ### v2.1 (2026-09-29) — 実機 PC-9821Ra266 で動く区切りの版
 
@@ -100,7 +100,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 
 「機能を足す前に入れ物を作り直す」版。2026-09-17 にカーネル帯 1MB の帯域超過 (必要量 1041KB) が判明し、再配置で凌いだ (修正後の余裕は 34KB、`docs/archive/kernel_v21/TASK_KSTACK_USER.md` §7) が、v2.1 の時点では本体の予算の残りが約 13KB — 穴の根は帯の切り方で、帯の中で削るのは延命、というのが出発点。
 目的の一文と目標の 2 段 (8MB 機で GUI + 私有 2MB のアプリ / 前景 1 本で P100/32MB の Win95 より快適、32〜64MB 機で Win2000 当時の使用感) は `docs/archive/v3/V3_PLAN_DRAFT.md` §2。
-メモリマップ (システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType) は 3 者討論で決めた (`docs/decisions/MEMMAP_V3.md`、D1〜D36)。
+メモリマップ (システムは恒等のまま、アプリだけ 0x80000000〜、物理台帳、SQLite のモジュール化、低位 640KB を V86 へ、OpenType) は 3 者討論で決めた (MEMMAP_V3 (記録はアーカイブ)、D1〜D36)。
 最初の票は T0 (C89 → C11、`docs/archive/v3/TASK_C11_MIGRATION.md`)。os32-v3 は新しい履歴 (初期コミット) で始め、経緯はこの文書で持つ (FORK_PLAN)。
 
 ---
@@ -111,7 +111,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 |---|---|---|
 | 2026-04〜08 | ユーザー + AI コーディングアシスタント 1 セッション。設計・実装・検証を同じセッションで。`CLAUDE.md` は 558 行 (`21cd48e9`、09-05) まで膨らんだ | README「制作経緯」、`docs/POLICY_DEV.md` §1 |
 | 2026-09-01 | 3 層 (設計 = Fable 5 / コーディング = 自宅サーバーのローカル LLM / ビルド検証 = NPU のローカル LLM) を組む | `docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |
-| 2026-09-04〜06 | GUI 1.1 で**レーン別の並列コーダー** (worktree 隔離のサブエージェント 12 票) と、外部の設計レビュー (契約の改訂 3 回) を初めて使う | `docs/decisions/gui/API_CONTRACTS.md`「改訂の記録」 |
+| 2026-09-04〜06 | GUI 1.1 で**レーン別の並列コーダー** (worktree 隔離のサブエージェント 12 票) と、外部の設計レビュー (契約の改訂 3 回) を初めて使う | API_CONTRACTS (記録はアーカイブ)|
 | 2026-09-05 | 文書運用の決定: 情報単位ごとに正典 1 か所、CLAUDE.md は入口だけ、手順はスキルへ | `docs/INDEX.md` 冒頭の正典表 |
 | 2026-09-07〜09 | hermes (Agent CLI) を PM に据え Claude / Codex / ローカル LLM をワーカーに。過剰なバグ懸念と 1 ステップごとの中断、設定の消失、Codex のクォータ枯渇で**撤収** | RETROSPECTIVE_2026-09-09 |
 | 2026-09-09 | **4 役**に固定: PM = Claude Code (Fable 5.1) / コーダー = Opus サブエージェント (worktree) / レビュアー / テスター = ローカル AI (`tools/emu_agent/`)。規約は 3 行に固定 (インシデントごとに 1 行足さない) | `docs/tasks/agents/ROLES.md` 旧 §1 |
@@ -123,7 +123,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 2026-09-25 | **レビュアーは Codex だけ**。コーダーは Codex の重大 (P1) 指摘を含む修正なら Fable 5.1、他は Opus 5.5 | ROLES §0 |
 | 2026-09-26 | Codex にモデル名を名乗らせ、astra でなければ休ませて Fable が代行。検査の 3 段とレビューの重さ (P3 だけの直しは PM が読んで着地) | ROLES §0 |
 | 2026-09-29 | PM = Sonnet 5.5 (取り次ぎのみ) → 同日夕に Opus 5.5 へ戻す。ドライバ設計のレビューは必ず Codex と突き合わせる。推奨は基本的に承認、[D2] と実機の物理操作は個別承認 | ROLES §0 |
-| 2026-09-29〜30 | **3 者討論** (ユーザー = 決定者、Fable 5.1、Codex gpt-6-astra、PM は進行) — 意見書 → 反論と合成 → 最終案 → Codex 往復 → ユーザー決裁の形式で v3 のメモリマップを決めた | `docs/decisions/MEMMAP_V3.md` §11 |
+| 2026-09-29〜30 | **3 者討論** (ユーザー = 決定者、Fable 5.1、Codex gpt-6-astra、PM は進行) — 意見書 → 反論と合成 → 最終案 → Codex 往復 → ユーザー決裁の形式で v3 のメモリマップを決めた | MEMMAP_V3 (記録はアーカイブ) §11 |
 
 現行の体制 (fork 時点) は ROLES §0 の 1 表。os32-v3 でも同じ体制で始める (FORK_PLAN §3 g)。
 
@@ -136,7 +136,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 日付 | 決定 | 出典 (os32) |
 |---|---|---|
 | 2026-09-01 | v2 は保護機構の導入 (リング 3)。Rust は新規ユーザーランド層だけ | `docs/archive/kernel_v2/PLAN.md` §1 |
-| 2026-09-04 | GUI の設計前提: **486 機能ティアは見送り** (可否は CPU 世代ではなくダーティ面積で決まる)、InvalidateRect / XOR 枠 / 単一バックバッファ、9821 は PEGC → Cirrus の順、共有ライブラリ帯は案 A (0x400000〜)、API 契約の凍結 (以後の変更はユーザー承認) | `docs/decisions/gui/DESIGN.md`、`API_CONTRACTS.md` |
+| 2026-09-04 | GUI の設計前提: **486 機能ティアは見送り** (可否は CPU 世代ではなくダーティ面積で決まる)、InvalidateRect / XOR 枠 / 単一バックバッファ、9821 は PEGC → Cirrus の順、共有ライブラリ帯は案 A (0x400000〜)、API 契約の凍結 (以後の変更はユーザー承認) | DESIGN (記録はアーカイブ)、API_CONTRACTS (記録はアーカイブ) |
 | 2026-09-05 | 文書運用: 情報単位ごとの正典 1 か所 (外部の冗長性診断 6 件を受けて) | `docs/INDEX.md` 冒頭 |
 | 2026-09-09 | hermes の撤収、4 役の体制 | RETROSPECTIVE_2026-09-09 |
 | 2026-09-11 | 物理 RAM 上限 16MB → 32MB 以上 (目標 128MB、K6-RAM)。CPL=3 アプリ生存中は `--cpl0` の子を拒否 (A1)。8MB は 1 本立てば要件 | `docs/archive/gui_v13/` |
@@ -151,7 +151,7 @@ v3 に先行して着地したもの: 結線の土台 (HAL_WIRING)、PCM CS4231�
 | 2026-09-25 | MINIMAL を「起動・HDD への導入・回復」に絞る (フォントと一般コマンドは NORMAL へ)。インストール後の実機 HDD の e2fsck は行わない。レビュアーは Codex だけ | RELEASE_v2.1 §4、ROLES §0 |
 | 2026-09-26 | 検査の 3 段 (コーダーの完了条件は `check-changed` rc=0、PM は着地で `check` を 1 回)。P3 だけの直しにレビューを回さない | ROLES §0 |
 | 2026-09-29 | **v2.1 確定** — Ra266 の PEGC は画面を見ない条件で受け入れ (v3 を遅らせない)。**GUI の版は 1.4 で閉じる**。OS64 は版数表に載せない。資料不足は FreeBSD を参照。**fork の決定群**: 現行の開発は v3 / 別リポジトリ **os32-v3** (ブランチではない) / **パブリック** / os32 の v2.x は戻り先 (新機能は入れない) / submodule は引き継ぐが当面の保守は os32 側 / CI は作り直す / 文書の正典は os32-v3 / `tools/` と NP21/W フォークは共有だが動作保証は v3 だけ | ROADMAP §0-1、`docs/archive/agents/HANDOVER_2026-09-29.md` §2 |
-| 2026-09-30 | **メモリマップの方針** (3 者討論): 8MB 機は GUI + 私有 2MB のアプリ、バイナリ互換は捨てる (ソース互換は極力)、アプリ帯 0x80000000、`--cpl0` 廃止、SQLite はカーネルの機能だが同一リンクにしない、低位 640KB は V86 へ、OpenType / KCG 廃止の検討、同時使用はしない (快適の判定は前景 1 本)、池の運用規則 (口は `mem_map` / `mem_unmap` の 2 つ、閾値 64KB)、MEMSYS5 512KB、SQLite と FEP は常に読み込む (例外は MINIMAL)。D35: fork 時の KAPI 整理でスロット順を変えてよい。D36: Rust で作る部品も 386 下限を守る (最終成果物の検査を必須の工程に)。保留 5 件 (U6) の仕分け、Rust vs C11 (U5、IRQ 文脈の合成器は Rust 可)、T0 = C11 化。**fork の準備を承認** (J1〜J8 は推奨どおり: LICENSE は MIT のまま、THIRD_PARTY.md はルート、TDD 記録と設計記録は持つ、CI は静的ゲート + 本体ビルドから) | `docs/decisions/MEMMAP_V3.md` §0・§11、`RUST_VS_C11.md`、`U6_PENDING_REVIEW.md`、`FORK_PLAN.md` |
+| 2026-09-30 | **メモリマップの方針** (3 者討論): 8MB 機は GUI + 私有 2MB のアプリ、バイナリ互換は捨てる (ソース互換は極力)、アプリ帯 0x80000000、`--cpl0` 廃止、SQLite はカーネルの機能だが同一リンクにしない、低位 640KB は V86 へ、OpenType / KCG 廃止の検討、同時使用はしない (快適の判定は前景 1 本)、池の運用規則 (口は `mem_map` / `mem_unmap` の 2 つ、閾値 64KB)、MEMSYS5 512KB、SQLite と FEP は常に読み込む (例外は MINIMAL)。D35: fork 時の KAPI 整理でスロット順を変えてよい。D36: Rust で作る部品も 386 下限を守る (最終成果物の検査を必須の工程に)。保留 5 件 (U6) の仕分け、Rust vs C11 (U5、IRQ 文脈の合成器は Rust 可)、T0 = C11 化。**fork の準備を承認** (J1〜J8 は推奨どおり: LICENSE は MIT のまま、THIRD_PARTY.md はルート、TDD 記録と設計記録は持つ、CI は静的ゲート + 本体ビルドから) | MEMMAP_V3 (記録はアーカイブ) §0・§11、`RUST_VS_C11.md`、`U6_PENDING_REVIEW.md`、`FORK_PLAN.md` |
 
 ---
 
@@ -195,7 +195,7 @@ FatFs (`fs/fatfs/`)、`assets/` (IPADIC・IPAex・常用漢字表) と、gitigno
 | 各版の要約 / v2.1 のリリースノート | `CHANGELOG.md`、`docs/RELEASE_v2.1.md` |
 | v1.0 到達までの経緯 | `docs/archive/ROADMAP_v1.0.md`、`docs/archive/REFACTORING_PLAN.md` |
 | v2.0 (リング 3) の判断と完了記録 | `docs/archive/kernel_v2/PLAN.md` |
-| GUI 1.1〜1.4 の設計・契約・票 | `docs/decisions/gui/DESIGN.md`、`API_CONTRACTS.md`、`docs/archive/gui_v11/`〜`gui_v14/` |
+| GUI 1.1〜1.4 の設計・契約・票 | DESIGN (記録はアーカイブ)、API_CONTRACTS (記録はアーカイブ)、`docs/archive/gui_v11/`〜`gui_v14/` |
 | 実機 Ra266 の票と判定 | `docs/archive/realhw_v21/` (CHECKLIST_2026-09-24/25/26、TASK_FDC_REALHW、TASK_SERIAL_VFAST、TASK_SERIAL_HOSTFS、TASK_HDD_INSTALL ほか)、`docs/tasks/realhw/` |
 | 引き継ぎ (日ごとの記録) | `docs/archive/agents/HANDOVER_2026-09-29.md`、`docs/archive/agents/HANDOVER_2026-09-{16,18,22}.md` |
 | 体制の推移 | `docs/tasks/agents/ROLES.md` (§0 現行、末尾に経緯)、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` |

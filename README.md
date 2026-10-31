@@ -10,7 +10,7 @@
 ドライバの置き場 (動的読み込み)、装置窓の資源割当、実機の装置ドライバ、そしてその上の HAL の口である。時代依存の仕事は Host Service に任せ、
 OS32 側の契約は小さく保つ」* ([docs/decisions/V3_GOALS.md §1](docs/decisions/V3_GOALS.md))。機能を足す前に入れ物を作り直す版で、
 柱と順序は [docs/tasks/v3/V3_PLAN.md](docs/tasks/v3/V3_PLAN.md)、
-設計の決定は [docs/decisions/MEMMAP_V3.md](docs/decisions/MEMMAP_V3.md) にあります。
+設計の決定は [MEMMAP_V3.md](docs/decisions/MEMMAP_V3.md) にあります。
 
 **fork 元**: os32 v2.1 (リポジトリ [os32](https://github.com/ske-studio/os32)、タグ `v2.1` = コミット `6ccc4049`) と、fork 時点の `feat/gui` (`dfa97f57`、2026-09-30) の作業ツリーです。
 os32-v3 は新しい履歴 (初期コミット 1 つ) で始めていて、**v2.x までのコミット履歴・日次の記録は os32 にあります**。

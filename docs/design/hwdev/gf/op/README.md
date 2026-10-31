@@ -2,6 +2,8 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `hwdev/gf/op/`
 
+> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
+
 共通計算は共有する。
 head/skip、SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。skip 中の CR44 による head 更新も維持する（`O/kdebug/gfinit_decode.c:79–96`）。
 

@@ -14,7 +14,6 @@ REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令
 |---|---|---|
 | 33 REPEAT | 2B、実物count=10。count回反復し終端直後へ。0は静的拒否（nouveauでは本体へ落ち1回走る） | I:658–677 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

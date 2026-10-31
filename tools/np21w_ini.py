@@ -46,7 +46,7 @@ import uuid
 #    7 = ゲスト 8MB。memory_boot の legacy フォールバックを通す
 #    8 = ゲスト 9MB。PEGC (640x480) の 300KB 予約がアプリ帯の外に出る最小構成
 # 8MB は CUI の最低動作環境であって GUI の最低要件ではない
-# (INSTALL.md / docs/02_memory.md / decisions/gui/DESIGN.md)。
+# (INSTALL.md / docs/02_memory.md / docs/02_memory.md の旧配置の注記)。
 ALLOWED = {'USEGD5430': ('true', 'false'), 'GD5430TYPE': ('91',),
            'USEPEGCP': ('true', 'false'), 'EXMEMORY': ('7', '8', '16', '33', '65', '129')}
 

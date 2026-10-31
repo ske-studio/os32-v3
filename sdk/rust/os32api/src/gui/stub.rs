@@ -246,7 +246,7 @@ pub const E_HOST_TIME: usize = 110;
 /* --- 111..=117: v1.4 複数行編集 WK_TEXTAREA (票 TASK_EDIT_GUI §2、決裁 A1) ---
  *
  * `E_W_TEXTBOX` (59) は **1 行のまま**。複数行は新しい種別を末尾に足した
- * (API_CONTRACTS.md の「末尾追記のみ」に収まる)。
+ * (docs/decisions/gui/API_CONTRACTS.md の「末尾追記のみ」に収まる)。
  *
  * **部品は本文を持たない。** アプリが本文を持ち、`textarea_clear` +
  * `textarea_add_row` で「いま見えている行」だけを写す。折り返しの桁は

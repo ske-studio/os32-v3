@@ -79,7 +79,7 @@ u32 kst_exec_tramp_user(void); u32 kst_exec_kapi_layout(void);
 
 - TIME、ログ、ROM全体の検査を割込み禁止区間に入れない。窓の排他フラグを KPEEK と共有し、busy 中の別 op は BUSY。PTE復元失敗は致命エラーとして後続を止める。
 
-- **割込み禁止の区間** (§2 の「index/data と RMW は一組の間だけ割込み禁止」): 実装は REALHW_RECOVER_ADDENDUM.md の S5 の決定 (区間を分ける) に従う。
+- **割込み禁止の区間** (§2 の「index/data と RMW は一組の間だけ割込み禁止」): 実装は `docs/design/kdebug/recover.md` の区間を分ける契約に従う。
 
 - T2窓をkdebug_windowへ移し、peekと同じboot寿命の排他・PTE復元失敗ラッチを使う；最大2 PTEを保存し、READはsupervisor/PCD・RWなし、WRITEだけRW、map失敗でも全PTEを復元してIRQを戻す。
 

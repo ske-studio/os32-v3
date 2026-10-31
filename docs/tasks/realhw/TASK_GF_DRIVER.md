@@ -71,7 +71,7 @@
 - 61行: `condition_decode.inc:1` / `condition_expand.inc:1`
 - 62行: `index_io_decode.inc:1` / `cr_index_io_expand.inc:1`
 - 63行: `pll2_zm_reg_decode.inc:1` / `decode.c:101`
-- 元 67 行: OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `O/kdebug/gfinit_op/pll2_zm_reg_decode.inc:3`、`reset_expand.inc:10`、`D/GF6200_4A_DESIGN.md:263`。nouveau 全機種対応への拡張はしない。
+- 元 67 行: OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `O/kdebug/gfinit_op/pll2_zm_reg_decode.inc:3`、`reset_expand.inc:10`、`docs/design/kdebug/recover_gf.md`。nouveau 全機種対応への拡張はしない。
 - 72: 下表の最終ファイルは `hwdev/gf/display/<語幹>.c`（上位サービスと PC-98 接続は例外を明記）。生成列の並びをこれらのファイルに分散複製しない。
 - 元 76 行: | 情報・モード一覧 `modes` | 既知装置と 1 モード、現在モードを返す | `dispnv04/crtc.c:643`（設定側。OS32 の一覧そのものは無し） | 4F00/01/03、pp.25/30/44 | `hwdev/gfinit_mode.h:6`／定数を共有、一覧接続は service の新規分に含む |
 - 元 77 行: | モード設定 `modeset` | 中層から共有列を呼ぶ組立て | `dispnv04/crtc.c:708,731`、`hw.c:827` | 4F02、p.40 | `hwdev/gf_load_state.c:11`／共有、接続は service の新規分に含む |
@@ -117,7 +117,7 @@
 - 元 196 行: | `gfinit_plan_c.c` 529 行、baseline:159–186・checks:187–275 | 本番で共有する baseline/CHECK の区間だけ同 TU の `.inc` へ機械切出しし、共有値・descriptor を独立化する。診断の node 生成接続、446 の呼出し、rows/build/control/vram/color は元の場所に残す（N3）。 |
 - 197: | `gfinit.c` 541 行、ROM:143–212 | 本番で共有する ROM の区間だけ機械切出しし、共有 parser は一つ。診断用出力/接続・lifetime/stages・owner/lease は元の場所に残す。P6 の A2/main 呼出し変更は維持する（N3）。 |
 - 元 198 行: | `gf_stage_state.c` 73 行・`gfinit_bus.c` 211 行 | baseline 値採取と局所復元だけ必要範囲を共有化。診断 recover 型の adapter を残す。 |
-- 199: | `recover_gf.c:125–129`・`recover_profile.c:42–71` | 本番が共有する戻し部品は quiesce と 98 セル手順の小さな二つ。記録/画面復帰 adapter は各層に置く。**recover.c の分割は GF_STAGES T3 に任せ、本票の作業・見積りに含めない**（F1、`D/GF_STAGES_DESIGN.md:162`）。 |
+- 199: | `recover_gf.c:125–129`・`recover_profile.c:42–71` | 本番が共有する戻し部品は quiesce と 98 セル手順の小さな二つ。記録/画面復帰 adapter は各層に置く。**recover.c の分割は GF_STAGES T3 に任せ、本票の作業・見積りに含めない**（F1、`(記録はアーカイブ)`）。 |
 - 200: | `gfx/gfx_core.c` 1,251 行・既存 PEGC/Cirrus | gfx_core は §4 の局所変更だけ、分割無し。`backend_pegc.c` 1,215 行・`backend_cirrus.c` 606 行は参考として読む。 |
 - 元 202 行: 移した実体の旧コピーは消す。診断 A1/A2/main/A4/C-only、CLI、記録、C-only の常駐 ROM/plan/lease は必要な寿命を保つ。P6 の展開削除時にも他診断が使う実体を巻き込まない。
 - 元 203 行: build/生成契約/source を読む試験/check_map/p2v 許可表/変異目印を追従する。GNU11・kstring・定数三層管理・物理変換（[C1–5]）と既存 KAPI 配置/cdecl（[ABI1–3]）を維持する。公開 ABI 更新が必要なら kapi.json・末尾追加・全再構築を P5 に含める。

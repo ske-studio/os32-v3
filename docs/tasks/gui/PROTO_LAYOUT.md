@@ -1,8 +1,8 @@
 # GUI プロトコル レイアウト参考 (PROTO_LAYOUT)
 
-> 上位: [GUI v1.1 の作業票](TASKS.md)・[GUI の API 契約](../../decisions/gui/API_CONTRACTS.md)
+> 上位: [GUI v1.1 の作業票](TASKS.md)・[GUI の API 契約](../../design/sdk/include/os32/os32_gui_shared.md)
 
-> 発行: K1 (2026-09-06) / 親: [TASKS.md](TASKS.md) §4 / 契約: [API_CONTRACTS.md](../../decisions/gui/API_CONTRACTS.md) T2 / U2
+> 発行: K1 (2026-09-06) / 親: [TASKS.md](TASKS.md) §4 / 契約: [memmap.md](../../design/include/memmap.md) T2 / U2
 > C 側正典: `sdk/include/os32/os32_gui_shared.h` (STATIC_ASSERT で固定)
 > Rust 側: `sdk/rust/os32api/src/gui/proto.rs` (C レーンが写す)
 
@@ -33,4 +33,4 @@ GUI は SHM 末尾の予約範囲をスロットに分割する。
 op・イベント種別・上限・Style.flags・システム色は
 [`os32_gui_shared.h`](../../../sdk/include/os32/os32_gui_shared.h)、
 エラー定義は [`os32_kapi_shared.h`](../../../sdk/include/os32/os32_kapi_shared.h) を参照する。
-TRIM の配送・消費・DONE の順序は [API 契約 T5a](../../decisions/gui/API_CONTRACTS.md#trim-contract) に従う。
+TRIM の配送・消費・DONE の順序は [API 契約 T5a](../../design/sdk/README.md#trim-contract) に従う。

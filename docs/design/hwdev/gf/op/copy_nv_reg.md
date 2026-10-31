@@ -12,7 +12,6 @@
 |---|---|---|
 | 5F COPY_NV_REG | 22B、dst←(旧&dm) OR ((shift(src)&sm)^xor)。10020Cは読取り元、1700が宛先 | I:1415–1434 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

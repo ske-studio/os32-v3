@@ -4,7 +4,7 @@
 
 ## GF6200_4C_DESIGN
 
-cleanup予算は既存のlocal→quiesce→screenを保ち、Cで増えるlocal保存対象を含む実対象数でP/Qを再計数、S=max(4096,Q)・byte/time/poll予約とCRC不変を維持（`docs/decisions/realhw/GF6200_RECLOG_DESIGN.md:150–193`）。hostは算定Tlog/cleanup_secondsで待ちを設定し、9600bpsの既定60秒を流用しない。
+cleanup予算は既存のlocal→quiesce→screenを保ち、Cで増えるlocal保存対象を含む実対象数でP/Qを再計数、S=max(4096,Q)・byte/time/poll予約とCRC不変を維持。hostは算定Tlog/cleanup_secondsで待ちを設定し、9600bpsの既定60秒を流用しない。
 
 ## GF6200_RECLOG_DESIGN
 

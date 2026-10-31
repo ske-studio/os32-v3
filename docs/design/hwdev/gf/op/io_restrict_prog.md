@@ -14,7 +14,6 @@ CR3C の組を確認する。
 |---|---|---|
 | 32 IO_RESTRICT_PROG | s=(VGA[index]&m)>>shift、count個のu32から選びR32へ。11+4count B。範囲外は無書込みで記録・続行 | I:621–651 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

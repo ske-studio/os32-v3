@@ -14,7 +14,6 @@ SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ�
 |---|---|---|
 | 6B SUB | 2B、script表のu8番号へcall、DONEでpc+2へ。skip中は呼ばない | I:1663–1683 |
 
-> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 |op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
 |---|---|---|---|

@@ -2,7 +2,7 @@
 
 > 上位: [F2_OWNERSHIP](F2_OWNERSHIP.md)
 
-> 発行: PM (2026-09-09) / 状態: **設計中 (2026-09-30)** — **U6 決定 (ユーザー 2026-09-30、[MEMMAP_V3](../../decisions/MEMMAP_V3.md) D31): 独立票にせず MEMMAP_V3 §6 の T2 / T4 / T5a の要件として拾う** — B1 (uaccess の bounded copy) → T2 (新しい帯で `ring3_ptr_ok` を書き直す差分に含める)、B3 (旧 `db_exec` / `db_prepare` の checked copy) と B4 (`enter` / `leave` と in-flight の fail-stop、エクスポート表のラッパに置く) → T4、B2 (FEP facade、staging → finalize → copyout) → T5a。**旧 `db_exec` / `db_prepare` の SQL 1024B 超は「切捨てて実行」から「失敗」に変える** (D7 の範囲)。置き換わった部分 (§4 の帯判定 → T2、§6.3 の台帳 → T4 のエクスポート表、§6.2 の CTRL+STOP 保留 → §3-5 R1) は U6_PENDING_REVIEW (アーカイブ: `docs/archive/v3/U6_PENDING_REVIEW.md`) §1-3。本文は 09-13 のままで書き換えない。
+> 発行: PM (2026-09-09) / 状態: **設計中 (2026-09-30)** — **U6 決定 (ユーザー 2026-09-30、[module_runtime.md](../../design/kernel/module/module_runtime.md) D31): 独立票にせず MEMMAP_V3 §6 の T2 / T4 / T5a の要件として拾う** — B1 (uaccess の bounded copy) → T2 (新しい帯で `ring3_ptr_ok` を書き直す差分に含める)、B3 (旧 `db_exec` / `db_prepare` の checked copy) と B4 (`enter` / `leave` と in-flight の fail-stop、エクスポート表のラッパに置く) → T4、B2 (FEP facade、staging → finalize → copyout) → T5a。**旧 `db_exec` / `db_prepare` の SQL 1024B 超は「切捨てて実行」から「失敗」に変える** (D7 の範囲)。置き換わった部分 (§4 の帯判定 → T2、§6.3 の台帳 → T4 のエクスポート表、§6.2 の CTRL+STOP 保留 → §3-5 R1) は U6_PENDING_REVIEW (アーカイブ: `docs/archive/v3/U6_PENDING_REVIEW.md`) §1-3。本文は 09-13 のままで書き換えない。
 > それまでの状態: 設計中 (2026-09-13)
 
 設計提案・独立レビュー R0 待ち／実装未承認。

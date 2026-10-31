@@ -16,13 +16,13 @@
 
 ## 1. PM 決定
 
-- **A3 (2026-10-21)**: 「実測までは暫定値で書込み試験を許す。暫定値は超えたら FAILED に倒れる上限で、書込みの各段はユーザーの承認と立会いのもと (U1・U2)。T5 で実測して置き換え、置き換えるまでの run の記録に暫定値で走ったことを残す」。暫定の復帰予算は 10 / 18 / 33 秒 (S0 / GF 通常 / GF SIZE_BARS、[ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) §1 の表)。
+- **A3 (2026-10-21)**: 「実測までは暫定値で書込み試験を許す。暫定値は超えたら FAILED に倒れる上限で、書込みの各段はユーザーの承認と立会いのもと (U1・U2)。T5 で実測して置き換え、置き換えるまでの run の記録に暫定値で走ったことを残す」。暫定の復帰予算は 10 / 18 / 33 秒 (S0 / GF 通常 / GF SIZE_BARS、[復帰予算](../../design/kdebug/recover_profile.md#realhw_recover_addendum_r2))。
 - **A4**: 段 4a の開始の前提は T1 (契約・状態機械) + T2 (98 復帰の共有部・窓) だけ。T3・T6 は 4a と並行か後でよく、T4・T5・T7 も 4a の前提にしない。各書込みの承認は別。
 - **N2**: VRAM の容量が分からなくても BAR1 先頭 1KiB の最小試験は行う。容量の探索と Haiku のライセンス確認は PM が持つ。
 - **R10**: 54h=0 で VGA 別名が応答しなければ A2 を止めて共通の終端へ進み、4a を保留して設計し直す (54h=1 や I/O decode の有効化で迂回しない)。1854h への書込みは実 ROM に無い — 別の ROM に現れたら照合して非 0 なら静的に拒否する。
 - **T1b を足した**: 27 種の実 opcode の引数配置とアクセス方向の表は 4a S2 の成果物。T1b は合成の opcode (2〜3 種) で表の形と検査の入口を作り、host 試験で契約を確かめる。
 - **A1 で GPU 書込みが 0 件なら、①の省略だけでは FAILED にしない** (ADDENDUM r4 の変更 I、PM 推奨)。
-- **e18 (PBUS 1850 への 0 書き、出力停止) は REC_LITERAL のまま** (他の RMW は REC_EXPR へ移す。決まった値で縛るのがいちばん簡単で安全、[S2_LAYOUT](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md) の確定 G1)。
+- **e18 (PBUS 1850 への 0 書き、出力停止) は REC_LITERAL のまま** (他の RMW は REC_EXPR へ移す。決まった値で縛るのがいちばん簡単で安全、[許可表の契約](../../design/kdebug/recover_gf.md))。
 - **T4 を T4a / T4b に分けた (2026-10-21)**: T4a は今すぐ見られる部分 (status・KDEBUG=0 の拒否・peek の回帰・シリアル 1 命令・reboot→ver)、T4b は試行の op が結線される 4a の S6 の後 (台帳 [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) の RECOVER-T4B)。
 - 0FACh を Ra266 で初めて書くのは T5 の中の明示承認の 1 回。それまでは読むだけで、bit1..0≠00b なら書かずに FAILED で止める。4a は 0FACh を読み書きしない。
 
@@ -40,7 +40,7 @@
 | T6 | 実機・承認済みの書込み: 最小変更 → 手動 abort → 短い期限切れ → 意図的なソフト失敗 → ①② | 未 (4a と並行か後) | — |
 | T7 | 復旧演習: シリアル reboot、旧版一式の復旧、立会いの物理復帰を各 1 回、外部デバイス実装モデルの材料に | 未 | — |
 
-### T4b の段の細分 (2026-10-23、PM — 設計は [RECOVER_T4B_INJECT](../../decisions/realhw/RECOVER_T4B_INJECT.md)、1 段 = 1 回の依頼で 1〜2 時間、段ごとにレビューと取り込み)
+### T4b の段の細分 (2026-10-23、PM — 設計は [recover_virtual.md](../../design/kdebug/recover_virtual.md)、1 段 = 1 回の依頼で 1〜2 時間、段ごとにレビューと取り込み)
 
 | 段 | 中身 (この段だけ) | 主なファイル | 受入 (host) と変異 (PM が 1 回) |
 |---|---|---|---|
@@ -65,11 +65,11 @@
 
 T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部品に分ける M1〜M5 を先に): 順序は `TASK_HWDEV` §3 が正。
 
-合格条件の全文は [DESIGN](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) §7 の表と [ADDENDUM_R2](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) §3。変異の実行は PM のレビューの後 (ROLES §0)。
+合格条件の当時の全文は記録はアーカイブ。変異の実行は PM のレビューの後 (ROLES §0)。
 
 ## 3. 設計者 (astra) が実装の中で決めたことの所在
 
-どれも [ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) の見出しの節にある。
+各判断の記録はアーカイブ。現行の契約は [recover](../../design/kdebug/recover.md) と [plan](../../design/kdebug/recover_plan/README.md) に分かれる。
 
 - 「§2 追加」4 節・「§3 追加」— plan の入力と寿命、分岐・skip・呼出し・反復と全経路検査、世代をまたぐ依存と実行時照合、EXPR 引数、検証済み BAR 長、T1b と S2 以降の分担 (r4、Opus 3 回、確定 C1〜C3・D1〜D2)。
 - 「T1b の欠けの補完」— 他装置・bridge 窓の照合 (`recover_bar_probe`、範囲表 256 件)、opcode layout の型。
@@ -80,7 +80,7 @@ T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部�
 
 ## 4. 送り項目 (どの段で直すか)
 
-| 出所 ([ADDENDUM](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) の見出し / DESIGN 末尾) | 中身 | 直す段 |
+| 出所 (旧 ADDENDUM の見出し / DESIGN 末尾、記録はアーカイブ) | 中身 | 直す段 |
 |---|---|---|
 | DESIGN 末尾「追記」の B1・B2 (Opus の ADDENDUM 第 2 回) | B1 安全点・accessor が非 0 を返した後は資源に触れずに戻る、local_cleanup は冪等で解放の唯一の持ち主。B2 UART の待ちの分解能が 1 フレーム (1042µs) 以下、HAL の手段 | B1 は T1b、B2 は T2 (コミットの記述では 85cda52・4f8685b に入った。B2 の実機の根拠は T5) |
 | 「T1b の取り込みで S2 へ送る項目」 | 実行時の index 選択記録が 1 つだけ、依存の線形探索 | 4a S2 (ポート別の記録と bind 時の cache で解消) |
@@ -99,7 +99,7 @@ T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部�
 | 0FACh で 98 表示に戻す | 切替回路を 98 表示へ (GeForce の映像は抜いちゃダメボード経由で同じ切替回路に入る)。読み戻しはモニタに何が映るかを証明しない | ② の先頭、全装置共通。読んで bit1..0≠00b のときだけ 00h を書いて読み戻す。最終判定はユーザーの目視。Ra266 での初めての書込みは T5 の承認の 1 回 |
 | USB リレー (RESET 接点・電源ボタン)・スマートプラグ・NMI | Ra266 の端子・仕様は未確認、NMI はバスリセットではない | 後で検討。初版は採らない |
 
-軽い順の復帰の段 ([DESIGN](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) §3):
+軽い順の復帰の段 ([S0 の復帰階梯](../../design/kdebug/recover_common/s0.md#3-軽い順の復帰階梯)):
 
 1. ① snapshot/restore — 書く前に止めて安全な値を採り、終端で profile の順に戻す。cold-required (PLL/PFB など戻せない物) は保存値を書き戻さず、止める (quiesce) だけ。
 2. ② 98 画面 — 0FACh を 98 表示へ → 装置の出力・DMA を止める → legacy decode を解放 → 共通の表示復帰 → テキストを描き直す。A0000h の空きセル 1 つで往復を確かめる。
@@ -116,18 +116,18 @@ NP21/W には PCI バスが無く通信速度も模擬しないので、NV44A �
 
 確定設計はリポジトリの `docs/decisions/realhw/` にある (2026-10-22 に `docs/tasks/realhw/design/` から移した) (往復の版 r1〜rN と REVIEW は `~/os32-tmp/run/realhw_recover/` などに残る)。
 
-- [REALHW_RECOVER_DESIGN.md](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) — 戻す処理の本文 (復帰先 S0/S1/S2/COLD、軽い順の段、deadman、書込み試験との契約、ハードの候補、受入と段分け)
-- [REALHW_RECOVER_ADDENDUM_R2.md](../../decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md) — 追記 r2 (暫定予算・A3・段の割り当てと変異)。本文の一部
-- [REALHW_RECOVER_ADDENDUM.md](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md) — 追記 r4 (plan の契約) と、各段で設計者が決めたこと・送り項目。本文の一部
-- [RECOVER_ROUTE_TEST.md](../../decisions/realhw/RECOVER_ROUTE_TEST.md) — T5 の 0FACh の初めての書込みの口 (2026-10-24 確定): 今は route_write が未接続で承認も常に false のため、私有 op 12 `recover route-test 0 --approve` (未試験 S0 だけ、00b でも 00h を 1 回書いて mask 03h で読み戻す、承認は recover.c の static で呼出し 1 回だけ)。実装は 1 段 (astra)、実機は S8 の立会いの回に 1 回
-- [RECOVER_T4B_INJECT.md](../../decisions/realhw/RECOVER_T4B_INJECT.md) — T4b の追記 (2026-10-23 確定): NP21/W で仮想 profile の試行 (`recover virtual begin|step|end`、私有 op 11) と故障・期限・停止時の poll・送信詰まりの 5 case を起こす口、ホストの終端不着の helper。段は B1・B2
-- [GF6200_4A_DESIGN.md](../../decisions/realhw/GF6200_4A_DESIGN.md) — 段 4a の設計 (recover の契約を使う側)
-- [GF6200_4A_S2_LAYOUT.md](../../decisions/realhw/GF6200_4A_S2_LAYOUT.md) — 段 4a S2 の引数配置
+- [recover](../../design/kdebug/recover.md)・[S0 復帰](../../design/kdebug/recover_common/s0.md)・[復帰の方針](../../decisions/realhw/REALHW_RECOVER_DESIGN.md) — 状態・期限・復帰先・承認。段分けと受入の記録はアーカイブ。
+- [recover_profile](../../design/kdebug/recover_profile.md) — 復帰予算と profile。段の割り当て・変異の記録はアーカイブ。
+- [recover_plan](../../design/kdebug/recover_plan/README.md)・[recover](../../design/kdebug/recover.md) — plan と試行の契約。判断と送り項目の記録はアーカイブ。
+- [s0.md](../../design/kdebug/recover_common/s0.md) — T5 の 0FACh の初めての書込みの口 (2026-10-24 確定): 今は route_write が未接続で承認も常に false のため、私有 op 12 `recover route-test 0 --approve` (未試験 S0 だけ、00b でも 00h を 1 回書いて mask 03h で読み戻す、承認は recover.c の static で呼出し 1 回だけ)。実装は 1 段 (astra)、実機は S8 の立会いの回に 1 回
+- [recover_virtual.md](../../design/kdebug/recover_virtual.md) — T4b の追記 (2026-10-23 確定): NP21/W で仮想 profile の試行 (`recover virtual begin|step|end`、私有 op 11) と故障・期限・停止時の poll・送信詰まりの 5 case を起こす口、ホストの終端不着の helper。段は B1・B2
+- [gfinit.md](../../design/kdebug/gfinit.md) — 段 4a の設計 (recover の契約を使う側)
+- [gfinit_decode.md](../../design/kdebug/gfinit_decode.md) — 段 4a S2 の引数配置
 
 確定の後に設計者の決定や送り項目を足したら、同じ取り込みで上の写しも更新する (スキル os32-design-rally §6)。
 
 ### 4a S6 接続 (2026-10-21)
 - 実装: trial_begin/step/endへのGF接続、T3のBEGIN不達・終端理由・送信中期限・SCREEN_CALL7・host所有重複を修正。
 - T4b道具: `rshell_recover.py --status` と `--port aidebug:...` を追加。
-- 決定は[追記](../../decisions/realhw/REALHW_RECOVER_ADDENDUM.md#4a-s6-の実装で設計者が決めたこと-2026-10-21)、検証証拠は `/home/hight/os32-tmp/run/gf4a_s6/`（最終結果は実装報告）。
+- 決定は[追記](../../design/kdebug/recover.md)、検証証拠は `/home/hight/os32-tmp/run/gf4a_s6/`（最終結果は実装報告）。
 - 未確認: PAUSEDの門・peek経路はT4bのNP21/Wで確認、31kHzのini鍵はT4b前にPMが扱う。

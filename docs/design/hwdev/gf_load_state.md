@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `hwdev/gf_load_state.c`
 
-**決定**：本番 modeset は nouveau の load_state に近い簡素な作りとし、試験 C と `gf_load_state`・生成列を同一ソースで使う（`D/GF_STAGES_DESIGN.md:59–63`）。
+**決定**：本番 modeset は nouveau の load_state に近い簡素な作りとし、試験 C と `gf_load_state`・生成列を同一ソースで使う。
 初版は独立 DPMS・非零の表示先頭・HW cursor を提供せず、DPMS は modeset 内の OFF/ON だけ（U4 決定）。
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|

@@ -14,7 +14,7 @@ record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必�
 
 ## GF6200_4C_DESIGN
 
-VRAMはQ→Pで停止後・Dより前にBAR1+[0,4B000h)の307,200 Bを予約してCPU転送。1行640 Bの固定試験データを480行、全行書込み後に全域比較、posted write排出は既存の安全なGPU読取り。VRAM容量/窓の下限と書込範囲をplanで確定（`docs/decisions/realhw/GF6200_4A_DESIGN.md:192–194`）。
+VRAMはQ→Pで停止後・Dより前にBAR1+[0,4B000h)の307,200 Bを予約してCPU転送。1行640 Bの固定試験データを480行、全行書込み後に全域比較、posted write排出は既存の安全なGPU読取り。VRAM容量/窓の下限と書込範囲をplanで確定（`docs/design/kdebug/gfinit_plan.md`）。
 
 HWDEV側 `gfinit_plan` に A2+main+固定C節を最初からbind。Cは入口CHECK→Q→P→VRAM→S/D→L1/2/3→C→R→出口CHECK→NONE、成功はPAUSED。失敗は既存trial_end、途中再開なし（`kdebug/gfinit.c:298–357`）。
 

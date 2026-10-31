@@ -17,7 +17,7 @@ from mkmod import Elf
 from module_schema import HEADER_FIELDS
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC = 'docs/decisions/realhw/HWDEV_CORE_API.md'
+DOC = 'docs/design/hwdev/hwdev_imports.md'
 
 
 def require(ok, message):

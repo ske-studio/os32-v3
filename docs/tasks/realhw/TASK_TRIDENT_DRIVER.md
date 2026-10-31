@@ -8,7 +8,7 @@
 > 版: v1 (2026-09-29、初版、コーダー `claude-opus-5-5`) → v2 (同日、Codex 1 回目の所見 1〜9 と段・T1〜T7 への意見を反映、コーダー `claude-fable-5-1`) → v3 (同日、Codex 2 回目の所見 1〜4・D1〜D8・T8・帯の配置とユーザー決裁 2 件を反映、同コーダー) → v4 (同日、Codex 3 回目の所見 2 件と、FreeBSD → X.Org 参照実装の調査 §3-6 を反映、同コーダー) → **v5 (同日、Codex 4 回目の P2 × 5 と undocumented の横断を反映、コーダー `claude-opus-5-5`)**。依頼 PM。
 > 対象: 実機 PC-9821Ra266 の内蔵アクセラレータ (PCI 0:8.0 `1023:9660`)。**NP21/W では動かせない** (§3-3)。
 > 関係: [RA266.md](../../decisions/realhw/RA266.md) §1・§7、`TASK_PEGC480_REALHW`、`TASK_LAN_82557` §6 (PCI 列挙の実測)、
-> `DEVICE_RESERVATION`、[../../decisions/MEMMAP_V3.md](../../decisions/MEMMAP_V3.md)、
+> `DEVICE_RESERVATION`、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md)、
 > `TASK_HAL_WIRING` §1-4 (PCI の結線表)、`gui/DESIGN` §2・§3・§6、[05_drivers.md §5-5](../../05_drivers.md)。
 
 ## 0. ユーザー決定 (2026-09-29) とこの票の範囲
@@ -454,8 +454,8 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
 
 ### 4-2. メモリ・窓 (v3 の資源台帳と私有 lease)
 
-資源・面・lease の正典は [MEMMAP_V3 §0 D33](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) と
-[§2-2](../../decisions/MEMMAP_V3.md#2-2-lease-の契約)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `platform/pc98/pci_resources.c`。
+資源・面・lease の正典は MEMMAP_V3 §0 D33 (記録はアーカイブ) と
+[§2-2](../../design/exec/lease.md)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `platform/pc98/pci_resources.c`。
 旧共有 PT 昇格案と変更経緯は 設計履歴 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に保存した。
 
 **予約と準備 (Trident 固有部分は未実装)**

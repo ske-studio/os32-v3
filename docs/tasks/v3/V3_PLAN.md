@@ -30,16 +30,16 @@
 | 柱 | 中身 | 正典 (決定・票) | 状態 |
 |---|---|---|---|
 | **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | `docs/archive/v3/TASK_C11_MIGRATION.md` (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
-| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | MEMMAP_V3 (決定 §0、帯 §2-1、票 T1〜T7 §6、受入 §7) | **T1 受入完了** (2026-10-01、TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`))、T2 は受入完了 (詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`))、T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19、[詳細](TASK_T4_T6_MODULES.md))、T7 は設計中 ([詳細](TASK_T7_AND_FOLLOWUPS.md)) |
-| **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | MEMMAP_V3 §4-7、票 T4〜T5c・T6b | P1 の中で |
+| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | [現行決定](../../decisions/MEMMAP_V3.md)・[配置の契約](../../design/include/memmap.md) (元の票分割・受入条件は記録はアーカイブ) | **T1 受入完了** (2026-10-01、TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`))、T2 は受入完了 (詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`))、T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19、[詳細](TASK_T4_T6_MODULES.md))、T7 は設計中 ([詳細](TASK_T7_AND_FOLLOWUPS.md)) |
+| **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | [モジュールの契約](../../design/kernel/module/module_runtime.md)、票 T4〜T5c・T6b | P1 の中で |
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
-| **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | MEMMAP_V3 D33・§4-5、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
+| **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | [資源予約の契約](../../design/mm/pgalloc.md)・[識別と enable の境界](../../design/include/gfx_hal.md)、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
 | **P5 実機ドライバ** | 82557 L-B〜L-E (最初、静的で入る)、PCM E4〜E6 → 合成器、Trident、FD144、KBD_NAV K3、実機の画面取得 (PLAN §5-4) | [TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md)、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md)、[TASK_TRIDENT_DRIVER.md](../realhw/TASK_TRIDENT_DRIVER.md)、[realhw/PLAN.md](../realhw/PLAN.md) | 82557 は P1 を待たない |
 | **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み)。**実測 (2026-10-16、Ra266、86ba40c)**: 実機の中だけで 10 MiB を `cp /data → /data` が 53.6 秒 (0.20 MB/s)、LAN で読んでディスクへ書く `cp /host → /data` は 56.6 秒で、ほとんどがディスク側 (`~/os32-tmp/evidence/2026-10-16/lan_10m/split/`)。台帳 DISKPERF-1 | ユーザー決定 2026-09-30 (草案 §3 の行)。**起票の指示 (ユーザー 2026-10-16)**: v3 のドライバ関係で起票する。現状の使用には足りている | 票は未起票。T3 の後、NP21/W と Ra266 で cp の時間の内訳 (IDE の転送方式・1 回の転送量・ext2 のメタデータの書き戻し) を測ってから |
-| **P6 実行モデル** | 協調型を基本に、前景が固まったらカーネルが取り戻す (番犬・CTRL+STOP)。スケジューリングとしてのプリエンプションは求めない | 意図はユーザー決定 2026-09-30、票の要件は MEMMAP_V3 §3-5-3 (Codex X5) | 実装方式の票は未起票 (P1 の後) |
+| **P6 実行モデル** | 協調型を基本に、前景が固まったらカーネルが取り戻す (番犬・CTRL+STOP)。スケジューリングとしてのプリエンプションは求めない | 意図はユーザー決定 2026-09-30、票の要件は MEMMAP_V3 の策定時の Codex X5 (記録はアーカイブ) | 実装方式の票は未起票 (P1 の後) |
 | **P7 KAPI / ABI** | 後方互換は基本考えない、fork 時に 1 回整理 (スロット順を変えてよい)、世代の識別と旧新混在の試験が必須 | MEMMAP_V3 D7・**D35** | P1 と同時 |
 | **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、microUI へのマウスキー、F3a〜c 等 | MEMMAP_V3 D19 | v3 後半 (§5) |
-| **P9 アプリ層・互換層** | Video HAL の共通化、VESA2 的互換層、SDL 1.2 の受け皿、移植アプリ (ZSNES を含む) | MEMMAP_V3 D19・§2-2 (lease)、[PORT_CANDIDATES.md](PORT_CANDIDATES.md) | v3 後半 (§5) |
+| **P9 アプリ層・互換層** | Video HAL の共通化、VESA2 的互換層、SDL 1.2 の受け皿、移植アプリ (ZSNES を含む) | [lease の契約](../../design/exec/lease.md)、[PORT_CANDIDATES.md](PORT_CANDIDATES.md) | v3 後半 (§5) |
 | **P10 データ・設定層** | F2 / FEP_BOUNDARY / F3a・F3c は P1 の T2〜T5a に畳む。独立票は辞書メタ情報と F3b だけ | MEMMAP_V3 D29〜D31、`docs/archive/v3/U6_PENDING_REVIEW.md` | v3 後半 (§5) |
 
 ## 4. 順序
@@ -56,7 +56,7 @@ T3以降の実装用詳細設計: T3 配置 (受入完了 2026-10-18、契約は
 
 T3 着手前の文書再整備は済み (経緯: `docs/archive/v3/DOCS_REORG_T3.md`)。予算再計算の経緯: `docs/archive/v3/TASK_T2D_T2H.md` §6-1。
 
-票の中の順序と受入は MEMMAP_V3 §6・§7 が正典。策定時の「1 と 2 を同時に動かさない」「アイデアを順序に割り込ませない」(PLAN §1・§6) は維持する。
+票の中の順序と受入の策定時の本文は記録としてアーカイブにある。策定時の「1 と 2 を同時に動かさない」「アイデアを順序に割り込ませない」(PLAN §1・§6) は維持する。
 
 ## 5. v3 後半の票 (基盤が整い次第)
 
@@ -86,7 +86,7 @@ PLAN §5 の残り (5-1 ホストを仮想メモリに、5-2 V86 の装置要求
 
 | 知りたいこと | 正典 |
 |---|---|
-| メモリマップ・モジュール・ABI・実行モデルの要件の決定 (D1〜D36) | [MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) §0 (経緯 §11、Codex X1〜X8 の補足 §8-4) |
+| メモリマップ・モジュール・ABI・実行モデルの要件の決定 (D1〜D36) | [現行決定](../../decisions/MEMMAP_V3.md) (経緯・補足の記録はアーカイブ) |
 | ユーザー判断 U1〜U11 と Codex の論点 X1〜X8 の往復 | `docs/archive/v3/V3_PLAN_DRAFT.md` §7 |
 | 草案の一覧と振り分け、食い違い D1〜D21、v2.x 互換の論点 C1〜C8 | 同 §1、§4、§5 (C1 は D35 で決着、C7 は二段移行) |
 | 版数と fork の決定、os32 v2.x の扱い | [VERSIONS.md](../../decisions/VERSIONS.md) §1・§2、`docs/archive/v3/FORK_PLAN.md` |

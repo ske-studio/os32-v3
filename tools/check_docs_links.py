@@ -97,6 +97,41 @@ ARCHIVE_SOURCE_MOVES = {
     'kernel/paging_app.h': 'mm/paging_app.h',
     'kernel/v86_io.c': 'kernel/v86/v86_io.c',
 }
+# D1: original decision documents remain complete in the archive; keep fragments.
+ARCHIVE_DECISION_MOVES = {
+    'docs/decisions/DEP_DIR_A_DESIGN.md': 'docs/archive/decisions/DEP_DIR_A_DESIGN.md',
+    'docs/decisions/DEP_DIR_B_DESIGN.md': 'docs/archive/decisions/DEP_DIR_B_DESIGN.md',
+    'docs/decisions/DEP_DIR_C_DESIGN.md': 'docs/archive/decisions/DEP_DIR_C_DESIGN.md',
+    'docs/decisions/DEP_DIR_D1_DESIGN.md': 'docs/archive/decisions/DEP_DIR_D1_DESIGN.md',
+    'docs/decisions/DEP_DIR_D2_DESIGN.md': 'docs/archive/decisions/DEP_DIR_D2_DESIGN.md',
+    'docs/decisions/DEP_DIR_D3_DESIGN.md': 'docs/archive/decisions/DEP_DIR_D3_DESIGN.md',
+    'docs/decisions/DEP_DIR_D_DESIGN.md': 'docs/archive/decisions/DEP_DIR_D_DESIGN.md',
+    'docs/decisions/MEMMAP_V3.md': 'docs/archive/decisions/MEMMAP_V3.md',
+    'docs/decisions/SLIM_KERNEL_DESIGN.md': 'docs/archive/decisions/SLIM_KERNEL_DESIGN.md',
+    'docs/decisions/SLIM_KERNEL_IMPORTS.md': 'docs/archive/decisions/SLIM_KERNEL_IMPORTS.md',
+    'docs/decisions/VER_INFO_DESIGN.md': 'docs/archive/decisions/VER_INFO_DESIGN.md',
+    'docs/decisions/gui/API_CONTRACTS.md': 'docs/archive/decisions/gui/API_CONTRACTS.md',
+    'docs/decisions/gui/DESIGN.md': 'docs/archive/decisions/gui/DESIGN.md',
+    'docs/decisions/gui/GFX_MODES_DESIGN.md': 'docs/archive/decisions/gui/GFX_MODES_DESIGN.md',
+    'docs/decisions/realhw/BARLEN_DESIGN.md': 'docs/archive/decisions/realhw/BARLEN_DESIGN.md',
+    'docs/decisions/realhw/CRT31K_DESIGN.md': 'docs/archive/decisions/realhw/CRT31K_DESIGN.md',
+    'docs/decisions/realhw/GF6200_4A_DESIGN.md': 'docs/archive/decisions/realhw/GF6200_4A_DESIGN.md',
+    'docs/decisions/realhw/GF6200_4A_S2_LAYOUT.md': 'docs/archive/decisions/realhw/GF6200_4A_S2_LAYOUT.md',
+    'docs/decisions/realhw/GF6200_4C_DESIGN.md': 'docs/archive/decisions/realhw/GF6200_4C_DESIGN.md',
+    'docs/decisions/realhw/GF6200_RECLOG_DESIGN.md': 'docs/archive/decisions/realhw/GF6200_RECLOG_DESIGN.md',
+    'docs/decisions/realhw/GF6200_S7_SHELL.md': 'docs/archive/decisions/realhw/GF6200_S7_SHELL.md',
+    'docs/decisions/realhw/GF6200_VPLL_PROBE.md': 'docs/archive/decisions/realhw/GF6200_VPLL_PROBE.md',
+    'docs/decisions/realhw/GF_STAGES_DESIGN.md': 'docs/archive/decisions/realhw/GF_STAGES_DESIGN.md',
+    'docs/decisions/realhw/HWDEV_CORE_API.md': 'docs/archive/decisions/realhw/HWDEV_CORE_API.md',
+    'docs/decisions/realhw/HWDEV_DESIGN.md': 'docs/archive/decisions/realhw/HWDEV_DESIGN.md',
+    'docs/decisions/realhw/REALHW_RECOVER_ADDENDUM.md': 'docs/archive/decisions/realhw/REALHW_RECOVER_ADDENDUM.md',
+    'docs/decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md': 'docs/archive/decisions/realhw/REALHW_RECOVER_ADDENDUM_R2.md',
+    'docs/decisions/realhw/REALHW_RECOVER_DESIGN.md': 'docs/archive/decisions/realhw/REALHW_RECOVER_DESIGN.md',
+    'docs/decisions/realhw/RECOVER_ROUTE_TEST.md': 'docs/archive/decisions/realhw/RECOVER_ROUTE_TEST.md',
+    'docs/decisions/realhw/RECOVER_T4B_INJECT.md': 'docs/archive/decisions/realhw/RECOVER_T4B_INJECT.md',
+    'docs/decisions/realhw/SLIM_HWDEV_DESIGN.md': 'docs/archive/decisions/realhw/SLIM_HWDEV_DESIGN.md',
+}
+
 # 消した・畳んだスキル (TASK_POLICY_LIGHT P2(b))。見出しは残らないので断片を落として先のファイルへ。
 ARCHIVE_DOC_MOVES = {
     '.claude/skills/os32-build-verify/SKILL.md': '.claude/skills/run-os32/SKILL.md',
@@ -135,7 +170,7 @@ def link_commands(exe, inputs):
     commands = [current + ['--', *inputs]]
     if glob.glob(os.path.join(PROJ_DIR, 'docs/archive/**/*.md'), recursive=True):
         archived = [exe, *LYCHEE_FLAGS]
-        for old, new in ARCHIVE_SOURCE_MOVES.items():
+        for old, new in {**ARCHIVE_SOURCE_MOVES, **ARCHIVE_DECISION_MOVES}.items():
             old_uri = (Path(PROJ_DIR) / old).as_uri()
             new_uri = (Path(PROJ_DIR) / new).as_uri()
             archived += ['--remap', '^' + re.escape(old_uri) + r'(#.*)?$ ' + new_uri + '$1']
