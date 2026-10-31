@@ -21,6 +21,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
     'kbd_source.inc': 'drivers/input/kbd.c',
     'ime_source.inc': 'kernel/ime/ime.c',
+    'ime_convert.inc': 'kernel/ime/ime_convert.inc',
     'gui_source.inc': 'kernel/gui.c',
     'sink_source.inc': 'kernel/console/con_sink.c',
     'inject_source.inc': 'kernel/kbd_inject.c',
@@ -85,7 +86,7 @@ def run(mutation=None):
 
 
 MUTATIONS = [
-    ('IMEORDER-key-before-candidate', 'ime_source.inc',
+    ('IMEORDER-key-before-candidate', 'ime_convert.inc',
      '    if (ascii >= ASCII_PRINT_FIRST && ascii <= ASCII_PRINT_LAST) {',
      '    if (0) {', 'FAIL IMEORDER candidate before typed ASCII'),
     ('MINIMAL-scan-only-poll', 'ime_source.inc',
@@ -97,11 +98,11 @@ MUTATIONS = [
      'static int ime_getchar_wait(int interruptible)\n{\n'
      '    if (!services_public) return interruptible ? kbd_getchar_kapi() : kbd_getchar();',
      'FAIL MINIMAL wait skips scan-only key'),
-    ('IMEIND-RETURN-clear-only', 'ime_source.inc',
+    ('IMEIND-RETURN-clear-only', 'ime_convert.inc',
      '            preedit_draw(); /* Keep the ON indicator even when nothing was committed. */',
      '            preedit_clear();',
      'FAIL IMEIND discarded RETURN keeps visible ON indicator'),
-    ('IMEIND-RETURN-stale-romaji', 'ime_source.inc',
+    ('IMEIND-RETURN-stale-romaji', 'ime_convert.inc',
      '            ime_rk_init(&g_ime.rk); /* Discard incomplete romaji after flushing n. */',
      '', 'FAIL IMEIND discarded reading is no longer visible'),
     ('IMECAND-no-immediate-ON-redraw', 'ime_source.inc',
