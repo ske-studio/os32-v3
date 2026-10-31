@@ -16,6 +16,7 @@ volatile u32 services_boot_fault;
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;
 static int scroll_rows, candidate_draws, mode_draws;
+static int reopen_failure, search_miss, long_candidate;
 static u32 ime_cells[25][80];
 static u32 gui_ime_cells[25][80];
 static AppSlot slots[APP_SLOT_COUNT];
@@ -96,13 +97,24 @@ static IME_Dict *shared_dict;
 int ime_dict_open(IME_Dict *d, const char *p)
 { opens++; shared_dict = d; kstrncpy(d->path, p, sizeof(d->path)); d->db = d; return 0; }
 int ime_dict_reopen(IME_Dict *d, const char *p)
-{ reopens++; return ime_dict_open(d, p); }
+{
+    reopens++;
+    if (reopen_failure == 2) return -1; /* Old close failed, connection remains. */
+    d->db = NULL;
+    if (reopen_failure) return -1; /* Old connection closed, new open failed. */
+    return ime_dict_open(d, p);
+}
 int ime_dict_search(IME_Dict *d, const char *y, IME_Result *r, int max)
 {
     (void)max;
-    if (d != shared_dict) return 0;
+    if (d != shared_dict || !d->db) return 0;
     searches++;
+    if (search_miss) return 0;
     kstrncpy(r[0].kanji, kstrcmp(y, "かんじ") == 0 ? "換字" : "亜", sizeof(r[0].kanji));
+    if (long_candidate) {
+        kmemset(r[0].kanji, 'K', sizeof(r[0].kanji) - 1);
+        r[0].kanji[sizeof(r[0].kanji) - 1] = '\0';
+    }
     kstrncpy(r[1].kanji, "阿", sizeof(r[1].kanji));
     return 2;
 }
@@ -153,6 +165,7 @@ static void reset(void)
     kmemset(ime_cells, 0, sizeof(ime_cells));
     kmemset(gui_ime_cells, 0, sizeof(gui_ime_cells));
     shared_dict = 0;
+    reopen_failure = search_miss = long_candidate = 0;
 }
 static void key(u8 code) { kbd_deliver(code); kbd_deliver(code | 0x80); }
 static int equal_state(const IME_State *a) { return !memcmp(a, &g_ime, sizeof(*a)); }
@@ -549,12 +562,159 @@ static int unpublished(void)
     say("PASS unpublished DB-independent IME stubs and MINIMAL input\n");
     return 0;
 }
+/* Survey 2: reopening may close the old DB before the new open fails. */
+static int dict_recovery(void)
+{
+    for (int toggle = 0; toggle < 2; toggle++) {
+        reset(); ime_toggle();
+        reopen_failure = 1;
+        CHECK(ime_switch_dict(2) == -1 && !g_ime.dict.db,
+              "IMEDICT switch closes old dictionary before failure");
+        ime_set_mode(IME_MODE_OFF);
+        if (toggle) ime_toggle(); else ime_set_mode(IME_MODE_HIRAGANA);
+        CHECK(opens == 2 && g_ime.dict_loaded && g_ime.dict.db,
+              "IMEDICT ON retries dictionary after failed switch");
+        (void)ime_feed_key((0x1d << 8) | 'a');
+        (void)ime_feed_key((KEY_SPACE << 8) | ' ');
+        CHECK(g_ime.result_count == 2, "IMEDICT conversion recovers");
+    }
+    reset();
+    CHECK(ime_switch_dict(0) == 0, "IMEDICT switch while OFF opens dictionary");
+    ime_toggle();
+    CHECK(opens == 1 && g_ime.dict_loaded, "IMEDICT ON reuses successful switch");
+    reopen_failure = 2;
+    CHECK(ime_switch_dict(2) == -1 && g_ime.dict_loaded && g_ime.dict.db,
+          "IMEDICT close failure retains existing connection state");
+    say("PASS IMEDICT failed and successful dictionary switches\n"); return 0;
+}
+
+/* Survey 3: deleting y from ny restores the same pending n as fresh input. */
+static int backspace_n(void)
+{
+    for (int finish_a = 0; finish_a < 2; finish_a++) {
+        reset(); ime_toggle();
+        (void)ime_feed_key((0x2e << 8) | 'n');
+        (void)ime_feed_key((0x15 << 8) | 'y');
+        (void)ime_feed_key((KEY_BS << 8) | 8);
+        CHECK(!kstrcmp(g_ime.rk.preedit, "n"), "IMEBS restored visible n");
+        if (finish_a) (void)ime_feed_key((0x1d << 8) | 'a');
+        const u8 *expected = (const u8 *)(finish_a ? "な" : "ん");
+        CHECK(ime_feed_key((KEY_RETURN << 8) | 13) == expected[0] &&
+              ime_feed_key(-1) == expected[1] && ime_feed_key(-1) == expected[2] &&
+              ime_feed_key(-1) == -1, "IMEBS restored n commits once");
+        CHECK(!g_ime.rk.preedit[0] && !g_ime.rk.n_wait, "IMEBS no pending romaji");
+    }
+    reset(); ime_toggle();
+    (void)ime_feed_key((0x2e << 8) | 'n');
+    (void)ime_feed_key((KEY_BS << 8) | 8);
+    CHECK(!g_ime.rk.preedit[0] && !g_ime.rk.n_wait, "IMEBS deleting n clears wait");
+    say("PASS IMEBS ny Backspace Enter/a and n Backspace\n"); return 0;
+}
+
+/* Survey 4: every byte before the NUL slot belongs to the existing capacity. */
+static int kana_capacity(void)
+{
+    const int lengths[] = {126, 127, 128};
+    for (u32 n = 0; n < sizeof(lengths)/sizeof(lengths[0]); n++) {
+        reset(); ime_toggle();
+        for (int i = 0; i < lengths[n]; i++)
+            CHECK(ime_feed_key((0x02 << 8) | '1') == -1, "IMECAP input consumed");
+        int expected = lengths[n] > 127 ? 127 : lengths[n];
+        CHECK(g_ime.kana_len == expected && !g_ime.kana_buf[expected],
+              "IMECAP uses all 127 bytes and preserves terminator");
+        for (int i = 0; i < expected; i++)
+            CHECK(ime_feed_key(i ? -1 : (KEY_RETURN << 8) | 13) == '1',
+                  "IMECAP commits every retained byte");
+        CHECK(ime_feed_key(-1) == -1, "IMECAP no extra byte");
+    }
+    say("PASS IMECAP 126/127/128 input bytes\n"); return 0;
+}
+
+/* Survey 5: Space flushes a lone n before both dictionary hit and miss. */
+static int lone_n_space(void)
+{
+    for (int miss = 0; miss < 2; miss++) {
+        reset(); ime_toggle(); search_miss = miss;
+        (void)ime_feed_key((0x2e << 8) | 'n');
+        int result = ime_feed_key((KEY_SPACE << 8) | ' ');
+        CHECK(searches == 1 && !g_ime.rk.n_wait && !g_ime.rk.preedit[0],
+              "IMESPACE lone n searched without raw Space or pending n");
+        const u8 *expected = (const u8 *)(miss ? "ん" : "亜");
+        if (!miss) {
+            CHECK(result == -1 && g_ime.converting && !kstrcmp(g_ime.kana_buf, "ん"),
+                  "IMESPACE dictionary hit enters conversion");
+            result = ime_feed_key((KEY_RETURN << 8) | 13);
+        }
+        CHECK(result == expected[0] && ime_feed_key(-1) == expected[1] &&
+              ime_feed_key(-1) == expected[2] && ime_feed_key(-1) == -1,
+              "IMESPACE candidate or kana delivered once");
+        CHECK(ime_feed_key((KEY_RETURN << 8) | 13) == ((KEY_RETURN << 8) | 13),
+              "IMESPACE no residual n on next Enter");
+    }
+    say("PASS IMESPACE lone n dictionary hit/miss\n"); return 0;
+}
+
+/* Survey 6: closing a GUI list must erase the actual renderer grid. */
+static int gui_list_clear(void)
+{
+    static const IME_Render gfx_render = {gui_draw_char, gui_draw_wide, gui_clear_row, 0, 0};
+    for (int enter = 0; enter < 2; enter++) {
+        reset(); ime_set_render((void *)&gfx_render); ime_toggle();
+        (void)ime_feed_key((0x1d << 8) | 'a');
+        (void)ime_feed_key((KEY_SPACE << 8) | ' ');
+        (void)ime_feed_key(KEY_DOWN << 8);
+        CHECK(g_ime.state == IME_ST_CANDLIST && gui_ime_cells[21][0] == '1' &&
+              gui_ime_cells[23][74], "IMEGUI candidate list visible");
+        int result = ime_feed_key(enter ? (KEY_RETURN << 8) | 13 : ASCII_ESC);
+        CHECK(g_ime.state == (enter ? IME_ST_INPUT : IME_ST_CONVERT) &&
+              scroll_rows == 1, "IMEGUI candidate list closed");
+        for (int y = 21; y < 24; y++)
+            for (int x = 0; x < TVRAM_COLS; x++)
+                CHECK(!gui_ime_cells[y][x], "IMEGUI closed list leaves empty rows");
+        if (enter) {
+            CHECK(result == 0xe4 && ime_feed_key(-1) == 0xba &&
+                  ime_feed_key(-1) == 0x9c && ime_feed_key(-1) == -1,
+                  "IMEGUI Enter still delivers selected candidate");
+        } else CHECK(result == -1 && g_ime.converting, "IMEGUI Esc retains conversion");
+    }
+    say("PASS IMEGUI candidate list Esc/Enter clears rows\n"); return 0;
+}
+
+/* Surveys 8/9: confirmation clears converting for numbers and full candidates. */
+static int candidate_boundaries(void)
+{
+    for (int number = 0; number < 2; number++) {
+        reset(); ime_toggle(); long_candidate = 1;
+        (void)ime_feed_key((0x1d << 8) | 'a');
+        (void)ime_feed_key((KEY_SPACE << 8) | ' ');
+        (void)ime_feed_key(KEY_DOWN << 8);
+        int result = ime_feed_key(number ? (0x02 << 8) | '1' : (0x1d << 8) | 'a');
+        for (int i = 0; i < 31; i++) {
+            CHECK(result == 'K', "IMEBOUND full 31-byte candidate delivered");
+            result = ime_feed_key(-1);
+        }
+        if (!number) {
+            CHECK(result == 'a', "IMEBOUND ASCII follows full candidate");
+            result = ime_feed_key(-1);
+        }
+        CHECK(result == -1 && !g_ime.converting && g_ime.state == IME_ST_INPUT &&
+              !g_ime.result_count && learns == 1, "IMEBOUND confirmation resets state once");
+    }
+    say("PASS IMEBOUND numeric confirmation and 31-byte candidate plus ASCII\n"); return 0;
+}
+
 void _start(void)
 {
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
     int rc = unpublished() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
+    rc |= dict_recovery();
+    rc |= backspace_n();
+    rc |= kana_capacity();
+    rc |= lone_n_space();
+    rc |= gui_list_clear();
+    rc |= candidate_boundaries();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }

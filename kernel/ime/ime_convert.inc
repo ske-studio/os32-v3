@@ -7,7 +7,7 @@
 static void append_rk_output(void)
 {
     int olen = (int)kstrlen(g_ime.rk.output);
-    if (g_ime.kana_len + olen < (int)sizeof(g_ime.kana_buf) - 1) {
+    if (g_ime.kana_len + olen <= (int)sizeof(g_ime.kana_buf) - 1) {
         kmemcpy(g_ime.kana_buf + g_ime.kana_len, g_ime.rk.output, olen);
         g_ime.kana_len += olen;
         g_ime.kana_buf[g_ime.kana_len] = '\0';
@@ -43,7 +43,6 @@ static void commit_candidate(void)
 {
     if (g_ime.candidate_idx < g_ime.result_count) {
         int len = (int)kstrlen(g_ime.results[g_ime.candidate_idx].kanji);
-        if (len > (int)sizeof(g_ime.commit_buf) - 1) len = (int)sizeof(g_ime.commit_buf) - 1;
         kmemcpy(g_ime.commit_buf, g_ime.results[g_ime.candidate_idx].kanji, len);
         g_ime.commit_len = len;
         g_ime.commit_pos = 0;
@@ -96,7 +95,6 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
             g_ime.candidate_idx = target;
             commit_candidate();
             g_ime.state = IME_ST_INPUT;
-            g_ime.converting = 0;
             tvram_set_scroll_reserve(1); /* インライン保護に戻す */
             candlist_clear(); /* リスト領域を消去 */
             if (g_ime.kana_len > 0) {
@@ -191,7 +189,6 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
     if (scancode == KEY_RETURN) {
         commit_candidate();
         g_ime.state = IME_ST_INPUT;
-        g_ime.converting = 0;
         tvram_set_scroll_reserve(1); /* インライン保護に戻す */
         candlist_clear(); /* リスト領域を消去 */
         if (g_ime.kana_len > 0) {
@@ -225,7 +222,6 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
     /* その他のキーは候補確定後にフォールスルー */
     commit_candidate();
     g_ime.state = IME_ST_INPUT;
-    g_ime.converting = 0;
     tvram_set_scroll_reserve(1); /* インライン保護に戻す */
     candlist_clear(); /* リスト領域を消去 */
     if (g_ime.kana_len > 0) {
@@ -253,7 +249,7 @@ static inline int ime_input_key(u8 ascii, u8 scancode)
     int count;
 
     /* スペースキー: 変換開始 (最長一致法) */
-    if (scancode == KEY_SPACE && g_ime.kana_len > 0) {
+    if (scancode == KEY_SPACE && (g_ime.kana_len > 0 || g_ime.rk.n_wait)) {
         int try_len;
         char saved_char;
 
@@ -324,7 +320,7 @@ static inline int ime_input_key(u8 ascii, u8 scancode)
             int plen = (int)kstrlen(g_ime.rk.preedit);
             if (plen > 0) {
                 g_ime.rk.preedit[plen - 1] = '\0';
-                if (plen - 1 == 0) g_ime.rk.n_wait = 0;
+                g_ime.rk.n_wait = (kstrcmp(g_ime.rk.preedit, "n") == 0);
             }
             preedit_draw();
             return 0;

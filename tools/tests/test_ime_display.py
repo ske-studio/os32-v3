@@ -13,6 +13,12 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 OLD = '        cursor_y--;\n'
 NEW = '        cursor_y -= 0;\n'
+MUTATIONS = [
+    ('cursor reservation', 'console.c', OLD, NEW, 'IME reservation preserves cursor'),
+    ('mode change restoration', 'ime.c',
+     '        candlist_clear(); /* Restore the list before changing input mode. */',
+     '', 'mode change restores candidate rows'),
+]
 
 
 def main():
@@ -28,12 +34,20 @@ def main():
         (tmp / 'con_sink_host.c').write_text(fixture)
         source = (ROOT / 'tools/tests/ime_display_host.c').read_text()
         source = source.replace('../../', str(ROOT) + '/')
+        source = source.replace(str(ROOT / 'kernel/ime/ime.c'), str(tmp / 'ime.c'))
         (tmp / 'ime_display_host.c').write_text(source)
-        original = (ROOT / 'kernel/console/console.c').read_text()
-        assert original.count(OLD) == 1, 'mutation target must match once'
-        for modified in (False, True) if args.mutate else (False,):
-            (tmp / 'console.c').write_text(original.replace(OLD, NEW) if modified else original)
-            exe = tmp / ('mutant' if modified else 'normal')
+        originals = {'console.c': (ROOT / 'kernel/console/console.c').read_text()}
+        for name in ('ime.c', 'ime_render.inc', 'ime_convert.inc', 'ime_dict_api.inc'):
+            originals[name] = (ROOT / 'kernel/ime' / name).read_text()
+        for mutation in [None] + (MUTATIONS if args.mutate else []):
+            sources = dict(originals)
+            if mutation:
+                name, target, old, new, expected = mutation
+                assert sources[target].count(old) == 1, 'mutation target must match once'
+                sources[target] = sources[target].replace(old, new)
+            for target, source in sources.items():
+                (tmp / target).write_text(source)
+            exe = tmp / ('mutant' if mutation else 'normal')
             host32.build(['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding',
                           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
                           '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
@@ -45,9 +59,9 @@ def main():
                           '-o', str(exe)], check=True)
             result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=30)
             print(result.stdout + result.stderr, end='', flush=True)
-            if modified:
-                assert result.returncode == 1 and 'IME reservation preserves cursor' in result.stdout
-                print('RED runtime cursor reservation (compiled with -Werror)', flush=True)
+            if mutation:
+                assert result.returncode == 1 and expected in result.stdout
+                print('RED runtime ' + name + ' (compiled with -Werror)', flush=True)
             else:
                 assert result.returncode == 0, result.returncode
 

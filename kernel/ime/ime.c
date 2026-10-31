@@ -163,6 +163,7 @@ void ime_set_mode(int mode)
     }
     g_ime.mode = mode;
     if (mode != IME_MODE_OFF) {
+        candlist_clear(); /* Restore the list before changing input mode. */
         g_ime.state = IME_ST_INPUT;
         g_ime.converting = 0;
         tvram_set_scroll_reserve(1);
