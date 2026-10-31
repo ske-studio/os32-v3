@@ -51,6 +51,7 @@ static void ime_cancel_input(void);
 #include "ime_render.inc"
 
 #include "ime_convert.inc"
+#include "ime_delivery.inc"
 
 /* ======================================================================== */
 /*  公開API                                                                  */
@@ -59,6 +60,7 @@ static void ime_cancel_input(void);
 void ime_init(void)
 {
     kmemset(&g_ime, 0, sizeof(IME_State));
+    ime_delivery_clear();
     g_ime.mode = IME_MODE_OFF;
     g_ime.dict_loaded = 0;
     g_ime.state = IME_ST_INPUT;
@@ -198,12 +200,14 @@ static int ime_getchar_wait(int interruptible)
     if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
     ime_prepare_cui_input();
 
-    /* バッファに確定済みがあれば返す */
-    if (g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-    }
-
     for (;;) {
+        keydata = ime_delivery_take();
+        if (keydata >= 0) {
+            u8 a = (u8)(keydata & 0xFF);
+            if (a != 0) return (int)a;
+            continue;
+        }
+
         keydata = kbd_getkey_wait(interruptible);
         if (keydata < 0) return -1;
 
@@ -225,12 +229,9 @@ static int ime_getchar_wait(int interruptible)
         }
 
         /* FEP ON: IME処理 */
-        result = ime_process_key(keydata);
-        if (result == 1 && g_ime.commit_pos < g_ime.commit_len) {
-            return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-        }
-        if (result == -1) {
-            u8 a = (u8)(keydata & 0xFF);
+        result = ime_delivery_process(keydata);
+        if (result >= 0) {
+            u8 a = (u8)(result & 0xFF);
             if (a != 0) return (int)a;
         }
     }
@@ -252,9 +253,11 @@ int ime_trygetchar(void)
     if (con_sink_is_enabled()) return kbd_trygetchar();
     ime_prepare_cui_input();
 
-    if (g_ime.commit_pos < g_ime.commit_len) {
+    keydata = ime_delivery_take();
+    if (keydata >= 0) {
         ime_note_cui_reader();
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
+        u8 a = (u8)(keydata & 0xFF);
+        return a != 0 ? (int)a : -1;
     }
 
     keydata = kbd_trygetkey();
@@ -276,12 +279,9 @@ int ime_trygetchar(void)
         return -1;
     }
 
-    result = ime_process_key(keydata);
-    if (result == 1 && g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-    }
-    if (result == -1) {
-        u8 a = (u8)(keydata & 0xFF);
+    result = ime_delivery_process(keydata);
+    if (result >= 0) {
+        u8 a = (u8)(result & 0xFF);
         if (a != 0) return (int)a;
     }
     return -1;
@@ -368,12 +368,12 @@ static int ime_getkey_wait(int interruptible)
     if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
     ime_prepare_cui_input();
 
-    /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
-    if (g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-    }
-
     for (;;) {
+        keydata = ime_delivery_take();
+        if (keydata >= 0) {
+            return keydata;
+        }
+
         keydata = kbd_getkey_wait(interruptible);
         if (keydata < 0) return -1; /* key wait interrupted */
 
@@ -393,14 +393,11 @@ static int ime_getkey_wait(int interruptible)
         }
 
         /* FEP ON: IME処理 */
-        result = ime_process_key(keydata);
-        if (result == 1 && g_ime.commit_pos < g_ime.commit_len) {
-            return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
+        result = ime_delivery_process(keydata);
+        if (result >= 0) {
+            return result;
         }
-        if (result == -1) {
-            return keydata;
-        }
-        /* result == 0: 未確定、次のキーを待つ */
+        /* No output: 未確定、次のキーを待つ */
     }
 }
 
@@ -413,10 +410,10 @@ int ime_trygetkey(void)
     if (con_sink_is_enabled()) return kbd_trygetkey();
     ime_prepare_cui_input();
 
-    /* バッファに確定済みがあれば 1バイトずつ返す (scancode=0) */
-    if (g_ime.commit_pos < g_ime.commit_len) {
+    keydata = ime_delivery_take();
+    if (keydata >= 0) {
         ime_note_cui_reader();
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
+        return keydata;
     }
 
     keydata = kbd_trygetkey();
@@ -439,14 +436,11 @@ int ime_trygetkey(void)
     }
 
     /* FEP ON: IME処理 */
-    result = ime_process_key(keydata);
-    if (result == 1 && g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
+    result = ime_delivery_process(keydata);
+    if (result >= 0) {
+        return result;
     }
-    if (result == -1) {
-        return keydata;
-    }
-    /* result == 0: 未確定、キーを消費したのでキーなし (-1) を返す */
+    /* No output: 未確定、キーを消費したのでキーなし (-1) を返す */
     return -1;
 }
 
@@ -464,6 +458,7 @@ static void ime_cancel_input(void)
     g_ime.result_count = g_ime.candidate_idx = g_ime.page = 0;
     g_ime.convert_len = 0;
     g_ime.commit_len = g_ime.commit_pos = 0;
+    ime_delivery_clear();
     ime_rk_init(&g_ime.rk);
     tvram_set_scroll_reserve(g_ime.mode != IME_MODE_OFF ? 1 : 0);
     /* OFF leaves the last console row to the app; ON keeps the mode visible. */

@@ -72,6 +72,13 @@ def build(gshell: Path, name: str, quiet: bool = False) -> Path:
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('IMETAB Pass leaves kernel commit', 'src/fep.rs',
+     '    if v >= 0x100 || v == 0x1B {\n        collect_kernel_commit();',
+     '    if v >= 0x100 || v == 0x1B {', 'imetab_'),
+    ('IMETAB dialog key before text', 'src/input.rs',
+     '                fep::flush_text(st);\n                modal::on_key(st, scan, ch, mods);',
+     '                modal::on_key(st, scan, ch, mods);\n                fep::flush_text(st);',
+     'imetab_input_dialog_flushes_before_on_key'),
     ('GUIRUNKEY pending notice does not park', 'src/multiapp.rs',
      '        || mm.key_wait_notice\n', '',
      'guirunkey_reason_waits_for_modal_but_reclaim_does_not'),

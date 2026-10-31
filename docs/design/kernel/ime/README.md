@@ -18,3 +18,5 @@
 
 `static int ime_candidate_key(u8 ascii, u8 scancode)`
 `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す
+
+- [候補確定と透過キーの配送](ime_delivery.md): 共有の確定列・1件保留、取消と park/resume の契約。

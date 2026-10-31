@@ -20,3 +20,5 @@
   カーネル常駐 (SQLite) のまま。
 
 - [set_text_cursor (window.rs)](../../rust/libos32gui/src/window.md#テキストカーソル)
+
+- Pass 時も確定列を回収してモードを同期し、既存 flush で Text を透過キー処理より先に届ける (`feed()` 自体では flush せず、`commit_to()` の元の窓への配送を保つ)。
