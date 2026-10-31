@@ -76,11 +76,8 @@ static void fdc_buf_setup(void)
     u32 dma_off, rest_off;
 
     if (s_dma) return;
-    if (fdc_buf_layout(V2P(s_fdbuf), FDC_BUF_BYTES, FDC_DMA_BUF_SIZE,
-                       &dma_off, &rest_off) != 0) {
-        dma_off = 0;
-        rest_off = FDC_DMA_BUF_SIZE;
-    }
+    (void)fdc_buf_layout(V2P(s_fdbuf), FDC_BUF_BYTES, FDC_DMA_BUF_SIZE,
+                         &dma_off, &rest_off);
     s_dma = s_fdbuf + dma_off;
     s_dma_pa = V2P(s_dma);
     s_slots = s_fdbuf + rest_off;

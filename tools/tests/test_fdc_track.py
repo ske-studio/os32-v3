@@ -5,7 +5,7 @@
 
 実物の drivers/block/fdc_track.c / fdc_decide.c / fdc.c を 1 行も写さずに #include
 して回す。fdc.c のポートは tools/tests/fdc_hostshim/io.h が試験側の µPD765A
-の模型へ回し、tick_count は「読むたびに 1 進む」時計に差し替える。
+の模型へ回し、tick_count は既定 10ms 刻み、整定試験では 1ms 刻みの時計に差し替える。
 
   python3 -B tools/tests/test_fdc_track.py            # ホストで全ケース
   python3 -B tools/tests/test_fdc_track.py --target   # + i386-elf で通す
@@ -366,7 +366,7 @@ MUTATIONS = [
        "    fdc_note_drive(drv);"),
       (r"    /\* 2\. FDC をリセットして実行フェーズを畳む。覚えているシリンダも捨てる。 \*/\n    fdc_forget_all\(\);",
        "    /* 2. */"),
-      (r"        if \(d < FDC_MAX_DRIVES\) s_known_cyl\[d\] = FDC_CYL_UNKNOWN;",
+      (r"        s_known_cyl\[d\] = FDC_CYL_UNKNOWN;",
        "")],
      None,
      "リセットと RECALIBRATE で覚えた値を捨てない (RECALIBRATE が落ちても古い値を信じる)"),
@@ -460,6 +460,14 @@ MUTATIONS = [
      r"    if \(!fdc_crosses_bank\(start, slot\)\) \{",
      "    if (1) {",
      "DMA の窓を常に先頭に置く (境界をまたぐ)"),
+    ("drivers/block/fdc_seek_reset.inc",
+     r"#define FDC_HEAD_SETTLE_TICKS  3",
+     "#define FDC_HEAD_SETTLE_TICKS  2",
+     "整定待ちが tick 境界直前では 15ms を下回る (修正前)"),
+    ("drivers/block/fdc_transfer.inc",
+     r"        st0 = seek_st0;",
+     "        st0 = s_last_seek_st0;",
+     "回復 RECALIBRATE の ST0 を SEEK 失敗の原因として報告する (修正前)"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("drivers/block/fdc_track.c", r"(#include \"fdc_track.h\")", r"\1",
      "対照 (何も変えない)"),

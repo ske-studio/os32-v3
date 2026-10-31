@@ -181,7 +181,7 @@ static void fdc_abort_transfer(void)
  * RECALIBRATE が通ると 0 を覚えるので、続く C=0 の読みは SEEK を省く。
  * 整定を SEEK にだけ任せていると、回復 (リセット + RECALIBRATE) の直後の
  * C=0 の READ が整定前に出る。 */
-#define FDC_HEAD_SETTLE_TICKS  2    /* 約 15ms を tick (10ms) に切り上げ */
+#define FDC_HEAD_SETTLE_TICKS  3    /* 15ms 切り上げ + 開始 tick の端数 (最大 10ms) */
 static void fdc_head_settle(void)
 {
     u32 start = tick_count;
@@ -194,7 +194,6 @@ static int fdc_recalibrate_st0(int drv, u8 *out_st0)
     int rc, attempt;
 
     st0 = 0;
-    rc = FDC_SEEK_FAIL;
 
     /* ヘッドが動く。通るまでは知らないことにする。 */
     fdc_note_drive(drv);

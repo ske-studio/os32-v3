@@ -137,7 +137,7 @@ static int fdc_sense_interrupt(u8 *st0, u8 *cyl)
         int d = (int)(*st0 & FDC_ST0_DS_MASK);
         s_stats.ready_change++;
         fdc_bump_gen(d);
-        if (d < FDC_MAX_DRIVES) s_known_cyl[d] = FDC_CYL_UNKNOWN;
+        s_known_cyl[d] = FDC_CYL_UNKNOWN;
     }
 
     /* 1 バイト応答なら PCN は来ない。MSR でも裏を取る — ST0 の読み方を
