@@ -27,14 +27,13 @@ i386 の保持オブジェクトの合計は 3248B（host ILP32 sizeof と kerne
 オブジェクト間のアラインメント 40B を含み、基点の両 .bss はともに 0B。
 ヒープ・mount／FD 数に応じた増加・1KiB のスタック配列はない。
 
-## D6 の共有契約 (段 1-0)
+## D6 の共有契約
 
-この段は型・定数・extern 宣言だけを追加する。保持領域の実体、関数の実装、
-既存 write からの接続は後段で追加し、現時点の実行時の振る舞いは変えない。
+実体と既存 write の接続は [batch](ext2_file_write_batch.md) が所有する。
 D2 の `EXT2_DATA_RUN_MAX_BLOCKS` と範囲 I/O の宣言は変更しない。
 
 `Ext2WriteWork` は同期 write 1 回につき `(ctx, ino)` 1 組が所有する固定領域。
-後段の batch 実装が `ext2_write_work` を 1 個定義する。create の inode 予約前は
+batch 実装が `ext2_write_work` を 1 個定義する。create の inode 予約前は
 `ino == EXT2_WRITE_NEW_INO` (0)。D1 とは別配列で、D1 reset は D6 を捨てない。
 begin は D1 を全失効し、begin/finish/abort は D6 の全 valid を落とす。
 既存 scratch と同じ非再入・操作中の別 ext2 操作への協調切替なしを前提とする。
@@ -69,7 +68,7 @@ data_done(n) は成功 prefix を n 件前進させる。失敗した範囲要�
 最大 32 件で切る。データの大きなコピーや次窓の先読みは追加しない。
 
 commit_window は未完了 suffix を trim し、data 成功→bitmap→下位表→上位表→
-inode の順で公開。clean 枠は次窓へ保持し、窓開始 inode と件数を更新する。
+inode の順で公開。create/全置換はdefer_inodeにより最終finishまでinodeを保留する。clean 枠は次窓へ保持し、窓開始 inode と件数を更新する。
 finish は残りの窓/inode を排出して閉じ、従来の sync は呼び手が完了する。
 create は finish→既存 add_entry→sync、stream の短い正値は対応する inode と
 sync の成功後だけ返す。inode/sync IO では過去の窓が成功していても IO を返す。

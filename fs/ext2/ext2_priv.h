@@ -24,8 +24,8 @@ extern u8 ext2_g_blk[EXT2_BLOCK_SIZE];
 extern u8 ext2_g_aux[EXT2_BLOCK_SIZE];
 extern u8 ext2_g_dat[EXT2_BLOCK_SIZE]; /* ext2_write_stream データ読み書き専用 */
 
-/* D6: 同期 write 1 回だけが所有する作業領域。ここでは型・宣言だけを固定し、
- * 実体と既存 write への接続は後段で追加する。D1 の読取枠とは共有しない。 */
+/* D6: 同期 write 1 回だけが所有する作業領域。bitmap/表/inode と窓の進捗を保持する。
+ * 実体は ext2_file_write_batch.inc。D1 の読取枠とは共有しない。 */
 #define EXT2_WRITE_WINDOW_BLOCKS 64u
 #define EXT2_WRITE_TABLE_SLOTS 3u /* 上位 1 枚 + 単間接/下位 2 枚 */
 #define EXT2_WRITE_UPPER_SLOT 0u
@@ -98,6 +98,7 @@ typedef struct {
     u32 table_count;
     u32 data_done; /* 成功した先頭 data 件数。失敗 run は一件も含めない */
     u8 active;
+    u8 defer_inode; /* create/全置換: 全データ完成まで inode を公開しない */
 } Ext2WriteWork;
 
 /* 既存の native host 模型では u32 == unsigned long が 64bit になる。
@@ -268,6 +269,8 @@ int ext2_truncate_blocks(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode, int *leaked);
 /* 写し blocks[EXT2_N_BLOCKS] が指すブロックを返す。**写しの参照が媒体上の
  * どこからも辿れないこと**が前提。戻り値 EXT2_ERR_IO = 一部を返せず漏れた。 */
 int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks);
+/* D6 未公開 builder の後始末。同じ解放処理だが metadata IO 後は書かない。 */
+int ext2_write_release_blocks(Ext2Ctx *ctx, const u32 *blocks);
 
 /* -- ext2_dir.c -- */
 /* 項目の名前として載せてよいか。空・"."・".."・EXT2_NAME_LEN 超え・"/" 入りは

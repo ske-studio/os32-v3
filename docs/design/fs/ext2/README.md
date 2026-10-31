@@ -29,3 +29,8 @@ fmt_ctxは元関数のstaticのままポインタ渡し。ext2_g_blkも元の共
 - [ext2_file_read_cache](ext2_file_read_cache.md)
 - [ext2_file_read_run](ext2_file_read_run.md)
 - [ext2_priv](ext2_priv.md)
+
+- [ext2_inode_write_bitmap](ext2_inode_write_bitmap.md)
+- [ext2_inode_write_bmap](ext2_inode_write_bmap.md)
+- [ext2_inode_write_cache](ext2_inode_write_cache.md)
+- [ext2_file_write_batch](ext2_file_write_batch.md)

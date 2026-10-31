@@ -138,6 +138,31 @@ int ext2_find_entry(Ext2Ctx *c, u32 d, const char *n, u32 *o, u8 *t)
 u32 ext2_current_time(void) { return 0; }
 int ext2_sync(Ext2Ctx *c) { (void)c; return 0; }
 
+/* D6's write-only inode boundary is linked by ext2_file.c but must never be
+ * entered by this read-only fixture. Fail loudly if a read crosses it. */
+static int unexpected_write(void) { CHECK(0); return EXT2_ERR_IO; }
+void ext2_read_cache_reset(void) { ext2_data_cache_reset(); }
+int ext2_write_release_blocks(Ext2Ctx *c, const u32 *b)
+{ (void)c; (void)b; return unexpected_write(); }
+int ext2_write_bitmap_reserve_inode(Ext2Ctx *c, u32 *i)
+{ (void)c; (void)i; return unexpected_write(); }
+int ext2_write_inode_load(Ext2Ctx *c, u32 i, const Ext2Inode *n)
+{ (void)c; (void)i; (void)n; return unexpected_write(); }
+int ext2_write_bmap_get(Ext2Ctx *c, u32 l, u32 *p)
+{ (void)c; (void)l; (void)p; return unexpected_write(); }
+int ext2_write_bitmap_reserve(Ext2Ctx *c, u32 *p)
+{ (void)c; (void)p; return unexpected_write(); }
+int ext2_write_bmap_set(Ext2Ctx *c, u32 l, u32 p)
+{ (void)c; (void)l; (void)p; return unexpected_write(); }
+void ext2_write_bmap_trim(Ext2Ctx *c)
+{ (void)c; (void)unexpected_write(); }
+int ext2_write_bitmap_commit(Ext2Ctx *c)
+{ (void)c; return unexpected_write(); }
+int ext2_write_bmap_commit(Ext2Ctx *c)
+{ (void)c; return unexpected_write(); }
+int ext2_write_inode_commit(Ext2Ctx *c)
+{ (void)c; return unexpected_write(); }
+
 #include "../../fs/ext2/ext2_file.c"
 
 /* ======================================================================== */
