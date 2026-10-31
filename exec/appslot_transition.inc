@@ -7,24 +7,8 @@ int appslot_park_check(void)
 {
     AppSlot *a;
 
-    if (g_cur < APP_ID_MIN || g_cur > APP_ID_MAX) {
-        /* 走っているアプリが居ない (WM top-level / シェル)。WM の規約違反。 */
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
+    if (appslot_park_kbd_check() < 0) return OS32_ERR_INVAL;
     a = appslot_get(g_cur);
-    if (!a || a->state != APP_STATE_RUNNING) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    /* 塞がない起動 (exec_start) で立ったアプリだけが park できる。
-     * CUI の入れ子 exec_run の子を park すると、longjmp の行き先が
-     * 「走っている親アプリの中の exec_run フレーム」になり、WM top-level へ
-     * 戻れない。親は子の終了まで塞がっているので譲る相手も居ない (D4)。 */
-    if (!a->gui) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
     /* 「OP_WAIT の中」でだけ譲る (契約 T2a、受入 G7)。他の op / X1 / X2 / X4
      * から呼ばれたら park させずに弾く — WM の行儀を信じない (D0)。 */
     if (!g_cur_op_is_wait || !a->in_op_wait) {
@@ -43,16 +27,13 @@ static void appslot_park_finish(AppSlot *a, int state)
     res_owner_set(APP_ID_SHELL);
 }
 
+#include "appslot_park.inc"
+
 void appslot_park_commit(void)
 {
     AppSlot *a = appslot_get(g_cur);
     if (!a) return;
-    /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
-    redir_switch_out(g_cur);
-    a->parked_from_wait = 1;      /* 「OP_WAIT 由来」の印 (C5) */
-    a->stop_wm_req = 0;
-    g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    appslot_park_finish(a, APP_STATE_PARKED);
+    appslot_park_commit_origin(a, &a->parked_from_wait, APP_STATE_PARKED);
 }
 
 /* ---- 第 2 の park 点: GUI 中の kbd 待ち (票 K7 D1) --------------------- */
@@ -87,12 +68,7 @@ void appslot_park_kbd_commit(void)
 {
     AppSlot *a = appslot_get(g_cur);
     if (!a) return;
-    /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
-    redir_switch_out(g_cur);
-    a->parked_from_kbd = 1;       /* 「kbd 待ち由来」の印 (K7 D1) */
-    a->stop_wm_req = 0;
-    g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    appslot_park_finish(a, APP_STATE_WAIT_KEY);
+    appslot_park_commit_origin(a, &a->parked_from_kbd, APP_STATE_WAIT_KEY);
     ring3_kbd_park_count++;
 }
 
@@ -105,8 +81,6 @@ void appslot_park_kbd_commit(void)
  * (ホスト試験ケース 22 の 22M / 22N がこの順番だけを見る)。 */
 int appslot_park_poll_check(u32 now_tick)
 {
-    AppSlot *a;
-
     /* 間引き (10ms に 1 回まで)。控えるのは **成立ではなく試み** で、表の側で
      * 弾かれた試みもここで止める — 譲れない文脈 (CUI の入れ子 exec_run の子)
      * が秒間数万回ポーリングしても ring3_park_reject_count が跳ね上がらない
@@ -116,34 +90,14 @@ int appslot_park_poll_check(u32 now_tick)
     if (now_tick == g_poll_last_tick) return OS32_ERR_AGAIN;
     g_poll_last_tick = now_tick;
 
-    if (g_cur < APP_ID_MIN || g_cur > APP_ID_MAX) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    a = appslot_get(g_cur);
-    if (!a || a->state != APP_STATE_RUNNING) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    /* CUI の入れ子 exec_run の子は譲れない (park_kbd_check と同じ理由:
-     * longjmp の行き先が親アプリの中の exec_run フレームになる)。 */
-    if (!a->gui) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    return 0;
+    return appslot_park_kbd_check();
 }
 
 void appslot_park_poll_commit(void)
 {
     AppSlot *a = appslot_get(g_cur);
     if (!a) return;
-    /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
-    redir_switch_out(g_cur);
-    a->parked_from_poll = 1;      /* 「ポーリング由来」の印 (T8 D8) */
-    a->stop_wm_req = 0;
-    g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    appslot_park_finish(a, APP_STATE_WAIT_POLL);
+    appslot_park_commit_origin(a, &a->parked_from_poll, APP_STATE_WAIT_POLL);
     /* 控え (g_poll_last_tick) を進めるのは check の側 — 弾かれた試みも
      * 間引きたいので、成立した分だけでは足りない。 */
     ring3_poll_yield_count++;
@@ -168,12 +122,7 @@ void appslot_park_yield_commit(void)
 {
     AppSlot *a = appslot_get(g_cur);
     if (!a) return;
-    /* 票 T9 §12 T1: リダイレクト表を ID の文脈として持ち替える。 */
-    redir_switch_out(g_cur);
-    a->parked_from_yield = 1;     /* 「明示的な譲り由来」の印 (T9 D5) */
-    a->stop_wm_req = 0;
-    g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    appslot_park_finish(a, APP_STATE_WAIT_POLL);
+    appslot_park_commit_origin(a, &a->parked_from_yield, APP_STATE_WAIT_POLL);
     ring3_yield_count++;
 }
 

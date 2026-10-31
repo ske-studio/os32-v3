@@ -44,7 +44,8 @@ def exec_sources(sources):
             'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
             'exec_restore_context', 'exec_park_transfer', 'exec_park', 'exec_resume'))
     sources['slot_source.inc'] = '\n'.join(function(sources['slot_source.inc'], name)
-        for name in ('appslot_park_check', 'appslot_park_finish', 'appslot_park_commit',
+        for name in ('appslot_park_kbd_check', 'appslot_park_check', 'appslot_park_finish',
+                     'appslot_park_commit_origin', 'appslot_park_commit',
                      'appslot_resume_check',
                      'appslot_resume_source', 'appslot_resume_commit', 'appslot_mark_scheduled'))
 
@@ -55,7 +56,8 @@ def run(mutation=None):
         name, source, old, new, expected = mutation
         assert sources[source].count(old) == 1, (name, sources[source].count(old))
         sources[source] = sources[source].replace(old, new)
-    sources['slot_source.inc'] += (ROOT / 'exec/appslot_transition.inc').read_text()
+    sources['slot_source.inc'] += (ROOT / 'exec/appslot_transition.inc').read_text().replace(
+        '#include "appslot_park.inc"', (ROOT / 'exec/appslot_park.inc').read_text())
     exec_sources(sources)
     with tempfile.TemporaryDirectory(prefix='x11-shared-') as directory:
         work = pathlib.Path(directory)

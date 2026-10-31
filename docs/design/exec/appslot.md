@@ -13,6 +13,9 @@ GUI STOP の WM 返却要求だけが **正常 syscall 完了後**に退避す�
 第5由来は WAIT_POLL の内部印 `parked_from_stop`、resume は保存 EAX を維持し、
 注入リングを読まない。X4 自体は退避も宛先解決もしない。
 
+OP_WAIT / kbd / poll / yield の共通更新と資格判定の順は
+[appslot_park](appslot_park.md) を参照。
+
 ## stdin の KBD 再開
 
 未完了の sys_read は AppSlot の進捗を保持し、KBD 再開時に文字を残して syscall を再実行する。
