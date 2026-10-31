@@ -1,5 +1,5 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
-TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc']
+TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc']
 
 from exec_source import exec_source
 import host32
@@ -22,6 +22,9 @@ def sources():
     trim_end = result['guards'].index('\n}', trim_start) + 2
     result['guards'] = result['guards'][:trim_start] + result['guards'][trim_end:]
     result['db'] = (walk.ROOT / 'kapi/kapi_db.c').read_text()
+    for name in ('kapi_db_helpers.inc', 'kapi_db_v50.inc', 'kapi_db_selftest.inc'):
+        result['db'] = result['db'].replace('#include "' + name + '"',
+                                            (walk.ROOT / 'kapi' / name).read_text())
     result['strings'] = (walk.ROOT / 'kapi/kapi_strings.c').read_text()
     start = src.index('int exec_disk_write_allowed(void)')
     result['disk_policy'] = src[start:src.index('\n}', start) + 2]
@@ -86,7 +89,7 @@ def main():
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, walk.ROOT)
     paths = [walk.ROOT / p for p in list(walk.FILES.values()) +
-             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'kapi/kapi_strings.c', 'fs/vfs.c',
+             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'fs/vfs.c',
               'kapi/kapi_generated.c', 'userland/tests/db_v50_test.c', 'tools/tests/db_caller_host.c']]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     src = sources()

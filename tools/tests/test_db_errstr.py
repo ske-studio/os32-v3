@@ -29,7 +29,7 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 規則にして、`kapi/kapi_db.c` がこの名前を 1 回も出さないことを見る。
 """
 CHECK = dict(name='db-errstr-host', tier=1,
-    covers=['fs/vfs_fd.c', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['fs/vfs_fd.c', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'kapi/kapi_db_*.inc'],
     needs=[], budget=10.560164)
 
 from exec_source import exec_source
@@ -137,6 +137,9 @@ def run_owned_cases(mutate):
             paths = ['kapi/kapi_db.c']
             for path in paths:
                 source = (ROOT / path).read_text()
+                for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
+                    source = source.replace('#include "' + name + '"',
+                                            (ROOT / "kapi" / name).read_text(encoding="utf-8"))
                 # Mutate each public guard independently: omitted, inverted,
                 # or incorrectly applied to TRUSTED calls.
                 guards = []
@@ -183,6 +186,9 @@ def check_no_block_size(root=ROOT):
     `DB_SHM_RESULT_LIMIT` (= 診断領域を除いた分) からだけ導く。
     """
     src = (root / "kapi/kapi_db.c").read_text(encoding="utf-8")
+    for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
+        src = src.replace('#include "' + name + '"',
+                          (root / "kapi" / name).read_text(encoding="utf-8"))
     hits = [n for n, line in enumerate(src.splitlines(), 1)
             if "DB_SHM_BLOCK_SIZE" in line]
     if hits:
@@ -219,6 +225,9 @@ def build_api(tmp, sqlite_obj, san):
 
 def run_api_mutations(tmp, sqlite_obj, exe):
     original = (ROOT / "kapi/kapi_db.c").read_text()
+    for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
+        original = original.replace('#include "' + name + '"',
+                                    (ROOT / "kapi" / name).read_text(encoding="utf-8"))
     guard = ("    if (!db_copy_input(sql, sql_copy_buf, SQL_COPY_BUF_SIZE, 1) ||\n"
              "        !sql_copy_buf[0]) return -1;")
     assert original.count(guard) == 3
@@ -274,19 +283,19 @@ MUTATIONS = [
      "run"),
     # 1. 上限の引き算を 1 か所だけ元に戻す (事前検査の payload 側)。
     #    → 上限を超える行が ROW として通り、診断領域を勘定に入れなくなる。
-    ("kapi/kapi_db.c",
+    ("kapi/kapi_db_helpers.inc",
      "    if (payload > (u32)DB_SHM_RESULT_LIMIT - need) return 0;",
      "    if (payload > (u32)DB_SHM_BLOCK_SIZE - need) return 0;",
      "run"),
     # 2. 1 回の db_exec のエラー欄の上限を元に戻す。
     #    → 長い診断文がそのまま診断領域へ流れ込む。
-    ("kapi/kapi_db.c",
+    ("kapi/kapi_db_helpers.inc",
      "    max_len = DB_SHM_RESULT_LIMIT - data_start - 1;",
      "    max_len = DB_SHM_BLOCK_SIZE - data_start - 1;",
      "run"),
     # 3. writer 側の残り容量を元に戻す。事前検査が先に断つので**実行時には
     #    見えない** — 静的な番人だけが捕まえる (この試験の要点の 1 つ)。
-    ("kapi/kapi_db.c",
+    ("kapi/kapi_db_helpers.inc",
      "        i32 remaining = DB_SHM_RESULT_LIMIT - data_offset;",
      "        i32 remaining = DB_SHM_BLOCK_SIZE - data_offset;",
      "source"),
@@ -310,12 +319,12 @@ MUTATIONS = [
      '        return "";',
      "run"),
     # 7. 切り詰めで NUL を置き忘れる (切った側)。
-    ("kapi/kapi_db.c",
+    ("kapi/kapi_db_helpers.inc",
      "    dst[len + mark] = '\\0';",
      "    if (len == 0u) dst[len + mark] = '\\0';",
      "run"),
     # 8. 切り詰めの上限を診断領域いっぱいに広げる (空文字列の 1 バイトを潰す)。
-    ("kapi/kapi_db.c",
+    ("kapi/kapi_db_helpers.inc",
      "    u32 cap = (u32)DB_SHM_ERRSTR_MAX - 1u;",
      "    u32 cap = (u32)DB_SHM_DIAG_SIZE;",
      "run"),
@@ -324,7 +333,9 @@ MUTATIONS = [
 
 def run_mutations(tmp, sqlite_obj, san):
     """Each mutation lives in an isolated tree, including the static guard input."""
-    real = {"tools/tests/db_errstr_host.c", "kapi/kapi_db.c"}
+    real = {"tools/tests/db_errstr_host.c", "kapi/kapi_db.c",
+            "kapi/kapi_db_helpers.inc", "kapi/kapi_db_v50.inc",
+            "kapi/kapi_db_selftest.inc"}
     control = mutpar.mutant_tree(ROOT, tmp / "control-tree", {}, real=real)
     exe = build(tmp, "control", sqlite_obj, san, root=control)
     if exe is None or run_cases(exe, CASES, root=control) or check_no_block_size_quiet(control):

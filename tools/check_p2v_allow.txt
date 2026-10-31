@@ -16,11 +16,11 @@ kdebug/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リ�
 kdebug/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
 kernel/v86/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
 kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db_selftest.inc:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db_helpers.inc:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db_helpers.inc:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db_helpers.inc:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+kapi/kapi_db_helpers.inc:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db.c:kapi_db_column_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 init/kernel.c:kernel_main:KHEAP_BASE は __bss_end 由来の仮想ポインタ
 arch/x86/kernel/isr_handlers.c:exc_dump_stack_trace:例外時の仮想スタック番地。物理への変換をしない
