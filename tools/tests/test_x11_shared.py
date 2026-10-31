@@ -41,9 +41,10 @@ def exec_sources(sources):
     sources['exec_source.inc'] = constants + '\n' + context + '\n' + '\n'.join(
         function(source, name) for name in (
             'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
-            'exec_restore_context', 'exec_park', 'exec_resume'))
+            'exec_restore_context', 'exec_park_transfer', 'exec_park', 'exec_resume'))
     sources['slot_source.inc'] = '\n'.join(function(sources['slot_source.inc'], name)
-        for name in ('appslot_park_check', 'appslot_park_commit', 'appslot_resume_check',
+        for name in ('appslot_park_check', 'appslot_park_finish', 'appslot_park_commit',
+                     'appslot_resume_check',
                      'appslot_resume_source', 'appslot_resume_commit', 'appslot_mark_scheduled'))
 
 
@@ -143,8 +144,8 @@ MUTATIONS = [
      '', 'FAIL IMECAND input lifetime cancels all transient state'),
 
     ('park-clears-candidates', 'exec_source.inc',
-     '    appslot_park_commit();      /* PARKED + 印 + owner 1 へ */',
-     '    ime_init();\n    appslot_park_commit();',
+     '    exec_park_transfer(id, a, g_cur_frame, appslot_park_commit);',
+     '    ime_init();\n    exec_park_transfer(id, a, g_cur_frame, appslot_park_commit);',
      'FAIL real park preserves candidate and dictionary'),
     ('resume-clears-output', 'exec_source.inc',
      '    appslot_resume_commit((int)app_id);',

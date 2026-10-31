@@ -24,10 +24,10 @@ TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'exec/exec_schedule.inc', 'kerne
          'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
          CACHE, WM, APP, STUB]
 MUTANTS = [
-    ('stop-leaves-bit', SLOT, '    slot_zero(a);\n    a->state = APP_STATE_FREE;',
+    ('stop-leaves-bit', SLOT, '    slot_zero(a);\n    appslot_reclaim_count++;',
      '    u32 pending = a->trim_pending, epoch = a->trim_epoch;\n'
      '    slot_zero(a); a->trim_pending = pending; a->trim_epoch = epoch;\n'
-     '    a->state = APP_STATE_FREE;', 2, 'STOP slot trim cleared'),
+     '    appslot_reclaim_count++;', 2, 'STOP slot trim cleared'),
     ('wm-forget-missing', WM,
      '(*SENT.0.get())[(id - multiapp::APP_ID_MIN) as usize] = false;',
      'let _ = id;', 1, 'WM sent cleared'),

@@ -73,8 +73,8 @@ RESIDENT_MUTATIONS = [
     ('exec', '*sbrk_limit = base;',
      '*sbrk_limit = base + (heap ? MEM_SHELL_EXEC_HEAP_SIZE - heap : 0);',
      'tiny heap tail reserved'),
-    ('exec', 'ctx->exec_heap_size = exec_heap_size;\n        kapi->sbrk_heap_limit = sbrk_end;',
-     'ctx->exec_heap_size = exec_heap_size;\n        kapi->sbrk_heap_limit = sbrk_end + exec_heap_size;',
+    ('exec', '    kapi->sbrk_heap_limit = sbrk_end;',
+     '    kapi->sbrk_heap_limit = sbrk_end + exec_heap_size;',
      'resident handoff limit'),
 ]
 
@@ -97,12 +97,16 @@ def resident_heap(prefix, work, mutant=None):
         start = source.index(signature)
         parts.append(source[start:source.index('\n}', start) + 2])
     # Exercise the product launch handoff, not a fixture assignment to KAPI.
-    start = source.index('    /* ヒープ・ガードページ設定 */')
+    start = source.index('    ctx->exec_heap_base = exec_heap_base;')
+    end = source.index('    ctx->cpl3 = 0;', start)
+    parts.append('static void resident_slot(AppSlot *ctx, u32 sbrk_end, '
+                 'u32 exec_heap_base, u32 exec_heap_size) {\n' + source[start:end] + '\n}')
+    start = source.index('    kapi->sbrk_heap_limit = sbrk_end')
     end = source.index('    {\n        u32 argv_addr;', start)
     parts.append('''
 static void resident_handoff(AppSlot *ctx, u32 sbrk_end, u32 exec_heap_base,
                              u32 exec_heap_size) {
-    int is_shell = 1;
+    resident_slot(ctx, sbrk_end, exec_heap_base, exec_heap_size);
 ''' + source[start:end] + '\n}')
     (work / 'resident_exec.inc').write_text('\n'.join(parts))
     inc = (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'sdk/allocator')] + include_flags(ROOT))

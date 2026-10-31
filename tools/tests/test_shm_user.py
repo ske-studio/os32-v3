@@ -78,7 +78,11 @@ MUTATIONS = (
     ('boot-once', 'mm/paging.c', 'boot_user_shared_done || live_addrspaces || !pg_enabled',
      'live_addrspaces || !pg_enabled', 'FAIL boot once'),
     ('shm-range', 'mm/paging.c',
-     'base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||', '', 'FAIL SHM foreign USER range'),
+     'if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||',
+     # Accept the foreign range before the SHM audit bitmap is indexed.
+     # Deleting the guard now crashes there instead of reaching the assertion.
+     'if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE) return 0;\n    if (',
+     'FAIL SHM foreign USER range'),
     ('shm-user-missing', 'mm/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
     ('v86-restore', 'mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
     ('boot-order', 'init/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',

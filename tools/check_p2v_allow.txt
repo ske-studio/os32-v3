@@ -62,8 +62,8 @@ fs/hostdrv/hostdrvfs.c:setup_query_info:NP21/W IA32 は線形 (CR3 越し) で�
 fs/hostdrv/hostdrvfs.c:setup_query_dir:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
 fs/hostdrv/hostdrvfs.c:hostdrv_read:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
 kapi/kapi_db.c:kapi_db_exec:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
-kapi/kapi_db.c:kapi_db_prepare:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
-kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
+kapi/kapi_db.c:slot_step_result:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、prepare/step の共通処理)
+kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、active_stmt が無い DONE 経路)
 drivers/pci/pci.c:pci_get:呼び手の仮想出力ポインタの型変換
 gfx/gfx_core_bridge.inc:gfx_framebuffer_bridge:公開 USER 橋。lease 表の base + plane_offset はアプリの仮想番地。物理変換せず B1 出力値にする
 kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物理番地ではなく、kernel から参照しない)

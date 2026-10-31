@@ -178,13 +178,14 @@ static u32 shlib_data_pages(void) { return 10; }
 static u32 pgalloc_free_pages(void) { return available; }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; errors++; }
 static void shell_print_dec(u32 n, u8 attr) { (void)n; (void)attr; }
-static void exec_restore_band(int id) { (void)id; restored++; }
+/* Admission rejects before switching context; neither path needs a restore. */
+void exec_restore_context(int id) { (void)id; restored++; }
 '''+funcs+'''
 static int launch(u32 image, u32 stack) {
     u32 load_base=MEM_EXEC_LOAD_ADDR, sbrk_end=PAGE_ALIGN_UP(load_base+image)+PAGE_SIZE;
     u32 exec_heap_size=MEM_EXEC_HEAP_MIN, stack_size=stack ? stack : MEM_EXEC_STACK_SIZE;
     u32 need_pages;
-    int want_ring3=1, gui=0, launcher_id=1;
+    int want_ring3=1, gui=0;
 '''+gate+'''
     entered++; /* host entry boundary, reached only after admission */
     return 0;
@@ -198,7 +199,7 @@ void _start(void) {
         u32 need=exec_ring3_pages(MEM_EXEC_LOAD_ADDR,
             PAGE_ALIGN_UP(MEM_EXEC_LOAD_ADDR+image)+PAGE_SIZE,MEM_EXEC_HEAP_MIN,stack);
         entered=errors=restored=0; available=need-1;
-        if(launch(image,stack)!=EXEC_ERR_NOMEM || entered || !errors || restored!=1) rc=1;
+        if(launch(image,stack)!=EXEC_ERR_NOMEM || entered || !errors || restored) rc=1;
         entered=errors=restored=0; available=need;
         if(launch(image,stack) || entered!=1 || errors || restored) rc=1;
     }

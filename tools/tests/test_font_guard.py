@@ -34,7 +34,7 @@ X87 = re.compile(r'^\s*[0-9a-f]+:\t(?:[0-9a-f]{2} )+\s*\t(f[a-z0-9]*|wait)\b', r
 def run(parts, work, name, expected=None):
     (work / 'guard.c').write_text(parts[0])
     (work / 'exec.inc').write_text('\n'.join(function(parts[1], n) for n in (
-        'ring3_abort_check', 'exec_park', 'exec_park_kbd', 'exec_park_poll',
+        'ring3_abort_check', 'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll',
         'exec_sys_yield', 'exec_park_stop')))
     handlers = ''.join(function(parts[2], n).split(marker)[0] + '}\n'
                        for n, marker in (

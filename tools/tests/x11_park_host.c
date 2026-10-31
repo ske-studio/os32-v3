@@ -33,7 +33,6 @@ void caller_access_leave(const volatile CallerAccessFrame *saved) { (void)saved;
 void caller_access_invalidate(void) {}
 static void redir_switch_out(int id) { (void)id; }
 static void redir_switch_in(int id) { (void)id; }
-static void ring3_band_set(u32 n) { (void)n; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd) { cr3 = pd; }
 int paging_v86_session_open(void) { return 0; }
