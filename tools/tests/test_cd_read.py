@@ -24,7 +24,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=12.534032)
 
 from kernel_boot_source import kernel_parts, kernel_source
@@ -58,7 +58,7 @@ READ_CASES = ["empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4
               "np2_stuck", "np2_ua_init", "np2_becoming_ready", "np2_no_medium",
               "np2_ready_total", "np2_srst", "ua_multi",
               "np2_spinup", "np2_srst_long", "np2_boot_worst", "np2_start_unit",
-              "np2_bus_dead"]
+              "np2_bus_dead", "poll_clock", "srst_clock", "pio_bounds"]
 # N = 32 の版で回すもの (1 回 64KB)
 WIDE_CASES = ["stream_4k", "stream_32k", "read_file", "multi_drq", "multi_fallback",
               "np2_read", "np2_async", "np2_sel_lag", "np2_stuck"]
@@ -204,6 +204,19 @@ def run_all(exes, tmp, quiet=False, keys=EXE_KEYS, first_fail=False, replay=None
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ファイル, パターン, 置換, 説明)。最後の 1 本は対照 (何も変えない)。
 MUTATIONS = [
+    # --- TASK_BLOCKDEV_PERF L2 (時計と PIO 境界)
+    ("drivers/ata/atapi.h", r"#define ATAPI_FAST_POLL_US      10UL",
+     "#define ATAPI_FAST_POLL_US      100UL", "短い待ちも従来の 100us に戻す"),
+    ("drivers/ata/atapi.h", r"#define ATAPI_FAST_POLLS        20UL",
+     "#define ATAPI_FAST_POLLS        21UL", "短い待ちを 1 回余分に続ける"),
+    ("drivers/ata/atapi.h", r"#define ATAPI_POLL_US           100UL",
+     "#define ATAPI_POLL_US           10UL", "長い待ちも 10us のままにする"),
+    ("drivers/ata/atapi.c", r"    cpu_delay_us\(ATAPI_SRST_HOLD_US\);",
+     "    cpu_delay_us(4);", "SRST の保持が規定の 5us を下回る"),
+    ("drivers/ata/atapi.c", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
+     "if (!(xfer_size & 1))", "高速路でバッファの上限を無視する"),
+    ("drivers/ata/atapi.c", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
+     "if (end <= buf_size)", "奇数 DRQ の端数まで 16bit 格納する"),
     # --- drivers/ata/atapi.c
     ("drivers/ata/atapi.c",
      r"u32 n = \(count < ATAPI_READ_MAX_SECTORS\) \? count : ATAPI_READ_MAX_SECTORS;",
@@ -470,11 +483,11 @@ MUTATIONS = [
      "READ(10) の UNIT ATTENTION を 1 回しか出し直さない (レビュー 2 の P3)"),
     # --- TASK_ATAPI_TIMEOUT (待ちの上限を秒で、SRST の 31 秒、START UNIT)
     ("drivers/ata/atapi.c",
-     r"    u32 waited = 0;\n    for \(;;\) \{\n        if \(!\(atapi_status\(\) & mask\)\) return ATAPI_OK;\n        if \(waited >= limit_us\) return ATAPI_ERR_TIMEOUT;\n        cpu_delay_us\(ATAPI_POLL_US\);\n        waited \+= ATAPI_POLL_US;\n    \}",
+     r"    u32 waited = 0;\n    for \(;;\) \{\n        if \(!\(atapi_status\(\) & mask\)\) return ATAPI_OK;\n        if \(waited >= limit_us\) return ATAPI_ERR_TIMEOUT;\n        atapi_poll_delay\(&waited\);\n    \}",
      "    int timeout = IDE_TIMEOUT_LOOP;\n    (void)limit_us;\n    while (timeout-- > 0) {\n        if (!(atapi_status() & mask)) return ATAPI_OK;\n    }\n    return ATAPI_ERR_TIMEOUT;",
      "BSY / DRQ の待ちの上限を回数 (IDE_TIMEOUT_LOOP 回の inp) に戻す (直す前の姿)"),
     ("drivers/ata/atapi.c",
-     r"        if \(waited >= s_wait_limit_us\) return ATAPI_ERR_TIMEOUT;\n        cpu_delay_us\(ATAPI_POLL_US\);\n        waited \+= ATAPI_POLL_US;\n    \}\n\}",
+     r"        if \(waited >= s_wait_limit_us\) return ATAPI_ERR_TIMEOUT;\n        atapi_poll_delay\(&waited\);\n    \}\n\}",
      "        if (++waited >= IDE_TIMEOUT_LOOP) return ATAPI_ERR_TIMEOUT;\n    }\n}",
      "CDB の DRQ の待ちの上限を回数に戻す"),
     ("drivers/ata/atapi.h",

@@ -23,6 +23,10 @@
 #define ATAPI_PRESENT_SLAVE   0x02
 #define ATAPI_PIO_BCL_MIN     2
 
+/* 呼び手のバッファや奇数長 DRQ の次の位置は、ワード境界とは限らない。
+ * x86 の非整列 16bit 格納を使い、元のバッファの型とも別名参照できるようにする。 */
+typedef u16 AtapiPioWord __attribute__((aligned(1), may_alias));
+
 /* === 内部状態 === */
 static int cdrom_present = 0;
 /* 使う装置の選択 (DRV_HEAD に書く値)。セカンダリのマスター = 0x00、
@@ -87,8 +91,17 @@ static u8 atapi_status(void)
     return st;
 }
 
+/* 短い遷移を細かく確認し、長い待ちは従来の間隔に戻す。 */
+static void atapi_poll_delay(u32 *waited)
+{
+    u32 us = (*waited < ATAPI_FAST_POLLS * ATAPI_FAST_POLL_US)
+             ? ATAPI_FAST_POLL_US : ATAPI_POLL_US;
+    cpu_delay_us(us);
+    *waited += us;
+}
+
 /* ALT_STATUS の mask のビットが全部落ちるまで、最大 limit_us 待つ。
- * 読むごとに cpu_delay_us(ATAPI_POLL_US) を挟み、挟んだ時間の合計で数える
+ * 読み直す間に atapi_poll_delay を挟み、挟んだ時間の合計で数える
  * (時間の上限。回数ではない — atapi.h「待ちの上限」)。すぐ落ちていれば待たない */
 static int atapi_wait_clear(u8 mask, u32 limit_us)
 {
@@ -96,8 +109,7 @@ static int atapi_wait_clear(u8 mask, u32 limit_us)
     for (;;) {
         if (!(atapi_status() & mask)) return ATAPI_OK;
         if (waited >= limit_us) return ATAPI_ERR_TIMEOUT;
-        cpu_delay_us(ATAPI_POLL_US);
-        waited += ATAPI_POLL_US;
+        atapi_poll_delay(&waited);
     }
 }
 
@@ -125,8 +137,7 @@ static int atapi_wait_drq(void)
             if (st & IDE_ST_DRQ) return ATAPI_OK;
         }
         if (waited >= s_wait_limit_us) return ATAPI_ERR_TIMEOUT;
-        cpu_delay_us(ATAPI_POLL_US);
-        waited += ATAPI_POLL_US;
+        atapi_poll_delay(&waited);
     }
 }
 
@@ -236,9 +247,8 @@ static int atapi_bus_dead_fail(void)
  * 期限切れならバスが死んだ印 (s_bus_dead) を立てる */
 static int atapi_srst(void)
 {
-    int i;
     outp(IDE_DEV_CTRL, IDE_NIEN | IDE_SRST);
-    for (i = 0; i < ATAPI_SRST_HOLD_LOOP; i++) (void)inp(IDE_ALT_STATUS);
+    cpu_delay_us(ATAPI_SRST_HOLD_US);
     outp(IDE_DEV_CTRL, IDE_NIEN);
     s_cursel = 0x00;
     s_stats.soft_resets++;
@@ -437,11 +447,16 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
          * バイトまで。buf_size を超えた分は読み捨てる */
         words = ((u32)xfer_size + sizeof(u16) - 1) / sizeof(u16);
         end = total_read + xfer_size;
-        for (k = 0; k < words; k++) {
-            u16 w = (u16)inpw(IDE_DATA);
-            u32 b = total_read + k * sizeof(u16);
-            if (b < end && b < buf_size) p[b] = (u8)(w & 0xFF);
-            if (b + 1 < end && b + 1 < buf_size) p[b + 1] = (u8)(w >> 8);
+        if (!(xfer_size & 1) && end <= buf_size) {
+            AtapiPioWord *dst = (AtapiPioWord *)(p + total_read);
+            for (k = 0; k < words; k++) dst[k] = (u16)inpw(IDE_DATA);
+        } else {
+            for (k = 0; k < words; k++) {
+                u16 w = (u16)inpw(IDE_DATA);
+                u32 b = total_read + k * sizeof(u16);
+                if (b < end && b < buf_size) p[b] = (u8)(w & 0xFF);
+                if (b + 1 < end && b + 1 < buf_size) p[b + 1] = (u8)(w >> 8);
+            }
         }
         total_read = end;
         atapi_settle();

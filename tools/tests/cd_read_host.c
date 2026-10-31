@@ -49,9 +49,12 @@ void *kmalloc(u32 size) { return g_kmalloc_fail ? (void *)0 : malloc((size_t)siz
  * 丸める — 丸めを知らずに 250ms を 1 回で頼む書き方はここで待ちが足りなくなる */
 static unsigned long g_delay_us;
 static unsigned long g_delay_calls;
+static u32 g_delay_trace[32];
 void cpu_delay_us(u32 us)
 {
     if (us > CPU_DELAY_US_MAX) us = CPU_DELAY_US_MAX;
+    if (g_delay_calls < sizeof(g_delay_trace) / sizeof(g_delay_trace[0]))
+        g_delay_trace[g_delay_calls] = us;
     g_delay_us += us;
     g_delay_calls++;
 }
@@ -403,9 +406,10 @@ static unsigned int m_inpw(unsigned int port)
     /* 境目の直後 (デバイスがまだ切り替えている間) や、データの外は屑 */
     if (M.lag > 0 || M.phase != 2 || M.pos >= M.blk_end) return 0xFFFF;
     w = (unsigned int)M.data[M.pos];
-    w |= (M.pos + 1 < M.data_len) ? ((unsigned int)M.data[M.pos + 1] << 8) : 0;
+    w |= (M.pos + 1 < M.blk_end) ? ((unsigned int)M.data[M.pos + 1] << 8) : 0;
     M.pos += 2;
-    if (M.pos > M.data_len) M.pos = M.data_len;
+    /* 奇数 DRQ の最後のワードの上位バイトは詰め物。次の DRQ を消費しない。 */
+    if (M.pos > M.blk_end) M.pos = M.blk_end;
     if (M.pos >= M.blk_end) {
         /* ブロックの終わり。しばらく古い状態 (DRQ) を見せる */
         M.lag = M.stale;
@@ -512,6 +516,8 @@ static struct {
     /* SRST を解いた時点の g_delay_us (srst_settling のあいだ 2ms を数える) */
     int srst_settling;
     unsigned long srst_release_us;
+    unsigned long srst_assert_us, srst_hold_us;
+    unsigned long srst_status_reads, srst_hold_reads;
     /* 模型の時計: 贋の cpu_delay_us が待った合計 + ステータスの読み 1 回 = NP2_INP_US */
     unsigned long n_status_reads;
     unsigned long first_devreset_us;   /* 最初の DEVICE RESET を受けた時刻 */
@@ -785,8 +791,14 @@ static void np2_outp(unsigned int port, unsigned int v)
                     if (D->srst_busy_us) D->busy_until = np2_now() + D->srst_busy_us;
                 }
             }
-            if (v & IDE_SRST) N.n_srst++;
+            if (v & IDE_SRST) {
+                N.n_srst++;
+                N.srst_assert_us = g_delay_us;
+                N.srst_status_reads = N.n_status_reads;
+            }
             else {
+                N.srst_hold_us = g_delay_us - N.srst_assert_us;
+                N.srst_hold_reads = N.n_status_reads - N.srst_status_reads;
                 N.drivesel = 0;                  /* リセット後はマスター */
                 if (N.strict) { N.srst_settling = 1; N.srst_release_us = g_delay_us; }
             }
@@ -2159,10 +2171,10 @@ static void t_np2_bus_dead(void)
 /* T2: 起動の最悪時間。atapi_init の待ちの合計 (贋の cpu_delay_us が数えた µs) を
  * 票と docs/05_drivers.md §5-6 の数に固定する。
  * (a) 2 台とも電源投入から BSY のまま (シグネチャも出ない): マスター 5 秒 +
- *     スレーブ 5 秒 + SRST の 2ms + SRST の後 31 秒 = 41.002 秒で「無し」
+ *     スレーブ 5 秒 + SRST の保持 10us + 2ms + SRST の後 31 秒 = 41.002010 秒で「無し」
  * (b) 2 台ともシグネチャは出るが、最初の PACKET で固まる: マスターの容量確認 5 秒 +
- *     スレーブを選ぶ前の待ち 5 秒 + DEVICE RESET の後 5 秒 + SRST 2ms + 31 秒
- *     = 46.002 秒で「マスター」。どちらも init の後の上限は ATAPI_CMD_TIMEOUT_US */
+ *     スレーブを選ぶ前の待ち 5 秒 + DEVICE RESET の後 5 秒 + SRST の保持 10us + 2ms + 31 秒
+ *     = 46.002010 秒で「マスター」。どちらも init の後の上限は ATAPI_CMD_TIMEOUT_US */
 static void t_np2_boot_worst(void)
 {
     AtapiStats st;
@@ -2174,8 +2186,8 @@ static void t_np2_boot_worst(void)
     N.d[0].dead = N.d[1].dead = 1;
     CHECK(atapi_init() == 0);
     printf("boot worst (a): %lu us\n", g_delay_us);
-    CHECK(g_delay_us == 2ul * ATAPI_INIT_TIMEOUT_US + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
-    CHECK(g_delay_us == 41002000ul);
+    CHECK(g_delay_us == 2ul * ATAPI_INIT_TIMEOUT_US + 10ul + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
+    CHECK(g_delay_us == 41002010ul);
     CHECK(s_wait_limit_us == ATAPI_CMD_TIMEOUT_US);
 
     g_np2cfg_no_init = 1;
@@ -2186,8 +2198,8 @@ static void t_np2_boot_worst(void)
     CHECK(atapi_init() == 1);
     CHECK(atapi_drive_index() == 0);
     printf("boot worst (b): %lu us\n", g_delay_us);
-    CHECK(g_delay_us == 3ul * ATAPI_INIT_TIMEOUT_US + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
-    CHECK(g_delay_us == 46002000ul);
+    CHECK(g_delay_us == 3ul * ATAPI_INIT_TIMEOUT_US + 10ul + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
+    CHECK(g_delay_us == 46002010ul);
     CHECK(s_wait_limit_us == ATAPI_CMD_TIMEOUT_US);
     np2_check_protocol();
 
@@ -2201,14 +2213,14 @@ static void t_np2_boot_worst(void)
     printf("boot worst (c): %lu us\n", g_delay_us);
     CHECK(g_delay_us == ATAPI_INIT_TIMEOUT_US);
     /* (d) 同じ機械で 1 台も居ない: シグネチャが無いので SRST し、s_present_mask が空の
-     * まま 0x80 を「マスターの BSY」と見て 31 秒待つ = (a) と同じ 41.002 秒 */
+     * まま 0x80 を「マスターの BSY」と見て 31 秒待つ = (a) と同じ 41.002010 秒 */
     g_np2cfg_no_init = 1;
     setup_np2_layout(0);
     g_np2cfg_no_init = 0;
     N.d[0].present = 0;
     CHECK(atapi_init() == 0);
     printf("boot worst (d): %lu us\n", g_delay_us);
-    CHECK(g_delay_us == 2ul * ATAPI_INIT_TIMEOUT_US + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
+    CHECK(g_delay_us == 2ul * ATAPI_INIT_TIMEOUT_US + 10ul + ATAPI_SRST_SETTLE_US + ATAPI_SRST_TIMEOUT_US);
     g_np2cfg.absent_status = 0xFF;
 }
 
@@ -2383,6 +2395,84 @@ static void t_iso_bad_pvd(void)
     iso9660_ops.umount(ctx);
 }
 
+/* L2: 時計の模型で最初の 20 回は 10us、その後は 100us と確かめる。
+ * BSY / idle / DRQ の各待ちと、DRQ が来ない場合の 10 秒上限も通す。 */
+static void t_poll_clock(void)
+{
+    static const int reads[] = { 0, 1, 19, 20, 21, 23 };
+    setup_np2();
+    atapi_select_bank(1);
+    outp(IDE_DRV_HEAD, 0);
+    for (int mode = 0; mode < 3; mode++) {
+        for (unsigned j = 0; j < sizeof(reads) / sizeof(reads[0]); j++) {
+            int n = reads[j];
+            N.d[0].status = mode == 2 ? IDE_ST_DRQ : 0;
+            N.d[0].busy_left = n;
+            g_delay_us = g_delay_calls = 0;
+            CHECK((mode == 2 ? atapi_wait_drq() : mode == 1 ? atapi_wait_idle()
+                                                          : atapi_wait_bsy()) == ATAPI_OK);
+            CHECK(g_delay_calls == (unsigned)n);
+            CHECK(g_delay_us == (unsigned)(n < 20 ? n * 10 : 200 + (n - 20) * 100));
+            for (int k = 0; k < n; k++) CHECK(g_delay_trace[k] == (k < 20 ? 10u : 100u));
+        }
+        N.d[0].status = 0; /* DRQ が来ない */
+        N.d[0].stuck = mode != 2;
+        g_delay_us = g_delay_calls = 0;
+        CHECK((mode == 2 ? atapi_wait_drq() : mode == 1 ? atapi_wait_idle()
+                                                      : atapi_wait_bsy()) == ATAPI_ERR_TIMEOUT);
+        CHECK(g_delay_us == 10000000ul);
+        CHECK(g_delay_calls == 100018ul);
+        N.d[0].stuck = 0;
+    }
+    N.d[0].status = IDE_ST_ERR | IDE_ST_DRQ;
+    N.d[0].busy_left = 1;
+    g_delay_us = g_delay_calls = 0;
+    CHECK(atapi_wait_drq() == ATAPI_ERR_IO); /* BSY 中の ERR は無視、ERR は DRQ より先 */
+    CHECK(g_delay_us == 10ul);
+    g_delay_us = g_delay_calls = 0;
+    CHECK(atapi_wait_drq() == ATAPI_ERR_IO);
+    CHECK(g_delay_calls == 0);
+}
+
+static void t_srst_clock(void)
+{
+    g_np2cfg.strict = 1;
+    setup_np2();
+    atapi_select_bank(1);
+    unsigned long t0 = g_delay_us;
+    CHECK(atapi_srst() == ATAPI_OK);
+    CHECK(N.srst_hold_us == 10ul);
+    CHECK(N.srst_hold_reads == 0);
+    CHECK(g_delay_us - t0 >= 2010ul);
+    CHECK(N.n_srst_early == 0);
+    CHECK(N.d[0].busy_left == 0);
+}
+
+/* バッファの先頭を奇数番地にし、偶数・奇数 DRQ と余剰データをガードで確認。 */
+static void t_pio_bounds(void)
+{
+    static const u32 chunks[] = { 8, 7, 2, 3 };
+    static const u32 sizes[] = { 0, 3, 8, 9 };
+    u8 cdb[ATAPI_CDB_BYTES] = { SCSI_CMD_READ_CAPACITY };
+    u16 storage[8];
+    u8 *bytes = (u8 *)storage;
+    setup();
+    atapi_select_bank(1);
+    M.cap_len = 9;
+    for (unsigned j = 0; j < sizeof(chunks) / sizeof(chunks[0]); j++) {
+        M.drq_max = chunks[j];
+        for (unsigned i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+            u32 actual = 0, size = sizes[i];
+            memset(storage, 0xCD, sizeof(storage));
+            CHECK(atapi_packet_read(cdb, bytes + 1, size, &actual) == ATAPI_OK);
+            CHECK(actual == 9);
+            CHECK(memcmp(bytes + 1, M.cap, size) == 0);
+            CHECK(bytes[0] == 0xCD);
+            for (unsigned k = size + 1; k < sizeof(storage); k++) CHECK(bytes[k] == 0xCD);
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     pc98_boot_names_bind();
@@ -2435,6 +2525,9 @@ int main(int argc, char **argv)
     else if (!strcmp(cs, "np2_boot_worst"))  t_np2_boot_worst();
     else if (!strcmp(cs, "np2_start_unit"))  t_np2_start_unit();
     else if (!strcmp(cs, "np2_bus_dead"))    t_np2_bus_dead();
+    else if (!strcmp(cs, "poll_clock"))      t_poll_clock();
+    else if (!strcmp(cs, "srst_clock"))      t_srst_clock();
+    else if (!strcmp(cs, "pio_bounds"))      t_pio_bounds();
     else { fprintf(stderr, "unknown case '%s'\n", cs); return 2; }
     return 0;
 }
