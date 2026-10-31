@@ -1,5 +1,4 @@
 """R1 recovery probes: real lifecycle slices and real SDK/lease attachment."""
-from exec_source import exec_source
 from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
@@ -10,7 +9,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
-               'exec/appslot.c', 'exec/appslot_transition.inc', 'exec/appslot.h', 'exec/owner_diag.h',
+               'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
                'mm/paging.c', 'exec/lease.c']
 
 
@@ -28,8 +27,8 @@ def recovery(tmp, function, runner, mutation=None):
         (tmp / name).write_text(text)
     stage('paging_source.c', read('mm/paging.c'))
     stage('pgalloc_source.c', read('mm/pgalloc.c'))
-    exe = exec_source(ROOT, read)
-    slot = read('exec/appslot.c') + read('exec/appslot_transition.inc')
+    exe = read('exec/exec.c')
+    slot = read('exec/appslot.c')
     stage('slot_source.c', '\n'.join(function(slot, sig) for sig in (
         'AppSlot *appslot_at(', 'AppSlot *appslot_get(', 'void appslot_resume_commit(',
         'int appslot_return_target(', 'void appslot_switch_to(', 'void appslot_mark_scheduled(')))
@@ -103,24 +102,24 @@ def lease_recovery(function, runner, mutation=None):
 
 RECOVERY_MUTANTS = [
     ('K1-hook', 'kernel/v86/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
-    ('parent-hook', 'exec/exec_finish.inc', '        r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
-    ('parent-too-late', 'exec/exec_finish.inc',
+    ('parent-hook', 'exec/exec.c', '        r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
+    ('parent-too-late', 'exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n        r1_fixture_parent(id);\n#endif\n        parent = appslot_return_target(id);',
      '        parent = appslot_return_target(id);\n#ifdef OS32_R1_FIXTURE\n        r1_fixture_parent(id);\n#endif', 'FAIL g_slot[2].as->appmem_poisoned'),
-    ('parked-hook', 'exec/exec_schedule.inc', '    r1_fixture_resume((int)app_id);', '    /* omitted */', 'FAIL g_slot[id].as->appmem_poisoned'),
-    ('parked-too-late', 'exec/exec_schedule.inc',
+    ('parked-hook', 'exec/exec.c', '    r1_fixture_resume((int)app_id);', '    /* omitted */', 'FAIL g_slot[id].as->appmem_poisoned'),
+    ('parked-too-late', 'exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n    r1_fixture_resume((int)app_id);\n#endif\n    appslot_resume_commit((int)app_id);',
      '    appslot_resume_commit((int)app_id);\n#ifdef OS32_R1_FIXTURE\n    r1_fixture_resume((int)app_id);\n#endif', 'FAIL g_slot[id].as->appmem_poisoned'),
     ('target-id', 'kernel/r1_fixture.c', 'r1_fixture_id[hook] != (u32)id ||', '0 ||', 'FAIL !spaces[2].appmem_poisoned'),
     ('target-generation', 'kernel/r1_fixture.c', 'r1_fixture_generation[hook] != a->as->generation', '0', 'FAIL !spaces[2].appmem_poisoned'),
     ('parked-mark', 'kernel/r1_fixture.c', 'a->state == APP_STATE_PARKED && a->parked_from_wait', 'a->state == APP_STATE_PARKED', 'FAIL !spaces[2].appmem_poisoned'),
     ('parent-state', 'kernel/r1_fixture.c', 'parent->state == APP_STATE_RUNNING', '1', 'FAIL !spaces[2].appmem_poisoned'),
-    ('commit-loses-abort', 'exec/appslot_transition.inc', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
+    ('commit-loses-abort', 'exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
      '    a->abort_req = 0;\n    a->parked_from_wait = 0;', 'FAIL !forbid_app_pd'),
-    ('resume-abort', 'exec/exec_schedule.inc', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
-    ('syscall-abort', 'exec/exec_syscall.inc', '    ring3_abort_check();\n    exec_park_stop(frame);', '    exec_park_stop(frame);', 'FAIL 0'),
-    ('quarantine-account', 'exec/exec_finish.inc', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
-    ('quarantine-pages', 'exec/exec_finish.inc', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
+    ('resume-abort', 'exec/exec.c', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
+    ('syscall-abort', 'exec/exec.c', '    ring3_abort_check();\n    exec_park_stop(frame);', '    exec_park_stop(frame);', 'FAIL 0'),
+    ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
+    ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
     ('normal-context-release', 'kernel/v86/v86_mem.c',
      'if (kctx_irq_depth || kctx_exc_depth) goto done;',

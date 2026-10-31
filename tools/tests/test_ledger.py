@@ -27,6 +27,7 @@
 復元を抜く) を写しに当て、どれかの試験が RED になることを見る。実物の
 ソースは書き換えない (メモリ上の写しをハーネスへ書き出すだけ)。
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -39,7 +40,6 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = ('mm/pgalloc.c',
-           'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
            'tools/tests/pgalloc_host_fixture.h',
            'arch/x86/kernel/setjmp.asm', 'arch/x86/kernel/isr_stub.asm', 'include/ksetjmp.h',
            'arch/x86/kernel/iret_user.inc', 'arch/x86/kernel/ring3_entry.asm',
@@ -47,15 +47,12 @@ SOURCES = ('mm/pgalloc.c',
 
 
 def load(mutation=None):
-    texts = {rel: (ROOT / rel).read_text() for rel in SOURCES}
+    texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
         if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が一意でない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
-    for part in ('owner', 'resource', 'surface'):
-        texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
-            f'#include "pgalloc_{part}.inc"', texts[f'mm/pgalloc_{part}.inc'])
     return texts
 
 
@@ -568,7 +565,7 @@ def jmpbuf_hardcoded():
     hits = []
     for top in ('kernel', 'exec', 'include'):
         for f in sorted((ROOT / top).rglob('*.[ch]')):
-            for n, line in enumerate(f.read_text(errors='replace').splitlines(), 1):
+            for n, line in enumerate(paging_source(f).splitlines(), 1):
                 if re.search(r'jmpbuf\s*\[\s*[0-9]', line):
                     hits.append('%s:%d' % (f.relative_to(ROOT), n))
     return hits
@@ -653,7 +650,7 @@ class Ledger(unittest.TestCase):
 
     def test_jmpbuf_length_not_hardcoded(self):
         self.assertEqual(jmpbuf_hardcoded(), [])
-        v86 = (ROOT / 'kernel/v86/v86.c').read_text()
+        v86 = paging_source(ROOT / 'kernel/v86/v86.c')
         self.assertIn('jmpbuf[KSETJMP_BUF_LEN]', (ROOT / 'kernel/v86/v86_mem.h').read_text())
         self.assertIn('#define v86_jmpbuf v86_session.jmpbuf', v86)
 
@@ -671,12 +668,12 @@ class Ledger(unittest.TestCase):
 
 # 変異 (§4-2)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('r1-panic-removed', 'mm/pgalloc_owner.inc',
+    ('r1-panic-removed', 'mm/pgalloc.c',
      '    for (;;) { _stop(); }', '    return;'),
-    ('owner-check-removed', 'mm/pgalloc_owner.inc',
+    ('owner-check-removed', 'mm/pgalloc.c',
      '    return bit(eligible, p) && bit(bitmap, p) && owner_map[p] == owner;',
      '    (void)owner;\n    return bit(eligible, p) && bit(bitmap, p);'),
-    ('claim-owner-blind', 'mm/pgalloc_owner.inc',
+    ('claim-owner-blind', 'mm/pgalloc.c',
      '        if (bit(eligible, p) && bit(bitmap, p) && owner_map[p] != owner) {',
      '        if (0) {'),
     ('irq4-leave-missing', 'arch/x86/kernel/isr_stub.asm',
@@ -690,7 +687,7 @@ MUTATIONS = [
     ('exc-return-leave-missing', 'arch/x86/kernel/isr_stub.asm',
      '        EXC_LEAVE\n        popad\n        add     esp, ISR_COMMON_SKIP_BYTES',
      '        popad\n        add     esp, ISR_COMMON_SKIP_BYTES'),
-    ('reclaim-device', 'mm/pgalloc_owner.inc',
+    ('reclaim-device', 'mm/pgalloc.c',
      '    if (kind == LEDGER_KIND_DEVICE || kind == LEDGER_KIND_PERSIST) goto done;',
      '    if (kind == LEDGER_KIND_PERSIST) goto done;'),
     ('longjmp-no-restore', 'arch/x86/kernel/setjmp.asm',

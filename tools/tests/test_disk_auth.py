@@ -4,6 +4,7 @@ CHECK = dict(name='disk-auth-host', tier=1,
     needs=['make:all'], budget=1.990454)
 
 import argparse
+from paging_source import paging_source
 from test_kapi_ranges import ROOT, run
 
 MUTANTS = (
@@ -35,7 +36,7 @@ if __name__ == '__main__':
     p.add_argument('--mutate', action='store_true')
     args = p.parse_args()
     # Fail closed if the loader no longer records the actual resolved image.
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = paging_source(ROOT / 'exec/exec.c')
     assert 'ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);' in source
     # Exercise the manifest check with real inputs and a moved installer.
     import copy

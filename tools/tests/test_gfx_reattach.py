@@ -1,5 +1,6 @@
 """T2e e7: two real SDK instances over kernel query/lease and all backends."""
 import host32
+from paging_source import paging_source
 import argparse
 import pathlib
 import re
@@ -26,7 +27,7 @@ def main():
     p.add_argument('--mutate', action='store_true')
     a = p.parse_args()
     host32.begin_control(a.mutate, a.runner, ROOT)
-    texts = {x: (ROOT/x).read_text() for x in TARGET_SRCS}
+    texts = {x: paging_source(ROOT/x) for x in TARGET_SRCS}
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(texts[x] for x in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
     pattern = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')

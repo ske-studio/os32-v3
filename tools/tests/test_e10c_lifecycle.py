@@ -1,5 +1,5 @@
 """e10c real gcap ownership/release, polled stop marker, and int80 VM branch."""
-from exec_source import EXEC_PARTS, exec_source
+from paging_source import paging_source
 from kernel_includes import include_flags
 import argparse
 from pathlib import Path
@@ -20,14 +20,14 @@ MUTANTS = [
  ('gcap-free',PATHS[0],'    kfree(tv);\n    kfree(g);\n    v86_gcap_free_count', '    v86_gcap_free_count','FAIL freed == 2'),
  ('gcap-ops',PATHS[0],'    gcap_ops = 0;','    (void)0;','FAIL !gcap_owned'),
  ('gcap-TV',PATHS[0],'    tv_restore(tv);','    (void)tv;','FAIL freed == 2 && restored == 1 && cursor == 1'),
- ('stop-mark','exec/exec_finish.inc','    exec_stop_count++;','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
- ('stop-serial','exec/exec_finish.inc','    serial_puts_polled("OS32: exec teardown stopped\\r\\n");','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
+ ('stop-mark','exec/exec.c','    exec_stop_count++;','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
+ ('stop-serial','exec/exec.c','    serial_puts_polled("OS32: exec teardown stopped\\r\\n");','    (void)0;','FAIL exec_stop_count == 1 && polled == 1'),
  ('VM-gate',PATHS[2],'        jnz     .dispatch','        nop','FAIL host_vm_gate(0x20000) == 0'),
  ('probe-before-only',PATHS[3],'    kaudit_post_probe();','','FAIL audit after probe'),
 ]
 
 def run(runner, mutant=None):
-    texts={p:(ROOT/p).read_text() for p in (*PATHS, *EXEC_PARTS)}
+    texts={p:paging_source(ROOT/p) for p in PATHS}
     if mutant:
         _,path,old,new,_=mutant
         assert old in texts[path]
@@ -37,7 +37,6 @@ def run(runner, mutant=None):
             texts[path] = texts[path].replace(body, body.replace(old, new))
         else:
             texts[path]=texts[path].replace(old,new)
-    texts[PATHS[1]] = exec_source(ROOT, texts.__getitem__)
     k=kernel_source(ROOT, {PATHS[3]: texts[PATHS[3]]})
     try:
         assert 'kaudit_post_probe();' in k and k.index('gfx_prepare_backend();') < k.index('kaudit_post_probe();'), 'FAIL audit after probe'
