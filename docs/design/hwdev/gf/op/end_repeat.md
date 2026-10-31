@@ -7,3 +7,15 @@
 | 36 END_REPEAT | I:724 `init_end_repeat` |
 
 REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 36 END_REPEAT | 1B、終端直後を保存し反復フレームへ復帰 | I:724–733 |
+
+> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 36 END_REPEAT | 1 | C`[I(repeat_pc),I(k),I(n)]` | Fで次反復入口／最終回は33出口、親ctxへ。skipでも構造を実行 |

@@ -7,3 +7,15 @@
 | 33 REPEAT | I:658 `init_repeat` |
 
 REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 33 REPEAT | 2B、実物count=10。count回反復し終端直後へ。0は静的拒否（nouveauでは本体へ落ち1回走る） | I:658–677 |
+
+> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 33 REPEAT | 2：n8@1 | 入口C`[I(n),I(end_pc)]`; 各反復入口C`[I(k)]`; 出口C`[I(n)]` | n回静的展開、新ctx、各回END_REPEATへ。skipでも構造を展開、n=0拒否 |

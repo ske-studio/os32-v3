@@ -7,3 +7,7 @@
 | パレット `palette` | mask/index/RGB、部分更新、256 項の shadow | `dispnv04/hw.c:795–810`、`crtc.c:778` | 4F09、p.54 |
 palette の first/count と FB の offset/pitch/height を既存範囲内で検査し、不正なら I/O 前に返す。
 移動した各機能の既存試験、AR/DAC/LIVE/FP/PLL復元・独立期待列・CHECK
+
+## 移し替えた設計
+
+index0..7=黒/赤/緑/青/白/cyan/magenta/黄（成分00/FF）、8..255=黒

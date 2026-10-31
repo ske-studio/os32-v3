@@ -8,3 +8,11 @@ runner が解読後・dispatch 前に REPEAT の `end_repeat` を対応する EN
 旧 plan executor の丸ごと移植や恒久的な二重実装はしない。
 実 ROM fixture（27 種/193 命令）の旧展開との I/O trace 差分試験 1 本＋制御個別 case
 skip/head、呼出し/反復上限
+
+## 移し替えた設計
+
+- 制御状態は `{pc,execute,head,call_frames,repeat_frames}`。executeのbit0=試行許可、bit1=skip、bit2=force（`I:59–81`）。forceは**書込許可・許可行・phaseを迂回しない**。
+- skip中のHW読取は0、HW書込・TIMEは無し。NOT/RESUME/構造制御は進め、RESET/COMPUTE_MEMのforceを再現。条件は真でもskipを解除しない。SUB後の条件状態・headは共有する。
+- 条件: `(R32&m)==v`。IO flag: `s=(VGA[index]&m)>>shift; (ROM[data+s]&dmask)==v`。欠けた表を偽として続行せず異常終了する。
+- mainごとにexecute=1・head既定0で開始（`I:2323–2339`）。main番号順0→4を1コマンドずつ。SUB/CALLは同コマンド内、途中再開や任意pc開始は提供しない。
+- 上限はmain1本につき動的4096命令、call深さ16、repeat深さ8、待ち累計5秒、送信を除く実行経過60秒。各内部MMIO・macro要素・repeatも予算を減らす。0回repeatは静的拒否、再帰・終端無しはhostで拒否を検証。

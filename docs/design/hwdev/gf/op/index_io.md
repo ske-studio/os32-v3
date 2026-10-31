@@ -5,3 +5,15 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 78 INDEX_IO | I:1853 `init_index_io` |
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 78 INDEX_IO | 6B、VGA←(旧&m) OR 値。indexは1Bとして復号 | I:1853–1868 |
+
+> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 78 INDEX_IO | 6：p16@1,i8@3,m8@4,v8@5 | X(t,i); M(t,m,v;DATA) | F、E81EのDATAだけ既定N1 guard/依存を保持 |
