@@ -17,7 +17,7 @@
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='fdc-track-host', tier=1,
-    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.297992)
 
 from kernel_includes import include_flags
@@ -269,7 +269,8 @@ def includes(first=None):
 
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
-# (ファイル, パターン, 置換, 説明)。最後の 1 本は対照 (何も変えない)。
+# (ファイル, パターン, 置換, 説明)。複数ファイルはパターンと同じ順のタプル。
+# 最後の 1 本は対照 (何も変えない)。
 MUTATIONS = [
     # --- 区切り・先読み・読み直し (drivers/block/fdc_track.c)
     ("drivers/block/fdc_track.c",
@@ -330,35 +331,37 @@ MUTATIONS = [
      "if (e->drv != drv) continue;",
      "セクタキャッシュが LBA を見ない (別のセクタを返す)"),
     # --- シークの省略・完了待ち (drivers/block/fdc.c)
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      r"if \(drv >= 0 && drv < FDC_MAX_DRIVES && s_known_cyl\[drv\] == cyl\) \{\n        s_stats\.seek_skipped\+\+;\n        return 0;\n    \}",
      "",
      "同じシリンダでもシークする (直す前の姿)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      [(r"     \* 排水は pending 無しなら SIS 1 回 \(1 バイト応答\) で終わる。 \*/\n    \(void\)fdc_drain_interrupts\(\);",
        "     */"),
       (r"        s_stats\.seek_skipped\+\+;\n        return 0;\n    \}\n    fdc_forget_cyl\(drv\);",
        "        s_stats.seek_skipped++;\n        return 0;\n    }\n    (void)fdc_drain_interrupts();\n    fdc_forget_cyl(drv);")],
      None,
      "シークの省略を排水より先に置く (取り残しで INT 線が上がったまま)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      r"                s_stats\.sis_foreign\+\+;\n                continue;",
      "                s_stats.sis_foreign++;\n                break;",
      "1 本のエッジで 1 件しか読まない (別の通知の後ろの完了を期限まで待つ)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      r"    if \(\(u8\)\(st0 & FDC_ST0_IC_MASK\) == FDC_ST0_IC_RDYCHG\n        && \(st0 & FDC_ST0_SE\) == 0\) return 1;",
      "",
      "自ドライブの Ready 変化をシークの失敗として扱う"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_io.inc",
      r"        s_stats\.ready_change\+\+;\n        fdc_bump_gen\(d\);",
      "        s_stats.ready_change++;",
      "Ready 変化で世代を進めない (入れ替えた媒体に古い先読みを当てる)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"    fdc_bump_gen\(drv\);\n    s_stats\.writes\+\+;",
      "    s_stats.writes++;",
      "書き込みで世代を進めない (dev.c / KAPI の書き込みの後に古い先読み)"),
     # リセットの後は Ready 変化の通知も来て、SIS の側でも捨てる (三重)。
-    ("drivers/block/fdc.c",
+    (("drivers/block/fdc_seek_reset.inc",
+      "drivers/block/fdc_seek_reset.inc",
+      "drivers/block/fdc_io.inc"),
      [(r"    /\* ヘッドが動く。通るまでは知らないことにする。 \*/\n    fdc_note_drive\(drv\);\n    fdc_forget_cyl\(drv\);",
        "    fdc_note_drive(drv);"),
       (r"    /\* 2\. FDC をリセットして実行フェーズを畳む。覚えているシリンダも捨てる。 \*/\n    fdc_forget_all\(\);",
@@ -367,7 +370,7 @@ MUTATIONS = [
        "")],
      None,
      "リセットと RECALIBRATE で覚えた値を捨てない (RECALIBRATE が落ちても古い値を信じる)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"        fdc_abort_transfer\(\);\n        \(void\)fdc_recalibrate\(drv\);",
      "        fdc_abort_transfer();",
      "まとめ読みの失敗の後に RECALIBRATE しない"),
@@ -379,51 +382,51 @@ MUTATIONS = [
      r"    s_geom\[drv\] = g;\n    /\* メディアが変わった。覚えているシリンダは信じず、先読みも捨てさせる。 \*/\n    fdc_forget_cyl\(drv\);",
      "    s_geom[drv] = g;",
      "メディアの変更で覚えたシリンダを捨てない"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"if \(fdc_send_byte\(\(u8\)eot\) != 0\) goto fail;",
      "if (fdc_send_byte((u8)sect) != 0) goto fail;",
      "EOT を sect のまま出す (1 セクタしか読まない)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"if \(fdc_send_byte\(FDC_OPT_MF \| FDC_CMD_READ_DATA\) != 0\) goto fail;",
      "if (fdc_send_byte(FDC_OPT_MT | FDC_OPT_MF | FDC_CMD_READ_DATA) != 0) goto fail;",
      "MT を立てる"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"if \(eot > \(int\)g->spt\) return FDC_MULTI_ERR_RANGE;",
      "",
      "トラックをまたぐ引数を断らない"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"        if \(seek_rc == FDC_RC_NOT_READY\) \{\n            fdc_forget_cyl\(drv\);\n            s_stats\.multi_nr\+\+;\n            return FDC_MULTI_ERR_NOT_READY;\n        \}",
      "",
      "SEEK の NR をまとめ読みの失敗に数える (行も出す)"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            fdc_forget_cyl\(drv\);",
      "        if (0) {\n            fdc_forget_cyl(drv);",
      "READ の NR をまとめ読みの失敗に数える (行も出す)"),
     # --- ラリー 2 (Codex / Fable)
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      r"            fdc_head_settle\(\);\n            fdc_note_cyl\(drv, 0\);",
      "            fdc_note_cyl(drv, 0);",
      "RECALIBRATE の後に整定しない (回復直後の C=0 の READ が整定前に出る)"),
     # 読み取り側 (READ) だけを消す。WRITE 側 (次の変異) と同じ形なので、count=1 と
     # ファイルの中の順番に頼らず、read 側にしか無い前置きの注釈で場所を決める。
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"(        /\* NR \(媒体無し\) は\*\*回復 \(リセット・RECALIBRATE\) より前に\*\*打ち切る\n[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
      r"\1",
      "単発の READ の NR で回復とリトライを踏む"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"        if \(results\[1\] & FDC_ST1_NW\) \{\n(?:[^\n]*\n)*?        \}\n",
      "",
      "WRITE の NW を通常エラーにして回復とリトライを踏む"),
     # 書き込み側に固有の注釈で NR の分岐を選ぶ。
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"(        /\* NR \(媒体無し\) は回復より前に打ち切る \(read 側と同じ\)。[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
      r"\1",
      "単発の WRITE の NR で回復とリトライを踏む"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_transfer.inc",
      r"        \(void\)fdc_recover\(drv\);\n    \} else \{\n        fdc_forget_cyl\(drv\);",
      "        fdc_forget_cyl(drv);\n    } else {\n        fdc_forget_cyl(drv);",
      "まとめ読みのシークの失敗で回復を通さない"),
-    ("drivers/block/fdc.c",
+    ("drivers/block/fdc_seek_reset.inc",
      r"        if \(i == FDC_SIS_DRAIN_MAX\) more = 1;",
      "",
      "SIS を件数の上限で止めたら次のエッジを待つ (上限ちょうどの通知で期限切れ)"),
@@ -466,7 +469,7 @@ CONTROL = len(MUTATIONS)
 
 def host_build(tmp, mutated=None):
     """ハーネスをコンパイルして実行ファイルのパスを返す。
-    mutated = (相対パス, 本文) なら、変異させた写しの木から組む。"""
+    mutated = {相対パス: 本文} なら、変異させた写しの木から組む。"""
     tmpd = pathlib.Path(tmp)
     exe = tmpd / "fdc-track-host"
     source = (ROOT / "platform/pc98/pic.c").read_text()
@@ -481,19 +484,21 @@ def host_build(tmp, mutated=None):
     if mutated is None:
         cmd = ["gcc", *FLAGS, "-I" + str(tmpd), *includes(), str(HARNESS), "-o", str(exe)]
     else:
-        rel, text = mutated
         tree = tmpd / "tree"
         for sub in ("drivers", "tools/tests", "fs/fat/fatfs", "lib"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
         for rel_ in ("drivers/block/fdc_track.c", "drivers/block/fdc_track.h",
                      "drivers/block/fdc.c", "drivers/block/fdc.h",
+                     "drivers/block/fdc_io.inc", "drivers/block/fdc_seek_reset.inc",
+                     "drivers/block/fdc_transfer.inc",
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
                      "fs/fat/fatfs/diskio.c"):
             (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")
-        (tree / rel).write_text(text, encoding="utf-8")
+        for rel, text in mutated.items():
+            (tree / rel).write_text(text, encoding="utf-8")
         harness = tree / "tools/tests/fdc_track_host.c"
         harness.write_text(HARNESS.read_text(encoding="utf-8"), encoding="utf-8")
         # 変異で fdc_track_is_bad() の唯一の呼出しを消すため、
@@ -542,11 +547,12 @@ def mutate(tmp):
     bad = 0
     tally = {"RED": 0, "ERROR": 0, "SURVIVED": 0}
     for i, (rel, pattern, repl, why) in enumerate(MUTATIONS, 1):
-        original = (ROOT / rel).read_text(encoding="utf-8")
         pairs = pattern if isinstance(pattern, list) else [(pattern, repl)]
-        mutated, n = original, 1
-        for pat, rp in pairs:
-            mutated, k = re.subn(pat, rp, mutated, count=1)
+        paths = [rel] * len(pairs) if isinstance(rel, str) else rel
+        original = {path: (ROOT / path).read_text(encoding="utf-8") for path in paths}
+        mutated, n = original.copy(), 1
+        for path, (pat, rp) in zip(paths, pairs):
+            mutated[path], k = re.subn(pat, rp, mutated[path], count=1)
             n = n and k == 1
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
@@ -555,7 +561,7 @@ def mutate(tmp):
         sub = pathlib.Path(tmp) / f"m{i}"
         sub.mkdir()
         try:
-            exe = host_build(sub, (rel, mutated))
+            exe = host_build(sub, mutated)
         except subprocess.CalledProcessError:
             status = "ERROR"
             hits = 0
