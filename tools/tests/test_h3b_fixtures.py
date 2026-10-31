@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import host32
 from contextlib import ExitStack
 from unittest.mock import patch
 
@@ -24,6 +25,64 @@ SOURCES = ('fs/pipe_buffer.c', 'platform/pc98/console.c', 'userland/tests/pipe_o
            'tools/nhd_deploy.py')
 sys.path.insert(0, str(ROOT / 'tools'))
 import deploy_manifests
+
+
+LOOP_MUTATIONS = [
+    ('nhd-lba-read-seek', 'loop_dev.c',
+     'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;\n    rd =',
+     'vfs_seek(s->fd, (int)offset, 0);\n    rd ='),
+    ('nhd-lba-write-seek', 'loop_dev.c',
+     'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;\n    wr =',
+     'vfs_seek(s->fd, (int)offset, 0);\n    wr ='),
+    ('nhd-block-read-seek', 'loop_dev_block_io.inc',
+     'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;',
+     'vfs_seek(s->fd, (int)offset, 0);'),
+    ('nhd-chs-read-seek', 'loop_dev_chs_io.inc',
+     'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;\n        rd =',
+     'vfs_seek(s->fd, (int)offset, 0);\n        rd ='),
+    ('nhd-chs-write-seek', 'loop_dev_chs_io.inc',
+     'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;\n        wr =',
+     'vfs_seek(s->fd, (int)offset, 0);\n        wr ='),
+    ('raw-short-read-success', 'loop_dev_block_io.inc',
+     'if (rd < (int)total_bytes) return -1;', '(void)rd;'),
+    ('raw-160k-half-size', 'loop_dev_format.inc',
+     '{  163840, 40, 1, 8,   512 }', '{  163840, 40, 1, 8,   256 }'),
+    ('d88-read-omitted', 'loop_dev_block_io.inc',
+     'if (loop_dev_read_chs(slot, (u16)cyl, (u8)head, (u8)r_1based, dst) != 0)',
+     'if (0)'),
+]
+
+
+def run_loop_harness(mutation=None):
+    # Keep the complete translation unit and all .inc files together so quoted
+    # includes cannot silently bypass a mutation via the real source directory.
+    with tempfile.TemporaryDirectory(prefix='os32-loop-') as directory:
+        tmp = Path(directory)
+        (tmp / 'string.h').write_text('int strcmp(const char *, const char *);\n'
+                                     'int strncmp(const char *, const char *, unsigned long);\n')
+        (tmp / 'stdlib.h').write_text('int atoi(const char *);\n')
+        block = tmp / 'drivers/block'
+        block.mkdir(parents=True)
+        (tmp / 'drivers/base').symlink_to(ROOT / 'drivers/base', target_is_directory=True)
+        for path in (ROOT / 'drivers/block').glob('loop_dev*'):
+            source = path.read_text()
+            if mutation and path.name == mutation[0]:
+                _, old, new = mutation
+                assert source.count(old) == 1, (path, old)
+                source = source.replace(old, new)
+            (block / path.name).write_text(source)
+        exe = tmp / 'loop'
+        subprocess.run([
+            'gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+            '-Wno-unused-variable', '-Wno-unused-parameter', '-Wno-unused-but-set-variable',
+            '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+            '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+            '-nostdlib', '-static', '-no-pie', '-I' + str(tmp), '-I' + str(block),
+            '-I' + str(ROOT / 'userland/shell'),
+            *include_flags(ROOT), str(ROOT / 'tools/tests/loop_dev_host.c'),
+            '-o', str(exe),
+        ], check=True, cwd=ROOT)
+        return host32.run([str(exe)], capture_output=True, text=True, timeout=30)
 
 
 def function(source, name):
@@ -94,6 +153,13 @@ def check_image_and_deploy():
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
                          (ROOT / 'drivers/block/loop_dev_format.inc').read_text())
     assert geometry and tuple(map(int, geometry.groups())) == (77, 2, 8, 1024)
+    raw_table = re.search(r'\} known\[\] = \{(.*?)\n    \};',
+                         (ROOT / 'drivers/block/loop_dev_format.inc').read_text(), re.S)
+    entries = re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
+                         raw_table.group(1))
+    assert len(entries) == 7
+    for size, c, h, s, bps in (map(int, entry) for entry in entries):
+        assert size == c * h * s * bps, (size, c, h, s, bps)
     boot = (ROOT / 'kernel/v86/v86.c').read_text().split('int v86_boot2(')[1]
     assert 'loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,' in boot
     assert len(module.IPL) <= module.SECTOR_BYTES
@@ -162,7 +228,18 @@ def check_image_and_deploy():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--loop-only', action='store_true')
     args = parser.parse_args()
+    result = run_loop_harness()
+    print(result.stdout + result.stderr, end='')
+    assert result.returncode == 0, result.returncode
+    if args.mutate:
+        for name, target, old, new in LOOP_MUTATIONS:
+            result = run_loop_harness((target, old, new))
+            assert result.returncode == 1 and 'FAIL: ' in result.stdout, (name, result)
+            print('RED ' + name)
+    if args.loop_only:
+        return
     check_image_and_deploy()
     result = run_harness()
     print(result.stdout + result.stderr, end='')

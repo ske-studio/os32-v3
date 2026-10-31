@@ -234,7 +234,7 @@ int loop_dev_attach_fd(int fd, int slot, int fmt)
         fmt_name = "NHD";
         break;
     case LOOP_FMT_RAW:
-        ret = attach_raw(s, fd, fsize);
+        ret = attach_raw(s, fsize);
         fmt_name = "RAW";
         break;
     default:
@@ -274,7 +274,6 @@ int loop_dev_attach(const char *vfs_path, int slot)
 {
     LoopSlot *s;
     int fd, fmt, ret;
-    u32 fsize;
 
     if (slot < 0 || slot >= LOOP_MAX_SLOTS || !vfs_path)
         return -1;
@@ -378,7 +377,7 @@ int loop_dev_read_lba(int slot, u32 lba, u32 count, void *buf)
     offset = s->data_offset + lba * (u32)s->lba_sect_size;
     total_bytes = count * (u32)s->lba_sect_size;
 
-    vfs_seek(s->fd, (int)offset, 0);
+    if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;
     rd = vfs_read_fd(s->fd, buf, total_bytes);
     if (rd < (int)total_bytes) return -1;
     return 0;
@@ -398,7 +397,7 @@ int loop_dev_write_lba(int slot, u32 lba, u32 count, const void *buf)
     offset = s->data_offset + lba * (u32)s->lba_sect_size;
     total_bytes = count * (u32)s->lba_sect_size;
 
-    vfs_seek(s->fd, (int)offset, 0);
+    if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;
     wr = vfs_write_fd(s->fd, buf, total_bytes);
     if (wr < (int)total_bytes) return -1;
     return 0;

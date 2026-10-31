@@ -189,7 +189,6 @@ static int attach_nhd(LoopSlot *s, int fd, u32 fsize)
     if (cyls == 0 || cyls > LOOP_HDD_CYL_MAX) return LOOP_ERR_FORMAT;
     {
         u32 per_cyl = heads * spt;              /* <= 255*255, 溢れない */
-        if (cyls > U32_MAX / per_cyl) return LOOP_ERR_FORMAT;
         if (cyls * per_cyl > U32_MAX / bps) return LOOP_ERR_FORMAT;
         if (cyls * per_cyl * bps > fsize - hdr_size) return LOOP_ERR_FORMAT;
     }
@@ -212,7 +211,7 @@ static int attach_nhd(LoopSlot *s, int fd, u32 fsize)
 /*  ヘッダなし。ファイルサイズの完全一致で既知容量テーブルから C/H/S/BPS を決定。 */
 /*  未知サイズの場合は拒否する (誤判定防止)。                              */
 /* ======================================================================== */
-static int attach_raw(LoopSlot *s, int fd, u32 fsize)
+static int attach_raw(LoopSlot *s, u32 fsize)
 {
     /* 既知容量テーブル */
     static const struct {
@@ -227,7 +226,7 @@ static int attach_raw(LoopSlot *s, int fd, u32 fsize)
         {  737280, 80, 2, 9,   512 }, /* 2DD 720KB */
         { 1474560, 80, 2, 18,  512 }, /* 2HD 1.44MB (IBM) */
         {  327680, 40, 2, 8,   512 }, /* 2D 320KB */
-        {  163840, 40, 1, 8,   256 }, /* 1D 160KB */
+        {  163840, 40, 1, 8,   512 }, /* 1D 160KB */
         { 0, 0, 0, 0, 0 }
     };
     int i;
