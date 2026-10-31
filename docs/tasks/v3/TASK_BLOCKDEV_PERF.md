@@ -1,6 +1,6 @@
 # TASK_BLOCKDEV_PERF — ブロックデバイス (IDE・FD・CD・ext2/FAT) の遅い所を直す
 
-> 状態: **実装中 (2026-10-31)** — astra の調べ (資料と突き合わせ、静的な計算) で 12 項目。軽い 4 項目 (L1・L2) を先に実装、重い 7 項目は設計の段へ、新機能は最後。
+> 状態: **実装中 (2026-10-31)** — L1・L2・D2・D4・D5a は main (e2fe4686、NP21/W 受入: 起動・自己試験 1748/0・guest_tests 21/21・CD の NORMAL.PKG 6.4MB を ISO とバイト一致)。D1 は実装中、Ra266 の確認はノートに依頼。astra の調べ (資料と突き合わせ、静的な計算) で 12 項目。軽い 4 項目 (L1・L2) を先に実装、重い 7 項目は設計の段へ、新機能は最後。
 > 上位: [ROADMAP](../../ROADMAP.md)。調べの原文: `~/os32-tmp/run/blockdev-kernel/REPORT.md` (資料の略号・file:line・見込みの計算)。
 
 ## ユーザーの指示と決定 (2026-10-31)
@@ -17,13 +17,13 @@
 
 | 段 | 項目 (調べの番号) | 中身 | 大きさ | 担当 | 状態 |
 |---|---|---|---|---|---|
-| L1 | #3 (小) | ext2 のブロック (1KB) の読み取りを 512B×2 の要求から count=2 の 1 要求に (`fs/ext2/ext2_super.c`、読み取りだけ) | 小 | terra | 実装中 |
-| L2 | #9 (小)・#10・#11 | ATAPI (`drivers/ata/atapi.c`): PIO のループの偶数長の高速路 (奇数長・読み捨ては今のまま、rep は使わない)・BSY/DRQ の待ちを最初は 10µs ごと→長い待ちで 100µs・SRST の保持を校正済みの 10µs 待ちに (解除後 2ms と BSY 待ちは残す) | 小 | sol | 実装中 |
-| D1 | #1・#5 | ext2 の間接表・inode・直近データの保持 | 設計 | astra 起草 | 計画 |
-| D2 | #2・#3 (中) | IDE の既存 READ/WRITE の Sector Count を使った複数セクタ、ext2 の連続ブロックを束ねる | 設計 | astra 起草 | 計画 |
-| D3 | #4・#7 | FD の Device API の経路にまとめ読み (fdc_read_sectors) を結ぶ、書き込みの同一トラックのまとめ | 設計 | astra 起草 | 計画 |
-| D4 | #6 | FAT の読み取りハンドル・位置の保持 (毎回の開き直しと先頭からの lseek をやめる) | 設計 | astra 起草 | 計画 |
-| D5 | #8・#9 (rep) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
+| L1 | #3 (小) | ext2 のブロック (1KB) の読み取りを 512B×2 の要求から count=2 の 1 要求に (`fs/ext2/ext2_super.c`、読み取りだけ) | 小 | terra | 済み (main e2fe4686) |
+| L2 | #9 (小)・#10・#11 | ATAPI (`drivers/ata/atapi.c`): PIO のループの偶数長の高速路 (奇数長・読み捨ては今のまま、rep は使わない)・BSY/DRQ の待ちを最初は 10µs ごと→長い待ちで 100µs・SRST の保持を校正済みの 10µs 待ちに (解除後 2ms と BSY 待ちは残す) | 小 | sol | 済み (main e2fe4686) |
+| D1 | #1・#5 | ext2 の間接表・inode・直近データの保持 | 設計 | astra 起草 | 実装中 (sol、D2 の口を使う) |
+| D2 | #2・#3 (中) | IDE の既存 READ/WRITE の Sector Count を使った複数セクタ、ext2 の連続ブロックを束ねる | 設計 | astra 起草 | 済み (main e2fe4686) |
+| D3 | #4・#7 | FD の Device API の経路にまとめ読み (fdc_read_sectors) を結ぶ、書き込みの同一トラックのまとめ | 設計 | astra 起草 | 見送りを提案 (Device API で count>1 の呼び手が無く、FatFs の FD 書き込みも 1 クラスタ=1 セクタ — Opus レビュー) |
+| D4 | #6 | FAT の読み取りハンドル・位置の保持 (毎回の開き直しと先頭からの lseek をやめる) | 設計 | astra 起草 | 済み (main e2fe4686) |
+| D5 | #8 (D5a 済み、main e2fe4686)・#9 の rep (D5b、手本・置き場が決まってから) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
 | N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 計画 |
 
 ## 軽い段の受入
