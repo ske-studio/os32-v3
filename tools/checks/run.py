@@ -629,7 +629,7 @@ def build_content(text, path):
     content, continued, defines = [], False, 0
     for line in text.splitlines():
         stripped = line.lstrip()
-        define = make and re.match(r"(?:(?:override|export)\s+)?define\b", stripped)
+        define = make and re.match(r"(?:(?:override|export|private|unexport)\s+)*define\b", stripped)
         endef = make and re.match(r"endef\b", stripped)
         protected = make and (line.startswith("\t") or continued or defines or define
                               or ";" in line or "$(eval" in line)

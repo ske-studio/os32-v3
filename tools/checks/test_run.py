@@ -293,6 +293,10 @@ class RunnerTest(unittest.TestCase):
                          R.build_content('VALUE = a\\#b # two\n', 'Makefile'))
         self.assertEqual(R.build_content('VALUE = $(value) # one\n', 'Makefile'),
                          R.build_content('VALUE = $(value) # two\n', 'Makefile'))
+        for head in ('export override define', 'override export define', 'private define'):
+            with self.subTest(head=head):
+                self.assertNotEqual(R.build_content(head + ' F\n-D="#one"\nendef\n', 'build/config.mk'),
+                                    R.build_content(head + ' F\n-D="#two"\nendef\n', 'build/config.mk'))
 
     def test_toml_comments_preserve_quoted_hashes(self):
         path = 'sdk/rust/demo/Cargo.toml'
