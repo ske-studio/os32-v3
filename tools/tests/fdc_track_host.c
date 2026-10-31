@@ -268,6 +268,9 @@ static struct {
     u8 last_rw[9];
     /* 失敗の差し込み */
     int write_protected;
+    int rw_stall_at;                /* 単発コマンドの指定バイトで RQM を落とす */
+    int rw_stall_polls;
+    int nr_nw;                       /* NR と NW の同時応答 */
     int fail_multi;                 /* EOT > R の READ を DE で落とす */
     int bad_c, bad_h, bad_r;        /* 読めないセクタ (bad_r = 0 で無し) */
     int drop_irq_reads;             /* READ の完了 IRQ を出さない回数 */
@@ -362,6 +365,7 @@ static void model_rw(int is_write)
     (void)model_geom;
 
     if (nsec < 1) { err = 1; st1 = 0x80; }                  /* EN */
+    else if (M.nr_nw) { err = 1; nr = 1; st1 = 0x02; }
     else if (!M.present[drv]) { err = 1; nr = 1; }
     else if (M.pcn[drv] != C) { err = 1; st1 = 0x04; st2 = 0x10; } /* ND / WC */
     else if (!is_write && M.fail_multi && nsec > 1) { err = 1; st1 = 0x20; }
@@ -460,6 +464,11 @@ static void model_exec(void)
 unsigned int fdc_shim_inp(unsigned int port)
 {
     if (port == 0x90) {
+        if (M.rw_stall_at && D.setups > 0 && !D.masked
+            && M.ncmd == M.rw_stall_at - 1) {
+            M.rw_stall_polls++;
+            return 0;
+        }
         if (M.rpos < M.nres) return 0x80 | 0x40 | 0x10;     /* RQM DIO CB */
         if (M.ncmd > 0) return 0x80 | 0x10;                 /* RQM CB */
         return 0x80;
@@ -1587,6 +1596,165 @@ static void track_nr_stop(void)
     CHECK(F.n == 1 && F.c[0].multi);            /* 単発は出ない */
 }
 
+/* 単発 READ/WRITE はジオメトリごとに同じ 9 バイト列と DMA 方向を保つ。 */
+static void single_commands(void)
+{
+    static u8 buf[1024];
+    const struct fdc_geom *geoms[] = { &fdc_geom_2hd, &fdc_geom_144 };
+    int i, write;
+
+    for (i = 0; i < 2; i++) {
+        const struct fdc_geom *g = geoms[i];
+        for (write = 0; write < 2; write++) {
+            u8 expected[] = {
+                FDC_OPT_MF | (write ? FDC_CMD_WRITE_DATA : FDC_CMD_READ_DATA),
+                (1 << FDC_HEAD_SHIFT) | 1, 7, 1, 3, g->sec_n, 3, g->gap3,
+                FDC_DTL_UNUSED
+            };
+            model_boot(1);
+            fdc_set_media(1, i ? FDC_MEDIA_2HD_1440 : FDC_MEDIA_2HD_1232);
+            memset(buf, 0x5A, sizeof(buf));
+            if (write) {
+                u8 disk[1024];
+                CHECK(fdc_write_sector_geom(1, 7, 1, 3, g, buf) == 0);
+                disk_sector(1, 7, 1, 3, g->bps, disk);
+                CHECK(memcmp(disk, buf, g->bps) == 0);
+            } else {
+                CHECK(fdc_read_sector_geom(1, 7, 1, 3, g, buf) == 0);
+                CHECK(check_bytes(buf, 1, 7, 1, 3, g->bps));
+            }
+            CHECK(memcmp(M.last_rw, expected, sizeof(expected)) == 0);
+            CHECK(D.dir == (write ? DMA_DIR_FROM_MEM : DMA_DIR_TO_MEM));
+            CHECK(D.bytes == g->bps);
+            CHECK(M.cmd_while_masked == 0);
+        }
+    }
+}
+
+/* どのバイトの送出で失敗しても、続きは送らず回復してから再試行する。 */
+static void single_command_failures(void)
+{
+    static u8 buf[1024];
+    int write, byte;
+
+    for (write = 0; write < 2; write++) {
+        for (byte = 1; byte <= 9; byte++) {
+            model_boot(0);
+            M.rw_stall_at = byte;
+            if (write)
+                CHECK(fdc_write_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf) == -1);
+            else
+                CHECK(fdc_read_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf) == -1);
+            CHECK(M.reads == 0 && M.writes == 0);
+            CHECK(M.rw_stall_polls == FDC_RW_RETRIES * FDC_TIMEOUT_LOOP);
+            CHECK(D.setups == FDC_RW_RETRIES);
+            CHECK(D.masked == 1);
+            CHECK(fdc_get_known_cyl(0) == -1);
+            CHECK(s_kprintf_lines == 1);
+        }
+    }
+}
+
+/* 計数は要求 1 回と READ の再試行だけ。WRITE の入力は先に DMA へ写す。 */
+static void single_transfer_contract(void)
+{
+    static u8 buf[1024], original[1024];
+    int write, errors;
+
+    memset(original, 0x5A, sizeof(original));
+    for (write = 0; write < 2; write++) {
+        for (errors = 0; errors <= FDC_RW_RETRIES; errors++) {
+            int rc, tries = errors < FDC_RW_RETRIES ? errors + 1 : errors;
+            u32 gen;
+
+            model_boot(0);
+            memcpy(buf, original, sizeof(buf));
+            gen = fdc_media_gen(0);
+            if (write) {
+                M.fail_writes = errors;
+                rc = fdc_write_sector_geom(0, 5, 1, 2, &fdc_geom_2hd, buf);
+            } else {
+                M.fail_reads = errors;
+                rc = fdc_read_sector_geom(0, 5, 1, 2, &fdc_geom_2hd, buf);
+            }
+            CHECK(rc == (errors < FDC_RW_RETRIES ? 0 : -1));
+            CHECK(s_stats.single_reads == (u32)!write);
+            CHECK(s_stats.single_retries == (write ? 0U : (u32)(tries - 1)));
+            CHECK(s_stats.writes == (u32)write);
+            CHECK(M.reads == (write ? 0 : tries));
+            CHECK(M.writes == (write ? tries : 0));
+            if (write) {
+                u8 disk[1024];
+                CHECK(fdc_media_gen(0) != gen);
+                CHECK(memcmp(buf, original, sizeof(buf)) == 0);
+                if (rc == 0) {
+                    disk_sector(0, 5, 1, 2, 1024, disk);
+                    CHECK(memcmp(disk, original, sizeof(disk)) == 0);
+                }
+            } else if (rc == 0) {
+                CHECK(check_bytes(buf, 0, 5, 1, 2, 1024));
+            } else {
+                CHECK(memcmp(buf, original, sizeof(buf)) == 0);
+            }
+            if (rc != 0) {
+                CHECK(D.masked == 1);
+                CHECK(fdc_get_known_cyl(0) == -1);
+            }
+        }
+    }
+}
+
+/* SEEK の NR なら両方向とも DMA・コマンド・回復を開始しない。 */
+static void single_seek_nr(void)
+{
+    static u8 buf[1024];
+    int write;
+
+    for (write = 0; write < 2; write++) {
+        int resets, recals;
+        model_boot(0);
+        M.present[0] = 0;
+        M.nr_on_seek = 1;
+        resets = M.resets; recals = M.recals;
+        if (write)
+            CHECK(fdc_write_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf) == -1);
+        else
+            CHECK(fdc_read_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf) == -1);
+        CHECK(M.resets == resets && M.recals == recals);
+        CHECK(M.reads == 0 && M.writes == 0 && D.setups == 0);
+        CHECK(s_stats.single_retries == 0);
+    }
+}
+
+/* NW と NR の同時応答: WRITE は NW が先、READ は NR で止まる。 */
+static void single_nr_nw_priority(void)
+{
+    static u8 buf[1024];
+    int write;
+
+    for (write = 0; write < 2; write++) {
+        int resets, recals;
+        char expected[128];
+
+        model_boot(0);
+        M.nr_nw = 1;
+        resets = M.resets; recals = M.recals;
+        if (write)
+            CHECK(fdc_write_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf)
+                  == FDC_RC_WRITE_PROTECTED);
+        else
+            CHECK(fdc_read_sector_geom(0, 5, 0, 2, &fdc_geom_2hd, buf) == -1);
+        CHECK(M.resets == resets && M.recals == recals);
+        CHECK(M.reads == !write && M.writes == write);
+        CHECK(D.masked == 1);
+        CHECK(fdc_get_known_cyl(0) == -1);
+        snprintf(expected, sizeof(expected),
+                 "[fdc] %s fail drv=0 chs=5/0/2 phase=%s st0=48 st1=02 st2=00 (NR)\n",
+                 write ? "write" : "read", write ? "result" : "nr");
+        CHECK(strcmp(s_last_kprintf, expected) == 0);
+    }
+}
+
 /* 単発の READ の NR も回復 (リセット / RECALIBRATE) を通さない。 */
 static void single_nr_no_recover(void)
 {
@@ -1863,6 +2031,11 @@ int main(int argc, char **argv)
         { "recal_settle", recal_settle },
         { "idle_rule", idle_rule },
         { "track_nr_stop", track_nr_stop },
+        { "single_transfer_contract", single_transfer_contract },
+        { "single_seek_nr", single_seek_nr },
+        { "single_nr_nw_priority", single_nr_nw_priority },
+        { "single_commands", single_commands },
+        { "single_command_failures", single_command_failures },
         { "single_nr_no_recover", single_nr_no_recover },
         { "write_nr_no_recover", write_nr_no_recover },
         { "write_protection", write_protection },

@@ -11,7 +11,7 @@
   python3 -B tools/tests/test_fdc_seek.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='fdc-seek-host', tier=1,
-    covers=['drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.113006)
 
 from kernel_includes import include_flags
@@ -107,7 +107,13 @@ def mutate(tmp):
     original = SRC.read_text(encoding="utf-8")
     bad = 0
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
-        mutated, n = re.subn(pattern, repl, original, count=1)
+        matches = len(list(re.finditer(pattern, original)))
+        print(f"MUTATION {i} marker: matches={matches}", flush=True)
+        if matches != 1:
+            print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
+            bad += 1
+            continue
+        mutated, n = re.subn(pattern, repl, original)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
