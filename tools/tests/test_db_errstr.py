@@ -301,10 +301,8 @@ MUTATIONS = [
      "source"),
     # 4. db_last_error の「範囲外の handle」経路をカーネル番地のまま返す。
     ("kapi/kapi_db.c",
-     "    if (handle < 0 || handle >= DB_MAX_CONNECTIONS)\n"
-     "        return db_shm_diag(\"invalid handle\");",
-     "    if (handle < 0 || handle >= DB_MAX_CONNECTIONS)\n"
-     "        return \"invalid handle\";",
+     '    if (!slot) return db_shm_diag("invalid handle");',
+     '    if (!slot) return "invalid handle";',
      "run"),
     # 5. db_last_error の sqlite3_errmsg 経路を SQLite の帯のまま返す。
     ("kapi/kapi_db.c",

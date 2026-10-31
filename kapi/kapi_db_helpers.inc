@@ -284,13 +284,6 @@ static int shm_write_row(DbSlot *slot)
     i32 data_offset;
     int i;
 
-    if (!slot->active_stmt) {
-        hdr->status = DB_STATUS_DONE;
-        hdr->column_count = 0;
-        hdr->error_offset = 0;
-        return DB_STATUS_DONE;
-    }
-
     ncol = sqlite3_column_count(slot->active_stmt);
     /* v50 (票 §1b): 収まらない行と **実体化に失敗した行** は 1 バイトも書かず
      * に失敗させる。部分 ROW も返さない — 呼び手が「取れた」と誤解しないため。

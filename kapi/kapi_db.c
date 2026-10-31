@@ -111,7 +111,10 @@ int __cdecl kapi_db_open(const char *path)
     for (i = 0; i < DB_MAX_CONNECTIONS; i++) {
         if (!db_slots[i].in_use) break;
     }
-    if (i >= DB_MAX_CONNECTIONS) return -1;
+    if (i >= DB_MAX_CONNECTIONS) {
+        open_fail_set(SQLITE_FULL);
+        return -1;
+    }
 
     /* パス文字列をカーネルバッファにコピー (外部プログラム空間からの読み取り問題回避)。
      * **切り詰めない** (票 TASK_VFS_FD_PATH v3 の追記)。以前は kstrncpy で
@@ -208,7 +211,7 @@ int __cdecl kapi_db_close(int handle)
         rc = SQLITE_OK;
     }
     slot->bindable = 0;
-    if (rc == SQLITE_OK && !sqlite3_get_autocommit(slot->db))
+    if (!sqlite3_get_autocommit(slot->db))
         rc = sqlite3_exec(slot->db, "ROLLBACK", 0, 0, 0);
     if (rc != SQLITE_OK) {
         slot_save_error(slot, rc);
@@ -285,13 +288,37 @@ int __cdecl kapi_db_exec(int handle, const char *sql)
     return 0;
 }
 
+/* prepare の自動 step と明示的な step の結果を同じ順序で公開する。 */
+static int slot_step_result(DbSlot *slot, int rc)
+{
+    if (rc == SQLITE_ROW) {
+        slot_note(slot, SQLITE_OK);
+        return shm_write_row(slot);
+    } else if (rc == SQLITE_DONE) {
+        DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
+        slot_note(slot, SQLITE_OK);
+        sqlite3_finalize(slot->active_stmt);
+        slot->active_stmt = (sqlite3_stmt *)0;
+        hdr->status = DB_STATUS_DONE;
+        hdr->column_count = 0;
+        hdr->error_offset = 0;
+        return DB_STATUS_DONE;
+    } else {
+        /* v50: 自動 finalize より前に拡張コードを控える。 */
+        slot_note(slot, slot_ext(slot, rc));
+        shm_write_error(slot);
+        sqlite3_finalize(slot->active_stmt);
+        slot->active_stmt = (sqlite3_stmt *)0;
+        return -1;
+    }
+}
+
 int __cdecl kapi_db_prepare(int handle, const char *sql)
 {
     if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
     int rc;
-    int step_rc;
 
     if (!slot) {
         shm_write_error((DbSlot *)0);
@@ -316,27 +343,7 @@ int __cdecl kapi_db_prepare(int handle, const char *sql)
     }
 
     /* 最初の行を自動取得 */
-    step_rc = sqlite3_step(slot->active_stmt);
-    if (step_rc == SQLITE_ROW) {
-        slot_note(slot, SQLITE_OK);
-        return shm_write_row(slot);
-    } else if (step_rc == SQLITE_DONE) {
-        DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
-        slot_note(slot, SQLITE_OK);
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
-        hdr->status = DB_STATUS_DONE;
-        hdr->column_count = 0;
-        hdr->error_offset = 0;
-        return DB_STATUS_DONE;
-    } else {
-        /* v50: 自動 finalize より前に拡張コードを控える。 */
-        slot_note(slot, slot_ext(slot, step_rc));
-        shm_write_error(slot);
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
-        return -1;
-    }
+    return slot_step_result(slot, sqlite3_step(slot->active_stmt));
 }
 
 int __cdecl kapi_db_step(int handle)
@@ -344,7 +351,6 @@ int __cdecl kapi_db_step(int handle)
     if (!DB_MODULE_READY()) return OS32_ERR_NOSYS;
     if (!SQLITE_OUTER_READY(1)) return -1;
     DbSlot *slot = slot_get(handle);
-    int rc;
 
     if (!slot) {
         shm_write_error((DbSlot *)0);
@@ -363,27 +369,7 @@ int __cdecl kapi_db_step(int handle)
     }
 
     slot->bindable = 0;    /* v50: 最初の step 以降は bind を受け付けない */
-    rc = sqlite3_step(slot->active_stmt);
-    if (rc == SQLITE_ROW) {
-        slot_note(slot, SQLITE_OK);
-        return shm_write_row(slot);
-    } else if (rc == SQLITE_DONE) {
-        DB_ResultHeader *hdr = (DB_ResultHeader *)DB_SHM_PTR;
-        slot_note(slot, SQLITE_OK);
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
-        hdr->status = DB_STATUS_DONE;
-        hdr->column_count = 0;
-        hdr->error_offset = 0;
-        return DB_STATUS_DONE;
-    } else {
-        /* v50: 自動 finalize より前に拡張コードを控える。 */
-        slot_note(slot, slot_ext(slot, rc));
-        shm_write_error(slot);
-        sqlite3_finalize(slot->active_stmt);
-        slot->active_stmt = (sqlite3_stmt *)0;
-        return -1;
-    }
+    return slot_step_result(slot, sqlite3_step(slot->active_stmt));
 }
 
 int __cdecl kapi_db_column_int(int handle, int col)
@@ -447,8 +433,6 @@ const char * __cdecl kapi_db_last_error(int handle)
     if (!DB_MODULE_READY()) return db_shm_diag("SQLite module unavailable");
     if (!SQLITE_OUTER_READY(0)) return db_shm_diag("SQLite engine unavailable");
     DbSlot *slot;
-    if (handle < 0 || handle >= DB_MAX_CONNECTIONS)
-        return db_shm_diag("invalid handle");
     slot = slot_diag(handle);
     if (!slot) return db_shm_diag("invalid handle");
     if (slot->cleanup_error != SQLITE_OK)
