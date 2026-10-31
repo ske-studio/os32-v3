@@ -99,3 +99,17 @@ R1/R2 は `tools/tests/test_*.py` に宣言を足し、集約入口・道具ラ�
 5. 変異は一時ディレクトリの `.c` / `.inc` 全文コピーに当て、include の探索順でそのコピーを確実に使う。
 6. 既存の入力・観測・正常対照を維持し、全体の前提で届かない境界値は実 helper を直接呼ぶ。
 7. `test_exec_image.py` と `exec_image_host.c` を手本に、変更後も同じ数の変異が実行時に RED になることを確認する。
+
+## D1 で移した設計 (SLIM_HWDEV_DESIGN)
+
+### recover-tables-host
+
+`kdebug/generated/recover_gf_tables.inc` の再現は `gen_recover_tables.py --check` を check-recover-tables-host から呼んで検査する (生成物を手で直さない)。
+
+> [要確認] check-recover-tables-host の現行入口は tools/checks/recover-tables-host.py。
+
+## 索引
+
+- [tools/checks/convert](convert.md)
+
+- [tools/checks/run](run.md)
