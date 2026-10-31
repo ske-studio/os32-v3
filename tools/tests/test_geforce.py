@@ -201,7 +201,87 @@ def module_registration():
             assert result.returncode==0,(mode,result.returncode,result.stdout,result.stderr)
     print('PASS GF registration: missing stub, NULL acceleration, prepare required, lifetime pin',flush=True)
 
+def present_trace(mutation=None):
+    source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
+    mutations={
+        'bounds': ('while (n >= 4)', 'while (n > 0)'),
+        'point': ('if (point(opaque)) {', 'if (row == 0 && point(opaque)) {'),
+    }
+    if mutation:
+        old,new=mutations[mutation]
+        assert source.count(old)==1
+        source=source.replace(old,new,1)
+    byte='*d++ = *s++;'
+    assert source.count(byte)==2
+    source=source.replace(byte, 'trace_store(d, 1); *d++ = *s++;')
+    word='*(volatile u32 *)d = v;'
+    assert source.count(word)==1
+    source=source.replace(word, 'trace_store(d, 4); *(volatile u32 *)d = v;')
+    drain='if (!rc) (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT);'
+    assert source.count(drain)==1
+    source=source.replace(drain, 'if (!rc) { trace_drain(); (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT); }')
+    harness=r'''
+#include "gfx_hal.h"
+#include "hwdev/gfinit_mode.h"
+GfxCounters gfx_counters;
+static void trace_store(volatile u8 *, int);
+static void trace_drain(void);
+#include "present.c"
+#define SIZE 4096
+static u8 src[SIZE], dst[SIZE], expected[SIZE];
+static volatile u8 *start;
+static int pitch, left, top, width, height, errors, calls, fail, drains;
+static u32 regs[(GF_PRESENT_PFB_AMOUNT / 4) + 1];
+static void trace_store(volatile u8 *p, int size) {
+    int offset = (int)(p - start), row = offset / pitch, col = offset % pitch;
+    if (row < top || row >= top + height || col < left || col + size > left + width ||
+        (size == 4 && ((uptr)p & 3)) || (size != 1 && size != 4)) {
+        __asm__ volatile("int $0x80" : : "a"(1), "b"(1) : "memory");
+    }
+    if (size == 1 && !((uptr)p & 3) && col + 4 <= left + width) errors++;
+}
+static void trace_drain(void) { if (calls != height || drains) errors++; drains++; }
+static int point(void *p) { (void)p; calls++; return calls == fail; }
+static void run(int sa, int da, int w, int clip, int failrow) {
+    int sp = 653, dp = 657, x = clip ? -2 : (w == 640 ? 0 : 1), y = 1, h = 3;
+    int marker = 0;
+    for (int i=0; i<SIZE; i++) { src[i]=(u8)(i*17+3); dst[i]=expected[i]=0xa5; }
+    start=dst+da; pitch=dp; left=clip ? 0 : x; top=y;
+    width=clip ? w-2 : w; height=failrow ? failrow-1 : h;
+    if (width < 0) width=0;
+    calls=0; drains=0; fail=failrow; gfx_counters=(GfxCounters){0};
+    for (int r=0; r<height; r++) for (int c=0; c<width; c++)
+        expected[da+(y+r)*dp+left+c]=src[sa+(y+r)*sp+left+c];
+    int rc=gf_present_rect(src+sa,sp,dst+da,dp,(volatile u8 *)regs,x,y,w,h,point,&marker);
+    if (rc != (failrow ? -1 : 0) || calls != (failrow ? failrow : h) ||
+        gfx_counters.present_bytes != (u32)(width*height) || gfx_counters.commits != (u32)!failrow || drains != !failrow) errors++;
+    for (int i=0; i<SIZE; i++) if (dst[i]!=expected[i]) errors++;
+}
+void _start(void) {
+    int widths[]={1,2,3,4,5,6,7,8,9,639,640};
+    for (int a=0; a<4; a++) for (int b=0; b<4; b++)
+        for (int i=0; i<11; i++) run(a,b,widths[i],0,0);
+    for (int i=3; i<11; i++) run(i%4,(i+1)%4,widths[i],1,0);
+    for (int i=1; i<=3; i++) run(1,2,9,0,i);
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(errors ? 1 : 0) : "memory");
+    for (;;) {}
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='gf-trace-') as td:
+        tmp=Path(td)
+        (tmp/'present.c').write_text(source.replace('#include "../../../gfx/gfx_internal.h"', '#include "gfx/gfx_internal.h"'))
+        (tmp/'host.c').write_text(harness)
+        exe=tmp/'host'
+        subprocess.run(FLAGS+['-I'+td]+INCLUDES+[str(tmp/'host.c'),'-o',str(exe)],check=True)
+        result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
+        assert result.returncode == (1 if mutation else 0), (mutation,result.returncode,result.stderr)
+        print(('RED '+mutation if mutation else 'PASS present store trace and byte equivalence'),flush=True)
+
 def main():
+    import sys
+    present_trace()
+    if '--mutate' in sys.argv:
+        for mutation in ('bounds', 'point'): present_trace(mutation)
     unsafe_console()
     product()
     module_registration()
@@ -218,6 +298,7 @@ def run(ctx) -> int:
     base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     env = dict(base_env)
     argv = ['python3', '-B', 'tools/tests/test_geforce.py']
+    if ctx.mutate: argv.append('--mutate')
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc

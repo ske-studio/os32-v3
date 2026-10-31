@@ -33,8 +33,17 @@ int gf_present_rect(const u8 *client, u32 client_pitch,
             rc = -1;
             break;
         }
-        for (int col = 0; col < w; col++)
-            display[col] = client[col];
+        const u8 *s = client;
+        volatile u8 *d = display;
+        int n = w;
+        while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }
+        while (n >= 4) {
+            u32 v;
+            __builtin_memcpy(&v, s, sizeof(u32));
+            *(volatile u32 *)d = v;
+            s += 4; d += 4; n -= 4;
+        }
+        while (n) { *d++ = *s++; --n; }
         rows++;
         client += client_pitch;
         display += display_pitch;
