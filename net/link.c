@@ -108,7 +108,6 @@ struct link_handle {
     u8  ring_owner;
     u32 wseq;
     u16 wlen;
-    u8  wacked;
     u8  w_due;
     u32 decl_len;
     u32 wsent_total;
@@ -196,7 +195,6 @@ static u32 link_stream_free(void)
 static void link_stream_push(const u8 *p, u16 n)
 {
     u32 tail, first;
-    if (n > link_stream_free()) { link_l2_overflow++; return; }
     tail = (link_stream_head + link_stream_count) % LINK_STREAM_BUF;
     first = LINK_STREAM_BUF - tail;
     if (first > n) first = n;
@@ -257,7 +255,7 @@ static void link_drop_all(void)
     int i;
     for (i = 0; i < LINK_HANDLES; i++) {
         struct link_handle *e = &link_h[i];
-        if (e->state != LINK_H_FREE) {
+        if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {
             e->state = LINK_H_STALE;
             link_rt_fail++;
         }
@@ -362,7 +360,7 @@ static void link_timers(void)
             e->retries++;
             link_retransmits++;
         }
-        if (e->wlen && !e->wacked && !e->w_due && since(e->last_tx_tick) >= LINK_RTO_TICKS) {
+        if (e->wlen && !e->w_due && since(e->last_tx_tick) >= LINK_RTO_TICKS) {
             if (e->retries >= LINK_TRIES) { link_resync(); return; }
             e->w_due = 1;
             e->retries++;

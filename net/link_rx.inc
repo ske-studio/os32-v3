@@ -174,8 +174,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
         e->last_rx_tick = tick_count;
         e->probes = 0;
         if (!e->req_acked) { e->req_acked = 1; e->req_due = 0; e->retries = 0; }
-        if (e->wlen && !e->wacked && ack >= e->wseq) {
-            e->wacked = 1;
+        if (e->wlen && ack >= e->wseq) {
             e->w_due = 0;
             e->wlen = 0;
             e->wseq++;

@@ -100,11 +100,18 @@ void link_selftest(int rounds)
     link_counters_reset();              /* L0 区間を隔離 (F2) */
     n = cstr("PING", req, sizeof(req));
     for (i = 0; i < rounds; i++) {
+        unsigned int f;
         u32 st = 0, ln = 0;
         i32 h = link_wait_open(req, n, LINK_PROBE_TICKS * 2);
         if (h < 0) { link_rt_fail++; continue; }
         (void)link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5);
+        /* 待機後の再確認・期限切れ計上・close を IRQ0 に対して不可分にする。
+         * STALE は再同期 / TOMBSTONE 側で計上済み。待機自体は IF=1。 */
+        f = LINK_IRQ_SAVE();
+        if (link_host_status(h, &st, &ln, LINK_SELF_OWNER) == OS32_ERR_AGAIN)
+            link_rt_fail++;
         link_host_close(h, LINK_SELF_OWNER);
+        LINK_IRQ_RESTORE(f);
     }
     /* L0 の結果を専用スナップショットへ (後続の L1〜L3 が link_rt_ok を打ち直すので、
      * net_l0_test.py の最終読み出しは link_l0_ok / link_l0_fail を見る)。*/
