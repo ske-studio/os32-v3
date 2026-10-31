@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -28,6 +28,9 @@ def wiring():
     assert body.index('r1_fixture_timer();') < body.index('tick_dispatch();')
     for rel, (slot, fn, entry) in OWNERS.items():
         src = (ROOT / rel).read_text()
+        if rel == 'drivers/net/ne2000/ne2000.c':
+            src = src.replace('#include "ne2000_control.inc"',
+                              (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
         registration = f'tick_register(PC98_TICK_{slot}, {fn})'
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
@@ -39,6 +42,9 @@ def wiring():
                           ('drivers/sound/cs4231/pcm_module.c', 'if (pcm_handle.generation)'),
                           ('drivers/net/e82557/lan_module.c', 'if (lan_handle.generation)')]:
         src = (ROOT / rel).read_text()
+        if rel == 'drivers/net/ne2000/ne2000.c':
+            src = src.replace('#include "ne2000_control.inc"',
+                              (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
         src = src[src.index(OWNERS[rel][2]):]
         assert src.index('tick_register(') < src.index(boundary), rel
     assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
