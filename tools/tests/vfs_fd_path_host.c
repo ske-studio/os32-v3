@@ -139,16 +139,18 @@ void *memset(void *dst, int val, u32 n) { return kmemset(dst, val, n); }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 #define HEAP_SLOTS 4
-static struct { int in_use; Ext2Ctx ctx; } g_slots[HEAP_SLOTS];
+/* Generic allocator boundary: FAT now owns retained FILs as well as FATFS. */
+#define HEAP_SLOT_BYTES 4096
+static struct { int in_use; u32 data[HEAP_SLOT_BYTES / sizeof(u32)]; } g_slots[HEAP_SLOTS];
 void *kzalloc(u32 size)
 {
     int i;
-    if (size > sizeof(Ext2Ctx)) return (void *)0;
+    if (size > sizeof(g_slots[0].data)) return (void *)0;
     for (i = 0; i < HEAP_SLOTS; i++) {
         if (!g_slots[i].in_use) {
             g_slots[i].in_use = 1;
-            kmemset(&g_slots[i].ctx, 0, sizeof(Ext2Ctx));
-            return (void *)&g_slots[i].ctx;
+            kmemset(g_slots[i].data, 0, sizeof(g_slots[i].data));
+            return (void *)g_slots[i].data;
         }
     }
     return (void *)0;
@@ -157,7 +159,7 @@ void kfree(void *p)
 {
     int i;
     for (i = 0; i < HEAP_SLOTS; i++)
-        if (p == (void *)&g_slots[i].ctx) { g_slots[i].in_use = 0; return; }
+        if (p == (void *)g_slots[i].data) { g_slots[i].in_use = 0; return; }
 }
 
 /* ======================================================================== */
@@ -1427,6 +1429,8 @@ char *strchr(const char *s, int c)
 }
 
 #include "fatfs_vfs.c"
+_Static_assert(sizeof(FatFsCtx) <= HEAP_SLOT_BYTES, "FAT fixture heap slot");
+_Static_assert(sizeof(Ext2Ctx) <= HEAP_SLOT_BYTES, "ext2 fixture heap slot");
 /* 修正前の fatfs_vfs.c (規則を取り込まない) と組んでも規則の表は回せるように */
 #include "vfs_name_rules.inc"
 

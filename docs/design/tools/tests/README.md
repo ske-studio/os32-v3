@@ -26,6 +26,14 @@
 
 - 抽出は別 translation unit の旧表／製品表を C で評価し、全欄を table・row・field・slot・value の名前付きレコードとして出力する；参照は NULL／シンボル名と全要素、式は eval の名前と前処理済み関数本文、profile は CRC も照合し、--extract で schema=1 の JSON を後続生成器へ渡す。
 
+### FatFs 保持と既存回帰
+
+- vfs_fd_path_host.c の allocator は4個の4KiBスロットとし、Ext2Ctx と保持状態を含む FatFsCtx が収まることを静的に確認する。Ext2Ctx のサイズを全 FS の確保上限としない。
+- fdc_track_host.c の font_replay は製品 fatfs_vfs_read_cache.inc の rc_read を実 FDC 模型と FatFs に接続し、解除前に破棄する。test_fdc_track.py は VFS と同じ helper を通す配線と、変異の写しにも製品 .inc を含むことを維持する。データ一致と配置から導くシーク・まとめ読み上限は保つ。
+
 ## 索引
 
+- [FatFs 読み取り保持の実 FatFs 試験](fatfs_read_cache_host.md)
+- [FatFs 読み取り保持の試験入口](test_fatfs_read_cache.md)
+- [FatFs VFS の境界回帰](fatfs_stat_host.md)
 - [tools/tests/recover_tables_oracle](recover_tables_oracle.md)

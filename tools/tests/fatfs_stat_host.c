@@ -148,6 +148,7 @@ FRESULT f_mount(FATFS *fs, const TCHAR *path, BYTE opt)
 
 /* ---- diskio / Device / IDE の境界 (mount) ---- */
 void diskio_set_fdd_drive(int drv) { (void)drv; }
+u32 fdc_media_gen(int drv) { (void)drv; return 0; }
 void diskio_set_hdd_drive(int drv) { (void)drv; }
 void diskio_set_hdd_partition(u32 offset) { (void)offset; }
 void diskio_set_hdd_sector_size(u16 sz) { (void)sz; }
@@ -171,6 +172,7 @@ void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
 u32 kstrlen(const char *s) { return (u32)strlen(s); }
+int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
 char *kstrncpy(char *dst, const char *src, u32 n)
 {
     u32 i;
