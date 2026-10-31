@@ -18,6 +18,12 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/v
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c']
+PEGC_PARTS = [
+    'drivers/video/pc98/backend_pegc_timing.inc',
+    'drivers/video/pc98/backend_pegc_diag.inc',
+    'drivers/video/pc98/backend_pegc_present.inc',
+    'drivers/video/pc98/backend_pegc_restore.inc',
+]
 MUTANTS = [
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
@@ -105,12 +111,15 @@ static inline void io_wait_n(int n) {(void)n;}
 #endif
 ''')
         sources = []
-        for path in TARGET_SRCS:
-            body = source_texts[path] if source_texts is not None else (ROOT/path).read_text()
+        for path in (*TARGET_SRCS, *PEGC_PARTS):
+            body = source_texts[path] if source_texts is not None and path in source_texts else (ROOT/path).read_text()
             for unit, old, new in extra_changes:
                 if unit == path:
                     assert body.count(old) == 1, (unit, old, body.count(old))
                     body = body.replace(old, new)
+            if path in PEGC_PARTS:
+                (tmp/pathlib.Path(path).name).write_text(body)
+                continue
             if path == 'gfx/gfx_core.c':
                 if mutation:
                     _, old, new, _ = mutation
