@@ -5,3 +5,15 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 72 RESUME | I:1751 `init_resume` |
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 72 RESUME | 1B、条件skipクリア | I:1751–1756 |
+
+> [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 72 RESUME | 1 | C`[]` | F、skip=0（skip中も実行） |

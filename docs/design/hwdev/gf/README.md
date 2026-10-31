@@ -42,3 +42,15 @@ S0 は PLL/PFB/旧 timing の完全復元ではなく PARTIAL/S1 未保証を保
 - [hwdev/gf/rom](rom.md)
 - [hwdev/gf/scripts](scripts.md)
 - [hwdev/gf/service](service.md)
+
+## 移し替えた設計
+
+- BSD/MIT ソースのみ保存。メーカー資料は閲覧と要約のみ。GPL/Linux は根拠・挙動確認・構造参照に不使用。
+
+- `N/` = `R/nouveau/drivers/gpu/drm/nouveau/nvkm/`、`I:行` = `N/subdev/bios/init.c:行`。参照版は `R/INDEX.md:6–10`。
+- nouveau の引用元は MIT 本文のあるファイル。派生実装に著作権・許諾を残す。Haiku は計画のライセンス確認待ちを守り、挙動の照合だけに使う。
+
+手本は `N/dispnv04/crtc.c:708` prepare、`:731` commit、`N/dispnv04/hw.c:827` load_state。新レジスタ列を推測で追加しない。
+
+- [HW3] 根拠: 98 復帰の資料と FreeBSD 対照は `R/kernel/v86_io.c:250`。NVIDIA 公開 MIT 実装 `T/refs/geforce6200/xf86-video-nv/src/nv_driver.c:2290` は選別した保存状態を順序付きで復元する前例で、Ra266 の冷間復帰保証ではない。
+- PBUS の意味は `T/refs/geforce6200/envytools/docs/hw/bus/pci.rst:50`、`:60`。ライセンスは `T/refs/geforce6200/INDEX.md:6`、`:7`。専有 driver/ROM x86 コードは解析しない。新しい装置 profile はメーカー資料と BSD/MIT 実装の照合を実装開始条件とする。
