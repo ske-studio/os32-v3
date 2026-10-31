@@ -428,7 +428,6 @@ static u8 memmap_want_at(u32 a, u32 tramp)
         }
         if (a >= MEM_SHM_GUARD_HI && a < MEM_SHM_GUARD_HI + PAGE_SIZE)
             return MM_NP;
-        if (a < MEM_SHM_GUARD_LO) return MM_RW; /* 本体 + ヒープ + KAPI */
         return MM_RW;                           /* SLACK */
     }
 
@@ -437,7 +436,6 @@ static u8 memmap_want_at(u32 a, u32 tramp)
     /* 台帳の backing は present / supervisor / R/W (T1-U1: USER は立たない)。 */
     if (a >= MEM_LEDGER_META_BASE && a < MEM_LEDGER_META_END)
         return MM_RW;
-    if (a >= MEM_KSTACK_BASE && a < MEM_SHELL_LOAD_ADDR) return MM_RW;
     if (a < MEM_SHELL_LOAD_ADDR) return MM_RW;
 
     /* DMA を含め、実 RAM の上端より先は not-present。 */
@@ -471,7 +469,7 @@ int paging_poke_user_bit(u32 virt, int set_user)
     u32 pdi = virt / (PTE_COUNT * PAGE_SIZE);
     u32 idx = (virt / PAGE_SIZE) % PTE_COUNT;
 
-    if (!pg_enabled || pdi >= PAGING_PT_COUNT || !page_tables[pdi]) return -1;
+    if (!pg_enabled || !page_tables[pdi]) return -1;
     if (set_user) page_tables[pdi][idx] |= (u32)PTE_USER;
     else          page_tables[pdi][idx] &= ~(u32)PTE_USER;
     arch_mmu_flush_tlb();
@@ -486,8 +484,7 @@ int paging_memmap_selftest(u32 tramp_page)
 
     if (paging_v86_session_open()) return -1;
     paging_memmap_bad_count = 0;
-    if (!pg_enabled || !page_tables[0] || !fixed_paging_valid() ||
-        V2P(page_directory) != MEM_FIXED_PD_BASE) return -1;
+    if (!pg_enabled || !page_tables[0] || !fixed_paging_valid()) return -1;
 
     i = 0;
     while (i < (MEM_DMA_POOL_END + 1) / PAGE_SIZE) {

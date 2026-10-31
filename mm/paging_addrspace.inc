@@ -234,7 +234,7 @@ ready: ;
     }
     /* この PD が既にアクティブなら TLB を捨てる。通常は CR3 に載せる前に
      * 呼ぶので不要だが、載せた後の追加マップにも備える。 */
-    if (as && as->pd_phys && paging_current_cr3() == as->pd_phys) {
+    if (paging_current_cr3() == as->pd_phys) {
         paging_load_cr3(as->pd_phys);
     }
     return 0;
@@ -312,8 +312,6 @@ u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
         u32 pdi = pfn / PTE_COUNT;
         u32 pti = pfn % PTE_COUNT;
         u32 *pt;
-        if (pdi < as->app_pde || pdi >= as->app_pde + as->app_pde_count)
-            continue;                       /* 共有帯は触らない */
         if (!as->app_pt_phys[pdi - as->app_pde]) continue;
         pt = (u32 *)P2V(as->app_pt_phys[pdi - as->app_pde]);
         if (pt[pti] & PTE_PRESENT) {

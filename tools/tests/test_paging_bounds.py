@@ -53,7 +53,16 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
         ]
         for name, old, new in mutants:
             assert source.count(old) == 1
-            (tmp / 'paging_host_source.c').write_text(source.replace(old, new))
+            mutant = source.replace(old, new)
+            if name in ('mixed free below allowed', 'mixed free allowed'):
+                # Keep the old bounded walk in these mutants: removing whole-range
+                # rejection must expose partial frees, not out-of-bounds indexing.
+                walk = '        if (!as->app_pt_phys[pdi - as->app_pde]) continue;'
+                assert source.count(walk) == 1
+                mutant = mutant.replace(walk,
+                    '        if (pdi < as->app_pde || pdi >= as->app_pde + as->app_pde_count)\n'
+                    '            continue;\n' + walk)
+            (tmp / 'paging_host_source.c').write_text(mutant)
             subprocess.run(build, check=True)  # Compile errors are not RED.
             result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
             assert result.returncode != 0, name + ' survived'

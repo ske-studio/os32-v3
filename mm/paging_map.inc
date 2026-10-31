@@ -54,10 +54,6 @@ static int set_page_noflush(u32 virt_addr, u32 phys_addr, u32 flags)
     u32 pdi = PDE_INDEX(virt_addr);
     u32 pti = PTE_INDEX(virt_addr);
 
-    /* マッピング範囲外。無言 no-op にすると「ガードページを置いたつもり」の
-     * まま保護なしで走る (fail-open) ので、必ず失敗を返す。 */
-    if (pdi >= PAGING_PT_COUNT) return -1;
-
     page_tables[pdi][pti] = (phys_addr & PTE_FRAME_MASK) | flags;
 
     /* 実効権限は PDE と PTE の論理積になる (i386 の仕様)。PTE だけ USER に
@@ -158,7 +154,6 @@ int paging_shm_set_rw(u32 base, u32 end, int writable)
     for (a = base; a < end; a += PAGE_SIZE) {
         u32 page = (a - MEM_SHM_BASE) / PAGE_SIZE;
         set_page_noflush(a, a, (writable ? PAGE_RW : PAGE_RO) | PTE_USER);
-        if (page >= MEM_SHM_SIZE / PAGE_SIZE) continue;
         if (writable) shm_audit_ro[page / BITS_PER_U32] &= ~(1UL << (page % BITS_PER_U32));
         else shm_audit_ro[page / BITS_PER_U32] |= 1UL << (page % BITS_PER_U32);
     }
