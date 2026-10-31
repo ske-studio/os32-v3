@@ -705,11 +705,13 @@ static int candidate_boundaries(void)
     say("PASS IMEBOUND numeric confirmation and 31-byte candidate plus ASCII\n"); return 0;
 }
 
+#include "x11_shared_host_l45.inc"
+
 void _start(void)
 {
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
-    int rc = unpublished() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() ||
+    int rc = unpublished() || cui_key_conversion() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() ||
              imetab_delivery() || imetab_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     rc |= dict_recovery();

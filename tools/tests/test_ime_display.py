@@ -18,6 +18,14 @@ MUTATIONS = [
     ('mode change restoration', 'ime.c',
      '        candlist_clear(); /* Restore the list before changing input mode. */',
      '', 'mode change restores candidate rows'),
+    ('candidate state restoration', 'ime_candidate_commit.inc',
+     '    g_ime.state = IME_ST_INPUT;', '',
+     'confirmation clears candidate state and saved rows'),
+    ('candidate remaining kana redraw', 'ime_candidate_commit.inc',
+     '        preedit_draw();', '',
+     'confirmation redraws remaining kana or clears preedit'),
+    ('candidate empty preedit clear', 'ime_candidate_commit.inc',
+     '        preedit_clear();', '', 'preedit cleared'),
 ]
 
 
@@ -37,7 +45,7 @@ def main():
         source = source.replace(str(ROOT / 'kernel/ime/ime.c'), str(tmp / 'ime.c'))
         (tmp / 'ime_display_host.c').write_text(source)
         originals = {'console.c': (ROOT / 'kernel/console/console.c').read_text()}
-        for name in ('ime.c', 'ime_render.inc', 'ime_convert.inc', 'ime_dict_api.inc'):
+        for name in ('ime.c', 'ime_render.inc', 'ime_convert.inc', 'ime_candidate_commit.inc', 'ime_dict_api.inc'):
             originals[name] = (ROOT / 'kernel/ime' / name).read_text()
         for mutation in [None] + (MUTATIONS if args.mutate else []):
             sources = dict(originals)
