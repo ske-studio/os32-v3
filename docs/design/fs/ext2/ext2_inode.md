@@ -4,6 +4,8 @@
 
 inode の読書きとブロック・inode の割当てを扱う。
 間接ブロック表の操作と解放を行う。
+read 入口は [inode 1 枠](ext2_inode_cache.md)、bmap は [間接表 2 枠](ext2_inode_indirect_cache.md)
+へ接続する。全失効の薄い束ね口は [ext2_priv](ext2_priv.md) の契約に従う。
 
 ## 落とし穴
 

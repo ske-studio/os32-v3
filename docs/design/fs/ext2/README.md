@@ -23,3 +23,9 @@ fmt_ctxは元関数のstaticのままポインタ渡し。ext2_g_blkも元の共
 - [fs/ext2/ext2_super.c](ext2_super.md)
 
 - [ext2_super_block_io.md](ext2_super_block_io.md)
+
+- [ext2_inode_cache](ext2_inode_cache.md)
+- [ext2_inode_indirect_cache](ext2_inode_indirect_cache.md)
+- [ext2_file_read_cache](ext2_file_read_cache.md)
+- [ext2_file_read_run](ext2_file_read_run.md)
+- [ext2_priv](ext2_priv.md)

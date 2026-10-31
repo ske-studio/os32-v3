@@ -83,6 +83,11 @@ int ext2_find_partition_src(int ide_drive, u32 *out_start, u32 *out_len,
  * 下位バイトのみを使用する。未登録なら NULL。 */
 Device *ext2_dev_for(int ide_drive);
 
+/* Fixed read slots, shared across mounts. Reset performs no I/O or clearing.
+ * All writes reset before issue; raw read failure and mount lifetime reset too. */
+void ext2_read_cache_reset(void);
+void ext2_data_cache_reset(void);
+
 /* -- ext2_inode.c -- */
 int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode);
 int ext2_write_inode(Ext2Ctx *ctx, u32 ino, const Ext2Inode *inode);

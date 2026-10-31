@@ -97,6 +97,15 @@ int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
 int ext2_read_data_block(Ext2Ctx *ctx, u32 block_num, void *buf)
 { return ext2_read_block(ctx, block_num, buf); }
 
+int ext2_read_data_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, void *buf)
+{
+    u32 i;
+    for (i = 0; i < blocks; i++)
+        if (ext2_read_data_block(ctx, first + i, (u8 *)buf + i * EXT2_BLOCK_SIZE) != 0)
+            return EXT2_ERR_IO;
+    return EXT2_OK;
+}
+
 /* ---- ext2_file.c が呼ぶ書き込み側 (この試験では使わない) ---- */
 int ext2_write_block(Ext2Ctx *c, u32 b, const void *p)
 { (void)c; (void)b; (void)p; return 0; }
@@ -142,6 +151,7 @@ static Ext2Ctx g_ctx;
 
 static void ctx_reset(u32 size)
 {
+    ext2_data_cache_reset();
     memset(&g_ctx, 0, sizeof(g_ctx));
     g_ctx.mounted = 1;
     g_file_size = size;
@@ -252,10 +262,14 @@ static void case_hole_and_errors(void)
             n = stream ? ext2_read_stream(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf), 0)
                        : ext2_read_file(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf));
             CHECK(n == (kind == 0 ? EXT2_BLOCK_SIZE : EXT2_ERR_IO));
-            for (i = 0; i < EXT2_BLOCK_SIZE; i++)
-                CHECK(buf[i] == block_byte(100, i));
-            for (; i < sizeof(buf); i++) CHECK(buf[i] == GUARD_BYTE);
-            CHECK(g_reads == (u32)(kind == 2 ? 2 : 1));
+            /* Failed reads return IO; their destination is not a successful prefix.
+             * The run builder can discover a bmap error before data I/O. */
+            if (kind == 0) {
+                for (i = 0; i < EXT2_BLOCK_SIZE; i++)
+                    CHECK(buf[i] == block_byte(100, i));
+                for (; i < sizeof(buf); i++) CHECK(buf[i] == GUARD_BYTE);
+            }
+            CHECK(g_reads == (u32)(kind == 2 ? 2 : kind == 1 ? 0 : 1));
         }
         ctx_reset(sizeof(buf));
         g_inode_error = EXT2_ERR_NOTFOUND;

@@ -1,4 +1,13 @@
 #include "ext2_priv.h"
+#include "ext2_inode_cache.inc"
+#include "ext2_inode_indirect_cache.inc"
+
+void ext2_read_cache_reset(void)
+{
+    ext2_inode_cache_reset();
+    ext2_indirect_cache_reset();
+    ext2_data_cache_reset();
+}
 
 /*  iノード読み書き — g_blk使用                                             */
 /* ======================================================================== */
@@ -29,6 +38,7 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
     int ret, i;
     u8 *src;
 
+    if (ext2_inode_cache_get(ctx, ino, inode)) return EXT2_OK;
     ret = ext2_read_inode_block(ctx, ino, &block_num, &src);
     if (ret != 0) return ret;
 
@@ -52,6 +62,7 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
     inode->dir_acl    = le32_rd(&src[EXT2_INODE_DIR_ACL_OFF]);
     inode->faddr      = le32_rd(&src[EXT2_INODE_FADDR_OFF]);
     ext2_mem_copy(inode->osd2, &src[EXT2_INODE_OSD2_OFF], EXT2_INODE_OSD2_SIZE);
+    ext2_inode_cache_put(ctx, ino, inode);
 
     return EXT2_OK;
 }
@@ -270,7 +281,7 @@ int ext2_free_inode(Ext2Ctx *ctx, u32 ino)
 }
 
 /* ======================================================================== */
-/*  間接ブロック: bmap — g_aux使用                                          */
+/*  間接ブロック: bmap — 専用の固定保持枠                                          */
 /* ======================================================================== */
 
 /* 「未割当 (0)」と「読めなかった (EXT2_ERR_IO)」を分けて返す。
@@ -291,10 +302,8 @@ int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
     file_block -= EXT2_NDIR_BLOCKS;
     if (file_block < EXT2_ADDR_PER_BLOCK) {
         if (inode->block[EXT2_IND_BLOCK] == 0) return EXT2_OK;
-        ret = ext2_read_block(ctx, inode->block[EXT2_IND_BLOCK], ext2_g_aux);
-        if (ret != 0) return EXT2_ERR_IO;
-        *out_phys = le32_rd(&ext2_g_aux[file_block * EXT2_BLOCK_PTR_SIZE]);
-        return EXT2_OK;
+        return ext2_indirect_cache_read(ctx, inode->block[EXT2_IND_BLOCK],
+                                         file_block, 0, out_phys);
     }
 
     file_block -= EXT2_ADDR_PER_BLOCK;
@@ -304,14 +313,11 @@ int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
         u32 ind1_block;
 
         if (inode->block[EXT2_DIND_BLOCK] == 0) return EXT2_OK;
-        ret = ext2_read_block(ctx, inode->block[EXT2_DIND_BLOCK], ext2_g_aux);
+        ret = ext2_indirect_cache_read(ctx, inode->block[EXT2_DIND_BLOCK],
+                                       ind1_idx, 1, &ind1_block);
         if (ret != 0) return EXT2_ERR_IO;
-        ind1_block = le32_rd(&ext2_g_aux[ind1_idx * EXT2_BLOCK_PTR_SIZE]);
         if (ind1_block == 0) return EXT2_OK;
-        ret = ext2_read_block(ctx, ind1_block, ext2_g_aux);
-        if (ret != 0) return EXT2_ERR_IO;
-        *out_phys = le32_rd(&ext2_g_aux[ind2_idx * EXT2_BLOCK_PTR_SIZE]);
-        return EXT2_OK;
+        return ext2_indirect_cache_read(ctx, ind1_block, ind2_idx, 0, out_phys);
     }
     /* 三重間接は未対応。範囲外は「未割当」= ファイルの終わり */
     return EXT2_OK;
