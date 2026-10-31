@@ -3,7 +3,7 @@
 Record: tools/tests/display_cleanup_tdd.md
 """
 CHECK = dict(name='display-cleanup-host', tier=1,
-    covers=['drivers/video/pc98/pc98_route.h', 'kernel/v86/v86.c', 'kernel/v86/v86_gp_emulate.inc', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'kernel/v86/v86_gcap.c', 'kdebug/v86_gcap.c', 'kernel/v86/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'kernel/v86/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/pc98/pc98_route.h', 'kernel/v86/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'gfx/gfx_vram.c', 'init/boot_splash.c', 'kernel/v86/v86_gcap.c', 'kdebug/v86_gcap.c', 'kernel/v86/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'include/pc98.h', 'include/pegc.h', 'kernel/v86/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.141466)
 
 from kernel_includes import include_dirs, include_flags

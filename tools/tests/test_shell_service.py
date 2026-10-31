@@ -22,7 +22,7 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'exec/exec_kapi_init.inc', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.566306)
 
 from kernel_includes import include_dirs, include_flags

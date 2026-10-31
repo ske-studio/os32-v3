@@ -49,6 +49,8 @@ def main(argv: list[str]) -> int: ...
    3集合は段の昇格・共有追加・変異選択より前に確定する。notest に分類しても実際の hit は消さない。
 4. **段**: full_hits、Makefile/build定義、KAPI入力・生成世代・link定義、ツールチェーン設定、ランナー自身は段4を最優先とする。
    旧 BUILD_CONFIG_GLOBS/KAPI_GENERATED を用いる。通常の CHECK ファイル変更は自己当たりとして扱う。
+   `--base` があれば full glob に当たる各ビルド定義の基点と作業木を比較し、コメント・空行だけの差では段4へ上げない。当たりの計算には残す。
+   make の recipe・define・継続行・エスケープされた `#` は保持し、曖昧な構文は実変更として扱う。基点なしでは従来どおり段4。
    変更なし/ignoreのみは従来の fast (段4、全列、変異なし)。notestだけで hit が空なら何も回さず、段0・mode=sel・空の stage/mutations/needs。
    docsのみは段0。残りは単一の非ヘッダかつ親が2成分以上で共有層以外なら段1、同じ深さ2以上の機能内なら段2。
    複数機能、親が1成分以下、include/kapi/mm/exec/lib/platform の層、または unmatched があれば段3。
@@ -71,9 +73,9 @@ def main(argv: list[str]) -> int: ...
 
 CHECK 自身、covers と run が呼ぶスクリプトから旧 Extractor の静的 import/文字列/include 閉包を導く (`tools/check_select.py:719,759,819`)。
 C/ハーネスを集めてから include を辿り、旧 `gcc -MM -MG -I.` と導出した -I の結果を合わせる (`:800,954,975`)。
-選択に自動追加するのは旧 effective_checks 同様 .h。直接読むヘッダ、.inc/.py/.c/データは同値が復元できなければ covers に残す。
-ヘッダ変更または sdk/kapi.json のときだけ compiler scan を使う (`:1321`)。ソース単位の失敗は旧静的閉包へ戻し、gcc 起動失敗は非0。
-キャッシュは同一プロセス内の lru のみ。root・入力条件を分け、ディスクへ保存しない。--list では依存抽出をせず、--lint はヘッダ全件コンパイルをしない。
+選択に自動追加するのは抽出した入力と `-MM` に出るリポジトリ内のファイル (`.h`・`.inc`・その他の C 断片を含む)。復元できない直接入力は covers に残す。
+文書以外の変更では compiler scan を使う。ソース単位の失敗は旧静的閉包へ戻し、gcc 起動失敗は非0。
+キャッシュは同一プロセス内の lru のみ。root・入力条件を分け、ディスクへ保存しない。--list では依存抽出をせず、--lint はヘッダ全件コンパイルをしない。静的抽出で導く `.h`・`.inc` は covers の重複を要求しない。
 成果物読取監査は旧 `:1015,1150` と PATH_AUDIT_ALLOW を移す。実行追跡や Python の汎用解釈器を作らない。
 ランナーは変更ファイルをそのまま ctx.files へ渡す。翻訳単位の逆引きは P1b の各 checker 側が持つ。
 p2v/c-dialect/arch-asm の run だけが既存 --files 契約へ渡す。未着地なら旧全走査。privileged/kprintf-window は旧入口を維持する。

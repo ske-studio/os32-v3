@@ -2,7 +2,7 @@
 記録: tools/tests/module_image_tdd.md
 """
 CHECK = dict(name='module-image-host', tier=1,
-    covers=['kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/crc32_core.inc', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.759112)
 
 from kernel_includes import include_flags
