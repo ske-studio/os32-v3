@@ -219,6 +219,8 @@ static u8 file_byte(const Media *m, u32 lba, u32 off)
 #define ST_ERR  0x01
 #define LOG_MAX 8192
 
+#define TEST_MEDIUM_ERROR 0x03
+
 static struct {
     Media *m;          /* いま入っている媒体 */
     int bank;
@@ -244,6 +246,7 @@ static struct {
     int short_multi;   /* count > 1 の READ(10) で 1 セクタ少なく渡す */
     int ua_next;       /* 次のこの数のコマンドで UNIT ATTENTION を返し、媒体を B へ */
     int stale;         /* 境目の後の古い状態の回数 */
+    int fail_after_block; /* data error after the first DRQ */
     int cap_nodata;    /* READ CAPACITY がデータ無しで終わる */
     u32 cap_len;       /* READ CAPACITY の応答の長さ (0 = 8)。7 / 9 は規定外の装置 */
     /* 数 */
@@ -414,7 +417,9 @@ static unsigned int m_inpw(unsigned int port)
         /* ブロックの終わり。しばらく古い状態 (DRQ) を見せる */
         M.lag = M.stale;
         M.lag_status = M.status;
-        if (M.pos < M.data_len) {
+        if (M.fail_after_block) {
+            model_error(TEST_MEDIUM_ERROR);
+        } else if (M.pos < M.data_len) {
             model_start_block();
         } else {
             M.status = ST_DRDY;
@@ -896,23 +901,42 @@ static void np2_outpw(unsigned int port, unsigned int v)
     }
 }
 
+static u16 g_pio_words[32768], g_pio_cdb[6];
+static u32 g_pio_n, g_pio_out;
+
 unsigned int atapi_shim_inp(unsigned int port)
 { return g_np2 ? np2_inp(port) : m_inp(port); }
 void atapi_shim_outp(unsigned int port, unsigned int value)
 { if (g_np2) np2_outp(port, value); else m_outp(port, value); }
 unsigned int atapi_shim_inpw(unsigned int port)
-{ return g_np2 ? np2_inpw(port) : m_inpw(port); }
+{
+    unsigned int w = g_np2 ? np2_inpw(port) : m_inpw(port);
+    if (g_pio_n < 32768) g_pio_words[g_pio_n] = (u16)w;
+    g_pio_n++;
+    return w;
+}
 void atapi_shim_outpw(unsigned int port, unsigned int value)
-{ if (g_np2) np2_outpw(port, value); else m_outpw(port, value); }
+{
+    if (g_pio_out < 6) g_pio_cdb[g_pio_out] = (u16)value;
+    g_pio_out++;
+    if (g_np2) np2_outpw(port, value); else m_outpw(port, value);
+}
 
 /* ======================================================================== */
 /*  実物 dev 層への fixture 装置・未使用境界                                                 */
 /* ======================================================================== */
 
+static u32 g_dev_lba[LOG_MAX], g_dev_cnt[LOG_MAX], g_dev_n;
+static int g_dev_poison;
+
 static int fixture_cd_read(Device *dev, int lba, int count, void *buf)
 {
     (void)dev;
-    return atapi_read_sectors((u32)lba, (u32)count, buf);
+    CHECK(g_dev_n < LOG_MAX);
+    g_dev_lba[g_dev_n] = (u32)lba; g_dev_cnt[g_dev_n++] = (u32)count;
+    int rc = atapi_read_sectors((u32)lba, (u32)count, buf);
+    if (rc && g_dev_poison) memset(buf, 0xA5, (size_t)count * SEC);
+    return rc;
 }
 static Device g_cd0 = {.name = "cd0", .type = DEV_BLOCK, .bus_type = DEV_BUS_ATAPI,
                        .sect_size = SEC, .blk_read = fixture_cd_read};
@@ -944,6 +968,7 @@ static void reset_devices(void)
 
 static void setup(void)
 {
+    g_dev_n = 0; g_dev_poison = 0;
     memset(&M, 0, sizeof(M));
     M.fail_lba = -1;
     M.stale = 3;         /* 400ns の整定を置かないと取り違える形 */
@@ -965,6 +990,7 @@ static void setup(void)
 static void setup_np2_layout(int layout)
 {
     int k;
+    g_dev_n = 0; g_dev_poison = 0;
     memset(&M, 0, sizeof(M));
     memset(&N, 0, sizeof(N));
     M.fail_lba = -1;
@@ -1453,11 +1479,18 @@ static void t_list_swap(void)
     CHECK(g_sw_deep_b);
     iso9660_ops.umount(c);
 
-    /* (2) 2 セクタの SUB の 1 セクタ目を読んだ後、次のセクタの読みで交換 → 中断 */
+    /* (2) UA is pending inside the window; detect it at the 17th sector. */
     setup(); c = do_mount();
     g_sw_calls = g_sw_deep_b = 0; g_sw_arm = 1; g_sw_read = 0;
     g_sw_ctx = c;
-    CHECK(iso9660_ops.list_dir(c, "/SUB", sw_cb, NULL) == VFS_ERR_IO);
+    c->root_lba = c->volume_size - 17;
+    c->root_size = 17 * SEC;
+    memset(g_media_a.img + c->root_lba * SEC, 0, c->root_size);
+    memcpy(g_media_a.img + c->root_lba * SEC, g_media_a.img + SUB_LBA * SEC, SEC);
+    /* No callback after the boundary: only the post-acquisition generation
+     * check can detect this successful UA retry into the new medium. */
+    memset(g_media_b.img + (c->root_lba + 16) * SEC, 0, SEC);
+    CHECK(iso9660_ops.list_dir(c, "/", sw_cb, NULL) == VFS_ERR_IO);
     CHECK(!g_sw_deep_b);
     iso9660_ops.umount(c);
 
@@ -2448,30 +2481,9 @@ static void t_srst_clock(void)
     CHECK(N.d[0].busy_left == 0);
 }
 
-/* バッファの先頭を奇数番地にし、偶数・奇数 DRQ と余剰データをガードで確認。 */
-static void t_pio_bounds(void)
-{
-    static const u32 chunks[] = { 8, 7, 2, 3 };
-    static const u32 sizes[] = { 0, 3, 8, 9 };
-    u8 cdb[ATAPI_CDB_BYTES] = { SCSI_CMD_READ_CAPACITY };
-    u16 storage[8];
-    u8 *bytes = (u8 *)storage;
-    setup();
-    atapi_select_bank(1);
-    M.cap_len = 9;
-    for (unsigned j = 0; j < sizeof(chunks) / sizeof(chunks[0]); j++) {
-        M.drq_max = chunks[j];
-        for (unsigned i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
-            u32 actual = 0, size = sizes[i];
-            memset(storage, 0xCD, sizeof(storage));
-            CHECK(atapi_packet_read(cdb, bytes + 1, size, &actual) == ATAPI_OK);
-            CHECK(actual == 9);
-            CHECK(memcmp(bytes + 1, M.cap, size) == 0);
-            CHECK(bytes[0] == 0xCD);
-            for (unsigned k = size + 1; k < sizeof(storage); k++) CHECK(bytes[k] == 0xCD);
-        }
-    }
-}
+#include "cd_read_host_pio.inc"
+
+#include "cd_read_host_dir.inc"
 
 int main(int argc, char **argv)
 {
@@ -2527,6 +2539,13 @@ int main(int argc, char **argv)
     else if (!strcmp(cs, "np2_bus_dead"))    t_np2_bus_dead();
     else if (!strcmp(cs, "poll_clock"))      t_poll_clock();
     else if (!strcmp(cs, "srst_clock"))      t_srst_clock();
+    else if (!strcmp(cs, "dir_batch"))       t_dir_batch();
+    else if (!strcmp(cs, "dir_find"))        t_dir_find();
+    else if (!strcmp(cs, "dir_reentry"))     t_dir_reentry();
+    else if (!strcmp(cs, "dir_failure"))     t_dir_failure();
+    else if (!strcmp(cs, "dir_tail"))        t_dir_tail();
+    else if (!strcmp(cs, "dir_media"))       t_dir_media();
+    else if (!strcmp(cs, "pio_trace"))       t_pio_trace();
     else if (!strcmp(cs, "pio_bounds"))      t_pio_bounds();
     else { fprintf(stderr, "unknown case '%s'\n", cs); return 2; }
     return 0;

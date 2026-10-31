@@ -29,3 +29,8 @@
 ## 索引
 
 - [tools/tests/recover_tables_oracle](recover_tables_oracle.md)
+
+- [cd_read_host](cd_read_host.md)
+- [cd_read_host_dir](cd_read_host_dir.md)
+- [cd_read_host_pio](cd_read_host_pio.md)
+- [test_cd_read](test_cd_read.md)

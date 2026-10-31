@@ -24,7 +24,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=12.534032)
 
 from kernel_boot_source import kernel_parts, kernel_source
@@ -42,12 +42,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
+TREE_FILES = ['drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "drivers/base/dev.h",
               "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
-              READ_HARNESS, PKG_HARNESS, SHIM + "/io.h"]
+              READ_HARNESS, "tools/tests/cd_read_host_dir.inc", "tools/tests/cd_read_host_pio.inc", PKG_HARNESS, SHIM + "/io.h"]
 
 READ_CASES = ["empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
               "short_transfer", "bad_outside", "bad_inside", "lru_order", "ua_mount", "multi_drq",
@@ -58,10 +58,11 @@ READ_CASES = ["empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4
               "np2_stuck", "np2_ua_init", "np2_becoming_ready", "np2_no_medium",
               "np2_ready_total", "np2_srst", "ua_multi",
               "np2_spinup", "np2_srst_long", "np2_boot_worst", "np2_start_unit",
-              "np2_bus_dead", "poll_clock", "srst_clock", "pio_bounds"]
+              "np2_bus_dead", "poll_clock", "srst_clock", "pio_bounds", "pio_trace", "dir_batch", "dir_find", "dir_reentry", "dir_failure", "dir_media", "dir_tail"]
 # N = 32 の版で回すもの (1 回 64KB)
 WIDE_CASES = ["stream_4k", "stream_32k", "read_file", "multi_drq", "multi_fallback",
-              "np2_read", "np2_async", "np2_sel_lag", "np2_stuck"]
+              "np2_read", "np2_async", "np2_sel_lag", "np2_stuck",
+              "dir_batch", "dir_reentry", "dir_failure", "dir_tail", "dir_media"]
 PKG_CASES = ["aligned_chunks", "nomem", "open_fail_frees"]
 
 COMMON = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
@@ -88,6 +89,8 @@ EXE_KEYS = ("read", "wide", "pkg")
 # ほかは実物で組んだもの (main の 1 回目、全部通ったもの) を使う。表に無いファイル
 # (ヘッダなど) は 3 本とも組む。表が gcc -MM の依存より狭ければ mutate() が落ちる。
 REBUILD = {
+    "drivers/ata/atapi_pio.inc": ("read", "wide"),
+    "fs/isofs/iso9660_dir_read.inc": ("read", "wide"),
     "drivers/ata/cd_body.c": ("read", "wide"),
     "init/kernel.c": ("read", "wide"),
     "fs/vfs.c": ("read", "wide"),
@@ -213,9 +216,9 @@ MUTATIONS = [
      "#define ATAPI_POLL_US           10UL", "長い待ちも 10us のままにする"),
     ("drivers/ata/atapi.c", r"    cpu_delay_us\(ATAPI_SRST_HOLD_US\);",
      "    cpu_delay_us(4);", "SRST の保持が規定の 5us を下回る"),
-    ("drivers/ata/atapi.c", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
+    ("drivers/ata/atapi_pio.inc", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
      "if (!(xfer_size & 1))", "高速路でバッファの上限を無視する"),
-    ("drivers/ata/atapi.c", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
+    ("drivers/ata/atapi_pio.inc", r"if \(!\(xfer_size & 1\) && end <= buf_size\)",
      "if (end <= buf_size)", "奇数 DRQ の端数まで 16bit 格納する"),
     # --- drivers/ata/atapi.c
     ("drivers/ata/atapi.c",
@@ -307,11 +310,11 @@ MUTATIONS = [
      "if (atapi_media_gen() == gen0 || 1) {\n            return (ret != 0) ? ret : (int)to_read;",
      "読みの途中で世代が進んでも読み直さない (iso_read_range)"),
     # --- セクタの LRU
-    ("fs/isofs/iso9660.c",
+    ("fs/isofs/iso9660_dir_read.inc",
      r"if \(victim < 0 \|\| s->used < ctx->scache\[victim\]\.used\) victim = i;",
      "if (victim < 0) victim = i;",
      "LRU でない (いつも最初のスロットを追い出す)"),
-    ("fs/isofs/iso9660.c",
+    ("fs/isofs/iso9660_dir_read.inc",
      r"if \(s->valid && s->lba == lba\) \{",
      "if (s->valid) {",
      "LRU が LBA を見ない"),
@@ -320,8 +323,8 @@ MUTATIONS = [
      "            cur = sec;",
      "list_dir がキャッシュを指したまま cb を呼ぶ (cb の読みで入れ替わる)"),
     ("fs/isofs/iso9660.c",
-     r"        if \(sect_off == 0 \|\| !sector\) \{\n            sector = iso_get_sector\(ctx, sect_lba\);",
-     "        if (!sector) {\n            sector = iso_get_sector(ctx, sect_lba);",
+     r"        if \(sect_off == 0 \|\| !sector\) \{\n            sector = iso_dir_sector\(ctx, dir_lba, dir_size, sect_idx, &scan\);",
+     "        if (!sector) {\n            sector = iso_dir_sector(ctx, dir_lba, dir_size, sect_idx, &scan);",
      "ディレクトリの 2 セクタ目を読まない"),
     # --- 先読みの窓・まとめ読み
     ("fs/isofs/iso9660.c",
@@ -444,9 +447,9 @@ MUTATIONS = [
      r"&& asc == ATAPI_ASC_MEDIUM_NOT_PRESENT\) \{\n                return ATAPI_ERR_NO_MEDIA;",
      "&& 0) {\n                return ATAPI_ERR_NO_MEDIA;",
      "媒体なし (3Ah) も待って出し直す"),
-    ("drivers/ata/atapi.c",
-     r"        total_read = end;\n",
-     "        total_read += words * 2;\n",
+    ("drivers/ata/atapi_pio.inc",
+     r"    return end;\n",
+     "    return total_read + words * 2;\n",
      "受け取ったバイト数をワードで数える (7 バイトを 8 と数える。レビュー 2 の P2)"),
     ("drivers/ata/atapi.c",
      r"atapi_drive_index\(\), \(unsigned\)s_diag_lba, \(unsigned\)s_diag_n, ret,",
@@ -562,6 +565,23 @@ MUTATIONS = [
     ("fs/vfs.c", r"(int vfs_dev_parse\(const char \*name, int \*dev_type, int \*dev_id\)\n\{)",
      r"\1" + "\n    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }",
      "R3: loop を ISO mount の対象に戻す"),
+    # --- D5a directory window contracts
+    ("fs/isofs/iso9660_dir_read.inc", r"if \(n > ISO_RA_SECTORS\) n = ISO_RA_SECTORS;",
+     "n = 1;", "D5a: ディレクトリを単セクタ読みに戻す"),
+    ("fs/isofs/iso9660_dir_read.inc", r"u32 n = sectors - sect_idx;",
+     "u32 n = ISO_RA_SECTORS;", "D5a: extent の末尾を越えて先読み"),
+    ("fs/isofs/iso9660_dir_read.inc", r"            if \(n > ctx->volume_size - lba\) n = ctx->volume_size - lba;\n",
+     "", "D5a: volume の末尾を越えて先読み"),
+    ("fs/isofs/iso9660_dir_read.inc", r"if \(!hit && sect_idx < scan->end\) scan->use_ra = false;",
+     "if (0) scan->use_ra = false;", "D5a: callback の後も毎回窓を補充"),
+    ("fs/isofs/iso9660_dir_read.inc", r"if \(sec\) return sec;",
+     "if (0) return sec;", "D5a: ディレクトリの既読 LRU を無視"),
+    ("fs/isofs/iso9660_dir_read.inc", r"            ctx->ra_valid = 0;\n",
+     "", "D5a: 補充失敗後に上書き途中の窓を残す"),
+    ("fs/isofs/iso9660_dir_read.inc", r"    if \(source\) \{",
+     "    if (source && 0) {", "D5a: 窓から LRU に写さず再読"),
+    ("fs/isofs/iso9660.c", r"(        /\* レコードがセクタ境界をまたぐ場合は次のセクタで再読み込み \*/\n        )if \(rec_len > dir_size - offset\) break;",
+     r"\1if (0) break;", "D5a: 検索で末尾余白のレコードを返す"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("fs/isofs/iso9660.c", r"(#include \"iso9660\.h\")", r"\1", "対照 (何も変えない)"),
 ]
