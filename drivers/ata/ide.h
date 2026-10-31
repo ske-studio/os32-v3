@@ -27,6 +27,7 @@
 #include "config.h"
 
 #define IDE_PIO_WORDS          (SYS_HDD_SECTOR_SIZE / sizeof(u16))
+#define IDE_COMMAND_MAX_SECTORS 256u /* count レジスタの 0 は 256 */
 #define IDE_IDENTIFY_WORDS     256
 #define IDE_ID_MODEL_WORD      27
 #define IDE_ID_SERIAL_WORD     10
@@ -108,7 +109,9 @@ int ide_write_sector_chs(int drive, u16 cyl, u8 head, u8 sect,
                          const void *buf);
 
 /* LBA の読み書き (KAPI slot ide_read_sector / ide_write_sector(s) と
- * drivers/base/dev.c の hd0-3)。範囲外は 1 セクタも読み書きせずに IDE_ERR_RANGE。 */
+ * drivers/base/dev.c の hd0-3)。範囲外は 1 セクタも読み書きせずに IDE_ERR_RANGE。
+ * 最初の失敗で停止し、負の既存エラーを返す。再試行・部分成功数は返さない。
+ * 失敗時の読取り先は未定義、書込みは一部変更済みになり得る。 */
 int ide_read_sector(int drive, u32 lba, void *buf);
 int ide_write_sector(int drive, u32 lba, const void *buf);
 int ide_read_sectors(int drive, u32 lba, u32 count, void *buf);

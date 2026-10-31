@@ -29,3 +29,6 @@
 ## 索引
 
 - [tools/tests/recover_tables_oracle](recover_tables_oracle.md)
+
+- [ide_pio_host.md](ide_pio_host.md)
+- [ext2_block_io_host.md](ext2_block_io_host.md)

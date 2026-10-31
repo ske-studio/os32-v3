@@ -123,71 +123,7 @@ static void ide_chs_addr(int drive, u16 cyl, u8 head, u8 sect, IdeAddr *a)
                        | ((drive % IDE_DRIVES_PER_BANK) ? IDE_DRVHEAD_SLAVE : 0x00));
 }
 
-/* 1 セクタ読み / 書き (指定は呼び手が作る) */
-static int ide_pio_read(int drive, const IdeAddr *a, void *buf)
-{
-    int ret;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-
-    ide_select_drive(drive);
-    ret = ide_wait_bsy();
-    if (ret != IDE_OK) return ret;
-
-    ide_set_addr(a, 1);
-
-    outp(IDE_COMMAND, IDE_CMD_READ);
-
-    ret = ide_wait_drq();
-    if (ret != IDE_OK) return ret;
-
-    {
-        u16 *dst = (u16 *)buf;
-        int w;
-        for (w = 0; w < IDE_PIO_WORDS; w++) {
-            dst[w] = (u16)inpw(IDE_DATA);
-        }
-    }
-
-    { u8 st = (u8)inp(IDE_STATUS); (void)st; }
-    ide_wait_bsy();
-
-    return IDE_OK;
-}
-
-static int ide_pio_write(int drive, const IdeAddr *a, const void *buf)
-{
-    int ret;
-    const u16 *data = (const u16 *)buf;
-    int i;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-
-    ide_select_drive(drive);
-    ret = ide_wait_bsy();
-    if (ret != IDE_OK) return ret;
-
-    ide_set_addr(a, 1);
-
-    outp(IDE_COMMAND, IDE_CMD_WRITE);
-
-    ret = ide_wait_drq();
-    if (ret != IDE_OK) return ret;
-
-    for (i = 0; i < IDE_PIO_WORDS; i++) {
-        outpw(IDE_DATA, (unsigned)data[i]);
-    }
-
-    ret = ide_wait_bsy();
-    if (ret != IDE_OK) return ret;
-
-    {
-        u8 st = (u8)inp(IDE_STATUS);
-        if (st & IDE_ST_ERR) return IDE_ERR_IO;
-    }
-
-    return IDE_OK;
-}
+#include "ide_pio.inc"
 
 /* ============================================================ */
 /*  公開API                                                      */
@@ -350,27 +286,6 @@ int ide_identify(int drive, IdeInfo *info)
 }
 
 
-/* ============================================================ */
-/*  CHS ネイティブ API (Phase 2)                                 */
-/*  LBA→CHS 変換を省略し、CHS を直接レジスタに設定する。       */
-/* ============================================================ */
-
-int ide_read_sector_chs(int drive, u16 cyl, u8 head, u8 sect,
-                        void *buf)
-{
-    IdeAddr a;
-    ide_chs_addr(drive, cyl, head, sect, &a);
-    return ide_pio_read(drive, &a, buf);
-}
-
-int ide_write_sector_chs(int drive, u16 cyl, u8 head, u8 sect,
-                         const void *buf)
-{
-    IdeAddr a;
-    ide_chs_addr(drive, cyl, head, sect, &a);
-    return ide_pio_write(drive, &a, buf);
-}
-
 int ide_drive_present(int drive)
 {
     return drive_present[drive & (IDE_MAX_DRIVES - 1)];
@@ -423,54 +338,4 @@ int ide_range_ok(int drive, u32 lba, u32 count)
     return ide_addr_range_ok(&drive_geom[drive], lba, count);
 }
 
-int ide_read_sector(int drive, u32 lba, void *buf)
-{
-    IdeAddr a;
-    int ret;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-    ret = ide_addr_make(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], drive & (IDE_MAX_DRIVES - 1), lba, &a);
-    if (ret != IDE_OK) return ret;
-    return ide_pio_read(drive & (IDE_MAX_DRIVES - 1), &a, buf);
-}
-
-int ide_write_sector(int drive, u32 lba, const void *buf)
-{
-    IdeAddr a;
-    int ret;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-    ret = ide_addr_make(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], drive & (IDE_MAX_DRIVES - 1), lba, &a);
-    if (ret != IDE_OK) return ret;
-    return ide_pio_write(drive & (IDE_MAX_DRIVES - 1), &a, buf);
-}
-
-int ide_read_sectors(int drive, u32 lba, u32 count, void *buf)
-{
-    u32 i;
-    u8 *dst = (u8 *)buf;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-    if (!ide_addr_range_ok(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], lba, count))
-        return IDE_ERR_RANGE;
-    for (i = 0; i < count; i++) {
-        int ret = ide_read_sector(drive, lba + i, dst + i * SYS_HDD_SECTOR_SIZE);
-        if (ret != IDE_OK) return ret;
-    }
-    return IDE_OK;
-}
-
-int ide_write_sectors(int drive, u32 lba, u32 count, const void *buf)
-{
-    u32 i;
-    const u8 *src = (const u8 *)buf;
-
-    if (!drive_present[drive & (IDE_MAX_DRIVES - 1)]) return IDE_ERR_NO_DRIVE;
-    if (!ide_addr_range_ok(&drive_geom[drive & (IDE_MAX_DRIVES - 1)], lba, count))
-        return IDE_ERR_RANGE;
-    for (i = 0; i < count; i++) {
-        int ret = ide_write_sector(drive, lba + i, src + i * SYS_HDD_SECTOR_SIZE);
-        if (ret != IDE_OK) return ret;
-    }
-    return IDE_OK;
-}
+#include "ide_request.inc"

@@ -5,3 +5,7 @@
 ### cd_module
 
 3. ATAPI/iso9660はFD/HDD root上からPOST_ROOTで読み、cdinst・USER_READYより前に登録する。MINIMALでもCD読取を残す。登録後に `/cd0` 自動mountとloop/hd上ISOのiso9660試行も実行する。
+
+- [ide.md](ide.md)
+- [ide_pio.md](ide_pio.md)
+- [ide_request.md](ide_request.md)

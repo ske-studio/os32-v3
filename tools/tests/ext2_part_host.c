@@ -161,13 +161,20 @@ static int g_fmt_trace;
 
 static int format_io(char op, u32 lba, int count)
 {
+    int i;
     if (!g_fmt_trace) return 0;
-    CHECK(count == 1);
-    CHECK(g_fmt_io_pos < g_fmt_io_count);
-    CHECK(g_fmt_io_pos <= g_fmt_fail_at);
-    CHECK(g_fmt_io[g_fmt_io_pos].op == op);
-    CHECK(g_fmt_io[g_fmt_io_pos].lba == lba);
-    return g_fmt_io_pos++ == g_fmt_fail_at ? -1 : 0;
+    /* D2 groups a 1KiB read into one count=2 request. Keep comparing the
+     * fixed sector sequence, including failure at either sector. Existing
+     * format writes must still use ordered single-sector requests. */
+    CHECK(op == 'W' ? count == 1 : (count == 1 || count == 2));
+    for (i = 0; i < count; i++) {
+        CHECK(g_fmt_io_pos < g_fmt_io_count);
+        CHECK(g_fmt_io_pos <= g_fmt_fail_at);
+        CHECK(g_fmt_io[g_fmt_io_pos].op == op);
+        CHECK(g_fmt_io[g_fmt_io_pos].lba == lba + (u32)i);
+        if (g_fmt_io_pos++ == g_fmt_fail_at) return -1;
+    }
+    return 0;
 }
 
 static Device g_hd0;
