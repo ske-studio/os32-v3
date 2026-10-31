@@ -40,6 +40,13 @@ int ext2_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf);
  * 理由が無い)。 */
 int ext2_read_data_block(Ext2Ctx *ctx, u32 block_num, void *buf);
 int ext2_write_data_block(Ext2Ctx *ctx, u32 block_num, const void *buf);
+/* Physical contiguous data only: bypass D1's retained blocks, never register.
+ * Validate the whole range before I/O. One Device request on valid input.
+ * Success 0 / negative Device error; failed read destination is undefined,
+ * failed writes may be partial. Neither entry calls ext2_fs_error. */
+#define EXT2_DATA_RUN_MAX_BLOCKS 32u
+int ext2_read_data_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, void *dst);
+int ext2_write_data_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, const void *src);
 /* **セクタ 1 本だけ**の I/O (票 H2 §2-2-1)。sect は 0 か 1。エラー状態は
  * 立てない — 呼び手が読み直して 3 値を決める。 */
 int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf);

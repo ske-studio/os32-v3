@@ -37,3 +37,6 @@
 - [FatFs 読み取り保持の試験入口](test_fatfs_read_cache.md)
 - [FatFs VFS の境界回帰](fatfs_stat_host.md)
 - [tools/tests/recover_tables_oracle](recover_tables_oracle.md)
+
+- [ide_pio_host.md](ide_pio_host.md)
+- [ext2_block_io_host.md](ext2_block_io_host.md)

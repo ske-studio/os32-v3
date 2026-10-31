@@ -130,7 +130,7 @@ C_MUTATIONS = [
      "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n"
      "    heads = info.heads; spt = info.sectors;\n",
      "区画表の CHS を IDENTIFY の幾何で LBA にする (F4)"),
-    ("fs/ext2/ext2_super.c", "    return (block_num < ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) ? 1 : 0;", "    return 1;",
+    ("fs/ext2/ext2_super_block_io.inc", "    if (first >= limit || blocks > limit - first) return 0;", "    (void)limit; /* mutation: ignore partition bounds */",
      "ブロック I/O が区画の外を書ける"),
     ("fs/ext2/ext2_super.c", "    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {",
      "    if (0) {", "FS が区画より大きくてもマウントする"),
@@ -870,7 +870,7 @@ def build_target(tmp):
 MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "drivers/ata/ide_addr.c",
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
-          "fs/ext2/ext2_super.c", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
+          "fs/ext2/ext2_super.c", "fs/ext2/ext2_super_block_io.inc", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
           "fs/ext2/ext2_dir_directory.inc", "fs/ext2/ext2_dir_rename.inc",
           "fs/ext2/ext2_file.c", "fs/ext2/ext2_fmt_write_groups.inc",
           "fs/ext2/ext2_fmt_write_backups.inc", "fs/ext2/ext2_fmt_init_groups.inc"]
@@ -908,6 +908,7 @@ REBUILD = {
     "fs/ext2/ext2_layout.c": ("pure", "part"),
     "userland/shell/hdprep_plan.c": ("pure",),
     "fs/ext2/ext2_super.c": ("part",),
+    "fs/ext2/ext2_super_block_io.inc": ("part",),
     "fs/ext2/ext2_fmt.c": ("part",),
 }
 C_HARNESS = {"pure": (_pure_cmd, PURE_CASES), "part": (_part_cmd, PART_CASES)}
