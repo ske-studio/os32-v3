@@ -286,10 +286,46 @@ static void key_push_run(char c, int n)
     for (i = 0; i < n; i++) key_push((int)(unsigned char)c);
 }
 
+/* Snapshot the terminal's cells before ENTER.  -1 is a wide continuation. */
+static int edit_cells[128], edit_x;
+static void edit_snapshot(void)
+{
+    int i, start = 0, x = 0;
+    for (i = 0; i < 128; i++) edit_cells[i] = ' ';
+    for (i = 0; i + 3 < g_out_len; i++)
+        if (g_out[i] == 's' && g_out[i+1] == 'h' && g_out[i+2] == '>' && g_out[i+3] == ' ') start = i;
+    for (i = start; i < g_out_len && x < 126; i++) {
+        unsigned char c = (unsigned char)g_out[i];
+        if (c == '\n') { x = 0; continue; }
+        if (c == '\b') {
+            if (x > 0) x--;
+            if (x > 0 && edit_cells[x] == -1) x--;
+        } else if (c < 0x80) {
+            if (edit_cells[x] == -1 && x > 0) edit_cells[x-1] = ' ';
+            if (edit_cells[x] > 255) edit_cells[x+1] = ' ';
+            edit_cells[x++] = c;
+        } else if ((c & 0xe0) == 0xc0) {
+            int cp = ((c & 31) << 6) | ((unsigned char)g_out[++i] & 63);
+            edit_cells[x++] = cp;
+        } else if ((c & 0xf0) == 0xe0) {
+            int cp = (c & 15) << 12;
+            cp |= ((unsigned char)g_out[++i] & 63) << 6;
+            cp |= (unsigned char)g_out[++i] & 63;
+            edit_cells[x++] = cp;
+            if (cp < 0xff61 || cp > 0xff9f) edit_cells[x++] = -1;
+        }
+    }
+    edit_x = x;
+}
+
 /* 台本を使い切ったら 0x1B (ESC) を返し続ける — どのループも必ず抜ける。 */
 static int key_next(void)
 {
-    if (g_keys_pos < g_keys_len) { g_key_overrun = 0; return g_keys[g_keys_pos++]; }
+    if (g_keys_pos < g_keys_len) {
+        g_key_overrun = 0;
+        if (g_keys[g_keys_pos] == 0xffff) { g_keys_pos++; edit_snapshot(); }
+        return g_keys[g_keys_pos++];
+    }
     if (++g_key_overrun > 1000) {
         report("  FAIL キー台本の読みすぎ (端末ループが抜けていない)\n");
         die(2);
@@ -2894,11 +2930,38 @@ static void ui_exit(void)
 static void case_ui_utf8_edit(void)
 {
     report("UTF-8 line editing\n");
+    out_reset(); sh_erase_cells((char)0xE3);
+    check(out_has("\b\b  \b\b"), "existing ask erase width");
+    fresh(); ui_reset();
+    key_push_str("echo 換字"); key_push(0x08); key_push(0xffff);
+    key_push(0x0D); ui_exit(); shell_run(0);
+    check(edit_x == 11 && edit_cells[9] == 0x63db && edit_cells[10] == -1 &&
+          edit_cells[11] == ' ' && edit_cells[12] == ' ',
+          "GUI wide BS keeps previous glyph and cursor");
+
+    fresh(); ui_reset();
+    key_push_str("echo xｱ"); key_push(0x08); key_push(0xffff);
+    key_push(0x0D); ui_exit(); shell_run(0);
+    check(edit_x == 10 && edit_cells[9] == 'x' && edit_cells[10] == ' ',
+          "GUI kana BS keeps ASCII and cursor");
+
+    fresh(); ui_reset();
+    key_push_str("echo xy"); key_push(0x08); key_push(0xffff);
+    key_push(0x0D); ui_exit(); shell_run(0);
+    check(edit_x == 10 && edit_cells[9] == 'x' && edit_cells[10] == ' ',
+          "GUI ASCII BS keeps previous cell and cursor");
+
+    fresh(); ui_reset();
+    key_push_str("echo 換字x"); key_push(0x3B00); key_push(0x08); key_push(0xffff);
+    key_push(0x0D); ui_exit(); shell_run(0);
+    check(edit_x == 11 && edit_cells[9] == 0x63db && edit_cells[10] == -1 &&
+          edit_cells[11] == 'x', "GUI middle BS redraws cells and cursor");
+
     fresh(); ui_reset();
     key_push_str("echo 換字"); key_push(0x08); key_push(0x08);
     key_push_str("x"); key_push(0x0D); ui_exit(); shell_run(0);
     check(str_eq(hist_buf[0], "echo x"), "UTF-8 tail BS removes whole characters");
-    check(out_has("\b\b  \b\b"), "UTF-8 tail BS erases two cells");
+
 
     fresh(); ui_reset();
     key_push_str("echo 換字x"); key_push(0x3B00); key_push(0x08);

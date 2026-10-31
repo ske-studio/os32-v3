@@ -54,6 +54,25 @@
 #define sh_drop_drawn()          ((void)0)
 #endif
 
+/* 先頭バイト位置の表示幅。GUI 端末は全角 ANK も 2 セルにする。 */
+static int sh_char_columns(const char *s)
+{
+    const u8 *p = (const u8 *)s;
+    u32 cp;
+    if ((*p & 0xC0) == 0x80) return 0;
+    if (*p < 0x80) return 1;
+    if ((*p & 0xE0) == 0xC0)
+        cp = ((u32)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+    else if ((*p & 0xF0) == 0xE0)
+        cp = ((u32)(p[0] & 0x0F) << 12) | ((u32)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+    else return 2;
+    if (cp == 0xA5 || (cp >= 0xFF61 && cp <= 0xFF9F)) return 1;
+#ifndef SHELL_AS_APP
+    if (cp >= 0xFF01 && cp <= 0xFF5E) return 1;
+#endif
+    return 2;
+}
+
 static char hist_buf[HIST_SIZE][HIST_LINE_MAX];
 static int  hist_count = 0;
 static int  hist_idx   = 0;
@@ -105,8 +124,7 @@ static void redraw_line(const char *buf, int len, int cursor) {
     tmp_buf[i] = '\0';
     g_api->shell_print_utf8(tmp_buf, ATTR_WHITE);
     for (i = 0; i < len; i++) {
-        u8 c = (u8)buf[i];
-        if ((c & 0xC0) != 0x80) columns += ((c & 0xF0) == 0xE0) ? 2 : 1;
+        columns += sh_char_columns(buf + i);
     }
     cl = prev_draw_len - columns;
     for (i = 0; i < cl; i++) g_api->shell_putchar(' ', ATTR_WHITE);
@@ -115,8 +133,7 @@ static void redraw_line(const char *buf, int len, int cursor) {
     g_api->console_set_cursor(0, g_api->console_get_cursor_y());
     show_prompt();
     for (i = 0; i < cursor; i++) {
-        u8 c = (u8)buf[i];
-        int width = (c & 0xC0) == 0x80 ? 0 : ((c & 0xF0) == 0xE0 ? 2 : 1);
+        int width = sh_char_columns(buf + i);
         while (width--) g_api->console_set_cursor(g_api->console_get_cursor_x() + 1, g_api->console_get_cursor_y());
     }
 }
@@ -650,10 +667,10 @@ void shell_run(const char *startup_notice) {
                         /* 端末の BS はセルを消さないので BS + 空白 + BS。
                          * 写しの確定も sh_backspace_tail の中で行う。 */
                         cmd_pos = cmd_len = start;
-                        sh_backspace_tail(cmd_buf, cmd_len);
+                        sh_backspace_tail(cmd_buf, cmd_len, sh_char_columns(cmd_buf + start));
                         prev_draw_len = cmd_len;
 #else
-                        int cells = (((u8)cmd_buf[start] & 0xF0) == 0xE0) ? 2 : 1;
+                        int cells = sh_char_columns(cmd_buf + start);
                         cmd_pos = cmd_len = start; cmd_buf[cmd_len] = 0;
                         while (cells--) { g_api->shell_putchar(0x08, ATTR_WHITE); prev_draw_len--; }
                         sh_mark_drawn(cmd_buf, cmd_len);
@@ -695,7 +712,11 @@ void shell_run(const char *startup_notice) {
                     int cells;
                     cmd_pos--;
                     while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
-                    cells = (((u8)cmd_buf[cmd_pos] & 0xF0) == 0xE0) ? 2 : 1;
+#ifdef SHELL_AS_APP
+                    cells = 1;
+#else
+                    cells = sh_char_columns(cmd_buf + cmd_pos);
+#endif
                     while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
                     sh_drop_drawn();
                 } continue;
@@ -716,7 +737,11 @@ void shell_run(const char *startup_notice) {
                     int cells;
                     cmd_pos--;
                     while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
-                    cells = (((u8)cmd_buf[cmd_pos] & 0xF0) == 0xE0) ? 2 : 1;
+#ifdef SHELL_AS_APP
+                    cells = 1;
+#else
+                    cells = sh_char_columns(cmd_buf + cmd_pos);
+#endif
                     while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
                 } sh_drop_drawn(); continue;
             }
@@ -788,7 +813,7 @@ void shell_run(const char *startup_notice) {
 #ifdef SHELL_AS_APP
                                 prev_draw_len = cmd_len;
 #else
-                                prev_draw_len += ((ascii_byte & 0xF0) == 0xE0) ? 2 : 1;
+                                prev_draw_len += sh_char_columns(utf8_tmp);
 #endif
                                 sh_mark_drawn(cmd_buf, cmd_len);
                             } else {

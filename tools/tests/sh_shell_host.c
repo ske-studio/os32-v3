@@ -698,9 +698,9 @@ static void case_backspace_erases(void)
     out_reset();
     g_cursor_calls = 0;
 
-    sh_backspace_tail(line, 2);             /* 'c' を消す */
+    sh_backspace_tail(line, 2, 1);             /* 'c' を消す */
     check(sh_drawn_len == 2 && sh_drawn_pos == 2, "4a 写しは縮んで末尾に居る");
-    sh_backspace_tail(line, 1);             /* 'b' を消す */
+    sh_backspace_tail(line, 1, 1);             /* 'b' を消す */
 
     /* ここから先は ui.c の直接印字 (行末への 1 文字追加) と同じ */
     line[1] = 'x'; line[2] = '\0';
@@ -716,8 +716,8 @@ static void case_backspace_erases(void)
     line[0] = (char)0xE3; line[1] = '\0';
     sh_set_drawn(line, 1, 1);
     out_reset();
-    sh_backspace_tail(line, 0);
-    check(out_is("\\b\\b  \\b\\b"),   "4e 全角の先頭は 2 セルぶん消す");
+    sh_backspace_tail(line, 0, 2);
+    check(out_is("\\b  \\b\\b"),   "4e 全角の先頭は 2 セルぶん消す");
 }
 
 /* ========================================================================
