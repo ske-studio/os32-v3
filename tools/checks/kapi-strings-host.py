@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kapi-strings-host', tier=1,
-    covers=['kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/ring3_ls.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'sdk/kapi.json', 'userland/tests/kstr_boundary.c', 'userland/tests/kstr_v86.c', 'build/app.conf', 'tools/tests/test_kapi_strings.py', 'tools/tests/kapi_strings_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/access_walk_host.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/ring3_ls.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'sdk/kapi.json', 'userland/tests/kstr_boundary.c', 'userland/tests/kstr_v86.c', 'build/app.conf', 'tools/tests/test_kapi_strings.py', 'tools/tests/kapi_strings_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/access_walk_host.c', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
     needs=['make:all'], budget=1.997898)
 
 

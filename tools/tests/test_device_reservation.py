@@ -34,6 +34,7 @@ irq_restore の度に L1 / L2 の不変条件を全ページ検査する — tes
 RED になることを見る。実物のソースは書き換えない。コンパイルの失敗は RED に
 数えない。
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 from kernel_boot_source import kernel_source
@@ -54,7 +55,7 @@ SOURCES = ('mm/pgalloc.c', 'tools/tests/pgalloc_host_fixture.h',
 
 
 def load(mutation=None):
-    texts = {rel: (ROOT / rel).read_text() for rel in SOURCES}
+    texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
         if old not in texts[rel]:

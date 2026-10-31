@@ -1,4 +1,5 @@
 """Actual paging.c, ILP32; only privileged asm replaced for host execution."""
+from paging_source import paging_source
 from kernel_includes import include_flags
 import host32
 import pathlib
@@ -14,7 +15,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     tmp = pathlib.Path(tmp)
-    source = (ROOT / 'mm/paging.c').read_text()
+    source = paging_source(ROOT / 'mm/paging.c')
     (tmp / 'paging_host_source.c').write_text(source)
     allocator = (ROOT / 'mm/pgalloc.c').read_text()
     allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')

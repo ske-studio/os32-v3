@@ -19,6 +19,7 @@
 ことを見る。中心は「浮動番地の規則を固定番地の境界より優先させない」こと —
 そこを崩すと自己診断そのものが穴を隠す。
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 import host32
 import mutpar
@@ -114,7 +115,7 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     sources = {}
     for src in TARGET_SRCS + [ROOT / "mm/pgalloc.c",
                                ROOT / "tools/tests/layout_boot_fixture.h"]:
-        sources[src] = src.read_text(encoding="utf-8")
+        sources[src] = paging_source(src)
     if mutation:
         rel, old, new = MUTATIONS[mutation]
         path = ROOT / rel

@@ -3,6 +3,7 @@
 Covers TASK_T2_APPBAND: sparse high PTs and the actual kselftest ledger
 procedure on 8/17MB pools.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -24,7 +25,7 @@ MUTATIONS = [
 def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-appband-') as tmp:
         tmp = pathlib.Path(tmp)
-        source = (ROOT / 'mm/paging.c').read_text()
+        source = paging_source(ROOT / 'mm/paging.c')
         ledger = (ROOT / 'kdebug/kselftest/ledger.inc').read_text()
         # This fixture tests ledger allocation/reclaim, not caller copies.
         # The real bounded boot helper is executed by test_access_walk.py.

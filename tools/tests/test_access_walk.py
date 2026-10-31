@@ -1,6 +1,7 @@
 """T2d d3: real paging/allocator/shlib/access source, ILP32 host MMU/IRQ.
 Only a fixed source closure is copied; compile failures never count as RED.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/shlib.c', 'kdebug/kselftest/caller_boot.inc']
@@ -96,7 +97,7 @@ def main():
     parser.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
-    sources = {k: (ROOT / v).read_text() for k, v in FILES.items()}
+    sources = {k: paging_source(ROOT / v) for k, v in FILES.items()}
     hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in FILES.values()}
     with host32.control(args.mutate, args.runner, ROOT) as normal:
         if normal:

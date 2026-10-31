@@ -2,6 +2,7 @@
 ledger and fixed KHEAP. Mutants must compile and fail during execution.
 """
 from exec_source import exec_source
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -85,7 +86,7 @@ def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'exec_bb_overlap.inc').write_text(extract(source))
-        (tmp / 'paging_host_source.c').write_text((ROOT / 'mm/paging.c').read_text())
+        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
         allocator = (ROOT / 'mm/pgalloc.c').read_text()
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)

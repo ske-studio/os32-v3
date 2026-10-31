@@ -2,6 +2,7 @@
 Normal controls run on every requested runner; mutants on the first runner.
 Hardware discovery and port I/O are stubbed, lifecycle and ledger are real.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -106,7 +107,7 @@ static inline void io_wait_n(int n) {(void)n;}
 ''')
         sources = []
         for path in TARGET_SRCS:
-            body = source_texts[path] if source_texts is not None else (ROOT/path).read_text()
+            body = source_texts[path] if source_texts is not None else paging_source(ROOT/path)
             for unit, old, new in extra_changes:
                 if unit == path:
                     assert body.count(old) == 1, (unit, old, body.count(old))

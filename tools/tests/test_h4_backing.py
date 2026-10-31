@@ -5,6 +5,7 @@ partial allocation/map failure and reclaim, I/O fault/cleanup controls, the
 actual DMA allocator and FDC setup at this kernel ELF's BSS address. --mutate is for PM verification;
 compilation errors never count as RED.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 import argparse
 from pathlib import Path
@@ -61,7 +62,7 @@ def run(body, runner):
                            ('pgalloc', 'mm/pgalloc.c'),
                            ('dma_pool', 'mm/dma_pool.c'),
                            ('access_walk', 'exec/access_walk.c')):
-            (tmp / (name + '_host_source.c')).write_text((ROOT / path).read_text())
+            (tmp / (name + '_host_source.c')).write_text(paging_source(ROOT / path))
         fdc = (ROOT / 'drivers/block/fdc.c').read_text()
         fdc = fdc[fdc.index('static u8 s_fdbuf['):fdc.index('static u8 *fdc_dma_buf(void)')]
         fdc = fdc.replace('static u8 s_fdbuf[FDC_BUF_BYTES];',

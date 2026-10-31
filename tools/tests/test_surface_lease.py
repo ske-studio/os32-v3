@@ -1,8 +1,9 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
 CHECK = dict(name='surface-lease-host', tier=1,
-    covers=['kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'README.md', 'docs/INDEX.md', 'exec/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
+    covers=['kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'README.md', 'docs/INDEX.md', 'exec/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'tools/tests/paging_source.py'],
     needs=['make:all'], budget=4.257004)
 
+from paging_source import paging_source
 from kernel_includes import include_flags
 TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
               'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
@@ -66,7 +67,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
         'tools/tests/' + fixture_name, 'tools/tests/test_surface_lease.py',
         'tools/tests/access_walk_host.c')]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
-    sources = {k: (ROOT / p).read_text() for k, p in files.items()}
+    sources = {k: paging_source(ROOT / p) for k, p in files.items()}
     with tempfile.TemporaryDirectory(prefix='os32-e2-') as directory:
         tmp = pathlib.Path(directory)
         if 'v86' in files:

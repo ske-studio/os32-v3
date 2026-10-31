@@ -2,6 +2,7 @@
 Fixed low fixture stack; explicit native/qemu execution, no silent fallback.
 Compile failures and signals are never mutation kills.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
 from kernel_layout import linker_flags
@@ -65,7 +66,7 @@ def main():
     paths += [ROOT / x for x in ('exec/surface_query.h', 'tools/tests/surface_query_host.c',
                                  'tools/tests/test_surface_query.py', 'tools/tests/access_walk_host.c')]
     hashes = {f: hashlib.sha256(f.read_bytes()).digest() for f in paths}
-    sources = {k: (ROOT / v).read_text() for k, v in walk.FILES.items()}
+    sources = {k: paging_source(ROOT / v) for k, v in walk.FILES.items()}
     sources['surface_query'] = (ROOT / 'exec/surface_query.c').read_text()
     with tempfile.TemporaryDirectory(prefix='os32-e1-') as directory:
         tmp = pathlib.Path(directory)
