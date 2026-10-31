@@ -225,9 +225,60 @@ static void resume_marks(void) {
     CHECK(ring3_park_reject_count == rejects + 1);
     CHECK(ring3_poll_yield_count == yields);
 }
+static int park_check_kind(int kind, u32 tick) {
+    if(kind==0) return appslot_park_check();
+    if(kind==1) return appslot_park_kbd_check();
+    if(kind==2) return appslot_park_poll_check(tick);
+    return appslot_park_yield_check();
+}
+static void park_contract(void) {
+    for(int kind=0;kind<4;kind++) {
+        for(int failure=0;failure<7;failure++) {
+            if(failure>=5 && kind!=0) continue;
+            setup(); appslot_gui_op_enter(1);
+            AppSlot *a=appslot_get(2);
+            if(failure==0) appslot_switch_to(APP_ID_SHELL);
+            if(failure==1) g_cur=APP_ID_MAX+1;
+            if(failure==2) a->state=APP_STATE_FREE;
+            if(failure==3) a->state=APP_STATE_PARKED;
+            if(failure==4) a->gui=0;
+            if(failure==5) g_cur_op_is_wait=0;
+            if(failure==6) a->in_op_wait=0;
+            u32 rejects=ring3_park_reject_count;
+            CHECK(park_check_kind(kind,1)==OS32_ERR_INVAL);
+            CHECK(ring3_park_reject_count==rejects+1);
+            if(kind==2) {
+                CHECK(park_check_kind(kind,1)==OS32_ERR_AGAIN);
+                CHECK(ring3_park_reject_count==rejects+1);
+            }
+        }
+        setup(); appslot_gui_op_enter(1);
+        AppSlot *a=appslot_get(2);
+        a->stop_wm_req=appslot_at(APP_ID_SHELL)->stop_wm_req=1;
+        u32 rejects=ring3_park_reject_count, kbd=ring3_kbd_park_count;
+        u32 poll=ring3_poll_yield_count, yield=ring3_yield_count;
+        CHECK(park_check_kind(kind,1)==0);
+        if(kind!=2) CHECK(park_check_kind(kind,1)==0);
+        if(kind==0) appslot_park_commit();
+        if(kind==1) appslot_park_kbd_commit();
+        if(kind==2) appslot_park_poll_commit();
+        if(kind==3) appslot_park_yield_commit();
+        CHECK(a->parked_from_wait==(kind==0) && a->parked_from_kbd==(kind==1));
+        CHECK(a->parked_from_poll==(kind==2) && a->parked_from_yield==(kind==3));
+        CHECK(!a->parked_from_stop && !a->stop_wm_req && !appslot_at(1)->stop_wm_req);
+        CHECK(a->state==(kind==0 ? APP_STATE_PARKED :
+                        kind==1 ? APP_STATE_WAIT_KEY : APP_STATE_WAIT_POLL));
+        CHECK(!a->in_op_wait && !g_cur_op_is_wait && appslot_cur()==1 && owner==1);
+        CHECK(ring3_kbd_park_count==kbd+(kind==1));
+        CHECK(ring3_poll_yield_count==poll+(kind==2));
+        CHECK(ring3_yield_count==yield+(kind==3));
+        CHECK(ring3_park_reject_count==rejects);
+    }
+}
 static int test(void) {
     static struct addrspace as;
     (void)as;
+    park_contract();
     dispatch_case(0); dispatch_case(1); dispatch_case(2);
     setup(); gui=0; ring3_abort_request(); CHECK(appslot_get(2)->abort_req && !appslot_get(2)->stop_wm_req);
     ring3_abort_check(); ring3_abort_check(); CHECK(aborted==1 && ring3_abort_count==1);
@@ -337,8 +388,10 @@ def run(overrides=None):
                               ('input','SC_STOP','KEY_STOP'), ('input','MOD_CTRL','SHIFT_CTRL')]:
         value=re.search(r'const '+rname+r': \w+ = (0x[0-9a-fA-F]+|[0-9]+);',read('userland/gshell/src/'+rust+'.rs'))[1]
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
+    transition = read('exec/appslot_transition.inc').replace(
+        '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
     code = PRE + constants + read('exec/appslot.c').replace(
-        '#include "appslot_transition.inc"', read('exec/appslot_transition.inc')) + '\n' + '\n'.join(function(ex,n) for n in (
+        '#include "appslot_transition.inc"', transition) + '\n' + '\n'.join(function(ex,n) for n in (
         'ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
@@ -379,8 +432,17 @@ for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
     src = function(exec_source(ROOT), 'exec_park_stop')
     assert src.count(guard)==1
     MUTATIONS.append(('guard-'+guard, 'exec/exec_syscall.inc', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
-for name in ('appslot_park_commit','appslot_park_kbd_commit','appslot_park_poll_commit',
-             'appslot_park_yield_commit','appslot_abort_clear','appslot_start_commit','appslot_resume_commit'):
+for name, origin in (('appslot_park_commit', 'wait'), ('appslot_park_kbd_commit', 'kbd'),
+                     ('appslot_park_poll_commit', 'poll'), ('appslot_park_yield_commit', 'yield')):
+    path = 'exec/appslot_park.inc'
+    src = function((ROOT/path).read_text(), 'appslot_park_commit_origin')
+    for line in src.splitlines():
+        if 'stop_wm_req = 0;' in line:
+            assert src.count(line)==1
+            # Preserve the separate mutant for each entry's request clearing.
+            conditional = f'    if (origin != &a->parked_from_{origin}) {line.strip()}'
+            MUTATIONS.append((name+'-'+line.strip(), path, src, src.replace(line, conditional)))
+for name in ('appslot_abort_clear','appslot_start_commit','appslot_resume_commit'):
     path = 'exec/appslot.c' if name in ('appslot_abort_clear', 'appslot_start_commit') else 'exec/appslot_transition.inc'
     src = function((ROOT/path).read_text(),name)
     for line in src.splitlines():
@@ -418,6 +480,24 @@ for name, fn, old, new in (
     src = function((ROOT/'exec/appslot_transition.inc').read_text(), fn)
     assert old in src
     MUTATIONS.append((name, 'exec/appslot_transition.inc', src, src.replace(old, new)))
+
+for name, fn, old, new in (
+    ('wait-op-gate', 'appslot_park_check', '!g_cur_op_is_wait ||', '0 ||'),
+    ('wait-slot-gate', 'appslot_park_check', '!a->in_op_wait', '((void)a->in_op_wait, 0)'),
+    ('park-running', 'appslot_park_kbd_check', 'a->state != APP_STATE_RUNNING', '0'),
+    ('park-gui', 'appslot_park_kbd_check', '!a->gui', '0'),
+    ('park-reject-count', 'appslot_park_kbd_check', 'ring3_park_reject_count++;', ';'),
+    ('kbd-park-count', 'appslot_park_kbd_commit', 'ring3_kbd_park_count++;', ';'),
+    ('poll-yield-count', 'appslot_park_poll_commit', 'ring3_poll_yield_count++;', ';'),
+    ('yield-count', 'appslot_park_yield_commit', 'ring3_yield_count++;', ';'),
+):
+    src = function((ROOT/'exec/appslot_transition.inc').read_text(), fn)
+    assert old in src
+    MUTATIONS.append((name, 'exec/appslot_transition.inc', src, src.replace(old, new)))
+for origin in ('wait', 'kbd', 'poll', 'yield'):
+    old = f'&a->parked_from_{origin},'
+    new = '&a->parked_from_stop,'
+    MUTATIONS.append((origin+'-park-origin', 'exec/appslot_transition.inc', old, new))
 
 if __name__ == '__main__':
     status,log=run(); print('kstop control:',status,log,flush=True)
