@@ -92,17 +92,19 @@ def check_timer_calls_link_tick():
     assert order.index("PC98_TICK_NE2K") < order.index("PC98_TICK_LINK")
     registrations = []
     for directory in ("kernel", "drivers", "net"):
-        for path in (ROOT / directory).glob("*.c"):
+        for path in (*sorted((ROOT / directory).glob("*.c")),
+                     *sorted((ROOT / directory).glob("link_*.inc"))):
             if re.search(r"tick_register\s*\([^,]+,\s*link_tick\s*\)", path.read_text()):
                 registrations.append(path.relative_to(ROOT).as_posix())
     assert registrations == ["net/link.c"], registrations
     assert "tick_register(PC98_TICK_LINK, link_tick)" in (ROOT / "net/link.c").read_text()
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"
-    link = re.sub(r"/\*.*?\*/", "", (ROOT / "net/link.c").read_text(encoding="utf-8"),
-                  flags=re.S)
+    link = "\n".join(path.read_text(encoding="utf-8") for path in
+                     (ROOT / "net/link.c", *sorted((ROOT / "net").glob("link_*.inc"))))
+    link = re.sub(r"/\*.*?\*/", "", link, flags=re.S)
     assert len(re.findall(r"\blink_tick\s*\(", link)) == 1, \
-        "net/link.c の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
+        "net/link.c / link_*.inc の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
     lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
     assert "if (!(flags & LGY98_FLAG_REFLECT)) link_init(mac);" in lgy, \
         "反射モードで link_init を止めていない"
