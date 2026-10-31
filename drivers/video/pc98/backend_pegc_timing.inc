@@ -159,8 +159,9 @@ static void pegc_apply_timing(const PegcTiming *t)
     if (((u8)_in(PEGC_HSYNC_PORT) & PEGC_HSYNC_READ_HF) !=
         (u8)(t->hsync & PEGC_HSYNC_READ_HF)) {
         _out(PEGC_HSYNC_PORT, t->hsync & PEGC_HSYNC_MASK);
+        gfx_counters.io_accesses++;
     }
-    gfx_counters.io_accesses += 2;
+    gfx_counters.io_accesses++;
     if (t->set_clock) {
         _out(MODE_FF2_PORT, t->clk1);
         _out(MODE_FF2_PORT, t->clk2);

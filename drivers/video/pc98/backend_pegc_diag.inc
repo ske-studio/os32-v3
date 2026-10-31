@@ -28,7 +28,7 @@ static void pegc_diag_take(PegcDiag *d)
     d->pgc = (u8)pegc_stat(PEGC_STAT_SEL_PAGECONT);
     d->fifo_to = pegc_gdc_fifo_timeouts;
     d->vs_to = pegc_vsync_timeouts;
-    gfx_counters.io_accesses += 14;
+    gfx_counters.io_accesses += 3;
 }
 
 static void pegc_diag_print(const char *tag, const PegcDiag *d)

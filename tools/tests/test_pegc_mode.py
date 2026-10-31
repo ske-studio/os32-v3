@@ -200,7 +200,27 @@ MUTATIONS = [
      "    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n",
      "    console_hw_cursor_enable();\n"),
     ("unrecorded_touches_6a", RESTORE_TARGET,
-     "    t.pegc = s_probe_ok;\n", "    t.pegc = 1;\n"),
+     "    t.pegc = s_hw_ok;\n", "    t.pegc = 1;\n"),
+    ("gate_restore_uses_availability", RESTORE_TARGET,
+     "    t.pegc = s_hw_ok;\n", "    t.pegc = s_probe_ok;\n"),
+    ("gate_restore_leaves_window", RESTORE_TARGET,
+     "    if (s_hw_ok && pegc_stat(PEGC_STAT_SEL_GFXMODE)) {",
+     "    if (s_probe_ok && pegc_stat(PEGC_STAT_SEL_GFXMODE)) {"),
+    ("hardware_result_not_recorded", MUT_TARGET,
+     "    s_hw_ok = s_probe_ok = pegc_linear_selftest();",
+     "    s_probe_ok = pegc_linear_selftest();"),
+    ("stat_io_not_counted", MUT_TARGET,
+     "    _out(PEGC_STAT_PORT, sel);\n    gfx_counters.io_accesses += 2;",
+     "    _out(PEGC_STAT_PORT, sel);"),
+    ("diag_io_overcounted", DIAG_TARGET,
+     "    gfx_counters.io_accesses += 3;",
+     "    gfx_counters.io_accesses += 4;"),
+    ("hsync_io_overcounted", TIMING_TARGET,
+     "    }\n    gfx_counters.io_accesses++;\n    if (t->set_clock) {",
+     "    }\n    gfx_counters.io_accesses += 2;\n    if (t->set_clock) {"),
+    ("sys16m_io_not_counted", MUT_TARGET,
+     "    s_sys16m_ram = (_in(PEGC_SYS16M_PORT) & PEGC_SYS16M_NORMAL_RAM) ? 1 : 0;\n    gfx_counters.io_accesses++;",
+     "    s_sys16m_ram = (_in(PEGC_SYS16M_PORT) & PEGC_SYS16M_NORMAL_RAM) ? 1 : 0;"),
     ("xattr_always_31k", RESTORE_TARGET,
      "    t.xattr = (hs == PEGC_HSYNC_31KHZ) ? PEGC_XATTR_31KHZ : PEGC_XATTR_24KHZ;",
      "    t.xattr = PEGC_XATTR_31KHZ;"),
@@ -315,7 +335,7 @@ def one_mutation(item):
         base = original_new
     else:
         base = original
-    if old not in base or (name in ("mode_height_400", "console_cursor_no_dc") and base.count(old) != 1):
+    if name != "control" and base.count(old) != 1:
         return "MUTATE %-34s SKIP (目印が見つからない)" % name, 1
     with tempfile.TemporaryDirectory(prefix="os32-pegc-mode-mut-") as td:
         exe = pathlib.Path(td) / ("mut-" + name)

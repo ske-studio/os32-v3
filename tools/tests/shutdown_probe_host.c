@@ -98,7 +98,8 @@ static void run(void)
         for (u32 i = 0; i < LEDGER_MAX_SURFACES; i++) CHECK(ledger_surfaces[i].gen == gens[i]);
         host_gfx_owner = 2;
         gfx_shutdown();
-        CHECK(shutdown_calls == shutdown_before + 1 && leave_calls == leave_before + 1);
+        CHECK(shutdown_calls == shutdown_before + 1 &&
+              leave_calls == leave_before + (backend != LEDGER_SF_PEGC));
         struct surface_query_source source;
         CHECK(gfx_surface_source(LEDGER_ROLE_CLIENT, &source) == OS32_ERR_INVAL);
         struct ledger_surface *sf = ledger_surface_find(backend, LEDGER_ROLE_CLIENT);
