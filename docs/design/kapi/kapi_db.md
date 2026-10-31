@@ -13,3 +13,9 @@ SQLite 接続とステートメントをハンドルとして公開する。
   エラー文字列は共有領域へ写される (`kapi/kapi_db.c:833`)。
   呼出し元によるハンドルの所有検査は `kapi/kapi_db.c:151` にある。
   `tools/tests/test_db_errstr.py` と `tools/tests/test_db_caller.py` が検査する。
+
+## 内部設計と契約 (D1)
+
+拒否時は「何も変えない」
+「受け付けた入力のときだけ」
+「拒否の戻り値を見ずに step すると前の文の続きが返る」

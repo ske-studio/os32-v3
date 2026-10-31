@@ -16,3 +16,17 @@
   常駐シェルは画像と sbrk の上限を exec_heap の開始位置で区切る
   (`exec/exec.c:1542`, `include/memmap.h:292`)。境界は定数を参照する。
   メモリ配置の回帰は `make check-memory-host` で検査する。
+
+## 内部設計と契約 (D1)
+
+シェルの 2 ヒープは API 2・供給元 1
+
+| 指摘 | 答え |
+|---|---|
+| ⑧ 既定 exec_heap の先取り | `heap_size == 0` は MEM_EXEC_HEAP_MIN から始め、失敗時にページ単位で伸ばす。sbrk も張ったぶんだけ。**伸ばす経路 (通常文脈の KAPI、大きな塊は map/unmap) は §3-5 R2** |
+
+ヒープ末尾に続けて `mem_map`
+`exec_heap`
+も同じ形で伸ばす。
+
+> [要確認] 現行 exec/exec_heap.c は appmem_map() 経由で伸長し、シェル用固定ヒープとは経路が異なる。
