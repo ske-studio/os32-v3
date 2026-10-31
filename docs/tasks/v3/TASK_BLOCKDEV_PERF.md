@@ -24,7 +24,7 @@
 | D2 | #2・#3 (中) | IDE の既存 READ/WRITE の Sector Count を使った複数セクタ、ext2 の連続ブロックを束ねる | 設計 | astra 起草 | 済み (main e2fe4686) |
 | D3 | #4・#7 | FD の Device API の経路にまとめ読み (fdc_read_sectors) を結ぶ、書き込みの同一トラックのまとめ | 設計 | astra 起草 | **改善しない (ユーザー決定 2026-10-31)** — Device API で FD を count>1 で読み書きする呼び手が無く、FatFs の FD は読みのまとめ・トラックのキャッシュが既にあり、書き込みは 1 クラスタ=1 セクタで束ねる相手が無い (Opus レビュー) |
 | D4 | #6 | FAT の読み取りハンドル・位置の保持 (毎回の開き直しと先頭からの lseek をやめる) | 設計 | astra 起草 | 済み (main e2fe4686) |
-| D5 | #8 (D5a 済み、main e2fe4686)・#9 の rep (D5b、手本・置き場が決まってから) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
+| D5 | #8 (D5a 済み、main e2fe4686)・#9 の rep (D5b、手本・置き場が決まってから) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | D5a 済み (main e2fe4686)。**D5b はやらない** (2026-11-01、sol の資料確認: PC9800Bible/2-9-1_IDE_PIO.md §5.3:259 が rep insw を避けるよう指示、§7.3:344–348 がタイミングの問題と手書きのループの中での調整を記載。報告 `~/os32-tmp/run/rest/d5b.md`) |
 | N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 済み (D6 段 3、main 4599cfd7、sol 実装・astra 取り込み可) |
 | L3 | 調べの主因 (書き込み) | ext2 の 1KB の書き込みを count=2 の 1 要求に (`ext2_raw_write_block`) | 小 | terra | 済み (main ce72c861、D1 の試験の目印の直し 6564c069) |
 | D6 | 調べの主因 (書き込みのメタデータ) | 段 1: ビットマップ・inode・間接表の保持とまとめ更新 / 段 2: データの連続区間の範囲書き / 段 3: N1 | 設計 | astra 起草、確定版 | 段 1 済み (main 0b0d46c6、sol 実装・Opus 取り込み可、取り込みの直し 11535a5f)、段 2 済み (main 36d74183、sol 実装・astra 取り込み可、64KiB の新規連続で書きの要求 69→7)、段 3 済み。取り込みの直し 48754cbf |
