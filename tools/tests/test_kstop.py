@@ -97,6 +97,7 @@ static u32 kapi_invoke(void *fn, const void *args, u32 n) {
     if (request_inside) ring3_abort_request();
     return 0x89abcdef;
 }
+int kbd_inject_peek_for(int id, u8 *ch) { (void)id; *ch='X'; return 1; }
 int kbd_inject_take_for(int id, u8 *ch) { (void)id; *ch='X'; injected++; return 1; }
 static int host_if=1;
 static u32 irq_save(void) { int old=host_if; host_if=0; return old; }
@@ -121,7 +122,9 @@ static i32 notice(u32 op, u32 arg, int id) {
 '''
 POST = r'''
 static void setup(void) {
+    appslot_at(2)->stdin_read.active = 1;
     appslot_init();
+    CHECK(!appslot_at(2)->stdin_read.active);
     for (int id=2; id<=3; id++) {
         AppSlot *a=appslot_at(id);
         a->state=APP_STATE_RUNNING; a->gui=1; a->cpl3=1;
@@ -242,7 +245,11 @@ static int test(void) {
     }
     setup(); ring3_abort_request(); res_owner_set(1); appslot_abort_clear();
     CHECK(!appslot_get(2)->stop_wm_req);
-    setup(); ring3_abort_request(); appslot_reclaim(2);
+    setup(); ring3_abort_request();
+    appslot_at(2)->stdin_read.active = 1;
+    appslot_at(2)->stdin_read.done = 2;
+    appslot_reclaim(2);
+    CHECK(!appslot_at(2)->stdin_read.active && !appslot_at(2)->stdin_read.done);
     CHECK(!appslot_at(2)->stop_wm_req && !appslot_at(2)->parked_from_stop);
     // Refusal guards: no unsafe-point transfer.
     for(int guard=0;guard<6;guard++) {

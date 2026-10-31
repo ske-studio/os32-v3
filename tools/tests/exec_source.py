@@ -8,7 +8,7 @@ import re
 EXEC_PARTS = (
     'exec/exec_tramp_init.inc', 'exec/exec_tramp_strings.inc',
     'exec/exec_abort.inc', 'exec/exec_image_map.inc', 'exec/exec_finish.inc',
-    'exec/exec_syscall.inc', 'exec/exec_fault.inc', 'exec/exec_launch.inc',
+    'exec/exec_syscall.inc', 'exec/exec_stdin.inc', 'exec/exec_fault.inc', 'exec/exec_launch.inc',
     'exec/exec_schedule.inc',
 )
 

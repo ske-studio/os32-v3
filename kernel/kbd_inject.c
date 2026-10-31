@@ -257,6 +257,18 @@ int kbd_inject_take_for(int id, u8 *out)
     return got;
 }
 
+int kbd_inject_peek_for(int id, u8 *out)
+{
+    unsigned int f;
+    int got;
+
+    if (!out) return 0;
+    f = kbd_inject_lock();
+    got = inj_read(out, id, 0);
+    kbd_inject_unlock(f);
+    return got;
+}
+
 int kbd_inject_take(u8 *out)
 {
     return kbd_inject_take_for(inj_current_reader(), out);

@@ -76,6 +76,7 @@ static int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u3
 static void exec_stop_mark(void) {}
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
+static int stdin_resume_test;
 static int cur = 2, owner = 2, cr3 = 2, host_if = 1, host_gui;
 static u32 host_esp0 = MEM_SHELL_STACK_TOP;
 u32 tss_get_esp0(void) { return host_esp0; }
@@ -108,6 +109,7 @@ int appslot_return_target(int id) { CHECK(id == 2); return slots[id].parent; }
 u32 appslot_reclaim(int id) { CHECK(teardown == 1); slots[id].state = APP_STATE_FREE; return 0; }
 void appslot_switch_to(int id) { cur = owner = id; }
 static void exec_restore_context(int id) {
+    if (stdin_resume_test && id == 2) { cr3 = 2; return; }
     CHECK(id == 3 || id == 1); cr3 = id;
     /* CR3/slot are fixture boundaries; restore actual resident heap bytes
      * through the same return callback for normal, fault and STOP landings. */
@@ -343,7 +345,8 @@ static int test(void) {
     /* g1 appends two ILP32 words after the unchanged 204-byte slot prefix. */
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32));
+    CHECK(sizeof(VfsStdinRead) == 16);
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
@@ -447,12 +450,95 @@ static int test(void) {
         CHECK(slots[2].state == APP_STATE_FREE && slots[3].state == APP_STATE_RUNNING);
         CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
     }
+    test_stdin_resume();
     return 0;
 }
 void _start(void) {
     int r = test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(r) : "memory");
     for (;;) {}
+}
+'''
+
+
+STDIN_PRE = r'''
+static int resume_src, resume_allowed = 1, key_count, key_owner = 2;
+static u32 expected_eax, expected_eip;
+static int expected_keys;
+struct tss_entry kernel_tss;
+int paging_v86_session_open(void) { return 0; }
+int appslot_resume_check(int id) { CHECK(id == 2); return resume_allowed ? 0 : OS32_ERR_STALE; }
+int appslot_resume_source(int id) { CHECK(id == 2); return resume_src; }
+void appslot_resume_commit(int id) { cur = owner = id; slots[id].state = APP_STATE_RUNNING; }
+void appslot_mark_scheduled(int id, u32 tick) { CHECK(id == 2); (void)tick; }
+int kbd_inject_peek_for(int id, u8 *out) {
+    if (!key_count || key_owner != id) return 0;
+    *out = 'A'; return 1;
+}
+int kbd_inject_take_for(int id, u8 *out) {
+    if (!kbd_inject_peek_for(id, out)) return 0;
+    key_count--; return 1;
+}
+static void ring3_resume(u32 *frame, u32 pd, void *tss) {
+    CHECK(tss == &kernel_tss && pd == 2 && cr3 == 2 && cur == 2 && owner == 2);
+    CHECK(frame[7] == expected_eax && frame[8] == expected_eip && key_count == expected_keys);
+    /* Model the immediately reissued int80, then use the real park + landing. */
+    for (int i = 0; i < APP_FRAME_WORDS; i++) child_frame[i] = frame[i];
+    child_frame[8] = 0x1002; child_frame[7] = KAPI_SLOT_SYS_READ;
+    g_cur_frame = child_frame; ring3_in_syscall = 1;
+    exec_park_kbd(); CHECK(0);
+}
+'''
+STDIN_POST = r'''
+static void test_stdin_resume(void) {
+    setup(1, EXEC_KIND_EXITED); stdin_resume_test = 1;
+    AppSlot *a = &slots[2];
+    child_frame[7] = KAPI_SLOT_SYS_READ; g_cur_frame = child_frame; ring3_in_syscall = 1;
+    CHECK(exec_stdin_state() == &a->stdin_read);
+    a->gui = 0; CHECK(!exec_stdin_state()); a->gui = 1;
+    a->cpl3 = 0; CHECK(!exec_stdin_state()); a->cpl3 = 1;
+    ring3_wm_depth = 1; CHECK(!exec_stdin_state()); ring3_wm_depth = 0;
+    ring3_in_syscall = 0; CHECK(!exec_stdin_state()); ring3_in_syscall = 1;
+    g_cur_frame = 0; CHECK(!exec_stdin_state()); g_cur_frame = child_frame;
+    child_frame[7] = KAPI_SLOT_SYS_READ + 1; CHECK(!exec_stdin_state());
+    child_frame[7] = KAPI_SLOT_SYS_READ;
+    g_cur_app = 0; CHECK(!exec_stdin_state()); g_cur_app = a;
+    cur = 3; CHECK(!exec_stdin_state()); cur = 2;
+    a->stdin_read.active = 1; a->stdin_read.done = 1;
+    a->stdin_read.size = 4; a->stdin_read.buf = (u8 *)0x2000;
+    a->frame[7] = KAPI_SLOT_SYS_READ; a->frame[8] = 0x1002;
+    a->state = APP_STATE_WAIT_KEY;
+    cur = owner = cr3 = 1; ring3_context_clear();
+    resume_src = APP_RESUME_SRC_KBD; key_count = 0;
+    AppSlot saved = *a;
+    CHECK(exec_resume(2, 999) == OS32_ERR_AGAIN);
+    for (u32 i = 0; i < sizeof(saved); i++) CHECK(((u8 *)a)[i] == ((u8 *)&saved)[i]);
+    CHECK(cur == 1 && owner == 1 && cr3 == 1);
+    CHECK(a->frame[7] == KAPI_SLOT_SYS_READ && a->frame[8] == 0x1002);
+    CHECK(a->state == APP_STATE_WAIT_KEY && a->stdin_read.active && a->stdin_read.done == 1);
+    key_count = 1; key_owner = 3;
+    CHECK(exec_resume(2, 999) == OS32_ERR_AGAIN && key_count == 1);
+    key_owner = 2; resume_allowed = 0;
+    CHECK(exec_resume(2, 999) == OS32_ERR_STALE && key_count == 1 && a->frame[8] == 0x1002);
+    resume_allowed = 1;
+    expected_eax = KAPI_SLOT_SYS_READ; expected_eip = 0x1000; expected_keys = 1;
+    for (int i = 0; i < 3; i++) {
+        CHECK(exec_resume(2, 999) == 2);
+        CHECK(a->frame[8] == 0x1002 && a->stdin_read.done == 1 && a->stdin_read.active);
+    }
+    a->stdin_read.active = 0;
+    expected_eip = 0x1002; expected_eax = 'A'; expected_keys = 0;
+    CHECK(exec_resume(2, 999) == 2);
+    for (int src = 0; src <= APP_RESUME_SRC_KEEP; src++) {
+        if (src == APP_RESUME_SRC_KBD) continue;
+        resume_src = src; key_count = 1; a->frame[7] = 3;
+        expected_eax = src == APP_RESUME_SRC_KEEP ? 3 : src == APP_RESUME_SRC_POLL ? 'A' : src == APP_RESUME_SRC_YIELD ? 0 : 999;
+        expected_keys = src == APP_RESUME_SRC_POLL ? 0 : 1;
+        CHECK(exec_resume(2, 999) == 2);
+    }
+    resume_src = APP_RESUME_SRC_POLL; key_count = expected_keys = 0; expected_eax = (u32)-1;
+    CHECK(exec_resume(2, 999) == 2);
+    stdin_resume_test = 0;
 }
 '''
 
@@ -471,11 +557,13 @@ def run(source=None, irq=None):
              'exec_kill_one', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
     access = (ROOT / 'exec/redir_access.c').read_text()
-    code = ('#include "types.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' +
+    stdin_start = source.index('VfsStdinRead *exec_stdin_state(')
+    stdin_state = source[stdin_start:source.index('\n}', stdin_start) + 2]
+    code = ('#include "types.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' + stdin_state + '\n' +
             '\n'.join(function(source, n) for n in names) + '\n' + POST +
             landing(source, 'static int exec_launch(', 'ctx->jmpbuf', 'launch_landing') +
             landing(source, 'i32 exec_resume(', 'a->jmpbuf', 'resume_landing') + BROKER +
-            function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + END)
+            function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 't.c').write_text(code)
@@ -497,13 +585,63 @@ def run(source=None, irq=None):
         return ('pass' if r.returncode == 0 else 'runtime'), "rc=%d " % r.returncode + r.stdout + r.stderr
 
 
+INJECT_STDIN = r'''
+static void case_stdin_peek(void)
+{
+    u8 ch = 0xCC;
+    reset_all(); con_sink_enable();
+    check(become_reader(2), "stdin reader");
+    host_children[2] = 3;
+    check(kbd_inject((const u8 *)"AB", 2) == 2, "stdin push");
+    check(!kbd_inject_peek_for(4, &ch) && ch == 0xCC && g_inj_count == 2, "stdin other slot cannot peek");
+    for (int i = 0; i < 2; i++)
+        check(kbd_inject_peek_for(3, &ch) && ch == 'A' && g_inj_count == 2, "stdin peek does not consume");
+    check(kbd_inject_take_for(3, &ch) && ch == 'A', "stdin take first");
+    check(kbd_inject_peek_for(2, &ch) && ch == 'B' && g_inj_count == 1, "stdin reader shares stream");
+    check(kbd_inject_take_for(3, &ch) && ch == 'B', "stdin take second");
+    ch = 0xCC;
+    check(!kbd_inject_peek_for(3, &ch) && ch == 0xCC && !g_inj_count, "stdin empty unchanged");
+    check(!kbd_inject_peek_for(3, 0), "stdin null output");
+}
+'''
+
+
+def run_inject(source=None):
+    import test_kbd_inject as inject
+    with tempfile.TemporaryDirectory(prefix='os32-stdin-peek-') as tmp:
+        tmp = pathlib.Path(tmp)
+        original = inject.HOST_SRC
+        host = original.read_text().replace('int main(void)', INJECT_STDIN + '\nint main(void)')
+        host = host.replace('    case_guirunkey();', '    case_stdin_peek();\n    case_guirunkey();')
+        inject.HOST_SRC = tmp / 'peek.c'
+        inject.HOST_SRC.write_text(host)
+        try:
+            result = inject.run(tmp, source or inject.KERNEL_SRC.read_text(), inject.MOVED_SRC.read_text())
+            return result.returncode, result.stdout + result.stderr
+        finally:
+            inject.HOST_SRC = original
+
+
 class ExecR1(unittest.TestCase):
+    def test_stdin_peek_delivery(self):
+        rc, log = run_inject()
+        self.assertEqual(rc, 0, log)
+
     def test_transfer_land_cleanup(self):
         status, log = run()
         self.assertEqual(status, 'pass', log)
 
 
 MUTATIONS = (
+    ('stdin-wrong-call', '        g_cur_frame[APP_FRAME_EAX] != KAPI_SLOT_SYS_READ ||', ''),
+    ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
+    ('stdin-no-rewind', '    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;', ''),
+    ('stdin-consume', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
+     '            if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;'),
+    ('stdin-eax-clobber', '            /* Leave the byte for sys_read in the child\'s normal syscall context. */',
+     '            a->frame[APP_FRAME_EAX] = 65;'),
+    ('stdin-ignore-empty', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
+     '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
     ('ime-owner-exit', '    ime_owner_exit(id);', ''),
     ('exit-kind-lost', '    gui_owner_exit(id, kind);', '    gui_owner_exit(id, 0);'),
@@ -551,6 +689,12 @@ if __name__ == '__main__':
     if not suite.result.wasSuccessful():
         sys.exit(1)
     if '--mutate' in sys.argv:
+        inject = (ROOT / 'kernel/kbd_inject.c').read_text()
+        old = '    got = inj_read(out, id, 0);'
+        assert inject.count(old) == 1
+        rc, log = run_inject(inject.replace(old, '    got = inj_read(out, id, 1);'))
+        assert rc == 1 and 'FAIL stdin peek does not consume' in log, log
+        print('stdin-real-peek-consume: runtime RED')
         source = exec_source(ROOT)
         for name, old, new in MUTATIONS:
             expected = 2 if name == 'landing-restore' else 1

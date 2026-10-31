@@ -11,6 +11,9 @@
 #include "console.h"
 #include "input_service.h"
 #include "kstring.h"
+#include "exec/exec.h"
+#include "vfs_stdin.h"
+#include "vfs_fd_stdin.inc"
 
 #ifndef ATTR_WHITE
 #define ATTR_WHITE   TATTR_WHITE
@@ -442,22 +445,7 @@ int vfs_read_fd(int fd, void *buf, u32 size)
         if (fd_is_redirected(0)) {
             return fd_redirect_read(0, buf, size);
         }
-        /* デフォルト: キーボードから行単位で読む (TTY の canonical 相当)。
-         * 以前は size バイト溜まるまで返らなかったので、`head` のように
-         * 64KB を要求するプログラムが TTY から読むと永久にブロックした。
-         * Enter (CR) は '\n' に正規化して行末で返す */
-        {
-            u8 *p = (u8 *)buf;
-            u32 i = 0;
-            while (i < size) {
-                int c = input_getchar_kapi();
-                if (c < 0) return i ? (int)i : c;
-                if (c == '\r') c = '\n';
-                p[i++] = (u8)c;
-                if (c == '\n') break;
-            }
-            return (int)i;
-        }
+        return vfs_stdin_read(buf, size);
     }
     if (fd >= 1 && fd < VFS_FIRST_FILE_FD) return VFS_ERR_INVAL;
 
