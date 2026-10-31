@@ -6,8 +6,10 @@
 `host32` の指定 runner で 12 case を実行する。実デバイスや既存ディスク像は使わない。
 `CHECK` に製品 .c/.inc・ヘッダ・fixture・host32・区画表境界を宣言する。
 
-`--mutate` は製品 fs の未変更コピーで全 case が成功した後、18 変異を別々に組む。
+`--mutate` は製品 fs の未変更コピーで全 case が成功した後、21 変異を別々に組む。
 inode／表／データの key・hit・値コピー、連続区間と 32 制限、書込発行前・
 読取失敗・mount／unmount の失効を壊し、実行時 assertion の rc=1 を必須とする。
 コンパイル失敗や runner の異常終了を kill に数えない。
+生／sector 読取の失敗と raw／sector／範囲書込の失効は、関数を含む一意な目印で
+呼出しごとに変異させ、assertion 直前の故障経路も照合する。
 実行は `python3 -B tools/tests/test_ext2_read_cache.py [--mutate]`。

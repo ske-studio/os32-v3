@@ -22,6 +22,20 @@ FLAGS = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-nostdlib', '-static', '-O1', '-Wall', '-Wextra',
          '-Werror', '-Wno-unused-parameter', '-Wno-sign-compare', '-D__cdecl=']
 
+
+def io_reset_mutant(name, anchor, case):
+    return (name, 'ext2_super_block_io.inc', anchor,
+            anchor.replace('ext2_read_cache_reset();', '/* mutation: retain cache */ (void)0;'), case)
+
+
+RESET_PATHS = {
+    'read-reset-raw': 'PATH read_failures k=3',
+    'read-reset-sector': 'PATH read_failures k=6',
+    'write-reset-raw': 'PATH write_failures k=0',
+    'write-reset-sector': 'PATH write_failures k=2',
+    'write-reset-range': 'PATH write_failures k=4',
+}
+
 MUTANTS = [
     ('inode-hit', 'ext2_inode_cache.inc', 'if (enabled && ext2_inode_cache.valid &&',
      'if (0 && enabled && ext2_inode_cache.valid &&', 'partial'),
@@ -52,10 +66,39 @@ MUTANTS = [
      '    /* mutation: retain lower */', 'write_failures'),
     ('data-reset', 'ext2_file_read_cache.inc', '    ext2_data_cache.valid = 0;\n}',
      '    /* mutation: retain data */\n}', 'write_failures'),
-    ('read-reset', 'ext2_super_block_io.inc', 'if (ret != 0) ext2_read_cache_reset();',
-     'if (0) ext2_read_cache_reset();', 'read_failures'),
-    ('write-reset', 'ext2_super_block_io.inc', '    ext2_read_cache_reset();',
-     '    /* mutation: retain on writes */', 'write_failures'),
+    io_reset_mutant('read-reset-raw',
+                   'static int ext2_raw_read_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, void *buf)\n'
+                   '{\n'
+                   '    u32 sector;\n'
+                   '    int ret = EXT2_ERR_IO;\n'
+                   '    if (ext2_block_range_lba(ctx, first, blocks, &sector))\n'
+                   '        ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);\n'
+                   '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
+    io_reset_mutant('read-reset-sector',
+                   'int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf)\n'
+                   '{\n'
+                   '    u32 sector;\n'
+                   '    int ret = EXT2_ERR_IO;\n'
+                   '    if (sect < EXT2_SECTORS_PER_BLOCK &&\n'
+                   '        ext2_block_range_lba(ctx, block_num, 1, &sector))\n'
+                   '        ret = dev_blk_read_lba(ctx->dev, sector + sect, 1, buf);\n'
+                   '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
+    io_reset_mutant('write-reset-raw',
+                   'static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)\n'
+                   '{\n'
+                   '    u32 sector;\n'
+                   '    int ret;\n\n'
+                   '    ext2_read_cache_reset();', 'write_failures'),
+    io_reset_mutant('write-reset-sector',
+                   'int ext2_write_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, const void *buf)\n'
+                   '{\n'
+                   '    u32 sector;\n'
+                   '    ext2_read_cache_reset();', 'write_failures'),
+    io_reset_mutant('write-reset-range',
+                   'int ext2_write_data_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, const void *src)\n'
+                   '{\n'
+                   '    u32 sector;\n'
+                   '    ext2_read_cache_reset();', 'write_failures'),
     ('mount-reset', 'ext2_super.c',
      '    ext2_read_cache_reset();\n    if (ctx->mounted) ext2_unmount(ctx);',
      '    if (ctx->mounted) ext2_unmount(ctx);', 'lifetime'),
@@ -99,16 +142,17 @@ def main(args):
             for name, file, old, new, case in MUTANTS:
                 path = directory / file
                 original = path.read_text()
-                expected = 2 if name == 'read-reset' else 3 if name == 'write-reset' else 1
-                if original.count(old) != expected:
-                    raise RuntimeError(f'{name}: mutation anchor count {original.count(old)} != {expected}')
+                if original.count(old) != 1:
+                    raise RuntimeError(f'{name}: mutation anchor count {original.count(old)} != 1')
                 path.write_text(original.replace(old, new))
                 build(directory, exe)
                 result = host32.run([str(exe), case], cwd=ROOT, capture_output=True, text=True)
                 path.write_text(original)
                 if result.returncode != 1 or 'FAIL line ' not in result.stdout:
                     raise RuntimeError(f'{name}: expected assertion, got {result.returncode}: {result.stdout}')
-                print(f'MUTANT {name}: runtime RED', flush=True)
+                if name in RESET_PATHS and result.stdout.splitlines()[-2:-1] != [RESET_PATHS[name]]:
+                    raise RuntimeError(f'{name}: assertion on wrong path: {result.stdout}')
+                print(f'MUTANT {name}: runtime RED\n{result.stdout.rstrip()}', flush=True)
         return 0
 
 

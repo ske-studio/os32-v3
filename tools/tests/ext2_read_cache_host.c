@@ -471,6 +471,7 @@ static void case_write_failures(void)
         kmemset(replacement, 0x55, sizeof(replacement));
         fail_lba = block_lba(block) + (k == 1 || k == 3 || k == 5 ? 1u : 0u);
         fail_write = 1; fail_hits = 0;
+        report("PATH write_failures k="); report_u(k); report("\n");
         if (k < 2) ret = ext2_write_data_block(&ctx, block, replacement);
         else if (k < 4) ret = ext2_write_sector(&ctx, block, k - 2, replacement);
         else ret = ext2_write_data_blocks(&ctx, block, 2, replacement);
@@ -513,6 +514,7 @@ static void case_read_failures(void)
         else if (k == 3) block++; /* partial miss */
         if (k != 0) fail_lba = block_lba(block) + 1; /* fail after one landed sector */
         fail_write = 0; fail_hits = 0;
+        report("PATH read_failures k="); report_u(k); report("\n");
         if (k == 0) ret = ext2_read_inode(&ctx, TEST_INO + 1, &inode);
         else if (k < 3) ret = ext2_bmap(&ctx, &inode, DOUBLE_START, &phys);
         else if (k == 3) ret = ext2_read_stream(&ctx, TEST_INO, output, 128,
