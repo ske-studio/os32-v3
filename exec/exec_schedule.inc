@@ -16,7 +16,6 @@ i32 exec_park(void)
     if (v86_call_pinned()) return OS32_ERR_BUSY;
     int id = appslot_cur();
     AppSlot *a;
-    u32 k;
     int rc;
 
     rc = appslot_park_check();
@@ -32,19 +31,7 @@ i32 exec_park(void)
 
     /* CPL=3 の続き = int80_stub のフレーム 13 語。resume はこれを積み直して
      * popad; iretd するだけ (D2 の (b): 追加 RAM は 1 アプリ 52B)。 */
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
-
-    exec_heap_save_state(&a->exec_heap_used);
-    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
-
-    /* master へ戻してから状態を切り替える (WM は master の下で走る)。 */
-    paging_load_cr3(paging_kernel_pd_phys());
-    appslot_park_commit();      /* PARKED + 印 + owner 1 へ */
-    exec_restore_context(APP_ID_SHELL);
-
-    g_longjmp_reason = EXEC_LJ_PARK;
-    g_longjmp_id = id;
-    exec_longjmp(a->jmpbuf);    /* 戻らない */
+    exec_park_transfer(id, a, g_cur_frame, appslot_park_commit);
     return 0;
 }
 
@@ -67,7 +54,6 @@ int exec_park_kbd(void)
     if (font_guard_active) return 0;
     int id;
     AppSlot *a;
-    u32 k;
 
     /* 票 §5 R1: CPL=3 のアプリが syscall の中に居るときだけ止められる。 */
     if (!g_cur_app || !g_cur_app->cpl3 || g_cur_frame == 0) return 0;
@@ -81,20 +67,7 @@ int exec_park_kbd(void)
         return 0;
     }
 
-    /* 以降は exec_park と 1 行も変えない (D2 の (b): フレーム 13 語を写して
-     * master へ戻り、WM の待っている復帰点へ longjmp する)。 */
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
-
-    exec_heap_save_state(&a->exec_heap_used);
-    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
-
-    paging_load_cr3(paging_kernel_pd_phys());
-    appslot_park_kbd_commit();  /* WAIT_KEY + 印 + owner 1 へ */
-    exec_restore_context(APP_ID_SHELL);
-
-    g_longjmp_reason = EXEC_LJ_PARK;
-    g_longjmp_id = id;
-    exec_longjmp(a->jmpbuf);    /* 戻らない */
+    exec_park_transfer(id, a, g_cur_frame, appslot_park_kbd_commit);
     return 0;
 }
 
@@ -124,7 +97,6 @@ int exec_park_poll(u32 now_tick)
     if (font_guard_active) return 0;
     int id;
     AppSlot *a;
-    u32 k;
 
     /* R1 (exec_park_kbd と同じ): CPL=3 のアプリが syscall の中に居るときだけ。
      * ここは数えない — 間引きより前に置いて、CPL=0 の呼び手 (常駐シェル) が
@@ -141,18 +113,7 @@ int exec_park_poll(u32 now_tick)
         return 0;
     }
 
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
-
-    exec_heap_save_state(&a->exec_heap_used);
-    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
-
-    paging_load_cr3(paging_kernel_pd_phys());
-    appslot_park_poll_commit();          /* WAIT_POLL + 印 + owner 1 へ */
-    exec_restore_context(APP_ID_SHELL);
-
-    g_longjmp_reason = EXEC_LJ_PARK;
-    g_longjmp_id = id;
-    exec_longjmp(a->jmpbuf);    /* 戻らない */
+    exec_park_transfer(id, a, g_cur_frame, appslot_park_poll_commit);
     return 0;
 }
 
@@ -179,7 +140,6 @@ i32 exec_sys_yield(void)
     if (font_guard_active) return OS32_ERR_BUSY;
     int id;
     AppSlot *a;
-    u32 k;
 
     /* CUI 中は協調型の相手 (WM) が居ない。従来どおり 1 回 hlt して戻る。 */
     if (!con_sink_is_enabled()) { _halt(); return 0; }
@@ -198,18 +158,7 @@ i32 exec_sys_yield(void)
         return 0;
     }
 
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = g_cur_frame[k];
-
-    exec_heap_save_state(&a->exec_heap_used);
-    ring3_context_clear();     /* この syscall はここで終わる — WM の出口も通らない */
-
-    paging_load_cr3(paging_kernel_pd_phys());
-    appslot_park_yield_commit();         /* WAIT_POLL + 印 + owner 1 へ */
-    exec_restore_context(APP_ID_SHELL);
-
-    g_longjmp_reason = EXEC_LJ_PARK;
-    g_longjmp_id = id;
-    exec_longjmp(a->jmpbuf);    /* 戻らない */
+    exec_park_transfer(id, a, g_cur_frame, appslot_park_yield_commit);
     return 0;
 }
 

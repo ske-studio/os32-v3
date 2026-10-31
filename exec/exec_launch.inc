@@ -234,7 +234,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
             shell_print(" free=", ATTR_WHITE);
             shell_print_dec(pgalloc_free_pages(), ATTR_WHITE);
             shell_print("\n", ATTR_WHITE);
-            exec_restore_band(launcher_id);
             return EXEC_ERR_NOMEM;
         }
     }
@@ -264,8 +263,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
     /* 票 T8 D1a: 全画面 GFX の宣言 (OS32X_FLAG_GFX) を見るのは gfx_init を
      * 呼ばれた瞬間なので、起動時にヘッダの flags を控えておく。 */
     ctx->hdr_flags = hdr->flags;
-    ctx->band_top = g_ring3_band_top;
-    ctx->band_pdes = g_ring3_band_pdes;
+    ctx->band_top = MEM_APP_STACK_TOP;
+    ctx->band_pdes = MEM_APP_BAND_MAX_PDES;
     ctx->pages = need_pages;
 
     /* ======== CPL=3: アドレス空間と per-app 物理 (D1) ======== */
@@ -276,7 +275,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * (TASK_T1_LEDGER §4-8)。返却は exec_teardown_app。 */
         if (!ledger_owner_new(LEDGER_KIND_AS, (u32)id, "app", &as_owner)) {
             shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
-            exec_restore_band(launcher_id);
             return EXEC_ERR_NOMEM;
         }
         paging_load_cr3(paging_kernel_pd_phys());
@@ -347,20 +345,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
     int image_rc = exec_load_image(ctx, resolved, hdr);
     if (image_rc) return exec_launch_abort(launcher_id, id, image_rc);
 
-    /* ヒープ・ガードページ設定 */
-    if (is_shell) {
-        /* exec_shell_layout の分割が常駐 CRT の sbrk 上限も決める。 */
-        ctx->exec_heap_base = exec_heap_base;
-        ctx->exec_heap_size = exec_heap_size;
-        kapi->sbrk_heap_limit = sbrk_end;
-    }
-
-
-    if (!is_shell) {
-        kapi->sbrk_heap_limit = sbrk_end;
-
-    }
-
+    /* 常駐 CRT と USER の sbrk 上限を公開する。 */
+    kapi->sbrk_heap_limit = sbrk_end;
     {
         u32 argv_addr;
         u32 frame[EXEC_ENTRY_ARGS + 1];

@@ -11,7 +11,7 @@
 /*  ガードページ (guard_a / guard_b) は「張っていない = 非 present」なので     */
 /*  返すものが無い。共有帯 (SHM / トランポリン) に掛かる解放要求は          */
 /*  paging_addrspace_free_user_range が全範囲無変更で拒否する。              */
-/*  band_top は私有領域の上端 (ring3_band_set)。BB の旧恒等 alias は         */
+/*  band_top は私有領域の上端 (MEM_APP_STACK_TOP)。BB の旧恒等 alias は      */
 /*  supervisor のままで私有 PT に重ねない。CLIENT の lease は     */
 /*  専用の解放口で回収し、ここで backing の物理ページを返さない (e11b2)。    */
 /* ======================================================================== */
@@ -83,11 +83,8 @@ u32 exec_ledger_owner(void)
 /*                                                                          */
 /*  票 D1 の I7 / I9 / I10 — 仮想レイアウトは動かさず、カーネル側の           */
 /*  「いま走っているのは誰か」を表す値だけを差し替える:                       */
-/*    CR3 / アプリ帯の上端 / exec_heap の管理変数 / sbrk 上限 (本物の表と      */
+/*    CR3 / exec_heap の管理変数 / sbrk 上限 (本物の表と                      */
 /*    トランポリンの両方) / exec ネスト段。                                   */
-/*  CPL=0 のプログラム (シェル / --cpl0 の子) のガードは master の identity    */
-/*  ページなので張り直す。CPL=3 アプリのガードはアプリ PT ごと捨てるので       */
-/*  何もしない (I8)。                                                        */
 /* ======================================================================== */
 static void exec_restore_context(int id)
 {
@@ -96,11 +93,9 @@ static void exec_restore_context(int id)
 
     if (a->cpl3 && a->as->pd_phys) {
         g_cur_app = a;
-        ring3_band_set(a->band_pdes);
         paging_load_cr3(a->as->pd_phys);
     } else {
         g_cur_app = 0;
-        ring3_band_set(1);
         paging_load_cr3(paging_kernel_pd_phys());
     }
 
@@ -114,10 +109,6 @@ static void exec_restore_context(int id)
     kapi->sbrk_heap_limit = a->sbrk_heap_limit;
     if (a->cpl3) {
         ((u32 *)ring3_tramp_page)[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = a->sbrk_heap_limit;
-    }
-    if (!a->cpl3 && a->guard_a != 0) {
-        paging_set_not_present(a->guard_a, a->guard_a + PAGE_SIZE - 1);
-        paging_set_not_present(a->guard_b, a->guard_b + PAGE_SIZE - 1);
     }
     exec_nest_level = a->depth;
 }
@@ -257,15 +248,6 @@ static int exec_launch_abort(int launcher_id, int id, int status)
     return status;
 }
 
-/* 起動を諦めるときに「アプリ帯の上端」だけを起動元の値へ戻す。
- * exec_restore_context を使うと exec_heap の管理変数まで巻き戻してしまい、
- * まだ save していない起動元のヒープ使用量が古い値で上書きされる。 */
-static void exec_restore_band(int id)
-{
-    AppSlot *a = appslot_at(id);
-    ring3_band_set((a && a->cpl3) ? a->band_pdes : 1);
-}
-
 /* longjmp する側がスロットを空にするので、jmpbuf は先に控える。 */
 static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
 volatile u32 exec_stop_count;
@@ -305,18 +287,6 @@ static void exec_finish(int id, int status, int kind)
         paging_load_cr3(paging_kernel_pd_phys());
     }
 
-    /* CPL=0 のプログラムだけがカーネルの identity ページを触っている。
-     * CPL=3 アプリのガードとヒープはアプリ PT ごと捨てるので不要 (I8)。 */
-    if (!a->cpl3) {
-        if (a->guard_a != 0) {
-            paging_set_page(a->guard_a, a->guard_a, PAGE_RW);
-            paging_set_page(a->guard_b, a->guard_b, PAGE_RW);
-        }
-        if (a->exec_heap_base != 0 && id != APP_ID_SHELL) {
-            exec_heap_reset();
-        }
-    }
-
     for (k = 0; k < KSETJMP_BUF_LEN; k++) g_exit_jmpbuf[k] = a->jmpbuf[k];
 
     /* WM 通知より先に親の文脈へ戻す。gui_owner_exit() は
@@ -328,7 +298,6 @@ static void exec_finish(int id, int status, int kind)
         /* シェル自身の終了 (K4 のシェル起動ループへ戻る)。従来どおり
          * 段 0 / owner 0 に落として exec_run(shell) の setjmp 点へ帰る。 */
         g_cur_app = 0;
-        ring3_band_set(1);
         exec_nest_level = 0;
         res_owner_set(0);
         exec_reclaim_owned(id, kind);

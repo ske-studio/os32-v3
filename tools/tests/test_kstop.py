@@ -332,7 +332,7 @@ def run(overrides=None):
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
     code = PRE + constants + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', read('exec/appslot_transition.inc')) + '\n' + '\n'.join(function(ex,n) for n in (
-        'ring3_abort_request','ring3_abort_check','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
+        'ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (is_mod) return;')]
