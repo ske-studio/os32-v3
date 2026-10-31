@@ -27,7 +27,6 @@ int db_slot_layout_ok(int slot_count)
     /* v50 で追記した 7 本が 201..207 に居る */
     if (KAPI_SLOT_DB_OPEN_EXISTING != 201) return 0;
     if (KAPI_SLOT_DB_ERROR_CODE != 207) return 0;          /* db 帯の末尾 */
-    if (KAPI_SLOT_DB_ERROR_CODE - KAPI_SLOT_DB_OPEN_EXISTING != 6) return 0;
 
     /* 既存 10 本は動いていない */
     if (KAPI_SLOT_DB_OPEN != 140) return 0;
@@ -36,7 +35,6 @@ int db_slot_layout_ok(int slot_count)
      * が間接的に押さえていただけだったので、**位置を明示して**見る。 */
     if (KAPI_SLOT_HOST_OPEN != 208) return 0;
     if (KAPI_SLOT_HOST_CLOSE != 212) return 0;
-    if (KAPI_SLOT_HOST_CLOSE - KAPI_SLOT_HOST_OPEN != 4) return 0;
 
     return 1;
 }

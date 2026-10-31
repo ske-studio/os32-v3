@@ -285,6 +285,23 @@ static void prepare_only(void)
     CHECK(kapi_db_column_int(h, 0) == 1);      /* 8 は入っていない */
     CHECK(kapi_db_finalize(h) == 0);
 
+    /* legacy prepare の自動 step も ROW / DONE / 実行エラーを保つ。 */
+    CHECK(kapi_db_prepare(h, "SELECT x FROM t") == DB_STATUS_ROW);
+    CHECK(kapi_db_column_int(h, 0) == 7);
+    CHECK(kapi_db_step(h) == DB_STATUS_DONE);
+    CHECK(kapi_db_prepare(h, "SELECT x FROM t WHERE 0") == DB_STATUS_DONE);
+    CHECK(db_slots[h].active_stmt == NULL);
+    CHECK(((DB_ResultHeader *)test_shm)->status == DB_STATUS_DONE);
+    CHECK(((DB_ResultHeader *)test_shm)->column_count == 0);
+    CHECK(((DB_ResultHeader *)test_shm)->error_offset == 0);
+    CHECK(kapi_db_prepare(h, "SELECT abs(-9223372036854775808)") == -1);
+    CHECK(kapi_db_error_code(h) == SQLITE_ERROR);
+    CHECK(((DB_ResultHeader *)test_shm)->status == DB_STATUS_ERROR);
+    CHECK(db_slots[h].active_stmt == NULL);
+    CHECK(kapi_db_prepare(h, "SELECT x FROM t") == DB_STATUS_ROW);
+    CHECK(kapi_db_error_code(h) == SQLITE_OK);
+    CHECK(kapi_db_finalize(h) == 0);
+
     /* 複数 statement は拒否、末尾の空白 / コメント / ; は可 */
     CHECK(kapi_db_prepare_only(h, "SELECT 1; SELECT 2") == -1);
     CHECK(kapi_db_error_code(h) == SQLITE_MISUSE);
@@ -376,6 +393,8 @@ static void binds(void)
 static void error_code(void)
 {
     int h, code;
+    int handles[DB_MAX_CONNECTIONS];
+    int i;
 
     CHECK(kapi_db_error_code(-2) == SQLITE_MISUSE);
     CHECK(kapi_db_error_code(DB_MAX_CONNECTIONS) == SQLITE_MISUSE);
@@ -419,6 +438,25 @@ static void error_code(void)
     current_owner = DB_OWNER_SLOTS;                  /* 池の外 */
     CHECK(kapi_db_error_code(-1) == SQLITE_MISUSE);
     resolve_owner = current_owner = 2;
+
+    /* legacy open も、全スロット使用中の失敗を owner の診断欄に残す。 */
+    for (i = 0; i < DB_MAX_CONNECTIONS; i++) {
+        handles[i] = kapi_db_open(":memory:");
+        CHECK(handles[i] >= 0);
+        CHECK(kapi_db_error_code(-1) == SQLITE_OK);
+    }
+    CHECK(kapi_db_open(":memory:") == -1);
+    CHECK(kapi_db_error_code(-1) == SQLITE_FULL);
+    CHECK(kapi_db_error_code(-1) == SQLITE_FULL);    /* 読んでも消えない */
+    resolve_owner = current_owner = 3;
+    CHECK(kapi_db_error_code(-1) == SQLITE_MISUSE);  /* 他 owner は変わらない */
+    resolve_owner = current_owner = 2;
+    CHECK(kapi_db_close(handles[0]) == 0);
+    handles[0] = kapi_db_open(":memory:");
+    CHECK(handles[0] >= 0);
+    CHECK(kapi_db_error_code(-1) == SQLITE_OK);      /* 成功で診断を戻す */
+    for (i = 0; i < DB_MAX_CONNECTIONS; i++)
+        CHECK(kapi_db_close(handles[i]) == 0);
 }
 
 /* ---- 4b. 起動時から移した v50 の契約 (slot / SHM / 入力 / owner) --------
