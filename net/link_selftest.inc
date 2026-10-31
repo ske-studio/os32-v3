@@ -103,7 +103,9 @@ void link_selftest(int rounds)
         u32 st = 0, ln = 0;
         i32 h = link_wait_open(req, n, LINK_PROBE_TICKS * 2);
         if (h < 0) { link_rt_fail++; continue; }
-        (void)link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5);
+        /* STALE は再同期 / TOMBSTONE 側で計上済み。待機期限切れだけを足す。 */
+        if (link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5) == OS32_ERR_AGAIN)
+            link_rt_fail++;
         link_host_close(h, LINK_SELF_OWNER);
     }
     /* L0 の結果を専用スナップショットへ (後続の L1〜L3 が link_rt_ok を打ち直すので、

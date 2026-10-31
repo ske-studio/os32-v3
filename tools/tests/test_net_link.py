@@ -9,7 +9,7 @@ tools/tests/kapi_db_v50_host.c と同じ様式 — 実物のソースを 1 行�
 UNIX ソケットでサブプロセス起動) か、フレームを手で組む台本。
 Make・エミュレータ・ネットワークには触らない (Agent は --offline で起動する)。
 
-  python3 -B tools/tests/test_net_link.py [--target] [--sanitize] [ケース名 ...]
+  python3 -B tools/tests/test_net_link.py [--target] [--sanitize] [--mutate] [ケース名 ...]
 
 --target は同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
 別に見る ([C1] GNU11)。
@@ -44,6 +44,69 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
 # 同じものをここでも渡す (ホスト側は LINK_HOST_TEST で io.h を外すので不要
 # だが、--target はカーネルと同じ素性で組むので要る)。
 TARGET_INC = include_flags(ROOT)
+
+MUTATIONS = (
+    ('l0-timeout-not-counted', 'link_selftest.inc',
+     'if (link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5) == OS32_ERR_AGAIN)',
+     'if (0 && link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5) == OS32_ERR_AGAIN)',
+     'l0_failures_are_counted_once'),
+    ('l0-stale-counted-twice', 'link_selftest.inc',
+     'link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5) == OS32_ERR_AGAIN',
+     'link_wait_status(h, &st, &ln, LINK_PROBE_TICKS * 5) < 0',
+     'l0_failures_are_counted_once'),
+    ('resync-counts-stale-again', 'link.c',
+     'if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {',
+     'if (e->state != LINK_H_FREE) {',
+     'r6_agent_silence_resyncs_and_stales_handles'),
+    ('wdata-ack-keeps-pending-length', 'link_rx.inc',
+     '            e->wlen = 0;\n            e->wseq++;',
+     '            e->wseq++;', 'write_contract_declared_length'),
+    ('request-rto-before-nic-acceptance', 'link.c',
+     '!e->req_acked && !e->req_due && since(e->last_tx_tick)',
+     '!e->req_acked && since(e->last_tx_tick)', 'tx_rto_starts_at_nic_acceptance'),
+    ('wdata-rto-before-nic-acceptance', 'link.c',
+     'e->wlen && !e->w_due && since(e->last_tx_tick)',
+     'e->wlen && since(e->last_tx_tick)', 'tx_rto_starts_at_nic_acceptance'),
+    ('release-rto-before-nic-acceptance', 'link.c',
+     'e->rel_pending && !e->rel_due && since(e->rel_tick)',
+     'e->rel_pending && since(e->rel_tick)', 'tx_rto_starts_at_nic_acceptance'),
+    ('request-send-does-not-start-rto', 'link.c',
+     'e->req_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->req_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
+    ('wdata-send-does-not-start-rto', 'link.c',
+     'e->w_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->w_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
+    ('release-send-does-not-start-rto', 'link.c',
+     'e->rel_due = 0;\n                e->rel_tick = tick_count;',
+     'e->rel_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
+    ('ring-overflow-not-counted', 'link_rx.inc',
+     'link_l2_overflow++;     /* 空き不足',
+     '(void)0;               /* 空き不足', 'data_gap_is_dropped_and_reacked'),
+)
+
+
+def check_mutations(tmp):
+    """Mutate full product files in isolation; a compile failure is not RED."""
+    originals = {path.name: path.read_text() for path in
+                 (ROOT / 'net/link.c', *sorted((ROOT / 'net').glob('link_*.inc')))}
+    for name, filename, old, new, case in MUTATIONS:
+        assert originals[filename].count(old) == 1, (name, 'marker must be unique')
+        with tempfile.TemporaryDirectory(prefix='net-link-mut-') as directory:
+            mutated = pathlib.Path(directory)
+            for target, source in originals.items():
+                (mutated / target).write_text(source.replace(old, new)
+                                               if target == filename else source)
+            exe = str(mutated / 'net_link')
+            subprocess.run(['gcc', *FLAGS, *argptr_defines(), *INC, '-I' + str(tmp),
+                            '-DLINK_SOURCE="' + str(mutated / 'link.c') + '"',
+                            str(HOST_SRC), '-o', exe], check=True, cwd=ROOT)
+            # Keep run_fixture's process-group cleanup for the real Agent.
+            log = mutated / 'runtime.log'
+            with log.open('w') as output:
+                rc = run_fixture([exe, case], stdout=output, stderr=subprocess.STDOUT)
+            result = log.read_text()
+            assert rc == 1 and '    FAIL ' in result, (name, rc, result)
+            print('MUTATION ' + name + ': runtime RED (unique marker)', flush=True)
 
 
 def argptr_defines():
@@ -112,7 +175,7 @@ def check_timer_calls_link_tick():
     print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
 
 
-def run_fixture(args, timeout=600):
+def run_fixture(args, timeout=600, **kwargs):
     def terminate(signum, frame):
         raise SystemExit(128 + signum)
 
@@ -123,7 +186,7 @@ def run_fixture(args, timeout=600):
             proc = None
             try:
                 proc = subprocess.Popen(args, cwd=ROOT, start_new_session=True,
-                                        env={**os.environ, 'TMPDIR': state})
+                                        env={**os.environ, 'TMPDIR': state}, **kwargs)
                 rc = proc.wait(timeout=timeout)
             finally:
                 if proc is not None:
@@ -159,4 +222,6 @@ if __name__ == "__main__":
         cases = [x for x in sys.argv[1:] if not x.startswith("--")]
         rc = run_fixture([exe, *cases])
         print("EXIT net_link_host=%d" % rc, flush=True)
+        if rc == 0 and '--mutate' in sys.argv:
+            check_mutations(tmp)
         sys.exit(rc)

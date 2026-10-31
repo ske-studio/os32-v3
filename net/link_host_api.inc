@@ -128,11 +128,9 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->ring_owner = 0;
         e->wseq = 1;
         e->wlen = 0;
-        e->wacked = 1;
         e->w_due = 0;
         e->decl_len = link_decl_len((const char *)e->req_copy, len);
         e->wsent_total = 0;
-        e->last_tx_tick = tick_count;   /* 未送信は RTO 対象外。req_due=1 が即送信を担保 */
         e->last_rx_tick = tick_count;
         e->retries = 0;
         e->probes = 0;
@@ -223,7 +221,7 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     remain = e->decl_len - e->wsent_total;
     if (len > remain) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
     if (!e->req_acked) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
-    if (e->wlen || !e->wacked) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
+    if (e->wlen) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
     gen = e->gen;
     n = (len > LINK_MAX_PAYLOAD) ? LINK_MAX_PAYLOAD : len;
     LINK_IRQ_RESTORE(f);
@@ -235,16 +233,14 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     e = link_slot(h, owner);
     if (!e || e->gen != gen) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
     if (e->state == LINK_H_STALE) { LINK_IRQ_RESTORE(f); return OS32_ERR_STALE; }
-    if (e->state != LINK_H_SENT || e->wlen || !e->wacked || !e->req_acked) {
+    if (e->state != LINK_H_SENT || e->wlen || !e->req_acked) {
         LINK_IRQ_RESTORE(f);
         return OS32_ERR_AGAIN;
     }
     e->wlen = (u16)n;
-    e->wacked = 0;
     e->w_due = 1;
     e->retries = 0;
     e->wsent_total += n;
-    e->last_tx_tick = tick_count;   /* 未送信は RTO 対象外。w_due=1 が即送信を担保 */
     LINK_IRQ_RESTORE(f);
     return (i32)n;
 }
@@ -257,7 +253,6 @@ static void link_free_handle(struct link_handle *e, int idx)
         e->rel_due = 1;
         e->rel_rid = e->rid;
         e->rel_epoch = e->epoch;
-        e->rel_tick = tick_count;   /* 未送信は RTO 対象外。rel_due=1 が即送信を担保 */
         e->rel_tries = 0;
     }
     if (e->ring_owner) {

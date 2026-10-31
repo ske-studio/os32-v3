@@ -68,9 +68,11 @@ typedef signed int     i32;
 static void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 static void *kmemset(void *d, int v, u32 n) { return memset(d, v, n); }
 static int kprintf_quiet = 1;
+static u8 kprintf_last_color;
 static void kprintf(u8 color, const char *fmt, ...)
 {
-    (void)color; (void)fmt;
+    kprintf_last_color = color;
+    (void)fmt;
     if (!kprintf_quiet) { /* 試験では黙らせる */ }
 }
 static int kutoa_dec(u32 val, char *buf, int bufsz)
@@ -239,7 +241,10 @@ int tick_register(unsigned int slot, tick_fn fn)
     (void)slot; (void)fn;
     return tick_register_result;
 }
-#include "../../net/link.c"
+#ifndef LINK_SOURCE
+#define LINK_SOURCE "../../net/link.c"
+#endif
+#include LINK_SOURCE
 
 static void link_tick_fwd(void) { link_tick(); }
 
@@ -1065,6 +1070,19 @@ static void r6_agent_silence_resyncs_and_stales_handles(void)
     check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_STALE, "A が STALE でない");
     check(link_host_status(b, 0, 0, host_owner) == OS32_ERR_STALE, "B が STALE でない");
     check(tx_count(LINK_OP_STATUS) >= LINK_PROBE_MAX, "STATUS を出していない");
+    check(link_rt_fail == 2, "最初の再同期の失敗数が 2 でない");
+    check(link_host_close(b, host_owner) == 0, "B の close が通らない");
+    /* A は STALE のまま保持し、もう一枠で新しい要求を失敗させる。 */
+    tx_clear();
+    script_handshake(SCRIPT_SESS, link_syn_epoch);
+    b = link_host_open("TIME", 4, host_owner);
+    check(b >= 0 && b != a, "再確立後の空き枠を開けない");
+    ticks(LINK_RTO_TICKS * (LINK_TRIES + 2));
+    check(link_resyncs == 2, "2 回目の再同期が起きない");
+    check(link_rt_fail == 3, "STALE の A を再び失敗に数えた");
+    check(link_host_status(a, 0, 0, host_owner) == OS32_ERR_STALE &&
+          link_host_status(b, 0, 0, host_owner) == OS32_ERR_STALE,
+          "2 回目の再同期後に STALE が保たれない");
     check(link_host_close(a, host_owner) == 0 && link_host_close(b, host_owner) == 0,
           "STALE の close が通らない");
 }
@@ -1417,9 +1435,83 @@ static void data_gap_is_dropped_and_reacked(void)
     while (a1 >= 0 && tx_ack(a1) == 0) a1 = tx_next(a1 + 1, LINK_OP_ACK);
     check(a1 >= 0 && tx_ack(a1) == 1, "欠落が埋まっても ACK が進まない");
     link_host_close(h, host_owner);
+
+    /* リングを満たし、次の in-order DATA は空き不足で保留する。 */
+    reset_all(cur_case);
+    script_handshake(SCRIPT_SESS, 0);
+    h = link_host_open("GET /x", 6, host_owner);
+    ticks(2);
+    resp_pl(pl, 200, LINK_STREAM_BUF + sizeof(body));
+    inject(LINK_OP_RESPONSE, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, pl, LINK_RESP_LEN);
+    host_tick();
+    (void)link_host_read_stage(h, 64, &src, host_owner);
+    for (u32 seq = 1, remaining = LINK_STREAM_BUF; remaining; seq++) {
+        u32 n = remaining < sizeof(body) ? remaining : sizeof(body);
+        inject(LINK_OP_DATA, 0, script_epoch, seq, 0, 1, SCRIPT_SESS, body, n);
+        host_tick();
+        remaining -= n;
+    }
+    u32 ack = link_h[h].ack_seq;
+    u32 received = link_h[h].recv_bytes;
+    tx_clear();
+    inject(LINK_OP_DATA, 0, script_epoch, ack + 1, 0, 1, SCRIPT_SESS, body, sizeof(body));
+    host_tick();
+    check(link_l2_overflow == 1, "空き不足を 1 回だけ計上していない");
+    check(link_h[h].ack_seq == ack && link_h[h].recv_bytes == received &&
+          link_stream_count == LINK_STREAM_BUF, "空き不足でも DATA を消費した");
+    check(link_host_read_stage(h, sizeof(body), &src, host_owner) == sizeof(body),
+          "満杯のリングを読めない");
+    tx_clear();
+    inject(LINK_OP_DATA, 0, script_epoch, ack + 1, 0, 1, SCRIPT_SESS, body, sizeof(body));
+    ticks(2);
+    a1 = tx_next(0, LINK_OP_ACK);
+    check(a1 >= 0 && tx_ack(a1) == ack + 1 && link_l2_overflow == 1,
+          "空きが戻っても再送 DATA を ACK できない");
+    link_host_close(h, host_owner);
 }
 
 /* ---- N2: カウンタ契約 --------------------------------------------------- */
+
+static void block_nic_tx(void) { nic_tx_allow = 0; }
+
+static void check_pending_tx_rto(u8 op)
+{
+    u32 retransmits = link_retransmits;
+    tx_clear();
+    wire_pump_fn = block_nic_tx;
+    ticks(LINK_RTO_TICKS * 2);
+    wire_pump_fn = 0;
+    check(tx_count(op) == 0 && link_retransmits == retransmits,
+          "NIC 受理前に RTO が進んだ");
+    host_tick();
+    check(tx_count(op) == 1, "NIC 受理が可能になっても送らない");
+    ticks(LINK_RTO_TICKS - 1);
+    check(tx_count(op) == 1 && link_retransmits == retransmits,
+          "NIC 受理時刻より前から RTO を数えた");
+    host_tick();
+    check(tx_count(op) == 2 && link_retransmits == retransmits + 1,
+          "NIC 受理から RTO 経過後に再送しない");
+}
+
+static void tx_rto_starts_at_nic_acceptance(void)
+{
+    script_handshake(SCRIPT_SESS, 0);
+    i32 h = link_host_open("ECHO 6", 6, host_owner);
+    check(h >= 0, "ECHO が開けない");
+    check_pending_tx_rto(LINK_OP_REQUEST);
+    inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
+    host_tick();
+    check(link_host_write(h, "abc", 3, host_owner) == 3, "WDATA を積めない");
+    check_pending_tx_rto(LINK_OP_WDATA);
+    inject(LINK_OP_ACK, 0, script_epoch, 0, 1, 1, SCRIPT_SESS, 0, 0);
+    host_tick();
+    tx_clear();
+    ticks(LINK_RTO_TICKS * 2);
+    check(tx_count(LINK_OP_WDATA) == 0, "ACK 後も WDATA を再送した");
+    check(link_host_write(h, "def", 3, host_owner) == 3, "ACK 後に次の WDATA を積めない");
+    check(link_host_close(h, host_owner) == 0, "close が失敗した");
+    check_pending_tx_rto(LINK_OP_RELEASE);
+}
 
 /* (a) 無ドロップの open→REQUEST→RESPONSE→read→close で再送計上が無い (F4)。
  * 修正前は open で 16・close で 16 の未送信フレームに RTO を課して
@@ -1444,6 +1536,39 @@ static void n2_no_drop_roundtrip_has_zero_retransmits(void)
     check(link_retransmits == 0,
           "無ドロップ往復で再送が計上された (F4: 未送信に RTO)");
     agent_stop();
+}
+
+static int selftest_reply_mode;
+
+static void selftest_reply(const u8 *f, unsigned int n)
+{
+    const u8 *h = f + LINK_ETH_HDR_LEN;
+    u32 rid = le_read32(h + LINK_OFF_RID);
+    u8 pl[LINK_RESP_LEN];
+    (void)n;
+    if (h[LINK_OFF_OP] != LINK_OP_REQUEST) return;
+    inject(LINK_OP_ACK, 0, script_epoch, 0, 0, rid, SCRIPT_SESS, 0, 0);
+    if (selftest_reply_mode == 1) {
+        resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
+        inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, rid,
+               SCRIPT_SESS, pl, LINK_RESP_LEN);
+    }
+}
+
+static void l0_failures_are_counted_once(void)
+{
+    for (int mode = 0; mode < 3; mode++) {
+        reset_all(cur_case);
+        script_handshake(SCRIPT_SESS, 0);
+        selftest_reply_mode = mode;
+        /* ACK のみ / TOMBSTONE / 完全無応答による再同期。 */
+        tx_hook = mode < 2 ? selftest_reply : 0;
+        link_selftest(1);
+        check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
+              "L0 の失敗往復を 1 回だけ計上していない");
+        check(kprintf_last_color == ATTR_YELLOW, "L0 の失敗表示が黄色でない");
+        check(link_resyncs == (mode == 2 ? 1u : 0u), "L0 の失敗経路が違う");
+    }
 }
 
 /* (b) L0 相当 → L1 相当を連続で回すと link_rt_ok が区間ごとに打ち直される (F2)。
@@ -1610,6 +1735,8 @@ static struct testcase cases[] = {
     { "open_error_codes",                           open_error_codes },
     { "last_data_and_eof_loss",                     last_data_and_eof_loss },
     { "data_gap_is_dropped_and_reacked",            data_gap_is_dropped_and_reacked },
+    { "tx_rto_starts_at_nic_acceptance",            tx_rto_starts_at_nic_acceptance },
+    { "l0_failures_are_counted_once",               l0_failures_are_counted_once },
     { "n2_no_drop_roundtrip_has_zero_retransmits",  n2_no_drop_roundtrip_has_zero_retransmits },
     { "n2_rt_ok_resets_between_selftest_sections",  n2_rt_ok_resets_between_selftest_sections },
     { "n1fix2_stream_over_64k_completes",           n1fix2_stream_over_64k_completes },
