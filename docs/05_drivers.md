@@ -259,7 +259,8 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
 | `atapi_get_stats(out)` | READ(10) の数・セクタ数・1 セクタずつへ落ちた数・DEVICE RESET / SRST の数・容量確認の出し直しの数・START UNIT の数・バスが死んだ印で断った数 (`dead_fails`) |
 
 - **PIO の受け取り**: byte count limit (Cylinder Low/High) には `min(バッファ, ATAPI_PIO_BCL_MAX = 0xF800)` を書き、
-  データは DRQ ごとに Cylinder Low/High のバイト数だけ読む。各ブロックの後に ALT_STATUS の空読みで 400ns 置く
+  データは DRQ ごとに Cylinder Low/High のバイト数だけ読む。偶数長でバッファ内に収まる DRQ は 16bit で格納し、
+  奇数長とバッファを超える DRQ はバイトごとの境界判定で受け取る (余剰は読み捨て)。各ブロックの後に ALT_STATUS の空読みで 400ns 置く
   (置かないと前のブロックの DRQ=1 を次のブロックと取り違える)。受け取ったバイト数がちょうど要求どおりでなければ失敗
 - **装置の選択**: `atapi_init` はセカンダリの**マスターとスレーブの両方**のシグネチャを見る (居ない装置は ALT_STATUS が
   0xFF なので BSY を待たない)。2 台あれば READ CAPACITY で**媒体の入っている方** (マスター優先) を選ぶ。
@@ -269,7 +270,8 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   Features / Byte Count → PACKET。`atapi_select_bank(1)` はバンクを切り替えるだけで DRV_HEAD は書かない。
   選択の待ちが期限切れ (下の「待ちの上限」) なら **DEVICE RESET (08h、その装置だけ。BSY でも受ける)** → それでも戻らなければ **SRST** (バンクで選んだ
   バスの 2 台。プライマリの HDD には届かない — UNDOCUMENTED io_ide 074Ch、NP21/W `ideio_o74c`。**同じバンク (セカンダリ) の
-  ATA HDD (`ide.c` の drive 2 / 3) も戻す**)。SRST は解いてから 2ms 置き (`ATAPI_SRST_SETTLE_US`)、マスターの BSY=0 を最大 31 秒待ってから
+  ATA HDD (`ide.c` の drive 2 / 3) も戻す**)。SRST は `cpu_delay_us(ATAPI_SRST_HOLD_US = 10µs)` で保持し (ATA/ATAPI-6 §9.2: 5µs 以上)、
+  解いてから 2ms 置き (`ATAPI_SRST_SETTLE_US`)、マスターの BSY=0 を最大 31 秒待ってから
   (マスターが居なければ待たない) 使う装置を選び直す (DRV_HEAD → 400ns → BSY=0)。スレーブの SRST 後の BSY は、選び直した後の
   待ち (`s_wait_limit_us`、ふだん 10 秒) までしか待たない。31 秒経っても BSY なら DRV_HEAD を書かずに
   期限切れを返す (`atapi_srst` の戻り値。`atapi_init` はそこで諦める)。どちらの後も装置は
@@ -277,7 +279,8 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   2026-09-26 まではマスターしか見ず、NP21/W で ide2 が空の CD のまま ide3 (セカンダリのスレーブ) に ISO を付けると
   `cd0: block 1 sects` (NP21/W は空のドライブの容量を 0 と答える) になり、1 セクタも読めなかった
 - **待ちの上限 (秒、2026-09-26 TASK_ATAPI_TIMEOUT (アーカイブ: `docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md`))**: BSY / DRQ の待ちは ALT_STATUS を
-  1 回読むごとに `cpu_delay_us(ATAPI_POLL_US = 100µs)` を挟み、挟んだ時間の合計で上限を数える (`atapi_wait_clear`)。
+  読み直す間に最初の `ATAPI_FAST_POLLS` (20) 回は `ATAPI_FAST_POLL_US` (10µs)、以後は `ATAPI_POLL_US` (100µs) を
+  `cpu_delay_us` で挟み、挟んだ時間の合計で上限を数える (`atapi_wait_clear` / `atapi_wait_drq`)。
   それまでは `IDE_TIMEOUT_LOOP` (100 万回の inp、Ra266 で 0.5〜1 秒) で、実機のスピンアップ (READ(10) で 2〜4 秒 BSY) に足りず
   健全な装置を DEVICE RESET で捨てていた。`tick_count` で数えないのは、呼ばれる文脈 (起動時の `atapi_init`、KAPI 経由の読み) で
   PIT の割り込みが来ていると決められないから (時計は `cpu_delay_us` の 1 本だけ。誤差 ±10% は上限の余裕で吸う)。
@@ -301,13 +304,13 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   `atapi_init` だけ (呼び直しがバスの再試行)。ホスト試験 `np2_bus_dead`
 
   **起動の最悪時間** (`atapi_init`、`cpu_delay_us` が数える時間。ホスト試験 `np2_boot_worst` が同じ数に固定):
-  装置なし (浮いたバス 0xFF) は SRST の 2ms だけ。2 台とも電源投入から BSY のまま (シグネチャも出ない) は
-  マスター 5 秒 + スレーブ 5 秒 + SRST 2ms + SRST の後 31 秒 = **41.0 秒**で「CD なし」。2 台ともシグネチャは出るが最初の
-  PACKET で固まる形は、容量確認 5 秒 + スレーブを選ぶ前の待ち 5 秒 + DEVICE RESET の後 5 秒 + SRST 2ms + 31 秒 = **46.0 秒**
+  装置なし (浮いたバス 0xFF) は SRST の保持 10µs + 解除後 2ms。2 台とも電源投入から BSY のまま (シグネチャも出ない) は
+  マスター 5 秒 + スレーブ 5 秒 + SRST 保持 10µs + 2ms + SRST の後 31 秒 = **41.0 秒**で「CD なし」。2 台ともシグネチャは出るが最初の
+  PACKET で固まる形は、容量確認 5 秒 + スレーブを選ぶ前の待ち 5 秒 + DEVICE RESET の後 5 秒 + SRST 保持 10µs + 2ms + 31 秒 = **46.0 秒**
   (これが上限)。どちらも `cpu_delay_us` の誤差 (±10%) と inp の時間 (読み 1 回ごとに約 1µs = +1%) の分だけ前後する。
   居ない装置の ALT_STATUS が BSY に見える機械 (0x80 など) では、居る装置が 1 台でもあればシグネチャの確認が居ない装置の
   分だけ 5 秒延びる。**1 台も居なければ 41.0 秒** — シグネチャが出ないので SRST し、`s_present_mask` が空のまま 0x80 を
-  「マスターの BSY」と見て 31 秒待つ (上の「2 台とも BSY」と同じ形。`np2_boot_worst` の (c) 5 秒 / (d) 41.002 秒)
+  「マスターの BSY」と見て 31 秒待つ (上の「2 台とも BSY」と同じ形。`np2_boot_worst` の (c) 5 秒 / (d) 41.002010 秒、SRST 保持の 10µs を含む)
 - **読みの失敗の行**: `[atapi] READ(10) drv= lba= n= ret= st= err= sense= got= req=` を起動から `ATAPI_DIAG_MAX` (8) 行まで出す。
   `lba` / `n` と `st` / `err` / `sense` / `got` は**最後に落ちた READ(10)** (複数セクタが落ちて 1 セクタずつ読み直したなら
   その 1 セクタ) とその終わった時点の値、`req=` は呼び手の範囲。`sense=5` は範囲外か空のドライブ (NP21/W は空のドライブへの

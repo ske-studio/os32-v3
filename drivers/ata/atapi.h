@@ -81,8 +81,9 @@
 #define ATAPI_UA_RETRIES        3
 
 /* ======== 待ちの上限 (秒単位、2026-09-26 TASK_ATAPI_TIMEOUT) ========
- * BSY / DRQ の待ちは ALT_STATUS を 1 回読むごとに cpu_delay_us(ATAPI_POLL_US) を
- * 挟み、挟んだ時間の合計で上限を数える (atapi_wait_clear)。以前は
+ * BSY / DRQ の待ちは ALT_STATUS を読み直す間に、最初の ATAPI_FAST_POLLS 回は
+ * ATAPI_FAST_POLL_US、それ以後は ATAPI_POLL_US を cpu_delay_us で挟み、
+ * 挟んだ時間の合計で上限を数える (atapi_wait_clear / atapi_wait_drq)。以前は
  * IDE_TIMEOUT_LOOP (100 万回の inp、Ra266 で 0.5〜1 秒) で、実機のスピンアップ
  * (READ(10) で 2〜4 秒 BSY) に足りず、健全な装置を DEVICE RESET で捨てていた。
  * tick_count で数えないのは、呼ばれる文脈 (起動時の atapi_init、KAPI 経由の読み)
@@ -90,6 +91,8 @@
  * cpu_delay_us の誤差は ±10% 程度 — 上限はどれも規定・実測より 2 倍以上の余裕で決める。
  * 読み間の inp の時間は数えないので、実際の待ちは上限より少し長い (長い側へ外れる) */
 #define ATAPI_POLL_US           100UL
+#define ATAPI_FAST_POLL_US      10UL
+#define ATAPI_FAST_POLLS        20UL
 /* 通常の PACKET の上限 (コマンドの BSY / DRQ、装置の選択、DEVICE RESET の後)。
  * スピンアップの 2〜4 秒 (票 §0) の 2 倍 + 余裕。cpu_delay_us が -10% に外れても 9 秒。
  * これを越えて BSY のままの装置だけを「固まった」と見る: コマンドの待ちが
@@ -104,8 +107,8 @@
 /* SRST の後にマスターの BSY=0 を待つ上限。ATA の規定の最大 (31 秒) */
 #define ATAPI_SRST_TIMEOUT_US   31000000UL
 
-/* SRST を立てておく長さ (ALT_STATUS の空読みの回数)。規定は 5µs 以上 */
-#define ATAPI_SRST_HOLD_LOOP    50000
+/* SRST を立てておく長さ (µs)。ATA/ATAPI-6 §9.2: 5µs 以上 */
+#define ATAPI_SRST_HOLD_US      10UL
 /* SRST を解いてからステータスを読むまで置く時間 (µs)。規定は 2ms 以上 —
  * それより前は BSY がまだ立っていないことがあり、準備済みに見える */
 #define ATAPI_SRST_SETTLE_US    2000UL

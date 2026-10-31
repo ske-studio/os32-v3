@@ -227,7 +227,7 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
 ## 3-6. 待ちの上限を秒で (2026-09-26、TASK_ATAPI_TIMEOUT (アーカイブ: `docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md`))
 
 - BSY / DRQ の待ちを `IDE_TIMEOUT_LOOP` (100 万回の inp) から**時間**へ: `atapi_wait_clear` が読み 1 回ごとに
-  `cpu_delay_us(ATAPI_POLL_US = 100µs)` を挟んで合計を数える。上限は `ATAPI_CMD_TIMEOUT_US` 10 秒 (init の間は
+  `cpu_delay_us` を最初の 20 回は 10µs、それ以後は `ATAPI_POLL_US` (100µs) 挟んで合計を数える。上限は `ATAPI_CMD_TIMEOUT_US` 10 秒 (init の間は
   `ATAPI_INIT_TIMEOUT_US` 5 秒)、SRST の後は `ATAPI_SRST_TIMEOUT_US` 31 秒。tick は使わない (割り込みが開いている保証が無い)
 - DEVICE RESET は、コマンドの待ちが期限切れになった後、次の選択でさらに上限まで待っても BSY / DRQ のときだけ
 - `atapi_srst` は int を返し、31 秒で BSY が落ちなければ `atapi_recover` / `atapi_init` は DRV_HEAD を書かずに諦める
@@ -238,7 +238,7 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   `np2_sel_busy` (1) の「30 万回 BSY」は「5 秒 BSY」に書き換えた (回数の模型では 100µs 刻みの待ちが 30 秒になる)
 - ケース 4 本: `np2_spinup` (3 秒・9 秒は READ(10) 1 回・リセット 0、25 秒はリセット 1 回で、それは BSY が上限を
   越えた後、CDB の前の 3 秒)、`np2_srst_long` (SRST 後 10 秒・25 秒を待ちきる、40 秒は 31 秒で諦め DRV_HEAD も PACKET も
-  書かない)、`np2_boot_worst` (起動の最悪時間 41.002 秒 / 46.002 秒に固定)、`np2_start_unit`
+  書かない)、`np2_boot_worst` (起動の最悪時間 41.002010 秒 / 46.002010 秒に固定、SRST の校正待ち 10µs を含む)、`np2_start_unit`
 - 変異 62〜73 (上限を回数に戻す × 2、PACKET 上限 1 秒、SRST の戻り値無視、SRST を PACKET の上限で諦める、init の SRST
   戻り値無視、init も 10 秒、init 後に上限を戻さない、START UNIT を出さない、何度も出す、ASCQ を読まない、ASC/ASCQ の行
   を出さない) は全部 RED。既存の変異のうち待ち・回復の形が変わった 7 本はパターンを新しい形に合わせた。
@@ -262,3 +262,9 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   (NP21/W は固まらず、READ CAPACITY で UA / NOT READY を返さない)。`atapi_get_stats` の
   `dev_resets` / `soft_resets` / `ready_retries` で踏んだかが分かる
 - HDD (ext2) への書き込みの速さは見ていない。CD 側が速くなった後は、そちらが律速になりうる
+
+## L2: PIO と短い待ち (2026-10-31)
+
+- `poll_clock`: BSY / idle / DRQ の最初の 20 回は 10µs、その後は 100µs。即応・ERR の順序・10 秒の上限を時計の模型で確認。
+- `srst_clock`: 校正待ちの保持 10µs、保持中のステータス空読みなし、解除後 2ms と BSY 待ちを確認。
+- `pio_bounds`: 非整列バッファ・偶数 / 奇数 DRQ・余剰の読み捨てをガードで確認。模型の奇数 DRQ の詰め物は次のブロックを消費しない。
