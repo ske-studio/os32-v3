@@ -17,6 +17,9 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     source = (ROOT / 'mm/paging.c').read_text()
     (tmp / 'paging_host_source.c').write_text(source)
     allocator = (ROOT / 'mm/pgalloc.c').read_text()
+    for part in ('owner', 'resource', 'surface'):
+        allocator = allocator.replace(
+            f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
     allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / 'pgalloc_host_source.c').write_text(allocator)
     # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、

@@ -42,6 +42,9 @@ def run(changes=None):
     with tempfile.TemporaryDirectory(prefix='os32-lease-') as tmpdir:
         tmp = pathlib.Path(tmpdir)
         texts = [(ROOT / p).read_text() for p in SOURCES]
+        for part in ('owner', 'resource', 'surface'):
+            texts[1] = texts[1].replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         if changes:
             name, index, old, new = changes
             assert texts[index].count(old) == 1, name

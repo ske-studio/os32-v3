@@ -71,7 +71,11 @@ def run(source):
         (tmp / 'budget_shlib.inc').write_text('\n'.join(bb.slice_out(shlib, sig) for sig in ('int shlib_addrspace_attach(', 'void shlib_addrspace_detach(')))
         (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit('))
         (tmp / 'paging_host_source.c').write_text((ROOT / 'mm/paging.c').read_text())
-        (tmp / 'pgalloc_host_source.c').write_text((ROOT / 'mm/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
+        allocator = (ROOT / 'mm/pgalloc.c').read_text()
+        for part in ('owner', 'resource', 'surface'):
+            allocator = allocator.replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
+        (tmp / 'pgalloc_host_source.c').write_text(allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
         try:
             gui = (ROOT / 'userland/tests/gui_demo.bin').read_bytes()
         except FileNotFoundError:

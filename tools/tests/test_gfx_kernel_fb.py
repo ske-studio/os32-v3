@@ -17,7 +17,9 @@ TARGET_SRCS = ['gfx/gfx_core.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/v
                'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
-               'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c']
+               'mm/pgalloc.c',
+               'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
+               'kernel/sys.c', 'mm/physmem.c']
 MUTANTS = [
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
@@ -145,7 +147,9 @@ static inline void io_wait_n(int n) {(void)n;}
             # Preserve source-relative include semantics for private copies.
             body = re.sub(r'#include "(\.\./[^"\n]+)"',
                           lambda m: '#include "'+str((ROOT/path).parent/m[1])+'"', body)
-            if path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
+            if path.endswith('.inc'):
+                (tmp / pathlib.Path(path).name).write_text(body)
+            elif path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
                 (tmp/(pathlib.Path(path).stem+'_host_source.c')).write_text(body)
             else:
                 dest = tmp/(pathlib.Path(path).stem+'.c');dest.write_text(body);sources.append(dest)
@@ -205,7 +209,7 @@ def main():
             ('display-authorization','exec/surface_query.c',
              'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))', 'if (0)',
              'FAIL surface_lease(&source,'),
-            ('map-range','mm/pgalloc.c',
+            ('map-range','mm/pgalloc_resource.inc',
              'first < end && first >= r->decode_first &&\n                               end <= r->decode_end',
              'first < end', 'FAIL !ledger_resource_set_map(0,rr->decode_first-1,rr->decode_end)')]:
             result=run_case(None,args.runner,[(unit,old,new)])

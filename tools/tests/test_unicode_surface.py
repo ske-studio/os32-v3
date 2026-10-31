@@ -36,6 +36,9 @@ TARGET_SRCS = [
     'mm/shlib.c',
     'mm/paging.c',
     'mm/pgalloc.c',
+    'mm/pgalloc_owner.inc',
+    'mm/pgalloc_resource.inc',
+    'mm/pgalloc_surface.inc',
     'kernel/sys.c',
     'mm/physmem.c',
     'userland/lib/gfx/libos32gfx_core.c',
@@ -67,7 +70,7 @@ assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
     ('sdk-no-kapi', UTF8, 'return kapi->unicode_to_jis(cp);', '(void)cp; return 0;', 'FAIL unicode_to_jis(0x3041)==0x2421'),
     ('tvram-gui', 'exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
-    ('slot-unready', 'mm/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
+    ('slot-unready', 'mm/pgalloc_surface.inc', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
 ]
 
 

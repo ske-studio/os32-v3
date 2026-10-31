@@ -132,6 +132,9 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     (tmp / "paging_host_source.c").write_text(sources[ROOT / "mm/paging.c"],
                                               encoding="utf-8")
     alloc = sources[ROOT / "mm/pgalloc.c"]
+    for part in ('owner', 'resource', 'surface'):
+        alloc = alloc.replace(
+            f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
     alloc = alloc.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / "pgalloc_host_source.c").write_text(alloc, encoding="utf-8")
 

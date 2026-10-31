@@ -103,6 +103,9 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
                     'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/memmap.h',
                     'tools/tests/layout_boot_fixture.h'):
             texts[rel] = (ROOT / rel).read_text()
+        for part in ('owner', 'resource', 'surface'):
+            texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         if mutation:
             _, rel, old, new, _ = mutation
             if old not in texts[rel]:
@@ -241,6 +244,9 @@ class MemoryBoot(unittest.TestCase):
     def test_legacy_allocator_is_gone(self):
         # D32 / T1a: legacy の口は製品のどこにも残っていない。
         alloc = (ROOT / 'mm/pgalloc.c').read_text()
+        for part in ('owner', 'resource', 'surface'):
+            alloc = alloc.replace(
+                f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         header = (ROOT / 'mm/pgalloc.h').read_text()
         self.assertNotRegex(alloc, r'\bvoid\s+pgalloc_init\s*\(')
         self.assertNotRegex(header, r'\bpgalloc_init\s*\(')
