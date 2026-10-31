@@ -514,6 +514,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 #include "exec_finish.inc"
 
 #include "exec_syscall.inc"
+#include "exec_stdin.inc"
 
 #include "exec_fault.inc"
 

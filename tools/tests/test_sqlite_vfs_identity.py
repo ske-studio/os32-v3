@@ -1,6 +1,6 @@
 """T4b-4: real SQLite callbacks/FD table; runtime mutation failures only."""
 CHECK = dict(name='sqlite-vfs-identity-host', tier=1,
-    covers=['tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'fs/vfs_fd.c', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=6.285076)
 
 from kernel_includes import include_flags
@@ -8,12 +8,13 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ['absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
          'close_gap', 'separate', 'errors', 'readonly', 'unsupported', 'fullpath']
-FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'lib/sqlite3/os32_sqlite_vfs.c',
+FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/input_fixture_host.h']
@@ -42,7 +43,7 @@ MUTANTS = [
         'if (pOutFlags) *pOutFlags = flags;',
         'if (pOutFlags) *pOutFlags = SQLITE_OPEN_READWRITE;')]),
     ('ro_write', 'readonly', [(VFS,
-        'if (p->readonly) return SQLITE_READONLY;', '(void)p->readonly;')]),
+        'if (p->readonly) return SQLITE_READONLY;\n    vfs_seek', '(void)p->readonly;\n    vfs_seek')]),
     ('ro_truncate', 'readonly', [(VFS,
         'if (p->readonly) return SQLITE_READONLY;\n    if (size < 0',
         'if (size < 0')]),
@@ -78,7 +79,7 @@ def main():
         for case in CASES:
             subprocess.run([str(exe), case], check=True)
         print(f'GREEN {len(CASES)}/{len(CASES)}', flush=True)
-        if os.environ.get('MUTATE', '0') != '1':
+        if os.environ.get('MUTATE', '0') != '1' and '--mutate' not in sys.argv:
             return
         for name, case, changes in MUTANTS:
             tree = work / name
@@ -89,7 +90,7 @@ def main():
             for file, old, new in changes:
                 path = tree / file
                 source = path.read_text()
-                assert old in source, (name, old)
+                assert source.count(old) == 1, (name, source.count(old))
                 path.write_text(source.replace(old, new))
             mutant = tree / 'run'
             compile_host(tree, obj, mutant)  # Compilation failure is never RED.

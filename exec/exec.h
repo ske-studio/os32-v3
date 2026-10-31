@@ -223,4 +223,8 @@ extern volatile u32 ring3_wm_fault_count;
 /* Entry identity mismatch, separate from ordinary pointer/fault kills. */
 extern volatile u32 ring3_caller_reject_count;
 
+/* Internal VFS continuation, only for the current GUI CPL3 sys_read. */
+struct VfsStdinRead;
+struct VfsStdinRead *exec_stdin_state(void);
+
 #endif /* __EXEC_H */

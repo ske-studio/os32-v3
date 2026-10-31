@@ -31,6 +31,7 @@
 /* ======================================================================== */
 
 #include "os32api.h"
+#include <string.h>
 #include <stdlib.h>          /* newlib malloc — アプリのヒープ (非恒等写像) */
 
 #define KOUT_PATH     "/etc/profile"
@@ -38,6 +39,21 @@
 #define KOUT_SECTOR   512
 #define KOUT_PCI_LEN  40     /* struct pci_dev の写し (drivers/pci/pci.h) */
 #define KOUT_VER_LEN  32
+
+/* Existing deployed CPL3 test: exercise sys_read across terminal waits. */
+static int stdin_test(KernelAPI *api, int size, const u8 *expected, int count)
+{
+    u8 buf[4] = {0xCC, 0xCC, 0xCC, 0xCC};
+    api->kprintf(0xE1, "stdin before: size=%d buf=%02x %02x %02x %02x\n",
+                 size, buf[0], buf[1], buf[2], buf[3]);
+    int rc = api->sys_read(0, buf, (u32)size);
+    api->kprintf(0xE1, "stdin after: rc=%d buf=%02x %02x %02x %02x\n",
+                 rc, buf[0], buf[1], buf[2], buf[3]);
+    int ok = rc == count && memcmp(buf, expected, (size_t)count) == 0;
+    for (int i = count; i < 4; i++) if (buf[i] != 0xCC) ok = 0;
+    api->kprintf(ok ? 0xE1 : 0x41, "stdin %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
 
 int main(int argc, char **argv, KernelAPI *api)
 {
@@ -50,7 +66,15 @@ int main(int argc, char **argv, KernelAPI *api)
     int fails = 0, skips = 0;
     int fd, rc, i, w, h, drv, present, absent;
 
-    if (argc > 1) path = argv[1];
+    if (argc > 1) {
+        if (strcmp(argv[1], "--stdin-byte") == 0)
+            return stdin_test(api, 1, (const u8 *)"A", 1);
+        if (strcmp(argv[1], "--stdin-line") == 0)
+            return stdin_test(api, 4, (const u8 *)"AB\n", 3);
+        if (strcmp(argv[1], "--stdin-utf8") == 0)
+            return stdin_test(api, 3, (const u8 *)"\xE3\x81\x82", 3);
+        path = argv[1];
+    }
 
     if (api->version < 60) {
         api->kprintf(0x41, "KAPI v%d < 60\n", api->version);

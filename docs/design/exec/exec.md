@@ -78,3 +78,9 @@ ring3_wm_leave内に残す。
 | 採用 | 解く欠点 | 386 でのコスト |
 |---|---|---|
 | **syscall 境界で WM の入力ポンプ** + ISR の強制脱出キー | 1 アプリが机を止める | プリエンプション無しの範囲で最善。純粋な計算ループには効かない |
+
+## stdin の KBD 再開
+
+未完了の sys_read は AppSlot の進捗を保持し、KBD 再開時に文字を残して syscall を再実行する。
+1文字を EAX に返す扱いは単独の getchar/getkey に適用する。
+状態の寿命とフレーム復帰の契約は [exec_stdin](exec_stdin.md) を参照。

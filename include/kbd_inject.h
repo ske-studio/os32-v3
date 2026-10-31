@@ -46,6 +46,8 @@ u32 kbd_inject_pending(void);
 int kbd_inject_take(u8 *out);
 /* exec_resume はまだWM文脈なので、検証済み再開先を明示する。KAPI非公開。 */
 int kbd_inject_take_for(int id, u8 *out);
+/* Same destination rules, without consuming the byte (stdin restart). */
+int kbd_inject_peek_for(int id, u8 *out);
 /* 1 バイト**覗く** (取り出さない)。覗けたら 1 を返して *out に書く。空なら 0。
  * kbd_peekkey (drivers/input/kbd.c) 用 — GUI 中の「ESC か否かだけ見て、ESC でなければ
  * 次の読み手に残す」を、リングを 1 バイトも動かさずに書くために要る。 */

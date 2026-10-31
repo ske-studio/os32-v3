@@ -224,14 +224,32 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 }
 
 /* ---- fs/vfs_fd.c の境界 ---- */
-int fd_is_redirected(int fd) { (void)fd; return 0; }
+static int stdin_redirected;
+int fd_is_redirected(int fd) { (void)fd; return stdin_redirected; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }
 int fd_redirect_read(int fd, void *buf, u32 size)
 { (void)fd; (void)buf; (void)size; return VFS_ERR_INVAL; }
 int fd_redirect_write(int fd, const void *buf, u32 size)
 { (void)fd; (void)buf; (void)size; return VFS_ERR_INVAL; }
-int kbd_getchar_kapi(void) { return '\n'; }
+#include "vfs_stdin.h"
+static VfsStdinRead stdin_states[2];
+static int stdin_slot, stdin_persistent, stdin_scripted, stdin_can_park;
+static int stdin_input[16], stdin_len, stdin_pos;
+static void *stdin_jmp[5];
+VfsStdinRead *exec_stdin_state(void)
+{
+    return stdin_persistent ? &stdin_states[stdin_slot] : 0;
+}
+int kbd_getchar_kapi(void)
+{
+    if (!stdin_scripted) return '\n';
+    if (stdin_pos == stdin_len) {
+        if (stdin_can_park) __builtin_longjmp(stdin_jmp, 1);
+        CHECK(0); return -1;
+    }
+    return stdin_input[stdin_pos++];
+}
 void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)size; (void)color; }
 int res_owner_get(void) { return 0; }
@@ -2164,6 +2182,85 @@ static void case_filedir(void)
 #undef FILEDIR_REFUSED
 #endif
 
+/* Lose the C stack at each empty input, just as exec_park_kbd does. */
+static void stdin_feed(int c)
+{
+    stdin_input[0] = c; stdin_len = 1; stdin_pos = 0;
+}
+static void stdin_park(u8 *buf, u32 size)
+{
+    stdin_can_park = 1;
+    if (__builtin_setjmp(stdin_jmp) == 0) {
+        (void)vfs_read_fd(0, buf, size);
+        CHECK(0); /* a partial line must not return before the next input */
+    }
+    stdin_can_park = 0;
+}
+#define STDIN_CHECK(x) do { CHECK(x); if (g_failures) return; } while (0)
+static void case_stdin(void)
+{
+    static u8 buf[8], other[8];
+    VfsStdinRead *st = &stdin_states[0];
+    report("case stdin (real VFS, discarded C stack)\n");
+    kmemset(stdin_states, 0, sizeof(stdin_states));
+    kmemset(buf, 0xCC, sizeof(buf));
+    stdin_slot = 0; stdin_persistent = stdin_scripted = 1;
+    stdin_len = stdin_pos = 0;
+    stdin_park(buf, 1);
+    STDIN_CHECK(buf[0] == 0xCC);
+    stdin_feed('A');
+    STDIN_CHECK(vfs_read_fd(0, buf, 1) == 1 && buf[0] == 'A' && !st->active);
+
+    stdin_feed('A'); stdin_park(buf, 4);
+    STDIN_CHECK(st->active && st->done == 1 && buf[0] == 'A');
+    if (g_failures) return;
+    stdin_slot = 1;
+    stdin_feed('X'); stdin_park(other, 4);
+    STDIN_CHECK(stdin_states[1].done == 1 && other[0] == 'X');
+    stdin_slot = 0;
+    stdin_feed('B'); stdin_park(buf, 4);
+    STDIN_CHECK(st->active && st->done == 2 && buf[0] == 'A' && buf[1] == 'B');
+    stdin_feed('\r');
+    STDIN_CHECK(vfs_read_fd(0, buf, 4) == 3);
+    STDIN_CHECK(buf[0] == 'A' && buf[1] == 'B' && buf[2] == '\n' && !st->active);
+    stdin_slot = 1; stdin_feed('\n');
+    STDIN_CHECK(vfs_read_fd(0, other, 4) == 2 && other[0] == 'X' && !stdin_states[1].active);
+    stdin_slot = 0;
+    for (int persistent = 0; persistent <= 1; persistent++) {
+        stdin_persistent = persistent;
+        stdin_feed('Q');
+        STDIN_CHECK(vfs_read_fd(0, buf, 0) == 0 && stdin_pos == 0 && !st->active);
+        STDIN_CHECK(vfs_read_fd(0, buf, 1) == 1 && buf[0] == 'Q');
+        stdin_input[0] = 0; stdin_input[1] = '\n'; stdin_input[2] = 'Z';
+        stdin_len = 3; stdin_pos = 0;
+        STDIN_CHECK(vfs_read_fd(0, buf, 4) == 2 && buf[0] == 0 && buf[1] == '\n');
+        STDIN_CHECK(stdin_pos == 2 && !st->active);
+        stdin_feed(-7);
+        STDIN_CHECK(vfs_read_fd(0, buf, 4) == -7 && !st->active);
+        stdin_input[0] = 'A'; stdin_input[1] = -7; stdin_len = 2; stdin_pos = 0;
+        STDIN_CHECK(vfs_read_fd(0, buf, 4) == 1 && buf[0] == 'A' && !st->active);
+    }
+    stdin_persistent = 1;
+    stdin_feed(0xE3); stdin_park(buf, 3);
+    stdin_feed(0x81); stdin_park(buf, 3);
+    stdin_feed(0x82);
+    STDIN_CHECK(vfs_read_fd(0, buf, 3) == 3 && buf[0] == 0xE3 && buf[1] == 0x81 && buf[2] == 0x82);
+    for (int mismatch = 0; mismatch < 3; mismatch++) {
+        stdin_feed('A'); stdin_park(buf, 4);
+        if (mismatch == 2) st->done = st->size;
+        stdin_feed('B');
+        STDIN_CHECK(vfs_read_fd(0, mismatch == 0 ? other : buf, mismatch == 1 ? 3 : 4) == VFS_ERR_INVAL);
+        STDIN_CHECK(!st->active && stdin_pos == 0);
+    }
+    stdin_redirected = 1; stdin_feed('Z');
+    /* The redirection fake returns INVAL: stdin must never consult its provider. */
+    STDIN_CHECK(vfs_read_fd(0, buf, 4) == VFS_ERR_INVAL && stdin_pos == 0 && !st->active);
+    stdin_redirected = 0;
+    stdin_scripted = stdin_persistent = 0;
+}
+
+#undef STDIN_CHECK
+
 /* sel が "+first-fail" なら全段を回し、どこかの段で落ちたらそこで打ち切る
  * (test_vfs_fd_path.py の変異。RED かどうかだけ分かればよい)。 */
 #define FDP_STEP(name, fn) \
@@ -2177,6 +2274,7 @@ static void run(const char *sel)
     int all;
     if (ff) sel = (const char *)0;
     all = (sel == (const char *)0);
+    FDP_STEP("stdin", case_stdin)
     FDP_STEP("fd", case_fd)
     FDP_STEP("busy", case_busy)
     FDP_STEP("dot", case_dot)
@@ -2209,6 +2307,7 @@ __asm__(".text\n"
         "  call fdp_start_c\n"
         "  hlt\n");
 
+#define INPUT_FIXTURE_STDIN_STATE
 #define INPUT_FIXTURE_SETUP fixture_input.getchar_kapi = kbd_getchar_kapi;
 #include "input_fixture_host.h"
 

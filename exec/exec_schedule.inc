@@ -54,7 +54,7 @@ i32 exec_park(void)
 /*  drivers/input/kbd.c の kbd_getchar / kbd_getkey が、GUI モードで注入リングが    */
 /*  空のときに呼ぶ。成立すれば **戻らない** (exec_park と同じ longjmp)。      */
 /*  起こすのは WM で、そのとき exec_resume が注入リングの 1 バイトを EAX へ   */
-/*  入れるので、アプリからは kbd_getchar() が普通に値を返したように見える。   */
+/*  入れる。sys_read の途中なら文字を残し、int80 を再実行して VFS へ戻す。  */
 /*                                                                          */
 /*  戻り値 0 = park できなかった。呼び手は従来の `hlt` 待ちへ落ちる。         */
 /*  「できなかった」の大半は CPL=0 の呼び手 (常駐シェル) や syscall の外で、  */
@@ -221,7 +221,7 @@ i32 exec_sys_yield(void)
 /*  EAX スロットに書くので、アプリから見れば gui_call(OP_WAIT) が普通に        */
 /*  その値を返したように見える。                                             */
 /*                                                                          */
-/*  起こせるのは **OP_WAIT で park された印のあるフレームだけ** (C5/C6)。     */
+/*  起こせるのは各 park 由来の印を持つフレームだけ (C5/C6)。                 */
 /*  印が無ければ OS32_ERR_STALE を返して ring3_resume_bad_frame_count を上げる*/
 /*  — WM の行儀を信じるのではなくカーネルが弾く形 (受入 G7)。                 */
 /* ======================================================================== */
@@ -233,6 +233,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     AppSlot *a;
     int rc;
     int src;
+    int restart_stdin;
     u8 ch;
 
     rc = appslot_resume_check((int)app_id);
@@ -241,6 +242,7 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     a = appslot_get((int)app_id);
     if (!a->cpl3 || !a->as->pd_phys) return OS32_ERR_INVAL;
     src = appslot_resume_source((int)app_id);
+    restart_stdin = src == APP_RESUME_SRC_KBD && a->stdin_read.active;
     if (src == APP_RESUME_SRC_KEEP) {
         /* STOP parked a completed syscall; do not overwrite EAX or read keys. */
     } else if (src == APP_RESUME_SRC_YIELD) {
@@ -257,15 +259,20 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
         if (kbd_inject_take_for((int)app_id, &ch)) a->frame[APP_FRAME_EAX] = (u32)ch;
         else                      a->frame[APP_FRAME_EAX] = (u32)(i32)-1;
     } else if (src == APP_RESUME_SRC_KBD) {
-        /* 票 §5 の指摘 B: 文字の取り出しはここで完結する (WM 側に取り出し用
-         * の KAPI は作らない)。WM が渡した wait_ret は**使わない**。
+        /* 単独 getchar/getkey はここで取得し、stdin は非消費で存在を確認する。
+         * WM が渡した wait_ret は使わない。
          * 端末由来も読み手とslot/launchの子孫だけが取得できる (GUIRUNKEY-1)。
          * WMのpendingはヒントなので、別のRunのWAIT_KEYに端末入力を渡さない。
          * 空なら起こさず OS32_ERR_AGAIN — 印も状態も残るので、WM は次の周で
          * もう一度試せばよい (その周は譲る = streak に数えない)。 */
         ch = 0;
-        if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
-        a->frame[APP_FRAME_EAX] = (u32)ch;
+        if (restart_stdin) {
+            /* Leave the byte for sys_read in the child's normal syscall context. */
+            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
+        } else {
+            if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;
+            a->frame[APP_FRAME_EAX] = (u32)ch;
+        }
     } else {
         a->frame[APP_FRAME_EAX] = (u32)wait_ret;
     }
@@ -294,6 +301,9 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     exec_restore_context((int)app_id);
     /* cli → TSS.ESP0 → CR3 → popad; iretd を割り込み禁止で一続きに。
      * iretd が保存済み EFLAGS (IF=1) を復元するのでアプリ側の IF は変わらない。 */
+    /* Saved EIP follows the two-byte int 0x80; EAX still contains sys_read's slot.
+     * Each new park saves a fresh post-int80 frame, so this is once per resume. */
+    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;
     ring3_resume(a->frame, a->as->pd_phys, &kernel_tss);
     return 0;   /* 到達しない */
 }

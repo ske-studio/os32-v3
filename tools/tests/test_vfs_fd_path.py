@@ -42,6 +42,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
 
   python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [case]
 
+--mutate          stdin の追加変異だけを回す (正常対照を先に回す)。
 --mutants=filedir  EXT2DIR-1 の追加変異だけを回す (正常対照を先に回す)。
 --target  触った fs/*.c を i386-elf-gcc で -Werror 単体コンパイル ([C1])。
 --mutants fs/ と userland/lib/rt/ の**写し**に変異を 1 つずつ当てて組み直し、
@@ -51,7 +52,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
           (失効の印・inode の口を直接見る検査と注入は RED では組まない)。
 """
 CHECK = dict(name='vfs-fd-path-host', tier=1,
-    covers=['fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'kernel/ime/ime_dict.c', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=18.564108)
 
 from kernel_includes import include_flags
@@ -367,6 +368,31 @@ IME_MUTANTS = [
      "    if (!dict_ready(dict) || !dict->learn_stmt) return;",
      "    if (!dict->db || !dict->learn_stmt) return;"),
 ]
+
+# Focused stdin regressions: every marker is unique and must fail at runtime.
+STDIN_MUTANTS = [
+    ("STDIN: restart at zero", "fs/vfs_fd_stdin.inc",
+     "    if (state->active) {", "    if (state->active) { state->done = 0;"),
+    ("STDIN: discard progress on park", "fs/vfs_fd_stdin.inc",
+     "        int c = input_getchar_kapi();", "        state->active = 0;\n        int c = input_getchar_kapi();"),
+    ("STDIN: lose CR normalization", "fs/vfs_fd_stdin.inc",
+     "        if (c == '\\r') c = '\\n';", "        /* no normalization */"),
+    ("STDIN: ignore newline", "fs/vfs_fd_stdin.inc",
+     "        if (c == '\\n') break;", "        /* keep reading */"),
+    ("STDIN: leave active on success", "fs/vfs_fd_stdin.inc",
+     "    result = (int)state->done;\n    state->active = 0;", "    result = (int)state->done;"),
+    ("STDIN: lose partial error count", "fs/vfs_fd_stdin.inc",
+     "            result = state->done ? (int)state->done : c;", "            result = c;"),
+    ("STDIN: accept different buffer", "fs/vfs_fd_stdin.inc",
+     "state->buf != buf || ", ""),
+    ("STDIN: accept different size", "fs/vfs_fd_stdin.inc",
+     "state->size != size || ", ""),
+    ("STDIN: accept finished progress", "fs/vfs_fd_stdin.inc",
+     "state->done >= size", "0"),
+    ("STDIN: retain mismatched state", "fs/vfs_fd_stdin.inc",
+     "            state->active = 0;\n            return VFS_ERR_INVAL;", "            return VFS_ERR_INVAL;"),
+]
+MUTANTS += STDIN_MUTANTS
 
 # lib/sqlite3/os32_sqlite_vfs.c と fs/vfs_fd.c の変異 (ime の段で落ちること)
 SQLITE_MUTANTS = [
@@ -891,6 +917,7 @@ def target_compile(tmp):
 REBUILD = {
     "fs/vfs.c": ("harness",),
     "fs/vfs_fd.c": ("harness",),
+    "fs/vfs_fd_stdin.inc": ("harness",),
     "fs/vfs_name_rules.inc": ("harness",),
     "fs/ext2/ext2_file.c": ("harness",),
     "fs/fat/fatfs_vfs.c": ("harness",),
@@ -928,8 +955,8 @@ def _mutant_one(item):
             return name, f"MUTANT {i} ({name}): build failed\n{err}"
         imgdir = tmp / f"img_m{i}"
         imgdir.mkdir()
-        if name.startswith("EXT2DIR-1:"):
-            result = host32.run([str(exe), str(imgdir), str(pkgdir), "filedir"],
+        if name.startswith(("EXT2DIR-1:", "STDIN:")):
+            result = host32.run([str(exe), str(imgdir), str(pkgdir), "stdin" if name.startswith("STDIN:") else "filedir"],
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 timeout=120)
             red = result.returncode == 1 and b"FAIL line" in result.stdout
@@ -1047,6 +1074,12 @@ def main():
             return 1
         if "--target" in sys.argv:
             target_compile(tmp)
+        if "--mutate" in sys.argv:
+            surv = mutants(tmp, pkgdir, e2fsck, STDIN_MUTANTS)
+            if surv:
+                print("STDIN MUTANTS SURVIVED: " + "; ".join(surv))
+                return 1
+            print(f"STDIN MUTANTS all {len(STDIN_MUTANTS)} runtime RED")
         if "--mutants=filedir" in sys.argv:
             surv = mutants(tmp, pkgdir, e2fsck, FILEDIR_MUTANTS)
             if surv:

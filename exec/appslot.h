@@ -25,6 +25,7 @@
 #include "types.h"
 #include "paging.h"        /* struct addrspace (値で持つ。関数は呼ばない) */
 #include "ksetjmp.h"       /* KSETJMP_BUF_LEN */
+#include "../fs/vfs_stdin.h"
 
 /* ---- ID の池 (D3) ---------------------------------------------------- */
 /* 1 = シェル帯 (CUI シェル / gshell)。kernel/gui.h の GUI_SHELL_OWNER と同値。
@@ -42,7 +43,7 @@
 /* GUI 中の kbd 待ち = **第 2 の park 点** (票 K7 §1 D1)。PARKED と同じく
  * 「フレームを保存して WM へ戻した」状態だが、起こす条件が違う:
  * PARKED は WM が渡す wait_ret で起き、WAIT_KEY は**注入リングの 1 バイト**で
- * 起きる (exec_resume が EAX へ入れる。§5 の指摘 B)。値の追加なので
+ * 起きる (単独 kbd は EAX へ、未完了 stdin は syscall 再実行)。値の追加なので
  * exec_app_state の既存の 0/1/2 は 1 つも動かない (§5 の指摘 C)。 */
 #define APP_STATE_WAIT_KEY 3
 /* GUI 中の**ポーリング型**の協調 yield = **第 3 の park 点** (票 T8 §7 D8)。
@@ -71,6 +72,7 @@
 #define APP_FRAME_WORDS    13
 /* pushad の EAX スロット = 戻り値 (resume の wait_ret を書く先) */
 #define APP_FRAME_EAX      7
+#define APP_FRAME_EIP      8
 /* CPL=3 の int80 が保存したユーザ ESP。 */
 #define APP_FRAME_ESP      11
 
@@ -137,6 +139,7 @@ typedef struct {
     int disk_write_authorized; /* loader-owned; never inherited by children */
     int trim_pending;         /* T2g: one pending request per slot */
     u32 trim_epoch;
+    VfsStdinRead stdin_read;  /* sys_read progress across KBD park */
 } AppSlot;
 
 extern u32 appslot_trim_epoch;
