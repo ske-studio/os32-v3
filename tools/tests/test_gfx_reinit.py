@@ -10,8 +10,8 @@ from mutpar import run_ordered
 from test_gfx_kernel_fb import run_case, TARGET_SRCS, ROOT
 
 HOOKS = [
- ('gfx/gfx_core.c', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */',
-  '    { extern void host_reinit_event(int); host_reinit_event(1); }\n    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */'),
+ ('gfx/gfx_core.c', '    gfx_bind_client(); /* retain 400-line plane stride in both modes */',
+  '    { extern void host_reinit_event(int); host_reinit_event(1); }\n    gfx_bind_client(); /* retain 400-line plane stride in both modes */'),
  ('mm/pgalloc.c', '    next.gen++;',
   '    { extern void host_reinit_event(int); host_reinit_event(2); }\n    next.gen++;'),
 ]
@@ -39,8 +39,8 @@ MUTANTS = [
   'FAIL surface_query_refs(&fresh,display.refs,4,LEDGER_PERM_RW) == OS32_ERR_STALE'),
  ('200-geometry', [('gfx/gfx_core.c', '            if (ledger_surface_regen(i, 0)) gfx_surface_unready &= ~bit;',
    '            struct ledger_surface geom = *sf;\n            if (sf->backend == LEDGER_SF_PC98) { geom.height = gfx_current_height; for (u32 j=0;j<sf->planes;j++) geom.plane_offset[j] = geom.pitch * geom.height * j; }\n            if (ledger_surface_regen(i, &geom)) gfx_surface_unready &= ~bit;')], 'FAIL pc->height == GFX_HEIGHT && pc->first == phys && pc->npages == pages'),
- ('200-clear-range', [('gfx/gfx_core.c', '    _gfx_common_init(GFX_PLANE_SZ_200);',
-   '    _gfx_common_init(GFX_PLANE_SZ_200 / 2);')], 'FAIL pixels[j] == 0'),
+ ('200-clear-range', [('gfx/gfx_core.c', '    _gfx_common_init(plane_sz);',
+   '    _gfx_common_init(legacy200 ? plane_sz / 2 : plane_sz);')], 'FAIL pixels[j] == 0'),
  ('revoke-stop-first', [('exec/lease.c', '            failed++;\n            lease_revoke_fail_count++;',
    '            failed++;\n            lease_revoke_fail_count++;\n            return failed;')],
   'FAIL other.leases[0].token == bv.token && !other.leases[1].token'),

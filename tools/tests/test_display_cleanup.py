@@ -95,10 +95,10 @@ MUTATIONS = [
      'gfx_clear_planar_pages(GFX_PLANE_SZ_200);', 1, 'splash', 'FAIL: residual logo page=0'),
 ]
 MUTATIONS += [
-    ('init-no-clear', TARGET_SRCS[3], '    gfx_clear_planar_pages(GFX_PLANE_SZ);',
-     '', 1, 'splash', 'FAIL: gfx_init residual page=0'),
-    ('init-200-no-clear', TARGET_SRCS[3], '    gfx_clear_planar_pages(GFX_PLANE_SZ_200);',
-     '', 1, 'splash', 'FAIL: gfx_init_200 residual page=0'),
+    ('init-no-clear', 'gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
+     '    if (legacy200) gfx_clear_planar_pages(plane_sz);', 1, 'splash', 'FAIL: gfx_init residual page=0'),
+    ('init-200-no-clear', 'gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
+     '    if (!legacy200) gfx_clear_planar_pages(plane_sz);', 1, 'splash', 'FAIL: gfx_init_200 residual page=0'),
 ]
 for plane in 'BRGI':
     MUTATIONS.append(('omit-plane-' + plane, TARGET_SRCS[3],

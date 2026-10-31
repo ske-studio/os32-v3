@@ -65,7 +65,8 @@ MUTANTS = [
  ('preinit-backend', 'selected ? gfx_sf_backend() : LEDGER_SF_PC98', 'gfx_sf_backend()',
   'FAIL fb.width == sf->width && fb.height == height'),
  # Missing CLIENT emits L2 with started=0 before returning.
- ('init200-rebind', '    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */', '',
+ ('init200-rebind', '    gfx_bind_client(); /* retain 400-line plane stride in both modes */',
+  '    if (!legacy200) gfx_bind_client();',
   'FAIL host_serial_find(" started=1 bb=")'),
  ('preinit-screen-pc98', '    if (g_backend && g_backend->query && !g_backend->query(info)) {',
   '    if (g_backend && g_backend->query && !(gfx_started ? g_backend : &gfx_backend_pc98)->query(info)) {',
