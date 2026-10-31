@@ -1,6 +1,6 @@
 """D04: execute the real NE2000 DMA paths with recorded I/O and PIO seams."""
 CHECK = dict(name='ne2000-dma-host', tier=4,
-    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 import os
@@ -42,7 +42,7 @@ def build(source, exe):
         'gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
         '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
-        '-Wl,--gc-sections', *include_flags(ROOT),
+        '-Wl,--gc-sections', *include_flags(ROOT), '-I' + str(SOURCE.parent),
         '-DNE2000_SOURCE="' + str(source) + '"', str(HARNESS), '-o', str(exe),
     ], check=True)
 
