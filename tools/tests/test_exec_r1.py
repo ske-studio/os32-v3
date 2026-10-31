@@ -18,7 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 def function(s, name):
     import re
-    m = re.search(r'^(?:static )?(?:void|int|i32) (?:__cdecl )?' + name + r'\([^)]*\)\n\{', s, re.M)
+    m = re.search(r'^(?:static )?(?:void|int|i32) (?:__cdecl )?' + name + r'\([^;{}]*\)\n\{', s, re.M)
     if not m:
         raise ValueError(name)
     return s[m.start():s.index('\n}', m.end()) + 2]
@@ -102,7 +102,6 @@ static u8 resident_bytes[4096] __attribute__((aligned(8)));
 static u8 child_heap_bytes[4096] __attribute__((aligned(8)));
 static u32 resident_used, *resident_sentinel;
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
-static void ring3_band_set(int n) { (void)n; }
 void res_owner_set(int id) { owner = id; }
 static void exec_cpl0_release(void) {}
 int appslot_return_target(int id) { CHECK(id == 2); return slots[id].parent; }
@@ -467,7 +466,7 @@ def run(source=None, irq=None):
     names = ('exec_reclaim_resources', 'exec_notify_owned', 'exec_reclaim_owned',
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
              'ring3_wm_enter', 'ring3_wm_leave', 'ring3_syscall_dispatch',
-             'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
+             'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
@@ -561,10 +560,21 @@ if __name__ == '__main__':
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
 
-        for name in ('exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop'):
-            original = function(source, name)
-            changed = original.replace('    ring3_context_clear();', '')
-            assert original.count('    ring3_context_clear();') == 1
+        # Omit invalidation for only the selected origin, preserving all five
+        # former per-origin mutants after the transfer sequence is shared.
+        for name, commit in (
+                ('exec_park', 'appslot_park_commit'),
+                ('exec_park_kbd', 'appslot_park_kbd_commit'),
+                ('exec_park_poll', 'appslot_park_poll_commit'),
+                ('exec_sys_yield', 'appslot_park_yield_commit'),
+                ('exec_park_stop', 'appslot_park_stop_commit')):
+            entry = function(source, name)
+            assert entry.count(', ' + commit + ');') == 1
+            original = function(source, 'exec_park_transfer')
+            assert source.count(original) == 1
+            clear = '    ring3_context_clear();'
+            assert original.count(clear) == 1
+            changed = original.replace(clear, '    if (commit != ' + commit + ') ring3_context_clear();')
             status, log = run(source.replace(original, changed))
             print(name + '-invalidate: ' + status)
             if status != 'runtime':

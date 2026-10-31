@@ -19,9 +19,24 @@
 /*  「CPL=3 の続き」を保存する (D2 の (b): カーネルスタックは 1 本のまま)。   */
 /* ======================================================================== */
 
-/* 可変長引数 (kprintf) を拾うためのコピー窓 (固定分より広めに取る)。 */
+/* kprintf の可変引数上限。固定引数 syscall のコピー長とは独立。 */
 #define RING3_ARG_WINDOW  64u
 STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
+
+/* Each park origin checks admission before saving its selected frame here. */
+static void exec_park_transfer(int id, AppSlot *a, const u32 *frame, void (*commit)(void))
+{
+    u32 k;
+    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = frame[k];
+    exec_heap_save_state(&a->exec_heap_used);
+    ring3_context_clear();     /* This syscall ends without passing the WM exit. */
+    paging_load_cr3(paging_kernel_pd_phys());
+    commit();
+    exec_restore_context(APP_ID_SHELL);
+    g_longjmp_reason = EXEC_LJ_PARK;
+    g_longjmp_id = id;
+    exec_longjmp(a->jmpbuf);
+}
 
 /* Fifth park origin: only after the entire KAPI/callback has returned.
  * No cleanup here; the existing WM top-level selects the owner to kill. */
@@ -30,19 +45,10 @@ static void exec_park_stop(u32 *frame)
     if (font_guard_active) return;
     int id = appslot_cur();
     AppSlot *a = appslot_get(id);
-    u32 k;
     if (!a || !appslot_stop_pending() || !a->gui || !a->cpl3 ||
         a != g_cur_app || a->state != APP_STATE_RUNNING || a->in_op_wait ||
         ring3_wm_depth || kctx_irq_depth || kctx_exc_depth) return;
-    for (k = 0; k < APP_FRAME_WORDS; k++) a->frame[k] = frame[k];
-    exec_heap_save_state(&a->exec_heap_used);
-    ring3_context_clear();
-    paging_load_cr3(paging_kernel_pd_phys());
-    appslot_park_stop_commit();
-    exec_restore_context(APP_ID_SHELL);
-    g_longjmp_reason = EXEC_LJ_PARK;
-    g_longjmp_id = id;
-    exec_longjmp(a->jmpbuf);
+    exec_park_transfer(id, a, frame, appslot_park_stop_commit);
 }
 
 void __cdecl ring3_syscall_dispatch(u32 *frame)
@@ -57,7 +63,6 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
     u32 user_esp = frame[APP_FRAME_ESP];        /* CPL=3 の ESP (int が積んだ) */
     const void *args_src;
     u32 nbytes;
-    u32 window;
     u32 wrapptr;
     u32 *prev_frame = g_cur_frame;
     int prev_in_syscall = ring3_in_syscall;
@@ -141,17 +146,9 @@ void __cdecl ring3_syscall_dispatch(u32 *frame)
         }
     }
 
-    /* 引数コピー窓: 固定分 + 可変長(kprintf)のため広めに取り、ユーザスタック
-     * 上端でクランプして over-read #PF を避ける。 */
-    window = (nbytes < RING3_ARG_WINDOW) ? RING3_ARG_WINDOW : nbytes;
-    if ((u32)args_src < RING3_USTACK_TOP &&
-        window > g_cur_app->stack_top - (u32)args_src) {
-        window = g_cur_app->stack_top - (u32)args_src;
-    }
-
     /* 本物の wrap を呼ぶ (現 CR3 = アプリ PD)。戻り値を eax スロットへ。
      * gui_call(OP_WAIT) → exec_park() はここから longjmp して戻らない。 */
-    frame[APP_FRAME_EAX] = kapi_invoke((void *)wrapptr, args_src, window);
+    frame[APP_FRAME_EAX] = kapi_invoke((void *)wrapptr, args_src, nbytes);
 
 syscall_complete:
     /* 正常復帰: ガードを下ろす */

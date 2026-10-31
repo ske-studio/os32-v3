@@ -7,7 +7,6 @@ static AppSlot slots[APP_SLOT_COUNT];
 static u32 parent_heap = 73, saved_heap, restores, admits;
 static u32 extra_pages, need_seen;
 static int fail_kheap;
-static u32 g_ring3_band_top = MEM_APP_STACK_TOP, g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
 AppSlot *appslot_at(int id) { return &slots[id]; }
 static int g_cur = APP_ID_SHELL;
 int appslot_alloc_id(void) { return 2; }
@@ -18,9 +17,8 @@ static int budget_admit(int gui, u32 pages, u32 free_pages) {
 }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; }
 static void shell_print_dec(u32 n, u8 attr) { (void)n; (void)attr; }
-static void exec_restore_band(int id) { CHECK(id == 1); restores++; }
 static void exec_restore_context(int id) {
-    exec_restore_band(id); parent_heap = saved_heap;
+    CHECK(id == 1); restores++; parent_heap = saved_heap;
     paging_load_cr3(paging_kernel_pd_phys());
 }
 static void exec_heap_save_state(u32 *out) { *out = saved_heap = parent_heap; }

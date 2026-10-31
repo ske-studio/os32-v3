@@ -37,7 +37,7 @@ def extract(source):
     start = source.index('    want_ring3 = !is_shell;')
     end = source.index('    /* ======== setjmp', start)
     layout = source[source.index('    /* ====== Level に応じた'):source.index('    load_addr = (u8 *)load_base;')]
-    shell = source[source.index('    /* ヒープ・ガードページ設定 */'):source.index('    {\n        u32 argv_addr;')]
+    shell = source[source.index('    /* 常駐 CRT と USER の sbrk 上限を公開する。 */'):source.index('    {\n        u32 argv_addr;')]
     parts.append('''
 #define kmalloc budget_kmalloc
 #define appslot_start_admit budget_admit

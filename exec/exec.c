@@ -43,7 +43,6 @@
 #include "launch.h"      /* T9: 起動要求表 (GUI 中の起動を WM が仲介する) */
 #include "ring3_str.h"   /* ring3_pte_writable_ok / ring3_range_overlaps (往復 10) */
 #include "kapi_host.h"   /* N1: Host Services のハンドル回収 (host_owner_exit) */
-#include "ring3_str.h"   /* T9 §12 R1: KAPI が CPL=3 へ返す文字列の置き場 */
 #include "kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "gdt.h"
@@ -176,15 +175,6 @@ static u32 *g_cur_frame = 0;
 #define RING3_USTACK_TOP MEM_APP_STACK_TOP
 #define RING3_HEAP_TOP (RING3_STACK_BOTTOM - PAGE_SIZE)
 #define RING3_STACK_BOTTOM (g_cur_app ? g_cur_app->stack_base : MEM_APP_STACK_TOP - MEM_EXEC_STACK_SIZE)
-static u32 g_ring3_band_top = MEM_APP_STACK_TOP;
-static u32 g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
-static void ring3_band_set(u32 pdes)
-{
-    (void)pdes;
-    g_ring3_band_top = MEM_APP_STACK_TOP;
-    g_ring3_band_pdes = MEM_APP_BAND_MAX_PDES;
-}
-
 /* いま走っている CPL=3 アプリのスロット (0 = 居ない)。かつての
  * g_ring3_as / g_ring3_active を 1 本にまとめたもの。park すると 0 になり、
  * resume で戻る。生きているだけで走っていないアプリは表に横たわっている。 */
