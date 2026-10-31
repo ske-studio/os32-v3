@@ -31,9 +31,9 @@ CANON = os.path.join(PROJ_DIR, "docs", "CONSTRAINTS.md")
 REFERRERS_REQUIRED = [os.path.join(PROJ_DIR, "CLAUDE.md")]
 REFERRERS_OPTIONAL = [os.path.join(PROJ_DIR, "SOUL.md")]
 
-ID_RE = re.compile(r"\[((?:ABI|(?:C|HW|V|D)\d+))\]")
+ID_RE = re.compile(r"\[((?:ABI|(?:C|HW|L|V|D)\d+))\]")
 # 正典側の見出し: "### [C1] ..." だけを規則の定義とみなす
-HEADING_RE = re.compile(r"^###\s+\[((?:ABI|(?:C|HW|V|D)\d+))\]", re.M)
+HEADING_RE = re.compile(r"^###\s+\[((?:ABI|(?:C|HW|L|V|D)\d+))\]", re.M)
 
 
 def read(path):
