@@ -27,11 +27,11 @@ MAP = "build/out/kernel.map"
 ETHERTYPE = 0x88B5
 PEER = bytes.fromhex("02005e0000aa")
 
-# struct ne2k_dev / ne2k_stats のオフセット (i386-elf-gcc offsetof, 2026-09-05, M4)
+# struct ne2k_dev / ne2k_stats のオフセット (offsetof は ne2000_dma_host.c で照合、2026-10-31)
 NIC_STATE = 24
-NIC_IRQ_ON = 31
-NIC_RXQ_COUNT = 53
-NIC_ST = 13716
+NIC_IRQ_ON = 32
+NIC_RXQ_COUNT = 56
+NIC_ST = 13720
 ST = {"rx_frames": 8, "rx_dropped": 11, "irq_count": 20, "watchdog_frames": 26, "watchdog_hits": 27}
 RING_FREE_SYM = "ne2k_rx_ring_free_pages"
 

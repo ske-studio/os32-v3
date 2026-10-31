@@ -96,6 +96,8 @@ static int rx_drain(unsigned int budget)
 /*  OVW 復旧 (DP8390D §7 の手順を状態機械に分けたもの)                       */
 /* ====================================================================== */
 
+static void tx_complete(u8 isr);
+
 static void ovw_begin(u8 isr)
 {
     nic.st.overwrite++;
@@ -104,21 +106,20 @@ static void ovw_begin(u8 isr)
     wr(NE2K_CR, NE2K_CR_PAGE0 | NE2K_CR_RD2 | NE2K_CR_STP);
     ne2k_imr_sync(0);                           /* 復旧完了まで NIC 割り込みは止める */
     nic.ovw_tick = tick_count;
-    nic.ovw_used_delay = 0;
     nic.state = NE2K_STATE_OVW_WAIT;
 }
 
 /* 1.6ms 以上経ったら復旧を完了する。IF=0 なら校正済み delay で待つ。 */
 static void ovw_continue(void)
 {
-    int resend;
+    int resend, r;
+    u8 isr;
 
     if (eflags_if() || nic.in_irq) {
         /* tick は IF=1 の foreground でもタイマ文脈 (tick を数えた直後) でも進む */
         if ((u32)(tick_count - nic.ovw_tick) < NE2K_OVW_WAIT_TICKS) return;
-    } else if (!nic.ovw_used_delay) {
+    } else {
         cpu_delay_us(NE2K_OVW_WAIT_US);
-        nic.ovw_used_delay = 1;
     }
 
     wr(NE2K_P0_RBCR0, 0);
@@ -127,9 +128,17 @@ static void ovw_continue(void)
     wr(NE2K_P0_TCR, NE2K_TCR_LOOP_INT);
     nic.state = NE2K_STATE_RUNNING;
     cr_page0_idle();                                    /* STA, loopback 中 */
-    if (rx_drain(NE2K_OVW_DRAIN_BUDGET) < 0) {
+    r = rx_drain(NE2K_OVW_DRAIN_BUDGET);
+    if (r < 0) {
         reinit_or_fail();
         return;
+    }
+    nic.rx_backlog = (u8)(r == 1);
+    /* 旧送信の完了を、新しい送信を受け付ける前に回収する。 */
+    isr = rd(NE2K_P0_ISR);
+    if (isr & (NE2K_ISR_PTX | NE2K_ISR_TXE)) {
+        tx_complete(isr);
+        resend = 0;
     }
     wr(NE2K_P0_ISR, NE2K_ISR_OVW);
     wr(NE2K_P0_TCR, (nic.cfg.flags & NE2K_CFG_LOOPBACK) ? NE2K_TCR_LOOP_INT : NE2K_TCR_NORMAL);
@@ -254,7 +263,6 @@ int ne2k_send(const void *frame, unsigned int length)
         kmemset(nic.tx_buf + padded, 0, NE2K_ETH_MIN_LEN - padded);
         padded = NE2K_ETH_MIN_LEN;
     }
-    nic.tx_buf[padded] = 0;                     /* 奇数長の最終 word 上位 */
 
     rc = dma_write((u16)nic.tx_page << 8, nic.tx_buf, padded);
     if (rc) {

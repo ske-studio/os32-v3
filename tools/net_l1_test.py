@@ -26,7 +26,7 @@ COUNT = 200
 
 # struct ne2k_stats 内の rx_dropped の word 索引 (offsetof/4)
 ST_RX_DROPPED = 11
-NIC_ST = 13716
+NIC_ST = 13720
 
 
 def http(path):

@@ -93,7 +93,6 @@ int ne2k_init(const struct ne2k_config *config)
 
     kmemset(&nic, 0, sizeof(nic));
     nic.cfg = *config;
-    nic.imr_mask = 0;                       /* M3 で NE2K_ISR_* を入れる */
 
     rc = bring_up();
     if (rc) {
@@ -124,7 +123,6 @@ void ne2k_stop(void)
 static void reinit_or_fail(void)
 {
     int rc;
-    nic.st.reinit++;
     if (nic.tx_reinit_run >= NE2K_TX_REINIT_MAX) {
         nic.state = NE2K_STATE_FAILED;
         wr(NE2K_CR, NE2K_CR_PAGE0 | NE2K_CR_RD2 | NE2K_CR_STP);
@@ -132,6 +130,7 @@ static void reinit_or_fail(void)
         return;
     }
     nic.tx_reinit_run++;
+    nic.st.reinit++;
     rc = bring_up();
     if (rc) {
         nic.state = NE2K_STATE_FAILED;

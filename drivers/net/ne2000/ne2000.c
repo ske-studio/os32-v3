@@ -97,7 +97,6 @@ struct ne2k_dev {
     u8  ovw_txp_was;         /* STP 時に TXP が立っていた */
     u8  ovw_tx_done;         /* その送信は既に PTX/TXE で終わっていた */
     u32 ovw_tick;
-    u8  ovw_used_delay;      /* IF=0 だったので cpu_delay_us で待った */
 
     u8  bad_hdr_run;
     u8  last_curr;           /* 直近に読んだ CURR (getter が NIC に触れず空きを見積もる, M4) */
@@ -256,6 +255,7 @@ static int dma_transfer(u16 addr, void *buf, u16 len, int write)
     int try_i;
     if (len == 0) return NE2K_OK;
     for (try_i = 0; try_i < NE2K_RDMA_ATTEMPTS; try_i++) {
+        if (try_i > 0) nic.st.rdc_retry++;
         wr(NE2K_P0_ISR, NE2K_ISR_RDC);      /* 古い RDC を消す */
         wr(NE2K_P0_RBCR0, (u8)(n & 0xFF));
         wr(NE2K_P0_RBCR1, (u8)(n >> 8));
@@ -265,7 +265,6 @@ static int dma_transfer(u16 addr, void *buf, u16 len, int write)
         if (write) ne2k_pio_write(nic.cfg.data_port, buf, len);
         else ne2k_pio_read(nic.cfg.data_port, buf, len);
         if (wait_rdc() == NE2K_OK) return NE2K_OK;
-        nic.st.rdc_retry++;
     }
     return NE2K_ERR_TIMEOUT;
 }

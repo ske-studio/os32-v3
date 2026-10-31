@@ -25,7 +25,7 @@ MAP = "build/out/kernel.map"
 TOTAL = 131072
 STREAM_BUF = 8192
 ST_RX_DROPPED = 11
-NIC_ST = 13716
+NIC_ST = 13720
 
 
 def http(path):

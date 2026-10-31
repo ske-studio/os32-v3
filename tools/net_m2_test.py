@@ -57,9 +57,9 @@ def read_u32(addr):
     return struct.unpack("<I", bytes.fromhex(d["hex"]))[0]
 
 
-# drivers/net/ne2000/ne2000.c struct ne2k_dev のオフセット (i386-elf-gcc の offsetof で確認、2026-09-05)
-NIC_IRQ_ON = 31
-NIC_ST = 13716
+# drivers/net/ne2000/ne2000.c struct ne2k_dev のオフセット (offsetof は ne2000_dma_host.c で照合、2026-10-31)
+NIC_IRQ_ON = 32
+NIC_ST = 13720
 ST_IRQ_COUNT, ST_IRQ_DEFERRED, ST_RX_DROPPED, ST_IRQ_RECHECKS, ST_BACKLOG = 20, 21, 11, 24, 25
 
 
