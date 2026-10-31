@@ -23,6 +23,12 @@ TARGET_SRCS = ['gfx/gfx_core.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c']
+PEGC_PARTS = [
+    'drivers/video/pc98/backend_pegc_timing.inc',
+    'drivers/video/pc98/backend_pegc_diag.inc',
+    'drivers/video/pc98/backend_pegc_present.inc',
+    'drivers/video/pc98/backend_pegc_restore.inc',
+]
 MUTANTS = [
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
@@ -110,8 +116,8 @@ static inline void io_wait_n(int n) {(void)n;}
 #endif
 ''')
         texts = {}
-        for path in TARGET_SRCS:
-            body = source_texts[path] if source_texts is not None else paging_source(ROOT/path)
+        for path in (*TARGET_SRCS, *PEGC_PARTS):
+            body = source_texts[path] if source_texts is not None and path in source_texts else paging_source(ROOT/path)
             for unit, old, new in extra_changes:
                 if unit == path:
                     assert body.count(old) == 1, (unit, old, body.count(old))
@@ -136,6 +142,8 @@ static inline void io_wait_n(int n) {(void)n;}
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'drivers/video/pc98/backend_pegc.c':
+                body = re.sub(r'^#include "(backend_pegc_\w+\.inc)"$',
+                              lambda m: texts['drivers/video/pc98/' + m[1]], body, flags=re.M)
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''
     extern int host_pegc_available;
