@@ -29,8 +29,6 @@ static void ring3_abort_kill(void) { kills++; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { if (p != 1) bad++; }
 int paging_set_page(u32 a, u32 b, u32 c) { (void)a; (void)b; (void)c; bad++; return 0; }
-static void exec_heap_reset(void) { bad++; }
-static void ring3_band_set(int n) { (void)n; bad++; }
 static void exec_reclaim_owned(int id, int kind) { (void)id; (void)kind; bad++; }
 void ring3_abort_request(void);
 

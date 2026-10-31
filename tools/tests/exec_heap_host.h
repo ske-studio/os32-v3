@@ -42,7 +42,6 @@ static struct { u32 sbrk_heap_limit; } heap_kapi, *kapi = &heap_kapi;
 static u32 ring3_tramp_page[KAPI_FUNC_COUNT + 2];
 volatile int exec_nest_level;
 AppSlot *appslot_at(int id) { return &g_slot[id]; }
-static void ring3_band_set(int n) { (void)n; }
 #include "heap_context_source.c"
 
 static int heap_fd, heap_alias_on;

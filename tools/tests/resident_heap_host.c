@@ -17,7 +17,6 @@ AppSlot *appslot_at(int id) { return id == APP_ID_SHELL ? &parent : 0; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { (void)p; }
 int paging_set_not_present(u32 a, u32 b) { (void)a; (void)b; return 0; }
-static void ring3_band_set(int n) { (void)n; }
 static void die(int n) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(n) : "memory");
     for (;;) {}

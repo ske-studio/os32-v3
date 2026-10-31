@@ -93,8 +93,6 @@ void exec_longjmp(u32 *buf) {
     kctx_exc_depth=kctx_irq_depth=0; /* setjmp.asm restores the trusted depths. */
     __builtin_longjmp(jump,1);
 }
-static void ring3_band_set(u32 n) { (void)n; }
-static void exec_heap_reset(void) {}
 static void exec_restore_context(int id) {
     AppSlot *a=appslot_at(id);
     g_cur_app=a->cpl3 ? a : 0;

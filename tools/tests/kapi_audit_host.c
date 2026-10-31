@@ -159,6 +159,8 @@ static void audit_ime_clear_row(int y, u8 color)
         for (int x = 0; x < TVRAM_COLS; x++) preedit_cells[x] = ' ';
     }
 }
+/* TVRAM identity is separate from this input/serial fixture's renderer. */
+const IME_Render g_ime_render_tvram = {0};
 static const IME_Render audit_ime_render = {
     .putc = audit_ime_putc, .putw = audit_ime_putw,
     .clear_row = audit_ime_clear_row
