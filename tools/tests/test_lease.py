@@ -1,4 +1,5 @@
 """T2b: actual paging/ledger/lease ILP32 runtime and compiled runtime mutants."""
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -41,7 +42,7 @@ def replace_once(body, old, new):
 def run(changes=None):
     with tempfile.TemporaryDirectory(prefix='os32-lease-') as tmpdir:
         tmp = pathlib.Path(tmpdir)
-        texts = [(ROOT / p).read_text() for p in SOURCES]
+        texts = [paging_source(ROOT / p) for p in SOURCES]
         if changes:
             name, index, old, new = changes
             assert texts[index].count(old) == 1, name

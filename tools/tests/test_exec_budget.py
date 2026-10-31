@@ -1,6 +1,7 @@
 """f12 startup budget: real exec launch allocation/teardown with real paging/ledger.
 Normal control always precedes runtime mutants. File I/O and entry are boundaries.
 """
+from paging_source import paging_source
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -70,7 +71,7 @@ def run(source):
         shlib = (ROOT / 'mm/shlib.c').read_text()
         (tmp / 'budget_shlib.inc').write_text('\n'.join(bb.slice_out(shlib, sig) for sig in ('int shlib_addrspace_attach(', 'void shlib_addrspace_detach(')))
         (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit('))
-        (tmp / 'paging_host_source.c').write_text((ROOT / 'mm/paging.c').read_text())
+        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
         (tmp / 'pgalloc_host_source.c').write_text((ROOT / 'mm/pgalloc.c').read_text().replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
         try:
             gui = (ROOT / 'userland/tests/gui_demo.bin').read_bytes()

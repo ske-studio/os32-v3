@@ -1,4 +1,5 @@
 """T2e e6: real SDK and kernel CLIENT leases, checked drawing and void bridge."""
+from paging_source import paging_source
 import host32
 import argparse
 import hashlib
@@ -110,7 +111,7 @@ def main():
     p.add_argument('--mutate',action='store_true')
     a=p.parse_args()
     host32.begin_control(a.mutate, a.runner, ROOT)
-    texts={path:(ROOT/path).read_text() for path in TARGET_SRCS}
+    texts={path:paging_source(ROOT/path) for path in TARGET_SRCS}
     digest={path:hashlib.sha256(text.encode()).digest() for path,text in texts.items()}
     # SDK and kernel deliberately export the same drawing names. Rename only
     # SDK symbols in the private test copies, never KernelAPI member names.
@@ -150,5 +151,5 @@ def main():
                 return f'RED {m[0]} {time.monotonic()-start:.2f}s'
             for msg in run_ordered(one,MUTANTS): print(msg)
             print(f'PASS {len(MUTANTS)}/{len(MUTANTS)} runtime mutants')
-    assert all(hashlib.sha256((ROOT/path).read_bytes()).digest()==d for path,d in digest.items())
+    assert all(hashlib.sha256(paging_source(ROOT/path).encode()).digest()==d for path,d in digest.items())
 if __name__=='__main__': main()

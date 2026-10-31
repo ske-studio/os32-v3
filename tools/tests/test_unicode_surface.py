@@ -4,9 +4,10 @@ The host maps separate lease VAs; no hardware or emulator is accessed.
 Mutants must fail at the named runtime assertion (compile failures are errors).
 """
 CHECK = dict(name='unicode-surface-host', tier=1,
-    covers=['exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'exec/system_surface.c', 'lib/utf8.c', 'tools/tests/unicode_surface_host.c', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'tools/tests/test_unicode_lookup.py', 'build/programs.mk', 'build/deploy.mk', 'kapi/kapi_generated.c', 'tools/tests/unicode_lookup_host.c', 'tools/tests/unicode_lookup_sdk.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/paging_source.py', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'gfx/gfx_scroll.c', 'gfx/gfx_vram.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'exec/system_surface.c', 'lib/utf8.c', 'tools/tests/unicode_surface_host.c', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'tools/tests/test_unicode_lookup.py', 'build/programs.mk', 'build/deploy.mk', 'kapi/kapi_generated.c', 'tools/tests/unicode_lookup_host.c', 'tools/tests/unicode_lookup_sdk.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=7.14036)
 
+from paging_source import paging_source
 import host32
 import argparse
 import pathlib
@@ -78,7 +79,7 @@ def main():
     p.add_argument('--mutate', action='store_true')
     a = p.parse_args()
     host32.begin_control(a.mutate, a.runner, ROOT)
-    originals = {x: (ROOT/x).read_text() for x in TARGET_SRCS}
+    originals = {x: paging_source(ROOT/x) for x in TARGET_SRCS}
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(originals[x] for x in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
     first = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')

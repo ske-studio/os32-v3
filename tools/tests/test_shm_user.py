@@ -1,3 +1,4 @@
+from paging_source import paging_source
 from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
@@ -111,7 +112,7 @@ def wiring(sources):
 
 def run(runner, mutation=None):
     paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
-    sources = {p: (ROOT/p).read_text() for p in (*paths, *kernel_parts(ROOT))}
+    sources = {p: paging_source(ROOT/p) for p in (*paths, *kernel_parts(ROOT))}
     if mutation:
         name, path, old, new, expected = mutation
         assert old in sources[path], name + ': mutation target'

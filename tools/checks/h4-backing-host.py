@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='h4-backing-host', tier=1,
-    covers=['tools/tests/test_h4_backing.py', 'tools/tests/h4_backing_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/**', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'exec/access_walk.c', 'mm/dma_pool.c', 'mm/dma_pool.h', 'mm/dma_pool_math.c', 'drivers/dma/dma8237.h', 'drivers/dma/dma8237_math.c', 'drivers/block/fdc.c', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_decide.h', 'fs/vfs.h', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/paging_source.py', 'tools/tests/test_h4_backing.py', 'tools/tests/h4_backing_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/host_arch/**', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'exec/access_walk.c', 'mm/dma_pool.c', 'mm/dma_pool.h', 'mm/dma_pool_math.c', 'drivers/dma/dma8237.h', 'drivers/dma/dma8237_math.c', 'drivers/block/fdc.c', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_decide.h', 'fs/vfs.h', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=5.178602)
 
 

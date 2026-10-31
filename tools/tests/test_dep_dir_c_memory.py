@@ -5,9 +5,10 @@ fixture manifest for revisions, inputs, shim/source hashes and procedure.
 All positive and later mutation builds use the same copied directory tree.
 """
 CHECK = dict(name='dep-dir-c-memory-host', tier=1,
-    covers=['mm/memory_boot.c', 'platform/pc98/memory.c', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'drivers/**/*.h', 'exec/*.h', 'sdk/include/os32/*.h', 'tools/tests/host_arch/*.h', 'tools/tests/host32.py', 'tools/tests/dep_dir_c_memory_host.c', 'tools/tests/fixtures/dep_dir_c/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
+    covers=['tools/tests/paging_source.py', 'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'drivers/**/*.h', 'exec/*.h', 'sdk/include/os32/*.h', 'tools/tests/host_arch/*.h', 'tools/tests/host32.py', 'tools/tests/dep_dir_c_memory_host.c', 'tools/tests/fixtures/dep_dir_c/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
     needs=[], budget=60.0)
 
+from paging_source import paging_source
 from kernel_includes import include_dirs, include_flags
 import gzip
 import argparse
@@ -106,7 +107,7 @@ def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
     for rel in SOURCES:
-        text = (source_root / rel).read_text()
+        text = paging_source(source_root / rel)
         if mutation and rel == mutation[1]:
             text = replace_once(text, mutation[2], mutation[3])
         unit = Path(rel).stem

@@ -12,6 +12,7 @@ sys_frozen_exec を workspace_first に戻す) と、FIXED / ARENA_TOP の境界
 backing の写像・FIXED の RAM 拒否を壊した版で、試験が RED になることを見る。
 変異は一時ディレクトリの写しに当てる (実物のソースは書き換えない)。
 """
+from paging_source import paging_source
 from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 import host32
@@ -102,7 +103,7 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         for rel in ('mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c',
                     'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/memmap.h',
                     'tools/tests/layout_boot_fixture.h'):
-            texts[rel] = (ROOT / rel).read_text()
+            texts[rel] = paging_source(ROOT / rel)
         if mutation:
             _, rel, old, new, _ = mutation
             if old not in texts[rel]:
@@ -246,7 +247,7 @@ class MemoryBoot(unittest.TestCase):
         self.assertNotRegex(header, r'\bpgalloc_init\s*\(')
         self.assertNotIn('legacy_metadata', alloc)
         self.assertNotIn('PGALLOC_BASE', header + alloc)
-        paging = (ROOT / 'mm/paging.c').read_text()
+        paging = paging_source(ROOT / 'mm/paging.c')
         body = paging.split('static u32 *reserve_table(void)', 1)[1].split('\n}', 1)[0]
         self.assertNotIn('pgalloc_alloc_n_pfn', body)
         self.assertIn('pgalloc_alloc_pt', body)

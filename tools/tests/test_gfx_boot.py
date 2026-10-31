@@ -30,6 +30,7 @@ gfx_client_to_gshell)。
 --mutate は要の行を写しで壊し、どれかの構成が実行時に RED になることを見る。
 実物のソースは書き換えない。コンパイルの失敗は RED に数えない。
 """
+from paging_source import paging_source
 from kernel_boot_source import kernel_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
@@ -89,7 +90,7 @@ CASES = [
 
 
 def load(mutation=None):
-    texts = {rel: (ROOT / rel).read_text() for rel in SOURCES}
+    texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
         if texts[rel].count(old) != 1:

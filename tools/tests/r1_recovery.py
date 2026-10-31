@@ -1,4 +1,5 @@
 """R1 recovery probes: real lifecycle slices and real SDK/lease attachment."""
+from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import re
@@ -14,7 +15,7 @@ TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
 
 def recovery(tmp, function, runner, mutation=None):
     def read(path):
-        text = (ROOT / path).read_text()
+        text = paging_source(ROOT / path)
         if mutation and path == mutation[0]:
             assert text.count(mutation[1]) == 1, mutation
             text = text.replace(mutation[1], mutation[2])
@@ -68,7 +69,7 @@ def recovery(tmp, function, runner, mutation=None):
 def lease_recovery(function, runner, mutation=None):
     from test_gfx_attach import TARGET_SRCS as GFX_SRCS, SDK_SRCS, HEADERS, CORE
     from test_gfx_kernel_fb import run_case
-    texts = {p: (ROOT/p).read_text() for p in GFX_SRCS}
+    texts = {p: paging_source(ROOT/p) for p in GFX_SRCS}
     fixture = (ROOT/'kernel/r1_fixture.c').read_text()
     if mutation:
         path, old, new = mutation
