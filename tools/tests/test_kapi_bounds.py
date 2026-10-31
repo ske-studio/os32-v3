@@ -4,6 +4,7 @@ Record: tools/tests/kapi_bounds_tdd.md.
 from kernel_includes import include_flags
 import argparse
 import pathlib
+import re
 import subprocess
 import tempfile
 import host32
@@ -28,6 +29,8 @@ MUTATIONS = [
 
 def run(runner, mutation=None):
     sources = [(ROOT / p).read_text() for p in SOURCES]
+    sources[3] = re.sub(r'^#include "(gfx_core_\w+\.inc)"$',
+                        lambda m: (ROOT / 'gfx' / m[1]).read_text(), sources[3], flags=re.M)
     if mutation:
         name, index, func, old, new, expected = mutation
         start = sources[index].index(func + '(')

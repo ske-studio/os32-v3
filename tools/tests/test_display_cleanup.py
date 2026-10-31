@@ -123,7 +123,8 @@ def main():
         # Only source/header files, never build outputs or hardware documents.
         for directory in (*dict.fromkeys(d for d in include_dirs() if d != '.'), 'kdebug'):
             for source in (ROOT / directory).rglob('*'):
-                if source.is_file() and source.suffix in ('.h', '.c'):
+                if source.is_file() and (source.suffix in ('.h', '.c') or
+                                         source.match('gfx_core_*.inc')):
                     target = tree / source.relative_to(ROOT)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
