@@ -13,7 +13,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='font-source-host', tier=1,
-    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=3.680518)
 
 from kernel_includes import include_dirs, include_flags
@@ -40,7 +40,7 @@ INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST = "tools/tests/font_source_host.c"
 SRC = "fs/vfs_fd.c"
 LEASE = "kernel/console/font_source.c"
-EXEC = "exec/exec.c"
+EXEC = "exec/exec_finish.inc"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
@@ -137,9 +137,9 @@ MUTATIONS = [
     (LEASE, "        if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);\n",
      "        if (0) (void)font_lease_release(s);\n", "close_shell が閉じない"),
     # ---- S3b: exec/exec.c の回収 hook ----
-    (EXEC, "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
+    ('exec/exec_finish.inc', "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
      "    vfs_close_owned(id);\n", "b1⑤ exec_reclaim_resources の font_lease_close_owned 呼出を外す"),
-    (EXEC, "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
+    ('exec/exec_finish.inc', "    font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
      "    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n    font_lease_close_owned(id);\n",
      "font_lease_close_owned を回収の後ろへずらす"),
 ]

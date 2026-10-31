@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
 CHECK = dict(name='allocator-bench-host', tier=1,
-    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh'],
+    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=['make:all'], budget=3.283154)
 
+from exec_source import exec_source
 from kernel_includes import include_flags
 import argparse
 import importlib.util
@@ -82,7 +83,7 @@ def mutations(cross, tmp, cc, objects, archive, runner):
             assert next(r['phase'] for r in data if not r['ok']) == phase, (name, run)
         print('RED runtime: ' + name)
 
-    source = teardown((ROOT / 'exec/exec.c').read_text())
+    source = teardown(exec_source(ROOT))
     old = 'e->kind == APPMEM_ANON || e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE'
     assert source.count(old) == 1
     (tmp / 'allocator_teardown.inc').write_text(source.replace(old, 'e->kind == APPMEM_EXEC_ARENA || e->kind == APPMEM_EXEC_LARGE'))
@@ -106,7 +107,7 @@ def main():
     cross = Path(os.environ['CROSS_DIR'])
     with tempfile.TemporaryDirectory(prefix='f9-') as directory:
         tmp = Path(directory)
-        (tmp / 'allocator_teardown.inc').write_text(teardown((ROOT / 'exec/exec.c').read_text()))
+        (tmp / 'allocator_teardown.inc').write_text(teardown(exec_source(ROOT)))
         archive = load_builder().build(cross, tmp / 'nano')
         cc = [str(cross / 'bin/i386-elf-gcc'), '-std=gnu11', '-O2', '-ffreestanding',
               '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra',

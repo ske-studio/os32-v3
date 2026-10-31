@@ -1,3 +1,4 @@
+from exec_source import EXEC_PARTS, exec_source
 from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
@@ -27,21 +28,21 @@ MUTATIONS = (
     ('return-gfx', 'kernel/v86/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
     ('kill-gcap-release', 'kernel/v86/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
     ('end-guest-iopl', 'kernel/v86/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
-    ('direct-kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', '    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
+    ('direct-kill-no-end', 'exec/exec_finish.inc', '    v86_session_end();\n    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', '    ring3_context_clear();\n    v86_call_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
     ('end-reentry', 'kernel/v86/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
-    ('landing-if', 'exec/exec.c', '    _enable();\n    v86_session_end();', '    v86_session_end();\n    _enable();', 'FAIL release IF enabled'),
+    ('landing-if', 'exec/exec_finish.inc', '    _enable();\n    v86_session_end();', '    v86_session_end();\n    _enable();', 'FAIL release IF enabled'),
     ('restore-flush', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
     ('restore-current-pde', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
     ('int80-offset', 'kernel/v86/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
 
-    ('exec-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
-    ('resume-gate', 'exec/exec.c', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
-    ('kill-no-release', 'exec/exec.c', '    v86_session_end();\n    v86_call_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
+    ('exec-gate', 'exec/exec_launch.inc', '    if (paging_v86_session_open()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
+    ('resume-gate', 'exec/exec_schedule.inc', '    if (paging_v86_session_open()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
+    ('kill-no-release', 'exec/exec_finish.inc', '    v86_session_end();\n    v86_call_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
     ('release-on-exception', 'kernel/v86/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
     ('page0-forget', 'kernel/v86/v86_mem.c', '    v86_bios_restore_real();', '    v86_bios_restore_real();\n    v86_session.real_saved = 0;', 'FAIL V86 second original valid'),
     ('consumer-direct', 'gfx/gfx_core.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
     ('page0-short', 'kernel/v86/v86_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
-    ('kill-no-end', 'exec/exec.c', '    v86_session_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
+    ('kill-no-end', 'exec/exec_finish.inc', '    v86_session_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
     ('fixed-restore', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
     ('active-pde', 'mm/paging.c', '    ((u32 *)P2V(s->active_cr3))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
     ('session-gate', 'mm/paging.c', '!v86_map_session || base >= end', 'base >= end', 'FAIL V86 outside session unchanged'),
@@ -74,13 +75,13 @@ MUTATIONS = (
     ('v86-restore', 'mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
     ('boot-order', 'init/kernel_boot_memory.inc', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
      '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
-    ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
+    ('launch-TVRAM', 'exec/exec_launch.inc', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch TVRAM removed'),
-    ('launch-font', 'exec/exec.c', '        /* --- K3:',
+    ('launch-font', 'exec/exec_launch.inc', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, 0x01000UL, 0x4A000UL, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch font removed'),
-    ('launch-shm', 'exec/exec.c', '        /* --- K3:',
+    ('launch-shm', 'exec/exec_launch.inc', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch SHM removed'),
 )
@@ -111,7 +112,7 @@ def wiring(sources):
 
 def run(runner, mutation=None):
     paths = ('mm/paging.c', 'mm/shm.c', 'kernel/v86/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'kernel/v86/v86.c', 'kernel/v86/v86_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c')
-    sources = {p: (ROOT/p).read_text() for p in (*paths, *kernel_parts(ROOT))}
+    sources = {p: (ROOT/p).read_text() for p in (*paths, *kernel_parts(ROOT), *EXEC_PARTS)}
     if mutation:
         name, path, old, new, expected = mutation
         assert old in sources[path], name + ': mutation target'
@@ -122,6 +123,7 @@ def run(runner, mutation=None):
             sources[path] = sources[path].replace(old, new, 1)
         else:
             sources[path] = sources[path].replace(old, new)
+    sources['exec/exec.c'] = exec_source(ROOT, sources.__getitem__)
     try:
         wiring(sources)
     except AssertionError as error:

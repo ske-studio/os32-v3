@@ -1,4 +1,5 @@
 """T4b-2: actual core guard, typed thunks and NASM trampoline on ILP32."""
+from exec_source import exec_source
 from kernel_includes import include_flags
 import argparse
 import json
@@ -37,7 +38,7 @@ def run(runner, mutant=None):
         (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth;\n')
         (tmp / 'memmap.h').write_text('')
         (tmp / 'paging.h').write_text('')
-        src = (ROOT / 'exec/exec.c').read_text()
+        src = exec_source(ROOT)
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
         src = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()

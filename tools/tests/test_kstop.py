@@ -1,6 +1,7 @@
 """GUI STOP A: actual AppSlot/dispatch/park/resume code, ILP32 + runtime mutants.
 R1's existing harness covers both landings, IRQ/fault cleanup and parked WM kill.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import pathlib
 import subprocess
@@ -318,7 +319,7 @@ def run(overrides=None):
     overrides = overrides or {}
     def read(p):
         return overrides.get(p, (ROOT / p).read_text())
-    ex = read('exec/exec.c')
+    ex = exec_source(ROOT, read)
     resume = function(ex, 'exec_resume')
     resume = resume[:resume.index('    volatile Ring3CallContext')] + '    return 0;\n}'
     # Preparation alone: the existing R1 harness exercises the real landing.
@@ -355,10 +356,10 @@ MUTATIONS = [
  ('lost-shell-request','exec/appslot.c','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
  ('ignore-shell-request','exec/appslot.c','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
- ('no-request','exec/exec.c','        appslot_stop_request();','        /* missing request */'),
- ('no-safe-transfer','exec/exec.c','    exec_park_stop(frame);','    /* missing transfer */'),
- ('before-completion','exec/exec.c','    frame[APP_FRAME_EAX] = kapi_invoke','    exec_park_stop(frame);\n    frame[APP_FRAME_EAX] = kapi_invoke'),
- ('eax-clobber','exec/exec.c','        /* STOP parked a completed syscall;', '        a->frame[APP_FRAME_EAX] = (u32)wait_ret;\n        /* STOP parked a completed syscall;'),
+ ('no-request','exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
+ ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(frame);','    /* missing transfer */'),
+ ('before-completion','exec/exec_syscall.inc','    frame[APP_FRAME_EAX] = kapi_invoke','    exec_park_stop(frame);\n    frame[APP_FRAME_EAX] = kapi_invoke'),
+ ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        a->frame[APP_FRAME_EAX] = (u32)wait_ret;\n        /* STOP parked a completed syscall;'),
  ('wrong-owner','exec/appslot.c','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
  ('stale-request','exec/appslot.c','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
  ('no-mark','exec/appslot.c','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
@@ -367,9 +368,9 @@ MUTATIONS = [
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
               'ring3_wm_depth ||', 'kctx_irq_depth ||', 'kctx_exc_depth'):
-    src = function((ROOT/'exec/exec.c').read_text(), 'exec_park_stop')
+    src = function(exec_source(ROOT), 'exec_park_stop')
     assert src.count(guard)==1
-    MUTATIONS.append(('guard-'+guard, 'exec/exec.c', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
+    MUTATIONS.append(('guard-'+guard, 'exec/exec_syscall.inc', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
 for name in ('appslot_park_commit','appslot_park_kbd_commit','appslot_park_poll_commit',
              'appslot_park_yield_commit','appslot_abort_clear','appslot_start_commit','appslot_resume_commit'):
     src = function((ROOT/'exec/appslot.c').read_text(),name)

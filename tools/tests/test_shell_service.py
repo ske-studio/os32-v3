@@ -22,9 +22,10 @@ entry frame の 5 語 (frame[5]) は字面で見る (static_checks)。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=1.566306)
 
+from exec_source import exec_source
 from kernel_includes import include_dirs, include_flags
 import re
 import host32
@@ -86,32 +87,32 @@ MUTATIONS = [
     (HDR, "#define SHELL_SERVICE_VERSION 2u\n", "#define SHELL_SERVICE_VERSION 1u\n",
      "b3 S2 版を 1 のまま (欄を足したのに版を上げない)"),
     # ---- S3b: exec/exec.c の結線 ----
-    (EXEC, "    if (ring3_wm_depth == 1) shell_service_wm_mark();\n", "",
+    ('exec/exec.c', "    if (ring3_wm_depth == 1) shell_service_wm_mark();\n", "",
      "b2③ ring3_wm_enter が印を立てない"),
-    (EXEC, "    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;\n}", "\n}",
+    ('exec/exec.c', "    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;\n}", "\n}",
      "ring3_wm_leave が深さ 0 で印を消さない"),
-    (EXEC, "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;\n}", "    ring3_wm_depth = 0;\n}",
+    ('exec/exec.c', "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;\n}", "    ring3_wm_depth = 0;\n}",
      "b2⑤ ring3_context_clear の shell_gen=0 を外す"),
-    (EXEC, "    ring3_wm_shell_gen = saved->wm_shell_gen;\n", "",
+    ('exec/exec.c', "    ring3_wm_shell_gen = saved->wm_shell_gen;\n", "",
      "ring3_context_restore が親の印を戻さない"),
-    (EXEC, "    ring3_wm_shell_gen = 0;   /* T7b-b2: 深さと同じく WM の印も 0 から始まる */\n", "",
+    ('exec/exec_syscall.inc', "    ring3_wm_shell_gen = 0;   /* T7b-b2: 深さと同じく WM の印も 0 から始まる */\n", "",
      "b2⑤ dispatch 入口の印の 0 を外す"),
-    (EXEC, "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
+    ('exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
      "            shell_service_publish(load_base, text_sz);\n",
      "shell 確定で retire せずに publish (旧 lease が残る)"),
-    (EXEC, "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
+    ('exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
      "            shell_service_publish(load_base, text_sz);\n            shell_service_retire();\n",
      "shell 確定の順を publish → retire にする"),
-    (EXEC, "        exec_reclaim_owned(id, kind);\n        /* T7b-b2 §3-1: shell の内部入口を外し",
+    ('exec/exec_finish.inc', "        exec_reclaim_owned(id, kind);\n        /* T7b-b2 §3-1: shell の内部入口を外し",
      "        shell_service_retire();\n        exec_reclaim_owned(id, kind);\n"
      "        /* T7b-b2 §3-1: shell の内部入口を外し", "exec_finish の shell 分岐が回収より先に retire"),
-    (EXEC, "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n"
+    ('exec/exec_finish.inc', "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n"
            "        shell_service_retire();\n",
      "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n",
      "exec_finish の shell 分岐が retire しない"),
-    (EXEC, "        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
+    ('exec/exec_launch.inc', "        frame[4] = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
      "        frame[4] = (u32)(uptr)&g_shell_service;\n", "app にも service 表の番地を渡す"),
-    (EXEC, "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
+    ('exec/exec_launch.inc', "                      (want_ring3 ? EXEC_ENTRY_ARGS + 1 : EXEC_ENTRY_ARGS) * sizeof(u32)))",
      "                      (want_ring3 ? EXEC_ENTRY_ARGS : EXEC_ENTRY_ARGS - 1) * sizeof(u32)))", "entry frame を 4 語目なしで積む"),
 ]
 
@@ -130,7 +131,7 @@ WIRE = [
 
 def write_wire(root, out):
     """exec.c から結線の部分を切り出して out/wire_*.inc に書く。切り出せなければ例外。"""
-    text = (root / EXEC).read_text(encoding="utf-8")
+    text = exec_source(root)
     files = {}
     for name, head, tail, keep in WIRE:
         if text.count(head) != 1:
@@ -184,7 +185,7 @@ def static_checks(root, quiet=False):
     if " exec/shell_service.c " not in mk or "| $(SHELL_SERVICE_OBJ)" in mk:
         bad.append("build/kernel.mk: shell_service.c が C_KERNEL に無い / 順序だけの前提が残る")
     # S3b: exec/exec.c の字面 (組めない部分)
-    ex = (root / EXEC).read_text(encoding="utf-8")
+    ex = exec_source(root)
     if not re.search(r"^#define EXEC_ENTRY_ARGS 4$", (root / "exec/exec.h").read_text(), re.M):
         bad.append("EXEC_ENTRY_ARGS must remain four words")
     if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "include/cpu.h").read_text(), re.M):

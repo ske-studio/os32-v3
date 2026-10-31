@@ -5,9 +5,10 @@ Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
 CHECK = dict(name='mem-stat-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sys.c', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'init/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sys.c', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'init/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=['make:all'], budget=3.068874)
 
+from exec_source import exec_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -46,7 +47,7 @@ def build_fixture(tmp):
     """Reuse the real f9/f10 fixture with a separate entry point for f13."""
     def read(p):
         return (ROOT / p).read_text()
-    exe = read('exec/exec.c')
+    exe = exec_source(ROOT, read)
     slot = read('exec/appslot.c')
     gen = read('kapi/kapi_generated.c')
     fixture = read('tools/tests/appmem_map_host.c').replace('void _start(void)', 'void map_fixture_start(void)')
@@ -156,7 +157,7 @@ MUTANTS = [
 
 
 def run_body(runner, mutate):
-    exe = (ROOT / 'exec/exec.c').read_text()
+    exe = exec_source(ROOT)
     assert 'if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);' in exe
     assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
     boot = (ROOT / 'init/kernel.c').read_text()
@@ -416,7 +417,7 @@ def kprintf_formats(source):
 
 
 def ring3_window_define():
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     match = re.search(r'^#define RING3_ARG_WINDOW\s+[^\n]+', source, re.M)
     assert match, 'FAIL: RING3_ARG_WINDOW definition'
     return match.group(0)

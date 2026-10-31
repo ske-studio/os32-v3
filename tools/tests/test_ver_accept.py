@@ -4,6 +4,7 @@ V8 owns the full-line oracle; V11 owns equality with the Rust reader/layout.
 This suite reuses V11's snapshots, including FD/HDD/?/none/missing boot info.
 --mutate corrupts an accepted CUI fixture and reruns the same acceptance check.
 """
+from exec_source import exec_source
 import io
 import json
 import re
@@ -117,7 +118,7 @@ def min_api(runner):
         assert header.parse_header(blob)['min_api_ver'] == max(requested, version)
     # Execute the actual exec guard against both kernel generations. This is
     # the API-version gate only; PM checks complete old/new binaries in guest.
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     guard = re.search(r'else if \((hdr->min_api_ver > KAPI_VERSION)\) reason = '
                       r'"required KAPI version is newer than kernel";', source)
     assert guard, 'exec API-version guard changed'

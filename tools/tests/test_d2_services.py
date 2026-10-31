@@ -1,4 +1,5 @@
 """D2 A/B/C: real service tables, public wrappers, wiring and ABI stability."""
+from exec_source import read_text
 from kernel_includes import include_flags
 import argparse
 import json
@@ -181,14 +182,14 @@ def contracts():
     assert '    pc98_d2_bind();' in platform
     assert boot.index('pc98_boot_bind(&boot, boot_drive);') < boot.index('boot_platform_run(BOOT_INPUT, &boot);')
     for name in ('fs/vfs_fd.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/ime/fep_module.c'):
-        source = (ROOT / name).read_text()
+        source = read_text(ROOT / name)
         assert '#include "input_service.h"' in source
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
     for name, header in (('kernel/ime/ime.c', '../../drivers/input/kbd.h'),
                          ('kdebug/kselftest.c', '../drivers/input/kbd.h')):
-        assert '#include "' + header + '"' in (ROOT / name).read_text()
+        assert '#include "' + header + '"' in read_text(ROOT / name)
     assert '#include "../../drivers/input/mouse.h"' in platform
     assert 'drivers/input/mouse.h' not in boot and 'drivers/input/kbd.h' not in boot
     assert '#include "../../include/pointer_service.h"' in (ROOT / 'drivers/input/mouse.h').read_text()
@@ -213,7 +214,7 @@ def contracts():
     assert 'const EmergencyOps emergency_output' in bind
     for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
                  'exec/exec.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c'):
-        source = (ROOT / name).read_text()
+        source = read_text(ROOT / name)
         assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name
     for header in ('port_service.h', 'console_output.h'):
         assert 'drivers/' not in (ROOT / 'include' / header).read_text()
@@ -227,7 +228,7 @@ def contracts():
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
     assert 'clock_register(&pc98_clock);' in bind
     for name in ('kernel/sys.c', 'fs/fat/fatfs/diskio.c'):
-        source = (ROOT / name).read_text()
+        source = read_text(ROOT / name)
         assert '#include "clock_service.h"' in source
         assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source
     assert 'drivers/' not in (ROOT / 'include/clock_service.h').read_text()

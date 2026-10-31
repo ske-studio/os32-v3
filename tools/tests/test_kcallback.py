@@ -2,6 +2,7 @@
 
 Only int80 is replaced by a host bridge; mutants must compile and fail at runtime.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -35,7 +36,7 @@ def function(source, signature):
 
 
 def run(args, mutant=None):
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     sources = {
         'wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
                             'int __cdecl wrap_sys_ls(const char *path, void *cb, void *ctx)'),

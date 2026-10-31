@@ -1,6 +1,7 @@
 """f12 startup budget: real exec launch allocation/teardown with real paging/ledger.
 Normal control always precedes runtime mutants. File I/O and entry are boundaries.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import os
 import pathlib
@@ -128,7 +129,7 @@ def resident_link_contract():
 
 
 def main():
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     r, sizes = run(source)
     print(r.stdout, end='')
     assert r.returncode == 0, (r.returncode, r.stderr)

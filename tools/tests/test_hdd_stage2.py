@@ -26,6 +26,7 @@
   python3 -B tools/tests/test_hdd_stage2.py --target   # + i386-elf -Werror で新しいソース
   python3 -B tools/tests/test_hdd_stage2.py --mutate   # 否定側 (変異が RED になるか)
 """
+from exec_source import exec_source
 import host32
 import importlib.util
 import pathlib
@@ -335,7 +336,7 @@ def str_return_guard():
         m = re.search(r"wrap_%s\([^)]*\)\n\{(.*?)\n\}" % name, gen, re.S)
         if not m or f"return {tgt}(" not in m.group(1):
             bad.append(f"kapi/kapi_generated.c: wrap_{name} が {tgt} を通らない (make all の前?)")
-    exe = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
+    exe = exec_source(ROOT)
     for tgt in sorted(TRAMP_TARGETS):
         m = re.search(r"const char \*%s\([^)]*\)\s*\{(.*?)\}" % tgt, exe, re.S)
         if not m or ("ring3_user_str(ring3_in_syscall" not in m.group(1) and "tramp_copy(" not in m.group(1)):

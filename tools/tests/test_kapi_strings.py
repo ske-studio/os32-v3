@@ -1,4 +1,5 @@
 """T4b-8b: USER string groups with real B1, distinct VA/PA, runtime RED."""
+from exec_source import exec_source
 import argparse
 import json
 import re
@@ -44,7 +45,7 @@ def run(args, mutant=None):
     setup = setup.replace('    caller_copy_tests();', '    caller_copy_tests();\n    die(0);')
     sources['setup'] = setup
     sources['strings'] = (ROOT / 'kapi/kapi_strings.c').read_text()
-    dispatch = (ROOT / 'exec/exec.c').read_text()
+    dispatch = exec_source(ROOT)
     start = dispatch.index('    int strings = kapi_strings_call(')
     sources['dispatch'] = dispatch[start:dispatch.index('    /* --- (補助)', start)]
     cleanup = dispatch.index('static void exec_reclaim_resources(int id)\n{')

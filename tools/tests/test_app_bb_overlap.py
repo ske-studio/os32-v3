@@ -1,6 +1,7 @@
 """T2c high private image/heap/variable stack and supervisor BB aliases; actual paging,
 ledger and fixed KHEAP. Mutants must compile and fail during execution.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import host32
@@ -75,7 +76,7 @@ def extract(source):
 
 
 def run(mutation=None):
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     if mutation and mutation[0] != "peak-common-update":
         _, old, new = mutation
         if old not in source:
