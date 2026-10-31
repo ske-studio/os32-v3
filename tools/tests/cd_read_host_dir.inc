@@ -245,4 +245,45 @@ static void t_dir_tail(void)
     CHECK(iso9660_ops.list_dir(c, "/", dir_cb, &d) == VFS_ERR_IO);
     CHECK(d.next == 1 && g_dev_n == 1 && g_dev_cnt[0] == 1);
     iso9660_ops.umount(c);
+
+    /* Same record positions through search and list, with and without a window.
+     * Eight skipped dot records leave 48 bytes at the end of the first sector. */
+    for (int window = 0; window <= 1; window++) {
+        for (int crossing = 0; crossing <= 1; crossing++) {
+            setup(); g_kmalloc_fail = !window;
+            c = do_mount(); g_kmalloc_fail = 0;
+            base = dir_fixture(c, 2 * SEC);
+            u8 *p = g_media_a.img + base * SEC;
+            memset(p, 0, 2 * SEC);
+            for (u32 pos = 0; pos < SEC - 48; pos += 250) {
+                put_rec(p + pos, base, 2 * SEC, ISO_FLAG_DIRECTORY, "\0", 1);
+                p[pos] = 250;
+            }
+            put_rec(p + SEC - 48, TINY_LBA, TINY_SIZE, 0, "E00000.TXT;1", 12);
+            p[SEC - 48] = (u8)(48 + crossing);
+            put_rec(p + SEC, TINY_LBA, TINY_SIZE, 0,
+                    crossing ? "E00000.TXT;1" : "E00001.TXT;1", 12);
+            d.next = 0;
+            CHECK(iso9660_ops.list_dir(c, "/", dir_cb, &d) == VFS_OK);
+            CHECK(d.next == (crossing ? 1u : 2u));
+            dir_requests(base, 2, window);
+            iso_drop_caches(c); model_reset_counts(); g_dev_n = 0;
+            CHECK(iso_find_in_dir(c, base, 2 * SEC, "E00000.TXT",
+                                  &lba, &size, &flags) == VFS_OK);
+            CHECK(lba == TINY_LBA && size == TINY_SIZE && flags == 0);
+            dir_requests(base, window || crossing ? 2 : 1, window);
+            iso_drop_caches(c);
+            CHECK(iso_find_in_dir(c, base, 2 * SEC, "ABSENT",
+                                  &lba, &size, &flags) == VFS_ERR_NOTFOUND);
+            /* A byte short at the extent end stops before publishing the entry. */
+            c->root_size = SEC - 1;
+            iso_drop_caches(c); d.next = 0;
+            CHECK(iso9660_ops.list_dir(c, "/", dir_cb, &d) == VFS_OK);
+            CHECK(d.next == 0);
+            iso_drop_caches(c);
+            CHECK(iso_find_in_dir(c, base, SEC - 1, "E00000.TXT",
+                                  &lba, &size, &flags) == VFS_ERR_NOTFOUND);
+            iso9660_ops.umount(c);
+        }
+    }
 }
