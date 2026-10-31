@@ -24,7 +24,7 @@
 | D3 | #4・#7 | FD の Device API の経路にまとめ読み (fdc_read_sectors) を結ぶ、書き込みの同一トラックのまとめ | 設計 | astra 起草 | 計画 |
 | D4 | #6 | FAT の読み取りハンドル・位置の保持 (毎回の開き直しと先頭からの lseek をやめる) | 設計 | astra 起草 | 計画 |
 | D5 | #8・#9 (rep) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
-| N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能) | 中〜大 | — | 計画 |
+| N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 計画 |
 
 ## 軽い段の受入
 
