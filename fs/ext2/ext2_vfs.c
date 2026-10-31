@@ -170,19 +170,11 @@ static int ext2_vfs_write(void *ctx, const char *path, const void *data, u32 siz
     return ext2_to_vfs_err(rc);
 }
 
+#include "ext2_vfs_remove_path.inc"
+
 static int ext2_vfs_unlink(void *ctx, const char *path)
 {
-    Ext2Ctx *ec = (Ext2Ctx *)ctx;
-    char dir_path[VFS_MAX_PATH];
-    const char *fname;
-    u32 dir_ino;
-    int rc;
-
-    ext2_split_path(path, dir_path, &fname);
-
-    rc = ext2_resolve_path(ec, dir_path, &dir_ino);
-    if (rc != VFS_OK) return rc;
-    return ext2_to_vfs_err(ext2_unlink(ec, dir_ino, fname));
+    return ext2_vfs_remove_path((Ext2Ctx *)ctx, path, ext2_unlink);
 }
 
 /* ---- 排他的作成 (票 H2 §2-1、KAPI v53 の O_EXCL) ----
@@ -262,17 +254,7 @@ static int ext2_vfs_mkdir(void *ctx, const char *path)
 
 static int ext2_vfs_rmdir(void *ctx, const char *path)
 {
-    Ext2Ctx *ec = (Ext2Ctx *)ctx;
-    char dir_path[VFS_MAX_PATH];
-    const char *dname;
-    u32 parent_ino;
-    int rc;
-
-    ext2_split_path(path, dir_path, &dname);
-
-    rc = ext2_resolve_path(ec, dir_path, &parent_ino);
-    if (rc != VFS_OK) return rc;
-    return ext2_to_vfs_err(ext2_rmdir(ec, parent_ino, dname));
+    return ext2_vfs_remove_path((Ext2Ctx *)ctx, path, ext2_rmdir);
 }
 
 static int ext2_vfs_read_stream(void *ctx, const char *path, void *buf, u32 size, u32 offset)

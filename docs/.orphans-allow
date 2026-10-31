@@ -9,3 +9,4 @@
 #
 # 例:
 #   docs/tasks/foo/SCRATCH.md   # 下書き。まとまったら INDEX へ、捨てるなら削除
+docs/design/fs/ext2/ext2_vfs_remove_path.md   # H02 依頼: 共用部の設計書を追加し、上位の索引へリンクを足さない。
