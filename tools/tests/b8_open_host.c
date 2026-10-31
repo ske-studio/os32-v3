@@ -477,7 +477,7 @@ int res_owner_get(void) { return 0; }
 
 #include "../../fs/ext2/ext2_super.c"
 #include "../../fs/ext2/ext2_inode.c"
-#include "../../fs/ext2/ext2_dir.c"
+#include "ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
 #include "../../fs/ext2/ext2_fmt.c"
 #include "../../fs/ext2/ext2_vfs.c"
@@ -2516,7 +2516,7 @@ static void dent_name(char *dst, int k)
 static int make_full_dir(const char *path, int count, u32 *dino, char *next_name)
 {
     Ext2Inode di;
-    u32 blocks = (count == DENT_FULL) ? EXT2_NDIR_BLOCKS : EXT2_NDIR_BLOCKS + 1;
+    u32 blocks = ((u32)count + 2) / 3;
     int k;
     if (ext2_vfs_mkdir(g_ec, path) != VFS_OK) return 0;
     memo_cold();
@@ -5352,12 +5352,195 @@ static void stage_x3_replace(void)
 /*  入口                                                                    */
 /* ======================================================================== */
 
+/* S-group: ext2_dir の実物を通す回帰。各障害は一度だけ注入する。 */
+static void ext2dir_parents(u32 *a, u32 *b, u32 *f)
+{
+    char name[8];
+    int i;
+    CHECK(ext2_mkdir(g_ec, EXT2_ROOT_INO, "ea") == EXT2_OK);
+    CHECK(ext2_lookup(g_ec, "/ea", a) == EXT2_OK);
+    /* 親とファイルを別の inode-table ブロックに置き、mtime だけを落とす。 */
+    for (i = 0; i < 16; i++) {
+        filler_name(name, i);
+        CHECK(ext2_create(g_ec, EXT2_ROOT_INO, name, "", 0) == EXT2_OK);
+        if (i == 7) CHECK(ext2_mkdir(g_ec, EXT2_ROOT_INO, "eb") == EXT2_OK);
+    }
+    CHECK(ext2_lookup(g_ec, "/eb", b) == EXT2_OK);
+    CHECK(ext2_create(g_ec, *a, "src", "S", 1) == EXT2_OK);
+    CHECK(ext2_lookup(g_ec, "/ea/src", f) == EXT2_OK);
+    CHECK(lba_of_inode(*a) != lba_of_inode(*b));
+    CHECK(lba_of_inode(*b) != lba_of_inode(*f));
+    CHECK(lba_of_inode(*a) != lba_of_inode(*f));
+}
+
+static void case_ext2dir_unknown(void)
+{
+    int cycle;
+    report("  [ext2dir-1] UNKNOWN directory: move and descendant rejection\n");
+    for (cycle = 0; cycle < 2; cycle++) {
+        u32 a = 0, b = 0, f = 0, d = 0, sub = 0, phys = 0, pos = 0, seen = 0;
+        u32 alinks, blinks;
+        disk_setup();
+        ext2dir_parents(&a, &b, &f);
+        CHECK(ext2_mkdir(g_ec, a, "dir") == EXT2_OK);
+        CHECK(ext2_find_entry_loc(g_ec, a, "dir", &d, (u8 *)0, &phys, &pos) == EXT2_OK);
+        CHECK(ext2_mkdir(g_ec, d, "sub") == EXT2_OK);
+        CHECK(ext2_find_entry(g_ec, d, "sub", &sub, (u8 *)0) == EXT2_OK);
+        raw_blk(phys)[pos + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_UNKNOWN;
+        alinks = raw_links(a); blinks = raw_links(b);
+        io_reset();
+        if (cycle) {
+            CHECK(ext2_rename(g_ec, a, "dir", sub, "loop") == EXT2_ERR_INVAL);
+            CHECK(g_wr_sect == 0);
+            CHECK(ext2_find_entry(g_ec, a, "dir", &seen, (u8 *)0) == EXT2_OK);
+            CHECK(seen == d);
+        } else {
+            CHECK(ext2_rename(g_ec, a, "dir", b, "moved") == EXT2_OK);
+            CHECK(ext2_lookup(g_ec, "/eb/moved/..", &seen) == EXT2_OK);
+            CHECK(seen == b);
+            CHECK(raw_links(a) == alinks - 1);
+            CHECK(raw_links(b) == blinks + 1);
+            CHECK(ext2_find_entry(g_ec, a, "dir", &seen, (u8 *)0) == EXT2_ERR_NOTFOUND);
+        }
+        disk_teardown();
+    }
+}
+
+static void case_ext2dir_double_nospc(void)
+{
+    MediaReport before, after;
+    Ext2Inode di;
+    u32 full = 0, src = 0, seen = 0;
+    u8 bitmap[EXT2_BLOCK_SIZE];
+    char next[DENT_NAME_LEN + 1];
+    report("  [ext2dir-2] double indirect NOSPC: no lost outer table\n");
+    disk_setup();
+    CHECK(make_full_dir("/double", 3 * (EXT2_NDIR_BLOCKS + EXT2_ADDR_PER_BLOCK), &full, next));
+    CHECK(ext2_create(g_ec, EXT2_ROOT_INO, "source", "", 0) == EXT2_OK);
+    CHECK(ext2_lookup(g_ec, "/source", &src) == EXT2_OK);
+    while (g_ec->sb_info.free_blocks_count > 2) {
+        if (ext2_alloc_block(g_ec) < 0) break;
+    }
+    CHECK(g_ec->sb_info.free_blocks_count == 2);
+    CHECK(ext2_sync(g_ec) == EXT2_OK);
+    kmemcpy(bitmap, raw_blk(g_ec->gd_table[0].block_bitmap), sizeof(bitmap));
+    media_check(&before);
+    CHECK(ext2_rename(g_ec, EXT2_ROOT_INO, "source", full, next) == EXT2_ERR_NOSPC);
+    media_check(&after);
+    CHECK(g_ec->sb_info.free_blocks_count == 2);
+    {
+        u32 i;
+        int same = 1;
+        for (i = 0; i < sizeof(bitmap); i++)
+            if (bitmap[i] != raw_blk(g_ec->gd_table[0].block_bitmap)[i]) same = 0;
+        CHECK(same);
+    }
+    CHECK(leak_delta(&after, &before) == 0);
+    CHECK(ext2_lookup(g_ec, "/source", &seen) == EXT2_OK && seen == src);
+    CHECK(ext2_find_entry(g_ec, full, next, &seen, (u8 *)0) == EXT2_ERR_NOTFOUND);
+    CHECK(ext2_read_inode(g_ec, full, &di) == EXT2_OK);
+    CHECK(di.block[EXT2_DIND_BLOCK] == 0);
+    disk_teardown();
+}
+
+static void case_ext2dir_parent_io(void)
+{
+    int deleting;
+    report("  [ext2dir-3] rename: add/delete parent mtime I/O is returned\n");
+    for (deleting = 0; deleting < 2; deleting++) {
+        u32 a = 0, b = 0, f = 0;
+        OS32_Stat st;
+        disk_setup();
+        ext2dir_parents(&a, &b, &f);
+        CHECK(ext2_sync(g_ec) == EXT2_OK);
+        CHECK(g_ec->meta_dirty == 0);
+        CHECK(vfs_stat("/ea/src", &st) == VFS_OK); /* キャッシュを温める */
+        wfail_arm(lba_of_inode(deleting ? a : b), 1);
+        CHECK(ext2_rename(g_ec, a, "src", b, "dst") == EXT2_ERR_IO);
+        wfail_disarm();
+        CHECK(g_wfail_fired == 1);
+        CHECK(vfs_stat("/eb/dst", &st) == VFS_OK && st.st_ino == f);
+        if (deleting) CHECK(vfs_stat("/ea/src", &st) == VFS_ERR_NOTFOUND);
+        disk_teardown();
+    }
+}
+
+static void case_ext2dir_delete_cache(void)
+{
+    u32 a = 0, b = 0, f = 0, seen = 0, phys = 0, pos = 0;
+    OS32_Stat st;
+    report("  [ext2dir-4] partial delete: cached and direct lookup agree\n");
+    disk_setup();
+    ext2dir_parents(&a, &b, &f);
+    CHECK(ext2_find_entry_loc(g_ec, a, "src", &seen, (u8 *)0, &phys, &pos) == EXT2_OK);
+    CHECK(pos < EXT2_SECTOR_SIZE);
+    CHECK(vfs_stat("/ea/src", &st) == VFS_OK);
+    wfail_arm(g_ec->base_lba + phys * 2 + 1, 1);
+    CHECK(ext2_unlink(g_ec, a, "src") == EXT2_ERR_IO);
+    wfail_disarm();
+    CHECK(g_wfail_fired == 1);
+    CHECK(ext2_lookup(g_ec, "/ea/src", &seen) == EXT2_ERR_NOTFOUND);
+    CHECK(vfs_stat("/ea/src", &st) == VFS_ERR_NOTFOUND);
+    disk_teardown();
+}
+
+static void case_ext2dir_replace_mtime(void)
+{
+    int failure;
+    report("  [ext2dir-5] cross-parent replacement: destination mtime and I/O\n");
+    for (failure = 0; failure < 2; failure++) {
+        u32 a = 0, b = 0, f = 0, seen = 0;
+        OS32_Stat st;
+        disk_setup();
+        ext2dir_parents(&a, &b, &f);
+        CHECK(ext2_create(g_ec, b, "dst", "D", 1) == EXT2_OK);
+        /* 旧 inode を残し、割当変更を起こさず mtime の失敗だけを観測する。 */
+        {
+            Ext2Inode di;
+            u32 dst = 0;
+            CHECK(ext2_find_entry(g_ec, b, "dst", &dst, (u8 *)0) == EXT2_OK);
+            CHECK(ext2_read_inode(g_ec, dst, &di) == EXT2_OK);
+            di.links_count++;
+            CHECK(ext2_write_inode(g_ec, dst, &di) == EXT2_OK);
+            CHECK(ext2_add_entry(g_ec, b, "keep", dst, EXT2_FT_REG_FILE) == EXT2_OK);
+        }
+        CHECK(vfs_set_mtime("/eb", 12345) == VFS_OK);
+        CHECK(ext2_sync(g_ec) == EXT2_OK);
+        wfail_arm(lba_of_inode(b), 1);
+        if (!failure) wfail_disarm();
+        CHECK(ext2_rename(g_ec, a, "src", b, "dst") ==
+              (failure ? EXT2_ERR_IO : EXT2_OK));
+        wfail_disarm();
+        CHECK(g_wfail_fired == failure);
+        CHECK(ext2_lookup(g_ec, "/eb/dst", &seen) == EXT2_OK && seen == f);
+        CHECK(ext2_lookup(g_ec, "/ea/src", &seen) == EXT2_ERR_NOTFOUND);
+        CHECK(vfs_stat("/eb", &st) == VFS_OK);
+        if (!failure) CHECK(st.st_mtime == ext2_current_time());
+        disk_teardown();
+    }
+}
+
+static void stage_ext2dir(void)
+{
+    report("== S-group ext2dir regressions ==\n");
+    case_ext2dir_unknown();
+    case_ext2dir_double_nospc();
+    case_ext2dir_parent_io();
+    case_ext2dir_delete_cache();
+    case_ext2dir_replace_mtime();
+}
+
+static int g_ext2dir_only;
+
 static void run(void)
 {
     report("=== 票 B8: 読み取り失敗を「不存在」にしない (vfs_open まで) ===\n");
-    stage_a();
-    stage_b();
-    stage_c();
+    if (!g_ext2dir_only) {
+        stage_a();
+        stage_b();
+        stage_c();
+    }
+    stage_ext2dir();
 
     report("\n");
     report_i(g_checks);
@@ -5406,6 +5589,7 @@ void b8_start_c(long *sp)
     const char **envp = (const char **)&sp[argc + 2];
     if (argc >= 2) g_dump_dir = (const char *)sp[2];
     g_pair_maxn = env_int(envp, "B8_PAIR_MAXN", PAIR_MAXN_DEFAULT);
+    g_ext2dir_only = env_int(envp, "B8_EXT2DIR_ONLY", 0);
     run();
     die(g_exit_code);
 }

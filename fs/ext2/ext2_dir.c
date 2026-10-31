@@ -262,9 +262,8 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
 
                 now = ext2_current_time();
                 dir_inode.mtime = now;
-                ext2_write_inode(ctx, dir_ino, &dir_inode);
                 ext2_ns_touch(ctx);
-                return EXT2_OK;
+                return ext2_write_inode(ctx, dir_ino, &dir_inode); /* add mtime */
             }
             pos += de_reclen;
         }
@@ -285,6 +284,7 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
      *                                    ポインタはここで媒体に載る
      * どの段で落ちても、繋がったブロックは中身が書けていて、size の内側にある。 */
     {
+        u32 old_dind = dir_inode.block[EXT2_DIND_BLOCK];
         int new_blk = ext2_alloc_block(ctx);
         u32 new_size;
         if (new_blk < 0) return new_blk;   /* NOSPC / IO をそのまま (往復 6) */
@@ -319,8 +319,14 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
             /* ディレクトリの表は媒体上の inode から辿れる。IO なら new_blk が
              * 表に載ったかもしれないので**返さない** (漏れで止める)。
              * NOSPC ならどこにも載っていない (票 B8 往復 3)。 */
-            if (ret == EXT2_ERR_NOSPC &&
-                ext2_free_block(ctx, (u32)new_blk) != 0) { /* 漏れ */ }
+            if (ret == EXT2_ERR_NOSPC) {
+                /* bmap_set が今回作った外側表は inode に未接続のまま。
+                 * 内側表の NOSPC でローカル inode とともに失わない。 */
+                if (old_dind == 0 && dir_inode.block[EXT2_DIND_BLOCK] != 0) {
+                    if (ext2_free_block(ctx, dir_inode.block[EXT2_DIND_BLOCK]) != 0) { /* 漏れ */ }
+                }
+                if (ext2_free_block(ctx, (u32)new_blk) != 0) { /* 漏れ */ }
+            }
             return ret;
         }
 
@@ -381,12 +387,11 @@ int ext2_delete_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name)
                      * rec_len と inode 番号が別セクタに載っても、どちらか一方が
                      * 届けばエントリは見えなくなる。 */
                     le32_wr(&ext2_g_aux[pos], 0);
+                    ext2_ns_touch(ctx); /* before delete write */
                     ret = ext2_write_block(ctx, phys, ext2_g_aux);
                     if (ret != 0) return EXT2_ERR_IO;
                     dir_inode.mtime = ext2_current_time();
-                    ext2_write_inode(ctx, dir_ino, &dir_inode);
-                    ext2_ns_touch(ctx);
-                    return EXT2_OK;
+                    return ext2_write_inode(ctx, dir_ino, &dir_inode); /* delete mtime */
                 }
             }
             prev_pos = pos;
@@ -410,7 +415,6 @@ int ext2_lookup(Ext2Ctx *ctx, const char *path, u32 *out_ino)
     char component[EXT2_NAME_LEN + 1];
     int i, ci;
     u32 found_ino;
-    u8 found_type;
     int ret;
 
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
@@ -430,7 +434,7 @@ int ext2_lookup(Ext2Ctx *ctx, const char *path, u32 *out_ino)
         /* **畳まない** (票 B8)。以前は I/O エラーもここで NOTFOUND に
          * なっていたので、「読めなかった」が「無い」として上へ伝わり、
          * open の O_CREAT 経路が既存ファイルを空で作り直していた。 */
-        ret = ext2_find_entry(ctx, current_ino, component, &found_ino, &found_type);
+        ret = ext2_find_entry(ctx, current_ino, component, &found_ino, (u8 *)0);
         if (ret != 0) return ret;
         current_ino = found_ino;
         if (path[i] == '/') {

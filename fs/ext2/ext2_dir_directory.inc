@@ -25,8 +25,7 @@ int ext2_mkdir(Ext2Ctx *ctx, u32 parent_ino, const char *name)
      * 既にある名前と同名のディレクトリを二重に作ってしまう (実測: 18 セクタ
      * 書き込み、同名エントリ 2 件)。**何も書かずに中断する**のが正解。 */
     {
-        u32 tmp;
-        ret = ext2_find_entry(ctx, parent_ino, name, &tmp, (u8 *)0);
+        ret = ext2_find_entry(ctx, parent_ino, name, (u32 *)0, (u8 *)0);
         if (ret == EXT2_OK) return EXT2_ERR_EXIST;
         if (ret != EXT2_ERR_NOTFOUND) return ret;
     }
