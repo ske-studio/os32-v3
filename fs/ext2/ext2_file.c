@@ -54,6 +54,7 @@ static int ext2_create_abort_unwritten(Ext2Ctx *ctx, u32 ino, const Ext2Inode *i
     return (r1 != 0) ? r1 : r2;
 }
 
+#include "ext2_file_write_run.inc"
 #include "ext2_file_write_batch.inc"
 
 int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u32 size)
