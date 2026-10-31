@@ -208,8 +208,10 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 static u8 g_disk[DISK_SECTORS * 512u];
 static u32 g_rd_sect;     /* 512B セクタ読み出し回数 */
 static u32 g_wr_sect;     /* 512B セクタ書き込み回数 */
+static u32 g_rd_calls, g_rd_lba;
+static int g_rd_count;
 
-static void io_reset(void) { g_rd_sect = 0; g_wr_sect = 0; }
+static void io_reset(void) { g_rd_sect = 0; g_wr_sect = 0; g_rd_calls = 0; }
 static u32 io_total(void) { return g_rd_sect + g_wr_sect; }
 
 static Device g_hd0;
@@ -225,6 +227,9 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 {
     int i;
     if (!dev) return -1;
+    g_rd_calls++;
+    g_rd_lba = lba;
+    g_rd_count = count;
     for (i = 0; i < count; i++) {
         if (lba + (u32)i >= DISK_SECTORS) return -1;
         kmemcpy((u8 *)buf + i * 512, g_disk + (lba + (u32)i) * 512u, 512);
@@ -771,6 +776,25 @@ static void case_meta_reaches_disk(void)
     disk_teardown();
 }
 
+static void case_block_read_request(void)
+{
+    u8 buf[EXT2_BLOCK_SIZE];
+    u32 i, block = 2;
+
+    disk_setup();
+    io_reset();
+    CHECK(ext2_read_block(g_ec, block, buf) == EXT2_OK);
+    CHECK(g_rd_calls == 1 && g_rd_count == EXT2_SECTORS_PER_BLOCK);
+    CHECK(g_rd_lba == DISK_BASE_LBA + block * EXT2_SECTORS_PER_BLOCK);
+    for (i = 0; i < sizeof(buf); i++)
+        CHECK(buf[i] == g_disk[g_rd_lba * EXT2_SECTOR_SIZE + i]);
+    io_reset();
+    CHECK(ext2_read_data_block(g_ec, block, buf) == EXT2_OK);
+    CHECK(g_rd_calls == 1 && g_rd_count == EXT2_SECTORS_PER_BLOCK);
+    CHECK(g_rd_lba == DISK_BASE_LBA + block * EXT2_SECTORS_PER_BLOCK);
+    disk_teardown();
+}
+
 /* ======================================================================== */
 
 static int str_eq(const char *a, const char *b) { return kstrcmp(a, b) == 0; }
@@ -789,6 +813,7 @@ int ext2_write_io_main(const char *sel)
     if (str_eq(sel, "all") || str_eq(sel, "ns_invalidation")) case_ns_invalidation();
     if (str_eq(sel, "all") || str_eq(sel, "sync_on_alloc"))   case_sync_on_alloc();
     if (str_eq(sel, "all") || str_eq(sel, "meta_reaches_disk")) case_meta_reaches_disk();
+    if (str_eq(sel, "all") || str_eq(sel, "block_read_request")) case_block_read_request();
 
     report("ext2_write_io: PASS (");
     report(sel);

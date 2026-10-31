@@ -182,10 +182,10 @@ Device *dev_find(const char *name)
 int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 {
     int i;
-    if (format_io('R', lba, count) != 0) return -1;
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
+        if (format_io('R', cur, 1) != 0) return -1;
         if (cur >= g_virtual_total) return -1;
         if (cur == g_fail_read_lba) return -1;
         if (cur >= DISK_TOTAL) kmemset((u8 *)buf + i * 512, 0, 512);
