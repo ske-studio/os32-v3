@@ -96,7 +96,7 @@ static void show_prompt(void) {
 #include "sh_redraw.inc"
 #else
 static void redraw_line(const char *buf, int len, int cursor) {
-    int i, cl;
+    int i, cl, columns = 0;
     char tmp_buf[CMD_BUF_SIZE];
     g_api->console_set_cursor(0, g_api->console_get_cursor_y());
     show_prompt();
@@ -104,13 +104,21 @@ static void redraw_line(const char *buf, int len, int cursor) {
     for (i = 0; i < len && i < CMD_BUF_SIZE - 1; i++) tmp_buf[i] = buf[i];
     tmp_buf[i] = '\0';
     g_api->shell_print_utf8(tmp_buf, ATTR_WHITE);
-    cl = prev_draw_len - len;
+    for (i = 0; i < len; i++) {
+        u8 c = (u8)buf[i];
+        if ((c & 0xC0) != 0x80) columns += ((c & 0xF0) == 0xE0) ? 2 : 1;
+    }
+    cl = prev_draw_len - columns;
     for (i = 0; i < cl; i++) g_api->shell_putchar(' ', ATTR_WHITE);
-    prev_draw_len = len;
+    prev_draw_len = columns;
 
     g_api->console_set_cursor(0, g_api->console_get_cursor_y());
     show_prompt();
-    for (i = 0; i < cursor; i++) g_api->console_set_cursor(g_api->console_get_cursor_x() + 1, g_api->console_get_cursor_y());
+    for (i = 0; i < cursor; i++) {
+        u8 c = (u8)buf[i];
+        int width = (c & 0xC0) == 0x80 ? 0 : ((c & 0xF0) == 0xE0 ? 2 : 1);
+        while (width--) g_api->console_set_cursor(g_api->console_get_cursor_x() + 1, g_api->console_get_cursor_y());
+    }
 }
 #endif
 
@@ -635,21 +643,25 @@ void shell_run(const char *startup_notice) {
             if ((key & 0xFF) == 0x0D) { g_api->shell_putchar('\n', ATTR_WHITE); break; }
             if ((key & 0xFF) == 0x08) {
                 if (cmd_pos > 0) {
+                    int start = cmd_pos - 1;
+                    while (start > 0 && (((u8)cmd_buf[start] & 0xC0) == 0x80)) start--;
                     if (cmd_pos == cmd_len) {
 #ifdef SHELL_AS_APP
                         /* 端末の BS はセルを消さないので BS + 空白 + BS。
                          * 写しの確定も sh_backspace_tail の中で行う。 */
-                        cmd_pos--; cmd_len--;
+                        cmd_pos = cmd_len = start;
                         sh_backspace_tail(cmd_buf, cmd_len);
                         prev_draw_len = cmd_len;
 #else
-                        cmd_pos--; cmd_len--; cmd_buf[cmd_len] = 0;
-                        g_api->shell_putchar(0x08, ATTR_WHITE); prev_draw_len = cmd_len;
+                        int cells = (((u8)cmd_buf[start] & 0xF0) == 0xE0) ? 2 : 1;
+                        cmd_pos = cmd_len = start; cmd_buf[cmd_len] = 0;
+                        while (cells--) { g_api->shell_putchar(0x08, ATTR_WHITE); prev_draw_len--; }
                         sh_mark_drawn(cmd_buf, cmd_len);
 #endif
                     } else {
-                        int i; for (i = cmd_pos - 1; i < cmd_len - 1; i++) cmd_buf[i] = cmd_buf[i+1];
-                        cmd_len--; cmd_pos--; cmd_buf[cmd_len] = 0; redraw_line(cmd_buf, cmd_len, cmd_pos);
+                        int i, removed = cmd_pos - start;
+                        for (i = start; i < cmd_len - removed; i++) cmd_buf[i] = cmd_buf[i + removed];
+                        cmd_len -= removed; cmd_pos = start; cmd_buf[cmd_len] = 0; redraw_line(cmd_buf, cmd_len, cmd_pos);
                     }
                 }
                 continue;
@@ -679,18 +691,41 @@ void shell_run(const char *startup_notice) {
              * 1 つ見落としても表示が壊れない。GUI 中はスキャンコードが来ない
              * のでここは通らず、CUI 直起動のときだけ効く。 */
             if ((key >> 8) == 0x3B) { /* LEFT */
-                if (cmd_pos > 0) { cmd_pos--; g_api->shell_putchar(0x08, ATTR_WHITE); sh_drop_drawn(); } continue;
+                if (cmd_pos > 0) {
+                    int cells;
+                    cmd_pos--;
+                    while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
+                    cells = (((u8)cmd_buf[cmd_pos] & 0xF0) == 0xE0) ? 2 : 1;
+                    while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
+                    sh_drop_drawn();
+                } continue;
             }
             if ((key >> 8) == 0x3C) { /* RIGHT */
-                if (cmd_pos < cmd_len) { g_api->shell_putchar(cmd_buf[cmd_pos], ATTR_WHITE); cmd_pos++; sh_drop_drawn(); } continue;
+                if (cmd_pos < cmd_len) {
+                    char ch[CMD_BUF_SIZE]; int n = 0;
+                    ch[n++] = cmd_buf[cmd_pos++];
+                    while (cmd_pos < cmd_len && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) ch[n++] = cmd_buf[cmd_pos++];
+                    ch[n] = 0;
+                    if (n == 1) g_api->shell_putchar(ch[0], ATTR_WHITE);
+                    else g_api->shell_print_utf8(ch, ATTR_WHITE);
+                    sh_drop_drawn();
+                } continue;
             }
             if ((key >> 8) == 0x3E) { /* HOME */
-                while (cmd_pos > 0) { cmd_pos--; g_api->shell_putchar(0x08, ATTR_WHITE); } sh_drop_drawn(); continue;
+                while (cmd_pos > 0) {
+                    int cells;
+                    cmd_pos--;
+                    while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
+                    cells = (((u8)cmd_buf[cmd_pos] & 0xF0) == 0xE0) ? 2 : 1;
+                    while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
+                } sh_drop_drawn(); continue;
             }
             if ((key >> 8) == 0x39) { /* DEL */
                 if (cmd_pos < cmd_len) {
-                    int i; for(i=cmd_pos; i<cmd_len-1; i++) cmd_buf[i]=cmd_buf[i+1];
-                    cmd_len--; cmd_buf[cmd_len]=0; redraw_line(cmd_buf, cmd_len, cmd_pos);
+                    int i, end = cmd_pos + 1;
+                    while (end < cmd_len && (((u8)cmd_buf[end] & 0xC0) == 0x80)) end++;
+                    for (i = cmd_pos; i < cmd_len - (end - cmd_pos); i++) cmd_buf[i] = cmd_buf[i + end - cmd_pos];
+                    cmd_len -= end - cmd_pos; cmd_buf[cmd_len]=0; redraw_line(cmd_buf, cmd_len, cmd_pos);
                 }
                 continue;
             }
@@ -750,7 +785,11 @@ void shell_run(const char *startup_notice) {
                                 }
                                 cmd_buf[cmd_len] = 0;
                                 g_api->shell_print_utf8(utf8_tmp, ATTR_WHITE);
+#ifdef SHELL_AS_APP
                                 prev_draw_len = cmd_len;
+#else
+                                prev_draw_len += ((ascii_byte & 0xF0) == 0xE0) ? 2 : 1;
+#endif
                                 sh_mark_drawn(cmd_buf, cmd_len);
                             } else {
                                 int i;
@@ -768,7 +807,12 @@ void shell_run(const char *startup_notice) {
                         char ch = (char)ascii_byte;
                         if (cmd_pos == cmd_len) {
                             cmd_buf[cmd_pos++] = ch; cmd_len++; cmd_buf[cmd_len] = 0;
-                            g_api->shell_putchar(ch, ATTR_WHITE); prev_draw_len = cmd_len;
+                            g_api->shell_putchar(ch, ATTR_WHITE);
+#ifdef SHELL_AS_APP
+                            prev_draw_len = cmd_len;
+#else
+                            prev_draw_len++;
+#endif
                             sh_mark_drawn(cmd_buf, cmd_len);
                         } else {
                             int i; for (i = cmd_len; i > cmd_pos; i--) cmd_buf[i] = cmd_buf[i-1];

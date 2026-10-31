@@ -2891,6 +2891,32 @@ static void ui_exit(void)
     key_push(0x0D);
 }
 
+static void case_ui_utf8_edit(void)
+{
+    report("UTF-8 line editing\n");
+    fresh(); ui_reset();
+    key_push_str("echo 換字"); key_push(0x08); key_push(0x08);
+    key_push_str("x"); key_push(0x0D); ui_exit(); shell_run(0);
+    check(str_eq(hist_buf[0], "echo x"), "UTF-8 tail BS removes whole characters");
+    check(out_has("\b\b  \b\b"), "UTF-8 tail BS erases two cells");
+
+    fresh(); ui_reset();
+    key_push_str("echo 換字x"); key_push(0x3B00); key_push(0x08);
+    key_push(0x0D); ui_exit(); shell_run(0);
+    check(str_eq(hist_buf[0], "echo 換x"), "UTF-8 middle BS removes whole character");
+
+    fresh(); ui_reset();
+    key_push_str("echo 換字"); key_push(0x3B00); key_push(0x3B00);
+    key_push(0x3C00); key_push_str("x"); key_push(0x0D); ui_exit(); shell_run(0);
+    check(str_eq(hist_buf[0], "echo 換x字"), "UTF-8 left and right move by character");
+
+    fresh(); ui_reset();
+    key_push_str("echo 換字"); key_push(0x3E00); key_push(0x3C00);
+    key_push(0x3C00); key_push(0x3C00); key_push(0x3C00); key_push(0x3C00);
+    key_push(0x3900); key_push(0x0D); ui_exit(); shell_run(0);
+    check(str_eq(hist_buf[0], "echo 字"), "UTF-8 HOME and DEL preserve character boundaries");
+}
+
 static void case_ui_history_and_line(void)
 {
     report("24 U14: 切れた行を履歴に入れない (T14)\n");
@@ -3625,6 +3651,7 @@ void _start(void)
     case_env_expand_name();
     case_rshell_line();
     case_ui_history_and_line();
+    case_ui_utf8_edit();
     case_filer_names();
     case_cfg_set_key();
     case_if_join_refuses();

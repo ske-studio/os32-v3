@@ -69,15 +69,15 @@ static void sh_cursor_back(const char *buf, int cursor, int len)
     }
 }
 
-/* sh_backspace_tail — 行末の 1 バイトを消す (SHELL_AS_APP の BS)
+/* sh_backspace_tail — 行末の 1 文字を消す (SHELL_AS_APP の BS)
  *
- *  new_len は**消した後**の長さで、buf[new_len] がこれから消えるバイト。
+ *  new_len は**消した後**の長さで、buf[new_len] が消える文字の先頭バイト。
  *  端末の BS (0x08) はカーソルを 1 セル左へ動かすだけでセルを消さない
  *  (userland/libos32term/src/model.rs の write_inner) ので、BS だけを出すと
  *  画面に文字が残ったままバッファだけ縮む (`echo abc` -> BS BS -> `x` で
  *  画面 `echo axc` / バッファ `echo ax`)。BS + 空白 + BS で上書きして消す。
  *  3 バイト列の先頭は 2 セルぶん。CUI の console は BS で消すので、この
- *  経路は SHELL_AS_APP だけ (常駐の BS は 1 バイトも変えていない)。
+ *  経路は SHELL_AS_APP だけ。
  *
  *  消した後はカーソルが新しい行末に来るので、写しもそこで確定する。 */
 /* sh_erase_cells — 消したバイト 1 つぶんを画面から消す (B5 で公開)
