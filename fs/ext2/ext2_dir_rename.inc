@@ -377,6 +377,16 @@ static int ext2_rename_replace(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
     /* 段 5 (段 3 / 4 の成否に依存しない) */
     if (ext2_drop_replaced(ctx, d_ino) != 0) cleanup_failed = 1;
 
+    /* 置き換えは add_entry を通らない。別親なら宛先の mtime も更新する。 */
+    if (new_dir != old_dir) {
+        ret = ext2_read_inode(ctx, new_dir, &inode);
+        if (ret == 0) {
+            inode.mtime = ext2_current_time(); /* replacement parent */
+            ret = ext2_write_inode(ctx, new_dir, &inode);
+        }
+        if (ret != 0) cleanup_failed = 1; /* replacement parent */
+    }
+
     /* 段 6 */
     if (ext2_sync(ctx) != 0) cleanup_failed = 1;
 
@@ -389,7 +399,7 @@ int ext2_rename(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
     u32 ino, dst_ino;
     u8 ftype, dst_type;
     Ext2Inode inode;
-    int ret;
+    int ret, is_dir;
 
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
     ret = ext2_check_writable(ctx);   /* エラー状態なら断る (票 B8 往復 5) */
@@ -408,6 +418,11 @@ int ext2_rename(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
         return EXT2_OK;
     }
 
+    /* dirent の種別は UNKNOWN のことがある。移動手順は実体で決める。 */
+    ret = ext2_read_inode(ctx, ino, &inode);
+    if (ret != 0) return ret;
+    is_dir = (inode.mode & EXT2_S_IFMT) == EXT2_S_IFDIR;
+
     /* 移動先に同名がある場合: ディレクトリは上書きしない。
      * ファイル同士なら POSIX と同じく置き換える。
      *
@@ -419,7 +434,7 @@ int ext2_rename(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
     ret = ext2_find_entry(ctx, new_dir, new_name, &dst_ino, &dst_type);
     if (ret == EXT2_OK) {
         if (dst_ino == ino) {
-            if (ftype == EXT2_FT_DIR) {
+            if (is_dir) {
                 /* **1 つのディレクトリに名前が 2 つ** = 媒体が壊れている
                  * (票 B8 往復 5)。往復 5 以降の rename はこの状態を作らない
                  * (旧名を先に消す) ので、ここに来るのは往復 4 以前のコードが
@@ -433,7 +448,7 @@ int ext2_rename(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
             return EXT2_OK;   /* ファイルのハードリンク同士 (POSIX どおり何もしない) */
         }
         if (dst_type == EXT2_FT_DIR) return EXT2_ERR_EXIST;
-        if (ftype == EXT2_FT_DIR) return EXT2_ERR_NOTDIR;
+        if (is_dir) return EXT2_ERR_NOTDIR;
         /* **通常ファイル同士だけ**が新しい置き換え経路 (票 H2 §2-2)。
          * 種別が揃わない組み合わせ (特殊ファイル等) は従来の unlink + add の
          * ままにする — 宛先エントリの file_type を書き換えずに inode だけ
@@ -448,7 +463,7 @@ int ext2_rename(Ext2Ctx *ctx, u32 old_dir, const char *old_name,
         return ret;
     }
 
-    if (ftype == EXT2_FT_DIR) {
+    if (is_dir) {
         if (old_dir != new_dir) {
             int desc = ext2_is_self_or_descendant(ctx, ino, new_dir);
             if (desc < 0) return desc;      /* 判定できなかった。INVAL と偽らない */

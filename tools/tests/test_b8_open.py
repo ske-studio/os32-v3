@@ -249,6 +249,68 @@ def run_with_e2fsck(exe, imgdir, e2fsck):
     return rc, stats
 
 
+# Each mutation uses a full copy of the production translation unit and includes.
+# Compilation failures never count as runtime RED.
+EXT2DIR_MUTANTS = [
+    ("inode mode", "ext2_dir_rename.inc",
+     "is_dir = (inode.mode & EXT2_S_IFMT) == EXT2_S_IFDIR;",
+     "is_dir = ftype == EXT2_FT_DIR;"),
+    ("NOSPC outer table", "ext2_dir.c",
+     "if (old_dind == 0 && dir_inode.block[EXT2_DIND_BLOCK] != 0)",
+     "if (0 && old_dind == 0 && dir_inode.block[EXT2_DIND_BLOCK] != 0)"),
+    ("add parent I/O", "ext2_dir.c",
+     "return ext2_write_inode(ctx, dir_ino, &dir_inode); /* add mtime */",
+     "(void)ext2_write_inode(ctx, dir_ino, &dir_inode); return EXT2_OK;"),
+    ("delete parent I/O", "ext2_dir.c",
+     "return ext2_write_inode(ctx, dir_ino, &dir_inode); /* delete mtime */",
+     "(void)ext2_write_inode(ctx, dir_ino, &dir_inode); return EXT2_OK;"),
+    ("partial delete cache", "ext2_dir.c",
+     "ext2_ns_touch(ctx); /* before delete write */",
+     "/* mutation: leave the old path memo alive */"),
+    ("replacement mtime", "ext2_dir_rename.inc",
+     "inode.mtime = ext2_current_time(); /* replacement parent */",
+     "/* mutation: leave the destination parent mtime unchanged */"),
+    ("replacement parent I/O", "ext2_dir_rename.inc",
+     "if (ret != 0) cleanup_failed = 1; /* replacement parent */",
+     "/* mutation: ignore the destination parent I/O failure */"),
+]
+
+
+def ext2dir_mutants(tmp):
+    failures = 0
+    for i, (name, filename, before, after) in enumerate(EXT2DIR_MUTANTS):
+        mdir = tmp / ("ext2dir-mutant-%d" % i)
+        mdir.mkdir()
+        for source in ("ext2_dir.c", "ext2_dir_directory.inc", "ext2_dir_rename.inc"):
+            shutil.copy2(ROOT / "fs/ext2" / source, mdir / source)
+        path = mdir / filename
+        original = path.read_text()
+        if original.count(before) != 1:
+            print("MUTANT %s: anchor is not unique" % name, flush=True)
+            failures += 1
+            continue
+        path.write_text(original.replace(before, after))
+        exe = mdir / "b8-open"
+        build = subprocess.run(["gcc", *HOST_FLAGS, "-I" + str(mdir), *INCLUDES,
+                                str(SRC), "-o", str(exe)], cwd=ROOT,
+                               capture_output=True, text=True)
+        if build.returncode:
+            print("MUTANT %s: COMPILE FAIL\n%s" % (name, build.stderr), flush=True)
+            failures += 1
+            continue
+        result = host32.run([str(exe)], cwd=ROOT,
+                            env=dict(os.environ, B8_EXT2DIR_ONLY="1"),
+                            capture_output=True, text=True, timeout=900)
+        killed = result.returncode == 1 and "  FAIL line " in result.stdout
+        print("MUTANT %s: %s" % (name, "runtime RED" if killed else "FAIL"), flush=True)
+        if not killed:
+            print(result.stdout + result.stderr, flush=True)
+            failures += 1
+    print("EXT2DIR MUTANTS: %d/%d runtime RED" %
+          (len(EXT2DIR_MUTANTS) - failures, len(EXT2DIR_MUTANTS)), flush=True)
+    return failures
+
+
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-b8-") as tmp:
         tmp = pathlib.Path(tmp)
@@ -280,4 +342,6 @@ if __name__ == "__main__":
                                cwd=ROOT, check=True)
             print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)
 
+        if rc == 0 and mismatch == 0 and "--mutate" in sys.argv:
+            mismatch += ext2dir_mutants(tmp)
         sys.exit(1 if (rc != 0 or mismatch) else 0)
