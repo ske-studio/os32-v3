@@ -114,9 +114,9 @@ static void ranges(void)
     }
     reset(); CHECK(ext2_read_data_block(&ctx, 3, buffer.data) == 0 && calls == 1 && last_count == 2);
     reset(); CHECK(ext2_read_block(&ctx, 3, buffer.data) == 0 && calls == 1 && last_count == 2);
-    /* Existing block writes keep their ordered two single-sector calls. */
-    reset(); CHECK(ext2_write_data_block(&ctx, 3, buffer.data) == 0 && calls == 2 && last_lba == 14 && last_count == 1);
-    reset(); CHECK(ext2_write_block(&ctx, 3, buffer.data) == 0 && calls == 2);
+    /* Block writes submit both sectors in one request. */
+    reset(); CHECK(ext2_write_data_block(&ctx, 3, buffer.data) == 0 && calls == 1 && last_lba == 13 && last_count == 2);
+    reset(); CHECK(ext2_write_block(&ctx, 3, buffer.data) == 0 && calls == 1 && last_lba == 13 && last_count == 2);
     reset(); CHECK(ext2_read_sector(&ctx, 3, 1, buffer.data) == 0 && calls == 1 && last_lba == 14 && last_count == 1);
     reset(); CHECK(ext2_write_sector(&ctx, 3, 0, buffer.data) == 0 && calls == 1 && last_lba == 13 && last_count == 1);
 }
@@ -167,10 +167,10 @@ static void errors(void)
     CHECK(ext2_read_data_block(&ctx, 3, buffer.data) == device_error && !ctx.fs_error);
     reset(); fail_call = 1;
     CHECK(ext2_read_block(&ctx, 3, buffer.data) == device_error && ctx.fs_error);
-    reset(); fail_call = 2; fail_after = 1;
+    reset(); fail_call = 1; fail_after = EXT2_SECTOR_SIZE;
     CHECK(ext2_write_data_block(&ctx, 3, buffer.data) == device_error);
-    CHECK(calls == 2 && !ctx.fs_error && disk[13 * EXT2_SECTOR_SIZE] == 0xCD);
-    reset(); fail_call = 2;
+    CHECK(calls == 1 && !ctx.fs_error && disk[13 * EXT2_SECTOR_SIZE] == 0xCD);
+    reset(); fail_call = 1; fail_after = EXT2_SECTOR_SIZE;
     CHECK(ext2_write_block(&ctx, 3, buffer.data) == device_error && ctx.fs_error);
     reset(); fail_call = 1;
     CHECK(ext2_read_sector(&ctx, 3, 1, buffer.data) == device_error && !ctx.fs_error);

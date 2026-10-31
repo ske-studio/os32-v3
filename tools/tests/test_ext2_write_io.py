@@ -17,7 +17,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ["w512_new", "w512_existing", "w1_append", "seek_back",
          "tar_sequence", "read512", "write_through", "ns_invalidation",
-         "sync_on_alloc", "meta_reaches_disk", "block_read_request"]
+         "sync_on_alloc", "meta_reaches_disk", "block_read_request",
+         "block_write_request"]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-nostdlib", "-static", "-O1",
          "-Wall", "-Wextra", "-Werror",

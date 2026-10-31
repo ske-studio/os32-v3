@@ -86,8 +86,7 @@ MUTANTS = [
     io_reset_mutant('write-reset-raw',
                    'static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)\n'
                    '{\n'
-                   '    u32 sector;\n'
-                   '    int ret;\n\n'
+                   '    u32 sector;\n\n'
                    '    ext2_read_cache_reset();', 'write_failures'),
     io_reset_mutant('write-reset-sector',
                    'int ext2_write_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, const void *buf)\n'

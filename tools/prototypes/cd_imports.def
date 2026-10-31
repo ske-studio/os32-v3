@@ -77,6 +77,12 @@
       "context": "normal",
       "irq": false,
       "source": "lib/kstring.h"
+    },
+    {
+      "symbol": "ide_multiple_reset_bank",
+      "context": "normal",
+      "irq": false,
+      "source": "drivers/ata/ide.h"
     }
   ]
 }

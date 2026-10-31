@@ -20,14 +20,18 @@
 |---|---|---|---|---|---|
 | L1 | #3 (小) | ext2 のブロック (1KB) の読み取りを 512B×2 の要求から count=2 の 1 要求に (`fs/ext2/ext2_super.c`、読み取りだけ) | 小 | terra | 済み (main e2fe4686) |
 | L2 | #9 (小)・#10・#11 | ATAPI (`drivers/ata/atapi.c`): PIO のループの偶数長の高速路 (奇数長・読み捨ては今のまま、rep は使わない)・BSY/DRQ の待ちを最初は 10µs ごと→長い待ちで 100µs・SRST の保持を校正済みの 10µs 待ちに (解除後 2ms と BSY 待ちは残す) | 小 | sol | 済み (main e2fe4686) |
-| D1 | #1・#5 | ext2 の間接表・inode・直近データの保持 | 設計 | astra 起草 | 実装中 (sol、D2 の口を使う) |
+| D1 | #1・#5 | ext2 の間接表・inode・直近データの保持 | 設計 | astra 起草 | 済み (main ba09ac7c) |
 | D2 | #2・#3 (中) | IDE の既存 READ/WRITE の Sector Count を使った複数セクタ、ext2 の連続ブロックを束ねる | 設計 | astra 起草 | 済み (main e2fe4686) |
 | D3 | #4・#7 | FD の Device API の経路にまとめ読み (fdc_read_sectors) を結ぶ、書き込みの同一トラックのまとめ | 設計 | astra 起草 | **改善しない (ユーザー決定 2026-10-31)** — Device API で FD を count>1 で読み書きする呼び手が無く、FatFs の FD は読みのまとめ・トラックのキャッシュが既にあり、書き込みは 1 クラスタ=1 セクタで束ねる相手が無い (Opus レビュー) |
 | D4 | #6 | FAT の読み取りハンドル・位置の保持 (毎回の開き直しと先頭からの lseek をやめる) | 設計 | astra 起草 | 済み (main e2fe4686) |
 | D5 | #8 (D5a 済み、main e2fe4686)・#9 の rep (D5b、手本・置き場が決まってから) | CD のディレクトリのまとめ読み、rep insw/outsw の適合の確認 | 設計 | astra 起草 | 計画 |
-| N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 計画 |
+| N1 | #12 | SET MULTIPLE MODE + READ/WRITE MULTIPLE (新機能、ユーザー「良い機能」2026-10-31 で実装する) — D2 の後。IDENTIFY word 47 で対応を確かめ、対応しないドライブは今の読み方 | 中〜大 | 設計は D2 の後 | 済み (D6 段 3、main 4599cfd7、sol 実装・astra 取り込み可) |
+| L3 | 調べの主因 (書き込み) | ext2 の 1KB の書き込みを count=2 の 1 要求に (`ext2_raw_write_block`) | 小 | terra | 済み (main ce72c861、D1 の試験の目印の直し 6564c069) |
+| D6 | 調べの主因 (書き込みのメタデータ) | 段 1: ビットマップ・inode・間接表の保持とまとめ更新 / 段 2: データの連続区間の範囲書き / 段 3: N1 | 設計 | astra 起草、確定版 | 段 1 実装中 (sol)、段 2 は段 1 の後、段 3 済み |
 
 ## 軽い段の受入
+
+- 2026-11-01: L3・N1 の入った main 4599cfd7 を NP21/W で起動、guest_tests 21/21 PASS (`~/os32-tmp/run/n1-guest/`)。NP21/W の IDE が MULTIPLE の経路を通ったかは起動のログに出ず未確認。実機の速さは D6 の後にまとめて測る。
 
 - ホスト: 既存の試験 (cd_read・ide・ext2 の像の試験) が変わらず通る。L1 は 1KB の読み取りの要求が 1 回になること、L2 は待ちの間隔と SRST の保持が規定の値であることを試験で見る。
 - ゲスト (NP21/W): 起動 (ext2 の root)・`ls /cd0` とファイルの読み取り・guest_tests。実機 (Ra266) は次の実機の回で起動と CD の読み取り。
