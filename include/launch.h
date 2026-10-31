@@ -107,9 +107,7 @@ int launch_chain(int head, int *out, int max);
  *                         無ければ IDLE (票 §10 non-blocker 1) */
 void launch_owner_exit(int id);
 
-/* ---- 自己診断 (kernel/kselftest.c) ------------------------------------- */
-/* 表の遷移を踏む。ビット 0..n が落ちた項目 (0 = 全部通った)。
- * 呼んだ後の表は空に戻る。 */
+/* 退役した私有 import の互換口。状態を変更せず 0 を返す。 */
 u32 launch_selftest(void);
 
 #endif /* __LAUNCH_H */

@@ -1,26 +1,24 @@
 /* ======================================================================== */
-/*  KTIME.H — µs 時計の**試験専用の注入口** (票 TASK_HAL_WIRING §1-5)       */
+/*  KTIME.H — µs 時計の退役した私有 import (票 TASK_HAL_WIRING §1-5)       */
 /*                                                                          */
 /*  時計そのもの (`sys_time_now`) の宣言は include/sys.h。                   */
-/*  E08 段1で起動時の注入試験はホストへ移した。ここは私有 import の互換口。  */
-/*  段2までは注入処理も有効で、test_dep_dir_b_timer.py が旧経路を検査する。 */
-/*  n = 0 が既定。型・保存領域・get/set/clear の実体は今後も保持する。       */
+/*  起動時の注入試験はホストへ移設済み。ここは私有 import の互換口。       */
+/*  型・保存領域・get/set/clear は残すが、値を書いても時計には影響しない。  */
 /* ======================================================================== */
 
 #ifndef __KTIME_H
 #define __KTIME_H
 
-/* Three failed snapshots exhaust one call; shared with the injection array. */
+/* Three failed snapshots exhaust one call; shared with the retained array. */
 #define TIME_RETRY_MAX 3
 
 struct time_test_feed {
     int p1;      /* 0 / 1 */
     int p2;      /* 0 / 1 */
-    int count;   /* < 0 = 実測のラッチ値をそのまま使う */
+    int count;   /* 旧注入値。現在は時計に使わない */
 };
 
-/* 試行 i は feed[min(i, n-1)] を使う (最後の要素を繰り返す)。
- * n = 0 (既定) なら注入しない。3 = sys_time_now の再試行上限。 */
+/* 保存領域だけを保持する。clear は n を 0 に戻す。 */
 /* Import ABI hashes this declaration spelling; the C definition uses
  * TIME_RETRY_MAX and the compiler checks that both array bounds agree. */
 extern struct time_test_feed time_test_feed[3];

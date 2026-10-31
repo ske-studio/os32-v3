@@ -400,13 +400,7 @@ int appslot_gfx_owner(void);
 /* 回収 (exec_reclaim_owned から)。所有者がこの ID なら WM へ戻す。 */
 void appslot_gfx_owner_exit(int id);
 
-/* ---- 自己診断 (kernel/kselftest.c) ------------------------------------- */
-/* 「印の無いフレームは resume できない」(票 K7 受入 I5 / K5b の C6) の負例を
- * ブート時に踏む。空きスロットを一時的に借りて、PARKED / WAIT_KEY /
- * WAIT_POLL の 3 つで
- * 印なし → OS32_ERR_STALE、印あり → 0 を確かめ、借りたスロットと
- * カウンタ・cur・owner を元に戻す。ビット 0..n が落ちた項目 (0 = 全部通った)。
- * 呼ぶのは exec_init() の前後どちらでもよい (触った状態は必ず戻す)。 */
+/* 退役した私有 import の互換口。状態を変更せず 0 を返す。 */
 u32 appslot_resume_mark_selftest(void);
 
 /* 「画面の所有者は gfx_init で移り、回収で WM へ戻る」(票 T8 D1) と

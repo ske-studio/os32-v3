@@ -6,6 +6,7 @@
 #include "time_math.h"
 #include "types.h"
 
+/* 退役した私有 import の保存領域。判定経路では増分しない。 */
 unsigned int time_branch_hits[TIME_BR_COUNT];
 
 void time_branch_reset(void)
@@ -22,7 +23,6 @@ int time_decide(int p1, int p2, unsigned int t, unsigned int count,
     if (p1) {
         /* 再ロードはラッチ**より前**に済んでいる。count は新しい周期のもの
          * なので、古い tick と組ませると時刻が 1 周期ぶん戻る。 */
-        time_branch_hits[TIME_BR_T1]++;
         out->tick  = t + 1;
         out->count = count;
         return TIME_DECIDE_OK;
@@ -30,10 +30,8 @@ int time_decide(int p1, int p2, unsigned int t, unsigned int count,
     if (p2) {
         /* ラッチの前後どちらで再ロードが起きたか分からない。
          * **採用しない** (どちらに寄せても最大 1 周期ずれる)。 */
-        time_branch_hits[TIME_BR_RETRY]++;
         return TIME_DECIDE_RETRY;
     }
-    time_branch_hits[TIME_BR_T0]++;
     out->tick  = t;
     out->count = count;
     return TIME_DECIDE_OK;
@@ -48,7 +46,7 @@ void time_us_from(unsigned int tick, unsigned int count, unsigned int reload,
 
     if (reload != 0) {
         /* mode 2 のカウンタは reload から 1 へ減る。経過ぶんは reload − count。
-         * ラッチ値が reload を超えることは無いが、注入試験が境界外を渡しても
+         * ラッチ値が reload を超えることは無いが、ホスト試験が境界外を渡しても
          * 巻き込まない (負にならない)。 */
         unsigned int elapsed = (count <= reload) ? (reload - count) : 0;
         frac = (unsigned int)(((unsigned long long)elapsed *

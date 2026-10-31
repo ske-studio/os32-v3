@@ -135,7 +135,7 @@ def mutate(tmp):
     original = SRC.read_text(encoding="utf-8")
     bad = 0
     for i, (pattern, repl, why) in enumerate(MUTATIONS, 1):
-        mutated, n = re.subn(pattern, repl, original, count=1)
+        mutated, n = re.subn(pattern, repl, original)
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)
             bad += 1
@@ -143,7 +143,8 @@ def mutate(tmp):
         try:
             exe = host_build(tmp, mutated)
         except subprocess.CalledProcessError:
-            print(f"MUTATION {i} RED (compile): {why}", flush=True)
+            print(f"MUTATION {i} INVALID (compile): {why}", flush=True)
+            bad += 1
             continue
         hits = sum(subprocess.run([str(exe), c], cwd=ROOT,
                                   stderr=subprocess.DEVNULL).returncode != 0

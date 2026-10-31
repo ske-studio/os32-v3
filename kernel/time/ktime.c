@@ -23,22 +23,16 @@
 #include "../../include/platform_timer.h"
 #include "sys.h"
 #include "time_math.h"
-#include "ktime.h"          /* 私有 import の注入口 (E08 段2まで処理を保持) */
+#include "ktime.h"          /* 退役した私有 import の互換宣言 */
 #include "os32_kapi_shared.h"   /* OS32_ERR_AGAIN / OS32_ERR_NOSYS */
 
 /* 3 回失敗したら諦める。1 回の読みは数 µs なので、同じ周期の中で境界を
  * 3 回も踏むことはない (踏むなら PIT が止まっているか mode が違う)。 */
 /* TIME_RETRY_MAX is shared with the feed declaration in ktime.h. */
 
-/* ------------------------------------------------------------------------ */
-/*  試験専用の注入口 (往復 8 の中継 1)                                       */
-/*                                                                           */
-/*  起動時の呼出しは E08 段1で外した。ホストの旧経路トレースを維持し、     */
-/*  注入処理そのものの撤去は段2で行う。n = 0 が既定。                       */
-/* ------------------------------------------------------------------------ */
-/* 型・保存領域は kernel/time/ktime.h と私有 import の互換口として残す。 */
+/* 退役した私有 import の保存領域。get/set/clear は残すが時計は参照しない。 */
 struct time_test_feed time_test_feed[TIME_RETRY_MAX];
-volatile int time_test_feed_n = 0;   /* > 0 でこの列を使う (最後の要素を繰り返す) */
+volatile int time_test_feed_n = 0;
 
 void time_test_feed_clear(void)
 {
@@ -87,16 +81,6 @@ int sys_time_now(u32 *lo, u32 *hi)
         /* 4. tick (IF=0 の中なので 1〜3 の間は不変) */
         t = (unsigned int)tick_count;
 
-        if (time_test_feed_n > 0) {
-            int k = (attempt < time_test_feed_n) ? attempt
-                                                 : (time_test_feed_n - 1);
-            p1 = time_test_feed[k].p1;
-            p2 = time_test_feed[k].p2;
-            if (time_test_feed[k].count >= 0) {
-                count = (unsigned int)time_test_feed[k].count;
-            }
-        }
-
         /* 5. 判定 */
         if (time_decide(p1, p2, t, count, &snap) == TIME_DECIDE_OK) {
             time_us_from(snap.tick, snap.count, ps->reload, ps->period_us,
@@ -106,11 +90,8 @@ int sys_time_now(u32 *lo, u32 *hi)
         }
     }
 
-    /* 6. 単調性のクランプ (**同じ IF=0 の中で**。単一の書き手)。
-     *    注入中 (time_test_feed_n > 0) は通さない — 境界の count を撃ち分ける
-     *    試験は「わざと前回より小さい値」を作るので、そこをクランプすると
-     *    補間そのものを観測できなくなる。製品経路 (n = 0) では必ず通る。 */
-    if (rc == 0 && time_test_feed_n == 0) {
+    /* 6. 単調性のクランプ (同じ IF=0 の中で。成功時は必ず通す)。 */
+    if (rc == 0) {
         unsigned long long us = ((unsigned long long)out_hi << BITS_PER_U32) |
                                 (unsigned long long)out_lo;
         if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;
