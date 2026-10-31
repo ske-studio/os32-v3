@@ -24,7 +24,7 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=12.534032)
 
 from kernel_boot_source import kernel_parts, kernel_source
@@ -42,14 +42,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ['drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
+TREE_FILES = ["tools/tests/cd_read_host_multiple_reset.inc", 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
               "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "drivers/base/dev.h",
               "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, "tools/tests/cd_read_host_dir.inc", "tools/tests/cd_read_host_pio.inc", PKG_HARNESS, SHIM + "/io.h"]
 
-READ_CASES = ["empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
+READ_CASES = ["multiple_reset", "empty_insert", "cd_body", "iso_devices", "iso_bad_pvd", "stream_4k", "stream_odd", "stream_32k", "read_file", "multi_fallback",
               "short_transfer", "bad_outside", "bad_inside", "lru_order", "ua_mount", "multi_drq",
               "path_cache", "dir_lru", "list_reentrant", "unit_attention",
               "idle_rule", "no_window", "stat_swap", "list_swap",
@@ -207,6 +207,8 @@ def run_all(exes, tmp, quiet=False, keys=EXE_KEYS, first_fail=False, replay=None
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ファイル, パターン, 置換, 説明)。最後の 1 本は対照 (何も変えない)。
 MUTATIONS = [
+    ("drivers/ata/atapi.c", r"    ide_multiple_reset_bank\(1\);",
+     "    /* mutation: omit HDD reset notification */", "SRST 前の HDD 設定失効を省く"),
     # --- TASK_BLOCKDEV_PERF L2 (時計と PIO 境界)
     ("drivers/ata/atapi.h", r"#define ATAPI_FAST_POLL_US      10UL",
      "#define ATAPI_FAST_POLL_US      100UL", "短い待ちも従来の 100us に戻す"),

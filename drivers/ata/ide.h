@@ -32,6 +32,10 @@
 #define IDE_ID_MODEL_WORD      27
 #define IDE_ID_SERIAL_WORD     10
 #define IDE_ID_FIRMWARE_WORD   23
+#define IDE_ID_MULTI_MAX_WORD      47
+#define IDE_ID_MULTI_CURRENT_WORD  59
+#define IDE_ID_MULTI_COUNT_MASK    0x00FF
+#define IDE_ID_MULTI_VALID         0x0100
 /* IDE I/Oポート (PC-98) */
 #define IDE_DATA       0x640   /* データレジスタ (16-bit) */
 #define IDE_ERROR      0x642   /* エラーレジスタ (R) */
@@ -63,6 +67,9 @@
 /* ATAコマンド */
 #define IDE_CMD_READ       0x20   /* READ SECTOR(S) */
 #define IDE_CMD_WRITE      0x30   /* WRITE SECTOR(S) */
+#define IDE_CMD_READ_MULTIPLE  0xC4
+#define IDE_CMD_WRITE_MULTIPLE 0xC5
+#define IDE_CMD_SET_MULTIPLE   0xC6
 #define IDE_CMD_IDENTIFY   0xEC   /* IDENTIFY DEVICE */
 
 #define IDE_TIMEOUT_LOOP   1000000 /* BSY/DRQ待ちループカウント (長い) */
@@ -96,6 +103,9 @@ typedef struct {
 /* 最後に成功した IDENTIFY の幾何 (ide_init が drive 0-3 を埋める)。
  * 0 = 値あり、負 = そのドライブは IDENTIFY に答えていない。 */
 int ide_get_geom(int drive, IdeGeom *out);
+
+/* Internal reset notification: invalidate the bank's two HDD settings before SRST. */
+void ide_multiple_reset_bank(int bank);
 
 /* IDE初期化 (ドライブ検出) */
 int ide_init(void);

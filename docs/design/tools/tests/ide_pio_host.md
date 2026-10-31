@@ -14,10 +14,12 @@ IDENTIFY の語で LBA28／現在 CHS／既定 CHS／SASI を設定する。
 - 相間の古い DRQ と BSY+DRQ で転送しない。READ ERR+DRQ は読み捨て、WRITE は送らない。
 - 途中失敗で後続チャンクと再試行を止め、次要求の BSY 待ち上限と idle 復帰後の内容を確認。
 
-実行は `python3 -B tools/tests/test_ide_pio.py`。
+実行は [test_ide_pio.py](test_ide_pio.md) (`python3 -B tools/tests/test_ide_pio.py`)。
 `--mutate` は未変更コピーの成功を先に確認し、製品 inc の意味変異を組んで
 実行時 assertion による RED を要求する。コンパイル失敗や signal は kill と数えない。
 CHECK に製品・inc・shim・試験入力を宣言する。
+
+MULTIPLE の設定・相・失敗試験は [追加ケース](ide_pio_host_multiple.md) に分ける。
 
 基点の count=2 は 2 コマンドで RED、変更後は 1 コマンドで GREEN。
 製品の手順は `ide_pio`。

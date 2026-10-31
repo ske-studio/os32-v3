@@ -243,6 +243,7 @@ static int atapi_bus_dead_fail(void)
  * 期限切れならバスが死んだ印 (s_bus_dead) を立てる */
 static int atapi_srst(void)
 {
+    ide_multiple_reset_bank(1);
     outp(IDE_DEV_CTRL, IDE_NIEN | IDE_SRST);
     cpu_delay_us(ATAPI_SRST_HOLD_US);
     outp(IDE_DEV_CTRL, IDE_NIEN);

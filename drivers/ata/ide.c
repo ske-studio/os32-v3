@@ -123,6 +123,9 @@ static void ide_chs_addr(int drive, u16 cyl, u8 head, u8 sect, IdeAddr *a)
                        | ((drive % IDE_DRIVES_PER_BANK) ? IDE_DRVHEAD_SLAVE : 0x00));
 }
 
+static void ide_pio_settle(void);
+static int ide_pio_finish(void);
+#include "ide_multiple.inc"
 #include "ide_pio.inc"
 
 /* ============================================================ */
@@ -138,6 +141,12 @@ int ide_init(void)
        IRQ9 = スレーブPIC bit1。未処理IRQによるシステム破壊を防止。
        手書きの IMR RMW は割り込みに分断されると危険なので共通 API を使う。 */
     irq_disable(PC98_IRQ_IDE);
+
+    ide_multiple_init();
+    for (drv = 0; drv < IDE_MAX_DRIVES; drv++) {
+        drive_present[drv] = 0;
+        drive_geom[drv].valid = 0;
+    }
 
     /* 全バンクの全ドライブをスキャン */
     for (bank = 0; bank < IDE_BANK_COUNT; bank++) {
@@ -167,6 +176,14 @@ int ide_init(void)
                 drive_present[idx] = 1;
                 found++;
             }
+        }
+        /* Detect both devices before a rejected/busy C6h can stop this bank. */
+        for (drv = 0; drv < IDE_DRIVES_PER_BANK; drv++) {
+            int idx = bank * IDE_DRIVES_PER_BANK + drv;
+            if (!drive_present[idx]) continue;
+            ide_select_drive(idx);
+            if (ide_wait_bsy() != IDE_OK) break;
+            if (ide_multiple_prepare(idx) != IDE_OK) break;
         }
     }
 
@@ -244,6 +261,9 @@ int ide_identify(int drive, IdeInfo *info)
     } else {
         info->phys_sector_size = SYS_HDD_SECTOR_SIZE;
     }
+
+    ide_multiple_identify(drive & (IDE_MAX_DRIVES - 1), buf,
+                          info->phys_sector_size);
 
     /* サイズ(MB) = 総セクタ数 / (1MB あたりのセクタ数)。
      * 総セクタ数 × セクタ長を先に掛けると 4GB 超 (実機の 8GB = 16,514,063
