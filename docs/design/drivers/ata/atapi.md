@@ -7,6 +7,10 @@
 `actual` は成功時に有効バイト数を返し、途中エラーでは入口の 0 を維持する。
 診断値はエラー時点の status/error/受信済み長を保持する。
 
+SRST 発行前に `ide_multiple_reset_bank(1)` で同バンクの HDD 2台を失効させる。
+SRST の失敗時も無効のままとし、次の HDD 要求で再設定する。
+ATAPI 単体 DEVICE RESET は HDD の設定へ触れない。
+
 ## 落とし穴
 
 L2 の短い待ち 20 回×10µs、以後 100µs、SRST 保持・回復待ちを維持する。

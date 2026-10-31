@@ -75,6 +75,16 @@ void kprintf(u8 attr, const char *fmt, ...)
     if (g_klog_n > sizeof(g_klog) - 1) g_klog_n = sizeof(g_klog) - 1;
 }
 
+/* IDE state is a boundary stub here; the SRST path itself is product code. */
+static unsigned multiple_notify_count, multiple_notify_bank, multiple_notify_mask;
+static int multiple_notify_armed;
+void ide_multiple_reset_bank(int bank)
+{
+    multiple_notify_count++;
+    multiple_notify_bank = (unsigned)bank;
+    multiple_notify_mask &= ~(3u << (bank * 2));
+}
+
 /* ---- 実物 ---- */
 #include "../../drivers/ata/atapi.c"
 #include "../../fs/isofs/iso9660.c"
@@ -797,6 +807,10 @@ static void np2_outp(unsigned int port, unsigned int v)
                 }
             }
             if (v & IDE_SRST) {
+                if (multiple_notify_armed) {
+                    CHECK(multiple_notify_count == 1 && multiple_notify_bank == 1);
+                    CHECK(multiple_notify_mask == 3); /* notification precedes SRST */
+                }
                 N.n_srst++;
                 N.srst_assert_us = g_delay_us;
                 N.srst_status_reads = N.n_status_reads;
@@ -2481,6 +2495,8 @@ static void t_srst_clock(void)
     CHECK(N.d[0].busy_left == 0);
 }
 
+#include "cd_read_host_multiple_reset.inc"
+
 #include "cd_read_host_pio.inc"
 
 #include "cd_read_host_dir.inc"
@@ -2538,6 +2554,7 @@ int main(int argc, char **argv)
     else if (!strcmp(cs, "np2_start_unit"))  t_np2_start_unit();
     else if (!strcmp(cs, "np2_bus_dead"))    t_np2_bus_dead();
     else if (!strcmp(cs, "poll_clock"))      t_poll_clock();
+    else if (!strcmp(cs, "multiple_reset"))  t_multiple_reset();
     else if (!strcmp(cs, "srst_clock"))      t_srst_clock();
     else if (!strcmp(cs, "dir_batch"))       t_dir_batch();
     else if (!strcmp(cs, "dir_find"))        t_dir_find();
