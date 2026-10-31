@@ -83,47 +83,27 @@ int ext2_write_finish(Ext2Ctx *ctx)
     return ret;
 }
 
-/* Stage 1 issues each data block separately. Full blocks use the caller's
- * buffer; only edge blocks need scratch. Stage 2 can replace this issuer. */
+/* The range issuer prepares and completes one window at a time. */
 static int ext2_write_batch_transfer(Ext2Ctx *ctx, const void *buf, u32 size,
                                      u32 offset, int complete)
 {
     Ext2WriteWork *w = &ext2_write_work;
     const u8 *src = (const u8 *)buf;
-    u32 done = 0, logical = offset / EXT2_BLOCK_SIZE;
-    u32 edge = offset % EXT2_BLOCK_SIZE;
+    u32 done = 0;
     int ret = EXT2_OK;
     while (done < size) {
-        Ext2WriteRecord *r;
-        const u8 *data = src + done;
-        u32 bytes = EXT2_BLOCK_SIZE - edge;
-        if (bytes > size - done) bytes = size - done;
-        ret = ext2_write_reserve(ctx, logical, &r);
-        if (ret != 0) break;
-        if (edge || bytes < EXT2_BLOCK_SIZE) {
-            if (r->flags & EXT2_WRITE_REC_NEW) ext2_mem_zero(ext2_g_dat, EXT2_BLOCK_SIZE);
-            else if (ext2_read_data_block(ctx, r->physical, ext2_g_dat) != 0) {
-                ret = EXT2_ERR_IO; break;
-            }
-            ext2_mem_copy(ext2_g_dat + edge, src + done, bytes);
-            data = ext2_g_dat;
-        }
-        if (ext2_write_data_block(ctx, r->physical, data) != 0) {
-            ret = EXT2_ERR_IO; break;
-        }
-        ext2_write_data_done(ctx, 1);
+        u32 bytes;
+        ret = ext2_write_run_window(ctx, src + done, size - done, offset + done, &bytes);
         done += bytes;
-        logical++; edge = 0;
-        if (offset + done > w->inode.current.size) w->inode.current.size = offset + done;
-        w->inode.dirty = 1;
-        if (w->data_count == EXT2_WRITE_WINDOW_BLOCKS && done < size) {
+        if (ret != 0) break;
+        if (done < size) {
             ret = ext2_write_commit_window(ctx);
             if (ret != 0) return ret;
         }
     }
     if (ctx->fs_error) { ext2_write_abort(ctx); return EXT2_ERR_IO; }
     if (complete && ret != 0) {
-        /* The current window has never been issued. Discard it before the
+        /* The current window's metadata has never been issued. Discard it before the
          * caller aborts the workspace and releases earlier unreferenced data. */
         w->data_done = 0;
         ext2_write_bmap_trim(ctx);

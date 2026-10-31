@@ -390,9 +390,10 @@ static void case_counts(void)
     report(" write_KiB="); report_u(g_wr_sect / 2);
     report(" read_requests="); report_u(g_rd_calls);
     report(" write_requests="); report_u(writes); report("\n");
-    CHECK(g_rd_sect == 12 && g_wr_sect == 138 && g_rd_calls == 6 && writes == 69);
+    CHECK(g_rd_sect == 12 && g_wr_sect == 138 && g_rd_calls == 6 && writes == 7);
     for (i = 0; i < event_count; i++) if (events[i].write)
-        CHECK(events[i].count == EXT2_SECTORS_PER_BLOCK);
+        CHECK(events[i].count == EXT2_SECTORS_PER_BLOCK ||
+              events[i].count == 32 * EXT2_SECTORS_PER_BLOCK);
     CHECK(ctx.sb_info.free_blocks_count == free - 64);
     /* Every new data block precedes bitmap; bitmap precedes lower, inode, SB, GDT.
      * No unchanged upper table is written. L3 writes one count=2 request per block. */
@@ -403,7 +404,7 @@ static void case_counts(void)
     for (i = 0; i < bitmap_event; i++) {
         if (events[i].write) data_writes++;
     }
-    CHECK(data_writes == 64);
+    CHECK(data_writes == 2);
     CHECK(bitmap_event < lower_event && lower_event < inode_event);
     read_check(offset, 65536);
     sample(1);

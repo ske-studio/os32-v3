@@ -9,7 +9,7 @@ begin/finish/abortでD6保持を破棄する。D1 resetはD6を変更しない�
 単一タスク・非再入のscratch契約を継承し、動的割当とdataの大きなコピーを作らない。
 
 reserveは最大64件を昇順で記録し、data_done(n)は要求全体の成功後だけ進める。
-段1ではdataを1本ずつ発行し、全1KiBは呼出元buf、端数だけg_datを使う。
+data発行は[write_run](ext2_file_write_run.md)が担当し、全1KiBは呼出元buf、端数だけg_datを使う。
 新規端数は0埋め、既存端数はdata RMW。窓境界でもclean表/bitmap/rawを保持する。
 
 公開はdata成功→bitmap→下位表→上位表→inode。streamは失敗したdataの予約を

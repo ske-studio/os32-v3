@@ -141,6 +141,8 @@ int ext2_sync(Ext2Ctx *c) { (void)c; return 0; }
 /* D6's write-only inode boundary is linked by ext2_file.c but must never be
  * entered by this read-only fixture. Fail loudly if a read crosses it. */
 static int unexpected_write(void) { CHECK(0); return EXT2_ERR_IO; }
+int ext2_write_data_blocks(Ext2Ctx *c, u32 b, u32 n, const void *p)
+{ (void)c; (void)b; (void)n; (void)p; return unexpected_write(); }
 void ext2_read_cache_reset(void) { ext2_data_cache_reset(); }
 int ext2_write_release_blocks(Ext2Ctx *c, const u32 *b)
 { (void)c; (void)b; return unexpected_write(); }
