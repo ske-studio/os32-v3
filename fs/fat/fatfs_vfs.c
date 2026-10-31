@@ -37,12 +37,15 @@
 #define FAT_BPS_LARGE 1024
 #define FAT_UPPER_EXT_FIRST 0x80
 
+#include "fatfs_vfs_read_cache.inc"
+
 /* ======== FatFs VFSコンテキスト ======== */
 typedef struct {
     FATFS  fatfs;     /* FatFsワークエリア */
     int    dev_id;    /* OS32デバイスID */
     BYTE   pdrv;      /* FatFs物理ドライブ番号 */
     char   vol[FAT_VOLUME_NAME_CAP];    /* ボリューム文字列 "0:" or "1:" */
+    FatReadCache read_cache;
 } FatFsCtx;
 
 /* 物理ドライブ占有フラグ (pdrv 0=FDD, 1=HDD)。
@@ -78,6 +81,7 @@ static int ff_to_vfs(FRESULT fr)
 static int ff_write_result(FatFsCtx *fc, FRESULT fr)
 {
     if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {
+        rc_invalidate_all(&fc->read_cache);
         f_mount(0, fc->vol, 0);
         (void)f_mount(&fc->fatfs, fc->vol, 1);
     }
@@ -207,30 +211,21 @@ static int fatfs_vfs_list(void *ctx, const char *path, vfs_dir_cb cb, void *user
 }
 
 
-/* 一括は seek せず、stream は offset が 0 でも seek する。 */
+/* 保持 FIL を要求位置へ合わせる。一括の要求位置は常に 0。 */
 static int ff_read_file(void *ctx, const char *path, void *buf, u32 size,
                         u32 offset, int stream)
 {
     FatFsCtx *fc = (FatFsCtx *)ctx;
     int rc_path;
     char fpath[VFS_MAX_PATH];
-    FIL fil;
     FRESULT fr;
     UINT br;
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
 
-    fr = f_open(&fil, fpath, FA_READ);
-    if (fr != FR_OK) return ff_to_vfs(fr);
-
-    if (stream) {
-        fr = f_lseek(&fil, (FSIZE_t)offset);
-        if (fr != FR_OK) { f_close(&fil); return ff_to_vfs(fr); }
-    }
-
-    fr = f_read(&fil, buf, size, &br);
-    f_close(&fil);
+    fr = rc_read(&fc->read_cache, fc->dev_id, fpath, buf, size,
+                 stream ? (FSIZE_t)offset : 0, &br);
 
     if (fr != FR_OK) return ff_to_vfs(fr);
     return (int)br;
@@ -258,6 +253,7 @@ static int ff_write_file(void *ctx, const char *path, const void *data, u32 size
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
 
+    rc_invalidate_all(&fc->read_cache);
     fr = f_open(&fil, fpath, FA_WRITE | (stream ? FA_OPEN_ALWAYS : FA_CREATE_ALWAYS));
     if (fr != FR_OK) return ff_write_result(fc, fr);
 
@@ -297,6 +293,7 @@ static int fatfs_vfs_unlink(void *ctx, const char *path)
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
+    rc_invalidate_all(&fc->read_cache);
     return ff_write_result(fc, f_unlink(fpath));
 }
 
@@ -310,6 +307,7 @@ static int fatfs_vfs_mkdir(void *ctx, const char *path)
 
     rc_path = ff_make_path(fc, path, fpath, sizeof(fpath));
     if (rc_path != VFS_OK) return rc_path;
+    rc_invalidate_all(&fc->read_cache);
     return ff_write_result(fc, f_mkdir(fpath));
 }
 
@@ -332,6 +330,7 @@ static int fatfs_vfs_rmdir(void *ctx, const char *path)
     fr = f_stat(fpath, &fno);
     if (fr != FR_OK) return ff_stat_to_vfs(fr);
     if (!(fno.fattrib & AM_DIR)) return VFS_ERR_NOTDIR;
+    rc_invalidate_all(&fc->read_cache);
     return ff_write_result(fc, f_unlink(fpath));
 }
 
@@ -348,6 +347,7 @@ static int fatfs_vfs_rename(void *ctx, const char *old_path, const char *new_pat
     if (rc_path != VFS_OK) return rc_path;
     rc_path = ff_make_path(fc, new_path, fpath_new, sizeof(fpath_new));
     if (rc_path != VFS_OK) return rc_path;
+    rc_invalidate_all(&fc->read_cache);
     return ff_write_result(fc, f_rename(fpath_old, fpath_new));
 }
 
@@ -674,6 +674,7 @@ static void *fatfs_vfs_mount(int dev_id)
                 diskio_set_hdd_sector_size(bps);
             }
             /* unmount してからリトライ */
+            rc_drop_on_umount(&fc->read_cache);
             f_mount(0, fc->vol, 0);
             fr = f_mount(&fc->fatfs, fc->vol, 1);
         }
@@ -684,6 +685,7 @@ static void *fatfs_vfs_mount(int dev_id)
                 dev_type, drv_num, fc->pdrv, (int)fr);
         /* FatFs[] に登録済みの fc->fatfs を解除してから解放する
          * (解除しないと解放済み領域への参照が残る) */
+        rc_drop_on_umount(&fc->read_cache);
         f_mount((FATFS *)0, fc->vol, 0);
         kfree(fc);
         return (void *)0;
@@ -707,6 +709,7 @@ static void fatfs_vfs_umount(void *ctx)
     FatFsCtx *fc = (FatFsCtx *)ctx;
 
     if (fc) {
+        rc_drop_on_umount(&fc->read_cache);
         f_mount((FATFS *)0, fc->vol, 0); /* アンマウント */
         pdrv_busy[fc->pdrv] = 0;
         kfree(fc);

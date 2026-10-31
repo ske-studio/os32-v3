@@ -198,8 +198,7 @@ def font_bounds(img, spt=8, heads=2):
 
 
 def check_read_stream_shape():
-    """fatfs_vfs_read_stream が今も「開いて、動いて、読んで、閉じる」か。
-    font_replay はこの形を写して回すので、形が変われば試験を直す合図。"""
+    """VFS と font_replay が同じ製品 rc_read を通すことを確認する。"""
     src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
     def body(name):
         m = re.search(r"static int " + name + r"\(.*?\n\}", src, re.S)
@@ -210,12 +209,12 @@ def check_read_stream_shape():
     if "return ff_read_file(ctx, path, buf, max_size, 0, 0);" not in body("fatfs_vfs_read"):
         return False
     helper = body("ff_read_file")
-    if not re.search(r"if \(stream\) \{\s*fr = f_lseek\(&fil, \(FSIZE_t\)offset\);", helper):
-        return False
-    # f_close は f_lseek の失敗の枝にも出るので、最後のものを見る。
-    order = [helper.find("f_open("), helper.find("f_lseek("), helper.find("f_read("),
-             helper.rfind("f_close(")]
-    return all(x >= 0 for x in order) and order == sorted(order)
+    replay = HARNESS.read_text(encoding="utf-8")
+    return (re.search(r"rc_read\(&fc->read_cache,.*?stream \? \(FSIZE_t\)offset : 0, &br\)",
+                      helper, re.S) is not None
+            and '#include "fatfs_vfs_read_cache.inc"' in src
+            and '#include "../../fs/fat/fatfs_vfs_read_cache.inc"' in replay
+            and 'rc_read(&s_read_cache,' in replay)
 
 
 def check_irq_entry():
@@ -501,7 +500,8 @@ def host_build(tmp, mutated=None):
                      "drivers/block/fdc_transfer.inc",
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
-                     "fs/fat/fatfs/diskio.c"):
+                     "fs/fat/fatfs/diskio.c",
+                     "fs/fat/fatfs_vfs_read_cache.inc"):
             (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")

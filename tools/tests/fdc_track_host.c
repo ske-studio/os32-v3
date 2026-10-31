@@ -134,6 +134,17 @@ void kprintf(u8 attr, const char *fmt, ...)
 
 void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, n); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
+int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
+char *kstrncpy(char *dst, const char *src, u32 n)
+{
+    if (n) {
+        size_t len = strlen(src);
+        if (len >= n) len = n - 1;
+        memcpy(dst, src, len);
+        dst[len] = 0;
+    }
+    return dst;
+}
 
 /* HDD queries are isolated from the FD hardware model. */
 static int hdd_present, hdd_geometry_rc = -1, hdd_query_drive;
@@ -1711,11 +1722,14 @@ static void sis_edge_limit(void)
 /*  読み方: kernel/boot_font.c → drivers/video/kcg/kcg.c の kcg_load_font と           */
 /*  fs/vfs_fd.c / fs/fat/fatfs_vfs.c のとおり:                                  */
 /*    vfs_open        = stat + get_file_size (どちらも f_stat)               */
-/*    vfs_read_fd(16) = read_stream = f_open → f_lseek → f_read → f_close   */
+/*    vfs_read_fd(16) = read_stream = rc_read (製品の保持・位置調整)        */
 /*    vfs_get_size    = f_stat                                               */
 /*    kcg_read_chunked = 1024B ずつ read_stream                              */
-/*  read_stream の形が変わっていないことは Python 側が静的に見る。          */
+/*  read_stream と同じ製品 helper を使うことは Python 側が静的に見る。      */
 /* ======================================================================== */
+#include "vfs.h"
+#include "../../fs/fat/fatfs_vfs_read_cache.inc"
+static FatReadCache s_read_cache;
 static u8 *s_font;
 static long s_font_len;
 static const char *s_font_path;
@@ -1724,16 +1738,9 @@ static long s_seek_max, s_multi_max;
 
 static int replay_read_stream(void *buf, u32 size, u32 offset)
 {
-    FIL fil;
-    FRESULT fr;
     UINT br;
-
-    fr = f_open(&fil, s_font_path, FA_READ);
-    if (fr != FR_OK) return -1;
-    fr = f_lseek(&fil, (FSIZE_t)offset);
-    if (fr != FR_OK) { f_close(&fil); return -1; }
-    fr = f_read(&fil, buf, size, &br);
-    f_close(&fil);
+    FRESULT fr = rc_read(&s_read_cache, VFS_MOUNT_DEV_ENCODE(VFS_DEV_FD, 0),
+                         s_font_path, buf, size, offset, &br);
     if (fr != FR_OK) return -1;
     return (int)br;
 }
@@ -1801,6 +1808,8 @@ static void font_replay(void)
     CHECK(st.seek_timeout == 0);
     CHECK(st.single_reads == 0);
     CHECK(M.reads == (int)st.multi_ok);
+    rc_drop_on_umount(&s_read_cache);
+    CHECK(f_mount(NULL, "0:", 0) == FR_OK);
 }
 
 static u8 *load_file(const char *env, long *len)
