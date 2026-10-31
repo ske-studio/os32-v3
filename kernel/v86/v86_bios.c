@@ -70,20 +70,22 @@ u32 v86_disklog[V86_DISKLOG_N * V86_DISKLOG_WORDS];
  * 定常ループも同じログの中に残る。 */
 #define DISKLOG_LOOKBACK    4
 
-static void disklog(u32 *frame, u32 ax_in, u32 phys, u32 done, u32 result)
+/* 出力レジスタへ書き換える前に呼び出し引数を保存する。 */
+static void disklog_begin(u32 *rec, const u32 *frame)
 {
-    u32 rec[V86_DISKLOG_RESULT];
-    u32 *e;
-    u32 back;
-    int i;
-
-    /* AX は処理の中で AH (ステータス) を書き換えるので、
-     * 呼び出し時点の値を別に受け取る。 */
-    rec[V86_DISKLOG_AX] = ax_in;
+    rec[V86_DISKLOG_AX] = frame[V86F_EAX] & U16_MAX;
     rec[V86_DISKLOG_CX] = frame[V86F_ECX] & U16_MAX;
     rec[V86_DISKLOG_DX] = frame[V86F_EDX] & U16_MAX;
     rec[V86_DISKLOG_BX] = frame[V86F_EBX] & U16_MAX;
     rec[V86_DISKLOG_ADDRESS] = ((frame[V86F_ES] & U16_MAX) << X86_REAL_SEG_SHIFT) + (frame[V86F_EBP] & U16_MAX);
+}
+
+static void disklog(u32 *rec, u32 phys, u32 done, u32 result)
+{
+    u32 *e;
+    u32 back;
+    int i;
+
     rec[V86_DISKLOG_PHYS] = phys;
     rec[V86_DISKLOG_DONE] = done;
 
@@ -139,7 +141,7 @@ static u32 xfer_done = 0;
  * 正解は NP21/W の src/bios/bios1b.c にそのまま書いてあった。
  * **INT 1Bh の仕様は FDC の仕様ではない。BIOS 側のソースを読むこと。**
  */
-static u8 cur_cyl  = 0;
+static u8 cur_cyl[V86_DRIVE_MAX];
 static u8 cur_head = 0;      /* SEEK の DH。実際には使わないが観測用に残す */
 
 /* READ ID がトラック内のどこまで返したか (実機の fdc.crcn)。
@@ -318,7 +320,9 @@ void v86_bios_setup(void)
     bios_last_vec = 0;
 
     /* 電源投入直後のドライブはトラック 0 に居る */
-    cur_cyl  = 0;
+    for (u32 i = 0; i < V86_DRIVE_MAX; i++) {
+        cur_cyl[i] = 0;
+    }
     cur_head = 0;
     cur_id_idx = 0;
     v86_disk_seek_n = 0;

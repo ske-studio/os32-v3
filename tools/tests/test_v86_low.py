@@ -53,7 +53,36 @@ MUTATIONS += (
      '    if (!pgalloc_alloc_phys(owner, 159)) return -2;', 'old-backing-allocation'),
 )
 
+# Keep BIOS fragments separate so each mutant is compiled through the real include.
+MUTATIONS += (
+    ('kernel/v86/v86_bios_fdd_command.inc',
+     'if (loop_dev_get_format(cur_fdd_slot) == LOOP_FMT_D88) {\n        if (loop_dev_track_id_d88',
+     'if (loop_dev_get_format(V86_DISK_SLOT) == LOOP_FMT_D88) {\n        if (loop_dev_track_id_d88', 'bios-format-slot'),
+    ('kernel/v86/v86_bios_fdd_command.inc',
+     '        cur_cyl[cur_fdd_slot]  = 0;', '        cur_cyl[0]  = 0;', 'bios-drive-cylinder'),
+    ('kernel/v86/v86_bios.c',
+     '    for (u32 i = 0; i < V86_DRIVE_MAX; i++) {\n        cur_cyl[i] = 0;\n    }', '', 'bios-cylinder-reset'),
+    ('kernel/v86/v86_bios_fdd_command.inc',
+     'cur_cyl[cur_fdd_slot] >= cyls', 'cur_cyl[cur_fdd_slot] >= (u8)cyls', 'bios-wide-geometry'),
+    ('kernel/v86/v86_bios_fdd_command.inc',
+     'V86_FDC_HEAD((frame[V86F_EDX] >> 8) & U8_MAX, ax_in & U8_MAX)',
+     'V86_FDC_HEAD((ax_in >> 8) & U8_MAX, ax_in & U8_MAX)', 'bios-log-head'),
+    ('kernel/v86/v86_bios_sasi.inc',
+     '    disklog(log_in, pos & 0xFFFFFFU, xfer_done,',
+     '    disklog_begin(log_in, frame);\n    disklog(log_in, pos & 0xFFFFFFU, xfer_done,', 'bios-sasi-log-input'),
+    ('kernel/v86/v86_bios_fdd_command.inc',
+     '    disklog(log_in, phys_in, xfer_done,',
+     '    disklog_begin(log_in, frame);\n    disklog(log_in, phys_in, xfer_done,', 'bios-fdd-log-input'),
+)
+
 EXPECTED = {
+    'bios-format-slot': 'BIOS second RAW READ ID',
+    'bios-drive-cylinder': 'BIOS per-drive SEEK RECAL',
+    'bios-cylinder-reset': 'BIOS setup resets first cylinder',
+    'bios-wide-geometry': 'BIOS FDI wide geometry first ID',
+    'bios-log-head': 'BIOS physical log uses DH',
+    'bios-sasi-log-input': 'BIOS SASI log input registers',
+    'bios-fdd-log-input': 'BIOS READ ID log input registers',
     'old-low-reservation': 'boot low reservation registration',
     'low-owner': 'single FIXED kernel WB all 160 PFNs',
     'low-end-PFN': 'single FIXED kernel WB all 160 PFNs',
@@ -89,7 +118,8 @@ def check_generated_map():
 def main():
     check_generated_map()
     paths = ('include/platform_emergency.h', 'platform/pc98/emergency.c', 'mm/paging.c', 'kernel/v86/v86_mem.c', 'kernel/v86/v86_bios.c', 'kernel/v86/v86_snapshot.c', 'kernel/time/sysclk.c', 'platform/pc98/clock.c', 'drivers/input/kbd.c', 'mm/memory_boot.c')
-    sources = {p: paging_source(ROOT / p) for p in (*paths,
+    sources = {p: ((ROOT / p).read_text() if p == 'kernel/v86/v86_bios.c'
+                   else paging_source(ROOT / p)) for p in (*paths,
         'kernel/v86/v86_bios_fdd_read.inc', 'kernel/v86/v86_bios_fdd_command.inc',
         'kernel/v86/v86_bios_sasi.inc')}
     with tempfile.TemporaryDirectory(prefix='v86-low-') as td:

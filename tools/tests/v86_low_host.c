@@ -123,6 +123,235 @@ void v86_runtime_end(void) { v86_session.active = v86_session.running = 0; }
 void gfx_v86_return(void) { CHECK(!kctx_exc_depth && !v86_session.open, "normal release"); releases++; }
 void kselftest_audit_v86_return(void) {}
 void loop_dev_detach(int slot) { (void)slot; }
+/* BIOS disk HLE is real; loop/VFS are deterministic image-I/O substitutes. */
+static struct {
+    int format;
+    u16 cyls, bps;
+    u8 heads, spt;
+} bios_images[V86_DRIVE_MAX];
+static u32 bios_io_calls, bios_failures, bios_d88_cyl, bios_d88_head;
+static u32 bios_frame[32];
+#define BIOS_CHECK(c, s) do { if (!(c)) { SAY("FAIL " s); bios_failures++; } } while (0)
+int loop_dev_attach(const char *path, int slot) {
+    bios_images[slot].format = path[0] == 'd' ? LOOP_FMT_D88 :
+                              path[0] == 'h' ? LOOP_FMT_HDI : LOOP_FMT_RAW;
+    bios_images[slot].cyls = path[0] == 'h' ? 615 : 80;
+    bios_images[slot].heads = path[0] == 'h' ? 4 : 2;
+    bios_images[slot].spt = path[0] == 'h' ? 17 : 8;
+    bios_images[slot].bps = 512;
+    return 0;
+}
+int loop_dev_get_format(int slot) { return bios_images[slot].format; }
+int loop_dev_is_hdd(int slot) { return bios_images[slot].format == LOOP_FMT_HDI; }
+int loop_dev_is_writable(int slot) { (void)slot; return 1; }
+int loop_dev_get_geometry(int slot, u16 *c, u8 *h, u8 *s, u16 *b, u32 *t) {
+    *c = bios_images[slot].cyls; *h = bios_images[slot].heads;
+    *s = bios_images[slot].spt; *b = bios_images[slot].bps;
+    *t = (u32)*c * *h * *s;
+    return 0;
+}
+u8 loop_dev_get_sec_n(int slot) {
+    u8 n = 0;
+    while ((128U << n) < bios_images[slot].bps) n++;
+    return n;
+}
+int loop_dev_track_id_d88(int slot, u8 c, u8 h, u16 idx,
+                          u8 *ic, u8 *ih, u8 *ir, u8 *in, u16 *spt) {
+    bios_io_calls++;
+    if (bios_images[slot].format != LOOP_FMT_D88 ||
+        c >= bios_images[slot].cyls || h >= bios_images[slot].heads) return -1;
+    *ic = c + 10; *ih = h ^ 1; *ir = idx + 3;
+    *in = loop_dev_get_sec_n(slot); *spt = bios_images[slot].spt;
+    return 0;
+}
+u32 loop_dev_seek_d88(int slot, u8 c, u8 h, u8 ic, u8 ih, u8 ir,
+                      u32 *len, u16 *spt) {
+    bios_io_calls++;
+    if (bios_images[slot].format != LOOP_FMT_D88 || c != bios_d88_cyl ||
+        h != bios_d88_head || ic != 0 || ih != 1 || ir != 1) return 0;
+    *len = bios_images[slot].bps; *spt = bios_images[slot].spt;
+    return 128;
+}
+int loop_dev_get_fd(int slot) { return slot; }
+int vfs_seek(int fd, int offset, int whence) {
+    (void)fd; (void)whence; return offset;
+}
+int vfs_read_fd(int fd, void *buf, u32 n) {
+    (void)fd; bios_io_calls++; kmemset(buf, 0x5a, n); return (int)n;
+}
+int loop_dev_read_chs(int slot, u16 c, u8 h, u8 s, void *buf) {
+    bios_io_calls++;
+    if (c >= bios_images[slot].cyls || h >= bios_images[slot].heads ||
+        s == 0 || s > bios_images[slot].spt) return -1;
+    kmemset(buf, 0x5a, bios_images[slot].bps);
+    return 0;
+}
+int loop_dev_write_chs(int slot, u16 c, u8 h, u8 s, const void *buf) {
+    bios_io_calls++;
+    BIOS_CHECK(((const u8 *)buf)[0] == 0x5a, "BIOS write payload");
+    return c < bios_images[slot].cyls && h < bios_images[slot].heads &&
+           s && s <= bios_images[slot].spt ? 0 : -1;
+}
+int loop_dev_read_lba(int slot, u32 lba, u32 n, void *buf) {
+    (void)lba; bios_io_calls++; kmemset(buf, 0x5a, n * bios_images[slot].bps); return 0;
+}
+int loop_dev_write_lba(int slot, u32 lba, u32 n, const void *buf) {
+    (void)slot; (void)lba; (void)n; (void)buf; bios_io_calls++; return 0;
+}
+static u32 *bios_call(u32 ax, u32 cx, u32 dx, u32 bx) {
+    kmemset(bios_frame, 0, sizeof(bios_frame));
+    bios_frame[V86F_EAX] = 0xabcd0000 | ax;
+    bios_frame[V86F_ECX] = 0x12340000 | cx;
+    bios_frame[V86F_EDX] = 0x56780000 | dx;
+    bios_frame[V86F_EBX] = 0x9abc0000 | bx;
+    bios_frame[V86F_ES] = 0x2000;
+    bios_frame[V86F_EBP] = 0x40;
+    v86_bios_dispatch(bios_frame, BIOS_INT_DISK);
+    return &v86_disklog[((v86_disklog_w - 1) % V86_DISKLOG_N) * V86_DISKLOG_WORDS];
+}
+static int bios_ok(void) { return !(bios_frame[V86F_EFLAGS] & 1); }
+static void bios_pair(const char *first, const char *second) {
+    BIOS_CHECK(!v86_bios_attach_disk(first), "BIOS first attach");
+    if (second) BIOS_CHECK(!v86_bios_attach_second(second), "BIOS second attach");
+    v86_bios_setup();
+}
+static void bios_disk_cases(void) {
+    u32 *log;
+    /* Different formats in both orders, including an HDD boot image. */
+    bios_pair("d88", "raw");
+    bios_call(0x0a91, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xffff) == 0x200 &&
+               (bios_frame[V86F_EDX] & 0xffff) == 1, "BIOS second RAW READ ID");
+    bios_pair("raw", "d88");
+    bios_call(0x0a91, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xffff) == 0x20a &&
+               (bios_frame[V86F_EDX] & 0xffff) == 0x103, "BIOS second D88 READ ID");
+    bios_pair("hdd", "d88");
+    bios_call(0x0a90, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 10,
+               "BIOS HDD boot second D88 READ ID");
+
+    bios_pair("raw", "raw");
+    bios_call(0x0090, 7, 0, 0);
+    bios_call(0x0091, 3, 0, 0);
+    bios_call(0x0791, 0, 0, 0);
+    log = bios_call(0x0a90, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 7,
+               "BIOS per-drive SEEK RECAL");
+    BIOS_CHECK(log[V86_DISKLOG_PHYS] == 7, "BIOS per-drive physical log");
+    /* Every implicit-seek command updates only the selected drive. */
+    for (u32 cmd = 0; cmd < 4; cmd++) {
+        static const u32 seek_cmds[] = {0x1691, 0x1191, 0x1591, 0x1a91};
+        bios_call(seek_cmds[cmd], 0x205, 1, 0);
+        bios_call(0x0a91, 0, 0, 0);
+        BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 5,
+                   "BIOS selected implicit seek");
+        bios_call(0x0a90, 0, 0, 0);
+        BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 7,
+                   "BIOS implicit seek preserves other drive");
+    }
+    bios_pair("d88", "d88");
+    bios_call(0x0090, 7, 0, 0);
+    bios_call(0x0791, 0, 0, 0);
+    bios_d88_cyl = 7; bios_d88_head = 1;
+    bios_call(0x0690, 0x200, 0x101, 512);
+    BIOS_CHECK(bios_ok() && *(u8 *)0x20040 == 0x5a,
+               "BIOS per-drive D88 physical read");
+    bios_call(0x0091, 9, 0, 0);
+    v86_bios_setup();
+    bios_call(0x0a90, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 10, "BIOS setup resets first cylinder");
+    bios_call(0x0a91, 0, 0, 0);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 10, "BIOS setup resets second cylinder");
+
+    bios_pair("raw", 0);
+    bios_images[0].format = LOOP_FMT_FDI;
+    for (u32 c = 255; c <= 257; c++) {
+        bios_images[0].cyls = c;
+        bios_call(0x1a90, 0, 0, 0);
+        BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 0, "BIOS FDI wide geometry first ID");
+        bios_call(0x1a90, 254, 0, 0);
+        BIOS_CHECK(bios_ok() && (bios_frame[V86F_ECX] & 0xff) == 254, "BIOS FDI wide geometry low ID");
+    }
+    bios_images[0].cyls = 255;
+    bios_call(0x1a90, 255, 0, 0);
+    BIOS_CHECK(!bios_ok() && ((bios_frame[V86F_EAX] >> 8) & 0xff) == 0xe0,
+               "BIOS FDI true cylinder limit");
+
+    bios_pair("raw", 0);
+    for (u32 odd = 0; odd < 2; odd++) {
+        for (u32 dh = 0; dh < 2; dh++) {
+            for (u32 bit2 = 0; bit2 < 2; bit2++) {
+                log = bios_call((odd ? 0x0190 : 0x0690) | (bit2 << 2),
+                                0x200, (dh << 8) | 1, 512);
+                BIOS_CHECK(bios_ok() && log[V86_DISKLOG_PHYS] == ((dh ^ bit2) << 8),
+                           "BIOS physical log uses DH");
+            }
+        }
+    }
+    bios_pair("hdd", 0);
+    log = bios_call(0x8480, 0x33, 0x44, 0x55);
+    BIOS_CHECK(bios_ok() && (bios_frame[V86F_EBX] & 0xffff) == 512 &&
+               (bios_frame[V86F_ECX] & 0xffff) == 615 &&
+               (bios_frame[V86F_EDX] & 0xffff) == 0x411, "BIOS SASI SENSE output");
+    BIOS_CHECK(log[V86_DISKLOG_AX] == 0x8480 && log[V86_DISKLOG_CX] == 0x33 &&
+               log[V86_DISKLOG_DX] == 0x44 && log[V86_DISKLOG_BX] == 0x55 &&
+               log[V86_DISKLOG_ADDRESS] == 0x20040, "BIOS SASI log input registers");
+    bios_pair("raw", 0);
+    log = bios_call(0x0a90, 0x3333, 0x4400, 0x55);
+    BIOS_CHECK(bios_ok() && log[V86_DISKLOG_CX] == 0x3333 &&
+               log[V86_DISKLOG_DX] == 0x4400 && log[V86_DISKLOG_BX] == 0x55,
+               "BIOS READ ID log input registers");
+    u32 logged = v86_disklog_w;
+    bios_call(0x0a90, 0x3333, 0x4400, 0x55);
+    BIOS_CHECK(v86_disklog_w == logged && log[V86_DISKLOG_RESULT] == 2 * V86_DISKLOG_REPEAT_ONE,
+               "BIOS log repeats compare inputs");
+
+    /* N=0..3 and masked N, real transfer, mismatch, partial and zero DONE. */
+    for (u32 n = 0; n < 4; n++) {
+        bios_pair("raw", 0);
+        bios_images[0].bps = 128U << n;
+        bios_images[0].format = (n & 1) ? LOOP_FMT_FDI : LOOP_FMT_RAW;
+        for (u32 write = 0; write < 2; write++) {
+            u32 ax = write ? 0x0590 : 0x0690;
+            log = bios_call(ax, ((n | 0xfc) << 8), 1, (128U << n) + 1);
+            BIOS_CHECK(bios_ok() && log[V86_DISKLOG_DONE] == (128U << n) + 1,
+                       "BIOS N transfer and partial sector");
+            log = bios_call(ax, n << 8, 1, 0);
+            BIOS_CHECK(bios_ok() && log[V86_DISKLOG_DONE] == 0, "BIOS zero count DONE reset");
+            log = bios_call(ax, n << 8, 8, (128U << n) + 1);
+            BIOS_CHECK(!bios_ok() && log[V86_DISKLOG_DONE] == (128U << n),
+                       "BIOS partial failure DONE");
+            log = bios_call(ax, ((n + 1) & 3) << 8, 1, 1);
+            BIOS_CHECK(!bios_ok() && log[V86_DISKLOG_DONE] == 0 &&
+                       log[V86_DISKLOG_RESULT] % 256 == V86_DISK_FAIL_SECTOR_SIZE,
+                       "BIOS bps mismatch DONE reset");
+        }
+        log = bios_call(0x0090, 0, 0, 0);
+        BIOS_CHECK(bios_ok() && log[V86_DISKLOG_DONE] == 0, "BIOS SEEK DONE reset");
+    }
+    for (u32 attached = 0; attached < 2; attached++) {
+        bios_pair("raw", 0);
+        if (!attached) v86_bios_detach_disk();
+        for (u32 cmd = 0; cmd < 3; cmd++) {
+            static const u32 cmds[] = {0x0690, 0x0190, 0x0590};
+            u32 fails = v86_disk_fail_n, calls = bios_io_calls;
+            log = bios_call(cmds[cmd] | (attached ? 1 : 0), 0x200, 1, 512);
+            BIOS_CHECK(!bios_ok() && v86_disk_fail_n == fails + 1 &&
+                       v86_disk_fail_why == V86_DISK_FAIL_NO_DEVICE &&
+                       log[V86_DISKLOG_DONE] == 0 && bios_io_calls == calls,
+                       "BIOS absent unit rejected once before IO");
+        }
+        u32 fails = v86_disk_fail_n;
+        bios_call(0x0390 | (attached ? 1 : 0), 0, 0, 0);
+        BIOS_CHECK(bios_ok() && v86_disk_fail_n == fails, "BIOS absent INIT succeeds");
+    }
+    v86_bios_detach_disk();
+    kmemcpy(P2V(0), v86_bios_real_lowmem(), PAGE_SIZE);
+    CHECK(!bios_failures, "BIOS disk regressions");
+    SAY("GREEN BIOS disk cases: formats / drive positions / geometry / call logs / transfers / absent units");
+}
+
 static u32 saved_pt[MEM_1MB / PAGE_SIZE], saved_pde, caller_pd[PDE_COUNT] __attribute__((aligned(PAGE_SIZE)));
 static u8 original(u32 a) { return (u8)(a ^ (a >> 8) ^ 0x39); }
 static u8 mailbox_byte(u32 a) { return (u8)(a * 17 + 3); }
@@ -209,6 +438,7 @@ void _start(void) {
     host_map_fixed_paging();
     for (u32 i = 0; i < PAGE_SIZE; i++) *(volatile u8 *)P2V(i) = original(i);
     v86_bios_save_real();
+    bios_disk_cases();
     paging_init(16384);
     host_pool_boot(16384);
 #include "low_reservation.inc"

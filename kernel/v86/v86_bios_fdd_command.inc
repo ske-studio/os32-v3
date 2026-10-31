@@ -23,21 +23,14 @@ static void disk_write(u32 *frame)
     static u8 secbuf[V86_SECTOR_BUFFER_BYTES];
 
     if (ah & BIOS_DISK_CMD_SEEK) {
-        cur_cyl = (u8)cyl;
+        cur_cyl[cur_fdd_slot] = (u8)cyl;
     }
     phys_head = V86_FDC_HEAD(head, frame[V86F_EAX] & U8_MAX);
 
     v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
     v86_disk_fail_len = (n << 16) | count;
     v86_disk_fail_dst = src;
-    xfer_done = 0;
 
-    if (!disk_attached) {
-        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
-        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
-        bios_set_cf(frame, 1);
-        return;
-    }
     if (count == 0) {
         bios_set_ah(frame, 0x00);
         bios_set_cf(frame, 0);
@@ -74,7 +67,7 @@ static void disk_write(u32 *frame)
         return;
     }
     seclen = (unsigned long)BIOS_SECTOR_BASE_BYTES << (n & BIOS_SECTOR_N_MASK);
-    if (seclen != (u32)bps || seclen > sizeof(secbuf)) {
+    if (seclen != (u32)bps) {
         v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
         bios_set_ah(frame, V86_DISK_ST_RANGE);
         bios_set_cf(frame, 1);
@@ -163,7 +156,7 @@ static void disk_readid(u32 *frame)
     u16 trk_spt = 0;
 
     if (ah & BIOS_DISK_CMD_SEEK) { /* AH bit4 = シーク付き */
-        cur_cyl = (u8)cyl;
+        cur_cyl[cur_fdd_slot] = (u8)cyl;
     }
     head = V86_FDC_HEAD((frame[V86F_EDX] >> 8) & U8_MAX, al);
 
@@ -174,8 +167,8 @@ static void disk_readid(u32 *frame)
         return;
     }
 
-    if (loop_dev_get_format(V86_DISK_SLOT) == LOOP_FMT_D88) {
-        if (loop_dev_track_id_d88(cur_fdd_slot, cur_cyl, (u8)head,
+    if (loop_dev_get_format(cur_fdd_slot) == LOOP_FMT_D88) {
+        if (loop_dev_track_id_d88(cur_fdd_slot, cur_cyl[cur_fdd_slot], (u8)head,
                                   (u16)cur_id_idx,
                                   &id_c, &id_h, &id_r, &id_n,
                                   &trk_spt) != 0) {
@@ -187,12 +180,12 @@ static void disk_readid(u32 *frame)
         spt = (u8)trk_spt;
     } else {
         /* RAW/FDI は全トラック同じ書式。ID は物理位置そのもの。 */
-        if (cur_cyl >= (u8)cyls || head >= (u32)heads) {
+        if (cur_cyl[cur_fdd_slot] >= cyls || head >= (u32)heads) {
             bios_set_ah(frame, V86_DISK_ST_ID_NOT_FOUND);
             bios_set_cf(frame, 1);
             return;
         }
-        id_c = cur_cyl;
+        id_c = cur_cyl[cur_fdd_slot];
         id_h = (u8)head;
         id_r = (u8)(cur_id_idx + 1);
         id_n = loop_dev_get_sec_n(cur_fdd_slot);
@@ -215,10 +208,13 @@ static void bios_fdd_int1b(u32 *frame)
 {
     u32 cmd = (frame[V86F_EAX] >> 8) & BIOS_DISK_CMD_MASK;   /* AH の下位ニブル */
     u32 ax_in = frame[V86F_EAX] & U16_MAX;
-    u32 phys_in = ((u32)V86_FDC_HEAD((ax_in >> 8) & U8_MAX, ax_in & U8_MAX) << 8)
-                  | cur_cyl;
+    int slot = daua_to_slot(ax_in & U8_MAX);
+    u32 phys_in = ((u32)V86_FDC_HEAD((frame[V86F_EDX] >> 8) & U8_MAX, ax_in & U8_MAX) << 8)
+                  | cur_cyl[(slot >= 0) ? slot : V86_DISK_SLOT];
     u32 fails_before = v86_disk_fail_n;
-    int slot;
+    u32 log_in[V86_DISKLOG_RESULT];
+
+    disklog_begin(log_in, frame);
 
     xfer_done = 0;      /* SEEK 等でも「今回の転送量」が 0 になるように */
 
@@ -232,12 +228,11 @@ static void bios_fdd_int1b(u32 *frame)
      *
      * 初期化 (AH=03h) だけは実機も装置の有無を見ずに答えるので通す
      * (bios1b.c: `if ((CPU_AH & 0x0f) != 0x03) { ...ready チェック... }`)。 */
-    slot = daua_to_slot(ax_in & U8_MAX);
     if (cmd != V86_DISK_INIT && slot < 0) {
         v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
         bios_set_ah(frame, V86_DISK_ST_NOT_READY);
         bios_set_cf(frame, 1);
-        disklog(frame, ax_in, phys_in, 0, v86_disk_fail_why);
+        disklog(log_in, phys_in, 0, v86_disk_fail_why);
         return;
     }
     cur_fdd_slot = (slot >= 0) ? slot : V86_DISK_SLOT;
@@ -270,7 +265,7 @@ static void bios_fdd_int1b(u32 *frame)
          * 「ここに居る物理トラック上で ID を照合する」ためにこれを使う。
          * ヘッドも憶える — シリンダだけだと Ys の 3 番目のロードが
          * 物理トラック 0 を見に行って空振りする。 */
-        cur_cyl  = (u8)(frame[V86F_ECX] & U8_MAX);
+        cur_cyl[cur_fdd_slot]  = (u8)(frame[V86F_ECX] & U8_MAX);
         /* DH はそのまま憶える。**1 ビットにマスクしてはいけない。**
          * 実測で DH=3 の SEEK が来ることがあり、マスクするとヘッド 1 の
          * 別トラックが「それらしく」読めてしまう。ID は合っているので
@@ -279,14 +274,14 @@ static void bios_fdd_int1b(u32 *frame)
          * 自分で DH=0 に直して読み直す。その結果が正しい。 */
         cur_head = (u8)((frame[V86F_EDX] >> 8) & U8_MAX);
         v86_disk_seek_n++;
-        v86_disk_seek_cyl = ((u32)cur_head << 8) | cur_cyl;
+        v86_disk_seek_cyl = ((u32)cur_head << 8) | cur_cyl[cur_fdd_slot];
         bios_set_ah(frame, 0x00);
         bios_set_cf(frame, 0);
         break;
 
     case V86_DISK_RECAL:
         /* トラック 0 へ戻す */
-        cur_cyl  = 0;
+        cur_cyl[cur_fdd_slot]  = 0;
         cur_head = 0;
         v86_disk_seek_n++;
         v86_disk_seek_cyl = 0;
@@ -307,7 +302,7 @@ static void bios_fdd_int1b(u32 *frame)
         break;
     }
 
-    disklog(frame, ax_in, phys_in, xfer_done,
+    disklog(log_in, phys_in, xfer_done,
             (v86_disk_fail_n != fails_before) ? v86_disk_fail_why
           : ((frame[V86F_EFLAGS] & 1UL) ? V86_DISKLOG_CF_ERROR : 0U));
 }

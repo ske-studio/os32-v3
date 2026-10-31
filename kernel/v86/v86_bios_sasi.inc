@@ -162,6 +162,7 @@ static void bios_sasi_int1b(u32 *frame)
 {
     u32 cmd = (frame[V86F_EAX] >> 8) & BIOS_DISK_CMD_MASK;
     u32 ax_in = frame[V86F_EAX] & U16_MAX;
+    u32 log_in[V86_DISKLOG_RESULT];
     u32 fails_before = v86_disk_fail_n;
     u32 ret;
     u32 pos = 0;
@@ -170,6 +171,7 @@ static void bios_sasi_int1b(u32 *frame)
     u8 heads = 0, spt = 0;
     u32 total_lba = 0;
 
+    disklog_begin(log_in, frame);
     xfer_done = 0;
 
     /* INIT 以外は装置の有無を先に見る (sasibios_operate と同じ)。 */
@@ -177,13 +179,13 @@ static void bios_sasi_int1b(u32 *frame)
     if (cmd == V86_DISK_INIT) {
         ret = sasi_init();
         sasi_done(frame, ret);
-        disklog(frame, ax_in, 0, 0, 0);
+        disklog(log_in, 0, 0, 0);
         return;
     }
     if (slot < 0 || !loop_dev_is_hdd(slot)) {
         v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
         sasi_done(frame, V86_DISK_ST_NOT_READY);
-        disklog(frame, ax_in, 0, 0, v86_disk_fail_why);
+        disklog(log_in, 0, 0, v86_disk_fail_why);
         return;
     }
     loop_dev_get_geometry(slot, &cyls, &heads, &spt, &bps, &total_lba);
@@ -217,7 +219,7 @@ static void bios_sasi_int1b(u32 *frame)
     }
 
     sasi_done(frame, ret);
-    disklog(frame, ax_in, pos & 0xFFFFFFU, xfer_done,
+    disklog(log_in, pos & 0xFFFFFFU, xfer_done,
             (v86_disk_fail_n != fails_before) ? v86_disk_fail_why
           : ((ret >= BIOS_DISK_STATUS_ERROR_MIN) ? V86_DISKLOG_CF_ERROR : 0U));
 }
