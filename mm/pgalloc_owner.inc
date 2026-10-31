@@ -179,7 +179,7 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
     ledger_note(LEDGER_OP_ALLOC, owner, LEDGER_CALLER());
     ok = n > 0 && alloc_owner(owner, (u32)n,
                               MEM_SHM_RESV_START / PAGE_SIZE,
-                              generic_end, LEDGER_BOTTOM_UP, &pfn);
+                              limit_pfn, LEDGER_BOTTOM_UP, &pfn);
     irq_restore(flags);
     return ok ? pfn * PAGE_SIZE : 0;
 }

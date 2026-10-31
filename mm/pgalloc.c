@@ -13,7 +13,7 @@
  * configuration boots through the model path. */
 #define WORKSPACE_WORDS (BITMAP_WORDS(PHYSMEM_LEGACY_MAX_PFN))
 static u32 *eligible, *bitmap;
-static u32 limit_pfn, generic_end, total_pages, used_pages;
+static u32 limit_pfn, total_pages, used_pages;
 static int initialized;
 static int online, model_mode;
 static u32 workspace_first, workspace_end;
@@ -133,13 +133,16 @@ static u32 model_limit(const struct physmem *m)
     }
     return end == PHYSMEM_MAX_PFN ? limit : 0;
 }
-u32 pgalloc_metadata_bytes(const struct physmem *m)
+static u32 metadata_bytes(u32 limit)
 {
-    u32 limit, bytes;
-    limit = model_limit(m);
+    u32 bytes;
     if (!limit) return 0;
     bytes = PGALLOC_META_BYTES(limit);
     return (bytes + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+}
+u32 pgalloc_metadata_bytes(const struct physmem *m)
+{
+    return metadata_bytes(model_limit(m));
 }
 /* 全ページが L0 で RESERVED (RAM ではない) か。FIXED 型の backing の条件。 */
 static int all_reserved(const struct physmem *m, u32 first, u32 end)
@@ -162,14 +165,14 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
                       int (*verify)(u32, u32, void *))
 {
     struct physmem next;
-    u32 bytes, pages, limit, addr, model_addr, lo, hi;
+    u32 bytes, pages, limit, addr, model_addr, lo, hi, initial_end;
     unsigned int flags;
     int ok;
     flags = irq_save();
     ok = 0;
     if (initialized || !m || !backing || !verify) goto done;
     limit = model_limit(m);
-    bytes = pgalloc_metadata_bytes(m);
+    bytes = metadata_bytes(limit);
     addr = (u32)backing;
     model_addr = (u32)m;
     if (!bytes || capacity < bytes || (addr & (PAGE_SIZE - 1)) ||
@@ -219,7 +222,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
     /* Never zero before all RAM reservations and mapping checks succeed. */
     /* DMA splits RAM eligibility, but ARENA_TOP placement still uses the
      * detected low tail. freeze later finds DMA's kernel PERSIST ownership. */
-    generic_end = dma ? (kind == PGALLOC_BACKING_ARENA_TOP ? ws_first :
+    initial_end = dma ? (kind == PGALLOC_BACKING_ARENA_TOP ? ws_first :
                         physmem_legacy_end(m)) : physmem_legacy_end(&next);
     *m = next;
     init_core(&next, (u32 *)backing, limit);
@@ -235,7 +238,7 @@ static int init_model(struct physmem *m, void *backing, u32 capacity,
                                     (MEM_DMA_POOL_END + 1) / PAGE_SIZE,
                                     LEDGER_CACHE_WB, LEDGER_RF_PERMANENT)) goto done;
     }
-    arena_end = generic_end;
+    arena_end = initial_end;
     workspace_first = ws_first;
     workspace_end = ws_end;
     model_mode = 1;
@@ -331,7 +334,6 @@ int pgalloc_stage_online(void)
             !paging_verify_identity(first, p - first, P2V(first * PAGE_SIZE)))
             goto done;
     }
-    generic_end = limit_pfn;
     online = 1;
     ok = 1;
 done:
