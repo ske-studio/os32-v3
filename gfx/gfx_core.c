@@ -363,99 +363,16 @@ void gfx_clear_planar_pages(u32 plane_size)
     kmemset((u8 *)P2V(VRAM_PLANE_I), 0, plane_size);
 }
 
+#include "gfx_core_init.inc"
+
 void gfx_init(void)
 {
-    gfx_init_gen++;
-    /* ⑤: GDC 初期化より前にバックエンドを決める */
-    int initialized = gfx_select_and_init_backend(0);
-    if (initialized < 0) return;
-    if (initialized) {
-        gfx_reinit_surfaces(1);
-        gfx_started = bb[0] != 0;
-        if (g_backend->enter) g_backend->enter();
-        gfx_diag_init();
-        return;   /* 9821 等: モード設定もバックバッファも init() が済ませた */
-    }
-
-    gfx_current_height = gfx_backend_mode(g_backend)->height;  /* selected planar mode */
-    gfx_display_page = 0;
-    prev_dirty.count = 0;
-
-    gfx_bind_client();
-    if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
-    _gfx_common_init(GFX_PLANE_SZ);
-
-    /* GDC CSRFORM: L/R=0 (400ライン) */
-    _out(GDC_GFX_CMD, GDC_GFX_400LINE);
-    _out(GDC_GFX_PARAM, 0x00);
-    _out(MODE_FF1_PORT, MFF1_HIRES);
-
-    _out(GDC_GFX_CMD, GDC_CMD_START);
-
-    gfx_clear_planar_pages(GFX_PLANE_SZ);
-
-    /* ページ0を表示、ページ1に描画 */
-    _out(GDC_DISP_PAGE, GDC_PAGE_0);
-    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
-    gfx_flip_enabled = 1;
-
-    palette_init();
-    gfx_scroll_init();
-    gfx_reinit_surfaces(1);
-    gfx_started = 1;
-
-    /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
-    if (g_backend && g_backend->enter) g_backend->enter();
-    gfx_diag_init();
+    gfx_init_mode(0);
 }
 
 void gfx_init_200(void)
 {
-    gfx_init_gen++;
-    /* ⑤: GDC 初期化より前にバックエンドを決める。
-     * 200 ラインは 9801 プレーン専用のモードなので、パックド系が選ばれた
-     * ときはそのバックエンドのネイティブ解像度で立ち上げる (200 ラインの
-     * 縦 2 倍表示は 16 色プレーンの機能で、PEGC には対応物が無い)。 */
-    int initialized = gfx_select_and_init_backend(1);
-    if (initialized < 0) return;
-    if (initialized) {
-        gfx_reinit_surfaces(1);
-        gfx_started = bb[0] != 0;
-        if (g_backend->enter) g_backend->enter();
-        gfx_diag_init();
-        return;
-    }
-
-    gfx_current_height = gfx_backend_mode(g_backend)->height;  /* selected legacy mode */
-
-    gfx_bind_client(); /* bind before init_200; retain 400-line plane stride */
-    if (!bb[0]) { gfx_reinit_surfaces(1); gfx_diag_init(); return; }
-    _gfx_common_init(GFX_PLANE_SZ_200);
-
-    /* GDC CSRFORM: L/R=1 (各ライン2倍表示 → 200ライン) */
-    _out(GDC_GFX_CMD, GDC_GFX_400LINE);
-    _out(GDC_GFX_PARAM, 0x01);
-    _out(MODE_FF1_PORT, MFF1_200LINE);
-
-    _out(GDC_GFX_CMD, GDC_CMD_START);
-
-    gfx_clear_planar_pages(GFX_PLANE_SZ_200);
-
-    /* ページ0を表示、ページ1に描画 */
-    _out(GDC_DISP_PAGE, GDC_PAGE_0);
-    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);
-    gfx_flip_enabled = 1;
-    gfx_display_page = 0;
-    prev_dirty.count = 0;
-
-    palette_init();
-    gfx_scroll_init();
-    gfx_reinit_surfaces(1);
-    gfx_started = 1;
-
-    /* 表示出力を有効化 (9801 の enter は空)。バックエンドの選択は先頭で済み。 */
-    if (g_backend && g_backend->enter) g_backend->enter();
-    gfx_diag_init();
+    gfx_init_mode(1);
 }
 
 /* ======================================================================== */
