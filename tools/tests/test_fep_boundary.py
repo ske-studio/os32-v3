@@ -14,19 +14,19 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
-    ('invalid-output-returns-error', 'kernel/ime/ime.c',
+    ('invalid-output-returns-error', 'kernel/ime/ime_dict_api.inc',
      '        ring3_fault_kill();\n        return -1;',
      '        return -1;',
      'invalid output must kill'),
-    ('failed-kanji-null', 'kernel/ime/ime.c',
+    ('failed-kanji-null', 'kernel/ime/ime_dict_api.inc',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) return -1;\n        kanji = k;',
      'if (!copy_caller_cstr(&caller, kanji, k, sizeof(k))) kanji = NULL;\n        else kanji = k;',
      'invalid input engine0/output unchanged'),
-    ('copyout-before-finalize', 'kernel/ime/ime.c',
+    ('copyout-before-finalize', 'kernel/ime/ime_dict_api.inc',
      '    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
      '    (void)copy_to_caller(&caller, out, ime_user_staging, sizeof(ime_user_staging));\n    n = ime_user_list(&g_ime.dict, yomi_prefix, ime_user_staging, max);',
      'finalize then leave then copyout'),
-    ('late-busy-leak', 'kernel/ime/ime.c',
+    ('late-busy-leak', 'kernel/ime/ime_dict_api.inc',
      '(u32)n * sizeof(IME_UserEntry))) n = -1;',
      '(u32)n * sizeof(IME_UserEntry))) return -1;',
      'busy released after late refusal'),
@@ -66,7 +66,7 @@ def main():
                                     if line.startswith('#define ASCII_'))
         (work / 'fep_boundary_host.c').write_text(ascii_constants + '\n' +
             (ROOT / 'tools/tests/fep_boundary_host.c').read_text())
-        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict.c')}
+        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/ime_dict.c')}
         cases = [('normal', None)]
         if args.mutate:
             cases += [(m[0], m) for m in MUTANTS]
@@ -77,6 +77,7 @@ def main():
                 assert current[path].count(old) == 1, name
                 current[path] = current[path].replace(old, new)
             (work / 'ime_source.inc').write_text(current['kernel/ime/ime.c'])
+            (work / 'ime_dict_api.inc').write_text(current['kernel/ime/ime_dict_api.inc'])
             (work / 'ime_dict.inc').write_text(current['kernel/ime/ime_dict.c'])
             harness = (ROOT / 'tools/tests/ime_dict_host.c').read_text().replace(
                 '#include "../../kernel/ime/ime_dict.c"', '#include "ime_dict.inc"')
