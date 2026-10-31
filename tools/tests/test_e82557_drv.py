@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LB3 real driver injection. Record: tools/tests/e82557_drv_tdd.md"""
 CHECK = dict(name='e82557-drv-host', tier=1,
-    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'kernel/module/module.h', 'include/config.h', 'include/bootinfo.h', 'fs/vfs.h', 'tools/tests/e82557_drv_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.c', 'mm/dma_pool.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_probe_reset_base.inc', 'drivers/net/e82557/e82557_probe_loopback.inc', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/net/e82557/e82557_eeprom.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h', 'kernel/module/module.h', 'include/config.h', 'include/bootinfo.h', 'fs/vfs.h', 'tools/tests/e82557_drv_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.c', 'mm/dma_pool.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=5.33304)
 
 from kernel_includes import include_flags
@@ -20,6 +20,7 @@ CASES += ["table", "dma_fail", "bm_fail", "bm_present", "stop_retry", "stop_fail
 CASES += ["phy_" + n for n in ("latch", "late", "down", "off", "none", "timeout")]
 CASES += ["nsc_" + n for n in ("rev", "id1", "id2", "same", "off", "reserved", "drop1", "drop5", "drop6", "timeout_pcr", "timeout_par", "timeout_read", "timeout_write")]
 CASES += ["probe_irq_fail", "probe_ring_fail", "probe_ru_fail", "lb_timeout", "lb_corrupt", "swi_lost", "swi_irq0"]
+CASES += ["lb_bad_status", "lb_short"]
 CASES += ["rx_" + n for n in ("empty", "full", "p1", "ready", "idle", "copy_tick", "short", "long", "overrun", "bad")] + [f"rx_wrap{i}" for i in range(1,9)]
 CASES += ["irq_" + n for n in ("none", "cx", "cna", "fr", "rnr", "swi", "mdi", "all", "dead", "again", "limit", "starting", "stopping", "recover", "failed")]
 CASES += ["tx_" + n for n in ("done", "bad", "reserved", "pending", "generation", "timeout", "pre", "post")]
@@ -34,7 +35,8 @@ MIRROR += ["include/pci_dev_contract.h", "include/pci_bind_contract.h",
            "include/lan_contract.h", "drivers/pci/pci_bind.h", "drivers/pci/pci.h",
            "drivers/pci/pci_decode.h", "include/types.h", "drivers/net/e82557/lan_module.h",
            "platform/pc98/lan_match.c"]
-MIRROR += ["drivers/net/e82557/e82557_probe_reset_base.inc"]
+MIRROR += ["drivers/net/e82557/e82557_probe_reset_base.inc",
+           "drivers/net/e82557/e82557_probe_loopback.inc"]
 MUTATIONS = [('drivers/net/e82557/e82557.c',
   'if (nic.tx == TX_ISSUED) tx_complete();',
   '/* send completion omitted */', 'send completion omitted'),
@@ -96,7 +98,7 @@ MUTATIONS = [('drivers/net/e82557/e82557.c',
   '        /* reset omitted */',
   'stop reset omitted'),
  ('drivers/net/e82557/e82557.c', '        scb_mask(base, 1);', '        scb_mask(base, 0);', 'rst2 and R1 mask omitted'),
- ('drivers/net/e82557/e82557.c',
+ ('drivers/net/e82557/e82557_probe_loopback.inc',
   'int stopped = stop_dma(base, &nic.stop, E82557_STOP_ATTEMPTS);\n    irq_restore(flags);',
   'int stopped = 1;\n    irq_restore(flags);',
   'cfg2 without selective reset'),
@@ -366,7 +368,7 @@ MUTATIONS += [
   '            if (!nic.swi_wait) (void)e82557_irq(0, NULL);\n            nic.state = E82557_RUNNING;\n            scb_mask(nic.base, 0);',
   '            nic.state = E82557_RUNNING;\n            scb_mask(nic.base, 0);\n            if (!nic.swi_wait) (void)e82557_irq(0, NULL);',
   'recovery drain after unmask'),
- ('drivers/net/e82557/e82557.c',
+ ('drivers/net/e82557/e82557_probe_loopback.inc',
   'if (kstrcmp(why, "ng") == 0) why = "txng";',
   'why = "txng";', 'loopback failure reason overwritten'),
 ]
@@ -387,6 +389,29 @@ MUTATIONS += [
   '*stage = "base";',
   '*stage = "rst";',
   'base diagnostic stage lost'),
+]
+
+
+# Loopback failure must return to cleanup; success only permits normal setup.
+MUTATIONS += [
+ ('drivers/net/e82557/e82557.c',
+  'why = probe_loopback(&stage, &lb_len);',
+  '(void)probe_loopback(&stage, &lb_len);',
+  'loopback failure ignored'),
+ ('drivers/net/e82557/e82557.c',
+  'why = probe_loopback(&stage, &lb_len);\n    if (why) goto done;',
+  'why = probe_loopback(&stage, &lb_len);\n    if (why) goto done;\n    result = PCI_PROBE_OK;',
+  'loopback success prematurely accepts probe'),
+ ('drivers/net/e82557/e82557_probe_loopback.inc',
+  '*stage = "rst2";', '*stage = "cmp";',
+  'loopback stop diagnostic stage lost'),
+ ('drivers/net/e82557/e82557_probe_loopback.inc',
+  '!(e82557_rd16(rx_ring()) & E82557_RFD_OK)',
+  '(0 && !(e82557_rd16(rx_ring()) & E82557_RFD_OK))',
+  'loopback RX status ignored'),
+ ('drivers/net/e82557/e82557_probe_loopback.inc',
+  '*lb_len != E82557_HELLO_LEN', '0',
+  'loopback RX length ignored'),
 ]
 
 

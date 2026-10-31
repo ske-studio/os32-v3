@@ -125,6 +125,7 @@ static int vendor_reads[32], vendor_timeout, pcr_timeout_first, pcr_timeout_writ
 static int mdi_timeout, mdi_reads, mdi_total, bmsr_reads, link_tick, an_off, latch_zero;
 static u32 mdi_ctl, current_stage, clock_reads;
 static int cb_pre_pending, loopback, lb_timeout, lb_corrupt, ru_starts, ru_fail;
+static int lb_bad_status, lb_short;
 static int swi_lost, irq0_first, irq_deliveries, runtime, inject_rus, inject_reset;
 static int yield_mode, ack_repeat, status_reads, cb_completed;
 static u32 ru_pointer, model_ticks;
@@ -149,6 +150,8 @@ static void model_time(void)
         if ((active_cb[2]&7)==4 && loopback && !lb_timeout) {
             model_rx(active_cb+16,raw16(off+12)&0x3fff);
             if (lb_corrupt) memory[1616+16]^=1;
+            if (lb_bad_status) put16(1616,0x8000); /* complete, without OK */
+            if (lb_short) put16(1616+12,0xc03b); /* EOF/F, 59 bytes */
         }
     }
 }
@@ -802,12 +805,15 @@ int main(int argc,char **argv)
     if(!strcmp(c,"probe_ru_fail")) ru_fail=2;
     if(!strcmp(c,"lb_timeout")) lb_timeout=1;
     if(!strcmp(c,"lb_corrupt")) lb_corrupt=1;
+    if(!strcmp(c,"lb_bad_status")) lb_bad_status=1;
+    if(!strcmp(c,"lb_short")) lb_short=1;
     if(!strcmp(c,"swi_lost")) swi_lost=1;
     if(!strcmp(c,"swi_irq0")) irq0_first=1;
     u16 initial_command=pci_command;
     int expect_fail=skip || idle_fail || pre_busy || post_busy || ee_mode>=2 || alloc_fail || bm_fail ||
         cb_fail || cb_ng || cu_pre || cu_post || cb_delay>20000 || stop_fail==2 || irq_fail || ru_fail ||
-        lb_timeout || lb_corrupt || mdi_timeout || vendor_timeout || pcr_timeout_first || pcr_timeout_write ||
+        lb_timeout || lb_corrupt || lb_bad_status || lb_short ||
+        mdi_timeout || vendor_timeout || pcr_timeout_first || pcr_timeout_write ||
         !strcmp(c,"phy_none");
     if(!strcmp(c,"table")) {
         struct pci_bind_info info;
@@ -858,7 +864,13 @@ int main(int argc,char **argv)
             if(pre_busy) CHECK(strstr(output,"base=timeout scb=2040"));
             if(post_busy) CHECK(strstr(output,"base=timeout scb=0040"));
             if(lb_timeout) CHECK(strstr(output,"FAIL(lb:timeout)"));
-            if(lb_corrupt) CHECK(strstr(output,"FAIL(cmp:ng)"));
+            if(lb_corrupt || lb_bad_status || lb_short) CHECK(strstr(output,"FAIL(cmp:ng)"));
+            if(stop_fail==2) CHECK(strstr(output,"FAIL(rst2:idle)"));
+            if((cb_fail>0 && cb_fail<=3) || (cb_ng>0 && cb_ng<=3) ||
+               (cu_pre>0 && cu_pre<=3) || (cu_post>0 && cu_post<=3) ||
+               ru_fail==1 || lb_timeout || lb_corrupt || lb_bad_status || lb_short || stop_fail==2) {
+                CHECK(starts<=3 && !(trace_bits&(1u<<E82557_TRACE_CFG2)));
+            }
             if(allocated) CHECK(stop_fail==2?leaked==1 && !freed:freed==1 && !leaked);
             if(freed && !irq_fail) CHECK(unregistered==1);
             if(freed) {

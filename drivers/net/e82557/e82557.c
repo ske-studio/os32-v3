@@ -652,12 +652,13 @@ static int probe_ru(void)
     return rc;
 }
 #include "e82557_probe_reset_base.inc"
+#include "e82557_probe_loopback.inc"
 
 static int e82557_probe(const struct pci_dev *dev)
 {
     const char *why, *stage = "win";
     u16 base, status = 0, compat = 0, lb_len = 0;
-    u8 cfg[E82557_CFG_LEN], frame[E82557_HELLO_LEN];
+    u8 cfg[E82557_CFG_LEN];
     struct phy_observation phy = { 0 };
     int allocated = 0, registered = 0, changed_bm = 0, width = 0, dummy;
     int reason, result = PCI_PROBE_DECLINE;
@@ -709,53 +710,8 @@ static int e82557_probe(const struct pci_dev *dev)
     phy_link_wait(base, &phy);
     phy_report(&phy, compat);
     if (phy.error) { why = phy.error; goto done; }
-    stage = "cfg";
-    nic_trace(E82557_TRACE_CFG);
-    e82557_config_bytes(cfg, E82557_CFG_LOOPBACK);
-    e82557_cb_config(nic.dma.va, cfg);
-    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
+    why = probe_loopback(&stage, &lb_len);
     if (why) goto done;
-    stage = "ia";
-    nic_trace(E82557_TRACE_IA);
-    e82557_cb_ia(nic.dma.va, nic.mac);
-    why = cb_run(base, &nic.dma, E82557_CB_OFF, &nic.stop);
-    if (why) goto done;
-    stage = "ring";
-    nic_trace(E82557_TRACE_RING);
-    e82557_rx_init(rx_ring(), nic.dma.pa + E82557_RFD_OFF, &nic.rx);
-    if (probe_ru() != ISSUE_OK) { why = "timeout"; goto done; }
-    stage = "lb";
-    nic_trace(E82557_TRACE_LB);
-    hello_build(frame, nic.mac);
-    (void)e82557_tcb_build((u8 *)nic.dma.va + E82557_TCB_OFF, frame,
-                           E82557_HELLO_LEN, E82557_TX_THRESH, E82557_TBD_NONE, 0);
-    why = cb_run(base, &nic.dma, E82557_TCB_OFF, &nic.stop);
-    if (why) {
-        if (kstrcmp(why, "ng") == 0) why = "txng";
-        goto done;
-    }
-    for (u32 ms = 0; !(e82557_rd16(rx_ring()) & E82557_RFD_C); ms++) {
-        if (ms == E82557_LB_WAIT_MS) { why = "timeout"; goto done; }
-        cpu_delay_us(E82557_CB_POLL_US);
-    }
-    E82557_BARRIER(); /* loopback completion acquisition */
-    stage = "cmp";
-    nic_trace(E82557_TRACE_CMP);
-    lb_len = e82557_rd16(rx_ring() + E82557_DESC_COUNT) & E82557_RFD_COUNT_MASK;
-    if (!(e82557_rd16(rx_ring()) & E82557_RFD_OK) || lb_len != E82557_HELLO_LEN) {
-        why = "ng"; goto done;
-    }
-    E82557_BARRIER();
-    E82557_DESC_ACCESS(rx_ring() + E82557_RFD_HEADER, lb_len, 0);
-    for (u32 i = 0; i < lb_len; i++) if (rx_ring()[E82557_RFD_HEADER + i] != frame[i]) {
-        why = "ng"; goto done;
-    }
-    stage = "rst2";
-    nic_trace(E82557_TRACE_RST2);
-    flags = irq_save();
-    int stopped = stop_dma(base, &nic.stop, E82557_STOP_ATTEMPTS);
-    irq_restore(flags);
-    if (!stopped) { why = "idle"; goto done; }
     stage = "cfg2";
     nic_trace(E82557_TRACE_CFG2);
     e82557_config_bytes(cfg, E82557_CFG_NORMAL);
