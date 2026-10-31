@@ -347,11 +347,10 @@ void _start(void)
         CHECK(paging_set_not_present(0x2000, 0x1000) == -1);
         CHECK(paging_map_range(0x4000, 0x2000, 0, PAGE_RW) == -1);
         CHECK(paging_set_readonly(0x4000, 0x2000) == -1);
-        CHECK(paging_pde_clear_user(0x4000, 0x2000) == -1);
-        CHECK(paging_range_reject_count == before + 4);
+        CHECK(paging_range_reject_count == before + 3);
         /* 空の範囲 (start == end) は逆転ではない。数えない。 */
         CHECK(paging_map_range(0x2000, 0x2000, 0x2000, PAGE_RW) == 0);
-        CHECK(paging_range_reject_count == before + 4);
+        CHECK(paging_range_reject_count == before + 3);
         /* 撥ねた呼び出しは 1 ページも変えていない */
         CHECK(paging_is_present(0x2000));
     }

@@ -172,7 +172,6 @@ void *kmalloc(u32 n) { CHECK(n == sizeof(space)); return &space; }
 void kfree(void *p) { CHECK(p == &space); }
 int paging_addrspace_create_lease(struct addrspace *as, u32 owner) { CHECK(as == &space && owner == 9); as->pd_phys = 23; as->owner = owner; return 0; }
 void appmem_init(struct addrspace *as, u32 b, u32 e, u32 h, u32 g) { (void)as; (void)b; (void)e; (void)h; (void)g; }
-int paging_addrspace_clear_app_band(struct addrspace *as) { CHECK(as == &space); return 0; }
 int shlib_addrspace_attach(struct addrspace *as) { CHECK(as == &space); return 0; }
 int exec_setjmp(u32 *buf) { (void)buf; CHECK(!jump_ready); jump_ready = 1; event('J'); return 0; }
 void exec_heap_user_init(struct addrspace *as) { (void)as; CHECK(0); }

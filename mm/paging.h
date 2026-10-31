@@ -131,10 +131,6 @@ extern u32 paging_shm_user_missing_count;
 /* V86 低位専用。open session 外は無変更で拒否する。 */
 int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags);
 
-/* 指定範囲を覆う PDE から USER を落とす (V86 セッション終了時の後始末)
- * end は inclusive。戻り値: 0=成功, -1=逆順 (未変更) */
-int paging_pde_clear_user(u32 start, u32 end);
-
 /* 指定範囲の全ページを Read-Only に。
  * end は inclusive。RW だけを落とし物理フレーム/USER/PCD/P/他属性を保持。
  * 不在 PT/PTE は不在のまま (RAM を生成しない)。
@@ -297,16 +293,6 @@ int paging_addrspace_map_user_range(struct addrspace *as, u32 vstart,
 int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 vstart,
                                          u32 vend, u32 pstart, u32 flags);
 
-/* アプリ固有 PDE 配下の PTE を全部 0 (非 present) に落とす (K5b P2)。
- * paging_addrspace_create_n() はアプリ PT を **master の identity PTE で**
- * 初期化する (V1 のため)。per-app 物理へ移す設計ではこれを落とし忘れると
- * 物理 0x5xxxxx が素通しで見え、他アプリのページや pgalloc の作業域が
- * CPL=3 から読めてしまう (票 TASK_K5_multiapp.md I6 — 最も静かに壊れる箇所)。
- * create_n の直後・per-app 物理を張る前に必ず呼ぶこと。
- * PDE の present/RW はそのまま (PT は残す)。USER は落とす。
- * 戻り値 0=成功, -1=AS 無効。 */
-int paging_addrspace_clear_app_band(struct addrspace *as);
-
 /* [vstart, vend) に張ってある **アプリ固有 PT の物理ページを as->owner で
  * pgalloc へ返し** (他 owner のページは返さず ledger_bad_free に数える)、
  * PTE を 0 にする (K5b P6)。共有 PT に掛かる要求は
@@ -317,10 +303,6 @@ int paging_addrspace_clear_app_band(struct addrspace *as);
 /* Master context only; do not restore an app CR3 after poisoning. */
 u32 paging_addrspace_free_user_range(struct addrspace *as, u32 vstart,
                                      u32 vend);
-
-/* Private PT range map preserving PCD/PWT. Shared PT: -1, unchanged. */
-int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
-                                   u32 vend, u32 flags);
 
 /* ⚠ **走っているアプリの PD を、そのアプリの syscall 中に歩いてはならない**
  * (票 S0-K / 実機 K2、2026-09-13 当時の旧配置の記録)。カーネルはページテーブルを「物理 = 仮想」で

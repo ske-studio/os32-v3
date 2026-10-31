@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------------ */
 /* Shared PT promotion is rejected without changing PFN/cache/PDE bits.
- * rc bits: 1=missing PT, 2=AS creation, 4=keep, 64=single page,
+ * rc bits: 1=missing PT, 2=AS creation, 64=single page,
  * 128=identity range, 256=physical range, 8=free, 16=entry changed,
  * 32=AS cleanup (paging_map_user_keep_selftest). */
 static void test_map_user_keep(void)

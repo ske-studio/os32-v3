@@ -49,8 +49,12 @@ CASES = [("typical", 0x280000, 0, 0), ("empty SLACK", 0x375000, 0, 0)]
 MUTATIONS = {
     # 逆転を撥ねても数えない = 空振りが成功に見えていた元の姿
     "no-reject": ("mm/paging.c",
-                  "if (start > end) { paging_range_reject_count++; return -1; }",
-                  "if (start > end) return -1;"),
+                  "int paging_set_not_present(u32 start, u32 end)\n"
+                  "{\n    u32 pfn, last;\n"
+                  "    if (start > end) { paging_range_reject_count++; return -1; }",
+                  "int paging_set_not_present(u32 start, u32 end)\n"
+                  "{\n    u32 pfn, last;\n"
+                  "    if (start > end) return -1;"),
     # 浮動番地 (SHM) の規則をカーネル帯域の外へも広げる。境界を固定番地として
     # 守らなくなるので、予算を超えた配置が「期待どおり」に見えてしまう。
     "band-unbounded": ("mm/paging.c",
@@ -120,9 +124,10 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
         rel, old, new = MUTATIONS[mutation]
         path = ROOT / rel
         text = sources[path]
-        if old not in text:
-            raise SystemExit("変異 %s の当て先が見つからない: %s" % (mutation, rel))
-        sources[path] = text.replace(old, new)
+        if text.count(old) != 1:
+            raise SystemExit("変異 %s の当て先が一意でない: %s (%d)"
+                             % (mutation, rel, text.count(old)))
+        sources[path] = text.replace(old, new, 1)
     path = ROOT / 'mm/paging.c'
     sources[path] = sources[path].replace('P2V_BOOT(', 'host_boot_paging_ptr(')
     if case[0] == 'PG-failure':

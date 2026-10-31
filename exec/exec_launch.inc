@@ -290,12 +290,6 @@ static int exec_launch(const char *cmdline, int gui_arg)
         appmem_init(ctx->as, load_base + text_sz + bss_sz, sbrk_end,
                     exec_heap_base + exec_heap_size, ctx->guard_b);
 
-        /* **I6**: アプリ PT は master の identity PTE で初期化されている。
-         * 落とし忘れると物理 0x5xxxxx が素通しで見え、他アプリのページや
-         * pgalloc の作業域が CPL=3 から読める。ここが本設計で最も静かに
-         * 壊れる箇所なので、per-app 物理を張る前に必ず全部 0 にする。 */
-        paging_addrspace_clear_app_band(ctx->as);
-
         /* 3 領域を per-app 物理で張る。連続が取れなければページ単位へ倒す
          * (D10 の断片化の申し送り)。ガードは張らない = 非 present のまま。 */
         if (app_map_region(ctx->as, load_base, sbrk_end) != 0 ||

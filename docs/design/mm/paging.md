@@ -23,6 +23,11 @@ static u32 native_cache_bits(u32 a)
 
 「固定」= 起動時に決まり台帳では owner=kernel。「池」= 台帳が owner 付きで配る恒等ページ。**通常アプリ (CPL=3 の AS) の不変条件: PDE 0〜511 に USER の PTE は、トランポリン (RO) と SHM (契約で全アプリ共有) 以外に存在しない**。**V86 セッションは例外** (§2-2 の V86 の項): セッション中だけ master の低位 (ページ 0・アリーナ・VRAM・ROM) に USER を立て、終了時に復元する既存機構 (`v86_mem.c:73,99`) を保つ。
 
+- AS 作成時の APP PDE は空で、私有 PT は写像時に疎に確保する。exec は作成直後にそのまま per-app 物理を張る。
+- 通常の私有写像は指定された flags を使い、キャッシュ属性は lease 側の台帳から取る。
+- V86 終了時は保存済みの master/active PDE を `paging_v86_restore()` で復元する。
+- 共有 PT 拒否の自己試験は単ページ・identity/physical 範囲・解放と PTE/PDE 不変を維持する。内部 import 名 `paging_map_user_keep_selftest` は据え置く。
+
 - **共有 PT を書く要求は通常の map / unmap API で拒否する**。V86 の例外は専用の入口と、終了・異常終了時の復元に限る。master を変更できる別の API (`paging.c:486` 系) も監査対象 — 「共有 PT の物理番号が不変」だけでは USER/RW の変更や他 AS への波及を取り逃す。
 
 | 指摘 | 答え |

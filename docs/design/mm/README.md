@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN・MEMMAP_V3・API_CONTRACTS (D1 で移した)
 ソース: `mm/`
 
-- paging_map_physのdevice UC、surfaceのcache指定、keep_cacheのPCD/PWT継承、DMAプールのWB、V86セッション復元は汎用処理として残す。
+- paging_map_physのdevice UC、surfaceのcache指定、DMAプールのWB、V86セッション復元は汎用処理として残す。
 - PDE/PT枠、aperture/MMIO窓、APP帯、pool、guard、ledger配置は一切動かさない。memmap.h/pc98.hの既存定数・マクロは他の利用者のため残す。
 
 **システム側は恒等のまま (D1・D20)、物理地図と所有権台帳を先に作り (D2)、アプリ帯だけを RAM の上 0x80000000 へ出す (D11)。**
