@@ -120,11 +120,9 @@ void appslot_init(void)
     g_poll_last_tick = 0;
     for (i = 0; i < APP_SLOT_COUNT; i++) {
         slot_zero(&g_slot[i]);
-        g_slot[i].state = APP_STATE_FREE;
     }
     /* シェル帯 (ID 1) は常に居る。depth は従来の exec_nest_level = 1。 */
     g_slot[APP_ID_SHELL].state = APP_STATE_RUNNING;
-    g_slot[APP_ID_SHELL].parent = 0;
     g_slot[APP_ID_SHELL].depth = 1;
     g_cur = APP_ID_SHELL;
     g_cur_op_is_wait = 0;
@@ -326,7 +324,6 @@ u32 appslot_reclaim(int id)
      * バッファ型の枠に FD は無く、バッファ自体は pipe_free_owned が返す。 */
     fd_redirect_clear_state(&g_redir[id]);
     slot_zero(a);
-    a->state = APP_STATE_FREE;
     appslot_reclaim_count++;
     appslot_last_reclaim_id = id;
     return pages;
