@@ -40,3 +40,7 @@
 
 - [ide_pio_host.md](ide_pio_host.md)
 - [ext2_block_io_host.md](ext2_block_io_host.md)
+- [cd_read_host](cd_read_host.md)
+- [cd_read_host_dir](cd_read_host_dir.md)
+- [cd_read_host_pio](cd_read_host_pio.md)
+- [test_cd_read](test_cd_read.md)

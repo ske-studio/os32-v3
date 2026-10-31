@@ -23,10 +23,6 @@
 #define ATAPI_PRESENT_SLAVE   0x02
 #define ATAPI_PIO_BCL_MIN     2
 
-/* 呼び手のバッファや奇数長 DRQ の次の位置は、ワード境界とは限らない。
- * x86 の非整列 16bit 格納を使い、元のバッファの型とも別名参照できるようにする。 */
-typedef u16 AtapiPioWord __attribute__((aligned(1), may_alias));
-
 /* === 内部状態 === */
 static int cdrom_present = 0;
 /* 使う装置の選択 (DRV_HEAD に書く値)。セカンダリのマスター = 0x00、
@@ -324,13 +320,14 @@ static int atapi_select_device(void)
 /*      → ホストが12バイトCDB書込み → atapicmd_a0() 呼び出し              */
 /* ======================================================================== */
 
+#include "atapi_pio.inc"
+
 /* PACKET の共通路: 装置選択 → Features=0 (PIO) / Byte Count = bcl →
  * PACKET → CDB 受付の DRQ 待ち → 12 バイト CDB を 6 ワード送出。
  * 装置選択と待ちを済ませてからレジスタを書く (旧装置に書かない) */
 static int atapi_send_cdb(const u8 *cdb, u32 bcl)
 {
     int ret;
-    int i;
 
     ret = atapi_select_device();
     if (ret != ATAPI_OK) return ret;
@@ -344,10 +341,7 @@ static int atapi_send_cdb(const u8 *cdb, u32 bcl)
     if (ret == ATAPI_ERR_IO) atapi_note_error();
     if (ret != ATAPI_OK) return ret;
 
-    for (i = 0; i < ATAPI_CDB_BYTES / (int)sizeof(u16); i++) {
-        u16 w = (u16)cdb[i * sizeof(u16)] | ((u16)cdb[i * sizeof(u16) + 1] << 8);
-        outpw(IDE_DATA, (unsigned)w);
-    }
+    atapi_pio_send_cdb(cdb);
     atapi_settle();
     return ATAPI_OK;
 }
@@ -415,9 +409,6 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
     /* データ転送ループ (DRQ ごとに 1 回) */
     while (1) {
         u16 xfer_size;
-        u32 words;
-        u32 end;
-        u32 k;
         u8 st;
 
         /* BSY=0になるまで待つ */
@@ -443,22 +434,7 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
         xfer_size = (u16)inp(IDE_CYL_LO) | ((u16)inp(IDE_CYL_HI) << 8);
         if (xfer_size == 0) break;
 
-        /* ワード単位で読み出す (奇数なら 1 ワード多い)。有効なのは xfer_size
-         * バイトまで。buf_size を超えた分は読み捨てる */
-        words = ((u32)xfer_size + sizeof(u16) - 1) / sizeof(u16);
-        end = total_read + xfer_size;
-        if (!(xfer_size & 1) && end <= buf_size) {
-            AtapiPioWord *dst = (AtapiPioWord *)(p + total_read);
-            for (k = 0; k < words; k++) dst[k] = (u16)inpw(IDE_DATA);
-        } else {
-            for (k = 0; k < words; k++) {
-                u16 w = (u16)inpw(IDE_DATA);
-                u32 b = total_read + k * sizeof(u16);
-                if (b < end && b < buf_size) p[b] = (u8)(w & 0xFF);
-                if (b + 1 < end && b + 1 < buf_size) p[b + 1] = (u8)(w >> 8);
-            }
-        }
-        total_read = end;
+        total_read = atapi_pio_read(p, buf_size, total_read, xfer_size);
         atapi_settle();
     }
 

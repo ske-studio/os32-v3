@@ -9,3 +9,5 @@
 - [ide.md](ide.md)
 - [ide_pio.md](ide_pio.md)
 - [ide_request.md](ide_request.md)
+- [atapi](atapi.md)
+- [atapi_pio](atapi_pio.md)

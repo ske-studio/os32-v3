@@ -9,6 +9,7 @@
 /* ======================================================================== */
 
 #include "iso9660.h"
+#include <stdbool.h>
 
 #include "dev.h"
 #include "atapi.h"
@@ -80,38 +81,7 @@ static void iso_check_media(Iso9660Ctx *ctx)
     ctx->media_gen = gen;
 }
 
-/* 1 セクタを LRU を通して得る。戻り値はキャッシュの中のセクタ (次に
- * iso_get_sector を呼ぶまで有効)。読めなければ NULL */
-static const u8 *iso_get_sector(Iso9660Ctx *ctx, u32 lba)
-{
-    int i;
-    int victim = -1;
-    IsoSectorSlot *s;
-
-    ctx->scache_clock++;
-    for (i = 0; i < ISO_SCACHE_SLOTS; i++) {
-        s = &ctx->scache[i];
-        if (s->valid && s->lba == lba) {
-            s->used = ctx->scache_clock;
-            ctx->stats.scache_hits++;
-            return s->data;
-        }
-    }
-    /* 空きか、いちばん古いものを追い出す */
-    for (i = 0; i < ISO_SCACHE_SLOTS; i++) {
-        s = &ctx->scache[i];
-        if (!s->valid) { victim = i; break; }
-        if (victim < 0 || s->used < ctx->scache[victim].used) victim = i;
-    }
-    s = &ctx->scache[victim];
-    s->valid = 0;
-    if (iso_dev_read(ctx, lba, 1, s->data) != 0) return (const u8 *)0;
-    s->lba = lba;
-    s->used = ctx->scache_clock;
-    s->valid = 1;
-    ctx->stats.scache_fills++;
-    return s->data;
-}
+#include "iso9660_dir_read.inc"
 
 /* ファイルの [offset, offset + len) を dst へ読む (範囲は呼び手が確かめる)。
  *   file_secs: ファイルのセクタ数 (窓をファイルの外へ広げない)
@@ -272,9 +242,10 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
 {
     const u8 *sector = (const u8 *)0;
     u32 offset = 0;
+    IsoDirScan scan = { .use_ra = true };
 
     while (offset < dir_size) {
-        u32 sect_lba = dir_lba + (offset / ISO_SECTOR_SIZE);
+        u32 sect_idx = offset / ISO_SECTOR_SIZE;
         u32 sect_off = offset % ISO_SECTOR_SIZE;
         const u8 *rec;
         u8 rec_len;
@@ -282,7 +253,7 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
         char entry_name[ISO_MAX_NAME];
 
         if (sect_off == 0 || !sector) {
-            sector = iso_get_sector(ctx, sect_lba);
+            sector = iso_dir_sector(ctx, dir_lba, dir_size, sect_idx, &scan);
             if (!sector) return VFS_ERR_IO;
         }
 
@@ -296,6 +267,7 @@ static int iso_find_in_dir(Iso9660Ctx *ctx, u32 dir_lba, u32 dir_size,
         }
 
         /* レコードがセクタ境界をまたぐ場合は次のセクタで再読み込み */
+        if (rec_len > dir_size - offset) break;
         if (sect_off + rec_len > ISO_SECTOR_SIZE) {
             offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
             continue;
@@ -512,6 +484,7 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
     const u8 *cur = sector;
     u32 offset;
     u32 gen0 = 0;
+    IsoDirScan scan = { .use_ra = true };
     int ret;
 
     if (!ctx) return VFS_ERR_NOMOUNT;
@@ -522,7 +495,7 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
 
     offset = 0;
     while (offset < dir_size) {
-        u32 sect_lba = dir_lba + (offset / ISO_SECTOR_SIZE);
+        u32 sect_idx = offset / ISO_SECTOR_SIZE;
         u32 sect_off = offset % ISO_SECTOR_SIZE;
         const u8 *rec;
         u8 rec_len, name_len;
@@ -530,7 +503,7 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
         /* キャッシュから手元へ写す。cb がこの FS を読み直すと (§4-26)
          * キャッシュの中身が入れ替わるので、指したまま cb を呼ばない */
         if (sect_off == 0) {
-            const u8 *sec = iso_get_sector(ctx, sect_lba);
+            const u8 *sec = iso_dir_sector(ctx, dir_lba, dir_size, sect_idx, &scan);
             if (!sec) return VFS_ERR_IO;
             /* 途中で媒体が替わった: 続きは別の媒体。一覧は中断する
              * (cb に渡した分は取り消せないので読み直さない) */
@@ -546,6 +519,7 @@ static int iso9660_list_dir(void *ctx_raw, const char *path,
             offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
             continue;
         }
+        if (rec_len > dir_size - offset) break;
         if (sect_off + rec_len > ISO_SECTOR_SIZE) {
             offset = ((offset / ISO_SECTOR_SIZE) + 1) * ISO_SECTOR_SIZE;
             continue;
