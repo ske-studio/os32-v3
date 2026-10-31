@@ -20,5 +20,5 @@ IDENTIFY の語で LBA28／現在 CHS／既定 CHS／SASI を設定する。
 CHECK に製品・inc・shim・試験入力を宣言する。
 
 基点の count=2 は 2 コマンドで RED、変更後は 1 コマンドで GREEN。
-製品の手順は [ide_pio](../../drivers/ata/ide_pio.md)。
+製品の手順は `ide_pio`。
 ポート模型の成功はゲスト／実機受入を代替しない。

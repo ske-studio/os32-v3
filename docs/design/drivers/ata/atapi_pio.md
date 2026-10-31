@@ -14,6 +14,6 @@ L2 の CDB 送出と DRQ のデータ転送をそのまま分離した内部実�
 ## 落とし穴
 
 待ち・reset・ステータス・診断・actual・DRQ 後 settle は
-[atapi.c](atapi.md) の責務。分離に伴って順序や値を変えない。
+`atapi.c` の責務。分離に伴って順序や値を変えない。
 rep insw/outsw は D5b の別段であり、ここには導入しない。
 [PIO 試験](../../tools/tests/cd_read_host_pio.md) は L2 と同じ語列・境界を確認する。

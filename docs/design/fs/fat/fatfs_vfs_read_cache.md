@@ -2,7 +2,7 @@
 
 > 状態: **現行 (2026-10-31)**
 
-[VFS 接続](fatfs_vfs.md) の各マウントに読み専用 FIL を4本保持する。
+`VFS 接続` の各マウントに読み専用 FIL を4本保持する。
 単一利用者・単一タスク・協調切替が前提。FatFs 本体や VFS FD の所有権は変えない。
 
 ## 状態と読み取り
@@ -26,7 +26,7 @@ FD では fdc_media_gen(VFS_MOUNT_DEV_ID(dev_id)) を入口で比較し、差が
 
 rc_invalidate_all は有効な全 FIL を閉じて無効にする。close の失敗は元の結果に
 上書きしない。rc_drop_on_umount はこれに加えて世代を初期化する。
-どちらも f_mount は呼ばない。接続先の順序は [VFS 接続](fatfs_vfs.md) を参照。
+どちらも f_mount は呼ばない。接続先の順序は `VFS 接続` を参照。
 
 open/seek/read が失敗すればその要求を負値に変換し、該当スロットを破棄する。
 FR_DISK_ERR・FR_NOT_READY・FR_INVALID_OBJECT・FR_INT_ERR では全スロットを破棄する。

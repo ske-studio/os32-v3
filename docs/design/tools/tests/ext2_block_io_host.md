@@ -23,4 +23,4 @@ D1 の保持枠と関数別失効・remount の統合試験は D1 の結線後�
 CHECK は新 inc と入力を宣言する。既存の HDD stage1、read_bound、write_io は回帰対象。
 HDD stage1 の format 模型は読取り count=2 をセクタ列に展開して照合する。
 固定した書込み順序と全 2008 セクタ位置での失敗注入は保ち、書込み count=1 を要求する。
-製品契約は [ext2_super_block_io](../../fs/ext2/ext2_super_block_io.md)。
+製品契約は `ext2_super_block_io`。
