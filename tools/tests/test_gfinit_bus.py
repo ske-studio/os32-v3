@@ -33,8 +33,8 @@ SHARED_MUTATIONS = [
     ('kdebug/recover.c', 'resource_overlap_right', '(unsigned long long)exclude[i].base < (unsigned long long)base + length', 'false'),
     ('kdebug/recover_plan/access.inc', 'cr1f_verify', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCKED : 0', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCK : 0'),
     ('kdebug/recover_plan/access.inc', 'cr1f_saved', 'RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK) : value;', 'RECOVER_CR1F_UNLOCK : 0) : value;'),
-    ('kdebug/recover_plan/access.inc', 'local_select', 'v->key == target && *value == t->index && t->access == REC_RW) found = true;',
-     'v->key == target && *value == t->index && t->access == REC_RW) found = false;'),
+    ('kdebug/recover_plan/access_saved_matches.inc', 'local_select', 'v->key == target && value == t->index && t->access == REC_RW) found = true;',
+     'v->key == target && value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
     ('kdebug/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;',
