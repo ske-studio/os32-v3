@@ -10,7 +10,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
-               'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
+               'exec/appslot.c', 'exec/appslot_transition.inc', 'exec/appslot.h', 'exec/owner_diag.h',
                'mm/paging.c', 'exec/lease.c']
 
 
@@ -29,7 +29,7 @@ def recovery(tmp, function, runner, mutation=None):
     stage('paging_source.c', read('mm/paging.c'))
     stage('pgalloc_source.c', read('mm/pgalloc.c'))
     exe = exec_source(ROOT, read)
-    slot = read('exec/appslot.c')
+    slot = read('exec/appslot.c') + read('exec/appslot_transition.inc')
     stage('slot_source.c', '\n'.join(function(slot, sig) for sig in (
         'AppSlot *appslot_at(', 'AppSlot *appslot_get(', 'void appslot_resume_commit(',
         'int appslot_return_target(', 'void appslot_switch_to(', 'void appslot_mark_scheduled(')))
@@ -115,7 +115,7 @@ RECOVERY_MUTANTS = [
     ('target-generation', 'kernel/r1_fixture.c', 'r1_fixture_generation[hook] != a->as->generation', '0', 'FAIL !spaces[2].appmem_poisoned'),
     ('parked-mark', 'kernel/r1_fixture.c', 'a->state == APP_STATE_PARKED && a->parked_from_wait', 'a->state == APP_STATE_PARKED', 'FAIL !spaces[2].appmem_poisoned'),
     ('parent-state', 'kernel/r1_fixture.c', 'parent->state == APP_STATE_RUNNING', '1', 'FAIL !spaces[2].appmem_poisoned'),
-    ('commit-loses-abort', 'exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
+    ('commit-loses-abort', 'exec/appslot_transition.inc', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
      '    a->abort_req = 0;\n    a->parked_from_wait = 0;', 'FAIL !forbid_app_pd'),
     ('resume-abort', 'exec/exec_schedule.inc', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
     ('syscall-abort', 'exec/exec_syscall.inc', '    ring3_abort_check();\n    exec_park_stop(frame);', '    exec_park_stop(frame);', 'FAIL 0'),

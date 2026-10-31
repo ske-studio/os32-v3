@@ -51,6 +51,7 @@ def run(mutation=None):
         name, source, old, new, expected = mutation
         assert sources[source].count(old) == 1, (name, sources[source].count(old))
         sources[source] = sources[source].replace(old, new)
+    sources['slot_source.inc'] += (ROOT / 'exec/appslot_transition.inc').read_text()
     exec_sources(sources)
     with tempfile.TemporaryDirectory(prefix='x11-shared-') as directory:
         work = pathlib.Path(directory)

@@ -330,7 +330,8 @@ def run(overrides=None):
                               ('input','SC_STOP','KEY_STOP'), ('input','MOD_CTRL','SHIFT_CTRL')]:
         value=re.search(r'const '+rname+r': \w+ = (0x[0-9a-fA-F]+|[0-9]+);',read('userland/gshell/src/'+rust+'.rs'))[1]
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
-    code = PRE + constants + read('exec/appslot.c') + '\n' + '\n'.join(function(ex,n) for n in (
+    code = PRE + constants + read('exec/appslot.c').replace(
+        '#include "appslot_transition.inc"', read('exec/appslot_transition.inc')) + '\n' + '\n'.join(function(ex,n) for n in (
         'ring3_abort_request','ring3_abort_check','exec_park_stop','ring3_syscall_dispatch')) + '\n' + resume + '\n'
     kbd = read('drivers/input/kbd.c')
     deliver = function(kbd, 'kbd_deliver')
@@ -353,16 +354,16 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
- ('lost-shell-request','exec/appslot.c','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
- ('ignore-shell-request','exec/appslot.c','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
+ ('lost-shell-request','exec/appslot_transition.inc','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
+ ('ignore-shell-request','exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
  ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
  ('no-request','exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
  ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(frame);','    /* missing transfer */'),
  ('before-completion','exec/exec_syscall.inc','    frame[APP_FRAME_EAX] = kapi_invoke','    exec_park_stop(frame);\n    frame[APP_FRAME_EAX] = kapi_invoke'),
  ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        a->frame[APP_FRAME_EAX] = (u32)wait_ret;\n        /* STOP parked a completed syscall;'),
- ('wrong-owner','exec/appslot.c','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
- ('stale-request','exec/appslot.c','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
- ('no-mark','exec/appslot.c','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
+ ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
+ ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
+ ('no-mark','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
  ('raw-stop-retained','drivers/input/kbd.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
@@ -373,17 +374,18 @@ for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
     MUTATIONS.append(('guard-'+guard, 'exec/exec_syscall.inc', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
 for name in ('appslot_park_commit','appslot_park_kbd_commit','appslot_park_poll_commit',
              'appslot_park_yield_commit','appslot_abort_clear','appslot_start_commit','appslot_resume_commit'):
-    src = function((ROOT/'exec/appslot.c').read_text(),name)
+    path = 'exec/appslot.c' if name in ('appslot_abort_clear', 'appslot_start_commit') else 'exec/appslot_transition.inc'
+    src = function((ROOT/path).read_text(),name)
     for line in src.splitlines():
         if 'stop_wm_req = 0;' in line:
             assert src.count(line)==1
-            MUTATIONS.append((name+'-'+line.strip(), 'exec/appslot.c',src,src.replace(line,'')))
+            MUTATIONS.append((name+'-'+line.strip(), path,src,src.replace(line,'')))
 src = (ROOT/'exec/appslot.c').read_text()
 a=src.index('u32 appslot_reclaim('); b=src.index('\n}',a)+2
 src=src[a:b]
 MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
-src=function((ROOT/'exec/appslot.c').read_text(),'appslot_stop_request')
-MUTATIONS.append(('request-non-gui','exec/appslot.c',src,src.replace('a->gui && ','')))
+src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
+MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
 MUTATIONS.append(('raw-full-loses-stop','drivers/input/kbd.c',
     'if (keycode == KEY_STOP && !is_break && (kbd_shift_state & SHIFT_CTRL)) {',
     'if (0) {'))
@@ -406,9 +408,9 @@ for name, fn, old, new in (
     ('poll-throttle', 'appslot_park_poll_check', 'now_tick == g_poll_last_tick', '0'),
     ('poll-attempt-tick', 'appslot_park_poll_check', 'g_poll_last_tick = now_tick;', ';'),
 ):
-    src = function((ROOT/'exec/appslot.c').read_text(), fn)
+    src = function((ROOT/'exec/appslot_transition.inc').read_text(), fn)
     assert old in src
-    MUTATIONS.append((name, 'exec/appslot.c', src, src.replace(old, new)))
+    MUTATIONS.append((name, 'exec/appslot_transition.inc', src, src.replace(old, new)))
 
 if __name__ == '__main__':
     status,log=run(); print('kstop control:',status,log,flush=True)
