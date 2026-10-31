@@ -118,6 +118,15 @@ def trace_sites(disasm, sym):
         for callee, suffix in (('exec_setjmp', '_landing'), ('exec_pending_finish', '_pending')):
             hits = [i for i, (_, insn) in enumerate(rows) if
                     insn.startswith('call') and insn.endswith('<' + callee + '>')]
+            if name == 'exec_resume' and suffix == '_landing' and len(hits) == 2:
+                # GCC duplicates setjmp for stdin replay; both landings share
+                # the single pending_finish below. Keep both PCs in the proof.
+                peek = [i for i, (_, insn) in enumerate(rows) if
+                        insn.startswith('call') and insn.endswith('<kbd_inject_peek_for>')]
+                require(len(peek) == 1 and hits[0] < peek[0] < hits[1] and
+                        hits[1] + 1 < len(rows), 'ambiguous stdin resume landing')
+                sites['resume_stdin_landing'] = rows[hits[1] + 1][0]
+                hits = hits[:1]
             require(len(hits) == 1 and hits[0] + 1 < len(rows), 'ambiguous trace site: ' + name + suffix)
             i = hits[0]
             sites[label + suffix] = rows[i + 1 if suffix == '_landing' else i][0]

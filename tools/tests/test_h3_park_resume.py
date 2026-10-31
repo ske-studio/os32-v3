@@ -662,6 +662,18 @@ class Tests(unittest.TestCase):
         self.assertEqual(sites, dict(pending_finish=0x80, wm_kill=0xa0, syscall_abort=0xb0, launch_landing=0x15,
                                     resume_landing=0x25, launch_pending=0x18, resume_pending=0x28,
                                     consumed=0x8a))
+        # Restartable stdin can make GCC duplicate setjmp, but not pending_finish.
+        stdin_path = ('  2d: call d0 <kbd_inject_peek_for>\n'
+                      '  32: call 90 <exec_setjmp>\n'
+                      '  37: test %eax,%eax\n'
+                      '  3a: jne 28 <exec_resume+0x8>\n'
+                      '  3c: ret')
+        duplicated = disasm.replace('  2d: ret', stdin_path)
+        self.assertEqual(h3.trace_sites(duplicated, sym), dict(sites, resume_stdin_landing=0x37))
+        for old, new in [('  2d: call d0 <kbd_inject_peek_for>', '  2d: nop'),
+                         ('  3c: ret', '  3c: call 90 <exec_setjmp>\n  41: ret'),
+                         ('  3c: ret', '  3c: call 80 <exec_pending_finish>\n  41: ret')]:
+            with self.assertRaises(RuntimeError): h3.trace_sites(duplicated.replace(old, new), sym)
         for old, new in [('  80: movl $0x0,0x40', '  80: nop'),
                          ('  20: call 90 <exec_setjmp>', '  20: nop'),
                          ('  a0: push %ebp', '  a0: nop'),

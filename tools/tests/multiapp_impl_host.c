@@ -323,7 +323,7 @@ static int ma_resume_kbd(int id)
     a = appslot_get(id);
     if (a->parked_from_kbd) {
         i32 app_id = id;
-    (void)app_id;
+        int restart_stdin = a->stdin_read.active;
 #include "exec_resume_kbd.inc"
     } else {
         a->frame[APP_FRAME_EAX] = 0;

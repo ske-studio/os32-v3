@@ -117,6 +117,8 @@ def mutation_test_sources(root):
 # The following helpers accept mutant data, not the suite's mutation-mode flag;
 # their callers run a normal fixture before calling the helper with each mutant.
 CONTROL_SKIP_ALLOW = {
+    ('tools/tests/' + 'test_sqlite_vfs_identity.py', "os.environ.get('MUTATE', '0') != '1' and '--mutate' not in sys.argv", 1):
+        'Returns after compiling and running every normal case; only mutations follow.',
     ('tools/checks/' + 'run.py', 'not ctx.mutate and elapsed > check.budget', 1):
         'Reports elapsed normal-control time after run(ctx) has finished; skips no controls.',
 
@@ -744,7 +746,15 @@ class InfrastructureTests(unittest.TestCase):
                     self.assertEqual(subprocess.run([str(tmp / 'out')]).returncode, value)
 
     def test_process_pool_timeout_retries_isolated(self):
-        with patch.dict(os.environ, OS32_MUT_JOBS='2'):
+        import concurrent.futures
+        import functools
+        import multiprocessing
+        # Exercise real isolated workers without forkserver's listening socket,
+        # which the Codex sandbox cannot bind (Python 3.14 defaults to forkserver).
+        pool = functools.partial(concurrent.futures.ProcessPoolExecutor,
+                                 mp_context=multiprocessing.get_context('spawn'))
+        with patch.dict(os.environ, OS32_MUT_JOBS='2'), \
+             patch.object(mutpar.concurrent.futures, 'ProcessPoolExecutor', pool):
             self.assertEqual(list(mutpar.run_ordered(_process_timeout_fixture,
                                                     [1, 2], processes=True)), [1, 2])
         import sys
@@ -886,15 +896,21 @@ class InfrastructureTests(unittest.TestCase):
         for phase in ('agent', 'bridge'):
             agent = Mock()
             agent.poll.return_value = None
+            nic = Mock()
             with tempfile.TemporaryDirectory() as tmp:
                 start = patch.object(lan.subprocess, 'Popen',
                     side_effect=[agent, RuntimeError('bridge startup')])
                 wait = patch.object(lan.Rig, '_wait_for',
                     side_effect=RuntimeError('agent startup') if phase == 'agent' else None)
-                with start, wait, self.assertRaises(RuntimeError):
+                # Startup and readiness are fakes here; NIC binding is a
+                # boundary too. Keep cleanup real for both failure phases.
+                with start, wait, patch.object(lan.socket, 'socket', return_value=nic), \
+                     self.assertRaisesRegex(RuntimeError, phase + ' startup'):
                     lan.Rig(tmp)
                 agent.terminate.assert_called_once()
                 agent.wait.assert_called_once()
+                nic.bind.assert_called_once_with(str(pathlib.Path(tmp) / 'nic.sock'))
+                nic.close.assert_called_once()
 
     def test_lan_delayed_address_and_dead_agent(self):
         from unittest.mock import Mock
