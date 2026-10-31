@@ -78,21 +78,14 @@ static void disk_read_common(u32 *frame, int transfer)
      * `if (CPU_AH & 0x10) biosfd_seek(CPU_CL, ...)`)。
      * 立っていなければ直前の SEEK が決めた位置のまま読む。 */
     if (ah & BIOS_DISK_CMD_SEEK) {
-        cur_cyl = (u8)cyl;
+        cur_cyl[cur_fdd_slot] = (u8)cyl;
     }
-    phys_cyl = cur_cyl;
+    phys_cyl = cur_cyl[cur_fdd_slot];
 
     v86_disk_fail_chs = (cyl << 16) | (head << 8) | sect;
     v86_disk_fail_len = (n << 16) | count;
     v86_disk_fail_dst = dst;
-    xfer_done = 0;
 
-    if (!disk_attached) {
-        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_NO_DEVICE;
-        bios_set_ah(frame, V86_DISK_ST_NOT_READY);
-        bios_set_cf(frame, 1);
-        return;
-    }
     if (count == 0) {
         /* 実機は BX=0 を「何もせず成功」として返す (while(size) に入らない) */
         bios_set_ah(frame, 0x00);
@@ -133,12 +126,6 @@ static void disk_read_common(u32 *frame, int transfer)
      * 直接読ませるとサイズが食い違ったときに溢れる。いったんカーネル側の
      * バウンスバッファへ受けてから、ゲストが要求した長さだけ渡す。 */
     seclen = (unsigned long)BIOS_SECTOR_BASE_BYTES << (n & BIOS_SECTOR_N_MASK);
-    if (seclen > sizeof(secbuf)) {
-        v86_disk_fail_n++; v86_disk_fail_why = V86_DISK_FAIL_SECTOR_SIZE;
-        bios_set_ah(frame, V86_DISK_ST_RANGE);
-        bios_set_cf(frame, 1);
-        return;
-    }
     while (count) {
         u32 i;
         u32 got;                    /* セクタから読めたバイト数 */
