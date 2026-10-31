@@ -3,6 +3,7 @@
 CPU ud2/stop are replaced; allocator and closing exception path are real source.
 Only the temporary source copy uses SOURCE_DATE_EPOCH for build comparisons.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 import argparse
@@ -51,7 +52,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
     fixture = fixture.replace('"../exec/appslot.h"', '"appslot.h"')
     (tmp / 'fixture_source.c').write_text(fixture)
     (tmp / 'pgalloc_source.c').write_text(read('mm/pgalloc.c').replace('#include "io.h"', ''))
-    exe = read('exec/exec.c')
+    exe = exec_source(ROOT, read)
     (tmp / 'exec_stop_source.c').write_text('\n'.join(function(exe, sig) for sig in (
         'static void exec_stop_mark(', 'static void exec_pending_transfer(')))
     isr = read('arch/x86/kernel/isr_handlers.c')

@@ -3,6 +3,7 @@
 AppSlot/CR3/IF と資源利用終了は記録する足場。全 loader/PCM 実機の代替ではない。
 写しだけを変異し、コンパイル成功後の実行失敗だけを RED とする。
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import os
 import host32
@@ -458,7 +459,7 @@ void _start(void) {
 
 
 def run(source=None, irq=None):
-    source = source or (ROOT / 'exec/exec.c').read_text()
+    source = source or exec_source(ROOT)
     irq = irq or (ROOT / 'kernel/irq/irq.c').read_text()
     constants = '\n'.join(l for l in source.splitlines() if
                           l.startswith(('#define EXEC_LJ_', 'static volatile int g_pending_',
@@ -551,7 +552,7 @@ if __name__ == '__main__':
     if not suite.result.wasSuccessful():
         sys.exit(1)
     if '--mutate' in sys.argv:
-        source = (ROOT / 'exec/exec.c').read_text()
+        source = exec_source(ROOT)
         for name, old, new in MUTATIONS:
             expected = 2 if name == 'landing-restore' else 1
             assert source.count(old) == expected, (name, source.count(old))

@@ -2,9 +2,10 @@
 Compile/link failures and signals are errors, never mutation RED.
 """
 CHECK = dict(name='h5-shapes-host', tier=1,
-    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c'],
+    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=4.779452)
 
+from exec_source import exec_source
 from kernel_includes import include_flags
 import argparse
 import os
@@ -154,7 +155,7 @@ def extract(source, signature):
 def preentry(tmp, headers, runner):
     # Use the real exec physical-budget rejection block and real admission
     # predicate. Entry/file I/O are host boundaries; no guest fault simulated.
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     start = '    need_pages = 0;\n    if (want_ring3) {'
     end = '    /* ======== 起動元のヒープ'
     require(start in source and end in source[source.find(start):],

@@ -1,4 +1,5 @@
 """T4b-8 kprintf: real B1/renderer with separate VA/PA (ILP32)."""
+from exec_source import exec_source
 import argparse
 import pathlib
 import json
@@ -44,7 +45,7 @@ def run(runner, mutant=None):
                       ('attr', 'lib/kprintf_attr.c'),
                       ('attr_backend', 'platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
-    dispatch = (ROOT / 'exec/exec.c').read_text()
+    dispatch = exec_source(ROOT)
     start = dispatch.index('    if (slot == KAPI_SLOT_KPRINTF) {')
     end = dispatch.index('    int strings = ', start)
     sources['dispatch'] = dispatch[start:end]

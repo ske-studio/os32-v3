@@ -15,6 +15,7 @@ Same shape as test_multiapp_model.py / test_pgalloc_range.py: build ILP32
 freestanding, run it, then prove the same source compiles with the cross
 compiler under the kernel's flags ([C1] GNU11).
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import host32
 import pathlib
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-multiapp-impl-") as tmp:
         tmp = pathlib.Path(tmp)
         exe = tmp / "multiapp-impl"
-        source = (ROOT / "exec/exec.c").read_text()
+        source = exec_source(ROOT)
         poll = source.split('} else if (src == APP_RESUME_SRC_POLL) {', 1)[1].split('} else if (src == APP_RESUME_SRC_KBD)', 1)[0]
         (tmp / 'exec_resume_poll.inc').write_text(poll)
         kbd = source.split('} else if (src == APP_RESUME_SRC_KBD) {', 1)[1].split('} else {', 1)[0]

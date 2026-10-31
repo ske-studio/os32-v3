@@ -19,7 +19,7 @@ WM = 'userland/gshell/src/trim.rs'
 SLOT = 'exec/appslot.c'
 APP = 'userland/rust/libos32gui/src/app.rs'
 STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
-TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
+TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'exec/exec_schedule.inc', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
          'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
          'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
          CACHE, WM, APP, STUB]
@@ -129,7 +129,7 @@ def build(tmp, sources):
     s = p.read_text().replace('#include "public_wrap_source.c"', '#undef caller_access_get\n#include "public_wrap_source.c"')
     p.write_text(s)
     fn = kernel.base.function
-    (tmp / 'stop_source.c').write_text('\n'.join(fn(sources['exec/exec.c'], sig) for sig in
+    (tmp / 'stop_source.c').write_text('\n'.join(fn(sources['exec/exec_schedule.inc'], sig) for sig in
         ('static void exec_kill_one(', 'i32 exec_kill(')))
     objects = []
     for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c')):

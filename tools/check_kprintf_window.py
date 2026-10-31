@@ -337,7 +337,7 @@ def rust_calls_in(source, file):
 
 
 def window_limit(root):
-    source = (root / 'exec/exec.c').read_text()
+    source = (root / 'exec/exec_syscall.inc').read_text()
     match = re.search(r'^#define\s+RING3_ARG_WINDOW\s+(0x[0-9a-fA-F]+|[0-9]+)[uUlL]*\s*(?://[^\n]*|/\*[^\n]*\*/)?$',
                       source, re.M)
     if not match:
@@ -445,7 +445,7 @@ def mutate(root):
         tree = Path(directory)
         for subdir in ('exec', 'tools', 'userland/tests', 'sdk'):
             (tree / subdir).mkdir(parents=True, exist_ok=True)
-        (tree / 'exec/exec.c').write_text((root / 'exec/exec.c').read_text())
+        (tree / 'exec/exec_syscall.inc').write_text((root / 'exec/exec_syscall.inc').read_text())
         (tree / ALLOW).write_text('')
         (tree / 'tools/source_roots.py').write_text(Path(__file__).with_name('source_roots.py').read_text())
         _, limit = window_limit(root)

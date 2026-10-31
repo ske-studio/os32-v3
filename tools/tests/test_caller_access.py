@@ -3,6 +3,7 @@
 Mutations compile then fail at runtime. Only the two C sources and fixture are
 copied per variant; headers use the original read-only include paths.
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import argparse
 import pathlib
@@ -49,7 +50,7 @@ def function(source, name):
     return source[start:source.index("\n}", start) + 2]
 
 def sources():
-    s = (ROOT / "exec/exec.c").read_text()
+    s = exec_source(ROOT)
     a = s.index("void __cdecl ring3_syscall_dispatch(u32 *frame)")
     b = s.index("\n}", a) + 2
     return {"access": (ROOT / "exec/redir_access.c").read_text(),

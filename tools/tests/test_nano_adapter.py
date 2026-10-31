@@ -3,9 +3,10 @@
 段: T2f f1b
 """
 CHECK = dict(name='nano-adapter-host', tier=1,
-    covers=['sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/nano_adapter_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/link_guard.py', 'sdk/crt/syscalls.c', 'userland/tests/malloc_arena_test.c', 'sdk/link/app.ld', 'userland/lib/rt/ls.c', 'tools/tests/resident_heap_host.c', 'exec/exec.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/appslot.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'include/memmap.h', 'tools/tests/host_arch/**', 'tools/tests/kernel_includes.py'],
+    covers=['sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/nano_adapter_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/link_guard.py', 'sdk/crt/syscalls.c', 'userland/tests/malloc_arena_test.c', 'sdk/link/app.ld', 'userland/lib/rt/ls.c', 'tools/tests/resident_heap_host.c', 'exec/exec.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/appslot.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'include/memmap.h', 'tools/tests/host_arch/**', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=['make:all'], budget=33.136144)
 
+from exec_source import exec_source
 from kernel_includes import include_flags
 import argparse
 import importlib.util
@@ -79,7 +80,7 @@ RESIDENT_MUTATIONS = [
 
 
 def resident_heap(prefix, work, mutant=None):
-    source = (ROOT / 'exec/exec.c').read_text()
+    source = exec_source(ROOT)
     adapter = SOURCE.read_text()
     if mutant:
         target, old, new, _ = mutant

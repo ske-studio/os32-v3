@@ -3,6 +3,7 @@ Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
               'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c']
+from exec_source import exec_source
 import argparse
 import json
 import pathlib
@@ -39,7 +40,7 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         assert rc == 0, output
         sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
         sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
-        source = (ROOT / 'exec/exec.c').read_text()
+        source = exec_source(ROOT)
         sources['exec'] = source[source.index('int ring3_ptr_ok('):source.index('\n#include "ksetjmp.h"')]
         # Keep every range guard, excluding the unrelated g1 DONE function.
         trim_start = sources['exec'].index('i32 exec_trim_done(')

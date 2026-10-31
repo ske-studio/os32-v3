@@ -1,6 +1,7 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
 TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc']
 
+from exec_source import exec_source
 import host32
 import argparse
 import hashlib
@@ -12,7 +13,7 @@ from mutpar import run_ordered
 
 def sources():
     result = {k: (walk.ROOT / p).read_text() for k, p in walk.FILES.items()}
-    src = (walk.ROOT / 'exec/exec.c').read_text()
+    src = exec_source(walk.ROOT)
     constants = '\n'.join(line for line in src.splitlines() if line.startswith('#define RING3_')) + '\n'
     result['guards'] = constants + src[src.index('int ring3_ptr_ok(u32 p)'):src.index('#include "ksetjmp.h"')]
     # g1 inserted DONE between range guards. Keep this DB fixture's source

@@ -5,6 +5,7 @@ gone (integer raster); the section, reentry/IRQ/exception BUSY, STOP/park and
 fault attribution stay. The compiled guard is checked to hold no x87
 instruction (counted by mnemonic in `objdump -d`, design G-4).
 """
+from exec_source import read_text
 from kernel_includes import include_flags
 from pathlib import Path
 import re
@@ -70,7 +71,7 @@ def run(parts, work, name, expected=None):
 
 
 def main():
-    sources=[(ROOT/p).read_text() for p in PATHS]
+    sources=[read_text(ROOT / p) for p in PATHS]
     with tempfile.TemporaryDirectory(prefix='font-guard-') as td:
         run(sources,Path(td),'normal')
         if '--mutate' in sys.argv:

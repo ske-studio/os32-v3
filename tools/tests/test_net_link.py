@@ -14,6 +14,7 @@ Make・エミュレータ・ネットワークには触らない (Agent は --of
 --target は同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
 別に見る ([C1] GNU11)。
 """
+from exec_source import exec_source
 from kernel_includes import include_flags
 import os
 import signal
@@ -75,7 +76,7 @@ def check_reclaim_has_host_owner_exit():
     並びは exec/exec.c の 1 か所にしかなく、ホストではリンクできない。
     con_sink_owner_exit / launch_owner_exit と同じ位置にあることを本文で見る。
     """
-    src = (ROOT / "exec/exec.c").read_text(encoding="utf-8")
+    src = exec_source(ROOT)
     m = re.search(r"static void exec_notify_owned\(int id, int kind\)\s*\{(.*?)\n\}", src, re.S)
     assert m, "exec_notify_owned が見つからない"
     body = m.group(1)

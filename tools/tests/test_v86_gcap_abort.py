@@ -5,9 +5,10 @@ Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
 CHECK = dict(name='v86-gcap-abort-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86_mem.*', 'kernel/v86/v86.c', 'kernel/v86/v86.h', 'kernel/v86/v86_gcap.*', 'kernel/v86/v86_io.*', 'kernel/module/module.h', 'exec/v86_call.c', 'exec/exec.c', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kernel/v86/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86_mem.*', 'kernel/v86/v86.c', 'kernel/v86/v86.h', 'kernel/v86/v86_gcap.*', 'kernel/v86/v86_io.*', 'kernel/module/module.h', 'exec/v86_call.c', 'exec/exec.c', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kernel/v86/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py'],
     needs=[], budget=2.256406)
 
+from exec_source import read_text
 from kernel_includes import include_flags
 from pathlib import Path
 import re
@@ -66,7 +67,7 @@ def main():
              'exec/v86_call.c', 'kernel/v86/v86_gcap.c', 'kernel/v86/v86_io.c',
              'arch/x86/kernel/isr_handlers.c', 'kernel/v86/v86.c',
              'kernel/v86/v86_gp_emulate.inc')
-    sources = {p: (ROOT / p).read_text() for p in paths}
+    sources = {p: read_text(ROOT / p) for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):

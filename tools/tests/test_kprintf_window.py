@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused lexical/format controls for the CPL3 argument-window check."""
 CHECK = dict(name='kprintf-window', tier=1,
-    covers=['tools/source_roots.py', 'userland/**', 'sdk/**', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'exec/exec.c', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt'],
+    covers=['tools/source_roots.py', 'userland/**', 'sdk/**', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'exec/exec_syscall.inc', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'exec/exec.c'],
     needs=[], budget=3.284328)
 
 from pathlib import Path
@@ -21,7 +21,7 @@ class WindowTests(unittest.TestCase):
         for subdir in ('exec', 'tools', 'userland', 'sdk'):
             (root / subdir).mkdir(parents=True, exist_ok=True)
         # Use the real ABI definition for boundary and allowlist tests.
-        (root / 'exec/exec.c').write_text((checker.ROOT / 'exec/exec.c').read_text())
+        (root / 'exec/exec_syscall.inc').write_text((checker.ROOT / 'exec/exec_syscall.inc').read_text())
         (root / checker.ALLOW).write_text(allow)
         for file, source in sources.items():
             path = root / file
@@ -106,7 +106,7 @@ void second(void) {
         with tempfile.TemporaryDirectory(prefix='kprintf-limit-') as directory:
             root = Path(directory)
             (root / 'exec').mkdir()
-            (root / 'exec/exec.c').write_text('#define RING3_ARG_WINDOW  80u\n')
+            (root / 'exec/exec_syscall.inc').write_text('#define RING3_ARG_WINDOW  80u\n')
             self.assertEqual(checker.window_limit(root), (80, 18))
 
     def test_all_user_sources_and_sdk_but_not_submodules(self):

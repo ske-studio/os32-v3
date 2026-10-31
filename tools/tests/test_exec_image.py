@@ -3,6 +3,7 @@
 Compile the complete exec.c translation unit, including its image and argv helpers.
 Only external allocation, VFS and CPU boundaries are supplied by the fixture.
 """
+from exec_source import exec_source
 from pathlib import Path
 import subprocess
 import sys
@@ -57,7 +58,7 @@ MUTATIONS = (
 
 def run(source=None, image=None, argv=None):
     if source is None:
-        source = (ROOT / 'exec/exec.c').read_text()
+        source = exec_source(ROOT)
     if image is None:
         image = (ROOT / 'exec/exec_image.inc').read_text()
     if argv is None:
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     if status != 'pass':
         raise SystemExit(status)
     if '--mutate' in sys.argv:
-        originals = {'source': (ROOT / 'exec/exec.c').read_text(),
+        originals = {'source': exec_source(ROOT),
                      'image': (ROOT / 'exec/exec_image.inc').read_text(),
                      'argv': (ROOT / 'exec/exec_argv.inc').read_text()}
         for name, target, old, new in MUTATIONS:

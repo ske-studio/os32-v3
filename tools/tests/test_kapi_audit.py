@@ -1,4 +1,5 @@
 """Real source ILP32 tests for cursor, FM/SSG, input STOP and rshell authority."""
+from exec_source import read_text
 from kernel_includes import include_flags
 import argparse
 import pathlib
@@ -62,7 +63,7 @@ for old, new in (('port_putchar_kapi', 'serial_putchar'),
     MUTATIONS.append((old + ' public target', 3, old + '(', new + '('))
 
 def run(runner, mutation=None, case=0, expected=None):
-    sources = [(ROOT / p).read_text() for p in SOURCES]
+    sources = [read_text(ROOT / p) for p in SOURCES]
     names = ('rshell_set_active', 'serial_putchar', 'serial_puts', 'serial_getchar',
              'kbd_getchar', 'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml')
     wrappers = []

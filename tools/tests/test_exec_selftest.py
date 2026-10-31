@@ -4,6 +4,7 @@
 Compile the real exec TU with section GC: retain snapshot, trampoline and
 string/WM paths, replacing only their environment. No emulator or mutants.
 """
+from exec_source import read_text
 from kernel_includes import include_flags
 import os
 import re
@@ -130,7 +131,7 @@ class ExecSelftest(unittest.TestCase):
             main = main.replace('@LAYOUT_INDEX@', str(by_name['os32x_layout_check']['index']))
             (out / 'main.c').write_text(main)
             # Keep real kernel implementations distinct from the module's stubs.
-            kernel_sources = '\n'.join((ROOT / p).read_text() for p in (
+            kernel_sources = '\n'.join(read_text(ROOT / p) for p in (
                 'exec/exec.c', 'exec/ring3_str.c', 'exec/os32x_hdr.c',
                 'tools/tests/exec_selftest_host.c'))
             definitions = {e['name'] for e in entries if re.search(

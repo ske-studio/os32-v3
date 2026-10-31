@@ -30,6 +30,7 @@ test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあ�
   python3 -B tools/tests/test_ring3_guard.py --target   # + i386-elf の -Werror
   python3 -B tools/tests/test_ring3_guard.py --mutate   # 否定側 (写しの上で変異)
 """
+from exec_source import exec_source
 from kernel_includes import include_dirs, include_flags
 import host32
 import pathlib
@@ -94,11 +95,11 @@ MUTATIONS = [
      "    if (res_owner_get() != GUI_SHELL_OWNER || !ring3_call_from_user()) {\n        return OS32_ERR_INVAL;\n",
      "gui_register の門が top-level の正当な登録を断る (過剰)"),
     # 代行レビュー P3 (2026-09-26): WM の中で落ちた観測点 (静的検査)。
-    ("exec/exec.c",
+    ('exec/exec_fault.inc',
      "    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
      "    ring3_context_clear();\n    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
      "ring3_wm_fault_count を深さを 0 に戻した後で数える (常に 0)"),
-    ("exec/exec.c",
+    ('exec/exec_fault.inc',
      "        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n",
      "",
      "ring3_wm_fault_count を数えない"),
@@ -139,7 +140,7 @@ def _func_body(text, head):
 def static_checks(root, quiet=False):
     """(6) WM の中で落ちた観測点。落ちた項目の数を返す。"""
     bad = []
-    exec_c = (root / "exec/exec.c").read_text(encoding="utf-8")
+    exec_c = exec_source(root)
     body = _func_body(exec_c, "static void ring3_kill_kind(int kind)")
     c = body.find(WM_FAULT_COUNT)
     # d2 P3: clear is shared by exec_exit / exec_pending_transfer. Count before

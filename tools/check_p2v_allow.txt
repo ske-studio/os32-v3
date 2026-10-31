@@ -30,16 +30,16 @@ mm/kmalloc.c:kheap_alloc:ヒープ内の仮想ポインタ算術 (整数幅・�
 mm/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅・整列)
 mm/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
 exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec.c:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_tramp_init.inc:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 kdebug/selftest_exec.c:kst_exec_kapi_layout:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 kdebug/selftest_exec.c:kst_exec_tramp_user:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec.c:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec.c:ring3_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_finish.inc:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_syscall.inc:ring3_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/ring3_ls.c:ring3_ls_dispatch:USER ESP と引数は呼び手の仮想番地。caller access が所属・PTE を検証して物理へ変換する
 exec/ring3_ls.c:ls_copy_path:USER パスの仮想番地の加算。copy_caller_bytes が所属・PTE を検証して物理へ変換する
-exec/exec.c:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_launch.inc:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_image.inc:exec_load_image:常駐 shell の BSS は ctx->load_addr の仮想番地。image の物理 backing は P2V
-exec/exec.c:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+exec/exec_tramp_strings.inc:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
 exec/exec_heap.c:exec_heap_init_at:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
 exec/exec_heap.c:exec_heap_restore_state:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
 lib/kstring_c.c:kmemcpy:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
