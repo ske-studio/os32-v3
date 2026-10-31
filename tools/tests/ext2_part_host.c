@@ -163,10 +163,9 @@ static int format_io(char op, u32 lba, int count)
 {
     int i;
     if (!g_fmt_trace) return 0;
-    /* D2 groups a 1KiB read into one count=2 request. Keep comparing the
-     * fixed sector sequence, including failure at either sector. Existing
-     * format writes must still use ordered single-sector requests. */
-    CHECK(op == 'W' ? count == 1 : (count == 1 || count == 2));
+    /* Compare the fixed sector sequence, including failure at either
+     * sector of a grouped request. */
+    CHECK(count == 1 || count == 2);
     for (i = 0; i < count; i++) {
         CHECK(g_fmt_io_pos < g_fmt_io_count);
         CHECK(g_fmt_io_pos <= g_fmt_fail_at);
@@ -205,10 +204,10 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
 int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
 {
     int i;
-    if (format_io('W', lba, count) != 0) return -1;
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
+        if (format_io('W', cur, 1) != 0) return -1;
         if (cur >= g_virtual_total) return -1;
         if (cur < DISK_TOTAL)
             kmemcpy(g_disk + cur * 512u, (const u8 *)buf + i * 512, 512);

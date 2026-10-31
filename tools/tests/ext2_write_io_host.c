@@ -210,8 +210,10 @@ static u32 g_rd_sect;     /* 512B セクタ読み出し回数 */
 static u32 g_wr_sect;     /* 512B セクタ書き込み回数 */
 static u32 g_rd_calls, g_rd_lba;
 static int g_rd_count;
+static u32 g_wr_calls, g_wr_lba, g_fail_write_lba;
+static int g_wr_count, g_fail_write;
 
-static void io_reset(void) { g_rd_sect = 0; g_wr_sect = 0; g_rd_calls = 0; }
+static void io_reset(void) { g_rd_sect = 0; g_wr_sect = 0; g_rd_calls = 0; g_wr_calls = 0; }
 static u32 io_total(void) { return g_rd_sect + g_wr_sect; }
 
 static Device g_hd0;
@@ -242,8 +244,12 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
 {
     int i;
     if (!dev) return -1;
+    g_wr_calls++;
+    g_wr_lba = lba;
+    g_wr_count = count;
     for (i = 0; i < count; i++) {
-        if (lba + (u32)i >= DISK_SECTORS) return -1;
+        if (lba + (u32)i >= DISK_SECTORS ||
+            (g_fail_write && lba + (u32)i == g_fail_write_lba)) return -1;
         kmemcpy(g_disk + (lba + (u32)i) * 512u, (const u8 *)buf + i * 512, 512);
         g_wr_sect++;
     }
@@ -795,6 +801,42 @@ static void case_block_read_request(void)
     disk_teardown();
 }
 
+static void case_block_write_request(void)
+{
+    u8 buf[EXT2_BLOCK_SIZE];
+    u32 i, block = 10, lba = DISK_BASE_LBA + block * EXT2_SECTORS_PER_BLOCK;
+
+    disk_setup();
+    kmemset(buf, 0x5a, sizeof(buf));
+    io_reset();
+    CHECK(ext2_write_block(g_ec, block, buf) == EXT2_OK);
+    CHECK(g_wr_calls == 1 && g_wr_count == EXT2_SECTORS_PER_BLOCK && g_wr_lba == lba);
+    for (i = 0; i < sizeof(buf); i++) CHECK(g_disk[lba * EXT2_SECTOR_SIZE + i] == buf[i]);
+    io_reset();
+    CHECK(ext2_write_data_block(g_ec, block, buf) == EXT2_OK);
+    CHECK(g_wr_calls == 1 && g_wr_count == EXT2_SECTORS_PER_BLOCK && g_wr_lba == lba);
+    io_reset();
+    CHECK(ext2_write_sector(g_ec, block, 1, buf) == EXT2_OK);
+    CHECK(g_wr_calls == 1 && g_wr_count == 1 && g_wr_lba == lba + 1);
+
+    kmemset(g_disk + lba * EXT2_SECTOR_SIZE, 0, sizeof(buf));
+    g_fail_write = 1;
+    g_fail_write_lba = lba + 1;
+    io_reset();
+    CHECK(ext2_write_data_block(g_ec, block, buf) == -1);
+    CHECK(g_wr_calls == 1 && g_wr_count == EXT2_SECTORS_PER_BLOCK);
+    CHECK(g_ec->fs_error == 0);
+    for (i = 0; i < sizeof(buf); i++)
+        CHECK(g_disk[lba * EXT2_SECTOR_SIZE + i] == (i < EXT2_SECTOR_SIZE ? 0x5a : 0));
+    kmemset(g_disk + lba * EXT2_SECTOR_SIZE, 0, sizeof(buf));
+    CHECK(ext2_write_block(g_ec, block, buf) == -1);
+    CHECK(g_ec->fs_error == 1);
+    for (i = 0; i < sizeof(buf); i++)
+        CHECK(g_disk[lba * EXT2_SECTOR_SIZE + i] == (i < EXT2_SECTOR_SIZE ? 0x5a : 0));
+    g_fail_write = 0;
+    disk_teardown();
+}
+
 /* ======================================================================== */
 
 static int str_eq(const char *a, const char *b) { return kstrcmp(a, b) == 0; }
@@ -814,6 +856,8 @@ int ext2_write_io_main(const char *sel)
     if (str_eq(sel, "all") || str_eq(sel, "sync_on_alloc"))   case_sync_on_alloc();
     if (str_eq(sel, "all") || str_eq(sel, "meta_reaches_disk")) case_meta_reaches_disk();
     if (str_eq(sel, "all") || str_eq(sel, "block_read_request")) case_block_read_request();
+
+    if (str_eq(sel, "all") || str_eq(sel, "block_write_request")) case_block_write_request();
 
     report("ext2_write_io: PASS (");
     report(sel);
