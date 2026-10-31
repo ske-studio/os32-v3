@@ -1,6 +1,6 @@
 # TASK_GFX_MODES — 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ
 
-> 上位: [ROADMAP](../../ROADMAP.md)・能力の問い合わせ [API_CONTRACTS](../../decisions/gui/API_CONTRACTS.md) G5・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
+> 上位: [ROADMAP](../../ROADMAP.md)・能力の問い合わせ [os32_kapi_shared.md](../../design/sdk/include/os32/os32_kapi_shared.md) G5・規則 [C4] ([POLICY_DEV](../../POLICY_DEV.md) §2)
 
 > 状態: **受入完了 (2026-10-26)** — G0・G2〜G6b が main。色数は形式から (`GFX_PAL_ENTRIES`)、各バックエンドが出せるモードを表で申告し、HAL が表から選んで FB・問い合わせの大きさを決め、予約に収まらないモードは断って今のモードへ戻る (高解像度の窓)。アプリへの口・KAPI は不変、Cirrus のモジュールの ABI 値だけ変わる (kernel と cirrus.mod を対で配る)。延ばした試験は DEFERRED_TESTS の GFX-MODES-C480。
 
@@ -27,7 +27,7 @@
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
 | G0 | 小さい直し: Cirrus と PEGC のパレット数を、形式から決まる 1 つの名前にする (機械語は変えない) | 不要 | sol | **main** (675bb395、astra 取り込み可、機械語の差 0) |
-| G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [GFX_MODES_DESIGN](../../decisions/gui/GFX_MODES_DESIGN.md) | sol | **main** (astra 取り込み可、.o の差は Cirrus の 3 関数、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
+| G2 | 形式とモードの記述 (include/gfx_format.h・gfx_hal.h・新しい gfx_mode.h、cirrus の契約一覧)。cirrus.mod の ABI の値が変わり対で配り直す | [gfx_mode.md](../../design/include/gfx_mode.md) | sol | **main** (astra 取り込み可、.o の差は Cirrus の 3 関数、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
 | G3 | 98 の 16 色のバックエンドがモードの表を申告 (drivers/video/pc98/backend_pc98.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-n16 合格) |
 | G4 | PEGC のバックエンドの表 (drivers/video/pc98/backend_pegc.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト gfx-modes-p480・p400 合格) |
 | G5 | Cirrus のバックエンドの表 (drivers/video/cirrus/backend_cirrus.c) | 同上 | sol | **main** (astra 取り込み可、PM のゲスト: Cirrus が無いときの PEGC への戻り。C480 は節目) |

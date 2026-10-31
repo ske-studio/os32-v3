@@ -6,3 +6,9 @@
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|
 | cursor `cursor` | offset=0・非表示だけ | `dispnv04/cursor.c:9–59` | Core に該当無し |
+
+## 移し替えた設計
+
+`nv04_cursor_set_offset` のCR30→31→2FとCurieの位置再書込み
+
+CR30/31/2F=80/00/00→680300=r

@@ -1,7 +1,7 @@
 # S8 (GeForce A1 → A2) 立会いの台本
 
-正典: 票 TASK_HWDEV §3-1 の 6、TASK_REALHW_RECOVER の T5、設計 [GF6200_4A_DESIGN](../../docs/decisions/realhw/GF6200_4A_DESIGN.md) §3 (A1・A2 の行)・§7 (実機 A1・A2) と
-[GF6200_S7_SHELL](../../docs/decisions/realhw/GF6200_S7_SHELL.md) §3・§4。本ファイルは受入の台本で、確定設計を変えない。
+正典: 票 TASK_HWDEV §3-1 の 6、TASK_REALHW_RECOVER の T5、設計 [初期化の契約](../../docs/design/kdebug/gfinit.md) と
+[シェルの契約](../../docs/design/userland/shell/cmd_gfinit.md)。本ファイルは受入の台本で、確定設計を変えない。
 **書込みを伴う段ごとにユーザーの承認を取る** (U2: A1 → 結果確認 → A2、main 0〜3 と A4 はこの回に含めない)。
 
 ## 0. 前提 (立会いの前に PM)
@@ -41,5 +41,5 @@
 - **A2 をやり直す前と route-test の前は、ユーザーが電源を切って入れ直す** (CPU のリセットが PCI の RST# を出す保証は無く、A2 の PMC.ENABLE bit0 などが残りうる。GRPH+2+RESET は 31kHz の設定と新しい起動のためで、冷えた状態への戻りの代わりにしない)。入れ直した後に ver・Image CRC・recover status (IDLE・sid 0) と PMC・1850h・1854h の初期値を記録し、inspect → A1 からやり直す (新しい起動では前の snapshot を使わない)。
 - 0FACh の初めての書込み — 承認 3 (A2 を止めた後、IDLE・session 0 の新しい起動で。route-test は session 0 だけ受ける):
   `rshell_serial.py … cmd 'recover route-test 0 --approve'` → route の step 0→1→0 が 1 組ずつ、終端 `PARTIAL target=S0 verified=1`。
-  直後にユーザーが 98 画面を目視。戻らなければユーザーがリセット。口は [RECOVER_ROUTE_TEST](../../docs/decisions/realhw/RECOVER_ROUTE_TEST.md)。
+  直後にユーザーが 98 画面を目視。戻らなければユーザーがリセット。口は [s0.md](../../docs/design/kdebug/recover_common/s0.md)。
 - 結果は `RESULT.md` に項目ごとの 合格/不合格/未確認。票には合否 1 語と証拠の所在だけ。

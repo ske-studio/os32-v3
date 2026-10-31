@@ -126,7 +126,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v76 | **受入済み (T3、2026-10-18 — 実装は T3d1b)** | `unicode_to_jis` (slot 249)、kernel 所有の組表を探索。4 世代・データ欄は不変。 | 本書 §4-13 |
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
-| v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[VER_INFO_DESIGN](decisions/VER_INFO_DESIGN.md) |
+| v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -214,7 +214,7 @@ SHM ブロック (`sys_shm_lock` / `sys_shm_free`)、パイプ (`sys_pipe_free` 
 | IME 辞書 `ime_user_export(path)` | 共通学習辞書の CSV 出力。非空 path | 0 / −1=入力・接続なし / −2=open / −3=prepare / −4=読取 / −5=書込失敗 | 成功は全件出力。出力先を create/truncate した後の失敗は空/途中のファイルを残し得る。学習辞書と候補コピーを変更しない | path は呼出し中有効。出力ファイルは owner終了で削除しない。B2 の入力 staging/副作用前拒否は T5a-1 で接続 |
 | IME 辞書 `ime_user_clear()` | 共通学習辞書を全消去 | 0 / −1=接続なし / −2=実行失敗 | 以後の検索へ全体に反映。表示済み候補/未読確定列はコピーとして残る。I/O回復による再openあり | owner終了やparkで消去を巻き戻さない。FEP常駐辞書はアプリのUSER勘定・回収対象と別 |
 | 実行 `exec_last_result(kind, code)` | 全呼び手。出力は各々 NULL 可、有効な書込先 | 0=記録あり、INVAL=なし (kind=NONE/code=0) | 全体の直前の同期 exec の1件。読みは非消費。次の exec_run 入口でNONEにし、完了/起動失敗で更新。exec_start/resume の GUI 子は更新しない | 呼び手へのコピーは次のexec後も有効。親子間で本人別に保存しない。fault/STOPも種別を保持し、park/resume単独では更新しない |
-| GUI `gui_call(op, arg)` | 現在の実ownerを WM に渡す。arg の形式/寿命は各opの契約 | WM の返値 / 未登録NOSYS / 内部 OWNER_EXIT はINVAL | 公開OWNER_EXITをWMへ転送しない。TRIM_DONE はcoreのepoch/owner検査へ。その他は実ownerのまま正規WMへ配送、WM文脈/WAIT印を対で管理 | 同期opのargは呼出し中有効。parkしたWAITは保存フレームの復帰値として戻る。owner終了時の内部通知が窓等を取消 (GUI契約 (決定 `decisions/gui/API_CONTRACTS.md`)) |
+| GUI `gui_call(op, arg)` | 現在の実ownerを WM に渡す。arg の形式/寿命は各opの契約 | WM の返値 / 未登録NOSYS / 内部 OWNER_EXIT はINVAL | 公開OWNER_EXITをWMへ転送しない。TRIM_DONE はcoreのepoch/owner検査へ。その他は実ownerのまま正規WMへ配送、WM文脈/WAIT印を対で管理 | 同期opのargは呼出し中有効。parkしたWAITは保存フレームの復帰値として戻る。owner終了時の内部通知が窓等を取消 (GUI契約 (決定 `docs/design/sdk/include/os32/os32_gui_shared.md`)) |
 | console `con_sink_read(buf, cap)` | 最初の有効な読取り主体が単一reader。非NULL buf、cap≥CON_SINK_REC_MAX | 完全レコードのコピーbyte数 / 空=0 / 入力INVAL / 別reader=EXIST | 空でもreaderを獲得。INVAL/EXISTは出力/リング/reader不変。park・子終了・enable/disableでは所有を返さず、reader本人の終了時だけ返す | コピーは呼び手所有。所有返却時にリングを捨てない。enable/disableはリング内容を捨てる。あふれは古いレコード単位で破棄 |
 
 IME の検索候補は SQL の最大32行から C 側で31 B に切る前の表記の重複を除き、学習語の先行順位を保つが、減った分は取り直さず32件未満を許す。
@@ -712,7 +712,7 @@ V86 ゲストを起動する。MS-DOS 5.00A の起動確認に使う。
 これを信じて 400 ライン・16 色を決め打ちしない。`gfx_hw_fill_rect` / `gfx_hw_blit` は
 アクセラレータ系バックエンド用の枠で、CPU バックエンド (9801 プレーン / PEGC) では
 `OS32_ERR_NOSYS` (-10) を返す。呼ぶ側は `GFX_CAP_HW_FILL` / `GFX_CAP_HW_BLT` を見て
-CPU 実装へフォールバックする。設計: `docs/decisions/gui/API_CONTRACTS.md` G5 / DESIGN.md §7。
+CPU 実装へフォールバックする。設計: `docs/design/sdk/include/os32/os32_kapi_shared.md` G5 / `docs/design/include/gfx_hal.md` §7。
 
 `ime_user_list` の `out` は `IME_UserEntry`(`sdk/include/os32/os32_kapi_shared.h`) の配列。
 `ime_trygetkey` は FEP を通したノンブロッキングのキー取得で、`kbd_trygetkey` の
@@ -1671,7 +1671,7 @@ C/Rust は GUI flag 下の確保失敗だけ、`sys_yield` 1回 → 操作全体
 flag 無し・hook 中・入口拒否・size 0・calloc 積 overflow は再試行しない。
 realloc は失敗時に旧内容を保ち、成功した再試行で copy と旧解放を行う。
 resident C CRT にはこの欄を組み込まず、gshell の Rust flag も偽のまま。
-詳細なアプリ契約は 決定 `decisions/gui/API_CONTRACTS.md` T5a。
+詳細なアプリ契約は 決定 `docs/design/sdk/README.md#trim-contract` T5a。
 
 ### sys_ver_info (v79)
 

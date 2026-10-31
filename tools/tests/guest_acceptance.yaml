@@ -389,7 +389,7 @@
 
 - id: e10c-boot-audit
   gate: e10c
-  contract: docs/decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "PM deploys this build and matching kernel.map; 8MB planar/PEGC and 17MB planar/PEGC/Cirrus; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: boot, capture bootlog and tools/accept/pt0_snapshot.py output, then run a CUI app
@@ -757,7 +757,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: "8MB planar; H-4 configuration batch, docs/decisions/MEMMAP_V3.md §7-1; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  prereq: "8MB planar; H-4 configuration batch; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: &id001
   - Use rebuilt generation-3 binaries and matching kernel.map; record hashes, __bss_end, backend and RAM.
@@ -786,7 +786,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: "8MB PEGC; H-4 configuration batch, docs/decisions/MEMMAP_V3.md §7-1; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  prereq: "8MB PEGC; H-4 configuration batch; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -800,7 +800,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: "17MB planar; H-4 configuration batch, docs/decisions/MEMMAP_V3.md §7-1; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  prereq: "17MB planar; H-4 configuration batch; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -814,7 +814,7 @@
   mode: manual
   status: deferred
   contract: docs/tasks/DEFERRED_TESTS.md#H-4
-  prereq: "17MB Cirrus; H-4 configuration batch, docs/decisions/MEMMAP_V3.md §7-1; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
+  prereq: "17MB Cirrus; H-4 configuration batch; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Full T2e acceptance suite
   observe: *id001
   expect:
@@ -840,7 +840,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/e12-cirrus-off/
 - id: e12-17mb-pegc-accepted
   gate: e12
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   status: accepted
   prereq: "17MB PEGC; e11 integrated build v70, commit 1d222ac; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
@@ -1650,7 +1650,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R0-winoptin/
 - id: h-R1a-matrix
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-1-構成ごとの観測と記録
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 台本 M; H-6a; PRIO-3 audit_test; S-2/S-5/S-6/S-7; E11-BUD CUI
@@ -1686,7 +1686,7 @@
   gate: T2h
   contract:
   - userland/tests/h2_stack.c
-  - docs/decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture
+  - sdk/include/os32/os32_generations.h
   mode: manual
   prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: h2_stack; h2_stack512; h2_stack512 guard; h2-isolated の正常 app と拒否 fixture
@@ -1756,7 +1756,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1a-f6/
 - id: h-R1a-shellheap
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#4-3-8mb-の勘定-d9d21
+  contract: docs/design/include/memmap.md
   mode: manual
   prereq: "R1a: L-h (KAPI 74 / MemStat 200B) の manifest・サイズ・SHA256・kernel.map を束縛、本 NHD の deploy-kernel は [D2] 個別承認と [D1]。17MB、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。CUI 常駐 shell。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: CPL0 shell の mem; 子ネスト; GUI→CUI; 既存16本; pool0 から閉じる
@@ -2140,7 +2140,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1c1-restore/
 - id: h-R1c2-oldshell
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys --rename shell.bin <old-shell.fixture>; deploy; start
@@ -2156,7 +2156,7 @@
 - id: h-R1c2-restore-shell
   gate: T2h
   contract:
-  - docs/decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture
+  - sdk/include/os32/os32_generations.h
   - docs/08_build.md#t2h-の試験専用-kernel-と隔離-nhd
   mode: manual
   prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
@@ -2177,7 +2177,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-restore-shell/
 - id: h-R1c2-oldshlib
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: copy --profile t2h --dest /sys/lib --rename libos32gui.shlib <old-shlib.fixture>; deploy; start; gui_demo
@@ -2196,7 +2196,7 @@
 - id: h-R1c2-restore-shlib
   gate: T2h
   contract:
-  - docs/decisions/MEMMAP_V3.md#7-2-旧形式の拒否の-fixture
+  - sdk/include/os32/os32_generations.h
   - docs/08_build.md#t2h-の試験専用-kernel-と隔離-nhd
   mode: manual
   prereq: "R1c-2: R1c-1 の正常復元後、同じ t2h_fault.ini / 隔離 ext2 NHD / --profile t2h。旧 shell/shlib・各復元・U3 予行の上書きはそれぞれ [D2] 個別承認と [D1]。gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致は正常対照で採る。旧 shell は entry 前停止なので hal_test を要求しない。 試験 kernel の Gui.launch は OS32_KERNEL_ELF=build/out/r1/kernel.elf を指定する。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
@@ -2271,7 +2271,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1c2-verify-stale/
 - id: h-R1d-planar
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off 分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e12-17mb-planar; gfx200_test; gfx_demo200; ring3_guard bb; 20回ループ
@@ -2300,7 +2300,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1d-planar/
 - id: h-R1d-cirrus-off
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R1d: L-h、17MB、ini 不変。gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致。cirrus-off 分岐は保存した USEGD5430 に従う。終了時は保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: e12-cirrus-off; gfxmode cirrus; fallbackを読み戻し/reset/hal_testで確認
@@ -2317,7 +2317,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R1d-cirrus-off/
 - id: h-R3-cirrus
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R3: L-h、17MB、PM の派生 t2h_cirrus.ini (cirrus-on)。np21w_ctl.py stop → start --ini t2h_cirrus.ini ([D1])、gfxmode cirrus → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 Cirrus 一致。派生 ini が使えないとき (R1c・R3〜R6 共通) の代替は np21w_ini_live.py の live-apply (道具自身が停止・起動し、同じ receipt で restore — SKILL os32-emu-config §2)。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-17mb-cirrus; ring3_guard cirrus; gdi_test CLIENT; V86往復; 20回ループ
@@ -2351,7 +2351,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R3-cirrus/
 - id: h-R4-8mb-planar
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R4: L-h、PM の派生 t2h_8mb.ini (ram-8mb)。np21w_ctl.py stop → start --ini t2h_8mb.ini ([D1])、gfxmode pc98 → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 pc98 一致、8MB を確認。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-8mb-planar; f12-8mb-startup; mem_map_test F-6; FEP; 20回ループ
@@ -2458,7 +2458,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R4-g/
 - id: h-R5-8mb-pegc
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R5: L-h、R4 と同じ t2h_8mb.ini / 8MB。gfxmode pegc (auto は使わない) → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: M; e12-8mb-pegc; f12-8mb-startup; h5_shape_i/ii/iii; g-G-1〜G-4; 20回
@@ -2509,7 +2509,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R5-8mb-pegc/
 - id: h-R6-64mb
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start し保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Mの boot/地図/kselftest/高位HostDrv/親子 (32MB超)
@@ -2631,7 +2631,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R7-recover/
 - id: h-R7a-cui
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: 'Ra26664MB: boot/ONLINE; SerialFS; 親子; map/trim/owner; PCM E6; T1f CUI'
@@ -2658,7 +2658,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/h-R7a-cui/
 - id: h-R7b-gui
   gate: T2h
-  contract: docs/decisions/MEMMAP_V3.md#7-受入条件
+  contract: tools/tests/guest_acceptance.yaml
   mode: manual
   prereq: "R7: Ra266 実機、64MB / PEGC。FD 書込み・HDD 更新・電源・音の確認は各物理操作の個別承認。gfxmode pegc → /etc/system.cfg 読み戻し → 実機 reset (個別承認) → hal_test 1 行目 PEGC 一致。更新前は v2.1、更新後は L-h (KAPI 74 / MemStat 200B)。NP21/W の観測で代用しない。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: H-5 present; CG窓WB; PEGC/日本語/全画面; GUI map/trim/owner/STOP; T1f; 31kHz STOP1/STOP2
@@ -2714,7 +2714,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/kpeek-T5-lan-82557/
 - id: gfx-modes-n16
   gate: GFX-MODES
-  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  contract: docs/design/include/gfx_mode.md
   mode: manual
   prereq: "9821, GFX=pc98, the stage's paired kernel and modules (hsync boot); kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: "GUI (os32gui) と既存の 200 ラインのアプリ"
@@ -2729,7 +2729,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: gfx-modes-p480
   gate: GFX-MODES
-  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  contract: docs/design/include/gfx_mode.md
   mode: manual
   prereq: "64MB, GFX=pegc, the stage's paired kernel and modules (hsync boot); kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: "GUI (os32gui)"
@@ -2744,7 +2744,7 @@
   evidence: ~/os32-tmp/evidence/<日付>/<case id>/
 - id: gfx-modes-p400
   gate: GFX-MODES
-  contract: docs/decisions/gui/GFX_MODES_DESIGN.md
+  contract: docs/design/include/gfx_mode.md
   mode: manual
   prereq: "400-line CUI, GFX=pegc, the stage's paired kernel and modules; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: "CUI から os32gui、GUI から CUI"

@@ -5,3 +5,14 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 52 CR | I:1176 `init_cr` |
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 52 CR | 4B、CR←(旧&m) OR 値 | I:1176–1189 |
+
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 52 CR | 4：i8@1,m8@2,v8@3 | X(t,i); M(t,m,v;DATA) | F |

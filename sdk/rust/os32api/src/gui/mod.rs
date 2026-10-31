@@ -1,4 +1,4 @@
-//! GUI シェル v1.1 共有定義 (Rust 側) — 契約 [API_CONTRACTS.md] / TASKS §4。
+//! GUI シェル v1.1 共有定義 (Rust 側) — 契約 docs/design/sdk/include/os32/os32_gui_shared.md / TASKS §4。
 //!
 //! - [`proto`] … C `sdk/include/os32/os32_gui_shared.h` の写し (op 番号・イベント種別・
 //!   Style フラグ・システム色・上限・SHM オフセット・エラー番号・16B イベント)。

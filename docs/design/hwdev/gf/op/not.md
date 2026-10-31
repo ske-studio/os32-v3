@@ -5,3 +5,14 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 38 NOT | I:767 `init_not` |
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 38 NOT | 1B、条件skip反転 | I:767–772 |
+
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 38 NOT | 1 | C`[]` | F、skip反転（skip中も実行） |

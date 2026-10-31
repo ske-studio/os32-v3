@@ -16,7 +16,7 @@
  * PCIR_PMBASEL_1/PCIR_PMLIMITL_1; TI PCI2050B SCPS076G sections
  * 4.20-4.25 (memory/prefetch base, limit and upper bits).
  * No sizing writes to other devices.
- * BARLEN_DESIGN.md: exact Intel apertures, conservative Trident bounds. */
+ * docs/design/kdebug/gfinit_resources.md: exact Intel apertures, conservative Trident bounds. */
 
 /* Local layer: Intel 8255x rev.1.3 section 4.1.10 Table 3 (4 KiB CSR,
  * 1 MiB Flash aperture, independent of Flash population). BSD comparison:

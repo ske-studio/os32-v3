@@ -78,7 +78,7 @@ $(R1_OBJ)/kernel/module/module.o \
 HWDEV_GEN := hwdev/generated
 HWDEV_HEADERS := $(wildcard include/*.h kernel/*.h kernel/console/*.h kernel/ime/*.h kernel/irq/*.h kernel/module/*.h kernel/time/*.h kernel/v86/*.h init/*.h mm/*.h arch/x86/kernel/*.h drivers/*.h drivers/ata/*.h drivers/base/*.h drivers/block/*.h drivers/char/*.h drivers/dma/*.h drivers/input/*.h drivers/net/e82557/*.h drivers/net/ne2000/*.h drivers/pci/*.h drivers/sound/cs4231/*.h drivers/sound/fm/*.h drivers/video/cirrus/*.h drivers/video/geforce/*.h drivers/video/kcg/*.h drivers/video/pc98/*.h lib/*.h fs/*.h exec/*.h gfx/*.h arch/x86/*.h platform/pc98/*.h sdk/include/os32/*.h kdebug/*.h hwdev/*.h)
 HWDEV_GENERATED := $(addprefix $(HWDEV_GEN)/,hwdev_contract.h hwdev_core.c hwdev_imports.h hwdev_layout.txt hwdev_import_macros.h hwdev_import_slots.c hwdev_import_stubs.S hwdev_imports.json)
-$(HWDEV_GENERATED) &: hwdev/hwdev_imports.def kernel/module/kdebug_imports.def tools/gen_kdebug_imports.py build/config.mk build/kdebug.mk tools/gen_hwdev_contract.py tools/hwdev_layout.json docs/decisions/realhw/HWDEV_CORE_API.md $(HWDEV_HEADERS)
+$(HWDEV_GENERATED) &: hwdev/hwdev_imports.def kernel/module/kdebug_imports.def tools/gen_kdebug_imports.py build/config.mk build/kdebug.mk tools/gen_hwdev_contract.py tools/hwdev_layout.json docs/design/hwdev/hwdev_imports.md $(HWDEV_HEADERS)
 	python3 tools/gen_hwdev_contract.py --cc $(CROSS_DIR)/bin/i386-elf-gcc --flags '$(filter-out -MMD -MP,$(KERNEL_CFLAGS))' --includes '$(INC_KERNEL)'
 $(KDEBUG_OUT)/hwdev_core.o: $(HWDEV_GEN)/hwdev_core.c $(HWDEV_GEN)/hwdev_contract.h
 	mkdir -p $(@D)

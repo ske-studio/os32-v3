@@ -63,7 +63,7 @@ SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 �
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
 
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
-lease (0xF0000000〜 の私有窓、契約は [MEMMAP_V3](decisions/MEMMAP_V3.md) §2-2、API は [KAPI_SPEC.md](KAPI_SPEC.md) の surface 系) と map の固定表は AS ごとに lease `MEM_LEASE_MAX` (8) 本・extent `APPMEM_EXTENT_MAX` (32) 本で、実行中に増やさない。静的リンクの libos32gfx と libos32gui.shlib の中の libos32gfx は別の実体なので、両方で描く GUI アプリは CLIENT lease を 2 本使う (8 本の内数)。
+lease (0xF0000000〜 の私有窓、契約は [lease](design/exec/lease.md)、API は [KAPI_SPEC.md](KAPI_SPEC.md) の surface 系) と map の固定表は AS ごとに lease `MEM_LEASE_MAX` (8) 本・extent `APPMEM_EXTENT_MAX` (32) 本で、実行中に増やさない。静的リンクの libos32gfx と libos32gui.shlib の中の libos32gfx は別の実体なので、両方で描く GUI アプリは CLIENT lease を 2 本使う (8 本の内数)。
 PTE の変更の TLB への反映は CR3 の読み直しで行い、`invlpg` を前提にしない (386 が下限)。動いていない AS は、再開の前に CR3 を読み込むことで反映する。
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 

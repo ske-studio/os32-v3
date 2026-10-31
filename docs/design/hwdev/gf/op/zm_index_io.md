@@ -5,3 +5,14 @@
 | opcode・命令名（最終ファイルの語幹） | nouveau の対応 |
 |---|---|
 | 62 ZM_INDEX_IO | I:1441 `init_zm_index_io` |
+
+## 移し替えた設計
+
+| opcode / 名称 | 意味・OS32実装 | MIT根拠 |
+|---|---|---|
+| 62 ZM_INDEX_IO | 5B、indexed VGA直書き | I:1441–1453 |
+
+
+|op / 名前|長さ・復号配置（+offset）|実行substep順・args/kind・方向|辺・展開／skip・force|
+|---|---|---|---|
+| 62 ZM_INDEX_IO | 5：p16@1,i8@3,v8@4 | X(t,i); D(t,v) | F |

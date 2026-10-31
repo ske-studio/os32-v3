@@ -21,7 +21,7 @@
 
 | 段 | 中身 | 設計 | 実装 | 状態 |
 |---|---|---|---|---|
-| V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [VER_INFO_DESIGN](../../decisions/VER_INFO_DESIGN.md) | sol | **main** (astra 取り込み可、試験 2 本を直してから) |
+| V1・V3・V4・V5 | 版数 3.0-dev と VERSIONS の注記、公開の型 (os32_ver_info.h)、kdebug の状態名の範囲検査、services の状態を取る口 | [os32_ver_info.md](../../design/sdk/include/os32/README.md#os32_ver_info) | sol | **main** (astra 取り込み可、試験 2 本を直してから) |
 | V6 | GFX の保存の状態を取る口 (gfx_hal.h・gfx_core.c) | 同上 | sol | **main** (astra 取り込み可、Cirrus の ABI 値が変わる — kernel と cirrus.mod を対で配る) |
 | V7 | 装置の状態を集める (kernel/ver_collect.c、kernel/ver_info.h、CPU の既定かどうかの口は cpu_calibrate) | 同上 | sol | **main** |
 | V8 | 行の formatter (kernel/ver_format.c、上限 20 行・52 桁) | 同上 | sol | **main** |

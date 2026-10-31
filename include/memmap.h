@@ -178,7 +178,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define MEM_SHM_DB_SIZE       0x4000UL                     /* 16KB = 1 ブロック */
 #define MEM_SHM_DB_BASE       (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)
 
-/* GUI 予約 SHM (契約 T2 / docs/decisions/gui/API_CONTRACTS.md)。
+/* GUI 予約 SHM (契約 T2 / docs/design/include/memmap.md)。
  * SHM 帯の **末尾 4 ブロック** を GUI 用に固定予約する。mm/shm.c の
  * 初期化でこの 4 ブロックを SHM_RESERVED にし、shm_alloc が配らないようにする。
  * 1 スロット (16KB) = アプリ 1 本、最大 4 アプリ (v1 はスロット 0 のみ)。
@@ -421,7 +421,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /*  物理末尾の 256KB を予約してホストから 1 バイナリを流し込む仕組みは     */
 /*  廃止した。窓 [末尾-256KB, 末尾) は CPL=3 スタック帯と同じ範囲で、      */
 /*  8MB 構成ではアプリ帯と必ず衝突していた                                 */
-/*  (docs/decisions/gui/DESIGN.md §9.3 の「9.6MB 構成以上が実質の下限」)。      */
+/*  (旧 GUI 設計の「9.6MB 構成以上が実質の下限」、記録はアーカイブ)。      */
 /*  ユーザーランドの配送は HostDrv (Windows の C:\os32 → ゲストの /host)   */
 /*  に一本化し、ゲスト側で /usr/bin へ写す。カーネルは NHD 配備のまま。    */
 /*  経緯: docs/tasks/hotdeploy/DESIGN.md                                   */

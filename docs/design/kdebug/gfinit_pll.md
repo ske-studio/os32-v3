@@ -3,3 +3,7 @@
 ソース: `kdebug/gfinit_pll.c`
 
 共通 solver は一つ。
+
+## HWDEV_DESIGN
+
+整数 PLL 探索

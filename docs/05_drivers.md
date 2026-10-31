@@ -132,7 +132,7 @@ GUI もアプリも 400 ライン / 16 色 / プレーンを決め打ちしな�
 開始後の FB は選択行の幅・pitch と現在高さを使い、未開始の内部 FB は起動時の planar 400 を返す。
 KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から選択行の幅・pitch と既定の高さを返す。
 `gfx_screen_info()` の高さは描画中は現在高さ、開始前・終了後は既定行 (planar 400 / packed 480)。
-高解像度の予約拡大・ハード設定は対象外。詳細は [GFX_MODES 設計](decisions/gui/GFX_MODES_DESIGN.md) §3・§4。
+高解像度の予約拡大・ハード設定は対象外。詳細は [モードの表](design/include/gfx_mode.md) と [容量の照合](design/gfx/gfx_core.md)。
 
 | バックエンド | 画面 | バックバッファ (CPU が描く面) | 表示面へ | 能力ビット |
 |---|---|---|---|---|
@@ -144,7 +144,7 @@ KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から
 (表示面へ直接描かせない = 契約 G4。写像の規則は [02 §2-1](02_memory.md))。counters
 (`gfx_stats`: present_bytes / hw_ops / io_accesses / commits) で「CPU が運んだ量」と
 「エンジンに任せた回数」を測る (NP21/W では時間が測れないため)。設計と経緯は
-決定 `decisions/gui/DESIGN.md` §5〜§8、Cirrus の資料は `include/wab_xe10.h` と
+設計 `docs/design/include/gfx_hal.md`、Cirrus の資料は `include/wab_xe10.h` と
 `drivers/video/cirrus/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
