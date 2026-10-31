@@ -75,8 +75,9 @@ MUTANTS = [
   'FAIL public_fb.width == si.width && public_fb.height == si.height && public_fb.pitch == client->pitch'),
  ('fallback-bind', '            gfx_bind_client(); /* bind init failure fallback */', '',
   'FAIL bb[0] == (u8 *)P2V(planar->first * PAGE_SIZE) && bb[1] == bb[0]+GFX_PLANE_SZ'),
- ('packed-bind', '        gfx_bind_client(); /* bind packed init */', '',
-  'FAIL bb[i] == want'),
+ ('packed-bind', '        gfx_reinit_pending = 0;\n        gfx_bind_client();',
+  '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();',
+  'FAIL host_serial_find(" started=1 bb=")'),
 ]
 
 def replace_function(body, signature, replacement):
@@ -123,10 +124,6 @@ static inline void io_wait_n(int n) {(void)n;}
                     _, old, new, _ = mutation
                     assert body.count(old) == 1, (mutation[0], body.count(old))
                     body = body.replace(old,new)
-                    if mutation[0] == 'packed-bind':
-                        old = '        gfx_reinit_pending = 0;\n        gfx_bind_client();'
-                        assert body.count(old) == 1
-                        body = body.replace(old, '        gfx_reinit_pending = 0;\n        if (gfx_sf_backend() == LEDGER_SF_PC98) gfx_bind_client();')
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'drivers/video/pc98/backend_pegc.c':

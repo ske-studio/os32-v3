@@ -168,9 +168,8 @@ static int gfx_mode_fits(const GfxBackend *be, const GfxMode *mode)
 static int gfx_select_mode(GfxBackend *be, int legacy200)
 {
     const GfxMode *mode = gfx_mode_pick(be, legacy200);
-    GfxFormatDesc format;
     gfx_mode_ready = 0;
-    if (!mode || !gfx_format_desc(mode->format, &format)) return 0;
+    if (!mode) return 0;
     if (!gfx_mode_fits(be, mode)) return 0;
     gfx_mode_ready = 1;
     be->selected_mode = mode;
@@ -371,7 +370,6 @@ void gfx_init(void)
     int initialized = gfx_select_and_init_backend(0);
     if (initialized < 0) return;
     if (initialized) {
-        gfx_bind_client(); /* bind packed init */
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();
@@ -421,7 +419,6 @@ void gfx_init_200(void)
     int initialized = gfx_select_and_init_backend(1);
     if (initialized < 0) return;
     if (initialized) {
-        gfx_bind_client();
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
         if (g_backend->enter) g_backend->enter();

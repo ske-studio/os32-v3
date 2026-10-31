@@ -293,8 +293,7 @@ int gfx_selected_selfcheck(void)
 {
     struct surface_query_source client, display;
     if (gfx_selected_source(LEDGER_ROLE_CLIENT, &client) ||
-        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display) ||
-        !client.ready || !display.ready || client.count != 1) return 0;
+        gfx_selected_source(LEDGER_ROLE_DISPLAY, &display)) return 0;
     for (u32 i = 0; i < display.count; i++)
         if (!ledger_surface_validate(&ledger_surfaces[display.refs[i].sid])) return 0;
     const struct ledger_surface *sf = &ledger_surfaces[client.refs[0].sid];
