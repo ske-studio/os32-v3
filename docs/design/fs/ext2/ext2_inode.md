@@ -5,7 +5,8 @@
 inode の読書きとブロック・inode の割当てを扱う。
 間接ブロック表の操作と解放を行う。
 read 入口は [inode 1 枠](ext2_inode_cache.md)、bmap は [間接表 2 枠](ext2_inode_indirect_cache.md)
-へ接続する。全失効の薄い束ね口は [ext2_priv](ext2_priv.md) の契約に従う。
+へ接続する。同期writeは [bitmap](ext2_inode_write_bitmap.md)・
+[表](ext2_inode_write_bmap.md)・[生inode](ext2_inode_write_cache.md) を別枠へ保持する。全失効の薄い束ね口は [ext2_priv](ext2_priv.md) の契約に従う。
 
 ## 落とし穴
 
@@ -16,3 +17,6 @@ read 入口は [inode 1 枠](ext2_inode_cache.md)、bmap は [間接表 2 枠](e
 - **参照を外してから解放**: inode が指すブロックを先に再利用すると、失敗時に別ファイルと共有される。
   inode のポインタをゼロにして媒体へ書いてから解放し、失敗時は漏れを許して参照を守る (`fs/ext2/ext2_inode.c:552`, `fs/ext2/ext2_inode.c:568`)。
   I/O 失敗を空きや不存在に変換しない。回帰は `tools/tests/test_b8_open.py`。
+
+D6の未公開builderはext2_write_release_blocksを使い、同じ解放走査でmetadata IO後の
+書込みを止める。既存truncate/unlink等の境界と解放契約はext2_release_blocksへ残す。

@@ -24,6 +24,141 @@ extern u8 ext2_g_blk[EXT2_BLOCK_SIZE];
 extern u8 ext2_g_aux[EXT2_BLOCK_SIZE];
 extern u8 ext2_g_dat[EXT2_BLOCK_SIZE]; /* ext2_write_stream データ読み書き専用 */
 
+/* D6: 同期 write 1 回だけが所有する作業領域。bitmap/表/inode と窓の進捗を保持する。
+ * 実体は ext2_file_write_batch.inc。D1 の読取枠とは共有しない。 */
+#define EXT2_WRITE_WINDOW_BLOCKS 64u
+#define EXT2_WRITE_TABLE_SLOTS 3u /* 上位 1 枚 + 単間接/下位 2 枚 */
+#define EXT2_WRITE_UPPER_SLOT 0u
+#define EXT2_WRITE_LOWER_FIRST 1u
+#define EXT2_WRITE_RECORDS (EXT2_WRITE_WINDOW_BLOCKS + EXT2_WRITE_TABLE_SLOTS)
+#define EXT2_WRITE_WORK_MAX_BYTES (40u * EXT2_BLOCK_SIZE)
+#define EXT2_WRITE_NEW_INO 0u
+
+#define EXT2_WRITE_KIND_DATA 0u
+#define EXT2_WRITE_KIND_LOWER 1u
+#define EXT2_WRITE_KIND_UPPER 2u
+#define EXT2_WRITE_REC_NEW 0x01u       /* この窓で予約した bit */
+#define EXT2_WRITE_REC_DATA_DONE 0x02u /* data 要求全体が成功 */
+#define EXT2_WRITE_REC_BITMAP_DONE 0x04u /* bit が媒体上で確保済み */
+#define EXT2_WRITE_REC_LINKED 0x08u    /* RAM の親へ 0 から追加済み */
+
+typedef struct {
+    u8 data[EXT2_BLOCK_SIZE];
+    u32 reserved; /* 未確定の予約数。ctx の空き数はまだ減らさない */
+    u8 valid;
+    u8 dirty;
+} Ext2WriteBitmap;
+
+typedef struct {
+    u8 data[EXT2_BLOCK_SIZE];
+    u32 physical;
+    u8 valid;
+    u8 dirty;
+} Ext2WriteTable;
+
+/* data は先頭 64 件、表は末尾 3 件。parent == 0 は inode.block[index]、
+ * それ以外は物理ブロック parent の LE32 項目 index。既存参照は上書きしない。 */
+typedef struct {
+    u32 logical;
+    u32 physical;
+    u32 parent;
+    u16 index;
+    u8 kind;
+    u8 flags;
+} Ext2WriteRecord;
+
+typedef struct {
+    u8 raw[EXT2_BLOCK_SIZE];
+    u32 physical; /* 生 inode 表の物理ブロック */
+    u32 offset;   /* 対象 inode の表内 byte 位置 */
+    Ext2Inode current;
+    Ext2Inode window_start;
+    u8 valid;
+    u8 dirty;
+} Ext2WriteInode;
+
+typedef struct {
+    u32 group;
+    u32 bit;
+    u8 reserved;
+    u8 bitmap_done;
+    u8 published; /* inode 書込み後は abort で再利用しない */
+} Ext2WriteInodeReservation;
+
+typedef struct {
+    Ext2Ctx *ctx;
+    u32 ino; /* inode 予約前だけ EXT2_WRITE_NEW_INO */
+    Ext2WriteBitmap block_bitmap[EXT2_MAX_GROUPS]; /* 添字が group */
+    Ext2WriteBitmap inode_bitmap;
+    Ext2WriteInodeReservation inode_reservation;
+    Ext2WriteTable table[EXT2_WRITE_TABLE_SLOTS];
+    Ext2WriteInode inode;
+    Ext2WriteRecord record[EXT2_WRITE_RECORDS];
+    u32 data_count;
+    u32 table_count;
+    u32 data_done; /* 成功した先頭 data 件数。失敗 run は一件も含めない */
+    u8 active;
+    u8 defer_inode; /* create/全置換: 全データ完成まで inode を公開しない */
+} Ext2WriteWork;
+
+/* 既存の native host 模型では u32 == unsigned long が 64bit になる。
+ * 製品の ILP32 配置を検査し、模型へ 32bit の配置を強制しない。 */
+STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteRecord) == 16,
+              ext2_write_record_size);
+STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteWork) <= EXT2_WRITE_WORK_MAX_BYTES,
+              ext2_write_work_size);
+
+/* 後段の batch 実装が 1 個だけ定義する。begin/finish/abort で全 valid を
+ * 落とす。作業中に別の ext2 操作へ協調切替しない既存 scratch の契約を継承。 */
+extern Ext2WriteWork ext2_write_work;
+
+/* -- ext2_inode_write_bitmap.inc (ext2_inode.c 内) -- */
+/* 現行の群/bit 探索順。予約は保持 bitmap と reserved だけを変更する。
+ * commit は各 bitmap 書込み成功後だけ ctx 空き数と meta_dirty を反映。
+ * cancel はこの窓の未確定の新規 bit だけを RAM 上で取り消し、I/O はしない。 */
+int ext2_write_bitmap_reserve(Ext2Ctx *ctx, u32 *out_phys);
+int ext2_write_bitmap_reserve_inode(Ext2Ctx *ctx, u32 *out_ino);
+void ext2_write_bitmap_cancel(Ext2Ctx *ctx, u32 physical);
+int ext2_write_bitmap_commit(Ext2Ctx *ctx);
+
+/* -- ext2_inode_write_bmap.inc (ext2_inode.c 内) -- */
+/* get は未割当を *out_phys == 0 で返す。set は必要な表を予約・全 0 で準備し、
+ * 親の 0 項目へ追加する。新規表も record に記録する。
+ * trim は成功 data_done より後の予約/追加参照と不要な新規表だけを RAM で取消。
+ * commit は bitmap 確定後に dirty な下位表→上位表だけを書く。 */
+int ext2_write_bmap_get(Ext2Ctx *ctx, u32 logical, u32 *out_phys);
+int ext2_write_bmap_set(Ext2Ctx *ctx, u32 logical, u32 physical);
+void ext2_write_bmap_trim(Ext2Ctx *ctx);
+int ext2_write_bmap_commit(Ext2Ctx *ctx);
+
+/* -- ext2_inode_write_cache.inc (ext2_inode.c 内) -- */
+/* load は生の表を一度読む。initial != NULL は create 用のデコード初期値。
+ * commit は対象欄だけ encode し、隣接 inode と未知欄を保存する。 */
+int ext2_write_inode_load(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial);
+int ext2_write_inode_commit(Ext2Ctx *ctx);
+
+/* -- ext2_file_write_batch.inc (ext2_file.c 内) -- */
+/* initial == NULL は既存 inode、ino == EXT2_WRITE_NEW_INO は create の予約。
+ * begin は D1 を全失効し、所有者を固定する。全置換は既存 truncate 成功後。
+ * 以下の int 口は EXT2_OK / 負の EXT2_ERR_* (data_count は返値にしない)。 */
+int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial);
+int ext2_write_map(Ext2Ctx *ctx, u32 logical, u32 *out_phys);
+/* 昇順の logical を窓に追加。既存/新規とも record 先頭の data_count 件へ。
+ * out_record は次の commit/finish/abort まで有効。buf のコピーは保持しない。 */
+int ext2_write_reserve(Ext2Ctx *ctx, u32 logical, Ext2WriteRecord **out_record);
+/* 要求全体の成功後だけ n 件前進 (累積値ではない)。失敗 run は渡さない。 */
+void ext2_write_data_done(Ext2Ctx *ctx, u32 n);
+/* 未完了 suffix を trim 後、data→bitmap→下位表→上位表→inode の順で公開。
+ * 次窓へ進む際も clean な保持枠は残し、window_start を更新する。 */
+int ext2_write_commit_window(Ext2Ctx *ctx);
+/* 残りの窓/inode を排出して全保持を捨てる。従来の sync は呼び手が完了する。
+ * create は finish 後に既存 add_entry→sync。正の stream 長は sync 成功後だけ。 */
+int ext2_write_finish(Ext2Ctx *ctx);
+/* I/O なしで全保持を捨てる。媒体上の bit/参照を逆書込み・再利用しない。
+ * metadata IO 失敗後は必ずこれで閉じる。create の data 失敗では既存の
+ * ext2_create_abort_unwritten→ext2_release_blocks より先に呼ぶ。 */
+void ext2_write_abort(Ext2Ctx *ctx);
+
 /* ======================================================================== */
 /* 内部関数プロトタイプ (全関数が Ext2Ctx* を第1引数に取る)                  */
 /* ======================================================================== */
@@ -134,6 +269,8 @@ int ext2_truncate_blocks(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode, int *leaked);
 /* 写し blocks[EXT2_N_BLOCKS] が指すブロックを返す。**写しの参照が媒体上の
  * どこからも辿れないこと**が前提。戻り値 EXT2_ERR_IO = 一部を返せず漏れた。 */
 int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks);
+/* D6 未公開 builder の後始末。同じ解放処理だが metadata IO 後は書かない。 */
+int ext2_write_release_blocks(Ext2Ctx *ctx, const u32 *blocks);
 
 /* -- ext2_dir.c -- */
 /* 項目の名前として載せてよいか。空・"."・".."・EXT2_NAME_LEN 超え・"/" 入りは

@@ -1,6 +1,9 @@
 #include "ext2_priv.h"
 #include "ext2_inode_cache.inc"
 #include "ext2_inode_indirect_cache.inc"
+#include "ext2_inode_write_cache.inc"
+#include "ext2_inode_write_bitmap.inc"
+#include "ext2_inode_write_bmap.inc"
 
 void ext2_read_cache_reset(void)
 {
@@ -35,33 +38,14 @@ static int ext2_read_inode_block(Ext2Ctx *ctx, u32 ino, u32 *block_num, u8 **dat
 int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
 {
     u32 block_num;
-    int ret, i;
+    int ret;
     u8 *src;
 
     if (ext2_inode_cache_get(ctx, ino, inode)) return EXT2_OK;
     ret = ext2_read_inode_block(ctx, ino, &block_num, &src);
     if (ret != 0) return ret;
 
-    inode->mode  = le16_rd(&src[EXT2_INODE_MODE_OFF]);
-    inode->uid   = le16_rd(&src[EXT2_INODE_UID_OFF]);
-    inode->size  = le32_rd(&src[EXT2_INODE_SIZE_OFF]);
-    inode->atime = le32_rd(&src[EXT2_INODE_ATIME_OFF]);
-    inode->ctime = le32_rd(&src[EXT2_INODE_CTIME_OFF]);
-    inode->mtime = le32_rd(&src[EXT2_INODE_MTIME_OFF]);
-    inode->dtime = le32_rd(&src[EXT2_INODE_DTIME_OFF]);
-    inode->gid   = le16_rd(&src[EXT2_INODE_GID_OFF]);
-    inode->links_count = le16_rd(&src[EXT2_INODE_LINKS_COUNT_OFF]);
-    inode->blocks = le32_rd(&src[EXT2_INODE_BLOCKS_OFF]);
-    inode->flags  = le32_rd(&src[EXT2_INODE_FLAGS_OFF]);
-    inode->osd1   = le32_rd(&src[EXT2_INODE_OSD1_OFF]);
-    for (i = 0; i < EXT2_N_BLOCKS; i++) {
-        inode->block[i] = le32_rd(&src[EXT2_INODE_BLOCK_OFF + i * EXT2_BLOCK_PTR_SIZE]);
-    }
-    inode->generation = le32_rd(&src[EXT2_INODE_GENERATION_OFF]);
-    inode->file_acl   = le32_rd(&src[EXT2_INODE_FILE_ACL_OFF]);
-    inode->dir_acl    = le32_rd(&src[EXT2_INODE_DIR_ACL_OFF]);
-    inode->faddr      = le32_rd(&src[EXT2_INODE_FADDR_OFF]);
-    ext2_mem_copy(inode->osd2, &src[EXT2_INODE_OSD2_OFF], EXT2_INODE_OSD2_SIZE);
+    ext2_inode_decode(src, inode);
     ext2_inode_cache_put(ctx, ino, inode);
 
     return EXT2_OK;
@@ -70,32 +54,13 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
 int ext2_write_inode(Ext2Ctx *ctx, u32 ino, const Ext2Inode *inode)
 {
     u32 block_num;
-    int ret, i;
+    int ret;
     u8 *dst;
 
     ret = ext2_read_inode_block(ctx, ino, &block_num, &dst);
     if (ret != 0) return ret;
 
-    le16_wr(&dst[EXT2_INODE_MODE_OFF], inode->mode);
-    le16_wr(&dst[EXT2_INODE_UID_OFF], inode->uid);
-    le32_wr(&dst[EXT2_INODE_SIZE_OFF], inode->size);
-    le32_wr(&dst[EXT2_INODE_ATIME_OFF], inode->atime);
-    le32_wr(&dst[EXT2_INODE_CTIME_OFF], inode->ctime);
-    le32_wr(&dst[EXT2_INODE_MTIME_OFF], inode->mtime);
-    le32_wr(&dst[EXT2_INODE_DTIME_OFF], inode->dtime);
-    le16_wr(&dst[EXT2_INODE_GID_OFF], inode->gid);
-    le16_wr(&dst[EXT2_INODE_LINKS_COUNT_OFF], inode->links_count);
-    le32_wr(&dst[EXT2_INODE_BLOCKS_OFF], inode->blocks);
-    le32_wr(&dst[EXT2_INODE_FLAGS_OFF], inode->flags);
-    le32_wr(&dst[EXT2_INODE_OSD1_OFF], inode->osd1);
-    for (i = 0; i < EXT2_N_BLOCKS; i++) {
-        le32_wr(&dst[EXT2_INODE_BLOCK_OFF + i * EXT2_BLOCK_PTR_SIZE], inode->block[i]);
-    }
-    le32_wr(&dst[EXT2_INODE_GENERATION_OFF], inode->generation);
-    le32_wr(&dst[EXT2_INODE_FILE_ACL_OFF], inode->file_acl);
-    le32_wr(&dst[EXT2_INODE_DIR_ACL_OFF], inode->dir_acl);
-    le32_wr(&dst[EXT2_INODE_FADDR_OFF], inode->faddr);
-    ext2_mem_copy(&dst[EXT2_INODE_OSD2_OFF], inode->osd2, EXT2_INODE_OSD2_SIZE);
+    ext2_inode_encode(dst, inode);
 
     return ext2_write_block(ctx, block_num, ext2_g_blk);
 }
@@ -487,20 +452,29 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
  * 戻り値 EXT2_OK = 全部返した / EXT2_ERR_IO = **一部を返せなかった (漏れ)**。
  * 読めない表はその配下ごと漏らす (表ブロック自体も返さない)。1 つ返せなくても
  * 残りは返し続ける — 参照はもう無いので、途中で止める理由が無い。
+ * D6 の未公開 builder 専用口だけは metadata IO 後の返却を止める。
  *
  * バッファ: 表は ext2_g_blk (単一間接・二重間接) と ext2_g_dat (二重間接の
  * 内側) に置く。ext2_free_block が ext2_g_aux へビットマップを読み直すので、
  * 表を ext2_g_aux に置くと 1 本目を返した瞬間に表がビットマップへ化ける
  * (2026-09-06 の相互リンクの直接原因。gotcha §4-24)。ext2_g_dat は
  * ext2_write_stream のデータ用だが、そこからこの関数は呼ばれない。 */
-int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks)
+/* Deferred D6 builders stop cleanup writes after metadata IO. Other release
+ * callers retain their existing boundary and leak accounting. */
+static int ext2_release_free(Ext2Ctx *ctx, u32 block, int stop_on_error)
+{
+    if (stop_on_error && ctx->fs_error) return EXT2_ERR_IO;
+    return ext2_free_block(ctx, block);
+}
+
+static int ext2_release_blocks_mode(Ext2Ctx *ctx, const u32 *blocks, int stop_on_error)
 {
     int i;
     int leaked = 0;
     u32 j, k;
 
     for (i = 0; i < EXT2_NDIR_BLOCKS; i++) {
-        if (blocks[i] != 0 && ext2_free_block(ctx, blocks[i]) != 0) leaked = 1;
+        if (blocks[i] != 0 && ext2_release_free(ctx, blocks[i], stop_on_error) != 0) leaked = 1;
     }
 
     if (blocks[EXT2_IND_BLOCK] != 0) {
@@ -509,9 +483,9 @@ int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks)
         } else {
             for (j = 0; j < EXT2_ADDR_PER_BLOCK; j++) {
                 u32 blk = le32_rd(&ext2_g_blk[j * EXT2_BLOCK_PTR_SIZE]);
-                if (blk != 0 && ext2_free_block(ctx, blk) != 0) leaked = 1;
+                if (blk != 0 && ext2_release_free(ctx, blk, stop_on_error) != 0) leaked = 1;
             }
-            if (ext2_free_block(ctx, blocks[EXT2_IND_BLOCK]) != 0) leaked = 1;
+            if (ext2_release_free(ctx, blocks[EXT2_IND_BLOCK], stop_on_error) != 0) leaked = 1;
         }
     }
 
@@ -528,15 +502,25 @@ int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks)
                 }
                 for (k = 0; k < EXT2_ADDR_PER_BLOCK; k++) {
                     u32 blk = le32_rd(&ext2_g_dat[k * EXT2_BLOCK_PTR_SIZE]);
-                    if (blk != 0 && ext2_free_block(ctx, blk) != 0) leaked = 1;
+                    if (blk != 0 && ext2_release_free(ctx, blk, stop_on_error) != 0) leaked = 1;
                 }
-                if (ext2_free_block(ctx, ind1) != 0) leaked = 1;
+                if (ext2_release_free(ctx, ind1, stop_on_error) != 0) leaked = 1;
             }
-            if (ext2_free_block(ctx, blocks[EXT2_DIND_BLOCK]) != 0) leaked = 1;
+            if (ext2_release_free(ctx, blocks[EXT2_DIND_BLOCK], stop_on_error) != 0) leaked = 1;
         }
     }
 
     return leaked ? EXT2_ERR_IO : EXT2_OK;
+}
+
+int ext2_release_blocks(Ext2Ctx *ctx, const u32 *blocks)
+{
+    return ext2_release_blocks_mode(ctx, blocks, 0);
+}
+
+int ext2_write_release_blocks(Ext2Ctx *ctx, const u32 *blocks)
+{
+    return ext2_release_blocks_mode(ctx, blocks, 1);
 }
 
 /* inode ino のブロックを全部外して返す (上の順序 1〜3)。

@@ -1203,10 +1203,8 @@ static void case_rename_dest_failure(void)
  * Codex 実測: 5 バイトのファイルに 4 バイト追記 -> 戻り値 4、
  * 媒体上のサイズは 5 のまま = 追記が見えない。
  *
- * 1 回の ext2_write_stream で、目当ての inode が載るブロックは
- *   1 回目 = 先頭の ext2_read_inode
- *   2 回目 = 最後の ext2_write_inode の read-modify-write
- * と読まれる。その **2 回目だけ**を落とす。 */
+ * D6 は生 inode 表を一度保持する。読取りの回数に依存せず、対象 inode 表への
+ * 最初の書込みを落として公開失敗を作る。 */
 static void case_write_stream_inode_failure(void)
 {
     u32 ino = 0, lba, sz = 0;
@@ -1226,12 +1224,12 @@ static void case_write_stream_inode_failure(void)
 
     lba = lba_of_inode(ino);
     io_reset();
-    fail_arm(lba, 2);
+    wfail_arm(lba, 1);
     rc = ext2_vfs_write_stream(g_ec, "/etc/small", "ABCD", 4, 5);
-    fail_disarm();
+    wfail_disarm();
     fault_done();
 
-    CHECK(g_fail_fired == 1);
+    CHECK(g_wfail_fired == 1);
     CHECK(rc < 0);                       /* 4 (成功) と言わない */
     CHECK(rc != 4);
     /* **戻り値が成功でないなら、媒体上のサイズと食い違っていてよい**。
@@ -1839,7 +1837,7 @@ static void case_reread_after_probe(void)
         memo_cold();
         fail_arm(lba, nth);
         rc = ext2_vfs_write(g_ec, "/etc/leak", "small", 5);
-        fail_disarm();
+        wfail_disarm();
         fault_done();
 
         media_check(&after);
@@ -1848,7 +1846,7 @@ static void case_reread_after_probe(void)
         CHECK(file_layout("/etc/leak", &ino, &fi));
         if (g_fail_fired) {
             CHECK(rc == VFS_ERR_IO);             /* 漏れを「成功」と言わない */
-            CHECK(fi.size == 5);                 /* 新しい中身は書けている */
+            CHECK(fi.size == 0);                 /* D6: metadata IO 後は構築を始めない */
             CHECK(fi.block[EXT2_IND_BLOCK] == 0);
             /* 読めなかった表は配下ごと漏らす (使用中のまま = 配られない) */
             CHECK(block_in_use(ind) == 1);
@@ -1860,8 +1858,8 @@ static void case_reread_after_probe(void)
             CHECK(leak_delta(&after, &before) == 0);
         }
         kmemset(got, 0, sizeof(got));
-        CHECK(ext2_read_file(g_ec, ino, got, sizeof(got)) == 5);
-        CHECK(kstrncmp((const char *)got, "small", 5) == 0);
+        CHECK(ext2_read_file(g_ec, ino, got, sizeof(got)) == (g_fail_fired ? 0 : 5));
+        if (!g_fail_fired) CHECK(kstrncmp((const char *)got, "small", 5) == 0);
     }
 }
 
@@ -2007,7 +2005,8 @@ static void case_rewrite_new_block_failure(void)
         CHECK(file_layout("/etc/rw", &ino, &fi));
         CHECK(fi.size == 0);                     /* 旧内容は戻らない (0 バイト) */
         for (k = 0; k < EXT2_N_BLOCKS; k++) CHECK(fi.block[k] == 0);
-        CHECK(leak_delta(&after, &before) == 0); /* 旧も新も全部返せた */
+        CHECK(leak_delta(&after, &before) == (which == 0 ? 0 : 21));
+        /* data IO は未公開予約を取消。表 IO は確定済み bitmap を戻さず漏らす。 */
     }
     /* 回帰: 書けるなら書ける */
     CHECK(ext2_vfs_write(g_ec, "/etc/rw", new_pat, sizeof(new_pat)) == VFS_OK);
@@ -2016,13 +2015,13 @@ static void case_rewrite_new_block_failure(void)
 /* Codex P1-C: ext2_create の失敗後始末が解放の失敗を捨てていた。
  * データの書き込みが落ち、**続く後始末の書き込みも全部落ちる** (装置が途中で
  * 消えた) 場合を作る。空打ちで書き込み先の順序を記録し、新しいファイルの
- * 最初のデータブロックへの書き込みから先を全部落とす。 */
+ * D6 の先頭64本を確定した後、次窓のデータ書込みから先を全部落とす。 */
 static void case_create_cleanup_failure(void)
 {
-    static u8 pat[20 * 1024];
+    static u8 pat[70 * 1024];
     MediaReport before, after;
     Ext2Inode lay;
-    u32 etc_ino = 0, tmp = 0, new_ino = 0, i, target;
+    u32 etc_ino = 0, tmp = 0, new_ino = 0, i, target, failed_phys = 0;
     int rc, k, first_data_write = -1;
 
     report("  [P1-C] ext2_create: データ書き込みが落ち、後始末の解放も落ちる\n");
@@ -2041,10 +2040,11 @@ static void case_create_cleanup_failure(void)
     memo_cold();
     CHECK(ext2_lookup(g_ec, "/etc/cc", &new_ino) == EXT2_OK);
     CHECK(ext2_read_inode(g_ec, new_ino, &lay) == EXT2_OK);
+    CHECK(ext2_bmap(g_ec, &lay, EXT2_WRITE_WINDOW_BLOCKS, &failed_phys) == EXT2_OK);
     undo_rollback();
     remount_cold();
 
-    target = g_ec->base_lba + lay.block[0] * 2;
+    target = g_ec->base_lba + failed_phys * 2;
     for (k = 0; k < g_wlog_n; k++) {
         if (g_wlog_lba[k] == target) { first_data_write = k + 1; break; }
     }
@@ -2076,12 +2076,13 @@ static void case_create_cleanup_failure(void)
     CHECK_MEDIA(&after);                         /* 判定の中心 */
     memo_cold();
     CHECK(ext2_lookup(g_ec, "/etc/cc", &tmp) == EXT2_ERR_NOTFOUND);
-    /* 後始末の書き込みも全部落ちたので、ブロック 0 と inode は漏れる。
+    /* 先頭窓の64data+1表と inode bitmap は既に確定している。
+     * 後始末の書き込みも全部落ちたので、その65本と inode は漏れる。
      * 媒体上の inode は一度も書いていないので、そのブロックを指していない */
     CHECK(block_in_use(lay.block[0]) == 1);
     CHECK(raw_inode_used(new_ino) == 1);
     CHECK(raw_inode_ptr(new_ino, 0) != lay.block[0]);
-    CHECK(leak_delta(&after, &before) == 1);
+    CHECK(leak_delta(&after, &before) == 65);
 }
 
 /* create の inode 書き込みが**後半セクタだけ**落ちる (inode は前半に載る = 実は
