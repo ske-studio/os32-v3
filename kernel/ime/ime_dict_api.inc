@@ -14,7 +14,9 @@ int ime_switch_dict(int variant)
     } else {
         return -1;
     }
-    return ime_dict_reopen(&g_ime.dict, path);
+    int rc = ime_dict_reopen(&g_ime.dict, path);
+    g_ime.dict_loaded = g_ime.dict.db != NULL;
+    return rc;
 }
 
 /* B2: retain no caller or SQLite pointers in the shared result staging. */

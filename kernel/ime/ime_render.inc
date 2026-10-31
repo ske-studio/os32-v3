@@ -51,6 +51,10 @@ static void candlist_save(void)
     top = IME_PREEDIT_ROW - rows;
 
     if (g_cand_has_saved) return;
+    if (g_ime.render != &g_ime_render_tvram) {
+        g_cand_has_saved = 1;
+        return;
+    }
     if (!g_cand_save_text || !g_cand_save_attr) return;
 
     for (y = 0; y < rows; y++) {
@@ -88,7 +92,15 @@ static void candlist_restore(void)
 static void candlist_clear(void)
 {
     if (g_cand_has_saved) {
-        candlist_restore();
+        if (g_ime.render == &g_ime_render_tvram) {
+            candlist_restore();
+        } else {
+            int rows = (g_ime.per_page + IME_CAND_COLS - 1) / IME_CAND_COLS;
+            int top = IME_PREEDIT_ROW - rows;
+            for (int y = top; y < IME_PREEDIT_ROW; y++)
+                g_ime.render->clear_row(y, ATTR_WHITE);
+            g_cand_has_saved = 0;
+        }
     }
 }
 
