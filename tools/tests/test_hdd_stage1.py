@@ -871,6 +871,7 @@ MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/id
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2/ext2_super.c", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
+          "fs/ext2/ext2_dir_directory.inc", "fs/ext2/ext2_dir_rename.inc",
           "fs/ext2/ext2_file.c", "fs/ext2/ext2_fmt_write_groups.inc",
           "fs/ext2/ext2_fmt_write_backups.inc", "fs/ext2/ext2_fmt_init_groups.inc"]
 PY_MIRROR = ["tools/pc98pt.py", "tools/nhd_deploy.py", "tools/deploy_protect.py",
