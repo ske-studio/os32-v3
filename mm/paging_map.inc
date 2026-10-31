@@ -219,25 +219,6 @@ int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags)
     return 0;
 }
 
-/* 指定範囲を覆う PDE から USER を落とす。
- * paging_set_page() は USER を立てる方向にしか伝播させないので、
- * V86 セッション終了時にカーネル側が明示的に戻すために使う。 */
-int paging_pde_clear_user(u32 start, u32 end)
-{
-    u32 pdi;
-    u32 first = PDE_INDEX(start);
-    u32 last  = PDE_INDEX(end);
-
-    if (start > end) { paging_range_reject_count++; return -1; }
-
-    for (pdi = first; pdi <= last && pdi < PAGING_PT_COUNT; pdi++) {
-        page_directory[pdi] &= ~(u32)PTE_USER;
-    }
-
-    if (pg_enabled) arch_mmu_flush_tlb();
-    return 0;
-}
-
 /* ======================================================================== */
 /*  paging_set_readonly — 範囲内の全ページをRead-Onlyに                     */
 /* ======================================================================== */

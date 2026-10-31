@@ -302,9 +302,9 @@ int paging_pd_clone_selftest(void)
 }
 
 /* Shared device aliases cannot be promoted, rewritten or freed by an AS.
- * Exercise ordinary/keep/physical range APIs as well as the single-page API.
+ * Exercise identity/physical range APIs as well as the single-page API.
  * Preserve complete entries, including PFN and cache bits, on rejection.
- * rc bits: 1=missing PT, 2=AS creation, 4=keep, 64=single page,
+ * rc bits: 1=missing PT, 2=AS creation, 64=single page,
  * 128=identity range, 256=physical range, 8=free, 16=entry changed,
  * 32=AS cleanup. */
 int paging_map_user_keep_selftest(void)
@@ -325,7 +325,6 @@ int paging_map_user_keep_selftest(void)
         return 2;
     }
     app = ((u32 *)P2V(as.pd_phys))[pdi];
-    if (paging_addrspace_map_user_keep(&as, va, va + PAGE_SIZE, PAGE_RW | PTE_USER) != -1) rc |= 4;
     if (paging_addrspace_map_user(&as, va, va, PAGE_RW | PTE_USER) != -1) rc |= 64;
     if (paging_addrspace_map_user_range(&as, va, va + PAGE_SIZE, PAGE_RW) != -1) rc |= 128;
     if (paging_addrspace_map_user_range_phys(&as, va, va + PAGE_SIZE, PAGE_SIZE, PAGE_RW) != -1) rc |= 256;

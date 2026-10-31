@@ -134,7 +134,6 @@ void _start(void)
     CHECK(!paging_is_present(0x2000000));
     CHECK(paging_set_readonly(0x4000, 0x2000) == -1);
     CHECK(paging_set_not_present(0x4000, 0x2000) == -1);
-    CHECK(paging_pde_clear_user(0x4000, 0x2000) == -1);
     {
         struct addrspace as;
         u32 before = used, before_calls;
@@ -177,10 +176,6 @@ void _start(void)
         CHECK(paging_addrspace_map_user_range(&as, 0x23FF000, 0x2401000, PAGE_RW | PTE_USER) == -1);
         CHECK(page_tables[8][1023] == saved);
         CHECK(paging_addrspace_map_user(&as, 0x2400000, 0, PAGE_RW | PTE_USER) == -1);
-        saved = page_tables[1023][1023];
-        CHECK(paging_addrspace_map_user_keep(&as, 0xFFFFF000UL, 0xFFFFFFFFUL, PAGE_RW | PTE_USER) == -1);
-        CHECK(page_tables[1023][1023] == saved);
-        CHECK(!(page_directory[1023] & PTE_USER));
         paging_addrspace_destroy(&as);
         CHECK(paging_map_user_keep_selftest() == 0);
     }
@@ -243,8 +238,6 @@ void _start(void)
         CHECK(paging_set_not_present(0xFFFFF000UL, 0xFFFFFFFFUL) == 0);
         CHECK(paging_set_readonly(0xFFFFF000UL, 0xFFFFFFFFUL) == 0);
         CHECK(!paging_is_present(0xFFFFFFFFUL));
-        CHECK(paging_pde_clear_user(0xFFFFF000UL, 0xFFFFFFFFUL) == 0);
-        CHECK(!(page_directory[1023] & PTE_USER));
     }
     {
         struct addrspace as;

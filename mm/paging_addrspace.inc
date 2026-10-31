@@ -6,8 +6,8 @@
 /*  カーネル全体は identity マッピング (仮想=物理) なので、pgalloc が返す     */
 /*  物理アドレスはそのまま仮想アドレスとして読み書きできる。新 PD / アプリ    */
 /*  PT のバッキングは常駐シェル帯 (0x400000) を除く物理 pool から取られ、      */
-/*  アプリ PT を master と同一 identity で初期化するため、CR3 を新 PD に      */
-/*  載せた後もそれらのページは自分自身を identity で見られる。               */
+/*  アプリ帯の PDE は空で作り、私有 PT は写像時に疎に確保する。              */
+/*  PD/PT の物理バッキングは共有の低位 identity で参照できる。               */
 /* ======================================================================== */
 
 /* 表の物理ポインタを触る口を paging に集約する (T1f)。
@@ -137,9 +137,9 @@ void paging_addrspace_destroy(struct addrspace *as)
     as->app_pde_count = 0;
 }
 
-/* Private application PT only; keep_cache preserves its existing PCD/PWT. */
+/* Private application PT only. */
 static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
-                                   u32 flags, int keep_cache)
+                                   u32 flags)
 {
     u32 pdi = PDE_INDEX(virt);
     u32 pti = PTE_INDEX(virt);
@@ -167,7 +167,6 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
         return -1; /* Shared PTs are immutable through ordinary AS mapping. */
     }
 
-    if (keep_cache) flags |= (pt[pti] & (u32)(PTE_PCD | PTE_PWT));
     pt[pti] = (phys & PTE_FRAME_MASK) | flags;
 
     /* このアプリ PD の PDE にだけ USER を伝播 (master の PDE は触らない)。 */
@@ -180,14 +179,14 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
 int paging_addrspace_map_user(struct addrspace *as, u32 virt, u32 phys,
                               u32 flags)
 {
-    return addrspace_map_user_page(as, virt, phys, flags, 0);
+    return addrspace_map_user_page(as, virt, phys, flags);
 }
 
 /* 範囲版の共通部。末尾の TLB 処理まで含めて 1 か所にまとめる。
  * phys_base != 0 のときは identity ではなく [phys_base, ...) の連続物理を
  * 張る (K5b P1)。identity 版は phys_base に 0 を渡す (物理 0 は張らない)。 */
 static int addrspace_map_user_range(struct addrspace *as, u32 vstart,
-                                    u32 vend, u32 flags, int keep_cache,
+                                    u32 vend, u32 flags,
                                     u32 phys_base)
 {
     u32 pfn, first, count, pdi;
@@ -230,7 +229,7 @@ ready: ;
         u32 phys = phys_base ? (phys_base + ((pfn - first) << PAGE_SHIFT))
                              : (pfn << PAGE_SHIFT);
         addrspace_map_user_page(as, pfn << PAGE_SHIFT, phys,
-                                flags, keep_cache);
+                                flags);
     }
     /* この PD が既にアクティブなら TLB を捨てる。通常は CR3 に載せる前に
      * 呼ぶので不要だが、載せた後の追加マップにも備える。 */
@@ -243,15 +242,7 @@ ready: ;
 int paging_addrspace_map_user_range(struct addrspace *as, u32 vstart,
                                     u32 vend, u32 flags)
 {
-    return addrspace_map_user_range(as, vstart, vend, flags, 0, 0);
-}
-
-/* 私有 PT の中だけで既存 PTE の PCD/PWT を保つ。現在 in-tree の呼び手なし
- * (拒否を検査する selftest を除く) — 将来の私有デバイス lease 用。 */
-int paging_addrspace_map_user_keep(struct addrspace *as, u32 vstart,
-                                   u32 vend, u32 flags)
-{
-    return addrspace_map_user_range(as, vstart, vend, flags, 1, 0);
+    return addrspace_map_user_range(as, vstart, vend, flags, 0);
 }
 
 /* ======================================================================== */
@@ -262,30 +253,7 @@ int paging_addrspace_map_user_range_phys(struct addrspace *as, u32 vstart,
                                          u32 vend, u32 pstart, u32 flags)
 {
     if (pstart == 0) return -1;   /* 物理 0 は identity 版の合図に使っている */
-    return addrspace_map_user_range(as, vstart, vend, flags, 0, pstart);
-}
-
-/* ======================================================================== */
-/*  paging_addrspace_clear_app_band — アプリ帯の identity を落とす (P2, I6)  */
-/* ======================================================================== */
-int paging_addrspace_clear_app_band(struct addrspace *as)
-{
-    u32 k, i;
-    u32 *pd;
-
-    if (!as || !as->pd_phys || !as->app_pde_count) return -1;
-    pd = (u32 *)P2V(as->pd_phys);
-    for (k = 0; k < as->app_pde_count; k++) {
-        u32 pdi = as->app_pde + k;
-        u32 *pt;
-        if (!as->app_pt_phys[k]) continue;
-        pt = (u32 *)P2V(as->app_pt_phys[k]);
-        for (i = 0; i < PTE_COUNT; i++) pt[i] = 0;
-        /* PDE は PT を指したまま present/RW。USER は張り直しで立てる。 */
-        pd[pdi] &= ~(u32)PTE_USER;
-    }
-    if (paging_current_cr3() == as->pd_phys) paging_load_cr3(as->pd_phys);
-    return 0;
+    return addrspace_map_user_range(as, vstart, vend, flags, pstart);
 }
 
 /* ======================================================================== */
