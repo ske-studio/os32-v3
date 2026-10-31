@@ -31,6 +31,7 @@
 
 ## 軽い段の受入
 
+- 2026-11-01: **Ra266 を ee4f3f42 (D1・L3・N1・D6 の全部) に更新** (ノートのセッション、証拠 ノートの `~/os32-tmp/evidence/2026-11-01/realhw-ee4f3f42/`): HDD 起動・Image CRC 8968e651・部品 pair 一致・leftover=0・audit_fail=0・selftest 1702/0・db_test 9/9。速さ (e2fe4686 の後 → ee4f3f42): `cp` 1.5MB → /tmp 7.07〜8.45 → **1.48〜1.50 s (約 5 倍)**、CD 10MB → /tmp 40.61 → **10.18 s (約 4 倍)**、SQLITE_INTERNAL_READY の tick 1751 → 1707。diff は両方とも一致、消して再起動も正常。selftest の pass が 1738 → 1702 (NP21/W も 1748 → 1712) に減ったのは、D1・D6 の保持でカーネルの BSS が 12 ページ増え、`slack_cycle` の空きのページが 388 → 376 (1 ページ 3 件 × 12 = 36) になったため — 試験の抜けではない (`~/os32-tmp/run/selftest-cmp/`)。
 - 2026-11-01: D6 段 2 の main 36d74183 を NP21/W で起動、guest_tests 21/21、cp・上書き・rm の後の再起動で中身一致、`e2fsck -fn` は起動前・書き込みと guest_tests の後とも clean (`~/os32-tmp/run/d6s2-guest/`)。次は Ra266 で D6 の前 (e2fe4686 の記録) と比べる速さの測り直し。
 - 2026-11-01: D6 段 1 の main 0b0d46c6 を NP21/W で起動、guest_tests 21/21、cp・上書き・rm・diff の一致。`e2fsck -fn` は起動だけ・書き込みの後・guest_tests の後のどれも clean (`~/os32-tmp/run/d6s1-fsck/`)。**測り方の罠**: `nhd_deploy.py deploy-nhd`・`pull` の後は手元の NHD がマウントされたまま残る — その像を e2fsck すると書き出し前の集計差が出る。e2fsck は NP21/W を止めて Windows 側の NHD を別の場所に写してからかける。
 - 2026-11-01: L3・N1 の入った main 4599cfd7 を NP21/W で起動、guest_tests 21/21 PASS (`~/os32-tmp/run/n1-guest/`)。NP21/W の IDE が MULTIPLE の経路を通ったかは起動のログに出ず未確認。実機の速さは D6 の後にまとめて測る。
