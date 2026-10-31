@@ -47,7 +47,6 @@ static void __attribute__((unused)) host_pool_boot_ws(u32 kb, u32 ws_first,
     for (i = 0; i < m.count; i++)
         if (m.ranges[i].kind == PHYSMEM_RAM) limit = m.ranges[i].end;
     init_core(&m, host_pool_storage, limit);
-    generic_end = limit;
     arena_end = physmem_legacy_end(&m);
     workspace_first = ws_first < ws_end ? ws_first : 0;
     workspace_end = ws_first < ws_end ? ws_end : 0;
