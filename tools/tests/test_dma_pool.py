@@ -18,7 +18,7 @@
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
 CHECK = dict(name='dma-pool-host', tier=1,
-    covers=['drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'init/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'drivers/base/dev.h', 'fs/vfs.h', 'include/pc98.h', 'init/boot_platform.h', 'init/boot_platform.c', 'init/boot_display.h', 'init/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'init/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'drivers/base/dev.h', 'fs/vfs.h', 'include/pc98.h', 'init/boot_platform.h', 'init/boot_platform.c', 'init/boot_display.h', 'init/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=2.26078)
 
 from kernel_boot_source import kernel_source
@@ -158,7 +158,9 @@ def boot_gate(tmp):
     for case in ("ready", "short", "conflict", "nodebug"):
         subprocess.run([str(exe), case], check=True)
     # FDC's early boot buffer must stay independent of the pool.
-    fdc = (ROOT / "drivers/block/fdc.c").read_text()
+    fdc = "\n".join((ROOT / path).read_text() for path in (
+        "drivers/block/fdc.c", "drivers/block/fdc_io.inc",
+        "drivers/block/fdc_seek_reset.inc", "drivers/block/fdc_transfer.inc"))
     assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
     assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)
     assert kernel.index('boot_platform_run(BOOT_FLOPPY, &boot)') < start
