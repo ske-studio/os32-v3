@@ -432,6 +432,22 @@ MUTATIONS = [
      "        }\n"
      "    }"),
 
+    ("utf8_bs_byte", "userland/shell/ui.c",
+     "while (start > 0 && (((u8)cmd_buf[start] & 0xC0) == 0x80)) start--;",
+     "while (0) start--;"),
+    ("utf8_left_byte", "userland/shell/ui.c",
+     "if (cmd_pos > 0) {\n                    int cells;\n                    cmd_pos--;\n                    while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;",
+     "if (cmd_pos > 0) {\n                    int cells;\n                    cmd_pos--;\n                    while (0) cmd_pos--;"),
+    ("utf8_right_byte", "userland/shell/ui.c",
+     "while (cmd_pos < cmd_len && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) ch[n++] = cmd_buf[cmd_pos++];",
+     "while (0) ch[n++] = cmd_buf[cmd_pos++];"),
+    ("utf8_bs_width", "userland/shell/sh_redraw.inc",
+     "int cells = ((((u8)removed) & 0xF0) == 0xE0) ? 2 : 1;",
+     "int cells = 1; (void)removed;"),
+    ("utf8_del_byte", "userland/shell/ui.c",
+     "while (end < cmd_len && (((u8)cmd_buf[end] & 0xC0) == 0x80)) end++;",
+     "while (0) end++;"),
+
     # T14-a: 切れた行を履歴に入れる
     ("t14_hist_add_truncates", "userland/shell/ui.c",
      "    if ((int)str_len(s) > HIST_LINE_MAX - 1) return;",
@@ -722,6 +738,8 @@ def run_mutations(tmp, shim):
                 exe = build_host(tmp, shim, "mut-" + name)
             except subprocess.CalledProcessError:
                 print("MUTATE %-22s RED (コンパイルが通らない)" % name, flush=True)
+                if name.startswith("utf8_"):
+                    bad += 1
                 continue
             rc = host32.run([str(exe)], cwd=ROOT, timeout=60,
                                 capture_output=True).returncode

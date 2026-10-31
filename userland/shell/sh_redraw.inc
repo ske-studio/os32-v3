@@ -19,7 +19,7 @@
  *    - それ以外は '\n' で次の行へ下り、プロンプトから行全体を描き直す。
  *      ('\r' は行頭へ戻るだけで消さないので、短くなった行が残ってしまう)
  *    - カーソルが行末より前なら BS (0x08) で戻す。端末の BS は 1 セル左へ
- *      動くだけで消さない。全角は 2 桁なので 3 バイト列では 2 回送る。
+ *      動くだけで消さない。全角の後半セルからは先頭セルへ戻る。
  *
  *  ホスト TDD (tools/tests/sh_shell_host.c) はこのファイルをそのまま
  *  #include して「延長は差分印字 / 非延長は行の作り直し」を見る。
@@ -56,7 +56,7 @@ static void sh_put_run(const char *buf, int from, int to)
     if (n > 0) g_api->shell_print_utf8(tmp, ATTR_WHITE);
 }
 
-/* buf[cursor, len) の**桁数**だけ BS を送ってカーソルを左へ戻す */
+/* buf[cursor, len) の文字数だけ BS を送ってカーソルを左へ戻す */
 static void sh_cursor_back(const char *buf, int cursor, int len)
 {
     int i;
@@ -64,20 +64,18 @@ static void sh_cursor_back(const char *buf, int cursor, int len)
         u8 c = (u8)buf[i];
         if ((c & 0xC0) == 0x80) continue;          /* UTF-8 の後続バイト */
         g_api->shell_putchar(0x08, ATTR_WHITE);
-        /* 3 バイト列 (CJK) は 2 桁ぶん進んでいる */
-        if ((c & 0xF0) == 0xE0) g_api->shell_putchar(0x08, ATTR_WHITE);
     }
 }
 
-/* sh_backspace_tail — 行末の 1 バイトを消す (SHELL_AS_APP の BS)
+/* sh_backspace_tail — 行末の 1 文字を消す (SHELL_AS_APP の BS)
  *
- *  new_len は**消した後**の長さで、buf[new_len] がこれから消えるバイト。
+ *  new_len は**消した後**の長さで、buf[new_len] が消える文字の先頭バイト。
  *  端末の BS (0x08) はカーソルを 1 セル左へ動かすだけでセルを消さない
  *  (userland/libos32term/src/model.rs の write_inner) ので、BS だけを出すと
  *  画面に文字が残ったままバッファだけ縮む (`echo abc` -> BS BS -> `x` で
  *  画面 `echo axc` / バッファ `echo ax`)。BS + 空白 + BS で上書きして消す。
- *  3 バイト列の先頭は 2 セルぶん。CUI の console は BS で消すので、この
- *  経路は SHELL_AS_APP だけ (常駐の BS は 1 バイトも変えていない)。
+ *  全角でも最初の BS は 1 回。CUI の console は BS で消すので、この
+ *  経路は SHELL_AS_APP だけ。
  *
  *  消した後はカーソルが新しい行末に来るので、写しもそこで確定する。 */
 /* sh_erase_cells — 消したバイト 1 つぶんを画面から消す (B5 で公開)
@@ -92,9 +90,13 @@ void sh_erase_cells(char removed)
     for (i = 0; i < cells; i++) g_api->shell_putchar(0x08, ATTR_WHITE);
 }
 
-static void sh_backspace_tail(char *buf, int new_len)
+static void sh_backspace_tail(char *buf, int new_len, int cells)
 {
-    sh_erase_cells(buf[new_len]);
+    int i;
+    /* 端末の BS は全角の後半から先頭まで一度に戻る。 */
+    g_api->shell_putchar(0x08, ATTR_WHITE);
+    for (i = 0; i < cells; i++) g_api->shell_putchar(' ', ATTR_WHITE);
+    for (i = 0; i < cells; i++) g_api->shell_putchar(0x08, ATTR_WHITE);
     buf[new_len] = '\0';
     sh_set_drawn(buf, new_len, new_len);
 }

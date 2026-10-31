@@ -54,6 +54,25 @@
 #define sh_drop_drawn()          ((void)0)
 #endif
 
+/* 先頭バイト位置の表示幅。GUI 端末は全角 ANK も 2 セルにする。 */
+static int sh_char_columns(const char *s)
+{
+    const u8 *p = (const u8 *)s;
+    u32 cp;
+    if ((*p & 0xC0) == 0x80) return 0;
+    if (*p < 0x80) return 1;
+    if ((*p & 0xE0) == 0xC0)
+        cp = ((u32)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+    else if ((*p & 0xF0) == 0xE0)
+        cp = ((u32)(p[0] & 0x0F) << 12) | ((u32)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+    else return 2;
+    if (cp == 0xA5 || (cp >= 0xFF61 && cp <= 0xFF9F)) return 1;
+#ifndef SHELL_AS_APP
+    if (cp >= 0xFF01 && cp <= 0xFF5E) return 1;
+#endif
+    return 2;
+}
+
 static char hist_buf[HIST_SIZE][HIST_LINE_MAX];
 static int  hist_count = 0;
 static int  hist_idx   = 0;
@@ -96,7 +115,7 @@ static void show_prompt(void) {
 #include "sh_redraw.inc"
 #else
 static void redraw_line(const char *buf, int len, int cursor) {
-    int i, cl;
+    int i, cl, columns = 0;
     char tmp_buf[CMD_BUF_SIZE];
     g_api->console_set_cursor(0, g_api->console_get_cursor_y());
     show_prompt();
@@ -104,13 +123,19 @@ static void redraw_line(const char *buf, int len, int cursor) {
     for (i = 0; i < len && i < CMD_BUF_SIZE - 1; i++) tmp_buf[i] = buf[i];
     tmp_buf[i] = '\0';
     g_api->shell_print_utf8(tmp_buf, ATTR_WHITE);
-    cl = prev_draw_len - len;
+    for (i = 0; i < len; i++) {
+        columns += sh_char_columns(buf + i);
+    }
+    cl = prev_draw_len - columns;
     for (i = 0; i < cl; i++) g_api->shell_putchar(' ', ATTR_WHITE);
-    prev_draw_len = len;
+    prev_draw_len = columns;
 
     g_api->console_set_cursor(0, g_api->console_get_cursor_y());
     show_prompt();
-    for (i = 0; i < cursor; i++) g_api->console_set_cursor(g_api->console_get_cursor_x() + 1, g_api->console_get_cursor_y());
+    for (i = 0; i < cursor; i++) {
+        int width = sh_char_columns(buf + i);
+        while (width--) g_api->console_set_cursor(g_api->console_get_cursor_x() + 1, g_api->console_get_cursor_y());
+    }
 }
 #endif
 
@@ -635,21 +660,25 @@ void shell_run(const char *startup_notice) {
             if ((key & 0xFF) == 0x0D) { g_api->shell_putchar('\n', ATTR_WHITE); break; }
             if ((key & 0xFF) == 0x08) {
                 if (cmd_pos > 0) {
+                    int start = cmd_pos - 1;
+                    while (start > 0 && (((u8)cmd_buf[start] & 0xC0) == 0x80)) start--;
                     if (cmd_pos == cmd_len) {
 #ifdef SHELL_AS_APP
                         /* 端末の BS はセルを消さないので BS + 空白 + BS。
                          * 写しの確定も sh_backspace_tail の中で行う。 */
-                        cmd_pos--; cmd_len--;
-                        sh_backspace_tail(cmd_buf, cmd_len);
+                        cmd_pos = cmd_len = start;
+                        sh_backspace_tail(cmd_buf, cmd_len, sh_char_columns(cmd_buf + start));
                         prev_draw_len = cmd_len;
 #else
-                        cmd_pos--; cmd_len--; cmd_buf[cmd_len] = 0;
-                        g_api->shell_putchar(0x08, ATTR_WHITE); prev_draw_len = cmd_len;
+                        int cells = sh_char_columns(cmd_buf + start);
+                        cmd_pos = cmd_len = start; cmd_buf[cmd_len] = 0;
+                        while (cells--) { g_api->shell_putchar(0x08, ATTR_WHITE); prev_draw_len--; }
                         sh_mark_drawn(cmd_buf, cmd_len);
 #endif
                     } else {
-                        int i; for (i = cmd_pos - 1; i < cmd_len - 1; i++) cmd_buf[i] = cmd_buf[i+1];
-                        cmd_len--; cmd_pos--; cmd_buf[cmd_len] = 0; redraw_line(cmd_buf, cmd_len, cmd_pos);
+                        int i, removed = cmd_pos - start;
+                        for (i = start; i < cmd_len - removed; i++) cmd_buf[i] = cmd_buf[i + removed];
+                        cmd_len -= removed; cmd_pos = start; cmd_buf[cmd_len] = 0; redraw_line(cmd_buf, cmd_len, cmd_pos);
                     }
                 }
                 continue;
@@ -679,18 +708,49 @@ void shell_run(const char *startup_notice) {
              * 1 つ見落としても表示が壊れない。GUI 中はスキャンコードが来ない
              * のでここは通らず、CUI 直起動のときだけ効く。 */
             if ((key >> 8) == 0x3B) { /* LEFT */
-                if (cmd_pos > 0) { cmd_pos--; g_api->shell_putchar(0x08, ATTR_WHITE); sh_drop_drawn(); } continue;
+                if (cmd_pos > 0) {
+                    int cells;
+                    cmd_pos--;
+                    while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
+#ifdef SHELL_AS_APP
+                    cells = 1;
+#else
+                    cells = sh_char_columns(cmd_buf + cmd_pos);
+#endif
+                    while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
+                    sh_drop_drawn();
+                } continue;
             }
             if ((key >> 8) == 0x3C) { /* RIGHT */
-                if (cmd_pos < cmd_len) { g_api->shell_putchar(cmd_buf[cmd_pos], ATTR_WHITE); cmd_pos++; sh_drop_drawn(); } continue;
+                if (cmd_pos < cmd_len) {
+                    char ch[CMD_BUF_SIZE]; int n = 0;
+                    ch[n++] = cmd_buf[cmd_pos++];
+                    while (cmd_pos < cmd_len && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) ch[n++] = cmd_buf[cmd_pos++];
+                    ch[n] = 0;
+                    if (n == 1) g_api->shell_putchar(ch[0], ATTR_WHITE);
+                    else g_api->shell_print_utf8(ch, ATTR_WHITE);
+                    sh_drop_drawn();
+                } continue;
             }
             if ((key >> 8) == 0x3E) { /* HOME */
-                while (cmd_pos > 0) { cmd_pos--; g_api->shell_putchar(0x08, ATTR_WHITE); } sh_drop_drawn(); continue;
+                while (cmd_pos > 0) {
+                    int cells;
+                    cmd_pos--;
+                    while (cmd_pos > 0 && (((u8)cmd_buf[cmd_pos] & 0xC0) == 0x80)) cmd_pos--;
+#ifdef SHELL_AS_APP
+                    cells = 1;
+#else
+                    cells = sh_char_columns(cmd_buf + cmd_pos);
+#endif
+                    while (cells--) g_api->shell_putchar(0x08, ATTR_WHITE);
+                } sh_drop_drawn(); continue;
             }
             if ((key >> 8) == 0x39) { /* DEL */
                 if (cmd_pos < cmd_len) {
-                    int i; for(i=cmd_pos; i<cmd_len-1; i++) cmd_buf[i]=cmd_buf[i+1];
-                    cmd_len--; cmd_buf[cmd_len]=0; redraw_line(cmd_buf, cmd_len, cmd_pos);
+                    int i, end = cmd_pos + 1;
+                    while (end < cmd_len && (((u8)cmd_buf[end] & 0xC0) == 0x80)) end++;
+                    for (i = cmd_pos; i < cmd_len - (end - cmd_pos); i++) cmd_buf[i] = cmd_buf[i + end - cmd_pos];
+                    cmd_len -= end - cmd_pos; cmd_buf[cmd_len]=0; redraw_line(cmd_buf, cmd_len, cmd_pos);
                 }
                 continue;
             }
@@ -750,7 +810,11 @@ void shell_run(const char *startup_notice) {
                                 }
                                 cmd_buf[cmd_len] = 0;
                                 g_api->shell_print_utf8(utf8_tmp, ATTR_WHITE);
+#ifdef SHELL_AS_APP
                                 prev_draw_len = cmd_len;
+#else
+                                prev_draw_len += sh_char_columns(utf8_tmp);
+#endif
                                 sh_mark_drawn(cmd_buf, cmd_len);
                             } else {
                                 int i;
@@ -768,7 +832,12 @@ void shell_run(const char *startup_notice) {
                         char ch = (char)ascii_byte;
                         if (cmd_pos == cmd_len) {
                             cmd_buf[cmd_pos++] = ch; cmd_len++; cmd_buf[cmd_len] = 0;
-                            g_api->shell_putchar(ch, ATTR_WHITE); prev_draw_len = cmd_len;
+                            g_api->shell_putchar(ch, ATTR_WHITE);
+#ifdef SHELL_AS_APP
+                            prev_draw_len = cmd_len;
+#else
+                            prev_draw_len++;
+#endif
                             sh_mark_drawn(cmd_buf, cmd_len);
                         } else {
                             int i; for (i = cmd_len; i > cmd_pos; i--) cmd_buf[i] = cmd_buf[i-1];
