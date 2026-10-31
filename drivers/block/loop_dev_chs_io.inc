@@ -164,13 +164,12 @@ int loop_dev_read_chs(int slot, u16 cyl, u8 head, u8 sect, void *buf)
     if (s->fmt == LOOP_FMT_D88) {
         /* D88: 標準 CHS アクセス (物理=論理) */
         u32 data_len = 0;
-        u16 trk_spt = 0;
         u32 off;
         u32 to_read;
 
         off = loop_dev_seek_d88(slot,
             (u8)cyl, head, (u8)cyl, head, sect,
-            &data_len, &trk_spt);
+            &data_len, 0);
         if (off == 0) return -1;
         to_read = data_len;
         if (to_read > (u32)s->lba_sect_size)
@@ -186,19 +185,16 @@ int loop_dev_read_chs(int slot, u16 cyl, u8 head, u8 sect, void *buf)
     } else {
         /* FDI/HDI/RAW: オフセット計算 */
         u32 offset;
-        u32 data_size;
 
         if (!raw_chs_ok(s, cyl, head, sect)) return -1;
 
-        data_size = s->file_size - s->data_offset;
         offset = s->data_offset
             + (((u32)cyl * (u32)s->heads + (u32)head)
                * (u32)s->spt + (u32)(sect - 1))
             * (u32)s->lba_sect_size;
-        if (offset + (u32)s->lba_sect_size >
-            s->data_offset + data_size)
+        if (offset + (u32)s->lba_sect_size > s->file_size)
             return -1;
-        vfs_seek(s->fd, (int)offset, 0);
+        if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;
         rd = vfs_read_fd(s->fd, buf, (u32)s->lba_sect_size);
         if (rd < (int)s->lba_sect_size) return -1;
         return 0;
@@ -225,13 +221,12 @@ int loop_dev_write_chs(int slot, u16 cyl, u8 head, u8 sect,
     if (s->fmt == LOOP_FMT_D88) {
         /* D88: seek_d88 でセクタデータ位置を取得 → 書き込み */
         u32 data_len = 0;
-        u16 trk_spt = 0;
         u32 off;
         u32 to_write;
 
         off = loop_dev_seek_d88(slot,
             (u8)cyl, head, (u8)cyl, head, sect,
-            &data_len, &trk_spt);
+            &data_len, 0);
         if (off == 0) return -1;
         to_write = data_len;
         if (to_write > (u32)s->lba_sect_size)
@@ -243,19 +238,16 @@ int loop_dev_write_chs(int slot, u16 cyl, u8 head, u8 sect,
     } else {
         /* FDI/HDI/RAW: オフセット計算 */
         u32 offset;
-        u32 data_size;
 
         if (!raw_chs_ok(s, cyl, head, sect)) return -1;
 
-        data_size = s->file_size - s->data_offset;
         offset = s->data_offset
             + (((u32)cyl * (u32)s->heads + (u32)head)
                * (u32)s->spt + (u32)(sect - 1))
             * (u32)s->lba_sect_size;
-        if (offset + (u32)s->lba_sect_size >
-            s->data_offset + data_size)
+        if (offset + (u32)s->lba_sect_size > s->file_size)
             return -1;
-        vfs_seek(s->fd, (int)offset, 0);
+        if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;
         wr = vfs_write_fd(s->fd, buf, (u32)s->lba_sect_size);
         if (wr < (int)s->lba_sect_size) return -1;
         return 0;
