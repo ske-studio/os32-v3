@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kcg-boot-host', tier=1,
-    covers=['drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg_module.h', 'init/kernel.c', 'lib/utf8.c', 'tools/tests/host32.py', 'tools/tests/kcg_boot_host.c', 'tools/tests/test_kcg_boot.py', 'tools/tests/mutpar.py', 'include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    covers=['drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg_module.h', 'init/kernel.c', 'lib/utf8.c', 'tools/tests/host32.py', 'tools/tests/kcg_boot_host.c', 'tools/tests/test_kcg_boot.py', 'tools/tests/mutpar.py', 'include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc', 'init/kernel_gui_shlib.inc', 'init/kernel_shell_fdd.inc'],
     needs=[], budget=1.490538)
 
 

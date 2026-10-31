@@ -18,7 +18,7 @@ SKIP と出す)。恒等の対照 (何も変えない置換) は GREEN でなけ
 RED なら変異の仕組みそのものが壊れている。
 """
 CHECK = dict(name='bootlog-host', tier=1,
-    covers=['fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c', 'init/bootlog.c', 'init/bootlog_save.c', 'kernel/console/console.c', 'init/kernel.c', 'tools/tests/bootlog_host.c', 'fs/vfs_name_rules.inc', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc'],
+    covers=['fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c', 'init/bootlog.c', 'init/bootlog_save.c', 'kernel/console/console.c', 'init/kernel.c', 'tools/tests/bootlog_host.c', 'fs/vfs_name_rules.inc', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc', 'init/kernel_gfx_config.inc', 'init/kernel_gui_shlib.inc', 'init/kernel_shell_fdd.inc'],
     needs=[], budget=1.63287)
 
 from kernel_boot_source import kernel_source
