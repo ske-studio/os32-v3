@@ -7,6 +7,7 @@ import json
 import os
 import re
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_kdebug_imports as gen
+from mkmod import pair_crc
+from module_schema import HEADER_FIELDS
 
 
 class ImportsTests(unittest.TestCase):
@@ -65,6 +68,12 @@ class ImportsTests(unittest.TestCase):
                 self.assertEqual(self.entries[index]['signature'], signature)
                 previous[index].pop('retained')
         self.assertNotEqual(gen.abi_hash(self.entries), gen.abi_hash(previous))
+        self.assertEqual(self.entries[181]['source_declaration'],
+                         'unsigned int time_branch_hits[TIME_BR_COUNT];')
+        self.assertEqual(self.entries[182]['source_declaration'],
+                         'struct time_test_feed time_test_feed[3];')
+        self.assertEqual(self.entries[147]['signature'], 'u32 kdi_get_ktime_clamp_count(void);')
+        self.assertFalse(self.entries[147].get('retained', False))
         with self.assertRaisesRegex(ValueError, 'nm mismatch: missing=.*time_'):
             gen.check_nm(previous)
         original = gen.symbols
@@ -78,6 +87,35 @@ class ImportsTests(unittest.TestCase):
             with self.subTest(symbol=symbol), patch.object(gen, 'symbols', side_effect=without_time):
                 with self.assertRaisesRegex(ValueError, 'retained imports missing from kernel'):
                     gen.check_nm(self.entries)
+
+    def test_retired_clock_storage_is_disconnected(self):
+        # Inspect actual product code, not the accessor/clear implementations
+        # which must still reference the retained storage.
+        for obj, function, retired in (
+                (ROOT / 'build/out/obj/kernel/time/ktime.o', 'sys_time_now', 'time_test_feed'),
+                (ROOT / 'build/out/obj/kernel/time/time_math.o', 'time_decide', 'time_branch_hits')):
+            with self.subTest(function=function):
+                code = subprocess.check_output([
+                    str(self.cross / 'i386-elf-objdump'), '-dr',
+                    '--disassemble=' + function, str(obj)], text=True)
+                self.assertIn('<' + function + '>:', code)
+                self.assertNotIn(retired, code)
+
+    def test_generated_abi_and_built_pair_match(self):
+        # Stage 1 already marked the retired slots and changed the ABI hash.
+        # Stage 2 preserves that contract; changed kernel code changes PAIR_CRC.
+        metadata = json.loads((ROOT / 'kdebug/generated/kdebug_imports.json').read_text())
+        self.assertEqual(metadata['imports'], self.entries)
+        abi = gen.abi_hash(self.entries)
+        self.assertEqual(metadata['module_abi_gen'], abi)
+        self.assertIn(f'#define KDEBUG_ABI_GEN 0x{abi:08x}u',
+                      (ROOT / 'kdebug/generated/kdebug_imports.h').read_text())
+        image = (ROOT / 'build/out/kdebug.bin').read_bytes()
+        header = dict(zip(HEADER_FIELDS, struct.unpack_from('<36I', image)))
+        self.assertEqual(header['ABI'], abi)
+        self.assertEqual(header['IMPORT_COUNT'], len(self.entries))
+        self.assertEqual(header['PAIR_CRC'],
+                         pair_crc((ROOT / 'build/out/vmkernel.lz4').read_bytes()))
 
     def test_removed_boot_tests_keep_private_abi_slots(self):
         signatures = {

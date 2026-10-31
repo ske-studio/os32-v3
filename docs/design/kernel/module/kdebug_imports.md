@@ -11,6 +11,14 @@
 現在は264〜270 (push群/stat/read/owner_exit) と303 (drop_count SETTER) を retained とし、
 番号・型・実体を維持する [ABI]。enable/disable は実 TVRAM/cursor の描画試験が使う。
 
+E08 の時計互換口 127/128/174/175/181/182 は段1から `retained`。
+段2では保存領域・get/set/clear/reset を保持し、時計からの読出し・増分を廃止した。
+9 (resume mark) と80 (launch) の自己試験は状態を変更せず0を返す。
+34 (DB)・60 (IRQ reset)・172/173 (IRQ quiet) はホスト試験が使うため実処理を保持する。
+私有ABI印は段1で更新済みで、段2は同じ番号・型・retained指定から再生成する。
+kernel/kdebug は対で再ビルドし、段1以前の契約はABI照合、段2以前の像はPAIR照合で拒否する。
+公開KAPI slot224・SDKと製品のクランプ観測口147は変更しない。
+
 | 記号 | 種類 | 呼出し名 |
 |---|---|---|
 | `appslot_cur` | FUNC | `appslot_cur` |

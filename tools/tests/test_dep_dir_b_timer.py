@@ -5,6 +5,8 @@ trace each TEST_CLOCK_BYTE. idt.c is sliced at its PIT state, without edits.
 The sources are also identical at the L13 step base 5399711c. Input read
 sequences are explicitly defined by samples() in dep_dir_b_timer_host.c.
 Runtime only links the current tree and compares the checked-in fixture.
+E08 stage 2 removes only the two feed-only calls per clock; every remaining
+I/O, return/output and IF row retains its original expected value.
 """
 from kernel_includes import include_flags
 import json
@@ -42,6 +44,10 @@ MUTATIONS = (
      'if (lo) *lo = (u32)out_lo ^ (attempt == 1);'),
     ('kernel/time/ktime.c', 'if (hi) *hi = (u32)out_hi;',
      'if (hi) *hi = (u32)out_hi ^ (attempt == 1);'),
+    ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
+     '(void)s_last_us;'),
+    ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
+     '(void)time_clamp(us, s_last_us, &us);'),
 )
 # Relocations remove the old operation, rather than adding another sample.
 REMOVALS = {2: '    out->p2 = platform_irq_timer_pending();',
@@ -98,8 +104,8 @@ def verify(mutation=None):
         assert actual == expected['traces'][str(byte)], (byte, actual)
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-retry-') as td:
             trace(build(Path(td), byte, mutation, retry_value=True))
-    print('PASS L13 clock/default/once, PIT/fallback/state, sample7/tick/feed, retry/clamp/IF/output', flush=True)
-    print('PASS retry -> success value: both clocks, IF=0/1, lo/hi after u32 rollover', flush=True)
+    print('PASS L13 clock/default/once, PIT/fallback/state, sample7/tick, retry/clamp/IF/output', flush=True)
+    print('PASS retry -> success / equal / clamp: both clocks, IF=0/1, lo/hi after u32 rollover', flush=True)
 
 
 if __name__ == '__main__':

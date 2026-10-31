@@ -106,7 +106,7 @@ int __cdecl kapi_db_error_code(int handle);
  * 決め打ちで、KAPI を足すたびに必ず落ちていた (2026-09-15、票 H3)。 */
 int db_slot_layout_ok(int slot_count);
 
-/* v50 の自己診断 (kernel/kselftest.c から。ホスト試験と同じ判定を踏む)。
+/* ホスト試験が呼ぶ v50 の自己診断。起動時の呼出しは廃止、私有 import は保持。
  * ビット 0..n が落ちた項目 (0 = 全部通った)。 */
 u32 db_v50_selftest(void);
 

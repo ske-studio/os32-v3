@@ -107,6 +107,17 @@ void _start(void)
         check(sys_time_now(&lo, &hi) == 0);
         check(read_at == read_n && enabled == state);
         check(lo == (state ? 17704U : 7704U) && hi == 1);
+        /* Same timestamp is not a clamp; a later reload at the same tick is.
+         * Keep the 64-bit result, exact count delta and caller's IF state. */
+        u32 clamps = ktime_clamp_count;
+        samples(0, pit_get_setup()->reload / 2, 0, 1);
+        check(sys_time_now(&lo, &hi) == 0 && read_at == read_n && enabled == state);
+        check(lo == (state ? 17704U : 7704U) && hi == 1);
+        check(ktime_clamp_count == clamps);
+        samples(0, pit_get_setup()->reload, 0, 1);
+        check(sys_time_now(&lo, &hi) == 0 && read_at == read_n && enabled == state);
+        check(lo == (state ? 17704U : 7704U) && hi == 1);
+        check(ktime_clamp_count == clamps + 1);
     }
     finish(0);
 #endif
@@ -138,13 +149,8 @@ void _start(void)
         samples(0, prior.reload, 0, 2);
         reads[3] = 1;
         check(sys_time_now(0, 0) == 0 && read_at == read_n && enabled == state);
-        /* Feed must follow the hardware/tick read, disable clamp, then clear. */
-        time_test_feed_n = 1;
-        time_test_feed[0].p1 = 0; time_test_feed[0].p2 = 0;
-        time_test_feed[0].count = (int)prior.reload;
+        /* A backwards hardware sample must still pass through the clamp. */
         tick_value = 1;
-        now(0, 0, 0, 1, 1);
-        time_test_feed_clear();
         now(0, 0, prior.reload, 0, 1);
         samples(0, 1, 0, 1);
         check(sys_time_now(0, 0) == 0 && read_at == read_n && enabled == state);
