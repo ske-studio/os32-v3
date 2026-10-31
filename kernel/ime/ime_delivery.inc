@@ -11,8 +11,8 @@ static void ime_delivery_clear(void)
 /* Return a committed byte (scan=0), a saved key including scan, or -1. */
 static int ime_delivery_take(void)
 {
-    if (g_ime.commit_pos < g_ime.commit_len)
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
+    int byte = ime_commit_take();
+    if (byte >= 0) return byte;
     int keydata = pending_keydata;
     pending_keydata = -1;
     return keydata;

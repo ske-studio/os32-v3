@@ -100,6 +100,39 @@ int main(void)
         check(code == (u8)"NEW"[x] && attr == ATTR_YELLOW,
               "OFF preserves console output after mode change");
     }
+    /* Numeric selection, Return and other keys share the same restoration,
+     * including the longest-match tail and the empty-preedit case. */
+    for (int kind = 0; kind < 4; kind++) {
+        for (int tail = 0; tail < 2; tail++) {
+            g_ime.mode = IME_MODE_HIRAGANA;
+            g_ime.state = IME_ST_CONVERT;
+            g_ime.converting = 1;
+            g_ime.candidate_idx = 0;
+            g_ime.result_count = 1;
+            g_ime.kana_buf[0] = 'x'; g_ime.kana_buf[1] = 'y'; g_ime.kana_buf[2] = 0;
+            g_ime.kana_len = 2;
+            g_ime.convert_len = tail ? 1 : 2;
+            g_ime.results[0].kanji[0] = 'K'; g_ime.results[0].kanji[1] = 0;
+            ime_candidate_key(0, KEY_DOWN);
+            check(g_cand_has_saved, "confirmation list saved");
+            int result = ime_candidate_key(kind == 0 ? '1' : kind == 2 ? 'a' : 9,
+                                           kind == 1 ? KEY_RETURN : kind == 3 ? KEY_TAB : 0);
+            check(result == (kind == 3 ? -1 : 1), "confirmation preserves key result");
+            check(g_ime.state == IME_ST_INPUT && !g_ime.converting &&
+                  !g_ime.result_count && !g_ime.convert_len && !g_cand_has_saved,
+                  "confirmation clears candidate state and saved rows");
+            check(g_ime.kana_len == tail && g_ime.kana_buf[tail] == 0 &&
+                  (!tail || g_ime.kana_buf[0] == 'y'), "confirmation preserves remaining kana");
+            check(g_ime.commit_len == (kind == 2 ? 2 : 1) && g_ime.commit_pos == 0 &&
+                  g_ime.commit_buf[0] == 'K' && (kind != 2 || g_ime.commit_buf[1] == 'a'),
+                  "confirmation candidate before printable key");
+            u16 code; u8 attr;
+            tvram_readchar_at(0, TVRAM_ROWS - 1, &code, &attr);
+            check(code == (tail ? '[' : TVRAM_SPACE), "confirmation redraws remaining kana or clears preedit");
+            tvram_readchar_at(4, TVRAM_ROWS - 1, &code, &attr);
+            check(code == (tail ? 'y' : TVRAM_SPACE), "confirmation redraws remaining kana or clears preedit");
+        }
+    }
     if (failures) die(1);
     report("GREEN IME display\n"); die(0); return 0;
 }

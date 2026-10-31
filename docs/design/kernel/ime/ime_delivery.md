@@ -4,6 +4,10 @@
 
 ソース: `kernel/ime/ime_delivery.inc`、接続: `kernel/ime/ime.c`。
 
+候補確定後の更新列は [ime_candidate_commit](ime_candidate_commit.md)、
+確定バイトの取得は [ime_commit_take](ime_commit_take.md)、
+CUI のキー 1 件の変換は [ime_cui_process](ime_cui_process.md) で共用する。
+
 単一利用者・単一タスク・協調切替の共有 IME。候補確定が透過を返すときも、
 確定した UTF-8 全体を元のキーより先に届ける。候補選択・確定条件・学習時点は変えない。
 

@@ -50,8 +50,10 @@ static void ime_cancel_input(void);
 
 #include "ime_render.inc"
 
+#include "ime_commit_take.inc"
 #include "ime_convert.inc"
 #include "ime_delivery.inc"
+#include "ime_cui_process.inc"
 
 /* ======================================================================== */
 /*  公開API                                                                  */
@@ -212,25 +214,7 @@ static int ime_getchar_wait(int interruptible)
         keydata = kbd_getkey_wait(interruptible);
         if (keydata < 0) return -1;
 
-        /* Shift+Space: ON/OFF問わず常に検出 */
-        if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
-            (kbd_shift_state & SHIFT_SHIFT)) {
-            ime_toggle();
-            if (g_ime.commit_pos < g_ime.commit_len) {
-                return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-            }
-            continue;
-        }
-
-        /* FEP OFF: ASCII値をそのまま返す */
-        if (g_ime.mode == IME_MODE_OFF) {
-            u8 a = (u8)(keydata & 0xFF);
-            if (a != 0) return (int)a;
-            continue;
-        }
-
-        /* FEP ON: IME処理 */
-        result = ime_delivery_process(keydata);
+        result = ime_cui_process(keydata);
         if (result >= 0) {
             u8 a = (u8)(result & 0xFF);
             if (a != 0) return (int)a;
@@ -265,22 +249,7 @@ int ime_trygetchar(void)
     if (keydata < 0) return -1;
     ime_note_cui_reader();
 
-    if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
-        (kbd_shift_state & SHIFT_SHIFT)) {
-        ime_toggle();
-        if (g_ime.commit_pos < g_ime.commit_len) {
-            return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-        }
-        return -1;
-    }
-
-    if (g_ime.mode == IME_MODE_OFF) {
-        u8 a = (u8)(keydata & 0xFF);
-        if (a != 0) return (int)a;
-        return -1;
-    }
-
-    result = ime_delivery_process(keydata);
+    result = ime_cui_process(keydata);
     if (result >= 0) {
         u8 a = (u8)(result & 0xFF);
         if (a != 0) return (int)a;
@@ -315,9 +284,8 @@ int ime_feed_key(int keydata)
     }
 
     /* 確定済みの続きがあれば先にそれを返す */
-    if (g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-    }
+    result = ime_commit_take();
+    if (result >= 0) return result;
     if (keydata < 0) {
         return -1;
     }
@@ -328,9 +296,7 @@ int ime_feed_key(int keydata)
     }
 
     result = ime_process_key(keydata);
-    if (result == 1 && g_ime.commit_pos < g_ime.commit_len) {
-        return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-    }
+    if (result == 1) return ime_commit_take();
     if (result == -1) {
         return keydata;      /* FEP が関与しないキー: 素通り */
     }
@@ -378,23 +344,7 @@ static int ime_getkey_wait(int interruptible)
         keydata = kbd_getkey_wait(interruptible);
         if (keydata < 0) return -1; /* key wait interrupted */
 
-        /* Shift+Space: ON/OFF問わず常に検出 */
-        if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
-            (kbd_shift_state & SHIFT_SHIFT)) {
-            ime_toggle();
-            if (g_ime.commit_pos < g_ime.commit_len) {
-                return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-            }
-            continue;
-        }
-
-        /* FEP OFF: キーをそのまま返す */
-        if (g_ime.mode == IME_MODE_OFF) {
-            return keydata;
-        }
-
-        /* FEP ON: IME処理 */
-        result = ime_delivery_process(keydata);
+        result = ime_cui_process(keydata);
         if (result >= 0) {
             return result;
         }
@@ -406,7 +356,6 @@ int ime_trygetkey(void)
 {
     if (!services_public) return kbd_trygetkey();
     int keydata;
-    int result;
 
     if (con_sink_is_enabled()) return kbd_trygetkey();
     ime_prepare_cui_input();
@@ -421,28 +370,7 @@ int ime_trygetkey(void)
     if (keydata < 0) return -1;
     ime_note_cui_reader();
 
-    /* Shift+Space: ON/OFF問わず常に検出 */
-    if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
-        (kbd_shift_state & SHIFT_SHIFT)) {
-        ime_toggle();
-        if (g_ime.commit_pos < g_ime.commit_len) {
-            return (int)(u8)g_ime.commit_buf[g_ime.commit_pos++];
-        }
-        return -1;
-    }
-
-    /* FEP OFF: キーをそのまま返す */
-    if (g_ime.mode == IME_MODE_OFF) {
-        return keydata;
-    }
-
-    /* FEP ON: IME処理 */
-    result = ime_delivery_process(keydata);
-    if (result >= 0) {
-        return result;
-    }
-    /* No output: 未確定、キーを消費したのでキーなし (-1) を返す */
-    return -1;
+    return ime_cui_process(keydata);
 }
 
 #include "ime_dict_api.inc"

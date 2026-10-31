@@ -74,6 +74,8 @@ static void commit_candidate(void)
     g_ime.convert_len = 0;
 }
 
+#include "ime_candidate_commit.inc"
+
 /* ======================================================================== */
 /*  IME コアロジック: キー処理                                               */
 /* ======================================================================== */
@@ -93,15 +95,7 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
         target = g_ime.page * g_ime.per_page + (n - 1);
         if (target < g_ime.result_count) {
             g_ime.candidate_idx = target;
-            commit_candidate();
-            g_ime.state = IME_ST_INPUT;
-            tvram_set_scroll_reserve(1); /* インライン保護に戻す */
-            candlist_clear(); /* リスト領域を消去 */
-            if (g_ime.kana_len > 0) {
-                preedit_draw();
-            } else {
-                preedit_clear();
-            }
+            ime_candidate_commit();
             return 1;
         }
         return 0;
@@ -187,15 +181,7 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
 
     /* Return (確定) */
     if (scancode == KEY_RETURN) {
-        commit_candidate();
-        g_ime.state = IME_ST_INPUT;
-        tvram_set_scroll_reserve(1); /* インライン保護に戻す */
-        candlist_clear(); /* リスト領域を消去 */
-        if (g_ime.kana_len > 0) {
-            preedit_draw();  /* 残りかなを表示 */
-        } else {
-            preedit_clear();
-        }
+        ime_candidate_commit();
         return 1;
     }
 
@@ -220,15 +206,7 @@ static inline int ime_candidate_key(u8 ascii, u8 scancode)
     }
 
     /* その他のキーは候補確定後にフォールスルー */
-    commit_candidate();
-    g_ime.state = IME_ST_INPUT;
-    tvram_set_scroll_reserve(1); /* インライン保護に戻す */
-    candlist_clear(); /* リスト領域を消去 */
-    if (g_ime.kana_len > 0) {
-        preedit_draw();
-    } else {
-        preedit_clear();
-    }
+    ime_candidate_commit();
     /* Deliver the confirmed candidate before the printable key, through the
      * same queue for CUI readers and the WM. Candidate storage leaves room
      * for one ASCII byte and the terminator. */
