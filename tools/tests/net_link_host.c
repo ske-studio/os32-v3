@@ -187,6 +187,7 @@ static int  irq_depth = 0;              /* IF=0 のネスト段数 */
 static u32  timer_deferred = 0;         /* IF=0 中に延期した tick 数 */
 static u32  timer_ran = 0;
 static void (*wire_pump_fn)(void);
+static void (*irq_restore_hook)(void);
 
 /* 前方宣言。link.c を include した後に実体を結ぶ。 */
 static void link_tick_fwd(void);
@@ -207,6 +208,7 @@ void link_test_irq_restore(unsigned int flags)
 {
     (void)flags;
     irq_depth--;
+    if (irq_depth == 0 && irq_restore_hook) irq_restore_hook();
     if (irq_depth == 0 && timer_deferred) {
         /* **IF 復元直後の tick が延期分を処理する** (TASK_N0 §2a) */
         timer_deferred--;
@@ -428,6 +430,7 @@ static void reset_all(const char *name)
     txn = 0;
     tx_hook = 0;
     wire_pump_fn = 0;
+    irq_restore_hook = 0;
     inject_on_send = 0; inject_len = 0;
     irq_depth = 0; timer_deferred = 0; timer_ran = 0;
     tick_count = 1000;
@@ -1571,6 +1574,39 @@ static void l0_failures_are_counted_once(void)
     }
 }
 
+static u32 selftest_deadline;
+
+static void selftest_tombstone_at_deadline_restore(void)
+{
+    u8 pl[LINK_RESP_LEN];
+    if ((i32)(selftest_deadline - tick_count) > 0) return;
+    irq_restore_hook = 0;
+    check(link_h[0].state == LINK_H_SENT && link_h[0].req_acked,
+          "最終 status の IF 復元前に SENT / ACK 済みでなくなった");
+    resp_pl(pl, LINK_CTL_TOMBSTONE, 0);
+    inject(LINK_OP_RESPONSE, LINK_F_CTRL, script_epoch, 0, 0, link_h[0].rid,
+           SCRIPT_SESS, pl, LINK_RESP_LEN);
+    host_tick();
+    check(link_h[0].state == LINK_H_STALE && link_rt_fail == 1,
+          "IF 復元時の tick が TOMBSTONE を処理していない");
+}
+
+static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
+{
+    script_handshake(SCRIPT_SESS, 0);
+    selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
+    tx_hook = selftest_reply;
+    selftest_deadline = tick_count + LINK_PROBE_TICKS * 5;
+    irq_restore_hook = selftest_tombstone_at_deadline_restore;
+    link_selftest(1);
+    check(!irq_restore_hook && link_tombstones == 1 && link_resyncs == 0,
+          "期限の IF 復元時に TOMBSTONE が届いていない");
+    check(link_l0_ok == 0 && link_l0_fail == 1 && link_rt_fail == 1,
+          "期限切れと TOMBSTONE が同じ失敗を二重計上した");
+    check(link_h[0].state == LINK_H_FREE, "自己試験がハンドルを閉じていない");
+    check(irq_depth == 0, "自己試験が IF を復元していない");
+}
+
 /* (b) L0 相当 → L1 相当を連続で回すと link_rt_ok が区間ごとに打ち直される (F2)。
  * L0 の結果は link_l0_ok に隔離され、L1 実行後も保たれる。*/
 static void n2_rt_ok_resets_between_selftest_sections(void)
@@ -1737,6 +1773,8 @@ static struct testcase cases[] = {
     { "data_gap_is_dropped_and_reacked",            data_gap_is_dropped_and_reacked },
     { "tx_rto_starts_at_nic_acceptance",            tx_rto_starts_at_nic_acceptance },
     { "l0_failures_are_counted_once",               l0_failures_are_counted_once },
+    { "l0_timeout_tombstone_at_status_restore_is_counted_once",
+      l0_timeout_tombstone_at_status_restore_is_counted_once },
     { "n2_no_drop_roundtrip_has_zero_retransmits",  n2_no_drop_roundtrip_has_zero_retransmits },
     { "n2_rt_ok_resets_between_selftest_sections",  n2_rt_ok_resets_between_selftest_sections },
     { "n1fix2_stream_over_64k_completes",           n1fix2_stream_over_64k_completes },
