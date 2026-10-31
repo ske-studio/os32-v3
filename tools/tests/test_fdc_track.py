@@ -17,7 +17,7 @@
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='fdc-track-host', tier=1,
-    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.297992)
 
 from kernel_includes import include_flags
@@ -42,7 +42,9 @@ CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "
          "seek_edge_foreign", "drain_before_skip", "readychange_invalidates",
          "multi_nr_quiet", "diskio_rw", "hdd_geometry_query", "buf_layout", "font_replay",
          "recal_settle", "idle_rule", "track_nr_stop", "single_nr_no_recover",
-         "sis_edge_limit", "write_nr_no_recover", "write_protection"]
+         "sis_edge_limit", "write_nr_no_recover", "write_protection",
+         "single_commands", "single_command_failures", "single_transfer_contract",
+         "single_seek_nr", "single_nr_nw_priority"]
 
 # font_replay の材料 (実物の FD イメージ)。make all が作る。
 # MINIMAL のカーネル像を使う。28,252 B の Unicode 組表では多トラック試験が
@@ -353,9 +355,9 @@ MUTATIONS = [
      r"        s_stats\.ready_change\+\+;\n        fdc_bump_gen\(d\);",
      "        s_stats.ready_change++;",
      "Ready 変化で世代を進めない (入れ替えた媒体に古い先読みを当てる)"),
-    ("drivers/block/fdc_transfer.inc",
-     r"    fdc_bump_gen\(drv\);\n    s_stats\.writes\+\+;",
-     "    s_stats.writes++;",
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"        fdc_bump_gen\(drv\);\n        s_stats\.writes\+\+;",
+     "        s_stats.writes++;",
      "書き込みで世代を進めない (dev.c / KAPI の書き込みの後に古い先読み)"),
     # リセットの後は Ready 変化の通知も来て、SIS の側でも捨てる (三重)。
     (("drivers/block/fdc_seek_reset.inc",
@@ -406,20 +408,19 @@ MUTATIONS = [
      r"            fdc_head_settle\(\);\n            fdc_note_cyl\(drv, 0\);",
      "            fdc_note_cyl(drv, 0);",
      "RECALIBRATE の後に整定しない (回復直後の C=0 の READ が整定前に出る)"),
-    # 読み取り側 (READ) だけを消す。WRITE 側 (次の変異) と同じ形なので、count=1 と
-    # ファイルの中の順番に頼らず、read 側にしか無い前置きの注釈で場所を決める。
-    ("drivers/block/fdc_transfer.inc",
-     r"(        /\* NR \(媒体無し\) は\*\*回復 \(リセット・RECALIBRATE\) より前に\*\*打ち切る\n[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
-     r"\1",
+    # 共通の NR 分岐を、方向ごとに無効にする。同じ目印が一意に当たり、
+    # READ の変異は WRITE を、WRITE の変異は READ をそのまま残す。
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);",
+     "        if (write && (results[0] & FDC_ST0_NR) != 0) {\n            dma_chan_mask(FDC_DMA_CHANNEL);",
      "単発の READ の NR で回復とリトライを踏む"),
-    ("drivers/block/fdc_transfer.inc",
-     r"        if \(results\[1\] & FDC_ST1_NW\) \{\n(?:[^\n]*\n)*?        \}\n",
-     "",
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"        if \(write && \(results\[1\] & FDC_ST1_NW\)\) \{",
+     "        if (0) {",
      "WRITE の NW を通常エラーにして回復とリトライを踏む"),
-    # 書き込み側に固有の注釈で NR の分岐を選ぶ。
-    ("drivers/block/fdc_transfer.inc",
-     r"(        /\* NR \(媒体無し\) は回復より前に打ち切る \(read 側と同じ\)。[^\n]*\n[^\n]*\n)        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);\n            dma_armed = 0;\n            phase = \"nr\";\n            break;\n        \}",
-     r"\1",
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);",
+     "        if (!write && (results[0] & FDC_ST0_NR) != 0) {\n            dma_chan_mask(FDC_DMA_CHANNEL);",
      "単発の WRITE の NR で回復とリトライを踏む"),
     ("drivers/block/fdc_transfer.inc",
      r"        \(void\)fdc_recover\(drv\);\n    \} else \{\n        fdc_forget_cyl\(drv\);",
@@ -467,6 +468,26 @@ MUTATIONS = [
      r"        st0 = seek_st0;",
      "        st0 = s_last_seek_st0;",
      "回復 RECALIBRATE の ST0 を SEEK 失敗の原因として報告する (修正前)"),
+    ("drivers/block/fdc_command.inc",
+     r"if \(fdc_send_byte\(\(u8\)sect\) != 0\) return -1;      /\* EOT = R \*/",
+     "if (fdc_send_byte((u8)(sect + 1)) != 0) return -1; /* EOT */",
+     "単発コマンドの EOT を R より先へ送る"),
+    ("drivers/block/fdc_command.inc",
+     r"if \(fdc_send_byte\(g->gap3\) != 0\) return -1;",
+     "(void)fdc_send_byte(g->gap3);",
+     "GPL の送信失敗を無視して DTL も送ろうとする"),
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"if \(!write\) s_stats\.single_retries\+\+;",
+     "s_stats.single_retries++;",
+     "WRITE の再試行も single_retries に数える"),
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"    \} else \{\n        s_stats\.single_reads\+\+;\n    \}",
+     "    }\n    s_stats.single_reads++;",
+     "WRITE も single_reads に数える"),
+    ("drivers/block/fdc_sector_transfer.inc",
+     r"kmemcpy\(dma_buffer, \(const u8 \*\)write_buf, \(u32\)bps\);",
+     "kmemset(dma_buffer, 0, (u32)bps);",
+     "WRITE の入力を転送前に DMA へコピーしない"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
     ("drivers/block/fdc_track.c", r"(#include \"fdc_track.h\")", r"\1",
      "対照 (何も変えない)"),
@@ -497,7 +518,8 @@ def host_build(tmp, mutated=None):
         for rel_ in ("drivers/block/fdc_track.c", "drivers/block/fdc_track.h",
                      "drivers/block/fdc.c", "drivers/block/fdc.h",
                      "drivers/block/fdc_io.inc", "drivers/block/fdc_seek_reset.inc",
-                     "drivers/block/fdc_transfer.inc",
+                     "drivers/block/fdc_transfer.inc", "drivers/block/fdc_command.inc",
+                     "drivers/block/fdc_sector_transfer.inc",
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
                      "fs/fat/fatfs/diskio.c",
@@ -559,8 +581,13 @@ def mutate(tmp):
         paths = [rel] * len(pairs) if isinstance(rel, str) else rel
         original = {path: (ROOT / path).read_text(encoding="utf-8") for path in paths}
         mutated, n = original.copy(), 1
-        for path, (pat, rp) in zip(paths, pairs):
-            mutated[path], k = re.subn(pat, rp, mutated[path], count=1)
+        for marker, (path, (pat, rp)) in enumerate(zip(paths, pairs), 1):
+            matches = len(list(re.finditer(pat, mutated[path])))
+            print(f"MUTATION {i} marker {marker}: matches={matches} {path}", flush=True)
+            if matches != 1:
+                n = 0
+                break
+            mutated[path], k = re.subn(pat, rp, mutated[path])
             n = n and k == 1
         if n != 1:
             print(f"MUTATION {i} NOT APPLICABLE: {why}", flush=True)

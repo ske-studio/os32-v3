@@ -15,6 +15,9 @@
 
 ## 設計の補足
 
+単発セクタの共通部は [転送骨格](fdc_sector_transfer.md) と
+[コマンド送出](fdc_command.md) に分かれる。
+
 ## 3. FDC IRQ の境界・起動・V86
 ```c
 /* drivers/block/fdc.c: 状態と入口をドライバ内へ閉じる。 */
