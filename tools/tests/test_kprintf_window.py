@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused lexical/format controls for the CPL3 argument-window check."""
 CHECK = dict(name='kprintf-window', tier=1,
-    covers=['tools/source_roots.py', 'userland/**', 'sdk/**', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt'],
+    covers=['tools/source_roots.py', 'userland/**', 'sdk/**', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'exec/exec_kapi_init.inc', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt'],
     needs=[], budget=3.284328)
 
 from pathlib import Path

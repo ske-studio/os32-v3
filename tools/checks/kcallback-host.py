@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kcallback-host', tier=1,
-    covers=['userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_kapi_init.inc', 'exec/ring3_ls.c', 'exec/ring3_ls.h', 'exec/ring3_ls.S', 'exec/ring3_str.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'build/kernel.mk', 'tools/tests/kcallback_host.c', 'tools/tests/test_kcallback.py', 'tools/tests/host32.py', 'userland/tests/kcallback_test.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
+    covers=['userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'exec/exec.c', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'exec/exec_kapi_init.inc', 'exec/ring3_ls.c', 'exec/ring3_ls.h', 'exec/ring3_ls.S', 'exec/ring3_str.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'build/kernel.mk', 'tools/tests/kcallback_host.c', 'tools/tests/test_kcallback.py', 'tools/tests/host32.py', 'userland/tests/kcallback_test.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=1.702804)
 
 

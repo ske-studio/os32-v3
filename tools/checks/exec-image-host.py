@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='exec-image-host', tier=1,
-    covers=['exec/exec.c', 'exec/exec_kapi_init.inc', 'exec/exec_image.inc', 'tools/tests/test_exec_image.py', 'tools/tests/exec_image_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    covers=['exec/exec.c', 'exec/exec_kapi_init.inc', 'exec/exec_image.inc', 'exec/exec_argv.inc', 'tools/tests/test_exec_image.py', 'tools/tests/exec_image_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 
