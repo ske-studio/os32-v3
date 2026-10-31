@@ -45,19 +45,11 @@ static int ext2_block_in_part(const Ext2Ctx *ctx, u32 block_num)
 static int ext2_raw_read_block(Ext2Ctx *ctx, u32 block_num, void *buf)
 {
     u32 sector;
-    u8 *dst = (u8 *)buf;
-    int ret;
 
     if (!ext2_block_in_part(ctx, block_num)) return EXT2_ERR_IO;
     sector = ctx->base_lba + block_num * EXT2_SECTORS_PER_BLOCK;
 
-    /* セクタ0 → buf[0..511] */
-    ret = dev_blk_read_lba(ctx->dev, sector, 1, dst);
-    if (ret != 0) return ret;
-
-    /* セクタ1 → buf[512..1023] */
-    ret = dev_blk_read_lba(ctx->dev, sector + 1, 1, dst + EXT2_SECTOR_SIZE);
-    return ret;
+    return dev_blk_read_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
 }
 
 static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)
@@ -109,8 +101,8 @@ int ext2_write_data_block(Ext2Ctx *ctx, u32 block_num, const void *buf)
 
 /* ---- セクタ 1 本だけの I/O (票 H2 §2-2-1) ----
  *
- * ext2_read_block / ext2_write_block は 1KB ブロックを 512B x 2 回で読み書き
- * するので、「1 回の書き込みが失敗した = ブロックは未変更」は成り立たない。
+ * ext2_write_block は 1KB ブロックを 512B x 2 回で書くので、
+ * 「1 回の書き込みが失敗した = ブロックは未変更」は成り立たない。
  * 変更したフィールドを含む**セクタ 1 本だけ**を書きたい経路 (ext2_dir.c の
  * 置き換え rename の公開処理) のために、ブロック内のセクタ番号を指定できる
  * 口を出す。sect は 0 か 1。
