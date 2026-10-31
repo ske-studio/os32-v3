@@ -196,11 +196,11 @@ def main(args):
             base = directory / 'base/ext2'
             base.mkdir(parents=True)
             paths = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only',
-                                            'c620101e', 'fs/ext2'], text=True).splitlines()
+                                            'ba09ac7c', 'fs/ext2'], text=True).splitlines()
             # The unchanged product baseline must compile and fail the count assertion.
             for path in paths:
                 (base / Path(path).name).write_bytes(subprocess.check_output(
-                    ['git', 'show', 'c620101e:' + path]))
+                    ['git', 'show', 'ba09ac7c:' + path]))
             # Relative ../vfs.h and ../ide_limits.h remain the product headers.
             for name in ('vfs.h', 'ide_limits.h'):
                 shutil.copyfile(ROOT / 'fs' / name, base.parent / name)

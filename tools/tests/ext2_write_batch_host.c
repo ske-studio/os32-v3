@@ -363,13 +363,26 @@ static void sample(int clean)
     report_u((u32)stopped_valid); report("\n");
     if (dump_dir) CHECK(sys3(3, 0, (long)&ack, 1) == 1 && ack == '\n');
 }
+static u32 write_event(u32 block)
+{
+    u32 i, found = event_count;
+    for (i = 0; i < event_count; i++) {
+        if (!events[i].write || events[i].lba != block_lba(block)) continue;
+        CHECK(found == event_count); /* Each block has exactly one write request. */
+        found = i;
+    }
+    CHECK(found < event_count);
+    return found;
+}
 static void case_counts(void)
 {
-    u32 i, writes = 0, free;
+    u32 i, writes = 0, free, bitmap_event, lower_event, inode_event, data_writes = 0;
     u32 offset = (EXT2_NDIR_BLOCKS + EXT2_ADDR_PER_BLOCK + 1) * EXT2_BLOCK_SIZE;
     prepare(1);
+#ifndef BASELINE
     CHECK(sizeof(Ext2WriteWork) <= EXT2_WRITE_WORK_MAX_BYTES);
     report("write workspace bytes="); report_u(sizeof(Ext2WriteWork)); report("\n");
+#endif
     free = ctx.sb_info.free_blocks_count;
     CHECK(ext2_write_stream(&ctx, target, input, 64u * EXT2_BLOCK_SIZE, offset) == 65536);
     for (i = 0; i < event_count; i++) if (events[i].write) writes++;
@@ -377,18 +390,21 @@ static void case_counts(void)
     report(" write_KiB="); report_u(g_wr_sect / 2);
     report(" read_requests="); report_u(g_rd_calls);
     report(" write_requests="); report_u(writes); report("\n");
-    CHECK(g_rd_sect == 12 && g_wr_sect == 138 && g_rd_calls == 6 && writes == 138);
+    CHECK(g_rd_sect == 12 && g_wr_sect == 138 && g_rd_calls == 6 && writes == 69);
+    for (i = 0; i < event_count; i++) if (events[i].write)
+        CHECK(events[i].count == EXT2_SECTORS_PER_BLOCK);
     CHECK(ctx.sb_info.free_blocks_count == free - 64);
     /* Every new data block precedes bitmap; bitmap precedes lower, inode, SB, GDT.
-     * No unchanged upper table is written. Raw D2 still writes two sectors. */
-    for (i = 0; i < 128; i++) {
-        CHECK(events[i + 4].write); /* inode + upper + lower + bitmap reads */
-        CHECK(events[i + 4].lba != block_lba(ctx.gd_table[0].block_bitmap));
+     * No unchanged upper table is written. L3 writes one count=2 request per block. */
+    bitmap_event = write_event(ctx.gd_table[0].block_bitmap);
+    lower_event = write_event(lower);
+    inode_event = write_event(ctx.gd_table[0].inode_table +
+          (target - 1) * ctx.sb_info.inode_size / EXT2_BLOCK_SIZE);
+    for (i = 0; i < bitmap_event; i++) {
+        if (events[i].write) data_writes++;
     }
-    CHECK(events[132].lba == block_lba(ctx.gd_table[0].block_bitmap));
-    CHECK(events[134].lba == block_lba(lower));
-    CHECK(events[136].lba == block_lba(ctx.gd_table[0].inode_table +
-          (target - 1) * ctx.sb_info.inode_size / EXT2_BLOCK_SIZE));
+    CHECK(data_writes == 64);
+    CHECK(bitmap_event < lower_event && lower_event < inode_event);
     read_check(offset, 65536);
     sample(1);
 }
