@@ -43,7 +43,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 
 ## 4. 落ちたとき
 
-1. `tail -1 rev.txt` で rc、`grep -a -nE "^make(\[[0-9]+\])?: \*\*\*" check.log` で落ちた対象。
+1. `tail -1 rev.txt` で rc、**落ちた対象は `awk -F'\t' '$3!=0' check_times.tsv` で全部出す**。check.log の `^make…: ***` の grep は使わない — 並列の検査の出力が混ざって `make[3]: ***` が行頭に来ないことがあり、2026-11-01 に落ちた 2 本のうち 1 本を見落として push した (CI の check で発覚)。
 2. その対象の周辺だけ読む (`sed -n` で行を絞る)。MUTATION の RED は期待どおりの行なので数えない。
 3. 直して main に別コミット。**落ちた対象だけ**を回し直して rc=0 を確かめる。全体を回し直さない。
 4. 失敗した作業木は `git worktree remove --force ~/wt/os32-v3/check-<名札>` (残すのは調べるため)。
