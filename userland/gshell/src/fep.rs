@@ -390,6 +390,8 @@ pub fn feed(st: &mut GuiState, scan: u8, ch: u8, _mods: u32) -> Fed {
         return Fed::Consumed;
     }
     if v >= 0x100 || v == 0x1B {
+        collect_kernel_commit();
+        sync_mode(st);
         return Fed::Pass;
     }
     /* 確定文字列の 1 バイト目。続きを引き切る。 */

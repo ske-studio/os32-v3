@@ -157,6 +157,7 @@ static void reset(void)
     kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
     kbd_shift_state = 0;
     kmemset(&g_ime, 0, sizeof(g_ime));
+    ime_delivery_clear();
     g_ime.per_page = 9;
     g_ime.render = &g_ime_render_tvram;
     g_ime_reader_owner = opens = reopens = searches = learns = management = 0;
@@ -463,6 +464,7 @@ static int gui_input_lifetime(void)
     say("PASS IMECAND real STOP and GUI CUI lifetime\n"); return 0;
 }
 
+#include "x11_shared_host_imetab.inc"
 #include "x11_park_host.c"
 
 static i32 handler(u32 op, u32 arg, int id)
@@ -707,7 +709,8 @@ void _start(void)
 {
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
-    int rc = unpublished() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() || park_lifetime() ||
+    int rc = unpublished() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() ||
+             imetab_delivery() || imetab_lifetime() || park_lifetime() ||
              gui_dispatch() || sink_readers() || results();
     rc |= dict_recovery();
     rc |= backspace_n();

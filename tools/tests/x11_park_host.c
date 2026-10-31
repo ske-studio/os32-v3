@@ -70,7 +70,12 @@ static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss)
             owner == 2 && g_cur == 2 && slots[2].state == APP_STATE_RUNNING &&
             !slots[2].parked_from_wait, "real resume reaches saved frame");
     resumed_count++;
-    if (park_partial) {
+    if (park_partial == 2) {
+        REQUIRE(equal_state(&park_expected), "IMETAB real resume preserves partial commit");
+        REQUIRE(ime_trygetchar() == 0xba && ime_trygetkey() == 0x9c &&
+                ime_trygetkey() == ((KEY_TAB << 8) | 9) && ime_trygetkey() == -1 && learns == 1,
+                "IMETAB real resume delivers remaining candidate then pending Tab once");
+    } else if (park_partial) {
         REQUIRE(equal_state(&park_expected), "real resume preserves unread commit and dictionary");
         REQUIRE(ime_feed_key(-1) == 0xba && ime_feed_key(-1) == 0x9c &&
                 ime_feed_key(-1) == -1, "resumed commit tail delivered exactly once");
@@ -94,7 +99,7 @@ static void ring3_resume(u32 *frame, u32 pd, struct tss_entry *tss)
 static int park_lifetime(void)
 {
     static struct addrspace space;
-    for (park_partial = 0; park_partial < 2; park_partial++) {
+    for (park_partial = 0; park_partial < 3; park_partial++) {
         reset();
         kmemset(slots, 0, sizeof(slots));
         slots[2].state = APP_STATE_RUNNING;
@@ -110,7 +115,12 @@ static int park_lifetime(void)
               ime_feed_key(KEY_DOWN << 8) == -1 && g_ime.state == IME_ST_CANDLIST &&
               g_ime.converting && g_ime.result_count == 2 && candidate_draws >= 2,
               "WM candidates actually displayed before real park");
-        if (park_partial)
+        if (park_partial == 2) {
+            con_sink_disable(); kbd_set_gui_mode(0);
+            key(KEY_TAB);
+            CHECK(ime_trygetkey() == 0xe4 && g_ime.commit_pos == 1 && learns == 1,
+                  "IMETAB CUI commit and pending Tab before real park");
+        } else if (park_partial)
             CHECK(ime_feed_key((KEY_RETURN << 8) | 13) == 0xe4 &&
                   g_ime.commit_pos == 1 && g_ime.commit_len == 3,
                   "WM commit partially consumed before real park");

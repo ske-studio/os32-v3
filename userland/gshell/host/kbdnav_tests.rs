@@ -1979,3 +1979,7 @@ fn s6_fep_cells_use_ank_route_and_keep_the_grid() {
     *fep::state() = fep::Fep::NEW;
     mocks::init(); fep_off();
 }
+
+#[cfg(test)]
+#[path = "kbdnav_tests_imetab.rs"]
+mod imetab;
