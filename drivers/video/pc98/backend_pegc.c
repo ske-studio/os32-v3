@@ -94,7 +94,8 @@ static const u16 s_crtc_port[PEGC_CRTC_COUNT] = {
 /* ------------------------------------------------------------------------ */
 static u32 s_bb_phys   = 0;   /* バックバッファ先頭 (物理 = 仮想, 4KB 境界) */
 static int s_probed    = 0;   /* probe を 1 回でも走らせたか */
-static int s_probe_ok  = 0;   /* probe の結果 (キャッシュ) */
+static int s_probe_ok  = 0;   /* 480 ラインモードの利用可否 (キャッシュ) */
+static int s_hw_ok     = 0;   /* PEGC 検出結果。prepare の利用取り下げ後も保持 */
 static int s_active    = 0;   /* init 済み = 拡張グラフィックモード中か */
 int gfx_diag_stripes;
 int gfx_diag_altwin;
@@ -160,6 +161,7 @@ static u8 bios_flag(u32 addr)
 static int pegc_stat(u8 sel)
 {
     _out(PEGC_STAT_PORT, sel);
+    gfx_counters.io_accesses += 2;
     return (_in(PEGC_STAT_PORT) & PEGC_STAT_BIT) ? 1 : 0;
 }
 
@@ -236,6 +238,7 @@ static int pegc_probe(void)
 
     /* --- 3. 16MB 空間の設定 (診断用。判定は 5 の実測で行う) --- */
     s_sys16m_ram = (_in(PEGC_SYS16M_PORT) & PEGC_SYS16M_NORMAL_RAM) ? 1 : 0;
+    gfx_counters.io_accesses++;
 
     /* --- 4. 09A0h が 6Ah に追随するか (open bus 除け) --- */
     _out(MODE_FF2_PORT, PEGC_FF2_UNLOCK);
@@ -246,7 +249,7 @@ static int pegc_probe(void)
     if (!(unlocked == 1 && locked == 0)) return 0;
 
     /* --- 5. リニア窓の書き込み読み戻し --- */
-    s_probe_ok = pegc_linear_selftest();
+    s_hw_ok = s_probe_ok = pegc_linear_selftest();
     return s_probe_ok;
 }
 
@@ -372,10 +375,7 @@ static int pegc_reserve_backbuffer(void)
     const struct ledger_surface *sf;
     if (s_bb_phys != 0) return 1;
     sf = ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);
-    if (!sf) {
-        s_probe_ok = 0;
-        return 0;
-    }
+    if (!sf) return 0;
     s_bb_phys = sf->first * PAGE_SIZE;
     gfx_backend_pegc.bb_base = P2V(s_bb_phys);
     gfx_backend_pegc.bb_size = sf->npages * PAGE_SIZE;
@@ -501,14 +501,6 @@ static void pegc_init(void)
 
 #include "backend_pegc_present.inc"
 
-/* ------------------------------------------------------------------------ */
-/*  enter / leave — 表示出力の切替。PEGC は本体のグラフィック出力そのもの    */
-/*  なのでリレーが無く、両方とも空 (9801 と同じ)。表示リレーを持つのは       */
-/*  H3 のアクセラレータだけ (DESIGN §8)。                                    */
-/* ------------------------------------------------------------------------ */
-static void pegc_enter(void) { }
-static void pegc_leave(void) { }
-
 #include "backend_pegc_restore.inc"
 
 /* ------------------------------------------------------------------------ */
@@ -524,8 +516,8 @@ GfxBackend gfx_backend_pegc = {
     pegc_shutdown,
     pegc_present_rect,
     pegc_set_palette,
-    pegc_enter,
-    pegc_leave,
+    (void (*)(void))0,         /* enter: 表示リレーなし */
+    (void (*)(void))0,         /* leave: 表示リレーなし */
     (int (*)(int, int, int, int, u8))0,        /* fill_rect: CPU 実装へ */
     (int (*)(int, int, int, int, int, int))0,  /* blit:      CPU 実装へ */
     (u8 *)0,                  /* bb_base:  init() が埋める */

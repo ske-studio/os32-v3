@@ -292,6 +292,8 @@ struct ledger_surface *ledger_surface_find(u32 b, u32 r)
 {
     if (b == LEDGER_SF_PEGC && r == LEDGER_ROLE_DISPLAY && ledger_surfaces[0].npages)
         return &ledger_surfaces[0];
+    if (b == LEDGER_SF_PEGC && r == LEDGER_ROLE_CLIENT && ledger_surfaces[1].npages)
+        return &ledger_surfaces[1];
     return 0;
 }
 int ledger_surface_release(u32 sid)
@@ -607,6 +609,7 @@ static void world_reset(void)
     s_boot_clk2 = -1;
     s_probed = 1;
     s_probe_ok = 1;
+    s_hw_ok = 1;
     s_active = 0;
 }
 
@@ -924,6 +927,7 @@ static void case_restore_unrecorded(void)
     world_reset();
     s_probed = 1;
     s_probe_ok = 0;
+    s_hw_ok = 0;
     fake_09a8_raw = 0xFF;               /* ポートが無い機種の読み */
     pegc_restore_text_sync(0);
     m.pegc = 0; m.set_clock = 0; m.write_hs = 1;
@@ -1291,6 +1295,49 @@ static void case_diag_alias(void)
     world_reset();
 }
 
+/* Port events are independent of the driver's MMIO write accounting. */
+static u32 count_port_ios(void)
+{
+    u32 count = 0;
+    for (int i = 0; i < ev_n; i++)
+        if (ev_kind[i] == EV_IN || ev_kind[i] == EV_OUT) count++;
+    return count;
+}
+
+static void case_io_counts(void)
+{
+    for (int same = 0; same < 2; same++) {
+        s_case = same ? "io_timing_same" : "io_timing_changed";
+        world_reset();
+        fake_09a8_raw = same ? PEGC_HSYNC_31KHZ : PEGC_HSYNC_24KHZ;
+        pegc_enter_480_ports();
+        CHECK(gfx_counters.io_accesses == count_port_ios());
+    }
+    s_case = "io_diag";
+    world_reset();
+    PegcDiag d;
+    pegc_diag_take(&d);
+    CHECK(count_port_ios() == 13);
+    CHECK(gfx_counters.io_accesses == count_port_ios());
+    output("PASS io_counts (same/changed frequency and standalone diagnostics)\n");
+}
+
+static void case_probe_missing_client(void)
+{
+    s_case = "probe_missing_client";
+    world_reset();
+    host_candidate = 1; host_alias = 1;
+    host_bios[PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX;
+    host_bios[PEGC_BIOS_MODE_FLAG] = PEGC_BIOS_MODE_EXTGFX;
+    s_probed = 0; s_bb_phys = 0;
+    s_hw_ok = 0;
+    CHECK(!pegc_probe() && s_probed && !s_probe_ok && !s_hw_ok && !ev_n);
+    ledger_surfaces[1].first = 0x6A000UL / PAGE_SIZE;
+    ledger_surfaces[1].npages = PEGC_FB_SIZE_480 / PAGE_SIZE;
+    CHECK(!pegc_probe() && !s_bb_phys && !ev_n && !win_logs);
+    output("PASS probe_missing_client (failure cached after CLIENT becomes available)\n");
+}
+
 /* Actual probe, including both restored windows and DISPLAY failure paths. */
 static void case_window_selection(void)
 {
@@ -1318,6 +1365,7 @@ static void case_window_selection(void)
         fake_sys16m = rows[i].sys16m; gfx_diag_altwin = rows[i].force;
         display_fail = rows[i].failure;
         s_probed = 0; s_bb_phys = 0x6A000UL;
+        s_hw_ok = 0;
         ledger_surfaces[0].first = PEGC_LINEAR_BASE / PAGE_SIZE;
         ledger_surfaces[0].npages = PEGC_FB_SIZE_480 / PAGE_SIZE;
         volatile u8 *a = P2V_IO(PEGC_BANK_WIN0 + 16);
@@ -1327,6 +1375,9 @@ static void case_window_selection(void)
         u8 saved_a = *a, saved_f = *f, saved_alt = *alt;
         *(volatile u16 *)P2V_IO(PEGC_MMIO_BANK0) = 7;
         CHECK(pegc_probe() == rows[i].ok);
+        CHECK(s_hw_ok == rows[i].ok);
+        u32 mmio_writes = 3 + (rows[i].f00[0] != 's') + (rows[i].fff[0] != 's');
+        CHECK(gfx_counters.io_accesses == count_port_ios() + mmio_writes);
         CHECK(*a == saved_a && *f == saved_f && *alt == saved_alt);
         CHECK(!fake_ext && !fake_unlock);
         CHECK(*(volatile u16 *)P2V_IO(PEGC_MMIO_LINEAR) == PEGC_LINEAR_OFF);
@@ -1438,6 +1489,41 @@ static void case_gate_24k_real(void)
     world_reset(); host_serial_gate = 1;
     pegc_prepare();
     CHECK(!host_serial_calls && !pegc_probe());
+}
+
+static void case_restore_after_gate(void)
+{
+    s_case = "restore_after_gate";
+    world_reset();
+    host_candidate = 1; host_alias = 1;
+    host_bios[PEGC_BIOS_ARCH_FLAG] = PEGC_BIOS_ARCH_EXTGFX;
+    host_bios[PEGC_BIOS_MODE_FLAG] = PEGC_BIOS_MODE_EXTGFX;
+    ledger_surfaces[1].first = 0x6A000UL / PAGE_SIZE;
+    ledger_surfaces[1].npages = PEGC_FB_SIZE_480 / PAGE_SIZE;
+    s_probed = 0; s_bb_phys = 0;
+    s_hw_ok = 0;
+    pegc_prepare();
+    CHECK(s_boot_hsync == PEGC_HSYNC_24KHZ && !pegc_probe());
+    CHECK(win_logs == 1 && !fake_ext && !s_active);
+
+    /* ROM changed the display, then failed to restore it. */
+    fake_ext = 1;
+    fake_09a8_raw = PEGC_HSYNC_31KHZ;
+    *(volatile u16 *)P2V_IO(PEGC_MMIO_LINEAR) = PEGC_LINEAR_ON;
+    ev_n = 0;
+    pegc_restore_text_sync(0);
+    CHECK(!fake_ext);
+    CHECK(*(volatile u16 *)P2V_IO(PEGC_MMIO_LINEAR) == PEGC_LINEAR_OFF);
+    XMode m = {1, 1, 1, 0x20, 0x68, 0x20, 0x00, 0x82, 0x84, 40,
+               B_MS24, B_SS24_L, R_SC400L};
+    x_reset();
+    x_out(PEGC_STAT_PORT, PEGC_STAT_SEL_GFXMODE);
+    x_mode(&m);
+    x_out(0x62, 0x6B);
+    x_cursor();
+    check_outs();
+    CHECK(!pegc_probe() && !s_active && gfx_current_height == GFX_HEIGHT);
+    output("PASS restore_after_gate (standard/400-line mode, clock, xattr and window)\n");
 }
 
 static void case_gate_24k_np2(void)
@@ -1586,9 +1672,12 @@ void _start(void)
     case_serial_enter();
     case_mode_layout();
     case_diag_alias();
+    case_io_counts();
+    case_probe_missing_client();
     case_window_selection();
     case_diag_stripes();
     case_gate_24k_real();
+    case_restore_after_gate();
     case_gate_24k_np2();
     case_gate_31k_real();
     case_restore_matrix();
@@ -1604,6 +1693,6 @@ void _start(void)
     case_fifo_stuck();
     case_vsync_stuck();
     case_seamless_exchange();
-    output("PASS pegc_mode_host (21 cases)\n");
+    output("PASS pegc_mode_host (24 cases)\n");
     finish(0);
 }

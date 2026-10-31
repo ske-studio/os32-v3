@@ -32,7 +32,7 @@ static void pegc_text_sync_400(u8 hs)
     int is5m = (s_boot_clk1 == 1 && s_boot_clk2 == 1) ? 1 : 0;
     int ss5m = known ? is5m : 1;     /* 記録なし = 従来の 5MHz 用 SYNC */
 
-    t.pegc = s_probe_ok;
+    t.pegc = s_hw_ok;
     t.ext = PEGC_FF2_STD_GFX;
     t.vram = PEGC_FF2_VRAM_400L;
     t.xattr = (hs == PEGC_HSYNC_31KHZ) ? PEGC_XATTR_31KHZ : PEGC_XATTR_24KHZ;
@@ -102,8 +102,8 @@ void pegc_restore_text_sync(int hsync31)
 {
     /* 09A0h と 6Ah・6Eh は PEGC の probe が通った機種の値。9801 で ROM の戻しに
      * 失敗してここへ来ても書かない (代行レビュー P3-2。6Ah・6Eh は
-     * pegc_apply_timing が t.pegc = s_probe_ok で見る)。 */
-    if (s_probe_ok && pegc_stat(PEGC_STAT_SEL_GFXMODE)) {
+     * pegc_apply_timing が t.pegc = s_hw_ok で見る)。480 ラインの利用可否とは別。 */
+    if (s_hw_ok && pegc_stat(PEGC_STAT_SEL_GFXMODE)) {
         mmio_w16(PEGC_MMIO_LINEAR, PEGC_LINEAR_OFF);
     }
     pegc_text_sync_400(hsync31 ? PEGC_HSYNC_31KHZ : PEGC_HSYNC_24KHZ);
