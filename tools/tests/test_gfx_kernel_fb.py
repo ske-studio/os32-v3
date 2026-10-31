@@ -15,22 +15,12 @@ import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c',
-    'gfx/gfx_core_framebuffer.inc',
-    'gfx/gfx_core_surface.inc',
-    'gfx/gfx_core_api.inc',
-    'gfx/gfx_core_bridge.inc', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
+               'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
                'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c',
-               'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
                'kernel/sys.c', 'mm/physmem.c']
-PEGC_PARTS = [
-    'drivers/video/pc98/backend_pegc_timing.inc',
-    'drivers/video/pc98/backend_pegc_diag.inc',
-    'drivers/video/pc98/backend_pegc_present.inc',
-    'drivers/video/pc98/backend_pegc_restore.inc',
-]
 MUTANTS = [
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
@@ -118,7 +108,7 @@ static inline void io_wait_n(int n) {(void)n;}
 #endif
 ''')
         texts = {}
-        for path in (*TARGET_SRCS, *PEGC_PARTS):
+        for path in TARGET_SRCS:
             body = source_texts[path] if source_texts is not None and path in source_texts else paging_source(ROOT/path)
             for unit, old, new in extra_changes:
                 if unit == path:
@@ -127,12 +117,8 @@ static inline void io_wait_n(int n) {(void)n;}
             texts[path] = body
         sources = []
         for path in TARGET_SRCS:
-            if path.endswith('.inc'):
-                continue
             body = texts[path]
             if path == 'gfx/gfx_core.c':
-                body = re.sub(r'^#include "(gfx_core_\w+\.inc)"$',
-                              lambda m: texts['gfx/' + m[1]], body, flags=re.M)
                 if mutation:
                     _, old, new, _ = mutation
                     assert body.count(old) == 1, (mutation[0], body.count(old))
@@ -144,8 +130,6 @@ static inline void io_wait_n(int n) {(void)n;}
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
             if path == 'drivers/video/pc98/backend_pegc.c':
-                body = re.sub(r'^#include "(backend_pegc_\w+\.inc)"$',
-                              lambda m: texts['drivers/video/pc98/' + m[1]], body, flags=re.M)
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''
     extern int host_pegc_available;
@@ -168,9 +152,7 @@ static inline void io_wait_n(int n) {(void)n;}
             # Preserve source-relative include semantics for private copies.
             body = re.sub(r'#include "(\.\./[^"\n]+)"',
                           lambda m: '#include "'+str((ROOT/path).parent/m[1])+'"', body)
-            if path.endswith('.inc'):
-                (tmp / pathlib.Path(path).name).write_text(body)
-            elif path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
+            if path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
                 (tmp/(pathlib.Path(path).stem+'_host_source.c')).write_text(body)
             else:
                 dest = tmp/(pathlib.Path(path).stem+'.c');dest.write_text(body);sources.append(dest)
@@ -230,7 +212,7 @@ def main():
             ('display-authorization','exec/surface_query.c',
              'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))', 'if (0)',
              'FAIL surface_lease(&source,'),
-            ('map-range','mm/pgalloc_resource.inc',
+            ('map-range','mm/pgalloc.c',
              'first < end && first >= r->decode_first &&\n                               end <= r->decode_end',
              'first < end', 'FAIL !ledger_resource_set_map(0,rr->decode_first-1,rr->decode_end)')]:
             result=run_case(None,args.runner,[(unit,old,new)])

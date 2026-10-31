@@ -24,10 +24,6 @@ SYSTEM = 'exec/system_surface.c'
 UTF8 = 'lib/utf8.c'
 TARGET_SRCS = [
     'gfx/gfx_core.c',
-    'gfx/gfx_core_framebuffer.inc',
-    'gfx/gfx_core_surface.inc',
-    'gfx/gfx_core_api.inc',
-    'gfx/gfx_core_bridge.inc',
     'drivers/video/pc98/backend_pc98.c',
     'drivers/video/pc98/backend_pegc.c',
     'drivers/video/cirrus/backend_cirrus.c',
@@ -41,9 +37,6 @@ TARGET_SRCS = [
     'mm/shlib.c',
     'mm/paging.c',
     'mm/pgalloc.c',
-    'mm/pgalloc_owner.inc',
-    'mm/pgalloc_resource.inc',
-    'mm/pgalloc_surface.inc',
     'kernel/sys.c',
     'mm/physmem.c',
     'userland/lib/gfx/libos32gfx_core.c',
@@ -69,13 +62,12 @@ TARGET_SRCS = [
     'exec/system_surface.h',
     'tools/tests/unicode_surface_host.c',
     'tools/tests/gfx_kernel_fb_host.c',
-    'tools/tests/gfx_attach_host.c',
-]
+    'tools/tests/gfx_attach_host.c',]
 assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
     ('sdk-no-kapi', UTF8, 'return kapi->unicode_to_jis(cp);', '(void)cp; return 0;', 'FAIL unicode_to_jis(0x3041)==0x2421'),
     ('tvram-gui', 'exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
-    ('slot-unready', 'mm/pgalloc_surface.inc', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
+    ('slot-unready', 'mm/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
 ]
 
 

@@ -5,7 +5,7 @@
 
 票 docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5。
 tools/tests/gfx_boot_host.c が実物の mm/paging.c・pgalloc.c・sys.c・
-physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、gfx/gfx_core_surface.inc
+physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、gfx/gfx_core.c
 から切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /
 gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものはそのファイルの
 冒頭)。切り出しは台帳・写像の呼び出しを記録係へ付け替えるだけで、記録係は
@@ -43,8 +43,7 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('gfx/gfx_core_surface.inc', 'mm/paging.c', 'mm/pgalloc.c', 
-           'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
+SOURCES = ('gfx/gfx_core.c', 'mm/paging.c', 'mm/pgalloc.c',
            'kernel/sys.c',
            'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
@@ -98,20 +97,17 @@ def load(mutation=None):
         if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
-    for part in ('owner', 'resource', 'surface'):
-        texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
-            f'#include "pgalloc_{part}.inc"', texts[f'mm/pgalloc_{part}.inc'])
     return texts
 
 
 def slice_gfx(core):
     if core.count(SLICE_BEGIN) != 1 or core.count(SLICE_END) != 1:
-        raise SystemExit('gfx/gfx_core_surface.inc: 切り出しの目印が 1 個ずつではない')
+        raise SystemExit('gfx/gfx_core.c: 切り出しの目印が 1 個ずつではない')
     body = core.split(SLICE_BEGIN, 1)[1].split(SLICE_END, 1)[0]
     body = SLICE_BEGIN + body + SLICE_END
     for old, new in HOOKS:
         body = body.replace(old, new)
-    return '#include \"geforce_module.h\"\n/* 生成物。gfx/gfx_core_surface.inc から test_gfx_boot.py が切り出した。 */\n' + body
+    return '#include \"geforce_module.h\"\n/* 生成物。gfx/gfx_core.c から test_gfx_boot.py が切り出した。 */\n' + body
 
 
 def build(texts, tmp):
@@ -120,7 +116,7 @@ def build(texts, tmp):
         source = source.replace('irq_save()', 'host_irq_save()').replace(
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
-    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core_surface.inc']))
+    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(texts['gfx/gfx_core.c']))
     # Execute the real planar boot assertion before and after owner transfer.
     selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
@@ -156,24 +152,20 @@ def run_case(texts, name, defs):
 
 def text_problems():
     problems = []
-    core = (ROOT / 'gfx/gfx_core_surface.inc').read_text()
+    core = paging_source(ROOT / 'gfx/gfx_core.c')
     body = core.split(SLICE_BEGIN, 1)[-1].split(SLICE_END, 1)[0]
     for old, _ in HOOKS:
         if old not in body:
-            problems.append('gfx/gfx_core_surface.inc: 切り出しに %r が無い (記録係へ付け替えられない)' % old)
+            problems.append('gfx/gfx_core.c: 切り出しに %r が無い (記録係へ付け替えられない)' % old)
     for rel in ('drivers/video/pc98/backend_pegc.c',
-                'drivers/video/pc98/backend_pegc_timing.inc',
-                'drivers/video/pc98/backend_pegc_diag.inc',
-                'drivers/video/pc98/backend_pegc_present.inc',
-                'drivers/video/pc98/backend_pegc_restore.inc',
                 'drivers/video/cirrus/backend_cirrus.c'):
-        if 'paging_map_phys(' in (ROOT / rel).read_text():
+        if 'paging_map_phys(' in paging_source(ROOT / rel):
             problems.append('%s が自分で写像している (予約・写像は ⑥ の 1 回だけ)' % rel)
     for d in ('kernel', 'gfx', 'include', 'exec', 'drivers', 'kapi'):
         for path in (ROOT / d).rglob('*'):
-            if path.suffix not in ('.c', '.h') and not path.match('gfx_core_*.inc'):
+            if path.suffix not in ('.c', '.h'):
                 continue
-            text = path.read_text(errors='replace')
+            text = paging_source(path)
             if re.search(r'\bsys_reserve_top\s*\(|\bsys_top_reserved\b', text):
                 problems.append('%s に sys_reserve_top / sys_top_reserved が残っている'
                                 % path.relative_to(ROOT))
@@ -225,7 +217,7 @@ for _name, _defs in CASES:
 
 
 def _swap_reserve_and_map():
-    core = (ROOT / 'gfx/gfx_core_surface.inc').read_text()
+    core = paging_source(ROOT / 'gfx/gfx_core.c')
     line = '    if (m && !ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)) m = 0;\n'
     start = core.index(line)
     end = core.index('    /* 4. BB', start)
@@ -245,66 +237,66 @@ MUTATIONS = [
     ('selftest-boot-owner-only', 'kdebug/kselftest/gfx_ledger.inc',
      '(p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL)',
      '(p->owner == LEDGER_OWNER_BOOT)'),
-    ('planar-pool-fails', 'gfx/gfx_core_surface.inc',
+    ('planar-pool-fails', 'gfx/gfx_core.c',
      'if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,',
      'if (1 || !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,'),
-    ('planar-failure-leaks', 'gfx/gfx_core_surface.inc',
+    ('planar-failure-leaks', 'gfx/gfx_core.c',
      '(void)pgalloc_free_n_owner(sf.owner, sf.first, (int)sf.npages);',
      '(void)sf;'),
 
-    ('pegc-alt-resource-missing', 'gfx/gfx_core_surface.inc',
+    ('pegc-alt-resource-missing', 'gfx/gfx_core.c',
      'for (i = n = 0; m && i < GFX_RES_COUNT; i++)',
      'for (i = n = 0; m && i < 3; i++)'),
-    ('pegc-alt-map-missing', 'gfx/gfx_core_surface.inc',
+    ('pegc-alt-map-missing', 'gfx/gfx_core.c',
      'if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&',
      'if (i != 3 && (m & gfx_cand_of(i)) && r->map_first < r->map_end &&'),
-    ('planar-plane-stride-rounded', 'gfx/gfx_core_surface.inc',
+    ('planar-plane-stride-rounded', 'gfx/gfx_core.c',
      '.plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,\n                       3 * GFX_BPL * GFX_HEIGHT}',
      '.plane_offset = {0, GVRAM_PLANE_SIZE, 2 * GVRAM_PLANE_SIZE, 3 * GVRAM_PLANE_SIZE}'),
-    ('planar-display-UC-lost', 'gfx/gfx_core_surface.inc',
+    ('planar-display-UC-lost', 'gfx/gfx_core.c',
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_UC',
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_WB'),
-    ('planar-last-plane-missing', 'gfx/gfx_core_surface.inc',
+    ('planar-last-plane-missing', 'gfx/gfx_core.c',
      'for (i = 0; i < GVRAM_PLANES; i++) {\n        sf = gfx_planar_display;',
      'for (i = 0; i < 3; i++) {\n        sf = gfx_planar_display;'),
     # BB の探索範囲を池全体にする (高位 RAM へ行く、X14)
-    ('bb-whole-pool', 'gfx/gfx_core_surface.inc',
+    ('bb-whole-pool', 'gfx/gfx_core.c',
      'pgalloc_arena_end(),\n                              LEDGER_TOP_DOWN',
      'pgalloc_limit_pfn(),\n                              LEDGER_TOP_DOWN'),
     # 1 つの窓の写像失敗で候補を全部捨てる (B3: Xe10 の失敗が PEGC を妨げる)
-    ('map-failure-drops-all', 'gfx/gfx_core_surface.inc',
+    ('map-failure-drops-all', 'gfx/gfx_core.c',
      'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m &= ~gfx_cand_of(i);',
      'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m = 0;'),
     # 写像を予約より先に行う (識別 → 予約 → 写像の順、D33)
-    ('map-before-reserve', 'gfx/gfx_core_surface.inc', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
+    ('map-before-reserve', 'gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
     # アリーナの上端を凍結しない (CPL=0 の子が BB まで伸びる)
-    ('no-freeze', 'gfx/gfx_core_surface.inc', '    ledger_arena_freeze();\n', ''),
+    ('no-freeze', 'gfx/gfx_core.c', '    ledger_arena_freeze();\n', ''),
     # BB を 0 で埋めない (前の中身が CPL=3 に見える)
-    ('bb-not-zeroed', 'gfx/gfx_core_surface.inc',
+    ('bb-not-zeroed', 'gfx/gfx_core.c',
      '        kmemset(P2V(pfn * PAGE_SIZE), 0, (u32)MEM_GFX_BB8_SIZE);\n',
      '        (void)0;\n'),
     # PEGC が候補でなくても BB を取る (量が候補の最大でない)
-    ('bb-always', 'gfx/gfx_core_surface.inc',
+    ('bb-always', 'gfx/gfx_core.c',
      '    if ((m & GFX_CAND_PEGC) &&\n        pgalloc_alloc_n_owner',
      '    if ((m | 1) &&\n        pgalloc_alloc_n_owner'),
     # GFX=pc98 でも識別して予約する
-    ('pc98-pref-ignored', 'gfx/gfx_core_surface.inc',
+    ('pc98-pref-ignored', 'gfx/gfx_core.c',
      '    if (g_backend_pref == GFX_PREF_PC98 || g_backend_pref == GFX_PREF_GEFORCE ||\n',
      '    if (0 || g_backend_pref == GFX_PREF_GEFORCE ||\n'),
     # e11a: authorized DISPLAY lease must now be possible
-    ('display-unlendable', 'gfx/gfx_core_surface.inc',
+    ('display-unlendable', 'gfx/gfx_core.c',
      '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW }',
      '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }'),
     # gfx_bb_phys_range が選択中の backend を見ない
-    ('phys-range-not-selected', 'gfx/gfx_core_surface.inc',
+    ('phys-range-not-selected', 'gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (base)',
      '        ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);\n    if (base)'),
     # ⑨ が選択中でない CLIENT を移す
-    ('gshell-wrong-client', 'gfx/gfx_core_surface.inc',
+    ('gshell-wrong-client', 'gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;',
      '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;'),
     # RAM の面の移譲で L2 のページを移さない
-    ('transfer-surface-only', 'mm/pgalloc_surface.inc',
+    ('transfer-surface-only', 'mm/pgalloc.c',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'
      '         ledger_transfer(sf->first, (int)sf->npages, from, to);',
      '    ok = 1;'),

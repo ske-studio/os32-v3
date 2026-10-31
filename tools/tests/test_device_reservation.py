@@ -50,7 +50,6 @@ import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
 SOURCES = ('mm/pgalloc.c',
-           'mm/pgalloc_owner.inc', 'mm/pgalloc_resource.inc', 'mm/pgalloc_surface.inc',
            'tools/tests/pgalloc_host_fixture.h',
            'platform/pc98/pci_resources.c', 'drivers/pci/pci.c', 'mm/paging.c', 'kernel/sys.c',
            'init/kernel.c')
@@ -60,12 +59,9 @@ def load(mutation=None):
     texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
-        if old not in texts[rel]:
+        if texts[rel].count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
         texts[rel] = texts[rel].replace(old, new, 1)
-    for part in ('owner', 'resource', 'surface'):
-        texts['mm/pgalloc.c'] = texts['mm/pgalloc.c'].replace(
-            f'#include "pgalloc_{part}.inc"', texts[f'mm/pgalloc_{part}.inc'])
     return texts
 
 
@@ -713,45 +709,45 @@ class DeviceReservation(unittest.TestCase):
 
 # 変異 (§4-4)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('raw-grants-authority', 'mm/pgalloc_resource.inc',
+    ('raw-grants-authority', 'mm/pgalloc.c',
      'rr->width_basis > LEDGER_WB_GLUE_CONST', 'rr->width_basis > LEDGER_WB_PROBE_UNVERIFIED'),
-    ('decode-end-unchecked', 'mm/pgalloc_resource.inc',
+    ('decode-end-unchecked', 'mm/pgalloc.c',
      '            t.end > rr->decode_end ||\n', ''),
-    ('decode-first-unchecked', 'mm/pgalloc_resource.inc',
+    ('decode-first-unchecked', 'mm/pgalloc.c',
      't.first >= t.end || t.first < rr->decode_first ||', 't.first >= t.end ||'),
-    ('res-mask-not-merged', 'mm/pgalloc_resource.inc',
+    ('res-mask-not-merged', 'mm/pgalloc.c',
      '            s[k - 1].res |= s[i].res;\n', ''),
-    ('mixed-kind-overlap-merged', 'mm/pgalloc_resource.inc',
+    ('mixed-kind-overlap-merged', 'mm/pgalloc.c',
      '            if (k && s[i].first < s[k - 1].end) goto done;\n', ''),
-    ('background-refused', 'mm/pgalloc_resource.inc',
+    ('background-refused', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;\n', ''),
-    ('fixed-allowed', 'mm/pgalloc_resource.inc',
+    ('fixed-allowed', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_FIXED) continue;'),
-    ('other-owner-device-allowed', 'mm/pgalloc_resource.inc',
+    ('other-owner-device-allowed', 'mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_DEVICE) continue;'),
-    ('partial-match-accepted', 'mm/pgalloc_resource.inc',
+    ('partial-match-accepted', 'mm/pgalloc.c',
      '        ok = hit == n && mine == n;', '        ok = hit == n;'),
-    ('res-mask-not-compared', 'mm/pgalloc_resource.inc',
+    ('res-mask-not-compared', 'mm/pgalloc.c',
      '                    g->res_mask == s[i].res && g->cache == s[i].kind) hit++;',
      '                    g->cache == s[i].kind) hit++;'),
-    ('live-or-permanent-unchecked', 'mm/pgalloc_resource.inc',
+    ('live-or-permanent-unchecked', 'mm/pgalloc.c',
      '            if (owner_map[p] ||\n', '            if (0 ||\n'),
-    ('ram-eligibility-unchecked', 'mm/pgalloc_resource.inc',
+    ('ram-eligibility-unchecked', 'mm/pgalloc.c',
      '(s[i].kind == LEDGER_CACHE_WB && !bit(eligible, p))) goto done;', '0) goto done;'),
-    ('eligibility-not-dropped', 'mm/pgalloc_resource.inc',
+    ('eligibility-not-dropped', 'mm/pgalloc.c',
      '                eligible[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));\n                total_pages--;\n',
      ''),
-    ('non-device-owner', 'mm/pgalloc_resource.inc',
+    ('non-device-owner', 'mm/pgalloc.c',
      '        ledger_owners[owner].kind != LEDGER_KIND_DEVICE || !spans || !n ||',
      '        !spans || !n ||'),
-    ('selfcheck-rejects-device-on-background', 'mm/pgalloc_owner.inc',
+    ('selfcheck-rejects-device-on-background', 'mm/pgalloc.c',
      '                !(r->type == LEDGER_R_DEVICE && g->type == LEDGER_R_BACKGROUND))\n',
      '                1)\n'),
-    ('overflow-not-counted', 'mm/pgalloc_resource.inc',
+    ('overflow-not-counted', 'mm/pgalloc.c',
      '        ledger_res_overflow++;\n', ''),
-    ('record-map-unchecked', 'mm/pgalloc_resource.inc',
+    ('record-map-unchecked', 'mm/pgalloc.c',
      '        rec->map_first > rec->map_end ||\n', ''),
     ('import-width-verified', 'platform/pc98/pci_resources.c',
      '    r.width_basis = LEDGER_WB_RAW;', '    r.width_basis = LEDGER_WB_SIZING;'),

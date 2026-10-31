@@ -6,7 +6,7 @@ from pathlib import Path
 import test_gfx_kernel_fb as base
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
- ('pegc', 'drivers/video/pc98/backend_pegc_present.inc',
+ ('pegc', 'drivers/video/pc98/backend_pegc.c',
   '    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, mode->height)) return;',
   '''    if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
