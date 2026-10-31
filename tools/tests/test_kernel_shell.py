@@ -71,38 +71,37 @@ def main():
         results = run_cases(build(work, source))
         assert all(rc == 0 for _, rc, _ in results), results
         print(f'GREEN {len(results)} real shell-loop cases (runner={host32.selected_runner()})', flush=True)
-        if '--mutate' not in sys.argv:
-            return
-        mutations = [
-            ('load-fail-waits', 'continue;   /* ウェイト無しで即 CUI を起動 */',
-             ';   /* mutation: fall through to wait */'),
-            ('fault-streak', 'gui_fault_streak++;', 'gui_fault_streak += 2;'),
-            ('layout-or', 'layout_bad |= exec_layout_rejected();',
-             'layout_bad = exec_layout_rejected();'),
-            ('layout-second', 'layout_bad |= exec_layout_rejected();',
-             'layout_bad |= 0;'),
-            ('consume-reset', 'gui_fault_streak = 0;   /* 別シェルへ切替',
-             ';   /* 別シェルへ切替'),
-        ]
-        # The new call boundaries must also be observed, not merely compiled.
-        if 'kernel_gui_shlib_ready(void)' in source:
-            mutations += [
-                ('gui-result', 'is_gui && !kernel_gui_shlib_ready()',
-                 'is_gui && kernel_gui_shlib_ready()'),
-                ('fdd-layout-argument', 'kernel_shell_fdd_fallback(exec_layout_rejected());',
-                 'kernel_shell_fdd_fallback(0);'),
+        if '--mutate' in sys.argv:
+            mutations = [
+                ('load-fail-waits', 'continue;   /* ウェイト無しで即 CUI を起動 */',
+                 ';   /* mutation: fall through to wait */'),
+                ('fault-streak', 'gui_fault_streak++;', 'gui_fault_streak += 2;'),
+                ('layout-or', 'layout_bad |= exec_layout_rejected();',
+                 'layout_bad = exec_layout_rejected();'),
+                ('layout-second', 'layout_bad |= exec_layout_rejected();',
+                 'layout_bad |= 0;'),
+                ('consume-reset', 'gui_fault_streak = 0;   /* 別シェルへ切替',
+                 ';   /* 別シェルへ切替'),
             ]
-        # Explicit identity control uses the very same build/runtime path.
-        marker = 'gui_fault_streak++;'
-        assert source.count(marker) == 1
-        assert all(rc == 0 for _, rc, _ in run_cases(build(work, source.replace(marker, marker))))
-        print('GREEN identity control', flush=True)
-        for label, old, new in mutations:
-            assert source.count(old) == 1, (label, source.count(old))
-            results = run_cases(build(work, source.replace(old, new, 1)))
-            failures = [case for case, rc, _ in results if rc == 1]
-            assert failures, (label, 'survived')
-            print(f'RED {label}: unique marker; runtime assertions: {", ".join(failures)}', flush=True)
+            # The new call boundaries must also be observed, not merely compiled.
+            if 'kernel_gui_shlib_ready(void)' in source:
+                mutations += [
+                    ('gui-result', 'is_gui && !kernel_gui_shlib_ready()',
+                     'is_gui && kernel_gui_shlib_ready()'),
+                    ('fdd-layout-argument', 'kernel_shell_fdd_fallback(exec_layout_rejected());',
+                     'kernel_shell_fdd_fallback(0);'),
+                ]
+            # Explicit identity control uses the very same build/runtime path.
+            marker = 'gui_fault_streak++;'
+            assert source.count(marker) == 1
+            assert all(rc == 0 for _, rc, _ in run_cases(build(work, source.replace(marker, marker))))
+            print('GREEN identity control', flush=True)
+            for label, old, new in mutations:
+                assert source.count(old) == 1, (label, source.count(old))
+                results = run_cases(build(work, source.replace(old, new, 1)))
+                failures = [case for case, rc, _ in results if rc == 1]
+                assert failures, (label, 'survived')
+                print(f'RED {label}: unique marker; runtime assertions: {", ".join(failures)}', flush=True)
 
 
 def run(ctx):
