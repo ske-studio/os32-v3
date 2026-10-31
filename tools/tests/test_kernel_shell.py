@@ -4,11 +4,10 @@ Only device/exec boundaries are faked; product control flow is compiled intact.
 Mutation compile failures and signals are errors, never runtime RED evidence.
 """
 CHECK = dict(name='kernel-shell-host', tier=1,
-    covers=['init/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    covers=['init/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/kernel_shell_arch/arch_io.h', 'init/kernel_*.inc', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=5)
 
 from pathlib import Path
-import re
 import subprocess
 import sys
 import tempfile
@@ -25,26 +24,23 @@ CASES = ('cui', 'gui', 'gui-probed', 'kcg', 'shlib-layout', 'shlib-api',
 
 
 def product_source():
-    source = (ROOT / 'init/kernel.c').read_text()
-    constants = '\n'.join(re.findall(
-        r'^#define (?:GUI_FAULT_STREAK_MAX|SHELL_RELOAD_DELAY) .+$', source, re.M))
-    # Follow the actual includes, so the same fixture works on the original loop.
-    source = re.sub(r'^#include "(kernel_(?:gui_shlib|shell_fdd)\.inc)"$',
-                    lambda m: (ROOT / 'init' / m[1]).read_text(), source, flags=re.M)
-    functions = re.findall(
-        r'^static (?:inline void kernel_shell_loop|int kernel_gui_shlib_ready|'
-        r'void kernel_shell_fdd_fallback)\([^\n]*\)\n\{.*?^}\n', source, re.M | re.S)
-    assert sum('kernel_shell_loop(void)' in f for f in functions) == 1
-    return constants + '\n' + '\n'.join(functions)
+    paths = [ROOT / 'init/kernel.c', *sorted((ROOT / 'init').glob('kernel_*.inc'))]
+    return {path.name: path.read_text() for path in paths}
 
 
-def build(work, source):
-    (work / 'kernel_shell_source.inc').write_text(source)
+def build(work, sources):
+    for name, source in sources.items():
+        (work / name).write_text(source)
     exe = work / 'shell'
     host32.build(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Wextra',
-                  '-Werror', '-static', '-fno-pie', '-no-pie', '-nostdlib',
+                  '-Werror', '-Wno-unused-function', '-Wno-unused-variable',
+                  '-Wno-unused-but-set-variable', '-D__KERNEL_BUILD__',
+                  '-static', '-fno-pie', '-no-pie', '-nostdlib',
                   '-ffreestanding', '-fno-builtin', '-fno-stack-protector',
-                  '-I' + str(work), *include_flags(ROOT),
+                  '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+                  '-I' + str(work), '-I' + str(ROOT / 'tools/tests/kernel_shell_arch'),
+                  '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'init'),
+                  *include_flags(ROOT),
                   str(ROOT / 'tools/tests/kernel_shell_host.c'), '-o', str(exe)],
                  check=True)
     return exe
@@ -54,7 +50,9 @@ def run_cases(exe):
     results = []
     for case in CASES:
         result = host32.run([str(exe), case], capture_output=True, text=True, timeout=10)
-        assert result.returncode in (0, 1), (case, result.returncode, result.stderr)
+        assert result.returncode == 0 or (result.returncode == 1 and
+                                          result.stdout.startswith("FAIL ")), (
+            case, result.returncode, result.stdout, result.stderr)
         results.append((case, result.returncode, result.stdout + result.stderr))
     return results
 
@@ -79,7 +77,7 @@ def main():
                  ';   /* 別シェルへ切替'),
             ]
             # The new call boundaries must also be observed, not merely compiled.
-            if 'kernel_gui_shlib_ready(void)' in source:
+            if 'kernel_gui_shlib_ready(void)' in source['kernel_gui_shlib.inc']:
                 mutations += [
                     ('gui-result', 'is_gui && !kernel_gui_shlib_ready()',
                      'is_gui && kernel_gui_shlib_ready()'),
@@ -88,12 +86,15 @@ def main():
                 ]
             # Explicit identity control uses the very same build/runtime path.
             marker = 'gui_fault_streak++;'
-            assert source.count(marker) == 1
-            assert all(rc == 0 for _, rc, _ in run_cases(build(work, source.replace(marker, marker))))
+            assert sum(text.count(marker) for text in source.values()) == 1
+            assert all(rc == 0 for _, rc, _ in run_cases(build(work, source)))
             print('GREEN identity control', flush=True)
             for label, old, new in mutations:
-                assert source.count(old) == 1, (label, source.count(old))
-                results = run_cases(build(work, source.replace(old, new, 1)))
+                matches = [name for name, text in source.items() if old in text]
+                assert len(matches) == 1 and source[matches[0]].count(old) == 1, (label, matches)
+                changed = dict(source)
+                changed[matches[0]] = changed[matches[0]].replace(old, new, 1)
+                results = run_cases(build(work, changed))
                 failures = [case for case, rc, _ in results if rc == 1]
                 assert failures, (label, 'survived')
                 print(f'RED {label}: unique marker; runtime assertions: {", ".join(failures)}', flush=True)
