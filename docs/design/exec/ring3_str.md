@@ -13,3 +13,9 @@ CPL=3 に返す文字列を写し、ページ権限とガードの判定を補�
   一方、以前登録したバッファは登録時の由来を保持して検査する
   (`fs/fd_redirect.c:99`, `exec/redir_access.c:162`)。
   `make check-ring3-guard-host` と `make check-access-host` が各経路を検査する。
+
+## 内部設計と契約 (D1)
+
+`RING3_LS_SHIM_OFF` は式を変えず `exec/ring3_str.h` へ移し、構築側と移植先の共通定義にする。
+
+ring3_guard_active / ring3_user_str
