@@ -24,7 +24,7 @@ u32 appslot_resume_mark_selftest(void)
 /*                                                                          */
 /*  壊れたときに実機で見えるのは「CTRL+STOP で関係ないアプリ (端末) まで     */
 /*  消える」か「暴走したアプリを畳めない」だけで、原因が遠い。借りた         */
-/*  スロットと cur / owner は必ず元へ戻す。ビット 0..n が落ちた項目。        */
+/*  スロットと cur は必ず元へ戻す。ビット 0..n が落ちた項目。                */
 /* ======================================================================== */
 u32 appslot_abort_admit_selftest(void)
 {
@@ -32,7 +32,6 @@ u32 appslot_abort_admit_selftest(void)
     int id = APP_ID_MAX;
     AppSlot saved;
     int saved_cur = g_cur;
-    int saved_owner = res_owner_get();
 
     saved = g_slot[id];
     slot_zero(&g_slot[id]);
@@ -76,7 +75,6 @@ u32 appslot_abort_admit_selftest(void)
 
     g_slot[id] = saved;
     g_cur = saved_cur;
-    res_owner_set(saved_owner);
     return bad;
 }
 

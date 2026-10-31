@@ -34,6 +34,15 @@ int appslot_park_check(void)
     return 0;
 }
 
+static void appslot_park_finish(AppSlot *a, int state)
+{
+    a->in_op_wait = 0;
+    a->state = state;
+    g_cur_op_is_wait = 0;
+    g_cur = APP_ID_SHELL;
+    res_owner_set(APP_ID_SHELL);
+}
+
 void appslot_park_commit(void)
 {
     AppSlot *a = appslot_get(g_cur);
@@ -43,11 +52,7 @@ void appslot_park_commit(void)
     a->parked_from_wait = 1;      /* 「OP_WAIT 由来」の印 (C5) */
     a->stop_wm_req = 0;
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    a->in_op_wait = 0;
-    a->state = APP_STATE_PARKED;
-    g_cur_op_is_wait = 0;
-    g_cur = APP_ID_SHELL;
-    res_owner_set(APP_ID_SHELL);
+    appslot_park_finish(a, APP_STATE_PARKED);
 }
 
 /* ---- 第 2 の park 点: GUI 中の kbd 待ち (票 K7 D1) --------------------- */
@@ -87,11 +92,7 @@ void appslot_park_kbd_commit(void)
     a->parked_from_kbd = 1;       /* 「kbd 待ち由来」の印 (K7 D1) */
     a->stop_wm_req = 0;
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    a->in_op_wait = 0;
-    a->state = APP_STATE_WAIT_KEY;
-    g_cur_op_is_wait = 0;
-    g_cur = APP_ID_SHELL;
-    res_owner_set(APP_ID_SHELL);
+    appslot_park_finish(a, APP_STATE_WAIT_KEY);
     ring3_kbd_park_count++;
 }
 
@@ -142,11 +143,7 @@ void appslot_park_poll_commit(void)
     a->parked_from_poll = 1;      /* 「ポーリング由来」の印 (T8 D8) */
     a->stop_wm_req = 0;
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    a->in_op_wait = 0;
-    a->state = APP_STATE_WAIT_POLL;
-    g_cur_op_is_wait = 0;
-    g_cur = APP_ID_SHELL;
-    res_owner_set(APP_ID_SHELL);
+    appslot_park_finish(a, APP_STATE_WAIT_POLL);
     /* 控え (g_poll_last_tick) を進めるのは check の側 — 弾かれた試みも
      * 間引きたいので、成立した分だけでは足りない。 */
     ring3_poll_yield_count++;
@@ -164,24 +161,7 @@ void appslot_poll_yield_reset(void)
  * 同じ tick の中で sh が回り続け、譲りが成立しないまま CPU を食う。 */
 int appslot_park_yield_check(void)
 {
-    AppSlot *a;
-
-    if (g_cur < APP_ID_MIN || g_cur > APP_ID_MAX) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    a = appslot_get(g_cur);
-    if (!a || a->state != APP_STATE_RUNNING) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    /* CUI の入れ子 exec_run の子は譲れない (park_kbd_check と同じ理由:
-     * longjmp の行き先が親アプリの中の exec_run フレームになる)。 */
-    if (!a->gui) {
-        ring3_park_reject_count++;
-        return OS32_ERR_INVAL;
-    }
-    return 0;
+    return appslot_park_kbd_check();
 }
 
 void appslot_park_yield_commit(void)
@@ -193,11 +173,7 @@ void appslot_park_yield_commit(void)
     a->parked_from_yield = 1;     /* 「明示的な譲り由来」の印 (T9 D5) */
     a->stop_wm_req = 0;
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
-    a->in_op_wait = 0;
-    a->state = APP_STATE_WAIT_POLL;
-    g_cur_op_is_wait = 0;
-    g_cur = APP_ID_SHELL;
-    res_owner_set(APP_ID_SHELL);
+    appslot_park_finish(a, APP_STATE_WAIT_POLL);
     ring3_yield_count++;
 }
 
@@ -232,11 +208,7 @@ void appslot_park_stop_commit(void)
     g_slot[APP_ID_SHELL].stop_wm_req = 0;
     ring3_stop_park_count++;
     a->parked_from_stop = 1;
-    a->in_op_wait = 0;
-    a->state = APP_STATE_WAIT_POLL;
-    g_cur_op_is_wait = 0;
-    g_cur = APP_ID_SHELL;
-    res_owner_set(APP_ID_SHELL);
+    appslot_park_finish(a, APP_STATE_WAIT_POLL);
 }
 
 int appslot_resume_check(int id)
