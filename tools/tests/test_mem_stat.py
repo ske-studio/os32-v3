@@ -89,7 +89,8 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
              ('void exec_addrspace_abort(', 'void ring3_abort_check(', 'static void exec_teardown_app(')]
     resume = function(exe, 'i32 exec_resume(')
     tail = resume[resume.index('    appslot_resume_commit('):resume.index('    return 0;   /* 到達しない */')]
-    parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id);\n' + tail + '\n}')
+    # Tail-only probes resume completed syscalls, with no stdin replay.
+    parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id); int restart_stdin = 0;\n' + tail + '\n}')
     dispatch = function(exe, 'void __cdecl ring3_syscall_dispatch(')
     tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
     parts.append('static void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; u32 *prev_frame=0;\n' + tail + '\n}')

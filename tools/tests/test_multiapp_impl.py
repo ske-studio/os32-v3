@@ -39,7 +39,7 @@ if __name__ == "__main__":
         source = exec_source(ROOT)
         poll = source.split('} else if (src == APP_RESUME_SRC_POLL) {', 1)[1].split('} else if (src == APP_RESUME_SRC_KBD)', 1)[0]
         (tmp / 'exec_resume_poll.inc').write_text(poll)
-        kbd = source.split('} else if (src == APP_RESUME_SRC_KBD) {', 1)[1].split('} else {', 1)[0]
+        kbd = source.split('} else if (src == APP_RESUME_SRC_KBD) {', 1)[1].split('\n    } else {', 1)[0]
         (tmp / 'exec_resume_kbd.inc').write_text(kbd)
         includes.insert(0, '-I'+str(tmp))
         command = ["gcc", *FLAGS, "-O0", "-nostdlib", "-static", "-no-pie",

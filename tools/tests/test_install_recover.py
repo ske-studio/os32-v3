@@ -8,7 +8,7 @@
   python3 -B tools/tests/test_install_recover.py [--target] [--sanitize] [case ...]
 """
 CHECK = dict(name='install-recover-host', tier=1,
-    covers=['fs/vfs_fd.c', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    covers=['fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
     needs=[], budget=8.130882)
 
 import pathlib
@@ -43,6 +43,7 @@ INC = ["-I" + str(ROOT / p) for p in
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
+    "exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
     "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n",
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
@@ -50,6 +51,7 @@ SHIMS = {
 
 def build(tmp, sanitize, recovery_source=None, kapi_source=None):
     for name, text in SHIMS.items():
+        (tmp / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp / name).write_text(text)
     obj = str(tmp / "sqlite.o")
     exe = str(tmp / "recoverhost")
