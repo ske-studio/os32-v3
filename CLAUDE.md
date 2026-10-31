@@ -11,7 +11,7 @@
 **このリポジトリ os32-v3 が現行** (os32 の v2.x は戻り先、[VERSIONS](docs/decisions/VERSIONS.md) §2)。
 **カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
 
-実装者の完了条件は `make all` + 足した・触った試験を `MUTATE=0` + `tools/checks/run.py --lint` の rc=0。複数段の作業は ROLES §0 に従う。
+実装者の完了条件は `make all` + `make -k check-changed BASE=<基点> MUTATE=0` + 足した・触った試験を `--mutate` (目印一意・実行時 RED) + `tools/checks/run.py --lint` の rc=0 (ユーザー承認 2026-10-31)。変異込みの全体は PM が取り込みで 1 回。複数段の作業は ROLES §0 に従う。
 
 ## Build Commands
 

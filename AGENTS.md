@@ -22,9 +22,11 @@ Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restar
 Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
-`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run only `make all` and the tests you added or touched, with `MUTATE=0`; also run
-`python3 -B tools/checks/run.py --lint` (seconds; a new test declares its inputs in its own `CHECK` dict). Do not run
-mutation passes, the full `--select` candidate set or the static checks (the PM runs them once after review).
+`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Run `make all`, then `make -k check-changed BASE=<SHA from the request> MUTATE=0` (every check your change hits —
+catches ripple into other tests), then the tests you added or touched with `--mutate` (each mutation anchor unique and
+RED at runtime; if you changed or removed a product line, `grep -rn` tools/tests for mutations anchored on it and move
+them), and `python3 -B tools/checks/run.py --lint` (a new test declares its inputs in its own `CHECK` dict). Do not run
+the full mutation pass (the PM runs it once when landing). User-approved 2026-10-31.
 For a request that is one step of a multi-step task (Tx, from T4): run `make kernel` (plus any userland image your step touches) instead of `make all`; after the last step, before review, run `make all`, the `python3 -B tools/checks/run.py --select --files <whole Tx diff>` candidates with `MUTATE=0`, and the five static checks once (ROLES §0).
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
