@@ -415,3 +415,5 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P2-c: 層 3 の確定設計の末尾にも同じ日付で 1 行足した (accel_out の欄と OPS_VERSION 3 はこの追記の §3 で確保済み、層 3 の C5 は 0 行)。
 - P3: identity が一致して BAR だけが変わった場合に config 経由で Command=0102h を書くか (手本 nouveau_drm.c:940 の pci_disable_device 相当) は、DMA を出す層 2 で決める。層 1 は書かない。
 - P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
+- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev (import 37/128)、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
+- 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
