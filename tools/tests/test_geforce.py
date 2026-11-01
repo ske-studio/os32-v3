@@ -211,12 +211,6 @@ def present_trace(mutation=None):
         old,new=mutations[mutation]
         assert source.count(old)==1
         source=source.replace(old,new,1)
-    byte='*d++ = *s++;'
-    assert source.count(byte)==2
-    source=source.replace(byte, 'trace_store(d, 1); *d++ = *s++;')
-    word='*(volatile u32 *)d = v;'
-    assert source.count(word)==1
-    source=source.replace(word, 'trace_store(d, 4); *(volatile u32 *)d = v;')
     drain='if (!rc) (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT);'
     assert source.count(drain)==1
     source=source.replace(drain, 'if (!rc) { trace_drain(); (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT); }')
@@ -224,7 +218,6 @@ def present_trace(mutation=None):
 #include "gfx_hal.h"
 #include "hwdev/gfinit_mode.h"
 GfxCounters gfx_counters;
-static void trace_store(volatile u8 *, int);
 static void trace_drain(void);
 #include "present.c"
 #define SIZE 4096
@@ -232,14 +225,6 @@ static u8 src[SIZE], dst[SIZE], expected[SIZE];
 static volatile u8 *start;
 static int pitch, left, top, width, height, errors, calls, fail, drains;
 static u32 regs[(GF_PRESENT_PFB_AMOUNT / 4) + 1];
-static void trace_store(volatile u8 *p, int size) {
-    int offset = (int)(p - start), row = offset / pitch, col = offset % pitch;
-    if (row < top || row >= top + height || col < left || col + size > left + width ||
-        (size == 4 && ((uptr)p & 3)) || (size != 1 && size != 4)) {
-        __asm__ volatile("int $0x80" : : "a"(1), "b"(1) : "memory");
-    }
-    if (size == 1 && !((uptr)p & 3) && col + 4 <= left + width) errors++;
-}
 static void trace_drain(void) { if (calls != height || drains) errors++; drains++; }
 static int point(void *p) { (void)p; calls++; return calls == fail; }
 static void run(int sa, int da, int w, int clip, int failrow) {
@@ -275,10 +260,77 @@ void _start(void) {
         subprocess.run(FLAGS+['-I'+td]+INCLUDES+[str(tmp/'host.c'),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
         assert result.returncode == (1 if mutation else 0), (mutation,result.returncode,result.stderr)
-        print(('RED '+mutation if mutation else 'PASS present store trace and byte equivalence'),flush=True)
+        print(('RED '+mutation if mutation else 'PASS present byte equivalence and bounds'),flush=True)
+
+def present_store_width(source):
+    """Count executed stores into the display via QEMU instruction/register traces."""
+    import re
+    harness = r'''
+#include "gfx_hal.h"
+GfxCounters gfx_counters;
+static u8 source[16], display[16] __attribute__((aligned(4)));
+static u32 registers[0x10020c / 4 + 1];
+int gf_present_rect(const u8 *, u32, volatile u8 *, u32, volatile u8 *,
+                    int, int, int, int, int (*)(void *), void *);
+static int point(void *p) { (void)p; return 0; }
+void _start(void) {
+    for (int i=0; i<16; i++) source[i]=(u8)(i+1);
+    int rc=gf_present_rect(source,16,display,16,(volatile u8 *)registers,
+                           0,0,16,1,point,0);
+    for (int i=0; i<16; i++) if (display[i]!=source[i]) rc=1;
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
+    for (;;) {}
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='gf-store-') as td:
+        tmp=Path(td); exe=tmp/'host'; log=tmp/'qemu.log'
+        (tmp/'host.c').write_text(harness)
+        # Include lookup preserves the product file byte-for-byte, including relative includes.
+        subprocess.run(FLAGS+INCLUDES+['-I'+str(ROOT/'drivers/video/geforce'),
+            str(tmp/'host.c'),str(source),'-o',str(exe)],check=True)
+        symbols=subprocess.check_output(['nm','-n',str(exe)],text=True)
+        display=int(re.search(r'^([0-9a-f]+) [bB] display$',symbols,re.M).group(1),16)
+        asm=subprocess.check_output(['objdump','-d','-Mintel','--no-show-raw-insn',str(exe)],text=True)
+        instructions={}
+        for line in asm.splitlines():
+            m=re.match(r'^\s*([0-9a-f]+):\s+([a-z][a-z0-9]*)(?:\s+(.*))?$',line)
+            if m: instructions[int(m[1],16)]=(m[2],m[3] or '')
+        result=subprocess.run(['qemu-i386','-one-insn-per-tb','-d','exec,cpu,nochain',
+            '-D',str(log),str(exe)],capture_output=True,text=True,timeout=60)
+        assert result.returncode==0,('fixture execution',result.returncode,result.stderr)
+        stores=[]
+        pattern=r'Trace \d+: [^\n]*\nEAX=([0-9a-f]+) EBX=([0-9a-f]+) ECX=([0-9a-f]+) EDX=([0-9a-f]+)\nESI=([0-9a-f]+) EDI=([0-9a-f]+) EBP=([0-9a-f]+) ESP=([0-9a-f]+)\nEIP=([0-9a-f]+)'
+        for m in re.finditer(pattern,log.read_text()):
+            regs=dict(zip(('eax','ebx','ecx','edx','esi','edi','ebp','esp'),
+                          (int(v,16) for v in m.groups()[:8])))
+            op,args=instructions[int(m[9],16)]
+            dest=args.split(',',1)[0].strip()
+            if op in ('cmp','test','lea','push','call','jmp'): continue
+            mem=re.fullmatch(r'(BYTE|WORD|DWORD) PTR (?:\[([^]]+)\]|ds:(0x[0-9a-f]+))',dest)
+            if not mem:
+                assert 'PTR' not in dest, (op,dest)
+                continue
+            # Objdump's i386 effective addresses consist only of registers,
+            # integer constants and +, - or *; reject anything else.
+            expr=mem[2] or mem[3]
+            for reg,value in regs.items(): expr=re.sub(r'\b'+reg+r'\b',str(value),expr)
+            assert re.fullmatch(r'[0-9xa-f+* -]+',expr),expr
+            address=eval(expr,{'__builtins__':{}},{}) & 0xffffffff
+            size={'BYTE':1,'WORD':2,'DWORD':4}[mem[1]]
+            if display <= address < display+16:
+                stores.append((address-display,size))
+        expected=[(0,4),(4,4),(8,4),(12,4)]
+        print(f"present executed stores: {stores}",flush=True)
+        assert stores==expected,('runtime store width',stores,expected)
+        print('PASS unmodified present: four aligned dword stores',flush=True)
+
 
 def main():
     import sys
+    if '--present-source' in sys.argv:
+        present_store_width(Path(sys.argv[sys.argv.index('--present-source')+1]))
+        return 0
+    present_store_width(ROOT/'drivers/video/geforce/gf_present.c')
     present_trace()
     if '--mutate' in sys.argv:
         for mutation in ('bounds', 'point'): present_trace(mutation)
