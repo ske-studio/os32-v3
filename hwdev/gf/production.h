@@ -42,6 +42,9 @@ struct gf_production {
     struct gf_production_local locks[GF_PRODUCTION_LOCKS];
     /* Layer 1 outlives scratch/ROM; IRQ arg refers to this same object. */
     struct gf_foundation foundation;
+    /* Lend to foundation.map_ops/map_owner before start, including fake MMIO.
+     * Keep both valid until stop/rollback has released the map; a failed stop
+     * retains the loan. io.opaque remains the gf_io adapter's own context. */
     const struct gf_instmem_map_ops *map_ops;
     void *map_owner;
 };

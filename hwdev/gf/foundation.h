@@ -18,8 +18,14 @@ struct gf_irq_stats {
     u32 entries, fifo, graph, vblank[2];
     u32 pmc, pfifo, pgraph, nsource, nstatus, unknown;
 };
+struct gf_instmem_map_ops;
 struct gf_foundation {
     struct gf_io io;
+    /* Production lends these before start; callbacks and owner stay valid
+     * through stop/rollback and successful map release, including failures.
+     * Independent of io.opaque; fake MMIO lends its own map_ops/owner. */
+    const struct gf_instmem_map_ops *map_ops;
+    void *map_owner;
     struct gf_imem imem;
     struct gf_irq_stats stats;
     volatile u8 *bar0, *bar2;
@@ -40,6 +46,21 @@ struct gf_instmem_map_ops {
 };
 int gf_master_enable(struct gf_foundation *); /* cfg16/8, enter RUN every start */
 int gf_master_disable(struct gf_foundation *); /* only after engine stop */
+/* B4: BIOS/display init complete, IRQ sources closed. Uses f->io for the
+ * nv44 MC sequence and updates expected_pmc. GF1_OK or GF1_EIO; no owned
+ * mapping/allocation to release. Caller rolls back start via foundation_stop. */
+int gf_mc_init(struct gf_foundation *);
+/* B5: bar is the checked third memory resource (borrowed for this call),
+ * bytes is R, its leading UC aperture size. Uses f->map_ops/map_owner.
+ * GF1_OK publishes bar2/aperture_bytes and mapped=true; GF1_EMAP leaves no
+ * new reservation/map (adapter rolls back). Foundation owns successful map. */
+int gf_instmem_map(struct gf_foundation *, const struct recover_bar_extent *bar,
+                   u32 bytes);
+/* After engine stop, IRQ detach and BM clear: release variable handles,
+ * then fixed regions, before this call. Uses the same borrowed adapter and
+ * bar2/aperture_bytes; GF1_OK clears mapped/bar2, GF1_EMAP retains ownership
+ * needed for cleanup. foundation_stop owns this release, not the caller. */
+int gf_instmem_unmap(struct gf_foundation *);
 int gf_instmem_init(struct gf_foundation *);
 /* Foreground only; align=0 means 1. Fixed handles are not individually freed. */
 int gf_inst_alloc(struct gf_foundation *, u32 bytes, u32 align, bool zero,
