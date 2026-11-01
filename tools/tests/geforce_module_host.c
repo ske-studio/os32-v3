@@ -5,6 +5,7 @@
 #include "../../drivers/video/geforce/geforce_body.c"
 static struct geforce_platform fixture_platform;
 struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
+void geforce_backend_wc_bind(int (*start)(void)) { (void)start; }
 void geforce_backend_stop_bind(int (*stop)(void)) { (void)stop; }
 int gf_production_prepare(struct gf_production *p,const struct gf_production_resources *b,
                          int (*r)(void *),void *o) { (void)p;(void)b;(void)r;(void)o;return -1; }

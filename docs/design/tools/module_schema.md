@@ -16,3 +16,5 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
 > [要確認] tools/module_schema.py の現行 MODULE_RECORD_CAP は GEFORCE 追加により 12。HWDEV の module_id=11 は維持される。
 
 KDEBUG/SQLITE/FEP/LAN は既存 KMOD。image/mem 上限は各 256/256、512/512、64/64、64/64 KiB。FEP は SQLITE 依存の先例
+
+GF_ACCEL S7 の内部 callback 追加に伴い GEFORCE の ops_version は 2。ヘッダとパッカーを対で更新し、既存 module ID/import 順は保持する。

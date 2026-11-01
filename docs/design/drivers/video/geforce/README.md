@@ -16,3 +16,5 @@ GUI/グラフィックコンソール→RAM CLIENT→`gfx_present/dirty`→`back
 - [geforce_module](geforce_module.md)
 - [geforce_platform](geforce_platform.md)
 - [gf_present](gf_present.md)
+
+- [gf_wc](gf_wc.md)

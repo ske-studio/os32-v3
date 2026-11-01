@@ -7,6 +7,8 @@
 STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
               GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE + 1,
               geforce_boot_pt_budget);
+/* BAR1 DISPLAY may be effective WC through MTRR. Ledger cache/intervals,
+ * permanent reservations and the existing 75 display PTEs remain unchanged. */
 static struct gf_production_resources boot_resources;
 static struct geforce_platform platform;
 static int reserve(void)
@@ -46,6 +48,9 @@ static int reserve(void)
 struct geforce_platform *geforce_platform_get(void)
 {
     platform.reserve = reserve;
+    platform.wc_start = geforce_wc_start;
+    platform.wc_stop = geforce_wc_stop;
+    platform.report = geforce_wc_report;
     return gf_production_selected() ? &platform : 0;
 }
 

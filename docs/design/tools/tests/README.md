@@ -57,3 +57,5 @@
 - [fep_standard_host](fep_standard_host.md)
 
 - [MTRR WC の模型試験](test_mtrr_wc.md)
+
+- [GeForce WC 寿命の fixture](gf_wc_host.md)

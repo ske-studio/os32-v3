@@ -41,6 +41,8 @@ static int (*interrupt_point)(void *);
 static void *interrupt_context;
 static int failed, active, routed;
 static int (*stop_device)(void);
+static int (*start_wc)(void);
+void geforce_backend_wc_bind(int (*start)(void)) { start_wc = start; }
 void geforce_backend_stop_bind(int (*stop)(void)) { stop_device = stop; }
 static u8 initial_palette[VIDEO_PALETTE_BYTES];
 
@@ -91,6 +93,7 @@ static void geforce_palette_init(void)
 
 static int geforce_stop(void)
 {
+    active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
     if (pc98_route_to_98()) rc = -1;
     active = routed = 0;
@@ -125,6 +128,7 @@ static void geforce_init(void)
     geforce_palette_init();
     pc98_console_set_safe(0);
     if (video_start(device, mode.id, initial_palette) ||
+        (start_wc && start_wc() < 0) ||
         geforce_transfer(0, 0, GF_WIDTH, GF_HEIGHT) ||
         pc98_route_cell_check() || pc98_route_to_gf()) {
         geforce_fail();
