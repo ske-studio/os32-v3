@@ -33,6 +33,9 @@
 
 ## 索引
 
+- [splash_raster_host.c.md](splash_raster_host.c.md)
+- [test_splash_raster.py.md](test_splash_raster.py.md)
+
 - [FatFs 読み取り保持の実 FatFs 試験](fatfs_read_cache_host.md)
 - [FatFs 読み取り保持の試験入口](test_fatfs_read_cache.md)
 - [FatFs VFS の境界回帰](fatfs_stat_host.md)

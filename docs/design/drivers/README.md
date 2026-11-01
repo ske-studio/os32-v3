@@ -28,4 +28,5 @@
 - [video/cirrus/wab_glue_xe10.md](video/cirrus/wab_glue_xe10.md)
 - [video/kcg/README.md](video/kcg/README.md)
 - [video/pc98/backend_pc98.md](video/pc98/backend_pc98.md)
+- [video/pc98/README.md](video/pc98/README.md)
 - [video/pc98/backend_pegc.md](video/pc98/backend_pegc.md)
