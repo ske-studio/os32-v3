@@ -75,6 +75,7 @@ def main():
     expected = gzip.decompress((FIXTURE/'splash.trace.gz').read_bytes())
     assert manifest['baseline'] == 'b400acb6'
     assert hashlib.sha256(expected).hexdigest() == manifest['trace_sha256']
+    assert hashlib.sha256((ROOT/HARNESS).read_bytes()).hexdigest() == manifest['harness_sha256_wire']
     # Historical trace includes a fourth frame after the old private deadline.
     # The shared deadline includes initial presentation: remove just that frame.
     import struct
