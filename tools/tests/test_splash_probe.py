@@ -2,7 +2,7 @@
 CHECK = dict(name='splash-probe-host', tier=1,
     covers=['platform/pc98/splash_probe.c', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'tools/tests/splash_probe_host.c',
-            'tools/tests/splash_raster_host.c', 'tools/tests/host32.py',
+            'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'include/platform_splash.h',
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
@@ -12,7 +12,6 @@ CHECK = dict(name='splash-probe-host', tier=1,
 import argparse
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 import host32
@@ -21,23 +20,49 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'platform/pc98/splash_probe.c'
 MUTATIONS = (
     ('omit pattern', '    probe_pattern();', '    (void)probe_pattern;'),
-    ('omit receive', '        probe_receive();', '        (void)probe_receive;'),
+    ('omit receive', '            probe_rx_count++;', '            (void)probe_rx_count;'),
     ('omit frame duration', '.duration = probe_now() - stamp,', '.duration = 0,'),
     ('print during scan', '    probe_pattern();', '    serial_puts_polled("early");\n    probe_pattern();'),
+    ('omit Q measurement', 'if (kind == PROBE_Q) probe_poll_batch(PROBE_COST_BATCH);',
+     'if (kind == PROBE_Q) probe_poll_batch(1);'),
+    ('mix clock into Q/W', 'elapsed > probe_c_min ? elapsed - probe_c_min : 0;',
+     'elapsed;'),
+    ('omit clock cost', 'probe_cost[PROBE_C].total_us += c;', '(void)c;'),
+    ('omit W measurement', 'else for (u32 i = 0; i < PROBE_COST_BATCH; i++) palette_set(1, 15, 0, 0);',
+     'else for (u32 i = 0; i < PROBE_COST_BATCH; i++) outp(PAL_IDX_PORT, 1);'),
+    ('omit Q loop cost bound', 'if (kind == PROBE_Q) probe_poll_batch(2);',
+     'if (kind == PROBE_Q) probe_poll_batch(1);'),
+    ('lose VS classification', 'else if (probe_delta(measured, s->vs_lines * tolerance) <= tolerance)',
+     'else if (0 && probe_delta(measured, s->vs_lines * tolerance) <= tolerance)'),
+    ('ignore eight-period mismatch', 'expected * SPLASH_RASTER_PERIOD_TOLERANCE) return;',
+     'expected * SPLASH_RASTER_PERIOD_TOLERANCE) (void)0;'),
+    ('lose F bracket', 'probe_f_lo = last; probe_f_hi = after;', 'probe_f_lo = after; probe_f_hi = after;'),
+    ('lose H bracket', 'probe_h_lo = last; probe_h_hi = after;', 'probe_h_lo = after; probe_h_hi = after;'),
+    ('omit cumulative IRQ', 'e->irq_us.max += span - probe_c_min;', 'e->irq_us.max = span - probe_c_min;'),
+    ('omit retry cost', 'return b->s[1].max - b->planned - b->retry;', 'return b->s[1].max - b->planned;'),
+    ('lose negative margin', 'e->frame_j_max = initial_margin;', 'e->frame_j_max = 0;'),
+    ('qualify unmeasured phase', '.initial_margin = initial_margin, .capture_margin = capture,',
+     '.qualified = 1, .initial_margin = initial_margin, .capture_margin = capture,'),
+    ('omit IF open window', 'probe_open_until = end + probe_open_gap_us;', 'probe_open_until = end;'),
 )
+def ordinary():
+    with tempfile.TemporaryDirectory(prefix='splash-probe-ordinary-') as td:
+        obj = Path(td) / 'probe.o'
+        cross = Path(os.environ['CROSS_DIR']) / 'bin'
+        subprocess.run([str(cross / 'i386-elf-gcc'), '-std=gnu11', '-O2',
+            '-ffreestanding', '-c', str(ROOT / SOURCE), '-o', str(obj)], check=True)
+        assert not subprocess.check_output([str(cross / 'i386-elf-nm'), str(obj)]).strip()
+    print('GREEN ordinary build contains no probe code/storage', flush=True)
 def execute(mutation=None):
     with tempfile.TemporaryDirectory(prefix='splash-probe-') as td:
         work = Path(td)
-        for rel in (SOURCE, 'drivers/video/pc98/splash_raster.c', 'tools/tests/splash_probe_host.c', 'tools/tests/splash_raster_host.c'):
+        for rel in (SOURCE, 'drivers/video/pc98/splash_raster.c', 'tools/tests/splash_probe_host.c'):
             dest = work/rel; dest.parent.mkdir(parents=True, exist_ok=True)
             source = (ROOT/rel).read_text()
             if rel == SOURCE and mutation:
                 name, old, new = mutation
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
-            if rel == 'tools/tests/splash_raster_host.c':
-                source = source.replace('REQUIRE(port == GDC_GFX_STAT);', 'REQUIRE(port == GDC_GFX_STAT || port == GDC_TEXT_STAT);')
-                source = source.replace('REQUIRE(writes < 1024);', 'writes %= 1024;')
             dest.write_text(source)
         cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'); exe = work/'probe'
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -51,8 +76,9 @@ def execute(mutation=None):
 
 def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
+    ordinary()
     assert execute() == 0
-    print('GREEN probe both modes, 32 VS/64 H periods, pattern/ruler, serial sequence, clock/IO, buffered output, bounded failure', flush=True)
+    print('GREEN four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
