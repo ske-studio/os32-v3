@@ -20,7 +20,7 @@ WRAPPER = r'''
 #include "gfx_osri.h"
 #include "gfx_hal.h"
 #include "../lib/crc32_core.inc"
-extern unsigned char data[]; extern unsigned char data_end[];
+extern unsigned char data[]; extern unsigned char expected_planes[];
 static unsigned int pos, chunk, length; static int closed;
 int vfs_open(const char *p, int mode) { (void)p; (void)mode; pos=0; closed=0; return 3; }
 void vfs_close(int fd) { (void)fd; closed++; }
@@ -36,6 +36,8 @@ static int run(int badfb) {
  if (badfb) fb.planes[2]++;
  int rc=osri_load("x", &fb, &im);
  if (!badfb && closed != 1) return 99;
+ if (!badfb && rc == 0 && length == 128096)
+  for (int i=0;i<128000;i++) if (planes[i] != expected_planes[i]) return 98;
  return rc;
 }
 static void put32(int off, unsigned int v) { for (int i=0;i<4;i++) data[off+i]=(unsigned char)(v>>(8*i)); }
@@ -62,12 +64,13 @@ void _start(void) { int rc=test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(
 '''
 
 
-def run_loader(td, data):
+def run_loader(td, data, expected):
     import host32
     src = Path(os.environ.get('OSRI_TEST_SOURCE', ROOT / 'gfx/gfx_osri.c')).read_text()
     wrapper = td / 'wrap.c'; wrapper.write_text(WRAPPER)
     blob = td / 'data.bin'; blob.write_bytes(data + b'X' + bytes(1600))
-    asm = td / 'data.S'; asm.write_text('.data\n.global data,data_end\ndata: .incbin "' + str(blob) + '"\ndata_end:\n')
+    expected_blob = td / 'expected.bin'; expected_blob.write_bytes(expected)
+    asm = td / 'data.S'; asm.write_text('.data\n.global data,expected_planes\ndata: .incbin "' + str(blob) + '"\nexpected_planes: .incbin "' + str(expected_blob) + '"\n')
     exe = td / 'test'
     includes = ['-I' + str(ROOT / x) for x in ('include', 'gfx', 'fs', 'sdk/include/os32', '.', 'exec')]
     subprocess.run(['gcc', '-m32', '-march=i386', '-nostdlib', '-static', '-fno-pie', '-no-pie',
@@ -77,14 +80,16 @@ def run_loader(td, data):
 
 
 def check():
-    spec = importlib.util.spec_from_file_location('img2osri', ROOT/'tools/img2osri.py')
+    spec = importlib.util.spec_from_file_location('img2osri', os.environ.get('OSRI_CONVERTER_SOURCE', ROOT/'tools/img2osri.py'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         src = Image.new('RGB', (640, 400))
         pix = src.load()
         for y in range(400):
-            for x in range(640): pix[x, y] = (255 if x < 320 else 0, 255 if y < 200 else 0, 0)
+            for x in range(640):
+                n = (x + 3 * y + x // 8) % 16
+                pix[x, y] = (255 if n & 1 else 0, (n // 4) * 85, 255 if n & 2 else 0)
         data, crc = mod.convert(src)
         assert len(data) == 128096 and struct.unpack_from('<I', data, 48)[0] == crc
         zero = bytearray(data); zero[48:52] = bytes(4)
@@ -92,7 +97,35 @@ def check():
         output = td/'image.osri'; output.write_bytes(data)
         mod.preview(output, src, td/'preview.png')
         assert Image.open(td/'preview.png').size == (1280, 420)
-        assert run_loader(td, data) == 0
+        # Derive palette indices from the generated source pixels, then pack each
+        # bit in display order independently of the converter and loader.
+        pal = struct.unpack_from('<16H', data, 64)
+        assert len(set(pal)) == 16
+        expected = bytearray(128000)
+        for y in range(400):
+            for x in range(640):
+                r, g, b = pix[x, y]
+                color = ((r // 17) << 8) | ((g // 17) << 4) | (b // 17)
+                index = pal.index(color)
+                for p in range(4):
+                    if index & (1 << p):
+                        expected[p * 32000 + y * 80 + x // 8] += 2 ** (7 - x % 8)
+        assert run_loader(td, data, expected) == 0
+
+        # A gradient contains intermediate colors and exceeds the 16-color palette.
+        middle = Image.new('RGB', (640, 400))
+        middle.putdata([((x * 7 + y) % 256, (x + y * 3) % 256, (x * 3 + y * 5) % 256)
+                        for y in range(400) for x in range(640)])
+        dithered, _ = mod.convert(middle)
+        original = (ROOT/'tools/img2osri.py').read_text()
+        anchor = 'd = rgb[c] - palette[index][c]'
+        assert original.count(anchor) == 1
+        no_dither_path = td/'no_dither.py'
+        no_dither_path.write_text(original.replace(anchor, 'd = 0'))
+        no_spec = importlib.util.spec_from_file_location('no_dither', no_dither_path)
+        no_mod = importlib.util.module_from_spec(no_spec); no_spec.loader.exec_module(no_mod)
+        undithered, _ = no_mod.convert(middle)
+        assert dithered[96:128096] != undithered[96:128096], 'error diffusion has no effect'
         print('OSRI conversion and loader: GREEN')
 
 
@@ -100,18 +133,25 @@ def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args(); check()
     if args.mutate:
-        src = (ROOT/'gfx/gfx_osri.c').read_text()
-        mutations = [('crc', 'crc32_core_final(crc) != expected', '0'),
-                     ('reserved', 'le_read16(h + 42)', '0'),
-                     ('end', 'vfs_read_fd(fd, &extra, 1) != 0', '0')]
+        mutations = [
+            ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
+            ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
+            ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
+            ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
+            ('bit-order', 'tools/img2osri.py', 'planes[p * PLANE + offset] |= 0x80 >> (x & 7)', 'planes[p * PLANE + offset] |= 1 << (x & 7)', 'OSRI_CONVERTER_SOURCE'),
+            ('diffusion', 'tools/img2osri.py', 'd = rgb[c] - palette[index][c]', 'd = 0', 'OSRI_CONVERTER_SOURCE'),
+        ]
         with tempfile.TemporaryDirectory() as td:
-            for name, old, new in mutations:
-                assert src.count(old) == 1
-                path = Path(td)/'gfx_osri.c'; path.write_text(src.replace(old, new))
-                env = dict(os.environ, OSRI_TEST_SOURCE=str(path))
+            for name, source, old, new, variable in mutations:
+                src = (ROOT/source).read_text()
+                assert src.count(old) == 1, name
+                path = Path(td)/Path(source).name; path.write_text(src.replace(old, new))
+                env = dict(os.environ, **{variable: str(path)})
                 result = subprocess.run([sys.executable, '-B', __file__], env=env, capture_output=True)
-                print(name, 'RED' if result.returncode else 'SURVIVED')
+                print(name, 'RED' if result.returncode else 'SURVIVED',
+                      result.stderr.decode().strip().splitlines()[-1] if result.stderr else '', flush=True)
                 assert result.returncode != 0
+                assert b'AssertionError' in result.stderr
     return 0
 
 if __name__ == '__main__': sys.exit(main())
