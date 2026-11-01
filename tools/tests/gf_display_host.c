@@ -118,7 +118,9 @@ static int sim_validate(struct gf_display_context *c)
     CHECK(c->initialized && c->baseline_valid && !c->init && !c->program);
     return sim_validate_fail?-1:0;
 }
-static const struct gf_display_owner sim_owner={sim_acquire,sim_release,sim_validate};
+static const struct gf_display_owner sim_owner={
+    .acquire=sim_acquire, .release=sim_release, .validate=sim_validate
+};
 static void sim_reset(void)
 {
     sim_count=sim_calls=sim_fail=sim_second_fail=sim_points=sim_point_fail=sim_time=0;

@@ -1,6 +1,8 @@
 """Pin private HWDEV ABI while allowing GeForce mode/verification values.
 
-The independent expectations below were captured from ca28d81b (main 4e96d02d).
+The import expectations were captured from ca28d81b (main 4e96d02d).
+GF_FEAT1 A0 appends the two foundation hooks to gf_display_owner; the layout
+CRC below pins that reviewed declaration change.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -16,7 +18,7 @@ import zlib
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gen_kdebug_imports import declaration
 
-LAYOUT_CRC = 0x64142dfa
+LAYOUT_CRC = 0x182910ed
 IMPORT_DECLARATIONS_SHA = '34b227461aff152720340d8087159a5a7554670259f4ea473947478752ba6d89'
 
 

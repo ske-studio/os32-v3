@@ -751,6 +751,8 @@
     ],
     "struct gf_display_owner": [
       "acquire",
+      "foundation_start",
+      "foundation_stop",
       "release",
       "validate"
     ],

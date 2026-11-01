@@ -2,7 +2,7 @@
 #ifndef TICK_H
 #define TICK_H
 
-#define TICK_SLOT_COUNT 6
+#define TICK_SLOT_COUNT 7
 #define TICK_ERR_CTX   -1
 #define TICK_ERR_INVAL -2
 #define TICK_ERR_BUSY  -3

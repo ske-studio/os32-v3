@@ -1,7 +1,7 @@
 /* P4/P5 connection. All objects/callbacks live until reboot (module pinned). */
 #ifndef HWDEV_GF_PRODUCTION_H
 #define HWDEV_GF_PRODUCTION_H
-#include "internal.h"
+#include "foundation.h"
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN /* existing acquisition ceiling */
 #define GF_PRODUCTION_SUBSYS 0x127010fcU
 #define GF_PRODUCTION_BAR0_BYTES 0x01000000U
@@ -40,6 +40,13 @@ struct gf_production {
     struct gfinit_resource_reject reject;
     struct gf_production_local indexes[GF_PRODUCTION_INDEXES];
     struct gf_production_local locks[GF_PRODUCTION_LOCKS];
+    /* Layer 1 outlives scratch/ROM; IRQ arg refers to this same object. */
+    struct gf_foundation foundation;
+    /* Lend to foundation.map_ops/map_owner before start, including fake MMIO.
+     * Keep both valid until stop/rollback has released the map; a failed stop
+     * retains the loan. io.opaque remains the gf_io adapter's own context. */
+    const struct gf_instmem_map_ops *map_ops;
+    void *map_owner;
 };
 /* Read-only boot identification/resource check. P5 reserves ALL three decode
  * ranges, maps BAR0 and the BAR1 DISPLAY with paging_map_phys(supervisor+PCD)

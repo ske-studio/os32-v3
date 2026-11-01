@@ -1,6 +1,6 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -19,6 +19,7 @@ OWNERS = {
     'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
     'net/link.c': ('LINK', 'link_tick', 'void link_init('),
     'drivers/net/ne2000/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
+    'drivers/video/geforce/geforce_tick.c': ('GF', 'geforce_tick', 'int geforce_tick_bind('),
 }
 
 def wiring():
@@ -27,6 +28,10 @@ def wiring():
     assert body.count('tick_dispatch();') == 1
     assert body.index('r1_fixture_timer();') < body.index('tick_dispatch();')
     for rel, (slot, fn, entry) in OWNERS.items():
+        # A0 reserves and exercises slot 6; B6 supplies its resident owner.
+        if rel == 'drivers/video/geforce/geforce_tick.c' and not (ROOT / rel).exists():
+            print('PENDING B6: GF resident owner; slot exercised by tick_host', flush=True)
+            continue
         src = (ROOT / rel).read_text()
         if rel == 'drivers/net/ne2000/ne2000.c':
             src = src.replace('#include "ne2000_control.inc"',
@@ -49,7 +54,7 @@ def wiring():
         assert src.index('tick_register(') < src.index(boundary), rel
     assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
     assert 'kernel/irq/tick.c' in (ROOT / 'build/kernel.mk').read_text()
-    print('PASS timer fixture order, six resident owners, platform boundary', flush=True)
+    print('PASS timer fixture order, six resident owners plus GF slot (owner checked when present), platform boundary', flush=True)
 
 
 def main():
@@ -75,10 +80,11 @@ def main():
                 ('else slots[slot].fn = fn;', 'else slots[slot].fn = 0;', 'registration lost'),
                 ('if (slots[slot].fn) slots[slot].fn();',
                  'if (slots[slot].fn) { slots[slot].fn(); slots[slot].fn(); }', 'double callback'),
+                ('slot < TICK_SLOT_COUNT;', 'slot < TICK_SLOT_COUNT - 1;', 'seventh slot omitted'),
                 ('irq_restore(saved);', 'irq_restore(saved & ~0x200U);', 'IF lost'),
             ]
             for old, new, label in mutants:
-                assert old in original
+                assert original.count(old) == 1
                 source = Path(td) / 'mutant.c'
                 source.write_text(original.replace(old, new, 1))
                 build(source)
