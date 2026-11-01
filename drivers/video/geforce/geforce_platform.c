@@ -4,8 +4,21 @@
 #include "../../../hwdev/gf/production.h"
 #include "../../../mm/pgalloc.h"
 #include "../../../mm/paging.h"
+/* R = align4096((0x4980 * vs + 0x4000) * 32 + 0x100000), vs <= 8. */
+#define GF_BOOT_INSTMEM_BAR 2U
+#define GF_BOOT_INSTMEM_VS_MAX 8U
+#define GF_BOOT_INSTMEM_VS_BYTES 0x4980U
+#define GF_BOOT_INSTMEM_FIXED_BYTES 0x4000U
+#define GF_BOOT_INSTMEM_COPIES 32U
+#define GF_BOOT_INSTMEM_EXTRA_BYTES 0x100000U
+#define GF_BOOT_INSTMEM_MAX_BYTES PAGE_ALIGN_UP( \
+    (GF_BOOT_INSTMEM_VS_BYTES * GF_BOOT_INSTMEM_VS_MAX + \
+     GF_BOOT_INSTMEM_FIXED_BYTES) * GF_BOOT_INSTMEM_COPIES + GF_BOOT_INSTMEM_EXTRA_BYTES)
+#define GF_BOOT_INSTMEM_PT_PAGES \
+    ((GF_BOOT_INSTMEM_MAX_BYTES + MEM_DEVICE_APERTURE_PDE_SIZE - 1) / MEM_DEVICE_APERTURE_PDE_SIZE)
 STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
-              GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE + 1,
+              GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE + 1 +
+              GF_BOOT_INSTMEM_PT_PAGES,
               geforce_boot_pt_budget);
 /* BAR1 DISPLAY may be effective WC through MTRR. Ledger cache/intervals,
  * permanent reservations and the existing 75 display PTEs remain unchanged. */
@@ -40,6 +53,12 @@ static int reserve(void)
         if (pages && (paging_map_phys(b->base, b->base, pages, PAGE_RW | PTE_PCD) ||
                       !ledger_resource_set_map(ids[i], first, first + pages))) return 0;
     }
+    /* Precreate shared PTs before any live AS. Keep access closed until B5 map. */
+    const struct recover_bar_extent *instmem = &boot_resources.bars[GF_BOOT_INSTMEM_BAR];
+    u32 bytes = instmem->length < GF_BOOT_INSTMEM_MAX_BYTES ?
+                instmem->length : GF_BOOT_INSTMEM_MAX_BYTES;
+    if (paging_map_phys(instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
+        paging_set_not_present(instmem->base, instmem->base + bytes - 1)) return 0;
     platform.bar0_phys = boot_resources.bars[GF_MODE_REGISTER_BAR].base;
     platform.display_phys = boot_resources.bars[GF_MODE_VRAM_BAR].base;
     platform.resources = &boot_resources;

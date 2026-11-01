@@ -15,6 +15,9 @@ $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) b
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
+GEFORCE_LAYER1_PENDING := hwdev/gf/master.c hwdev/gf/instmem.c hwdev/gf/irq.c \
+ hwdev/gf/instmem_map.c hwdev/gf/foundation.c
+GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
 GEFORCE_SERVICE_OBJS := $(patsubst %.c,$(GEFORCE_OUT)/%.o,$(GEFORCE_SOURCES))
 $(GEFORCE_SERVICE_OBJS): $(GEFORCE_OUT)/%.o: %.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	mkdir -p $(@D)

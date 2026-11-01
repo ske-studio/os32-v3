@@ -23,7 +23,7 @@ def component(name):
         assert result.returncode==0,(name,result.returncode,result.stdout,result.stderr)
         print('PASS '+name,flush=True)
 
-def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
+def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mutation=None):
     fixture=(ROOT/'tools/tests/gfx_kernel_fb_host.c').read_text().replace('return id == 2 ? &slot : 0;', 'return id == 2 || id == APP_ID_SHELL ? &slot : 0;')
     fixture=fixture.replace('void gui_display_failed(void) {}', '')
     fixture=fixture.replace('static void run(void)\n{',
@@ -42,11 +42,33 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY));
     CHECK(!geforce_range_reserved(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES));
     CHECK(!geforce_range_reserved(GF_TEST_DISPLAY,GF_PRODUCTION_BAR1_BYTES));
-    CHECK(!geforce_range_reserved(GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES));
+    CHECK(!geforce_range_reserved(GF_TEST_BAR2,BAR2_BYTES));
     CHECK((paging_pte_raw(GF_TEST_BAR0)&(PTE_PRESENT|PTE_USER|PTE_PCD))==(PTE_PRESENT|PTE_PCD));
     CHECK((paging_pte_raw(GF_TEST_DISPLAY)&(PTE_PRESENT|PTE_USER|PTE_PCD))==(PTE_PRESENT|PTE_PCD));
     CHECK(!(paging_pte_raw(GF_TEST_BAR2)&PTE_PRESENT));
     CHECK(!(paging_pte_raw(GF_TEST_DISPLAY+MEM_GFX_BB8_SIZE)&PTE_PRESENT));
+    /* Boot builds both instmem PTs, but leaves every aperture PTE closed. */
+    const u32 instmem_bytes = BAR2_BYTES < 0x618000U ? BAR2_BYTES : 0x618000U;
+    CHECK(GF_PRODUCTION_PT_PAGES==7);
+    for (u32 off=0; off<instmem_bytes; off+=PAGE_SIZE) {
+        CHECK(paging_registered_pt(GF_TEST_BAR2+off));
+        CHECK(paging_pte_raw(GF_TEST_BAR2+off)==((GF_TEST_BAR2+off)|PTE_RW|PTE_PCD));
+    }
+    CHECK(!paging_pte_raw(GF_TEST_BAR2+instmem_bytes));
+    /* A later live AS inherits the PTs and can reopen/close them without allocation. */
+    u32 instmem_owner;
+    CHECK(ledger_owner_new(LEDGER_KIND_AS,2,"gf-pt",&instmem_owner));
+    CHECK(!paging_addrspace_create_lease(&space,instmem_owner));
+    for (u32 off=0; off<instmem_bytes; off+=MEM_DEVICE_APERTURE_PDE_SIZE) {
+        u32 va=GF_TEST_BAR2+off;
+        u32 pde=((u32 *)P2V(space.pd_phys))[va/MEM_DEVICE_APERTURE_PDE_SIZE];
+        CHECK((pde&PTE_FRAME_MASK)==paging_registered_pt(va) && (pde&PTE_PRESENT));
+    }
+    CHECK(!paging_map_phys(GF_TEST_BAR2,GF_TEST_BAR2,instmem_bytes/PAGE_SIZE,PAGE_RW|PTE_PCD));
+    CHECK(!paging_set_not_present(GF_TEST_BAR2,GF_TEST_BAR2+instmem_bytes-1));
+    CHECK(!geforce_range_reserved(GF_TEST_BAR2,BAR2_BYTES));
+    paging_addrspace_destroy(&space);
+    CHECK(ledger_owner_retire(instmem_owner));
     CHECK(!acquires && !starts);
     if (!MISSING) geforce_backend_bind(&device_gf,identify_gf,0,point_gf,0);
     gfx_prepare_backend(); CHECK(!acquires && !starts);
@@ -88,8 +110,29 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0):
     }
     SAY("PASS GF core lifecycle/reservation/fallback"); die(0);
 ''')
-    fixture=f'#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
+    fixture=f'#define BAR2_BYTES {bar2_bytes}U\n#define GF_RESERVATION_TEST 1\n#define INIT_FAIL {init_fail}\n#define UNSAFE {unsafe}\n#define MISSING {missing}\n#define GUI_FIRST {gui_first}\nunsigned int host_arch_if=0x202U;\n'+fixture
     def stage(tmp,sources):
+        cases=(ROOT/'tools/tests/geforce_core_cases.inc').read_text()
+        # Match production BAR2 below the private AS bands.
+        cases=cases.replace('#define GF_TEST_BAR2 0xe1000000U', '#define GF_TEST_BAR2 0x25000000U')
+        cases=cases.replace('GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1',
+                            'GF_TEST_BAR2,GF_TEST_BAR2,BAR2_BYTES,1')
+        platform=(ROOT/'drivers/video/geforce/geforce_platform.c').read_text()
+        if mutation:
+            old,new={
+                'instmem-no-pt': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
+                'instmem-open': ('paging_set_not_present(instmem->base, instmem->base + bytes - 1)', '0'),
+                'instmem-short': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'bytes / PAGE_SIZE - 1, PAGE_RW | PTE_PCD)'),
+                'instmem-overrun': ('instmem->length : GF_BOOT_INSTMEM_MAX_BYTES;', 'GF_BOOT_INSTMEM_MAX_BYTES : GF_BOOT_INSTMEM_MAX_BYTES;'),
+                'instmem-wb': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'bytes / PAGE_SIZE, PAGE_RW)'),
+            }[mutation]
+            assert platform.count(old)==1,(mutation,old)
+            platform=platform.replace(old,new,1)
+        # Preserve source-relative header lookup when staging the product code.
+        platform=platform.replace('"../../../', '"'+str(ROOT)+'/')
+        (tmp/'geforce_platform.inc').write_text(platform)
+        cases=cases.replace('"../../drivers/video/geforce/geforce_platform.c"', '"geforce_platform.inc"')
+        (tmp/'geforce_core_cases.inc').write_text(cases)
         gui=(ROOT/'kernel/gui.c').read_text()
         (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
         source=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
@@ -108,8 +151,12 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
     result=run_case(None,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
         ('gfx/gfx_core.c','static void _gfx_common_init(int plane_sz)\n{',
          'static void _gfx_common_init(int plane_sz)\n{\n    extern int host_planar_inits; host_planar_inits++;')])
-    assert result.returncode==0,(init_fail,unsafe,missing,result.returncode,result.stdout,result.stderr)
-    print(result.stdout,end='',flush=True)
+    assert result.returncode==(1 if mutation else 0),(init_fail,unsafe,missing,mutation,result.returncode,result.stdout,result.stderr)
+    if mutation:
+        assert 'FAIL ' in result.stdout,result.stdout
+        print('RED '+mutation+' '+result.stdout.strip(),flush=True)
+    else:
+        print(result.stdout,end='',flush=True)
 
 def unsafe_console(old=False):
     from test_dep_dir_d_console import grid_instrument
@@ -472,6 +519,9 @@ def main():
     present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
     present_trace(byte=True)
     if '--mutate' in sys.argv:
+        for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb'):
+            core(mutation=mutation)
+        core(bar2_bytes=0x400000,mutation='instmem-overrun')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
         wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
         for mutation in ('wc-stop','wc-repeat','wc-start','wc-alias'): wc_lifecycle(mutation)
@@ -484,6 +534,7 @@ def main():
     module_registration()
     for name in ('gf_present','backend_geforce','pc98_route'): component(name)
     for args in ((0,0,0,0),(0,0,0,1),(1,0,0,0),(1,1,0,0),(0,0,1,0)): core(*args)
+    core(bar2_bytes=0x400000)
     return 0
 if __name__=='__main__': raise SystemExit(main())
 
