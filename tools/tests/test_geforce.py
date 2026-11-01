@@ -201,7 +201,171 @@ def module_registration():
             assert result.returncode==0,(mode,result.returncode,result.stdout,result.stderr)
     print('PASS GF registration: missing stub, NULL acceleration, prepare required, lifetime pin',flush=True)
 
+def present_trace(mutation=None):
+    source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
+    mutations={
+        'bounds': ('while (n >= 4)', 'while (n > 0)'),
+        'point': ('if (point(opaque)) {', 'if (row == 0 && point(opaque)) {'),
+    }
+    if mutation:
+        old,new=mutations[mutation]
+        assert source.count(old)==1
+        source=source.replace(old,new,1)
+    drain='if (!rc) (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT);'
+    assert source.count(drain)==1
+    source=source.replace(drain, 'if (!rc) { trace_drain(); (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT); }')
+    harness=r'''
+#include "gfx_hal.h"
+#include "hwdev/gfinit_mode.h"
+GfxCounters gfx_counters;
+static void trace_drain(void);
+#include "present.c"
+#define SIZE 4096
+static u8 src[SIZE], dst[SIZE], expected[SIZE];
+static volatile u8 *start;
+static int pitch, left, top, width, height, errors, calls, fail, drains;
+static u32 regs[(GF_PRESENT_PFB_AMOUNT / 4) + 1];
+static void trace_drain(void) { if (calls != height || drains) errors++; drains++; }
+static int point(void *p) { (void)p; calls++; return calls == fail; }
+static void run(int sa, int da, int w, int clip, int failrow) {
+    int sp = 653, dp = 657, x = clip ? -2 : (w == 640 ? 0 : 1), y = 1, h = 3;
+    int marker = 0;
+    for (int i=0; i<SIZE; i++) { src[i]=(u8)(i*17+3); dst[i]=expected[i]=0xa5; }
+    start=dst+da; pitch=dp; left=clip ? 0 : x; top=y;
+    width=clip ? w-2 : w; height=failrow ? failrow-1 : h;
+    if (width < 0) width=0;
+    calls=0; drains=0; fail=failrow; gfx_counters=(GfxCounters){0};
+    for (int r=0; r<height; r++) for (int c=0; c<width; c++)
+        expected[da+(y+r)*dp+left+c]=src[sa+(y+r)*sp+left+c];
+    int rc=gf_present_rect(src+sa,sp,dst+da,dp,(volatile u8 *)regs,x,y,w,h,point,&marker);
+    if (rc != (failrow ? -1 : 0) || calls != (failrow ? failrow : h) ||
+        gfx_counters.present_bytes != (u32)(width*height) || gfx_counters.commits != (u32)!failrow || drains != !failrow) errors++;
+    for (int i=0; i<SIZE; i++) if (dst[i]!=expected[i]) errors++;
+}
+void _start(void) {
+    int widths[]={1,2,3,4,5,6,7,8,9,639,640};
+    for (int a=0; a<4; a++) for (int b=0; b<4; b++)
+        for (int i=0; i<11; i++) run(a,b,widths[i],0,0);
+    for (int i=3; i<11; i++) run(i%4,(i+1)%4,widths[i],1,0);
+    for (int i=1; i<=3; i++) run(1,2,9,0,i);
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(errors ? 1 : 0) : "memory");
+    for (;;) {}
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='gf-trace-') as td:
+        tmp=Path(td)
+        (tmp/'present.c').write_text(source.replace('#include "../../../gfx/gfx_internal.h"', '#include "gfx/gfx_internal.h"'))
+        (tmp/'host.c').write_text(harness)
+        exe=tmp/'host'
+        subprocess.run(FLAGS+['-I'+td]+INCLUDES+[str(tmp/'host.c'),'-o',str(exe)],check=True)
+        result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
+        assert result.returncode == (1 if mutation else 0), (mutation,result.returncode,result.stderr)
+        print(('RED '+mutation if mutation else 'PASS present byte equivalence and bounds'),flush=True)
+
+def present_store_width(source, mutation=None):
+    """Count executed stores into the display via QEMU instruction/register traces."""
+    import re
+    harness = r'''
+#include "gfx_hal.h"
+GfxCounters gfx_counters;
+static u8 source[1400], display[1400] __attribute__((aligned(4)));
+static const int widths[]={1,3,4,5,9,17,639,640};
+static u32 registers[0x10020c / 4 + 1];
+int gf_present_rect(const u8 *, u32, volatile u8 *, u32, volatile u8 *,
+                    int, int, int, int, int (*)(void *), void *);
+static int point(void *p) { (void)p; return 0; }
+void _start(void) {
+    int rc=0;
+    for (int a=0; a<4; a++) for (int i=0; i<8; i++)
+        rc |= gf_present_rect(source,649,display+8+a,645,(volatile u8 *)registers,
+                              0,0,widths[i],2,point,0);
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
+    for (;;) {}
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='gf-store-') as td:
+        tmp=Path(td); exe=tmp/'host'; log=tmp/'qemu.log'
+        (tmp/'host.c').write_text(harness)
+        # Include lookup preserves the product file byte-for-byte, including relative includes.
+        if mutation:
+            body=source.read_text()
+            old={
+                'alignment': 'while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }',
+                'tail': 'while (n) { *d++ = *s++; --n; }',
+            }[mutation]
+            assert body.count(old)==1, mutation
+            modified=tmp/'present.c'
+            modified.write_text(body.replace(old, '', 1))
+            source=modified
+        subprocess.run(FLAGS+INCLUDES+['-I'+str(ROOT/'drivers/video/geforce'),
+            str(tmp/'host.c'),str(source),'-o',str(exe)],check=True)
+        symbols=subprocess.check_output(['nm','-n',str(exe)],text=True)
+        display=int(re.search(r'^([0-9a-f]+) [bB] display$',symbols,re.M).group(1),16)
+        asm=subprocess.check_output(['objdump','-d','-Mintel','--no-show-raw-insn',str(exe)],text=True)
+        instructions={}
+        for line in asm.splitlines():
+            m=re.match(r'^\s*([0-9a-f]+):\s+([a-z][a-z0-9]*)(?:\s+(.*))?$',line)
+            if m: instructions[int(m[1],16)]=(m[2],m[3] or '')
+        result=subprocess.run(['qemu-i386','-one-insn-per-tb','-d','exec,cpu,nochain',
+            '-D',str(log),str(exe)],capture_output=True,text=True,timeout=60)
+        assert result.returncode==0,('fixture execution',result.returncode,result.stderr)
+        stores=[]
+        pattern=r'Trace \d+: [^\n]*\nEAX=([0-9a-f]+) EBX=([0-9a-f]+) ECX=([0-9a-f]+) EDX=([0-9a-f]+)\nESI=([0-9a-f]+) EDI=([0-9a-f]+) EBP=([0-9a-f]+) ESP=([0-9a-f]+)\nEIP=([0-9a-f]+)'
+        for m in re.finditer(pattern,log.read_text()):
+            regs=dict(zip(('eax','ebx','ecx','edx','esi','edi','ebp','esp'),
+                          (int(v,16) for v in m.groups()[:8])))
+            op,args=instructions[int(m[9],16)]
+            dest=args.split(',',1)[0].strip()
+            if op in ('cmp','test','lea','push','call','jmp'): continue
+            mem=re.fullmatch(r'(BYTE|WORD|DWORD) PTR (?:\[([^]]+)\]|ds:(0x[0-9a-f]+))',dest)
+            if not mem:
+                assert 'PTR' not in dest, (op,dest)
+                continue
+            # Objdump's i386 effective addresses consist only of registers,
+            # integer constants and +, - or *; reject anything else.
+            expr=mem[2] or mem[3]
+            for reg,value in regs.items(): expr=re.sub(r'\b'+reg+r'\b',str(value),expr)
+            assert re.fullmatch(r'[0-9xa-f+* -]+',expr),expr
+            address=eval(expr,{'__builtins__':{}},{}) & 0xffffffff
+            size={'BYTE':1,'WORD':2,'DWORD':4}[mem[1]]
+            if address < display+1400 and address+size > display:
+                stores.append((address-display,size))
+        expected=[]
+        for alignment in range(4):
+            for width in (1,3,4,5,9,17,639,640):
+                for row in range(2):
+                    offset=8+alignment+row*645
+                    remaining=width
+                    while remaining and (display+offset)%4:
+                        expected.append((offset,1)); offset+=1; remaining-=1
+                    while remaining>=4:
+                        expected.append((offset,4)); offset+=4; remaining-=4
+                    while remaining:
+                        expected.append((offset,1)); offset+=1; remaining-=1
+        if stores != expected:
+            mismatch=next((i for i,(a,b) in enumerate(zip(stores,expected)) if a!=b),
+                          min(len(stores),len(expected)))
+            detail=(mismatch, stores[mismatch:mismatch+4], expected[mismatch:mismatch+4],
+                    len(stores),len(expected))
+            print(f"present store mismatch: {detail}",flush=True)
+            assert mutation, ('runtime store width/address',detail)
+            print('RED '+mutation+' (executed store trace)',flush=True)
+        else:
+            assert not mutation, ('mutation survived',mutation)
+            print(f'PASS present stores: 32 rectangles, two rows, {len(stores)} stores',flush=True)
+
+
 def main():
+    import sys
+    if '--present-source' in sys.argv:
+        present_store_width(Path(sys.argv[sys.argv.index('--present-source')+1]))
+        return 0
+    present_store_width(ROOT/'drivers/video/geforce/gf_present.c')
+    present_trace()
+    if '--mutate' in sys.argv:
+        for mutation in ('bounds', 'point'): present_trace(mutation)
+        for mutation in ('alignment', 'tail'):
+            present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
     unsafe_console()
     product()
     module_registration()
@@ -218,6 +382,7 @@ def run(ctx) -> int:
     base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     env = dict(base_env)
     argv = ['python3', '-B', 'tools/tests/test_geforce.py']
+    if ctx.mutate: argv.append('--mutate')
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc
