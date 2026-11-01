@@ -22,7 +22,7 @@ Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restar
 Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
-`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build only what you touched (`make kernel`, or the module / userland image you changed — not `make all`; the PM runs `make all` once when landing, user-approved 2026-11-01), then run `make -k check-changed BASE=<SHA from the request> MUTATE=0` (every check your change hits —
+`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build only what you touched (`make kernel`, or the module / userland image you changed — do not type `make all` yourself; the PM runs it once when landing, user-approved 2026-11-01 — but never suppress the build that `check-changed` itself prepares, some checks verify fresh boot media), then run `make -k check-changed BASE=<SHA from the request> MUTATE=0` (every check your change hits —
 catches ripple into other tests), then the tests you added or touched with `--mutate` (each mutation anchor unique and
 RED at runtime; if you changed or removed a product line, `grep -rn` tools/tests for mutations anchored on it and move
 them), and `python3 -B tools/checks/run.py --lint` (a new test declares its inputs in its own `CHECK` dict). Do not run

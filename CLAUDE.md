@@ -11,7 +11,7 @@
 **このリポジトリ os32-v3 が現行** (os32 の v2.x は戻り先、[VERSIONS](docs/decisions/VERSIONS.md) §2)。
 **カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
 
-実装者の完了条件は、触った像のビルド (`make kernel` か触った部品・ユーザーランド) + `make -k check-changed BASE=<基点> MUTATE=0` + 足した・触った試験を `--mutate` (目印一意・実行時 RED) + `tools/checks/run.py --lint` の rc=0 (ユーザー承認 2026-10-31・11-01)。**`make all` は段の取り込みで PM が 1 回** (`check_wt.sh`、ゲストへはその成果物を配る)。変異込みの全体も PM が取り込みで 1 回。複数段の作業は ROLES §0 に従う。
+実装者の完了条件は、触った像のビルド (`make kernel` か触った部品・ユーザーランド) + `make -k check-changed BASE=<基点> MUTATE=0` + 足した・触った試験を `--mutate` (目印一意・実行時 RED) + `tools/checks/run.py --lint` の rc=0 (ユーザー承認 2026-10-31・11-01)。**`make all` を自分からは打たない** — 段の取り込みで PM が `check_wt.sh` で 1 回、ゲストへはその成果物を配る (`check-changed` が準備で必要な分を組むのは止めない — 像の鮮度を見る検査がある、2026-11-01 に止めて 3 件落ちた)。変異込みの全体も PM が取り込みで 1 回。複数段の作業は ROLES §0 に従う。
 
 ## Build Commands
 
