@@ -260,3 +260,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 
 ## HW3 のメーカー資料の照合 (PM、2026-11-01)
 - NEC PC-9800 Technical Databook Hardware (1993) を取得 (~/os32-tmp/refs/pc98-databook/、読むだけ)。p.351 のノーマルモードの 24.83KHz の表 (H=40.28µs、HDISP 30.4・HFP 3.04・HS 3.04・HBP 3.8µs、V=17.72ms=440H/56.4Hz、VDISP 400H・VFP 7H・VS 8H・VBP 25H) は本設計の 24k の値 (pegc.h の SYNC から) と一致。p.160 で 9821 の 24.8/31.5KHz の切り替え (GRPH+1/GRPH+2、本体に記憶) を確認。**31.5KHz の表は無い** — SYNC の値からの導出と段 0 の実測で決める (§2 のとおり)。詳細は ~/os32-tmp/refs/pc98-databook/NOTES.md。
+
+## L0 の取り込みで決めたこと (PM、2026-11-01、Opus レビュー L0-2)
+- 静止の fallback (入口 IF=0・dynamic_ok=0・予算違反) の gfx_present_raster は VSYNC で歩調を取らずに戻る。歩調は呼び手が持つ — B1 の boot_splash の 3 秒のループは時計で 1 フレームぶん待つ (空回りさせない)。KAPI の説明にも「fallback は VSYNC で歩調を取らない」と書く (B1 の段で)。
+- 公開 KAPI の意味の変化 (同じ行に複数件・2 行未満の間隔・昇順でない表は全体を拒否して静止) は設計どおり。木の中の呼び手は boot_splash だけで通る。apps/ (H-7 で保留) は再開のときに確かめる — DEFERRED_TESTS の行に置く。
