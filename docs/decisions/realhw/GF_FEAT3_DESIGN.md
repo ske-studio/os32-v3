@@ -266,3 +266,6 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 
 ## 確定 (2026-11-02、Opus 第 2 回 Approve、PM が反映)
 - 指摘 10 (P3、PM 決定: 手本に合わせる): M2MF の notifier の ctxdma は、手本 (nouveau-v6.1 nouveau_drm.c:408–422) どおり `gf_inst_alloc(32)` の instmem に class 0x3d (NV_DMA_IN_MEMORY)・RDWR・VRAM で作る。§3 の 101 行付近の「表示の後ろの VRAM に 32B を予約し、class 3・WO」は**これで置き換える**。表示の後ろの予約は要らなくなり、§13 の試験面の起点は notifier の予約より前の元の位置に戻す。
+
+## 層 1 の追記との関係 (2026-11-02、PM)
+- GeforceModuleContext の accel_out の欄と GEFORCE_MODULE_OPS_VERSION 3 は、層 1 の確定設計 GF_FEAT1_DESIGN の「C 段の実装で分かった欠けの追記」§3 で先に確保した。層 3 の C5 の「accel_out 欄と OPS_VERSION=3」と §198 の「末尾に accel_out」は 0 行になる (二重に版を上げない)。

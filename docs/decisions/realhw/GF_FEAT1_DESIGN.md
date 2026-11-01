@@ -317,3 +317,101 @@ B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾
 
 ### C0 で PM が決めたこと (2026-11-02)
 - 停止の後の expected_pmc: foundation_stop は engine 停止 (B3 の reset パルス) が成功したら、PMC (200h) を gf_io で 1 回読み、その値を expected_pmc にする。MC の PMC の書き込みより前に失敗した場合も同じ (結果は「停止前の PMC | 0x1102」になり得る。§3:112 の「正常停止後 ffffffff」は MC が成功した場合の値としてそのまま成り立つ)。読み取りが失敗したら expected_pmc は変えず、停止の失敗として返す。手本は PMC の期待値を持たないので、OS32 の段の検査 (gf_stage_state.c:70) のための差分。B3・B4 は変えない。
+
+## C 段の実装で分かった欠けの追記 (2026-11-02、astra 起草、Opus 第 4 回の条件付き承認、PM 反映)
+
+### C 段の実装で分かった欠けの追記 (2026-11-02、astra 起草)
+確定本文・PM 決定の撤回なし。O/、N/ と手本の版は本文と同じ。以下は内部 ABI の補完。
+
+### 1. identity/BAR 失効は「停止未確認」のまま所有を残す
+手本 N/nvkm/subdev/mc/nv04.c:82–106 は常設 MMIO で unarm/pending、PCI 再照会をしない。
+N/nouveau_drm.c:881、:933–941 は master 有効化と device 後始末→PCI disable の順。
+BAR が別物になった OS32 の旧 map でこの列を実行してよい根拠にはならない。本文の停止失敗時所有保持を適用する。
+```c
+/* foundation.h: struct gf_foundation の末尾へ追加（宣言1行） */
+    bool revoked; /* sticky until reboot; not a successful hardware stop */
+/* foundation.h: 関数宣言追加（1行）。定義は foundation.c */
+void gf_foundation_revoke(struct gf_foundation *);
+```
+revoke は短い irq_save/restore 内で revoked=true、running=false にするだけ。PCI/MMIO/待ち/ログなし。
+C2 は bus.c の失効確定箇所で p->revoked と上記を同じ CLI 区間で公開する。診断 bus も ops の REVOKE 経由で同期接続。
+C1 の常設 read/write は f->revoked ならアクセスせず失敗。IRQ/tick は running=false により MMIO 前に退出。
+C1 の stop adapter は前景で identity/BAR を照合し、失敗なら revoke 後、必ず通常の gf_foundation_stop へ入る。
+```c
+/* C0: stop の先頭。正常時は以後の既定 mask/reset/detach/BM/unmap 列へ */
+f->running = false;                 /* 既存の短い CLI 区間内 */
+rc = geforce_tick_bind(0, 0);
+if (rc || f->revoked) { /* CLI を戻してから return */
+    return f->last_rc = rc ? GF1_EIRQ : GF1_EPCI;
+}
+```
+失効時は mask/ACK/reset/PMC 読み/PCI Command 書き込みを一切しない。expected_* と bm は最終確認値のまま。
+registered、instmem の handle、map、map_ops/owner、常設 BAR0/1、永久予約を保持。IRQ unregister も行わない。
+未停止の共有 IRQ source を閉じたとは扱わず、handler は IRQ_NONE。共有 IRQ6 全体を無効化しない。
+tick unbind 失敗でも running=false を維持し、stop 再試行は参照解除だけ可能。失効を解除して再開始しない。
+C4 は active=false、reusable=false、engaged と失敗を保持し、旧表示の局所復元へ進まない。
+C5 は登録/tick 参照又は未解放所有がある限り detach を拒否し owner/module を保持（失効時は再起動まで）。
+start と試験の可変操作（STOP/REVOKE を除く）も revoked を先に拒否。検出前の物理的抜去まで保証する新 hotplug 機構は作らない。
+
+### 2. 診断 owner と stage の接続
+```c
+/* gfinit.c の static control 内（scratch/ROM/work には置かない） */
+struct gf_foundation foundation; /* struct gfinit_owner に追加 */
+/* gf_stage_state.h: 前方宣言と struct gf_stage_state の借用欄 */
+struct gf_foundation;
+const struct gf_foundation *foundation;
+/* gfinit.c: baseline を構築し終え、capture/entry に渡す前 */
+stage.foundation = &g->foundation;
+```
+production は従来どおり p->foundation、診断は control.foundation が唯一の所有者。両者は既存 device lease で排他。
+診断は資源照合後、下記 ops.prepare で常設 io・BAR0・instmem_bar・map_ops/owner を接続してから N1 を行う。
+初期 expected_command は STOP、初期 expected_pmc は main 後の baseline 採取時に設定。以後は master/MC/stop が更新。
+診断 N1/start/stop hook は下記 call 経由。CHECK 後 start、全 cleanup/S0 前 stop、失敗なら lease/owner を解放しない。
+C7 の正常な S0 列は維持し、失効時は同じ bus guard で拒否。正常 stop の PMC 更新は末尾 C0 決定に従う。
+C8 は参照なし/失効なら失敗、Command/PMC は参照先 expected_* と比較し、保存 baseline は変更しない。
+work 解放だけでは foundation をゼロ化しない。正常 stop と参照解除後に stage.foundation を外し、次 session を準備する。
+停止失敗時は control・bus adapter・lease・module の寿命を保持し、ROM 等の作業領域とは切り離す。
+
+### 3. serial/module 試験入口
+Context 出力 slot に統一する理由: 層3と同じ module 内 dispatch を借用でき、geforce.mod の import を増やさない。
+```c
+/* geforce_module.h: 層1で VERSION を 2→3。Context 末尾（この順） */
+const struct gf3_test_ops **accel_out; /* 層3の確定欄を先に確保、層1では NULL */
+const struct gf1_test_ops **foundation_out;
+/* 新 gf1_test.h（内部型。foundation.h の宣言変更には含めない） */
+enum gf1_test_op { GF1T_MASTER, GF1T_START, GF1T_STOP, GF1T_SNAPSHOT,
+                  GF1T_HEADS, GF1T_INST_PAGE, GF1T_REVOKE };
+struct gf1_test_request { u32 size, op, heads; };
+struct gf1_test_reply { int rc; u32 command, pmc, flags, bytes, bad_off;
+                       struct gf_irq_stats stats; };
+struct gf1_test_ops { struct gf_foundation *production;
+  int (*prepare)(struct gf_foundation *, const struct recover_bar_extent *, u32);
+  int (*call)(struct gf_foundation *, const struct gf1_test_request *, struct gf1_test_reply *);
+};
+const struct gf1_test_ops *geforce_foundation_ops(void); /* kernel の slot getter */
+```
+prepare の最後2引数は照合済み bars 配列と要素数。常設 adapter を貸し、未所有の診断 f だけを準備する（HW 書込なし）。
+call は同期・前景専用、size/op/heads を検査し gf1_rc を戻して reply.rc にも記録。要求ポインタは内部だけで使用。
+MASTER/START/STOP/REVOKE は既存関数へ、SNAPSHOT はソフト状態と stats を採取（失効後も可）。
+HEADS は running 時だけ既存 FIFO/GR 要求を保ち gf_irq_enable。INST_PAGE は1頁を確保し32bit pattern/readback/free。
+flags は bit0=bm、1=mapped、2=registered、3=running、4=revoked。command/pmc は期待値、実測と区別して出力。
+INST_PAGE は bytes=比較済みbyte数、bad_off=先頭不一致（なしは ~0U）。他操作は bytes=0、bad_off=~0U。
+module の新 hwdev/gf/foundation_test.c が表と dispatch/prepare を所有し、C11 は geforce.mod だけに組む。
+C5 は kernel static slot の番地を Context へ渡す。module 初期化成功後に公開、abort/detach 前に NULL、旧版は拒否。
+loader/manifest/host 期待値を3へ揃える。層3は確保済み accel_out を使い、同じ版上げを重複実施しない。
+getter を kernel export 生成元へ追加し kdebug/hwdev の import に接続。geforce.mod は既存31本のまま、生成物は手編集しない。
+gfinit_wire と hwdev_ops callbacks は変更しない。診断 gfinit.c と C9 は getter から毎回借用し、表を長期保存しない。
+C9 は serial `gf1 status|instmem|vblank|cycle` を既存コマンド dispatch へ結線。表示中は production、診断中は lease owner の f を使用。
+vblank は snapshot→1000ms待ち→snapshot を head A有効/両head無効/A再有効で各1回。待ちは C9 の既存時計、IRQ 有効のまま。
+差分は u32 wrap、A増加/B不変→両方不変→A増加を検査し元の heads を復元。tick 回収中も無効headを数えないことを検査。
+cycle は所有者の表示 stop/start 経由で STOP/RUN 実測 Command を採取、instmem は表示 CRC 前後一致も C9 で検査。
+serial は case/owner/観測ms/rc/期待値/実測値/flags/stats差分/比較bytes/不一致offset を完了時出力。未公開は unavailable、合格にしない。
+PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch/loader・export生成元・C9/serial結線を各Cファイル1段で出す。
+受入に失効直後IRQ割込み、stop再試行、診断work解放、slot解除、3→旧版拒否、import<=32を追加。正常停止の既存試験も維持する。
+
+### 確定 (2026-11-02、Opus 第 4 回、PM が反映)
+- P2-a: 失効 (revoked) を見たら、foundation の停止は B5 の unmap (paging_set_not_present、CPU の PTE を落とすだけで BAR には書かない) を呼ぶ。旧 BAR2 の物理番地への PTE を Present のまま残さない。B1 の gf_inst_read32/write32 の API は変えない (unmap の後は呼ばれない — running=false の後なので)。
+- P2-b: 失効でも 98 の表示への切り替え (backend_geforce.c:101 の pc98_route_to_98、GeForce の MMIO を使わない) は従来どおり行う。display/quiesce.c の gf_display_stop で変えるのは「失効のときは reusable=false を保持する」ことだけ (書き込みの拒否を全行試し、最後に engaged=false にする今の動きは変えない)。
+- P2-c: 層 3 の確定設計の末尾にも同じ日付で 1 行足した (accel_out の欄と OPS_VERSION 3 はこの追記の §3 で確保済み、層 3 の C5 は 0 行)。
+- P3: identity が一致して BAR だけが変わった場合に config 経由で Command=0102h を書くか (手本 nouveau_drm.c:940 の pci_disable_device 相当) は、DMA を出す層 2 で決める。層 1 は書かない。
+- P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
