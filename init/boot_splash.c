@@ -19,6 +19,8 @@
 #include "tvram.h"
 #include "types.h"
 #include "os32_kapi_shared.h"
+#include "config.h"
+#include "splash_raster.h"
 
 /* ======== 外部参照 ======== */
 extern volatile u32 tick_count;
@@ -198,7 +200,8 @@ static void build_raster(GFX_RasterPalTable *tbl, int offset)
 void boot_splash(void)
 {
     int cx, i, grad_offset;
-    u32 start_tick;
+    u32 end_tick = tick_count + BOOT_TIMEOUT;
+    int static_logo = 0;
     GFX_RasterPalTable raster_table;
 
     const SplashGlyph *gdata[NUM_CHARS];
@@ -214,6 +217,15 @@ void boot_splash(void)
         tvram_clear();
         return;
     }
+
+#ifdef SPLASH_RASTER_DIAG
+    platform_splash_probe();
+    goto cleanup;
+#endif
+    int image_result = platform_splash_try_image(SYS_SPLASH_IMAGE, end_tick);
+    if (image_result == PLATFORM_SPLASH_DONE) goto cleanup;
+    struct SplashRaster *state = pc98_splash_raster_state();
+    static_logo = image_result == PLATFORM_SPLASH_NO_SYNC || !state->dynamic_ok;
 
     /* パレット設定 */
     palette_set(PAL_BG,         0,  0,  0);
@@ -240,17 +252,23 @@ void boot_splash(void)
     grad_offset = 0;
     build_raster(&raster_table, grad_offset);
     gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);
-    gfx_present_raster(&raster_table);
+    if (static_logo) gfx_present_nosync();
+    else gfx_present_raster(&raster_table);
 
     /* アニメーションループ (3秒間) */
-    start_tick = tick_count;
-    while (tick_count - start_tick < BOOT_TIMEOUT) {
+    while ((i32)(tick_count - end_tick) < 0) {
+        if (static_logo || state->last_result == SPLASH_RASTER_NO_SYNC) {
+            static_logo = 1;
+            if (platform_splash_wait_frame(end_tick)) break;
+            continue;
+        }
         grad_offset = (grad_offset + 1) % GRAD_STEPS;
         build_raster(&raster_table, grad_offset);
         gfx_present_raster(&raster_table);
     }
 
     /* クリーンアップ: VRAM全クリア → テキストモード復帰 */
+cleanup:
     platform_splash_clear_pages();
     gfx_shutdown();
     palette_init();

@@ -243,6 +243,8 @@ static struct gfx_kernel_fb splash_fb;
 ```
 
 - bb_clear/bb_fill_rectの本体を移動し呼出名を置換。clip、端byteのmask、4面のbit順、GFX_PLANE_SZ/BPLはPC98側へ。
+- beginのplanar確認後に再生器所有の状態を借用し、最初の8周期照合を行う。判定不可でも固定画像/静止ロゴの描画は可能。
+- `platform_splash_wait_frame` は時計で有理数の1フレームぶん待つ。逆行/停止/時計失敗は有限回で返し、共通期限と入口IFを維持する。
 
 > [要確認: 計画の時制?]
 
@@ -289,3 +291,7 @@ static struct gfx_kernel_fb splash_fb;
 - [platform/pc98/platform_memory_desc](platform_memory_desc.md)
 
 - [platform/pc98/timer](timer.md)
+
+- [platform/pc98/splash_image.c](splash_image.c.md)
+
+- [platform/pc98/splash_probe.c](splash_probe.c.md)

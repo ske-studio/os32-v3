@@ -4,6 +4,11 @@
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "kstring.h"
+#include "splash_raster.h"
+#include "sys.h"
+
+#define SPLASH_WAIT_POLLS 1000000u
+extern volatile u32 tick_count;
 
 static struct gfx_kernel_fb splash_fb;
 
@@ -14,6 +19,9 @@ int platform_splash_begin(void)
 {
     int saved_pref = gfx_get_backend_pref();
     gfx_set_backend_pref(GFX_PREF_PC98);
+#ifdef SPLASH_RASTER_DIAG
+    platform_splash_probe_before();
+#endif
     gfx_init();
     gfx_set_backend_pref(saved_pref);
     /* gfx_init is void: validate before any drawing, without another probe. */
@@ -23,7 +31,31 @@ int platform_splash_begin(void)
         gfx_shutdown();
         return -1;
     }
+    (void)pc98_splash_raster_state();
     return 0;
+}
+
+/* Static raster fallback does not wait for VSYNC. Bound the wait even when
+ * PIT stops (including entry IF=0), and never change the caller's IF. */
+int platform_splash_wait_frame(u32 end_tick)
+{
+    struct SplashRaster *s = pc98_splash_raster_state();
+    u32 lo, hi;
+    unsigned long long start, previous, target;
+    if (sys_time_now(&lo, &hi)) return -1;
+    start = previous = ((unsigned long long)hi << BITS_PER_U32) | lo;
+    u32 den = s->line_den ? s->line_den : SPLASH_RASTER_24K_DEN;
+    u32 lines = s->total_lines ? s->total_lines : SPLASH_RASTER_VISIBLE_LINES;
+    target = start + ((unsigned long long)lines * SPLASH_RASTER_LINE_NUM_US + den - 1) / den;
+    for (u32 poll = 0; poll < SPLASH_WAIT_POLLS; poll++) {
+        if ((i32)(tick_count - end_tick) >= 0) return 0;
+        if (sys_time_now(&lo, &hi)) return -1;
+        unsigned long long now = ((unsigned long long)hi << BITS_PER_U32) | lo;
+        if (now < previous) return -1;
+        if (now >= target) return 0;
+        previous = now;
+    }
+    return -1;
 }
 
 /* バックバッファ全面を指定色で塗る — kmemset (rep stosd) で高速化 */

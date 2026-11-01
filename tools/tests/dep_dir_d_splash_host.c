@@ -4,6 +4,7 @@
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "platform_splash.h"
+#include "splash_raster.h"
 #define TRACE_SIZE 24000000
 static u8 trace[TRACE_SIZE];
 static u32 count;
@@ -59,6 +60,12 @@ void gfx_present_raster(GFX_RasterPalTable *table)
     bytes(pixels[generation], sizeof(pixels[0]));
     tick_count += 100;
 }
+static struct SplashRaster splash_test_state = { .dynamic_ok = 1 };
+struct SplashRaster *pc98_splash_raster_state(void) { return &splash_test_state; }
+int platform_splash_try_image(const char *path, u32 end_tick)
+{ (void)path; (void)end_tick; return PLATFORM_SPLASH_FALLBACK; }
+void gfx_present_nosync(void) { finish(4); }
+int sys_time_now(u32 *lo, u32 *hi) { *lo = 0; *hi = 0; return -1; }
 #include "splash_source.inc"
 static void begin(void)
 {

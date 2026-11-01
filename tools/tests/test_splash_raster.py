@@ -32,7 +32,7 @@ MUTATIONS = (
     ('relative 120us', 'unsigned long long start = target - lines_us(s, 1);',
      'unsigned long long start = fall + (unsigned long long)i * 120;'),
     ('accept sub-two-line gap', 'SPLASH_RASTER_MIN_GAP))', '0))'),
-    ('omit line-zero color', 'color(e->pal_idx, e->r, e->g, e->b);\n        first = 1;',
+    ('omit line-zero color', 'color(e->pal_idx, e->r, e->g, e->b);\n        DIAG(diag_event_end(0));\n        first = 1;',
      '(void)e;\n        first = 1;'),
     ('omit fixed initial color', 'color(i, rgb >> 8, rgb >> 4, rgb);', '(void)rgb;'),
     ('forget reset', 'raster = (struct SplashRaster){0};', 'raster.frame = 0;'),

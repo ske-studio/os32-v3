@@ -37,4 +37,18 @@ int pc98_splash_raster_begin(struct SplashRaster *s);
 int pc98_splash_raster_frame(struct SplashRaster *s, const struct OsriImage *image);
 int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t);
 
+#ifdef SPLASH_RASTER_DIAG
+struct SplashRasterEventDiag {
+    unsigned long long target_us, begin_us, end_us;
+    u32 line, index, applied;
+};
+struct SplashRasterDiag {
+    unsigned long long if0_max_us, if0_total_us;
+    u32 count, capacity, overflow, clock_errors, late, dropped, unapplied;
+    const struct SplashRasterEventDiag *events;
+};
+/* Last frame, borrowed until the next frame/reset; diagnostics build only. */
+const struct SplashRasterDiag *pc98_splash_raster_diag(void);
+#endif
+
 #endif

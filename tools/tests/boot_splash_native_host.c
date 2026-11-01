@@ -208,6 +208,8 @@ int pgalloc_free_n_owner(u32 o, u32 p, int n)
 { (void)o; (void)p; (void)n; return 0; }
 int paging_map_phys(u32 v, u32 p, u32 n, u32 f) { (void)v; (void)p; (void)n; (void)f; return -1; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+int platform_splash_try_image(const char *path, u32 end_tick)
+{ (void)path; (void)end_tick; return PLATFORM_SPLASH_FALLBACK; }
 void palette_init(void) { }
 void palette_set(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; }

@@ -48,3 +48,7 @@ bootinfo_report は BIOS 行→IDENTIFY 行（BOOTINFO_NDRIVES=2）の順・書�
 - [init/kernel.c](kernel.md)
 - [kernel_gfx_config.md](kernel_gfx_config.md)
 - [sysconfig.md](sysconfig.md)
+
+### boot_splash
+
+begin後に固定OSRIを試し、失敗時は内蔵の同じロゴを全面描き直す。3秒のend_tickは開始時に一度だけ定め、画像読み込み/初回表示/復帰先で共有する。NO_SYNC/動的判定不可ではnosyncで一度提示し、ループは時計で1フレームずつ待つ。時計も使えなければ終了へ進む。診断版はprobe後に同じcleanupへ戻る。終了順は画像側の解放、両ページ消去、gfx_shutdown、palette_init、tvram_clear。

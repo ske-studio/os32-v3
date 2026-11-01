@@ -1746,6 +1746,7 @@ v24で追加。VSYNC後のアクティブ表示期間中に、走査線ごとに
 - **割り込みと遅れ**: 入口 IF を維持する。IF=1 なら目標の 1 行前からパレットの 4 OUT までだけ保護し、各保護区間の後は 1 行以上 IF=1 を確保する。遅れは次の HBLANK へ順序を保って繰り越し、可視区間内に収まらない分は捨てて次フレームの初期色で回復する。
 - **静止提示**: 入口 IF=0・動的判定不可・同期失敗・予算違反では転送済み像を提示して `void` で戻る。同期待ちは有限 (VSYNC は 100ms、時計停止時もポーリング上限あり)。表が NULL、count が 1〜200 外なら転送しない。packed 系は通常の dirty present へ委譲する。`gfx_shutdown` でも共通再生状態を失効させる。
 - **libos32gfx ラッパー**: `gfx_raster_clear()`, `gfx_raster_add()`, `gfx_present_raster_only()`, `gfx_present_with_raster()`
+- **fallback の歩調**: 静止の fallback は VSYNC で歩調を取らない。必要な待ちは呼び手が時計で行う。
 
 ### §4-3 FDリダイレクト・パイプAPI
 
