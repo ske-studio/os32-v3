@@ -26,6 +26,7 @@ struct gf_foundation {
      * Independent of io.opaque; fake MMIO lends its own map_ops/owner. */
     const struct gf_instmem_map_ops *map_ops;
     void *map_owner;
+    struct recover_bar_extent instmem_bar; /* Checked third memory resource, copied before start. */
     struct gf_imem imem;
     struct gf_irq_stats stats;
     volatile u8 *bar0, *bar2;
@@ -36,14 +37,15 @@ struct gf_foundation {
     bool bm, mapped, registered, running;
     int last_rc;
 };
-/* Production owns the adapter and owner; fake MMIO replaces this contract.
- * map reserves then maps UC, rolling back internally on failure. mapped is
- * set only after success. unmap removes the mapping then the reservation. */
+/* Production owns adapter/owner; fake MMIO supplies the same contract.
+ * BAR reservation is permanent from boot. map only maps UC; failure leaves no new map.
+ * mapped is set only on success. unmap removes access, never the BAR reservation. */
 struct gf_instmem_map_ops {
     int (*map)(void *owner, const struct recover_bar_extent *bar,
                u32 bytes, volatile u8 **out);
     int (*unmap)(void *owner, volatile u8 *ptr, u32 bytes);
 };
+extern const struct gf_instmem_map_ops gf_production_instmem_map_ops;
 int gf_master_enable(struct gf_foundation *); /* cfg16/8, enter RUN every start */
 int gf_master_disable(struct gf_foundation *); /* only after engine stop */
 /* B4: BIOS/display init complete, IRQ sources closed. Uses f->io for the
@@ -52,8 +54,8 @@ int gf_master_disable(struct gf_foundation *); /* only after engine stop */
 int gf_mc_init(struct gf_foundation *);
 /* B5: bar is the checked third memory resource (borrowed for this call),
  * bytes is R, its leading UC aperture size. Uses f->map_ops/map_owner.
- * GF1_OK publishes bar2/aperture_bytes and mapped=true; GF1_EMAP leaves no
- * new reservation/map (adapter rolls back). Foundation owns successful map. */
+ * GF1_OK publishes bar2/aperture_bytes and mapped=true; GF1_EMAP leaves no new map.
+ * Foundation owns the successful map; the permanent boot reservation is unchanged. */
 int gf_instmem_map(struct gf_foundation *, const struct recover_bar_extent *bar,
                    u32 bytes);
 /* After engine stop, IRQ detach and BM clear: release variable handles,
