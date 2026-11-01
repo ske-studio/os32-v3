@@ -120,6 +120,61 @@ int (*wc_start)(void); int (*wc_stop)(void);
 - 受入用 platform.report callback を kernel 側 gf_wc.c に持たせ、計測完了後の record を serial_puts（O/drivers/char/serial.h:278）へ出す。計時中のシリアル出力を止め、常用版に sample 配列を含めない。
 - tools/accept/gf_accel.py は保存済みシリアルログから版/設定/個別時間を照合し集計。実機操作は PM→ノート側セッション、表示の判定は RA266.md §3-1 のカメラ、数字はシリアル。
 
+### 5.1 受入版の作成と入替 (S14〜S16/T3)
+
+PM判断(2026-11-01): `GF_PRESENT_BYTE` は受入対象だけが定義し、既定の dword の
+機械語は不変とする。通常の gf_present.o の .text を追加前後で比較する。
+受入backendだけが `gf_accept_transfer` を経由し、実物の gf_present_rect を呼ぶ。
+受入用の配列/計時は常用のgeforce.mod/kdebug.binに含めない。
+
+作業木の環境(CROSS_DIR/TMPDIR/HOST32_RUNNERS)とビルド済みkernelを用意する。
+PMは同じソースで識別子(例 `f5468c6c-gfa-r2`)を固定し、各MODEについて次を実行する。
+ビルド/試験は check_slot.sh の枠を使う。自分から make all は実行しない。
+
+```sh
+MODE=byte-uc  # 次の2回は dword-uc / dword-wc
+GF_ACCEPT_ID=f5468c6c-gfa-r2 GF_ACCEPT_MODE="$MODE" \
+  /home/hight/os32-tmp/bin/check_slot.sh gfa-build \
+  make -j4 geforce-accept gshell GEFORCE_ACCEPT="$MODE" GSHELL_FEATURES=gf_accel_accept
+```
+
+部品は `build/out/geforce-accept/$MODE/geforce.mod`、GUIは
+`userland/gshell.bin` (BUILD_OUTを替えたときはその下のresident/gshell.bin)。
+GUIの出力先は通常と共用なので方式ごとに別名で保管する。
+`GF_ACCEPT_ID` を部品/gshellで一致させ、gshell環境の `GF_ACCEPT_MODE` も同じ方式にする。
+受入部品のkernel pairは常用の `build/out/vmkernel.lz4` と同じ。kernelは通常版を使う。
+取り違え防止に配布物のCRC/ハッシュも保管する。常用へ戻すGUIは featureなしで組み直す。
+通常像を後で組み直した場合は kernel Image CRC が変わり得るため、受入3部品も
+その kernel に対して再作成し、部品の PAIR_CRC と照合してから配布する。
+
+PM→ノート側セッションで、kernel/通常部品の対が揃った状態から、CUIでhsyncを使って
+選んだ `geforce.mod` を `/boot/geforce.mod`、対応GUIを `/bin/gshell.bin` に入れ再起動。
+方式を替えるたび同じ経路で入替え、再起動してシリアルを方式別ファイルに保存する。
+NP21/Wの設定変更・実機の操作はこの実装者は行わない。常用へ戻すときも通常の
+geforce.mod/gshell.binを同じ経路で戻す。詳細の配備権限は ROLES §0 に従う。
+
+GUIの最初の通常present後に、0..255の固定RAMパターンが表示される。
+GFA1 pattern行から測定/記録の送出中に RA266 §3-1 のカメラで確認し、同じID/方式で
+記録する。計時の外で各矩形をreadbackし、送出が終わればCLIENT全面を戻す。
+1起動で合成転送の計測は1回だけ。固定台本の3操作(窓移動/スクロール/カーソル)は
+それぞれ別起動で、同じ窓/移動幅/スクロール量/入力間隔を使い、10更新warmup後に
+300更新のGFW1が出るまで記録する。GUI時間はwm_cycle内の更新に加え、
+その外のCOMMIT/Pumpによる実転送も採る。周期外は転送だけを独立sampleにし、
+total=present、event/composite=0とする。次周期にアプリが描く時間・待ち時間は
+含めない。総合の操作応答は実機台本でも見る。
+
+```sh
+python3 -B tools/accept/gf_accel.py --build-id f5468c6c-gfa-r2 \
+  --pair-crc 0x1234abcd --require-wm byte-uc.log dword-uc.log dword-wc.log > comparison.json
+```
+
+`--pair-crc` はその日のkernel Image CRCの実値に置換する。保存済みログだけを読む。
+nearest-rankの100個/300個を別集計し、時刻失敗は数えて除外する。BIOS WC下のUCや
+WC不成立は理由付きSKIPで、比較の合格と数えない。レコードの欄は
+[gf_accept](../../design/drivers/video/geforce/gf_accept.md) と
+[gf_accel](../../design/tools/accept/gf_accel.md)。実機はGUI終了後の元MSR/PTE復元、
+再GUIと他表示への復帰、既存ゲスト回帰も別に確認する。host結果だけで受入としない。
+
 ## 6. 規模と現在の成果物（読み取り実測、再ビルドなし）
 | 項目 | 2026-11-01 の値・段 0 の見積り |
 |---|---|

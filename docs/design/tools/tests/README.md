@@ -63,3 +63,4 @@
 - [GeForce 再 init・shell fault の停止経路](gf_wc_recovery_host.inc.md)
 
 - [tools/tests/test_osri](test_osri.md)
+- [受入計測の模型](test_gf_accel.md)

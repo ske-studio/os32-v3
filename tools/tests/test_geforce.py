@@ -171,6 +171,7 @@ def product():
     rebuilt,stats=mkmod.build(body,meta,kernel,spec['version'],spec['generations']['memory_layout'],module_id=12)
     assert rebuilt==data
     symbols=mkmod.Elf(body).symbols
+    assert 'gf_accept_transfer' not in symbols and 'samples' not in symbols
     for symbol in ('gf_video_ops','gf_init_run','gf_display_modeset','geforce_backend_ops','gf_production_prepare',
                    'gf_production_identify','gf_production_quiesce','gf_production_decode_safe'):
         assert symbol in symbols,symbol
@@ -201,7 +202,7 @@ def module_registration():
             assert result.returncode==0,(mode,result.returncode,result.stdout,result.stderr)
     print('PASS GF registration: missing stub, NULL acceleration, prepare required, lifetime pin',flush=True)
 
-def present_trace(mutation=None):
+def present_trace(mutation=None, byte=False):
     source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
     mutations={
         'bounds': ('while (n >= 4)', 'while (n > 0)'),
@@ -257,12 +258,12 @@ void _start(void) {
         (tmp/'present.c').write_text(source.replace('#include "../../../gfx/gfx_internal.h"', '#include "gfx/gfx_internal.h"'))
         (tmp/'host.c').write_text(harness)
         exe=tmp/'host'
-        subprocess.run(FLAGS+['-I'+td]+INCLUDES+[str(tmp/'host.c'),'-o',str(exe)],check=True)
+        subprocess.run(FLAGS+(['-DGF_PRESENT_BYTE'] if byte else [])+['-I'+td]+INCLUDES+[str(tmp/'host.c'),'-o',str(exe)],check=True)
         result=host32.run([str(exe)],capture_output=True,text=True,timeout=60)
         assert result.returncode == (1 if mutation else 0), (mutation,result.returncode,result.stderr)
         print(('RED '+mutation if mutation else 'PASS present byte equivalence and bounds'),flush=True)
 
-def present_store_width(source, mutation=None):
+def present_store_width(source, mutation=None, byte=False):
     """Count executed stores into the display via QEMU instruction/register traces."""
     import re
     harness = r'''
@@ -289,15 +290,16 @@ void _start(void) {
         # Include lookup preserves the product file byte-for-byte, including relative includes.
         if mutation:
             body=source.read_text()
-            old={
-                'alignment': 'while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }',
-                'tail': 'while (n) { *d++ = *s++; --n; }',
+            old,new={
+                'alignment': ('while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }', ''),
+                'tail': ('while (n) { *d++ = *s++; --n; }', ''),
+                'byte': ('#ifdef GF_PRESENT_BYTE', '#if 0'),
             }[mutation]
             assert body.count(old)==1, mutation
             modified=tmp/'present.c'
-            modified.write_text(body.replace(old, '', 1))
+            modified.write_text(body.replace(old, new, 1))
             source=modified
-        subprocess.run(FLAGS+INCLUDES+['-I'+str(ROOT/'drivers/video/geforce'),
+        subprocess.run(FLAGS+(['-DGF_PRESENT_BYTE'] if byte else [])+INCLUDES+['-I'+str(ROOT/'drivers/video/geforce'),
             str(tmp/'host.c'),str(source),'-o',str(exe)],check=True)
         symbols=subprocess.check_output(['nm','-n',str(exe)],text=True)
         display=int(re.search(r'^([0-9a-f]+) [bB] display$',symbols,re.M).group(1),16)
@@ -336,7 +338,7 @@ void _start(void) {
                 for row in range(2):
                     offset=8+alignment+row*645
                     remaining=width
-                    while remaining and (display+offset)%4:
+                    while remaining and (byte or (display+offset)%4):
                         expected.append((offset,1)); offset+=1; remaining-=1
                     while remaining>=4:
                         expected.append((offset,4)); offset+=4; remaining-=4
@@ -352,7 +354,7 @@ void _start(void) {
             print('RED '+mutation+' (executed store trace)',flush=True)
         else:
             assert not mutation, ('mutation survived',mutation)
-            print(f'PASS present stores: 32 rectangles, two rows, {len(stores)} stores',flush=True)
+            print(f'PASS present stores: {"byte" if byte else "dword"}, 32 rectangles, two rows, {len(stores)} stores',flush=True)
 
 
 def wc_lifecycle(mutation=None):
@@ -467,6 +469,8 @@ def main():
     wc_lifecycle()
     present_store_width(ROOT/'drivers/video/geforce/gf_present.c')
     present_trace()
+    present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
+    present_trace(byte=True)
     if '--mutate' in sys.argv:
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
         wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
@@ -474,6 +478,7 @@ def main():
         for mutation in ('bounds', 'point'): present_trace(mutation)
         for mutation in ('alignment', 'tail'):
             present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
+        present_store_width(ROOT/'drivers/video/geforce/gf_present.c', 'byte', byte=True)
     unsafe_console()
     product()
     module_registration()

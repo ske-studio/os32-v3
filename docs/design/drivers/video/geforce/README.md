@@ -18,3 +18,5 @@ GUI/グラフィックコンソール→RAM CLIENT→`gfx_present/dirty`→`back
 - [gf_present](gf_present.md)
 
 - [gf_wc](gf_wc.md)
+
+- [gf_accept](gf_accept.md)
