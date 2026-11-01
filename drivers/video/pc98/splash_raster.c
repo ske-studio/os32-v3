@@ -18,8 +18,72 @@ static struct SplashRaster raster;
 static const u8 sync_24[] = PEGC_GDC_MSYNC_400;
 static const u8 sync_31[] = PEGC_GDC_MSYNC_400_31K;
 
+#ifdef SPLASH_RASTER_DIAG
+#define DIAG_EVENTS 128u /* Local: first N planned colors per frame. */
+static struct SplashRasterEventDiag diag_events[DIAG_EVENTS];
+static struct SplashRasterDiag diag = { .capacity = DIAG_EVENTS, .events = diag_events };
+static unsigned long long diag_closed, diag_origin;
+static int diag_resolved;
+
+static unsigned long long diag_now(void)
+{
+    u32 lo, hi;
+    if (sys_time_now(&lo, &hi)) { diag.clock_errors++; return 0; }
+    return ((unsigned long long)hi << BITS_PER_U32) | lo;
+}
+static void diag_reset(void)
+{
+    diag_origin = 0; diag_resolved = 0;
+    diag = (struct SplashRasterDiag){ .capacity = DIAG_EVENTS, .events = diag_events };
+    for (u32 i = 0; i < DIAG_EVENTS; i++)
+        diag_events[i] = (struct SplashRasterEventDiag){0};
+}
+static void diag_plan(u32 i, u32 line, u32 index, unsigned long long target)
+{
+    if (i >= DIAG_EVENTS) { diag.overflow++; return; }
+    diag_events[i].target_us = target;
+    diag_events[i].line = line;
+    diag_events[i].index = index;
+    if (diag.count <= i) diag.count = i + 1;
+}
+static void diag_close(void) { diag_closed = diag_now(); }
+static void diag_open(void)
+{
+    unsigned long long end = diag_now();
+    if (!diag_closed || end < diag_closed) { diag.clock_errors++; return; }
+    unsigned long long span = end - diag_closed;
+    diag.if0_total_us += span;
+    if (span > diag.if0_max_us) diag.if0_max_us = span;
+}
+static void diag_event_begin(u32 i)
+{
+    if (i < DIAG_EVENTS) diag_events[i].begin_us = diag_now();
+}
+static void diag_event_end(u32 i)
+{
+    if (i < DIAG_EVENTS) {
+        diag_events[i].end_us = diag_now();
+        diag_events[i].applied = 1;
+    }
+}
+const struct SplashRasterDiag *pc98_splash_raster_diag(void)
+{
+    /* Resolve precomputed offsets after playback, outside the measured scan. */
+    if (!diag_resolved) {
+        for (u32 i = 0; i < diag.count; i++)
+            if (diag_events[i].line) diag_events[i].target_us += diag_origin;
+        diag_resolved = 1;
+    }
+    return &diag;
+}
+#define DIAG(call) do { call; } while (0)
+#else
+#define DIAG(call) do { } while (0)
+#endif
+
 static int result(struct SplashRaster *s, int rc)
 {
+    DIAG(diag.late = s->late; diag.dropped = s->dropped; diag.unapplied = s->unapplied);
     s->last_result = rc;
     return rc;
 }
@@ -78,6 +142,7 @@ static int new_vsync(unsigned long long *rise)
 void pc98_splash_raster_reset(void)
 {
     raster = (struct SplashRaster){0};
+    DIAG(diag_reset());
 }
 
 struct SplashRaster *pc98_splash_raster_state(void)
@@ -149,10 +214,13 @@ int pc98_splash_raster_frame(struct SplashRaster *s, const struct OsriImage *ima
     unsigned long long rise;
     if (!image || image->count || new_vsync(&rise))
         return result(s, SPLASH_RASTER_NO_SYNC);
+    DIAG(diag_reset());
     /* Fixed palette is independent of dynamic mode/phase qualification. */
     for (u32 i = 0; i < OSRI_COLORS; i++) {
         u16 rgb = image->pal[i];
+        DIAG(diag_plan(i, 0, i, rise); diag_event_begin(i));
         color(i, rgb >> 8, rgb >> 4, rgb);
+        DIAG(diag_event_end(i));
     }
     s->frame++;
     return result(s, SPLASH_RASTER_OK);
@@ -170,11 +238,14 @@ static int capture_fall(struct SplashRaster *s, unsigned long long rise,
     if (t > predicted && (t - predicted) * 2 * s->line_den >= s->line_num_us)
         goto drop;
     flags = irq_save();
+    DIAG(diag_close());
     if (!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC)) {
+        DIAG(diag_open());
         irq_restore(flags);
         goto drop;
     }
     int rc = wait_bit(GDC_STAT_VSYNC, 0, t + line, fall);
+    DIAG(diag_open());
     irq_restore(flags);
     if (now_us(&t)) return SPLASH_RASTER_NO_SYNC;
     *open_until = t + (s->line_num_us + s->line_den - 1) / s->line_den;
@@ -200,15 +271,24 @@ int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t
             (i && e->line < t->entries[i-1].line + SPLASH_RASTER_MIN_GAP))
             return result(s, SPLASH_RASTER_NO_SYNC);
     }
+    DIAG(diag_reset());
+#ifdef SPLASH_RASTER_DIAG
+    for (int i = 0; i < t->count; i++)
+        diag_plan(i, t->entries[i].line, t->entries[i].pal_idx,
+                  lines_us(s, s->active0_lines + t->entries[i].line));
+#endif
     if (new_vsync(&rise)) return result(s, SPLASH_RASTER_NO_SYNC);
     if (t->entries[0].line == 0) {
         const GFX_RasterPalEntry *e = &t->entries[0];
+        DIAG(diag_plan(0, 0, e->pal_idx, rise); diag_event_begin(0));
         color(e->pal_idx, e->r, e->g, e->b);
+        DIAG(diag_event_end(0));
         first = 1;
     }
     int capture = capture_fall(s, rise, &fall, &open_until);
     if (capture < 0) return result(s, SPLASH_RASTER_NO_SYNC);
     s->frame++;
+    DIAG(diag_origin = capture ? rise + s->high_us : fall);
     if (capture) { s->unapplied += t->count - first; return result(s, 0); }
     for (int i = first; i < t->count; i++) {
         if (handled[i]) continue;
@@ -233,14 +313,18 @@ int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t
             }
             unsigned long long deadline = now + lines_us(s, 2);
             unsigned int flags = irq_save();
+            DIAG(diag_close());
             int rc = wait_bit(GDC_STAT_HBLANK, 0, deadline, &now);
             if (!rc) rc = wait_bit(GDC_STAT_HBLANK, 1, deadline, &now);
             if (now >= target && !late) { s->late++; late = 1; counted[i] = 1; }
             if (!rc && now < visible_end) {
+                DIAG(diag_event_begin(selected));
                 color(e->pal_idx, e->r, e->g, e->b);
+                DIAG(diag_event_end(selected));
                 handled[selected] = 1;
                 applied = 1;
             }
+            DIAG(diag_open());
             irq_restore(flags);
             if (now_us(&now)) return result(s, SPLASH_RASTER_NO_SYNC);
             for (int j = i + 1; j < t->count; j++) {

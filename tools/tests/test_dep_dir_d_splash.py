@@ -1,6 +1,6 @@
 """L20: pre-move planar bytes, boot lifecycle and isolated mutation preparation."""
 CHECK = dict(name='dep-dir-d-splash-host', tier=4,
-    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
+    covers=['arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
@@ -20,7 +20,7 @@ FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/splash.c'
 HEADER = 'include/platform_splash.h'
 HARNESS = 'tools/tests/dep_dir_d_splash_host.c'
-FILES = ('arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
+FILES = ('arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
 MUTATIONS = (('mask_first = 0xFF >> (x1 % BITS_PER_BYTE);',
               'mask_first = 0xFF << (x1 % BITS_PER_BYTE);'),)
 
@@ -33,11 +33,13 @@ def once(text, old, new):
 
 
 def command(work):
-    return ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-Wall', '-Wextra',
+    import os
+    cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc')
+    return [cc, '-m32', '-march=i386', '-std=gnu11', '-O0', '-Wall', '-Wextra',
             '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
             '-nostdlib', '-static', '-no-pie', '-D__KERNEL_BUILD__',
-            *include_flags(work),
-            str(work/HARNESS), '-o', str(work/'splash')]
+            *include_flags(work), '-I' + str(work/'drivers/video/pc98'),
+            str(work/HARNESS), '-lgcc', '-o', str(work/'splash')]
 
 
 def build(work, source, omit_header=False):
@@ -73,7 +75,18 @@ def main():
     expected = gzip.decompress((FIXTURE/'splash.trace.gz').read_bytes())
     assert manifest['baseline'] == 'b400acb6'
     assert hashlib.sha256(expected).hexdigest() == manifest['trace_sha256']
-    assert hashlib.sha256((ROOT/HARNESS).read_bytes()).hexdigest() == manifest['harness_sha256']
+    assert hashlib.sha256((ROOT/HARNESS).read_bytes()).hexdigest() == manifest['harness_sha256_wire']
+    # Historical trace includes a fourth frame after the old private deadline.
+    # The shared deadline includes initial presentation: remove just that frame.
+    import struct
+    removed = 0
+    for pref in range(4):
+        marker = struct.pack('<4I', 11, 300, pref, 100)
+        assert expected.count(marker) == 1
+        at = expected.index(marker)
+        expected = expected[:at] + expected[at + 16 + 100*20 + 128000:]
+        removed += 1
+    assert removed == 4
     source = (ROOT/BACKEND).read_text()
     old, new = MUTATIONS[0]
     try:

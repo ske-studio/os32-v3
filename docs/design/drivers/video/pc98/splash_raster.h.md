@@ -12,3 +12,5 @@ begin/frame/table は OK/NO_SYNC を戻し、last_result にも保存する。�
 総行数・VS幅・VBPを取り出す。単色ロゴの上限は1件/行、行間隔は2行以上。
 実機の複数色予算は未測定であり、この定数は段0の表再生の制限である。
 frame は段0では差分0の初期16色だけを扱い、OSRI差分は段2で追加する。
+
+診断記述型と `pc98_splash_raster_diag()` は SPLASH_RASTER_DIAG の内側だけに置く。配列長を公開定数にせず、count/capacityと借用のconst eventsポインタで読む。通常のSplashRaster配置と公開KAPIは維持する。

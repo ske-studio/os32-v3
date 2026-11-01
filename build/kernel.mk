@@ -27,7 +27,7 @@ ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/rin
 # === カーネル C ソース ===
 C_KERNEL = \
     arch/x86/kernel/mtrr_wc.c \
-    init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \
+    init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c platform/pc98/splash_image.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \
     mm/paging.c mm/paging_app.c mm/dma_pool.c mm/dma_pool_math.c mm/physmem.c mm/pgalloc.c platform/pc98/lan_match.c platform/pc98/device_loop.c platform/pc98/device_ide.c platform/pc98/device_fs.c platform/pc98/device_pci.c platform/pc98/device_host.c platform/pc98/device_kcg.c platform/pc98/pci_resources.c platform/pc98/boot_disk.c mm/memory_boot.c platform/pc98/memory.c mm/shlib.c mm/shm.c kernel/gui.c kernel/input_service.c kernel/time/clock_service.c kernel/port_service.c kernel/serial_diag.c platform/pc98/d2_bind.c platform/pc98/boot_names.c mm/kmalloc.c kernel/console/console.c platform/pc98/console.c platform/pc98/display.c kernel/console/con_sink.c init/bootlog.c init/bootlog_save.c kernel/kbd_inject.c kernel/sys.c platform/pc98/system.c platform/pc98/pic.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/irq/tick.c kernel/time/ktime.c kernel/time/time_math.c \
     kernel/ver_collect.c kernel/ver_format.c \
     kernel/console/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module/module.c kernel/module/hwdev_module.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/console/unicode_file.c kernel/ime/fep_module.c drivers/ata/cd_module.c drivers/video/kcg/kcg_module.c drivers/sound/fm/fm_module.c \
@@ -46,6 +46,11 @@ C_KERNEL = \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
     $(KSTRING_C_SRC) \
     drivers/video/pc98/splash_raster.c
+
+ifeq ($(SPLASH_DIAG_BUILD),1)
+C_KERNEL += platform/pc98/splash_probe.c
+KERNEL_CFLAGS += -DSPLASH_RASTER_DIAG
+endif
 
 C_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_KERNEL:.c=.o))
 
@@ -294,3 +299,14 @@ $(KERNEL_OBJ_PREFIX)lib/sqlite3/os32_sqlite_test.o: lib/sqlite3/os32_sqlite_test
 
 # Finish every paired image before snapshotting the boot distribution.
 $(BUILD_OUT)/generations-manifest.json: $(KERNEL_PAIRED_MODULES)
+
+# Raster diagnostics have their own object tree, map, image and paired modules.
+# Normal make kernel/all never defines SPLASH_RASTER_DIAG.
+.PHONY: kernel-splash-diag
+kernel-splash-diag:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/splash-diag SPLASH_DIAG_BUILD=1 splash-diag-image
+
+# The normal manifest generators describe build/out, not alternate images.
+# Keep this diagnostic target confined to its image and matching modules.
+.PHONY: splash-diag-image
+splash-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)

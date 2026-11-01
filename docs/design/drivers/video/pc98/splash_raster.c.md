@@ -26,3 +26,5 @@ Databook Hardware (1993) p.351（PM照合、24kHz）。31kHzの位相・I/O予�
 関門であり、ホスト模型の合格で置き換えない。同期辺・番号/G/R/Bの参考は
 [FreeBSD releng/10.4 gdc.c:655,685,831](https://github.com/freebsd/freebsd-src/blob/releng/10.4/sys/pc98/cbus/gdc.c#L655)
 （BSD 3条項）。描画コマンドや実装構造は取り込まない。
+
+診断版だけがフレームごとの先頭128件の予定/開始/終了と適用状態、IF=0区間の最大/合計、late/drop/未適用を記録する。NはLocal定数。読出しは非公開accessor1本、次のframe/resetまで借用。未適用は時刻0とapplied=0、溢れと時計異常は別カウンタ。IRQ操作の位置・順序・判定は維持し、記録の追加読出し費用は診断負荷として測る。常用ではDIAGが消え、変更前の.textとバイト一致を確認する。

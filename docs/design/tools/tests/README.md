@@ -67,3 +67,15 @@
 
 - [tools/tests/test_osri](test_osri.md)
 - [受入計測の模型](test_gf_accel.md)
+
+- [tools/tests/splash_wire_host.c](splash_wire_host.c.md)
+
+- [tools/tests/test_splash_wire.py](test_splash_wire.py.md)
+
+- [tools/tests/splash_raster_diag_host.c](splash_raster_diag_host.c.md)
+
+- [tools/tests/test_splash_raster_diag.py](test_splash_raster_diag.py.md)
+
+- [tools/tests/splash_probe_host.c](splash_probe_host.c.md)
+
+- [tools/tests/test_splash_probe.py](test_splash_probe.py.md)
