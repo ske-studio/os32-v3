@@ -1546,4 +1546,9 @@ kdi_ptr___kernel_resident_end:
 gf_production_selected:
     jmp *kdebug_import_slots+1232
 .size gf_production_selected, .-gf_production_selected
+.globl geforce_foundation_ops
+.type geforce_foundation_ops, @function
+geforce_foundation_ops:
+    jmp *kdebug_import_slots+1236
+.size geforce_foundation_ops, .-geforce_foundation_ops
 .section .note.GNU-stack,"",@progbits

@@ -26,7 +26,7 @@ static struct gf_production_resources boot_resources;
 static struct geforce_platform platform;
 static int reserve(void)
 {
-    if (!gf_production_selected() || gf_production_identify(&boot_resources)) return 0;
+    if (!gf_foundation_requested() || gf_production_identify(&boot_resources)) return 0;
     struct ledger_span spans[RECOVER_BAR_COUNT];
     u32 ids[RECOVER_BAR_COUNT];
     for (u32 i = 0; i < RECOVER_BAR_COUNT; ++i) {
@@ -70,7 +70,7 @@ struct geforce_platform *geforce_platform_get(void)
     platform.wc_start = geforce_wc_start;
     platform.wc_stop = geforce_wc_stop;
     platform.report = geforce_wc_report;
-    return gf_production_selected() ? &platform : 0;
+    return gf_foundation_requested() ? &platform : 0;
 }
 
 int geforce_range_reserved(u32 base, u32 length)

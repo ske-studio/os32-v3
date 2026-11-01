@@ -43,6 +43,7 @@ int gf_production_point(void *p) { (void)p;return identity_ok ? 0 : -1; }
 int pc98_route_select_98(void) { return pc98_route_to_98(); }
 #define geforce_backend_ops gfx_backend_geforce
 #include "geforce_body.inc"
+struct gf1_test_ops gf1_module_ops;
 #undef geforce_backend_ops
 
 static struct ledger_region recovery_regions[LEDGER_MAX_REGIONS];
@@ -136,8 +137,10 @@ static void wc_recovery_run(void)
     map_host(0x10000,0xff0000);map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
     boot();gfx_set_backend_pref(GFX_PREF_GEFORCE);gfx_boot_reserve();
     struct geforce_platform *p=geforce_platform_get();
+    const struct gf3_test_ops *accel=0;
+    const struct gf1_test_ops *foundation=0;
     GeforceModuleContext ctx={&gfx_backend_geforce,&gfx_counters,&gfx_current_height,
-                             &gfx_flip_enabled,&gfx_display_page,p};
+                             &gfx_flip_enabled,&gfx_display_page,p,&accel,&foundation};
     CHECK(!geforce_module_init(&gfx_backend_geforce,&ctx));
     wc_snapshot();
     bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;

@@ -109,7 +109,7 @@ def main():
             print('RED runtime: machine device ID changed (compiled successfully)')
 
 
-HWDEV_SHA = 'bf1f752de85aa877d33226e2952d2c2e8d6a4e43beeea4a2dde9ddf7c906d119'
+HWDEV_SHA = '88ae20d93fbb27f777a9192b73f46219659fafa715a7612a8ec643210e65a55f'
 if __name__ == '__main__':
     main()
 

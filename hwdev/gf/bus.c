@@ -2,6 +2,7 @@
  * follows kdebug/gfinit_bus.c; no diagnostic executor or real VGA port I/O. */
 #include "production.h"
 #include "../../drivers/pci/pci.h"
+#include "../../include/io.h"
 int gf_production_identity(struct gf_production *p)
 {
     const struct recover_identity *id=&p->display.identity;
@@ -15,7 +16,11 @@ int gf_production_identity(struct gf_production *p)
             goto bad;
     return 0;
 bad:
-    p->revoked=true;p->display.reusable=false;
+    unsigned flags=irq_save();
+    p->revoked=true;
+    gf_foundation_revoke(&p->foundation);
+    irq_restore(flags);
+    p->display.reusable=false;
     return -1;
 }
 static int raw(struct gf_production *p, u32 bar, u32 off, u32 width, bool write, u32 *value)
@@ -26,7 +31,7 @@ static int raw(struct gf_production *p, u32 bar, u32 off, u32 width, bool write,
         (bar!=GF_MODE_REGISTER_BAR && (bar!=GF_MODE_VRAM_BAR ||
          off>GF_MODE_VRAM_BYTES || width>GF_MODE_VRAM_BYTES-off)) ||
         gf_production_identity(p) ||
-        pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND)!=RECOVER_COMMAND_OVERRIDE)
+        pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND)!=p->foundation.expected_command)
         return -1;
     return gf_production_mmio(p,bar,off,width,write,value);
 }
@@ -106,7 +111,7 @@ int gf_production_decode_safe(struct gf_production *p)
 {
     u32 value;
     if (!p || !p->prepared || gf_production_identity(p) ||
-        pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND)!=RECOVER_COMMAND_OVERRIDE ||
+        pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,PCI_CFG_COMMAND)!=p->foundation.expected_command ||
         pci_cfg_read32(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,RECOVER_CFG50) ||
         pci_cfg_read32(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,RECOVER_CFG54)) return -1;
     if (raw(p,0,RECOVER_PBUS1850,4,false,&value) || value ||

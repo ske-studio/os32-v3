@@ -3,6 +3,7 @@
  * main0..4, baseline, calc, load_state and required CHECK remain in service.c. */
 #include "production.h"
 #include "../../drivers/pci/pci.h"
+#include "../../lib/serial_diag.h"
 #include "../../mm/pgalloc.h"
 #include "../../lib/kstring.h"
 #include "../../lib/crc32_core.inc"
@@ -27,6 +28,53 @@ static int same_resources(struct gf_production *p)
     }
     return gf_production_mapped(p);
 }
+/* IRQ/tick use the permanent BAR0 map: no PCI scan, waits or VGA windows.
+ * nouveau nvkm/subdev/mc/nv04.c:94 nv04_mc_intr_pending uses direct MMIO. */
+static int foundation_read(void *opaque, u32 bar, u32 off, u32 width, u32 *value)
+{
+    struct gf_foundation *f=opaque;
+    (void)bar;(void)width;
+    if (f->revoked) return -1;
+    *value=*(volatile u32 *)(f->bar0+off);
+    return 0;
+}
+static int foundation_write(void *opaque, u32 bar, u32 off, u32 width, u32 value)
+{
+    struct gf_foundation *f=opaque;
+    (void)bar;(void)width;
+    if (f->revoked) return -1;
+    *(volatile u32 *)(f->bar0+off)=value;
+    return 0;
+}
+static int foundation_result(struct gf_display_context *c, int rc)
+{
+    if (rc && !serial_gate_active()) {
+        serial_puts_polled("[gf1] lifecycle rc=");serial_diag_i32(rc);
+        serial_puts_polled("\r\n");
+    }
+    struct gf_production *p=c->io.opaque;
+    p->foundation.last_rc=rc;
+    c->last_rc=rc;
+    return rc ? -1 : 0;
+}
+static int foundation_start(struct gf_display_context *c)
+{
+    struct gf_production *p=c->io.opaque;
+    if (p->foundation.revoked || same_resources(p))
+        return foundation_result(c,GF1_EPCI);
+    p->foundation.instmem_bar=c->bars[2];
+    p->foundation.map_ops=p->map_ops;
+    p->foundation.map_owner=p->map_owner;
+    return foundation_result(c,gf_foundation_start(&p->foundation));
+}
+static int foundation_stop(struct gf_display_context *c)
+{
+    struct gf_production *p=c->io.opaque;
+    /* Stop must still unbind tick/unmap after an identity or BAR revoke.
+     * nouveau_drm.c:933-941 tears down before disabling PCI. */
+    (void)gf_production_identity(p);
+    return foundation_result(c,gf_foundation_stop(&p->foundation));
+}
 int gf_production_prepare(struct gf_production *p,
                           const struct gf_production_resources *boot,
                           int (*route98)(void *), void *opaque)
@@ -38,9 +86,14 @@ int gf_production_prepare(struct gf_production *p,
     p->display.io=(struct gf_io){p,gf_production_read,gf_production_write,
         {gf_production_clock,gf_production_wait},gf_production_point,gf_production_restore,0};
     p->display.owner=&gf_production_owner;
+    p->foundation.io=(struct gf_io){.opaque=&p->foundation,
+        .read=foundation_read,.write=foundation_write};
+    p->foundation.expected_command=RECOVER_COMMAND_STOP;
+    p->map_ops=&gf_production_instmem_map_ops;p->map_owner=p;
     p->video=(struct video_device){&p->display,&gf_video_ops};
     if (same_resources(p)) return -1;
     p->display.bar0_map=(void *)P2V_IO(p->display.bars[0].base);
+    p->foundation.bar0=p->display.bar0_map;
     p->display.bar1_map=(void *)P2V_IO(p->display.bars[GF_MODE_VRAM_BAR].base);
     p->prepared=true;p->display.reusable=true;
     return 0;
@@ -71,11 +124,8 @@ static int acquire(struct gf_display_context *c)
     if (p->attempted || !p->prepared) return -1;
     p->attempted=true;
     if (p->route98(p->route_opaque) || same_resources(p)) return -1;
-    /* N1: one WORD write, then raw WORD compare. Never a DWORD RMW or BAR write. */
-    if (pci_cfg_write16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,
-                        PCI_CFG_COMMAND,RECOVER_COMMAND_OVERRIDE) ||
-        pci_cfg_read16(RECOVER_GF_BUS,RECOVER_GF_DEV,RECOVER_GF_FN,
-                        PCI_CFG_COMMAND)!=RECOVER_COMMAND_OVERRIDE) return -1;
+    /* nouveau_drm.c:858,881 nouveau_drm_probe: master before devinit. */
+    if (foundation_result(c,gf_master_enable(&p->foundation))) return -1;
     u32 started;
     if (gf_production_clock(p,&started)) return -1;
     u32 phys=pgalloc_alloc_phys(LEDGER_OWNER_KERNEL,PAGE_ALIGN_UP(sizeof(*p->scratch))/PAGE_SIZE);
@@ -91,6 +141,7 @@ static void release(struct gf_display_context *c)
 {
     struct gf_production *p=c->io.opaque;
     p->acquiring=false;
+    if (c->baseline_valid) p->foundation.expected_pmc=c->baseline_pmc;
     if (p->scratch)
         (void)pgalloc_free_n_owner(LEDGER_OWNER_KERNEL,V2P(p->scratch)/PAGE_SIZE,
                                    PAGE_ALIGN_UP(sizeof(*p->scratch))/PAGE_SIZE);
@@ -102,12 +153,13 @@ static int validate(struct gf_display_context *c)
     u32 amount,pmc;
     if (gf_production_decode_safe(p) ||
         gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&pmc) ||
-        (c->initialized && pmc!=c->baseline_pmc) ||
+        (c->initialized && pmc!=p->foundation.expected_pmc) ||
         gf_production_read(p,0,GF_PRODUCTION_PFB_AMOUNT,4,&amount)) return -1;
     amount&=GF_PRODUCTION_PFB_MASK;
     return amount<GF_PRODUCTION_PFB_MIN || (amount&(amount-1)) ||
         amount<GF_MODE_VRAM_BYTES || gf_production_point(p) ? -1 : 0;
 }
 const struct gf_display_owner gf_production_owner={
-    .acquire=acquire, .release=release, .validate=validate
+    .acquire=acquire, .release=release, .validate=validate,
+    .foundation_start=foundation_start, .foundation_stop=foundation_stop
 };

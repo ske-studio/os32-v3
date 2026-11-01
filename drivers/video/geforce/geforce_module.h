@@ -4,10 +4,12 @@
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "../../../kernel/module/module_runtime.h"
-#define GEFORCE_MODULE_OPS_VERSION 2u
+#define GEFORCE_MODULE_OPS_VERSION 3u
 #define GEFORCE_WC_BYTES 0x80000U
 struct gf_production_resources;
 struct gf3_test_ops;
+struct gf1_test_ops;
+const struct gf1_test_ops *geforce_foundation_ops(void);
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);
@@ -37,6 +39,8 @@ typedef struct {
     GfxCounters *counters;
     int *height, *flip, *page;
     struct geforce_platform *platform;
+    const struct gf3_test_ops **accel_out;
+    const struct gf1_test_ops **foundation_out;
 } GeforceModuleContext;
 extern const GeforceModuleContext *geforce_context;
 extern GfxBackend geforce_backend_ops;

@@ -4,6 +4,7 @@
 #define production prod
 #include "drivers/video/geforce/geforce_body.c"
 #undef production
+struct gf1_test_ops gf1_module_ops;
 static GfxBackend hal_backend;
 static GfxCounters hal_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
@@ -43,8 +44,10 @@ static void prod_hal_cases(void)
     kmemset(&prod,0,sizeof(prod)); /* module prepare, rather than fixture prepare */
     struct geforce_platform p={.resources=&prod_boot,
         .bar0_phys=prod_boot.bars[0].base,.display_phys=prod_boot.bars[1].base};
+    const struct gf3_test_ops *accel=0;
+    const struct gf1_test_ops *foundation=0;
     GeforceModuleContext ctx={&hal_backend,&hal_counters,&gfx_current_height,
-        &gfx_flip_enabled,&gfx_display_page,&p};
+        &gfx_flip_enabled,&gfx_display_page,&p,&accel,&foundation};
     static u8 client[MEM_GFX_BB8_SIZE];
     CHECK(!geforce_module_init(&hal_backend,&ctx));
     hal_backend.bb_base=client;hal_backend.bb_pitch=640;
@@ -54,9 +57,9 @@ static void prod_hal_cases(void)
     CHECK(prod_trace[prod_trace_count-3]==0xc0f1 &&
           prod_trace[prod_trace_count-2]==0xce11 && prod_trace[prod_trace_count-1]==0xfac01);
     hal_backend.init();hal_backend.enter();
-    CHECK(prod_cmd_writes==1 && hal_copies==1 && hal_cells==1);
+    CHECK(prod_cmd_writes==2 && hal_copies==1 && hal_cells==1);
     hal_backend.shutdown();CHECK(hal_safe && !hal_route);prod_exit_order();
-    hal_backend.init();CHECK(prod_cmd_writes==1 && hal_copies==2 && hal_cells==2);
+    hal_backend.init();CHECK(prod_cmd_writes==3 && hal_copies==2 && hal_cells==2);
     CHECK(!geforce_return(&p));prod_exit_order();
     /* Stop failure must still select 00 and check decode before 98 writes. */
     hal_backend.shutdown();hal_backend.init();prod_stop_fail=prod_stop_writes+1;

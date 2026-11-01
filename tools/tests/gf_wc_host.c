@@ -102,6 +102,7 @@ int gf_production_quiesce(struct gf_production *p)
 int gf_production_point(void *p) { (void)p;return identity ? 0 : -1; }
 int pc98_route_select_98(void) { return 0; }
 #include "../../drivers/video/geforce/geforce_body.c"
+struct gf1_test_ops gf1_module_ops;
 static PaletteEntry colors[16];
 static u8 client[640*480];
 static const PaletteEntry *fake_colors(void) { return colors; }
@@ -139,8 +140,10 @@ int pc98_route_to_98(void) { CHECK(!lease.active || restore_fail);return 0; }
 void geforce_display_failed(void) {}
 int gfx_current_height,gfx_flip_enabled,gfx_display_page;
 static GfxCounters counters;
+static const struct gf3_test_ops *accel_slot;
+static const struct gf1_test_ops *foundation_slot;
 static GeforceModuleContext ctx={&gfx_backend_geforce,&counters,&gfx_current_height,
-                                &gfx_flip_enabled,&gfx_display_page,&plat};
+                                &gfx_flip_enabled,&gfx_display_page,&plat,&accel_slot,&foundation_slot};
 static void snapshot(void)
 {
     __builtin_memcpy(saved_pd,pd,sizeof(pd));

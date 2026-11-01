@@ -87,7 +87,7 @@ static int quiesce_engine_access(struct recover *r, struct recover_bus_access *a
 }
 static bool quiesce_engines(struct recover *r)
 {
-    static const u32 engines[] = {0x100U, 0x1000U, 0x2U};
+    static const u32 engines[] = {RECOVER_PMC_ENGINE_FIFO, RECOVER_PMC_ENGINE_GR, RECOVER_PMC_ENGINE_MPEG};
     u32 key = RECOVER_NONE;
     for (u32 i = 0; i < r->profile->target_count; i++) {
         const struct recover_target *t = &r->profile->targets[i];
@@ -208,7 +208,8 @@ static int cleanup(struct recover *r)
     for (u32 i = 0; i < RECOVER_RULE_MAX / BITS_PER_U32; i++) r->restored_rules[i] = 0;
     r->restore_polls = 0; r->uart_polls = 0; r->uart_bytes = 0; r->in_s0 = false;
     state(r, REC_RESTORING);
-    if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
+    int stopped = r->ops->pre_cleanup ? r->ops->pre_cleanup(r->opaque) : 0;
+    if (stopped || recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
     bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);

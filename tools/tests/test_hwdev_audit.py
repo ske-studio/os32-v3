@@ -22,6 +22,11 @@ def main():
         document.write_text(source.replace('| 0 | `trial_begin` | `kdebug/recover.h` |', ''))
         p = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         assert p.returncode != 0 and 'core slot order/count' in p.stderr, p
+        # Kernel getter must not collide with CORE runner slot 36.
+        document.write_text(source.replace('| 37 | geforce_foundation_ops | 309 |',
+                                           '| 36 | geforce_foundation_ops | 309 |'))
+        p = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+        assert p.returncode != 0 and 'kernel import table order/symbol/index' in p.stderr, p
     print('PASS audit under -O: rejects missing slot, ignores rows outside section 2')
 
 if __name__ == '__main__':

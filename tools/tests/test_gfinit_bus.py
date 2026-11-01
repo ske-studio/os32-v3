@@ -17,6 +17,8 @@ def command(exe):
 
 
 MUTATIONS = [
+    ("raw_bar_revoke", "if (b->foundation && bars[i] != b->bars[i]) gfinit_bus_revoke(b);", "(void)b;"),
+    ("revoked_bus_write", "(b->foundation && b->foundation->revoked) ||", ""),
     ('cr1f_second_visit', 'k < sizeof(order) / sizeof(order[0])', 'k + 1 < sizeof(order) / sizeof(order[0])'),
     ('cr1f_restore', 'value = !k || v->value == RECOVER_CR1F_UNLOCKED ?', 'value = true ?'),
     ('cleanup_order', '{RECOVER_CR1F, RECOVER_CR11, RECOVER_CR44, RECOVER_CR1F}', '{RECOVER_CR1F, RECOVER_CR11, RECOVER_CR1F, RECOVER_CR44}'),
@@ -24,7 +26,7 @@ MUTATIONS = [
     ('legacy_reject', 'if (pa < GF_LEGACY_HI && pa + a->width > GF_LEGACY_LO)', 'if (false)'),
     ('bar_type', '(bars[i] & PCI_BAR_TYPE_MASK)', 'false'),
     ('bus_mem', '!(command & RECOVER_COMMAND_MEM)', 'false'),
-    ('bus_bar', 'bars[i] != b->bars[i]', 'false'),
+    ('bus_bar', 'for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (bars[i] != b->bars[i])', 'for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (false)'),
     ('bus_tuple', 'a->offset != resolved.offset', 'false'),
     ('bus_command_width', 'if (a->width == 2)', 'if (a->width == 1)'),
 ]

@@ -82,6 +82,21 @@ static void sequence_cases(void)
 #include "../../drivers/char/serial.h"
 #include "../../hwdev/owner.h"
 #include "hwdev_trace_symbols.h"
+static int sequence_foundation_prepare(struct gf_foundation *f,
+    const struct recover_bar_extent *bars, u32 n)
+{ CHECK(f->io.opaque && bars && n==RECOVER_BAR_COUNT);return 0; }
+static int sequence_foundation_call(struct gf_foundation *f,
+    const struct gf1_test_request *q, struct gf1_test_reply *reply)
+{
+    CHECK(q->op==GF1T_MASTER || q->op==GF1T_START || q->op==GF1T_STOP || q->op==GF1T_REVOKE);
+    if(q->op==GF1T_REVOKE)f->revoked=true;
+    *reply=(struct gf1_test_reply){0};return 0;
+}
+static const struct gf1_test_ops *sequence_foundation_ops(void)
+{
+    static const struct gf1_test_ops ops={0,sequence_foundation_prepare,sequence_foundation_call};
+    return &ops;
+}
 static struct gfinit_owner *sequence_bundle;
 static u8 sequence_flow[RECOVER_NODE_MAX*RECOVER_BITS_WORDS*sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static struct recover *sequence_recover_owner(void) {return &core;}

@@ -49,6 +49,7 @@ static const struct { u32 write, off, value; } mask_ops[] = {
 };
 static int io_access(bool write, void *arg, u32 bar, u32 off, u32 width, u32 *v)
 {
+    CHECK(!f.revoked);
     CHECK(arg == &f && bar == 0 && width == 4);
     if (f.bm || command == RECOVER_COMMAND_STOP) CHECK(f.expected_command == command);
     if (!write && off == 0x200) {
@@ -174,9 +175,12 @@ void gf_inst_free(struct gf_foundation *p, struct gf_inst *obj)
 }
 int gf_instmem_unmap(struct gf_foundation *p)
 {
-    CHECK(p == &f && f.mapped && !f.bm && !f.registered && !bound && !f.running);
-    CHECK(!f.imem.used && !f.imem.vbios.size && !f.imem.ramht.size &&
-          !f.imem.ramro.size && !f.imem.ramfc.size);
+    CHECK(p == &f && f.mapped && !f.running && host_if);
+    if (!f.revoked) {
+        CHECK(!f.bm && !f.registered && !bound);
+        CHECK(!f.imem.used && !f.imem.vbios.size && !f.imem.ramht.size &&
+              !f.imem.ramro.size && !f.imem.ramfc.size);
+    }
     int rc = step(UNMAP, GF1_EMAP);
     if (!rc) { f.mapped = false; f.bar2 = 0; f.imem.aperture_bytes = 0; }
     return rc;
@@ -210,13 +214,43 @@ void _start(void)
     f=(struct gf_foundation){.running=true,.bm=true,.registered=true,.mapped=true,
         .expected_command=RECOVER_COMMAND_RUN,.expected_pmc=0xabcde000U};
     host_if=1;
+    unsigned before_saves=saves;
     gf_foundation_revoke(&f);
+    CHECK(saves==before_saves+1);
     CHECK(f.revoked && !f.running && f.bm && f.registered && f.mapped);
     CHECK(f.expected_command==RECOVER_COMMAND_RUN && f.expected_pmc==0xabcde000U);
     CHECK(host_if==1 && saves==restores && !count && !io_count);
     host_if=0;
+    before_saves=saves;
     gf_foundation_revoke(&f);
+    CHECK(saves==before_saves+1);
     CHECK(f.revoked && !f.running && !host_if && saves==restores);
+    /* Revocation must remove CPU BAR2 access without touching the old device,
+     * freeing handles or pretending that IRQ/BM shutdown succeeded. */
+    for (unsigned failure=0;failure<3;failure++) {
+        reset();
+        CHECK(gf_foundation_start(&f)==0);
+        gf_foundation_revoke(&f);
+        unsigned before_io=io_count;
+        u32 before_pmc=f.expected_pmc;
+        struct gf_inst *before_used=f.imem.used;
+        count=0;
+        fail_step=failure==1 ? UNBIND : failure==2 ? UNMAP : 0;
+        CHECK(gf_foundation_stop(&f)==(failure==1 ? GF1_EIRQ : failure==2 ? GF1_EMAP : GF1_EPCI));
+        CHECK(count==2 && trace[0]==UNBIND && trace[1]==UNMAP);
+        CHECK(io_count==before_io && !pmc_reads);
+        CHECK(f.revoked && !f.running && f.bm && f.registered);
+        CHECK(f.expected_command==RECOVER_COMMAND_RUN && f.expected_pmc==before_pmc);
+        CHECK(f.imem.used==before_used && f.imem.ramfc.size==0x20000);
+        CHECK(f.mapped==(failure==2));
+        count=0;
+        CHECK(gf_foundation_stop(&f)==GF1_EPCI);
+        CHECK(!f.mapped && !f.bar2 && !bound && !f.imem.aperture_bytes);
+        CHECK(count==(failure==2 ? 2U : 1U) && trace[0]==UNBIND);
+        CHECK(io_count==before_io && host_if && saves==restores);
+        count=0;
+        CHECK(gf_foundation_start(&f)==GF1_EPCI && !count);
+    }
     static const unsigned start[] = {MASTER,MASK,MC,IMEM,BIND,ATTACH,ENABLE};
     static const unsigned stop[] = {UNBIND,MASK,ENGINE,PMC_READ,DETACH,DISABLE,FREE,FREE,UNMAP};
     static const unsigned failed[] = {MASTER,MC,IMEM,BIND,ATTACH,ENABLE};

@@ -150,7 +150,7 @@ static int local_cleanup(void *v)
 }
 static const struct recover_ops ops = {
     ticks, identity, ready, config, read_bus, write_bus, route_read, route_write,
-    screen_safe, screen_restore, abort_requested, local_cleanup, event, 0, 0, 0, 0
+    screen_safe, screen_restore, abort_requested, local_cleanup, event, 0, 0, 0, 0, 0
 };
 static struct recover_reg regs[2];
 static struct recover_write quiet[3];
@@ -550,11 +550,33 @@ static void owner_detach_tests(void)
     }
 }
 
+static unsigned pre_cleanups;
+static int pre_failure;
+static int before_cleanup(void *v)
+{
+    struct fake *f=v;
+    CHECK(!f->local_calls && !f->screen_done);
+    pre_cleanups++;
+    return pre_failure;
+}
+static void pre_cleanup_tests(void)
+{
+    for (unsigned failure=0;failure<2;failure++) {
+        setup(false);begin();
+        struct recover_ops hooked=ops;
+        hooked.pre_cleanup=before_cleanup;r.ops=&hooked;
+        pre_cleanups=0;pre_failure=failure;
+        int rc=trial_end(&r,&r.token,REC_NORMAL);
+        CHECK(pre_cleanups==1);
+        CHECK(failure ? rc<0 && !f.local_calls && r.access_blocked : rc==0 && f.local_calls==1);
+    }
+}
+
 #include "recover_diag_host.inc"
 
 void _start(void)
 {
-    preconditions(); normal(); mismatches(); timing(); callback_timing();
+    pre_cleanup_tests(); preconditions(); normal(); mismatches(); timing(); callback_timing();
     failures(); cold_and_config(); routes(); descriptor_tests(); t2_tests(); t3_tests(); owner_detach_tests(); diag_tests();
     output(fails ? "recover_host: FAIL\n" : "recover_host: PASS\n");
     __asm__ volatile("int $0x80" : : "a"(1), "b"(fails ? 1 : 0) : "memory");

@@ -222,3 +222,31 @@ static void setup(void)
 }
 static void prepared(void)
 { CHECK(call(GF_OP_INSPECT,0,0)==0);CHECK(call(GF_OP_SIZE_BARS,GF_ALLOW_WRITE,0)==0);CHECK(call(GF_OP_PREPARE,GF_ALLOW_WRITE,0)==0); }
+
+static u32 foundation_op, foundation_stops;
+static int foundation_error;
+static int test_foundation_prepare(struct gf_foundation *f, const struct recover_bar_extent *b, u32 n)
+{ (void)f;(void)b;(void)n;return 0; }
+static int test_foundation_call(struct gf_foundation *f,const struct gf1_test_request *q,struct gf1_test_reply *reply)
+{ (void)f;foundation_op=q->op;if(q->op==GF1T_STOP)foundation_stops++;*reply=(struct gf1_test_reply){0};return foundation_error; }
+static const struct gf1_test_ops test_foundation_ops={0,test_foundation_prepare,test_foundation_call};
+const struct gf1_test_ops *geforce_foundation_ops(void) { return &test_foundation_ops; }
+void gfinit_bus_revoke(struct gfinit_bus *b) { if(b->foundation)b->foundation->revoked=true; }
+
+static void foundation_cleanup_test(void)
+{
+    setup();CHECK(!call(GF_OP_INSPECT,0,0));
+    owner->foundation_prepared=true;owner->foundation_active=true;
+    owner->bus.foundation=&owner->foundation;
+    owner->next_main=GF_INIT_MAINS;stage.initialized=true;
+    stage.values[GF_STAGE_PMC]=0x12345678U;
+    CHECK(!gf_capture(&core,&stage));
+    CHECK(owner->foundation.expected_pmc==stage.values[GF_STAGE_PMC]);
+    core.access_blocked=true;foundation_error=0;foundation_stops=0;
+    CHECK(!gf_pre_cleanup(&owner->bus));
+    CHECK(foundation_stops==1 && foundation_op==GF1T_STOP);
+    CHECK(!owner->foundation_active && !owner->foundation.revoked);
+    owner->foundation_active=true;foundation_error=-1;
+    CHECK(gf_release_rom(owner)<0 && owner->rom && owner->foundation_active);
+    foundation_error=0;CHECK(!gf_release_rom(owner));
+}

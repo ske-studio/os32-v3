@@ -258,6 +258,13 @@
       "source": "kdebug/recover.h",
       "kind": "FUNC",
       "group": "core"
+    },
+    {
+      "index": 37,
+      "symbol": "geforce_foundation_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

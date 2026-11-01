@@ -34,7 +34,7 @@ static int gf_start(void *v, u32 mode_id, const u8 *rgb)
     if (gfinit_mode_calc(&c->limits,&c->baseline,&c->mode) ||
         !gfinit_mode_pll_ok(&c->mode) || gf_display_modeset(c)) goto fail;
     c->section=GF_DISPLAY_CHECK;
-    if (gf_display_checks(c)) goto fail;
+    if (gf_display_checks(c) || c->owner->foundation_start(c)) goto fail;
     c->active=true;c->blank=false;c->last_rc=0;
     return 0;
 fail:

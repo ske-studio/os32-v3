@@ -144,6 +144,24 @@ offset	GFX_Surface.planes	12
 member_size	GFX_Surface.planes	16
 offset	GFX_Surface.w	0
 member_size	GFX_Surface.w	4
+size	GeforceModuleContext	32
+align	GeforceModuleContext	4
+offset	GeforceModuleContext.accel_out	24
+member_size	GeforceModuleContext.accel_out	4
+offset	GeforceModuleContext.backend	0
+member_size	GeforceModuleContext.backend	4
+offset	GeforceModuleContext.counters	4
+member_size	GeforceModuleContext.counters	4
+offset	GeforceModuleContext.flip	12
+member_size	GeforceModuleContext.flip	4
+offset	GeforceModuleContext.foundation_out	28
+member_size	GeforceModuleContext.foundation_out	4
+offset	GeforceModuleContext.height	8
+member_size	GeforceModuleContext.height	4
+offset	GeforceModuleContext.page	16
+member_size	GeforceModuleContext.page	4
+offset	GeforceModuleContext.platform	20
+member_size	GeforceModuleContext.platform	4
 size	HddGeom	32
 align	HddGeom	4
 offset	HddGeom.addr_mode	29
@@ -1160,6 +1178,86 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
+size	struct GfxBackend	76
+align	struct GfxBackend	4
+offset	struct GfxBackend.bb_base	44
+member_size	struct GfxBackend.bb_base	4
+offset	struct GfxBackend.bb_format	52
+member_size	struct GfxBackend.bb_format	1
+offset	struct GfxBackend.bb_pitch	48
+member_size	struct GfxBackend.bb_pitch	4
+offset	struct GfxBackend.bb_size	56
+member_size	struct GfxBackend.bb_size	4
+offset	struct GfxBackend.blit	40
+member_size	struct GfxBackend.blit	4
+offset	struct GfxBackend.default_mode	70
+member_size	struct GfxBackend.default_mode	2
+offset	struct GfxBackend.enter	28
+member_size	struct GfxBackend.enter	4
+offset	struct GfxBackend.fill_rect	36
+member_size	struct GfxBackend.fill_rect	4
+offset	struct GfxBackend.init	8
+member_size	struct GfxBackend.init	4
+offset	struct GfxBackend.leave	32
+member_size	struct GfxBackend.leave	4
+offset	struct GfxBackend.mode_count	68
+member_size	struct GfxBackend.mode_count	2
+offset	struct GfxBackend.modes	64
+member_size	struct GfxBackend.modes	4
+offset	struct GfxBackend.name	0
+member_size	struct GfxBackend.name	4
+offset	struct GfxBackend.prepare	60
+member_size	struct GfxBackend.prepare	4
+offset	struct GfxBackend.present_rect	20
+member_size	struct GfxBackend.present_rect	4
+offset	struct GfxBackend.probe	4
+member_size	struct GfxBackend.probe	4
+offset	struct GfxBackend.query	12
+member_size	struct GfxBackend.query	4
+offset	struct GfxBackend.selected_mode	72
+member_size	struct GfxBackend.selected_mode	4
+offset	struct GfxBackend.set_palette	24
+member_size	struct GfxBackend.set_palette	4
+offset	struct GfxBackend.shutdown	16
+member_size	struct GfxBackend.shutdown	4
+size	struct GfxCounters	16
+align	struct GfxCounters	4
+offset	struct GfxCounters.commits	12
+member_size	struct GfxCounters.commits	4
+offset	struct GfxCounters.hw_ops	4
+member_size	struct GfxCounters.hw_ops	4
+offset	struct GfxCounters.io_accesses	8
+member_size	struct GfxCounters.io_accesses	4
+offset	struct GfxCounters.present_bytes	0
+member_size	struct GfxCounters.present_bytes	4
+size	struct GfxFormatDesc	6
+align	struct GfxFormatDesc	2
+offset	struct GfxFormatDesc.bits_per_plane	3
+member_size	struct GfxFormatDesc.bits_per_plane	1
+offset	struct GfxFormatDesc.bpp	0
+member_size	struct GfxFormatDesc.bpp	1
+offset	struct GfxFormatDesc.indexed	1
+member_size	struct GfxFormatDesc.indexed	1
+offset	struct GfxFormatDesc.palette_count	4
+member_size	struct GfxFormatDesc.palette_count	2
+offset	struct GfxFormatDesc.planes	2
+member_size	struct GfxFormatDesc.planes	1
+size	struct GfxMode	12
+align	struct GfxMode	4
+offset	struct GfxMode.dac_bits	5
+member_size	struct GfxMode.dac_bits	1
+offset	struct GfxMode.format	4
+member_size	struct GfxMode.format	1
+offset	struct GfxMode.height	2
+member_size	struct GfxMode.height	2
+offset	struct GfxMode.hw_mode	6
+member_size	struct GfxMode.hw_mode	1
+offset	struct GfxMode.pitch	8
+member_size	struct GfxMode.pitch	4
+offset	struct GfxMode.reserved	7
+member_size	struct GfxMode.reserved	1
+offset	struct GfxMode.width	0
+member_size	struct GfxMode.width	2
 size	struct addrspace	1228
 align	struct addrspace	4
 offset	struct addrspace.app_pde	8
@@ -1334,6 +1432,34 @@ offset	struct bootinfo_wire_drive.rsvd	11
 member_size	struct bootinfo_wire_drive.rsvd	5
 offset	struct bootinfo_wire_drive.valid	1
 member_size	struct bootinfo_wire_drive.valid	1
+size	struct geforce_platform	52
+align	struct geforce_platform	4
+offset	struct geforce_platform.bar0_phys	24
+member_size	struct geforce_platform.bar0_phys	4
+offset	struct geforce_platform.device	0
+member_size	struct geforce_platform.device	4
+offset	struct geforce_platform.display_phys	28
+member_size	struct geforce_platform.display_phys	4
+offset	struct geforce_platform.identify	8
+member_size	struct geforce_platform.identify	4
+offset	struct geforce_platform.opaque	20
+member_size	struct geforce_platform.opaque	4
+offset	struct geforce_platform.pc98_safe	12
+member_size	struct geforce_platform.pc98_safe	4
+offset	struct geforce_platform.point	16
+member_size	struct geforce_platform.point	4
+offset	struct geforce_platform.report	48
+member_size	struct geforce_platform.report	4
+offset	struct geforce_platform.reserve	4
+member_size	struct geforce_platform.reserve	4
+offset	struct geforce_platform.resources	32
+member_size	struct geforce_platform.resources	4
+offset	struct geforce_platform.stop	36
+member_size	struct geforce_platform.stop	4
+offset	struct geforce_platform.wc_start	40
+member_size	struct geforce_platform.wc_start	4
+offset	struct geforce_platform.wc_stop	44
+member_size	struct geforce_platform.wc_stop	4
 size	struct gf_display_context	1732
 align	struct gf_display_context	4
 offset	struct gf_display_context.active	250
@@ -1560,19 +1686,21 @@ offset	struct gf_stage_state.s0_ok	6
 member_size	struct gf_stage_state.s0_ok	1
 offset	struct gf_stage_state.values	212
 member_size	struct gf_stage_state.values	40
-size	struct gfinit_bus	88
+size	struct gfinit_bus	92
 align	struct gfinit_bus	4
-offset	struct gfinit_bus.bars	72
+offset	struct gfinit_bus.bars	76
 member_size	struct gfinit_bus.bars	12
-offset	struct gfinit_bus.identity	40
+offset	struct gfinit_bus.foundation	0
+member_size	struct gfinit_bus.foundation	4
+offset	struct gfinit_bus.identity	44
 member_size	struct gfinit_bus.identity	32
-offset	struct gfinit_bus.pci	0
+offset	struct gfinit_bus.pci	4
 member_size	struct gfinit_bus.pci	4
-offset	struct gfinit_bus.profile	4
+offset	struct gfinit_bus.profile	8
 member_size	struct gfinit_bus.profile	4
-offset	struct gfinit_bus.ready	84
+offset	struct gfinit_bus.ready	88
 member_size	struct gfinit_bus.ready	1
-offset	struct gfinit_bus.window	8
+offset	struct gfinit_bus.window	12
 member_size	struct gfinit_bus.window	32
 size	struct gfinit_c_check_result	8
 align	struct gfinit_c_check_result	4
@@ -1928,6 +2056,18 @@ offset	struct gfinit_request.steps	36
 member_size	struct gfinit_request.steps	4
 offset	struct gfinit_request.version	0
 member_size	struct gfinit_request.version	4
+size	struct gfx_kernel_fb	32
+align	struct gfx_kernel_fb	4
+offset	struct gfx_kernel_fb.format	12
+member_size	struct gfx_kernel_fb.format	4
+offset	struct gfx_kernel_fb.height	4
+member_size	struct gfx_kernel_fb.height	4
+offset	struct gfx_kernel_fb.pitch	8
+member_size	struct gfx_kernel_fb.pitch	4
+offset	struct gfx_kernel_fb.planes	16
+member_size	struct gfx_kernel_fb.planes	16
+offset	struct gfx_kernel_fb.width	0
+member_size	struct gfx_kernel_fb.width	4
 size	struct hwdev_core_api	120
 align	struct hwdev_core_api	4
 offset	struct hwdev_core_api.abi	0
@@ -2170,6 +2310,154 @@ offset	struct ledger_surface.role	39
 member_size	struct ledger_surface.role	1
 offset	struct ledger_surface.width	30
 member_size	struct ledger_surface.width	2
+size	struct module_component_policy	52
+align	struct module_component_policy	4
+offset	struct module_component_policy.allowed_flags	12
+member_size	struct module_component_policy.allowed_flags	4
+offset	struct module_component_policy.export_max	44
+member_size	struct module_component_policy.export_max	4
+offset	struct module_component_policy.image_max	28
+member_size	struct module_component_policy.image_max	4
+offset	struct module_component_policy.import_max	40
+member_size	struct module_component_policy.import_max	4
+offset	struct module_component_policy.load_span_max	48
+member_size	struct module_component_policy.load_span_max	4
+offset	struct module_component_policy.mem_max	32
+member_size	struct module_component_policy.mem_max	4
+offset	struct module_component_policy.module_id	0
+member_size	struct module_component_policy.module_id	4
+offset	struct module_component_policy.ops_slots	24
+member_size	struct module_component_policy.ops_slots	4
+offset	struct module_component_policy.ops_version	20
+member_size	struct module_component_policy.ops_version	4
+offset	struct module_component_policy.phase	4
+member_size	struct module_component_policy.phase	4
+offset	struct module_component_policy.reloc_max	36
+member_size	struct module_component_policy.reloc_max	4
+offset	struct module_component_policy.required_flags	8
+member_size	struct module_component_policy.required_flags	4
+offset	struct module_component_policy.stop_allowed	16
+member_size	struct module_component_policy.stop_allowed	4
+size	struct module_handle	8
+align	struct module_handle	4
+offset	struct module_handle.generation	4
+member_size	struct module_handle.generation	4
+offset	struct module_handle.slot	0
+member_size	struct module_handle.slot	4
+size	struct module_image_plan	148
+align	struct module_image_plan	4
+offset	struct module_image_plan.load_span	144
+member_size	struct module_image_plan.load_span	4
+offset	struct module_image_plan.word	0
+member_size	struct module_image_plan.word	144
+size	struct module_image_policy	40
+align	struct module_image_policy	4
+offset	struct module_image_policy.exports	32
+member_size	struct module_image_policy.exports	4
+offset	struct module_image_policy.img_valid	20
+member_size	struct module_image_policy.img_valid	4
+offset	struct module_image_policy.import_count	24
+member_size	struct module_image_policy.import_count	4
+offset	struct module_image_policy.imports	28
+member_size	struct module_image_policy.imports	4
+offset	struct module_image_policy.kapi_abi_gen	0
+member_size	struct module_image_policy.kapi_abi_gen	4
+offset	struct module_image_policy.layout_gen	4
+member_size	struct module_image_policy.layout_gen	4
+offset	struct module_image_policy.module_abi_gen	8
+member_size	struct module_image_policy.module_abi_gen	4
+offset	struct module_image_policy.module_id	36
+member_size	struct module_image_policy.module_id	4
+offset	struct module_image_policy.ops_version	16
+member_size	struct module_image_policy.ops_version	4
+offset	struct module_image_policy.pair_image_crc	12
+member_size	struct module_image_policy.pair_image_crc	4
+size	struct module_lifecycle	16
+align	struct module_lifecycle	4
+offset	struct module_lifecycle.detach	8
+member_size	struct module_lifecycle.detach	4
+offset	struct module_lifecycle.quiesce	4
+member_size	struct module_lifecycle.quiesce	4
+offset	struct module_lifecycle.start	0
+member_size	struct module_lifecycle.start	4
+offset	struct module_lifecycle.stop_dma	12
+member_size	struct module_lifecycle.stop_dma	4
+size	struct module_record	252
+align	struct module_record	4
+offset	struct module_record.active_refs	228
+member_size	struct module_record.active_refs	4
+offset	struct module_record.backing	20
+member_size	struct module_record.backing	4
+offset	struct module_record.base	32
+member_size	struct module_record.base	4
+offset	struct module_record.callback_refs	220
+member_size	struct module_record.callback_refs	4
+offset	struct module_record.dependencies	144
+member_size	struct module_record.dependencies	64
+offset	struct module_record.dependency_count	208
+member_size	struct module_record.dependency_count	4
+offset	struct module_record.dma_refs	224
+member_size	struct module_record.dma_refs	4
+offset	struct module_record.exports	60
+member_size	struct module_record.exports	84
+offset	struct module_record.generation	4
+member_size	struct module_record.generation	4
+offset	struct module_record.image_crc	56
+member_size	struct module_record.image_crc	4
+offset	struct module_record.init	44
+member_size	struct module_record.init	4
+offset	struct module_record.irq_refs	212
+member_size	struct module_record.irq_refs	4
+offset	struct module_record.lifecycle	236
+member_size	struct module_record.lifecycle	16
+offset	struct module_record.module_id	12
+member_size	struct module_record.module_id	4
+offset	struct module_record.owner	0
+member_size	struct module_record.owner	4
+offset	struct module_record.pages	24
+member_size	struct module_record.pages	4
+offset	struct module_record.pair_crc	16
+member_size	struct module_record.pair_crc	4
+offset	struct module_record.prefix_pages	28
+member_size	struct module_record.prefix_pages	4
+offset	struct module_record.registration_refs	232
+member_size	struct module_record.registration_refs	4
+offset	struct module_record.ro	48
+member_size	struct module_record.ro	4
+offset	struct module_record.ro_size	52
+member_size	struct module_record.ro_size	4
+offset	struct module_record.state	8
+member_size	struct module_record.state	4
+offset	struct module_record.text	36
+member_size	struct module_record.text	4
+offset	struct module_record.text_size	40
+member_size	struct module_record.text_size	4
+offset	struct module_record.tick_refs	216
+member_size	struct module_record.tick_refs	4
+size	struct module_request	76
+align	struct module_request	4
+offset	struct module_request.dependencies	52
+member_size	struct module_request.dependencies	4
+offset	struct module_request.dependency_count	56
+member_size	struct module_request.dependency_count	4
+offset	struct module_request.imports	48
+member_size	struct module_request.imports	4
+offset	struct module_request.lifecycle	60
+member_size	struct module_request.lifecycle	16
+offset	struct module_request.name	4
+member_size	struct module_request.name	4
+offset	struct module_request.path	0
+member_size	struct module_request.path	4
+offset	struct module_request.policy	8
+member_size	struct module_request.policy	40
+size	struct module_symbol_contract	8
+align	struct module_symbol_contract	4
+offset	struct module_symbol_contract.kind	6
+member_size	struct module_symbol_contract.kind	2
+offset	struct module_symbol_contract.name_hash	0
+member_size	struct module_symbol_contract.name_hash	4
+offset	struct module_symbol_contract.version	4
+member_size	struct module_symbol_contract.version	2
 size	struct pci_dev	40
 align	struct pci_dev	4
 offset	struct pci_dev.bar	12
@@ -2500,7 +2788,7 @@ offset	struct recover_opcode_layout.opcode	0
 member_size	struct recover_opcode_layout.opcode	4
 offset	struct recover_opcode_layout.substep	4
 member_size	struct recover_opcode_layout.substep	4
-size	struct recover_ops	68
+size	struct recover_ops	72
 align	struct recover_ops	4
 offset	struct recover_ops.abort_requested	40
 member_size	struct recover_ops.abort_requested	4
@@ -2518,6 +2806,8 @@ offset	struct recover_ops.mode_vram	52
 member_size	struct recover_ops.mode_vram	4
 offset	struct recover_ops.mode_wait	60
 member_size	struct recover_ops.mode_wait	4
+offset	struct recover_ops.pre_cleanup	68
+member_size	struct recover_ops.pre_cleanup	4
 offset	struct recover_ops.raw_config	12
 member_size	struct recover_ops.raw_config	4
 offset	struct recover_ops.read	16
@@ -3081,6 +3371,74 @@ enum	GF_MODE_CR_VT	6
 enum	GF_VERIFY_CR	1
 enum	GF_VERIFY_MMIO	0
 enum	GF_VERIFY_SR	2
+enum	MI_ABI	6
+enum	MI_BSS_OFF	19
+enum	MI_BSS_SIZE	20
+enum	MI_DATA_OFF	17
+enum	MI_DATA_SIZE	18
+enum	MI_EXPORT_COUNT	26
+enum	MI_EXPORT_OFF	25
+enum	MI_FLAGS	9
+enum	MI_FORMAT	1
+enum	MI_HEADER_SIZE	2
+enum	MI_ID	7
+enum	MI_IMAGE_CRC	32
+enum	MI_IMAGE_SIZE	3
+enum	MI_IMPORT_COUNT	24
+enum	MI_IMPORT_OFF	23
+enum	MI_INIT	29
+enum	MI_KAPI	4
+enum	MI_LAYOUT	5
+enum	MI_MAGIC	0
+enum	MI_MEM_SIZE	10
+enum	MI_NAMES_OFF	27
+enum	MI_NAMES_SIZE	28
+enum	MI_OPS_VERSION	33
+enum	MI_PAIR_CRC	31
+enum	MI_PAYLOAD_OFF	11
+enum	MI_PAYLOAD_SIZE	12
+enum	MI_PHASE	8
+enum	MI_RELOC_COUNT	22
+enum	MI_RELOC_OFF	21
+enum	MI_RESERVED0	34
+enum	MI_RESERVED1	35
+enum	MI_RO_OFF	15
+enum	MI_RO_SIZE	16
+enum	MI_STOP	30
+enum	MI_TEXT_OFF	13
+enum	MI_TEXT_SIZE	14
+enum	MI_WORDS	36
+enum	MODULE_ABI_MISMATCH	6
+enum	MODULE_ABSENT	0
+enum	MODULE_BAD_CRC	9
+enum	MODULE_BAD_DEPENDENCY	14
+enum	MODULE_BAD_HEADER	3
+enum	MODULE_BUSY	15
+enum	MODULE_HEADER_CHECKED	1
+enum	MODULE_IMAGE_OK	0
+enum	MODULE_IMPORT_INVALID	12
+enum	MODULE_INIT_FAILED	10
+enum	MODULE_ISOLATED	16
+enum	MODULE_NOT_FOUND	2
+enum	MODULE_NO_IMAGE_CRC	5
+enum	MODULE_NO_PAGES	7
+enum	MODULE_OWNED_IMAGE	2
+enum	MODULE_PAIR_MISMATCH	4
+enum	MODULE_QUARANTINED	8
+enum	MODULE_RECORD_FULL	13
+enum	MODULE_REF_ACTIVE	4
+enum	MODULE_REF_CALLBACK	2
+enum	MODULE_REF_DMA	3
+enum	MODULE_REF_IRQ	0
+enum	MODULE_REF_REGISTRATION	5
+enum	MODULE_REF_TICK	1
+enum	MODULE_RELOCATED	4
+enum	MODULE_RELOC_INVALID	11
+enum	MODULE_ROLLING_BACK	7
+enum	MODULE_RUNNING	6
+enum	MODULE_SHORT_READ	8
+enum	MODULE_STARTING	5
+enum	MODULE_VALIDATED	3
 enum	REC_ABORT	1
 enum	REC_AFTER	2
 enum	REC_ARG_READ	1

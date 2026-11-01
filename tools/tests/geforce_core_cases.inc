@@ -22,8 +22,10 @@ int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : 
 static int acquire_gf(struct gf_display_context *c) { (void)c; acquires++; return INIT_FAIL ? -1 : 0; }
 static void release_gf(struct gf_display_context *c) { (void)c; releases++; }
 static int validate_gf(struct gf_display_context *c) { (void)c; validates++; return 0; }
+static int foundation_gf(struct gf_display_context *c) { (void)c;return 0; }
 static const struct gf_display_owner owner_gf={
-    .acquire=acquire_gf, .release=release_gf, .validate=validate_gf
+    .acquire=acquire_gf, .release=release_gf, .validate=validate_gf,
+    .foundation_start=foundation_gf,.foundation_stop=foundation_gf
 };
 static struct gf_display_context display_gf={.owner=&owner_gf,.reusable=true,
     .bars={[GF_MODE_VRAM_BAR]={.base=GF_TEST_DISPLAY,.length=GF_MODE_VRAM_BYTES}}};
@@ -39,9 +41,13 @@ int gf_display_blank(struct gf_display_context *c,int v) { c->blank=v;return 0; 
 int gf_display_stop(void *v) { struct gf_display_context *c=v;stops++;c->active=false;return 0; }
 static struct video_device device_gf={&display_gf,&gf_video_ops};
 #include "../../hwdev/gf/production.h"
-int gf_production_selected(void) { return 1; }
+static int host_gf_selected=1, host_gf_requested=1;
+static u32 host_gf_probes;
+int gf_production_selected(void) { return host_gf_selected; }
+int gf_foundation_requested(void) { return host_gf_requested; }
 int gf_production_identify(struct gf_production_resources *r)
 {
+    host_gf_probes++;
     *r=(struct gf_production_resources){0};
     r->identity.device=RECOVER_GF_DEVICE;
     r->bars[0]=(struct recover_bar_extent){GF_TEST_BAR0,GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES,1};
@@ -54,6 +60,18 @@ int geforce_wc_stop(void) { return 0; }
 void geforce_wc_report(const char *s) { (void)s; }
 #include "../../drivers/video/geforce/geforce_platform.c"
 #include "geforce_reserve.inc"
+static void __attribute__((unused)) foundation_selection_test(void)
+{
+    u32 probes=host_gf_probes;
+    host_gf_requested=0;
+    CHECK(!geforce_platform_get() && !reserve() && host_gf_probes==probes);
+    host_gf_requested=1;host_gf_selected=0;
+    CHECK(geforce_platform_get() && geforce_boot_reserve());
+    CHECK(host_gf_probes==probes+1);
+    CHECK(!ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_CLIENT));
+    CHECK(!ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_DISPLAY));
+    host_gf_selected=1;
+}
 static int geforce_gui(void) { return host_gui; }
 static i32 wm_notice(u32 op,u32 arg,int owner)
 {

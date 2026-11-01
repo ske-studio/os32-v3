@@ -13,6 +13,9 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 MUTATIONS = [
+    ("baseline_foundation_pmc", "owner->foundation.expected_pmc = stage.values[GF_STAGE_PMC];", "owner->foundation.expected_pmc = ~stage.values[GF_STAGE_PMC];"),
+    ("foundation_stop", "int rc = gf_foundation_call(GF1T_STOP);", "int rc = 0;"),
+    ("foundation_retain", "if (g->foundation_active && gf_pre_cleanup(&g->bus)) return -1;", "if (false) return -1;"),
     ('cli_mode_c', 'q.flags |= GF_MODE_C;', 'q.flags |= 0;', 'userland/shell/cmd_gfinit.c'),
     ('modeset_flag', 'op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C)', 'op == GF_OP_MODESET'),
     ('modeset_order', 'owner->next_main == GF_INIT_MAINS && r->state == REC_PAUSED', 'true'),

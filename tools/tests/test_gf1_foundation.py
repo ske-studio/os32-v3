@@ -54,6 +54,14 @@ def main():
         if '--mutate' in sys.argv:
             original = SOURCE.read_text()
             mutants = [
+                ('unsigned flags = irq_save();\n    f->revoked = true;',
+                 'unsigned flags = 0;\n    f->revoked = true;', 'revoke CLI omitted'),
+                ('if (!rc && !f->revoked) rc = mask_sources(f);',
+                 'if (!rc) rc = mask_sources(f);', 'revoked MMIO guard omitted'),
+                ('int unmap_rc = f->mapped ? gf_instmem_unmap(f) : GF1_OK;',
+                 'int unmap_rc = GF1_OK;', 'revoked BAR2 unmap omitted'),
+                ('if (f->revoked) return f->last_rc = GF1_EPCI;',
+                 '/* revoked restart permitted */', 'revoked restart permitted'),
                 ('f->revoked = true;', '/* revoke omitted */', 'revoke sticky state omitted'),
                 ('f->running = false; /* revoke publication */', '/* still running */', 'revoke running retained'),
                 ('f->expected_pmc = stopped_pmc;', '/* expected PMC retained */',
@@ -64,8 +72,8 @@ def main():
                  'stopped PMC read failure ignored'),
                 ('int rc = gf_master_enable(f);', 'int rc = 0;', 'restart BM enable removed'),
                 ('rc = gf_engine_stop(f);', 'rc = gf_master_disable(f);', 'BM clear before engine stop'),
-                ('rc = geforce_tick_bind(0, 0) ? GF1_EIRQ : mask_sources(f);',
-                 'rc = mask_sources(f);', 'tick reference retained'),
+                ('rc = geforce_tick_bind(0, 0) ? GF1_EIRQ : GF1_OK;',
+                 'rc = GF1_OK;', 'tick reference retained'),
                 ('f->running = false;\n    rc =', '/* running retained */\n    rc =', 'running retained at stop'),
                 ('f->running = true;', '/* running not published */', 'running missing at enable'),
                 ('unsigned flags = irq_save();\n        f->running = true;',

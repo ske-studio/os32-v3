@@ -1,3 +1,4 @@
+int gf_foundation_requested(void) { return 0; }
 /* Real splash + gfx dispatch + PC98 lifecycle; only hardware edges stubbed. */
 #define _GNU_SOURCE
 #include "serial_diag_host.h"

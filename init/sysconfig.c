@@ -15,12 +15,18 @@
 #include "gf_production.h"
 
 static int gf_selected;
+static int gf_requested;
 static int gf_configured;
 void gf_production_configure(const char *gfx, int gui)
 {
     if (gf_configured) return;
     gf_configured = 1;
-    gf_selected = gfx && !kstrcmp(gfx, "geforce") && gui != 1;
+    gf_requested = gfx && !kstrcmp(gfx, "geforce");
+    gf_selected = gf_requested && gui != 1;
+}
+int gf_foundation_requested(void)
+{
+    return gf_requested;
 }
 int gf_production_selected(void)
 {

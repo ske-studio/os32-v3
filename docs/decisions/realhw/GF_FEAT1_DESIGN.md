@@ -430,3 +430,13 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c:212-219) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
 - P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc:91 と hwdev/gf/engine_stop.c:6-8 に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
 - P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
+
+## CW の実装で設計者が決めたこと
+- prepare(f, bars, n) は既存シグネチャを保ち、診断 owner が f->io.opaque に永続 lease bus を、bus.foundation に f を先に設定する；module は opaque を保持して常設 BAR0 adapter を貸し、正常 stop と参照解除まで両者を存続させる。
+- cleanup/S0 前 stop は recover_ops 末尾の任意 pre_cleanup hook とし、復元予算の検査より先に必ず呼ぶ；失敗なら旧装置への局所復元を止め、既存 S0 の 98 route 復帰と失敗記録を行う。
+- 失効 stop は running=false の公開後、tick 解除の失敗時も CPU 側の B5 unmap を試す；戻り値は EIRQ、EMAP、EPCI の順で優先し、未完了の解除を再試行できる所有状態を残す。
+- module の出力 slot は登録成功後に getter から公開し、abort/detach の前に消す；診断 owner も登録済み module の常駐期間に含め、既存の登録参照による detach 拒否を使う。
+- HEADS の割込み要求変更は既存 gf_irq_enable の契約どおり短い irq_save/restore 内で行う；INST_PAGE は 1 頁の offset ごとの固定32bit patternを書き、readback済みbyte数と最初の不一致を返して解放する。
+- 診断 getter は kernel export 宣言と HWDEV import の末尾へ追加し、共有型の入力台帳・契約CRCを生成し直す；geforce.mod の import は既存31本を維持し、公開 KAPI は変更しない。
+- 診断の CHECK_OUT は route01 と表示内容の照合を含む既存承認済み plan なのでその順を保ち、診断節の「CHECK 後 start」を全 CHECK_OUT 成功後へ結ぶ；本番表示は本文どおり CHECK→start→初回表示/route01 とする。
+- 診断と本番の排他を保ったまま層1を診断へ貸すため、既存 GFX=geforce・GUI=1 でも起動時の資源照合・常設map/PT予約とmodule登録だけを行う；診断用 Context の platform は NULL とし本番 owner/表示を結ばず、診断側で GeForce が無い場合と GFX 非指定の起動では module を読まない。

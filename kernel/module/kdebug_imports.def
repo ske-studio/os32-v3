@@ -2505,6 +2505,15 @@
       "context_safe": false,
       "index": 308,
       "retained": true
+    },
+    {
+      "index": 309,
+      "symbol": "geforce_foundation_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

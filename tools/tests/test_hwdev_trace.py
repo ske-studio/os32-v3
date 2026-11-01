@@ -34,7 +34,7 @@ def run(folder, image=None, mode_c=False):
     header = '#define TRACE_IMPORT_SLOTS %dU\n' % elf.symbol('hwdev_import_slots')['value']
     if mode_c:
         owner_source = (ROOT/'kdebug/gfinit.c').read_text()
-        header += '#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n'
+        header += '#include "hwdev/gf/foundation.h"\n#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n'
         header += re.search(r'struct gfinit_owner \{.*?\n\};', owner_source, re.S)[0] + '\n'
         # The decoder's local control() has the same name as the owner's BSS.
         symbols = {line.split()[-1]: int(line.split()[0],16) for line in
@@ -91,6 +91,7 @@ def run(folder, image=None, mode_c=False):
                      'pgalloc_alloc_phys', 'pgalloc_free_n_owner', 'serial_get_setup')} if mode_c else {}
     if mode_c:
         replacements['recover_hal_wait_frame'] = 'exec_delay'
+        replacements['geforce_foundation_ops'] = 'sequence_foundation_ops'
     replacements['gf_production_selected'] = 'trace_production_selected'
     source += '    const unsigned imports[] = {\n' + ''.join(
         '        (unsigned)' + replacements.get(e['name'],

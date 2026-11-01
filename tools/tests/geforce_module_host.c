@@ -3,6 +3,7 @@
 #undef _start
 #include "../../drivers/video/geforce/geforce_module.c"
 #include "../../drivers/video/geforce/geforce_body.c"
+struct gf1_test_ops gf1_module_ops;
 static struct geforce_platform fixture_platform;
 struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
 void geforce_backend_wc_bind(int (*start)(void)) { (void)start; }
@@ -20,7 +21,10 @@ void gf_production_set_return(int (*callback)(void *),void *opaque)
 { (void)callback;(void)opaque;CHECK(registered);return_registered++; }
 GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
-static u32 probes, enables;
+static u32 probes, enables, unbinds;
+static int unbind_fail;
+int geforce_tick_bind(void (*poll)(void *),void *arg)
+{ CHECK(!poll && !arg);unbinds++;return unbind_fail; }
 static int probe(void) { probes++; return 1; }
 static void enable(void) { enables++; }
 static int query(GFX_ScreenInfo *s) { (void)s; return 0; }
@@ -38,6 +42,21 @@ void _start(void)
     kmemcpy(&imports[0].name_hash,file+152,4);
     kmemcpy(&exports[4].name_hash,file+164,4); exports[4].version=1;
     context.platform=&fixture_platform;
+    fixture_platform.opaque=&production;
+    production.foundation.registered=true;
+    CHECK(!geforce_detach(0) && !unbinds);
+    production.foundation.registered=false;
+    production.foundation.bm=true;CHECK(!geforce_detach(0) && !unbinds);
+    production.foundation.bm=false;
+    production.foundation.mapped=true;CHECK(!geforce_detach(0) && !unbinds);
+    production.foundation.mapped=false;
+    production.foundation.running=true;CHECK(!geforce_detach(0) && !unbinds);
+    production.foundation.running=false;
+    struct gf_inst instance={0};production.foundation.imem.used=&instance;
+    CHECK(!geforce_detach(0) && !unbinds);production.foundation.imem.used=0;
+    unbind_fail=1;
+    CHECK(!geforce_detach(0) && unbinds==1);
+    unbind_fail=0;CHECK(geforce_detach(0) && unbinds==2);
     struct module_request q=request();
     q.lifecycle=(struct module_lifecycle){.start=geforce_start,.detach=geforce_detach};
     CHECK(!gfx_backend_geforce.probe());
@@ -54,6 +73,7 @@ void _start(void)
         CHECK(!gfx_backend_geforce.probe()); empty(); finish(0);
     }
     CHECK(!rc && registered && r->registration_refs==1 && return_registered==1);
+    CHECK(geforce_foundation_ops()==&gf1_module_ops && !accel_slot);
     gfx_backend_geforce=candidate;
     CHECK(geforce_context->backend==&gfx_backend_geforce);
     CHECK(gfx_backend_geforce.prepare && !gfx_backend_geforce.fill_rect && !gfx_backend_geforce.blit);
@@ -61,5 +81,6 @@ void _start(void)
     CHECK(probes==1 && enables==1);
     u32 before=returned;
     CHECK(geforce_module_abort()==MODULE_ISOLATED && returned==before && registered);
+    CHECK(!geforce_foundation_ops());
     finish(0);
 }

@@ -1,5 +1,7 @@
 /* Diagnostic owner: bound stage approvals and the recorded common runner. */
 #include "gfinit.h"
+#include "../hwdev/gf/gf1_test.h"
+#include "drivers/video/geforce/geforce_module.h"
 #include "gf_production.h"
 #include "hwdev/owner.h"
 #include "gfinit_bus.h"
@@ -45,6 +47,8 @@ STATIC_ASSERT((PAGE_ALIGN_UP(GF_ROM_MAX) +
               gf_work_page_contract);
 struct gfinit_owner {
     struct gfinit_bus bus;
+    struct gf_foundation foundation;
+    bool foundation_prepared, foundation_active;
     struct recover_ops ops;
     struct recover_profile profile;
     const struct recover_profile *s0;
@@ -111,6 +115,51 @@ static int gf_write(void *opaque, const struct recover_bus_access *a, u32 value)
     if (!gf_owned(recover_owner())) return -1;
     return gfinit_bus_write(opaque, a, value);
 }
+static int gf_foundation_call(u32 op)
+{
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf1_test_request q = {sizeof(q), op, 0};
+    struct gf1_test_reply reply;
+    if (!owner || !owner->foundation_prepared || !ops || !ops->call) return -1;
+    return ops->call(&owner->foundation, &q, &reply);
+}
+static int gf_pre_cleanup(void *opaque)
+{
+    (void)opaque;
+    if (!owner || !owner->foundation_active) return 0;
+    struct recover_identity id;
+    u32 command, bars[RECOVER_BAR_COUNT];
+    if (gfinit_bus_identity(&owner->bus, &id) ||
+        gfinit_bus_raw_config(&owner->bus, &command, bars))
+        gfinit_bus_revoke(&owner->bus);
+    else for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
+        if (bars[i] != owner->bus.bars[i]) gfinit_bus_revoke(&owner->bus);
+    int rc = gf_foundation_call(GF1T_STOP);
+    if (!rc) owner->foundation_active = false;
+    return rc;
+}
+static int gf_capture(struct recover *r, void *arg)
+{
+    int rc = gf_stage_capture(r, arg);
+    if (!rc && owner && stage.initialized)
+        owner->foundation.expected_pmc = stage.values[GF_STAGE_PMC];
+    return rc;
+}
+static int gf_prepare(struct recover *r, void *arg)
+{
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gfinit_owner *g = owner;
+    if (!g || !ops || !ops->prepare || !ops->call) return -1;
+    g->foundation.io.opaque = &g->bus;
+    g->bus.foundation = &g->foundation;
+    if (ops->prepare(&g->foundation, r->bars, RECOVER_BAR_COUNT)) return -1;
+    g->foundation_prepared = true;
+    stage.foundation = &g->foundation;
+    /* A failed MASTER readback may already have enabled bus mastering. */
+    g->foundation_active = true;
+    if (gf_foundation_call(GF1T_MASTER)) return -1;
+    return gfinit_exec_prepare(r, arg);
+}
 static int gf_local(void *opaque)
 {
     int rc = owner ? gfinit_exec_restore(owner->execution) : 0;
@@ -143,6 +192,7 @@ static const struct gfinit_exec_ops gf_clock_ops = {gf_clock, recover_hal_wait_f
 static int gf_release_rom(struct gfinit_owner *g)
 {
     struct recover *r = recover_owner();
+    if (g->foundation_active && gf_pre_cleanup(&g->bus)) return -1;
     /* Detach even a partially bound plan before returning its backing pages.
      * INSPECT has not installed callbacks and therefore needs no detachment. */
     if ((r->ops == &g->ops || r->profile == &g->profile ||
@@ -160,6 +210,8 @@ static int gf_release_rom(struct gfinit_owner *g)
     g->last_op = RECOVER_NONE;
     g->prepare_flags = 0;
     g->rom = 0; g->inspected = false;
+    g->foundation_prepared = false;
+    g->bus.foundation = 0;
     gf_lease.active = false;
     return 0;
 }
@@ -198,6 +250,7 @@ static int gf_inspect(struct recover *r, const struct recover_ops *base,
     g->ops.read = gf_read; g->ops.write = gf_write;
     g->ops.mode_vram = gf_mode_vram; g->ops.mode_color = gf_mode_color;
     g->ops.mode_wait = recover_hal_wait_frame;
+    g->ops.pre_cleanup = gf_pre_cleanup;
     g->ops.local_cleanup = gf_local; g->ops.screen_safe = gf_screen_safe;
     g->s0 = s0;
     r->transport = transport;
@@ -286,7 +339,9 @@ static int gf_modeset(struct recover *r, void *arg)
             rc = recover_plan_access(r, &value);
         if (rc || recover_plan_leave(r, edge)) return -1;
     }
-    return 0;
+    if (!owner || !owner->foundation_prepared || owner->foundation.revoked) return -1;
+    owner->foundation_active = true;
+    return gf_foundation_call(GF1T_START);
 }
 static int gf_begin(struct recover *r, struct gfinit_owner *g,
                     struct recover_transport *transport, bool size, u32 flags,
@@ -337,7 +392,7 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     gf_lease.session = r->token.session;
     struct gfinit_exec e={.rom=g->rom,.rom_size=g->rom_size,.ops=&gf_clock_ops,.opaque=r};
     g->execution=size?0:&e;
-    int rc=trial_step(r,&r->token,true,size?gf_fixed:gfinit_exec_prepare,size?(void *)g:(void *)&e);
+    int rc=trial_step(r,&r->token,true,size?gf_fixed:gf_prepare,size?(void *)g:(void *)&e);
     g->execution=0;
     if(rc)return -1;
     if (size) return trial_end(r, &r->token, REC_NORMAL);
@@ -445,7 +500,7 @@ int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
         if (!rc) owner->next_main++;
 #if !GF_VPLL_PROBE
         if (!rc && owner->next_main == GF_INIT_MAINS)
-            rc = trial_step(r,&r->token,true,gf_stage_capture,&stage);
+            rc = trial_step(r,&r->token,true,gf_capture,&stage);
 #endif
     } else if (owner && op == GF_OP_MODESET && (owner->prepare_flags & GF_MODE_C) &&
                owner->next_main == GF_INIT_MAINS && r->state == REC_PAUSED) {

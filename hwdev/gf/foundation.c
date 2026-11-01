@@ -63,8 +63,14 @@ int gf_foundation_stop(struct gf_foundation *f)
     unsigned flags = irq_save();
     int rc;
     f->running = false;
-    rc = geforce_tick_bind(0, 0) ? GF1_EIRQ : mask_sources(f);
+    rc = geforce_tick_bind(0, 0) ? GF1_EIRQ : GF1_OK;
+    if (!rc && !f->revoked) rc = mask_sources(f);
     irq_restore(flags);
+    if (f->revoked) {
+        /* Only CPU access is revoked here; hardware ownership is retained. */
+        int unmap_rc = f->mapped ? gf_instmem_unmap(f) : GF1_OK;
+        return f->last_rc = rc ? rc : unmap_rc ? unmap_rc : GF1_EPCI;
+    }
     if (rc) return f->last_rc = rc;
     rc = gf_engine_stop(f);
     if (rc) return f->last_rc = rc;
@@ -92,6 +98,7 @@ int gf_foundation_stop(struct gf_foundation *f)
  * an intervening MMIO operation. MC must see all IRQ sources closed. */
 int gf_foundation_start(struct gf_foundation *f)
 {
+    if (f->revoked) return f->last_rc = GF1_EPCI;
     int rc = gf_master_enable(f);
     if (!rc) rc = mask_sources(f);
     if (!rc) rc = gf_mc_init(f);
