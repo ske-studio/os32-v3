@@ -314,3 +314,6 @@ B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾
 ### B1 の再開で PM が決めたこと (2026-11-02)
 - 4 の倍数でない大きさの確保: 大きさを 4 バイトに切り上げて確保し、zero もその大きさで 32bit 単位に書く (instmem へのアクセスは手本の nvkm_wo32/ro32 と同じく 32bit だけ。範囲の外には書かない)。size 0 は従来どおり拒否。
 - 直接 MMIO の失敗: bar2 への volatile の読み書きには失敗の戻り値が無いので、読み書きの関数は失敗を返さない (EIO は map の失敗 = B5 の GF1_EMAP から来るものだけ)。§4 の「MMIO 失敗を EIO」は map されていない (mapped=false) ときの呼び出しを指すと読む — そのときは GF1_EMAP を返す。
+
+### C0 で PM が決めたこと (2026-11-02)
+- 停止の後の expected_pmc: foundation_stop は engine 停止 (B3 の reset パルス) が成功したら、PMC (200h) を gf_io で 1 回読み、その値を expected_pmc にする。MC の PMC の書き込みより前に失敗した場合も同じ (結果は「停止前の PMC | 0x1102」になり得る。§3:112 の「正常停止後 ffffffff」は MC が成功した場合の値としてそのまま成り立つ)。読み取りが失敗したら expected_pmc は変えず、停止の失敗として返す。手本は PMC の期待値を持たないので、OS32 の段の検査 (gf_stage_state.c:70) のための差分。B3・B4 は変えない。
