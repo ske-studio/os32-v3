@@ -256,3 +256,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 ## 確定 (2026-11-01)
 - r3 を確定版とする。Opus の第 2 回 (条件付き) の N1〜N4 は r3 で反映、PM が本文で確認 (dynamic_ok・2 行未満の拒否・テーブルの行位置の基準・±10%)。N5・N6 は §7 の段の依頼の注記。
 - ユーザーの決定・指示は USER_DECISIONS の 6 件 (並行で進める・24.8kHz の吸収・24kHz の実機は立会いのついで・120µs はマジックナンバー・ディザで 256 色並み・プレビューは PNG で足りる)。未決 2 (配布) は PM 決定 (NORMAL だけ、無い・壊れていれば内蔵のロゴ)。
+- ユーザーの決定・指示は USER_DECISIONS の 6 件 (並行で進める・24.8kHz の吸収・24kHz の実機は立会いのついで・120µs はマジックナンバー・ディザで 256 色並み・プレビューは PNG で足りる)。未決 2 (配布) は PM 決定 (NORMAL だけ、無い・壊れていれば内蔵のロゴ)。
+
+## HW3 のメーカー資料の照合 (PM、2026-11-01)
+- NEC PC-9800 Technical Databook Hardware (1993) を取得 (~/os32-tmp/refs/pc98-databook/、読むだけ)。p.351 のノーマルモードの 24.83KHz の表 (H=40.28µs、HDISP 30.4・HFP 3.04・HS 3.04・HBP 3.8µs、V=17.72ms=440H/56.4Hz、VDISP 400H・VFP 7H・VS 8H・VBP 25H) は本設計の 24k の値 (pegc.h の SYNC から) と一致。p.160 で 9821 の 24.8/31.5KHz の切り替え (GRPH+1/GRPH+2、本体に記憶) を確認。**31.5KHz の表は無い** — SYNC の値からの導出と段 0 の実測で決める (§2 のとおり)。詳細は ~/os32-tmp/refs/pc98-databook/NOTES.md。
