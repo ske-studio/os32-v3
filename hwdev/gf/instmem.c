@@ -2,7 +2,11 @@
 
 /* nv40_instmem_oneinit, nvkm/subdev/instmem/nv40.c:158-206. */
 enum { VRAM_SIZE_REG = 0x10020c, VS_REG = 0x1540, PAGE_BYTES = 4096,
-       DISPLAY_BYTES = 307200, FIXED_END = 0x40000 };
+       DISPLAY_BYTES = 307200, FIXED_END = 0x40000,
+       VS_CONTEXT_BYTES = 0x4980, BASE_CONTEXT_BYTES = 0x4000,
+       CONTEXT_COUNT = 32, RESERVE_BASE_BYTES = 0x100000,
+       VBIOS_BYTES = 0x10000, RAMHT_BYTES = 0x8000,
+       RAMRO_BYTES = 0x8000, RAMFC_BYTES = 0x20000 };
 
 static int allocate(struct gf_foundation *f, u32 start, u32 bytes, u32 align,
                     bool zero, struct gf_inst *out)
@@ -84,15 +88,15 @@ int gf_instmem_init(struct gf_foundation *f)
     v &= 0xff000000U;
     mask = (mask >> 8) & 0xff;
     while (mask) { vs += mask & 1; mask >>= 1; }
-    r = ((0x4980U * vs + 0x4000U) * 32 + 0x100000U + PAGE_BYTES - 1) & ~(PAGE_BYTES - 1);
+    r = ((VS_CONTEXT_BYTES * vs + BASE_CONTEXT_BYTES) * CONTEXT_COUNT + RESERVE_BASE_BYTES + PAGE_BYTES - 1) & ~(PAGE_BYTES - 1);
     if (v < r + DISPLAY_BYTES) return GF1_ENOSPC;
     f->imem.vram_bytes = v; f->imem.reserved = r;
     rc = gf_instmem_map(f, &f->instmem_bar, r);
     if (rc) return rc;
     f->imem.used = 0;
-    rc = allocate(f, 0, 0x10000, 1, false, &f->imem.vbios);
-    if (!rc) rc = allocate(f, 0, 0x8000, 1, true, &f->imem.ramht);
-    if (!rc) rc = allocate(f, 0, 0x8000, 1, false, &f->imem.ramro);
-    if (!rc) rc = allocate(f, 0, 0x20000, 1, true, &f->imem.ramfc);
+    rc = allocate(f, 0, VBIOS_BYTES, 1, false, &f->imem.vbios);
+    if (!rc) rc = allocate(f, 0, RAMHT_BYTES, 1, true, &f->imem.ramht);
+    if (!rc) rc = allocate(f, 0, RAMRO_BYTES, 1, false, &f->imem.ramro);
+    if (!rc) rc = allocate(f, 0, RAMFC_BYTES, 1, true, &f->imem.ramfc);
     return rc;
 }
