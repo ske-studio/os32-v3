@@ -82,6 +82,11 @@ def run_loader(td, data, expected):
 def check():
     spec = importlib.util.spec_from_file_location('img2osri', os.environ.get('OSRI_CONVERTER_SOURCE', ROOT/'tools/img2osri.py'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    for option, value in (('--events', '101'), ('--per-line', '2')):
+        result = subprocess.run([sys.executable, str(ROOT/'tools/img2osri.py'), 'missing.png',
+                                 '-o', 'unused.osri', '--preview', 'unused.png', option, value],
+                                capture_output=True, text=True)
+        assert result.returncode != 0 and 'invalid event' in result.stderr
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         src = Image.new('RGB', (640, 400))
@@ -126,6 +131,53 @@ def check():
         no_mod = importlib.util.module_from_spec(no_spec); no_spec.loader.exec_module(no_mod)
         undithered, _ = no_mod.convert(middle)
         assert dithered[96:128096] != undithered[96:128096], 'error diffusion has no effect'
+        # Vertical and horizontal gradients plus colored blocks exercise band changes.
+        pattern = Image.new('RGB', (640, 400))
+        pattern.putdata([((y * 255 // 399), (x * 255 // 639),
+                          ((y // 20) * 41 + (x // 160) * 37) % 256)
+                         for y in range(400) for x in range(640)])
+        _, limited_events, _ = mod.palette_history(pattern, 'B', 3, 2, 4, 8)
+        assert len(limited_events) <= 3
+        dynamic, _ = mod.convert(pattern, 'B', 100, 1, 4, 8)
+        count = struct.unpack_from('<I', dynamic, 36)[0]
+        assert 0 < count <= 100
+        assert len(dynamic) == 128096 + count * 8
+        initial, expected_events, history = mod.palette_history(pattern, 'B', 100, 1, 4, 8)
+        events = [struct.unpack_from('<HBBHH', dynamic, 128096 + 8 * i) for i in range(count)]
+        assert [(y, i, color) for y, i, _, color, _ in events] == expected_events
+        current = list(initial)
+        previous = -2
+        for y, index, reserved, color, reserved2 in events:
+            assert y % 4 == 0 and y - previous >= 2 and not reserved and not reserved2
+            assert current[index] != color
+            current[index] = color
+            previous = y
+        output.write_bytes(dynamic)
+        mod.preview(output, pattern, td/'dynamic.png')
+        preview = Image.open(td/'dynamic.png').load()
+        pal = list(initial)
+        event_index = 0
+        dynamic_error = fixed_error = 0
+        fixed_data, _ = mod.convert(pattern)
+        fixed_pal = [mod.expand(c) for c in struct.unpack_from('<16H', fixed_data, 64)]
+        pattern_pixels = pattern.load()
+        for y in range(400):
+            while event_index < count and events[event_index][0] == y:
+                _, i, _, color, _ = events[event_index]
+                pal[i] = color
+                event_index += 1
+            assert pal == history[y]
+            for x in range(640):
+                off = 96 + y * 80 + x // 8
+                mask = 128 >> (x % 8)
+                index = sum(1 << p for p in range(4) if dynamic[off + p * 32000] & mask)
+                fixed_index = sum(1 << p for p in range(4) if fixed_data[off + p * 32000] & mask)
+                rgb = mod.expand(pal[index])
+                assert preview[x, y + 20] == rgb
+                original_rgb = pattern_pixels[x, y]
+                dynamic_error += sum((rgb[k] - original_rgb[k]) ** 2 for k in range(3))
+                fixed_error += sum((fixed_pal[fixed_index][k] - original_rgb[k]) ** 2 for k in range(3))
+        assert dynamic_error < fixed_error
         print('OSRI conversion and loader: GREEN')
 
 
@@ -139,6 +191,9 @@ def main():
             ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
             ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
             ('bit-order', 'tools/img2osri.py', 'planes[p * PLANE + offset] |= 0x80 >> (x & 7)', 'planes[p * PLANE + offset] |= 1 << (x & 7)', 'OSRI_CONVERTER_SOURCE'),
+            ('budget', 'tools/img2osri.py', 'if y and len(events) < events_limit and y - last_line >= 2:', 'if y and (events_limit := 200) and y - last_line >= 2:', 'OSRI_CONVERTER_SOURCE'),
+            ('same-color', 'tools/img2osri.py', 'events.append((y, index, color))', 'events.append((y, index, initial[index]))', 'OSRI_CONVERTER_SOURCE'),
+            ('band', 'tools/img2osri.py', 'range(0, H, band)', 'range(0, H, 1)', 'OSRI_CONVERTER_SOURCE'),
             ('diffusion', 'tools/img2osri.py', 'd = rgb[c] - palette[index][c]', 'd = 0', 'OSRI_CONVERTER_SOURCE'),
         ]
         with tempfile.TemporaryDirectory() as td:
