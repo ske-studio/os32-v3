@@ -11,7 +11,7 @@
 #include "palette.h"
 #include "pc98.h"
 #include "pegc.h"
-#include "paging.h"
+#include "v86_bios.h"
 #include "io.h"
 #include "sys.h"
 #include "serial.h"
@@ -81,7 +81,7 @@ static void probe_receive(void);
 void platform_splash_probe_before(void)
 {
     probe_raw_before = inp(PEGC_HSYNC_PORT);
-    probe_bios_before = *(volatile u8 *)P2V_IO(PEGC_BIOS_PRXCRT);
+    probe_bios_before = v86_bios_real_lowmem()[PEGC_BIOS_PRXCRT];
 }
 static unsigned long long probe_now(void)
 {
@@ -534,7 +534,7 @@ void platform_splash_probe(void)
     struct SplashRaster *s = pc98_splash_raster_state();
     const struct bootinfo *bi = bootinfo_get();
     u32 raw_after = inp(PEGC_HSYNC_PORT);
-    u32 bios_after = *(volatile u8 *)P2V_IO(PEGC_BIOS_PRXCRT);
+    u32 bios_after = v86_bios_real_lowmem()[PEGC_BIOS_PRXCRT];
     u32 mode, baud, fifo, oe0, fe0, pe0, ov0, oe, fe, pe, ov;
     u32 clamp0 = ktime_clamp_count, tick0 = tick_count, ticks, clamps;
     unsigned long long stamp, io[3][3] = {{0}}, empty[3] = {0}, initial_begin = 0, initial_end = 0, initial_fall = 0;

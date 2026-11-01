@@ -51,7 +51,7 @@
 |---|---|
 | PC9800Bible `docs/hw/PC9800Bible/2-7_グラフィック.md:230` | 0A8h=番号、0AAh=G、0ACh=R、0AEh=B。既存の4 OUT順を保つ。 |
 | UNDOCUMENTED `docs/hw/undocumented/io_disp.md:24,765` | 0060h/00A0h の bit5=VSYNC、bit6=HORIZONTAL BLANK。水平同期信号そのものとの同一視はしない。 |
-| `include/pegc.h:95,106,115,247` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数とP2Vで診断記録だけ。 |
+| `include/pegc.h:95,106,115,247` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数と `v86_bios_real_lowmem()` の起動時の写しで診断記録だけ（ページ0は未写像、fix0依頼で訂正）。 |
 | 周期・位相の正典 | `include/pegc.h:325-335` の400行SYNCと `docs/hw/undocumented/io_disp.md:1875` の公称周波数を組にする。周期のµs比は31k=`100000/3147`、24k=`100000/2483`、4行は約127.1/161.1µs。 |
 | NEC Technical Databook Hardware (1993) | 手元の `docs/hw/` に該当資料を確認できず、未照合。メーカー資料のタイミング表を実装前のHW3資料ゲートでPMが補う。 |
 | BSD参照 | [FreeBSD releng/10.4 sys/pc98/cbus/gdc.c](https://github.com/freebsd/freebsd-src/blob/releng/10.4/sys/pc98/cbus/gdc.c#L655):655,685 はVSYNCの抜け→入り、831は16色パレット設定。冒頭はBSD 3条項。同期・I/Oの参考に限り、描画コマンドは採らない。 |
@@ -62,7 +62,7 @@
 
 | 測るもの | 手順・記録 |
 |---|---|
-| 起動条件 | SHA・媒体CRC・機種・09A8h生値/D0・054Ch bit5・表示高・flip・PIT分周・シリアル速度。begin前後の値を比較する。 |
+| 起動条件 | SHA・媒体CRC・機種・09A8h生値/D0・054Ch bit5・表示高・flip・PIT分周・シリアル速度。begin前後の値を比較する (054Ch は起動時の写しなので前後は同値、begin による変化は 09A8h で見る)。 |
 | VSYNC起点 | begin後、00A0h bit5の新しい立上りを9回採り8周期をsys_time_nowで測る。立下りも記録し、周期用の立上りと位相用の立下りを分ける。診断では32周期のmin/median/maxと0060hとの差も採る。 |
 | 行周期/HBLANK幅 | bit6の0→1→0を高速ポーリング。32/64周期の総時間を整数比で求め、幅は単発測定の観測誤差込みで下限を出す。IRQを含む長い区間は欠落候補として別集計。 |
 | パレットI/O | 同じ値で単一OUTを8/16回、色1件の4 OUTを1/4/8組実施。空ループ・時計費用を別測定し、組数に対する傾きと単発上限を記録。長い組は分割しIRQ窓を設ける。 |

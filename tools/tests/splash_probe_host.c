@@ -6,6 +6,8 @@
 #include "gfx_hal.h"
 #include "bootinfo.h"
 #include "idt.h"
+#include "paging.h"
+#include "v86_bios.h"
 #define IO_H
 static unsigned long long scan_us, irq_at[4], irq_delay[4];
 static u32 in_us = 1, clock_cost_us = 1, out_us = 1, calls, writes;
@@ -86,8 +88,19 @@ static void irq_restore(unsigned int flags)
     irq_on = flags; test_open_at = scan_us;
 }
 #include "../../drivers/video/pc98/splash_raster.c"
-static u8 probe_fake_bios = PEGC_BIOS_PRXCRT_31KHZ;
-#define P2V_IO(address) (&probe_fake_bios)
+static u8 probe_bios_snapshot[PAGE_SIZE];
+static u32 probe_bios_reads;
+const u8 *v86_bios_real_lowmem(void)
+{
+    probe_bios_reads++;
+    return probe_bios_snapshot;
+}
+static inline volatile void *probe_io_address(u32 address)
+{
+    REQUIRE(address >= PAGE_SIZE); /* The kernel leaves page0 not present. */
+    return P2V_IO(address);
+}
+#define P2V_IO(address) probe_io_address(address)
 static int probe_frame_checked(struct SplashRaster *s, const GFX_RasterPalTable *t);
 #define pc98_splash_raster_table probe_frame_checked
 #include "../../platform/pc98/splash_probe.c"
@@ -170,6 +183,8 @@ static void setup(int mode, int vs)
     irq_on = 1; missing_h = frozen = backwards = 0;
     calls = writes = probe_errors = 0; probe_previous = 0;
     probe_output_size = probe_presents = probe_rects = probe_rx_pos = 0;
+    probe_bios_reads = 0;
+    probe_bios_snapshot[PEGC_BIOS_PRXCRT] = mode ? PEGC_BIOS_PRXCRT_31KHZ : 0;
     probe_checked_frames = 0;
     initial_irq_us = 0;
     calibration_irq_us = 0;
@@ -279,7 +294,12 @@ void _start(void)
         setup(mode, vs);
         wide_h = wide;
         platform_splash_probe_before();
+        REQUIRE(probe_bios_reads == 1);
+        REQUIRE(probe_bios_before == probe_bios_snapshot[PEGC_BIOS_PRXCRT]);
         platform_splash_probe();
+        REQUIRE(probe_bios_reads == 2);
+        REQUIRE(probe_contains(mode ? " bios_before=32 bios_after=32" :
+                                     " bios_before=0 bios_after=0"));
         REQUIRE(!probe_errors && probe_rx_count == 8 && !probe_rx_missing && !probe_rx_bytes);
         REQUIRE(probe_presents == 1 && probe_rects > 1000);
         REQUIRE(probe_frames[PROBE_FRAMES-1].duration > 0);

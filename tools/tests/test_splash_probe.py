@@ -6,7 +6,7 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'tools/tests/kernel_includes.py', 'include/platform_splash.h',
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
-            'mm/paging.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
+            'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'arch/x86/kernel/idt.h',
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=20.0)
 import argparse
@@ -19,6 +19,12 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'platform/pc98/splash_probe.c'
 MUTATIONS = (
+    ('direct BIOS read before begin',
+     'probe_bios_before = v86_bios_real_lowmem()[PEGC_BIOS_PRXCRT];',
+     'probe_bios_before = *(volatile u8 *)P2V_IO(PEGC_BIOS_PRXCRT);'),
+    ('direct BIOS read after begin',
+     'u32 bios_after = v86_bios_real_lowmem()[PEGC_BIOS_PRXCRT];',
+     'u32 bios_after = *(volatile u8 *)P2V_IO(PEGC_BIOS_PRXCRT);'),
     ('omit pattern', '    probe_pattern();', '    (void)probe_pattern;'),
     ('omit receive', '            probe_rx_count++;', '            (void)probe_rx_count;'),
     ('omit frame duration', '.duration = probe_now() - stamp,', '.duration = 0,'),
@@ -95,7 +101,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
