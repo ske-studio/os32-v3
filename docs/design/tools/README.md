@@ -106,3 +106,5 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/rshell_recover](rshell_recover.md)
 
 - [tools/tests/README](tests/README.md)
+
+- [tools/img2osri](img2osri.md)
