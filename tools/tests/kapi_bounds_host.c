@@ -53,6 +53,10 @@ GfxBackend gfx_backend_pc98 = {.query=host_query, .set_palette=host_palette};
 /* Retained by raster's real call graph, never used by rejected calls. */
 int vram_scroll_y;
 void cpu_delay_us(u32 n) { (void)n; }
+struct SplashRaster *pc98_splash_raster_state(void) { return 0; }
+int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t)
+{ (void)s; (void)t; return SPLASH_RASTER_NO_SYNC; }
+
 
 
 static void say(const char *s, unsigned n)

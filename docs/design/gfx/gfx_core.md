@@ -2,6 +2,8 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `gfx/gfx_core.c`
 
+`gfx_shutdown` は画面所有者の検査後に共通ラスタ再生状態を失効させる。
+
 400/200 行の初期化共通部は [gfx_core_init](gfx_core_init.md) を参照。
 
 RAM CLIENT 300 KiB と BAR1+[0,4B000h) の DISPLAY を SURFACE 台帳へ別登録し、`bb_base/bb_size/bb_pitch` と framebuffer API は CLIENT を返す。**PEGC と GF の CLIENT は一方だけ予約**し、600 KiB の二重確保を避ける（F10）。

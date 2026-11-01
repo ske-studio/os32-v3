@@ -620,15 +620,17 @@ typedef struct {
     int _pool_idx;
 } GFX_Sprite;
 
-/* ラスタパレットエントリ (1分割 = 2ライン単位) */
+/* PC98 400 行の絶対可視行。line=0 は初期色、昇順・各行 1 件・行間隔 2 以上。
+ * 既定の採用予算は 4 行 1 件。200 は格納上限で時間予算ではない。
+ * dirty 転送/flip 後に再生。IF=0・判定不可・同期失敗・予算違反は静止提示。 */
 typedef struct {
-    u16 line;           /* 開始ライン (0-398, 2ライン単位推奨) */
+    u16 line;           /* 開始可視行 (0-399) */
     u8  pal_idx;        /* パレット番号 (0-15) */
     u8  r, g, b;        /* RGB値 (0-15) */
     u8  _pad[2];        /* アラインメント用 */
 } GFX_RasterPalEntry;
 
-#define GFX_RASTER_MAX_ENTRIES 200  /* 最大200エントリ (NP21/W: 1024イベント制限) */
+#define GFX_RASTER_MAX_ENTRIES 200  /* 格納上限 (再生予算は別に検査) */
 
 /* ラスタパレットテーブル (外部プログラムが構築→カーネルに渡す) */
 typedef struct {

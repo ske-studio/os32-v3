@@ -105,3 +105,17 @@ No shared object/build output, full build, deployment or emulator run was used.
 caller/query/lease の未解決参照で rc=1 となった。kernel と同様に
 `--gc-sections` を付けて未結線部分だけを除去する。既存の boot/splash の
 判定・呼出経路・期待値は変えない。2試験 (各4 preference) を再検査する。
+
+
+## L0 共通ラスタ再生への移行 (2026-11-01)
+
+旧 cpu_delay_us フックを実際の splash_raster と有理数走査時計へ置き換えた。
+boot と GUI 希望値・両ページ消去の正常対照を保持し、公開 KAPI を splash 外で呼ぶ。
+24/31kHz × flip 有無 × 初回 dirty / ステイル / palette-only と 0/10/398 行の
+ポート順・色・時刻、commits と実 VRAM bytes、同期失敗・予算違反・IF=0、
+shutdown / init / init200 での再判定を検査する。OSRI の型だけ ILP32 として
+読み、LP64 fixture でも wire layout の静的検査を有効に保つ。
+
+`test_boot_splash_native.py --mutate` は一時コピーへ一意な目印で変異を適用する。
+再生呼出し・nonflip転送・flip・initリセット・shutdownリセットの省略と
+120µs相対待ち復活を、コンパイル成功後に名前付き実行時 FAIL で検出する。

@@ -17,6 +17,7 @@
 #include "geforce_module.h"
 #include "gui.h"
 #include "../drivers/video/pc98/pc98_route.h"
+#include "../drivers/video/pc98/splash_raster.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"
 #include "../exec/exec.h"
@@ -433,6 +434,7 @@ void gfx_shutdown(void)
         if (!caller_access_get_user(&caller) ||
             caller.app_id != appslot_gfx_owner()) return;
     }
+    pc98_splash_raster_reset();
     gfx_started = 0;
     gfx_reinit_surfaces(0);
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。

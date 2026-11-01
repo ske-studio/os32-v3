@@ -4,6 +4,7 @@
 
 `gfx_core.c` の `gfx_init()` / `gfx_init_200()` は同じ翻訳単位の
 `gfx_init_mode(legacy200)` をそれぞれ 0 / 1 で呼ぶ。
+入口で共通ラスタ再生器の状態をリセットし、次の table 利用で周期・位相を再判定する。
 世代を進めてバックエンドを選択し、既存の revoke → bind → 世代更新を通る。
 packed 系は backend の init / enter に任せ、200 行要求でも native 解像度を保つ。
 既存の失敗出口と診断の時機を保つ。
