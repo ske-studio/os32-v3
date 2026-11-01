@@ -33,3 +33,5 @@ DFはline→guard→残列空白の順
 
 - [kentry.md](kentry.md)
 - [ring3_entry.md](ring3_entry.md)
+
+- [mtrr_wc.c / mtrr_wc.h — CPU の WC lease](mtrr_wc.md)
