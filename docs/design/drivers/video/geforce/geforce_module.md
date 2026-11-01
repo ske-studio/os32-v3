@@ -8,3 +8,5 @@ RAM CLIENT 300 KiB と BAR1+[0,4B000h) の DISPLAY を SURFACE 台帳へ別登�
 CLIENT は PEGC/GF のどちらか一つの 300 KiB。BAR1 の DISPLAY は MMIO で RAM の CLIENT と別。
 
 CLIENT は PEGC/GF 一方だけ、pc98 fallback、decode不明時98無書込み、shutdown→再init、部品欠落/KDEBUG=0。
+
+GF_ACCEL S7: 内部 OPS_VERSION=2、表示 WC 範囲 GEFORCE_WC_BYTES=512 KiB。platform に kernel 所有 wc_start/wc_stop/report を末尾追加し、核と geforce.mod を対で生成する。公開 KAPI/SDK と import 順は不変。

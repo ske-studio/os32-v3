@@ -82,8 +82,8 @@ MUTATIONS = [
      "    if (ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
      "ime_set_render の門が owner を見ない"),
     ("kernel/gui.c",
-     "        ime_set_render((void *)0);\n    }\n}\n",
-     "    }\n}\n",
+     "        ime_set_render((void *)0);\n",
+     "",
      "gshell の終了で FEP の描画先を戻さない"),
     # 代行レビュー P3 (2026-09-26): gui_register も同じ門。
     ("kernel/gui.c",

@@ -73,7 +73,8 @@ void kbd_set_gui_mode(int on) { (void)on; }
  * の代わりの印 (NULL と区別する)。gui_ime_set_render の門の試験 (5) が読む。 */
 static int host_tvram_mark;
 static void *host_ime_render = &host_tvram_mark;
-static int host_ime_set_calls;
+static int host_ime_set_calls, host_gfx_shutdowns;
+void gfx_shutdown(void) { host_gfx_shutdowns++; }
 void ime_set_render(void *r) { host_ime_set_calls++; host_ime_render = r; }
 
 /* exec/exec.c の ring3_wm_depth / enter / leave と同じ振る舞い。
@@ -307,8 +308,10 @@ static void case_owner_exit(void)
     check(host_enter_calls == before_enter + 1 &&
           host_leave_calls == before_leave + 1, "3d enter/leave paired");
 
+    check(host_gfx_shutdowns == 0, "3d app exit keeps display");
     /* WM 自身 (owner 1) の終了 = 登録解除。以後の gui_call は印を立てない。 */
     gui_owner_exit(GUI_SHELL_OWNER, 1);
+    check(host_gfx_shutdowns == 0, "3e normal shell exit already stopped its display");
     before_enter = host_enter_calls;
     check(gui_call(GUI_OP_POLL, 0) == OS32_ERR_NOSYS, "3e WM gone -> NOSYS");
     check(host_enter_calls == before_enter && ring3_wm_depth == 0,

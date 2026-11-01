@@ -47,6 +47,9 @@ int gf_production_identify(struct gf_production_resources *r)
     r->bars[2]=(struct recover_bar_extent){GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1};
     return 0;
 }
+int geforce_wc_start(void) { return 0; }
+int geforce_wc_stop(void) { return 0; }
+void geforce_wc_report(const char *s) { (void)s; }
 #include "../../drivers/video/geforce/geforce_platform.c"
 #include "geforce_reserve.inc"
 static int geforce_gui(void) { return host_gui; }

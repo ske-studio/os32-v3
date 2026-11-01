@@ -4,7 +4,8 @@
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "../../../kernel/module/module_runtime.h"
-#define GEFORCE_MODULE_OPS_VERSION 1u
+#define GEFORCE_MODULE_OPS_VERSION 2u
+#define GEFORCE_WC_BYTES 0x80000U
 struct gf_production_resources;
 struct geforce_platform {
     struct video_device *device;
@@ -19,6 +20,11 @@ struct geforce_platform {
     u32 bar0_phys, display_phys;
     const struct gf_production_resources *resources;
     int (*stop)(void);
+    /* Kernel-owned lease: 0=UC, 1=WC, negative=fatal. Stop is idempotent. */
+    int (*wc_start)(void);
+    int (*wc_stop)(void);
+    /* Acceptance records only, after timing; no sample storage in production. */
+    void (*report)(const char *record);
 };
 struct geforce_platform *geforce_platform_get(void);
 int geforce_boot_reserve(void) __attribute__((weak));
@@ -36,6 +42,10 @@ extern GfxBackend geforce_backend_ops;
 void geforce_backend_bind(struct video_device *, int (*)(void), u32,
                           int (*)(void *), void *);
 void geforce_backend_stop_bind(int (*stop)(void));
+void geforce_backend_wc_bind(int (*start)(void));
+int geforce_wc_start(void);
+int geforce_wc_stop(void);
+void geforce_wc_report(const char *record);
 int geforce_module_load(void);
 int geforce_module_abort(void);
 #endif

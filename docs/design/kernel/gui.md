@@ -57,3 +57,5 @@ OWNER_EXIT はカーネル内部専用で arg = EXEC_KIND_* (T4)。ABORTED は W
 
 **Wayland 型の協定** (非同期・ID 参照・損傷 + commit・入力 serial・バージョン付き)
 イベントは 1 回で一括取り出し
+
+shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録・入力モード・IME 描画先を解除した後に gfx_shutdown を呼ぶ。正常終了では gshell 自身の既存停止処理を使う。fault 回収から shell を再起動する前に、GF の WC 停止・98 route 復帰まで表示の寿命を閉じる。

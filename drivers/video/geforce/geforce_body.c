@@ -5,7 +5,13 @@ const GeforceModuleContext *geforce_context;
 static struct gf_production production;
 static int identify(void) { return production.prepared && !gf_production_identity(&production); }
 static int safe(void) { return !production.attempted || !gf_production_decode_safe(&production); }
-static int stop(void) { return gf_production_quiesce(&production); }
+static int stop(void)
+{
+    const struct geforce_platform *p = geforce_context->platform;
+    int rc = p && p->wc_stop ? p->wc_stop() : 0;
+    if (gf_production_quiesce(&production)) rc = -1;
+    return rc;
+}
 static int route98(void *opaque) { (void)opaque; return pc98_route_select_98(); }
 int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
 {
@@ -23,6 +29,7 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
     if (p) {
         geforce_backend_bind(p->device, p->identify, p->bar0_phys, p->point, p->opaque);
         geforce_backend_stop_bind(p->stop);
+        geforce_backend_wc_bind(p->wc_start);
     }
     *out = geforce_backend_ops;
     return 0;

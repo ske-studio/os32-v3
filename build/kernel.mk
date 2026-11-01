@@ -36,7 +36,7 @@ C_KERNEL = \
     drivers/input/mouse.c drivers/input/mouse_bus.c drivers/input/mouse_seamless.c \
     drivers/net/ne2000/lgy98.c drivers/net/ne2000/ne2000.c drivers/net/ne2000/ne2000_ring.c \
     drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \
-    drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
+    drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/geforce/gf_wc.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
     gfx/gfx_core.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
     fs/fat/fatfs/ff.c fs/fat/fatfs/diskio.c fs/fat/fatfs_vfs.c \

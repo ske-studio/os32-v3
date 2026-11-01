@@ -8,6 +8,7 @@
 
 #include "serial_diag.h"
 #include "gui.h"
+#include "gfx.h"
 #include "kstring.h"
 #include "input_service.h"      /* input_set_gui_mode (K2-B) */
 #include "ime/ime.h"      /* ime_set_render (レビュー #4 ①: gshell 終了時の防御的リセット) */
@@ -148,6 +149,9 @@ void gui_owner_exit(int owner, int kind)
          * NULL を渡すが、クラッシュで抜けた場合もシェル帯の旧コードを
          * 指したままにしない。 */
         ime_set_render((void *)0);
+        /* Fault/abort recovery reaches here in ordinary context. Finish the
+         * display lifetime before the shell restart, as normal gshell does. */
+        if (kind != EXEC_KIND_EXITED) gfx_shutdown();
     }
 }
 
