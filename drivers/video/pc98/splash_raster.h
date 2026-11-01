@@ -76,10 +76,11 @@ int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t
 
 #ifdef SPLASH_RASTER_DIAG
 struct SplashRasterProbeCost {
-    /* Batched mean numerator/us with denominator samples, plus observed
-     * single-operation upper bound. IRQ contamination is retained. */
+    /* IF=0 batch means; upper_num_us/upper_samples retains sub-us precision.
+     * upper_us is its ceiling for coarse waits only. IF=1 is kept separate. */
     unsigned long long total_us, upper_us;
-    u32 samples;
+    unsigned long long upper_num_us, open_total_us, open_max_us;
+    u32 samples, upper_samples, batch;
 };
 struct SplashRasterProbeEntry {
     struct SplashRasterEntryBudget budget;

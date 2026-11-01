@@ -12,6 +12,9 @@ static u32 in_us = 1, clock_cost_us = 1, out_us = 1, calls, writes;
 static u32 den, total, high_lines, raw_mode, wide_h;
 static int irq_on = 1, missing_h, frozen, backwards;
 static u32 initial_irq_us;
+static u32 calibration_irq_us;
+static u32 if0_end_clock, if0_in_reads, if0_max_in_run;
+static int require_clockless_in;
 static unsigned long long test_open_at, test_min_open, test_closed_at, test_max_closed;
 static void finish(int code)
 {
@@ -34,6 +37,7 @@ static void advance(u32 cost)
 }
 int sys_time_now(u32 *lo, u32 *hi)
 {
+    if (!irq_on && if0_in_reads && require_clockless_in) if0_end_clock++;
     advance(clock_cost_us);
     unsigned long long t = backwards ? 10000000 - scan_us : scan_us;
     *lo = t; *hi = t >> BITS_PER_U32;
@@ -51,6 +55,11 @@ static unsigned int inp(unsigned int port)
         if (!missing_h && phase % 100000 >= 100000 - width) status |= GDC_STAT_HBLANK;
     }
     advance(in_us); /* sample and return are deliberately distinct */
+    if (!irq_on) {
+        if (require_clockless_in) REQUIRE(!if0_end_clock);
+        if0_in_reads++;
+        if (if0_in_reads > if0_max_in_run) if0_max_in_run = if0_in_reads;
+    }
     return status;
 }
 static void outp(unsigned int port, unsigned int value)
@@ -58,6 +67,9 @@ static void outp(unsigned int port, unsigned int value)
     REQUIRE(port == PAL_IDX_PORT || port == PAL_G_PORT || port == PAL_R_PORT || port == PAL_B_PORT);
     REQUIRE(value < 16);
     writes++; advance(out_us);
+    if (irq_on && calibration_irq_us) {
+        advance(calibration_irq_us); calibration_irq_us = 0;
+    }
 }
 static int _irq_enabled(void) { return irq_on; }
 static unsigned int irq_save(void)
@@ -65,6 +77,7 @@ static unsigned int irq_save(void)
     u32 flags = irq_on;
     if (test_open_at && scan_us - test_open_at < test_min_open) test_min_open = scan_us - test_open_at;
     irq_on = 0; test_closed_at = scan_us;
+    if0_in_reads = if0_end_clock = 0;
     return flags;
 }
 static void irq_restore(unsigned int flags)
@@ -159,6 +172,9 @@ static void setup(int mode, int vs)
     probe_output_size = probe_presents = probe_rects = probe_rx_pos = 0;
     probe_checked_frames = 0;
     initial_irq_us = 0;
+    calibration_irq_us = 0;
+    if0_end_clock = if0_in_reads = if0_max_in_run = 0;
+    require_clockless_in = 0;
     test_open_at = test_closed_at = test_max_closed = 0; test_min_open = ~0ULL;
     for (u32 i = 0; i < 4; i++) irq_at[i] = irq_delay[i] = 0;
     pc98_splash_raster_reset();
@@ -168,15 +184,29 @@ static void costs(void)
     const u32 costs[] = {1, 5, 8};
     for (u32 i = 0; i < 3; i++) for (u32 c = 0; c < 3; c++) for (u32 o = 1; o <= 2; o++) {
         setup(1, 0); in_us = costs[i]; clock_cost_us = costs[c]; out_us = o;
-        probe_costs();
-        REQUIRE(probe_cost[PROBE_Q].total_us == PROBE_COST_BATCH * in_us);
-        REQUIRE(probe_cost[PROBE_C].total_us == PROBE_COST_BATCH * clock_cost_us);
-        REQUIRE(probe_cost[PROBE_W].total_us == PROBE_COST_BATCH * 4 * out_us);
-        REQUIRE(probe_cost[PROBE_Q].upper_us == 2 * in_us + 1);
-        REQUIRE(probe_cost[PROBE_C].upper_us == clock_cost_us + 1);
-        REQUIRE(probe_cost[PROBE_W].upper_us == 4 * out_us + 1);
+        probe_costs(pc98_splash_raster_state());
+        const u32 expected[] = {in_us, clock_cost_us, 4 * out_us};
+        for (u32 kind = 0; kind < PROBE_COST_KINDS; kind++) {
+            const struct SplashRasterProbeCost *p = &probe_cost[kind];
+            REQUIRE(p->total_us == p->samples * expected[kind]);
+            REQUIRE(p->batch > 1 && p->batch <= 8);
+            REQUIRE(p->upper_num_us == p->upper_samples * expected[kind] +
+                    (kind == PROBE_C ? 1 : 1 + probe_cost[PROBE_C].batch));
+            REQUIRE(probe_cost_bound(kind, den) ==
+                    (p->upper_num_us * den + p->upper_samples - 1) / p->upper_samples);
+            REQUIRE(p->open_total_us == p->total_us);
+        }
+        REQUIRE(test_max_closed * den <= 200000);
+        REQUIRE(test_min_open * den >= 100000);
+        REQUIRE(irq_on && !probe_errors);
     }
     in_us = clock_cost_us = out_us = 1;
+    setup(1, 0); calibration_irq_us = 100;
+    probe_costs(pc98_splash_raster_state());
+    REQUIRE(probe_cost[PROBE_W].upper_num_us == 265);
+    REQUIRE(probe_cost[PROBE_W].open_max_us == 132);
+    REQUIRE(probe_cost[PROBE_W].open_total_us == probe_cost[PROBE_W].total_us + 100);
+    REQUIRE(test_max_closed * den <= 200000 && irq_on);
 }
 static void budgets(void)
 {
@@ -187,9 +217,64 @@ static void budgets(void)
     b.usable = 0; REQUIRE(probe_j_max(&b) < 0);
     b.usable = 3; b.retry = 41; REQUIRE(probe_j_max(&b) < 0);
 }
+static void widths(void)
+{
+    const u32 clocks[] = {1, 5, 8};
+    for (int mode = 0; mode < 2; mode++) for (int wide = 0; wide < 2; wide++)
+    for (u32 c = 0; c < 3; c++) for (u32 phase = 0; phase < 8; phase++) {
+        setup(mode, 0); in_us = 1; clock_cost_us = clocks[c]; out_us = 1; wide_h = wide;
+        struct SplashRaster *s = pc98_splash_raster_state();
+        probe_costs(s);
+        probe_eight_us = (unsigned long long)8 * total * 100000 / den;
+        scan_us += phase;
+        test_max_closed = 0; test_min_open = ~0ULL;
+        if0_max_in_run = 0;
+        require_clockless_in = 1;
+        REQUIRE(probe_hblank(s) == PROBE_HPERIODS);
+        require_clockless_in = 0;
+        REQUIRE(if0_max_in_run > 2);
+        probe_bounds(s);
+        long long reference = wide ? (mode ? 80000 : 75472) : (mode ? 20000 : 24532);
+        REQUIRE(probe_budget.b.min > 0);
+        REQUIRE(probe_budget.b.min <= reference && probe_budget.b.max >= reference);
+        REQUIRE(probe_budget.b.min >= reference - 2 * (long long)den);
+        REQUIRE(probe_budget.b.max <= reference + 2 * (long long)den);
+        unsigned long long highs = 0, samples = 0;
+        for (u32 i = 0; i < PROBE_HPERIODS; i++) {
+            highs += probe_highsamples[i]; samples += probe_hsamples[i];
+        }
+        long long measured = highs * 100000 / samples;
+        REQUIRE(probe_delta(measured, reference) <= (unsigned long long)den);
+        REQUIRE(test_max_closed * den <= 200000);
+        REQUIRE(test_min_open * den >= 100000);
+        REQUIRE(!probe_errors && irq_on);
+    }
+    in_us = clock_cost_us = out_us = 1;
+}
 void _start(void)
 {
-    costs(); budgets();
+    /* L1: a 5us clock must not turn the 31k 6.36us pulse into B_min=0. */
+    setup(1, 0); in_us = 1; clock_cost_us = 5; out_us = 1;
+    platform_splash_probe();
+    REQUIRE(probe_budget.b.min > 0);
+    REQUIRE(probe_budget.b.min <= 20000 && probe_budget.b.max >= 20000);
+    REQUIRE(probe_budget.b.min >= 20000 - 2 * (long long)den);
+    REQUIRE(probe_budget.b.max <= 20000 + 2 * (long long)den);
+    REQUIRE(probe_budget.q.max + probe_budget.w.max + probe_budget.error < 20000);
+    /* Preserve the actual B bounds and cost fractions in the test log. */
+    for (u32 i = 0; i < probe_output_size; i++) {
+        const char *prefix = "SPLR budget_den=";
+        u32 j = 0;
+        while (prefix[j] && prefix[j] == probe_output[i+j]) j++;
+        if (!prefix[j]) {
+            u32 n = 0;
+            while (i+n < probe_output_size && probe_output[i+n++] != '\n') { }
+            __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(probe_output+i), "d"(n) : "memory");
+            break;
+        }
+    }
+    in_us = clock_cost_us = out_us = 1;
+    costs(); budgets(); widths();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {
         setup(mode, vs);
         wide_h = wide;
@@ -224,7 +309,7 @@ void _start(void)
         REQUIRE(probe_contains(" begin_us=") && probe_contains(" end_us="));
         REQUIRE(probe_contains("errors=0") && probe_contains("rx_words=8"));
         REQUIRE(probe_contains("commit=host-probe crc=123"));
-        REQUIRE(probe_contains("SPLR cost=0 num_us=64 den=64 upper_us=3"));
+        REQUIRE(probe_contains("SPLR cost=0 num_us=512 den=512 upper_us=2 upper_num_us=73 upper_den=64"));
         REQUIRE(probe_contains("SPLR entry_y=396"));
         REQUIRE(irq_on);
         /* Observe the survey alone: the old player has its own IF tests. */

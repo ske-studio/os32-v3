@@ -28,4 +28,7 @@ LC-A は内部の整数比予算を追加する。`SplashRasterBudget` の全分
 入口までの累積遅延であり、単一 ISR の最長時間ではない。
 
 診断専用の費用・入口記録と4型分類は同じ内部ヘッダーで共有する。
+費用は IF=0 の total_us/samples と上限 upper_num_us/upper_samples、束の回数 batch、
+IF=1 の open_total_us/open_max_us を別々に持つ。upper_us は粗待ち用の切上げ値。
+Q/W の上限は端点時計Cの束平均を差し引くため、上限の分母と束の回数は異なり得る。
 通常版の `SplashRaster`、公開 SDK/KAPI と再生手順は LC-A では変更しない。
