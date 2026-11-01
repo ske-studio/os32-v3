@@ -233,3 +233,80 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 - 層 2 の Opus レビュー F4 と同じ理由で、T0 (1 ファイルの host 試験) を B 段ごとに分ける: 各 B 段は自分の部品の host 試験 `tools/tests/gf1_<部品>_host.c` と `tools/tests/test_gf1_<部品>.py` (CHECK 宣言・変異) を成果物に含める。T0 は C 段の後の結合の試験 (開始・停止の順) に絞る。
 - B 段の .c はモジュールへの結線 (C11 の build/geforce-module.mk・C10 の import) の前なので、B 段ではホストの試験で組んで確かめる。像への組み込みは C10・C11。
 - 実装者: B2 (irq.c、判定の論理) は sol、ほかの B 段は terra。
+
+## B 段の実装で分かった欠けの追記 (2026-11-02、astra 起草、Opus 第 3 回、PM 反映)
+
+
+> 確定本文 §2 の「map 時に予約、unmap 後に予約解除」は PM 決定で覆す (BAR の予約は起動時の永久予約のまま、層 1 は map/unmap だけ)。
+O/ は /home/hight/os32-v3/、N/ は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/。
+BAR の予約は起動時の永久予約（O/drivers/video/geforce/geforce_platform.c:14–42）のまま、層1は map/unmap だけを所有する。
+手本: N/nvkm/subdev/instmem/nv40.c:249–253 は BAR を ioremap_wc するだけ、:222–223 は iounmap；:164–179 の予約は VRAM 末尾の instmem 用であり BAR decode の再予約ではない。
+
+### 欠け1 — build 対象を決める
+B の前に build/geforce-module.mk の追補を出し、GEFORCE_SOURCES の wildcard 結果から次のファイルを filter-out する。
+```make
+GEFORCE_LAYER1_PENDING := hwdev/gf/master.c hwdev/gf/instmem.c hwdev/gf/irq.c \
+ hwdev/gf/instmem_map.c hwdev/gf/foundation.c
+GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
+```
+配置は既存 GEFORCE_SOURCES 定義の直後、GEFORCE_SERVICE_OBJS 算出より前。B6 の常駐 tick も C11 まで kernel に追加しない。
+理由: 未完成の import/provider に依存せず、末尾の「B は host 単独検証、像への組込みは C10/C11」を維持できる。
+各 B の host 試験は当該 .c を直接組む。tools/checks/map.py の needs=['make:all'] は残し、check-changed の準備も通す。
+C10 の import 契約と B6 provider を揃え、C11 で除外を撤去し常駐 tick を配置する；層1を参照する C の接続変更はこの結線と一緒に検査する。
+C10 は下記 production map adapter の paging_map_phys・paging_set_not_present も import に含め、既存 paging_pte_raw を再利用し、32 枠上限を検査する。
+
+### 欠け2 — resource・V・R と呼出し順
+resource の入口は既存 gf_production_identify → boot_resources → gf_production_prepare(boot) → p->display.bars（O/hwdev/gf/devinit.c:30–36）。
+C1 の owner start adapter は既存の資源再照合成功後、第三 memory resource の p->display.bars[2] を f->instmem_bar に値コピーしてから C0 を呼ぶ。
+これは PCI BAR slot を再解釈する経路ではない。diagnostic/fake owner も照合済みの同じ resource を設定する。
+C0 はその snapshot を使い、map_owner を具体型へ cast しない。snapshot は scratch/ROM と独立し、失敗した stop の後も保持する。
+C1 は B5 提供の gf_production_instmem_map_ops と production owner を貸す；fake は同契約の独自 ops/owner を貸す。
+B1 の gf_instmem_init(f) が f->io で 10020ch と 1540h を読み、V=(10020ch の値 & ff000000h)、vs=popcount((1540h の値>>8)&ffh)、
+R=align4096((4980h*vs+4000h)*32+100000h) を算出する。読取失敗は GF1_EIO、V<R+307200 は GF1_ENOSPC。
+V/R を f->imem.vram_bytes/reserved に保存し、gf_instmem_map(f, &f->instmem_bar, R) に resource と R を渡す。
+B5 は valid・ページ整列・範囲内・resource.length>=R を確認する。不成立/map 失敗は GF1_EMAP。
+C0 の順は master_enable → mc_init（IRQ 閉）→ instmem_init〔V/R 算出 → B5 map → 固定4領域確保〕→ tick bind → IRQ attach → enable。
+固定領域は VBIOS → RAMHT → RAMRO/pad → RAMFC/pad、map 成功前には確保も zero もしない。成功した map の aperture_bytes は R。
+途中失敗は C0 の foundation_stop へ戻し、その順 (r2 §3・foundation.h:84-85) に従う (ここで列を書き直さない)。停止失敗時は必要な所有状態を保持する。
+
+### A0 追補 — PM が出す変更行（リポジトリはこの依頼では変更しない）
+foundation.h の struct gf_foundation に次の1行を追加する。
+```c
+    struct recover_bar_extent instmem_bar; /* Checked third memory resource, copied before start. */
+```
+foundation.h の struct gf_instmem_map_ops 定義の後に次の1行を追加する（定義と production callbacks は B5 の instmem_map.c）。
+```c
+extern const struct gf_instmem_map_ops gf_production_instmem_map_ops;
+```
+map_ops 直前の契約コメント3行を次の3行で置換する。
+```c
+/* Production owns adapter/owner; fake MMIO supplies the same contract.
+ * BAR reservation is permanent from boot. map only maps UC; failure leaves no new map.
+ * mapped is set only on success. unmap removes access, never the BAR reservation. */
+```
+B5 map 直前コメントの末尾2行を次の2行で置換する（bar/bytes の説明2行は維持）。
+```c
+ * GF1_OK publishes bar2/aperture_bytes and mapped=true; GF1_EMAP leaves no new map.
+ * Foundation owns the successful map; the permanent boot reservation is unchanged. */
+```
+gf_instmem_init(f) と gf_instmem_map(f,bar,bytes) の関数宣言、production.h・internal.h は変更不要。
+宣言の変更は追加2行（既存宣言の置換0行）、別に契約コメント5行を置換する。
+
+### 欠け3 — map/unmap API と失敗
+O/ で rg -n 'paging_map_phys|paging_unmap' mm include を実行し、paging_unmap は存在しないと確認した。
+map は paging_map_phys(base, base, R/PAGE_SIZE, PAGE_RW | PTE_PCD)（mm/paging.h:124、mm/paging_map.inc:107）。PTE_USER は付けない。
+B5 production adapter は geforce_range_reserved(base,R) の成功と、対象全頁の paging_pte_raw の Present=0 を先に確認し、既存の他者の map は上書きしない。
+成功後だけ *out=P2V_IO(base) を公開する。引数/予約/PTE 検査の失敗は無変更、paging_map_phys の失敗も全範囲無変更・追加 PT 全解放（同 .inc:14–48,107–119）。
+成功後に失敗し得る処理を置かず、map 失敗時の個別ページ巻戻しや ledger_reserve_set は呼ばない。B5 は失敗を GF1_EMAP に変換する。
+unmap は paging_set_not_present(base, base+R-1)（mm/paging.h:143、mm/paging_map.inc:241）。end は inclusive；全対象の P を落とし TLB を flush する。
+これはアクセス解除であり PTE の frame/属性や PT 自体は残る。PT は master の寿命まで保持し、再開始で再利用する。永久 BAR 予約も残す。
+unmap 成功時だけ mapped=false・bar2=NULL・aperture_bytes=0。失敗は GF1_EMAP とし、それらと ops/owner を保持して stop 再試行へ渡す。
+新 PT は live AS≠0 では作れない (mm/paging.h:114–116、paging_map.inc:22-25) ので、**BAR2 の PT は起動時に作る** (下の「確定」の B7)。B5 の map は既存の PT に P を立てるだけになる。
+BAR2 の追加 PT 予算は §4 の ceil((base の4MiB内offset+R)/4MiB) を D2 に明記する。unmap による PT の回収を予算に織り込まない。
+B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾頁だけまでの unmap、unmap失敗時の所有保持、再開始を検査する。
+
+### 確定 (2026-11-02、Opus 第 3 回、PM が反映)
+- P1 (欠け 3): GeForce の開始は GUI を起こしたとき (live AS≥1) なので、初回 map で新 PT を作る形では毎回 GF1_EMAP になる。BAR2 (0x25000000、PDE 0x94) の PT は今 geforce_platform.c:38-41 で作られていない (BAR0 の 0x90〜0x93 と表示の窓 0xC0 だけ、:7-9 の STATIC_ASSERT で 5 頁)。**段 B7 (drivers/video/geforce/geforce_platform.c) を足す**: reserve() で BAR2 の先頭 R_max を起動時に paging_map_phys(PAGE_RW|PTE_PCD) で張り、すぐ paging_set_not_present で閉じる。R_max = vs=8 の R = align4096((4980h*8+4000h)*32+100000h) = 618000h (PT 2 頁)、BAR2 の長さで切る。STATIC_ASSERT・GF_PRODUCTION_PT_PAGES・docs/02_memory.md:152 の予算を +2。AS は PDE ごと写すので、どの AS からも同じ PT が見え、B5 の「全頁 Present=0 を確かめて map → set_not_present で unmap」はそのまま成り立つ。手本 (ioremap だけ) との差は「OS32 では新しい PT を後から作れないため」。
+- P3 (欠け 1): filter-out は未解決の import を持つものだけ (master・instmem・irq・instmem_map・foundation)。mc.c・engine_stop.c (B4・B3、main) は今も geforce.mod に組まれリンクできているので外さない。
+- P3 (欠け 2): 途中失敗の後始末は foundation_stop の順に従う (列を書き直さない)。
+- 段の順: **A0 追補** (foundation.h の追加 2 行・コメント 5 行、build/geforce-module.mk の filter-out) と **B7** (geforce_platform.c の BAR2 の PT) を先に出し、取り込んでから B0・B1・B2・B5 を続ける。
