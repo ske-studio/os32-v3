@@ -9,14 +9,30 @@
 
 #define __cdecl
 #define IO_H
-static unsigned int inp(unsigned int port) { return port == 0x60 ? 0x20 : 0; }
-static unsigned int irq_save(void) { return 0; }
-static void irq_restore(unsigned int flags) { (void)flags; }
+static unsigned long long raster_clock;
+static unsigned int raster_den = 3147, raster_total = 449, raster_raw = 0xff;
+static unsigned int raster_if = 0x202;
+static int raster_no_sync;
+static unsigned int inp(unsigned int port)
+{
+    if (port == 0x9a8) return raster_raw;
+    if (port == 0x60) return 0x20;
+    if (port != 0xa0) return 0;
+    unsigned long long phase = raster_clock * raster_den %
+                              ((unsigned long long)raster_total * 100000);
+    return (!raster_no_sync && phase < (raster_total - 400) * 100000ULL ? 0x20 : 0) |
+           (phase % 100000 >= 100000 - 8 * raster_den ? 0x40 : 0);
+}
+static int _irq_enabled(void) { return !!(raster_if & 0x200); }
+static unsigned int irq_save(void)
+{ unsigned int f = raster_if; raster_if &= ~0x200U; return f; }
+static void irq_restore(unsigned int flags) { raster_if = flags; }
 static void outp(unsigned int port, unsigned int value);
 /* This fixture is LP64. Read the GUI wire layouts with their target widths;
  * keep their assertions active. gfx_vram only needs the shared coordinates. */
 #include "types.h"
 #include "os32_kapi_shared.h"
+#include "cpu_calibrate.h"
 #include <stdint.h>
 #define u32 uint32_t
 #define i32 int32_t
@@ -35,6 +51,11 @@ const u8 *v86_bios_real_lowmem(void)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
 #include "../../gfx/gfx_vram.c"
+/* OSRI is an ILP32 wire layout; keep its size assertions live on LP64. */
+#define u32 uint32_t
+#include "../../gfx/gfx_osri.h"
+#undef u32
+#include "../../drivers/video/pc98/splash_raster.c"
 #pragma GCC diagnostic pop
 #include "../../platform/pc98/splash.c"
 #include "../../init/boot_splash.c"
@@ -46,6 +67,9 @@ int vram_scroll_y;
 static int cirrus_probes, pegc_probes, optional_inits;
 static int cirrus_ok = 1, pegc_ok = 1, init_fail;
 static int raster_frames, text_clears, stops, starts;
+static int raster_record, raster_writes;
+static unsigned long long raster_times[400];
+static unsigned int raster_values[400], raster_ports[400];
 static int expected_pref;
 static int native_state_fault;
 static unsigned char pages[2][4][GFX_PLANE_SZ];
@@ -96,6 +120,19 @@ GfxBackend gfx_backend_pegc = {
 };
 static void outp(unsigned int port, unsigned int value)
 {
+    if (port == PAL_IDX_PORT) {
+        raster_frames++;
+        CHECK(g_backend == &gfx_backend_pc98, "raster uses native PC98");
+        CHECK(gfx_get_backend_pref() == expected_pref,
+              "configured GUI preference restored before drawing");
+    }
+    if (raster_record && port >= PAL_IDX_PORT && port <= PAL_B_PORT) {
+        CHECK(raster_writes < 400, "palette trace bounded");
+        CHECK(!dirty_queue.count, "all dirty transferred before palette");
+        raster_times[raster_writes] = raster_clock;
+        raster_ports[raster_writes] = port;
+        raster_values[raster_writes++] = value;
+    }
     if (port == GDC_ACCESS_PAGE) {
         bank_sync();
         access_page = value;
@@ -179,14 +216,18 @@ void gfx_scroll_init(void)
     /* After GDC START, ledger fixture omits the last two planes. */
 }
 void tvram_clear(void) { text_clears++; }
+int sys_time_now(u32 *lo, u32 *hi)
+{
+    raster_clock++;
+    tick_count = raster_clock / 10000;
+    *lo = (u32)raster_clock;
+    *hi = raster_clock >> BITS_PER_U32;
+    return 0;
+}
 void cpu_delay_us(u32 us)
 {
     (void)us;
-    CHECK(g_backend == &gfx_backend_pc98, "raster uses native PC98");
-    CHECK(gfx_get_backend_pref() == expected_pref,
-          "configured GUI preference restored before drawing");
-    raster_frames++;
-    tick_count++;
+    CHECK(0, "relative raster delay must not return");
 }
 static void map_region(u32 base, u32 size)
 {
@@ -194,6 +235,94 @@ static void map_region(u32 base, u32 size)
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     CHECK(p != MAP_FAILED, "host maps simulated native memory");
 }
+/* Public KAPI outside boot_splash, with real transfer/flip/player/lifecycle. */
+static void test_raster_dispatch(void)
+{
+    GFX_RasterPalTable table = { .count = 3, .entries = {
+        { .line = 0, .pal_idx = 1, .r = 2, .g = 3, .b = 4 },
+        { .line = 10, .pal_idx = 1, .r = 5, .g = 6, .b = 7 },
+        { .line = 398, .pal_idx = 1, .r = 8, .g = 9, .b = 10 }
+    }};
+    expected_pref = GFX_PREF_PC98;
+    gfx_set_backend_pref(expected_pref);
+    for (int mode = 0; mode < 2; mode++) for (int flip = 0; flip < 2; flip++) {
+        raster_den = mode ? 3147 : 2483;
+        raster_total = mode ? 449 : 440;
+        raster_raw = mode ? 0xff : 0xfe;
+        gfx_init();
+        CHECK(!raster.checked, "init invalidates timing");
+        gfx_flip_enabled = flip;
+        /* Match the selected access page when exercising non-flip mode. */
+        if (!flip) outp(GDC_ACCESS_PAGE, 0);
+        for (int frame = 0; frame < 3; frame++) {
+            u32 before = gfx_counters.present_bytes, commits = gfx_counters.commits;
+            int page_before = gfx_display_page;
+            if (!frame) {
+                for (int p = 0; p < 4; p++)
+                    memset(bb[p], 0x91 + p, GFX_PLANE_SZ);
+                gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);
+            }
+            raster_record = 1; raster_writes = 0;
+            gfx_present_raster(&table);
+            raster_record = 0;
+            CHECK(raster_writes == 12, "public raster uses common player");
+            CHECK(raster.checked && raster.dynamic_ok && raster.mode == (u32)mode,
+                  "public raster lazily qualifies both modes");
+            CHECK(gfx_counters.commits == commits + 1, "one commit per raster call");
+            u32 transferred = (!frame || (flip && frame == 1)) ? GFX_PLANE_SZ * 4 : 0;
+            CHECK(gfx_counters.present_bytes == before + transferred,
+                  "dirty bytes include initial transfer and stale page only");
+            CHECK(gfx_display_page == (page_before ^ (flip && transferred != 0)),
+                  "flip only when a page was transferred");
+            CHECK(!dirty_queue.count && prev_dirty.count == (flip && !frame),
+                  "dirty queues retain stale page contract");
+            bank_sync();
+            for (int p = 0; p < 4; p++) for (int i = 0; i < GFX_PLANE_SZ; i++)
+                CHECK(pages[gfx_display_page][p][i] == 0x91 + p,
+                      "all planes transferred before raster presentation");
+            for (int i = 0; i < table.count; i++) {
+                unsigned int j = i * 4;
+                CHECK(raster_ports[j] == PAL_IDX_PORT && raster_values[j] == 1 &&
+                      raster_ports[j+1] == PAL_G_PORT && raster_values[j+1] == table.entries[i].g &&
+                      raster_ports[j+2] == PAL_R_PORT && raster_values[j+2] == table.entries[i].r &&
+                      raster_ports[j+3] == PAL_B_PORT && raster_values[j+3] == table.entries[i].b,
+                      "palette port order and colors");
+                if (i) {
+                    unsigned long long phase = raster_times[j] * raster_den %
+                                               ((unsigned long long)raster_total * 100000);
+                    unsigned long long target = (raster_total - 400ULL + table.entries[i].line) * 100000;
+                    CHECK(phase < target && target - phase <= 10 * raster_den,
+                          "public raster honors unequal absolute lines");
+                }
+            }
+            CHECK(raster_if == 0x202, "raster preserves enabled IF");
+        }
+        /* Timing/budget failure still drains dirty without a palette write. */
+        for (int failure = 0; failure < 3; failure++) {
+            table.entries[1].line = failure == 0 ? 1 : 10;
+            raster_no_sync = failure == 1;
+            raster_if = failure == 2 ? 2 : 0x202;
+            gfx_add_dirty_rect(0, 0, 32, 1);
+            u32 before = gfx_counters.present_bytes;
+            raster_record = 1; raster_writes = 0;
+            gfx_present_raster(&table);
+            raster_record = 0;
+            CHECK(!raster_writes && !dirty_queue.count &&
+                  gfx_counters.present_bytes > before, "static fallback transfers dirty");
+            CHECK(raster_if == (failure == 2 ? 2U : 0x202U), "fallback preserves entry IF");
+        }
+        raster_if = 0x202; raster_no_sync = 0;
+        gfx_shutdown();
+        CHECK(!raster.checked && !raster.dynamic_ok, "shutdown invalidates timing");
+        /* The 200-line entry must invalidate the same cached state. */
+        raster.checked = raster.dynamic_ok = 1;
+        gfx_init_200();
+        CHECK(!raster.checked && !raster.dynamic_ok, "init200 invalidates timing");
+        gfx_shutdown();
+    }
+    puts("PASS: public raster both modes, flip/dirty, absolute lines, fallback, reset");
+}
+
 int main(int argc, char **argv)
 {
     int pref;
@@ -212,6 +341,10 @@ int main(int argc, char **argv)
     map_region(TVRAM_BASE, VRAM_PLANE_B - TVRAM_BASE);
     map_region(VRAM_PLANE_B, 0x18000);
     map_region(VRAM_PLANE_I, 0x8000);
+    if (argc == 3 && !strcmp(argv[2], "raster")) {
+        test_raster_dispatch();
+        return 0;
+    }
     if (argc == 3 && (!strcmp(argv[2], "init400") || !strcmp(argv[2], "init200"))) {
         memset(pages, 0xA5, sizeof(pages));
         for (int p = 0; p < 4; p++)

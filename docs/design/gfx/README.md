@@ -11,6 +11,7 @@
 ## 索引
 
 - [gfx/gfx_core](gfx_core.md)
+- [gfx/gfx_vram](gfx_vram.md)
 
 - [gfx/gfx_osri.h](gfx_osri.h.md)
 - [gfx/gfx_osri.c](gfx_osri.c.md)

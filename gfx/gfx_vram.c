@@ -5,7 +5,7 @@
 #include "gfx_internal.h"
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"
-#include "cpu_calibrate.h"
+#include "../drivers/video/pc98/splash_raster.h"
 #include "io.h"
 
 /* Compare with the last printed sample; a closed serial gate cannot consume it. */
@@ -300,181 +300,37 @@ diag:
 }
 
 /* ======================================================================== */
-/*  1ライン分だけVRAM転送 (全dirty rectの該当ラインのみ)                   */
-/* ======================================================================== */
-static void _flush_dirty_line(int line)
-{
-    int i;
-    u8 *vb_base = (u8 *)P2V(VRAM_PLANE_B);
-    u8 *vr_base = (u8 *)P2V(VRAM_PLANE_R);
-    u8 *vg_base = (u8 *)P2V(VRAM_PLANE_G);
-    u8 *vi_base = (u8 *)P2V(VRAM_PLANE_I);
-
-    for (i = 0; i < dirty_queue.count; i++) {
-        GFX_Rect *r = &dirty_queue.rects[i];
-        int byte_x, byte_w, words;
-        int physical_y;
-        unsigned long phys_off, base_off;
-
-        /* このdirty rectにこのラインが含まれるかチェック */
-        if (line < r->y || line >= r->y + r->h) continue;
-
-        byte_x = r->x >> GVRAM_PIXELS_PER_BYTE_SHIFT;
-        byte_w = r->w >> GVRAM_PIXELS_PER_BYTE_SHIFT;
-        words  = byte_w >> 1;
-        if (words <= 0) continue;
-
-        physical_y = (line + vram_scroll_y) % gfx_current_height;
-        phys_off = (unsigned long)physical_y * GFX_BPL + byte_x;
-        base_off = (unsigned long)line * GFX_BPL + byte_x;
-
-        _memcpy_w(vb_base + phys_off, bb_b + base_off, words);
-        _memcpy_w(vr_base + phys_off, bb_r + base_off, words);
-        _memcpy_w(vg_base + phys_off, bb_g + base_off, words);
-        _memcpy_w(vi_base + phys_off, bb_i + base_off, words);
-    }
-}
-
-/* ======================================================================== */
 /*  KAPI: ラスタパレット付きVRAM転送                                        */
 /*                                                                          */
-/*  VSYNC待機後、ラスタパレットテーブルに従ってパレットI/Oを書き換える。      */
-/*  NP21/Wのrasterdraw機構はCPUクロック値でイベントをラスタラインに            */
-/*  対応付けるため、HBLANK I/Oポーリングではなく固定CPUサイクルの              */
-/*  ディレイで書き込み間隔を制御する。                                        */
-/*                                                                          */
-/*  2ライン ≈ gdc.rasterclock*2 CPUサイクル。                                */
-/*  実機8MHz時: 1ライン ≈ 199サイクル → 2ライン ≈ 398サイクル。              */
-/*  NOPディレイでこれに近い間隔を確保する。                                  */
+/*  dirty は先に一括転送し、flip 後の次の VSYNC から共通再生器へ渡す。       */
+/*  line=0 は初期色、以後は可視行の絶対位置 (異なる行の間隔は 2 行以上)。   */
+/*  再生器が目標の 1 行前から HBLANK の 4 OUT までだけ IF=0 にし、           */
+/*  各保護区間後は IF=1 を 1 行以上確保する。VRAM 転送は保護しない。        */
+/*  入口 IF=0・判定不可・同期失敗・予算違反では転送済み像を静止提示する。   */
 /* ======================================================================== */
-
-/* ラスタパレット書き換え間ディレイ
- * NP21/W 実測: 約120µs で全400ラインカバー (100エントリ × 4ライン間隔)。
- * cpu_delay_us() により CPU 速度に自動適応する。 */
-#define RASTER_LINE_US  120
-
-static inline void _raster_delay(void)
-{
-    cpu_delay_us(RASTER_LINE_US);
-}
-
-/* ======================================================================== */
-/*  _raster_delay_open — 待つあいだは **割り込みを戻す**                    */
-/*                                                                          */
-/*  ⚠ ここで割り込みを止め続けてはいけない (Codex レビュー往復 2 B4)。       */
-/*  ラスタ期間は IF=0 で守られているが、待ちは 100〜400 回繰り返される。     */
-/*  cpu_calibrate() の丸めを直して cpu_delay_us が**本来の長さ**を待つように */
-/*  なったので (票 TASK_SERIAL_VFAST 往復 3)、この待ちの合計は実機で         */
-/*  **12〜48ms** になる。そのあいだ割り込みを止めると:                      */
-/*    - 38400 以上の受信を取りこぼす (FIFO は 16 バイトしかない)             */
-/*    - PIT の tick を失う → drivers/char/serial.c の送信予算 (tick を数える)     */
-/*      の前提が崩れる                                                      */
-/*                                                                          */
-/*  **開けるのは待ちのあいだだけ。** VSYNC 終了待ち・VRAM 転送                */
-/*  (`_flush_dirty_line`)・パレットの 4 ポート連続 out は **IF=0 のまま**     */
-/*  (割り込みで分断されると色や転送先がずれる)。つまり「最小区間だけ守る」    */
-/*  ではなく「**待ちのぶんだけ窓を開ける**」で、1 行あたり                    */
-/*  RASTER_LINE_US (120µs) ごとに割り込みが 1 回通る。400 行なら 400 回。     */
-/*  引き換えに、待ちの途中で割り込みが入るとラスタの位置が数十µs ずれうる    */
-/*  — 呼び手は init/boot_splash.c の 2 か所だけなので、スプラッシュの      */
-/*  見た目で確かめる。                                                      */
-/* ======================================================================== */
-static void _raster_delay_open(unsigned int *flags)
-{
-    irq_restore(*flags);
-    _raster_delay();
-    *flags = irq_save();
-}
-
 void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 {
     u32 before = gfx_counters.present_bytes;
     if (!bb_b) goto diag;
-    int entry_idx, line;
-    int has_dirty;
-    unsigned int flags;
-
     if (!table || table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES) goto diag;
 
-    /* ラスタパレットは 16 色プレーン機の HBLANK 同期パレット書き換え。
-     * パックド系 (PEGC 256 色) には対応物が無いので、v1 では普通の present に
-     * 落とす (色は化けず、ラスタ効果だけが出ない)。 */
+    /* packed 系は通常の dirty present に委譲する。 */
     if (_present_dirty_packed()) goto diag;
 
     gfx_counters.commits++;
-
-    /* フリップモード: VRAM転送はフリップ経由、パレット書き換えのみVSYNC同期 */
     if (gfx_flip_enabled) {
-        /* まずフリップ転送でVRAMを更新 */
         if (dirty_queue.count > 0 || prev_dirty.count > 0) {
-            DirtyRectQueue snapshot;
-            snapshot = dirty_queue;
+            DirtyRectQueue snapshot = dirty_queue;
             _merge_prev_dirty();
             _flush_dirty_queue();
             prev_dirty = snapshot;
             _flip_page();
         }
-        /* VSYNC待ち → パレット書き換えのみ */
-        while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
-        flags = irq_save();
-        while (_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) { }
-        for (entry_idx = 0; entry_idx < table->count; entry_idx++) {
-            GFX_RasterPalEntry *e = &table->entries[entry_idx];
-            _out(PAL_IDX_PORT, e->pal_idx);
-            _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
-            _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
-            _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
-            _raster_delay_open(&flags);
-        }
-        irq_restore(flags);
-        goto diag;
-    }
-
-    has_dirty = (dirty_queue.count > 0);
-
-    /* VSYNC期間になるまで待つ */
-    while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }
-
-    /* 割り込み禁止 (全ラスタ期間を通じて安定させる) */
-    flags = irq_save();
-
-    /* VSYNC終了を待つ → アクティブ表示領域が始まる */
-    while (_in(GDC_GFX_STAT) & GDC_STAT_VSYNC) { }
-
-    entry_idx = 0;
-
-    if (has_dirty) {
-        /* VRAM転送 + パレット書き換え */
-        for (line = 0; line < gfx_current_height; line++) {
-            _flush_dirty_line(line);
-
-            while (entry_idx < table->count &&
-                   table->entries[entry_idx].line <= (u16)line) {
-                GFX_RasterPalEntry *e = &table->entries[entry_idx];
-                _out(PAL_IDX_PORT, e->pal_idx);
-                _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
-                _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
-                _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
-                entry_idx++;
-            }
-            _raster_delay_open(&flags);
-        }
     } else {
-        /* パレット書き換えのみ (VRAM転送なし) */
-        for (entry_idx = 0; entry_idx < table->count; entry_idx++) {
-            GFX_RasterPalEntry *e = &table->entries[entry_idx];
-            _out(PAL_IDX_PORT, e->pal_idx);
-            _out(PAL_G_PORT, e->g & GFX_PALETTE_COMPONENT_MASK);
-            _out(PAL_R_PORT, e->r & GFX_PALETTE_COMPONENT_MASK);
-            _out(PAL_B_PORT, e->b & GFX_PALETTE_COMPONENT_MASK);
-            _raster_delay_open(&flags);
-        }
+        _flush_dirty_queue();
     }
 
-    /* 割り込み復帰 */
-    irq_restore(flags);
-
-    dirty_queue.count = 0;
+    (void)pc98_splash_raster_table(pc98_splash_raster_state(), table);
 diag:
     gfx_diag_first_present(before);
 }
