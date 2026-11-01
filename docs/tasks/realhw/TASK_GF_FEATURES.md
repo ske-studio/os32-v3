@@ -2,14 +2,14 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。最初は 1 (土台: Bus Master の撤回・PRAMIN・割り込み) の設計の起草から。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。**層 1 の設計は確定** ([GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)、astra r1〜r2、Opus 2 回)、実装はこれから。層 2 の設計を並べて起草する。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 
 - 「GUIなどに繋ぐ部分は後回しでもいいのですが、PCIのBus Masterの件は何で決まっていますか？ たぶん、内蔵IDEの件で誤解していると思いますが、追加のPCIデバイスにはこれは当たらなかったはず。」
 - 「実際の動作確認は実装後のテストでもいいし実機でテストで動作チェックすればいいですが、基本的にすべての機能が同じレベル（GUI以外）には用意されるべきです。」
 - 範囲の選択: 「１から５で。それ以降は残タスクしてドキュメント化」 (1〜5 は §1 の表。3D・Xv・MPEG は §3 の残タスク)。
-- 「足りる」の基準を PM が決めない ([TASK_GF_ACCEL](TASK_GF_ACCEL.md) の状態行の訂正、2026-11-02)。
+- 「足りる」の基準を PM が決めない (票 TASK_GF_ACCEL の状態行の訂正、2026-11-02)。
 
 ## 1. 範囲 (1〜5)
 
@@ -44,5 +44,5 @@
 
 | 段 | 中身 | 状態 |
 |---|---|---|
-| 1 | 土台 (Bus Master・PRAMIN・割り込み) | 設計中 — astra 起草、Opus レビュー |
+| 1 | 土台 (Bus Master・PRAMIN・割り込み) | 設計確定 — [GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md) §7 の段 (A0 → B0〜B6 並列 → C0〜C10)。要点: Bus Master は開始ごとに最初に立て、停止は engine の reset パルス → IRQ の登録解除 → BM 解除 (nouveau の remove/suspend の順)。latency は 0Ch に write16。instmem は VRAM 末尾、BAR2 を直に UC で。割り込みは IRQ6 の共有登録、未知の要因は PMC を閉じて IRQ_DEFERRED、tick の 7 枠目で拾い直す。import は約 20 → 28〜30 (上限 32) |
 | 2〜5 | §1 の表 | 計画 |
