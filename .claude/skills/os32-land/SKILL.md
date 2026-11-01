@@ -52,7 +52,7 @@ python3 tools/np21w_ctl.py stop
 python3 tools/np21w_ctl.py start --ini np21x64w.ini --wait-ready
 ```
 
-- 検査の作業木は受入が終わるまで消さない。e2fsck は `pull` の後のマウントが残った像でなく、NP21/W を止めて Windows 側の NHD を写してからかける。
+- 検査は `KEEP_WT=1 CHECK_BASE=… ~/os32-tmp/bin/check_wt.sh <名札> <SHA>` で回す (既定は rc=0 で作業木を消す — 2026-11-01 に消えて配れなかった)。受入が終わったら `git worktree remove --force ~/wt/os32-v3/check-<名札>`。e2fsck は `pull` の後のマウントが残った像でなく、NP21/W を止めて Windows 側の NHD を写してからかける。
 
 ## 4. 落ちたとき
 
