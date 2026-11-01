@@ -207,6 +207,16 @@ static void sequence(const unsigned *want, unsigned n)
 }
 void _start(void)
 {
+    f=(struct gf_foundation){.running=true,.bm=true,.registered=true,.mapped=true,
+        .expected_command=RECOVER_COMMAND_RUN,.expected_pmc=0xabcde000U};
+    host_if=1;
+    gf_foundation_revoke(&f);
+    CHECK(f.revoked && !f.running && f.bm && f.registered && f.mapped);
+    CHECK(f.expected_command==RECOVER_COMMAND_RUN && f.expected_pmc==0xabcde000U);
+    CHECK(host_if==1 && saves==restores && !count && !io_count);
+    host_if=0;
+    gf_foundation_revoke(&f);
+    CHECK(f.revoked && !f.running && !host_if && saves==restores);
     static const unsigned start[] = {MASTER,MASK,MC,IMEM,BIND,ATTACH,ENABLE};
     static const unsigned stop[] = {UNBIND,MASK,ENGINE,PMC_READ,DETACH,DISABLE,FREE,FREE,UNMAP};
     static const unsigned failed[] = {MASTER,MC,IMEM,BIND,ATTACH,ENABLE};

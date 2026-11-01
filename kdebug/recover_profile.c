@@ -197,6 +197,7 @@ int recover_indexed_cleanup(struct recover *r, const struct recover_local_step *
 #define GF_CFG50 4U
 #define GF_CFG54 5U
 #define GF_RESTORE_CMD 6U
+#define GF_PMC 6U
 static const struct recover_target gf_targets[] = {
     {REC_PCI_CFG,0,RECOVER_COMMAND,0,0,RECOVER_NONE,2,REC_RW,1},
     {REC_BAR_MMIO,0,RECOVER_PBUS1850,0,0,RECOVER_NONE,4,REC_RW,1},
@@ -204,6 +205,7 @@ static const struct recover_target gf_targets[] = {
     {REC_BAR_MMIO,0,RECOVER_GF_PMC_IRQ,0,0,RECOVER_NONE,4,REC_RW,1},
     {REC_PCI_CFG,0,RECOVER_CFG50,0,0,RECOVER_NONE,4,REC_RW,1},
     {REC_PCI_CFG,0,RECOVER_CFG54,0,0,RECOVER_NONE,4,REC_RW,1},
+    {REC_BAR_MMIO,0,RECOVER_PMC_ENABLE,0,0,RECOVER_NONE,4,REC_RW,1},
 };
 static const u32 gf_after_out[]={GF_OUT}, gf_after_legacy[]={GF_LEGACY};
 static const u32 gf_after_irq[]={GF_IRQ}, gf_after_50[]={GF_CFG50}, gf_after_54[]={GF_CFG54};
@@ -211,15 +213,16 @@ static const u32 gf_after_irq[]={GF_IRQ}, gf_after_50[]={GF_CFG50}, gf_after_54[
     { .id=id_, .key=key_, .phase=phase_, .main_id=RECOVER_NONE, .pc=RECOVER_NONE, \
       .substep=REC_WRITE, .write_mask=mask_, .verify_mask=verify_, \
       .value={.mode=REC_LITERAL,.mask=mask_,.bits=bits_,.expr_id=RECOVER_NONE}, \
-      .requires=deps_, .requires_count=n_ }
+      .requires=deps_, .requires_count=n_, \
+      .flags=((id_) == GF_CMD ? REC_GF_ENGINE_STOP : 0) }
 static const struct recover_rule gf_rules[]={
     GF_RULE(GF_OUT,GF_OUT,REC_QUIESCE,~0U,~0U,0,0,0),
     GF_RULE(GF_LEGACY,GF_LEGACY,REC_QUIESCE,~0U,~0U,0,gf_after_out,1),
     GF_RULE(GF_IRQ,GF_IRQ,REC_QUIESCE,~0U,~0U,0,gf_after_legacy,1),
     GF_RULE(GF_CFG50,GF_CFG50,REC_QUIESCE,~0U,~0U,0,gf_after_irq,1),
     GF_RULE(GF_CFG54,GF_CFG54,REC_QUIESCE,~0U,~0U,0,gf_after_50,1),
-    GF_RULE(GF_CMD,GF_CMD,REC_QUIESCE,RECOVER_GF_COMMAND_MASK,0xffffU,RECOVER_COMMAND_OVERRIDE,gf_after_54,1),
-    GF_RULE(GF_RESTORE_CMD,GF_CMD,REC_RESTORE,RECOVER_GF_COMMAND_MASK,0xffffU,RECOVER_COMMAND_OVERRIDE,0,0),
+    GF_RULE(GF_CMD,GF_CMD,REC_QUIESCE,RECOVER_GF_COMMAND_MASK,0xffffU,RECOVER_COMMAND_STOP,gf_after_54,1),
+    GF_RULE(GF_RESTORE_CMD,GF_CMD,REC_RESTORE,RECOVER_GF_COMMAND_MASK,0xffffU,RECOVER_COMMAND_STOP,0,0),
 };
 #undef GF_RULE
 static const struct recover_reg gf_regs[]={
@@ -228,7 +231,7 @@ static const struct recover_reg gf_regs[]={
 static const struct recover_write gf_quiet[]={
     {GF_OUT,4,0,~0U,GF_OUT}, {GF_LEGACY,4,0,~0U,GF_LEGACY},
     {GF_IRQ,4,0,~0U,GF_IRQ}, {GF_CFG50,4,0,~0U,GF_CFG50}, {GF_CFG54,4,0,~0U,GF_CFG54},
-    {GF_CMD,2,RECOVER_COMMAND_OVERRIDE,0xffffU,GF_CMD}
+    {GF_CMD,2,RECOVER_COMMAND_STOP,0xffffU,GF_CMD}
 };
 int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
 {
@@ -243,7 +246,7 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
      * widths including the failure and final override rows. T3's serializer
      * must fit this grammar; adding fields/operations requires revalidation.
      * Count the actual T2 sequence, not an average line length: snapshot,
-     * local cleanup, six quiesce writes, Command override, verification,
+     * local cleanup, six quiesce writes plus engine reset, Command override, verification,
      * terminal event; six extra map/unmap pairs for the three MMIO W/Rs.
      * SIZE_BARS adds three BAR restore/readback pairs plus its Command fence.
      * ②: route R/W/R, safe, display, cell R/W/R/W/R, redraw, final verify.
@@ -261,7 +264,10 @@ int recover_gf_profile(struct recover_profile *p, bool cold, u32 kind, u32 hz)
     /* Include a resynchronizing newline before each row after a lost row. */
     u32 pair_bytes=sizeof(begin_row)+sizeof(end_row);
     u32 s0_bytes=14*pair_bytes+sizeof(final_row)+sizeof(discard_row);
-    u32 main_pairs=1+1+p->quiesce_count+1+1+1+6;
+    /* Each fixed write can read old/write/readback (three REC pairs).
+     * Engine stop: 3 engines * (read + write/read + write/read), with
+     * two window map/unmap pairs per access. Independent screen S0 is unchanged. */
+    u32 main_pairs=1+1+3*p->quiesce_count+1+1+1+6 + 3*5*3;
     if (kind==REC_BUDGET_SIZE_BARS) main_pairs+=7;
     struct recover_static_work work={
         main_pairs*pair_bytes+s0_bytes+sizeof(state_row), kind==REC_BUDGET_SIZE_BARS ? RECOVER_BUDGET_EXEC_MS_SIZE_BARS:RECOVER_BUDGET_EXEC_MS_RUN,

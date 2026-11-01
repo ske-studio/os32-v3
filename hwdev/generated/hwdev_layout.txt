@@ -1536,27 +1536,29 @@ offset	struct gf_script_span.length	8
 member_size	struct gf_script_span.length	4
 offset	struct gf_script_span.pc	4
 member_size	struct gf_script_span.pc	4
-size	struct gf_stage_state	248
+size	struct gf_stage_state	252
 align	struct gf_stage_state	4
-offset	struct gf_stage_state.bars	36
+offset	struct gf_stage_state.bars	40
 member_size	struct gf_stage_state.bars	48
-offset	struct gf_stage_state.entry_ok	1
+offset	struct gf_stage_state.entry_ok	5
 member_size	struct gf_stage_state.entry_ok	1
-offset	struct gf_stage_state.identity	4
+offset	struct gf_stage_state.foundation	0
+member_size	struct gf_stage_state.foundation	4
+offset	struct gf_stage_state.identity	8
 member_size	struct gf_stage_state.identity	32
-offset	struct gf_stage_state.initialized	0
+offset	struct gf_stage_state.initialized	4
 member_size	struct gf_stage_state.initialized	1
-offset	struct gf_stage_state.keys	168
+offset	struct gf_stage_state.keys	172
 member_size	struct gf_stage_state.keys	40
-offset	struct gf_stage_state.limits	84
+offset	struct gf_stage_state.limits	88
 member_size	struct gf_stage_state.limits	76
-offset	struct gf_stage_state.rom_crc	160
+offset	struct gf_stage_state.rom_crc	164
 member_size	struct gf_stage_state.rom_crc	4
-offset	struct gf_stage_state.rom_size	164
+offset	struct gf_stage_state.rom_size	168
 member_size	struct gf_stage_state.rom_size	4
-offset	struct gf_stage_state.s0_ok	2
+offset	struct gf_stage_state.s0_ok	6
 member_size	struct gf_stage_state.s0_ok	1
-offset	struct gf_stage_state.values	208
+offset	struct gf_stage_state.values	212
 member_size	struct gf_stage_state.values	40
 size	struct gfinit_bus	88
 align	struct gfinit_bus	4
@@ -3109,6 +3111,7 @@ enum	REC_DATA	3
 enum	REC_EXPR	3
 enum	REC_FAILED	7
 enum	REC_FORCE	4
+enum	REC_GF_ENGINE_STOP	32
 enum	REC_IDLE	0
 enum	REC_IMM	0
 enum	REC_LITERAL	0

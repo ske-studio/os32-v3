@@ -181,9 +181,13 @@ int recover_profile_ok(const struct recover_profile *p)
              (w->main_id != RECOVER_NONE || w->pc != RECOVER_NONE)) ||
             w->requires_count > RECOVER_LINK_MAX || (w->requires_count && !w->requires) ||
             w->guard_count > RECOVER_LINK_MAX || (w->guard_count && !w->guards) ||
-            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_VERIFY_RECORD)) ||
+            (w->flags & ~(REC_N1 | REC_LOCAL | REC_FORCE | REC_VERIFY_RECORD | REC_GF_ENGINE_STOP)) ||
             ((w->flags & REC_VERIFY_RECORD) && (w->phase != REC_MODE_C || !w->verify_mask))) return -1;
         const struct recover_target *t = &p->targets[w->key];
+        if ((w->flags & REC_GF_ENGINE_STOP) &&
+            (p->expected_device != RECOVER_GF_DEVICE || w->phase != REC_QUIESCE ||
+             t->space != REC_PCI_CFG || t->offset != RECOVER_COMMAND ||
+             w->substep != REC_WRITE)) return -1;
         const struct recover_value *v = &w->value;
         u32 mask = width_mask(t->width);
         if (t->access == REC_UNCLASSIFIED || ((w->write_mask | w->verify_mask | v->mask | v->bits) & ~mask) ||

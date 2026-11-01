@@ -73,10 +73,57 @@ static bool config_ok(struct recover *r)
     return true;
 }
 
+/* Fixed trusted GF recovery operation, separate from trial expression rules.
+ * Same reset pulse as hwdev/gf/engine_stop.c (nvkm_subdev_fini / nv17 MC).
+ * All accesses use the owner's guarded bus and normal REC/deadline path. */
+static int bus_address(struct recover *, u32, u32, struct recover_bus_access *);
+static int quiesce_engine_access(struct recover *r, struct recover_bus_access *a,
+                                 bool write, u32 *value)
+{
+    if (r->state == REC_RESTORING ? recover_restore_point(r) : call_point(r, false))
+        return -1;
+    a->dir_substep = write ? REC_WRITE : REC_READ;
+    return write ? logged_write(r, a, *value, 0) : logged_read(r, a, value);
+}
+static bool quiesce_engines(struct recover *r)
+{
+    static const u32 engines[] = {0x100U, 0x1000U, 0x2U};
+    u32 key = RECOVER_NONE;
+    for (u32 i = 0; i < r->profile->target_count; i++) {
+        const struct recover_target *t = &r->profile->targets[i];
+        if (t->space == REC_BAR_MMIO && t->bar == 0 &&
+            t->offset == RECOVER_PMC_ENABLE && t->width == 4 && t->read_safe)
+            key = i;
+    }
+    struct recover_bus_access a;
+    if (key == RECOVER_NONE || bus_address(r, key, REC_READ, &a)) {
+        fail(r, REC_CONTRACT, REC_PHASE_QUIESCE, key); return false;
+    }
+    for (u32 i = 0; i < sizeof(engines) / sizeof(engines[0]); i++) {
+        u32 value, actual;
+        if (quiesce_engine_access(r, &a, false, &value)) goto failed;
+        value &= ~engines[i];
+        for (u32 set = 0; set < 2; set++) {
+            if (set) value |= engines[i];
+            if (quiesce_engine_access(r, &a, true, &value)) goto failed;
+            if (quiesce_engine_access(r, &a, false, &actual)) goto failed;
+            if (actual != value) {
+                fail(r, REC_VERIFY, REC_PHASE_QUIESCE, key); return false;
+            }
+        }
+    }
+    return true;
+failed:
+    fail(r, REC_BUS, REC_PHASE_QUIESCE, key); return false;
+}
+
 static bool write_verify(struct recover *r, const struct recover_write *w,
                          enum recover_phase phase, bool restoring)
 {
     if (restoring && !restore_time(r)) return false;
+    const struct recover_rule *rule = rule_by_id(r->profile, w->rule_id);
+    if (phase == REC_PHASE_QUIESCE && rule &&
+        (rule->flags & REC_GF_ENGINE_STOP) && !quiesce_engines(r)) return false;
     u32 value = w->value;
     r->auth_phase = phase == REC_PHASE_RESTORE ? REC_RESTORE : REC_QUIESCE;
     if (recover_access(r, RECOVER_NONE, REC_WRITE, w->key, w->width, &value)) return false;

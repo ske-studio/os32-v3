@@ -110,3 +110,12 @@ int gf_foundation_start(struct gf_foundation *f)
     }
     return f->last_rc = rc;
 }
+
+/* Publish loss of the hardware lease without touching the old device. */
+void gf_foundation_revoke(struct gf_foundation *f)
+{
+    unsigned flags = irq_save();
+    f->revoked = true;
+    f->running = false; /* revoke publication */
+    irq_restore(flags);
+}

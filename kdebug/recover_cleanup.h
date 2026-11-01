@@ -40,6 +40,8 @@ static u32 cleanup_access_pairs(const struct recover_profile *p, u32 key, u32 di
     if (!w) return 0; /* authorization rejects before any bus operation */
     const struct recover_target *t = &p->targets[key];
     u32 pairs = 1 + (w->verify_mask != 0) + (w->write_mask != width_mask(t->width));
+    /* Reset: 15 accesses, each with its REC and worst-case map/unmap. */
+    if (w->flags & REC_GF_ENGINE_STOP) pairs += 3U * 5U * 3U;
     if (w->flags & REC_N1) pairs += 2 * cleanup_zero_count(p);
     for (u32 i = 0; i < w->guard_count; i++) {
         if (w->guards[i].when & REC_BEFORE) pairs++;

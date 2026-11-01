@@ -418,3 +418,8 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev (import 37/128)、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
 - 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
 - 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c:46-77・348-461、include/hwdev_private.h:15-22) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
+
+## CK の実装で設計者が決めたこと
+- C7 の固定表は変動する PMC 値を表せないため、Command の QUIESCE rule に REC_GF_ENGINE_STOP を登録し write_verify から固定停止関数を呼ぶ；汎用 plan/式の実行契約は変更せず、FIFO→GR→MPEG の現値 clear/read/set/read を既存の guarded bus・REC・safe point で実施し、どの失敗も後続 Command/保存復元を止める。
+- C7 の PMC は read-safe target として追加し、各 engine ごとの先頭 read を含む 15 アクセスと最大 30 map/unmap の REC pair を静的・実効 cleanup 予算へ加算する；独立画面 S0 の 4096 byte/10秒予約は維持し、RUN/SIZE_BARS の既定枠を各32768 byte・60秒・131072 poll とする（9600bps、送信余裕・実行時間を含む）。
+- C8 は stage に const foundation 借用欄を追加して参照なし/失効を拒否する；所有者の設定と寿命の結線は CW、CK は共有レイアウトの入力台帳も追従させ生成器で契約 CRC を更新する（公開 KAPI 変更なし）。

@@ -19,7 +19,9 @@
 #define GF_C_S0_BYTES 65536U
 
 /* One boot-lifetime value set. Backing plans, bus and ROM stay with the owner. */
+struct gf_foundation;
 struct gf_stage_state {
+    const struct gf_foundation *foundation;
     bool initialized, entry_ok, s0_ok;
     struct recover_identity identity;
     struct recover_bar_extent bars[RECOVER_BAR_COUNT];

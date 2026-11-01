@@ -830,6 +830,7 @@
     "struct gf_stage_state": [
       "bars",
       "entry_ok",
+      "foundation",
       "identity",
       "initialized",
       "keys",
@@ -1758,6 +1759,7 @@
     "REC_EXPR",
     "REC_FAILED",
     "REC_FORCE",
+    "REC_GF_ENGINE_STOP",
     "REC_IDLE",
     "REC_IMM",
     "REC_LITERAL",
