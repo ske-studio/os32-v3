@@ -41,6 +41,19 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
   rc=0 ならその SHA を**新しい最後の全体検査**にして、以後の `CHECK_BASE` を差し替え、HANDOVER §1 に書く。
 - 検査中に main へ次の段を merge してよい。push するのは検査した SHA まで (`git push origin <SHA>:main`)。
 
+## 3-1. ゲストの受入は検査の成果物から (ユーザー承認 2026-11-01)
+
+`make all` は段の取り込みの `check_wt.sh` の 1 回だけ。NP21/W の受入は main で組み直さず、検査の作業木の成果物を配る (検査した版と配った版が一致する)。作業木に `.env` が無いので置き場を明示する:
+
+```bash
+W=~/wt/os32-v3/check-<名札>; N=/mnt/c/Users/hight/Documents/np21w
+python3 tools/np21w_ctl.py stop
+(cd $W && NP21W_DIR=$N python3 tools/nhd_deploy.py pull && NP21W_DIR=$N make CROSS_DIR=$HOME/opt/cross NP21W_DIR=$N deploy-nhd && NP21W_DIR=$N python3 tools/nhd_deploy.py umount)
+python3 tools/np21w_ctl.py start --ini np21x64w.ini --wait-ready
+```
+
+- 検査の作業木は受入が終わるまで消さない。e2fsck は `pull` の後のマウントが残った像でなく、NP21/W を止めて Windows 側の NHD を写してからかける。
+
 ## 4. 落ちたとき
 
 1. `tail -1 rev.txt` で rc、**落ちた対象は `awk -F'\t' '$3!=0' check_times.tsv` で全部出す**。check.log の `^make…: ***` の grep は使わない — 並列の検査の出力が混ざって `make[3]: ***` が行頭に来ないことがあり、2026-11-01 に落ちた 2 本のうち 1 本を見落として push した (CI の check で発覚)。
