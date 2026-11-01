@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。**層 1 の設計は確定** ([GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)、astra r1〜r2、Opus 2 回)、実装はこれから。**層 2 の設計も確定** ([GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)、astra r1〜r2、Opus 2 回)。**層 3 の設計も確定** ([GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md))。**層 4 の設計も確定** ([GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md))。層 5 は設計中。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。**層 1 の設計は確定** ([GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)、astra r1〜r2、Opus 2 回)、実装はこれから。**層 2 の設計も確定** ([GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)、astra r1〜r2、Opus 2 回)。**層 3 の設計も確定** ([GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md))。**層 4 の設計も確定** ([GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md))。**層 5 の設計も確定** ([GF_FEAT5_DESIGN](../../decisions/realhw/GF_FEAT5_DESIGN.md)) — 1〜5 の設計がすべて確定。実装は層 1 の B 段から。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 
@@ -48,4 +48,4 @@
 | 2 | コマンドの投入 (PFIFO・push・dmaobj/RAMHT・PGRAPH・fence) | 設計確定 — [GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md) §8 の段 (A0〜A3 → B0〜B8 並列 → C)。層 1 の A0 の取り込み後に着手。要点: チャネル 0、push は VRAM、PCI の staging、nv17 型の reference で完了待ち、PCI dmaobj の前に NV44 FB の 100850/100800 を手本どおり、割り込みの trap は前景で採取 (層 1 は変えない)。import は 29〜31 (上限 32) |
 | 3 | 2D と M2MF (SURFACE_2D・GDI・IMAGE_BLIT・ROP・IFC・SIFM・M2MF、HAL の fill_rect・blit の hook と試験の入口) | 設計確定 — [GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md)。要点: ROP は手本の表 (nv_rop.h)、1bpp は CGA6 (fbcon)、M2MF には notifier (instmem 32B・class 0x3d)、hook は Cirrus の G5 の約束 (切り方と rc) に合わせ gf_hook.c に、GEFORCE_MODULE_OPS_VERSION 2→3。層 2 の実装の後 |
 | 4 | 表示 (モードと色深度・EDID/DDC・DPMS・HW カーソル・VBLANK と flip・ガンマ・TMDS/TV/2 画面の端子の確認) | 設計確定 — [GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md)。要点: PLLSEL は手本の 688→153→162 (50Ch bit9 は VPLL1 の mask で今の値のまま)、flip は counter の増えた後に bit3 を見る、EDID と TV の表はカーネル側 (geforce.mod の 128KiB に収める)、OPS_VERSION 3→4、停止は層 4→層 3→層 2→層 1 の順 |
-| 5 | §1 の表 | 設計中 (astra r2) |
+| 5 | その他 (コアとメモリのクロック・温度とファン・電圧・タイリング・状態の保存と復元) | 設計確定 — [GF_FEAT5_DESIGN](../../decisions/realhw/GF_FEAT5_DESIGN.md)。要点: 切り替えは手本の pstate→cstate の順 (ram→ファン上げ→電圧上げ→clk→電圧下げ→ファン下げ)、止めるのは ram_prog の区間だけ、ファンは AUTO・TRIP/LINEAR を前景の tick で、実機の試験は ROM の perf 状態どうしと起動時の値への復帰まで、温度は手本の式 (外部温度計なし)、snapshot の上限なし |
