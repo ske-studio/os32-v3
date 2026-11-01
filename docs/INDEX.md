@@ -370,6 +370,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **計画 (2026-09-30)** — 範囲・候補項目・設計で決めること (Q1〜Q8) だけ。設計票の作成は v3 後半 (T4・T5a と P8 の後) |
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
 | [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
+| [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **設計中 (2026-11-01)** |
 | `docs/archive/gui_v14/TASK_EDIT_GUI.md` | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
 | [../tools/tests/gui_review_20260910_tdd.md](../tools/tests/gui_review_20260910_tdd.md) / [gui_review3_20260910_tdd.md](../tools/tests/gui_review3_20260910_tdd.md) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
 
