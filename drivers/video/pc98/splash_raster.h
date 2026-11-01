@@ -14,6 +14,43 @@
 #define SPLASH_RASTER_MIN_GAP 2u
 #define SPLASH_RASTER_PER_LINE 1u /* stage 0: single-color logo only */
 #define SPLASH_RASTER_SYNC_TIMEOUT_US 100000u
+#define SPLASH_RASTER_MEASURE_PERIODS 8u
+#define SPLASH_RASTER_PERIOD_PERCENT 100u
+#define SPLASH_RASTER_PERIOD_TOLERANCE 1u
+/* B is a reference, not a measured/adopted bit6 width. 24k: NEC p.351;
+ * 31k: H * (HFP+HS+HBP)/100 from the existing 400-line SYNC. */
+#define SPLASH_RASTER_24K_BLANK_NUM_US 988u
+#define SPLASH_RASTER_24K_BLANK_DEN 100u
+#define SPLASH_RASTER_31K_BLANK_NUM_US 20000u
+#define SPLASH_RASTER_CLOCK_QUANTUM_US 1u
+
+/* Internal LC contract. Signed numerators preserve negative margins. Bounds
+ * in a budget share den (units = 1/den us), never rounded to whole lines.
+ * Q includes IN/loop/compare/count; branch is successful IN return -> OUT,
+ * so it must not include Q again. C is clock cost, W is all four OUTs.
+ * Q+branch+m*W+E < B_min; Q < min(B_min,H_min-B_max).
+ * These measured bounds do not certify arbitrary interrupt workloads. */
+struct SplashRasterTimeRange { long long min, max; };
+struct SplashRasterBudget {
+    u32 den;
+    struct SplashRasterTimeRange q, c, w, h, b;
+    long long branch, error, retry;
+};
+struct SplashRasterEntryBudget {
+    struct SplashRasterTimeRange s[2]; /* inward-rounded S_j and S_(j+1) */
+    long long planned, retry, j_max;
+    u32 usable; /* bit0/bit1: nonempty S, including >=1H open / <=2H shut */
+};
+/* J_max(y)=U_(j+1)-planned-retry for two windows; U_j-planned
+ * for one window. Frame J_max=min(all entries/relays, F entry margin,
+ * initial palette completion margin). Negative or unknown => unqualified.
+ * J is cumulative IRQ/return delay from coarse-wait tail to entry, not the
+ * longest single ISR. Failed post-save checks also count toward IF=0. */
+enum SplashRasterWave {
+    SPLASH_RASTER_WAVE_UNKNOWN,
+    SPLASH_RASTER_WAVE_24K_BLANK, SPLASH_RASTER_WAVE_24K_VS,
+    SPLASH_RASTER_WAVE_31K_BLANK, SPLASH_RASTER_WAVE_31K_VS
+};
 
 enum { SPLASH_RASTER_OK = 0, SPLASH_RASTER_NO_SYNC = -1 };
 enum { SPLASH_RASTER_24K = 0, SPLASH_RASTER_31K = 1 };
@@ -38,6 +75,20 @@ int pc98_splash_raster_frame(struct SplashRaster *s, const struct OsriImage *ima
 int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t);
 
 #ifdef SPLASH_RASTER_DIAG
+struct SplashRasterProbeCost {
+    /* IF=0 batch means; upper_num_us/upper_samples retains sub-us precision.
+     * upper_us is its ceiling for coarse waits only. IF=1 is kept separate. */
+    unsigned long long total_us, upper_us;
+    unsigned long long upper_num_us, open_total_us, open_max_us;
+    u32 samples, upper_samples, batch;
+};
+struct SplashRasterProbeEntry {
+    struct SplashRasterEntryBudget budget;
+    unsigned long long wait_begin_us, planned_us, entered_us, end_us;
+    struct SplashRasterTimeRange irq_us;
+    long long initial_margin, capture_margin, frame_j_max;
+    u32 line, rx_words, qualified;
+};
 struct SplashRasterEventDiag {
     unsigned long long target_us, begin_us, end_us;
     u32 line, index, applied;
