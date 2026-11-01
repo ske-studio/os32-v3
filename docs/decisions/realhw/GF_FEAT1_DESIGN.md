@@ -310,3 +310,7 @@ B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾
 - P3 (欠け 1): filter-out は未解決の import を持つものだけ (master・instmem・irq・instmem_map・foundation)。mc.c・engine_stop.c (B4・B3、main) は今も geforce.mod に組まれリンクできているので外さない。
 - P3 (欠け 2): 途中失敗の後始末は foundation_stop の順に従う (列を書き直さない)。
 - 段の順: **A0 追補** (foundation.h の追加 2 行・コメント 5 行、build/geforce-module.mk の filter-out) と **B7** (geforce_platform.c の BAR2 の PT) を先に出し、取り込んでから B0・B1・B2・B5 を続ける。
+
+### B1 の再開で PM が決めたこと (2026-11-02)
+- 4 の倍数でない大きさの確保: 大きさを 4 バイトに切り上げて確保し、zero もその大きさで 32bit 単位に書く (instmem へのアクセスは手本の nvkm_wo32/ro32 と同じく 32bit だけ。範囲の外には書かない)。size 0 は従来どおり拒否。
+- 直接 MMIO の失敗: bar2 への volatile の読み書きには失敗の戻り値が無いので、読み書きの関数は失敗を返さない (EIO は map の失敗 = B5 の GF1_EMAP から来るものだけ)。§4 の「MMIO 失敗を EIO」は map されていない (mapped=false) ときの呼び出しを指すと読む — そのときは GF1_EMAP を返す。
