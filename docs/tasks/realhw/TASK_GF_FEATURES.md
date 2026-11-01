@@ -2,7 +2,7 @@
 
 > 上位: [実機の票の索引](PLAN.md)
 
-> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。**層 1 の設計は確定** ([GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)、astra r1〜r2、Opus 2 回)、実装はこれから。**層 2 の設計も確定** ([GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)、astra r1〜r2、Opus 2 回)。**層 3 の設計も確定** ([GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md))。層 4・5 は設計中。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
+> 状態: **設計中 (2026-11-02)** — ユーザー決定で範囲を 1〜5 に確定。**層 1 の設計は確定** ([GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md)、astra r1〜r2、Opus 2 回)、実装はこれから。**層 2 の設計も確定** ([GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md)、astra r1〜r2、Opus 2 回)。**層 3 の設計も確定** ([GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md))。**層 4 の設計も確定** ([GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md))。層 5 は設計中。機能の比較は [GF_FEATURE_COMPARE](../../decisions/realhw/GF_FEATURE_COMPARE.md)。
 
 ## 0. ユーザーの決定 (2026-11-02、原文)
 
@@ -47,4 +47,5 @@
 | 1 | 土台 (Bus Master・PRAMIN・割り込み) | 設計確定 — [GF_FEAT1_DESIGN](../../decisions/realhw/GF_FEAT1_DESIGN.md) §7 の段 (A0 → B0〜B6 並列 → C0〜C10)。要点: Bus Master は開始ごとに最初に立て、停止は engine の reset パルス → IRQ の登録解除 → BM 解除 (nouveau の remove/suspend の順)。latency は 0Ch に write16。instmem は VRAM 末尾、BAR2 を直に UC で。割り込みは IRQ6 の共有登録、未知の要因は PMC を閉じて IRQ_DEFERRED、tick の 7 枠目で拾い直す。import は約 20 → 28〜30 (上限 32) |
 | 2 | コマンドの投入 (PFIFO・push・dmaobj/RAMHT・PGRAPH・fence) | 設計確定 — [GF_FEAT2_DESIGN](../../decisions/realhw/GF_FEAT2_DESIGN.md) §8 の段 (A0〜A3 → B0〜B8 並列 → C)。層 1 の A0 の取り込み後に着手。要点: チャネル 0、push は VRAM、PCI の staging、nv17 型の reference で完了待ち、PCI dmaobj の前に NV44 FB の 100850/100800 を手本どおり、割り込みの trap は前景で採取 (層 1 は変えない)。import は 29〜31 (上限 32) |
 | 3 | 2D と M2MF (SURFACE_2D・GDI・IMAGE_BLIT・ROP・IFC・SIFM・M2MF、HAL の fill_rect・blit の hook と試験の入口) | 設計確定 — [GF_FEAT3_DESIGN](../../decisions/realhw/GF_FEAT3_DESIGN.md)。要点: ROP は手本の表 (nv_rop.h)、1bpp は CGA6 (fbcon)、M2MF には notifier (instmem 32B・class 0x3d)、hook は Cirrus の G5 の約束 (切り方と rc) に合わせ gf_hook.c に、GEFORCE_MODULE_OPS_VERSION 2→3。層 2 の実装の後 |
-| 4〜5 | §1 の表 | 設計中 (astra 起草 r1、Opus レビュー中) |
+| 4 | 表示 (モードと色深度・EDID/DDC・DPMS・HW カーソル・VBLANK と flip・ガンマ・TMDS/TV/2 画面の端子の確認) | 設計確定 — [GF_FEAT4_DESIGN](../../decisions/realhw/GF_FEAT4_DESIGN.md)。要点: PLLSEL は手本の 688→153→162 (50Ch bit9 は VPLL1 の mask で今の値のまま)、flip は counter の増えた後に bit3 を見る、EDID と TV の表はカーネル側 (geforce.mod の 128KiB に収める)、OPS_VERSION 3→4、停止は層 4→層 3→層 2→層 1 の順 |
+| 5 | §1 の表 | 設計中 (astra r2) |
