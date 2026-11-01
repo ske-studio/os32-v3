@@ -37,6 +37,7 @@ AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_gfx_owner(void) { return 0; }
 i32 launch_child(i32 id) { (void)id; return 0; }
 int ring3_call_from_user(void) { return user && !wm_depth; }
+void gfx_shutdown(void) {} /* Display hardware is outside this service fixture. */
 void ring3_abort_check(void) {}
 void ring3_abort_request(void) {}
 int ring3_wait_pending(void) { return 1; }

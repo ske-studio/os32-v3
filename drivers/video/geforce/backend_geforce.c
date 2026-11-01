@@ -58,9 +58,14 @@ void geforce_backend_bind(struct video_device *d, int (*identify)(void),
     interrupt_context = context;
 }
 
+static void geforce_fail(void);
+
 static int geforce_probe(void)
 {
-    return !failed && device && identify_resources && identify_resources();
+    int ok = !failed && device && identify_resources && identify_resources();
+    /* Reinit may drop this backend immediately after a failed probe. */
+    if (!ok && active) geforce_fail();
+    return ok;
 }
 
 static void geforce_prepare(void)
