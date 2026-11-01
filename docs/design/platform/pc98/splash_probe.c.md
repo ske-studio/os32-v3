@@ -2,7 +2,7 @@
 
 状態: **現行 (2026-11-01)**。
 
-`kernel-splash-diag` のみが SPLASH_RASTER_DIAG を定義し、別 BUILD_OUT のオブジェクト・map・像を組む。通常の kernel/all は probe をリンクしない。begin 前には09A8hと054Chを記録し、begin 後に比較する。054Chは P2V_IO と既存PEGC定数で読み、判定には使わない。
+`kernel-splash-diag` のみが SPLASH_RASTER_DIAG を定義し、別 BUILD_OUT のオブジェクト・map・像を組む。通常の kernel/all は probe をリンクしない。begin 前には09A8hと054Chを記録し、begin 後に比較する。054Chは既存PEGC定数を添字に `v86_bios_real_lowmem()` の起動時の写しから読み、判定には使わない。ページ0はNULL保護で未写像のため直接読まない。前後とも同じ不変のBIOS値であり、beginによる変化は09A8hで観測する。
 
 RAMに32 VSYNC周期と両辺/テキスト状態、64 HBLANK周期/幅、時計128回、空ループと1/4/8色・8/16 OUT・初期16色、32フレームのIF最大/合計・late/drop/未適用・tickを採る。32周期のmin/median/p99/max、絶対予定/開始/終了は測定後にシリアルへ出す。時計異常・有限ポーリング・記録溢れはerrorsとして扱い、共通cleanupへ戻る。
 

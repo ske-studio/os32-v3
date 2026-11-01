@@ -51,7 +51,7 @@
 |---|---|
 | PC9800Bible `docs/hw/PC9800Bible/2-7_グラフィック.md:230` | 0A8h=番号、0AAh=G、0ACh=R、0AEh=B。既存の4 OUT順を保つ。 |
 | UNDOCUMENTED `docs/hw/undocumented/io_disp.md:24,765` | 0060h/00A0h の bit5=VSYNC、bit6=HORIZONTAL BLANK。水平同期信号そのものとの同一視はしない。 |
-| `include/pegc.h:95,106,115,247` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数とP2Vで診断記録だけ。 |
+| `include/pegc.h:95,106,115,247` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数と `v86_bios_real_lowmem()` の起動時の写しで診断記録だけ（ページ0は未写像、fix0依頼で訂正）。 |
 | 周期・位相の正典 | `include/pegc.h:325-335` の400行SYNCと `docs/hw/undocumented/io_disp.md:1875` の公称周波数を組にする。周期のµs比は31k=`100000/3147`、24k=`100000/2483`、4行は約127.1/161.1µs。 |
 | NEC Technical Databook Hardware (1993) | 手元の `docs/hw/` に該当資料を確認できず、未照合。メーカー資料のタイミング表を実装前のHW3資料ゲートでPMが補う。 |
 | BSD参照 | [FreeBSD releng/10.4 sys/pc98/cbus/gdc.c](https://github.com/freebsd/freebsd-src/blob/releng/10.4/sys/pc98/cbus/gdc.c#L655):655,685 はVSYNCの抜け→入り、831は16色パレット設定。冒頭はBSD 3条項。同期・I/Oの参考に限り、描画コマンドは採らない。 |
