@@ -90,14 +90,15 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
 static int geforce_detach(struct module_record *r)
 {
     (void)r;
-    foundation_slot=0;accel_slot=0;
     /* Device context and restoration callbacks live for the whole boot. */
     const struct geforce_platform *p=context.platform;
     const struct gf_production *owner=p ? p->opaque : 0;
     if (registered || (owner && (owner->foundation.registered ||
         owner->foundation.running || owner->foundation.bm ||
         owner->foundation.mapped || owner->foundation.imem.used))) return 0;
-    return !geforce_tick_bind(0,0);
+    if (geforce_tick_bind(0,0)) return 0;
+    foundation_slot=0;accel_slot=0;
+    return 1;
 }
 int geforce_module_load(void)
 {
@@ -121,6 +122,6 @@ int geforce_module_load(void)
 }
 int geforce_module_abort(void)
 {
-    foundation_slot=0;accel_slot=0;
+    if (registered) return MODULE_ISOLATED;
     return module_abort(geforce_handle);
 }

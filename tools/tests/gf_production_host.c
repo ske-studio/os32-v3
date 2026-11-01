@@ -26,6 +26,7 @@ static u32 prod_deadline_section;
 static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pfb;
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
+static int prod_foundation_fail;
 static u32 prod_logs,prod_cfg_reads;
 void kprintf(u8 attr,const char *format,...)
 { (void)attr;(void)format;prod_logs++; }
@@ -172,6 +173,7 @@ int gf_foundation_stop(struct gf_foundation *f)
 {
     CHECK(f==&prod.foundation && !prod.display.active);
     f->running=false;
+    if (prod_foundation_fail) return f->last_rc=GF1_EIO;
     if (f->revoked) return f->last_rc=GF1_EPCI;
     /* This double owns no IRQ/map. Return to STOP while retaining the old
      * transport counters (which specifically count the N1 WORD write). */
@@ -330,6 +332,14 @@ static void prod_cases(void)
     CHECK(prod_a2_done && prod_main_mask==31 && !prod.display.baseline_valid);prod_exit_order();
     prod_reset();prod_clock_fail=1;prod_failure();prod_exit_order();
     output("PASS Command mismatch, route/ROM/alloc/A2/main/baseline/PLL/CHECK/PFB/clock/deadline failures and 98 exit order\n");
+    prod_reset();CHECK(!prod_start());prod_foundation_fail=1;
+    prod.indexes[0]=(struct gf_production_local){RECOVER_PRMCIO+RECOVER_CRTC,0,0x22,true};
+    CHECK(prod_return(&prod)==-1 && prod.display.engaged && !prod.display.stop_ok);
+    CHECK(prod.indexes[0].valid && !prod_stop_writes && prod_route_calls==2);
+    CHECK(prod.foundation.bm && !prod.display.reusable && !prod.display.active);
+    prod_foundation_fail=0;
+    CHECK(!prod_return(&prod) && !prod.display.engaged && prod.display.stop_ok);
+    CHECK(prod_stop_writes==3 && prod_route_calls==3 && !prod.foundation.bm && !prod.indexes[0].valid);
     for(u32 fault=1;fault<=3;fault++) {
         prod_reset();CHECK(!prod_start());prod_stop_fail=fault;
         CHECK(prod_return(&prod)==-1 && prod_stop_writes==3 && !prod.display.reusable);
@@ -346,7 +356,7 @@ static void prod_cases(void)
         else prod_cfg[13][0][2]^=1;
         reads=prod_mmio_calls;
         CHECK(prod_return(&prod)==-1 && prod.revoked && prod.foundation.revoked && !prod.foundation.running && prod.foundation.bm && prod_mmio_calls==reads && !prod_redraws);
-        CHECK(prod_route_calls==2 && prod_start()==-1);
+        CHECK(prod_route_calls==2 && prod_start()==-1 && !prod.display.engaged);
     }
     output("PASS cleanup failures attempt all quiesce writes; ID/subsys/revision/each BAR change denies MMIO and still attempts route00\n");
     prod_reset();u32 value;

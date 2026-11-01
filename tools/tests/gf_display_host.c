@@ -287,8 +287,8 @@ static void service_cases(void)
     CHECK(video_start(&d,1,sim_rgb)==-1 && sim_starts==1 && sim_stops==1);
     sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_stop_fail=1;
     before=sim_calls;
-    CHECK(video_stop(&d)==-1 && !display.engaged && !display.active && !display.reusable && sim_calls==before+3);
-    sim_stop_fail=0;CHECK(!video_stop(&d) && !display.engaged && sim_stops==1);
+    CHECK(video_stop(&d)==-1 && display.engaged && !display.active && !display.reusable && !display.stop_ok && sim_calls==before);
+    sim_stop_fail=0;CHECK(!video_stop(&d) && !display.engaged && display.stop_ok && sim_stops==2);
     output("PASS service: runner/baseline/load/check, restart, palette/blank/stop, all bus/point/wait failures\n");
 }
 static void record_cases(void)

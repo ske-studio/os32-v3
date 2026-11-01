@@ -269,7 +269,8 @@ def module_registration(mutation=None):
             text=source.read_text()
             old,new={
                 'detach-irq': ('owner->foundation.registered ||', 'false ||'),
-                'detach-tick': ('return !geforce_tick_bind(0,0);', 'return 1;'),
+                'detach-tick': ('if (geforce_tick_bind(0,0)) return 0;', 'if (false) return 0;'),
+                'abort-slot': ('if (registered) return MODULE_ISOLATED;', 'foundation_slot=0;accel_slot=0;'),
             }[mutation]
             assert text.count(old)==1, mutation
             import re
@@ -566,7 +567,7 @@ def main():
     present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
     present_trace(byte=True)
     if '--mutate' in sys.argv:
-        for mutation in ('detach-irq','detach-tick'): module_registration(mutation)
+        for mutation in ('detach-irq','detach-tick','abort-slot'): module_registration(mutation)
         for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb'):
             core(mutation=mutation)
         core(bar2_bytes=0x400000,mutation='instmem-overrun')

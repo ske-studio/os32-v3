@@ -121,6 +121,7 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/display/quiesce.c', 'if (c->engaged) return -1;', 'if (false) return -1;', 'failed stop cleanup forbidden'),
         ('hwdev/gf/service.c', ' || c->owner->foundation_start(c)', '', 'start hook omitted'),
         ('hwdev/gf/display/quiesce.c', 'int stopped=c->owner->foundation_stop(c);', 'int stopped=0;', 'stop hook omitted'),
         ('hwdev/gf/display/quiesce.c', '    c->active=false;\n', '    (void)c;\n', 'stop while active'),

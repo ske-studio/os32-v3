@@ -73,7 +73,11 @@ static int foundation_stop(struct gf_display_context *c)
     /* Stop must still unbind tick/unmap after an identity or BAR revoke.
      * nouveau_drm.c:933-941 tears down before disabling PCI. */
     (void)gf_production_identity(p);
-    return foundation_result(c,gf_foundation_stop(&p->foundation));
+    int rc=gf_foundation_stop(&p->foundation);
+    /* Revoked display cannot be retried; quiesce still attempts every rejected
+     * cleanup row (design P2-b). Ordinary stop failures keep engaged. */
+    if (p->foundation.revoked) c->engaged=false;
+    return foundation_result(c,rc);
 }
 int gf_production_prepare(struct gf_production *p,
                           const struct gf_production_resources *boot,

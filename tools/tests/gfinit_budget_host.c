@@ -43,6 +43,9 @@ static const struct recover_transport budget_transport={
     .uart={exec_log_ready,budget_put,exec_log_wait},.frame_us=1042,
     .max_polls=RECOVER_CLEANUP_TRANSPORT_POLLS};
 static u32 budget_clock(void *v){(void)v;return budget_tick;}
+/* The owner stops foundation before S0; this fixture bypasses gfinit.c. */
+static int budget_stop(void *v)
+{ (void)v;rawcommand=RECOVER_COMMAND_STOP;return 0; }
 static int budget_local(void *v)
 {
     (void)v;cleanup_calls++;local_count=core.local_saved_count;
@@ -147,6 +150,7 @@ static void budget_setup(u32 fault_kind,bool fp_on)
     c_arm();profile.expected_device=RECOVER_GF_DEVICE;budget_fault=fault_kind;budget_tick=0;
     values[key_for(&profile,0x680848,0,0,0)]=fp_on?0x10000000:0x20000022;
     executor_bus.ticks=budget_clock;executor_bus.read=budget_read;executor_bus.write=budget_write;
+    executor_bus.pre_cleanup=budget_stop;
     executor_bus.local_cleanup=budget_local;executor_bus.route_read=budget_route_read;
     executor_bus.route_write=budget_route_write;executor_bus.screen_safe=budget_safe;
     executor_bus.screen_restore_verify=budget_screen;

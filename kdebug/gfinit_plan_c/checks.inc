@@ -28,6 +28,9 @@ static void c_check_literal(struct c_builder *b,u32 key,u32 mask,u32 expected)
 { c_check(b,REC_CHECK_TARGET,key,mask,expected,~0U,RECOVER_NONE,0); }
 static void c_check_mmio(struct c_builder *b,u32 reg,u32 mask,u32 expected)
 { c_check_literal(b,c_key(b,GF_C_MMIO,reg,0,4),mask,expected); }
+/* Initial RUN already passed MASTER; C_ONLY enters after STOP. */
+static u32 c_command(const struct c_builder *b)
+{ return b->baseline ? RECOVER_COMMAND_STOP : RECOVER_COMMAND_RUN; }
 static void c_check_in(struct c_builder *b)
 {
     u32 first=b->out->plan.node_count;
@@ -44,7 +47,7 @@ static void c_check_in(struct c_builder *b)
             b->baseline->bars[key-REC_GF_T_BAR0].raw};
         c_emit(b,b->baseline?GF_C_CHECK:GF_C_CHECK_SAVED,RECOVER_NONE,RECOVER_NONE,a,C_COUNT(a));
     }
-    c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
+    c_check_literal(b,REC_GF_T_COMMAND,~0U,c_command(b));
     for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
     c_check(b,REC_CHECK_ROUTE,RECOVER_NONE,RECOVER_ROUTE_MASK,0,~0U,RECOVER_NONE,0);
     for(u32 i=first;i<b->out->plan.node_count;i++)
@@ -66,7 +69,7 @@ static void c_check_out(struct c_builder *b,const struct gfinit_mode *m,
 #undef CHECK_INDEX
 #undef CHECK_SAVED
     for(u32 key=REC_GF_T_CFG50;key<=REC_GF_T_PBUS1854;key++)c_check_literal(b,key,~0U,0);
-    c_check_literal(b,REC_GF_T_COMMAND,~0U,RECOVER_COMMAND_OVERRIDE);
+    c_check_literal(b,REC_GF_T_COMMAND,~0U,c_command(b));
     c_check_exit(b,REC_CHECK_ROUTE,RECOVER_ROUTE_MASK,RECOVER_ROUTE_RGB_IN,GF_C_EXIT_ROUTE_SLOT);
     c_check_exit(b,REC_CHECK_CELL,~0U,1,GF_C_EXIT_CELL_SLOT);
 }

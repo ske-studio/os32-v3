@@ -23,6 +23,15 @@ GfxCounters gfx_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 static u32 probes, enables, unbinds;
 static int unbind_fail;
+static int diagnostic_stops, diagnostic_fail=1;
+static int diagnostic_call(struct gf_foundation *f,const struct gf1_test_request *q,
+                           struct gf1_test_reply *reply)
+{
+    CHECK(q->op==GF1T_STOP);diagnostic_stops++;
+    reply->rc=diagnostic_fail ? GF1_EIO : 0;
+    if (!diagnostic_fail) f->running=false;
+    return reply->rc;
+}
 int geforce_tick_bind(void (*poll)(void *),void *arg)
 { CHECK(!poll && !arg);unbinds++;return unbind_fail; }
 static int probe(void) { probes++; return 1; }
@@ -81,6 +90,19 @@ void _start(void)
     CHECK(probes==1 && enables==1);
     u32 before=returned;
     CHECK(geforce_module_abort()==MODULE_ISOLATED && returned==before && registered);
-    CHECK(!geforce_foundation_ops());
+    struct gf_foundation diagnostic={.running=true};
+    struct gf1_test_request stop={sizeof(stop),GF1T_STOP,0};
+    struct gf1_test_reply reply;
+    gf1_module_ops.call=diagnostic_call;
+    CHECK(geforce_foundation_ops()==&gf1_module_ops);
+    if (!geforce_foundation_ops()) finish(1);
+    CHECK(geforce_foundation_ops()->call(&diagnostic,&stop,&reply)==GF1_EIO);
+    CHECK(diagnostic.running && diagnostic_stops==1);
+    CHECK(geforce_module_abort()==MODULE_ISOLATED && registered);
+    CHECK(geforce_foundation_ops()==&gf1_module_ops);
+    if (!geforce_foundation_ops()) finish(1);
+    diagnostic_fail=0;
+    CHECK(!geforce_foundation_ops()->call(&diagnostic,&stop,&reply));
+    CHECK(!diagnostic.running && diagnostic_stops==2 && returned==before);
     finish(0);
 }

@@ -20,7 +20,10 @@ int gf_display_stop(void *v)
     c->active=false;
     int stopped=c->owner->foundation_stop(c);
     int stop_rc=c->last_rc;
-    if (stopped) c->reusable=false;
+    if (stopped) {
+        c->reusable=false;c->stop_ok=false;
+        if (c->engaged) return -1;
+    }
     struct gf_init_context cleanup={.io=c->io};
     int rc=c->io.restore(c->io.opaque,&cleanup);
     u32 target=c->target;

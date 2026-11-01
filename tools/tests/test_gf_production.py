@@ -59,6 +59,7 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/devinit.c', 'if (p->foundation.revoked) c->engaged=false;', '(void)c;', 'revoked cleanup exception omitted'),
         ('hwdev/gf/devinit.c', '*value=*(volatile u32 *)(f->bar0+off);', '(void)f;(void)off;*value=0;', 'resident MMIO read omitted'),
         ('hwdev/gf/devinit.c', '*(volatile u32 *)(f->bar0+off)=value;', '(void)f;(void)off;(void)value;', 'resident MMIO write omitted'),
         ('hwdev/gf/devinit.c', '    if (f->revoked) return -1;\n    *value=', '    *value=', 'revoked resident read allowed'),
