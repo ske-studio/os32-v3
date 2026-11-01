@@ -178,6 +178,33 @@ def check():
                 dynamic_error += sum((rgb[k] - original_rgb[k]) ** 2 for k in range(3))
                 fixed_error += sum((fixed_pal[fixed_index][k] - original_rgb[k]) ** 2 for k in range(3))
         assert dynamic_error < fixed_error
+        # The global variance must drive both palette selection and distance.
+        biased = Image.new('RGB', (640, 400))
+        biased.putdata([((x % 16) * 17, (y % 4) * 17, 0)
+                        for y in range(400) for x in range(640)])
+        weights = mod.variance_weights(biased)
+        assert weights[0] > weights[1] > weights[2] == 0
+        old_colors = mod.quantized_colors(biased, 16)
+        new_colors = mod.variance_colors(biased, 16, weights)
+        assert len({c >> 8 & 15 for c in new_colors}) > len({c >> 8 & 15 for c in old_colors})
+        assert len(set(new_colors)) == len(new_colors) <= 16
+        assert mod.color_distance((17, 0, 0), (0, 17, 0), weights) == 289 * (weights[0] + weights[1])
+        for mode in ('A', 'B', 'C'):
+            variance, _ = mod.convert(biased, mode, 3, 1, 4, 8, 'variance')
+            repeated, _ = mod.convert(biased, mode, 3, 1, 4, 8, 'variance')
+            assert variance == repeated
+            count = struct.unpack_from('<I', variance, 36)[0]
+            assert len(variance) == 128096 + 8 * count and count <= 3
+            events = [struct.unpack_from('<HBBHH', variance, 128096 + i * 8) for i in range(count)]
+            previous = 0
+            palette = list(struct.unpack_from('<16H', variance, 64))
+            for y, index, reserved, color, reserved2 in events:
+                assert y % 4 == 0 and y - previous >= 2 and index < 16
+                assert not reserved and not reserved2 and color < 4096 and palette[index] != color
+                if mode == 'B':
+                    assert index >= 8
+                palette[index] = color
+                previous = y
         print('OSRI conversion and loader: GREEN')
 
 
@@ -186,6 +213,9 @@ def main():
     args = parser.parse_args(); check()
     if args.mutate:
         mutations = [
+            ('variance-weights', 'tools/img2osri.py', 'return weights if any(weights) else [1, 1, 1]', 'return [1, 1, 1]', 'OSRI_CONVERTER_SOURCE'),
+            ('variance-distance', 'tools/img2osri.py', 'weights[k] * (a[k] - b[k]) ** 2', '(a[k] - b[k]) ** 2', 'OSRI_CONVERTER_SOURCE'),
+            ('variance-split', 'tools/img2osri.py', '* weights[channel]', '* (1 if weights[channel] else 0)', 'OSRI_CONVERTER_SOURCE'),
             ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
             ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
             ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
