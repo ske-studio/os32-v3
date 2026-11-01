@@ -133,6 +133,17 @@ static void ports(void)
 
 static void qualification(void)
 {
+    /* IF=0 defers the first measurement; the next IF=1 access retries. */
+    setup(0, 0); irq_on = 0;
+    struct SplashRaster *deferred = pc98_splash_raster_state();
+    REQUIRE(deferred->last_result == SPLASH_RASTER_NO_SYNC);
+    REQUIRE(!deferred->checked && !deferred->dynamic_ok && !irq_on);
+    REQUIRE(!mode_reads && !calls && !writes);
+    irq_on = 1;
+    REQUIRE(pc98_splash_raster_state() == deferred);
+    REQUIRE(deferred->checked && deferred->dynamic_ok);
+    REQUIRE(deferred->last_result == SPLASH_RASTER_OK && mode_reads == 1 && irq_on);
+
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) {
         setup(mode, vs);
         struct SplashRaster *s = pc98_splash_raster_state();
@@ -228,6 +239,19 @@ static void faults(void)
     writes = 0;
     REQUIRE(!pc98_splash_raster_table(s, &logo) && writes == 400);
     REQUIRE(s->dropped == 1);
+
+    /* A delayed rising-edge observation must not turn an already-low VSYNC
+     * into a captured falling edge and shift every band in the frame. */
+    setup(0, 0); make_logo(); s = pc98_splash_raster_state();
+    next_rise = ((clock_us * den / (total * 100000)) + 1) * total * 100000 / den;
+    inject_at = next_rise - 1;
+    inject_us = 200;
+    REQUIRE(!pc98_splash_raster_table(s, &logo));
+    REQUIRE(s->dropped == 1 && writes == 4 && irq_on);
+    REQUIRE(s->frame == 1 && s->unapplied == 99 && s->dynamic_ok);
+    writes = 0;
+    REQUIRE(!pc98_splash_raster_table(s, &logo) && writes == 400);
+    REQUIRE(s->dropped == 1 && s->unapplied == 99 && irq_on);
 
     setup(0, 0); make_logo(); s = pc98_splash_raster_state();
     track_irq = 1;

@@ -91,6 +91,7 @@ int pc98_splash_raster_begin(struct SplashRaster *s)
     unsigned long long first, rise, fall, high = 0, measured, expected, delta;
     const u8 *sync;
     if (s->checked) return s->last_result;
+    if (!_irq_enabled()) return result(s, SPLASH_RASTER_NO_SYNC);
     s->checked = 1;
     s->dynamic_ok = 0;
     s->mode = (inp(PEGC_HSYNC_PORT) & PEGC_HSYNC_READ_HF) ?
@@ -103,7 +104,7 @@ int pc98_splash_raster_begin(struct SplashRaster *s)
     s->vbp_lines = sync[7] >> 2;
     s->total_lines = sync[6] + ((sync[7] & 3) << BITS_PER_BYTE) +
                      sync[5] + s->vs_lines + s->vbp_lines;
-    if (!_irq_enabled() || new_vsync(&first))
+    if (new_vsync(&first))
         return result(s, SPLASH_RASTER_NO_SYNC);
     rise = first;
     for (u32 i = 0; i < MEASURE_PERIODS; i++) {
@@ -169,6 +170,10 @@ static int capture_fall(struct SplashRaster *s, unsigned long long rise,
     if (t > predicted && (t - predicted) * 2 * s->line_den >= s->line_num_us)
         goto drop;
     flags = irq_save();
+    if (!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC)) {
+        irq_restore(flags);
+        goto drop;
+    }
     int rc = wait_bit(GDC_STAT_VSYNC, 0, t + line, fall);
     irq_restore(flags);
     if (now_us(&t)) return SPLASH_RASTER_NO_SYNC;

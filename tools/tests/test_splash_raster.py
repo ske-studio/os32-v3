@@ -37,11 +37,16 @@ MUTATIONS = (
     ('omit fixed initial color', 'color(i, rgb >> 8, rgb >> 4, rgb);', '(void)rgb;'),
     ('forget reset', 'raster = (struct SplashRaster){0};', 'raster.frame = 0;'),
     ('lose lazy measurement latch', 's->checked = 1;', 's->checked = 0;'),
+    ('latch measurement with IF disabled',
+     'if (!_irq_enabled()) return result(s, SPLASH_RASTER_NO_SYNC);',
+     'if (!_irq_enabled()) { s->checked = 1; return result(s, SPLASH_RASTER_NO_SYNC); }'),
     ('lose IRQ restoration', 'irq_restore(flags);\n            if (now_us(&now))',
      '(void)flags;\n            if (now_us(&now))'),
     ('lose IRQ open window', 'if (wait_until(open_until, &now))', 'if (wait_until(now, &now))'),
     ('stop on late', 'if (applied) break;', 'if (late) return result(s, SPLASH_RASTER_NO_SYNC);\n            if (applied) break;'),
     ('omit late frame discard', 's->dropped++;', 's->frame++;'),
+    ('accept initially low VSYNC', 'if (!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC))',
+     'if (0)'),
     ('apply discarded frame', 's->dropped++;\n    return 1;',
      's->dropped++;\n    *fall = predicted;\n    *open_until = predicted;\n    return 0;'),
     ('ignore entry IF', 'if (!_irq_enabled() || !s->dynamic_ok', 'if (!s->dynamic_ok'),
@@ -88,7 +93,7 @@ def main():
     source = (ROOT / SOURCE).read_text()
     rc = execute(source)
     assert rc == 0, f'baseline runtime rc={rc} (REQUIRE line modulo 250 + 1)'
-    print('GREEN both modes/phase types, +/-1%, absolute lines, IRQ, timeout, late/recovery, fixed palette', flush=True)
+    print('GREEN both modes/phase types, +/-1%, absolute lines, IRQ, timeout, late/recovery, fixed palette, deferred IF=0 measurement, missed falling edge', flush=True)
     if args.mutate:
         for name, old, new in MUTATIONS:
             # Two loops intentionally share a bound: mutate one unique whole line.
