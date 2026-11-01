@@ -9,3 +9,5 @@ rshell_recover の open_port/exchange を使い、受信を底の raw へ記録�
 
 - helper は既存 state の session/Image CRC を照合して virtual end だけを送る。begin/step の state/log を継続し、ver を再送しない。
 - 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort フレーム数は標準出力に出し、成功は既存exchangeのOKだけとする。
+
+- [gf_accel](gf_accel.md)

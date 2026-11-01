@@ -897,9 +897,13 @@ pub fn flush_present() {
     if crate::fullscreen::active() {
         return;
     }
+    #[cfg(feature = "gf_accel_accept")]
+    let timing = gf_accept::present_begin();
     unsafe {
         (os32api::api().gfx_present_dirty)();
     }
+    #[cfg(feature = "gf_accel_accept")]
+    gf_accept::present_end(timing);
 }
 
 /// 1 矩形だけを即転送する近道 (積む + 流す)。
@@ -1160,7 +1164,11 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     if ctx != input::Ctx::Pump {
         crate::gserial::poll_x3(st);
     }
+    #[cfg(feature = "gf_accel_accept")]
+    if ctx != input::Ctx::Pump { gf_accept::begin(); }
     input::capture(st, ctx);
+    #[cfg(feature = "gf_accel_accept")]
+    if ctx != input::Ctx::Pump { gf_accept::event_done(); }
     if ctx != input::Ctx::Pump {
         /* モーダルの X3 分 (W4): 保留していた VFS 走査と、sticky な
          * `GUI_EV_MODAL` の再配送 (リングに空きができるまで諦めない)。 */
@@ -1182,6 +1190,8 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
          * 動いていなければ何もしない。 */
         crate::multiapp::sync_snd_focus(st);
     }
+    #[cfg(feature = "gf_accel_accept")]
+    if ctx != input::Ctx::Pump { gf_accept::finish(); }
 }
 
 /* ================================================================ */
@@ -1709,3 +1719,93 @@ pub fn restore_palette(p: &[u8; 48]) {
 #[cfg(test)]
 #[path = "../host/wm_composite_tests.rs"]
 mod wm_composite_tests;
+
+// Acceptance timing begin. No storage, clocks or serial calls in normal builds.
+#[cfg(feature = "gf_accel_accept")]
+pub(crate) mod gf_accept {
+    use core::{cell::UnsafeCell, fmt::Write};
+    const COUNT: usize = 300;
+    const FAILED: u32 = u32::MAX;
+    struct State {
+        active: bool, valid: bool, touched: bool, warm: usize, count: usize,
+        start: u64, event: u64, event_present: u64, present: u64,
+        samples: [[u32; 4]; COUNT],
+    }
+    struct Store(UnsafeCell<State>);
+    unsafe impl Sync for Store {}
+    static STORE: Store = Store(UnsafeCell::new(State {
+        active: false, valid: true, touched: false, warm: 0, count: 0,
+        start: 0, event: 0, event_present: 0, present: 0, samples: [[0; 4]; COUNT],
+    }));
+    fn state() -> &'static mut State { unsafe { &mut *STORE.0.get() } }
+    fn now() -> u64 {
+        let (mut lo, mut hi) = (0, 0);
+        if unsafe { (os32api::api().sys_time_now)(&mut lo, &mut hi) } != 0 { state().valid = false; }
+        (u64::from(hi) << 32) | u64::from(lo)
+    }
+    pub fn begin() {
+        if state().count == COUNT { return; }
+        state().valid = true;
+        let start = if state().warm >= 10 { now() } else { 0 };
+        let s = state();
+        s.active = true; s.touched = false; s.start = start;
+        s.event = 0; s.event_present = 0; s.present = 0;
+    }
+    pub fn event_done() {
+        if !state().active || state().warm < 10 { return; }
+        let end = now();
+        let s = state();
+        s.event = end.saturating_sub(s.start); s.event_present = s.present;
+    }
+    pub fn present_begin() -> Option<u64> {
+        if state().active && state().warm >= 10 { Some(now()) } else { None }
+    }
+    pub fn present_end(start: Option<u64>) {
+        if state().active { state().touched = true; }
+        if let Some(start) = start {
+            let end = now();
+            let s = state();
+            if end < start { s.valid = false; }
+            s.present += end.saturating_sub(start);
+        }
+    }
+    pub fn finish() {
+        if !state().active { return; }
+        if state().warm < 10 {
+            let s = state(); s.active = false;
+            if s.touched { s.warm += 1; }
+            return;
+        }
+        let end = now();
+        let s = state();
+        s.active = false;
+        if !s.touched { return; } // Idle cycles are not update latency samples.
+        let total = end.saturating_sub(s.start);
+        let event = s.event.saturating_sub(s.event_present);
+        let phases = [total, event, total.saturating_sub(event + s.present), s.present];
+        s.samples[s.count] = if s.valid && end >= s.start && total < u64::from(FAILED)
+            && event + s.present <= total { phases.map(|v| v as u32) } else { [FAILED; 4] };
+        s.count += 1;
+        if s.count == COUNT { emit(); }
+    }
+    struct Line { bytes: [u8; 256], len: usize }
+    impl Write for Line {
+        fn write_str(&mut self, text: &str) -> core::fmt::Result {
+            if self.len + text.len() >= self.bytes.len() { return Err(core::fmt::Error); }
+            self.bytes[self.len..self.len+text.len()].copy_from_slice(text.as_bytes());
+            self.len += text.len(); Ok(())
+        }
+    }
+    fn emit() {
+        // All clocks have stopped; emit buffered samples exactly once.
+        for i in 0..COUNT {
+            let v = state().samples[i];
+            let mut line = Line { bytes: [0; 256], len: 0 };
+            if writeln!(&mut line, "GFW1 {} {} sample {} {} {} {} {}",
+                env!("GF_ACCEPT_ID"), env!("GF_ACCEPT_MODE"), i, v[0], v[1], v[2], v[3]).is_ok() {
+                unsafe { (os32api::api().serial_puts)(line.bytes.as_ptr()); }
+            }
+        }
+    }
+}
+// Acceptance timing end.

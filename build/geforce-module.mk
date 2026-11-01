@@ -55,3 +55,34 @@ C_KERNEL_OBJ += $(GEFORCE_BOOT_OBJS)
 R1_OBJECTS += $(GEFORCE_BOOT_OBJS)
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(GEFORCE_BOOT_OBJS)
 -include $(GEFORCE_BOOT_OBJS:.o=.d)
+
+# Explicit acceptance target; production objects/images never receive these flags.
+# GF_ACCEPT_ID identifies the paired module + gshell measurement build.
+GEFORCE_ACCEPT ?=
+ifneq ($(GEFORCE_ACCEPT),)
+ifeq ($(filter $(GEFORCE_ACCEPT),byte-uc dword-uc dword-wc),)
+$(error GEFORCE_ACCEPT must be byte-uc, dword-uc or dword-wc)
+endif
+ifeq ($(GF_ACCEPT_ID),)
+$(error GF_ACCEPT_ID is required for acceptance builds)
+endif
+GFA_OUT := $(BUILD_OUT)/geforce-accept/$(GEFORCE_ACCEPT)
+GFA_MODE := $(if $(filter byte-uc,$(GEFORCE_ACCEPT)),0,$(if $(filter dword-uc,$(GEFORCE_ACCEPT)),1,2))
+GFA_OBJS := $(filter-out $(GEFORCE_OUT)/backend_geforce.o $(GEFORCE_OUT)/gf_present.o,$(GEFORCE_OBJS)) $(addprefix $(GFA_OUT)/,backend_geforce.o gf_present.o gf_accept.o)
+$(GFA_OUT)/build-id: FORCE
+	@mkdir -p $(@D)
+	@if [ "$$(cat $@ 2>/dev/null)" != '$(GF_ACCEPT_ID)' ]; then echo '$(GF_ACCEPT_ID)' > $@; fi
+$(GFA_OUT)/backend_geforce.o: private GFA_FLAGS = -Dgf_present_rect=gf_accept_transfer
+$(GFA_OUT)/gf_present.o: private GFA_FLAGS = $(if $(filter byte-uc,$(GEFORCE_ACCEPT)),-DGF_PRESENT_BYTE)
+$(GFA_OUT)/gf_accept.o: private GFA_FLAGS = -DGF_ACCEPT_MODE=$(GFA_MODE) -DGF_ACCEPT_ID='"$(GF_ACCEPT_ID)"' -DGF_ACCEPT_PAIR=$$(python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); import mkmod; print(mkmod.pair_crc(Path("$(BUILD_OUT)/vmkernel.lz4").read_bytes()))')
+$(GFA_OUT)/gf_accept.o: $(BUILD_OUT)/vmkernel.lz4
+$(GFA_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) $(GFA_OUT)/build-id build/config.mk build/geforce-module.mk
+	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GFA_FLAGS) $(GEFORCE_INC) -c $< -o $@
+$(GFA_OUT)/geforce.elf: $(GFA_OBJS) build/geforce-module.ld sdk/link/generations.ld
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GFA_OUT)/geforce.map $(GFA_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+$(GFA_OUT)/geforce.mod: $(GFA_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json
+	python3 tools/mkmod.py --module-id 12 --elf $(GFA_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
+.PHONY: geforce-accept
+geforce-accept: $(GFA_OUT)/geforce.mod
+-include $(GFA_OBJS:.o=.d)
+endif

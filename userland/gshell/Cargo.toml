@@ -23,6 +23,8 @@ crate-type = ["staticlib"]
 # T7b-b2 b2③ のゲスト fixture (src/fixture.rs)。製品 build には入れない —
 # `make gshell GSHELL_FEATURES=r1_fixture` のときだけ (build/programs.mk)。
 r1_fixture = []
+# TASK_GF_ACCEL: buffered update/compose/present timings, acceptance images only.
+gf_accel_accept = []
 
 [dependencies]
 # in-repo クレートのみ。os32api が KernelAPI バインディング / GUI 共有定義

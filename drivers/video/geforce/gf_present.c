@@ -36,6 +36,9 @@ int gf_present_rect(const u8 *client, u32 client_pitch,
         const u8 *s = client;
         volatile u8 *d = display;
         int n = w;
+#ifdef GF_PRESENT_BYTE
+        for (; n; --n) *d++ = *s++;
+#else
         while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }
         while (n >= 4) {
             u32 v;
@@ -44,6 +47,7 @@ int gf_present_rect(const u8 *client, u32 client_pitch,
             s += 4; d += 4; n -= 4;
         }
         while (n) { *d++ = *s++; --n; }
+#endif
         rows++;
         client += client_pitch;
         display += display_pitch;
