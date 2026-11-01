@@ -262,22 +262,23 @@ void _start(void) {
         assert result.returncode == (1 if mutation else 0), (mutation,result.returncode,result.stderr)
         print(('RED '+mutation if mutation else 'PASS present byte equivalence and bounds'),flush=True)
 
-def present_store_width(source):
+def present_store_width(source, mutation=None):
     """Count executed stores into the display via QEMU instruction/register traces."""
     import re
     harness = r'''
 #include "gfx_hal.h"
 GfxCounters gfx_counters;
-static u8 source[16], display[16] __attribute__((aligned(4)));
+static u8 source[1400], display[1400] __attribute__((aligned(4)));
+static const int widths[]={1,3,4,5,9,17,639,640};
 static u32 registers[0x10020c / 4 + 1];
 int gf_present_rect(const u8 *, u32, volatile u8 *, u32, volatile u8 *,
                     int, int, int, int, int (*)(void *), void *);
 static int point(void *p) { (void)p; return 0; }
 void _start(void) {
-    for (int i=0; i<16; i++) source[i]=(u8)(i+1);
-    int rc=gf_present_rect(source,16,display,16,(volatile u8 *)registers,
-                           0,0,16,1,point,0);
-    for (int i=0; i<16; i++) if (display[i]!=source[i]) rc=1;
+    int rc=0;
+    for (int a=0; a<4; a++) for (int i=0; i<8; i++)
+        rc |= gf_present_rect(source,649,display+8+a,645,(volatile u8 *)registers,
+                              0,0,widths[i],2,point,0);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }
@@ -286,6 +287,16 @@ void _start(void) {
         tmp=Path(td); exe=tmp/'host'; log=tmp/'qemu.log'
         (tmp/'host.c').write_text(harness)
         # Include lookup preserves the product file byte-for-byte, including relative includes.
+        if mutation:
+            body=source.read_text()
+            old={
+                'alignment': 'while (n && ((uptr)d & 3)) { *d++ = *s++; --n; }',
+                'tail': 'while (n) { *d++ = *s++; --n; }',
+            }[mutation]
+            assert body.count(old)==1, mutation
+            modified=tmp/'present.c'
+            modified.write_text(body.replace(old, '', 1))
+            source=modified
         subprocess.run(FLAGS+INCLUDES+['-I'+str(ROOT/'drivers/video/geforce'),
             str(tmp/'host.c'),str(source),'-o',str(exe)],check=True)
         symbols=subprocess.check_output(['nm','-n',str(exe)],text=True)
@@ -317,12 +328,31 @@ void _start(void) {
             assert re.fullmatch(r'[0-9xa-f+* -]+',expr),expr
             address=eval(expr,{'__builtins__':{}},{}) & 0xffffffff
             size={'BYTE':1,'WORD':2,'DWORD':4}[mem[1]]
-            if display <= address < display+16:
+            if address < display+1400 and address+size > display:
                 stores.append((address-display,size))
-        expected=[(0,4),(4,4),(8,4),(12,4)]
-        print(f"present executed stores: {stores}",flush=True)
-        assert stores==expected,('runtime store width',stores,expected)
-        print('PASS unmodified present: four aligned dword stores',flush=True)
+        expected=[]
+        for alignment in range(4):
+            for width in (1,3,4,5,9,17,639,640):
+                for row in range(2):
+                    offset=8+alignment+row*645
+                    remaining=width
+                    while remaining and (display+offset)%4:
+                        expected.append((offset,1)); offset+=1; remaining-=1
+                    while remaining>=4:
+                        expected.append((offset,4)); offset+=4; remaining-=4
+                    while remaining:
+                        expected.append((offset,1)); offset+=1; remaining-=1
+        if stores != expected:
+            mismatch=next((i for i,(a,b) in enumerate(zip(stores,expected)) if a!=b),
+                          min(len(stores),len(expected)))
+            detail=(mismatch, stores[mismatch:mismatch+4], expected[mismatch:mismatch+4],
+                    len(stores),len(expected))
+            print(f"present store mismatch: {detail}",flush=True)
+            assert mutation, ('runtime store width/address',detail)
+            print('RED '+mutation+' (executed store trace)',flush=True)
+        else:
+            assert not mutation, ('mutation survived',mutation)
+            print(f'PASS present stores: 32 rectangles, two rows, {len(stores)} stores',flush=True)
 
 
 def main():
@@ -334,6 +364,8 @@ def main():
     present_trace()
     if '--mutate' in sys.argv:
         for mutation in ('bounds', 'point'): present_trace(mutation)
+        for mutation in ('alignment', 'tail'):
+            present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
     unsafe_console()
     product()
     module_registration()
