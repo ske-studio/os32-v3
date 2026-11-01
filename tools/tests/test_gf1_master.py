@@ -39,6 +39,12 @@ def main():
             mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"').replace('#include "../../drivers/pci/pci.h"', '#include "' + str(ROOT / 'drivers/pci/pci.h') + '"').replace('#include "../../kdebug/recover.h"', '#include "' + str(ROOT / 'kdebug/recover.h') + '"').replace(old, new))
             assert run(mutant) != 0
             print('MUTATE RED Command DWORD write', flush=True)
+            old = 'PCI_CFG_LATENCY_TIMER) < GF_LATENCY_MIN'
+            new = 'PCI_CFG_CACHE_LINE) < GF_LATENCY_MIN'
+            assert original.count(old) == 1
+            mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"').replace('#include "../../drivers/pci/pci.h"', '#include "' + str(ROOT / 'drivers/pci/pci.h') + '"').replace('#include "../../kdebug/recover.h"', '#include "' + str(ROOT / 'kdebug/recover.h') + '"').replace(old, new))
+            assert run(mutant) != 0
+            print('MUTATE RED latency read at 0Ch', flush=True)
 
 
 def run(ctx):

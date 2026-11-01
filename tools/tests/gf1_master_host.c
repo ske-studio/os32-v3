@@ -2,7 +2,7 @@
 #include "drivers/pci/pci.h"
 #include "kdebug/recover.h"
 static u16 command, cache;
-static u32 status_writes, writes, fail_write, bad_command, bad_latency;
+static u32 status_writes, writes, fail_write, bad_command, bad_latency, bad_reads;
 static u8 header = 0x51, bist = 0xa7;
 int pci_cfg_write16(u32 b, u32 d, u32 f, u32 reg, u16 value)
 {
@@ -18,13 +18,21 @@ void pci_cfg_write32(u32 b, u32 d, u32 f, u32 reg, u32 value)
 { (void)b; (void)d; (void)f; (void)reg; (void)value; status_writes++; }
 u16 pci_cfg_read16(u32 b, u32 d, u32 f, u32 reg)
 {
-    (void)b; (void)d; (void)f;
+    if (b != RECOVER_GF_BUS || d != RECOVER_GF_DEV || f != RECOVER_GF_FN ||
+        (reg != PCI_CFG_COMMAND && reg != PCI_CFG_CACHE_LINE)) {
+        bad_reads++;
+        return 0;
+    }
     if (reg == PCI_CFG_COMMAND) return command ^ (bad_command ? 1 : 0);
     return cache;
 }
 u8 pci_cfg_read8(u32 b, u32 d, u32 f, u32 reg)
 {
-    (void)b; (void)d; (void)f; (void)reg;
+    if (b != RECOVER_GF_BUS || d != RECOVER_GF_DEV || f != RECOVER_GF_FN ||
+        reg != PCI_CFG_LATENCY_TIMER) {
+        bad_reads++;
+        return 0;
+    }
     return (u8)((cache >> 8) ^ (bad_latency && writes > 1 ? 1 : 0));
 }
 #include MASTER_SOURCE
@@ -57,6 +65,7 @@ static int test(void)
     CHECK(gf_master_enable(&f) == GF1_EPCI && f.bm);
     fail_write = 0; writes = 0; bad_command = 1;
     CHECK(gf_master_disable(&f) == GF1_EPCI && f.bm && f.expected_command == RECOVER_COMMAND_RUN);
+    CHECK(!bad_reads);
     return 0;
 }
 void _start(void) { int rc = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
