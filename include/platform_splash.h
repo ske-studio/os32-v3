@@ -9,4 +9,11 @@ int platform_splash_begin(void);
 void platform_splash_clear(u8 color);
 void platform_splash_fill_rect(int x, int y, int w, int h, u8 color);
 void platform_splash_clear_pages(void);
+/* Internal boot foreground result; no public KAPI change. */
+enum { PLATFORM_SPLASH_DONE = 0, PLATFORM_SPLASH_FALLBACK = 1,
+       PLATFORM_SPLASH_NO_SYNC = 2 };
+int platform_splash_try_image(const char *path, u32 end_tick);
+#ifdef SPLASH_RASTER_DIAG
+void platform_splash_probe(void);
+#endif
 #endif

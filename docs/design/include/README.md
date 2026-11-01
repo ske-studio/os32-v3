@@ -222,4 +222,5 @@ drop 観測変数の既存実体はカーネルに残し、宣言を `include/kb
 - [include/pegc.h](pegc.md)
 - [include/platform_device.h](platform_device.md)
 - [include/platform_memory.h](platform_memory.md)
+- [platform_splash.h.md](platform_splash.h.md)
 - [video_service.md](video_service.md)
