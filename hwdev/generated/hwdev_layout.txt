@@ -1398,10 +1398,14 @@ offset	struct gf_display_context.stop_ok	252
 member_size	struct gf_display_context.stop_ok	1
 offset	struct gf_display_context.target	1716
 member_size	struct gf_display_context.target	4
-size	struct gf_display_owner	12
+size	struct gf_display_owner	20
 align	struct gf_display_owner	4
 offset	struct gf_display_owner.acquire	0
 member_size	struct gf_display_owner.acquire	4
+offset	struct gf_display_owner.foundation_start	12
+member_size	struct gf_display_owner.foundation_start	4
+offset	struct gf_display_owner.foundation_stop	16
+member_size	struct gf_display_owner.foundation_stop	4
 offset	struct gf_display_owner.release	4
 member_size	struct gf_display_owner.release	4
 offset	struct gf_display_owner.validate	8

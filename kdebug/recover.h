@@ -157,7 +157,10 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_WINDOW_PAGES 2U /* a peek chunk (< one page) spans at most two PTEs */
 #define RECOVER_CFG_SIZE PCI_CFG_SPACE_SIZE
 #define RECOVER_COMMAND PCI_CFG_COMMAND
-#define RECOVER_COMMAND_OVERRIDE 0x0102U
+#define RECOVER_COMMAND_RUN  0x0106U
+#define RECOVER_COMMAND_STOP 0x0102U
+/* Existing users remain STOP until the layer 1 integration steps. */
+#define RECOVER_COMMAND_OVERRIDE RECOVER_COMMAND_STOP
 #define RECOVER_CFG50 0x50U
 #define RECOVER_CFG54 0x54U
 #define RECOVER_PBUS1850 0x1850U

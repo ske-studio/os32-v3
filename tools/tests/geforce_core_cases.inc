@@ -22,7 +22,9 @@ int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : 
 static int acquire_gf(struct gf_display_context *c) { (void)c; acquires++; return INIT_FAIL ? -1 : 0; }
 static void release_gf(struct gf_display_context *c) { (void)c; releases++; }
 static int validate_gf(struct gf_display_context *c) { (void)c; validates++; return 0; }
-static const struct gf_display_owner owner_gf={acquire_gf,release_gf,validate_gf};
+static const struct gf_display_owner owner_gf={
+    .acquire=acquire_gf, .release=release_gf, .validate=validate_gf
+};
 static struct gf_display_context display_gf={.owner=&owner_gf,.reusable=true,
     .bars={[GF_MODE_VRAM_BAR]={.base=GF_TEST_DISPLAY,.length=GF_MODE_VRAM_BYTES}}};
 int gf_init_run(struct gf_init_context *c, struct gf_init_program *p) { (void)c;(void)p;starts++;return 0; }

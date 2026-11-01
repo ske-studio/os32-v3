@@ -108,4 +108,6 @@ static int validate(struct gf_display_context *c)
     return amount<GF_PRODUCTION_PFB_MIN || (amount&(amount-1)) ||
         amount<GF_MODE_VRAM_BYTES || gf_production_point(p) ? -1 : 0;
 }
-const struct gf_display_owner gf_production_owner={acquire,release,validate};
+const struct gf_display_owner gf_production_owner={
+    .acquire=acquire, .release=release, .validate=validate
+};

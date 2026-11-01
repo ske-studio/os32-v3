@@ -196,6 +196,10 @@ struct gf_display_owner {
     int (*acquire)(struct gf_display_context *);
     void (*release)(struct gf_display_context *);
     int (*validate)(struct gf_display_context *);
+    /* Layer 1 hooks: 0/-1 adapters; connected in the later integration steps.
+     * Both production and diagnostic owners must supply them before use. */
+    int (*foundation_start)(struct gf_display_context *);
+    int (*foundation_stop)(struct gf_display_context *);
 };
 struct gf_display_context {
     struct gf_io io;
