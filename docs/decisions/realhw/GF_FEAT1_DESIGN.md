@@ -228,3 +228,8 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 - R2 の条件: C0 に「Command の書き込みと expected_command の更新のあいだに MMIO を挟まない」。
 - R3: engine 停止の順は合成で、手本の順は未確認と書き直した。
 - P3: PMC を閉じているあいだの VBLANK の数の意味を §5 に 1 行。
+
+## B 段の出し方で PM が決めたこと (2026-11-02)
+- 層 2 の Opus レビュー F4 と同じ理由で、T0 (1 ファイルの host 試験) を B 段ごとに分ける: 各 B 段は自分の部品の host 試験 `tools/tests/gf1_<部品>_host.c` と `tools/tests/test_gf1_<部品>.py` (CHECK 宣言・変異) を成果物に含める。T0 は C 段の後の結合の試験 (開始・停止の順) に絞る。
+- B 段の .c はモジュールへの結線 (C11 の build/geforce-module.mk・C10 の import) の前なので、B 段ではホストの試験で組んで確かめる。像への組み込みは C10・C11。
+- 実装者: B2 (irq.c、判定の論理) は sol、ほかの B 段は terra。
