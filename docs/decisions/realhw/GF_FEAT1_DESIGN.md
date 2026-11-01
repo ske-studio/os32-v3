@@ -423,3 +423,10 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - C7 の固定表は変動する PMC 値を表せないため、Command の QUIESCE rule に REC_GF_ENGINE_STOP を登録し write_verify から固定停止関数を呼ぶ；汎用 plan/式の実行契約は変更せず、FIFO→GR→MPEG の現値 clear/read/set/read を既存の guarded bus・REC・safe point で実施し、どの失敗も後続 Command/保存復元を止める。
 - C7 の PMC は read-safe target として追加し、各 engine ごとの先頭 read を含む 15 アクセスと最大 30 map/unmap の REC pair を静的・実効 cleanup 予算へ加算する；独立画面 S0 の 4096 byte/10秒予約は維持し、RUN/SIZE_BARS の既定枠を各32768 byte・60秒・131072 poll とする（9600bps、送信余裕・実行時間を含む）。
 - C8 は stage に const foundation 借用欄を追加して参照なし/失効を拒否する；所有者の設定と寿命の結線は CW、CK は共有レイアウトの入力台帳も追従させ生成器で契約 CRC を更新する（公開 KAPI 変更なし）。
+
+### CK の取り込みで CW へ送る項目 (2026-11-02、Opus レビュー、PM)
+- P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、kdebug/recover_gf.c:127,209 の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
+- P2-2: gf_foundation_stop (hwdev/gf/foundation.c:61-88) に、失効のときに先に戻る分岐 (追記 :341-345) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
+- P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c:212-219) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
+- P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc:91 と hwdev/gf/engine_stop.c:6-8 に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
+- P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
