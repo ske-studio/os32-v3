@@ -61,3 +61,5 @@
 - [GeForce WC 寿命の fixture](gf_wc_host.md)
 
 - [GeForce 再 init・shell fault の停止経路](gf_wc_recovery_host.inc.md)
+
+- [tools/tests/test_osri](test_osri.md)

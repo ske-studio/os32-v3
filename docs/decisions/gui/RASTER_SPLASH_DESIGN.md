@@ -165,7 +165,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 ```
 - 初回のopenは現行boot_splash内、begin後・root mount/IRQ有効化後。パスは `SYS_SPLASH_IMAGE` の `/boot/splash.osri`。その前に共通再生器で8周期を判定し、結果を画像/ロゴで共有する。Host Serviceや遅延mountを待たない。
 - begin後はパレットを黒へ揃える。`osri_load` は64Bヘッダー→32Bパレット→4プレーン→イベントを順に読み、4KiB以下の単位で既存BBへ直接格納しCRCを逐次更新する。
-- 短い正のreadは残量を読み足す。失敗なら全BBをロゴで上書きしてから提示。固定サイズのBB各プレーン・pitch・高さを確認してから読み込む。`OsriImage`だけ小容量確保し、大きなスタック配列・128KBの一括ヒープ確保は避ける。
+- 短い正のreadは残量を読み足す。失敗なら全BBをロゴで上書きしてから提示。BBのpitch×高さが32,000Bで4プレーンが連続していることを確認してから読み込む。プレーン容量はモード選択時のgfx_mode_fitsの台帳検査を前提とする。`OsriImage`だけ小容量確保し、大きなスタック配列・128KBの一括ヒープ確保は避ける。
 - 全検査完了後に全画面dirtyを1回登録し `gfx_present_nosync()` を1回呼ぶ。準備中は黒、最初の正常VSYNCで初期色を出す。flip後の表示ページを固定し、以後present/flipを呼ばない。
 - prev_dirtyは次回presentのための既存状態として残るが、画像再生中は参照されない。終了/ロゴ再描画を含め両ページを確認する。継続フレームのVRAM書込量は0。
 - 起動判定: D0が選ぶ周期と8周期平均/総行数を±1%で照合する。SYNCの総行数は31k=449（約14.27ms）、24k=440（約17.72ms）。照合は64bit整数の交差積で行い、不一致はdynamic_ok=0としn=0画像のみ使用、動的画像/ロゴは静止ロゴへ。bit5高期間からのactive0選択は§2に従い、どちらの幅にも合わない場合もdynamic_ok=0。beginがBIOSのSYNCを保つ前提も段0で検証する。
