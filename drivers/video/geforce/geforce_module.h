@@ -7,6 +7,7 @@
 #define GEFORCE_MODULE_OPS_VERSION 2u
 #define GEFORCE_WC_BYTES 0x80000U
 struct gf_production_resources;
+struct gf3_test_ops;
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);

@@ -54,6 +54,8 @@ def main():
         if '--mutate' in sys.argv:
             original = SOURCE.read_text()
             mutants = [
+                ('f->revoked = true;', '/* revoke omitted */', 'revoke sticky state omitted'),
+                ('f->running = false; /* revoke publication */', '/* still running */', 'revoke running retained'),
                 ('f->expected_pmc = stopped_pmc;', '/* expected PMC retained */',
                  'stopped PMC publication omitted'),
                 ('f->expected_pmc = stopped_pmc;', 'f->expected_pmc = 0xffffffffU;',
@@ -64,7 +66,7 @@ def main():
                 ('rc = gf_engine_stop(f);', 'rc = gf_master_disable(f);', 'BM clear before engine stop'),
                 ('rc = geforce_tick_bind(0, 0) ? GF1_EIRQ : mask_sources(f);',
                  'rc = mask_sources(f);', 'tick reference retained'),
-                ('f->running = false;', '/* running retained */', 'running retained at stop'),
+                ('f->running = false;\n    rc =', '/* running retained */\n    rc =', 'running retained at stop'),
                 ('f->running = true;', '/* running not published */', 'running missing at enable'),
                 ('unsigned flags = irq_save();\n        f->running = true;',
                  'unsigned flags = 0;\n        f->running = true;', 'IRQ enable outside CLI'),

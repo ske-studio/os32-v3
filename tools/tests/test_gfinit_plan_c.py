@@ -110,10 +110,14 @@ MUTATIONS = [
 ]
 
 STAGE_MUTATIONS = [
+    ('kdebug/gf_stage_state.c', 'entry_command',
+     'command != s->foundation->expected_command', 'false', 's0'),
+    ('kdebug/gf_stage_state.c', 'entry_revoked',
+     's->foundation->revoked ||', '', 's0'),
     ('kdebug/gf_stage_state.c', 'baseline_once',
      'if (s->initialized) return 0;', 'if (false) return 0;', 'c_only'),
     ('kdebug/gf_stage_state.c', 'entry_pmc',
-     'value != s->values[GF_STAGE_PMC]', 'false', 's0'),
+     'value != s->foundation->expected_pmc', 'false', 's0'),
     ('kdebug/gf_stage_state.h', 'entry_last_s0',
      'r->gf_stage->s0_ok && r->s0_verified', 'r->gf_stage->s0_ok', 'c_only'),
     ('kdebug/recover_common/session.inc', 'cold_retained',

@@ -36,6 +36,7 @@ struct gf_foundation {
     u8 irq_line;
     bool bm, mapped, registered, running;
     int last_rc;
+    bool revoked; /* sticky until reboot; not a successful hardware stop */
 };
 /* Production owns adapter/owner; fake MMIO supplies the same contract.
  * BAR reservation is permanent from boot. map only maps UC; failure leaves no new map.
@@ -86,4 +87,5 @@ int gf_engine_stop(struct gf_foundation *); /* reset pulses, no submission resta
  * display owner adapters translate to the existing 0/-1 video contract. */
 int gf_foundation_start(struct gf_foundation *);
 int gf_foundation_stop(struct gf_foundation *);
+void gf_foundation_revoke(struct gf_foundation *);
 #endif

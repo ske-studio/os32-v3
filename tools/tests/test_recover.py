@@ -29,6 +29,13 @@ def host_cmd(exe):
 
 
 MUTATIONS = [
+    ("engine_budget", "if (w->flags & REC_GF_ENGINE_STOP) pairs += 3U * 5U * 3U;", "/* engine REC omitted */", "kdebug/recover_cleanup.h"),
+    ("engine_clear", "value &= ~engines[i];", "value |= engines[i];", "kdebug/recover_common/s0.inc"),
+    ("engine_set", "if (set) value |= engines[i];", "if (set) value &= ~engines[i];", "kdebug/recover_common/s0.inc"),
+    ("engine_preserve", "value &= ~engines[i];", "value = ~engines[i];", "kdebug/recover_common/s0.inc"),
+    ("engine_verify", "if (actual != value) {", "if (false) {", "kdebug/recover_common/s0.inc"),
+    ("engine_stop_failure", "(rule->flags & REC_GF_ENGINE_STOP) && !quiesce_engines(r)) return false;", "(rule->flags & REC_GF_ENGINE_STOP) && !quiesce_engines(r)) return true;", "kdebug/recover_common/s0.inc"),
+    ("engine_registration", ".flags=((id_) == GF_CMD ? REC_GF_ENGINE_STOP : 0)", ".flags=0", "kdebug/recover_profile.c"),
     ("route_unapproved_write", "if (!once && !r->route_write_approved)", "if (false)", "kdebug/recover_common/s0.inc"),
     ("route_zero_skipped", "if (once || (route & RECOVER_ROUTE_MASK))", "if (route & RECOVER_ROUTE_MASK)", "kdebug/recover_common/s0.inc"),
     ("route_readback_ignored", "logged_route(r, &route) || (route & RECOVER_ROUTE_MASK)", "logged_route(r, &route)", "kdebug/recover_common/s0.inc"),

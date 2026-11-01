@@ -1,5 +1,6 @@
 /* Initial values are read once, after main4 and before any C write. */
 #include "gf_stage_state.h"
+#include "../hwdev/gf/foundation.h"
 #include "gfinit_plan_c.h"
 #include "recover_gf.h"
 #include "../hwdev/gfinit_mode.h"
@@ -54,20 +55,20 @@ int gf_stage_entry(struct recover *r)
     struct gf_stage_state *s = r->gf_stage;
     struct recover_identity id;
     u32 command, bars[RECOVER_BAR_COUNT], value;
-    if (!s || !s->initialized || !s->s0_ok || !r->s0_verified ||
+    if (!s || !s->foundation || s->foundation->revoked || !s->initialized || !s->s0_ok || !r->s0_verified ||
         r->ops->identity(r->opaque, &id) ||
         id.boot != s->identity.boot || id.image_version != s->identity.image_version ||
         id.kdebug_version != s->identity.kdebug_version || id.bdf != s->identity.bdf ||
         id.device != s->identity.device || id.subsys != s->identity.subsys ||
         id.revision != s->identity.revision || id.bar0 != s->identity.bar0 ||
-        r->ops->raw_config(r->opaque, &command, bars) || command != RECOVER_COMMAND_OVERRIDE)
+        r->ops->raw_config(r->opaque, &command, bars) || command != s->foundation->expected_command)
         return -1;
     for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
         if (!s->bars[i].valid || bars[i] != s->bars[i].raw) return -1;
     if (s->bars[GF_MODE_VRAM_BAR].length < GF_MODE_VRAM_BYTES) return -1;
     for (u32 key = REC_GF_T_CFG50; key <= REC_GF_T_PBUS1854; key++)
         if (stage_read(r, key, &value) || value) return -1;
-    if (stage_read(r, REC_GF_T_PMC_ENABLE, &value) || value != s->values[GF_STAGE_PMC] ||
+    if (stage_read(r, REC_GF_T_PMC_ENABLE, &value) || value != s->foundation->expected_pmc ||
         r->ops->route_read(r->opaque, &value) || (value & RECOVER_ROUTE_MASK)) return -1;
     return 0;
 }

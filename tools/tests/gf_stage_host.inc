@@ -1,3 +1,5 @@
+#include "../../hwdev/gf/foundation.h"
+static struct gf_foundation stage_foundation;
 static struct gf_stage_state stage_fixture;
 static void stage_baseline(void)
 {
@@ -19,7 +21,23 @@ static void stage_baseline(void)
     u32 sid=core.token.session;
     CHECK(!recover_restore_session(&core));
     CHECK(core.token.session==sid && stage_fixture.initialized && stage_fixture.s0_ok);
+    stage_foundation=(struct gf_foundation){.expected_command=rawcommand,
+        .expected_pmc=values[REC_GF_T_PMC_ENABLE]};
+    stage_fixture.foundation=&stage_foundation;
     CHECK(!gf_stage_entry(&core));
+    u32 baseline_pmc=stage_fixture.values[GF_STAGE_PMC];
+    rawcommand=stage_foundation.expected_command=RECOVER_COMMAND_RUN;
+    values[REC_GF_T_PMC_ENABLE]=stage_foundation.expected_pmc=0xabcde102U;
+    CHECK(!gf_stage_entry(&core));
+    CHECK(stage_fixture.values[GF_STAGE_PMC]==baseline_pmc);
+    stage_foundation.revoked=true;
+    CHECK(gf_stage_entry(&core)<0);
+    stage_foundation.revoked=false;
+    stage_fixture.foundation=0;
+    CHECK(gf_stage_entry(&core)<0);
+    stage_fixture.foundation=&stage_foundation;
+    rawcommand=stage_foundation.expected_command=RECOVER_COMMAND_STOP;
+    values[REC_GF_T_PMC_ENABLE]=stage_foundation.expected_pmc=baseline_pmc;
     core.failed=true;core.state=REC_FAILED;core.reason=REC_VERIFY;
     CHECK(recover_restore_session(&core)<0 && core.failed);
     CHECK(stage_fixture.initialized && stage_fixture.s0_ok && core.s0_verified);

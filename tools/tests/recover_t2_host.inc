@@ -193,7 +193,7 @@ static void uart_events(void)
 }
 static void budgets(void)
 {
-    static const u32 bytes[]={4096,8192,16384}, sec[]={10,18,33}, polls[]={16384,32768,65536};
+    static const u32 bytes[]={4096,32768,32768}, sec[]={10,60,60}, polls[]={16384,131072,131072};
     for(u32 kind=0;kind<3;kind++) {
         setup(false);
         struct recover_static_work work={bytes[kind],2000+kind*2000,1024,4096,2000,1024};
@@ -257,6 +257,62 @@ static void delays(void)
     CHECK(recover_delay_ms(&r,10,uart_wait,&u)<0 && u.waits==5 && r.failed);
     CHECK(r.reason==REC_TIMEOUT);
 }
+static u32 engine_call, engine_fault, engine_bad;
+static int engine_read(void *v, const struct recover_bus_access *a, u32 *value)
+{
+    if (a->space==REC_BAR_MMIO && a->offset==RECOVER_PMC_ENABLE) {
+        if (++engine_call==engine_fault) return -1;
+        int rc=read_bus(v,a,value);
+        if (engine_call==engine_bad) *value ^= 0x10000U;
+        return rc;
+    }
+    return read_bus(v,a,value);
+}
+static int engine_write(void *v, const struct recover_bus_access *a, u32 value)
+{
+    if (a->space==REC_BAR_MMIO && a->offset==RECOVER_PMC_ENABLE &&
+        ++engine_call==engine_fault) return -1;
+    return write_bus(v,a,value);
+}
+static void gf_engine_recovery(void)
+{
+    const u32 initial[]={0xabcde000U,0xffffffffU};
+    const u32 bits[]={0x100U,0x1000U,2U};
+    struct recover_ops engine_ops=ops;
+    engine_ops.read=engine_read; engine_ops.write=engine_write;
+    for(u32 init=0;init<2;init++) for(u32 fault=0;fault<=21;fault++) {
+        setup(false);
+        CHECK(!recover_gf_profile(&profile,false,REC_BUDGET_GF,100));
+        profile.layouts=layouts; profile.layout_count=1;
+        profile.crc=recover_profile_crc(&profile);
+        f.command_bus=true; f.command=RECOVER_COMMAND_RUN;
+        f.id.bdf=RECOVER_GF_BDF; f.id.device=RECOVER_GF_DEVICE;
+        f.values[GF_PMC]=initial[init]; bar_cache();
+        r.ops=&engine_ops;
+        engine_call=0;engine_fault=fault<=15?fault:0;
+        engine_bad=fault>15 ? ((fault-16)/2)*5+((fault-16)%2?5:3) : 0;
+        int rc=bound_begin(&r,&profile,0,100);
+        if(fault) {
+            CHECK(rc<0 && !count('w',GF_CMD) && f.command==RECOVER_COMMAND_RUN);
+            CHECK(engine_call==(engine_fault?engine_fault:engine_bad));
+        } else {
+            CHECK(!rc && engine_call==15 && f.command==RECOVER_COMMAND_STOP);
+            CHECK(cleanup_access_pairs(&profile,GF_CMD,REC_WRITE,REC_QUIESCE)==48);
+            struct rec_cleanup_budget needed;
+            CHECK(!cleanup_budget_compute(&r,&profile,false,&needed));
+            CHECK(needed.bytes>12000 && needed.s0_bytes==4096);
+            u32 n=0,value=initial[init];
+            for(u32 i=0;i<f.n;i++) if(f.trace[i].op=='w' && f.trace[i].key==GF_PMC) {
+                value=n%2 ? value|bits[n/2] : value&~bits[n/2];
+                CHECK(n<6 && f.trace[i].value==value);n++;
+            }
+            CHECK(n==6 && f.values[GF_PMC]==(initial[init]|0x1102U));
+            f.n=0; engine_call=0;
+            CHECK(!trial_end(&r,&r.token,REC_NORMAL) && engine_call==15);
+            CHECK(count('w',GF_CMD)==2 && count('w',GF_PMC)==6);
+        }
+    }
+}
 static void gf_profiles(void)
 {
     for (u32 cold=0;cold<2;cold++) for(u32 size=0;size<2;size++) {
@@ -311,6 +367,10 @@ static void size_tail_setup(u32 max_polls)
 {
     setup(false); CHECK(!recover_gf_profile(&profile,false,REC_BUDGET_SIZE_BARS,100));
     profile.expected_device=0; /* synthetic default-budget tail boundaries */
+    for (u32 i=0;i<profile.rule_count;i++) {
+        rules[i]=profile.rules[i]; rules[i].flags &= ~REC_GF_ENGINE_STOP;
+    }
+    profile.rules=rules; /* Test only the existing SIZE_BARS deadline tail. */
     profile.restore_limit=33; profile.s0_reserve_ticks=10;
     profile.s0_reserve_polls=0; profile.restore_max_polls=max_polls;
     profile.layouts=layouts; profile.layout_count=1; profile.crc=recover_profile_crc(&profile);
@@ -383,4 +443,4 @@ static void every_restore_callback(void)
         CHECK(trial_end(&r,&r.token,REC_NORMAL)<0 && f.bus_calls==calls);
     }
 }
-static void t2_tests(void) { uart_events(); size_tail_deadline(); windows(); texts(); frame_clock(); budgets(); delays(); gf_profiles(); indexed_order(); every_restore_callback(); a1_failed_config(); }
+static void t2_tests(void) { uart_events(); size_tail_deadline(); windows(); texts(); frame_clock(); budgets(); delays(); gf_engine_recovery(); gf_profiles(); indexed_order(); every_restore_callback(); a1_failed_config(); }

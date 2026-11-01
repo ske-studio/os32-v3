@@ -72,24 +72,24 @@
 
 /* Published S0 / PREPARE-RUN / SIZE_BARS budget envelopes. */
 #define RECOVER_BUDGET_BYTES_S0 4096U
-#define RECOVER_BUDGET_BYTES_RUN 8192U
-#define RECOVER_BUDGET_BYTES_SIZE_BARS 16384U
+#define RECOVER_BUDGET_BYTES_RUN 32768U
+#define RECOVER_BUDGET_BYTES_SIZE_BARS 32768U
 #define RECOVER_BUDGET_EXEC_MS_S0 2000U
 #define RECOVER_BUDGET_EXEC_MS_RUN 4000U
 #define RECOVER_BUDGET_EXEC_MS_SIZE_BARS 6000U
 #define RECOVER_BUDGET_SECONDS_S0 10U
-#define RECOVER_BUDGET_SECONDS_RUN 18U
-#define RECOVER_BUDGET_SECONDS_SIZE_BARS 33U
+#define RECOVER_BUDGET_SECONDS_RUN 60U
+#define RECOVER_BUDGET_SECONDS_SIZE_BARS 60U
 #define RECOVER_BUDGET_POLLS_S0 16384U
-#define RECOVER_BUDGET_POLLS_RUN 32768U
-#define RECOVER_BUDGET_POLLS_SIZE_BARS 65536U
+#define RECOVER_BUDGET_POLLS_RUN 131072U
+#define RECOVER_BUDGET_POLLS_SIZE_BARS 131072U
 #define RECOVER_BUDGET_S0_WAIT_MS RECOVER_BUDGET_EXEC_MS_S0
 #define RECOVER_BUDGET_S0_POINTS 256U
 #define RECOVER_BUDGET_MARGIN_S 3U
 #define RECOVER_BUDGET_POINTS 1024U
 #define RECOVER_BUDGET_TRIAL_SECONDS 60U
 #define RECOVER_BUDGET_STEPS 4096U
-#define RECOVER_BUDGET_POLLS RECOVER_BUDGET_POLLS_SIZE_BARS
+#define RECOVER_BUDGET_POLLS 65536U /* trial polling is independent of restoration */
 /* Validated maximum GF cleanup candidate, including UART busy polls. */
 #define RECOVER_CLEANUP_TRANSPORT_POLLS 1048576U
 
@@ -209,7 +209,8 @@ enum recover_value_mode { REC_LITERAL, REC_SET, REC_RANGE, REC_EXPR, REC_SAVED }
 enum recover_arg_kind { REC_IMM, REC_ARG_READ, REC_ARG_SAVED };
 enum recover_guard_when { REC_BEFORE = 1, REC_AFTER = 2 };
 enum recover_rule_flag { REC_N1 = 1, REC_LOCAL = 2, REC_FORCE = 4,
-    REC_VERIFY_RECORD = 16 /* C write: read and report mismatch, continue */ };
+    REC_VERIFY_RECORD = 16, /* C write: read and report mismatch, continue */
+    REC_GF_ENGINE_STOP = 32 /* trusted quiesce: reset engines before Command */ };
 struct recover_target {
     u32 space, bar, offset, head, port, index, width, access, read_safe;
 };
