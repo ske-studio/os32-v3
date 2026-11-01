@@ -4,15 +4,21 @@ CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
     covers=['tools/tests/test_gf_accel.py', 'tools/accept/gf_accel.py',
             'drivers/video/geforce/gf_accept.c', 'drivers/video/geforce/gf_present.c',
             'drivers/video/geforce/geforce_module.h', 'hwdev/gf/production.h',
-            'userland/gshell/src/wm.rs',
+            'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs',
+            'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'userland/lib/font/**',
+            'exec/shell_service.h', 'sdk/include/os32/os32_gui_shared.h',
+            'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
 from pathlib import Path
 import importlib.util
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import host32
+import os32api_host
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -29,7 +35,7 @@ def consumer(source=None):
     return module
 
 
-def producer(mode, scenario=0, mutation=None):
+def producer(mode, scenario=0, mutation=None, expected_exit=0):
     source = (ROOT/'drivers/video/geforce/gf_accept.c').read_text()
     if mutation:
         old, new = mutation
@@ -78,7 +84,7 @@ int sys_time_now(u32 *lo,u32 *hi) {
     return SCENARIO==2 && calls==9 ? -1 : 0;
 }
 u32 pgalloc_alloc_phys(u32 owner,int pages) { (void)owner; if(pages!=75) die(56); return V2P(model_pattern); }
-int pgalloc_free_n_owner(u32 owner,u32 pfn,int pages) { (void)owner; if(pfn!=V2P(model_pattern)/PAGE_SIZE || pages!=75) die(57); return 0; }
+int pgalloc_free_n_owner(u32 owner,u32 pfn,int pages) { (void)owner; if(pfn!=V2P(model_pattern)/PAGE_SIZE || pages!=75) die(57); return SCENARIO==5 ? 0 : 1; }
 u32 paging_pte_raw(u32 addr) { return addr|PTE_PRESENT|PAGE_RW|PTE_PCD; }
 u32 pci_cfg_read32(u32 b,u32 d,u32 f,u32 reg) { (void)b;(void)d;(void)f;(void)reg; return 0x6000; }
 u16 pci_cfg_read16(u32 b,u32 d,u32 f,u32 reg) { (void)b;(void)d;(void)f;(void)reg; return 0x102; }
@@ -92,7 +98,7 @@ void _start(void) {
     int first=gf_accept_transfer(client,640,display,640,(volatile u8 *)registers,0,0,640,480,point,0);
     if (first) die(52);
     int rc=gf_accept_transfer(client,640,display,640,(volatile u8 *)registers,1,1,32,32,point,0);
-    if (SCENARIO==3) die(rc == -1 ? 0 : 53);
+    if (SCENARIO==3 || SCENARIO==5) die(rc == -1 ? 0 : 53);
     if (rc) die(54);
     for (u32 i=0; i<sizeof(client); ++i) if (display[i]!=client[i]) die(55);
     if (GF_ACCEPT_MODE!=2 && SCENARIO==0) {
@@ -111,7 +117,7 @@ void _start(void) {
             '-DGF_ACCEPT_ID="fixture"', '-DGF_ACCEPT_PAIR=123', f'-DSCENARIO={scenario}', '-I'+str(ROOT/'drivers/video/geforce'),
             str(tmp/'host.c'), str(ROOT/'drivers/video/geforce/gf_present.c'), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
-        assert result.returncode == 0, (mode, scenario, result.returncode, result.stderr)
+        assert result.returncode == expected_exit, (mode, scenario, result.returncode, result.stderr)
         return result.stdout
 
 
@@ -167,6 +173,101 @@ fn main() {
     return result.stdout
 
 
+def gui_paths(mutation=None, kinds=('commit', 'pump')):
+    """Run the actual handler and Pump -> input -> cursor -> flush code."""
+    harness = r'''
+#[test]
+fn acceptance_external_transfer() {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use os32api::gui::proto::GUI_OP_COMMIT;
+    static TICK: AtomicU32 = AtomicU32::new(0);
+    unsafe extern "C" fn now(lo: *mut u32, hi: *mut u32) -> i32 {
+        *lo = TICK.fetch_add(10, Ordering::SeqCst); *hi = 0; 0
+    }
+    mocks::init();
+    unsafe { (*os32api::api_ptr()).sys_time_now = now; }
+    let shm = mocks::Shm::new();
+    let st = wm::g();
+    *st = wm::GuiState::NEW;
+    st.inited = true; st.screen_w = 640; st.screen_h = 480;
+    st.slots[0].used = true; st.slots[0].owner = 2;
+    st.shm_base = shm.base();
+    st.windows[0].used = true; st.windows[0].owner = 2;
+    st.windows[0].x = 40; st.windows[0].y = 40;
+    st.windows[0].w = 320; st.windows[0].h = 240;
+    let pump = std::env::var("GFA_PATH").unwrap() == "pump";
+    // No transfer, including guarded Pump calls and empty COMMITs, yields no sample.
+    if pump {
+        st.inited = false; pump::gshell_gui_pump(); st.inited = true;
+        st.in_pump = true; pump::gshell_gui_pump(); st.in_pump = false;
+    } else {
+        assert_eq!(handler::gshell_gui_handler(GUI_OP_COMMIT, 0, 2), 0);
+    }
+    assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty());
+    for i in 0..310 {
+        // App rendering / time between callbacks must not enter the sample.
+        TICK.fetch_add(100_000, Ordering::SeqCst);
+        if pump {
+            *mocks::MOUSE.lock().unwrap() = (100 + (i % 2) as i16, 400, 0);
+            pump::gshell_gui_pump();
+            // The same pointer position is idle, with no further transfer.
+            pump::gshell_gui_pump();
+        } else {
+            wm::g().windows[0].issued.push(wm::Rect::new(0, 0, 32, 32));
+            assert_eq!(handler::gshell_gui_handler(GUI_OP_COMMIT, 0, 2), 0);
+        }
+        assert_eq!(mocks::PRESENTS.load(Ordering::SeqCst), i + 1);
+        if i < 309 { assert!(mocks::SERIAL_OUT.lock().unwrap().is_empty()); }
+    }
+    let output = String::from_utf8(mocks::SERIAL_OUT.lock().unwrap().clone()).unwrap();
+    assert_eq!(output.lines().count(), 300, "external transfer samples missing");
+    for (i, line) in output.lines().enumerate() {
+        let words: Vec<_> = line.split_whitespace().collect();
+        assert_eq!(words[..4], ["GFW1", "fixture", "byte-uc", "sample"]);
+        assert_eq!(words[4].parse::<usize>().unwrap(), i);
+        assert_eq!(words[5..], ["10", "0", "0", "10"]);
+    }
+}
+'''
+    with tempfile.TemporaryDirectory(prefix='gf-path-') as directory:
+        tmp = Path(directory)
+        gshell = ROOT/'userland/gshell'
+        src = gshell/'src'
+        if mutation:
+            shutil.copytree(src, tmp/'src')
+            (tmp/'host').symlink_to(gshell/'host', target_is_directory=True)
+            src = tmp/'src'
+            path = src/'wm.rs'
+            old, new = mutation
+            text = path.read_text()
+            assert text.count(old) == 1, old
+            path.write_text(text.replace(old, new, 1))
+        root = (src/'lib.rs').read_text().replace('#![no_std]', '#![allow(dead_code)]')
+        root = root.replace('#[no_mangle]', '').replace('pub extern "C" fn main(', 'pub extern "C" fn guest_main(')
+        root = re.sub(r'^mod (\w+);', lambda m: f'#[path="{src/(m[1]+".rs")}"] mod {m[1]};', root, flags=re.M)
+        path = tmp/'root.rs'
+        path.write_text(root+f'\n#[path="{gshell/"host/mocks.rs"}"] mod mocks;\n'+harness)
+        rlib = os32api_host.build(tmp)
+        font, deps = os32api_host.build_font()
+        subprocess.run(['rustc', '--edition=2021', str(gshell/'build.rs'), '-o', str(tmp/'build-script')], check=True)
+        env = dict(os.environ, OUT_DIR=str(tmp), CARGO_MANIFEST_DIR=str(gshell),
+                   GF_ACCEPT_ID='fixture', GF_ACCEPT_MODE='byte-uc')
+        subprocess.run([str(tmp/'build-script')], env=env, check=True, stdout=subprocess.DEVNULL)
+        exe = tmp/'host-tests'
+        built = subprocess.run(['rustc', '--edition=2021', '--test', '--cfg', 'feature="gf_accel_accept"',
+                        str(path), '--extern', f'os32api={rlib}', '--extern', f'os32_font={font}',
+                        '-L', f'dependency={deps}', '-o', str(exe)], env=env,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        assert built.returncode == 0, built.stderr.decode()
+        for kind in kinds:
+            result = subprocess.run([str(exe), '--exact', 'acceptance_external_transfer', '--nocapture'],
+                                    env=dict(env, GFA_PATH=kind), capture_output=True, text=True)
+            assert result.returncode == (101 if mutation else 0), (kind, result.stdout, result.stderr)
+            if mutation:
+                assert 'external transfer samples missing' in result.stderr, result.stderr
+            print(('RED' if mutation else 'PASS')+f' real {kind} path outside wm_cycle')
+
+
 def main():
     module = consumer()
     for count, p50, p95 in ((100, 50, 95), (300, 150, 285)):
@@ -191,9 +292,11 @@ def main():
     failed = module.parse_log(producer(0, 2), 'fixture')
     assert failed['status'] == 'FAIL' and failed['rectangles']['0']['pooled']['failures'] == 1
     reject(module, producer(0, 3))
+    producer(0, 5)  # pgalloc_free_n_owner failure (0) must abort.
     fake_uc = logs[0].replace('state UC OK', 'state WC OK')
     reject(module, fake_uc)
     wm_log = gui()
+    gui_paths()
     assert module.parse_log(logs[0]+wm_log, 'fixture', require_wm=True)['wm']['total']['p95'] == 40
     with tempfile.TemporaryDirectory(prefix='gf-cli-') as directory:
         paths = [Path(directory)/f'{mode}.log' for mode in range(3)]
@@ -217,6 +320,9 @@ def main():
         reject(module, producer(0, 1, mutation))
         print('RED BIOS WC: mutated producer emits WC measurements in UC group')
         gui(('s.present += end.saturating_sub(start);', 's.present += 0;'))
+        producer(0, mutation=('if (rc || !freed) return -1;', 'if (rc || freed) return -1;'), expected_exit=54)
+        print('RED release contract: successful free must restore CLIENT and return success')
+        gui_paths(('let standalone = !state().active;', 'let standalone = false;'))
     return 0
 
 

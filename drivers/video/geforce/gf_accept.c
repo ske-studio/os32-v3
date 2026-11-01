@@ -247,7 +247,7 @@ int gf_accept_transfer(const u8 *client, u32 client_pitch, volatile u8 *display,
             int rc=measure(display,display_pitch,bar0);
             int freed=pgalloc_free_n_owner(LEDGER_OWNER_KERNEL,phys/PAGE_SIZE,ACCEPT_PAGE_COUNT);
             pattern=0;
-            if (rc || freed) return -1;
+            if (rc || !freed) return -1;
         }
         /* Restore all of CLIENT after the synthetic full-screen pattern. */
         x=0; y=0; w=GF_MODE_WIDTH; h=GF_MODE_HEIGHT;

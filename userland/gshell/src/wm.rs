@@ -1757,26 +1757,40 @@ pub(crate) mod gf_accept {
         let s = state();
         s.event = end.saturating_sub(s.start); s.event_present = s.present;
     }
-    pub fn present_begin() -> Option<u64> {
-        if state().active && state().warm >= 10 { Some(now()) } else { None }
+    pub fn present_begin() -> (bool, Option<u64>) {
+        if state().count == COUNT { return (false, None); }
+        // COMMIT and Pump can flush outside wm_cycle. Measure only their
+        // transfer; app rendering and time between callbacks stay outside.
+        let standalone = !state().active;
+        if standalone { begin(); }
+        let start = if state().warm >= 10 {
+            Some(if standalone { state().start } else { now() })
+        } else { None };
+        (standalone, start)
     }
-    pub fn present_end(start: Option<u64>) {
+    pub fn present_end((standalone, start): (bool, Option<u64>)) {
         if state().active { state().touched = true; }
+        let mut end_time = None;
         if let Some(start) = start {
             let end = now();
+            end_time = Some(end);
             let s = state();
             if end < start { s.valid = false; }
             s.present += end.saturating_sub(start);
         }
+        if standalone { finish_at(end_time); }
     }
     pub fn finish() {
+        finish_at(None);
+    }
+    fn finish_at(end: Option<u64>) {
         if !state().active { return; }
         if state().warm < 10 {
             let s = state(); s.active = false;
             if s.touched { s.warm += 1; }
             return;
         }
-        let end = now();
+        let end = match end { Some(end) => end, None => now() };
         let s = state();
         s.active = false;
         if !s.touched { return; } // Idle cycles are not update latency samples.
