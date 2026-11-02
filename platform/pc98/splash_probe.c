@@ -42,6 +42,10 @@
 #define PROBE_BURST 8u
 #define PROBE_ENTRIES 99u
 #define PROBE_COST_KINDS 3u
+#define PROBE_RAW_READS 4096u
+#define PROBE_RAW_BLOCKS 8u
+#define PROBE_RAW_VALUES 256u
+#define PROBE_RAW_PER_LINE 16u
 #define PROBE_Q 0u
 #define PROBE_C 1u
 #define PROBE_W 2u
@@ -71,6 +75,61 @@ static unsigned long long probe_entry_upper, probe_retry_upper;
 static unsigned long long probe_survey_if0_max, probe_survey_if0_total;
 static unsigned long long probe_open_until;
 static u32 probe_open_gap_us;
+
+/* H reason: 0=not run, 1=complete, 2=Q zero, 3=clock budget,
+ * 4=count, 5=open wait, 6=deadline, 7=burst limit, 8=IF0 overrun. */
+static struct probe_hdiag {
+    u32 reason, count, bursts, completed, rise, fall, high, low, over;
+    unsigned long long min_us, max_us;
+} probe_hd;
+struct probe_raw_bit {
+    u32 high, low, rise, fall, min[2], max[2];
+};
+static struct probe_raw {
+    u32 both, either, freq[PROBE_RAW_VALUES];
+    struct probe_raw_bit bit[2];
+    unsigned long long elapsed;
+} probe_raw[2];
+
+static unsigned long long probe_now(void);
+
+/* IF=1 only. The gaps between blocks have no observed continuity. Counts
+ * and run lengths are samples, not time; IRQ delays stay in elapsed. */
+static void probe_raw_run(struct probe_raw_bit *b, u32 level, u32 run)
+{
+    if (!b->min[level] || run < b->min[level]) b->min[level] = run;
+    if (run > b->max[level]) b->max[level] = run;
+}
+static void probe_raw_scan(u32 port, struct probe_raw *r)
+{
+    *r = (struct probe_raw){ .both = PROBE_RAW_VALUES - 1 };
+    for (u32 block = 0; block < PROBE_RAW_BLOCKS; block++) {
+        u32 old = 0, run[2] = {0};
+        unsigned long long begin = probe_now();
+        for (u32 i = 0; i < PROBE_RAW_READS; i++) {
+            u32 value = inp(port);
+            r->both &= value;
+            r->either |= value;
+            r->freq[value]++;
+            for (u32 k = 0; k < 2; k++) {
+                struct probe_raw_bit *b = &r->bit[k];
+                u32 level = (value >> (5 + k)) & 1;
+                u32 previous = (old >> (5 + k)) & 1;
+                if (level) b->high++; else b->low++;
+                if (i && level != previous) {
+                    if (level) b->rise++; else b->fall++;
+                    probe_raw_run(b, previous, run[k]);
+                    run[k] = 0;
+                }
+                run[k]++;
+            }
+            old = value;
+        }
+        r->elapsed += probe_now() - begin;
+        for (u32 k = 0; k < 2; k++)
+            probe_raw_run(&r->bit[k], (old >> (5 + k)) & 1, run[k]);
+    }
+}
 
 /* Timestamp sandwiches include the final clock call, not the first one.
  * Short IF=0 batches separate Q/C/W; IF=1 measurements retain IRQ pollution. */
@@ -214,19 +273,30 @@ static u32 probe_hblank(const struct SplashRaster *s)
 {
     unsigned long long q = probe_cost_bound(PROBE_Q, s->line_den);
     unsigned long long clocks = 2 * probe_cost_bound(PROBE_C, s->line_den);
-    if (!q || clocks >= 2 * s->line_num_us) { probe_errors++; return 0; }
+    probe_hd = (struct probe_hdiag){0};
+    if (!q || clocks >= 2 * s->line_num_us) {
+        probe_hd.reason = !q ? 2 : 3;
+        probe_errors++; return 0;
+    }
     u32 count = (2 * s->line_num_us - clocks) / q;
-    if (count < 2) { probe_errors++; return 0; }
+    probe_hd.count = count;
+    if (count < 2) { probe_hd.reason = 4; probe_errors++; return 0; }
     unsigned long long deadline = probe_now() + SPLASH_RASTER_SYNC_TIMEOUT_US;
     u32 completed = 0;
     for (u32 burst = 0; burst < PROBE_POLLS && completed < PROBE_HPERIODS; burst++) {
-        if (probe_measure_open() || probe_now() > deadline) break;
+        if (probe_measure_open()) { probe_hd.reason = 5; break; }
+        if (probe_now() > deadline) { probe_hd.reason = 6; break; }
+        probe_hd.bursts++;
         unsigned int flags = irq_save();
         unsigned long long a = probe_now();
         u32 old = inp(GDC_GFX_STAT), rise = 0, highs = 0, armed = 0;
+        if (old & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
         for (u32 i = 1; i < count; i++) {
             u32 status = inp(GDC_GFX_STAT);
+            if (status & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
+            if ((old & GDC_STAT_HBLANK) && !(status & GDC_STAT_HBLANK)) probe_hd.fall++;
             if (!(old & GDC_STAT_HBLANK) && (status & GDC_STAT_HBLANK)) {
+                probe_hd.rise++;
                 if (armed && completed < PROBE_HPERIODS) {
                     probe_hsamples[completed] = i - rise;
                     probe_highsamples[completed++] = highs;
@@ -238,10 +308,15 @@ static u32 probe_hblank(const struct SplashRaster *s)
         }
         unsigned long long elapsed = probe_now() - a;
         probe_measure_restore(flags, s);
+        probe_hd.completed = completed;
+        if (probe_hd.bursts == 1 || elapsed < probe_hd.min_us) probe_hd.min_us = elapsed;
+        if (elapsed > probe_hd.max_us) probe_hd.max_us = elapsed;
         if ((elapsed + probe_cost[PROBE_C].upper_us) * s->line_den > 2 * s->line_num_us) {
+            probe_hd.over++; probe_hd.reason = 8;
             probe_errors++; return 0;
         }
     }
+    if (!probe_hd.reason) probe_hd.reason = completed == PROBE_HPERIODS ? 1 : 7;
     if (completed != PROBE_HPERIODS) probe_errors++;
     unsigned long long periods = SPLASH_RASTER_MEASURE_PERIODS * s->total_lines;
     for (u32 i = 0; i < completed; i++) {
@@ -474,6 +549,45 @@ static void probe_field(const char *key, unsigned long long n)
     if (n >> BITS_PER_U32) { serial_diag_u32(n >> BITS_PER_U32); serial_puts_polled(":"); }
     serial_diag_u32(n);
 }
+/* At most 39 additional lines: H + 2*(summary + 2 bits + 16 hist).
+ * Histograms retain every nonzero byte value, packed 16 pairs per line. */
+static void probe_measure_dump(void)
+{
+    probe_field("SPLR h_reason=", probe_hd.reason);
+    probe_field(" count=", probe_hd.count); probe_field(" bursts=", probe_hd.bursts);
+    probe_field(" completed=", probe_hd.completed); probe_field(" rise=", probe_hd.rise);
+    probe_field(" fall=", probe_hd.fall); probe_field(" high=", probe_hd.high);
+    probe_field(" low=", probe_hd.low); probe_field(" min_us=", probe_hd.min_us);
+    probe_field(" max_us=", probe_hd.max_us); probe_field(" if0_over=", probe_hd.over);
+    serial_puts_polled("\n");
+    for (u32 p = 0; p < 2; p++) {
+        const struct probe_raw *r = &probe_raw[p];
+        u32 port = p ? GDC_TEXT_STAT : GDC_GFX_STAT;
+        probe_field("SPLR raw_port=", port);
+        probe_field(" blocks=", PROBE_RAW_BLOCKS); probe_field(" reads=", PROBE_RAW_READS);
+        probe_field(" and=", r->both); probe_field(" or=", r->either);
+        probe_field(" elapsed_us=", r->elapsed); serial_puts_polled("\n");
+        for (u32 k = 0; k < 2; k++) {
+            const struct probe_raw_bit *b = &r->bit[k];
+            probe_field("SPLR raw_port=", port); probe_field(" bit=", 5 + k);
+            probe_field(" high=", b->high); probe_field(" low=", b->low);
+            probe_field(" rise=", b->rise); probe_field(" fall=", b->fall);
+            probe_field(" low_min=", b->min[0]); probe_field(" low_max=", b->max[0]);
+            probe_field(" high_min=", b->min[1]); probe_field(" high_max=", b->max[1]);
+            serial_puts_polled("\n");
+        }
+        u32 pairs = 0;
+        for (u32 value = 0; value < PROBE_RAW_VALUES; value++) if (r->freq[value]) {
+            if (!(pairs % PROBE_RAW_PER_LINE)) {
+                probe_field("SPLR raw_hist=", port);
+                serial_puts_polled(" value:count");
+            }
+            probe_field(" ", value); probe_field(":", r->freq[value]);
+            if (!(++pairs % PROBE_RAW_PER_LINE)) serial_puts_polled("\n");
+        }
+        if (pairs % PROBE_RAW_PER_LINE) serial_puts_polled("\n");
+    }
+}
 static void probe_signed(const char *key, long long n)
 {
     serial_puts_polled(key);
@@ -548,6 +662,7 @@ void platform_splash_probe(void)
     serial_diag_get(&oe0, &fe0, &pe0, &ov0);
     probe_errors = probe_rx_count = probe_rx_missing = probe_rx_bytes = probe_rx_value = probe_rx_next = 0;
     probe_previous = 0;
+    probe_hd = (struct probe_hdiag){0};
     probe_entry_count = probe_wave = probe_period_ok = probe_phase_status = 0;
     probe_eight_us = probe_high_us = 0;
     probe_budget = (struct SplashRasterBudget){0};
@@ -650,6 +765,10 @@ void platform_splash_probe(void)
         probe_receive();
     }
 dump:
+    /* Both independent raw scans also run after an early H failure. No
+     * serial output or palette writes until both buffers are complete. */
+    probe_raw_scan(GDC_GFX_STAT, &probe_raw[0]);
+    probe_raw_scan(GDC_TEXT_STAT, &probe_raw[1]);
     ticks = tick_count - tick0; clamps = ktime_clamp_count - clamp0;
     serial_diag_get(&oe, &fe, &pe, &ov);
     serial_puts_polled("SPLR commit="); serial_puts_polled(os32_build_commit);
@@ -680,6 +799,7 @@ dump:
         probe_field(" if1_max_batch_us=", probe_cost[i].open_max_us);
         serial_puts_polled("\n");
     }
+    probe_measure_dump();
     unsigned long long h_samples = 0, h_highs = 0;
     for (u32 i = 0; i < hcompleted; i++) {
         h_samples += probe_hsamples[i];
