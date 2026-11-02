@@ -124,6 +124,8 @@ static inline volatile void *probe_io_address(u32 address)
 #define P2V_IO(address) probe_io_address(address)
 static int probe_frame_checked(struct SplashRaster *s, const GFX_RasterPalTable *t);
 #define pc98_splash_raster_table probe_frame_checked
+/* The host build inserts this guard at the aggregation entry. */
+static void probe_hcollect_check(void) { REQUIRE(irq_on); }
 #include "../../platform/pc98/splash_probe.c"
 #undef pc98_splash_raster_table
 

@@ -46,8 +46,11 @@ MUTATIONS = (
      'c->open_total_us += elapsed;\n            if (elapsed * c->upper_samples > c->upper_num_us) c->upper_num_us = elapsed * c->upper_samples;'),
     ('omit measurement open window', 'probe_open_until = probe_now() + (s->line_num_us + s->line_den - 1) / s->line_den;',
      'probe_open_until = probe_now() + 0 * s->line_num_us;'),
-    ('clock inside H sample run', 'for (u32 i = 1; i < count; i++) {\n            u32 status = inp(GDC_GFX_STAT);',
-     'for (u32 i = 1; i < count; i++) {\n            (void)probe_now();\n            u32 status = inp(GDC_GFX_STAT);'),
+    ('clock inside H sample run', '        probe_hstatus[i] = inp(GDC_GFX_STAT);',
+     '        probe_hstatus[i] = inp(GDC_GFX_STAT) + 0 * probe_now();'),
+    ('aggregate inside IF0',
+     '        unsigned long long elapsed = probe_now() - a;\n        probe_measure_restore(flags, s);\n        completed = probe_hcollect(count, completed);',
+     '        completed = probe_hcollect(count, completed);\n        unsigned long long elapsed = probe_now() - a;\n        probe_measure_restore(flags, s);'),
     ('include partial H period', 'if (armed && completed < PROBE_HPERIODS)', 'if (completed < PROBE_HPERIODS)'),
     ('wrong duty numerator', '        highs += probe_highsamples[i];',
      '        highs += probe_hsamples[i] - probe_highsamples[i];'),
@@ -113,6 +116,9 @@ def execute(mutation=None):
                 name, old, new = mutation
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
+            if rel == SOURCE:
+                source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',
+                    'static u32 probe_hcollect(u32 count, u32 completed)\n{\n    probe_hcollect_check();')
             dest.write_text(source)
         cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'); exe = work/'probe'
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',

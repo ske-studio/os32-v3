@@ -70,7 +70,7 @@ static struct SplashRasterBudget probe_budget;
 static u32 probe_wave, probe_period_ok, probe_phase_status, probe_phase_ambiguous, probe_entry_count;
 static unsigned long long probe_f_lo, probe_f_hi, probe_h_lo, probe_h_hi;
 static unsigned long long probe_eight_us, probe_high_us, probe_c_min;
-static volatile u32 probe_poll_sink;
+static volatile u8 probe_hstatus[PROBE_SAMPLES];
 static unsigned long long probe_entry_upper, probe_retry_upper;
 static unsigned long long probe_survey_if0_max, probe_survey_if0_total;
 static unsigned long long probe_open_until;
@@ -154,13 +154,10 @@ static unsigned long long probe_now(void)
 }
 static void probe_poll_batch(u32 count)
 {
-    u32 old = inp(GDC_GFX_STAT), edges = 0;
-    for (u32 i = 1; i < count; i++) {
-        u32 status = inp(GDC_GFX_STAT);
-        if (!(old & GDC_STAT_HBLANK) && (status & GDC_STAT_HBLANK)) edges++;
-        old = status;
-    }
-    probe_poll_sink = edges;
+    /* Identical capture work for Q calibration and H bursts. Volatile keeps
+     * calibration stores even though only H bursts consume the samples. */
+    for (u32 i = 0; i < count; i++)
+        probe_hstatus[i] = inp(GDC_GFX_STAT);
 }
 static unsigned long long probe_cost_batch(u32 kind, u32 count)
 {
@@ -267,6 +264,28 @@ static unsigned long long probe_delta(unsigned long long a, unsigned long long b
 {
     return a > b ? a - b : b - a;
 }
+/* Aggregate only after restoring IF; no continuity across bursts. */
+static u32 probe_hcollect(u32 count, u32 completed)
+{
+    u32 old = probe_hstatus[0], rise = 0, highs = 0, armed = 0;
+    if (old & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
+    for (u32 i = 1; i < count; i++) {
+        u32 status = probe_hstatus[i];
+        if (status & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
+        if ((old & GDC_STAT_HBLANK) && !(status & GDC_STAT_HBLANK)) probe_hd.fall++;
+        if (!(old & GDC_STAT_HBLANK) && (status & GDC_STAT_HBLANK)) {
+            probe_hd.rise++;
+            if (armed && completed < PROBE_HPERIODS) {
+                probe_hsamples[completed] = i - rise;
+                probe_highsamples[completed++] = highs;
+            }
+            rise = i; highs = 0; armed = 1;
+        }
+        if (armed && (status & GDC_STAT_HBLANK)) highs++;
+        old = status;
+    }
+    return completed;
+}
 /* Capture only complete rise-to-rise sample runs. Clocks and IRQs between
  * bursts are never included in either the high count or its denominator. */
 static u32 probe_hblank(const struct SplashRaster *s)
@@ -279,6 +298,7 @@ static u32 probe_hblank(const struct SplashRaster *s)
         probe_errors++; return 0;
     }
     u32 count = (2 * s->line_num_us - clocks) / q;
+    if (count > PROBE_SAMPLES) count = PROBE_SAMPLES;
     probe_hd.count = count;
     if (count < 2) { probe_hd.reason = 4; probe_errors++; return 0; }
     unsigned long long deadline = probe_now() + SPLASH_RASTER_SYNC_TIMEOUT_US;
@@ -289,25 +309,10 @@ static u32 probe_hblank(const struct SplashRaster *s)
         probe_hd.bursts++;
         unsigned int flags = irq_save();
         unsigned long long a = probe_now();
-        u32 old = inp(GDC_GFX_STAT), rise = 0, highs = 0, armed = 0;
-        if (old & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
-        for (u32 i = 1; i < count; i++) {
-            u32 status = inp(GDC_GFX_STAT);
-            if (status & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;
-            if ((old & GDC_STAT_HBLANK) && !(status & GDC_STAT_HBLANK)) probe_hd.fall++;
-            if (!(old & GDC_STAT_HBLANK) && (status & GDC_STAT_HBLANK)) {
-                probe_hd.rise++;
-                if (armed && completed < PROBE_HPERIODS) {
-                    probe_hsamples[completed] = i - rise;
-                    probe_highsamples[completed++] = highs;
-                }
-                rise = i; highs = 0; armed = 1;
-            }
-            if (armed && (status & GDC_STAT_HBLANK)) highs++;
-            old = status;
-        }
+        probe_poll_batch(count);
         unsigned long long elapsed = probe_now() - a;
         probe_measure_restore(flags, s);
+        completed = probe_hcollect(count, completed);
         probe_hd.completed = completed;
         if (probe_hd.bursts == 1 || elapsed < probe_hd.min_us) probe_hd.min_us = elapsed;
         if (elapsed > probe_hd.max_us) probe_hd.max_us = elapsed;
