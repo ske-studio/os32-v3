@@ -49,6 +49,7 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 証拠は ~/os32-tmp/evidence/<日付>/<名札>/ (ノート側でよい、所在を報告に書く)、報告は短く (各段の rc、ver、試験の結果、異常)。
 ```
 
+- **経路の優先度: LAN 版が先、シリアル版は LAN が使えないときだけ** (FD 起動でも LAN は使える。正典は [RA266](../../../docs/decisions/realhw/RA266.md) §0 の「転送の経路の優先度」)。依頼文にも「LAN で」と書き、シリアルで始めていたら CTRL+STOP で止めて LAN でやり直させる。
 - LAN 版 SerialFS の使い方 (`sfs lan peer`・`sfs lan on`、ノートの `lanfs_host.py --iface … --root … --peer …`、
   `rshell_serial.py --sfs-lan … cmd "sfs run hsync boot"`) は
   [TASK_LAN_82557](../../../docs/tasks/realhw/TASK_LAN_82557.md) の状態行。LAN が使えないときは
