@@ -114,20 +114,30 @@ static struct pit_setup probe_pit = { .reload = 24576 };
 static int probe_presents, probe_rects, probe_rx_pos;
 static u32 probe_checked_frames;
 static char probe_output[131072];
-static u32 probe_output_size;
+static u32 probe_output_size, probe_serial_baud;
 int gfx_current_height = 400, gfx_flip_enabled = 1;
 const struct bootinfo *bootinfo_get(void) { return &probe_bootinfo; }
 const struct pit_setup *pit_get_setup(void) { return &probe_pit; }
 int serial_gate_active(void) { return 0; }
+void serial_init(unsigned long baud)
+{
+    REQUIRE(baud == SYS_SERIAL_BAUD && irq_on);
+    REQUIRE(!probe_output_size);
+    probe_serial_baud = baud;
+}
 void serial_puts_polled(const char *p)
 {
+    REQUIRE(probe_serial_baud == SYS_SERIAL_BAUD);
     REQUIRE(probe_frames[PROBE_FRAMES-1].duration || probe_errors);
     REQUIRE(irq_on);
     while (*p) { REQUIRE(probe_output_size < sizeof(probe_output)-1); probe_output[probe_output_size++] = *p++; }
     probe_output[probe_output_size] = 0;
 }
 int serial_get_status(u32 *mode, u32 *baud, u32 *fifo)
-{ *mode = 0; *baud = 9600; *fifo = 1; return 0; }
+{
+    REQUIRE(probe_serial_baud == SYS_SERIAL_BAUD);
+    *mode = 0; *baud = probe_serial_baud; *fifo = 1; return 0;
+}
 void serial_diag_get(u32 *oe, u32 *fe, u32 *pe, u32 *overflow)
 { *oe = *fe = *pe = *overflow = 0; }
 int serial_trygetchar(void)
@@ -183,7 +193,7 @@ static void setup(int mode, int vs)
     irq_on = 1; missing_h = frozen = backwards = 0;
     calls = writes = probe_errors = 0; probe_previous = 0;
     probe_output_size = probe_presents = probe_rects = probe_rx_pos = 0;
-    probe_bios_reads = 0;
+    probe_bios_reads = probe_serial_baud = 0;
     probe_bios_snapshot[PEGC_BIOS_PRXCRT] = mode ? PEGC_BIOS_PRXCRT_31KHZ : 0;
     probe_checked_frames = 0;
     initial_irq_us = 0;
