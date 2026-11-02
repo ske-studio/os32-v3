@@ -46,8 +46,11 @@ MUTATIONS = (
      'c->open_total_us += elapsed;\n            if (elapsed * c->upper_samples > c->upper_num_us) c->upper_num_us = elapsed * c->upper_samples;'),
     ('omit measurement open window', 'probe_open_until = probe_now() + (s->line_num_us + s->line_den - 1) / s->line_den;',
      'probe_open_until = probe_now() + 0 * s->line_num_us;'),
-    ('clock inside H sample run', 'for (u32 i = 1; i < count; i++) {\n            u32 status = inp(GDC_GFX_STAT);',
-     'for (u32 i = 1; i < count; i++) {\n            (void)probe_now();\n            u32 status = inp(GDC_GFX_STAT);'),
+    ('clock inside H sample run', '        probe_hstatus[i] = inp(GDC_GFX_STAT);',
+     '        probe_hstatus[i] = inp(GDC_GFX_STAT) + 0 * probe_now();'),
+    ('aggregate inside IF0',
+     '        unsigned long long elapsed = probe_now() - a;\n        probe_measure_restore(flags, s);\n        completed = probe_hcollect(count, completed);',
+     '        completed = probe_hcollect(count, completed);\n        unsigned long long elapsed = probe_now() - a;\n        probe_measure_restore(flags, s);'),
     ('include partial H period', 'if (armed && completed < PROBE_HPERIODS)', 'if (completed < PROBE_HPERIODS)'),
     ('wrong duty numerator', '        highs += probe_highsamples[i];',
      '        highs += probe_hsamples[i] - probe_highsamples[i];'),
@@ -68,6 +71,32 @@ MUTATIONS = (
     ('qualify unmeasured phase', '.initial_margin = initial_margin, .capture_margin = capture,',
      '.qualified = 1, .initial_margin = initial_margin, .capture_margin = capture,'),
     ('omit IF open window', 'probe_open_until = end + probe_open_gap_us;', 'probe_open_until = end;'),
+    ('omit H rise diagnostic', 'probe_hd.rise++;', '(void)probe_hd.rise;'),
+    ('omit H fall diagnostic', 'probe_hd.fall++;', '(void)probe_hd.fall;'),
+    ('omit H first sample', 'if (old & GDC_STAT_HBLANK) probe_hd.high++; else probe_hd.low++;', '(void)old;'),
+    ('omit H completed diagnostic', 'probe_hd.completed = completed;', 'probe_hd.completed = 0;'),
+    ('omit H min time', 'probe_hd.min_us = elapsed;', 'probe_hd.min_us = 0;'),
+    ('omit H max time', 'probe_hd.max_us = elapsed;', 'probe_hd.max_us = 0;'),
+    ('omit H overrun', 'probe_hd.over++; probe_hd.reason = 8;', 'probe_hd.reason = 8;'),
+    ('wrong H reason', 'probe_hd.reason = 6; break;', 'probe_hd.reason = 7; break;'),
+    ('omit raw block', 'block < PROBE_RAW_BLOCKS;', 'block < PROBE_RAW_BLOCKS - 1;'),
+    ('omit raw read', 'i < PROBE_RAW_READS;', 'i < PROBE_RAW_READS - 1;'),
+    ('wrong raw port', 'u32 value = inp(port);', 'u32 value = inp(GDC_GFX_STAT); (void)port;'),
+    ('raw CLI', '*r = (struct probe_raw){ .both = PROBE_RAW_VALUES - 1 };',
+     '*r = (struct probe_raw){ .both = PROBE_RAW_VALUES - 1 }; (void)irq_save();'),
+    ('raw inner clock', 'r->freq[value]++;', 'r->freq[value]++; (void)probe_now();'),
+    ('omit raw AND', 'r->both &= value;', 'r->both |= value;'),
+    ('omit raw OR', 'r->either |= value;', 'r->either &= value;'),
+    ('omit raw frequency', 'r->freq[value]++;', 'r->freq[value] += 2;'),
+    ('omit raw high', 'if (level) b->high++; else b->low++;', 'if (level) b->high += 0; else b->low++;'),
+    ('omit raw edge', 'if (level) b->rise++; else b->fall++;', 'if (level) b->rise += 0; else b->fall++;'),
+    ('wrong raw run minimum', 'run < b->min[level]', 'run > b->min[level]'),
+    ('omit raw run tail', 'probe_raw_run(&r->bit[k], (old >> (5 + k)) & 1, run[k]);', '(void)run[k];'),
+    ('omit raw elapsed', 'r->elapsed += probe_now() - begin;', 'r->elapsed = probe_now() - begin;'),
+    ('print zero bins', 'if (r->freq[value]) {', 'if (1) {'),
+    ('unbounded histogram lines', '#define PROBE_RAW_PER_LINE 16u', '#define PROBE_RAW_PER_LINE 1u'),
+    ('omit new dump', '    probe_measure_dump();', '    (void)probe_measure_dump;'),
+    ('omit raw scan after H failure', '    probe_raw_scan(GDC_TEXT_STAT, &probe_raw[1]);', '    (void)probe_raw[1];'),
 )
 def ordinary():
     with tempfile.TemporaryDirectory(prefix='splash-probe-ordinary-') as td:
@@ -87,6 +116,9 @@ def execute(mutation=None):
                 name, old, new = mutation
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
+            if rel == SOURCE:
+                source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',
+                    'static u32 probe_hcollect(u32 count, u32 completed)\n{\n    probe_hcollect_check();')
             dest.write_text(source)
         cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'); exe = work/'probe'
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
