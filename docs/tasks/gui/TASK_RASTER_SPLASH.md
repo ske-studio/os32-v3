@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **設計中 (2026-11-01)** — 設計は確定 ([RASTER_SPLASH_DESIGN](../../decisions/gui/RASTER_SPLASH_DESIGN.md)、ユーザーの草案から astra 起草 r1〜r3、Opus レビュー 2 回)。段 0 の実装はこれから。GeForce の転送高速化 (票 TASK_GF_ACCEL) と並行。
+> 状態: **設計中 (2026-11-02)** — **1 行ごとの改訂が確定** ([RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md)、ユーザー決定「案Bで」: ホストのエンコーダー (先読みの貪欲法、番号の対応は自由、成分ごとの差分) で各行の HBLANK の OUT を N=5 以内に、.osri v2、PEGC・EGC は使わない)。実機 Ra266 の実測 (2026-11-02、LAN で 574f6c5b): HBLANK ≈ 5.9µs (A0h bit6、1H ≈ 31.8µs)、IN ≈ 1.15µs、パレットの OUT ≈ 0.65µs 平均 / 0.78µs 上限。旧いエンコード経路と各行独立 16 色のプレビューは外す (ユーザー決定)。次は改訂設計の段 (§6・§7) を実装に出す。それまで: **設計中 (2026-11-01)** — 設計は確定 ([RASTER_SPLASH_DESIGN](../../decisions/gui/RASTER_SPLASH_DESIGN.md)、ユーザーの草案から astra 起草 r1〜r3、Opus レビュー 2 回)。段 0 の実装はこれから。GeForce の転送高速化 (票 TASK_GF_ACCEL) と並行。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
