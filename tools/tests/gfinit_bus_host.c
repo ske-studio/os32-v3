@@ -5,6 +5,11 @@
 #define KDEBUG_WINDOW_HOST 1
 #include "../../kdebug/kdebug_window.c"
 #include "../../kdebug/gfinit_bus.c"
+static int bus_foundation_call(struct gf_foundation *f, const struct gf1_test_request *q,
+                                struct gf1_test_reply *reply)
+{ (void)reply;CHECK(q->op==GF1T_REVOKE);f->revoked=true;return 0; }
+static const struct gf1_test_ops bus_foundation_ops={.call=bus_foundation_call};
+const struct gf1_test_ops *geforce_foundation_ops(void) { return &bus_foundation_ops; }
 static u32 pci_id, pci_status, pci_writes, cfg_width, cfg_offset;
 static u32 pte, mapped_pa, mapped_flags, irq_state, maps, restores, fault;
 static struct gfinit_bus device;
@@ -85,6 +90,18 @@ static struct recover_bus_access address(u32 key,u32 dir)
 }
 static void accessor_tests(void)
 {
+    bus_setup();
+    struct gf_foundation moved={0};
+    device.foundation=&moved;
+    rawbars[2]^=PAGE_SIZE;
+    u32 command_value, moved_bars[RECOVER_BAR_COUNT];
+    CHECK(!gfinit_bus_raw_config(&device,&command_value,moved_bars) && moved.revoked);
+    bus_setup();
+    struct gf_foundation lost = {.revoked=true};
+    device.foundation=&lost;
+    struct recover_bus_access old_command=address(6,REC_WRITE);
+    CHECK(bus_write_test(0,&old_command,RECOVER_COMMAND_RUN)<0 && !pci_writes);
+    bus_setup();
     for(u32 key=0;key<gf_fixture_profile.target_count;key++) {
         bus_setup();
         const struct recover_target *t=&profile.targets[key];

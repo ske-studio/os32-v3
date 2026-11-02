@@ -158,6 +158,7 @@ static void c_arm(void)
     executor_bus.read=bus_read_test;executor_bus.write=bus_write_test;
     for(u32 i=0;i<profile.target_count;i++)values[i]=0;
     CHECK(!gfinit_exec_prepare(&core,&execution));
+    rawcommand=RECOVER_COMMAND_RUN; /* MASTER precedes the initial C plan. */
     for(u32 main=0;main<GF_INIT_MAINS;main++) {
         execution.main_id=main;CHECK(gfinit_exec_run(&core,&execution)==0);
     }

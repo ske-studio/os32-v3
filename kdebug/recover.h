@@ -57,6 +57,9 @@
 #define RECOVER_GF_DEVICE ((PCI_DEVICE_NV44A << 16) | PCI_VENDOR_NVIDIA)
 #define RECOVER_GF_PMC_IRQ 0x0140U
 #define RECOVER_PMC_ENABLE 0x200U
+#define RECOVER_PMC_ENGINE_FIFO 0x00000100U
+#define RECOVER_PMC_ENGINE_GR   0x00001000U
+#define RECOVER_PMC_ENGINE_MPEG 0x00000002U
 #define RECOVER_PMC_ENABLE_BIT0 1U
 #define RECOVER_PBUS184C 0x184cU
 #define RECOVER_CR11_PROTECT 0x80U
@@ -353,6 +356,8 @@ struct recover_ops {
     int (*mode_color)(void *opaque, struct recover *r, u32 row, u32 value);
     int (*mode_wait)(void *opaque, u32 us);
     int (*mode_cell)(void *opaque, struct recover *r, u32 *actual);
+    /* Unconditional foreground stop before budget-gated local/S0 cleanup. */
+    int (*pre_cleanup)(void *opaque);
 };
 struct recover {
     const struct recover_ops *ops;

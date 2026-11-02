@@ -12,6 +12,7 @@ static u32 sim_waits,sim_wait_fail,sim_validate_fail,sim_acquire_fail;
 static u32 sim_check_reads,sim_check_mismatch,sim_restore_fail;
 static u32 sim_pll_write_fail,sim_pll_writes;
 static bool sim_compare,sim_trace;
+static u32 sim_starts,sim_stops,sim_start_fail,sim_stop_fail;
 static struct gf_display_context display;
 static struct gf_init_context display_init;
 static struct gf_init_program display_program;
@@ -118,11 +119,26 @@ static int sim_validate(struct gf_display_context *c)
     CHECK(c->initialized && c->baseline_valid && !c->init && !c->program);
     return sim_validate_fail?-1:0;
 }
+static int sim_foundation_start(struct gf_display_context *c)
+{
+    CHECK(c->section==GF_DISPLAY_CHECK && sim_validates && sim_check_reads);
+    CHECK(!c->active && c->engaged && !c->init && !c->program);
+    sim_starts++;
+    return sim_start_fail ? -1 : 0;
+}
+static int sim_foundation_stop(struct gf_display_context *c)
+{
+    CHECK(c->section==GF_DISPLAY_STOP && !c->active && c->engaged);
+    sim_stops++;
+    return sim_stop_fail ? -1 : 0;
+}
 static const struct gf_display_owner sim_owner={
-    .acquire=sim_acquire, .release=sim_release, .validate=sim_validate
+    .acquire=sim_acquire, .release=sim_release, .validate=sim_validate,
+    .foundation_start=sim_foundation_start,.foundation_stop=sim_foundation_stop
 };
 static void sim_reset(void)
 {
+    sim_starts=sim_stops=sim_start_fail=sim_stop_fail=0;
     sim_count=sim_calls=sim_fail=sim_second_fail=sim_points=sim_point_fail=sim_time=0;
     sim_restores=sim_saved=sim_acquires=sim_releases=sim_validates=sim_waits=0;
     sim_wait_fail=sim_validate_fail=sim_acquire_fail=0;sim_compare=sim_trace=false;
@@ -209,7 +225,7 @@ static void service_cases(void)
     display.bars[1].length=0x10000000;
     CHECK(!video_start(&d,mode.id,sim_rgb));
     CHECK(display.active && display.initialized && display.baseline_valid && display.reusable);
-    CHECK(sim_acquires==1 && sim_releases==1 && sim_validates==1);
+    CHECK(sim_acquires==1 && sim_releases==1 && sim_validates==1 && sim_starts==1 && !sim_stops);
     u32 first_calls=sim_calls,first_points=sim_points,first_waits=sim_waits,first_checks=sim_check_reads;
     u8 latency=display.mode.cr[0x52];
     CHECK(!video_query(&d,&info) && info.active && info.current_mode==mode.id);
@@ -226,7 +242,8 @@ static void service_cases(void)
     sim_vga[0][0x52]=0xf0;
     CHECK(!video_start(&d,mode.id,sim_rgb) && sim_acquires==1 && sim_validates==3);
     CHECK(display.mode.cr[0x52]==latency);
-    CHECK(!video_stop(&d));
+    CHECK(sim_starts==2 && sim_stops==1);
+    CHECK(!video_stop(&d) && sim_stops==2);
     /* Every actual bus failure in a full first start must revoke reuse and
      * finish cleanup/quiesce; failure position comes from the successful run. */
     for(u32 i=1;i<=first_calls;i++) {
@@ -266,6 +283,12 @@ static void service_cases(void)
     CHECK(video_framebuffer(0,&fb)==OS32_ERR_INVAL && !fb.bytes);
     CHECK(video_start(0,1,sim_rgb)==OS32_ERR_INVAL && video_palette(0,0,1,sim_rgb)==OS32_ERR_INVAL);
     CHECK(video_blank(0,0)==OS32_ERR_INVAL && video_stop(0)==OS32_ERR_INVAL && video_display_start(0,0)==OS32_ERR_INVAL);
+    sim_reset();sim_start_fail=1;
+    CHECK(video_start(&d,1,sim_rgb)==-1 && sim_starts==1 && sim_stops==1);
+    sim_reset();CHECK(!video_start(&d,1,sim_rgb));sim_stop_fail=1;
+    before=sim_calls;
+    CHECK(video_stop(&d)==-1 && display.engaged && !display.active && !display.reusable && !display.stop_ok && sim_calls==before);
+    sim_stop_fail=0;CHECK(!video_stop(&d) && !display.engaged && display.stop_ok && sim_stops==2);
     output("PASS service: runner/baseline/load/check, restart, palette/blank/stop, all bus/point/wait failures\n");
 }
 static void record_cases(void)

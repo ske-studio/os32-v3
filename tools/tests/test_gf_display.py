@@ -6,6 +6,7 @@ CHECK = dict(name='gf-display-host', tier=1,
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
 import host32
 import test_gfinit_plan_c
 
@@ -78,7 +79,7 @@ def check_rows(text):
             print(line)
 
 
-def main():
+def main(override=None):
     with tempfile.TemporaryDirectory(prefix='gf-display-') as tmp:
         tmp = Path(tmp)
         (tmp / 'gf_previous_calc.inc').write_text(previous_calc())
@@ -88,6 +89,9 @@ def main():
         sources = [ROOT / 'hwdev/gf/service.c',
                    *[p for p in sorted((ROOT / 'hwdev/gf/display').glob('*.c'))
                      if p.stem in ('baseline', 'checks', 'load_row', 'modeset', 'quiesce', 'palette', 'blank', 'modes')]]
+        if override:
+            rel, replacement = override
+            sources = [replacement if p == ROOT / rel else p for p in sources]
         cmd += ['-I'+str(ROOT), '-I'+str(tmp), *map(str, sources)]
         subprocess.run(cmd, cwd=ROOT, check=True)
         result = host32.run([str(exe)], cwd=ROOT, timeout=180, capture_output=True, text=True)
@@ -115,8 +119,34 @@ def main():
     return 0
 
 
+def mutations():
+    rows = [
+        ('hwdev/gf/display/quiesce.c', 'if (c->engaged) return -1;', 'if (false) return -1;', 'failed stop cleanup forbidden'),
+        ('hwdev/gf/service.c', ' || c->owner->foundation_start(c)', '', 'start hook omitted'),
+        ('hwdev/gf/display/quiesce.c', 'int stopped=c->owner->foundation_stop(c);', 'int stopped=0;', 'stop hook omitted'),
+        ('hwdev/gf/display/quiesce.c', '    c->active=false;\n', '    (void)c;\n', 'stop while active'),
+    ]
+    with tempfile.TemporaryDirectory(prefix='gf-cw-display-mut-') as td:
+        for rel, old, new, label in rows:
+            source = ROOT / rel
+            original = source.read_text()
+            assert original.count(old) == 1, label
+            import re
+            text = re.sub(r'#include "([^"\n]+)"',
+                          lambda m: '#include "' + str((source.parent / m[1]).resolve()) + '"',
+                          original.replace(old, new, 1))
+            mutant = Path(td) / source.name
+            mutant.write_text(text)
+            # main checks compilation with check=True, so only runtime failure counts.
+            assert main((rel, mutant)) != 0, label
+            print('MUTATE runtime RED: ' + label, flush=True)
+
+
 if __name__ == '__main__':
-    raise SystemExit(main())
+    rc = main()
+    if not rc and '--mutate' in sys.argv:
+        mutations()
+    raise SystemExit(rc)
 
 
 def run(ctx) -> int:
@@ -126,6 +156,8 @@ def run(ctx) -> int:
     base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     env = dict(base_env)
     argv = ['python3', '-B', 'tools/tests/test_gf_display.py']
+    if ctx.mutate:
+        argv.append('--mutate')
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc

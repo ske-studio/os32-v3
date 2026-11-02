@@ -1,5 +1,7 @@
 #include "geforce_module.h"
 #include "geforce_imports.h"
+#include "geforce_tick.h"
+#include "../../../hwdev/gf/production.h"
 #include "bootinfo.h"
 #include "config.h"
 #include "os32_generations.h"
@@ -15,10 +17,14 @@ extern const struct module_symbol_contract geforce_import_contracts[], geforce_e
 static struct module_handle geforce_handle;
 static GfxBackend candidate;
 static int registered;
+static const struct gf3_test_ops *accel_slot;
+static const struct gf1_test_ops *foundation_slot;
+const struct gf1_test_ops *geforce_foundation_ops(void)
+{ return registered ? foundation_slot : 0; }
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};
 static GeforceModuleContext context = {
-    &gfx_backend_geforce, &gfx_counters, &gfx_current_height, &gfx_flip_enabled, &gfx_display_page, 0
+    &gfx_backend_geforce, &gfx_counters, &gfx_current_height, &gfx_flip_enabled, &gfx_display_page, 0, &accel_slot, &foundation_slot
 };
 int geforce_pc98_safe(void)
 {
@@ -84,7 +90,14 @@ static int geforce_detach(struct module_record *r)
 {
     (void)r;
     /* Device context and restoration callbacks live for the whole boot. */
-    return !registered;
+    const struct geforce_platform *p=context.platform;
+    const struct gf_production *owner=p ? p->opaque : 0;
+    if (registered || (owner && (owner->foundation.registered ||
+        owner->foundation.running || owner->foundation.bm ||
+        owner->foundation.mapped || owner->foundation.imem.used))) return 0;
+    if (geforce_tick_bind(0,0)) return 0;
+    foundation_slot=0;accel_slot=0;
+    return 1;
 }
 int geforce_module_load(void)
 {
@@ -102,7 +115,12 @@ int geforce_module_load(void)
     if (!rc) rc=module_start(geforce_handle);
     if (!rc && !module_exports(geforce_handle)) rc=MODULE_INIT_FAILED;
     if (!rc) gfx_backend_geforce=candidate;
+    else {foundation_slot=0;accel_slot=0;}
     kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, bi->img_crc, registered);
     return rc;
 }
-int geforce_module_abort(void) { return module_abort(geforce_handle); }
+int geforce_module_abort(void)
+{
+    if (registered) return MODULE_ISOLATED;
+    return module_abort(geforce_handle);
+}

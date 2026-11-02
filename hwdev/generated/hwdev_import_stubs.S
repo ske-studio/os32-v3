@@ -186,4 +186,9 @@ gf_production_selected:
 recover_gf_runner_access:
     jmp *hwdev_import_slots+144
 .size recover_gf_runner_access, .-recover_gf_runner_access
+.globl geforce_foundation_ops
+.type geforce_foundation_ops, @function
+geforce_foundation_ops:
+    jmp *hwdev_import_slots+148
+.size geforce_foundation_ops, .-geforce_foundation_ops
 .section .note.GNU-stack,"",@progbits

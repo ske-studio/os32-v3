@@ -175,7 +175,7 @@ def main():
         # platform/trial callbacks are doubles; call/release execute KMOD code.
         owner_source = (ROOT/'kdebug/gfinit.c').read_text()
         owner_type = re.search(r'struct gfinit_owner \{.*?\n\};', owner_source, re.S)[0]
-        header = '#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n' + owner_type + '\n'
+        header = '#include "hwdev/gf/foundation.h"\n#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n' + owner_type + '\n'
         for name in ('control', 'owner', 'gf_lease'):
             header += '#define IMAGE_' + name.upper() + ' ' + str(symbols[name]) + 'U\n'
         (folder/'hwdev_owner_fixture.h').write_text(header)

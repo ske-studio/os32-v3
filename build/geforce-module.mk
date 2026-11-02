@@ -1,8 +1,8 @@
 # T5c-5b: reuse T4 function imports, VA0 packing and paired distribution.
 GEFORCE_OUT := $(BUILD_OUT)/geforce
 GEFORCE_GEN := $(addprefix $(GEFORCE_OUT)/,geforce_imports.h geforce_imports.json geforce_import_slots.c geforce_import_stubs.S geforce_provider_types.c geforce_kexports.c)
-GEFORCE_DEF_SOURCES := drivers/video/geforce/geforce_module.h include/gfx_hal.h include/gfx_mode.h include/video_service.h hwdev/gf/production.h
-$(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
+GEFORCE_DEF_SOURCES := hwdev/gf/gf1_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
+$(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 
 GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,geforce_body.o backend_geforce.o gf_present.o geforce_import_slots.o geforce_import_stubs.o)
@@ -15,9 +15,6 @@ $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) b
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
 GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
-GEFORCE_LAYER1_PENDING := hwdev/gf/master.c hwdev/gf/instmem.c hwdev/gf/irq.c \
- hwdev/gf/instmem_map.c hwdev/gf/foundation.c
-GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
 GEFORCE_SERVICE_OBJS := $(patsubst %.c,$(GEFORCE_OUT)/%.o,$(GEFORCE_SOURCES))
 $(GEFORCE_SERVICE_OBJS): $(GEFORCE_OUT)/%.o: %.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	mkdir -p $(@D)
@@ -47,7 +44,10 @@ $(R1_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports
 -include $(GEFORCE_OBJS:.o=.d) $(GEFORCE_OUT)/geforce_kexports.d $(GEFORCE_OUT)/geforce_provider_types.d
 
 # Identification is also needed before module loading / ledger freeze.
-GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o
+GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o
+$(GEFORCE_OUT)/geforce_tick.o: drivers/video/geforce/geforce_tick.c drivers/video/geforce/geforce_tick.h build/geforce-module.mk
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) -Os $(GEFORCE_INC) -c $< -o $@
 $(GEFORCE_OUT)/boot_resources.o: hwdev/gf/resources.c build/geforce-module.mk
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os -DGF_PRODUCTION $(GEFORCE_INC) -c $< -o $@

@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 494921367,
+  "module_abi_gen": 3769453070,
   "stage": "S6",
-  "count": 309,
+  "count": 310,
   "imports": [
     {
       "stage": "S1",
@@ -4668,6 +4668,22 @@
       "type_ver": 1,
       "signature": "int gf_production_selected(void);",
       "source_declaration": "int gf_production_selected(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 309,
+      "symbol": "geforce_foundation_ops",
+      "source": "drivers/video/geforce/geforce_module.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "geforce_foundation_ops",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "const struct gf1_test_ops *geforce_foundation_ops(void);",
+      "source_declaration": "const struct gf1_test_ops *geforce_foundation_ops(void);",
       "dtype": null,
       "array": false
     }

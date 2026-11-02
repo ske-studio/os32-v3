@@ -72,6 +72,9 @@ def check_output(text, verbose=True):
 
 
 MUTATIONS = [
+    ('kdebug/gfinit_plan_c/checks.inc', 'command_run_stop',
+     'b->baseline ? RECOVER_COMMAND_STOP : RECOVER_COMMAND_RUN',
+     'b->baseline ? RECOVER_COMMAND_RUN : RECOVER_COMMAND_STOP'),
     ('kdebug/recover_plan/access.inc', 'rmw_destination_sample',
      'if (a->value == w->key) *old = values[i];', '(void)old;'),
     ('kdebug/recover_gf_stage/c.inc', 'record_cell_required',
@@ -110,6 +113,9 @@ MUTATIONS = [
 ]
 
 STAGE_MUTATIONS = [
+    ('kdebug/gfinit_plan_c/checks.inc', 'c_only_command_stopped',
+     'b->baseline ? RECOVER_COMMAND_STOP : RECOVER_COMMAND_RUN',
+     'b->baseline ? RECOVER_COMMAND_RUN : RECOVER_COMMAND_RUN', 's0'),
     ('kdebug/gf_stage_state.c', 'entry_command',
      'command != s->foundation->expected_command', 'false', 's0'),
     ('kdebug/gf_stage_state.c', 'entry_revoked',

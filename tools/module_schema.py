@@ -184,7 +184,7 @@ COMPONENTS = (
     dict(name='GEFORCE', path='/boot/geforce.mod', dependencies=(), required=False,
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-         stop_allowed=0, ops_version=2, ops_slots=1,
+         stop_allowed=0, ops_version=3, ops_slots=1,
          image_max=131072, mem_max=131072, load_span_max=163840,
          reloc_max=8192, import_max=32, export_max=1,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',

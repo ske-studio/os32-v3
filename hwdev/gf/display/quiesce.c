@@ -14,10 +14,21 @@ int gf_display_stop(void *v)
     if (!c) return OS32_ERR_INVAL;
     if (!c->engaged) return 0;
     c->section=GF_DISPLAY_STOP;
+    /* nouveau_drm.c:926-940 nouveau_drm_remove: stop before restoration.
+     * Even revoked access attempts all existing cleanup rows; the bus rejects
+     * old MMIO and the outer backend still selects the 98 display. */
+    c->active=false;
+    int stopped=c->owner->foundation_stop(c);
+    int stop_rc=c->last_rc;
+    if (stopped) {
+        c->reusable=false;c->stop_ok=false;
+        if (c->engaged) return -1;
+    }
     struct gf_init_context cleanup={.io=c->io};
     int rc=c->io.restore(c->io.opaque,&cleanup);
     u32 target=c->target;
-    int first_rc=rc;
+    int first_rc=stopped ? stop_rc : rc;
+    if (stopped) rc=-1;
     if (rc) rc=-1;
     /* Always attempt all quiesce writes, even if local cleanup failed. The
      * owner bus rejects access if identity/BAR validation revoked its map. */

@@ -26,7 +26,8 @@ static u32 prod_deadline_section;
 static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pfb;
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
-static u32 prod_logs;
+static int prod_foundation_fail;
+static u32 prod_logs,prod_cfg_reads;
 void kprintf(u8 attr,const char *format,...)
 { (void)attr;(void)format;prod_logs++; }
 #define PROD_ROUTE 0xfacU
@@ -96,6 +97,7 @@ int gf_production_mmio(struct gf_production *p,u32 bar,u32 off,u32 width,bool wr
 }
 u32 pci_cfg_read32(u32 b,u32 d,u32 f,u32 o)
 {
+    prod_cfg_reads++;
     CHECK(b==0 && d<32 && f<8 && o<256 && !(o&3));
     if(d==13 && (o==RECOVER_CFG50 || o==RECOVER_CFG54))
         return *prod_reg(o==RECOVER_CFG50?0x1850:0x1854);
@@ -107,9 +109,9 @@ void pci_cfg_write32(u32 b,u32 d,u32 f,u32 o,u32 v)
 {(void)b;(void)d;(void)f;(void)o;(void)v;prod_other_cfg_writes++;}
 int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
-    CHECK(!b && d==13 && !f && o==4 && v==0x102);
+    CHECK(!b && d==13 && !f && o==4 && v==0x106);
     prod_event(4);prod_cmd_writes++;
-    prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x106:v);
+    prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
     return 0;
 }
 void *kmemset(void *p,int value,u32 n)
@@ -144,6 +146,43 @@ int sys_time_now(u32 *lo,u32 *hi)
     }
     if(++prod_clock_calls==prod_clock_fail)return -1;
     prod_now+=prod_clock_step;*lo=prod_now;*hi=0;return 0;
+}
+const struct gf_instmem_map_ops gf_production_instmem_map_ops={0};
+int serial_gate_active(void) { return 1; }
+void serial_puts_polled(const char *s) { (void)s; }
+int gf_master_enable(struct gf_foundation *f)
+{
+    if(pci_cfg_write16(0,13,0,4,RECOVER_COMMAND_RUN) ||
+       pci_cfg_read16(0,13,0,4)!=RECOVER_COMMAND_RUN)return GF1_EPCI;
+    f->expected_command=RECOVER_COMMAND_RUN;f->bm=true;return 0;
+}
+void gf_foundation_revoke(struct gf_foundation *f)
+{ f->revoked=true;f->running=false; }
+int gf_foundation_start(struct gf_foundation *f)
+{
+    CHECK(f==&prod.foundation && prod.display.section==GF_DISPLAY_CHECK);
+    CHECK(f->instmem_bar.base==prod_boot.bars[2].base && f->map_owner==&prod &&
+          f->map_ops==&gf_production_instmem_map_ops && f->io.opaque==f &&
+          f->bar0==prod.display.bar0_map && !prod.scratch && prod.display.baseline_valid);
+    if (gf_master_enable(f)) return GF1_EPCI;
+    /* Emulate MC state change without touching the fake physical BAR map. */
+    *prod_reg(RECOVER_PMC_ENABLE)=f->expected_pmc=0xffffffffU;
+    f->running=true;return 0;
+}
+int gf_foundation_stop(struct gf_foundation *f)
+{
+    CHECK(f==&prod.foundation && !prod.display.active);
+    f->running=false;
+    if (prod_foundation_fail) return f->last_rc=GF1_EIO;
+    if (f->revoked) return f->last_rc=GF1_EPCI;
+    /* This double owns no IRQ/map. Return to STOP while retaining the old
+     * transport counters (which specifically count the N1 WORD write). */
+    if(f->bm) {
+        prod_cfg[13][0][1]=(prod_cfg[13][0][1]&0xffff0000U)|RECOVER_COMMAND_STOP;
+        f->expected_command=RECOVER_COMMAND_STOP;f->bm=false;
+    }
+    f->expected_pmc=*prod_reg(RECOVER_PMC_ENABLE);
+    return 0;
 }
 static int prod_route(void *v)
 {CHECK(v==&prod);prod_event(PROD_ROUTE);prod_route_calls++;return prod_route_fail?-1:0;}
@@ -200,6 +239,19 @@ static void prod_reset(void)
     CHECK(!gf_production_identify(&prod_boot));
     CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
     CHECK(!prod_cmd_writes && !prod_mmio_calls && !prod_route_calls);
+    /* IRQ/tick adapter uses only its permanent map, never the guarded bus. */
+    u32 words[2]={0,0},value,reads=prod_cfg_reads;
+    volatile u8 *saved=prod.foundation.bar0;
+    prod.foundation.bar0=(volatile u8 *)words;
+    CHECK(!prod.foundation.io.write(&prod.foundation,0,4,4,0x12345678));
+    CHECK(!prod.foundation.io.read(&prod.foundation,0,4,4,&value));
+    CHECK(value==0x12345678 && words[1]==value && prod_cfg_reads==reads);
+    prod.foundation.revoked=true;
+    value=0xabcdef01;
+    CHECK(prod.foundation.io.read(&prod.foundation,0,4,4,&value)==-1 && value==0xabcdef01);
+    CHECK(prod.foundation.io.write(&prod.foundation,0,4,4,0)==-1 && words[1]==0x12345678);
+    prod.foundation.revoked=false;
+    prod.foundation.bar0=saved;
 }
 static int prod_start(void)
 {return video_start(&prod.video,1,prod_rgb);}
@@ -252,15 +304,15 @@ static void prod_selection_tests(void)
 static void prod_cases(void)
 {
     prod_reset();CHECK(!prod_start());prod_order();
-    CHECK(prod_cmd_writes==1 && !prod_other_cfg_writes && prod_reads16 && !prod_live_pages);
-    CHECK((prod_cfg[13][0][1]&0xffff)==0x102 && (prod_cfg[13][0][1]>>16)==0x02b0);
+    CHECK(prod_cmd_writes==2 && !prod_other_cfg_writes && prod_reads16 && !prod_live_pages);
+    CHECK((prod_cfg[13][0][1]&0xffff)==0x106 && (prod_cfg[13][0][1]>>16)==0x02b0);
     CHECK(!prod_return(&prod));prod_exit_order();
     CHECK(prod_index[0]==0x22 && prod_vga[0][0x11]==0x80 && prod_vga[0][0x1f]==0);
     u32 reads=prod_mmio_calls;
     CHECK(!gf_production_quiesce(&prod) && prod_mmio_calls==reads);
-    CHECK(!prod_start() && prod_cmd_writes==1);CHECK(!prod_return(&prod));
-    output("PASS real startup/main/baseline/mode/CHECK, WORD Command 0106->0102 once, no BAR writes, restart without devinit\n");
-    prod_reset();prod_mismatch=1;prod_failure();CHECK(prod_cmd_writes==1 && !prod_mmio_calls && !prod_a2_done && !prod_redraws);
+    CHECK(!prod_start() && prod_cmd_writes==3);CHECK(!prod_return(&prod));
+    output("PASS real startup/main/baseline/mode/CHECK, WORD Command RUN at N1, STOP on exit, no BAR writes, restart without devinit\n");
+    prod_reset();prod_mismatch=1;prod_failure();CHECK(prod_cmd_writes==1 && !prod_a2_done);
     prod_reset();prod_route_fail=1;prod_failure();CHECK(!prod_cmd_writes && !prod_mmio_calls);
     prod_reset();prod_alloc_fail=1;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
     prod_reset();prod_rom[0]=0;prod_failure();CHECK(!prod_a2_done);prod_exit_order();
@@ -278,6 +330,14 @@ static void prod_cases(void)
     CHECK(prod_a2_done && prod_main_mask==31 && !prod.display.baseline_valid);prod_exit_order();
     prod_reset();prod_clock_fail=1;prod_failure();prod_exit_order();
     output("PASS Command mismatch, route/ROM/alloc/A2/main/baseline/PLL/CHECK/PFB/clock/deadline failures and 98 exit order\n");
+    prod_reset();CHECK(!prod_start());prod_foundation_fail=1;
+    prod.indexes[0]=(struct gf_production_local){RECOVER_PRMCIO+RECOVER_CRTC,0,0x22,true};
+    CHECK(prod_return(&prod)==-1 && prod.display.engaged && !prod.display.stop_ok);
+    CHECK(prod.indexes[0].valid && !prod_stop_writes && prod_route_calls==2);
+    CHECK(prod.foundation.bm && !prod.display.reusable && !prod.display.active);
+    prod_foundation_fail=0;
+    CHECK(!prod_return(&prod) && !prod.display.engaged && prod.display.stop_ok);
+    CHECK(prod_stop_writes==3 && prod_route_calls==3 && !prod.foundation.bm && !prod.indexes[0].valid);
     for(u32 fault=1;fault<=3;fault++) {
         prod_reset();CHECK(!prod_start());prod_stop_fail=fault;
         CHECK(prod_return(&prod)==-1 && prod_stop_writes==3 && !prod.display.reusable);
@@ -293,8 +353,8 @@ static void prod_cases(void)
         else if(fault==4)prod_cfg[13][0][11]^=1;
         else prod_cfg[13][0][2]^=1;
         reads=prod_mmio_calls;
-        CHECK(prod_return(&prod)==-1 && prod.revoked && prod_mmio_calls==reads && !prod_redraws);
-        CHECK(prod_route_calls==2 && prod_start()==-1);
+        CHECK(prod_return(&prod)==-1 && prod.revoked && prod.foundation.revoked && !prod.foundation.running && prod.foundation.bm && prod_mmio_calls==reads && !prod_redraws);
+        CHECK(prod_route_calls==2 && prod_start()==-1 && !prod.display.engaged);
     }
     output("PASS cleanup failures attempt all quiesce writes; ID/subsys/revision/each BAR change denies MMIO and still attempts route00\n");
     prod_reset();u32 value;
@@ -358,7 +418,7 @@ static void prod_present_cases(void)
         u32 reads=prod_mmio_calls;prod_points=0;gfx_counters=(GfxCounters){0};
         CHECK(gf_present_rect(src,GF_MODE_WIDTH,prod_unmapped,GF_MODE_WIDTH,prod_unmapped,
                               0,0,2,h,prod_present_point,&prod)==-1);
-        CHECK(prod_points==1 && prod.revoked && prod_mmio_calls==reads);
+        CHECK(prod_points==1 && prod.revoked && prod.foundation.revoked && !prod.foundation.running && prod.foundation.bm && prod_mmio_calls==reads);
         CHECK(!gfx_counters.commits && !gfx_counters.present_bytes);
         /* Existing failure exit: stop (MMIO denied) -> route00, no 98 redraw. */
         CHECK(prod_return(&prod)==-1 && prod_mmio_calls==reads && prod_route_calls==2 && !prod_redraws);

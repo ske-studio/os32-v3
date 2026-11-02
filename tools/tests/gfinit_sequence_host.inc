@@ -82,6 +82,24 @@ static void sequence_cases(void)
 #include "../../drivers/char/serial.h"
 #include "../../hwdev/owner.h"
 #include "hwdev_trace_symbols.h"
+static int sequence_foundation_prepare(struct gf_foundation *f,
+    const struct recover_bar_extent *bars, u32 n)
+{ CHECK(f->io.opaque && bars && n==RECOVER_BAR_COUNT);return 0; }
+static int sequence_foundation_call(struct gf_foundation *f,
+    const struct gf1_test_request *q, struct gf1_test_reply *reply)
+{
+    CHECK(q->op==GF1T_MASTER || q->op==GF1T_START || q->op==GF1T_STOP || q->op==GF1T_REVOKE);
+    if(q->op==GF1T_MASTER || q->op==GF1T_START)
+        rawcommand=f->expected_command=RECOVER_COMMAND_RUN;
+    if(q->op==GF1T_STOP)rawcommand=f->expected_command=RECOVER_COMMAND_STOP;
+    if(q->op==GF1T_REVOKE)f->revoked=true;
+    *reply=(struct gf1_test_reply){0};return 0;
+}
+static const struct gf1_test_ops *sequence_foundation_ops(void)
+{
+    static const struct gf1_test_ops ops={0,sequence_foundation_prepare,sequence_foundation_call};
+    return &ops;
+}
 static struct gfinit_owner *sequence_bundle;
 static u8 sequence_flow[RECOVER_NODE_MAX*RECOVER_BITS_WORDS*sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static struct recover *sequence_recover_owner(void) {return &core;}
@@ -148,6 +166,23 @@ static void sequence_owner_run(bool mode_c,bool record,bool changing)
         CHECK(!rc);if(rc)return;
     }
     CHECK(g->next_main==GF_INIT_MAINS && core.gf_stage && core.gf_stage->initialized);
+    CHECK(rawcommand==RECOVER_COMMAND_RUN);
+    if (mode_c) {
+        g->ops.mode_wait=exec_delay;g->ops.mode_vram=frame_operation;g->ops.mode_color=color_operation;
+        g->ops.route_read=c_route_read;g->ops.route_write=c_route_write;g->ops.mode_cell=c_cell;
+        memory_ops.load=frame_load;memory_ops.store=frame_store;
+        route_value=route_writes=route_reads=route_fault=route_noise=0;
+        cell_value=0x1234;cell_calls=cell_writes=cell_fault=cell_runs=0;
+        frame_writes=frame_reads=drains=frame_points=0;
+        frame_fail_at=frame_abort_at=color_fail_at=RECOVER_NONE;
+        vram_active=color_active=false;color_count=0;
+        q=(struct gfinit_request){.version=GF_INIT_VERSION,.size=sizeof(q),.flags=GF_ALLOW_WRITE,
+            .max_steps=GF_INIT_SCHEDULE,.session=core.token.session};
+        rc=call(GF_OP_MODESET,&q,sizeof(q),&ops,&transport,&gf_fixture_profile);
+        if(rc){output("owner C failure reason ");number(core.reason);output("\n");}
+        CHECK(!rc);
+        CHECK(composed.c_checks[94].valid && composed.c_checks[95].valid);
+    }
     CHECK(sequence_gpio_reads==1);
     CHECK(sequence_gpio_value==(((0xa5a50f55U ^ (changing?0x80000000U:0)) & 0xfffeefefU) | 0x11000U));
 }

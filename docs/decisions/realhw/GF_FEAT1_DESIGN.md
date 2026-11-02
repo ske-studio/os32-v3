@@ -397,7 +397,7 @@ HEADS は running 時だけ既存 FIFO/GR 要求を保ち gf_irq_enable。INST_P
 flags は bit0=bm、1=mapped、2=registered、3=running、4=revoked。command/pmc は期待値、実測と区別して出力。
 INST_PAGE は bytes=比較済みbyte数、bad_off=先頭不一致（なしは ~0U）。他操作は bytes=0、bad_off=~0U。
 module の新 hwdev/gf/foundation_test.c が表と dispatch/prepare を所有し、C11 は geforce.mod だけに組む。
-C5 は kernel static slot の番地を Context へ渡す。module 初期化成功後に公開、abort/detach 前に NULL、旧版は拒否。
+C5 は kernel static slot の番地を Context へ渡す。module 初期化成功後に公開、所有中の abort/detach は公開を保って拒否、解除成功後に NULL、旧版は拒否。
 loader/manifest/host 期待値を3へ揃える。層3は確保済み accel_out を使い、同じ版上げを重複実施しない。
 getter を kernel export 生成元へ追加し kdebug/hwdev の import に接続。geforce.mod は既存31本のまま、生成物は手編集しない。
 gfinit_wire と hwdev_ops callbacks は変更しない。診断 gfinit.c と C9 は getter から毎回借用し、表を長期保存しない。
@@ -430,3 +430,15 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c:212-219) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
 - P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc:91 と hwdev/gf/engine_stop.c:6-8 に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
 - P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
+
+## CW の実装で設計者が決めたこと
+- prepare(f, bars, n) は既存シグネチャを保ち、診断 owner が f->io.opaque に永続 lease bus を、bus.foundation に f を先に設定する；module は opaque を保持して常設 BAR0 adapter を貸し、正常 stop と参照解除まで両者を存続させる。
+- cleanup/S0 前 stop は recover_ops 末尾の任意 pre_cleanup hook とし、復元予算の検査より先に必ず呼ぶ；失敗なら旧装置への局所復元を止め、既存 S0 の 98 route 復帰と失敗記録を行う。本番 display も非失効の停止失敗では engaged を保持して再試行し、失効時だけ P2-b の全行試行・engaged 解除を適用する。
+- 失効 stop は running=false の公開後、tick 解除の失敗時も CPU 側の B5 unmap を試す；戻り値は EIRQ、EMAP、EPCI の順で優先し、未完了の解除を再試行できる所有状態を残す。
+- module の出力 slot は登録成功後に getter から公開する；登録中の abort は公開解除前に拒否し、detach は所有と tick の解除成功後に slot を消す。診断 owner も登録済み module の常駐期間に含め、停止失敗後も getter 経由の cleanup 再試行を保つ。
+- HEADS の割込み要求変更は既存 gf_irq_enable の契約どおり短い irq_save/restore 内で行う；INST_PAGE は 1 頁の offset ごとの固定32bit patternを書き、readback済みbyte数と最初の不一致を返して解放する。
+- 診断 getter は kernel export 宣言と HWDEV import の末尾へ追加し、共有型の入力台帳・契約CRCを生成し直す；geforce.mod の import は既存31本を維持し、公開 KAPI は変更しない。
+- 診断の CHECK_OUT は route01 と表示内容の照合を含む既存承認済み plan なのでその順を保ち、診断節の「CHECK 後 start」を全 CHECK_OUT 成功後へ結ぶ；本番表示は本文どおり CHECK→start→初回表示/route01 とする。
+- 診断と本番の排他を保ったまま層1を診断へ貸すため、既存 GFX=geforce・GUI=1 でも起動時の資源照合・常設map/PT予約とmodule登録だけを行う；診断用 Context の platform は NULL とし本番 owner/表示を結ばず、診断側で GeForce が無い場合と GFX 非指定の起動では module を読まない。
+- **ユーザー決定 (2026-11-02、CW の決定 8 について)**: 「決定８はGUIの起動時に」— GFX=geforce・GUI=1 でも、GeForce の資源の予約と geforce.mod の登録は**起動時には行わず、GUI を起こしたときに行う** (CW の決定 8 の起動時の動作は計画外の追加として外す)。
+- CW の決定 8 の起動時の資源予約・module 登録はユーザー決定で外した。基点 f7d0978f の既存経路へ戻し、GUI を起こしたときに行う。

@@ -20,7 +20,7 @@ SOURCE = ROOT / 'hwdev/gf/engine_stop.c'
 
 def main():
     original = SOURCE.read_text()
-    mutations = [('FIFO pulse omitted', 'value &= ~engines[i];', 'value &= ~(engines[i] & ~GF_ENGINE_FIFO);'),
+    mutations = [('FIFO pulse omitted', 'value &= ~engines[i];', 'value &= ~(engines[i] & ~RECOVER_PMC_ENGINE_FIFO);'),
                  ('readback ignored', 'observed != value)\n            return GF1_ESTOP;\n        value |=', '0)\n            return GF1_ESTOP;\n        value |=')]
     with tempfile.TemporaryDirectory(prefix='gf1-stop-') as td:
         def run(source):

@@ -29,6 +29,7 @@ def host_cmd(exe):
 
 
 MUTATIONS = [
+    ("pre_cleanup_omitted", "int stopped = r->ops->pre_cleanup ? r->ops->pre_cleanup(r->opaque) : 0;", "int stopped = 0;", "kdebug/recover_common/s0.inc"),
     ("engine_budget", "if (w->flags & REC_GF_ENGINE_STOP) pairs += 3U * 5U * 3U;", "/* engine REC omitted */", "kdebug/recover_cleanup.h"),
     ("engine_clear", "value &= ~engines[i];", "value |= engines[i];", "kdebug/recover_common/s0.inc"),
     ("engine_set", "if (set) value |= engines[i];", "if (set) value &= ~engines[i];", "kdebug/recover_common/s0.inc"),
@@ -88,12 +89,12 @@ MUTATIONS = [
      "    if (abort)", "kdebug/recover_common/session.inc"),
     ("pause_time_lost", "    if (check_deadline(r)) return -1;\n    r->in_call = false;",
      "    r->in_call = false;", "kdebug/recover_common/session.inc"),
-    ("local_cleanup_removed", "if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {", "if (false) {", "kdebug/recover_common/s0.inc"),
-    ("local_cleanup_after_quiesce", """    if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
+    ("local_cleanup_removed", "if (stopped || recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {", "if (stopped) {", "kdebug/recover_common/s0.inc"),
+    ("local_cleanup_after_quiesce", """    if (stopped || recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }
     bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);""", """    bool safe = !r->s0_only && !r->access_blocked && quiesce(r, true);
-    if (recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
+    if (stopped || recover_restore_point(r) || r->ops->local_cleanup(r->opaque)) {
         fail(r, REC_BUS, REC_PHASE_RESTORE, 0); r->access_blocked = true;
     }""", "kdebug/recover_common/s0.inc"),
     ("head_stride_removed", "t->head * RECOVER_HEAD_STRIDE + t->port", "0 * t->head + t->port", "kdebug/recover_plan/profile.inc"),

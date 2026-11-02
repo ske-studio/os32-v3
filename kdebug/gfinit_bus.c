@@ -6,9 +6,24 @@
 #include "gfinit_bus.h"
 #include "../hwdev/gfinit_mode.h"
 #include "memmap.h"
+#include "../hwdev/gf/gf1_test.h"
+#include "../drivers/video/geforce/geforce_module.h"
+#if defined(HWDEV_MODULE)
+#include "../hwdev/generated/hwdev_import_macros.h"
+#elif defined(__KERNEL_BUILD__)
+#include "generated/kdebug_import_macros.h"
+#endif
 #define GF_LEGACY_LO MEM_CONV_END
 #define GF_LEGACY_HI 0xc0000U
 
+void gfinit_bus_revoke(struct gfinit_bus *b)
+{
+    if (!b || !b->foundation) return;
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf1_test_request q = {sizeof(q), GF1T_REVOKE, 0};
+    struct gf1_test_reply reply;
+    if (ops) (void)ops->call(b->foundation, &q, &reply);
+}
 void gfinit_bus_init(struct gfinit_bus *b, const struct recover_profile *p,
                      const struct gfinit_pci_ops *pci)
 {
@@ -25,9 +40,12 @@ static int present(const struct gfinit_bus *b)
 int gfinit_bus_raw_config(void *opaque, u32 *command, u32 bars[RECOVER_BAR_COUNT])
 {
     struct gfinit_bus *b = opaque;
-    if (!command || !bars || !present(b)) return -1;
+    if (!command || !bars || !present(b)) { gfinit_bus_revoke(b); return -1; }
     *command = b->pci->read16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN, RECOVER_COMMAND);
-    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) bars[i] = cfg32(b, PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i);
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) {
+        bars[i] = cfg32(b, PCI_CFG_BAR0 + PCI_CFG_BAR_STRIDE * i);
+        if (b->foundation && bars[i] != b->bars[i]) gfinit_bus_revoke(b);
+    }
     return 0;
 }
 int gfinit_bus_probe(struct gfinit_bus *b)
@@ -49,28 +67,42 @@ int gfinit_bus_probe(struct gfinit_bus *b)
 int gfinit_bus_identity(void *opaque, struct recover_identity *out)
 {
     struct gfinit_bus *b = opaque;
-    if (!out || !b || !b->ready || !present(b)) return -1;
+    if (!out || !b || !b->ready) return -1;
+    if (!present(b)) { gfinit_bus_revoke(b); return -1; }
     *out = b->identity;
     out->subsys = cfg32(b, PCI_CFG_SUBSYS_VENDOR);
     out->revision = cfg32(b, PCI_CFG_REVISION_ID) & PCI_REVISION_MASK;
     out->bar0 = cfg32(b, PCI_CFG_BAR0);
+    if (out->subsys != b->identity.subsys || out->revision != b->identity.revision ||
+        out->bar0 != b->identity.bar0) { gfinit_bus_revoke(b); return -1; }
     return 0;
 }
 static int memory_config(struct gfinit_bus *b, u32 bars[RECOVER_BAR_COUNT])
 {
     u32 command;
-    if (gfinit_bus_raw_config(b, &command, bars) || !(command & RECOVER_COMMAND_MEM)) return -1;
-    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (bars[i] != b->bars[i]) return -1;
+    if (b->foundation) {
+        struct recover_identity id;
+        if (b->foundation->revoked || gfinit_bus_identity(b, &id)) return -1;
+    }
+    if (gfinit_bus_raw_config(b, &command, bars) || !(command & RECOVER_COMMAND_MEM)) {
+        gfinit_bus_revoke(b); return -1;
+    }
+    for (u32 i = 0; i < RECOVER_BAR_COUNT; i++) if (bars[i] != b->bars[i]) { gfinit_bus_revoke(b); return -1; }
     return 0;
 }
 static int bus_access(struct gfinit_bus *b, const struct recover_bus_access *a,
                       bool write, u32 *value)
 {
     struct recover_bus_access resolved;
-    if (!b || !b->ready || !a || !value || a->key >= b->profile->target_count ||
+    if (!b || !b->ready || !a || !value ||
+        (b->foundation && b->foundation->revoked) || a->key >= b->profile->target_count ||
         recover_target_address(&b->profile->targets[a->key], a->dir_substep, &resolved) ||
         a->space != resolved.space || a->bar != resolved.bar ||
         a->offset != resolved.offset || a->width != resolved.width) return -1;
+    if (b->foundation) {
+        struct recover_identity id;
+        if (gfinit_bus_identity(b, &id)) return -1;
+    }
     if (a->space == REC_PCI_CFG) {
         if (!present(b)) return -1;
         if (a->width == 2) {

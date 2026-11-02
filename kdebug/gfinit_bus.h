@@ -9,7 +9,9 @@ struct gfinit_pci_ops {
     void (*write32)(u32 bus, u32 dev, u32 fn, u32 reg, u32 value);
     int (*write16)(u32 bus, u32 dev, u32 fn, u32 reg, u16 value);
 };
+struct gf_foundation;
 struct gfinit_bus {
+    struct gf_foundation *foundation;
     const struct gfinit_pci_ops *pci;
     const struct recover_profile *profile;
     struct recover_window window;
@@ -17,6 +19,7 @@ struct gfinit_bus {
     u32 bars[RECOVER_BAR_COUNT];
     bool ready;
 };
+void gfinit_bus_revoke(struct gfinit_bus *b);
 void gfinit_bus_init(struct gfinit_bus *b, const struct recover_profile *profile,
                      const struct gfinit_pci_ops *pci);
 /* Read-only PCI probe; identity boot/image/kdebug fields are supplied by S6. */

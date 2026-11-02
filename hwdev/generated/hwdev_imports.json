@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 2447964218,
+  "module_abi_gen": 2780990006,
   "imports": [
     {
       "name": "trial_begin",
@@ -220,6 +220,12 @@
     {
       "name": "recover_gf_runner_access",
       "index": 36,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "geforce_foundation_ops",
+      "index": 37,
       "kind": 1,
       "type_ver": 1
     }

@@ -49,8 +49,11 @@ def audit(out, cross):
     require(refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}')
     kernel_rows = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
                              kernel_table, re.M)
-    expected_kernel = [(str(25+i), n, str(imports[n]['index'])) for i, n in
-                       enumerate(sorted(kernel_names, key=lambda n: imports[n]['index']))]
+    # Slot 36 is the appended CORE runner access; CW's kernel getter uses 37.
+    kernel_slots = [*range(25, 36), 37]
+    require(len(kernel_names) == len(kernel_slots), 'kernel import table count')
+    expected_kernel = [(str(slot), n, str(imports[n]['index'])) for slot, n in
+                       zip(kernel_slots, sorted(kernel_names, key=lambda n: imports[n]['index']))]
     require(kernel_rows == expected_kernel, 'kernel import table order/symbol/index')
     slots = []
     for index, name, source in rows:

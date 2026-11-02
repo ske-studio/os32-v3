@@ -4,7 +4,12 @@
     "drivers/video/geforce/geforce_module.h",
     "include/gfx_hal.h",
     "include/video_service.h",
-    "hwdev/gf/production.h"
+    "hwdev/gf/production.h",
+    "hwdev/gf/foundation.h",
+    "hwdev/gf/internal.h",
+    "drivers/video/geforce/geforce_tick.h",
+    "hwdev/gf/gf1_test.h",
+    "kdebug/gfinit_bus.h"
   ],
   "imports": [
     {
@@ -124,6 +129,74 @@
     {
       "symbol": "kprintf",
       "source": "include/kprintf.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pci_cfg_read8",
+      "source": "drivers/pci/pci.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "irq_register",
+      "source": "kernel/irq/irq.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "irq_unregister",
+      "source": "kernel/irq/irq.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "irq_save",
+      "source": "include/io.h",
+      "context": "normal",
+      "irq": true,
+      "declaration": "unsigned int irq_save(void);"
+    },
+    {
+      "symbol": "irq_restore",
+      "source": "include/io.h",
+      "context": "normal",
+      "irq": true,
+      "declaration": "void irq_restore(unsigned int flags);"
+    },
+    {
+      "symbol": "geforce_tick_bind",
+      "source": "drivers/video/geforce/geforce_tick.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "paging_map_phys",
+      "source": "mm/paging.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "paging_set_not_present",
+      "source": "mm/paging.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "serial_gate_active",
+      "source": "lib/serial_diag.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "serial_puts_polled",
+      "source": "lib/serial_diag.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "tick_register",
+      "source": "kernel/irq/tick.h",
       "context": "normal",
       "irq": false
     }
