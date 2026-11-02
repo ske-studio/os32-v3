@@ -41,10 +41,9 @@ int gf_display_blank(struct gf_display_context *c,int v) { c->blank=v;return 0; 
 int gf_display_stop(void *v) { struct gf_display_context *c=v;stops++;c->active=false;return 0; }
 static struct video_device device_gf={&display_gf,&gf_video_ops};
 #include "../../hwdev/gf/production.h"
-static int host_gf_selected=1, host_gf_requested=1;
+static int host_gf_selected=1;
 static u32 host_gf_probes;
 int gf_production_selected(void) { return host_gf_selected; }
-int gf_foundation_requested(void) { return host_gf_requested; }
 int gf_production_identify(struct gf_production_resources *r)
 {
     host_gf_probes++;
@@ -63,11 +62,9 @@ void geforce_wc_report(const char *s) { (void)s; }
 static void __attribute__((unused)) foundation_selection_test(void)
 {
     u32 probes=host_gf_probes;
-    host_gf_requested=0;
+    host_gf_selected=0;
     CHECK(!geforce_platform_get() && !reserve() && host_gf_probes==probes);
-    host_gf_requested=1;host_gf_selected=0;
-    CHECK(geforce_platform_get() && geforce_boot_reserve());
-    CHECK(host_gf_probes==probes+1);
+    CHECK(!geforce_boot_reserve() && host_gf_probes==probes);
     CHECK(!ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_CLIENT));
     CHECK(!ledger_surface_find(LEDGER_SF_GEFORCE,LEDGER_ROLE_DISPLAY));
     host_gf_selected=1;

@@ -250,10 +250,7 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
     gfx_prepare_backend();
     /* Register after boot preparation: GUI=0 must never probe/enable Cirrus. */
     cirrus_module_load();
-    const struct geforce_platform *gf_platform = geforce_platform_get();
-    if (gfx_get_backend_pref() == GFX_PREF_GEFORCE ||
-        (gf_foundation_requested() && gf_platform && gf_platform->resources))
-        geforce_module_load();
+    if (gfx_get_backend_pref() == GFX_PREF_GEFORCE) geforce_module_load();
     kaudit_post_probe();
     if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_post_probe();
 

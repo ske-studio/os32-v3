@@ -123,8 +123,9 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
         cases=cases.replace('GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1',
                             'GF_TEST_BAR2,GF_TEST_BAR2,BAR2_BYTES,1')
         platform=(ROOT/'drivers/video/geforce/geforce_platform.c').read_text()
-        if mutation and mutation!='diagnostic-client':
+        if mutation:
             old,new={
+                'gui-boot-reserve': ('if (!gf_production_selected() || gf_production_identify(&boot_resources)) return 0;', 'if (gf_production_identify(&boot_resources)) return 0;'),
                 'instmem-no-pt': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', '0, PAGE_RW | PTE_PCD)'),
                 'instmem-open': ('paging_set_not_present(instmem->base, instmem->base + bytes - 1)', '0'),
                 'instmem-short': ('bytes / PAGE_SIZE, PAGE_RW | PTE_PCD)', 'bytes / PAGE_SIZE - 1, PAGE_RW | PTE_PCD)'),
@@ -141,10 +142,6 @@ def core(init_fail=0, unsafe=0, missing=0, gui_first=0, bar2_bytes=0x1000000, mu
         gui=(ROOT/'kernel/gui.c').read_text()
         (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
         source=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
-        if mutation=='diagnostic-client':
-            old='    if (!gf_production_selected()) return 1;'
-            assert source.count(old)==1
-            source=source.replace(old,'',1)
         start=source.index('int geforce_boot_reserve(void)')
         end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
@@ -571,7 +568,7 @@ def main():
         for mutation in ('instmem-no-pt','instmem-open','instmem-short','instmem-wb'):
             core(mutation=mutation)
         core(bar2_bytes=0x400000,mutation='instmem-overrun')
-        core(diagnostic=True,mutation='diagnostic-client')
+        core(diagnostic=True,mutation='gui-boot-reserve')
         wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
         wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
         for mutation in ('wc-stop','wc-repeat','wc-start','wc-alias'): wc_lifecycle(mutation)

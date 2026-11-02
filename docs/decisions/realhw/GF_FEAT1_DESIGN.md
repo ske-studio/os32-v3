@@ -440,3 +440,5 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - 診断 getter は kernel export 宣言と HWDEV import の末尾へ追加し、共有型の入力台帳・契約CRCを生成し直す；geforce.mod の import は既存31本を維持し、公開 KAPI は変更しない。
 - 診断の CHECK_OUT は route01 と表示内容の照合を含む既存承認済み plan なのでその順を保ち、診断節の「CHECK 後 start」を全 CHECK_OUT 成功後へ結ぶ；本番表示は本文どおり CHECK→start→初回表示/route01 とする。
 - 診断と本番の排他を保ったまま層1を診断へ貸すため、既存 GFX=geforce・GUI=1 でも起動時の資源照合・常設map/PT予約とmodule登録だけを行う；診断用 Context の platform は NULL とし本番 owner/表示を結ばず、診断側で GeForce が無い場合と GFX 非指定の起動では module を読まない。
+- **ユーザー決定 (2026-11-02、CW の決定 8 について)**: 「決定８はGUIの起動時に」— GFX=geforce・GUI=1 でも、GeForce の資源の予約と geforce.mod の登録は**起動時には行わず、GUI を起こしたときに行う** (CW の決定 8 の起動時の動作は計画外の追加として外す)。
+- CW の決定 8 の起動時の資源予約・module 登録はユーザー決定で外した。基点 f7d0978f の既存経路へ戻し、GUI を起こしたときに行う。

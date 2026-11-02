@@ -45,7 +45,6 @@ int geforce_boot_reserve(void)
         .cache=LEDGER_CACHE_UC, .perm_max=LEDGER_PERM_RW
     };
     if (!p || !p->reserve || !p->reserve()) return 0;
-    if (!gf_production_selected()) return 1;
     sf.first = p->display_phys / PAGE_SIZE;
     if (!ledger_surface_create(&sf, 0)) return 0;
     if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, sf.npages, MEM_PHYS_EXEC_FLOOR / PAGE_SIZE,
@@ -103,7 +102,7 @@ static int geforce_detach(struct module_record *r)
 int geforce_module_load(void)
 {
     if (geforce_handle.generation) return MODULE_BUSY;
-    context.platform=gf_production_selected() ? geforce_platform_get() : 0;
+    context.platform=geforce_platform_get();
     const struct bootinfo *bi=bootinfo_get();
     const struct module_request request = {
         .path = SYS_GEFORCE_MOD, .name="geforce",

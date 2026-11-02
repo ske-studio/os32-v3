@@ -1,4 +1,3 @@
-#include "gf_production.h"
 /* Boot SURFACE reservation, publication, regeneration and ownership transfer. */
 /* ======================================================================== */
 /*  ⑥ gfx の識別 → 予約 → 写像 → BB (TASK_T1_LEDGER §3-3 ⑥・§3-8、T1e)     */
@@ -221,8 +220,8 @@ void __attribute__((cold)) gfx_boot_reserve(void)
         if (!ledger_surface_create(&sf, 0)) display_fail++;
     }
     (void)ledger_surface_create(&system_tvram, 0);
-    /* An explicit GF request also reserves its stopped diagnostic foundation. */
-    if (gf_foundation_requested() && geforce_boot_reserve)
+    /* GF and PEGC are mutually exclusive boot candidates. */
+    if (g_backend_pref == GFX_PREF_GEFORCE && geforce_boot_reserve)
         (void)geforce_boot_reserve();
     /* 6. */
     ledger_arena_freeze();

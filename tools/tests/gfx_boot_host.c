@@ -1,4 +1,3 @@
-int gf_foundation_requested(void) { return 0; }
 /* ========================================================================
  *  gfx_boot_host.c — 起動時の ⑥ gfx の識別 → 予約 → 写像 → BB → SURFACE
  *

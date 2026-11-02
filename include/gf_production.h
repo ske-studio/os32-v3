@@ -4,8 +4,6 @@
 /* Four PTs for aligned 16MiB BAR0, one for the 300KiB DISPLAY, two for BAR2 instmem. */
 #define GF_PRODUCTION_PT_PAGES 7UL
 int gf_production_selected(void);
-/* Explicit GF request reserves foundation resources even with the PC98 GUI. */
-int gf_foundation_requested(void);
 /* Called once before gfx_boot_reserve; GUI omitted is supplied as zero. */
 void gf_production_configure(const char *gfx, int gui);
 /* P5 pins the module/context before registration. Callback performs GPU stop,

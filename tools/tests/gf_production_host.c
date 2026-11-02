@@ -297,9 +297,7 @@ static void prod_selection_tests(void)
     for(u32 i=0;i<7;i++) {
         gf_configured=0;gf_production_configure(gfx[i],gui[i]);
         CHECK(gf_production_selected()==(i==0 || i==2));
-        CHECK(gf_foundation_requested()==(i<3));
         gf_production_configure("auto",0);CHECK(gf_production_selected()==(i==0 || i==2));
-        CHECK(gf_foundation_requested()==(i<3));
     }
     output("PASS selection: GUI=0/default or !=1, GUI=1 refusal, immutable boot choice\n");
 }

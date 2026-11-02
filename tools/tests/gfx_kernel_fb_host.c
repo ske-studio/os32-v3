@@ -31,9 +31,6 @@ static u32 checks;
 #include "surface_query.h"
 #include "appslot.h"
 #include "gf_production.h"
-#ifndef GF_RESERVATION_TEST
-int gf_foundation_requested(void) { return 0; }
-#endif
 #define CFG_KB 17408
 #ifndef HOST_ALT_WINDOW
 #define HOST_ALT_WINDOW 0
