@@ -20,6 +20,7 @@
 #include "build_id.h"
 #include "idt.h"
 #include "ktime.h"
+#include "config.h"
 
 #define PROBE_FRAMES 32u
 #define PROBE_HPERIODS 64u
@@ -542,6 +543,7 @@ void platform_splash_probe(void)
     u32 initial_status = 0, completed = 0, hcompleted = 0, missed_h = 0;
     const u32 counts[3] = {1, 4, 8};
     if (serial_gate_active() || !_irq_enabled()) return;
+    serial_init(SYS_SERIAL_BAUD);
     serial_get_status(&mode, &baud, &fifo);
     serial_diag_get(&oe0, &fe0, &pe0, &ov0);
     probe_errors = probe_rx_count = probe_rx_missing = probe_rx_bytes = probe_rx_value = probe_rx_next = 0;

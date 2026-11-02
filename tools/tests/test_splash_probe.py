@@ -7,7 +7,7 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
             'include/pc98.h', 'include/pegc.h', 'include/types.h', 'include/sys.h',
             'mm/paging.h', 'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
-            'include/bootinfo.h', 'include/build_id.h', 'arch/x86/kernel/idt.h',
+            'include/bootinfo.h', 'include/build_id.h', 'include/config.h', 'arch/x86/kernel/idt.h',
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=20.0)
 import argparse
 import os
@@ -19,6 +19,8 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'platform/pc98/splash_probe.c'
 MUTATIONS = (
+    ('omit UART initialization', '    serial_init(SYS_SERIAL_BAUD);',
+     '    (void)SYS_SERIAL_BAUD;'),
     ('direct BIOS read before begin',
      'probe_bios_before = v86_bios_real_lowmem()[PEGC_BIOS_PRXCRT];',
      'probe_bios_before = *(volatile u8 *)P2V_IO(PEGC_BIOS_PRXCRT);'),
