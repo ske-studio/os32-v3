@@ -37,7 +37,7 @@ S0 は PLL/PFB/旧 timing の完全復元ではなく PARTIAL/S1 未保証を保
 - `hwdev/gf/instmem_map.c` — BAR2 写像の生存期間 (B5)
 - `drivers/video/geforce/geforce_tick.c` — 常駐 tick 登録・参照管理 (B6)
 - `hwdev/gf/foundation.c` — 層1 の開始・停止 (C0)
-- `kdebug/gf_foundation_test.c` — serial `gf1` 試験 adapter (C9、並行実装中)。module 側の `hwdev/gf/foundation_test.c` が dispatch / prepare を持つ。
+- `kdebug/gf_foundation_test.c` — serial `gf1` 試験 adapter (C9)。module 側の `hwdev/gf/foundation_test.c` が dispatch / prepare を持つ。
 
 - [hwdev/gf/display/](display/README.md)
 - [hwdev/gf/op/](op/README.md)
