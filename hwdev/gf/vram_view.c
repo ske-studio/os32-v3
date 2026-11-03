@@ -5,6 +5,7 @@
 #include "accel.h"
 
 static struct gf_vram_registry registry;
+static struct gf_vram_view *views;
 
 static bool registry_matches(struct gf2_chan *ch)
 {
@@ -121,7 +122,7 @@ int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
     volatile u8 *base;
     u32 start, end, bytes;
 
-    if (!view || !ch || !out || view->mapped || !ch->map_ops ||
+    if (!view || !ch || !out || view->mapped || !view->close || !ch->map_ops ||
         !ch->map_ops->map || !ch->map_ops->unmap || !ch->bar1.valid ||
         !len || (off & 3U) || (len & 3U) || off > U32_MAX - len)
         return GF2_EMAP;
@@ -147,8 +148,11 @@ int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
     *view = (struct gf_vram_view){
         .extent = extent, .va = base + (off - start), .map_base = base,
         .map_bytes = bytes, .bytes = len, .mapped = true,
-        .map_ops = ch->map_ops, .map_owner = ch->map_owner
+        .map_ops = ch->map_ops, .map_owner = ch->map_owner,
+        .ch = ch, .next = views,
+        .close_owner = view->close_owner, .close = view->close
     };
+    views = view;
     *out = view->va;
     return 0;
 }
@@ -158,6 +162,27 @@ int gf_vram_view_unmap(struct gf_vram_view *view)
     if (!view || !view->mapped || !view->map_ops || !view->map_ops->unmap ||
         view->map_ops->unmap(view->map_owner, view->map_base, view->map_bytes))
         return GF2_EMAP;
+    for (struct gf_vram_view **link = &views; *link; link = &(*link)->next) {
+        if (*link != view) continue;
+        *link = view->next;
+        break;
+    }
     *view = (struct gf_vram_view){0};
+    return 0;
+}
+
+i32 gf_vram_views_close(struct gf2_chan *ch)
+{
+    if (!ch) return GF3_EINVAL;
+    if (registry.ch && !registry_matches(ch)) return GF3_ESTATE;
+    for (struct gf_vram_view *view = views; view;) {
+        /* The owner may successfully unmap and clear this view. */
+        struct gf_vram_view *next = view->next;
+        if (view->ch == ch) {
+            i32 rc = view->close(view->close_owner, view);
+            if (rc < 0) return rc;
+        }
+        view = next;
+    }
     return 0;
 }
