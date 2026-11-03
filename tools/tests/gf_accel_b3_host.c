@@ -9,6 +9,17 @@ static struct gf_vram_reservation_node reservation;
 static const struct gf3_surface surface = {0x1000, 4096, 64, 64, 64, GF3_INDEX8, 1, 1};
 static const struct gf3_rect rect = {7, 11, 13, 17};
 #define DEADLINE 500U
+/* Independent method and format expectations: nv04_exa.c:118-129,153-157;
+ * format rows: GF_FEAT3_DESIGN.md section 9, nv04_exa.c:97-129. */
+#define EXPECT_GDI_FORMAT_METHOD 0x0300U
+#define EXPECT_GDI_COLOR_METHOD  0x03fcU
+#define EXPECT_GDI_RECT_METHOD   0x0400U
+#define EXPECT_GDI_INDEX8         3U
+#define EXPECT_GDI_RGB565         1U
+#define EXPECT_GDI_ARGB8888       3U
+#define TEST_COLOR 0x12345678U
+#define GX_COPY 3U
+#define GX_XOR  6U
 
 static void setup(void)
 {
@@ -21,7 +32,7 @@ static void setup(void)
 }
 static int fill(void)
 {
-    return gf3_fill(&host.ctx, &surface, rect, 0x12345678, 3, 0xff, DEADLINE);
+    return gf3_fill(&host.ctx, &surface, rect, TEST_COLOR, GX_COPY, 0xff, DEADLINE);
 }
 static void packet(u32 i, u16 method, u16 count, u32 first, u32 second)
 {
@@ -36,9 +47,12 @@ void _start(void)
     setup();
     assert(fill() == 0 && host.ctx.last_rc == 0);
     assert(host.npackets == 3 && host.nwords == 4);
-    packet(0, 0x300, 1, 3, 0);
-    packet(1, 0x3fc, 1, 0x12345678, 0);
-    packet(2, 0x400, 2, 0x0007000b, 0x000d0011);
+    packet(0, EXPECT_GDI_FORMAT_METHOD, 1, EXPECT_GDI_INDEX8, 0);
+    packet(1, EXPECT_GDI_COLOR_METHOD, 1, TEST_COLOR, 0);
+    /* GDI packs x/width in the high half, y/height in the low half:
+     * nv04_exa.c:153-157. Derive expected words from the input rectangle. */
+    packet(2, EXPECT_GDI_RECT_METHOD, 2, (rect.x << 16) | rect.y,
+           (rect.w << 16) | rect.h);
     assert(events[1].op == H_SURFACE_CHECK && events[1].a[4] == GF3_USE_GDI);
     assert(events[2].op == H_ROP && events[2].a[0] == GF3_SUBC_GDI &&
            events[2].a[1] == 3 && events[2].a[2] == 0xff &&
@@ -48,6 +62,35 @@ void _start(void)
     assert(host.calls[H_FENCE] == 1 && host.calls[H_WAIT] == 1);
     assert(events[7].op == H_FENCE && events[7].a[0] == DEADLINE);
     assert(events[8].op == H_WAIT && events[8].a[2] == DEADLINE);
+
+    /* The ROP dependency is stubbed: check its inputs independently of the
+     * emitted packets. 32-bit uses the supported copy/full-mask path. */
+    const struct {
+        enum gf3_fmt fmt;
+        u32 cpp, expected_gdi, mask;
+        u8 alu;
+    } cases[] = {
+        {GF3_RGB565, 2, EXPECT_GDI_RGB565, 0x55aaU, GX_XOR},
+        {GF3_ARGB8888, 4, EXPECT_GDI_ARGB8888, 0xffffffffU, GX_COPY},
+    };
+    for (u32 i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        struct gf3_surface s = surface;
+        setup();
+        s.fmt = cases[i].fmt;
+        s.pitch = s.width * cases[i].cpp;
+        s.bytes = s.pitch * s.height;
+        reservation.value.bytes = s.bytes;
+        assert(gf3_fill(&host.ctx, &s, rect, TEST_COLOR, cases[i].alu,
+                        cases[i].mask, DEADLINE) == 0);
+        assert(host.npackets == 3 && host.nwords == 4);
+        packet(0, EXPECT_GDI_FORMAT_METHOD, 1, cases[i].expected_gdi, 0);
+        packet(1, EXPECT_GDI_COLOR_METHOD, 1, TEST_COLOR, 0);
+        packet(2, EXPECT_GDI_RECT_METHOD, 2, (rect.x << 16) | rect.y,
+               (rect.w << 16) | rect.h);
+        assert(events[2].op == H_ROP && events[2].a[0] == GF3_SUBC_GDI &&
+               events[2].a[1] == cases[i].alu && events[2].a[2] == cases[i].mask &&
+               events[2].a[3] == cases[i].fmt && events[2].a[4] == DEADLINE);
+    }
 
     const enum gf3_host_op failures[] = {H_FAULT, H_SURFACE_CHECK, H_ROP, H_SURFACE_SET, H_EMIT, H_FENCE, H_WAIT};
     for (u32 i = 0; i < sizeof(failures)/sizeof(failures[0]); ++i) {
