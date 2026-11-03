@@ -44,6 +44,8 @@ int pc98_route_select_98(void) { return pc98_route_to_98(); }
 #define geforce_backend_ops gfx_backend_geforce
 #include "geforce_body.inc"
 struct gf1_test_ops gf1_module_ops;
+void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
+{ (void)f;(void)ch; }
 #undef geforce_backend_ops
 
 static struct ledger_region recovery_regions[LEDGER_MAX_REGIONS];
