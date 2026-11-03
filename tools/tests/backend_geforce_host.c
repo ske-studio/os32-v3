@@ -22,18 +22,20 @@ const unsigned int __os32_abi_1_mem_4_fmt_4 = 0;
 static int events[32], n, fail_step;
 static PaletteEntry colors[16];
 static u8 client[640 * 480];
+/* Synthetic nonzero address for testing framebuffer information propagation. */
+enum { FAKE_FB_PHYS = sizeof(client) };
 void pc98_console_set_safe(int safe) { (void)safe; }
 static int identify(void) { return 1; }
 static const PaletteEntry *fake_palette_get_all(void) { return colors; }
 static void fake_palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (void)b; }
 static int fake_mode(struct video_device *d, u32 i, struct video_mode *m) { (void)d; (void)i; m->id=7; return 0; }
-static int fake_fb(struct video_device *d, struct video_fb *f) { (void)d; f->phys=0; f->pitch=640; return 0; }
+static int fake_fb(struct video_device *d, struct video_fb *f) { (void)d; f->phys=FAKE_FB_PHYS; f->pitch=640; return 0; }
 static int fake_start(struct video_device *d, u32 id, const u8 *p) {
     (void)d; events[n++]=1;
 #ifdef OS32_GEFORCE_MODULE
-    struct video_fb fb; u32 width=0, height=0;
+    struct video_fb fb = {0}; u32 width=0, height=0;
     geforce_backend_framebuffer_info(&fb, &width, &height);
-    if (fb.phys!=0 || fb.pitch!=640 || width!=640 || height!=480) return 1;
+    if (fb.phys!=FAKE_FB_PHYS || fb.pitch!=640 || width!=640 || height!=480) return 1;
 #endif
     return id!=7 || p[16*3+2]!=0 || p[17*3+2]!=51 || fail_step==1;
 }
