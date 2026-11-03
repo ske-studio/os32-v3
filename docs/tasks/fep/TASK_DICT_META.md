@@ -1,5 +1,7 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
+> 状態: **設計中 (2026-11-04)** — 確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。実装はまだ出さない (ユーザー 2026-11-04、設計だけ前倒し)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
+
 > 上位: [FEP の索引](00_INDEX.md)
 
 > 発行: PM (Claude Code `claude-fable-5-1`、2026-09-30) / 状態: **計画 (2026-09-30)** — ユーザー決定 (2026-09-30、[MEMMAP_V3.md](../../decisions/MEMMAP_V3.md) D27・D28) を記録した段。**着手は v3 の後の方** (`docs/archive/v3/V3_PLAN_DRAFT.md` §3 P10「v3 後半」)。設計票の往復・実装は未着手。
