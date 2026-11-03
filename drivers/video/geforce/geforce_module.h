@@ -1,6 +1,7 @@
 /* P5 connection to P4's boot/resource owner. No register/ROM policy here. */
 #ifndef GEFORCE_MODULE_H
 #define GEFORCE_MODULE_H
+#include <stdbool.h>
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "../../../kernel/module/module_runtime.h"

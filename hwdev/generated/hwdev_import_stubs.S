@@ -191,4 +191,9 @@ recover_gf_runner_access:
 geforce_foundation_ops:
     jmp *hwdev_import_slots+148
 .size geforce_foundation_ops, .-geforce_foundation_ops
+.globl serial_puts_polled
+.type serial_puts_polled, @function
+serial_puts_polled:
+    jmp *hwdev_import_slots+152
+.size serial_puts_polled, .-serial_puts_polled
 .section .note.GNU-stack,"",@progbits

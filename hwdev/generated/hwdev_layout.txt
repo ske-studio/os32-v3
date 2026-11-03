@@ -1460,6 +1460,48 @@ offset	struct geforce_platform.wc_start	40
 member_size	struct geforce_platform.wc_start	4
 offset	struct geforce_platform.wc_stop	44
 member_size	struct geforce_platform.wc_stop	4
+size	struct gf1_request	16
+align	struct gf1_request	4
+offset	struct gf1_request.rc	12
+member_size	struct gf1_request.rc	4
+offset	struct gf1_request.session	8
+member_size	struct gf1_request.session	4
+offset	struct gf1_request.size	0
+member_size	struct gf1_request.size	4
+offset	struct gf1_request.test	4
+member_size	struct gf1_request.test	4
+size	struct gf1_test_ops	12
+align	struct gf1_test_ops	4
+offset	struct gf1_test_ops.call	8
+member_size	struct gf1_test_ops.call	4
+offset	struct gf1_test_ops.prepare	4
+member_size	struct gf1_test_ops.prepare	4
+offset	struct gf1_test_ops.production	0
+member_size	struct gf1_test_ops.production	4
+size	struct gf1_test_reply	68
+align	struct gf1_test_reply	4
+offset	struct gf1_test_reply.bad_off	20
+member_size	struct gf1_test_reply.bad_off	4
+offset	struct gf1_test_reply.bytes	16
+member_size	struct gf1_test_reply.bytes	4
+offset	struct gf1_test_reply.command	4
+member_size	struct gf1_test_reply.command	4
+offset	struct gf1_test_reply.flags	12
+member_size	struct gf1_test_reply.flags	4
+offset	struct gf1_test_reply.pmc	8
+member_size	struct gf1_test_reply.pmc	4
+offset	struct gf1_test_reply.rc	0
+member_size	struct gf1_test_reply.rc	4
+offset	struct gf1_test_reply.stats	24
+member_size	struct gf1_test_reply.stats	44
+size	struct gf1_test_request	12
+align	struct gf1_test_request	4
+offset	struct gf1_test_request.heads	8
+member_size	struct gf1_test_request.heads	4
+offset	struct gf1_test_request.op	4
+member_size	struct gf1_test_request.op	4
+offset	struct gf1_test_request.size	0
+member_size	struct gf1_test_request.size	4
 size	struct gf_display_context	1732
 align	struct gf_display_context	4
 offset	struct gf_display_context.active	250
@@ -1536,6 +1578,66 @@ offset	struct gf_display_owner.release	4
 member_size	struct gf_display_owner.release	4
 offset	struct gf_display_owner.validate	8
 member_size	struct gf_display_owner.validate	4
+size	struct gf_foundation	204
+align	struct gf_foundation	4
+offset	struct gf_foundation.bar0	164
+member_size	struct gf_foundation.bar0	4
+offset	struct gf_foundation.bar2	168
+member_size	struct gf_foundation.bar2	4
+offset	struct gf_foundation.bm	191
+member_size	struct gf_foundation.bm	1
+offset	struct gf_foundation.expected_command	188
+member_size	struct gf_foundation.expected_command	2
+offset	struct gf_foundation.expected_pmc	184
+member_size	struct gf_foundation.expected_pmc	4
+offset	struct gf_foundation.imem	56
+member_size	struct gf_foundation.imem	64
+offset	struct gf_foundation.instmem_bar	40
+member_size	struct gf_foundation.instmem_bar	16
+offset	struct gf_foundation.io	0
+member_size	struct gf_foundation.io	32
+offset	struct gf_foundation.irq_line	190
+member_size	struct gf_foundation.irq_line	1
+offset	struct gf_foundation.last_rc	196
+member_size	struct gf_foundation.last_rc	4
+offset	struct gf_foundation.map_ops	32
+member_size	struct gf_foundation.map_ops	4
+offset	struct gf_foundation.map_owner	36
+member_size	struct gf_foundation.map_owner	4
+offset	struct gf_foundation.mapped	192
+member_size	struct gf_foundation.mapped	1
+offset	struct gf_foundation.registered	193
+member_size	struct gf_foundation.registered	1
+offset	struct gf_foundation.revoked	200
+member_size	struct gf_foundation.revoked	1
+offset	struct gf_foundation.running	194
+member_size	struct gf_foundation.running	1
+offset	struct gf_foundation.stats	120
+member_size	struct gf_foundation.stats	44
+offset	struct gf_foundation.wanted_fifo	172
+member_size	struct gf_foundation.wanted_fifo	4
+offset	struct gf_foundation.wanted_graph	176
+member_size	struct gf_foundation.wanted_graph	4
+offset	struct gf_foundation.wanted_heads	180
+member_size	struct gf_foundation.wanted_heads	4
+size	struct gf_imem	64
+align	struct gf_imem	4
+offset	struct gf_imem.aperture_bytes	8
+member_size	struct gf_imem.aperture_bytes	4
+offset	struct gf_imem.ramfc	48
+member_size	struct gf_imem.ramfc	12
+offset	struct gf_imem.ramht	24
+member_size	struct gf_imem.ramht	12
+offset	struct gf_imem.ramro	36
+member_size	struct gf_imem.ramro	12
+offset	struct gf_imem.reserved	4
+member_size	struct gf_imem.reserved	4
+offset	struct gf_imem.used	60
+member_size	struct gf_imem.used	4
+offset	struct gf_imem.vbios	12
+member_size	struct gf_imem.vbios	12
+offset	struct gf_imem.vram_bytes	0
+member_size	struct gf_imem.vram_bytes	4
 size	struct gf_init_context	740
 align	struct gf_init_context	4
 offset	struct gf_init_context.call	64
@@ -1598,6 +1700,20 @@ offset	struct gf_init_saved.select_value	20
 member_size	struct gf_init_saved.select_value	4
 offset	struct gf_init_saved.width	8
 member_size	struct gf_init_saved.width	4
+size	struct gf_inst	12
+align	struct gf_inst	4
+offset	struct gf_inst.next	8
+member_size	struct gf_inst.next	4
+offset	struct gf_inst.off	0
+member_size	struct gf_inst.off	4
+offset	struct gf_inst.size	4
+member_size	struct gf_inst.size	4
+size	struct gf_instmem_map_ops	8
+align	struct gf_instmem_map_ops	4
+offset	struct gf_instmem_map_ops.map	0
+member_size	struct gf_instmem_map_ops.map	4
+offset	struct gf_instmem_map_ops.unmap	4
+member_size	struct gf_instmem_map_ops.unmap	4
 size	struct gf_io	32
 align	struct gf_io	4
 offset	struct gf_io.opaque	0
@@ -1614,6 +1730,28 @@ offset	struct gf_io.trace	28
 member_size	struct gf_io.trace	4
 offset	struct gf_io.write	8
 member_size	struct gf_io.write	4
+size	struct gf_irq_stats	44
+align	struct gf_irq_stats	4
+offset	struct gf_irq_stats.entries	0
+member_size	struct gf_irq_stats.entries	4
+offset	struct gf_irq_stats.fifo	4
+member_size	struct gf_irq_stats.fifo	4
+offset	struct gf_irq_stats.graph	8
+member_size	struct gf_irq_stats.graph	4
+offset	struct gf_irq_stats.nsource	32
+member_size	struct gf_irq_stats.nsource	4
+offset	struct gf_irq_stats.nstatus	36
+member_size	struct gf_irq_stats.nstatus	4
+offset	struct gf_irq_stats.pfifo	24
+member_size	struct gf_irq_stats.pfifo	4
+offset	struct gf_irq_stats.pgraph	28
+member_size	struct gf_irq_stats.pgraph	4
+offset	struct gf_irq_stats.pmc	20
+member_size	struct gf_irq_stats.pmc	4
+offset	struct gf_irq_stats.unknown	40
+member_size	struct gf_irq_stats.unknown	4
+offset	struct gf_irq_stats.vblank	12
+member_size	struct gf_irq_stats.vblank	8
 size	struct gf_load_io	12
 align	struct gf_load_io	4
 offset	struct gf_load_io.row	4
@@ -1652,6 +1790,64 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
+size	struct gf_production	2180
+align	struct gf_production	4
+offset	struct gf_production.acquiring	1755
+member_size	struct gf_production.acquiring	1
+offset	struct gf_production.attempted	1753
+member_size	struct gf_production.attempted	1
+offset	struct gf_production.display	0
+member_size	struct gf_production.display	1732
+offset	struct gf_production.foundation	1968
+member_size	struct gf_production.foundation	204
+offset	struct gf_production.indexes	1776
+member_size	struct gf_production.indexes	96
+offset	struct gf_production.locks	1872
+member_size	struct gf_production.locks	96
+offset	struct gf_production.map_ops	2172
+member_size	struct gf_production.map_ops	4
+offset	struct gf_production.map_owner	2176
+member_size	struct gf_production.map_owner	4
+offset	struct gf_production.prepared	1752
+member_size	struct gf_production.prepared	1
+offset	struct gf_production.reject	1756
+member_size	struct gf_production.reject	20
+offset	struct gf_production.revoked	1754
+member_size	struct gf_production.revoked	1
+offset	struct gf_production.route98	1744
+member_size	struct gf_production.route98	4
+offset	struct gf_production.route_opaque	1748
+member_size	struct gf_production.route_opaque	4
+offset	struct gf_production.scratch	1740
+member_size	struct gf_production.scratch	4
+offset	struct gf_production.video	1732
+member_size	struct gf_production.video	8
+size	struct gf_production_local	16
+align	struct gf_production_local	4
+offset	struct gf_production_local.alias	0
+member_size	struct gf_production_local.alias	4
+offset	struct gf_production_local.index	4
+member_size	struct gf_production_local.index	4
+offset	struct gf_production_local.valid	12
+member_size	struct gf_production_local.valid	1
+offset	struct gf_production_local.value	8
+member_size	struct gf_production_local.value	4
+size	struct gf_production_resources	100
+align	struct gf_production_resources	4
+offset	struct gf_production_resources.bars	32
+member_size	struct gf_production_resources.bars	48
+offset	struct gf_production_resources.identity	0
+member_size	struct gf_production_resources.identity	32
+offset	struct gf_production_resources.reject	80
+member_size	struct gf_production_resources.reject	20
+size	struct gf_production_scratch	141100
+align	struct gf_production_scratch	4
+offset	struct gf_production_scratch.init	0
+member_size	struct gf_production_scratch.init	740
+offset	struct gf_production_scratch.program	740
+member_size	struct gf_production_scratch.program	9288
+offset	struct gf_production_scratch.rom	10028
+member_size	struct gf_production_scratch.rom	131072
 size	struct gf_script_span	16
 align	struct gf_script_span	4
 offset	struct gf_script_span.crc	12
@@ -2056,6 +2252,18 @@ offset	struct gfinit_request.steps	36
 member_size	struct gfinit_request.steps	4
 offset	struct gfinit_request.version	0
 member_size	struct gfinit_request.version	4
+size	struct gfinit_resource_reject	20
+align	struct gfinit_resource_reject	4
+offset	struct gfinit_resource_reject.dev	4
+member_size	struct gfinit_resource_reject.dev	4
+offset	struct gfinit_resource_reject.fn	8
+member_size	struct gfinit_resource_reject.fn	4
+offset	struct gfinit_resource_reject.raw	16
+member_size	struct gfinit_resource_reject.raw	4
+offset	struct gfinit_resource_reject.reason	0
+member_size	struct gfinit_resource_reject.reason	4
+offset	struct gfinit_resource_reject.reg	12
+member_size	struct gfinit_resource_reject.reg	4
 size	struct gfx_kernel_fb	32
 align	struct gfx_kernel_fb	4
 offset	struct gfx_kernel_fb.format	12
@@ -3273,6 +3481,27 @@ enum	EXEC_ERR_INVALID	4294967291
 enum	EXEC_ERR_NOMEM	4294967292
 enum	EXEC_ERR_NOT_FOUND	4294967293
 enum	EXEC_SUCCESS	0
+enum	GF1T_DISPLAY_START	8
+enum	GF1T_DISPLAY_STOP	7
+enum	GF1T_HEADS	4
+enum	GF1T_INST_PAGE	5
+enum	GF1T_MASTER	0
+enum	GF1T_REVOKE	6
+enum	GF1T_SNAPSHOT	3
+enum	GF1T_START	1
+enum	GF1T_STOP	2
+enum	GF1_CYCLE	3
+enum	GF1_EINVAL	4294967192
+enum	GF1_EIO	4294967189
+enum	GF1_EIRQ	4294967191
+enum	GF1_EMAP	4294967194
+enum	GF1_ENOSPC	4294967193
+enum	GF1_EPCI	4294967195
+enum	GF1_ESTOP	4294967190
+enum	GF1_INSTMEM	1
+enum	GF1_OK	0
+enum	GF1_STATUS	0
+enum	GF1_VBLANK	2
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5
