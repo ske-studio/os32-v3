@@ -47,10 +47,10 @@ int gf2_fence_wait(struct gf2_chan *ch, struct gf2_fence fence, u32 deadline_us)
         if (rc) return rc;
         if (fence.epoch != ch->epoch) return GF2_EFAULT;
         if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-        if ((s32)(now - deadline_us) >= 0) return GF2_ETIME;
+        if ((i32)(now - deadline_us) >= 0) return GF2_ETIME;
         if (io->read(io->opaque, GF2_FENCE_BAR, GF2_FENCE_REFERENCE,
                      GF2_FENCE_WIDTH, &observed)) return GF2_EIO;
-        if ((s32)(observed - fence.seq) >= 0) return GF2_OK;
+        if ((i32)(observed - fence.seq) >= 0) return GF2_OK;
         delay = deadline_us - now;
         if (delay > GF2_WAIT_MAX_US) delay = GF2_WAIT_MAX_US;
         if (io->timing.wait_us(io->opaque, delay)) return GF2_EIO;
