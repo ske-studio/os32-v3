@@ -74,7 +74,10 @@ struct PlProfile {
  * NO costs, windows or denominators. All members must be installed together
  * by R1a, then replaced/re-certified by R1b/M2. No runtime CPU guessing.
  * N6 slots are dormant unless the diagnostic candidate explicitly adopts 6. */
-static const struct PlProfile pl_profiles[2][2][2] = {
+#ifndef PL_PROFILES_CONST
+#define PL_PROFILES_CONST const
+#endif
+static PL_PROFILES_CONST struct PlProfile pl_profiles[2][2][2] = {
     { { { .n = 5 }, { .n = 6 } }, { { .n = 5 }, { .n = 6 } } },
     { { { .n = 5 }, { .n = 6 } }, { { .n = 5 }, { .n = 6 } } }
 };

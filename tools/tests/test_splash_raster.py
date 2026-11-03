@@ -1,6 +1,6 @@
 """Shared palette player: rational scan model, IRQ windows and runtime mutants."""
 CHECK = dict(name='splash-raster-host', tier=1,
-    covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster.h',
+    covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
             'tools/tests/splash_raster_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'gfx/gfx_osri.h', 'gfx/gfx.h',
             'include/types.h', 'include/pc98.h', 'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
