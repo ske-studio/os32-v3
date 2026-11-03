@@ -1,6 +1,14 @@
-/* Link with the real hwdev/gf/push.c only. A2 is not present yet: this
+/* Link with the real hwdev/gf/push.c and A2's VA read observer. This
  * fixture supplies gf_io callbacks and the B7 gf2_fault_check stub locally. */
 #include "hwdev/gf/command.h"
+
+/* A2 contract: watch actual CPU reads of this one volatile u32 (not writes)
+ * without changing push.c. begin returns 0 on success and resets the count;
+ * count does not access the watched word; end restores its ordinary mapping.
+ * No no-op fallback: missing observation must fail to link, not pass silently. */
+extern int gf2_host_va_read_begin(volatile u32 *word);
+extern u32 gf2_host_va_read_count(void);
+extern void gf2_host_va_read_end(void);
 
 #define BASE 0x100000U
 #define USER (GF2_USER_BASE + GF2_CHID * GF2_USER_STRIDE)
@@ -9,9 +17,9 @@ static u32 ring[GF2_PUSH_WORDS];
 static struct gf2_chan ch;
 static struct gf_foundation f;
 static struct fake {
-    u32 get[8], put[8], now, waits;
+    u32 get[8], put[8], readbacks_at_put[8], now, waits;
     unsigned gets, reads, writes, fault_after_reads;
-    bool fault, read_fail, write_fail, clock_fail, wait_fail;
+    bool fault, read_fail, write_fail, clock_fail, wait_fail, watch_readback;
 } m;
 
 static int read_reg(void *owner, u32 bar, u32 off, u32 width, u32 *out)
@@ -28,6 +36,8 @@ static int write_reg(void *owner, u32 bar, u32 off, u32 width, u32 value)
     struct fake *p = owner;
     if (bar != GF_MODE_REGISTER_BAR || off != USER + GF2_USER_PUT ||
         width != sizeof(u32) || p->writes == 8 || p->write_fail) return -1;
+    if (p->watch_readback)
+        p->readbacks_at_put[p->writes] = gf2_host_va_read_count();
     p->put[p->writes++] = value;
     return 0;
 }
@@ -60,6 +70,36 @@ static void fresh(enum gf2_state state)
         .cur = GF2_PUSH_SKIPS, .max = GF2_PUSH_MAX,
         .free = GF2_PUSH_MAX - GF2_PUSH_SKIPS };
     for (u32 i = 0; i < GF2_PUSH_WORDS; ++i) ring[i] = 0;
+}
+static int test_readback_order(void)
+{
+    fresh(GF2_RUN);
+    REQUIRE(!gf2_push_reference(&ch, 1, 100));
+    REQUIRE(!gf2_host_va_read_begin(ch.va));
+    m.watch_readback = true;
+    REQUIRE(gf2_host_va_read_count() == 0);
+    REQUIRE(!gf2_kick(&ch));
+    REQUIRE(m.writes == 1 && m.readbacks_at_put[0] == 1);
+    REQUIRE(gf2_host_va_read_count() == 1);
+    REQUIRE(!gf2_kick(&ch)); /* No pending data: no readback or PUT. */
+    REQUIRE(m.writes == 1 && gf2_host_va_read_count() == 1);
+    gf2_host_va_read_end();
+
+    fresh(GF2_RUN);
+    ch.cur = ch.max - 1; ch.put = ch.cur - 2; ch.free = 1;
+    m.get[0] = BASE + ch.cur * 4;
+    REQUIRE(!gf2_host_va_read_begin(ch.va));
+    m.watch_readback = true;
+    REQUIRE(!gf2_push_reference(&ch, 2, 100));
+    /* Pending tail and wrap PUT must each have a preceding readback. */
+    REQUIRE(m.writes == 2 && m.readbacks_at_put[0] == 1 &&
+            m.readbacks_at_put[1] == 2);
+    REQUIRE(gf2_host_va_read_count() == 2);
+    REQUIRE(!gf2_kick(&ch));
+    REQUIRE(m.writes == 3 && m.readbacks_at_put[2] == 3);
+    REQUIRE(gf2_host_va_read_count() == 3);
+    gf2_host_va_read_end();
+    return 0;
 }
 static int test(void)
 {
@@ -136,7 +176,8 @@ static int test(void)
 }
 void _start(void)
 {
-    int rc = test();
+    int rc = test_readback_order();
+    if (!rc) rc = test();
     __asm__ volatile ("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
