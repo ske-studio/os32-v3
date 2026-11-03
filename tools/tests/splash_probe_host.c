@@ -16,7 +16,7 @@ static int irq_on = 1, missing_h, frozen, backwards;
 static u32 initial_irq_us;
 static u32 calibration_irq_us;
 static u32 if0_end_clock, if0_in_reads, if0_max_in_run;
-static int require_clockless_in;
+static int require_clockless_in, slow_capture;
 static int raw_test, h_test;
 static u32 raw_reads, raw_port, h_reads, h_high, h_rise, h_fall, h_old;
 static u32 raw_clocks;
@@ -77,7 +77,8 @@ static unsigned int inp(unsigned int port)
         }
         h_reads++; h_high += !!(status & GDC_STAT_HBLANK); h_old = status;
     }
-    advance(in_us); /* sample and return are deliberately distinct */
+    advance(in_us + (slow_capture && !irq_on && if0_in_reads >= 1500));
+    /* Sample and return are deliberately distinct. */
     if (!irq_on) {
         if (require_clockless_in) REQUIRE(!if0_end_clock);
         if0_in_reads++;
@@ -101,6 +102,7 @@ static unsigned int irq_save(void)
     if (test_open_at && scan_us - test_open_at < test_min_open) test_min_open = scan_us - test_open_at;
     irq_on = 0; test_closed_at = scan_us;
     if0_in_reads = if0_end_clock = 0;
+    if (h_test) h_reads = h_high = h_rise = h_fall = 0;
     return flags;
 }
 static void irq_restore(unsigned int flags)
@@ -228,6 +230,7 @@ static void setup(int mode, int vs)
     calibration_irq_us = 0;
     if0_end_clock = if0_in_reads = if0_max_in_run = 0;
     require_clockless_in = 0;
+    slow_capture = 0;
     test_open_at = test_closed_at = test_max_closed = 0; test_min_open = ~0ULL;
     for (u32 i = 0; i < 4; i++) irq_at[i] = irq_delay[i] = 0;
     pc98_splash_raster_reset();
@@ -298,8 +301,7 @@ static void widths(void)
         }
         long long measured = highs * 100000 / samples;
         REQUIRE(probe_delta(measured, reference) <= (unsigned long long)den);
-        REQUIRE(test_max_closed * den <= probe_hd.count * probe_cost_bound(PROBE_Q, den) +
-                2 * probe_cost_bound(PROBE_C, den));
+        REQUIRE(test_max_closed * den <= (PROBE_HPERIODS + 2) * 100000);
         REQUIRE(test_min_open * den >= 100000);
         REQUIRE(!probe_errors && irq_on);
     }
@@ -378,17 +380,23 @@ static void h_diagnostics(void)
     REQUIRE(probe_hd.max_us == probe_hd.min_us && !probe_hd.over);
     /* Same calibration, slower actual loop: preserve the completed count
      * and raw edges even when the first IF0 burst overruns. */
-    in_us = 2;
+    slow_capture = 1;
     REQUIRE(!probe_hblank(s));
     REQUIRE(probe_hd.reason == 8 && probe_hd.over == 1 && probe_hd.bursts == 1);
     REQUIRE(probe_hd.completed > 0 && probe_hd.max_us > 60 && irq_on);
     /* The former real-log count=18 no longer loses armed at each burst. */
-    in_us = 1; probe_errors = 0;
+    slow_capture = 0; probe_errors = 0;
     probe_cost[PROBE_Q].upper_num_us = 37;
     probe_cost[PROBE_Q].upper_samples = 16;
     probe_cost[PROBE_C].upper_num_us = 10;
     probe_cost[PROBE_C].upper_samples = 1;
     probe_cost[PROBE_C].upper_us = 10;
+    /* Large uncertainty must not buy a longer IF=0 region. */
+    REQUIRE(!probe_hblank(s));
+    REQUIRE(probe_hd.reason == 3 && !probe_hd.bursts && irq_on);
+    probe_errors = 0;
+    probe_cost[PROBE_C].upper_samples = 8;
+    probe_cost[PROBE_C].upper_us = 2;
     REQUIRE(probe_hblank(s) == 64);
     REQUIRE(probe_hd.reason == 1 && probe_hd.count > 2000 && probe_hd.completed == 64);
     REQUIRE(probe_hd.rise && probe_hd.fall && probe_hd.high && probe_hd.low);
@@ -403,13 +411,42 @@ static void h_diagnostics(void)
     probe_cost[PROBE_Q].upper_num_us = 0;
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 2 && !probe_hd.bursts);
     probe_cost[PROBE_Q].upper_num_us = 73;
+    probe_cost[PROBE_Q].upper_samples = 64;
+    missing_h = 0; probe_errors = 0;
     probe_q_lower = 1;
-    REQUIRE(!probe_hblank(s) && probe_hd.reason == 4 && probe_hd.count > PROBE_HSAMPLES);
+    REQUIRE(probe_hblank(s) == 64); /* refine the coarse lower bound */
     probe_cost[PROBE_C].upper_num_us = 100000;
+    probe_cost[PROBE_C].upper_us = 100000;
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 3);
     setup(1, 0); s = pc98_splash_raster_state(); probe_costs(s);
     frozen = 1; probe_open_until = scan_us + 100;
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 5 && !probe_hd.bursts);
+}
+static void pl_normal_windows(void)
+{
+    /* Exact IN/OUT costs from the independent clock, with no timestamp in
+     * the scan. Exercise a certified window rather than the fallback path. */
+    for (int mode = 0; mode < 2; mode++) for (u32 phase = 0; phase < 42; phase++) {
+        setup(mode, 0); in_us = clock_cost_us = out_us = 1;
+        struct SplashRaster *s = pc98_splash_raster_state();
+        probe_pl_columns_init();
+        scan_us = phase;
+        probe_open_until = 0;
+        for (u32 i = 0; i < probe_pl_count; i++) {
+            struct probe_pl_column *c = &probe_pl_columns[i];
+            struct probe_pl_result r = { .budget = { .den = den,
+                .h = {100000, 100000}, .q = {den, 2 * den},
+                .w = {c->n * den, c->n * den} },
+                .poll = {9 * den / 10, den}, .prep = den };
+            probe_pl_window(&r);
+            REQUIRE(r.window_ok && r.lower > 1);
+            require_clockless_in = 1;
+            probe_pl_scan(s, c, &r);
+            require_clockless_in = 0;
+            REQUIRE(c->completed == 64 && !c->early && !c->timeout);
+            REQUIRE(c->window_ok && irq_on);
+        }
+    }
 }
 void _start(void)
 {
@@ -439,7 +476,7 @@ void _start(void)
         }
     }
     in_us = clock_cost_us = out_us = 1;
-    costs(); budgets(); widths(); raw_measurements(); h_diagnostics();
+    costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_diagnostics();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {
         setup(mode, vs);
         wide_h = wide;

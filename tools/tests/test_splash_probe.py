@@ -59,8 +59,20 @@ MUTATIONS = (
     ('omit B upper sample error', '                                 probe_budget.q.max : 0;',
      '                                 0 : 0;'),
     ('truncate continuous H capture',
-     'u32 count = ((PROBE_HPERIODS + 2) * s->line_num_us + probe_q_lower - 1) / probe_q_lower;',
+     'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;',
      'u32 count = s->line_num_us / q;'),
+    ('coarse Q calibration for 64H', 'u32 count = (limit - clocks) / *q;',
+     'u32 count = 8;'),
+    ('ignore fixed costs in lower window', 'long long remaining = r->early_time - fixed;',
+     'long long remaining = r->early_time;'),
+    ('use shortest poll for lower window',
+     'r->lower = remaining > 0 ? (remaining + r->poll.max - 1) / r->poll.max : 1;',
+     'r->lower = remaining > 0 ? (remaining + r->poll.min - 1) / r->poll.min : 1;'),
+    ('extend IF0 time frame', 'unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;',
+     'unsigned long long limit = (PROBE_HPERIODS + 32) * s->line_num_us;'),
+    ('ignore H sample count cap',
+     'if (count > cap) { probe_hd.reason = 3; probe_errors++; return 0; }',
+     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_errors++; return 0; }'),
     ('lose VS classification', 'else if (probe_delta(measured, s->vs_lines * tolerance) <= tolerance)',
      'else if (0 && probe_delta(measured, s->vs_lines * tolerance) <= tolerance)'),
     ('ignore eight-period mismatch', 'expected * SPLASH_RASTER_PERIOD_TOLERANCE) return;',
@@ -138,7 +150,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 66H IF0 cap', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)

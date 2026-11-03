@@ -391,21 +391,62 @@ static u32 probe_hcollect(u32 count, u32 completed)
     }
     return completed;
 }
+/* Refine Q with the identical RAM-store loop over at most 32H. The short
+ * bootstrap's two timestamp quanta are too large for a 64H sample count.
+ * Both calibration and capture have time limits independent of that count. */
+static int probe_hcalibrate(const struct SplashRaster *s, unsigned long long *q,
+    unsigned long long clocks)
+{
+    unsigned long long limit = PROBE_HPERIODS / 2 * s->line_num_us;
+    if (clocks + *q >= limit) { probe_hd.reason = 3; return -1; }
+    u32 count = (limit - clocks) / *q;
+    if (count > PROBE_HSAMPLES) count = PROBE_HSAMPLES;
+    if (count < 2) { probe_hd.reason = 3; return -1; }
+    if (probe_measure_open()) { probe_hd.reason = 5; return -1; }
+    unsigned int flags = irq_save();
+    unsigned long long one = probe_cost_batch(PROBE_Q, 1);
+    probe_measure_restore(flags, s);
+    unsigned long long lower = ~0ULL, upper = 0;
+    for (u32 i = 0; i < PROBE_COST_BATCH; i++) {
+        if (probe_measure_open()) { probe_hd.reason = 5; return -1; }
+        flags = irq_save();
+        unsigned long long span = probe_cost_batch(PROBE_Q, count);
+        probe_measure_restore(flags, s);
+        if ((span + probe_cost[PROBE_C].upper_us + SPLASH_RASTER_CLOCK_QUANTUM_US) *
+            s->line_den > limit) { probe_hd.reason = 3; return -1; }
+        unsigned long long lo = span > one + 2 * SPLASH_RASTER_CLOCK_QUANTUM_US ?
+            (span - one - 2 * SPLASH_RASTER_CLOCK_QUANTUM_US) * s->line_den / (count - 1) : 0;
+        unsigned long long hi = ((span + SPLASH_RASTER_CLOCK_QUANTUM_US - probe_c_min) *
+                                 s->line_den + count - 1) / count;
+        if (lo < lower) lower = lo;
+        if (hi > upper) upper = hi;
+    }
+    if (!lower) { probe_hd.reason = 2; return -1; }
+    probe_q_lower = lower;
+    *q = upper;
+    return 0;
+}
 /* Leave room for the two partial endpoint periods. No clock, IRQ opening,
  * or armed-state reset interrupts the 64 complete rise-to-rise periods. */
 static u32 probe_hblank(const struct SplashRaster *s)
 {
     unsigned long long q = probe_cost_bound(PROBE_Q, s->line_den);
-    unsigned long long clocks = 2 * probe_cost_bound(PROBE_C, s->line_den);
+    unsigned long long clocks = (2 * probe_cost[PROBE_C].upper_us +
+                                 SPLASH_RASTER_CLOCK_QUANTUM_US) * s->line_den;
+    unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;
     probe_hd = (struct probe_hdiag){0};
-    if (!q || clocks >= (PROBE_HPERIODS + 2) * s->line_num_us) {
+    if (!q || clocks >= limit) {
         probe_hd.reason = !q ? 2 : 3;
         probe_errors++; return 0;
     }
-    if (!probe_q_lower) { probe_hd.reason = 2; probe_errors++; return 0; }
-    u32 count = ((PROBE_HPERIODS + 2) * s->line_num_us + probe_q_lower - 1) / probe_q_lower;
+    if (probe_hcalibrate(s, &q, clocks)) { probe_errors++; return 0; }
+    /* At least 65H plus one sample spans 64 complete periods at any phase.
+     * Refuse inadequate precision instead of enlarging the 66H IF=0 limit. */
+    u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;
+    u32 cap = (limit - clocks) / q;
     probe_hd.count = count;
     if (count < 2 || count > PROBE_HSAMPLES) { probe_hd.reason = 4; probe_errors++; return 0; }
+    if (count > cap) { probe_hd.reason = 3; probe_errors++; return 0; }
     u32 completed = 0;
     for (u32 burst = 0; burst < 1; burst++) {
         if (probe_measure_open()) { probe_hd.reason = 5; break; }
@@ -419,7 +460,8 @@ static u32 probe_hblank(const struct SplashRaster *s)
         probe_hd.completed = completed;
         if (probe_hd.bursts == 1 || elapsed < probe_hd.min_us) probe_hd.min_us = elapsed;
         if (elapsed > probe_hd.max_us) probe_hd.max_us = elapsed;
-        if ((elapsed + probe_cost[PROBE_C].upper_us) * s->line_den > count * q + clocks) {
+        if ((elapsed + probe_cost[PROBE_C].upper_us + SPLASH_RASTER_CLOCK_QUANTUM_US) *
+            s->line_den > limit) {
             probe_hd.over++; probe_hd.reason = 8;
             probe_errors++; return 0;
         }
@@ -659,10 +701,14 @@ static void probe_pl_window(struct probe_pl_result *r)
     r->early_time = b->h.min - b->q.max - b->error;
     if (r->poll.min <= 0 || r->poll.max <= 0) return;
     r->upper = r->normal / r->poll.min + 2;
-    r->lower = r->early_time > 0 ?
-        (r->early_time + r->poll.min - 1) / r->poll.min + 1 : 1;
+    /* low+high counts only IN iterations. Include every intervening cost
+     * before rejecting a short count; its greatest elapsed time must still
+     * precede the earliest normal edge. Use the longest poll, not shortest. */
+    long long fixed = b->d.max + b->w.max + r->prep + r->transition;
+    long long remaining = r->early_time - fixed;
+    r->lower = remaining > 0 ? (remaining + r->poll.max - 1) / r->poll.max : 1;
     r->tmin = (r->upper - 1) * r->poll.min;
-    r->tmax = r->upper * r->poll.max + b->d.max + b->w.max + r->prep + r->transition;
+    r->tmax = r->upper * r->poll.max + fixed;
     r->window_ok = r->normal < r->tmin && r->tmin <= r->tmax && r->tmax < r->miss &&
                    r->lower < r->upper;
 }
