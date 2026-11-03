@@ -1,4 +1,5 @@
 #include "access.h"
+#include "../command.h"
 #include "../quiesce_rows.h"
 /* Keep the first failing target/rc; later successful cleanup must not
  * overwrite it (docs/design/hwdev/gf/display/quiesce.md). */
@@ -18,6 +19,13 @@ int gf_display_stop(void *v)
      * Even revoked access attempts all existing cleanup rows; the bus rejects
      * old MMIO and the outer backend still selects the 98 display. */
     c->active=false;
+    struct gf_foundation *f=0;
+    struct gf2_chan *ch=c->owner->command_get ? c->owner->command_get(c,&f) : 0;
+    int rc=ch ? gf2_stop(ch) : 0;
+    if (rc && !f->revoked) {
+        c->last_rc=rc;c->reusable=false;c->stop_ok=false;
+        return -1;
+    }
     int stopped=c->owner->foundation_stop(c);
     int stop_rc=c->last_rc;
     if (stopped) {
@@ -25,7 +33,7 @@ int gf_display_stop(void *v)
         if (c->engaged) return -1;
     }
     struct gf_init_context cleanup={.io=c->io};
-    int rc=c->io.restore(c->io.opaque,&cleanup);
+    rc=c->io.restore(c->io.opaque,&cleanup);
     u32 target=c->target;
     int first_rc=stopped ? stop_rc : rc;
     if (stopped) rc=-1;
