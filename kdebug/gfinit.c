@@ -459,6 +459,7 @@ invalid:
 /* Borrowed only while the synchronous cycle runs; stop/start cannot overwrite
  * the RUN policy saved by its caller, or borrow the last request cache. */
 static const struct gfinit_prepare_request *gf_cycle_policy;
+static struct recover_transport *gf_cycle_transport;
 static int gf_diagnostic_display(bool start)
 {
     struct recover *r = recover_owner();
@@ -470,9 +471,10 @@ static int gf_diagnostic_display(bool start)
         if (rc) return owner->foundation.last_rc ? owner->foundation.last_rc : GF1_ESTOP;
         return GF1_OK;
     }
-    if (r->state != REC_VERIFIED || !stage.s0_ok || !r->s0_verified || !gf_cycle_policy)
+    if (r->state != REC_VERIFIED || !stage.s0_ok || !r->s0_verified ||
+        !gf_cycle_policy || !gf_cycle_transport)
         return GF1_ESTOP;
-    rc = gf_c_only(r, r->transport, gf_cycle_policy->request.flags,
+    rc = gf_c_only(r, gf_cycle_transport, gf_cycle_policy->request.flags,
                     gf_cycle_policy->regs, gf_cycle_policy->count);
     return rc ? (owner->foundation.last_rc ? owner->foundation.last_rc : GF1_EIO) : GF1_OK;
 }
@@ -508,7 +510,8 @@ static int gf_production_read_row(void *opaque, u32 y, u8 *row)
     }
     return GF1_OK;
 }
-static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops *base)
+static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops *base,
+                                  struct recover_transport *transport)
 {
     if (!buf || size != sizeof(struct gf1_request)) return GF1_EINVAL;
     struct gf1_request q = *(const struct gf1_request *)buf;
@@ -532,6 +535,7 @@ static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops 
         policy.count = owner->policy_count;
         for (u32 i = 0; i < policy.count; i++) policy.regs[i] = owner->policy_regs[i];
         gf_cycle_policy = &policy;
+        gf_cycle_transport = transport;
         owner->last_op = RECOVER_NONE;
     }
     int rc = gf_foundation_test(&q, f, base,
@@ -539,6 +543,7 @@ static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops 
         production ? gf_production_read_row : gf_diagnostic_read_row,
         production ? (void *)f : (void *)owner);
     gf_cycle_policy = 0;
+    gf_cycle_transport = 0;
     *(struct gf1_request *)buf = q;
     return rc;
 }
@@ -546,7 +551,7 @@ static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops 
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
-    if (op == GF_OP_FOUNDATION) return gf_foundation_dispatch(buf, size, base);
+    if (op == GF_OP_FOUNDATION) return gf_foundation_dispatch(buf, size, base, transport);
     if (gf_production_selected()) return -1;
     if (!buf || size < sizeof(struct gfinit_request)) return -1;
     struct gfinit_request q = *(const struct gfinit_request *)buf;
