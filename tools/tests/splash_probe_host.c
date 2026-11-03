@@ -66,8 +66,15 @@ static unsigned int inp(unsigned int port)
         REQUIRE(port == GDC_GFX_STAT || port == GDC_TEXT_STAT);
         unsigned long long phase = scan_us * den % ((unsigned long long)total * 100000);
         if (phase < (unsigned long long)high_lines * 100000) status |= GDC_STAT_VSYNC;
-        u32 width = wide_h ? (raw_mode ? 80000 : 75472) : (raw_mode ? 20000 : 24532);
+#ifdef PROBE_MODEL_PHASE
+        phase = PROBE_MODEL_PHASE(scan_us);
+#endif
+        u32 width __attribute__((unused)) = wide_h ? (raw_mode ? 80000 : 75472) : (raw_mode ? 20000 : 24532);
+#ifdef PROBE_MODEL_PHASE
+        if (phase % 318 >= 318 - 59) status |= GDC_STAT_HBLANK;
+#else
         if (!missing_h && phase % 100000 >= 100000 - width) status |= GDC_STAT_HBLANK;
+#endif
     }
     if (h_test && !irq_on) {
         if (!(if0_in_reads)) h_old = status;
