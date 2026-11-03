@@ -298,6 +298,158 @@ class RunnerTest(unittest.TestCase):
                 self.assertNotEqual(R.build_content(head + ' F\n-D="#one"\nendef\n', 'build/config.mk'),
                                     R.build_content(head + ' F\n-D="#two"\nendef\n', 'build/config.mk'))
 
+    def test_build_source_lists_route_sources_and_artifacts(self):
+        cases = (
+            ('build/kernel.mk', 'kernel/time/time_splash_math.c',
+             'C_KERNEL = \\\n    arch/x86/kernel/mtrr_wc.c\n',
+             'C_KERNEL = \\\n    kernel/time/time_splash_math.c \\\n    arch/x86/kernel/mtrr_wc.c\n'),
+            ('build/kernel.mk', 'drivers/video/pc98/splash_raster_image.c',
+             'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c\n',
+             'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c \\\n    drivers/video/pc98/splash_raster_image.c\n'),
+            ('build/geforce-module.mk', 'hwdev/gf/new.c',
+             'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c\n',
+             'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c hwdev/gf/new.c\n'),
+            ('build/libs.mk', 'userland/lib/gfx/new.c',
+             'GFX_SRC = $(wildcard userland/lib/gfx/*.c)\n',
+             'GFX_SRC = $(wildcard userland/lib/gfx/*.c) userland/lib/gfx/new.c\n'),
+            ('build/programs.mk', 'userland/system/inst_new.c',
+             'INST_SHARED_SRC = userland/system/inst_disk.c\n',
+             'INST_SHARED_SRC = userland/system/inst_disk.c userland/system/inst_new.c\n'),
+            ('build/libs.mk', 'userland/lib/db/new.c',
+             'LIBOS32DB_ARCHIVE_OBJ = userland/lib/db/libos32db.o\n',
+             'LIBOS32DB_ARCHIVE_OBJ = userland/lib/db/libos32db.o userland/lib/db/new.o\n'),
+        )
+        self.check('reader', covers=['build/out/kernel.map'])
+        self.check('sdk-reader', covers=['build/sdk/lib/a.a'])
+        self.check('all-reader', covers=['unrelated'], needs=['make:all'])
+        self.check('scanner', covers=['drivers/**'])
+        self.check('other', covers=['unrelated'])
+        self.check('stable', covers=['unrelated'], tier=4)
+        for path, source, before, after in cases:
+            for old, new in ((before, after), (after, before)):
+                with self.subTest(path=path, source=source, removal=old == after):
+                    self.check('source', covers=[source])
+                    self.write(source, 'int probe;\n')
+                    self.write(path, old)
+                    self.commit()
+                    base = self.git('rev-parse', 'HEAD')
+                    self.write(path, new)
+                    result = R.plan(self.root, self.registry(), (path,), base=base)
+                    self.assertEqual((result.tier, result.mode), (3, 'sel'))
+                    self.assertEqual(result.full_hits, set())
+                    self.assertEqual(result.unmatched, set())
+                    self.assertEqual(set(result.stage),
+                                     {'source', 'reader', 'sdk-reader', 'all-reader', 'scanner'})
+                    self.assertEqual(result.needs, ('all',))
+                    self.assertEqual(self.plan(path).mode, 'full')
+                    self.assertIn('source', result.hit)
+
+    def test_build_unresolved_registration_is_full(self):
+        path = 'build/geforce-module.mk'
+        self.check('source', covers=['kdebug/gfinit_resources.c'])
+        self.write('kdebug/gfinit_resources.c', 'int probe;\n')
+        before = ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o '
+                  '$(GEFORCE_OUT)/boot_scan.o\n')
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, before.replace(' $(GEFORCE_OUT)/boot_scan.o', ''))
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.full_hits), ('full', {path}))
+        self.assertIn('source', result.stage)
+
+    def test_build_branch_exchange_routes_both_sources(self):
+        path = 'build/kernel.mk'
+        for name in ('a', 'b'):
+            self.check(name, covers=['kernel/' + name + '.c'])
+            self.write('kernel/' + name + '.c', 'int probe;\n')
+        before = 'ifeq ($(MODE),a)\nC_KERNEL += kernel/a.c\nelse\nC_KERNEL += kernel/b.c\nendif\n'
+        after = 'ifeq ($(MODE),a)\nC_KERNEL += kernel/b.c\nelse\nC_KERNEL += kernel/a.c\nendif\n'
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, after)
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.unmatched), ('sel', set()))
+        self.assertTrue({'a', 'b'} <= result.hit)
+        self.assertEqual(R.routed_build_inputs(self.root, base, path), {'kernel/a.c', 'kernel/b.c'})
+
+    def test_build_uncovered_registration_expands_checks(self):
+        path = 'build/kernel.mk'
+        self.check('covered', covers=['kernel/a.c'])
+        self.check('other', covers=['elsewhere.c'])
+        self.check('stable', covers=['elsewhere.c'], tier=4)
+        self.write('kernel/a.c', 'int a;\n')
+        self.write('kernel/new.c', 'int probe;\n')
+        before = 'C_KERNEL = kernel/a.c\n'
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, before.rstrip() + ' kernel/new.c\n')
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.tier, result.unmatched), ('sel', 3, {'kernel/new.c'}))
+        self.assertIn('other', result.stage)
+        self.assertNotIn('stable', result.stage)
+
+    def test_build_source_reordering_is_full(self):
+        path = 'build/kernel.mk'
+        self.check('a', covers=['kernel/a.c'])
+        self.write('kernel/a.c', 'int a;\n')
+        self.write('kernel/b.c', 'int b;\n')
+        self.write(path, 'C_KERNEL = kernel/a.c kernel/b.c\n')
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, 'C_KERNEL = kernel/b.c kernel/a.c\n')
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.full_hits), ('full', {path}))
+
+    def test_build_source_lists_keep_semantic_changes_full(self):
+        before = 'C_KERNEL = drivers/video/a.c\n'
+        changes = (
+            'C_KERNEL = drivers/video/a.c drivers/video/b.c\nCFLAGS += -Os\n',
+            'C_KERNEL = drivers/video/a.c drivers/video/b.c\nb.o: b.c\n\t$(CC) -c $< -o $@\n',
+            'C_KERNEL := drivers/video/a.c\n',
+            'OTHER_SRC = drivers/video/a.c\n',
+            'C_KERNEL = $(filter-out drivers/video/a.c,drivers/video/b.c)\n',
+            'C_KERNEL = $(shell echo drivers/video/a.c)\n',
+            'C_KERNEL = drivers/video/a.c -DTEST\n',
+        )
+        self.check()
+        self.write('build/kernel.mk', before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        for after in changes:
+            with self.subTest(after=after):
+                self.write('build/kernel.mk', after)
+                result = R.plan(self.root, self.registry(), ('build/kernel.mk',), base=base)
+                self.assertEqual((result.tier, result.mode, result.full_hits),
+                                 (4, 'full', {'build/kernel.mk'}))
+        pairs = (
+            ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o\n',
+             'GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o\n'),
+            ('GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o)\n',
+             'GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o new.o)\n'),
+            ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o\n',
+             'GEFORCE_BOOT_OBJS := $(OTHER_OUT)/boot_scan.o\n'),
+            ('GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,a.o)\n',
+             'GEFORCE_OBJS := $(addprefix $(OTHER_OUT)/,a.o b.o)\n'),
+            ('GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c)\n',
+             'GEFORCE_SOURCES := $(wildcard hwdev/gf/op/*.c)\n'),
+            ('define BODY\nC_KERNEL = a.c\nendef\n',
+             'define BODY\nC_KERNEL = a.c b.c\nendef\n'),
+            ('all:\n\tC_KERNEL = a.c\n', 'all:\n\tC_KERNEL = a.c b.c\n'),
+            ('KERNEL_CFLAGS = a.c\n', 'KERNEL_CFLAGS = a.c b.c\n'),
+            ('target: DEPS_SRC = a.c\n', 'target: DEPS_SRC = a.c b.c\n'),
+        )
+        for old, new in pairs:
+            with self.subTest(old=old):
+                self.write('build/geforce-module.mk', old)
+                self.commit()
+                base = self.git('rev-parse', 'HEAD')
+                self.write('build/geforce-module.mk', new)
+                result = R.plan(self.root, self.registry(), ('build/geforce-module.mk',), base=base)
+                self.assertEqual((result.mode, result.full_hits), ('full', {'build/geforce-module.mk'}))
+
     def test_toml_comments_preserve_quoted_hashes(self):
         path = 'sdk/rust/demo/Cargo.toml'
         self.write(path, 'name = "a#b" # old\n')
@@ -536,6 +688,42 @@ def run_mutations():
         ('fragment-scan-disabled', 'dependency_scan = any(not matches(f, DOCS) for f in changed)',
          'dependency_scan = any(f.endswith(".h") for f in changed)',
          'test_fragments_are_derived_without_explicit_covers'),
+        ('source-lists-force-full', 'if old_shape is not None and old_shape == new_shape:',
+         'if False:', 'test_build_source_lists_route_sources_and_artifacts'),
+        ('module-list-forces-full', 'if sources is None:',
+         'if sources is None or f == "build/geforce-module.mk":',
+         'test_build_source_lists_route_sources_and_artifacts'),
+        ('list-artifact-readers-lost', 'hit.update(artifact_targets)\n                hit.update',
+         'hit.update(())\n                hit.update',
+         'test_build_source_lists_route_sources_and_artifacts'),
+        ('list-source-routing-lost',
+         'hit.update(n for n, pats in patterns.items() if any(matches(s, pats) for s in sources))',
+         'hit.update(())', 'test_build_source_lists_route_sources_and_artifacts'),
+        ('list-object-source-routing-lost', 't[:-2] + ".c" if t.endswith(".o") else t',
+         't', 'test_build_source_lists_route_sources_and_artifacts'),
+        ('list-operator-change-safe', '(name, operator, prefix, references, tuple(t for t in tokens if t not in paths))',
+         '(name, "", prefix, references, tuple(t for t in tokens if t not in paths))',
+         'test_build_source_lists_keep_semantic_changes_full'),
+        ('list-unresolved-registration-safe',
+         'if prefix or any("$" in t for t in changed_paths):',
+         'if False:', 'test_build_unresolved_registration_is_full'),
+        ('list-branch-deltas-cancelled', 'sources.update(changed_paths)',
+         'sources.symmetric_difference_update(changed_paths)',
+         'test_build_branch_exchange_routes_both_sources'),
+        ('list-uncovered-registration-lost',
+         'unmatched.update(s for s in sources if uncovered(s))',
+         'unmatched.update(())', 'test_build_uncovered_registration_expands_checks'),
+        ('list-reordering-safe',
+         'if tuple(t for t in old_tokens if t in common) != tuple(t for t in new_tokens if t in common):',
+         'if False:', 'test_build_source_reordering_is_full'),
+        ('list-new-rule-safe',
+         'signature.append(statement)\n            continue\n        name, operator, value',
+         'continue\n        name, operator, value',
+         'test_build_source_lists_keep_semantic_changes_full'),
+        ('list-flags-change-safe', 'paths = {t for t in tokens if SOURCE_PATH.fullmatch(t)}',
+         'paths = set(tokens)', 'test_build_source_lists_keep_semantic_changes_full'),
+        ('define-list-change-safe', 'assignment = None if protected else re.fullmatch(',
+         'assignment = re.fullmatch(', 'test_build_source_lists_keep_semantic_changes_full'),
     )
     original = globals()['R']
     for name, before, after, case in mutations:
