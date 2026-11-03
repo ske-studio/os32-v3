@@ -1,0 +1,381 @@
+/* Real OBS loader, columns, player and boot owner against a free-running
+ * scan oscillator. No edge/row state is taken from the implementation. */
+#include "types.h"
+#include "pc98.h"
+#include "gfx_osri.h"
+#include "splash_raster_image.h"
+#define IO_H
+
+static void finish(u32 line)
+{
+    if (line) {
+        char msg[] = "OBS failed line 00000000\n";
+        for (int i = 0; i < 8; i++)
+            msg[16 + i] = "0123456789abcdef"[(line >> (28 - 4 * i)) & 15];
+        __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(msg), "d"(sizeof(msg)-1) : "memory");
+    }
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(line ? line % 250 + 1 : 0) : "memory");
+    __builtin_unreachable();
+}
+#define REQUIRE(c) do { if (!(c)) finish(__LINE__); } while (0)
+#define HOST_H 100u
+#define HOST_WRITES (64u + 4u * 399u * 16u)
+static struct SplashRaster state;
+static struct OsriImage image;
+static struct PlObsPlan plan;
+static u32 stamp, reads, writes, out_cost, vs_lines, fall_at, cli_at, restores;
+static int irq_on, freeze, no_h, no_v_after_f, stuck_v, force_v_at, delay_cli;
+static struct { u32 port, value, time, open; } output[HOST_WRITES];
+
+static unsigned int inp(unsigned int port)
+{
+    REQUIRE(port == GDC_GFX_STAT);
+    REQUIRE(++reads < 2100000u); /* Unbounded-wait mutants fail at runtime. */
+    u32 phase = stamp++ % (state.total_lines * HOST_H);
+    u32 status = 0;
+    if (!freeze && (phase < vs_lines * HOST_H ||
+        (stuck_v && stamp >= state.total_lines * HOST_H) ||
+        (force_v_at && stamp >= (u32)force_v_at))) status |= GDC_STAT_VSYNC;
+    if (no_v_after_f && stamp >= fall_at) status &= ~GDC_STAT_VSYNC;
+    if (!no_h && phase % HOST_H >= HOST_H - 20u) status |= GDC_STAT_HBLANK;
+    return status;
+}
+static void outp(unsigned int port, unsigned int value)
+{
+    REQUIRE(writes < HOST_WRITES);
+    output[writes].port = port; output[writes].value = value;
+    output[writes].time = stamp; output[writes++].open = irq_on;
+    stamp += out_cost;
+}
+static int _irq_enabled(void) { return irq_on; }
+static unsigned int irq_save(void)
+{
+    u32 flags = irq_on;
+    irq_on = 0; cli_at = stamp;
+    if (delay_cli) stamp = fall_at + HOST_H;
+    return flags;
+}
+static void irq_restore(unsigned int flags) { restores++; irq_on = flags; }
+
+#define now_us obs_host_now_us
+#define finish obs_host_image_finish
+#include "../../drivers/video/pc98/splash_raster_image.c"
+#undef finish
+#undef now_us
+#include "../../gfx/gfx_osri.c"
+#include "../../platform/pc98/splash_obs.c"
+#include "../../init/boot_splash.c"
+
+struct SplashRaster *pc98_splash_raster_state(void) { return &state; }
+int sys_time_now(u32 *lo, u32 *hi)
+{ (void)lo; (void)hi; REQUIRE(0); return -1; }
+int ktime_splash_sample(struct TimeSplashSample *s) { (void)s; REQUIRE(0); return -1; }
+int ktime_splash_settle(const struct TimeSplashMathInput *s) { (void)s; REQUIRE(0); return -1; }
+
+static void setup(int mode, int vs)
+{
+    state = (struct SplashRaster){ .mode = mode, .checked = 1, .dynamic_ok = 1,
+        .line_num_us = 100000, .line_den = mode ? 3147 : 2483,
+        .total_lines = mode ? 449 : 440, .vbp_lines = mode ? 34 : 25,
+        .vs_lines = mode ? 2 : 8 };
+    state.active0_lines = vs ? state.vbp_lines : 0;
+    vs_lines = vs ? state.vs_lines : state.total_lines - 400;
+    fall_at = (state.total_lines + vs_lines) * HOST_H;
+    stamp = reads = writes = restores = cli_at = 0; out_cost = 0;
+    irq_on = 1; freeze = no_h = no_v_after_f = stuck_v = force_v_at = delay_cli = 0;
+}
+static u16 rgb(u32 index) { return (u16)(index * 0x111u); }
+static void make_image(u32 n)
+{
+    image = (struct OsriImage){ .count = 399 * n, .band = 1, .version = 2 };
+    for (u32 i = 0; i < 16; i++) image.pal[i] = rgb(i);
+    for (u32 y = 1; y < 400; y++) for (u32 j = 0; j < n; j++) {
+        u32 index = y % (17 - n) + j;
+        image.event[(y - 1) * n + j] = (struct OsriEvent){ .line = y,
+            .index = index, .rgb444 = rgb(index) }; /* Intentionally same RGB. */
+    }
+}
+static void test_prepare(void)
+{
+    for (u32 n = 1; n <= 16; n++) {
+        make_image(n);
+        REQUIRE(!pl_obs_prepare(&image, n, &plan));
+        REQUIRE(!plan.row[0].count);
+        for (u32 y = 1; y < 400; y++) {
+            struct PlObsRow *r = &plan.row[y];
+            REQUIRE(r->count == 4 * n - 1 && r->first == y % (17 - n));
+            u32 pos = 0;
+            for (u32 j = 0; j < n; j++) {
+                u32 index = y % (17 - n) + j;
+                if (j) { REQUIRE(r->port[pos] == PAL_IDX_PORT && r->value[pos] == index); pos++; }
+                REQUIRE(r->port[pos] == PAL_G_PORT && r->value[pos] == index); pos++;
+                REQUIRE(r->port[pos] == PAL_R_PORT && r->value[pos] == index); pos++;
+                REQUIRE(r->port[pos] == PAL_B_PORT && r->value[pos] == index); pos++;
+            }
+            REQUIRE(pos == r->count);
+        }
+        image.count--; REQUIRE(pl_obs_prepare(&image, n, &plan));
+        image.count += 2; REQUIRE(pl_obs_prepare(&image, n, &plan));
+    }
+    make_image(1);
+    REQUIRE(pl_obs_prepare(&image, 0, &plan));
+    REQUIRE(pl_obs_prepare(&image, 17, &plan));
+    REQUIRE(pl_obs_prepare(0, 1, &plan)); REQUIRE(pl_obs_prepare(&image, 1, 0));
+    image.version = 1; REQUIRE(pl_obs_prepare(&image, 1, &plan));
+    image.version = 2; image.band = 2; REQUIRE(pl_obs_prepare(&image, 1, &plan));
+    make_image(2); image.event[2].line++; REQUIRE(pl_obs_prepare(&image, 2, &plan));
+    make_image(2); image.event[1].index = image.event[0].index;
+    REQUIRE(pl_obs_prepare(&image, 2, &plan));
+}
+static void test_scan(void)
+{
+    for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++)
+    for (u32 n = 1; n <= 16; n++) {
+        setup(mode, vs); out_cost = 1; make_image(n);
+        REQUIRE(!pl_obs_prepare(&image, n, &plan));
+        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(irq_on && restores == 1 && state.frame == 1 && !state.dropped);
+        REQUIRE(writes == 64 + 399 * 4 * n);
+        REQUIRE(cli_at >= state.total_lines * HOST_H && cli_at < fall_at);
+        for (u32 i = 0; i < writes; i++) REQUIRE(!output[i].open);
+        for (u32 i = 0; i < 16; i++) {
+            REQUIRE(output[4*i].port == PAL_IDX_PORT && output[4*i].value == i);
+            REQUIRE(output[4*i+1].port == PAL_G_PORT && output[4*i+1].value == i);
+            REQUIRE(output[4*i+2].port == PAL_R_PORT && output[4*i+2].value == i);
+            REQUIRE(output[4*i+3].port == PAL_B_PORT && output[4*i+3].value == i);
+            REQUIRE(output[4*i+3].time < fall_at);
+        }
+        for (u32 y = 1; y < 400; y++) {
+            u32 pos = 64 + (y - 1) * 4 * n;
+            REQUIRE(output[pos].port == PAL_IDX_PORT && output[pos].value == plan.row[y].first);
+            REQUIRE(output[pos].time % HOST_H < 80); /* First index in preceding low. */
+            REQUIRE(output[pos+1].time == fall_at + (state.active0_lines+y-1)*HOST_H + 81);
+            for (u32 j = 0; j < 4*n-1; j++) {
+                REQUIRE(output[pos+j+1].port == plan.row[y].port[j]);
+                REQUIRE(output[pos+j+1].value == plan.row[y].value[j]);
+            }
+        }
+        REQUIRE(stamp >= fall_at + (state.active0_lines+399)*HOST_H + 80);
+        /* A continuation consumes the very next VBLANK, never two. */
+        u32 previous = stamp; writes = reads = 0;
+        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(stamp - previous == state.total_lines * HOST_H);
+    }
+    setup(1, 0); make_image(16); REQUIRE(!pl_obs_prepare(&image, 16, &plan));
+    out_cost = 8;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+    REQUIRE(irq_on && restores == 1 && state.dropped == 1 && !state.frame);
+    REQUIRE(stamp < 3 * state.total_lines * HOST_H);
+    /* B1: VSYNC must drop in both the high-wait and low-wait paths. */
+    for (u32 extra = 0; extra <= 80; extra += 80) {
+        setup(1, 0); make_image(1); REQUIRE(!pl_obs_prepare(&image, 1, &plan));
+        force_v_at = fall_at + 10 * HOST_H + extra;
+        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+        REQUIRE(irq_on && restores == 1 && stamp <= (u32)force_v_at + 1);
+    }
+    setup(1, 0); freeze = 1;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(irq_on && !restores && reads <= 1000001u);
+    setup(1, 0); no_h = no_v_after_f = 1;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(irq_on && restores == 1);
+    setup(1, 0); stuck_v = 1;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(irq_on && restores == 1);
+    setup(1, 0); delay_cli = 1;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_DROP);
+    REQUIRE(irq_on && restores == 1 && !writes);
+    setup(1, 0); irq_on = 0;
+    REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_NO_SYNC);
+    REQUIRE(!irq_on && !restores && !reads);
+}
+
+#define HOST_FILE_BYTES (OSRI_EVENTS_OFF + 8 * 6385u)
+static u8 file[HOST_FILE_BYTES], pixels[OSRI_PIXELS_BYTES];
+static u32 file_bytes, file_pos, file_n, active_n, scenario;
+static u32 allocs, frees, opens, closes, commits, blacks, begins, clears, stops, defaults, texts;
+static int image_busy, plan_busy;
+static char label[4];
+static char log_text[8192];
+static u32 log_pos;
+static void rehash(void)
+{
+    le_write32(file+48, 0);
+    le_write32(file+48, crc32_core_final(crc32_core_update(CRC32_INIT, file, file_bytes)));
+}
+static void make_file(u32 n)
+{
+    file_n = n; make_image(n);
+    file_bytes = OSRI_EVENTS_OFF + OSRI_EVENT_BYTES * image.count;
+    for (u32 i = 0; i < OSRI_HEADER_BYTES; i++) file[i] = 0;
+    file[0]='O'; file[1]='S'; file[2]='R'; file[3]='I';
+    le_write16(file+4, 2); le_write16(file+6, 64);
+    le_write16(file+8, 640); le_write16(file+10, 400); file[12]=4; file[13]=1;
+    le_write32(file+16, file_bytes); le_write32(file+20, 64); le_write32(file+24, 96);
+    le_write32(file+28, 128000); le_write32(file+32, 128096);
+    le_write32(file+36, image.count); le_write16(file+40, 8); le_write16(file+44, 1);
+    for (u32 i = 0; i < 16; i++) le_write16(file+64+2*i, rgb(i));
+    for (u32 i = 0; i < 128000; i++) file[96+i] = i / 32000 + 1;
+    for (u32 i = 0; i < image.count; i++) {
+        u8 *e = file + OSRI_EVENTS_OFF + 8*i;
+        le_write16(e, image.event[i].line); e[2] = image.event[i].index; e[3] = 0;
+        le_write16(e+4, image.event[i].rgb444); le_write16(e+6, 0);
+    }
+    rehash();
+}
+int vfs_stat(const char *path, OS32_Stat *st)
+{
+    (void)st; REQUIRE(irq_on);
+    active_n = (path[SPLASH_OBS_DIGITS]-'0')*10 + path[SPLASH_OBS_DIGITS+1]-'0';
+    REQUIRE(active_n >= 1 && active_n <= 16);
+    REQUIRE(label[0] == 'N' && label[1] == '=' &&
+            label[2] == (char)('0'+active_n/10) && label[3] == (char)('0'+active_n%10));
+    return (scenario == 1 && active_n == 1) || (scenario == 3 && active_n != 16) ? -1 : 0;
+}
+int vfs_open(const char *path, int flags)
+{
+    (void)path; REQUIRE(flags == O_RDONLY); opens++; file_pos = 0;
+    if (scenario != 2) {
+        make_file(scenario == 1 && active_n == 3 ? 2 : active_n);
+        if (scenario == 1 && active_n == 2) file[100] ^= 1;
+    }
+    return 3;
+}
+void vfs_close(int fd) { REQUIRE(fd == 3); closes++; }
+int vfs_read_fd(int fd, void *dst, u32 n)
+{
+    REQUIRE(fd == 3);
+    if (n > 23) n = 23;
+    if (n > file_bytes-file_pos) n = file_bytes-file_pos;
+    for (u32 i = 0; i < n; i++) ((u8 *)dst)[i] = file[file_pos++];
+    return n;
+}
+void *kmalloc(u32 size)
+{
+    REQUIRE(irq_on); allocs++;
+    if (size == sizeof(image)) {
+        REQUIRE(!image_busy);
+        if (scenario == 1 && active_n == 6) return 0;
+        image_busy=1; return &image;
+    }
+    REQUIRE(size == sizeof(plan) && !plan_busy);
+    if (scenario == 1 && active_n == 4) return 0;
+    plan_busy=1; return &plan;
+}
+void kfree(void *p)
+{
+    REQUIRE(irq_on); frees++;
+    if (p == &image) { REQUIRE(image_busy); image_busy=0; }
+    else { REQUIRE(p == &plan && plan_busy); plan_busy=0; }
+}
+int gfx_kernel_framebuffer(struct gfx_kernel_fb *fb)
+{
+    *fb = (struct gfx_kernel_fb){ .width=640, .height=400, .pitch=80, .format=GFX_BB_PLANAR4 };
+    for (u32 i = 0; i < 4; i++) fb->planes[i] = pixels + 32000*i;
+    return 0;
+}
+void gfx_add_dirty_rect(int x, int y, int w, int h)
+{ REQUIRE(!x && !y && w == 640 && h == 400); }
+void gfx_present_nosync(void)
+{
+    REQUIRE(irq_on && image_busy && plan_busy && blacks >= (commits+1)*16);
+    REQUIRE(pixels[0] == 1 && pixels[32000] == 2 && pixels[64000] == 3 && pixels[96000] == 4);
+    commits++; stamp=reads=writes=0;
+    freeze = scenario == 1 && active_n == 5;
+    out_cost = scenario == 3 ? 8 : 0;
+}
+void palette_set(int index, u8 r, u8 g, u8 b)
+{ REQUIRE(irq_on && index >= 0 && index < 16 && !r && !g && !b); blacks++; }
+void serial_puts_polled(const char *s)
+{
+    REQUIRE(irq_on);
+    while (*s) { REQUIRE(log_pos+1 < sizeof(log_text)); log_text[log_pos++] = *s++; }
+    log_text[log_pos]=0;
+}
+void tvram_putchar_at(int x, int y, char ch, u8 attr)
+{
+    REQUIRE(irq_on && !y && attr == 7);
+    if (x == 0) REQUIRE(ch == 'N'); else if (x == 1) REQUIRE(ch == '=');
+    else if (x == 2) REQUIRE(ch >= '0' && ch <= '1');
+    else REQUIRE(x == 3 && ch >= '0' && ch <= '9');
+    label[x] = ch;
+}
+int platform_splash_begin(void) { begins++; return 0; }
+void platform_splash_clear_pages(void) { clears++; }
+void gfx_shutdown(void) { stops++; }
+void palette_init(void) { defaults++; }
+void tvram_clear(void) { texts++; }
+static u32 find_from(const char *text, u32 start)
+{
+    for (u32 i = start; i < log_pos; i++) {
+        u32 j = 0; while (text[j] && log_text[i+j] == text[j]) j++;
+        if (!text[j]) return i;
+    }
+    return U32_MAX;
+}
+static int contains(const char *text) { return find_from(text, 0) != U32_MAX; }
+static void test_owner(void)
+{
+    for (scenario = 0; scenario <= 1; scenario++) {
+        setup(1, 0);
+        REQUIRE(obs_rounds(&state) == 351);
+        state.line_den = 2483; state.total_lines = 440;
+        REQUIRE(obs_rounds(&state) == 283);
+        state.line_num_us = 0; REQUIRE(!obs_rounds(&state));
+        setup(1, 0);
+        /* Synthetic 5s frame: one round, to exercise all ownership paths. */
+        state.line_num_us = 5000000; state.line_den = state.total_lines;
+        allocs=frees=opens=closes=commits=blacks=log_pos=0;
+        begins=clears=stops=defaults=texts=0; image_busy=plan_busy=0;
+        boot_splash();
+        REQUIRE(begins == 1 && clears == 1 && stops == 1 && defaults == 1 && texts == 1);
+        REQUIRE(!image_busy && !plan_busy && opens == closes);
+        REQUIRE(frees == allocs - 2*scenario && commits == (scenario ? 11u : 16u));
+        REQUIRE(blacks == 32 * commits);
+        u32 log_cursor = 0;
+        for (u32 n = 1; n <= 16; n++) {
+            char start[] = "SPLO n=00 start crc=";
+            char end[] = "SPLO n=00 end status=";
+            if (n < 10) {
+                start[7]='0'+n; end[7]='0'+n;
+                for (u32 i=8; start[i]; i++) start[i]=start[i+1];
+                for (u32 i=8; end[i]; i++) end[i]=end[i+1];
+            } else { start[7]='1'; start[8]='0'+n-10; end[7]='1'; end[8]='0'+n-10; }
+            log_cursor = find_from(start, log_cursor); REQUIRE(log_cursor != U32_MAX);
+            log_cursor = find_from(end, log_cursor); REQUIRE(log_cursor != U32_MAX);
+        }
+        if (scenario) {
+            REQUIRE(contains("n=1 end status=missing frames=0 drop=0"));
+            REQUIRE(contains("n=2 end status=invalid frames=0 drop=0"));
+            REQUIRE(contains("n=3 end status=colors_mismatch frames=0 drop=0"));
+            REQUIRE(contains("n=4 end status=memory frames=0 drop=0"));
+            REQUIRE(contains("n=5 end status=no_sync frames=0 drop=0"));
+            REQUIRE(contains("n=6 end status=memory frames=0 drop=0"));
+        }
+        REQUIRE(contains("n=16 end status=ok frames=1 drop=0"));
+    }
+    scenario=3; setup(1, 0);
+    state.line_num_us=5000000; state.line_den=state.total_lines;
+    allocs=frees=opens=closes=commits=blacks=log_pos=0;
+    image_busy=plan_busy=0;
+    boot_splash();
+    REQUIRE(allocs == 2 && frees == 2 && commits == 1);
+    REQUIRE(contains("n=16 end status=drop frames=0 drop=1"));
+}
+static void test_loader(void)
+{
+    struct gfx_kernel_fb fb;
+    gfx_kernel_framebuffer(&fb); scenario=2;
+    make_file(16); REQUIRE(file_bytes == 179168 && !osri_load("fixture", &fb, &image));
+    REQUIRE(image.count == 6384 && file_pos == file_bytes);
+    le_write32(file+36, 6385); file_bytes += 8; le_write32(file+16, file_bytes); rehash();
+    REQUIRE(osri_load("fixture", &fb, &image) && file_pos == 64);
+    make_file(1); le_write16(file+4, 1); rehash(); REQUIRE(osri_load("fixture", &fb, &image));
+    make_file(2); file[OSRI_EVENTS_OFF+10] = file[OSRI_EVENTS_OFF+2]; rehash();
+    REQUIRE(osri_load("fixture", &fb, &image));
+    make_file(1); file[100] ^= 1; REQUIRE(osri_load("fixture", &fb, &image));
+}
+void _start(void)
+{
+    test_prepare(); test_scan(); test_loader(); test_owner(); finish(0);
+}

@@ -16,4 +16,15 @@ enum { PL_FRAME_OK = 0, PL_FRAME_DROP = 1, PL_FRAME_NO_SYNC = -1,
        PL_FRAME_DEADLINE = -2 };
 int pl_frame(struct SplashRaster *state, const struct OsriImage *image,
              const struct PlPlan *plan, unsigned long long deadline_us);
+#ifdef SPLASH_RASTER_OBS
+#define PL_OBS_MAX_OUTS 64u
+#define PL_OBS_COLOR_OUTS 4u
+struct PlObsRow { u8 first, count, port[PL_OBS_MAX_OUTS], value[PL_OBS_MAX_OUTS]; };
+struct PlObsPlan { struct PlObsRow row[SPLASH_RASTER_VISIBLE_LINES]; };
+STATIC_ASSERT(sizeof(struct PlObsRow) == 130, pl_obs_row_size);
+STATIC_ASSERT(sizeof(struct PlObsPlan) == 52000, pl_obs_plan_size);
+int pl_obs_prepare(const struct OsriImage *image, u8 colors, struct PlObsPlan *plan);
+int pl_obs_frame(struct SplashRaster *state, const struct OsriImage *image,
+                 const struct PlObsPlan *plan);
+#endif
 #endif

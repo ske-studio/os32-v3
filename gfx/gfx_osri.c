@@ -6,6 +6,11 @@
 
 #define OSRI_READ_CHUNK 4096u
 #define OSRI_CRC_OFF 48u
+#ifdef SPLASH_RASTER_OBS
+#define OSRI_ALLOW_SAME(version) ((version) == OSRI_VERSION_2)
+#else
+#define OSRI_ALLOW_SAME(version) 0
+#endif
 
 static int read_part(int fd, u8 *p, u32 n, u32 *crc)
 {
@@ -44,7 +49,11 @@ int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *ima
     version = le_read16(h + 4);
     /* Bound the version's count before computing the exact file length. */
     if ((version != OSRI_VERSION_1 && version != OSRI_VERSION_2) ||
+#ifdef SPLASH_RASTER_OBS
+        count > (version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OBS_V2_MAX_EVENTS)) goto done;
+#else
         count > (version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)) goto done;
+#endif
     if (h[0] != 'O' || h[1] != 'S' || h[2] != 'R' || h[3] != 'I' ||
         le_read16(h + 6) != OSRI_HEADER_BYTES ||
         le_read16(h + 8) != GFX_WIDTH || le_read16(h + 10) != GFX_HEIGHT ||
@@ -72,11 +81,15 @@ int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *ima
         ev->rgb444 = le_read16(e + 4); ev->reserved1 = le_read16(e + 6);
         if (!ev->line || ev->line >= GFX_HEIGHT || ev->line % band ||
             ev->index >= OSRI_COLORS || ev->reserved0 || ev->reserved1 || ev->rgb444 > 0xfff ||
-            current[ev->index] == ev->rgb444 ||
+            (!OSRI_ALLOW_SAME(version) && current[ev->index] == ev->rgb444) ||
             (i && (ev->line < image->event[i-1].line ||
                    (ev->line == image->event[i-1].line && ev->index <= image->event[i-1].index)))) goto done;
         line_count = i && ev->line == image->event[i-1].line ? line_count + 1 : 1;
+#ifdef SPLASH_RASTER_OBS
+        if (version == OSRI_VERSION_2 && line_count > OBS_V2_MAX_EVENTS_PER_LINE) goto done;
+#else
         if (version == OSRI_VERSION_2 && line_count > OSRI_V2_MAX_EVENTS_PER_LINE) goto done;
+#endif
         current[ev->index] = ev->rgb444;
     }
     if (vfs_read_fd(fd, &extra, 1) != 0 || crc32_core_final(crc) != expected) goto done;
