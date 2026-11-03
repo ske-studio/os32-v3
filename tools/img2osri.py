@@ -11,6 +11,9 @@ W, H = 640, 400
 PLANE = W * H // 8
 PIXELS_OFF, EVENTS_OFF = 96, 128096
 MAX_EVENTS = 1197
+PALETTE_COLORS = 16
+OBS_MAX_EVENTS = (H - 1) * PALETTE_COLORS
+OBS_OUTS_PER_COLOR = 4  # Index, G, R, B; the first index is preselected.
 MASKS = np.array([[bool(m & (1 << c)) for c in range(3)] for m in range(1, 8)])
 
 
@@ -139,8 +142,69 @@ def palette_history(source, hblank_outs=5, band=1):
     return initial, events, history
 
 
-def convert(source, hblank_outs=5, band=1):
-    colors, events, history = palette_history(source, hblank_outs, band)
+def obs_quantized_colors(image):
+    """Keep candidate slots even when RGB444 rounding makes colors equal."""
+    q = image.quantize(colors=PALETTE_COLORS, method=Image.Quantize.MEDIANCUT,
+                       dither=Image.Dither.NONE)
+    raw = q.getpalette()
+    colors = sorted(rgb444(raw[3 * i:3 * i + 3]) for _, i in q.getcolors())
+    return colors + [0] * (PALETTE_COLORS - len(colors))
+
+
+def obs_optimize_row(old, pixels, candidates, colors):
+    """Select exactly colors distinct slots and candidate slots by row SSE."""
+    dp = distances(pixels, np.array([expand(c) for c in old])).T
+    dc = distances(pixels, np.array([expand(c) for c in candidates])).T
+    remaining = sorted(range(PALETTE_COLORS), key=lambda i: (candidates[i], i))
+    available = list(range(PALETTE_COLORS))
+    planned, selected = old.copy(), []
+    for _ in range(colors):
+        # Minimizing the new SSE maximizes its reduction from the same baseline.
+        nearest = dp.argmin(axis=0)
+        first, second = np.partition(dp, 1, axis=0)[:2]
+        best = None
+        for slot in available:
+            without = np.where(nearest == slot, second, first)
+            losses = np.minimum(dc[remaining], without).sum(axis=1)
+            k = int(losses.argmin())
+            candidate = remaining[k]
+            key = (int(losses[k]), slot, candidates[candidate], candidate)
+            if best is None or key < best[0]:
+                best = (key, slot, candidate)
+        _, slot, candidate = best
+        planned[slot] = candidates[candidate]
+        selected.append(slot)
+        dp[slot] = dc[candidate]
+        available.remove(slot)
+        remaining.remove(candidate)
+    return planned, selected
+
+
+def obs_palette_history(source, colors):
+    if source.size != (W, H) or source.mode != 'RGB':
+        raise ValueError('source must be 640x400 RGB')
+    if not 1 <= colors <= PALETTE_COLORS:
+        raise ValueError('invalid observation color count')
+    pixels = np.asarray(source)
+    rows = [obs_quantized_colors(source.crop((0, y, W, y + 1))) for y in range(H)]
+    initial = rows[0].copy()
+    history, events = [initial.copy()], []
+    for y in range(1, H):
+        planned, selected = obs_optimize_row(history[-1], pixels[y], rows[y], colors)
+        for index in sorted(selected):
+            events.append((y, index, planned[index]))
+        history.append(planned)
+    assert len(events) == (H - 1) * colors <= OBS_MAX_EVENTS
+    return initial, events, history
+
+
+def convert(source, hblank_outs=5, band=1, *, obs_colors=None):
+    if obs_colors is None:
+        colors, events, history = palette_history(source, hblank_outs, band)
+    else:
+        if band != 1:
+            raise ValueError('observation requires band=1')
+        colors, events, history = obs_palette_history(source, obs_colors)
     src = source.load()
     planes = bytearray(PLANE * 4)
     error = [[0, 0, 0] for _ in range(W + 2)]
@@ -172,17 +236,37 @@ def convert(source, hblank_outs=5, band=1):
     return data, crc
 
 
+def obs_statistics(data, colors):
+    palette = list(struct.unpack_from('<16H', data, 64))
+    changed = [0] * (H - 1)
+    for offset in range(EVENTS_OFF, len(data), 8):
+        y, index, _, color, _ = struct.unpack_from('<HBBHH', data, offset)
+        changed[y - 1] += palette[index] != color
+        palette[index] = color
+    return dict(bytes=len(data), events=(len(data) - EVENTS_OFF) // 8,
+                written_colors=colors, actual_changed_colors_min=min(changed),
+                actual_changed_colors_max=max(changed),
+                hblank_outs=OBS_OUTS_PER_COLOR * colors - 1,
+                total_outs=OBS_OUTS_PER_COLOR * colors,
+                crc32=f'{struct.unpack_from("<I", data, 48)[0]:08x}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input')
     parser.add_argument('-o', '--output', required=True)
     parser.add_argument('--mode', choices=['PL-B'], default='PL-B')
-    parser.add_argument('--hblank-outs', type=int, choices=[5, 6], default=5)
+    parser.add_argument('--hblank-outs', type=int, choices=[5, 6])
+    parser.add_argument('--obs-colors', type=int, choices=range(1, PALETTE_COLORS + 1))
     parser.add_argument('--band', type=int, choices=[1, 2, 4], default=1)
     parser.add_argument('--dither', choices=['fs'], default='fs')
     args = parser.parse_args()
+    if args.obs_colors is not None and (args.hblank_outs is not None or args.band != 1):
+        parser.error('--obs-colors requires --band 1 and cannot use --hblank-outs')
+    if args.hblank_outs is None:
+        args.hblank_outs = 5
     source = resize_image(args.input)
-    data, crc = convert(source, args.hblank_outs, args.band)
+    data, crc = convert(source, args.hblank_outs, args.band, obs_colors=args.obs_colors)
     with open(args.output, 'wb') as f:
         f.write(data)
     count = struct.unpack_from('<I', data, 36)[0]
@@ -194,8 +278,13 @@ def main():
                          for shift in (8, 4, 0))
         row_costs[y] = row_costs[y] + components + 1 if y in row_costs else components
         palette[index] = color
-    print(f'events={count} max_outs={max(row_costs.values(), default=0)} '
-          f'N={args.hblank_outs} crc32={crc:08x} Pillow={pillow_version} args={vars(args)}')
+    if args.obs_colors is None:
+        print(f'events={count} max_outs={max(row_costs.values(), default=0)} '
+              f'N={args.hblank_outs} crc32={crc:08x} Pillow={pillow_version} args={vars(args)}')
+    else:
+        stats = obs_statistics(data, args.obs_colors)
+        print(' '.join(f'{key}={value}' for key, value in stats.items()) +
+              f' Pillow={pillow_version} NumPy={np.__version__} args={vars(args)}')
 
 
 if __name__ == '__main__':
