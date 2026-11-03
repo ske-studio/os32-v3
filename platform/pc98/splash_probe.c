@@ -36,6 +36,13 @@
 #define PROBE_PL_EMPTY 3u
 #define PROBE_PL_PREP 4u
 #define PROBE_PL_KINDS 5u
+#define PROBE_PL_TRANS 5u
+#define PROBE_PL_JOINT 6u
+#define PROBE_PL_SLOTS 7u
+#define PROBE_PL_PARTS 4u /* poll batch, single seed, prep, successful wait linkage */
+#define PROBE_PL_STAMP_BEGIN 1u
+#define PROBE_PL_STAMP_END 2u
+#define PROBE_H_PER_LINE 4u
 #define PROBE_SHIFT 4
 #define PROBE_STEP 8
 #define PROBE_BAND_LINES 4
@@ -103,7 +110,7 @@ struct probe_pl_column {
     u32 colors, n;
     struct SplashRasterTimeRange poll;
     long long d, w, prep;
-    struct probe_pl_peak peak[2][PROBE_PL_KINDS];
+    struct probe_pl_peak peak[2][PROBE_PL_SLOTS];
     long long empty_min[2];
     unsigned long long elapsed_us;
     u32 completed, early, timeout, high_after, low_after, window_ok, scan_reason;
@@ -116,9 +123,27 @@ static struct probe_pl_result {
     u32 columns, lower, upper, window_ok, qualified;
 } probe_pl_result[2];
 static u32 probe_pl_count;
+struct probe_pl_detail {
+    struct probe_pl_peak raw, upper, correction;
+};
+static struct probe_pl_detail probe_pl_detail[2][PROBE_PL_PARTS];
+/* Representative: prefixes of the first N6 column (N3 uses G/R/B), chosen before timing.
+ * These extra measurements do not supply or change an adoption budget. */
+static struct probe_pl_column probe_pl_joint[PROBE_PL_SLOTS];
+static struct probe_pl_detail probe_pl_outside[PROBE_PL_SLOTS][2];
+static struct probe_pl_peak probe_pl_joint_polls[PROBE_PL_SLOTS][2];
+struct probe_pl_stamp { unsigned long long begin, end; u32 iterations, clocks; };
+static unsigned long long probe_pl_batch_total, probe_pl_batch_outside;
+static u32 probe_pl_batch_polls, probe_pl_edge_upper;
 
 #define PROBE_NOINLINE __attribute__((noinline, noclone))
 #define PROBE_PL_OUT(i) outp(r->port[i], r->value[i])
+static PROBE_NOINLINE void probe_pl_emit1(const struct PlRow *r) { PROBE_PL_OUT(0); }
+static PROBE_NOINLINE void probe_pl_emit2(const struct PlRow *r) { PROBE_PL_OUT(0); PROBE_PL_OUT(1); }
+static PROBE_NOINLINE void probe_pl_emit3(const struct PlRow *r)
+{ PROBE_PL_OUT(0); PROBE_PL_OUT(1); PROBE_PL_OUT(2); }
+static PROBE_NOINLINE void probe_pl_emit4(const struct PlRow *r)
+{ PROBE_PL_OUT(0); PROBE_PL_OUT(1); PROBE_PL_OUT(2); PROBE_PL_OUT(3); }
 static PROBE_NOINLINE void probe_pl_emit5(const struct PlRow *r)
 {
     PROBE_PL_OUT(0); PROBE_PL_OUT(1); PROBE_PL_OUT(2);
@@ -158,6 +183,41 @@ static PROBE_NOINLINE const struct PlRow *probe_pl_prepare(
     outp(PAL_IDX_PORT, r->first);
     return r;
 }
+/* Observe an actual low before accepting high, as in R1 next_edge.
+ * Clocks bracket the whole finite wait, outside its loop. Thus the body
+ * interval bounds successful IN -> last OUT conservatively: it also contains
+ * the preceding low/unsuccessful polls (reported separately as a count).
+ * Entry/return/caller control is measured in disjoint outer intervals, never
+ * hidden in this body or removed with an EMPTY differential. These M1 costs
+ * overlap Q and D+W; they do not certify R1's final machine instructions. */
+/* noipa is essential: all benchmark arguments are fixed, and noclone alone
+ * lets GCC delete the success/upper/lower branches by propagating constants. */
+static __attribute__((noipa)) int probe_pl_success(const struct PlRow *r,
+    probe_pl_emit_fn emit, u32 mask, u32 want, u32 lower, u32 upper,
+    int armed, int require_low, u32 *iterations, struct probe_pl_stamp *stamp)
+{
+    int result = -1;
+    if (stamp->clocks & PROBE_PL_STAMP_BEGIN) stamp->begin = probe_now();
+    for (u32 i = 1; ; i++) {
+        u32 status = inp(GDC_GFX_STAT);
+        if (i >= upper) { *iterations = i; break; }
+        if (i == 1 && require_low && (status & mask) == want) {
+            *iterations = i;
+            break;
+        }
+        if ((status & mask) != want) armed = 1;
+        else if (armed) {
+            *iterations = i;
+            if (i < lower) break;
+            emit(r);
+            result = 0;
+            break;
+        }
+    }
+    if (stamp->clocks & PROBE_PL_STAMP_END) stamp->end = probe_now();
+    stamp->iterations = *iterations;
+    return result;
+}
 /* Like probe_cost_batch: both clocks are outside the measured inner loop.
  * W/EMPTY share the indirect-call loop. D substitutes EMPTY, so the emitted
  * body is charged only to W; the shared call/return stays in D. */
@@ -166,7 +226,32 @@ static PROBE_NOINLINE unsigned long long probe_pl_batch(u32 kind,
 {
     unsigned long long begin = probe_now();
     if (kind == PROBE_PL_Q) (void)probe_pl_wait(0, GDC_STAT_HBLANK, count + 1);
-    else if (kind == PROBE_PL_D) {
+    else if (kind == PROBE_PL_TRANS || kind == PROBE_PL_JOINT) {
+        struct probe_pl_stamp first = { .clocks = kind == PROBE_PL_JOINT ?
+            PROBE_PL_STAMP_BEGIN | PROBE_PL_STAMP_END : PROBE_PL_STAMP_END };
+        struct probe_pl_stamp next = { .clocks = PROBE_PL_STAMP_BEGIN };
+        u32 iterations;
+        /* Both kinds run once: a real low->high wait must fit the IF budget.
+         * Joint includes real OUTs; linkage starts after the successful body
+         * and runs through its return, prep, and the next wait's entry. */
+        if (probe_pl_success(&c->row[phase & 1],
+                kind == PROBE_PL_JOINT ? emit : probe_pl_empty,
+                GDC_STAT_HBLANK, GDC_STAT_HBLANK, 1, probe_pl_edge_upper,
+                0, 0, &iterations, &first)) probe_errors++;
+        if (kind == PROBE_PL_TRANS) {
+            const struct PlRow *r = probe_pl_prepare(c, phase + 1);
+            /* Enter and sample the next wait, without waiting a second H.
+             * upper=2 executes INs and the finite-limit path, not zero-trip. */
+            (void)probe_pl_success(r, probe_pl_empty,
+                GDC_STAT_HBLANK, GDC_STAT_HBLANK, 1, 2, 0, 0, &iterations, &next);
+        }
+        unsigned long long end = probe_now();
+        probe_pl_batch_total = end - begin;
+        if (kind == PROBE_PL_JOINT)
+            probe_pl_batch_outside = first.begin - begin + end - first.end;
+        probe_pl_batch_polls = first.iterations;
+        return kind == PROBE_PL_JOINT ? first.end - first.begin : next.begin - first.end;
+    } else if (kind == PROBE_PL_D) {
         for (u32 i = 0; i < count; i++)
             (void)probe_pl_commit(&c->row[(i + phase) & 1], probe_pl_empty, 1, 1, 2);
     } else if (kind == PROBE_PL_PREP) {
@@ -698,20 +783,54 @@ static void probe_pl_peak_add(struct probe_pl_peak *p, long long value)
     }
     p->batches++;
 }
+static void probe_pl_detail_add(struct probe_pl_detail *d,
+    unsigned long long span, u32 count, u32 den, u32 clocks)
+{
+    long long raw = ((long long)span * den + count - 1) / count;
+    long long corrected = ((long long)(span + clocks * SPLASH_RASTER_CLOCK_QUANTUM_US - clocks * probe_c_min) *
+                           den + count - 1) / count;
+    probe_pl_peak_add(&d->raw, raw);
+    probe_pl_peak_add(&d->upper, corrected);
+    /* Difference of rounded bounds: signed; no assumption of cancellation. */
+    probe_pl_peak_add(&d->correction, corrected - raw);
+}
+/* Phase setup is outside IF=0 and all timed intervals. Joint's two entry
+ * clocks start at fresh high; linkage's one entry clock starts at fresh low.
+ * This avoids paying for a missed low phase within the unchanged 2H cap. */
+static int probe_pl_align(u32 kind)
+{
+    if (kind != PROBE_PL_JOINT && kind != PROBE_PL_TRANS) return 0;
+    u32 first = kind == PROBE_PL_TRANS ? GDC_STAT_HBLANK : 0;
+    if (!probe_pl_wait(GDC_STAT_HBLANK, first, probe_pl_edge_upper) ||
+        !probe_pl_wait(GDC_STAT_HBLANK, first ^ GDC_STAT_HBLANK, probe_pl_edge_upper)) {
+        probe_errors++;
+        return -1;
+    }
+    return 0;
+}
 static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *s,
     u32 kind, struct probe_pl_column *c, probe_pl_emit_fn emit, u32 phase,
     unsigned long long *one_upper)
 {
     struct SplashRasterTimeRange result = { .min = 0x7fffffffffffffffLL };
-    if (kind == PROBE_PL_W) {
+    probe_pl_edge_upper = 2 * s->line_num_us / (probe_q_lower ? probe_q_lower : 1) + 1;
+    if (kind == PROBE_PL_W || kind == PROBE_PL_JOINT) {
         const struct PlRow *opposite = probe_pl_prepare(c, phase ^ 1);
         emit(opposite);
+        if (kind == PROBE_PL_JOINT) (void)probe_pl_prepare(c, phase);
     }
-    if (probe_measure_open()) return (struct SplashRasterTimeRange){0};
+    if (probe_measure_open() || probe_pl_align(kind)) return (struct SplashRasterTimeRange){0};
     unsigned int flags = irq_save();
     unsigned long long seed = probe_pl_batch(kind, c, emit, 1, phase);
+    unsigned long long seed_closed = kind == PROBE_PL_JOINT || kind == PROBE_PL_TRANS ?
+        probe_pl_batch_total : seed;
     probe_measure_restore(flags, s);
-    u32 count = PROBE_BURST;
+    if (kind == PROBE_PL_Q)
+        probe_pl_detail_add(&probe_pl_detail[c->n - SPLASH_RASTER_IMAGE_OUTS][1],
+                            seed, 1, s->line_den, 1);
+    /* One joint operation per sandwich keeps first-index restoration and
+     * the opposite color outside the measured IN-to-OUT interval. */
+    u32 count = kind == PROBE_PL_JOINT || kind == PROBE_PL_TRANS ? 1 : PROBE_BURST;
     unsigned long long clocks = 2 * probe_cost[PROBE_C].upper_us;
     /* Eight fast INs can be shorter than seed + two timestamp quanta,
      * producing a zero lower bound. Only Q needs a longer calibration;
@@ -724,7 +843,8 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
     }
     while (count > 1 && (count * (seed + 1) + clocks) * s->line_den > limit)
         count /= 2;
-    if ((count * (seed + 1) + clocks) * s->line_den > limit) {
+    if ((count * (seed + 1) + clocks) * s->line_den > limit ||
+        (seed_closed + probe_cost[PROBE_C].upper_us) * s->line_den > limit) {
         probe_errors++;
         return (struct SplashRasterTimeRange){0};
     }
@@ -732,15 +852,18 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
     *peak = (struct probe_pl_peak){ .count = count };
     unsigned long long shortest = ~0ULL;
     for (u32 i = 0; i < PROBE_COST_BATCH; i++) {
-        if (kind == PROBE_PL_W) {
+        if (kind == PROBE_PL_W || kind == PROBE_PL_JOINT) {
             const struct PlRow *opposite = probe_pl_prepare(c, phase ^ 1);
             emit(opposite);
+            if (kind == PROBE_PL_JOINT) (void)probe_pl_prepare(c, phase);
         }
-        if (probe_measure_open()) return (struct SplashRasterTimeRange){0};
+        if (probe_measure_open() || probe_pl_align(kind)) return (struct SplashRasterTimeRange){0};
         flags = irq_save();
         unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);
         probe_measure_restore(flags, s);
-        if ((span + probe_cost[PROBE_C].upper_us) * s->line_den > limit) {
+        unsigned long long closed = kind == PROBE_PL_JOINT || kind == PROBE_PL_TRANS ?
+            probe_pl_batch_total : span;
+        if ((closed + probe_cost[PROBE_C].upper_us) * s->line_den > limit) {
             probe_errors++;
             return (struct SplashRasterTimeRange){0};
         }
@@ -753,6 +876,16 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         if (lo < result.min) result.min = lo;
         if (hi > result.max) result.max = hi;
         probe_pl_peak_add(peak, hi);
+        if (kind == PROBE_PL_JOINT) {
+            probe_pl_detail_add(&probe_pl_outside[c->n][phase],
+                probe_pl_batch_outside, 1, s->line_den, 2);
+            probe_pl_peak_add(&probe_pl_joint_polls[c->n][phase], probe_pl_batch_polls);
+        }
+        if (kind == PROBE_PL_Q || kind == PROBE_PL_PREP || kind == PROBE_PL_TRANS) {
+            u32 part = kind == PROBE_PL_Q ? 0 : kind == PROBE_PL_PREP ? 2 : 3;
+            probe_pl_detail_add(&probe_pl_detail[c->n - SPLASH_RASTER_IMAGE_OUTS][part],
+                                span, count, s->line_den, 1);
+        }
     }
     if (kind == PROBE_PL_Q) {
         /* Exclude wait entry/exit with a one-poll differential, as for the
@@ -826,6 +959,15 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
 {
     probe_bounds(s);
     probe_pl_columns_init();
+    for (u32 n = 0; n < 2; n++) for (u32 part = 0; part < PROBE_PL_PARTS; part++)
+        probe_pl_detail[n][part] = (struct probe_pl_detail){0};
+    for (u32 n = 0; n < PROBE_PL_SLOTS; n++) {
+        probe_pl_joint[n] = (struct probe_pl_column){0};
+        for (u32 phase = 0; phase < 2; phase++) {
+            probe_pl_outside[n][phase] = (struct probe_pl_detail){0};
+            probe_pl_joint_polls[n][phase] = (struct probe_pl_peak){0};
+        }
+    }
     for (u32 n = 0; n < 2; n++) {
         struct probe_pl_result *r = &probe_pl_result[n];
         *r = (struct probe_pl_result){ .budget = { .den = s->line_den,
@@ -848,6 +990,9 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
                                           phase, &one);
                 if (probe_errors) return;
             }
+            if (cost[PROBE_PL_Q].min > 0)
+                (void)probe_pl_measure(s, PROBE_PL_TRANS, c, emit, phase, &one);
+            if (probe_errors) return;
             long long w = cost[PROBE_PL_W].max - cost[PROBE_PL_EMPTY].min;
             c->empty_min[phase] = cost[PROBE_PL_EMPTY].min;
             if (w > c->w) c->w = w;
@@ -885,6 +1030,35 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
     }
     if (probe_errors)
         for (u32 n = 0; n < 2; n++) probe_pl_result[n].qualified = 0;
+    static const probe_pl_emit_fn emitters[PROBE_PL_SLOTS] = {
+        probe_pl_empty, probe_pl_emit1, probe_pl_emit2, probe_pl_emit3,
+        probe_pl_emit4, probe_pl_emit5, probe_pl_emit6
+    };
+    /* A zero poll lower bound cannot size a finite physical-edge wait.
+     * Leave these diagnostic distributions empty, as for the skipped scan. */
+    if (probe_pl_result[0].poll.min <= 0) return;
+    for (u32 n = 0; n < PROBE_PL_SLOTS && !probe_errors; n++) {
+        struct probe_pl_column *c = &probe_pl_joint[n];
+        c->n = n;
+        c->row[0] = probe_pl_columns[42].row[0]; /* first N6, prefix N */
+        c->row[1] = probe_pl_columns[42].row[1];
+        c->row[0].count = c->row[1].count = n;
+        /* The N6 prefix of length three ends in an index without a component.
+         * Use a complete single-color RGB column for this representative. */
+        if (n == 3) {
+            c->row[0].port[2] = c->row[1].port[2] = PAL_B_PORT;
+            c->row[0].value[2] = 15;
+            c->row[1].value[2] = 0;
+        }
+        for (u32 phase = 0; phase < 2; phase++) {
+            for (u32 k = 0; k < 3; k++) palette_set(k, 0, 0, 0);
+            /* Opposite values and the first index are outside the span. */
+            emitters[n](probe_pl_prepare(c, phase ^ 1));
+            (void)probe_pl_prepare(c, phase);
+            unsigned long long one = 0;
+            (void)probe_pl_measure(s, PROBE_PL_JOINT, c, emitters[n], phase, &one);
+        }
+    }
 }
 /* Survey the 99 four-line entry deadlines without issuing palette changes.
  * This is measurement, not the LC-B player: observed execution costs and
@@ -1038,6 +1212,75 @@ static void probe_signed(const char *key, long long n)
     serial_puts_polled(key);
     if (n < 0) serial_puts_polled("-");
     probe_field("", n < 0 ? (unsigned long long)(-(n + 1)) + 1 : (unsigned long long)n);
+}
+static void probe_pl_peak_fields(const char *prefix, const struct probe_pl_peak *peak)
+{
+    serial_puts_polled(prefix); probe_signed("max_num=", peak->batches ? peak->max : 0);
+    serial_puts_polled(prefix); probe_field("max_count=", peak->hits);
+    serial_puts_polled(prefix); probe_signed("second_num=", peak->second_valid ? peak->second : 0);
+    serial_puts_polled(prefix); probe_field("second_valid=", peak->second_valid);
+    serial_puts_polled(prefix); probe_field("samples=", peak->batches);
+}
+static void probe_pl_details_dump(void)
+{
+    for (u32 n = 0; n < 2; n++) {
+        const struct probe_pl_result *r = &probe_pl_result[n];
+        probe_field("SPLR pl_q_contract=", SPLASH_RASTER_IMAGE_OUTS + n);
+        probe_field(" den=", r->budget.den);
+        probe_signed(" poll_or_seed_num=", r->poll.max);
+        probe_signed(" prep_num=", r->prep);
+        probe_signed(" two_seed_num=", r->transition);
+        probe_signed(" total_num=", r->budget.q.max);
+        /* Linkage contains prep, so compare to prep+two_seed, not two_seed
+         * alone. A negative gap is diagnostic; adoption Q is unchanged. */
+        probe_signed(" link_budget_num=", r->prep + r->transition);
+        probe_signed(" link_upper_num=", probe_pl_detail[n][3].upper.max);
+        probe_signed(" link_gap_num=", r->prep + r->transition - probe_pl_detail[n][3].upper.max);
+        serial_puts_polled("\n");
+        for (u32 part = 0; part < PROBE_PL_PARTS; part++) {
+            const struct probe_pl_detail *d = &probe_pl_detail[n][part];
+            probe_field("SPLR pl_q_part=", part);
+            probe_field(" n=", SPLASH_RASTER_IMAGE_OUTS + n);
+            probe_field(" den=", r->budget.den);
+            probe_pl_peak_fields(" raw_", &d->raw);
+            probe_pl_peak_fields(" upper_", &d->upper);
+            probe_pl_peak_fields(" clock_delta_", &d->correction);
+            serial_puts_polled("\n");
+        }
+    }
+    for (u32 n = 0; n < PROBE_PL_SLOTS; n++) for (u32 phase = 0; phase < 2; phase++) {
+        const struct probe_pl_peak *p = &probe_pl_joint[n].peak[phase][PROBE_PL_JOINT];
+        probe_field("SPLR pl_joint_n=", n); probe_field(" phase=", phase);
+        probe_field(" den=", probe_pl_result[0].budget.den);
+        probe_field(" count=", p->count);
+        probe_pl_peak_fields(" ", p);
+        probe_field(" subtract_num=", 0);
+        probe_pl_peak_fields(" polls_", &probe_pl_joint_polls[n][phase]);
+        serial_puts_polled("\n");
+        const struct probe_pl_detail *d = &probe_pl_outside[n][phase];
+        probe_field("SPLR pl_joint_outer_n=", n); probe_field(" phase=", phase);
+        probe_field(" den=", probe_pl_result[0].budget.den);
+        probe_pl_peak_fields(" raw_", &d->raw);
+        probe_pl_peak_fields(" upper_", &d->upper);
+        probe_pl_peak_fields(" clock_delta_", &d->correction);
+        serial_puts_polled("\n");
+    }
+}
+/* Dump original sample order before probe_stats sorts its separate arrays.
+ * Four high:total pairs per line preserve every completed B period cheaply. */
+static void probe_hsamples_dump(void)
+{
+    struct probe_pl_peak highs = {0};
+    for (u32 i = 0; i < probe_hd.completed; i++) {
+        if (!(i % PROBE_H_PER_LINE)) probe_field("SPLR b_samples=", i);
+        probe_field(" ", probe_highsamples[i]); probe_field(":", probe_hsamples[i]);
+        probe_pl_peak_add(&highs, probe_highsamples[i]);
+        if ((i + 1) % PROBE_H_PER_LINE == 0 || i + 1 == probe_hd.completed)
+            serial_puts_polled("\n");
+    }
+    serial_puts_polled("SPLR b_high_samples");
+    probe_pl_peak_fields(" ", &highs);
+    serial_puts_polled("\n");
 }
 static void probe_pl_dump(void)
 {
@@ -1311,6 +1554,8 @@ dump:
         serial_puts_polled("\n");
     }
     probe_measure_dump();
+    probe_pl_details_dump();
+    probe_hsamples_dump();
     probe_pl_dump();
     unsigned long long h_samples = 0, h_highs = 0;
     for (u32 i = 0; i < hcompleted; i++) {
