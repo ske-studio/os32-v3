@@ -18,6 +18,8 @@
 #define PL_ADOPTED_OUTS SPLASH_RASTER_IMAGE_OUTS
 #define PL_INITIAL_OUTS (OSRI_COLORS * 4u)
 #define PL_IF_MAX_US 20000u
+/* Same finite status-poll bound as splash_raster.c and the OBS player. */
+#define PL_PREVIEW_POLL_LIMIT 1000000u
 
 typedef unsigned long long PlTime;
 typedef struct SplashRasterTimeRange PlRange;
@@ -92,7 +94,7 @@ static struct {
     const struct OsriImage *image;
     const struct PlPlan *plan;
     PlTime fmin, fmax, last_clock;
-    int anchored, clocked;
+    int anchored, clocked, previewed;
 } pl_context;
 
 static PlRange window_time(const struct PlWindow *w, u32 i)
@@ -240,6 +242,7 @@ int pl_prepare(const struct OsriImage *image, u8 n, struct PlPlan *plan)
     if (!image || !plan || !qualified(p, s)) return -1;
     pl_context.anchored = 0;
     pl_context.clocked = 0;
+    pl_context.previewed = 0;
     pl_context.plan = NULL;
     for (u32 i = 0; i < OSRI_COLORS; i++) palette[i] = image->pal[i];
     for (u32 y = 0; y < SPLASH_RASTER_VISIBLE_LINES; y++)
@@ -496,6 +499,36 @@ static int finish(struct SplashRaster *s, const struct OsriImage *image,
     return rc;
 }
 
+static u32 preview_rounds(const struct SplashRaster *s)
+{
+    unsigned long long period = (unsigned long long)s->total_lines * s->line_num_us;
+    unsigned long long duration = (unsigned long long)SPLASH_RASTER_PREVIEW_MS *
+                                 SPLASH_RASTER_US_PER_MS * s->line_den;
+    return (u32)((duration + period - 1) / period);
+}
+
+static int preview_vsync(int high)
+{
+    for (u32 i = 0; i < PL_PREVIEW_POLL_LIMIT; i++)
+        if (!!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC) == high) return 0;
+    return -1;
+}
+
+int pl_preview(struct SplashRaster *s)
+{
+    if (!s || !s->checked || !s->dynamic_ok || !_irq_enabled() ||
+        !s->line_num_us || !s->line_den ||
+        s->total_lines <= SPLASH_RASTER_VISIBLE_LINES) return -1;
+    palette_init();
+    /* Align once, then count full periods: a partially elapsed first
+     * VBLANK must not shorten the requested one-second preview. */
+    if (preview_vsync(0) || preview_vsync(1)) return -1;
+    u32 rounds = preview_rounds(s);
+    for (u32 round = 0; round < rounds; round++)
+        if (preview_vsync(0) || preview_vsync(1)) return -1;
+    return 0;
+}
+
 int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
              const struct PlPlan *plan, PlTime deadline_us)
 {
@@ -522,6 +555,15 @@ int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
                       p->extra[PL_FRAME_REMAIN].time.max +
                       p->extra[PL_CEXIT].time.max +
                       p->extra[PL_COMMON_EXIT].time.max, den);
+    if (image->count && !pl_context.previewed) {
+        PlTime preview = ((PlTime)(preview_rounds(s) + 1u) * s->total_lines *
+                          s->line_num_us + s->line_den - 1u) / s->line_den;
+        if (now >= deadline_us || preview + reserve > deadline_us - now)
+            return finish(s, image, 0, PL_FRAME_DEADLINE);
+        if (pl_preview(s)) return finish(s, image, 0, PL_FRAME_NO_SYNC);
+        pl_context.previewed = 1;
+        if (now_us(&now)) return finish(s, image, 0, PL_FRAME_NO_SYNC);
+    }
     if (now >= deadline_us || reserve > deadline_us - now)
         return finish(s, image, 0, PL_FRAME_DEADLINE);
     cutoff = earlier(now + SPLASH_RASTER_SYNC_TIMEOUT_US,

@@ -6,6 +6,8 @@
 #include "kmalloc.h"
 #include "palette.h"
 #include "serial_diag.h"
+#include "serial.h"
+#include "config.h"
 #include "tvram.h"
 #include "vfs.h"
 #include "../lib/le_internal.h"
@@ -14,7 +16,7 @@
 #define SPLASH_OBS_US_PER_SECOND 1000000u
 #define SPLASH_OBS_PATH "/boot/obs/N00.osri"
 #define SPLASH_OBS_DIGITS (sizeof("/boot/obs/N") - 1u)
-#define SPLASH_OBS_LABEL_ATTR 0x07u
+#define SPLASH_OBS_LABEL_ATTR TATTR_WHITE
 #define SPLASH_OBS_CRC_OFFSET 48u
 #define SPLASH_OBS_CRC_DIGITS 8u
 
@@ -70,6 +72,9 @@ static void obs_end(u32 n, const char *status, u32 frames, u32 drops)
 
 void platform_splash_observe(void)
 {
+    /* The DIAG probe used to own this early initialization. OBS omits
+     * that probe, but still emits SPLO before the shell initializes UART. */
+    serial_init(SYS_SERIAL_BAUD);
     struct SplashRaster *s = pc98_splash_raster_state();
     u32 rounds = obs_rounds(s);
     for (u32 n = 1; n <= OSRI_COLORS; n++) {
@@ -105,6 +110,8 @@ void platform_splash_observe(void)
         obs_black();
         gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);
         gfx_present_nosync();
+        status = "no_sync";
+        if (pl_preview(s)) { obs_black(); goto done; }
         status = "ok";
         for (u32 round = 0; round < rounds; round++) {
             int rc = pl_obs_frame(s, image, plan);

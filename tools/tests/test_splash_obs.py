@@ -7,7 +7,8 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'platform/pc98/splash.c', 'platform/pc98/splash_image.c', 'init/boot_splash.c',
             'include/platform_splash.h', 'tools/tests/splash_obs_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h'],
+            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h',
+            'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
     needs=[], budget=60.0)
 
 import argparse
@@ -21,6 +22,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
+NORMAL_BASE = '22685d9b'
 PLAYER = 'drivers/video/pc98/splash_raster_image.c'
 OWNER = 'platform/pc98/splash_obs.c'
 HEADER = 'gfx/gfx_osri.h'
@@ -60,6 +62,11 @@ MUTATIONS = (
     ('omit image release', OWNER, 'if (image) kfree(image);', '(void)image;'),
     ('drop extends duration', OWNER, 'round < rounds; round++', 'frames < rounds; round++'),
     ('duration rounding', OWNER, '(duration + period - 1) / period', 'duration / period'),
+    ('omit UART init', OWNER, '    serial_init(SYS_SERIAL_BAUD);', '    (void)SYS_SERIAL_BAUD;'),
+    ('invisible label', OWNER, '#define SPLASH_OBS_LABEL_ATTR TATTR_WHITE',
+     '#define SPLASH_OBS_LABEL_ATTR 0x07u'),
+    ('preview shortened', PLAYER, 'round < rounds; round++)\n        if (preview_vsync',
+     'round + 1u < rounds; round++)\n        if (preview_vsync'),
     ('OBS guard removed', HEADER,
      '#ifdef SPLASH_RASTER_OBS\n#define OBS_V2_MAX_EVENTS_PER_LINE',
      '#define SPLASH_RASTER_OBS 1\n#ifdef SPLASH_RASTER_OBS\n#define OBS_V2_MAX_EVENTS_PER_LINE'),
@@ -115,7 +122,14 @@ def execute(mutation=None):
 
 
 def normal_sections():
-    """Compare all normal .text/.rodata sections with the worktree base (HEAD)."""
+    """Compare normal code to the fixed pre-OBS base, including after commit.
+
+    FIX1 intentionally adds the preview to R1. Only its new helper and its
+    prepare/frame hooks may differ; every other normal section stays exact.
+    Runtime tests separately exercise those three changed functions.
+    """
+    preview_sections = {'.text.pl_preview', '.text.preview_vsync',
+                        '.text.preview_rounds', '.text.pl_prepare', '.text.pl_frame'}
     with tempfile.TemporaryDirectory(prefix='splash-normal-') as td:
         work = Path(td)
         cc = compiler()
@@ -125,7 +139,7 @@ def normal_sections():
                     'drivers/video/pc98/splash_raster_image.h']:
             dest = work / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(subprocess.check_output(['git', 'show', 'HEAD:' + rel], cwd=ROOT))
+            dest.write_bytes(subprocess.check_output(['git', 'show', NORMAL_BASE + ':' + rel], cwd=ROOT))
         for rel in NORMAL_UNITS:
             sections = []
             for index, source in enumerate((work / rel, ROOT / rel)):
@@ -139,10 +153,12 @@ def normal_sections():
                     blob = work / 'section.bin'
                     subprocess.run([objcopy, '-O', 'binary', '--only-section=' + name,
                                     str(obj), str(blob)], check=True)
-                    data[name] = blob.read_bytes()
+                    if rel != PLAYER or name not in preview_sections:
+                        data[name] = blob.read_bytes()
                 sections.append(data)
             assert sections[0] == sections[1], f'normal code changed: {rel}'
-    print('GREEN normal .text/.rodata unchanged (six translation units)', flush=True)
+    print('GREEN normal .text/.rodata vs ' + NORMAL_BASE +
+          ' (six units; explicit R1 preview hooks excluded)', flush=True)
 
 
 def main():

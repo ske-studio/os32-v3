@@ -25,12 +25,13 @@ static struct OsriImage image;
 static struct PlObsPlan plan;
 static u32 stamp, reads, writes, out_cost, vs_lines, fall_at, cli_at, restores;
 static int irq_on, freeze, no_h, no_v_after_f, stuck_v, force_v_at, delay_cli;
+static u32 preview_at, preview_pending, uart_inits;
 static struct { u32 port, value, time, open; } output[HOST_WRITES];
 
 static unsigned int inp(unsigned int port)
 {
     REQUIRE(port == GDC_GFX_STAT);
-    REQUIRE(++reads < 2100000u); /* Unbounded-wait mutants fail at runtime. */
+    REQUIRE(++reads < 4000000u); /* Includes a full one-second preview. */
     u32 phase = stamp++ % (state.total_lines * HOST_H);
     u32 status = 0;
     if (!freeze && (phase < vs_lines * HOST_H ||
@@ -42,6 +43,13 @@ static unsigned int inp(unsigned int port)
 }
 static void outp(unsigned int port, unsigned int value)
 {
+    if (preview_pending) {
+        unsigned long long duration = (unsigned long long)1000000u * state.line_den;
+        unsigned long long period = (unsigned long long)state.total_lines * state.line_num_us;
+        u32 rounds = (u32)((duration + period - 1u) / period);
+        REQUIRE(stamp - preview_at >= rounds * state.total_lines * HOST_H);
+        preview_pending = 0;
+    }
     REQUIRE(writes < HOST_WRITES);
     output[writes].port = port; output[writes].value = value;
     output[writes].time = stamp; output[writes++].open = irq_on;
@@ -81,7 +89,7 @@ static void setup(int mode, int vs)
     state.active0_lines = vs ? state.vbp_lines : 0;
     vs_lines = vs ? state.vs_lines : state.total_lines - 400;
     fall_at = (state.total_lines + vs_lines) * HOST_H;
-    stamp = reads = writes = restores = cli_at = 0; out_cost = 0;
+    stamp = reads = writes = restores = cli_at = preview_pending = 0; out_cost = 0;
     irq_on = 1; freeze = no_h = no_v_after_f = stuck_v = force_v_at = delay_cli = 0;
 }
 static u16 rgb(u32 index) { return (u16)(index * 0x111u); }
@@ -280,7 +288,7 @@ void gfx_present_nosync(void)
 {
     REQUIRE(irq_on && image_busy && plan_busy && blacks >= (commits+1)*16);
     REQUIRE(pixels[0] == 1 && pixels[32000] == 2 && pixels[64000] == 3 && pixels[96000] == 4);
-    commits++; stamp=reads=writes=0;
+    commits++; stamp=reads=writes=preview_pending=0;
     freeze = scenario == 1 && active_n == 5;
     out_cost = scenario == 3 ? 8 : 0;
 }
@@ -288,13 +296,14 @@ void palette_set(int index, u8 r, u8 g, u8 b)
 { REQUIRE(irq_on && index >= 0 && index < 16 && !r && !g && !b); blacks++; }
 void serial_puts_polled(const char *s)
 {
-    REQUIRE(irq_on);
+    REQUIRE(irq_on && uart_inits);
     while (*s) { REQUIRE(log_pos+1 < sizeof(log_text)); log_text[log_pos++] = *s++; }
     log_text[log_pos]=0;
 }
 void tvram_putchar_at(int x, int y, char ch, u8 attr)
 {
-    REQUIRE(irq_on && !y && attr == 7);
+    REQUIRE(irq_on && !y && attr == TATTR_WHITE);
+    REQUIRE((attr & TATTR_VISIBLE) && !(attr & (TATTR_BLINK | TATTR_REVERSE)));
     if (x == 0) REQUIRE(ch == 'N'); else if (x == 1) REQUIRE(ch == '=');
     else if (x == 2) REQUIRE(ch >= '0' && ch <= '1');
     else REQUIRE(x == 3 && ch >= '0' && ch <= '9');
@@ -303,7 +312,14 @@ void tvram_putchar_at(int x, int y, char ch, u8 attr)
 int platform_splash_begin(void) { begins++; return 0; }
 void platform_splash_clear_pages(void) { clears++; }
 void gfx_shutdown(void) { stops++; }
-void palette_init(void) { defaults++; }
+void serial_init(unsigned long baud)
+{ REQUIRE(irq_on && baud == SYS_SERIAL_BAUD); uart_inits++; }
+void palette_init(void)
+{
+    REQUIRE(irq_on);
+    defaults++;
+    if (image_busy) { preview_at = stamp; preview_pending = 1; }
+}
 void tvram_clear(void) { texts++; }
 static u32 find_from(const char *text, u32 start)
 {
@@ -314,6 +330,30 @@ static u32 find_from(const char *text, u32 start)
     return U32_MAX;
 }
 static int contains(const char *text) { return find_from(text, 0) != U32_MAX; }
+static void test_preview(void)
+{
+    for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) {
+        setup(mode, vs);
+        u32 period = state.total_lines * HOST_H;
+        unsigned long long duration = (unsigned long long)1000000u * state.line_den;
+        unsigned long long physical_period = (unsigned long long)state.total_lines * state.line_num_us;
+        u32 rounds = (u32)((duration + physical_period - 1) / physical_period);
+        stamp = period / 2; /* A partial first frame does not count. */
+        u32 before = defaults;
+        REQUIRE(!pl_preview(&state));
+        REQUIRE(defaults == before+1 && !writes && irq_on && !restores);
+        REQUIRE(stamp >= (rounds+1)*period && stamp <= (rounds+1)*period+2);
+        /* The next call really switches to the initial and per-row palette. */
+        reads = 0; make_image(2);
+        REQUIRE(!pl_obs_prepare(&image, 2, &plan));
+        REQUIRE(pl_obs_frame(&state, &image, &plan) == PL_FRAME_OK);
+        REQUIRE(writes == 64+399*8 && irq_on);
+    }
+    setup(1, 0); freeze = 1;
+    REQUIRE(pl_preview(&state) && reads < 1100000u && irq_on);
+    setup(1, 0); irq_on = 0;
+    REQUIRE(pl_preview(&state) && !reads && !writes && !irq_on);
+}
 static void test_owner(void)
 {
     for (scenario = 0; scenario <= 1; scenario++) {
@@ -326,9 +366,10 @@ static void test_owner(void)
         /* Synthetic 5s frame: one round, to exercise all ownership paths. */
         state.line_num_us = 5000000; state.line_den = state.total_lines;
         allocs=frees=opens=closes=commits=blacks=log_pos=0;
-        begins=clears=stops=defaults=texts=0; image_busy=plan_busy=0;
+        begins=clears=stops=defaults=texts=uart_inits=0; image_busy=plan_busy=0;
         boot_splash();
-        REQUIRE(begins == 1 && clears == 1 && stops == 1 && defaults == 1 && texts == 1);
+        REQUIRE(begins == 1 && clears == 1 && stops == 1 && defaults == commits+1 && texts == 1);
+        REQUIRE(uart_inits == 1);
         REQUIRE(!image_busy && !plan_busy && opens == closes);
         REQUIRE(frees == allocs - 2*scenario && commits == (scenario ? 11u : 16u));
         REQUIRE(blacks == 32 * commits);
@@ -377,5 +418,5 @@ static void test_loader(void)
 }
 void _start(void)
 {
-    test_prepare(); test_scan(); test_loader(); test_owner(); finish(0);
+    test_prepare(); test_scan(); test_loader(); test_preview(); test_owner(); finish(0);
 }
