@@ -21,6 +21,20 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'platform/pc98/splash_probe.c'
 MUTATIONS = (
+    ('include failed phase column budget',
+     '            if ((long long)(2 * one) > transition) transition = 2 * one;',
+     '            if ((long long)(2 * one) > transition) transition = 2 * one;\n'
+     '            if (c->w > r->budget.w.max) r->budget.w.max = c->w;\n'
+     '            if (c->d > r->budget.d.max) r->budget.d.max = c->d;\n'
+     '            if (c->prep > r->prep) r->prep = c->prep;\n'
+     '            if (transition > r->transition) r->transition = transition;'),
+    ('omit joint phase error status',
+     'probe_errors != errors_before ? PROBE_SCAN_ERROR :\n                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;',
+     'probe_errors != errors_before ? PROBE_SCAN_AFTER_ERROR :\n                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;'),
+    ('omit first error reason output', 'probe_field("SPLR error_first reason=", probe_error_first.reason);',
+     'probe_field("SPLR missing_first reason=", probe_error_first.reason);'),
+    ('abort after column error', '        c->scan_reason = PROBE_SCAN_ERROR;',
+     '        c->scan_reason = PROBE_SCAN_ERROR; return;'),
     ('omit UART initialization', '    serial_init(SYS_SERIAL_BAUD);',
      '    (void)SYS_SERIAL_BAUD;'),
     ('direct BIOS read before begin',
@@ -89,8 +103,8 @@ MUTATIONS = (
      '1, 1, 0, 0, &iterations, &next);'),
     ('clock inside successful edge loop', 'u32 status = inp(GDC_GFX_STAT);\n        if (i >= upper)',
      'u32 status = inp(GDC_GFX_STAT); (void)probe_now();\n        if (i >= upper)'),
-    ('force first-IN success', '0, 0, &iterations, &first)) probe_errors++;',
-     '1, 0, &iterations, &first)) probe_errors++;'),
+    ('force first-IN success', '0, 0, &iterations, &first)) probe_error(PROBE_ERR_PL_SUCCESS, iterations);',
+     '1, 0, &iterations, &first)) probe_error(PROBE_ERR_PL_SUCCESS, iterations);'),
     ('lose outside entry cost', 'first.begin - begin + end - first.end;',
      'end - first.end;'),
     ('lose outside return cost', 'first.begin - begin + end - first.end;',
@@ -110,8 +124,8 @@ MUTATIONS = (
      '            if (0 && i < lower) break;'),
     ('omit joint emit', '            emit(r);\n            result = 0;',
      '            (void)r; (void)emit;\n            result = 0;'),
-    ('omit joint count six', 'n < PROBE_PL_SLOTS && !probe_errors;',
-     'n < PROBE_PL_SLOTS - 1 && !probe_errors;'),
+    ('omit joint count six', 'n < PROBE_PL_SLOTS && !probe_fatal;',
+     'n < PROBE_PL_SLOTS - 1 && !probe_fatal;'),
     ('invalid N3 representative', '        if (n == 3) {', '        if (0) {'),
     ('omit joint output', 'probe_field("SPLR pl_joint_n=", n);',
      'probe_field("SPLR missing_joint_n=", n);'),
@@ -136,8 +150,8 @@ MUTATIONS = (
     ('extend IF0 time frame', 'unsigned long long limit = (PROBE_HPERIODS + 6) * s->line_num_us;',
      'unsigned long long limit = (PROBE_HPERIODS + 32) * s->line_num_us;'),
     ('ignore H sample count cap',
-     'if (count > cap) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_errors++; return 0; }',
-     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_errors++; return 0; }'),
+     'if (count > cap) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_error(PROBE_ERR_H_COUNT, count); return 0; }',
+     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_error(PROBE_ERR_H_COUNT, count); return 0; }'),
     ('omit second H precision pass', 'for (u32 pass = 0; pass < 2; pass++)',
      'for (u32 pass = 0; pass < 1; pass++)'),
     ('use one rounded short sandwich', 'sample < PROBE_COST_BATCH;', 'sample < 1;'),
@@ -237,6 +251,10 @@ def execute(mutation=None):
                 source = source.replace(
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);',
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);\n        span = probe_host_pl_span(span);')
+                source = source.replace('    unsigned long long seed_closed =',
+                    '    seed = probe_host_error_span(seed, 1);\n    unsigned long long seed_closed =')
+                source = source.replace('        unsigned long long closed =',
+                    '        span = probe_host_error_span(span, 0);\n        unsigned long long closed =')
                 source = source.replace('probe_hcalibrate(s, &q, clocks, pass)',
                     'probe_host_hcalibrate(s, &q, clocks, pass)')
                 source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',

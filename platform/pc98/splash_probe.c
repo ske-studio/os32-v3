@@ -78,6 +78,64 @@ static unsigned long long probe_hperiod[PROBE_HPERIODS], probe_hwidth[PROBE_HPER
 static u32 probe_hsamples[PROBE_HPERIODS], probe_highsamples[PROBE_HPERIODS];
 static unsigned long long probe_clock[PROBE_SAMPLES];
 static u32 probe_errors, probe_raw_before, probe_bios_before;
+/* Stable diagnostic reason IDs; zero means no error. Context is captured in
+ * RAM only: serial output must stay outside all measurements and IF=0. */
+enum probe_error_reason {
+    PROBE_ERR_NONE = 0,
+    PROBE_ERR_PL_SUCCESS = 1,
+    PROBE_ERR_CLOCK_READ = 2,
+    PROBE_ERR_CLOCK_BACKWARD = 3,
+    PROBE_ERR_OPEN_WAIT = 4,
+    PROBE_ERR_COST_BUDGET = 5,
+    PROBE_ERR_H_BUDGET = 6,
+    PROBE_ERR_H_CALIBRATE = 7,
+    PROBE_ERR_H_CAPACITY = 8,
+    PROBE_ERR_H_COUNT = 9,
+    PROBE_ERR_H_OVERRUN = 10,
+    PROBE_ERR_H_INCOMPLETE = 11,
+    PROBE_ERR_PHASE_WAIT = 12,
+    PROBE_ERR_ENTRY_OPEN = 13,
+    PROBE_ERR_PL_ALIGN = 14,
+    PROBE_ERR_PL_SEED_BUDGET = 15,
+    PROBE_ERR_PL_BATCH_BUDGET = 16,
+    PROBE_ERR_ENTRY_WAIT = 17,
+    PROBE_ERR_BIT_WAIT = 18,
+    PROBE_ERR_V_INCOMPLETE = 19,
+    PROBE_ERR_TABLE_DIAG = 20,
+    PROBE_ERR_COUNT
+};
+enum probe_scan_reason { PROBE_SCAN_COMPLETE = 1, PROBE_SCAN_ERROR = 5, PROBE_SCAN_AFTER_ERROR = 6 };
+#define PROBE_CONTEXT_NONE (~0u)
+static u32 probe_fatal, probe_error_counts[PROBE_ERR_COUNT];
+static struct probe_error_context {
+    u32 col, phase, n, kind;
+} probe_context;
+static struct {
+    enum probe_error_reason reason;
+    struct probe_error_context context;
+    unsigned long long value;
+} probe_error_first;
+static void probe_error_reset(void)
+{
+    probe_errors = probe_fatal = 0;
+    for (u32 i = 0; i < PROBE_ERR_COUNT; i++) probe_error_counts[i] = 0;
+    probe_error_first.reason = PROBE_ERR_NONE;
+    probe_context = (struct probe_error_context){ PROBE_CONTEXT_NONE,
+        PROBE_CONTEXT_NONE, PROBE_CONTEXT_NONE, PROBE_CONTEXT_NONE };
+}
+static void probe_error(enum probe_error_reason reason, unsigned long long value)
+{
+    if (!probe_errors) {
+        probe_error_first.reason = reason;
+        probe_error_first.context = probe_context;
+        probe_error_first.value = value;
+    }
+    probe_errors++;
+    probe_error_counts[reason]++;
+    if (reason != PROBE_ERR_PL_SUCCESS && reason != PROBE_ERR_PL_ALIGN &&
+        reason != PROBE_ERR_PL_SEED_BUDGET && reason != PROBE_ERR_PL_BATCH_BUDGET)
+        probe_fatal = 1;
+}
 static u32 probe_rx_count, probe_rx_missing, probe_rx_value, probe_rx_bytes, probe_rx_next;
 static unsigned long long probe_previous;
 static GFX_RasterPalTable probe_table;
@@ -130,6 +188,7 @@ static struct probe_pl_detail probe_pl_detail[2][PROBE_PL_PARTS];
 /* Representative: prefixes of the first N6 column (N3 uses G/R/B), chosen before timing.
  * These extra measurements do not supply or change an adoption budget. */
 static struct probe_pl_column probe_pl_joint[PROBE_PL_SLOTS];
+static u32 probe_pl_joint_reason[PROBE_PL_SLOTS][2];
 static struct probe_pl_detail probe_pl_outside[PROBE_PL_SLOTS][2];
 static struct probe_pl_peak probe_pl_joint_polls[PROBE_PL_SLOTS][2];
 struct probe_pl_stamp { unsigned long long begin, end; u32 iterations, clocks; };
@@ -237,7 +296,7 @@ static PROBE_NOINLINE unsigned long long probe_pl_batch(u32 kind,
         if (probe_pl_success(&c->row[phase & 1],
                 kind == PROBE_PL_JOINT ? emit : probe_pl_empty,
                 GDC_STAT_HBLANK, GDC_STAT_HBLANK, 1, probe_pl_edge_upper,
-                0, 0, &iterations, &first)) probe_errors++;
+                0, 0, &iterations, &first)) probe_error(PROBE_ERR_PL_SUCCESS, iterations);
         if (kind == PROBE_PL_TRANS) {
             const struct PlRow *r = probe_pl_prepare(c, phase + 1);
             /* Enter and sample the next wait, without waiting a second H.
@@ -344,9 +403,9 @@ void platform_splash_probe_before(void)
 static unsigned long long probe_now(void)
 {
     u32 lo, hi;
-    if (sys_time_now(&lo, &hi)) { probe_errors++; return probe_previous; }
+    if (sys_time_now(&lo, &hi)) { probe_error(PROBE_ERR_CLOCK_READ, probe_previous); return probe_previous; }
     unsigned long long t = ((unsigned long long)hi << BITS_PER_U32) | lo;
-    if (t < probe_previous) probe_errors++;
+    if (t < probe_previous) probe_error(PROBE_ERR_CLOCK_BACKWARD, probe_previous - t);
     probe_previous = t;
     return t;
 }
@@ -371,9 +430,9 @@ static int probe_measure_open(void)
 {
     for (u32 n = 0; n < PROBE_POLLS; n++) {
         if (probe_now() >= probe_open_until) return 0;
-        if (probe_errors) break;
+        if (probe_fatal) break;
     }
-    probe_errors++;
+    probe_error(PROBE_ERR_OPEN_WAIT, probe_open_until);
     return -1;
 }
 static void probe_measure_restore(unsigned int flags, const struct SplashRaster *s)
@@ -425,7 +484,7 @@ static void probe_costs(const struct SplashRaster *s)
         while (count > 1 && (count * seed[kind] + 2 * seed[PROBE_C]) * s->line_den >
                             2 * s->line_num_us) count /= 2;
         if ((count * seed[kind] + 2 * seed[PROBE_C]) * s->line_den > 2 * s->line_num_us) {
-            probe_errors++; return;
+            probe_error(PROBE_ERR_COST_BUDGET, count * seed[kind] + 2 * seed[PROBE_C]); return;
         }
         c->batch = count;
         c->upper_samples = count * (kind == PROBE_C ? 1 : clock_samples);
@@ -563,10 +622,10 @@ static u32 probe_hblank(const struct SplashRaster *s)
     if (!q || clocks >= limit) {
         probe_hd.reason = !q ? 2 : 3;
         if (q) probe_hd.budget_stage = 1;
-        probe_errors++; return 0;
+        probe_error(PROBE_ERR_H_BUDGET, clocks); return 0;
     }
     for (u32 pass = 0; pass < 2; pass++)
-        if (probe_hcalibrate(s, &q, clocks, pass)) { probe_errors++; return 0; }
+        if (probe_hcalibrate(s, &q, clocks, pass)) { probe_error(PROBE_ERR_H_CALIBRATE, pass); return 0; }
     /* At least 65H plus one sample spans 64 complete periods at any phase.
      * Refuse inadequate precision instead of enlarging the 70H IF=0 limit. */
     u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;
@@ -574,8 +633,8 @@ static u32 probe_hblank(const struct SplashRaster *s)
     probe_hd.count = count;
     probe_hd.cap = cap;
     probe_hd.excess = (long long)(count * q + clocks) - (long long)limit;
-    if (count < 2 || count > PROBE_HSAMPLES) { probe_hd.reason = 4; probe_errors++; return 0; }
-    if (count > cap) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_errors++; return 0; }
+    if (count < 2 || count > PROBE_HSAMPLES) { probe_hd.reason = 4; probe_error(PROBE_ERR_H_CAPACITY, count); return 0; }
+    if (count > cap) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_error(PROBE_ERR_H_COUNT, count); return 0; }
     u32 completed = 0;
     for (u32 burst = 0; burst < 1; burst++) {
         if (probe_measure_open()) { probe_hd.reason = 5; break; }
@@ -592,11 +651,11 @@ static u32 probe_hblank(const struct SplashRaster *s)
         if ((elapsed + probe_cost[PROBE_C].upper_us + SPLASH_RASTER_CLOCK_QUANTUM_US) *
             s->line_den > limit) {
             probe_hd.over++; probe_hd.reason = 8;
-            probe_errors++; return 0;
+            probe_error(PROBE_ERR_H_OVERRUN, elapsed); return 0;
         }
     }
     if (!probe_hd.reason) probe_hd.reason = completed == PROBE_HPERIODS ? 1 : 6;
-    if (completed != PROBE_HPERIODS) probe_errors++;
+    if (completed != PROBE_HPERIODS) probe_error(PROBE_ERR_H_INCOMPLETE, completed);
     unsigned long long periods = SPLASH_RASTER_MEASURE_PERIODS * s->total_lines;
     for (u32 i = 0; i < completed; i++) {
         probe_hperiod[i] = (probe_hsamples[i] * probe_cost[PROBE_Q].total_us +
@@ -641,7 +700,7 @@ static int probe_phase(void)
         before = probe_now();
         u32 status = inp(GDC_GFX_STAT);
         after = probe_now();
-        if (probe_errors || after > deadline) break;
+        if (probe_fatal || after > deadline) break;
         if (status & GDC_STAT_VSYNC) saw_high = 1;
         if (saw_high && (old & GDC_STAT_VSYNC) && !(status & GDC_STAT_VSYNC)) {
             probe_f_lo = last; probe_f_hi = after; probe_phase_status = status;
@@ -655,7 +714,7 @@ static int probe_phase(void)
         if (fell && !(status & GDC_STAT_HBLANK)) low = 1;
         old = status; last = before;
     }
-    probe_errors++;
+    probe_error(PROBE_ERR_PHASE_WAIT, after);
     return -1;
 }
 static long long probe_j_max(struct SplashRasterEntryBudget *b)
@@ -695,9 +754,9 @@ static void probe_entry_costs(const struct SplashRaster *s)
             u32 poll;
             for (poll = 0; poll < PROBE_POLLS; poll++) {
                 if (probe_now() >= probe_open_until) break;
-                if (probe_errors) return;
+                if (probe_fatal) return;
             }
-            if (poll == PROBE_POLLS) { probe_errors++; return; }
+            if (poll == PROBE_POLLS) { probe_error(PROBE_ERR_ENTRY_OPEN, poll); return; }
             unsigned long long a = probe_now();
             (void)probe_enter(~0ULL);
             unsigned long long span = probe_now() - a + SPLASH_RASTER_CLOCK_QUANTUM_US;
@@ -803,7 +862,7 @@ static int probe_pl_align(u32 kind)
     u32 first = kind == PROBE_PL_TRANS ? GDC_STAT_HBLANK : 0;
     if (!probe_pl_wait(GDC_STAT_HBLANK, first, probe_pl_edge_upper) ||
         !probe_pl_wait(GDC_STAT_HBLANK, first ^ GDC_STAT_HBLANK, probe_pl_edge_upper)) {
-        probe_errors++;
+        probe_error(PROBE_ERR_PL_ALIGN, probe_pl_edge_upper);
         return -1;
     }
     return 0;
@@ -812,6 +871,8 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
     u32 kind, struct probe_pl_column *c, probe_pl_emit_fn emit, u32 phase,
     unsigned long long *one_upper)
 {
+    u32 errors_before = probe_errors;
+    probe_context.phase = phase; probe_context.n = c->n; probe_context.kind = kind;
     struct SplashRasterTimeRange result = { .min = 0x7fffffffffffffffLL };
     probe_pl_edge_upper = 2 * s->line_num_us / (probe_q_lower ? probe_q_lower : 1) + 1;
     if (kind == PROBE_PL_W || kind == PROBE_PL_JOINT) {
@@ -825,6 +886,7 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
     unsigned long long seed_closed = kind == PROBE_PL_JOINT || kind == PROBE_PL_TRANS ?
         probe_pl_batch_total : seed;
     probe_measure_restore(flags, s);
+    if (probe_errors != errors_before) return (struct SplashRasterTimeRange){0};
     if (kind == PROBE_PL_Q)
         probe_pl_detail_add(&probe_pl_detail[c->n - SPLASH_RASTER_IMAGE_OUTS][1],
                             seed, 1, s->line_den, 1);
@@ -845,7 +907,7 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         count /= 2;
     if ((count * (seed + 1) + clocks) * s->line_den > limit ||
         (seed_closed + probe_cost[PROBE_C].upper_us) * s->line_den > limit) {
-        probe_errors++;
+        probe_error(PROBE_ERR_PL_SEED_BUDGET, seed_closed);
         return (struct SplashRasterTimeRange){0};
     }
     struct probe_pl_peak *peak = &c->peak[phase][kind];
@@ -861,10 +923,11 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         flags = irq_save();
         unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);
         probe_measure_restore(flags, s);
+        if (probe_errors != errors_before) return (struct SplashRasterTimeRange){0};
         unsigned long long closed = kind == PROBE_PL_JOINT || kind == PROBE_PL_TRANS ?
             probe_pl_batch_total : span;
         if ((closed + probe_cost[PROBE_C].upper_us) * s->line_den > limit) {
-            probe_errors++;
+            probe_error(PROBE_ERR_PL_BATCH_BUDGET, closed);
             return (struct SplashRasterTimeRange){0};
         }
         if (span < shortest) shortest = span;
@@ -964,6 +1027,7 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
     for (u32 n = 0; n < PROBE_PL_SLOTS; n++) {
         probe_pl_joint[n] = (struct probe_pl_column){0};
         for (u32 phase = 0; phase < 2; phase++) {
+            probe_pl_joint_reason[n][phase] = 0;
             probe_pl_outside[n][phase] = (struct probe_pl_detail){0};
             probe_pl_joint_polls[n][phase] = (struct probe_pl_peak){0};
         }
@@ -975,12 +1039,15 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
             .error = SPLASH_RASTER_CLOCK_QUANTUM_US * s->line_den },
             .poll = { .min = 0x7fffffffffffffffLL } };
     }
-    for (u32 i = 0; i < probe_pl_count && !probe_errors; i++) {
+    for (u32 i = 0; i < probe_pl_count && !probe_fatal; i++) {
         struct probe_pl_column *c = &probe_pl_columns[i];
         struct probe_pl_result *r = &probe_pl_result[c->n - SPLASH_RASTER_IMAGE_OUTS];
         probe_pl_emit_fn emit = c->n == SPLASH_RASTER_IMAGE_OUTS ? probe_pl_emit5 : probe_pl_emit6;
+        u32 errors_before = probe_errors;
+        probe_context.col = i;
         r->columns++;
         c->poll.min = 0x7fffffffffffffffLL;
+        long long transition = 0;
         for (u32 phase = 0; phase < 2; phase++) {
             for (u32 k = 0; k < c->colors; k++) palette_set(k, 0, 0, 0);
             struct SplashRasterTimeRange cost[PROBE_PL_KINDS];
@@ -988,26 +1055,33 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
             for (u32 k = 0; k < PROBE_PL_KINDS; k++) {
                 cost[k] = probe_pl_measure(s, k, c, k == PROBE_PL_EMPTY ? probe_pl_empty : emit,
                                           phase, &one);
-                if (probe_errors) return;
+                if (probe_fatal) { c->scan_reason = PROBE_SCAN_ERROR; return; }
+                if (probe_errors != errors_before) goto column_error;
             }
             if (cost[PROBE_PL_Q].min > 0)
                 (void)probe_pl_measure(s, PROBE_PL_TRANS, c, emit, phase, &one);
-            if (probe_errors) return;
+            if (probe_fatal) { c->scan_reason = PROBE_SCAN_ERROR; return; }
+            if (probe_errors != errors_before) goto column_error;
             long long w = cost[PROBE_PL_W].max - cost[PROBE_PL_EMPTY].min;
             c->empty_min[phase] = cost[PROBE_PL_EMPTY].min;
             if (w > c->w) c->w = w;
             if (cost[PROBE_PL_D].max > c->d) c->d = cost[PROBE_PL_D].max;
             if (cost[PROBE_PL_PREP].max > c->prep) c->prep = cost[PROBE_PL_PREP].max;
-            if (w > r->budget.w.max) r->budget.w.max = w;
-            if (cost[PROBE_PL_D].max > r->budget.d.max) r->budget.d.max = cost[PROBE_PL_D].max;
-            if (cost[PROBE_PL_PREP].max > r->prep) r->prep = cost[PROBE_PL_PREP].max;
             if (cost[PROBE_PL_Q].min < c->poll.min) c->poll.min = cost[PROBE_PL_Q].min;
             if (cost[PROBE_PL_Q].max > c->poll.max) c->poll.max = cost[PROBE_PL_Q].max;
             /* Two wait entry/return paths surround the low-phase prep. */
-            if ((long long)(2 * one) > r->transition) r->transition = 2 * one;
+            if ((long long)(2 * one) > transition) transition = 2 * one;
         }
+        /* Adopt a column only after both phases finish without errors. */
+        if (c->w > r->budget.w.max) r->budget.w.max = c->w;
+        if (c->d > r->budget.d.max) r->budget.d.max = c->d;
+        if (c->prep > r->prep) r->prep = c->prep;
+        if (transition > r->transition) r->transition = transition;
         if (c->poll.min < r->poll.min) r->poll.min = c->poll.min;
         if (c->poll.max > r->poll.max) r->poll.max = c->poll.max;
+        continue;
+column_error:
+        c->scan_reason = PROBE_SCAN_ERROR;
     }
     for (u32 n = 0; n < 2; n++) {
         struct probe_pl_result *r = &probe_pl_result[n];
@@ -1020,11 +1094,14 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
             r->budget.q.max < r->budget.b.min &&
             r->budget.q.max < r->budget.h.min - r->budget.b.max;
     }
-    for (u32 i = 0; i < probe_pl_count && !probe_errors; i++) {
+    for (u32 i = 0; i < probe_pl_count && !probe_fatal; i++) {
         struct probe_pl_column *c = &probe_pl_columns[i];
         struct probe_pl_result *r = &probe_pl_result[c->n - SPLASH_RASTER_IMAGE_OUTS];
+        probe_context = (struct probe_error_context){ i, PROBE_CONTEXT_NONE, c->n, PROBE_CONTEXT_NONE };
+        if (c->scan_reason == PROBE_SCAN_ERROR) { r->qualified = 0; continue; }
         if (r->poll.min <= 0) { c->scan_reason = 2; r->qualified = 0; continue; }
         probe_pl_scan(s, c, r);
+        if (probe_errors && !probe_fatal) c->scan_reason = PROBE_SCAN_AFTER_ERROR;
         if (c->completed != PROBE_HPERIODS || c->early || c->timeout || c->low_after)
             r->qualified = 0;
     }
@@ -1037,8 +1114,9 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
     /* A zero poll lower bound cannot size a finite physical-edge wait.
      * Leave these diagnostic distributions empty, as for the skipped scan. */
     if (probe_pl_result[0].poll.min <= 0) return;
-    for (u32 n = 0; n < PROBE_PL_SLOTS && !probe_errors; n++) {
+    for (u32 n = 0; n < PROBE_PL_SLOTS && !probe_fatal; n++) {
         struct probe_pl_column *c = &probe_pl_joint[n];
+        probe_context.col = PROBE_CONTEXT_NONE;
         c->n = n;
         c->row[0] = probe_pl_columns[42].row[0]; /* first N6, prefix N */
         c->row[1] = probe_pl_columns[42].row[1];
@@ -1056,9 +1134,15 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
             emitters[n](probe_pl_prepare(c, phase ^ 1));
             (void)probe_pl_prepare(c, phase);
             unsigned long long one = 0;
+            u32 errors_before = probe_errors;
             (void)probe_pl_measure(s, PROBE_PL_JOINT, c, emitters[n], phase, &one);
+            probe_pl_joint_reason[n][phase] = probe_errors != errors_before ? PROBE_SCAN_ERROR :
+                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;
+            if (probe_fatal) return;
         }
     }
+    probe_context = (struct probe_error_context){ PROBE_CONTEXT_NONE,
+        PROBE_CONTEXT_NONE, PROBE_CONTEXT_NONE, PROBE_CONTEXT_NONE };
 }
 /* Survey the 99 four-line entry deadlines without issuing palette changes.
  * This is measurement, not the LC-B player: observed execution costs and
@@ -1110,9 +1194,9 @@ static void probe_entries(const struct SplashRaster *s, long long initial_margin
                 e->irq_us.min += span - probe_cost[PROBE_C].upper_us;
             if (span > probe_c_min) e->irq_us.max += span - probe_c_min;
             last = now;
-            if (probe_errors) return;
+            if (probe_fatal) return;
         }
-        if (now < e->planned_us) { probe_errors++; return; }
+        if (now < e->planned_us) { probe_error(PROBE_ERR_ENTRY_WAIT, e->planned_us - now); return; }
         e->entered_us = now;
         /* Exercise the entry precheck/save/recheck/first-IN sequence only
          * when its measured cost fits the <=2H contract. No palette OUT. */
@@ -1138,10 +1222,10 @@ static int probe_bit(u32 port, u32 bit, int high, unsigned long long *stamp)
     for (u32 n = 0; n < PROBE_POLLS; n++) {
         u32 status = inp(port);
         *stamp = probe_now();
-        if (probe_errors || *stamp > deadline) break;
+        if (probe_fatal || *stamp > deadline) break;
         if (!!(status & bit) == high) return 0;
     }
-    probe_errors++;
+    probe_error(PROBE_ERR_BIT_WAIT, *stamp);
     return -1;
 }
 static void probe_field(const char *key, unsigned long long n)
@@ -1251,6 +1335,7 @@ static void probe_pl_details_dump(void)
     for (u32 n = 0; n < PROBE_PL_SLOTS; n++) for (u32 phase = 0; phase < 2; phase++) {
         const struct probe_pl_peak *p = &probe_pl_joint[n].peak[phase][PROBE_PL_JOINT];
         probe_field("SPLR pl_joint_n=", n); probe_field(" phase=", phase);
+        probe_field(" scan_reason=", probe_pl_joint_reason[n][phase]);
         probe_field(" den=", probe_pl_result[0].budget.den);
         probe_field(" count=", p->count);
         probe_pl_peak_fields(" ", p);
@@ -1259,6 +1344,7 @@ static void probe_pl_details_dump(void)
         serial_puts_polled("\n");
         const struct probe_pl_detail *d = &probe_pl_outside[n][phase];
         probe_field("SPLR pl_joint_outer_n=", n); probe_field(" phase=", phase);
+        probe_field(" scan_reason=", probe_pl_joint_reason[n][phase]);
         probe_field(" den=", probe_pl_result[0].budget.den);
         probe_pl_peak_fields(" raw_", &d->raw);
         probe_pl_peak_fields(" upper_", &d->upper);
@@ -1321,7 +1407,8 @@ static void probe_pl_dump(void)
         probe_field(" early=", c->early); probe_field(" timeout=", c->timeout);
         probe_field(" high_after=", c->high_after); probe_field(" low_after=", c->low_after);
         probe_field(" window_ok=", c->window_ok); probe_field(" elapsed_us=", c->elapsed_us);
-        /* 1=ran, 2=zero Q lower, 3=prior measurement error, 4=open wait. */
+        /* 1=ran, 2=zero Q lower, 3=not measured, 4=open wait,
+         * 5=column measurement error, 6=continued after error. */
         probe_field(" scan_reason=", c->scan_reason);
         serial_puts_polled("\n");
         /* Q is the poll batch (seed shown separately); D/W use the same
@@ -1408,7 +1495,8 @@ void platform_splash_probe(void)
     serial_init(SYS_SERIAL_BAUD);
     serial_get_status(&mode, &baud, &fifo);
     serial_diag_get(&oe0, &fe0, &pe0, &ov0);
-    probe_errors = probe_rx_count = probe_rx_missing = probe_rx_bytes = probe_rx_value = probe_rx_next = 0;
+    probe_error_reset();
+    probe_rx_count = probe_rx_missing = probe_rx_bytes = probe_rx_value = probe_rx_next = 0;
     probe_previous = 0;
     probe_hd = (struct probe_hdiag){0};
     probe_pl_count = 0;
@@ -1436,7 +1524,7 @@ void platform_splash_probe(void)
     for (u32 poll = 0; poll < PROBE_POLLS; poll++) {
         u32 g = inp(GDC_GFX_STAT), t = inp(GDC_TEXT_STAT);
         stamp = probe_now();
-        if (probe_errors || stamp > edge_deadline) break;
+        if (probe_fatal || stamp > edge_deadline) break;
         if (!(old_g & GDC_STAT_VSYNC) && (g & GDC_STAT_VSYNC) && completed <= PROBE_FRAMES)
             probe_edges[completed++].rise = stamp;
         if ((old_g & GDC_STAT_VSYNC) && !(g & GDC_STAT_VSYNC) && completed)
@@ -1450,13 +1538,13 @@ void platform_splash_probe(void)
             probe_edges[PROBE_FRAMES].fall && probe_edges[PROBE_FRAMES].text_fall) break;
     }
     if (completed != PROBE_FRAMES + 1 || text_edges != PROBE_FRAMES + 1 ||
-        !probe_edges[PROBE_FRAMES].fall || !probe_edges[PROBE_FRAMES].text_fall) probe_errors++;
-    if (probe_errors) goto dump;
+        !probe_edges[PROBE_FRAMES].fall || !probe_edges[PROBE_FRAMES].text_fall) probe_error(PROBE_ERR_V_INCOMPLETE, completed);
+    if (probe_fatal) goto dump;
     probe_classify(s);
     hcompleted = probe_hblank(s);
-    if (probe_errors) goto dump;
+    if (probe_fatal) goto dump;
     probe_pl_measure_all(s);
-    if (probe_errors) goto dump;
+    if (probe_fatal) goto dump;
     /* 8/16 single OUTs; 1/4/8 four-OUT colors; matching empty-loop cost.
      * Leave IF enabled, including all sixteen initial colors. */
     for (u32 k = 0; k < 3; k++) {
@@ -1515,7 +1603,7 @@ void platform_splash_probe(void)
             .closed_max = d->if0_max_us, .closed_total = d->if0_total_us,
             .late = s->late - late, .dropped = s->dropped - drop,
             .unapplied = s->unapplied - unapplied, .tick = tick_count - tick };
-        if (rc || d->overflow || d->clock_errors) { probe_errors++; break; }
+        if (rc || d->overflow || d->clock_errors) { probe_error(PROBE_ERR_TABLE_DIAG, rc); break; }
         probe_receive();
     }
 dump:
@@ -1636,7 +1724,21 @@ dump:
         probe_field(" target_us=", e->target_us); probe_field(" begin_us=", e->begin_us);
         probe_field(" end_us=", e->end_us); probe_field(" applied=", e->applied); serial_puts_polled("\n");
     }
-    probe_field("SPLR errors=", probe_errors); probe_field(" missing_h=", missed_h);
+    if (probe_errors) {
+        probe_field("SPLR error_first reason=", probe_error_first.reason);
+        probe_field(" col=", probe_error_first.context.col);
+        probe_field(" phase=", probe_error_first.context.phase);
+        probe_field(" n=", probe_error_first.context.n);
+        probe_field(" kind=", probe_error_first.context.kind);
+        probe_field(" value=", probe_error_first.value);
+        serial_puts_polled("\n");
+    }
+    probe_field("SPLR errors=", probe_errors);
+    for (u32 reason = 1; reason < PROBE_ERR_COUNT; reason++) {
+        probe_field(" reason_", reason);
+        probe_field("=", probe_error_counts[reason]);
+    }
+    probe_field(" missing_h=", missed_h);
     probe_field(" clamps=", clamps); probe_field(" ticks=", ticks);
     probe_field(" oe=", oe - oe0); probe_field(" fe=", fe - fe0); probe_field(" pe=", pe - pe0);
     probe_field(" overflow=", ov - ov0); probe_field(" rx_words=", probe_rx_count);
