@@ -13,7 +13,8 @@ CHECK = dict(name='ext2-write-run-host', tier=1, budget=900,
              covers=['fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',
-                     'tools/tests/b8_e2fsck.py', 'drivers/block/pc98pt.c',
+                     'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',
+                     'drivers/block/pc98pt.c',
                      'drivers/block/pc98pt.h', 'include/platform_device.h',
                      'include/ide_contract.h', 'tools/tests/ext2_write_run_host.c',
                      'tools/tests/test_ext2_write_run.py'], needs=[])
@@ -52,10 +53,13 @@ def build(product, exe):
 def main(args):
     with tempfile.TemporaryDirectory(prefix='os32-ext2-run-') as tmp:
         directory = Path(tmp)
+        batch.check_cache(directory / 'cache-check')
+        oracle = batch.OracleCache(batch.fsck)
         exe = directory / 'run'
         build(ROOT / 'fs/ext2', exe)
         for case in [a for a in args if not a.startswith('--')] or CASES:
-            batch.exercise(exe, case, directory)
+            batch.exercise(exe, case, directory, oracle)
+        oracle.report()
         if '--baseline' in args:
             mirror = directory / 'baseline/fs'
             shutil.copytree(ROOT / 'fs', mirror)

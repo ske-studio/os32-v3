@@ -8,13 +8,15 @@ import sys
 import tempfile
 import host32
 import b8_e2fsck
+from ext2_oracle_cache import OracleCache, check_cache
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-write-batch-host', tier=1, budget=900,
              covers=['fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',
-                     'tools/tests/b8_e2fsck.py', 'drivers/block/pc98pt.c',
+                     'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',
+                     'drivers/block/pc98pt.c',
                      'drivers/block/pc98pt.h', 'include/platform_device.h',
                      'include/ide_contract.h'], needs=[])
 ROOT = Path(__file__).resolve().parents[2]
@@ -137,10 +139,11 @@ def media_check(image):
             raise AssertionError('unrelated guard content changed')
 
 
-def fsck(image, clean):
+def fsck(image, clean, *, env=None, checker='e2fsck'):
     media_check(image)
-    env = dict(os.environ, LC_ALL='C')
-    result = subprocess.run(['e2fsck', '-fn', str(image)], capture_output=True,
+    if env is None:
+        env = dict(os.environ, LC_ALL='C')
+    result = subprocess.run([checker, '-fn', str(image)], capture_output=True,
                             text=True, env=env, timeout=30)
     text = result.stdout + result.stderr
     allowed, bad = b8_e2fsck.classify(text, image)
@@ -149,9 +152,9 @@ def fsck(image, clean):
     if not clean:
         fixed = image.with_suffix('.fixed')
         shutil.copyfile(image, fixed)
-        repair = subprocess.run(['e2fsck', '-fy', str(fixed)], capture_output=True,
+        repair = subprocess.run([checker, '-fy', str(fixed)], capture_output=True,
                                 text=True, env=env, timeout=30)
-        verify = subprocess.run(['e2fsck', '-fn', str(fixed)], capture_output=True,
+        verify = subprocess.run([checker, '-fn', str(fixed)], capture_output=True,
                                 text=True, env=env, timeout=30)
         media_check(fixed)
         if repair.returncode not in (0, 1) or verify.returncode:
@@ -159,7 +162,7 @@ def fsck(image, clean):
     return len(allowed)
 
 
-def exercise(exe, case, directory):
+def exercise(exe, case, directory, oracle=fsck):
     proc = subprocess.Popen(host32.command([str(exe), case, str(directory)], cwd=ROOT),
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True)
@@ -168,10 +171,10 @@ def exercise(exe, case, directory):
         for line in proc.stdout:
             if line.startswith('@@IMAGE '):
                 clean, stopped = map(int, line.split()[1:])
-                repairs += fsck(directory / 'final.img', clean)
+                repairs += oracle(directory / 'final.img', clean)
                 samples += 1
                 if stopped:
-                    repairs += fsck(directory / 'stop.img', False)
+                    repairs += oracle(directory / 'stop.img', False)
                     samples += 1
                 proc.stdin.write('\n'); proc.stdin.flush()
             else:
@@ -187,11 +190,14 @@ def exercise(exe, case, directory):
 def main(args):
     with tempfile.TemporaryDirectory(prefix='os32-ext2-batch-') as tmp:
         directory = Path(tmp)
+        check_cache(directory / 'cache-check')
+        oracle = OracleCache(fsck)
         exe = directory / 'batch'
         build(ROOT / 'fs/ext2', exe)
         cases = [a for a in args if not a.startswith('--')] or CASES
         for case in cases:
-            exercise(exe, case, directory)
+            exercise(exe, case, directory, oracle)
+        oracle.report()
         if '--baseline' in args:
             base = directory / 'base/ext2'
             base.mkdir(parents=True)
