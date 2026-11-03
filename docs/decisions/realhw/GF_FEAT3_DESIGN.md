@@ -677,3 +677,8 @@ PM 登録段が `kernel/module/kdebug_imports.def` に symbol=geforce_accel_ops/
 
 ## 追記 (2026-11-04、C1 の欠け — 試験面の幾何、PM 決定)
 - `gf3_service.test` (T0 が借りる試験面) の幾何は表示面に合わせる: `fmt` = 表示面の fmt、`width` = 表示面の width、`pitch` = 表示面の pitch (64B の整列を満たさないときは 64B に切り上げ)、`height` = min(表示面の height, floor(試験面の予約の bytes / pitch))。予約の範囲は結線の追記の N2 (表示の予約の末尾の次の 4KiB 境界から B 以下の最後の 4KiB 境界まで)。height が 0 なら GF2_ENOSPC で試験面を公開しない (表示は続ける)。根拠: T0 の比べ方 (§13) は表示面と同じ形式・幅の面への描画と読み戻しで、別の幾何は要らない。
+
+## 追記 (2026-11-04、T1 の欠け — T0 の入口と case、PM 決定)
+- T0 の公開の入口は `int gf_accel_test(u32 case_id)` (T0 の実装、kdebug/gf_accel_test.c)。case_id は 0 init / 1 fill / 2 copy / 3 mono / 4 ifc / 5 upload / 6 download / 7 scale / 8 present-m2mf / 9 all。宣言は T0 と同じ置き場のヘッダー (kdebug/gf_accel_test.h、T1 が足す) に置く。
+- 既存の GF の試験の入口 (kdebug/gf_command_test.c) に新しい case を 1 つ足す: `GF2_VBLANK` の次の番号を `GF3_ACCEL` とし、引数の 1 語を case_id として `gf_accel_test` へ dispatch する。追従する kdebug/gf_command_wire.h (case の番号)・kdebug/gfinit.c の上限の検査 (GF2_VBLANK まで → GF3_ACCEL まで)・shell の側の case の名前の表は、T1 の段が持つ (他の段は触らない)。
+- build/hwdev.mk の HWDEV_GF への gf_accel_test の登録は PM が統合の段で足す。
