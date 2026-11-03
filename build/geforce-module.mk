@@ -1,7 +1,7 @@
 # T5c-5b: reuse T4 function imports, VA0 packing and paired distribution.
 GEFORCE_OUT := $(BUILD_OUT)/geforce
 GEFORCE_GEN := $(addprefix $(GEFORCE_OUT)/,geforce_imports.h geforce_imports.json geforce_import_slots.c geforce_import_stubs.S geforce_provider_types.c geforce_kexports.c)
-GEFORCE_DEF_SOURCES := hwdev/gf/gf1_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
+GEFORCE_DEF_SOURCES := hwdev/gf/command.h hwdev/gf/gf1_test.h kdebug/gfinit_bus.h arch/x86/arch_io.h drivers/pci/pci.h drivers/video/geforce/geforce_module.h drivers/video/geforce/geforce_tick.h drivers/video/pc98/pc98_route.h gfx/palette.h hwdev/gf/foundation.h hwdev/gf/internal.h hwdev/gf/production.h include/gfx_hal.h include/gfx_mode.h include/io.h include/kprintf.h include/sys.h include/video_service.h kernel/irq/irq.h kernel/irq/tick.h lib/kstring.h lib/serial_diag.h mm/paging.h mm/pgalloc.h
 $(GEFORCE_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/geforce_imports.def $(GEFORCE_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module geforce --out-dir $(GEFORCE_OUT)
 
@@ -14,7 +14,8 @@ $(GEFORCE_OUT)/backend_geforce.o: drivers/video/geforce/backend_geforce.c $(GEFO
 $(GEFORCE_OUT)/gf_present.o: drivers/video/geforce/gf_present.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GEFORCE_INC) -c $< -o $@
 # P3 service and P2 runner are linked independently of diagnostic HWDEV/KDEBUG.
-GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
+GEFORCE_LAYER2_SOURCES := $(addprefix hwdev/gf/,fifo.c push.c dmaobj.c ramht.c grctx.c gr.c fence.c fault.c command_platform.c command.c)
+GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER2_SOURCES),$(wildcard hwdev/gf/*.c)) $(GEFORCE_LAYER2_SOURCES) $(wildcard hwdev/gf/display/*.c hwdev/gf/op/*.c) hwdev/gf_load_state.c kdebug/gfinit_decode.c kdebug/gfinit_pll.c kdebug/gfinit_resources.c
 GEFORCE_SERVICE_OBJS := $(patsubst %.c,$(GEFORCE_OUT)/%.o,$(GEFORCE_SOURCES))
 $(GEFORCE_SERVICE_OBJS): $(GEFORCE_OUT)/%.o: %.c $(GEFORCE_GEN) build/config.mk build/geforce-module.mk
 	mkdir -p $(@D)
@@ -34,6 +35,7 @@ $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(GEFORCE_OUT)/geforce_kexports.o
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: $(GEFORCE_GEN)
 $(KERNEL_OBJ_PREFIX)drivers/video/geforce/geforce_module.o $(R1_OBJ)/drivers/video/geforce/geforce_module.o: private CFLAGS_BASE += -I$(GEFORCE_OUT)
 
+# mkmod enforces the GEFORCE policy: image <= 128 KiB and imports <= 32.
 define pack_geforce
 	python3 tools/mkmod.py --module-id 12 --elf $(GEFORCE_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 endef
@@ -42,6 +44,17 @@ $(BUILD_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_impo
 $(R1_OUT)/geforce.mod: $(GEFORCE_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json build/geforce-module.mk
 	$(call pack_geforce,$(R1_OUT)/vmkernel.lz4)
 -include $(GEFORCE_OBJS:.o=.d) $(GEFORCE_OUT)/geforce_kexports.d $(GEFORCE_OUT)/geforce_provider_types.d
+
+# The DMA adapter stays resident and is shared through its typed import.
+GEFORCE_DMA_OBJ := drivers/video/geforce/geforce_dma.o
+GEFORCE_DMA_KERNEL_OBJ := $(addprefix $(KERNEL_OBJ_PREFIX),$(GEFORCE_DMA_OBJ))
+GEFORCE_DMA_R1_OBJ := $(addprefix $(R1_OBJ)/,$(GEFORCE_DMA_OBJ))
+C_KERNEL_OBJ += $(GEFORCE_DMA_KERNEL_OBJ)
+R1_OBJECTS += $(GEFORCE_DMA_R1_OBJ)
+$(BUILD_OUT)/kernel.elf: $(GEFORCE_DMA_KERNEL_OBJ)
+$(R1_OUT)/kernel.elf: $(GEFORCE_DMA_R1_OBJ)
+$(GEFORCE_DMA_KERNEL_OBJ) $(GEFORCE_DMA_R1_OBJ): $(LAYOUT_HEADER) build/kernel.mk build/config.mk
+-include $(GEFORCE_DMA_KERNEL_OBJ:.o=.d) $(GEFORCE_DMA_R1_OBJ:.o=.d)
 
 # Identification is also needed before module loading / ledger freeze.
 GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o
