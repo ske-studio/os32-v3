@@ -1,5 +1,6 @@
 /* GF video operations. Resource/ROM/A2 ownership is supplied by P4. */
 #include "internal.h"
+#include "command.h"
 static int gf_failure(struct gf_display_context *c)
 {
     u32 section=c->section,ordinal=c->ordinal,target=c->target;
@@ -35,6 +36,10 @@ static int gf_start(void *v, u32 mode_id, const u8 *rgb)
         !gfinit_mode_pll_ok(&c->mode) || gf_display_modeset(c)) goto fail;
     c->section=GF_DISPLAY_CHECK;
     if (gf_display_checks(c) || c->owner->foundation_start(c)) goto fail;
+    struct gf_foundation *f=0;
+    struct gf2_chan *ch=c->owner->command_get ? c->owner->command_get(c,&f) : 0;
+    int rc;
+    if (ch && (rc=gf2_start(ch,f))) {c->last_rc=rc;goto fail;}
     c->active=true;c->blank=false;c->last_rc=0;
     return 0;
 fail:
