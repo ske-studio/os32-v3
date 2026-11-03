@@ -279,3 +279,18 @@ C0 の初回は `rc=gf2_fence_emit(ch,&f,dl); if (!rc) rc=gf2_fence_wait(ch,f,dl
 手本（N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau）: `N/nouveau_chan.c:469–478,496–497` は ring/NOP と fence context の初期化、`N/nv17_fence.c:90–93` は NV10 emit/read の採用、`N/nv10_fence.c:33–41,53–55` は固定 reference の reserve/write/kick と読出し。INIT/RUN の区別と初回完了試験は OS32 の契約であり nouveau の状態値ではない。
 確定本文を覆す必要なし：初回成功→RUN と一般 emit の RUN 制限を保ち、未定義だった内部初回 reference の境界を補う。リポジトリは未編集。
 
+## 追記: B0 の fifo の 7 本の担当と C0 の呼ぶ順 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-b0/ADDENDUM.md (B0 の sol の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 直しが要る → r2 写してよい)。**「確定」節の 7 本の注記はこの追記で置き換える** (宣言は変えない)。
+
+確定節 :253–259 の注記を以下で置換する（宣言の変更0行、設計を覆す必要なし）。順序は push DMA 構築後に gf2_fifo_init → gf2_fifo_bind_gr → gf2_fifo_start。参照の fifo/・fb/ は設計本文の N/nvkm/engine/fifo/・N/nvkm/subdev/fb/。
+int  gf2_fb_init(struct gf2_chan *); /* 停止ゲート後、PCI dmaobj 前に 100850=80000000→100800=1（fb/nv44.c:48–53）。 */
+int  gf2_fifo_init(struct gf2_chan *); /* §2:43 の RAMFC 128B zero→+00/+04=B、+0c=push_dma.off>>4、+18=30086078、+3c=0001ffff（fifo/nv40.c:39–58）→§2:44–45 の表レジスタ・無効chid・開放（同:190–228）。PUSH0=1→PULL0=1→CACHES=1 は同:226–228、2100/2140 は書かない（F1 所有；手本の IRQ ACK/enable は fifo/nv40.c:223–224）。 */
+int  gf2_fifo_bind_gr(struct gf2_chan *, u32 ctx_off); /* B5 が ctx.off を渡す。2500 bit0=0→active chid=0 の場合のみ32e0=ctx_off>>4→RAMFC+38に同値→2500 bit0=1（fifo/nv40.c:125–164）。 */
+int  gf2_fifo_start(struct gf2_chan *); /* MODE(2504) bit0=1 のみ（fifo/nv04.c:92–99）。RAMFC は書かず、DMA_PUSH・PULL0 の書込みは不要。PULL0 は init の開放済み（fifo/nv40.c:226–228）；DMA_PUSH を追加で有効化しない。 */
+void gf2_fifo_stop(struct gf2_chan *); /* 停止・active chid=0 の RAMFC 退避/レジスタクリア・無効chid選択・MODE解除（fifo/nv04.c:41–88、NV40 layout は fifo/nv40.c:64–87）。 */
+int  gf2_fifo_pause(struct gf2_chan *); /* drain 後、2500=0→PULL0 bit0=0→HASH_BUSY消滅待ち→HASH無効化。HASH_FAILED/期限切れは§4・§6の既定処理（fifo/nv04.c:212–243）。 */
+void gf2_fifo_resume(struct gf2_chan *); /* 表書換え/publish後、PULL0 bit0=1→2500=1（fifo/nv04.c:247–254）。 */
+C0 の順は gf2_fifo_init → gf2_gr_init（bind_gr を含む）→ gf2_fifo_start。§2 の「GR初期化」は GR の文脈の確保と読む（RAMFC 初期値: fifo/nv40.c:39–58、GR bind: 同:125–164、開始: fifo/nv04.c:92–99）。+38 の退避・復元は足さない。
+r1→r2 の変更: P2 の C0 呼出し順と §2 の解釈を明記し、P3 の 2100/2140 は B0 が書かず F1 所有と明記。
+
