@@ -1,11 +1,10 @@
-"""OSRI fixed conversion and loader tests with generated images and VFS stub."""
+"""OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
              covers=['gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
                      'lib/le_internal.h', 'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=[], budget=60)
 
 import argparse
 import ctypes
-import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -83,11 +82,11 @@ def run_loader(td, data, expected):
 def check():
     spec = importlib.util.spec_from_file_location('img2osri', os.environ.get('OSRI_CONVERTER_SOURCE', ROOT/'tools/img2osri.py'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-    for option, value in (('--events', '101'), ('--per-line', '2')):
+    for option, value in (('--hblank-outs', '7'), ('--band', '3')):
         result = subprocess.run([sys.executable, str(ROOT/'tools/img2osri.py'), 'missing.png',
-                                 '-o', 'unused.osri', '--preview', 'unused.png', option, value],
+                                 '-o', 'unused.osri', option, value],
                                 capture_output=True, text=True)
-        assert result.returncode != 0 and 'invalid event' in result.stderr
+        assert result.returncode != 0 and 'invalid choice' in result.stderr
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         src = Image.new('RGB', (640, 400))
@@ -100,9 +99,6 @@ def check():
         assert len(data) == 128096 and struct.unpack_from('<I', data, 48)[0] == crc
         zero = bytearray(data); zero[48:52] = bytes(4)
         assert zlib.crc32(zero) == crc
-        output = td/'image.osri'; output.write_bytes(data)
-        mod.preview(output, src, td/'preview.png')
-        assert Image.open(td/'preview.png').size == (1280, 420)
         # Derive palette indices from the generated source pixels, then pack each
         # bit in display order independently of the converter and loader.
         pal = struct.unpack_from('<16H', data, 64)
@@ -116,7 +112,13 @@ def check():
                 for p in range(4):
                     if index & (1 << p):
                         expected[p * 32000 + y * 80 + x // 8] += 2 ** (7 - x % 8)
-        assert run_loader(td, data, expected) == 0
+        # The loader is still v1 until F1; use an equivalent static v1 fixture.
+        legacy = bytearray(data)
+        struct.pack_into('<H', legacy, 4, 1)
+        struct.pack_into('<H', legacy, 44, 4)
+        legacy[48:52] = bytes(4)
+        struct.pack_into('<I', legacy, 48, zlib.crc32(legacy))
+        assert run_loader(td, legacy, expected) == 0
 
         # A gradient contains intermediate colors and exceeds the 16-color palette.
         middle = Image.new('RGB', (640, 400))
@@ -137,97 +139,28 @@ def check():
         pattern.putdata([((y * 255 // 399), (x * 255 // 639),
                           ((y // 20) * 41 + (x // 160) * 37) % 256)
                          for y in range(400) for x in range(640)])
-        _, limited_events, _ = mod.palette_history(pattern, 'B', 3, 2, 4, 8)
-        assert len(limited_events) <= 3
-        dynamic, _ = mod.convert(pattern, 'B', 100, 1, 4, 8)
+        dynamic, _ = mod.convert(pattern, band=2)
         count = struct.unpack_from('<I', dynamic, 36)[0]
-        assert 0 < count <= 100
+        assert 0 < count <= 597
         assert len(dynamic) == 128096 + count * 8
-        initial, expected_events, history = mod.palette_history(pattern, 'B', 100, 1, 4, 8)
+        initial, expected_events, history = mod.palette_history(pattern, band=2)
         events = [struct.unpack_from('<HBBHH', dynamic, 128096 + 8 * i) for i in range(count)]
         assert [(y, i, color) for y, i, _, color, _ in events] == expected_events
         current = list(initial)
-        previous = -2
+        previous = (0, -1)
         for y, index, reserved, color, reserved2 in events:
-            assert y % 4 == 0 and y - previous >= 2 and not reserved and not reserved2
+            assert y % 2 == 0 and (y, index) > previous and not reserved and not reserved2
             assert current[index] != color
             current[index] = color
-            previous = y
-        output.write_bytes(dynamic)
-        mod.preview(output, pattern, td/'dynamic.png')
-        preview = Image.open(td/'dynamic.png').load()
-        pal = list(initial)
+            previous = (y, index)
         event_index = 0
-        dynamic_error = fixed_error = 0
-        fixed_data, _ = mod.convert(pattern)
-        fixed_pal = [mod.expand(c) for c in struct.unpack_from('<16H', fixed_data, 64)]
-        pattern_pixels = pattern.load()
+        current = list(initial)
         for y in range(400):
             while event_index < count and events[event_index][0] == y:
-                _, i, _, color, _ = events[event_index]
-                pal[i] = color
+                _, index, _, color, _ = events[event_index]
+                current[index] = color
                 event_index += 1
-            assert pal == history[y]
-            for x in range(640):
-                off = 96 + y * 80 + x // 8
-                mask = 128 >> (x % 8)
-                index = sum(1 << p for p in range(4) if dynamic[off + p * 32000] & mask)
-                fixed_index = sum(1 << p for p in range(4) if fixed_data[off + p * 32000] & mask)
-                rgb = mod.expand(pal[index])
-                assert preview[x, y + 20] == rgb
-                original_rgb = pattern_pixels[x, y]
-                dynamic_error += sum((rgb[k] - original_rgb[k]) ** 2 for k in range(3))
-                fixed_error += sum((fixed_pal[fixed_index][k] - original_rgb[k]) ** 2 for k in range(3))
-        assert dynamic_error < fixed_error
-        # The global variance must drive both palette selection and distance.
-        biased = Image.new('RGB', (640, 400))
-        biased.putdata([((x % 16) * 17, ((y // 4) % 4) * 17, 0)
-                        for y in range(400) for x in range(640)])
-        default, _ = mod.convert(biased)
-        # Fixed baseline for the default allocator, including header and planes.
-        assert hashlib.sha256(default).hexdigest() == '692977942866276ec36f3b1f5c1dc51a84792fc323b56f9d2922a99d2a71b21e'
-        weights = mod.variance_weights(biased)
-        assert weights[0] > weights[1] > weights[2] == 0
-        old_colors = mod.quantized_colors(biased, 16)
-        new_colors = mod.variance_colors(biased, 16, weights)
-        assert len({c >> 8 & 15 for c in new_colors}) > len({c >> 8 & 15 for c in old_colors})
-        assert len(set(new_colors)) == len(new_colors) <= 16
-        assert mod.color_distance((17, 0, 0), (0, 17, 0), weights) == 289 * (weights[0] + weights[1])
-        decoded_red = {}
-        for mode in ('A', 'B', 'C'):
-            variance, _ = mod.convert(biased, mode, 3, 1, 4, 8, 'variance')
-            repeated, _ = mod.convert(biased, mode, 3, 1, 4, 8, 'variance')
-            assert variance == repeated
-            count = struct.unpack_from('<I', variance, 36)[0]
-            assert len(variance) == 128096 + 8 * count and 0 < count <= 3
-            events = [struct.unpack_from('<HBBHH', variance, 128096 + i * 8) for i in range(count)]
-            previous = 0
-            palette = list(struct.unpack_from('<16H', variance, 64))
-            for y, index, reserved, color, reserved2 in events:
-                assert y % 4 == 0 and y - previous >= 2 and index < 16
-                assert not reserved and not reserved2 and color < 4096 and palette[index] != color
-                if mode == 'B':
-                    assert index >= 8
-                palette[index] = color
-                previous = y
-            if mode == 'B':
-                median, _ = mod.convert(biased, mode, 3, 1, 4, 8)
-                for name, data in (('median', median), ('variance', variance)):
-                    palette = list(struct.unpack_from('<16H', data, 64))
-                    count = struct.unpack_from('<I', data, 36)[0]
-                    assert count > 0
-                    for i in range(count):
-                        y, index, _, color, _ = struct.unpack_from('<HBBHH', data, 128096 + 8 * i)
-                        if y <= 12:
-                            palette[index] = color
-                    colors = set()
-                    for x in range(640):
-                        off = 96 + 12 * 80 + x // 8
-                        mask = 128 >> (x % 8)
-                        index = sum(1 << p for p in range(4) if data[off + p * 32000] & mask)
-                        colors.add(palette[index])
-                    decoded_red[name] = {color >> 8 for color in colors}
-                assert len(decoded_red['variance']) > len(decoded_red['median'])
+            assert current == history[y]
         print('OSRI conversion and loader: GREEN')
 
 
@@ -236,18 +169,13 @@ def main():
     args = parser.parse_args(); check()
     if args.mutate:
         mutations = [
-            ('alloc-wiring', 'tools/img2osri.py', "    weights = variance_weights(source) if alloc == 'variance' else [1, 1, 1]\n    colors, events, history = palette_history", "    alloc = 'median'\n    weights = variance_weights(source) if alloc == 'variance' else [1, 1, 1]\n    colors, events, history = palette_history", 'OSRI_CONVERTER_SOURCE'),
-            ('variance-weights', 'tools/img2osri.py', 'return weights if any(weights) else [1, 1, 1]', 'return [1, 1, 1]', 'OSRI_CONVERTER_SOURCE'),
-            ('variance-distance', 'tools/img2osri.py', 'weights[k] * (a[k] - b[k]) ** 2', '(a[k] - b[k]) ** 2', 'OSRI_CONVERTER_SOURCE'),
-            ('variance-split', 'tools/img2osri.py', '* weights[channel]', '* (1 if weights[channel] else 0)', 'OSRI_CONVERTER_SOURCE'),
             ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
             ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
             ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
             ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
             ('bit-order', 'tools/img2osri.py', 'planes[p * PLANE + offset] |= 0x80 >> (x & 7)', 'planes[p * PLANE + offset] |= 1 << (x & 7)', 'OSRI_CONVERTER_SOURCE'),
-            ('budget', 'tools/img2osri.py', 'if y and len(events) < events_limit and y - last_line >= 2:', 'if y and (events_limit := 200) and y - last_line >= 2:', 'OSRI_CONVERTER_SOURCE'),
             ('same-color', 'tools/img2osri.py', 'events.append((y, index, color))', 'events.append((y, index, initial[index]))', 'OSRI_CONVERTER_SOURCE'),
-            ('band', 'tools/img2osri.py', 'range(0, H, band)', 'range(0, H, 1)', 'OSRI_CONVERTER_SOURCE'),
+            ('band', 'tools/img2osri.py', 'for y in range(band, H, band):', 'for y in range(1, H, 1):', 'OSRI_CONVERTER_SOURCE'),
             ('diffusion', 'tools/img2osri.py', 'd = rgb[c] - palette[index][c]', 'd = 0', 'OSRI_CONVERTER_SOURCE'),
         ]
         with tempfile.TemporaryDirectory() as td:

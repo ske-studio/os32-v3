@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Convert a picture to the fixed-palette OSRI v1 format."""
+"""Convert a picture to OSRI v2 with the PL-B palette planner."""
 import argparse
-import json
 import struct
 import zlib
 
-from PIL import Image, ImageDraw, __version__ as pillow_version
+import numpy as np
+from PIL import Image, __version__ as pillow_version
 
 W, H = 640, 400
 PLANE = W * H // 8
 PIXELS_OFF, EVENTS_OFF = 96, 128096
+MAX_EVENTS = 1197
+MASKS = np.array([[bool(m & (1 << c)) for c in range(3)] for m in range(1, 8)])
 
 
 def resize_image(path):
@@ -37,135 +39,108 @@ def trunc16(n):
     return n // 16 if n >= 0 else -((-n) // 16)
 
 
-def quantized_colors(image, count):
-    q = image.quantize(colors=count, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+def quantized_colors(image):
+    """Used MEDIANCUT colors, rounded to RGB444, sorted and black padded."""
+    q = image.quantize(colors=16, method=Image.Quantize.MEDIANCUT,
+                       dither=Image.Dither.NONE)
     raw = q.getpalette()
-    counts = q.getcolors()
-    merged = {}
-    for n, i in counts:
-        color = rgb444(raw[3 * i:3 * i + 3])
-        merged[color] = merged.get(color, 0) + n
-    return sorted(merged, key=lambda c: (-merged[c], c))
+    colors = sorted({rgb444(raw[3 * i:3 * i + 3]) for _, i in q.getcolors()})
+    return colors + [0] * (16 - len(colors))
 
 
-
-def histogram444(image):
-    counts = {}
-    for count, rgb in image.getcolors(image.width * image.height):
-        color = rgb444(rgb)
-        counts[color] = counts.get(color, 0) + count
-    return sorted(counts.items())
+def distances(pixels, palette):
+    return np.sum((pixels[:, None, :].astype(np.int32) -
+                   palette[None, :, :].astype(np.int32)) ** 2, axis=2)
 
 
-def variance_weights(image):
-    hist = histogram444(image)
-    n = sum(count for _, count in hist)
-    weights = []
-    for shift in (8, 4, 0):
-        total = sum(((color >> shift) & 15) * count for color, count in hist)
-        squares = sum(((color >> shift) & 15) ** 2 * count for color, count in hist)
-        weights.append(n * squares - total * total)
-    return weights if any(weights) else [1, 1, 1]
+def out_count(old, new):
+    diff = old != new
+    slots = int(np.any(diff, axis=1).sum())
+    return int(diff.sum()) + max(0, slots - 1)
 
 
-def variance_colors(image, count, weights):
-    boxes = [histogram444(image)]
-    while len(boxes) < count:
+def optimize_row(old, pixels, endpoints, budget, band=1):
+    """Exact final OUT accounting, greedy gain per extra OUT.
+
+    Later refinements of a slot are merged before serialization, not executed
+    as intermediate writes. The first selected slot is preselected in active
+    display; all other index writes occur inside the same HBLANK.
+    """
+    p = old.copy()
+    pts = pixels.reshape(-1, 3).astype(np.int32)
+    weights = np.ones(len(pts), dtype=np.float64)
+    weights[band * W:] = 0.5
+    # Per-component lookup avoids a large three-channel candidate tensor.
+    component = [(pts[:, c, None] - np.arange(16)[None, :] * 17) ** 2
+                 for c in range(3)]
+    candidates = np.unique(endpoints.reshape(-1, 3), axis=0)
+    used = 0
+    for _ in range(2 * budget):
+        dp = distances(pts, p * 17).T
+        baseline = dp.min(axis=0)
+        base_loss = float(np.sum(baseline * weights))
         best = None
-        for i, box in enumerate(boxes):
-            n = sum(item[1] for item in box)
-            for channel, shift in enumerate((8, 4, 0)):
-                total = sum(((c >> shift) & 15) * num for c, num in box)
-                squares = sum(((c >> shift) & 15) ** 2 * num for c, num in box)
-                score = (n * squares - total * total) * weights[channel]
-                # Compare weighted variance exactly without floating point.
-                if score and (best is None or score * best[1] > best[0] * n * n):
-                    best = (score, n * n, i, shift)
+        for slot in range(16):
+            proposal = np.where(MASKS[:, None, :], candidates[None, :, :], p[slot])
+            proposal = np.unique(proposal.reshape(-1, 3), axis=0)
+            changed = np.count_nonzero(proposal != old[slot], axis=1)
+            old_diff = np.count_nonzero(p != old, axis=1)
+            components_other = int(old_diff.sum() - old_diff[slot])
+            slots_other = int(np.count_nonzero(old_diff) - (old_diff[slot] > 0))
+            costs = components_other + changed + np.maximum(0, slots_other + (changed > 0) - 1)
+            valid = (costs <= budget) & np.any(proposal != p[slot], axis=1)
+            proposal, costs = proposal[valid], costs[valid]
+            if not len(proposal):
+                continue
+            without = np.min(np.delete(dp, slot, axis=0), axis=0)
+            dc = sum(component[c][:, proposal[:, c]].T for c in range(3))
+            loss = np.sum(np.minimum(dc, without[None, :]) * weights, axis=1)
+            gain = base_loss - loss
+            scores = gain / np.maximum(1, costs - used)
+            k = int(np.argmax(scores))
+            if gain[k] <= 1e-7:
+                continue
+            key = (float(scores[k]), float(gain[k]), -int(costs[k]), -slot,
+                   tuple(-int(v) for v in proposal[k]))
+            if best is None or key > best[0]:
+                best = (key, slot, proposal[k], int(costs[k]))
         if best is None:
             break
-        _, _, i, shift = best
-        box = sorted(boxes.pop(i), key=lambda item: ((item[0] >> shift) & 15, item[0]))
-        n = sum(num for _, num in box)
-        cumulative = 0
-        split = 1
-        best_distance = n
-        # Split only between distinct channel levels, respecting RGB444's 16 levels.
-        for j in range(1, len(box)):
-            cumulative += box[j - 1][1]
-            if (box[j - 1][0] >> shift & 15) == (box[j][0] >> shift & 15):
-                continue
-            distance = abs(n - 2 * cumulative)
-            if distance < best_distance:
-                best_distance, split = distance, j
-        boxes.extend((box[:split], box[split:]))
-    merged = {}
-    for box in boxes:
-        n = sum(num for _, num in box)
-        components = [(sum(((c >> shift) & 15) * num for c, num in box) + n // 2) // n
-                      for shift in (8, 4, 0)]
-        color = components[0] << 8 | components[1] << 4 | components[2]
-        merged[color] = merged.get(color, 0) + n
-    return sorted(merged, key=lambda c: (-merged[c], c))
+        _, slot, value, used = best
+        p[slot] = value
+    assert out_count(old, p) <= budget
+    return p
 
 
-def color_distance(a, b, weights):
-    return sum(weights[k] * (a[k] - b[k]) ** 2 for k in range(3))
-
-def palette_history(source, mode, events_limit, per_line, band, fixed_colors, alloc="median", weights=None):
-    weights = weights if weights is not None else (variance_weights(source) if alloc == "variance" else [1, 1, 1])
-    quantize = (lambda image, count: variance_colors(image, count, weights)) if alloc == "variance" else quantized_colors
-    if mode == 'fixed':
-        colors = quantize(source, 16)
-        return (colors + [0] * 16)[:16], [], [colors + [0] * (16 - len(colors))] * H
-    fixed = quantize(source, 16)[:fixed_colors] if mode == 'B' else []
-    first = quantize(source.crop((0, 0, W, band)), 16)
-    initial = fixed + [c for c in first if c not in fixed]
-    initial = (initial + [0] * 16)[:16]
-    current = initial.copy()
-    history = []
+def palette_history(source, hblank_outs=5, band=1):
+    if source.size != (W, H) or source.mode != 'RGB':
+        raise ValueError('source must be 640x400 RGB')
+    if hblank_outs not in (5, 6) or band not in (1, 2, 4):
+        raise ValueError('invalid HBLANK budget or band')
+    pixels = np.asarray(source)
+    endpoints = np.array([[[c >> 8, c >> 4 & 15, c & 15]
+                           for c in quantized_colors(source.crop((0, y, W, y + band)))]
+                          for y in range(0, H, band)], dtype=np.uint8)
+    current = endpoints[0].copy()
+    initial = [(int(r) << 8) | (int(g) << 4) | int(b) for r, g, b in current]
+    history = [initial.copy() for _ in range(band)]
     events = []
-    last_line = -2
-    for y in range(0, H, band):
-        strip = source.crop((0, y, W, min(y + band, H)))
-        if y and len(events) < events_limit and y - last_line >= 2:
-            histogram = strip.getcolors(W * band)
-            candidates = sorted(quantize(strip, 16))
-            changes = []
-            for unused in range(min(per_line, events_limit - len(events))):
-                palette = [expand(c) for c in current]
-                best = None
-                distances = [[color_distance(rgb, c, weights) for c in palette]
-                             for _, rgb in histogram]
-                candidate_distances = {candidate: [color_distance(rgb, expand(candidate), weights) for _, rgb in histogram]
-                                       for candidate in candidates}
-                for index in range(len(fixed), 16):
-                    if any(i == index for i, _ in changes):
-                        continue
-                    baseline = [min(row) for row in distances]
-                    without = [min(row[:index] + row[index + 1:]) for row in distances]
-                    for candidate in candidates:
-                        if candidate == current[index]:
-                            continue
-                        delta = sum(histogram[j][0] * (min(without[j], distance) - baseline[j])
-                                    for j, distance in enumerate(candidate_distances[candidate]))
-                        choice = (delta, index, candidate)
-                        if best is None or choice < best:
-                            best = choice
-                if best is None or best[0] >= 0:
-                    break
-                _, index, candidate = best
-                current[index] = candidate
-                changes.append((index, candidate))
-            for index, color in sorted(changes):
+    for y in range(band, H, band):
+        planned = optimize_row(current, pixels[y:y + 2 * band],
+                               endpoints[y // band:y // band + 2], hblank_outs, band)
+        colors = [(int(r) << 8) | (int(g) << 4) | int(b) for r, g, b in planned]
+        for index in range(16):
+            if np.any(current[index] != planned[index]):
+                color = colors[index]
                 events.append((y, index, color))
-                last_line = y
-        history.extend([current.copy()] * min(band, H - y))
+        history.extend([colors.copy() for _ in range(band)])
+        current = planned
+    assert len(events) <= min(MAX_EVENTS, 3 * (H // band - 1))
     return initial, events, history
 
 
-def convert(source, mode='fixed', events_limit=100, per_line=1, band=4, fixed_colors=8, alloc='median'):
-    weights = variance_weights(source) if alloc == 'variance' else [1, 1, 1]
-    colors, events, history = palette_history(source, mode, events_limit, per_line, band, fixed_colors, alloc, weights)
+def convert(source, hblank_outs=5, band=1):
+    colors, events, history = palette_history(source, hblank_outs, band)
     src = source.load()
     planes = bytearray(PLANE * 4)
     error = [[0, 0, 0] for _ in range(W + 2)]
@@ -174,7 +149,7 @@ def convert(source, mode='fixed', events_limit=100, per_line=1, band=4, fixed_co
         nxt = [[0, 0, 0] for _ in range(W + 2)]
         for x in range(W):
             rgb = [max(0, min(255, src[x, y][c] + error[x + 1][c])) for c in range(3)]
-            index = min(range(16), key=lambda i: color_distance(rgb, palette[i], weights))
+            index = min(range(16), key=lambda i: sum((rgb[c] - palette[i][c]) ** 2 for c in range(3)))
             offset = y * (W // 8) + x // 8
             for p in range(4):
                 if index & (1 << p):
@@ -187,9 +162,9 @@ def convert(source, mode='fixed', events_limit=100, per_line=1, band=4, fixed_co
                 nxt[x + 2][c] += trunc16(d)
         error = nxt
     size = EVENTS_OFF + 8 * len(events)
-    header = struct.pack('<4sHHHHBBHIIIIIIHHHHIIII', b'OSRI', 1, 64, W, H, 4, 1, 0,
+    header = struct.pack('<4sHHHHBBHIIIIIIHHHHIIII', b'OSRI', 2, 64, W, H, 4, 1, 0,
                          size, 64, PIXELS_OFF, PLANE * 4, EVENTS_OFF, len(events),
-                         8, 0, band if events else 4, 0, 0, 0, 0, 0)
+                         8, 0, band, 0, 0, 0, 0, 0)
     entries = b''.join(struct.pack('<HBBHH', y, i, 0, c, 0) for y, i, c in events)
     data = bytearray(header + struct.pack('<16H', *colors) + planes + entries)
     crc = zlib.crc32(data)
@@ -197,66 +172,30 @@ def convert(source, mode='fixed', events_limit=100, per_line=1, band=4, fixed_co
     return data, crc
 
 
-def preview(path, source, out):
-    data = open(path, 'rb').read()
-    pal = [expand(c) for c in struct.unpack_from('<16H', data, 64)]
-    count = struct.unpack_from('<I', data, 36)[0]
-    events = [struct.unpack_from('<HBBHH', data, EVENTS_OFF + i * 8) for i in range(count)]
-    event_index = 0
-    image = Image.new('RGB', (W, H))
-    pix = image.load()
-    for y in range(H):
-        while event_index < count and events[event_index][0] == y:
-            _, index, _, color, _ = events[event_index]
-            pal[index] = expand(color)
-            event_index += 1
-        for x in range(W):
-            off = PIXELS_OFF + y * (W // 8) + x // 8
-            mask = 0x80 >> (x & 7)
-            idx = sum((1 << p) for p in range(4) if data[off + p * PLANE] & mask)
-            pix[x, y] = pal[idx]
-    reference_palette = source.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
-    reference = source.quantize(palette=reference_palette, dither=Image.Dither.FLOYDSTEINBERG).convert('RGB')
-    canvas = Image.new('RGB', (2 * W, H + 20), 'black')
-    canvas.paste(image, (0, 20)); canvas.paste(reference, (W, 20))
-    draw = ImageDraw.Draw(canvas)
-    draw.text((4, 3), 'OSRI', fill='white')
-    draw.text((W + 4, 3), '256 colors', fill='white')
-    canvas.save(out)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input')
     parser.add_argument('-o', '--output', required=True)
-    parser.add_argument('--mode', choices=['fixed', 'A', 'B', 'C'], default='B')
-    parser.add_argument('--events', type=int, default=100)
-    parser.add_argument('--per-line', type=int, default=1)
-    parser.add_argument('--band', type=int, choices=[4], default=4)
-    parser.add_argument('--fixed-colors', type=int, default=8)
-    parser.add_argument('--budget', help='JSON file with events and per_line limits')
-    parser.add_argument('--alloc', choices=['median', 'variance'], default='median')
+    parser.add_argument('--mode', choices=['PL-B'], default='PL-B')
+    parser.add_argument('--hblank-outs', type=int, choices=[5, 6], default=5)
+    parser.add_argument('--band', type=int, choices=[1, 2, 4], default=1)
     parser.add_argument('--dither', choices=['fs'], default='fs')
-    parser.add_argument('--preview', required=True)
     args = parser.parse_args()
-    if not 0 <= args.events <= 100 or args.per_line != 1 or not 0 <= args.fixed_colors <= 16:
-        parser.error('invalid event, per-line, or fixed-color limit')
-    if args.budget:
-        with open(args.budget) as f:
-            budget = json.load(f)
-        args.events = min(args.events, budget['events'])
-        args.per_line = min(args.per_line, budget['per_line'])
-        if not 0 <= args.events <= 100 or args.per_line != 1:
-            parser.error('invalid budget')
     source = resize_image(args.input)
-    data, crc = convert(source, args.mode, args.events, args.per_line, args.band, args.fixed_colors, args.alloc)
+    data, crc = convert(source, args.hblank_outs, args.band)
     with open(args.output, 'wb') as f:
         f.write(data)
-    preview(args.output, source, args.preview)
     count = struct.unpack_from('<I', data, 36)[0]
-    lines = [struct.unpack_from('<H', data, EVENTS_OFF + i * 8)[0] for i in range(count)]
-    max_line = max((lines.count(y) for y in set(lines)), default=0)
-    print(f'events={count} max_per_line={max_line} budget={args.events}/{args.per_line} crc32={crc:08x} Pillow={pillow_version} mode={args.mode} band={args.band} fixed_colors={args.fixed_colors} dither={args.dither} alloc={args.alloc}')
+    palette = list(struct.unpack_from('<16H', data, 64))
+    row_costs = {}
+    for offset in range(EVENTS_OFF, len(data), 8):
+        y, index, _, color, _ = struct.unpack_from('<HBBHH', data, offset)
+        components = sum(((palette[index] >> shift) & 15) != ((color >> shift) & 15)
+                         for shift in (8, 4, 0))
+        row_costs[y] = row_costs[y] + components + 1 if y in row_costs else components
+        palette[index] = color
+    print(f'events={count} max_outs={max(row_costs.values(), default=0)} '
+          f'N={args.hblank_outs} crc32={crc:08x} Pillow={pillow_version} args={vars(args)}')
 
 
 if __name__ == '__main__':
