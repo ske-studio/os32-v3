@@ -902,6 +902,63 @@ static void image_burst(void)
     }
     irq_on = 1;
     host_number("GREEN 31.8/5.9us start phases x64", scan.input.h);
+
+    /* The same oscillator must also drive the REAL frame player, with
+     * nonempty columns and matching budget inputs. Sweep every 1/100us
+     * entry phase in 31k VS mode, without phase sampling. The four normal
+     * mode/phase combinations remain covered by image_replay(). */
+    image_fixture(1, 1); image_make();
+    struct SplashRaster *s = pc98_splash_raster_state();
+    scan.input.h = 3180;
+    scan.input.blank = 590;
+    for (u32 count = 0; count <= 5; count++) {
+        fixture.count[count].io.h = (PlRange){3180, 3180};
+        fixture.count[count].io.b = (PlRange){590, 590};
+    }
+    /* E(1) is H - blank - the oscillator's 2us offset after F. The first
+     * IN returns after the same 200 units as each subsequent iteration. */
+    fixture.extra[PL_FIRST_PHASE] = host_cost(2390, 2390);
+    fixture.extra[PL_FRAME_REMAIN] = host_cost(0, 402 * 3180);
+    fixture.first = host_window(11, 15, 200, 200, 200);
+    REQUIRE(qualified(&fixture, s));
+    pl_profiles[1][1][0] = fixture;
+    for (u32 phase = 0; phase < 3180; phase++) {
+        /* Reset the real acquisition context for every phase. Reuse only
+         * mode qualification and fixed inputs, not an earlier F anchor. */
+        REQUIRE(!pl_prepare(&image, 5, &plan));
+        scan.time = phase;
+        unsigned long long visible = image_first_visible(s);
+        image_arm(visible);
+        REQUIRE(pl_frame(s, &image, &plan, 3000000) == PL_FRAME_OK);
+        REQUIRE(s->frame == phase + 1 && !s->dropped && !s->late && !s->unapplied);
+        image_observe(s, 1);
+
+        /* Match every emitted component to its FILE event's row, port,
+         * value and HBLANK interval, independently of the prepared plan. */
+        u16 palette[16];
+        for (u32 i = 0; i < 16; i++) palette[i] = image.pal[i];
+        u32 out = 64;
+        const u32 ports[] = {PAL_G_PORT, PAL_R_PORT, PAL_B_PORT};
+        const u32 shifts[] = {4, 8, 0};
+        for (u32 i = 0; i < image.count; i++) {
+            const struct OsriEvent *e = &image.event[i];
+            u16 changed = palette[e->index] ^ e->rgb444;
+            REQUIRE(write_port[out] == PAL_IDX_PORT && write_value[out] == e->index);
+            out++;
+            unsigned long long row = visible + (unsigned long long)e->line * scan.input.h;
+            for (u32 c = 0; c < 3; c++) if (changed & (15u << shifts[c])) {
+                REQUIRE(out < writes && write_port[out] == ports[c]);
+                REQUIRE(write_value[out] == ((e->rgb444 >> shifts[c]) & 15));
+                REQUIRE(scan.out_at[out] >= row - 590 - 2 * SCAN_DEN);
+                REQUIRE(scan.out_at[out] < row - 2 * SCAN_DEN);
+                out++;
+            }
+            palette[e->index] = e->rgb444;
+        }
+        REQUIRE(out == writes);
+    }
+    host_number("GREEN 31.8/5.9us full-frame start phases", 3180);
+    host_number("rows/frame", 400);
 }
 
 void _start(void)
