@@ -37,7 +37,7 @@ def slots():
             raise SystemExit('kernel declaration index mismatch')
         result.append(dict(e, index=int(index), group='kernel'))
     result.sort(key=lambda e: e['index'])
-    if [e['index'] for e in result] != list(range(39)):
+    if [e['index'] for e in result] != list(range(40)):
         raise SystemExit('HWDEV slot order/count')
     defined = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
     keys = ('index', 'symbol', 'source', 'kind', 'group')
@@ -100,7 +100,8 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     # gfinit.h already includes the private wire; keep the umbrella stable.
     headers += [str(p.relative_to(ROOT)) for p in sorted((ROOT/'kdebug').glob('gfinit*.h'))
                 if p.name != 'gfinit_wire.h']
-    headers += ['kdebug/gf_foundation_test.h', 'hwdev/gf/gf1_test.h',
+    headers += ['kdebug/gf_command_test.h', 'kdebug/gf_foundation_test.h',
+                'hwdev/gf/gf1_test.h',
                 'hwdev/gf/production.h', 'kdebug/kpeek.h', 'include/hwdev_private.h']
     headers += sorted({e['source'] for e in entries if e['group'] == 'kernel'})
     umbrella = ''.join(f'#include "{h}"\n' for h in dict.fromkeys(headers))

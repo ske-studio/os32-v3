@@ -272,6 +272,13 @@
       "source": "lib/serial_diag.h",
       "index": 38,
       "group": "kernel"
+    },
+    {
+      "index": 39,
+      "symbol": "sys_time_now",
+      "source": "include/sys.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

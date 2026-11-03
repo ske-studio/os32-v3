@@ -1,6 +1,8 @@
 /* Diagnostic owner: bound stage approvals and the recorded common runner. */
 #include "gfinit.h"
 #include "gf_foundation_test.h"
+#include "gf_command_test.h"
+#include "../hwdev/gf/command.h"
 #include "../hwdev/gf/gf1_test.h"
 #include "../hwdev/gf/production.h"
 #include <stddef.h>
@@ -51,7 +53,7 @@ STATIC_ASSERT((PAGE_ALIGN_UP(GF_ROM_MAX) +
 struct gfinit_owner {
     struct gfinit_bus bus;
     struct gf_foundation foundation;
-    bool foundation_prepared, foundation_active;
+    bool foundation_prepared, foundation_active, command_prepared;
     struct recover_ops ops;
     struct recover_profile profile;
     const struct recover_profile *s0;
@@ -127,6 +129,30 @@ static int gf_foundation_call(u32 op)
     if (!owner || !owner->foundation_prepared || !ops || !ops->call) return -1;
     return ops->call(&owner->foundation, &q, &reply);
 }
+/* T2 diagnostic time advances independently of recover safe points. */
+static int gf2_diag_clock(void *opaque, u32 *out)
+{
+    u32 lo, hi;
+    (void)opaque;
+    int rc = sys_time_now(&lo, &hi);
+    if (rc) return rc;
+    *out = lo;
+    return 0;
+}
+static int gf_command_cleanup(struct gfinit_owner *g)
+{
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf2_test_reply reply;
+    u32 now;
+    if (!g->command_prepared) return 0;
+    if (!ops || !ops->command || !ops->command->call ||
+        g->foundation.io.timing.clock_us(g->foundation.io.opaque, &now)) return GF2_EIO;
+    const struct gf2_test_request q = {sizeof(q), GF2T_STOP, now + GF2_TIMEOUT_US};
+    int rc = ops->command->call(&g->foundation, &q, &reply);
+    /* C0 may return the original fault after completing all release work. */
+    if (rc && reply.state != GF2_OFF) return rc;
+    return 0;
+}
 static int gf_pre_cleanup(void *opaque)
 {
     (void)opaque;
@@ -138,6 +164,8 @@ static int gf_pre_cleanup(void *opaque)
         gfinit_bus_revoke(&owner->bus);
     else for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
         if (bars[i] != owner->bus.bars[i]) gfinit_bus_revoke(&owner->bus);
+    int command_rc = gf_command_cleanup(owner);
+    if (command_rc) return command_rc;
     int rc = gf_foundation_call(GF1T_STOP);
     if (!rc) owner->foundation_active = false;
     return rc;
@@ -158,6 +186,11 @@ static int gf_prepare(struct recover *r, void *arg)
     g->bus.foundation = &g->foundation;
     if (ops->prepare(&g->foundation, r->bars, RECOVER_BAR_COUNT)) return -1;
     g->foundation_prepared = true;
+    g->foundation.io.timing.clock_us = gf2_diag_clock;
+    g->foundation.io.timing.wait_us = recover_hal_wait_frame;
+    if (!ops->command || !ops->command->prepare ||
+        ops->command->prepare(&g->foundation, r->bars, RECOVER_BAR_COUNT)) return -1;
+    g->command_prepared = true;
     stage.foundation = &g->foundation;
     /* A failed MASTER readback may already have enabled bus mastering. */
     g->foundation_active = true;
@@ -216,6 +249,7 @@ static int gf_release_rom(struct gfinit_owner *g)
     g->policy_count = 0;
     g->rom = 0; g->inspected = false;
     g->foundation_prepared = false;
+    g->command_prepared = false;
     g->bus.foundation = 0;
     gf_lease.active = false;
     return 0;
@@ -548,9 +582,37 @@ static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops 
     return rc;
 }
 
+static int gf_command_dispatch(void *buf, u32 size)
+{
+    if (!buf || size != sizeof(struct gf2_request)) return GF2_EINVAL;
+    struct gf2_request q = *(const struct gf2_request *)buf;
+    if (q.size != sizeof(q) || q.test > GF2_VBLANK || q.session || q.rc) {
+        q.session = 0; q.rc = GF2_EINVAL;
+        *(struct gf2_request *)buf = q;
+        return q.rc;
+    }
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf_foundation *f = 0;
+    bool production = gf_production_selected();
+    struct recover *r = recover_owner();
+    if (ops) {
+        if (production) { f = ops->production; }
+        else if (gf_owned(r) && owner->foundation_prepared && owner->command_prepared &&
+                 stage.foundation == &owner->foundation) f = &owner->foundation;
+    }
+    if (!production && f)
+        owner->last_op = q.test == GF2_STATUS ? owner->last_op : RECOVER_NONE;
+    int rc = gf_command_test(&q, f,
+        production ? gf_production_read_row : gf_diagnostic_read_row,
+        production ? (void *)f : (void *)owner);
+    *(struct gf2_request *)buf = q;
+    return rc;
+}
+
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
+    if (op == GF_OP_COMMAND) return gf_command_dispatch(buf, size);
     if (op == GF_OP_FOUNDATION) return gf_foundation_dispatch(buf, size, base, transport);
     if (gf_production_selected()) return -1;
     if (!buf || size < sizeof(struct gfinit_request)) return -1;
