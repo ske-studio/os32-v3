@@ -235,7 +235,7 @@ int gfx_device_activate(devres_handle h);
 | T4 共存 | host: 内蔵2台+GF、非選択も予約、固定重複groupは一回、PCI重複は拒否 | GF選択で内蔵収集をskip |
 | T4 GUI境界 | host＋ゲスト: GUI=0の起動だけは予約ありprobe0、GUI往復/単独アプリ（§9決定に追随）/再init、BB/USER/PCD維持 | unready確認を外す |
 | T4 表示gate | host: 同一h acquireは冪等、別hは拒否、release→再acquire成功。HWDEV DISPLAY拒否は既存回帰だけ | 正常CUI復帰のreleaseを除去 |
-| T5 回帰 | host: 旧票T5群＋T1/T2/SURFACE関連選択検査、ゲスト: CUI/GUI/abort/ネスト/隔離 | 表示面を通常CLIENTとして貸す |
+| T5 回帰 | host: `test_physmem.py`・`test_pgalloc_range.py`・`test_pgalloc_model.py`・`test_highram_stage.py`・`test_paging_bounds.py`・`test_boot_splash_native.py`＋T1/T2/SURFACE関連選択検査、ゲスト: CUI/GUI/abort/ネスト/隔離 | 表示面を通常CLIENTとして貸す |
 | 実機資源 | host: BARLEN条件・上限とwidth_basis、RAW別slotの18資源構成、GF選択でPEGC BB無し | width_basisをRAWへ変更 |
 | 実機表示 | **PM 決定（ID10）**: Ra266+液晶でPEGC/Cirrus/GF各選択のCUI cold boot・GUI往復。カメラで同期/桁ズレ、シリアルでprobe順を確認 | hostでPEGC probeを起動へ戻す |
 

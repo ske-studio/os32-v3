@@ -13,7 +13,7 @@ description: レビューを通った段 (作業木のブランチ) を main に
 - レビューが「取り込み可」か。要修正なら直してから (軽い指摘は PM が直すか、次の段の依頼に書いて設計票の末尾に「送り項目」として残す)。
 - 作業木に未コミットが無いか (`git -C ~/wt/os32-v3/<名> status --short`)。PM が直したら作業木でコミットしてから merge。
 - 直しのログは**最後の変更より後**のものだけ合格に数える。PM が直したら、その直しに当たる試験を自分で回す
-  (`CROSS_DIR=/home/hight/opt/cross ~/os32-tmp/bin/check_slot.sh <名札> bash -c "make <check-…> MUTATE=0"`)。足した・触った試験の変異処理も直した場合は、ROLES §0「検査」に従いその試験を `--mutate` で確かめる。
+  (`CROSS_DIR=/home/hight/opt/cross ~/os32-tmp/bin/check_slot.sh <名札> bash -c "make <check-…> MUTATE=0"`)。足した・触った試験は、ROLES §0「検査」に従いその試験を `--mutate` で確かめる。
 
 ## 2. merge
 
