@@ -27,7 +27,7 @@
 - Ra266 vmap確認: 指定refs・作業資料・OのROM decoder/host試験に実ROMのBIT P値を確認できるデータは見つからず、有無は未確認。`N/nvkm/subdev/bios/vmap.c:29–53`のBIT P v2+20hのLE32ポインタと版10/20hを実装時のinfoで出す（v1/ポインタ0は不在）。合成ROM試験を実機の根拠にしない。
 - 対象: OS32 / PC-9821 Ra266、PCI 0:13.0、10de:0221、chipset=4ah。実機を今回測定したという意味ではない。
 - O=`/home/hight/os32-v3/`、N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/` (指定 c03c1a1)、E=`/home/hight/os32-tmp/refs/geforce6200/envytools/`。以下の file:line はこの取得物。
-- 票 `O/docs/tasks/realhw/TASK_GF_FEATURES.md`、比較 `O/docs/decisions/realhw/GF_FEATURE_COMPARE.md:52–55`、確定 F1=GF_FEAT1_DESIGN §2・3、F2=GF_FEAT2_DESIGN を前提とする。層3は確定GF_FEAT3_DESIGNのサイズ/import該当行だけ参照（§8）。層4の設計中ファイルは未読。
+- 票 `O/docs/tasks/realhw/TASK_GF_FEATURES.md`、比較 `O/docs/decisions/realhw/GF_FEATURE_COMPARE.md:52–55`、確定 F1=GF_FEAT1_DESIGN §2・3、F2=GF_FEAT2_DESIGN を前提とする。層3の窓/面台帳と層4の保存型を境界とし、容量は[共通合算表](GF_FEAT3_DESIGN.md#合算予算)に従う。
 - ユーザー決定: 「基本的にすべての機能が同じレベル（GUI以外）には用意されるべきです」「実際の動作確認は実装後のテストでもいいし実機でテストで動作チェックすればいい」。GUIから呼ばずカーネル試験入口まで作る。
 - GNU11、整数演算、kstring、番地/サイズの定数3層管理、P2V等の変換境界、[D1]〜[D4]を維持。MITのN/Eのみを実装資料としGPLのPCI/DRM/TTM実装を写さない。メーカーの詳細資料は指定資料内に無く、メーカー確認済みとはしない。
 
@@ -51,8 +51,8 @@ struct gf5_clock { u32 core_khz, shader_khz, mem_khz; };
 struct gf5_plan { u32 nc, nn, sc, mux, mc, mn; struct gf5_clock actual; };
 struct gf5; struct gf5_image; struct gf5_tile; struct gf5_thermal;
 struct gf5_links { /* F2/F4 adapterが提供、追加のmodule importではない */
-  int (*drain_pause)(void *); /* 新規投入閉→fence完了→FIFO pause→GR idle */
-  void (*unpause)(void *);   /* 失敗時は呼ばずF2 fault停止へ */
+  int (*drain_pause)(void *); /* 受付閉→dlでfence完了→F2独自2秒のFIFO pause→GR idle */
+  int (*unpause)(void *);    /* resume後last_rc/stateを照合し復帰失敗を返す。A0で凍結 */
   int (*display_save)(void *, struct gf5_image *);
   int (*display_restore)(void *, const struct gf5_image *);
   int (*memory_script)(void *, u16 pc); /* decode済みBIT M scriptのみ */
@@ -91,7 +91,7 @@ int gf5_perf_select(struct gf5 *, u8 index); /* 表・fan・電圧・両clockを
 | 6 同`:161–175` | 対象headのvblank bit10000=1を2000ms待ち→index=1→保存SR1へ戻す。 | ETIMEでもSR1復旧を試み、投入は閉じる |
 
 - 差分: 手本のvblank待ち結果は戻り値にしていない。OS32では試験の失敗を成功扱いしないためETIMEを返す。新しいPLL lock poll/独自の待ち時間は足さない。
-- RAM区間: calc成功後にCPUのVRAM操作を閉じ、F2 drain_pause→ram_prog全体→成功時unpause/CPU受付再開。IRQのVRAM fence読出しもこの区間は抑止しMMIO ACKだけ行う。clock/fan/voltまで停止を広げない（PM決定）。
+- RAM区間: calc成功後にCPUのVRAM操作を閉じ、F2 drain_pause→ram_prog全体→成功時unpause/CPU受付再開。RAM区間はCPU窓/present/描画/flipの受付を閉じる。現行referenceはMMIO読出し (fence.c:57) でIRQにVRAM fence読出しは無く、架空の抑止hookは作らない。F1 MMIO ACKは継続する。clock/fan/voltまで停止を広げない（PM決定）。
 - BIT M scriptは切替前に全decodeし、呼出先を含め既存runnerで実行可能か確認。固定main全体の再実行で代替しない。未登録spanの登録/試験がB2の必須作業（D2）。
 - calc失敗は無変更。self-refresh以後のEIOでは旧4020/4024とc040を同じ切替順で戻す試行を1回行い、必ずself-refresh解除/auto-refresh復旧まで進む。再失敗はFAULT、F2停止へ渡す。これは手本に無い試験adapter失敗の後始末であり自動再試行ループは作らない。
 
@@ -113,17 +113,17 @@ int gf5_perf_select(struct gf5 *, u8 index); /* 表・fan・電圧・両clockを
 | `N/nvkm/subdev/therm/fantog.c:39–62,81–115` | PWMをdisable→GPIO論理値を反転。period=100000µs、on時間=percent*period/100、off時間=period-onで次回設定。0/100到達後は再予約しない。GPIO列は§5を共有。 | 時刻予約/IO失敗EIO |
 
 ```c
-struct gf5_thermal { u32 raw; s32 milli_c; bool calibrated; };
+struct gf5_thermal { u32 raw; i32 milli_c; bool calibrated; };
 int gf5_therm_read(struct gf5 *, struct gf5_thermal *);
 enum gf5_fan_mode { GF5_FAN_NONE, GF5_FAN_MANUAL, GF5_FAN_AUTO };
 int gf5_fan_mode_set(struct gf5 *, enum gf5_fan_mode);
 struct gf5_emergency_ops { void (*downclock)(void *, bool); void (*pause)(void *, bool); void *owner; }; /* 任意登録、temp.c:110–117 */
 int gf5_fan_get(struct gf5 *, u32 *percent);
 int gf5_fan_cstate(struct gf5 *, u8 percent, int dir);
-void gf5_fan_tick(struct gf5 *, u64 now_us); /* AUTO算出/段階duty/sensor poll/toggle各期限を既存前景から駆動 */
+void gf5_fan_tick(struct gf5 *, u64 now_us); /* AUTO算出/段階duty/sensor poll/toggle各期限を前景adapterから駆動、呼出し箇所はPMがA0レビューで凍結 */
 ```
 - PM決定: 温度は手本の整数式、外部温度計は使わない。calibratedはROM係数で換算可能という意味に限定し、外部測定済みを意味しない。15b0、fanの制御mode/方式/目標/cstate/last_tripと閾値状態をsnapshotに含め、復帰時は各期限を現在時刻から再予約する。
-- perf切替のfan上げ/下げはcstateの保存値更新とAUTO再評価を指す。TRIP/LINEARの温度目標をperf値で上書きしない。差分: 非同期workerが無いため各alarmを前景tickへ移す。試験ループ/既存前景の待機でもtickを呼び、IRQは記録だけ。
+- perf切替のfan上げ/下げはcstateの保存値更新とAUTO再評価を指す。TRIP/LINEARの温度目標をperf値で上書きしない。差分: 非同期workerが無いため各alarmを前景tickへ移す。前景の協調地点・診断待機から型付きpollを呼ぶ具体的箇所はPMがF5 A0宣言レビューで選定し、凍結までC2は出さない。IRQ/tickの既存F1 polling口とは分離し、IRQからfan/alloc/待ちは実行しない。u64 now_usはsys_time_nowのhi/loから構成し、下位u32を単純拡張しない。
 - 差分: OS32に電源断機構が無いためshutdownのorderly_poweroffを記録＋ファン100%要求へ置換する。15a0/15a4の独自書込や熱IRQは追加しない。無ファン板は制御不可を記録する。
 
 ## 5. 電圧
@@ -163,13 +163,13 @@ int gf5_tile_clear(struct gf5 *, unsigned slot); /* disable descriptorを両側�
 - OS32統括列: drain/pause→PFB列→PGRAPH列→unpause。差分: 手本の二つの関数を単一の停止区間で包む（PFB/GRの不一致中に仕事を投入させないため）。
 - clearはaddr/limit/pitch=0の無効descriptorを同順で両側へ書く。使用中枠の変更/解放は最後のfence後。単なるレジスタ更新で内容のlinear↔tiled変換は起きない。
 - 入力契約: `N/nouveau_bo.c:178–188`よりbaseは65536B整列、pitch>0、bytes=roundup(要求bytes,64*pitch)をu64で計算し、その全領域を予約する（越境/overflow/未整列はEINVAL）。`nouveau_bo.c:108–135`どおり空き枠を昇順検索して最初を採用、未使用の古いdescriptorはclear、使用中枠は最後のfence後に再利用。pitch=0はclear入口だけ。
-- `gr/nv44.c:98`のclass309eはswizzled surface objectでありPFB tileとは別。F2のobject生成で公開し、層3の転送境界へ渡す。メソッド定義/形式検証は層3の責務で、B5のPFB tile整列契約とは分離する。3Dレンダラを必要条件にしない。
+- `gr/nv44.c:98`のclass309eはF2 command.hで既に許可済みのswizzled surface objectでありPFB tileとは別。PFB tileは既定転送で検証し、層3に無いswizzled転送APIをB5の依存として追加しない。
 
 ## 7. 状態の保存と復元
 | 手本の列 | OS32の列 | 誤り |
 |---|---|---|
-| `N/nouveau_drm.c:944–991 nouveau_do_suspend`、`dispnv04/disp.c:57–95 nv04_display_fini` | 投入/flip受付閉→F2 fence drain→表示の論理状態保存/blank・vblank抑止→使用中VRAMをhostへ退避→fence世代保存→F1停止。 | 退避領域不足ENOMEM、待ちETIME、F1 rc保存 |
-| `N/nouveau_drm.c:1007–1028 nouveau_do_resume`、`dispnv04/disp.c:99–159 nv04_display_init` | F1開始（BM最初）→必要な既存devinit→F2チャネル/objects再生成（受付閉）→§5の順でRAM/clock/volt/fan復旧・therm再設定→tile復旧→VRAM内容戻し→表示mode/palette/cursor/DPMS再適用→IRQ要求復旧→受付開。 | 失敗はFAULT、画像/資源保持 |
+| `N/nouveau_drm.c:944–991 nouveau_do_suspend`、`dispnv04/disp.c:57–95 nv04_display_fini` | 投入/flip受付閉→F2 fence drain→表示の論理状態保存/blank・vblank抑止→使用中VRAMをF3 V0のCPU窓で動的RAMへ退避→fence世代保存→F3無効化→F2/F1停止。 | 退避領域不足ENOMEM、待ちETIME、F1 rc保存 |
+| `N/nouveau_drm.c:1007–1028 nouveau_do_resume`、`dispnv04/disp.c:99–159 nv04_display_init` | BM先行→必要な既存devinit→F1/F2開始→F3 objects再生成（受付閉）→§5の順でRAM/clock/volt/fan復旧・therm再設定→tile復旧→VRAM内容戻し→表示mode/palette/cursor/DPMS再適用→IRQ要求復旧→受付開。 | 失敗はFAULT、画像/資源保持 |
 | `nouveau_drm.c:1047–1076` | PCI D3/D0・OS電源断は行わない。F1のreset→IRQ解除→BM解除の停止順、再開のBM先行は変更しない。 | OS suspend入口は作らない |
 
 ```c
@@ -181,7 +181,7 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 ```
 - RUN→SAVING→SAVED→RESTORING→RUN。pause/save中の二重要求はEBUSY、未保存restoreはESTATE。stop失敗はFAULTで元snapshotを残す。save前のメモリ確保失敗ならRUNを維持。
 - 所有extentを全て退避: 表示front/back、cursor、層3面、呼出元が内容維持を要求した領域。PRAMIN/RAMHT/RAMFC/GR context/pushはF2の再構成対象として画像コピーと区別する。未完了コマンドを再送しない。
-- F1 stopでmap/instmemが解放されるため、GPU内ポインタをsnapshotに残さない。restoreは同一VRAM offsetを再予約してから転送する。予約不能ならENOMEMで止める。
+- F2 stopでmap/可変instmemが解放されるため、GPU内ポインタをsnapshotに残さない。restoreは同一VRAM offsetを再予約してから転送する。予約不能ならENOMEMで止める。
 - 差分: nouveauのdisplay→evict→idleはTTMの依存追跡が有る。OS32のCPUコピーは先にfence完了が必要。fenceは旧世代を完了扱いにして新世代へ進め、旧ticketを再利用しない。
 - 差分: nouveauのobject resume→VBIOS→display列をOS32のdevinit→F2再生成へ置換。既存devinitがエンジンを初期化し直すので先に行う。display adapterには両head・palette・cursor・DPMS・未完了flip整理を要求（層4設計へ渡す契約）。
 - 試験は電源維持save/restoreと、退避後に試験用extentを破壊して復元する内容消失模擬まで。OS全体のS3、PCI電源状態遷移、実電源断復帰の完成とは呼ばない。
@@ -189,24 +189,24 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 ## 8. 大きさの見積もり
 | 追加部品 | text/rodata予算KiB | 状態/一時領域 |
 |---|---:|---|
-| perf表/状態選択、clock、ram | 3 / 2 / 3 | 表はROM view、plan約64B、scriptは既存decodeを再用 |
+| perf表/状態選択、clock、ram | 3 / 2 / 3 | 必要ROM/spanとdecode済みBIT M programはproductionがdevinit解放前に別所有し、F5停止・snapshot利用終了まで動的RAMで保持。plan約64B、restore用一時programとは別寿命 |
 | therm（fan含む）、volt、tile、state | 3.25 / 2.25 / 1.5 / 3 | 常駐state合計1KiB以下、snapshot metadata約2KiB＋extent数依存 |
 | 結線/余裕 | 0 | 層5増分計18KiB＋BSS/alignment最大2KiB=20KiB予算 |
 | 診断 | 4〜6 | kdebug側だけ、KDEBUG=0のmoduleに文字列を残さない |
 
-- 実測（2026-11-02）: `O/build/out/geforce.mod`=39,788B（38.86KiB）、`geforce/geforce.elf`はtext=0x6067/rodata=0x2a58/bss=0xbe4、生成`geforce_imports.json`は20本。F1 8＋F2 28＋F5 20KiBを加え94.86KiB、層3/4へ33.14KiB。BSSを保守的に重ねて数える場合はさらに2.97KiB減る。
-- `O/docs/decisions/realhw/GF_FEAT3_DESIGN.md:203–211`のサイズ行は§11（指定§10とは節番号差）: text等14〜20＋bss等8=22〜28KiB、imports追加0。従って層4へ5.14〜11.14KiB（既存bss別算入なら2.17〜8.17KiB）。層4はEDID/TV表をkernel側に置くPM方針でmodule内の表を減らすが、コード量未実測なので収まるとは断定しない。
-- Aで統合link map/生成import実数を採取、CでKDEBUG=0/1再測定。超過時はF2方針どおりchip4a専用化・debug分離・dead strip・GR初期値圧縮を先に実施。本体のkernel複製や機能削除で逃げない。なお超過なら像分割/上限変更は別設計が必要であり本設計の受入を止める。
+- 容量の起点は2026-11-04の層2後の実測とし、image/memを分離した[共通合算表](GF_FEAT3_DESIGN.md#合算予算)で判定する。F1/F2は再加算しない。
+- F5本体20KiBにC1共有decoder/tables.incの0〜4KiBを別加算する。常駐ROM/span/programの動的RAMはC2報告で別記し、20KiBに含めない。
+- 統合後にlink map/生成import実数とKDEBUG=0/1を計測する。F4 C3が設定するimage/mem160KiB・load_span208KiBと共通合算予算で判定し、圧縮を発注条件にしない。必要importは本数制限なしで生成元へ追加する。
 - F5は既存gf_ioと型付き資源opsを使う。新しいimportが要るなら生成元 (geforce_imports.def) に足し、汎用dispatcher化しない。生成元を編集し生成ヘッダは手修正しない。
-- VRAM退避はmodule BSS外のhost動的メモリ。重複extentは統合しsum(bytes)を事前計算、metadata約2KiB＋extent配列を加えて一括確保。例:640×480×4Bの表示2面=2,457,600B、層3の同寸法2面=同量、cursor 64×64×4=16,384B、計4,931,584B（4.70MiB）。各面を64行へ切上げるtile例なら5,259,264B（5.02MiB）。
+- VRAM退避はmodule BSS外のゲスト動的RAM。重複extentは統合しsum(bytes)を事前計算、metadata約2KiB＋extent配列を加えて一括確保。例:640×480×4Bの表示2面=2,457,600B、層3の同寸法2面=同量、cursor 64×64×4=16,384B、計4,931,584B（4.70MiB）。各面を64行へ切上げるtile例なら5,259,264B（5.02MiB）。
 - PM決定: snapshotの固定上限/対RAM比率制限は置かない。必要総量の確保失敗時だけ停止前にENOMEM、部分確保を解放してRUNを維持。一部extentだけの成功はしない。scratch/ROM/画像の所有者を分離する。
 
 ## 9. ファイルごとの変更一覧と段（以下は実装予定、リポジトリ未編集）
 | 段 | ファイル（O/相対、新規は＋） | 内容・概算行数 |
 |---|---|---|
-| A0 | ＋hwdev/gf/feature5.h | 上記型/adapter/rc、120行。F2/F4との契約確定 |
-| A1 | ＋tools/tests/gf5_fake.h | MMIO/時間/ROM/extent/traceの試験骨格、160行。A段で用意 |
-| A2 | ＋kdebug/gf5_test.c | serial入口の骨格、info/clock/ram/therm/fan/volt/tile/save/restore dispatch、100行 |
+| A0 | ＋hwdev/gf/feature5.h | 上記型/adapter/rc、120行。F2停止口・F4保存型の凍結後。int unpause契約と前景poll呼出し箇所をPMレビューで凍結、F4 C3の前方宣言struct gf5_test_opsと整合 |
+| A1 | ＋tools/tests/gf5_fake.h | MMIO/時間/ROM/extent/traceの試験骨格、160行。F5 A0統合後に発注 |
+| A2 | ＋kdebug/gf5_test.c | serial入口の骨格、info/clock/ram/therm/fan/volt/tile/save/restore dispatch、100行。F5 A0統合後に発注し、F4 C3のfeature5_out slotを使用 |
 | A3 | ＋tools/tests/test_gf5.py | CHECK登録・部品別host駆動・正常対照と変異、100行。未着手Bは未登録、追加済みBの欠落は失敗 |
 | B0 | ＋hwdev/gf/perf.c | 表列挙/状態選択、250行＋tools/tests/gf5_perf_host.c |
 | B1 | ＋hwdev/gf/clock.c | calc/read/prog、180行＋gf5_clock_host.c |
@@ -218,8 +218,10 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | C0 | hwdev/gf/clock.c | 既存PLL limits/solverとのadapter（B1へ統合）、レジスタキー対応と同値回帰 |
 | C1 | kdebug/gfinit_decode/tables.inc | BIT Mの既存未登録spanが有れば追加、runner decode試験を伴う |
 | C2 | hwdev/gfのproduction所有者・F2 command境界・F4表示所有者 | links/save adapter/受付閉を結線（実装時の確定ファイルに1変更段ずつ割当） |
-| C3 | build/geforce-module.mk・tools/prototypes/geforce_imports.def | 新部品link、128KiB検査 |
-| C4 | kdebug/gf5_test.c | B試験入口を結線、全機能serial台本、200行追加 |
+| C2-ROM | ＋hwdev/gf/feature5_rom.c | 必要ROM/span/programの取得・所有・解放。devinit解放前の取得結線は共有ファイルごとにC2で直列 |
+| C2-service | ＋hwdev/gf/feature5_service.c | 前景fan poll adapter。PMがA0で呼出し箇所を凍結後、前景呼出し元の結線は別段 |
+| C3 | build/geforce-module.mk・tools/prototypes/geforce_imports.def | 新部品link、image/mem160KiB・load_span208KiB検査、F4 C3後に直列 |
+| C4 | kdebug/gf5_test.c | feature5_out slot経由でB試験入口を結線 (F5で版上げなし)、全機能serial台本、200行追加 |
 
 - B各段は対応するホスト試験・変異を同時に完成させる。A骨格だけで合格にしない。A→B（依存順）→C→実機受入。B3/B4/B5の温度/電圧/整列列は本書で確定済み。
 
@@ -233,9 +235,9 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | 電圧を実測値と呼ばない | 実GPIO列をfake MMIOで検証、vmap有無/必要speedo不在/prev失敗/min_id最大選択、要求間の最近上位entry/最大超過/同値・欠落bit・極性、RAM→fan↑→volt↑→clock→volt↓→fan↓。変異:下位entry採用、clock前降圧 | VID前後/要求・採用µV、ROM perf状態間とboot復帰 |
 | tile両側が同期する | 12枠/再利用/境界/overlap/解放。変異:FB flush削除、GR addr先行、11→12 slot | linear基準とtiled転送の内容比較、隣接面CRC不変 |
 | 状態が再使用できる | 8MiB超の確保成功/確保失敗ENOMEMかつ停止なし、save失敗/途中restore失敗/extent破壊/再割当/fence世代。変異:cursor退避削除、BM先行解除、古いticket再利用 | 描画→save→restore→再描画を3回、mode/cursor/palette/CRC/IRQ継続 |
-| 予算・非GUI | KDEBUG両像、module<=128KiB、GUI参照追加0 | 0:13.0/0221を記録、stage/rc/元rc付きのPASS/FAIL |
+| 予算・非GUI | KDEBUG両像、image/mem<=160KiB・load_span<=208KiB、GUI参照追加0 | 0:13.0/0221を記録、stage/rc/元rc付きのPASS/FAIL |
 
-- 実装後は触った像のbuild、check-changed MUTATE=0、各追加試験の一意anchor変異RED、lint。実機未実施は未実施と記録し、NP21/WでGPU実証したとしない。今回は設計のみでbuild/実機試験なし。
+- 全実装後にPMが生成→まとめビルド→検査を実行し、check-changed MUTATE=0・各追加試験の一意anchor変異RED・lintを確認する。実機未実施は未実施と記録し、NP21/WでGPU実証したとしない。今回は設計のみでbuild/実機試験なし。
 - `CHECK=dict(name="gf5-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/**","kdebug/gf5_test.c","tools/tests/gf5*","tools/tests/test_gf5.py"])`をA3で宣言。Bごとのhost.cは実部品をlink、依存はA1 stub、Aにも骨格の正常/変異を置く。
 - 各変異は無変更対照GREEN→一意anchorを1箇所変更→同じ試験が実行時RED→復元GREEN。compile失敗は検出成功に数えない。ゲスト入口は成功0/失敗1/実機未実施または機能不在77を返し、stage/rcをserialへ出す。77をPASSとして集計しない。
 - 実装のD段で`O/docs/tasks/DEFERRED_TESTS.md`へ次表を登録する（今回はリポジトリ未編集）。
@@ -245,7 +247,8 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | GF-L5-Ra266 / 未実施 | 0:13.0/0221、ROM perf間＋boot復帰、RAM CRC、温度/fan/VID、tile、save/restore3回。担当/日付/serialログを実施時記入 |
 | GF-L5-ENOTSUP / 暫定 | 未実装stubのENOTSUPは受入保留。B3/B4/B5の実列host GREENと実機結果で解除。ROM/GPIO不在は根拠付き機能不在へ分類し、stub完了に流用しない |
 
-## 11. 未決（0件）
+## 11. 未決（ユーザー0件／PM1件）
+- PM決定（7）: F5前景fanの具体的呼出し箇所はPMがF5 A0宣言レビューで選定し、凍結後にC2を発注する。
 - PM決定: 実機のクロック/電圧試験はROM perf状態間の切替と起動値復帰まで。ROM外は範囲外。
 - PM決定: 温度は手本の式を採用し、外部温度計は使わない。
 
@@ -258,3 +261,20 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 - G2: vmap があれば手本の式、無ければ id*10000。Ra266 の ROM の vmap の有無は手元の資料で分からないので、実装の後に実機の info で採る (astra の反論を採用)。
 - G3: snapshot の上限は置かない (PM 決定、マジックナンバーを作らない)。確保に失敗したら ENOMEM。
 - 未決 2 件は PM が決めた: 実機のクロック/電圧の試験は ROM の perf 状態どうしの切り替えと起動時の値への復帰まで。温度は手本の式に従い、外部温度計は使わない。
+
+## 追記 (2026-11-04、段に出す前の点検)
+
+| 境目／持ち主 | 宣言段で凍結する追記 |
+|---|---|
+| ROM／A0・B0・B2・C1・C2 | `service.c:29`→`devinit.c:155–163`でROM/programは解放される。gf5の表viewをscratchへ残さない。production所有の必要ROM/spanとdecode済みBIT M programを動的確保し、devinit解放前に取得、F5停止・snapshot利用終了まで保持する。restoreのdevinit用一時programとは別寿命。新`hwdev/gf/feature5_rom.c`をC2から独立した段に割り当てる。 |
+| 時計／A0・B3 | F2/F4はsys_time_nowの下位u32 µsで絶対期限、差はi32比較。F5 fan期限は同じsys_time_nowのhi/loからu64 µsを構成し、u32を単純拡張しない。5ms等は既存短waitを刻んで待つ。時計失敗は元rcを保存しEIO。 |
+| 前景fan／C2を分割 | `geforce_tick.c:14–16`・`foundation.c:106`はIRQ/tickのF1 polling口で、fanの前景入口ではない。新`hwdev/gf/feature5_service.c`がgf5_fan_tickを所有し、既存前景の協調地点・診断待機から型付きpollを呼ぶ結線を別段にする。**PM 決定（7）**: PMがF5 A0の宣言レビューで具体的呼出し箇所を決め、凍結するまでC2は出さない。IRQからfan処理・alloc・待ちを実行しない。 |
+| RAM/tile停止／A0・B2・B5 | drain_pauseは受付閉→dlでfence完了→F2独自2秒のFIFO pause→GR idle。unpauseは復帰失敗を返すint型としてF5 A0で凍結する。RAM区間だけCPU窓/present/描画/flipの受付を閉じる。clock単体にpauseを追加しない。現行referenceはMMIO読出し（fence.c:57）、IRQにはVRAM fence読出しが無いので存在しない処理への抑止hookは作らない。 |
+| save/restore／B6・C2 | snapshot所有者は呼出元、gf5は処理中借用し失敗時もfreeしない。停止前に全extent・metadataを確保。saveは受付閉→drain→表示保存/blank→CPU窓で退避→F3無効化→F2/F1停止。restoreはBM先行→必要devinit→F1/F2→F3 objects→性能/thermal/tile→同一offへ画像→F4論理状態→IRQ→受付公開。途中失敗はFAULT、未完了ticketは再送しない。 |
+| tileと309e／B5 | N/nvkm/subdev/fb/nv44.c:30–46とengine/gr/nv44.c:31–46のPFB→PGRAPH列を一停止区間で実施。309eは既にF2許可class（command.h）、PFB tileとは独立。層3設計に無いswizzled転送APIをB5の依存として増設しない。 |
+| 配置・試験環境 | B0 perf/B1 clock/B2 ramclock/B3 therm/B4 volt/B5 tile/B6 state・ROM/前景adapterはゲストgeforce.mod＋各libcなしhost試験。C0はB1の直列追記、C1 decoderは共有ゲスト部品＋既存host試験。A2/C4はゲストkdebug、A1はhost土台、A3はhost Python登録。新F5部品をhwdev.modに混入させない。 |
+| 予算 | mod text/rodata18＋BSS/alignment2＝20KiBに、C1共有decoder/tables.incの0〜4KiBを別加算（geforce-module.mk:18）。snapshot画像は動的RAM（例4.70MiB、tile例5.02MiB）でmod BSS外、固定上限は追加しない。常駐ROM/span・decode済みprogramの動的RAM量はC2報告で別記し、20KiBに含むと偽らない。 |
+
+共通の[合算予算](GF_FEAT3_DESIGN.md#合算予算)・[共有ファイルの衝突表と所有段](GF_FEAT3_DESIGN.md#共有ファイルの衝突表所有段)・[依存と並列発注](GF_FEAT3_DESIGN.md#依存と並列発注)はGF_FEAT3を正とする。
+
+F5 A0はF2停止口とF4保存型の凍結後、A1/A2はF5 A0統合後に発注する。B0〜B6は異なるファイルならF3/F4 B群と並列にコーディングできる。B3はB4所有のGPIO宣言を使う。B2/B5の停止結合、B6の全extent/再生成結合、C2はF3を待ち、state/display結線はF4 C2/C4も待つ。C0はB1の同一所有者による直列追記、C1はF4 A0後。試験コードは各Bで完成させ、実行は全実装後のPMの生成→まとめビルド→検査にまとめる。
