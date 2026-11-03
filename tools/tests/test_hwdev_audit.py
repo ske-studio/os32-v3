@@ -9,6 +9,20 @@ DOC = ROOT/'docs/design/hwdev/hwdev_imports.md'
 
 
 def main():
+    sys.path.insert(0, str(ROOT/'tools'))
+    from hwdev_audit import linked_accounting
+    from mkmod import Elf
+    image = bytearray((ROOT/'build/out/hwdev.mod').read_bytes())
+    elf = Elf((ROOT/'build/out/hwdev/hwdev.elf').read_bytes())
+    header, sections, padding = linked_accounting(image, elf)
+    assert padding >= 0 and sections['.rodata'] > 0
+    image[header['PAYLOAD_OFF']] ^= 1
+    try:
+        linked_accounting(image, elf)
+    except SystemExit as error:
+        assert str(error) == 'image/section accounting mismatch'
+    else:
+        raise AssertionError('corrupted linked payload accepted')
     with tempfile.TemporaryDirectory(prefix='hwdev-audit-') as td:
         document = Path(td)/'contract.md'
         source = DOC.read_text()

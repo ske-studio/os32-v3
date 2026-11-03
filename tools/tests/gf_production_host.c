@@ -148,6 +148,22 @@ int sys_time_now(u32 *lo,u32 *hi)
     prod_now+=prod_clock_step;*lo=prod_now;*hi=0;return 0;
 }
 const struct gf_instmem_map_ops gf_production_instmem_map_ops={0};
+/* Keep the P4 transport oracle independent of command MMIO. C0/B hosts test
+ * the real channel; this seam verifies the production owner's new wiring. */
+static const struct gf2_dma_ops prod_dma_ops={0};
+const struct gf2_dma_ops *geforce_dma_ops(void) { return &prod_dma_ops; }
+int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
+{
+    CHECK(ch==&prod.chan && f==&prod.foundation && f->running);
+    CHECK(ch->dma_ops==&prod_dma_ops && ch->map_ops==prod.map_ops &&
+          ch->map_owner==prod.map_owner && ch->bar1.base==prod.display.bars[1].base);
+    ch->f=f;ch->state=GF2_RUN;return GF2_OK;
+}
+int gf2_stop(struct gf2_chan *ch)
+{
+    CHECK(ch==&prod.chan);
+    ch->state=GF2_OFF;return GF2_OK;
+}
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
 int gf_master_enable(struct gf_foundation *f)

@@ -2,6 +2,12 @@
 #define GF_C_ENTRY previous_c_tests
 #include "gfinit_plan_c_host.c"
 #include "gf_previous_calc.inc" /* generated from the immutable P3 base */
+#include "../../hwdev/gf/command.h"
+/* Display-only owner leaves command_get NULL; never accept a command call. */
+int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
+{ (void)ch;(void)f;return GF2_ESTATE; }
+int gf2_stop(struct gf2_chan *ch)
+{ (void)ch;return GF2_ESTATE; }
 
 struct sim_reg {u32 off,value;};
 static struct sim_reg sim_regs[4096];

@@ -1,12 +1,19 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
-CHECK = dict(name='gf-command-host', tier=1, needs=[], budget=90.0,
-    covers=['hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
+CHECK = dict(name='gf-command-host', tier=1, needs=['make:build/out/geforce/geforce_imports.h'], budget=90.0,
+    covers=['build/programs.mk', 'drivers/base/dev.c', 'fs/vfs.c', 'kernel/console/console.c', 'kernel/module/kdebug_call.c', 'kernel/module/module_image.c', 'kernel/module/module_runtime.c', 'kernel/port_service.c', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'platform/pc98/boot_names.c', 'platform/pc98/console.c', 'platform/pc98/console_attr.c', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'userland/shell/cmd_gfinit.c', 'hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
             'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
             'kdebug/gf_command_wire.h', 'kdebug/recover.h',
             'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
             'include/io.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
             'tools/tests/gf_command*', 'tools/tests/test_gf_command.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
+            'tools/tests/mutpar.py', 'tools/tests/test_gfinit_owner.py',
+            'tools/tests/gfinit_owner*', 'tools/tests/test_module_runtime.py',
+            'tools/tests/module_runtime_host.c', 'tools/tests/gf1_dispatch_host.c',
+            'tools/tests/geforce_module_host.c',
+            'drivers/video/geforce/geforce_body.c',
+            'drivers/video/geforce/geforce_module.c', 'hwdev/gf/foundation_test.c',
+            'kdebug/gfinit.c', 'build/out/geforce/*'])
 
 import argparse
 import os
@@ -14,6 +21,9 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import struct
+
+import mutpar
 
 import host32
 from kernel_includes import include_flags
@@ -24,6 +34,10 @@ ORACLE = Path('/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/'
 # A2 report: only the tested component is real; dependencies live in the
 # fixture header. B7/T2b include their product source and must not link it twice.
 COMPONENTS = {
+    'c0': ('hwdev/gf/command.c', True),
+    't2a2-link': ('hwdev/gf/foundation_test.c', False),
+    't2a2-bind': ('drivers/video/geforce/geforce_body.c', False),
+    't2b-owner': ('kdebug/gfinit.c', False),
     'b0': ('hwdev/gf/fifo.c', True),
     'b1': ('hwdev/gf/push.c', False),
     'b2': ('hwdev/gf/dmaobj.c', False),
@@ -40,8 +54,60 @@ COMPONENTS = {
 # Each old string must occur once in the original product source. Keep these
 # independent of the oracle and fixture; mutate one product site per build.
 MUTATIONS = {
-    # PM/A3 consolidates the T2a1 mutation tuples from its report.
-    't2a1': [],
+    'c0': [('irq-close', 'command_irq(ch, false) ||', 'command_irq(ch, true) ||'),
+     # Retain the parameter use so -Werror does not replace the runtime oracle.
+     ('reset-success', 'return ch->last_rc = result;', '(void)result; return ch->last_rc = GF2_OK;'),
+     ('early-staging-free',
+      'gf_foundation_stop(ch->f))',
+      '(gf2_dma_put(ch), gf_foundation_stop(ch->f)))'),
+     ('early-inst-free',
+      'gf_engine_stop(ch->f) || release_instances(ch)',
+      'release_instances(ch) || gf_engine_stop(ch->f)')],
+    't2a1': [('bad-handle', '#define TEST_BAD_HANDLE 0xdeadbeefU', '#define TEST_BAD_HANDLE 0x80000002U'),
+     ('bad-method', '#define TEST_BAD_METHOD 0x1ffcU', '#define TEST_BAD_METHOD 0x0100U'),
+     ('object-epoch',
+      'if (!test_object.handle || test_object_epoch != ch->epoch)',
+      'if (!test_object.handle)'),
+     ('diagnostic-only',
+      'if (ch != &diagnostic || ch->state != GF2_RUN) return GF2_ESTATE;',
+      'if (ch->state != GF2_RUN) return GF2_ESTATE;'),
+     ('prepare-retention', 'if (diagnostic.state != GF2_OFF) return GF2_ESTATE;', '(void)0;'),
+     ('revoked-access',
+      'if (f->revoked) return reply->rc = GF2_EFAULT;',
+      'if (false) return reply->rc = GF2_EFAULT;'),
+     ('fault-wait',
+      'return wait_fault(ch, deadline);',
+      '(void)wait_fault; return reference(ch, deadline);'),
+     ('reference-wait', 'if (!rc) rc = gf2_fence_wait(ch, fence, deadline);', '(void)fence;'),
+     ('deadline-wrap',
+      'if ((i32)(now - deadline) >= 0) return GF2_ETIME;',
+      'if (now >= deadline) return GF2_ETIME;'),
+     ('bad-kick', 'rc = gf2_kick(ch);', 'rc = GF2_OK;')],
+    't2a2-link': [('t2a2-command-link', '.command=&gf2_module_ops', '.command=0')],
+    't2a2-bind': [('t2a2-production-bind',
+      'gf2_test_bind_production(&production.foundation,&production.chan);',
+      '(void)0;')],
+    't2b': [('reference-count',
+      '#define GF2_REFERENCE_COUNT 100000U',
+      '#define GF2_REFERENCE_COUNT 1000U'),
+     ('get-put-completion',
+      '(i32)(o->reply.reference - o->reply.seq) < 0) return GF2_EIO;',
+      'o->reply.get != o->reply.put) return GF2_EIO;'),
+     ('wrap-check', 'o->wraps >= 2U', 'true'),
+     ('recover-epoch', 'o->reply.epoch == o->previous_epoch', 'false'),
+     ('fault-required',
+      'rc == GF2_EFAULT && o->reply.state == GF2_FAULT &&',
+      'rc == GF2_OK && o->reply.state == GF2_FAULT &&'),
+     ('display-crc', 'o.crc_before != o.crc_after', 'false'),
+     ('deadline', 'now + GF2_TIMEOUT_US', 'now'),
+     ('fault-subchannel',
+      '(p->gr_method >> 16) & GF2_SUBCHANNEL_MAX',
+      '(p->gr_trap >> 16) & GF2_SUBCHANNEL_MAX')],
+    't2b-owner': [('clock-frozen', 'int rc = sys_time_now(&lo, &hi);', 'int rc = 0; lo = hi = 0; (void)hi;'),
+     ('revoked-layer1-stop',
+      'if (command_rc && !owner->foundation.revoked) return command_rc;',
+      'if (command_rc) return command_rc;')],
+
     'b0': [
         ('ramfc-r-base', 'im->vram_bytes - RAMFC_WINDOW_BYTES +',
          'im->vram_bytes - im->reserved +'),
@@ -110,7 +176,6 @@ MUTATIONS = {
     'b9': [
         ('alloc-rc-lost', 'return rc;', 'return 0;'),
     ],
-    't2b': [],  # Mutation registration belongs to A3; see T2b report tuples.
 }
 
 
@@ -137,7 +202,15 @@ def build(component, source, directory, flags):
         core.mkdir(exist_ok=True)
         (core / 'gpuobj.h').write_text('/* Oracle services supplied by B4 host. */\n')
         extra += ['-I' + str(directory), '-DGF2_B4_ORACLE="' + str(ORACLE) + '"']
-    if component == 'b7':
+    if component in ('t2a2-bind', 't2b-owner'):
+        return build_integration(component, source, directory)
+    if component == 'c0':
+        extra += ['-DGF2_COMMAND_SOURCE="' + str(source) + '"']
+        sources = [str(ROOT / 'hwdev/gf/fence.c')]
+    elif component == 't2a2-link':
+        extra += ['-DGF1_DISPATCH_SOURCE="' + str(source) + '"']
+        sources = []
+    elif component == 'b7':
         extra += ['-DGF2_FAULT_SOURCE="' + str(source) + '"']
         sources = []
     elif component == 't2b':
@@ -148,14 +221,38 @@ def build(component, source, directory, flags):
     exe = directory / 'host'
     # check=True is deliberate: a compile/link failure never kills a mutant.
     subprocess.run(['gcc', *flags, *extra,
-                    str(ROOT / ('tools/tests/gf_command_' + component + '_host.c')),
+                    str(ROOT / ('tools/tests/gf1_dispatch_host.c' if component == 't2a2-link'
+                                else 'tools/tests/gf_command_' + component + '_host.c')),
                     *sources, '-o', str(exe)], cwd=ROOT, check=True)
     return exe
 
 
-def execute(exe, runners, label, green):
+def build_integration(component, source, directory):
+    """Reuse the established owner/module oracles in a copied source tree."""
+    exe = directory / 'host'
+    if component == 't2b-owner':
+        from test_gfinit_owner import command
+        cmd = command(exe)
+    else:
+        from test_module_runtime import FLAGS, INCLUDES
+        cmd = ['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
+               '-Igfx', '-Ibuild/out/geforce', '-I' + str(ROOT / 'tools/tests'),
+               str(ROOT / 'tools/tests/geforce_module_host.c'),
+               *[str(ROOT / f) for f in ('kernel/module/module_runtime.c',
+                  'kernel/module/module_image.c', 'fs/vfs.c', 'drivers/base/dev.c')],
+               '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-o', str(exe)]
+    copied = Path(tempfile.mkdtemp(prefix='integration-', dir=directory))
+    mutpar.build_in_tree(ROOT, copied, {COMPONENTS[component][0]: source.read_text()}, [cmd])
+    return exe
+
+
+def execute(exe, runners, label, green, component):
+    data = None
+    if component == 't2a2-bind':
+        from test_module_runtime import image
+        data = struct.pack('<II', 0, 0) + image()
     for runner in runners:
-        result = host32.run([str(exe)], runner=runner, cwd=ROOT)
+        result = host32.run([str(exe)], runner=runner, cwd=ROOT, input=data)
         require((result.returncode == 0) == green,
                 f'{label}: runner={runner} rc={result.returncode}, '
                 f'expected runtime {"GREEN" if green else "RED"}')
@@ -167,7 +264,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--component', choices=tuple(COMPONENTS),
-                        help='run one independently linked component (B, T2a1, or the T2b observer)')
+                        help='run one component or its established integration oracle')
     args = parser.parse_args()
     runners = os.environ.get('HOST32_RUNNERS', 'qemu').split()
     require(bool(runners) and all(r in ('native', 'qemu') for r in runners),
@@ -184,30 +281,41 @@ def main():
                 require(not args.component,
                         f'{component}: requested component has not been added')
                 continue  # Unstarted B components are not registered yet (§9).
-            host = ROOT / ('tools/tests/gf_command_' + component + '_host.c')
+            host = ROOT / {'t2a2-link': 'tools/tests/gf1_dispatch_host.c',
+                           't2a2-bind': 'tools/tests/geforce_module_host.c',
+                           't2b-owner': 'tools/tests/gfinit_owner_host.c'}.get(
+                               component, 'tools/tests/gf_command_' + component + '_host.c')
             require(host.is_file(), f'{component}: added component is missing its host')
             directory = Path(tmp) / component
             directory.mkdir()
             original = source.read_text()
             exe = build(component, source, directory, flags)
-            execute(exe, runners, component + ' control', True)
-            if not args.mutate:
-                continue
-            mutant = directory / source.name
-            for name, old, new in MUTATIONS[component]:
-                label = component + '-' + name
-                require(original.count(old) == 1, label + ': anchor must be unique')
-                # The previous restored GREEN is the next unchanged control.
-                mutant.write_text(relocated(original.replace(old, new, 1), source))
-                try:
-                    exe = build(component, mutant, directory, flags)
-                    execute(exe, runners, label, False)
-                finally:
-                    # Never edit the worktree. Restore the temporary source and
-                    # rebuild, even when a mutant fails to compile or survives.
-                    mutant.write_text(relocated(original, source))
-                    exe = build(component, mutant, directory, flags)
-                    execute(exe, runners, label + ' restored', True)
+            execute(exe, runners, component + ' control', True, component)
+        # All selected normal controls complete before mutation dispatch.
+        if args.mutate:
+            failures = []
+            for component in selected:
+                source = ROOT / COMPONENTS[component][0]
+                directory = Path(tmp) / component
+                original = source.read_text()
+                mutant = directory / source.name
+                for name, old, new in MUTATIONS[component]:
+                    label = component + '-' + name
+                    require(original.count(old) == 1, label + ': anchor must be unique')
+                    def temporary(text):
+                        return text if component in ('t2a2-bind', 't2b-owner') else relocated(text, source)
+                    mutant.write_text(temporary(original.replace(old, new, 1)))
+                    try:
+                        exe = build(component, mutant, directory, flags)
+                        execute(exe, runners, label, False, component)
+                    except (subprocess.CalledProcessError, RuntimeError) as error:
+                        failures.append(label)
+                        print(f'{label}: ERROR {error}', flush=True)
+                    finally:
+                        mutant.write_text(temporary(original))
+                        exe = build(component, mutant, directory, flags)
+                        execute(exe, runners, label + ' restored', True, component)
+            require(not failures, 'mutation failures: ' + ', '.join(failures))
     return 0
 
 

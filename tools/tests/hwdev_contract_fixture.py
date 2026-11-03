@@ -8,6 +8,8 @@ hook and module-context declarations, and appends geforce_foundation_ops at
 HWDEV index 37 (the existing indices remain fixed). C9b appends
 serial_puts_polled at index 38 for the serial response, and includes the
 GF1/production/foundation shared types for display callbacks and row reads.
+Layer 2 adds the command hooks/channel and GF2 diagnostic types, and appends
+sys_time_now at private index 39. These reviewed changes own the pins below.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -23,8 +25,24 @@ import zlib
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gen_kdebug_imports import declaration
 
-LAYOUT_CRC = 0x8fb849f6
-IMPORT_DECLARATIONS_SHA = '487da9db87fd7aeb63316d360ab72398f8d80aead683ea9b5f85189580f24efa'
+# Review pins, not values derived from the artifact being checked. Layer 2
+# appends sys_time_now, GF2 types, command/command_get and the production chan.
+# After reviewing the declaration/inventory/layout diff, print replacement pins:
+#   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
+REVIEWED_LAYOUT_CRC = 0x64414309
+REVIEWED_IMPORT_DECLARATIONS_SHA = '9c806c08f5117e0b76aeedd55fc90010496a2ebce7442527948524c95687413a'
+REVIEWED_INVENTORY_SHA = 'c70250c92740b9c038c25fab48d73f037e08a8405e9eedbdf4618d705e48e432'
+
+
+def import_declarations(root):
+    entries = json.loads((root / 'hwdev/hwdev_imports.def').read_text())['imports']
+    return ''.join(f'{e["index"]}:{e["symbol"]}:'
+                   f'{"".join(declaration(e, root).split())}\n' for e in entries)
+
+
+def assert_hwdev_inventory(root):
+    assert hashlib.sha256((root / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == REVIEWED_INVENTORY_SHA, \
+        'reviewed HWDEV type/member/enum inventory changed'
 
 
 def assert_hwdev_contract(root):
@@ -36,10 +54,19 @@ def assert_hwdev_contract(root):
     assert values['HWDEV_CONTRACT_CRC'] == imports['module_abi_gen']
     assert values['HWDEV_LAYOUT_CRC'] == zlib.crc32((generated / 'hwdev_layout.txt').read_bytes())
     entries = json.loads((root / 'hwdev/hwdev_imports.def').read_text())['imports']
-    declarations = ''.join(f'{e["index"]}:{e["symbol"]}:'
-                           f'{"".join(declaration(e, root).split())}\n' for e in entries)
-    assert hashlib.sha256(declarations.encode()).hexdigest() == IMPORT_DECLARATIONS_SHA, \
+    assert hashlib.sha256(import_declarations(root).encode()).hexdigest() == REVIEWED_IMPORT_DECLARATIONS_SHA, \
         'private HWDEV import indices/names/types changed'
     assert imports['imports'] == [dict(name=e['symbol'], index=e['index'], kind=1, type_ver=1)
                                   for e in entries], 'private HWDEV import metadata changed'
-    assert values['HWDEV_LAYOUT_CRC'] == LAYOUT_CRC, 'private HWDEV layout changed'
+    assert values['HWDEV_LAYOUT_CRC'] == REVIEWED_LAYOUT_CRC, 'private HWDEV layout changed'
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='Print current HWDEV review pins; review diffs before accepting them.')
+    parser.add_argument('--snapshot', action='store_true', required=True)
+    parser.parse_args()
+    root = Path(__file__).resolve().parents[2]
+    print(f'REVIEWED_LAYOUT_CRC = 0x{zlib.crc32((root / "hwdev/generated/hwdev_layout.txt").read_bytes()):08x}')
+    print(f'REVIEWED_IMPORT_DECLARATIONS_SHA = {hashlib.sha256(import_declarations(root).encode()).hexdigest()!r}')
+    print(f'REVIEWED_INVENTORY_SHA = {hashlib.sha256((root / "tools/hwdev_layout.json").read_bytes()).hexdigest()!r}')

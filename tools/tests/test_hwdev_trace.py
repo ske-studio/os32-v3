@@ -92,6 +92,7 @@ def run(folder, image=None, mode_c=False):
     if mode_c:
         replacements['recover_hal_wait_frame'] = 'exec_delay'
         replacements['geforce_foundation_ops'] = 'sequence_foundation_ops'
+        replacements['sys_time_now'] = 'sequence_sys_time_now'
     replacements['gf_production_selected'] = 'trace_production_selected'
     source += '    const unsigned imports[] = {\n' + ''.join(
         '        (unsigned)' + replacements.get(e['name'],

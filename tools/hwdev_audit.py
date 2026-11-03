@@ -14,7 +14,7 @@ import subprocess
 
 from gen_kdebug_imports import ABI_SYMBOL, declaration, symbols, hwdev_gf_objects
 from mkmod import Elf
-from module_schema import HEADER_FIELDS
+from module_schema import COMPONENTS, HEADER_FIELDS
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC = 'docs/design/hwdev/hwdev_imports.md'
@@ -23,6 +23,21 @@ DOC = 'docs/design/hwdev/hwdev_imports.md'
 def require(ok, message):
     if not ok:
         raise SystemExit(message)
+
+
+def linked_accounting(binary, elf):
+    header = dict(zip(HEADER_FIELDS, struct.unpack_from('<36I', binary)))
+    sections = {s['name']: s['size'] for s in elf.sections if s['flags'] & 2}
+    policy = next(c for c in COMPONENTS if c['name'] == 'HWDEV')
+    payload, mem_size, _ = elf.body(policy)
+    # Input .rodata strings can be merged by ld (SHF_MERGE), so raw object
+    # sizes are attribution only. The linked bytes own payload accounting.
+    require(header['IMAGE_SIZE'] == len(binary) and
+            header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary) and
+            header['PAYLOAD_SIZE'] == len(payload) and header['MEM_SIZE'] == mem_size and
+            binary[header['PAYLOAD_OFF']:] == payload, 'image/section accounting mismatch')
+    content = sum(sections.get('.' + k, 0) for k in ('text', 'rodata', 'data'))
+    return header, sections, len(payload) - content
 
 
 def audit(out, cross):
@@ -42,20 +57,20 @@ def audit(out, cross):
     kernel_table = doc.split('## 3.', 1)[1].split('## 4.', 1)[0]
     rows = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
                       core_table, re.M)
-    require([int(r[0]) for r in rows] == list(range(25)) + [36], 'core slot order/count')
+    private = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
+    require([int(r[0]) for r in rows] == [e['index'] for e in private if e['group'] == 'core'],
+            'core slot order/count')
     imports = {r['symbol']: r for r in json.loads((ROOT/'kernel/module/kdebug_imports.def').read_text())['imports']}
     core_names = {r[1] for r in rows}
     kernel_names = refs & imports.keys()
     require(refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}')
     kernel_rows = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
                              kernel_table, re.M)
-    # Slot 36 is the appended CORE runner access; CW's kernel getter uses 37.
-    kernel_slots = [*range(25, 36), 37, 38]
-    require(len(kernel_names) == len(kernel_slots), 'kernel import table count')
-    private_kernel = [e for e in json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
-                      if e['group'] == 'kernel']
-    require([e['index'] for e in private_kernel] == kernel_slots and
-            {e['symbol'] for e in private_kernel} == kernel_names,
+    # The reviewed declaration list owns the private slot order, which differs
+    # from kdebug index order. Reconcile it with both object users and the docs.
+    private_kernel = [e for e in private if e['group'] == 'kernel']
+    require(len(kernel_names) == len(private_kernel), 'kernel import table count')
+    require({e['symbol'] for e in private_kernel} == kernel_names,
             'private kernel import slots/symbols')
     expected_kernel = [(str(e['index']), e['symbol'], str(imports[e['symbol']]['index']))
                        for e in private_kernel]
@@ -81,15 +96,10 @@ def audit(out, cross):
         for key, value in sizes.items():
             group[key] += value
     binary = (out/'hwdev.mod').read_bytes()
-    header = dict(zip(HEADER_FIELDS, struct.unpack_from('<36I', binary)))
     elf = Elf((out/'hwdev/hwdev.elf').read_bytes())
-    sections = {s['name']: s['size'] for s in elf.sections if s['flags'] & 2}
-    content = sum(g[k] for g in groups.values() for k in ('text', 'rodata', 'data'))
-    require(header['IMAGE_SIZE'] == len(binary), 'image/section accounting mismatch')
-    require(header['PAYLOAD_OFF'] + header['PAYLOAD_SIZE'] == len(binary), 'image/section accounting mismatch')
-    require(all(sections['.'+k] >= sum(g[k] for g in groups.values()) for k in ('text','rodata','data','bss')), 'image/section accounting mismatch')
+    header, sections, padding = linked_accounting(binary, elf)
     return dict(header=header, elf_sections=sections, objects=details, groups=groups,
-                file_other=dict(prefix=header['PAYLOAD_OFF'], padding=header['PAYLOAD_SIZE']-content),
+                file_other=dict(prefix=header['PAYLOAD_OFF'], padding=padding),
                 map=str(map_path), core_slots=slots, kernel_imports=kernel)
 
 

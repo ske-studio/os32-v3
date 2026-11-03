@@ -81,6 +81,8 @@ static void sequence_cases(void)
 #ifdef HWDEV_SEQUENCE_IMAGE
 #include "../../drivers/char/serial.h"
 #include "../../hwdev/owner.h"
+#include "../../hwdev/gf/command.h"
+#include "../../hwdev/gf/gf2_test.h"
 #include "hwdev_trace_symbols.h"
 static int sequence_foundation_prepare(struct gf_foundation *f,
     const struct recover_bar_extent *bars, u32 n)
@@ -95,9 +97,22 @@ static int sequence_foundation_call(struct gf_foundation *f,
     if(q->op==GF1T_REVOKE)f->revoked=true;
     *reply=(struct gf1_test_reply){0};return 0;
 }
+/* The sequence oracle exercises layer 1; prepare/cleanup still cross the
+ * typed layer-2 boundary added by T2. No command submission is requested. */
+static int sequence_command_call(struct gf_foundation *f,
+    const struct gf2_test_request *q, struct gf2_test_reply *reply)
+{
+    CHECK(f->io.opaque && q->size==sizeof(*q) && q->op==GF2T_STOP);
+    *reply=(struct gf2_test_reply){.state=GF2_OFF};return GF2_OK;
+}
+static int sequence_sys_time_now(u32 *lo,u32 *hi)
+{ *hi=0;return exec_clock(0,lo); }
 static const struct gf1_test_ops *sequence_foundation_ops(void)
 {
-    static const struct gf1_test_ops ops={0,sequence_foundation_prepare,sequence_foundation_call};
+    static const struct gf2_test_ops command={.prepare=sequence_foundation_prepare,
+                                             .call=sequence_command_call};
+    static const struct gf1_test_ops ops={.prepare=sequence_foundation_prepare,
+                                         .call=sequence_foundation_call,.command=&command};
     return &ops;
 }
 static struct gfinit_owner *sequence_bundle;

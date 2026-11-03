@@ -202,7 +202,9 @@ static void t2b_display_changed(void)
 }
 static void t2b_deadline_wrap(void)
 {
-    reset();now_us = 0xfffffff0U;
+    /* observe() reads the clock before command_call(). Start half a timeout
+     * before wrap so both reads precede it and the command deadline crosses it. */
+    reset();now_us = 0U - GF2_TIMEOUT_US / 2U;
     assert(request(GF2_START) == GF2_OK && deadline_wrapped);
 }
 static void t2b_fault_subchannel(void)

@@ -17,6 +17,10 @@ int pc98_route_to_gf(void) { route_gf++; route=1; return 0; }
 int pc98_route_to_98(void) { route_98++; route=0; console_safe=decode_safe; return decode_safe ? 0 : -1; }
 int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : -1; }
 #include "../../hwdev/gf/internal.h"
+#include "../../hwdev/gf/command.h"
+/* This HAL fixture has no command owner. Unexpected layer-2 use must fail. */
+int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
+{ (void)ch;(void)f;return GF2_ESTATE; }
 /* Run the actual P3 start state machine. These seams replace lower hardware
  * operations, not the acquire-once/validate-on-resume decision. */
 static int acquire_gf(struct gf_display_context *c) { (void)c; acquires++; return INIT_FAIL ? -1 : 0; }

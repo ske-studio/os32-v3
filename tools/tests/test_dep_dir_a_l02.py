@@ -8,8 +8,7 @@ CHECK = dict(name='dep-dir-a-l02-host', tier=1,
 
 from kernel_includes import include_flags
 import argparse
-from hwdev_contract_fixture import assert_hwdev_contract
-import hashlib
+from hwdev_contract_fixture import assert_hwdev_contract, assert_hwdev_inventory
 import json
 from pathlib import Path
 import shutil
@@ -48,7 +47,7 @@ def contracts():
                                  'build/out/lan/lan_imports.h'], cwd=ROOT,
                                 capture_output=True, text=True, check=True)
         assert 'gen_sqlite_imports.py --module lan ' in result.stdout, result.stdout
-    assert hashlib.sha256((ROOT / 'tools/hwdev_layout.json').read_bytes()).hexdigest() == HWDEV_SHA
+    assert_hwdev_inventory(ROOT)
     # Private GF values follow the generated pair; public ABI snapshots stay fixed.
     assert_hwdev_contract(ROOT)
     print('PASS B1/B2: fixed hwdev inventory/current private pair, both LAN contract dependencies')
@@ -109,7 +108,6 @@ def main():
             print('RED runtime: machine device ID changed (compiled successfully)')
 
 
-HWDEV_SHA = 'c26155aa237c8fc6ed7eacfbe2e806d92e7133dd925d749f8210339ad02c245b'
 if __name__ == '__main__':
     main()
 
