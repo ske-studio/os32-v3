@@ -195,7 +195,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 - `geforce.mod image_max=128KiB` は維持。F1後の実像＋層2text/rodata/data/BSS/alignmentをlink mapで計測、収まるとは未断定。F1の増分予算8KiBに上表を足す。
 - 超過時はgrctxを4a定数分岐で最適化、debug文字列を診断側へ、死コード除去。なお超過ならgrctx生成をbuild時生成の圧縮初期値/run列＋ctxprogへ変換して同値試験する。機能削除/上限拡張/本体のkernel複製では解決しない。
 - importはF1後28〜30＋**1** (`geforce_dma_ops`等の単一typed accessor)で29〜31を目標。clock/wait/MMIO/mapは既存gf_io/production adapterを再用。dma_alloc/freeを別importにせず、常駐の型付きops表を取得する。汎用syscall dispatcherにはしない。
-- 生成契約実数が32超なら既存個別資源importを同じ資源opsへ統合して32以下へ収める。32の上限は変更しない。常駐adapterの増分は0.5KiB予算、ctx本体を常駐させない。
+- importは生成契約と件数・各シンボルの完全一致で照合する。常駐adapterの増分は0.5KiB予算、ctx本体を常駐させない。
 
 ## 8. ファイルごとの変更一覧 (O/相対、1行=1段=1実装者)
 | 段/ファイル | 役目 / 依存 / 増分行目安 |
@@ -234,7 +234,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 | B7/C 障害寿命 | F1 ACK後の件数差→採取→要求閉→gate閉、first-fault固定、tick重複、timeout、F1停止失敗では解放なし、旧epoch拒否 | 不正handle/範囲外methodを診断専用入口で投入、停止ログ→明示recover→正常reference / 件数差見落とし、要求閉省略、fault後kick、reset後成功通知を殺す |
 | PCI機能 | FB 100850→100800→PCI descriptor順、pa/va異なるfixture、4KiB端点、pool不足、完了前free禁止 | 層3の0039 M2MFと結合しRAM→VRAM→RAM、固定/歩行bit/CRC一致、82557併用 / PCI target誤値、端点+1、early-freeを殺す |
 | B8 map | BAR1長不足/加算overflow/部分extentのbaseとlength/解除失敗時保持 | 64KiB mapのPT増分と予約解除を記録 / offset無視を殺す |
-| 最終 | KDEBUG=0本番link、import<=32、image<=128KiB、全段rollback | 起動→投入→停止→再開、IRQ6共有/VBLANK増加、表示維持、0:13.0/0221一致 |
+| 最終 | KDEBUG=0本番link、image<=128KiB、全段rollback | 起動→投入→停止→再開、IRQ6共有/VBLANK増加、表示維持、0:13.0/0221一致 |
 - host試験はレジスタ副作用のモデルでありDMA到達性の証明ではない。実機試験を実装前の着手条件にしない。PCI転送の結合試験だけ層3M2MFに依存し、referenceまでの層2受入を先行する。
 - T1は`CHECK=dict(name='gf-command-host',tier=1,needs=[],budget=90.0,covers=['hwdev/gf/**','drivers/video/geforce/geforce_dma.c','tools/tests/gf_command*','tools/tests/test_gf_command.py'])`を宣言。未着手Bは登録せず、追加済みBの試験欠落は失敗。A時点で骨格の正常/変異を実行する。
 - 各変異は無変更対照がGREEN→一意の目印で1箇所を変更→同じ対象試験が実行時RED→復元してGREENを要求。コンパイル失敗を検出成功に数えない。B担当が自身のfixture/変異をT1へ登録。

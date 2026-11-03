@@ -23,7 +23,7 @@
 | **記録** | 票に人が書くのは **1 段 10 行以内** — 決定・未確認・持越し・証拠の所在。**受入の結果は票・台帳・HANDOVER には「合否 1 語 + 証拠のパス」だけ**、中身は証拠の `RESULT.md` に (HANDOVER §2 を長文にしない)。受入の観測スクリプトは `tools/accept/` にだけ新しく作る (ユーザー承認 2026-10-10、実施 2026-10-14)。コマンド・runner・rc・時刻・RED/GREEN は道具のログに残し、票に貼らない。契約の変更は仕様の正典へ書く |
 | **持越し** | 延ばした試験・SKIP・ホストだけの合格・未結線は [DEFERRED_TESTS.md](../DEFERRED_TESTS.md) の 1 か所に書く (何を・なぜ・どの関門で必ずやるか)。そこに無い SKIP は合格に数えない |
 | **レビューの重さ** | P3 だけの直し、および**機械的な小さい依頼 (文言・表示・設定の追従など、試験を含めて 30 行程度まで、判定ロジックを変えない)** は PM が差分を読んで着地する (ユーザー決定 2026-10-14)。P1・P2 の直しの確認は**前回と同じレビュアーに差分だけ**。**3 往復で決着しない争点はユーザーへ** |
-| **決裁** | PM の推奨は**基本的に承認** (その範囲で止まらずに進める)。**[D2] の操作と実機の物理操作は個別に承認**。互換の無い更新 (配置の世代や ABI が変わり、新旧のカーネルとユーザーランドが混ざると起動しない) を実機に入れるときは、手順をユーザーに示してから行う (2026-10-16)。**実機への配備・再起動・シリアルの試験は、PM が ssh で直接流さず、ノートの Remote Control のセッションに依頼する** (スキル `os32-realhw-update` §1 の形、入れる版は CI の build が成功した SHA — 実機の調べ用の診断ビルドだけは例外。PM の ssh は**ファイルを置くこと** (CI を待たない版の成果物を scp で送り展開する) と状態の確認までで、置いた後の処理 (lanfs_host の起動・hsync・再起動・シリアルの試験) はノートに頼む、2026-10-30)。NP21/W の ini を変えてよいのは PM だけ (原本を残す経路で、終わったら戻す — スキル `os32-emu-config`) |
+| **決裁** | PM の推奨は**基本的に承認** (その範囲で止まらずに進める)。**[D2] の操作と実機の物理操作は個別に承認**。互換の無い更新 (配置の世代や ABI が変わり、新旧のカーネルとユーザーランドが混ざると起動しない) を実機に入れるときは、手順をユーザーに示してから行う (2026-10-16)。**実機への配備・再起動・シリアルの試験は、PM が ssh で直接流さず、ノートの Remote Control のセッションに依頼する** (スキル [os32-realhw-update §1](../../../.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く) の形、入れる版は CI の build が成功した SHA — 実機の調べ用の診断ビルドだけは例外。PM の ssh は**ファイルを置くこと** (CI を待たない版の成果物を scp で送り展開する) と状態の確認までで、置いた後の処理 (lanfs_host の起動・hsync・再起動・シリアルの試験) はノートに頼む、2026-10-30)。NP21/W の ini を変えてよいのは PM だけ (原本を残す経路で、終わったら戻す — スキル `os32-emu-config`) |
 | **場所** | 開発は os32-v3 (このリポジトリ)。os32 の v2.x は戻り先で新機能を入れない ([VERSIONS.md §2](../../decisions/VERSIONS.md))。**worktree は `~/wt/os32-v3/<名前>`** に作り (ホーム直下に作らない)、取り込んだら撤去する。一時ファイルは `~/os32-tmp/` の下 |
 
 
@@ -48,7 +48,7 @@ timeout 7100 codex exec -m gpt-6.1-sol -c service_tier='"priority"' -s workspace
 
 # 差分のレビュー (既定、sol の実装) — astra の read-only。対象の worktree を -C に、依頼は §5 の書式:
 timeout 1500 codex exec -m gpt-6-astra -s read-only -C <worktree> "<依頼文>" < /dev/null > <ログ> 2>&1
-# 差分のレビュー (astra の実装・大物の sol の差分) — Agent(subagent_type: "reviewer")、model は reviewer.md の opus。読むだけ・編集禁止。
+# 差分のレビュー (astra の実装) — Agent(subagent_type: "reviewer")、model は reviewer.md の opus。読むだけ・編集禁止。
 # 設計票の書き手 — astra。書くのは指定した一時ディレクトリの票だけ、リポジトリは読むだけ:
 timeout 7100 codex exec --skip-git-repo-check -m gpt-6-astra -s workspace-write -C ~/os32-tmp/run/<題> "<依頼文>" < /dev/null > <ログ> 2>&1
 # 設計票のレビュー — 別インスタンスの Agent(subagent_type: "reviewer")、model は opus。
@@ -62,7 +62,7 @@ timeout 7100 codex exec --skip-git-repo-check -m gpt-6-astra -s workspace-write 
 
 **依頼パック** (PM が 1 本のファイルにまとめ、依頼文の冒頭で「最初に読む」と指定する。票の節番号を指すだけで済ませない):
 期待する基点の SHA / **実装者のモデルと選んだ理由 1 行** (sol / astra、§0 の基準で) / 契約の正典 (節) / 触る関数と呼出し元 (file:line) / 決定済みの事項 / **期待が変わる既存試験** /
-**回す検査の名前と runner** (`python3 tools/checks/run.py --select --files <触る予定のファイル>` の候補から PM が選ぶ。**全体に効く静的検査 `check-p2v` `check-c-dialect` `check-constraints` `check-arch-asm` `check-privileged` は毎回含める**。これは PM が取り込みで回す一覧で、実装者に回させるのは `make all` と足した・触った試験だけ — §0「検査」) / 受入条件 (**配備・照合の経路を変える段は、実ゲストでの予行を受入条件の 1 番目に置く** — h1c の反省) / 既知の未確認 / 外部の実物の形 (NP21/W の API の返り値など) / 環境 (上の 3 点)。
+**回す検査の名前と runner** (`python3 tools/checks/run.py --select --files <触る予定のファイル>` の候補から選ぶ。実装者・PM の完了条件と検査の分担は §0「検査」、移植の例外は [PORT_FLOW](PORT_FLOW.md)) / 受入条件 (**配備・照合の経路を変える段は、実ゲストでの予行を受入条件の 1 番目に置く** — h1c の反省) / 既知の未確認 / 外部の実物の形 (NP21/W の API の返り値など) / 環境 (上の 3 点)。
 実装者は最初に `git log --oneline -1` を実行して報告の先頭に書く。期待と違えば合わせる (`--hard` は使わない)。
 PM は着地の前に worktree の `git log -1` を確かめる。参照先が「無い」と報告されたら、まず基点を疑う。
 

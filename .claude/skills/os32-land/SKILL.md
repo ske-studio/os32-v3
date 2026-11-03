@@ -13,7 +13,7 @@ description: レビューを通った段 (作業木のブランチ) を main に
 - レビューが「取り込み可」か。要修正なら直してから (軽い指摘は PM が直すか、次の段の依頼に書いて設計票の末尾に「送り項目」として残す)。
 - 作業木に未コミットが無いか (`git -C ~/wt/os32-v3/<名> status --short`)。PM が直したら作業木でコミットしてから merge。
 - 直しのログは**最後の変更より後**のものだけ合格に数える。PM が直したら、その直しに当たる試験を自分で回す
-  (`CROSS_DIR=/home/hight/opt/cross ~/os32-tmp/bin/check_slot.sh <名札> bash -c "make <check-…> MUTATE=1"`)。
+  (`CROSS_DIR=/home/hight/opt/cross ~/os32-tmp/bin/check_slot.sh <名札> bash -c "make <check-…> MUTATE=0"`)。足した・触った試験の変異処理も直した場合は、ROLES §0「検査」に従いその試験を `--mutate` で確かめる。
 
 ## 2. merge
 
@@ -37,7 +37,7 @@ git worktree remove --force ~/wt/os32-v3/<名> && git branch -d wt/<名>
 | 節目 (票の終わり・実機配備の前・検査の仕組みを変えた・tier-2 の push の 1 日後) | `~/os32-tmp/bin/check_wt.sh <名札> <SHA>` (全体) |
 
 - `check_wt.sh` は `run_in_background` で回し、通知を待つ (結果は `~/os32-tmp/run/<名札>/{rev.txt,all.log,check.log}`)。
-- **check-changed が `→ full` と出たら** (変更が多い・Cargo.toml や build/*.mk に触った) その回は全体検査になる。
+- **check-changed が `→ full` と出たら** (変更が多い・Cargo.toml やビルド規則を変えた。build/*.mk のソース一覧だけの変更は除く。詳細は [選択器の契約](../../../docs/design/tools/checks/run.md)) その回は全体検査になる。
   rc=0 ならその SHA を**新しい最後の全体検査**にして、以後の `CHECK_BASE` を差し替え、HANDOVER §1 に書く。
 - 検査中に main へ次の段を merge してよい。push するのは検査した SHA まで (`git push origin <SHA>:main`)。
 
