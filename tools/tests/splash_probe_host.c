@@ -145,6 +145,18 @@ static void probe_hcollect_check(void) { REQUIRE(irq_on); }
 static u32 fixture_q, fixture_lower;
 static int probe_host_hcalibrate(const struct SplashRaster *, unsigned long long *,
     unsigned long long, u32);
+/* Inject only into returned batch spans, after the actual clock-free batch
+ * and IF restoration. The seed is deliberately outside this fixture. */
+static u32 peak_fixture, peak_index;
+static unsigned long long __attribute__((unused)) probe_host_pl_span(unsigned long long span)
+{
+    REQUIRE(irq_on);
+    if (!peak_fixture) return span;
+    u32 i = peak_index++;
+    REQUIRE(i < 64);
+    if (peak_fixture == 2) return 8;
+    return i == 7 || i == 51 ? 12 : i == 23 ? 10 : 8;
+}
 #include "../../platform/pc98/splash_probe.c"
 #undef pc98_splash_raster_table
 static int capture_active(void) { return probe_hd.bursts != 0; }
@@ -167,7 +179,7 @@ static struct bootinfo probe_bootinfo = { .img_crc = 123, .source = 2 };
 static struct pit_setup probe_pit = { .reload = 24576 };
 static int probe_presents, probe_rects, probe_rx_pos;
 static u32 probe_checked_frames;
-static char probe_output[131072];
+static char probe_output[524288];
 static u32 probe_output_size, probe_serial_baud;
 int gfx_current_height = 400, gfx_flip_enabled = 1;
 const struct bootinfo *bootinfo_get(void) { return &probe_bootinfo; }
@@ -244,6 +256,7 @@ static int probe_frame_checked(struct SplashRaster *s, const GFX_RasterPalTable 
 static void setup(int mode, int vs)
 {
     probe_hd = (struct probe_hdiag){0};
+    peak_fixture = peak_index = 0;
     raw_test = h_test = 0;
     raw_reads = raw_clocks = h_reads = h_high = h_rise = h_fall = 0;
     scan_us = 0; den = mode ? 3147 : 2483; total = mode ? 449 : 440;
@@ -343,6 +356,90 @@ static void widths(void)
     probe_bounds(pc98_splash_raster_state());
     REQUIRE(probe_budget.b.max >= 7 * 100000 / 32);
     in_us = clock_cost_us = out_us = 1;
+}
+static void calibrated_width_error(void)
+{
+    /* Exact third Ra266 log. The two duty endpoints are 6/32 and 7/32.
+     * The raw endpoints are ~5.933/6.925us; retaining calibrated Q error
+     * gives ~4.933/7.925us, rather than bootstrap ~4.307/8.550us. */
+    setup(1, 1);
+    probe_eight_us = 113678;
+    probe_cost[PROBE_Q] = (struct SplashRasterProbeCost){
+        .upper_num_us = 13, .upper_samples = 8, .upper_us = 2 };
+    probe_cost[PROBE_C] = (struct SplashRasterProbeCost){
+        .upper_num_us = 21, .upper_samples = 2, .upper_us = 11 };
+    probe_cost[PROBE_W].upper_samples = 1;
+    probe_hd.cal[0].q_after = 3173;
+    probe_hd.cal[1].q_after = 3146;
+    for (u32 i = 0; i < PROBE_HPERIODS; i++) {
+        probe_hsamples[i] = 32;
+        probe_highsamples[i] = i ? 7 : 6;
+    }
+    probe_bounds(pc98_splash_raster_state());
+    REQUIRE(probe_budget.q.max == 5114);
+    REQUIRE(probe_budget.h.min == 99572 && probe_budget.h.max == 99617);
+    REQUIRE(probe_budget.b.min == 15523 && probe_budget.b.max == 24938);
+    REQUIRE(6 * probe_budget.h.min / 32 == 18669);
+    REQUIRE((7 * probe_budget.h.max + 31) / 32 == 21792);
+    /* Changing only the calibrated interval moves both endpoints by the
+     * same amount in opposite directions, independently of bootstrap Q. */
+    probe_hd.cal[1].q_after = 3000;
+    probe_bounds(pc98_splash_raster_state());
+    REQUIRE(probe_budget.b.min == 15669 && probe_budget.b.max == 24792);
+}
+static void pl_batch_peaks(void)
+{
+    setup(1, 0); in_us = clock_cost_us = out_us = 1;
+    struct SplashRaster *s = pc98_splash_raster_state();
+    probe_costs(s);
+    probe_pl_columns_init();
+    struct probe_pl_column *c = &probe_pl_columns[0];
+    /* Known distribution: two maxima, one smaller runner-up, 61 lows.
+     * Repeat with all equal values: second must explicitly be absent.
+     * Every phase/kind uses the real 64-batch path and its own count. */
+    for (u32 fixture = 1; fixture <= 2; fixture++)
+    for (u32 phase = 0; phase < 2; phase++) for (u32 k = 0; k < PROBE_PL_KINDS; k++) {
+        peak_fixture = fixture; peak_index = 0;
+        unsigned long long one = 0;
+        struct SplashRasterTimeRange cost = probe_pl_measure(s, k, c,
+            k == PROBE_PL_EMPTY ? probe_pl_empty : probe_pl_emit5, phase, &one);
+        peak_fixture = 0;
+        const struct probe_pl_peak *p = &c->peak[phase][k];
+        REQUIRE(!probe_errors && irq_on && peak_index == 64);
+        REQUIRE(p->count > 1 && p->batches == 64);
+        REQUIRE(p->max == ((fixture == 1 ? 12 : 8) * (long long)den + p->count - 1) / p->count);
+        REQUIRE(p->hits == (fixture == 1 ? 2u : 64u));
+        REQUIRE(p->second_valid == (fixture == 1));
+        if (fixture == 1) REQUIRE(p->second == (10 * (long long)den + p->count - 1) / p->count);
+        if (k == PROBE_PL_Q) {
+            REQUIRE(p->seed == one && one > (unsigned long long)p->max);
+            REQUIRE(cost.max == (long long)one);
+        } else REQUIRE(!p->seed && cost.max == p->max);
+    }
+    /* An early maximum followed by a newer one resets frequency; a later
+     * intermediate value replaces the former maximum as runner-up. */
+    struct probe_pl_peak p = {0};
+    const long long values[] = {4, 4, 9, 4, 6, 9, 6, 5};
+    for (u32 i = 0; i < sizeof(values) / sizeof(values[0]); i++) probe_pl_peak_add(&p, values[i]);
+    REQUIRE(p.max == 9 && p.hits == 2 && p.second == 6 && p.second_valid && p.batches == 8);
+    /* Formatting includes W's same-phase EMPTY lower subtraction, and
+     * zero-valued runner-ups remain distinguishable from absence. */
+    probe_pl_count = 1;
+    probe_pl_result[0].budget.den = den;
+    c->peak[0][PROBE_PL_W] = (struct probe_pl_peak){
+        .max = 120, .second = 100, .hits = 2, .batches = 64, .second_valid = 1, .count = 8 };
+    c->empty_min[0] = 30;
+    c->peak[1][PROBE_PL_W] = (struct probe_pl_peak){
+        .max = 80, .second = 40, .hits = 1, .batches = 64, .second_valid = 1, .count = 4 };
+    c->empty_min[1] = 40;
+    probe_errors = 1; serial_init(SYS_SERIAL_BAUD); probe_pl_dump();
+    REQUIRE(probe_contains("SPLR pl_peak=0 phase=0 kind=2 den=3147 count=8 batches=64 max_num=90 max_count=2 second_num=70 second_valid=1 seed_num=0 subtract_num=30\n"));
+    REQUIRE(probe_contains("SPLR pl_peak=0 phase=1 kind=2 den=3147 count=4 batches=64 max_num=40 max_count=1 second_num=0 second_valid=1 seed_num=0 subtract_num=40\n"));
+    REQUIRE(probe_contains("SPLR pl_peak=0 phase=0 kind=0"));
+    REQUIRE(probe_contains("SPLR pl_peak=0 phase=1 kind=4"));
+    u32 lines = 0;
+    for (u32 i = 0; i < probe_output_size; i++) lines += probe_output[i] == '\n';
+    REQUIRE(lines == 15); /* four summaries, column, 2*5 batch rows */
 }
 static void raw_measurements(void)
 {
@@ -669,7 +766,7 @@ void _start(void)
     }
     in_us = clock_cost_us = out_us = 1;
     costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_limit_inputs(); h_diagnostics();
-    realhw_precision(); np_fast_poll();
+    realhw_precision(); np_fast_poll(); calibrated_width_error(); pl_batch_peaks();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {
         setup(mode, vs);
         wide_h = wide;
@@ -719,6 +816,12 @@ void _start(void)
             const struct probe_pl_column *c = &probe_pl_columns[i];
             REQUIRE(c->row[0].count == c->n && c->row[1].count == c->n);
             REQUIRE(c->completed == 64 && !c->timeout && !c->early);
+            for (u32 phase = 0; phase < 2; phase++) for (u32 k = 0; k < PROBE_PL_KINDS; k++) {
+                const struct probe_pl_peak *p = &c->peak[phase][k];
+                REQUIRE(p->batches == 64 && p->hits == 64 && !p->second_valid);
+                if (k == PROBE_PL_W) REQUIRE(p->max - c->empty_min[phase] == c->w);
+                if (k == PROBE_PL_D) REQUIRE(p->max == c->d);
+            }
         }
         REQUIRE(irq_on);
         /* Observe the survey alone: the old player has its own IF tests. */
