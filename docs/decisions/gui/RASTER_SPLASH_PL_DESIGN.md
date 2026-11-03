@@ -255,3 +255,42 @@ else if (armed) {
 - 位相、実列の時間余裕、PIT精算は上記の受入事項。既決範囲を越える変更が必要になった時だけ具体案と推奨を添えて判断を求める。
 
 反論：概算だけで採用するとの指摘は不採用。r1の実列Q/D/WとB_minによる採否条件を維持する。
+
+## 追記: H1 の移し方 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/pl-h1-add/ADDENDUM.md (astra 起草、Opus レビュー Approve・P3 2 件を反映)。
+対象: 確定設計 RASTER_SPLASH_PL_DESIGN §2/§5/§6。本文・ユーザー決定を覆す必要なし。
+参照は main `/home/hight/os32-v3`、HEAD `c9963e3b` 相対 (40fec057 から行番号の変化なし) の file:line。
+
+### 決定: H1 を宣言先行 H1a と F1 直前の型切替 H1b に分ける
+- H1a (`gfx/gfx_osri.h`): terra の v1/v2 定数を採用し、`OSRI_MAX_EVENTS` は200のまま。既存 RAM 型・既存関数宣言を維持する。
+- v2 RAM 型の実体化は H1b (`gfx/gfx_osri.h` の後続段) に移す。同じ `struct OsriImage` を最終形へ置換し、別型・別ローダー・変換アダプターは追加しない。
+```c
+/* H1a: 既存の配置・sizeof を保持。 */
+struct OsriImage {
+    u16 pal[OSRI_COLORS], count, band;
+    struct OsriEvent event[OSRI_MAX_EVENTS]; /* 200、sizeof=1636 */
+};
+/* H1b: 上の定義をこれに置換（併存させない）。 */
+struct OsriImage {
+    u16 pal[OSRI_COLORS], count, band, version;
+    struct OsriEvent event[OSRI_V2_MAX_EVENTS]; /* 1197 */
+};
+STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
+```
+- H1b は `OSRI_MAX_EVENTS` (200) を残し、F1 で版別の上限に置き換える (H1b 単独でも組める)。
+- §5 の9614B検査は H1b の同ヘッダー、型定義直後に置く。既存の8Bイベント検査 (`gfx/gfx_osri.h:30`) も維持する。
+- H1a の実体は `gfx/gfx_osri.h:27`、旧イベント位置は36B。H1bで38Bへ移り、画像RAMは+7978Bとなる。
+- F1境界で H1b を取り込み、`gfx/gfx_osri.c:23` の `osri_load` は同名・同じ型名のまま最終RAM型へ切り替える。F1でversionを必ず格納し、版別上限・検査を実装する (`gfx/gfx_osri.c:45`、`:48`、`:61`、`:63`)。
+- この型切替で既存所有者も再コンパイルし、`platform/pc98/splash_image.c:17`、`:25`、`:28` の確保・引数が同時に9614Bへ追従する。確保サイズの変更をI1まで遅らせない。
+- H2の前方宣言・画像APIはterra案どおり `struct OsriImage` のまま。R1はH1b/F1後の最終型だけを扱い、I1は同じ型の所有・転送・反復を実装する。
+- 既存画像入口 (`drivers/video/pc98/splash_raster.c:212`) はpal/countだけを読み、H1b後も有効。R2で画像入口をR1へ移す。I1までは既存の動的画像拒否 (`platform/pc98/splash_image.c:31`) を維持する。
+
+### 宣言段の条件と段の依存
+- 宣言段はH1aおよびH2〜H6。既存型・上限定数の値・関数宣言を変えず、未使用の定数／宣言だけを追加するため既存コード生成を変えない。terra報告の比較に続き、最終宣言差分で通常ELFの `.text` を基点とcmpして確認する。
+- H1bは宣言段の `.text` 同一受入の後に着手する。H1b/F1では機能実装に伴う `.text` 変更を許容し、型変更後は全利用翻訳単位を再ビルドする。
+- §6の依存変更あり: `宣言段受入 → H1b → F1`。H2/T1の「H1後」はH1a後と読み替え、他の依存は維持する。H1bとF1を同じ取り込み単位にし、各小段の1ファイル所有は維持する。
+- H1b/F1の組合せでv1/v2読込を受け入れ、R1/I1は既定の依存どおり後続する。旧型と新型をcastで接続せず、旧オブジェクトとの混在も認めない。
+
+公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `gfx/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
+公開型の利用者はロゴ `init/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
