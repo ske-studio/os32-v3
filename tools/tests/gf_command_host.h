@@ -360,9 +360,8 @@ int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *obj,
 
 #if defined(GF2_HOST_B4)
 enum { IMAGE_WORDS = 80 * 1024 / 4 };
-static u32 actual[IMAGE_WORDS], expected[IMAGE_WORDS];
-static u32 oracle_code[256], uploaded[256], upload_words;
-static u32 writes, fail_write, image_bytes;
+static u32 actual[IMAGE_WORDS];
+static u32 writes, fail_write;
 
 /* A2 dependency-stub contract: offsets are relative to ctx, first failure
  * is injectable, and no MMIO/IRQ/timing/platform service is required. */

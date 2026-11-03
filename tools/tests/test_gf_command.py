@@ -29,8 +29,6 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-ORACLE = Path('/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/'
-              'nouveau/nvkm/engine/gr/ctxnv40.c')
 # A2 report: only the tested component is real; dependencies live in the
 # fixture header. B7/T2b include their product source and must not link it twice.
 COMPONENTS = {
@@ -194,13 +192,6 @@ def relocated(text, source):
 
 def build(component, source, directory, flags):
     extra = ['-nostdlib']
-    if component == 'b4':
-        require(ORACLE.is_file() and ORACLE.with_suffix('.h').is_file(),
-                'B4 requires the independent c03c1a1 MIT ctxnv40.c/.h oracle')
-        core = directory / 'core'
-        core.mkdir(exist_ok=True)
-        (core / 'gpuobj.h').write_text('/* Oracle services supplied by B4 host. */\n')
-        extra += ['-I' + str(directory), '-DGF2_B4_ORACLE="' + str(ORACLE) + '"']
     if component in ('t2a2-bind', 't2b-owner'):
         return build_integration(component, source, directory)
     if component == 'c0':
@@ -264,6 +255,8 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--component', choices=tuple(COMPONENTS),
                         help='run one component or its established integration oracle')
+    parser.add_argument('--oracle', type=Path,
+                        help='also compare B4 fixture with local c03c1a1 ctxnv40.c/.h')
     args = parser.parse_args()
     runners = os.environ.get('HOST32_RUNNERS', 'qemu').split()
     require(bool(runners) and all(r in ('native', 'qemu') for r in runners),
@@ -273,6 +266,12 @@ def main():
              '-fno-stack-protector', '-static', '-no-pie',
              *include_flags(ROOT), '-I' + str(ROOT)]
     selected = (args.component,) if args.component else COMPONENTS
+    if args.oracle:
+        require('b4' in selected, '--oracle requires the B4 component')
+        from gf_command_b4_fixture import FIXTURE, generate
+        require(generate(args.oracle) == FIXTURE.read_text(),
+                'B4 frozen expectations differ from the independent MIT oracle')
+        print('b4 fixture: independent c03c1a1 oracle GREEN', flush=True)
     with tempfile.TemporaryDirectory(prefix='gf-command-') as tmp:
         for component in selected:
             source = ROOT / COMPONENTS[component]
