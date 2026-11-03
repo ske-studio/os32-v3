@@ -17,6 +17,7 @@ struct gf1_test_ops {
      * bus.foundation=f. Both survive until successful stop and release. */
     int (*prepare)(struct gf_foundation *, const struct recover_bar_extent *, u32);
     int (*call)(struct gf_foundation *, const struct gf1_test_request *, struct gf1_test_reply *);
+    const struct gf2_test_ops *command;
 };
 extern struct gf1_test_ops gf1_module_ops;
 #endif
