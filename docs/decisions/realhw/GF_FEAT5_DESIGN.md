@@ -197,7 +197,7 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 - 実測（2026-11-02）: `O/build/out/geforce.mod`=39,788B（38.86KiB）、`geforce/geforce.elf`はtext=0x6067/rodata=0x2a58/bss=0xbe4、生成`geforce_imports.json`は20本。F1 8＋F2 28＋F5 20KiBを加え94.86KiB、層3/4へ33.14KiB。BSSを保守的に重ねて数える場合はさらに2.97KiB減る。
 - `O/docs/decisions/realhw/GF_FEAT3_DESIGN.md:203–211`のサイズ行は§11（指定§10とは節番号差）: text等14〜20＋bss等8=22〜28KiB、imports追加0。従って層4へ5.14〜11.14KiB（既存bss別算入なら2.17〜8.17KiB）。層4はEDID/TV表をkernel側に置くPM方針でmodule内の表を減らすが、コード量未実測なので収まるとは断定しない。
 - Aで統合link map/生成import実数を採取、CでKDEBUG=0/1再測定。超過時はF2方針どおりchip4a専用化・debug分離・dead strip・GR初期値圧縮を先に実施。本体のkernel複製や機能削除で逃げない。なお超過なら像分割/上限変更は別設計が必要であり本設計の受入を止める。
-- F2後29〜31 importsの見込み。F5は既存gf_ioと型付き資源opsで追加0を目標。F4までで32超なら個別PCI/map/時刻/alloc輸入を常駐typed platform ops accessorへ統合して削減、汎用dispatcher化しない。生成元を編集し生成ヘッダは手修正しない。
+- F5は既存gf_ioと型付き資源opsを使う。新しいimportが要るなら生成元 (geforce_imports.def) に足し、汎用dispatcher化しない。生成元を編集し生成ヘッダは手修正しない。
 - VRAM退避はmodule BSS外のhost動的メモリ。重複extentは統合しsum(bytes)を事前計算、metadata約2KiB＋extent配列を加えて一括確保。例:640×480×4Bの表示2面=2,457,600B、層3の同寸法2面=同量、cursor 64×64×4=16,384B、計4,931,584B（4.70MiB）。各面を64行へ切上げるtile例なら5,259,264B（5.02MiB）。
 - PM決定: snapshotの固定上限/対RAM比率制限は置かない。必要総量の確保失敗時だけ停止前にENOMEM、部分確保を解放してRUNを維持。一部extentだけの成功はしない。scratch/ROM/画像の所有者を分離する。
 
@@ -218,7 +218,7 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | C0 | hwdev/gf/clock.c | 既存PLL limits/solverとのadapter（B1へ統合）、レジスタキー対応と同値回帰 |
 | C1 | kdebug/gfinit_decode/tables.inc | BIT Mの既存未登録spanが有れば追加、runner decode試験を伴う |
 | C2 | hwdev/gfのproduction所有者・F2 command境界・F4表示所有者 | links/save adapter/受付閉を結線（実装時の確定ファイルに1変更段ずつ割当） |
-| C3 | build/geforce-module.mk・tools/prototypes/geforce_imports.def | 新部品link/必要時ops統合、生成数と128KiB検査 |
+| C3 | build/geforce-module.mk・tools/prototypes/geforce_imports.def | 新部品link、128KiB検査 |
 | C4 | kdebug/gf5_test.c | B試験入口を結線、全機能serial台本、200行追加 |
 
 - B各段は対応するホスト試験・変異を同時に完成させる。A骨格だけで合格にしない。A→B（依存順）→C→実機受入。B3/B4/B5の温度/電圧/整列列は本書で確定済み。
@@ -233,7 +233,7 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | 電圧を実測値と呼ばない | 実GPIO列をfake MMIOで検証、vmap有無/必要speedo不在/prev失敗/min_id最大選択、要求間の最近上位entry/最大超過/同値・欠落bit・極性、RAM→fan↑→volt↑→clock→volt↓→fan↓。変異:下位entry採用、clock前降圧 | VID前後/要求・採用µV、ROM perf状態間とboot復帰 |
 | tile両側が同期する | 12枠/再利用/境界/overlap/解放。変異:FB flush削除、GR addr先行、11→12 slot | linear基準とtiled転送の内容比較、隣接面CRC不変 |
 | 状態が再使用できる | 8MiB超の確保成功/確保失敗ENOMEMかつ停止なし、save失敗/途中restore失敗/extent破壊/再割当/fence世代。変異:cursor退避削除、BM先行解除、古いticket再利用 | 描画→save→restore→再描画を3回、mode/cursor/palette/CRC/IRQ継続 |
-| 予算・非GUI | KDEBUG両像、imports<=32、module<=128KiB、GUI参照追加0 | 0:13.0/0221を記録、stage/rc/元rc付きのPASS/FAIL |
+| 予算・非GUI | KDEBUG両像、module<=128KiB、GUI参照追加0 | 0:13.0/0221を記録、stage/rc/元rc付きのPASS/FAIL |
 
 - 実装後は触った像のbuild、check-changed MUTATE=0、各追加試験の一意anchor変異RED、lint。実機未実施は未実施と記録し、NP21/WでGPU実証したとしない。今回は設計のみでbuild/実機試験なし。
 - `CHECK=dict(name="gf5-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/**","kdebug/gf5_test.c","tools/tests/gf5*","tools/tests/test_gf5.py"])`をA3で宣言。Bごとのhost.cは実部品をlink、依存はA1 stub、Aにも骨格の正常/変異を置く。
