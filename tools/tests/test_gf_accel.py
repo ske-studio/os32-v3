@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Acceptance producer/consumer, firmware WC SKIP, clock/point failures and GUI phases."""
+"""Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
-    covers=['tools/tests/test_gf_accel.py', 'tools/accept/gf_accel.py',
+    covers=['hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+            'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
+            'drivers/video/geforce/*', 'tools/tests/gf_accel*',
+            'tools/tests/gf_command_runtime_host.h',
+            'tools/tests/test_gf_accel.py', 'tools/accept/gf_accel.py',
             'drivers/video/geforce/gf_accept.c', 'drivers/video/geforce/gf_present.c',
             'drivers/video/geforce/geforce_module.h', 'hwdev/gf/production.h',
             'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs',
@@ -10,6 +14,7 @@ CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
             'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
 from pathlib import Path
+import argparse
 import importlib.util
 import os
 import re
@@ -23,6 +28,321 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
+
+
+# GF_FEAT3_DESIGN §13/G1: one real product TU per host, UNIT selected in C.
+# B4 is unstarted and has no registration. Every registered entry is required,
+# including in this wiring worktree before the product branches are integrated.
+COMPONENTS = {
+    'b0': 'hwdev/gf/accel_objects.c',
+    'b1': 'hwdev/gf/accel_surface.c',
+    'b2': 'hwdev/gf/accel_rop.c',
+    'b3': 'hwdev/gf/accel_fill.c',
+    'b5': 'hwdev/gf/accel_mono.c',
+    'b6': 'hwdev/gf/accel_ifc.c',
+    'b7': 'hwdev/gf/accel_m2mf.c',
+    'b8': 'hwdev/gf/accel_transfer.c',
+    'b9': 'hwdev/gf/accel_scale.c',
+    'b10': 'drivers/video/geforce/gf_present_m2mf.c',
+    'v0': 'hwdev/gf/vram_view.c',
+}
+
+# Reports gf3-b*/report*.md, gf3-v0/report.md (B0 fix1 supersedes old anchors).
+# (name, product, unique original, replacement, runtime RED host).
+# Expectations and fixtures are never mutated. No report/reference files are
+# read at runtime; these registrations are frozen repository inputs.
+MUTATIONS = {
+    'b0': [
+        ('surface-class', 'hwdev/gf/accel_objects.c',
+         'GF3_CLASS_NULL, GF3_CLASS_SURFACE2D,',
+         'GF3_CLASS_NULL, GF2_GR_SURFACE2D_NV30,', 'tools/tests/gf_accel_b0_host.c'),
+        ('ifc-class', 'hwdev/gf/accel_objects.c',
+         'GF3_CLASS_M2MF, GF3_CLASS_IFC\n',
+         'GF3_CLASS_M2MF, GF3_CLASS_SURFACE2D\n', 'tools/tests/gf_accel_b0_host.c'),
+        ('m2mf-subc', 'hwdev/gf/accel_objects.c',
+         '{GF3_SUBC_M2MF, SETUP_BIND, 1, {GF3_HANDLE_M2MF}}',
+         '{GF3_SUBC_REFERENCE, SETUP_BIND, 1, {GF3_HANDLE_M2MF}}', 'tools/tests/gf_accel_b0_host.c'),
+        ('notify-null', 'hwdev/gf/accel_objects.c',
+         '{GF3_SUBC_M2MF, SETUP_DMA_NOTIFY, 1, {GF3_HANDLE_NOTIFY}}',
+         '{GF3_SUBC_M2MF, SETUP_DMA_NOTIFY, 1, {GF3_HANDLE_NULL}}', 'tools/tests/gf_accel_b0_host.c'),
+        ('partial-success', 'hwdev/gf/accel_objects.c',
+         'if (rc) return failed_init(c, rc);\n    }\n    rc = drain',
+         'if (rc) return c->last_rc = GF3_OK;\n    }\n    rc = drain', 'tools/tests/gf_accel_b0_host.c'),
+        ('notify-relative', 'hwdev/gf/accel_objects.c',
+         'c->notify_storage.off;\n        rc = gf2_dma_new',
+         '0U;\n        rc = gf2_dma_new', 'tools/tests/gf_accel_b0_host.c'),
+        ('gdi-cga6', 'hwdev/gf/accel_objects.c',
+         '{GF3_SUBC_GDI, SETUP_GDI_MONO_FORMAT, 1, {SETUP_GDI_CGA6}}',
+         '{GF3_SUBC_GDI, SETUP_GDI_MONO_FORMAT, 1, {2U}}', 'tools/tests/gf_accel_b0_host.c'),
+        ('stop-retention', 'hwdev/gf/accel_objects.c',
+         'if (stopped == GF2_ESTOP) return c->last_rc = stopped;',
+         'if (stopped == GF2_ESTOP) return c->last_rc = rc;', 'tools/tests/gf_accel_b0_host.c'),
+    ],
+    'b1': [
+        ('b1_argb_gdi', 'hwdev/gf/accel_surface.c',
+         '{4, 10, 11, 3, 3, 4, 3}',
+         '{4, 10, 10, 3, 3, 4, 3}', 'tools/tests/gf_accel_b1_host.c'),
+        ('b1_span_extent', 'hwdev/gf/accel_surface.c',
+         'bytes = (rows-1)*pitch+rowbytes;',
+         'bytes = rowbytes;', 'tools/tests/gf_accel_b1_host.c'),
+        ('b1_identity', 'hwdev/gf/accel_surface.c',
+         's->off, s->bytes, &key);',
+         's->off, 1, &key);', 'tools/tests/gf_accel_b1_host.c'),
+        ('b1_sf_gdi', 'hwdev/gf/accel_surface.c',
+         'gdi ? sf.sf_gdi : sf.sf,',
+         'sf.sf,', 'tools/tests/gf_accel_b1_host.c'),
+        ('b1_sf_pitch_swap', 'hwdev/gf/accel_surface.c',
+         '(dst->pitch << 16) | src->pitch',
+         '(src->pitch << 16) | dst->pitch', 'tools/tests/gf_accel_b1_host.c'),
+        ('b1_sf_offset_swap', 'hwdev/gf/accel_surface.c',
+         'src->off, dst->off};',
+         'dst->off, src->off};', 'tools/tests/gf_accel_b1_host.c'),
+    ],
+    'b2': [
+        ('b2-copy-rop', 'hwdev/gf/accel_rop.c',
+         '{0x44, 0x45}, {0xcc, 0xca}',
+         '{0x44, 0x45}, {0xcc, 0xcc}', 'tools/tests/gf_accel_b2_host.c'),
+        ('b2-mask8', 'hwdev/gf/accel_rop.c',
+         'mask |= 0xffffff00U;',
+         'mask |= 0xfffffe00U;', 'tools/tests/gf_accel_b2_host.c'),
+        ('b2-pat-format', 'hwdev/gf/accel_rop.c',
+         'value = format.pat;',
+         'value = 3U;', 'tools/tests/gf_accel_b2_host.c'),
+        ('b2-operation', 'hwdev/gf/accel_rop.c',
+         '#define GF3_OPERATION_COPY    3U',
+         '#define GF3_OPERATION_COPY    1U', 'tools/tests/gf_accel_b2_host.c'),
+        ('b2-clear', 'hwdev/gf/accel_rop.c',
+         '{0x00, 0x00}, {0x88, 0x8a}',
+         '{0x00, 0x0a}, {0x88, 0x8a}', 'tools/tests/gf_accel_b2_host.c'),
+        ('b2-mask16', 'hwdev/gf/accel_rop.c',
+         'mask |= 0xffff0000U;',
+         'mask |= 0U;', 'tools/tests/gf_accel_b2_host.c'),
+    ],
+    'b3': [
+        ('fill_gdi_constant', 'hwdev/gf/accel_fill.c',
+         'v[0] = fmt.gdi;',
+         'v[0] = 3;', 'tools/tests/gf_accel_b3_host.c'),
+        # Keep alu used under -Werror; the drawing operation still becomes copy.
+        ('fill_alu_constant', 'hwdev/gf/accel_fill.c',
+         'GF3_SUBC_GDI, alu, mask, s->fmt, dl',
+         'GF3_SUBC_GDI, ((void)alu, 3), mask, s->fmt, dl', 'tools/tests/gf_accel_b3_host.c'),
+        ('fill_point_order', 'hwdev/gf/accel_fill.c',
+         '(r.x << 16) | r.y',
+         '(r.y << 16) | r.x', 'tools/tests/gf_accel_b3_host.c'),
+        ('fill_size_order', 'hwdev/gf/accel_fill.c',
+         '(r.w << 16) | r.h',
+         '(r.h << 16) | r.w', 'tools/tests/gf_accel_b3_host.c'),
+        ('fill_format', 'hwdev/gf/accel_fill.c',
+         'v[0] = fmt.gdi;',
+         'v[0] = fmt.sf_gdi;', 'tools/tests/gf_accel_b3_host.c'),
+        ('fill_wait', 'hwdev/gf/accel_fill.c',
+         'rc = gf2_fence_wait(c->ch, fence, dl);',
+         'rc = GF3_OK;', 'tools/tests/gf_accel_b3_host.c'),
+    ],
+    'b5': [
+        ('mono-cga6', 'hwdev/gf/accel_mono.c',
+         '#define MONO_CGA6 1U',
+         '#define MONO_CGA6 2U', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-noninc', 'hwdev/gf/accel_mono.c',
+         'MONO_DATA, false, c->scratch',
+         'MONO_DATA, true, c->scratch', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-tail-read', 'hwdev/gf/accel_mono.c',
+         '&& row < r.h',
+         '&& row <= r.h', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-pitch', 'hwdev/gf/accel_mono.c',
+         'row * bits->pitch + byte',
+         'row * rowbytes + byte', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-zero-tail', 'hwdev/gf/accel_mono.c',
+         'u32 word = 0;',
+         'u32 word = 0xffffffffU;', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-exclusive', 'hwdev/gf/accel_mono.c',
+         '(bottom << 16) | right;',
+         '(bottom << 16) | (right - 1);', 'tools/tests/gf_accel_b5_host.c'),
+        ('mono-short-batch', 'hwdev/gf/accel_mono.c',
+         'words > GF3_MONO_BATCH_WORDS ? GF3_MONO_BATCH_WORDS : words',
+         'words > GF3_MONO_BATCH_WORDS ? GF3_MONO_BATCH_WORDS - 1 : words', 'tools/tests/gf_accel_b5_host.c'),
+    ],
+    'b6': [
+        ('ifc-size-out-padding', 'hwdev/gf/accel_ifc.c',
+         'v[1] = (1U << IFC_FIELD_SHIFT) | r.w;',
+         'v[1] = (1U << IFC_FIELD_SHIFT) | iw;', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-row-restart', 'hwdev/gf/accel_ifc.c',
+         'v[0] = ((r.y + y) << IFC_FIELD_SHIFT) | r.x;',
+         'v[0] = (r.y << IFC_FIELD_SHIFT) | r.x;', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-padding-nonzero', 'hwdev/gf/accel_ifc.c',
+         'c->scratch[i] = 0;',
+         'c->scratch[i] = 0xa5a5a5a5U;', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-sf-format', 'hwdev/gf/accel_ifc.c',
+         'v[1] = fmt.ifc;',
+         'v[1] = fmt.sf;', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-limit-exclusive', 'hwdev/gf/accel_ifc.c',
+         'part.rowbytes > GF3_SCRATCH_WORDS * sizeof(u32)',
+         'part.rowbytes >= GF3_SCRATCH_WORDS * sizeof(u32)', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-early-completion', 'hwdev/gf/accel_ifc.c',
+         'if (!rc) rc = gf2_fence_wait(c->ch, fence, dl);',
+         'if (!rc) rc = GF3_OK;', 'tools/tests/gf_accel_b6_host.c'),
+        ('ifc-clip-point-size-swap', 'hwdev/gf/accel_ifc.c',
+         'v[0] = (r.y << IFC_FIELD_SHIFT) | r.x;\n    v[1] = (r.h << IFC_FIELD_SHIFT) | r.w;',
+         'v[0] = (r.h << IFC_FIELD_SHIFT) | r.w;\n    v[1] = (r.y << IFC_FIELD_SHIFT) | r.x;', 'tools/tests/gf_accel_b6_host.c'),
+    ],
+    'b7': [
+        ('rows-2048', 'hwdev/gf/accel_m2mf.c',
+         'u32 n = rows > GF3_M2MF_MAX_ROWS ? GF3_M2MF_MAX_ROWS : rows;',
+         'u32 n = rows > 2048U ? 2048U : rows;', 'tools/tests/gf_accel_b7_host.c'),
+        ('post-offset', 'hwdev/gf/accel_m2mf.c',
+         'M2MF_OFFSET_OUT, false, &zero, 1, dl',
+         'M2MF_NOP, false, &zero, 1, dl', 'tools/tests/gf_accel_b7_host.c'),
+        ('skip-wait', 'hwdev/gf/accel_m2mf.c',
+         'if (!rc) rc = gf2_fence_wait(ch, fence, dl);',
+         'if (!rc) rc = GF3_OK;', 'tools/tests/gf_accel_b7_host.c'),
+        ('out-stride', 'hwdev/gf/accel_m2mf.c',
+         'out_off += out_pitch * n;',
+         'out_off += in_pitch * n;', 'tools/tests/gf_accel_b7_host.c'),
+        ('overlap', 'hwdev/gf/accel_m2mf.c',
+         'return m2mf_result(c, GF3_EUNSUPPORTED);',
+         '(void)0;', 'tools/tests/gf_accel_b7_host.c'),
+    ],
+    'b8': [
+        ('rows-cap', 'hwdev/gf/accel_transfer.c',
+         'if (rows > GF3_M2MF_MAX_ROWS) rows = GF3_M2MF_MAX_ROWS;',
+         'if (rows > GF3_M2MF_MAX_ROWS) rows = GF3_M2MF_MAX_ROWS + 1U;', 'tools/tests/gf_accel_b8_host.c'),
+        ('ram-pitch', 'hwdev/gf/accel_transfer.c',
+         'staging[j * bytes + b] = memory[(y + j) * cpu.pitch + x + b];',
+         'staging[j * bytes + b] = memory[(y + j) * vr.pitch + x + b];', 'tools/tests/gf_accel_b8_host.c'),
+        ('ifc-16k', 'hwdev/gf/accel_transfer.c',
+         '(TRANSFER_IFC_BYTES - 1U) / span->rowbytes',
+         'TRANSFER_IFC_BYTES / span->rowbytes', 'tools/tests/gf_accel_b8_host.c'),
+        ('ifc-fallback', 'hwdev/gf/accel_transfer.c',
+         'if (rc != GF3_EUNSUPPORTED) return transfer_result(c, rc);',
+         'if (rc != GF3_EFORMAT) return transfer_result(c, rc);', 'tools/tests/gf_accel_b8_host.c'),
+        ('deadline', 'hwdev/gf/accel_transfer.c',
+         '0, off, bytes, vr.pitch, bytes, rows, dl);',
+         '0, off, bytes, vr.pitch, bytes, rows, dl + GF3_TIMEOUT_US);', 'tools/tests/gf_accel_b8_host.c'),
+    ],
+    'b9': [
+        ('scale_surface_src', 'hwdev/gf/accel_scale.c',
+         'gf3_surface_set(c, dst, dst, false, dl)',
+         'gf3_surface_set(c, src, dst, false, dl)', 'tools/tests/gf_accel_b9_host.c'),
+        ('scale_wait_rc', 'hwdev/gf/accel_scale.c',
+         'rc = gf2_fence_wait(c->ch, fence, dl);',
+         'gf2_fence_wait(c->ch, fence, dl); rc = 0;', 'tools/tests/gf_accel_b9_host.c'),
+        ('scale_filter', 'hwdev/gf/accel_scale.c',
+         'bilinear ? SIFM_FILTER_BILINEAR : 0',
+         'bilinear ? 0 : SIFM_FILTER_BILINEAR', 'tools/tests/gf_accel_b9_host.c'),
+        ('scale_point', 'hwdev/gf/accel_scale.c',
+         '((sr.y << 4) << 16) | (sr.x << 4)',
+         '((sr.x << 4) << 16) | (sr.y << 4)', 'tools/tests/gf_accel_b9_host.c'),
+        ('scale_ratio', 'hwdev/gf/accel_scale.c',
+         'v[4] = du; v[5] = dv;',
+         'v[4] = dv; v[5] = du;', 'tools/tests/gf_accel_b9_host.c'),
+    ],
+    'b10': [
+        ('b10-force', 'drivers/video/geforce/gf_present_m2mf.c',
+         'gf3_upload(c, scan, r, ram, true, dl)',
+         'gf3_upload(c, scan, r, ram, false, dl)', 'tools/tests/gf_accel_b10_host.c'),
+        ('b10-rc', 'drivers/video/geforce/gf_present_m2mf.c',
+         'return gf3_upload(c, scan, r, ram, true, dl);',
+         'return gf3_upload(c, scan, r, ram, true, dl), 0;', 'tools/tests/gf_accel_b10_host.c'),
+    ],
+    'v0': [
+        ('v0-containment', 'hwdev/gf/vram_view.c',
+         'bytes <= r->bytes - (off - r->off)',
+         'bytes < r->bytes - (off - r->off)', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-generation', 'hwdev/gf/vram_view.c',
+         '.generation = node->value.generation + 1U',
+         '.generation = node->value.generation + 2U', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-owner', 'hwdev/gf/vram_view.c',
+         '(owner && v->owner != owner)',
+         '(owner && v->owner == owner)', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-release-key', 'hwdev/gf/vram_view.c',
+         'v->generation != key->generation',
+         'v->generation + 1U != key->generation', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-id-order', 'hwdev/gf/vram_view.c',
+         'n->value.reservation_id < first->reservation_id',
+         'n->value.reservation_id > first->reservation_id', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-display-map', 'hwdev/gf/vram_view.c',
+         'start < display_end',
+         'start > display_end', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-byte-offset', 'hwdev/gf/vram_view.c',
+         '.va = base + (off - start)',
+         '.va = base', 'tools/tests/gf_accel_v0_host.c'),
+        ('v0-unmap-extent', 'hwdev/gf/vram_view.c',
+         'view->map_base, view->map_bytes',
+         'view->va, view->bytes', 'tools/tests/gf_accel_v0_host.c'),
+    ],
+}
+
+
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+
+def component_build(host, source, directory):
+    exe = directory/'host'
+    # check=True: compilation/link errors are suite failures, never runtime RED.
+    subprocess.run(FLAGS + ['-Werror=vla', *include_flags(ROOT), '-I'+str(ROOT),
+                           str(host), str(source), '-o', str(exe)],
+                   cwd=ROOT, check=True)
+    return exe
+
+
+def component_execute(exe, runners, label, green):
+    for runner in runners:
+        result = host32.run([str(exe)], runner=runner, cwd=ROOT)
+        require((result.returncode == 0) == green,
+                f'{label}: runner={runner} rc={result.returncode}, '
+                f'expected runtime {"GREEN" if green else "RED"}')
+        print(f'{label}: runtime {"GREEN" if green else "RED"} '
+              f'(runner={runner}, rc={result.returncode})', flush=True)
+
+
+def component_hosts(selected, mutate):
+    runners = os.environ.get('HOST32_RUNNERS', 'qemu').split()
+    require(bool(runners) and all(r in ('native', 'qemu') for r in runners),
+            'HOST32_RUNNERS must select native and/or qemu')
+    # Validate the whole selection before invoking the compiler. Missing
+    # integrated products/hosts are failures, not silently skipped cases.
+    for component in selected:
+        source = ROOT/COMPONENTS[component]
+        host = ROOT/f'tools/tests/gf_accel_{component}_host.c'
+        require(source.is_file(), f'{component}: registered product missing: {source}')
+        require(host.is_file(), f'{component}: registered host missing: {host}')
+        if mutate:
+            original = source.read_text()
+            for name, product, old, new, red_host in MUTATIONS[component]:
+                require(product == COMPONENTS[component] and ROOT/red_host == host,
+                        f'{component}-{name}: inconsistent registration')
+                require(old != new and original.count(old) == 1,
+                        f'{component}-{name}: anchor must be unique and change source')
+    with tempfile.TemporaryDirectory(prefix='gf-accel-') as temporary:
+        for component in selected:
+            source = ROOT/COMPONENTS[component]
+            host = ROOT/f'tools/tests/gf_accel_{component}_host.c'
+            directory = Path(temporary)/component
+            directory.mkdir()
+            exe = component_build(host, source, directory)
+            component_execute(exe, runners, component+' control', True)
+            if not mutate:
+                continue
+            original = source.read_text()
+            # Only the temporary product changes; quoted includes keep their
+            # original parent, so mutants/restored controls link the same API.
+            def relocated(code):
+                return re.sub(r'^#include "([^"\n]+)"',
+                              lambda m: '#include "'+str((source.parent/m[1]).resolve())+'"',
+                              code, flags=re.MULTILINE)
+            mutant = directory/source.name
+            for name, product, old, new, red_host in MUTATIONS[component]:
+                label = component+'-'+name
+                mutant.write_text(relocated(original.replace(old, new, 1)))
+                try:
+                    exe = component_build(host, mutant, directory)
+                    component_execute(exe, runners, label, False)
+                finally:
+                    mutant.write_text(relocated(original))
+                    exe = component_build(host, mutant, directory)
+                    component_execute(exe, runners, label+' restored', True)
 
 
 def consumer(source=None):
@@ -268,7 +588,7 @@ fn acceptance_external_transfer() {
             print(('RED' if mutation else 'PASS')+f' real {kind} path outside wm_cycle')
 
 
-def main():
+def acceptance_main():
     module = consumer()
     for count, p50, p95 in ((100, 50, 95), (300, 150, 285)):
         result = module.stats(list(range(1, count+1)))
@@ -323,6 +643,19 @@ def main():
         producer(0, mutation=('if (rc || !freed) return -1;', 'if (rc || freed) return -1;'), expected_exit=54)
         print('RED release contract: successful free must restore CLIENT and return success')
         gui_paths(('let standalone = !state().active;', 'let standalone = false;'))
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--component', choices=(*COMPONENTS, 'acceptance'),
+                        help='run one component, or only the existing acceptance tests')
+    args = parser.parse_args()
+    if args.component != 'acceptance':
+        component_hosts((args.component,) if args.component else tuple(COMPONENTS), args.mutate)
+    if args.component is None or args.component == 'acceptance':
+        return acceptance_main()
     return 0
 
 
