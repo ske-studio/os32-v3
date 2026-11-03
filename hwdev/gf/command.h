@@ -167,12 +167,13 @@ void gf2_fifo_resume(struct gf2_chan *);
 
 /* B1 / push.c. Reserve count+1 contiguous words before writing a packet.
  * count=1..2047, subc<=7, method aligned to 4 and <=1ffc; incrementing
- * packets must also end <=1ffc. Invalid input EINVAL, non-RUN ESTATE
- * (internal drain fence excepted). Bind: method=0, one object.handle word.
+ * packets must also end <=1ffc. Invalid input EINVAL, non-RUN ESTATE;
+ * INIT/DRAIN reference goes through gf2_push_reference. Bind: method=0, one object.handle word.
  * kick drains posted writes by reading va[0] before PUT=B+4*cur. Neither
  * emit nor kick proves completion; a fault prevents any further kick. */
 int gf2_emit(struct gf2_chan *, u8 subc, u16 method, bool noninc,
              const u32 *data, u16 count, u32 deadline_us);
+int gf2_push_reference(struct gf2_chan *, u32 seq, u32 deadline_us);
 int gf2_kick(struct gf2_chan *);
 
 /* B2 / dmaobj.c. Inclusive [start,limit], class FROM/TO/IN_MEMORY.
