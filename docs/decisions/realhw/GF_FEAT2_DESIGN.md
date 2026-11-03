@@ -263,3 +263,19 @@ void gf2_fifo_resume(struct gf2_chan *);              /* PULL0=1→2500=1 */
 - F2 (前提): A0 (command.h) は層 1 の foundation.h (gf_inst・gf_irq_stats・gf_instmem_map_ops) を include する。層 1 の A0 を main に取り込んでから着手する (§8 の A0 の依存を直した)。
 - F1 (P3): §1 の食い違いは 0 件に直した。
 - F4 (P3): T1 を A3 として A 段に移した。B 段の試験の登録は PM が直列に取り込む。
+
+## 追記: INIT のあいだの初回 reference (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-a0/ADDENDUM.md (A0 の sol の設計の欠け → astra 起草、Opus レビュー Approve)。**小段 A0b** (hwdev/gf/command.h、terra): 下の宣言 1 行を足し、gf2_emit のコメントを「non-RUN ESTATE; INIT/DRAIN reference goes through gf2_push_reference」に替える (Opus P3-1)。B1・B6・C0 は A0b の上に書く。P3-2 (fence_emit が常に push_reference を呼ぶ形) は採らず、追記のとおり。
+
+状態は既存の `GF2_INIT=1` を維持（OFF=0/RUN=2/DRAIN=3/FAULT=4、新値・フラグなし）。C0 の start/recover は §2 の IRQ 開まで済ませてから初回 reference を発行する。
+B1 に固定 reference 専用の内部境界を置く（command.h の宣言追加1行、既存宣言変更0行）:
+```c
+int gf2_push_reference(struct gf2_chan *ch, u32 seq, u32 deadline_us);
+```
+この関数は `state==GF2_INIT || state==GF2_DRAIN || state==GF2_RUN` を許し、`subc=0, method=0x0050, noninc=false, count=1, data=&seq` だけを B1 の共通 reserve/write 処理へ渡す。`gf2_emit` の一般投入は RUN 限定を維持し、内部 drain もこの境界を使う。
+B6 `gf2_fence_emit` は RUN で既定の `gf2_emit`、INIT/DRAIN で `gf2_push_reference` を呼び、既定の ++seq・epoch 記録・kick を行う。`gf2_kick` と `gf2_fence_wait` も INIT/RUN/DRAIN を許す。fault確認・期限・barrier/readback は既定どおり。
+C0 の初回は `rc=gf2_fence_emit(ch,&f,dl); if (!rc) rc=gf2_fence_wait(ch,f,dl); if (!rc) ch->state=GF2_RUN;`（同一期限）。失敗時は RUN にせず §6 の共通停止へ。INIT 発行はこの初回試験、DRAIN 発行は最終 fence の呼出契約とし、追加の検査フラグは設けない。
+手本（N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau）: `N/nouveau_chan.c:469–478,496–497` は ring/NOP と fence context の初期化、`N/nv17_fence.c:90–93` は NV10 emit/read の採用、`N/nv10_fence.c:33–41,53–55` は固定 reference の reserve/write/kick と読出し。INIT/RUN の区別と初回完了試験は OS32 の契約であり nouveau の状態値ではない。
+確定本文を覆す必要なし：初回成功→RUN と一般 emit の RUN 制限を保ち、未定義だった内部初回 reference の境界を補う。リポジトリは未編集。
+
