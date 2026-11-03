@@ -544,3 +544,44 @@ static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct g
 
 ### 確定の補い (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
 - N1: B8 が IFC を選ぶ条件の並び (G2) に「かつ rowbytes×h < 16KiB (§7:145、xf86-video-nouveau の nouveau_exa.c:320 の `w*h*cpp < 16*1024`)」を足す。G1 の表の B8 の行も同じ条件にそろえる。
+
+## 追記 (2026-11-04、B4 の欠け — 同じ VRAM を指す 2 面の copy)
+
+> 出所: ~/os32-tmp/run/gf3-gaps2/ADDENDUM.md (astra 起草、Opus レビュー 1 回で確定、補いは PM)。§5 の「正規化する」はこの追記で置き換える。
+
+## 追記 (2026-11-04、B4 の欠け — 同じ VRAM を指す 2 面の copy)
+
+本追記は §5 の「異なる descriptor の alias を正規化」を以下の限定規則に置換する。G2・A0 の検査/予約契約と ABI は変更しない。未決 0 件。
+
+### 手本と採用範囲
+- 略号 X/N/V は §1 と同じ。`X/nv04_exa.c:170–200` は両 pixmap の BO を取得し、それぞれの pitch と BO 相対 offset=0 を SURFACE に設定する。同一 pixmap なら off/pitch は共通になる。同じ BO というだけで異なる pitch が安全とは読まない。
+- `X/nv04_exa.c:255–258` は元の src/dst 座標と寸法をそのまま IMAGE_BLIT に渡す。PrepareCopy の dx/dy 方向引数は使わない。`:227–253` の別 pixmap 用 VBLANK 分割は alias 正規化の根拠ではなく、既決どおり採用しない。
+- `X/nouveau_exa.c:88–98,113–143` は BO 先頭への map と面ごとの BO/pitch 確保。`V/nv04_fbcon.c:32–47` も同一表示面の座標を直接渡す。これらに任意の部分面 offset 差を商/余りで座標へ直す処理はない。
+- `N/nouveau_bo.c:594–599,618–625` の固定配置の寿命に対応して、OS32 は生存予約を検査から reference 完了まで保持する。予約全体は幾何情報を持たないため、予約 off/bytes から親面を推測しない。
+
+### 判定と投入
+1. 必須ポインタ・ready/epoch/RUN/fault を既決どおり検査。w=0 または h=0 はその後、面を参照せず無投入成功。非空では以下を ROP を含む最初の emit より前に完了する。
+2. 元の src/dst を各々 `gf3_surface_check(...,GF3_USE_2D,...)` で全面および要求矩形について検査する。dst 矩形は `{dx,dy,sr.w,sr.h}`。両 fmt の一致を要求する。全面検査は G2 の surface_set が後から検出する不正を先に排除するために必要。
+3. 重なりとは「コピーする有効 byte」の共通部分があること。検査済み span ごとの行区間 `[span.off+i*pitch, span.off+i*pitch+rowbytes)` のいずれかが相手の行区間と交差する場合とする。descriptor.bytes や行間 padding の交差だけでは重なりとしない。
+4. 行先頭は単調増加する。src/dst の先頭行から、交差すれば重複、交差しなければ先に終わる側の行を進め、片側が尽きれば非重複とする（O(src.rows+dst.rows)、追加配列なし）。末尾加算は検査済み範囲内、最終行後の先頭は計算しない。
+5. 非重複なら、同一予約/異なる予約、同じ/異なる off/pitch を問わず、元の両 descriptor と座標のまま 1 矩形を投入する。
+6. 重複なら、両 descriptor の `reservation_id,generation,off,pitch,fmt` が全て等しい場合だけ許可する。別の構造体でもこの条件なら既に共通座標系であり、「正規化できる」はこの恒等変換だけを意味する。width/height/bytes の一致は不要だが、各々が手順 2 を満たすこと。
+7. 重複して手順 6 を満たさないものは `GF3_EUNSUPPORTED=-305`。off 差が 1 byte、1 行、複数行、cpp の倍数であるかを問わず off が異なれば拒否し、pitch 不一致も拒否する。差の除算・剰余、行折返し、行分割、一時面、CPU/M2MF への内部 fallback は追加しない。
+8. 許可時は元の src/dst を `gf3_surface_set(c,src,dst,false,dl)` に渡す。bytes/width/height/予約 ID/世代を一切合成・拡張しない。重複時の共通 off/pitch は元の値、座標も元の値。B1 の全面検査を迂回しない（`gf3-b1/hwdev/gf/accel_surface.c:86–101`）。
+9. §5 の ROP→SURFACE→BLIT:0300 の 3 語→reference emit/wait 1 回を維持する。上下左右/斜め/同位置も 1 矩形で、座標を右下へ移さず pitch を反転しない。dl は操作全体で不変、部分投入後の失敗は再送しない。
+- NULL は EINVAL=-301、fmt 不一致/2D 非対応は EFORMAT=-302、元の面/矩形/packed field/予約包含の不正は ERANGE=-303。古い ID/世代等は match の ESTATE=-304 を含め原 rc を返す。元の検査失敗を EUNSUPPORTED に置換しない。全 rc は既決どおり last_rc に保存する。
+- off=0 と off=1、pitch=16 の INDEX8 部分面が重なる例は EUNSUPPORTED。呼出側が共通の正規面 descriptor を既に所有する場合は、それを両引数に用い、部分位置を座標として渡す。B4 が予約から正規面を生成することはない。
+
+### B4 host 試験（記述例、ビルド/実行は PM 統合後）
+- 以下は生存予約 `[0,128)`、同一 ID/世代、INDEX8、bytes は全面の最後の有効 byte までを基本とする。拒否例は ROP/SURFACE_SET/EMIT/FENCE/WAIT が全て 0 回であることを照合する。
+- 正規化可能：別構造体 A=`{off=0,bytes=64,pitch=16,width=16,height=4}`、B=`{0,48,16,16,3}`。sr=(0,0,8,2)、dst=(1,1) は成功。SURFACE_SET に元の全欄を渡し、BLIT payload は `[0,0x00010001,0x00020008]`。同一面の 8 方向・同位置も独立期待値で照合する。
+- 正規化不能：A と B=`{1,63,16,15,4}`、sr=(0,0,8,2)、dst=(0,0) は EUNSUPPORTED。B=`{16,64,16,16,4}` と `{17,63,16,15,4}` でも同じ矩形で行をまたぐ重複を拒否する。B=`{0,56,20,16,3}` の異 pitch 重複も拒否する。
+- 非重複：A と B=`{1,63,16,15,4}`、sr=(0,0,1,2)、dst=(0,0) は行区間が接するだけなので成功（包絡は交差）。異 pitch の B=`{64,56,20,16,3}`、sr=(0,0,8,2)、dst=(0,0) も成功し、元の off/pitch を保持する。別の非重複予約でも成功する。
+- 境界：A の sr=(15,3,1,1)、dst=(14,3) は byte 63 までで成功、sr.x=16,w=1 は ERANGE。bytes=63 の A、pitch=65536、全面 height=65536 は小さな要求矩形でも ERANGE。古い世代は ESTATE、fmt 不一致は EFORMAT、ゼロ矩形は必須ポインタ/状態検査後に無投入成功。
+- B4 単独 host は G1 の SURFACE_SET/ROP stub の引数を observe 内で照合し、実 B4 の BLIT packet と fence/deadline/失敗伝播を検証する。stub は SF packet を生成しない。B1 結合で SF の両 offset/pitch と全面検査を確認し、実機の重なり結果は T0 がコピー前保存像から作る期待像と照合する。
+
+### 確定の補い (2026-11-04、claude-opus-5-5、PM が反映)
+- R1: rc の順は src の検査 → dst の検査 → fmt の一致で、最初の rc を返す (B1 の gf3_surface_set、accel_surface.c:91-97 と同じ順)。
+- R2: pitch=65536・height=65536 の例は span_check 経由の ERANGE。pitch の 16bit の上限は B1 の試験が持つ。
+- R3: 非重複の例の前提に、[128,256) の予約 (ID・世代は別) を足す。
+- R4: 同一面の 8 方向・同位置の例は、A で sr=(4,1,4,2)、dst を (3..5, 0..2) の 8 点と (4,1) とし、payload を列挙する。T0 には「重なる copy は同じ descriptor で」。
