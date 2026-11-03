@@ -338,3 +338,22 @@ call は f で上記 chan を選択し、START/STOP/RECOVER は既存 gf2_*、RE
 新小段 T2b（T2a0→T2a1→T2a2後、C9相当の結線）：userland/shell/cmd_gf2.c と既存shell登録/ビルド、kdebug/{gf_command_wire.h,gf_command_test.h,kdebug_main.c,gfinit.c}、build/hwdev.mk。GF_OP_COMMAND と専用要求型を追加し shell→kdebug_main→既存HWDEV gfinit振分け→T2へ接続、gfinitがowner準備/停止を担当。T2本体 kdebug/gf_command_test.c はT2a/b依存でserial受入を実装する。cmd_gf2.c を分ける場合だけ T2c とし、T2 は T2c にも依存。
 r1→r2 の変更：P2 の reply.handle 削除・gr_handle→gr_class、P3 の ops版3→4と契約再生成を明記、T2aをT2a0/T2a1/T2a2に分割（宣言の変更は5行＋版定義1行＝6行）、確定本文を覆す必要なし。
 
+## 追記: T2 の ops の実体・BAD_* の固定値・診断の時計 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-t2gap/ADDENDUM.md (T2a1・T2a2・T2b の設計の欠け → astra 起草 r1〜r3、Opus レビュー r1・r3)。**ユーザー指示「tick より短い関数を使用し直して」**: 診断の時計は sys_time_now (µs)。**Opus r3 の P2 (PM が注記)**: T2b が hwdev の import に sys_time_now を足すときは、docs/design/hwdev/hwdev_imports.md §3 の表に `| 39 | sys_time_now | 123 |` を足し (kdebug の index は 123)、同じ節の「kernel imports は **13**」を 14 に、tools/gen_hwdev_contract.py:40 の `range(39)` を `range(40)` にする (.def だけを変えると生成器が止まる — 層 1 の C9b の直し 1 と同じ形)。P3: sys_time_now が OS32_ERR_AGAIN を返したら EIO で 1 回落ちる — 守りは足さず実機のログで見る。
+
+T2補遺：確定本文・handleを障害出力に出さない決定を覆す必要なし。以下の実装パスは /home/hight/wt/os32-v3/gf2-l2 基準。
+追加宣言は3行（下記、hwdev/gf/gf2_test.h、T2a1が先に追加しT2a2が利用）；既存宣言変更0行、既定のops版定義3→4の1行はT2a2のまま。gf2_test_opsの型・共有構造体の寸法は今回変えない。
+`struct gf2_chan;`
+`extern const struct gf2_test_ops gf2_module_ops;`
+`void gf2_test_bind_production(struct gf_foundation *, struct gf2_chan *);`
+T2a1 command_test.cがops実体とbind関数を定義し、bindは借用f/chをstaticな対に保存するだけ；T2a2 bodyはfoundation_out公開前に `gf2_test_bind_production(&production.foundation,&production.chan);`、foundation_test.cは `.command=&gf2_module_ops`。callはfが保存production fなら保存ch、prepare済み診断fなら診断chを選ぶ（production chの初期化・zero化なし）。
+T2a1 BAD_HANDLE：診断RUN専用、RAMHTに登録しない固定handle `0xdeadbeefU`、subc=0、method=0、data=同handle、count=1、noninc=falseで `gf2_emit(ch,0,0,false,&h,1,q->deadline_us)` → `gf2_kick(ch)`；class作成・先行bindなし。
+T2a1 BAD_METHOD：診断RUN専用、固定handle `0x80000100U`、class=`GF2_GR_M2MF`（0x0039）を `gf2_gr_object_new(ch,h,GF2_GR_M2MF,&test_object)` で作成→subc=0/method=0/data=hのbind→subc=0/method=0x1ffc/data=0を順にgf2_emit（各count=1、noninc=false、同一期限）→kick。「範囲外」はclassの未定義methodでありpacket encoding範囲外ではない；DMA context設定・転送開始は不要。test_objectはcommand_test.cのstatic実体とし、作成したepochを保存して同じepochでは再作成せずbindから始める；作り直すのはC0のrelease_instances（command.c:43–57）で回収された後だけ。
+BAD_*は各APIの失敗で打ち切り、kick後は既存 `gf2_fault_check(ch)` とfのclock/waitで同一期限まで障害を待つ（正常reference完了を障害成立の代わりにしない）；既存reserve/kick/fault経路だけを使い、raw投入API・subc→handle追跡・handle出力は追加しない。
+参照根は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/：include/nvhw/class/cl0039.h:27–44（bind/定義method）、nvkm/engine/gr/nv40.c:455（class）, :242–246,274–280（trap出力）、nvkm/engine/fifo/nv04.c:282–291,331–339（bind/不正methodの処理）。この固定の障害投入列そのもののnouveau手本は確認できず、値と列はOS32の診断fixtureとしてここで決める。
+T2b（kdebug/gfinit.c）のstatic adapterは `static int gf2_diag_clock(void *opaque,u32 *out) { u32 lo,hi; (void)opaque; int rc=sys_time_now(&lo,&hi); if (rc) return rc; *out=lo; return 0; }`。include/sys.h:47–56のPITラッチ補間済みu64 µsの下位32bitを使い、hiは捨てる（自然wrap）；失敗時out不変、recover.spent・tick換算は使わない。grep確認：gfinit.c:33–36はHWDEV用importを選び、既存gf_clockはspent換算、µs取得口なし；kdebug importのsys_time_now（kernel/module/kdebug_imports.def:998）だけでは届かない。T2bがhwdev/hwdev_imports.def末尾へ `{ "index":39, "symbol":"sys_time_now", "source":"include/sys.h", "kind":"FUNC", "group":"kernel" }` 1本追加・既存生成経路で再生成（39→40/128）。
+T2bはgf_prepareで層1prepare成功後・層2prepare/start前に `g->foundation.io.timing.clock_us=gf2_diag_clock; g->foundation.io.timing.wait_us=recover_hal_wait_frame;` を設定。既存waitはtick待ちでなくPITラッチ差分の有限poll（kdebug/recover_profile.c:129–167、1count<1µs、0<us<10000）；層2は既存1–50µs（command.h:98–99）を使うので追加wait/import不要。両callbackはopaqueを使わず、f/bus/opsとcallbackは層2停止・解放まで存続；T2a1 prepareはtimingを保持しproductionのtimingは差し替えない。
+T2bは各要求直前に `f->io.timing.clock_us(f->io.opaque,&now)` 成功後だけ `q.deadline_us=now+GF2_TIMEOUT_US;`（期間<2^31）、期限比較はB6（fence.c:50）と同じ `(i32)(now-deadline_us)>=0`。同一期限をemit/kick後の待ちまで共有し更新しない；START/STOP/RECOVER内部も既存C0どおり同じfの時計。safe pointはC9同様REC_RUNNING時にcall外で実行、clock/wait内からcleanupを再入させず時計はsafe pointなしでも進む。T2a2の宣言依存・型収集・ops版4・契約/対生成は既定どおり；static adapterの公開宣言追加0、geforce.mod import32/32・export追加0。実装・実機検証は各小段担当とPM。
+r2→r3 の変更：P2の修正案どおり、BAD_METHODのtest_objectは作成epochを保存し、同じepochでは再作成せずbindから開始、C0のrelease_instancesで回収後だけ再作成する。(3)のsys_time_nowの時計はr2のまま；追加宣言3行・既存宣言変更0行、既定の版定義変更1行は維持、確定本文・handle非出力の決定を新たに覆す必要なし。
+
