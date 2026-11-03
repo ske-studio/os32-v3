@@ -294,3 +294,7 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 
 公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `gfx/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
 公開型の利用者はロゴ `init/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
+
+## 宣言の段 (H1a・H2〜H6) の取り込みで後続の段へ送る項目 (2026-11-03、PM 決定)
+- 戻り値 (astra レビューの P3): `pl_prepare`・`time_splash_math`・`ktime_splash_sample`・`ktime_splash_settle`・`osri_load` は既存 (`gfx/gfx_osri.c`) と同じく **成功 0・失敗 -1**。`pl_frame` は宣言済みの `PL_FRAME_*`。実装の段 (F1・P1・P2・R1) で宣言のコメントに 1 行足す。
+- 試験の持ち主: F1・T1 は既存の `tools/tests/test_osri.py` を自分の変更に追従させる最小の直し (消えた経路の変異の目印・v1 の作り方) だけを持つ。v1/v2・案B の新しい試験は V1。衝突は PM が取り込みで解く。
