@@ -1,6 +1,6 @@
 """CW module dispatch, diagnostic lease adapter and page/IRQ operations."""
 CHECK = dict(name='gf1-dispatch-host', tier=1,
-    covers=['hwdev/gf/foundation_test.c', 'hwdev/gf/gf1_test.h',
+    covers=['hwdev/gf/foundation_test.c', 'hwdev/gf/gf1_test.h', 'hwdev/gf/gf2_test.h',
             'drivers/video/geforce/geforce_module.h',
             'include/gfx_hal.h', 'include/gfx_format.h',
             'kernel/module/module_runtime.h', 'kernel/module/module_image.h',

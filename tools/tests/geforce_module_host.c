@@ -4,6 +4,12 @@
 #include "../../drivers/video/geforce/geforce_module.c"
 #include "../../drivers/video/geforce/geforce_body.c"
 struct gf1_test_ops gf1_module_ops;
+static struct gf_foundation *bound_foundation;
+static struct gf2_chan *bound_chan;
+void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
+{ bound_foundation=f;bound_chan=ch; }
+static void production_bind(void)
+{ CHECK(bound_foundation==&production.foundation && bound_chan==&production.chan); }
 static struct geforce_platform fixture_platform;
 struct geforce_platform *geforce_platform_get(void) { return &fixture_platform; }
 void geforce_backend_wc_bind(int (*start)(void)) { (void)start; }
@@ -82,6 +88,7 @@ void _start(void)
         CHECK(!gfx_backend_geforce.probe()); empty(); finish(0);
     }
     CHECK(!rc && registered && r->registration_refs==1 && return_registered==1);
+    production_bind();
     CHECK(geforce_foundation_ops()==&gf1_module_ops && !accel_slot);
     gfx_backend_geforce=candidate;
     CHECK(geforce_context->backend==&gfx_backend_geforce);

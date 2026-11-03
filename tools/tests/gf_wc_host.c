@@ -103,6 +103,8 @@ int gf_production_point(void *p) { (void)p;return identity ? 0 : -1; }
 int pc98_route_select_98(void) { return 0; }
 #include "../../drivers/video/geforce/geforce_body.c"
 struct gf1_test_ops gf1_module_ops;
+void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
+{ (void)f;(void)ch; }
 static PaletteEntry colors[16];
 static u8 client[640*480];
 static const PaletteEntry *fake_colors(void) { return colors; }

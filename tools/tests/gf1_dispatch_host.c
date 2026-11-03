@@ -17,6 +17,8 @@ static void irq_restore(unsigned v) { CHECK(!host_if);host_if=v;restores++; }
 #define GF1_DISPATCH_SOURCE "../../hwdev/gf/foundation_test.c"
 #endif
 #include GF1_DISPATCH_SOURCE
+const struct gf2_test_ops gf2_module_ops={0};
+static void command_link(void) { CHECK(gf1_module_ops.command==&gf2_module_ops); }
 static struct gf_foundation foundation;
 static struct gfinit_bus lease_bus;
 static struct recover_bar_extent bars[RECOVER_BAR_COUNT];
@@ -110,6 +112,7 @@ static void prepare_cases(void)
 }
 void _start(void)
 {
+    command_link();
     prepare_cases();
     struct gf1_test_request q={sizeof(q),GF1T_SNAPSHOT,0};
     CHECK(gf1_module_ops.call(&foundation,&q,0)==GF1_EINVAL);

@@ -100,7 +100,7 @@ def generate(cc, flags, includes, out=OUT, inventory=INVENTORY, seed=False):
     # gfinit.h already includes the private wire; keep the umbrella stable.
     headers += [str(p.relative_to(ROOT)) for p in sorted((ROOT/'kdebug').glob('gfinit*.h'))
                 if p.name != 'gfinit_wire.h']
-    headers += ['kdebug/gf_foundation_test.h', 'hwdev/gf/gf1_test.h',
+    headers += ['kdebug/gf_foundation_test.h', 'hwdev/gf/gf1_test.h', 'hwdev/gf/gf2_test.h',
                 'hwdev/gf/production.h', 'kdebug/kpeek.h', 'include/hwdev_private.h']
     headers += sorted({e['source'] for e in entries if e['group'] == 'kernel'})
     umbrella = ''.join(f'#include "{h}"\n' for h in dict.fromkeys(headers))

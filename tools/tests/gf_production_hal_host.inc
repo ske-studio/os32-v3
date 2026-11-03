@@ -5,6 +5,8 @@
 #include "drivers/video/geforce/geforce_body.c"
 #undef production
 struct gf1_test_ops gf1_module_ops;
+void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
+{ (void)f;(void)ch; }
 static GfxBackend hal_backend;
 static GfxCounters hal_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
