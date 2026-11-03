@@ -15,6 +15,7 @@ struct TimeSplashMathResult {
     long long tick_adjust; /* wraps + start.pending - end.pending */
 };
 /* Succeed only for a unique wrap count in the elapsed interval. */
+/* Returns 0 on success, -1 on failure. */
 int time_splash_math(const struct TimeSplashMathInput *input,
                      struct TimeSplashMathResult *result);
 #endif
