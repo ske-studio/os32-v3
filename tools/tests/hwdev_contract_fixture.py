@@ -5,7 +5,9 @@ GF_FEAT1 A0 appends the two foundation hooks to gf_display_owner; the layout
 CRC below pins that declaration plus CK's stage foundation reference and
 fixed engine-stop rule flag. CW adds the lease foundation pointer, cleanup
 hook and module-context declarations, and appends geforce_foundation_ops at
-HWDEV index 37 (the existing indices remain fixed).
+HWDEV index 37 (the existing indices remain fixed). C9b appends
+serial_puts_polled at index 38 for the serial response, and includes the
+GF1/production/foundation shared types for display callbacks and row reads.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -21,8 +23,8 @@ import zlib
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gen_kdebug_imports import declaration
 
-LAYOUT_CRC = 0x0f8e5ffb
-IMPORT_DECLARATIONS_SHA = '412eaf6f8e2372da88464d513b7287e300638206622228361ce0ec9c7593ac7e'
+LAYOUT_CRC = 0x8fb849f6
+IMPORT_DECLARATIONS_SHA = '487da9db87fd7aeb63316d360ab72398f8d80aead683ea9b5f85189580f24efa'
 
 
 def assert_hwdev_contract(root):

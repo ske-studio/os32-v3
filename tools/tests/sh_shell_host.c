@@ -497,6 +497,7 @@ static void show_prompt(void) { out_str("sh> "); }
 #include "../../userland/shell/cmd_mnt.c"
 #include "../../userland/shell/cmd_env.c"
 #include "../../userland/shell/cmd_sys.c"
+#include "../../userland/shell/cmd_gf1.c"
 #include "../../userland/shell/kbd_watch.c"   /* kbdstat -w の行 (票 TASK_KBD_NAV §3) */
 /* `peek` (cmd_sys.c の表の 1 行) の本体 cmd_peek.c は heap と CRC32 を使うので
  * ここへは取り込まない — 本体は tools/tests/kpeek_cli_host.c が回す。 */
