@@ -84,11 +84,12 @@ static int reference_test(struct gf2_chan *ch)
 
 int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
 {
-    /* Caller lends BAR1, mapping/DMA adapters and heads through cleanup. */
+    /* Caller lends BAR1 and mapping/DMA adapters through cleanup. */
     u32 available;
     int rc;
     if (ch->state != GF2_OFF || !f->running) return GF2_ESTATE;
     ch->f = f;
+    ch->heads = f->wanted_heads; /* Preserve F1's VBLANK request. */
     ch->state = GF2_INIT;
     ch->fault = (struct gf2_fault){0};
     gf_irq_snapshot(f, &ch->seen);
