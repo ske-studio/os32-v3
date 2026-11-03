@@ -62,6 +62,10 @@ static int foundation_start(struct gf_display_context *c)
     struct gf_production *p=c->io.opaque;
     if (p->foundation.revoked || same_resources(p))
         return foundation_result(c,GF1_EPCI);
+    p->chan.map_ops=p->map_ops;
+    p->chan.map_owner=p->map_owner;
+    p->chan.bar1=c->bars[GF_MODE_VRAM_BAR];
+    p->chan.dma_ops=geforce_dma_ops();
     p->foundation.instmem_bar=c->bars[2];
     p->foundation.map_ops=p->map_ops;
     p->foundation.map_owner=p->map_owner;
@@ -78,6 +82,13 @@ static int foundation_stop(struct gf_display_context *c)
      * cleanup row (design P2-b). Ordinary stop failures keep engaged. */
     if (p->foundation.revoked) c->engaged=false;
     return foundation_result(c,rc);
+}
+static struct gf2_chan *command_get(struct gf_display_context *c,
+                                    struct gf_foundation **out)
+{
+    struct gf_production *p=c->io.opaque;
+    *out=&p->foundation;
+    return &p->chan;
 }
 int gf_production_prepare(struct gf_production *p,
                           const struct gf_production_resources *boot,
@@ -165,5 +176,6 @@ static int validate(struct gf_display_context *c)
 }
 const struct gf_display_owner gf_production_owner={
     .acquire=acquire, .release=release, .validate=validate,
-    .foundation_start=foundation_start, .foundation_stop=foundation_stop
+    .foundation_start=foundation_start, .foundation_stop=foundation_stop,
+    .command_get=command_get
 };
