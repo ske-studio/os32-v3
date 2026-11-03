@@ -91,11 +91,20 @@ static unsigned long long probe_now(void);
 /* Fixed before scanning; the two rows differ only in component value.
  * No mask expansion or column selection takes place inside H. */
 typedef void (*probe_pl_emit_fn)(const struct PlRow *);
+/* Corrected per-operation batch upper bounds, excluding the single seed.
+ * second is the greatest value strictly below max; ties count at max. */
+struct probe_pl_peak {
+    long long max, second;
+    unsigned long long seed;
+    u32 hits, batches, second_valid, count;
+};
 struct probe_pl_column {
     struct PlRow row[2];
     u32 colors, n;
     struct SplashRasterTimeRange poll;
     long long d, w, prep;
+    struct probe_pl_peak peak[2][PROBE_PL_KINDS];
+    long long empty_min[2];
     unsigned long long elapsed_us;
     u32 completed, early, timeout, high_after, low_after, window_ok, scan_reason;
 };
@@ -620,6 +629,7 @@ static void probe_entry_costs(const struct SplashRaster *s)
 static void probe_bounds(const struct SplashRaster *s)
 {
     u32 den = s->line_den;
+    long long sample_q = probe_hd.cal[1].q_after;
     unsigned long long uncertainty = probe_cost[PROBE_Q].upper_us +
         2 * probe_cost[PROBE_C].upper_us + SPLASH_RASTER_CLOCK_QUANTUM_US;
     probe_budget = (struct SplashRasterBudget){ .den = den };
@@ -632,15 +642,16 @@ static void probe_bounds(const struct SplashRaster *s)
     probe_budget.h.max = ((probe_eight_us + uncertainty) * den + divisor - 1) / divisor;
     /* Duty ratio times H, with one sample of edge uncertainty. C is absent:
      * neither endpoint clock is in the uninterrupted IN sample runs.
+     * Use the final RAM-loop calibration, not the bootstrap Q bound.
      * Use individual extrema; an average cannot hide a narrower H pulse. */
     probe_budget.b.min = 0x7fffffffffffffffLL;
     for (u32 i = 0; i < PROBE_HPERIODS; i++) {
         unsigned long long samples = probe_hsamples[i], highs = 0;
         highs += probe_highsamples[i];
         long long lo = samples ? highs * probe_budget.h.min / samples : 0;
-        long long lower = lo > probe_budget.q.max ? lo - probe_budget.q.max : 0;
+        long long lower = lo > sample_q ? lo - sample_q : 0;
         long long upper = samples ? (highs * probe_budget.h.max + samples - 1) / samples +
-                                 probe_budget.q.max : 0;
+                                 sample_q : 0;
         if (lower < probe_budget.b.min) probe_budget.b.min = lower;
         if (upper > probe_budget.b.max) probe_budget.b.max = upper;
     }
@@ -674,8 +685,21 @@ static void probe_pl_columns_init(void)
                             if (r.port[i] != PAL_IDX_PORT) c->row[1].value[i] = 0;
                     }
 }
+static void probe_pl_peak_add(struct probe_pl_peak *p, long long value)
+{
+    if (!p->batches || value > p->max) {
+        if (p->batches) { p->second = p->max; p->second_valid = 1; }
+        p->max = value;
+        p->hits = 1;
+    } else if (value == p->max) p->hits++;
+    else if (!p->second_valid || value > p->second) {
+        p->second = value;
+        p->second_valid = 1;
+    }
+    p->batches++;
+}
 static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *s,
-    u32 kind, const struct probe_pl_column *c, probe_pl_emit_fn emit, u32 phase,
+    u32 kind, struct probe_pl_column *c, probe_pl_emit_fn emit, u32 phase,
     unsigned long long *one_upper)
 {
     struct SplashRasterTimeRange result = { .min = 0x7fffffffffffffffLL };
@@ -704,6 +728,8 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         probe_errors++;
         return (struct SplashRasterTimeRange){0};
     }
+    struct probe_pl_peak *peak = &c->peak[phase][kind];
+    *peak = (struct probe_pl_peak){ .count = count };
     unsigned long long shortest = ~0ULL;
     for (u32 i = 0; i < PROBE_COST_BATCH; i++) {
         if (kind == PROBE_PL_W) {
@@ -726,6 +752,7 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         hi = (hi + count - 1) / count;
         if (lo < result.min) result.min = lo;
         if (hi > result.max) result.max = hi;
+        probe_pl_peak_add(peak, hi);
     }
     if (kind == PROBE_PL_Q) {
         /* Exclude wait entry/exit with a one-poll differential, as for the
@@ -733,6 +760,7 @@ static struct SplashRasterTimeRange probe_pl_measure(const struct SplashRaster *
         result.min = count > 1 && shortest > seed + 2 * SPLASH_RASTER_CLOCK_QUANTUM_US ?
             (shortest - seed - 2 * SPLASH_RASTER_CLOCK_QUANTUM_US) * s->line_den / (count - 1) : 0;
         *one_upper = (seed + SPLASH_RASTER_CLOCK_QUANTUM_US - probe_c_min) * s->line_den;
+        peak->seed = *one_upper;
         if ((long long)*one_upper > result.max) result.max = *one_upper;
     }
     return result;
@@ -821,6 +849,7 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
                 if (probe_errors) return;
             }
             long long w = cost[PROBE_PL_W].max - cost[PROBE_PL_EMPTY].min;
+            c->empty_min[phase] = cost[PROBE_PL_EMPTY].min;
             if (w > c->w) c->w = w;
             if (cost[PROBE_PL_D].max > c->d) c->d = cost[PROBE_PL_D].max;
             if (cost[PROBE_PL_PREP].max > c->prep) c->prep = cost[PROBE_PL_PREP].max;
@@ -1052,6 +1081,22 @@ static void probe_pl_dump(void)
         /* 1=ran, 2=zero Q lower, 3=prior measurement error, 4=open wait. */
         probe_field(" scan_reason=", c->scan_reason);
         serial_puts_polled("\n");
+        /* Q is the poll batch (seed shown separately); D/W use the same
+         * corrections as d_num/w_num. W subtracts this phase's EMPTY min.
+         * kind: 0=Q/poll, 1=D, 2=W, 3=EMPTY, 4=PREP. */
+        for (u32 phase = 0; phase < 2; phase++) for (u32 k = 0; k < PROBE_PL_KINDS; k++) {
+            const struct probe_pl_peak *p = &c->peak[phase][k];
+            long long subtract = k == PROBE_PL_W ? c->empty_min[phase] : 0;
+            probe_field("SPLR pl_peak=", i); probe_field(" phase=", phase); probe_field(" kind=", k);
+            probe_field(" den=", probe_pl_result[c->n - SPLASH_RASTER_IMAGE_OUTS].budget.den);
+            probe_field(" count=", p->count); probe_field(" batches=", p->batches);
+            probe_signed(" max_num=", p->batches ? p->max - subtract : 0);
+            probe_field(" max_count=", p->hits);
+            probe_signed(" second_num=", p->second_valid ? p->second - subtract : 0);
+            probe_field(" second_valid=", p->second_valid);
+            probe_field(" seed_num=", p->seed); probe_signed(" subtract_num=", subtract);
+            serial_puts_polled("\n");
+        }
     }
 }
 static void probe_stats(const char *key, unsigned long long *v, u32 n)

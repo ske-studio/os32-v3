@@ -55,9 +55,25 @@ MUTATIONS = (
     ('include partial H period', 'if (armed && completed < PROBE_HPERIODS)', 'if (completed < PROBE_HPERIODS)'),
     ('wrong duty numerator', '        highs += probe_highsamples[i];',
      '        highs += probe_hsamples[i] - probe_highsamples[i];'),
-    ('charge C to B lower bound', 'lo - probe_budget.q.max : 0;', 'lo - probe_budget.c.max : 0;'),
-    ('omit B upper sample error', '                                 probe_budget.q.max : 0;',
+    ('charge C to B lower bound', 'lo - sample_q : 0;', 'lo - probe_budget.c.max : 0;'),
+    ('omit B upper sample error', '                                 sample_q : 0;',
      '                                 0 : 0;'),
+    ('restore bootstrap B sample error', 'long long sample_q = probe_hd.cal[1].q_after;',
+     'long long sample_q = probe_cost_bound(PROBE_Q, den);'),
+    ('omit batch peak collection', '        probe_pl_peak_add(peak, hi);',
+     '        (void)peak;'),
+    ('lose maximum frequency', 'else if (value == p->max) p->hits++;',
+     'else if (value == p->max) p->hits = 1;'),
+    ('count former maximum hits', '        p->hits = 1;', '        p->hits++;'),
+    ('lose former maximum as second', 'p->second = p->max; p->second_valid = 1;',
+     'p->second = value; p->second_valid = 1;'),
+    ('lose intermediate second value', 'value > p->second)', 'value < p->second)'),
+    ('mix Q seed into batch distribution', '        peak->seed = *one_upper;',
+     '        peak->seed = *one_upper; probe_pl_peak_add(peak, *one_upper);'),
+    ('omit W peak subtraction', 'long long subtract = k == PROBE_PL_W ? c->empty_min[phase] : 0;',
+     'long long subtract = 0;'),
+    ('omit peak dump frequency', 'probe_field(" max_count=", p->hits);',
+     'probe_field(" missing_max_count=", p->hits);'),
     ('truncate continuous H capture',
      'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;',
      'u32 count = s->line_num_us / q;'),
@@ -151,6 +167,9 @@ def execute(mutation=None):
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
             if rel == SOURCE:
+                source = source.replace(
+                    'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);',
+                    'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);\n        span = probe_host_pl_span(span);')
                 source = source.replace('probe_hcalibrate(s, &q, clocks, pass)',
                     'probe_host_hcalibrate(s, &q, clocks, pass)')
                 source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',
@@ -171,7 +190,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap and real-hardware ratio cases', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap, calibrated B error, per-column/phase/kind batch maximum frequency and distinct second', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
