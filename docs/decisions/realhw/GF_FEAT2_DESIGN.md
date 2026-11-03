@@ -319,3 +319,22 @@ C2は `rc=ch ? gf2_stop(ch) : 0; if (rc && !f->revoked) { c->last_rc=rc; c->reus
 gf2_stop が失敗しても f->revoked なら foundation_stop と既存の quiesce へ進む（devinit.c:70–81、display/quiesce.c:16–39）；F1はtick解除とCPU unmapを試みinstを保持する（foundation.c:65–72）。chanはOFFにせず層2資源を保持し、C3はdetachを拒む。
 r1→r2 の変更：P2のrevoked時も既存cleanupへ進む例外をC2のコード境界と説明に反映し、devinit.cのadapter終端とfoundation.cのstop終端の行番号を修正。
 
+## 追記: T2 から層 2 を呼ぶ診断の境界 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-t2/ADDENDUM.md (T2 の sol の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 直しが要る → r2 写してよい)。新しい小段 T2a0・T2a1・T2a2・T2b (T2c の cmd_gf2.c は T2b に含める、PM 決定)。
+
+T2 補遺（確定本文の変更不要）：層1の op は増やさず、診断専用 gf2_test_ops を gf1_test_ops 末尾から渡す。層2本体の直接 link・汎用投入口・新しい防御機構は追加しない。
+```c
+enum gf2_test_op { GF2T_START, GF2T_REFERENCE, GF2T_SNAPSHOT, GF2T_STOP, GF2T_RECOVER, GF2T_BAD_HANDLE, GF2T_BAD_METHOD };
+struct gf2_test_request { u32 size; enum gf2_test_op op; u32 deadline_us; };
+struct gf2_test_reply { int rc, dma_rc; u32 state, epoch, seq, put, get, reference, B, ctx_off, ctx_bytes, ctx_words, fault_epoch, chid, fault_put, fault_get, fault_reference, caches, push1, cache_get, pull0, method, data, dma_state, dma_fetch, dma_push, dma_dcount, gr_trap, gr_method, gr_data, gr_class; bool latched; struct gf_irq_stats stats, first, latest; };
+struct gf2_test_ops { int (*prepare)(struct gf_foundation *, const struct recover_bar_extent *, u32); int (*call)(struct gf_foundation *, const struct gf2_test_request *, struct gf2_test_reply *); };
+const struct gf2_test_ops *command; /* gf1_test_ops 末尾へ追加（上の4宣言は hwdev/gf/gf2_test.h）。 */
+```
+所有：module 内 command_test.c に診断 chan を1個保持、prepare は C9 の準備済み foundation/lease を借り、f・BAR1・f の map_ops/map_owner・既存 geforce_dma_ops() を設定する。production は既存 production.chan を body から結ぶ。診断 f/bus/lease は層2 stop 成功・資源解放まで保持し、失敗時は再準備・再利用しない。前景のみ、C9 と同じ owner 選択で同時所有しない。
+call は f で上記 chan を選択し、START/STOP/RECOVER は既存 gf2_*、REFERENCE は fence_emit→wait（同一期限）、SNAPSHOT は前景 fault_check と観測値のコピー、BAD_* は§9の固定不正handle/範囲外method投入だけ（RUN の診断 owner 限定、既存 reserve/kick/待ち・fault経路使用）。失効後は保存値だけ返す。診断 cleanup は層2 stop→既存層1停止・lease解放、停止失敗時は所有を保持する。
+新小段 T2a0（宣言）：hwdev/gf/gf2_test.h の上記4宣言と gf1_test.h の末尾1行（A段と同じ扱い）。障害の handle は持たず gr_class を返し、subchannel→handle の追跡は足さない。
+新小段 T2a1（本体）：hwdev/gf/command_test.c。T2a2（結線・契約）：hwdev/gf/foundation_test.c、drivers/video/geforce/geforce_body.c、build/geforce-module.mk（宣言依存）、drivers/video/geforce/geforce_module.h の `#define GEFORCE_MODULE_OPS_VERSION 4u`（3→4）と既存契約生成・対の更新（tools/gen_hwdev_contract.py の型収集、hwdev_contract.h の gf1_test_ops sizeof=12→16 の assert を含む）。foundation_out→既存 geforce_foundation_ops()->command で授受し geforce_module.c の新slot不要、GeForce import は32/32のまま・export追加0・HWDEV import追加0。
+新小段 T2b（T2a0→T2a1→T2a2後、C9相当の結線）：userland/shell/cmd_gf2.c と既存shell登録/ビルド、kdebug/{gf_command_wire.h,gf_command_test.h,kdebug_main.c,gfinit.c}、build/hwdev.mk。GF_OP_COMMAND と専用要求型を追加し shell→kdebug_main→既存HWDEV gfinit振分け→T2へ接続、gfinitがowner準備/停止を担当。T2本体 kdebug/gf_command_test.c はT2a/b依存でserial受入を実装する。cmd_gf2.c を分ける場合だけ T2c とし、T2 は T2c にも依存。
+r1→r2 の変更：P2 の reply.handle 削除・gr_handle→gr_class、P3 の ops版3→4と契約再生成を明記、T2aをT2a0/T2a1/T2a2に分割（宣言の変更は5行＋版定義1行＝6行）、確定本文を覆す必要なし。
+
