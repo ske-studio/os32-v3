@@ -77,7 +77,7 @@ static int test(void) {
  fixture(2,200,1); if (run(0)) return 11;
  fixture(2,201,1); if (run(0)) return 12;
  fixture(2,1197,1); if (run(0)) return 13;
- fixture(2,1198,1); if (run(0)>=0) return 14;
+ fixture(2,1198,1); if (run(0)>=0 || pos != 64) return 14;
  fixture(1,200,1); if (run(0)) return 15;
  fixture(1,201,1); if (run(0)>=0) return 16;
  fixture(1,0,4); if (run(0)) return 17;
@@ -141,8 +141,39 @@ def check_small(mod):
             unpack = lambda row: np.array([[(c >> shift) & 15 for shift in (8,4,0)]
                                            for c in row], dtype=np.uint8)
             assert mod.out_count(unpack(before), unpack(after)) == cost <= 5
-        _, two_band_events, _ = mod.palette_history(image, band=2)
+        two_initial, two_band_events, two_history = mod.palette_history(image, band=2)
         assert two_band_events and all(event[0] == 2 for event in two_band_events)
+        packed, crc = mod.convert(image, band=2)
+        assert struct.unpack_from('<H', packed, 4)[0] == 2
+        assert struct.unpack_from('<H', packed, 44)[0] == 2
+        assert struct.unpack_from('<I', packed, 48)[0] == crc
+        zeroed = bytearray(packed); zeroed[48:52] = bytes(4)
+        assert zlib.crc32(zeroed) == crc
+        serialized = [struct.unpack_from('<HBBHH', packed, 112 + 8*i)
+                      for i in range(struct.unpack_from('<I', packed, 36)[0])]
+        assert serialized == [(y, i, 0, color, 0) for y, i, color in two_band_events]
+        current = two_initial.copy()
+        for y in range(4):
+            for line, index, color in two_band_events:
+                if line == y: current[index] = color
+            assert current == two_history[y]
+        assert all(a[:2] < b[:2] for a, b in zip(serialized, serialized[1:]))
+        initial6, events6, history6 = mod.palette_history(image, hblank_outs=6)
+        current = initial6.copy()
+        for y in range(4):
+            for line, index, color in events6:
+                if line == y: current[index] = color
+            assert current == history6[y]
+        assert events6 and any(a != b for a, b in zip(history6, history6[1:]))
+        zero = np.zeros((16, 3), dtype=np.uint8)
+        for changes, expected in (([(0,0)],1), ([(0,0),(0,1),(0,2)],3),
+                                  ([(0,0),(1,0),(2,0)],5),
+                                  ([(0,0),(0,1),(1,0),(2,0)],6),
+                                  ([(0,0),(0,1),(0,2),(1,0),(1,1),(1,2)],7)):
+            changed = zero.copy()
+            for slot, component in changes: changed[slot, component] = 1
+            assert mod.out_count(zero, changed) == expected
+            if expected == 7: assert mod.out_count(zero, changed) > 6
         data, _ = mod.convert(image)
         # Independent physical-index reconstruction, including signed FS carry.
         error = [[0]*3 for _ in range(10)]
@@ -160,6 +191,7 @@ def check_small(mod):
                         v = d*weight
                         target[pos][c] += (abs(v)//16) * (1 if v >= 0 else -1)
             error = nxt
+        # Expected indices were calculated by hand from the signed FS recurrence.
         # This input changes four physical indices if vertical FS carry is lost.
         carry_image = Image.fromarray(np.random.default_rng(0).integers(0, 256, (4,8,3), dtype=np.uint8))
         carry_data, _ = mod.convert(carry_image)
@@ -178,6 +210,7 @@ def check_small(mod):
         assert tall_data[96+398] == 255 and tall_data[96+399] == 0
         assert all(tall_data[96+p*400+399] == 0 for p in range(4))
         mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF = 8, 4, 4, 112
+        # Expected slot-tie output was generated with pl_estimate.py.
         # Equal slot scores with different gains and costs: argmax keeps the
         # first RGB proposal; using gain as an intra-slot tiebreak changes it.
         old = np.array([[1,2,2],[2,0,1],[1,0,2],[1,1,1],[1,1,0],[1,2,1],
@@ -190,6 +223,17 @@ def check_small(mod):
         expected = old.copy(); expected[5] = [0,2,0]; expected[7] = [0,0,1]
         mod.W = 5
         assert np.array_equal(mod.optimize_row(old, pts, ends, 5), expected)
+        # Lookahead accepts a current-row loss of 289 to save 1156 on the next row.
+        old = np.array([[2,0,0],[1,2,2],[2,0,1],[0,0,1],[2,0,2],[0,0,2],[0,2,2],[1,1,0],
+                        [2,1,0],[0,1,1],[0,1,2],[0,2,0],[2,0,2],[1,1,0],[1,0,0],[0,2,2]], dtype=np.uint8)
+        pts = np.array([[[34,34,34],[0,0,34],[17,34,17],[0,17,34],[0,0,34]],
+                        [[34,34,0],[17,34,34],[0,34,17],[0,34,17],[0,17,34]]], dtype=np.uint8)
+        ends = np.array([[[0,1,2],[0,2,1],[2,0,2],[0,1,0]],
+                         [[2,2,1],[1,2,2],[2,0,1],[1,1,2]]], dtype=np.uint8)
+        planned = mod.optimize_row(old, pts, ends, 5)
+        losses = [int(mod.distances(row, planned * 17).min(axis=1).sum()) for row in pts]
+        assert losses == [289, 0]  # no lookahead yields [0, 1156]
+        assert losses[0] > 0 and losses[0] + losses[1] / 2 < 1156 / 2
         mod.W = 8
         flat = Image.new('RGB', (8, 1)); flat.putdata([(1,1,1),(2,2,2)]*4)
         assert mod.quantized_colors(flat) == [0]*16
@@ -225,12 +269,15 @@ def main():
     if args.mutate:
         mutations = [
             ('v1-line-limit', 'gfx/gfx_osri.c', 'version == OSRI_VERSION_2 && line_count > OSRI_V2_MAX_EVENTS_PER_LINE', 'line_count > OSRI_V2_MAX_EVENTS_PER_LINE', 'OSRI_TEST_SOURCE'),
+            ('v2-max-plus-one', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS + 1)', 'OSRI_TEST_SOURCE'),
             ('v2-count', 'gfx/gfx_osri.c', 'version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS', 'OSRI_V1_MAX_EVENTS', 'OSRI_TEST_SOURCE'),
             ('version', 'gfx/gfx_osri.c', '(version != OSRI_VERSION_1 && version != OSRI_VERSION_2)', '0', 'OSRI_TEST_SOURCE'),
             ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
             ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
             ('end', 'gfx/gfx_osri.c', 'vfs_read_fd(fd, &extra, 1) != 0', '0', 'OSRI_TEST_SOURCE'),
             ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
+            ('converter-crc', 'tools/img2osri.py', "struct.pack_into('<I', data, 48, crc)", 'pass', 'OSRI_CONVERTER_SOURCE'),
+            ('converter-version', 'tools/img2osri.py', "b'OSRI', 2, 64, W, H", "b'OSRI', 1, 64, W, H", 'OSRI_CONVERTER_SOURCE'),
             ('vertical-carry', 'tools/img2osri.py', 'error = nxt', 'error = [[0, 0, 0] for _ in range(W + 2)]', 'OSRI_CONVERTER_SOURCE'),
             ('slot-tie', 'tools/img2osri.py', 'k = int(np.argmax(scores))', 'k = max(range(len(scores)), key=lambda i: (scores[i], gain[i]))', 'OSRI_CONVERTER_SOURCE'),
             ('lookahead', 'tools/img2osri.py', 'weights[band * W:] = 0.5', 'weights[band * W:] = 0', 'OSRI_CONVERTER_SOURCE'),
