@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small, isolated fixtures for the declaration runner (no production checks)."""
+"""Declaration runner fixtures and production input registration regressions."""
 import contextlib
 from dataclasses import replace
 import importlib.util
@@ -77,7 +77,7 @@ class RunnerTest(unittest.TestCase):
 
     def test_ast_list_and_json_do_not_import_or_extract(self):
         self.check('z', budget=8, prefix='raise RuntimeError("imported")\n')
-        self.check('a', budget=8)
+        self.check('a', covers=['drivers/video/a.c', 'tools/checks/helper.py'], budget=8)
         self.check('slow', budget=90)
         self.write('tools/checks/helper.py', 'raise RuntimeError("helper imported")\n')
         with patch.object(R, 'extract', side_effect=AssertionError('dependency scan')):
@@ -111,18 +111,18 @@ class RunnerTest(unittest.TestCase):
     def test_leaf_floor_and_hit_tiers(self):
         for tier in (1, 2, 3, 4):
             self.check('t' + str(tier), tier=tier)
-        for name in R.STATIC_LANDING:
+        for name in {'p2v', 'c-dialect', 'arch-asm', 'map', 'privileged', 'kprintf-window'}:
             self.check(name, covers=['other/input'])
         direct = self.plan('drivers/video/a.c')
         self.assertEqual((direct.tier, direct.mutations), (1, ()))
         self.assertTrue({'t1', 't2', 't3'} <= set(direct.stage))
         self.assertNotIn('t4', direct.stage)
-        self.assertTrue(R.STATIC_DIRECT <= set(direct.stage))
+        self.assertEqual(set(direct.stage), {'t1', 't2', 't3'})
         self.assertNotIn('privileged', direct.stage)
         landing = self.plan('drivers/video/a.c', floor=2)
         self.assertEqual(landing.tier, 2)
         self.assertEqual(set(landing.mutations), {'t1', 't2', 't3'})
-        self.assertTrue(R.STATIC_LANDING <= set(landing.stage))
+        self.assertEqual(set(landing.stage), {'t1', 't2', 't3'})
 
     def test_function_layer_and_unmatched(self):
         self.check('a', covers=['drivers/video/**'])
@@ -135,11 +135,11 @@ class RunnerTest(unittest.TestCase):
             with self.subTest(files=files):
                 result = self.plan(*files)
                 self.assertEqual(result.tier, 3)
-                self.assertIn('shared', result.stage)
+                self.assertNotIn('shared', result.stage)
                 self.assertNotIn('stable', result.stage)
         result = self.plan('unknown.c')
         self.assertEqual(result.unmatched, {'unknown.c'})
-        self.assertIn('other', result.stage)
+        self.assertNotIn('other', result.stage)
         self.assertEqual(result.mutations, ())
         self.assertEqual(self.plan('drivers/video/new.c').unmatched, set())
         result = self.plan('drivers/video/a.c', 'else/missing.c')
@@ -150,21 +150,21 @@ class RunnerTest(unittest.TestCase):
         self.check('shared', covers=['missing'], tier=3)
         self.check('doc', covers=['missing'], tier=0)
         result = self.plan('drivers/video/a.c', floor=3)
-        self.assertEqual(set(result.stage), {'a', 'shared', 'doc'})
+        self.assertEqual(set(result.stage), {'a'})
         self.assertEqual(result.mutations, ())
         self.assertEqual(set(self.plan('drivers/video/a.c', floor=4).mutations), {'a', 'shared', 'doc'})
 
     def test_fast_docs_full_and_three_sets(self):
         self.check('a', covers=['docs/*.md'])
         self.check('stable', tier=4)
-        for name in R.DOCS_ALWAYS:
+        for name in {'constraints', 'docs-links', 'memmap'}:
             self.check(name, covers=['nonmatching'])
         fast = self.plan()
         self.assertEqual((fast.mode, fast.tier, fast.mutations), ('fast', 4, ()))
         self.assertEqual(self.plan('.claude/a').mode, 'fast')
         docs = self.plan('docs/note.md', floor=2)
         self.assertEqual((docs.tier, docs.mode), (0, 'docs'))
-        self.assertEqual(set(docs.stage), R.DOCS_ALWAYS | {'a'})
+        self.assertEqual(set(docs.stage), {'a'})
         self.assertEqual(docs.mutations, docs.stage)
         for file in ('Makefile', 'build/kernel.mk', 'build/sdk.mk', 'sdk/kapi.json',
                      'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
@@ -186,6 +186,70 @@ class RunnerTest(unittest.TestCase):
         self.assertIn('docs/manpages/hsync.1', self.plan('docs/manpages/hsync.1').unmatched)
         self.check('reader', covers=['userland/cmds/foo.c'])
         self.assertEqual(self.plan('userland/cmds/foo.c', floor=2).mutations, ('reader',))
+
+    def test_input_covers_select_readers(self):
+        cases = {
+            'tools-host': ['tools/mk_blank_nhd.py', 'tools/emu_agent/agent.py', '.env.sample'],
+            'privileged': ['lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h',
+                           'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h',
+                           'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
+            'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
+        }
+        cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
+                                'drivers/block/pc98pt.c', 'drivers/block/pc98pt.h',
+                                'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_layout.h']
+        actual = Path(__file__).resolve().parents[2]
+        # Read the real CHECK declarations, but use empty source fixtures so a
+        # missing declaration cannot be masked by transitive imports/includes.
+        checks = R.discover(actual)
+        for name, files in cases.items():
+            check = checks[name]
+            self.write(check.path, (actual / check.path).read_text())
+            for file in files:
+                self.write(file, '')
+            for file in files:
+                with self.subTest(name=name, file=file):
+                    self.assertIn(name, self.plan(file).stage)
+
+    def test_production_gfinit_input(self):
+        actual = Path(__file__).resolve().parents[2]
+        check = R.Check('gfinit-fixture-host', 'tools/tests/test_gfinit_fixture.py', (), 0)
+        self.assertIn('tools/gfinit_rom_check.py', R.extract(actual, check))
+        self.check('a')
+        self.assertFalse(any(R.matches('tools/gfinit_rom_check.py', (p,))
+                             for p, _ in R.NOTEST))
+        self.assertEqual(self.plan('tools/gfinit_rom_check.py').mode, 'full')
+
+    def test_production_build_inputs_force_full(self):
+        self.check('a')
+        self.check('stable', covers=['elsewhere.c'], tier=4)
+        for file in ('.gitmodules', 'requirements.txt', 'tools/check_tree_unchanged.py',
+                     'tools/fep_compiler.py', 'tools/gen_sdk_manifest.py',
+                     'tools/mkd88.py', 'tools/mkfat12.py', 'tools/jobs.sh', 'tools/gfinit_source.py',
+                     'tools/emu_agent/tasks/regress.txt', 'tools/screenshot.py',
+                     'tools/net_l0_test.py', 'tools/net_l3_test.py',
+                     'tools/sync_docs_to_win.sh'):
+            with self.subTest(file=file):
+                result = self.plan(file)
+                self.assertEqual((result.tier, result.mode), (4, 'full'))
+                self.assertEqual(set(result.stage), {'a', 'stable'})
+                with patch.object(R, 'FULL', tuple(p for p in R.FULL if p != file)):
+                    self.assertNotEqual(self.plan(file).mode, 'full')
+
+    def test_unmatched_rejected_and_lint_checks_repository(self):
+        self.check()
+        self.check('other', covers=['elsewhere.c'])
+        self.write('unknown.xyz', 'unregistered input\n')
+        result = self.plan('drivers/video/a.c', 'unknown.xyz')
+        self.assertEqual(set(result.stage), {'a'})
+        rc, out, err = self.cli('--select', '--files', 'unknown.xyz')
+        self.assertEqual((rc, out), (2, ''))
+        self.assertIn('対象の宣言が無い: unknown.xyz', err)
+        rc, _, err = self.cli('--lint')
+        self.assertEqual(rc, 1)
+        self.assertIn('対象の宣言が無い: unknown.xyz', err)
+        self.check('other', covers=['unknown.xyz'])
+        self.assertEqual(self.cli('--lint')[0], 0, self.cli('--lint')[2])
 
     def test_kapi_reader_routing(self):
         self.check('reader', covers=['build/out/kernel.map'], needs=['make:all'])
@@ -374,7 +438,7 @@ class RunnerTest(unittest.TestCase):
         self.assertTrue({'a', 'b'} <= result.hit)
         self.assertEqual(R.routed_build_inputs(self.root, base, path), {'kernel/a.c', 'kernel/b.c'})
 
-    def test_build_uncovered_registration_expands_checks(self):
+    def test_build_uncovered_registration_is_rejected(self):
         path = 'build/kernel.mk'
         self.check('covered', covers=['kernel/a.c'])
         self.check('other', covers=['elsewhere.c'])
@@ -388,7 +452,7 @@ class RunnerTest(unittest.TestCase):
         self.write(path, before.rstrip() + ' kernel/new.c\n')
         result = R.plan(self.root, self.registry(), (path,), base=base)
         self.assertEqual((result.mode, result.tier, result.unmatched), ('sel', 3, {'kernel/new.c'}))
-        self.assertIn('other', result.stage)
+        self.assertNotIn('other', result.stage)
         self.assertNotIn('stable', result.stage)
 
     def test_build_source_reordering_is_full(self):
@@ -473,7 +537,7 @@ class RunnerTest(unittest.TestCase):
         self.write('other.fragment', '/* arbitrary C fragment extension */\n')
         self.write('drivers/generated/piece.inc', '/* generated C fragment */\n')
         self.write('direct.inc', '/* directly declared, not derived */\n')
-        self.check('direct', covers=['direct.inc'])
+        self.check('direct', covers=['direct.inc', 'active.inc', 'other.fragment'])
         for path in ('active.inc', 'other.fragment', 'drivers/video/inactive.inc',
                      'drivers/video/nested.inc', 'drivers/generated/piece.inc'):
             with self.subTest(path=path):
@@ -535,7 +599,7 @@ class RunnerTest(unittest.TestCase):
         self.write('drivers/video/loose.c', 'int x;\n')
         self.assertEqual(set(R.changed_files(self.root, initial)),
                          {'drivers/video/a.c', 'drivers/video/new.c', 'drivers/video/loose.c'})
-        self.check()
+        self.check(covers=['drivers/video/**'])
         rc, out, _ = self.cli('--select', '--files')
         self.assertEqual((rc, self.shell(out)['CC_MODE']), (0, 'fast'))
         rc, out, _ = self.cli('--select', '--base', initial)
@@ -675,6 +739,18 @@ def run_mutations():
     """Run focused regression cases against broken copies of the runner."""
     source = Path(R.__file__).read_text()
     mutations = (
+        ('unconditional-static',
+         '    stage = closure(checks, selected)',
+         '    selected.update({"p2v", "c-dialect", "arch-asm", "map"} & checks.keys())\n    stage = closure(checks, selected)',
+         'test_leaf_floor_and_hit_tiers'),
+        ('unconditional-tier3',
+         '    stage = closure(checks, selected)',
+         '    selected.update(n for n, c in checks.items() if tier >= 3 and c.tier == 3)\n    stage = closure(checks, selected)',
+         'test_function_layer_and_unmatched'),
+        ('unmatched-expands-all',
+         '    stage = closure(checks, selected)',
+         '    if unmatched: selected.update(n for n, c in checks.items() if c.tier <= 3)\n    stage = closure(checks, selected)',
+         'test_unmatched_rejected_and_lint_checks_repository'),
         ('comments-force-full', 'and not routed_build_safe(root, base, f)}', '}',
          'test_build_comments_keep_hits_without_forcing_full'),
         ('recipe-hash-stripped', 'line.startswith("\\t") or continued', 'continued',
@@ -712,7 +788,7 @@ def run_mutations():
          'test_build_branch_exchange_routes_both_sources'),
         ('list-uncovered-registration-lost',
          'unmatched.update(s for s in sources if uncovered(s))',
-         'unmatched.update(())', 'test_build_uncovered_registration_expands_checks'),
+         'unmatched.update(())', 'test_build_uncovered_registration_is_rejected'),
         ('list-reordering-safe',
          'if tuple(t for t in old_tokens if t in common) != tuple(t for t in new_tokens if t in common):',
          'if False:', 'test_build_source_reordering_is_full'),
@@ -726,7 +802,9 @@ def run_mutations():
          'assignment = re.fullmatch(', 'test_build_source_lists_keep_semantic_changes_full'),
     )
     original = globals()['R']
-    for name, before, after, case in mutations:
+    mutations = tuple((name, 'tools/checks/run.py', before, after, case)
+                      for name, before, after, case in mutations)
+    for name, filename, before, after, case in mutations:
         if source.count(before) != 1:
             raise AssertionError('mutation anchor: ' + name)
         mutant = type(original)('runner_mutant')
@@ -742,6 +820,47 @@ def run_mutations():
         if result.errors or not result.failures:
             raise AssertionError('mutation did not fail an assertion: ' + name)
         print('RED:', name)
+    registrations = (
+        ('blank-nhd-cover', 'tools-host', "'tools/mk_blank_nhd.py', ",
+         'test_input_covers_select_readers'),
+        ('kstring-asm-cover', 'privileged', "'lib/kstring_asm.asm', ",
+         'test_input_covers_select_readers'),
+        ('pci-decode-cover', 'privileged', "'drivers/pci/pci_decode.c', ",
+         'test_input_covers_select_readers'),
+    )
+    read_text = Path.read_text
+    for name, filename, before, case in registrations:
+        target = Path(__file__).with_name(filename + '.py').resolve()
+        if read_text(target).count(before) != 1:
+            raise AssertionError('mutation anchor: ' + name)
+
+        def broken_read(path, *args, **kwargs):
+            content = read_text(path, *args, **kwargs)
+            return content.replace(before, '') if path == target else content
+
+        with patch.object(Path, 'read_text', broken_read):
+            result = unittest.TextTestRunner(stream=io.StringIO()).run(RunnerTest(case))
+        if result.errors or not result.failures:
+            raise AssertionError('mutation did not fail an assertion: ' + name)
+        print('RED:', name, filename)
+    # gfinit is deliberately outside the automatic registry; remove its actual
+    # FULL registration and check that its import input loses the route.
+    before = "    'tools/gfinit_rom_check.py',\n"
+    if source.count(before) != 1:
+        raise AssertionError('mutation anchor: gfinit-rom-input')
+    mutant = type(original)('runner_mutant')
+    mutant.__file__ = original.__file__
+    sys.modules[mutant.__name__] = mutant
+    try:
+        exec(compile(source.replace(before, ''), mutant.__file__, 'exec'), mutant.__dict__)
+        globals()['R'] = mutant
+        result = unittest.TextTestRunner(stream=io.StringIO()).run(RunnerTest('test_production_gfinit_input'))
+    finally:
+        globals()['R'] = original
+        sys.modules.pop(mutant.__name__, None)
+    if result.errors or not result.failures:
+        raise AssertionError('mutation did not fail an assertion: gfinit-rom-input')
+    print('RED: gfinit-rom-input tools/checks/run.py')
     return 0
 
 

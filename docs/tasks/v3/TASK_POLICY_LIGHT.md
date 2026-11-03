@@ -85,24 +85,24 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 | tier 4 | 宣言の `tier=4`。段 1〜3 では当たっても回さず `make check` (節目) で回る | B-2 の 11 本 + R2 で covers が狭まった後の追加 |
 | 変異だけ外す | `MUTATIONS` を段 4 だけ (宣言の `mutate_tier=4`) | 分岐の少ない表の試験 (pci・irq/time)。本数は R2 で確定 |
 
-守る最低限: ビルドと静的の差分検査は全段、ゲストの最小回帰は段 3、退行は段 4 と実機の回で拾う (r1 と同じ)。
+守る最低限: 触った像のビルドと covers に当たる静的の差分検査は全段、ゲストの最小回帰は段 3、退行は段 4 と実機の回で拾う (r1 と同じ)。
 
 ## C. 試験の 4 段 (段 = 宣言の tier)
 
-段は **変更が届く木の高さ** (変更ファイルの共通の親の深さ) で道具が出し、各検査は宣言の `tier` (その検査が回り始める最も浅い段) で選ばれる。`CC_TIER` をランナーが表示する。
+段は **変更が届く木の高さ** (変更ファイルの共通の親の深さ) で道具が出し、段 0〜3 では covers に当たる検査とその前提だけを選ぶ (`tier=4` は全体検査だけ)。段は変異の実行条件にも使う。`CC_TIER` をランナーが表示する。
 
 | 段 | 何が変わったか | 組む | 回す検査 | 変異 | ゲスト・実機 | 誰・いつ・目安 |
 |---|---|---|---|---|---|---|
-| **1 ファイル** | 深さ 3 の葉 1 つ (drivers/video/geforce/*.c、kernel/ime/*.c) | `make kernel` + **触った像** (userland/… を触ったらその像、R-5) | **covers に当たる tier 1 の検査** + 静的 3 本を**変わった翻訳単位だけ** (`--files`) + `--lint` | なし | なし | 実装者、段ごと、3〜5 分 |
-| **2 機能** | 1 つの機能ディレクトリに閉じる (ヘッダ含む) | 増分 `make all` | 段 1 の集合 + 当たる tier ≤ 2 + 静的 5 本 (差分) | 当たりに変異 | 票に **host で見られない受入項目があれば段 3 へ上げる** (R-4) | PM の取り込み (レビュー後)、5〜10 分 |
-| **3 層** | 複数の機能・共有ヘッダ・層をまたぐ (include/・kapi/・mm/・exec/・lib/・platform/)、または当たりが無い変更 (unmatched) | 増分 `make all` | 段 2 の集合 + **tier 3 (共有: tick・kstring・memmap など) は当たらなくても回す** | 当たりに変異 | **最小回帰** (配備の照合・起動・kselftest・db_test、ROLES §4 (1)) + **変更箇所だけのゲスト受入** (票の host で見られない項目だけ、ROLES §4 (2) — R-4) | PM の取り込み (カーネル層の段)、15〜25 分 |
+| **1 ファイル** | 深さ 3 の葉 1 つ (drivers/video/geforce/*.c、kernel/ime/*.c) | `make kernel` + **触った像** (userland/… を触ったらその像、R-5) | **covers に当たる検査とその前提** (静的検査も当たりだけ、変わった翻訳単位を `--files` で渡す) + `--lint` | なし | なし | 実装者、段ごと、3〜5 分 |
+| **2 機能** | 1 つの機能ディレクトリに閉じる (ヘッダ含む) | 増分 `make all` | covers に当たる検査とその前提 (静的検査も当たりの差分だけ) + `--lint` | 当たりに変異 | 票に **host で見られない受入項目があれば段 3 へ上げる** (R-4) | PM の取り込み (レビュー後)、5〜10 分 |
+| **3 層** | 複数の機能・共有ヘッダ・層をまたぐ (include/・kapi/・mm/・exec/・lib/・platform/) | 増分 `make all` | covers に当たる検査とその前提 + `--lint` (tier 3 の無条件追加なし) | 当たりに変異 | **最小回帰** (配備の照合・起動・kselftest・db_test、ROLES §4 (1)) + **変更箇所だけのゲスト受入** (票の host で見られない項目だけ、ROLES §4 (2) — R-4) | PM の取り込み (カーネル層の段)、15〜25 分 |
 | **4 全体** | build/・Makefile・sdk/kapi.json・配置の世代・ツールチェーン・ランナー自体、**または節目** (票の終わり・**通常版の実機配備の前**・リリース) | `make all` (KAPI・世代なら `make clean` 先) | 全部 (tier 4 を含む) = `make -k check` | 全部 | ゲストの約束を一通り (ROLES §4 (3)) + 実機 | PM、節目に 1 回、専用の作業木 (check_wt.sh)、60〜90 分 |
 
-- **段 0 (文書だけ)**: tier 0 の検査 (docs-links・orphans・status・tree・constraints) だけ。変えない。
+- **段 0 (文書だけ)**: 文書の covers に当たる検査とその前提だけ。tier 0 の無条件追加なし。
 - **実機の試験・調べの版は段 1 相当で実機へ** (ROLES §0 :17、ユーザー決定 2026-10-28、R-7): ビルド (既定と診断版) rc=0・既定の成果物が基点と同じ・直接の試験 MUTATE=0。段 4 は**通常版**の配備の前だけ。取り込みの検査は取り込みのときに段 2〜4 で。
 - **Tx の流れ** (段ごと `make kernel` + 触った像、最後に候補の全部): 段ごとは段 1、最後の段の後に段 2 (当たりの全部、MUTATE=0) を実装者が 1 回。変えない。
 - **今の 3 段との対応**: 文書だけ → 段 0、小さい取り込み → 段 1〜2、check-changed → 段 2〜3、節目の全体 → 段 4。ROLES §0「検査」の 1 セルと §4 のゲスト受入 3 段をこの表で置き換える。
-- **unmatched の扱い**: 今は「対応表に無い → 全部を変異込み」(`check_select.py:1388`、直近 60 コミットの 4 件)。段 3 に落とし (tier ≤ 3 + 共有)、漏れは段 4 で拾う。
+- **unmatched の扱い**: 対象の宣言が無いファイルは `--lint` と変更選択の入口でエラーにする。実際の入力を covers に宣言し、検査対象外は明示的な NOTEST、ビルドなど全体に届く入力は段 4 の経路に登録する。
 - **段 4 の頻度**: 票の終わりか週 1 の早い方 (G-2)。CI は check-fast のまま。
 
 ## C-2. 1 検査 1 ファイルとランナー (新、ユーザー提案 2026-10-30)
@@ -117,7 +117,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 ### tools/checks/mm/dma_pool.py   (移す前は tools/tests/test_dma_pool.py の先頭に足す)
 CHECK = dict(
     name="dma-pool-host",            # make check-dma-pool-host の名 (CI・スキルが呼ぶ)
-    tier=1,                          # 1 直接 / 3 共有 (段 3 以上で当たらなくても回す) / 4 節目だけ / 0 文書
+    tier=1,                          # 1 直接 / 3 共有 (当たりだけ) / 4 全体だけ / 0 文書 (当たりだけ)
     covers=["mm/dma_pool_math.c", "mm/dma_pool.c", "lib/dma_contract.c",
             "drivers/dma/dma8237_math.c"],   # 組む・読むソース。ヘッダは gcc -MM で導く (書かない)
     needs=[],                        # 先に要る make の目標: "kernel" / "all" / "sqlite-module-proto"
@@ -141,8 +141,8 @@ def run(ctx) -> int:
 1. **列**: `tools/checks/**/*.py` (移行中は `tools/tests/test_*.py` も) の CHECK を読み、`--list` で make の列を出す。並び順は `budget` の大きい順 (今の `CHECK_PAR_ORDER` の手書きの番号 244 個が消える)。
 2. **変更**: `git diff <基点>` か `--files`。`ignore`・`docs_only`・`notest`・`full` の 5 種の glob (今の `check_map.yaml` の全体方針 115 行 → ランナーの定数 約 40 行)。
 3. **当たり**: 変更 ∩ (covers ∪ covers の gcc -MM ヘッダ)。ヘッダは今の `compiler_headers` (`check_select.py:963`) をそのまま持ち込み、結果を `build/out/` にキャッシュ。
-4. **段**: 変更の共通の親の深さ → 1〜3、`full` の glob に当たれば 4。当たりが無ければ 3。
-5. **回す**: `{c | c が当たり ∧ c.tier ≤ 段} ∪ {c | c.tier ≤ 段 ∧ c が「共有」}` (tier 3 と 0 は共有)。変異は `段 ≥ c.mutate_tier` の当たりだけ。
+4. **段**: 変更の共通の親の深さ → 1〜3、`full` の glob に当たれば 4。宣言漏れはエラー。
+5. **回す**: 段 0〜3 は `{c | c が当たり ∧ c.tier != 4}` とその前提だけ。静的・tier 0・tier 3 の無条件追加はしない。段 4 は全部。変異は `段 ≥ c.mutate_tier` の当たりだけ。
 6. **先に組む**: 回す検査の `needs` の和集合を 1 回 `make`。
 7. **出力**: 今の `check_changed.sh` と同じ `CC_STAGE1`・`CC_MUT1` + `CC_TIER`・`CC_NEEDS`。`make check-changed` (`sdk.mk:134-144`) の形は変えない。
 8. **`--lint`**: 宣言のあるファイルだけが列に載る・covers のパスが実在する・`name` が重複しない・build/out を読むなら needs にある。数秒。
