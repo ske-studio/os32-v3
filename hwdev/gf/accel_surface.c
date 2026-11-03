@@ -3,6 +3,9 @@
  * nv04_exa.c:97-129,180-200,302-319, nv04_xv_blit.c:68-117. */
 #include "accel.h"
 
+/* xf86-video-nouveau/src/nv04_exa.c:193-200: SF2D FORMAT method. */
+#define GF3_SF2D_FORMAT 0x0300U
+
 static const struct gf3_format formats[] = {
     {1, 1, 1, 3, 3, 0, 0}, {2, 4, 4, 1, 1, 1, 7},
     {4, 6, 6, 3, 3, 4, 4}, {4, 10, 11, 3, 3, 4, 3},
@@ -95,5 +98,5 @@ int gf3_surface_set(struct gf3_ctx *c, const struct gf3_surface *src,
     /* nv04_exa.c:118-129,180-200: SF format, packed pitches, offsets. */
     u32 values[4] = {gdi ? sf.sf_gdi : sf.sf,
                      (dst->pitch << 16) | src->pitch, src->off, dst->off};
-    return gf2_emit(c->ch, GF3_SUBC_SURFACE2D, 0x0300, false, values, 4, dl);
+    return gf2_emit(c->ch, GF3_SUBC_SURFACE2D, GF3_SF2D_FORMAT, false, values, 4, dl);
 }

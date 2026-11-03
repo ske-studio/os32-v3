@@ -56,11 +56,12 @@ static int test(void)
     REQUIRE(gf3_surface_check(&h.ctx,&s,r,GF3_USE_SIFM_SRC,&f,&p)==GF3_ERANGE);
     REQUIRE(gf3_surface_check(&h.ctx,&s,r,GF3_USE_2D,&f,&p)==GF3_EFORMAT);
     s.fmt=GF3_ARGB8888; s.pitch=32; s.bytes=256;
+    struct gf3_surface dst={0x2000,384,48,8,8,GF3_ARGB8888,7,3};
     gf3_host_trace_clear(&h);
-    REQUIRE(!gf3_surface_set(&h.ctx,&s,&s,true,123));
+    REQUIRE(!gf3_surface_set(&h.ctx,&s,&dst,true,123));
     REQUIRE(h.npackets==1 && packets[0].subc==GF3_SUBC_SURFACE2D && packets[0].method==0x300 &&
             !packets[0].noninc && packets[0].count==4 && packets[0].deadline==123);
-    REQUIRE(words[0]==11 && words[1]==0x00200020 && words[2]==s.off && words[3]==s.off);
+    REQUIRE(words[0]==11 && words[1]==0x00300020 && words[2]==0x1000 && words[3]==0x2000);
     gf3_host_trace_clear(&h);
     REQUIRE(!gf3_surface_set(&h.ctx,&s,&s,false,124) && words[0]==10);
     gf3_host_trace_clear(&h);
