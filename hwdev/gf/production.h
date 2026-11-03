@@ -3,6 +3,7 @@
 #define HWDEV_GF_PRODUCTION_H
 #include "foundation.h"
 #include "command.h"
+#include "accel.h"
 #define GF_ROM_MAX KPEEK_NV_PROM_LEN /* existing acquisition ceiling */
 #define GF_PRODUCTION_SUBSYS 0x127010fcU
 #define GF_PRODUCTION_BAR0_BYTES 0x01000000U
@@ -45,6 +46,8 @@ struct gf_production {
     struct gf_foundation foundation;
     /* Layer 2 owns one immovable channel for the production lifetime. */
     struct gf2_chan chan;
+    /* Layer 3 owns one immovable context for the production lifetime. */
+    struct gf3_ctx accel;
     /* Lend to foundation.map_ops/map_owner before start, including fake MMIO.
      * Keep both valid until stop/rollback has released the map; a failed stop
      * retains the loan. io.opaque remains the gf_io adapter's own context. */
