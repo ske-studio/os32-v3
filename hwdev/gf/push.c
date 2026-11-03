@@ -37,7 +37,7 @@ static int push_poll(struct gf2_chan *ch, u32 deadline)
     int rc = gf2_fault_check(ch);
     if (rc) return rc;
     if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-    return (s32)(now - deadline) >= 0 ? GF2_ETIME : GF2_OK;
+    return (i32)(now - deadline) >= 0 ? GF2_ETIME : GF2_OK;
 }
 
 static int push_wait(struct gf2_chan *ch)

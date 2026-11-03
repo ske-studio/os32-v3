@@ -974,6 +974,7 @@
     ],
     "struct gf_display_owner": [
       "acquire",
+      "command_get",
       "foundation_start",
       "foundation_stop",
       "release",

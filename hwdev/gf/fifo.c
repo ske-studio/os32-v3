@@ -217,7 +217,7 @@ int gf2_fifo_pause(struct gf2_chan *ch)
     for (;;) {
         TRY(gf2_fault_check(ch));
         if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-        if ((s32)(now - deadline) >= 0) return GF2_ETIME;
+        if ((i32)(now - deadline) >= 0) return GF2_ETIME;
         TRY(rd(ch, CACHE_PULL0, &pull));
         if (!(pull & HASH_BUSY)) break;
         u32 delay = deadline - now;
