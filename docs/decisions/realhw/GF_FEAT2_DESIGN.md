@@ -294,3 +294,9 @@ void gf2_fifo_resume(struct gf2_chan *); /* 表書換え/publish後、PULL0 bit0
 C0 の順は gf2_fifo_init → gf2_gr_init（bind_gr を含む）→ gf2_fifo_start。§2 の「GR初期化」は GR の文脈の確保と読む（RAMFC 初期値: fifo/nv40.c:39–58、GR bind: 同:125–164、開始: fifo/nv04.c:92–99）。+38 の退避・復元は足さない。
 r1→r2 の変更: P2 の C0 呼出し順と §2 の解釈を明記し、P3 の 2100/2140 は B0 が書かず F1 所有と明記。
 
+## 追記: 障害の出力から handle を外す (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-b7/ADDENDUM.md (B7 の sol の設計の欠け → astra は確定本文 :183 を覆す必要ありとして停止)。**ユーザー決定 (2026-11-03)「handle を外す (推奨)」**: 障害の serial 出力は手本と同じく class・subc・method (既存の他の診断項目は維持)。subchannel→handle の追跡は足さない。**小段 A0c** (hwdev/gf/command.h、terra): 下の宣言の変更 2 行。B7 は A0c の上に書く。
+
+確定本文 GF_FEAT2_DESIGN.md:183 の handle 出力要求を覆す必要があるため、次の最小修正判断を記して停止する：handle を出力から外し、PGRAPH は class/subc/method（既存の他の診断項目は維持）を出す；根拠は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/engine/gr/nv40.c:242–246,274–280（subc=(400704の値>>16)&7、method=同値&0x1ffc、class=read(0x400160+subc*4)&0xffff、object handle の出力なし）；subchannel→handle 追跡は追加しない；A0 command.h の宣言変更は2行（:122 の handle を削除、:127 の gr_handle を gr_class に改名）、B7 は上記採取値から subc/method を復号し、PFIFO に class/handle を推定補完しない；本文・宣言の実編集は未実施。
+
