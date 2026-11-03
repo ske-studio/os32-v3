@@ -94,7 +94,10 @@ static int geforce_detach(struct module_record *r)
     const struct gf_production *owner=p ? p->opaque : 0;
     if (registered || (owner && (owner->foundation.registered ||
         owner->foundation.running || owner->foundation.bm ||
-        owner->foundation.mapped || owner->foundation.imem.used))) return 0;
+        owner->foundation.mapped || owner->foundation.imem.used ||
+        owner->chan.state != GF2_OFF || owner->chan.fault.latched ||
+        owner->chan.mapped || owner->chan.vram_reserved ||
+        owner->chan.staging_live))) return 0;
     if (geforce_tick_bind(0,0)) return 0;
     foundation_slot=0;accel_slot=0;
     return 1;
