@@ -3,6 +3,7 @@
 #include "../../kdebug/gfinit_bus.h"
 #include "../../include/memmap.h"
 #include "../../include/io.h"
+#include "../../drivers/video/geforce/geforce_module.h"
 
 /* The lease bus owns the diagnostic foundation. IRQ/tick only use its
  * permanent pointer, never PCI checks or the recover window. */
@@ -61,7 +62,7 @@ static int call(struct gf_foundation *f, const struct gf1_test_request *q,
 {
     if (!reply) return GF1_EINVAL;
     *reply=(struct gf1_test_reply){.rc=GF1_EINVAL,.bad_off=~0U};
-    if (!f || !q || q->size!=sizeof(*q) || q->op>GF1T_REVOKE ||
+    if (!f || !q || q->size!=sizeof(*q) || q->op>GF1T_DISPLAY_START ||
         q->heads>3 || (q->op!=GF1T_HEADS && q->heads)) return reply->rc;
     int rc=GF1_OK;
     if (f->revoked && q->op!=GF1T_STOP && q->op!=GF1T_REVOKE && q->op!=GF1T_SNAPSHOT)
@@ -78,6 +79,11 @@ static int call(struct gf_foundation *f, const struct gf1_test_request *q,
         break;
     }
     case GF1T_INST_PAGE: rc=f->running ? inst_page(f,reply) : GF1_EINVAL;break;
+    case GF1T_DISPLAY_STOP:
+    case GF1T_DISPLAY_START:
+        rc=f==gf1_module_ops.production ?
+            geforce_foundation_display(q->op==GF1T_DISPLAY_START) : GF1_EINVAL;
+        break;
     case GF1T_SNAPSHOT: break;
     }
     reply->command=f->expected_command;reply->pmc=f->expected_pmc;

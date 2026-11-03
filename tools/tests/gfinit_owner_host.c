@@ -15,6 +15,36 @@ static void production_gate_test(void)
     production_selected=0;
     output("Production selection refuses gfinit before diagnostics I/O PASS\n");
 }
+static void foundation_selection_test(void)
+{
+    setup();observations=0;
+    struct gf1_request q={sizeof(q),GF1_STATUS,0,0};
+    CHECK(gfinit_call(GF_OP_FOUNDATION,&q,sizeof(q),&base,&transport,&s0)==GF1_EINVAL);
+    CHECK(observations==1 && !observed_foundation && !reads && !alloc_calls);
+    static struct gf_foundation production;
+    production_selected=1;test_foundation_ops.production=&production;
+    q=(struct gf1_request){sizeof(q),GF1_STATUS,0,0};
+    CHECK(!gfinit_call(GF_OP_FOUNDATION,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(observed_foundation==&production && observed_row_owner==&production);
+    production_selected=0;test_foundation_ops.production=0;
+    CHECK(!call(GF_OP_INSPECT,0,0));
+    owner->foundation_prepared=true;stage.foundation=&owner->foundation;
+    owner->prepare_flags=GF_ALLOW_WRITE|GF_MODE_C|GF_NO_VERIFY_FILE|GF_VERIFY_RECORD;
+    owner->policy_count=1;owner->policy_regs[0]=(struct gfinit_no_verify){GF_VERIFY_MMIO,0x200};
+    owner->last_op=GF_OP_MODESET;owner->last_count=0;
+    q=(struct gf1_request){sizeof(q),GF1_CYCLE,0,0};
+    CHECK(!gfinit_call(GF_OP_FOUNDATION,&q,sizeof(q),&base,&transport,&s0));
+    CHECK(observed_foundation==&owner->foundation && observed_row_owner==owner && !gf_cycle_policy);
+    stage.foundation=0;
+    q=(struct gf1_request){sizeof(q),GF1_STATUS,0,0};
+    CHECK(gfinit_call(GF_OP_FOUNDATION,&q,sizeof(q),&base,&transport,&s0)==GF1_EINVAL);
+    CHECK(!observed_foundation);
+    u32 before=observations;
+    q=(struct gf1_request){sizeof(q),GF1_STATUS,1,0};
+    CHECK(gfinit_call(GF_OP_FOUNDATION,&q,sizeof(q),&base,&transport,&s0)==GF1_EINVAL);
+    CHECK(observations==before && q.rc==GF1_EINVAL);
+    CHECK(!gf_release_rom(owner));
+}
 void _start(void)
 {
-    foundation_cleanup_test(); production_gate_test();vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }
+    foundation_selection_test();foundation_cleanup_test(); production_gate_test();vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

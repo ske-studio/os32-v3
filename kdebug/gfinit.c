@@ -1,6 +1,9 @@
 /* Diagnostic owner: bound stage approvals and the recorded common runner. */
 #include "gfinit.h"
+#include "gf_foundation_test.h"
 #include "../hwdev/gf/gf1_test.h"
+#include "../hwdev/gf/production.h"
+#include <stddef.h>
 #include "drivers/video/geforce/geforce_module.h"
 #include "gf_production.h"
 #include "hwdev/owner.h"
@@ -66,6 +69,7 @@ struct gfinit_owner {
     u8 *rom;
     bool inspected;
     u32 generation, prepare_flags;
+    u32 policy_count; struct gfinit_no_verify policy_regs[GF_NO_VERIFY_MAX];
     u32 last_count;
     struct gfinit_no_verify last_regs[GF_NO_VERIFY_MAX];
 };
@@ -209,6 +213,7 @@ static int gf_release_rom(struct gfinit_owner *g)
     (void)recover_gf_profile_expand(&g->profile, 0);
     g->last_op = RECOVER_NONE;
     g->prepare_flags = 0;
+    g->policy_count = 0;
     g->rom = 0; g->inspected = false;
     g->foundation_prepared = false;
     g->bus.foundation = 0;
@@ -360,13 +365,15 @@ static int gf_begin(struct recover *r, struct gfinit_owner *g,
     } else {
         if (!r->cache.bar[1].valid || gfinit_decode_rom(g->rom, g->rom_size,
                 &g->profile, g->decoded)) return -1;
-        g->prepare_flags = flags;
         if (flags & GF_MODE_C) {
             if (gfinit_plan_build_c(g->compiled, g->decoded, &g->profile,
                     r->cache.bar[1].length, g->rom, g->rom_size) ||
                 gfinit_verify_policy(g->compiled, &g->profile, flags, regs, count)) return -1;
         } else if (gfinit_plan_build(g->compiled, g->decoded, &g->profile,
                                      r->cache.bar[1].length)) return -1;
+        g->prepare_flags = flags;
+        g->policy_count = count;
+        for (u32 i = 0; i < count; i++) g->policy_regs[i] = regs[i];
         plan = &g->compiled->plan;
     }
     if (!size && gfinit_plan_baseline(g->compiled,&g->profile,&stage,g->rom,g->rom_size)) return -1;
@@ -441,15 +448,105 @@ static int gf_c_only(struct recover *r, struct recover_transport *transport,
     gf_lease.session=r->token.session;
     stage.entry_ok=false;
     g->prepare_flags=flags;
+    g->policy_count=count;
+    for (u32 i=0;i<count;i++) g->policy_regs[i]=regs[i];
     return trial_step(r,&r->token,true,gf_modeset,g->compiled);
 invalid:
     stage.initialized=false;
     return -1;
 }
 
+/* Borrowed only while the synchronous cycle runs; stop/start cannot overwrite
+ * the RUN policy saved by its caller, or borrow the last request cache. */
+static const struct gfinit_prepare_request *gf_cycle_policy;
+static int gf_diagnostic_display(bool start)
+{
+    struct recover *r = recover_owner();
+    if (!gf_owned(r)) return GF1_EINVAL;
+    if (owner->foundation.revoked) return GF1_EPCI;
+    int rc;
+    if (!start) {
+        rc = trial_end(r, &r->token, REC_NORMAL);
+        if (rc) return owner->foundation.last_rc ? owner->foundation.last_rc : GF1_ESTOP;
+        return GF1_OK;
+    }
+    if (r->state != REC_VERIFIED || !stage.s0_ok || !r->s0_verified || !gf_cycle_policy)
+        return GF1_ESTOP;
+    rc = gf_c_only(r, r->transport, gf_cycle_policy->request.flags,
+                    gf_cycle_policy->regs, gf_cycle_policy->count);
+    return rc ? (owner->foundation.last_rc ? owner->foundation.last_rc : GF1_EIO) : GF1_OK;
+}
+static int gf_production_display(bool start)
+{
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf1_test_request q = {sizeof(q), start ? GF1T_DISPLAY_START : GF1T_DISPLAY_STOP, 0};
+    struct gf1_test_reply reply;
+    if (!ops || !ops->call || !ops->production) return GF1_EINVAL;
+    return ops->call(ops->production, &q, &reply);
+}
+static int gf_diagnostic_read_row(void *opaque, u32 y, u8 *row)
+{
+    struct recover *r = recover_owner();
+    if (!gf_owned(r)) return GF1_EIO;
+    struct gfinit_owner *g = opaque;
+    if (recover_safe_point(r) || gfinit_bus_mode_read_row(&g->bus, y, row) ||
+        (y == GF_MODE_HEIGHT - 1U && recover_safe_point(r))) return GF1_EIO;
+    return GF1_OK;
+}
+static int gf_production_read_row(void *opaque, u32 y, u8 *row)
+{
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf_foundation *f = opaque;
+    if (!f || !ops || f != ops->production || !row || y >= GF_MODE_HEIGHT) return GF1_EIO;
+    struct gf_production *p = (void *)((u8 *)f - offsetof(struct gf_production, foundation));
+    for (u32 x = 0; x < GF_MODE_PITCH; x += GF_MODE_VRAM_WORD_BYTES) {
+        u32 value;
+        if (p->display.io.read(p->display.io.opaque, GF_MODE_VRAM_BAR,
+                y * GF_MODE_PITCH + x, GF_MODE_VRAM_WORD_BYTES, &value)) return GF1_EIO;
+        for (u32 byte = 0; byte < GF_MODE_VRAM_WORD_BYTES; byte++)
+            row[x + byte] = (u8)(value >> (byte * BITS_PER_BYTE));
+    }
+    return GF1_OK;
+}
+static int gf_foundation_dispatch(void *buf, u32 size, const struct recover_ops *base)
+{
+    if (!buf || size != sizeof(struct gf1_request)) return GF1_EINVAL;
+    struct gf1_request q = *(const struct gf1_request *)buf;
+    if (q.size != sizeof(q) || q.test > GF1_CYCLE || q.session || q.rc) {
+        q.session = 0; q.rc = GF1_EINVAL;
+        *(struct gf1_request *)buf = q;
+        return q.rc;
+    }
+    const struct gf1_test_ops *ops = geforce_foundation_ops();
+    struct gf_foundation *f = 0;
+    bool production = gf_production_selected();
+    struct recover *r = recover_owner();
+    struct gfinit_prepare_request policy = {0};
+    if (ops) {
+        if (production) f = ops->production;
+        else if (gf_owned(r) && owner->foundation_prepared &&
+                 stage.foundation == &owner->foundation) f = &owner->foundation;
+    }
+    if (!production && f && q.test == GF1_CYCLE) {
+        policy.request.flags = owner->prepare_flags;
+        policy.count = owner->policy_count;
+        for (u32 i = 0; i < policy.count; i++) policy.regs[i] = owner->policy_regs[i];
+        gf_cycle_policy = &policy;
+        owner->last_op = RECOVER_NONE;
+    }
+    int rc = gf_foundation_test(&q, f, base,
+        production ? gf_production_display : gf_diagnostic_display,
+        production ? gf_production_read_row : gf_diagnostic_read_row,
+        production ? (void *)f : (void *)owner);
+    gf_cycle_policy = 0;
+    *(struct gf1_request *)buf = q;
+    return rc;
+}
+
 int gfinit_call(u32 op, void *buf, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
+    if (op == GF_OP_FOUNDATION) return gf_foundation_dispatch(buf, size, base);
     if (gf_production_selected()) return -1;
     if (!buf || size < sizeof(struct gfinit_request)) return -1;
     struct gfinit_request q = *(const struct gfinit_request *)buf;

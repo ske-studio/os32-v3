@@ -78,6 +78,8 @@ int gfinit_bus_raw_config(void *v,u32 *command,u32 bars[3])
 { struct gfinit_bus *b=v;reads++;*command=RECOVER_COMMAND_MEM;for(u32 i=0;i<3;i++)bars[i]=b->bars[i];return 0; }
 int gfinit_bus_read(void *v,const struct recover_bus_access *a,u32 *out) { (void)v;(void)a;reads++;*out=0;return 0; }
 int gfinit_bus_write(void *v,const struct recover_bus_access *a,u32 value) { (void)v;(void)a;(void)value;writes++;return 0; }
+int gfinit_bus_mode_read_row(struct gfinit_bus *b,u32 y,u8 *row)
+{ CHECK(b==&owner->bus && y<GF_MODE_HEIGHT && row);reads++;return 0; }
 int gfinit_bus_local_cleanup(struct gfinit_bus *b,struct recover *r) { (void)b;(void)r;cleans++;return 0; }
 int recover_gf_screen_safe(struct recover *r) { (void)r;return 0; }
 int recover_hal_wait_frame(void *v,u32 us) { (void)v;(void)us;return 0; }
@@ -229,9 +231,29 @@ static int test_foundation_prepare(struct gf_foundation *f, const struct recover
 { (void)f;(void)b;(void)n;return 0; }
 static int test_foundation_call(struct gf_foundation *f,const struct gf1_test_request *q,struct gf1_test_reply *reply)
 { (void)f;foundation_op=q->op;if(q->op==GF1T_STOP)foundation_stops++;*reply=(struct gf1_test_reply){0};return foundation_error; }
-static const struct gf1_test_ops test_foundation_ops={0,test_foundation_prepare,test_foundation_call};
+static struct gf1_test_ops test_foundation_ops={0,test_foundation_prepare,test_foundation_call};
 const struct gf1_test_ops *geforce_foundation_ops(void) { return &test_foundation_ops; }
 void gfinit_bus_revoke(struct gfinit_bus *b) { if(b->foundation)b->foundation->revoked=true; }
+
+static struct gf_foundation *observed_foundation;
+static void *observed_row_owner;
+static u32 observations;
+int gf_foundation_test(struct gf1_request *q,struct gf_foundation *f,
+                       const struct recover_ops *ops,int (*display)(bool),
+                       int (*read_row)(void *,u32,u8 *),void *row_owner)
+{
+    CHECK(ops==&base && display && read_row);
+    observed_foundation=f;observed_row_owner=row_owner;observations++;
+    if(f==&control.foundation && q->test==GF1_CYCLE) {
+        CHECK(gf_cycle_policy && gf_cycle_policy->request.flags==owner->prepare_flags);
+        CHECK(gf_cycle_policy->count==owner->policy_count);
+        for(u32 i=0;i<owner->policy_count;i++)
+            CHECK(gf_cycle_policy->regs[i].kind==owner->policy_regs[i].kind &&
+                  gf_cycle_policy->regs[i].reg==owner->policy_regs[i].reg);
+        CHECK(owner->last_op==RECOVER_NONE);
+    }
+    q->session=core.token.session;q->rc=f?GF1_OK:GF1_EINVAL;return q->rc;
+}
 
 static void foundation_cleanup_test(void)
 {

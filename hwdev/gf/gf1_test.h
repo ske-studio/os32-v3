@@ -3,7 +3,8 @@
 #define HWDEV_GF1_TEST_H
 #include "foundation.h"
 enum gf1_test_op { GF1T_MASTER, GF1T_START, GF1T_STOP, GF1T_SNAPSHOT,
-                  GF1T_HEADS, GF1T_INST_PAGE, GF1T_REVOKE };
+                  GF1T_HEADS, GF1T_INST_PAGE, GF1T_REVOKE,
+                  GF1T_DISPLAY_STOP, GF1T_DISPLAY_START };
 struct gf1_test_request { u32 size, op, heads; };
 struct gf1_test_reply {
     int rc;

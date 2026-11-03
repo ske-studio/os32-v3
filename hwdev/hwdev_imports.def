@@ -265,6 +265,13 @@
       "source": "drivers/video/geforce/geforce_module.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "kind": "FUNC",
+      "symbol": "serial_puts_polled",
+      "source": "lib/serial_diag.h",
+      "index": 38,
+      "group": "kernel"
     }
   ]
 }
