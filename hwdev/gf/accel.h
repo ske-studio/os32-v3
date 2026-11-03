@@ -103,6 +103,50 @@ struct gf3_ctx {
     u32 scratch[GF3_SCRATCH_WORDS];
 };
 
+/* G2 addendum: B1 owns the seven-row format table; callers receive copies.
+ * xf86-video-nouveau/src/nv_accel_common.c:254-276 and nv04_exa.c:97-129,
+ * 180-200,302-319; SIFM: nv04_xv_blit.c:68-93,99-117. Unsupported fields
+ * are NONE; INDEX8 and luminance Y8 retain distinct meanings. */
+#define GF3_FMT_NONE 0U
+struct gf3_format { u32 cpp, sf, sf_gdi, gdi, pat, ifc, sifm; };
+enum gf3_surface_use {
+    GF3_USE_BYTES, GF3_USE_2D, GF3_USE_GDI, GF3_USE_IFC,
+    GF3_USE_SIFM_SRC
+};
+/* bytes is the envelope through the last valid byte, including row gaps. */
+struct gf3_span { u32 off, rowbytes, pitch, rows, bytes; };
+/* Required out: NULL is EINVAL; unknown fmt is EFORMAT. YUY2/UYVY have
+ * cpp=2 and only sifm set; Y8 has no IFC format. */
+int gf3_format_get(enum gf3_fmt fmt, struct gf3_format *out);
+/* off is relative to a capacity-byte base. Require off<=capacity and
+ * pitch>=rowbytes; validate (rows-1)*pitch+rowbytes <= capacity-off without
+ * overflowing. Either zero rowbytes or zero rows gives bytes=0. NULL out
+ * is EINVAL; other range errors are ERANGE. Publish only on success. */
+int gf3_span_check(u32 off, u32 capacity, u32 pitch, u32 rowbytes,
+                   u32 rows, struct gf3_span *out);
+/* NULL c/ch/s/fmt/span or unknown use is EINVAL. Match the live reservation
+ * first with gf_vram_match(ch,NULL,ID,generation,off,bytes,&key), propagating
+ * its rc. Then check format, nonempty surface geometry, pitch>=width*cpp,
+ * full-surface last byte and rectangle containment without overflow.
+ * span.off is absolute VRAM, rowbytes=r.w*cpp, rows=r.h, pitch=s->pitch.
+ * BYTES accepts all formats without packed-field limits. 2D/GDI/IFC require
+ * sf/sf_gdi/ifc respectively (NONE is EFORMAT), 16bit pitch and packed
+ * coordinates/dimensions. SIFM_SRC requires sifm, 16bit pitch/full geometry,
+ * 12.4 start points and even YUV width/r.x/r.w. No new pitch/width alignment.
+ * Both outputs remain unchanged on failure. Ready/epoch/RUN/fault checks
+ * belong to drawing entries; IFC transfer limits belong to B6.
+ * Entries handle zero rectangles after required pointer/state checks,
+ * before accessing surfaces/RAM; all nonempty checks precede any emit. */
+int gf3_surface_check(struct gf3_ctx *c, const struct gf3_surface *s,
+                      struct gf3_rect r, enum gf3_surface_use use,
+                      struct gf3_format *fmt, struct gf3_span *span);
+/* Borrow ram->ptr unchanged. NULL ram/out, or NULL ptr for a nonempty
+ * transfer, is EINVAL. Otherwise use span_check(0,bytes,pitch,rowbytes,rows).
+ * Callers compute rowbytes without overflow (mono ceil(w/8), else w*cpp).
+ * Publish out only on success. */
+int gf3_ram_check(const struct gf3_ram *ram, u32 rowbytes, u32 rows,
+                  struct gf3_span *out);
+
 /* dl is the operation-wide absolute deadline, never renewed. FIFO pause
  * keeps F2's independent timeout; after resume check ch->last_rc/state.
  * Init registers while paused, initializes in RUN, waits then sets ready.
