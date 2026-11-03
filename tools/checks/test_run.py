@@ -306,9 +306,6 @@ class RunnerTest(unittest.TestCase):
             ('build/kernel.mk', 'drivers/video/pc98/splash_raster_image.c',
              'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c\n',
              'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c \\\n    drivers/video/pc98/splash_raster_image.c\n'),
-            ('build/geforce-module.mk', 'drivers/video/geforce/geforce_tick.c',
-             'GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o\n',
-             'GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o\n'),
             ('build/geforce-module.mk', 'hwdev/gf/new.c',
              'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c\n',
              'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c hwdev/gf/new.c\n'),
@@ -321,9 +318,6 @@ class RunnerTest(unittest.TestCase):
             ('build/libs.mk', 'userland/lib/db/new.c',
              'LIBOS32DB_ARCHIVE_OBJ = userland/lib/db/libos32db.o\n',
              'LIBOS32DB_ARCHIVE_OBJ = userland/lib/db/libos32db.o userland/lib/db/new.o\n'),
-            ('build/hwdev.mk', 'hwdev/gf/new.c',
-             'GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o)\n',
-             'GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o new.o)\n'),
         )
         self.check('reader', covers=['build/out/kernel.map'])
         self.check('sdk-reader', covers=['build/sdk/lib/a.a'])
@@ -340,7 +334,7 @@ class RunnerTest(unittest.TestCase):
                     self.commit()
                     base = self.git('rev-parse', 'HEAD')
                     self.write(path, new)
-                    result = R.plan(self.root, self.registry(), (path, source), base=base)
+                    result = R.plan(self.root, self.registry(), (path,), base=base)
                     self.assertEqual((result.tier, result.mode), (3, 'sel'))
                     self.assertEqual(result.full_hits, set())
                     self.assertEqual(result.unmatched, set())
@@ -348,10 +342,66 @@ class RunnerTest(unittest.TestCase):
                                      {'source', 'reader', 'sdk-reader', 'all-reader', 'scanner'})
                     self.assertEqual(result.needs, ('all',))
                     self.assertEqual(self.plan(path).mode, 'full')
-                    # Literal source/object paths also route an unchanged source
-                    # when the only edited file is its build registration.
-                    if any(p in new or p in old for p in (source, source[:-2] + '.o')):
-                        self.assertIn('source', R.plan(self.root, self.registry(), (path,), base=base).hit)
+                    self.assertIn('source', result.hit)
+
+    def test_build_unresolved_registration_is_full(self):
+        path = 'build/geforce-module.mk'
+        self.check('source', covers=['kdebug/gfinit_resources.c'])
+        self.write('kdebug/gfinit_resources.c', 'int probe;\n')
+        before = ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o '
+                  '$(GEFORCE_OUT)/boot_scan.o\n')
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, before.replace(' $(GEFORCE_OUT)/boot_scan.o', ''))
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.full_hits), ('full', {path}))
+        self.assertIn('source', result.stage)
+
+    def test_build_branch_exchange_routes_both_sources(self):
+        path = 'build/kernel.mk'
+        for name in ('a', 'b'):
+            self.check(name, covers=['kernel/' + name + '.c'])
+            self.write('kernel/' + name + '.c', 'int probe;\n')
+        before = 'ifeq ($(MODE),a)\nC_KERNEL += kernel/a.c\nelse\nC_KERNEL += kernel/b.c\nendif\n'
+        after = 'ifeq ($(MODE),a)\nC_KERNEL += kernel/b.c\nelse\nC_KERNEL += kernel/a.c\nendif\n'
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, after)
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.unmatched), ('sel', set()))
+        self.assertTrue({'a', 'b'} <= result.hit)
+        self.assertEqual(R.routed_build_inputs(self.root, base, path), {'kernel/a.c', 'kernel/b.c'})
+
+    def test_build_uncovered_registration_expands_checks(self):
+        path = 'build/kernel.mk'
+        self.check('covered', covers=['kernel/a.c'])
+        self.check('other', covers=['elsewhere.c'])
+        self.check('stable', covers=['elsewhere.c'], tier=4)
+        self.write('kernel/a.c', 'int a;\n')
+        self.write('kernel/new.c', 'int probe;\n')
+        before = 'C_KERNEL = kernel/a.c\n'
+        self.write(path, before)
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, before.rstrip() + ' kernel/new.c\n')
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.tier, result.unmatched), ('sel', 3, {'kernel/new.c'}))
+        self.assertIn('other', result.stage)
+        self.assertNotIn('stable', result.stage)
+
+    def test_build_source_reordering_is_full(self):
+        path = 'build/kernel.mk'
+        self.check('a', covers=['kernel/a.c'])
+        self.write('kernel/a.c', 'int a;\n')
+        self.write('kernel/b.c', 'int b;\n')
+        self.write(path, 'C_KERNEL = kernel/a.c kernel/b.c\n')
+        self.commit()
+        base = self.git('rev-parse', 'HEAD')
+        self.write(path, 'C_KERNEL = kernel/b.c kernel/a.c\n')
+        result = R.plan(self.root, self.registry(), (path,), base=base)
+        self.assertEqual((result.mode, result.full_hits), ('full', {path}))
 
     def test_build_source_lists_keep_semantic_changes_full(self):
         before = 'C_KERNEL = drivers/video/a.c\n'
@@ -375,6 +425,10 @@ class RunnerTest(unittest.TestCase):
                 self.assertEqual((result.tier, result.mode, result.full_hits),
                                  (4, 'full', {'build/kernel.mk'}))
         pairs = (
+            ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o\n',
+             'GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o $(GEFORCE_OUT)/geforce_tick.o\n'),
+            ('GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o)\n',
+             'GF_CALC_OBJS := $(addprefix $(HWDEV_OUT)/,old.o new.o)\n'),
             ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_scan.o\n',
              'GEFORCE_BOOT_OBJS := $(OTHER_OUT)/boot_scan.o\n'),
             ('GEFORCE_OBJS := $(addprefix $(GEFORCE_OUT)/,a.o)\n',
@@ -650,9 +704,18 @@ def run_mutations():
         ('list-operator-change-safe', '(name, operator, prefix, references, tuple(t for t in tokens if t not in paths))',
          '(name, "", prefix, references, tuple(t for t in tokens if t not in paths))',
          'test_build_source_lists_keep_semantic_changes_full'),
-        ('list-output-reference-change-safe',
-         'tuple(sorted({ref for t in paths for ref in re.findall(SOURCE_REF, t)}))',
-         '()', 'test_build_source_lists_keep_semantic_changes_full'),
+        ('list-unresolved-registration-safe',
+         'if prefix or any("$" in t for t in changed_paths):',
+         'if False:', 'test_build_unresolved_registration_is_full'),
+        ('list-branch-deltas-cancelled', 'sources.update(changed_paths)',
+         'sources.symmetric_difference_update(changed_paths)',
+         'test_build_branch_exchange_routes_both_sources'),
+        ('list-uncovered-registration-lost',
+         'unmatched.update(s for s in sources if uncovered(s))',
+         'unmatched.update(())', 'test_build_uncovered_registration_expands_checks'),
+        ('list-reordering-safe',
+         'if tuple(t for t in old_tokens if t in common) != tuple(t for t in new_tokens if t in common):',
+         'if False:', 'test_build_source_reordering_is_full'),
         ('list-new-rule-safe',
          'signature.append(statement)\n            continue\n        name, operator, value',
          'continue\n        name, operator, value',

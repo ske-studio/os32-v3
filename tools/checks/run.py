@@ -688,7 +688,7 @@ SOURCE_PATH = re.compile(rf"(?:{SOURCE_REF}/)?[A-Za-z0-9_][A-Za-z0-9_./+-]*\.(?:
 
 def source_list_content(content):
     """Keep assignment names/operators and every non-source operand unchanged."""
-    signature, sources, defines = [], set(), 0
+    signature, lists, defines = [], [], 0
     lines = iter(content)
     for line in lines:
         parts = [line]
@@ -724,12 +724,8 @@ def source_list_content(content):
         paths = {t for t in tokens if SOURCE_PATH.fullmatch(t)}
         references = tuple(sorted({ref for t in paths for ref in re.findall(SOURCE_REF, t)}))
         signature.append((name, operator, prefix, references, tuple(t for t in tokens if t not in paths)))
-        # Only literal repository paths can be routed without interpreting make.
-        # Output-directory references are covered by artifact readers; changed
-        # implementation files still take their usual covers/dependency route.
-        sources.update(t[:-2] + ".c" if t.endswith(".o") else t
-                       for t in paths if not prefix and "$" not in t)
-    return tuple(signature), sources
+        lists.append((prefix, tuple(tokens)))
+    return tuple(signature), lists
 
 
 def routed_build_inputs(root, base, path):
@@ -749,10 +745,21 @@ def routed_build_inputs(root, base, path):
     if old == new:
         return frozenset()
     if matches(path, ("build/**/*.mk",)):
-        old_shape, old_sources = source_list_content(old)
-        new_shape, new_sources = source_list_content(new)
+        old_shape, old_lists = source_list_content(old)
+        new_shape, new_lists = source_list_content(new)
         if old_shape is not None and old_shape == new_shape:
-            return frozenset(old_sources ^ new_sources)
+            sources = set()
+            for (prefix, old_tokens), (_, new_tokens) in zip(old_lists, new_lists):
+                common = set(old_tokens) & set(new_tokens)
+                if tuple(t for t in old_tokens if t in common) != tuple(t for t in new_tokens if t in common):
+                    return None  # Existing operands must retain their link order.
+                changed_paths = set(old_tokens) ^ set(new_tokens)
+                if not changed_paths:
+                    continue
+                if prefix or any("$" in t for t in changed_paths):
+                    return None  # Cannot resolve the implementation without make.
+                sources.update(changed_paths)
+            return frozenset(t[:-2] + ".c" if t.endswith(".o") else t for t in sources)
     return None
 
 
@@ -768,6 +775,11 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     snapshot = tracked(root) if dependency_scan else None
     patterns = {n: c.covers + (c.path,) + (tuple(extract(root, c, snapshot, compiler=True))
                          if dependency_scan else ()) for n, c in checks.items()}
+    def uncovered(f):
+        return not matches(f, DOCS) and not any(
+            matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST
+        ) and not any(matches(f, pats) for pats in patterns.values())
+
     hit, unmatched, full_hits = set(), set(), set()
     # Conversion retains the old artifact_readers as make:all consumers,
     # including readers whose covers contain no build output paths.
@@ -784,6 +796,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
                 hit.update(artifact_targets)
                 hit.update(n for n, c in checks.items() if any("**" in p for p in c.covers))
                 hit.update(n for n, pats in patterns.items() if any(matches(s, pats) for s in sources))
+                unmatched.update(s for s in sources if uncovered(s))
             continue
         if f == "sdk/kapi.json":
             hit.update(artifact_targets)
@@ -792,8 +805,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
             continue
         if matches(f, FULL + BUILD_CONFIG_GLOBS):
             full_hits.add(f)
-        elif not matches(f, DOCS) and not any(matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST) \
-                and not any(matches(f, pats) for pats in patterns.values()):
+        elif uncovered(f):
             unmatched.add(f)
     docs_only = bool(changed) and all(matches(f, DOCS) for f in changed)
     notest_only = bool(changed) and all(any(matches(f, (p,)) and not matches(f, ex)
