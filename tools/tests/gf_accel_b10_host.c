@@ -23,7 +23,11 @@ void _start(void)
            events[0].a[2] == r.w && events[0].a[3] == r.h &&
            events[0].a[4] == true && events[0].a[5] == deadline);
     for (u32 i = 0; i < sizeof(vram); ++i) {
-        u8 expected = i == 17 ? 11 : i == 18 ? 12 : i == 25 ? 21 : i == 26 ? 22 : 0;
+        u8 expected = 0;
+        for (u32 y = 0; y < r.h; ++y)
+            for (u32 x = 0; x < r.w; ++x)
+                if (i == scan.off + (r.y + y) * scan.pitch + r.x + x)
+                    expected = pixels[y * ram.pitch + x];
         assert(vram[i] == expected);
     }
     gf3_host_trace_clear(&host);
