@@ -186,6 +186,8 @@ enum gf_display_stage { GF_DISPLAY_INIT=GF_LOAD_COMMIT+1, GF_DISPLAY_BASELINE,
     GF_DISPLAY_CALC, GF_DISPLAY_CHECK, GF_DISPLAY_PALETTE, GF_DISPLAY_BLANK,
     GF_DISPLAY_STOP };
 struct gf_display_context;
+struct gf2_chan;
+struct gf_foundation;
 /* P4 owner: acquire performs resource/Command/ROM/A2 preparation and supplies
  * init/program + parsed limits. release drops borrowed ROM/scratch after
  * baseline (also on failure). validate rechecks identity/BAR/Command/legacy/
@@ -200,6 +202,7 @@ struct gf_display_owner {
      * Both production and diagnostic owners must supply them before use. */
     int (*foundation_start)(struct gf_display_context *);
     int (*foundation_stop)(struct gf_display_context *);
+    struct gf2_chan *(*command_get)(struct gf_display_context *, struct gf_foundation **);
 };
 struct gf_display_context {
     struct gf_io io;
