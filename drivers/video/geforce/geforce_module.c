@@ -19,6 +19,8 @@ static GfxBackend candidate;
 static int registered;
 static const struct gf3_test_ops *accel_slot;
 static const struct gf1_test_ops *foundation_slot;
+const struct gf3_test_ops *geforce_accel_ops(void)
+{ return registered ? accel_slot : 0; }
 const struct gf1_test_ops *geforce_foundation_ops(void)
 { return registered ? foundation_slot : 0; }
 static int missing_probe(void) { return 0; }
@@ -69,7 +71,7 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
     int (*init)(GfxBackend *, const GeforceModuleContext *) =
         (int (*)(GfxBackend *, const GeforceModuleContext *))(uptr)entry;
     int rc = init(&candidate, &context);
-    if (rc) return rc;
+    if (rc) goto failed;
     const u32 entries[] = {
         (u32)(uptr)candidate.probe, (u32)(uptr)candidate.init,
         (u32)(uptr)candidate.query, (u32)(uptr)candidate.shutdown,
@@ -77,18 +79,32 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
         (u32)(uptr)candidate.enter, (u32)(uptr)candidate.leave, (u32)(uptr)candidate.prepare
     };
     for (u32 i=0; i<sizeof(entries)/sizeof(entries[0]); i++)
-        if (!module_text_contains(r, entries[i]))
-            return MODULE_INIT_FAILED;
-    if (candidate.fill_rect || candidate.blit) return MODULE_INIT_FAILED;
-    if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0))
-        return MODULE_INIT_FAILED;
+        if (!module_text_contains(r, entries[i])) {
+            rc=MODULE_INIT_FAILED;
+            goto failed;
+        }
+    /* Layer 3 hooks are optional, but must belong to the pinned module. */
+    if ((candidate.fill_rect && !module_text_contains(r, (u32)(uptr)candidate.fill_rect)) ||
+        (candidate.blit && !module_text_contains(r, (u32)(uptr)candidate.blit))) {
+        rc=MODULE_INIT_FAILED;
+        goto failed;
+    }
+    if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0)) {
+        rc=MODULE_INIT_FAILED;
+        goto failed;
+    }
     registered=1;
     if (context.platform) gf_production_set_return(geforce_return, context.platform);
     return 0;
+failed:
+    accel_slot=0;
+    return rc;
 }
 static int geforce_detach(struct module_record *r)
 {
     (void)r;
+    /* Close admission even when the module must retain its resources. */
+    accel_slot=0;
     /* Device context and restoration callbacks live for the whole boot. */
     const struct geforce_platform *p=context.platform;
     const struct gf_production *owner=p ? p->opaque : 0;
@@ -104,6 +120,7 @@ static int geforce_detach(struct module_record *r)
 }
 int geforce_module_load(void)
 {
+    accel_slot=0;
     if (geforce_handle.generation) return MODULE_BUSY;
     context.platform=geforce_platform_get();
     const struct bootinfo *bi=bootinfo_get();
@@ -124,6 +141,7 @@ int geforce_module_load(void)
 }
 int geforce_module_abort(void)
 {
+    accel_slot=0;
     if (registered) return MODULE_ISOLATED;
     return module_abort(geforce_handle);
 }
