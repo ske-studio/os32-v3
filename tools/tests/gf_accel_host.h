@@ -195,6 +195,19 @@ static inline void gf3_host_ref_m2mf(const struct gf3_ram *src, u32 src_off, str
     assert(!gf3_host_overlap((u8 *)src->ptr+src_off, ns, (u8 *)dst->ptr+dst_off, nd));
     for (u32 y=0;y<rows;++y) gf2_host_memcpy((u8 *)dst->ptr+dst_off+y*dst->pitch,(u8 *)src->ptr+src_off+y*src->pitch,rowbytes);
 }
+/* Binary long division avoids an i386 libgcc dependency in -nostdlib tests. */
+static inline unsigned long long gf3_host_div_u64_u32(unsigned long long n, u32 d)
+{
+    assert(d);
+    unsigned long long q = 0, r = 0;
+    for (unsigned bit = 64; bit; ) {
+        --bit;
+        r = (r << 1) | ((n >> bit) & 1ULL);
+        q <<= 1;
+        if (r >= d) { r -= d; q |= 1ULL; }
+    }
+    return q;
+}
 /* The fixed-point reference accepts RGB point samples and constant-color
  * bilinear inputs only; the hardware packet remains independently tested. */
 static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct gf3_host_image *dst, struct gf3_rect sr, struct gf3_rect dr, struct gf3_rect clip, bool bilinear)
@@ -210,8 +223,8 @@ static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct g
         for (u32 b=0;b<cpp;++b)
             if (src->fmt != GF3_XRGB8888 || b != 3)
                 assert(src->ptr[y*src->pitch+x*cpp+b] == src->ptr[b]);
-    unsigned long long du=((unsigned long long)sr.w << 20)/dr.w;
-    unsigned long long dv=((unsigned long long)sr.h << 20)/dr.h;
+    unsigned long long du=gf3_host_div_u64_u32((unsigned long long)sr.w << 20, dr.w);
+    unsigned long long dv=gf3_host_div_u64_u32((unsigned long long)sr.h << 20, dr.h);
     assert(du && dv && du <= U32_MAX && dv <= U32_MAX);
     for (u32 y=0;y<dr.h;++y) for (u32 x=0;x<dr.w;++x) {
         u32 px=dr.x+x, py=dr.y+y;
