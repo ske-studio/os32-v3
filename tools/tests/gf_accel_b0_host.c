@@ -36,6 +36,11 @@ static const struct { u8 subc; u16 method, count; u32 data[7]; } b0_expected[] =
 };
 #define B0_PACKET_COUNT (sizeof(b0_expected) / sizeof(b0_expected[0]))
 #define B0_CLASS_COUNT (sizeof(b0_classes) / sizeof(b0_classes[0]))
+/* Notifier contract: accel.h:69; F1/F2 descriptor and alignment contract:
+ * command.h:56-57 and dmaobj.c:33-46. Keep numeric oracles independent. */
+#define B0_NOTIFY_BYTES 32U
+#define B0_OBJECT_ALIGN 16U
+#define B0_DMA_OBJECT_BYTES 16U
 /* Non-display inst offset exercises the absolute notifier conversion. */
 #define B0_STORAGE_OFF 0x50000U
 #define B0_VRAM_BYTES (64U * 1024U * 1024U)
@@ -59,17 +64,17 @@ static void observe(struct gf3_host *h, const struct gf3_host_event *e)
     case H_ALLOC:
         assert(h->paused && waited == 1 && !h->calls[H_DMA_NEW]);
         assert(e->p[0] == &h->f && e->p[1] == &h->ctx.notify_storage);
-        assert(e->a[0] == 32 && e->a[1] == 16 && !e->a[2]);
+        assert(e->a[0] == B0_NOTIFY_BYTES && e->a[1] == B0_OBJECT_ALIGN && !e->a[2]);
         break;
     case H_DMA_NEW:
-        assert(h->paused && !created && h->ctx.notify_storage.size == 32);
+        assert(h->paused && !created && h->ctx.notify_storage.size == B0_NOTIFY_BYTES);
         assert(e->p[0] == &h->ch && e->p[1] == &h->ctx.notify);
         assert(e->a[0] == H(12) && e->a[1] == 0x3d);
         assert(e->a[2] == 0 && e->a[3] == 2);
-        assert(e->a[4] == B0_NOTIFY_OFF && e->a[5] == B0_NOTIFY_OFF + 31);
+        assert(e->a[4] == B0_NOTIFY_OFF && e->a[5] == B0_NOTIFY_OFF + B0_NOTIFY_BYTES - 1U);
         if (!e->rc) dma_created = 1;
         else if (e->rc == GF2_EIO)
-            assert(!h->ctx.notify.handle && h->ctx.notify.inst.size == 16);
+            assert(!h->ctx.notify.handle && h->ctx.notify.inst.size == B0_DMA_OBJECT_BYTES);
         break;
     case H_GR_NEW:
         assert(h->paused && !emitted && h->ctx.notify.handle == H(12));
@@ -97,6 +102,9 @@ static void observe(struct gf3_host *h, const struct gf3_host_event *e)
         assert(e->p[0] == &h->ch);
         assert((created == B0_CLASS_COUNT && !deleted) || !h->live_objects);
         assert(e->rc ? h->ch.last_rc == e->rc : !h->paused);
+        /* RESUME injection records last_rc only (fifo.c:232-238).
+         * FAULT injection has its own state/latch assertions below. */
+        assert(h->ch.state == GF2_RUN && !h->ch.fault.latched);
         break;
     case H_FENCE:
         assert(!h->paused && e->p[0] == &h->ch && e->p[1]);
@@ -160,7 +168,7 @@ static void dead(void)
 static void retained(void)
 {
     assert(!b0.ctx.ready && b0.live_objects == B0_CLASS_COUNT + 1);
-    assert(b0.f.imem.used && b0.ctx.notify_storage.size == 32);
+    assert(b0.f.imem.used && b0.ctx.notify_storage.size == B0_NOTIFY_BYTES);
     assert(b0.ctx.notify.handle == H(12));
     for (u32 i = 0; i < B0_CLASS_COUNT; ++i)
         assert(b0.ctx.obj[i].handle == H(i) && b0.ctx.obj[i].cookie);
@@ -252,6 +260,8 @@ void _start(void)
 
     reset(); inject(H_FAULT, 1, GF2_EFAULT);
     assert(init() == GF2_EFAULT && !b0.calls[H_FENCE]); dead();
+    assert(b0.ch.state == GF2_FAULT && b0.ch.fault.latched);
+    assert(b0.ch.last_rc == GF2_EFAULT);
     reset(); b0.now = deadline;
     assert(init() == GF2_ETIME && b0.calls[H_STOP] == 1); dead();
     reset(); b0.now = deadline-1; b0.complete_after = U32_MAX;
