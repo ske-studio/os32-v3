@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small, isolated fixtures for the declaration runner (no production checks)."""
+"""Declaration runner fixtures and production input registration regressions."""
 import contextlib
 from dataclasses import replace
 import importlib.util
@@ -195,19 +195,30 @@ class RunnerTest(unittest.TestCase):
                            'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
             'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
         }
+        cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
+                                'drivers/block/pc98pt.c', 'drivers/block/pc98pt.h',
+                                'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_layout.h']
+        actual = Path(__file__).resolve().parents[2]
+        # Read the real CHECK declarations, but use empty source fixtures so a
+        # missing declaration cannot be masked by transitive imports/includes.
+        checks = R.discover(actual)
         for name, files in cases.items():
-            self.check(name, covers=files, tier=0 if name == 'docs-links' else 1)
+            check = checks[name]
+            self.write(check.path, (actual / check.path).read_text())
+            for file in files:
+                self.write(file, '')
             for file in files:
                 with self.subTest(name=name, file=file):
-                    self.write(file, '')
                     self.assertIn(name, self.plan(file).stage)
-                    # Empty input fixtures cannot derive the missing cover
-                    # through another reader. Removing it must lose this hit.
-                    check = self.registry()[name]
-                    without = replace(check, covers=tuple(
-                        p for p in check.covers if not R.matches(file, (p,))))
-                    lost = R.plan(self.root, {name: without}, (file,))
-                    self.assertNotIn(name, lost.stage)
+
+    def test_production_gfinit_input(self):
+        actual = Path(__file__).resolve().parents[2]
+        check = R.Check('gfinit-fixture-host', 'tools/tests/test_gfinit_fixture.py', (), 0)
+        self.assertIn('tools/gfinit_rom_check.py', R.extract(actual, check))
+        self.check('a')
+        self.assertFalse(any(R.matches('tools/gfinit_rom_check.py', (p,))
+                             for p, _ in R.NOTEST))
+        self.assertEqual(self.plan('tools/gfinit_rom_check.py').mode, 'full')
 
     def test_production_build_inputs_force_full(self):
         self.check('a')
@@ -809,6 +820,47 @@ def run_mutations():
         if result.errors or not result.failures:
             raise AssertionError('mutation did not fail an assertion: ' + name)
         print('RED:', name)
+    registrations = (
+        ('blank-nhd-cover', 'tools-host', "'tools/mk_blank_nhd.py', ",
+         'test_input_covers_select_readers'),
+        ('kstring-asm-cover', 'privileged', "'lib/kstring_asm.asm', ",
+         'test_input_covers_select_readers'),
+        ('pci-decode-cover', 'privileged', "'drivers/pci/pci_decode.c', ",
+         'test_input_covers_select_readers'),
+    )
+    read_text = Path.read_text
+    for name, filename, before, case in registrations:
+        target = Path(__file__).with_name(filename + '.py').resolve()
+        if read_text(target).count(before) != 1:
+            raise AssertionError('mutation anchor: ' + name)
+
+        def broken_read(path, *args, **kwargs):
+            content = read_text(path, *args, **kwargs)
+            return content.replace(before, '') if path == target else content
+
+        with patch.object(Path, 'read_text', broken_read):
+            result = unittest.TextTestRunner(stream=io.StringIO()).run(RunnerTest(case))
+        if result.errors or not result.failures:
+            raise AssertionError('mutation did not fail an assertion: ' + name)
+        print('RED:', name, filename)
+    # gfinit is deliberately outside the automatic registry; remove its actual
+    # FULL registration and check that its import input loses the route.
+    before = "    'tools/gfinit_rom_check.py',\n"
+    if source.count(before) != 1:
+        raise AssertionError('mutation anchor: gfinit-rom-input')
+    mutant = type(original)('runner_mutant')
+    mutant.__file__ = original.__file__
+    sys.modules[mutant.__name__] = mutant
+    try:
+        exec(compile(source.replace(before, ''), mutant.__file__, 'exec'), mutant.__dict__)
+        globals()['R'] = mutant
+        result = unittest.TextTestRunner(stream=io.StringIO()).run(RunnerTest('test_production_gfinit_input'))
+    finally:
+        globals()['R'] = original
+        sys.modules.pop(mutant.__name__, None)
+    if result.errors or not result.failures:
+        raise AssertionError('mutation did not fail an assertion: gfinit-rom-input')
+    print('RED: gfinit-rom-input tools/checks/run.py')
     return 0
 
 
