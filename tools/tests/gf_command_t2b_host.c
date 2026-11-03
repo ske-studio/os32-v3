@@ -15,6 +15,15 @@ static u32 now_us, last_clock, reference_calls, recover_calls;
 static bool stalled, no_wrap, same_epoch, no_fault, changed_display, deadline_wrapped;
 static char serial[32768];
 static unsigned serial_used;
+static u32 accel_case, accel_calls;
+static int accel_rc;
+
+int gf_accel_test(u32 case_id)
+{
+    accel_case = case_id;
+    accel_calls++;
+    return accel_rc;
+}
 
 void serial_puts_polled(const char *s)
 {
@@ -144,6 +153,8 @@ static void reset(void)
     stalled = no_wrap = same_epoch = no_fault = changed_display = deadline_wrapped = false;
     serial_used = 0;
     serial[0] = 0;
+    accel_case = accel_calls = 0;
+    accel_rc = GF2_OK;
 }
 static int request(u32 test)
 {
@@ -215,10 +226,32 @@ static void t2b_fault_subchannel(void)
     assert(gf2_host_strstr(serial, " subc=5 "));
     assert(!gf2_host_strstr(serial, " subc=2 "));
 }
+static void t2b_accel_dispatch(void)
+{
+    /* Case IDs follow the T0 entry contract: kdebug/gf_accel_test.c:24-26. */
+    enum { ACCEL_INIT = 0, ACCEL_FILL = 1 };
+    const u32 cases[] = {ACCEL_INIT, ACCEL_FILL};
+    const int results[] = {GF2_OK, GF2_EIO};
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        reset();
+        accel_rc = results[i];
+        struct gf2_request q = {sizeof(q), GF3_ACCEL, cases[i], 0};
+        assert(gf_command_test(&q, 0, 0, 0) == results[i]);
+        assert(accel_calls == 1 && accel_case == cases[i]);
+        assert(q.rc == results[i] && q.session == 0);
+    }
+    reset();
+    struct gf2_request bad = {sizeof(bad) - 1U, GF3_ACCEL, ACCEL_FILL, 0};
+    assert(gf_command_test(&bad, &device, fake_row, &device) == GF2_EINVAL);
+    assert(!accel_calls);
+    bad = (struct gf2_request){sizeof(bad), GF3_ACCEL, ACCEL_FILL, GF2_EIO};
+    assert(gf_command_test(&bad, &device, fake_row, &device) == GF2_EINVAL);
+    assert(!accel_calls);
+}
 void _start(void)
 {
     t2b_reference_count();t2b_reference_stalled();t2b_wrap_required();
     t2b_recover_epoch();t2b_fault_recover();t2b_display_changed();
-    t2b_deadline_wrap();t2b_fault_subchannel();
+    t2b_deadline_wrap();t2b_fault_subchannel();t2b_accel_dispatch();
     gf2_host_exit(0);
 }
