@@ -1,33 +1,9 @@
-/* B8 fixture: map and DMA adapters have the A2-compatible ops signatures. */
+/* Link command_platform.c only; A2 supplies map and DMA ops. */
 #include <assert.h>
 #include "../../hwdev/gf/command.h"
 
-static struct recover_bar_extent mapped_extent;
-static u32 mapped_bytes, storage[GF2_PUSH_WORDS];
-static int map_fail, unmap_fail, alloc_fail, free_fail, leaked;
-static int map_stub(void *owner, const struct recover_bar_extent *bar,
-                    u32 bytes, volatile u8 **out)
-{
-    (void)owner; if (map_fail) return map_fail;
-    mapped_extent = *bar; mapped_bytes = bytes;
-    *out = (volatile u8 *)storage; return 0;
-}
-static int unmap_stub(void *owner, volatile u8 *ptr, u32 bytes)
-{
-    (void)owner; assert(ptr == (volatile u8 *)storage);
-    assert(bytes == mapped_bytes); return unmap_fail;
-}
-static int alloc_stub(u32 bytes, u32 align, u32 mask, struct gf2_dma_buf *b)
-{
-    assert(bytes == GF2_STAGING_BYTES && align == GF2_STAGING_ALIGN);
-    assert(mask == GF2_STAGING_MASK);
-    if (alloc_fail) return alloc_fail;
-    *b = (struct gf2_dma_buf){0x1000U, bytes, storage}; return 0;
-}
-static int free_stub(struct gf2_dma_buf *b) { (void)b; return free_fail; }
-static void leak_stub(struct gf2_dma_buf *b) { (void)b; leaked++; }
-static const struct gf_instmem_map_ops map_ops = {map_stub, unmap_stub};
-static const struct gf2_dma_ops dma_ops = {alloc_stub, free_stub, leak_stub};
+#define GF2_HOST_B8
+#include "gf_command_host.h"
 
 int main(void)
 {

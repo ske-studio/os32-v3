@@ -5,6 +5,7 @@
  * positive counts busy reads, then clears (set/get do not consume reads).
  * clock/wait failures and fault_rc are injected before the next callback. */
 #include <assert.h>
+#define GF2_HOST_B0
 #include "gf_command_host.h"
 
 static struct gf2_host h;

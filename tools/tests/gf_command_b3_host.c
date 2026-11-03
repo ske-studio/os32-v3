@@ -1,22 +1,9 @@
 #include <stdio.h>
 #include "../../hwdev/gf/command.h"
 
-/* A2 can supply these F1 stubs; storage models the fixed RAMHT. */
-static u32 table[GF2_RAMHT_ENTRIES * 2U];
-int gf_inst_read32(struct gf_foundation *f, const struct gf_inst *obj,
-                   u32 off, u32 *value)
-{
-    (void)f; (void)obj;
-    *value = table[off / 4U];
-    return GF1_OK;
-}
-int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *obj,
-                    u32 off, u32 value)
-{
-    (void)f; (void)obj;
-    table[off / 4U] = value;
-    return GF1_OK;
-}
+#define GF2_HOST_B3
+#include "gf_command_host.h"
+
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (0)
 
 int main(void)

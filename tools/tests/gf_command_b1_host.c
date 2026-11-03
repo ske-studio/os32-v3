@@ -1,76 +1,11 @@
-/* Link with the real hwdev/gf/push.c and A2's VA read observer. This
- * fixture supplies gf_io callbacks and the B7 gf2_fault_check stub locally. */
+/* Link only the real hwdev/gf/push.c; A2 supplies dependencies and
+ * observes actual CPU reads of va[0] before each PUT. */
 #include "hwdev/gf/command.h"
 
-/* A2 contract: watch actual CPU reads of this one volatile u32 (not writes)
- * without changing push.c. begin returns 0 on success and resets the count;
- * count does not access the watched word; end restores its ordinary mapping.
- * No no-op fallback: missing observation must fail to link, not pass silently. */
-extern int gf2_host_va_read_begin(volatile u32 *word);
-extern u32 gf2_host_va_read_count(void);
-extern void gf2_host_va_read_end(void);
-
-#define BASE 0x100000U
-#define USER (GF2_USER_BASE + GF2_CHID * GF2_USER_STRIDE)
 #define REQUIRE(expr) do { if (!(expr)) return __LINE__; } while (0)
-static u32 ring[GF2_PUSH_WORDS];
-static struct gf2_chan ch;
-static struct gf_foundation f;
-static struct fake {
-    u32 get[8], put[8], readbacks_at_put[8], now, waits;
-    unsigned gets, reads, writes, fault_after_reads;
-    bool fault, read_fail, write_fail, clock_fail, wait_fail, watch_readback;
-} m;
+#define GF2_HOST_B1
+#include "gf_command_host.h"
 
-static int read_reg(void *owner, u32 bar, u32 off, u32 width, u32 *out)
-{
-    struct fake *p = owner;
-    if (bar != GF_MODE_REGISTER_BAR || off != USER + GF2_USER_GET ||
-        width != sizeof(u32) || p->read_fail) return -1;
-    *out = p->get[p->reads < p->gets ? p->reads : p->gets - 1U];
-    ++p->reads;
-    return 0;
-}
-static int write_reg(void *owner, u32 bar, u32 off, u32 width, u32 value)
-{
-    struct fake *p = owner;
-    if (bar != GF_MODE_REGISTER_BAR || off != USER + GF2_USER_PUT ||
-        width != sizeof(u32) || p->writes == 8 || p->write_fail) return -1;
-    if (p->watch_readback)
-        p->readbacks_at_put[p->writes] = gf2_host_va_read_count();
-    p->put[p->writes++] = value;
-    return 0;
-}
-static int clock_us(void *owner, u32 *now)
-{
-    struct fake *p = owner;
-    *now = p->now;
-    return p->clock_fail ? -1 : 0;
-}
-static int wait_us(void *owner, u32 us)
-{
-    struct fake *p = owner;
-    if (us < GF2_WAIT_MIN_US || us > GF2_WAIT_MAX_US || p->wait_fail) return -1;
-    p->now += us;
-    ++p->waits;
-    return 0;
-}
-int gf2_fault_check(struct gf2_chan *c)
-{
-    if (m.fault || (m.fault_after_reads && m.reads >= m.fault_after_reads))
-        c->state = GF2_FAULT;
-    return c->state == GF2_FAULT ? GF2_EFAULT : GF2_OK;
-}
-static void fresh(enum gf2_state state)
-{
-    m = (struct fake){ .gets = 1 };
-    f = (struct gf_foundation){ .io = { .opaque = &m, .read = read_reg,
-        .write = write_reg, .timing = { .clock_us = clock_us, .wait_us = wait_us } } };
-    ch = (struct gf2_chan){ .f = &f, .state = state, .B = BASE, .va = ring,
-        .cur = GF2_PUSH_SKIPS, .max = GF2_PUSH_MAX,
-        .free = GF2_PUSH_MAX - GF2_PUSH_SKIPS };
-    for (u32 i = 0; i < GF2_PUSH_WORDS; ++i) ring[i] = 0;
-}
 static int test_readback_order(void)
 {
     fresh(GF2_RUN);

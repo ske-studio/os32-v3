@@ -1,56 +1,9 @@
-/* Link fence.c only. These B1/B7 stubs can move to A2 when it is available. */
+/* Link fence.c only; A2 supplies the B1/B7 and timing/MMIO stubs. */
 #include <assert.h>
 #include "../../hwdev/gf/command.h"
 
-static u32 now, reference, get, emitted, deadline, reads, waits, faults, kicks;
-static u32 general, internal, complete_after, fault_after;
-static int emit_rc, kick_rc, clock_rc, read_rc, wait_rc;
-
-int gf2_fault_check(struct gf2_chan *ch)
-{
-    faults++;
-    if (ch->state == GF2_FAULT || (fault_after && faults >= fault_after)) {
-        ch->state = GF2_FAULT; return GF2_EFAULT;
-    }
-    return GF2_OK;
-}
-int gf2_emit(struct gf2_chan *ch, u8 subc, u16 method, bool noninc,
-             const u32 *data, u16 count, u32 dl)
-{
-    assert(ch->state == GF2_RUN && subc == 0 && method == 0x0050U);
-    assert(!noninc && count == 1); general++;
-    emitted = *data; deadline = dl; return emit_rc;
-}
-int gf2_push_reference(struct gf2_chan *ch, u32 seq, u32 dl)
-{
-    assert(ch->state == GF2_INIT || ch->state == GF2_DRAIN);
-    internal++; emitted = seq; deadline = dl; return emit_rc;
-}
-int gf2_kick(struct gf2_chan *ch)
-{
-    int rc = gf2_fault_check(ch);
-    if (rc) return rc;
-    kicks++; return kick_rc;
-}
-static int read_stub(void *opaque, u32 bar, u32 off, u32 width, u32 *value)
-{
-    (void)opaque;
-    assert(bar == 0 && width == 4);
-    assert(off == 0x00c00048U || off == 0x00c00044U);
-    reads++; *value = off == 0x00c00048U ? reference : get; return read_rc;
-}
-static int clock_stub(void *opaque, u32 *value)
-{
-    (void)opaque; *value = now; return clock_rc;
-}
-static int wait_stub(void *opaque, u32 us)
-{
-    (void)opaque;
-    assert(us >= GF2_WAIT_MIN_US && us <= GF2_WAIT_MAX_US);
-    now += us; waits++;
-    if (complete_after && waits >= complete_after) reference = emitted;
-    return wait_rc;
-}
+#define GF2_HOST_B6
+#include "gf_command_host.h"
 
 int main(void)
 {

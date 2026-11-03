@@ -8,22 +8,8 @@
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
-enum { IMAGE_WORDS = 80 * 1024 / 4 };
-static u32 actual[IMAGE_WORDS], expected[IMAGE_WORDS];
-static u32 oracle_code[256], uploaded[256], upload_words;
-static u32 writes, fail_write, image_bytes;
-
-/* A2 dependency-stub contract: offsets are relative to ctx, first failure
- * is injectable, and no MMIO/IRQ/timing/platform service is required. */
-int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *ctx,
-                    u32 off, u32 value)
-{
-    (void)f;
-    CHECK(!(off & 3) && off < ctx->size && off < sizeof(actual));
-    if (++writes == fail_write) return GF1_EIO;
-    actual[off / 4] = value;
-    return GF1_OK;
-}
+#define GF2_HOST_B4
+#include "gf_command_host.h"
 
 /* Host adapters for the unmodified MIT oracle, including its own helpers
  * from ctxnv40.h. nv40.h's unrelated engine interfaces are not needed. */
