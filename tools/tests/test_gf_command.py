@@ -30,10 +30,13 @@ COMPONENTS = {
     'b7': ('hwdev/gf/fault.c', False),
     'b8': ('hwdev/gf/command_platform.c', True),
     'b9': ('drivers/video/geforce/geforce_dma.c', True),
+    't2a1': ('hwdev/gf/command_test.c', True),
 }
 # Each old string must occur once in the original product source. Keep these
 # independent of the oracle and fixture; mutate one product site per build.
 MUTATIONS = {
+    # PM/A3 consolidates the T2a1 mutation tuples from its report.
+    't2a1': [],
     'b0': [
         ('ramfc-r-base', 'im->vram_bytes - RAMFC_WINDOW_BYTES +',
          'im->vram_bytes - im->reserved +'),
@@ -155,7 +158,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--component', choices=tuple(COMPONENTS),
-                        help='run one independently linked B component')
+                        help='run one independently linked component')
     args = parser.parse_args()
     runners = os.environ.get('HOST32_RUNNERS', 'qemu').split()
     require(bool(runners) and all(r in ('native', 'qemu') for r in runners),
