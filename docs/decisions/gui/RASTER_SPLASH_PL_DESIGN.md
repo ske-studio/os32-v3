@@ -554,3 +554,7 @@ int pl_obs_frame(struct SplashRaster *, const struct OsriImage *,
 - B1: 可視の行のループは、行ごとの 0A0h の IN で bit5 (VSYNC) も見る (追加の IN なし)。可視の行の途中で VSYNC を見たら、その周を drop として打ち切り IF を戻す (N が大きく 1 行が 1H を超えても、1 周が 1 フレームを超えず IF=0 の区間と T が N によらず決まる)。drop の回数は SPLO の行に出し、観測の結果として記録する (失敗は失敗)。host 試験と変異を 1 行ずつ。
 - B2: watchdog = 16×T + 16×(1 枚の読込の上限) + 起動、かつ 300 秒 (カメラの保持) 未満。読込の上限は NP21/W の予行の SPLO の start〜end の時刻差で PM が確定する。
 - B3: 記録の表で「書込色数」と「実差分」を両方見る。
+
+## 追記 (2026-11-04、ホストのエンコーダーの作り直し)
+
+- 1 行ごとの 16 色の再最適化 (256 色のマスター・OUT の本数の予算・はみ出しの見た目の誤差・最後に誤差拡散) は [RASTER_SPLASH_ENC2_DESIGN](RASTER_SPLASH_ENC2_DESIGN.md)。
