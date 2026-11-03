@@ -1,38 +1,11 @@
 #include "../../hwdev/gf/command.h"
 
-/* Temporary A2 substitutes: same signatures as the foundation and B3 APIs. */
-static u32 words[4], writes, adds, dels, frees, add_engine, add_off;
-static int alloc_rc, write_fail, add_rc, del_rc;
-int gf_inst_alloc(struct gf_foundation *f, u32 bytes, u32 align, bool zero,
-                  struct gf_inst *out)
-{
-    (void)f;
-    if (alloc_rc) return alloc_rc;
-    if (bytes != 16 || align != 16 || zero) return GF1_EINVAL;
-    out->off = 0x40000; out->size = bytes; out->next = 0;
-    return GF1_OK;
-}
-void gf_inst_free(struct gf_foundation *f, struct gf_inst *obj)
-{ (void)f; (void)obj; ++frees; }
-int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *obj, u32 off, u32 v)
-{
-    (void)f; (void)obj;
-    if (off != writes * 4 || writes >= 4) return GF1_EINVAL;
-    if (write_fail && writes == (u32)(write_fail - 1)) return GF1_EIO;
-    words[writes++] = v;
-    return GF1_OK;
-}
-int gf2_ramht_add(struct gf2_chan *c, u32 handle, u8 engine, u32 off, u32 *cookie)
-{
-    (void)c; (void)handle; ++adds; add_engine = engine; add_off = off;
-    if (add_rc) return add_rc;
-    *cookie = 7; return GF2_OK;
-}
-int gf2_ramht_del(struct gf2_chan *c, u32 cookie)
-{ (void)c; if (cookie != 7) return GF2_EINVAL; ++dels; return del_rc; }
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
+#define GF2_HOST_B2
+#include "gf_command_host.h"
+
 void _start(void)
 {
     struct gf_foundation f = {0};

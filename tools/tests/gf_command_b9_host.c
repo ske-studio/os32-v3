@@ -1,22 +1,9 @@
-/* B9 links the resident adapter with these DMA pool stubs; A2 is not needed. */
+/* Link geforce_dma.c only; A2 supplies DMA pool dependencies. */
 #include <assert.h>
 #include "../../hwdev/gf/command.h"
-#include "../../mm/dma_pool.h"
 
-static int alloc_rc, free_rc, leak_calls;
-static u32 requested_bytes, requested_align, requested_mask;
-static struct dma_buf seen;
-static int storage;
-
-int dma_alloc(u32 bytes, u32 align, u32 mask, struct dma_buf *out)
-{
-    requested_bytes = bytes; requested_align = align; requested_mask = mask;
-    if (alloc_rc) return alloc_rc;
-    *out = (struct dma_buf){ .pa = 0x12345000U, .va = &storage, .size = bytes };
-    return 0;
-}
-int dma_free(const struct dma_buf *buf) { seen = *buf; return free_rc; }
-int dma_mark_leaked(const struct dma_buf *buf) { seen = *buf; ++leak_calls; return 0; }
+#define GF2_HOST_B9
+#include "gf_command_host.h"
 
 int main(void)
 {

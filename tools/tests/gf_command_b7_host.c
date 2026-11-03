@@ -1,20 +1,9 @@
-/* B7 only: include the real component; A2 substitutes below model F1 after
- * ACK, MMIO ordering, IRQ save/restore and the polled serial facade. */
-#define IO_H
+/* B7 includes the real component; A2 models F1 after ACK, MMIO,
+ * IRQ save/restore and the polled serial facade. */
 #include "../../hwdev/gf/command.h"
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line % 250 + 1)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
-static unsigned host_flags = 0x202U;
-static unsigned irq_save(void)
-{ unsigned v = host_flags; host_flags &= ~0x200U; return v; }
-static void irq_restore(unsigned v)
-{ CHECK(!(host_flags & 0x200U)); host_flags = v; }
-#ifndef GF2_FAULT_SOURCE
-#define GF2_FAULT_SOURCE "../../hwdev/gf/fault.c"
-#endif
-#include GF2_FAULT_SOURCE
-
 /* Explicit addresses/values are independent of product register aliases.
  * kind 2 is the F1 request close, strictly after capture and before gates. */
 static const struct event { u32 kind, off, value; } expected[] = {
@@ -30,45 +19,19 @@ static const struct event { u32 kind, off, value; } expected[] = {
     {0,0x3250,0x101}, {1,0x3250,0x100}, {0,0x400720,0xa5}, {1,0x400720,0xa4}
 };
 #define EVENT_COUNT (sizeof(expected) / sizeof(expected[0]))
-static struct gf_foundation foundation;
-static struct gf2_chan channel;
-static u32 cursor, fail_at, snapshots, log_bytes;
-static int enable_rc, serial_gated;
-static char output[1024];
+#define GF2_HOST_B7
+#include "gf_command_host.h"
+
+#ifndef GF2_FAULT_SOURCE
+#define GF2_FAULT_SOURCE "../../hwdev/gf/fault.c"
+#endif
+#include GF2_FAULT_SOURCE
+
 static u32 event(u32 kind, u32 off)
 {
     CHECK(cursor < EVENT_COUNT && expected[cursor].kind == kind);
     CHECK(expected[cursor].off == off);
     return expected[cursor++].value;
-}
-static int mmio_read(void *owner, u32 bar, u32 off, u32 width, u32 *out)
-{
-    CHECK(owner == &foundation && bar == 0 && width == 4);
-    u32 value = event(0, off);
-    if (cursor == fail_at) return -1;
-    *out = value; return 0;
-}
-static int mmio_write(void *owner, u32 bar, u32 off, u32 width, u32 value)
-{
-    CHECK(owner == &foundation && bar == 0 && width == 4);
-    CHECK(value == event(1, off));
-    return cursor == fail_at ? -1 : 0;
-}
-void gf_irq_snapshot(struct gf_foundation *f, struct gf_irq_stats *out)
-{ CHECK(f == &foundation); snapshots++; *out = f->stats; }
-int gf_irq_enable(struct gf_foundation *f, bool fifo, bool graph, unsigned heads)
-{
-    CHECK(f == &foundation && !fifo && !graph && heads == 3);
-    CHECK(!(host_flags & 0x200U)); (void)event(2, 0);
-    f->wanted_fifo = f->wanted_graph = 0; f->wanted_heads = heads;
-    return enable_rc;
-}
-int serial_gate_active(void) { return serial_gated; }
-void serial_puts_polled(const char *s)
-{
-    CHECK(cursor == EVENT_COUNT && channel.state == GF2_FAULT);
-    while (*s) { CHECK(log_bytes + 1 < sizeof(output)); output[log_bytes++] = *s++; }
-    output[log_bytes] = 0;
 }
 static bool contains(const char *s)
 {
@@ -78,16 +41,6 @@ static bool contains(const char *s)
         if (!s[j]) return true;
     }
     return false;
-}
-static void reset(void)
-{
-    foundation = (struct gf_foundation){0}; channel = (struct gf2_chan){0};
-    foundation.io.opaque = &foundation;
-    foundation.io.read = mmio_read; foundation.io.write = mmio_write;
-    foundation.wanted_fifo = foundation.wanted_graph = ~0U;
-    channel.f = &foundation; channel.state = GF2_RUN; channel.heads = 3; channel.epoch = 9;
-    cursor = fail_at = snapshots = log_bytes = 0; output[0] = 0;
-    enable_rc = serial_gated = 0; host_flags = 0x202U;
 }
 static void b7_fault_order(void)
 {

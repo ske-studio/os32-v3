@@ -1,98 +1,13 @@
-/* Link with hwdev/gf/gr.c only. Dependency stubs below can move to A2;
- * their names/signatures are the command.h / foundation.h ABI. No B4 oracle
- * is duplicated here: B4 separately checks the real generator against MIT. */
+/* Link hwdev/gf/gr.c only; A2 supplies B0/B3/B4 and foundation stubs.
+ * B4 separately checks the real generator against the independent MIT oracle. */
 #include "../../hwdev/gf/command.h"
 
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
-struct event { u32 write, off, value; };
-static struct event events[256];
-static u32 memory[16], count, cursor, fail_io, units, overlap, words = 3;
-static u32 inst_calls, fail_inst;
-static int alloc_rc, fill_rc, bind_rc, ramht_rc;
-static bool live, published, bound;
-static unsigned frees, adds;
-static struct gf_foundation foundation;
-static struct gf2_chan channel;
+#define GF2_HOST_B5
+#include "gf_command_host.h"
 
-static int rd(void *p, u32 bar, u32 off, u32 width, u32 *value)
-{
-    (void)p;
-    CHECK(bar == 0 && width == 4 && count < 256);
-    *value = 0;
-    if (off == 0x1540) *value = units;
-    else if (off == 0x100200) *value = 0x12345678;
-    else if (off == 0x100204) *value = 0x87654321;
-    else {
-        CHECK(off >= 0x100600 && off < 0x1006c0);
-        u32 i = (off - 0x100600) / 16, part = off & 15;
-        if (part == 0) *value = overlap && i == 11 ? channel.B | 1 : i * 0x1000 + 1;
-        else if (part == 4) *value = overlap && i == 11 ? channel.B : i * 0x1000 + 0xfff;
-        else { CHECK(part == 8); *value = (i + 1) * 0x100; }
-    }
-    events[count++] = (struct event){0, off, *value};
-    return count == fail_io ? -1 : 0;
-}
-static int wr(void *p, u32 bar, u32 off, u32 width, u32 value)
-{
-    (void)p;
-    CHECK(bar == 0 && width == 4 && count < 256);
-    if (off == 0x400720) CHECK(bound);
-    events[count++] = (struct event){1, off, value};
-    return count == fail_io ? -1 : 0;
-}
-int gf2_grctx_program(u32 code[GF2_GRCTX_PROGRAM_WORDS], u32 *n, u32 *bytes)
-{ code[0] = 0x123; code[1] = 0x456; code[2] = 0x789; *n = words; *bytes = 64; return 0; }
-int gf2_grctx_fill(struct gf_foundation *f, const struct gf_inst *ctx)
-{ CHECK(f == &foundation && live && ctx == &channel.grctx); memory[1] = 0xfeed; return fill_rc; }
-int gf_inst_alloc(struct gf_foundation *f, u32 bytes, u32 align, bool zero, struct gf_inst *out)
-{
-    CHECK(f == &foundation && !live && align == 16 && bytes <= sizeof(memory));
-    CHECK((bytes == 64 && zero) || (bytes == 20 && !zero));
-    if (alloc_rc) return alloc_rc;
-    *out = (struct gf_inst){0x40000, bytes, 0};
-    f->imem.used = out; live = true;
-    for (unsigned i = 0; i < 16; i++) memory[i] = zero ? 0 : 0xdead;
-    return 0;
-}
-void gf_inst_free(struct gf_foundation *f, struct gf_inst *inst)
-{ CHECK(live && f->imem.used == inst); f->imem.used = 0; live = false; frees++; }
-int gf_inst_write32(struct gf_foundation *f, const struct gf_inst *inst, u32 off, u32 value)
-{
-    CHECK(live && f->imem.used == inst && !(off & 3) && off < inst->size);
-    if (++inst_calls == fail_inst) return GF1_EIO;
-    memory[off / 4] = value; published = false; return 0;
-}
-int gf_inst_read32(struct gf_foundation *f, const struct gf_inst *inst, u32 off, u32 *value)
-{
-    CHECK(live && f->imem.used == inst && off == 0);
-    if (++inst_calls == fail_inst) return GF1_EIO;
-    *value = memory[0]; published = true; return 0;
-}
-int gf2_fifo_bind_gr(struct gf2_chan *ch, u32 off)
-{
-    CHECK(ch == &channel && published && off == ch->grctx.off);
-    CHECK(memory[0] == off >> 4 && memory[1] == 0xfeed);
-    bound = !bind_rc; return bind_rc;
-}
-int gf2_ramht_add(struct gf2_chan *ch, u32 handle, u8 engine, u32 off, u32 *cookie)
-{
-    CHECK(ch == &channel && handle == GF2_HANDLE_LAYER3_FIRST);
-    CHECK(engine == 1 && off == 0x40000 && published);
-    for (unsigned i = 1; i < 5; i++) CHECK(memory[i] == 0);
-    adds++; if (!ramht_rc) *cookie = 9; return ramht_rc;
-}
-static void reset(void)
-{
-    foundation = (struct gf_foundation){0}; channel = (struct gf2_chan){0};
-    foundation.io.read = rd; foundation.io.write = wr; channel.f = &foundation;
-    foundation.imem.vram_bytes = 0x4000000; channel.bar1.length = 0x8000000;
-    channel.B = 0x3000000; units = 0x108; overlap = 0; words = 3;
-    count = cursor = fail_io = frees = adds = 0;
-    inst_calls = fail_inst = 0;
-    alloc_rc = fill_rc = bind_rc = ramht_rc = 0; live = published = bound = false;
-}
 static void event(u32 write, u32 off, u32 value)
 {
     CHECK(cursor < count && events[cursor].write == write);
