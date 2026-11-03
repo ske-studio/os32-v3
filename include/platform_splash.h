@@ -13,6 +13,8 @@ void platform_splash_clear_pages(void);
 enum { PLATFORM_SPLASH_DONE = 0, PLATFORM_SPLASH_FALLBACK = 1,
        PLATFORM_SPLASH_NO_SYNC = 2 };
 int platform_splash_try_image(const char *path, u32 end_tick);
+/* Absolute boot-entry deadline in microseconds, shared with logo/exit. */
+int platform_splash_try_image_until(const char *path, unsigned long long deadline_us);
 /* Clock-paced static/fixed display; failure means no usable clock. */
 int platform_splash_wait_frame(u32 end_tick);
 #ifdef SPLASH_RASTER_DIAG
