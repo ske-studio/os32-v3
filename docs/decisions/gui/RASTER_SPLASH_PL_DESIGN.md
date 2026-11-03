@@ -210,6 +210,7 @@ else if (armed) {
 | R2 | `drivers/video/pc98/splash_raster.c` | 旧画像入口の削除。モード状態・公開tableは保持。H3/R1/I1 と V2a・V7a の後 (末尾の追記「R2 の旧静止画像入口の終了」)。 |
 | P2a | `kernel/time/ktime.c` | 出口精算の暫定値 (B・l_min・費用表) と根拠。R1後・M2初測前 (末尾の追記「P2 の出口精算」)。 |
 | P2b | `kernel/time/ktime.c` | M2初測の実測値を反映し、同じSHAでM2を再測定して認定。M2初測後。 |
+| R1t | `drivers/video/pc98/splash_raster_image.c` | 予算表の const を PL_PROFILES_CONST で切り替える 4 行 (試験から表を与えるため、常用の .text・.rodata は不変)。R1後・R1a前 (末尾の追記「V2 の予算表の試験入力」)。 |
 | R1a | `drivers/video/pc98/splash_raster_image.c` | 再生の予算表の暫定値と根拠。P2a後・M2初測前 (末尾の追記「R1 の認定予算」)。 |
 | R1b | `drivers/video/pc98/splash_raster_image.c` | M2初測の実測値を反映。P2b後、続けてM2再で認定。 |
 | V2a | `tools/tests/splash_raster_host.c` | 旧入口専用の試験・呼出しの除去。I1後。 |
@@ -389,3 +390,16 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - §7:244は `M1→P1/P2→R1→P2a→R1a→M2→P2b→R1b→M2再→V2〜V5/V7/V8`、次行は `I1/I2→V2a/V7a→R2→H3a→V3/V8・V6→NP21/W` に変更する。削除後も機械語変更後のM2再認定をNP21/W前に満たす（既定の反復上限を維持）。
 - H1追記の「R2で画像入口をR1へ移す」も「I1で新入口へ切替後、R2で旧入口を削除」に追従させる。各段1ファイル所有を維持し、PMが直列に取り込む。
 - 確定本文の機能契約・ユーザー決定を覆す必要なし。段の順と移行担当の補完のみで、旧経路を最終成果に残さない。
+
+## 追記: V2 の予算表の試験入力 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/raster-splash/V2_ADDENDUM.md (V2 の sol の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 Approve)。§6 の表に R1t を PM が足した。
+
+対象は §6 V2。R1後・R1a前に小段 R1t（所有は `drivers/video/pc98/splash_raster_image.c` のみ）を追加する。製品変更は追加3行・置換1行。V2の所有は既定のホスト試験のみ。確定本文を覆す必要なし。
+R1tは既存 :77 の表宣言の直前へ `#ifndef PL_PROFILES_CONST`、`#define PL_PROFILES_CONST const`、`#endif` を順に挿入し、宣言を `static PL_PROFILES_CONST struct PlProfile pl_profiles[2][2][2] = {` に置換する。既存初期値は保持し、製品ビルドではマクロを外部定義しない。API・ヘッダー・選択処理・qualified検査は変更しない。
+V2は既存 `tools/tests/splash_raster_host.c:98` の splash_raster.c のinclude後に、`#define PL_PROFILES_CONST`、`#define now_us pl_host_now_us`、`#include "../../drivers/video/pc98/splash_raster_image.c"`、`#undef now_us`、`#undef PL_PROFILES_CONST` を各1行で順に置く。画像側の定義・呼出しだけを前処理で改名し、同一翻訳単位のnow_us衝突を解消する。
+include後、表を書き換える前に製品初期値の各表を実物の `qualified()` に通し、その設定状態に応じた受理・拒否を確認する（R1a/R1bの値も同じ初期化子から読む）。constへの書込みやキャストによるconst除去はしない。
+試験コードは `pl_profiles[mode][phase][nslot] = fixture;` で同じ私有型の全予算・費用・窓を設定し、その入力を独立模型にも渡す。各ケースのprepare前に設定を完了し、そのケースのframe終了まで固定する。未設定・不正値も実物の検査を通し、検査を迂回しない。
+常用の確認：R1t前後を同じ製品コンパイラ・フラグ・予算値（ホストdefineなし）でコンパイルし、各 `S=.text` と `S=.rodata` について `objcopy -O binary --only-section=$S before.o before.bin` と同様のafter抽出後、`cmp before.bin after.bin` が一致することを受入条件とする。
+V2の受入では既存ロゴと画像の両.cを含むホスト試験をコンパイルし、now_usの再定義がないことを確認する（ビルド・変異の所有は既定のV3のまま）。
+r1→r2 の変更：A1は画像.cのinclude範囲だけのマクロ改名で解消。A2はconstだけを切り替えて製品初期値の検査を追加、A3は.rodataの比較も受入に追加。
