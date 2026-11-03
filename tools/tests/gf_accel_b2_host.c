@@ -32,18 +32,17 @@ static void packet(u32 n, u8 subc, u16 method, u16 count, const u32 *v)
     for (u32 i = 0; i < count; ++i) assert(host.words[p->first+i] == v[i]);
 }
 
-/* GX truth table independently expands S,D into the hardware P,S,D index.
- * The three specified mask-independent operations ignore P. */
+/* Independently resolved from NVROP copy/copy_planemask and ROP definitions:
+ * xf86-video-nouveau/src/nv_rop.h:303-318, 32-287. */
 static u32 expected_rop(u32 alu, bool full)
 {
-    u32 result = 0;
-    for (u32 i = 0; i < 8; ++i) {
-        u32 s = (i >> 1) & 1, d = i & 1;
-        u32 bit = (alu >> (((1-s) << 1) | (1-d))) & 1;
-        if (!full && alu != 0 && alu != 10 && alu != 15 && !(i & 4)) bit = d;
-        result |= bit << i;
-    }
-    return result;
+    static const u8 expected[16][2] = {
+        {0x00, 0x00}, {0x88, 0x8a}, {0x44, 0x45}, {0xcc, 0xca},
+        {0x22, 0x2a}, {0xaa, 0xaa}, {0x66, 0x6a}, {0xee, 0xea},
+        {0x11, 0x15}, {0x99, 0x95}, {0x55, 0x55}, {0xdd, 0xd5},
+        {0x33, 0x2e}, {0xbb, 0xba}, {0x77, 0x75}, {0xff, 0xff}
+    };
+    return expected[alu][!full];
 }
 
 static void exercise(enum gf3_fmt fmt, u32 bits, u32 pat, u32 alu, u32 mask)
