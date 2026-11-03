@@ -25,13 +25,14 @@ int main(void)
     struct gf2_chan c = {0};
     u32 a, b, reused;
     c.f = &f;
-    /* 0x1001 and 1 hash to zero; deletion must not hide a duplicate. */
+    /* 0x1001 and 0x2002 hash to zero; deletion must not hide a duplicate. */
     CHECK(gf2_ramht_add(&c, 0x1001, GF2_RAMHT_ENGINE_GR, 0x40000, &a) == GF2_OK);
     CHECK(a == 1 && table[0] == 0x1001 && table[1] == 0x104000);
-    CHECK(gf2_ramht_add(&c, 1, GF2_RAMHT_ENGINE_DMA, 0x40010, &b) == GF2_OK);
+    CHECK(gf2_ramht_add(&c, 0x2002, GF2_RAMHT_ENGINE_DMA, 0x40010, &b) == GF2_OK);
     CHECK(b == 2 && table[3] == 0x4001);
     CHECK(gf2_ramht_del(&c, a) == GF2_OK && table[0] == 0 && table[1] == 0);
-    CHECK(gf2_ramht_add(&c, 1, GF2_RAMHT_ENGINE_DMA, 0x40010, &reused) == GF2_EEXIST);
+    /* Mutation: insert break after `free_slot = slot;` in ramht.c. */
+    CHECK(gf2_ramht_add(&c, 0x2002, GF2_RAMHT_ENGINE_DMA, 0x40010, &reused) == GF2_EEXIST);
     CHECK(gf2_ramht_add(&c, 0x1001, GF2_RAMHT_ENGINE_GR, 0x40000, &reused) == GF2_OK && reused == a);
     CHECK(gf2_ramht_add(&c, 0xfff, GF2_RAMHT_ENGINE_DMA, 0x40020, &a) == GF2_OK && a == GF2_RAMHT_ENTRIES);
     CHECK(gf2_ramht_add(&c, 0x1ffe, GF2_RAMHT_ENGINE_DMA, 0x40030, &b) == GF2_OK && b == 3);
