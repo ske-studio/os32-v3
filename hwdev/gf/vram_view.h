@@ -21,6 +21,13 @@ struct gf_vram_view {
     bool mapped;
     const struct gf_instmem_map_ops *map_ops;
     void *map_owner;
+    /* C2-2/F5-F6: set close/close_owner before map (owner may be NULL).
+     * Success preserves them and links ch/next; all four survive failure.
+     * Callback/owner storage outlives successful unmap and cannot move. */
+    struct gf2_chan *ch;
+    struct gf_vram_view *next;
+    void *close_owner;
+    i32 (*close)(void *owner, struct gf_vram_view *view);
 };
 /* off/len: nonzero length, both 4B aligned, contained in one live reservation
  * of ch. Page-rounded extent must fit BAR1/physical range and must not
@@ -88,4 +95,23 @@ int gf_vram_next(struct gf2_chan *ch, u32 *cursor,
  * or match containment GF3_ERANGE; overlap/live node GF2_EEXIST; identity
  * exhaustion GF2_ENOSPC; uninitialized/wrong ch/missing/stale/wrong owner
  * GF3_ESTATE. No locks, refcounts or automatic eviction. */
+
+/* C2-2 / final F6: map additionally requires close != NULL, otherwise
+ * GF2_EMAP. Success preserves caller-supplied close/close_owner, adding
+ * ch/next to V0's single live-view list. Failed map leaves every field and
+ * out unchanged. Successful unmap unlinks and zeros all fields; failed
+ * unmap preserves fields and linkage. Reinstall callback before remap.
+ * Model: nouveau (c03c1a1), drivers/gpu/drm/nouveau/nouveau_bo.c:669-689;
+ * the intrusive list/callback replaces BO-owned kmap lifetime in OS32. */
+/* Invoke each ch window's close(close_owner,view), saving next first.
+ * Callback ends CPU use, drains posted writes, calls unmap and returns its
+ * rc; success also discards the owner's borrowed VA. No GPU wait, new map,
+ * other-window operation or reentry. Stop at the first negative rc and
+ * retain failed ownership; already closed windows are skipped on retry.
+ * NULL ch: GF3_EINVAL; initialized registry/ch mismatch: GF3_ESTATE;
+ * empty (including before registry init) or all closed: 0; callback failure:
+ * original negative rc. Callers keep views resident across failed unmap.
+ * A test window may retain only its saved unmap pointer until unmap succeeds
+ * after slot closure; this does not extend table/ctx/surface borrowing. */
+i32 gf_vram_views_close(struct gf2_chan *ch);
 #endif
