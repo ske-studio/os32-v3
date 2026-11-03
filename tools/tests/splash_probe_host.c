@@ -142,9 +142,23 @@ static int probe_frame_checked(struct SplashRaster *s, const GFX_RasterPalTable 
 #define pc98_splash_raster_table probe_frame_checked
 /* The host build inserts this guard at the aggregation entry. */
 static void probe_hcollect_check(void) { REQUIRE(irq_on); }
+static u32 fixture_q, fixture_lower;
+static int probe_host_hcalibrate(const struct SplashRaster *, unsigned long long *,
+    unsigned long long, u32);
 #include "../../platform/pc98/splash_probe.c"
 #undef pc98_splash_raster_table
 static int capture_active(void) { return probe_hd.bursts != 0; }
+/* Supply measured calibration bounds to the real capture admission path.
+ * All other cases still execute both product calibration passes. */
+/* The independent waveform harness includes this file without this hook. */
+static int __attribute__((unused)) probe_host_hcalibrate(const struct SplashRaster *s, unsigned long long *q,
+    unsigned long long clocks, u32 pass)
+{
+    if (!fixture_q) return probe_hcalibrate(s, q, clocks, pass);
+    *q = fixture_q;
+    probe_q_lower = fixture_lower;
+    return 0;
+}
 
 volatile u32 tick_count;
 u32 ktime_clamp_count;
@@ -317,7 +331,7 @@ static void widths(void)
         }
         long long measured = highs * 100000 / samples;
         REQUIRE(probe_delta(measured, reference) <= (unsigned long long)den);
-        REQUIRE(test_max_closed * den <= (PROBE_HPERIODS + 2) * 100000);
+        REQUIRE(test_max_closed * den <= (PROBE_HPERIODS + 6) * 100000);
         REQUIRE(test_min_open * den >= 100000);
         REQUIRE(!probe_errors && irq_on);
     }
@@ -380,6 +394,39 @@ static void raw_measurements(void)
     probe_errors = 1; serial_init(SYS_SERIAL_BAUD); probe_measure_dump();
     REQUIRE(!probe_contains(" 64:") && !probe_contains(" 255:") && !probe_contains(":0"));
 }
+static void h_limit_inputs(void)
+{
+    /* Exact second Ra266 log, review counterexample, and the rounded ratio
+     * boundary: 3147/2956 is admitted, 3147/2955 exceeds ~1.064623. */
+    const struct { u32 q, lower, count, cap, admitted; } cases[] = {
+        {3147, 3120, 2086, 2201, 1},
+        {3163, 3105, 2096, 2190, 1},
+        {3147, 2956, 2201, 2201, 1},
+        {3147, 2955, 2202, 2201, 0},
+    };
+    for (u32 i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        setup(1, 0); in_us = clock_cost_us = out_us = 1;
+        struct SplashRaster *s = pc98_splash_raster_state();
+        probe_costs(s);
+        probe_eight_us = (unsigned long long)8 * total * 100000 / den;
+        probe_cost[PROBE_C].upper_us = 11; /* C=(2*11+1)*3147=72381 */
+        fixture_q = cases[i].q; fixture_lower = cases[i].lower;
+        u32 completed = probe_hblank(s);
+        fixture_q = fixture_lower = 0;
+        REQUIRE(probe_hd.den == 3147 && probe_hd.clocks == 72381);
+        REQUIRE(probe_hd.limit == 7000000);
+        REQUIRE(probe_hd.count == cases[i].count && probe_hd.cap == cases[i].cap);
+        REQUIRE(probe_hd.excess == (long long)cases[i].count * cases[i].q + 72381 - 7000000);
+        if (cases[i].admitted) {
+            REQUIRE(completed == 64 && probe_hd.bursts == 1 && probe_hd.reason == 1);
+            REQUIRE(!probe_errors && !probe_hd.over);
+        } else {
+            REQUIRE(!completed && !probe_hd.bursts && probe_hd.reason == 3);
+            REQUIRE(probe_hd.budget_stage == 5 && probe_errors == 1);
+        }
+        REQUIRE(irq_on);
+    }
+}
 static void h_diagnostics(void)
 {
     setup(1, 0); in_us = clock_cost_us = out_us = 1;
@@ -406,7 +453,7 @@ static void h_diagnostics(void)
     probe_cost[PROBE_Q].upper_samples = 16;
     probe_cost[PROBE_C].upper_num_us = 10;
     probe_cost[PROBE_C].upper_samples = 1;
-    probe_cost[PROBE_C].upper_us = 20;
+    probe_cost[PROBE_C].upper_us = 100;
     /* Large uncertainty must not buy a longer IF=0 region. */
     REQUIRE(!probe_hblank(s));
     REQUIRE(probe_hd.reason == 3 && probe_hd.budget_stage == 5 && !probe_hd.bursts && irq_on);
@@ -484,7 +531,7 @@ static void realhw_precision(void)
     require_clockless_in = 0;
     const struct probe_hcal *first = &probe_hd.cal[0], *last = &probe_hd.cal[1];
     REQUIRE(first->count == 611 && probe_hd.clocks == 23 * den);
-    u32 old_cap = (probe_hd.limit - probe_hd.clocks) / first->upper;
+    u32 old_cap = (66 * 100000 - probe_hd.clocks) / first->upper;
     u32 old_count = (65 * 100000 + first->upper + first->lower - 1) / first->lower + 1;
     REQUIRE(old_count > old_cap && 2093 > old_cap); /* old path rejects */
     REQUIRE(last->count > first->count && last->q_before == first->q_after);
@@ -494,10 +541,10 @@ static void realhw_precision(void)
     REQUIRE(probe_hd.reason == 1 && !probe_hd.budget_stage && probe_hd.cal_pass == 2);
     REQUIRE(last->span_min > last->one + 2 && last->span_min <= last->span_max &&
             last->one && irq_on && !probe_errors);
-    REQUIRE(test_max_closed * den <= 66 * 100000 && test_min_open * den >= 100000);
+    REQUIRE(test_max_closed * den <= 70 * 100000 && test_min_open * den >= 100000);
     /* Check the new post-IF diagnostic fields against the retained RAM. */
     probe_errors = 1; serial_init(SYS_SERIAL_BAUD); probe_measure_dump();
-    REQUIRE(probe_contains("SPLR h_budget_stage=0 cal_pass=2 den=3147 clocks_num=72381 limit_num=6600000"));
+    REQUIRE(probe_contains("SPLR h_budget_stage=0 cal_pass=2 den=3147 clocks_num=72381 limit_num=7000000"));
     REQUIRE(probe_contains("SPLR h_cal=1 den=3147 q_before_num=5114"));
     REQUIRE(probe_contains("SPLR h_cal=2 den=3147 q_before_num="));
     REQUIRE(probe_contains(" lower_before_num=") && probe_contains(" span_min_us=") &&
@@ -523,8 +570,11 @@ static void realhw_precision(void)
         require_clockless_in = 1;
         REQUIRE(probe_hblank(s) == 64);
         require_clockless_in = 0;
+        /* Repeated one-poll sandwiches retain 9us clock + 1us entry +
+         * 1us IN, even when the first IN rounds up to 2us. */
+        REQUIRE(probe_hd.cal[0].one == 11 && probe_hd.cal[1].one == 11);
         REQUIRE(probe_hd.count <= probe_hd.cap && probe_hd.excess <= 0);
-        REQUIRE(!probe_errors && irq_on && test_max_closed * den <= 6600000);
+        REQUIRE(!probe_errors && irq_on && test_max_closed * den <= 7000000);
     }
     /* The recorded count=2093 constrains Q lower, not the IF=1 raw IN
      * average. A separate synthetic .991us RAM loop reproduces that count
@@ -543,7 +593,7 @@ static void realhw_precision(void)
     require_clockless_in = 0;
     first = &probe_hd.cal[0];
     old_count = (65 * 100000 + first->upper + first->lower - 1) / first->lower + 1;
-    old_cap = (probe_hd.limit - probe_hd.clocks) / first->upper;
+    old_cap = (66 * 100000 - probe_hd.clocks) / first->upper;
     REQUIRE(first->count == 611 && old_count == 2093 && old_count > old_cap);
     REQUIRE(probe_hd.count <= probe_hd.cap && !probe_errors && irq_on);
 }
@@ -618,7 +668,7 @@ void _start(void)
         }
     }
     in_us = clock_cost_us = out_us = 1;
-    costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_diagnostics();
+    costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_limit_inputs(); h_diagnostics();
     realhw_precision(); np_fast_poll();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {
         setup(mode, vs);

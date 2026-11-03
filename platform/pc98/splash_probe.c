@@ -404,7 +404,7 @@ static u32 probe_hcollect(u32 count, u32 completed)
 }
 /* Refine Q with the identical RAM-store loop, first over <=32H, then <=64H.
  * The second pass uses the first pass's upper bound to size its batch.
- * Both remain below the unchanged 66H capture limit, including clocks.
+ * Both remain below the 70H capture limit, including clocks.
  * The short bootstrap's two timestamp quanta are too large for a 64H count.
  * Both calibration and capture have time limits independent of that count. */
 static int probe_hcalibrate(const struct SplashRaster *s, unsigned long long *q,
@@ -464,7 +464,7 @@ static u32 probe_hblank(const struct SplashRaster *s)
     unsigned long long q = probe_cost_bound(PROBE_Q, s->line_den);
     unsigned long long clocks = (2 * probe_cost[PROBE_C].upper_us +
                                  SPLASH_RASTER_CLOCK_QUANTUM_US) * s->line_den;
-    unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;
+    unsigned long long limit = (PROBE_HPERIODS + 6) * s->line_num_us;
     probe_hd = (struct probe_hdiag){ .den = s->line_den, .clocks = clocks, .limit = limit };
     if (!q || clocks >= limit) {
         probe_hd.reason = !q ? 2 : 3;
@@ -474,7 +474,7 @@ static u32 probe_hblank(const struct SplashRaster *s)
     for (u32 pass = 0; pass < 2; pass++)
         if (probe_hcalibrate(s, &q, clocks, pass)) { probe_errors++; return 0; }
     /* At least 65H plus one sample spans 64 complete periods at any phase.
-     * Refuse inadequate precision instead of enlarging the 66H IF=0 limit. */
+     * Refuse inadequate precision instead of enlarging the 70H IF=0 limit. */
     u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;
     u32 cap = (limit - clocks) / q;
     probe_hd.count = count;
