@@ -47,4 +47,5 @@ static void foundation_selection_test(void)
 }
 void _start(void)
 {
+    t2b_clock_advances();t2b_revoked_cleanup();
     foundation_selection_test();foundation_cleanup_test(); production_gate_test();vpll_budget_test();mode_c_test();owner_verify_test();cli_test();cli_write_test();cli_verify_test();inspection_test();lifecycle();failures_test();allocation_test();ownership_test();expansion_lifetime_test();output(failures?"GF owner FAIL\n":"GF owner PASS\n");__asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0));__builtin_unreachable(); }

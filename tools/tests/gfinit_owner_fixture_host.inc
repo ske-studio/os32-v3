@@ -23,6 +23,10 @@ static u32 expand_fail, expand_calls, detach_fail, plan_reads, boot_fail;
 static u32 run_mask, run_fail, step_fail, decode_fail, probe_fail, peek_fail, verify_calls;
 static u32 mode_calls, mode_fail;
 static int production_selected;
+static u32 diag_time;
+static int diag_time_error;
+int sys_time_now(u32 *lo,u32 *hi)
+{ if(diag_time_error)return diag_time_error;*lo=diag_time++;*hi=7;return 0; }
 int gf_production_selected(void) { return production_selected; }
 static char events[64]; static u32 event_count;
 static void output(const char *s)
@@ -213,6 +217,7 @@ static void setup(void)
     zero(&control,sizeof(control));owner=0;zero(&gf_lease,sizeof(gf_lease));gf_device.generation=1;gf_device.state=HWDEV_STOPPED_UNOWNED;zero(&core,sizeof(core));core.ops=&base;core.s0_profile=&s0;zero(image,sizeof(image));zero(&transport,sizeof(transport));
     allocations=frees=reads=writes=begins=steps=ends=cleans=run_mask=run_fail=step_fail=decode_fail=probe_fail=peek_fail=verify_calls=event_count=0;
     mode_calls=mode_fail=reentry_fault=0;stage=(struct gf_stage_state){0};
+    diag_time=0;diag_time_error=0;
     image[0]=0x55;image[1]=0xaa;image[2]=1;image[0x18]=0x20;
     image[0x20]='P';image[0x21]='C';image[0x22]='I';image[0x23]='R';image[0x24]=0xde;image[0x25]=0x10;image[0x26]=0x21;image[0x27]=2;
     image[0x40]=0xff;image[0x41]=0xb8;image[0x42]='B';image[0x43]='I';image[0x44]='T';
@@ -231,7 +236,21 @@ static int test_foundation_prepare(struct gf_foundation *f, const struct recover
 { (void)f;(void)b;(void)n;return 0; }
 static int test_foundation_call(struct gf_foundation *f,const struct gf1_test_request *q,struct gf1_test_reply *reply)
 { (void)f;foundation_op=q->op;if(q->op==GF1T_STOP)foundation_stops++;*reply=(struct gf1_test_reply){0};return foundation_error; }
-static struct gf1_test_ops test_foundation_ops={0,test_foundation_prepare,test_foundation_call};
+static u32 command_stops, command_state;
+static int command_error;
+static int test_command_prepare(struct gf_foundation *f,const struct recover_bar_extent *b,u32 n)
+{ (void)f;(void)b;(void)n;return 0; }
+static int test_command_call(struct gf_foundation *f,const struct gf2_test_request *q,struct gf2_test_reply *reply)
+{
+    CHECK(f==&owner->foundation && q->op==GF2T_STOP);
+    command_stops++;
+    *reply=(struct gf2_test_reply){.state=command_state};
+    return command_error;
+}
+static const struct gf2_test_ops test_command_ops={test_command_prepare,test_command_call};
+static struct gf1_test_ops test_foundation_ops={
+    .prepare=test_foundation_prepare,.call=test_foundation_call,.command=&test_command_ops
+};
 const struct gf1_test_ops *geforce_foundation_ops(void) { return &test_foundation_ops; }
 void gfinit_bus_revoke(struct gfinit_bus *b) { if(b->foundation)b->foundation->revoked=true; }
 
@@ -253,6 +272,44 @@ int gf_foundation_test(struct gf1_request *q,struct gf_foundation *f,
         CHECK(owner->last_op==RECOVER_NONE);
     }
     q->session=core.token.session;q->rc=f?GF1_OK:GF1_EINVAL;return q->rc;
+}
+int gf_command_test(struct gf2_request *q,struct gf_foundation *f,
+                    int (*read_row)(void *,u32,u8 *),void *row_owner)
+{ (void)q;(void)f;(void)read_row;(void)row_owner;return GF2_OK; }
+
+static void t2b_clock_advances(void)
+{
+    u32 first=123,second=456;
+    diag_time=0xfffffffeU;diag_time_error=0;
+    CHECK(!gf2_diag_clock(0,&first) && first==0xfffffffeU);
+    CHECK(!gf2_diag_clock(0,&second) && second-first==1U);
+    CHECK(!gf2_diag_clock(0,&second) && second==0);
+    diag_time_error=-17;second=123;
+    CHECK(gf2_diag_clock(0,&second)==-17 && second==123);
+    diag_time_error=0;
+}
+
+static void t2b_revoked_cleanup(void)
+{
+    setup();CHECK(!call(GF_OP_INSPECT,0,0));
+    owner->foundation_prepared=owner->foundation_active=owner->command_prepared=true;
+    owner->bus.foundation=&owner->foundation;
+    owner->foundation.io.timing.clock_us=gf2_diag_clock;
+    u32 pages=live_pages;
+    command_stops=foundation_stops=0;command_state=GF2_FAULT;command_error=GF2_EFAULT;
+    foundation_error=0;
+    /* An ordinary layer 2 stop failure must retain layer 1 untouched. */
+    CHECK(gf_pre_cleanup(&owner->bus)==GF2_EFAULT);
+    CHECK(command_stops==1 && !foundation_stops && owner->foundation_active);
+    gfinit_bus_revoke(&owner->bus);foundation_error=GF1_EPCI;
+    CHECK(gf_pre_cleanup(&owner->bus)==GF2_EFAULT);
+    CHECK(command_stops==2 && foundation_stops==1 && foundation_op==GF1T_STOP);
+    CHECK(owner->foundation_active && owner->command_prepared && gf_lease.active);
+    CHECK(gf_release_rom(owner)<0 && live_pages==pages && owner->rom);
+    CHECK(command_stops==3 && foundation_stops==2 && gf_lease.active);
+    /* Reset only the fake device so later cases can release their fixture. */
+    owner->foundation.revoked=false;command_error=foundation_error=0;command_state=GF2_OFF;
+    CHECK(!gf_release_rom(owner));
 }
 
 static void foundation_cleanup_test(void)

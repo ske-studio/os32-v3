@@ -12,6 +12,7 @@
 #include "recover_virtual.h"
 #include "gfinit.h"
 #include "gf_foundation_wire.h"
+#include "gf_command_wire.h"
 #include "kernel/module/hwdev_module.h"
 #include "kernel/console/display_restore.h"
 #include "arch/x86/kernel/idt.h"
@@ -122,7 +123,7 @@ static i32 recovery_call(u32 op, void *buf, u32 size)
 {
     struct recover *r = recover_owner();
     if ((op >= GF_OP_INSPECT && op <= GF_OP_ABORT) || op == GF_OP_MODESET ||
-        op == GF_OP_C_ONLY || op == GF_OP_FOUNDATION) {
+        op == GF_OP_C_ONLY || op == GF_OP_FOUNDATION || op == GF_OP_COMMAND) {
         const struct hwdev_ops *ops = hwdev_module_ops();
         if (!ops || recovery_attach()) return -1;
         int rc = ops->call(op, buf, size, &recovery_ops, &recovery_transport, &recovery_s0);

@@ -42,7 +42,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 ## 3. HWDEV の import の生成 (G3)
 
 - 核は **26** 関数で上表に不足・余剰なし。`recover_hal_wait_frame` は直接 CALL が無くてもアドレス参照が必要。
-- kernel imports は **13** (C9 のシリアル応答用 `serial_puts_polled` を末尾追加)。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
+- kernel imports は **14** (T2 の診断時計用 `sys_time_now` を末尾追加)。HWDEV 内の index は25から次表順に続ける。既存 kdebug import の番号は再利用/変更せず、宣言の取得元として照合する。
 
 | HWDEV index | 関数 | 既存 kdebug index |
 |---|---|---|
@@ -59,6 +59,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 35 | gf_production_selected | 308 |
 | 37 | geforce_foundation_ops | 309 |
 | 38 | serial_puts_polled | 120 |
+| 39 | sys_time_now | 123 |
 
 `boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 
