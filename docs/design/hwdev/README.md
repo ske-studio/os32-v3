@@ -8,10 +8,13 @@ kdebug・hwdev が読むヘッダには enum を足さず `#define` で書く。
 ### owner
 
 ```c
-struct hwdev_lease { u32 slot, generation, session; };
+struct hwdev_lease {
+    u32 generation, owner_generation, session;
+    bool active;
+};
 ```
 
-> [要確認] 現行 owner.h は slot でなく owner_generation と active を持つ。
+型の正典は `hwdev/owner.h`。
 
 - v1 の所有権は BDF/platform device ID・I/O/MMIO/IRQ/DMA 範囲・世代の構造体の形と拒否判定だけ。root IDE・LAN/SerialFS・表示 driver の所有中または未分類なら拒否
 - v1 claim は「既に停止・非所有」だけ成功。透過的 driver 中断は作らない。
