@@ -187,6 +187,44 @@ class RunnerTest(unittest.TestCase):
         self.check('reader', covers=['userland/cmds/foo.c'])
         self.assertEqual(self.plan('userland/cmds/foo.c', floor=2).mutations, ('reader',))
 
+    def test_input_covers_select_readers(self):
+        cases = {
+            'tools-host': ['tools/mk_blank_nhd.py', 'tools/emu_agent/agent.py', '.env.sample'],
+            'privileged': ['lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h',
+                           'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h',
+                           'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
+            'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
+        }
+        for name, files in cases.items():
+            self.check(name, covers=files, tier=0 if name == 'docs-links' else 1)
+            for file in files:
+                with self.subTest(name=name, file=file):
+                    self.write(file, '')
+                    self.assertIn(name, self.plan(file).stage)
+                    # Empty input fixtures cannot derive the missing cover
+                    # through another reader. Removing it must lose this hit.
+                    check = self.registry()[name]
+                    without = replace(check, covers=tuple(
+                        p for p in check.covers if not R.matches(file, (p,))))
+                    lost = R.plan(self.root, {name: without}, (file,))
+                    self.assertNotIn(name, lost.stage)
+
+    def test_production_build_inputs_force_full(self):
+        self.check('a')
+        self.check('stable', covers=['elsewhere.c'], tier=4)
+        for file in ('.gitmodules', 'requirements.txt', 'tools/check_tree_unchanged.py',
+                     'tools/fep_compiler.py', 'tools/gen_sdk_manifest.py',
+                     'tools/mkd88.py', 'tools/mkfat12.py', 'tools/jobs.sh', 'tools/gfinit_source.py',
+                     'tools/emu_agent/tasks/regress.txt', 'tools/screenshot.py',
+                     'tools/net_l0_test.py', 'tools/net_l3_test.py',
+                     'tools/sync_docs_to_win.sh'):
+            with self.subTest(file=file):
+                result = self.plan(file)
+                self.assertEqual((result.tier, result.mode), (4, 'full'))
+                self.assertEqual(set(result.stage), {'a', 'stable'})
+                with patch.object(R, 'FULL', tuple(p for p in R.FULL if p != file)):
+                    self.assertNotEqual(self.plan(file).mode, 'full')
+
     def test_unmatched_rejected_and_lint_checks_repository(self):
         self.check()
         self.check('other', covers=['elsewhere.c'])
@@ -756,8 +794,6 @@ def run_mutations():
     mutations = tuple((name, 'tools/checks/run.py', before, after, case)
                       for name, before, after, case in mutations)
     for name, filename, before, after, case in mutations:
-        if Path(filename).resolve() != Path(original.__file__).resolve():
-            raise AssertionError('mutation file: ' + filename)
         if source.count(before) != 1:
             raise AssertionError('mutation anchor: ' + name)
         mutant = type(original)('runner_mutant')

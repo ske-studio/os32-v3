@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='privileged', tier=1,
-    covers=['userland/**/*.[ch]', 'userland/**/*.inc', 'userland/**/*.rs', 'userland/**/*.asm', 'tools/check_privileged.py', 'tools/check_privileged_allow.txt', 'tools/tests/test_check_privileged.py'],
+    covers=['.env.sample', 'lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/crc32_core.inc', 'include/types.h', 'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_config.h', 'userland/**/*.[ch]', 'userland/**/*.inc', 'userland/**/*.rs', 'userland/**/*.asm', 'tools/check_privileged.py', 'tools/check_privileged_allow.txt', 'tools/tests/test_check_privileged.py'],
     needs=[], budget=7.120772)
 
 

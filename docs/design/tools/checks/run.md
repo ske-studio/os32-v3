@@ -47,7 +47,7 @@ def main(argv: list[str]) -> int: ...
    KAPI 入力から生成物の読み手へ当たりを足す旧処理を保つ (`tools/check_select.py:1332`)。
    full_hits は旧 full/BUILD_CONFIG_GLOBS と build 入力の判定で得る変更パスの集合。旧 `:1378` の mode 分岐直前に対応する。
    3集合は段の昇格・変異選択より前に確定する。notest に分類しても実際の hit は消さない。
-4. **段**: full_hits、Makefile/build定義、KAPI入力・生成世代・link定義、ツールチェーン設定、ランナー自身は段4を最優先とする。
+4. **段**: full_hits、FULL に明示したビルド入力・検査基盤の入力、Makefile/build定義、KAPI入力・生成世代・link定義、ツールチェーン設定、ランナー自身は段4を最優先とする。
    旧 BUILD_CONFIG_GLOBS/KAPI_GENERATED を用いる。通常の CHECK ファイル変更は自己当たりとして扱う。
    `--base` があれば full glob に当たる各ビルド定義の基点と作業木を比較し、コメント・空行だけの差では段4へ上げない。当たりの計算には残す。
    make の recipe・define・継続行・エスケープされた `#` は保持し、曖昧な構文は実変更として扱う。基点なしでは従来どおり段4。
