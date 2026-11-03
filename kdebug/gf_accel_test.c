@@ -356,6 +356,38 @@ static int mono_case(void)
     }
     return 0;
 }
+/* RAM offsets include pitch padding and the trailing guard. Derive each
+ * payload byte from the tightly packed seed, not the transfer's own data. */
+static int compare_transfer(bool download, u32 rowbytes, u32 rows, u32 pitch)
+{
+    u32 count = 0, bad = 0, first = TEST_FULL_MASK, delta = 0;
+    u8 first_expected = 0, first_actual = 0;
+    for (u32 i = 0; i < sizeof(transfer); i++) {
+        u32 y = i / pitch, b = i % pitch;
+        bool payload = y < rows && b < rowbytes;
+        if (payload && !download) continue;
+        u8 want = payload ? expected[y * rowbytes + b] : TEST_GUARD_VALUE;
+        u8 actual = transfer[i];
+        count++;
+        if (actual == want) continue;
+        if (!bad) { first = i; first_expected = want; first_actual = actual; }
+        bad++;
+        u32 d = actual > want ? actual - want : want - actual;
+        if (d > delta) delta = d;
+    }
+    compared += count; differences += bad;
+    if (first_bad == TEST_FULL_MASK && bad) first_bad = first;
+    if (delta > max_delta) max_delta = delta;
+    serial_puts_polled("GF3 RAM compare");
+    number(" compare_bytes=", count); number(" differences=", bad);
+    hex(" first_bad=", first); number(" max_delta=", delta);
+    if (bad) {
+        number(" expected_byte=", first_expected);
+        number(" actual_byte=", first_actual);
+    }
+    serial_puts_polled(" offset_space=ram\r\n");
+    return bad ? GF2_EIO : 0;
+}
 static int transfer_case(enum gf3_case which)
 {
     /* Transfer dimensions exercise byte lengths and the independent 2047
@@ -400,21 +432,19 @@ static int transfer_case(enum gf3_case which)
             continue;
         }
         if (rc) return rc;
-        for (u32 y = 0; y < h; y++)
-        for (u32 b = 0; b < rowbytes; b++) {
-            if (which == TEST_DOWNLOAD) {
-                if (transfer[y * ram_pitch + b] != expected[y * rowbytes + b]) return GF2_EIO;
-            } else expected[y * rowbytes + b] = transfer[y * ram_pitch + b];
-        }
-        /* Padding and the exact RAM envelope's trailing guard stay intact. */
-        for (u32 y = 0; y + 1U < h; y++)
-        for (u32 b = rowbytes; b < ram_pitch; b++)
-            if (transfer[y * ram_pitch + b] != TEST_GUARD_VALUE) return GF2_EIO;
-        for (u32 b = ram_bytes; b < sizeof(transfer); b++)
-            if (transfer[b] != TEST_GUARD_VALUE) return GF2_EIO;
         serial_puts_polled("GF3 sample");
+        number(" fmt=", fmt); number(" width=", w);
         number(" rowbytes=", rowbytes); number(" rows=", h);
+        number(" ram_pitch=", ram_pitch); number(" ram_bytes=", ram_bytes);
         serial_puts_polled("\r\n");
+        /* Record payload/padding/guard mismatches before returning, even
+         * when this is the first transfer and no VRAM comparison has run. */
+        rc = compare_transfer(which == TEST_DOWNLOAD, rowbytes, h, ram_pitch);
+        if (rc) return rc;
+        if (which != TEST_DOWNLOAD)
+            for (u32 y = 0; y < h; y++)
+            for (u32 b = 0; b < rowbytes; b++)
+                expected[y * rowbytes + b] = transfer[y * ram_pitch + b];
         /* Independent UC window first, then a separate download comparison:
          * a matching M2MF round trip alone never establishes correctness. */
         rc = compare(false, false); if (rc) return rc;
