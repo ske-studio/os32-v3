@@ -29,7 +29,7 @@ int gf_display_stop(void *v)
             first_rc=rc; closed=false;
             if (!revoked) goto fail;
         }
-        if (!c->engaged) {
+        if (!c->engaged && ch->state==GF2_OFF) {
             if (closed && ch->state==GF2_OFF) {
                 rc=gf3_service_release(s);
                 if (rc && !first_rc) first_rc=rc;
@@ -76,12 +76,15 @@ int gf_display_stop(void *v)
 #define GF_QUIESCE_WRITE(key,off,rule) gf_stop_write(c,off,&rc,&target,&first_rc);
     GF_QUIESCE_ROWS(GF_QUIESCE_WRITE)
 #undef GF_QUIESCE_WRITE
+    /* Keep display cleanup pending across retries, independently of errors
+     * from fini or a later reservation release. */
+    if (!rc && closed && (!ch || ch->state==GF2_OFF)) c->engaged=false;
     if (!rc && s && closed && ch->state==GF2_OFF) {
         int release_rc=gf3_service_release(s);
         if (release_rc) {rc=-1;if (!first_rc) first_rc=release_rc;}
     }
     if (first_rc) rc=-1;
-    c->active=false;c->blank=false;c->engaged=false;c->stop_ok=!rc;
+    c->active=false;c->blank=false;c->stop_ok=!rc;
     if (rc) {c->reusable=false;c->target=target;c->last_rc=first_rc ? first_rc : -1;}
     return rc ? -1 : 0;
 fail:

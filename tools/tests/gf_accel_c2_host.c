@@ -59,6 +59,12 @@ void _start(void)
     reset(); stop_rc=-210; stop_off=false; assert(gf_display_stop(&display)==-1); expect(retained,4);
     reset(); foundation.revoked=true; close_rc=-203; assert(gf_display_stop(&display)==-1 && display.last_rc==-203); expect(revoked,8);
     reset(); restore_rc=-9; assert(gf_display_stop(&display)==-1 && display.last_rc==-9 && events[count-1]==WRITE);
+    assert(display.engaged);
+    restore_rc=0; count=0; assert(!gf_display_stop(&display));
+    assert(!display.engaged && events[count-1]==RELEASE);
+    reset(); write_rc=-9; assert(gf_display_stop(&display)==-1 && display.engaged);
+    write_rc=0; count=0; assert(!gf_display_stop(&display));
+    assert(!display.engaged && events[count-1]==RELEASE);
     reset(); release_rc=-10; assert(gf_display_stop(&display)==-1 && display.last_rc==-10);
     release_rc=0; count=0; assert(!gf_display_stop(&display)); expect(retry,2);
     reset(); clock_rc=-1; assert(gf_display_stop(&display)==-1 && display.last_rc==GF2_EIO && events[2]==STOP);
