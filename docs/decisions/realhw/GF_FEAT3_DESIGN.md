@@ -160,7 +160,7 @@ int gf3_present_m2mf(struct gf3_ctx *c,const struct gf3_surface *scan,
 | 同:138–154 | GDI03fc=0→SIFM0308=[clip_point,clip_size,dst_point,dst_size,du,dv]→0400=[src_height<<16\|src_width,src_pitch\|00010000\|filter,src_off,src_point]→reference完了。filter=01000000 bilinear、0 point。 |
 - RGB565=7、ARGB=3、Y8=8もH:917–925に従う入力formatとして提供、出力SFは§9。DITHER=0を維持、INDEX8はY8色変換と混同せずSIFM EFORMAT (パレット量子化ではない)。現在の表示以外の16/32bit試験面で色変換を検証。
 - sr/dr/clipは面内、src全体サイズとsrの開始点/拡縮量を別に渡す。YUVはpacked 4:2:2、幅・xを偶数にしpitch>=width*2。重なりsrc/dstはEUNSUPPORTED。理由: 読みながら拡縮する順序を手本は保証しない。
-- 拡縮率は `((u64)sw<<20)/dw` (高さも同様) で計算し、最終u32範囲を照合する。64bit除算helperが必要ならmodule内実装を予算化、importを増やさない。
+- 拡縮率は `((u64)sw<<20)/dw` (高さも同様) で計算し、最終u32範囲を照合する。64bit除算helperが必要ならmodule内実装を予算化する。
 - 差分: Xvのregion/BOを面・矩形引数に置換、VRAM入力へ限定してRAM入力はM2MFで先に格納。理由: Xvサービスは票§3の別機能、SIFM転送そのものは全て試験可能にする。
 
 ## 9. (g) 色深度・面format
@@ -208,7 +208,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | SIFM/format/整数helper | 2〜3 | 大表なし |
 | HAL/寿命/dispatch | 1〜2 | kernel試験本体はmod外、試験ops表のみmod内 |
 - text等14〜20KiB＋bss等約8KiB、image_maxへbssも保守的に算入: 層1・2後約75KiB→97〜103KiB、128KiBまで25KiB以上。link mapで実測し128KiB超なら段不合格。
-- importは追加0、層2後29〜31のまま (上限32)。F2/gf_io/kstringの既存module内境界を利用、serialやDMA関数を部品ごとにimportしない。RAM/VRAM常駐予約とmodule像は別計上 (notifier VRAM 32B、DMA inst 16B、RAMHT 1枠、ctx追加分はbss約8KiB予算内)。
+- F2/gf_io/kstringの既存module内境界を利用し、serialやDMA関数を部品ごとにimportしない。RAM/VRAM常駐予約とmodule像は別計上 (notifier VRAM 32B、DMA inst 16B、RAMHT 1枠、ctx追加分はbss約8KiB予算内)。
 
 ## 12. ファイルごとの変更一覧 (O/相対、1行=1段=1実装者)
 | 段 / ファイル | 機能 / 依存 / 行目安 |
@@ -233,7 +233,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | C0b tools/tests/backend_geforce_host.c 変 | 非module/GFAの未解決参照なし、module版はhook stubでG5境界値照合 / C0a / 35 |
 | C1 hwdev/gf/service.c 変 | F2 start後gf3_init、recover後再生成 / B0 / 20 |
 | C2 hwdev/gf/display/quiesce.c 変 | gf3受付停止→fini→既存F2停止、失敗時所有保持 / B0 / 15 |
-| C3 build/geforce-module.mk 変 | 新部品をmoduleだけにlink・GFA別compile確認・image/import検査 / B群 / 20 |
+| C3 build/geforce-module.mk 変 | 新部品をmoduleだけにlink・GFA別compile確認・image検査 / B群 / 20 |
 | C4 drivers/video/geforce/geforce_module.c 変 | kernel側slotをContextへ設定・abort時解除、module側公開はC0/C1 / B群 / 25 |
 | C5 drivers/video/geforce/geforce_module.h 変 | accel_out欄とOPS_VERSION=3 / A0 / 5 |
 | T0 kdebug/gf_accel_test.c 新 | serial case、予約試験面、比較/復元 / C群 / 220 |
@@ -251,7 +251,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | IFC | 16/32bit幅奇数、8byte padding、ring wrap、1792語境界。変異:SIZE_OUT=IW/0300順逆 | 強制IFCでreadback一致、8bitは未対応rcを記録 |
 | M2MF | L=1/1024/4096/4097、rows=2047/2048、双方向、RAM末尾guard、reference遅延。変異:2048行/byte数をpixel数/PCI offset=PA/notifierをNへ/待ち削除/0310後処理削除 | 強制M2MF upload→download、既知模様とCRC+byte比較、staging guard保持 |
 | SIFM | 1:1/2倍/1/2/非整数、clip、RGB/YUV順序・pitch・固定小数。変異:20→16bit/filter逆/offset誤り | 565/32bit offscreen readback、色変換・bilinearは既知単色/端/許容丸めを記録、8bit表示試験と混同しない |
-| hook/present/障害 | gf2失敗全段注入、HAL rc、fill(639,479,INT_MAX,INT_MAX)・blit負座標/巨大寸法・!active、無GUI経路、image/import予算。変異:GET=PUTを完了扱い/旧epoch受付 | serialにseq/ref/rc、未完了を成功にしない、CPU presentの従来表示を撮影 |
+| hook/present/障害 | gf2失敗全段注入、HAL rc、fill(639,479,INT_MAX,INT_MAX)・blit負座標/巨大寸法・!active、無GUI経路、image予算。変異:GET=PUTを完了扱い/旧epoch受付 | serialにseq/ref/rc、未完了を成功にしない、CPU presentの従来表示を撮影 |
 - A骨格→各B単独host/変異→C結合 (F1/F2実コード+偽MMIO)→T実機。各段は該当変異を落とせて合格、実機未試験を機能削除の根拠にしない。カメラだけでDMA正しさを判定せずserialのbyte比較と組にする。
 - A2は `CHECK=dict(name="gf-accel-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/accel*","drivers/video/geforce/*","tools/tests/gf_accel*","tools/tests/test_gf_accel.py"])`。未着手Bは未登録、登録済みBの欠落は失敗。各変異は無変更GREEN→1箇所変更で実行時RED→復元GREEN、コンパイル失敗は検出に数えない。
 - D1の台帳行: `GF-L3-Ra266 | 未実施 | Ra266 0:13.0/0221 | 2D全case・PCI双方向・M2MF notifier・recover・CPU present維持 | 実施担当/日付/serialログ/カメラを実施時記入`。host合格で実機済みにしない。

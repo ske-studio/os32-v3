@@ -3,7 +3,9 @@
 
 static u8 image[1024 * 1024];
 static u8 before[1024 * 1024];
-static struct module_symbol_contract imports[MODULE_IMPORT_MAX];
+/* Input capacity of this stdin fixture, independent of component policy. */
+#define TEST_IMPORT_CAPACITY 2048U
+static struct module_symbol_contract imports[TEST_IMPORT_CAPACITY];
 static struct module_symbol_contract exports[MODULE_OPS_SLOTS];
 
 static int read_exact(void *buf, u32 len)
@@ -35,7 +37,7 @@ static void check_unchanged(const void *bytes, u32 size, u8 value)
 void _start(void)
 {
     u32 input[11];
-    if (!read_exact(input, sizeof(input)) || input[6] > MODULE_IMPORT_MAX ||
+    if (!read_exact(input, sizeof(input)) || input[6] > TEST_IMPORT_CAPACITY ||
         input[7] > sizeof(image)) finish(2);
     struct module_image_policy policy = {
         input[0], input[1], input[2], input[3], input[4], input[5], input[6], imports, exports,

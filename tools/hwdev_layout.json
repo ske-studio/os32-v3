@@ -1505,7 +1505,6 @@
       "allowed_flags",
       "export_max",
       "image_max",
-      "import_max",
       "load_span_max",
       "mem_max",
       "module_id",

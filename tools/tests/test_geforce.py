@@ -223,13 +223,9 @@ def product():
     data=(ROOT/'build/out/geforce.mod').read_bytes()
     rebuilt,stats=mkmod.build(body,meta,kernel,spec['version'],spec['generations']['memory_layout'],module_id=12)
     assert rebuilt==data
-    from module_schema import COMPONENTS
-    limit=next(c['import_max'] for c in COMPONENTS if c['name']=='GEFORCE')
-    # The generator input owns the import inventory; the component schema
-    # owns its budget. Check both instead of duplicating either count here.
+    # The generator input owns the import inventory.
     declared=json.loads((ROOT/'tools/prototypes/geforce_imports.def').read_text())['imports']
     assert [e['name'] for e in meta['imports']]==[e['symbol'] for e in declared]
-    assert len(meta['imports'])<=limit
     resident=subprocess.check_output(['nm','--defined-only',str(ROOT/'build/out/kernel.elf')],text=True)
     assert ' geforce_tick_bind' in resident and ' t geforce_tick\n' in resident
     assert ' t geforce_tick\n' not in subprocess.check_output(

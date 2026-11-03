@@ -184,7 +184,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | TMDS/TV実行/2head | 6〜8 | norm表・係数生成はkernel 3〜4KiB、最大2head |
 - F3後97〜103KiB (bss込み)＋mod text/rodata14〜21KiB＋追加bss1〜3KiB＝**112〜127KiB**を予算とする。mode/LUT/TV作業域など10〜14KiBは最初からkernel所有、借用pointerのみmodへ。image_max/mem_maxの両方131072以下をlink mapで必須判定。VRAMは別枠: 1280×1024×4×2=10MiB/head、実VRAM・Bで判定。
 - B4のEDID parser/規格表とB11のTV係数生成は初めからkernel専用、C4でhelperをbind。modにはMMIO実行・小状態・opsのみ。A/C段で実測し超過段は不合格として配置/実装を縮小、機能削除や上限拡大はしない。
-- helper/state/試験slotは§2のContext経由。新symbol importは**0**、F3後29〜31→同数、上限32。IRQ/time/MMIO/DMAは既存F1/F2/gf_ioを使用。停止完了後にkernel側slot/借用stateを解除。
+- helper/state/試験slotは§2のContext経由。IRQ/time/MMIO/DMAは既存F1/F2/gf_ioを使用。停止完了後にkernel側slot/借用stateを解除。
 - kernel helper text/rodataは7〜10KiB、state10〜14KiB＋試験本体を別計上。hwdev.modは現状112.5KiB＋共有計算/診断変更0〜8KiB＋snapshot等0〜4KiB＝112.5〜124.5KiB予算、bss込みmem/image上限192KiBをC3で検査。全て実測前の予算。
 
 ## 11. ファイルごとの変更一覧 (O/相対、1機能1ファイル)
@@ -210,7 +210,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | C0 hwdev/gf/display/modeset.c 変 | 準備→load→復元transaction / B群 / 100 |
 | C1 drivers/video/geforce/backend_geforce.c 変、include/gfx_hal.h 変 | HAL adapters/記述子/既存route維持、hook追加 / C0 / 140＋35 |
 | C2 hwdev/gf/production.h,service.c,display/quiesce.c 変 | ctx/予約/epoch/stop・callback解除 / C0 / 計65 |
-| C3 drivers/video/geforce/geforce_module.c/.h、tools/module_schema.py、build/geforce-module.mk・hwdev.mk 変 | Context/版4/生成物更新、リンク分離・像/import検査、kernel・geforce/cirrus/pegcの全backendを再ビルド / C群 / 計90 |
+| C3 drivers/video/geforce/geforce_module.c/.h、tools/module_schema.py、build/geforce-module.mk・hwdev.mk 変 | Context/版4/生成物更新、リンク分離・像検査、kernel・geforce/cirrus/pegcの全backendを再ビルド / C群 / 計90 |
 | C4 drivers/video/geforce/gf_display_data.c 新、kernelのソース列 変 | helper ops/state所有・bind、B4/B11 kernel部分だけをkernelにlink、moduleに重複linkしない / B4,B11 / 60 |
 - C3のhwdev.mkは新規ddc/dpms/flip/gamma/tmds/tv/heads.cを全てfilter-out (全てgeforce.mod専用)、edid.c/tv_data.c/gf_display_data.cはkernel専用。既存cursor.cは診断のhide列を維持しF2 mapを使う画像APIをOS32_GEFORCE_MODULE内に限定。既存modes/modeset/output/palette/blank/service/quiesceのF1〜3・helper参照も同条件に置き、hwdev側は従来診断列。timing/format/fifo/PLLは共有純計算/MMIOを維持。hwdev/R1/VPLL/GFA/非module backendの実linkで未解決参照を検出。
 - 各Bでtools/tests/gf_display_b<N>_host.cを同時作成、実部品をlink、A1で依存を偽装し各40〜100行。A3へ各caseを追加、共有登録はC段で直列統合。kdebug/gfinit_pll/は既存純整数solverを再利用、同じ計算の別実装を増やさない。
@@ -225,7 +225,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | VBLANK/flip | counter wrap/欠落/tick代行/IRQ停止、render未完了、stale epoch、書込後timeoutの面保持。変異:highでも次edge待ち、lowで即書込、drain削除、旧面早期解放 | 二面に番号/斜線、連続flip、serialにbefore/after/base/rc/edge→write時間。カメラでtear確認、high直後/low遅延の両経路を記録 | gf-display-host/flip・high即書込・low立上り待ち、drainとpin保持・GF-L4-Ra266-flip |
 | gamma | RGB順768byte/>>8/identity/565/32/INDEX8分離。変異:>>6、G/B交換、depth変更reloadなし | identity/整数暗化/復元、8bit palette帰還、serial LUT checksum＋撮影 | gf-display-host/gamma・identityとRGB rampの期待列・GF-L4-Ra266-gamma |
 | TMDS/TV/2head | DCB各route/OR競合、FP/PTV書込順、別head保存。変異:head stride無し、TMDS DATA/CONTROL逆、PTV3e toggle無し | 端子写真＋DCB、接続可能な出力を単独/同時表示、不可なら理由。片head DPMSが他方を消さない | gf-display-host/outputs・両head独立stateとFP/PTV期待列・GF-L4-Ra266-outputs |
-| 従来経路/容量 | 既定enter/leave/失敗復元、route呼出し回数、GF image/mem128KiB・hwdev192KiB/import32、版4/旧版拒否、detach callback無し、停止順/F1停止後待ち無し。変異:成功前selected_mode更新、F1停止後待ち、旧版受入 | PC-98→GF→PC-98を各試験後確認、停止失敗もserialで追跡 | gf-display-host/lifecycle・既定enter/leave・正しい停止順・版4・GF-L4-Ra266-lifecycle |
+| 従来経路/容量 | 既定enter/leave/失敗復元、route呼出し回数、GF image/mem128KiB・hwdev192KiB、版4/旧版拒否、detach callback無し、停止順/F1停止後待ち無し。変異:成功前selected_mode更新、F1停止後待ち、旧版受入 | PC-98→GF→PC-98を各試験後確認、停止失敗もserialで追跡 | gf-display-host/lifecycle・既定enter/leave・正しい停止順・版4・GF-L4-Ra266-lifecycle |
 - A2のCHECKはname="gf-display-host",tier=1,needs=[],budget=90.0、coversは表示部品・kernel helper・backend/ABI・build定義・gf_display試験。各変異を1箇所ずつ無変更GREEN→実行時RED→復元GREENで判定し、コンパイル失敗は検出に数えない。
 - C段でdocs/tasks/DEFERRED_TESTS.mdへ表の8個のIDを各1行追加: `ID | 未実施 | Ra266 0:13.0/0221 | 当該受入の実機項目 | 担当/日付/serial/カメラ証跡は実施時記入`。DPMSのLCD反応、outputsの端子/TMDS/TV/2head、flipのtearも明示して残す。台帳欠落は失敗、登録済み未実施は未実施として保持しhost合格と区別。
 - A骨格→B部品＋各変異→C結合/容量→T実機。実機は実装後でよい。カメラ http://hight-pc-vj24lfwz1srg:8080/ のcase番号付き像とserialを対応付け、実機未試験は合格としない。この設計作業では実機操作/撮影/リポジトリ編集をしていない。

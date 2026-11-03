@@ -24,7 +24,7 @@ def render():
     lines += ['', '/* Compatibility names for the existing KDEBUG contracts. */']
     kdebug = POLICIES[CONSTANTS['ID_KDEBUG']]
     for name, field in (('IMAGE_MAX', 'image_max'), ('RELOC_MAX', 'reloc_max'),
-                        ('IMPORT_MAX', 'import_max'), ('EXPORT_MAX', 'export_max'),
+                        ('EXPORT_MAX', 'export_max'),
                         ('OPS_SLOTS', 'ops_slots')):
         lines.append(f'#define MODULE_{name} {kdebug[field]}U')
     lines += ['', '/* Wire word numbers; decode little-endian bytes explicitly. */',

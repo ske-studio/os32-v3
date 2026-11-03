@@ -115,8 +115,10 @@ def cases():
         add("table-range", f"table-{i}-wrap", lambda b, i=i: word(b, i, 0xfffffffc))
     add("table-range", "empty-table-below-header",
         lambda b: word(word(b, 22, 0), 21, 143))
-    for i, limit in ((22, 16384), (24, 1024), (26, 64)):
+    for i, limit in ((22, 16384), (26, 64)):
         add("table-range", f"count-{i}", lambda b, i=i, limit=limit: word(b, i, limit + 1))
+    add("table-range", "import-table-past-payload",
+        lambda b: word(b, 24, (4096 - 152) // 12 + 1))
     add("table-range", "names-wrap", lambda b: word(b, 28, 0xffffffff))
     add("table-overlap", "tables-overlap", lambda b: word(b, 23, 148))
     add("table-overlap", "names-overlap", lambda b: word(b, 27, 170))
@@ -229,6 +231,28 @@ def run_suite(exe, runner, verbose=True):
     run = validate(exe, crc(large), runner=runner)
     if run.returncode or run.stdout != b"GREEN\n":
         return False, "maximum-reloc-count", run
+    # A matching contract above the former largest component import ceiling.
+    count = 1025
+    names = [f"import_{i}" for i in range(count)]
+    contracts = [(fnv(name), 1, 1) for name in names]
+    names_blob = b"".join(name.encode() + b"\0" for name in names)
+    names_off = 144 + count * 12
+    payload_off = (names_off + len(names_blob) + 4095) // 4096 * 4096
+    payload_size = 4 + count * 4
+    many = bytearray(fixture()[:144])
+    many.extend(bytes(payload_off + payload_size - len(many)))
+    for index, value in ((3, len(many)), (10, 8192), (11, payload_off),
+                         (12, payload_size), (14, 4), (15, 4), (16, 0),
+                         (17, 4), (18, count * 4), (19, payload_size), (20, 0),
+                         (22, 0), (23, 144), (24, count), (25, names_off),
+                         (26, 0), (27, names_off), (28, len(names_blob))):
+        word(many, index, value)
+    for i, (name_hash, version, kind) in enumerate(contracts):
+        struct.pack_into("<IHHI", many, 144 + i * 12, name_hash, version, kind, 4 + i * 4)
+    many[names_off:names_off + len(names_blob)] = names_blob
+    run = validate(exe, crc(many), runner=runner, imports=contracts)
+    if run.returncode or run.stdout != b"GREEN\n":
+        return False, "imports-above-former-ceiling", run
     groups = set()
     for group, name, image, expected, policy in cases():
         run = validate(exe, image, runner=runner, **policy)
@@ -257,6 +281,7 @@ MUTATIONS = [
     ("pair", "h[MI_PAIR_CRC] != policy->pair_image_crc", "0"),
     ("img-valid", "!policy->img_valid", "0"),
     ("abi-ops", "h[MI_OPS_VERSION] != policy->ops_version", "0"),
+    ("import-count", "h[MI_IMPORT_COUNT] != policy->import_count", "0"),
     ("policy-ops", "h[MI_OPS_VERSION] != component->ops_version", "0"),
     ("policy-id", "h[MI_ID] != component->module_id", "0"),
     ("image-limit", "file_size > component->image_max", "0"),
