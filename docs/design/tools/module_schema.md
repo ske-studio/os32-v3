@@ -8,7 +8,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
      required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
      stop_allowed=0, ops_version=1, ops_slots=1,
      image_max=196608, mem_max=196608, load_span_max=262144,
-     reloc_max=16384, import_max=128, export_max=1,
+     reloc_max=16384, export_max=1,
      init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
      ops_symbol='hwdev_ops', ops_names=('initialize',))
 ```
@@ -18,3 +18,5 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
 KDEBUG/SQLITE/FEP/LAN は既存 KMOD。image/mem 上限は各 256/256、512/512、64/64、64/64 KiB。FEP は SQLITE 依存の先例
 
 GF_ACCEL S7 の内部 callback 追加に伴い GEFORCE の ops_version は 2。ヘッダとパッカーを対で更新し、既存 module ID/import 順は保持する。
+
+部品ごとの import 数の上限は設けない。import はリンク時の未解決参照と、読み込み時の契約との件数・各シンボルの完全一致で検査する。テーブルが像に収まる照合は維持する。

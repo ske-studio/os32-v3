@@ -221,7 +221,6 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     init = elf.symbol(policy['init_symbol'])['value']
     require(text_off <= init < text_off + text_size, 'init outside text')
     imports = metadata['imports']
-    require(len(imports) <= policy['import_max'], 'too many imports')
     import_table, export_table, names = bytearray(), bytearray(), bytearray()
     seen_names, seen_hashes = set(), set()
     if imports:

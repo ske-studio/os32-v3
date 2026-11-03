@@ -9,7 +9,9 @@ HWDEV index 37 (the existing indices remain fixed). C9b appends
 serial_puts_polled at index 38 for the serial response, and includes the
 GF1/production/foundation shared types for display callbacks and row reads.
 Layer 2 adds the command hooks/channel and GF2 diagnostic types, and appends
-sys_time_now at private index 39. These reviewed changes own the pins below.
+sys_time_now at private index 39. The 2026-11-03 import ceiling removal drops
+that member from module_component_policy and shifts its following export/load-span
+fields. These changes own the pins below.
 Layout includes sizes, alignments, member offsets/sizes and enum values. Import
 indices, names and function declarations stay fixed even after regeneration.
 The full contract CRC includes mode constants/inline checks, so only its pair
@@ -29,9 +31,9 @@ from gen_kdebug_imports import declaration
 # appends sys_time_now, GF2 types, command/command_get and the production chan.
 # After reviewing the declaration/inventory/layout diff, print replacement pins:
 #   python3 -B tools/tests/hwdev_contract_fixture.py --snapshot
-REVIEWED_LAYOUT_CRC = 0x64414309
+REVIEWED_LAYOUT_CRC = 0x5aa7a2f0
 REVIEWED_IMPORT_DECLARATIONS_SHA = '9c806c08f5117e0b76aeedd55fc90010496a2ebce7442527948524c95687413a'
-REVIEWED_INVENTORY_SHA = 'c70250c92740b9c038c25fab48d73f037e08a8405e9eedbdf4618d705e48e432'
+REVIEWED_INVENTORY_SHA = '8e526bb21dc3d3992c258327fd8009538ced2b62907c92faf045c117106f155a'
 
 
 def import_declarations(root):

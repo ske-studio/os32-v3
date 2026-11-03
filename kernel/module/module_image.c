@@ -52,9 +52,6 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
         return MODULE_BAD_HEADER;
     const struct module_component_policy *component = component_policy(policy->module_id);
     if (!component) return MODULE_BAD_HEADER;
-    const u32 count_max[MODULE_RECORD_TABLES] = {
-        component->reloc_max, component->import_max, component->export_max
-    };
     for (u32 i = 0; i < MI_WORDS; i++) h[i] = le_read32(header + MODULE_WORD_BYTES * i);
     if (h[MI_MAGIC] != MODULE_MAGIC || h[MI_FORMAT] != MODULE_FORMAT_VERSION ||
         h[MI_HEADER_SIZE] != MODULE_HEADER_SIZE || h[MI_IMAGE_SIZE] != file_size ||
@@ -95,7 +92,9 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
         if (off < MODULE_HEADER_SIZE || off > h[MI_PAYLOAD_OFF])
             return MODULE_BAD_HEADER;
         if (i < MODULE_RECORD_TABLES) {
-            if (count > count_max[i] || count > (h[MI_PAYLOAD_OFF] - off) / record_size[i])
+            if ((i == 0 && count > component->reloc_max) ||
+                (i == 2 && count > component->export_max) ||
+                count > (h[MI_PAYLOAD_OFF] - off) / record_size[i])
                 return MODULE_BAD_HEADER;
             table_len[i] = count * record_size[i];
         } else {

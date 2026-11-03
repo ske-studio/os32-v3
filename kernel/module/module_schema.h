@@ -48,7 +48,6 @@
 /* Compatibility names for the existing KDEBUG contracts. */
 #define MODULE_IMAGE_MAX 262144U
 #define MODULE_RELOC_MAX 16384U
-#define MODULE_IMPORT_MAX 1024U
 #define MODULE_EXPORT_MAX 64U
 #define MODULE_OPS_SLOTS 20U
 
@@ -106,7 +105,6 @@ enum module_field {
         .image_max = 262144U, \
         .mem_max = 262144U, \
         .reloc_max = 16384U, \
-        .import_max = 1024U, \
         .export_max = 64U, \
         .load_span_max = 524288U, \
     }, \
@@ -121,7 +119,6 @@ enum module_field {
         .image_max = 524288U, \
         .mem_max = 524288U, \
         .reloc_max = 4096U, \
-        .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 544768U, \
     }, \
@@ -136,7 +133,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 96U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -151,7 +147,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -166,7 +161,6 @@ enum module_field {
         .image_max = 16384U, \
         .mem_max = 81920U, \
         .reloc_max = 256U, \
-        .import_max = 2U, \
         .export_max = 1U, \
         .load_span_max = 86016U, \
     }, \
@@ -181,7 +175,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 16U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -196,7 +189,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -211,7 +203,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 48U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -226,7 +217,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 48U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -241,7 +231,6 @@ enum module_field {
         .image_max = 65536U, \
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
-        .import_max = 16U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
@@ -256,7 +245,6 @@ enum module_field {
         .image_max = 196608U, \
         .mem_max = 196608U, \
         .reloc_max = 16384U, \
-        .import_max = 128U, \
         .export_max = 1U, \
         .load_span_max = 262144U, \
     }, \
@@ -271,7 +259,6 @@ enum module_field {
         .image_max = 131072U, \
         .mem_max = 131072U, \
         .reloc_max = 8192U, \
-        .import_max = 32U, \
         .export_max = 1U, \
         .load_span_max = 163840U, \
     }, \
