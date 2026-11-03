@@ -31,13 +31,14 @@ FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', 
 
 
 # GF_FEAT3_DESIGN §13/G1: one real product TU per host, UNIT selected in C.
-# B4 is unstarted and has no registration. Every registered entry is required,
-# including in this wiring worktree before the product branches are integrated.
+# Every registered entry is required, including in this wiring worktree before
+# the product branches are integrated.
 COMPONENTS = {
     'b0': 'hwdev/gf/accel_objects.c',
     'b1': 'hwdev/gf/accel_surface.c',
     'b2': 'hwdev/gf/accel_rop.c',
     'b3': 'hwdev/gf/accel_fill.c',
+    'b4': 'hwdev/gf/accel_copy.c',
     'b5': 'hwdev/gf/accel_mono.c',
     'b6': 'hwdev/gf/accel_ifc.c',
     'b7': 'hwdev/gf/accel_m2mf.c',
@@ -138,6 +139,25 @@ MUTATIONS = {
         ('fill_wait', 'hwdev/gf/accel_fill.c',
          'rc = gf2_fence_wait(c->ch, fence, dl);',
          'rc = GF3_OK;', 'tools/tests/gf_accel_b3_host.c'),
+    ],
+    # B4 report2: packed coordinate/size anchors follow IMAGE_BLIT's 16-bit
+    # fields (xf86-video-nouveau/src/nv04_exa.c:255-258).
+    'b4': [
+        ('b4_alias_off', 'hwdev/gf/accel_copy.c',
+         'src->off != dst->off',
+         'src->off == dst->off', 'tools/tests/gf_accel_b4_host.c'),
+        ('b4_overlap_touch', 'hwdev/gf/accel_copy.c',
+         'ap < be && bp < ae',
+         'ap <= be && bp <= ae', 'tools/tests/gf_accel_b4_host.c'),
+        ('b4_src_point', 'hwdev/gf/accel_copy.c',
+         '(sr.y << 16) | sr.x',
+         '(sr.x << 16) | sr.y', 'tools/tests/gf_accel_b4_host.c'),
+        ('b4_dst_point', 'hwdev/gf/accel_copy.c',
+         '(dy << 16) | dx',
+         '(dx << 16) | dy', 'tools/tests/gf_accel_b4_host.c'),
+        ('b4_size', 'hwdev/gf/accel_copy.c',
+         '(sr.h << 16) | sr.w',
+         '(sr.w << 16) | sr.h', 'tools/tests/gf_accel_b4_host.c'),
     ],
     'b5': [
         ('mono-cga6', 'hwdev/gf/accel_mono.c',
@@ -278,10 +298,11 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def component_build(host, source, directory):
+def component_build(host, source, directory, original_parent):
     exe = directory/'host'
     # check=True: compilation/link errors are suite failures, never runtime RED.
     subprocess.run(FLAGS + ['-Werror=vla', *include_flags(ROOT), '-I'+str(ROOT),
+                           '-iquote', str(original_parent),
                            str(host), str(source), '-o', str(exe)],
                    cwd=ROOT, check=True)
     return exe
@@ -321,27 +342,23 @@ def component_hosts(selected, mutate):
             host = ROOT/f'tools/tests/gf_accel_{component}_host.c'
             directory = Path(temporary)/component
             directory.mkdir()
-            exe = component_build(host, source, directory)
+            exe = component_build(host, source, directory, source.parent)
             component_execute(exe, runners, component+' control', True)
             if not mutate:
                 continue
             original = source.read_text()
-            # Only the temporary product changes; quoted includes keep their
-            # original parent, so mutants/restored controls link the same API.
-            def relocated(code):
-                return re.sub(r'^#include "([^"\n]+)"',
-                              lambda m: '#include "'+str((source.parent/m[1]).resolve())+'"',
-                              code, flags=re.MULTILINE)
+            # Preserve include spelling: -iquote supplies the original parent,
+            # while root-relative includes still use the normal include paths.
             mutant = directory/source.name
             for name, product, old, new, red_host in MUTATIONS[component]:
                 label = component+'-'+name
-                mutant.write_text(relocated(original.replace(old, new, 1)))
+                mutant.write_text(original.replace(old, new, 1))
                 try:
-                    exe = component_build(host, mutant, directory)
+                    exe = component_build(host, mutant, directory, source.parent)
                     component_execute(exe, runners, label, False)
                 finally:
-                    mutant.write_text(relocated(original))
-                    exe = component_build(host, mutant, directory)
+                    mutant.write_text(original)
+                    exe = component_build(host, mutant, directory, source.parent)
                     component_execute(exe, runners, label+' restored', True)
 
 
