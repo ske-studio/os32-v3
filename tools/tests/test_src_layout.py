@@ -101,7 +101,7 @@ class LayoutTools(unittest.TestCase):
         module = load('check_arm_compile')
         with patch.object(module, 'PROJ_DIR', str(ROOT)):
             files = module.scan_glob()
-        self.assertEqual(len(files), 215)
+        self.assertEqual(len(files), 216)  # +kernel/time/time_splash_math.c (PL P1)
         self.assertTrue(all((ROOT / name).is_file() for name in files))
         for path, expected in (
                 ('init/kernel.c', 'INC_KERNEL'), ('mm/paging.c', 'INC_KERNEL'),
