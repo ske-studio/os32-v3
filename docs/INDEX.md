@@ -21,6 +21,7 @@ PC-9801シリーズ向け 32ビット ベアメタルOS
 | 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-25.md](tasks/agents/HANDOVER_2026-10-25.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は `docs/archive/agents/HANDOVER_2026-10-08.md` |
 | 文書の書き方 (置くもの・置かないもの・正典の 1 か所) | [POLICY_DEV.md §9](POLICY_DEV.md) | CLAUDE.md (1 行) |
 | エージェント運用体制 (役割・起動・規約) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は `docs/archive/agents/ROLES_HISTORY_2026-10-06.md`、見直しの根拠は `docs/archive/agents/REVIEW_2026-10-06.md` |
+| 機能ごとのブランチで並列に実装する (触るファイルの一覧・共有の登録ファイルの持ち主・上限の予算・結線は直列) | [tasks/agents/PARALLEL_BRANCHES.md](tasks/agents/PARALLEL_BRANCHES.md) |
 | 手本がある移植の進め方 (コンパイルを全部の実装の後に・設計の段の点検・依頼に必ず書くこと・踏んだこと) | [tasks/agents/PORT_FLOW.md](tasks/agents/PORT_FLOW.md) | ROLES §0 (1 行)、スキル `os32-delegate` (案内のみ) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
 | 番地・帯域 | `include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
