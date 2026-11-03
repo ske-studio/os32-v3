@@ -13,6 +13,8 @@ static unsigned long long scan_us, irq_at[4], irq_delay[4];
 static u32 in_us = 1, clock_cost_us = 1, out_us = 1, calls, writes;
 /* Sub-microsecond IN timing with a 1us-quantized public clock. */
 static u32 in_milli, scan_milli, poll_entry_us;
+static u32 pl_script, pl_reads, success_entry_cost, success_return_cost;
+static int success_scanning;
 static int capture_active(void);
 static u32 den, total, high_lines, raw_mode, wide_h;
 static int irq_on = 1, missing_h, frozen, backwards;
@@ -45,6 +47,7 @@ static void advance(u32 cost)
 }
 int sys_time_now(u32 *lo, u32 *hi)
 {
+    REQUIRE(!success_scanning); /* clocks must remain outside the edge loop */
     if (raw_test) {
         REQUIRE(irq_on && !(raw_reads % 4096));
         REQUIRE(raw_clocks < 16);
@@ -79,6 +82,11 @@ static unsigned int inp(unsigned int port)
         if (!missing_h && phase % 100000 >= 100000 - width) status |= GDC_STAT_HBLANK;
 #endif
     }
+    if (pl_script) {
+        /* Start high: first-IN forced success must fail this fixture.
+         * The real predicate sees high, low, low, high in that order. */
+        status = (++pl_reads % 4 == 1 || pl_reads % 4 == 0) ? GDC_STAT_HBLANK : 0;
+    }
     if (h_test && !irq_on) {
         if (!(if0_in_reads)) h_old = status;
         else {
@@ -94,7 +102,7 @@ static unsigned int inp(unsigned int port)
     scan_milli %= 1000;
     /* Sample and return are deliberately distinct. */
     if (!irq_on) {
-        if (require_clockless_in) REQUIRE(!if0_end_clock);
+        if (require_clockless_in && !success_scanning) REQUIRE(!if0_end_clock);
         if0_in_reads++;
         if (if0_in_reads > if0_max_in_run) if0_max_in_run = if0_in_reads;
     }
@@ -148,11 +156,13 @@ static int probe_host_hcalibrate(const struct SplashRaster *, unsigned long long
 /* Inject only into returned batch spans, after the actual clock-free batch
  * and IF restoration. The seed is deliberately outside this fixture. */
 static u32 peak_fixture, peak_index;
-static u32 wait_entry_cost, wait_calls;
-static void __attribute__((unused)) probe_host_wait_enter(void)
+static void __attribute__((unused)) probe_host_success_enter(void)
 {
-    wait_calls++;
-    if (wait_entry_cost) advance(wait_entry_cost);
+    advance(success_entry_cost);
+}
+static void __attribute__((unused)) probe_host_success_return(void)
+{
+    advance(success_return_cost);
 }
 static unsigned long long __attribute__((unused)) probe_host_pl_span(unsigned long long span)
 {
@@ -264,6 +274,7 @@ static void setup(int mode, int vs)
 {
     probe_hd = (struct probe_hdiag){0};
     peak_fixture = peak_index = 0;
+    pl_script = pl_reads = success_entry_cost = success_return_cost = success_scanning = 0;
     raw_test = h_test = 0;
     raw_reads = raw_clocks = h_reads = h_high = h_rise = h_fall = 0;
     scan_us = 0; den = mode ? 3147 : 2483; total = mode ? 449 : 440;
@@ -472,16 +483,23 @@ static void pl_details(void)
         REQUIRE(d[k].raw.hits == d[k].raw.batches);
         REQUIRE(d[k].upper.max == d[k].raw.max + d[k].correction.max);
     }
-    wait_entry_cost = 2; wait_calls = 0;
-    u32 reads = if0_in_reads, before_writes = writes;
-    REQUIRE(probe_pl_batch(PROBE_PL_TRANS, c, probe_pl_emit5, 8, 0) == 35);
-    REQUIRE(wait_calls == 16 && if0_in_reads == reads && writes == before_writes);
-    wait_entry_cost = 0;
+    pl_script = 1; pl_reads = 0;
+    success_entry_cost = 2; success_return_cost = 5;
+    probe_pl_edge_upper = 64;
+    unsigned int saved = irq_save();
+    u32 before_writes = writes;
+    /* Successful return + prepare's OUT + next wait entry + one clock.
+     * No poll or successful-body cost belongs to this linkage interval. */
+    REQUIRE(probe_pl_batch(PROBE_PL_TRANS, c, probe_pl_emit5, 1, 0) == 12);
+    REQUIRE(if0_in_reads == 6 && pl_reads == 6 && writes == before_writes + 1);
+    REQUIRE(probe_pl_batch_polls == 4);
+    REQUIRE(probe_pl_batch_total == 3 * 3 + 2 * (2 + 5) + 6 * in_us + out_us);
+    irq_restore(saved);
     const probe_pl_emit_fn emitters[] = { probe_pl_empty, probe_pl_emit1,
         probe_pl_emit2, probe_pl_emit3, probe_pl_emit4, probe_pl_emit5, probe_pl_emit6 };
-    /* Exact independent cost: real IN + N OUT, one clock per whole batch.
-     * No prior index OUT, no EMPTY subtraction, no clocks between INs.
-     * Vary I/O costs so a missing IN/OUT cannot pass as fixed overhead. */
+    /* Exact independent body: high/low/low/high INs + N OUT + one clock.
+     * Independently timed outside cost: entry + return + two clocks.
+     * Vary I/O and linkage costs to ensure the two intervals stay disjoint. */
     for (u32 n = 0; n <= 6; n++) for (u32 phase = 0; phase < 2; phase++) {
         struct probe_pl_column *j = &probe_pl_joint[n];
         *j = *c; j->n = n;
@@ -490,31 +508,44 @@ static void pl_details(void)
         j->row[0].count = j->row[1].count = n;
         for (u32 cost = 1; cost <= 2; cost++) {
             in_us = cost; out_us = cost + 1;
-            before_writes = writes;
+            before_writes = writes; pl_reads = 0;
+            success_entry_cost = cost * 2; success_return_cost = cost * 5;
             unsigned int flags = irq_save();
             require_clockless_in = 1;
-            unsigned long long span = probe_pl_batch(PROBE_PL_JOINT, j, emitters[n], 4, phase);
+            unsigned long long span = probe_pl_batch(PROBE_PL_JOINT, j, emitters[n], 1, phase);
             require_clockless_in = 0;
-            REQUIRE(span == 3 + 4 * (cost + n * (cost + 1)));
-            REQUIRE(if0_in_reads == 4 && if0_end_clock == 1);
-            REQUIRE(writes - before_writes == 4 * n);
+            REQUIRE(span == 3 + 4 * cost + n * (cost + 1));
+            REQUIRE(probe_pl_batch_outside == 6 + 7 * cost);
+            REQUIRE(probe_pl_batch_total == span + probe_pl_batch_outside);
+            REQUIRE(probe_pl_batch_polls == 4);
+            REQUIRE(if0_in_reads == 4 && if0_end_clock == 2);
+            REQUIRE(writes - before_writes == n);
             irq_restore(flags);
         }
+        in_us = out_us = 1;
+        success_entry_cost = success_return_cost = 0;
         peak_fixture = 1; peak_index = 0;
         (void)probe_pl_measure(s, PROBE_PL_JOINT, j, emitters[n], phase, &one);
         peak_fixture = 0;
         REQUIRE(j->peak[phase][PROBE_PL_JOINT].hits == 2);
         REQUIRE(j->peak[phase][PROBE_PL_JOINT].second_valid);
+        const struct probe_pl_detail *outside = &probe_pl_outside[n][phase];
+        REQUIRE(outside->raw.batches == 64 && outside->raw.max == 6 * (long long)den);
+        REQUIRE(outside->upper.max == 2 * (long long)den);
+        REQUIRE(outside->correction.max == -4 * (long long)den);
+        REQUIRE(probe_pl_joint_polls[n][phase].batches == 64);
     }
+    pl_script = 0;
+    struct probe_pl_stamp stamp = { .clocks = PROBE_PL_STAMP_BEGIN | PROBE_PL_STAMP_END };
     u32 iterations = 0;
     before_writes = writes;
-    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 1, 1, 0, &iterations) == -1);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 1, 1, 0, &iterations, &stamp) == -1);
     REQUIRE(iterations == 1 && writes == before_writes);
-    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 2, 2, 1, 0, &iterations) == -1);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 2, 2, 1, 0, &iterations, &stamp) == -1);
     REQUIRE(iterations == 1 && writes == before_writes);
-    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 1, 1, &iterations) == -1);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 1, 1, &iterations, &stamp) == -1);
     REQUIRE(iterations == 1 && writes == before_writes);
-    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 0, 0, &iterations) == -1);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 0, 0, &iterations, &stamp) == -1);
     REQUIRE(iterations == 2 && writes == before_writes);
     probe_errors = 1; serial_init(SYS_SERIAL_BAUD);
     probe_pl_result[0].budget.den = den;
@@ -523,6 +554,12 @@ static void pl_details(void)
     REQUIRE(probe_contains("clock_delta_max_num=-6294 clock_delta_max_count=1"));
     REQUIRE(probe_contains("SPLR pl_joint_n=0 phase=0 den=3147"));
     REQUIRE(probe_contains("SPLR pl_joint_n=6 phase=1 den=3147"));
+    REQUIRE(probe_contains("SPLR pl_joint_outer_n=6 phase=1 den=3147 raw_max_num=18882"));
+    REQUIRE(probe_contains("polls_max_num=4 polls_max_count=64"));
+    probe_pl_result[0].prep = 10; probe_pl_result[0].transition = 20;
+    probe_pl_detail[0][3].upper.max = 24;
+    probe_pl_details_dump();
+    REQUIRE(probe_contains(" link_budget_num=30 link_upper_num=24 link_gap_num=6"));
     REQUIRE(probe_contains(" max_count=2 second_num="));
     /* Preserve period order and total counts, including a partial last row. */
     probe_hd.completed = 5;
