@@ -37,7 +37,7 @@ def slots():
             raise SystemExit('kernel declaration index mismatch')
         result.append(dict(e, index=int(index), group='kernel'))
     result.sort(key=lambda e: e['index'])
-    if [e['index'] for e in result] != list(range(38)):
+    if [e['index'] for e in result] != list(range(39)):
         raise SystemExit('HWDEV slot order/count')
     defined = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
     keys = ('index', 'symbol', 'source', 'kind', 'group')
