@@ -1,6 +1,7 @@
 #include "geforce_module.h"
 #include "hwdev/gf/production.h"
 #include "hwdev/gf/gf1_test.h"
+#include "hwdev/gf/gf2_test.h"
 #include "pc98_route.h"
 const GeforceModuleContext *geforce_context;
 static struct gf_production production;
@@ -34,6 +35,7 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
     }
     *out = geforce_backend_ops;
     gf1_module_ops.production=&production.foundation;
+    gf2_test_bind_production(&production.foundation,&production.chan);
     *context->accel_out=0;
     *context->foundation_out=&gf1_module_ops;
     return 0;

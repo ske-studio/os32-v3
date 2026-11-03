@@ -1,5 +1,6 @@
 /* Foreground layer-1 bridge; serial command policy belongs to C9. */
 #include "gf1_test.h"
+#include "gf2_test.h"
 #include "../../kdebug/gfinit_bus.h"
 #include "../../include/memmap.h"
 #include "../../include/io.h"
@@ -92,4 +93,4 @@ static int call(struct gf_foundation *f, const struct gf1_test_request *q,
     gf_irq_snapshot(f,&reply->stats);
     return reply->rc=rc;
 }
-struct gf1_test_ops gf1_module_ops={.prepare=prepare,.call=call};
+struct gf1_test_ops gf1_module_ops={.prepare=prepare,.call=call,.command=&gf2_module_ops};
