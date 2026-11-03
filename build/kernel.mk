@@ -46,7 +46,8 @@ C_KERNEL = \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
     $(KSTRING_C_SRC) \
-    drivers/video/pc98/splash_raster.c
+    drivers/video/pc98/splash_raster.c \
+    drivers/video/pc98/splash_raster_image.c
 
 ifeq ($(SPLASH_DIAG_BUILD),1)
 C_KERNEL += platform/pc98/splash_probe.c
