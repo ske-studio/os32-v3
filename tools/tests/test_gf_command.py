@@ -34,22 +34,22 @@ ORACLE = Path('/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/'
 # A2 report: only the tested component is real; dependencies live in the
 # fixture header. B7/T2b include their product source and must not link it twice.
 COMPONENTS = {
-    'c0': ('hwdev/gf/command.c', True),
-    't2a2-link': ('hwdev/gf/foundation_test.c', False),
-    't2a2-bind': ('drivers/video/geforce/geforce_body.c', False),
-    't2b-owner': ('kdebug/gfinit.c', False),
-    'b0': ('hwdev/gf/fifo.c', True),
-    'b1': ('hwdev/gf/push.c', False),
-    'b2': ('hwdev/gf/dmaobj.c', False),
-    'b3': ('hwdev/gf/ramht.c', True),
-    'b4': ('hwdev/gf/grctx.c', False),
-    'b5': ('hwdev/gf/gr.c', False),
-    'b6': ('hwdev/gf/fence.c', True),
-    'b7': ('hwdev/gf/fault.c', False),
-    'b8': ('hwdev/gf/command_platform.c', True),
-    'b9': ('drivers/video/geforce/geforce_dma.c', True),
-    't2a1': ('hwdev/gf/command_test.c', True),
-    't2b': ('kdebug/gf_command_test.c', True),
+    'c0': 'hwdev/gf/command.c',
+    't2a2-link': 'hwdev/gf/foundation_test.c',
+    't2a2-bind': 'drivers/video/geforce/geforce_body.c',
+    't2b-owner': 'kdebug/gfinit.c',
+    'b0': 'hwdev/gf/fifo.c',
+    'b1': 'hwdev/gf/push.c',
+    'b2': 'hwdev/gf/dmaobj.c',
+    'b3': 'hwdev/gf/ramht.c',
+    'b4': 'hwdev/gf/grctx.c',
+    'b5': 'hwdev/gf/gr.c',
+    'b6': 'hwdev/gf/fence.c',
+    'b7': 'hwdev/gf/fault.c',
+    'b8': 'hwdev/gf/command_platform.c',
+    'b9': 'drivers/video/geforce/geforce_dma.c',
+    't2a1': 'hwdev/gf/command_test.c',
+    't2b': 'kdebug/gf_command_test.c',
 }
 # Each old string must occur once in the original product source. Keep these
 # independent of the oracle and fixture; mutate one product site per build.
@@ -193,8 +193,7 @@ def relocated(text, source):
 
 
 def build(component, source, directory, flags):
-    _, libc = COMPONENTS[component]
-    extra = [] if libc else ['-nostdlib']
+    extra = ['-nostdlib']
     if component == 'b4':
         require(ORACLE.is_file() and ORACLE.with_suffix('.h').is_file(),
                 'B4 requires the independent c03c1a1 MIT ctxnv40.c/.h oracle')
@@ -242,7 +241,7 @@ def build_integration(component, source, directory):
                   'kernel/module/module_image.c', 'fs/vfs.c', 'drivers/base/dev.c')],
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-o', str(exe)]
     copied = Path(tempfile.mkdtemp(prefix='integration-', dir=directory))
-    mutpar.build_in_tree(ROOT, copied, {COMPONENTS[component][0]: source.read_text()}, [cmd])
+    mutpar.build_in_tree(ROOT, copied, {COMPONENTS[component]: source.read_text()}, [cmd])
     return exe
 
 
@@ -276,7 +275,7 @@ def main():
     selected = (args.component,) if args.component else COMPONENTS
     with tempfile.TemporaryDirectory(prefix='gf-command-') as tmp:
         for component in selected:
-            source = ROOT / COMPONENTS[component][0]
+            source = ROOT / COMPONENTS[component]
             if not source.is_file():
                 require(not args.component,
                         f'{component}: requested component has not been added')
@@ -295,7 +294,7 @@ def main():
         if args.mutate:
             failures = []
             for component in selected:
-                source = ROOT / COMPONENTS[component][0]
+                source = ROOT / COMPONENTS[component]
                 directory = Path(tmp) / component
                 original = source.read_text()
                 mutant = directory / source.name

@@ -1,11 +1,10 @@
 /* Link command_platform.c only; A2 supplies map and DMA ops. */
-#include <assert.h>
 #include "../../hwdev/gf/command.h"
 
 #define GF2_HOST_B8
 #include "gf_command_host.h"
 
-int main(void)
+void _start(void)
 {
     struct gf2_chan ch = {0}; volatile u32 *va = 0;
     ch.map_ops = &map_ops; ch.dma_ops = &dma_ops;
@@ -27,5 +26,5 @@ int main(void)
     alloc_fail = 0; assert(gf2_dma_get(&ch) == GF2_OK && ch.staging_live);
     free_fail = -8; gf2_dma_put(&ch);
     assert(leaked == 1 && ch.dma_rc == -8 && !ch.staging_live);
-    return 0;
+    gf2_host_exit(0);
 }

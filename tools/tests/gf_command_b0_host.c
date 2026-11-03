@@ -4,7 +4,6 @@
  * busy_reads applies when stored PULL0 bit0 is clear: -1 stays busy,
  * positive counts busy reads, then clears (set/get do not consume reads).
  * clock/wait failures and fault_rc are injected before the next callback. */
-#include <assert.h>
 #define GF2_HOST_B0
 #include "gf_command_host.h"
 
@@ -135,4 +134,4 @@ static void fifo_pause(void)
     gf2_fifo_resume(&h.ch); assert(h.ch.last_rc == GF2_EFAULT); done();
 }
 
-int main(void) { fifo_layout(); fifo_stop(); fifo_pause(); return 0; }
+void _start(void) { fifo_layout(); fifo_stop(); fifo_pause(); gf2_host_exit(0); }

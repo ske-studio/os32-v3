@@ -2,11 +2,12 @@
  * including this header in the host test TU, never in the product TU.
  * Link only the component under test (B7 includes its source instead).
  * The selected fixture supplies its dependencies without linking any B.
- * Define CHECK before B4/B5/B7, and include assert.h before B0/B6/B8/B9.
+ * Define CHECK before B4/B5/B7. The runtime header supplies libc-free assert.
  * B7 also supplies event(kind, off) and EVENT_COUNT from its oracle table.
  * Expectation tables and the B4 independent oracle stay in the tests. */
 #ifndef TOOLS_TESTS_GF_COMMAND_HOST_H
 #define TOOLS_TESTS_GF_COMMAND_HOST_H
+#include "gf_command_runtime_host.h"
 #include "../../hwdev/gf/command.h"
 
 #if (defined(GF2_HOST_B0) + defined(GF2_HOST_B1) + defined(GF2_HOST_B2) + \

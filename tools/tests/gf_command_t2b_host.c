@@ -1,7 +1,6 @@
 /* Real T2 observer, with typed module/trial/clock/serial dependencies only.
  * No channel implementation is linked: acceptance must reject bad replies. */
-#include <assert.h>
-#include <string.h>
+#include "gf_command_runtime_host.h"
 #include "../../include/io.h"
 #define _irq_enabled() 1
 #ifndef GF2_T2B_SOURCE
@@ -19,9 +18,9 @@ static unsigned serial_used;
 
 void serial_puts_polled(const char *s)
 {
-    unsigned n = strlen(s);
+    unsigned n = gf2_host_strlen(s);
     assert(serial_used + n < sizeof(serial));
-    memcpy(serial + serial_used, s, n + 1);
+    gf2_host_memcpy(serial + serial_used, s, n + 1);
     serial_used += n;
 }
 u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 offset)
@@ -126,7 +125,7 @@ const struct gf1_test_ops *geforce_foundation_ops(void) { return &foundations; }
 static int fake_row(void *opaque, u32 y, u8 *row)
 {
     assert(opaque == &device && y < GF_MODE_HEIGHT);
-    memset(row, changed_display && recover_calls ? 1 : 0, GF_MODE_WIDTH);
+    gf2_host_memset(row, changed_display && recover_calls ? 1 : 0, GF_MODE_WIDTH);
     return 0;
 }
 static void reset(void)
@@ -158,7 +157,7 @@ static void t2b_reference_count(void)
     reset();
     assert(request(GF2_REFERENCE) == GF2_OK);
     assert(reference_calls == 100000U);
-    assert(strstr(serial, "completed=100000 "));
+    assert(gf2_host_strstr(serial, "completed=100000 "));
 }
 static void t2b_reference_stalled(void)
 {
@@ -170,7 +169,7 @@ static void t2b_wrap_required(void)
 {
     reset();no_wrap = true;
     assert(request(GF2_REFERENCE) == GF2_EIO);
-    assert(reference_calls == 100000U && strstr(serial, " wraps=0 "));
+    assert(reference_calls == 100000U && gf2_host_strstr(serial, " wraps=0 "));
 }
 static void t2b_recover_epoch(void)
 {
@@ -198,7 +197,7 @@ static void t2b_display_changed(void)
     assert(reference_calls == 200000U && device.wanted_heads == 3U);
     reset();changed_display = true;
     assert(request(GF2_CYCLE) == GF2_EIO);
-    assert(strstr(serial, "GF2 phase=display "));
+    assert(gf2_host_strstr(serial, "GF2 phase=display "));
 }
 static void t2b_deadline_wrap(void)
 {
@@ -213,13 +212,13 @@ static void t2b_fault_subchannel(void)
     saved.gr_trap = 2U << 16;
     saved.gr_method = (5U << 16) | 0x1ffcU;
     assert(request(GF2_STATUS) == GF2_OK);
-    assert(strstr(serial, " subc=5 "));
-    assert(!strstr(serial, " subc=2 "));
+    assert(gf2_host_strstr(serial, " subc=5 "));
+    assert(!gf2_host_strstr(serial, " subc=2 "));
 }
-int main(void)
+void _start(void)
 {
     t2b_reference_count();t2b_reference_stalled();t2b_wrap_required();
     t2b_recover_epoch();t2b_fault_recover();t2b_display_changed();
     t2b_deadline_wrap();t2b_fault_subchannel();
-    return 0;
+    gf2_host_exit(0);
 }

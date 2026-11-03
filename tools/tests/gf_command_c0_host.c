@@ -5,7 +5,7 @@
  * are local until A2 incorporates them. No ports or privileged instructions.
  * Test names use underscores in C: c0-stop-order -> c0_stop_order, etc. */
 #define IO_H
-#include <assert.h>
+#include "gf_command_runtime_host.h"
 #include "../../hwdev/gf/command.h"
 #ifdef NDEBUG
 #error "C0's ownership and ordering oracle requires assertions"
@@ -369,9 +369,9 @@ static void c0_recover_old_epoch(void)
     assert(gf2_fence_wait(&c0_ch, current, c0_now + GF2_TIMEOUT_US) == GF2_OK);
     c0_expect(C0_READ_REFERENCE, GF2_RUN); c0_done();
 }
-int main(void)
+void _start(void)
 {
     c0_stop_order(); c0_initial_reference_failure(); c0_f1_stop_failure();
     c0_engine_stop_failure(); c0_recover_old_epoch();
-    return 0;
+    gf2_host_exit(0);
 }

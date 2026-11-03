@@ -1,8 +1,7 @@
 /* Link the real command_test.c as a separate TU. Dependencies below model
  * C0/B ownership and completion; no product source is included or replaced.
  * Test names match REVIEW_r1's proposed runtime mutation targets. */
-#include <assert.h>
-#include <string.h>
+#include "gf_command_runtime_host.h"
 #include "../../hwdev/gf/command.h"
 #include "../../hwdev/gf/gf2_test.h"
 #ifdef NDEBUG
@@ -69,7 +68,7 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
         diagnostic_ch = ch;
         assert(ch->f == f && ch->map_ops == &map_ops && ch->map_owner == f);
         assert(ch->dma_ops == &dma_ops);
-        assert(!memcmp(&ch->bar1, &bars[GF_MODE_VRAM_BAR], sizeof(ch->bar1)));
+        assert(!gf2_host_memcmp(&ch->bar1, &bars[GF_MODE_VRAM_BAR], sizeof(ch->bar1)));
     } else assert(ch == &production_ch && f == &production_f);
     ch->f = f; ch->state = GF2_RUN; ++ch->epoch;
     ch->fault = (struct gf2_fault){0};
@@ -173,7 +172,7 @@ static void fresh(void)
     production_f = diagnostic_f; production_f.io.opaque = &production_f;
     production_ch = (struct gf2_chan){.f = &production_f};
     gf2_test_bind_production(&production_f, &production_ch);
-    memset(bars, 0, sizeof(bars));
+    gf2_host_memset(bars, 0, sizeof(bars));
     bars[GF_MODE_VRAM_BAR] = (struct recover_bar_extent){
         0x90000008, 0x90000000, 0x4000000, 1};
     assert(gf2_module_ops.prepare(&diagnostic_f, bars, RECOVER_BAR_COUNT) == 0);
@@ -220,12 +219,12 @@ static void t2a1_production_reject(void)
     production_f.running = true;
     struct gf2_chan before = production_ch;
     gf2_test_bind_production(&production_f, &production_ch);
-    assert(!memcmp(&before, &production_ch, sizeof(before)));
+    assert(!gf2_host_memcmp(&before, &production_ch, sizeof(before)));
     assert(gf2_module_ops.prepare(&production_f, bars, RECOVER_BAR_COUNT) == GF2_EINVAL);
     for (enum gf2_test_op op = GF2T_BAD_HANDLE; op <= GF2T_BAD_METHOD; ++op) {
         assert(invoke(&production_f, op) == GF2_ESTATE);
         assert(!nevents && !m.faults && !m.creates);
-        assert(!memcmp(&before, &production_ch, sizeof(before)));
+        assert(!gf2_host_memcmp(&before, &production_ch, sizeof(before)));
     }
 }
 static void t2a1_failed_stop_prepare(void)
@@ -239,8 +238,8 @@ static void t2a1_failed_stop_prepare(void)
     struct gf_foundation replacement = diagnostic_f;
     replacement.map_ops = &other_map_ops; replacement.map_owner = &replacement;
     assert(gf2_module_ops.prepare(&replacement, bars, RECOVER_BAR_COUNT) == GF2_ESTATE);
-    assert(!memcmp(&before, diagnostic_ch, sizeof(before)));
-    assert(!memcmp(&obj_before, object, sizeof(obj_before)) && m.live);
+    assert(!gf2_host_memcmp(&before, diagnostic_ch, sizeof(before)));
+    assert(!gf2_host_memcmp(&obj_before, object, sizeof(obj_before)) && m.live);
     assert(diagnostic_f.imem.used == &object->inst);
 }
 static void t2a1_revoked_saved_only(void)
@@ -256,8 +255,8 @@ static void t2a1_revoked_saved_only(void)
     before.kicked = false;
     for (enum gf2_test_op op = GF2T_START; op <= GF2T_BAD_METHOD; ++op) {
         assert(invoke(&diagnostic_f, op) == GF2_EFAULT);
-        assert(!memcmp(&reply, &saved, sizeof(saved)));
-        assert(!memcmp(&m, &before, sizeof(m)) && !nevents);
+        assert(!gf2_host_memcmp(&reply, &saved, sizeof(saved)));
+        assert(!gf2_host_memcmp(&m, &before, sizeof(m)) && !nevents);
     }
 }
 static void t2a1_wait_for_fault(void)
@@ -311,12 +310,12 @@ static void t2a1_dispatch(void)
     assert(gf2_module_ops.call(&diagnostic_f, 0, &reply) == GF2_EINVAL);
     assert(gf2_module_ops.call(&diagnostic_f, &q, 0) == GF2_EINVAL);
 }
-int main(void)
+void _start(void)
 {
     t2a1_bad_handle(); t2a1_bad_method(); t2a1_recover_recreate();
     t2a1_production_reject(); t2a1_failed_stop_prepare();
     t2a1_revoked_saved_only(); t2a1_wait_for_fault();
     t2a1_reference_completion(); t2a1_deadline_wrap();
     t2a1_bad_packet_kick(); t2a1_dispatch();
-    assert(gf2_stop(diagnostic_ch) == 0); return 0;
+    assert(gf2_stop(diagnostic_ch) == 0); gf2_host_exit(0);
 }

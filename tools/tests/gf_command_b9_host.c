@@ -1,11 +1,10 @@
 /* Link geforce_dma.c only; A2 supplies DMA pool dependencies. */
-#include <assert.h>
 #include "../../hwdev/gf/command.h"
 
 #define GF2_HOST_B9
 #include "gf_command_host.h"
 
-int main(void)
+void _start(void)
 {
     const struct gf2_dma_ops *ops = geforce_dma_ops();
     struct gf2_dma_buf buf = { .pa = 7, .size = 9, .va = &storage };
@@ -25,5 +24,5 @@ int main(void)
     assert(leak_calls == 1 && seen.pa == buf.pa && seen.va == buf.va && seen.size == buf.size);
     free_rc = 0;
     assert(ops->free(&buf) == 0);
-    return 0;
+    gf2_host_exit(0);
 }

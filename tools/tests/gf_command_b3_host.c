@@ -1,12 +1,11 @@
-#include <stdio.h>
 #include "../../hwdev/gf/command.h"
 
 #define GF2_HOST_B3
 #include "gf_command_host.h"
 
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "line %d: %s\n", __LINE__, #x); return 1; } } while (0)
+#define CHECK(x) assert(x)
 
-int main(void)
+void _start(void)
 {
     struct gf_foundation f = {0};
     struct gf2_chan c = {0};
@@ -25,5 +24,5 @@ int main(void)
     CHECK(gf2_ramht_add(&c, 0x1ffe, GF2_RAMHT_ENGINE_DMA, 0x40030, &b) == GF2_OK && b == 3);
     for (u32 i = 0; i < GF2_RAMHT_BITMAP_BYTES; i++) c.bitmap[i] = 0xff;
     CHECK(gf2_ramht_add(&c, 0xdeadbeef, GF2_RAMHT_ENGINE_DMA, 0, &reused) == GF2_ENOSPC);
-    return 0;
+    gf2_host_exit(0);
 }

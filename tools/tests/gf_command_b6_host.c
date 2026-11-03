@@ -1,11 +1,10 @@
 /* Link fence.c only; A2 supplies the B1/B7 and timing/MMIO stubs. */
-#include <assert.h>
 #include "../../hwdev/gf/command.h"
 
 #define GF2_HOST_B6
 #include "gf_command_host.h"
 
-int main(void)
+void _start(void)
 {
     struct gf_foundation f = {0};
     struct gf2_chan ch = {0};
@@ -61,5 +60,5 @@ int main(void)
     assert(gf2_fence_wait(&ch, fence, 200) == GF2_ESTATE);
     ch.state = GF2_FAULT;
     assert(gf2_fence_emit(&ch, &fence, 200) == GF2_EFAULT);
-    return 0;
+    gf2_host_exit(0);
 }
