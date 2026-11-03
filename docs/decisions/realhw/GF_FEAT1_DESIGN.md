@@ -515,3 +515,25 @@ foundation_test.c: DISPLAY 2操作の dispatch と上限検査。backend_geforce
 P2-1: 再開始の除外表を要求キャッシュから独立して保持。P3-1: 本番 cycle は RUN 前提を明記。
 P3-2: wire/kernel ヘッダ分離と宣言数更新。P3-3: 登録時期の表現を既存経路に修正。
 P3-4: 診断 STOP の PCI 経路・PMC=na を明記。推測: rshell は不可、既存 GSERIAL→GUI端末で本番 RUN を観測。
+
+## C9a の表示 CRC の入口 (追記、2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf-c9/ADDENDUM_C9a.md (C9a の sol の設計の欠け → astra 起草、Opus レビュー写してよい、P3 2 件を PM が反映)。
+確定本文の表示 CRC 前後一致・範囲・guarded bus を維持する。既存診断入口だけでは実測列を取得できないため、固定行 read を補う。
+```c
+/* C9b: kdebug/gfinit_bus.h に追加、同 .c に定義（hwdev.mod 内）。 */
+int gfinit_bus_mode_read_row(struct gfinit_bus *, u32 y, u8 *row);
+/* C9a: kdebug/gf_foundation_test.h の既存宣言を置換、同 .c が利用。 */
+int gf_foundation_test(struct gf1_request *, struct gf_foundation *, const struct recover_ops *, int (*display)(bool), int (*read_row)(void *, u32, u8 *), void *row_owner);
+/* C9a: 両 owner 共通。row は呼出側の640 byte buffer、y=0..479。 */
+rc = read_row(row_owner, y, row); /* 成功時だけ crc32_core_update(state, row, 640) */
+```
+C9b の gfinit.c が選択済み owner の同期専用 callback/context を渡す（保存しない）。callback は成功0、失敗は既存 gf1_rc を返す。
+診断 callback は gf_mode_vram (gfinit.c:169-173) と同じく先に gf_owned(r) を確かめ、trial_step 内で各行前と最終行後に recover_safe_point(r)、行取得は gfinit_bus_mode_read_row(&g->bus,y,row)。
+新 bus 入口は gfinit_bus.c:140-154 の ready/y/範囲検査・memory_config と recover_window_access を共有し、write=false、4 byteずつ取得して低位byteから row に格納する。戻り値は既存同様0/-1、callback は失敗を GF1_EIO に変換。
+既存 mode_row の比較契約は変更しない。memory_config (:80-91) の identity/BAR/失効検査と既存 window の復元を通し、登録 target を偽装せず、直接 window を試験から呼ばない。
+本番 callback（C9b、gfinit.c）は slot->production と一致する f から offsetof(struct gf_production,foundation) で p を得て、p->display.io.read(p->display.io.opaque,1,y*640+x,4,&v) を x=0..636 に呼び、低位byteから格納する（y<480）。失敗は GF1_EIO。
+本番の結線は hwdev/gf/devinit.c:90-91、入口は bus.c:26-39 の gf_production_read、実読取りは native.c:46-60 の既存 CPU map。f->io.read は BAR0 専用なので両 owner とも表示には使わない。
+読む範囲は両方とも BAR1 の [0,307200)、640×480×8bit 全体。追加の常設 map・予約・import は不要。診断の一時 window 操作は既存のものだけ。
+C9a は lib/crc32_core.inc を使い各走査で INIT→480行 update→final を1回、CRC前→INST_PAGE→CRC後の順に比較する。診断はこの列を trial_step 内で実施し、途中失敗は未測定CRC=na/result=ng、不一致も GF1_EIO。測定中は既定どおり serial 出力しない。
+宣言変更は追加1行＋置換1行＝2行（r2 の宣言追補総数は8→9行、static/include/生成物は除く）。C9a は callback 消費まで、bus実装・両callback・呼出元・共有入力台帳 (tools/hwdev_layout.json に struct gf_production の foundation・display.io の 2 欄を足す)/契約生成の追従は C9b。確定本文の撤回なし、新しい守り・回復機構なし。
