@@ -104,7 +104,7 @@ enum probe_error_reason {
     PROBE_ERR_TABLE_DIAG = 20,
     PROBE_ERR_COUNT
 };
-enum probe_scan_reason { PROBE_SCAN_ERROR = 5, PROBE_SCAN_AFTER_ERROR = 6 };
+enum probe_scan_reason { PROBE_SCAN_COMPLETE = 1, PROBE_SCAN_ERROR = 5, PROBE_SCAN_AFTER_ERROR = 6 };
 #define PROBE_CONTEXT_NONE (~0u)
 static u32 probe_fatal, probe_error_counts[PROBE_ERR_COUNT];
 static struct probe_error_context {
@@ -188,6 +188,7 @@ static struct probe_pl_detail probe_pl_detail[2][PROBE_PL_PARTS];
 /* Representative: prefixes of the first N6 column (N3 uses G/R/B), chosen before timing.
  * These extra measurements do not supply or change an adoption budget. */
 static struct probe_pl_column probe_pl_joint[PROBE_PL_SLOTS];
+static u32 probe_pl_joint_reason[PROBE_PL_SLOTS][2];
 static struct probe_pl_detail probe_pl_outside[PROBE_PL_SLOTS][2];
 static struct probe_pl_peak probe_pl_joint_polls[PROBE_PL_SLOTS][2];
 struct probe_pl_stamp { unsigned long long begin, end; u32 iterations, clocks; };
@@ -1026,6 +1027,7 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
     for (u32 n = 0; n < PROBE_PL_SLOTS; n++) {
         probe_pl_joint[n] = (struct probe_pl_column){0};
         for (u32 phase = 0; phase < 2; phase++) {
+            probe_pl_joint_reason[n][phase] = 0;
             probe_pl_outside[n][phase] = (struct probe_pl_detail){0};
             probe_pl_joint_polls[n][phase] = (struct probe_pl_peak){0};
         }
@@ -1045,6 +1047,7 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
         probe_context.col = i;
         r->columns++;
         c->poll.min = 0x7fffffffffffffffLL;
+        long long transition = 0;
         for (u32 phase = 0; phase < 2; phase++) {
             for (u32 k = 0; k < c->colors; k++) palette_set(k, 0, 0, 0);
             struct SplashRasterTimeRange cost[PROBE_PL_KINDS];
@@ -1064,14 +1067,16 @@ static void probe_pl_measure_all(const struct SplashRaster *s)
             if (w > c->w) c->w = w;
             if (cost[PROBE_PL_D].max > c->d) c->d = cost[PROBE_PL_D].max;
             if (cost[PROBE_PL_PREP].max > c->prep) c->prep = cost[PROBE_PL_PREP].max;
-            if (w > r->budget.w.max) r->budget.w.max = w;
-            if (cost[PROBE_PL_D].max > r->budget.d.max) r->budget.d.max = cost[PROBE_PL_D].max;
-            if (cost[PROBE_PL_PREP].max > r->prep) r->prep = cost[PROBE_PL_PREP].max;
             if (cost[PROBE_PL_Q].min < c->poll.min) c->poll.min = cost[PROBE_PL_Q].min;
             if (cost[PROBE_PL_Q].max > c->poll.max) c->poll.max = cost[PROBE_PL_Q].max;
             /* Two wait entry/return paths surround the low-phase prep. */
-            if ((long long)(2 * one) > r->transition) r->transition = 2 * one;
+            if ((long long)(2 * one) > transition) transition = 2 * one;
         }
+        /* Adopt a column only after both phases finish without errors. */
+        if (c->w > r->budget.w.max) r->budget.w.max = c->w;
+        if (c->d > r->budget.d.max) r->budget.d.max = c->d;
+        if (c->prep > r->prep) r->prep = c->prep;
+        if (transition > r->transition) r->transition = transition;
         if (c->poll.min < r->poll.min) r->poll.min = c->poll.min;
         if (c->poll.max > r->poll.max) r->poll.max = c->poll.max;
         continue;
@@ -1129,7 +1134,11 @@ column_error:
             emitters[n](probe_pl_prepare(c, phase ^ 1));
             (void)probe_pl_prepare(c, phase);
             unsigned long long one = 0;
+            u32 errors_before = probe_errors;
             (void)probe_pl_measure(s, PROBE_PL_JOINT, c, emitters[n], phase, &one);
+            probe_pl_joint_reason[n][phase] = probe_errors != errors_before ? PROBE_SCAN_ERROR :
+                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;
+            if (probe_fatal) return;
         }
     }
     probe_context = (struct probe_error_context){ PROBE_CONTEXT_NONE,
@@ -1326,6 +1335,7 @@ static void probe_pl_details_dump(void)
     for (u32 n = 0; n < PROBE_PL_SLOTS; n++) for (u32 phase = 0; phase < 2; phase++) {
         const struct probe_pl_peak *p = &probe_pl_joint[n].peak[phase][PROBE_PL_JOINT];
         probe_field("SPLR pl_joint_n=", n); probe_field(" phase=", phase);
+        probe_field(" scan_reason=", probe_pl_joint_reason[n][phase]);
         probe_field(" den=", probe_pl_result[0].budget.den);
         probe_field(" count=", p->count);
         probe_pl_peak_fields(" ", p);
@@ -1334,6 +1344,7 @@ static void probe_pl_details_dump(void)
         serial_puts_polled("\n");
         const struct probe_pl_detail *d = &probe_pl_outside[n][phase];
         probe_field("SPLR pl_joint_outer_n=", n); probe_field(" phase=", phase);
+        probe_field(" scan_reason=", probe_pl_joint_reason[n][phase]);
         probe_field(" den=", probe_pl_result[0].budget.den);
         probe_pl_peak_fields(" raw_", &d->raw);
         probe_pl_peak_fields(" upper_", &d->upper);

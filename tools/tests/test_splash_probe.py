@@ -21,6 +21,16 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'platform/pc98/splash_probe.c'
 MUTATIONS = (
+    ('include failed phase column budget',
+     '            if ((long long)(2 * one) > transition) transition = 2 * one;',
+     '            if ((long long)(2 * one) > transition) transition = 2 * one;\n'
+     '            if (c->w > r->budget.w.max) r->budget.w.max = c->w;\n'
+     '            if (c->d > r->budget.d.max) r->budget.d.max = c->d;\n'
+     '            if (c->prep > r->prep) r->prep = c->prep;\n'
+     '            if (transition > r->transition) r->transition = transition;'),
+    ('omit joint phase error status',
+     'probe_errors != errors_before ? PROBE_SCAN_ERROR :\n                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;',
+     'probe_errors != errors_before ? PROBE_SCAN_AFTER_ERROR :\n                probe_errors ? PROBE_SCAN_AFTER_ERROR : PROBE_SCAN_COMPLETE;'),
     ('omit first error reason output', 'probe_field("SPLR error_first reason=", probe_error_first.reason);',
      'probe_field("SPLR missing_first reason=", probe_error_first.reason);'),
     ('abort after column error', '        c->scan_reason = PROBE_SCAN_ERROR;',
@@ -241,6 +251,10 @@ def execute(mutation=None):
                 source = source.replace(
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);',
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);\n        span = probe_host_pl_span(span);')
+                source = source.replace('    unsigned long long seed_closed =',
+                    '    seed = probe_host_error_span(seed, 1);\n    unsigned long long seed_closed =')
+                source = source.replace('        unsigned long long closed =',
+                    '        span = probe_host_error_span(span, 0);\n        unsigned long long closed =')
                 source = source.replace('probe_hcalibrate(s, &q, clocks, pass)',
                     'probe_host_hcalibrate(s, &q, clocks, pass)')
                 source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',
