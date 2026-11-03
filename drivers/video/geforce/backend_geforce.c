@@ -7,6 +7,7 @@
 #include "hwdev/gf/foundation.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "geforce_module.h"
+#include "hwdev/gf/accel.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
 #define gfx_flip_enabled (*geforce_context->flip)
@@ -37,6 +38,14 @@ extern GfxBackend gfx_backend_geforce;
 static struct video_device *device;
 static int (*identify_resources)(void);
 static struct video_fb framebuffer;
+#ifdef OS32_GEFORCE_MODULE
+void geforce_backend_framebuffer_info(struct video_fb *out, u32 *width, u32 *height)
+{
+    *out = framebuffer;
+    *width = GF_WIDTH;
+    *height = GF_HEIGHT;
+}
+#endif
 static u32 bar0_phys;
 static int (*interrupt_point)(void *);
 static void *interrupt_context;
@@ -99,6 +108,9 @@ static void geforce_palette_init(void)
 
 static int geforce_stop(void)
 {
+#ifdef OS32_GEFORCE_MODULE
+    gf_hook_scan_bind(false, 0);
+#endif
     active = routed = 0;
     int rc = stop_device ? stop_device() : device ? video_stop(device) : 0;
     if (pc98_route_to_98()) rc = -1;
@@ -213,6 +225,9 @@ GfxBackend gfx_backend_geforce = {
     .query = geforce_query, .shutdown = geforce_shutdown,
     .present_rect = geforce_present, .set_palette = geforce_set_palette,
     .enter = geforce_enter, .leave = geforce_leave,
+#ifdef OS32_GEFORCE_MODULE
+    .fill_rect = geforce_fill_rect, .blit = geforce_blit,
+#endif
     .bb_pitch = GF_PITCH, .bb_format = GFX_BB_PACKED8,
     .prepare = geforce_prepare, .modes = geforce_modes,
     .mode_count = sizeof(geforce_modes) / sizeof(geforce_modes[0])
