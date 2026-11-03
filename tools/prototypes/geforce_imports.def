@@ -199,6 +199,12 @@
       "source": "kernel/irq/tick.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "geforce_dma_ops",
+      "source": "hwdev/gf/command.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }
