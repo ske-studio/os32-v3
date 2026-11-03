@@ -196,4 +196,9 @@ geforce_foundation_ops:
 serial_puts_polled:
     jmp *hwdev_import_slots+152
 .size serial_puts_polled, .-serial_puts_polled
+.globl sys_time_now
+.type sys_time_now, @function
+sys_time_now:
+    jmp *hwdev_import_slots+156
+.size sys_time_now, .-sys_time_now
 .section .note.GNU-stack,"",@progbits

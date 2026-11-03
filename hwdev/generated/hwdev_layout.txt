@@ -1470,10 +1470,12 @@ offset	struct gf1_request.size	0
 member_size	struct gf1_request.size	4
 offset	struct gf1_request.test	4
 member_size	struct gf1_request.test	4
-size	struct gf1_test_ops	12
+size	struct gf1_test_ops	16
 align	struct gf1_test_ops	4
 offset	struct gf1_test_ops.call	8
 member_size	struct gf1_test_ops.call	4
+offset	struct gf1_test_ops.command	12
+member_size	struct gf1_test_ops.command	4
 offset	struct gf1_test_ops.prepare	4
 member_size	struct gf1_test_ops.prepare	4
 offset	struct gf1_test_ops.production	0
@@ -1502,6 +1504,242 @@ offset	struct gf1_test_request.op	4
 member_size	struct gf1_test_request.op	4
 offset	struct gf1_test_request.size	0
 member_size	struct gf1_test_request.size	4
+size	struct gf2_chan	924
+align	struct gf2_chan	4
+offset	struct gf2_chan.B	12
+member_size	struct gf2_chan.B	4
+offset	struct gf2_chan.bar1	860
+member_size	struct gf2_chan.bar1	16
+offset	struct gf2_chan.bitmap	256
+member_size	struct gf2_chan.bitmap	512
+offset	struct gf2_chan.cur	16
+member_size	struct gf2_chan.cur	4
+offset	struct gf2_chan.dma_ops	908
+member_size	struct gf2_chan.dma_ops	4
+offset	struct gf2_chan.dma_rc	900
+member_size	struct gf2_chan.dma_rc	4
+offset	struct gf2_chan.epoch	36
+member_size	struct gf2_chan.epoch	4
+offset	struct gf2_chan.f	0
+member_size	struct gf2_chan.f	4
+offset	struct gf2_chan.fault	44
+member_size	struct gf2_chan.fault	168
+offset	struct gf2_chan.free	24
+member_size	struct gf2_chan.free	4
+offset	struct gf2_chan.grctx	840
+member_size	struct gf2_chan.grctx	12
+offset	struct gf2_chan.heads	8
+member_size	struct gf2_chan.heads	4
+offset	struct gf2_chan.last_rc	904
+member_size	struct gf2_chan.last_rc	4
+offset	struct gf2_chan.map_bytes	892
+member_size	struct gf2_chan.map_bytes	4
+offset	struct gf2_chan.map_ops	852
+member_size	struct gf2_chan.map_ops	4
+offset	struct gf2_chan.map_owner	856
+member_size	struct gf2_chan.map_owner	4
+offset	struct gf2_chan.mapped	896
+member_size	struct gf2_chan.mapped	1
+offset	struct gf2_chan.max	28
+member_size	struct gf2_chan.max	4
+offset	struct gf2_chan.pci_dma	816
+member_size	struct gf2_chan.pci_dma	24
+offset	struct gf2_chan.push_dma	768
+member_size	struct gf2_chan.push_dma	24
+offset	struct gf2_chan.push_extent	876
+member_size	struct gf2_chan.push_extent	16
+offset	struct gf2_chan.put	20
+member_size	struct gf2_chan.put	4
+offset	struct gf2_chan.seen	212
+member_size	struct gf2_chan.seen	44
+offset	struct gf2_chan.seq	32
+member_size	struct gf2_chan.seq	4
+offset	struct gf2_chan.staging	912
+member_size	struct gf2_chan.staging	12
+offset	struct gf2_chan.staging_live	898
+member_size	struct gf2_chan.staging_live	1
+offset	struct gf2_chan.state	4
+member_size	struct gf2_chan.state	4
+offset	struct gf2_chan.va	40
+member_size	struct gf2_chan.va	4
+offset	struct gf2_chan.vram_dma	792
+member_size	struct gf2_chan.vram_dma	24
+offset	struct gf2_chan.vram_reserved	897
+member_size	struct gf2_chan.vram_reserved	1
+size	struct gf2_dma_buf	12
+align	struct gf2_dma_buf	4
+offset	struct gf2_dma_buf.pa	0
+member_size	struct gf2_dma_buf.pa	4
+offset	struct gf2_dma_buf.size	4
+member_size	struct gf2_dma_buf.size	4
+offset	struct gf2_dma_buf.va	8
+member_size	struct gf2_dma_buf.va	4
+size	struct gf2_dma_ops	12
+align	struct gf2_dma_ops	4
+offset	struct gf2_dma_ops.alloc	0
+member_size	struct gf2_dma_ops.alloc	4
+offset	struct gf2_dma_ops.free	4
+member_size	struct gf2_dma_ops.free	4
+offset	struct gf2_dma_ops.leak	8
+member_size	struct gf2_dma_ops.leak	4
+size	struct gf2_fault	168
+align	struct gf2_fault	4
+offset	struct gf2_fault.cache_get	120
+member_size	struct gf2_fault.cache_get	4
+offset	struct gf2_fault.caches	112
+member_size	struct gf2_fault.caches	4
+offset	struct gf2_fault.chid	8
+member_size	struct gf2_fault.chid	4
+offset	struct gf2_fault.data	132
+member_size	struct gf2_fault.data	4
+offset	struct gf2_fault.dma_dcount	148
+member_size	struct gf2_fault.dma_dcount	4
+offset	struct gf2_fault.dma_fetch	140
+member_size	struct gf2_fault.dma_fetch	4
+offset	struct gf2_fault.dma_push	144
+member_size	struct gf2_fault.dma_push	4
+offset	struct gf2_fault.dma_state	136
+member_size	struct gf2_fault.dma_state	4
+offset	struct gf2_fault.epoch	4
+member_size	struct gf2_fault.epoch	4
+offset	struct gf2_fault.first	24
+member_size	struct gf2_fault.first	44
+offset	struct gf2_fault.get	16
+member_size	struct gf2_fault.get	4
+offset	struct gf2_fault.gr_class	164
+member_size	struct gf2_fault.gr_class	4
+offset	struct gf2_fault.gr_data	160
+member_size	struct gf2_fault.gr_data	4
+offset	struct gf2_fault.gr_method	156
+member_size	struct gf2_fault.gr_method	4
+offset	struct gf2_fault.gr_trap	152
+member_size	struct gf2_fault.gr_trap	4
+offset	struct gf2_fault.latched	0
+member_size	struct gf2_fault.latched	1
+offset	struct gf2_fault.latest	68
+member_size	struct gf2_fault.latest	44
+offset	struct gf2_fault.method	128
+member_size	struct gf2_fault.method	4
+offset	struct gf2_fault.pull0	124
+member_size	struct gf2_fault.pull0	4
+offset	struct gf2_fault.push1	116
+member_size	struct gf2_fault.push1	4
+offset	struct gf2_fault.put	12
+member_size	struct gf2_fault.put	4
+offset	struct gf2_fault.reference	20
+member_size	struct gf2_fault.reference	4
+size	struct gf2_fence	8
+align	struct gf2_fence	4
+offset	struct gf2_fence.epoch	0
+member_size	struct gf2_fence.epoch	4
+offset	struct gf2_fence.seq	4
+member_size	struct gf2_fence.seq	4
+size	struct gf2_object	24
+align	struct gf2_object	4
+offset	struct gf2_object.class_id	20
+member_size	struct gf2_object.class_id	2
+offset	struct gf2_object.cookie	4
+member_size	struct gf2_object.cookie	4
+offset	struct gf2_object.handle	0
+member_size	struct gf2_object.handle	4
+offset	struct gf2_object.inst	8
+member_size	struct gf2_object.inst	12
+size	struct gf2_request	16
+align	struct gf2_request	4
+offset	struct gf2_request.rc	12
+member_size	struct gf2_request.rc	4
+offset	struct gf2_request.session	8
+member_size	struct gf2_request.session	4
+offset	struct gf2_request.size	0
+member_size	struct gf2_request.size	4
+offset	struct gf2_request.test	4
+member_size	struct gf2_request.test	4
+size	struct gf2_test_ops	8
+align	struct gf2_test_ops	4
+offset	struct gf2_test_ops.call	4
+member_size	struct gf2_test_ops.call	4
+offset	struct gf2_test_ops.prepare	0
+member_size	struct gf2_test_ops.prepare	4
+size	struct gf2_test_reply	260
+align	struct gf2_test_reply	4
+offset	struct gf2_test_reply.B	32
+member_size	struct gf2_test_reply.B	4
+offset	struct gf2_test_reply.cache_get	76
+member_size	struct gf2_test_reply.cache_get	4
+offset	struct gf2_test_reply.caches	68
+member_size	struct gf2_test_reply.caches	4
+offset	struct gf2_test_reply.chid	52
+member_size	struct gf2_test_reply.chid	4
+offset	struct gf2_test_reply.ctx_bytes	40
+member_size	struct gf2_test_reply.ctx_bytes	4
+offset	struct gf2_test_reply.ctx_off	36
+member_size	struct gf2_test_reply.ctx_off	4
+offset	struct gf2_test_reply.ctx_words	44
+member_size	struct gf2_test_reply.ctx_words	4
+offset	struct gf2_test_reply.data	88
+member_size	struct gf2_test_reply.data	4
+offset	struct gf2_test_reply.dma_dcount	104
+member_size	struct gf2_test_reply.dma_dcount	4
+offset	struct gf2_test_reply.dma_fetch	96
+member_size	struct gf2_test_reply.dma_fetch	4
+offset	struct gf2_test_reply.dma_push	100
+member_size	struct gf2_test_reply.dma_push	4
+offset	struct gf2_test_reply.dma_rc	4
+member_size	struct gf2_test_reply.dma_rc	4
+offset	struct gf2_test_reply.dma_state	92
+member_size	struct gf2_test_reply.dma_state	4
+offset	struct gf2_test_reply.epoch	12
+member_size	struct gf2_test_reply.epoch	4
+offset	struct gf2_test_reply.fault_epoch	48
+member_size	struct gf2_test_reply.fault_epoch	4
+offset	struct gf2_test_reply.fault_get	60
+member_size	struct gf2_test_reply.fault_get	4
+offset	struct gf2_test_reply.fault_put	56
+member_size	struct gf2_test_reply.fault_put	4
+offset	struct gf2_test_reply.fault_reference	64
+member_size	struct gf2_test_reply.fault_reference	4
+offset	struct gf2_test_reply.first	172
+member_size	struct gf2_test_reply.first	44
+offset	struct gf2_test_reply.get	24
+member_size	struct gf2_test_reply.get	4
+offset	struct gf2_test_reply.gr_class	120
+member_size	struct gf2_test_reply.gr_class	4
+offset	struct gf2_test_reply.gr_data	116
+member_size	struct gf2_test_reply.gr_data	4
+offset	struct gf2_test_reply.gr_method	112
+member_size	struct gf2_test_reply.gr_method	4
+offset	struct gf2_test_reply.gr_trap	108
+member_size	struct gf2_test_reply.gr_trap	4
+offset	struct gf2_test_reply.latched	124
+member_size	struct gf2_test_reply.latched	1
+offset	struct gf2_test_reply.latest	216
+member_size	struct gf2_test_reply.latest	44
+offset	struct gf2_test_reply.method	84
+member_size	struct gf2_test_reply.method	4
+offset	struct gf2_test_reply.pull0	80
+member_size	struct gf2_test_reply.pull0	4
+offset	struct gf2_test_reply.push1	72
+member_size	struct gf2_test_reply.push1	4
+offset	struct gf2_test_reply.put	20
+member_size	struct gf2_test_reply.put	4
+offset	struct gf2_test_reply.rc	0
+member_size	struct gf2_test_reply.rc	4
+offset	struct gf2_test_reply.reference	28
+member_size	struct gf2_test_reply.reference	4
+offset	struct gf2_test_reply.seq	16
+member_size	struct gf2_test_reply.seq	4
+offset	struct gf2_test_reply.state	8
+member_size	struct gf2_test_reply.state	4
+offset	struct gf2_test_reply.stats	128
+member_size	struct gf2_test_reply.stats	44
+size	struct gf2_test_request	12
+align	struct gf2_test_request	4
+offset	struct gf2_test_request.deadline_us	8
+member_size	struct gf2_test_request.deadline_us	4
+offset	struct gf2_test_request.op	4
+member_size	struct gf2_test_request.op	4
+offset	struct gf2_test_request.size	0
+member_size	struct gf2_test_request.size	4
 size	struct gf_display_context	1732
 align	struct gf_display_context	4
 offset	struct gf_display_context.active	250
@@ -1566,10 +1804,12 @@ offset	struct gf_display_context.stop_ok	252
 member_size	struct gf_display_context.stop_ok	1
 offset	struct gf_display_context.target	1716
 member_size	struct gf_display_context.target	4
-size	struct gf_display_owner	20
+size	struct gf_display_owner	24
 align	struct gf_display_owner	4
 offset	struct gf_display_owner.acquire	0
 member_size	struct gf_display_owner.acquire	4
+offset	struct gf_display_owner.command_get	20
+member_size	struct gf_display_owner.command_get	4
 offset	struct gf_display_owner.foundation_start	12
 member_size	struct gf_display_owner.foundation_start	4
 offset	struct gf_display_owner.foundation_stop	16
@@ -1790,12 +2030,14 @@ offset	struct gf_op_dispatch.opcode	0
 member_size	struct gf_op_dispatch.opcode	4
 offset	struct gf_op_dispatch.run	4
 member_size	struct gf_op_dispatch.run	4
-size	struct gf_production	2180
+size	struct gf_production	3104
 align	struct gf_production	4
 offset	struct gf_production.acquiring	1755
 member_size	struct gf_production.acquiring	1
 offset	struct gf_production.attempted	1753
 member_size	struct gf_production.attempted	1
+offset	struct gf_production.chan	2172
+member_size	struct gf_production.chan	924
 offset	struct gf_production.display	0
 member_size	struct gf_production.display	1732
 offset	struct gf_production.foundation	1968
@@ -1804,9 +2046,9 @@ offset	struct gf_production.indexes	1776
 member_size	struct gf_production.indexes	96
 offset	struct gf_production.locks	1872
 member_size	struct gf_production.locks	96
-offset	struct gf_production.map_ops	2172
+offset	struct gf_production.map_ops	3096
 member_size	struct gf_production.map_ops	4
-offset	struct gf_production.map_owner	2176
+offset	struct gf_production.map_owner	3100
 member_size	struct gf_production.map_owner	4
 offset	struct gf_production.prepared	1752
 member_size	struct gf_production.prepared	1
@@ -3502,6 +3744,38 @@ enum	GF1_INSTMEM	1
 enum	GF1_OK	0
 enum	GF1_STATUS	0
 enum	GF1_VBLANK	2
+enum	GF2T_BAD_HANDLE	5
+enum	GF2T_BAD_METHOD	6
+enum	GF2T_RECOVER	4
+enum	GF2T_REFERENCE	1
+enum	GF2T_SNAPSHOT	2
+enum	GF2T_START	0
+enum	GF2T_STOP	3
+enum	GF2_BAD_HANDLE	6
+enum	GF2_BAD_METHOD	7
+enum	GF2_CYCLE	5
+enum	GF2_DRAIN	3
+enum	GF2_ECLASS	4294967087
+enum	GF2_EEXIST	4294967088
+enum	GF2_EFAULT	4294967090
+enum	GF2_EINVAL	4294967095
+enum	GF2_EIO	4294967092
+enum	GF2_EMAP	4294967093
+enum	GF2_ENOSPC	4294967094
+enum	GF2_ESTATE	4294967089
+enum	GF2_ESTOP	4294967086
+enum	GF2_ETIME	4294967091
+enum	GF2_FAULT	4
+enum	GF2_INIT	1
+enum	GF2_OFF	0
+enum	GF2_OK	0
+enum	GF2_RECOVER	4
+enum	GF2_REFERENCE	2
+enum	GF2_RUN	2
+enum	GF2_START	1
+enum	GF2_STATUS	0
+enum	GF2_STOP	3
+enum	GF2_VBLANK	8
 enum	GF_C_AR	4
 enum	GF_C_AR_GATE	6
 enum	GF_C_BRANCH	5

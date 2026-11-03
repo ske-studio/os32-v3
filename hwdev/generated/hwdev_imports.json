@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 2283671928,
+  "module_abi_gen": 4054577517,
   "imports": [
     {
       "name": "trial_begin",
@@ -232,6 +232,12 @@
     {
       "name": "serial_puts_polled",
       "index": 38,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "sys_time_now",
+      "index": 39,
       "kind": 1,
       "type_ver": 1
     }
