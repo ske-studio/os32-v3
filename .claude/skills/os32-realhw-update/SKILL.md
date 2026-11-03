@@ -6,8 +6,9 @@ description: 実機 PC-9821Ra266 の OS32 を、HDD 起動のまま新しい版 
 # os32-realhw-update — 実機 Ra266 を HDD 起動のまま更新する
 
 PM は実機に直接つながっていない。実機のシリアル (/dev/ttyUSB0) と LAN はノート側にある。
-ノートのセッション名は変わるので、毎回 `ListAgents` で `hight-pc-…` の Remote Control の行を探して
+ノートのセッション名は変わるので (2026-11-03 は「実機ノート」)、毎回 `ListAgents` で Remote Control の行を探して
 `SendMessage` で頼む (返事は来ないことがある。結果はノートの証拠の所在を報告させて読む)。
+**一覧に別の機械のセッションが 1 つも出ないときは、このセッション自身が Remote Control につながっていない** — ユーザーに `/remote-control` を頼む (2026-11-03、3 回探して見つからなかった)。
 **PM が ssh でノートに入り、配備・再起動・シリアルの台本を直接流さない** (2026-10-30 にこれをして、ノートに依頼の記録が残らず、CI の成果物でない手元ビルドを入れた — ユーザー指摘)。ssh で PM がしてよいのは**ファイルを置くこと** (試験を飛ばして手元ビルドの成果物を入れるとき、scp で送って ~/os32-ci/os32-local-<SHA> に展開する) と状態の確認 (ファイルの有無・git の版) まで。**置いた後の処理** (lanfs_host の起動・hsync・再起動・シリアルの試験) は依頼文に書いてノートに頼む (ユーザー指示 2026-10-30)。
 
 ## 0. 前提の確かめ (頼む前に PM が行う)
@@ -64,6 +65,18 @@ OS32 実機 (Ra266) を os32-v3 main <SHA> に更新してください。ユー�
 - 音・物理操作が要る項目は実施しないで、台帳 ([DEFERRED_TESTS](../../../docs/tasks/DEFERRED_TESTS.md)) の該当行に
   「立会い待ち」として残す。
 - 票の状態行と証拠の所在を記録する。実機の基準構成が変わっていたら [RA266](../../../docs/decisions/realhw/RA266.md) §1-1 を先に照合。
+
+## 3. 観測と受け渡しの道具 (2026-11-03 に確かめた形)
+
+- **ssh / scp**: `ssh -i ~/.ssh/brain_pwsh4 -o BatchMode=yes hight@100.76.241.127` (tailscale の IP)。ホスト名 `hight-pc-vj24lfwz1srg` で入ると鍵が違い `Permission denied`。scp も同じ鍵と IP。してよいのは §冒頭のとおりファイルを置くことと状態の確認まで。置いたら sha256 を両側で照合する。
+- **カメラ** (画面): `curl -s http://hight-pc-vj24lfwz1srg:8080/api/frames` (JSON、毎秒 1 枚・直近の名前の配列、末尾が最新) → `curl -s -o x.jpg http://hight-pc-vj24lfwz1srg:8080/frames/<名前>` を Read で見る。文字は読めない — 写った・崩れ・真っ黒の判定だけ (正典 [RA266](../../../docs/decisions/realhw/RA266.md) §3-1)。**ノートに reboot の時刻 (秒まで) を先に返させ**、その時刻からの枚を見る。
+- **起動の途中のシリアル** (起動ログ・診断の行): ノートが rshell で `reboot` を打ち、そのまま約 150 秒シリアルを記録して `<名札>/splr-boot.log` と `.raw`、各段の開始・終了・rc を `TIMES.txt` に残す (2026-11-02 の splash-diag-b9c239d4 の形)。依頼文に「前回と同じ採り方」でなく、この 1 行を書く。
+- **診断の像 (別の BUILD_OUT、例 `make kernel-splash-diag` → `build/out/splash-diag/`) の渡し方**: `deploy.yaml` は `build/out` を前提にするので、次の手で HostDrv の根を作る。
+  1. 診断の作業木で `make all` と診断の像を組む (重い仕事は同時 2 本まで — メモリ不足で止められた)。
+  2. NP21/W の予行 (罠の 1 行目): `np21w_ctl.py stop` → 作業木で `nhd_deploy.py pull` → `make deploy-nhd` → `umount` → `start --wait-ready`。続けて `make deploy` (HostDrv `/mnt/c/os32`) の後、`build/out/splash-diag/{*.mod,vmkernel.lz4,kdebug.bin}` を `/mnt/c/os32/boot/` に上書きし、**目録 `/mnt/c/os32/.deploy/manifest.txt` の `boot/` の行を `tools/hostdrv_deploy.py` の `manifest_line()` で作り直す** (そのままだと hsync が `manifest_crc_mismatch` で 13 件とも断る)。ゲストで `hsync -n boot` → `hsync boot` → `emu_reset`。
+  3. NP21/W の起動の途中のシリアルは `curl.exe -s http://127.0.0.1:8025/api/serial/read` (JSON の hex、読むと消える) を 2 秒ごとに約 90 秒集めて読む。最後に `ver` で Image CRC と `kdebug: on (pair …)`。
+  4. 実機へは `/mnt/c/os32` を丸ごと tgz にして scp で `~/os32-ci/os32-local-<名札>/` に置き、ノートには root をそこの `os32` にして `sfs run hsync boot` と頼む。戻しの root (今の常用の成果物の場所) は、準備の問い合わせでノートに返させる。
+  5. 終わったら NP21/W と `/mnt/c/os32` は `make deploy` (と必要なら `deploy-nhd`) で常用に戻す。
 
 ## 罠
 
