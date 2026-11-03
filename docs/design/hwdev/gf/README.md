@@ -18,12 +18,26 @@ OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0
 HAL に GF のレジスタ・ROM・recover token を出さない。
 
 これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`O/init/kernel.c:343–366,577–582`）。
-順番は **route00→ID/定数長/base/資源/写像確認→Command=0x0102 設定・生の 16bit 読戻し確認→ROM 採取・解読→A2 の legacy 無効化/解錠→main0〜4→基準値採取→mode 計算→共有列→必須 CHECK→初回転送/セル→route01**。A1 は本番の全経路から外す。
+順番は **route00→ID/定数長/base/資源/写像確認→Command=0x0106 設定・生の 16bit 読戻し確認→ROM 採取・解読→A2 の legacy 無効化/解錠→main0〜4→基準値採取→mode 計算→共有列→必須 CHECK→層1 start→初回転送/セル→route01**。A1 は本番の全経路から外す。
 本番は既知 27 命令専用 runner。解読・整数 PLL・資源検査・A2 のハード手順・局所復元を共有し、recover の plan/node/capture/REC 実行器や kpeek を本番から呼ばない（`O/kdebug/gfinit_exec.c:80`、`gfinit.c:176`）。
 配置は **`geforce.mod`＋核の薄い予約/復帰口**（U5）。下層/中層は `hwdev/gf/`、HAL のバックエンドは `drivers/video/geforce/` (共通層は `gfx/`、TASK_SRC_LAYOUT L2 で移った)、診断 adapter は `kdebug/` と従来 hwdev.mod。本番は KDEBUG=0 で動く。
-終了/障害/reboot 前は **局所 index/lock/窓復元→1850=0→1854=0→PMC140=0→route00→decode 安全確認→98 復元・予約セル往復・再描画**（`docs/design/kdebug/recover_common/s0.md`）。
+層1 start は毎回 `gf_master_enable` → IRQ を閉じて MC 初期化 → instmem (容量計算・BAR2 map・固定領域確保) → tick bind → IRQ attach → running と source ACK/enable・PMC enable。Command の書き込みと `expected_command` の更新のあいだに MMIO を挟まない。再開始も同じ start に入る。
+終了/障害/reboot 前は **新規呼出し停止→層1 stop (running 停止・tick 解除・source mask/ACK → engine 停止・PMC 読取り → IRQ 解除 → BM 解除 → instmem 解放/unmap) →局所 index/lock/窓復元→1850=0→1854=0→PMC140=0→route00→decode 安全確認→98 復元・予約セル往復・再描画**（`docs/design/kdebug/recover_common/s0.md`）。
+途中失敗では停止に必要な所有状態を保持する。identity/BAR 失効時は旧装置へのアクセスをせず、BAR2 の CPU 写像を解除して所有を保持し、98 への切替を試みる。
 S0 は PLL/PFB/旧 timing の完全復元ではなく PARTIAL/S1 未保証を保つ。無応答 MMIO/CPU 停止は既存の物理リセット手順へ戻す。
 ## 索引
+
+層1 の部品（[確定設計](../../../decisions/realhw/GF_FEAT1_DESIGN.md) §7 と追記）:
+
+- `hwdev/gf/master.c` — PCI Bus Master / latency (B0)
+- `hwdev/gf/instmem.c` — instance 確保・解放・アクセス (B1)
+- `hwdev/gf/irq.c` — IRQ 登録・dispatch・ACK・統計 (B2)
+- `hwdev/gf/engine_stop.c` — engine 停止 (B3)
+- `hwdev/gf/mc.c` — NV44 MC 初期化 (B4)
+- `hwdev/gf/instmem_map.c` — BAR2 写像の生存期間 (B5)
+- `drivers/video/geforce/geforce_tick.c` — 常駐 tick 登録・参照管理 (B6)
+- `hwdev/gf/foundation.c` — 層1 の開始・停止 (C0)
+- `kdebug/gf_foundation_test.c` — serial `gf1` 試験 adapter (C9、並行実装中)。module 側の `hwdev/gf/foundation_test.c` が dispatch / prepare を持つ。
 
 - [hwdev/gf/display/](display/README.md)
 - [hwdev/gf/op/](op/README.md)
