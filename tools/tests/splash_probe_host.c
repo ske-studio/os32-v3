@@ -181,7 +181,9 @@ void gfx_present_nosync(void) { probe_presents++; }
 void palette_set(int index, u8 r, u8 g, u8 b)
 {
     color(index, r, g, b);
-    if (index == 0 && initial_irq_us) {
+    /* Inject into the initial sixteen colors, after PL calibration resets. */
+    if (index == 0 && initial_irq_us && probe_pl_count &&
+        probe_pl_columns[probe_pl_count-1].completed == PROBE_HPERIODS) {
         advance(initial_irq_us); initial_irq_us = 0;
     }
 }
@@ -288,18 +290,26 @@ static void widths(void)
         long long reference = wide ? (mode ? 80000 : 75472) : (mode ? 20000 : 24532);
         REQUIRE(probe_budget.b.min > 0);
         REQUIRE(probe_budget.b.min <= reference && probe_budget.b.max >= reference);
-        REQUIRE(probe_budget.b.min >= reference - 2 * (long long)den);
-        REQUIRE(probe_budget.b.max <= reference + 2 * (long long)den);
+        REQUIRE(probe_budget.b.min >= reference - 3 * (long long)den);
+        REQUIRE(probe_budget.b.max <= reference + 3 * (long long)den);
         unsigned long long highs = 0, samples = 0;
         for (u32 i = 0; i < PROBE_HPERIODS; i++) {
             highs += probe_highsamples[i]; samples += probe_hsamples[i];
         }
         long long measured = highs * 100000 / samples;
         REQUIRE(probe_delta(measured, reference) <= (unsigned long long)den);
-        REQUIRE(test_max_closed * den <= 200000);
+        REQUIRE(test_max_closed * den <= probe_hd.count * probe_cost_bound(PROBE_Q, den) +
+                2 * probe_cost_bound(PROBE_C, den));
         REQUIRE(test_min_open * den >= 100000);
         REQUIRE(!probe_errors && irq_on);
     }
+    /* Six high samples can hide a seventh sample-width at the endpoints.
+     * Taking the maximum individual duty still needs that uncertainty. */
+    for (u32 i = 0; i < PROBE_HPERIODS; i++) {
+        probe_hsamples[i] = 32; probe_highsamples[i] = 6;
+    }
+    probe_bounds(pc98_splash_raster_state());
+    REQUIRE(probe_budget.b.max >= 7 * 100000 / 32);
     in_us = clock_cost_us = out_us = 1;
 }
 static void raw_measurements(void)
@@ -372,29 +382,29 @@ static void h_diagnostics(void)
     REQUIRE(!probe_hblank(s));
     REQUIRE(probe_hd.reason == 8 && probe_hd.over == 1 && probe_hd.bursts == 1);
     REQUIRE(probe_hd.completed > 0 && probe_hd.max_us > 60 && irq_on);
-    /* Real-log bounds give count=18: isolated edges must survive even
-     * though the burst cannot contain a full 31k rise-to-rise period. */
+    /* The former real-log count=18 no longer loses armed at each burst. */
     in_us = 1; probe_errors = 0;
     probe_cost[PROBE_Q].upper_num_us = 37;
     probe_cost[PROBE_Q].upper_samples = 16;
     probe_cost[PROBE_C].upper_num_us = 10;
     probe_cost[PROBE_C].upper_samples = 1;
     probe_cost[PROBE_C].upper_us = 10;
-    REQUIRE(!probe_hblank(s));
-    REQUIRE(probe_hd.reason == 6 && probe_hd.count == 18 && !probe_hd.completed);
+    REQUIRE(probe_hblank(s) == 64);
+    REQUIRE(probe_hd.reason == 1 && probe_hd.count > 2000 && probe_hd.completed == 64);
     REQUIRE(probe_hd.rise && probe_hd.fall && probe_hd.high && probe_hd.low);
-    REQUIRE(probe_hd.min_us == 19 && probe_hd.max_us == 19 && !probe_hd.over);
+    REQUIRE(probe_hd.min_us == probe_hd.count + 1 && probe_hd.max_us == probe_hd.min_us && !probe_hd.over);
     setup(1, 0); in_us = clock_cost_us = out_us = 1;
     s = pc98_splash_raster_state();
     probe_costs(s); missing_h = 1;
     REQUIRE(!probe_hblank(s));
     REQUIRE(probe_hd.reason == 6 && !probe_hd.completed && !probe_hd.rise && !probe_hd.fall);
     REQUIRE(!probe_hd.high && probe_hd.low == probe_hd.bursts * probe_hd.count);
-    REQUIRE(probe_hd.bursts > 1 && !probe_hd.over);
+    REQUIRE(probe_hd.bursts == 1 && !probe_hd.over);
     probe_cost[PROBE_Q].upper_num_us = 0;
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 2 && !probe_hd.bursts);
-    probe_cost[PROBE_Q].upper_num_us = 100000;
-    REQUIRE(!probe_hblank(s) && probe_hd.reason == 4 && probe_hd.count < 2);
+    probe_cost[PROBE_Q].upper_num_us = 73;
+    probe_q_lower = 1;
+    REQUIRE(!probe_hblank(s) && probe_hd.reason == 4 && probe_hd.count > PROBE_HSAMPLES);
     probe_cost[PROBE_C].upper_num_us = 100000;
     REQUIRE(!probe_hblank(s) && probe_hd.reason == 3);
     setup(1, 0); s = pc98_splash_raster_state(); probe_costs(s);
@@ -471,6 +481,15 @@ void _start(void)
         REQUIRE(probe_contains("commit=host-probe crc=123"));
         REQUIRE(probe_contains("SPLR cost=0 num_us=512 den=512 upper_us=2 upper_num_us=73 upper_den=64"));
         REQUIRE(probe_contains("SPLR entry_y=396"));
+        REQUIRE(probe_pl_count == 129);
+        REQUIRE(probe_pl_result[0].columns == 42 && probe_pl_result[1].columns == 87);
+        REQUIRE(probe_contains("SPLR pl_trial_n=5 columns=42 periods=64"));
+        REQUIRE(probe_contains("SPLR pl_trial_n=6 columns=87 periods=64"));
+        for (u32 i = 0; i < probe_pl_count; i++) {
+            const struct probe_pl_column *c = &probe_pl_columns[i];
+            REQUIRE(c->row[0].count == c->n && c->row[1].count == c->n);
+            REQUIRE(c->completed == 64 && !c->timeout && !c->early);
+        }
         REQUIRE(irq_on);
         /* Observe the survey alone: the old player has its own IF tests. */
         test_open_at = 0; test_min_open = ~0ULL; test_max_closed = 0;
