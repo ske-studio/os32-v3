@@ -40,6 +40,7 @@ extern u32 ktime_clamp_count;
 
 /* Splash-only, called with IF=0. Sample at both ends, then settle exactly
  * once before restoring IF; failure must not guess or extend the deadline. */
+/* Returns 0 on success, -1 on failure. */
 int ktime_splash_sample(struct TimeSplashSample *sample);
 int ktime_splash_settle(const struct TimeSplashMathInput *input);
 
