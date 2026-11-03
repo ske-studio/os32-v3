@@ -26,7 +26,69 @@ BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 FULL = ("Makefile", "build/*.mk")
 DOCS = ("**/*.md", "docs/.orphans-allow", "docs/images/**", "docs/logs/**")
+# No automated check exists for these repository metadata, saved observations,
+# sample assets and standalone operational/conversion tools. Keep names explicit
+# so adding a different file still requires a coverage decision.
 NOTEST = (
+    ('lib/microtar/LICENSE', ()),
+    ('lib/microtar/README.OS32', ()),
+    ('lib/zlib/README.OS32', ()),
+    ('.env.sample', ()),
+    ('.gitattributes', ()),
+    ('.gitignore', ()),
+    ('.gitmodules', ()),
+    ('.ignore', ()),
+    ('.mcp.json', ()),
+    ('LICENSE', ()),
+    ('docs/archive/v21/v86v2/data/bda_hddboot.json', ()),
+    ('docs/archive/v21/v86v2/data/trace_boot.json', ()),
+    ('docs/archive/v21/v86v2/data/trace_write.json', ()),
+    ('docs/tasks/portability/data/kstr_bench_2026-09-17_run1.txt', ()),
+    ('docs/tasks/portability/data/kstr_bench_2026-09-17_run2.txt', ()),
+    ('docs/tasks/portability/data/kstr_bench_2026-09-17_run3.txt', ()),
+    ('requirements.txt', ()),
+    ('sample/Gemini_Generated_Image_2d9f9k2d9f9k2d9f.jpg', ()),
+    ('sample/Gemini_Generated_Image_2sdhsx2sdhsx2sdh.jpg', ()),
+    ('sample/Gemini_Generated_Image_dm5n0hdm5n0hdm5n.jpg', ()),
+    ('sample/README.OS32', ()),
+    ('sample/dog.vbz', ()),
+    ('sample/dragon.vbz', ()),
+    ('sample/dragon8.vbz', ()),
+    ('sample/dragon_hb.vbz', ()),
+    ('sample/runner.vbz', ()),
+    ('sample/runner8.vbz', ()),
+    ('sample/runner_hb.vbz', ()),
+    ('tools/audit_cast_align.sh', ()),
+    ('tools/check_tree_unchanged.py', ()),
+    ('tools/ci_fetch.sh', ()),
+    ('tools/create_fat12_d88.sh', ()),
+    ('tools/emu_agent/agent.py', ()),
+    ('tools/emu_agent/mcp_server.py', ()),
+    ('tools/emu_agent/tasks/regress.txt', ()),
+    ('tools/emu_agent/tasks/v86_dos.txt', ()),
+    ('tools/fep_compiler.py', ()),
+    ('tools/gen_sdk_manifest.py', ()),
+    ('tools/gen_unicode.py', ()),
+    ('tools/gfinit_rom_check.py', ()),
+    ('tools/gfinit_source.py', ()),
+    ('tools/img2mgx.py', ()),
+    ('tools/img2vbz.py', ()),
+    ('tools/jobs.sh', ()),
+    ('tools/kstr_bench_report.py', ()),
+    ('tools/lz4_compress.py', ()),
+    ('tools/mk_blank_nhd.py', ()),
+    ('tools/mkd88.py', ()),
+    ('tools/mkfat12.py', ()),
+    ('tools/move_docs.py', ()),
+    ('tools/net_l0_test.py', ()),
+    ('tools/net_l3_test.py', ()),
+    ('tools/np21w_restart.py', ()),
+    ('tools/os32_server.py', ()),
+    ('tools/review_local.py', ()),
+    ('tools/screenshot.py', ()),
+    ('tools/split_c_functions.py', ()),
+    ('tools/sync_docs_to_win.sh', ()),
+    ('tools/sync_hwdocs.sh', ()),
     ("userland/tests/bench_scale2x/main.c", ()),
     ("userland/cmds/**", tuple("userland/cmds/" + n + ".c" for n in
         ("cfg", "hclip", "hdate", "lpr", "stat", "tar", "wget"))),
@@ -40,10 +102,6 @@ NOTEST = (
     "math/fix16", "math/lerp", "math/random", "math/recip", "math/sqrt", "math/trig",
     "math/vec2", "mgx/mgx_blit", "mgx/mgx_decode", "save/save_core", "save/save_meta",
     "snd/libos32snd", "ui/libos32ui_core", "ui/microui"))
-DOCS_ALWAYS = frozenset(("constraints", "kapi-version", "manifests", "packages-host",
-    "tests-inventory", "docs-links", "docs-orphans", "docs-status", "docs-status-host", "memmap"))
-STATIC_DIRECT = frozenset(("p2v", "c-dialect", "arch-asm", "map"))
-STATIC_LANDING = STATIC_DIRECT | {"privileged", "kprintf-window"}
 SHARED_LAYERS = frozenset(("include", "kapi", "mm", "exec", "lib", "platform"))
 OUTSIDE = frozenset(("arm-compile", "gfinit-fixture-host", "e10c-lifecycle",
     "host-agent", "host-lib-host", "net-link-host", "lan-bridge-host"))
@@ -767,6 +825,12 @@ def routed_build_safe(root, base, path):
     return routed_build_inputs(root, base, path) is not None
 
 
+def undeclared(files, patterns):
+    return {f for f in files if not matches(f, IGNORE + DOCS + FULL + BUILD_CONFIG_GLOBS + KAPI_GENERATED)
+            and not any(matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST)
+            and not any(matches(f, pats) for pats in patterns)}
+
+
 def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
          *, base: str | None = None, tier_floor: int = 0) -> Plan:
     compiler_headers.cache_clear()
@@ -776,9 +840,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     patterns = {n: c.covers + (c.path,) + (tuple(extract(root, c, snapshot, compiler=True))
                          if dependency_scan else ()) for n, c in checks.items()}
     def uncovered(f):
-        return not matches(f, DOCS) and not any(
-            matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST
-        ) and not any(matches(f, pats) for pats in patterns.values())
+        return bool(undeclared((f,), patterns.values()))
 
     hit, unmatched, full_hits = set(), set(), set()
     # Conversion retains the old artifact_readers as make:all consumers,
@@ -823,8 +885,6 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     elif docs_only:
         tier, mode = 0, "docs"
         selected = {n for n in hit if checks[n].tier != 4}
-        selected.update(n for n, c in checks.items() if c.tier == 0 or n in DOCS_ALWAYS)
-        selected = {n for n in selected if checks[n].tier != 4}
     else:
         parents = [Path(f).parent.parts for f in changed]
         common = os.path.commonpath([str(Path(f).parent) for f in changed])
@@ -838,10 +898,6 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
         tier = max(tier, tier_floor)
         mode = "full" if tier == 4 else "sel"
         selected = set(checks) if tier == 4 else {n for n in hit if checks[n].tier != 4}
-        selected.update(n for n, c in checks.items() if c.tier == 0 or tier >= 3 and c.tier == 3)
-        if unmatched:
-            selected.update(n for n, c in checks.items() if c.tier <= 3)
-        selected.update((STATIC_DIRECT if tier == 1 else STATIC_LANDING) & checks.keys())
     stage = closure(checks, selected)
     if mode == "fast" or tier == 1:
         mutations = ()
@@ -893,8 +949,10 @@ def lint(root, checks):
     snapshot = tracked(root)
     generated = set(KAPI_GENERATED) | {f for f in snapshot if "_generated." in Path(f).name
                 or "generations." in Path(f).name or "/generated/" in f}
+    coverage = []
     for name, check in checks.items():
         derived = extract(root, check, snapshot)
+        coverage.append(check.covers + (check.path,) + tuple(derived))
         patterns = check.covers + (check.path,) + tuple(f for f in derived if f.endswith(".inc"))
         prepared = make_needs(checks, closure(checks, (name,)))
         for pattern in check.covers:
@@ -938,6 +996,8 @@ def lint(root, checks):
                         if not matches(dep, patterns) and dep not in missing:
                             errors.append(f"{name}: uncovered generated input {dep}")
                             missing.add(dep)
+    for path in sorted(undeclared(snapshot, coverage)):
+        errors.append("対象の宣言が無い: " + path)
     closure(checks, checks)
     for error in errors:
         print(error, file=sys.stderr)
@@ -1003,6 +1063,8 @@ def main(argv: list[str]) -> int:
             base = None if args.files is not None else args.base or default_base(ROOT)
             files = tuple(args.files) if args.files is not None else changed_files(ROOT, base)
             result = plan(ROOT, checks, files, base=base, tier_floor=args.tier)
+            if result.unmatched:
+                raise ValueError("対象の宣言が無い: " + " ".join(sorted(result.unmatched)))
             print(f"check-changed: {result.mode}, tier {result.tier}, {len(result.stage)} checks", file=sys.stderr)
             print(emit_shell(result), end="")
             return 0

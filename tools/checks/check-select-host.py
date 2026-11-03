@@ -9,5 +9,6 @@ CHECK = dict(name='check-select-host', tier=1,
 
 def run(ctx) -> int:
     import subprocess
-    return subprocess.call(['python3', '-B', 'tools/checks/test_run.py'],
+    return subprocess.call(['python3', '-B', 'tools/checks/test_run.py'] +
+                           (['--mutate'] if ctx.mutate else []),
                            cwd=ctx.root, close_fds=False)

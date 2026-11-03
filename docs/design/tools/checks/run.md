@@ -33,7 +33,7 @@ def main(argv: list[str]) -> int: ...
 - `--list --json`: 同じ列の name/target/path と CHECK の値。inventory が読む。
 - `--select [--base REF | --files PATH...] [--tier N]`: stdout は shell 代入、説明は stderr。明示空 --files と未指定を区別する。
 - `--run NAME... [--files PATH...]`: name/check-name を受け、明示された検査と check 前提の閉包を実行する。単独 CLI の make 前提はまとめて1回組む。
-- `--lint`: 宣言の型・名前・入力・既存の成果物読取監査。検査は実行せず、mutate_tier の省略を許す。
+- `--lint`: 宣言の型・名前・全ファイルの対象宣言漏れ・入力・既存の成果物読取監査。検査は実行せず、mutate_tier の省略を許す。
 
 `--pack`・`--inputs`・`--suggest` は移さない。`--list --make`・make 断片・`--prepared` は作らない。
 
@@ -46,7 +46,7 @@ def main(argv: list[str]) -> int: ...
    unmatched は docs/notest/ignore 以外で、どの検査の covers にも当たらない変更 (`**` を含む glob の当たりも解消に数える)。
    KAPI 入力から生成物の読み手へ当たりを足す旧処理を保つ (`tools/check_select.py:1332`)。
    full_hits は旧 full/BUILD_CONFIG_GLOBS と build 入力の判定で得る変更パスの集合。旧 `:1378` の mode 分岐直前に対応する。
-   3集合は段の昇格・共有追加・変異選択より前に確定する。notest に分類しても実際の hit は消さない。
+   3集合は段の昇格・変異選択より前に確定する。notest に分類しても実際の hit は消さない。
 4. **段**: full_hits、Makefile/build定義、KAPI入力・生成世代・link定義、ツールチェーン設定、ランナー自身は段4を最優先とする。
    旧 BUILD_CONFIG_GLOBS/KAPI_GENERATED を用いる。通常の CHECK ファイル変更は自己当たりとして扱う。
    `--base` があれば full glob に当たる各ビルド定義の基点と作業木を比較し、コメント・空行だけの差では段4へ上げない。当たりの計算には残す。
@@ -54,24 +54,24 @@ def main(argv: list[str]) -> int: ...
    `build/**/*.mk` の既存のソース/オブジェクト一覧 (`C_KERNEL`、`*_SRC`/`*_SOURCES`/`*_OBJ`/`*_OBJS`) への
    リテラルの `.c`/`.o` の追加・削除だけも段4へ上げない。継続行と `addprefix` の一覧引数を扱い、変数名・代入演算子・
    出力接頭辞・他の式は保持する。既存要素の相対順の変更、旗・規則・依存・define の変更は段4。
-   一覧ごと（条件の枝ごと）の追加・削除の和集合を対応する `.c` に照合し、未カバーなら通常の unmatched による拡張を適用する。
+   一覧ごと（条件の枝ごと）の追加・削除の和集合を対応する `.c` に照合し、未カバーなら unmatched として選択時にエラーにする。
    出力変数や `addprefix` 付きの登録変更など、対応ソースを解決できない変更は段4。安全な mk 変更では成果物の読み手と `**` の検査も足す。
    変更なし/ignoreのみは従来の fast (段4、全列、変異なし)。notestだけで hit が空なら何も回さず、段0・mode=sel・空の stage/mutations/needs。
    docsのみは段0。残りは単一の非ヘッダかつ親が2成分以上で共有層以外なら段1、同じ深さ2以上の機能内なら段2。
-   複数機能、親が1成分以下、include/kapi/mm/exec/lib/platform の層、または unmatched があれば段3。
+   複数機能、親が1成分以下、include/kapi/mm/exec/lib/platform の層は段3。
    --tier はコード変更の推定段の下限。`make check-changed` は `--tier 2` を渡し、単一leafでも取り込みは段2以上。
    段1は実装者が直接 `--select` を使う場合だけ。docs/notestの特別分岐は既定の下限2で引き上げない。節目は make check。
 5. **実行集合**: 段0〜3では tier4 を除く hit をすべて回す。当たった tier2/3 を浅い段という理由で削らない。
-   これに tier0 を加え、段3以上では当たらない tier3 も加える。unmatched がある場合は通常列の tier≤3 を回す。段4は通常列全て。
-   段0の文書集合は旧 docs_always を tier0 の初期値として保持する。notestだけで空の分岐では共有・静的も追加しない。
-   コードの段1は既存の静的3本 (p2v/c-dialect/arch-asm) と check-map、段2/3はさらに privileged/kprintf-window を加える。
+   静的検査・tier0・tier3・文書検査も当たりがある場合だけ選ぶ。段4は通常列全て。
    check needs の閉包を加えて重複を除く。ver-info の前提もここで加えるだけで、実行依存グラフは作らない。
    変異は段1なし、段2/3は hit ∩ stage のうち mutate_tier≤段、段4は全て。docs の MUT1=stage と fast の MUT1=空は旧互換。
 6. **準備**: stage の make needs の和が CC_NEEDS。親 make が検査の前に1回組む。make の内部前提は既存の build 規則に任せる。
 7. **出力**: CC_MODE/CC_STAGE1/CC_MUT1/CC_SUMMARY の名前と quoting を維持 (`tools/check_select.py:1424`)。CC_TIER/CC_NEEDS/CC_FILES_JSON を足す。
    STAGE1/MUT1 は check- つき、MUT1⊆STAGE1。CC_FILES_JSON は元の変更パス。--select は build・検査・ゲストを起動しない。
-   mode は fast/docs/sel/full を維持し、unmatched による段3は sel。notestだけの空列も sel と理由を表示する。
-8. **lint**: 宣言の契約と既存の入力監査だけ。通常のパス/glob は追跡＋未追跡入力で照合し、生成物は未生成を許す。
+   mode は fast/docs/sel/full を維持する。unmatched があれば shell 代入を出さず非0で終了する。notestだけの空列も sel と理由を表示する。
+8. **lint**: 宣言の契約・既存の入力監査・全ファイルの対象宣言漏れを検査する。通常のパス/glob は追跡＋未追跡入力で照合し、生成物は未生成を許す。
+   covers・自己ファイル・抽出依存のどれにも当たらない入力は「対象の宣言が無い」として落とす。
+   docs/notest/ignore と全体検査を要求するビルド定義・生成物は対象宣言漏れから除く。
    mk/yaml 相互照合は削除。成果物 covers と make needs、既存の読取監査・例外は保ち、build/out だけへ対象を狭めない。
 
 ## deps と静的検査の境界
@@ -117,9 +117,9 @@ check-map は新 lint、check-check-select-host は新 test_run の入口。列�
 |---|---|
 | AST/lint | import 副作用なし、名前・入力・成果物、mutate_tier 省略で既定2。列外7入口を含めない |
 | 変更と依存 | 明示空、基点枝、未追跡、削除/rename両名、直接.h/include連鎖/inactive include、別root、globの新規入力 |
-| 当たり | tier2/3 は段1でも当たれば実行、tier4 は除外。全検査で ** だけでは unmatched を解消しない |
-| 段と変異 | 単一leafの --select は段1、同じ変更の check-changed は段2で当たりに変異。段3の非当たり共有は正常系のみ |
-| 分岐 | fast の全列・変異なし、docs の既存集合、full/KAPI/build の段4、unmatched の段3、notestのみ無当たりは準備も検査も0 |
+| 当たり | tier2/3 は段1でも当たれば実行、tier4 は除外。** も unmatched を解消する |
+| 段と変異 | 単一leafの --select は段1、同じ変更の check-changed は段2で当たりに変異。段3も非当たりの検査は選ばない |
+| 分岐 | fast の全列・変異なし、docs の当たりだけ、full/KAPI/build の段4、unmatched の選択エラーと lint エラー、notestのみ無当たりは準備も検査も0 |
 | notest | 当たりがあれば消さない。段の下限2が文書/空notestを引き上げない |
 | 静的 | 元の変更パスを渡す。None/空/列、P1bの3本と未対応2本の呼出し契約 |
 | 実行/make | 複数行の失敗、MUT/MUTS、host32先頭だけ変異、共有前提の準備1回、ver-info閉包、空列、直接名、計時とrc |
