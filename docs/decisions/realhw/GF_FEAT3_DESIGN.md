@@ -330,3 +330,103 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | F3の後でないと結線できない段 | F4 C0/C1/C2、B6の実map結合、B7の実drain結合。F5 B2/B5の停止結合、B6の全extent/再生成結合、C2。F5 state/display結線はF4 C2/C4も待つ。 |
 | 統合順 | 同じファイル・ABI世代はPARALLEL_BRANCHES §1どおり先のmain取り込み後に切る。機能ごとのworktree、触る一覧外は報告。C結線は全部品後に直列、全実装後にPMが生成→まとめビルド→検査。設計にある「各Bで試験」は試験コードを完成させる意味で、実行は先送り。 |
 | 全依頼の共通条件 | PORT_FLOW §4・§5：i32、必要include、kstring、hostは-nostdlib/自前_start・32bit glibc導入なし、assertの最適化消失防止、変異は一意anchorと実行時RED。共通誤りは全担当へ展開し統合前にgrep。ゲストは既定newlib nanoツールチェーン、module/kernel自体にlibc依存を追加しない。 |
+
+## 追記 (2026-11-04、A0 の欠け — 独立 VRAM 窓と面予約台帳の宣言)
+
+> 出所: ~/os32-tmp/run/gf3-a0/ADDENDUM.r2.md (astra 起草 r1〜r2、Opus レビュー 2 回、確定の補いは PM)。
+
+- ID 1: 窓に map_base/map_bytes を追加し、頁丸めと解除範囲を一致させる。
+- ID 2: C1 で表示面・試験面を登録し、scan の識別値と試験用 surface を module から渡す。
+- ID 3: PM 決定 — 既存表示範囲は bar1_map を借用し、窓は EMAP で拒否する。
+- ID 4: PM 決定 — F5 は save/restore をまたいで予約を保持する。
+- ID 5: 保持窓と試験面の予約を 4KiB 整列にする。
+- ID 6: C1 の登録前に台帳を初期化し、host 試験は 1 プロセス 1 ch とする。
+- ID 7: include の向きと V0 CHECK の vram_view.* covers を明記する。
+
+## 追記 (2026-11-04、A0 の欠け)
+
+本追記は F3 A0/V0 と F4/F5 の共通契約。宣言は `hwdev/gf/vram_view.h`（`command.h` を include）、`accel.h` は `vram_view.h` を include し、`vram_view.c` は誤り値定義のため `accel.h` を include、実装は V0。前景のシングルタスク・協調切替を前提とし、IRQ・再入・列挙中の台帳変更は呼出側で行わない。一般 heap、ロック、参照カウント、自動退避は追加しない。
+
+### 1. 独立 VRAM 窓
+```c
+struct gf_vram_view {
+    struct recover_bar_extent extent;
+    volatile u8 *va;
+    volatile u8 *map_base;
+    u32 map_bytes;
+    u32 bytes;
+    bool mapped;
+    const struct gf_instmem_map_ops *map_ops;
+    void *map_owner;
+};
+int gf_vram_view_map(struct gf_vram_view *view, struct gf2_chan *ch,
+                     u32 off, u32 len, volatile u8 **out);
+int gf_vram_view_unmap(struct gf_vram_view *view);
+```
+- 初期値は全欄 0。窓は呼出側所有、成功 map から成功 unmap まで同じ記憶域を維持し、値コピーしない。F3 readback/F5 一時コピーは呼出し内の局所記憶域、F4 の保持窓は常駐 ctx 内に置ける。借用 ops/owner は解除成功まで存続する。
+- map は `ch->bar1` の頁丸めした部分 extent を UC で写す。start=off&~4095U、end=ceil((off+len)/4096)*4096 を桁あふれなく求め、extent は [start,end)、map_bytes=end-start、map_base は下位 map の返す基底、va=map_base+(off-start)、bytes=len。成功時だけ全所有欄と借用 ops/owner を保存して `*out=va`、0 を返す。`ch->va/mapped/push_extent` は変更せず、push が map 済みでも利用できる。
+- off/len は byte、非零 len と 4B 整列を要求。BAR1・物理番地の加算範囲は `command_platform.c:11–15` と同じ条件。加えて範囲全体が共通台帳の生存予約 1 件に含まれることを照合する。4B に丸めた readback 要求範囲も予約内であること。頁丸め後の extent は BAR1・物理番地の有効範囲内を要求するが、予約への包含照合は要求範囲 off/len に行い、CPU はその範囲外にアクセスしない。
+- NULL 引数・ops 不備・二重 map・範囲/整列不正・下位 map 失敗は `GF2_EMAP=-203`、予約不存在は `GF3_ESTATE=-304`。失敗時は窓と出力を変更しない。台帳/ch の対応不成立も ESTATE。
+- unmap は保存した ops/owner/map_base/map_bytes を使用し、成功時に全欄を 0 に戻して 0。NULL・未 map・下位失敗は GF2_EMAP、全所有欄を保持して再試行可能とする。
+- map は GPU 完了を待たない。呼出側が reference 完了（restore は GPU がその領域を使わない区間）を保証し、CPU アクセス後は必要な posted write 排出を済ませて unmap。窓を解除するまで対応予約を解除せず、停止/復旧前に全窓を閉じる。解除失敗時は予約・adapter の所有を保持する。
+- PM 決定 (ID 3): 起動時の BAR1 表示先頭 75 頁は既存の bar1_map を借用して読み書きし、窓の頁丸め extent がそこに重なる場合は GF2_EMAP。借用表示 map に窓の unmap は呼ばない。根拠: `hwdev/gf/production.h:55`、`drivers/video/geforce/geforce_platform.c:24`。
+- 保持したままにする窓（F4 cursor 等）と T0 試験面の予約は off/bytes を 4KiB 整列とし、別予約の窓が同じ頁を共有しない。下位の頁単位契約は `hwdev/gf/instmem_map.c:12–15,24–25` に合わせる。
+- F3 `gf3_test_ops.map/unmap` は上記関数へのポインタ型（既決の `__typeof__`）に固定。F4 cursor と F5 の未マップ領域の退避も同じ口を使う。T0 の表示面 readback は既存 bar1_map を借用する。
+- 手本 N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`、`N/nouveau_bo.c:669–679` の BO 固有 kmap、`:684–689` の kunmap に対応。OS32 は BO/TTM の代わりに呼出側窓と既存 map_ops を使う。int unmap と失敗時保持は `hwdev/gf/command_platform.c:32–42` の既存失敗契約に合わせる。TTM の reserve ロックは協調前景では追加しない。
+
+### 2. 面予約台帳
+```c
+struct gf_vram_reservation {
+    const void *owner;
+    u32 off, bytes, reservation_id, generation;
+};
+struct gf_vram_reservation_node {
+    struct gf_vram_reservation value;
+    struct gf_vram_reservation_node *next;
+};
+struct gf_vram_registry {
+    struct gf2_chan *ch;
+    struct gf_vram_reservation_node *head;
+    u32 next_id;
+};
+int gf_vram_registry_init(struct gf2_chan *ch);
+int gf_vram_reserve(struct gf2_chan *ch, const void *owner,
+                    u32 off, u32 bytes, struct gf_vram_reservation_node *node);
+int gf_vram_release(struct gf2_chan *ch, const struct gf_vram_reservation *key);
+int gf_vram_match(struct gf2_chan *ch, const void *owner,
+                  u32 reservation_id, u32 generation, u32 off, u32 bytes,
+                  struct gf_vram_reservation *out);
+int gf_vram_next(struct gf2_chan *ch, u32 *cursor,
+                 struct gf_vram_reservation *out);
+```
+- V0 は production の 1 channel 専用共通台帳を `static struct gf_vram_registry` 1 個として所有する（production の寿命内、host も 1 個）。全欄 0 が未初期化。init(ch) は初回に ch/head=NULL/next_id=1 を設定して 0、同じ ch への再呼出しは無変更で 0、異なる ch は GF3_ESTATE、NULL は GF3_EINVAL。C1 の gf3_init 結線で ch 確定後、最初の reserve と hook/test 公開より前に init(ch) を呼ぶ。V0 host 試験は 1 プロセス 1 ch。recover で台帳/ID 発行器を零化しない。
+- node は予約主体が所有する静的記憶域または常駐 ctx の欄、初回は全欄 0。登録中は移動/書換え禁止。台帳は node を借用して連結し、画像や node の heap 確保を行わない。owner は同期間存続する所有者オブジェクトの非 NULL アドレス（同一性だけ比較、逆参照しない）。
+- reserve は指定範囲を登録するだけで配置を探索しない。bytes>0、off<=ch->B かつ bytes<=ch->B-off、VRAM末尾 instmem より下、既存予約と非重複を要求する。全成功時だけ node を連結し value を確定して 0。push/instmem は台帳外で F2/F1 が所有する。
+- reservation_id は登録ごとに next_id から新規発行し、解除後も再使用しない。U32_MAX 発行後は next_id=0（以後 ENOSPC）。generation は node の登録成功ごとに 1 増加、初回 1。上限到達 node の再登録も ENOSPC とし、古い組を再発行しない。これは既決の古い予約排除の識別契約であり、追加の HW 監視ではない。
+- release は key の全 5 欄が生存項目と一致した時だけ連結を外し 0。node は next=NULL、value.owner=NULL、off/bytes=0 とし、ID/generation は履歴として保持。失敗時は保持。GPU 完了・表示による利用終了・窓解除は所有者が先に保証する。
+- match は ID/generation と範囲包含を照合し、owner 非 NULL なら所有者も一致させ、成功時だけ *out に予約値をコピーして 0。owner=NULL は信頼済み内部利用者の所有者不問照合（ID/世代は必須）。off/bytes は部分面を許すが bytes>0。出力は借用 node ではなく値コピー。
+- init 以外の通常成功は 0。NULL 必須引数/不正サイズは `GF3_EINVAL=-301`、配置可能範囲外は `GF3_ERANGE=-303`、重複/登録済み node は `GF2_EEXIST=-208`、ID/世代発行不能は `GF2_ENOSPC=-202`、未初期化/ch 不一致/予約不存在/古い ID・世代/所有者不一致は GF3_ESTATE。match の包含失敗は GF3_ERANGE。失敗時は台帳・node・出力を変更しない。
+- next は *cursor=0 で開始し、ID 昇順で *cursor より大きい最初の項目を *out にコピー、*cursor=その ID として **1**。終端は **0**（両出力保持）、誤りは上記負 rc。列挙中は登録/解除しない。固定件数上限・全件用静的配列は設けない。
+- 古い面排除に必要な最小補正として、§2 の `gf3_surface` を次の完全定義に置換する（他の描画 API 引数は不変、F2 fence epoch は変更しない）。
+```c
+struct gf3_surface {
+    u32 off, bytes, pitch, width, height;
+    enum gf3_fmt fmt;
+    u32 reservation_id, generation;
+};
+```
+- surface は全欄 0 では未予約。所有者が登録成功した value から ID/generation を設定する。B1 は match(ch,NULL,s->reservation_id,s->generation,s->off,s->bytes,&r) を先に行う。範囲だけから最新予約を推測して古い面を通すことは禁止。予約を破棄する recover/所有終了時は受付を閉じ、旧予約を解除して再登録し、surface/hook を作り直す。F5 の同一配置 save/restore は下記の保持契約を適用する。停止失敗時は予約を保持する。
+- F3 単体でも C1 の module が静的 owner と表示用・試験用 node（各全欄 0）を持ち、gf3_init 結線で表示面、次に試験面を reserve し、成功後だけ hook/test を公開する。試験面は表示予約末尾の次の 4KiB 境界から確保し、必要 bytes も 4KiB に切り上げる（pitch は従来の 64B 整列）。終了時は利用停止・窓解除後に module が release する。
+- §10:187 の scan 構築・bind は C1 の module 側へ移し、既存の幾何欄に `.reservation_id=scan_node.value.reservation_id,.generation=scan_node.value.generation` を追加する。C0a は未登録 scan を公開せず、表示確定情報を C1 の結線で渡す。登録失敗時は hook を無効のまま誤りを返す。
+- `gf3_test_ops` に `const struct gf3_surface *test_surface;` を追加し、module 所有の常駐面（登録値から ID/世代を設定）を借用で渡す。T0 はこの予約内で部分面を作り、識別値を引き継ぐ。予約失効時は dispatch 公開を閉じる。reserve/release の 2 口を増やすより、BO 所有者が確保して利用者に渡す手本に近く、追加は面を渡す 1 欄で済む。
+- F4 導入時は F3 の表示・試験利用を停止して両予約を解除した後に所有を引き継ぎ、重複登録しない。F4 は front/back/cursor 各予約の node を常駐 ctx に持ち、初期 scanout も試験公開前に登録する。mode 変更で旧面を解除するのは表示利用終了後。GfxScanout の ID は再使用されないため、adapter は所有 ctx に保持する同 ID の予約から generation を得て owner 付き match を行い surface に転記する。不一致を現在の範囲だけで補完しない。
+- PM 決定 (ID 4): F5 は予約を解除せず、同一 VRAM 配置の save/restore をまたいで node・owner・ID/世代を生存させる。F5 は受付閉で next を全件走査し off/bytes と識別値を snapshot に値保存する。全画像記憶域確保→drain/blank→全件コピー（既存表示範囲は bar1_map、残りは窓。境界をまたぐ予約は分割）→全窓解除→既決停止。restore は同じ経路で同一 off/bytes に書き戻し、同じ識別値で全利用者を再 bind。push/PRAMIN 等は従来どおり再生成し、node/va を snapshot に保存しない。画像容量に固定上限を足さない。
+- 手本は `N/nouveau_bo.c:594–599` の placement/validate/pin と `:618–629` の unpin。TTM の BO 所有・固定配置を OS32 の明示範囲/常駐 node 台帳に置換する（`ttm_bo_reserve` は排他であり範囲登録 API そのものではない）。ID/世代は既決 F4 の HAL 境界用、列挙は既決 F5 CPU 退避用。一般 allocator・evict・参照数は移植しない。
+- V0 の CHECK の covers に `hwdev/gf/vram_view.*` を追加する（F3 §13:257 の既存 accel* だけでは対象外）。
+- V0 に残すのは連結操作・照合 helper・map 実装と試験の細部。F3 A0 は上記宣言、A3/C 群は既決所有と起動/停止の結線を担当する。未決 0 件。
+
+### 確定の補い (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
+- N1: F5 の save は、受付を閉じたあと、コピーの前に、開いたままの窓 (F4 の cursor) を持ち主の F4 に閉じさせる。コピーの後、F4 が開き直す。
+- N2: 試験面の範囲は、表示の予約の末尾の次の 4KiB 境界から、B 以下の最後の 4KiB 境界まで。
+- N3: F4 の段で、C1 の登録 (表示面・試験面) を F4 の ctx に移す (実行時の引き渡しはしない)。
+- N4: C0a が backend の framebuffer の情報を C1 へ渡す口の名前と型は、A0 で accel.h に宣言する (A0 の実装者が決め、報告に書く)。
