@@ -24,6 +24,17 @@
 #define SPLASH_RASTER_31K_BLANK_NUM_US 20000u
 #define SPLASH_RASTER_CLOCK_QUANTUM_US 1u
 
+/* Image-only adopted OUT budget; 6 is for explicit diagnostic trials. */
+#define SPLASH_RASTER_IMAGE_OUTS 5u
+#define SPLASH_RASTER_IMAGE_DIAG_OUTS 6u
+
+/* Measured bounds are required before adopting an image path. Q includes
+ * sampling and row preparation, D is successful IN return to column start,
+ * W is the entire prepared column, and B is bit6 high width. All ranges use
+ * 1/den us. Require Q+D+W+E < B_min and Q < min(B_min,H_min-B_max).
+ * Phase: F is a new bit5 high-to-low transition; the first subsequent new
+ * bit6 low-to-high edge is k=1 and E(y) is k=active0+y. One IN samples both.
+ * The existing public table's IF and spacing budgets remain unchanged. */
 /* Internal LC contract. Signed numerators preserve negative margins. Bounds
  * in a budget share den (units = 1/den us), never rounded to whole lines.
  * Q includes IN/loop/compare/count; branch is successful IN return -> OUT,
@@ -31,6 +42,11 @@
  * Q+branch+m*W+E < B_min; Q < min(B_min,H_min-B_max).
  * These measured bounds do not certify arbitrary interrupt workloads. */
 struct SplashRasterTimeRange { long long min, max; };
+struct SplashRasterImageBudget {
+    u32 den, outs;
+    struct SplashRasterTimeRange q, d, w, h, b;
+    long long error;
+};
 struct SplashRasterBudget {
     u32 den;
     struct SplashRasterTimeRange q, c, w, h, b;

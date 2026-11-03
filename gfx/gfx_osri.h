@@ -10,7 +10,13 @@
 #define OSRI_PIXELS_BYTES 128000u
 #define OSRI_EVENTS_OFF 128096u
 #define OSRI_EVENT_BYTES 8u
-#define OSRI_MAX_EVENTS 200u
+#define OSRI_VERSION_1 1u
+#define OSRI_VERSION_2 2u
+#define OSRI_V1_MAX_EVENTS 200u
+#define OSRI_V2_MAX_EVENTS 1197u
+#define OSRI_V2_MAX_EVENTS_PER_LINE 3u
+/* Existing loader retains its v1 limit until F1. */
+#define OSRI_MAX_EVENTS OSRI_V1_MAX_EVENTS
 #define OSRI_COLORS 16u
 
 /* Layout describes the file; decode little endian fields rather than casting. */
