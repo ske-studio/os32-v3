@@ -2,6 +2,7 @@
 CHECK = dict(name='splash-probe-host', tier=1,
     covers=['platform/pc98/splash_probe.c', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'tools/tests/splash_probe_host.c',
+            'drivers/video/pc98/splash_raster_image.h',
             'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'include/platform_splash.h',
             'gfx/gfx_internal.h', 'gfx/gfx_osri.h', 'gfx/gfx.h', 'gfx/palette.h', 'include/gfx_hal.h',
@@ -57,8 +58,21 @@ MUTATIONS = (
     ('charge C to B lower bound', 'lo - probe_budget.q.max : 0;', 'lo - probe_budget.c.max : 0;'),
     ('omit B upper sample error', '                                 probe_budget.q.max : 0;',
      '                                 0 : 0;'),
-    ('extend H burst past 2H', 'u32 count = (2 * s->line_num_us - clocks) / q;',
-     'u32 count = (4 * s->line_num_us - clocks) / q;'),
+    ('truncate continuous H capture',
+     'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;',
+     'u32 count = s->line_num_us / q;'),
+    ('coarse Q calibration for 64H', 'u32 count = (limit - clocks) / *q;',
+     'u32 count = 8;'),
+    ('ignore fixed costs in lower window', 'long long remaining = r->early_time - fixed;',
+     'long long remaining = r->early_time;'),
+    ('use shortest poll for lower window',
+     'r->lower = remaining > 0 ? (remaining + r->poll.max - 1) / r->poll.max : 1;',
+     'r->lower = remaining > 0 ? (remaining + r->poll.min - 1) / r->poll.min : 1;'),
+    ('extend IF0 time frame', 'unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;',
+     'unsigned long long limit = (PROBE_HPERIODS + 32) * s->line_num_us;'),
+    ('ignore H sample count cap',
+     'if (count > cap) { probe_hd.reason = 3; probe_errors++; return 0; }',
+     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_errors++; return 0; }'),
     ('lose VS classification', 'else if (probe_delta(measured, s->vs_lines * tolerance) <= tolerance)',
      'else if (0 && probe_delta(measured, s->vs_lines * tolerance) <= tolerance)'),
     ('ignore eight-period mismatch', 'expected * SPLASH_RASTER_PERIOD_TOLERANCE) return;',
@@ -78,7 +92,8 @@ MUTATIONS = (
     ('omit H min time', 'probe_hd.min_us = elapsed;', 'probe_hd.min_us = 0;'),
     ('omit H max time', 'probe_hd.max_us = elapsed;', 'probe_hd.max_us = 0;'),
     ('omit H overrun', 'probe_hd.over++; probe_hd.reason = 8;', 'probe_hd.reason = 8;'),
-    ('wrong H reason', 'probe_hd.reason = 6; break;', 'probe_hd.reason = 7; break;'),
+    ('wrong H reason', 'completed == PROBE_HPERIODS ? 1 : 6;', 'completed == PROBE_HPERIODS ? 1 : 9;'),
+    ('omit N6 fixed columns', 'n <= SPLASH_RASTER_IMAGE_DIAG_OUTS;', 'n < SPLASH_RASTER_IMAGE_DIAG_OUTS;'),
     ('omit raw block', 'block < PROBE_RAW_BLOCKS;', 'block < PROBE_RAW_BLOCKS - 1;'),
     ('omit raw read', 'i < PROBE_RAW_READS;', 'i < PROBE_RAW_READS - 1;'),
     ('wrong raw port', 'u32 value = inp(port);', 'u32 value = inp(GDC_GFX_STAT); (void)port;'),
@@ -135,7 +150,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 66H IF0 cap', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
