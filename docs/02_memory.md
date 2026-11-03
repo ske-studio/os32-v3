@@ -150,6 +150,18 @@ mem_alloc)・CUI shell 1,032 B (NP21/W、filer・edit_gui と FEP 変換・設�
 **実 RAM の人為的な上限は無い** (K6-RAM で PAGING_RAM_LIMIT を撤廃)。paging_init が恒等で張るのは
 min(検出量, 32MB) — その上端が paging_boot_identity_end() — で、それより上の RAM は
 pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。高位 RAM のある構成では、GeForce の BAR0 16MiB、DISPLAY 300KiB、BAR2 先頭の instmem 用に PT 7 頁 (4+1+2) を追加予約する。BAR2 は R_max = align4096((4980h×8+4000h)×32+100000h) = 618000h を BAR2 長で切り、起動時に UC 写像して直ちに P=0 に戻す。追加 PT 数は ceil((base の 4MiB 内 offset + R)/4MiB) で、整列済み BAR2 では最大 2 頁。PT は master の寿命まで残し、後の map/unmap で回収しない。BAR2 の予約は起動時の永久予約で、層1 は予約済み範囲と全対象 PTE の Present=0 を確認して supervisor/RW/PCD で恒等写像する。unmap は P を落とし TLB を flush するだけで、予約と PT を保持して再開始時に再利用する。FIXED 型の低メモリ構成は従来の workspace 1 頁を保ち、GF の写像に不足すれば 98 へフォールバックする。
+**GeForce 層2 push の予算と寿命**: pushbuffer は一般 VRAM から 4KiB 整列の
+64KiB (16 頁) を予約し、BAR1 の部分 extent を UC で写像する。VRAM 容量 V、
+instmem の予約量 R に対し開始 offset は `align_down(V - R - 0x10000, 0x1000)`、
+表示面の終端 `0x4B000` 以上とし、範囲が BAR1 長に収まることを確認する。
+この写像の仮想配置に応じ、既存 PT と共有できない場合に備えて追加 PT を最大 2 頁
+予算化する。実際の PT 増分と予約・解除は実機受入で記録し、測定済みとは扱わない。
+`gf2_map_vram` は offset・長さと加算の範囲を検査し、map 成功時に写像と VRAM の
+予約を保持する。正常停止では最終 fence を待って停止し、fault / timeout も共通の
+停止列へ進む。engine stop 成功後に可変 inst を返し、F1 stop 成功後にだけ push の
+写像と予約を解放する。停止に失敗した場合は残資源を保持し、unmap に失敗した場合も
+写像・予約状態を保持する。再構築時は改めて予約・写像し、初回 reference の完了後に RUN へ移る。
+
 15〜16MB (F00000h-FFFFFFh) は PC-98 のシステム空間で RAM にはしない (MEM_SYSTEM_SPACE_*)。ただしセットアップで「16MB システム空間: 切り離す」(I/O 043Bh bit2=1) の機械では、そこは通常 RAM で PEGC の VRAM は F00000h に出ない (FFF00000h の別名でだけ見える — undocumented io_mem.md)。実機 Ra266 はこの構成 (R7-1、2026-10-14)。v3 ではこの構成でも RAM にしない (損失 1MB、v4 の物理地図で見直す)。
 PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD で恒等に張り、043Bh bit2=1 または `GFXDIAG=altwin` なら別名から双方向の別名試験を行う。最初に成立した窓を DISPLAY に使い、両方不成立または DISPLAY 付け替え失敗なら pc98 へ落ちる。Ra266 の別名は実機未確認。
 16MB 超で RAM が載っていない範囲は既定 Not-Present で、必要な範囲だけ paging_map_phys() で張る。
