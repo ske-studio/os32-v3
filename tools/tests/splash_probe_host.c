@@ -148,6 +148,12 @@ static int probe_host_hcalibrate(const struct SplashRaster *, unsigned long long
 /* Inject only into returned batch spans, after the actual clock-free batch
  * and IF restoration. The seed is deliberately outside this fixture. */
 static u32 peak_fixture, peak_index;
+static u32 wait_entry_cost, wait_calls;
+static void __attribute__((unused)) probe_host_wait_enter(void)
+{
+    wait_calls++;
+    if (wait_entry_cost) advance(wait_entry_cost);
+}
 static unsigned long long __attribute__((unused)) probe_host_pl_span(unsigned long long span)
 {
     REQUIRE(irq_on);
@@ -226,7 +232,8 @@ void palette_set(int index, u8 r, u8 g, u8 b)
     color(index, r, g, b);
     /* Inject into the initial sixteen colors, after PL calibration resets. */
     if (index == 0 && initial_irq_us && probe_pl_count &&
-        probe_pl_columns[probe_pl_count-1].completed == PROBE_HPERIODS) {
+        probe_pl_columns[probe_pl_count-1].completed == PROBE_HPERIODS &&
+        probe_pl_joint[6].peak[1][PROBE_PL_JOINT].batches == PROBE_COST_BATCH) {
         advance(initial_irq_us); initial_irq_us = 0;
     }
 }
@@ -440,6 +447,94 @@ static void pl_batch_peaks(void)
     u32 lines = 0;
     for (u32 i = 0; i < probe_output_size; i++) lines += probe_output[i] == '\n';
     REQUIRE(lines == 15); /* four summaries, column, 2*5 batch rows */
+}
+static void pl_details(void)
+{
+    setup(1, 0); in_us = 1; out_us = 2; clock_cost_us = 3;
+    struct SplashRaster *s = pc98_splash_raster_state();
+    probe_costs(s);
+    probe_pl_columns_init();
+    for (u32 n = 0; n < 2; n++) for (u32 k = 0; k < PROBE_PL_PARTS; k++)
+        probe_pl_detail[n][k] = (struct probe_pl_detail){0};
+    struct probe_pl_column *c = &probe_pl_columns[0];
+    unsigned long long one = 0;
+    for (u32 kind = 0; kind < PROBE_PL_SLOTS; kind++) {
+        if (kind != PROBE_PL_Q && kind != PROBE_PL_PREP && kind != PROBE_PL_TRANS) continue;
+        (void)probe_pl_measure(s, kind, c, probe_pl_emit5, 0, &one);
+    }
+    const struct probe_pl_detail *d = probe_pl_detail[0];
+    REQUIRE(d[0].raw.batches == 64 && d[1].raw.batches == 1);
+    REQUIRE(d[2].raw.batches == 64 && d[3].raw.batches == 64);
+    REQUIRE(d[1].raw.max == 4 * (long long)den);
+    REQUIRE(d[1].upper.max == 2 * (long long)den);
+    REQUIRE(d[1].correction.max == -2 * (long long)den);
+    for (u32 k = 0; k < PROBE_PL_PARTS; k++) {
+        REQUIRE(d[k].raw.hits == d[k].raw.batches);
+        REQUIRE(d[k].upper.max == d[k].raw.max + d[k].correction.max);
+    }
+    wait_entry_cost = 2; wait_calls = 0;
+    u32 reads = if0_in_reads, before_writes = writes;
+    REQUIRE(probe_pl_batch(PROBE_PL_TRANS, c, probe_pl_emit5, 8, 0) == 35);
+    REQUIRE(wait_calls == 16 && if0_in_reads == reads && writes == before_writes);
+    wait_entry_cost = 0;
+    const probe_pl_emit_fn emitters[] = { probe_pl_empty, probe_pl_emit1,
+        probe_pl_emit2, probe_pl_emit3, probe_pl_emit4, probe_pl_emit5, probe_pl_emit6 };
+    /* Exact independent cost: real IN + N OUT, one clock per whole batch.
+     * No prior index OUT, no EMPTY subtraction, no clocks between INs.
+     * Vary I/O costs so a missing IN/OUT cannot pass as fixed overhead. */
+    for (u32 n = 0; n <= 6; n++) for (u32 phase = 0; phase < 2; phase++) {
+        struct probe_pl_column *j = &probe_pl_joint[n];
+        *j = *c; j->n = n;
+        j->row[0] = probe_pl_columns[42].row[0];
+        j->row[1] = probe_pl_columns[42].row[1];
+        j->row[0].count = j->row[1].count = n;
+        for (u32 cost = 1; cost <= 2; cost++) {
+            in_us = cost; out_us = cost + 1;
+            before_writes = writes;
+            unsigned int flags = irq_save();
+            require_clockless_in = 1;
+            unsigned long long span = probe_pl_batch(PROBE_PL_JOINT, j, emitters[n], 4, phase);
+            require_clockless_in = 0;
+            REQUIRE(span == 3 + 4 * (cost + n * (cost + 1)));
+            REQUIRE(if0_in_reads == 4 && if0_end_clock == 1);
+            REQUIRE(writes - before_writes == 4 * n);
+            irq_restore(flags);
+        }
+        peak_fixture = 1; peak_index = 0;
+        (void)probe_pl_measure(s, PROBE_PL_JOINT, j, emitters[n], phase, &one);
+        peak_fixture = 0;
+        REQUIRE(j->peak[phase][PROBE_PL_JOINT].hits == 2);
+        REQUIRE(j->peak[phase][PROBE_PL_JOINT].second_valid);
+    }
+    u32 iterations = 0;
+    before_writes = writes;
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 1, 1, 0, &iterations) == -1);
+    REQUIRE(iterations == 1 && writes == before_writes);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 2, 2, 1, 0, &iterations) == -1);
+    REQUIRE(iterations == 1 && writes == before_writes);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 1, 1, &iterations) == -1);
+    REQUIRE(iterations == 1 && writes == before_writes);
+    REQUIRE(probe_pl_success(&c->row[0], probe_pl_emit5, 0, 0, 1, 2, 0, 0, &iterations) == -1);
+    REQUIRE(iterations == 2 && writes == before_writes);
+    probe_errors = 1; serial_init(SYS_SERIAL_BAUD);
+    probe_pl_result[0].budget.den = den;
+    probe_pl_details_dump();
+    REQUIRE(probe_contains("SPLR pl_q_part=1 n=5 den=3147 raw_max_num=12588 raw_max_count=1"));
+    REQUIRE(probe_contains("clock_delta_max_num=-6294 clock_delta_max_count=1"));
+    REQUIRE(probe_contains("SPLR pl_joint_n=0 phase=0 den=3147"));
+    REQUIRE(probe_contains("SPLR pl_joint_n=6 phase=1 den=3147"));
+    REQUIRE(probe_contains(" max_count=2 second_num="));
+    /* Preserve period order and total counts, including a partial last row. */
+    probe_hd.completed = 5;
+    for (u32 i = 0; i < 5; i++) {
+        probe_highsamples[i] = i == 2 ? 8 : i == 3 ? 6 : 7;
+        probe_hsamples[i] = 31 + i;
+    }
+    probe_hsamples_dump();
+    REQUIRE(probe_contains("SPLR b_samples=0 7:31 7:32 8:33 6:34\n"));
+    REQUIRE(probe_contains("SPLR b_samples=4 7:35\n"));
+    REQUIRE(probe_contains("SPLR b_high_samples max_num=8 max_count=1 second_num=7 second_valid=1 samples=5\n"));
+    in_us = out_us = clock_cost_us = 1;
 }
 static void raw_measurements(void)
 {
@@ -766,7 +861,7 @@ void _start(void)
     }
     in_us = clock_cost_us = out_us = 1;
     costs(); budgets(); pl_normal_windows(); widths(); raw_measurements(); h_limit_inputs(); h_diagnostics();
-    realhw_precision(); np_fast_poll(); calibrated_width_error(); pl_batch_peaks();
+    realhw_precision(); np_fast_poll(); calibrated_width_error(); pl_batch_peaks(); pl_details();
     for (int mode = 0; mode < 2; mode++) for (int vs = 0; vs < 2; vs++) for (int wide = 0; wide < 2; wide++) {
         setup(mode, vs);
         wide_h = wide;
@@ -809,6 +904,26 @@ void _start(void)
         REQUIRE(probe_contains("SPLR cost=0 num_us=512 den=512 upper_us=2 upper_num_us=73 upper_den=64"));
         REQUIRE(probe_contains("SPLR entry_y=396"));
         REQUIRE(probe_pl_count == 129);
+        for (u32 n = 0; n < 2; n++) {
+            REQUIRE(probe_pl_detail[n][1].raw.batches == (n ? 174u : 84u));
+            REQUIRE(probe_pl_detail[n][0].upper.batches == (n ? 174u : 84u) * 64);
+            REQUIRE(probe_pl_detail[n][3].upper.batches == (n ? 174u : 84u) * 64);
+            REQUIRE(probe_pl_result[n].budget.q.max == probe_pl_result[n].poll.max +
+                    probe_pl_result[n].prep + probe_pl_result[n].transition);
+        }
+        for (u32 n = 0; n <= 6; n++) for (u32 phase = 0; phase < 2; phase++) {
+            REQUIRE(probe_pl_joint[n].peak[phase][PROBE_PL_JOINT].batches == 64);
+            const struct PlRow *row = &probe_pl_joint[n].row[phase];
+            REQUIRE(row->count == n);
+            if (n) REQUIRE(row->port[n-1] != PAL_IDX_PORT);
+            if (n == 3) {
+                REQUIRE(row->port[0] == PAL_G_PORT && row->port[1] == PAL_R_PORT);
+                REQUIRE(row->port[2] == PAL_B_PORT && row->value[2] == (phase ? 0 : 15));
+            }
+        }
+        REQUIRE(probe_contains("SPLR b_samples=60 "));
+        REQUIRE(probe_contains("SPLR pl_q_contract=5"));
+        REQUIRE(probe_contains("SPLR pl_q_part=3 n=6"));
         REQUIRE(probe_pl_result[0].columns == 42 && probe_pl_result[1].columns == 87);
         REQUIRE(probe_contains("SPLR pl_trial_n=5 columns=42 periods=64"));
         REQUIRE(probe_contains("SPLR pl_trial_n=6 columns=87 periods=64"));

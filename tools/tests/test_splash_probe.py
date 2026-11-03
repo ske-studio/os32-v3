@@ -12,6 +12,7 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=20.0)
 import argparse
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -74,6 +75,35 @@ MUTATIONS = (
      'long long subtract = 0;'),
     ('omit peak dump frequency', 'probe_field(" max_count=", p->hits);',
      'probe_field(" missing_max_count=", p->hits);'),
+    ('omit Q detail raw collection', '    probe_pl_peak_add(&d->raw, raw);',
+     '    (void)raw;'),
+    ('omit Q detail corrected collection', '    probe_pl_peak_add(&d->upper, corrected);',
+     '    (void)corrected;'),
+    ('lose signed clock correction', 'probe_pl_peak_add(&d->correction, corrected - raw);',
+     'probe_pl_peak_add(&d->correction, 0);'),
+    ('omit single seed detail', '                            seed, 1, s->line_den);',
+     '                            0, 1, s->line_den);'),
+    ('omit wait transition linkage', '            (void)probe_pl_wait(0, GDC_STAT_HBLANK, 1);\n            (void)probe_pl_wait(0, GDC_STAT_HBLANK, 1);',
+     '            (void)probe_pl_wait(0, GDC_STAT_HBLANK, 1);'),
+    ('omit joint real IN', 'u32 status = inp(GDC_GFX_STAT);\n        if (i >= upper)',
+     'u32 status = 0;\n        if (i >= upper)'),
+    ('omit joint upper guard', 'if (i >= upper) { *iterations = i; return -1; }',
+     'if (0 && i >= upper) { *iterations = i; return -1; }'),
+    ('omit joint lower guard', '            if (i < lower) return -1;',
+     '            if (0 && i < lower) return -1;'),
+    ('omit joint emit', '            emit(r);\n            return 0;',
+     '            (void)r; (void)emit;\n            return 0;'),
+    ('omit joint count six', 'n < PROBE_PL_SLOTS && !probe_errors;',
+     'n < PROBE_PL_SLOTS - 1 && !probe_errors;'),
+    ('invalid N3 representative', '        if (n == 3) {', '        if (0) {'),
+    ('omit joint output', 'probe_field("SPLR pl_joint_n=", n);',
+     'probe_field("SPLR missing_joint_n=", n);'),
+    ('omit cycle high count', 'probe_field(" ", probe_highsamples[i]); probe_field(":", probe_hsamples[i]);',
+     'probe_field(" ", 0); probe_field(":", probe_hsamples[i]);'),
+    ('omit cycle total count', 'probe_field(" ", probe_highsamples[i]); probe_field(":", probe_hsamples[i]);',
+     'probe_field(" ", probe_highsamples[i]); probe_field(":", 0);'),
+    ('omit B cycle dump', '    probe_hsamples_dump();', '    (void)probe_hsamples_dump;'),
+    ('omit Q details dump', '    probe_pl_details_dump();', '    (void)probe_pl_details_dump;'),
     ('truncate continuous H capture',
      'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;',
      'u32 count = s->line_num_us / q;'),
@@ -156,6 +186,18 @@ def ordinary():
             '-ffreestanding', '-c', str(ROOT / SOURCE), '-o', str(obj)], check=True)
         assert not subprocess.check_output([str(cross / 'i386-elf-nm'), str(obj)]).strip()
     print('GREEN ordinary build contains no probe code/storage', flush=True)
+    with tempfile.TemporaryDirectory(prefix='splash-probe-instructions-') as td:
+        obj = Path(td) / 'probe.o'
+        subprocess.run([str(cross / 'i386-elf-gcc'), '-std=gnu11', '-O2',
+            '-march=i386', '-ffreestanding', '-D__KERNEL_BUILD__', '-DSPLASH_RASTER_DIAG',
+            *include_flags(ROOT), '-I'+str(ROOT/'drivers/video/pc98'),
+            '-c', str(ROOT / SOURCE), '-o', str(obj)], check=True)
+        asm = subprocess.check_output([str(cross / 'i386-elf-objdump'), '-d',
+            '--disassemble=probe_pl_success', str(obj)], text=True)
+        jumps = re.findall(r'\t(j[a-z]+)\s', asm)
+        assert len([j for j in jumps if j != 'jmp']) >= 4, asm
+        assert re.search(r'\tin\s', asm) and re.search(r'\tcall\s+\*', asm), asm
+    print('GREEN product joint machine code retains IN, guards, indirect emit', flush=True)
 def execute(mutation=None):
     with tempfile.TemporaryDirectory(prefix='splash-probe-') as td:
         work = Path(td)
@@ -167,6 +209,8 @@ def execute(mutation=None):
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
             if rel == SOURCE:
+                source = source.replace('static PROBE_NOINLINE u32 probe_pl_wait(u32 mask, u32 want, u32 limit)\n{',
+                    'static PROBE_NOINLINE u32 probe_pl_wait(u32 mask, u32 want, u32 limit)\n{\n    probe_host_wait_enter();')
                 source = source.replace(
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);',
                     'unsigned long long span = probe_pl_batch(kind, c, emit, count, phase);\n        probe_measure_restore(flags, s);\n        span = probe_host_pl_span(span);')
@@ -190,7 +234,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap, calibrated B error, per-column/phase/kind batch maximum frequency and distinct second', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap, calibrated B error, per-column/phase/kind batch maximum frequency and distinct second, raw/corrected Q parts, N0..6 joint spans, ordered B periods', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
