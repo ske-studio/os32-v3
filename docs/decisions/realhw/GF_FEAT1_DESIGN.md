@@ -442,3 +442,76 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - 診断と本番の排他を保ったまま層1を診断へ貸すため、既存 GFX=geforce・GUI=1 でも起動時の資源照合・常設map/PT予約とmodule登録だけを行う；診断用 Context の platform は NULL とし本番 owner/表示を結ばず、診断側で GeForce が無い場合と GFX 非指定の起動では module を読まない。
 - **ユーザー決定 (2026-11-02、CW の決定 8 について)**: 「決定８はGUIの起動時に」— GFX=geforce・GUI=1 でも、GeForce の資源の予約と geforce.mod の登録は**起動時には行わず、GUI を起こしたときに行う** (CW の決定 8 の起動時の動作は計画外の追加として外す)。
 - CW の決定 8 の起動時の資源予約・module 登録はユーザー決定で外した。基点 f7d0978f の既存経路へ戻し、GUI を起こしたときに行う。
+
+## C9 の入口の契約 (追記 r2、2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf-c9/ADDENDUM.md (astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 写してよい、P3 2 件を PM が反映)。
+対象: main 502be34e (GF 側の現物は 40fec057 から変化なし)。GF_FEAT1_DESIGN.md の本文・CW 末尾・ユーザー決定を維持する。
+C9 は試験 adapter のみ。既存経路（init/kernel.c:253）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
+未公開なら `unavailable`。診断 owner を使える起動経路を新設せず、利用不能を合格に数えない。
+### 像と入口
+`kdebug/gf_foundation_test.c` は **hwdev.mod** に組む。gfinit.c と同じ像なので control/lease を外へ渡さない。
+```c
+/* 新 kdebug/gf_foundation_wire.h: 以下3行のみ userland と共有（u32 の定義を include） */
+#define GF_OP_FOUNDATION 16U
+enum gf1_case { GF1_STATUS, GF1_INSTMEM, GF1_VBLANK, GF1_CYCLE };
+struct gf1_request { u32 size, test, session; int rc; };
+/* 新 kdebug/gf_foundation_test.h: wire・foundation.h・recover.h を include、userland は読まない */
+int gf_foundation_test(struct gf1_request *, struct gf_foundation *, const struct recover_ops *, int (*display)(bool));
+int geforce_foundation_display(bool start); /* module 内入口、geforce_module.h に宣言 */
+    GF1T_DISPLAY_STOP, GF1T_DISPLAY_START /* gf1_test.h の enum 末尾追加、既存値・構造体は不変 */
+```
+shell の `gf1` → kdebug_call(GF_OP_FOUNDATION) → kdebug.mod/recovery_call → hwdev_ops.call → gfinit_call → C9。
+recovery_call は既存 recovery_attach と同じ base/transport/s0 を渡す。PAUSED の一般拒否より先に分岐する。
+gfinit_call は新 op を既存 gfinit_request のサイズ検査・production_selected 拒否より先に別 dispatch する。
+要求は session=rc=0、ローカルにコピーし size/test を検査、rc/session を返す。既存 gfinit_wire・hwdev_ops・公開 KAPI は変更しない。
+### owner と表示の境界
+production_selected なら slot->production、そうでなければ gf_owned(recover_owner()) が成立する control.foundation。
+診断は foundation_prepared と stage.foundation の既存借用を使う。所有者の切替・新規 claim・prepare は C9 で行わない。
+slot は各呼出しで getter から借用する。未公開・owner 不在なら unavailable、失効後の status はソフト snapshot のみ。
+```c
+ops = geforce_foundation_ops(); ops->call(f, &request, &reply);
+/* production の display callback */ request.op = start ? GF1T_DISPLAY_START : GF1T_DISPLAY_STOP;
+/* foundation_test.c の上記2操作（f == gf1_module_ops.production のみ） */
+rc = geforce_foundation_display(start);
+/* 診断 callback（gfinit.c 内 static）: stop */ rc = trial_end(r, &r->token, REC_NORMAL);
+/* start */ rc = gf_c_only(r, r->transport, saved_flags, saved_regs, saved_count);
+```
+本番 cycle は f->running が偽なら display を呼ばず phase=precheck/result=ng。新入口は backend_geforce.c の geforce_stop()/geforce_init() を呼び、停止 rc／active・failed で成否を返す（WC・転送・route・active/routed も既存経路）。
+本番の再開始は service.c の initialized→validate→modeset→CHECK→foundation_start。低位 START/STOP だけで cycle を代用しない。
+診断の cycle は成功した MODESET/C_ONLY 後の REC_PAUSED、expected_node=NONE、stage.initialized、running から開始する。
+gfinit_owner に `u32 policy_count; struct gfinit_no_verify policy_regs[GF_NO_VERIFY_MAX];` を追加。gf_begin の非size PREPARE・gf_c_only で受理した表を prepare_flags と組でコピーする（count=0 は空表）。
+RUN を成立させた方針を保持し RUN_ONE/MODESET の last_* 更新では触らない。cycle 前に prepare_flags/policy_regs/count をローカル保存し gf_c_only へ渡す（required/record/除外を保持）。
+stop は pre_cleanup→foundation_stop→局所復元/S0→REC_VERIFIED。stage.s0_ok・s0_verified 成立時だけ再開始する。
+control・bus・lease・ROM/compiled/flow・baseline・stage.foundation は保持し、gf_release_rom/INSPECT/PREPARE は呼ばない。
+再開始は既存 gf_stage_entry/reentry→C plan 再構築→trial_begin→gf_modeset→CHECK_OUT 成功→foundation_start→REC_PAUSED。
+gf_c_only が lease.session を新 token.session に更新する。返却 session は新値、gfinit の last_op キャッシュは無効化する。
+停止/再開始失敗ならそこで cycle を終了し、既存 cleanup と所有保持に従う。失効・S0 不成立を試験側で解除しない。
+### 観測と応答
+status は待ち0、instmem は既存 INST_PAGE 1頁（4096 byte）と表示領域 [0,307200) の前後 CRC32 一致。
+CRC は照合済み BAR1 の既存 CPU map/診断 window を読み、追加 map を作らない。診断は既存 guarded bus を通す。
+RUN と本番 STOP の Command は PCI read16(04h)、PMC は owner の guarded read(200h)。診断 STOP は gfinit.c の gf_pci.read16(bus,dev,fn,0x04)（既存 BDF を分解） で Command を採取し PMC=na（trial 外）。reply.command/pmc は期待値。
+vblank は元 wanted_heads を控え、HEADS=1/0/1 の各設定直後に snapshot→1000ms→snapshot、最後に元の要求を復元する。
+差分は u32 減算。A>0/B=0 → A=0/B=0 → A>0/B=0 を判定、FIFO/GRAPH/unknown も報告する。
+cycle は RUN→表示stop→STOP→表示start→RUN の各区間1000ms。元の heads を保存し RUN は A のみに揃え、成功時復元。Command 実測0106/0102/0106、VBLANK は A増加/両head不変/A増加を判定し、再開始した表示を残す。
+時計は渡された base->ticks と PIT_HZ、待ちは既存 recover_hal_wait_frame。IRQ 有効、測定区間では serial を送信しない。
+診断の RUN 中の観測・HEADS・INST_PAGE/CRC は trial_step の callback 内で行い、待ち中に recover_safe_point を通す。
+cycle 全体を trial_step で包まない。区間ごとの trial_step を終えて PAUSED に戻してから display(false/true) を呼ぶ。
+診断 STOP 区間は REC_VERIFIED のまま時計・ソフト snapshot・上記 PCI 読取りで測定する。初回 start の代わりに承認済み gfinit 手順を自動実行しない。
+CUI/rshell の要求は `gf1 status|instmem|vblank|cycle`（改行終端）、owner は自動選択。新しい汎用コマンドや承認方式は設けない。
+GUI RUN では shell.bin と gshell.bin は同時常駐せず（init/kernel.c:340）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
+本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c:186・200、userland/gshell/src/gserial.rs。hwdev.mod は hwdev/gf/devinit.c で import 済みなので import は増えない)。
+根拠: gserial.rs の parse/enqueue/deliver、shell/main.c:112–118（共通表・rshellのみ除外）、userland/sh.inputs.json。GUI/GSERIAL は変更しない。CUI 復帰は gfx_shutdown 済み（gshell/src/lib.rs:678）なので STOP status のみ、cycle は上記 precheck で ng。
+応答は完了時 `GF1 case=<...> owner=production|diagnostic session=<n> phase=<...> ms=<実測> rc=<n> result=ok|ng|unavailable`。
+各 phase 行に `command_expected/actual pmc_expected/actual flags delta_entries/fifo/graph/vblankA/vblankB unknown bytes bad_off crc_before/after` を付ける。
+未測定値は `na`、失敗した phase と既存 gf1_rc を保持する。gfinit の既存 REC 行はそのまま残し、最後に `GF1 end rc=<n>` を出す。
+### 結線担当と宣言数
+shell: userland/shell/cmd_gf1.c・shell.h・cmd_sys.c、userland/{shell,sh}.inputs.json（両像）。kdebug_main.c: op16 の既存 call への振分け。
+gfinit.c: owner 選択・診断 display callback・試験への引渡し。gf_foundation_test.c: 観測・比較・serial 出力。
+foundation_test.c: DISPLAY 2操作の dispatch と上限検査。backend_geforce.c: 本番 display 入口。build/hwdev.mk: C9 を追加。
+共有入力台帳 tools/hwdev_layout.json と契約生成を追従。geforce.mod import は31本のまま、Context/OPS_VERSION=3を維持する。
+宣言追補は既存 enum 追加1行＋新規5行＋shell.h prototype 1行＋owner の保存欄1行＝計8行（include・生成物・static 定義は除く）。撤回なし、新しい守り・回復機構は加えない。
+### r1→r2 の変更
+P2-1: 再開始の除外表を要求キャッシュから独立して保持。P3-1: 本番 cycle は RUN 前提を明記。
+P3-2: wire/kernel ヘッダ分離と宣言数更新。P3-3: 登録時期の表現を既存経路に修正。
+P3-4: 診断 STOP の PCI 経路・PMC=na を明記。推測: rshell は不可、既存 GSERIAL→GUI端末で本番 RUN を観測。
