@@ -37,6 +37,7 @@ static int run(int badfb) {
  if (badfb) fb.planes[2]++;
  int rc=osri_load("x", &fb, &im);
  if (!badfb && closed != 1) return 99;
+ if (rc == 0 && im.version != OSRI_VERSION_1) return 97;
  if (!badfb && rc == 0 && length == 128096)
   for (int i=0;i<128000;i++) if (planes[i] != expected_planes[i]) return 98;
  return rc;
@@ -67,6 +68,12 @@ void _start(void) { int rc=test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(
 
 def run_loader(td, data, expected):
     import host32
+    # Keep the existing C loader cases on v1 independently of the encoder default.
+    data = bytearray(data)
+    struct.pack_into('<H', data, 4, 1)
+    struct.pack_into('<H', data, 44, 4)
+    data[48:52] = bytes(4)
+    struct.pack_into('<I', data, 48, zlib.crc32(data))
     src = Path(os.environ.get('OSRI_TEST_SOURCE', ROOT / 'gfx/gfx_osri.c')).read_text()
     wrapper = td / 'wrap.c'; wrapper.write_text(WRAPPER)
     blob = td / 'data.bin'; blob.write_bytes(data + b'X' + bytes(1600))

@@ -15,7 +15,7 @@
 #define OSRI_V1_MAX_EVENTS 200u
 #define OSRI_V2_MAX_EVENTS 1197u
 #define OSRI_V2_MAX_EVENTS_PER_LINE 3u
-/* Existing loader retains its v1 limit until F1. */
+/* Compatibility limit for v1; image storage uses the v2 capacity. */
 #define OSRI_MAX_EVENTS OSRI_V1_MAX_EVENTS
 #define OSRI_COLORS 16u
 
@@ -30,11 +30,16 @@ struct OsriHeader {
     u32 file_crc32, reserved[3];
 };
 struct OsriEvent { u16 line; u8 index, reserved0; u16 rgb444, reserved1; };
-struct OsriImage { u16 pal[OSRI_COLORS], count, band; struct OsriEvent event[OSRI_MAX_EVENTS]; };
+struct OsriImage {
+    u16 pal[OSRI_COLORS], count, band, version;
+    struct OsriEvent event[OSRI_V2_MAX_EVENTS];
+};
+STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 STATIC_ASSERT(sizeof(struct OsriHeader) == OSRI_HEADER_BYTES, osri_header_size);
 STATIC_ASSERT(__builtin_offsetof(struct OsriHeader, file_crc32) == 48, osri_crc_offset);
 STATIC_ASSERT(sizeof(struct OsriEvent) == OSRI_EVENT_BYTES, osri_event_size);
 
 /* Plane capacity is guaranteed by gfx_mode_fits' ledger check at mode selection. */
+/* Returns 0 on success, -1 on failure. */
 int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *image);
 #endif
