@@ -1,10 +1,13 @@
 """OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
              covers=['gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
-                     'lib/le_internal.h', 'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=[], budget=60)
+                     'tools/raster_obs_assets.py', 'lib/le_internal.h',
+                     'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=[], budget=60)
 
 import argparse
 import ctypes
+import csv
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -13,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import zlib
+from unittest.mock import patch
 from PIL import Image
 import numpy as np
 
@@ -195,6 +199,18 @@ def check_small(mod):
         # This input changes four physical indices if vertical FS carry is lost.
         carry_image = Image.fromarray(np.random.default_rng(0).integers(0, 256, (4,8,3), dtype=np.uint8))
         carry_data, _ = mod.convert(carry_image)
+        # SHA256 of complete files from the unchanged T1 at base 22685d9b.
+        legacy_sha = {
+            (5, 1): 'd6172e231476857106677ce522cd91ff52b38585c6f48238d3304615bc835bf0',
+            (5, 2): '8c09264d8e7203289f2767d02cf16e871041fcb6aef044919f6b885640f0f08f',
+            (5, 4): 'dff605993d888c3b123e92abbfd847b2fececa866177de4196c6efc53dc09f60',
+            (6, 1): '53b8341c1c45c2fad0368944ac2eb7cbfadb33e3ac9654afa7b99289cb4fcddb',
+            (6, 2): '94815737fdbfba8e04b047f73b6e0f1e94aa9367152d13b554c048f3ea0352dc',
+            (6, 4): 'dff605993d888c3b123e92abbfd847b2fececa866177de4196c6efc53dc09f60',
+        }
+        for (budget, band), expected_sha in legacy_sha.items():
+            legacy, _ = mod.convert(carry_image, budget, band)
+            assert hashlib.sha256(legacy).hexdigest() == expected_sha
         for y, x, expected_index in ((2,3,5),(2,4,4),(3,2,7),(3,6,3)):
             decoded = sum(((carry_data[96+p*4+y] >> (7-x)) & 1) << p for p in range(4))
             assert decoded == expected_index
@@ -241,15 +257,153 @@ def check_small(mod):
         mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF = old_constants
 
 
+def obs_oracle(old, pixels, candidates, n):
+    """Scalar replacement search, independent of the NumPy distance planner."""
+    palette = old.copy()
+    slots, unused, selected = set(range(16)), set(range(16)), []
+    for _ in range(n):
+        choices = []
+        for slot in slots:
+            for candidate in unused:
+                trial = palette.copy(); trial[slot] = candidates[candidate]
+                rgb = [[(c >> shift & 15)*17 for shift in (8,4,0)] for c in trial]
+                loss = sum(min(sum((int(p[k])-c[k])**2 for k in range(3))
+                               for c in rgb) for p in pixels)
+                choices.append((loss, slot, candidates[candidate], candidate))
+        _, slot, color, candidate = min(choices)
+        palette[slot] = color; selected.append(slot)
+        slots.remove(slot); unused.remove(candidate)
+    return palette, selected
+
+
+def check_obs(mod):
+    old_constants = mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF
+    try:
+        mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF = 8, 4, 4, 112
+        pixels = np.random.default_rng(3).integers(0, 256, (4,8,3), dtype=np.uint8)
+        image = Image.fromarray(pixels)
+        # Distinct MEDIANCUT colors round to the same RGB444 value.
+        rounded = Image.new('RGB', (8,1)); rounded.putdata([(17,0,0),(18,0,0)]*4)
+        assert mod.obs_quantized_colors(rounded) == [0x100,0x100] + [0]*14
+        candidates = [0xfff, 0x100, 0x100] + [(i*0x217) & 0xfff for i in range(13)]
+        old = [(i*0x135) & 0xfff for i in range(16)]
+        for n in range(1,17):
+            expected, selected = obs_oracle(old, pixels[0], candidates, n)
+            actual, actual_selected = mod.obs_optimize_row(old, pixels[0], candidates, n)
+            assert (actual, actual_selected) == (expected, selected)
+            initial, events, history = mod.obs_palette_history(image, n)
+            assert len(events) == 3*n and history[0] == initial
+            for y in range(1,4):
+                row = [e for e in events if e[0] == y]
+                assert len(row) == n and row == sorted(row)
+                indices = {e[1] for e in row}
+                assert len(indices) == n
+                assert all(history[y][i] == history[y-1][i] for i in set(range(16))-indices)
+                if n == 16:
+                    assert sorted(history[y]) == sorted(mod.obs_quantized_colors(image.crop((0,y,8,y+1))))
+        # All losses can be zero or negative: selections must still reach N.
+        actual, selected = mod.obs_optimize_row([0]*16, np.zeros((8,3), dtype=np.uint8), [0]*16, 16)
+        assert actual == [0]*16 and selected == list(range(16))
+        actual, selected = mod.obs_optimize_row([0]*16, np.zeros((8,3), dtype=np.uint8), [0xfff]*16, 16)
+        assert actual == [0xfff]*16 and selected == list(range(16))
+        for n in (0,17):
+            try: mod.obs_palette_history(image, n)
+            except Exception as exc:
+                assert isinstance(exc, ValueError) and str(exc) == 'invalid observation color count'
+            else: assert False, 'observation bounds'
+        try: mod.convert(image, band=2, obs_colors=1)
+        except ValueError: pass
+        else: assert False, 'observation band'
+        data, crc = mod.convert(image, obs_colors=16)
+        assert struct.unpack_from('<HH', data, 4) == (2,64)
+        assert struct.unpack_from('<HH', data, 44) == (1,0)
+        assert data[52:64] == bytes(12)
+        assert len(data) == 112+8*3*16 and struct.unpack_from('<I', data,36)[0] == 48
+        checked = bytearray(data); checked[48:52] = bytes(4)
+        assert zlib.crc32(checked) == crc == struct.unpack_from('<I', data,48)[0]
+        palette = list(struct.unpack_from('<16H', data,64))
+        error = [[0]*3 for _ in range(10)]
+        for y in range(4):
+            for off in range(112,len(data),8):
+                line, index, reserved, color, reserved2 = struct.unpack_from('<HBBHH',data,off)
+                assert reserved == reserved2 == 0
+                if line == y: palette[index] = color
+            nxt = [[0]*3 for _ in range(10)]
+            rgb = [[(c >> s & 15)*17 for s in (8,4,0)] for c in palette]
+            for x in range(8):
+                value = [max(0,min(255,int(pixels[y,x,c])+error[x+1][c])) for c in range(3)]
+                index = min(range(16), key=lambda i: sum((value[c]-rgb[i][c])**2 for c in range(3)))
+                decoded = sum(((data[96+p*4+y] >> (7-x)) & 1) << p for p in range(4))
+                assert decoded == index
+                for c in range(3):
+                    delta = value[c]-rgb[index][c]
+                    for target,pos,weight in ((error,x+2,7),(nxt,x,3),(nxt,x+1,5),(nxt,x+2,1)):
+                        v = delta*weight; target[pos][c] += (abs(v)//16)*(1 if v >= 0 else -1)
+            error = nxt
+        mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF = 8,400,400,1696
+        flat = Image.new('RGB', (8,400))
+        for n in range(1,17):
+            initial, events, history = mod.obs_palette_history(flat,n)
+            assert len(events) == 399*n
+            assert events == [(y,i,0) for y in range(1,400) for i in range(n)]
+            assert history == [[0]*16]*400
+        largest, _ = mod.convert(flat, obs_colors=16)
+        assert len(largest) == 1696+8*6384
+        stats = mod.obs_statistics(largest,16)
+        assert stats['events'] == 6384 and stats['written_colors'] == 16
+        assert stats['actual_changed_colors_min'] == stats['actual_changed_colors_max'] == 0
+        assert (stats['hblank_outs'],stats['total_outs']) == (63,64)
+    finally:
+        mod.W, mod.H, mod.PLANE, mod.EVENTS_OFF = old_constants
+
+
+def check_assets(mod):
+    spec = importlib.util.spec_from_file_location('raster_obs_assets', os.environ.get('OSRI_ASSETS_SOURCE', ROOT/'tools/raster_obs_assets.py'))
+    assets = importlib.util.module_from_spec(spec)
+    with patch.dict(sys.modules, img2osri=mod): spec.loader.exec_module(assets)
+    # Mutant copies live outside tools; keep the production converter location.
+    assets.CONVERTER = ROOT/'tools/img2osri.py'
+    with tempfile.TemporaryDirectory() as name:
+        td = Path(name); source = td/'source.png'; source.write_bytes(b'original')
+        out = td/'assets'; out.mkdir(); (out/'N02.osri').write_bytes(b'stale')
+        stats = dict(bytes=128104, events=399, written_colors=1, actual_changed_colors_min=0,
+                     actual_changed_colors_max=1, hblank_outs=3, total_outs=4, crc32='00000000')
+        def convert(command, **kwargs):
+            n = int(command[command.index('--obs-colors')+1])
+            temporary = Path(command[-1])
+            assert not (out/f'N{n:02d}.osri').exists()
+            temporary.write_bytes(b'partial' if n == 2 else b'new')
+            return subprocess.CompletedProcess(command, 7 if n == 2 else 0, 'log\n', 'bad\n' if n == 2 else '')
+        with patch.object(assets.subprocess,'run',side_effect=convert), patch.object(mod,'obs_statistics',return_value=stats):
+            rows = assets.generate_assets(source,out)
+        assert [r['N'] for r in rows] == list(range(1,17))
+        assert rows[1]['status'] == 'failed' and rows[1]['exit_code'] == 7 and 'bad' in rows[1]['reason']
+        assert not (out/'N02.osri').exists() and (out/'N16.osri').read_bytes() == b'new'
+        assert len(list(out.glob('N*.log'))) == 16 and not list(out.glob('.N*'))
+        with (out/'manifest.tsv').open() as stream: manifest = list(csv.DictReader(stream,delimiter='\t'))
+        assert len(manifest) == 16 and manifest[1]['status'] == 'failed'
+        assert manifest[0]['source_sha256'] == hashlib.sha256(b'original').hexdigest()
+        assert manifest[0]['source_path'] == str(source.resolve())
+        assert manifest[0]['tool_sha'] == hashlib.sha256(assets.CONVERTER.read_bytes()).hexdigest()
+        assert 'Pillow=' in manifest[0]['library_versions'] and 'NumPy=' in manifest[0]['library_versions']
+
+
 def check():
     spec = importlib.util.spec_from_file_location('img2osri', os.environ.get('OSRI_CONVERTER_SOURCE', ROOT/'tools/img2osri.py'))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
     check_small(mod)
+    check_obs(mod)
+    check_assets(mod)
     for option, value in (('--hblank-outs', '7'), ('--band', '3')):
         result = subprocess.run([sys.executable, str(ROOT/'tools/img2osri.py'), 'missing.png',
                                  '-o', 'unused.osri', option, value],
                                 capture_output=True, text=True)
         assert result.returncode != 0 and 'invalid choice' in result.stderr
+    for options in (['--obs-colors','0'], ['--obs-colors','17'],
+                    ['--obs-colors','1','--band','2'], ['--obs-colors','1','--hblank-outs','5']):
+        result = subprocess.run([sys.executable, str(ROOT/'tools/img2osri.py'), 'missing.png',
+                                 '-o','unused.osri',*options], capture_output=True,text=True)
+        assert result.returncode != 0 and ('invalid choice' in result.stderr or 'cannot use' in result.stderr)
     with tempfile.TemporaryDirectory() as name:
         td = Path(name)
         # A static v1 file with independently chosen plane bytes and palette.
@@ -289,6 +443,16 @@ def main():
             ('same-color', 'tools/img2osri.py', 'events.append((y, index, color))', 'events.append((y, index, initial[index]))', 'OSRI_CONVERTER_SOURCE'),
             ('band', 'tools/img2osri.py', 'for y in range(band, H, band):', 'for y in range(1, H, 1):', 'OSRI_CONVERTER_SOURCE'),
             ('diffusion', 'tools/img2osri.py', 'd = rgb[c] - palette[index][c]', 'd = 0', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-lower-bound', 'tools/img2osri.py', 'if not 1 <= colors <= PALETTE_COLORS:', 'if not 0 <= colors <= PALETTE_COLORS:', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-upper-bound', 'tools/img2osri.py', 'if not 1 <= colors <= PALETTE_COLORS:', 'if not 1 <= colors <= PALETTE_COLORS + 1:', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-exact-count', 'tools/img2osri.py', 'for _ in range(colors):', 'for _ in range(colors - 1):', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-same-color', 'tools/img2osri.py', 'events.append((y, index, planned[index]))', 'if planned[index] != history[-1][index]: events.append((y, index, planned[index]))', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-candidate-reuse', 'tools/img2osri.py', 'remaining.remove(candidate)', 'pass', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-slot-tie', 'tools/img2osri.py', 'key = (int(losses[k]), slot, candidates[candidate], candidate)', 'key = (int(losses[k]), -slot, candidates[candidate], candidate)', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-update-distance', 'tools/img2osri.py', 'dp[slot] = dc[candidate]', 'pass', 'OSRI_CONVERTER_SOURCE'),
+            ('obs-rgb444-duplicates', 'tools/img2osri.py', 'colors = sorted(rgb444(raw[3 * i:3 * i + 3]) for _, i in q.getcolors())', 'colors = sorted({rgb444(raw[3 * i:3 * i + 3]) for _, i in q.getcolors()})', 'OSRI_CONVERTER_SOURCE'),
+            ('assets-stale-output', 'tools/raster_obs_assets.py', 'output.unlink(missing_ok=True)', 'pass', 'OSRI_ASSETS_SOURCE'),
+            ('assets-failure-continue', 'tools/raster_obs_assets.py', 'rows.append(row)', 'rows.append(row)\n        if row["status"] == "failed": break', 'OSRI_ASSETS_SOURCE'),
         ]
         with tempfile.TemporaryDirectory() as td:
             for name, source, old, new, variable in mutations:
