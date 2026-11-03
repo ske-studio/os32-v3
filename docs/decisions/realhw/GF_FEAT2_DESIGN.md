@@ -300,3 +300,22 @@ r1→r2 の変更: P2 の C0 呼出し順と §2 の解釈を明記し、P3 の 
 
 確定本文 GF_FEAT2_DESIGN.md:183 の handle 出力要求を覆す必要があるため、次の最小修正判断を記して停止する：handle を出力から外し、PGRAPH は class/subc/method（既存の他の診断項目は維持）を出す；根拠は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/engine/gr/nv40.c:242–246,274–280（subc=(400704の値>>16)&7、method=同値&0x1ffc、class=read(0x400160+subc*4)&0xffff、object handle の出力なし）；subchannel→handle 追跡は追加しない；A0 command.h の宣言変更は2行（:122 の handle を削除、:127 の gr_handle を gr_class に改名）、B7 は上記採取値から subc/method を復号し、PFIFO に class/handle を推定補完しない；本文・宣言の実編集は未実施。
 
+## 追記: C1・C2 から層 2 のチャネルに届く口 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/gf2-c12/ADDENDUM.md (C1・C2 の terra の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 直しが要る → r2 写してよい)。新しい小段 **A0d** (hwdev/gf/internal.h) と **C1a** (hwdev/gf/devinit.c)。
+
+確定本文を覆す必要なし。以下の相対パスは /home/hight/wt/os32-v3/gf2-l2 基準。F1取得口は無く、既存境界は hwdev/gf/internal.h:201–202 の owner hook → hwdev/gf/devinit.c:60–81 の production adapter（service.c:37、display/quiesce.c:21）。
+小段 A0d（internal.h、C1/C2の前提）で宣言を3行追加、既存宣言変更0行：前方宣言2行と gf_display_owner 末尾の任意ops 1行。command.h・production.h の宣言変更は0行。
+```c
+struct gf2_chan;
+struct gf_foundation;
+struct gf2_chan *(*command_get)(struct gf_display_context *, struct gf_foundation **);
+```
+小段 C1a（hwdev/gf/devinit.c、A0d/A1/B9の後）で static adapter と owner の指定初期化を接続：`struct gf_production *p=c->io.opaque; *out=&p->foundation; return &p->chan;`。取得は副作用なし、start前・失敗後にも同じ実体を返す。汎用側で opaque を cast しない。
+C1a は既存 foundation_start の資源照合成功後、F1 start 前に `p->chan.map_ops=p->map_ops; p->chan.map_owner=p->map_owner; p->chan.bar1=c->bars[GF_MODE_VRAM_BAR]; p->chan.dma_ops=geforce_dma_ops();` を設定（devinit.c:63–68、production.h:45–52）。chan全体のzero化・失敗資源の上書きはしない；C0は渡された f を保存し借用adapterを停止完了まで保持する。
+C1/C2共通の取得は `struct gf_foundation *f=0; struct gf2_chan *ch=c->owner->command_get ? c->owner->command_get(c,&f) : 0;`。ch非NULLならfも有効という契約；層2を持たない診断owner・既存host fixtureはops未指定/NULLで層2を飛ばす。層2結合fixtureだけ自分のchan/fと偽adapterを返す。C1はF1開始成功後 `if (ch && (rc=gf2_start(ch,f))) { c->last_rc=rc; goto fail; }`。
+層2開始前の失敗は既存 `gf_failure → gf_display_stop → owner->foundation_stop(c)` がF1を回収する（service.c:3–10、devinit.c:132でF1 start前にもBM取得）；F1 start内部rollback（foundation.c:114–117）済みでも同hookを呼ぶ。C0の未開始/停止完了GF2_OFFは `gf2_stop(ch)==0`、I/O・解放なしとし、新しい開始済みフラグは足さない。
+C2は `rc=ch ? gf2_stop(ch) : 0; if (rc && !f->revoked) { c->last_rc=rc; c->reusable=false; c->stop_ok=false; return -1; } stopped=c->owner->foundation_stop(c);` の順で既存quiesceへ続く。revokedでない層2失敗ではengaged・資源を保持しhook/restoreへ進めない（§6の保持契約、C3 geforce_module.c:95–100）；成功後のhookは省略せずidentity照合・revoked/last_rc反映を保つ。F1重複stopは既存foundation.c:61–94の冪等停止に委ねる（無I/Oとはしない）；C0は失敗をOFFにせず再stop可能にし、表示停止完了後の重複呼出しは既存quiesce.c:15のengaged判定で0。
+gf2_stop が失敗しても f->revoked なら foundation_stop と既存の quiesce へ進む（devinit.c:70–81、display/quiesce.c:16–39）；F1はtick解除とCPU unmapを試みinstを保持する（foundation.c:65–72）。chanはOFFにせず層2資源を保持し、C3はdetachを拒む。
+r1→r2 の変更：P2のrevoked時も既存cleanupへ進む例外をC2のコード境界と説明に反映し、devinit.cのadapter終端とfoundation.cのstop終端の行番号を修正。
+
