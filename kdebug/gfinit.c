@@ -165,8 +165,11 @@ static int gf_pre_cleanup(void *opaque)
     else for (u32 i = 0; i < RECOVER_BAR_COUNT; i++)
         if (bars[i] != owner->bus.bars[i]) gfinit_bus_revoke(&owner->bus);
     int command_rc = gf_command_cleanup(owner);
-    if (command_rc) return command_rc;
+    /* Revoked layer 2 returns its saved fault without stopping. Layer 1
+     * must still unbind the tick and unmap CPU access; retain the lease. */
+    if (command_rc && !owner->foundation.revoked) return command_rc;
     int rc = gf_foundation_call(GF1T_STOP);
+    if (command_rc) return command_rc;
     if (!rc) owner->foundation_active = false;
     return rc;
 }

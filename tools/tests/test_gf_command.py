@@ -1,6 +1,10 @@
 """Layer 2 component hosts: isolated links and runtime mutation controls."""
 CHECK = dict(name='gf-command-host', tier=1, needs=[], budget=90.0,
     covers=['hwdev/gf/**', 'drivers/video/geforce/geforce_dma.c',
+            'kdebug/gf_command_test.c', 'kdebug/gf_command_test.h',
+            'kdebug/gf_command_wire.h', 'kdebug/recover.h',
+            'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
+            'include/io.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
             'tools/tests/gf_command*', 'tools/tests/test_gf_command.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'])
 
@@ -18,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ORACLE = Path('/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/'
               'nouveau/nvkm/engine/gr/ctxnv40.c')
 # A2 report: only the tested component is real; dependencies live in the
-# fixture header. B7 includes fault.c itself and must never link it again.
+# fixture header. B7/T2b include their product source and must not link it twice.
 COMPONENTS = {
     'b0': ('hwdev/gf/fifo.c', True),
     'b1': ('hwdev/gf/push.c', False),
@@ -30,6 +34,7 @@ COMPONENTS = {
     'b7': ('hwdev/gf/fault.c', False),
     'b8': ('hwdev/gf/command_platform.c', True),
     'b9': ('drivers/video/geforce/geforce_dma.c', True),
+    't2b': ('kdebug/gf_command_test.c', True),
 }
 # Each old string must occur once in the original product source. Keep these
 # independent of the oracle and fixture; mutate one product site per build.
@@ -102,6 +107,7 @@ MUTATIONS = {
     'b9': [
         ('alloc-rc-lost', 'return rc;', 'return 0;'),
     ],
+    't2b': [],  # Mutation registration belongs to A3; see T2b report tuples.
 }
 
 
@@ -131,6 +137,9 @@ def build(component, source, directory, flags):
     if component == 'b7':
         extra += ['-DGF2_FAULT_SOURCE="' + str(source) + '"']
         sources = []
+    elif component == 't2b':
+        extra += ['-DGF2_T2B_SOURCE="' + str(source) + '"']
+        sources = []
     else:
         sources = [str(source)]
     exe = directory / 'host'
@@ -155,7 +164,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--component', choices=tuple(COMPONENTS),
-                        help='run one independently linked B component')
+                        help='run one B component or the T2b observer')
     args = parser.parse_args()
     runners = os.environ.get('HOST32_RUNNERS', 'qemu').split()
     require(bool(runners) and all(r in ('native', 'qemu') for r in runners),

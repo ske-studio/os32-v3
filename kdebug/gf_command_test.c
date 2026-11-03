@@ -248,7 +248,7 @@ static void emit(struct gf2_observer *o, const char *phase, u32 session, bool av
         number(" dma_state=", p->dma_state, true); number(" dma_fetch=", p->dma_fetch, true);
         number(" dma_push=", p->dma_push, true); number(" dma_dcount=", p->dma_dcount, true);
         number(" gr_trap=", p->gr_trap, true); number(" gr_method=", p->gr_method, true);
-        number(" subc=", (p->gr_trap >> 16) & GF2_SUBCHANNEL_MAX, false);
+        number(" subc=", (p->gr_method >> 16) & GF2_SUBCHANNEL_MAX, false);
         number(" gr_data=", p->gr_data, true); number(" gr_class=", p->gr_class, true);
         stats(" first", &p->first); stats(" latest", &p->latest);
     }
