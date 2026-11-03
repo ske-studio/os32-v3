@@ -139,6 +139,7 @@ static const struct hwdev_ops *hwdev_module_ops(void)
 }
 static int kpeek_call(u32 op,void *p,u32 sz) {(void)op;(void)p;(void)sz;peek_calls++;return 0;}
 #include "../../kdebug/gfinit_wire.h"
+#include "../../kdebug/gf_foundation_wire.h"
 #define ATTR_RED 1
 #define ATTR_WHITE 2
 static void print(int attr,const char *fmt,...) {(void)attr;(void)fmt;}

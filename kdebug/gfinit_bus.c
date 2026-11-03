@@ -137,15 +137,21 @@ int gfinit_bus_write(void *opaque, const struct recover_bus_access *a, u32 value
 
 /* Same DWORD aperture/restore path as A4, with no per-word plan or REC.
  * The caller checks safe points between the fixed 640-byte rows. */
+static int mode_vram_base(struct gfinit_bus *b, u32 y, u32 *base)
+{
+    u32 bars[RECOVER_BAR_COUNT];
+    if (!b || !b->ready || y >= GF_MODE_HEIGHT || memory_config(b, bars)) return -1;
+    *base = bars[GF_MODE_VRAM_BAR] & ~PCI_BAR_MEM_ATTR_MASK;
+    if (*base > ~0U - (GF_MODE_VRAM_BYTES - 1U) ||
+        (*base < GF_LEGACY_HI && *base + GF_MODE_VRAM_BYTES > GF_LEGACY_LO)) return -1;
+    return 0;
+}
+
 int gfinit_bus_mode_row(struct gfinit_bus *b, u32 y, bool write, const u8 *row,
                         u32 *bad_offset, u32 *expected, u32 *actual)
 {
-    u32 bars[RECOVER_BAR_COUNT];
-    if (!b || !b->ready || y >= GF_MODE_HEIGHT || !row ||
-        memory_config(b, bars)) return -1;
-    u32 base = bars[GF_MODE_VRAM_BAR] & ~PCI_BAR_MEM_ATTR_MASK;
-    if (base > ~0U - (GF_MODE_VRAM_BYTES - 1U) ||
-        (base < GF_LEGACY_HI && base + GF_MODE_VRAM_BYTES > GF_LEGACY_LO)) return -1;
+    u32 base;
+    if (!row || mode_vram_base(b, y, &base)) return -1;
     for (u32 x = 0; x < GF_MODE_PITCH; x += GF_MODE_VRAM_WORD_BYTES) {
         u32 wanted = 0;
         for (u32 byte = 0; byte < GF_MODE_VRAM_WORD_BYTES; byte++)
@@ -161,6 +167,20 @@ int gfinit_bus_mode_row(struct gfinit_bus *b, u32 y, bool write, const u8 *row,
                 }
             }
         }
+    }
+    return 0;
+}
+
+int gfinit_bus_mode_read_row(struct gfinit_bus *b, u32 y, u8 *row)
+{
+    u32 base;
+    if (!row || mode_vram_base(b, y, &base)) return -1;
+    for (u32 x = 0; x < GF_MODE_PITCH; x += GF_MODE_VRAM_WORD_BYTES) {
+        u32 value = 0, off = GF_MODE_VRAM_OFFSET + y * GF_MODE_PITCH + x;
+        if (recover_window_access(&b->window, base + off,
+                GF_MODE_VRAM_WORD_BYTES, false, &value)) return -1;
+        for (u32 byte = 0; byte < GF_MODE_VRAM_WORD_BYTES; byte++)
+            row[x + byte] = (u8)(value >> (byte * BITS_PER_BYTE));
     }
     return 0;
 }

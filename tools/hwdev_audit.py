@@ -50,10 +50,15 @@ def audit(out, cross):
     kernel_rows = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
                              kernel_table, re.M)
     # Slot 36 is the appended CORE runner access; CW's kernel getter uses 37.
-    kernel_slots = [*range(25, 36), 37]
+    kernel_slots = [*range(25, 36), 37, 38]
     require(len(kernel_names) == len(kernel_slots), 'kernel import table count')
-    expected_kernel = [(str(slot), n, str(imports[n]['index'])) for slot, n in
-                       zip(kernel_slots, sorted(kernel_names, key=lambda n: imports[n]['index']))]
+    private_kernel = [e for e in json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
+                      if e['group'] == 'kernel']
+    require([e['index'] for e in private_kernel] == kernel_slots and
+            {e['symbol'] for e in private_kernel} == kernel_names,
+            'private kernel import slots/symbols')
+    expected_kernel = [(str(e['index']), e['symbol'], str(imports[e['symbol']]['index']))
+                       for e in private_kernel]
     require(kernel_rows == expected_kernel, 'kernel import table order/symbol/index')
     slots = []
     for index, name, source in rows:

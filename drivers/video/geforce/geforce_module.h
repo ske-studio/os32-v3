@@ -1,6 +1,7 @@
 /* P5 connection to P4's boot/resource owner. No register/ROM policy here. */
 #ifndef GEFORCE_MODULE_H
 #define GEFORCE_MODULE_H
+#include <stdbool.h>
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "../../../kernel/module/module_runtime.h"
@@ -10,6 +11,7 @@ struct gf_production_resources;
 struct gf3_test_ops;
 struct gf1_test_ops;
 const struct gf1_test_ops *geforce_foundation_ops(void);
+int geforce_foundation_display(bool start);
 struct geforce_platform {
     struct video_device *device;
     /* reserve owns permanent BAR reservations/maps (1 ready, 0 unavailable);
