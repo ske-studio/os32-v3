@@ -210,6 +210,7 @@ else if (armed) {
 | R2 | `drivers/video/pc98/splash_raster.c` | 旧画像入口の削除。モード状態・公開tableは保持。H3/R1/I1 と V2a・V7a の後 (末尾の追記「R2 の旧静止画像入口の終了」)。 |
 | P2a | `kernel/time/ktime.c` | 出口精算の暫定値 (B・l_min・費用表) と根拠。R1後・M2初測前 (末尾の追記「P2 の出口精算」)。 |
 | P2b | `kernel/time/ktime.c` | M2初測の実測値を反映し、同じSHAでM2を再測定して認定。M2初測後。 |
+| R1t | `drivers/video/pc98/splash_raster_image.c` | 予算表の const を PL_PROFILES_CONST で切り替える 4 行 (試験から表を与えるため、常用の .text・.rodata は不変)。R1後・R1a前 (末尾の追記「V2 の予算表の試験入力」)。 |
 | R1a | `drivers/video/pc98/splash_raster_image.c` | 再生の予算表の暫定値と根拠。P2a後・M2初測前 (末尾の追記「R1 の認定予算」)。 |
 | R1b | `drivers/video/pc98/splash_raster_image.c` | M2初測の実測値を反映。P2b後、続けてM2再で認定。 |
 | V2a | `tools/tests/splash_raster_host.c` | 旧入口専用の試験・呼出しの除去。I1後。 |
@@ -389,3 +390,32 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - §7:244は `M1→P1/P2→R1→P2a→R1a→M2→P2b→R1b→M2再→V2〜V5/V7/V8`、次行は `I1/I2→V2a/V7a→R2→H3a→V3/V8・V6→NP21/W` に変更する。削除後も機械語変更後のM2再認定をNP21/W前に満たす（既定の反復上限を維持）。
 - H1追記の「R2で画像入口をR1へ移す」も「I1で新入口へ切替後、R2で旧入口を削除」に追従させる。各段1ファイル所有を維持し、PMが直列に取り込む。
 - 確定本文の機能契約・ユーザー決定を覆す必要なし。段の順と移行担当の補完のみで、旧経路を最終成果に残さない。
+
+## 追記: V2 の予算表の試験入力 (2026-11-03)
+
+> 出所: ~/os32-tmp/run/raster-splash/V2_ADDENDUM.md (V2 の sol の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 Approve)。§6 の表に R1t を PM が足した。
+
+対象は §6 V2。R1後・R1a前に小段 R1t（所有は `drivers/video/pc98/splash_raster_image.c` のみ）を追加する。製品変更は追加3行・置換1行。V2の所有は既定のホスト試験のみ。確定本文を覆す必要なし。
+R1tは既存 :77 の表宣言の直前へ `#ifndef PL_PROFILES_CONST`、`#define PL_PROFILES_CONST const`、`#endif` を順に挿入し、宣言を `static PL_PROFILES_CONST struct PlProfile pl_profiles[2][2][2] = {` に置換する。既存初期値は保持し、製品ビルドではマクロを外部定義しない。API・ヘッダー・選択処理・qualified検査は変更しない。
+V2は既存 `tools/tests/splash_raster_host.c:98` の splash_raster.c のinclude後に、`#define PL_PROFILES_CONST`、`#define now_us pl_host_now_us`、`#include "../../drivers/video/pc98/splash_raster_image.c"`、`#undef now_us`、`#undef PL_PROFILES_CONST` を各1行で順に置く。画像側の定義・呼出しだけを前処理で改名し、同一翻訳単位のnow_us衝突を解消する。
+include後、表を書き換える前に製品初期値の各表を実物の `qualified()` に通し、その設定状態に応じた受理・拒否を確認する（R1a/R1bの値も同じ初期化子から読む）。constへの書込みやキャストによるconst除去はしない。
+試験コードは `pl_profiles[mode][phase][nslot] = fixture;` で同じ私有型の全予算・費用・窓を設定し、その入力を独立模型にも渡す。各ケースのprepare前に設定を完了し、そのケースのframe終了まで固定する。未設定・不正値も実物の検査を通し、検査を迂回しない。
+常用の確認：R1t前後を同じ製品コンパイラ・フラグ・予算値（ホストdefineなし）でコンパイルし、各 `S=.text` と `S=.rodata` について `objcopy -O binary --only-section=$S before.o before.bin` と同様のafter抽出後、`cmp before.bin after.bin` が一致することを受入条件とする。
+V2の受入では既存ロゴと画像の両.cを含むホスト試験をコンパイルし、now_usの再定義がないことを確認する（ビルド・変異の所有は既定のV3のまま）。
+r1→r2 の変更：A1は画像.cのinclude範囲だけのマクロ改名で解消。A2はconstだけを切り替えて製品初期値の検査を追加、A3は.rodataの比較も受入に追加。
+
+## 追記: M1 の採取の IF=0 の上限を 70H に (2026-11-03)
+
+> 出所: ~/os32-tmp/run/raster-splash/M1_LIMIT_ADDENDUM.md (実機 Ra266 の 2 回目 — ~/os32-tmp/evidence/2026-11-03/m1diag2/ — で count=2086 > cap=2074 の拒否 → astra 起草 r1 (67H)・r2 (70H)、Opus レビュー r1 Request changes (比 q/l の余裕) → r2 写してよい)。ユーザー決定「上限は物理の制約が無ければ広げてよい」(2026-10-28) の範囲。時計の上限の値は PM が式どおり約 14.4µs に直した。
+
+M1_LIMIT_ADDENDUM r2：連続64周期採取の IF=0 上限を固定70Hとする。確定本文・ユーザー決定を覆す必要なし（64周期・時計予約・既存計測を維持）。
+整数式：L=100000、d=line_den、q=校正Q上限の分子、l=下限の分子、C=(2×時計上限µs+量子µs)×d、n=ceil((65L+q)/l)+1、cap=floor((70L−C)/q)；ceil(a/b)=(a+b−1)/b、採取は既存のn≤cap・RAM上限・事後時間検査を維持。
+比の余裕で70Hを選ぶ：n≤capの厳密な同値条件はq/l≤q(cap−1)/(65L+q)（q,l>0、cap≥2）；今回q=3147,C=72381ではcap=2201、比上限=6923400/6503147≈1.064623（表示のみ小数、判定は整数）。比を超えれば固定上限を延ばさず既存判定で拒否する。
+Ra266のl=3120ではq/l=3147/3120≈1.008654、n=2086、nq+C=6637023≤7000000；入口2H・両端2標本を含む積上げ66L+C+2q=6678675も70L内。レビュー反例l=3105,q=3163,C=72381でもn=2096≤cap=2190で通る。
+P3条件：積上げ66L+C+2q≤67L≤70Lが成り立つ条件はC+2q≤L（時計上限≤(L−2q−量子µs×d)/(2d)、今回約14.4µs）；今回78675≤100000。現物はこの条件・積上げ式を直接検査していないため、条件外へこの説明を一般化しない。
+70Hは31kでceil(7000000/3147)=2225µs、24kでceil(7000000/2483)=2820µsで20ms未満；CLI〜保存IF復元を上限に含めて実測確認する。通常再生の402H_max+Cexit<20ms、公開table／ロゴの≤2Hは維持。
+PIT 24576/2457600秒=10msに対して採取は1tick未満；採取前の保留IRQ0処理、採取後の既存≥1H開放・IRQ再開を維持すれば保留は高々1回でtickを失わず、M1の新たなtick補正は不要。画像再生§3のPIT精算、§6の受信損失記録・受信欠落0を採否に追加しない方針・IRQ再開確認を維持し、実機で64周期・IF時間・tick／受信記録を再採取する。
+書換一覧（文書）：docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md §3の142行と末尾「M1の固定の計測列」の323行へ固定70H・上記式と条件を追記する；現行の両箇所には「66H」の文字列はない。
+書換一覧（現物）：platform/pc98/splash_probe.c:467のlimit=(PROBE_HPERIODS+2)*Lを(PROBE_HPERIODS+6)*Lへ、407行のunchanged 66Hと477行の66H固定拒否コメントを70Hへ整合；479行cap・482行excess・498〜499行事後検査は共通limitに追従。校正32H／64Hとcountは変更不要。
+r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込みの比上限と反例の通過、P3のC+2q≤L条件を明記、書換一覧を70Hへ更新。
+

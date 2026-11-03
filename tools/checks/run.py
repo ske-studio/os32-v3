@@ -680,17 +680,91 @@ def build_content(text, path):
     return tuple(content)
 
 
-def routed_build_safe(root, base, path):
+SOURCE_REF = r"\$\([A-Z_][A-Z_0-9]*\)"
+SOURCE_WORD = rf"(?:{SOURCE_REF}|[A-Za-z0-9_./+-])+"
+SOURCE_TOKEN = rf"(?:\$\(wildcard [A-Za-z0-9_./*? \t-]+\)|{SOURCE_WORD})"
+SOURCE_PATH = re.compile(rf"(?:{SOURCE_REF}/)?[A-Za-z0-9_][A-Za-z0-9_./+-]*\.(?:c|o)\Z")
+
+
+def source_list_content(content):
+    """Keep assignment names/operators and every non-source operand unchanged."""
+    signature, lists, defines = [], [], 0
+    lines = iter(content)
+    for line in lines:
+        parts = [line]
+        while parts[-1].endswith("\\"):
+            following = next(lines, None)
+            if following is None:
+                return None, set()
+            parts.append(following)
+        statement = "\n".join(parts)
+        define = re.match(r"(?:(?:override|export|private|unexport)\s+)*define\b", line.lstrip())
+        protected = line.startswith("\t") or defines or define
+        if define:
+            defines += 1
+        if re.match(r"endef\b", line.lstrip()):
+            defines = max(0, defines - 1)
+        logical = " ".join(p[:-1] if p.endswith("\\") else p for p in parts)
+        assignment = None if protected else re.fullmatch(
+            r"[ ]*(C_KERNEL|[A-Z][A-Z_0-9]*_(?:SRC|SOURCES|OBJ|OBJS))"
+            r"[ \t]*(:=|\+=|\?=|=)[ \t]*(.*)", logical)
+        if assignment is None:
+            signature.append(statement)
+            continue
+        name, operator, value = assignment.groups()
+        # Only addprefix's file-list argument is a list here. Other functions
+        # (including wildcard) remain opaque, identical operands on both sides.
+        wrapper = re.fullmatch(rf"(\$\(addprefix[ \t]+{SOURCE_WORD}/,)[ \t]*(.*?)\)", value)
+        prefix, value = (wrapper[1], wrapper[2]) if wrapper else ("", value)
+        value = value.strip()
+        if value and not re.fullmatch(rf"{SOURCE_TOKEN}(?:[ \t]+{SOURCE_TOKEN})*", value):
+            signature.append(statement)
+            continue
+        tokens = re.findall(SOURCE_TOKEN, value)
+        paths = {t for t in tokens if SOURCE_PATH.fullmatch(t)}
+        references = tuple(sorted({ref for t in paths for ref in re.findall(SOURCE_REF, t)}))
+        signature.append((name, operator, prefix, references, tuple(t for t in tokens if t not in paths)))
+        lists.append((prefix, tuple(tokens)))
+    return tuple(signature), lists
+
+
+def routed_build_inputs(root, base, path):
+    """None means full; otherwise return source inputs changed by registration."""
     if base is None:
-        return False
+        return None
     try:
         ancestor = git(root, "merge-base", base, "HEAD")[0]
         before = "\n".join(git(root, "show", ancestor + ":" + path))
         after = (root / path).read_text()
     except (ValueError, OSError, IndexError):
-        return False
+        return None
     old = build_content(before, path)
-    return old is not None and old == build_content(after, path)
+    new = build_content(after, path)
+    if old is None or new is None:
+        return None
+    if old == new:
+        return frozenset()
+    if matches(path, ("build/**/*.mk",)):
+        old_shape, old_lists = source_list_content(old)
+        new_shape, new_lists = source_list_content(new)
+        if old_shape is not None and old_shape == new_shape:
+            sources = set()
+            for (prefix, old_tokens), (_, new_tokens) in zip(old_lists, new_lists):
+                common = set(old_tokens) & set(new_tokens)
+                if tuple(t for t in old_tokens if t in common) != tuple(t for t in new_tokens if t in common):
+                    return None  # Existing operands must retain their link order.
+                changed_paths = set(old_tokens) ^ set(new_tokens)
+                if not changed_paths:
+                    continue
+                if prefix or any("$" in t for t in changed_paths):
+                    return None  # Cannot resolve the implementation without make.
+                sources.update(changed_paths)
+            return frozenset(t[:-2] + ".c" if t.endswith(".o") else t for t in sources)
+    return None
+
+
+def routed_build_safe(root, base, path):
+    return routed_build_inputs(root, base, path) is not None
 
 
 def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
@@ -701,6 +775,11 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     snapshot = tracked(root) if dependency_scan else None
     patterns = {n: c.covers + (c.path,) + (tuple(extract(root, c, snapshot, compiler=True))
                          if dependency_scan else ()) for n, c in checks.items()}
+    def uncovered(f):
+        return not matches(f, DOCS) and not any(
+            matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST
+        ) and not any(matches(f, pats) for pats in patterns.values())
+
     hit, unmatched, full_hits = set(), set(), set()
     # Conversion retains the old artifact_readers as make:all consumers,
     # including readers whose covers contain no build output paths.
@@ -709,12 +788,15 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
     generated = KAPI_GENERATED + ("sdk/gen_kapi.py", "sdk/kapi_rust_gen.py")
     for f in changed:
         hit.update(n for n, pats in patterns.items() if matches(f, pats))
-        if f in {"build/kernel.mk", "build/libs.mk", "build/programs.mk"}:
-            if not routed_build_safe(root, base, f):
+        if matches(f, ("build/**/*.mk",)):
+            sources = routed_build_inputs(root, base, f)
+            if sources is None:
                 full_hits.add(f)
             else:
                 hit.update(artifact_targets)
                 hit.update(n for n, c in checks.items() if any("**" in p for p in c.covers))
+                hit.update(n for n, pats in patterns.items() if any(matches(s, pats) for s in sources))
+                unmatched.update(s for s in sources if uncovered(s))
             continue
         if f == "sdk/kapi.json":
             hit.update(artifact_targets)
@@ -723,8 +805,7 @@ def plan(root: Path, checks: Mapping[str, Check], files: tuple[str, ...],
             continue
         if matches(f, FULL + BUILD_CONFIG_GLOBS):
             full_hits.add(f)
-        elif not matches(f, DOCS) and not any(matches(f, (p,)) and not matches(f, ex) for p, ex in NOTEST) \
-                and not any(matches(f, pats) for pats in patterns.values()):
+        elif uncovered(f):
             unmatched.add(f)
     docs_only = bool(changed) and all(matches(f, DOCS) for f in changed)
     notest_only = bool(changed) and all(any(matches(f, (p,)) and not matches(f, ex)

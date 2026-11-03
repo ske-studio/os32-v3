@@ -1,6 +1,6 @@
 """Boot wire: generated fixed OSRI, real loader, shared deadline and cleanup."""
 CHECK = dict(name='splash-wire-host', tier=1,
-    covers=['init/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
+    covers=['init/boot_splash.c', 'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
             'include/platform_splash.h', 'include/config.h', 'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h',
             'tools/tests/splash_wire_host.c', 'tools/tests/splash_raster_host.c',

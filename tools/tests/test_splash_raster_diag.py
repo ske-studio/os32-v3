@@ -1,11 +1,17 @@
 """Diagnostic records execute; the ordinary player retains identical text."""
 CHECK = dict(name='splash-raster-diag-host', tier=1,
-    covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster.h',
+    covers=['drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
             'tools/tests/splash_raster_diag_host.c', 'tools/tests/splash_raster_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'gfx/gfx_osri.h', 'gfx/gfx.h', 'include/types.h', 'include/pc98.h',
             'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
-            'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=20.0)
+            'sdk/include/os32/os32_kapi_shared.h', 'platform/pc98/splash_probe.c',
+            'tools/tests/splash_probe_host.c', 'tools/tests/splash_raster_model_host.c',
+            'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
+            'gfx/gfx_internal.h', 'include/gfx_hal.h', 'mm/paging.h',
+            'kernel/v86/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
+            'include/bootinfo.h', 'include/build_id.h', 'include/config.h',
+            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=20.0)
 import argparse
 import os
 from pathlib import Path
@@ -41,6 +47,30 @@ def execute(source):
         if result.returncode: print(result.stderr, flush=True)
         return result.returncode
 
+
+PROBE = 'platform/pc98/splash_probe.c'
+CAPTURE = 'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;'
+def model(truncate=False):
+    with tempfile.TemporaryDirectory(prefix='splash-model-') as td:
+        work = Path(td)
+        for rel in (PROBE, SOURCE, 'tools/tests/splash_probe_host.c',
+                    'tools/tests/splash_raster_model_host.c'):
+            dest = work/rel; dest.parent.mkdir(parents=True, exist_ok=True)
+            source = (ROOT/rel).read_text()
+            if rel == PROBE and truncate:
+                assert source.count(CAPTURE) == 1
+                source = source.replace(CAPTURE, 'u32 count = s->line_num_us / q;', 1)
+            dest.write_text(source)
+        cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'); exe = work/'model'
+        subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
+            '-D__KERNEL_BUILD__', '-DSPLASH_RASTER_DIAG', *include_flags(ROOT),
+            '-I'+str(ROOT/'drivers/video/pc98'), str(work/'tools/tests/splash_raster_model_host.c'),
+            '-lgcc', '-o', str(exe)], check=True)
+        result = host32.run([str(exe)], runner='qemu', capture_output=True)
+        if result.returncode: print(result.stderr, flush=True)
+        return result.returncode
+
 def ordinary_symbols():
     with tempfile.TemporaryDirectory(prefix='splash-ordinary-') as td:
         obj = Path(td)/'raster.o'
@@ -58,9 +88,14 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     source = (ROOT/SOURCE).read_text()
     ordinary_symbols()
+    assert model() == 0
+    print('GREEN independent waveform: 318 phases, 64 complete periods', flush=True)
     assert execute(source) == 0
     print('GREEN diagnostic targets/start/end, IF maximum/total, late, reset, fixed palette', flush=True)
     if args.mutate:
+        rc = model(truncate=True)
+        assert rc != 0
+        print(f'RED truncate continuous H capture: compiled, runtime rc={rc}', flush=True)
         for name, old, new in MUTATIONS:
             assert source.count(old) == 1, name
             rc = execute(source.replace(old, new, 1))

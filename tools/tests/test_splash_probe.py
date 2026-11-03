@@ -68,11 +68,30 @@ MUTATIONS = (
     ('use shortest poll for lower window',
      'r->lower = remaining > 0 ? (remaining + r->poll.max - 1) / r->poll.max : 1;',
      'r->lower = remaining > 0 ? (remaining + r->poll.min - 1) / r->poll.min : 1;'),
-    ('extend IF0 time frame', 'unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;',
+    ('restore 66H capture limit', 'unsigned long long limit = (PROBE_HPERIODS + 6) * s->line_num_us;',
+     'unsigned long long limit = (PROBE_HPERIODS + 2) * s->line_num_us;'),
+    ('extend IF0 time frame', 'unsigned long long limit = (PROBE_HPERIODS + 6) * s->line_num_us;',
      'unsigned long long limit = (PROBE_HPERIODS + 32) * s->line_num_us;'),
     ('ignore H sample count cap',
-     'if (count > cap) { probe_hd.reason = 3; probe_errors++; return 0; }',
-     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_errors++; return 0; }'),
+     'if (count > cap) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_errors++; return 0; }',
+     'if (count > cap + PROBE_HSAMPLES) { probe_hd.reason = 3; probe_hd.budget_stage = 5; probe_errors++; return 0; }'),
+    ('omit second H precision pass', 'for (u32 pass = 0; pass < 2; pass++)',
+     'for (u32 pass = 0; pass < 1; pass++)'),
+    ('use one rounded short sandwich', 'sample < PROBE_COST_BATCH;', 'sample < 1;'),
+    ('short PL Q calibration', 'if (count > PROBE_COST_BATCH) count = PROBE_COST_BATCH;',
+     'if (count > PROBE_BURST) count = PROBE_BURST;'),
+    ('omit budget rejection substage', 'probe_hd.budget_stage = 5;', 'probe_hd.budget_stage = 0;'),
+    ('omit retained cap', 'probe_hd.cap = cap;', 'probe_hd.cap = 0;'),
+    ('omit retained excess',
+     'probe_hd.excess = (long long)(count * q + clocks) - (long long)limit;',
+     'probe_hd.excess = 0;'),
+    ('omit calibration span minimum', 'c->span_min = span;', 'c->span_min = 0;'),
+    ('omit calibration span maximum', 'c->span_max = span;', 'c->span_max = 0;'),
+    ('omit H budget dump', 'probe_signed(" excess_num=", probe_hd.excess);',
+     'probe_signed(" missing_excess_num=", probe_hd.excess);'),
+    ('omit column skip reason', 'c->scan_reason = 2;', 'c->scan_reason = 0;'),
+    ('omit column skip dump', 'probe_field(" scan_reason=", c->scan_reason);',
+     'probe_field(" missing_scan_reason=", c->scan_reason);'),
     ('lose VS classification', 'else if (probe_delta(measured, s->vs_lines * tolerance) <= tolerance)',
      'else if (0 && probe_delta(measured, s->vs_lines * tolerance) <= tolerance)'),
     ('ignore eight-period mismatch', 'expected * SPLASH_RASTER_PERIOD_TOLERANCE) return;',
@@ -132,6 +151,8 @@ def execute(mutation=None):
                 assert source.count(old) == 1, name
                 source = source.replace(old, new, 1)
             if rel == SOURCE:
+                source = source.replace('probe_hcalibrate(s, &q, clocks, pass)',
+                    'probe_host_hcalibrate(s, &q, clocks, pass)')
                 source = source.replace('static u32 probe_hcollect(u32 count, u32 completed)\n{',
                     'static u32 probe_hcollect(u32 count, u32 completed)\n{\n    probe_hcollect_check();')
             dest.write_text(source)
@@ -150,7 +171,7 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args = p.parse_args()
     ordinary()
     assert execute() == 0
-    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 66H IF0 cap', flush=True)
+    print('GREEN boot BIOS snapshot before/after begin, four wave types, independent IN/clock/OUT costs, cumulative IRQ/J_max, signed margins, buffered output, bounded failure, certified N5/N6 normal H windows, 70H IF0 cap and real-hardware ratio cases', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:
             rc = execute(mutation)
