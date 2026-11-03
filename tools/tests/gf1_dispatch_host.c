@@ -22,9 +22,12 @@ static struct gfinit_bus lease_bus;
 static struct recover_bar_extent bars[RECOVER_BAR_COUNT];
 static u32 mmio[8], page_data[MEM_PAGE_SIZE/sizeof(u32)];
 static unsigned masters, starts, stops, revokes, snapshots, heads_calls, allocs, frees;
+static unsigned display_starts, display_stops;
 static int operation_rc, alloc_rc, write_rc, read_rc;
 static u32 fault_off=~0U;
 const struct gf_instmem_map_ops gf_production_instmem_map_ops={0};
+int geforce_foundation_display(bool start)
+{ if(start)display_starts++;else display_stops++;return operation_rc; }
 int gf_master_enable(struct gf_foundation *f)
 { CHECK(f==&foundation);masters++;return operation_rc; }
 int gf_foundation_start(struct gf_foundation *f)
@@ -114,10 +117,18 @@ void _start(void)
     CHECK(gf1_module_ops.call(&foundation,0,&reply)==GF1_EINVAL);
     q.size--;
     CHECK(gf1_module_ops.call(&foundation,&q,&reply)==GF1_EINVAL);
-    CHECK(request(GF1T_REVOKE+1,0)==GF1_EINVAL);
+    CHECK(request(GF1T_DISPLAY_START+1,0)==GF1_EINVAL);
     CHECK(request(GF1T_HEADS,4)==GF1_EINVAL);
     CHECK(request(GF1T_SNAPSHOT,1)==GF1_EINVAL);
     CHECK(!masters && !starts && !stops && !revokes && !snapshots);
+    CHECK(request(GF1T_DISPLAY_STOP,0)==GF1_EINVAL && !display_stops);
+    CHECK(request(GF1T_DISPLAY_START,0)==GF1_EINVAL && !display_starts);
+    gf1_module_ops.production=&foundation;
+    CHECK(request(GF1T_DISPLAY_STOP,1)==GF1_EINVAL && !display_stops);
+    CHECK(request(GF1T_DISPLAY_START,0)==0 && display_starts==1 && !starts);
+    operation_rc=GF1_ESTOP;
+    CHECK(request(GF1T_DISPLAY_STOP,0)==GF1_ESTOP && display_stops==1 && !stops);
+    operation_rc=0;
     CHECK(request(GF1T_MASTER,0)==0 && masters==1);
     operation_rc=GF1_EIO;
     CHECK(request(GF1T_START,0)==GF1_EIO && starts==1);
@@ -156,6 +167,8 @@ void _start(void)
     CHECK(request(GF1T_START,0)==GF1_EPCI && starts==1);
     CHECK(request(GF1T_HEADS,1)==GF1_EPCI && heads_calls==4);
     CHECK(request(GF1T_INST_PAGE,0)==GF1_EPCI && allocs==5);
+    CHECK(request(GF1T_DISPLAY_START,0)==GF1_EPCI && display_starts==1);
+    CHECK(request(GF1T_DISPLAY_STOP,0)==GF1_EPCI && display_stops==1);
     CHECK(request(GF1T_STOP,0)==0 && stops==2);
     CHECK(request(GF1T_REVOKE,0)==0 && revokes==2);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));

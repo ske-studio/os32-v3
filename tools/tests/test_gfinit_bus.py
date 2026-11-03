@@ -17,6 +17,10 @@ def command(exe):
 
 
 MUTATIONS = [
+    ('row_little_endian', 'row[x + byte] = (u8)(value >> (byte * BITS_PER_BYTE));',
+     'row[x + byte] = (u8)(value >> ((3U - byte) * BITS_PER_BYTE));'),
+    ('row_read_only', 'GF_MODE_VRAM_WORD_BYTES, false, &value)',
+     'GF_MODE_VRAM_WORD_BYTES, true, &value)'),
     ("raw_bar_revoke", "if (b->foundation && bars[i] != b->bars[i]) gfinit_bus_revoke(b);", "(void)b;"),
     ("revoked_bus_write", "(b->foundation && b->foundation->revoked) ||", ""),
     ('cr1f_second_visit', 'k < sizeof(order) / sizeof(order[0])', 'k + 1 < sizeof(order) / sizeof(order[0])'),

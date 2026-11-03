@@ -88,6 +88,42 @@ static struct recover_bus_access address(u32 key,u32 dir)
     struct recover_bus_access a;
     CHECK(recover_target_address(&profile.targets[key],dir,&a)==0);a.key=key;return a;
 }
+static u32 row_offset, row_bytes;
+static int row_load(void *opaque,u32 va,u32 width,u32 *value)
+{
+    (void)opaque;
+    u32 pa=mapped_pa+va-MEM_DEVICE_APERTURE_BASE;
+    CHECK(!irq_state && width==4 && mapped_flags==(PTE_PRESENT|PTE_PCD));
+    CHECK(pa==(rawbars[1]&~15U)+row_offset+row_bytes);
+    *value=0x80ff4201U^(row_offset+row_bytes);row_bytes+=4;
+    return fault==3?-1:0;
+}
+static int row_store(void *opaque,u32 va,u32 width,u32 value)
+{ (void)opaque;(void)va;(void)width;(void)value;CHECK(false);return -1; }
+static void mode_read_row_tests(void)
+{
+    u8 row[GF_MODE_PITCH];
+    const u32 rows[]={0,GF_MODE_HEIGHT-1U};
+    for(u32 i=0;i<ARRAY_SIZE(rows);i++) {
+        bus_setup();memory_ops.load=row_load;memory_ops.store=row_store;
+        row_offset=rows[i]*GF_MODE_PITCH;row_bytes=0;
+        CHECK(!gfinit_bus_mode_read_row(&device,rows[i],row));
+        CHECK(row_bytes==sizeof(row) && maps==sizeof(row)/4 && restores==maps);
+        for(u32 x=0;x<sizeof(row);x++) {
+            u32 word=0x80ff4201U^(row_offset+(x&~3U));
+            CHECK(row[x]==(u8)(word>>(8*(x&3U))));
+        }
+        CHECK(pte==0x876540a5 && irq_state==1 && !device.window.owned && !window_busy);
+    }
+    u32 before=maps;
+    CHECK(gfinit_bus_mode_read_row(&device,GF_MODE_HEIGHT,row)<0 && maps==before);
+    CHECK(gfinit_bus_mode_read_row(&device,0,0)<0 && maps==before);
+    device.ready=false;
+    CHECK(gfinit_bus_mode_read_row(&device,0,row)<0 && maps==before);
+    bus_setup();memory_ops.load=row_load;row_offset=row_bytes=0;fault=3;
+    CHECK(gfinit_bus_mode_read_row(&device,0,row)<0 && maps==1 && restores==1);
+    CHECK(pte==0x876540a5 && irq_state==1 && !device.window.owned && !window_busy);
+}
 static void accessor_tests(void)
 {
     bus_setup();
@@ -527,7 +563,7 @@ static void resource_probe_tests(void)
 void GF_S5_ENTRY(void)
 {
     gf_fixture_init();
-    resource_tests();resource_barlen_tests();resource_probe_tests();accessor_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
+    resource_tests();resource_barlen_tests();resource_probe_tests();accessor_tests();mode_read_row_tests();production_plan(0);production_plan(RECOVER_CR1F_UNLOCKED);
     output(failures?"GF S5 FAIL\n":"GF S5 PASS\n");
     __asm__ volatile("int $0x80"::"a"(1),"b"(failures?1:0):"memory");for(;;){}
 }

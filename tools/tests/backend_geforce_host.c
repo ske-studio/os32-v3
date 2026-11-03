@@ -42,9 +42,12 @@ static int run(void)
     if (n!=4 || events[0]!=1 || events[1]!=2 || events[2]!=3 || events[3]!=4) return 2;
     gfx_backend_geforce.enter(); if (n!=4) return 3;
     gfx_backend_geforce.set_palette(16,1,rgb); if (!gfx_backend_geforce.probe()) return 4;
-    gfx_backend_geforce.leave(); gfx_backend_geforce.enter(); gfx_backend_geforce.shutdown();
+    if (geforce_foundation_display(false)!=GF1_OK || active || routed) return 7;
+    if (geforce_foundation_display(true)!=GF1_OK || !active || !routed) return 8;
+    gfx_backend_geforce.shutdown();
     if (n!=12 || events[4]!=5 || events[5]!=6 || events[6]!=1 || events[9]!=4 || events[10]!=5 || events[11]!=6) return 5;
-    n=0; fail_step=3; gfx_backend_geforce.init();
+    n=0; fail_step=3;
+    if (geforce_foundation_display(true)!=GF1_EIO) return 9;
     if (n!=5 || events[2]!=3 || events[3]!=5 || events[4]!=6 || gfx_backend_geforce.probe()) return 6;
     return 0;
 }

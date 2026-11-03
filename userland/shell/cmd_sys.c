@@ -682,6 +682,7 @@ static const ShellCmd sys_cmds[] = {
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|geforce|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
     { "gfinit", shell_cmd_gfinit, "inspect <sid> | abort <sid> --allow-write", "Inspect GF ROM or release the session" },
+    { "gf1", shell_cmd_gf1, "status|instmem|vblank|cycle", "Observe the current GeForce layer-1 owner" },
     { "recover", shell_cmd_recover, "status | now <session> | virtual begin <case> | virtual step|end <session>", "Show recovery state or recover the current session" },
     { "peek",   shell_cmd_peek, "[-k|-p|-m] [-w1|-w2|-w4] addr [len]", "Read memory via kdebug (hex, KDEBUG=1)" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },

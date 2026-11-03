@@ -785,6 +785,31 @@
       "wc_start",
       "wc_stop"
     ],
+    "struct gf1_request": [
+      "rc",
+      "session",
+      "size",
+      "test"
+    ],
+    "struct gf1_test_ops": [
+      "call",
+      "prepare",
+      "production"
+    ],
+    "struct gf1_test_reply": [
+      "bad_off",
+      "bytes",
+      "command",
+      "flags",
+      "pmc",
+      "rc",
+      "stats"
+    ],
+    "struct gf1_test_request": [
+      "heads",
+      "op",
+      "size"
+    ],
     "struct gf_display_context": [
       "active",
       "bar0_map",
@@ -825,6 +850,38 @@
       "release",
       "validate"
     ],
+    "struct gf_foundation": [
+      "bar0",
+      "bar2",
+      "bm",
+      "expected_command",
+      "expected_pmc",
+      "imem",
+      "instmem_bar",
+      "io",
+      "irq_line",
+      "last_rc",
+      "map_ops",
+      "map_owner",
+      "mapped",
+      "registered",
+      "revoked",
+      "running",
+      "stats",
+      "wanted_fifo",
+      "wanted_graph",
+      "wanted_heads"
+    ],
+    "struct gf_imem": [
+      "aperture_bytes",
+      "ramfc",
+      "ramht",
+      "ramro",
+      "reserved",
+      "used",
+      "vbios",
+      "vram_bytes"
+    ],
     "struct gf_init_context": [
       "call",
       "calls",
@@ -859,6 +916,15 @@
       "select_value",
       "width"
     ],
+    "struct gf_inst": [
+      "next",
+      "off",
+      "size"
+    ],
+    "struct gf_instmem_map_ops": [
+      "map",
+      "unmap"
+    ],
     "struct gf_io": [
       "opaque",
       "point",
@@ -867,6 +933,18 @@
       "timing",
       "trace",
       "write"
+    ],
+    "struct gf_irq_stats": [
+      "entries",
+      "fifo",
+      "graph",
+      "nsource",
+      "nstatus",
+      "pfifo",
+      "pgraph",
+      "pmc",
+      "unknown",
+      "vblank"
     ],
     "struct gf_load_io": [
       "row",
@@ -889,6 +967,39 @@
     "struct gf_op_dispatch": [
       "opcode",
       "run"
+    ],
+    "struct gf_production": [
+      "acquiring",
+      "attempted",
+      "display",
+      "foundation",
+      "indexes",
+      "locks",
+      "map_ops",
+      "map_owner",
+      "prepared",
+      "reject",
+      "revoked",
+      "route98",
+      "route_opaque",
+      "scratch",
+      "video"
+    ],
+    "struct gf_production_local": [
+      "alias",
+      "index",
+      "valid",
+      "value"
+    ],
+    "struct gf_production_resources": [
+      "bars",
+      "identity",
+      "reject"
+    ],
+    "struct gf_production_scratch": [
+      "init",
+      "program",
+      "rom"
     ],
     "struct gf_script_span": [
       "crc",
@@ -1113,6 +1224,13 @@
       "status",
       "steps",
       "version"
+    ],
+    "struct gfinit_resource_reject": [
+      "dev",
+      "fn",
+      "raw",
+      "reason",
+      "reg"
     ],
     "struct gfx_kernel_fb": [
       "format",
@@ -1791,6 +1909,27 @@
     "EXEC_ERR_NOMEM",
     "EXEC_ERR_NOT_FOUND",
     "EXEC_SUCCESS",
+    "GF1T_DISPLAY_START",
+    "GF1T_DISPLAY_STOP",
+    "GF1T_HEADS",
+    "GF1T_INST_PAGE",
+    "GF1T_MASTER",
+    "GF1T_REVOKE",
+    "GF1T_SNAPSHOT",
+    "GF1T_START",
+    "GF1T_STOP",
+    "GF1_CYCLE",
+    "GF1_EINVAL",
+    "GF1_EIO",
+    "GF1_EIRQ",
+    "GF1_EMAP",
+    "GF1_ENOSPC",
+    "GF1_EPCI",
+    "GF1_ESTOP",
+    "GF1_INSTMEM",
+    "GF1_OK",
+    "GF1_STATUS",
+    "GF1_VBLANK",
     "GF_C_AR",
     "GF_C_AR_GATE",
     "GF_C_BRANCH",

@@ -4,6 +4,7 @@
 #include "memmap.h"
 #include "../../../gfx/palette.h"
 #include "../pc98/pc98_route.h"
+#include "hwdev/gf/foundation.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "geforce_module.h"
 #define gfx_backend_geforce (*geforce_context->backend)
@@ -142,6 +143,13 @@ static void geforce_init(void)
     active = routed = 1;
     gfx_flip_enabled = gfx_display_page = 0;
     gfx_current_height = GF_HEIGHT;
+}
+
+int geforce_foundation_display(bool start)
+{
+    if (!start) return geforce_stop() ? GF1_ESTOP : GF1_OK;
+    geforce_init();
+    return active && !failed ? GF1_OK : GF1_EIO;
 }
 
 static int geforce_query(GFX_ScreenInfo *info)

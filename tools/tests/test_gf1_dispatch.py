@@ -1,6 +1,9 @@
 """CW module dispatch, diagnostic lease adapter and page/IRQ operations."""
 CHECK = dict(name='gf1-dispatch-host', tier=1,
     covers=['hwdev/gf/foundation_test.c', 'hwdev/gf/gf1_test.h',
+            'drivers/video/geforce/geforce_module.h',
+            'include/gfx_hal.h', 'include/gfx_format.h',
+            'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
             'hwdev/gf/foundation.h', 'hwdev/gf/internal.h',
             'hwdev/gf/display/*.h', 'hwdev/gf_load_state.h',
             'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.h', 'kdebug/recover.h',
@@ -65,12 +68,17 @@ def main():
                 ('reply->command=f->expected_command;', 'reply->command=0;', 'expected command omitted'),
                 ('(f->revoked?16U:0)', '(f->revoked?0U:0)', 'revoked output flag'),
                 ('gf_irq_snapshot(f,&reply->stats);', '/* snapshot omitted */', 'snapshot omitted'),
+                ('q->op>GF1T_DISPLAY_START', 'q->op>GF1T_REVOKE', 'display operations rejected'),
+                ('rc=f==gf1_module_ops.production ?', 'rc=true ?', 'diagnostic display dispatch'),
+                ('geforce_foundation_display(q->op==GF1T_DISPLAY_START)',
+                 'geforce_foundation_display(q->op==GF1T_DISPLAY_STOP)', 'display direction swapped'),
             ]
             for old, new, label in mutants:
                 assert original.count(old) == 1, label
                 text = original.replace(old, new, 1)
                 for header in ('gf1_test.h', '../../kdebug/gfinit_bus.h',
-                               '../../include/memmap.h', '../../include/io.h'):
+                               '../../include/memmap.h', '../../include/io.h',
+                               '../../drivers/video/geforce/geforce_module.h'):
                     text = text.replace('#include "' + header + '"',
                                         '#include "' + str((SOURCE.parent / header).resolve()) + '"')
                 mutant = td / 'mutant.c'

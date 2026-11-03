@@ -13,6 +13,11 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-D__KERNEL_BUILD__']
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 MUTATIONS = [
+    ('foundation_production_owner', 'if (production) f = ops->production;', 'if (production) f = 0;'),
+    ('foundation_cycle_policy_count', 'policy.count = owner->policy_count;', 'policy.count = 0;'),
+    ('foundation_cycle_policy_flags', 'policy.request.flags = owner->prepare_flags;', 'policy.request.flags = 0;'),
+    ('foundation_cycle_policy_regs', 'policy.regs[i] = owner->policy_regs[i];', 'policy.regs[i] = (struct gfinit_no_verify){0};'),
+    ('foundation_cycle_cache', 'owner->last_op = RECOVER_NONE;', '(void)owner;'),
     ("baseline_foundation_pmc", "owner->foundation.expected_pmc = stage.values[GF_STAGE_PMC];", "owner->foundation.expected_pmc = ~stage.values[GF_STAGE_PMC];"),
     ("foundation_stop", "int rc = gf_foundation_call(GF1T_STOP);", "int rc = 0;"),
     ("foundation_retain", "if (g->foundation_active && gf_pre_cleanup(&g->bus)) return -1;", "if (false) return -1;"),
