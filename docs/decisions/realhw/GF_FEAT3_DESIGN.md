@@ -674,3 +674,6 @@ PM 登録段が `kernel/module/kdebug_imports.def` に symbol=geforce_accel_ops/
 - F5: V0 の map の成功は、呼出側が先に入れた close と close_owner を保持し、ch と next だけを足す (今の vram_view.c:147 の全欄の上書きを直す — V0 の段で)。
 - F6: 凍結の例外として、map の前提に close を足す (close が無ければ GF2_EMAP)。V0 の host 試験と既存の窓の利用者は追随する。
 - F7: revoked のときは窓の close の失敗を記録して先へ進む (quiesce.c:18-20 の「cleanup の行は全部試す」に合わせる)。
+
+## 追記 (2026-11-04、C1 の欠け — 試験面の幾何、PM 決定)
+- `gf3_service.test` (T0 が借りる試験面) の幾何は表示面に合わせる: `fmt` = 表示面の fmt、`width` = 表示面の width、`pitch` = 表示面の pitch (64B の整列を満たさないときは 64B に切り上げ)、`height` = min(表示面の height, floor(試験面の予約の bytes / pitch))。予約の範囲は結線の追記の N2 (表示の予約の末尾の次の 4KiB 境界から B 以下の最後の 4KiB 境界まで)。height が 0 なら GF2_ENOSPC で試験面を公開しない (表示は続ける)。根拠: T0 の比べ方 (§13) は表示面と同じ形式・幅の面への描画と読み戻しで、別の幾何は要らない。
