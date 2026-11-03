@@ -5,7 +5,7 @@ CHECK = dict(name='time-splash-math-host', tier=1,
             'tools/tests/time_splash_math_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'include/types.h',
             'include/platform_timer.h', 'arch/x86/kernel/idt.h',
-            'kernel/time/pit_math.h'], needs=[], budget=30.0)
+            'kernel/time/pit_math.h', 'kernel/time/time_math.h'], needs=[], budget=30.0)
 import argparse
 import os
 from pathlib import Path
@@ -23,12 +23,13 @@ MUTATIONS = (
     ('unset budget accepted', KTIME, 'if (!cost || cost->budget == 0)', 'if (!cost)'),
     ('lower range not updated', HARNESS, 'in.elapsed_min += a;', '(void)a;'),
     ('upper range not updated', HARNESS, 'in.elapsed_max += b;', '(void)b;'),
+    ('loop bounds swapped', HARNESS, 'a += c.loop.lo + tries * c.retry.lo + c.head.lo;\n            b += c.loop.hi + tries * c.retry.hi + c.head.hi;', 'a += c.loop.hi + tries * c.retry.lo + c.head.lo;\n            b += c.loop.lo + tries * c.retry.hi + c.head.hi;'),
     ('restart from exit', HARNESS, 'in.end = next;', 'in.start = in.end; in.end = next;'),
     ('double tick adjustment', HARNESS, 'm->tick += (u32)m->result.tick_adjust;', 'm->tick += 2 * (u32)m->result.tick_adjust;'),
     ('pending sign', PURE, 'input->start.pending -\n                          input->end.pending', 'input->end.pending -\n                          input->start.pending'),
 )
 
-def execute(mutation=None):
+def execute(mutation=None, valid_loop=False):
     with tempfile.TemporaryDirectory(prefix='time-splash-') as td:
         work = Path(td)
         paths = {}
@@ -37,12 +38,11 @@ def execute(mutation=None):
             if mutation and mutation[1] == rel:
                 assert source.count(mutation[2]) == 1, mutation[0]
                 source = source.replace(mutation[2], mutation[3], 1)
-                if mutation[0] == 'unset budget accepted':
-                    # Isolate the early B guard: keep B unset but make the
-                    # independent loop bound valid in this mutation fixture.
-                    anchor = '.reload = SYSCLK_1997 / PIT_HZ }'
-                    assert source.count(anchor) == 1
-                    source = source.replace(anchor, '.reload = SYSCLK_1997 / PIT_HZ, .loop_min = 1 }', 1)
+            if rel == KTIME and (valid_loop or (mutation and mutation[0] == 'unset budget accepted')):
+                # Exercise the same valid loop bound with and without the B guard.
+                anchor = '.reload = SYSCLK_1997 / PIT_HZ }'
+                assert source.count(anchor) == 1
+                source = source.replace(anchor, '.reload = SYSCLK_1997 / PIT_HZ, .loop_min = 1 }', 1)
             dest = work / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(source)
@@ -68,6 +68,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     assert execute() == 0
+    assert execute(valid_loop=True) == 0
     print('GREEN PIT phases, pending, retry, exit accounting and unset P2', flush=True)
     if args.mutate:
         for mutation in MUTATIONS:

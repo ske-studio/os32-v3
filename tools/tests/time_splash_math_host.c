@@ -102,6 +102,17 @@ static void tests(void)
     feed_pos=0; feed_len=2; put(0,3,0,1); put(1,24575,1,1);
     m = (struct model){.tick=7};
     REQUIRE(model_settle(&m,in,c) == 0 && m.reads == 1 && m.a == 5 && m.b == 5 && m.tick == 7);
+    /* Hand calculation: 2+3+4+2+2+4+5+2=24, and
+       3+5+6+4+3+6+7+4=38; 96+24..96+38 = 120..134.
+       The final latch implies 100+24576-24550 = 126 cycles. */
+    c = (struct costs){4,1,{2,3},{3,5},{4,6},{5,7},{2,4}};
+    in = (struct TimeSplashMathInput){{100,0},{4,0},24576,96,96};
+    feed_pos=0; feed_len=3; put(0,3,0,0); put(1,2,0,1); put(2,24550,1,1);
+    m = (struct model){.tick=7};
+    REQUIRE(model_settle(&m,in,c) == 0 && m.reads == 2 && feed_pos == 3);
+    REQUIRE(m.a == 24 && m.b == 38 && m.lo == 120 && m.hi == 134);
+    REQUIRE(m.result.wraps == 1 && m.result.tick_adjust == 0 && m.tick == 7);
+    c = (struct costs){4,1,{1,1},{1,1},{1,1},{1,1},{1,1}};
     /* Early drop still settles the elapsed interval. */
     in = (struct TimeSplashMathInput){{100,0},{90,0},19968,10,10};
     m = (struct model){.tick=9}; feed_pos=feed_len=0;
