@@ -86,6 +86,12 @@ struct hwb_address {
 };
 struct hwb_instruction {
     enum hwb_opcode op;
+    /* READ/WRITE: requested PCI/IO/PHYS from the command spelling, independent
+     * of address.kind. Exec uses it for dispatch and BAR type validation;
+     * IO requires an I/O BAR, PHYS a memory BAR (also for window references).
+     * POLL: PCI for pci, IO for port, PHYS for phys/bar/window. Otherwise 0.
+     * Exec never reparses the command spelling to recover this information. */
+    enum hw_space space;
     u32 line, pc, next_pc, width; /* 1-based physical line; width in bytes */
     struct hwb_span name, text; /* destination/label and quoted text contents */
     struct hwb_address address;

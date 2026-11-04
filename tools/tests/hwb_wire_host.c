@@ -17,6 +17,8 @@ STATIC_ASSERT(__builtin_types_compatible_p(__typeof__(&pci_hwb_write),
     u32 (*)(u32, u32, u32, u32)), pci_hwb_write_signature);
 STATIC_ASSERT(__builtin_types_compatible_p(__typeof__(&exec_hwb_abort_take),
     u32 (*)(void)), exec_hwb_abort_signature);
+STATIC_ASSERT(__builtin_types_compatible_p(__typeof__(((struct hwb_instruction *)0)->space),
+    enum hw_space), hwb_instruction_space_type);
 #ifdef __KERNEL_BUILD__
 STATIC_ASSERT(__builtin_types_compatible_p(__typeof__(&hwb_access),
     i32 (*)(void *, u32)), hwb_access_signature);
@@ -128,6 +130,51 @@ static void bus(void)
     fake.status_fail_at = fake.accesses + 1;
     CHECK(b->access(b->ctx, &r) == 0 && r.status == HW_IO_ERROR && p->config[4] == 7);
 }
+static void invalid_requests(void)
+{
+    HWB_TEST("wire-errors"); hwbf_init(&fake);
+    const struct hwb_backend *b = &fake.backend;
+    /* §3 malformed envelope/unused inputs: call fails, no output writes. */
+    struct hw_req malformed[] = {
+        {HW_VERSION + 1, HW_WRITE, HW_IO, 1, 0, 0, 1, 0},
+        {HW_VERSION, HW_WRITE, HW_PHYS, 1, 0, 0, 1, HW_ARG},
+        {HW_VERSION, HW_READ, HW_PCI, 1, 0, 0, 1, 0},
+        {HW_VERSION, 0, HW_IO, 1, 0, 0, 1, 0},
+        {HW_VERSION, HW_WRITE, 0, 1, 0, 0, 1, 0},
+        {HW_VERSION, HW_WRITE, HW_IO, 1, 1, 0, 1, 0},
+        {HW_VERSION, HW_READ, HW_PHYS, 1, 1, 0, 0, 0},
+    };
+    for (u32 i = 0; i < sizeof(malformed) / sizeof(malformed[0]); i++) {
+        struct hw_req r = malformed[i];
+        CHECK(b->access(b->ctx, &r) == OS32_ERR_INVAL);
+        const u8 *before = (const u8 *)&malformed[i], *after = (const u8 *)&r;
+        for (u32 n = 0; n < sizeof(r); n++) CHECK(before[n] == after[n]);
+        CHECK(fake.events[i].rc == OS32_ERR_INVAL);
+        CHECK(fake.bus_accesses == 0 && fake.cell_count == 0);
+    }
+    HWB_TEST("access-errors");
+    /* §3 valid envelope, invalid access width/range/alignment/value. */
+    struct hw_req invalid[] = {
+        {HW_VERSION, HW_READ, HW_PCI, 3, 0, 0, 0, 0},
+        {HW_VERSION, HW_READ, HW_PCI, 1, HW_BDF_MASK + 1, 0, 0, 0},
+        {HW_VERSION, HW_WRITE, HW_PCI, 2, 0, HW_PCI_CONFIG_BYTES - 1, 1, 0},
+        {HW_VERSION, HW_READ, HW_IO, 2, 0, U16_MAX, 0, 0},
+        {HW_VERSION, HW_WRITE, HW_PHYS, 4, 0, U32_MAX, 1, 0},
+        {HW_VERSION, HW_READ, HW_PHYS, 2, 0, 1, 0, 0},
+        {HW_VERSION, HW_WRITE, HW_IO, 1, 0, 0, U8_MAX + 1U, 0},
+    };
+    for (u32 i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+        struct hw_req r = invalid[i];
+        CHECK(b->access(b->ctx, &r) == 0 && r.status == HW_ARG);
+        CHECK(r.value == invalid[i].value);
+        CHECK(fake.events[fake.event_count - 1].rc == 0);
+        CHECK(fake.bus_accesses == 0 && fake.cell_count == 0);
+    }
+    /* Same bus is usable after rejection: a valid write reaches it once. */
+    struct hw_req r = request(HW_WRITE, HW_IO, 1, 0, 0, 1);
+    CHECK(b->access(b->ctx, &r) == 0 && r.status == HW_OK);
+    CHECK(fake.bus_accesses == 1 && fake.cell_count == 1 && fake.cells[0].value == 1);
+}
 static void boundaries(void)
 {
     HWB_TEST("clock"); hwbf_init(&fake);
@@ -181,7 +228,7 @@ static void boundaries(void)
 }
 void _start(void)
 {
-    wire(); bus(); boundaries();
-    hwb_test_write("PASS wire/bdf/limits, fake bus/W1C/lane/trace/clock/point/files/ID\n");
+    wire(); bus(); invalid_requests(); boundaries();
+    hwb_test_write("PASS wire/bdf/limits, wire-errors/access-errors, fake bus/W1C/lane/trace/clock/point/files/ID\n");
     hwb_test_exit(0);
 }

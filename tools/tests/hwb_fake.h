@@ -76,6 +76,7 @@ struct hwb_fake {
     u32 points, point_at, pending_abort, yields;
     /* Inject raw call failure or status failure on the Nth access, zero=off. */
     u32 accesses, access_fail_at, status_fail_at, failure_status;
+    u32 bus_accesses; /* dispatches reaching the fake bus after validation */
     int call_error, point_error, file_error, find_error;
 };
 static inline void hwbf_zero(void *p, u32 bytes)
@@ -137,15 +138,18 @@ static inline int hwbf_access(void *ctx, struct hw_req *r)
     struct hwbf_event *e = hwbf_event(f, HWBF_ACCESS);
     e->req = *r; f->accesses++;
     if (f->access_fail_at == f->accesses) return hwbf_access_result(e, r, f->call_error);
+    /* Wire shape errors leave every request byte intact. POINT has its own
+     * backend adapter; access accepts only READ/WRITE, per hwb_backend. */
+    if (r->version != HW_VERSION || r->status != 0 ||
+        (r->action == HW_READ && r->value != 0) ||
+        (r->action != HW_READ && r->action != HW_WRITE) ||
+        r->space < HW_PCI || r->space > HW_PHYS ||
+        (r->space != HW_PCI && r->bdf))
+        return hwbf_access_result(e, r, OS32_ERR_INVAL);
     u32 value = r->value;
     if (r->action == HW_READ) r->value = 0;
     r->status = HW_OK;
-    if (r->version != HW_VERSION || e->req.status != 0 ||
-        (r->action == HW_READ && value != 0) ||
-        (r->action != HW_READ && r->action != HW_WRITE) ||
-        (r->width != 1 && r->width != 2 && r->width != 4) ||
-        r->space < HW_PCI || r->space > HW_PHYS ||
-        (r->space != HW_PCI && r->bdf) ||
+    if ((r->width != 1 && r->width != 2 && r->width != 4) ||
         (r->space == HW_PCI && (r->bdf > HW_BDF_MASK || r->addr >= HW_PCI_CONFIG_BYTES ||
                                 r->width > HW_PCI_CONFIG_BYTES - r->addr)) ||
         (r->space == HW_IO && (r->addr > U16_MAX || r->width - 1 > U16_MAX - r->addr)) ||
@@ -156,6 +160,7 @@ static inline int hwbf_access(void *ctx, struct hw_req *r)
     }
     if (f->status_fail_at == f->accesses) { r->status = f->failure_status; return hwbf_access_result(e, r, 0); }
     if (r->space == HW_PCI && !f->mechanism) { r->status = HW_NOSYS; return hwbf_access_result(e, r, 0); }
+    f->bus_accesses++;
     for (u32 i = 0; i < f->register_count; i++) {
         const struct hwbf_register *reg = &f->registers[i];
         if (reg->write_only && reg->space == r->space && reg->bdf == r->bdf &&

@@ -19,6 +19,16 @@ MUTATIONS = [
     ('wire-write-action', 'kdebug/hwb_wire.h', 'HW_WRITE = 2', 'HW_WRITE = 4', 'wire'),
     ('call-depth', 'userland/shell/hwb.h', '#define HWB_CALL_DEPTH 8U',
      '#define HWB_CALL_DEPTH 7U', 'limits'),
+    ('bad-wire-call', 'tools/tests/hwb_fake.h',
+     'return hwbf_access_result(e, r, OS32_ERR_INVAL);',
+     'return hwbf_access_result(e, r, 0);', 'wire-errors'),
+    ('bad-wire-output', 'tools/tests/hwb_fake.h',
+     'return hwbf_access_result(e, r, OS32_ERR_INVAL);',
+     'return r->value = 0, hwbf_access_result(e, r, OS32_ERR_INVAL);', 'wire-errors'),
+    ('bad-access-dispatch', 'tools/tests/hwb_fake.h',
+     'r->status = HW_ARG; return hwbf_access_result(e, r, 0);',
+     'r->status = HW_ARG; f->bus_accesses++; return hwbf_access_result(e, r, 0);',
+     'access-errors'),
 ]
 
 
