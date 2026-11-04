@@ -1,5 +1,6 @@
 /* Boot foreground image owner. Pixels borrow the existing planar BB. */
 #include "platform_splash.h"
+#include "config.h"
 #include "gfx_osri.h"
 #include "splash_raster_image.h"
 #include "splash_raster_play.h"
@@ -9,6 +10,7 @@
 #include "vfs.h"
 #include "io.h"
 #include "pegc.h"
+#include "kstring.h"
 
 #define SPLASH_IMAGE_TICK_US (TICK_MS * SPLASH_RASTER_US_PER_MS)
 extern volatile u32 tick_count;
@@ -58,7 +60,10 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
     int rc = PLATFORM_SPLASH_FALLBACK;
     if (gfx_kernel_framebuffer(&fb)) goto done;
     reason = "missing";
-    if (vfs_stat(path, &stat)) goto done;
+    if (!kstrcmp(path, SYS_SPLASH_IMAGE) &&
+        !vfs_stat(SYS_SPLASH_USER_IMAGE, &stat))
+        path = SYS_SPLASH_USER_IMAGE;
+    else if (vfs_stat(path, &stat)) goto done;
     reason = "memory";
     image = kmalloc(sizeof(*image));
     if (!image) goto done;

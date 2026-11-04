@@ -27,6 +27,7 @@ static int wire_pref, wire_saved_pref, wire_fault, wire_invalid_fb;
 static int wire_allocs, wire_frees, wire_opens, wire_closes, wire_logs;
 static int wire_commits, wire_rasters, wire_clears, wire_stops, wire_text;
 static int wire_loaded, wire_fixed_colors, wire_static;
+static int wire_user;
 static u32 wire_pos, wire_size;
 static const u8 *wire_file;
 volatile u32 tick_count;
@@ -62,10 +63,15 @@ void *kmalloc(u32 size)
   REQUIRE(size == sizeof(wire_image)); return &wire_image; }
 void kfree(void *p) { REQUIRE(p == &wire_image || p == &wire_plan); wire_frees++; }
 int vfs_stat(const char *path, OS32_Stat *st)
-{ REQUIRE(!kstrcmp(path, SYS_SPLASH_IMAGE)); (void)st; return wire_fault == 1 ? -1 : 0; }
+{
+    (void)st;
+    if (!kstrcmp(path, SYS_SPLASH_USER_IMAGE)) return wire_user ? 0 : -1;
+    REQUIRE(!kstrcmp(path, SYS_SPLASH_IMAGE) && !wire_user);
+    return wire_fault == 1 ? -1 : 0;
+}
 int vfs_open(const char *path, int flags)
 {
-    REQUIRE(!kstrcmp(path, SYS_SPLASH_IMAGE) && flags == O_RDONLY);
+    REQUIRE(!kstrcmp(path, wire_user ? SYS_SPLASH_USER_IMAGE : SYS_SPLASH_IMAGE) && flags == O_RDONLY);
     wire_opens++; wire_pos = 0; return 3;
 }
 void vfs_close(int fd) { REQUIRE(fd == 3); wire_closes++; }
@@ -135,7 +141,9 @@ static void wire_setup(int fault)
 }
 void _start(void)
 {
+    for (int user = 0; user < 2; user++)
     for (int pref = 0; pref < 4; pref++) for (int fault = 0; fault <= 15; fault++) {
+        wire_user = user && fault != 1;
         wire_setup(fault); wire_pref = wire_saved_pref = pref;
         boot_splash();
         REQUIRE(wire_pref == pref && wire_stops == 1 && wire_clears == 1 && wire_text == 1);
@@ -156,7 +164,7 @@ void _start(void)
         if (fault != 8 && fault != 10 && fault != 11) REQUIRE(tick_count >= PLATFORM_SPLASH_TICKS - 2);
         if (fault != 8) REQUIRE(tick_count <= PLATFORM_SPLASH_TICKS + 3);
     }
-    wire_setup(0); wire_invalid_fb = 1;
+    wire_user = 0; wire_setup(0); wire_invalid_fb = 1;
     boot_splash();
     REQUIRE(wire_stops == 1 && wire_text == 1 && !wire_allocs && !wire_commits && !wire_clears);
     finish(0);

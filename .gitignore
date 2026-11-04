@@ -131,3 +131,7 @@ tools/emu_agent/logs/
 # Validated linker input and Rust generation ledgers (build artifacts)
 *.inputs.json
 *.generations.json
+
+# Local splash image and generation record (never publish)
+/assets/splash/splash.osri
+/assets/splash/splash.manifest.json
