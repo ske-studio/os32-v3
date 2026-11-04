@@ -50,3 +50,12 @@ __attribute__((weak)) int geforce_fill_rect(int x, int y, int w, int h, u8 color
 { (void)x;(void)y;(void)w;(void)h;(void)color; __builtin_trap(); }
 __attribute__((weak)) int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
 { (void)dx;(void)dy;(void)sx;(void)sy;(void)w;(void)h; __builtin_trap(); }
+
+/* Legacy F3 fixtures never bind display4; a routed F4 start is unexpected. */
+struct gf4_ctx;
+__attribute__((weak)) i32 gf4_service_start(struct gf4_ctx *ctx, u32 dl)
+{ (void)ctx; (void)dl; __builtin_trap(); }
+
+__attribute__((weak)) int gf_vram_match(struct gf2_chan *ch,const void *owner,
+    u32 id,u32 gen,u32 off,u32 bytes,struct gf_vram_reservation *out)
+{ (void)ch;(void)owner;(void)id;(void)gen;(void)off;(void)bytes;(void)out;__builtin_trap(); }

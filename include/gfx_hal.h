@@ -26,6 +26,18 @@
 #define GFX_BB_PLANAR4  0   /* 4 プレーン。bb_base=プレーン0, 各面 height*pitch */
 #define GFX_BB_PACKED8  1   /* 1 バイト 1 ピクセル (PEGC / アクセラレータ CPU 転送) */
 
+/* GF_FEAT4_DESIGN §2: HAL types; conversion to gf3_surface stays in GF. */
+struct GfxCursorImage {
+    const u32 *argb_pm;
+    u32 bytes, pitch, width, height;
+    i32 hot_x, hot_y;
+};
+struct GfxScanout {
+    u32 reservation_id, offset, bytes, pitch, width, height, format;
+};
+/* offset is checked against reservation_id, never a user physical address.
+ * GfxScanout.format uses GFX_FMT_* IDs from gfx_format.h. */
+
 /* ------------------------------------------------------------------------ */
 /*  バックエンド関数表 (DESIGN §7-1 の契約)。                                */
 /*                                                                          */
@@ -83,6 +95,16 @@ typedef struct GfxBackend {
     const GfxMode *modes;
     u16 mode_count, default_mode;
     const GfxMode *selected_mode;
+
+    /* Optional display hooks (GF_FEAT4_DESIGN §2); NULL means NOSYS. */
+    int (*set_mode)(u32 id);
+    int (*dpms)(u8 head, u32 state);
+    int (*cursor_image)(u8 head, const struct GfxCursorImage *);
+    int (*cursor_move)(u8 head, i32 x, i32 y);
+    int (*cursor_show)(u8 head, int show);
+    int (*vsync)(u8 head, u32 after, u32 deadline, u32 *seen);
+    int (*page_flip)(u8 head, const struct GfxScanout *, int sync, u32 deadline);
+    int (*gamma)(u8 head, const u16 rgb[3][256]);
 } GfxBackend;
 
 static inline const GfxMode *gfx_mode_pick(const GfxBackend *be, int legacy200)

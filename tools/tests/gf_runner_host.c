@@ -8,6 +8,8 @@
 
 struct raw_event { u32 write, off, width, value, pc, op; };
 #include "gf_runner_trace_fixture.h"
+/* S1 remains 27 kinds; init.c:1093-1143 adds exactly two dispatch entries. */
+enum { GF_RUNNER_S1_KINDS=27, GF_RUNNER_TMDS_KINDS=2 };
 static struct raw_event new_trace[TRACE_MAX];
 static const struct raw_event *old_trace;
 static u32 raw_count, raw_index[6], fail_at, point_count, point_fail;
@@ -224,7 +226,7 @@ static void differential(bool diagnostic)
     else {
         diagnostic_mode=false;
         CHECK(gf_init_run(&init,&program)==0);
-        CHECK(program.count==193 && gf_op_dispatch_count==27 && !restore_calls);
+        CHECK(program.count==193 && gf_op_dispatch_count==GF_RUNNER_S1_KINDS+GF_RUNNER_TMDS_KINDS && !restore_calls);
     }
     output("S1 command/wait events old/new (with saves) "); number(old_count); output("/"); number(raw_count); output("\n");
     /* P0 adds four literal PLL snapshots and two latch index pairs to the

@@ -1,5 +1,5 @@
 {
-  "module_abi_gen": 3382500634,
+  "module_abi_gen": 196800975,
   "imports": [
     {
       "name": "trial_begin",
@@ -250,6 +250,12 @@
     {
       "name": "gfx_present",
       "index": 41,
+      "kind": 1,
+      "type_ver": 1
+    },
+    {
+      "name": "gf_display_test",
+      "index": 42,
       "kind": 1,
       "type_ver": 1
     }

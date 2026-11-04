@@ -11,6 +11,8 @@
 #define GF_INIT_IO_FLAG_CONDITION 0x39
 #define GF_INIT_IO_RESTRICT_PLL2 0x4a
 #define GF_INIT_PLL2 0x4b
+#define GF_INIT_TMDS_REG 0x4f
+#define GF_INIT_ZM_TMDS_GROUP 0x50
 #define GF_INIT_CR_INDEX_ADDRESS_LATCHED 0x51
 #define GF_INIT_CR 0x52
 #define GF_INIT_ZM_CR 0x53
@@ -34,6 +36,13 @@
 #define GF_SHIFT_LEFT 0x80U
 #define GF_SHIFT_WRAP 0x100U
 #define GF_SHIFT_BITS BITS_PER_U32
+/* BIT I version/pointer offsets: nouveau init.c:359-407. */
+#define GF_INIT_BIT_VERSION 1U
+#define GF_INIT_BIT_MIN_LENGTH 12U
+#define GF_INIT_BIT_SCRIPT 0U
+#define GF_INIT_BIT_MACRO 4U
+#define GF_INIT_BIT_CONDITION 6U
+#define GF_INIT_BIT_IO_FLAG 10U
 #define GF_INIT_SUB_FIRST 6U
 #define GF_INIT_SUB_LAST 8U
 #define GF_INIT_COUNT_MAX 256U
@@ -104,6 +113,8 @@ struct gfinit_decode {
  * bypass in gfinit_decode_rom: every production script must match S1. */
 int gfinit_decode_instruction(const u8 *rom, u32 size, u32 pc,
                              struct gfinit_instruction *out);
+int gfinit_decode_script_instruction(const u8 *rom, u32 size, u32 init_table,
+                                     u32 pc, struct gfinit_instruction *out);
 int gfinit_decode_rom(const u8 *rom, u32 size, const struct recover_profile *profile,
                       struct gfinit_decode *out);
 #endif

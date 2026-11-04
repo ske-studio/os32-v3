@@ -104,3 +104,18 @@
 一覧を回しただけでは受入一式の代わりにならない — これらは段の受入で個別に回し、結果を票に 1 行書く。
 一覧への追加と「台帳に無い SKIP・未起動の必須試験を失敗にする」照合はまだ無い (経緯: 2026-10-06 の体制の見直しの残り b、`docs/archive/agents/REVIEW_2026-10-06.md`)。
 SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の S-1・S-4 だけ — ここに無い SKIP は延期ではない。
+
+## 6. GeForce 層4の実機受入
+
+[確定設計 §12](../decisions/realhw/GF_FEAT4_DESIGN.md) の実機項目。ホスト検査の合格とは区別する。
+
+| ID | 状態 | 構成 | 受入項目 | 証跡 |
+|---|---|---|---|---|
+| GF-L4-Ra266-mode | 未実施 | Ra266 0:13.0/0221 | 各depthの色帯・格子、EDID上限、PLL/CRCと撮影 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-ddc | 未実施 | Ra266 0:13.0/0221 | LCD1770VM EDID・抜線時既定3depth | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-dpms | 未実施 | Ra266 0:13.0/0221 | 4状態のLCD反応・OSD・帰還画面 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-cursor | 未実施 | Ra266 0:13.0/0221 | 非対称色・半透明・四辺clip・mode/depth変更 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-flip | 未実施 | Ra266 0:13.0/0221 | 二面flip・edge→write時間・カメラでtear確認 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-gamma | 未実施 | Ra266 0:13.0/0221 | identity・整数暗化・8bit palette帰還・LUT checksum | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-outputs | 未実施 | Ra266 0:13.0/0221 | 端子写真・DCB・TMDS/TV/2head独立動作、不可時理由 | 担当/日付/serial/カメラ証跡は実施時記入 |
+| GF-L4-Ra266-lifecycle | 未実施 | Ra266 0:13.0/0221 | PC-98→GF→PC-98・失敗復元・停止順 | 担当/日付/serial/カメラ証跡は実施時記入 |

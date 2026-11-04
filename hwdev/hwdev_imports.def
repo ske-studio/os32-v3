@@ -293,6 +293,13 @@
       "source": "gfx/gfx.h",
       "kind": "FUNC",
       "group": "kernel"
+    },
+    {
+      "index": 42,
+      "symbol": "gf_display_test",
+      "source": "kdebug/gf_display_test.h",
+      "kind": "FUNC",
+      "group": "kernel"
     }
   ]
 }

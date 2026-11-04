@@ -24,13 +24,13 @@
 #define C_PLL_PRIMARY_WRITE 3U
 struct c_saved_field { u32 offset, kind, reg, index, width, keep, add, bits, saved_offset; };
 static const struct c_saved_field c_fields[] = {
-    {GF_STATE_OFF(cr)+GF_MODE_CR_ENH,GF_C_CR,0,GF_MODE_CR_ENH,1,~GF_MODE_ENH_CLEAR,0,0,__builtin_offsetof(struct gfinit_mode_saved,cr1c)},
-    {GF_STATE_OFF(cr)+GF_MODE_CR_LCD,GF_C_CR,0,GF_MODE_CR_LCD,1,~GF_MODE_LCD_CLEAR,0,0,__builtin_offsetof(struct gfinit_mode_saved,cr33)},
-    {GF_STATE_OFF(cr)+GF_MODE_CR_SCRATCH4,GF_C_CR,0,GF_MODE_CR_SCRATCH4,1,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,cr3c)},
-    {GF_STATE_OFF(cr)+GF_MODE_CR_SCRATCH4B,GF_C_CR,0,GF_MODE_CR_SCRATCH4B,1,~0U,0,GF_MODE_HEAD_A_SCRATCH,__builtin_offsetof(struct gfinit_mode_saved,cr4b)},
-    {GF_STATE_OFF(cr)+GF_MODE_CR_LATENCY,GF_C_CR,0,GF_MODE_CR_LATENCY,1,~0U,GF_MODE_LATENCY_ADD,0,__builtin_offsetof(struct gfinit_mode_saved,cr52)},
-    {GF_STATE_OFF(gpio_ext),GF_C_MMIO,C_GPIO_EXT,0,4,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,gpio_ext)},
-    {GF_STATE_OFF(crtc850),GF_C_MMIO,C_CRTC850,0,4,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,crtc850)},
+    {GF_STATE_OFF(cr)+GF_MODE_CR_ENH,GF_C_CR,0,GF_MODE_CR_ENH,1,~GF_MODE_ENH_CLEAR,0,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].cr1c)},
+    {GF_STATE_OFF(cr)+GF_MODE_CR_LCD,GF_C_CR,0,GF_MODE_CR_LCD,1,~GF_MODE_LCD_CLEAR,0,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].cr33)},
+    {GF_STATE_OFF(cr)+GF_MODE_CR_SCRATCH4,GF_C_CR,0,GF_MODE_CR_SCRATCH4,1,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].cr3c)},
+    {GF_STATE_OFF(cr)+GF_MODE_CR_SCRATCH4B,GF_C_CR,0,GF_MODE_CR_SCRATCH4B,1,~0U,0,GF_MODE_HEAD_A_SCRATCH,__builtin_offsetof(struct gfinit_mode_saved,head[0].cr4b)},
+    {GF_STATE_OFF(cr)+GF_MODE_CR_LATENCY,GF_C_CR,0,GF_MODE_CR_LATENCY,1,~0U,GF_MODE_LATENCY_ADD,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].cr52)},
+    {GF_STATE_OFF(gpio_ext),GF_C_MMIO,C_GPIO_EXT,0,4,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].gpio_ext)},
+    {GF_STATE_OFF(crtc850),GF_C_MMIO,C_CRTC850,0,4,~0U,0,0,__builtin_offsetof(struct gfinit_mode_saved,head[0].crtc850)},
     {GF_STATE_OFF(sel_clk),GF_C_MMIO,C_SEL_CLK,0,4,~GF_MODE_SEL_CLK_CLEAR,0,0,__builtin_offsetof(struct gfinit_mode_saved,sel_clk)}
 };
 #endif

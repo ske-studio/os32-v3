@@ -22,9 +22,9 @@ from mkmod import pair_crc
 from module_schema import HEADER_FIELDS
 
 
-# GF3 appends two function imports after the reviewed S6 prefix.
+# GF4 appends the kernel display diagnostic after the reviewed GF3 tail.
 REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
-                             'geforce_accel_ops', 'gfx_present')
+                             'geforce_accel_ops', 'gfx_present', 'gf_display_test')
 REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):

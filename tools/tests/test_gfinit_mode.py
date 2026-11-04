@@ -19,8 +19,8 @@ LIVE = 0xa5a55a5a
 
 
 def command(exe):
-    return ['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
-            '-I'+str(ROOT/'include'), str(ROOT/'tools/tests/gfinit_mode_host.c'), '-o', str(exe)]
+    return ['gcc', *FLAGS, '-O2', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
+            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_mode_host.c'), '-o', str(exe)]
 
 
 def timings():

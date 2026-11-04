@@ -1,3 +1,26 @@
+/*
+ * Copyright 2012 Red Hat Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Authors: Ben Skeggs
+ */
 /* NV44A init DATA decoder. S2_LAYOUT.final (G1-G3), DESIGN.final §4-6.
  * Semantics checked against MIT nouveau c03c1a1 bios/init.c handlers;
  * no x86 instructions, hardware access, or vendor ROM bytes here. */
@@ -12,8 +35,8 @@ const struct gf_script_span *gfinit_script_spans(u32 *count)
     *count = GF_ARRAY(scripts);
     return scripts;
 }
-int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
-                             struct gfinit_instruction *o)
+static int decode_instruction(const u8 *r, u32 size, u32 pc,
+                              struct gfinit_instruction *o, u32 init_table, bool display)
 {
     if (!r || !o || span(size, pc, 1)) return -1;
     *o = (struct gfinit_instruction){.pc = pc, .opcode = r[pc], .end_repeat = RECOVER_NONE};
@@ -22,6 +45,8 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     case GF_INIT_IO_RESTRICT_PROG: case GF_INIT_IO_RESTRICT_PLL2: fixed = 11; off = 6; unit = 4; break;
     case GF_INIT_CR_INDEX_ADDRESS_LATCHED: fixed = 5; off = 4; unit = 1; break;
     case GF_INIT_ZM_CR_GROUP: fixed = 2; off = 1; unit = 2; break;
+    case GF_INIT_TMDS_REG: fixed = 5; break;
+    case GF_INIT_ZM_TMDS_GROUP: fixed = 3; off = 2; unit = 2; break;
     case GF_INIT_ZM_REG_SEQUENCE: fixed = 6; off = 5; unit = 4; break;
     case GF_INIT_REPEAT: case GF_INIT_IO_FLAG_CONDITION: case GF_INIT_SUB: case GF_INIT_MACRO: case GF_INIT_CONDITION: fixed = 2; break;
     case GF_INIT_END_REPEAT: case GF_INIT_NOT: case GF_INIT_COMPUTE_MEM: case GF_INIT_DONE: case GF_INIT_RESUME: fixed = 1; break;
@@ -48,6 +73,7 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     #include "gfinit_op/cr_index_address_latched_decode.inc"
     #include "gfinit_op/cr_decode.inc"
     #include "gfinit_op/zm_reg_sequence_decode.inc"
+    #include "gfinit_op/tmds_decode.inc"
     case GF_INIT_SUB_DIRECT: o->ref = le(r, pc + 1, 2); break;
     #include "gfinit_op/sub_decode.inc"
     #include "gfinit_op/index_io_decode.inc"
@@ -56,13 +82,26 @@ int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
     case GF_INIT_TIME: o->value = le(r, pc + 1, 2); break;
     default: break;
     }
-    if (o->target & 3U) return -1;
+    if (o->opcode != GF_INIT_TMDS_REG && (o->target & 3U)) return -1;
     if (o->port && o->port != RECOVER_CRTC && o->port != RECOVER_SEQ && o->port != RECOVER_GFX) return -1;
     if (o->opcode == GF_INIT_IO_RESTRICT_PLL2 || o->opcode == GF_INIT_PLL2) {
         struct gfinit_pll_limits limits;
         if (gfinit_pll_parse(r, size, GF_INIT_PLL_TABLE, o->target, &limits)) return -1;
     }
     return 0;
+}
+int gfinit_decode_instruction(const u8 *r, u32 size, u32 pc,
+                             struct gfinit_instruction *o)
+{
+    return decode_instruction(r, size, pc, o, 0, false);
+}
+int gfinit_decode_script_instruction(const u8 *r, u32 size, u32 init_table,
+                                     u32 pc, struct gfinit_instruction *o)
+{
+    /* BIT I has script/macro/condition/io-flag pointers through +10.
+     * nouveau nvkm/subdev/bios/init.c:359-407. */
+    if (!init_table || span(size, init_table, GF_INIT_BIT_MIN_LENGTH)) return -1;
+    return decode_instruction(r, size, pc, o, init_table, true);
 }
 #ifndef GF_PRODUCTION_DECODE
 int gfinit_decode_rom(const u8 *r, u32 size, const struct recover_profile *p,

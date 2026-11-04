@@ -601,5 +601,6 @@ GfxBackend CIRRUS_BACKEND_TABLE = {
     cirrus_modes,
     sizeof(cirrus_modes) / sizeof(cirrus_modes[0]),
     0,                        /* default_mode */
-    (const GfxMode *)0         /* selected_mode */
+    (const GfxMode *)0         /* selected_mode */,
+    .set_mode = 0             /* optional display hooks default to unavailable */
 };

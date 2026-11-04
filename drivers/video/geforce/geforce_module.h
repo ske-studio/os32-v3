@@ -5,13 +5,21 @@
 #include "gfx_hal.h"
 #include "video_service.h"
 #include "../../../kernel/module/module_runtime.h"
-#define GEFORCE_MODULE_OPS_VERSION 4u
+#define GEFORCE_MODULE_OPS_VERSION 5u
 #define GEFORCE_WC_BYTES 0x80000U
 struct gf_production_resources;
 struct gf3_test_ops;
 struct gf1_test_ops;
+struct gf4_data_ops;
+struct gf4_state;
+struct gf4_test_ops;
+struct gf4_restore_ops;
+struct gf5_test_ops;
 const struct gf3_test_ops *geforce_accel_ops(void);
 const struct gf1_test_ops *geforce_foundation_ops(void);
+/* Read the normal/restore slot on every call; do not retain across unload. */
+const struct gf4_test_ops *geforce_display_ops(void);
+const struct gf4_restore_ops *geforce_display_restore_ops(void);
 int geforce_foundation_display(bool start);
 struct geforce_platform {
     struct video_device *device;
@@ -44,6 +52,16 @@ typedef struct {
     struct geforce_platform *platform;
     const struct gf3_test_ops **accel_out;
     const struct gf1_test_ops **foundation_out;
+    /* Kernel-owned helper/state loans, valid until module stop completes. */
+    const struct gf4_data_ops *display_data;
+    struct gf4_state *display_state;
+    /* Version 5 appends to the version 4 prefix (including accel/foundation).
+     * Kernel static slot addresses; C2 owns publication. Reread per dispatch.
+     * The restore loan survives a saved display or retained-resource failure;
+     * processing and completed unload close it. */
+    const struct gf4_test_ops **display_out;
+    const struct gf5_test_ops **feature5_out;
+    const struct gf4_restore_ops **display_restore_out;
 } GeforceModuleContext;
 extern const GeforceModuleContext *geforce_context;
 extern GfxBackend geforce_backend_ops;

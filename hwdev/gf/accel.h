@@ -196,6 +196,10 @@ int geforce_fill_rect(int x, int y, int w, int h, u8 color);
 int geforce_blit(int dx, int dy, int sx, int sy, int w, int h);
 void gf_hook_ctx_bind(struct gf3_ctx *);
 void gf_hook_scan_bind(bool active, const struct gf3_surface *);
+/* C1 owns (backend_geforce.c/gf_hook.c): the HAL descriptor and format-specific
+ * hook follow a confirmed scan change of head 0 (F4 C2-scan links.scan_changed,
+ * PM 2026-11-04). head!=0 is ignored. */
+void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id);
 
 /* Addendum N4: C0a implements this copy-out of backend framebuffer metadata
  * for C1. All outputs are required; video_framebuffer must have succeeded.

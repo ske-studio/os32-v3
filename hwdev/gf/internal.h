@@ -61,6 +61,10 @@ struct gf_init_context {
     int last_rc;
     u32 saved_count;
     struct gf_init_saved saved[GF_INIT_SAVE_MAX];
+    /* Display script loan: raw DCB OR, independent head, absolute deadline. */
+    u8 or_mask;
+    bool display_script;
+    u32 deadline;
 };
 /* P2 runner owns these implementations; runs never call timing.wait_us
  * directly or update the wait counters. gf_init_wait returns 0/-1:
@@ -106,6 +110,9 @@ int gf_init_restore(struct gf_init_context *ctx);
  * call io.restore once before returning; owner then quiesces. ctx/work/ROM
  * and all io callbacks are supplied by the owner. */
 int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
+enum gf_init_script_rc { GF_SCRIPT_OK=0, GF_SCRIPT_EIO=-1, GF_SCRIPT_ETIME=-5 };
+int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
+                       u32 pc, u8 head, u8 or_mask, u32 dl);
 /* Already prepared immutable program; diagnostic owner approves one main. */
 int gf_init_run_one(struct gf_init_context *ctx, const struct gf_init_program *work);
 /* A2 shares the same ordered writes; owner checks legacy decode before VGA. */
@@ -172,6 +179,10 @@ int gf_op_copy_nv_reg_run(struct gf_init_context *, const struct gfinit_instruct
 int gf_op_zm_index_io_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_compute_mem_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_reset_run(struct gf_init_context *, const struct gfinit_instruction *);
+int gf_op_tmds_reg_run(struct gf_init_context *, const struct gfinit_instruction *);
+int gf_op_zm_tmds_group_run(struct gf_init_context *, const struct gfinit_instruction *);
+/* nouveau init.c:539-572: selector-to-base mapping, no head stride. */
+int gf_init_tmds_base(const struct gf_init_context *, u32 selector, u32 *base);
 int gf_op_sub_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_nv_reg_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_macro_run(struct gf_init_context *, const struct gfinit_instruction *);
@@ -204,6 +215,7 @@ struct gf_display_owner {
     int (*foundation_stop)(struct gf_display_context *);
     struct gf2_chan *(*command_get)(struct gf_display_context *, struct gf_foundation **);
 };
+struct gf4_ctx;
 struct gf_display_context {
     struct gf_io io;
     const struct gf_display_owner *owner;
@@ -227,6 +239,11 @@ struct gf_display_context {
     u32 section, ordinal, target, pll_gate;
     bool pll_gate_valid, fp_on;
     int last_rc;
+    /* Layer 4 (GF_FEAT4 addendum 2026-11-04): C2-service binds this to the
+     * gf4_ctx; the legacy blank/palette entries delegate through it.
+     * X3/N1: retain through complete video stop until module exit; normal
+     * video start/stop dispatch solely on this loan. */
+    struct gf4_ctx *display4;
 };
 /* Connect via a thin void* adapter to gf_load_io.row; section/wait retain
  * gf_load_io's existing signatures and ms/fp_only semantics. gf_load_state
@@ -244,5 +261,12 @@ int gf_display_modeset(struct gf_display_context *);
 int gf_display_baseline(struct gf_display_context *);
 int gf_display_checks(struct gf_display_context *);
 int gf_display_stop(void *);
+/* X3: foundation cleanup/local restore/quiesce rows only. No F3/F2 stop,
+ * delegation, waits or reservation release. NULL: OS32_ERR_INVAL; preserve
+ * the original cleanup error, success 0. Leaves engaged and display4 intact;
+ * the caller clears engaged after cleanup succeeds, F2 is OFF and close
+ * succeeds, then releases its reservations (including the F4 service path).
+ * C2-service-stop owns this helper. */
+i32 gf_display_quiesce(struct gf_display_context *c);
 extern const struct video_ops gf_video_ops;
 #endif

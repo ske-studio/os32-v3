@@ -177,15 +177,15 @@ COMPONENTS = (
          module_id=11, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          stop_allowed=0, ops_version=1, ops_slots=1,
-         image_max=196608, mem_max=196608, load_span_max=262144,
+         image_max=262144, mem_max=262144, load_span_max=327680,
          reloc_max=16384, export_max=1,
          init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
          ops_symbol='hwdev_ops', ops_names=('initialize',)),
     dict(name='GEFORCE', path='/boot/geforce.mod', dependencies=(), required=False,
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-         stop_allowed=0, ops_version=4, ops_slots=1,
-         # GF_FEAT3_DESIGN combined F3/F4/F5 budget: 160/160/208 KiB.
+         stop_allowed=0, ops_version=5, ops_slots=1,
+         # GF_FEAT4_DESIGN §11 C3 combined budget: 160/160/208 KiB.
          image_max=160 * 1024, mem_max=160 * 1024, load_span_max=208 * 1024,
          reloc_max=8192, export_max=1,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',

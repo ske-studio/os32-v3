@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1323484579,
+  "module_abi_gen": 2042276556,
   "stage": "S6",
-  "count": 312,
+  "count": 313,
   "imports": [
     {
       "stage": "S1",
@@ -4716,6 +4716,22 @@
       "type_ver": 1,
       "signature": "void gfx_present(void);",
       "source_declaration": "void gfx_present(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 312,
+      "symbol": "gf_display_test",
+      "source": "kdebug/gf_display_test.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "gf_display_test",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "i32 gf_display_test(u32 session);",
+      "source_declaration": "i32 gf_display_test(u32 session);",
       "dtype": null,
       "array": false
     }

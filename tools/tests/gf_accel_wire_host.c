@@ -1,4 +1,5 @@
-/* Real module body -> video start -> F1/F2/F3 and diagnostic service bridge.
+/* Ownerless F3 composition -> video start -> F1/F2/F3 and diagnostic bridge.
+ * Current F4 module initialization/owner binding is covered by gf4_c3_host.c.
  * Reuse C1's fake PCI/MMIO device and resident OS adapters. Only display
  * preparation/ROM and platform discovery are fixtures; lifecycle, objects,
  * reservations, windows, hooks and dispatch below are product code. */
@@ -86,10 +87,11 @@ void _start(void)
     const struct gf1_test_ops *foundation_slot = 0;
     GeforceModuleContext context = {.backend = &backend, .accel_out = &cint_slot,
         .foundation_out = &foundation_slot};
-    assert(!geforce_module_init(&backend, &context));
+    assert(!gf_ownerless_module_init(&backend, &context));
     cint_service = gf3_service_get(&cint_prod.chan);
     assert(cint_service && cint_service->slot == &cint_slot);
     assert(foundation_slot == &gf1_module_ops);
+    assert(!cint_service->owner && !cint_prod.display.display4);
     wire_video_start();
     assert(cint_slot && hook_active && cint_prod.accel.ready);
     cint_owned_reservations();

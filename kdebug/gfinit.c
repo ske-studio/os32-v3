@@ -589,8 +589,8 @@ static int gf_command_dispatch(void *buf, u32 size)
 {
     if (!buf || size != sizeof(struct gf2_request)) return GF2_EINVAL;
     struct gf2_request q = *(const struct gf2_request *)buf;
-    if (q.size != sizeof(q) || q.test > GF3_ACCEL ||
-        (q.test != GF3_ACCEL && q.session) || q.rc) {
+    if (q.size != sizeof(q) || q.test > GF4_DISPLAY ||
+        (q.test != GF3_ACCEL && q.test != GF4_DISPLAY && q.session) || q.rc) {
         q.session = 0; q.rc = GF2_EINVAL;
         *(struct gf2_request *)buf = q;
         return q.rc;

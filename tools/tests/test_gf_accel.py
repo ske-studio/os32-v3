@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
-    covers=['include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+    covers=['tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
             'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
@@ -25,6 +25,7 @@ import tempfile
 import host32
 import os32api_host
 from kernel_includes import include_flags
+from gf_ownerless_fixture import ownerless_body
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
@@ -326,8 +327,8 @@ MUTATIONS = {
          '*dl = now + GF3_TIMEOUT_US;',
          '*dl = now;', 'tools/tests/gf_accel_c0_host.c'),
         ('admission', 'drivers/video/geforce/gf_hook.c',
-         'hook_active = active && scan;',
-         'hook_active = ((void)active, scan != NULL);', 'tools/tests/gf_accel_c0_host.c'),
+         'hook_active = active && scan && scan->fmt == GF3_INDEX8;',
+         'hook_active = ((void)active, scan && scan->fmt == GF3_INDEX8);', 'tools/tests/gf_accel_c0_host.c'),
         ('mask', 'drivers/video/geforce/gf_hook.c',
          '#define GF_HOOK_FULL_MASK 0xffU',
          '#define GF_HOOK_FULL_MASK 0x0fU', 'tools/tests/gf_accel_c0_host.c'),
@@ -337,7 +338,7 @@ MUTATIONS = {
     ],
     'c1': [
         ('close-slot', 'hwdev/gf/service.c',
-         '*s->slot = 0;\n    gf_hook_scan_bind(false, 0);',
+         '*s->slot = 0;\n        gf_hook_scan_bind(false, 0);',
          'gf_hook_scan_bind(false, 0);', 'tools/tests/gf_accel_c1_host.c'),
         ('diagnostic-release', 'hwdev/gf/service.c',
          'else if (!first) first = GF2_ESTOP;\n    return service_result(s, first);',
@@ -367,28 +368,28 @@ MUTATIONS = {
          'rc = gf3_service_release(s);',
          'rc = 0;', 'tools/tests/gf_accel_c1_host.c'),
         ('c1-deadline', 'hwdev/gf/service.c',
-         'i32 rc = gf3_init(&p->accel, &p->chan, dl);',
-         'i32 rc = gf3_init(&p->accel, &p->chan, dl + 1U);', 'tools/tests/gf_accel_c1_host.c'),
+         'gf3_init(&p->accel, &p->chan, dl)',
+         'gf3_init(&p->accel, &p->chan, dl + 1U)', 'tools/tests/gf_accel_c1_host.c'),
     ],
     'wire': [
         ('body-bind', 'drivers/video/geforce/geforce_body.c',
-         'int rc = gf3_service_bind(&production, context->accel_out);',
-         'int rc = false ? gf3_service_bind(&production, context->accel_out) : 0;',
+         'int rc=gf3_service_bind(&production, context->accel_out);',
+         'int rc=false ? gf3_service_bind(&production, context->accel_out) : 0;',
          'tools/tests/gf_accel_wire_host.c'),
         ('production-stop', 'hwdev/gf/command_test.c',
-         'rc = service ? gf3_service_stop(service) : gf2_stop(ch);',
-         'rc = gf2_stop(ch);', 'tools/tests/gf_accel_wire_host.c'),
+         'service ? gf3_service_stop(service) : gf2_stop(ch)',
+         'gf2_stop(ch)', 'tools/tests/gf_accel_wire_host.c'),
     ],
     'c2': [
         ('close-failure', 'hwdev/gf/display/quiesce.c',
          'if (!revoked) goto fail;',
          'if (false) goto fail;', 'tools/tests/gf_accel_c2_host.c'),
         ('release-gate', 'hwdev/gf/display/quiesce.c',
-         'if (!rc && s && closed && ch->state==GF2_OFF) {',
-         'if (s && closed && ch->state==GF2_OFF) {', 'tools/tests/gf_accel_c2_host.c'),
+         'if (!rc && s && closed && ch->state==GF2_OFF && !f4_owned) {',
+         'if (s && closed && ch->state==GF2_OFF && !f4_owned) {', 'tools/tests/gf_accel_c2_host.c'),
         ('engaged-retry', 'hwdev/gf/display/quiesce.c',
-         'if (!rc && closed && (!ch || ch->state==GF2_OFF)) c->engaged=false;',
-         'if (closed && (!ch || ch->state==GF2_OFF)) c->engaged=false;', 'tools/tests/gf_accel_c2_host.c'),
+         'if (!rc && closed && !clock_failed && (!ch || ch->state==GF2_OFF)) c->engaged=false;',
+         'if (closed && !clock_failed && (!ch || ch->state==GF2_OFF)) c->engaged=false;', 'tools/tests/gf_accel_c2_host.c'),
         ('invalidate-before-off', 'hwdev/gf/display/quiesce.c',
          'if (s && ch->state==GF2_OFF) gf3_service_invalidate(s);',
          'if (s) gf3_service_invalidate(s);', 'tools/tests/gf_accel_c2_host.c'),
@@ -429,6 +430,10 @@ def component_build(host, source, directory, original_parent):
             for pattern in ('gf_accel*.[ch]', 'gf_command_runtime_host.h'):
                 for fixture in (ROOT/'tools/tests').glob(pattern):
                     shutil.copy2(fixture, tree/'tools/tests'/fixture.name)
+        if component == 'wire':
+            body = (tree/'drivers/video/geforce/geforce_body.c').read_text()
+            (tree/'tools/tests/gf_ownerless_body.inc').write_text(
+                ownerless_body(body, bind_f3=True))
         exe = directory/'host'
         subprocess.run(FLAGS + ['-Werror=vla', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', *include_flags(ROOT), '-I'+str(tree), '-I'+str(ROOT),

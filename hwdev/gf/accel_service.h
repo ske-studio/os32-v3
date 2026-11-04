@@ -10,6 +10,15 @@
 #include "accel.h"
 
 struct gf_production;
+/* F4 X3/N1: C2-service owns the resident table through module exit.
+ * Diagnostic START/STOP/RECOVER use these callbacks with the request dl;
+ * normal video entries dispatch through display4 instead. */
+struct gf3_service_owner {
+    void *owner;
+    i32 (*start)(void *owner, u32 dl);
+    i32 (*stop)(void *owner, u32 dl);
+    i32 (*recover)(void *owner, u32 dl);
+};
 struct gf3_service {
     struct gf_production *production;
     const struct gf3_test_ops **slot;
@@ -20,7 +29,31 @@ struct gf3_service {
      * phys is physical, pitch is bytes, width/height are pixels. Recover
      * reuses this geometry and replaces reservation IDs/generations. */
     u32 scan_pitch, scan_width, scan_height, scan_phys;
+    const struct gf3_service_owner *owner;
 };
+/* Required s/incomplete table: EINVAL; different owner or incomplete-stop
+ * unbind: ESTATE. Same table is unchanged success. NULL owner unbinds only
+ * after complete stop and return of all windows/reservations. The empty
+ * registry proves windows returned: window owners retain reservations
+ * until unmap succeeds. Never closes windows as a side effect of unbind. */
+i32 gf3_service_owner_bind(struct gf3_service *s,
+                           const struct gf3_service_owner *owner);
+/* F4 owns the nodes; these are value loans, copied atomically after BYTES
+ * and registry validation. NULL scan/test clears that loan. Require F4
+ * binding, ready F3 and no remaining service-owned nodes. Never reserve,
+ * release, wait or publish; preserve all surface fields and output on error. */
+i32 gf3_service_surfaces(struct gf3_service *s,
+                         const struct gf3_surface *scan,
+                         const struct gf3_surface *test);
+/* RUN/fault/epoch/channel/!ready validation then gf3_init only. No geometry,
+ * reservation or publication; retain partial objects until F2 is OFF. */
+i32 gf3_service_objects_init(struct gf3_service *s, u32 dl);
+/* false closes slot/hook only, retaining ready, windows, nodes and loans.
+ * true validates RUN/ready/epoch/loans then publishes without waits/HW I/O;
+ * absent test keeps slot NULL, absent scan keeps hook closed. With an F4
+ * owner, C1/C2-links owns the format-dependent scan hook publication; this
+ * entry publishes only the F3 ctx/test ops after validating both loans. */
+i32 gf3_service_admission(struct gf3_service *s, bool open);
 /* production/slot are borrowed; each node owns itself by address. The only
  * ctx is production->accel, never copied. Required NULL: GF3_EINVAL;
  * different p/slot on rebind: GF3_ESTATE; same pair: unchanged success.
@@ -32,7 +65,8 @@ struct gf3_service *gf3_service_get(struct gf2_chan *ch);
 /* RUN required, already ready is ESTATE. Registry init, scan/test reserve,
  * gf3_init, ctx/scan bind, then publish &s->ops. Retain existing reservations
  * for retry without double reserve; ops borrows resident ctx/test_surface.
- * dl is one absolute deadline, shared with recover and never renewed. */
+ * dl is one absolute deadline, shared with recover and never renewed.
+ * X3/N1: owner-bound start returns GF3_ESTATE without mutation. */
 i32 gf3_service_start(struct gf3_service *s, u32 dl);
 /* Clear slot, unbind scan, then gf_vram_views_close. Keep ready for fini.
  * Close failure retains the failed window, reservation and adapter. C2
@@ -53,14 +87,16 @@ void gf3_service_invalidate(struct gf3_service *s);
 i32 gf3_service_release(struct gf3_service *s);
 /* F1: close -> fini -> gf2_stop -> OFF check -> invalidate, retaining
  * reservations and display use. Normal video stop uses the C2 display
- * cleanup instead. OFF can accompany an old fault rc; preserve first rc. */
+ * cleanup instead. OFF can accompany an old fault rc; preserve first rc.
+ * X3: owner-bound stop returns GF3_ESTATE without mutation. */
 i32 gf3_service_stop(struct gf3_service *s);
 /* Close, stop and confirm OFF, recover F2, invalidate old descriptors.
  * Only an engaged display updates reservations, initializes F3 and publishes
  * hook/slot; otherwise recover F2 alone. Stop failure before OFF retains all
  * ownership. F2 recover failure permits invalidate but keeps reservations.
  * F2: init/reservation-update failure leaves slot closed and ctx/reservations
- * retained for the next C2 stop. Never replay a partly submitted operation. */
+ * retained for the next C2 stop. Never replay a partly submitted operation.
+ * X3: when owner-bound, delegate to owner->recover with the same dl. */
 i32 gf3_service_recover(struct gf3_service *s, u32 dl);
 /* Except get/invalidate: NULL required arguments are GF3_EINVAL, invalid
  * RUN/epoch/ownership state is GF3_ESTATE, success is 0. Propagate lower

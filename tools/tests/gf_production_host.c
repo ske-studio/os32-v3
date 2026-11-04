@@ -56,7 +56,7 @@ int gf_production_mmio(struct gf_production *p,u32 bar,u32 off,u32 width,bool wr
     CHECK(write || (off!=0x6013c0 && off!=0x6813c9));
     prod_mmio_calls++;
     if(off>=KPEEK_NV_PROM_OFF && off-KPEEK_NV_PROM_OFF<GF_ROM_MAX) {
-        CHECK(!write && prod_cmd_writes==1);
+        CHECK(!write && (prod.display.initialized || prod_cmd_writes==1));
         *v=prod_rom[off-KPEEK_NV_PROM_OFF];
         if(prod_rom_changed && prod_mmio_calls>GF_ROM_MAX)*v^=1;
         return 0;
@@ -317,8 +317,70 @@ static void prod_selection_tests(void)
     }
     output("PASS selection: GUI=0/default or !=1, GUI=1 refusal, immutable boot choice\n");
 }
+static void prod_script_loans(void)
+{
+    prod_reset(); CHECK(!prod_start());
+    struct gf_display_context *c=&prod.display;
+    u32 command=prod_cmd_writes,route=prod_route_calls,a2=prod_a2_writes;
+    u32 mains=prod_main_mask;
+    /* mc.c:21-24 records ffffffff, which is not a verified readback value.
+     * Exercise exactly that runtime state with a different MMIO read value. */
+    prod.foundation.expected_pmc=0xffffffffU;
+    *prod_reg(RECOVER_PMC_ENABLE)=0x11401100U;
+    for(u32 n=0;n<2;n++) {
+        CHECK(!c->owner->validate(c));
+        CHECK(!c->owner->acquire(c) && prod_live_pages && c->init && c->program);
+        CHECK(prod_cmd_writes==command && prod_route_calls==route &&
+              prod_a2_writes==a2 && prod_main_mask==mains);
+        /* Synthetic BIT I/script goes into the already validated scratch.
+         * Locations are fixture offsets; bus expectation comes independently
+         * from nouveau init.c:539-572,1121-1143 (OR4 XOR8 => 6828b8). */
+        enum { LOAN_BIT_COUNT=0x10a, LOAN_ENTRY=0x112,
+               LOAN_TABLE=0x200, LOAN_PC=0x240, LOAN_TMDS=0x6828b8 };
+        CHECK(c->init->rom==prod.scratch->rom && c->init->rom_size==c->rom_size);
+        u8 *loan=prod.scratch->rom;
+        loan[LOAN_BIT_COUNT]=2;
+        const u8 entry[]={'I',1,12,0,0,2};
+        const u8 script[]={0x50,0x81,1,0x17,0xa2,0x71};
+        for(u32 i=0;i<sizeof(entry);i++) loan[LOAN_ENTRY+i]=entry[i];
+        kmemset(loan+LOAN_TABLE,0,GF_INIT_BIT_MIN_LENGTH);
+        for(u32 i=0;i<sizeof(script);i++) loan[LOAN_PC+i]=script[i];
+        u32 dl=prod_now+GF_INIT_EXEC_US;
+        CHECK(!gf_init_run_script(c->init,c->program,LOAN_PC,1,4,dl));
+        CHECK(c->init->head==1 && c->init->or_mask==4 && c->init->deadline==dl);
+        CHECK(*prod_reg(LOAN_TMDS)==0x17 && *prod_reg(LOAN_TMDS+4)==0xa2);
+        CHECK(prod_cmd_writes==command && prod_route_calls==route && prod_a2_writes==a2);
+        CHECK(!c->io.restore(c->io.opaque,c->init));
+        /* runner.c:init_point checks first, bus.c:gf_production_point then
+         * reads again: cross the configured elapsed budget on that read.
+         * Absolute dl is still in the future. No script MMIO may follow. */
+        /* OS32 timing oracle: runner.c:52 + bus.c:106, one read each. */
+        enum { LOAN_POINT_CLOCKS=2 };
+        prod_now=c->init->started_us+GF_INIT_EXEC_US-LOAN_POINT_CLOCKS*prod_clock_step;
+        u32 clocks=prod_clock_calls,mmio=prod_mmio_calls;
+        dl=prod_now+GF_INIT_EXEC_US;
+        CHECK(gf_init_run_script(c->init,c->program,LOAN_PC,1,4,dl)==GF_SCRIPT_ETIME);
+        CHECK(c->init->last_rc==GF_SCRIPT_ETIME && c->init->elapsed_us==GF_INIT_EXEC_US);
+        CHECK(prod_clock_calls-clocks==LOAN_POINT_CLOCKS && prod_mmio_calls==mmio);
+        CHECK(prod_live_pages && prod.scratch && c->init && c->program && prod.acquiring);
+        c->owner->release(c);
+        CHECK(!prod_live_pages && !prod.scratch && !c->init && !c->program);
+        CHECK(prod.foundation.expected_pmc==0xffffffffU && !prod.acquiring);
+    }
+    /* PBUS protection is a rejection, never an A2 reset during a loan. */
+    *prod_reg(RECOVER_PBUS1850)=1;
+    CHECK(c->owner->acquire(c)==-1 && !prod_live_pages);
+    CHECK(prod_cmd_writes==command && prod_route_calls==route && prod_a2_writes==a2);
+    c->owner->release(c);
+    *prod_reg(RECOVER_PBUS1850)=0;
+    prod_rom[0]=0;
+    CHECK(c->owner->acquire(c)==-1 && prod_live_pages);
+    c->owner->release(c);
+    CHECK(!prod_live_pages && !c->init && prod.foundation.expected_pmc==0xffffffffU);
+}
 static void prod_cases(void)
 {
+    prod_script_loans();
     prod_reset();CHECK(!prod_start());prod_order();
     CHECK(prod_cmd_writes==2 && !prod_other_cfg_writes && prod_reads16 && !prod_live_pages);
     CHECK((prod_cfg[13][0][1]&0xffff)==0x106 && (prod_cfg[13][0][1]>>16)==0x02b0);

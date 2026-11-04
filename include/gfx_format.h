@@ -5,6 +5,12 @@
 #include "types.h"
 #include "../sdk/include/os32/os32_kapi_shared.h"
 
+/* Kernel-only HAL format IDs (GF_FEAT4_DESIGN, C-group declarations).
+ * The current GUI does not use these; keep KAPI/SDK ABI unchanged.
+ * Use these same numbers when the formats are exposed through the SDK. */
+#define GFX_FMT_RGB565   2
+#define GFX_FMT_XRGB8888 3
+
 /* Correspond to the SDK's GFX_FMT_PLANAR4 / GFX_FMT_PACKED8 format IDs. */
 #define GFX_FMT_PLANAR4_BPP 4
 #define GFX_FMT_PACKED8_BPP 8

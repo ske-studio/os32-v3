@@ -67,6 +67,23 @@ static const GeforceModuleContext module_context = {
     .flip=&module_flip, .page=&module_page
 };
 const GeforceModuleContext *geforce_context = &module_context;
+/* Explicit ownerless HAL fixture: optional F4 hooks remain in the ops
+ * table, but invoking their lower layers here must fail, never succeed. */
+int gf_vram_next(struct gf2_chan *ch,u32 *cursor,struct gf_vram_reservation *out)
+{ (void)ch;(void)cursor;(void)out;__builtin_trap(); }
+int gf_vram_match(struct gf2_chan *ch,const void *owner,u32 id,u32 gen,
+                  u32 off,u32 bytes,struct gf_vram_reservation *out)
+{ (void)ch;(void)owner;(void)id;(void)gen;(void)off;(void)bytes;(void)out;__builtin_trap(); }
+int gf3_upload(struct gf3_ctx *c,const struct gf3_surface *s,struct gf3_rect r,
+               const struct gf3_ram *ram,bool force,u32 dl)
+{ (void)c;(void)s;(void)r;(void)ram;(void)force;(void)dl;__builtin_trap(); }
+int gf3_fill(struct gf3_ctx *c,const struct gf3_surface *s,struct gf3_rect r,
+             u32 color,u8 alu,u32 mask,u32 dl)
+{ (void)c;(void)s;(void)r;(void)color;(void)alu;(void)mask;(void)dl;__builtin_trap(); }
+int gf2_fence_emit(struct gf2_chan *ch,struct gf2_fence *out,u32 dl)
+{ (void)ch;(void)out;(void)dl;__builtin_trap(); }
+int gf2_fence_wait(struct gf2_chan *ch,struct gf2_fence fence,u32 dl)
+{ (void)ch;(void)fence;(void)dl;__builtin_trap(); }
 #else
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 #endif
