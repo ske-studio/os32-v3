@@ -4,6 +4,8 @@
 #define GF4_HOST_UNIT 2
 #include "gf4_display_fake.h"
 
+/* nouveau nvkm/subdev/devinit/nv04.c:200-273: five PLL writes. */
+#define GF4_PLL_SEQUENCE_WRITES 5U
 static struct gf4_head_image heads[GF4_HEADS];
 void _start(void)
 {
@@ -41,10 +43,28 @@ void _start(void)
     struct gf4_route route = {0};
     assert(gf4_pll_calc(&mode, &route, &saved, &limits, &out) == GF4_OK);
     assert(out.pll.actual == 148500 && out.pllsel == 0x10000204U);
-    assert(out.sequence.count == 5);
+    assert(out.sequence.count == GF4_PLL_SEQUENCE_WRITES);
+    /* With M=1 and VCO <= 500000, the closest clock around 148500
+     * is 11 * 27000 / 2. Offsets straddle the design's 0.5% limit. */
+    const u32 near_clock = 148500U, within_offset = 500U, outside_offset = 1000U;
+    struct gfinit_pll_solution solution;
+    mode.t.khz = near_clock + within_offset;
+    assert(gfinit_pll_solve(&limits, mode.t.khz, &solution) == 0);
+    assert(solution.actual == near_clock && solution.error == within_offset);
+    assert(gf4_pll_calc(&mode, &route, &saved, &limits, &out) == GF4_OK);
+    assert(out.pll.actual == near_clock && out.pll.error == within_offset);
+    mode.t.khz = near_clock + outside_offset;
+    assert(gfinit_pll_solve(&limits, mode.t.khz, &solution) == 0);
+    assert(solution.actual == near_clock && solution.error == outside_offset);
+    unsigned char before[sizeof(out)];
+    gf2_host_memcpy(before, &out, sizeof(out));
+    assert(gf4_pll_calc(&mode, &route, &saved, &limits, &out) == GF4_EPLL);
+    for (u32 i = 0; i < sizeof(out); ++i)
+        assert(((const unsigned char *)&out)[i] == before[i]);
+    mode.t.khz = near_clock;
     route.head = 1;
     assert(gf4_pll_calc(&mode, &route, &saved, &limits, &out) == GF4_OK);
-    assert(out.pllsel == 0x20000804U && out.sequence.count == 5);
+    assert(out.pllsel == 0x20000804U && out.sequence.count == GF4_PLL_SEQUENCE_WRITES);
     assert(out.sequence.writes[3].reg == 0x680520U); /* nv04.c:184-193 */
     mode.t.khz = 0;
     out.pllsel = 0xdeadbeefU;
