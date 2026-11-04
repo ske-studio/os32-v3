@@ -35,7 +35,9 @@ def landing(s, start, buf, name):
             '    simulate(); return 99;\n}\n'
             'static int ' + name + '(void) {\n'
             '    u32 before = tss_get_esp0();\n'
+            '    x87_restores = 0;\n'
             '    int rc = ' + name + '_body();\n'
+            '    CHECK(x87_restores == 1 && x87_last == &x87_parent[exec_nest_level]);\n'
             '    CHECK(tss_get_esp0() == before);\n'
             '    return rc;\n}\n')
 
@@ -76,7 +78,9 @@ static int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u3
 static void exec_stop_mark(void) {}
 static X87State x87_parent[APP_SLOT_COUNT];
 void x87_save(X87State *p) { (void)p; }
-void x87_restore(const X87State *p) { (void)p; }
+static int x87_restores;
+static const X87State *x87_last;
+void x87_restore(const X87State *p) { x87_restores++; x87_last = p; }
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int stdin_resume_test;
@@ -636,6 +640,10 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('x87-launch-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
+     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
+    ('x87-resume-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
+     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        g_cur_frame[APP_FRAME_EAX] != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
     ('stdin-no-rewind', '    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;', ''),
