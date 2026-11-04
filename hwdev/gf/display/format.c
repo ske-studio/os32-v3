@@ -26,6 +26,18 @@
  * see docs/design/hwdev/gf/display/format.md for the assignment ownership. */
 #include "calc.h"
 #include "api.h"
+/* GF_FEAT4_DESIGN §3 pitch alignment; nouveau dispnv04/crtc.c:308-312,
+ * 868-888 and nvreg.h:230,281,341-347 register fields. */
+enum {
+    FORMAT_PITCH_ALIGN = 64, FORMAT_START_ALIGN = 4,
+    FORMAT_PITCH_UNIT = 8, FORMAT_PITCH_MAX = 0xfff,
+    FORMAT_MISC_BASE = 0x23, FORMAT_MISC_NEG_H = 0x40,
+    FORMAT_MISC_NEG_V = 0x80, FORMAT_PIXEL_MASK = 3,
+    FORMAT_DAC_ALT_MODE = 0x1000, FORMAT_PITCH_HI_SHIFT = 8,
+    FORMAT_PITCH_HI_MASK = 7, FORMAT_PITCH_HI_DEST = 5,
+    FORMAT_PITCH_LOW_MASK = 0xff, FORMAT_PITCH_11_SHIFT = 11,
+    FORMAT_PITCH_11_DEST = 6
+};
 void gf_mode_format(struct gfinit_mode *o)
 {
     o->misc = GF_MODE_MISC_NEG_HV;
@@ -57,18 +69,18 @@ i32 gf4_format_calc(const struct gf4_mode *mode,const struct gf3_surface *front,
     default: return GF4_EFORMAT;
     }
     if (front->fmt != mode->fmt) return GF4_EFORMAT;
-    u32 pitch=((u32)mode->t.hd * cpp + 63U) & ~63U;
+    u32 pitch=((u32)mode->t.hd * cpp + FORMAT_PITCH_ALIGN - 1U) & ~(FORMAT_PITCH_ALIGN - 1U);
     if (!pitch || mode->pitch != pitch || front->pitch != pitch ||
-        pitch / 8U > 0xfffU || (front->off & 3U)) return GF4_ERANGE;
+        pitch / FORMAT_PITCH_UNIT > FORMAT_PITCH_MAX || (front->off & (FORMAT_START_ALIGN - 1U))) return GF4_ERANGE;
     gf_mode_format(o);
-    o->misc=0x23U | ((mode->t.flags & GF4_NEG_H) ? 0x40U : 0) |
-        ((mode->t.flags & GF4_NEG_V) ? 0x80U : 0);
-    o->cr[GF_MODE_CR_PIXEL]=(o->cr[GF_MODE_CR_PIXEL] & ~3U) | pixel;
-    o->general=GF_MODE_GENERAL | (mode->fmt == GF3_RGB565 ? 0x1000U : 0);
-    u32 q=pitch / 8U;
-    o->cr[GF_MODE_CR_PITCH_HI]=((q >> 8) & 7U) << 5;
-    o->cr[GF_MODE_CR_PITCH]=q & 0xffU;
-    o->cr[GF_MODE_CR_PITCH11]=((q >> 11) & 1U) << 6;
+    o->misc=FORMAT_MISC_BASE | ((mode->t.flags & GF4_NEG_H) ? FORMAT_MISC_NEG_H : 0) |
+        ((mode->t.flags & GF4_NEG_V) ? FORMAT_MISC_NEG_V : 0);
+    o->cr[GF_MODE_CR_PIXEL]=(o->cr[GF_MODE_CR_PIXEL] & ~FORMAT_PIXEL_MASK) | pixel;
+    o->general=GF_MODE_GENERAL | (mode->fmt == GF3_RGB565 ? FORMAT_DAC_ALT_MODE : 0);
+    u32 q=pitch / FORMAT_PITCH_UNIT;
+    o->cr[GF_MODE_CR_PITCH_HI]=((q >> FORMAT_PITCH_HI_SHIFT) & FORMAT_PITCH_HI_MASK) << FORMAT_PITCH_HI_DEST;
+    o->cr[GF_MODE_CR_PITCH]=q & FORMAT_PITCH_LOW_MASK;
+    o->cr[GF_MODE_CR_PITCH11]=((q >> FORMAT_PITCH_11_SHIFT) & 1U) << FORMAT_PITCH_11_DEST;
     o->start=front->off;
     return GF4_OK;
 }

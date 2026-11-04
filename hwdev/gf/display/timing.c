@@ -26,6 +26,8 @@
  * see docs/design/hwdev/gf/display/timing.md for the assignment ownership. */
 #include "calc.h"
 #include "api.h"
+/* nouveau dispnv04/crtc.c:510-516; dispnv04/nvreg.h:160. */
+enum { TIMING_CURSOR_DOUBLE_SCAN = 0x10 };
 void gf_mode_timing(struct gfinit_mode *o)
 {
     struct gfinit_mode_timing *t = &o->timing;
@@ -111,7 +113,9 @@ i32 gf4_timing_calc(const struct gf4_mode *mode, struct gfinit_mode *o)
     u32 ilace=(ht >> 1) & ~1U;
     o->cr[GF_MODE_CR_INTERLACE]=(v->flags & GF4_INTERLACE) ? ilace : GF_MODE_BYTE_MASK;
     if (v->flags & GF4_INTERLACE) o->cr[GF_MODE_CR_HEB] |= mode_bit(ilace,8,4);
-    o->config=GF_MODE_CONFIG_HSYNC | ((v->flags & GF4_DBLSCAN) ? 0x10U : 0);
+    o->config=GF_MODE_CONFIG_HSYNC;
+    o->cursor_cfg=(o->cursor_cfg & ~TIMING_CURSOR_DOUBLE_SCAN) |
+        ((v->flags & GF4_DBLSCAN) ? TIMING_CURSOR_DOUBLE_SCAN : 0);
     o->crtc830=v->vd-3; o->crtc834=v->vd-1;
     return GF4_OK;
 }

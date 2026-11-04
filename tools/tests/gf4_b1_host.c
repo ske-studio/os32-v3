@@ -3,6 +3,9 @@
 #define GF4_HOST_UNIT 1
 #include "gf4_display_fake.h"
 #define REQUIRE(x) do { __asm__ volatile("" : : : "memory"); if (!(x)) return __LINE__; } while (0)
+/* nouveau dispnv04/crtc.c:510-516, dispnv04/nvreg.h:160;
+ * PCRTC_CONFIG value: dispnv04/crtc.c:568, dispnv04/nvreg.h:157. */
+enum { TEST_CURSOR_DOUBLE_SCAN = 0x10, TEST_CONFIG_HSYNC = 2 };
 struct row { struct gf4_timing t; u8 ht,hd,hs,he,vt,ov,vs,ve,vd,vbs,vbe,rpc,lsr,heb,ebr; };
 static const struct row rows[] = {
     {{25175,640,656,752,800,480,490,492,525,GF4_NEG_H|GF4_NEG_V},95,79,83,0x9f,11,0x3e,0xe9,0x2b,0xdf,0xdf,0x0c,4,0x10,0,0},
@@ -36,7 +39,11 @@ static int test(void)
     m.t=rows[0].t; m.t.hs++; REQUIRE(gf4_timing_calc(&m,&out)==GF4_ERANGE);
     m.t=rows[0].t; m.t.vt=5000; REQUIRE(gf4_timing_calc(&m,&out)==GF4_ERANGE);
     m.t=rows[0].t; m.t.flags|=GF4_INTERLACE|GF4_DBLSCAN;
-    REQUIRE(!gf4_timing_calc(&m,&out) && out.cr[0x39]==46 && (out.cr[9]&0x80) && (out.config&0x10));
+    REQUIRE(!gf4_timing_calc(&m,&out) && out.cr[0x39]==46 && (out.cr[9]&0x80) &&
+            out.config==TEST_CONFIG_HSYNC && (out.cursor_cfg&TEST_CURSOR_DOUBLE_SCAN));
+    m.t.flags &= ~GF4_DBLSCAN;
+    REQUIRE(!gf4_timing_calc(&m,&out) && out.config==TEST_CONFIG_HSYNC &&
+            !(out.cursor_cfg&TEST_CURSOR_DOUBLE_SCAN) && !(out.cr[9]&0x80));
     out.cr[0x47]=0xff; gf4_fifo_calc(&out);
     REQUIRE(out.cr[0x1b]==4 && out.cr[0x20]==0xc0 && out.cr[0x47]==0);
     return 0;
