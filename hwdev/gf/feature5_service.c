@@ -53,7 +53,7 @@ static void service_fan_tick(struct gf5 *g,u64 now)
 i32 gf5_service_poll(struct gf5 *g)
 {
     u64 now;
-    i32 rc;
+    i32 rc, previous_rc, previous_source_rc;
     if (!g) return GF5_EINVAL;
     if (g->busy || g->phase!=GF5_RUN) return 0;
     if (!g->links.clock64) return g->last_rc=GF5_EINVAL;
@@ -62,8 +62,17 @@ i32 gf5_service_poll(struct gf5 *g)
         g->source_rc=rc;
         return g->last_rc=gf5_rc_map(rc);
     }
+    /* A successful tick must not erase an earlier diagnostic. */
+    previous_rc=g->last_rc;
+    previous_source_rc=g->source_rc;
+    g->last_rc=0;
     gf5_fan_tick(g,now);
-    return 0;
+    rc=g->last_rc;
+    if (!rc) {
+        g->last_rc=previous_rc;
+        g->source_rc=previous_source_rc;
+    }
+    return rc;
 }
 
 static i32 service_poll(struct gf5 *g)
