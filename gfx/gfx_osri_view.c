@@ -17,7 +17,7 @@ static int osri_active;
 int gfx_osri_poll_abort(int caller)
 {
     AppSlot *slot = appslot_get(caller);
-    return slot && slot->abort_req;
+    return (slot && slot->abort_req) || appslot_stop_pending();
 }
 
 int gfx_osri_view(const char *path, u32 duration_ms, int caller)

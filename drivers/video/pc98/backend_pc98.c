@@ -24,6 +24,8 @@
 #include "config.h"
 #include "kmalloc.h"
 #include "input_service.h"
+#include "con_sink.h"
+#include "kbd.h"
 
 /* gfx_vram.c の VRAM 転送エンジン (低レベル present)。
  * バックエンドはこれを呼び、gfx_present_rect / gfx_present は本バックエンドの
@@ -141,11 +143,20 @@ static int pc98_osri_poll(void *ctx)
 {
     struct Pc98OsriPoll *p = ctx;
     if (gfx_osri_poll_abort(p->caller)) return 1;
+    int gui = con_sink_is_enabled();
     for (u32 i = 0; i < OSRI_POLL_KEYS; i++) {
-        if (input_peekkey() < 0) break;
-        int key = input_trygetkey();
-        if (key < 0) break;
-        if ((key & 0xff) == OSRI_ESC_ASCII) return 1;
+        if (gui) {
+            /* WM cannot forward keys while this synchronous call owns display. */
+            int raw = input_trygetrawkey();
+            if (raw < 0) break;
+            if (!(raw & KBD_RAW_MAKE)) continue;
+            if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_ESC | KBD_RAW_MAKE)) return 1;
+        } else {
+            if (input_peekkey() < 0) break;
+            int key = input_trygetkey();
+            if (key < 0) break;
+            if ((key & 0xff) == OSRI_ESC_ASCII) return 1;
+        }
         if (p->run) pl_run_extend(p->run, tick_count,
                                   GFX_OSRI_SHOW_EXTEND_MS * SPLASH_RASTER_US_PER_MS);
     }

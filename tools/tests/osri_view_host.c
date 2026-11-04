@@ -42,6 +42,7 @@ static struct PlV2Plan plan_store;
 static u16 text_store[OSRI_TEXT_CELLS];
 static PaletteEntry saved_colors[OSRI_COLORS], colors[OSRI_COLORS];
 static int keys[64], key_count, key_pos, gets, peeks, copy_count;
+static int raw_keys[64], raw_count, raw_pos, raw_gets, stop_pending;
 static const char *user_path;
 static u32 user_bytes;
 static int use_real_frame, fixed_cancel_peek, fixed_peeks;
@@ -50,6 +51,7 @@ static u32 repeat_key_every;
 int gfx_is_started(void) { return started; }
 int con_sink_is_enabled(void) { return gui; }
 int appslot_gfx_owner(void) { return owner; }
+int appslot_stop_pending(void) { return stop_pending; }
 AppSlot *appslot_get(int id) { REQUIRE(id == 2); return &slot; }
 int serial_gate_active(void) { return gate; }
 int serialfs_is_mounted(void) { return mounted; }
@@ -135,6 +137,8 @@ int input_peekkey(void)
 }
 int input_trygetkey(void)
 { REQUIRE(irq_on); gets++; return key_pos < key_count ? keys[key_pos++] : -1; }
+int input_trygetrawkey(void)
+{ REQUIRE(irq_on); raw_gets++; return raw_pos < raw_count ? raw_keys[raw_pos++] : -1; }
 int pl_v2_frame_poll(struct SplashRaster *s, const struct OsriImage *image,
                      const struct PlV2Plan *plan, int (*poll)(void *), void *ctx)
 {
@@ -165,6 +169,7 @@ static void reset(int dynamic)
     frame_mode=PL_FRAME_OK; g_backend=&gfx_backend_pc98; gfx_current_height=GFX_HEIGHT;
     key_count=key_pos=gets=peeks=copy_count=use_real_frame=0;
     fixed_cancel_peek=fixed_peeks=0; repeat_key_every=0;
+    raw_count=raw_pos=raw_gets=stop_pending=0;
     slot.abort_req=0; file_data=dynamic ? wire_events : wire_fixed;
     file_size=dynamic ? sizeof(wire_events) : sizeof(wire_fixed);
     kmemset(pixels, 0xa5, sizeof(pixels));
@@ -307,6 +312,46 @@ static void deadlines(void)
         REQUIRE(r.start == now && r.budget_us == 30000000u && !r.consumed && !r.frames);
     }
 }
+static void gui_input(void)
+{
+    /* Raw codes, including modifiers, are distinct from the idle inject ring. */
+    reset(1); gui=1; owner=2; use_real_frame=1;
+    raw_keys[0]=KEY_ESC | KBD_RAW_MAKE | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT); raw_count=1;
+    keys[0]='a'; key_count=1;
+    REQUIRE(show(1000) == GFX_OSRI_SHOW_CANCELLED && raw_pos == 1 && raw_gets == 1);
+    REQUIRE(!gets && !peeks && !key_pos && !raster.frame);
+
+    reset(1); gui=1; owner=2;
+    raw_keys[0]=KEY_ESC; raw_keys[1]=KEY_SPACE; raw_count=2; /* Breaks cannot extend or cancel. */
+    REQUIRE(show(1000) == GFX_OSRI_SHOW_DONE && frame_calls == 70 && raw_pos == 2);
+    REQUIRE(!gets && !peeks);
+
+    reset(1); gui=1; owner=2;
+    raw_keys[0]=KEY_SPACE | KBD_RAW_MAKE; raw_count=1;
+    REQUIRE(show(1000) == GFX_OSRI_SHOW_DONE && frame_calls == 2102 && raw_pos == 1);
+    REQUIRE(!gets && !peeks);
+
+    /* One boundary consumes at most 32 events, including breaks. */
+    reset(1); gui=1; owner=2;
+    for (u32 i=0; i<OSRI_POLL_KEYS; i++) raw_keys[i]=KEY_SPACE;
+    raw_keys[OSRI_POLL_KEYS]=KEY_ESC | KBD_RAW_MAKE; raw_count=OSRI_POLL_KEYS+1;
+    REQUIRE(show(1000) == GFX_OSRI_SHOW_CANCELLED && frame_calls == 2);
+    REQUIRE(raw_pos == (int)OSRI_POLL_KEYS+1 && raw_gets == raw_pos && !gets && !peeks);
+
+    reset(0); gui=1; owner=2;
+    raw_keys[0]=KEY_ESC; raw_keys[1]=KEY_SPACE | KBD_RAW_MAKE;
+    raw_keys[2]=KEY_ESC | KBD_RAW_MAKE; raw_count=3;
+    REQUIRE(show(1) == GFX_OSRI_SHOW_CANCELLED && raw_pos == 3 && raw_gets == 3);
+    REQUIRE(!gets && !peeks && !frame_calls);
+
+    for (int dynamic=0; dynamic<=1; dynamic++) {
+        reset(dynamic); gui=1; owner=2; stop_pending=1;
+        raw_keys[0]=KEY_SPACE | KBD_RAW_MAKE;
+        raw_keys[1]=KEY_ESC | KBD_RAW_MAKE; raw_count=2;
+        REQUIRE(show(1000) == GFX_OSRI_SHOW_CANCELLED && stop_pending == 1);
+        REQUIRE(!slot.abort_req && !raw_gets && !raw_pos && !gets && !peeks);
+    }
+}
 static int boundary_poll(void *ctx)
 {
     REQUIRE(ctx == &slot && irq_on && !writes && !raster.frame);
@@ -331,5 +376,5 @@ static void boundaries_and_fixed(void)
 }
 void _start(void)
 {
-    entry_and_failures(); deadlines(); boundaries_and_fixed(); finish(0);
+    entry_and_failures(); deadlines(); gui_input(); boundaries_and_fixed(); finish(0);
 }
