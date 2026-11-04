@@ -9,10 +9,14 @@
 #define GF4_NEG_V 2U
 #define GF4_INTERLACE 4U
 #define GF4_DBLSCAN 8U
-#define GF4_DATA_VERSION 1U
+#define GF4_DATA_VERSION 2U
 #define GF4_EDID_VERSION 1U
 #define GF4_TV_VERSION 1U
 
+enum gf4_rc { GF4_OK=0, GF4_EINVAL=-401, GF4_ERANGE=-402,
+ GF4_EFORMAT=-403, GF4_EPLL=-404, GF4_EDDC=-405, GF4_EEDID=-406,
+ GF4_ENOSPC=-407, GF4_ESTATE=-408, GF4_ETIME=-409,
+ GF4_EUNSUPPORTED=-410, GF4_EBUSY=-411, GF4_ENODEV=-412 };
 enum gf4_route_type { GF4_ANALOG=0, GF4_TV=1, GF4_TMDS=2, GF4_LVDS=3 };
 struct gf4_timing { u32 khz; u16 hd,hs,he,ht,vd,vs,ve,vt; u32 flags; };
 struct gf4_route {
@@ -34,5 +38,19 @@ struct gf4_data_ops {
     u32 version,size;
     i32 (*edid_modes)(const u8 block[128],u32 block_no,struct gf4_edid_state *);
     i32 (*tv_state)(u32 norm,const struct gf4_timing *,struct gf4_tv_state *);
+    i32 (*tv_modes)(u32 norm,struct gf4_edid_state *);
 };
+/* DCB entries remain one route each; head_mask carries all allowed heads.
+ * These values own no ROM pointers. */
+struct gf4_i2c_port { u8 drive,sense; };
+struct gf4_gpio_value { bool present; u8 line,log[2]; };
+struct gf4_dcb_values {
+    struct gf4_route routes[32]; u32 nroutes;
+    struct gf4_i2c_port i2c[16]; i32 i2c_rc[16];
+    struct gf4_gpio_value tvdac[2];
+};
+i32 gf4_edid_modes(const u8 block[128],u32 block_no,struct gf4_edid_state *);
+i32 gf4_tv_state_calc(u32 norm,const struct gf4_timing *,struct gf4_tv_state *);
+i32 gf4_tv_modes(u32 norm,struct gf4_edid_state *);
+i32 gf4_dcb_parse(const u8 *rom,u32 size,u32 bmp_offset,struct gf4_dcb_values *out);
 #endif

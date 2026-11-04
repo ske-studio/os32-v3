@@ -35,7 +35,10 @@ typedef long long i64;
 
 enum gf4_host_op { D_READ,D_WRITE,D_CLOCK,D_SLEEP,D_SNAPSHOT,D_IRQ,D_FENCE,
     D_FENCE_WAIT,D_FAULT,D_MATCH,D_MAP,D_UNMAP,D_FORMAT,D_SURFACE,D_ROUTE,D_LUT,
-    D_HEADS,D_EDID,D_TV,D_LOAD,D_SAVE,D_RESTORE,D_SCRIPT,D_EXTERNAL,D_DPMS,D_OP_COUNT };
+    D_HEADS,D_EDID,D_TV,D_LOAD,D_SAVE,D_RESTORE,D_SCRIPT,D_EXTERNAL,D_DPMS,
+    D_I2C_PORT,D_ADMISSION,D_FAILED,D_SCAN_CHANGED,D_CHANGE_BEGIN,D_CHANGE_END,
+    D_CURSOR_APPLY,D_FLIP_COMPLETE,D_PLLSEL,D_DAC,D_EXTERNAL_DPMS,D_TV_GPIO,
+    D_TV_MODES,D_OP_COUNT };
 struct gf4_host_event {
     enum gf4_host_op op;
     u32 nth,a[GF4_HOST_VALUE_ARGS];
@@ -49,7 +52,7 @@ struct gf4_host {
     struct gf4_ctx ctx;
     struct gf4_state *state;
     struct gf4_exec_ops exec;
-    const u8 *ddc_block; /* Borrowed C0 DDC result, GF4_HOST_EDID_BYTES. */
+    const u8 *ddc_block; /* Borrowed B0 DDC result, GF4_HOST_EDID_BYTES. */
     struct gf4_host_event *events;
     u32 cevents,nevents,calls[D_OP_COUNT],fail_at[D_OP_COUNT];
     i32 fail_rc[D_OP_COUNT];
@@ -63,6 +66,9 @@ struct gf4_host {
     struct gf_irq_stats irq;
     struct gf_vram_view *views;
     void (*observe)(struct gf4_host *,const struct gf4_host_event *);
+    struct gf4_links links; struct gf4_i2c_port port;
+    struct gf4_edid_state tv_modes; i32 port_rc;
+    u32 applied_write_nth; i32 applied_write_rc;
 };
 static struct gf4_host *gf4_host_current;
 static inline struct gf4_host_event *gf4_host_begin(struct gf4_host *h,enum gf4_host_op op)
@@ -90,6 +96,12 @@ static inline void gf4_host_fail_at(struct gf4_host *h,enum gf4_host_op op,u32 n
 {
     assert(h && (unsigned)op<D_OP_COUNT && op!=D_SNAPSHOT);
     h->fail_at[op]=nth; h->fail_rc[op]=rc;
+}
+/* nth is the D_WRITE call number since the last trace clear; zero disables. */
+static inline void gf4_host_write_applied_error(struct gf4_host *h,u32 nth,i32 rc)
+{
+    assert(h && (!nth || rc<0));
+    h->applied_write_nth=nth; h->applied_write_rc=rc;
 }
 static inline void gf4_host_reads(struct gf4_host *h,const struct gf4_host_read *r,u32 n)
 {
@@ -231,11 +243,13 @@ static inline int gf4_host_write(void *owner,u32 bar,u32 off,u32 width,u32 value
     assert(off<=U32_MAX-(width-1U));
     struct gf4_host_event *e=gf4_host_begin(h,D_WRITE);
     e->p[0]=owner; e->a[0]=bar; e->a[1]=off; e->a[2]=width; e->a[3]=value;
-    if (!e->rc) for (u32 b=0;b<width;++b) {
+    bool applied=h->applied_write_nth && e->nth==h->applied_write_nth;
+    if (!e->rc || applied) for (u32 b=0;b<width;++b) {
         u32 byte=(value>>(b*8U))&U8_MAX;
         if (bar!=GF_MODE_REGISTER_BAR || !gf4_host_indexed(h,off+b,true,&byte))
             gf4_host_reg_byte_set(h,bar,off+b,byte);
     }
+    if (applied) e->rc=h->applied_write_rc;
     return gf4_host_end(h,e);
 }
 static inline int gf4_host_clock(void *owner,u32 *now)
@@ -287,9 +301,68 @@ static inline i32 gf4_host_external_mode(void *owner,const struct gf4_route *rou
     e->p[0]=owner; e->p[1]=route; e->p[2]=mode; e->a[0]=dl;
     return gf4_host_end(h,e);
 }
+static inline i32 gf4_host_tv_modes(u32 norm,struct gf4_edid_state *out)
+{
+    struct gf4_host *h=gf4_host_current; assert(h && out);
+    struct gf4_host_event *e=gf4_host_begin(h,D_TV_MODES);
+    e->p[0]=out; e->a[0]=norm;
+    if (!e->rc) *out=h->tv_modes;
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_i2c_port(void *owner,u8 bus,struct gf4_i2c_port *out)
+{
+    struct gf4_host *h=owner; assert(h && out);
+    struct gf4_host_event *e=gf4_host_begin(h,D_I2C_PORT);
+    e->p[0]=owner; e->p[1]=out; e->a[0]=bus;
+    if (!e->rc) e->rc=h->port_rc;
+    if (!e->rc) *out=h->port;
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_admission(void *owner,bool open)
+{
+    struct gf4_host *h=owner; assert(h);
+    struct gf4_host_event *e=gf4_host_begin(h,D_ADMISSION);
+    e->p[0]=owner; e->a[0]=open;
+    if (!e->rc) h->ctx.accepting=open;
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_failed(void *owner,i32 cause,u32 dl)
+{
+    struct gf4_host *h=owner; assert(h);
+    struct gf4_host_event *e=gf4_host_begin(h,D_FAILED);
+    e->p[0]=owner; e->a[0]=(u32)cause; e->a[1]=dl;
+    if (!e->rc) { h->ctx.accepting=false; h->ctx.reusable=false; }
+    /* No reservation or window is released by this notification oracle. */
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_scan_changed(void *owner,u8 head,const struct gf3_surface *front)
+{
+    struct gf4_host *h=owner; assert(h && front && head<GF4_HEADS);
+    struct gf4_host_event *e=gf4_host_begin(h,D_SCAN_CHANGED);
+    e->p[0]=owner; e->p[1]=front; e->a[0]=head;
+    /* B7 commits front/hold after this adapter succeeds; observe represents
+     * the C2 HAL descriptor/hook. The oracle never releases either face. */
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_external_dpms(void *owner,const struct gf4_route *route,
+                                         enum gf4_dpms dpms,u32 dl)
+{
+    struct gf4_host *h=owner; assert(h);
+    struct gf4_host_event *e=gf4_host_begin(h,D_EXTERNAL_DPMS);
+    e->p[0]=owner; e->p[1]=route; e->a[0]=dpms; e->a[1]=dl;
+    return gf4_host_end(h,e);
+}
+static inline i32 gf4_host_tv_gpio(void *owner,bool on,u32 dl)
+{
+    struct gf4_host *h=owner; assert(h);
+    struct gf4_host_event *e=gf4_host_begin(h,D_TV_GPIO);
+    e->p[0]=owner; e->a[0]=on; e->a[1]=dl;
+    return gf4_host_end(h,e);
+}
 static const struct gf4_data_ops gf4_host_data_ops={
     .version=GF4_DATA_VERSION,.size=sizeof(struct gf4_data_ops),
-    .edid_modes=gf4_host_edid_modes,.tv_state=gf4_host_tv_state
+    .edid_modes=gf4_host_edid_modes,.tv_state=gf4_host_tv_state,
+    .tv_modes=gf4_host_tv_modes
 };
 /* Lower UC adapter, also usable by integration tests linking real V0.
  * Its image is borrowed, so map/unmap do not allocate or release RAM. */
@@ -320,7 +393,15 @@ static inline void gf4_host_init(struct gf4_host *h,struct gf4_state *state)
     h->ctx.state=state; h->ctx.ch=&h->base.ch; h->ctx.accel=&h->base.ctx;
     h->ctx.data=&gf4_host_data_ops; h->ctx.epoch=h->base.ch.epoch;
     h->ctx.ready=h->ctx.accepting=h->ctx.reusable=true;
-    h->exec=(struct gf4_exec_ops){gf4_host_tmds_script,gf4_host_external_mode,h};
+    h->exec=(struct gf4_exec_ops){
+        .tmds_script=gf4_host_tmds_script,.external_mode=gf4_host_external_mode,
+        .owner=h,.external_dpms=gf4_host_external_dpms,.tv_gpio=gf4_host_tv_gpio
+    };
+    h->links=(struct gf4_links){
+        .i2c_port=gf4_host_i2c_port,.admission=gf4_host_admission,
+        .failed=gf4_host_failed,.scan_changed=gf4_host_scan_changed,.owner=h
+    };
+    h->ctx.links=&h->links;
     h->ctx.exec=&h->exec;
     h->base.f.io.opaque=h; h->base.f.io.read=gf4_host_read; h->base.f.io.write=gf4_host_write;
     h->base.f.io.timing.clock_us=gf4_host_clock; h->base.f.io.timing.wait_us=gf4_host_wait;
@@ -450,6 +531,28 @@ int gf_vram_view_map(struct gf_vram_view *view,struct gf2_chan *ch,u32 off,u32 l
 int gf_vram_view_unmap(struct gf_vram_view *view)
 {
     return gf4_host_view_unmap(gf4_host_current,view);
+}
+#endif
+#if GF4_HOST_UNIT == 0
+int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_EDID);
+    e->p[0]=ctx; e->p[1]=out; e->a[0]=bus; e->a[1]=block; e->a[2]=dl;
+    if (!e->rc) { assert(h->ddc_block && out); gf2_host_memcpy(out,h->ddc_block,GF4_HOST_EDID_BYTES); }
+    return gf4_host_end(h,e);
+}
+#endif
+#if GF4_HOST_UNIT == 0 || GF4_HOST_UNIT == 13
+i32 gf4_pll_calc(const struct gf4_mode *mode,const struct gf4_route *route,
+                  const struct gfinit_mode_saved *saved,const struct gfinit_pll_limits *limits,
+                  struct gfinit_mode *out)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
+    e->p[0]=mode; e->p[1]=route; e->p[2]=saved; e->p[3]=limits; e->p[4]=out;
+    if (!e->rc) { assert(route && route->head<GF4_HEADS && out); *out=h->state->work[route->head]; }
+    return gf4_host_end(h,e);
 }
 #endif
 #if GF4_HOST_UNIT == 0
@@ -618,32 +721,6 @@ void gf4_fifo_calc(struct gfinit_mode *out)
     e->rc=0; assert(out); *out=h->state->work[0];
     (void)gf4_host_end(h,e);
 }
-i32 gf4_pll_calc(const struct gf4_mode *mode,const struct gf4_route *route,
-                  const struct gfinit_mode_saved *saved,const struct gfinit_pll_limits *limits,
-                  struct gfinit_mode *out)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
-    e->p[0]=mode; e->p[1]=route; e->p[2]=saved; e->p[3]=limits; e->p[4]=out;
-    if (!e->rc) { assert(route && route->head<GF4_HEADS && out); *out=h->state->work[route->head]; }
-    return gf4_host_end(h,e);
-}
-int gf4_modes(struct gf4_ctx *ctx,u8 connector,const struct gf4_mode **out,u32 *count)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_EDID);
-    e->p[0]=ctx; e->p[1]=out; e->p[2]=count; e->a[0]=connector;
-    if (!e->rc) { assert(ctx && ctx->state && out && count); *out=ctx->state->modes; *count=ctx->state->nmodes; }
-    return gf4_host_end(h,e);
-}
-int gf4_ddc_read(struct gf4_ctx *ctx,u8 bus,u8 block,u8 out[128],u32 dl)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_EDID);
-    e->p[0]=ctx; e->p[1]=out; e->a[0]=bus; e->a[1]=block; e->a[2]=dl;
-    if (!e->rc) { assert(h->ddc_block && out); gf2_host_memcpy(out,h->ddc_block,GF4_HOST_EDID_BYTES); }
-    return gf4_host_end(h,e);
-}
 i32 gf4_lut_load(struct gf4_ctx *ctx,u8 head)
 {
     struct gf4_host *h=gf4_host_current;
@@ -651,6 +728,20 @@ i32 gf4_lut_load(struct gf4_ctx *ctx,u8 head)
     e->p[0]=ctx; e->a[0]=head;
     return gf4_host_end(h,e);
 }
+int gf4_dpms_set(struct gf4_ctx *ctx,u8 head,enum gf4_dpms dpms,u32 dl)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_DPMS);
+    e->p[0]=ctx; e->a[0]=head; e->a[1]=dpms; e->a[2]=dl;
+    if (!e->rc) {
+        assert(ctx && ctx->state && head<GF4_HEADS);
+        struct gf4_head_image *image=ctx->changing ? ctx->state->next : ctx->state->head;
+        image[head].dpms=dpms;
+    }
+    return gf4_host_end(h,e);
+}
+#endif
+#if GF4_HOST_UNIT == 5 || GF4_HOST_UNIT == 13
 i32 gf4_heads_apply(struct gf4_ctx *ctx,u32 heads)
 {
     struct gf4_host *h=gf4_host_current;
@@ -662,85 +753,70 @@ i32 gf4_heads_apply(struct gf4_ctx *ctx,u32 heads)
     }
     return gf4_host_end(h,e);
 }
-int gf4_cursor_show(struct gf4_ctx *ctx,u8 head,bool show)
+#endif
+/* Final addendum (a): C0-load and C0-tx are real together in UNIT 13.
+ * Neither mode_load nor change_begin/end has a fixture definition. */
+#if GF4_HOST_UNIT == 13
+i32 gf4_pllsel_calc(const struct gf4_head_image heads[GF4_HEADS],u32 *out)
 {
     struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
-    e->p[0]=ctx; e->a[0]=head; e->a[1]=show;
+    struct gf4_host_event *e=gf4_host_begin(h,D_PLLSEL);
+    e->p[0]=heads; e->p[1]=out;
+    if (!e->rc) { assert(heads && out); *out=h->state->work[0].pllsel; }
     return gf4_host_end(h,e);
 }
-int gf4_cursor_image(struct gf4_ctx *ctx,u8 head,const struct gf4_cursor *image,u32 dl)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
-    e->p[0]=ctx; e->p[1]=image; e->a[0]=head; e->a[1]=dl;
-    return gf4_host_end(h,e);
-}
-int gf4_cursor_move(struct gf4_ctx *ctx,u8 head,i32 x,i32 y)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
-    e->p[0]=ctx; e->a[0]=head; e->a[1]=(u32)x; e->a[2]=(u32)y;
-    return gf4_host_end(h,e);
-}
-int gf4_vblank_wait(struct gf4_ctx *ctx,u8 head,u32 after,u32 dl,u32 *seen)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_FENCE_WAIT);
-    e->p[0]=ctx; e->p[1]=seen; e->a[0]=head; e->a[1]=after; e->a[2]=dl;
-    if (!e->rc) { assert(head<GF4_HEADS && seen); *seen=h->irq.vblank[head]; }
-    return gf4_host_end(h,e);
-}
-int gf4_flip(struct gf4_ctx *ctx,u8 head,const struct gf3_surface *front,bool sync,u32 dl)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LOAD);
-    e->p[0]=ctx; e->p[1]=front; e->a[0]=head; e->a[1]=sync; e->a[2]=dl;
-    return gf4_host_end(h,e);
-}
-int gf4_gamma(struct gf4_ctx *ctx,u8 head,const u16 rgb[3][256])
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_LUT);
-    e->p[0]=ctx; e->p[1]=rgb; e->a[0]=head;
-    return gf4_host_end(h,e);
-}
-int gf4_dpms_set(struct gf4_ctx *ctx,u8 head,enum gf4_dpms dpms,u32 dl)
+i32 gf4_blank_set(struct gf4_ctx *ctx,u8 head,bool blank,u32 dl)
 {
     struct gf4_host *h=gf4_host_current;
     struct gf4_host_event *e=gf4_host_begin(h,D_DPMS);
-    e->p[0]=ctx; e->a[0]=head; e->a[1]=dpms; e->a[2]=dl;
-    return gf4_host_end(h,e);
-}
-i32 gf4_display_save(struct gf4_ctx *ctx,struct gf4_saved *out,u32 dl)
-{
-    struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_SAVE);
-    e->p[0]=ctx; e->p[1]=out; e->a[0]=dl;
+    e->p[0]=ctx; e->a[0]=head; e->a[1]=blank; e->a[2]=dl;
     if (!e->rc) {
-        assert(ctx && ctx->state && ctx->ch && ctx->ch->f && out);
-        struct gf4_saved saved={.version=GF4_SAVED_VERSION,.size=sizeof(saved),
-            .wanted_fifo=ctx->ch->f->wanted_fifo,.wanted_graph=ctx->ch->f->wanted_graph,
-            .wanted_heads=ctx->ch->f->wanted_heads};
-        gf2_host_memcpy(saved.head,ctx->state->head,sizeof(saved.head));
-        gf2_host_memcpy(saved.hold,ctx->hold,sizeof(saved.hold));
-        *out=saved;
+        assert(ctx && ctx->state && head<GF4_HEADS);
+        struct gf4_head_image *image=ctx->changing ? ctx->state->next : ctx->state->head;
+        image[head].blank=blank;
     }
     return gf4_host_end(h,e);
 }
-i32 gf4_display_restore(struct gf4_ctx *ctx,const struct gf4_saved *saved,u32 dl)
+i32 gf4_flip_complete(struct gf4_ctx *ctx,u8 head,u32 dl)
 {
     struct gf4_host *h=gf4_host_current;
-    struct gf4_host_event *e=gf4_host_begin(h,D_RESTORE);
-    e->p[0]=ctx; e->p[1]=saved; e->a[0]=dl;
+    struct gf4_host_event *e=gf4_host_begin(h,D_FLIP_COMPLETE);
+    e->p[0]=ctx; e->a[0]=head; e->a[1]=dl;
     if (!e->rc) {
-        assert(ctx && ctx->state && ctx->ch && ctx->ch->f && saved);
-        gf2_host_memcpy(ctx->state->head,saved->head,sizeof(saved->head));
-        gf2_host_memcpy(ctx->hold,saved->hold,sizeof(saved->hold));
-        ctx->ch->f->wanted_fifo=saved->wanted_fifo;
-        ctx->ch->f->wanted_graph=saved->wanted_graph;
-        ctx->ch->f->wanted_heads=saved->wanted_heads;
+        assert(ctx && ctx->state && head<GF4_HEADS);
+        struct gf4_flip_hold *hold=&ctx->hold[head];
+        if (hold->pending) {
+            /* A seeded successful completion confirms the new face.
+             * Failure injection leaves both faces and pending untouched. */
+            ctx->state->head[head].front=hold->new_front;
+            hold->base_verified=true; hold->pending=false;
+        }
     }
+    return gf4_host_end(h,e);
+}
+#endif
+#if GF4_HOST_UNIT == 5 || GF4_HOST_UNIT == 13
+i32 gf4_cursor_apply(struct gf4_ctx *ctx,u8 head,bool visible)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_CURSOR_APPLY);
+    e->p[0]=ctx; e->a[0]=head; e->a[1]=visible;
+    if (!e->rc) {
+        assert(ctx && ctx->state && head<GF4_HEADS);
+        const struct gf4_head_image *image=ctx->changing ? ctx->state->next : ctx->state->head;
+        if (visible && (!image[head].enabled || image[head].dpms!=GF4_ON ||
+            image[head].blank || !image[head].cursor_valid)) e->rc=GF4_ESTATE;
+    }
+    /* Physical visibility only: never overwrite cursor_visible demand. */
+    return gf4_host_end(h,e);
+}
+#endif
+#if GF4_HOST_UNIT == 5 || GF4_HOST_UNIT == 10 || GF4_HOST_UNIT == 11 || GF4_HOST_UNIT == 13
+i32 gf4_dac_set(struct gf4_ctx *ctx,const struct gf4_route *route,bool on)
+{
+    struct gf4_host *h=gf4_host_current;
+    struct gf4_host_event *e=gf4_host_begin(h,D_DAC);
+    e->p[0]=ctx; e->p[1]=route; e->a[0]=on;
     return gf4_host_end(h,e);
 }
 #endif
