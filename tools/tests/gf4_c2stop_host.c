@@ -1,6 +1,7 @@
 /* C2-service-stop, GF4 UNIT14: real F1/F2/F3/V0 and legacy display stop.
  * Reuse C1's integration hardware oracle, not fake service dependencies.
  * Link B4 and F4 service dependencies separately, as for gf_accel_c1_host.c.
+ * F4 service.c itself is included below; never link a second copy.
  * PM must first integrate C2-service-f3. No libc; entry _start.
  * Ordering oracle: MIT nouveau c03c1a1 nouveau_drm.c:944-988 (display,
  * idle/fence, objects). Local quiesce values are the PC-98 coexistence
@@ -8,6 +9,7 @@
 #include "../../include/io.h"
 #define irq_save() 0U
 #define irq_restore(flags) ((void)(flags))
+#define GF_PRODUCTION_MODULE
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 #define GF3_CINT_C2
@@ -16,6 +18,12 @@
 #define GF4_COMMAND_TEST_SOURCE "../../hwdev/gf/command_test.c"
 #endif
 #include GF4_COMMAND_TEST_SOURCE
+/* UNIT14 links real service dependencies; no gf4_service_stop stub.
+ * This TU becomes available when PM integrates C2-service. */
+#ifndef GF4_SERVICE_SOURCE
+#define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
+#endif
+#include GF4_SERVICE_SOURCE
 
 /* Callback failure is an existing owner boundary, not a fake F3 service
  * symbol. Distinct errors check that neither F4 nor F2 codes are rounded. */
@@ -178,6 +186,72 @@ static void failed_clock_cleanup(void)
         cint_no_resources();
     }
 }
+/* A running F3-only scan is a valid lower owner to stop. Keep F4 heads
+ * disabled here so this test isolates the video_stop dispatch from modeset.
+ * The F3-owned nodes are released explicitly after checking F4's result. */
+static struct gf4_ctx stop_ctx;
+static struct gf4_state stop_state;
+static struct gf4_host stop_host;
+/* One close/cleanup pass per stop, nouveau_drm.c:955-988. Retry adds a
+ * second entry; this count is independent of service implementation. */
+enum { STOP_PASSES_PER_ENTRY=1 };
+static u32 stop_deadline, stop_admissions;
+static i32 stop_admission(void *owner,bool open)
+{
+    assert(owner==&stop_ctx && !open);
+    assert(stop_ctx.deadline==stop_deadline);
+    ++stop_admissions;
+    return gf3_service_admission(cint_service,false);
+}
+static struct gf4_links stop_links;
+static void normal_clock_dispatch(void)
+{
+    const i32 results[]={0,CINT_RESTORE_FAILURE};
+    for (u32 i=0;i<sizeof(results)/sizeof(results[0]);++i) {
+        cint_reset(); cint_start();
+        gf2_host_memset(&stop_ctx,0,sizeof(stop_ctx));
+        gf2_host_memset(&stop_state,0,sizeof(stop_state));
+        gf4_host_init(&stop_host,&stop_state);
+        gf3_host_current=&cint_host;
+        stop_ctx.ch=&cint_prod.chan; stop_ctx.accel=&cint_prod.accel;
+        stop_ctx.state=&stop_state;
+        stop_links=stop_host.links;
+        stop_links.owner=&stop_ctx; stop_links.admission=stop_admission;
+        assert(!gf4_service_bind(&stop_ctx,&cint_prod.display,&stop_links));
+        assert(!gf3_service_owner_bind(cint_service,gf4_service_owner_table()));
+        stop_ctx.ready=true; stop_ctx.accepting=true;
+        stop_ctx.epoch=cint_prod.chan.epoch;
+        struct gf_vram_reservation scan=cint_service->scan_node.value;
+        cint_trace_clear();
+        stop_admissions=0; stop_deadline=cint_deadline();
+        cint_restore_rc=results[i];
+        /* The real service records dl and calls the real F3/F2/cleanup.
+         * A negative cleanup rc must pass through the video entry verbatim. */
+        assert(gf_display_stop(&cint_prod.display)==results[i]);
+        assert(stop_ctx.deadline==stop_deadline && stop_admissions==STOP_PASSES_PER_ENTRY);
+        assert(stop_ctx.last_rc==results[i]);
+        assert(cint_prod.chan.state==GF2_OFF && !stop_ctx.ready && !stop_ctx.accepting);
+        assert(cint_owner_stops==STOP_PASSES_PER_ENTRY &&
+               cint_restore_calls==STOP_PASSES_PER_ENTRY);
+        assert(cint_prod.display.display4==&stop_ctx && stop_ctx.legacy==&cint_prod.display);
+        assert(!gf2_host_memcmp(&scan,&cint_service->scan_node.value,sizeof(scan)));
+        cint_closed();
+        if (results[i]) {
+            assert(cint_prod.display.engaged);
+            assert(cint_prod.display.last_rc==results[i]);
+            /* Retry with a fresh entry deadline, retaining the same loans. */
+            cint_restore_rc=0; cint_restore_seen=false;
+            stop_deadline=cint_deadline();
+            assert(!gf_display_stop(&cint_prod.display));
+            assert(stop_ctx.deadline==stop_deadline && stop_admissions==STOP_PASSES_PER_ENTRY+STOP_PASSES_PER_ENTRY);
+        }
+        assert(!cint_prod.display.engaged && cint_prod.display.stop_ok);
+        /* Only the lower F3 fixture owns these nodes; F4 cannot free them. */
+        assert(!gf3_service_release(cint_service));
+        assert(!gf3_service_owner_bind(cint_service,0));
+        cint_no_resources();
+    }
+}
 void _start(void)
 {
     assert(gf_display_quiesce(0)==OS32_ERR_INVAL);
@@ -186,5 +260,6 @@ void _start(void)
     quiesce_first_error();
     quiesce_row_failures();
     failed_clock_cleanup();
+    normal_clock_dispatch();
     gf2_host_exit(0);
 }

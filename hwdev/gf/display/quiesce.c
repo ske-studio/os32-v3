@@ -26,7 +26,9 @@
 #include "../command.h"
 #include "../accel_service.h"
 #include "../quiesce_rows.h"
+#ifdef GF_PRODUCTION_MODULE
 #include "api.h"
+#endif
 /* Keep the first failing target/rc; later successful cleanup must not
  * overwrite it (docs/design/hwdev/gf/display/quiesce.md). */
 static void gf_stop_write(struct gf_display_context *c, u32 off, int *rc,
@@ -81,6 +83,9 @@ int gf_display_stop(void *v)
     struct gf3_service *s=ch ? gf3_service_get(ch) : 0;
     int first_rc=0, rc=0;
     bool clock_failed=false;
+    bool f4_owned=false;
+#ifdef GF_PRODUCTION_MODULE
+    f4_owned=c->display4!=0;
     if (c->display4) {
         u32 now;
         if (c->io.timing.clock_us &&
@@ -96,6 +101,7 @@ int gf_display_stop(void *v)
             if (rc && !(f && f->revoked)) goto fail;
         }
     }
+#endif
     bool closed=true;
     bool revoked=f && f->revoked;
     if (!c->engaged && !s && !clock_failed) return 0;
@@ -109,7 +115,7 @@ int gf_display_stop(void *v)
             if (!revoked) goto fail;
         }
         if (!c->engaged && ch->state==GF2_OFF) {
-            if (closed && ch->state==GF2_OFF && !c->display4) {
+            if (closed && ch->state==GF2_OFF && !f4_owned) {
                 rc=gf3_service_release(s);
                 if (rc && !first_rc) first_rc=rc;
             }
@@ -141,7 +147,7 @@ int gf_display_stop(void *v)
     /* Keep display cleanup pending across retries, independently of errors
      * from fini or a later reservation release. */
     if (!rc && closed && !clock_failed && (!ch || ch->state==GF2_OFF)) c->engaged=false;
-    if (!rc && s && closed && ch->state==GF2_OFF && !c->display4) {
+    if (!rc && s && closed && ch->state==GF2_OFF && !f4_owned) {
         int release_rc=gf3_service_release(s);
         if (release_rc) {rc=-1;if (!first_rc) first_rc=release_rc;}
     }
