@@ -13,6 +13,7 @@
 #define GF4_SAVED_VERSION 2U
 
 struct gf_display_context;
+struct gf_production;
 
 enum gf4_dpms { GF4_ON, GF4_STANDBY, GF4_SUSPEND, GF4_OFF };
 struct gf4_mode { u32 id; struct gf4_timing t; enum gf3_fmt fmt; u32 pitch; };
@@ -131,6 +132,10 @@ i32 gf4_scan_changed(void *owner,u8 head,const struct gf3_surface *front);
  * C3 passes it to gf3_service_owner_bind (X3, PM 2026-11-04). */
 struct gf3_service_owner;
 const struct gf3_service_owner *gf4_service_owner_table(void);
+/* C2-service owns one resident production ctx; C3 calls after owner_bind.
+ * C2-links supplies its resident callback table to this initial binding. */
+i32 gf4_service_init(struct gf_production *,struct gf_display_context *legacy);
+const struct gf4_links *gf4_links_table(void);
 i32 gf4_service_bind(struct gf4_ctx *,struct gf_display_context *,const struct gf4_links *);
 i32 gf4_service_start(struct gf4_ctx *,u32 dl);
 i32 gf4_service_stop(struct gf4_ctx *,u32 dl);
