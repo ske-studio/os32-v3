@@ -6,7 +6,7 @@
 型付き facade を含む VA0 ELF → 現行 VK32 と対の KMOD → 実 GNU11 ILP32
 validator/relocator を qemu-i386 で通す。生成器の 29 import の型・版・通常文脈/
 IRQ不可の情報と provider 型を照合し、静的 pool 除去 (pool は外部を指す 4 B)、
-local memcpy/memset、libgcc member 台帳、世代・CRC・prefix/body を確認する。
+local memcpy/memset・divdi3、libgcc member 台帳が空であること、世代・CRC・prefix/body を確認する。
 
 ① 実リンク ELF の未解決 symbol・外部 data (SHN_ABS)・不支持 reloc を拒否。
 ② 非整列/隣接/最後の4Bは成功。末尾−2/BSS/整列余白/重複/部分重複/import交差は

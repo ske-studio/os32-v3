@@ -45,7 +45,7 @@ C_KERNEL = \
     exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
-    $(KSTRING_C_SRC) \
+    lib/divdi3.c $(KSTRING_C_SRC) \
     drivers/video/pc98/splash_raster.c \
     drivers/video/pc98/splash_raster_image.c
 
@@ -102,7 +102,7 @@ $(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py
 .FORCE:
 
 $(BUILD_OUT)/kernel.elf: $(BUILD_OUT)/os32.ld $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
-	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) -lgcc
+	$(LD) $(LDFLAGS) -o $@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ)
 
 $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
@@ -232,7 +232,7 @@ $(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(R1_OBJ)/\1@g' $< > $@
 
 $(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(R1_OUT)/os32.ld
-	$(LD) $(filter-out -Map=% -T $(BUILD_OUT)/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS) -lgcc
+	$(LD) $(filter-out -Map=% -T $(BUILD_OUT)/os32.ld,$(LDFLAGS)) -T $(R1_OUT)/os32.ld -Map=$(R1_OUT)/kernel.map -o $@ $(R1_OBJECTS)
 
 $(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@

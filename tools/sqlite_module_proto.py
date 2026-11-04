@@ -27,13 +27,13 @@ def measure(directory, vmkernel):
     # ld's archive inclusion preamble records every actually selected member.
     link_map = (directory / 'sqlite.map').read_text()
     stats['libgcc_members'] = sorted(set(re.findall(r'libgcc\.a\(([^)]+)\)', link_map)))
-    if not stats['libgcc_members']:
-        raise ValueError('missing explicit libgcc member ledger')
+    if re.search(r'libgcc(?:_eh)?\.a(?:\(|\b)', link_map):
+        raise ValueError('forbidden libgcc input in SQLite module')
     stats['sqlite_version'] = re.search(r'#define SQLITE_VERSION\s+"([^"]+)"',
                                        (ROOT / 'lib/sqlite3/sqlite3.c').read_text())[1]
     stats['elf_sha256'] = hashlib.sha256(elf).hexdigest()
     stats['pool_in_body'] = False
-    stats['configuration'] = 'full amalgamation; GNU89 -Os; product config; local kstring/kmath; external 512KiB pool; no stack in body'
+    stats['configuration'] = 'full amalgamation; GNU89 -Os; product config; local kstring/kmath/divdi3; external 512KiB pool; no stack in body'
     (directory / 'measurements.json').write_text(json.dumps(stats, indent=2) + '\n')
     print(json.dumps(stats, ensure_ascii=False, indent=2))
     return image, stats

@@ -14,7 +14,7 @@ $(V86_OUT)/v86_import_slots.o $(V86_OUT)/v86_provider_types.o $(V86_OUT)/v86_kex
 $(V86_OUT)/v86_import_stubs.o: $(V86_OUT)/v86_import_stubs.S build/config.mk build/v86-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(V86_OUT)/v86.elf: $(V86_OBJS) build/v86-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/v86-module.ld -Map=$(V86_OUT)/v86.map $(V86_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/v86-module.ld -Map=$(V86_OUT)/v86.map $(V86_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(V86_OUT)/v86_kexports.o

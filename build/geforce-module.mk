@@ -26,7 +26,7 @@ $(GEFORCE_OUT)/geforce_import_slots.o $(GEFORCE_OUT)/geforce_provider_types.o $(
 $(GEFORCE_OUT)/geforce_import_stubs.o: $(GEFORCE_OUT)/geforce_import_stubs.S build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(GEFORCE_OUT)/geforce.elf: $(GEFORCE_OBJS) build/geforce-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GEFORCE_OUT)/geforce.map $(GEFORCE_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GEFORCE_OUT)/geforce.map $(GEFORCE_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(GEFORCE_OUT)/geforce_kexports.o
@@ -95,7 +95,7 @@ $(GFA_OUT)/gf_accept.o: $(BUILD_OUT)/vmkernel.lz4
 $(GFA_OUT)/%.o: drivers/video/geforce/%.c $(GEFORCE_GEN) $(GFA_OUT)/build-id build/config.mk build/geforce-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_GEFORCE_MODULE $(GFA_FLAGS) $(GEFORCE_INC) -c $< -o $@
 $(GFA_OUT)/geforce.elf: $(GFA_OBJS) build/geforce-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GFA_OUT)/geforce.map $(GFA_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/geforce-module.ld -Map=$(GFA_OUT)/geforce.map $(GFA_OBJS) -o $@
 $(GFA_OUT)/geforce.mod: $(GFA_OUT)/geforce.elf $(GEFORCE_OUT)/geforce_imports.json $(GEFORCE_OUT)/geforce_provider_types.o $(BUILD_OUT)/vmkernel.lz4 tools/mkmod.py tools/module_schema.py sdk/kapi.json
 	python3 tools/mkmod.py --module-id 12 --elf $(GFA_OUT)/geforce.elf --metadata $(GEFORCE_OUT)/geforce_imports.json --vmkernel $(BUILD_OUT)/vmkernel.lz4 --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@
 .PHONY: geforce-accept
