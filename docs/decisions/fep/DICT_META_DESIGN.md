@@ -327,7 +327,7 @@ int ime_dict_info_facade(int key, int offset, char *out, int capacity);
 int ime_meta_read(int key, int offset, char *out, int capacity);
 ```
 facade は既存 ime_user_list_facade の caller_access_get/check_caller_write_range/copy_to_caller を踏襲。SQL 前に全 capacity を検査、終了後に n+1 byte を再検査してコピー。
-meta 読取は system 接続だけで既知キーをバインドし、長文は `substr(CAST(value AS BLOB),offset+1,capacity-1)` で取得。offset>=byte長なら SQL の offset+1 を計算せず EOF。
+meta 読取は system 接続だけで既知キーをバインドし、長文は確定 A3 のとおり C の側で byte を切る。
 SQLite の結果は step/reset/finalize 前に staging にコピーし、finalize 後に呼出元へ渡す。SQL失敗を EOF に丸めず、接続失効は SQL 前に検査。原文の常駐コピー・追加接続は作らない。
 FepModuleApi は20→21スロット、FEP_MODULE_OPS_VERSION は1→2、fep_body.c・core stub（NOSYS）・ロード検査の契約を同期し、旧部品を混用しない。
 現行 sdk/kapi.json は v79・255本。追加が先行しなければ v80/slot255。実装時に §3-2 と末尾を再確認し、KAPI_VERSION・関数表・依存 app.conf も更新する。
@@ -345,7 +345,7 @@ NP21/W：停止→NHD配備→再起動後、実CPL3から256B分割し原文と
 ### 確定 (2026-11-05、Opus 第 1 回の条件付き承認、PM が反映)
 - A1: **20 キー** (ユーザー決定 2026-11-05「20」)。確定設計 DICT_META_DESIGN §5 の 4 キー (license・attribution・entry_count・status) を §2 の全欄の 20 キーに広げる。同じ SQL でキー名を引くだけで、後で版を上げずに済む。
 - A2: SQL の後のコピー前の再検査と、それを狙う変異を削除。copy_to_caller は 1 回だけ。最初の検査で n+1 ≤ capacity が成り立つ (シングルタスクで途中に yield が無い、手本 kernel/ime/ime_dict_api.inc:30 も 1 回)。
-- A3 (PM 決定): `SELECT length(CAST(value AS BLOB))` を先に引き、offset < len のときだけ substr に `(i64)offset+1` を bind_int64 で渡す (offset=INT_MAX の桁あふれを避ける)。
+- A3 (PM 決定、2026-11-05 実装で書き換え): SQL では byte を切らない (製品の SQLite は `SQLITE_OMIT_CAST`、outer facade に bind_int64 が無い)。`SELECT value FROM meta WHERE key = ?` を 1 回 step し、`sqlite3_column_blob` と `sqlite3_column_bytes` で byte の長さ len を取り、`offset < len` のときだけ C の側で [offset, offset + min(len - offset, capacity - 1)) を staging に写してから finalize する。offset >= len (INT_MAX を含む) は EOF。§5 の substr の文はこれで置き換える。
 - A4 (PM 決定): この口は dict_ready を呼ばない。vfs_fd_is_stale だけで STALE を返し、STATUS キーも STALE を返す (既存の ime_user_* と違い、開き直さない)。
 - A5 (PM 決定): v80 で一緒に入る 3 本 (STOP の宛先・gfx_osri_show・この口) の slot の並びは PM が統合の段で決める。
 - A6 (PM 決定): capacity が 256 を超えたら 256 として扱う (INVAL にしない)。
