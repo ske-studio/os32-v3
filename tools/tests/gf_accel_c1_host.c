@@ -295,8 +295,10 @@ int tick_register(unsigned slot, tick_fn fn)
     assert(slot == PC98_TICK_GF && fn == geforce_tick);
     return 0;
 }
+#ifndef GF_OBJWAIT_SERIAL
 int serial_gate_active(void) { return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
+#endif
 
 static int cint_map(void *owner, const struct recover_bar_extent *bar,
                     u32 bytes, volatile u8 **out)
