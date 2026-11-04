@@ -185,8 +185,9 @@ COMPONENTS = (
          module_id=12, phase=CONSTANTS['PHASE_POST_ROOT'],
          required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
          stop_allowed=0, ops_version=5, ops_slots=1,
-         # GF_FEAT4_DESIGN §11 C3 combined budget: 160/160/208 KiB.
-         image_max=160 * 1024, mem_max=160 * 1024, load_span_max=208 * 1024,
+         # GF layer 5 integration (2026-11-04): measured mem end 181,044 B > 160 KiB;
+         # no physical limit (pgalloc, no fixed band), widened like HWDEV: 256/256/320 KiB.
+         image_max=256 * 1024, mem_max=256 * 1024, load_span_max=320 * 1024,
          reloc_max=8192, export_max=1,
          init_symbol='geforce_module_init', imports_symbol='geforce_import_slots',
          ops_symbol='geforce_module_ops', ops_names=('initialize',)),
