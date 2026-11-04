@@ -1,0 +1,335 @@
+/* HW_BASIC_DESIGN §§2,3,7: real parser/logger/executor, only backend is fake. */
+#include "hwb_fake.h"
+#include "userland/shell/hwb_parse.c"
+#include "userland/shell/hwb_log.c"
+#include "userland/shell/hwb_exec.c"
+
+static struct hwb_fake f;
+static struct hwb_state s;
+static struct hwb_program programs[2];
+static char sources[2][HWB_FILE_BYTES];
+static u32 which;
+/* Independent fixture addresses: intentionally absent from any product table. */
+#define TEST_PHYS 0x34567000UL
+#define TEST_PORT 0x715U
+#define TEST_BDF HW_BDF(7,13,2)
+#define TRIDENT_BASE 0x20400000UL
+#define TRIDENT_FAC 0xFACU
+static u32 length(const char *p) { u32 n = 0; while (p[n]) n++; return n; }
+static void setup(void) { hwbf_init(&f); hwb_init(&s, &f.backend); which = 0; }
+static enum hwb_rc load(const char *text, const struct hwb_initial *args, u32 count)
+{
+    f.file_count = 0; hwbf_add_file(&f, "script", text, length(text));
+    which = s.program == &programs[0] ? 1U : 0U;
+    return hwb_load(&s, &programs[which], sources[which], sizeof(sources[which]), "script", args, count);
+}
+static enum hwb_rc run(const char *text)
+{
+    enum hwb_rc rc = load(text, 0, 0); return rc ? rc : hwb_continue(&s);
+}
+static u32 scalar(const char *name)
+{
+    for (u32 n = 0; n < s.var_count; n++) if (hwbf_equal(name, s.vars[n].name)) return s.vars[n].value;
+    CHECK(0); return 0;
+}
+static u32 count_access(u32 space, u32 action)
+{
+    u32 count = 0;
+    for (u32 n = 0; n < f.event_count; n++) if (f.events[n].kind == HWBF_ACCESS &&
+        f.events[n].req.space == space && f.events[n].req.action == action) count++;
+    return count;
+}
+static int contains(const char *p, const char *q)
+{
+    for (; *p; p++) { u32 n = 0; while (q[n] && p[n] == q[n]) n++; if (!q[n]) return 1; }
+    return 0;
+}
+static void fresh_addresses(void)
+{
+    HWB_TEST("fresh-addresses"); setup();
+    const char *a = "device d = bdf 7:13.2\npciwrite8 d 0x41 0xA5\niowrite8 port 0x715 0x6B\nmmiowrite32 phys 0x34567000 0x12345678\nend";
+    const char *b = "device d = bdf 11:29.6\npciwrite16 d 0x42 0x789A\niowrite16 port 0x927 0xBCDE\nmmiowrite8 phys 0x45678003 0xEF";
+    CHECK(run(a) == HWB_OK && s.writes == 3);
+    CHECK(*hwbf_byte(&f, HW_PHYS, TEST_PHYS) == 0x78);
+    CHECK(*hwbf_byte(&f, HW_IO, TEST_PORT) == 0x6B);
+    CHECK(f.events[0].kind == HWBF_FILE);
+    int found = 0;
+    for (u32 n = 0; n < f.event_count; n++) if (f.events[n].kind == HWBF_ACCESS &&
+        f.events[n].req.bdf == TEST_BDF && f.events[n].req.value == 0xA5) found = 1;
+    CHECK(found);
+    hwbf_clear_trace(&f);
+    CHECK(run(b) == HWB_OK && s.writes == 3);
+    CHECK(*hwbf_byte(&f, HW_IO, 0x927) == 0xDE && *hwbf_byte(&f, HW_IO, 0x928) == 0xBC);
+    CHECK(*hwbf_byte(&f, HW_PHYS, 0x45678003) == 0xEF);
+    CHECK(contains(f.lines[0], "seq=1 "));
+    CHECK(contains(f.lines[f.line_count-1], "writes=3"));
+}
+static void widths(void)
+{
+    HWB_TEST("widths-rmw"); setup();
+    struct hwbf_pci *p = hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+    p->config[4] = 0xA0; p->config[5] = 0xA1; p->config[6] = 0xFF; p->config[7] = 0xFF;
+    CHECK(run("device d = bdf 7:13.2\npciread8 d 4 -> t\nlet t = t | 3\npciwrite8 d 4 t\npciwrite16 d 4 0x1234\npciread16 d 4 -> x") == HWB_OK);
+    CHECK(p->config[4] == 0x34 && p->config[5] == 0x12 && p->config[6] == 0xFF && p->config[7] == 0xFF);
+    CHECK(scalar("x") == 0x1234 && count_access(HW_PCI, HW_READ) == 2);
+    u32 actions[4] = {HW_READ,HW_WRITE,HW_WRITE,HW_READ}, widths[4] = {1,1,2,2}, k = 0;
+    for (u32 n = 0; n < f.event_count; n++) if (f.events[n].kind == HWBF_ACCESS) {
+        CHECK(k < 4 && f.events[n].req.action == actions[k] && f.events[n].req.width == widths[k]);
+        k++;
+        CHECK(n && f.events[n-1].kind == HWBF_LINE && contains(f.lines[f.events[n-1].a], "phase=begin"));
+    }
+    CHECK(k == 4);
+}
+static void write_only(void)
+{
+    HWB_TEST("write-only"); setup();
+    hwbf_add_register(&f, HW_PHYS, 0, TEST_PHYS, 4, 1);
+    CHECK(run("mmiowrite32 phys 0x34567000 0xAABBCCDD") == HWB_OK);
+    CHECK(count_access(HW_PHYS, HW_READ) == 0 && s.writes == 1);
+}
+static void bad_args(void)
+{
+    HWB_TEST("boundary"); setup();
+    CHECK(run("iowrite32 port 65534 0\niowrite8 port 1 1") == HWB_ARG);
+    CHECK(f.accesses == 0 && s.writes == 0 && s.stopped);
+    u32 pc = s.pc, points = f.points;
+    CHECK(hwb_step(&s) == HWB_ARG && hwb_continue(&s) == HWB_ARG && f.points == points && s.pc == pc);
+    const char *bad[] = {"mmiowrite32 phys 0xFFFFFFFE 0", "mmioread16 phys 1 -> x",
+        "device d = bdf 0:0.0\npciread32 d 254 -> x", "iowrite8 port 4 256",
+        "wait us 0", "wait us 10000001", "let x = 0xFFFFFFFF + 1", "let x = missing",
+        "poll 8 port 1 0xFF 1 5 0 -> x", "poll 8 port 1 1 2 5 1 -> x",
+        "poll 8 port 1 256 0 5 1 -> x", "return", "call loop\nend\nlabel loop\ncall loop\nreturn"};
+    for (u32 n = 0; n < sizeof(bad)/sizeof(bad[0]); n++) {
+        hwbf_clear_trace(&f); CHECK(run(bad[n]) == HWB_ARG); CHECK(s.writes == 0);
+    }
+    CHECK(s.call_depth == HWB_CALL_DEPTH);
+}
+static void failures(void)
+{
+    HWB_TEST("failures"); setup(); f.access_fail_at = 2;
+    CHECK(run("iowrite8 port 1 1\niowrite8 port 2 2\niowrite8 port 3 3") == HWB_IO);
+    CHECK(f.accesses == 2 && s.writes == 1 && *hwbf_byte(&f, HW_IO, 3) == 0);
+    setup(); f.status_fail_at = 1; f.failure_status = HW_WINDOW;
+    CHECK(run("mmioread8 phys 0 -> x\niowrite8 port 3 3") == HWB_WINDOW && s.writes == 0);
+    setup(); f.mechanism = 0;
+    CHECK(run("device d = bdf 0:0.0\npciread32 d 0 -> x\niowrite8 port 3 3") == HWB_NOSYS);
+    CHECK(hwb_exit_status(s.rc) == 3 && s.writes == 0);
+    setup(); f.clock_fail_at = 1;
+    CHECK(run("wait us 1\niowrite8 port 3 3") == HWB_IO && s.writes == 0);
+    setup(); f.now_lo = 100; f.tick_us = 1; f.reverse_clock = 1;
+    CHECK(run("wait us 2\niowrite8 port 3 3") == HWB_IO && s.writes == 0);
+}
+/* Million-iteration tests keep counters, discarding only old observation events. */
+static void bounded_yield(void *ctx) { hwbf_yield(ctx); ((struct hwb_fake *)ctx)->event_count = 0; }
+static void clocks(void)
+{
+    HWB_TEST("clock-wrap"); setup(); f.now_lo = U32_MAX - 2U; f.tick_us = 2;
+    CHECK(run("wait us 6\niowrite8 port 3 3") == HWB_OK && s.writes == 1);
+    CHECK(f.now_hi == 1 && f.yields == 2);
+}
+static int jumping_time(void *ctx, u32 *lo, u32 *hi)
+{
+    struct hwb_fake *fake = ctx; *lo = 0; *hi = fake->times++; return 0;
+}
+static void deadlines(void)
+{
+    HWB_TEST("clock-high-difference"); setup(); f.backend.time_now = jumping_time; f.backend.yield = bounded_yield;
+    CHECK(run("wait us 10") == HWB_OK && f.times == 2 && f.yields == 0);
+    HWB_TEST("frozen-clock"); setup(); f.backend.yield = bounded_yield;
+    CHECK(run("wait us 1\niowrite8 port 3 3") == HWB_TIMEOUT && s.writes == 0);
+    CHECK(f.yields == HWB_ITERATIONS);
+    HWB_TEST("poll-timeout"); setup(); f.tick_us = 2;
+    CHECK(run("poll 8 port 1 255 1 10 2 -> x\niowrite8 port 3 3") == HWB_TIMEOUT);
+    CHECK(s.writes == 0 && count_access(HW_IO, HW_READ) == 4 && scalar("x") == 0);
+    setup(); *hwbf_byte(&f, HW_IO, 1) = 1; f.tick_us = 1;
+    CHECK(run("poll 8 port 1 255 1 10 2 -> x") == HWB_OK);
+    CHECK(count_access(HW_IO, HW_READ) == 1 && scalar("x") == 1);
+    setup(); f.backend.yield = bounded_yield;
+    CHECK(run("poll 8 port 1 255 1 10 2 -> x") == HWB_TIMEOUT);
+    CHECK(f.accesses == 1 && f.yields == HWB_ITERATIONS);
+}
+static void aborts(void)
+{
+    HWB_TEST("instruction-point"); setup(); f.point_at = 2;
+    CHECK(run("iowrite8 port 1 1\niowrite8 port 2 2") == HWB_ABORT && s.writes == 0);
+    CHECK(hwb_exit_status(s.rc) == 130);
+    f.point_at = 0; f.pending_abort = 1; hwbf_clear_trace(&f);
+    CHECK(run("iowrite8 port 1 1") == HWB_OK && s.writes == 1);
+    setup(); f.point_at = 5;
+    CHECK(run("label loop\ngoto loop\niowrite8 port 1 1") == HWB_ABORT && s.writes == 0);
+    setup(); f.point_at = 4;
+    CHECK(run("wait us 10\niowrite8 port 1 1") == HWB_ABORT && s.writes == 0);
+    setup(); f.point_at = 4;
+    CHECK(run("poll 8 port 1 255 1 10 2 -> x\niowrite8 port 1 1") == HWB_ABORT && f.accesses == 0);
+    setup(); CHECK(load("let x = 4\niowrite8 port 1 x", 0, 0) == HWB_OK);
+    CHECK(hwb_step(&s) == HWB_OK && scalar("x") == 4 && !s.stopped);
+    hwb_abort(&s); u32 lines = f.line_count; hwb_abort(&s);
+    CHECK(hwb_continue(&s) == HWB_ABORT && s.writes == 0 && lines == f.line_count);
+}
+static void sessions(void)
+{
+    HWB_TEST("sessions"); setup();
+    CHECK(load("let x = mode\niowrite8 port 1 x", 0, 0) == HWB_OK);
+    CHECK(scalar("mode") == 0 && s.seq == 0 && !s.writes);
+    CHECK(hwb_step(&s) == HWB_OK && scalar("x") == 0);
+    const struct hwb_program *old = s.program; u32 pc = s.pc;
+    CHECK(load("bad", 0, 0) == HWB_ARG && s.program == old && s.pc == pc && scalar("x") == 0);
+    CHECK(hwb_command(&s, "let x = 7", 9) == HWB_OK && s.pc == pc && s.program == old);
+    CHECK(hwb_continue(&s) == HWB_OK && *hwbf_byte(&f, HW_IO, 1) == 7);
+    hwb_reset(&s); CHECK(!s.var_count && s.program == old);
+    struct hwb_initial args[] = {{"mode",2},{"custom",3}};
+    CHECK(load("let x = mode", args, 2) == HWB_OK && scalar("mode") == 2);
+    CHECK(hwb_continue(&s) == HWB_OK && scalar("x") == 2);
+}
+static void bars(void)
+{
+    HWB_TEST("bars"); setup();
+    struct hwbf_pci *p = hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+    /* BAR0 memory, BAR1 I/O, BAR2/3 64-bit memory, BAR4 memory zero base. */
+    p->config[0x12] = 0x50; p->config[0x14] = 0x01; p->config[0x15] = 0x07;
+    p->config[0x18] = 4; p->config[0x1B] = 0x20;
+    CHECK(run("device d = bdf 7:13.2\nwindow v = bar d 0\nmmiowrite8 v + 3 4\npciwrite32 d 0x10 0x600000\nmmiowrite8 v + 3 5\niowrite8 bar d 1 + 2 6\nmmiowrite32 bar d 2 + 0 7\nmmiowrite8 bar d 4 + 0 8") == HWB_OK);
+    CHECK(*hwbf_byte(&f, HW_PHYS, 0x500003) == 4 && *hwbf_byte(&f, HW_PHYS, 0x600003) == 5);
+    CHECK(*hwbf_byte(&f, HW_IO, 0x702) == 6 && *hwbf_byte(&f, HW_PHYS, 0) == 8);
+    const char *bad[] = {"mmioread8 bar d 1 + 0 -> x", "ioread8 bar d 0 + 0 -> x",
+        "mmioread8 bar d 3 + 0 -> x", "mmioread8 bar d 6 + 0 -> x"};
+    for (u32 n = 0; n < sizeof(bad)/sizeof(bad[0]); n++) {
+        CHECK(hwb_command(&s, bad[n], length(bad[n])) == HWB_ARG);
+    }
+    p->config[0x1C] = 1;
+    CHECK(hwb_command(&s, "mmioread8 bar d 2 + 0 -> x", length("mmioread8 bar d 2 + 0 -> x")) == HWB_ARG);
+    p->config[0x0E] = 1;
+    CHECK(hwb_command(&s, "mmioread8 bar d 2 + 0 -> x", length("mmioread8 bar d 2 + 0 -> x")) == HWB_ARG);
+    p->config[0x0E] = 2;
+    CHECK(hwb_command(&s, "mmioread8 bar d 0 + 0 -> x", length("mmioread8 bar d 0 + 0 -> x")) == HWB_ARG);
+}
+static void ids(void)
+{
+    HWB_TEST("ids"); setup();
+    hwbf_add_pci(&f, TEST_BDF, 0xABCD, 0x1234);
+    CHECK(run("device d = id ABCD:1234\npciread16 d 0 -> v") == HWB_OK && scalar("v") == 0xABCD);
+    hwbf_add_pci(&f, HW_BDF(1,1,1), 0xABCD, 0x1234);
+    CHECK(run("device d = id ABCD:1234\niowrite8 port 1 1") == HWB_ARG && s.writes == 0);
+    u32 candidates = 0;
+    for (u32 n = 0; n < f.line_count; n++) if (contains(f.lines[n], "candidate bdf=")) {
+        CHECK(contains(f.lines[n], "0x07:0x0D.2") || contains(f.lines[n], "0x01:0x01.1"));
+        candidates++;
+    }
+    CHECK(candidates == 2);
+    CHECK(run("device d = id 9999:8888") == HWB_ARG);
+}
+/* Exact design §8 text; the separate trident stage owns Protect expansion. */
+static const char trident[] =
+    "# /test/hw/trident.hwb \u2014 vgaHWProtect\u672a\u5c55\u958b\u306e\u8abf\u67fb\u7528\u8ee2\u8a18\n"
+    " device d = bdf 0:8.0\n"
+    " window v = bar d 1\n"
+    " if mode == 1 goto enable\n"
+    " if mode == 2 goto disable\n"
+    " mmiowrite8 v + 0x3C4 0x09\n"
+    " mmioread8 v + 0x3C5 -> chip\n"
+    " print \"SR09\" chip\n"
+    " end\n"
+    " label enable\n"
+    " iowrite8 port 0x68 0x0E\n"
+    " iowrite8 port 0x6A 0x07\n"
+    " iowrite8 port 0x6A 0x8F\n"
+    " iowrite8 port 0x6A 0x06\n"
+    " # \u5143\u30bd\u30fc\u30b9704: vgaHWProtect(TRUE) \u5c55\u958b\u4f4d\u7f6e\n"
+    " mmiowrite8 v + 0x3D4 0x23\n"
+    " mmioread8 v + 0x3D5 -> t\n"
+    " mmiowrite16 v + 0x3D4 0x23 | ((t & 0xDF) << 8)\n"
+    " mmiowrite8 v + 0x3D4 0x29\n"
+    " mmioread8 v + 0x3D5 -> t\n"
+    " mmiowrite16 v + 0x3D4 0x29 | ((t | 4) << 8)\n"
+    " let mask = 0xFF\n"
+    " let bits = 6\n"
+    " call dac\n"
+    " let bits = 8\n"
+    " call dac\n"
+    " mmiowrite8 v + 0x3CE 0x23\n"
+    " mmioread8 v + 0x3CF -> t\n"
+    " mmiowrite16 v + 0x3CE 0x23 | ((t & 0xFC) << 8)\n"
+    " let bits = 1\n"
+    " call dac\n"
+    " mmiowrite8 v + 0x3C4 1\n"
+    " mmioread8 v + 0x3C5 -> t\n"
+    " mmiowrite16 v + 0x3C4 1 | ((t & 0xEF) << 8)\n"
+    " # \u5143\u30bd\u30fc\u30b9727: vgaHWProtect(FALSE) \u5c55\u958b\u4f4d\u7f6e\n"
+    " iowrite8 port 0xFAC 2\n"
+    " end\n"
+    " label disable\n"
+    " iowrite8 port 0xFAC 0\n"
+    " # \u5143\u30bd\u30fc\u30b9740: vgaHWProtect(TRUE) \u5c55\u958b\u4f4d\u7f6e\n"
+    " mmiowrite8 v + 0x3C4 1\n"
+    " mmioread8 v + 0x3C5 -> t\n"
+    " mmiowrite16 v + 0x3C4 1 | ((t | 0x10) << 8)\n"
+    " let bits = 0\n"
+    " let mask = 0xFE\n"
+    " call dac\n"
+    " mmiowrite8 v + 0x3CE 0x23\n"
+    " mmioread8 v + 0x3CF -> t\n"
+    " mmiowrite16 v + 0x3CE 0x23 | (((t & 0xFC) | 1) << 8)\n"
+    " let mask = 0xFD\n"
+    " call dac\n"
+    " let mask = 0xCF\n"
+    " call dac\n"
+    " let mask = 0xF7\n"
+    " call dac\n"
+    " let mask = 0xFB\n"
+    " call dac\n"
+    " mmiowrite8 v + 0x3D4 0x29\n"
+    " mmioread8 v + 0x3D5 -> t\n"
+    " mmiowrite16 v + 0x3D4 0x29 | ((t & 0xFB) << 8)\n"
+    " mmiowrite8 v + 0x3D4 0x23\n"
+    " mmioread8 v + 0x3D5 -> t\n"
+    " mmiowrite16 v + 0x3D4 0x23 | ((t | 0x20) << 8)\n"
+    " # \u5143\u30bd\u30fc\u30b9769: vgaHWProtect(FALSE) \u5c55\u958b\u4f4d\u7f6e\n"
+    " iowrite8 port 0x6A 0x07\n"
+    " iowrite8 port 0x6A 0x8E\n"
+    " iowrite8 port 0x6A 0x06\n"
+    " iowrite8 port 0x68 0x0F\n"
+    " end\n"
+    " label dac\n"
+    " mmiowrite8 v + 0x83C8 4\n"
+    " mmioread8 v + 0x83C6 -> t\n"
+    " mmiowrite8 v + 0x83C8 4\n"
+    " mmiowrite8 v + 0x83C6 (t & mask) | bits\n"
+    " return\n"
+;
+static void trident_modes(void)
+{
+    HWB_TEST("trident-fac-order");
+    for (u32 mode = 0; mode < 3; mode++) {
+        setup(); struct hwbf_pci *p = hwbf_add_pci(&f, HW_BDF(0,8,0), 0x1023, 0x9660);
+        /* Design §8 fake BAR1=0x20400000; little-endian config bytes. */
+        p->config[0x16] = 0x40; p->config[0x17] = 0x20;
+        struct hwb_initial arg = {"mode",mode};
+        CHECK(load(trident, &arg, 1) == HWB_OK && hwb_continue(&s) == HWB_OK);
+        u32 first = U32_MAX, last = 0, fac = U32_MAX, fac_count = 0, writes = 0;
+        for (u32 n = 0; n < f.event_count; n++) {
+            struct hwbf_event *e = &f.events[n];
+            if (e->kind != HWBF_ACCESS || e->req.action != HW_WRITE || e->req.space == HW_PCI) continue;
+            if (first == U32_MAX) first = n;
+            last = n; writes++;
+            if (e->req.space == HW_IO && e->req.addr == TRIDENT_FAC) {
+                fac = n; fac_count++; CHECK(e->req.width == 1 && e->req.value == (mode == 1 ? 2U : 0U));
+            }
+        }
+        /* Independent counts from the §8 statement list, not executor calculations. */
+        CHECK(writes == (mode == 0 ? 1U : mode == 1 ? 22U : 28U));
+        CHECK(mode == 0 ? fac_count == 0 : fac_count == 1);
+        if (mode == 1) CHECK(fac == last);
+        if (mode == 2) CHECK(fac == first);
+    }
+}
+void _start(void)
+{
+    HWB_TEST("record-pairs"); setup();
+    CHECK(run("print \"value\" mode\nlog \"note\"") == HWB_OK);
+    CHECK(f.line_count == 5 && contains(f.lines[0], "phase=begin") &&
+          contains(f.lines[1], "phase=end") && contains(f.lines[2], "seq=2 ") &&
+          contains(f.lines[3], "phase=end"));
+    fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
+    deadlines(); aborts(); sessions(); bars(); ids(); trident_modes();
+    hwb_test_write("PASS hwb-exec\n"); hwb_test_exit(0);
+}
