@@ -11,11 +11,13 @@
 /*    pcm_test          5 秒鳴らし、1 秒ごとに pcm_status を出して close      */
 /*    pcm_test short    1 frame だけ書いて close (drain の最短経路)           */
 /*    pcm_test nodev    装置が無い機械で OS32_ERR_NOSYS が返ることの確認      */
+/*    pcm_test e4       専用診断像で共有 IRQ の 5 場面 (結果は serial)       */
 /*                                                                          */
 /*  [C1] C11 (GNU11)。main() は**このファイルの最初の関数**。                */
 /* ======================================================================== */
 
 #include "os32api.h"
+#include "../../drivers/sound/cs4231/pcm_e4_wire.h"
 
 #define PCM_RATE        44100
 #define PCM_SECONDS     5
@@ -45,6 +47,14 @@ int main(int argc, char **argv, KernelAPI *api)
 {
     int rc, failed = 0;
     u32 total;
+
+    /* Private diagnostic kernel entry; result and ordered evidence go serial. */
+    if (argc > 1 && argv[1][0] == 'e' && argv[1][1] == '4' && !argv[1][2]) {
+        if (api->version < PCM_E4_KAPI_MIN || !api->kdebug_call) return 1;
+        rc = api->kdebug_call(PCM_E4_OP_RUN, 0, 0);
+        api->kprintf(rc == 0 ? 0xC1 : 0x41, "pcm_e4 -> %d\n", rc);
+        return rc == 0 ? 0 : 1;
+    }
 
     if (api->version < PCM_MIN_API) {
         api->kprintf(0x41, "KAPI v%d < %d: pcm_* absent\n",
