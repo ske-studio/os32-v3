@@ -13,6 +13,17 @@ FIXTURE = 'tools/tests/pci_hwb_host.c'
 MUTATIONS = [
     ('write16-rmw', 'drivers/pci/pci_hwb.c', 'else if (width == 2) outpw(port, *value);',
      'else if (width == 2) { u32 old = inpd(PCI_CFG_DATA_PORT); outpd(PCI_CFG_DATA_PORT, (old & 0xffff0000u) | *value); }', 'w1c'),
+    ('write16-lane', 'drivers/pci/pci_hwb.c', 'else if (width == 2) outpw(port, *value);',
+     'else if (width == 2) outpw(PCI_CFG_DATA_PORT, *value);', 'write16-lane'),
+    # A crossing access in a 256-byte space is necessarily unaligned. Bypass
+    # both guards for that case to expose the boundary guard at runtime.
+    ('cross-boundary', 'drivers/pci/pci_hwb.c',
+     'width <= HW_PCI_CONFIG_BYTES - offset &&\n           !(offset & (width - 1))',
+     '(width > HW_PCI_CONFIG_BYTES - offset || !(offset & (width - 1)))', 'boundary'),
+    ('write-readback', 'drivers/pci/pci_hwb.c', 'if (width == 1) outp(port, *value);',
+     'if (width == 1) { outp(port, *value); (void)inp(port); }', 'write-only'),
+    ('reject-unregistered', 'drivers/pci/pci_hwb.c', 'if (!valid(bdf, offset, width) ||',
+     'if (bdf == HW_BDF(0x7e, 0x1d, 7) || !valid(bdf, offset, width) ||', 'unregistered'),
     ('restore-cf8', 'drivers/pci/pci_hwb.c', 'outpd(PCI_CFG_ADDR_PORT, saved);', '(void)saved;', 'read-lane'),
     ('read8-lane', 'drivers/pci/pci_hwb.c', '*value = inp(port);', '*value = inp(PCI_CFG_DATA_PORT);', 'read-lane'),
     ('no-mechanism', 'drivers/pci/pci_hwb.c', '? HW_OK : HW_NOSYS;', '? HW_OK : HW_OK;', 'absent'),
