@@ -217,6 +217,7 @@ void _start(void)
     struct gf3_service *service=gf3_service_get(&production.chan);
     CHECK(service && service->owner==gf4_service_owner_table());
     CHECK(production.display.display4);
+    CHECK(service->owner->owner==production.display.display4);
     CHECK(production.display.display4->legacy==&production.display);
     CHECK(production.display.display4->data==context.display_data);
     CHECK(production.display.display4->state==context.display_state);

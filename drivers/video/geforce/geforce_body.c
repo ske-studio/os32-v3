@@ -50,10 +50,12 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
      * No register sequence or source from that implementation is copied. */
     int rc=gf3_service_bind(&production, context->accel_out);
     if (rc) return rc;
+    /* C-group production ctx contract: init fills the owner table's ctx
+     * before F3 validates and borrows it (GF_FEAT4_DESIGN, final addendum). */
+    rc=gf4_service_init(&production, &production.display);
+    if (rc) return rc;
     rc=gf3_service_owner_bind(gf3_service_get(&production.chan),
                               gf4_service_owner_table());
-    if (rc) return rc;
-    rc=gf4_service_init(&production, &production.display);
     if (rc) return rc;
     *context->foundation_out=&gf1_module_ops;
     return 0;
