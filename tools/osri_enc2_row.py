@@ -128,6 +128,7 @@ class RowSearch:
             if np.array_equal(best_p, p):
                 break
             p = best_p
-            movable = np.flatnonzero(np.any(p != self.old, axis=1))
-            p = self.lloyd(p, movable)
-        return p
+        # C2 completes the tree exchanges before C4/C5 refine the changed set.
+        # A retained seed still gets Lloyd when no tree exchange improves it.
+        movable = np.flatnonzero(np.any(p != self.old, axis=1))
+        return self.lloyd(p, movable)

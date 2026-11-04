@@ -61,7 +61,8 @@ def compare(path, output_dir, cfg=Config(), row_start=1, row_count=399):
     scope = f'rows={row_start}:{row_start + row_count};full={row_count == 399}'
     for budget in BUDGETS:
         start = time.perf_counter()
-        palettes, orders, stats = plan(pixels, budget, cfg, prepared, active)
+        palettes, orders, stats = plan(pixels, budget, cfg, prepared, active,
+                                       trace_path=out / f'enc2-b{budget}.trace.jsonl')
         enc_seconds = time.perf_counter() - start
         print(json.dumps(dict(stage='plan', B=budget, **stats)), flush=True)
         start = time.perf_counter()
@@ -84,13 +85,14 @@ def compare(path, output_dir, cfg=Config(), row_start=1, row_count=399):
                     metrics_seconds = time.perf_counter() - start
                     start = time.perf_counter()
                     crc = ''
-                    if method == 'enc2' and dither and timed:
+                    if method in ('enc2', 'greedy-order') and dither and timed:
                         data = pack(p, order, ix, budget)
                         dp, do, di, _ = decode(data, budget)
                         assert np.array_equal(dp, p) and do == order and np.array_equal(di, ix)
-                        (out / f'enc2-b{budget}.osri').write_bytes(data)
+                        (out / f'{method}-b{budget}.osri').write_bytes(data)
                         crc = f'{struct.unpack_from("<I", data, 48)[0]:08x}'
-                        pictures.append(visible.astype(np.uint8))
+                        if method == 'enc2':
+                            pictures.append(visible.astype(np.uint8))
                     pack_seconds = time.perf_counter() - start
                     rows.append(dict(image=str(path.resolve()), B=budget, method=method,
                                      scope=scope, dither=dither, timed=timed, **score,

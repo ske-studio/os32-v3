@@ -22,7 +22,7 @@ def _u32(values):
     return np.asarray(values, dtype='<u4').tobytes()
 
 
-def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True):
+def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True, trace_path=None):
     pixels = np.asarray(pixels)
     if (pixels.ndim != 3 or pixels.shape[2] != 3 or
             not 1 <= pixels.shape[0] <= 400 or not 1 <= pixels.shape[1] <= 640 or
@@ -40,14 +40,17 @@ def _run(mode, pixels, budget, cfg, payload, *, timed=True, dither=True):
     with tempfile.TemporaryDirectory(prefix='enc2-core-') as name:
         request, response = Path(name) / 'input', Path(name) / 'output'
         request.write_bytes(header + pixels.astype(np.uint8).tobytes() + payload)
-        subprocess.run([str(binary), str(request), str(response)], check=True)
+        command = [str(binary), str(request), str(response)]
+        if trace_path is not None:
+            command.append(str(trace_path))
+        subprocess.run(command, check=True)
         result = response.read_bytes()
     if result[:12] != struct.pack('<3I', 0x52324345, 1, mode):
         raise ValueError('invalid enc2 core response')
     return result[12:]
 
 
-def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None):
+def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None, *, trace_path=None):
     pixels = np.asarray(pixels, dtype=np.int32)
     colors, roots, stats = prepared if prepared is not None else prepare(pixels, cfg)
     stats = dict(stats)
@@ -63,7 +66,7 @@ def plan(pixels, budget, cfg=Config(), prepared=None, active_rows=None):
     for y in range(height):
         q = codes(candidates[y]) if y in candidates else []
         payload += _u32([len(q)]) + _u32(q)
-    response = _run(0, pixels, budget, cfg, payload)
+    response = _run(0, pixels, budget, cfg, payload, trace_path=trace_path)
     offset = 0
 
     def take(fmt):

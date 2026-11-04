@@ -36,6 +36,7 @@ typedef struct {
     int nm, nc[MAX_H];
     Palette roots, palettes[MAX_H];
     Order orders[MAX_H];
+    FILE *diagnostic; int phase, seed;
     uint64_t evaluations;
     int64_t trace[65]; int nt;
     Visit *visits; size_t nv, cv;
@@ -320,6 +321,46 @@ static uint16_t centroid(int64_t n,const int64_t *sums) {
     }
     return result;
 }
+/* Optional host-only JSONL; never participates in candidate selection. */
+static void trace_state(Search *s,const char *stage,int iteration,int slot,
+                        const Palette *before,const Palette *after,int total,int valid,int up) {
+    FILE *f=s->im->diagnostic;if(!f) return;
+    Value a=evaluate(s,before,NULL,NULL),b=evaluate(s,after,NULL,NULL);
+    Config *cfg=&s->im->cfg;
+    int64_t weighted=0,ideal=0;int ids[MAX_W];
+    for(int t=0;t<s->t;t++) {
+        int d,id=nearest(s->im->pixels+3*(s->y*cfg->w+t),after,&d);
+        weighted+=(int64_t)d*weights[t/cfg->w];
+        if(t<cfg->w) {ideal+=d;ids[t]=id;}
+    }
+    int64_t actual=ideal;int k=0;
+    if(s->old) {
+        Cost cost;cost_init(&cost,s->im->pixels+3*s->y*cfg->w,s->old,after,ids,cfg);
+        actual=cost_score(&cost,&b.order);
+        int boundary[SLOTS][3]={{0}},j=0;
+        for(int pos=0;pos<b.order.n;pos++) {
+            int i=b.order.slot[pos];if(pos) j++;
+            for(int c=0;c<3;c++) {int ch=component_order[c];
+                if(channel(s->old->q[i],ch)!=channel(after->q[i],ch)) boundary[i][ch]=cut(cfg,++j);
+            }
+        }
+        for(int x=0;x<cfg->w;x++) {
+            int old=0;for(int c=0;c<3;c++) old|=x<boundary[ids[x]][c];
+            k+=old;
+        }
+    }
+    fprintf(f,"{\"phase\":%d,\"seed\":%d,\"y\":%d,\"stage\":\"%s\",\"iteration\":%d,\"slot\":%d,"
+              "\"before\":%lld,\"after\":%lld,\"F\":%lld,\"delta\":%lld,\"next_delta_weighted\":%lld,"
+              "\"OUT\":%d,\"next_OUT\":%d,\"K_plan\":%d,\"total\":%d,\"valid\":%d,\"out_up\":%d,\"palette\":[",
+            s->im->phase,s->im->seed,s->y,stage,iteration,slot,(long long)a.score,(long long)b.score,
+            (long long)weighted,(long long)(actual-ideal),(long long)(b.score-weighted-SPILL_WEIGHT*(actual-ideal)),
+            s->old?out_count(s->old,after):0,s->following?out_count(after,s->following):0,k,total,valid,up);
+    for(int i=0;i<SLOTS;i++) fprintf(f,"%s%u",i?",":"",after->q[i]);
+    fputs("],\"order\":[",f);
+    for(int i=0;i<b.order.n;i++) fprintf(f,"%s%d",i?",":"",b.order.slot[i]);
+    fputs("]}\n",f);
+    if(ferror(f)) fail("diagnostic output");
+}
 static Palette lloyd(Search *s,Palette p,const int *movable,int nm) {
     Config *cfg=&s->im->cfg;
     for(int iteration=0;iteration<cfg->iters;iteration++) {
@@ -341,32 +382,43 @@ static Palette lloyd(Search *s,Palette p,const int *movable,int nm) {
                 Palette trial;Value v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
                 if(v.valid && v.score<current.score && key_less(s,&trial,v,&best,bv)) {best=trial;bv=v;}
             }
-            if(!same(&best,&p)) {p=best;changed=1;}
+            if(!same(&best,&p)) {trace_state(s,"lloyd",iteration,slot,&p,&best,np,0,0);p=best;changed=1;}
         }
-        if(!changed) break;
+        if(!changed) {trace_state(s,"lloyd-stationary",iteration,-1,&p,&p,0,0,0);break;}
     }
     return p;
 }
 static int search(Search *s,const Palette *seed,int initial,Palette *result) {
     Palette p=*seed;Value current=evaluate(s,&p,NULL,NULL);
     if(!current.valid) return 0;
+    trace_state(s,"seed",0,-1,&p,&p,0,0,0);
     if(initial) {int all[SLOTS];for(int i=0;i<SLOTS;i++) all[i]=i;*result=lloyd(s,p,all,SLOTS);return 1;}
     for(int move=0;move<s->im->cfg.moves;move++) {
         Palette best=p;Value bv=evaluate(s,&p,NULL,NULL);current=bv;
         Neighbors nb;neighbors(s,&p,&nb);
+        int total=0,valid=0,up=0;
         for(int slot=0;slot<SLOTS;slot++) {
             Proposal prop[COLORS];int np=proposals(p.q[slot],s->im->candidates[s->y],s->im->nc[s->y],prop,0,NULL);
             for(int i=0;i<np;i++) {
                 Palette trial;Value v=evaluate_slot(s,&p,slot,prop[i].q,&nb,&trial);
+                if(s->im->diagnostic) {
+                    total++;valid+=v.valid;
+                    up+=v.valid && out_count(s->old,&trial)>out_count(s->old,&p);
+                }
                 if(v.valid && v.score<current.score && key_less(s,&trial,v,&best,bv)) {best=trial;bv=v;}
             }
         }
+        trace_state(s,same(&best,&p)?"exchange-stationary":"exchange",move,-1,&p,&best,total,valid,up);
         if(same(&best,&p)) break;
-        p=best;int movable[SLOTS],nm=0;
-        for(int i=0;i<SLOTS;i++) if(p.q[i]!=s->old->q[i]) movable[nm++]=i;
-        p=lloyd(s,p,movable,nm);
+        p=best;
     }
-    *result=p;return 1;
+    /* C2 exhausts tree exchanges before C4/C5 refine the final changed set.
+     * Also refine a retained seed when no tree exchange improves it. */
+    int movable[SLOTS],nm=0;
+    for(int i=0;i<SLOTS;i++) if(p.q[i]!=s->old->q[i]) movable[nm++]=i;
+    *result=lloyd(s,p,movable,nm);
+    trace_state(s,"search-final",0,-1,&p,result,0,0,0);
+    return 1;
 }
 static int64_t objective(Image *im) {
     int64_t total=0;Config *cfg=&im->cfg;
@@ -411,7 +463,8 @@ static void plan(Image *im,FILE *out) {
         im->palettes[y]=im->palettes[y-1];
         if(im->active[y]) {
             s=search_new(im,y,&im->palettes[y-1],NULL,empty,NULL,empty);
-            search(s,&im->palettes[y-1],0,&im->palettes[y]);im->orders[y]=evaluate(s,&im->palettes[y],NULL,NULL).order;search_free(s);
+            search(s,&im->palettes[y-1],0,&im->palettes[y]);im->orders[y]=evaluate(s,&im->palettes[y],NULL,NULL).order;
+            trace_state(s,"forward",0,-1,&im->palettes[y-1],&im->palettes[y],0,0,0);search_free(s);
         }
         if(y%25==0) fprintf(stderr,"enc2 B%d forward %d/%d\n",cfg->budget,y,cfg->h-1);
     }
@@ -422,7 +475,7 @@ static void plan(Image *im,FILE *out) {
             int y=direction?step:cfg->h-1-step;if(y && !im->active[y]) continue;
             const Palette *old=y?&im->palettes[y-1]:NULL,*following=y+1<cfg->h?&im->palettes[y+1]:NULL;
             Order next=following?im->orders[y+1]:empty;
-            Palette current=im->palettes[y];
+            Palette current=im->palettes[y];im->phase=1+2*trip+direction;
             s=search_new(im,y,old,following,next,&current,im->orders[y]);
             Value value=evaluate(s,&current,NULL,NULL);int64_t incumbent=value.score;
             int ids[MAX_W];
@@ -438,7 +491,7 @@ static void plan(Image *im,FILE *out) {
             Palette best=current;Value bv=value;
             const Palette *seeds[2]={y?old:&im->roots,&current};
             for(int i=0;i<2;i++) {
-                Palette trial;if(!search(s,seeds[i],y==0,&trial)) continue;
+                im->seed=i;Palette trial;if(!search(s,seeds[i],y==0,&trial)) continue;
                 Value v=evaluate(s,&trial,NULL,NULL);
                 if(key_less(s,&trial,v,&best,bv)) {best=trial;bv=v;}
             }
@@ -446,6 +499,11 @@ static void plan(Image *im,FILE *out) {
                 im->palettes[y]=best;im->orders[y]=bv.order;if(following) im->orders[y+1]=bv.next;
                 changes++;add_visit(im,y,incumbent,bv.score);
             }
+            if(im->diagnostic) fprintf(im->diagnostic,
+                "{\"phase\":%d,\"y\":%d,\"stage\":\"visit-decision\",\"J_before\":%lld,\"J_after\":%lld,\"accepted\":%d}\n",
+                im->phase,y,(long long)incumbent,
+                (long long)(bv.score<incumbent?bv.score:incumbent),bv.score<incumbent);
+            trace_state(s,"visit",0,-1,&current,&im->palettes[y],0,0,0);
             search_free(s);
             if(y%25==0) fprintf(stderr,"enc2 B%d trip %d direction %d row %d\n",cfg->budget,trip+1,direction,y);
         }
@@ -489,11 +547,12 @@ static void quantize(Image *im,FILE *out) {
     }
 }
 int main(int argc,char **argv) {
-    if(argc!=3) fail("usage: osri-enc2-core INPUT OUTPUT");
+    if(argc!=3 && argc!=4) fail("usage: osri-enc2-core INPUT OUTPUT [TRACE_JSONL]");
     FILE *in=fopen(argv[1],"rb");if(!in) fail("open input");
     if(read32(in)!=UINT32_C(0x43324345) || read32(in)!=1) fail("protocol version");
     uint32_t mode=read32(in);if(mode>1) fail("mode");
     Image *im=allocate(sizeof(*im));Config *cfg=&im->cfg;
+    if(argc==4) {im->diagnostic=fopen(argv[3],"w");if(!im->diagnostic) fail("open diagnostic");}
     cfg->h=signed32(in);cfg->w=signed32(in);cfg->budget=signed32(in);
     cfg->lookahead=signed32(in);cfg->iters=signed32(in);cfg->trips=signed32(in);cfg->moves=signed32(in);cfg->passes=signed32(in);
     cfg->delay=signed32(in);cfg->offset=signed32(in);cfg->timed=signed32(in);cfg->dither=signed32(in);
@@ -522,5 +581,6 @@ int main(int argc,char **argv) {
     write32(out,UINT32_C(0x52324345));write32(out,1);write32(out,mode);
     if(mode) quantize(im,out);else plan(im,out);
     if(fclose(out)) fail("close output");
+    if(im->diagnostic && fclose(im->diagnostic)) fail("close diagnostic");
     free(im->pixels);free(im->visits);free(im);return 0;
 }

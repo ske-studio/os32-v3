@@ -23,7 +23,7 @@ HBLANK_NS, OUT_NS, LINE_NS = 5900, 650, 31800
 ACTIVE_NS, PIXEL0_OFFSET_NS = 25900, 0
 IN_NS, START_DELAY_NS = 1150, 575
 I_PAIR_ENABLED, SPILL_WEIGHT = False, 8
-VERSION = 'enc2-r3-supplement1'
+VERSION = 'enc2-r3-supplement1-c2-before-c4'
 
 
 @dataclass(frozen=True)

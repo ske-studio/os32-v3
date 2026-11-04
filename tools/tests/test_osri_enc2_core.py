@@ -19,6 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 from osri_enc2_spec import BUDGETS, Config, components, allowed
+from osri_enc2_row import RowSearch
 from osri_enc2_plan import prepare, plan, objective
 from osri_enc2_dither import quantize
 from osri_enc2_pack import pack
@@ -72,6 +73,18 @@ def check():
     assert np.array_equal(ap, bp) and ao == bo
     assert ast['j_trace'] == bst['j_trace'] and ast['visits'] == bst['visits']
 
+    # A retained changed slot needs Lloyd even when the tree has no improving
+    # exchange. The tree offers only 111; the master/centroid can reach 222.
+    source = np.full((2, 8, 3), 34, dtype=np.int32)
+    old = np.zeros((16, 3), dtype=np.int32)
+    seed = old.copy(); seed[0] = 1
+    config = Config(row_iters=1, row_moves=1, lookahead_rows=0)
+    search = RowSearch(source, 1, old, None, (), 3,
+                       components([0x222]), components([0x111]), config)
+    refined = search.search(seed)
+    assert np.array_equal(refined[0], [2, 2, 2])
+    assert np.array_equal(refined[1:], old[1:])
+
     # Default settings on a 400-row fixture, with the S1 active-row mechanism.
     # The other 398 rows and both adjacent boundary constraints remain present.
     y, x, c = np.indices((400, 8, 3))
@@ -89,6 +102,21 @@ def check():
     bi = c_quantize(wide, b, bo)
     assert np.array_equal(ai, bi)
     assert pack(a, ao, ai, 31) == pack(b, bo, bi, 31)
+
+    with tempfile.TemporaryDirectory(prefix='enc2-trace-test-') as name:
+        import json
+        trace = Path(name) / 'rows.jsonl'
+        a, ao, ast = c_plan(full, 31, default, prepared, {198}, trace_path=trace)
+        assert np.array_equal(a, b) and ao == bo
+        assert ast['j_trace'] == bst['j_trace']
+        records = [json.loads(line) for line in trace.read_text().splitlines()]
+        assert any(r['stage'] == 'forward' and r['y'] == 198 for r in records)
+        assert any(r['stage'] == 'exchange-stationary' for r in records)
+        assert all(r['OUT'] <= 31 and r['next_OUT'] <= 31 for r in records if 'OUT' in r)
+        decisions = [r for r in records if r['stage'] == 'visit-decision']
+        assert decisions and all(r['J_before'] >= r['J_after'] for r in decisions)
+        assert sum(r['J_before'] - r['J_after'] for r in decisions) == bst['j_trace'][0] - bst['j_trace'][-1]
+        assert ast['evaluations'] == bst['evaluations']
 
     # Edge widths, equality at a completion time, signed truncation, slot ties,
     # deliberately nonascending orders, missing downwards error and ideal mode.
@@ -125,6 +153,7 @@ MUTATIONS = [
     ('component-out', 'return components + (slots ? slots-1 : 0);', 'return slots;'),
     ('next-delta', 'value.score+=SPILL_WEIGHT*(next-s->next_ideal);', 'value.score+=0*(next-s->next_ideal);'),
     ('partial-mask', '(mask&(1<<c))?candidates[i]:current', 'candidates[i]'),
+    ('lloyd-after-exchanges', '*result=lloyd(s,p,movable,nm);', '*result=p; (void)movable; (void)nm;'),
     ('runner-up', 'n->nearest[t]==slot?n->second[t]:n->first[t]', 'n->first[t]'),
     ('pixel-ceil', 'if(numerator>0 && numerator%ACTIVE_NS) x++;', 'if(0) x++;'),
     ('order-timing', 'int slot=im->orders[y].slot[pos];if(pos) j++;', 'int slot=pos;if(pos) j++;'),
@@ -165,6 +194,17 @@ int main(void) {
     for(int x=0;x<16;x++) for(int c=0;c<3;c++) if(x<boundaries[c]) actual+=255*255;
     assert(actual>0);
     assert(v.score==INT64_C(4)*16*3*255*255+8*actual);
+    search_free(s);free(im->pixels);free(im);
+    im=allocate(sizeof(*im));
+    im->cfg=(Config){.h=2,.w=8,.budget=3,.moves=1,.iters=1};
+    for(int j=0;j<68;j++) im->cfg.cuts[j]=cut(&im->cfg,j);
+    im->pixels=allocate(2*8*3);memset(im->pixels,34,2*8*3);
+    im->nm=1;im->master[0]=0x222;im->nc[1]=1;im->candidates[1][0]=0x111;
+    Palette old={{0}},seed={{0x111}},result;
+    s=search_new(im,1,&old,NULL,empty,NULL,empty);
+    assert(search(s,&seed,0,&result));
+    assert(result.q[0]==0x222);
+    for(int i=1;i<SLOTS;i++) assert(!result.q[i]);
     search_free(s);free(im->pixels);free(im);
     return 0;
 }
