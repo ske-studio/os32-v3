@@ -13,6 +13,8 @@
 
 #define SLOTS 16
 #define COLORS 4096
+/* Each of the 16 tree colors contributes at most seven masked proposals. */
+#define EXCHANGE_PROPOSALS (SLOTS*SLOTS*7)
 #define MAX_W 640
 #define MAX_H 400
 #define MAX_T (MAX_W * 4)
@@ -63,7 +65,7 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t ready, finished;
     pthread_t *workers;
-    int count, generation, stop, pending, next, total, completed;
+    int count, generation, stop, pending, next, total, completed, chunk;
     void (*job)(void *, int);
     void *context;
 } Pool;
@@ -72,10 +74,10 @@ static Pool pool = {.mutex=PTHREAD_MUTEX_INITIALIZER,
 static void pool_work(void) {
     for(;;) {
         pthread_mutex_lock(&pool.mutex);
-        int first=pool.next;pool.next+=4;
+        int first=pool.next;pool.next+=pool.chunk;
         pthread_mutex_unlock(&pool.mutex);
         if(first>=pool.total) break;
-        int end=first+4;if(end>pool.total) end=pool.total;
+        int end=first+pool.chunk;if(end>pool.total) end=pool.total;
         for(int i=first;i<end;i++) pool.job(pool.context,i);
     }
 }
@@ -102,6 +104,10 @@ static void pool_init(int threads) {
 }
 static void pool_run(int n,void (*job)(void *,int),void *context) {
     pthread_mutex_lock(&pool.mutex);
+    /* Several chunks per worker balance expensive order searches without
+     * taking the queue mutex for every few candidates in a whole-stage batch. */
+    pool.chunk=n/((pool.count+1)*4);if(pool.chunk<4) pool.chunk=4;
+    if(pool.chunk>32) pool.chunk=32;
     pool.total=n;pool.next=0;pool.completed=0;pool.job=job;pool.context=context;
     pool.pending=pool.count;pool.generation++;
     pthread_cond_broadcast(&pool.ready);
@@ -365,24 +371,24 @@ static Value evaluate_slot(Search *s,const Palette *p,int slot,uint16_t q,const 
     cache_save(s,trial,value);return value;
 }
 typedef struct {
-    Search *s;const Palette *p;int slot;const Proposal *prop;const Neighbors *nb;
+    Search *s;const Palette *p;const int *slots;const Proposal *prop;const Neighbors *nb;
     Value *values;const int *ids;
 } Batch;
 static void candidate_job(void *context,int job) {
     Batch *batch=context;int i=batch->ids[job];Palette trial;
-    Value value=evaluate_slot_raw(batch->s,batch->p,batch->slot,batch->prop[i].q,batch->nb,&trial);
+    Value value=evaluate_slot_raw(batch->s,batch->p,batch->slots[i],batch->prop[i].q,batch->nb,&trial);
     pthread_mutex_lock(&pool.mutex);
     int result_index=i; /* Keep candidate identity, regardless of completion order. */
     batch->values[result_index]=value;pool.completed++;
     pthread_mutex_unlock(&pool.mutex);
 }
-static void evaluate_candidates(Search *s,const Palette *p,int slot,const Proposal *prop,
+static void evaluate_stage(Search *s,const Palette *p,const int *slots,const Proposal *prop,
                                 int np,const Neighbors *nb,Value *values) {
     int ids[COLORS],n=0;
     /* Cache hits and invalid candidates are cheap. Keep them on the caller;
      * only pixel scans merit waking the pool. No cache is changed here. */
     for(int i=0;i<np;i++) {
-        Palette trial=*p;trial.q[slot]=prop[i].q;
+        Palette trial=*p;trial.q[slots[i]]=prop[i].q;
         Entry *entry=cache_entry(s,&trial,hash_palette(&trial));
         if(entry->hash) values[i]=entry->v;
         else if((s->old && out_count(s->old,&trial)>s->im->cfg.budget) ||
@@ -390,16 +396,23 @@ static void evaluate_candidates(Search *s,const Palette *p,int slot,const Propos
             values[i]=evaluate_raw(s,&trial,NULL,NULL);
         else ids[n++]=i;
     }
-    Batch batch={s,p,slot,prop,nb,values,ids};
+    Batch batch={s,p,slots,prop,nb,values,ids};
     if(n>=8) pool_run(n,candidate_job,&batch);
     else for(int job=0;job<n;job++) {
         int i=ids[job];Palette trial;
-        values[i]=evaluate_slot_raw(s,p,slot,prop[i].q,nb,&trial);
+        values[i]=evaluate_slot_raw(s,p,slots[i],prop[i].q,nb,&trial);
     }
     /* Publish cache entries in exactly the original proposal order. */
     for(int i=0;i<np;i++) {
-        Palette trial=*p;trial.q[slot]=prop[i].q;cache_save(s,&trial,values[i]);
+        Palette trial=*p;trial.q[slots[i]]=prop[i].q;cache_save(s,&trial,values[i]);
     }
+}
+/* Lloyd updates physical slots sequentially; only the candidates within
+ * that slot share an immutable palette. Exchanges share it across all slots. */
+static void evaluate_candidates(Search *s,const Palette *p,int slot,const Proposal *prop,
+                                int np,const Neighbors *nb,Value *values) {
+    int slots[COLORS];for(int i=0;i<np;i++) slots[i]=slot;
+    evaluate_stage(s,p,slots,prop,np,nb,values);
 }
 static int proposal_cmp(const void *a,const void *b) {
     const Proposal *x=a,*y=b;
@@ -477,9 +490,10 @@ static Palette lloyd(Search *s,Palette p,const int *movable,int nm) {
         int changed=0;
         for(int k=0;k<nm;k++) {
             int slot=movable[k];int64_t n=0,sums[3]={0};
+            Neighbors nb;neighbors(s,&p,&nb);
             const uint8_t *pixels=s->im->pixels+3*s->y*cfg->w;
             for(int t=0;t<s->t;t++) {
-                int id=nearest(pixels+3*t,&p,NULL);
+                int id=nb.nearest[t];
                 if(id==slot) {int w=weights[t/cfg->w];n+=w;for(int c=0;c<3;c++) sums[c]+=(int64_t)pixels[3*t+c]*w;}
             }
             if(!n) continue;
@@ -487,7 +501,6 @@ static Palette lloyd(Search *s,Palette p,const int *movable,int nm) {
             candidates[s->im->nm]=centroid(n,sums);
             Proposal prop[COLORS];int np=proposals(p.q[slot],candidates,s->im->nm+1,prop,n,sums);
             Palette best=p;Value current=evaluate(s,&p,NULL,NULL),bv=current;
-            Neighbors nb;neighbors(s,&p,&nb);
             Value values[COLORS];
             if(pool.count) evaluate_candidates(s,&p,slot,prop,np,&nb,values);
             for(int i=0;i<np;i++) {
@@ -507,14 +520,31 @@ static int search(Search *s,const Palette *seed,int initial,Palette *result) {
     if(!current.valid) return 0;
     trace_state(s,"seed",0,-1,&p,&p,0,0,0);
     if(initial) {int all[SLOTS];for(int i=0;i<SLOTS;i++) all[i]=i;*result=lloyd(s,p,all,SLOTS);return 1;}
+    Proposal *stage_prop=NULL;Value *stage_values=NULL;int *stage_slots=NULL;
+    if(pool.count && s->im->cfg.moves) {
+        stage_prop=allocate(EXCHANGE_PROPOSALS*sizeof(*stage_prop));
+        stage_values=allocate(EXCHANGE_PROPOSALS*sizeof(*stage_values));
+        stage_slots=allocate(EXCHANGE_PROPOSALS*sizeof(*stage_slots));
+    }
     for(int move=0;move<s->im->cfg.moves;move++) {
         Palette best=p;Value bv=evaluate(s,&p,NULL,NULL);current=bv;
         Neighbors nb;neighbors(s,&p,&nb);
-        int total=0,valid=0,up=0;
+        int total=0,valid=0,up=0,offsets[SLOTS+1]={0};
+        if(pool.count) {
+            for(int slot=0;slot<SLOTS;slot++) {
+                int first=offsets[slot];
+                int np=proposals(p.q[slot],s->im->candidates[s->y],s->im->nc[s->y],stage_prop+first,0,NULL);
+                offsets[slot+1]=first+np;
+                for(int i=first;i<first+np;i++) stage_slots[i]=slot;
+            }
+            evaluate_stage(s,&p,stage_slots,stage_prop,offsets[SLOTS],&nb,stage_values);
+        }
         for(int slot=0;slot<SLOTS;slot++) {
-            Proposal prop[COLORS];int np=proposals(p.q[slot],s->im->candidates[s->y],s->im->nc[s->y],prop,0,NULL);
-            Value values[COLORS];
-            if(pool.count) evaluate_candidates(s,&p,slot,prop,np,&nb,values);
+            Proposal serial_prop[COLORS];
+            Proposal *prop=pool.count?stage_prop+offsets[slot]:serial_prop;
+            int np=pool.count?offsets[slot+1]-offsets[slot]:
+                proposals(p.q[slot],s->im->candidates[s->y],s->im->nc[s->y],prop,0,NULL);
+            Value *values=pool.count?stage_values+offsets[slot]:NULL;
             for(int i=0;i<np;i++) {
                 Palette trial;Value v;
                 if(pool.count) {trial=p;trial.q[slot]=prop[i].q;v=values[i];}
@@ -530,6 +560,7 @@ static int search(Search *s,const Palette *seed,int initial,Palette *result) {
         if(same(&best,&p)) break;
         p=best;
     }
+    free(stage_slots);free(stage_values);free(stage_prop);
     /* C2 exhausts tree exchanges before C4/C5 refine the final changed set.
      * Also refine a retained seed when no tree exchange improves it. */
     int movable[SLOTS],nm=0;

@@ -50,7 +50,7 @@ def check():
         assert py_s['j_trace'] == c_s['j_trace'], ('J', budget)
         assert py_s['visits'] == c_s['visits'], ('visits', budget)
         assert py_s['evaluations'] == c_s['evaluations'], ('cache', budget)
-        for threads in (2, 4, 16):
+        for threads in (2, 4, 8, 16):
             mp, mo, ms = native_plan(pixels, budget, cfg, prepared, threads=threads)
             assert np.array_equal(c_p, mp) and c_o == mo, ('parallel palette/order', budget, threads)
             for key in ('j_trace', 'visits', 'evaluations'):
@@ -261,6 +261,37 @@ int main(void) {
         assert(!order_cmp(&values[i].next,&expected.next));
     }
     assert(im->evaluations==64);
+    /* One exchange stage retains candidate IDs across every physical slot
+     * and mixes cached candidates with fresh evaluations. */
+    Proposal stage_prop[16*64];Value stage_values[16*64];int slots[16*64];
+    for(int slot=0;slot<SLOTS;slot++) for(int i=0;i<64;i++) {
+        int index=slot*64+i;stage_prop[index]=prop[i];slots[index]=slot;
+    }
+    evaluate_stage(s,&base,slots,stage_prop,16*64,&nb,stage_values);
+    for(int i=0;i<16*64;i++) {
+        Palette trial=base;trial.q[slots[i]]=stage_prop[i].q;
+        Value expected=evaluate_raw(s,&trial,NULL,NULL);
+        assert(stage_values[i].valid==expected.valid && stage_values[i].score==expected.score);
+        assert(!order_cmp(&stage_values[i].order,&expected.order));
+        assert(!order_cmp(&stage_values[i].next,&expected.next));
+    }
+    assert(im->evaluations==16*64);
+    /* Cached stage: no jobs, no new cache publications. */
+    evaluate_stage(s,&base,slots,stage_prop,16*64,&nb,stage_values);
+    assert(im->evaluations==16*64);
+    /* Duplicated proposals still publish only one entry per palette. */
+    stage_prop[0]=stage_prop[1];
+    evaluate_stage(s,&base,slots,stage_prop,16*64,&nb,stage_values);
+    assert(stage_values[0].score==stage_values[1].score);
+    assert(im->evaluations==16*64);
+    search_free(s);
+    /* A wholly invalid exchange stage must neither wake workers nor scan
+     * pixels; its invalid values still enter the cache deterministically. */
+    im->cfg.budget=0;
+    s=search_new(im,0,&base,NULL,empty,NULL,empty);
+    evaluate_stage(s,&base,slots,stage_prop,16*64,&nb,stage_values);
+    for(int i=0;i<16*64;i++) assert(!stage_values[i].valid);
+    assert(im->evaluations==2*16*64-1);
     search_free(s);free(im->pixels);free(im);pool_free();
     return 0;
 }

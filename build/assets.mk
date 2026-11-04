@@ -159,7 +159,7 @@ HOSTCC ?= gcc
 ENC2_CORE = $(BUILD_OUT)/osri-enc2-core
 $(ENC2_CORE): tools/osri_enc2_core.c
 	@mkdir -p $(dir $@)
-	$(HOSTCC) -std=c11 -O3 -Wall -Wextra -Werror -Wvla $< -o $@
+	$(HOSTCC) -std=c11 -O3 -Wall -Wextra -Werror -Wvla -pthread $< -o $@
 
 osri-enc2-core: $(ENC2_CORE)
 .PHONY: osri-enc2-core
