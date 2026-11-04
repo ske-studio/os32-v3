@@ -269,3 +269,4 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - P5 (vgaHWProtect の展開): 出典は X.Org xserver hw/xfree86/vgahw/vgaHW.c の vgaHWProtect (MIT、xorg-server-21.1.13、PM の手元 ~/os32-tmp/refs/xorg-vgahw/vgaHW.c:574)。trident の段で script 内の call に展開する。
 - P6 (検査): このブランチはメインストリームでない (PARALLEL_BRANCHES §3)。段の実装者は make all (check_slot.sh 経由) と自分の試験の直接の実行・--mutate・--lint だけ。check-changed は回さず、取り込みの検査は wt/hw-basic の GitHub の CI の緑で代える。
 - P7 (§4 の seq の初期値、rshell の段の欠け): seq は run ごとに 1 から始め、命令ごとに 1 ずつ増やす (begin と end は同じ seq)。ホストの採取は最初の seq が 1 でなければ先頭の欠けとして扱う。
+- P8 (vgaHW.c の許諾、trident の段の欠け): vgaHW.c の冒頭は著作権表示だけで、許諾文は xserver の COPYING の XFree86 Project の項 (xorg-server-21.1.13 の COPYING:54-76、X11 型の MIT 系) が当たる。trident.hwb の注記には vgaHW.c の著作権表示とその許諾文を置く ([HW3] の BSD/MIT の参照、GPL ではない)。
