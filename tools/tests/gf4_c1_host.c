@@ -74,6 +74,10 @@ static u32 c1_fail_after_reference;
 static void c1_observe(struct gf3_host *h,const struct gf3_host_event *e)
 {
     svc_observe(h,e);
+    /* Advance the simulated device clock in bounded steps during a stalled
+     * reference. Keep the caller deadline and trace capacity unchanged. */
+    if (!e->rc && e->op==H_SLEEP && cint_stall_reference)
+        h->now+=GF3_TIMEOUT_US/8U;
     /* Inject only after the real PUT has submitted the fill's reference.
      * nv10_fence.c:33-41,53-55: submission precedes completion reads. */
     if (c1_fail_after_reference && cint_references==c1_fail_after_reference &&
@@ -253,13 +257,13 @@ static void c1_failures(void)
     gf3_host_fail_at(&cint_host,H_CLOCK,0,0);
     c1_expect(&before,GFX_FMT_XRGB8888,C1_XRGB_BPP);
     /* Runtime rejection during render: newly reserved bank is discarded. */
-    bool ready=cint_prod.accel.ready; cint_prod.accel.ready=false;
+    gf3_host_fail_at(&cint_host,H_CLOCK,2,GF1_EIO);
     assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
-    assert(svc_ctx.last_rc==GF3_ESTATE);
+    assert(svc_ctx.last_rc==GF2_EIO);
     const struct gf_vram_reservation_node *unused=svc_ctx.scan_bank[0] ?
         svc_ctx.scan[0] : svc_ctx.scan_next[0];
     assert(!unused[0].value.owner && !unused[1].value.owner);
-    cint_prod.accel.ready=ready;
+    gf3_host_fail_at(&cint_host,H_CLOCK,0,0);
     c1_expect(&before,GFX_FMT_XRGB8888,C1_XRGB_BPP);
     svc_keys_live(&before);
     /* Fail commit publication once. Real C0 rolls the hardware back and
