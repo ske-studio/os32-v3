@@ -401,6 +401,25 @@ static void test_restart_failure(void)
     assert(host.ctx.deadline==deadline && !host.ctx.ready && !cint_slot && !publish_calls);
     retained(); finish();
 }
+static void test_restart_revoked(void)
+{
+    setup(GF3_INDEX8);
+    assert(!gf4_service_suspend(&host.ctx,deadline));
+    gf_foundation_revoke(&cint_prod.foundation);
+    trace_clear();
+    u32 pci_writes=cint_pci_writes,epoch=cint_prod.chan.epoch;
+    u16 command=cint_pci_command;
+    /* OS32 lease oracle: foundation.c:101 rejects with GF1_EPCI before
+     * master.c:16-17 can write Command. Compare counts, not fixed totals. */
+    assert(gf4_service_restart(&host.ctx,deadline)==GF1_EPCI);
+    assert(host.ctx.last_rc==GF1_EPCI && cint_prod.foundation.revoked);
+    assert(cint_pci_writes==pci_writes && cint_pci_command==command);
+    assert(!host.nevents && !cint_host.nevents);
+    assert(cint_prod.chan.epoch==epoch && cint_prod.chan.state==GF2_OFF);
+    assert(!host.ctx.ready && !cint_prod.accel.ready && !cint_prod.foundation.bm);
+    assert(!host.ctx.accepting && !cint_slot && !publish_calls);
+    retained(); finish();
+}
 static void test_failed_and_arguments(void)
 {
     assert(gf4_service_suspend(NULL,deadline)==GF4_EINVAL);
@@ -423,6 +442,7 @@ void _start(void)
     test_close_and_stop_failures();
     test_fault_recover();
     test_restart_failure();
+    test_restart_revoked();
     test_restore_and_publication_failure();
     test_failed_and_arguments();
     gf2_host_exit(0);

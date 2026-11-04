@@ -276,6 +276,8 @@ i32 gf4_service_restart(struct gf4_ctx *c,u32 dl)
     if (!rc && (c->ready || c->accel->ready || c->ch->state!=GF2_OFF ||
                 c->hold_saved.version!=GF4_SAVED_VERSION ||
                 c->hold_saved.size!=sizeof(c->hold_saved))) rc=GF4_ESTATE;
+    /* Match foundation_start's lease gate before the earlier PCI master write. */
+    if (!rc && c->ch->f->revoked) rc=GF1_EPCI;
     if (rc) return rec_result(c,rc);
     c->deadline=dl; c->accepting=false;
     rc=c->links->admission(c->links->owner,false);
