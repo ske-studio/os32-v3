@@ -1,4 +1,13 @@
 #include "../../userland/tests/pcm_wav.h"
+enum {
+    RIFF_HEADER_SIZE = 12, CHUNK_HEADER_SIZE = 8, FMT_SIZE = 16,
+    FMT_FORMAT = 0, FMT_CHANNELS = 2, FMT_RATE = 4,
+    FMT_ALIGN = 12, FMT_BITS = 14,
+    CANONICAL_FMT = RIFF_HEADER_SIZE + CHUNK_HEADER_SIZE,
+    CANONICAL_DATA = RIFF_HEADER_SIZE + CHUNK_HEADER_SIZE + FMT_SIZE,
+    CANONICAL_DATA_OFFSET = CANONICAL_DATA + CHUNK_HEADER_SIZE,
+    LIST_CHUNK_SIZE = CHUNK_HEADER_SIZE + 4
+};
 static unsigned char file[128];
 static unsigned length;
 static void put32(unsigned at, unsigned n) { file[at]=n; file[at+1]=n>>8; file[at+2]=n>>16; file[at+3]=n>>24; }
@@ -23,14 +32,16 @@ static void setup(int extra)
 static int run(void)
 {
     struct wav_info w;
-    unsigned fields[] = {20,22,24,32,34};
+    unsigned fields[] = {CANONICAL_FMT + FMT_FORMAT, CANONICAL_FMT + FMT_CHANNELS,
+                         CANONICAL_FMT + FMT_RATE, CANONICAL_FMT + FMT_ALIGN,
+                         CANONICAL_FMT + FMT_BITS};
     unsigned i;
-    setup(0); if (wav_parse(read_at,0,length,&w) || w.data_offset != 44 || w.data_size != 8) return 1;
-    setup(1); if (wav_parse(read_at,0,length,&w) || w.data_offset != 56) return 2;
+    setup(0); if (wav_parse(read_at,0,length,&w) || w.data_offset != CANONICAL_DATA_OFFSET || w.data_size != 8) return 1;
+    setup(1); if (wav_parse(read_at,0,length,&w) || w.data_offset != CANONICAL_DATA_OFFSET + LIST_CHUNK_SIZE) return 2;
     for (i=0;i<5;i++) { setup(0); file[fields[i]]=0; if (wav_parse(read_at,0,length,&w) != -2) return 3+i; }
     setup(0); if (wav_parse(read_at,0,length-1,&w) != -1) return 8;
-    setup(0); put32(40,12); if (wav_parse(read_at,0,length,&w) != -1) return 9;
-    setup(0); put32(40,6); if (wav_parse(read_at,0,length,&w) != -1) return 10;
+    setup(0); put32(CANONICAL_DATA + 4,12); if (wav_parse(read_at,0,length,&w) != -1) return 9;
+    setup(0); put32(CANONICAL_DATA + 4,6); if (wav_parse(read_at,0,length,&w) != -1) return 10;
     setup(1); put32(16,0xffffffffu); if (wav_parse(read_at,0,length,&w) != -1) return 11;
     setup(1); put32(4,length-9); if (wav_parse(read_at,0,length,&w) != -1) return 12;
     return 0;
