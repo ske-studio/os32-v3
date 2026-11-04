@@ -25,6 +25,7 @@
 /* NV44A analog: MIT nouveau c03c1a1 dispnv04/crtc.c:245-606;
  * see docs/design/hwdev/gf/display/timing.md for the assignment ownership. */
 #include "calc.h"
+#include "api.h"
 void gf_mode_timing(struct gfinit_mode *o)
 {
     struct gfinit_mode_timing *t = &o->timing;
@@ -65,4 +66,52 @@ void gf_mode_timing(struct gfinit_mode *o)
         mode_bit(t->vd, 11, 2) | mode_bit(t->vt, 11, 0);
     o->cr[GF_MODE_CR_INTERLACE] = GF_MODE_BYTE_MASK;
     o->config = GF_MODE_CONFIG_HSYNC;
+}
+
+/* nouveau dispnv04/crtc.c:245-257, 301-302, 350-413. End
+ * registers wrap relative to their start: HBE 7, HRE 5, VBE 8,
+ * VRE 4 bits. The CRTC receives already-normalized vertical timings. */
+i32 gf4_timing_calc(const struct gf4_mode *mode, struct gfinit_mode *o)
+{
+    if (!mode || !o) return GF4_EINVAL;
+    const struct gf4_timing *v = &mode->t;
+    if (!v->hd || v->hd >= v->hs || v->hs >= v->he || v->he > v->ht ||
+        v->vd < 3 || v->vd >= v->vs || v->vs >= v->ve || v->ve > v->vt ||
+        ((v->hd | v->hs | v->he | v->ht) & 7U) || v->ht < 40 || v->vt < 3)
+        return GF4_ERANGE;
+    u32 hd=(v->hd >> 3)-1, hs=(v->hs >> 3)+1, he=(v->he >> 3)+1;
+    u32 ht=(v->ht >> 3)-5, hbe=(v->ht >> 3)-1;
+    u32 vd=v->vd-1, vs=v->vs-1, ve=v->ve-1, vt=v->vt-2, vbe=v->vt-1;
+    if (v->flags & GF4_INTERLACE) vt |= 1U;
+    if (hd > 0x1ffU || hs > 0x1ffU || ht > 0x1ffU ||
+        hbe-hd > 0x7fU || he-hs > 0x1fU || vd > 0xfffU ||
+        vs > 0xfffU || vt > 0xfffU || vbe-vd > 0xffU || ve-vs > 0xfU)
+        return GF4_ERANGE;
+    struct gfinit_mode_timing *t=&o->timing;
+    *t=(struct gfinit_mode_timing){hd,hs,he,ht,hd,hbe,vd,vs,ve,vt,vd,vbe};
+    o->cr[GF_MODE_CR_HT]=ht; o->cr[GF_MODE_CR_HD]=hd;
+    o->cr[GF_MODE_CR_HBS]=hd;
+    o->cr[GF_MODE_CR_HBE]=GF_MODE_HBE_ENABLE | (hbe & GF_MODE_END_MASK);
+    o->cr[GF_MODE_CR_HS]=hs;
+    o->cr[GF_MODE_CR_HE]=mode_bit(hbe,5,7) | (he & GF_MODE_END_MASK);
+    o->cr[GF_MODE_CR_VT]=vt;
+    o->cr[GF_MODE_CR_OVERFLOW]=mode_bit(vs,9,7)|mode_bit(vd,9,6)|
+        mode_bit(vt,9,5)|GF_MODE_OVL_LINE_COMPARE|mode_bit(vd,8,3)|
+        mode_bit(vs,8,2)|mode_bit(vd,8,1)|mode_bit(vt,8,0);
+    o->cr[GF_MODE_CR_CELL]=GF_MODE_CELL_LINE_COMPARE|mode_bit(vd,9,5)|
+        ((v->flags & GF4_DBLSCAN) ? 0x80U : 0);
+    o->cr[GF_MODE_CR_VS]=vs; o->cr[GF_MODE_CR_VE]=GF_MODE_VRE_ENABLE|(ve & GF_MODE_VRE_MASK);
+    o->cr[GF_MODE_CR_VD]=vd; o->cr[GF_MODE_CR_VBS]=vd; o->cr[GF_MODE_CR_VBE]=vbe;
+    o->cr[GF_MODE_CR_MODE]=GF_MODE_CRTC_MODE; o->cr[GF_MODE_CR_LINE_COMPARE]=GF_MODE_BYTE_MASK;
+    o->cr[GF_MODE_CR_RPC1]=v->hd < 1280 ? GF_MODE_RPC1_LARGE : 0;
+    o->cr[GF_MODE_CR_LSR]=mode_bit(hbe,6,4)|mode_bit(vd,10,3)|mode_bit(vs,10,2)|
+        mode_bit(vd,10,1)|mode_bit(vt,10,0);
+    o->cr[GF_MODE_CR_HEB]=mode_bit(hs,8,3)|mode_bit(hd,8,2)|mode_bit(hd,8,1)|mode_bit(ht,8,0);
+    o->cr[GF_MODE_CR_EBR]=mode_bit(vd,11,6)|mode_bit(vs,11,4)|mode_bit(vd,11,2)|mode_bit(vt,11,0);
+    u32 ilace=(ht >> 1) & ~1U;
+    o->cr[GF_MODE_CR_INTERLACE]=(v->flags & GF4_INTERLACE) ? ilace : GF_MODE_BYTE_MASK;
+    if (v->flags & GF4_INTERLACE) o->cr[GF_MODE_CR_HEB] |= mode_bit(ilace,8,4);
+    o->config=GF_MODE_CONFIG_HSYNC | ((v->flags & GF4_DBLSCAN) ? 0x10U : 0);
+    o->crtc830=v->vd-3; o->crtc834=v->vd-1;
+    return GF4_OK;
 }

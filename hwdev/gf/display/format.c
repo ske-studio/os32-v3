@@ -25,6 +25,7 @@
 /* NV44A analog: MIT nouveau c03c1a1 dispnv04/crtc.c:245-606;
  * see docs/design/hwdev/gf/display/format.md for the assignment ownership. */
 #include "calc.h"
+#include "api.h"
 void gf_mode_format(struct gfinit_mode *o)
 {
     o->misc = GF_MODE_MISC_NEG_HV;
@@ -41,4 +42,33 @@ void gf_mode_format(struct gfinit_mode *o)
     o->ar[0x10] = 1;
     o->ar[0x12] = GF_MODE_PLANES;
     o->cr[GF_MODE_CR_PIXEL] = (GF_MODE_BPP + 1) / 8;
+}
+
+/* nouveau dispnv04/crtc.c:308-340, 838-903; nvreg.h:230,281,341-347. */
+i32 gf4_format_calc(const struct gf4_mode *mode,const struct gf3_surface *front,
+                    struct gfinit_mode *o)
+{
+    if (!mode || !front || !o) return GF4_EINVAL;
+    u32 cpp, pixel;
+    switch (mode->fmt) {
+    case GF3_INDEX8: cpp=1; pixel=1; break;
+    case GF3_RGB565: cpp=2; pixel=2; break;
+    case GF3_XRGB8888: cpp=4; pixel=3; break;
+    default: return GF4_EFORMAT;
+    }
+    if (front->fmt != mode->fmt) return GF4_EFORMAT;
+    u32 pitch=((u32)mode->t.hd * cpp + 63U) & ~63U;
+    if (!pitch || mode->pitch != pitch || front->pitch != pitch ||
+        pitch / 8U > 0xfffU || (front->off & 3U)) return GF4_ERANGE;
+    gf_mode_format(o);
+    o->misc=0x23U | ((mode->t.flags & GF4_NEG_H) ? 0x40U : 0) |
+        ((mode->t.flags & GF4_NEG_V) ? 0x80U : 0);
+    o->cr[GF_MODE_CR_PIXEL]=(o->cr[GF_MODE_CR_PIXEL] & ~3U) | pixel;
+    o->general=GF_MODE_GENERAL | (mode->fmt == GF3_RGB565 ? 0x1000U : 0);
+    u32 q=pitch / 8U;
+    o->cr[GF_MODE_CR_PITCH_HI]=((q >> 8) & 7U) << 5;
+    o->cr[GF_MODE_CR_PITCH]=q & 0xffU;
+    o->cr[GF_MODE_CR_PITCH11]=((q >> 11) & 1U) << 6;
+    o->start=front->off;
+    return GF4_OK;
 }
