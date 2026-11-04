@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Layer 3 component hosts/mutations and existing transfer/GUI acceptance tests."""
 CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=90.0,
-    covers=['include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
+    covers=['tools/tests/gf_ownerless_fixture.py', 'include/**', 'kdebug/*.h', 'kernel/irq/irq.h', 'hwdev/*.h', 'mm/*.h', 'drivers/pci/pci.h', 'lib/serial_diag.h', 'hwdev/gf/**', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'hwdev/gf/accel*', 'hwdev/gf/vram_view.*',
             'hwdev/gf/command.h', 'hwdev/gf/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
@@ -25,6 +25,7 @@ import tempfile
 import host32
 import os32api_host
 from kernel_includes import include_flags
+from gf_ownerless_fixture import ownerless_body
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
@@ -429,6 +430,10 @@ def component_build(host, source, directory, original_parent):
             for pattern in ('gf_accel*.[ch]', 'gf_command_runtime_host.h'):
                 for fixture in (ROOT/'tools/tests').glob(pattern):
                     shutil.copy2(fixture, tree/'tools/tests'/fixture.name)
+        if component == 'wire':
+            body = (tree/'drivers/video/geforce/geforce_body.c').read_text()
+            (tree/'tools/tests/gf_ownerless_body.inc').write_text(
+                ownerless_body(body, bind_f3=True))
         exe = directory/'host'
         subprocess.run(FLAGS + ['-Werror=vla', '-ffunction-sections', '-fdata-sections',
                        '-Wl,--gc-sections', *include_flags(ROOT), '-I'+str(tree), '-I'+str(ROOT),

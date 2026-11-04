@@ -1,4 +1,5 @@
-/* T1 compiles the real GF WC owner, module stop and HAL lifecycle together. */
+/* T1: real WC owner, platform stop and HAL; explicit ownerless display fixture.
+ * The complete F4 module composition is covered by gf4_c3_host.c. */
 #include "geforce_module.h"
 #include "hwdev/gf/production.h"
 #include "mm/pgalloc.h"
@@ -104,10 +105,7 @@ int pc98_route_select_98(void) { return 0; }
 #include "../../hwdev/gf/accel.h"
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 { CHECK(!active && !scan); }
-#include "tools/tests/gf_accel_no_bind.h"
-#define gf3_service_bind gf3_host_no_bind
 #include "../../drivers/video/geforce/geforce_body.c"
-#undef gf3_service_bind
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }
@@ -150,8 +148,9 @@ int gfx_current_height,gfx_flip_enabled,gfx_display_page;
 static GfxCounters counters;
 static const struct gf3_test_ops *accel_slot;
 static const struct gf1_test_ops *foundation_slot;
-static GeforceModuleContext ctx={&gfx_backend_geforce,&counters,&gfx_current_height,
-                                &gfx_flip_enabled,&gfx_display_page,&plat,&accel_slot,&foundation_slot};
+static GeforceModuleContext ctx={.backend=&gfx_backend_geforce,.counters=&counters,
+    .height=&gfx_current_height,.flip=&gfx_flip_enabled,.page=&gfx_display_page,
+    .platform=&plat,.accel_out=&accel_slot,.foundation_out=&foundation_slot};
 static void snapshot(void)
 {
     __builtin_memcpy(saved_pd,pd,sizeof(pd));
@@ -197,7 +196,8 @@ static void setup(int bios)
     ledger_surfaces[0]=(struct ledger_surface){.first=DISPLAY/PAGE_SIZE,.npages=75,.cache=LEDGER_CACHE_UC,.backing=LEDGER_SB_MMIO};
     plat=(struct geforce_platform){.resources=&resources,.bar0_phys=REGS,.display_phys=DISPLAY,
         .identify=prepare_identity,.wc_start=geforce_wc_start,.wc_stop=geforce_wc_stop,.report=geforce_wc_report};
-    CHECK(!geforce_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(!production.display.display4);
     gfx_backend_geforce.bb_base=client;snapshot();
 }
 static void restored(void) { CHECK(!lease.active && effective==baseline);unchanged(); }

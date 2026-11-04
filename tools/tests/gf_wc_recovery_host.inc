@@ -1,4 +1,5 @@
-/* Real HAL selection + WC owner + common stop + deferred shell fault landing.
+/* Ownerless legacy display: real HAL selection, WC owner, common stop and
+ * deferred shell fault landing. F4 module composition is covered by C3.
  * Acquisition/CPU/MSR and device operations are models; exec/GUI functions are extracted
  * verbatim by test_geforce.py. Each scenario runs in a fresh process. */
 #include "arch/x86/kernel/mtrr_wc.h"
@@ -43,12 +44,9 @@ int gf_production_point(void *p) { (void)p;return identity_ok ? 0 : -1; }
 int pc98_route_select_98(void) { return pc98_route_to_98(); }
 /* The parent fixture aliases its AppSlot as slot. */
 #undef slot
-#include "gf_accel_no_bind.h"
 #define slot host_slots[2]
-#define gf3_service_bind gf3_host_no_bind
 #define geforce_backend_ops gfx_backend_geforce
 #include "geforce_body.inc"
-#undef gf3_service_bind
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }
@@ -150,7 +148,8 @@ static void wc_recovery_run(void)
     GeforceModuleContext ctx={.backend=&gfx_backend_geforce,.counters=&gfx_counters,
         .height=&gfx_current_height,.flip=&gfx_flip_enabled,.page=&gfx_display_page,
         .platform=p,.accel_out=&accel,.foundation_out=&foundation};
-    CHECK(!geforce_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(!gf_ownerless_module_init(&gfx_backend_geforce,&ctx));
+    CHECK(!production.display.display4 && !gf3_service_get(&production.chan));
     wc_snapshot();
     bios_wc=BIOS_WC;wc_effective=bios_wc;host_user=0;host_gui=1;
     gfx_init();CHECK(lease.active && wc_acquires==1 && route);
