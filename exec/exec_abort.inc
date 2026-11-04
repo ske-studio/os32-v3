@@ -1,4 +1,17 @@
 /* Abort requests, safe-point checks and GUI input pumping. Included by exec.c. */
+#include "exec_hwb.h"
+
+/* HW_BASIC_DESIGN §3/F: IRQ1 sets this only for the CUI shell. */
+static volatile u32 g_hwb_abort_pending = 0;
+
+u32 exec_hwb_abort_take(void)
+{
+    unsigned int flags = irq_save();
+    u32 pending = g_hwb_abort_pending;
+    g_hwb_abort_pending = 0;
+    irq_restore(flags);
+    return !!pending;
+}
 /* ======================================================================== */
 /*  GUI 入力ポンプと強制脱出 (K2 / 契約 T6・T8 の X4)                        */
 /* ======================================================================== */
@@ -35,17 +48,23 @@ volatile u32 ring3_abort_count = 0;
 /*  ring3_abort_request — CTRL+STOP を受けた (IRQ1 の ISR から呼ばれる)      */
 /*                                                                          */
 /*  ISR の中では畳まない (EOI も V86 反射も済んでいない)。CPL=3 アプリが      */
-/*  走っているときだけ要求を立てる。CUI でシェルしか居ないときは無視。        */
+/*  走っているときに要求を立てる。CUI シェルでは HW 専用の印だけ立てる。        */
 /* ======================================================================== */
 void ring3_abort_request(void)
 {
+    if (!con_sink_is_enabled() && appslot_cur() == APP_ID_SHELL) {
+        g_hwb_abort_pending = 1;
+        return;
+    }
+
     /* 票 T9 §12 S6: GUI 中は宛先 (フォーカス窓の連鎖の末尾、D8) を知って
      * いるのは WM だけなので、カーネルは立てない — 要求は raw リング経由で
      * WM へ届き、WM が exec_abort_clear → exec_kill(末尾) を実行する
      * (決裁 A1)。立てると「そのとき走っていた slot」= WAIT_POLL の sh や
      * 100ms タイマの端末が巻き込まれる (受入 S6 の 2 回目)。
      * 例外は暴走 (APP_RUNAWAY_TICKS 以上 WM へ戻っていない) だけ。
-     * CUI 中は 1 バイトも変えない (K2 の唯一の逃げ道)。 */
+     * CUI シェルは上の専用印だけを変え、AppSlot は変えない。
+     * CUI アプリの既存の中止経路はそのまま (K2)。 */
     if (!appslot_abort_admit(con_sink_is_enabled(), tick_count)) {
         appslot_stop_request();
         return;

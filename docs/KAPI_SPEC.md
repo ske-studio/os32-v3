@@ -2081,6 +2081,12 @@ app の終了・fault で残った lease は回収で閉じる (結線は T7b-b2
 
 ### §4-15 kdebug_call (v78)
 
+HW-BASIC は公開 KAPI を追加せず、この口の private `HW_OP` を使う。
+private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
+(末尾 314: `pci_hwb_read`、315: `pci_hwb_write`、316: `exec_hwb_abort_take`)。
+生成器で契約と ABI 指紋を再生成する。
+
+
 | オフセット | 名前 | 型 |
 |---|---|---|
 | 0x3FC | kdebug_call | `i32(u32 op, void *buf, u32 size)` |

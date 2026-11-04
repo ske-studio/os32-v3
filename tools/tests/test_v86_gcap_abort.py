@@ -88,7 +88,8 @@ def main():
                 'int v86_gdc_capture(int mode, V86Gcap *out)',
                 'int capture_body(int mode, V86Gcap *out)'))
             (work / 'facade.c').write_text(parts[paths[4]])
-            (work / 'kill.inc').write_text(''.join(function(parts[paths[2]], n) for n in (
+            hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', parts[paths[2]], re.M)[0]
+            (work / 'kill.inc').write_text(hwb_flag + '\n' + ''.join(function(parts[paths[2]], n) for n in (
                 'exec_exit', 'exec_pending_transfer', 'exec_pending_finish',
                 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill',
                 'ring3_abort_request', 'ring3_abort_check')))

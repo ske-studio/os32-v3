@@ -32,7 +32,7 @@ C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid
     kernel/ver_collect.c kernel/ver_format.c \
     kernel/console/font_source.c kernel/sqlite_engine.c kernel/sqlite_outer.c lib/sqlite3/os32_sqlite_test.c kernel/module/module.c kernel/module/hwdev_module.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/console/unicode_file.c kernel/ime/fep_module.c drivers/ata/cd_module.c drivers/video/kcg/kcg_module.c drivers/sound/fm/fm_module.c \
     drivers/input/kbd.c drivers/input/kbd_status.c drivers/input/kbd_dlog.c drivers/char/serial.c drivers/char/serial_plan.c \
-    drivers/block/fdc.c drivers/block/fdc_decide.c drivers/block/fdc_track.c drivers/dma/dma8237.c drivers/dma/dma8237_math.c lib/dma_contract.c drivers/pci/pci.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c drivers/ata/ide.c drivers/ata/ide_addr.c drivers/block/pc98pt.c drivers/char/rtc.c drivers/base/dev.c drivers/video/kcg/kcg.c drivers/char/np2sysp.c drivers/block/loop_dev.c \
+    drivers/block/fdc.c drivers/block/fdc_decide.c drivers/block/fdc_track.c drivers/dma/dma8237.c drivers/dma/dma8237_math.c lib/dma_contract.c drivers/pci/pci.c drivers/pci/pci_hwb.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c drivers/ata/ide.c drivers/ata/ide_addr.c drivers/block/pc98pt.c drivers/char/rtc.c drivers/base/dev.c drivers/video/kcg/kcg.c drivers/char/np2sysp.c drivers/block/loop_dev.c \
     drivers/input/mouse.c drivers/input/mouse_bus.c drivers/input/mouse_seamless.c \
     drivers/net/ne2000/lgy98.c drivers/net/ne2000/ne2000.c drivers/net/ne2000/ne2000_ring.c \
     drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \

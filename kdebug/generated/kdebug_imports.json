@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2120238464,
+  "module_abi_gen": 3637799731,
   "stage": "S6",
-  "count": 314,
+  "count": 317,
   "imports": [
     {
       "stage": "S1",
@@ -4748,6 +4748,54 @@
       "type_ver": 1,
       "signature": "i32 gf5_test(u32 session);",
       "source_declaration": "i32 gf5_test(u32 session);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 314,
+      "symbol": "pci_hwb_read",
+      "source": "drivers/pci/pci_hwb.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false,
+      "name": "pci_hwb_read",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 pci_hwb_read(u32 bdf, u32 offset, u32 width, u32 *value);",
+      "source_declaration": "u32 pci_hwb_read(u32 bdf, u32 offset, u32 width, u32 *value);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 315,
+      "symbol": "pci_hwb_write",
+      "source": "drivers/pci/pci_hwb.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false,
+      "name": "pci_hwb_write",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 pci_hwb_write(u32 bdf, u32 offset, u32 width, u32 value);",
+      "source_declaration": "u32 pci_hwb_write(u32 bdf, u32 offset, u32 width, u32 value);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 316,
+      "symbol": "exec_hwb_abort_take",
+      "source": "exec/exec_hwb.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": false,
+      "name": "exec_hwb_abort_take",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 exec_hwb_abort_take(void);",
+      "source_declaration": "u32 exec_hwb_abort_take(void);",
       "dtype": null,
       "array": false
     }

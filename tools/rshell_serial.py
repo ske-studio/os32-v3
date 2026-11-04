@@ -90,6 +90,11 @@ try:
 except ImportError:  # pragma: no cover
     rshell_peek = None
 
+try:
+    import rshell_hwb
+except ImportError:  # pragma: no cover
+    rshell_hwb = None
+
 # `serial N` を送ってから閉じるまでの間合い [秒]。9600 で 14 文字 ≒ 15ms なので
 # 十分な余裕。短くすると行の途中でポートを閉じてゲストが切り替えを始めない。
 SPEED_SWITCH_SETTLE_S = 0.5
@@ -480,6 +485,9 @@ def main():
     if rshell_peek is not None:
         p_peek = sub.add_parser("peek", help="ゲストの `peek` で読んで照合 (tools/rshell_peek.py)")
         rshell_peek.add_arguments(p_peek)
+    if rshell_hwb is not None:
+        p_hwb = sub.add_parser("hwb", help="collect HW records")
+        rshell_hwb.add_arguments(p_hwb)
     args = ap.parse_args()
 
     baud = args.baud
@@ -609,6 +617,17 @@ def run_peek(args, port, baud):
     return rshell_peek.run(args, send, baud)
 
 
+def run_hwb(args, port, baud):
+    def send(line, timeout_s):
+        text, ok = send_cmd(port, line, timeout_s)
+        if not ok:
+            return text, "timeout waiting for EOT (%.0fs)" % timeout_s
+        if not check_echo(text, line):
+            return text, "desync: expected echo of %r" % line
+        return text, None
+    return rshell_hwb.run(args, send, baud)
+
+
 def make_server(args):
     if not args.serve_host:
         return None
@@ -636,6 +655,8 @@ def run_mode(args, port, baud):
         return (0 if ok else 1), port, baud
     if args.mode == "peek":
         return run_peek(args, port, baud), port, baud
+    if args.mode == "hwb":
+        return run_hwb(args, port, baud), port, baud
     server = make_server(args)
     if args.mode == "cmd":
         line = " ".join(args.line)
