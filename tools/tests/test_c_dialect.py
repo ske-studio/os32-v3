@@ -736,8 +736,13 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # The real-tree warm run and the make variants share the persistent result cache
+    # (the same one the product check fills), so a warm cache skips both. Where that
+    # cache is off by default (CI), a suite-scoped one still lets the variants reuse
+    # the warm run. Fixture cases isolate their own OS32_CHECK_CACHE.
     with tempfile.TemporaryDirectory(prefix='c_dialect_suite_cache_') as cache:
-        os.environ['OS32_CHECK_CACHE'] = cache
+        if 'OS32_CHECK_CACHE' not in os.environ and os.environ.get('CI'):
+            os.environ['OS32_CHECK_CACHE'] = cache
         sys.exit(main(sys.argv[1:]))
 
 
