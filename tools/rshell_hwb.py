@@ -48,14 +48,33 @@ def inspect(text):
             rc = fields['rc']
             if not op or rc not in (('PENDING',) if phase == 'begin' else STATUS):
                 errors.append('invalid operation or rc')
+            numeric = []
             if re.fullmatch(r'(?:pci|io|mmio)(?:read|write)(?:8|16|32)', op):
-                for key in (('target', 'addr', 'val') if phase == 'begin'
-                            else ('addr', 'val')):
-                    if not fields[key]:
-                        raise ValueError('empty field')
-                for key in ('addr', 'val'):
-                    if not re.fullmatch(r'0x[0-9a-fA-F]+', fields[key]):
-                        raise ValueError('invalid hexadecimal field')
+                numeric += ['addr', 'val']
+            elif op == 'poll':
+                numeric += ['addr', 'val']  # poll-address: P9 includes final address
+                if phase == 'end':
+                    numeric += ['reads', 'elapsed_us']
+            elif op == 'wait':
+                numeric += ['requested_us']
+                if phase == 'end':
+                    numeric += ['elapsed_us']
+            elif phase == 'end' and rc == 'OK' and op in ('print', 'log'):
+                key = 'tag' if op == 'print' else 'text'
+                # hwb_log.c escapes spaces/controls as \xHH, quotes and slashes
+                # with a backslash. Empty quoted strings are valid.
+                if not re.fullmatch(r'"(?:[^"\\\x00-\x20\x7f]|\\(?:["\\]|x[0-9A-Fa-f]{2}))*"', fields[key]):
+                    raise ValueError('invalid quoted field')
+                if op == 'print':
+                    numeric += ['val']
+            for key in numeric:
+                # P9: address resolution failures still emit begin/end records.
+                if key == 'addr' and fields[key] == 'UNRESOLVED' and (
+                        phase == 'begin' or (phase == 'end' and rc != 'OK')):
+                    continue
+                pattern = r'[0-9]+' if key in ('reads', 'requested_us') else r'0x[0-9a-fA-F]+'
+                if not re.fullmatch(pattern, fields[key]):
+                    raise ValueError('invalid numeric field')
             if last is None and seq != 1:
                 errors.append('sequence gap or duplicate at %d' % seq)
             if phase == 'begin':
