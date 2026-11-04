@@ -54,6 +54,7 @@ GfxCounters gfx_counters = { 0, 0, 0, 0 };
 const GfxBackend *g_backend = &gfx_backend_pc98;
 
 static int gfx_started;
+int gfx_is_started(void) { return gfx_started; }
 /* Boot binds PC98 before DISPLAY registration; selection validates thereafter. */
 static int gfx_mode_ready = 1;
 u32 gfx_init_gen;

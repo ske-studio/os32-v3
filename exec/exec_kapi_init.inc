@@ -253,10 +253,13 @@ extern i32 __cdecl wrap_font_source_read_at(u32 id, u32 offset, void *dst, u32 l
 extern i32 __cdecl wrap_font_source_close(u32 id);
 extern i32 __cdecl wrap_kdebug_call(u32 op, void *buf, u32 size);
 extern int __cdecl wrap_sys_ver_info(void *out, u32 size);
+extern i32 __cdecl wrap_exec_stop_culprit(void);
+extern int __cdecl wrap_ime_dict_info(int key, int offset, char *out, int capacity);
+extern int __cdecl wrap_gfx_osri_show(const char *path, u32 duration_ms);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 79;
+kapi->version = 80;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -513,6 +516,9 @@ kapi->version = 79;
     kapi->font_source_close = wrap_font_source_close;
     kapi->kdebug_call = wrap_kdebug_call;
     kapi->sys_ver_info = wrap_sys_ver_info;
+    kapi->exec_stop_culprit = wrap_exec_stop_culprit;
+    kapi->ime_dict_info = wrap_ime_dict_info;
+    kapi->gfx_osri_show = wrap_gfx_osri_show;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

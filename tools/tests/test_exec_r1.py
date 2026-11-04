@@ -25,7 +25,7 @@ def function(s, name):
 
 
 def landing(s, start, buf, name):
-    a = s.index('    volatile Ring3CallContext caller_context;', s.index(start))
+    a = s.index('    volatile int x87_depth =', s.index(start))
     jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
     b = s.index('\n    }', jump) + len('\n    }')
     return ('static int ' + name + '_body(void) {\n'
@@ -35,7 +35,9 @@ def landing(s, start, buf, name):
             '    simulate(); return 99;\n}\n'
             'static int ' + name + '(void) {\n'
             '    u32 before = tss_get_esp0();\n'
+            '    x87_restores = 0;\n'
             '    int rc = ' + name + '_body();\n'
+            '    CHECK(x87_restores == 1 && x87_last == &x87_parent[exec_nest_level]);\n'
             '    CHECK(tss_get_esp0() == before);\n'
             '    return rc;\n}\n')
 
@@ -74,6 +76,12 @@ static int v86_call_dispatch(u32 slot, void *fn, const void *args, u32 bytes, u3
     return 0;
 }
 static void exec_stop_mark(void) {}
+static X87State x87_parent[APP_SLOT_COUNT];
+static int x87_saves;
+void x87_save(X87State *p) { (void)p; x87_saves++; }
+static int x87_restores;
+static const X87State *x87_last;
+void x87_restore(const X87State *p) { x87_restores++; x87_last = p; }
 static AppSlot slots[APP_SLOT_COUNT];
 static AppSlot *g_cur_app;
 static int stdin_resume_test;
@@ -94,6 +102,9 @@ static int g_last_kind, g_last_code;
 static u32 g_exit_jmpbuf[KSETJMP_BUF_LEN];
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
+int appslot_kill_check(int id) { CHECK(id == 2); return 0; }
+int launch_chain(int id, int *chain, int cap)
+{ CHECK(id == 2 && cap >= 1); chain[0] = id; return 1; }
 static void _stop(void) { die(__LINE__); }
 static void _enable(void) { CHECK(!kctx_irq_depth && !kctx_exc_depth); host_if = 1; }
 u32 paging_kernel_pd_phys(void) { return 1; }
@@ -346,7 +357,7 @@ static int test(void) {
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
     CHECK(sizeof(VfsStdinRead) == 16);
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(X87State));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
@@ -445,7 +456,9 @@ static int test(void) {
         cur = owner = cr3 = 1; g_cur_app = 0; host_wm_kill = 1;
         ring3_transition_count = 0;
         slots[2].state = state;
-        exec_kill_one(2);
+        x87_saves = x87_restores = 0; x87_last = 0;
+        CHECK(exec_kill(2) == 0);
+        CHECK(x87_saves == 0 && x87_restores == 0 && x87_last == 0);
         CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
         CHECK(slots[2].state == APP_STATE_FREE && slots[3].state == APP_STATE_RUNNING);
         CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
@@ -554,7 +567,7 @@ def run(source=None, irq=None):
              'ring3_wm_enter', 'ring3_wm_leave', 'ring3_syscall_dispatch',
              'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
-             'exec_kill_one', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
+             'exec_kill_one', 'exec_kill', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
     access = (ROOT / 'exec/redir_access.c').read_text()
     stdin_start = source.index('VfsStdinRead *exec_stdin_state(')
@@ -633,6 +646,12 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
+     '    x87_restore(&a->x87_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
+    ('x87-launch-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
+     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
+    ('x87-resume-landing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
+     '        exec_pending_finish();\n        (void)x87_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        g_cur_frame[APP_FRAME_EAX] != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
     ('stdin-no-rewind', '    if (restart_stdin) a->frame[APP_FRAME_EIP] -= 2;', ''),
@@ -678,10 +697,10 @@ MUTATIONS = (
     ('landing-if-missing', '    _enable();\n    v86_session_end();', '    v86_session_end();'),
     ('pending-consumed-twice', '    g_pending_id = 0;             /* callback',
      '    g_pending_id = id;            /* callback'),
-    ('resume-landing-missing', '        exec_pending_finish();\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
-     '        _enable();\n        if (g_longjmp_reason'),
-    ('launch-landing-missing', '        exec_pending_finish();\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        _enable();\n        /* 畳み'),
+    ('resume-landing-missing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
+     '        x87_restore(&x87_parent[x87_depth]);\n        _enable();\n        if (g_longjmp_reason'),
+    ('launch-landing-missing', '        exec_pending_finish();\n        x87_restore(&x87_parent[x87_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
+     '        x87_restore(&x87_parent[x87_depth]);\n        _enable();\n        /* 畳み'),
 )
 
 if __name__ == '__main__':

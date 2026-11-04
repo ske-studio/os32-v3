@@ -362,6 +362,8 @@ offset	KernelAPI.exec_run	164
 member_size	KernelAPI.exec_run	4
 offset	KernelAPI.exec_start	728
 member_size	KernelAPI.exec_start	4
+offset	KernelAPI.exec_stop_culprit	1028
+member_size	KernelAPI.exec_stop_culprit	4
 offset	KernelAPI.ext2_format	240
 member_size	KernelAPI.ext2_format	4
 offset	KernelAPI.ext2_format_at	928
@@ -402,6 +404,8 @@ offset	KernelAPI.gfx_init_200	12
 member_size	KernelAPI.gfx_init_200	4
 offset	KernelAPI.gfx_lease_palette	704
 member_size	KernelAPI.gfx_lease_palette	4
+offset	KernelAPI.gfx_osri_show	1036
+member_size	KernelAPI.gfx_osri_show	4
 offset	KernelAPI.gfx_present	20
 member_size	KernelAPI.gfx_present	4
 offset	KernelAPI.gfx_present_dirty	376
@@ -454,6 +458,8 @@ offset	KernelAPI.ide_write_sector	264
 member_size	KernelAPI.ide_write_sector	4
 offset	KernelAPI.ide_write_sectors	268
 member_size	KernelAPI.ide_write_sectors	4
+offset	KernelAPI.ime_dict_info	1032
+member_size	KernelAPI.ime_dict_info	4
 offset	KernelAPI.ime_feed_key	720
 member_size	KernelAPI.ime_feed_key	4
 offset	KernelAPI.ime_get_mode	428
@@ -484,8 +490,8 @@ offset	KernelAPI.ime_user_export	652
 member_size	KernelAPI.ime_user_export	4
 offset	KernelAPI.ime_user_list	644
 member_size	KernelAPI.ime_user_list	4
-offset	KernelAPI.kapi_reserved	1028
-member_size	KernelAPI.kapi_reserved	180
+offset	KernelAPI.kapi_reserved	1040
+member_size	KernelAPI.kapi_reserved	168
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1188,7 +1194,7 @@ offset	V86GcapOut.value	6
 member_size	V86GcapOut.value	2
 offset	V86GcapOut.width	12
 member_size	V86GcapOut.width	1
-size	struct GfxBackend	108
+size	struct GfxBackend	112
 align	struct GfxBackend	4
 offset	struct GfxBackend.bb_base	44
 member_size	struct GfxBackend.bb_base	4
@@ -1226,6 +1232,8 @@ offset	struct GfxBackend.modes	64
 member_size	struct GfxBackend.modes	4
 offset	struct GfxBackend.name	0
 member_size	struct GfxBackend.name	4
+offset	struct GfxBackend.osri_show	108
+member_size	struct GfxBackend.osri_show	4
 offset	struct GfxBackend.page_flip	100
 member_size	struct GfxBackend.page_flip	4
 offset	struct GfxBackend.prepare	60

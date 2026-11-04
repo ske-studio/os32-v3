@@ -142,6 +142,18 @@ void appslot_stop_request(void)
         a->stop_wm_req = 1;
 }
 
+/* Read-only WM query: ordinary poll/yield parks are not STOP culprits. */
+int appslot_stop_culprit(void)
+{
+    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++) {
+        AppSlot *a = appslot_get(id);
+        if (a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)
+            return id;
+    }
+    return 0;
+}
+
 int appslot_stop_pending(void)
 {
     AppSlot *a = appslot_get(g_cur);

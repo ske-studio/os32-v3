@@ -312,6 +312,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     }
 
     /* ======== setjmp — この ID の呼び出し元へ帰る点 ======== */
+    volatile int x87_depth = exec_nest_level;
     volatile Ring3CallContext caller_context;
     ring3_context_save(&caller_context);
     if (exec_setjmp(ctx->jmpbuf) != 0) {
@@ -324,6 +325,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * してくる (exec_longjmp は EFLAGS を復元しない)。呼び出し元は常に
          * 割り込み有効で動いているので、ここで無条件に開けてよい。 */
         exec_pending_finish();
+        x87_restore(&x87_parent[x87_depth]);
         ring3_context_restore(&caller_context);
         _enable();
         /* 畳み (終了 / fault / CTRL+STOP) も park も、戻す作業は
@@ -394,6 +396,9 @@ static int exec_launch(const char *cmdline, int gui_arg)
         else if (exec_heap_size) exec_heap_init_at(exec_heap_base, exec_heap_size);
 
         if (want_ring3) kselftest_run_audit("AS-launch");
+
+        x87_save(&x87_parent[x87_depth]);
+        x87_init();
 
         /* ======== ここで初めて「走っているのはこの ID」になる ======== */
         if (is_shell) {

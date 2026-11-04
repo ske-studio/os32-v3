@@ -26,7 +26,7 @@ ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) exec/rin
 
 # === カーネル C ソース ===
 C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid.c drivers/video/geforce/tv_data.c drivers/video/geforce/gf_display_data.c \
-    arch/x86/kernel/mtrr_wc.c \
+    arch/x86/kernel/mtrr_wc.c arch/x86/kernel/x87.c \
     init/boot_platform.c init/boot_display.c platform/pc98/emergency.c platform/pc98/boot.c kernel/console/font_guard.c init/kernel.c kernel/kstack_hw.c arch/x86/kernel/gdt.c arch/x86/kernel/double_fault.c arch/x86/kernel/tss.c kernel/v86/v86.c kernel/v86/v86_mem.c kernel/v86/v86_snapshot.c kernel/v86/v86_module.c kernel/v86/v86_gcap.c kernel/module/kdebug_call.c init/boot_splash.c platform/pc98/splash.c platform/pc98/splash_image.c arch/x86/kernel/idt.c arch/x86/kernel/isr_handlers.c kernel/time/cpu_calibrate.c kernel/time/cpu_calibrate_math.c kernel/time/sysclk.c platform/pc98/clock.c kernel/time/pit.c platform/pc98/timer.c kernel/time/pit_math.c init/bootinfo.c init/bootinfo_check.c \
     mm/paging.c mm/paging_app.c mm/dma_pool.c mm/dma_pool_math.c mm/physmem.c mm/pgalloc.c platform/pc98/lan_match.c platform/pc98/device_loop.c platform/pc98/device_ide.c platform/pc98/device_fs.c platform/pc98/device_pci.c platform/pc98/device_host.c platform/pc98/device_kcg.c platform/pc98/pci_resources.c platform/pc98/boot_disk.c mm/memory_boot.c platform/pc98/memory.c mm/shlib.c mm/shm.c kernel/gui.c kernel/input_service.c kernel/time/clock_service.c kernel/port_service.c kernel/serial_diag.c platform/pc98/d2_bind.c platform/pc98/boot_names.c mm/kmalloc.c kernel/console/console.c platform/pc98/console.c platform/pc98/display.c kernel/console/con_sink.c init/bootlog.c init/bootlog_save.c kernel/kbd_inject.c kernel/sys.c platform/pc98/system.c platform/pc98/pic.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/irq/tick.c kernel/time/ktime.c kernel/time/time_math.c \
     kernel/ver_collect.c kernel/ver_format.c \
@@ -38,17 +38,17 @@ C_KERNEL = kdebug/gf5_test.c kdebug/gf_display_test.c drivers/video/geforce/edid
     drivers/sound/cs4231/pcm_module.c drivers/net/e82557/lan_module.c \
     drivers/video/cirrus/cirrus_module.c drivers/video/geforce/geforce_module.c drivers/video/geforce/geforce_platform.c drivers/video/geforce/gf_wc.c drivers/video/pc98/pc98_route.c drivers/video/cirrus/cirrus_identify.c \
     net/link.c \
-    gfx/gfx_core.c gfx/gfx_osri.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pegc.c \
+    gfx/gfx_core.c gfx/gfx_osri.c gfx/gfx_osri_view.c gfx/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pc98_osri.c drivers/video/pc98/backend_pegc.c \
     fs/fat/fatfs/ff.c fs/fat/fatfs/diskio.c fs/fat/fatfs_vfs.c \
     fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c \
     exec/exec.c exec/shell_service.c exec/v86_call.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
-    kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_host.c \
+    kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_osri.c kapi/kapi_host.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
     lib/divdi3.c $(KSTRING_C_SRC) \
     drivers/video/pc98/splash_raster.c \
     drivers/video/pc98/splash_raster_image.c \
     drivers/video/pc98/splash_raster_plan.c \
-    drivers/video/pc98/splash_raster_play.c
+    drivers/video/pc98/splash_raster_play.c drivers/video/pc98/splash_raster_run.c
 
 ifeq ($(SPLASH_DIAG_BUILD),1)
 ifeq ($(SPLASH_OBS_BUILD),1)

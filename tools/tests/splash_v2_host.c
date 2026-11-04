@@ -6,6 +6,7 @@
 #define IO_H
 static int irq_on = 1;
 static int _irq_enabled(void) { return irq_on; }
+#include "../../drivers/video/pc98/splash_raster_run.c"
 #include "../../platform/pc98/splash_image.c"
 #include "../../drivers/video/pc98/splash_raster_plan.c"
 

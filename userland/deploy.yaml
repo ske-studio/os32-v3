@@ -85,6 +85,12 @@ filesystem:
     - host: userland/tests/h3b.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/fp_stop.bin
+      guest: /usr/bin/
+      tags: [test]
+    - host: userland/tests/stop_loop.bin
+      guest: /usr/bin/
+      tags: [test]
     # --- T2g / GK-3 cooperative trim fixtures (interactive) ---
     - host: userland/tests/trim_back.bin
       guest: /usr/bin/

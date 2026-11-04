@@ -53,7 +53,7 @@
 //!   `ma_pick_poll` (`tools/tests/multiapp_model_host.c`) はまだ T8 の
 //!   「ID 昇順」のままで、この 1 点だけ 1 対 1 ではない — 巡回と tick の
 //!   検査は `userland/gshell/host/wm_tests.rs` の T9-W 検査 6 / 7 が持つ。
-//! - CTRL+STOP の宛先は要求表の連鎖の**末尾** ([`abort_target`] / [`chain_tail`])。
+//! - CTRL+STOP は STOP park の張本人を優先し、居なければ要求表の連鎖の**末尾** ([`abort_target`] / [`chain_tail`])。
 
 use crate::wm::GuiState;
 use crate::{damage, ring, session, timer};
@@ -175,6 +175,8 @@ pub struct Multi {
     /// フォーカス窓の**別の**アプリだったとき、走っている本人が負っている
     /// 要求を降ろす。KAPI は owner 1 からしか通らない (K5c) ので予約にする。
     abort_clear_req: bool,
+    /// STOP の予約宛先。追跡表にない ID も保持し、top-level で張本人を優先する。
+    abort_kill_target: i32,
     /* ---- ポーリング群の公平性 (票 T9 D5) ---------------------------- *
      * 票は「状態は `GuiState` に持つ」と書いているが、譲り合いの控え
      * (`last_run` / `input_streak` / `turn_used`) は全部この私有の表にある。
@@ -205,6 +207,7 @@ impl Multi {
         snd_owner: APP_ID_SHELL,
         pending_start: false,
         abort_clear_req: false,
+        abort_kill_target: 0,
         poll_last: 0,
         poll_choice: 0,
         injected_keys: [false; MAX_APPS],
@@ -473,12 +476,8 @@ fn has_top_level_work(mm: &Multi) -> bool {
 /// (票 T9 D8、実機受入 S6 の修正 2026-09-13)。呼ぶのは単独ループの
 /// [`crate::top_level_abort`] だけ。戻り値は畳んだ ID (0 = 何も畳まなかった)。
 ///
-/// `redirect_abort` (予約) ではなく直接実行にしてあるのは 2 つの理由:
-///
-/// - 予約 (`request_kill`) は **WM の表に載っている ID** にしか積めない。連鎖の
-///   末尾が何かの拍子に表から落ちていると、CTRL+STOP が黙って消える。
-/// - ここは既に owner 1 の文脈なので、`exec_abort_clear` も `exec_kill` も
-///   その場で通る (`drain_top_level` と同じ地点)。
+/// ここは既に owner 1 の文脈なので、`exec_abort_clear` も `exec_kill` も
+/// その場で通る (`drain_top_level` と同じ地点)。
 ///
 /// `exec_abort_clear()` を**必ず先に**呼ぶ (決裁 A1 と同じ順序)。IRQ1 は宛先を
 /// 選べないので、走っていた別の 1 本に要求が載っていることがある — 降ろさずに
@@ -527,9 +526,7 @@ pub fn abort_at_top_level(st: &GuiState) -> i32 {
 /// 予約する — 誰も死なないが、カーネルに載ったかもしれない要求は降ろす。
 pub fn reserve_abort_self(st: &GuiState, cur: i32) {
     m().abort_clear_req = true;
-    if abort_target(st) == cur {
-        request_kill(cur);
-    }
+    m().abort_kill_target = if abort_target(st) == cur { cur } else { 0 };
 }
 
 pub fn redirect_abort(st: &GuiState, cur: i32) {
@@ -541,9 +538,7 @@ pub fn redirect_abort(st: &GuiState, cur: i32) {
         return;
     }
     m().abort_clear_req = true;
-    /* フォーカス窓の owner が WM の握るアプリでなければ (シェル帯の窓など)
-     * 畳む相手は居ない。取り消しだけ行う = 誰も死なない。 */
-    request_kill(f);
+    m().abort_kill_target = f;
 }
 
 /* ================================================================ */
@@ -1220,8 +1215,19 @@ fn drain_top_level() -> bool {
     let mut did = false;
     if mm.abort_clear_req {
         mm.abort_clear_req = false;
+        // op_wait could only query as the application owner (ERR_INVAL).
+        // Resolve again as WM before clearing the request or resuming anyone.
+        let culprit = stop_culprit();
+        let target = if culprit != 0 { culprit } else { mm.abort_kill_target };
+        mm.abort_kill_target = 0;
         unsafe {
             (os32api::api().exec_abort_clear)();
+        }
+        if target >= APP_ID_MIN && target <= APP_ID_MAX {
+            if kill_for_request(target) >= 0 {
+                forget(target);
+            }
+            return true;
         }
         did = true;
     }
@@ -1330,7 +1336,7 @@ pub fn abort_targets_current(st: &GuiState, cur: i32) -> bool {
     f == 0 || f == cur
 }
 
-/// CTRL+STOP の宛先 (0 = 宛先なし)。
+/// CTRL+STOP の宛先 (0 = 宛先なし)。STOP park の張本人は連鎖を辿らず返す。
 ///
 /// 頭は**フォーカス窓のアプリ** (契約 T6)。**全画面 GFX 中だけは画面の
 /// 所有者** (票 T8 D4d) — 画面を持っているプログラムは窓を持たないので、
@@ -1340,12 +1346,22 @@ pub fn abort_targets_current(st: &GuiState, cur: i32) -> bool {
 /// 端末 → `sh` → 子 と積み上がっているとき、頭 (端末) を畳むと `sh` と子が
 /// 孤児になる。畳むのは末尾 1 本で、`sh` はその `DONE` を受けて `sh> ` に戻る。
 pub fn abort_target(st: &GuiState) -> i32 {
+    let culprit = stop_culprit();
+    if culprit != 0 {
+        return culprit;
+    }
     let owner = crate::fullscreen::owner();
     let head = if owner != 0 { owner } else { st.front_owner() };
     if head == 0 {
         return 0;
     }
     chain_tail(head)
+}
+
+/// owner 1 以外 (op_wait 内) の ERR_INVAL は宛先として使わない。
+fn stop_culprit() -> i32 {
+    let id = unsafe { (os32api::api().exec_stop_culprit)() };
+    if id >= APP_ID_MIN && id <= APP_ID_MAX { id } else { 0 }
 }
 
 /// `launch_child` を末尾まで辿る (票 T9 D8)。**同じ ID が 2 度出たら止める** —

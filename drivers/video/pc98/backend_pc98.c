@@ -125,6 +125,12 @@ static void pc98_set_palette(int first, int count, const u8 *rgb)
 static void pc98_enter(void) { }
 static void pc98_leave(void) { }
 
+/* gfx_osri_show の hook の実体は backend_pc98_osri.c (1 機能 1 ファイル)。weak なので
+ * それを組まない host の土台では NULL (= gfx_osri_show は NOSYS)。カーネルは必ず組む。 */
+struct OsriImage;
+struct OsriViewRun;
+int pc98_osri_show(const struct OsriImage *image, struct OsriViewRun *ctl) __attribute__((weak));
+
 /* ------------------------------------------------------------------------ */
 /*  バックエンド表。fill_rect / blit は NULL = CPU 共通実装へフォールバック。 */
 /* ------------------------------------------------------------------------ */
@@ -149,5 +155,6 @@ GfxBackend gfx_backend_pc98 = {
     sizeof(pc98_modes) / sizeof(pc98_modes[0]),
     PC98_MODE_400,           /* default_mode */
     (const GfxMode *)0       /* selected_mode */,
-    .set_mode = 0             /* optional display hooks default to unavailable */
+    .set_mode = 0,            /* optional display hooks default to unavailable */
+    .osri_show = pc98_osri_show
 };

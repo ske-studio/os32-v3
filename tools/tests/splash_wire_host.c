@@ -17,6 +17,7 @@ int sys_time_now(u32 *lo, u32 *hi);
 #include "../../drivers/video/pc98/splash_raster_plan.c"
 #include "../../drivers/video/pc98/splash_raster_play.c"
 #include "../../drivers/video/pc98/splash_raster_image.c"
+#include "../../drivers/video/pc98/splash_raster_run.c"
 #include "../../platform/pc98/splash_image.c"
 #include "../../init/boot_splash.c"
 
