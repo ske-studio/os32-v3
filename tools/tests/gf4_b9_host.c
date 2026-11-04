@@ -26,7 +26,7 @@
 #define GF4_HOST_UNIT 9
 #include "gf4_display_fake.h"
 #define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
-#define T_DAC_A 0x68052cU
+/* nouveau dispnv04/nvreg.h:329-330,348; dac.c:41-51,364-444. */
 #define T_DAC_B 0x68252cU
 #define T_TEST_B 0x682608U
 #define T_TEST_VALUE 0x00100000U
@@ -36,6 +36,7 @@
 static struct gf4_host host;
 static struct gf4_state state;
 static struct gf4_host_event events[64];
+static struct gf3_host_reg regs[GF4_HEADS];
 static int test(void)
 {
     struct gf4_route wired={.connector=2,.head=0,.type=GF4_ANALOG,.or_mask=2,
@@ -44,9 +45,13 @@ static int test(void)
     struct gfinit_mode mode={0};
     gf4_host_init(&host,&state);
     host.events=events; host.cevents=sizeof(events)/sizeof(events[0]);
+    host.base.regs=regs; host.base.cregs=sizeof(regs)/sizeof(regs[0]);
     host.ctx.routes=&wired; host.ctx.nroutes=1;
     route.head=1;
     REQUIRE(!gf4_route_check(&host.ctx,&route));
+    route.head=GF4_HEADS;
+    REQUIRE(gf4_route_check(&host.ctx,&route)==GF4_EINVAL);
+    route.head=1;
     route.connector++;
     REQUIRE(gf4_route_check(&host.ctx,&route)==GF4_ENODEV);
     route=wired; route.head=1; route.max_khz++;
@@ -80,12 +85,26 @@ static int test(void)
     REQUIRE(host.events[3].a[3]==(T_INITIAL|T_HEAD_B|T_ENABLE));
     REQUIRE(host.events[4].a[1]==T_TEST_B && host.events[4].a[3]==T_TEST_VALUE);
     REQUIRE(host.events[6].a[3]==(T_INITIAL|T_HEAD_B|T_ENABLE));
-    gf4_host_trace_clear(&host);
-    gf4_host_reads(&host,reads,1);
-    gf4_host_fail_at(&host,D_READ,1,GF2_EIO);
-    REQUIRE(gf4_analog_load(&host.ctx,&route,&mode,0)==GF2_EIO);
-    REQUIRE(host.nevents==1 && !host.calls[D_WRITE]);
-    (void)T_DAC_A;
+    /* The load sequence is OFF R/W, select R/W, TEST W, ON R/W. */
+    const enum gf4_host_op sequence[]={D_READ,D_WRITE,D_READ,D_WRITE,
+                                       D_WRITE,D_READ,D_WRITE};
+    struct gf4_state before;
+    gf2_host_memcpy(&before,&state,sizeof(before));
+    for (u32 failure=0;failure<sizeof(sequence)/sizeof(sequence[0]);failure++) {
+        u32 nth=0;
+        for (u32 i=0;i<=failure;i++) if (sequence[i]==sequence[failure]) nth++;
+        gf4_host_trace_clear(&host);
+        gf4_host_reads(&host,load_reads,sizeof(load_reads)/sizeof(load_reads[0]));
+        gf4_host_fail_at(&host,D_READ,0,0);
+        gf4_host_fail_at(&host,D_WRITE,0,0);
+        gf4_host_fail_at(&host,sequence[failure],nth,GF2_EIO);
+        REQUIRE(gf4_analog_load(&host.ctx,&route,&mode,0)==GF2_EIO);
+        REQUIRE(host.nevents==failure+1U);
+        for (u32 i=0;i<host.nevents;i++) REQUIRE(host.events[i].op==sequence[i]);
+        REQUIRE(host.events[failure].rc==GF2_EIO);
+        const u8 *actual=(const u8 *)&state,*expected=(const u8 *)&before;
+        for (u32 i=0;i<sizeof(state);i++) REQUIRE(actual[i]==expected[i]);
+    }
     return 0;
 }
 void _start(void)

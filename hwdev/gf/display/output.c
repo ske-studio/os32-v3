@@ -68,7 +68,8 @@ static bool route_equal(const struct gf4_route *a,const struct gf4_route *b)
 i32 gf4_route_check(struct gf4_ctx *ctx,const struct gf4_route *route)
 {
     if (!ctx || !ctx->state || !route || (ctx->nroutes && !ctx->routes)) return GF4_EINVAL;
-    if (route->head>=GF4_HEADS || !(route->head_mask & (1U<<route->head)) ||
+    if (route->head>=GF4_HEADS) return GF4_EINVAL;
+    if (!(route->head_mask & (1U<<route->head)) ||
         !route->or_mask || (route->or_mask & (route->or_mask-1U)) || route->or_mask>OUT_OR_D)
         return GF4_ENODEV;
     bool found=false;
