@@ -141,6 +141,9 @@ static void shell_fault(void)
 static void wc_recovery_run(void)
 {
     map_host(0x10000,0xff0000);map_host(GF_TEST_DISPLAY,MEM_GFX_BB8_SIZE);
+    map_host(GF_TEST_BAR0,GF_PRODUCTION_BAR0_BYTES);
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VRAM_SIZE_REG)=0x8000000U;
+    *(volatile u32 *)(GF_TEST_BAR0+GF_VS_REG)=0x700U;
     boot();gfx_set_backend_pref(GFX_PREF_GEFORCE);gfx_boot_reserve();
     struct geforce_platform *p=geforce_platform_get();
     const struct gf3_test_ops *accel=0;

@@ -113,7 +113,7 @@ int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
     stage = "map_vram";
     available = f->imem.vram_bytes - f->imem.reserved;
     if (available < GF2_PUSH_BYTES) { rc = GF2_ENOSPC; goto fail; }
-    ch->B = (available - GF2_PUSH_BYTES) & ~(GF2_PUSH_ALIGN - 1U);
+    ch->B = gf_push_base(available);
     if (ch->B < GF2_PUSH_MIN_BASE) { rc = GF2_ENOSPC; goto fail; }
     rc = gf2_map_vram(ch, ch->B, GF2_PUSH_BYTES, &ch->va);
     if (rc) goto fail;
