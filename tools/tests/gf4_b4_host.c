@@ -159,6 +159,52 @@ static void base_and_errors(void)
     state.truncated=true; state.last_rc=GF4_EEDID; setup(); accepted_base();
     assert(!state.truncated && !state.last_rc && state.ntiming==1);
 }
+/* CEA-861-D table 27 byte 3: native count covers the original DTD
+ * sequence, starting in base EDID. Unsupported and duplicate DTDs still
+ * occupy positions; monitor descriptors and SVDs do not. */
+static void native_dtd_order(void)
+{
+    /* A later CTA count can identify a nonpreferred legacy base DTD. */
+    setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0; accepted_base();
+    assert(state.preferred==NO_PREFERRED);
+    cta_one(0); b[2]=4; b[3]=1; seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==0);
+    equal(&state.timing[0],&vga_dtd);
+    /* Unsupported base DTD consumes the only native position. */
+    setup(); b[DTD+17]=0; accepted_base();
+    assert(!state.ntiming && state.last_rc==GF4_EUNSUPPORTED);
+    cta_one(0); b[2]=4; b[3]=1; vga(4); seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
+           state.preferred==NO_PREFERRED);
+    equal(&state.timing[0],&vga_dtd);
+    /* Unsupported native CTA DTD cannot confer priority on its successor. */
+    empty_base(); accepted_base();
+    cta_one(0); b[2]=4; b[3]=1; vga(4); b[4+17]=0;
+    vga(4+DESC_BYTES); seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
+           state.preferred==NO_PREFERRED && state.last_rc==GF4_EUNSUPPORTED);
+    /* The second extension's native count refers back to the first DTD,
+     * rather than starting at the second extension's distinct timing. */
+    empty_base(); accepted_base(); cta_one(0); b[2]=4; vga(4); seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.preferred==NO_PREFERRED);
+    b[3]=1; b[4]++; seal();
+    assert(gf4_edid_modes(b,2,&state)==0 && state.ntiming==2 && state.preferred==0);
+    equal(&state.timing[0],&vga_dtd);
+    assert(state.timing[1].khz==vga_dtd.khz+10);
+    /* Deduplication must not collapse original DTD positions. */
+    setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0;
+    b[DTD+17]=0; vga(DTD+DESC_BYTES); b[DTD+DESC_BYTES+17]=0;
+    accepted_base();
+    cta_one(0); b[2]=4; b[3]=2; vga(4); seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==1 &&
+           state.preferred==NO_PREFERRED);
+    /* A duplicate supported DTD likewise consumes a position. */
+    setup(); b[EDID_REVISION]=3; b[EDID_FEATURES]=0;
+    vga(DTD+DESC_BYTES); accepted_base();
+    cta_one(0); b[2]=4; b[3]=3; vga(4); b[4]++; seal();
+    assert(gf4_edid_modes(b,1,&state)==0 && state.ntiming==2 && state.preferred==0);
+    equal(&state.timing[0],&vga_dtd);
+}
 static void extensions(void)
 {
     setup(); accepted_base();
@@ -470,7 +516,7 @@ static void vic_and_capacity(void)
 }
 void _start(void)
 {
-    base_and_errors(); extensions(); interlace_and_sync();
+    base_and_errors(); extensions(); native_dtd_order(); interlace_and_sync();
     dmt_and_established(); formula_and_range(); vic_and_capacity();
     gf2_host_exit(0);
 }
