@@ -204,4 +204,6 @@ CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.
 [MIT License](LICENSE)。取り込んでいる第三者の部品 (SQLite、zlib、FatFs、IPADIC、IPAex フォントなど) と
 その配布条件は [THIRD_PARTY.md](THIRD_PARTY.md)。ホストの Python 依存は [requirements.txt](requirements.txt)。
 
+PCM の合成器 (OPNA、実装予定) は **fmgen** (Copyright (C) cisc 1998, 2003) を手本にします。fmgen の条件 (出所と著作権の明記・フリーソフトとして配布・改変の明示・作者の `fmgen_readme.txt` を改変せず添付) は、MIT のフリーソフトである OS32 で満たします。fmgen 由来の部分は MIT ではなく fmgen の条件のままで、**商用ソフトへの組み込みには作者の事前の合意が要ります**。取り込むときに THIRD_PARTY.md と添付文書に記します。
+
 Copyright (c) 2025-2026 すけさん
