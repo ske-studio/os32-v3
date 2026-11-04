@@ -1,4 +1,6 @@
-"""Explicit enc2 host experiments. S1 can limit planned rows; full runs belong to S3.
+"""Explicit enc2 C11 host experiments, retaining Python S1 as an oracle.
+
+Build first: make osri-enc2-core
 
 Example: python3 -B tools/osri_enc2_compare.py photo.png --output-dir OUT
          --row-start 198 --row-count 1
@@ -18,9 +20,9 @@ import numpy as np
 from PIL import Image, __version__ as pillow_version
 from img2osri import resize_image, quantized_colors, optimize_row
 from osri_enc2_spec import BUDGETS, Config, VERSION, components
-from osri_enc2_plan import prepare, plan
+from osri_enc2_plan import prepare
+from osri_enc2_native import plan, quantize
 from osri_enc2_order import optimize_order
-from osri_enc2_dither import quantize
 from osri_enc2_metrics import metrics
 from osri_enc2_pack import pack
 from osri_enc2_decode import decode
@@ -95,7 +97,8 @@ def compare(path, output_dir, cfg=Config(), row_start=1, row_count=399):
                                      plan_seconds=seconds, quantize_seconds=quantize_seconds,
                                      metrics_seconds=metrics_seconds, pack_seconds=pack_seconds,
                                      seconds=seconds + quantize_seconds + metrics_seconds + pack_seconds,
-                                     RSS_KiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                                     RSS_KiB=max(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                                                 resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss),
                                      CRC=crc))
         # Write incremental tables too; a later slow budget does not erase evidence.
         write_tables(out, rows, path, cfg, prepared[2])
@@ -114,10 +117,11 @@ def write_tables(out, rows, source, cfg, stages):
                     resize='img2osri.resize_image: black composite, LANCZOS thumbnail, centered 640x400',
                     RGB='RGB444 expanded by 17; original RGB8 optimization input',
                     diffusion='one signed integer FS pass, LTR, per-contribution truncation toward zero',
-                    numpy=np.__version__, Pillow=pillow_version)
-    text = '# enc2 S1 comparison\n\n' + '```json\n' + json.dumps(metadata, indent=2) + '\n```\n\n'
+                    numpy=np.__version__, Pillow=pillow_version, backend='C11',
+                    RSS='max of parent/children process peaks, KiB (not simultaneous total)')
+    text = '# enc2 C11 comparison\n\n' + '```json\n' + json.dumps(metadata, indent=2) + '\n```\n\n'
     text += ('Scope: ' + rows[0]['scope'] +
-             '. Only listed rows and the initial palette are optimized; other palettes are frozen after forward initialization.\n\n')
+             '. All listed rows and the initial palette are optimized; any unlisted rows are frozen after forward initialization.\n\n')
     text += '|B|method|FS|timed|SSE|PSNR|blur MSE|OUT max/mean|K total/max|width|seconds|CRC|\n'
     text += '|---|---|---|---|---|---|---|---|---|---|---|---|\n'
     for r in rows:

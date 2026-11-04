@@ -153,3 +153,13 @@ clean-assets:
 	rm -f $(filter-out $(GUI_FONT_FILES),$(ASSETS_ALL)) $(PRELOAD16)
 
 .PHONY: fonts fonts-clean assets-deployed assets-all clean-assets
+
+# Explicit experimental host encoder; never linked into a guest image.
+HOSTCC ?= gcc
+ENC2_CORE = $(BUILD_OUT)/osri-enc2-core
+$(ENC2_CORE): tools/osri_enc2_core.c
+	@mkdir -p $(dir $@)
+	$(HOSTCC) -std=c11 -O3 -Wall -Wextra -Werror -Wvla $< -o $@
+
+osri-enc2-core: $(ENC2_CORE)
+.PHONY: osri-enc2-core

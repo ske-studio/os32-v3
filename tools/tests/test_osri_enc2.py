@@ -1,8 +1,9 @@
 """S1 integer oracle, timing/prefix, two-sided planning and v2 round trips."""
-CHECK = dict(name='osri-enc2', tier=1, needs=[], budget=90,
+CHECK = dict(name='osri-enc2', tier=1, needs=['make:osri-enc2-core'], budget=90,
              covers=['tools/osri_enc2_spec.py', 'tools/osri_enc2_master.py',
                      'tools/osri_enc2_tree.py', 'tools/osri_enc2_row.py',
                      'tools/osri_enc2_plan.py', 'tools/osri_enc2_order.py',
+                     'tools/osri_enc2_native.py',
                      'tools/osri_enc2_timing.py', 'tools/osri_enc2_dither.py',
                      'tools/osri_enc2_pack.py', 'tools/osri_enc2_decode.py',
                      'tools/osri_enc2_metrics.py', 'tools/osri_enc2_compare.py',
