@@ -591,3 +591,9 @@ A1のD_WRITE注入は従来「書かずに失敗」に加え、宣言節のgf4_h
 - (c) 関数の表に 2 行を足す: `surface_check` → D/modes.c → B0 → 7,13 / `timing_calc`・`format_calc`・`fifo_calc` → D/timing.c・D/format.c・D/fifo.c → B1 (実装済み) → 13。
 - P3 A1 の event: stub の UNIT が「—」の D_DETECT・D_PALETTE・D_CURSOR_CLOSE・D_SCAN_PREPARE・D_SCAN_DISCARD・D_SAVED_RELEASE は A1 に足さない (使う UNIT が出たらその段で足す)。
 - P3 D0 の routes: DCB の 1 entry = 1 route とし、entry の heads を `head_mask` に持たせる (nouveau の dcb_output.heads と同じ)。head ごとに展開しない。B9 の route_check は head_mask で照合する。
+
+### 層 4 第 1 波の再開で決めたこと (2026-11-04、PM 決定)
+- **B0 の mode 表と head**: mode 表は connector 単位で、head は持たない (DRM の connector の mode 一覧と同じ)。候補は、その connector の route のどれかの head_mask のどれかの head で PLL limits と encoder の上限を満たせば公開する (和集合)。実際に使えるかは set_mode が選んだ route・head で判定し、満たさなければ EPLL / ERANGE を返す (mode 表の公開はやり直さない)。同じ connector に DCB の route が複数あるとき: 上限は route ごとに判定して和集合、DDC は route の順で最初に i2c が有効な route の port、TV norm は TV の route が 1 本なのでその route のもの。
+- **B7 の新旧 off が等しい flip**: 投入不明からの収束で新旧の off が等しいときは、readback の判定をせず新面として即確定する (同じ面なので表示は変わらない、ESTATE にしない)。同じ面への flip は拒否しない (nouveau の nv04 の page flip も同じ fb を拒否しない、dispnv04/crtc.c:1030 以降)。
+- **B5 の host 試験**: A1 の UNIT 5 に gf4_change_begin / gf4_change_end の境界の stub を置いた (35cec902)。change_end は注入した rc があればそれを、無ければ操作の rc を返す。UNIT 13 は確定 (a) のとおり stub を置かない。
+- **B3 の大きさ**: カードの行数は目安で、超えても止めない。B3 (I2C の bitbang 一式) は sol に替えて書き切る。
