@@ -727,3 +727,67 @@ A1はUNIT番号を増やさず、既存admission/scan_changed stubを本契約�
   - Context の版 5: `geforce_module.h` の Context に display_data・display_state・display_out・feature5_out を末尾に足し、版を 4→5 (§310 の行)。`geforce_display_ops`・`geforce_display_restore_ops` の宣言も同じヘッダーに。
   - production の ctx: C2-service (D/service.c) が常駐の `struct gf4_ctx` を 1 つ持ち、`i32 gf4_service_init(struct gf_production *, struct gf_display_context *legacy)` で ctx・legacy・links (C2-links の `const struct gf4_links *gf4_links_table(void)`) を結ぶ。C3 は module の initialize で `gf3_service_bind` の後にこれ (`gf4_service_init`) を呼び、その後で `gf3_service_owner_bind(…, gf4_service_owner_table())` を呼ぶ (owner の表の owner は gf4_service_init が入れるので、この順でないと bind が EINVAL になる — C3 のレビューの P1)。production.h には欄を足さない。
 - **links と exec の表、初期の結線の順 (C2-links の欠け、PM 決定)**: C2-links (D/links.c) が常駐の `struct gf4_links` と `struct gf4_exec_ops` を持ち、`struct gf4_links *gf4_links_table(void)` と `const struct gf4_exec_ops *gf4_exec_table(void)` で渡す (wt/gf-l4 0a6d9b9b、A0z の const の宣言を書き換えた — 実装前)。`gf4_service_init` (C2-service) の順: 常駐 ctx を初期化 → ctx->links = gf4_links_table()、ctx->exec = gf4_exec_table() → links->owner = ctx → gf4_service_bind(ctx, legacy, links)。links.failed の実体は C2-recover の `gf4_service_failed(void *owner, i32 cause, u32 dl)` (宣言を足した)。
+
+## 追記 — TMDS の script の実行の口（2026-11-04）
+
+対象は NV44A の内蔵 TMDS。C2-links-b の未凍結だった interpreter 境界を以下で確定する。
+N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau、V=同 refs/geforce6200/nouveau-v6.1/drivers/gpu/drm/nouveau、O=/home/hight/os32-v3。
+N には nouveau_bios.c が無いため、その関数の出典だけ V を使う。実装済みという意味ではない。
+
+### 宣言と持ち主
+```c
+/* hwdev/gf/internal.h：新段 C2-links-init が層2の共有ファイルを一括所有。 */
+enum gf_init_script_rc { GF_SCRIPT_OK=0, GF_SCRIPT_EIO=-1, GF_SCRIPT_ETIME=-5 };
+int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
+                       u32 pc, u8 head, u8 or_mask, u32 dl);
+/* kdebug/gfinit_decode.h：既存 decoder の共通本体を使う表示script用入口。 */
+int gfinit_decode_script_instruction(const u8 *rom, u32 size, u32 init_table,
+                                     u32 pc, struct gfinit_instruction *out);
+/* hwdev/gf/display/api.h：純解析、C2-links-b、実体は display/links.c。 */
+i32 gf4_tmds_script_select(const u8 *rom, u32 size,
+                           const struct gf4_route *route, u32 khz, u32 *pc);
+```
+- C2-links-init → C2-links-b の順に直列。前者は internal.h、runner.c、kdebug/gfinit_decode.h/.c と gfinit_op/*.inc、hwdev/gf/op/ の必要な拡張・dispatch、devinit.c の借用分岐・hwdev/gf/rom.inc の共通 BIT 探索・対応する試験、docs/design/hwdev/gf/op/tmds_reg.md・zm_tmds_group.md、gen_hwdev_contract による hwdev/generated/* の再生成（layout と STATIC_ASSERT の整合）を所有する。共有ファイルの担当を他段へ分散しない。
+- 宣言はこの追記で凍結。api.h の select 宣言も C2-links-init が先に置き、links.c の実装は C2-links-b。PM が既存 internal.h 編集段・B2-b と直列化する。
+- ctx に `u8 or_mask; bool display_script; u32 deadline;` を追加。OR は DCB の生 mask、ffs の結果や head 番号へ変換しない。ROM/io は acquire の借用、work はその窓内の既存 scratch を再利用し、常駐 ROM・別 IR・別 interpreter を作らない。
+
+### 単一 script の契約
+- run_script は必須 pointer/callback、pc!=0 と ROM 内、saved_count==0 を入口で検査し、不正時 -1。未清算の保存表は所有保持。route 由来の head/OR の妥当性は select 済みを前提とし、再検査しない。
+- `display_script=true, deadline=dl, or_mask=引数, head=引数, pc=引数`。calls/repeats/skip、steps/wait_us/elapsed_us、fail_pc/last_rc を当該実行用に初期化し、started_us は acquire が設定した値を保持する。
+- runner.c の実行ループを内部共通化する。run_one は従来どおり main_pc[main_id]・head=0 で入り、新入口は指定 PC/head で入る。命令実行による head 変更は既存 opcode の意味に従う。
+- run/prepare/run_one の署名、S1 span/CRC、診断承認、main0〜4 の trace・戻り値 0/-1・総予算を変更しない。旧入口では display_script=false とし OR/外側期限を参照しない。
+- 新入口の prepare は選択 PC から DONE まで命令長で読み、SUB/SUB_DIRECT の到達先も既存 work に一度ずつ収める。REPEAT は各逐次列内で対応付け、calls を展開せず、SUB 表の値 0 は nouveau と同じく呼ばずに飛ばす。既存容量/深さ/step/wait 上限を共用し、第二の実行計画を作らない。
+- 新 decoder は旧 decoder と opcode 本体・命令型を共用。表示用の SUB/CONDITION/IO_FLAG_CONDITION/MACRO の参照表だけ引数 init_table（BIT 'I' のデータ先頭）の +0/+6/+10/+4 から解決し、ROM 境界で検査する。'i'/'I'/'T' の探索は hwdev/gf/rom.inc の共通処理に集約し、'I' の範囲・長さを一度検証して prepare/実行へ渡す。命令ごとの探索はしない。旧 S1 の固定表・SUB 番号制限は旧入口だけに残す。PLL は既存 acquire が検証する既知 ROM の limits/helper を使い、別 ROM 世代の対応を増やさない。
+- decoder の新入口は 0/-1。切れた命令/表/不整合 REPEAT、未対応 opcode/表形式、work/stack 容量超過、実行先不正はすべて -1 とし、未知命令を成功として読み飛ばさない。run_script は成功0、期限/実行予算の消費 GF_SCRIPT_ETIME、それ以外 -1。
+- 0x4f/0x50 を共通 decoder と既存 dispatch に追加（長さ5 / 3+2*count）。実体はそれぞれ hwdev/gf/op/tmds_reg.c と hwdev/gf/op/zm_tmds_group.c。skip 中は MMIO なし、OR 参照は ctx->or_mask、0x80/0x81 は手本の offset 表と XOR 8、直接 selector 0..3 は同じ base 表を用いる。
+- 0x4f は address|0x10000 → data=(old&mask)|value → address、0x50 は組ごと DATA → address。未知 selector は -1。head stride を OR 由来の TMDS base に重ねて足さない。
+- 新経路では prepare 中と各命令の前後・待ち chunk の前後に同じ dl を検査（clock_us と `(i32)(now-dl)>=0`）。dl=0 も通常の絶対期限であり無期限ではない。期限は ETIME、既存 io の失敗は EIO=-1、既存実行上限の消費は ETIME。途中で dl を作り直さない。
+- gf_init_wait の署名・旧経路の 0/-1 は維持。表示経路の期限理由を ctx->last_rc に保存し、既存 opcode が -1 へ畳んでも新入口はその理由を返す。fail_pc は失敗命令、成功 last_rc=0。
+- 実行失敗時は従来の io.restore を一度試み元 rc を保持。cleanup を期限で省略しない。成功時の保存済 index/lock 復元は呼出側が io.restore を一度行う。callback の CR44 選択は saved に載せない生書きとし、呼出し前 owner の復元は B10 末尾に任せる。復元失敗は既存 reusable/停止 cleanup 契約へ渡す。
+
+### 表の選択と C2-links-b の呼出し
+- select は MMIO なし、失敗時 *pc 不変。route の head/head_mask・type=TMDS・OR を検査し、不正引数 EINVAL=-401、外付け/未知形式 EUNSUPPORTED=-410、表・選択 PC 不在 ENODEV=-412、ROM 範囲/表破損 ERANGE=-402。成功0。
+- BIT directory の 'T' は長さ2、その u16 が指す TMDS 表は version 0x11。ffs(or_mask)==1 は +11、==2/3 は +13 の u16 clock 表を使う。head は選択表を変えず実行へ渡す。
+- clock 表は4byteずつ ROM 順に読み、`khz >= u16_threshold*10` を最初に満たす行の u16 PC を選ぶ。0 threshold 行も比較対象、PC=0 は不在。+7/+9 の script は実行しない。pre-BIT/BMP や他世代への fallback は足さない。
+- callback は既決の `i32 (*tmds_script)(void *,const struct gf4_route *,u32 khz,u32 dl)`。常駐 exec.owner から links.owner の ctx を取得し、同じ dl で acquire → select → run_script → 復元 → release を完結する。C2 の route 検査は select の一度だけとし、callback に B9 route_check を重ねない。B10 既存の入口検査と外付け排除は維持する。analog/外付けから内蔵 script を呼ばない。
+- 既存 devinit.c:136–166 の acquire は起動専用なので、そのまま再呼出しは不可。C2-links-init が `c->initialized` の稼働中分岐を同じ acquire/release に追加する。validate → 同じ scratch の一時借用・ROM 読取/既存検証だけを行い、attempted の起動拒否、route98、master enable、A2、main0〜4 を再実行しない。稼働中の release は expected_pmc に触れず、validate は PMC と稼働中 expected_pmc（mc.c の 0xffffffff）との照合を維持する。未初期化側は従来どおり。
+- 稼働中 PROM 読取は起動 A2/RESET 後の PBUS1850=0 が前提。validate 内の gf_production_decode_safe（bus.c:117）がこれを読取前に検査し、非零なら -1、再設定や A2 再実行はしない。
+- acquire は署名に dl が無いので前後で外側 dl を検査し、返却後に新入口へそのまま渡す。借用内の既存有限読取上限は維持する（X4 と同じく全壁時計時間を dl 内とは保証しない）。失敗した acquire の部分借用も既存 cleanup/release へ渡す。
+- 窓内の順序は SEL_CLK の binding bits 0x50000 保存 → CR44 生書きで対象 head 選択 → run_script →（成功時だけ）io.restore → SEL_CLK の binding bits だけ復元 → release。C2 は bind しない。B10 の script 前 bind と dual 判定 khz>165000 を維持する。
+- 失敗時も保存済 binding を復元して release。run_script 失敗時の io.restore は runner が一度行い、callback は重ねず、run_script 前の失敗でも B10 が CR44 owner を復元する。release は現宣言が void なので架空の戻り値を読まない。cleanup 失敗は既存 reusable/所有状態に記録し、元エラーが無いときは -1、あるときは元値を返す。ROM/PC を指す work は release 後に保持しない。
+- callback は run_script の GF_SCRIPT_ETIME→GF4_ETIME、それ以外の実行失敗は -1。select の上記 GF4 エラーは保持し、acquire/bus の失敗は -1、外側期限は GF4_ETIME とする。新口を呼ばず gf_init_run を代用することは禁止。
+
+### 試験の土台・出典と差分
+- C2-links-init は gf_runner_host.c/test_gf_runner.py に合成 ROM と実 decoder/runner/0x4f/0x50 を結合。head1・OR別/0x81・SUB/DIRECT・REPEAT・skip・未知/切断・期限と待ち・元rc/restore失敗を正常対照付きで確認。旧 S1 CRC 不一致拒否と main0〜4 の trace と共用 decoder の gfinit-host 系を回帰対象に残す。
+- C2-links-b は gf4_c2links_host.c を追加、A1 の既存 UNIT14 に実 select/runner を結合し A2 が依存登録。UNIT10 の B10 用 script stub は維持し、別の結合ケースで B10 と実 callback を接続して khz=165000 とその前後の bind 回数（single 1 回 / dual 各 bank 1 回、C2 の追加0回）を照合する。新 UNIT 番号・ROM_COPY/RELEASE の製品 event は作らない。
+- fake の owner/io に窓の貸出し/返却・PC/head/OR/dl 観測、ROM 範囲と clock 閾値の fixture、途中失敗を足す。head0 強制、OR取り違え、閾値比較逆転、期限更新、DATA/address逆転、cleanup脱落の各変異に正常対照を置く。再 acquire で A2/main/PC-98 切替なし、窓外参照なしも照合する。start → TMDS 設定 → release → TMDS 設定で expected_pmc が保たれ、2 回目の validate が通ることを確認する。
+- 表選択: V/nouveau_bios.c:66–91,627–680,904–962。head/outp: N/dispnv04/disp.h:175–184、N/dispnv04/dfp.c:446–460。head binding/CR44/SEL_CLK: V/nouveau_bios.c:93–106,673–677、N/dispnv04/dfp.c:68–90。
+- 表参照/命令: N/nvkm/subdev/bios/init.c:359–424,539–572,1093–1143,1663–1682,1727–1744。nouveau の outp 全体に代えて必要な OR を値渡しし、head は独立して渡す。
+- 差分理由（ID 1/8）: nouveau の script 後 bind・khz>=165000 に対し、PM 決定により B10 の script 前 bind・khz>165000 を保持し C2 では bind しない。未知 selector は nouveau の無書込み継続と異なり、既存 decoder の未知操作拒否に合わせ -1 で止める。SUB 表の値 0 は手本どおりスキップ。
+- 差分理由: OS32 は既存の有限 scratch・命令上限・絶対期限・負rc・一時 ROM 借用を持つため、その契約へ接続する。nouveau に無い再入監視・能力bit・別 interpreter・常駐コピーは追加しない。ROM 境界検査は既存 decoder の責務の延長。
+- 未決（ユーザー判断）0件。今回は静的照合のみ。ビルド・試験・実機確認は未実施で、上記は各実装段の受入条件。
+- 反論: 0件。
+
+### 確定 (2026-11-04、Opus 第 2 回の条件付き承認、PM が反映)
+- N1: 稼働中の分岐では PMC を expected_pmc と照合しない (nouveau にこの照合は無く、0xffffffff の読み戻しは実機で確かめていない — mc.c:21-24 は書いた値を expected にしている)。gf_production_decode_safe (bus.c:117-118) と PFB の検査は残す。試験の「稼働中に TMDS を 2 回続けて設定し、2 回目の validate が通る」は残す。
+- N2: C2-links-init の受け持ちに `tools/hwdev_layout.json` の gf_init_context に or_mask・display_script・deadline の 3 欄を足すことを加える (gen_hwdev_contract の再生成と合わせて)。
