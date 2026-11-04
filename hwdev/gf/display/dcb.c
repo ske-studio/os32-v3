@@ -270,7 +270,7 @@ static i32 gpio_read(struct rom_view r,const struct dcb_table *d,
     return GF4_OK;
 }
 
-int gf4_dcb_parse(const u8 *rom,u32 size,u32 bmp_offset,struct gf4_dcb_values *out)
+i32 gf4_dcb_parse(const u8 *rom,u32 size,u32 bmp_offset,struct gf4_dcb_values *out)
 {
     if (!rom || !out) return GF4_EINVAL;
     struct rom_view r={rom,size};
