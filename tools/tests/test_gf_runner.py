@@ -32,6 +32,16 @@ MUTATIONS = [
 
 
 SCRIPT_MUTATIONS = [
+    ('script_wait_budget_eio', 'hwdev/gf/runner.c',
+     'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+     '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;',
+     'if (us > GF_INIT_WAIT_MAX - ctx->wait_us) {\n'
+     '        if (ctx->display_script) ctx->last_rc = GF_SCRIPT_EIO;'),
+    ('script_step_budget_eio', 'hwdev/gf/runner.c',
+     'if (ctx->steps == GF_INIT_SCHEDULE) {\n'
+     '            if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;',
+     'if (ctx->steps == GF_INIT_SCHEDULE) {\n'
+     '            if (ctx->display_script) ctx->last_rc = GF_SCRIPT_EIO;'),
     ('script_head0', 'hwdev/gf/runner.c', 'ctx->head = head; ctx->pc = pc;',
      '(void)head; ctx->head = 0; ctx->pc = pc;'),
     ('script_or1', 'hwdev/gf/op/tmds_reg.c', 'offsets[ctx->or_mask]', 'offsets[1]'),
