@@ -1,507 +1,843 @@
-/* C1 lifecycle oracle. A1 UNIT=12 supplies tracing/runtime without component
- * stubs: service lifecycle dependencies are modeled below; V0 is real.
- * Build this TU alone (include_flags from kernel_includes.py), no libc.
- * GF3_SERVICE_SOURCE may select a mutated service.c. No external refs at run.
- * Model: GF_FEAT3_DESIGN N2, F1-F7 and C1 test geometry addendum.
- * This is the service/registry boundary test; PM's F1/F2 fake-MMIO integration
- * remains a separate gate. No hardware completion is inferred here. */
+/* G1 UNIT=12 integration, also included by gf_accel_c2_host.c.
+ * Compile either test alone, plus the real B4 translation unit, with
+ * kernel_includes.py flags, -m32 -nostdlib -ffunction-sections
+ * -fdata-sections -Wl,--gc-sections. No libc, generated images or refs/.
+ * GC drops unused backend/video-start/production-paging entry points;
+ * it never replaces a dependency of the lifecycle exercised below.
+ * F1/F2, B0-B3/B5-B10, V0, C0, C1 and C2 are included verbatim. Only
+ * colliding private identifiers and privileged host IRQ primitives differ.
+ * B4 must be linked as a real product (absent from the supplied base).
+ * Tests check ownership/protocol, not GPU-rendered pixels. */
+#include "../../include/io.h"
+#define irq_save() 0U
+#define irq_restore(flags) ((void)(flags))
 #define GF3_HOST_UNIT 12
 #include "gf_accel_host.h"
-#include "../../hwdev/gf/accel_service.h"
 #include "../../hwdev/gf/production.h"
+#include "../../hwdev/gf/accel_service.h"
 
-/* Keep the real registry, including its monotonic ID/generation history.
- * Wrappers inject failures at ownership boundaries without replacing V0. */
-#define gf_vram_registry_init real_registry_init
-#define gf_vram_reserve real_reserve
-#define gf_vram_release real_release
-#define gf_vram_views_close real_views_close
+#include "../../hwdev/gf/master.c"
+#include "../../hwdev/gf/mc.c"
+#include "../../hwdev/gf/instmem.c"
+#include "../../hwdev/gf/instmem_map.c"
+#include "../../hwdev/gf/engine_stop.c"
+#define rd cint_irq_rd
+#define wr cint_irq_wr
+#define drain cint_irq_drain
+#include "../../hwdev/gf/irq.c"
+#undef drain
+#undef wr
+#undef rd
+#define release_instances cint_foundation_release_instances
+#include "../../hwdev/gf/foundation.c"
+#undef release_instances
+#include "../../drivers/video/geforce/geforce_tick.c"
+
+#define rd cint_fifo_rd
+#define wr cint_fifo_wr
+#include "../../hwdev/gf/fifo.c"
+#undef wr
+#undef rd
+#include "../../hwdev/gf/push.c"
+#include "../../hwdev/gf/dmaobj.c"
+#include "../../hwdev/gf/ramht.c"
+#include "../../hwdev/gf/grctx.c"
+#define rd cint_gr_rd
+#define wr cint_gr_wr
+#include "../../hwdev/gf/gr.c"
+#undef wr
+#undef rd
+#include "../../hwdev/gf/fence.c"
+#define rd cint_fault_rd
+#define wr cint_fault_wr
+#include "../../hwdev/gf/fault.c"
+#undef wr
+#undef rd
+#include "../../hwdev/gf/command_platform.c"
+#define release_instances cint_command_release_instances
+#include "../../hwdev/gf/command.c"
+#undef release_instances
+
 #include "../../hwdev/gf/vram_view.c"
-#undef gf_vram_registry_init
-#undef gf_vram_reserve
-#undef gf_vram_release
-#undef gf_vram_views_close
+#include "../../hwdev/gf/accel_objects.c"
+#include "../../hwdev/gf/accel_surface.c"
+#include "../../hwdev/gf/accel_rop.c"
+#include "../../hwdev/gf/accel_fill.c"
+#include "../../hwdev/gf/accel_mono.c"
+#include "../../hwdev/gf/accel_ifc.c"
+#include "../../hwdev/gf/accel_m2mf.c"
+#include "../../hwdev/gf/accel_transfer.c"
+#include "../../hwdev/gf/accel_scale.c"
+#include "../../drivers/video/geforce/gf_present_m2mf.c"
+#include "../../drivers/video/geforce/gf_hook.c"
+
+/* Use the real C0a getter and its borrowed metadata, not a custom getter. */
+#ifndef OS32_GEFORCE_MODULE
+#define OS32_GEFORCE_MODULE
+#endif
+#include "../../drivers/video/geforce/backend_geforce.c"
+#undef gfx_backend_geforce
+#undef gfx_current_height
+#undef gfx_flip_enabled
+#undef gfx_display_page
 #ifndef GF3_SERVICE_SOURCE
 #define GF3_SERVICE_SOURCE "../../hwdev/gf/service.c"
 #endif
 #include GF3_SERVICE_SOURCE
+#ifndef GF3_QUIESCE_SOURCE
+#define GF3_QUIESCE_SOURCE "../../hwdev/gf/display/quiesce.c"
+#endif
+#include GF3_QUIESCE_SOURCE
 
-static struct gf3_host host;
-/* At most one lifecycle call per boundary, plus its close/hook/clock events;
- * this budget also covers a failed attempt followed by a successful retry. */
-static struct gf3_host_event events[H_OP_COUNT * 8U];
-static struct gf_production prod, other;
-static const struct gf3_test_ops *slot, *other_slot;
-static struct gf3_service *service;
-static struct gf3_ctx *hook_ctx;
-static struct gf3_surface hook_scan;
-static bool hook_active, stop_off;
-static u32 deadline, framebuffer_calls;
-static struct video_fb framebuffer;
-static u32 fb_width, fb_height;
-static struct gf_vram_view view;
-static volatile u8 *loan;
-static u8 window[MEM_PAGE_SIZE];
-static int unmap_rc;
+/* Capacities are fixture budgets, not device limits. VRAM detection is the
+ * smallest supported size (production.h); VS=0 reserves 1536 KiB:
+ * (16 KiB * 32 + 1 MiB), instmem.c / nv40.c:183-206.
+ * Host backing only covers the inst aperture, push and two independent CPU
+ * windows. Their addresses are never used as device physical addresses. */
+#define CINT_FB_PHYS 0x30000000U
+#define CINT_IMEM_PHYS 0x40000000U
+#define CINT_IMEM_BYTES (1536U * 1024U)
+#define CINT_SCAN_OFF 123U
+#define CINT_SCAN_PITCH 641U
+#define CINT_TEST_PITCH 704U
+#define CINT_SCAN_HEIGHT 480U
+#define CINT_TEST_OFF (76U * MEM_PAGE_SIZE) /* ceil((123+641*480)/4096) */
+#define CINT_WINDOW_OFF CINT_TEST_OFF
+#define CINT_IO_FAILURE (-901)
+#define CINT_RESTORE_FAILURE (-902)
+#define CINT_EVENTS 16384U /* GR program upload + start/recover/stop traces */
+static struct gf3_host cint_host;
+static struct gf3_host_event cint_events[CINT_EVENTS];
+static struct gf3_host_reg cint_regs[512], cint_writes[4096];
+static struct gf_production cint_prod;
+static const struct gf3_test_ops *cint_slot;
+static struct gf3_service *cint_service;
+static u8 cint_imem[CINT_IMEM_BYTES] __attribute__((aligned(MEM_PAGE_SIZE)));
+static u32 cint_push[GF2_PUSH_WORDS];
+static u8 cint_windows[2][MEM_PAGE_SIZE];
+static struct gf_vram_view cint_view[2];
+static volatile u8 *cint_loan[2];
+static u32 cint_close_calls[2], cint_maps[4], cint_unmaps[4];
+enum { CINT_MAP_IMEM, CINT_MAP_PUSH, CINT_MAP_VIEW0, CINT_MAP_VIEW1 };
+static int cint_map_fail, cint_unmap_fail, cint_restore_rc;
+static u32 cint_restore_calls, cint_owner_stops, cint_dma_allocs, cint_dma_frees;
+static u32 cint_consumed, cint_reference, cint_references, cint_stall_reference;
+static u32 cint_pci_writes, cint_pci_fail_at;
+static u16 cint_pci_command;
+static bool cint_irq_registered, cint_dma_live, cint_expect_closed;
+static bool cint_limit_new_imem, cint_restore_seen;
+static bool cint_saw_unfinished, cint_fail_stop_after_put;
+static u32 cint_old_epoch;
 
-/* Independent concrete fixture: 641-byte scan rows round to 704 test rows;
- * [123,2687) ends in the first page. Test range is [4096,20480), not
- * [2688,...). B is intentionally unaligned. */
-#define FB_PHYS 0x30000000U
-#define SCAN_OFF 123U
-#define SCAN_PITCH 641U
-#define SCAN_HEIGHT 4U
-#define TEST_START 4096U
-#define TEST_END 20480U
-#define TEST_PITCH 704U
-#define TEST_DEADLINE 123456U
-#define WINDOW_START 0x4c000U /* first full page after a shifted scan */
+static inline u32 cint_used_count(void)
+{
+    u32 n = 0;
+    for (struct gf_inst *p = cint_prod.foundation.imem.used; p; p = p->next) {
+        assert(++n <= GF3_OBJECT_COUNT + 16U);
+        assert(p->size && p->off + p->size <= cint_prod.foundation.imem.aperture_bytes);
+    }
+    return n;
+}
+static inline bool cint_inst_live(const struct gf_inst *inst)
+{
+    for (struct gf_inst *p = cint_prod.foundation.imem.used; p; p = p->next)
+        if (p == inst) return true;
+    return false;
+}
+static inline u32 cint_used_end(void)
+{
+    u32 end = 0;
+    for (struct gf_inst *p = cint_prod.foundation.imem.used; p; p = p->next)
+        if (end < p->off + p->size) end = p->off + p->size;
+    return end;
+}
+static inline void cint_closed(void)
+{
+    assert(!cint_slot && !hook_active);
+    assert(geforce_fill_rect(0, 0, 1, 1, 1) == OS32_ERR_NOSYS);
+}
 
-static struct gf3_host_event *event(enum gf3_host_op op)
-{ return gf3_host_event_begin(&host, op); }
-static i32 done(struct gf3_host_event *e)
-{ return gf3_host_event_end(&host, e); }
-int gf_vram_registry_init(struct gf2_chan *ch)
+/* Fake device consumes the actual published ring. GET advances independently
+ * of REFERENCE: only a submitted subc0/0050 packet completes a fence. No
+ * gf2_emit/fence/stop or allocator is stubbed; other methods are only skipped.
+ * Encoding: nouveau_dma.h:82-96; nv10_fence.c:33-41 (design sections 3/6). */
+static void cint_consume(u32 raw_put)
 {
-    struct gf3_host_event *e = event(H_PAUSE);
-    assert(ch == &prod.chan && !slot && !hook_active);
-    if (!e->rc) e->rc = real_registry_init(ch);
-    return done(e);
+    struct gf2_chan *ch = &cint_prod.chan;
+    assert(ch->mapped && raw_put >= ch->B && !(raw_put & 3U));
+    u32 put = (raw_put - ch->B) / sizeof(u32);
+    assert(put <= ch->max);
+    if (ch->put == 0) cint_consumed = 0; /* freshly initialized F2 ring */
+    u32 budget = GF2_PUSH_WORDS;
+    while (cint_consumed != put) {
+        assert(budget-- && cint_consumed < GF2_PUSH_WORDS);
+        u32 head = cint_push[cint_consumed++];
+        if (!head) continue;
+        if (head & GF2_PUSH_JUMP) {
+            u32 address = head & ~GF2_PUSH_JUMP;
+            assert(address >= ch->B && !(address & 3U));
+            cint_consumed = (address - ch->B) / sizeof(u32);
+            continue;
+        }
+        u32 count = (head >> GF2_METHOD_COUNT_SHIFT) & GF2_METHOD_COUNT_MAX;
+        u32 subc = (head >> GF2_METHOD_SUBCHANNEL_SHIFT) & GF2_SUBCHANNEL_MAX;
+        u32 method = head & GF2_METHOD_MAX;
+        assert(count && count <= GF2_PUSH_WORDS - cint_consumed);
+        if (!subc && method == GF2_REFERENCE_METHOD) {
+            assert(count == 1);
+            ++cint_references;
+            if (cint_references != cint_stall_reference)
+                cint_reference = cint_push[cint_consumed];
+        }
+        cint_consumed += count;
+    }
+    gf3_host_set(&cint_host, 0, GF2_USER_BASE + GF2_USER_GET, raw_put);
+    gf3_host_set(&cint_host, 0, GF2_USER_BASE + GF2_USER_REFERENCE, cint_reference);
 }
-int gf_vram_reserve(struct gf2_chan *ch, const void *owner, u32 off, u32 bytes,
-                    struct gf_vram_reservation_node *node)
+static void cint_observe(struct gf3_host *h, const struct gf3_host_event *e)
 {
-    struct gf3_host_event *e = event(H_ALLOC);
-    assert(ch == &prod.chan && owner == node && !slot && !hook_active);
-    assert(node == &service->scan_node || node == &service->test_node);
-    if (!e->rc) e->rc = real_reserve(ch, owner, off, bytes, node);
-    return done(e);
+    assert(h == &cint_host);
+    if (cint_expect_closed) cint_closed();
+    if (!cint_slot) assert(!hook_active); /* neither is published during init */
+    else {
+        assert(cint_prod.accel.ready && hook_active);
+        assert(cint_slot == &cint_service->ops);
+        assert(cint_service->scan_node.value.owner && cint_service->test_node.value.owner);
+    }
+    if (!e->rc && e->op == H_WRITE && e->a[1] == GF2_USER_BASE + GF2_USER_PUT)
+        cint_consume(e->a[3]);
+    /* IRQ source status is W1C (real irq.c), not ordinary register storage. */
+    if (!e->rc && e->op == H_WRITE) {
+        static const u32 status[] = {GF_IRQ_FIFO_STATUS, GF_IRQ_GRAPH_STATUS,
+            GF_IRQ_CRTC_STATUS, GF_IRQ_CRTC_STATUS + GF_IRQ_HEAD_STRIDE,
+            0x008100U, 0x009100U, 0x001100U, 0x00b100U}; /* irq.c unused_status */
+        for (unsigned i = 0; i < sizeof(status) / sizeof(status[0]); ++i)
+            if (e->a[1] == status[i]) gf3_host_set(h, 0, status[i], 0);
+    }
+    if (e->rc && e->op == H_WRITE && e->a[1] == GF2_USER_BASE + GF2_USER_PUT && cint_fail_stop_after_put) {
+        /* The injected publication failure is followed by a persistent bus
+         * failure, so real F2 cannot establish quiescence or release inst. */
+        gf3_host_fail_at(h, H_WRITE, 0, CINT_IO_FAILURE);
+        cint_fail_stop_after_put = false;
+    }
+    if (!e->rc && e->op == H_READ && e->a[1] == GF2_USER_BASE + GF2_USER_REFERENCE &&
+        *(const u32 *)e->p[1] != cint_prod.chan.seq) {
+        assert(cint_consumed == cint_prod.chan.put);
+        cint_saw_unfinished = true;
+    }
+    if (e->op == H_READ && e->a[1] == GF2_USER_BASE + GF2_USER_REFERENCE &&
+        cint_limit_new_imem && cint_prod.chan.epoch != cint_old_epoch &&
+        cint_prod.chan.state == GF2_INIT) {
+        /* Fault injection at the next real allocation, after new F2 exists. */
+        cint_prod.foundation.imem.aperture_bytes = cint_used_end();
+        cint_limit_new_imem = false;
+    }
+    if (cint_restore_seen && e->op == H_WRITE) {
+        assert(cint_prod.foundation.revoked ||
+            (!cint_prod.foundation.imem.used && cint_prod.chan.state == GF2_OFF));
+        assert(cint_service->scan_node.value.owner); /* release follows all rows */
+    }
 }
-int gf_vram_release(struct gf2_chan *ch, const struct gf_vram_reservation *key)
+
+/* Host OS adapters below supply the external environment of real F1/F2.
+ * They implement PCI storage, resident IRQ/tick registration and borrowed
+ * map/DMA callbacks only, never GF lifecycle/object/VRAM/dispatch functions. */
+u16 pci_cfg_read16(u32 bus, u32 dev, u32 fn, u32 reg)
 {
-    struct gf3_host_event *e = event(H_FREE);
-    assert(ch == &prod.chan && !slot && !hook_active);
-    /* Test goes first; scan cannot be released while a test node is live. */
-    if (key == &service->scan_node.value) assert(!service->test_node.value.owner);
-    if (!e->rc) e->rc = real_release(ch, key);
-    return done(e);
+    assert(bus == RECOVER_GF_BUS && dev == RECOVER_GF_DEV && fn == RECOVER_GF_FN);
+    assert(reg == PCI_CFG_COMMAND || reg == PCI_CFG_CACHE_LINE);
+    return reg == PCI_CFG_COMMAND ? cint_pci_command : 0;
 }
-i32 gf_vram_views_close(struct gf2_chan *ch)
+u8 pci_cfg_read8(u32 bus, u32 dev, u32 fn, u32 reg)
 {
-    struct gf3_host_event *e = event(H_STOP);
-    assert(ch == &prod.chan && !slot && !hook_active);
-    if (!e->rc) e->rc = real_views_close(ch);
-    return done(e);
+    assert(bus == RECOVER_GF_BUS && dev == RECOVER_GF_DEV && fn == RECOVER_GF_FN);
+    assert(reg == PCI_CFG_LATENCY_TIMER || reg == PCI_CFG_INT_LINE);
+    return reg == PCI_CFG_INT_LINE ? 6U : 64U;
 }
-int gf3_init(struct gf3_ctx *c, struct gf2_chan *ch, u32 dl)
+int pci_cfg_write16(u32 bus, u32 dev, u32 fn, u32 reg, u16 value)
 {
-    struct gf3_host_event *e = event(H_GR_NEW);
-    assert(c == &prod.accel && ch == &prod.chan && dl == deadline);
-    assert(!slot && !hook_active && !c->ready && service->scan_node.value.owner);
-    c->ch = ch; c->epoch = ch->epoch;
-    /* Simulate partial live descriptors even on failed initialization. */
-    c->obj[0].handle = GF3_HANDLE_NULL;
-    c->notify_storage.size = GF3_NOTIFY_BYTES;
-    c->notify.handle = GF3_HANDLE_NOTIFY;
-    c->notify_off = 100U;
-    if (!e->rc) c->ready = true;
-    c->last_rc = e->rc;
-    return done(e);
-}
-int gf3_fini(struct gf3_ctx *c, u32 dl)
-{
-    struct gf3_host_event *e = event(H_DEL);
-    assert(c == &prod.accel && c->ready && !slot && !hook_active && !view.mapped);
-    assert(dl == deadline);
-    c->ready = false;
-    return done(e);
-}
-int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
-{
-    struct gf3_host_event *e = event(H_DMA_NEW);
-    assert(ch == &prod.chan && f == &prod.foundation);
-    if (!e->rc) { ch->state = GF2_RUN; ch->f = f; ++ch->epoch; }
-    return done(e);
-}
-int gf2_stop(struct gf2_chan *ch)
-{
-    struct gf3_host_event *e = event(H_FENCE);
-    assert(ch == &prod.chan && !slot && !hook_active);
-    assert(!view.mapped || prod.foundation.revoked);
-    if (stop_off) ch->state = GF2_OFF;
-    else ch->state = GF2_FAULT;
-    return done(e);
-}
-int gf2_recover(struct gf2_chan *ch)
-{
-    struct gf3_host_event *e = event(H_RESUME);
-    assert(ch == &prod.chan && ch->state == GF2_OFF && !slot && !hook_active);
-    if (!e->rc) { ++ch->epoch; ch->state = GF2_RUN; ch->fault.latched = false; }
-    return done(e);
-}
-void gf_hook_ctx_bind(struct gf3_ctx *c)
-{
-    assert(c == &prod.accel && c->ready && !slot);
-    hook_ctx = c;
-}
-void gf_hook_scan_bind(bool active, const struct gf3_surface *s)
-{
-    struct gf3_host_event *e = event(H_SURFACE_SET);
-    if (active) {
-        assert(hook_ctx == &prod.accel && prod.accel.ready && s == &service->scan && !slot);
-        hook_scan = *s;
-    } else assert(!slot && !s);
-    hook_active = active;
-    (void)done(e);
-}
-void geforce_backend_framebuffer_info(struct video_fb *out, u32 *width, u32 *height)
-{
-    ++framebuffer_calls;
-    *out = framebuffer; *width = fb_width; *height = fb_height;
-}
-static int clock_now(void *opaque, u32 *now)
-{
-    assert(opaque == &host);
-    return gf3_host_clock(opaque, now);
-}
-static int map_window(void *owner, const struct recover_bar_extent *extent,
-                       u32 bytes, volatile u8 **out)
-{
-    assert(owner == &prod && extent->base == FB_PHYS + WINDOW_START && bytes == sizeof(window));
-    *out = window;
+    assert(bus == RECOVER_GF_BUS && dev == RECOVER_GF_DEV && fn == RECOVER_GF_FN);
+    assert(reg == PCI_CFG_COMMAND);
+    if (++cint_pci_writes == cint_pci_fail_at) return CINT_IO_FAILURE;
+    cint_pci_command = value;
     return 0;
 }
-static int unmap_window(void *owner, volatile u8 *base, u32 bytes)
+int irq_register(unsigned line, irq_handler_fn fn, void *arg, unsigned flags)
 {
-    assert(owner == &prod && base == window && bytes == sizeof(window));
-    return unmap_rc;
+    assert(line == 6 && fn == gf_irq_handler && arg == &cint_prod.foundation);
+    assert(flags == IRQ_F_SHARED && !cint_irq_registered);
+    cint_irq_registered = true;
+    return 0;
 }
-static const struct gf_instmem_map_ops map_ops = {map_window, unmap_window};
-static i32 close_window(void *owner, struct gf_vram_view *v)
+int irq_unregister(unsigned line, irq_handler_fn fn, void *arg)
 {
-    assert(owner == &prod && v == &view && loan == window);
-    int rc = gf_vram_view_unmap(v);
-    if (!rc) loan = 0;
+    assert(line == 6 && fn == gf_irq_handler && arg == &cint_prod.foundation);
+    assert(cint_irq_registered);
+    cint_irq_registered = false;
+    return 0;
+}
+int tick_register(unsigned slot, tick_fn fn)
+{
+    assert(slot == PC98_TICK_GF && fn == geforce_tick);
+    return 0;
+}
+int serial_gate_active(void) { return 1; }
+void serial_puts_polled(const char *s) { (void)s; }
+
+static int cint_map(void *owner, const struct recover_bar_extent *bar,
+                    u32 bytes, volatile u8 **out)
+{
+    assert(owner == &cint_prod && bar->valid && bytes <= bar->length);
+    u32 which;
+    volatile u8 *ptr;
+    if (bar->base == CINT_IMEM_PHYS) {
+        which = CINT_MAP_IMEM; ptr = cint_imem;
+        assert(bytes == CINT_IMEM_BYTES);
+    } else if (bytes == GF2_PUSH_BYTES) {
+        which = CINT_MAP_PUSH; ptr = (volatile u8 *)cint_push;
+        assert(bar->base == CINT_FB_PHYS + cint_prod.chan.B);
+    } else {
+        assert(bytes == MEM_PAGE_SIZE && bar->base >= CINT_FB_PHYS + CINT_WINDOW_OFF);
+        u32 i = (bar->base - CINT_FB_PHYS - CINT_WINDOW_OFF) / MEM_PAGE_SIZE;
+        assert(i < 2 && bar->base == CINT_FB_PHYS + CINT_WINDOW_OFF + i * MEM_PAGE_SIZE);
+        which = CINT_MAP_VIEW0 + i; ptr = cint_windows[i];
+    }
+    ++cint_maps[which];
+    if (cint_map_fail == (int)which) return CINT_IO_FAILURE;
+    if (which == CINT_MAP_PUSH) cint_consumed = cint_reference = 0;
+    *out = ptr;
+    return 0;
+}
+static int cint_unmap(void *owner, volatile u8 *ptr, u32 bytes)
+{
+    assert(owner == &cint_prod);
+    u32 which;
+    if (ptr == cint_imem) { which = CINT_MAP_IMEM; assert(bytes == CINT_IMEM_BYTES); }
+    else if (ptr == (volatile u8 *)cint_push) { which = CINT_MAP_PUSH; assert(bytes == GF2_PUSH_BYTES); }
+    else {
+        assert(ptr == cint_windows[0] || ptr == cint_windows[1]);
+        which = ptr == cint_windows[0] ? CINT_MAP_VIEW0 : CINT_MAP_VIEW1;
+        assert(bytes == MEM_PAGE_SIZE);
+    }
+    ++cint_unmaps[which];
+    return cint_unmap_fail == (int)which ? CINT_IO_FAILURE : 0;
+}
+static const struct gf_instmem_map_ops cint_map_ops = {cint_map, cint_unmap};
+static int cint_dma_alloc(u32 bytes, u32 align, u32 mask, struct gf2_dma_buf *out)
+{
+    assert(!cint_dma_live && bytes == GF2_STAGING_BYTES && align == MEM_PAGE_SIZE && mask == U32_MAX);
+    /* Synthetic PCI address; never convert a host VA into a device address. */
+    *out = (struct gf2_dma_buf){.pa = 0x01000000U, .size = bytes, .va = cint_host.staging};
+    cint_dma_live = true; ++cint_dma_allocs;
+    return 0;
+}
+static int cint_dma_free(struct gf2_dma_buf *buf)
+{
+    assert(cint_dma_live && buf->va == cint_host.staging && buf->size == GF2_STAGING_BYTES);
+    cint_dma_live = false; ++cint_dma_frees;
+    return 0;
+}
+static void cint_dma_leak(struct gf2_dma_buf *buf)
+{ (void)buf; assert(0); }
+static const struct gf2_dma_ops cint_dma_ops = {cint_dma_alloc, cint_dma_free, cint_dma_leak};
+static struct gf2_chan *cint_command_get(struct gf_display_context *c, struct gf_foundation **f)
+{
+    assert(c == &cint_prod.display);
+    *f = &cint_prod.foundation;
+    return &cint_prod.chan;
+}
+static int cint_foundation_stop(struct gf_display_context *c)
+{
+    assert(c == &cint_prod.display);
+    assert(cint_prod.chan.state == GF2_OFF || cint_prod.foundation.revoked);
+    cint_closed(); ++cint_owner_stops;
+    int rc = gf_foundation_stop(&cint_prod.foundation);
+    if (rc) c->last_rc = rc;
+    return rc ? -1 : 0;
+}
+static const struct gf_display_owner cint_display_owner = {
+    .foundation_stop = cint_foundation_stop, .command_get = cint_command_get
+};
+static int cint_restore(void *owner, struct gf_init_context *cleanup)
+{
+    assert(owner == &cint_host && cleanup->io.opaque == owner);
+    cint_closed();
+    if (cint_prod.foundation.revoked) {
+        /* CPU cleanup is still attempted, even when the bus lease no longer
+         * permits restoration of device registers. Hardware ownership stays. */
+        assert(cint_service->scan_node.value.owner);
+        ++cint_restore_calls; cint_restore_seen = true;
+        return CINT_IO_FAILURE;
+    }
+    assert(cint_prod.chan.state == GF2_OFF && !cint_prod.accel.ready);
+    assert(!cint_prod.foundation.imem.used && cint_owner_stops);
+    assert(cint_service->scan_node.value.owner);
+    ++cint_restore_calls; cint_restore_seen = true;
+    return cint_restore_rc;
+}
+static i32 cint_close_window(void *owner, struct gf_vram_view *view)
+{
+    unsigned i = owner == &cint_loan[0] ? 0U : 1U;
+    assert(owner == &cint_loan[i] && view == &cint_view[i]);
+    cint_closed(); ++cint_close_calls[i];
+    assert(cint_loan[i] == cint_windows[i]);
+    /* This is the owner's CPU-use/posted-write boundary, before unmap. */
+    __asm__ volatile("" ::: "memory");
+    (void)cint_loan[i][0];
+    int rc = gf_vram_view_unmap(view);
+    if (!rc) cint_loan[i] = 0;
     return rc;
 }
-static void open_window(void)
+static inline void cint_open_windows(void)
 {
-    view.close = close_window; view.close_owner = &prod;
-    assert(!gf_vram_view_map(&view, &prod.chan, WINDOW_START, MEM_PAGE_SIZE, &loan));
+    for (unsigned i = 0; i < 2; ++i) {
+        cint_view[i].close = cint_close_window;
+        cint_view[i].close_owner = &cint_loan[i];
+        assert(!gf_vram_view_map(&cint_view[i], &cint_prod.chan,
+            CINT_WINDOW_OFF + i * MEM_PAGE_SIZE, MEM_PAGE_SIZE, &cint_loan[i]));
+        assert(cint_view[i].close == cint_close_window && cint_view[i].close_owner == &cint_loan[i]);
+    }
+}
+static inline void cint_trace_clear(void)
+{
+    gf3_host_trace_clear(&cint_host);
+    gf2_host_memset(cint_host.fail_at, 0, sizeof(cint_host.fail_at));
+    gf2_host_memset(cint_host.fail_rc, 0, sizeof(cint_host.fail_rc));
+    cint_restore_calls = cint_owner_stops = 0;
+    cint_restore_seen = false;
+}
+static inline void cint_owned_reservations(void)
+{
+    struct gf_vram_reservation key;
+    struct gf_vram_reservation_node *nodes[] = {&cint_service->scan_node, &cint_service->test_node};
+    for (unsigned i = 0; i < 2; ++i) {
+        const struct gf_vram_reservation *v = &nodes[i]->value;
+        assert(v->owner == nodes[i]);
+        assert(!gf_vram_match(&cint_prod.chan, nodes[i], v->reservation_id,
+            v->generation, v->off, v->bytes, &key));
+    }
+}
+static inline void cint_no_resources(void)
+{
+    cint_closed();
+    assert(cint_prod.chan.state == GF2_OFF && !cint_prod.accel.ready);
+    assert(!cint_prod.foundation.imem.used && !cint_prod.foundation.mapped);
+    assert(!cint_prod.chan.mapped && !cint_prod.chan.staging_live && !cint_dma_live);
+    assert(!cint_irq_registered && !tick_poll && !cint_prod.foundation.bm);
+    assert(!views && !registry.head);
+    assert(!cint_service->scan_node.value.owner && !cint_service->test_node.value.owner);
+    for (u32 i = 0; i < sizeof(cint_prod.chan.bitmap); ++i) assert(!cint_prod.chan.bitmap[i]);
+    for (unsigned i = 0; i < 2; ++i) assert(!cint_view[i].mapped && !cint_loan[i]);
+    assert(cint_dma_allocs == cint_dma_frees);
+}
+static inline void cint_reset(void)
+{
+    /* Previous case must clean up via the product, never erase live lists.
+     * Preserve registry/node ID history and the single service binding. */
+    if (cint_service) cint_no_resources();
+    gf2_host_memset(&cint_prod, 0, sizeof(cint_prod));
+    gf3_host_init(&cint_host);
+    cint_host.events = cint_events; cint_host.cevents = CINT_EVENTS;
+    cint_host.regs = cint_regs; cint_host.cregs = sizeof(cint_regs) / sizeof(cint_regs[0]);
+    cint_host.writes = cint_writes; cint_host.cwrites = sizeof(cint_writes) / sizeof(cint_writes[0]);
+    cint_host.observe = cint_observe;
+    cint_host.now = 100;
+    cint_map_fail = cint_unmap_fail = -1;
+    cint_restore_rc = 0; cint_restore_seen = cint_expect_closed = false;
+    cint_limit_new_imem = false;
+    cint_saw_unfinished = cint_fail_stop_after_put = false;
+    cint_stall_reference = cint_references = 0;
+    cint_pci_writes = cint_pci_fail_at = 0;
+    gf2_host_memset(cint_close_calls, 0, sizeof(cint_close_calls));
+    gf2_host_memset(cint_maps, 0, sizeof(cint_maps));
+    gf2_host_memset(cint_unmaps, 0, sizeof(cint_unmaps));
+    cint_prod.foundation.io = cint_host.f.io;
+    cint_prod.foundation.map_ops = &cint_map_ops;
+    cint_prod.foundation.map_owner = &cint_prod;
+    cint_prod.foundation.instmem_bar = (struct recover_bar_extent){
+        .base = CINT_IMEM_PHYS, .length = sizeof(cint_imem), .valid = true};
+    cint_prod.chan.bar1 = (struct recover_bar_extent){
+        .base = CINT_FB_PHYS, .length = GF_PRODUCTION_PFB_MIN, .valid = true};
+    cint_prod.chan.map_ops = &cint_map_ops; cint_prod.chan.map_owner = &cint_prod;
+    cint_prod.chan.dma_ops = &cint_dma_ops;
+    cint_prod.display.owner = &cint_display_owner;
+    cint_prod.display.io = cint_host.f.io;
+    cint_prod.display.io.restore = cint_restore;
+    cint_prod.display.engaged = cint_prod.display.active = cint_prod.display.reusable = true;
+    framebuffer = (struct video_fb){.phys = CINT_FB_PHYS + CINT_SCAN_OFF,
+        .bytes = CINT_SCAN_PITCH * CINT_SCAN_HEIGHT, .pitch = CINT_SCAN_PITCH,
+        .format = GFX_FMT_PACKED8};
+    gf3_host_set(&cint_host, 0, GF_PRODUCTION_PFB_AMOUNT, GF_PRODUCTION_PFB_MIN);
+    gf3_host_set(&cint_host, 0, GR_UNITS, 0);
+    assert(!gf3_service_bind(&cint_prod, &cint_slot));
+    cint_service = gf3_service_get(&cint_prod.chan);
+    assert(cint_service);
+    cint_service->scan_pitch = cint_service->scan_width = cint_service->scan_height = cint_service->scan_phys = 0;
+    assert(!gf_foundation_start(&cint_prod.foundation));
+    assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
+    assert(cint_prod.chan.state == GF2_RUN && cint_prod.chan.mapped && cint_dma_live);
+    assert(cint_used_count() == 8U); /* four fixed + three DMA + GR context */
+    cint_trace_clear();
+}
+static inline u32 cint_deadline(void) { return cint_host.now + GF3_TIMEOUT_US; }
+static inline void cint_start(void)
+{
+    assert(!gf3_service_start(cint_service, cint_deadline()));
+    assert(cint_slot == &cint_service->ops && cint_slot->ctx == &cint_prod.accel);
+    assert(cint_slot->test_surface == &cint_service->test && cint_prod.accel.ready);
+    assert(hook_active && hook_ctx == &cint_prod.accel);
+    assert(!gf2_host_memcmp(&hook_scan, &cint_service->scan, sizeof(hook_scan)));
+    cint_owned_reservations();
+    assert(cint_used_count() == 8U + 2U + GF3_OBJECT_COUNT); /* storage + notify DMA + GRs */
+    assert(cint_inst_live(&cint_prod.accel.notify_storage));
+    assert(cint_inst_live(&cint_prod.accel.notify.inst));
+    for (unsigned i = 0; i < GF3_OBJECT_COUNT; ++i)
+        assert(cint_inst_live(&cint_prod.accel.obj[i].inst));
+    assert(cint_service->scan.off == CINT_SCAN_OFF && cint_service->scan.pitch == CINT_SCAN_PITCH);
+    assert(cint_service->scan.width == 640 && cint_service->scan.height == CINT_SCAN_HEIGHT);
+    assert(cint_service->test.off == CINT_TEST_OFF && cint_service->test.pitch == CINT_TEST_PITCH);
+    assert(cint_service->test.bytes == (cint_prod.chan.B & ~(MEM_PAGE_SIZE - 1U)) - CINT_TEST_OFF);
+    assert(cint_service->test.height == CINT_SCAN_HEIGHT);
+}
+static inline void cint_stop_display(void)
+{
+    cint_expect_closed = true;
+    assert(!gf_display_stop(&cint_prod.display));
+    cint_no_resources();
 }
 
-/* Unused drawing/display dependencies keep exact frozen signatures. These
- * return no synthetic packets/images; C1 tests the published function table. */
-#define U __attribute__((unused))
-int gf3_fill(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, u32 color U, u8 alu U, u32 mask U, u32 dl U) { return 0; }
-int gf3_copy(struct gf3_ctx *c U, const struct gf3_surface *s U, const struct gf3_surface *d U, struct gf3_rect r U, u32 x U, u32 y U, u8 alu U, u32 mask U, u32 dl U) { return 0; }
-int gf3_mono(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, const struct gf3_ram *bits U, u32 fg U, u32 bg U, struct gf3_rect clip U, u32 dl U) { return 0; }
-int gf3_ifc(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, const struct gf3_ram *ram U, u32 dl U) { return 0; }
-int gf3_upload(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, const struct gf3_ram *ram U, bool force U, u32 dl U) { return 0; }
-int gf3_download(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, struct gf3_ram *ram U, u32 dl U) { return 0; }
-int gf3_scale(struct gf3_ctx *c U, const struct gf3_surface *s U, const struct gf3_surface *d U, struct gf3_rect sr U, struct gf3_rect dr U, struct gf3_rect clip U, bool bilinear U, u32 dl U) { return 0; }
-int gf3_present_m2mf(struct gf3_ctx *c U, const struct gf3_surface *s U, struct gf3_rect r U, const struct gf3_ram *ram U, u32 dl U) { return 0; }
-int gf_display_query(void *v U, struct video_info *out U) { return 0; }
-int gf_display_framebuffer(void *v U, struct video_fb *out U) { return 0; }
-int gf_display_start(void *v U, u32 off U) { return 0; }
-int gf_display_palette(struct gf_display_context *c U, u32 first U, u32 count U, const u8 *rgb U) { return 0; }
-int gf_display_blank(struct gf_display_context *c U, int blank U) { return 0; }
-int gf_display_modeset(struct gf_display_context *c U) { return 0; }
-int gf_display_baseline(struct gf_display_context *c U) { return 0; }
-int gf_display_checks(struct gf_display_context *c U) { return 0; }
-int gf_init_run(struct gf_init_context *c U, struct gf_init_program *p U) { return 0; }
-int gfinit_mode_calc(const struct gfinit_pll_limits *limits U, const struct gfinit_mode_saved *saved U, struct gfinit_mode *out U) { return 0; }
-int gf_display_mode_info(void *v U, u32 index, struct video_mode *out)
+#ifndef GF3_CINT_C2
+static void cint_start_and_diagnostic_stop(void)
 {
-    assert(index == 0 && out);
-    *out = (struct video_mode){.id = 42};
-    return 0;
+    cint_reset(); cint_start(); cint_open_windows();
+    u32 id = cint_service->scan.reservation_id;
+    cint_trace_clear(); cint_expect_closed = true;
+    assert(!gf3_service_stop(cint_service));
+    cint_closed(); cint_owned_reservations();
+    assert(cint_prod.display.engaged && !cint_restore_calls && !cint_owner_stops);
+    assert(cint_prod.chan.state == GF2_OFF && !cint_prod.foundation.imem.used);
+    assert(!cint_prod.accel.ready && !cint_prod.accel.epoch && !cint_prod.accel.notify_storage.size);
+    assert(cint_close_calls[0] == 1 && cint_close_calls[1] == 1 && !views);
+    /* Diagnostic START reuses the saved scan and the same live keys. */
+    framebuffer = (struct video_fb){0};
+    assert(!gf_foundation_start(&cint_prod.foundation));
+    assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
+    cint_expect_closed = false; cint_start();
+    assert(cint_service->scan.reservation_id == id);
+    cint_stop_display();
 }
-/* C2 is owned by another stage. This local failure sink closes admission;
- * it does not pretend to validate C2 restoration or F1/F2 MMIO behavior. */
-static u32 display_stops;
-int gf_display_stop(void *v)
+static void cint_real_dispatch(void)
 {
-    assert(v == &prod.display);
-    ++display_stops;
-    return gf3_service_close(service);
+    cint_reset(); cint_start();
+    struct gf3_surface a = *cint_slot->test_surface;
+    struct gf3_rect r = {0, 0, 8, 2};
+    u8 data[64] = {0};
+    struct gf3_ram ram = {data, sizeof(data), 16};
+    assert(cint_slot->fill == gf3_fill && cint_slot->copy == gf3_copy && cint_slot->mono == gf3_mono);
+    assert(cint_slot->map == gf_vram_view_map && cint_slot->unmap == gf_vram_view_unmap);
+    /* Reacquire dispatch/ctx at each synchronous call; never cache the table. */
+    assert(!cint_slot->fill(cint_slot->ctx, &a, r, 3, 3, 0xff, cint_deadline()));
+    assert(!cint_slot->copy(cint_slot->ctx, &a, &a, r, 16, 2, 3, 0xff, cint_deadline()));
+    assert(!cint_slot->mono(cint_slot->ctx, &a, r, &ram, 1, 0, r, cint_deadline()));
+    a.fmt = GF3_RGB565; a.width = 8; a.height = 2; a.bytes = a.pitch + 16U;
+    assert(!cint_slot->ifc(cint_slot->ctx, &a, r, &ram, cint_deadline()));
+    assert(!cint_slot->upload(cint_slot->ctx, &a, r, &ram, false, cint_deadline()));
+    assert(!cint_slot->download(cint_slot->ctx, &a, r, &ram, cint_deadline()));
+    assert(!cint_slot->present_m2mf(cint_slot->ctx, &a, r, &ram, cint_deadline()));
+    struct gf3_surface b = a;
+    b.off += MEM_PAGE_SIZE; /* both descriptors stay in the real test reservation */
+    assert(!cint_slot->scale(cint_slot->ctx, &a, &b, r, r, r, false, cint_deadline()));
+    assert(!geforce_fill_rect(0, 0, 2, 2, 1));
+    assert(!geforce_blit(2, 2, 0, 0, 2, 2));
+    cint_owned_reservations();
+    cint_stop_display();
 }
-static int owner_ok(struct gf_display_context *c)
-{ assert(c == &prod.display); return 0; }
-static void owner_release(struct gf_display_context *c)
-{ assert(c == &prod.display); }
-static struct gf2_chan *command_get(struct gf_display_context *c, struct gf_foundation **f)
+static void cint_init_allocation_failures(void)
 {
-    assert(c == &prod.display);
-    *f = &prod.foundation;
-    return &prod.chan;
+    /* Exhaust the real allocator at each of 14 allocation boundaries, without
+     * replacing alloc/free/object_new. Earlier allocations must be unlinked. */
+    for (unsigned allowed = 0; allowed < GF3_OBJECT_COUNT + 2U; ++allowed) {
+        cint_reset();
+        u32 original = cint_prod.foundation.imem.aperture_bytes;
+        u32 end = cint_used_end();
+        for (unsigned i = 0; i < allowed; ++i) {
+            end = (end + GF2_OBJECT_ALIGN - 1U) & ~(GF2_OBJECT_ALIGN - 1U);
+            end += i == 0 ? GF3_NOTIFY_BYTES : i == 1 ? GF2_DMA_OBJECT_BYTES : GF2_GR_OBJECT_BYTES;
+        }
+        cint_prod.foundation.imem.aperture_bytes = end;
+        int rc = gf3_service_start(cint_service, cint_deadline());
+        assert(rc == (allowed ? GF2_ENOSPC : GF1_ENOSPC));
+        cint_closed(); cint_owned_reservations();
+        assert(cint_prod.chan.state == GF2_RUN && !cint_prod.accel.ready);
+        assert(cint_used_count() == 8U && !cint_prod.accel.notify_storage.size);
+        u32 id = cint_service->test.reservation_id;
+        cint_prod.foundation.imem.aperture_bytes = original;
+        cint_start();
+        assert(cint_service->test.reservation_id == id);
+        cint_stop_display();
+    }
 }
-static const struct gf_display_owner display_owner = {
-    owner_ok, owner_release, owner_ok, owner_ok, owner_ok, command_get
-};
-static u8 palette[VIDEO_PALETTE_BYTES];
-
-static void clear_trace(void)
+static void cint_init_io_failures(void)
 {
-    gf3_host_trace_clear(&host);
-    gf2_host_memset(host.fail_at, 0, sizeof(host.fail_at));
-    gf2_host_memset(host.fail_rc, 0, sizeof(host.fail_rc));
+    /* Every successful-init MMIO/clock boundary is retried with one failing
+     * callback. The real unwind may leave RUN or stop F2; both retain keys. */
+    cint_reset(); cint_start();
+    u32 counts[] = {cint_host.calls[H_READ], cint_host.calls[H_WRITE], cint_host.calls[H_CLOCK]};
+    cint_stop_display();
+    const enum gf3_host_op ops[] = {H_READ, H_WRITE, H_CLOCK};
+    for (unsigned k = 0; k < sizeof(ops) / sizeof(ops[0]); ++k)
+        for (u32 n = 1; n <= counts[k]; ++n) {
+            cint_reset();
+            gf3_host_fail_at(&cint_host, ops[k], n, CINT_IO_FAILURE);
+            assert(gf3_service_start(cint_service, cint_deadline()) < 0);
+            cint_closed(); cint_owned_reservations();
+            assert(!cint_prod.accel.ready);
+            cint_trace_clear();
+            if (cint_prod.chan.state != GF2_RUN) {
+                assert(cint_prod.chan.state == GF2_OFF);
+                assert(!cint_prod.foundation.imem.used && !cint_prod.chan.mapped);
+                assert(!gf_foundation_start(&cint_prod.foundation));
+                assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
+            } else assert(cint_used_count() == 8U);
+            cint_start(); cint_stop_display();
+        }
 }
-static void reset(void)
+static void cint_recover_success_and_fault(void)
 {
-    /* Fixture cleanup, never reset the registry or node identity history. */
-    unmap_rc = 0;
-    if (view.mapped) assert(!real_views_close(&prod.chan));
-    if (service->test_node.value.owner)
-        assert(!real_release(&prod.chan, &service->test_node.value));
-    if (service->scan_node.value.owner)
-        assert(!real_release(&prod.chan, &service->scan_node.value));
-    assert(!registry.head && !views);
-    gf2_host_memset(&prod, 0, sizeof(prod));
-    prod.chan.f = &prod.foundation;
-    prod.chan.state = GF2_RUN; prod.chan.epoch = 7;
-    prod.chan.B = TEST_END + 19U;
-    prod.chan.bar1 = (struct recover_bar_extent){.base = FB_PHYS,
-        .length = 64U * 1024U * 1024U, .valid = true};
-    prod.foundation.imem.vram_bytes = prod.chan.bar1.length;
-    prod.foundation.imem.reserved = 1024U * 1024U;
-    prod.foundation.io.opaque = &host;
-    prod.foundation.io.timing.clock_us = clock_now;
-    prod.chan.map_ops = &map_ops; prod.chan.map_owner = &prod;
-    prod.display.engaged = prod.display.initialized = prod.display.reusable = true;
-    prod.display.owner = &display_owner;
-    prod.display.bars[GF_MODE_VRAM_BAR].length = GF_MODE_VRAM_BYTES;
-    prod.video = (struct video_device){.context = &prod.display, .ops = &gf_video_ops};
-    service->scan = service->test = (struct gf3_surface){0};
-    service->scan_pitch = service->scan_width = service->scan_height = service->scan_phys = 0;
-    slot = 0; hook_ctx = 0; hook_active = false;
-    framebuffer = (struct video_fb){FB_PHYS + SCAN_OFF, SCAN_PITCH * SCAN_HEIGHT,
-                                   SCAN_PITCH, GFX_FMT_PACKED8};
-    fb_width = 640U; fb_height = SCAN_HEIGHT;
-    stop_off = true; framebuffer_calls = display_stops = 0;
-    host.now = 100U; deadline = TEST_DEADLINE;
-    clear_trace();
+    for (unsigned fault = 0; fault < 2; ++fault) {
+        cint_reset(); cint_start(); cint_open_windows();
+        struct gf3_surface old = cint_service->test;
+        u32 epoch = cint_prod.chan.epoch, gen = cint_service->scan.generation;
+        if (fault) {
+            /* Real F1 IRQ statistics feed real F2 foreground fault capture. */
+            ++cint_prod.foundation.stats.graph;
+            assert(gf2_fault_check(&cint_prod.chan) == GF2_EFAULT);
+        }
+        framebuffer = (struct video_fb){0};
+        cint_trace_clear(); cint_expect_closed = true;
+        assert(!gf3_service_recover(cint_service, cint_deadline()));
+        cint_expect_closed = false;
+        assert(cint_slot && hook_active && cint_prod.accel.ready);
+        assert(cint_prod.chan.epoch == epoch + 1U && cint_prod.accel.epoch == epoch + 1U);
+        assert(cint_service->scan.generation == gen + 1U && cint_service->test.reservation_id != old.reservation_id);
+        assert(cint_service->scan.pitch == CINT_SCAN_PITCH && cint_service->test.pitch == CINT_TEST_PITCH);
+        assert(!views && !cint_loan[0] && !cint_loan[1]);
+        u32 writes = cint_host.calls[H_WRITE];
+        assert(gf3_fill(&cint_prod.accel, &old, (struct gf3_rect){0,0,1,1}, 1, 3, 0xff, cint_deadline()) == GF3_ESTATE);
+        assert(cint_host.calls[H_WRITE] == writes);
+        cint_stop_display();
+    }
 }
-static void inject(enum gf3_host_op op, u32 nth, int rc)
+static void cint_recover_close_retry(void)
 {
-    /* A1 intentionally disallows generic FREE injection; release is an i32
-     * service boundary here, rather than A1's void F1 inst_free operation. */
-    host.fail_at[op] = nth; host.fail_rc[op] = rc;
+    cint_reset(); cint_start(); cint_open_windows();
+    u32 id = cint_service->scan.reservation_id, count = cint_used_count();
+    struct gf_inst *head = cint_prod.foundation.imem.used;
+    cint_trace_clear(); cint_expect_closed = true; cint_unmap_fail = CINT_MAP_VIEW0;
+    assert(gf3_service_recover(cint_service, cint_deadline()) == GF2_EMAP);
+    cint_closed(); cint_owned_reservations();
+    assert(cint_prod.chan.state == GF2_RUN && cint_prod.accel.ready);
+    assert(cint_prod.foundation.imem.used == head && cint_used_count() == count);
+    assert(cint_view[0].mapped && !cint_view[1].mapped);
+    assert(!cint_host.calls[H_WRITE] && !cint_host.calls[H_CLOCK]);
+    cint_unmap_fail = -1;
+    assert(!gf3_service_recover(cint_service, cint_deadline()));
+    cint_expect_closed = false;
+    assert(cint_slot && cint_prod.accel.ready && cint_service->scan.reservation_id != id);
+    assert(cint_close_calls[0] == 2 && cint_close_calls[1] == 1);
+    cint_stop_display();
 }
-static void start_ok(void)
+static void cint_failure_cleanup(void)
 {
-    assert(!gf3_service_start(service, deadline));
-    assert(slot == &service->ops && slot->ctx == &prod.accel);
-    assert(slot->test_surface == &service->test && prod.accel.ready);
-    assert(hook_active && hook_ctx == &prod.accel);
-    assert(!gf2_host_memcmp(&hook_scan, &service->scan, sizeof(hook_scan)));
-    assert(slot->fill == gf3_fill && slot->copy == gf3_copy && slot->mono == gf3_mono);
-    assert(slot->ifc == gf3_ifc && slot->upload == gf3_upload && slot->download == gf3_download);
-    assert(slot->scale == gf3_scale && slot->present_m2mf == gf3_present_m2mf);
-    assert(slot->map == gf_vram_view_map && slot->unmap == gf_vram_view_unmap);
+    cint_reset();
+    /* Exercise the real C1 failure sink with a partial real initialization;
+     * metadata identifying the initial error must survive C2's cleanup. */
+    int rc = gf3_service_start(cint_service, cint_host.now);
+    assert(rc == GF2_ETIME);
+    cint_prod.display.section = GF_DISPLAY_CALC;
+    cint_prod.display.ordinal = 7;
+    cint_prod.display.target = 0x1234U;
+    cint_prod.display.last_rc = rc;
+    cint_expect_closed = true;
+    assert(gf_failure(&cint_prod.display) == -1);
+    assert(cint_prod.display.section == GF_DISPLAY_CALC && cint_prod.display.ordinal == 7);
+    assert(cint_prod.display.target == 0x1234U && cint_prod.display.last_rc == rc);
+    cint_no_resources();
 }
-static void check_geometry(void)
+static void cint_reference_failure_and_retained_init(void)
 {
-    assert(service->scan.off == SCAN_OFF && service->scan.bytes == 2564U);
-    assert(service->scan.pitch == 641U && service->scan.width == 640U && service->scan.height == 4U);
-    assert(service->scan.fmt == GF3_INDEX8);
-    assert(service->test.off == TEST_START && service->test.bytes == TEST_END - TEST_START);
-    assert(service->test.pitch == TEST_PITCH && service->test.width == 640U && service->test.height == 4U);
-    assert(service->test.fmt == service->scan.fmt);
-    assert(service->scan.reservation_id == service->scan_node.value.reservation_id);
-    assert(service->test.generation == service->test_node.value.generation);
+    for (unsigned wait_error = 0; wait_error < 2; ++wait_error) {
+        cint_reset();
+        cint_stall_reference = cint_references + 1U;
+        if (wait_error) gf3_host_fail_at(&cint_host, H_SLEEP, 1, CINT_IO_FAILURE);
+        assert(gf3_service_start(cint_service, cint_host.now + 3U) ==
+            (wait_error ? GF2_EIO : GF2_ETIME));
+        assert(cint_saw_unfinished); /* GET==PUT was not treated as completion */
+        cint_closed(); cint_owned_reservations();
+        assert(cint_prod.chan.state == GF2_OFF && !cint_prod.foundation.imem.used);
+        cint_trace_clear(); cint_stop_display();
+    }
+    /* Fail after all real F3 inst have been published, then deny stop.
+     * This distinguishes retained live descriptors from the old stub's
+     * simulated sizes/handles and catches invalidate-before-OFF mutations. */
+    cint_reset(); cint_start();
+    u32 nth = 0;
+    for (u32 i = 0; i < cint_host.nevents; ++i)
+        if (cint_events[i].op == H_WRITE && cint_events[i].a[1] == GF2_USER_BASE + GF2_USER_PUT)
+            nth = cint_events[i].nth;
+    assert(nth); cint_stop_display(); cint_reset();
+    gf3_host_fail_at(&cint_host, H_WRITE, nth, CINT_IO_FAILURE);
+    cint_fail_stop_after_put = true;
+    assert(gf3_service_start(cint_service, cint_deadline()) == GF2_ESTOP);
+    cint_closed(); cint_owned_reservations();
+    assert(cint_prod.chan.state == GF2_FAULT && !cint_prod.accel.ready);
+    assert(cint_prod.accel.obj[0].handle && cint_inst_live(&cint_prod.accel.obj[0].inst));
+    assert(cint_inst_live(&cint_prod.accel.notify_storage));
+    assert(cint_used_count() == 8U + 2U + GF3_OBJECT_COUNT);
+    assert(cint_prod.chan.mapped && cint_prod.foundation.mapped && cint_dma_live);
+    cint_trace_clear(); cint_expect_closed = true;
+    assert(gf_display_stop(&cint_prod.display) == -1 && cint_prod.display.last_rc == GF2_EFAULT);
+    cint_no_resources();
 }
-static void no_publication(void)
-{ assert(!slot && !hook_active); }
-static void clock_deadline(void) { deadline = host.now + GF3_TIMEOUT_US; }
-
+static void cint_recover_failures(void)
+{
+    /* Concrete stages: old stop, new F1 master/map, new F2 map/GR/reference,
+     * and F3 allocation after new F2's initial reference has completed. */
+    for (unsigned stage = 0; stage < 7; ++stage) {
+        cint_reset(); cint_start();
+        u32 old_id = cint_service->scan.reservation_id;
+        cint_old_epoch = cint_prod.chan.epoch;
+        cint_trace_clear(); cint_expect_closed = true;
+        if (stage == 1) cint_pci_fail_at = cint_pci_writes + 2U; /* old disable, then new enable */
+        if (stage == 2) cint_map_fail = CINT_MAP_IMEM;
+        if (stage == 3) cint_map_fail = CINT_MAP_PUSH;
+        if (stage == 0 || stage == 4 || stage == 5) {
+            /* Locate the real new-F2 operation from a successful trace below. */
+            cint_expect_closed = false;
+            assert(!gf3_service_recover(cint_service, cint_deadline()));
+            u32 nth = 0, matches = 0;
+            for (u32 i = 0; i < cint_host.nevents; ++i) {
+                const struct gf3_host_event *e = &cint_events[i];
+                u32 off = stage == 0 ? COMMAND_CACHES : stage == 4 ? GR_PROGRAM_DATA : GF2_USER_BASE + GF2_USER_PUT;
+                if (e->op == H_WRITE && e->a[1] == off &&
+                    (stage != 0 || e->a[3] == 0) && ++matches == (stage == 4 ? 1U : 2U)) {
+                    nth = e->nth; break;
+                }
+            }
+            assert(nth); cint_stop_display(); cint_reset(); cint_start();
+            old_id = cint_service->scan.reservation_id;
+            cint_old_epoch = cint_prod.chan.epoch;
+            cint_trace_clear(); cint_expect_closed = true;
+            gf3_host_fail_at(&cint_host, H_WRITE, nth, CINT_IO_FAILURE);
+        }
+        if (stage == 6) cint_limit_new_imem = true;
+        assert(gf3_service_recover(cint_service, cint_deadline()) < 0);
+        cint_closed();
+        assert(cint_service->scan_node.value.owner && cint_service->test_node.value.owner);
+        if (stage == 6) {
+            assert(cint_prod.chan.state == GF2_RUN && !cint_prod.accel.ready);
+            assert(cint_service->scan.reservation_id != old_id && cint_used_count() == 8U);
+            cint_prod.foundation.imem.aperture_bytes = CINT_IMEM_BYTES;
+        } else assert(cint_service->scan.reservation_id == old_id);
+        cint_map_fail = -1; cint_pci_fail_at = 0; cint_trace_clear();
+        /* Failure after new F2 exists is cleaned by real C2, not a fake sink. */
+        cint_stop_display();
+    }
+}
+static void cint_recover_without_display(void)
+{
+    cint_reset(); cint_start();
+    u32 id = cint_service->scan.reservation_id;
+    cint_prod.display.engaged = false;
+    cint_expect_closed = true;
+    assert(!gf3_service_recover(cint_service, cint_deadline()));
+    cint_closed();
+    assert(cint_prod.chan.state == GF2_RUN && !cint_prod.accel.ready);
+    assert(cint_service->scan.reservation_id == id && cint_used_count() == 8U);
+    /* !engaged with RUN must stop F2 before releasing the live reservations. */
+    cint_stop_display();
+}
+static void cint_recover_f3_submission_failure(void)
+{
+    cint_reset(); cint_start(); cint_trace_clear();
+    assert(!gf3_service_recover(cint_service, cint_deadline()));
+    u32 nth = 0;
+    for (u32 i = 0; i < cint_host.nevents; ++i)
+        if (cint_events[i].op == H_WRITE && cint_events[i].a[1] == GF2_USER_BASE + GF2_USER_PUT)
+            nth = cint_events[i].nth; /* final new-F3 setup reference */
+    assert(nth); cint_stop_display();
+    for (unsigned persistent = 0; persistent < 3; ++persistent) {
+        cint_reset(); cint_start();
+        u32 id = cint_service->scan.reservation_id, epoch = cint_prod.chan.epoch;
+        cint_trace_clear(); cint_expect_closed = true;
+        if (persistent < 2) {
+            gf3_host_fail_at(&cint_host, H_WRITE, nth, CINT_IO_FAILURE);
+            cint_fail_stop_after_put = persistent != 0;
+        } else {
+            /* Old stop + new F2 reference + new F3 pre-drain + setup drain.
+             * Stall only the fourth: F2's later cleanup reference can finish. */
+            cint_stall_reference = cint_references + 4U;
+        }
+        int rc = gf3_service_recover(cint_service,
+            persistent == 2 ? cint_host.now + 3U : cint_deadline());
+        assert(rc == (persistent == 0 ? GF2_EIO : persistent == 1 ? GF2_ESTOP : GF2_ETIME));
+        cint_closed(); cint_owned_reservations();
+        assert(cint_prod.chan.epoch == epoch + 1U && cint_service->scan.reservation_id != id);
+        assert(!cint_prod.accel.ready);
+        if (persistent == 1) {
+            assert(cint_prod.chan.state == GF2_FAULT && cint_prod.accel.obj[0].handle);
+            assert(cint_inst_live(&cint_prod.accel.obj[0].inst));
+            assert(cint_used_count() == 8U + 2U + GF3_OBJECT_COUNT);
+            cint_trace_clear();
+            assert(gf_display_stop(&cint_prod.display) == -1);
+            assert(cint_prod.display.last_rc == GF2_EFAULT);
+            cint_no_resources();
+        } else {
+            assert(cint_prod.chan.state == GF2_OFF && !cint_prod.foundation.imem.used);
+            if (persistent == 2) assert(cint_saw_unfinished);
+            cint_trace_clear(); cint_stop_display();
+        }
+    }
+}
+static void cint_id_exhaustion(void)
+{
+    cint_reset(); cint_start();
+    cint_trace_clear(); cint_expect_closed = true;
+    registry.next_id = U32_MAX; /* last scan ID is issued; test reserve fails */
+    assert(gf3_service_recover(cint_service, cint_deadline()) == GF2_ENOSPC);
+    /* F2: ID exhaustion during reservation update is an error, not the
+     * nonfatal geometric no-test-capacity case. Current service_publish
+     * conflates them and rebinds the hook: retain this regression assertion. */
+    cint_closed();
+    assert(cint_prod.chan.state == GF2_RUN && !cint_prod.accel.ready);
+    assert(cint_service->scan_node.value.owner && !cint_service->test_node.value.owner);
+    assert(cint_used_count() == 8U);
+    /* Next recover fails at scan reserve; no key issuer reset or wrap. */
+    assert(gf3_service_recover(cint_service, cint_deadline()) == GF2_ENOSPC);
+    assert(!registry.head && !cint_prod.accel.ready && cint_prod.chan.state == GF2_RUN);
+    /* No display surface exists after this failed update; stop F2 then C2's
+     * !engaged/OFF path, which needs neither restoration nor a fake reserve. */
+    assert(!gf3_service_stop(cint_service));
+    cint_prod.display.engaged = false;
+    assert(!gf_display_stop(&cint_prod.display));
+    cint_no_resources();
+}
 void _start(void)
 {
-    gf3_host_init(&host); host.events = events;
-    host.cevents = sizeof(events) / sizeof(events[0]);
-    assert(!gf3_service_get(0) && !gf3_service_get(&prod.chan));
-    assert(gf3_service_bind(0, &slot) == GF3_EINVAL);
-    assert(gf3_service_bind(&prod, 0) == GF3_EINVAL);
-    slot = (const struct gf3_test_ops *)&other;
-    assert(!gf3_service_bind(&prod, &slot) && !slot);
-    service = gf3_service_get(&prod.chan);
-    assert(service && !gf3_service_get(&host.ch) && !gf3_service_get(0));
-    assert(!gf3_service_bind(&prod, &slot));
-    assert(gf3_service_bind(&other, &slot) == GF3_ESTATE);
-    assert(gf3_service_bind(&prod, &other_slot) == GF3_ESTATE);
-    assert(gf3_service_start(0, 1) == GF3_EINVAL);
-    assert(gf3_service_close(0) == GF3_EINVAL);
-    assert(gf3_service_fini(0, 1) == GF3_EINVAL);
-    assert(gf3_service_release(0) == GF3_EINVAL);
-    assert(gf3_service_stop(0) == GF3_EINVAL);
-    assert(gf3_service_recover(0, 1) == GF3_EINVAL);
-    gf3_service_invalidate(0);
-
-    reset(); start_ok(); check_geometry();
-    u32 id = service->scan.reservation_id, gen = service->scan.generation;
-    u32 test_id = service->test.reservation_id;
-    assert(!gf3_service_bind(&prod, &slot) && slot == &service->ops);
-    assert(gf3_service_start(service, deadline) == GF3_ESTATE);
-    assert(!gf3_service_close(service) && prod.accel.ready);
-    no_publication(); assert(!gf3_service_fini(service, deadline));
-    assert(!gf2_stop(&prod.chan)); gf3_service_invalidate(service);
-    assert(!prod.accel.ready && !prod.accel.epoch && prod.accel.ch == &prod.chan);
-    assert(!prod.accel.obj[0].handle && !prod.accel.notify.handle && !prod.accel.notify_storage.size);
-    assert(!gf3_service_release(service));
-    assert(!service->scan.bytes && !service->test.bytes);
-    assert(service->scan_node.value.reservation_id == id && service->scan_node.value.generation == gen);
-    assert(!gf3_service_release(service));
-
-    /* Recover keeps framebuffer geometry, but invalidates every old key.
-     * Backend metadata is intentionally made unusable before recovery. */
-    reset(); start_ok(); id = service->scan.reservation_id; gen = service->scan.generation;
-    test_id = service->test.reservation_id;
-    framebuffer.phys = 0; fb_width = fb_height = 0;
-    clear_trace(); assert(!gf3_service_recover(service, deadline));
-    assert(framebuffer_calls == 1 && prod.chan.epoch == 8 && prod.accel.epoch == 8);
-    assert(slot == &service->ops && prod.accel.ready); check_geometry();
-    assert(service->scan.reservation_id != id && service->scan.generation == gen + 1U);
-    assert(service->test.reservation_id != test_id);
-    struct gf_vram_reservation key;
-    assert(gf_vram_match(&prod.chan, 0, id, gen, SCAN_OFF, 1, &key) == GF3_ESTATE);
-
-    /* Fault rc plus OFF is sufficient for recover; diagnostic STOP preserves
-     * the first failure while still invalidating dead F3 descriptors. */
-    reset(); start_ok(); clear_trace(); prod.chan.fault.latched = true;
-    inject(H_FENCE, 1, GF2_EFAULT);
-    assert(!gf3_service_recover(service, deadline) && slot);
-    reset(); start_ok(); id = service->scan.reservation_id; clear_trace(); clock_deadline();
-    inject(H_FENCE, 1, GF2_EFAULT);
-    assert(gf3_service_stop(service) == GF2_EFAULT);
-    no_publication(); assert(prod.chan.state == GF2_OFF && !prod.accel.ready);
-    assert(service->scan_node.value.reservation_id == id && service->test_node.value.owner);
-    assert(prod.accel.last_rc == GF2_EFAULT && prod.display.engaged);
-    prod.chan.state = GF2_RUN; ++prod.chan.epoch; prod.chan.fault.latched = false;
-    framebuffer.phys = 0; fb_width = fb_height = 0;
-    clear_trace(); start_ok();
-    assert(framebuffer_calls == 1 && !host.calls[H_ALLOC] && service->scan.reservation_id == id);
-
-    reset(); start_ok(); clear_trace(); stop_off = false;
-    inject(H_FENCE, 1, GF2_ESTOP);
-    assert(gf3_service_recover(service, deadline) == GF2_ESTOP);
-    no_publication(); assert(prod.accel.ready && prod.accel.obj[0].handle);
-    assert(!host.calls[H_RESUME] && !host.calls[H_FREE]);
-    reset(); start_ok(); clear_trace(); inject(H_RESUME, 1, GF2_EIO);
-    assert(gf3_service_recover(service, deadline) == GF2_EIO);
-    no_publication(); assert(!prod.accel.ready && !prod.accel.notify_storage.size);
-    assert(service->scan_node.value.owner && service->test_node.value.owner && !host.calls[H_FREE]);
-
-    /* Reservation failures retain only the not-yet-released nodes, and a
-     * retry touches only those nodes. Failed init leaves partial ctx for C2. */
-    for (u32 nth = 1; nth <= 2; ++nth) {
-        reset(); start_ok(); clear_trace(); inject(H_FREE, nth, GF3_ESTATE);
-        assert(gf3_service_recover(service, deadline) == GF3_ESTATE);
-        no_publication(); assert(!prod.accel.ready && !host.calls[H_GR_NEW]);
-        assert(service->scan_node.value.owner);
-        assert((bool)service->test_node.value.owner == (nth == 1));
-        clear_trace(); assert(!gf3_service_recover(service, deadline) && slot);
-    }
-    for (u32 nth = 1; nth <= 2; ++nth) {
-        reset(); start_ok(); clear_trace(); inject(H_ALLOC, nth, GF1_EIO);
-        assert(gf3_service_recover(service, deadline) == GF1_EIO);
-        no_publication(); assert(!prod.accel.ready && !host.calls[H_GR_NEW]);
-        assert((bool)service->scan_node.value.owner == (nth == 2));
-        clear_trace(); assert(!gf3_service_recover(service, deadline) && slot);
-    }
-    reset(); start_ok(); clear_trace(); inject(H_GR_NEW, 1, GF2_ETIME);
-    assert(gf3_service_recover(service, deadline) == GF2_ETIME);
-    no_publication(); assert(!prod.accel.ready && prod.accel.notify_storage.size);
-    assert(service->scan_node.value.owner && service->test_node.value.owner);
-    clear_trace(); clock_deadline(); assert(!gf3_service_stop(service));
-    assert(!host.calls[H_DEL] && !prod.accel.notify_storage.size);
-
-    reset(); start_ok(); clear_trace(); prod.display.engaged = false;
-    id = service->scan.reservation_id;
-    assert(!gf3_service_recover(service, deadline)); no_publication();
-    assert(!host.calls[H_ALLOC] && !host.calls[H_FREE] && !host.calls[H_GR_NEW]);
-    assert(service->scan_node.value.reservation_id == id && !prod.accel.ready);
-
-    /* Fini eligibility and stop failure ordering. */
-    reset(); start_ok(); clear_trace(); ++prod.chan.epoch;
-    assert(!gf3_service_fini(service, deadline) && !host.calls[H_DEL]);
-    --prod.chan.epoch; prod.chan.fault.latched = true;
-    assert(!gf3_service_fini(service, deadline) && !host.calls[H_DEL]);
-    prod.chan.fault.latched = false; prod.chan.state = GF2_FAULT;
-    assert(!gf3_service_fini(service, deadline) && !host.calls[H_DEL]);
-    reset(); start_ok(); clear_trace(); clock_deadline(); inject(H_DEL, 1, GF2_ETIME);
-    assert(gf3_service_stop(service) == GF2_ETIME && host.calls[H_FENCE] == 1);
-    assert(!prod.accel.ready && !prod.accel.notify_storage.size);
-    reset(); start_ok(); clear_trace(); inject(H_CLOCK, 1, GF1_EIO);
-    assert(gf3_service_stop(service) == GF2_EIO && !host.calls[H_DEL] && host.calls[H_FENCE] == 1);
-    assert(!prod.accel.ready && prod.accel.last_rc == GF2_EIO);
-    reset(); start_ok(); clear_trace(); stop_off = false; clock_deadline();
-    assert(gf3_service_stop(service) == GF2_ESTOP && service->scan_node.value.owner);
-
-    /* A real V0 window callback survives slot closure and failed unmap.
-     * Move the display/test ranges beyond the fixed boot-display map. */
-    reset(); framebuffer.phys += GF_MODE_VRAM_BYTES;
-    prod.chan.B += GF_MODE_VRAM_BYTES;
-    start_ok(); assert(service->test.off == WINDOW_START); open_window();
-    clear_trace(); unmap_rc = -1;
-    assert(gf3_service_stop(service) == GF2_EMAP); no_publication();
-    assert(view.mapped && loan && prod.accel.ready && !host.calls[H_FENCE]);
-    assert(gf3_service_recover(service, deadline) == GF2_EMAP && !host.calls[H_RESUME]);
-    unmap_rc = 0; clear_trace(); clock_deadline();
-    assert(!gf3_service_stop(service) && !view.mapped && !loan);
-    assert(service->test_node.value.owner && !prod.accel.ready);
-    reset(); start_ok(); clear_trace(); prod.foundation.revoked = true;
-    inject(H_STOP, 1, GF2_EMAP); clock_deadline();
-    assert(gf3_service_stop(service) == GF2_EMAP && host.calls[H_FENCE] == 1);
-    no_publication();
-
-    /* Capacity and exact pitch/height rules, including height truncation. */
-    reset(); prod.chan.B = TEST_START + MEM_PAGE_SIZE;
-    fb_height = 6; framebuffer.bytes = SCAN_PITCH * 6U;
-    start_ok(); assert(service->test.height == 5U && service->test.pitch == 704U);
-    reset(); framebuffer.pitch = 1024; fb_height = 3;
-    prod.chan.B = 2U * MEM_PAGE_SIZE;
-    start_ok(); assert(service->test.pitch == 1024U && service->test.height == 3U);
-    reset(); framebuffer.pitch = 3000; fb_height = 1;
-    prod.chan.B = 2U * MEM_PAGE_SIZE;
-    start_ok(); assert(service->test.pitch == 3008U && service->test.height == 1U);
-    reset(); framebuffer.pitch = 5000; fb_height = 1;
-    prod.chan.B = 3U * MEM_PAGE_SIZE;
-    assert(gf3_service_start(service, deadline) == GF2_ENOSPC);
-    assert(!slot && hook_active && prod.accel.ready && !service->test_node.value.owner);
-    reset(); prod.chan.B = TEST_START;
-    assert(gf3_service_start(service, deadline) == GF2_ENOSPC && !slot && prod.accel.ready);
-    reset(); framebuffer.pitch = 640; framebuffer.phys = FB_PHYS;
-    start_ok(); assert(service->test.pitch == 640U);
-
-    /* Failed ordinary start retries preserve a successfully reserved scan. */
-    reset(); inject(H_ALLOC, 2, GF1_EIO);
-    assert(gf3_service_start(service, deadline) == GF1_EIO);
-    id = service->scan_node.value.reservation_id; gen = service->scan_node.value.generation;
-    clear_trace(); start_ok();
-    assert(host.calls[H_ALLOC] == 1 && service->scan.reservation_id == id && service->scan.generation == gen);
-    reset(); inject(H_PAUSE, 1, GF3_ESTATE);
-    assert(gf3_service_start(service, deadline) == GF3_ESTATE && !host.calls[H_ALLOC]);
-    reset(); prod.chan.state = GF2_OFF;
-    assert(gf3_service_start(service, deadline) == GF3_ESTATE && !framebuffer_calls);
-    reset(); prod.chan.epoch = 0;
-    assert(gf3_service_start(service, deadline) == GF3_ESTATE);
-    reset(); framebuffer.format = GFX_FMT_PACKED8 + 1U;
-    assert(gf3_service_start(service, deadline) == GF3_EFORMAT && !host.calls[H_ALLOC]);
-    reset(); framebuffer.pitch = U32_MAX; fb_height = 2;
-    assert(gf3_service_start(service, deadline) == GF3_ERANGE && !host.calls[H_ALLOC]);
-
-    /* Exercise the actual gf_video_ops.start connection, including clock
-     * failure and the display-only ENOSPC outcome. */
-    reset(); clock_deadline();
-    assert(!video_start(&prod.video, 42, palette) && prod.display.active && slot);
-    reset(); clock_deadline(); inject(H_CLOCK, 1, GF1_EIO);
-    assert(video_start(&prod.video, 42, palette) == -1 && display_stops == 1);
-    assert(prod.display.last_rc == GF2_EIO && !host.calls[H_GR_NEW]); no_publication();
-    reset(); clock_deadline(); inject(H_GR_NEW, 1, GF2_ETIME);
-    assert(video_start(&prod.video, 42, palette) == -1 && display_stops == 1);
-    assert(prod.display.last_rc == GF2_ETIME); no_publication();
-    reset(); clock_deadline(); prod.chan.B = TEST_START;
-    assert(!video_start(&prod.video, 42, palette) && prod.display.active && !slot && hook_active);
-    reset();
+    assert(!gf3_service_get(0) && !gf3_service_get(&cint_prod.chan));
+    cint_start_and_diagnostic_stop();
+    assert(!gf3_service_get(&cint_host.ch)); /* diagnostic channel stays separate */
+    cint_real_dispatch();
+    cint_init_allocation_failures();
+    cint_init_io_failures();
+    cint_reference_failure_and_retained_init();
+    cint_recover_success_and_fault();
+    cint_recover_close_retry();
+    cint_recover_failures();
+    cint_recover_f3_submission_failure();
+    cint_recover_without_display();
+    cint_failure_cleanup();
+    cint_id_exhaustion(); /* identity exhaustion is deliberately the final case */
     gf2_host_exit(0);
 }
+#endif
