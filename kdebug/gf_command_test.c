@@ -3,6 +3,7 @@
 #include "gf_command_test.h"
 #include "gf_accel_test.h"
 #include "gf_display_test.h"
+#include "gf5_test.h"
 #include "../hwdev/gf/command.h"
 #include "../hwdev/gf/gf1_test.h"
 #include "../drivers/video/geforce/geforce_module.h"
@@ -281,6 +282,12 @@ int gf_command_test(struct gf2_request *request, struct gf_foundation *f,
     }
     if (q.size == sizeof(q) && q.test == GF4_DISPLAY && !q.rc) {
         int rc = gf_display_test(q.session);
+        request->session = 0;
+        request->rc = rc;
+        return rc;
+    }
+    if (q.size == sizeof(q) && q.test == GF5_FEATURE && !q.rc) {
+        int rc = gf5_test(q.session);
         request->session = 0;
         request->rc = rc;
         return rc;
