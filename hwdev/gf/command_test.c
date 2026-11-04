@@ -4,6 +4,7 @@
  * Owner selection and lease cleanup stay with C9/T2b. */
 #include "command.h"
 #include "gf2_test.h"
+#include "accel_service.h"
 
 #define TEST_BAD_HANDLE 0xdeadbeefU
 #define TEST_METHOD_HANDLE 0x80000100U
@@ -181,8 +182,18 @@ static int call(struct gf_foundation *f, const struct gf2_test_request *q,
     /* Revocation forbids every hardware operation, including fault capture
      * and stop/recover. The lease owner retains resources for its cleanup. */
     if (f->revoked) return reply->rc = GF2_EFAULT;
+    /* X3: production lifecycle belongs to F4 when an owner is bound.
+     * The diagnostic channel keeps its independent F2 lifecycle. */
+    struct gf3_service *service=ch==production_ch ? gf3_service_get(ch) : 0;
+    const struct gf3_service_owner *owner=service ? service->owner : 0;
     switch (q->op) {
-    case GF2T_START: rc = gf2_start(ch, f); break;
+    case GF2T_START:
+        if (owner) rc=owner->start(owner->owner,q->deadline_us);
+        else {
+            rc=gf2_start(ch,f);
+            if (!rc && service) rc=gf3_service_start(service,q->deadline_us);
+        }
+        break;
     case GF2T_REFERENCE:
         rc = ch->f == f && ch->state != GF2_OFF ?
              reference(ch, q->deadline_us) : GF2_ESTATE;
@@ -190,9 +201,14 @@ static int call(struct gf_foundation *f, const struct gf2_test_request *q,
     case GF2T_SNAPSHOT:
         if (ch->state != GF2_OFF && f->running) rc = gf2_fault_check(ch);
         break;
-    case GF2T_STOP: rc = gf2_stop(ch); break;
+    case GF2T_STOP:
+        rc=owner ? owner->stop(owner->owner,q->deadline_us) :
+           service ? gf3_service_stop(service) : gf2_stop(ch);
+        break;
     case GF2T_RECOVER:
-        rc = ch->f == f ? gf2_recover(ch) : GF2_ESTATE;
+        rc=owner ? owner->recover(owner->owner,q->deadline_us) :
+           service ? gf3_service_recover(service,q->deadline_us) :
+           ch->f==f ? gf2_recover(ch) : GF2_ESTATE;
         break;
     case GF2T_BAD_HANDLE:
     case GF2T_BAD_METHOD: rc = bad_command(ch, q->op, q->deadline_us); break;
