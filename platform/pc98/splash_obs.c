@@ -57,8 +57,6 @@ static void obs_start(u32 n, u32 crc)
 {
     serial_puts_polled("SPLO n="); serial_diag_u32(n);
     serial_puts_polled(" start crc="); serial_diag_hex(crc, SPLASH_OBS_CRC_DIGITS);
-    serial_puts_polled(" colors="); serial_diag_u32(n);
-    serial_puts_polled(" houts="); serial_diag_u32(PL_OBS_COLOR_OUTS * n - 1);
     serial_puts_polled("\n");
 }
 
@@ -106,8 +104,12 @@ void platform_splash_observe(void)
         status = "invalid";
         if (osri_load(path, &fb, image)) goto done;
         if (image->version != OSRI_VERSION_2 || image->band != 1) goto done;
-        status = "colors_mismatch";
-        if (pl_obs_prepare(image, (u8)n, plan)) goto done;
+        status = "prepare";
+        if (pl_obs_prepare(image, plan)) goto done;
+        serial_puts_polled("SPLO n="); serial_diag_u32(n);
+        serial_puts_polled(" out_max="); serial_diag_u32(plan->max_outs);
+        serial_puts_polled(" out_total="); serial_diag_u32(plan->total_outs);
+        serial_puts_polled("\n");
         obs_black();
         gfx_add_dirty_rect(0, 0, GFX_WIDTH, GFX_HEIGHT);
         gfx_present_nosync();

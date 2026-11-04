@@ -766,38 +766,57 @@ restore:
  * These columns deliberately have no R1 qualification or PIT settlement. */
 #define PL_OBS_POLL_LIMIT 1000000u
 
-int pl_obs_prepare(const struct OsriImage *image, u8 colors, struct PlObsPlan *plan)
+int pl_obs_prepare(const struct OsriImage *image, struct PlObsPlan *plan)
 {
-    if (!image || !plan || colors < 1 || colors > OSRI_COLORS ||
-        image->version != OSRI_VERSION_2 || image->band != 1 ||
-        image->count != (SPLASH_RASTER_VISIBLE_LINES - 1) * colors)
-        return -1;
+    u16 current[OSRI_COLORS];
+    u32 pos = 0;
+    if (!image || !plan || image->version != OSRI_VERSION_2 || image->band != 1 ||
+        image->count > OBS_V2_MAX_EVENTS) return -1;
+    for (u32 i = 0; i < OSRI_COLORS; i++) {
+        if (image->pal[i] > 0xfff) return -1;
+        current[i] = image->pal[i];
+    }
+    plan->max_outs = plan->total_outs = 0;
     plan->row[0] = (struct PlObsRow){0};
     for (u32 y = 1; y < SPLASH_RASTER_VISIBLE_LINES; y++) {
         struct PlObsRow *r = &plan->row[y];
+        u16 seen = 0;
         *r = (struct PlObsRow){0};
-        u32 previous = 0;
-        for (u32 j = 0; j < colors; j++) {
-            const struct OsriEvent *e = &image->event[(y - 1) * colors + j];
-            if (e->line != y || e->index >= OSRI_COLORS ||
-                (j && e->index <= previous) || e->rgb444 > 0xfff ||
-                e->reserved0 || e->reserved1) return -1;
-            previous = e->index;
-            if (!j) r->first = e->index;
+        while (pos < image->count && image->event[pos].line <= y) {
+            const struct OsriEvent *e = &image->event[pos++];
+            if (e->line != y || e->index >= OSRI_COLORS || e->rgb444 > 0xfff ||
+                e->reserved0 || e->reserved1 || (seen & (1u << e->index))) return -1;
+            seen |= 1u << e->index;
+            u16 old = current[e->index], rgb = e->rgb444;
+            current[e->index] = rgb;
+            /* Same-color events remain valid OBS input but emit nothing. */
+            if (old == rgb) continue;
+            u32 outs = ((old & 0x0f0) != (rgb & 0x0f0)) +
+                       ((old & 0xf00) != (rgb & 0xf00)) +
+                       ((old & 0x00f) != (rgb & 0x00f));
+            if (r->count + outs + !!r->count > PL_OBS_OUT_LIMIT) return -1;
+            if (!r->count) r->first = e->index;
             else {
                 r->port[r->count] = PAL_IDX_PORT;
                 r->value[r->count++] = e->index;
             }
-            /* Same RGB still writes all three components: N counts slots. */
-            r->port[r->count] = PAL_G_PORT;
-            r->value[r->count++] = (e->rgb444 >> 4) & GFX_PALETTE_COMPONENT_MASK;
-            r->port[r->count] = PAL_R_PORT;
-            r->value[r->count++] = (e->rgb444 >> 8) & GFX_PALETTE_COMPONENT_MASK;
-            r->port[r->count] = PAL_B_PORT;
-            r->value[r->count++] = e->rgb444 & GFX_PALETTE_COMPONENT_MASK;
+            if ((old & 0x0f0) != (rgb & 0x0f0)) {
+                r->port[r->count] = PAL_G_PORT;
+                r->value[r->count++] = (rgb >> 4) & GFX_PALETTE_COMPONENT_MASK;
+            }
+            if ((old & 0xf00) != (rgb & 0xf00)) {
+                r->port[r->count] = PAL_R_PORT;
+                r->value[r->count++] = (rgb >> 8) & GFX_PALETTE_COMPONENT_MASK;
+            }
+            if ((old & 0x00f) != (rgb & 0x00f)) {
+                r->port[r->count] = PAL_B_PORT;
+                r->value[r->count++] = rgb & GFX_PALETTE_COMPONENT_MASK;
+            }
         }
+        if (r->count > plan->max_outs) plan->max_outs = r->count;
+        plan->total_outs += r->count;
     }
-    return 0;
+    return pos == image->count ? 0 : -1;
 }
 
 /* Select a fully expanded column before polling its edge. Every emitter
