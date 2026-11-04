@@ -1,4 +1,29 @@
 /*
+ * Copyright (C) 2009 Francisco Jerez.
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the
+ * next paragraph) shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER(S) AND/OR ITS SUPPLIERS BE
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
+/*
  * Copyright 1993-2003 NVIDIA, Corporation
  * Copyright 2006 Dave Airlie
  * Copyright 2007 Maarten Maathuis
@@ -111,18 +136,18 @@ static bool timing_equal(const struct gf4_timing *a,const struct gf4_timing *b)
 
 static bool timing_fits(const struct gf4_timing *t,const struct gf4_edid_state *e)
 {
-    /* Input is already field-normalized by the generator. Do not round. */
+    /* C:245-256 truncates horizontal pixels to character clocks and permits
+     * vs==vd. Keep the original pixels in the published mode. */
     if (!t->khz || !t->hd || t->vd<3U ||
         t->hd>=t->hs || t->hs>=t->he || t->he>t->ht ||
-        t->vd>=t->vs || t->vs>=t->ve || t->ve>t->vt ||
-        ((t->hd|t->hs|t->he|t->ht)&7U) ||
+        t->vd>t->vs || t->vs>=t->ve || t->ve>t->vt ||
         t->ht<40U || t->vt<3U ||
         (t->hs>>3)+1U>GF4_HFIELD_MAX ||
         (t->hd>>3)-1U>GF4_HFIELD_MAX || (t->ht>>3)-5U>GF4_HFIELD_MAX ||
         t->vd-1U>GF4_VFIELD_MAX || t->vs-1U>GF4_VFIELD_MAX ||
         ((t->vt-2U)|((t->flags&GF4_INTERLACE)?1U:0U))>GF4_VFIELD_MAX ||
-        ((t->ht-t->hd)>>3)>GF4_HBLANK_MAX ||
-        ((t->he-t->hs)>>3)>GF4_HSYNC_MAX ||
+        ((t->ht>>3)-(t->hd>>3))>GF4_HBLANK_MAX ||
+        ((t->he>>3)-(t->hs>>3))>GF4_HSYNC_MAX ||
         t->vt-t->vd>GF4_VBLANK_MAX || t->ve-t->vs>GF4_VSYNC_MAX ||
         (t->flags & ~(GF4_NEG_H|GF4_NEG_V|GF4_INTERLACE|GF4_DBLSCAN))) return false;
     if (!e->range_valid) return true;
@@ -136,6 +161,37 @@ static bool timing_fits(const struct gf4_timing *t,const struct gf4_edid_state *
         (!e->max_h_khz || t->khz<=(u64)e->max_h_khz*t->ht) &&
         (!e->min_v_hz || hz>=pixels*e->min_v_hz) &&
         (!e->max_v_hz || hz<=pixels*e->max_v_hz);
+}
+
+/* MIT nouveau c03c1a1 dispnv04/tvnv17.c:310-349 mode_valid;
+ * norm order/kind/size/rate: tvmodesnv17.c:33-215. Interlaced CTV
+ * dimensions here are field-normalized, as required by data.h. */
+#define GF4_TV_CLOCK_MAX 70000U
+#define GF4_CTV_CLOCK_MAX 400000U
+static bool tv_timing_fits(const struct gf4_timing *t,u32 norm)
+{
+    static const struct { u16 width,height; u8 hz; bool ctv,interlace; } norms[]={
+        {720,576,50,false,false}, {720,480,60,false,false},
+        {720,576,50,false,false}, {720,576,50,false,false},
+        {720,480,60,false,false}, {720,480,60,false,false},
+        {720,480,60,false,false}, {720,480,0,true,false},
+        {720,576,50,false,false}, {720,576,0,true,false},
+        {1280,720,0,true,false}, {1920,540,0,true,true}
+    };
+    if (norm>=sizeof(norms)/sizeof(norms[0])) return false;
+    if (norms[norm].ctv)
+        return t->khz<=GF4_CTV_CLOCK_MAX && t->hd<=norms[norm].width &&
+            t->vd<=norms[norm].height &&
+            !!(t->flags&GF4_INTERLACE)==norms[norm].interlace &&
+            !(t->flags&GF4_DBLSCAN);
+    if (t->khz>GF4_TV_CLOCK_MAX || (t->flags&GF4_INTERLACE)) return false;
+    /* tvnv17.c:334-339 compares rounded integer Hz against 50000/59940
+     * mHz with tolerance 600. Only 50/60 Hz respectively survive. Compare
+     * the half-open rounding interval without a 64-bit division. DBLSCAN
+     * has already doubled vt, so do not divide the refresh a second time. */
+    u64 pixels=(u64)t->ht*t->vt, twice_hz=(u64)t->khz*2000U;
+    u32 hz=norms[norm].hz;
+    return twice_hz>=pixels*(2U*hz-1U) && twice_hz<pixels*(2U*hz+1U);
 }
 
 static i32 candidate_pll(struct gf4_ctx *c,u8 connector,const struct gf4_mode *m)
@@ -241,9 +297,12 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
     i32 reason=0,rc=0;
     for (u32 connector=0;connector<GF4_CONNECTORS;connector++) {
         bool present=false,tv=false,first=true;
+        u32 tv_norm=0;
         for (u32 r=0;r<c->nroutes;r++) if (c->routes[r].connector==connector) {
             present=true;
-            if (c->routes[r].type==GF4_TV) tv=true;
+            if (c->routes[r].type==GF4_TV) {
+                tv=true; tv_norm=c->routes[r].tv_norm;
+            }
         }
         if (!present) continue;
         struct gf4_edid_state e;
@@ -267,7 +326,7 @@ i32 gf4_detect(struct gf4_ctx *c,u32 dl)
                 }
                 t=&e.timing[at];
             }
-            if (!timing_fits(t,&e)) continue;
+            if (tv ? !tv_timing_fits(t,tv_norm) : !timing_fits(t,&e)) continue;
             bool surviving=false;
             for (u32 depth=0;depth<GF4_DEPTHS;depth++) {
                 static const enum gf3_fmt formats[GF4_DEPTHS]={
