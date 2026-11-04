@@ -74,7 +74,7 @@ static struct gf4_host_read reads[80]; /* 2 * (initial + 33 probes + 3 edges). *
 static struct gf_init_program program;
 static u8 rom[M_PC+1U];
 static const struct gf5_plan plan = {.mc=NEW_CTRL,.mn=NEW_COEF};
-static u32 write_count, read_count, sleep_count, clock_count, self_depth;
+static u32 write_count, read_count, sleep_count, clock_count, self_depth, protected_heads;
 static bool timeout_jump;
 struct golden { u32 off,width,value; };
 static const struct golden golden[] = {
@@ -100,6 +100,8 @@ static const struct golden rollback_golden[] = {
 #define RESTORE_WRITES (HEADS * 2U) /* index + data per saved SR1 */
 #define SCRIPT_WRITES (GOLDEN_WRITES - RESTORE_WRITES)
 #define ROLLBACK_WRITES (sizeof(rollback_golden)/sizeof(rollback_golden[0]))
+/* ramnv40.c:111-113,171-173: each SR1 operation is index then data. */
+#define SR_WRITES_PER_HEAD (RESTORE_WRITES / HEADS)
 static u32 reg(u32 off)
 {
     u32 v=0;
@@ -114,6 +116,8 @@ static void observe_mmio(struct gf4_host *d,const struct gf4_host_event *e)
      * all CPU/GPU admission remains closed. Neither test nor product maps
      * VRAM, calls COPY, resumes, or accesses a BAR1 aperture. */
     if (self_depth) {
+        for (u32 head=0;head<HEADS;++head)
+            if (protected_heads&(1U<<head)) assert(d->sr[head][SR1]&BLANK);
         assert(!h.ctx.accepting && d->base.paused && !d->ctx.accepting);
         if (e->op==D_READ || e->op==D_WRITE) assert(e->a[0]==0);
         assert(!h.calls[F5_COPY] && !h.calls[F5_RESUME]);
@@ -165,7 +169,7 @@ static void setup(u32 active,u32 preblank,bool script)
         add_read(VBL+head*STRIDE,HIGH,&n);
     gf4_host_reads(&h.display,reads,n);
     h.display.observe=observe_mmio; h.observe=observe_link;
-    self_depth=0; timeout_jump=false;
+    self_depth=0; protected_heads=active&~preblank; timeout_jump=false;
 }
 static void retained(void)
 {
@@ -175,12 +179,28 @@ static void retained(void)
     assert(h.ctx.rom.bytes==rom && h.ctx.rom.memory_program==&program);
     assert(h.ctx.rom.size==sizeof(rom) && h.ctx.deadline==DEADLINE);
 }
-/* Compare every write, including the failed attempt, with one complete
- * rollback before SR1 (script failure) or after SR1 (late I/O failure). */
-static void recovery_trace(bool late)
+/* Compare every write, including the failed attempt. A late SR1 index
+ * failure omits that data write; reblank and final restore surround rollback.
+ * failed_write is the one-based forward write site, or zero for script error. */
+static void recovery_trace(u32 failed_write)
 {
     u32 n=0, slept=0, settle_left=0;
-    u32 prefix=late?GOLDEN_WRITES:SCRIPT_WRITES;
+    struct golden expected[GOLDEN_WRITES+RESTORE_WRITES*2U+ROLLBACK_WRITES];
+    u32 count=0, prefix=failed_write?GOLDEN_WRITES:SCRIPT_WRITES;
+    for (u32 i=0;i<prefix;++i) {
+        expected[count++]=golden[i];
+        /* sr_write returns immediately when its index write fails. */
+        if (i+1U==failed_write && golden[i].off==
+            SR_INDEX+((i-SCRIPT_WRITES)/SR_WRITES_PER_HEAD)*STRIDE) ++i;
+    }
+    if (failed_write) {
+        for (u32 head=0;head<HEADS;++head) {
+            expected[count++]=(struct golden){SR_INDEX+head*STRIDE,BYTE,SR1};
+            expected[count++]=(struct golden){SR_DATA+head*STRIDE,BYTE,SR_OLD|BLANK};
+        }
+    }
+    for (u32 i=0;i<ROLLBACK_WRITES;++i) expected[count++]=rollback_golden[i];
+    for (u32 i=SCRIPT_WRITES;i<GOLDEN_WRITES;++i) expected[count++]=golden[i];
     for (u32 i=0;i<h.display.nevents;++i) {
         const struct gf4_host_event *e=&display_events[i];
         if (e->op==D_SLEEP) {
@@ -189,20 +209,15 @@ static void recovery_trace(bool late)
         }
         if (e->op!=D_WRITE) continue;
         assert(!settle_left);
-        const struct golden *expected;
-        if (n<prefix) expected=&golden[n];
-        else if (n<prefix+ROLLBACK_WRITES) expected=&rollback_golden[n-prefix];
-        else {
-            assert(!late && n<GOLDEN_WRITES+ROLLBACK_WRITES);
-            expected=&golden[n-ROLLBACK_WRITES];
-        }
-        assert(e->a[0]==0 && e->a[1]==expected->off);
-        assert(e->a[2]==expected->width && e->a[3]==expected->value);
-        if (expected->off==COEF || (expected->off==AUTO && expected->value==AUTO_BIT))
+        assert(n<count);
+        const struct golden *want=&expected[n];
+        assert(e->a[0]==0 && e->a[1]==want->off);
+        assert(e->a[2]==want->width && e->a[3]==want->value);
+        if (want->off==COEF || (want->off==AUTO && want->value==AUTO_BIT))
             settle_left=SETTLE_US;
         ++n;
     }
-    assert(n==GOLDEN_WRITES+ROLLBACK_WRITES && !settle_left);
+    assert(n==count && !settle_left);
     /* ramnv40.c:145,152: two settles for each of forward and rollback. */
     assert(slept==2U*2U*SETTLE_US);
     assert(reg(CTRL)==OLD_CTRL && reg(COEF)==OLD_COEF && reg(MUX)==OLD_MUX);
@@ -272,7 +287,7 @@ void _start(void)
     gf5_host_fail_at(&h,F5_SCRIPT,1,GF_SCRIPT_ETIME);
     assert(gf5_ram_prog(&h.ctx,&plan)==GF5_ETIME);
     retained(); assert(h.calls[F5_SCRIPT]==1 && h.ctx.source_rc==GF_SCRIPT_ETIME);
-    recovery_trace(false);
+    recovery_trace(0);
     /* Each saved SR1 index/data write can report an applied I/O failure.
      * These run after the initial rollback decision; still restore PLL once. */
     for (u32 nth=SCRIPT_WRITES+1U;nth<=GOLDEN_WRITES;++nth) {
@@ -280,7 +295,7 @@ void _start(void)
         gf4_host_write_applied_error(&h.display,nth,-77);
         assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
         retained(); assert(h.ctx.source_rc==-77 && h.ctx.last_rc==GF5_EIO);
-        recovery_trace(true);
+        recovery_trace(nth);
     }
     /* Rollback failure cannot suppress controller/SR1 cleanup or mask cause. */
     setup(3,0,true);
@@ -288,7 +303,7 @@ void _start(void)
     gf4_host_fail_at(&h.display,D_WRITE,SCRIPT_WRITES+1U,-82); /* rollback precharge */
     assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
     retained(); assert(h.ctx.source_rc==-81 && !reg(SELF) && reg(AUTO)==AUTO_BIT);
-    recovery_trace(false);
+    recovery_trace(0);
     setup(0,0,false);
     assert(gf5_ram_prog(&h.ctx,&plan)==0 && h.calls[F5_SCRIPT]==0);
     assert(h.display.calls[D_SLEEP]==HEADS*PROBES+2U*(SETTLE_US/GF2_WAIT_MAX_US));

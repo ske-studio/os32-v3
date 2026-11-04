@@ -237,7 +237,19 @@ cleanup:
     }
     /* SR1/vblank can fail after the first rollback decision. Preserve rc,
      * and include this late failure in the same single old-PLL attempt. */
-    if (rc && touched && !rolled_back) (void)rollback(io, ctrl, coef, mux);
+    if (rc && touched && !rolled_back) {
+        /* ramnv40.c:98-120: disable head memory access before reclocking,
+         * including heads already reopened by the SR1 cleanup above. */
+        for (u32 h = 0; h < RAM_HEADS; ++h) {
+            if (blanked & (1U << h))
+                (void)sr_write(io, h, sr[h] | RAM_BLANK);
+        }
+        (void)rollback(io, ctrl, coef, mux);
+        /* ramnv40.c:161-175: restore every saved head after reclocking. */
+        for (u32 h = 0; h < RAM_HEADS; ++h) {
+            if (blanked & (1U << h)) (void)sr_write(io, h, sr[h]);
+        }
+    }
     if (rc) goto failed;
     rc = g->links.unpause(g->links.owner);
     if (!rc && reopen) rc = g->links.admission(g->links.owner, true);
