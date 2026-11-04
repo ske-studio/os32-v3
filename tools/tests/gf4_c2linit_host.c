@@ -272,17 +272,24 @@ static void c2_deadlines(void)
     /* Total wait ceiling is distinct from the absolute/elapsed deadline.
      * REPEAT accepts 1..254 (shared decoder contract). 76 full u16 waits
      * fit in 5s; the 77th must fail before any wait callback/accounting. */
+    /* 76 repeats of one u16 wait (0xffff us): wait = 76*65535 us; each wait
+     * is split into 66 sleep callbacks; steps = REPEAT + 76*(WAIT+END) + the
+     * refused 77th REPEAT body entry. */
+    enum { C2_WAIT_REPS=76U, C2_WAIT_ONE_US=65535U, C2_SLEEPS_PER_WAIT=66U };
+    const u32 c2_wait_total=C2_WAIT_REPS*C2_WAIT_ONE_US;
+    const u32 c2_sleep_total=C2_WAIT_REPS*C2_SLEEPS_PER_WAIT;
+    const u32 c2_wait_steps=1U+C2_WAIT_REPS*2U+1U;
     c2_reset(); const u8 wait_budget[]={0x33,76,0x74,0xff,0xff,0x36,0x71};
     c2_code(C2_MAIN,wait_budget,sizeof(wait_budget));
     assert(c2_run(0,1,GF_INIT_EXEC_US)==0 && !c2_restores);
-    assert(c2_init.wait_us==4980660U && c2_host.calls[D_SLEEP]==5016U);
-    assert(c2_host.local_now==C2_NOW+4980660U);
+    assert(c2_init.wait_us==c2_wait_total && c2_host.calls[D_SLEEP]==c2_sleep_total);
+    assert(c2_host.local_now==C2_NOW+c2_wait_total);
     c2_reset(); c2_code(C2_MAIN,wait_budget,sizeof(wait_budget));
     c2_rom[C2_MAIN+1]=77;
     assert(c2_run(0,1,GF_INIT_EXEC_US)==GF_SCRIPT_ETIME && c2_restores==1);
-    assert(c2_init.wait_us==4980660U && c2_host.calls[D_SLEEP]==5016U);
-    assert(c2_host.local_now==C2_NOW+4980660U &&
-           c2_init.elapsed_us<GF_INIT_EXEC_US && c2_init.steps==154U);
+    assert(c2_init.wait_us==c2_wait_total && c2_host.calls[D_SLEEP]==c2_sleep_total);
+    assert(c2_host.local_now==C2_NOW+c2_wait_total &&
+           c2_init.elapsed_us<GF_INIT_EXEC_US && c2_init.steps==c2_wait_steps);
     assert(c2_init.fail_pc==C2_MAIN+2 && !c2_host.calls[D_WRITE]);
     /* Step cap uses ETIME; call-stack cap uses EIO. */
     c2_reset(); const u8 budget[]={0x33,254,0x33,254,0x63,0x36,0x36,0x71};
