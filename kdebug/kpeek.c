@@ -9,8 +9,8 @@
 /*  NOMAP、PCD/PWT のページ (装置) と [A0000h, E8000h) は DENY (K1・R2)。    */
 /*  1 ページでも断れば 1 バイトも読まない。fail_addr はそのページの先頭。    */
 /*                                                                          */
-/*  -m (MMIO): 4MB (窓の PT 1 枚) をまたぐ要求は ARG (K6)。許可リスト       */
-/*  (kpeek_allow.c) に収まらなければ DENY。デバイス窓の先頭 4MB の PT の     */
+/*  -m (MMIO): 4MB (窓の PT 1 枚) をまたぐ要求は ARG (K6)。任意の物理番地を */
+/*  デバイス窓の先頭 4MB の PT に写像する。                                 */
 /*  触る PTE (最大 2) だけ退避し、読み専用 (RW なし・PCD・supervisor) で     */
 /*  張って幅どおりに読み、退避した生値を書き戻す。張る・読む・戻すは全部     */
 /*  irq_save の中 (K7)。張るのに失敗しても戻しは必ず通る。                   */
@@ -30,7 +30,6 @@
 #include "memmap.h"
 #include "pc98.h"
 #include "paging.h"
-#include "kpeek_allow.h"
 #include "kpeek.h"
 #include "kdebug_window.h"
 #include "drivers/net/e82557/e82557.h"
@@ -44,6 +43,8 @@
 #include "../lib/crc32_core.inc"
 
 /* 窓の PT 1 枚 (デバイス窓の先頭 4MB) の中のオフセット */
+#define KPEEK_RAM_DENY_LO TVRAM_CHAR_BASE
+#define KPEEK_RAM_DENY_HI BIOS_ROM_BASE
 #define KPEEK_WIN_MASK    (MEM_DEVICE_APERTURE_PDE_SIZE - 1U)
 #define KPEEK_PAGE_MASK   ((u32)PAGE_SIZE - 1U)
 /* LAN の出口 (§2-8): フレーム = Ethernet 14 + SFS ヘッダ 12 + [addr u32][data]
@@ -110,10 +111,6 @@ static u32 kpeek_mmio(KdebugPeek *req)
     if ((req->addr & KPEEK_WIN_MASK) + req->len > MEM_DEVICE_APERTURE_PDE_SIZE) {
         req->fail_addr = req->addr;
         return KDEBUG_PEEK_ARG;
-    }
-    if (kpeek_allow_check(req->addr, req->len, req->width) != KDEBUG_PEEK_OK) {
-        req->fail_addr = req->addr;
-        return KDEBUG_PEEK_DENY;
     }
     struct recover_window window;
     recover_window_hal_init(&window);

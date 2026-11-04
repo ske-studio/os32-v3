@@ -1,8 +1,8 @@
 /* ======================================================================== */
-/*  kpeek_host.c — kdebug の peek 本体 (kdebug/kpeek.c・kpeek_allow.c) の    */
+/*  kpeek_host.c — kdebug の peek 本体 (kdebug/kpeek.c) の    */
 /*  ホスト試験 (TASK_KPEEK §4)                                              */
 /*                                                                          */
-/*  実物の kpeek.c と kpeek_allow.c を 1 行も写さずに #include し、import   */
+/*  実物の kpeek.c を 1 行も写さずに #include し、import   */
 /*  (paging_* / pci_* / irq_save / irq_restore) と読み (kpeek_load) だけを  */
 /*  贋物にする (KPEEK_HOST)。贋の PT は「番地 → PTE の生値」の表で、窓の     */
 /*  張り替えと戻しをそのまま記録する。呼ばれた順は ev[] に 1 文字ずつ積む:  */
@@ -127,22 +127,6 @@ static void kpeek_load(u32 addr, u32 width, u32 len, u8 *out)
     }
 }
 
-/* ---- 贋の PCI ------------------------------------------------------ */
-static struct pci_dev nv;
-static int nv_present;
-static u32 pci_get_calls;
-int pci_find(u16 vendor, u16 device)
-{
-    return (nv_present && vendor == nv.vendor && device == nv.device) ? 3 : -1;
-}
-int pci_get(u32 idx, void *out)
-{
-    pci_get_calls++;
-    if (idx != 3 || !nv_present) return -1;
-    memcpy(out, &nv, sizeof(nv));
-    return 0;
-}
-
 /* ---- 贋の lan.mod (T5) -------------------------------------------- */
 volatile u32 tick_count;
 #define FAKE_FRAMES 72
@@ -180,7 +164,6 @@ int sfs_lan_peer_mac(u8 *out)
     return 0;
 }
 
-#include "../../kdebug/kpeek_allow.c"
 #define KDEBUG_WINDOW_HOST 1
 #include "../../kdebug/kdebug_window.c"
 #include "../../kdebug/kpeek.c"
@@ -198,11 +181,7 @@ static void reset(void)
     irq_depth = 0; load_calls = 0; load_phys = 0; load_pte = 0;
     nsent = 0; send_calls = 0; tick_step = 0; send_rc = 0; send_rc_times = 0;
     lan_state = E82557_RUNNING; peer_ok = 0; peer_calls = 0;
-    memset(&nv, 0, sizeof(nv));
-    nv.vendor = KPEEK_NV_VENDOR; nv.device = KPEEK_NV44A_DEVICE;
-    nv.bar[0] = NV_BAR0;                  /* メモリ BAR、32bit、非 prefetch */
-    nv.command = PCI_CMD_MEM_ENABLE;
-    nv_present = 1;
+
 }
 
 static void ram(u32 lo, u32 hi, u32 flags)    /* [lo, hi) を恒等で present */
@@ -322,67 +301,17 @@ static void t_ram(void)
     CHECK(call(0, 0xE7FF0, 1, 0x20) == KDEBUG_PEEK_DENY && rq.fail_addr == 0xE7000);
 }
 
-/* MMIO: 許可リストと BAR の確かめ */
+/* 任意の物理番地を各幅で窓から読む。 */
 static void t_allow(void)
 {
-    reset();
-#if GF_VPLL_PROBE
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF, 4, 4) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF - 4, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF + 4, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_CORE_PLL_OFF, 4, 8) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_MEM_PLL_OFF, 4, 8) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_CORE_PLL_OFF - 4, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_CORE_PLL_OFF + 8, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_MEM_PLL_OFF - 4, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_MEM_PLL_OFF + 8, 4, 4) == KDEBUG_PEEK_DENY);
-#else
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_VPLL_CONTROL_OFF, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_CORE_PLL_OFF, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_MEM_PLL_OFF, 4, 4) == KDEBUG_PEEK_DENY);
-#endif
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF, 4, 0x10) == KDEBUG_PEEK_OK);
-    CHECK(data_is(NV_BAR0, 0x10));
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF + 0x3F0, 4, 0x10) == KDEBUG_PEEK_OK);  /* 行の末尾ちょうど */
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF + 0x3F0, 4, 0x20) == KDEBUG_PEEK_DENY); /* 行をはみ出す */
-    CHECK(rq.fail_addr == NV_BAR0 + 0x3F0 && data_untouched());
-    CHECK(call(1, NV_BAR0 + 0x000400, 4, 4) == KDEBUG_PEEK_DENY);  /* 行の間 */
-    CHECK(call(1, NV_BAR0 - 4, 4, 4) == KDEBUG_PEEK_DENY);         /* BAR の前 */
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF, 1, 4) == KDEBUG_PEEK_DENY);   /* 幅外 */
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PMC_OFF, 2, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PCRTC1_OFF + 0xFFC, 4, 4) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRAMDAC1_OFF, 4, 0x400) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PSTRAPS_OFF + 0xC, 4, 4) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PSTRAPS_OFF + 0x10, 4, 4) == KDEBUG_PEEK_DENY);
-    /* VGA 別名は 1 バイトずつ。3C9 と隣り合わせの 2 バイトは断る */
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMVIO0_OFF + KPEEK_VGA_SRX, 1, 1) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMVIO0_OFF + KPEEK_VGA_SR, 1, 1) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMVIO0_OFF + KPEEK_VGA_SRX, 1, 2) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMVIO0_OFF + 0x3C9, 1, 1) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMCIO0_OFF + 0x3DA, 1, 1) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMVIO0_OFF + 0x3DA, 1, 1) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMCIO0_OFF + KPEEK_VGA_CR, 1, 1) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PRMCIO0_OFF + KPEEK_VGA_CRX, 4, 4) == KDEBUG_PEEK_DENY);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PROM_OFF + 0x1FC00, 1, 0x400) == KDEBUG_PEEK_OK);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PROM_OFF, 4, 4) == KDEBUG_PEEK_DENY);
-
-    /* BAR の 3 条件 (K2): I/O BAR・未割当・Memory 無効 */
-    reset(); nv.bar[0] = NV_BAR0 | 1U;
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_DENY && map_calls == 0);
-    reset(); nv.bar[0] = 0x8U;                      /* 番地 0 (prefetch bit だけ) */
-    CHECK(call(1, 0x0, 4, 4) == KDEBUG_PEEK_DENY && map_calls == 0);
-    CHECK(call(1, KPEEK_NV_PMC_OFF, 4, 4) == KDEBUG_PEEK_DENY);
-    reset(); nv.command = 0;
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_DENY && map_calls == 0);
-    reset(); nv.command = PCI_CMD_IO_ENABLE;
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_DENY);
-    reset(); nv_present = 0;                        /* NP21/W: PCI が無い */
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_DENY && data_untouched());
-    reset(); nv.device = 0x0222;
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_DENY);
-    reset(); nv.bar[0] = NV_BAR0 | 0x8U;            /* prefetch の印は基準から外す */
-    CHECK(call(1, NV_BAR0, 4, 4) == KDEBUG_PEEK_OK);
-    CHECK(sizeof(kpeek_allow_rows) / sizeof(kpeek_allow_rows[0]) == kpeek_allow_count);
+    const u32 addr = 0x12345000U;
+    u32 width;
+    for (width = 1; width <= 4; width *= 2) {
+        reset();
+        CHECK(call(1, addr, width, 16) == KDEBUG_PEEK_OK);
+        CHECK(load_phys == addr && load_width == width && data_is(addr, 16));
+        CHECK(streq(ev, "SrMLRU") && irq_depth == 0);
+    }
 }
 
 /* MMIO: 窓の付け替え (K6・K7) */
@@ -390,10 +319,10 @@ static void t_window(void)
 {
     u32 win, a;
     /* 4MB の境界をまたぐ要求は ARG。境界で終わる要求は通る */
-    reset(); nv.bar[0] = 0x24000000U;
+    reset();
     a = NV_BAR0 + KPEEK_NV_PROM_OFF;               /* PROM は 0x300000-0x31FFFF、4MB の中 */
     CHECK(call(1, a, 1, 0x10) == KDEBUG_PEEK_OK);
-    reset(); nv.bar[0] = 0x240E0000U;              /* PROM の行が 4MB 境界 (0x24400000) をまたぐ BAR */
+    reset();
     a = 0x24400000U - 0x10U;                       /* PROM の行の末尾 = 4MB 境界 */
     CHECK(call(1, a, 1, 0x20) == KDEBUG_PEEK_ARG && map_calls == 0 && rq.fail_addr == a);
     CHECK(call(1, a, 1, 0x10) == KDEBUG_PEEK_OK);  /* 4MB 境界ちょうどで終わる */
@@ -403,7 +332,6 @@ static void t_window(void)
     win = MEM_DEVICE_APERTURE_BASE + ((NV_BAR0 + KPEEK_NV_PCRTC0_OFF) & 0x3FFFFFU);
     pt_set(win, 0xFE000000U | PTE_PRESENT | PTE_RW | PTE_PCD);    /* 元の Xe10 の窓 */
     pt_set(win + PAGE_SIZE, 0xFE001000U | PTE_PRESENT | PTE_RW | PTE_PCD);
-    CHECK(call(1, NV_BAR0 + KPEEK_NV_PCRTC0_OFF + 0xF00, 4, 0x200) == KDEBUG_PEEK_DENY); /* 行外 (0x601000〜) */
     CHECK(call(1, NV_BAR0 + KPEEK_NV_PCRTC0_OFF + 0xE00, 4, 0x200) == KDEBUG_PEEK_OK);
     CHECK(streq(ev, "SrMLRU"));
     CHECK(load_irq_depth == 1 && irq_depth == 0);

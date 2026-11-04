@@ -1,24 +1,24 @@
-"""kdebug の peek 本体 (kdebug/kpeek.c・kpeek_allow.c) のホスト試験。
+"""kdebug の peek 本体 (kdebug/kpeek.c) のホスト試験。
 
 票: docs/tasks/v3/TASK_KPEEK.md (詳細設計 §2-4・§2-5・§4)
 
-tools/tests/kpeek_host.c が実物の kpeek.c と kpeek_allow.c を 1 行も写さずに
+tools/tests/kpeek_host.c が実物の kpeek.c を 1 行も写さずに
 #include し、import (paging_* / pci_* / irq_save / irq_restore) と読みだけを
 贋物にして回す。幅・長さ・整列の拒否、NOMAP / PCD・PWT / [A0000h, E8000h) の
-DENY (読まない・fail_addr はページ先頭)、許可リストの行と幅、BAR の 3 条件、
+DENY (読まない・fail_addr はページ先頭)、任意の物理番地と幅、
 4MB 境界またぎの ARG、窓の順序 (irq_save → 退避 → 張る → 読む → 戻す →
 irq_restore、失敗でも戻す)、窓の flags に RW が無いことを見る。
 LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Ethernet・SFS の
 封筒 (T_DUMP、tag、通し番号 0 から)・addr・data・CRC32 (種別〜末尾)・60 B の
 詰め物、AGAIN だけ 2 tick 再試行で LAN (7)、他の負は即 LAN、probe は RUNNING
 かつ宛先 (明示かペア) のときだけ OK。
-同じ 2 ファイルを i386-elf-gcc -Wall -Wextra -Werror でも通す (実物の io.h・P2V_IO)。
+製品ファイルを i386-elf-gcc -Wall -Wextra -Werror でも通す (実物の io.h・P2V_IO)。
 
   python3 -B tools/tests/test_kpeek.py            # ホスト + i386-elf
   python3 -B tools/tests/test_kpeek.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kpeek-host', tier=1,
-    covers=['kdebug/kpeek.c', 'kdebug/kpeek.h', 'kdebug/kpeek_allow.c', 'kdebug/kpeek_allow.h', 'mm/paging.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'include/pc98.h', 'include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['kdebug/kpeek.c', 'kdebug/kpeek.h', 'mm/paging.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'include/pc98.h', 'include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=1.591064)
 
 from kernel_includes import include_flags
@@ -36,7 +36,6 @@ import mutpar                                                   # noqa: E402
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/tests/kpeek_host.c"
 KPEEK = "kdebug/kpeek.c"
-ALLOW = "kdebug/kpeek_allow.c"
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
 # build/config.mk の INC_KERNEL と同じ探索先 (+ kdebug)。
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
@@ -57,23 +56,19 @@ def host_cmd(exe, probe=False):
 
 
 MUTATIONS = [
-    ("vpll_allow", ALLOW, "    NV_ROW(KPEEK_NV_VPLL_CONTROL_OFF, KPEEK_NV_VPLL_CONTROL_LEN, KPEEK_W4),", ""),
+    ("deny_unlisted", KPEEK, "    struct recover_window window;",
+     "    if (req->addr == 0x12345000U) return KDEBUG_PEEK_DENY;\n    struct recover_window window;"),
     # (名前, 対象, 元, 変異後)
     ("chunk_ge", KPEEK,
      "req->len > KDEBUG_PEEK_CHUNK", "req->len >= KDEBUG_PEEK_CHUNK"),
     ("no_restore", "kdebug/kdebug_window.c",
      "w->ops->unmap(w->opaque, w->va + i * MEM_PAGE_SIZE, w->raw[i])", "0"),
-    ("width_mask_flip", ALLOW,
-     "if (!(r->width_mask & width)) continue;",
-     "if (r->width_mask & width) continue;"),
     ("present_first_only", KPEEK,
      "if (!paging_is_present(page))",
      "if (page == (req->addr & ~KPEEK_PAGE_MASK) && !paging_is_present(page))"),
     ("no_pcd_check", KPEEK,
      "        else if (paging_pte_flags(page) & (PTE_PCD | PTE_PWT))\n"
      "            st = KDEBUG_PEEK_DENY;\n", ""),
-    ("no_mem_enable", ALLOW,
-     "    if (!(d.command & PCI_CMD_MEM_ENABLE)) return 0;\n", ""),
     ("pde_ge", KPEEK,
      "+ req->len > MEM_DEVICE_APERTURE_PDE_SIZE", "+ req->len >= MEM_DEVICE_APERTURE_PDE_SIZE"),
     ("no_legacy_deny", KPEEK,
@@ -81,8 +76,6 @@ MUTATIONS = [
      "            st = KDEBUG_PEEK_DENY;\n", ""),
     ("win_rw", "kdebug/kdebug_window.c",
      "(write ? PTE_RW : 0)", "(write ? PTE_RW : PTE_RW)"),
-    ("no_io_bar", ALLOW,
-     "    if (bar & KPEEK_BAR_IO_BIT) return 0;\n", ""),
     # T5 (LAN の出口)
     ("lan_crc_shift", KPEEK,
      "crc32_core_update(CRC32_INIT, sfs + 3,", "crc32_core_update(CRC32_INIT, sfs + 4,"),
@@ -130,7 +123,7 @@ def main():
         tmp = pathlib.Path(tmp)
         exe = tmp / "kpeek-host"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS (real kdebug/kpeek.c + kpeek_allow.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real kdebug/kpeek.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         if rc == 0:
@@ -143,7 +136,7 @@ def main():
             print("TARGET i386-elf-gcc が無い = FAIL (CROSS_DIR を渡す)")
             failed += 1
         else:
-            for src in (KPEEK, ALLOW, "kdebug/kdebug_window.c"):
+            for src in (KPEEK, "kdebug/kdebug_window.c"):
                 subprocess.run([gcc, *FLAGS, "-m32", "-march=i386",
                                 "-ffreestanding", "-fno-pie",
                                 "-fno-stack-protector", "-O2",
@@ -152,7 +145,7 @@ def main():
                                 str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)
             print("TARGET i386-elf GNU11 -Wextra -Werror COMPILE PASS "
-                  "(kpeek.c + kpeek_allow.c)", flush=True)
+                  "(kpeek.c)", flush=True)
         if "--mutate" in sys.argv:
             failed += mutpar.run_with_control(one_mutation, MUTATIONS,
                                               ("control", KPEEK, "", ""))

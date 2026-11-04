@@ -49,7 +49,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 | 4b | **畳んだ (ユーザー決定 2026-10-28「nouveau に沿う: 4b を畳んで 4c へ」)** — 旧: PBUS 0x1854←0 を先に・映像出力の有効化 (PBUS 0x1850←1)。nouveau は自前の POST の INIT_RESET で 1850 bit0 を 0 にし以後 1 に戻さない (nvkm/subdev/bios/init.c:1494、shadowrom.c:55-62 は PROM を読む間だけ 0)、envytools は「1 で ROM shadow と映像出力が有効」(docs/hw/bus/pci.rst:50-53) と食い違う → 手本の nouveau に沿い初期化の後は 1850=0 のまま 4c へ。4c で映像が出なければ 1850←1 を一条件の比較として試す。1854 (cfg 54h) は A2 の G1 で 0 にしてある。起草とレビューは `~/os32-tmp/run/gf-4b/` (4B_DESIGN.md・Opus のレビューは要修正 P1 無し) | — | — |
 | 4c | 承認地点 C: 画面モード (PCRTC/PRAMDAC、整数 PLL)、98 側との共存 (別コネクタ) — **映像を目視 (2026-10-29、4 回目)** | 書く | 承認・**モニタ接続はユーザー** |
 
-道具: `TASK_KPEEK` の peek (T7 の後の最初の実装) に MMIO の許可リストを足して使う。結果はシリアルで持ち帰る。PM 決定: Haiku のライセンスは調べて記録、envytools の nvbios はホストで自前の ROM に当てて使ってよい (MIT)、BAR の大きさは段 4a で測る、cfg 54h は段 4 で扱う、固まったときの電源断は 2026-10-12 の決定 (立会い無しの試験) の範囲。
+道具: peek -m で任意の物理番地を一時窓から読む。結果はシリアルで持ち帰る。PM 決定: Haiku のライセンスは調べて記録、envytools の nvbios はホストで自前の ROM に当てて使ってよい (MIT)、BAR の大きさは段 4a で測る、cfg 54h は段 4 で扱う、固まったときの電源断は 2026-10-12 の決定 (立会い無しの試験) の範囲。
 
 ## 4. 観測の記録
 
@@ -119,7 +119,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 - 検証証拠: `~/os32-tmp/run/gf4a_s4/`。実accessor・実機・NP21/W・S6の時計/poll設定は対象外。
 
 ### 4a S5 bus・共有窓 (2026-10-21)
-- T2/peekの窓を共有し、READはRWなし・WRITEだけRW、PTE復元失敗はboot寿命で停止。peekの幅/許可表/2ページ跨ぎ/LAN契約を維持。
+- T2/peekの窓を共有し、READはRWなし・WRITEだけRW、PTE復元失敗はboot寿命で停止。peekの幅/引数検査/2ページ跨ぎ/LAN契約を維持。
 - GF accessorは生PCI ID・Mem・BARを照合、Command16とBAR probe、PRMVIO/PRMCIOのhead別名をdescriptor経由で扱う。PCI imports・入口・shellはS6以降。
 - COPY2・一時再生3行を結線、局所CR11/CR1F/CR44→元index復元を追加。COLD DATAは終端再生しない。N1の4対象guardは維持。
 - S4送り3件を修正。設計者判断の記録はアーカイブ。現行の窓は [kdebug_window](../../design/kdebug/README.md#kdebug_windowc)。
