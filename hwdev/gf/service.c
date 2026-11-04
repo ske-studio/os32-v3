@@ -55,8 +55,9 @@ static struct gf3_surface service_surface(const struct gf_vram_reservation_node 
 
 /* Reuse live nodes on an ordinary failed-start retry; recovery explicitly
  * releases them first. The registry/ID issuer is never reset. */
-static i32 service_reserve(struct gf3_service *s)
+static i32 service_reserve(struct gf3_service *s, bool *no_test_capacity)
 {
+    *no_test_capacity = false;
     struct gf2_chan *ch = &s->production->chan;
     u32 mask = MEM_PAGE_SIZE - 1U;
     i32 rc = gf_vram_registry_init(ch);
@@ -81,7 +82,10 @@ static i32 service_reserve(struct gf3_service *s)
     u32 start = (end + mask) & ~mask;
     u32 limit = ch->B & ~mask;
     u32 pitch = (s->scan_pitch + GF3_TEST_PITCH_ALIGN - 1U) & ~(GF3_TEST_PITCH_ALIGN - 1U);
-    if (start >= limit || (limit - start) / pitch == 0) return GF2_ENOSPC;
+    if (start >= limit || (limit - start) / pitch == 0) {
+        *no_test_capacity = true;
+        return GF2_ENOSPC;
+    }
     u32 height = (limit - start) / pitch;
     if (height > s->scan_height) height = s->scan_height;
     if (!s->test_node.value.owner) {
@@ -97,10 +101,12 @@ static i32 service_reserve(struct gf3_service *s)
 static i32 service_publish(struct gf3_service *s, u32 dl)
 {
     struct gf_production *p = s->production;
-    i32 reserved = service_reserve(s);
+    bool no_test_capacity;
+    i32 reserved = service_reserve(s, &no_test_capacity);
     /* No test capacity is nonfatal to display: initialize the scan hook,
-     * leave dispatch closed and report ENOSPC to the start caller. */
-    if (reserved && (reserved != GF2_ENOSPC || !s->scan_node.value.owner ||
+     * leave dispatch closed and report ENOSPC to the start caller. ID
+     * exhaustion is a reservation failure: F2 keeps hook/slot closed. */
+    if (reserved && (!no_test_capacity || !s->scan_node.value.owner ||
                      s->test_node.value.owner)) return service_result(s, reserved);
     i32 rc = gf3_init(&p->accel, &p->chan, dl);
     if (rc) return service_result(s, rc);
