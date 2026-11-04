@@ -70,9 +70,17 @@ static i32 c1_admission(void *owner,bool open)
     return 0;
 }
 static bool c1_deliver_vblank=true;
+static u32 c1_fail_after_reference;
 static void c1_observe(struct gf3_host *h,const struct gf3_host_event *e)
 {
     svc_observe(h,e);
+    /* Inject only after the real PUT has submitted the fill's reference.
+     * nv10_fence.c:33-41,53-55: submission precedes completion reads. */
+    if (c1_fail_after_reference && cint_references==c1_fail_after_reference &&
+        !e->rc && e->op==H_WRITE && e->a[1]==GF2_USER_BASE+GF2_USER_PUT) {
+        c1_fail_after_reference=0;
+        gf3_host_fail_at(h,H_CLOCK,0,GF1_EIO);
+    }
     /* The host environment delivers one observation while foreground waits.
      * Product F1 snapshot/counter, F2 fences and B7 completion stay real. */
     if (!e->rc && e->op==H_SLEEP && c1_deliver_vblank)
@@ -298,7 +306,7 @@ static void c1_other_hooks(void)
     assert(!c1_hal.gamma(0,gamma));
     assert(!gf2_host_memcmp(svc_state.head[0].gamma,gamma,sizeof(gamma)));
 }
-void _start(void)
+static void c1_start(void)
 {
     svc_fixture();
     svc_links.admission=c1_admission;
@@ -306,9 +314,88 @@ void _start(void)
     cint_host.observe=c1_observe;
     assert(!gf4_service_start(&svc_ctx,cint_deadline()));
     assert(c1_normal==&c1_ops && c1_hal.mode_count==svc_state.nmodes);
+}
+/* C2 scan banks contain a front/back pair, per gf4_scan_prepare's API.
+ * These are value snapshots, never copies of the resident registry nodes. */
+static struct gf_vram_reservation c1_retained[2];
+static u32 c1_failed_calls;
+static i32 c1_failed_stop(void *owner,i32 cause,u32 dl)
+{
+    struct gf4_ctx *c=owner;
+    assert(c==&svc_ctx && !c->reusable && !c->accepting);
+    assert(dl==c->deadline);
+    ++c1_failed_calls;
+    const struct gf_vram_reservation_node *nodes=c->scan_bank[0] ? c->scan[0] : c->scan_next[0];
+    for (u32 i=0;i<sizeof(c1_retained)/sizeof(c1_retained[0]);++i) {
+        assert(nodes[i].value.owner==&nodes[i]);
+        c1_retained[i]=nodes[i].value;
+    }
+    /* Deny F2's stop writes, so the real service cannot confirm OFF.
+     * nouveau_drm.c:955-988 orders stop before ownership release. */
+    gf3_host_fail_at(&cint_host,H_WRITE,0,GF1_EIO);
+    return svc_failed(owner,cause,dl);
+}
+static void c1_render_failures(void)
+{
+    const i32 errors[]={GF2_ETIME,GF2_EIO};
+    for (u32 n=0;n<sizeof(errors)/sizeof(errors[0]);++n) {
+        c1_start();
+        struct gf3_surface before=svc_state.head[0].front;
+        u8 bank=svc_ctx.scan_bank[0];
+        u32 opens=svc_opens,dl=cint_host.now+GF3_TIMEOUT_US;
+        c1_failed_calls=0;
+        svc_links.failed=c1_failed_stop;
+        /* Next emitted reference belongs to fill; stall its completion.
+         * Count is derived from the live consumer, not a packet ordinal. */
+        u32 submitted=cint_references+1U;
+        cint_stall_reference=submitted;
+        if (errors[n]==GF2_EIO) c1_fail_after_reference=submitted;
+        c1_clear_trace();
+        assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
+        assert(cint_references==submitted && cint_reference!=cint_prod.chan.seq);
+        assert(c1_failed_calls==1 && svc_ctx.last_rc==errors[n]);
+        assert(svc_ctx.deadline==dl && svc_ctx.recovery_rc);
+        assert(cint_prod.chan.state!=GF2_OFF && !c1_normal);
+        assert(!svc_ctx.reusable && !svc_ctx.accepting);
+        assert(svc_opens==opens && svc_ctx.scan_bank[0]==bank);
+        c1_expect(&before,GFX_FMT_PACKED8,C1_INDEX_BPP);
+        svc_keys_live(&before);
+        for (u32 i=0;i<sizeof(c1_retained)/sizeof(c1_retained[0]);++i) {
+            struct gf_vram_reservation key;
+            const struct gf_vram_reservation *v=&c1_retained[i];
+            assert(!gf_vram_match(svc_ctx.ch,v->owner,v->reservation_id,
+                v->generation,v->off,v->bytes,&key));
+        }
+        /* A later HAL call or direct prepare cannot recycle these keys. */
+        assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_NOSYS);
+        struct gf3_surface pair[2];
+        assert(gf4_scan_prepare(&svc_ctx,0,c1_mode(GF3_RGB565),pair,dl)==GF4_ESTATE);
+        cint_stall_reference=0;
+        svc_finish(); /* Clear injection; confirmed stop now releases all. */
+        assert(!c1_normal && !hook_active);
+    }
+    /* A one-shot wait I/O failure can drain with the original deadline:
+     * only that confirmed completion permits normal candidate discard. */
+    c1_start();
+    u32 submitted=cint_references+1U;
+    cint_stall_reference=submitted;
+    c1_clear_trace();
+    gf3_host_fail_at(&cint_host,H_SLEEP,1,GF1_EIO);
+    assert(c1_hal.set_mode(c1_mode(GF3_RGB565))==OS32_ERR_IO);
+    assert(svc_ctx.last_rc==GF2_EIO && c1_normal && svc_ctx.reusable);
+    assert(cint_references>submitted && cint_reference==cint_prod.chan.seq);
+    const struct gf_vram_reservation_node *unused=svc_ctx.scan_bank[0] ? svc_ctx.scan[0] : svc_ctx.scan_next[0];
+    assert(!unused[0].value.owner && !unused[1].value.owner);
+    cint_stall_reference=0;
+    svc_finish();
+}
+void _start(void)
+{
+    c1_start();
     c1_expect(&svc_state.head[0].front,GFX_FMT_PACKED8,C1_INDEX_BPP);
     c1_formats(); c1_geometry(); c1_flips(); c1_failures(); c1_other_hooks();
     svc_finish();
     assert(!c1_normal && !hook_active);
+    c1_render_failures();
     gf2_host_exit(0);
 }

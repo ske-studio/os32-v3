@@ -195,6 +195,26 @@ static int geforce_set_mode(u32 id)
     rc = gf3_fill(c->accel, &scan[0],
         (struct gf3_rect){0, 0, scan[0].width, scan[0].height},
         0, GF_GXCOPY, U32_MAX, dl); /* GXcopy, all planes; nv04_exa.c:46-84. */
+    if (rc) {
+        /* A failed fill can already be queued/published. Drain before unpin,
+         * including packets whose fence emission failed. Reference protocol:
+         * nouveau c03c1a1 nv10_fence.c:33-41,53-55; BO lifetime:
+         * nouveau_bo.c:594-629. Keep the original error and absolute deadline. */
+        struct gf2_fence fence;
+        int drain = gf2_fence_emit(c->ch, &fence, dl);
+        if (!drain) drain = gf2_fence_wait(c->ch, fence, dl);
+        if (drain) {
+            c->recovery_rc = drain;
+            c->deadline = dl;
+            c->reusable = false;
+            c->accepting = false;
+            /* The existing failure owner closes admission and releases only
+             * after confirmed stop. Never discard these candidates here or
+             * allow a later scan_prepare to recycle them while GPU is live. */
+            (void)c->links->failed(c->links->owner, rc, dl);
+            return display_result(c, rc);
+        }
+    }
     if (!rc) rc = ops->set_mode(c, &route, id, &scan[0], dl);
     if (rc) {
         int cleanup = ops->scan_discard(c, 0, dl);
