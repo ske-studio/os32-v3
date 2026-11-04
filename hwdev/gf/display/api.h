@@ -124,6 +124,9 @@ i32 gf4_scan_discard(struct gf4_ctx *,u8 head,u32 dl);
  * return of every display reservation after the display stopped (X1/X3). */
 i32 gf4_scan_reserve_initial(struct gf4_ctx *,u32 dl);
 i32 gf4_scan_release_all(struct gf4_ctx *,u32 dl);
+/* C2-scan owns the body of links.scan_changed; C2-links stores it in the
+ * resident gf4_links (owner = struct gf4_ctx *), PM 2026-11-04. */
+i32 gf4_scan_changed(void *owner,u8 head,const struct gf3_surface *front);
 /* C2-service owns: the resident owner table lent to F3 until module exit;
  * C3 passes it to gf3_service_owner_bind (X3, PM 2026-11-04). */
 struct gf3_service_owner;
