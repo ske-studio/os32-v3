@@ -61,6 +61,10 @@ struct gf_init_context {
     int last_rc;
     u32 saved_count;
     struct gf_init_saved saved[GF_INIT_SAVE_MAX];
+    /* Display script loan: raw DCB OR, independent head, absolute deadline. */
+    u8 or_mask;
+    bool display_script;
+    u32 deadline;
 };
 /* P2 runner owns these implementations; runs never call timing.wait_us
  * directly or update the wait counters. gf_init_wait returns 0/-1:
@@ -106,6 +110,9 @@ int gf_init_restore(struct gf_init_context *ctx);
  * call io.restore once before returning; owner then quiesces. ctx/work/ROM
  * and all io callbacks are supplied by the owner. */
 int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
+enum gf_init_script_rc { GF_SCRIPT_OK=0, GF_SCRIPT_EIO=-1, GF_SCRIPT_ETIME=-5 };
+int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
+                       u32 pc, u8 head, u8 or_mask, u32 dl);
 /* Already prepared immutable program; diagnostic owner approves one main. */
 int gf_init_run_one(struct gf_init_context *ctx, const struct gf_init_program *work);
 /* A2 shares the same ordered writes; owner checks legacy decode before VGA. */
@@ -172,6 +179,10 @@ int gf_op_copy_nv_reg_run(struct gf_init_context *, const struct gfinit_instruct
 int gf_op_zm_index_io_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_compute_mem_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_reset_run(struct gf_init_context *, const struct gfinit_instruction *);
+int gf_op_tmds_reg_run(struct gf_init_context *, const struct gfinit_instruction *);
+int gf_op_zm_tmds_group_run(struct gf_init_context *, const struct gfinit_instruction *);
+/* nouveau init.c:539-572: selector-to-base mapping, no head stride. */
+int gf_init_tmds_base(const struct gf_init_context *, u32 selector, u32 *base);
 int gf_op_sub_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_nv_reg_run(struct gf_init_context *, const struct gfinit_instruction *);
 int gf_op_macro_run(struct gf_init_context *, const struct gfinit_instruction *);

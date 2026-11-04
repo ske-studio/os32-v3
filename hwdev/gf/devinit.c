@@ -133,14 +133,22 @@ static int read_rom(struct gf_production *p)
 }
 static int a2_decode_safe(void *opaque)
 { return gf_production_decode_safe(opaque); }
+static int validate(struct gf_display_context *c);
 static int acquire(struct gf_display_context *c)
 {
     struct gf_production *p=c->io.opaque;
-    if (p->attempted || !p->prepared) return -1;
-    p->attempted=true;
-    if (p->route98(p->route_opaque) || same_resources(p)) return -1;
-    /* nouveau_drm.c:858,881 nouveau_drm_probe: master before devinit. */
-    if (foundation_result(c,gf_master_enable(&p->foundation))) return -1;
+    if (c->initialized) {
+        /* C2-links-init: runtime ROM loan, not a second boot attempt.
+         * GF_FEAT4_DESIGN TMDS addendum N1: no PMC readback comparison.
+         * decode_safe checks PBUS1850/1854 before any PROM byte. */
+        if (!p->prepared || validate(c)) return -1;
+    } else {
+        if (p->attempted || !p->prepared) return -1;
+        p->attempted=true;
+        if (p->route98(p->route_opaque) || same_resources(p)) return -1;
+        /* nouveau_drm.c:858,881 nouveau_drm_probe: master before devinit. */
+        if (foundation_result(c,gf_master_enable(&p->foundation))) return -1;
+    }
     u32 started;
     if (gf_production_clock(p,&started)) return -1;
     u32 phys=pgalloc_alloc_phys(LEDGER_OWNER_KERNEL,PAGE_ALIGN_UP(sizeof(*p->scratch))/PAGE_SIZE);
@@ -150,13 +158,15 @@ static int acquire(struct gf_display_context *c)
     c->init=&p->scratch->init;c->program=&p->scratch->program;
     *c->init=(struct gf_init_context){.io=c->io,.started_us=started};
     p->acquiring=true;
-    return read_rom(p) || gf_init_a2(c->init,a2_decode_safe) ? -1 : 0;
+    if (read_rom(p)) return -1;
+    return c->initialized ? 0 : gf_init_a2(c->init,a2_decode_safe);
 }
 static void release(struct gf_display_context *c)
 {
     struct gf_production *p=c->io.opaque;
     p->acquiring=false;
-    if (c->baseline_valid) p->foundation.expected_pmc=c->baseline_pmc;
+    if (!c->initialized && c->baseline_valid)
+        p->foundation.expected_pmc=c->baseline_pmc;
     if (p->scratch)
         (void)pgalloc_free_n_owner(LEDGER_OWNER_KERNEL,V2P(p->scratch)/PAGE_SIZE,
                                    PAGE_ALIGN_UP(sizeof(*p->scratch))/PAGE_SIZE);
@@ -165,10 +175,8 @@ static void release(struct gf_display_context *c)
 static int validate(struct gf_display_context *c)
 {
     struct gf_production *p=c->io.opaque;
-    u32 amount,pmc;
+    u32 amount;
     if (gf_production_decode_safe(p) ||
-        gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&pmc) ||
-        (c->initialized && pmc!=p->foundation.expected_pmc) ||
         gf_production_read(p,0,GF_PRODUCTION_PFB_AMOUNT,4,&amount)) return -1;
     amount&=GF_PRODUCTION_PFB_MASK;
     return amount<GF_PRODUCTION_PFB_MIN || (amount&(amount-1)) ||

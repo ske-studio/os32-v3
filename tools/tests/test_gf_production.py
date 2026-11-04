@@ -66,7 +66,7 @@ def mutations():
         ('hwdev/gf/devinit.c', '    if (f->revoked) return -1;\n    *(volatile', '    *(volatile', 'revoked resident write allowed'),
         ('hwdev/gf/bus.c', '    gf_foundation_revoke(&p->foundation);', '    (void)p;', 'revoke publication omitted'),
         ('hwdev/gf/devinit.c', 'gf_master_enable(&p->foundation)', '0', 'N1 BM enable omitted'),
-        ('hwdev/gf/devinit.c', 'pmc!=p->foundation.expected_pmc', 'pmc!=c->baseline_pmc', 'saved PMC comparison restored'),
+        ('hwdev/gf/devinit.c', '    u32 amount;\n    if (gf_production_decode_safe(p)', '    u32 amount,pmc;\n    if (gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&pmc) || pmc!=p->foundation.expected_pmc || gf_production_decode_safe(p)', 'unverified PMC readback comparison restored'),
         ('hwdev/gf/bus.c', '!=p->foundation.expected_command)', '!=RECOVER_COMMAND_STOP)', 'RUN transport rejected'),
     ]
     with tempfile.TemporaryDirectory(prefix='gf-cw-production-mut-') as td:

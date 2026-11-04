@@ -184,4 +184,7 @@ struct gf4_test_ops {
     __typeof__(&gf4_scan_prepare) scan_prepare;
     __typeof__(&gf4_scan_discard) scan_discard;
 };
+/* Pure BIT 'T' selection; implementation belongs to C2-links-b. */
+i32 gf4_tmds_script_select(const u8 *rom, u32 size,
+                           const struct gf4_route *route, u32 khz, u32 *pc);
 #endif
