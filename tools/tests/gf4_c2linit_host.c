@@ -269,14 +269,23 @@ static void c2_deadlines(void)
     assert(c2_run(0,1,0)==0);
     c2_reset(); c2_rom[C2_MAIN]=0x71; c2_init.started_us=C2_NOW-GF_INIT_EXEC_US;
     assert(c2_run(0,1,C2_DEADLINE)==GF_SCRIPT_ETIME);
-    /* Total wait ceiling is distinct from the absolute/elapsed deadline. */
-    c2_reset(); const u8 wait_budget[]={0x33,255,0x74,0xff,0xff,0x36,0x71};
+    /* Total wait ceiling is distinct from the absolute/elapsed deadline.
+     * REPEAT accepts 1..254 (shared decoder contract). 76 full u16 waits
+     * fit in 5s; the 77th must fail before any wait callback/accounting. */
+    c2_reset(); const u8 wait_budget[]={0x33,76,0x74,0xff,0xff,0x36,0x71};
     c2_code(C2_MAIN,wait_budget,sizeof(wait_budget));
+    assert(c2_run(0,1,GF_INIT_EXEC_US)==0 && !c2_restores);
+    assert(c2_init.wait_us==4980660U && c2_host.calls[D_SLEEP]==5016U);
+    assert(c2_host.local_now==C2_NOW+4980660U);
+    c2_reset(); c2_code(C2_MAIN,wait_budget,sizeof(wait_budget));
+    c2_rom[C2_MAIN+1]=77;
     assert(c2_run(0,1,GF_INIT_EXEC_US)==GF_SCRIPT_ETIME && c2_restores==1);
-    assert(c2_init.wait_us<=GF_INIT_WAIT_MAX &&
-           GF_INIT_WAIT_MAX-c2_init.wait_us<65535U);
+    assert(c2_init.wait_us==4980660U && c2_host.calls[D_SLEEP]==5016U);
+    assert(c2_host.local_now==C2_NOW+4980660U &&
+           c2_init.elapsed_us<GF_INIT_EXEC_US && c2_init.steps==154U);
+    assert(c2_init.fail_pc==C2_MAIN+2 && !c2_host.calls[D_WRITE]);
     /* Step cap uses ETIME; call-stack cap uses EIO. */
-    c2_reset(); const u8 budget[]={0x33,255,0x33,255,0x63,0x36,0x36,0x71};
+    c2_reset(); const u8 budget[]={0x33,254,0x33,254,0x63,0x36,0x36,0x71};
     c2_code(C2_MAIN,budget,sizeof(budget));
     assert(c2_run(0,1,C2_DEADLINE)==GF_SCRIPT_ETIME);
     assert(c2_init.steps==GF_INIT_SCHEDULE && c2_restores==1);
