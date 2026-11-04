@@ -14,12 +14,18 @@ struct gf4_data_ops;
 struct gf4_state;
 struct gf4_test_ops;
 struct gf4_restore_ops;
+struct gf5;
 struct gf5_test_ops;
 const struct gf3_test_ops *geforce_accel_ops(void);
 const struct gf1_test_ops *geforce_foundation_ops(void);
 /* Read the normal/restore slot on every call; do not retain across unload. */
 const struct gf4_test_ops *geforce_display_ops(void);
 const struct gf4_restore_ops *geforce_display_restore_ops(void);
+/* Version 5 uses the reserved feature5_out; reread before each dispatch. */
+const struct gf5_test_ops *geforce_feature5_ops(void);
+/* Borrow the same production context until module stop completes. */
+void geforce_backend_feature5_bind(struct gf5 *);
+void gf_hook_feature5_bind(struct gf5 *);
 int geforce_foundation_display(bool start);
 struct geforce_platform {
     struct video_device *device;
