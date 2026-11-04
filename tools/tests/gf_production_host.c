@@ -351,6 +351,18 @@ static void prod_script_loans(void)
         CHECK(*prod_reg(LOAN_TMDS)==0x17 && *prod_reg(LOAN_TMDS+4)==0xa2);
         CHECK(prod_cmd_writes==command && prod_route_calls==route && prod_a2_writes==a2);
         CHECK(!c->io.restore(c->io.opaque,c->init));
+        /* runner.c:init_point checks first, bus.c:gf_production_point then
+         * reads again: cross the configured elapsed budget on that read.
+         * Absolute dl is still in the future. No script MMIO may follow. */
+        /* OS32 timing oracle: runner.c:52 + bus.c:106, one read each. */
+        enum { LOAN_POINT_CLOCKS=2 };
+        prod_now=c->init->started_us+GF_INIT_EXEC_US-LOAN_POINT_CLOCKS*prod_clock_step;
+        u32 clocks=prod_clock_calls,mmio=prod_mmio_calls;
+        dl=prod_now+GF_INIT_EXEC_US;
+        CHECK(gf_init_run_script(c->init,c->program,LOAN_PC,1,4,dl)==GF_SCRIPT_ETIME);
+        CHECK(c->init->last_rc==GF_SCRIPT_ETIME && c->init->elapsed_us==GF_INIT_EXEC_US);
+        CHECK(prod_clock_calls-clocks==LOAN_POINT_CLOCKS && prod_mmio_calls==mmio);
+        CHECK(prod_live_pages && prod.scratch && c->init && c->program && prod.acquiring);
         c->owner->release(c);
         CHECK(!prod_live_pages && !prod.scratch && !c->init && !c->program);
         CHECK(prod.foundation.expected_pmc==0xffffffffU && !prod.acquiring);

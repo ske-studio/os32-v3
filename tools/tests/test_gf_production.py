@@ -59,6 +59,7 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/runner.c', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (ctx->elapsed_us >= GF_INIT_EXEC_US)', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (0)', 'script point budget reported as EIO'),
         ('hwdev/gf/devinit.c', 'if (p->foundation.revoked) c->engaged=false;', '(void)c;', 'revoked cleanup exception omitted'),
         ('hwdev/gf/devinit.c', '*value=*(volatile u32 *)(f->bar0+off);', '(void)f;(void)off;*value=0;', 'resident MMIO read omitted'),
         ('hwdev/gf/devinit.c', '*(volatile u32 *)(f->bar0+off)=value;', '(void)f;(void)off;(void)value;', 'resident MMIO write omitted'),

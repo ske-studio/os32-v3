@@ -59,7 +59,14 @@ static int init_point(struct gf_init_context *ctx)
         if (ctx->display_script) ctx->last_rc = GF_SCRIPT_ETIME;
         return -1;
     }
-    return ctx->display_script ? ctx->io.point(ctx->io.opaque) : 0;
+    if (!ctx->display_script) return 0;
+    int rc = ctx->io.point(ctx->io.opaque);
+    /* Production point reads the clock again and updates elapsed_us. */
+    if (ctx->elapsed_us >= GF_INIT_EXEC_US) {
+        ctx->last_rc = GF_SCRIPT_ETIME;
+        return -1;
+    }
+    return rc;
 }
 int gf_init_wait(struct gf_init_context *ctx, u32 us)
 {
