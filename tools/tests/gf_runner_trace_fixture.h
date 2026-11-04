@@ -911,3 +911,29 @@ static const struct raw_event a2_trace_fixture[] = {
     {1,0x6013d5,1,0x57,RECOVER_NONE,0}, {1,0x6013d4,1,0x11,RECOVER_NONE,0},
     {0,0x6013d5,1,0,RECOVER_NONE,0}, {1,0x6013d5,1,0,RECOVER_NONE,0}
 };
+
+/* F5 split-runner synthetic BIT I graph. Offsets are fixture layout only.
+ * Opcodes/order: MIT nouveau c03c1a1 bios/init.c:359-407 (BIT I),
+ * 658-676 (REPEAT), 1663-1682 (SUB), 1340-1363 (SUB_DIRECT),
+ * 1727-1744 (MACRO). Expected effects below are literal script operands. */
+enum {
+    SPLIT_BIT=0x20, SPLIT_I=0x60, SPLIT_SUB_TABLE=0x80,
+    SPLIT_MACRO_TABLE=0xa0, SPLIT_MAIN=0x100, SPLIT_SUB=0x200,
+    SPLIT_DIRECT=0x300, SPLIT_REG=0x400, SPLIT_VALUE=0x12345678,
+    /* 1 REPEAT + 2*(SUB, MACRO, DONE, END) + SUB_DIRECT/MACRO/DONE
+     * + TIME/ZM_CR/DONE = 15 steps; 7 main + 2 + 2 callee insns. */
+    SPLIT_DL=100000, SPLIT_WAIT=17, SPLIT_STEPS=15,
+    SPLIT_INSNS=11, SPLIT_HEAD=1, SPLIT_OR=4
+};
+static const u8 split_signature[]={0xff,0xb8,'B','I','T',0,0};
+static const u8 split_main[]={0x33,2,0x6b,0,0x36,0x5b,0,3,
+                              0x74,17,0,0x53,0x11,7,0x71};
+static const u8 split_sub[]={0x6f,0,0x71};
+static const struct raw_event split_trace[]={
+    {1,SPLIT_REG,4,SPLIT_VALUE,SPLIT_SUB,0x6f},
+    {1,SPLIT_REG,4,SPLIT_VALUE,SPLIT_SUB,0x6f},
+    {1,SPLIT_REG,4,SPLIT_VALUE,SPLIT_DIRECT,0x6f},
+    {2,0,0,SPLIT_WAIT,SPLIT_MAIN+8,0x74},
+    {1,0x6033d4,1,0x11,SPLIT_MAIN+11,0x53},
+    {1,0x6033d5,1,7,SPLIT_MAIN+11,0x53}
+};
