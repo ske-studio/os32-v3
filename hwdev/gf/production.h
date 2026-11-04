@@ -59,8 +59,9 @@ struct gf_production {
  * before freeze, and passes this snapshot to prepare. No BAR sizing/writes.
  * Ra266's GPU is on bus 0; other bridge forwarding windows are exclusions. */
 int gf_production_identify(struct gf_production_resources *out);
-/* Read-only, once per zero-initialized p. Checks snapshot, reservation and
- * mappings. Does NOT devinit. First video_start(&p->video,...) does that. */
+/* Once per zero-initialized p. Checks snapshot, reservation and mappings,
+ * then clears only PCI BusMaster until start. Does NOT devinit.
+ * First video_start(&p->video,...) does that. */
 int gf_production_prepare(struct gf_production *p,
                           const struct gf_production_resources *boot,
                           int (*route98)(void *), void *opaque);
