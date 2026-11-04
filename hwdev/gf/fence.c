@@ -3,6 +3,7 @@
  * and INIT/DRAIN routing follow GF_FEAT2_DESIGN sections 6 and the addendum.
  * Sequence distance and deadline horizon are each below 2^31 by contract. */
 #include "command.h"
+#include "wait_diag.h"
 
 #define GF2_FENCE_BAR 0U
 #define GF2_FENCE_WIDTH 4U
@@ -47,7 +48,14 @@ int gf2_fence_wait(struct gf2_chan *ch, struct gf2_fence fence, u32 deadline_us)
         if (rc) return rc;
         if (fence.epoch != ch->epoch) return GF2_EFAULT;
         if (io->timing.clock_us(io->opaque, &now)) return GF2_EIO;
-        if ((i32)(now - deadline_us) >= 0) return GF2_ETIME;
+        if ((i32)(now - deadline_us) >= 0) {
+            if (gf_wait_timeout(io, "fence_reference", GF2_FENCE_REFERENCE,
+                                "signed(reference-seq)>=0", " reference=", deadline_us, now)) {
+                serial_puts_polled(" seq="); serial_diag_u32(fence.seq);
+                serial_puts_polled("\r\n");
+            }
+            return GF2_ETIME;
+        }
         if (io->read(io->opaque, GF2_FENCE_BAR, GF2_FENCE_REFERENCE,
                      GF2_FENCE_WIDTH, &observed)) return GF2_EIO;
         if ((i32)(observed - fence.seq) >= 0) return GF2_OK;

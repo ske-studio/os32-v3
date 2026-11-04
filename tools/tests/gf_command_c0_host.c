@@ -19,6 +19,8 @@ static void irq_restore(unsigned saved)
 #define GF2_COMMAND_SOURCE "../../hwdev/gf/command.c"
 #endif
 #include "gf_startlog_host.h"
+int serial_gate_active(void) { return 1; }
+void serial_puts_polled(const char *s) { (void)s; }
 #include GF2_COMMAND_SOURCE
 
 enum c0_event {
