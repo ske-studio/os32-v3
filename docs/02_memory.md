@@ -149,13 +149,16 @@ mem_alloc)・CUI shell 1,032 B (NP21/W、filer・edit_gui と FEP 変換・設�
 静的 PT (bootstrap) の守備範囲は 32MB (PAGING_BOOT_MAP_SIZE = PAGING_MAP_SIZE、固定 PT 8 枚、画像外)。
 **実 RAM の人為的な上限は無い** (K6-RAM で PAGING_RAM_LIMIT を撤廃)。paging_init が恒等で張るのは
 min(検出量, 32MB) — その上端が paging_boot_identity_end() — で、それより上の RAM は
-pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。高位 RAM のある構成では、GeForce の BAR0 16MiB、DISPLAY 300KiB、BAR2 先頭の instmem 用に PT 7 頁 (4+1+2) を追加予約する。BAR2 は R_max = align4096((4980h×8+4000h)×32+100000h) = 618000h を BAR2 長で切り、起動時に UC 写像して直ちに P=0 に戻す。追加 PT 数は ceil((base の 4MiB 内 offset + R)/4MiB) で、整列済み BAR2 では最大 2 頁。PT は master の寿命まで残し、後の map/unmap で回収しない。BAR2 の予約は起動時の永久予約で、層1 は予約済み範囲と全対象 PTE の Present=0 を確認して supervisor/RW/PCD で恒等写像する。unmap は P を落とし TLB を flush するだけで、予約と PT を保持して再開始時に再利用する。FIXED 型の低メモリ構成は従来の workspace 1 頁を保ち、GF の写像に不足すれば 98 へフォールバックする。
+pgalloc_stage_online() が paging_map_phys() で張り、PT はブート workspace から動的に取る。高位 RAM のある構成では、GeForce の BAR0 16MiB、BAR2 先頭の instmem、BAR1 の DISPLAY・push・層3 VRAM view 用に PT 70 頁 (4+2+64) を追加予約する。BAR1 は整列済み 256MiB の最大 64 頁を共有し、実際には読み取った V・R から求める使用可能範囲だけに PT を作る。BAR2 は R_max = align4096((4980h×8+4000h)×32+100000h) = 618000h を BAR2 長で切り、起動時に UC 写像して直ちに P=0 に戻す。追加 PT 数は ceil((base の 4MiB 内 offset + R)/4MiB) で、整列済み BAR2 では最大 2 頁。PT は master の寿命まで残し、後の map/unmap で回収しない。BAR2 の予約は起動時の永久予約で、層1 は予約済み範囲と全対象 PTE の Present=0 を確認して supervisor/RW/PCD で恒等写像する。unmap は P を落とし TLB を flush するだけで、予約と PT を保持して再開始時に再利用する。FIXED 型の低メモリ構成は従来の workspace 1 頁を保ち、GF の写像に不足すれば 98 へフォールバックする。
 **GeForce 層2 push の予算と寿命**: pushbuffer は一般 VRAM から 4KiB 整列の
 64KiB (16 頁) を予約し、BAR1 の部分 extent を UC で写像する。VRAM 容量 V、
 instmem の予約量 R に対し開始 offset は `align_down(V - R - 0x10000, 0x1000)`、
 表示面の終端 `0x4B000` 以上とし、範囲が BAR1 長に収まることを確認する。
-この写像の仮想配置に応じ、既存 PT と共有できない場合に備えて追加 PT を最大 2 頁
-予算化する。実際の PT 増分と予約・解除は実機受入で記録し、測定済みとは扱わない。
+起動時に写像済み BAR0 の PFB・vs を読み、層1 と共有する式で V・R、層2 と共有する式で
+B を求める。push の最大 2 頁の PT を UC 写像して直ちに P=0 に戻す。層3 の予約は
+任意の `[align_up(DISPLAY終端, 4KiB), B)` を使えるため、この範囲も同じ形で起動時に
+PT を作り P=0 に戻す。DISPLAY の既存 PTE は開いたまま保つ。これらの PT は BAR1 の
+最大 64 頁の内数で、live AS 作成後の map/unmap は既存 PT を再利用する。
 `gf2_map_vram` は offset・長さと加算の範囲を検査し、map 成功時に写像と VRAM の
 予約を保持する。正常停止では最終 fence を待って停止し、fault / timeout も共通の
 停止列へ進む。engine stop 成功後に可変 inst を返し、F1 stop 成功後にだけ push の

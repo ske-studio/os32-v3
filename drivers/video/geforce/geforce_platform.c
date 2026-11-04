@@ -2,23 +2,20 @@
 #include "geforce_module.h"
 #include "gf_production.h"
 #include "../../../hwdev/gf/production.h"
+#include "../../../hwdev/gf/vram_layout.h"
 #include "../../../mm/pgalloc.h"
 #include "../../../mm/paging.h"
-/* R = align4096((0x4980 * vs + 0x4000) * 32 + 0x100000), vs <= 8. */
 #define GF_BOOT_INSTMEM_BAR 2U
-#define GF_BOOT_INSTMEM_VS_MAX 8U
-#define GF_BOOT_INSTMEM_VS_BYTES 0x4980U
-#define GF_BOOT_INSTMEM_FIXED_BYTES 0x4000U
-#define GF_BOOT_INSTMEM_COPIES 32U
-#define GF_BOOT_INSTMEM_EXTRA_BYTES 0x100000U
-#define GF_BOOT_INSTMEM_MAX_BYTES PAGE_ALIGN_UP( \
-    (GF_BOOT_INSTMEM_VS_BYTES * GF_BOOT_INSTMEM_VS_MAX + \
-     GF_BOOT_INSTMEM_FIXED_BYTES) * GF_BOOT_INSTMEM_COPIES + GF_BOOT_INSTMEM_EXTRA_BYTES)
+#define GF_BOOT_INSTMEM_MAX_BYTES GF_INSTMEM_BYTES(GF_VS_MAX)
 #define GF_BOOT_INSTMEM_PT_PAGES \
     ((GF_BOOT_INSTMEM_MAX_BYTES + MEM_DEVICE_APERTURE_PDE_SIZE - 1) / MEM_DEVICE_APERTURE_PDE_SIZE)
+/* BAR1 is aligned to its 256MiB extent. DISPLAY, push (at most two PTs)
+ * and all layer-3 views share these PTs; count their union only once. */
+#define GF_BOOT_VRAM_PT_PAGES \
+    (GF_PRODUCTION_BAR1_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE)
 STATIC_ASSERT(GF_PRODUCTION_PT_PAGES ==
-              GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE + 1 +
-              GF_BOOT_INSTMEM_PT_PAGES,
+              GF_PRODUCTION_BAR0_BYTES / MEM_DEVICE_APERTURE_PDE_SIZE +
+              GF_BOOT_INSTMEM_PT_PAGES + GF_BOOT_VRAM_PT_PAGES,
               geforce_boot_pt_budget);
 /* BAR1 DISPLAY may be effective WC through MTRR. Ledger cache/intervals,
  * permanent reservations and the existing 75 display PTEs remain unchanged. */
@@ -59,6 +56,24 @@ static int reserve(void)
                 instmem->length : GF_BOOT_INSTMEM_MAX_BYTES;
     if (paging_map_phys(instmem->base, instmem->base, bytes / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
         paging_set_not_present(instmem->base, instmem->base + bytes - 1)) return 0;
+    volatile u8 *bar0 = P2V_IO(boot_resources.bars[GF_MODE_REGISTER_BAR].base);
+    u32 v = gf_vram_bytes(*(volatile u32 *)(bar0 + GF_VRAM_SIZE_REG));
+    u32 r = gf_instmem_reserved(*(volatile u32 *)(bar0 + GF_VS_REG));
+    const struct recover_bar_extent *vram = &boot_resources.bars[GF_MODE_VRAM_BAR];
+    if (v < r + GF2_PUSH_BYTES || v > vram->length) return 0;
+    u32 push = gf_push_base(v - r);
+    u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);
+    if (push < display_end) return 0;
+    u32 push_phys = vram->base + push;
+    if (paging_map_phys(push_phys, push_phys, GF2_PUSH_BYTES / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
+        paging_set_not_present(push_phys, push_phys + GF2_PUSH_BYTES - 1)) return 0;
+    /* Layer 3 reservations may occupy any VRAM below B. Leave DISPLAY open,
+     * and precreate the rest before live address spaces inherit the PTs. */
+    u32 view_phys = vram->base + display_end;
+    u32 view_bytes = push - display_end;
+    if (view_bytes &&
+        (paging_map_phys(view_phys, view_phys, view_bytes / PAGE_SIZE, PAGE_RW | PTE_PCD) ||
+         paging_set_not_present(view_phys, view_phys + view_bytes - 1))) return 0;
     platform.bar0_phys = boot_resources.bars[GF_MODE_REGISTER_BAR].base;
     platform.display_phys = boot_resources.bars[GF_MODE_VRAM_BAR].base;
     platform.resources = &boot_resources;

@@ -18,6 +18,7 @@ int pc98_route_to_98(void) { route_98++; route=0; console_safe=decode_safe; retu
 int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : -1; }
 #include "../../hwdev/gf/internal.h"
 #include "../../hwdev/gf/command.h"
+#include "../../hwdev/gf/vram_view.h"
 /* This HAL fixture has no command owner. Unexpected layer-2 use must fail. */
 int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
 { (void)ch;(void)f;return GF2_ESTATE; }
@@ -89,3 +90,79 @@ static void wm_consume(void)
     host_user=0; gfx_shutdown();
 }
 /* Code from P5's actual failure hook is compiled with core, not faked. */
+
+#ifdef EXPECT_VRAM_PT
+/* Real paging + production adapters: a live AS forbids creating new PTs. */
+static struct gf_foundation vram_foundation;
+static struct gf2_chan vram_channel;
+static i32 close_test_view(void *owner, struct gf_vram_view *view)
+{ (void)owner; return gf_vram_view_unmap(view); }
+static void prepared_vram_test(void)
+{
+    const u32 v = gf_vram_bytes(TEST_VRAM_BYTES);
+    const u32 r = gf_instmem_reserved(TEST_VS_MASK);
+    const u32 push = gf_push_base(v-r);
+    const u32 display_end = PAGE_ALIGN_UP(GF_MODE_VRAM_BYTES);
+    vram_foundation.imem.vram_bytes=v;
+    vram_foundation.imem.reserved=r;
+    vram_channel=(struct gf2_chan){
+        .bar1={GF_TEST_DISPLAY|8,GF_TEST_DISPLAY,GF_PRODUCTION_BAR1_BYTES,1},
+        .map_ops=&gf_production_instmem_map_ops
+    };
+    vram_channel.f=&vram_foundation;
+    vram_channel.B=push;
+    u32 owner;
+    CHECK(ledger_owner_new(LEDGER_KIND_AS,2,"gf-vram-pt",&owner));
+    CHECK(!paging_addrspace_create_lease(&space,owner));
+    if (!EXPECT_VRAM_PT) {
+        /* Same boot function with only BAR1 preparation removed. Ledger and
+         * production_map are real, so EMAP comes from the missing live-AS PT. */
+        volatile u32 *va;
+        CHECK(!paging_registered_pt(GF_TEST_DISPLAY+push));
+        CHECK(!geforce_range_reserved(GF_TEST_DISPLAY+push,GF2_PUSH_BYTES));
+        CHECK(gf2_map_vram(&vram_channel,push,GF2_PUSH_BYTES,&va)==GF2_EMAP);
+        CHECK(!gf_vram_registry_init(&vram_channel));
+        struct gf_vram_reservation_node node={0};
+        const u32 off=MEM_DEVICE_APERTURE_PDE_SIZE;
+        CHECK(!gf_vram_reserve(&vram_channel,&node,off,PAGE_SIZE,&node));
+        struct gf_vram_view view={.close=close_test_view};
+        volatile u8 *ptr;
+        CHECK(gf_vram_view_map(&view,&vram_channel,off,PAGE_SIZE,&ptr)==GF2_EMAP);
+        CHECK(!gf_vram_release(&vram_channel,&node.value));
+        paging_addrspace_destroy(&space);
+        CHECK(ledger_owner_retire(owner));
+        return;
+    }
+    /* Check every closed PTE, including both ends of the push aperture. */
+    for (u32 off=display_end;off<push+GF2_PUSH_BYTES;off+=PAGE_SIZE) {
+        u32 va=GF_TEST_DISPLAY+off;
+        CHECK(paging_pte_raw(va)==(va|PTE_RW|PTE_PCD));
+        u32 pde=((u32 *)P2V(space.pd_phys))[va/MEM_DEVICE_APERTURE_PDE_SIZE];
+        CHECK((pde&PTE_FRAME_MASK)==paging_registered_pt(va) && (pde&PTE_PRESENT));
+    }
+    CHECK(!paging_pte_raw(GF_TEST_DISPLAY+push+GF2_PUSH_BYTES));
+    volatile u32 *va;
+    CHECK(!gf2_map_vram(&vram_channel,push,GF2_PUSH_BYTES,&va));
+    CHECK((paging_pte_raw(GF_TEST_DISPLAY+push)&(PTE_PRESENT|PTE_RW|PTE_USER|PTE_PCD))==
+          (PTE_PRESENT|PTE_RW|PTE_PCD));
+    CHECK(!gf2_unmap_vram(&vram_channel));
+    CHECK(!gf_vram_registry_init(&vram_channel));
+    struct gf_vram_reservation_node node={0};
+    CHECK(!gf_vram_reserve(&vram_channel,&node,display_end,push-display_end,&node));
+    /* First view, a different PDE, and the highest available page. */
+    const u32 offsets[]={display_end,MEM_DEVICE_APERTURE_PDE_SIZE-PAGE_SIZE,
+                        MEM_DEVICE_APERTURE_PDE_SIZE,push-PAGE_SIZE};
+    for (u32 i=0;i<sizeof(offsets)/sizeof(offsets[0]);i++) {
+        struct gf_vram_view view={.close=close_test_view};
+        volatile u8 *ptr;
+        CHECK(!gf_vram_view_map(&view,&vram_channel,offsets[i],PAGE_SIZE,&ptr));
+        CHECK((paging_pte_raw(GF_TEST_DISPLAY+offsets[i])&(PTE_PRESENT|PTE_USER|PTE_PCD))==
+              (PTE_PRESENT|PTE_PCD));
+        CHECK(!gf_vram_view_unmap(&view));
+    }
+    CHECK(!gf_vram_release(&vram_channel,&node.value));
+    CHECK(paging_pte_raw(GF_TEST_DISPLAY)&PTE_PRESENT);
+    paging_addrspace_destroy(&space);
+    CHECK(ledger_owner_retire(owner));
+}
+#endif

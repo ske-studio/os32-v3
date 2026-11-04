@@ -2,6 +2,7 @@
 #ifndef HWDEV_GF_FOUNDATION_H
 #define HWDEV_GF_FOUNDATION_H
 #include "internal.h"
+#include "vram_layout.h"
 
 enum gf1_rc {
     GF1_OK=0, GF1_EPCI=-101, GF1_EMAP=-102, GF1_ENOSPC=-103,
