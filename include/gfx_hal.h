@@ -46,6 +46,9 @@ struct GfxScanout {
 /*  フォールバックする。文字とビットマップは v1 では CPU 共通実装に任せるため  */
 /*  この表には置かない (契約 G2 の対応表)。                                   */
 /* ------------------------------------------------------------------------ */
+struct OsriImage;
+struct OsriViewRun;
+
 typedef struct GfxBackend {
     const char *name;
 
@@ -105,6 +108,9 @@ typedef struct GfxBackend {
     int (*vsync)(u8 head, u32 after, u32 deadline, u32 *seen);
     int (*page_flip)(u8 head, const struct GfxScanout *, int sync, u32 deadline);
     int (*gamma)(u8 head, const u16 rgb[3][256]);
+    /* Synchronous OSRI presentation; NULL means NOSYS. Backend owns the
+     * plan and hardware restoration, service owns image and borrowed BB. */
+    int (*osri_show)(const struct OsriImage *, struct OsriViewRun *);
 } GfxBackend;
 
 static inline const GfxMode *gfx_mode_pick(const GfxBackend *be, int legacy200)

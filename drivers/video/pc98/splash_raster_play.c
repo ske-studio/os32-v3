@@ -84,13 +84,14 @@ static int play_edge(const struct PlV2Row *r, PlV2Emit emit)
     return PL_FRAME_NO_SYNC;
 }
 
-int pl_v2_frame(struct SplashRaster *s, const struct OsriImage *image,
-                 const struct PlV2Plan *plan)
+int pl_v2_frame_poll(struct SplashRaster *s, const struct OsriImage *image,
+                     const struct PlV2Plan *plan, int (*poll)(void *), void *ctx)
 {
     if (!s || !image || !plan || !_irq_enabled() ||
         !s->checked || !s->dynamic_ok) return PL_FRAME_NO_SYNC;
     /* Exactly one new VBLANK per call, even when the following scan drops. */
     if (play_vsync(0) || play_vsync(1)) return PL_FRAME_NO_SYNC;
+    if (poll && poll(ctx)) return PL_FRAME_CANCEL;
     unsigned int flags = irq_save();
     int rc = PL_FRAME_DROP;
     /* Protect F acquisition as well as visible rows. IRQs were open while
@@ -120,4 +121,10 @@ play_done:
     if (rc == PL_FRAME_OK) s->frame++;
     else if (rc == PL_FRAME_DROP) s->dropped++;
     return rc;
+}
+
+int pl_v2_frame(struct SplashRaster *s, const struct OsriImage *image,
+                const struct PlV2Plan *plan)
+{
+    return pl_v2_frame_poll(s, image, plan, 0, 0);
 }
