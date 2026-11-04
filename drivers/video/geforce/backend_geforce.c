@@ -1,3 +1,27 @@
+/*
+ * Copyright 1993-2003 NVIDIA, Corporation
+ * Copyright 2006 Dave Airlie
+ * Copyright 2007 Maarten Maathuis
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 /* GeForce HAL adapter. Reservation and device ownership belong to the caller. */
 #include "gfx_hal.h"
 #include "video_service.h"
@@ -7,7 +31,8 @@
 #include "hwdev/gf/foundation.h"
 #ifdef OS32_GEFORCE_MODULE
 #include "geforce_module.h"
-#include "hwdev/gf/accel.h"
+#include "hwdev/gf/display/api.h"
+#include "../../../gfx/gfx_internal.h"
 #define gfx_backend_geforce (*geforce_context->backend)
 #define gfx_current_height (*geforce_context->height)
 #define gfx_flip_enabled (*geforce_context->flip)
@@ -19,6 +44,11 @@ extern void geforce_display_failed(void) __attribute__((weak));
 #define GF_HEIGHT 480
 #define GF_PITCH GF_WIDTH
 #define GF_MODE_INDEX 0U
+/* dispnv04/crtc.c:869-883 uses depth 16 and depth 24/cpp 4. HAL bpp
+ * describes storage, so XRGB8888 is 32 bits per pixel. */
+#define GF_RGB565_BPP 16U
+#define GF_XRGB8888_BPP 32U
+#define GF_GXCOPY 3U /* xf86-video-nouveau nv04_exa.c:46-84 */
 #define GF_LEASE_FIRST 16
 #define GF_LEASE_COUNT (VIDEO_PALETTE_ENTRIES - GF_LEASE_FIRST)
 #define GF_GRAY_FIRST 8
@@ -39,11 +69,16 @@ static struct video_device *device;
 static int (*identify_resources)(void);
 static struct video_fb framebuffer;
 #ifdef OS32_GEFORCE_MODULE
+static struct gf3_surface selected_front;
+static GfxMode selected_scan_mode;
+static GfxMode display_modes[GF4_MODES];
+#endif
+#ifdef OS32_GEFORCE_MODULE
 void geforce_backend_framebuffer_info(struct video_fb *out, u32 *width, u32 *height)
 {
     *out = framebuffer;
-    *width = GF_WIDTH;
-    *height = GF_HEIGHT;
+    *width = selected_front.bytes ? selected_front.width : GF_WIDTH;
+    *height = selected_front.bytes ? selected_front.height : GF_HEIGHT;
 }
 #endif
 static u32 bar0_phys;
@@ -67,6 +102,202 @@ void geforce_backend_bind(struct video_device *d, int (*identify)(void),
     interrupt_point = point;
     interrupt_context = context;
 }
+
+#ifdef OS32_GEFORCE_MODULE
+/* No cached dispatch: C2 closes the kernel slot during change/recovery. */
+static const struct gf4_test_ops *display_ops(void)
+{
+    return geforce_context->display_out ? *geforce_context->display_out : 0;
+}
+static int display_result(struct gf4_ctx *c, int rc)
+{
+    if (c) c->last_rc = rc;
+    switch (rc) {
+    case 0: return 0;
+    case GF4_EINVAL: case GF4_ERANGE: case GF4_EFORMAT:
+    case GF3_EINVAL: case GF3_ERANGE: case GF3_EFORMAT: return OS32_ERR_INVAL;
+    case GF4_EUNSUPPORTED: case GF4_ENODEV: return OS32_ERR_NOSYS;
+    case GF4_ENOSPC: case GF2_ENOSPC: return OS32_ERR_NOSPC;
+    case GF4_EBUSY: return OS32_ERR_BUSY;
+    default: return OS32_ERR_IO;
+    }
+}
+static int display_deadline(struct gf4_ctx *c, u32 *dl)
+{
+    u32 now;
+    struct gf_io *io = &c->ch->f->io;
+    if (!io->timing.clock_us || io->timing.clock_us(io->opaque, &now))
+        return GF2_EIO;
+    *dl = now + GF3_TIMEOUT_US;
+    return 0;
+}
+static u8 display_format(enum gf3_fmt fmt)
+{
+    switch (fmt) {
+    case GF3_INDEX8: return GFX_FMT_PACKED8;
+    case GF3_RGB565: return GFX_FMT_RGB565;
+    case GF3_XRGB8888: return GFX_FMT_XRGB8888;
+    default: return 0;
+    }
+}
+/* Confirmed head-0 scan only. C2 calls this after validation and before
+ * publishing either dispatch. BO format/pitch/base: nouveau c03c1a1
+ * dispnv04/crtc.c:838-903; flip completion :1074-1087,1136-1217.
+ * OS32's immutable mode table and value loans replace DRM framebuffer BOs.
+ * No wait, allocation, register write or dispatch lookup in publication. */
+void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)
+{
+    if (head || !front) return;
+    selected_front = *front;
+    selected_scan_mode = (GfxMode){front->width, front->height,
+        display_format(front->fmt), VIDEO_RGB_BITS, 0, 0, front->pitch};
+    framebuffer = (struct video_fb){geforce_context->platform->display_phys + front->off, front->bytes,
+        front->pitch, selected_scan_mode.format};
+    struct gf4_state *state = geforce_context->display_state;
+    if (state) {
+        for (u32 i = 0; i < state->nmodes; ++i) {
+            const struct gf4_mode *m = &state->modes[i];
+            if (m->id == mode_id) gfx_backend_geforce.default_mode = i;
+            display_modes[i] = (GfxMode){m->t.hd, m->t.vd,
+                display_format(m->fmt), VIDEO_RGB_BITS, 0, 0, m->pitch};
+        }
+        gfx_backend_geforce.modes = display_modes;
+        gfx_backend_geforce.mode_count = state->nmodes;
+    }
+    gfx_backend_geforce.selected_mode = &selected_scan_mode;
+    gfx_current_height = front->height;
+    /* fill_rect's u8 color and the legacy RAM backing are INDEX8 only. */
+    gfx_backend_geforce.fill_rect = front->fmt == GF3_INDEX8 ? geforce_fill_rect : 0;
+    gfx_backend_geforce.blit = front->fmt == GF3_INDEX8 ? geforce_blit : 0;
+    gf_hook_scan_bind(true, front);
+}
+static int geforce_set_mode(u32 id)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    if (!ops || !ops->set_mode || !ops->scan_prepare || !ops->scan_discard)
+        return OS32_ERR_NOSYS;
+    struct gf4_ctx *c = ops->ctx;
+    const struct gf4_route route = c->state->head[0].route;
+    if (route.head || route.type != GF4_ANALOG)
+        return display_result(c, GF4_EUNSUPPORTED);
+    bool found = false;
+    for (u32 i = 0; i < c->state->nmodes; ++i)
+        if (c->state->modes[i].id == id &&
+            c->state->mode_connector[i] == route.connector) found = true;
+    if (!found) return display_result(c, GF4_EINVAL);
+    u32 dl;
+    int rc = display_deadline(c, &dl);
+    struct gf3_surface scan[2];
+    if (!rc) rc = ops->scan_prepare(c, 0, id, scan, dl);
+    if (rc) return display_result(c, rc);
+    /* New reservation only: never draw into a front/hold/snapshot. gf3_fill
+     * synchronously drains its own render fence with this same deadline. */
+    rc = gf3_fill(c->accel, &scan[0],
+        (struct gf3_rect){0, 0, scan[0].width, scan[0].height},
+        0, GF_GXCOPY, U32_MAX, dl); /* GXcopy, all planes; nv04_exa.c:46-84. */
+    if (rc) {
+        /* A failed fill can already be queued/published. Drain before unpin,
+         * including packets whose fence emission failed. Reference protocol:
+         * nouveau c03c1a1 nv10_fence.c:33-41,53-55; BO lifetime:
+         * nouveau_bo.c:594-629. Keep the original error and absolute deadline. */
+        struct gf2_fence fence;
+        int drain = gf2_fence_emit(c->ch, &fence, dl);
+        if (!drain) drain = gf2_fence_wait(c->ch, fence, dl);
+        if (drain) {
+            c->recovery_rc = drain;
+            c->deadline = dl;
+            c->reusable = false;
+            c->accepting = false;
+            /* The existing failure owner closes admission and releases only
+             * after confirmed stop. Never discard these candidates here or
+             * allow a later scan_prepare to recycle them while GPU is live. */
+            (void)c->links->failed(c->links->owner, rc, dl);
+            return display_result(c, rc);
+        }
+    }
+    if (!rc) rc = ops->set_mode(c, &route, id, &scan[0], dl);
+    if (rc) {
+        int cleanup = ops->scan_discard(c, 0, dl);
+        if (cleanup) c->recovery_rc = cleanup;
+    }
+    /* C2 scan_changed/admission commits the descriptor, even on rollback. */
+    return display_result(c, rc);
+}
+static int geforce_dpms(u8 head, u32 state)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    if (!ops || !ops->dpms_set) return OS32_ERR_NOSYS;
+    u32 dl;
+    int rc = state > GF4_OFF ? GF4_EINVAL : display_deadline(ops->ctx, &dl);
+    if (!rc) rc = ops->dpms_set(ops->ctx, head, (enum gf4_dpms)state, dl);
+    return display_result(ops->ctx, rc);
+}
+static int geforce_cursor_image(u8 head, const struct GfxCursorImage *image)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    if (!ops || !ops->cursor_image) return OS32_ERR_NOSYS;
+    if (!image) return display_result(ops->ctx, GF4_EINVAL);
+    struct gf4_cursor cursor = {image->argb_pm, image->bytes, image->pitch,
+        image->width, image->height, image->hot_x, image->hot_y};
+    u32 dl;
+    int rc = display_deadline(ops->ctx, &dl);
+    if (!rc) rc = ops->cursor_image(ops->ctx, head, &cursor, dl);
+    return display_result(ops->ctx, rc);
+}
+static int geforce_cursor_move(u8 head, i32 x, i32 y)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    return !ops || !ops->cursor_move ? OS32_ERR_NOSYS :
+        display_result(ops->ctx, ops->cursor_move(ops->ctx, head, x, y));
+}
+static int geforce_cursor_show(u8 head, int show)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    if (!ops || !ops->cursor_show) return OS32_ERR_NOSYS;
+    if (show != 0 && show != 1) return display_result(ops->ctx, GF4_EINVAL);
+    return display_result(ops->ctx, ops->cursor_show(ops->ctx, head, show != 0));
+}
+static int geforce_vsync(u8 head, u32 after, u32 dl, u32 *seen)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    return !ops || !ops->vblank_wait ? OS32_ERR_NOSYS :
+        display_result(ops->ctx, ops->vblank_wait(ops->ctx, head, after, dl, seen));
+}
+static int geforce_page_flip(u8 head, const struct GfxScanout *s, int sync, u32 dl)
+{
+    const struct gf4_test_ops *ops = display_ops();
+    if (!ops || !ops->flip) return OS32_ERR_NOSYS;
+    struct gf4_ctx *c = ops->ctx;
+    if (!s || (sync != 0 && sync != 1)) return display_result(c, GF4_EINVAL);
+    enum gf3_fmt fmt;
+    switch (s->format) {
+    case GFX_FMT_PACKED8: fmt = GF3_INDEX8; break;
+    case GFX_FMT_RGB565: fmt = GF3_RGB565; break;
+    case GFX_FMT_XRGB8888: fmt = GF3_XRGB8888; break;
+    default: return display_result(c, GF4_EFORMAT);
+    }
+    /* HAL carries no generation/owner: obtain both from the live registry,
+     * then match the contained image before passing it to B7. */
+    u32 cursor = 0;
+    struct gf_vram_reservation key;
+    int rc;
+    while ((rc = gf_vram_next(c->ch, &cursor, &key)) > 0)
+        if (key.reservation_id == s->reservation_id) break;
+    if (rc <= 0) return display_result(c, rc ? rc : GF3_ESTATE);
+    rc = gf_vram_match(c->ch, key.owner, s->reservation_id, key.generation,
+        s->offset, s->bytes, &key);
+    struct gf3_surface front = {s->offset, s->bytes, s->pitch, s->width, s->height,
+        fmt, s->reservation_id, key.generation};
+    if (!rc) rc = ops->flip(c, head, &front, sync != 0, dl);
+    return display_result(c, rc);
+}
+static int geforce_gamma(u8 head, const u16 rgb[3][256])
+{
+    const struct gf4_test_ops *ops = display_ops();
+    return !ops || !ops->gamma ? OS32_ERR_NOSYS :
+        display_result(ops->ctx, ops->gamma(ops->ctx, head, rgb));
+}
+#endif
 
 static void geforce_fail(void);
 
@@ -128,6 +359,38 @@ static void geforce_fail(void)
 
 static int geforce_transfer(int x, int y, int w, int h)
 {
+#ifdef OS32_GEFORCE_MODULE
+    if (selected_front.bytes && (selected_front.fmt != GF3_INDEX8 ||
+        selected_front.width != GF_WIDTH || selected_front.height != GF_HEIGHT)) {
+        const struct gf4_test_ops *ops = display_ops();
+        if (ops) ops->ctx->last_rc = GF4_EFORMAT;
+        return OS32_ERR_INVAL;
+    }
+    if (selected_front.bytes && selected_front.off) {
+        /* Only the boot display has the permanent CPU map. A newly reserved
+         * VGA INDEX8 scan uses F3's existing RAM upload, not an unchecked
+         * P2V cast beyond that map (nouveau_bo.c:669-689, OS32 V0 boundary).
+         * The old offset-zero CPU path below remains unchanged. */
+        const struct gf4_test_ops *ops = display_ops();
+        if (!ops) return OS32_ERR_NOSYS;
+        if (!gfx_clip_screen(&x, &y, &w, &h, GF_WIDTH, GF_HEIGHT)) return 0;
+        u32 pitch = gfx_backend_geforce.bb_pitch;
+        if (!pitch || (u32)y > U32_MAX / pitch) return OS32_ERR_INVAL;
+        u32 start = (u32)y * pitch;
+        if ((u32)x > U32_MAX - start) return OS32_ERR_INVAL;
+        start += (u32)x;
+        if (!gfx_backend_geforce.bb_base || start > gfx_backend_geforce.bb_size)
+            return OS32_ERR_INVAL;
+        struct gf3_ram ram = {gfx_backend_geforce.bb_base + start,
+            gfx_backend_geforce.bb_size - start, pitch};
+        u32 dl;
+        int rc = display_deadline(ops->ctx, &dl);
+        if (!rc) rc = gf3_upload(ops->ctx->accel, &selected_front,
+            (struct gf3_rect){x, y, w, h}, &ram, false, dl);
+        ops->ctx->last_rc = rc;
+        return rc ? OS32_ERR_IO : 0;
+    }
+#endif
     return gf_present_rect(gfx_backend_geforce.bb_base, gfx_backend_geforce.bb_pitch,
                            P2V_IO(framebuffer.phys), framebuffer.pitch, P2V_IO(bar0_phys),
                            x, y, w, h, interrupt_point, interrupt_context);
@@ -137,7 +400,7 @@ static void geforce_init(void)
 {
     struct video_mode mode;
     if (!geforce_probe()) return;
-    if (active) return; /* One fixed mode; gfx_init -> gfx_init_200 preserves it. */
+    if (active) return; /* gfx_init -> gfx_init_200 preserves the current scan. */
     if (video_mode_info(device, GF_MODE_INDEX, &mode) ||
         video_framebuffer(device, &framebuffer) || !gfx_backend_geforce.bb_base) {
         geforce_fail();
@@ -169,7 +432,9 @@ static int geforce_query(GFX_ScreenInfo *info)
     const GfxMode *mode = gfx_backend_mode(&gfx_backend_geforce);
     if (!info || !mode) return OS32_ERR_INVAL;
     info->width = mode->width; info->height = mode->height;
-    info->bpp = GFX_FMT_PACKED8_BPP; info->format = mode->format;
+    info->bpp = mode->format == GFX_FMT_RGB565 ? GF_RGB565_BPP :
+        mode->format == GFX_FMT_XRGB8888 ? GF_XRGB8888_BPP : GFX_FMT_PACKED8_BPP;
+    info->format = mode->format;
     info->flags = 0; info->lease_mask = 0;
     info->lease_first = GF_LEASE_FIRST; info->lease_count = GF_LEASE_COUNT;
     for (u32 i = 0; i < sizeof(info->reserved) / sizeof(info->reserved[0]); ++i)
@@ -179,7 +444,9 @@ static int geforce_query(GFX_ScreenInfo *info)
 
 static void geforce_present(int x, int y, int w, int h)
 {
-    if (active && geforce_transfer(x, y, w, h)) geforce_fail();
+    if (!active) return;
+    int rc = geforce_transfer(x, y, w, h);
+    if (rc && rc != OS32_ERR_INVAL) geforce_fail();
 }
 
 static void geforce_set_palette(int first, int count, const u8 *rgb)
@@ -227,6 +494,10 @@ GfxBackend gfx_backend_geforce = {
     .enter = geforce_enter, .leave = geforce_leave,
 #ifdef OS32_GEFORCE_MODULE
     .fill_rect = geforce_fill_rect, .blit = geforce_blit,
+    .set_mode = geforce_set_mode, .dpms = geforce_dpms,
+    .cursor_image = geforce_cursor_image, .cursor_move = geforce_cursor_move,
+    .cursor_show = geforce_cursor_show, .vsync = geforce_vsync,
+    .page_flip = geforce_page_flip, .gamma = geforce_gamma,
 #endif
     .bb_pitch = GF_PITCH, .bb_format = GFX_BB_PACKED8,
     .prepare = geforce_prepare, .modes = geforce_modes,

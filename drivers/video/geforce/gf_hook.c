@@ -1,3 +1,27 @@
+/*
+ * Copyright 1993-2003 NVIDIA, Corporation
+ * Copyright 2006 Dave Airlie
+ * Copyright 2007 Maarten Maathuis
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 /* Module-only HAL adapter, GF_FEAT3_DESIGN section 10. Drawing targets the
  * borrowed scanout, while the existing CPU backbuffer/present path persists.
  * Clipping follows backend_cirrus.c:403-406,492-505 (G5); hardware operations
@@ -22,7 +46,10 @@ void gf_hook_ctx_bind(struct gf3_ctx *ctx)
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 {
     if (scan) hook_scan = *scan;
-    hook_active = active && scan;
+    /* The HAL color is a palette index. A truecolor scan must not receive
+     * this INDEX8 adapter, even if an older service rebinds it directly.
+     * Display cpp/depth: nouveau c03c1a1 dispnv04/crtc.c:869-883. */
+    hook_active = active && scan && scan->fmt == GF3_INDEX8;
 }
 
 static int hook_deadline(u32 *dl)
