@@ -204,6 +204,8 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/gui/API_CONTRACTS.md](decisions/gui/API_CONTRACTS.md) | GUI 契約の変更方針、色崩れの許容範囲、性能目標と測定方針。 |
 | [decisions/gui/DESIGN.md](decisions/gui/DESIGN.md) | GUI の採用方針、性能目標、対象装置と検証環境の構成。 |
 | [decisions/gui/GFX_MODES_DESIGN.md](decisions/gui/GFX_MODES_DESIGN.md) | 形式・モードの拡張範囲と配置変更の方針。 |
+| [decisions/gui/CONTROL_PANEL_DESIGN.md](decisions/gui/CONTROL_PANEL_DESIGN.md) | コントロールパネル (2 ページ・5 項目、同期保存、RELOAD) の確定設計。 |
+| [decisions/gui/P8_GUI_LAYER_DESIGN.md](decisions/gui/P8_GUI_LAYER_DESIGN.md) | P8 GUI 層 (PCM の公開 4 本・入力 event の所有と drop) の確定設計。 |
 | [decisions/realhw/BARLEN_DESIGN.md](decisions/realhw/BARLEN_DESIGN.md) | 基準構成と BAR 上限方式の信頼範囲・許可方針。 |
 | [decisions/realhw/DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) | 装置ごとに要る状態と復帰の要件。 |
 | [decisions/realhw/GF6200_4A_DESIGN.md](decisions/realhw/GF6200_4A_DESIGN.md) | GeForce 4a の範囲・書込み承認・立会いと復帰の方針。 |
@@ -212,6 +214,8 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md) | HWDEV の採用方式・境界と安全条件の維持。 |
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | Ra266 の機体構成・基準構成と実機の方針。 |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) | 復帰の保証範囲、配線・電源操作・書込み承認の方針。 |
+| [decisions/sound/SYNTH_OPNA_DESIGN.md](decisions/sound/SYNTH_OPNA_DESIGN.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) の確定設計。 |
+| [decisions/time/TICK_1KHZ_DESIGN.md](decisions/time/TICK_1KHZ_DESIGN.md) | 1kHz IRQ0 tick (物理 1kHz・論理 100Hz の二周期) の実測計画と切り替えの確定設計。 |
 
 ## タスク
 
@@ -289,6 +293,8 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | `docs/archive/v3/TASK_C11_MIGRATION.md` | **T0: C89 (gnu89) → C11 (gnu11) への移行 — 受入完了 (2026-09-30、main `f5bcb35`)** — 範囲は「言語モードと検査の移行」に限定 (本体・ブート・userland・SDK 実装は gnu11、公開 SDK ヘッダは C89 互換、SQLite 系は gnu89 の専用規則、全面書き換えなし)、前提文書の訂正 (§2: `kernel.mk:175` は SQLite 本体でない、`CFLAGS_SQLITE` の継承、`shm.c` は修正済み、`check_constraints.py` は言語検査をしていない)、作業の分類表 (§3)、C11 機能の採用範囲 (§4)、gnu89 → gnu11 の意味の差 (§5)、実施順序 1〜7 と検査 (§6)、受入 (§7)、ユーザー判断 3 点 (§8) は推奨どおり承認・[C1] は §9 の文面で改訂済み、`make check-c-dialect` を新設、A8 は Codex Approve・A9 は NP21/W で合格 |
 | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) | 結線の土台 (割り込みの動的登録 / 8237 / DMA プール / PCI の結線表 / µs 時計) **受入完了・実機確認待ち** (残: W7) |
 | [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入待ち** (E0〜E4 合格、残: E5 は NP21/W、E6 は実機の聴取)。ini の SNDboard は [D2] |
+| [tasks/v3/TASK_SYNTH_OPNA.md](tasks/v3/TASK_SYNTH_OPNA.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
+| [tasks/v3/TASK_TICK_1KHZ.md](tasks/v3/TASK_TICK_1KHZ.md) | P3 の 1kHz IRQ0 tick (実測 → 二周期への切り替え) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/settings/DEVICE_RESERVATION.md](tasks/settings/DEVICE_RESERVATION.md) / [FEP_BOUNDARY.md](tasks/settings/FEP_BOUNDARY.md) / [F2_OWNERSHIP.md](tasks/settings/F2_OWNERSHIP.md) | v3 の入力になる設計提案 (計画 / 設計中 / 設計中)。**U6 決定 (2026-09-30) を状態行に注記**: DEVICE_RESERVATION は改訂して P4 (核は T1 の台帳)、FEP_BOUNDARY と F2 の残りは P1 の T2 / T4 / T5a の要件。MEMORY_RAM_INTEGRATION は撤回して archive/settings/ (アーカイブ: `docs/archive/settings/MEMORY_RAM_INTEGRATION.md`) へ |
 | [DESIGN_APP_FIRST.md](DESIGN_APP_FIRST.md) | **アプリケーション優先設計の草案** — 前景 1 アプリへ資源を集中する設計思想。640×480×16bit を高機能グラフィックスの境界とし、Video HAL / VESA2 的互換層 / SDL 等の判断基準を整理。ロードマップではない |
 | [AUXILIARY_CORE_SERVICE.md](tasks/vision/AUXILIARY_CORE_SERVICE.md) / [LEGACY_LIVING_PRESERVATION.md](tasks/vision/LEGACY_LIVING_PRESERVATION.md) | 草案 (2026-09-28) — 余剰コアを固定機能アクセラレータに / レガシー実機の動態保存と OS32・OS64・Host Service の役割分離。ACS は v3 の範囲外。**OS64 は OS32 とは別の 64 ビット OS の構想** (v3 / v4 の範囲外、版数表に載せない。定義は LEGACY の冒頭、2026-09-30) |
@@ -370,8 +376,9 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/v13/PLAN.md](tasks/gui/v13/PLAN.md) | **v1.3 計画と票の索引** (受入完了 2026-09-14) — K5b / K6 / K7 / T7〜T9、監査 (`AUDIT_2026-09-10.md`)、レビュー記録 (`archive/gui_v13_reviews/REVIEW_*.md`、完了記録) |
 | `docs/archive/gui_v13/TASK_K6C_A_terminal.md` / `docs/archive/gui_v13/TASK_T7_terminal_cmd.md` / `docs/archive/gui_v13_reviews/REVIEW_T5A_APP.md` | v1.3 の票のうち `PLAN.md` から直接辿れない 3 本 (端末アプリ、端末からの CUI 起動、T5a アプリのレビュー記録) |
 | [tasks/gui/TASK_KBD_NAV.md](tasks/gui/TASK_KBD_NAV.md) | マウスなしで GUI を操作する (WM のショートカット + マウスキー、Windows 98 の割り当て) **受入完了・実機確認待ち** (K1・K2 合格、残: K3 実機) |
-| [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **計画 (2026-09-30)** — 範囲・候補項目・設計で決めること (Q1〜Q8) だけ。設計票の作成は v3 後半 (T4・T5a と P8 の後) |
+| [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
+| [tasks/gui/TASK_P8_GUI_LAYER.md](tasks/gui/TASK_P8_GUI_LAYER.md) | P8 GUI 層 (音のリングと入力) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
 | [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |

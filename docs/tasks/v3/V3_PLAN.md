@@ -32,13 +32,13 @@
 | **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | `docs/archive/v3/TASK_C11_MIGRATION.md` (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
 | **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | [現行決定](../../decisions/MEMMAP_V3.md)・[配置の契約](../../design/include/memmap.md) (元の票分割・受入条件は記録はアーカイブ) | **T1 受入完了** (2026-10-01、TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`))、T2 は受入完了 (詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`))、T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19、[詳細](TASK_T4_T6_MODULES.md))、T7 は受入完了・実機確認待ち ([詳細](TASK_T7_AND_FOLLOWUPS.md)) |
 | **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | [モジュールの契約](../../design/kernel/module/module_runtime.md)、票 T4〜T5c・T6b | P1 の中で |
-| **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
+| **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick ([TASK_TICK_1KHZ](TASK_TICK_1KHZ.md)) | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は設計中 (設計は確定、実装は未着手) |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | [資源予約の契約](../../design/mm/pgalloc.md)・[識別と enable の境界](../../design/include/gfx_hal.md)、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
 | **P5 実機ドライバ** | 82557 L-B〜L-E (最初、静的で入る)、PCM E5・E6 → 合成器、Trident、FD144、KBD_NAV K3、実機の画面取得 (PLAN §5-4) | [TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md)、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md)、[TASK_TRIDENT_DRIVER.md](../realhw/TASK_TRIDENT_DRIVER.md)、[realhw/PLAN.md](../realhw/PLAN.md) | 82557 は P1 を待たない |
 | **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み)。**実測 (2026-10-16、Ra266、86ba40c)**: 実機の中だけで 10 MiB を `cp /data → /data` が 53.6 秒 (0.20 MB/s)、LAN で読んでディスクへ書く `cp /host → /data` は 56.6 秒で、ほとんどがディスク側 (`~/os32-tmp/evidence/2026-10-16/lan_10m/split/`)。台帳 DISKPERF-1 | ユーザー決定 2026-09-30 (草案 §3 の行)。**起票の指示 (ユーザー 2026-10-16)**: v3 のドライバ関係で起票する。現状の使用には足りている | **受入完了** (2026-11-04、票 [TASK_BLOCKDEV_PERF](TASK_BLOCKDEV_PERF.md)、実機 Ra266 で `cp` 約 5 倍・CD 約 4 倍) |
 | **P6 実行モデル** | 協調型を基本に、前景が固まったら CTRL+STOP で取り戻す。スケジューリングとしてのプリエンプションは求めない | 意図はユーザー決定 2026-09-30。仕上げはユーザー決定 2026-11-04 (原文): 「１．要らない。キーが効くのであればユーザーが任意で落とすべき」(自動の番犬は作らない)・「３．これは普通にその時に対処。デバッグする」(KAPI の中で固まるのはカーネルの不具合として直す)・「４．終わってからでいい。それでハングして止めるならユーザーの責任」(長い KAPI は終わってから止める)・「５．直す。」(x87 の初期化と保存復元)・GUI アプリからの `exec_run` をカーネルで断る (契約 F1 の強制、承認)・GUI の STOP が効かない 2 つの場合 (STOP の張本人と前景の連鎖の末尾が違う・窓の無いアプリ) は「直す」— WM を塞いでいる張本人 (`stop_wm_req` の current) がいればそれを止め、いなければ前景の連鎖の末尾 (PM 決定) | CTRL+STOP・故障の回収・GUI の KAPI-loop の STOP は実装済み (T7a ほか、`docs/09_exec.md`)。残りは x87・F1 の強制・STOP の宛先の 1 段 (p6-close) |
 | **P7 KAPI / ABI** | 後方互換は基本考えない、fork 時に 1 回整理 (スロット順を変えてよい)、世代の識別と旧新混在の試験が必須 | MEMMAP_V3 D7・**D35** | P1 と同時 (世代の識別は済み)。**一度限りのスロットの整理は v3 の最後** (ユーザー 2026-11-05「これはv3の最後で行うのが良いと思っています。」) |
-| **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、F3a〜c 等。**microUI は廃止** (ユーザー 2026-11-05「microUIは廃止です。すでにos32guiがあるので」) | MEMMAP_V3 D19 | v3 後半 (§5) |
+| **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、F3a〜c 等。**microUI は廃止** (ユーザー 2026-11-05「microUIは廃止です。すでにos32guiがあるので」) | [gui/TASK_P8_GUI_LAYER.md](../gui/TASK_P8_GUI_LAYER.md)、MEMMAP_V3 D19 | v3 後半 (§5)。設計中 (設計は確定) |
 | **P9 アプリ層・互換層** | Video HAL の共通化、VESA2 的互換層、SDL 1.2 の受け皿、移植アプリ (ZSNES を含む) | [lease の契約](../../design/exec/lease.md)、[PORT_CANDIDATES.md](PORT_CANDIDATES.md) | v3 後半 (§5) |
 | **P10 データ・設定層** | F2 / FEP_BOUNDARY / F3a・F3c は P1 の T2〜T5a に畳む。独立票は辞書メタ情報と F3b だけ | MEMMAP_V3 D29〜D31、`docs/archive/v3/U6_PENDING_REVIEW.md` | v3 後半 (§5) |
 
@@ -62,12 +62,12 @@ T3 着手前の文書再整備は済み (経緯: `docs/archive/v3/DOCS_REORG_T3.
 
 | 票 | 中身 | 着手の条件 |
 |---|---|---|
-| [gui/TASK_CONTROL_PANEL.md](../gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ) | T4・T5a と P8 のウィジェットの後 |
+| [gui/TASK_CONTROL_PANEL.md](../gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ)。設計中 (設計は確定) | T4・T5a と P8 のウィジェットの後 |
 | [gui/TASK_I18N.md](../gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表) | T4 とコントロールパネルの後 (他の文字体系は T7b の後) |
 | [fep/TASK_DICT_META.md](../fep/TASK_DICT_META.md) | FEP 辞書のメタ情報と学習データの別ファイル化、その後に F3b (同一 DB の排他 open) | T4・T5a の後 |
 | [PORT_CANDIDATES.md](PORT_CANDIDATES.md) | 既存ソフトウェアの移植 (P9、難度の低いものから、ZSNES を含む) | P9 の Video HAL と P5 の 16bit 面 |
 | GUI アプリ群 (ROADMAP §2) | 設定アプリの拡張・画像ビューア・音楽プレーヤなど | 票は未起票。コントロールパネルと重なる分はそちら |
-| PCM の合成器 (PLAN §5-5 の P2〜P4) | ソフト OPNA 合成器 (Rust、IRQ 文脈はまず整数演算)、`snd` の口、V86 への提供。**fmgen を移植する** (cisc、NP21/W の `src/sound/fmgen/`、ユーザー決定 2026-11-04「fmgenは採用です」「fmgenは無理に手本でなく移植で大丈夫です」)。fmgen の条件 (出所と著作権の明記・フリーソフトとして配布・改変の明示・`fmgen_readme.txt` を改変せず添付、商用への組み込みは作者の合意) は OS32 (MIT のフリーソフト) で満たす。fmgen 由来の部分は自分の条件を保ち、添付文書で示す (NP21/W の `src/LICENSES/` と同じ形) | P2 (動的読み込み) は済み、PCM E4 まで済み — GeForce を待たずに設計を始められる。Rust の範囲は [RUST_VS_C11.md](RUST_VS_C11.md)・MEMMAP_V3 D36 |
+| [PCM の合成器](TASK_SYNTH_OPNA.md) (PLAN §5-5 の P2〜P4)。設計中 (設計は確定) | ソフト OPNA 合成器 (Rust、IRQ 文脈はまず整数演算)、`snd` の口、V86 への提供。**fmgen を移植する** (cisc、NP21/W の `src/sound/fmgen/`、ユーザー決定 2026-11-04「fmgenは採用です」「fmgenは無理に手本でなく移植で大丈夫です」)。fmgen の条件 (出所と著作権の明記・フリーソフトとして配布・改変の明示・`fmgen_readme.txt` を改変せず添付、商用への組み込みは作者の合意) は OS32 (MIT のフリーソフト) で満たす。fmgen 由来の部分は自分の条件を保ち、添付文書で示す (NP21/W の `src/LICENSES/` と同じ形) | P2 (動的読み込み) は済み、PCM E4 まで済み — GeForce を待たずに設計を始められる。Rust の範囲は [RUST_VS_C11.md](RUST_VS_C11.md)・MEMMAP_V3 D36 |
 | FM 音源の効果音 (GUI の操作音・OS の起動音など) | 効果音は FM 音源で鳴らす。FM 音源の無い PCM だけの機械では、fmgen で FM の音から作った PCM を鳴らす。その PCM は、ユーザーが任意で実行したときに作る (起動のたびに作らない)。ユーザー決定 2026-11-04 (原文):「v3の気が向いたタイミングですが、FM音源で効果音を出します。GUIの操作音やOSの起動音などです。PCMオンリーな場合はfmgenから生成されたPCMを使用する感じです。PCMはユーザーが任意で実行したタイミングで生成されるように。」 | v3 の中で時期は任意 (ユーザー「気が向いたタイミング」)。PCM だけの機械の分は PCM の合成器 (fmgen) の後。票は未起票 |
 | ネットワーク越しの CD・HostDrv の Host Services 経路 (PLAN §5-6・§5-7) | 82557 の上で `cdinst` 無変更のインストール、実機の `/host` | 82557 L-B〜L-E |
 
