@@ -200,8 +200,74 @@ static void bars(void)
     CHECK(hwb_command(&s, "mmioread8 bar d 2 + 0 -> x", length("mmioread8 bar d 2 + 0 -> x")) == HWB_ARG);
     p->config[0x0E] = 1;
     CHECK(hwb_command(&s, "mmioread8 bar d 2 + 0 -> x", length("mmioread8 bar d 2 + 0 -> x")) == HWB_ARG);
+    /* PCI header type 2 exposes exactly BAR0 (CardBus socket base). */
     p->config[0x0E] = 2;
-    CHECK(hwb_command(&s, "mmioread8 bar d 0 + 0 -> x", length("mmioread8 bar d 0 + 0 -> x")) == HWB_ARG);
+    CHECK(hwb_command(&s, "mmioread8 bar d 0 + 0 -> x", length("mmioread8 bar d 0 + 0 -> x")) == HWB_OK);
+    CHECK(hwb_command(&s, "mmioread8 bar d 1 + 0 -> x", length("mmioread8 bar d 1 + 0 -> x")) == HWB_ARG);
+}
+/* A mismatch must not replace the window or offset used by the next read. */
+static void poll_aliases(void)
+{
+    HWB_TEST("poll-alias"); setup(); f.tick_us = 1;
+    hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+    CHECK(run("device d = bdf 7:13.2\nwindow v = bar d 0\npoll 8 v + 0 255 1 10 1 -> v\niowrite8 port 3 3") == HWB_TIMEOUT);
+    CHECK(count_access(HW_PHYS, HW_READ) > 1 && scalar("v") == 0 && s.writes == 0);
+    setup(); f.tick_us = 1;
+    CHECK(run("let x = 1\npoll 8 port x 255 1 10 1 -> x") == HWB_TIMEOUT);
+    CHECK(count_access(HW_IO, HW_READ) > 1 && scalar("x") == 0);
+    for (u32 n = 0; n < f.event_count; n++) if (f.events[n].kind == HWBF_ACCESS)
+        CHECK(f.events[n].req.addr == 1);
+}
+static u32 record_run(const char *p)
+{
+    u32 result = 0;
+    while (*p && *p != '=') p++;
+    CHECK(*p == '='); p++;
+    while (*p >= '0' && *p <= '9') result = result * 10U + (*p++ - '0');
+    return result;
+}
+static void suspended_records(void)
+{
+    HWB_TEST("suspended-records"); setup();
+    CHECK(load("iowrite8 port 1 1\niowrite8 port 2 x", 0, 0) == HWB_OK);
+    CHECK(hwb_step(&s) == HWB_OK);
+    u32 loaded_run = s.run, pc = s.pc;
+    CHECK(hwb_command(&s, "let x = 7", length("let x = 7")) == HWB_OK);
+    CHECK(s.run == loaded_run && s.seq == 1 && s.lines == 1 && s.writes == 1 && s.pc == pc);
+    u32 interactive_run = record_run(f.lines[2]);
+    CHECK(interactive_run != loaded_run);
+    CHECK(hwb_command(&s, "let x = x + 1", length("let x = x + 1")) == HWB_OK);
+    CHECK(record_run(f.lines[5]) != interactive_run && record_run(f.lines[5]) != loaded_run);
+    CHECK(hwb_continue(&s) == HWB_OK && s.lines == 2 && s.writes == 2 && s.seq == 2);
+    CHECK(*hwbf_byte(&f, HW_IO, 2) == 8);
+    CHECK(record_run(f.lines[8]) == loaded_run && contains(f.lines[8], "seq=2 "));
+    CHECK(record_run(f.lines[10]) == loaded_run && contains(f.lines[10], "op=end rc=OK lines=2 writes=2"));
+    /* Replacing an unfinished load closes its run exactly once. */
+    setup(); CHECK(load("let x = 1\nend", 0, 0) == HWB_OK);
+    CHECK(hwb_step(&s) == HWB_OK); loaded_run = s.run;
+    CHECK(load("end", 0, 0) == HWB_OK);
+    CHECK(record_run(f.lines[2]) == loaded_run && contains(f.lines[2], "op=end rc=ABORT"));
+    CHECK(hwb_continue(&s) == HWB_OK);
+}
+static void begin_records(void)
+{
+    HWB_TEST("begin-before-bar");
+    /* Stop at each config read, and at the resolved MMIO operation. */
+    for (u32 fail = 1; fail <= 3; fail++) {
+        setup(); hwbf_add_pci(&f, TEST_BDF, 0x1111, 0x2222);
+        f.access_fail_at = fail;
+        CHECK(run("device d = bdf 7:13.2\nmmioread8 bar d 0 + 0 -> x\niowrite8 port 3 3") == HWB_IO);
+        u32 begin = U32_MAX;
+        for (u32 n = 0; n < f.event_count; n++) {
+            if (f.events[n].kind == HWBF_LINE && contains(f.lines[f.events[n].a], "op=mmioread8") &&
+                contains(f.lines[f.events[n].a], "phase=begin")) begin = n;
+            if (f.events[n].kind == HWBF_ACCESS) CHECK(begin < n);
+        }
+        CHECK(begin != U32_MAX && f.accesses == fail && s.writes == 0);
+    }
+    HWB_TEST("wait-begin-duration"); setup(); f.clock_fail_at = 1;
+    CHECK(run("wait us 10") == HWB_IO);
+    CHECK(contains(f.lines[0], "phase=begin op=wait requested_us=10"));
 }
 static void ids(void)
 {
@@ -330,6 +396,6 @@ void _start(void)
           contains(f.lines[1], "phase=end") && contains(f.lines[2], "seq=2 ") &&
           contains(f.lines[3], "phase=end"));
     fresh_addresses(); write_only(); widths(); bad_args(); failures(); clocks();
-    deadlines(); aborts(); sessions(); bars(); ids(); trident_modes();
+    deadlines(); aborts(); sessions(); bars(); poll_aliases(); suspended_records(); begin_records(); ids(); trident_modes();
     hwb_test_write("PASS hwb-exec\n"); hwb_test_exit(0);
 }

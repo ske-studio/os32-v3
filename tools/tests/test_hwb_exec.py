@@ -37,6 +37,23 @@ MUTATIONS = [
     ('fac-value', PRODUCT,
      'action == HW_WRITE ? *value : 0, 0};',
      'action == HW_WRITE ? (space == HW_IO && addr == 0xFACU ? (*value ^ 2U) : *value) : 0, 0};', 'trident-fac-order'),
+    ('fac-enable-order', PRODUCT,
+     'if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;',
+     'if (action == HW_WRITE && space == HW_IO && addr == 0xFACU && *value == 2U) return HWB_OK;\n'
+     '    if (action == HW_WRITE && space == HW_IO && addr == 0x68U && *value == 0x0EU) {\n'
+     '        struct hw_req early = {HW_VERSION, HW_WRITE, HW_IO, 1, 0, 0xFACU, 2, 0};\n'
+     '        s->backend->access(s->backend->ctx, &early);\n'
+     '    }\n'
+     '    if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;', 'trident-fac-order'),
+    ('fac-disable-order', PRODUCT,
+     'if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;',
+     'static int pending_fac;\n'
+     '    if (action == HW_WRITE && space == HW_IO && addr == 0xFACU && *value == 0) { pending_fac = 1; return HWB_OK; }\n'
+     '    if (s->backend->access(s->backend->ctx, &req)) return HWB_IO;\n'
+     '    if (pending_fac && action == HW_WRITE) {\n'
+     '        struct hw_req late = {HW_VERSION, HW_WRITE, HW_IO, 1, 0, 0xFACU, 0, 0};\n'
+     '        s->backend->access(s->backend->ctx, &late); pending_fac = 0;\n'
+     '    }', 'trident-fac-order'),
     ('poll-read-point', PRODUCT,
      'rc = he_point(s, 0); if (rc) return rc;\n            rc = he_address',
      'rc = HWB_OK; if (rc) return rc;\n            rc = he_address', 'instruction-point'),

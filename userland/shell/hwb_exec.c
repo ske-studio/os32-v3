@@ -6,6 +6,10 @@
 #define HE_BAR0 0x10U
 #define HE_BAR_COUNT 6U
 #define HE_BRIDGE_BARS 2U
+#define HE_CARDBUS_BARS 1U
+
+/* Process-wide IDs keep interactive records separate from a suspended run. */
+static u32 he_run_serial;
 #define HE_HEADER_MASK 0x7FU
 #define HE_IO_BIT 1U
 #define HE_MEMORY_TYPE 6U
@@ -74,7 +78,8 @@ static enum hwb_rc he_bar(struct hwb_state *s, u32 slot, u32 number,
     enum hwb_rc rc = he_access(s, HW_READ, HW_PCI, 1, bdf, HE_HEADER, &header);
     if (rc) return rc;
     header &= HE_HEADER_MASK;
-    u32 count = header == 0 ? HE_BAR_COUNT : header == 1 ? HE_BRIDGE_BARS : 0;
+    u32 count = header == 0 ? HE_BAR_COUNT : header == 1 ? HE_BRIDGE_BARS :
+                header == 2 ? HE_CARDBUS_BARS : 0;
     if (number >= count) return HWB_ARG;
     for (u32 n = 0; n <= number; n++) {
         u32 low = 0;
@@ -103,7 +108,7 @@ static enum hwb_rc he_bar(struct hwb_state *s, u32 slot, u32 number,
     return HWB_ARG;
 }
 static enum hwb_rc he_address(struct hwb_state *s, const struct hwb_instruction *i,
-                               struct hwb_log_record *r)
+                               struct hwb_log_record *r, int resolve)
 {
     const struct hwb_address *a = &i->address;
     u32 offset, base = 0;
@@ -121,6 +126,8 @@ static enum hwb_rc he_address(struct hwb_state *s, const struct hwb_instruction 
                 if (s->vars[slot].kind != HWB_WINDOW_REF) return HWB_ARG;
                 bar = s->vars[slot].bar; slot = (int)s->vars[slot].device_slot;
             } else { rc = hwb_eval(s, a->bar, &bar); if (rc) return rc; }
+            /* Before resolution, begin records the logical target and offset. */
+            if (!resolve) { r->addr = offset; return HWB_OK; }
             rc = he_bar(s, (u32)slot, bar, i->space, &base);
             if (rc) return rc;
         }
@@ -151,11 +158,8 @@ static enum hwb_rc he_wait_poll(struct hwb_state *s, const struct hwb_instructio
                                  struct hwb_log_record *r, struct hwb_poll_result *p)
 {
     int poll = i->op == HWB_POLL;
-    u32 duration, interval = 0, mask = 0, wanted = 0;
-    enum hwb_rc rc = hwb_eval(s, poll ? i->timeout : i->value, &duration);
-    if (rc) return rc;
-    if (duration < HWB_US_MIN || duration > HWB_US_MAX) return HWB_ARG;
-    r->requested_us = duration;
+    u32 duration = r->requested_us, interval = 0, mask = 0, wanted = 0;
+    enum hwb_rc rc;
     if (poll) {
         if (hwb_eval(s, i->interval, &interval) || hwb_eval(s, i->mask, &mask) ||
             hwb_eval(s, i->value, &wanted)) return HWB_ARG;
@@ -176,11 +180,10 @@ static enum hwb_rc he_wait_poll(struct hwb_state *s, const struct hwb_instructio
         if (poll && p->reads && elapsed_us >= duration) return HWB_TIMEOUT;
         if (poll && (!p->reads || now - last >= interval)) {
             rc = he_point(s, 0); if (rc) return rc;
-            rc = he_address(s, i, r); if (rc) return rc;
+            rc = he_address(s, i, r, 1); if (rc) return rc;
             rc = he_access(s, HW_READ, i->space, i->width, r->bdf, r->addr, &p->value);
             if (rc) return rc;
             p->reads++; r->value = p->value; last = now;
-            rc = he_assign(s, i->name, HWB_SCALAR, p->value, 0, 0); if (rc) return rc;
             if ((p->value & mask) == wanted) return HWB_OK;
         }
         s->backend->yield(s->backend->ctx);
@@ -244,7 +247,7 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
         return he_assign(s, i->name, HWB_WINDOW_REF, 0, (u32)slot, a);
     }
     case HWB_READ: case HWB_WRITE:
-        /* Address and write value are prepared before begin, operation follows it. */
+        /* Address resolution and the operation both follow begin. */
         a = r->value;
         rc = he_access(s, i->op == HWB_READ ? HW_READ : HW_WRITE,
                        i->space, i->width, r->bdf, r->addr, &a);
@@ -322,7 +325,8 @@ enum hwb_rc hwb_load(struct hwb_state *s, struct hwb_program *g, char *source,
         if (he_put(&fresh, name, HWB_SCALAR, initial[n].value, 0, 0)) return HWB_ARG;
     }
     enum hwb_rc rc = he_point(&fresh, 1); if (rc) return rc;
-    fresh.program = g; fresh.pc = he_first(g); fresh.run = s->run + 1U; fresh.stopped = 0;
+    if (!s->stopped) he_stop(s, HWB_ABORT);
+    fresh.program = g; fresh.pc = he_first(g); fresh.run = ++he_run_serial; fresh.stopped = 0;
     *s = fresh; return HWB_OK;
 }
 enum hwb_rc hwb_run(struct hwb_state *s, struct hwb_program *g, char *source,
@@ -348,17 +352,26 @@ enum hwb_rc hwb_step(struct hwb_state *s)
     if (i.address.device.end > i.address.device.begin) {
         he_name(s, i.address.device, target); r.target = target;
     }
-    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_POLL) rc = he_address(s, &i, &r);
+    if (i.op == HWB_READ || i.op == HWB_WRITE || i.op == HWB_POLL) rc = he_address(s, &i, &r, 0);
     if (!rc && i.op == HWB_WRITE) {
         rc = hwb_eval(s, i.value, &r.value);
         if (!rc && !he_fits(r.value, i.width)) rc = HWB_ARG;
     }
+    if (!rc && (i.op == HWB_WAIT || i.op == HWB_POLL)) {
+        rc = hwb_eval(s, i.op == HWB_POLL ? i.timeout : i.value, &r.requested_us);
+        if (!rc && (r.requested_us < HWB_US_MIN || r.requested_us > HWB_US_MAX)) rc = HWB_ARG;
+    }
     hwb_log_begin(s->backend, &r);
+    if (!rc && (i.op == HWB_READ || i.op == HWB_WRITE)) rc = he_address(s, &i, &r, 1);
     u32 next = i.next_pc;
     struct hwb_poll_result poll = {0};
     if (!rc) {
         if (i.op == HWB_WAIT || i.op == HWB_POLL) rc = he_wait_poll(s, &i, &r, &poll);
         else rc = he_execute(s, &i, &r, &next);
+    }
+    if (i.op == HWB_POLL && poll.reads) {
+        enum hwb_rc assigned = he_assign(s, i.name, HWB_SCALAR, poll.value, 0, 0);
+        if (!rc) rc = assigned;
     }
     r.rc = rc;
     if (i.op == HWB_POLL) hwb_log_poll(s->backend, &r, &poll);
@@ -386,15 +399,11 @@ enum hwb_rc hwb_command(struct hwb_state *s, const char *source, u32 bytes)
     struct hwb_state work = *s;
     enum hwb_rc rc = he_point(&work, 1); if (rc) return rc;
     work.program = &command; work.pc = he_first(&command); work.call_depth = 0;
-    work.run++; work.seq = work.lines = work.writes = 0; work.stopped = 0;
+    work.run = ++he_run_serial; work.seq = work.lines = work.writes = 0; work.stopped = 0;
     rc = hwb_step(&work);
     if (!work.stopped) he_stop(&work, rc);
-    /* Interactive variables and run identity persist; loaded execution stays borrowed. */
+    /* Only variables cross back; the loaded run retains its records and PC. */
     for (u32 n = 0; n < HWB_VARIABLES; n++) s->vars[n] = work.vars[n];
-    s->var_count = work.var_count; s->run = work.run; s->seq = work.seq;
-    if (!s->stopped) {
-        /* The interactive run is closed. Resume the retained PC in a fresh run. */
-        s->run++; s->seq = s->lines = s->writes = 0;
-    }
+    s->var_count = work.var_count;
     return rc;
 }
