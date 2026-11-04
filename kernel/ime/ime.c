@@ -44,6 +44,11 @@ extern void ring3_abort_check(void);
 /* ======================================================================== */
 
 static IME_State g_ime;
+
+const IME_Dict *ime_current_dict(void)
+{
+    return &g_ime.dict;
+}
 static int g_ime_reader_owner;
 static int g_ime_cui_redraw;
 static void ime_cancel_input(void);

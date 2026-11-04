@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """T5a-1 B2 production facade/dictionary, ordinary failures and lifetime mutants."""
 CHECK = dict(name='fep-boundary-host', tier=1,
-    covers=['tools/tests/fep_boundary_host.c', 'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/fep_budget_linux.c', 'tools/tests/test_vfs_fd_path.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'lib/kstring.h', 'include/redir_access.h', 'include/io.h', 'fs/vfs_fd.c', 'fs/vfs.h', 'lib/sqlite3/**', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'build/core.yaml', 'drivers/block/fdc_track.c', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'lib/kutf16.c', 'platform/pc98/boot_names.c', 'sdk/allocator/nano_adapter.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/mutpar.py', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'userland/deploy.yaml', 'userland/lib/rt/ls.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c'],
+    covers=['tools/tests/fep_boundary_host.c', 'tools/tests/fep_boundary_runtime.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c', 'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/test_vfs_fd_path.py', 'tools/tests/host32.py', 'tools/tests/host_arch/**', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_dict_info.c', 'tools/tests/ime_dict_info_host.inc', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/fep_module.c', 'lib/kstring.h', 'include/redir_access.h', 'include/io.h', 'fs/vfs_fd.c', 'fs/vfs.h', 'lib/sqlite3/**', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'build/core.yaml', 'drivers/block/fdc_track.c', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'lib/kutf16.c', 'platform/pc98/boot_names.c', 'sdk/allocator/nano_adapter.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/mutpar.py', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'userland/deploy.yaml', 'userland/lib/rt/ls.c', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c'],
     needs=['make:all'], budget=4.429502)
 
 from kernel_includes import include_flags
 import argparse
 import os
+import re
 from pathlib import Path
 import tempfile
 
@@ -40,6 +41,41 @@ MUTANTS = [
     ('learn-borrow-leak', 'kernel/ime/ime_dict.c',
      'int k_rc = sqlite3_bind_null(stmt, 2);', 'int k_rc = SQLITE_OK;',
      'binding lifetime ended'),
+    ('info-capacity-overrun', 'kernel/ime/ime_dict_info.c',
+     'if (n > capacity - 1) n = capacity - 1;',
+     'if (n > capacity - 1) n = capacity;', 'metadata chunk cap'),
+    ('info-character-slice', 'kernel/ime/ime_dict_info.c',
+     'kmemcpy(out, (const char *)value + offset, (u32)n);',
+     'if (n > 0 && (((const unsigned char *)value)[offset + n - 1] & 0x80)) n = 0;\n        kmemcpy(out, (const char *)value + offset, (u32)n);',
+     'metadata full byte reassembly'),
+    ('info-notfound-eof', 'kernel/ime/ime_dict_info.c',
+     'if (rc == SQLITE_DONE) result = OS32_ERR_NOTFOUND;',
+     'if (rc == SQLITE_DONE) result = 0;', 'metadata error code'),
+    ('info-io-eof', 'kernel/ime/ime_dict_info.c',
+     'if (present < 0) return present;', 'if (present < 0) return 0;',
+     'metadata one copy on success'),
+    ('info-no-stale-check', 'kernel/ime/ime_dict_info.c',
+     'if (fd >= 0 && vfs_fd_is_stale(fd)) return OS32_ERR_STALE;',
+     '(void)fd;', 'metadata error code'),
+    ('info-old-variant', 'kernel/ime/ime_dict_info.c',
+     'if (!kstrcmp(dict->path, IME_INFO_SMALL_PATH)) value = "S";',
+     'if (!kstrcmp(dict->path, IME_INFO_SMALL_PATH)) value = "M";',
+     'metadata exact bytes'),
+    ('info-stub-success', 'kernel/ime/fep_module.c',
+     '{ (void)key; (void)offset; (void)out; (void)capacity; return OS32_ERR_NOSYS; }',
+     '{ (void)key; (void)offset; (void)out; (void)capacity; return 0; }',
+     'metadata absent module stub'),
+    ('info-no-offset-bound', 'kernel/ime/ime_dict_info.c',
+     'if (offset < len) {', 'if (1) {', 'metadata copy bound'),
+    ('info-no-public-check', 'kernel/ime/ime_dict_info.c',
+     'if (!services_public) return OS32_ERR_NOSYS;', '(void)services_public;',
+     'metadata error code'),
+    ('info-no-output-kill', 'kernel/ime/ime_dict_info.c',
+     '        ring3_fault_kill();', '', 'metadata invalid output must kill'),
+    ('info-ignore-finalize', 'kernel/ime/ime_dict_info.c',
+     'if (sqlite3_finalize(stmt) != SQLITE_OK) result = OS32_ERR_IO;\n    return result;\n}\n\nint ime_dict_info_facade',
+     '(void)sqlite3_finalize(stmt);\n    return result;\n}\n\nint ime_dict_info_facade',
+     'metadata error code'),
 ]
 
 
@@ -60,13 +96,12 @@ def main():
         shim.mkdir()
         (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'include/memmap.h') + '"\n'
             'extern unsigned char test_shm[];\n#undef MEM_SHM_BASE\n#define MEM_SHM_BASE test_shm\n')
-        # ime_dict_host suppresses kstring.h's libc declarations. Keep its
-        # ASCII constants from the real header without duplicating their values.
-        ascii_constants = '\n'.join(line for line in (ROOT / 'lib/kstring.h').read_text().splitlines()
-                                    if line.startswith('#define ASCII_'))
-        (work / 'fep_boundary_host.c').write_text(ascii_constants + '\n' +
+        for header in ('stdio.h', 'stdlib.h', 'string.h'):
+            (work / header).write_text('#include \"fep_boundary_runtime.h\"\n')
+        (work / 'fep_boundary_host.c').write_text(
             (ROOT / 'tools/tests/fep_boundary_host.c').read_text())
-        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/ime_dict.c')}
+        (work / 'ime_dict_info_host.inc').write_text((ROOT / 'tools/tests/ime_dict_info_host.inc').read_text())
+        sources = {p: (ROOT / p).read_text() for p in ('kernel/ime/ime.c', 'kernel/ime/ime_dict_api.inc', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/fep_module.c')}
         cases = [('normal', None)]
         if args.mutate:
             cases += [(m[0], m) for m in MUTANTS]
@@ -79,14 +114,20 @@ def main():
             (work / 'ime_source.inc').write_text(current['kernel/ime/ime.c'])
             (work / 'ime_dict_api.inc').write_text(current['kernel/ime/ime_dict_api.inc'])
             (work / 'ime_dict.inc').write_text(current['kernel/ime/ime_dict.c'])
+            (work / 'ime_dict_info.inc').write_text(current['kernel/ime/ime_dict_info.c'].replace('../../lib/', str(ROOT / 'lib') + '/'))
+            stub = re.search(r'static int stub_dict_info\([^}]+\}', current['kernel/ime/fep_module.c']).group(0)
+            (work / 'ime_info_stub.inc').write_text(stub + '\n')
             harness = (ROOT / 'tools/tests/ime_dict_host.c').read_text().replace(
                 '#include "../../kernel/ime/ime_dict.c"', '#include "ime_dict.inc"')
             # Keep other real source includes anchored at the repository.
             harness = harness.replace('#include "../../lib/', '#include "' + str(ROOT / 'lib') + '/')
+            start = harness.index('#define __KSTRING_H')
+            end = harness.index('#include \"' + str(ROOT / 'lib'), start)
+            harness = harness[:start] + 'void *kzalloc(u32 n) { return calloc(1, n); }\nvoid kfree(void *p) { free(p); }\n' + harness[end:]
             (work / 'ime_dict_host.c').write_text(harness)
             exe = work / name
             cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
-            host32.build([cc, '-m32', '-march=i386', '-std=gnu11', '-Os', '-nostartfiles',
+            host32.build([cc, '-m32', '-march=i386', '-std=gnu11', '-Os', '-nostdlib', '-fno-builtin',
                           '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                           '-Wall', '-Wextra', '-Werror', '-Werror=vla', '-D__cdecl=',
                           '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
@@ -94,8 +135,7 @@ def main():
                           '-I' + str(work), '-I' + str(work / 'ime_shim'),
                           *(['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT)),
                           str(work / 'fep_boundary_host.c'),
-                          str(ROOT / 'tools/tests/fep_budget_linux.c'), str(work / 'sqlite.o'),
-                          '-lm', '-o', str(exe)], check=True)
+                          *[str(ROOT / p) for p in ('lib/kstring_c.c', 'lib/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')], str(work / 'sqlite.o'), '-o', str(exe)], check=True)
             result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=120)
             print(result.stdout + result.stderr, end='', flush=True)
             if mutation:
