@@ -232,7 +232,8 @@ static i32 save_cursor(struct gf4_ctx *c,u8 h,const struct gf4_head_image *v)
     if (x<SAVE_CURSOR_MIN || x>SAVE_CURSOR_MAX ||
         y<SAVE_CURSOR_MIN || y>SAVE_CURSOR_MAX) return GF4_ERANGE;
     u32 off=v->cursor.off,pos;
-    i32 rc=save_write(c,h,SAVE_CURSOR_CFG,4,GF_MODE_CURSOR_CONFIG);
+    /* crtc.c:510-516: retain the timing-derived DBLSCAN configuration. */
+    i32 rc=save_write(c,h,SAVE_CURSOR_CFG,4,c->state->work[h].cursor_cfg);
     if (!rc) rc=save_index(c,h,SAVE_CR,SAVE_CURSOR_HI,SAVE_CURSOR_ADDRESS|((off>>17)&0x7fU));
     if (!rc) rc=save_index(c,h,SAVE_CR,SAVE_CURSOR_LO,((off>>11)&0x3fU)<<2 |
                           ((v->mode.t.flags&GF4_DBLSCAN) ? SAVE_CURSOR_DOUBLE : 0));
