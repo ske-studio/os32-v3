@@ -502,10 +502,11 @@ static void check_cvt_inputs(void)
     static const struct gf4_timing vga={23750,640,664,720,800,480,483,487,500,GF4_NEG_H};
     /* 720x576 at 60Hz, xf86cvt.c:155-209,249-251: period=27.835us,
      * HBlank=192, VSyncAndBackPorch=20; 5:4 VSync=7 (:137-138).
+     * Clock=floor((912*1000/27.835348)/250)*250=32750 kHz.
      * At :202-205 integer sync width
      * is floor(912*8/100)=72; start=816-72=744, then next cell=752.
      * This distinguishes division before subtraction from after it. */
-    static const struct gf4_timing pal_cvt_60hz={32500,720,752,816,912,
+    static const struct gf4_timing pal_cvt_60hz={32750,720,752,816,912,
         576,579,586,599,GF4_NEG_H};
     static const struct gf4_timing xga_i={66750,1024,2080,2088,2200,384,542,544,562,
         GF4_NEG_H|GF4_INTERLACE};
