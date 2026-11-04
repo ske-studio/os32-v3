@@ -15,6 +15,7 @@ static int engine, entries, live, finals, columns, writes, copies;
 static int fail_prepare, fail_bind, fail_int, fail_step, fail_final, late, reenter;
 static int fail_after, steps;
 static int origin, identity = 1;
+static int info_test;
 static const char *bad_byte, *caller_y, *caller_k;
 static IME_UserEntry *watched;
 static void *kill_escape[5];
@@ -83,7 +84,7 @@ static int finalize(sqlite3_stmt *s)
     int rc = sqlite3_finalize(s);
     if (s) { live--; memset(&bindings[binding_slot(s)], 0, sizeof(bindings[0])); }
     finals++;
-    engine = 0; return fail_final ? SQLITE_ERROR : rc;
+    engine = 0; return fail_final && (!info_test || finals >= fail_final) ? SQLITE_ERROR : rc;
 }
 static const unsigned char *column_text(sqlite3_stmt *s, int i)
 {
@@ -127,7 +128,7 @@ int check_caller_write_range(const struct caller_access *c, void *p, u32 n)
 { (void)c; return p && !(bad_byte && (uptr)bad_byte >= (uptr)p && (uptr)bad_byte - (uptr)p < n); }
 int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
 {
-    require(!engine && live == 3 && finals > 0, "finalize then leave then copyout");
+    require(!engine && (info_test ? live == 0 || live == 3 : live == 3 && finals > 0), "finalize then leave then copyout");
     copies++;
     if (reenter) {
         reenter = 0;
@@ -307,6 +308,8 @@ static void exports(void)
     require(ime_user_export_facade(path) == -2 && live == 3 && generic_fds() == baseline + n, "export open failure cleanup");
     while (n) vfs_close(held[--n]);
 }
+#include "ime_dict_info_host.inc"
+
 int main(void)
 {
     CHECK(os32_sqlite_init() == SQLITE_OK); fixture_init(); make_dict("/db/fep.db", "蚊");
@@ -315,6 +318,7 @@ int main(void)
         require(ime_user_clear_facade() == 0, "clear fixture");
         inputs(); deletes(); listing(); exports();
     }
+    metadata();
     require(ime_dict_close(&g_ime.dict) == 0 && live == 0, "all statements finalized");
     puts("PASS B2 bounds NULL staged output lifetime SQL errors busy export"); return 0;
 }

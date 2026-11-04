@@ -181,6 +181,18 @@
       "source": "lib/sqlite3/os32_sqlite_outer.h"
     },
     {
+      "symbol": "os32_sqlite_column_blob",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_column_bytes",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
       "symbol": "os32_sqlite_column_int",
       "context": "normal",
       "irq": false,
@@ -188,6 +200,12 @@
     },
     {
       "symbol": "os32_sqlite_column_text",
+      "context": "normal",
+      "irq": false,
+      "source": "lib/sqlite3/os32_sqlite_outer.h"
+    },
+    {
+      "symbol": "os32_sqlite_column_type",
       "context": "normal",
       "irq": false,
       "source": "lib/sqlite3/os32_sqlite_outer.h"
