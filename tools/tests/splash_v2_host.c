@@ -110,21 +110,28 @@ void _start(void)
     for (int mode=0; mode<2; mode++) for (int wrap=0; wrap<2; wrap++) {
         setup(mode); tick_count=wrap ? 0xfffffff0u : 0;
         u32 initial=tick_count, end=initial+PLATFORM_SPLASH_TICKS;
+        u32 prefix=load_ticks+transfer_ticks+preview_ticks;
+        u32 remaining=PLATFORM_SPLASH_TICKS-prefix;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE);
         unsigned long long p=(unsigned long long)state.total_lines * 100000;
-        u32 expected=(192ull * 10000 * state.line_den) / p;
+        u32 expected=((unsigned long long)remaining * 10000 * state.line_den) / p;
         REQUIRE(frames == expected && previews == 1 && commits == 1 && allocs == 2);
-        REQUIRE(tick_count == initial+108); /* No compensation of global PIT. */
-        REQUIRE(end-tick_count < 2 && end-tick_count <= PLATFORM_SPLASH_TICKS-108);
+        REQUIRE(tick_count == initial+prefix); /* No compensation of global PIT. */
+        REQUIRE(end-tick_count < 2 && end-tick_count <= remaining);
 
         setup(mode); frame_result=PL_FRAME_DROP; end=300;
         REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == expected && previews == 1);
         REQUIRE(end-tick_count < 2);
         setup(mode); frame_ticks=3; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && frames == 64);
+        prefix=load_ticks+transfer_ticks+preview_ticks;
+        remaining=end-prefix;
+        u32 tick_limited=(remaining+frame_ticks-1)/frame_ticks;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && frames == tick_limited);
         REQUIRE(end-tick_count <= 1);
         setup(mode); stop_frame=3; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == 3 && end-tick_count == (192ull * 10000 * state.line_den - 2*p) / (10000ull * state.line_den));
+        prefix=load_ticks+transfer_ticks+preview_ticks;
+        remaining=end-prefix;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == (u32)stop_frame && end-tick_count == ((unsigned long long)remaining * 10000 * state.line_den - (stop_frame-1)*p) / (10000ull * state.line_den));
         /* A single successful frame before NO_SYNC is still a failure. */
         setup(mode); preview_fail=1; end=300;
         REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && previews == 1 && !frames && end == 300);
