@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **実装中 (2026-11-04)** — 計測 (M1) は止め、観測の像に切り替えた (ユーザー決定 11-04)。観測の 2 回目 (S4、可変 OUT の 8 枚、1 行の OUT 最大 28 本) は実機 Ra266 31k で 8 枚とも崩れなし・SPLO 全部 ok (記録 ~/os32-tmp/run/obs-s4/RESULT.md)。**ユーザーが方式を採用 (11-04、§0)、凍結しない** — 次は常用の経路への組み込みと、ユーザーが渡す差し替えの画像。現行の画像形式・再生・受入は [RASTER_SPLASH_PL_DESIGN](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) と [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md) が正典。常用への組み込み (S5、enc2・B31、ユーザー決定 11-04「N7でマルチスレッド化してください」「ブートスプラッシュ側もN7で最適化してください。」・tick の遅れは補正しない) の確定設計は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)。
+> 状態: **受入完了 (2026-11-04、ユーザー「ラスタの件はこれで締めてください」)** — 常用の可変 OUT (enc2・B31) と配布の画像の経路が main (S5a〜S5d、385a4589)。実機 Ra266 31k で `/boot/user.osri` (ネオン街、画面全体で 518 色) がカメラに映り、最初の約 1 秒のデフォルトパレットは演出 (ユーザー指定)。現行の正典は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)、画像形式は [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md)。.osri のビューアー (ユーザーアプリ) は別の票 TASK_OSRI_VIEWER で GeForce の後。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
@@ -22,5 +22,4 @@
 |---|---|---|
 | 0 | 測定 + 既存のロゴのラスタを周期の定数と位置の待ちに (120µs を消す) | 実装中 — 形式と変換 (8a1eceed)・再生の核 (2d78b816)・L0 (87e9074f) は main。NP21/W: guest_tests 21/21、スプラッシュの commits 171 → 167 (−2.3%、±10% 内)。**起動のスプラッシュの見た目 (帯の位置・ロゴが下端まで) はユーザーがエミュレータで確かめる** (ユーザー 2026-11-01「エミュレータの起動は別でユーザーが確認します」)。後続の結線は段 1 を参照 |
 | 1 | 固定 16 色の画像の読み込み | 実装済み (main a107b52b、結線 C1・P0・P2・P1・B1・B2、Opus 取り込み可)。NP21/W: 画像なしで `[splash] missing: builtin logo`、`/boot/splash.osri` (試しの固定 16 色) を置くと戻る理由の行が出ず画像の経路、guest_tests 21/21・GUI 起動。**見た目はユーザーがエミュレータで確かめる** (NP21/W の本 NHD に試しの画像を置いたまま)。残り: 画像の配布 (D1・D2)、Ra266 の 31kHz |
-| 計測整理 | 案 1 の計測を整理する | 次の作業。完了・実機合格とは数えない |
-| PL の後続 | 現行設計の段と受入 | [RASTER_SPLASH_PL_DESIGN §6・§7](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) を参照。実機計測を継続する |
+| S5 | 常用の可変 OUT・enc2/B31 の既定化・配布の画像 (S5a〜S5d) | 完了 — main 385a4589。実機 Ra266 31k で user.osri の表示をカメラで確認 (2026-11-04、証拠はノートの ~/os32-tmp/evidence/2026-11-04/neon-385a4589/) |
