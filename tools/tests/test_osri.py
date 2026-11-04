@@ -1,6 +1,6 @@
 """OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
-             covers=['gfx/osri_profile.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
+             covers=['tools/osri_profile.py', 'gfx/osri_profile.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
                      'tools/osri_enc2_*.py',
                      'tools/raster_obs_assets.py', 'lib/le_internal.h',
                      'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=60)
@@ -22,6 +22,7 @@ from PIL import Image
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'tools'))
 WRAPPER = r'''
 #include "gfx_osri.h"
 #include "gfx_hal.h"

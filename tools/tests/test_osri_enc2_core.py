@@ -1,6 +1,6 @@
 """C/Python bit agreement for both-sided planning, timing and signed FS."""
 CHECK = dict(name='osri-enc2-core', tier=1, needs=['make:osri-enc2-core'], budget=180,
-             covers=['tools/osri_enc2_core.c', 'tools/osri_enc2_native.py',
+             covers=['gfx/osri_profile.h', 'tools/osri_profile.py', 'tools/osri_enc2_core.c', 'tools/osri_enc2_native.py',
                      'build/assets.mk', 'tools/osri_enc2_spec.py',
                      'tools/osri_enc2_plan.py', 'tools/osri_enc2_master.py',
                      'tools/osri_enc2_tree.py', 'tools/osri_enc2_row.py',
