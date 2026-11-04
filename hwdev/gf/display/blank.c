@@ -17,6 +17,7 @@ int gf_display_blank(struct gf_display_context *ctx, int blank)
     u32 seq;
 
     if (!ctx || (blank != 0 && blank != 1)) return OS32_ERR_INVAL;
+    #ifdef GF_PRODUCTION_MODULE
     if (ctx->display4) {
         u32 now;
         if (!ctx->io.timing.clock_us || ctx->io.timing.clock_us(ctx->io.opaque, &now))
@@ -25,6 +26,7 @@ int gf_display_blank(struct gf_display_context *ctx, int blank)
         if (!rc) ctx->blank = (bool)blank;
         return rc;
     }
+    #endif
     if (ctx->blank == (bool)blank) return 0;
     /* Shared access record keeps the failing target and bus rc. */
     if (gf_display_write(ctx, GF_SEQ_INDEX_PORT, GF_SEQ_WIDTH, GF_SEQ_CLOCK_INDEX) ||
