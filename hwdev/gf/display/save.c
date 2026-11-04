@@ -244,15 +244,22 @@ static i32 save_cursor(struct gf4_ctx *c,u8 h,const struct gf4_head_image *v)
     if (!rc) rc=gf4_cursor_apply(c,h,v->cursor_visible && v->dpms==GF4_ON && !v->blank);
     return rc;
 }
-i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
+/* Only initial video start supplies a stage sink. Ordinary restores keep
+ * their existing diagnostics and never emit a start-failure message. */
+i32 gf4_display_restore_stage(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl,
+                              const char **stage)
 {
+    const char *ignored;
+    if (!stage) stage=&ignored;
+    *stage="restore_check";
     i32 rc=save_check(c);
     if (!rc && !s) rc=GF4_EINVAL;
     if (rc) return save_result(c,rc);
+    *stage="restore_drain";
     rc=save_close(c,dl);
-    if (!rc) rc=save_matches(c,s);
+    if (!rc) { *stage="restore_matches"; rc=save_matches(c,s); }
     if (rc) return save_result(c,rc);
-    if (!c->legacy) return save_result(c,GF4_ESTATE);
+    if (!c->legacy) { *stage="restore_legacy"; return save_result(c,GF4_ESTATE); }
     /* Before any HW restore, prevent all nested operations from publishing. */
     c->saved_closed=true;
     c->changing=true;
@@ -265,6 +272,7 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
         /* G3: restore the old front, never replay an unfinished flip. */
         if (s->hold[h].pending) c->state->next[h].front=s->hold[h].old_front;
         if (!s->head[h].enabled) continue;
+        *stage="mode_calc";
         if (!c->limits_valid[h]) { rc=GF4_EPLL; break; }
         rc=gf4_route_check(c,&c->state->next[h].route);
         if (!rc) rc=gf4_surface_check(c,&c->state->next[h].front,&s->head[h].mode);
@@ -273,7 +281,7 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
         if (rc) break;
     }
     u32 pllsel;
-    if (!rc) rc=gf4_pllsel_calc(c->state->next,&pllsel);
+    if (!rc) { *stage="pllsel_calc"; rc=gf4_pllsel_calc(c->state->next,&pllsel); }
     /* dfp.c:204-244: rebuild both digital bindings before either head
      * loads the shared SEL_CLK; preserve unrelated baseline clock bits. */
     u32 sel_clk=c->legacy->baseline.sel_clk&~GF_MODE_SEL_CLK_CLEAR;
@@ -295,6 +303,7 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
     }
     /* Shut down old outputs before switching shared clocks/routes. */
     for (u8 h=0;!rc && h<GF4_HEADS;++h) if (c->state->head[h].enabled) {
+        *stage="output_disable";
         rc=gf4_cursor_apply(c,h,false);
         if (!rc) rc=save_screen(c,h,true);
         if (!rc) rc=save_encoder(c,&c->state->head[h],GF4_OFF,dl);
@@ -302,23 +311,30 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
     for (u8 h=0;!rc && h<GF4_HEADS;++h) {
         struct gf4_head_image *v=&c->state->next[h];
         if (!v->enabled) continue;
+        *stage="mode_deadline";
         rc=save_time(c,dl);
         /* The saved route can differ from the currently selected route.
          * crtc.c:710-733 / dfp.c:245-278: prepare the target encoder too;
          * on retry it may already be on after a partial earlier restore. */
-        if (!rc) rc=save_encoder(c,v,GF4_OFF,dl);
-        if (!rc) rc=gf4_mode_load(c,h,&c->state->work[h],dl);
-        if (!rc) switch (v->route.type) {
-        case GF4_ANALOG: rc=gf4_analog_load(c,&v->route,&c->state->work[h],dl); break;
-        case GF4_TMDS: case GF4_LVDS: rc=gf4_tmds_load(c,&v->route,&c->state->work[h],dl); break;
-        case GF4_TV: rc=gf4_tv_load(c,&v->route,&c->state->work[h],dl); break;
-        default: rc=GF4_EUNSUPPORTED; break;
+        if (!rc) { *stage="encoder_off"; rc=save_encoder(c,v,GF4_OFF,dl); }
+        if (!rc) { *stage="mode_load"; rc=gf4_mode_load(c,h,&c->state->work[h],dl); }
+        if (!rc) {
+            *stage="encoder_load";
+            switch (v->route.type) {
+            case GF4_ANALOG: *stage="analog_load"; rc=gf4_analog_load(c,&v->route,&c->state->work[h],dl); break;
+            case GF4_TMDS: case GF4_LVDS: *stage="tmds_load"; rc=gf4_tmds_load(c,&v->route,&c->state->work[h],dl); break;
+            case GF4_TV: *stage="tv_load"; rc=gf4_tv_load(c,&v->route,&c->state->work[h],dl); break;
+            default: rc=GF4_EUNSUPPORTED; break;
+            }
         }
-        if (!rc) rc=gf4_lut_load(c,h);
-        if (!rc) rc=save_dpms(c,h,v,dl);
-        if (!rc) rc=save_cursor(c,h,v);
+        if (!rc) { *stage="lut_load"; rc=gf4_lut_load(c,h); }
+        if (!rc) { *stage="dpms"; rc=save_dpms(c,h,v,dl); }
+        if (!rc) { *stage="cursor"; rc=save_cursor(c,h,v); }
     }
-    if (!rc) rc=gf_irq_enable(c->ch->f,s->wanted_fifo!=0,s->wanted_graph!=0,s->wanted_heads);
+    if (!rc) {
+        *stage="heads_irq";
+        rc=gf_irq_enable(c->ch->f,s->wanted_fifo!=0,s->wanted_graph!=0,s->wanted_heads);
+    }
     if (!rc) {
         c->ch->heads=s->wanted_heads;
         for (u8 h=0;h<GF4_HEADS;++h) {
@@ -335,6 +351,11 @@ i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
     c->changing=false;
     return save_result(c,rc);
 }
+i32 gf4_display_restore(struct gf4_ctx *c,const struct gf4_saved *s,u32 dl)
+{
+    return gf4_display_restore_stage(c,s,dl,NULL);
+}
+
 i32 gf4_diagnostic_save(struct gf4_ctx *c,struct gf4_saved *out,u32 dl)
 {
     i32 rc=save_check(c);

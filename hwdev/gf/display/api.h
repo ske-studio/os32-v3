@@ -93,6 +93,8 @@ int gf4_mode_load(struct gf4_ctx *,u8,const struct gfinit_mode *,u32);
 struct gf5_test_ops;
 i32 gf4_display_save(struct gf4_ctx *,struct gf4_saved *,u32);
 i32 gf4_display_restore(struct gf4_ctx *,const struct gf4_saved *,u32);
+/* Initial-start diagnostics; stage is borrowed only for this call. */
+i32 gf4_display_restore_stage(struct gf4_ctx *,const struct gf4_saved *,u32,const char **);
 i32 gf4_surface_check(struct gf4_ctx *,const struct gf3_surface *,const struct gf4_mode *);
 i32 gf4_route_check(struct gf4_ctx *,const struct gf4_route *);
 i32 gf4_lut_load(struct gf4_ctx *,u8);
