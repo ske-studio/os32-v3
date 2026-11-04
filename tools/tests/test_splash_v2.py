@@ -78,7 +78,7 @@ def no_division():
         link_source=link_source.replace('void _start(void)', 'void unused_vectors(void)')
         link_source=re.sub(r'#include "../../([^"\n]+)"',
                            lambda m: '#include "'+str(ROOT/m[1])+'"', link_source)
-        link_source += '\nvoid _start(void) { setup(1); u32 end=300; finish(run(&end)); }\n'
+        link_source += '\nvoid _start(void) { setup(1); u32 end=PLATFORM_SPLASH_IMAGE_TICKS; finish(run(&end)); }\n'
         source=work/'link.c'; source.write_text(link_source)
         exe=work/'owner-linked'
         subprocess.run([compiler(), *flags(work), '-ffunction-sections', '-fdata-sections',

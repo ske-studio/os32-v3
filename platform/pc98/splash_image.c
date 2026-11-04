@@ -21,7 +21,7 @@ static void image_black(void)
 }
 
 /* Only the two existing 400-line profiles enter the rational deadline math.
- * With <=3s, <=300 frames and these profiles, every product fits in u64. */
+ * With <=8s, <=800 frames and these profiles, every product fits in u64. */
 static int image_timing(const struct SplashRaster *s)
 {
     static const u8 sync24[] = PEGC_GDC_MSYNC_400;
@@ -47,7 +47,7 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
     u32 start = tick_count;
     i32 left = (i32)(*end_tick - start);
     u32 budget = left > 0 ? (u32)left : 0;
-    if (budget > PLATFORM_SPLASH_TICKS) budget = PLATFORM_SPLASH_TICKS;
+    if (budget > PLATFORM_SPLASH_IMAGE_TICKS) budget = PLATFORM_SPLASH_IMAGE_TICKS;
     struct gfx_kernel_fb fb;
     struct SplashRaster *s = pc98_splash_raster_state();
     struct OsriImage *image = 0;
@@ -103,7 +103,7 @@ int platform_splash_try_image(const char *path, u32 *end_tick)
         unsigned long long period = (unsigned long long)s->total_lines * s->line_num_us;
         unsigned long long consumed = 0;
         u32 frames = 0, good = 0;
-        while (frames < PLATFORM_SPLASH_TICKS) {
+        while (frames < PLATFORM_SPLASH_IMAGE_TICKS) {
             unsigned long long elapsed = (unsigned long long)image_elapsed(play_start, budget) *
                                          SPLASH_IMAGE_TICK_US * divisor;
             unsigned long long used = elapsed > consumed ? elapsed : consumed;
@@ -129,7 +129,7 @@ done:
     if (plan) kfree(plan);
     if (image) kfree(image);
     /* Round down by bounded multiplication comparison. Never restart the
-     * three-second window, double-charge model+tick, or compensate PIT. */
+     * image window, double-charge model+tick, or compensate PIT. */
     u32 now = tick_count;
     u32 ticks = now - start;
     if (ticks > budget) ticks = budget;

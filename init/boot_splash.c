@@ -198,7 +198,8 @@ static void build_raster(GFX_RasterPalTable *tbl, int offset)
 void boot_splash(void)
 {
     int cx, i, grad_offset;
-    u32 end_tick = tick_count + PLATFORM_SPLASH_TICKS;
+    u32 start_tick = tick_count;
+    u32 end_tick = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;
     int static_logo = 0;
     GFX_RasterPalTable raster_table;
 
@@ -222,6 +223,9 @@ void boot_splash(void)
 #endif
     int image_result = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
     if (image_result == PLATFORM_SPLASH_DONE) goto cleanup;
+    u32 logo_end = start_tick + PLATFORM_SPLASH_TICKS;
+    if ((i32)(tick_count - logo_end) >= 0) end_tick = tick_count;
+    else if ((i32)(end_tick - logo_end) > 0) end_tick = logo_end;
     struct SplashRaster *state = pc98_splash_raster_state();
     static_logo = image_result == PLATFORM_SPLASH_NO_SYNC || !state->dynamic_ok;
 

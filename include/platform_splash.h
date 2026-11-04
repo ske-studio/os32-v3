@@ -3,6 +3,10 @@
 #include "types.h"
 #include "memmap.h"
 #define PLATFORM_SPLASH_TICKS (3u * PIT_HZ)
+#define PLATFORM_SPLASH_IMAGE_PREVIEW_SECONDS 2u
+#define PLATFORM_SPLASH_IMAGE_PLAY_SECONDS 6u
+#define PLATFORM_SPLASH_IMAGE_TICKS ((PLATFORM_SPLASH_IMAGE_PREVIEW_SECONDS + \
+                                     PLATFORM_SPLASH_IMAGE_PLAY_SECONDS) * PIT_HZ)
 /* Fixed platform entry points, synchronous boot foreground only.
  * begin returns 0 when drawing is possible; failure already shuts gfx down.
  * The framebuffer descriptor borrows gfx storage and is refreshed each begin.

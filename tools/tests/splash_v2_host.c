@@ -82,7 +82,7 @@ int pl_v2_frame(struct SplashRaster *s, const struct OsriImage *image, const str
     REQUIRE(s == &state && image == &image_storage && plan == &plan_storage);
     REQUIRE(previews == 1 && commits == 1 && live_image && live_plan && irq_on);
     frames++; tick_count += frame_ticks;
-    REQUIRE(frames <= PLATFORM_SPLASH_TICKS);
+    REQUIRE(frames <= PLATFORM_SPLASH_IMAGE_TICKS);
     return (int)frames == stop_frame ? PL_FRAME_NO_SYNC : frame_result;
 }
 int pc98_splash_raster_frame(struct SplashRaster *s, const struct OsriImage *image)
@@ -97,7 +97,7 @@ static void setup(int mode)
     allocs=frees=live_image=live_plan=commits=previews=frames=fixed_frames=black_calls=logs=0;
     black_since_commit=0; fail_alloc=bad_load=missing=over_budget=fixed_image=preview_fail=0;
     stat_delay=stop_frame=0; irq_on=1; frame_result=PL_FRAME_OK;
-    load_ticks=5; transfer_ticks=2; preview_ticks=101; frame_ticks=0;
+    load_ticks=5; transfer_ticks=2; preview_ticks=SPLASH_RASTER_PREVIEW_MS / TICK_MS + 1; frame_ticks=0;
     tick_count=0;
 }
 static int run(u32 *end)
@@ -112,9 +112,9 @@ void _start(void)
 {
     for (int mode=0; mode<2; mode++) for (int wrap=0; wrap<2; wrap++) {
         setup(mode); tick_count=wrap ? 0xfffffff0u : 0;
-        u32 initial=tick_count, end=initial+PLATFORM_SPLASH_TICKS;
+        u32 initial=tick_count, end=initial+PLATFORM_SPLASH_IMAGE_TICKS;
         u32 prefix=load_ticks+transfer_ticks+preview_ticks;
-        u32 remaining=PLATFORM_SPLASH_TICKS-prefix;
+        u32 remaining=PLATFORM_SPLASH_IMAGE_TICKS-prefix;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE);
         unsigned long long p=(unsigned long long)state.total_lines * 100000;
         u32 expected=((unsigned long long)remaining * 10000 * state.line_den) / p;
@@ -122,38 +122,39 @@ void _start(void)
         REQUIRE(tick_count == initial+prefix); /* No compensation of global PIT. */
         REQUIRE(end-tick_count < 2 && end-tick_count <= remaining);
 
-        setup(mode); frame_result=PL_FRAME_DROP; end=300;
+        setup(mode); frame_result=PL_FRAME_DROP; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == expected && previews == 1);
         REQUIRE(end-tick_count < 2);
-        setup(mode); frame_ticks=3; end=300;
+        setup(mode); frame_ticks=3; end=PLATFORM_SPLASH_IMAGE_TICKS;
         prefix=load_ticks+transfer_ticks+preview_ticks;
         remaining=end-prefix;
-        u32 tick_limited=(remaining+frame_ticks-1)/frame_ticks;
+        u32 tick_limited=(u32)(((unsigned long long)remaining * SPLASH_IMAGE_TICK_US * state.line_den - p) /
+                               ((unsigned long long)frame_ticks * SPLASH_IMAGE_TICK_US * state.line_den)) + 1;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && frames == tick_limited);
         REQUIRE(end-tick_count <= 1);
-        setup(mode); stop_frame=3; end=300;
+        setup(mode); stop_frame=3; end=PLATFORM_SPLASH_IMAGE_TICKS;
         prefix=load_ticks+transfer_ticks+preview_ticks;
         remaining=end-prefix;
         REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && frames == (u32)stop_frame && end-tick_count == ((unsigned long long)remaining * 10000 * state.line_den - (stop_frame-1)*p) / (10000ull * state.line_den));
         /* A single successful frame before NO_SYNC is still a failure. */
-        setup(mode); preview_fail=1; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && previews == 1 && !frames && end == 300);
-        setup(mode); transfer_ticks=300; end=300;
+        setup(mode); preview_fail=1; end=PLATFORM_SPLASH_IMAGE_TICKS;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_NO_SYNC && previews == 1 && !frames && end == PLATFORM_SPLASH_IMAGE_TICKS);
+        setup(mode); transfer_ticks=PLATFORM_SPLASH_IMAGE_TICKS; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && previews == 1 && !frames && end == tick_count);
-        setup(mode); preview_ticks=295; end=300;
+        setup(mode); preview_ticks=PLATFORM_SPLASH_IMAGE_TICKS - load_ticks; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && !frames && end == tick_count);
-        setup(mode); load_ticks=201; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && !commits && !previews && end == 300);
-        setup(mode); load_ticks=0; end=100;
+        setup(mode); load_ticks=PLATFORM_SPLASH_IMAGE_TICKS - SPLASH_RASTER_PREVIEW_MS / TICK_MS + 1; end=PLATFORM_SPLASH_IMAGE_TICKS;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && !commits && !previews && end == PLATFORM_SPLASH_IMAGE_TICKS);
+        setup(mode); load_ticks=0; end=SPLASH_RASTER_PREVIEW_MS / TICK_MS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && previews == 1 && !frames && end == tick_count);
         setup(mode); end=0;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && !commits && end == tick_count);
-        setup(mode); load_ticks=400; end=300;
+        setup(mode); load_ticks=PLATFORM_SPLASH_IMAGE_TICKS + PIT_HZ; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && !commits && end == tick_count);
-        setup(mode); over_budget=1; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && !commits && !previews && end == 300);
+        setup(mode); over_budget=1; end=PLATFORM_SPLASH_IMAGE_TICKS;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && !commits && !previews && end == PLATFORM_SPLASH_IMAGE_TICKS);
         for (int fault=0; fault<7; fault++) {
-            setup(mode); end=300;
+            setup(mode); end=PLATFORM_SPLASH_IMAGE_TICKS;
             if (fault==0) missing=1;
             if (fault==1) bad_load=1;
             if (fault==2) fail_alloc=1;
@@ -162,11 +163,11 @@ void _start(void)
             if (fault==5) state.dynamic_ok=0;
             if (fault==6) state.line_den=1;
             REQUIRE(run(&end) == (fault>=4 ? PLATFORM_SPLASH_NO_SYNC : PLATFORM_SPLASH_FALLBACK));
-            REQUIRE(!commits && !previews && !frames && end == 300 && irq_on == (fault!=4));
+            REQUIRE(!commits && !previews && !frames && end == PLATFORM_SPLASH_IMAGE_TICKS && irq_on == (fault!=4));
         }
-        setup(mode); missing=1; stat_delay=120; end=300;
-        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && end == 300);
-        setup(mode); fixed_image=1; end=300;
+        setup(mode); missing=1; stat_delay=120; end=PLATFORM_SPLASH_IMAGE_TICKS;
+        REQUIRE(run(&end) == PLATFORM_SPLASH_FALLBACK && end == PLATFORM_SPLASH_IMAGE_TICKS);
+        setup(mode); fixed_image=1; end=PLATFORM_SPLASH_IMAGE_TICKS;
         REQUIRE(run(&end) == PLATFORM_SPLASH_DONE && allocs == 1 && !previews && !frames && fixed_frames == 1);
     }
     finish(0);
