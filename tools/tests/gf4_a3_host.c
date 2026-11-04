@@ -1,4 +1,4 @@
-/* A3 wire/session/case0..2: UNIT 14 supplies helpers, no dependency stubs.
+/* A3 wire/session/case0..7: UNIT 14 supplies helpers, no dependency stubs.
  * Compile this TU alone, -m32 -nostdlib, with include/ on the include path.
  * The local slot callbacks model C3/C2's public contract, not hardware.
  * A2 owns registration/CHECK inputs and mutation execution at integration. */
@@ -11,7 +11,9 @@
 
 enum session_event { SESSION_SAVE, SESSION_RESTORE, SESSION_RELEASE,
     CASE_PREPARE, CASE_DISCARD, CASE_UPLOAD, CASE_DOWNLOAD, CASE_SET,
-    CASE_PALETTE, CASE_DPMS, CASE_DDC };
+    CASE_PALETTE, CASE_DPMS, CASE_DDC, CASE_CURSOR_IMAGE,
+    CASE_CURSOR_MOVE, CASE_CURSOR_SHOW, CASE_FLIP, CASE_VBLANK,
+    CASE_GAMMA, CASE_ENTER, CASE_LEAVE };
 /* One start + initial restore + final restore/release, with retry room. */
 #define SESSION_EVENTS (GF4_MODES * 16U)
 #define SESSION_NOW 123U
@@ -34,7 +36,14 @@ static struct gf4_route routes[2];
 #define IMAGE_HEIGHT 3U
 #define IMAGE_BYTES (IMAGE_WIDTH * IMAGE_HEIGHT * 4U)
 #define LOG_BYTES (GF4_MODES * 256U)
-static u8 image[IMAGE_BYTES];
+static u8 image[IMAGE_BYTES], back_image[IMAGE_BYTES];
+static u8 head0_image[2][IMAGE_BYTES];
+static bool output_fixture, revoke_gamma, enter_invalid, leave_failed, perturb_other;
+static u32 gammas, enters, leaves, prepared_head[GF4_HEADS], discarded_head[GF4_HEADS];
+/* docs/decisions/realhw/GF_FEAT4_DESIGN.md:574: identity, dark curve,
+ * identity; palette return has no gamma. */
+enum { EXPECTED_GAMMA_APPLIES = 3 };
+static u32 gamma_checksum[EXPECTED_GAMMA_APPLIES];
 static char output[LOG_BYTES];
 static u32 log_bytes, uploads, downloads, prepares, discards, sets, powers, ddcs;
 static enum gf4_dpms power_seen[sizeof(display_power) / sizeof(display_power[0])];
@@ -49,6 +58,36 @@ static u32 port_reads;
 #define NEXT_DDC_BUS (FIRST_DDC_BUS + 1U)
 static u8 expected_ddc_bus;
 
+/* Independent A3-card oracle: 10 camera steps, two initial cursor images
+ * plus the mode-change upload; two flip steps of 16 frames each. */
+enum { EXPECTED_CURSOR_READY = 10, EXPECTED_CURSOR_IMAGES = 3,
+       EXPECTED_FLIP_FRAMES = 16, EXPECTED_FLIP_STEPS = 2,
+       EXPECTED_FLIP_TOTAL = EXPECTED_FLIP_FRAMES * EXPECTED_FLIP_STEPS };
+static u32 cursor_images, cursor_moves, cursor_shows, flips, waits, snapshots;
+static u32 cursor_sides[EXPECTED_CURSOR_IMAGES], cursor_copy[GF4_CURSOR_BYTES / sizeof(u32)];
+static i32 move_x[16], move_y[16];
+static bool show_seen[16], sync_seen[EXPECTED_FLIP_TOTAL], revoke_cursor, revoke_flip, wrong_base;
+static struct gf3_surface flip_surface;
+static u8 *surface_image(const struct gf3_surface *s)
+{
+    if (s->off >= GF3_STAGING_BYTES + 2U * IMAGE_BYTES)
+        return head0_image[s->off == GF3_STAGING_BYTES + 2U * IMAGE_BYTES ? 0 : 1];
+    return s->off == GF3_STAGING_BYTES ? image : back_image;
+}
+static struct gf1_test_ops foundation_ops;
+static bool revoke_snapshot;
+static i32 snapshot_rc;
+const struct gf1_test_ops *geforce_foundation_ops(void) { return &foundation_ops; }
+/* Borrowed F1 snapshot dispatch, foundation_test.c:65-94. */
+static int snapshot_call(struct gf_foundation *f, const struct gf1_test_request *q,
+                         struct gf1_test_reply *out)
+{
+    assert(f == &host.base.f && q->size == sizeof(*q) &&
+           q->op == GF1T_SNAPSHOT && !q->heads);
+    ++snapshots; out->stats = f->stats;
+    if (revoke_snapshot) normal_slot = NULL;
+    return snapshot_rc;
+}
 const struct gf3_test_ops *geforce_accel_ops(void) { return accel_slot; }
 int serial_gate_active(void) { return 0; }
 void serial_puts_polled(const char *s)
@@ -62,27 +101,29 @@ void serial_puts_polled(const char *s)
 static i32 case_event(enum session_event e)
 {
     assert(nevents < SESSION_EVENTS); events[nevents++] = e;
-    if (e == fail_event && ++failure_calls == failure_nth) return failure_rc;
+    if (e == fail_event && failure_nth && ++failure_calls == failure_nth) return failure_rc;
     return 0;
 }
 static int modes_call(struct gf4_ctx *ctx, u8 connector,
                       const struct gf4_mode **m, u32 *n)
 {
-    assert(ctx == &host.ctx && connector == routes[0].connector);
+    assert(ctx == &host.ctx && (connector == routes[0].connector ||
+           (output_fixture && connector == routes[1].connector)));
     *m = state.modes; *n = state.nmodes; return 0;
 }
 static i32 prepare_call(struct gf4_ctx *ctx, u8 head, u32 id,
                         struct gf3_surface out[2], u32 dl)
 {
-    assert(ctx == &host.ctx && head == 1 && id >= 1 && id <= state.nmodes);
+    assert(ctx == &host.ctx && (head == 1 || (output_fixture && head == 0)) && id >= 1 && id <= state.nmodes);
     assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
-    ++prepares;
+    ++prepares; ++prepared_head[head];
     i32 rc = case_event(CASE_PREPARE);
     if (rc) return rc;
     const struct gf4_mode *m = &state.modes[id - 1U];
     out[0] = (struct gf3_surface){.off=GF3_STAGING_BYTES, .bytes=m->pitch*m->t.vd,
         .pitch=m->pitch, .width=m->t.hd, .height=m->t.vd, .fmt=m->fmt,
         .reservation_id=id, .generation=1};
+    if (head == 0) out[0].off += 2U * IMAGE_BYTES;
     out[1] = out[0]; out[1].off += IMAGE_BYTES; ++out[1].reservation_id;
     if (revoke_after_prepare) accel_slot = NULL;
     if (revoke_normal_after_prepare) normal_slot = NULL;
@@ -90,9 +131,9 @@ static i32 prepare_call(struct gf4_ctx *ctx, u8 head, u32 id,
 }
 static i32 discard_call(struct gf4_ctx *ctx, u8 head, u32 dl)
 {
-    assert(ctx == &host.ctx && head == 1 && !ctx->saved_closed);
+    assert(ctx == &host.ctx && (head == 1 || (output_fixture && head == 0)) && !ctx->saved_closed);
     assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
-    ++discards; return case_event(CASE_DISCARD);
+    ++discards; ++discarded_head[head]; return case_event(CASE_DISCARD);
 }
 static int upload_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
                        struct gf3_rect r, const struct gf3_ram *ram, bool force, u32 dl)
@@ -107,7 +148,7 @@ static int upload_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
     ++uploads;
     i32 rc = case_event(CASE_UPLOAD);
     if (rc) return rc;
-    gf2_host_memcpy(image + off, ram->ptr, ram->bytes);
+    gf2_host_memcpy(surface_image(s) + off, ram->ptr, ram->bytes);
     if (revoke_after_upload) accel_slot = NULL;
     return 0;
 }
@@ -119,7 +160,7 @@ static int download_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
     i32 rc = case_event(CASE_DOWNLOAD);
     if (rc) return rc;
     u32 cpp = s->fmt == GF3_INDEX8 ? 1U : s->fmt == GF3_RGB565 ? 2U : 4U;
-    gf2_host_memcpy(ram->ptr, image + r.y * s->pitch + r.x * cpp, ram->bytes);
+    gf2_host_memcpy(ram->ptr, surface_image(s) + r.y * s->pitch + r.x * cpp, ram->bytes);
     if (corrupt) ((u8 *)ram->ptr)[0] ^= 1U;
     if (cpp == 4) /* Hardware may return any unused X byte. */
         for (u32 x = 0; x < r.w; ++x) ((u8 *)ram->ptr)[x * cpp + 3U] = U8_MAX;
@@ -128,17 +169,22 @@ static int download_call(struct gf3_ctx *ctx, const struct gf3_surface *s,
 static int set_call(struct gf4_ctx *ctx, const struct gf4_route *r, u32 id,
                     const struct gf3_surface *s, u32 dl)
 {
-    assert(ctx == &host.ctx && r->connector == routes[0].connector && r->head == 1);
+    assert(ctx == &host.ctx && (r->connector == routes[0].connector || output_fixture));
+    assert(r->head == 1 || (output_fixture && r->head == 0));
     assert(s->reservation_id == id && dl == SESSION_NOW + GF3_TIMEOUT_US);
     assert(uploads == downloads && uploads);
     ++sets;
     i32 rc = case_event(CASE_SET);
     if (rc && fail_restore_after_set) restore_rc = SESSION_FAILURE;
+    if (!rc) {
+        state.head[r->head].mode = state.modes[id-1U]; state.head[r->head].front = *s;
+        state.head[r->head].enabled = true; state.head[r->head].dpms = GF4_ON;
+    }
     return rc;
 }
 static i32 palette_call(struct gf4_ctx *ctx, u8 head, u32 first, u32 n, const u8 *rgb)
 {
-    assert(ctx == &host.ctx && head == 1 && first == 0 && n == 8);
+    assert(ctx == &host.ctx && (head == 1 || (output_fixture && head == 0)) && first == 0 && n == 8);
     /* RGB cube endpoint oracle, independent of the product palette. */
     for (u32 i = 0; i < n; ++i)
         for (u32 c = 0; c < 3; ++c)
@@ -147,10 +193,123 @@ static i32 palette_call(struct gf4_ctx *ctx, u8 head, u32 first, u32 n, const u8
 }
 static int dpms_call(struct gf4_ctx *ctx, u8 head, enum gf4_dpms power, u32 dl)
 {
-    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(ctx == &host.ctx && (head == 1 || output_fixture) && dl == SESSION_NOW + GF3_TIMEOUT_US);
     assert(powers < sizeof(power_seen) / sizeof(power_seen[0]));
-    power_seen[powers++] = power; return case_event(CASE_DPMS);
+    power_seen[powers++] = power;
+    i32 rc = case_event(CASE_DPMS);
+    if (!rc) {
+        state.head[head].dpms = power;
+        if (perturb_other) ++state.head[head ^ 1U].front.off;
+    }
+    return rc;
 }
+static int cursor_image_call(struct gf4_ctx *ctx, u8 head,
+                             const struct gf4_cursor *c, u32 dl)
+{
+    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(c->w == c->h && (c->w == 32 || c->w == 64));
+    assert(c->pitch == c->w * sizeof(u32) && c->bytes == c->pitch * c->h);
+    assert(c->hot_x == 3 && c->hot_y == 5 && cursor_images < EXPECTED_CURSOR_IMAGES);
+    cursor_sides[cursor_images++] = c->w;
+    i32 rc = case_event(CASE_CURSOR_IMAGE);
+    if (rc) return rc;
+    gf2_host_memcpy(cursor_copy, c->argb_pm, c->bytes);
+    /* Independent PM oracle: first arrow column covers alpha endpoints;
+     * red=A, green=floor(A/2). This input has no hardware alpha+1 fixup. */
+    static const u32 expected[] = {0x00000000U,0x01010000U,0xfefe7f00U,0xffff7f00U};
+    for (u32 y = 0; y < 4; ++y) assert(cursor_copy[y*c->w] == expected[y]);
+    assert(cursor_copy[c->w-1U] == 0); /* Asymmetric, transparent outside arrow. */
+    state.head[head].cursor_valid = true;
+    if (revoke_cursor) normal_slot = NULL;
+    return 0;
+}
+static int cursor_move_call(struct gf4_ctx *ctx, u8 head, i32 x, i32 y)
+{
+    assert(ctx == &host.ctx && head == 1 && cursor_moves < 16);
+    move_x[cursor_moves] = x; move_y[cursor_moves++] = y;
+    return case_event(CASE_CURSOR_MOVE);
+}
+static int cursor_show_call(struct gf4_ctx *ctx, u8 head, bool show)
+{
+    assert(ctx == &host.ctx && head == 1 && cursor_shows < 16);
+    show_seen[cursor_shows++] = show;
+    i32 rc = case_event(CASE_CURSOR_SHOW);
+    if (!rc) state.head[head].cursor_visible = show;
+    return rc;
+}
+static int flip_call(struct gf4_ctx *ctx, u8 head, const struct gf3_surface *s,
+                     bool sync, u32 dl)
+{
+    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    assert(flips < EXPECTED_FLIP_TOTAL && !ctx->hold[head].pending && uploads == downloads);
+    /* First target is back, then front, repeated independently of product constants. */
+    if (output_fixture) assert(sync && s->off == GF3_STAGING_BYTES + IMAGE_BYTES);
+    else assert(s->off == GF3_STAGING_BYTES + ((flips % 2U) ? 0U : IMAGE_BYTES));
+    sync_seen[flips++] = sync;
+    i32 rc = case_event(CASE_FLIP);
+    if (rc) return rc;
+    flip_surface = *s;
+    ctx->hold[head].pending = !sync;
+    if (sync) { state.head[head].front = *s; ++host.base.f.stats.vblank[head]; }
+    if (revoke_flip) normal_slot = NULL;
+    return 0;
+}
+static int vblank_call(struct gf4_ctx *ctx, u8 head, u32 after, u32 dl, u32 *seen)
+{
+    assert(ctx == &host.ctx && head == 1 && dl == SESSION_NOW + GF3_TIMEOUT_US);
+    ++waits;
+    i32 rc = case_event(CASE_VBLANK);
+    if (rc) return rc;
+    if (ctx->hold[head].pending) {
+        state.head[head].front = flip_surface; ctx->hold[head].pending = false;
+        ++host.base.f.stats.vblank[head];
+    }
+    assert((u32)(host.base.f.stats.vblank[head] - after) != 0);
+    *seen = host.base.f.stats.vblank[head];
+    if (wrong_base) state.head[head].front.off = 0;
+    return 0;
+}
+/* Endpoint/midpoint values from the specified integer curve, calculated
+ * independently as floor((i/255)^2 * 65535). No production constants used. */
+static int gamma_call(struct gf4_ctx *ctx, u8 head, const u16 rgb[3][256])
+{
+    assert(ctx == &host.ctx && head == 1 && state.head[head].mode.fmt != GF3_INDEX8);
+    assert(gammas < EXPECTED_GAMMA_APPLIES);
+    /* Observe the callback's complete input independently of serial output. */
+    gamma_checksum[gammas] = 0;
+    for (u32 c = 0; c < sizeof(display_ramp) / sizeof(display_ramp[0]); ++c)
+        for (u32 i = 0; i < sizeof(display_ramp[0]) / sizeof(display_ramp[0][0]); ++i)
+            gamma_checksum[gammas] += rgb[c][i];
+    static const u16 curve[] = {0,1,16512,65535};
+    static const u32 at[] = {0,1,128,255};
+    for (u32 c = 0; c < 3U; ++c)
+        for (u32 j = 0; j < sizeof(at)/sizeof(at[0]); ++j)
+            assert(rgb[c][at[j]] == (gammas == 1U ? curve[j] : at[j]*257U));
+    ++gammas;
+    i32 rc = case_event(CASE_GAMMA);
+    if (revoke_gamma) normal_slot = NULL;
+    return rc;
+}
+static void enter_call(void)
+{
+    ++enters;
+    i32 rc = case_event(CASE_ENTER);
+    if (rc) { normal_slot = NULL; return; }
+    normal_slot = &normal; host.ctx.ready = true;
+    state.head[0].enabled = !enter_invalid; state.head[0].mode = state.modes[0];
+    state.head[0].front.reservation_id = enters;
+    state.head[0].dpms = GF4_ON;
+}
+static void leave_call(void)
+{
+    ++leaves;
+    i32 rc = case_event(CASE_LEAVE);
+    if (rc || leave_failed) return;
+    assert(!host.ctx.diagnostic_saved && !display_session.valid);
+    normal_slot = NULL; host.ctx.ready = false;
+    state.head[0].enabled = false;
+}
+GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
 static int ddc_call(struct gf4_ctx *ctx, u8 bus, u8 block, u8 out[128], u32 dl)
 {
     assert(ctx == &host.ctx && bus == expected_ddc_bus && block == ddcs);
@@ -204,6 +363,7 @@ static i32 save_call(struct gf4_ctx *ctx, struct gf4_saved *saved, u32 dl)
     event(SESSION_SAVE, ctx, saved);
     assert(dl == SESSION_NOW + GF3_TIMEOUT_US);
     if (save_rc) return save_rc;
+    for (u8 h = 0; h < GF4_HEADS; ++h) saved->head[h] = state.head[h];
     saved->version = GF4_SAVED_VERSION; saved->size = sizeof(*saved);
     ctx->diagnostic_saved = saved; ctx->saved_closed = true;
     normal_slot = NULL;
@@ -218,6 +378,8 @@ static i32 restore_call(struct gf4_ctx *ctx, const struct gf4_saved *saved, u32 
     if (swap_after_restore) management_slot = &replacement_management;
     if (restore_rc) return restore_rc;
     ctx->saved_closed = false;
+    for (u8 h = 0; h < GF4_HEADS; ++h) state.head[h] = saved->head[h];
+    ctx->hold[1].pending = false; state.head[1].cursor_valid = false;
     normal_slot = publish ? &normal : NULL;
     return 0;
 }
@@ -232,9 +394,16 @@ static i32 release_call(struct gf4_ctx *ctx, const struct gf4_saved *saved)
 static void reset(void)
 {
     gf4_host_init(&host, &state);
+    output_fixture = revoke_gamma = enter_invalid = leave_failed = perturb_other = false;
+    gammas = enters = leaves = 0;
+    for (u8 h = 0; h < GF4_HEADS; ++h) prepared_head[h] = discarded_head[h] = 0;
+    gfx_backend_geforce.enter = enter_call; gfx_backend_geforce.leave = leave_call;
     gf2_host_memset(&display_session, 0, sizeof(display_session));
     normal = (struct gf4_test_ops){.ctx=&host.ctx, .display_save=save_call};
+    normal.gamma = gamma_call;
     normal.modes = modes_call; normal.scan_prepare = prepare_call;
+    normal.cursor_image = cursor_image_call; normal.cursor_move = cursor_move_call;
+    normal.cursor_show = cursor_show_call; normal.flip = flip_call; normal.vblank_wait = vblank_call;
     normal.scan_discard = discard_call; normal.set_mode = set_call;
     normal.palette_set = palette_call; normal.dpms_set = dpms_call; normal.ddc_read = ddc_call;
     accel_ops = (struct gf3_test_ops){.ctx=&host.base.ctx,
@@ -263,6 +432,10 @@ static void reset(void)
     corrupt = revoke_after_upload = revoke_after_prepare = revoke_normal_after_prepare = false;
     failure_rc = SESSION_FAILURE; first_port_rc = 0; port_reads = 0;
     fail_restore_after_set = false;
+    cursor_images = cursor_moves = cursor_shows = flips = waits = snapshots = 0;
+    revoke_cursor = revoke_flip = revoke_snapshot = wrong_base = false; snapshot_rc = 0;
+    foundation_ops = (struct gf1_test_ops){.production=&host.base.f, .call=snapshot_call};
+    host.base.f.stats.vblank[1] = U32_MAX - 7U; /* Exercise natural wrap in 16 flips. */
     expected_ddc_bus = FIRST_DDC_BUS;
     host.links.i2c_port = port_call;
 }
@@ -354,16 +527,17 @@ static void restore_retries(void)
 }
 /* Independent bit-at-a-time CRC oracle (ZIP/PNG reflected polynomial),
  * rather than the product's nibble table implementation. */
-static u32 image_crc(u32 bytes)
+static u32 buffer_crc(const u8 *data, u32 bytes)
 {
     u32 crc = ~0U;
     for (u32 i = 0; i < bytes; ++i) {
-        crc ^= image[i];
+        crc ^= data[i];
         for (u32 bit = 0; bit < 8; ++bit)
             crc = (crc >> 1) ^ ((crc & 1U) ? 0xedb88320U : 0U);
     }
     return ~crc;
 }
+static u32 image_crc(u32 bytes) { return buffer_crc(image, bytes); }
 static u32 occurrences(const char *needle)
 {
     u32 n = 0;
@@ -459,8 +633,6 @@ static void enumeration(void)
     assert(gf_display_test(0) == GF4_ENODEV && !nevents);
     reset(); normal_slot = NULL;
     assert(gf_display_test(0) == GF4_ESTATE && !nevents);
-    reset(); assert(gf_display_test(3) == GF4_EUNSUPPORTED && !nevents);
-    assert(gf2_host_strstr(output, "SKIP") && !display_session.valid);
 }
 static void enumeration_ports(void)
 {
@@ -566,10 +738,378 @@ static void case_failures(void)
     assert(occurrences("SKIP") == 1 && !occurrences("READY"));
     assert(!gf_display_test(DISPLAY_RESTORE));
 }
+#define CURSOR_WIRE 0x1a503U
+#define FLIP_WIRE 0x1a504U
+static void cursor_steps(void)
+{
+    reset(); assert(!gf_display_test(CURSOR_WIRE));
+    assert(cursor_images == 1 && cursor_sides[0] == 32 && sets == 1);
+    assert(display_session.crc == buffer_crc((const u8 *)cursor_copy, 32U*32U*sizeof(u32)));
+    assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(cursor_images == 2 && cursor_sides[1] == 64 && sets == 1);
+    assert(display_session.crc == buffer_crc((const u8 *)cursor_copy, sizeof(cursor_copy)));
+    /* Four corners, then a negative hotspot position. */
+    static const i32 xs[] = {0,IMAGE_WIDTH-1,0,IMAGE_WIDTH-1,-8};
+    static const i32 ys[] = {0,0,IMAGE_HEIGHT-1,IMAGE_HEIGHT-1,-8};
+    for (u32 i = 0; i < 5; ++i) {
+        assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+        assert(move_x[i+2U] == xs[i] && move_y[i+2U] == ys[i]);
+    }
+    assert(move_x[0] == IMAGE_WIDTH/2 && move_y[0] == IMAGE_HEIGHT/2);
+    u32 moves = cursor_moves, shows = cursor_shows;
+    assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(cursor_moves == moves && !show_seen[shows]);
+    assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(cursor_moves == moves && show_seen[shows+1U]);
+    u32 before = nevents;
+    assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(events[before] == SESSION_RESTORE && events[before+1] == CASE_DISCARD &&
+           events[before+2] == CASE_PREPARE);
+    assert(cursor_images == EXPECTED_CURSOR_IMAGES && cursor_sides[2] == 64 && sets == 2 && discards == 1);
+    assert(display_session.mode == 2 && occurrences("READY") == EXPECTED_CURSOR_READY);
+    assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(!display_session.valid && discards == 2 && !host.ctx.diagnostic_saved);
+}
+static void flip_steps(void)
+{
+    reset(); assert(!gf_display_test(FLIP_WIRE));
+    assert(flips == EXPECTED_FLIP_FRAMES && waits == flips && snapshots == flips && prepares == 1);
+    assert(occurrences("GF4 FLIP") == EXPECTED_FLIP_FRAMES && occurrences("READY") == 1);
+    assert(!host.ctx.hold[1].pending && host.base.f.stats.vblank[1] == (u32)(U32_MAX - 7U + EXPECTED_FLIP_FRAMES));
+    /* At x=1,y=0 the front is blue and the back red; diagonals at
+     * x=32,y=0 and x=30,y=0 run in opposite directions (height=3). */
+    assert(image[1] == 1 && back_image[1] == 4);
+    assert(image[32] == 7 && back_image[30] == 7);
+    /* Left cell in the glyph's second row is lit for 1, dark for 2. */
+    assert(image[IMAGE_WIDTH + IMAGE_WIDTH/3U] == 7);
+    assert(back_image[IMAGE_WIDTH + IMAGE_WIDTH/3U] == 0);
+    assert(display_session.crc == image_crc(IMAGE_WIDTH*IMAGE_HEIGHT));
+    assert(!gf_display_test(FLIP_WIRE | NEXT_PHASE));
+    assert(flips == EXPECTED_FLIP_TOTAL && waits == flips && snapshots == flips && prepares == 1);
+    for (u32 i = 0; i < EXPECTED_FLIP_TOTAL; ++i) assert(sync_seen[i] == (i < EXPECTED_FLIP_FRAMES));
+    assert(occurrences("GF4 FLIP") == EXPECTED_FLIP_TOTAL && occurrences("READY") == EXPECTED_FLIP_STEPS);
+    assert(gf2_host_strstr(output, "counter=0") && gf2_host_strstr(output, " base="));
+    assert(!gf_display_test(FLIP_WIRE | NEXT_PHASE));
+    assert(!display_session.valid && discards == 1 && !host.ctx.hold[1].pending);
+}
+static void cursor_flip_failures(void)
+{
+    static const enum session_event failed[] = {
+        CASE_CURSOR_IMAGE, CASE_CURSOR_MOVE, CASE_CURSOR_SHOW, CASE_FLIP, CASE_VBLANK
+    };
+    for (u32 i = 0; i < sizeof(failed)/sizeof(failed[0]); ++i) {
+        reset(); fail_event = failed[i]; failure_nth = 1;
+        u32 wire = i < 3 ? CURSOR_WIRE : FLIP_WIRE;
+        assert(gf_display_test(wire) == SESSION_FAILURE);
+        assert(events[nevents-1] == failed[i] && !occurrences("READY"));
+        assert(display_session.valid && !display_session.running && display_session.prepared);
+        assert(host.ctx.diagnostic_saved && !discards);
+        u32 before = nevents;
+        assert(gf_display_test(wire | NEXT_PHASE) == GF4_ESTATE && nevents == before);
+        failure_nth = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+        assert(!display_session.valid && !host.ctx.diagnostic_saved && discards == 1);
+    }
+    reset(); revoke_cursor = true;
+    assert(gf_display_test(CURSOR_WIRE) == GF4_ESTATE && cursor_images == 1 && !cursor_moves);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); revoke_flip = true;
+    assert(gf_display_test(FLIP_WIRE) == GF4_ESTATE && flips == 1 && !waits);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); wrong_base = true;
+    assert(gf_display_test(FLIP_WIRE) == GF4_ESTATE && flips == 1 && waits == 1);
+    assert(display_session.valid && !discards && !occurrences("READY"));
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); snapshot_rc = SESSION_FAILURE;
+    assert(gf_display_test(FLIP_WIRE) == SESSION_FAILURE && !flips && !waits);
+    assert(display_session.valid && !occurrences("READY") && !discards);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); revoke_snapshot = true;
+    assert(gf_display_test(FLIP_WIRE) == GF4_ESTATE && snapshots == 1 && !flips);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); fail_event = CASE_FLIP; failure_nth = 5;
+    assert(gf_display_test(FLIP_WIRE) == SESSION_FAILURE && flips == 5 && waits == 4);
+    assert(occurrences("GF4 FLIP") == 5 && !occurrences("READY"));
+    assert(events[nevents-1] == CASE_FLIP && !discards && display_session.valid);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    /* A back upload failure stops before any mode switch or flip. */
+    reset(); fail_event = CASE_UPLOAD; failure_nth = IMAGE_HEIGHT + 1U;
+    assert(gf_display_test(FLIP_WIRE) == SESSION_FAILURE && !sets && !flips);
+    assert(events[nevents-1] == CASE_UPLOAD && !discards && display_session.valid);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    /* Async completion failure retains a pending pair until management restore. */
+    reset(); assert(!gf_display_test(FLIP_WIRE));
+    fail_event = CASE_VBLANK; failure_nth = 1;
+    assert(gf_display_test(FLIP_WIRE | NEXT_PHASE) == SESSION_FAILURE);
+    assert(host.ctx.hold[1].pending && flips == EXPECTED_FLIP_FRAMES + 1U && !discards && display_session.valid);
+    restore_rc = SESSION_FAILURE;
+    assert(gf_display_test(DISPLAY_RESTORE) == SESSION_FAILURE && host.ctx.hold[1].pending);
+    restore_rc = 0; failure_nth = 0;
+    assert(!gf_display_test(DISPLAY_RESTORE) && !host.ctx.hold[1].pending);
+    /* A missing second mode is a reasoned SKIP after restore/discard. */
+    reset(); state.nmodes = 1; assert(!gf_display_test(CURSOR_WIRE));
+    for (u32 i = 1; i < 9; ++i) assert(!gf_display_test(CURSOR_WIRE | NEXT_PHASE));
+    assert(gf_display_test(CURSOR_WIRE | NEXT_PHASE) == GF4_ENODEV);
+    assert(occurrences("SKIP") == 1 && sets == 1 && discards == 1);
+    assert(!gf_display_test(DISPLAY_RESTORE) && !display_session.valid);
+}
+/* Independent wire/camera oracles from the final A3 card: four gamma
+ * pictures, two routes then a pair, OFF and ON/flip, three lifetime calls. */
+#define GAMMA_WIRE 0x1a505U
+#define OUTPUT_WIRE 0x1a506U
+#define LIFETIME_WIRE 0x1a507U
+enum { EXPECTED_GAMMA_READY = 4, EXPECTED_OUTPUT_READY = 6,
+       EXPECTED_PAIR_READY = 4, EXPECTED_LIFETIME_READY = 3 };
+static void gamma_log(u32 from, u32 expected)
+{
+    static const char key[] = " LUT checksum=";
+    const char *p = gf2_host_strstr(output + from, key);
+    assert(p);
+    p += sizeof(key) - 1U;
+    u32 value = 0;
+    assert(*p >= '0' && *p <= '9');
+    while (*p >= '0' && *p <= '9')
+        value = value * (sizeof("0123456789") - 1U) + (*p++ - '0');
+    assert(*p == '\r' && value == expected);
+}
+static void gamma_steps(void)
+{
+    reset(); assert(!gf_display_test(GAMMA_WIRE));
+    gamma_log(0, gamma_checksum[0]);
+    assert(gammas == 1 && prepares == 1 && sets == 1 && display_session.mode == 2);
+    /* Halfway across the 565 card must contain a mid grey, so changing
+     * the curve has a visible effect; RGB-cube endpoint bars would not. */
+    u32 middle = IMAGE_WIDTH * 2U + (IMAGE_WIDTH / 2U) * 2U;
+    assert(image[middle] == 0xef && image[middle+1U] == 0x7b);
+    assert(display_session.crc == image_crc(IMAGE_WIDTH*IMAGE_HEIGHT*2U));
+    u32 log_start = log_bytes, frame_crc = display_session.crc;
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    gamma_log(log_start, gamma_checksum[1]);
+    assert(gamma_checksum[0] != gamma_checksum[1] && display_session.crc == frame_crc);
+    log_start = log_bytes;
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    gamma_log(log_start, gamma_checksum[2]);
+    assert(gamma_checksum[0] == gamma_checksum[2] && display_session.crc == frame_crc);
+    assert(gammas == 3 && prepares == 1 && sets == 1 && !discards);
+    u32 before = nevents;
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    assert(events[before] == SESSION_RESTORE && events[before+1U] == CASE_DISCARD &&
+           events[before+2U] == CASE_PREPARE);
+    assert(display_session.mode == 1 && events[nevents-1U] == CASE_PALETTE);
+    assert(gammas == 3 && prepares == 2 && sets == 2 && discards == 1);
+    assert(occurrences(" LUT checksum=") == EXPECTED_GAMMA_APPLIES);
+    assert(occurrences("READY") == EXPECTED_GAMMA_READY && image[IMAGE_WIDTH+130U] == 1);
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    assert(!display_session.valid && !host.ctx.diagnostic_saved && discards == 2);
+
+    reset(); state.modes[1].fmt = GF3_XRGB8888;
+    state.modes[1].pitch = IMAGE_WIDTH * 4U;
+    assert(!gf_display_test(GAMMA_WIRE) && gammas == 1);
+    middle = IMAGE_WIDTH * 4U + (IMAGE_WIDTH / 2U) * 4U;
+    assert(image[middle] == 127 && image[middle+1U] == 127 && image[middle+2U] == 127);
+    assert(display_session.crc == image_crc(sizeof(image)));
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); state.nmodes = 1;
+    assert(gf_display_test(GAMMA_WIRE) == GF4_EFORMAT && !gammas && !prepares);
+    assert(occurrences("SKIP") == 1 && !occurrences("READY"));
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    for (u32 nth = 1; nth <= 3; ++nth) {
+        reset(); fail_event = CASE_GAMMA; failure_nth = nth;
+        for (u32 i = 1; i < nth; ++i)
+            assert(!gf_display_test(GAMMA_WIRE | (i == 1 ? 0 : NEXT_PHASE)));
+        assert(gf_display_test(GAMMA_WIRE | (nth == 1 ? 0 : NEXT_PHASE)) == SESSION_FAILURE);
+        assert(events[nevents-1U] == CASE_GAMMA && gammas == nth);
+        assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
+        assert(occurrences("READY") == nth-1U && !discards);
+        assert(occurrences(" LUT checksum=") == nth-1U);
+        assert(!gf_display_test(DISPLAY_RESTORE));
+    }
+    reset(); revoke_gamma = true;
+    assert(!gf_display_test(GAMMA_WIRE) && gammas == 1);
+    assert(gf_display_test(GAMMA_WIRE | NEXT_PHASE) == GF4_ESTATE && gammas == 1);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    reset(); assert(!gf_display_test(GAMMA_WIRE));
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    fail_event = CASE_PALETTE; failure_nth = 1;
+    assert(gf_display_test(GAMMA_WIRE | NEXT_PHASE) == SESSION_FAILURE);
+    assert(events[nevents-1U] == CASE_PALETTE && occurrences("READY") == 3);
+    assert(display_session.valid && display_session.prepared && !display_session.running);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+}
+static void outputs_reset(void)
+{
+    reset(); output_fixture = true;
+    routes[0].head_mask = 1; routes[0].or_mask = 1;
+    routes[1].connector = routes[0].connector + 1U;
+    routes[1].head_mask = 2; routes[1].or_mask = 2;
+}
+static void outputs_pair_ready(void)
+{
+    assert(!gf_display_test(OUTPUT_WIRE));
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+}
+static void outputs_steps(void)
+{
+    outputs_reset(); assert(!gf_display_test(OUTPUT_WIRE));
+    assert(sets == 1 && prepared_head[0] == 1 && !prepared_head[1]);
+    assert(gf2_host_strstr(output, "connector=165 mode=1 head=0"));
+    u32 before = nevents;
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(events[before] == SESSION_RESTORE && events[before+1U] == CASE_DISCARD);
+    assert(sets == 2 && discarded_head[0] == 1 && prepared_head[1] == 1);
+    assert(gf2_host_strstr(output, "connector=166 mode=1 head=1"));
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(sets == 4 && prepared_head[0] == 2 && prepared_head[1] == 2);
+    assert(discarded_head[0] == 1 && discarded_head[1] == 1);
+    assert(state.head[0].mode.id == 1 && state.head[1].mode.id == 2);
+    assert(head0_image[0][1] == 1); /* A blue card; B red in RGB565. */
+    assert(image[2] == 0 && image[3] == 0xf8);
+    assert(state.head[0].front.off != state.head[1].front.off);
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(powers == 1 && power_seen[0] == GF4_OFF && state.head[0].dpms == GF4_ON);
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(powers == 2 && power_seen[1] == GF4_ON && flips == 1 && !host.ctx.hold[1].pending);
+    assert(state.head[0].front.off == GF3_STAGING_BYTES + 2U*IMAGE_BYTES);
+    assert(occurrences("READY") == EXPECTED_OUTPUT_READY); /* Two singles, A/B, OFF, ON+flip. */
+    before = nevents;
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(events[before] == SESSION_RESTORE && events[before+1U] == CASE_DISCARD &&
+           events[before+2U] == CASE_DISCARD && events[before+3U] == SESSION_RELEASE);
+    assert(!display_session.valid && !display_session.prepared_heads);
+    assert(discarded_head[0] == 2 && discarded_head[1] == 2);
+    /* An active snapshot on the other head is powered off for a single. */
+    outputs_reset(); state.head[1].enabled = true; state.head[1].dpms = GF4_ON;
+    assert(!gf_display_test(OUTPUT_WIRE));
+    assert(powers == 1 && state.head[1].dpms == GF4_OFF);
+    assert(!gf_display_test(DISPLAY_RESTORE) && state.head[1].dpms == GF4_ON);
+}
+static void outputs_failures(void)
+{
+    /* Every recoverable pair rejection, on either head and at either
+     * allocation or modeset, must skip DPMS/flip and release only after
+     * restoring. Derive counts from the configured route/head arrays. */
+    static const i32 skipped[] = {GF4_ENODEV, GF4_EUNSUPPORTED, GF4_EPLL,
+        GF4_ERANGE, GF4_EBUSY, GF4_ENOSPC};
+    static const enum session_event pair_ops[] = {CASE_PREPARE, CASE_SET};
+    for (u32 e = 0; e < sizeof(skipped) / sizeof(skipped[0]); ++e)
+        for (u32 op = 0; op < sizeof(pair_ops) / sizeof(pair_ops[0]); ++op)
+            for (u32 head = 0; head < GF4_HEADS; ++head) {
+                outputs_reset();
+                for (u32 route = 0; route < host.ctx.nroutes; ++route)
+                    assert(!gf_display_test(OUTPUT_WIRE | (route ? NEXT_PHASE : 0)));
+                fail_event = pair_ops[op]; failure_nth = head + 1U; failure_rc = skipped[e];
+                assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == skipped[e]);
+                assert(occurrences("SKIP") == 1 && occurrences("READY") == host.ctx.nroutes);
+                assert(!display_session.output_pair_ready && display_session.valid &&
+                       display_session.running && host.ctx.diagnostic_saved);
+                u32 held = display_session.prepared_heads, before = nevents;
+                u32 banks = 0, old_discards = discards;
+                for (u32 h = 0; h < GF4_HEADS; ++h) banks += (held >> h) & 1U;
+                assert(held && !powers && !flips);
+                failure_nth = 0;
+                assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+                assert(events[before] == SESSION_RESTORE && events[nevents-1U] == SESSION_RELEASE);
+                assert(nevents - before == banks + 2U); /* restore, banks, release */
+                assert(discards == old_discards + banks && !powers && !flips);
+                assert(!display_session.valid && !display_session.prepared_heads &&
+                       !host.ctx.diagnostic_saved && occurrences("READY") == host.ctx.nroutes);
+            }
+    /* A second-head failure must retain both staged banks and emit no
+     * pair READY. Restore failure retains them for explicit case8 retry. */
+    outputs_reset(); assert(!gf_display_test(OUTPUT_WIRE));
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    fail_event = CASE_PREPARE; failure_nth = 2;
+    assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == SESSION_FAILURE);
+    assert(events[nevents-1U] == CASE_PREPARE && occurrences("READY") == 2);
+    assert(display_session.prepared_heads == 3 && host.ctx.diagnostic_saved);
+    u32 discarded = discards;
+    restore_rc = SESSION_FAILURE;
+    assert(gf_display_test(DISPLAY_RESTORE) == SESSION_FAILURE && discards == discarded);
+    assert(display_session.prepared_heads == 3 && display_session.valid);
+    restore_rc = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+    assert(discards == discarded+2U && !display_session.valid);
+
+    static const enum session_event failed[] = {CASE_DPMS,CASE_FLIP,CASE_DISCARD};
+    for (u32 i = 0; i < sizeof(failed)/sizeof(failed[0]); ++i) {
+        outputs_reset(); outputs_pair_ready();
+        if (failed[i] != CASE_DPMS) assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+        fail_event = failed[i]; failure_nth = 1;
+        u32 wire = failed[i] == CASE_DISCARD ? DISPLAY_RESTORE : OUTPUT_WIRE | NEXT_PHASE;
+        assert(gf_display_test(wire) == SESSION_FAILURE);
+        assert(events[nevents-1U] == failed[i] && display_session.valid);
+        assert(host.ctx.diagnostic_saved && display_session.prepared_heads);
+        failure_nth = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+        assert(!display_session.valid && !display_session.prepared_heads);
+    }
+    outputs_reset(); outputs_pair_ready(); perturb_other = true;
+    assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == GF4_ESTATE);
+    assert(occurrences("READY") == EXPECTED_PAIR_READY && display_session.valid && !display_session.running);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    outputs_reset(); outputs_pair_ready();
+    fail_event = CASE_DISCARD; failure_nth = 2;
+    assert(gf_display_test(DISPLAY_RESTORE) == SESSION_FAILURE);
+    assert(display_session.prepared_heads == 2 && host.ctx.diagnostic_saved);
+    u32 first_discarded = discarded_head[0];
+    failure_nth = 0; assert(!gf_display_test(DISPLAY_RESTORE));
+    assert(discarded_head[0] == first_discarded && !display_session.prepared_heads);
+    outputs_reset(); routes[1].connector = routes[0].connector;
+    assert(!gf_display_test(OUTPUT_WIRE)); assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == GF4_ENODEV);
+    assert(occurrences("SKIP") == 1 && occurrences("READY") == 2);
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE) && !display_session.valid);
+    outputs_reset(); routes[1].or_mask = routes[0].or_mask;
+    assert(!gf_display_test(OUTPUT_WIRE)); assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == GF4_ENODEV);
+    assert(!gf_display_test(DISPLAY_RESTORE));
+    outputs_reset(); fail_event = CASE_SET; failure_nth = 1; failure_rc = GF4_EUNSUPPORTED;
+    assert(gf_display_test(OUTPUT_WIRE) == GF4_EUNSUPPORTED);
+    assert(!occurrences("READY") && occurrences("SKIP") == 1 && display_session.running);
+    assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+    assert(!gf_display_test(DISPLAY_RESTORE));
+}
+static void lifecycle_steps(void)
+{
+    reset(); assert(!gf_display_test(LIFETIME_WIRE));
+    assert(enters == 1 && !leaves && !display_session.valid && !host.ctx.diagnostic_saved);
+    assert(display_session.lifecycle && nevents == 1 && events[0] == CASE_ENTER);
+    u32 before = nevents;
+    assert(!gf_display_test(DISPLAY_RESTORE) && nevents == before && display_session.lifecycle);
+    assert(gf_display_test(MODE_WIRE) == GF4_EBUSY);
+    assert(!gf_display_test(LIFETIME_WIRE | NEXT_PHASE));
+    assert(leaves == 1 && events[1] == CASE_LEAVE && !normal_slot && !host.ctx.ready);
+    assert(!gf_display_test(DISPLAY_RESTORE) && !normal_slot && nevents == 2);
+    assert(!gf_display_test(LIFETIME_WIRE | NEXT_PHASE));
+    assert(events[2] == CASE_ENTER && nevents == 3 && enters == 2 && normal_slot);
+    assert(state.head[0].enabled && state.head[0].front.reservation_id == 2);
+    assert(!display_session.lifecycle && !display_session.valid && occurrences("READY") == EXPECTED_LIFETIME_READY);
+    assert(!gf_display_test(DISPLAY_RESTORE) && nevents == 3);
+    assert(gf_display_test(LIFETIME_WIRE | NEXT_PHASE) == GF4_ESTATE);
+
+    reset(); host.ctx.saved_closed = true;
+    assert(gf_display_test(LIFETIME_WIRE) == GF4_ESTATE && !nevents);
+    reset(); enter_invalid = true;
+    assert(gf_display_test(LIFETIME_WIRE) == GF4_ESTATE && enters == 1 && !leaves);
+    assert(!occurrences("READY") && !display_session.lifecycle);
+    reset(); assert(!gf_display_test(LIFETIME_WIRE)); leave_failed = true;
+    assert(gf_display_test(LIFETIME_WIRE | NEXT_PHASE) == GF4_ESTATE);
+    assert(enters == 1 && leaves == 1 && normal_slot && !display_session.lifecycle);
+    reset(); assert(!gf_display_test(LIFETIME_WIRE));
+    assert(!gf_display_test(LIFETIME_WIRE | NEXT_PHASE)); enter_invalid = true;
+    assert(gf_display_test(LIFETIME_WIRE | NEXT_PHASE) == GF4_ESTATE);
+    assert(enters == 2 && !display_session.valid && !display_session.lifecycle);
+    assert(occurrences("READY") == 2 && !host.ctx.diagnostic_saved);
+    reset(); gfx_backend_geforce.enter = NULL;
+    assert(gf_display_test(LIFETIME_WIRE) == GF4_EUNSUPPORTED && !enters);
+    assert(occurrences("SKIP") == 1 && !occurrences("READY"));
+}
+
 void _start(void)
 {
     wire_and_admission(); start_failures(); restore_retries();
     mode_steps(); dpms_steps(); enumeration(); enumeration_ports();
     skipped_modes(); case_failures();
+    cursor_steps(); flip_steps(); cursor_flip_failures();
+    gamma_steps(); outputs_steps(); outputs_failures(); lifecycle_steps();
     gf2_host_exit(0);
 }

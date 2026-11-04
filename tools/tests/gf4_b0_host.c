@@ -160,7 +160,18 @@ static void ranges_and_tv(void)
     state.edid.range_valid=true; state.edid.max_khz=40000;
     assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==2U*B0_DEPTHS && state.modes[0].t.hd==800);
     fresh(1); state.edid.ntiming=1; state.edid.timing[0]=svga;
-    state.edid.timing[0].hs++; /* Reject unrepresentable pixels, no rounding. */
+    state.edid.timing[0].hs++; /* C:245-250: retain pixels, truncate only at CRTC encoding. */
+    assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==2U*B0_DEPTHS);
+    assert(state.modes[0].t.hs==svga.hs+1U);
+    /* C:245-256,348-353: subtract encoded endpoints, not raw pixel
+     * differences. 1824/8 - 801/8 = 128 exceeds the 7-bit blank span. */
+    fresh(1); state.edid.ntiming=1; state.edid.timing[0]=svga;
+    state.edid.timing[0].hd=801; state.edid.timing[0].ht=1824;
+    assert(!gf4_detect(&h.ctx,B0_DL)); expect_vga(state.modes,state.nmodes);
+    /* HRE span similarly: 1096/8 - 841/8 = 32 exceeds 5 bits. */
+    fresh(1); state.edid.ntiming=1; state.edid.timing[0]=svga;
+    state.edid.timing[0].hs=841; state.edid.timing[0].he=1096;
+    state.edid.timing[0].ht=1200;
     assert(!gf4_detect(&h.ctx,B0_DL)); expect_vga(state.modes,state.nmodes);
     fresh(1); state.edid.ntiming=1; state.edid.timing[0]=xga;
     state.edid.range_valid=true; state.edid.min_v_hz=61;
@@ -173,7 +184,7 @@ static void ranges_and_tv(void)
     fresh(1); state.edid.ntiming=2;
     state.edid.timing[0]=xga; state.edid.timing[1]=vga; h.base.ch.B=B0_VGA8_BYTES;
     assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==1 && state.modes[0].t.hd==640);
-    fresh(1); routes[0].type=GF4_TV; routes[0].tv_norm=7;
+    fresh(1); routes[0].type=GF4_TV; routes[0].tv_norm=10; /* M:180-185 HD720P fits 800x600. */
     h.tv_modes.ntiming=1; h.tv_modes.timing[0]=svga;
     assert(!gf4_detect(&h.ctx,B0_DL) && state.nmodes==B0_DEPTHS);
     assert(h.calls[D_TV_MODES]==1 && !h.calls[D_EDID] && state.modes[0].t.hd==800);

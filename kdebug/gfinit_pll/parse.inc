@@ -1,3 +1,26 @@
+/*
+ * Copyright 2005-2006 Erik Waling
+ * Copyright 2006 Stephane Marchesin
+ * Copyright 2007-2009 Stuart Bennett
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+ * OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 int gfinit_pll_parse(const u8 *r, u32 size, u32 table, u32 reg, struct gfinit_pll_limits *o)
 {
     if (!r || !o || pll_span(size, table, GF_PLL_TBL_HDR_MIN) ||
@@ -9,7 +32,7 @@ int gfinit_pll_parse(const u8 *r, u32 size, u32 table, u32 reg, struct gfinit_pl
     if (pll_span(size, table, header + len * count)) return -1;
     u32 key = reg;
     if (reg == GF_PLL_CORE || reg == GF_PLL_MEMORY) key -= GF_PLL_CTRL_OFFSET;
-    else if (reg != GF_PLL_VIDEO) return -1;
+    else if (reg != GF_PLL_VIDEO && reg != GF_PLL_VIDEO_B) return -1;
     /* No matching key: use the first entry, as nouveau nvkm/subdev/bios/pll.c:162-175
      * (MIT) does for version 0x2x tables (Ra266's ROM keys only the memory PLL). */
     u32 at = table + header, found = 0;
