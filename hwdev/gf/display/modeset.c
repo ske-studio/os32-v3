@@ -70,6 +70,17 @@ int gf_display_modeset(struct gf_display_context *c)
 #define MS_SEL_CLK 0x680524U
 #define MS_PLLSEL 0x68050cU
 #define MS_SCREEN_OFF 0x20U
+/* crtc.c:334-337: SR1 character clock and optional divide by two. */
+#define MS_SR_CLOCK 1U
+#define MS_CLKDIV2 0x08U
+/* tvnv17.h:54-70: route.tv_norm uses this frozen ordinal order. */
+enum ms_tv_norm { MS_PAL, MS_PAL_M, MS_PAL_N, MS_PAL_NC, MS_NTSC_M,
+    MS_NTSC_J, MS_HD480I, MS_HD480P, MS_HD576I, MS_HD576P,
+    MS_HD720P, MS_HD1080I };
+/* tvnv17.c:360-363; tvmodesnv17.c:148-200 (CTV output clocks). */
+#define MS_TV_LD_KHZ 90000U
+#define MS_TV_SD_KHZ 27000U
+#define MS_TV_HD_KHZ 74250U
 #define MS_MODE_ENABLE 0x80U
 #define MS_SYNC_MASK 0xc0U
 /* dfp.c:204-244: per-OR SEL_CLK fields (16/17 and 18/19). */
@@ -106,7 +117,26 @@ int gf4_mode_calc(const struct gf4_mode *mode,const struct gf4_route *route,
     m.ramdaca24=GF_MODE_RAMDACA24; m.ramdaca34=1;
     int rc=gf4_timing_calc(mode,&m);
     if (!rc) rc=gf4_format_calc(mode,front,&m);
-    if (!rc) { gf4_fifo_calc(&m); rc=gf4_pll_calc(mode,route,saved,limits,&m); }
+    if (!rc) {
+        struct gf4_mode adjusted=*mode;
+        bool divide=false;
+        if (route->type==GF4_TV) {
+            /* tvnv17.c:360-363: PLL follows encoder clock, not input clock.
+             * HD480I/HD576I also use TV_ENC_MODE (tvmodesnv17.c:123-145).
+             * The three LD doublescan inputs are precisely the CLKDIV2
+             * modes (tvmodesnv17.c:439-451); A0 carries DBLSCAN only. */
+            switch (route->tv_norm) {
+            case MS_HD480P: case MS_HD576P: adjusted.t.khz=MS_TV_SD_KHZ; break;
+            case MS_HD720P: case MS_HD1080I: adjusted.t.khz=MS_TV_HD_KHZ; break;
+            default: adjusted.t.khz=MS_TV_LD_KHZ;
+                divide=(mode->t.flags&GF4_DBLSCAN)!=0; break;
+            }
+        }
+        gf4_fifo_calc(&m);
+        rc=gf4_pll_calc(&adjusted,route,saved,limits,&m);
+        if (!rc) m.sr[MS_SR_CLOCK]=(m.sr[MS_SR_CLOCK]&~MS_CLKDIV2)|
+            (divide ? MS_CLKDIV2 : 0);
+    }
     if (!rc) { m.head=route->head; *out=m; }
     return rc;
 }
@@ -193,8 +223,8 @@ static int ms_row(void *owner,const struct gfinit_mode *m,u32 ordinal)
     if (owner_row) value=l->head ? 3U : 0;
     /* crtc.c:175-233: the final unprotect must respect DPMS and blank. */
     if (ordinal>=GF_MODE_ROW_GATE_ON) {
-        if (r->kind==GF_C_SR && r->index==1)
-            value=(value&~MS_SCREEN_OFF)|((h->blank || h->dpms!=GF4_ON) ? MS_SCREEN_OFF : 0);
+        if (r->kind==GF_C_SR && r->index==MS_SR_CLOCK)
+            value=(m->sr[MS_SR_CLOCK]&~MS_SCREEN_OFF)|((h->blank || h->dpms!=GF4_ON) ? MS_SCREEN_OFF : 0);
         if (r->kind==GF_C_CR && r->index==GF_MODE_CR_MODE)
             value=(value&~MS_MODE_ENABLE)|(h->dpms==GF4_OFF ? 0 : MS_MODE_ENABLE);
         if (r->kind==GF_C_CR && r->index==GF_MODE_CR_RPC1)

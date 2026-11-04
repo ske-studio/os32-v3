@@ -8,6 +8,21 @@
 #include "../../hwdev/gf/internal.h"
 #define REQUIRE(x) do { __asm__ volatile ("" ::: "memory"); if (!(x)) return __LINE__; } while (0)
 /* hw.h:70-124 / crtc.c:91-102: independent expected register addresses. */
+/* crtc.c:334-337: SR1 CLKDIV2 and character-clock bit. */
+#define T_SR_CLOCK 1U
+#define T_SR_DIV2 0x08U
+#define T_SR_RUN 0x01U
+#define T_SR_OFF 0x20U
+/* tvnv17.h:54-70: named fixture ordinals, independent of C0 constants. */
+enum t_tv_norm { T_PAL, T_PAL_M, T_PAL_N, T_PAL_NC, T_NTSC_M, T_NTSC_J,
+    T_HD480I, T_HD480P, T_HD576I, T_HD576P, T_HD720P, T_HD1080I };
+/* tvmodesnv17.c:439-443, CRTC vertical normalization per crtc.c:245-256. */
+#define T_LD_WIDTH 320U
+#define T_LD_HEIGHT 200U
+#define T_LD_SCAN_FACTOR 2U
+#define T_LD_CLOCK 90000U /* tvnv17.c:363 */
+#define T_SD_CLOCK 27000U /* tvmodesnv17.c:150,166 */
+#define T_HD_CLOCK 74250U /* tvmodesnv17.c:182,198 */
 #define T_HEAD_B 1U
 #define T_ENGINE_B 0x602860U
 #define T_LCD_B 0x6033d4U
@@ -68,6 +83,7 @@ static void setup(void)
             .bytes=GF_MODE_VRAM_BYTES,.pitch=GF_MODE_WIDTH,.width=GF_MODE_WIDTH,.height=GF_MODE_HEIGHT};
         h->dpms=GF4_ON; h->cursor_visible=h->cursor_valid=true;
         struct gfinit_mode *m=&state.work[i];
+        m->sr[T_SR_CLOCK]=GF_MODE_SR_BLANKED;
         m->head=i; m->pllsel=T_PLL_MASK; m->sel_clk=T_SHARED_SEED;
         m->engine_ctrl=i ? 0 : GF_MODE_ENGINE_I2C;
         m->cr[GF_MODE_CR_LCD]=T_LCD_SEED; /* sentinel for ext ordering */
@@ -167,7 +183,7 @@ static int preparation_and_io(void)
     setup();
     host.ctx.hold[T_HEAD_B]=(struct gf4_flip_hold){.pending=true,.base_written=true,
         .old_front=state.head[T_HEAD_B].front,.new_front=state.head[0].front};
-    gf4_host_fail_at(&host,D_FLIP_COMPLETE,2,T_FAILURE);
+    gf4_host_fail_at(&host,D_FLIP_COMPLETE,1,T_FAILURE);
     REQUIRE(gf4_change_begin(&host.ctx,T_DEADLINE)==T_FAILURE);
     REQUIRE(host.ctx.hold[T_HEAD_B].pending && host.ctx.hold[T_HEAD_B].base_written);
     REQUIRE(!host.calls[D_FENCE] && !host.calls[D_WRITE]);
@@ -188,11 +204,116 @@ static int preparation_and_io(void)
     host.ctx.accepting=false;
     REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
     REQUIRE(gf4_change_end(&host.ctx,T_FAILURE)==T_FAILURE);
-    REQUIRE(!host.ctx.accepting && !host.ctx.recovery_rc && host.ctx.reusable);
+    REQUIRE(host.ctx.accepting && !host.ctx.recovery_rc && host.ctx.reusable);
+    return 0;
+}
+/* UNIT 13's B2 stub receives a temporary adjusted mode: copy the clock
+ * while the call is live rather than retaining its stack pointer. */
+static u32 pll_clock,pll_calls;
+static void observe_pll(struct gf4_host *h,const struct gf4_host_event *e)
+{
+    (void)h;
+    if (e->op==D_LOAD && e->p[4]) {
+        pll_clock=((const struct gf4_mode *)e->p[0])->t.khz;
+        pll_calls++;
+    }
+}
+static int tv_clock_and_divider(void)
+{
+    setup(); host.observe=observe_pll; pll_calls=0;
+    struct gfinit_mode analog;
+    REQUIRE(!gf4_mode_calc(&state.modes[0],&state.head[T_HEAD_B].route,
+        &legacy.baseline,&host.ctx.limits[T_HEAD_B],&state.head[T_HEAD_B].front,&analog));
+    REQUIRE(pll_calls==1 && pll_clock==GF_MODE_CLOCK_KHZ);
+    REQUIRE(!(analog.sr[T_SR_CLOCK]&T_SR_DIV2));
+    /* Independent oracle: tvnv17.c:360-363; tvmodesnv17.c:123-200.
+     * Both interlaced component norms are TV_ENC_MODE, not CTV. */
+    static const struct { u32 norm,clock; } cases[]={
+        {T_PAL,T_LD_CLOCK},{T_PAL_M,T_LD_CLOCK},{T_PAL_N,T_LD_CLOCK},
+        {T_PAL_NC,T_LD_CLOCK},{T_NTSC_M,T_LD_CLOCK},{T_NTSC_J,T_LD_CLOCK},
+        {T_HD480I,T_LD_CLOCK},{T_HD480P,T_SD_CLOCK},
+        {T_HD576I,T_LD_CLOCK},{T_HD576P,T_SD_CLOCK},
+        {T_HD720P,T_HD_CLOCK},{T_HD1080I,T_HD_CLOCK}
+    };
+    for (u32 i=0;i<sizeof(cases)/sizeof(cases[0]);i++) {
+        setup(); host.observe=observe_pll; pll_calls=0;
+        struct gf4_route route=state.head[T_HEAD_B].route;
+        route.type=GF4_TV; route.tv_norm=cases[i].norm;
+        struct gfinit_mode output;
+        REQUIRE(!gf4_mode_calc(&state.modes[0],&route,&legacy.baseline,
+            &host.ctx.limits[T_HEAD_B],&state.head[T_HEAD_B].front,&output));
+        REQUIRE(pll_calls==1 && pll_clock==cases[i].clock);
+        REQUIRE(state.modes[0].t.khz==GF_MODE_CLOCK_KHZ);
+        REQUIRE(!(output.sr[T_SR_CLOCK]&T_SR_DIV2) && !host.calls[D_WRITE]);
+    }
+    /* tvmodesnv17.c:439-443: 320x200 has DBLSCAN and CLKDIV2.
+     * A0's input timing is already normalized; B1/B2 are stubbed here. */
+    setup(); host.observe=observe_pll; pll_calls=0;
+    struct gf4_route route=state.head[T_HEAD_B].route;
+    route.type=GF4_TV; route.tv_norm=T_NTSC_M;
+    state.modes[0].t.hd=T_LD_WIDTH;
+    state.modes[0].t.vd=T_LD_HEIGHT*T_LD_SCAN_FACTOR;
+    state.modes[0].t.flags|=GF4_DBLSCAN;
+    struct gfinit_mode output;
+    REQUIRE(!gf4_mode_calc(&state.modes[0],&route,&legacy.baseline,
+        &host.ctx.limits[T_HEAD_B],&state.head[T_HEAD_B].front,&output));
+    REQUIRE(pll_clock==T_LD_CLOCK && pll_calls==1);
+    REQUIRE(output.sr[T_SR_CLOCK]==(GF_MODE_SR_BLANKED|T_SR_DIV2));
+    REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
+    state.next[T_HEAD_B].mode=state.modes[0];
+    REQUIRE(!gf4_mode_load(&host.ctx,T_HEAD_B,&output,T_DEADLINE));
+    REQUIRE(host.sr[T_HEAD_B][T_SR_CLOCK]==(T_SR_RUN|T_SR_DIV2));
+    state.next[T_HEAD_B].blank=true;
+    REQUIRE(!gf4_mode_load(&host.ctx,T_HEAD_B,&output,T_DEADLINE));
+    REQUIRE(host.sr[T_HEAD_B][T_SR_CLOCK]==(T_SR_RUN|T_SR_OFF|T_SR_DIV2));
+    state.next[T_HEAD_B].blank=false; state.next[T_HEAD_B].dpms=GF4_OFF;
+    REQUIRE(!gf4_mode_load(&host.ctx,T_HEAD_B,&output,T_DEADLINE));
+    REQUIRE(host.sr[T_HEAD_B][T_SR_CLOCK]==(T_SR_RUN|T_SR_OFF|T_SR_DIV2));
+    return 0;
+}
+static int inactive_heads(void)
+{
+    /* Fail any unnecessary B7 call: the real B7 validates enabled/DPMS/IRQ
+     * before looking at pending (display/flip.c:15-24,86-95). */
+    for (u32 active=0;active<=1U;active++) {
+        setup();
+        for (u8 i=0;i<GF4_HEADS;i++) state.head[i].enabled=i<active;
+        host.base.ch.heads=host.base.f.wanted_heads=active ? 1U : 0;
+        gf4_host_fail_at(&host,D_FLIP_COMPLETE,0,GF4_ESTATE);
+        struct gf4_route route=state.head[T_HEAD_B].route;
+        struct gf3_surface front=state.head[T_HEAD_B].front;
+        REQUIRE(!gf4_set_mode(&host.ctx,&route,T_NEW_ID,&front,T_DEADLINE));
+        REQUIRE(state.head[T_HEAD_B].enabled && host.ctx.accepting);
+        REQUIRE(!host.calls[D_FLIP_COMPLETE]);
+    }
+    setup();
+    state.head[T_HEAD_B].dpms=GF4_OFF;
+    host.base.ch.heads=host.base.f.wanted_heads=1U;
+    gf4_host_fail_at(&host,D_FLIP_COMPLETE,0,GF4_ESTATE);
+    REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
+    state.next[T_HEAD_B].dpms=GF4_ON;
+    REQUIRE(!gf4_change_end(&host.ctx,0));
+    REQUIRE(state.head[T_HEAD_B].dpms==GF4_ON && !host.calls[D_FLIP_COMPLETE]);
+    REQUIRE(host.base.ch.heads==((1U<<GF4_HEADS)-1U) && host.ctx.accepting);
+    /* A pending hold must still be completed before rollback is captured. */
+    setup();
+    host.ctx.hold[T_HEAD_B]=(struct gf4_flip_hold){.pending=true,
+        .old_front=state.head[T_HEAD_B].front,.new_front=state.head[0].front};
+    REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
+    REQUIRE(host.calls[D_FLIP_COMPLETE]==1 && !host.ctx.hold[T_HEAD_B].pending);
+    REQUIRE(state.rollback.head[T_HEAD_B].front.off==state.head[0].front.off);
+    REQUIRE(!gf4_change_end(&host.ctx,0));
     return 0;
 }
 static int saved_and_deadline(void)
 {
+    setup();
+    host.ctx.saved_closed=true; host.ctx.diagnostic_saved=&state.rollback;
+    host.ctx.accepting=false;
+    REQUIRE(!gf4_change_begin(&host.ctx,T_DEADLINE));
+    REQUIRE(!gf4_change_end(&host.ctx,0));
+    REQUIRE(host.ctx.accepting && events[host.nevents-1].op==D_ADMISSION);
+
     setup();
     host.ctx.saved_closed=true; host.ctx.diagnostic_saved=0;
     host.ctx.accepting=false;
@@ -215,6 +336,8 @@ void _start(void)
     if (!rc) rc=failures();
     if (!rc) rc=preparation_and_io();
     if (!rc) rc=saved_and_deadline();
+    if (!rc) rc=inactive_heads();
+    if (!rc) rc=tv_clock_and_divider();
     /* Every failed REQUIRE exits nonzero even beyond the 8-bit exit range. */
     __asm__ volatile ("int $0x80" : : "a"(1),"b"(rc ? 1 : 0));
     __builtin_unreachable();

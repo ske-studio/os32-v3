@@ -39,7 +39,7 @@ static int tx_admission(struct gf4_ctx *c,bool open)
 static bool tx_publish(const struct gf4_ctx *c)
 {
     /* Includes F5's saved_closed && !diagnostic_saved ownership predicate. */
-    return !c->saved_closed;
+    return !(c->saved_closed && c->diagnostic_saved == NULL);
 }
 static int tx_cursor(struct gf4_ctx *c,u8 head)
 {
@@ -66,7 +66,8 @@ int gf4_change_begin(struct gf4_ctx *c,u32 dl)
     bool reopen=c->accepting && tx_publish(c);
     c->accepting=false;
     int rc=tx_admission(c,false);
-    for (u8 i=0;!rc && i<GF4_HEADS;i++) rc=gf4_flip_complete(c,i,dl);
+    for (u8 i=0;!rc && i<GF4_HEADS;i++)
+        if (c->hold[i].pending) rc=gf4_flip_complete(c,i,dl);
     struct gf2_fence fence;
     if (!rc) rc=gf2_fence_emit(c->ch,&fence,dl);
     if (!rc) rc=gf2_fence_wait(c->ch,fence,dl);
