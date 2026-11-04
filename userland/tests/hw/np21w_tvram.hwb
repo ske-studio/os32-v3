@@ -1,0 +1,9 @@
+mmioread8 phys 0xA0000 -> s
+mmiowrite8 phys 0xA0000 0x41
+mmioread8 phys 0xA0000 -> x
+mmiowrite8 phys 0xA0000 s
+if x != 0x41 goto failed
+end
+label failed
+let failure = 0 - 1
+end
