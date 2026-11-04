@@ -2,7 +2,7 @@
 
 > 索引: v3 の段の票を並べる親 (子の票は `> 上位:` でここを指す)
 
-> 状態: **実装中 (2026-10-19)** — v3 の本案。草案 `docs/archive/v3/V3_PLAN_DRAFT.md` を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2・T3・T4・T5 は受入完了、T7 は受入完了・実機確認待ち (台帳 T7B-REALHW、2026-10-20)。詳細は T2 (`TASK_T2_APPBAND.md`)・T3 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`)・[T4〜T6b](TASK_T4_T6_MODULES.md)・[T7](TASK_T7_AND_FOLLOWUPS.md) の状態行を参照** (T2d〜h の経緯: `docs/archive/v3/TASK_T2D_T2H.md`)。
+> 状態: **実装中 (2026-11-04)** — v3 の本案。草案 `docs/archive/v3/V3_PLAN_DRAFT.md` を、ユーザー判断 U1〜U11 と Codex の突き合わせ X1〜X8 (草案 §7) が揃った 2026-09-30 に昇格した (最後の U3 (OS64) と U4 (目的と範囲) は同日ユーザーが決定)。**T0 (C11) は受入完了 (2026-09-30、main `f5bcb35`)、T1 (物理地図 + 所有権台帳) も受入完了 (2026-10-01)、T2・T3・T4・T5 は受入完了、T7 は受入完了・実機確認待ち (台帳 T7B-REALHW、2026-10-20)。詳細は T2 (`TASK_T2_APPBAND.md`)・T3 (アーカイブ: `docs/archive/v3/TASK_T3_LAYOUT.md`)・[T4〜T6b](TASK_T4_T6_MODULES.md)・[T7](TASK_T7_AND_FOLLOWUPS.md) の状態行を参照** (T2d〜h の経緯: `docs/archive/v3/TASK_T2D_T2H.md`)。
 >
 > 発行: コーダー `claude-opus-5-5` (worktree `wt/v3-plan`、基点 main `c9a8973`)、PM の指示による。
 
@@ -30,12 +30,12 @@
 | 柱 | 中身 | 正典 (決定・票) | 状態 |
 |---|---|---|---|
 | **P0 規約と道具** | C11 (gnu11) への移行、型は固定長のまま、fork 先の検査・CI・文書 | `docs/archive/v3/TASK_C11_MIGRATION.md` (T0) | **受入完了** (2026-09-30、`f5bcb35`) |
-| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | [現行決定](../../decisions/MEMMAP_V3.md)・[配置の契約](../../design/include/memmap.md) (元の票分割・受入条件は記録はアーカイブ) | **T1 受入完了** (2026-10-01、TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`))、T2 は受入完了 (詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`))、T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19、[詳細](TASK_T4_T6_MODULES.md))、T7 は設計中 ([詳細](TASK_T7_AND_FOLLOWUPS.md)) |
+| **P1 メモリマップの再構築** | システムは恒等写像のまま、アプリだけ 0x80000000〜 の私有写像、物理地図 + 所有権台帳、固定帯はカーネル 3MB + シェル 1MB、SQLite・FEP 等をモジュールに、低位 640KB を V86 へ、OpenType | [現行決定](../../decisions/MEMMAP_V3.md)・[配置の契約](../../design/include/memmap.md) (元の票分割・受入条件は記録はアーカイブ) | **T1 受入完了** (2026-10-01、TASK_T1_LEDGER (アーカイブ: `docs/archive/v3/TASK_T1_LEDGER.md`))、T2 は受入完了 (詳細 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`))、T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19、[詳細](TASK_T4_T6_MODULES.md))、T7 は受入完了・実機確認待ち ([詳細](TASK_T7_AND_FOLLOWUPS.md)) |
 | **P2 ドライバの置き場** | 専用のモジュールローダ (ロード時検証、信頼する配布物だけ、IRQ 登録と初期化状態の結び付け、停止を証明できない失敗は隔離) | [モジュールの契約](../../design/kernel/module/module_runtime.md)、票 T4〜T5c・T6b | P1 の中で |
 | **P3 HAL の結線** | HAL_WIRING の残 (W7)、NIC 境界 (L-C)、音源バックエンド、1kHz tick | [TASK_HAL_WIRING.md](TASK_HAL_WIRING.md)、[realhw/TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md) | 一部着地 (v2.1)。1kHz tick は票が無い |
 | **P4 デバイス窓の資源割当** | 予約の核は T1 の台帳の MMIO 登録、P4 には順序契約 (識別 → 予約 → 写像 → probe / enable → 面公開) と検証済み資源レコード (実測 BAR) | [資源予約の契約](../../design/mm/pgalloc.md)・[識別と enable の境界](../../design/include/gfx_hal.md)、[settings/DEVICE_RESERVATION.md](../settings/DEVICE_RESERVATION.md) (改訂は P4 着手時) | T1 / T2 の後 |
-| **P5 実機ドライバ** | 82557 L-B〜L-E (最初、静的で入る)、PCM E4〜E6 → 合成器、Trident、FD144、KBD_NAV K3、実機の画面取得 (PLAN §5-4) | [TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md)、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md)、[TASK_TRIDENT_DRIVER.md](../realhw/TASK_TRIDENT_DRIVER.md)、[realhw/PLAN.md](../realhw/PLAN.md) | 82557 は P1 を待たない |
-| **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み)。**実測 (2026-10-16、Ra266、86ba40c)**: 実機の中だけで 10 MiB を `cp /data → /data` が 53.6 秒 (0.20 MB/s)、LAN で読んでディスクへ書く `cp /host → /data` は 56.6 秒で、ほとんどがディスク側 (`~/os32-tmp/evidence/2026-10-16/lan_10m/split/`)。台帳 DISKPERF-1 | ユーザー決定 2026-09-30 (草案 §3 の行)。**起票の指示 (ユーザー 2026-10-16)**: v3 のドライバ関係で起票する。現状の使用には足りている | 票は未起票。T3 の後、NP21/W と Ra266 で cp の時間の内訳 (IDE の転送方式・1 回の転送量・ext2 のメタデータの書き戻し) を測ってから |
+| **P5 実機ドライバ** | 82557 L-B〜L-E (最初、静的で入る)、PCM E5・E6 → 合成器、Trident、FD144、KBD_NAV K3、実機の画面取得 (PLAN §5-4) | [TASK_LAN_82557.md](../realhw/TASK_LAN_82557.md)、[TASK_PCM_CS4231.md](TASK_PCM_CS4231.md)、[TASK_TRIDENT_DRIVER.md](../realhw/TASK_TRIDENT_DRIVER.md)、[realhw/PLAN.md](../realhw/PLAN.md) | 82557 は P1 を待たない |
+| **P5 (追加) ディスクの速さ** | IDE の DMA 転送と ext2 の読み書きの経路 (ブロックキャッシュ・先読み)。**実測 (2026-10-16、Ra266、86ba40c)**: 実機の中だけで 10 MiB を `cp /data → /data` が 53.6 秒 (0.20 MB/s)、LAN で読んでディスクへ書く `cp /host → /data` は 56.6 秒で、ほとんどがディスク側 (`~/os32-tmp/evidence/2026-10-16/lan_10m/split/`)。台帳 DISKPERF-1 | ユーザー決定 2026-09-30 (草案 §3 の行)。**起票の指示 (ユーザー 2026-10-16)**: v3 のドライバ関係で起票する。現状の使用には足りている | **受入完了** (2026-11-04、票 [TASK_BLOCKDEV_PERF](TASK_BLOCKDEV_PERF.md)、実機 Ra266 で `cp` 約 5 倍・CD 約 4 倍) |
 | **P6 実行モデル** | 協調型を基本に、前景が固まったら CTRL+STOP で取り戻す。スケジューリングとしてのプリエンプションは求めない | 意図はユーザー決定 2026-09-30。仕上げはユーザー決定 2026-11-04 (原文): 「１．要らない。キーが効くのであればユーザーが任意で落とすべき」(自動の番犬は作らない)・「３．これは普通にその時に対処。デバッグする」(KAPI の中で固まるのはカーネルの不具合として直す)・「４．終わってからでいい。それでハングして止めるならユーザーの責任」(長い KAPI は終わってから止める)・「５．直す。」(x87 の初期化と保存復元)・GUI アプリからの `exec_run` をカーネルで断る (契約 F1 の強制、承認)・GUI の STOP が効かない 2 つの場合 (STOP の張本人と前景の連鎖の末尾が違う・窓の無いアプリ) は「直す」— WM を塞いでいる張本人 (`stop_wm_req` の current) がいればそれを止め、いなければ前景の連鎖の末尾 (PM 決定) | CTRL+STOP・故障の回収・GUI の KAPI-loop の STOP は実装済み (T7a ほか、`docs/09_exec.md`)。残りは x87・F1 の強制・STOP の宛先の 1 段 (p6-close) |
 | **P7 KAPI / ABI** | 後方互換は基本考えない、fork 時に 1 回整理 (スロット順を変えてよい)、世代の識別と旧新混在の試験が必須 | MEMMAP_V3 D7・**D35** | P1 と同時 |
 | **P8 GUI 層** | 8bpp のまま、音 (PCM リング) と入力の層、microUI へのマウスキー、F3a〜c 等 | MEMMAP_V3 D19 | v3 後半 (§5) |
@@ -47,12 +47,12 @@
 | 段 | やること | 並行してよいもの |
 |---|---|---|
 | 1 | **P0** — 単独で (コンパイラの変更と配置の変更を別々に受け入れ、障害の原因を分けるため。Codex X1)。**済** | — |
-| 2 | **P1 T1 → T2 → T3**、同時に **P7** の KAPI 整理。**P4** は T1 (台帳) の後・T2 の後 | **82557 L-B** (静的、P1 を待たない)、並行の実機確認 (HAL_WIRING W7、PCM E4〜E6、FD144、KBD_NAV K3)、P5 ディスクの実測 |
+| 2 | **P1 T1 → T2 → T3**、同時に **P7** の KAPI 整理。**P4** は T1 (台帳) の後・T2 の後 | **82557 L-B** (静的、P1 を待たない)、並行の実機確認 (HAL_WIRING W7、PCM E5・E6、FD144、KBD_NAV K3)、P5 ディスクの実測 |
 | 3 | **P1 T4 → T5a → T5b → T5c** (= **P2**) → **T7a → T7b** (T6b-1/2 は凍結・T6b-M は不要) | — |
 | 4 | **P3 → P5 の残り** (PCM の合成器、Trident 段 3〜5)、**P6** の実装 | — |
 | 5 | **v3 後半** (§5): P8 → P9、P10 の残り、GUI アプリ群 | — |
 
-T3以降の実装用詳細設計: T3 配置 (受入完了 2026-10-18、契約は 02_memory §2-1、経緯: `docs/archive/v3/TASK_T3_LAYOUT.md`)、[T4〜T6b モジュール・起動](TASK_T4_T6_MODULES.md)、[T7 低位・OpenType / P3〜P10 接続ゲート](TASK_T7_AND_FOLLOWUPS.md)。T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19)、T7 は設計中。各票の状態行を参照し、方針決定と実装・受入を区別する。
+T3以降の実装用詳細設計: T3 配置 (受入完了 2026-10-18、契約は 02_memory §2-1、経緯: `docs/archive/v3/TASK_T3_LAYOUT.md`)、[T4〜T6b モジュール・起動](TASK_T4_T6_MODULES.md)、[T7 低位・OpenType / P3〜P10 接続ゲート](TASK_T7_AND_FOLLOWUPS.md)。T3・T4 は受入完了 (2026-10-18)、T5 は完了 (2026-10-19)、T7 は受入完了・実機確認待ち。各票の状態行を参照し、方針決定と実装・受入を区別する。
 
 T3 着手前の文書再整備は済み (経緯: `docs/archive/v3/DOCS_REORG_T3.md`)。予算再計算の経緯: `docs/archive/v3/TASK_T2D_T2H.md` §6-1。
 
