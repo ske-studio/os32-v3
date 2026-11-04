@@ -254,3 +254,98 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 - N2: §4:89-90・§8 E2 を書き換える — 実機の学習の写しは「FD 起動 (FEP なし、旧辞書は開かれない) + LAN 版 SerialFS で /db/fep*.db を取り出す」(RA266 §0 の転送の優先度)。HDD を別の PC へつなぐ手段は使わない。NP21/W は既存の `tools/nhd_deploy.py` の pull と mount を読取りだけで使う。E2 は manifest を書く程度の数十行の道具に縮める。
 - N3: core が常駐の接続数 (`boot_check(live, …)` の第 1 引数、vfs.c:261-268 の完全一致) を受け取る口を FEP の ops (`boot_bytes` の隣) に 1 つ置く。学習が無効なら 1、有効なら 2 を返す。
 - R14: PM 決定 — 学習ファイルの custom path は /etc 直下に限る (票 §3 の「settings で上書き可」の範囲内の絞り込み、既存の列挙 hsync_protect.inc:163-198・hsync.c:1201-1261 をそのまま使う)。ユーザーへの未決は無し。
+
+
+## 追記 (2026-11-05、辞書のメタ情報を返す KAPI の口 — ユーザー「返す口だけでも設計させて」)
+
+> 出所: ~/os32-tmp/run/dictinfo/DESIGN.final.md (astra 起草 r1、Opus レビュー 1 回、PM が確定)。本文 §5 の 4 キーは下の確定 A1 で 20 キーに置き換える。
+
+# ime_dict_info — 辞書メタ情報を返す KAPI の詳細設計 r1
+2026-11-05 / Codex（実行モデル ID は取得不能。gpt-6-astra と断定しない）。
+対象は返却口だけ。リポジトリ編集・ビルド・試験・配備は未実施。
+根拠は `/home/hight/os32-v3` の `docs/decisions/fep/DICT_META_DESIGN.md` §2・3・5・6、`docs/tasks/fep/TASK_DICT_META.md:106`。
+追加規約は `docs/KAPI_SPEC.md` §3-1・3-3、`.claude/skills/os32-kapi-add/SKILL.md`、`docs/CONSTRAINTS.md` [C1]〜[D4]・[ABI]。
+
+### 1. 公開契約
+確定設計 §5 の分割返却案を採用。現在選択中のシステム辞書だけを対象とし、パス・SQL・接続・学習データを渡さない。
+```c
+/* sdk/include/os32/os32_kapi_shared.h: C89。公開構造体は作らない。 */
+#define IME_DICT_INFO_CAP 256
+/* IME_DICT_INFO_* のキー定数は下表の整数値を固定して定義する。 */
+/* KernelAPI メンバ／生成ラッパーの型 */
+int ime_dict_info(int key, int offset, char *out, int capacity);
+```
+公開構造体の `size` による版管理は不採用。可変長原文を固定長構造体に収めず、キー末尾追加と KAPI 版で拡張する。
+`offset` は先頭からの byte 数（0 以上）、`capacity` は NUL 込み 2〜256、`out` はその全域を書ける呼出元バッファ。
+成功はコピー byte 数 `n`（NUL を除く）。`n=min(残りbyte数,capacity-1)` とし `out[n]=0`。残りが無ければ 0 と `out[0]=0`。
+長さ以上の offset は EOF=0。加算で範囲判定せず、まず offset と長さを比較してから残長を引く。長さ照会専用モードは作らない。
+UTF-8 の文字途中でも byte 境界で分割する。呼出側は戻り値分を連結または逐次出力し、`offset += n`、0 で終了する。
+文末改行は付加しない。数値も符号なし十進 ASCII として返す（内部は u32）、空文字と未収録は区別する。
+
+### 2. キーと返す内容
+キー名は `IME_DICT_INFO_` に下表の大文字名を続ける。全キーが同じ文字列契約であり、バイナリ数値・enum の配置を公開しない。
+| 値 / キー名 | 確定設計の欄・値 / 元の型 |
+|---|---|
+| 1 STATUS | この口の状態文字列：`unloaded` / `metadata-unavailable` / `legacy` / `meta`（後述） |
+| 2 FORMAT_VERSION / 3 MIN_FEP_VERSION | §2 format_version / min_fep_version、u32。後者は FEP_DICT_READER_VERSION との照合値で KAPI 版ではない |
+| 4 DICT_ID / 5 KIND | §2 dict_id / kind、UTF-8。現設計では `ipadic-2.7.0` / `system` |
+| 6 LANGUAGE / 7 CHARSET / 8 VARIANT | §2 language / charset / variant、`ja` / `UTF-8` / `S`・`M`・`L` |
+| 9 SOURCE / 10 SOURCE_VERSION | §2 source / source_version、UTF-8 |
+| 11 LICENSE / 12 ATTRIBUTION | §2 license / attribution、原文全文 UTF-8。要約・固定長切捨て・ファイル参照への置換をしない |
+| 13 BUILD_TOOL / 14 BUILD_DATE | §2 build_tool / build_date、UTF-8 / UTC ISO 8601 |
+| 15 ENTRY_COUNT / 16 POS_TABLE_VERSION | §2 entry_count / pos_table_version、u32 |
+| 17 COST_SCALE | §2 cost_scale、UTF-8（現設計 `os32-log2047-boost-v1`） |
+| 18 MEM_RESERVE_KB / 19 CACHE_PAGES | §2 mem_reserve_kb / cache_pages、u32。予約は辞書要求 KiB、settings 上書き後の実効予約ではない |
+| 20 CHECKSUM | §2 checksum、`sha256:` + 64 hex。記録値であって今回の検証結果ではない |
+page_size・実効予約・学習 DB の created/migration・学習有効状態は追加しない。S/M/L は同じ dict_id、学習別ファイル化の契約を変えない。
+
+### 3. 状態・エラー・呼出文脈
+FEP 未ロードまたは services_public=0 は全キー `OS32_ERR_NOSYS(-10)`。ロード済みでも辞書無しなら STATUS=`unloaded`、他キーは `OS32_ERR_AGAIN(-14)`。
+引数不正（未知キー、負 offset、capacity 範囲外、NULL）は `OS32_ERR_INVAL(-9)`、既知キーの未収録は `OS32_ERR_NOTFOUND(-2)`。
+SQL/読取失敗または形式1の必須値欠落・不正は `OS32_ERR_IO(-1)`、失効接続は `OS32_ERR_STALE(-11)`。エラーでは out を更新しない。
+検査順は公開可否→引数→呼出元書込域→辞書状態/失効→値取得。CPL3 の不正書込域は既存契約どおり ring3_fault_kill（通常の負値復帰ではない）。
+CUI/GUI の通常処理、CPL3 アプリ・CPL0/WM から呼べる。IME OFF でも可。IRQ/NMI・描画/入力コールバック・SQLite 処理中の再入からは呼ばない。
+シングルタスク・協調切替を前提とし、この口の途中では yield・exec・コールバックを行わない。SQL 中に IRQ を長時間止めず、新しいロックは設けない。
+各呼出しはその時点の辞書を読む。複数回に跨るスナップショットは保証しない。全文取得中は呼出側が切替・yield を挟まず、失効時は取得を中断する。
+切替は成功した辞書の値だけを公開。旧辞書の復旧成功なら旧値、復旧失敗なら unloaded。照会から辞書 open・recover・切替を起動しない。
+
+### 4. 今返せる値と DICT_META 後
+現状 `kernel/ime/ime_dict.c` は meta/header を検査せず RW open、学習表同居。`ime.h` の db/path/isolated と接続の失効を確認する。
+口だけを先行実装した段では、使用可能な辞書の STATUS=`metadata-unavailable`、VARIANT は現在の固定3パスと一致する場合だけ返す。他キーは NOTFOUND。
+任意パスなら VARIANT も NOTFOUND にするだけで、辞書や呼出元を許可リストで拒否しない。現在のファイルを未検査のまま format=0/IPADIC と断定しない。
+DICT_META 実装後は、読込検査済み形式1を STATUS=`meta` として全欄を返す。entry_count は記録値を使い COUNT(*) しない。checksum も計算しない。
+検査済み旧形式は STATUS=`legacy`、format=0、確定設計 §2 の ID/品詞/尺度・固定パスの variant・予約192/cache16 を互換既定値として返す。
+旧形式の license/attribution・件数・生成情報等、同節が既定値を定めない欄は NOTFOUND。表示側が「旧形式に未収録」と表示し、偽の原文や件数0を返さない。
+
+### 5. 実装境界と登録（実装時の作業）
+```c
+/* sdk/kapi.json: api の末尾に1本。ret=int、args は §1、out="target" */
+/* name=ime_dict_info, target=ime_dict_info_facade */
+/* core fep_module.c -> FepModuleApi末尾 dict_info -> FEP ime_dict_api.inc */
+int ime_dict_info_facade(int key, int offset, char *out, int capacity);
+/* FEP 内部だけ。out は256Bのローカル staging、呼出元ポインタではない。 */
+int ime_meta_read(int key, int offset, char *out, int capacity);
+```
+facade は既存 ime_user_list_facade の caller_access_get/check_caller_write_range/copy_to_caller を踏襲。SQL 前に全 capacity を検査、終了後に n+1 byte を再検査してコピー。
+meta 読取は system 接続だけで既知キーをバインドし、長文は `substr(CAST(value AS BLOB),offset+1,capacity-1)` で取得。offset>=byte長なら SQL の offset+1 を計算せず EOF。
+SQLite の結果は step/reset/finalize 前に staging にコピーし、finalize 後に呼出元へ渡す。SQL失敗を EOF に丸めず、接続失効は SQL 前に検査。原文の常駐コピー・追加接続は作らない。
+FepModuleApi は20→21スロット、FEP_MODULE_OPS_VERSION は1→2、fep_body.c・core stub（NOSYS）・ロード検査の契約を同期し、旧部品を混用しない。
+現行 sdk/kapi.json は v79・255本。追加が先行しなければ v80/slot255。実装時に §3-2 と末尾を再確認し、KAPI_VERSION・関数表・依存 app.conf も更新する。
+gen_kapi.py/kapi_rust_gen.py で再生成、差分確認、PM の clean→all、担当別検査と CHECK lint。外部 apps/game は H-7 再開決定後。今回はこれらを実行しない。
+
+### 6. 試験と変異（実装時）
+host：実 facade/meta読取を既存 ime_dict_host 系へ接続し、全キー・未ロード/未読込/旧形式/形式1・未知キー・負offset・capacity 0/1/2/256/257・EOF/INT_MAXを検査。
+host：UTF-8途中分割を含む原文の全byte再結合、NUL/番兵、空値/未収録/SQL失敗、失効時SQL無し、caller RO/跨頁、切替失敗後の値、呼出元へSQLite pointerを残さないことを検査。
+変異：capacity-1→capacity、byte分割→文字分割、NOTFOUND/IO→EOF、失効検査除去、コピー前の再検査除去、切替前の値を返す、stub→成功を各固有anchorで実行時REDにする。
+NP21/W：停止→NHD配備→再起動後、実CPL3から256B分割し原文と照合、S/M/L切替、IME OFF/GUI、旧辞書・辞書無し・FEP無し・学習使用不可でもsystem情報取得を確認。先行段は未収録を期待する。
+### 7. 未決
+ユーザー判断が必要な未決：0件。推奨は上記の1口・文字列分割・構造体なし。学習パス等の既存未決はこの口に依存せず、今回再決裁しない。
+
+
+### 確定 (2026-11-05、Opus 第 1 回の条件付き承認、PM が反映)
+- A1: **20 キー** (ユーザー決定 2026-11-05「20」)。確定設計 DICT_META_DESIGN §5 の 4 キー (license・attribution・entry_count・status) を §2 の全欄の 20 キーに広げる。同じ SQL でキー名を引くだけで、後で版を上げずに済む。
+- A2: SQL の後のコピー前の再検査と、それを狙う変異を削除。copy_to_caller は 1 回だけ。最初の検査で n+1 ≤ capacity が成り立つ (シングルタスクで途中に yield が無い、手本 kernel/ime/ime_dict_api.inc:30 も 1 回)。
+- A3 (PM 決定): `SELECT length(CAST(value AS BLOB))` を先に引き、offset < len のときだけ substr に `(i64)offset+1` を bind_int64 で渡す (offset=INT_MAX の桁あふれを避ける)。
+- A4 (PM 決定): この口は dict_ready を呼ばない。vfs_fd_is_stale だけで STALE を返し、STATUS キーも STALE を返す (既存の ime_user_* と違い、開き直さない)。
+- A5 (PM 決定): v80 で一緒に入る 3 本 (STOP の宛先・gfx_osri_show・この口) の slot の並びは PM が統合の段で決める。
+- A6 (PM 決定): capacity が 256 を超えたら 256 として扱う (INVAL にしない)。
