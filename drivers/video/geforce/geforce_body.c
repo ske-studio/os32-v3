@@ -57,6 +57,10 @@ int geforce_module_init(GfxBackend *out, const GeforceModuleContext *context)
     rc=gf3_service_owner_bind(gf3_service_get(&production.chan),
                               gf4_service_owner_table());
     if (rc) return rc;
+    rc=gf5_service_init(&production, production.display.display4, context->feature5_out);
+    if (rc) return rc;
+    geforce_backend_feature5_bind(&production.feature5);
+    gf_hook_feature5_bind(&production.feature5);
     *context->foundation_out=&gf1_module_ops;
     return 0;
 }

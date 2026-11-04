@@ -34,6 +34,9 @@
 #include "../accel_service.h"
 #include "../production.h"
 #include "../../../drivers/video/geforce/geforce_module.h"
+#define GF_ROM_BIT_ONLY
+#include "../rom.inc"
+#undef GF_ROM_BIT_ONLY
 
 /* C2-service owns the address; C4/kernel owns the borrowed state/helpers. */
 static struct gf4_ctx svc_production_ctx;
@@ -185,7 +188,52 @@ i32 gf4_service_init(struct gf_production *p,struct gf_display_context *legacy)
     return gf4_service_bind(&svc_production_ctx,legacy,links);
 }
 
-/* Values only, before release. No ROM/span/init/program survives the loan.
+/* F5 borrows the same production owner as F3/F4. Prepare an independent M
+ * program before releasing devinit scratch (nvkm/subdev/fb/ramnv40.c:154-156,
+ * nvkm/subdev/bios/bit.c:29-55). No script execution or new register writes.
+ * A missing M script still permits full-ROM acquisition. PM decision 8:
+ * F5 failure is diagnostic only; the completed F4 baseline remains valid. */
+#define SVC_MEMORY_PC_BYTES 2U /* ramnv40.c:156: nvbios_rd16(bios, M.offset). */
+static void svc_feature5(struct gf4_ctx *c)
+{
+    struct gf3_service *s=gf3_service_get(c->ch);
+    struct gf5 *g=&s->production->feature5;
+    struct gf_init_context *init=c->legacy->init;
+    struct gf_init_program *memory=0;
+    void *allocation=0;
+    u32 table=0,length=0,pc=0;
+    u8 version=0;
+    i32 source=gf_rom_bit_entry(init->rom,init->rom_size,'M',&table,&length,&version);
+    i32 rc=source<0 ? GF5_EBIOS : 0;
+    g->deadline=c->deadline;
+    if (!source) {
+        if (length<SVC_MEMORY_PC_BYTES) { source=GF_SCRIPT_EIO; rc=GF5_EBIOS; }
+        else pc=(u32)init->rom[table]|(u32)init->rom[table+1]<<8;
+    }
+    if (!rc && pc>=init->rom_size && pc) {
+        source=GF_SCRIPT_EIO; rc=GF5_EBIOS;
+    }
+    if (!rc && pc) {
+        source=g->links.alloc(g->links.owner,sizeof(*memory),&allocation);
+        if (source) rc=gf5_rc_map(source);
+        else {
+            memory=allocation;
+            source=gf_init_script_prepare(init,memory,pc,0,0,c->deadline);
+            if (source) rc=source==GF_SCRIPT_EIO ? GF5_EBIOS : gf5_rc_map(source);
+        }
+    }
+    if (!rc) {
+        /* acquire maps its public return but retains the original allocator
+         * failure in source_rc. Do not replace that with the mapped value
+         * when recording this optional F5 failure (PM decisions 8 and 22). */
+        rc=gf5_rom_acquire(g,init->rom,init->rom_size,memory);
+        if (rc) source=g->source_rc;
+    }
+    if (allocation) g->links.free(g->links.owner,allocation);
+    if (rc) { g->last_rc=rc; g->source_rc=source; }
+}
+
+/* F4 keeps values only; F5 copies the full ROM and prepared M separately.
  * BMP signature: nvkm/subdev/bios/base.c:180-182. Limits: existing parser,
  * nvkm/subdev/bios/pll.c:162-175 (first entry fallback), :301-331. */
 static i32 svc_rom(struct gf4_ctx *c)
@@ -211,6 +259,7 @@ static i32 svc_rom(struct gf4_ctx *c)
         }
         if (!rc) rc=gf_init_run(l->init,l->program);
         if (!rc) rc=gf_display_baseline(l);
+        if (!rc) svc_feature5(c);
     }
     /* acquire may have allocated scratch even when it returns an error. */
     l->owner->release(l);

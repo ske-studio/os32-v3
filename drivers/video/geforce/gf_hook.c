@@ -29,6 +29,7 @@
 #include "gfx_hal.h"
 #include "../../../gfx/gfx_internal.h"
 #include "hwdev/gf/accel.h"
+#include "hwdev/gf/feature5.h"
 
 /* GXcopy from X11 GX, nv04_exa.c:46-84; all INDEX8 planes are selected. */
 #define GF_HOOK_GXCOPY 3U
@@ -37,6 +38,15 @@
 static struct gf3_ctx *hook_ctx;
 static struct gf3_surface hook_scan;
 static bool hook_active;
+/* GF_FEAT5_DESIGN C2: borrowed production owner, foreground entry only.
+ * therm/base.c:361-370 (nouveau c03c1a1) schedules work; OS32 polls here. */
+static struct gf5 *hook_feature5;
+void gf_hook_feature5_bind(struct gf5 *g) { hook_feature5 = g; }
+
+static int hook_feature5_poll(void)
+{
+    return hook_feature5 ? gf5_service_poll(hook_feature5) : 0;
+}
 
 void gf_hook_ctx_bind(struct gf3_ctx *ctx)
 {
@@ -68,6 +78,8 @@ int geforce_fill_rect(int x, int y, int w, int h, u8 color)
 {
     u32 dl;
     if (!hook_active || !hook_ctx) return OS32_ERR_NOSYS;
+    int poll = hook_feature5_poll();
+    if (poll) return poll;
     if (!gfx_clip_screen(&x, &y, &w, &h, hook_scan.width, hook_scan.height))
         return 0;
     if (hook_deadline(&dl)) return OS32_ERR_IO;
@@ -82,6 +94,8 @@ int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
 {
     u32 dl;
     if (!hook_active || !hook_ctx) return OS32_ERR_NOSYS;
+    int poll = hook_feature5_poll();
+    if (poll) return poll;
     if (dx < 0 || dy < 0 || sx < 0 || sy < 0) return OS32_ERR_INVAL;
     if ((u32)dx >= hook_scan.width || (u32)sx >= hook_scan.width ||
         (u32)dy >= hook_scan.height || (u32)sy >= hook_scan.height) return 0;

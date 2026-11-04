@@ -115,6 +115,10 @@ i32 gf5_perf_count(struct gf5 *, u32 *);
 i32 gf5_perf_get(struct gf5 *, u32 index, struct gf5_perf_entry *);
 i32 gf5_perf_select(struct gf5 *, u8 index);
 i32 gf5_therm_read(struct gf5 *, struct gf5_thermal *);
+/* N/nvkm/subdev/therm/base.c:376–394: sensor setup, saved duty/mode,
+ * then sensor/fan deadlines from clock64. Copy into the existing trip array;
+ * ntrip mismatch is ESTATE. No allocation or trip ownership transfer. */
+i32 gf5_therm_resume(struct gf5 *, const struct gf5_fan_saved *saved);
 i32 gf5_fan_mode_set(struct gf5 *, enum gf5_fan_mode);
 i32 gf5_fan_get(struct gf5 *, u32 *percent);
 i32 gf5_fan_cstate(struct gf5 *, u8 percent, i32 dir);
