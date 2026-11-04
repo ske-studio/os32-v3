@@ -210,12 +210,26 @@ class CacheTests(unittest.TestCase):
             with mock.patch.dict(os.environ, OS32_CHECK_CACHE='off'):
                 self.assertEqual(cd.check_internal_units([unit], self.root), updated)
 
+    def test_vendor_spelling_is_not_shared(self):
+        # The vendor exemption reads the spelling of src; the key reads its bytes.
+        vendor = self.root / 'lib/zlib'
+        vendor.mkdir(parents=True)
+        (vendor / 'a.c').write_text('#include "inner.h"\n')
+        (self.root / 'inner.h').write_text('int f(int *restrict p);\n')
+        spellings = [dict(src='lib/zlib/a.c', argv=self.argv),
+                     dict(src=str(vendor / 'a.c'), argv=self.argv)]
+        with mock.patch.dict(os.environ, OS32_CHECK_CACHE='off'):
+            off = [cd.check_internal_units([u], self.root)[0] for u in spellings]
+        self.assertNotEqual(off[0], off[1])
+        self.assertEqual([cd.check_internal_units([u], self.root)[0] for u in spellings], off)
+
 
 MUTATIONS = [
     ('dependency bytes', 'hashlib.sha256(p.read_bytes()).hexdigest())\n                   for p in sorted(paths',
      "'ignored')\n                   for p in sorted(paths"),
     ('arguments', '_arguments(argv, root), _arguments(args, root),', '[], [],'),
-    ('checker hash', '_checker_source_digest(tool)]', "'ignored']"),
+    ('checker hash', '_checker_source_digest(tool), variant]', "'ignored', variant]"),
+    ('variant', '_checker_source_digest(tool), variant]', '_checker_source_digest(tool), None]'),
     ('compiler identity', '_compiler_identity(), _checker_source_digest(tool)',
      '[], _checker_source_digest(tool)'),
     ('expanded output', 'inputs.append(hashlib.sha256(expanded).hexdigest())',

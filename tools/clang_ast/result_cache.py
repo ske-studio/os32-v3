@@ -89,7 +89,7 @@ def _arguments(argv, root):
     return result
 
 
-def _internal_cache_key(tool, src, argv, root):
+def _internal_cache_key(tool, src, argv, root, variant=None):
     """Resolve every dependency afresh, including system/generated headers."""
     root = pathlib.Path(root).absolute()
     args = ast.flags(argv, root)
@@ -113,7 +113,7 @@ def _internal_cache_key(tool, src, argv, root):
               hashlib.sha256((root / src).read_bytes()).hexdigest(),
               _arguments(argv, root), _arguments(args, root),
               os.environ.get('OS32_CLANG_CROSS_FREE', ''),
-              _compiler_identity(), _checker_source_digest(tool)]
+              _compiler_identity(), _checker_source_digest(tool), variant]
     # Raw dependency contents catch comments and unexpanded macro changes too.
     inputs.append([(_name(p, root), hashlib.sha256(p.read_bytes()).hexdigest())
                    for p in sorted(paths, key=lambda p: _name(p, root))])
@@ -168,17 +168,19 @@ def _write(path, tool, key, result):
                 pass
 
 
-def get_or_compute(tool, src, argv, root, compute):
+def get_or_compute(tool, src, argv, root, compute, variant=None):
     """Return a JSON list/dict, or propagate compute's exception without saving.
 
     p2v may store findings and its function/scanned/include sets as JSON arrays
     within a dict. Rule aggregation and exception policy remain with the caller.
+    variant is JSON for caller decisions made outside the unit's bytes (c-dialect's vendor
+    exemption reads the spelling of src), so a hit never crosses them.
     """
     directory = _directory()
     if directory is None:
         return compute()
     try:
-        key = _internal_cache_key(tool, src, argv, root)
+        key = _internal_cache_key(tool, src, argv, root, variant)
     except (OSError, ValueError, KeyError, ast.ParseError, subprocess.SubprocessError,
             ctypes.ArgumentError, AttributeError):
         key = None

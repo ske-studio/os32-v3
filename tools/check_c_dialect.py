@@ -418,7 +418,8 @@ def check_internal_units(units, root, jobs=None):
             return sorted(unit_probs)
 
         try:
-            probs.update(get_or_compute('c-dialect', src, argv, root, compute))
+            probs.update(get_or_compute('c-dialect', src, argv, root, compute,
+                                       variant=dict(vendor=vendor)))
         except ast.ParseError as e:
             probs.add('%s: clang parse failure — %s' % (src,e))
     return sorted(probs),count
