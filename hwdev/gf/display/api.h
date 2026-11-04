@@ -135,7 +135,13 @@ const struct gf3_service_owner *gf4_service_owner_table(void);
 /* C2-service owns one resident production ctx; C3 calls after owner_bind.
  * C2-links supplies its resident callback table to this initial binding. */
 i32 gf4_service_init(struct gf_production *,struct gf_display_context *legacy);
-const struct gf4_links *gf4_links_table(void);
+/* C2-links owns the resident links and exec tables. gf4_service_init sets
+ * ctx->links/exec from these, then links->owner = ctx, before
+ * gf4_service_bind (PM 2026-11-04, C2-links gaps). */
+struct gf4_links *gf4_links_table(void);
+const struct gf4_exec_ops *gf4_exec_table(void);
+/* C2-recover owns the body of links.failed. */
+i32 gf4_service_failed(void *owner,i32 cause,u32 dl);
 i32 gf4_service_bind(struct gf4_ctx *,struct gf_display_context *,const struct gf4_links *);
 i32 gf4_service_start(struct gf4_ctx *,u32 dl);
 i32 gf4_service_stop(struct gf4_ctx *,u32 dl);
