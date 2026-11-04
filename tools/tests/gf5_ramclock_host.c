@@ -30,6 +30,7 @@
 #define GF5_HOST_UNIT 2
 #include "gf5_fake.h"
 
+/* Register/command golden values: ramnv40.c:78-175. */
 #define STRIDE 0x2000U /* ramnv40.c:80 */
 #define VBL 0x600808U
 #define HIGH 0x10000U
@@ -42,6 +43,20 @@
 #define MUX 0xc040U
 #define AUTO 0x100210U
 #define SELF 0x1002dcU
+/* ramnv40.c:115-120,145-152: prepare/refresh/mux and settle values. */
+#define PRECHARGE 0x1002d4U
+#define REFRESH 0x1002d0U
+#define AUTO_BIT 0x80000000U
+#define MUX_MASK 0xc000U
+#define COMMAND 1U
+#define WORD 4U
+#define BYTE 1U
+#define SR1 1U /* ramnv40.c:84,112,172 */
+#define HEADS 2U /* ramnv40.c:79 */
+#define PROBES 33U /* ramnv40.c:81-94: do/while cnt++ < 32 */
+#define SETTLE_US 100U /* ramnv40.c:145,152 */
+#define VBLANK_US 2000000U /* ramnv40.c:102,108,166: 2000ms */
+/* Synthetic saved state and B1 plan, independent of the product solver. */
 #define OLD_CTRL 0x80000100U
 #define OLD_COEF 0x1401U
 #define OLD_MUX 0xc123U
@@ -63,16 +78,28 @@ static u32 write_count, read_count, sleep_count, clock_count, self_depth;
 static bool timeout_jump;
 struct golden { u32 off,width,value; };
 static const struct golden golden[] = {
-    {SR_INDEX,1,1}, {SR_INDEX+STRIDE,1,1},
-    {SR_INDEX,1,1}, {SR_DATA,1,SR_OLD|BLANK},
-    {SR_INDEX+STRIDE,1,1}, {SR_DATA+STRIDE,1,SR_OLD|BLANK},
-    {0x1002d4,4,1}, {0x1002d0,4,1}, {0x1002d0,4,1},
-    {AUTO,4,0}, {SELF,4,1}, {MUX,4,0x123},
-    {CTRL,4,NEW_CTRL}, {COEF,4,NEW_COEF}, {MUX,4,OLD_MUX},
-    {SELF,4,0}, {AUTO,4,0x80000000},
-    {SR_INDEX,1,1}, {SR_DATA,1,SR_OLD},
-    {SR_INDEX+STRIDE,1,1}, {SR_DATA+STRIDE,1,SR_OLD}
+    {SR_INDEX,BYTE,SR1}, {SR_INDEX+STRIDE,BYTE,SR1},
+    {SR_INDEX,BYTE,SR1}, {SR_DATA,BYTE,SR_OLD|BLANK},
+    {SR_INDEX+STRIDE,BYTE,SR1}, {SR_DATA+STRIDE,BYTE,SR_OLD|BLANK},
+    {PRECHARGE,WORD,COMMAND}, {REFRESH,WORD,COMMAND}, {REFRESH,WORD,COMMAND},
+    {AUTO,WORD,0}, {SELF,WORD,COMMAND}, {MUX,WORD,OLD_MUX&~MUX_MASK},
+    {CTRL,WORD,NEW_CTRL}, {COEF,WORD,NEW_COEF}, {MUX,WORD,OLD_MUX},
+    {SELF,WORD,0}, {AUTO,WORD,AUTO_BIT},
+    {SR_INDEX,BYTE,SR1}, {SR_DATA,BYTE,SR_OLD},
+    {SR_INDEX+STRIDE,BYTE,SR1}, {SR_DATA+STRIDE,BYTE,SR_OLD}
 };
+/* Same ramnv40.c:115-152 sequence with the saved PLL, never BIT M.
+ * GF_FEAT5_DESIGN section 3 requires one best-effort pass on failure. */
+static const struct golden rollback_golden[] = {
+    {PRECHARGE,WORD,COMMAND}, {REFRESH,WORD,COMMAND}, {REFRESH,WORD,COMMAND},
+    {AUTO,WORD,0}, {SELF,WORD,COMMAND}, {MUX,WORD,OLD_MUX&~MUX_MASK},
+    {CTRL,WORD,OLD_CTRL}, {COEF,WORD,OLD_COEF}, {MUX,WORD,OLD_MUX},
+    {SELF,WORD,0}, {AUTO,WORD,AUTO_BIT}
+};
+#define GOLDEN_WRITES (sizeof(golden)/sizeof(golden[0]))
+#define RESTORE_WRITES (HEADS * 2U) /* index + data per saved SR1 */
+#define SCRIPT_WRITES (GOLDEN_WRITES - RESTORE_WRITES)
+#define ROLLBACK_WRITES (sizeof(rollback_golden)/sizeof(rollback_golden[0]))
 static u32 reg(u32 off)
 {
     u32 v=0;
@@ -91,7 +118,7 @@ static void observe_mmio(struct gf4_host *d,const struct gf4_host_event *e)
         if (e->op==D_READ || e->op==D_WRITE) assert(e->a[0]==0);
         assert(!h.calls[F5_COPY] && !h.calls[F5_RESUME]);
     }
-    if (timeout_jump && e->op==D_SLEEP) h.now+=2000000U;
+    if (timeout_jump && e->op==D_SLEEP) h.now+=VBLANK_US;
 }
 static void observe_link(struct gf5_host *host,const struct gf5_host_event *e)
 {
@@ -99,7 +126,7 @@ static void observe_link(struct gf5_host *host,const struct gf5_host_event *e)
         assert(!self_depth && !host->ctx.accepting && host->display.base.paused);
         assert(e->a[0]==M_PC && e->a[1]==DEADLINE);
         assert(e->p[1]==&program && host->ctx.rom.bytes==rom);
-        assert(reg(AUTO)==0x80000000U);
+        assert(reg(AUTO)==AUTO_BIT);
     }
     if (e->op==F5_RESUME) assert(!self_depth);
 }
@@ -122,19 +149,19 @@ static void setup(u32 active,u32 preblank,bool script)
     gf3_host_set(&h.display.base,0,CTRL,OLD_CTRL);
     gf3_host_set(&h.display.base,0,COEF,OLD_COEF);
     gf3_host_set(&h.display.base,0,MUX,OLD_MUX);
-    gf3_host_set(&h.display.base,0,AUTO,0x80000000U);
+    gf3_host_set(&h.display.base,0,AUTO,AUTO_BIT);
     u32 n=0;
-    for (u32 head=0;head<2;++head) {
+    for (u32 head=0;head<HEADS;++head) {
         u32 off=VBL+head*STRIDE;
         add_read(off,0,&n);
         if (active&(1U<<head)) add_read(off,1,&n);
-        else for (u32 probe=0;probe<33;++probe) add_read(off,0,&n);
+        else for (u32 probe=0;probe<PROBES;++probe) add_read(off,0,&n);
     }
-    for (u32 head=0;head<2;++head) if ((active&~preblank)&(1U<<head)) {
+    for (u32 head=0;head<HEADS;++head) if ((active&~preblank)&(1U<<head)) {
         add_read(VBL+head*STRIDE,0,&n);
         add_read(VBL+head*STRIDE,HIGH,&n);
     }
-    for (u32 head=0;head<2;++head) if ((active&~preblank)&(1U<<head))
+    for (u32 head=0;head<HEADS;++head) if ((active&~preblank)&(1U<<head))
         add_read(VBL+head*STRIDE,HIGH,&n);
     gf4_host_reads(&h.display,reads,n);
     h.display.observe=observe_mmio; h.observe=observe_link;
@@ -147,6 +174,41 @@ static void retained(void)
     assert(h.display.base.paused && !h.display.ctx.accepting);
     assert(h.ctx.rom.bytes==rom && h.ctx.rom.memory_program==&program);
     assert(h.ctx.rom.size==sizeof(rom) && h.ctx.deadline==DEADLINE);
+}
+/* Compare every write, including the failed attempt, with one complete
+ * rollback before SR1 (script failure) or after SR1 (late I/O failure). */
+static void recovery_trace(bool late)
+{
+    u32 n=0, slept=0, settle_left=0;
+    u32 prefix=late?GOLDEN_WRITES:SCRIPT_WRITES;
+    for (u32 i=0;i<h.display.nevents;++i) {
+        const struct gf4_host_event *e=&display_events[i];
+        if (e->op==D_SLEEP) {
+            assert(e->a[0] && e->a[0]<=GF2_WAIT_MAX_US && e->a[0]<=settle_left);
+            slept+=e->a[0]; settle_left-=e->a[0];
+        }
+        if (e->op!=D_WRITE) continue;
+        assert(!settle_left);
+        const struct golden *expected;
+        if (n<prefix) expected=&golden[n];
+        else if (n<prefix+ROLLBACK_WRITES) expected=&rollback_golden[n-prefix];
+        else {
+            assert(!late && n<GOLDEN_WRITES+ROLLBACK_WRITES);
+            expected=&golden[n-ROLLBACK_WRITES];
+        }
+        assert(e->a[0]==0 && e->a[1]==expected->off);
+        assert(e->a[2]==expected->width && e->a[3]==expected->value);
+        if (expected->off==COEF || (expected->off==AUTO && expected->value==AUTO_BIT))
+            settle_left=SETTLE_US;
+        ++n;
+    }
+    assert(n==GOLDEN_WRITES+ROLLBACK_WRITES && !settle_left);
+    /* ramnv40.c:145,152: two settles for each of forward and rollback. */
+    assert(slept==2U*2U*SETTLE_US);
+    assert(reg(CTRL)==OLD_CTRL && reg(COEF)==OLD_COEF && reg(MUX)==OLD_MUX);
+    assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
+    assert(h.display.sr[0][SR1]==SR_OLD && h.display.sr[1][SR1]==SR_OLD);
+    assert(h.calls[F5_SCRIPT]==1 && !h.calls[F5_ADMIT]);
 }
 static void normal(void)
 {
@@ -164,7 +226,7 @@ static void normal(void)
         }
         if (e->op==D_SLEEP) { assert(e->a[0]==GF2_WAIT_MAX_US); ++settles; }
     }
-    assert(n==sizeof(golden)/sizeof(golden[0]) && settles==2U*(100U/GF2_WAIT_MAX_US));
+    assert(n==sizeof(golden)/sizeof(golden[0]) && settles==2U*(SETTLE_US/GF2_WAIT_MAX_US));
     assert(h.calls[F5_PAUSE]==1 && h.calls[F5_RESUME]==1 && h.calls[F5_SCRIPT]==1);
     assert(h.calls[F5_ADMIT]==1 && h.ctx.accepting && !h.display.base.paused);
     assert(h.ctx.source_rc==0 && h.ctx.last_rc==0 && h.ctx.phase==GF5_RUN);
@@ -182,7 +244,7 @@ void _start(void)
         gf4_host_write_applied_error(&h.display,nth,-77);
         assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
         retained(); assert(h.ctx.source_rc==-77 && h.ctx.last_rc==GF5_EIO);
-        assert(!reg(SELF) && reg(AUTO)==0x80000000U);
+        assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
         assert(h.calls[F5_SCRIPT]<=1);
     }
     for (u32 nth=1;nth<=read_count;++nth) {
@@ -190,7 +252,7 @@ void _start(void)
         gf4_host_fail_at(&h.display,D_READ,nth,-78);
         assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
         assert(h.ctx.source_rc==-78 && !h.calls[F5_RESUME]);
-        assert(!reg(SELF) && reg(AUTO)==0x80000000U);
+        assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
     }
     for (u32 nth=1;nth<=sleep_count;++nth) {
         setup(3,0,true);
@@ -204,22 +266,32 @@ void _start(void)
         gf4_host_fail_at(&h.display,D_CLOCK,nth,-80);
         assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
         retained(); assert(h.ctx.source_rc==-80);
-        assert(!reg(SELF) && reg(AUTO)==0x80000000U);
+        assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
     }
     setup(3,0,true);
     gf5_host_fail_at(&h,F5_SCRIPT,1,GF_SCRIPT_ETIME);
     assert(gf5_ram_prog(&h.ctx,&plan)==GF5_ETIME);
     retained(); assert(h.calls[F5_SCRIPT]==1 && h.ctx.source_rc==GF_SCRIPT_ETIME);
-    assert(reg(CTRL)==OLD_CTRL && reg(COEF)==OLD_COEF && reg(MUX)==OLD_MUX);
+    recovery_trace(false);
+    /* Each saved SR1 index/data write can report an applied I/O failure.
+     * These run after the initial rollback decision; still restore PLL once. */
+    for (u32 nth=SCRIPT_WRITES+1U;nth<=GOLDEN_WRITES;++nth) {
+        setup(3,0,true);
+        gf4_host_write_applied_error(&h.display,nth,-77);
+        assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
+        retained(); assert(h.ctx.source_rc==-77 && h.ctx.last_rc==GF5_EIO);
+        recovery_trace(true);
+    }
     /* Rollback failure cannot suppress controller/SR1 cleanup or mask cause. */
     setup(3,0,true);
     gf5_host_fail_at(&h,F5_SCRIPT,1,-81);
-    gf4_host_fail_at(&h.display,D_WRITE,18,-82); /* first rollback auto write */
+    gf4_host_fail_at(&h.display,D_WRITE,SCRIPT_WRITES+1U,-82); /* rollback precharge */
     assert(gf5_ram_prog(&h.ctx,&plan)==GF5_EIO);
-    retained(); assert(h.ctx.source_rc==-81 && !reg(SELF) && reg(AUTO)==0x80000000U);
+    retained(); assert(h.ctx.source_rc==-81 && !reg(SELF) && reg(AUTO)==AUTO_BIT);
+    recovery_trace(false);
     setup(0,0,false);
     assert(gf5_ram_prog(&h.ctx,&plan)==0 && h.calls[F5_SCRIPT]==0);
-    assert(h.display.calls[D_SLEEP]==2U*33U+2U*(100U/GF2_WAIT_MAX_US));
+    assert(h.display.calls[D_SLEEP]==HEADS*PROBES+2U*(SETTLE_US/GF2_WAIT_MAX_US));
     setup(3,2,false);
     assert(gf5_ram_prog(&h.ctx,&plan)==0);
     assert(h.display.sr[0][1]==SR_OLD && h.display.sr[1][1]==(SR_OLD|BLANK));
@@ -257,7 +329,7 @@ void _start(void)
     retained(); assert(!h.calls[F5_SCRIPT] && reg(CTRL)==OLD_CTRL);
     assert(h.display.sr[0][1]==SR_OLD && h.display.sr[1][1]==SR_OLD);
     for (u32 i=0;i<h.display.nevents;++i)
-        assert(display_events[i].op!=D_WRITE || display_events[i].a[1]!=0x1002d4U);
-    assert(!reg(SELF) && reg(AUTO)==0x80000000U);
+        assert(display_events[i].op!=D_WRITE || display_events[i].a[1]!=PRECHARGE);
+    assert(!reg(SELF) && reg(AUTO)==AUTO_BIT);
     gf2_host_exit(0);
 }

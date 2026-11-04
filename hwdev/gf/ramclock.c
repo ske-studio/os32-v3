@@ -129,7 +129,11 @@ static i32 cleanup_delay(struct gf_io *io)
 }
 static i32 rollback(struct gf_io *io, u32 ctrl, u32 coef, u32 mux)
 {
-    i32 rc = mask(io, RAM_AUTO, RAM_AUTO_BIT, 0);
+    /* ramnv40.c:115-120: prepare again after normal refresh / BIT M. */
+    i32 rc = wr(io, RAM_PRECHARGE, RAM_WORD, 1);
+    first(&rc, wr(io, RAM_REFRESH, RAM_WORD, 1)); /* rollback refresh first */
+    first(&rc, wr(io, RAM_REFRESH, RAM_WORD, 1)); /* rollback refresh second */
+    first(&rc, mask(io, RAM_AUTO, RAM_AUTO_BIT, 0));
     first(&rc, wr(io, RAM_SELF, RAM_WORD, 1));
     first(&rc, mask(io, RAM_MUX, RAM_MUX_MASK, 0));
     first(&rc, wr(io, RAM_CTRL, RAM_WORD, ctrl));
@@ -151,7 +155,7 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
 {
     struct gf_io *io;
     u32 ctrl, coef, mux, sr[RAM_HEADS] = {0}, active = 0, blanked = 0;
-    bool touched = false, reopen;
+    bool touched = false, rolled_back = false, reopen;
     i32 rc;
     if (!g || !plan) return finish(g, GF5_EINVAL);
     if (!g->ch || !g->ch->f || !g->links.owner || !g->links.drain_pause ||
@@ -221,13 +225,19 @@ i32 gf5_ram_prog(struct gf5 *g, const struct gf5_plan *plan)
     if (!rc && g->rom.memory_program)
         rc = g->links.memory_script(g->links.owner, g->rom.memory_pc);
 cleanup:
-    if (rc && touched) (void)rollback(io, ctrl, coef, mux);
+    if (rc && touched) {
+        (void)rollback(io, ctrl, coef, mux);
+        rolled_back = true;
+    }
     /* ramnv40.c:161-175: even timeout must attempt every saved SR1. */
     for (u32 h = 0; h < RAM_HEADS; ++h) {
         if (!(blanked & (1U << h))) continue;
         if (!rc) first(&rc, vblank(g, io, h, true));
         first(&rc, sr_write(io, h, sr[h]));
     }
+    /* SR1/vblank can fail after the first rollback decision. Preserve rc,
+     * and include this late failure in the same single old-PLL attempt. */
+    if (rc && touched && !rolled_back) (void)rollback(io, ctrl, coef, mux);
     if (rc) goto failed;
     rc = g->links.unpause(g->links.owner);
     if (!rc && reopen) rc = g->links.admission(g->links.owner, true);
