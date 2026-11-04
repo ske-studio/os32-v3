@@ -18,6 +18,8 @@
 #define PL_ADOPTED_OUTS SPLASH_RASTER_IMAGE_OUTS
 #define PL_INITIAL_OUTS (OSRI_COLORS * 4u)
 #define PL_IF_MAX_US 20000u
+/* Same finite status-poll bound as splash_raster.c and the OBS player. */
+#define PL_PREVIEW_POLL_LIMIT 1000000u
 
 typedef unsigned long long PlTime;
 typedef struct SplashRasterTimeRange PlRange;
@@ -92,7 +94,7 @@ static struct {
     const struct OsriImage *image;
     const struct PlPlan *plan;
     PlTime fmin, fmax, last_clock;
-    int anchored, clocked;
+    int anchored, clocked, previewed;
 } pl_context;
 
 static PlRange window_time(const struct PlWindow *w, u32 i)
@@ -240,6 +242,7 @@ int pl_prepare(const struct OsriImage *image, u8 n, struct PlPlan *plan)
     if (!image || !plan || !qualified(p, s)) return -1;
     pl_context.anchored = 0;
     pl_context.clocked = 0;
+    pl_context.previewed = 0;
     pl_context.plan = NULL;
     for (u32 i = 0; i < OSRI_COLORS; i++) palette[i] = image->pal[i];
     for (u32 y = 0; y < SPLASH_RASTER_VISIBLE_LINES; y++)
@@ -496,6 +499,50 @@ static int finish(struct SplashRaster *s, const struct OsriImage *image,
     return rc;
 }
 
+static u32 preview_rounds(const struct SplashRaster *s)
+{
+    unsigned long long period = (unsigned long long)s->total_lines * s->line_num_us;
+    unsigned long long duration = (unsigned long long)SPLASH_RASTER_PREVIEW_MS *
+                                 SPLASH_RASTER_US_PER_MS * s->line_den;
+    return (u32)((duration + period - 1) / period);
+}
+
+static int preview_vsync(int high, const struct PlProfile *p, PlTime deadline)
+{
+    /* R1 retains its boot deadline and calibrated open-wait limits.
+     * OBS has no clock budget and keeps its finite-poll wait below. */
+    if (p) {
+        PlTime now, before, after;
+        if (now_us(&now)) return -1;
+        return open_status(p, GDC_STAT_VSYNC, high,
+                           earlier(now + SPLASH_RASTER_SYNC_TIMEOUT_US, deadline),
+                           &before, &after);
+    }
+    for (u32 i = 0; i < PL_PREVIEW_POLL_LIMIT; i++)
+        if (!!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC) == high) return 0;
+    return -1;
+}
+
+static int preview(struct SplashRaster *s, const struct PlProfile *p, PlTime deadline)
+{
+    if (!s || !s->checked || !s->dynamic_ok || !_irq_enabled() ||
+        !s->line_num_us || !s->line_den ||
+        s->total_lines <= SPLASH_RASTER_VISIBLE_LINES) return -1;
+    palette_init();
+    /* Align once, then count full periods: a partially elapsed first
+     * VBLANK must not shorten the requested one-second preview. */
+    if (preview_vsync(0, p, deadline) || preview_vsync(1, p, deadline)) return -1;
+    u32 rounds = preview_rounds(s);
+    for (u32 round = 0; round < rounds; round++)
+        if (preview_vsync(0, p, deadline) || preview_vsync(1, p, deadline)) return -1;
+    return 0;
+}
+
+int pl_preview(struct SplashRaster *s)
+{
+    return preview(s, NULL, 0);
+}
+
 int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
              const struct PlPlan *plan, PlTime deadline_us)
 {
@@ -522,6 +569,16 @@ int pl_frame(struct SplashRaster *s, const struct OsriImage *image,
                       p->extra[PL_FRAME_REMAIN].time.max +
                       p->extra[PL_CEXIT].time.max +
                       p->extra[PL_COMMON_EXIT].time.max, den);
+    if (image->count && !pl_context.previewed) {
+        PlTime preview_us = ((PlTime)(preview_rounds(s) + 1u) * s->total_lines *
+                          s->line_num_us + s->line_den - 1u) / s->line_den;
+        if (now >= deadline_us || preview_us + reserve > deadline_us - now)
+            return finish(s, image, 0, PL_FRAME_DEADLINE);
+        if (preview(s, p, deadline_us - reserve))
+            return finish(s, image, 0, PL_FRAME_NO_SYNC);
+        pl_context.previewed = 1;
+        if (now_us(&now)) return finish(s, image, 0, PL_FRAME_NO_SYNC);
+    }
     if (now >= deadline_us || reserve > deadline_us - now)
         return finish(s, image, 0, PL_FRAME_DEADLINE);
     cutoff = earlier(now + SPLASH_RASTER_SYNC_TIMEOUT_US,
@@ -703,3 +760,197 @@ restore:
         finish(s, image, applied_line, PL_FRAME_DROP);
     return finish(s, image, applied_line, rc);
 }
+
+#ifdef SPLASH_RASTER_OBS
+/* Observation only: same finite poll cap as splash_raster.c's POLL_LIMIT.
+ * These columns deliberately have no R1 qualification or PIT settlement. */
+#define PL_OBS_POLL_LIMIT 1000000u
+
+int pl_obs_prepare(const struct OsriImage *image, u8 colors, struct PlObsPlan *plan)
+{
+    if (!image || !plan || colors < 1 || colors > OSRI_COLORS ||
+        image->version != OSRI_VERSION_2 || image->band != 1 ||
+        image->count != (SPLASH_RASTER_VISIBLE_LINES - 1) * colors)
+        return -1;
+    plan->row[0] = (struct PlObsRow){0};
+    for (u32 y = 1; y < SPLASH_RASTER_VISIBLE_LINES; y++) {
+        struct PlObsRow *r = &plan->row[y];
+        *r = (struct PlObsRow){0};
+        u32 previous = 0;
+        for (u32 j = 0; j < colors; j++) {
+            const struct OsriEvent *e = &image->event[(y - 1) * colors + j];
+            if (e->line != y || e->index >= OSRI_COLORS ||
+                (j && e->index <= previous) || e->rgb444 > 0xfff ||
+                e->reserved0 || e->reserved1) return -1;
+            previous = e->index;
+            if (!j) r->first = e->index;
+            else {
+                r->port[r->count] = PAL_IDX_PORT;
+                r->value[r->count++] = e->index;
+            }
+            /* Same RGB still writes all three components: N counts slots. */
+            r->port[r->count] = PAL_G_PORT;
+            r->value[r->count++] = (e->rgb444 >> 4) & GFX_PALETTE_COMPONENT_MASK;
+            r->port[r->count] = PAL_R_PORT;
+            r->value[r->count++] = (e->rgb444 >> 8) & GFX_PALETTE_COMPONENT_MASK;
+            r->port[r->count] = PAL_B_PORT;
+            r->value[r->count++] = e->rgb444 & GFX_PALETTE_COMPONENT_MASK;
+        }
+    }
+    return 0;
+}
+
+/* Select a fully expanded column before polling its edge. Every emitter
+ * writes offsets in ascending order; no loop or color decoding inside H. */
+typedef void (*PlObsEmit)(const struct PlObsRow *);
+#define OBS_OUT_0 (void)r
+#define OBS_OUT_1 OBS_OUT_0; outp(r->port[0], r->value[0])
+#define OBS_OUT_2 OBS_OUT_1; outp(r->port[1], r->value[1])
+#define OBS_OUT_3 OBS_OUT_2; outp(r->port[2], r->value[2])
+#define OBS_OUT_4 OBS_OUT_3; outp(r->port[3], r->value[3])
+#define OBS_OUT_5 OBS_OUT_4; outp(r->port[4], r->value[4])
+#define OBS_OUT_6 OBS_OUT_5; outp(r->port[5], r->value[5])
+#define OBS_OUT_7 OBS_OUT_6; outp(r->port[6], r->value[6])
+#define OBS_OUT_8 OBS_OUT_7; outp(r->port[7], r->value[7])
+#define OBS_OUT_9 OBS_OUT_8; outp(r->port[8], r->value[8])
+#define OBS_OUT_10 OBS_OUT_9; outp(r->port[9], r->value[9])
+#define OBS_OUT_11 OBS_OUT_10; outp(r->port[10], r->value[10])
+#define OBS_OUT_12 OBS_OUT_11; outp(r->port[11], r->value[11])
+#define OBS_OUT_13 OBS_OUT_12; outp(r->port[12], r->value[12])
+#define OBS_OUT_14 OBS_OUT_13; outp(r->port[13], r->value[13])
+#define OBS_OUT_15 OBS_OUT_14; outp(r->port[14], r->value[14])
+#define OBS_OUT_16 OBS_OUT_15; outp(r->port[15], r->value[15])
+#define OBS_OUT_17 OBS_OUT_16; outp(r->port[16], r->value[16])
+#define OBS_OUT_18 OBS_OUT_17; outp(r->port[17], r->value[17])
+#define OBS_OUT_19 OBS_OUT_18; outp(r->port[18], r->value[18])
+#define OBS_OUT_20 OBS_OUT_19; outp(r->port[19], r->value[19])
+#define OBS_OUT_21 OBS_OUT_20; outp(r->port[20], r->value[20])
+#define OBS_OUT_22 OBS_OUT_21; outp(r->port[21], r->value[21])
+#define OBS_OUT_23 OBS_OUT_22; outp(r->port[22], r->value[22])
+#define OBS_OUT_24 OBS_OUT_23; outp(r->port[23], r->value[23])
+#define OBS_OUT_25 OBS_OUT_24; outp(r->port[24], r->value[24])
+#define OBS_OUT_26 OBS_OUT_25; outp(r->port[25], r->value[25])
+#define OBS_OUT_27 OBS_OUT_26; outp(r->port[26], r->value[26])
+#define OBS_OUT_28 OBS_OUT_27; outp(r->port[27], r->value[27])
+#define OBS_OUT_29 OBS_OUT_28; outp(r->port[28], r->value[28])
+#define OBS_OUT_30 OBS_OUT_29; outp(r->port[29], r->value[29])
+#define OBS_OUT_31 OBS_OUT_30; outp(r->port[30], r->value[30])
+#define OBS_OUT_32 OBS_OUT_31; outp(r->port[31], r->value[31])
+#define OBS_OUT_33 OBS_OUT_32; outp(r->port[32], r->value[32])
+#define OBS_OUT_34 OBS_OUT_33; outp(r->port[33], r->value[33])
+#define OBS_OUT_35 OBS_OUT_34; outp(r->port[34], r->value[34])
+#define OBS_OUT_36 OBS_OUT_35; outp(r->port[35], r->value[35])
+#define OBS_OUT_37 OBS_OUT_36; outp(r->port[36], r->value[36])
+#define OBS_OUT_38 OBS_OUT_37; outp(r->port[37], r->value[37])
+#define OBS_OUT_39 OBS_OUT_38; outp(r->port[38], r->value[38])
+#define OBS_OUT_40 OBS_OUT_39; outp(r->port[39], r->value[39])
+#define OBS_OUT_41 OBS_OUT_40; outp(r->port[40], r->value[40])
+#define OBS_OUT_42 OBS_OUT_41; outp(r->port[41], r->value[41])
+#define OBS_OUT_43 OBS_OUT_42; outp(r->port[42], r->value[42])
+#define OBS_OUT_44 OBS_OUT_43; outp(r->port[43], r->value[43])
+#define OBS_OUT_45 OBS_OUT_44; outp(r->port[44], r->value[44])
+#define OBS_OUT_46 OBS_OUT_45; outp(r->port[45], r->value[45])
+#define OBS_OUT_47 OBS_OUT_46; outp(r->port[46], r->value[46])
+#define OBS_OUT_48 OBS_OUT_47; outp(r->port[47], r->value[47])
+#define OBS_OUT_49 OBS_OUT_48; outp(r->port[48], r->value[48])
+#define OBS_OUT_50 OBS_OUT_49; outp(r->port[49], r->value[49])
+#define OBS_OUT_51 OBS_OUT_50; outp(r->port[50], r->value[50])
+#define OBS_OUT_52 OBS_OUT_51; outp(r->port[51], r->value[51])
+#define OBS_OUT_53 OBS_OUT_52; outp(r->port[52], r->value[52])
+#define OBS_OUT_54 OBS_OUT_53; outp(r->port[53], r->value[53])
+#define OBS_OUT_55 OBS_OUT_54; outp(r->port[54], r->value[54])
+#define OBS_OUT_56 OBS_OUT_55; outp(r->port[55], r->value[55])
+#define OBS_OUT_57 OBS_OUT_56; outp(r->port[56], r->value[56])
+#define OBS_OUT_58 OBS_OUT_57; outp(r->port[57], r->value[57])
+#define OBS_OUT_59 OBS_OUT_58; outp(r->port[58], r->value[58])
+#define OBS_OUT_60 OBS_OUT_59; outp(r->port[59], r->value[59])
+#define OBS_OUT_61 OBS_OUT_60; outp(r->port[60], r->value[60])
+#define OBS_OUT_62 OBS_OUT_61; outp(r->port[61], r->value[61])
+#define OBS_OUT_63 OBS_OUT_62; outp(r->port[62], r->value[62])
+#define OBS_EMITTER(n) static void obs_emit##n(const struct PlObsRow *r) { OBS_OUT_##n; }
+OBS_EMITTER(0) OBS_EMITTER(1) OBS_EMITTER(2) OBS_EMITTER(3) OBS_EMITTER(4) OBS_EMITTER(5) OBS_EMITTER(6) OBS_EMITTER(7)
+OBS_EMITTER(8) OBS_EMITTER(9) OBS_EMITTER(10) OBS_EMITTER(11) OBS_EMITTER(12) OBS_EMITTER(13) OBS_EMITTER(14) OBS_EMITTER(15)
+OBS_EMITTER(16) OBS_EMITTER(17) OBS_EMITTER(18) OBS_EMITTER(19) OBS_EMITTER(20) OBS_EMITTER(21) OBS_EMITTER(22) OBS_EMITTER(23)
+OBS_EMITTER(24) OBS_EMITTER(25) OBS_EMITTER(26) OBS_EMITTER(27) OBS_EMITTER(28) OBS_EMITTER(29) OBS_EMITTER(30) OBS_EMITTER(31)
+OBS_EMITTER(32) OBS_EMITTER(33) OBS_EMITTER(34) OBS_EMITTER(35) OBS_EMITTER(36) OBS_EMITTER(37) OBS_EMITTER(38) OBS_EMITTER(39)
+OBS_EMITTER(40) OBS_EMITTER(41) OBS_EMITTER(42) OBS_EMITTER(43) OBS_EMITTER(44) OBS_EMITTER(45) OBS_EMITTER(46) OBS_EMITTER(47)
+OBS_EMITTER(48) OBS_EMITTER(49) OBS_EMITTER(50) OBS_EMITTER(51) OBS_EMITTER(52) OBS_EMITTER(53) OBS_EMITTER(54) OBS_EMITTER(55)
+OBS_EMITTER(56) OBS_EMITTER(57) OBS_EMITTER(58) OBS_EMITTER(59) OBS_EMITTER(60) OBS_EMITTER(61) OBS_EMITTER(62) OBS_EMITTER(63)
+static const PlObsEmit obs_emitters[PL_OBS_MAX_OUTS] = {
+    obs_emit0, obs_emit1, obs_emit2, obs_emit3, obs_emit4, obs_emit5, obs_emit6, obs_emit7,
+    obs_emit8, obs_emit9, obs_emit10, obs_emit11, obs_emit12, obs_emit13, obs_emit14, obs_emit15,
+    obs_emit16, obs_emit17, obs_emit18, obs_emit19, obs_emit20, obs_emit21, obs_emit22, obs_emit23,
+    obs_emit24, obs_emit25, obs_emit26, obs_emit27, obs_emit28, obs_emit29, obs_emit30, obs_emit31,
+    obs_emit32, obs_emit33, obs_emit34, obs_emit35, obs_emit36, obs_emit37, obs_emit38, obs_emit39,
+    obs_emit40, obs_emit41, obs_emit42, obs_emit43, obs_emit44, obs_emit45, obs_emit46, obs_emit47,
+    obs_emit48, obs_emit49, obs_emit50, obs_emit51, obs_emit52, obs_emit53, obs_emit54, obs_emit55,
+    obs_emit56, obs_emit57, obs_emit58, obs_emit59, obs_emit60, obs_emit61, obs_emit62, obs_emit63,
+};
+#undef OBS_EMITTER
+
+static int obs_vsync(int high)
+{
+    for (u32 i = 0; i < PL_OBS_POLL_LIMIT; i++)
+        if (!!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC) == high) return 0;
+    return -1;
+}
+
+/* Low and high waits each inspect VSYNC in the very same status IN.
+ * A long column may lose H edges; a new VBLANK always terminates the frame. */
+static int obs_edge(const struct PlObsRow *r, PlObsEmit emit)
+{
+    int armed = 0;
+    for (u32 i = 0; i < PL_OBS_POLL_LIMIT; i++) {
+        u32 status = inp(GDC_GFX_STAT);
+        if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;
+        if (!(status & GDC_STAT_HBLANK)) {
+            if (!armed) {
+                armed = 1;
+                if (r->count) outp(PAL_IDX_PORT, r->first);
+            }
+        } else if (armed) {
+            emit(r);
+            return PL_FRAME_OK;
+        }
+    }
+    return PL_FRAME_NO_SYNC;
+}
+
+int pl_obs_frame(struct SplashRaster *s, const struct OsriImage *image,
+                 const struct PlObsPlan *plan)
+{
+    if (!s || !image || !plan || !_irq_enabled() ||
+        !s->checked || !s->dynamic_ok) return PL_FRAME_NO_SYNC;
+    /* Exactly one new VBLANK per call, even when the following scan drops. */
+    if (obs_vsync(0) || obs_vsync(1)) return PL_FRAME_NO_SYNC;
+    unsigned int flags = irq_save();
+    int rc = PL_FRAME_DROP;
+    /* Protect F acquisition as well as visible rows. IRQs were open while
+     * waiting for this new VBLANK; a delayed CLI may already have lost it. */
+    if (!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC)) goto obs_done;
+    for (u32 i = 0; i < OSRI_COLORS; i++) {
+        u16 rgb = image->pal[i];
+        outp(PAL_IDX_PORT, i);
+        outp(PAL_G_PORT, (rgb >> 4) & GFX_PALETTE_COMPONENT_MASK);
+        outp(PAL_R_PORT, (rgb >> 8) & GFX_PALETTE_COMPONENT_MASK);
+        outp(PAL_B_PORT, rgb & GFX_PALETTE_COMPONENT_MASK);
+    }
+    /* If initial colors/IRQ crossed F, its origin is lost. Do not rebase. */
+    if (!(inp(GDC_GFX_STAT) & GDC_STAT_VSYNC)) goto obs_done;
+    rc = PL_FRAME_NO_SYNC;
+    if (obs_vsync(0)) goto obs_done;
+    for (u32 k = 1; k <= s->active0_lines + SPLASH_RASTER_VISIBLE_LINES; k++) {
+        u32 y = k > s->active0_lines ? k - s->active0_lines : 0;
+        const struct PlObsRow *r = &plan->row[y < SPLASH_RASTER_VISIBLE_LINES ? y : 0];
+        PlObsEmit emit = obs_emitters[r->count];
+        rc = obs_edge(r, emit);
+        if (rc != PL_FRAME_OK) break;
+    }
+obs_done:
+    irq_restore(flags);
+    s->last_result = rc;
+    if (rc == PL_FRAME_OK) s->frame++;
+    else if (rc == PL_FRAME_DROP) s->dropped++;
+    return rc;
+}
+#endif
