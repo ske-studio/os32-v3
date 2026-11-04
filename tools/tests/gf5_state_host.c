@@ -34,7 +34,17 @@ static u8 pattern(u32 i) { return (u8)(i^(i>>8)^0xa5U); }
 static void observe(struct gf5_host *host,const struct gf5_host_event *e)
 {
     struct gf5 *g=&host->ctx;
-    if (check_deadline && e->op!=F5_CLOCK64) assert(g->deadline==expected_deadline);
+    if (check_deadline) {
+        if (e->op==F5_CLOCK64) {
+            /* GF_FEAT4_DESIGN.md:380: one deadline per outer operation.
+             * The callback observes the clock result before state.c assigns
+             * it. Rejected operations and failed clocks retain the old one,
+             * including when the caller subsequently frees the image. */
+            assert(host->calls[F5_CLOCK64]==1);
+            assert(g->deadline==expected_deadline);
+            if (!e->rc) expected_deadline=(u32)host->now+GF2_TIMEOUT_US;
+        } else assert(g->deadline==expected_deadline);
+    }
     if (e->op==F5_STOP) {
         assert(g->image && g->image->complete);
         assert(!g->accepting && g->phase==GF5_SAVING);
@@ -111,7 +121,7 @@ static void reset(void)
 static struct gf5_image *save(void)
 {
     struct gf5_image *image=0;
-    expected_deadline=(u32)h.now+GF2_TIMEOUT_US; check_deadline=true;
+    expected_deadline=h.ctx.deadline; check_deadline=true;
     assert(gf5_state_save(&h.ctx,&image)==0 && image);
     assert(h.ctx.phase==GF5_SAVED && !h.ctx.busy && !h.ctx.accepting);
     assert(h.ctx.image==image && image->complete && h.live_allocs==1);
@@ -126,8 +136,8 @@ static struct gf5_image *save(void)
 }
 static void begin_restore(void)
 {
-    h.now+=123456U;
-    expected_deadline=(u32)h.now+GF2_TIMEOUT_US;
+    /* Advance from the configured timeout so restore needs a fresh deadline. */
+    h.now+=GF2_TIMEOUT_US/2U;
     gf5_host_trace_clear(&h);
 }
 static u32 first(enum gf5_host_op op)
