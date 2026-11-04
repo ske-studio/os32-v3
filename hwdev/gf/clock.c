@@ -47,6 +47,11 @@ static i32 result(struct gf5 *g, i32 rc)
     if (g) { g->source_rc=rc; g->last_rc=gf5_rc_map(rc); return g->last_rc; }
     return rc;
 }
+static i32 classified(struct gf5 *g, i32 source, i32 category)
+{
+    if (g) { g->source_rc=source; g->last_rc=gf5_rc_map(category); return g->last_rc; }
+    return gf5_rc_map(category);
+}
 static struct gf_io *clock_io(struct gf5 *g)
 {
     return g && g->ch && g->ch->f ? &g->ch->f->io : 0;
@@ -58,15 +63,17 @@ static int rd(struct gf_io *io,u32 reg,u32 *v)
 static int mask(struct gf_io *io,u32 reg,u32 bits,u32 value)
 {
     u32 old;
-    return rd(io,reg,&old) || io->write(io->opaque,0,reg,4,(old & ~bits)|value);
+    int rc=rd(io,reg,&old);
+    return rc ? rc : io->write(io->opaque,0,reg,4,(old & ~bits)|value);
 }
 static int read_pll(struct gf_io *io,u32 reg,bool single,u32 *out)
 {
     u32 c,n,m,p,v;
-    if (rd(io,reg,&c)) return -1;
+    int rc=rd(io,reg,&c);
+    if (rc) return rc;
     p=(c>>16)&7U;
     if (single) v=c;
-    else if (rd(io,reg+4,&v)) return -1;
+    else { rc=rd(io,reg+4,&v); if (rc) return rc; }
     n=(v>>8)&255U; m=v&255U;
     if (!(c&CLK_ENABLE) || !m) { *out=0; return 0; }
     u32 khz=GF_PLL_REF*n/m;
@@ -88,9 +95,11 @@ i32 gf5_clock_read(struct gf5 *g,struct gf5_clock *out)
 {
     struct gf_io *io=clock_io(g); struct gf5_clock c; u32 mux;
     if (!io || !io->read || !out) return result(g,GF5_EINVAL);
-    if (rd(io,CLK_MUX,&mux) || read_source(io,mux&3U,&c.core_khz) ||
-        read_source(io,(mux>>4)&3U,&c.shader_khz) || read_pll(io,CLK_MEM,false,&c.mem_khz))
-        return result(g,GF5_EIO);
+    int rc=rd(io,CLK_MUX,&mux);
+    if (!rc) rc=read_source(io,mux&3U,&c.core_khz);
+    if (!rc) rc=read_source(io,(mux>>4)&3U,&c.shader_khz);
+    if (!rc) rc=read_pll(io,CLK_MEM,false,&c.mem_khz);
+    if (rc) return result(g,rc);
     *out=c;
     return result(g,c.core_khz && c.shader_khz && c.mem_khz ? 0 : GF5_ESTATE);
 }
@@ -103,17 +112,20 @@ static u32 coefficient(const struct gfinit_pll_solution *s)
 static i32 solve(struct gf5 *g,u32 reg,u32 khz,bool disable_second,
                  struct gfinit_pll_limits *l,struct gfinit_pll_solution *s)
 {
-    if (gfinit_pll_parse(g->rom.bytes,g->rom.size,GF_INIT_PLL_TABLE,reg,l)) return GF5_EBIOS;
+    int rc=gfinit_pll_parse(g->rom.bytes,g->rom.size,GF_INIT_PLL_TABLE,reg,l);
+    if (rc) return classified(g,rc,GF5_EBIOS);
     if (disable_second && khz<l->vco1.max_freq) l->vco2.max_freq=0;
-    return gfinit_pll_solve(l,khz,s) ? GF5_ERANGE : 0;
+    rc=gfinit_pll_solve(l,khz,s);
+    return rc ? classified(g,rc,GF5_ERANGE) : 0;
 }
 i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *request,struct gf5_plan *out)
 {
     struct gfinit_pll_limits l; struct gfinit_pll_solution s; struct gf5_plan p={0}; i32 rc;
     if (!g || !request || !out || !request->core_khz || !request->mem_khz)
         return result(g,GF5_EINVAL);
+    if (!g->rom.bytes) return result(g,GF5_ENOTSUP);
     rc=solve(g,GF_PLL_CORE,request->core_khz,true,&l,&s);
-    if (rc) return result(g,rc);
+    if (rc) return rc;
     p.nc=CLK_ENABLE|(s.p<<16)|(s.n2==s.m2 ? CLK_SINGLE : CLK_DOUBLE);
     p.nn=coefficient(&s); p.actual.core_khz=s.actual;
     if (request->shader_khz && request->shader_khz!=request->core_khz) {
@@ -122,7 +134,7 @@ i32 gf5_clock_calc(struct gf5 *g,const struct gf5_clock *request,struct gf5_plan
     }
     p.mux=CLK_SHARED; p.actual.shader_khz=p.actual.core_khz;
     rc=solve(g,GF_PLL_MEMORY,request->mem_khz,false,&l,&s);
-    if (rc) return result(g,rc);
+    if (rc) return rc;
     u32 bias=l.bias_p+s.p; if (bias>l.max_p) bias=l.max_p;
     p.mc=CLK_ENABLE|(s.p<<16)|(bias<<20)|(s.n2==s.m2 ? CLK_SINGLE : CLK_DOUBLE);
     p.mn=coefficient(&s); p.actual.mem_khz=s.actual;
@@ -133,9 +145,16 @@ i32 gf5_clock_prog(struct gf5 *g,const struct gf5_plan *p)
     struct gf_io *io=clock_io(g);
     if (!io || !io->read || !io->write || !io->timing.wait_us || !p)
         return result(g,GF5_EINVAL);
-    if (mask(io,CLK_MUX,CLK_MUX_MASK,0) || io->write(io->opaque,0,CLK_COEF,4,p->nn) ||
-        mask(io,CLK_CORE,CLK_CORE_MASK,p->nc) || mask(io,CLK_SHADER,CLK_SHADER_MASK,p->sc) ||
-        io->timing.wait_us(io->opaque,CLK_SETTLE_US) || mask(io,CLK_MUX,CLK_MUX_MASK,p->mux))
-        return result(g,GF5_EIO);
+    int rc=mask(io,CLK_MUX,CLK_MUX_MASK,0);
+    if (!rc) rc=io->write(io->opaque,0,CLK_COEF,4,p->nn);
+    if (!rc) rc=mask(io,CLK_CORE,CLK_CORE_MASK,p->nc);
+    if (!rc) rc=mask(io,CLK_SHADER,CLK_SHADER_MASK,p->sc);
+    for (u32 remaining=CLK_SETTLE_US; !rc && remaining; ) {
+        u32 chunk=remaining>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : remaining;
+        rc=io->timing.wait_us(io->opaque,chunk);
+        remaining-=chunk;
+    }
+    if (!rc) rc=mask(io,CLK_MUX,CLK_MUX_MASK,p->mux);
+    if (rc) return result(g,rc);
     return result(g,0);
 }

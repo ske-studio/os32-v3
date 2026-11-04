@@ -1,6 +1,7 @@
 /* B1/C0 fixture: link clock.c and kdebug/gfinit_pll.c, -m32 -nostdlib. */
 #define GF5_HOST_UNIT 1
 #include "gf5_fake.h"
+#include "../../kdebug/gfinit_decode.h"
 static struct gf5_host h;
 static struct gf4_state state;
 static struct gf4_host_event de[64];
@@ -25,37 +26,105 @@ static void fixture(void)
         rom[p+29]=3;
     }
 }
+/* Register masks and programming sequence: nouveau clk/nv40.c:126-196. */
+#define REG_CORE 0x4000U
+#define REG_COEF 0x4004U
+#define REG_SHADER 0x4008U
+#define REG_MEM 0x4020U
+#define REG_MUX 0xc040U
+#define OLD_MUX 0xa5a5ffffU
+#define OLD_CORE 0x3ff8feffU
+#define OLD_SHADER 0x3ff80000U
+#define MUX_BITS 0x333U
+#define CORE_BITS 0xc0070100U
+#define SHADER_BITS 0xc007ffffU
+#define SETTLE_US 5000U /* nouveau clk/nv40.c:193 */
+#define REF_KHZ 27000U /* nouveau clk/pllnv04.c:36; fixture reference */
+#define N1 20U
+#define M1 2U
+#define N2 3U
+#define M2 2U
+#define ENABLE 0x80000000U
+#define DOUBLE 0x40000000U
+#define SINGLE 0x100U
+#define SHARED 0x333U
+#define FIXTURE_KHZ (REF_KHZ*N1/M1)
+#define OTHER_KHZ (FIXTURE_KHZ+10000U)
+static void set_reg(u32 reg,u32 value)
+{
+    gf3_host_set(&h.display.base,0,reg,value);
+}
+static void write_event(u32 index,u32 reg,u32 value)
+{
+    assert(de[index].op==D_WRITE && de[index].a[0]==0 &&
+           de[index].a[1]==reg && de[index].a[2]==4 && de[index].a[3]==value);
+}
 static void run(void)
 {
-    struct gf5_plan p={.nc=0x80000100U,.nn=0x1402U,.sc=0,.mux=0x333U};
+    struct gf5_plan p={.nc=ENABLE|SINGLE,.nn=(N1<<8)|M1,.sc=0,.mux=SHARED};
     struct gf5_clock c;
     gf5_host_init(&h,&state);
     h.display.events=de; h.display.cevents=64;
     h.events=fe; h.cevents=8;
+    set_reg(REG_MUX,OLD_MUX); set_reg(REG_CORE,OLD_CORE);
+    set_reg(REG_SHADER,OLD_SHADER);
     assert(gf5_clock_prog(&h.ctx,&p)==0);
-    assert(h.display.calls[D_WRITE]==5 && h.display.calls[D_SLEEP]==1);
-    assert(de[1].op==D_WRITE && de[1].a[1]==0xc040U);
-    assert(de[2].op==D_WRITE && de[2].a[1]==0x4004U);
-    assert(de[4].op==D_WRITE && de[4].a[1]==0x4000U);
-    assert(de[6].op==D_WRITE && de[6].a[1]==0x4008U);
-    assert(de[7].op==D_SLEEP && de[7].a[0]==5000U);
-    assert(de[9].op==D_WRITE && de[9].a[1]==0xc040U);
+    assert(h.display.calls[D_WRITE]==5);
+    write_event(1,REG_MUX,OLD_MUX&~MUX_BITS);
+    write_event(2,REG_COEF,p.nn);
+    write_event(4,REG_CORE,(OLD_CORE&~CORE_BITS)|p.nc);
+    write_event(6,REG_SHADER,(OLD_SHADER&~SHADER_BITS)|p.sc);
+    u32 elapsed=0, index=7;
+    while (index<h.display.nevents && de[index].op==D_SLEEP) {
+        assert(de[index].a[0] && de[index].a[0]<=GF_INIT_WAIT_CHUNK_US);
+        elapsed+=de[index++].a[0];
+    }
+    assert(elapsed==SETTLE_US && h.display.calls[D_SLEEP]==index-7);
+    assert(de[index].op==D_READ && de[index].a[1]==REG_MUX);
+    write_event(index+1,REG_MUX,(OLD_MUX&~MUX_BITS)|p.mux);
+    assert(h.display.nevents==index+2);
     gf5_host_trace_clear(&h);
     gf4_host_fail_at(&h.display,D_WRITE,2,-1);
-    assert(gf5_clock_prog(&h.ctx,&p)==GF5_EIO);
+    assert(gf5_clock_prog(&h.ctx,&p)==GF5_EIO && h.ctx.source_rc==-1);
     assert(h.display.calls[D_WRITE]==2 && !h.display.calls[D_SLEEP]);
     gf4_host_fail_at(&h.display,D_WRITE,0,0);
     gf5_host_trace_clear(&h);
-    assert(gf5_clock_read(&h.ctx,&c)==GF5_ESTATE);
-    assert(c.core_khz==270000U && c.shader_khz==270000U && !c.mem_khz);
-    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){270000,0,270000},&p)==GF5_EBIOS);
-    fixture(); h.ctx.rom.bytes=rom; h.ctx.rom.size=sizeof(rom);
-    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){270000,0,270000},&p)==0);
-    assert(p.nc==0x80000100U && p.nn==0x1402U && p.sc==0 && p.mux==0x333U);
-    assert(p.mc==0x80000100U && p.mn==0x1402U);
-    assert(p.actual.core_khz==270000U && p.actual.shader_khz==270000U && p.actual.mem_khz==270000U);
+    gf4_host_fail_at(&h.display,D_SLEEP,2,-1);
+    assert(gf5_clock_prog(&h.ctx,&p)==GF5_EIO && h.ctx.source_rc==-1);
+    assert(h.display.calls[D_SLEEP]==2 && h.display.calls[D_WRITE]==4);
+    gf4_host_fail_at(&h.display,D_SLEEP,0,0);
     gf5_host_trace_clear(&h);
-    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){270000,280000,270000},&p)==GF5_EBIOS);
+    assert(gf5_clock_read(&h.ctx,&c)==GF5_ESTATE);
+    assert(!c.core_khz && !c.shader_khz && !c.mem_khz);
+    /* Independent two-stage read fixture, nv40.c:39-74: 27 MHz * 20/2 * 3/2. */
+    set_reg(REG_MUX,SHARED);
+    set_reg(REG_CORE,ENABLE|DOUBLE);
+    set_reg(REG_COEF,(N2<<24)|(M2<<16)|(N1<<8)|M1);
+    set_reg(REG_MEM,ENABLE|DOUBLE);
+    set_reg(REG_MEM+4,(N2<<24)|(M2<<16)|(N1<<8)|M1);
+    gf5_host_trace_clear(&h);
+    assert(gf5_clock_read(&h.ctx,&c)==0);
+    assert(c.core_khz==REF_KHZ*N1/M1*N2/M2 &&
+           c.shader_khz==REF_KHZ*N1/M1*N2/M2 && c.mem_khz==REF_KHZ*N1/M1*N2/M2);
+    gf5_host_trace_clear(&h);
+    gf4_host_fail_at(&h.display,D_READ,2,-1);
+    c=(struct gf5_clock){1,2,3};
+    assert(gf5_clock_read(&h.ctx,&c)==GF5_EIO && h.ctx.source_rc==-1);
+    assert(h.display.calls[D_READ]==2 && c.core_khz==1 && c.shader_khz==2 && c.mem_khz==3);
+    gf4_host_fail_at(&h.display,D_READ,0,0);
+    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){FIXTURE_KHZ,0,FIXTURE_KHZ},&p)==GF5_ENOTSUP);
+    fixture(); h.ctx.rom.bytes=rom; h.ctx.rom.size=sizeof(rom);
+    rom[ROM_TABLE]=0;
+    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){FIXTURE_KHZ,0,FIXTURE_KHZ},&p)==GF5_EBIOS && h.ctx.source_rc==-1);
+    rom[ROM_TABLE]=0x21;
+    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){U32_MAX,0,FIXTURE_KHZ},&p)==GF5_ERANGE && h.ctx.source_rc==-1);
+    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){FIXTURE_KHZ,0,FIXTURE_KHZ},&p)==0);
+    assert(p.nc==(ENABLE|SINGLE));
+    assert(p.nn==((N1<<8)|M1) && p.sc==0 && p.mux==SHARED);
+    assert(p.mc==(ENABLE|SINGLE) && p.mn==((N1<<8)|M1));
+    assert(p.actual.core_khz==REF_KHZ*N1/M1 && p.actual.shader_khz==REF_KHZ*N1/M1 && p.actual.mem_khz==REF_KHZ*N1/M1);
+    gf5_host_trace_clear(&h);
+    assert(gf5_clock_calc(&h.ctx,&(struct gf5_clock){FIXTURE_KHZ,OTHER_KHZ,FIXTURE_KHZ},&p)==GF5_EBIOS);
     assert(!h.display.calls[D_WRITE]);
 }
 void _start(void)
