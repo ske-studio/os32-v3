@@ -85,6 +85,9 @@ filesystem:
     - host: userland/tests/h3b.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/fp_stop.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/stop_loop.bin
       guest: /usr/bin/
       tags: [test]

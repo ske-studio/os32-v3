@@ -16,6 +16,7 @@
 # --- 第 1 陣 (TASK_TEST_RESULT.md §4 の 16 本。2026-09-17 にゲストで実測済み) ---
 
 klibc_test              # PASS 49/49  kstring / kprintf などの基本
+fp_stop check           # x87 initial state and Newton iteration
 math_test               # PASS 110/110
 mgx_test                # PASS 76/76
 ecs_test                # PASS 45/45
