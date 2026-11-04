@@ -72,14 +72,15 @@ void gf_mode_timing(struct gfinit_mode *o)
 
 /* nouveau dispnv04/crtc.c:245-257, 301-302, 350-413. End
  * registers wrap relative to their start: HBE 7, HRE 5, VBE 8,
- * VRE 4 bits. The CRTC receives already-normalized vertical timings. */
+ * VRE 4 bits. Horizontal shifts truncate (no pixel alignment requirement);
+ * vs==vd is valid. The CRTC receives already-normalized vertical timings. */
 i32 gf4_timing_calc(const struct gf4_mode *mode, struct gfinit_mode *o)
 {
     if (!mode || !o) return GF4_EINVAL;
     const struct gf4_timing *v = &mode->t;
     if (!v->hd || v->hd >= v->hs || v->hs >= v->he || v->he > v->ht ||
-        v->vd < 3 || v->vd >= v->vs || v->vs >= v->ve || v->ve > v->vt ||
-        ((v->hd | v->hs | v->he | v->ht) & 7U) || v->ht < 40 || v->vt < 3)
+        v->vd < 3 || v->vd > v->vs || v->vs >= v->ve || v->ve > v->vt ||
+        v->ht < 40 || v->vt < 3)
         return GF4_ERANGE;
     u32 hd=(v->hd >> 3)-1, hs=(v->hs >> 3)+1, he=(v->he >> 3)+1;
     u32 ht=(v->ht >> 3)-5, hbe=(v->ht >> 3)-1;

@@ -1,3 +1,28 @@
+/*
+ * Copyright (C) 2010 Francisco Jerez.
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the
+ * next paragraph) shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER(S) AND/OR ITS SUPPLIERS BE
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
 static void pll_write(struct gfinit_pll_sequence *q, u32 reg, u32 source, u32 keep, u32 value)
 {
     if (q->count < GF_PLL_WRITES_MAX) q->writes[q->count++] = (struct gfinit_pll_write){reg, source, keep, value};
@@ -11,10 +36,15 @@ int gfinit_pll_sequence(u32 reg, const struct gfinit_pll_limits *l,
     q->count = 0;
     u32 nm1 = s->n1 << 8 | s->m1, nm2 = s->n2 << 8 | s->m2;
     bool single = s->n2 == s->m2;
-    if (reg == GF_PLL_VIDEO) {
-        pll_write(q, GF_PLL_GATE, GF_PLL_GATE, ~GF_PLL_GATE_VIDEO, 0);
-        pll_write(q, GF_PLL_VIDEO_STAGE, GF_PLL_VIDEO_STAGE, ~GF_PLL_CTRL_SINGLE, single ? GF_PLL_CTRL_SINGLE : 0);
-        pll_write(q, GF_PLL_VIDEO_COEFF, GF_PLL_VIDEO_COEFF, GF_PLL_VIDEO_S2_KEEP, GF_PLL_VIDEO_S2_ENABLE | nm2 | (single ? 0x011fU : 0));
+    if (reg == GF_PLL_VIDEO || reg == GF_PLL_VIDEO_B) {
+        /* nouveau nv04.c:184-193, 202-204, 218-226, 247-273. */
+        bool head_b = reg == GF_PLL_VIDEO_B;
+        u32 gate = head_b ? GF_PLL_GATE_VIDEO_B : GF_PLL_GATE_VIDEO;
+        u32 stage = head_b ? GF_PLL_CTRL_SINGLE_B : GF_PLL_CTRL_SINGLE;
+        u32 coeff = head_b ? GF_PLL_VIDEO_COEFF_B : GF_PLL_VIDEO_COEFF;
+        pll_write(q, GF_PLL_GATE, GF_PLL_GATE, ~gate, 0);
+        pll_write(q, GF_PLL_VIDEO_STAGE, GF_PLL_VIDEO_STAGE, ~stage, single ? stage : 0);
+        pll_write(q, coeff, coeff, GF_PLL_VIDEO_S2_KEEP, GF_PLL_VIDEO_S2_ENABLE | nm2 | (single ? 0x011fU : 0));
         pll_write(q, reg, reg, GF_PLL_VIDEO_KEEP, s->p << GF_PLL_CTRL_P_SHIFT | nm1);
         pll_write(q, GF_PLL_GATE, GF_PLL_GATE, ~0U, 0); /* video gate restore */
     } else if (reg == GF_PLL_CORE || reg == GF_PLL_MEMORY) {

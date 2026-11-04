@@ -60,6 +60,11 @@
 #define GF_PLL_CORE 0x4004U
 #define GF_PLL_MEMORY 0x4024U
 #define GF_PLL_VIDEO 0x680508U
+/* nouveau nvkm/subdev/devinit/nv04.c:184-193, 202, 251-261. */
+#define GF_PLL_VIDEO_B 0x680520U
+#define GF_PLL_CTRL_SINGLE_B (1U << 28)
+#define GF_PLL_GATE_VIDEO_B (3U << 18)
+#define GF_PLL_VIDEO_COEFF_B 0x68057cU
 #define GF_PLL_MEMORY_MIRROR 0x4038U
 #define GF_PLL_MEMORY_COEFF 0x403cU
 #define GF_PLL_GATE 0xc040U
