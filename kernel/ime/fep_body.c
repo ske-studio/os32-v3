@@ -22,6 +22,7 @@ static const FepModuleApi api = {
     .owner_exit = ime_owner_exit,
     .getchar_kapi = ime_getchar_kapi,
     .getkey_kapi = ime_getkey_kapi,
+    .dict_info = ime_dict_info_facade,
 };
 
 int fep_module_init(FepModuleApi *out)

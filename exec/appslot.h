@@ -364,6 +364,10 @@ void appslot_mark_scheduled(int id, u32 now_tick);
  * 戻り値: 0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 でない。 */
 int appslot_abort_clear(void);
 
+/* KAPI exec_stop_culprit の実体 (v80)。parked_from_stop で WAIT_POLL に
+ * 居る ID、無ければ 0、owner 1 以外は OS32_ERR_INVAL。 */
+int appslot_stop_culprit(void);
+
 /* KAPI exec_app_state の実体:
  *   0=空き / 1=走っている / 2=park 中 (OP_WAIT) / 3=kbd 待ち /
  *   4=ポーリング譲り中 / 負=不正。

@@ -4,7 +4,7 @@
 #include "ime.h"
 #include "../module/module_runtime.h"
 
-#define FEP_MODULE_OPS_VERSION 1u
+#define FEP_MODULE_OPS_VERSION 2u
 typedef struct {
     int (*boot_abort)(void);
     u32 (*boot_bytes)(void);
@@ -26,8 +26,9 @@ typedef struct {
     void (*owner_exit)(int owner);
     int (*getchar_kapi)(void);
     int (*getkey_kapi)(void);
+    int (*dict_info)(int key, int offset, char *out, int capacity);
 } FepModuleApi;
-#define FEP_MODULE_API_SLOTS 20u
+#define FEP_MODULE_API_SLOTS 21u
 
 int fep_module_load(struct module_handle sqlite);
 int fep_module_abort(void);

@@ -142,6 +142,12 @@ void appslot_stop_request(void)
         a->stop_wm_req = 1;
 }
 
+/* v80 registration stub; the STOP stage owns the body. */
+int appslot_stop_culprit(void)
+{
+    return 0;
+}
+
 int appslot_stop_pending(void)
 {
     AppSlot *a = appslot_get(g_cur);

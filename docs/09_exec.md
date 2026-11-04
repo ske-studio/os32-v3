@@ -117,8 +117,9 @@ WM 側も STOP を消費する OP_WAIT / top-level に届かない。この場�
 - ABORTED の OWNER_EXIT は raw の未読 CTRL+STOP make、WM の abort_seen、pending_raw 内の CTRL+STOP make を消費し、次の前景への二重 kill を防ぐ。
   ABORTED の後に遅れて届く CTRL+STOP make も、STOP・修飾キー以外の次の make、新しいマウスボタンの押下、ABORTED から 500 ms (PIT 50 tick) の
   いずれかまで合流して捨てる。修飾キー・break・ボタン解放・押しっぱなし・終了に伴う自動の前景切替では解除しない。CUI と GUI の切替で抑止を持ち越さない。
-- 既知の制約: STOP の張本人 (current) と前景連鎖の末尾が違うとき、宛先を畳んだ後に張本人は保存 EAX で再開し、再び WM を塞ぎ得る。
-  窓なし・連鎖外の張本人の KAPI-loop は畳めない。協調切替なので KAPI-loop 中は時計も止まる。
+- 宛先は張本人を優先する (ユーザー決定「直す」2026-11-04): WM は宛先を決める前に `exec_stop_culprit` (KAPI v80) で
+  `parked_from_stop` の張本人を引き、居ればその ID を `exec_kill` する。居なければ今までどおり前景の窓 (全画面中は画面の所有者) の連鎖の末尾。
+- 既知の制約: 協調切替なので KAPI-loop 中は時計も止まる。
 - GUI アプリからの exec_run はカーネルが拒否する。
 - x87 の状態はアプリ切替で保存・復元する。KAPI の出入りでは呼出し境界でスタックが空なので保存しない。
 

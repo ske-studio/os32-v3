@@ -330,6 +330,11 @@ i32 exec_app_state(i32 app_id)
 /*  (= 意図しない 1 本が死ぬ)。要求以外の状態は何も動かさない。              */
 /*  0 = 降ろした / 要求が無かった、OS32_ERR_INVAL = owner 1 以外。           */
 /* ======================================================================== */
+i32 exec_stop_culprit(void)
+{
+    return appslot_stop_culprit();
+}
+
 i32 exec_abort_clear(void)
 {
     if (font_guard_active) return OS32_ERR_BUSY;
