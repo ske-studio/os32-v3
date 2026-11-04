@@ -45,6 +45,19 @@ def inspect(text):
                 continue
             seq, line = int(fields['seq']), int(fields['line'])
             phase, op = fields['phase'], fields['op']
+            rc = fields['rc']
+            if not op or rc not in (('PENDING',) if phase == 'begin' else STATUS):
+                errors.append('invalid operation or rc')
+            if re.fullmatch(r'(?:pci|io|mmio)(?:read|write)(?:8|16|32)', op):
+                for key in (('target', 'addr', 'val') if phase == 'begin'
+                            else ('addr', 'val')):
+                    if not fields[key]:
+                        raise ValueError('empty field')
+                for key in ('addr', 'val'):
+                    if not re.fullmatch(r'0x[0-9a-fA-F]+', fields[key]):
+                        raise ValueError('invalid hexadecimal field')
+            if last is None and seq != 1:
+                errors.append('sequence gap or duplicate at %d' % seq)
             if phase == 'begin':
                 if pending is not None:
                     errors.append('missing end seq=%d line=%d' % pending[:2])

@@ -17,9 +17,9 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import rshell_serial as serial
 
 SRC = ROOT / 'tools/rshell_hwb.py'
-BEGIN = 'HW run=3 seq=12 line=8 phase=begin op=mmiowrite8 target=0:8.0/bar1+0x3C4 addr=0x204003C4 val=0x09 rc=PENDING\r\n'
-END = 'HW run=3 seq=12 line=8 phase=end op=mmiowrite8 addr=0x204003C4 val=0x09 rc=OK\r\n'
-READ = 'HW run=3 seq=13 line=9 phase=end op=mmioread8 addr=0x204003C5 val=0x01 rc=OK\r\n'
+BEGIN = 'HW run=3 seq=1 line=8 phase=begin op=mmiowrite8 target=0:8.0/bar1+0x3C4 addr=0x204003C4 val=0x09 rc=PENDING\r\n'
+END = 'HW run=3 seq=1 line=8 phase=end op=mmiowrite8 addr=0x204003C4 val=0x09 rc=OK\r\n'
+READ = 'HW run=3 seq=2 line=9 phase=end op=mmioread8 addr=0x204003C5 val=0x01 rc=OK\r\n'
 TERM = 'HW run=3 op=end rc=OK lines=10 writes=1\r\n'
 
 
@@ -56,6 +56,11 @@ class Port:
         return data
 
 
+def check(condition, message='check failed'):
+    if not condition:
+        raise AssertionError(message)
+
+
 def exercise(mod):
     serial.rshell_hwb = mod
     with tempfile.TemporaryDirectory() as tmp:
@@ -65,19 +70,22 @@ def exercise(mod):
             port = Port(body, **kw)
             rc = serial.run_hwb(args, port, 9600)
             saved = path.read_text()
-            assert saved == '> hw run /test/a.hwb\n' + body.replace('\r\n', '\n')
-            assert port.sent.count('hw run /test/a.hwb') == 1
+            check(saved == '> hw run /test/a.hwb\n' + body.replace('\r\n', '\n'))
+            check(port.sent.count('hw run /test/a.hwb') == 1)
             return rc, port.sent
         good = BEGIN + END + READ + TERM
-        assert attempt(good) == (0, ['hw run /test/a.hwb', 'echo $?'])
-        assert attempt(BEGIN + TERM)[0] == 1
-        assert attempt(BEGIN + END + READ.replace('seq=13', 'seq=14') + TERM)[0] == 1
-        assert attempt(BEGIN + END + READ + READ + TERM)[0] == 1
-        assert attempt(BEGIN + END + READ.replace('run=3', 'run=4') + TERM)[0] == 1
-        assert attempt(BEGIN + END + READ)[0] == 1
-        assert attempt(good, eot=False)[0] == 1
-        assert attempt(good, status='5')[0] == 1
-        assert attempt(good.replace('rc=OK lines=', 'rc=TIMEOUT lines='), status='124')[0] == 124
+        check(attempt(good) == (0, ['hw run /test/a.hwb', 'echo $?']))
+        check(attempt(BEGIN + TERM)[0] == 1)
+        check(attempt(BEGIN + 'HW run=3 seq=1 line=8 phase=end op=mmiowrite8\r\n' + TERM)[0] == 1)
+        check(attempt(good.replace('rc=OK\r\n', 'rc=BAD\r\n', 1))[0] == 1)
+        check(attempt(READ + TERM)[0] == 1)
+        check(attempt(BEGIN + END + READ.replace('seq=2', 'seq=3') + TERM)[0] == 1)
+        check(attempt(BEGIN + END + READ + READ + TERM)[0] == 1)
+        check(attempt(BEGIN + END + READ.replace('run=3', 'run=4') + TERM)[0] == 1)
+        check(attempt(BEGIN + END + READ)[0] == 1)
+        check(attempt(good, eot=False)[0] == 1)
+        check(attempt(good, status='5')[0] == 1)
+        check(attempt(good.replace('rc=OK lines=', 'rc=TIMEOUT lines='), status='124')[0] == 124)
 
 
 MUTATIONS = [
@@ -95,7 +103,7 @@ def main():
     original = SRC.read_text()
     with tempfile.TemporaryDirectory() as tmp:
         for name, filename, before, after, case in MUTATIONS:
-            assert original.count(before) == 1, name
+            check(original.count(before) == 1, name)
             path = pathlib.Path(tmp) / (name.replace(' ', '_') + '.py')
             path.write_text(original.replace(before, after))
             result = subprocess.run([sys.executable, '-B', __file__, '--child', str(path)],
