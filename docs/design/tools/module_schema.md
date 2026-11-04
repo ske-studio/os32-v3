@@ -7,7 +7,7 @@ dict(name='HWDEV', path='/boot/hwdev.mod', dependencies=(1,), required=False,
      module_id=11, phase=CONSTANTS['PHASE_POST_ROOT'],
      required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
      stop_allowed=0, ops_version=1, ops_slots=1,
-     image_max=196608, mem_max=196608, load_span_max=262144,
+     image_max=262144, mem_max=262144, load_span_max=327680,
      reloc_max=16384, export_max=1,
      init_symbol='hwdev_init', imports_symbol='hwdev_import_slots',
      ops_symbol='hwdev_ops', ops_names=('initialize',))

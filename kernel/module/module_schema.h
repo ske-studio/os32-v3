@@ -242,11 +242,11 @@ enum module_field {
         .stop_allowed = 0U, \
         .ops_version = 1U, \
         .ops_slots = 1U, \
-        .image_max = 196608U, \
-        .mem_max = 196608U, \
+        .image_max = 262144U, \
+        .mem_max = 262144U, \
         .reloc_max = 16384U, \
         .export_max = 1U, \
-        .load_span_max = 262144U, \
+        .load_span_max = 327680U, \
     }, \
     { \
         .module_id = 12U, \

@@ -183,7 +183,8 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | DDC (mod) / EDID・DMT・GTF・CVT・CTA (kernel) | mod 1〜2 / kernel 4〜6 | 128byte buffer、parserとmode表はkernel所有 |
 | DPMS/cursor/flip/gamma | 3〜5 | cursorは16KiB/head、ramp1536byte/head、palette768byte/head |
 | TMDS/TV実行/2head | 6〜8 | norm表・係数生成はkernel 3〜4KiB、最大2head |
-- mod text/rodata14〜21KiB＋BSS1〜3KiB＝mem増分15〜24KiB。mode/LUT/TV作業域10〜14KiBはkernel所有、借用pointerのみmodへ。全層の容量判定は[GF_FEAT3の合算予算](GF_FEAT3_DESIGN.md#合算予算)に従う。VRAMは別枠: 1280×1024×4×2=10MiB/head、実VRAM・Bで判定。
+- 2026-11-04の層4統合実測: GEFORCEのmemは層3の90,112 Bから155,648 Bへ65,536 B（64 KiB）増加。text 116,767 B・rodata 14,304 B・data 288 B・BSS 21,492 B。mode/LUT/TV作業域10〜14KiBはkernel所有、借用pointerのみmodへ。全層の容量判定は[GF_FEAT3の合算予算](GF_FEAT3_DESIGN.md#合算予算)に従う。VRAMは別枠: 1280×1024×4×2=10MiB/head、実VRAM・Bで判定。
+- HWDEVの主なBSSは`gf_accel_test`のtransfer 20,496 B・expected 20,480 B・before 12,288 B・control 4,004 Bで、HWDEV全体のmem実測は200,704 B（上限と内訳は[容量表](../../08_build.md#起動時に読む部品の大きさの上限と由来)）。
 - B4のEDID parser/規格表とB11のTV係数生成は初めからkernel専用、C4でhelperをbind。modにはMMIO実行・小状態・opsのみ。統合時に実測し、PM決定の合算予算と新上限で判定する。圧縮を発注条件にせず、機能を削除しない。
 - helper/state/試験slotは§2のContext経由。IRQ/time/MMIO/DMAは既存F1/F2/gf_ioを使用。停止完了後にkernel側slot/借用stateを解除。
 - kernel helper text/rodata7〜10KiB、state10〜14KiB＋試験本体を別計上。hwdev共有計算/診断変更は計12KiB以内とし、層2後の実測とF5共有decoder増分を含む容量は[共通合算表](GF_FEAT3_DESIGN.md#合算予算)で判定する。
@@ -256,7 +257,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | CPU窓・復旧／B6・C2 | cursor画像はF3追加VRAM窓を使いpush mapを借りない。F5向けdisplay_save/restoreは両headのmode/front/palette/gamma/cursor/DPMS/route/IRQ要求と未完了flipの保持面を渡す。受付閉のまま復元し、F5最終成功時だけslot/hookを開く。 |
 | コンパイル条件／C3 | hwdev/gf配下は現行`build/geforce-module.mk:22`のGF_PRODUCTION_MODULEで分岐する。backend/gf_hookはOS32_GEFORCE_MODULE。両者を混同しない。`build/hwdev.mk:122`のwildcardから新表示部品を除外し、共有計算と従来診断列だけ残す。 |
 | 配置・試験環境 | B0〜B3/B5〜B10/B12およびB11のtv.cはゲストmod＋libcなしhost実部品試験。B1/B2等の共有計算はhwdev/VPLLにも残る。B4 edid.c・B11 tv_data.c・C4 helper/stateはゲストkernel専用＋libcなしhost試験。A3はゲスト診断、A2はhost Python登録。 |
-| 予算 | mod text/rodata14〜21＋BSS1〜3＝15〜24KiB。kernel helper7〜10、state10〜14KiB、cursor VRAM16KiB/headを別計上。hwdev共有変更は計12KiB以内。EDID/TV helperをhwdev.modへ移したことにはしない。 |
+| 予算 | 層4統合実測（2026-11-04）のGEFORCE mem増分64 KiB、mem合計155,648 B（§10）。kernel helper7〜10、state10〜14KiB、cursor VRAM16KiB/headを別計上。hwdev共有変更は計12KiB以内。EDID/TV helperをhwdev.modへ移したことにはしない。 |
 
 共通の[合算予算](GF_FEAT3_DESIGN.md#合算予算)・[共有ファイルの衝突表と所有段](GF_FEAT3_DESIGN.md#共有ファイルの衝突表所有段)・[依存と並列発注](GF_FEAT3_DESIGN.md#依存と並列発注)はGF_FEAT3を正とする。
 
