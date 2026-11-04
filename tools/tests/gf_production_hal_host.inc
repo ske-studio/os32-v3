@@ -1,15 +1,21 @@
-/* P5 module adapter + real P4 owner/transport/runner, with fake ports/copy. */
+/* Ownerless platform adapter + real P4 owner/transport/runner, fake ports/copy.
+ * F4 module initialization is covered separately by gf4_c3_host.c. */
 #include "drivers/video/geforce/geforce_module.h"
 #include "gfx/palette.h"
-#include "gf_accel_no_bind.h"
-#define gf3_service_bind gf3_host_no_bind
 #define production prod
-#include "drivers/video/geforce/geforce_body.c"
-#undef gf3_service_bind
+#include "gf_ownerless_body.inc"
 #undef production
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }
+/* Optional F4 HAL entries are retained by the backend ops table. This
+ * ownerless fixture never invokes them: fail at runtime if that changes. */
+int gf2_fence_emit(struct gf2_chan *ch,struct gf2_fence *out,u32 dl)
+{ (void)ch;(void)out;(void)dl;__builtin_trap(); }
+int gf2_fence_wait(struct gf2_chan *ch,struct gf2_fence fence,u32 dl)
+{ (void)ch;(void)fence;(void)dl;__builtin_trap(); }
+int gf_vram_next(struct gf2_chan *ch,u32 *cursor,struct gf_vram_reservation *out)
+{ (void)ch;(void)cursor;(void)out;__builtin_trap(); }
 static GfxBackend hal_backend;
 static GfxCounters hal_counters;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
@@ -51,10 +57,12 @@ static void prod_hal_cases(void)
         .bar0_phys=prod_boot.bars[0].base,.display_phys=prod_boot.bars[1].base};
     const struct gf3_test_ops *accel=0;
     const struct gf1_test_ops *foundation=0;
-    GeforceModuleContext ctx={&hal_backend,&hal_counters,&gfx_current_height,
-        &gfx_flip_enabled,&gfx_display_page,&p,&accel,&foundation};
+    GeforceModuleContext ctx={.backend=&hal_backend,.counters=&hal_counters,
+        .height=&gfx_current_height,.flip=&gfx_flip_enabled,.page=&gfx_display_page,
+        .platform=&p,.accel_out=&accel,.foundation_out=&foundation};
     static u8 client[MEM_GFX_BB8_SIZE];
-    CHECK(!geforce_module_init(&hal_backend,&ctx));
+    CHECK(!gf_ownerless_module_init(&hal_backend,&ctx));
+    CHECK(!prod.display.display4 && !gf3_service_get(&prod.chan));
     hal_backend.bb_base=client;hal_backend.bb_pitch=640;
     hal_backend.prepare();CHECK(!prod_cmd_writes && !prod_mmio_calls);
     hal_backend.init();CHECK(hal_backend.probe() && hal_route==1 && !hal_safe);
@@ -73,5 +81,5 @@ static void prod_hal_cases(void)
     prod_cfg[13][0][0]^=1;u32 redraws=prod_redraws,reads=prod_mmio_calls;
     CHECK(geforce_return(&p)==-1 && !hal_safe && !hal_route);
     CHECK(prod_mmio_calls==reads && prod_redraws==redraws);
-    output("PASS P4/P5 module: prepare-only, start/copy/cell/01, fixed reinit, stop/00/decode/redraw, reboot return failure\n");
+    output("PASS P4/P5 ownerless platform: prepare-only, start/copy/cell/01, fixed reinit, stop/00/decode/redraw, reboot return failure\n");
 }

@@ -86,7 +86,7 @@
 #define GF3_SERVICE_SOURCE "../../hwdev/gf/service.c"
 #endif
 #include GF3_SERVICE_SOURCE
-#if !defined(GF4_REAL_DISPLAY) && !defined(GF3_CINT_WIRE)
+#if !defined(GF4_REAL_DISPLAY)
 /* Legacy F3-only hosts never install display4. Full F4 integration links
  * the actual service; an accidental F4 dispatch here must fail visibly. */
 struct gf4_ctx;
@@ -119,7 +119,7 @@ static struct gf3_host cint_host;
 static struct gf3_host_event cint_events[CINT_EVENTS];
 static struct gf3_host_reg cint_regs[512], cint_writes[4096];
 #ifdef GF3_CINT_WIRE
-#include "../../drivers/video/geforce/geforce_body.c"
+#include "gf_ownerless_body.inc"
 #define cint_prod production
 #else
 static struct gf_production cint_prod;

@@ -1,9 +1,10 @@
 """KDEBUG=0 production startup, resource gate, cleanup and reboot order."""
 CHECK = dict(name='gf-production-host', tier=1,
-    covers=['tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=60.0)
 
 from kernel_includes import include_flags
+from gf_ownerless_fixture import ownerless_body
 from pathlib import Path
 import os
 import subprocess
@@ -21,6 +22,8 @@ def main(override=None):
              '-DKDEBUG=0', '-DGF_PRODUCTION',
              *include_flags(ROOT)]
     with tempfile.TemporaryDirectory(prefix='gf-production-') as tmp:
+        (Path(tmp)/'gf_ownerless_body.inc').write_text(ownerless_body(
+            (ROOT/'drivers/video/geforce/geforce_body.c').read_text(), bind_f3=False))
         exe = Path(tmp) / 'host'
         native = Path(tmp) / 'native.o'
         # P5 owns module/build registration. Compile the new production TUs
@@ -42,9 +45,14 @@ def main(override=None):
         sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'kernel/sys.c',
                    'hwdev/gf/devinit.c', 'hwdev/gf/bus.c', 'hwdev/gf/resources.c',
                    'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
-                   'hwdev/gf/service.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_resources.c']
-        sources += [str(p.relative_to(ROOT)) for pattern in ('hwdev/gf/op/*.c', 'hwdev/gf/display/*.c')
-                    for p in sorted(ROOT.glob(pattern))]
+                   'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_resources.c']
+        # Ownerless legacy display composition: F4-only lifecycle TUs must
+        # not override the trap for an unexpected gf4_service_start call.
+        f4_only = {'dcb', 'ddc', 'dpms', 'flip', 'gamma', 'tmds', 'tv',
+                   'heads', 'transaction', 'service', 'save', 'recover', 'scan', 'links'}
+        sources += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob('hwdev/gf/op/*.c'))]
+        sources += [str(p.relative_to(ROOT)) for p in sorted(ROOT.glob('hwdev/gf/display/*.c'))
+                    if p.stem not in f4_only]
         subprocess.run(['gcc', *flags, '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), '-o', str(exe)], check=True)
         symbols = subprocess.check_output(['nm', '--defined-only', str(exe)], text=True)
