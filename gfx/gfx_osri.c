@@ -30,6 +30,9 @@ int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *ima
     u8 h[OSRI_HEADER_BYTES], pal[OSRI_COLORS * 2], e[OSRI_EVENT_BYTES], extra;
     u16 current[OSRI_COLORS], version;
     u32 crc = CRC32_INIT, expected, count, band, plane, i, line_count = 0;
+#ifdef SPLASH_RASTER_OBS
+    u16 seen = 0;
+#endif
     int fd, result = -1;
     if (!path || !dst || !image || dst->width != GFX_WIDTH ||
         dst->height != GFX_HEIGHT || dst->pitch != GFX_BPL ||
@@ -83,9 +86,18 @@ int osri_load(const char *path, struct gfx_kernel_fb *dst, struct OsriImage *ima
             ev->index >= OSRI_COLORS || ev->reserved0 || ev->reserved1 || ev->rgb444 > 0xfff ||
             (!OSRI_ALLOW_SAME(version) && current[ev->index] == ev->rgb444) ||
             (i && (ev->line < image->event[i-1].line ||
-                   (ev->line == image->event[i-1].line && ev->index <= image->event[i-1].index)))) goto done;
+#ifdef SPLASH_RASTER_OBS
+                   (version != OSRI_VERSION_2 &&
+                    ev->line == image->event[i-1].line && ev->index <= image->event[i-1].index)
+#else
+                   (ev->line == image->event[i-1].line && ev->index <= image->event[i-1].index)
+#endif
+                   ))) goto done;
         line_count = i && ev->line == image->event[i-1].line ? line_count + 1 : 1;
 #ifdef SPLASH_RASTER_OBS
+        if (line_count == 1) seen = 0;
+        if (seen & (1u << ev->index)) goto done;
+        seen |= 1u << ev->index;
         if (version == OSRI_VERSION_2 && line_count > OBS_V2_MAX_EVENTS_PER_LINE) goto done;
 #else
         if (version == OSRI_VERSION_2 && line_count > OSRI_V2_MAX_EVENTS_PER_LINE) goto done;

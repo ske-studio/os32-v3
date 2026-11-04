@@ -16,6 +16,8 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
+import zlib
 import tempfile
 
 import host32
@@ -34,17 +36,20 @@ NORMAL_UNITS = ['gfx/gfx_osri.c', PLAYER, 'init/boot_splash.c',
                 'drivers/video/pc98/splash_raster.c', 'platform/pc98/splash.c',
                 'platform/pc98/splash_image.c']
 MUTATIONS = (
-    ('N minimum', PLAYER, 'colors < 1 || colors > OSRI_COLORS', 'colors < 2 || colors > OSRI_COLORS'),
-    ('N maximum', PLAYER, 'colors > OSRI_COLORS ||', 'colors >= OSRI_COLORS ||'),
-    ('row equality', PLAYER,
-     'image->count != (SPLASH_RASTER_VISIBLE_LINES - 1) * colors',
-     'image->count < (SPLASH_RASTER_VISIBLE_LINES - 1) * colors'),
-    ('missing row', PLAYER, 'e->line != y ||', 'e->line + 1u < y ||'),
+    ('prepare capacity', PLAYER, 'image->count > OBS_V2_MAX_EVENTS', 'image->count >= OBS_V2_MAX_EVENTS'),
+    ('row order', PLAYER, 'e->line != y || e->index', 'e->line > y || e->index'),
+    ('47 bound', PLAYER, '> PL_OBS_OUT_LIMIT) return -1;', '> PL_OBS_OUT_LIMIT + 1) return -1;'),
+    ('component G', PLAYER, 'if ((old & 0x0f0) != (rgb & 0x0f0)) {', 'if (1) {'),
+    ('component R', PLAYER, 'if ((old & 0xf00) != (rgb & 0xf00)) {', 'if (1) {'),
+    ('component B', PLAYER, 'if ((old & 0x00f) != (rgb & 0x00f)) {', 'if (1) {'),
+    ('carry colors', PLAYER, 'current[e->index] = rgb;', '(void)rgb;'),
+    ('max stats', PLAYER, 'plan->max_outs = r->count;', 'plan->max_outs = 0;'),
+    ('total stats', PLAYER, 'plan->total_outs += r->count;', 'plan->total_outs = r->count;'),
+    ('early selection', PLAYER, 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;\n        if (!(status & GDC_STAT_HBLANK)) {\n            if (!armed) {\n                armed = 1;\n                if (r->count) outp(PAL_IDX_PORT, r->first);', 'if (status & GDC_STAT_VSYNC) return PL_FRAME_DROP;\n        if (!(status & GDC_STAT_HBLANK)) {\n            if (!armed) {\n                armed = 1;\n                (void)r;'),
+    ('duplicate OBS', 'gfx/gfx_osri.c', 'if (seen & (1u << ev->index)) goto done;', 'if (0 && (seen & (1u << ev->index))) goto done;'),
     ('6384 bound', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OBS_V2_MAX_EVENTS)',
      'OSRI_V1_MAX_EVENTS : OBS_V2_MAX_EVENTS - 1)'),
     ('next index', PLAYER, 'r->value[r->count++] = e->index;', 'r->value[r->count++] = 0;'),
-    ('same RGB omitted', PLAYER, 'r->port[r->count] = PAL_G_PORT;',
-     'if (e->rgb444 == image->pal[e->index]) continue;\n            r->port[r->count] = PAL_G_PORT;'),
     ('low rearm', PLAYER, 'else if (armed) {\n            emit(r);',
      'else {\n            emit(r);'),
     ('missing CLI', PLAYER, 'unsigned int flags = irq_save();\n    int rc = PL_FRAME_DROP;',
@@ -99,10 +104,81 @@ def populate(work, mutation=None):
         dest.write_text(text)
 
 
-def execute(mutation=None):
+def asset_fixtures(work, directory):
+    """Independent v2 decode to a serialized plan; no encoder imports/sidecar."""
+    declarations, calls, assembly = [], [], ['.section .rodata']
+    for n in range(1, 9):
+        path = directory / f'N{n:02}.osri'
+        data = path.read_bytes()
+        checked = bytearray(data)
+        checked[48:52] = bytes(4)
+        assert zlib.crc32(checked) == struct.unpack_from('<I', data, 48)[0]
+        assert struct.unpack_from('<H', data, 4)[0] == 2
+        count = struct.unpack_from('<I', data, 36)[0]
+        assert len(data) == 128096 + 8*count
+        colors = list(struct.unpack_from('<16H', data, 64))
+        rows = [[] for _ in range(400)]
+        first = [0]*400
+        seen, previous = set(), 0
+        for j in range(count):
+            y, index, reserved, color, reserved2 = struct.unpack_from('<HBBHH', data, 128096+8*j)
+            assert 1 <= y < 400 and previous <= y and index < 16
+            assert not reserved and not reserved2 and color <= 4095
+            if y != previous:
+                seen = set()
+            assert index not in seen
+            seen.add(index)
+            previous = y
+            old = colors[index]
+            colors[index] = color
+            components = [(port, (color >> shift) & 15) for port, shift in
+                          ((0xaa, 4), (0xac, 8), (0xae, 0))
+                          if (old >> shift) & 15 != (color >> shift) & 15]
+            if components:
+                if rows[y]:
+                    rows[y].append((0xa8, index))
+                else:
+                    first[y] = index
+                rows[y].extend(components)
+            assert len(rows[y]) <= 47
+        expected = bytearray()
+        for y, row in enumerate(rows):
+            expected += bytes([first[y], len(row)])
+            expected += bytes(port for port, value in row) + bytes(64-len(row))
+            expected += bytes(value for port, value in row) + bytes(64-len(row))
+        maximum, total = max(map(len, rows)), sum(map(len, rows))
+        expected += struct.pack('<II', maximum, total)
+        fixture = work / f'asset{n}.bin'
+        fixture.write_bytes(data + expected)
+        assembly += [f'.global asset{n}', f'asset{n}: .incbin "{fixture}"']
+        declarations.append(f'extern const u8 asset{n}[];')
+        calls.append(f'check_asset(asset{n}, {len(data)});')
+        print(f'N{n:02}: independent I/O max={maximum} total={total} events={count}', flush=True)
+    helper = """
+static void check_asset(const u8 *data, u32 size) {
+    struct gfx_kernel_fb fb;
+    scenario=2; file_bytes=size;
+    for (u32 i=0; i<size; i++) file[i]=data[i];
+    gfx_kernel_framebuffer(&fb);
+    REQUIRE(!osri_load("asset", &fb, &image));
+    REQUIRE(!pl_obs_prepare(&image, &plan));
+    for (u32 i=0; i<sizeof(plan); i++) REQUIRE(((u8 *)&plan)[i] == data[size+i]);
+}
+"""
+    source = work / 'tools/tests/splash_obs_host.c'
+    source.write_text(source.read_text().replace('void _start(void)',
+        '\n'.join(declarations) + helper + 'void _start(void)').replace(
+        '    test_prepare();', '    ' + ' '.join(calls) + '\n    test_prepare();'))
+    asm = work / 'assets.S'
+    asm.write_text('\n'.join(assembly) + '\n.section .note.GNU-stack,"",@progbits\n')
+    return [str(asm)]
+
+
+def execute(mutation=None, asset_dir=None):
     with tempfile.TemporaryDirectory(prefix='splash-obs-') as td:
         work = Path(td)
         populate(work, mutation)
+        assets = asset_fixtures(work, asset_dir) if asset_dir else []
         normal = work / 'normal.c'
         normal.write_text('#include "gfx_osri.h"\n'
             'void _start(void) { int rc = sizeof(struct OsriImage) != 9614;'
@@ -116,7 +192,7 @@ def execute(mutation=None):
             return rc
         subprocess.run([compiler(), *flags(work), '-nostdlib', '-DSPLASH_RASTER_OBS',
                         '-Wl,--gc-sections', str(work / 'tools/tests/splash_obs_host.c'),
-                        '-lgcc', '-o', str(exe)], check=True)
+                        *assets, '-lgcc', '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner='qemu', capture_output=True)
         if result.returncode:
             print(result.stderr.decode(), end='', flush=True)
@@ -166,9 +242,10 @@ def normal_sections():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--obs-dir', type=Path, help='also compare N01..N08 to independent I/O decode')
     args = parser.parse_args()
-    assert execute() == 0, 'OBS baseline runtime failed'
-    print('GREEN N=1..16, 6384 boundary, exact columns, both modes/phases, IF, '
+    assert execute(asset_dir=args.obs_dir) == 0, 'OBS baseline runtime failed'
+    print('GREEN variable OUTs, pi, 47/48 boundary, 6384 capacity, exact columns, both modes/phases, IF, '
           'VSYNC drop, finite waits, next frame, ownership, serial pairs and cleanup', flush=True)
     normal_sections()
     if args.mutate:
