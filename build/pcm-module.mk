@@ -18,7 +18,7 @@ $(PCM_OUT)/pcm_import_slots.o $(PCM_OUT)/pcm_provider_types.o $(PCM_OUT)/pcm_kex
 $(PCM_OUT)/pcm_import_stubs.o: $(PCM_OUT)/pcm_import_stubs.S build/config.mk build/pcm-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(PCM_OUT)/pcm.elf: $(PCM_OBJS) build/pcm-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/pcm-module.ld -Map=$(PCM_OUT)/pcm.map $(PCM_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/pcm-module.ld -Map=$(PCM_OUT)/pcm.map $(PCM_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(PCM_OUT)/pcm_kexports.o

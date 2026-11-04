@@ -60,8 +60,7 @@ $(BOOT_OUT)/vk32_boot.o: boot/vk32_boot.c boot/boot_defs.h lib/crc32_core.inc li
 	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
 
 $(BOOT_OUT)/loader_hdd.elf: $(BOOT_ALL_OBJ) boot/loader.ld
-	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $(filter %.o,$^) \
-		-L$(shell $(CC) -print-libgcc-file-name | xargs dirname) -lgcc
+	$(LD) -m elf_i386 -T boot/loader.ld -Map=$(@:.elf=.map) -o $@ $(filter %.o,$^)
 
 $(BOOT_OUT)/loader_hdd.bin: $(BOOT_OUT)/loader_hdd.elf
 	$(OBJCOPY) -O binary $< $@
@@ -108,8 +107,7 @@ $(BOOT_OUT)/boot_debug.o: boot/boot_debug.c boot/boot_defs.h drivers/block/pc98p
 	$(CC) $(CFLAGS_BOOT) -Idrivers/block -c -o $@ $<
 
 $(BOOT_OUT)/loader_hdd_debug.elf: $(BOOT_DBG_ALL_OBJ) boot/loader.ld
-	$(LD) -m elf_i386 -T boot/loader.ld -o $@ $(filter %.o,$^) \
-		-L$(shell $(CC) -print-libgcc-file-name | xargs dirname) -lgcc
+	$(LD) -m elf_i386 -T boot/loader.ld -Map=$(@:.elf=.map) -o $@ $(filter %.o,$^)
 
 $(BOOT_OUT)/loader_hdd_debug.bin: $(BOOT_OUT)/loader_hdd_debug.elf
 	$(OBJCOPY) -O binary $< $@

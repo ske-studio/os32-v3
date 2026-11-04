@@ -18,7 +18,7 @@ $(LAN_OUT)/lan_import_slots.o $(LAN_OUT)/lan_provider_types.o $(LAN_OUT)/lan_kex
 $(LAN_OUT)/lan_import_stubs.o: $(LAN_OUT)/lan_import_stubs.S build/config.mk build/lan-module.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(LAN_OUT)/lan.elf: $(LAN_OBJS) build/lan-module.ld sdk/link/generations.ld
-	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/lan-module.ld -Map=$(LAN_OUT)/lan.map $(LAN_OBJS) $(shell $(CC) -print-libgcc-file-name) -o $@
+	$(CROSS_DIR)/bin/i386-elf-ld -m elf_i386 --emit-relocs -T build/lan-module.ld -Map=$(LAN_OUT)/lan.map $(LAN_OBJS) -o $@
 
 # Kernel and R1 both publish exactly the generated function contracts.
 C_KERNEL_OBJ += $(LAN_OUT)/lan_kexports.o
