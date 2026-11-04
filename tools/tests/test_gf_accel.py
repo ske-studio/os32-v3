@@ -49,6 +49,7 @@ COMPONENTS = {
     'c0': 'drivers/video/geforce/gf_hook.c',
     'c1': 'hwdev/gf/service.c',
     'c2': 'hwdev/gf/display/quiesce.c',
+    'wire': 'drivers/video/geforce/geforce_body.c',
 }
 
 # Reports gf3-b*/report*.md, gf3-v0/report.md (B0 fix1 supersedes old anchors).
@@ -369,6 +370,15 @@ MUTATIONS = {
          'i32 rc = gf3_init(&p->accel, &p->chan, dl);',
          'i32 rc = gf3_init(&p->accel, &p->chan, dl + 1U);', 'tools/tests/gf_accel_c1_host.c'),
     ],
+    'wire': [
+        ('body-bind', 'drivers/video/geforce/geforce_body.c',
+         'int rc = gf3_service_bind(&production, context->accel_out);',
+         'int rc = false ? gf3_service_bind(&production, context->accel_out) : 0;',
+         'tools/tests/gf_accel_wire_host.c'),
+        ('production-stop', 'hwdev/gf/command_test.c',
+         'rc = service ? gf3_service_stop(service) : gf2_stop(ch);',
+         'rc = gf2_stop(ch);', 'tools/tests/gf_accel_wire_host.c'),
+    ],
     'c2': [
         ('close-failure', 'hwdev/gf/display/quiesce.c',
          'if (!revoked) goto fail;',
@@ -401,7 +411,7 @@ def require(condition, message):
 
 def component_build(host, source, directory, original_parent):
     component = host.stem.removeprefix('gf_accel_').removesuffix('_host')
-    if component in ('c1', 'c2'):
+    if component in ('c1', 'c2', 'wire'):
         # Preserve relative includes for real F1/F2/F3 integration and mutations.
         tree = directory/'tree'
         if not tree.exists():
@@ -458,7 +468,7 @@ def component_hosts(selected, mutate):
         if mutate:
             original = source.read_text()
             for name, product, old, new, red_host in MUTATIONS[component]:
-                require((component in ('c1', 'c2') or product == COMPONENTS[component]) and ROOT/red_host == host,
+                require((component in ('c1', 'c2', 'wire') or product == COMPONENTS[component]) and ROOT/red_host == host,
                         f'{component}-{name}: inconsistent registration')
                 require(old != new and (ROOT/product).read_text().count(old) == 1,
                         f'{component}-{name}: anchor must be unique and change source')
@@ -477,8 +487,8 @@ def component_hosts(selected, mutate):
                 mutant = directory/source.name
                 for name, product, old, new, red_host in MUTATIONS[component]:
                     label = component+'-'+name
-                    target = directory/'tree'/product if component in ('c1', 'c2') else mutant
-                    if component in ('c1', 'c2'):
+                    target = directory/'tree'/product if component in ('c1', 'c2', 'wire') else mutant
+                    if component in ('c1', 'c2', 'wire'):
                         require(target.resolve().is_relative_to((directory/'tree').resolve()),
                                 label+': mutation must stay in the copied product tree')
                     product_original = (ROOT/product).read_text()

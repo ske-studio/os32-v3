@@ -16,6 +16,10 @@ static const struct gf3_test_ops accel_ops_a, accel_ops_b;
 struct gf1_test_ops gf1_module_ops;
 static struct gf_foundation *bound_foundation;
 static struct gf2_chan *bound_chan;
+/* This module-loader fixture models the service registration only. The
+ * gf_accel_wire host runs the same body against real F1/F2/F3 lifecycle. */
+i32 gf3_service_bind(struct gf_production *p, const struct gf3_test_ops **slot)
+{ CHECK(p==&production && slot); return 0; }
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { bound_foundation=f;bound_chan=ch; }
 static void production_bind(void)

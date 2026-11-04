@@ -104,7 +104,10 @@ int pc98_route_select_98(void) { return 0; }
 #include "../../hwdev/gf/accel.h"
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 { CHECK(!active && !scan); }
+#include "tools/tests/gf_accel_no_bind.h"
+#define gf3_service_bind gf3_host_no_bind
 #include "../../drivers/video/geforce/geforce_body.c"
+#undef gf3_service_bind
 struct gf1_test_ops gf1_module_ops;
 void gf2_test_bind_production(struct gf_foundation *f,struct gf2_chan *ch)
 { (void)f;(void)ch; }

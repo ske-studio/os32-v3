@@ -4,6 +4,15 @@
 #include "gf_command_runtime_host.h"
 #include "../../hwdev/gf/command.h"
 #include "../../hwdev/gf/gf2_test.h"
+#include "../../hwdev/gf/accel_service.h"
+/* This layer-2 oracle has no registered layer 3. Real production lifecycle
+ * is covered by gf_accel_wire_host with the actual service implementation. */
+struct gf3_service *gf3_service_get(struct gf2_chan *ch) { (void)ch; return 0; }
+i32 gf3_service_start(struct gf3_service *s, u32 dl)
+{ (void)s;(void)dl; __builtin_trap(); }
+i32 gf3_service_stop(struct gf3_service *s) { (void)s; __builtin_trap(); }
+i32 gf3_service_recover(struct gf3_service *s, u32 dl)
+{ (void)s;(void)dl; __builtin_trap(); }
 #ifdef NDEBUG
 #error "T2a1's oracle requires assertions"
 #endif

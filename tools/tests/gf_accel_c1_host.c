@@ -35,7 +35,9 @@
 
 #define rd cint_fifo_rd
 #define wr cint_fifo_wr
+#define stop cint_fifo_stop
 #include "../../hwdev/gf/fifo.c"
+#undef stop
 #undef wr
 #undef rd
 #include "../../hwdev/gf/push.c"
@@ -109,7 +111,12 @@
 static struct gf3_host cint_host;
 static struct gf3_host_event cint_events[CINT_EVENTS];
 static struct gf3_host_reg cint_regs[512], cint_writes[4096];
+#ifdef GF3_CINT_WIRE
+#include "../../drivers/video/geforce/geforce_body.c"
+#define cint_prod production
+#else
 static struct gf_production cint_prod;
+#endif
 static const struct gf3_test_ops *cint_slot;
 static struct gf3_service *cint_service;
 static u8 cint_imem[CINT_IMEM_BYTES] __attribute__((aligned(MEM_PAGE_SIZE)));
@@ -469,10 +476,15 @@ static inline void cint_reset(void)
         .format = GFX_FMT_PACKED8};
     gf3_host_set(&cint_host, 0, GF_PRODUCTION_PFB_AMOUNT, GF_PRODUCTION_PFB_MIN);
     gf3_host_set(&cint_host, 0, GR_UNITS, 0);
+#ifndef GF3_CINT_WIRE
     assert(!gf3_service_bind(&cint_prod, &cint_slot));
+#endif
     cint_service = gf3_service_get(&cint_prod.chan);
+#ifndef GF3_CINT_WIRE
     assert(cint_service);
-    cint_service->scan_pitch = cint_service->scan_width = cint_service->scan_height = cint_service->scan_phys = 0;
+#endif
+    if (cint_service)
+        cint_service->scan_pitch = cint_service->scan_width = cint_service->scan_height = cint_service->scan_phys = 0;
     assert(!gf_foundation_start(&cint_prod.foundation));
     assert(!gf2_start(&cint_prod.chan, &cint_prod.foundation));
     assert(cint_prod.chan.state == GF2_RUN && cint_prod.chan.mapped && cint_dma_live);
