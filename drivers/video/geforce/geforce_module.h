@@ -55,7 +55,10 @@ typedef struct {
     /* Kernel-owned helper/state loans, valid until module stop completes. */
     const struct gf4_data_ops *display_data;
     struct gf4_state *display_state;
-    /* Addresses of kernel static slots; reread before each dispatch. */
+    /* Version 5 appends to the version 4 prefix (including accel/foundation).
+     * Kernel static slot addresses; C2 owns publication. Reread per dispatch.
+     * The restore loan survives a saved display or retained-resource failure;
+     * processing and completed unload close it. */
     const struct gf4_test_ops **display_out;
     const struct gf5_test_ops **feature5_out;
     const struct gf4_restore_ops **display_restore_out;

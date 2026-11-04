@@ -11,6 +11,7 @@
 #include "kprintf.h"
 #include "gf_production.h"
 #include "pc98_route.h"
+#include "../../../hwdev/gf/display/api.h"
 
 extern const u32 geforce_kexports[];
 extern const struct module_symbol_contract geforce_import_contracts[], geforce_export_contracts[];
@@ -19,14 +20,27 @@ static GfxBackend candidate;
 static int registered;
 static const struct gf3_test_ops *accel_slot;
 static const struct gf1_test_ops *foundation_slot;
+/* OS32 module loans, GF_FEAT4_DESIGN C3-slot. C2 owns publication and
+ * operation-time closure; the kernel owns these addresses until unload. */
+static const struct gf4_test_ops *display_slot;
+static const struct gf4_restore_ops *display_restore_slot;
+static const struct gf5_test_ops *feature5_slot;
 const struct gf3_test_ops *geforce_accel_ops(void)
 { return registered ? accel_slot : 0; }
 const struct gf1_test_ops *geforce_foundation_ops(void)
 { return registered ? foundation_slot : 0; }
+const struct gf4_test_ops *geforce_display_ops(void)
+{ return registered ? display_slot : 0; }
+const struct gf4_restore_ops *geforce_display_restore_ops(void)
+{ return registered ? display_restore_slot : 0; }
 static int missing_probe(void) { return 0; }
 GfxBackend gfx_backend_geforce = {.name="geforce-unavailable", .probe=missing_probe};
 static GeforceModuleContext context = {
-    &gfx_backend_geforce, &gfx_counters, &gfx_current_height, &gfx_flip_enabled, &gfx_display_page, 0, &accel_slot, &foundation_slot
+    .backend=&gfx_backend_geforce, .counters=&gfx_counters,
+    .height=&gfx_current_height, .flip=&gfx_flip_enabled, .page=&gfx_display_page,
+    .accel_out=&accel_slot, .foundation_out=&foundation_slot,
+    .display_out=&display_slot, .feature5_out=&feature5_slot,
+    .display_restore_out=&display_restore_slot
 };
 int geforce_pc98_safe(void)
 {
@@ -89,6 +103,17 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
         rc=MODULE_INIT_FAILED;
         goto failed;
     }
+    const u32 display_entries[] = {
+        (u32)(uptr)candidate.set_mode, (u32)(uptr)candidate.dpms,
+        (u32)(uptr)candidate.cursor_image, (u32)(uptr)candidate.cursor_move,
+        (u32)(uptr)candidate.cursor_show, (u32)(uptr)candidate.vsync,
+        (u32)(uptr)candidate.page_flip, (u32)(uptr)candidate.gamma
+    };
+    for (u32 i=0; i<sizeof(display_entries)/sizeof(display_entries[0]); i++)
+        if (display_entries[i] && !module_text_contains(r, display_entries[i])) {
+            rc=MODULE_INIT_FAILED;
+            goto failed;
+        }
     if (!module_ref_acquire(geforce_handle, r->owner, MODULE_REF_REGISTRATION, 0)) {
         rc=MODULE_INIT_FAILED;
         goto failed;
@@ -98,6 +123,9 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
     return 0;
 failed:
     accel_slot=0;
+    display_slot=0;
+    display_restore_slot=0;
+    feature5_slot=0;
     return rc;
 }
 static int geforce_detach(struct module_record *r)
@@ -105,6 +133,10 @@ static int geforce_detach(struct module_record *r)
     (void)r;
     /* Close admission even when the module must retain its resources. */
     accel_slot=0;
+    display_slot=0;
+    /* A refused detach keeps the management loan for retained resources. */
+    const struct gf4_restore_ops *restore=display_restore_slot;
+    display_restore_slot=0;
     /* Device context and restoration callbacks live for the whole boot. */
     const struct geforce_platform *p=context.platform;
     const struct gf_production *owner=p ? p->opaque : 0;
@@ -113,15 +145,29 @@ static int geforce_detach(struct module_record *r)
         owner->foundation.mapped || owner->foundation.imem.used ||
         owner->chan.state != GF2_OFF || owner->chan.fault.latched ||
         owner->chan.mapped || owner->chan.vram_reserved ||
-        owner->chan.staging_live))) return 0;
-    if (geforce_tick_bind(0,0)) return 0;
+        owner->chan.staging_live))) {
+        display_restore_slot=restore;
+        return 0;
+    }
+    if (geforce_tick_bind(0,0)) {
+        display_restore_slot=restore;
+        return 0;
+    }
     foundation_slot=0;accel_slot=0;
+    feature5_slot=0;
+    context.display_data=0;
+    context.display_state=0;
     return 1;
 }
 int geforce_module_load(void)
 {
-    accel_slot=0;
     if (geforce_handle.generation) return MODULE_BUSY;
+    accel_slot=0;
+    display_slot=0;
+    display_restore_slot=0;
+    feature5_slot=0;
+    int rc=gf4_data_bind(&context.display_data, &context.display_state);
+    if (rc) return rc;
     context.platform=geforce_platform_get();
     const struct bootinfo *bi=bootinfo_get();
     const struct module_request request = {
@@ -131,17 +177,23 @@ int geforce_module_load(void)
             GEFORCE_IMPORT_COUNT, geforce_import_contracts, geforce_export_contracts, MODULE_ID_GEFORCE},
         .imports=geforce_kexports, .lifecycle={.start=geforce_start, .detach=geforce_detach}
     };
-    int rc=module_load(&request, &geforce_handle);
+    rc=module_load(&request, &geforce_handle);
     if (!rc) rc=module_start(geforce_handle);
     if (!rc && !module_exports(geforce_handle)) rc=MODULE_INIT_FAILED;
     if (!rc) gfx_backend_geforce=candidate;
-    else {foundation_slot=0;accel_slot=0;}
+    else {
+        foundation_slot=0;accel_slot=0;
+        display_slot=0;display_restore_slot=0;feature5_slot=0;
+    }
     kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, bi->img_crc, registered);
     return rc;
 }
 int geforce_module_abort(void)
 {
     accel_slot=0;
+    display_slot=0;
     if (registered) return MODULE_ISOLATED;
+    display_restore_slot=0;
+    feature5_slot=0;
     return module_abort(geforce_handle);
 }
