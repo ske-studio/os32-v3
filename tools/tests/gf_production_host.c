@@ -26,7 +26,7 @@ static u32 prod_deadline_section;
 static u32 prod_stop_fail,prod_stop_writes,prod_route_calls,prod_redraws,prod_pfb;
 static u32 prod_trace[8192],prod_trace_count,prod_main_mask;
 static bool prod_a2_done,prod_stopping,prod_faulted;
-static int prod_foundation_fail;
+static int prod_foundation_fail,prod_prepare_read_fail;
 static u32 prod_logs,prod_cfg_reads,prod_prepare_writes;
 void kprintf(u8 attr,const char *format,...)
 { (void)attr;(void)format;prod_logs++; }
@@ -54,6 +54,13 @@ int gf_production_mmio(struct gf_production *p,u32 bar,u32 off,u32 width,bool wr
 {
     CHECK(p==&prod && bar==0 && (width==1 || width==2 || width==4));
     CHECK(write || (off!=0x6013c0 && off!=0x6813c9));
+    if (!p->prepared) {
+        CHECK(!write && off==RECOVER_PMC_ENABLE && width==4);
+        CHECK(!(prod_cfg[13][0][1]&PCI_CMD_BUS_MASTER));
+        CHECK(p->display.bar0_map==(void *)P2V_IO(prod_boot.bars[0].base) &&
+              p->foundation.bar0==p->display.bar0_map);
+        if (prod_prepare_read_fail) return -1;
+    }
     prod_mmio_calls++;
     if(off>=KPEEK_NV_PROM_OFF && off-KPEEK_NV_PROM_OFF<GF_ROM_MAX) {
         CHECK(!write && (prod.display.initialized || prod_cmd_writes==1));
@@ -233,7 +240,7 @@ static void prod_reset(void)
     kmemset(prod_vga,0,sizeof(prod_vga));kmemset(prod_index,0,sizeof(prod_index));
     prod_reg_count=prod_trace_count=prod_main_mask=0;
     prod_now=prod_clock_calls=prod_mmio_calls=prod_cmd_writes=prod_other_cfg_writes=prod_reads16=0;
-    prod_prepare_writes=prod_logs=0;
+    prod_prepare_writes=prod_logs=prod_prepare_read_fail=0;
     prod_clock_step=1;prod_clock_fail=prod_live_pages=prod_alloc_fail=prod_map_fail=prod_ram_fail=0;
     prod_route_fail=prod_rom_changed=prod_mismatch=prod_fail_main=0;
     prod_fail_section=prod_deadline_section=RECOVER_NONE;
@@ -261,10 +268,12 @@ static void prod_reset(void)
     u8 sum=0;for(u32 i=0;i<65536;i++)sum+=prod_rom[i];prod_rom[65535]-=sum;
     prod_vga[0][0x11]=0x80;prod_index[0]=0x22;
     *prod_reg(0x1850)=*prod_reg(0x1854)=1;
+    *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U;
     CHECK(!gf_production_identify(&prod_boot));
     CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
     CHECK(prod_prepare_writes==1 && prod_logs==1 && prod_cfg[13][0][1]==0x02b00102U);
-    CHECK(!prod_cmd_writes && !prod_mmio_calls && !prod_route_calls);
+    CHECK(!prod_cmd_writes && prod_mmio_calls==1 && !prod_route_calls);
+    CHECK(prod.foundation.expected_pmc==0x03010000U);
     /* IRQ/tick adapter uses only its permanent map, never the guarded bus. */
     u32 words[2]={0,0},value,reads=prod_cfg_reads;
     volatile u8 *saved=prod.foundation.bar0;
@@ -304,20 +313,28 @@ static void prod_prepare_cases(void)
     for(u32 i=0;i<sizeof(commands)/sizeof(commands[0]);i++) {
         prod_reset();kmemset(&prod,0,sizeof(prod));
         prod_cfg[13][0][1]=0x02b00000U|commands[i];
-        prod_prepare_writes=prod_logs=0;
+        prod_prepare_writes=prod_logs=prod_mmio_calls=0;
+        *prod_reg(RECOVER_PMC_ENABLE)=0x03010000U+i;
         CHECK(!gf_production_prepare(&prod,&prod_boot,prod_route,&prod));
         CHECK(prod_cfg[13][0][1]==(0x02b00000U|(commands[i]&~4U)));
         CHECK(prod_prepare_writes==((commands[i]&4U)?1U:0U));
         CHECK(prod_logs==prod_prepare_writes && !prod_cmd_writes && !prod_other_cfg_writes);
-        CHECK(!prod_mmio_calls && !prod_route_calls);
+        CHECK(prod_mmio_calls==1 && !prod_route_calls);
+        CHECK(prod.foundation.expected_pmc==0x03010000U+i);
     }
+    prod_reset();kmemset(&prod,0,sizeof(prod));
+    prod_prepare_read_fail=1;
+    prod.foundation.expected_pmc=0x12345678U;
+    CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
+    CHECK(!prod.prepared && !prod.display.reusable && !prod_route_calls);
+    CHECK(prod.foundation.expected_pmc==0x12345678U);
     /* A failed BAR/mapping gate must not write even a valid Command word. */
     prod_reset();kmemset(&prod,0,sizeof(prod));
     prod_cfg[13][0][1]=0x02b00106U;prod_map_fail=1;
     prod_prepare_writes=prod_logs=0;
     CHECK(gf_production_prepare(&prod,&prod_boot,prod_route,&prod)==-1);
     CHECK(!prod.prepared && !prod_prepare_writes && !prod_logs && prod_cfg[13][0][1]==0x02b00106U);
-    output("PASS production prepare: shared clock/wait and production opaque; BM-only WORD clear, no write if clear or invalid maps\n");
+    output("PASS production prepare: shared clock/wait and production opaque; BM-only WORD clear, no write if clear or invalid maps; PMC readback before start, read failure rejects prepare\n");
 }
 static int prod_start(void)
 {return video_start(&prod.video,1,prod_rgb);}

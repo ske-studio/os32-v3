@@ -69,6 +69,7 @@ def main(override=None):
 
 def mutations():
     rows = [
+        ('hwdev/gf/devinit.c', 'p->foundation.expected_pmc=prepared_pmc;', '(void)prepared_pmc;', 'prepare PMC publication omitted'),
         ('hwdev/gf/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),
         ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=RECOVER_COMMAND_STOP;', 'prepare other Command bits lost'),

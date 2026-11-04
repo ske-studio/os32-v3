@@ -128,6 +128,12 @@ int gf_production_prepare(struct gf_production *p,
     }
     p->display.bar0_map=(void *)P2V_IO(p->display.bars[0].base);
     p->foundation.bar0=p->display.bar0_map;
+    /* As in gf_foundation_stop (foundation.c), nouveau has no expected_pmc;
+     * publish only the successful readback, here before the first start. */
+    u32 prepared_pmc;
+    if (gf_production_mmio(p,GF_MODE_REGISTER_BAR,RECOVER_PMC_ENABLE,
+                           sizeof(prepared_pmc),false,&prepared_pmc)) return -1;
+    p->foundation.expected_pmc=prepared_pmc;
     p->display.bar1_map=(void *)P2V_IO(p->display.bars[GF_MODE_VRAM_BAR].base);
     p->prepared=true;p->display.reusable=true;
     return 0;

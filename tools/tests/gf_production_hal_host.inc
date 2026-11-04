@@ -64,7 +64,7 @@ static void prod_hal_cases(void)
     CHECK(!gf_ownerless_module_init(&hal_backend,&ctx));
     CHECK(!prod.display.display4 && !gf3_service_get(&prod.chan));
     hal_backend.bb_base=client;hal_backend.bb_pitch=640;
-    hal_backend.prepare();CHECK(!prod_cmd_writes && !prod_mmio_calls);
+    hal_backend.prepare();CHECK(!prod_cmd_writes && prod_mmio_calls==2);
     hal_backend.init();CHECK(hal_backend.probe() && hal_route==1 && !hal_safe);
     prod_order();
     CHECK(prod_trace[prod_trace_count-3]==0xc0f1 &&
