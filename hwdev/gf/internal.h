@@ -111,6 +111,18 @@ int gf_init_restore(struct gf_init_context *ctx);
  * and all io callbacks are supplied by the owner. */
 int gf_init_run(struct gf_init_context *ctx, struct gf_init_program *work);
 enum gf_init_script_rc { GF_SCRIPT_OK=0, GF_SCRIPT_EIO=-1, GF_SCRIPT_ETIME=-5 };
+/* F5 BIT M: prepare validates without GPU writes; only publish out on
+ * success. execute borrows the completed immutable program and matching
+ * ROM/pc/head/OR, preserving started_us and steps/wait/elapsed budgets.
+ * Both return 0/-1/-5 and restore once on failure after execution begins.
+ * A later standalone execute has its budget initialized by the F5 owner;
+ * run_script remains the composition, with its existing public signature. */
+i32 gf_init_script_prepare(struct gf_init_context *ctx,
+                            struct gf_init_program *out, u32 pc,
+                            u8 head, u8 or_mask, u32 dl);
+i32 gf_init_script_execute(struct gf_init_context *ctx,
+                            const struct gf_init_program *program, u32 pc,
+                            u8 head, u8 or_mask, u32 dl);
 int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
                        u32 pc, u8 head, u8 or_mask, u32 dl);
 /* Already prepared immutable program; diagnostic owner approves one main. */
