@@ -40,6 +40,10 @@ static u8 image[IMAGE_BYTES], back_image[IMAGE_BYTES];
 static u8 head0_image[2][IMAGE_BYTES];
 static bool output_fixture, revoke_gamma, enter_invalid, leave_failed, perturb_other;
 static u32 gammas, enters, leaves, prepared_head[GF4_HEADS], discarded_head[GF4_HEADS];
+/* docs/decisions/realhw/GF_FEAT4_DESIGN.md:574: identity, dark curve,
+ * identity; palette return has no gamma. */
+enum { EXPECTED_GAMMA_APPLIES = 3 };
+static u32 gamma_checksum[EXPECTED_GAMMA_APPLIES];
 static char output[LOG_BYTES];
 static u32 log_bytes, uploads, downloads, prepares, discards, sets, powers, ddcs;
 static enum gf4_dpms power_seen[sizeof(display_power) / sizeof(display_power[0])];
@@ -270,7 +274,12 @@ static int vblank_call(struct gf4_ctx *ctx, u8 head, u32 after, u32 dl, u32 *see
 static int gamma_call(struct gf4_ctx *ctx, u8 head, const u16 rgb[3][256])
 {
     assert(ctx == &host.ctx && head == 1 && state.head[head].mode.fmt != GF3_INDEX8);
-    assert(gammas < 3U);
+    assert(gammas < EXPECTED_GAMMA_APPLIES);
+    /* Observe the callback's complete input independently of serial output. */
+    gamma_checksum[gammas] = 0;
+    for (u32 c = 0; c < sizeof(display_ramp) / sizeof(display_ramp[0]); ++c)
+        for (u32 i = 0; i < sizeof(display_ramp[0]) / sizeof(display_ramp[0][0]); ++i)
+            gamma_checksum[gammas] += rgb[c][i];
     static const u16 curve[] = {0,1,16512,65535};
     static const u32 at[] = {0,1,128,255};
     for (u32 c = 0; c < 3U; ++c)
@@ -850,17 +859,36 @@ static void cursor_flip_failures(void)
 #define LIFETIME_WIRE 0x1a507U
 enum { EXPECTED_GAMMA_READY = 4, EXPECTED_OUTPUT_READY = 6,
        EXPECTED_PAIR_READY = 4, EXPECTED_LIFETIME_READY = 3 };
+static void gamma_log(u32 from, u32 expected)
+{
+    static const char key[] = " LUT checksum=";
+    const char *p = gf2_host_strstr(output + from, key);
+    assert(p);
+    p += sizeof(key) - 1U;
+    u32 value = 0;
+    assert(*p >= '0' && *p <= '9');
+    while (*p >= '0' && *p <= '9')
+        value = value * (sizeof("0123456789") - 1U) + (*p++ - '0');
+    assert(*p == '\r' && value == expected);
+}
 static void gamma_steps(void)
 {
     reset(); assert(!gf_display_test(GAMMA_WIRE));
+    gamma_log(0, gamma_checksum[0]);
     assert(gammas == 1 && prepares == 1 && sets == 1 && display_session.mode == 2);
     /* Halfway across the 565 card must contain a mid grey, so changing
      * the curve has a visible effect; RGB-cube endpoint bars would not. */
     u32 middle = IMAGE_WIDTH * 2U + (IMAGE_WIDTH / 2U) * 2U;
     assert(image[middle] == 0xef && image[middle+1U] == 0x7b);
     assert(display_session.crc == image_crc(IMAGE_WIDTH*IMAGE_HEIGHT*2U));
+    u32 log_start = log_bytes, frame_crc = display_session.crc;
     assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    gamma_log(log_start, gamma_checksum[1]);
+    assert(gamma_checksum[0] != gamma_checksum[1] && display_session.crc == frame_crc);
+    log_start = log_bytes;
     assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
+    gamma_log(log_start, gamma_checksum[2]);
+    assert(gamma_checksum[0] == gamma_checksum[2] && display_session.crc == frame_crc);
     assert(gammas == 3 && prepares == 1 && sets == 1 && !discards);
     u32 before = nevents;
     assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
@@ -868,6 +896,7 @@ static void gamma_steps(void)
            events[before+2U] == CASE_PREPARE);
     assert(display_session.mode == 1 && events[nevents-1U] == CASE_PALETTE);
     assert(gammas == 3 && prepares == 2 && sets == 2 && discards == 1);
+    assert(occurrences(" LUT checksum=") == EXPECTED_GAMMA_APPLIES);
     assert(occurrences("READY") == EXPECTED_GAMMA_READY && image[IMAGE_WIDTH+130U] == 1);
     assert(!gf_display_test(GAMMA_WIRE | NEXT_PHASE));
     assert(!display_session.valid && !host.ctx.diagnostic_saved && discards == 2);
@@ -891,6 +920,7 @@ static void gamma_steps(void)
         assert(events[nevents-1U] == CASE_GAMMA && gammas == nth);
         assert(display_session.valid && !display_session.running && host.ctx.diagnostic_saved);
         assert(occurrences("READY") == nth-1U && !discards);
+        assert(occurrences(" LUT checksum=") == nth-1U);
         assert(!gf_display_test(DISPLAY_RESTORE));
     }
     reset(); revoke_gamma = true;
@@ -956,6 +986,35 @@ static void outputs_steps(void)
 }
 static void outputs_failures(void)
 {
+    /* Every recoverable pair rejection, on either head and at either
+     * allocation or modeset, must skip DPMS/flip and release only after
+     * restoring. Derive counts from the configured route/head arrays. */
+    static const i32 skipped[] = {GF4_ENODEV, GF4_EUNSUPPORTED, GF4_EPLL,
+        GF4_ERANGE, GF4_EBUSY, GF4_ENOSPC};
+    static const enum session_event pair_ops[] = {CASE_PREPARE, CASE_SET};
+    for (u32 e = 0; e < sizeof(skipped) / sizeof(skipped[0]); ++e)
+        for (u32 op = 0; op < sizeof(pair_ops) / sizeof(pair_ops[0]); ++op)
+            for (u32 head = 0; head < GF4_HEADS; ++head) {
+                outputs_reset();
+                for (u32 route = 0; route < host.ctx.nroutes; ++route)
+                    assert(!gf_display_test(OUTPUT_WIRE | (route ? NEXT_PHASE : 0)));
+                fail_event = pair_ops[op]; failure_nth = head + 1U; failure_rc = skipped[e];
+                assert(gf_display_test(OUTPUT_WIRE | NEXT_PHASE) == skipped[e]);
+                assert(occurrences("SKIP") == 1 && occurrences("READY") == host.ctx.nroutes);
+                assert(!display_session.output_pair_ready && display_session.valid &&
+                       display_session.running && host.ctx.diagnostic_saved);
+                u32 held = display_session.prepared_heads, before = nevents;
+                u32 banks = 0, old_discards = discards;
+                for (u32 h = 0; h < GF4_HEADS; ++h) banks += (held >> h) & 1U;
+                assert(held && !powers && !flips);
+                failure_nth = 0;
+                assert(!gf_display_test(OUTPUT_WIRE | NEXT_PHASE));
+                assert(events[before] == SESSION_RESTORE && events[nevents-1U] == SESSION_RELEASE);
+                assert(nevents - before == banks + 2U); /* restore, banks, release */
+                assert(discards == old_discards + banks && !powers && !flips);
+                assert(!display_session.valid && !display_session.prepared_heads &&
+                       !host.ctx.diagnostic_saved && occurrences("READY") == host.ctx.nroutes);
+            }
     /* A second-head failure must retain both staged banks and emit no
      * pair READY. Restore failure retains them for explicit case8 retry. */
     outputs_reset(); assert(!gf_display_test(OUTPUT_WIRE));

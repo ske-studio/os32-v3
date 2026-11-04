@@ -29,7 +29,7 @@ static struct {
     struct gf3_surface scan[2];
     u32 scan_crc[2];
     u32 prepared_heads;
-    bool valid, running, prepared, lifecycle;
+    bool valid, running, prepared, lifecycle, output_pair_ready;
     struct gf3_surface output_scan[GF4_HEADS][2];
     u32 output_crc[GF4_HEADS][2];
     struct display_request output_request[GF4_HEADS];
@@ -130,6 +130,7 @@ static inline i32 display_begin(const struct display_request *q)
     display_session.step = display_session.mode = display_session.crc = 0;
     display_session.prepared = false;
     display_session.prepared_heads = 0;
+    display_session.output_pair_ready = false;
     display_session.valid = true;
     return display_restore(false);
 }
@@ -621,6 +622,19 @@ static i32 display_gamma_step(const struct display_request *q)
         if (!o || !o->ctx || !o->gamma) return GF4_ESTATE;
         rc = o->gamma(o->ctx, q->head, display_ramp);
         if (rc) return rc;
+        /* Sum the successfully applied RGB u16 entries, before DAC packing
+         * (MIT nouveau dispnv04/crtc.c:778-797,816-834). Frame CRC stays
+         * unchanged while gamma changes, so record this separately (§12). */
+        u32 checksum = 0;
+        for (u32 c = 0; c < sizeof(display_ramp) / sizeof(display_ramp[0]); ++c)
+            for (u32 i = 0; i < DISPLAY_LUT_ENTRIES; ++i)
+                checksum += display_ramp[c][i];
+        if (!serial_gate_active()) {
+            serial_puts_polled("GF4 GAMMA"); display_number(" step=", step);
+            display_number(" head=", q->head);
+            display_number(" LUT checksum=", checksum);
+            serial_puts_polled("\r\n");
+        }
     }
     display_record(q, "READY", step, display_session.mode, display_session.crc, 0);
     return 0;
@@ -675,6 +689,9 @@ static i32 display_outputs_step(const struct display_request *q)
     if (!o || !o->ctx) return GF4_ESTATE;
     u32 n = o->ctx->nroutes, step = display_session.step + (q->phase ? 1U : 0U), dl;
     if (step >= n + 3U) return display_restore(true);
+    /* A skipped pair never established the banks used by DPMS/flip.
+     * Its next phase goes straight to final restore/discard/release. */
+    if (step > n && !display_session.output_pair_ready) return display_restore(true);
     display_session.step = step;
     i32 rc = display_deadline(o->ctx, &dl);
     if (rc) return rc;
@@ -701,10 +718,7 @@ static i32 display_outputs_step(const struct display_request *q)
             return rc;
         }
         rc = display_output_pair(pair, n);
-        if (rc) {
-            if (rc == GF4_ENODEV) display_session.step = n + 2U;
-            return rc;
-        }
+        if (rc) return rc;
         for (u8 h = 0; h < GF4_HEADS; ++h) {
             u32 index = 0;
             if (h == 1U) {
@@ -724,6 +738,7 @@ static i32 display_outputs_step(const struct display_request *q)
             if (!head->enabled || head->front.off != display_session.output_scan[h][0].off)
                 return GF4_ESTATE;
         }
+        display_session.output_pair_ready = true;
         for (u8 h = 0; h < GF4_HEADS; ++h)
             display_record(&display_session.output_request[h], "READY", step,
                            o->ctx->state->head[h].mode.id,
